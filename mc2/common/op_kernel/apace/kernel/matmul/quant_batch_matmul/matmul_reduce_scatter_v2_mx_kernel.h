@@ -9,8 +9,8 @@
  */
 
 /*!
- * \file matmul_reduce_scatter_v2_qbmm_mx_kernel.h
- * \brief APACE MXFP8/MXFP4 and native HiFP4 kernel for MatmulReduceScatterV2.
+ * \file matmul_reduce_scatter_v2_mx_kernel.h
+ * \brief MatmulReduceScatterV2 的 APACE MXFP8、MXFP4 和 HiFP4 计算实现。
  */
 
 #pragma once
@@ -31,10 +31,8 @@ namespace Blaze {
 namespace Gemm {
 namespace Kernel {
 
-// The scheduler sees rankDim * sliceM as one logical M. Each scheduler block
-// is explicitly split at a rank boundary and passed to the MX block or the
-// HiFP4 MatmulWithScaleMx block. This keeps all ranks in one scheduler
-// without requiring FragmentTensor or a fragment-MMAD dependency.
+// 将各目标 rank 在当前通信片中的行段按逻辑 M 统一调度。
+// 计算块跨行段边界时分段计算，并映射回本卡输入的实际行号。
 template <class ProblemShape, class BlockMmad, class BlockScheduler>
 class MatmulReduceScatterV2QbmmMxKernel {
 public:
@@ -105,88 +103,21 @@ public:
         SliceParams sliceParams;
     };
 
-    __aicore__ inline void Run(const Params& params)
+    // 通信分片的循环和跨核同步由融合层统一管理。
+    __aicore__ inline void InitGroup(const Params& params)
     {
-        if ASCEND_IS_AIV {
-            return;
-        }
-
-        const auto& sp = params.sliceParams;
-        const uint64_t logicalM = sp.sliceM * sp.rankDim;
-        if (sp.rankDim == 0 || sp.sliceM == 0 || sp.perRankM == 0 || sp.sliceStart + sp.sliceM > sp.perRankM ||
-            static_cast<uint64_t>(AscendC::Te::Get<MNK_M>(params.problemShape)) != logicalM) {
-            return;
-        }
-
         const bool isBias = !IS_HIF4 && params.qbmmParams.isBias == QBMMTiling::BIAS_ENABLED;
-        BlockScheduler scheduler(params.problemShape, params.schedulerParams);
         BlockShape l0TileShape{params.qbmmParams.baseM, params.qbmmParams.baseN, params.qbmmParams.baseK, 0};
         mmOp_.Init(params.problemShape, l0TileShape, params.l1Params, isBias, params.qbmmParams.dbL0C > 1, 1);
+    }
+
+    __aicore__ inline void ProcessSlice(const Params& params)
+    {
+        BlockScheduler scheduler(params.problemShape, params.schedulerParams);
         Process(params, scheduler);
     }
 
-    __aicore__ inline void operator()(const Params& params)
-    {
-        Run(params);
-    }
-
-    // Compute all communication slices through one QBMM-kernel invocation.
-    // The head group shares one BlockMmad initialization; an optional tail
-    // group has its own tiling and therefore initializes at most once more.
-    // CommPolicy::IssueSlice() is called only after every AIC has completed
-    // the current slice, preserving the compute(i) / communication(i-1)
-    // overlap required by MatmulReduceScatterV2.
-    template <typename CommPolicy>
-    __aicore__ inline void RunSlices(const Params& tileParams, uint32_t tileCount, const Params& tailParams,
-                                     uint32_t tailCount, CommPolicy& commPolicy)
-    {
-        if ASCEND_IS_AIV {
-            return;
-        }
-        if (tileCount > 0) {
-            RunSliceGroup(tileParams, tileCount, 0, commPolicy);
-        }
-        if (tailCount > 0) {
-            const uint64_t tailStart = static_cast<uint64_t>(tileCount) * tileParams.sliceParams.sliceM;
-            RunSliceGroup(tailParams, tailCount, tailStart, commPolicy);
-        }
-    }
-
 private:
-    template <typename CommPolicy>
-    __aicore__ inline void RunSliceGroup(const Params& groupParams, uint32_t sliceCount, uint64_t groupStart,
-                                         CommPolicy& commPolicy)
-    {
-        const auto& groupSlice = groupParams.sliceParams;
-        const uint64_t groupM = static_cast<uint64_t>(sliceCount) * groupSlice.sliceM;
-        const uint64_t logicalM = groupSlice.sliceM * groupSlice.rankDim;
-        if (groupSlice.rankDim == 0 || groupSlice.sliceM == 0 || groupSlice.perRankM == 0 ||
-            groupStart + groupM > groupSlice.perRankM ||
-            static_cast<uint64_t>(AscendC::Te::Get<MNK_M>(groupParams.problemShape)) != logicalM) {
-            return;
-        }
-
-        const bool isBias = !IS_HIF4 && groupParams.qbmmParams.isBias == QBMMTiling::BIAS_ENABLED;
-        BlockShape l0TileShape{groupParams.qbmmParams.baseM, groupParams.qbmmParams.baseN, groupParams.qbmmParams.baseK,
-                               0};
-        mmOp_.Init(groupParams.problemShape, l0TileShape, groupParams.l1Params, isBias,
-                   groupParams.qbmmParams.dbL0C > 1, 1);
-
-        Params params = groupParams;
-        const uint64_t n = static_cast<uint64_t>(AscendC::Te::Get<MNK_N>(params.problemShape));
-        GM_ADDR workspaceBase = params.mmParams.cGmAddr;
-        for (uint32_t sliceIdx = 0; sliceIdx < sliceCount; ++sliceIdx) {
-            const uint64_t sliceStart = groupStart + static_cast<uint64_t>(sliceIdx) * groupSlice.sliceM;
-            params.sliceParams.sliceStart = sliceStart;
-            params.mmParams.cGmAddr = workspaceBase + sliceStart * groupSlice.rankDim * n * sizeof(CType);
-
-            BlockScheduler scheduler(params.problemShape, params.schedulerParams);
-            Process(params, scheduler);
-            commPolicy.SyncAicCores();
-            commPolicy.IssueSlice(sliceStart, groupSlice.sliceM);
-        }
-    }
-
     template <typename TensorScaleB>
     __aicore__ inline void SetScaleL2Cache(const ProblemShape& problemShape, uint64_t baseN, uint64_t scaleKL1,
                                            TensorScaleB& gmScaleB)
@@ -288,12 +219,12 @@ private:
             }
 
             scheduler.GetTileCoord(blockIdx, mPos, nPos);
-            // Slice 接收逻辑元素坐标；4-bit 数据的字节偏移由 Tensor API 的指针适配层折半。
+            // Slice 使用逻辑元素坐标，4 位数据的字节偏移由 Tensor API 换算。
             auto blockB = gmB.Slice(AscendC::Te::MakeCoord(0L, nPos), AscendC::Te::MakeShape(k, currentN));
             int64_t scaleBPos = nPos;
             if constexpr (IS_HIF4 && !transB) {
-                // NN scale 已按 [K组, 低/高16位字段, N] 预排。
-                // 每列字段占 2B，Slice 的 hif4_scale 指针单位为 4B，需换算列偏移。
+                // 非转置 x2 的 scale 输入按 [K组, 低/高16位字段, N] 存放。
+                // 每列字段占 2 字节，hif4_scale 指针步长为 4 字节，需换算列偏移。
                 scaleBPos = nPos * sizeof(uint16_t) / sizeof(ScaleType);
             }
             auto blockScaleB =

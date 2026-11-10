@@ -25,16 +25,26 @@
 #define MMRS_APACE_HIF4_DTYPE 0
 #endif
 
-// MatmulReduceScatterV2 also registers HIFLOAT8 binaries, while the APACE MX
-// kernel accepts MXFP8/MXFP4/HiFP4. Keep APACE out of other dtype translation
-// units so collection cannot instantiate MatmulWithScaleMx with __hif8.
-#if ((((ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X1 == DT_FLOAT8_E5M2)) && \
+// MX APACE 仅在 960 编译，且排除 HiFloat8 等不支持的输入类型。
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201) && \
+    ((((ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X1 == DT_FLOAT8_E5M2)) && \
       ((ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X2 == DT_FLOAT8_E5M2))) || \
      ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_FLOAT4_E2M1)) || MMRS_APACE_HIF4_DTYPE)
 #define MMRS_APACE_MX_DTYPE 1
-#include "../../../common/op_kernel/apace/kernel/fusions/matmul_reduce_scatter_v2/matmul_reduce_scatter_v2_mx_quant_hcomm_impl.h"
 #else
 #define MMRS_APACE_MX_DTYPE 0
+#endif
+
+// 非量化 APACE 仅在 960 编译。
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201) && (ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && \
+    ((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16))
+#define MMRS_APACE_FP16_BF16_DTYPE 1
+#else
+#define MMRS_APACE_FP16_BF16_DTYPE 0
+#endif
+
+#if MMRS_APACE_FP16_BF16_DTYPE || MMRS_APACE_MX_DTYPE
+#include "../../../common/op_kernel/apace/kernel/fusions/matmul_reduce_scatter_v2/matmul_reduce_scatter_v2_hcomm_impl.h"
 #endif
 
 #if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && ((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)))
@@ -122,13 +132,21 @@ __global__ __aicore__ void matmul_reduce_scatter_v2(GM_ADDR aGM, GM_ADDR bGM, GM
     // MXFP4/MXFP8 保留旧路径的默认结构，APACE 再显式解析自己的结构。
     REGISTER_TILING_DEFAULT(Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData);
 #endif
-#if MMRS_APACE_MX_DTYPE
+#if MMRS_APACE_FP16_BF16_DTYPE || MMRS_APACE_MX_DTYPE
     if constexpr (TPL_USING_APACE) {
+#if MMRS_APACE_FP16_BF16_DTYPE
+        using ApaceTilingData = Mc2Tiling::MatmulReduceScatterV2TilingData;
+        GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::MatmulReduceScatterV2TilingData, tilingData, tilingGM);
+#else
+        using ApaceTilingData = hcommMatmulReduceScatterV2TilingData;
         GET_TILING_DATA_WITH_STRUCT(hcommMatmulReduceScatterV2TilingData, tilingData, tilingGM);
+#endif
         if ASCEND_IS_AIC {
-            Apace::MatmulReduceScatterV2MxQuantHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, TPL_TRANSB,
-                                                         hcommMatmulReduceScatterV2TilingData,
-                                                         AscendC::HcclServerType::HCCL_SERVER_TYPE_AICPU>
+            constexpr AscendC::HcclServerType hcclServerType = TPL_COMM_MODE == TPL_CCU_COMM_MODE ?
+                                                                   AscendC::HcclServerType::HCCL_SERVER_TYPE_CCU :
+                                                                   AscendC::HcclServerType::HCCL_SERVER_TYPE_AICPU;
+            Apace::MatmulReduceScatterV2HcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, TPL_TRANSB, ApaceTilingData,
+                                                  hcclServerType>
                 op(&tilingData);
             op.Init(aGM, bGM, biasGM, x1ScaleGM, x2ScaleGM, cGM, (GM_ADDR)context, workspaceGM);
             op.Run();
@@ -193,3 +211,4 @@ __global__ __aicore__ void matmul_reduce_scatter_v2(GM_ADDR aGM, GM_ADDR bGM, GM
 
 #undef MMRS_APACE_MX_DTYPE
 #undef MMRS_APACE_HIF4_DTYPE
+#undef MMRS_APACE_FP16_BF16_DTYPE

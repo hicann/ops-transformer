@@ -66,6 +66,8 @@ protected:
     ge::graphStatus DoLibApiTiling() override;
     ge::graphStatus GetWorkspaceSize() override;
     uint64_t GetTilingKey() const override;
+    bool IsApaceSupported(mc2tiling::Mc2QuantMode quantMode = mc2tiling::Mc2QuantMode::DEFAULT,
+                          bool isHiF4 = false) const;
 
     // tiling
     void DoFormulaticTiling(Mc2Tiling::RCSTiling& rcsCfg);
@@ -74,6 +76,7 @@ protected:
     uint32_t ReduceScatterSpliteM(mc2tiling::TilingArgs& args, uint32_t maxTileCnt = 64) const;
     ge::graphStatus DoSplitMTiling(Mc2Tiling::RCSTiling& rcsCfg);
     virtual CutResult GetTilingResult();
+    void AlignCutResForApace(CutResult& cutRes, uint64_t mValue) const;
     uint32_t GetRankSize(const char* group) const;
     void Reset();
     bool ReduceScatterCheckShapeInfo();
@@ -110,6 +113,7 @@ protected:
     int64_t rankSize_{0};
     uint8_t commMode_{0};
     bool isPeerOnly_{false};
+    bool usingApaceImpl_{false};
     uint64_t tileMValue_{0};  // mc2 切块后主块M的大小；
     uint64_t tailMValue_{0};  // mc2 切块后尾块M的大小；
     uint64_t longTileLen_{0}; // mc2 切块后长块的大小；

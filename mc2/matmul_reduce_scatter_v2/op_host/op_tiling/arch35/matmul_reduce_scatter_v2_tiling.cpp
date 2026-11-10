@@ -13,6 +13,7 @@
  * \brief
  */
 #include "matmul_reduce_scatter_v2_tiling.h"
+#include <algorithm>
 #include <queue>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -127,7 +128,8 @@ ge::graphStatus MatmulReduceScatterV2Tiling::SetMc2Hcomm()
     }
     const auto commMode = context_->GetAttrs()->GetAttrPointer<char>(COMMMODE_INDEX);
     const bool enablePeerOnly = std::strcmp(commMode, ACLNN_CCU_PEER_ONLY_MODE) == 0;
-    isPeerOnly_ = enablePeerOnly && !isA2APath_ && commMode_ == TPL_CCU_COMM_MODE &&
+    // APACE 保留本地 rank 的结果拷贝，仅禁用 PeerOnly 优化，不禁用 CCU。
+    isPeerOnly_ = !usingApaceImpl_ && enablePeerOnly && !isA2APath_ && commMode_ == TPL_CCU_COMM_MODE &&
                   args_.rankDim == PEER_ONLY_RANK_SIZE && mc2tiling::Mc2TilingUtils::GetDebugMode() == 0;
     if (isPeerOnly_) {
         mc2CcTilingConfig.SetAlgConfig(PEER_ONLY_ALGORITHM);
@@ -164,6 +166,59 @@ ge::graphStatus MatmulReduceScatterV2Tiling::DoMatmulV3Tiling(Mc2MatmulHelper::M
     OP_TILING_CHECK(
         Mc2MMTilingRegistry::GetInstance().DoTilingImpl(context_, tilingCfg, registerCfg) != ge::GRAPH_SUCCESS,
         OP_LOGE(opName_, "do tiling failed"), return ge::GRAPH_FAILED);
+    if (!usingApaceImpl_) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const auto& cube = tilingData.tCubeTiling;
+    if (static_cast<uint64_t>(cube.M) != mmV3Args_.mValue || cube.M <= 0 || cube.N <= 0 || cube.Ka <= 0 ||
+        cube.Kb != cube.Ka || static_cast<uint64_t>(cube.N) != args_.orgNValue ||
+        static_cast<uint64_t>(cube.Ka) != args_.orgKValue || cube.baseM <= 0 || cube.baseN <= 0 || cube.baseK <= 0 ||
+        cube.stepKa <= 0 || cube.stepKb <= 0 || cube.usedCoreNum <= 0 ||
+        static_cast<uint64_t>(cube.usedCoreNum) > args_.aicCoreNum || cube.baseM % BASIC_BLOCK_SIZE_16 != 0 ||
+        cube.baseN % BASIC_BLOCK_SIZE_16 != 0 || cube.baseK % BASIC_BLOCK_SIZE_16 != 0 || tilingData.mTailCnt == 0 ||
+        tilingData.nTailCnt == 0) {
+        OP_LOGE(opName_, "Matmul tiling does not fit APACE Basic scheduling");
+        return ge::GRAPH_FAILED;
+    }
+    const uint64_t baseM = cube.baseM;
+    const uint64_t baseN = cube.baseN;
+    const uint64_t baseK = cube.baseK;
+    const auto validTail = [](uint64_t length, uint64_t base, uint64_t splitCount, uint64_t tailMain) {
+        const uint64_t blocks = (length + base - 1) / base;
+        if (splitCount == 0 || splitCount > blocks) {
+            return false;
+        }
+        const uint64_t tail = length - (blocks - splitCount) * base;
+        return splitCount == 1 || (tailMain > 0 && tailMain <= base && tailMain * (splitCount - 1) < tail &&
+                                   tail - tailMain * (splitCount - 1) <= base);
+    };
+    if (!validTail(cube.M, baseM, tilingData.mBaseTailSplitCnt, tilingData.mTailMain) ||
+        !validTail(cube.N, baseN, tilingData.nBaseTailSplitCnt, tilingData.nTailMain)) {
+        OP_LOGE(opName_, "Matmul tiling does not fit APACE Basic scheduling");
+        return ge::GRAPH_FAILED;
+    }
+    // Basic 按实际启动核数分配尾轮，原来的尾块细分必须仍落在同一轮内。
+    const uint64_t blocks =
+        ((static_cast<uint64_t>(cube.M) + baseM - 1) / baseM) * ((static_cast<uint64_t>(cube.N) + baseN - 1) / baseN);
+    const uint64_t tailBlocks = blocks % args_.aicCoreNum;
+    const uint64_t tailSplit = static_cast<uint64_t>(tilingData.mTailCnt) * tilingData.nTailCnt;
+    if (tailSplit > 1 && (tailBlocks == 0 || tailSplit > args_.aicCoreNum / tailBlocks)) {
+        OP_LOGE(opName_, "Matmul tiling does not fit APACE Basic scheduling");
+        return ge::GRAPH_FAILED;
+    }
+
+    // 与 Basic BlockMmad 的两份 L1、L0A/L0B 和 BiasTable 分配保持一致。
+    const uint64_t kL1 = baseK * static_cast<uint64_t>(std::min(cube.stepKa, cube.stepKb));
+    const uint64_t l1SlotBytes = compileInfo_.l1Size / DB_SIZE;
+    const uint64_t biasBytes = args_.isBias ? baseN * ge::GetSizeByDataType(args_.geBiasType) : 0;
+    const uint64_t l1RowBytes = (baseM + baseN) * args_.inputDtypeSize;
+    const uint64_t l0cStages = cube.dbL0C > DB_OFF_SIZE ? DB_SIZE : DB_OFF_SIZE;
+    OP_TILING_CHECK(l1RowBytes == 0 || biasBytes > l1SlotBytes || kL1 > (l1SlotBytes - biasBytes) / l1RowBytes ||
+                        baseM * baseK * args_.inputDtypeSize > compileInfo_.l0ASize / DB_SIZE ||
+                        baseN * baseK * args_.inputDtypeSize > compileInfo_.l0BSize / DB_SIZE ||
+                        baseM * baseN * sizeof(float) > compileInfo_.l0CSize / l0cStages ||
+                        (args_.isBias && baseN * sizeof(float) > compileInfo_.btSize / DB_SIZE),
+                    OP_LOGE(opName_, "Matmul tiling exceeds APACE Basic buffer capacity"), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -187,14 +242,17 @@ ge::graphStatus MatmulReduceScatterV2Tiling::DoAllMatmulTiling()
     // 获取tileTiling
     mmV3Args_.mValue = tileMValue_ * args_.rankDim;
     OP_LOGD(opName_, "Do Mc2MatMulV3 tile tiling!");
+    // APACE 调度完整逻辑 M，跨 rank 的块由 Kernel 分段；不再套用单 rank 的尾轮修正。
     Mc2MatmulHelper::Mc2MatmulTilingCfg tileTilingCfg(static_cast<const void*>(&compileInfo_),
-                                                      static_cast<const void*>(&mmV3Args_), tileMValue_);
+                                                      static_cast<const void*>(&mmV3Args_),
+                                                      usingApaceImpl_ ? 0UL : tileMValue_);
     MC2_CHECK_LOG_RET(opName_, DoMatmulV3Tiling(tileTilingCfg, registerCfg, MutableMC2MmV3TileTilingData()));
     if (tailMValue_ != 0UL) {
         mmV3Args_.mValue = tailMValue_ * args_.rankDim;
         OP_LOGD(opName_, "Do Mc2MatMulV3 tail tiling!");
         Mc2MatmulHelper::Mc2MatmulTilingCfg tailTilingCfg(static_cast<const void*>(&compileInfo_),
-                                                          static_cast<const void*>(&mmV3Args_), tailMValue_);
+                                                          static_cast<const void*>(&mmV3Args_),
+                                                          usingApaceImpl_ ? 0UL : tailMValue_);
         MC2_CHECK_LOG_RET(opName_, DoMatmulV3Tiling(tailTilingCfg, registerCfg, MutableMC2MmV3TailTilingData()));
     }
     return ge::GRAPH_SUCCESS;
@@ -202,18 +260,41 @@ ge::graphStatus MatmulReduceScatterV2Tiling::DoAllMatmulTiling()
 
 ge::graphStatus MatmulReduceScatterV2Tiling::DoOpTiling()
 {
+    usingApaceImpl_ = IsApaceSupported();
+    if (usingApaceImpl_) {
+        isA2APath_ = false;
+    }
     MC2_CHECK_LOG_RET(opName_, CheckHCCLSize());
     MC2_CHECK_LOG_RET(opName_, CheckInput());
     OP_TILING_CHECK(SetMc2Hcomm() != ge::GRAPH_SUCCESS, OP_LOGE(opName_, "Tiling SetHcommCfg failed."),
                     return ge::GRAPH_FAILED);
     SetRcsTilingData(matmulReduceScatterV2TilingData_->param);
-    DoSplitMTiling(matmulReduceScatterV2TilingData_->param);
+    MC2_CHECK_LOG_RET(opName_, DoSplitMTiling(matmulReduceScatterV2TilingData_->param));
     MC2_CHECK_LOG_RET(opName_,
                       AdjustHCCLLimit(matmulReduceScatterV2TilingData_->param, mc2tiling::Mc2QuantMode::DEFAULT));
     MC2_CHECK_LOG_RET(opName_, DoAllMatmulTiling());
     SetTilingResult(matmulReduceScatterV2TilingData_->param, MutableMC2MmV3TileTilingData().tCubeTiling,
                     MutableMC2MmV3TailTilingData().tCubeTiling, matmulReduceScatterV2TilingData_->debugMode,
                     matmulReduceScatterV2TilingData_->dataType);
+    if (usingApaceImpl_) {
+        const auto& cfg = matmulReduceScatterV2TilingData_->param;
+        const uint64_t tailM = cfg.tailCnt > 0 ? tailMValue_ : 0;
+        OP_TILING_CHECK(cfg.rankDim == 0 || cfg.tileCnt == 0 || cfg.rankM % cfg.rankDim != 0,
+                        OP_LOGE(opName_, "invalid APACE nonquant split"), return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(static_cast<uint64_t>(cfg.tileCnt) + cfg.tailCnt > REDUCE_SCATTER_V2_HCCL_NUM_LIMIT,
+                        OP_LOGE(opName_, "APACE communication count %u + %u exceeds %lu", cfg.tileCnt, cfg.tailCnt,
+                                REDUCE_SCATTER_V2_HCCL_NUM_LIMIT),
+                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            tileMValue_ == 0 || tileMValue_ * cfg.tileCnt + tailM * cfg.tailCnt != cfg.rankM / cfg.rankDim ||
+                (cfg.tailCnt > 0 && (tailM == 0 || cfg.tailM != tailM)),
+            OP_LOGE(opName_, "APACE nonquant slices do not cover all output rows"), return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(std::max(tileMValue_, tailM) * args_.orgNValue * args_.outputDtypeSize >
+                            mc2tiling::ALL_GATHER_HCCL_MEM_LIMIT,
+                        OP_LOGE(opName_, "APACE communication slice exceeds 256 MiB"), return ge::GRAPH_FAILED);
+    }
+    OP_LOGI(opName_, "FP16/BF16 APACE selected: %d, commMode=%u, tileCnt=%u, tailCnt=%u", usingApaceImpl_, commMode_,
+            matmulReduceScatterV2TilingData_->param.tileCnt, matmulReduceScatterV2TilingData_->param.tailCnt);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -241,11 +322,11 @@ ge::graphStatus MatmulReduceScatterV2Tiling::PostTiling()
 
 CutResult MatmulReduceScatterV2Tiling::GetTilingResult()
 {
-    if (mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
+    if (!usingApaceImpl_ && mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
         MMReduceScatterFitBalanceTiling scatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
                                                       TopoType::STANDARD_CARD, (commMode_ == TPL_AICPU_COMM_MODE));
         return scatterTiling.GetTiling();
-    } else if (mc2tiling::Is8P(args_.rankDim, npuArch_)) {
+    } else if (!usingApaceImpl_ && mc2tiling::Is8P(args_.rankDim, npuArch_)) {
         MMReduceScatterFitBalanceTiling scatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
                                                       TopoType::EIGHT_P, (commMode_ == TPL_AICPU_COMM_MODE));
         return scatterTiling.GetTiling();
@@ -253,7 +334,11 @@ CutResult MatmulReduceScatterV2Tiling::GetTilingResult()
         MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, npuArch_, false,
                                           (commMode_ == TPL_AICPU_COMM_MODE));
         scatterTiling.GetTiling();
-        return scatterTiling.tilingM_.cutRes;
+        CutResult cutRes = scatterTiling.tilingM_.cutRes;
+        if (usingApaceImpl_) {
+            AlignCutResForApace(cutRes, args_.mValue);
+        }
+        return cutRes;
     }
 }
 

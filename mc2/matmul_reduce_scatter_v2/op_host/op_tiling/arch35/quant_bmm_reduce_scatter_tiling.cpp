@@ -43,7 +43,6 @@ constexpr uint32_t DTYPE_ENUM_BF16 = 27;
 constexpr uint64_t PERBLOCK_SIZE = 128;
 constexpr uint64_t HIF4_GROUP_SIZE = 64;
 constexpr uint64_t HIF4_SCALE_LAST_DIM = 1;
-constexpr uint64_t APACE_IMPL_MAX_RANK_DIM = 64;
 constexpr double APACE_RS_FP4_COMPUTE_PER_CYCLE_RATIO = 1.0;
 constexpr uint64_t APACE_RS_PER_RANK_BASE_M = 256;
 constexpr uint64_t MXFP8_SIZE = 32;
@@ -590,7 +589,8 @@ ge::graphStatus QuantBmmReduceScatterTiling::SetMc2Hcomm()
     }
     const auto commMode = context_->GetAttrs()->GetAttrPointer<char>(COMMMODE_INDEX);
     const bool enablePeerOnly = std::strcmp(commMode, ACLNN_CCU_PEER_ONLY_MODE) == 0;
-    isPeerOnly_ = enablePeerOnly && !isA2APath_ && commMode_ == TPL_CCU_COMM_MODE &&
+    // APACE 不使用 PeerOnly 优化，先剔除
+    isPeerOnly_ = enablePeerOnly && !usingApaceImpl_ && !isA2APath_ && commMode_ == TPL_CCU_COMM_MODE &&
                   args_.rankDim == PEER_ONLY_RANK_SIZE && quantMode_ != mc2tiling::Mc2QuantMode::PERBLOCK_MODE &&
                   mc2tiling::Mc2TilingUtils::GetDebugMode() == 0;
     if (isPeerOnly_) {
@@ -675,13 +675,7 @@ bool QuantBmmReduceScatterTiling::CheckPerblockM()
 ge::graphStatus QuantBmmReduceScatterTiling::DoOpTiling()
 {
     MC2_CHECK_LOG_RET(opName_, CheckInput());
-    // HiFP4 复用 MX APACE；MXFP4/MXFP8 保持原有平台选择。
-    const bool isMxFp8 = (args_.geAType == ge::DT_FLOAT8_E4M3FN || args_.geAType == ge::DT_FLOAT8_E5M2) &&
-                         (args_.geBType == ge::DT_FLOAT8_E4M3FN || args_.geBType == ge::DT_FLOAT8_E5M2);
-    usingApaceImpl_ = (isHiF4_ || ((isMxfp4_ || isMxFp8) && npuArch_ == Ops::Base::DAV_9201)) &&
-                      commMode_ == TPL_AICPU_COMM_MODE && quantMode_ == mc2tiling::Mc2QuantMode::MXFP_MODE &&
-                      !args_.isATrans && args_.rankDim <= APACE_IMPL_MAX_RANK_DIM &&
-                      mc2tiling::Mc2TilingUtils::GetDebugMode() == 0;
+    usingApaceImpl_ = IsApaceSupported(quantMode_, isHiF4_);
     OP_TILING_CHECK(isHiF4_ && !usingApaceImpl_, OP_LOGE(opName_, "HiFP4 requires APACE, ai_cpu and debugMode=0"),
                     return ge::GRAPH_FAILED);
     // APACE 最终写入较小的独立结构，过渡字段保存在本地，不能提前占用 legacy Tiling 缓冲。
@@ -693,8 +687,8 @@ ge::graphStatus QuantBmmReduceScatterTiling::DoOpTiling()
         OP_TILING_CHECK(quantBmmMatmulReducescatterTilingData_ == nullptr,
                         OP_LOGE(opName_, "failed to get legacy quant BMM tiling data from context"),
                         return ge::GRAPH_FAILED);
-        MC2_CHECK_LOG_RET(opName_, CheckHCCLSize());
     }
+    MC2_CHECK_LOG_RET(opName_, CheckHCCLSize());
     OP_TILING_CHECK(SetMc2Hcomm() != ge::GRAPH_SUCCESS, OP_LOGE(opName_, "Tiling SetHcommCfg failed."),
                     return ge::GRAPH_FAILED);
     SetRcsTilingData(MutableRCSTilingDataA5());
@@ -1039,6 +1033,10 @@ ge::graphStatus QuantBmmReduceScatterTiling::DoApaceMxTiling()
                     OP_LOGE(opName_, "invalid APACE MX split: rankM=%u, rankDim=%u, tileCnt=%u", cfg.rankM, cfg.rankDim,
                             cfg.tileCnt),
                     return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(static_cast<uint64_t>(cfg.tileCnt) + cfg.tailCnt > REDUCE_SCATTER_V2_HCCL_NUM_LIMIT,
+                    OP_LOGE(opName_, "APACE communication count %u + %u exceeds %lu", cfg.tileCnt, cfg.tailCnt,
+                            REDUCE_SCATTER_V2_HCCL_NUM_LIMIT),
+                    return ge::GRAPH_FAILED);
 
     const uint64_t perRankM = static_cast<uint64_t>(cfg.rankM) / cfg.rankDim;
     // APACE consumes the exact formulaic split. Do not derive tileM again by
@@ -1294,7 +1292,8 @@ QuantBmmReduceScatterHelper::QuantBmmReduceScatterHelper(QuantBmmReduceScatterTi
 CutResult QuantBmmReduceScatterTiling::GetTilingResult()
 {
     if (usingApaceImpl_) {
-        MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, npuArch_, false, true);
+        MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, npuArch_, false,
+                                          (commMode_ == TPL_AICPU_COMM_MODE));
         ConfigureApaceFormulaModel(scatterTiling, isMxfp4_ || isHiF4_);
         scatterTiling.GetTiling();
         CutResult cutRes = scatterTiling.tilingM_.cutRes;
@@ -1318,43 +1317,6 @@ CutResult QuantBmmReduceScatterTiling::GetTilingResult()
     }
 }
 
-void QuantBmmReduceScatterTiling::AlignCutResForApace(CutResult& cutRes, uint64_t mValue) const
-{
-    // The QBMM scheduler sees rankDim fragments concatenated in logical M, but
-    // its standard BlockMmad must not be fed tiny sub-M fragments every time a
-    // scheduler block crosses a rank boundary. Align the per-rank slice to 256
-    // (the same granularity used by the AllToAll APACE path), so normal head
-    // blocks stay inside one rank fragment. Only a possible tail remains small.
-    constexpr uint64_t APACE_PER_RANK_M_ALIGN = 256;
-    if (cutRes.longTileLen == 0 || mValue == 0) {
-        OP_LOGD(opName_, "AlignCutResForApace skip: longTileLen=%lu, mValue=%lu", cutRes.longTileLen, mValue);
-        return;
-    }
-    const uint64_t rankDim = std::max(static_cast<uint64_t>(args_.rankDim), uint64_t{1});
-    const uint64_t perRankAlign = APACE_PER_RANK_M_ALIGN;
-    const bool shortTileAtBack = cutRes.shortTileAtBack;
-    const uint64_t longTile = mc2tiling::AlignUp(cutRes.longTileLen, perRankAlign);
-    if (longTile >= mValue) {
-        cutRes.longTileLen = mValue;
-        cutRes.numLongTile = 1;
-        cutRes.shortTileLen = 0;
-        cutRes.numShortTile = 0;
-    } else {
-        cutRes.longTileLen = longTile;
-        cutRes.numLongTile = mValue / longTile;
-        cutRes.shortTileLen = mValue % longTile;
-        cutRes.numShortTile = cutRes.shortTileLen > 0 ? 1 : 0;
-    }
-    // MMRS has independent QBMM tilings for both groups, so it can preserve
-    // the formula model's compute/communication-balanced head/tail order.
-    cutRes.shortTileAtBack = shortTileAtBack;
-    cutRes.totalTileCnt = cutRes.numLongTile + cutRes.numShortTile;
-    OP_LOGD(opName_,
-            "APACE logical-M aligned cut: m=%lu, rankDim=%lu, perRankAlign=%lu, "
-            "long=%lu x %lu, short=%lu x %lu, shortAtBack=%d",
-            mValue, rankDim, perRankAlign, cutRes.longTileLen, cutRes.numLongTile, cutRes.shortTileLen,
-            cutRes.numShortTile, cutRes.shortTileAtBack);
-}
 // 注册Tiling类
 REGISTER_TILING_TEMPLATE_WITH_ARCH(MatmulReduceScatterV2, QuantBmmReduceScatterTiling,
                                    std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_3510),

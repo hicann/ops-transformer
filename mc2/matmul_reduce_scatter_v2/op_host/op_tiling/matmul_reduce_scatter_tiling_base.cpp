@@ -12,6 +12,7 @@
  * \file matmul_reduce_scatter_tiling_base.cpp
  * \brief
  */
+#include <algorithm>
 #include <queue>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -49,6 +50,7 @@ constexpr uint32_t IS_TRANS_A = 2;
 constexpr uint32_t IS_TRANS_B = 3;
 constexpr uint32_t COMM_TURN = 4;
 constexpr int64_t AICPU_STRLEN = 6;
+constexpr uint64_t APACE_IMPL_MAX_RANK_DIM = 64;
 const std::set<int> SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64};
 const std::set<std::string> SUPPORT_COMM_MODE_A5{"ai_cpu", "ccu", "ccu_peer_only"};
 
@@ -76,6 +78,40 @@ CutResult MatmulReduceScatterTilingBase::GetTilingResult()
     MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, npuArch_, false, false);
     scatterTiling.GetTiling();
     return scatterTiling.tilingM_.cutRes;
+}
+
+void MatmulReduceScatterTilingBase::AlignCutResForApace(CutResult& cutRes, uint64_t mValue) const
+{
+    // 将每个 rank 的通信片长按 256 行对齐，减少计算块跨 rank 行段时的拆分。
+    // 这是性能调整，尾片和不足 256 行的整片仍保留实际长度。
+    constexpr uint64_t APACE_PER_RANK_M_ALIGN = 256;
+    if (cutRes.longTileLen == 0 || mValue == 0) {
+        OP_LOGD(opName_, "AlignCutResForApace skip: longTileLen=%lu, mValue=%lu", cutRes.longTileLen, mValue);
+        return;
+    }
+    const uint64_t rankDim = std::max(static_cast<uint64_t>(args_.rankDim), uint64_t{1});
+    const uint64_t perRankAlign = APACE_PER_RANK_M_ALIGN;
+    const bool shortTileAtBack = cutRes.shortTileAtBack;
+    const uint64_t longTile = mc2tiling::AlignUp(cutRes.longTileLen, perRankAlign);
+    if (longTile >= mValue) {
+        cutRes.longTileLen = mValue;
+        cutRes.numLongTile = 1;
+        cutRes.shortTileLen = 0;
+        cutRes.numShortTile = 0;
+    } else {
+        cutRes.longTileLen = longTile;
+        cutRes.numLongTile = mValue / longTile;
+        cutRes.shortTileLen = mValue % longTile;
+        cutRes.numShortTile = cutRes.shortTileLen > 0 ? 1 : 0;
+    }
+    // 保留公式模型选择的长短片顺序，后续分别生成计算 Tiling。
+    cutRes.shortTileAtBack = shortTileAtBack;
+    cutRes.totalTileCnt = cutRes.numLongTile + cutRes.numShortTile;
+    OP_LOGD(opName_,
+            "APACE logical-M aligned cut: m=%lu, rankDim=%lu, perRankAlign=%lu, "
+            "long=%lu x %lu, short=%lu x %lu, shortAtBack=%d",
+            mValue, rankDim, perRankAlign, cutRes.longTileLen, cutRes.numLongTile, cutRes.shortTileLen,
+            cutRes.numShortTile, cutRes.shortTileAtBack);
 }
 
 void MatmulReduceScatterTilingBase::DoFormulaticTiling(Mc2Tiling::RCSTiling& rcsCfg)
@@ -259,10 +295,34 @@ uint64_t MatmulReduceScatterTilingBase::GetTilingKey() const
     uint8_t commAlg =
         isPeerOnly_ ? TPL_CCU_REDUCESUM_PEER_ONLY : (isA2APath_ ? TPL_CCU_ALL2ALL_VEC_REDUCE : TPL_CCU_REDUCESUM);
     uint64_t tilingKey = GET_TPL_TILING_KEY(false, args_.isATrans, args_.isBTrans, inputIsBf16Fp16, OUTPUT_TYPE_IS_FP8,
-                                            TPL_X1_X2_DTYPE_IS_OTHER, commAlg, commMode_, false);
+                                            TPL_X1_X2_DTYPE_IS_OTHER, commAlg, commMode_, usingApaceImpl_);
     OP_LOGD(opName_, "args_.isATrans, args_.isBTrans, inputIsBf16Fp16 is: [%d, %d, %d]", args_.isATrans, args_.isBTrans,
             inputIsBf16Fp16);
     return tilingKey;
+}
+
+bool MatmulReduceScatterTilingBase::IsApaceSupported(mc2tiling::Mc2QuantMode quantMode, bool isHiF4) const
+{
+    // APACE 仅开放 960 的 AICPU 通路，950 沿用原模板。
+    const bool isSupportedArch = npuArch_ == Ops::Base::DAV_9201 && commMode_ == TPL_AICPU_COMM_MODE;
+    if (!isSupportedArch || args_.isATrans || args_.rankDim > APACE_IMPL_MAX_RANK_DIM ||
+        mc2tiling::Mc2TilingUtils::GetDebugMode() != 0) {
+        return false;
+    }
+    if (quantMode == mc2tiling::Mc2QuantMode::DEFAULT) {
+        return (args_.geAType == ge::DT_FLOAT16 || args_.geAType == ge::DT_BF16) && args_.geAType == args_.geBType &&
+               args_.geAType == args_.geCType && (!args_.isBias || args_.geBiasType == args_.geCType);
+    }
+    if (quantMode != mc2tiling::Mc2QuantMode::MXFP_MODE) {
+        return false;
+    }
+    if (isHiF4) {
+        return npuArch_ == Ops::Base::DAV_9201;
+    }
+    const bool isMxfp4 = args_.geAType == ge::DT_FLOAT4_E2M1 && args_.geBType == ge::DT_FLOAT4_E2M1;
+    const bool isMxfp8 = (args_.geAType == ge::DT_FLOAT8_E4M3FN || args_.geAType == ge::DT_FLOAT8_E5M2) &&
+                         (args_.geBType == ge::DT_FLOAT8_E4M3FN || args_.geBType == ge::DT_FLOAT8_E5M2);
+    return isMxfp4 || isMxfp8;
 }
 
 ge::graphStatus MatmulReduceScatterTilingBase::DoLibApiTiling()
@@ -459,6 +519,7 @@ void MatmulReduceScatterTilingBase::Reset()
     longTileLen_ = 0UL; // mc2 切块后长块的大小；
     mmResultLen_ = 0UL; // mc2 matmul计算后结果的大小
     isPeerOnly_ = false;
+    usingApaceImpl_ = false;
 }
 
 void MatmulReduceScatterTilingBase::SetReduceScatterTilingArgsDataType()

@@ -84,7 +84,6 @@ protected:
     ge::graphStatus BuildQuantWorkspaceLayout();
 #endif
     ge::graphStatus DoApaceMxTiling();
-    void AlignCutResForApace(CutResult& cutRes, uint64_t mValue) const;
     bool HiF4SceneParamCheck(const gert::StorageShape* x1ScaleShape, const gert::StorageShape* x2ScaleShape) const;
     ge::graphStatus DoAdaptSlidWindowTiling();
     ge::graphStatus SetMc2Hcomm();
@@ -105,7 +104,6 @@ private:
     Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData* quantBmmMatmulReducescatterTilingData_;
     uint64_t myWorkSpaceSize_{0U};
     mc2tiling::Mc2QuantMode quantMode_{mc2tiling::Mc2QuantMode::DEFAULT};
-    bool usingApaceImpl_{false};
     bool isHiF4_{false};
     hcommMatmulReduceScatterV2TilingData apaceTilingData_{};
     bool isMxfp4_{false}; // MXFP4场景标志位
