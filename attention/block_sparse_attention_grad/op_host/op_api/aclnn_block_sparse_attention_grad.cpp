@@ -55,7 +55,8 @@ struct BSAGParams {
 
 static aclnnStatus CheckMandatoryTensors(const aclTensor* dout, const aclTensor* query, const aclTensor* key,
                                          const aclTensor* value, const aclTensor* attentionOut,
-                                         const aclTensor* softmaxLse, const aclTensor* blockSparseMaskOptional)
+                                         const aclTensor* softmaxLse, const aclTensor* blockSparseMaskOptional,
+                                         const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut)
 {
     CHECK_RET(dout != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -64,6 +65,9 @@ static aclnnStatus CheckMandatoryTensors(const aclTensor* dout, const aclTensor*
     CHECK_RET(attentionOut != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(softmaxLse != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(blockSparseMaskOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(dqOut != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(dkOut != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(dvOut != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     return ACLNN_SUCCESS;
 }
 
@@ -110,10 +114,10 @@ static aclnnStatus ValidateParams(const BSAGParams& params)
                "qInputLayout or kvInputLayout is nullptr.");
     std::string qLayout(params.qInputLayout);
     std::string kvLayout(params.kvInputLayout);
-    CHECK_RET(
-        CheckMandatoryTensors(params.attentionOutGrad, params.query, params.key, params.value, params.attentionOut,
-                              params.softmaxLse, params.blockSparseMaskOptional) == ACLNN_SUCCESS,
-        ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(CheckMandatoryTensors(params.attentionOutGrad, params.query, params.key, params.value,
+                                    params.attentionOut, params.softmaxLse, params.blockSparseMaskOptional,
+                                    params.dqOut, params.dkOut, params.dvOut) == ACLNN_SUCCESS,
+              ACLNN_ERR_PARAM_NULLPTR);
     CHECK_COND(qLayout == kvLayout, ACLNN_ERR_PARAM_INVALID, "qInputLayout and kvInputLayout must be the same.");
     CHECK_COND(qLayout == "BNSD" || qLayout == "TND" || qLayout == "BSND", ACLNN_ERR_PARAM_INVALID,
                "qInputLayout and kvInputLayout must be BNSD, TND, or BSND.");

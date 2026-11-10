@@ -168,15 +168,11 @@ public:
         dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dkWrk + dkvOffset);
         dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dvWrk + dkvOffset);
 
-        if constexpr (INPUT_LAYOUT == TND) {
-            dqGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dq + dqOffset);
-            dkGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dk + dkvOffset);
-            dvGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dv + dkvOffset);
-        } else if constexpr (INPUT_LAYOUT == BNSD) {
-            dqGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dq);
-            dkGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dk);
-            dvGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dv);
-        }
+        // TND / BNSD 共用：Post 按展平行号等分 workspace，本核负责的一段在输出上同样连续，
+        // 基址统一叠加本核起点偏移（dqOffset / dkvOffset），出口不再区分 layout。
+        dqGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dq + dqOffset);
+        dkGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dk + dkvOffset);
+        dvGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dv + dkvOffset);
 
         ubBasePreBufferSize = ubBaseSize / BUFFER_NUM / BASE_BLOCK_BYTE * BASE_BLOCK_BYTE; // double buffer
         for (uint64_t i = 0; i < BUFFER_NUM; i++) {
@@ -388,17 +384,14 @@ public:
             set_flag(PIPE_V, PIPE_MTE3, event_id);
             wait_flag(PIPE_V, PIPE_MTE3, event_id);
 
-            if constexpr (INPUT_LAYOUT == TND) {
-                GlobalTensor<OutputDtype_> outGm = dqGm;
-                if (qkvFlag == DK) {
-                    outGm = dkGm;
-                } else if (qkvFlag == DV) {
-                    outGm = dvGm;
-                }
-                DataCopy(outGm[gmOffset], dstLocal, sCount * d);
-            } else {
-                CopyOutPost(sCount, output[ping], qkvFlag);
+            // TND / BNSD 共用同一出口：基址已含本核起点偏移，这里只加段内行偏移 gmOffset
+            GlobalTensor<OutputDtype_> outGm = dqGm;
+            if (qkvFlag == DK) {
+                outGm = dkGm;
+            } else if (qkvFlag == DV) {
+                outGm = dvGm;
             }
+            DataCopy(outGm[gmOffset], dstLocal, sCount * d);
 
             set_flag(PIPE_MTE3, PIPE_MTE2, event_id);
 
