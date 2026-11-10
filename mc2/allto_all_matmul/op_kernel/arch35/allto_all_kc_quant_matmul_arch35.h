@@ -199,7 +199,7 @@ __aicore__ inline void AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerConte
     pipeLineContext_.computationContext->baseData.cOffset =
         (uint64_t)mc2Tiling_.tailM * mc2Tiling_.rankN * (uint64_t)sizeof(DTYPE_Y);
     pipeLineContext_.computationContext->additionalData.x1Scale =
-        x1ScaleGM_ + mc2Tiling_.tileCnt * mc2Tiling_.tileM * sizeof(float);
+        x1ScaleGM_ + (uint64_t)mc2Tiling_.tileCnt * mc2Tiling_.tileM * sizeof(float);
     pipeLineContext_.computationContext->additionalData.x1ScaleOffset = (uint64_t)mc2Tiling_.tailM * sizeof(float);
     pipeLineContext_.computationContext->additionalData.x2Scale = x2Scale_;
     pipeLineContext_.computationContext->additionalData.x2Offset = x2Offset_;

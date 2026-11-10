@@ -591,7 +591,7 @@ static void CalculateNd2nzLen(Mc2Tiling::RCSTiling &config, mc2tiling::TilingArg
     } else {
         auto alignM = config.rankM + 16;
         auto alignK = config.rankK + 16;
-        nd2nzLen = mc2tiling::AlignUp(alignM * alignK * args.inputDtypeSize, alignAddrLen);
+        nd2nzLen = mc2tiling::AlignUp(static_cast<uint64_t>(alignM) * alignK * args.inputDtypeSize, alignAddrLen);
     }
 }
 

@@ -116,7 +116,7 @@ private:
             DataCopy(bias, biasGlobal[offsetRankN], calCount);
             SyncAll();
             // offset M*N
-            for (uint32_t i = 0; i < param_->rankM; ++i) {
+            for (uint64_t i = 0; i < param_->rankM; ++i) {
                 uint64_t offsetRankM = i * param_->rankN + offsetRankN;
                 DataCopy(cGlobalBias[offsetRankM], bias, calCount);
                 SyncAll();
@@ -126,7 +126,7 @@ private:
         if (biasTailSize > 0) {
             DataCopy(bias, biasGlobal[biasUbAlignSize], ubAlignCntSize);
             SyncAll();
-            for (uint32_t i = 0; i < param_->rankM; ++i) {
+            for (uint64_t i = 0; i < param_->rankM; ++i) {
                 uint64_t offsetDst = i * param_->rankN + biasUbAlignSize;
                 DataCopyPad(cGlobalBias[offsetDst], bias,
                             {1, static_cast<uint16_t>(biasTailSize * sizeof(YType)), 0, 0});

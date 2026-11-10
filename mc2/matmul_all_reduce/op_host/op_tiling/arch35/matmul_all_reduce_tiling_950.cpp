@@ -179,8 +179,8 @@ ge::graphStatus MatmulAllReduceTilingA5::GetWorkspaceSizeForA2ARSAG()
 {
     uint64_t commWorkSpace = 0UL;
     uint64_t cgmPadLen = 0UL;
-    uint64_t tempTileSize = MutableTCubeTileTilingData().M * MutableTCubeTileTilingData().N;
-    uint64_t tempTailSize = MutableTCubeTailTilingData().M * MutableTCubeTailTilingData().N;
+    uint64_t tempTileSize = static_cast<uint64_t>(MutableTCubeTileTilingData().M) * MutableTCubeTileTilingData().N;
+    uint64_t tempTailSize = static_cast<uint64_t>(MutableTCubeTailTilingData().M) * MutableTCubeTailTilingData().N;
 
     cgmPadLen = (MutableRCSTilingData().tileCnt + MutableRCSTilingData().tailCnt) * FIVE_ONE_TWO;
     commWorkSpace =
