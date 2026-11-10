@@ -25,6 +25,7 @@ constexpr uint32_t BLOCK = 32;                            // 32B
 constexpr uint32_t B32 = 4;                               // 4B
 constexpr uint32_t B16 = 2;
 constexpr uint32_t SINGLE_N_512 = 512;
+constexpr uint32_t D_SIZE = 512;
 constexpr uint32_t SINGLE_N_256 = 256;
 constexpr uint32_t SINGLE_N_128 = 128;
 constexpr int64_t GM_ALIGN = 512;
@@ -514,6 +515,22 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
     uint32_t dimSize = queryShape.GetDimNum();
     int64_t dimDq = queryShape.GetDim(dimSize - 1);
     int64_t dimOriKv = oriKvShape.GetDim(dimSize - 1);
+    if (dimDq != D_SIZE) {
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            Ops::Base::GetOpInfo(context_).c_str(), "query", std::to_string(dimDq).c_str(),
+            (std::string() + "The headDim of query should be equal to 512, but got dimDq=" + std::to_string(dimDq) +
+             ".")
+                .c_str());
+        return ge::GRAPH_FAILED;
+    }
+    if (dimOriKv != D_SIZE) {
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            Ops::Base::GetOpInfo(context_).c_str(), "ori_kv", std::to_string(dimOriKv).c_str(),
+            (std::string() +
+             "The headDim of ori_kv should be equal to 512, but got dimOriKv=" + std::to_string(dimOriKv) + ".")
+                .c_str());
+        return ge::GRAPH_FAILED;
+    }
 
     // ori_kv + ori_sparse_indices + ori_topk_length，cmp_kv 为空：MODE 3。
     // 未命中时仍要求这三个可选输入为空，SWA/CFA/SCFA 的后续判定不改。
@@ -663,6 +680,14 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
         const gert::Shape& cmpKvShape =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CMP_KV))->GetStorageShape();
         int64_t dimCmpKv = cmpKvShape.GetDim(dimSize - 1);
+        if (dimCmpKv != D_SIZE) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                Ops::Base::GetOpInfo(context_).c_str(), "cmp_kv", std::to_string(dimCmpKv).c_str(),
+                (std::string() +
+                 "The headDim of cmp_kv should be equal to 512, but got dimCmpKv=" + std::to_string(dimCmpKv) + ".")
+                    .c_str());
+            return ge::GRAPH_FAILED;
+        }
         if (dimDq != dimCmpKv) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                 Ops::Base::GetOpInfo(context_).c_str(), "query, cmp_kv",
