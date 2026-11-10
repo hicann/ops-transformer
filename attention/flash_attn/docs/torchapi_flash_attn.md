@@ -153,8 +153,8 @@ cann_ops_transformer.flash_attn(
 | seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)|
 | seqused_kv | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)|
 | batch_size | int | 可选 | batch大小。若未传入，则从cu_seqlens_q或seqused_q推导。默认值为None | int32 | - | - |
-| max_seqlen_q | int | 可选 | 指定查询q序列的长度上限 | int32 | - | - |
-| max_seqlen_kv | int | 可选 | 指定键k和值v序列的长度上限 | int32 | - | - |
+| max_seqlen_q | int | 可选 | 指定查询q序列的长度上限，追求最优性能时需传入 | int32 | - | - |
+| max_seqlen_kv | int | 可选 | 指定键k和值v序列的长度上限，追求最优性能时需传入 | int32 | - | - |
 | mask_mode | int | 可选 | 掩码模式 | int32 | - | - |
 | win_left | int | 可选 | window左界限 | int32 | - | - |
 | win_right | int | 可选 | window右界限 | int32 | - | - |
@@ -188,8 +188,8 @@ cann_ops_transformer.flash_attn(
 | attn_mask | Tensor | 可选 | 掩码矩阵 | int8 | ND | (2048, 2048)|
 | win_left | int | 可选 | window左界限 | int32 | - | - |
 | win_right | int | 可选 | window右界限 | int32 | - | - |
-| max_seqlen_q | int | 可选 | 指定查询q序列的长度上限 | int32 | - | - |
-| max_seqlen_kv | int | 可选 | 指定键k和值v序列的长度上限 | int32 | - | - |
+| max_seqlen_q | int | 可选 | 指定查询q序列的长度上限，追求最优性能时需传入 | int32 | - | - |
+| max_seqlen_kv | int | 可选 | 指定键k和值v序列的长度上限，追求最优性能时需传入 | int32 | - | - |
 | layout_q | string | 可选 | 定义输入q张量的布局格式 | string | - | - |
 | layout_kv | string | 可选 | 定义输入k和v张量的布局格式 | string | - | - |
 | layout_out | string | 可选 | 定义输出张量的布局格式 | string | - | - |
@@ -219,6 +219,7 @@ cann_ops_transformer.flash_attn(
 
 - 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、block_table及attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - flash_attn_metadata和flash_attn的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+- **最佳性能约束**：为保证性能最优，调用 `flash_attn_metadata` 和 `flash_attn` 时均需同时传入 `max_seqlen_q` 和 `max_seqlen_kv`，未同时传入这两个参数时，无法保证性能最优。
 
 ### 特性参数组
 

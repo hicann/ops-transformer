@@ -155,8 +155,8 @@ cann_ops_transformer.flash_attn(
 | seqused_q | Tensor | Optional | Specifies the actual sequence length used in each batch, to truncate redundant computation | int32 | ND | (B,)
 | seqused_kv | Tensor | Optional | Specifies the actual sequence length used in each batch, to truncate redundant computation | int32 | ND | (B,)
 | batch_size | int | Optional | Batch size. If not passed in, it is derived from cu_seqlens_q or seqused_q. Default value is None | int32 | - | - |
-| max_seqlen_q | int | Optional | Specifies the upper limit of the query q sequence length | int32 | - | - |
-| max_seqlen_kv | int | Optional | Specifies the upper limit of the key k and value v sequence lengths | int32 | - | - |
+| max_seqlen_q | int | Optional | Specifies the upper limit of the query q sequence length, and should be passed when seeking optimal performance | int32 | - | - |
+| max_seqlen_kv | int | Optional | Specifies the upper limit of the key k and value v sequence lengths, and should be passed when seeking optimal performance | int32 | - | - |
 | mask_mode | int | Optional | Mask mode | int32 | - | - |
 | win_left | int | Optional | Left boundary of window | int32 | - | - |
 | win_right | int | Optional | Right boundary of window | int32 | - | - |
@@ -190,8 +190,8 @@ cann_ops_transformer.flash_attn(
 | attn_mask | Tensor | Optional | Mask matrix. | int8 | ND | (2048, 2048)
 | win_left | int | Optional | Left boundary of the window. | int32 | - | - |
 | win_right | int | Optional | Right boundary of the window. | int32 | - | - |
-| max_seqlen_q | int | Optional | Specifies the upper limit of the q sequence length. | int32 | - | - |
-| max_seqlen_kv | int | Optional | Specifies the upper limit of the k and v sequence lengths. | int32 | - | - |
+| max_seqlen_q | int | Optional | Specifies the upper limit of the q sequence length, and should be passed when seeking optimal performance. | int32 | - | - |
+| max_seqlen_kv | int | Optional | Specifies the upper limit of the k and v sequence lengths, and should be passed when seeking optimal performance. | int32 | - | - |
 | layout_q | string | Optional | Defines input q tensor layout format. | string | - | - |
 | layout_kv | string | Optional | Defines input k and v tensor layout format. | string | - | - |
 | layout_out | string | Optional | Defines output tensor layout format. | string | - | - |
@@ -221,6 +221,7 @@ cann_ops_transformer.flash_attn(
 
 - The parameters cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, block_table, and attn_mask are tensors. Since the operator cannot obtain the actual values of the tensors during the Tiling phase, the tiling side does not validate the values, and you must ensure their correctness. If invalid values are passed in for these parameters, undefined behavior occurs, such as precision issues or program crashes caused by invalid memory access.
 - The input parameters of flash_attn_metadata and flash_attn must be consistent when the APIs are called. Since the operator is called in two phases through two APIs, the operator cannot validate the consistency itself, and you must ensure correctness. If inconsistent parameters are passed in, undefined behavior occurs, such as precision issues or program crashes caused by invalid memory access.
+- **Optimal performance constraint**: For optimal performance, pass both `max_seqlen_q` and `max_seqlen_kv` to both `flash_attn_metadata` and `flash_attn`, as optimal performance cannot be guaranteed if either parameter is omitted.
 
 ### Feature Parameter Group
 
