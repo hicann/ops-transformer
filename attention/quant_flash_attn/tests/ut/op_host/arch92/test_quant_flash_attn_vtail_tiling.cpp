@@ -431,5 +431,19 @@ TEST(QuantFlashAttnArch92VTailTiling, DISABLED_InvalidTailDtypeShapeAndStridesAr
     ::TilingInfo result;
     EXPECT_FALSE(ExecuteTiling(lastAxisView.Context(), result));
 }
+
+TEST(QuantFlashAttnArch92VTailTiling, D192IsRejectedOnArch92)
+{
+    // MxFP8 的 D=192 仅 arch35 支持，arch92 需在 tiling 阶段拦截（QK head dim）。
+    VTailCase params(false, false);
+    params.inputs[0] = Tensor("34 4 192", ge::DT_FLOAT8_E4M3FN);    // q D=192
+    params.inputs[1] = Tensor("8 2 128 192", ge::DT_FLOAT8_E4M3FN); // k D=192
+    params.inputs[2] = Tensor("8 2 128 128", ge::DT_FLOAT8_E4M3FN); // v D_v=128
+    params.inputs[3] = Tensor("34 4 3 2", ge::DT_FLOAT8_E8M0);      // q_descale 192/64=3
+    params.inputs[4] = Tensor("8 2 128 3 2", ge::DT_FLOAT8_E8M0);   // k_descale 192/64=3
+    params.inputs[5] = Tensor("8 2 2 128 2", ge::DT_FLOAT8_E8M0);   // v_descale D_v=128
+    ::TilingInfo result;
+    EXPECT_FALSE(ExecuteTiling(params.Context(), result));
+}
 } // namespace
 } // namespace QuantFlashAttnUT

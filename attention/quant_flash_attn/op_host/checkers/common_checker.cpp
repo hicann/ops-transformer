@@ -320,13 +320,18 @@ ge::graphStatus CommonChecker::CheckAxis(const QfaTilingInfo& qfaInfo)
                                               "The value of axis KV_S must be greater than or equal to 0"),
         return ge::GRAPH_FAILED);
 
-    const std::vector<int64_t> supportedQKHeadDims = {64, 72, 128, 192, 256};
+    std::vector<int64_t> supportedQKHeadDims = {64, 72, 128, 256};
+    std::string supportedQKDimsStr = "64/72/128/256";
+    if (qfaInfo.npuArch == NpuArch::DAV_3510) {
+        supportedQKHeadDims = {64, 72, 128, 192, 256};
+        supportedQKDimsStr = "64/72/128/192/256";
+    }
     const std::vector<int64_t> supportedVHeadDims = {64, 72, 128, 256};
-    OP_CHECK_IF(CheckValueSupport(qfaInfo.qkHeadDim, supportedQKHeadDims) != ge::GRAPH_SUCCESS,
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
-                    qfaInfo.opName, "axis D of query and key", std::to_string(qfaInfo.qkHeadDim).c_str(),
-                    "The value of axis D of query and key can only be 64/72/128/192/256"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckValueSupport(qfaInfo.qkHeadDim, supportedQKHeadDims) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(qfaInfo.opName, "axis D of query and key",
+                                               std::to_string(qfaInfo.qkHeadDim).c_str(), supportedQKDimsStr.c_str()),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckValueSupport(qfaInfo.vHeadDim, supportedVHeadDims) != ge::GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "axis D of value",
                                                       std::to_string(qfaInfo.vHeadDim).c_str(),

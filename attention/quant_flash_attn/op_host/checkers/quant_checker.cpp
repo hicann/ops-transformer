@@ -1319,8 +1319,13 @@ ge::graphStatus QuantChecker::CheckVTailFeature(const QfaTilingInfo& qfaInfo) co
                     "v_tail is only supported in PA scenario (paged KV cache layout)"),
                 return ge::GRAPH_FAILED);
     // BF16 PA_NZ requires a head dimension divisible by 16.
-    auto vtailDimOk = [&qfaInfo](int64_t d) {
-        if (d != 64 && d != 72 && d != 128 && d != 192 && d != 256) {
+    const std::vector<int64_t> supportedVTailDims = (qfaInfo.npuArch == NpuArch::DAV_3510) ?
+                                                        std::vector<int64_t>{64, 72, 128, 192, 256} :
+                                                        std::vector<int64_t>{64, 72, 128, 256};
+    const std::string supportedVTailDimsStr =
+        (qfaInfo.npuArch == NpuArch::DAV_3510) ? "{64, 72, 128, 192, 256}" : "{64, 72, 128, 256}";
+    auto vtailDimOk = [&qfaInfo, &supportedVTailDims](int64_t d) {
+        if (std::find(supportedVTailDims.begin(), supportedVTailDims.end(), d) == supportedVTailDims.end()) {
             return false;
         }
         return (qfaInfo.kvLayout != QfaLayout::PA_NZ) || (d % 16 == 0);
@@ -1329,8 +1334,9 @@ ge::graphStatus QuantChecker::CheckVTailFeature(const QfaTilingInfo& qfaInfo) co
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     qfaInfo.opName, "v_tail",
                     (std::to_string(qfaInfo.qkHeadDim) + "/" + std::to_string(qfaInfo.vHeadDim)).c_str(),
-                    "v_tail is only supported with qk/v head dim in {64, 72, 128, 192, 256}, and requires dim %16 == 0 "
-                    "under PA_NZ layout (bf16 NZ fractal of inner dim 16)"),
+                    ("v_tail is only supported with qk/v head dim in " + supportedVTailDimsStr +
+                     ", and requires dim %16 == 0 under PA_NZ layout (bf16 NZ fractal of inner dim 16)")
+                        .c_str()),
                 return ge::GRAPH_FAILED);
     if (CheckVTailExistence(qfaInfo) != ge::GRAPH_SUCCESS || CheckVTailShape(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;

@@ -213,7 +213,7 @@ cann_ops_transformer.quant_flash_attn(
 | batch_size        | int           | 可选    | batch大小。若未传入，则从cu_seqlens_q或seqused_q推导。默认值为None                               | int32  | -    | -      | -         |
 | max_seqlen_q     | int           | 可选    | 指定查询q序列的长度上限                                                                      | int32  | -    | -      | -         |
 | max_seqlen_kv    | int           | 可选    | 指定键k和值v序列的长度上限                                                                    | int32  | -    | -      | -         |
-| head_dim_v       | int           | 可选    | v的每个注意力头维度，默认值为None（等价于head_dim）。当前仅支持传None、与head_dim相等的值，或当head_dim=192时传128（即D=192、D_v=128的非对称组合）；其余值会拦截截                    | int32  | -    | -      | -         |
+| head_dim_v       | int           | 可选    | v的每个注意力头维度，默认值为None（等价于head_dim）。当前仅支持传None、与head_dim相等的值，或当head_dim=192时传128（即D=192、D_v=128的非对称组合）；其余值会拦截                    | int32  | -    | -      | -         |
 | mask_mode         | int/MaskMode  | 可选    | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前版本仅支持0/3                              | int32  | -    | -      | -         |
 | win_left          | int           | 可选    | window左界限                                                                         | int32  | -    | -      | -         |
 | win_right         | int           | 可选    | window右界限                                                                         | int32  | -    | -      | -         |
