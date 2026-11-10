@@ -23,11 +23,21 @@
 
 ## 功能说明
 
-- **接口功能**：计算`SparseFlashMla`训练场景下注意力的反向输出，支持Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention。
+- **接口功能**：计算`SparseFlashMla`训练场景下注意力的反向输出，支持Sliding Window Attention、Compressed Attention、Sparse Compressed Attention，以及 Atlas A2/A3 上对 `ori_kv` 的 Topk 稀疏。
 
 - **计算公式**：
 
-    阶段一：根据不同cmp_ratio场景，对输入ori_kv与cmp_kv进行选择
+    阶段一：根据不同场景选择 selectedKv
+
+    * ori sparse（`oriMaskMode=0`，`oriSparseIndices` 非空，`cmpKv` 为空）：
+
+    $$
+    selectedKv = Gather(oriKv,\ oriSparseIndices[i]),\quad 0 \le i < actualK
+    $$
+
+    $$
+    actualK = \min(oriTopkLength,\ K,\ usedS2)
+    $$
 
     * 当cmp_ratio = 1 (SWA)：
 
@@ -228,7 +238,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>输入</td>
             <td>经过Compressor压缩后的K(V)。</td>
             <td>
-            支持空tensor，此时按计算公式中的SWA场景计算。
+            支持空tensor。为空且 oriSparseIndicesOptional 为空时按 SWA 计算；为空且 oriSparseIndicesOptional 非空、oriMaskMode=0 时按 ori sparse 计算。ori sparse 不能与非空 cmpKvOptional 同时使用。
             </td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
@@ -242,7 +252,10 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>输入</td>
             <td>稀疏场景下选择的oriKvOptional中权重较高的注意力索引。</td>
             <td>
-            目前暂不支持对ori_kv进行稀疏计算，故设置此参数无效。
+            <ul>
+                <li><term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：oriMaskMode=0 时支持对 oriKvOptional 做 Topk 稀疏计算。此时必须传入 oriTopkLengthOptional，且 cmpKvOptional、cmpSparseIndicesOptional、cmpTopkLengthOptional、cmpResidualKvOptional 为空，dOriKvOutOptional 与 oriKvOptional 同 shape。</li>
+                <li>SWA、CFA、SCFA场景不使用该参数，需传空。</li>
+            </ul>
             </td>
             <td>INT32</td>
             <td>ND</td>
@@ -374,7 +387,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>输入</td>
             <td>表示每行query对应的oriKvOptional实际可选的topk长度。</td>
             <td>
-            oriMaskMode=0且oriSparseIndicesOptional不为空时需要传，且必须为准确值。
+            oriMaskMode=0且oriSparseIndicesOptional不为空时必须传入，且必须为准确值。非 ori sparse 路径必须为空。
             </td>
             <td>INT32</td>
             <td>ND</td>
@@ -480,7 +493,8 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>表示query和oriKvOptional计算中query对过去token计算的数量。</td>
             <td>
             <ul>
-                <li>仅支持取值：127</li>
+                <li>SWA、CFA、SCFA 仅支持取值 127。</li>
+                <li>ori sparse（oriMaskMode=0）不使用滑窗，不校验该值。</li>
             </ul>
             </td>
             <td>INT64</td>
@@ -494,7 +508,8 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>表示query和oriKvOptional计算中query对未来token计算的数量。</td>
             <td>
             <ul>
-                <li>仅支持取值：0</li>
+                <li>SWA、CFA、SCFA 仅支持取值 0。</li>
+                <li>ori sparse（oriMaskMode=0）不使用滑窗，不校验该值。</li>
             </ul>
             </td>
             <td>INT64</td>
@@ -583,7 +598,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>输出</td>
             <td>表示query与oriKvOptional计算得出的softmax L1Norm结果，公式为reduceG(softmax)/G。</td>
             <td>
-            若存在oriSparseIndicesOptional，则该输出不为空；其他场景下该参数输出为空。
+            若存在oriSparseIndicesOptional且不是 Atlas A2/A3 的 ori sparse 路径，则该输出不为空；其他场景下该参数输出为空。Atlas A2/A3 ori sparse 不产出该输出，需传空。
             </td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -608,7 +623,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
     </table>
 
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持oriTopkLengthOptional、cmpTopkLengthOptional、metadataOptional字段。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持cmpTopkLengthOptional、metadataOptional字段。
 
     <!-- end id7 -->
 
@@ -700,7 +715,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
 - 确定性计算：
 
     <!-- npu="A3,910b" id8 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：aclnnSparseFlashMlaGrad默认非确定性实现，不支持通过aclrtSetSysParamOpt开启确定性。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：aclnnSparseFlashMlaGrad默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 
     <!-- end id8 -->
     <!-- npu="950" id9 -->
@@ -804,7 +819,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
   - 参数oriMaskMode的支持情况:
 
     <!-- npu="A3,910b" id12 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：oriMaskMode支持4。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：SWA、CFA、SCFA 的 oriMaskMode 支持 4；ori sparse 的 oriMaskMode 支持 0。
     <!-- end id12 -->
     <!-- npu="950" id13 -->
     - <term>Ascend 950PR&950DT系列产品</term>：oriMaskMode支持0、3、4。

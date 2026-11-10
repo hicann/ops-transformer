@@ -25,12 +25,22 @@
 
 - **接口功能**：
 
-  - `sparse_flash_mla_grad`：计算`SparseFlashMla`训练场景下注意力的反向输出，支持Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention。
+  - `sparse_flash_mla_grad`：计算`SparseFlashMla`训练场景下注意力的反向输出，支持Sliding Window Attention、Compressed Attention、Sparse Compressed Attention，以及 Atlas A2/A3 上对 `ori_kv` 的 Topk 稀疏。
   - `sparse_flash_mla_grad_metadata`：接口用于生成一个任务列表，包含每个AI Core的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引，供后续`sparse_flash_mla_grad`算子使用。
 
 - **计算公式**：
 
-    阶段一：根据不同cmp_ratio场景，对输入ori_kv与cmp_kv进行选择
+    阶段一：根据不同场景选择 selectedKv
+
+  - ori sparse（`ori_mask_mode=0`，`ori_sparse_indices` 非空，`cmp_kv` 为空）：
+
+    $$
+    selectedKv = Gather(oriKv,\ ori\_sparse\_indices[i]),\quad 0 \le i < actualK
+    $$
+
+    $$
+    actualK = \min(ori\_topk\_length,\ K,\ usedS2)
+    $$
 
   - 当cmp_ratio = 1 (SWA)：
 
@@ -159,7 +169,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 - **ori_kv**（`Tensor`）：可选参数，对应公式中的$oriKv$。`layout_kv`="BSND" 时shape为 `[B, S2, N2, D]`；`layout_kv`="TND" 时shape为 `[T2, N2, D]`。B：与q的B保持一致；S2：支持泛化；N2：1；D：512；T2：B × S2。支持非连续，数据格式支持ND，数据类型支持`bfloat16`和`float16`。
 
-- **cmp_kv**（`Tensor`）：可选参数，对应公式中的$cmpkv$。`layout_kv`="BSND" 时shape为 `[B, S3, N2, D]`；`layout_kv`="TND" 时shape为 `[T3, N2, D]`。B：与q的B保持一致；S3：支持泛化；N2：1；D：512；T3：B × S3。传None时按SWA场景计算。支持非连续，数据格式支持ND，数据类型支持`bfloat16`和`float16`。
+- **cmp_kv**（`Tensor`）：可选参数，对应公式中的$cmpkv$。`layout_kv`="BSND" 时shape为 `[B, S3, N2, D]`；`layout_kv`="TND" 时shape为 `[T3, N2, D]`。B：与q的B保持一致；S3：支持泛化；N2：1；D：512；T3：B × S3。传 None 且 `ori_sparse_indices` 为 None 时按 SWA 计算；传 None 且 `ori_sparse_indices` 非空、`ori_mask_mode=0` 时按 ori sparse 计算。ori sparse 不能与非空 `cmp_kv` 同时使用。支持非连续，数据格式支持ND，数据类型支持`bfloat16`和`float16`。
 
 - **ori_sparse_indices**（`Tensor`）：可选参数，对应oriKv部分的topk索引。`layout_q`="BSND" 时shape为 `[B, S1, N2, K1]`；`layout_q`="TND" 时shape为 `[T1, N2, K1]`。B：与q的B保持一致；S1：与q的S1 保持一致；N2：1；K1：支持泛化；T1：B × S1。支持非连续，数据格式支持ND，数据类型支持`int32`。
 
@@ -179,7 +189,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 - **cmp_residual_kv**（`Tensor`）：可选参数，表示每个batch S2 // cmpRatio后的余数。shape为 `[B]`。当cmp_kv不为空且cmp_mask_mode=3 时必须传入。支持非连续，数据格式支持ND，数据类型支持`int32`。
 
-- **ori_topk_length**（`Tensor`）：可选参数，表示每行query对应的ori_kv实际可选的topk长度。shape为 `[B, S1, N2]`（BSND）或 `[T1, N2]`（TND）。当ori_mask_mode=0 且ori_sparse_indices不为None时必须传入且必须为准确值。支持非连续，数据格式支持ND，数据类型支持`int32`。
+- **ori_topk_length**（`Tensor`）：可选参数，表示每行query对应的ori_kv实际可选的topk长度。shape为 `[B, S1, N2]`（BSND）或 `[T1, N2]`（TND）。当ori_mask_mode=0 且ori_sparse_indices不为None时必须传入且必须为准确值。非 ori sparse 路径必须为 None。支持非连续，数据格式支持ND，数据类型支持`int32`。
 
 - **cmp_topk_length**（`Tensor`）：可选参数，表示每行query对应的cmp_kv实际可选的topk长度。shape为 `[B, S1, N2]`（BSND）或 `[T1, N2]`（TND）。当cmp_mask_mode=0 且cmp_sparse_indices不为None时必须传入且必须为准确值。支持非连续，数据格式支持ND，数据类型支持`int32`。
 
@@ -195,16 +205,16 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 - **cmp_mask_mode**（`int`）：可选参数，q和cmp_kv计算的mask模式。模式0 为不做mask操作；模式3 为rightDownCausal。数据类型支持`int`。
 
-- **ori_win_left**（`int`）：可选参数，q和ori_kv计算中q对过去token计算的数量。当前仅支持取值127。数据类型支持`int`。
+- **ori_win_left**（`int`）：可选参数，q和ori_kv计算中q对过去token计算的数量。SWA、CFA、SCFA 仅支持取值127。ori sparse（`ori_mask_mode=0`）不使用滑窗，不校验该值。数据类型支持`int`。
 
-- **ori_win_right**（`int`）：可选参数，q和ori_kv计算中q对未来token计算的数量。当前仅支持取值0。数据类型支持`int`。
+- **ori_win_right**（`int`）：可选参数，q和ori_kv计算中q对未来token计算的数量。SWA、CFA、SCFA 仅支持取值0。ori sparse（`ori_mask_mode=0`）不使用滑窗，不校验该值。数据类型支持`int`。
 
 - **layout_q**（`str`）：可选参数，q的数据排布格式。支持 "BSND"、"TND"。数据类型支持`str`。
 
 - **layout_kv**（`str`）：可选参数，ori_kv、cmp_kv的数据排布格式。支持 "BSND"、"TND"，当前必须与layout_q保持一致。数据类型支持`str`。
 
 <!-- npu="A3,910b" id5 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持seqused_q、seqused_ori_kv、seqused_cmp_kv、ori_topk_length、cmp_topk_lengt、metadata参数。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持seqused_q、seqused_ori_kv、seqused_cmp_kv、cmp_topk_length、metadata参数。
 <!-- end id5 -->
 
 ### sparse_flash_mla_grad_metadata
@@ -240,7 +250,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 | has_cmp_kv | bool | 可选 | 表示是否传入cmp_kv，默认值为true。 | bool | - |
 
 <!-- npu="A3,910b" id6 -->
-- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：不支持seqused_q、seqused_ori_kv、seqused_cmp_kv、ori_topk_length、cmp_topk_length，ori_mask_mode仅支持4，cmp_mask_mode仅支持3，ori_win_left仅支持127，ori_win_right仅支持0。
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：暂不支持seqused_q、seqused_ori_kv、seqused_cmp_kv、cmp_topk_length。SWA、CFA、SCFA 的 ori_mask_mode 仅支持 4，ori_win_left 仅支持 127，ori_win_right 仅支持 0；ori sparse 的 ori_mask_mode 仅支持 0，不校验滑窗。cmp_mask_mode 仅支持 3。
 <!-- end id6 -->
 
 ## 返回值说明
@@ -255,7 +265,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 - **dsinks**（`Tensor`）：可选输出，表示输入sinks的梯度，支持非连续，数据格式支持ND，数据类型支持`float32`，shape与输入sinks保持一致。
 
-- **ori_softmax_l1norm**（`Tensor`）：可选输出，表示q与ori_kv计算得出的softmax的L1Norm结果，公式为reduceG(softmax)/G；数据类型为`float32`。`layout_q`为BSND时shape为`[B,S1,N2,K1]`，当`layout_q`为TND时shape为`[T1,N2,K1]`。当ori_sparse_indices不为None时该输出不为空，其他场景下输出为None。
+- **ori_softmax_l1norm**（`Tensor`）：可选输出，表示q与ori_kv计算得出的softmax的L1Norm结果，公式为reduceG(softmax)/G；数据类型为`float32`。`layout_q`为BSND时shape为`[B,S1,N2,K1]`，当`layout_q`为TND时shape为`[T1,N2,K1]`。当ori_sparse_indices不为None且不是 Atlas A2/A3 的 ori sparse 路径时该输出不为空。Atlas A2/A3 ori sparse 不产出该输出，需传 None。其他场景下输出为None。
 
 - **cmp_softmax_l1norm**（`Tensor`）：可选输出，表示q与cmp_kv计算得出的softmax的L1Norm结果，公式为reduceG(softmax)/G；当cmp_sparse_indices不为None时该输出不为空，其他场景下输出为None。
 
@@ -298,14 +308,14 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
   - `ori_kv`/`cmp_kv`传None的支持情况:
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：ori_kv 不能为 None。cmp_kv 在 SWA 与 ori sparse 时必须为 None，在 CFA、SCFA 时不能为 None。
     <!-- end id7 -->
     <!-- npu="950" id10 -->
     - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id10 -->
   - `ori_sparse_indices`的支持情况:
     <!-- npu="A3,910b" id11 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：ori_mask_mode=0 时支持。SWA、CFA、SCFA场景不使用该参数，需传 None。
     <!-- end id11 -->
     <!-- npu="950" id12 -->
     - <term>Ascend 950PR&950DT系列产品</term>：支持。
@@ -340,7 +350,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
     <!-- end id20 -->
   - `ori_mask_mode`的支持情况:
     <!-- npu="A3,910b" id21 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：仅支持模式4。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：SWA、CFA、SCFA 仅支持模式 4；ori sparse 仅支持模式 0。
     <!-- end id21 -->
     <!-- npu="950" id22 -->
     - <term>Ascend 950PR&950DT系列产品</term>：支持模式0、3、4。
