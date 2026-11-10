@@ -75,7 +75,7 @@ __attribute__((always_inline)) __aicore__ __inline__ void moe_distribute_combine
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
     // A3 式直接传值：mc2Context 为 HcclCombinOpParam 布局上下文设备地址
     GM_ADDR contextGM0 = mc2Context;
-    MoeDistributeCombineV2A5Mte<ExpandXType, XType, int32_t, QuantMode, false> op;
+    MoeDistributeCombineV2A5Mte<ExpandXType, XType, int32_t, QuantMode, false, false> op;
     // residualX/gamma/yOut/rstdOut在apt.cpp中固定为nullptr
     op.Init(contextGM0, expandX, expertIds, assistInfoForCombine, epSendCount, nullptr, nullptr, scales, xActiveMask,
             sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV, performanceInfo,

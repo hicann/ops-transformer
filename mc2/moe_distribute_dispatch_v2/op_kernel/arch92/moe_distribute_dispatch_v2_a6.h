@@ -271,6 +271,7 @@ private:
     uint32_t axisMaxBS_{0};
     uint32_t axisH_{0};
     uint32_t axisK_{0};
+    uint64_t rswBufferSize_{0};
     uint32_t aivNum_{0};
     uint32_t sharedUsedAivNum_{0};
     uint32_t moeUsedAivNum_{0};
@@ -399,6 +400,7 @@ __aicore__ inline void MoeDistributeDispatchV2A6<DISPATCH_V2_A6_TEMPLATE_ARGS>::
         tilingData->moeDistributeDispatchV2Info.scalesCol * tilingData->moeDistributeDispatchV2Info.scalesTypeSize;
     scalesCount_ = tilingData->moeDistributeDispatchV2Info.scalesCount;
     axisMaxBS_ = globalBS_ / epWorldSizeOriginal_;
+    rswBufferSize_ = tilingData->moeDistributeDispatchV2Info.rswBufferSize;
     maxSize_ = tilingData->moeDistributeDispatchV2Info.maxSizeForUbBuffer;
     totalUbSize_ = tilingData->moeDistributeDispatchV2Info.totalUbSize;
 }
@@ -515,8 +517,10 @@ __aicore__ inline void MoeDistributeDispatchV2A6<DISPATCH_V2_A6_TEMPLATE_ARGS>::
     dataState_ = InitWinState(selfDataStatusGMTensor_, epRankIdHccl, epWorldSizeHccl, epRankIdOriginal_, moeExpertNum_,
                               epWorldSizeOriginal_, globalBS_, dataStateBuf);
     uint64_t hSizeAlignCombine = Ceil(axisH_ * COMBINE_IN_DATA_SIZE, SPLIT_BLOCK_DATA_SIZE) * SPLIT_BLOCK_SIZE;
+
+    uint64_t combineSlotBytes = (rswBufferSize_ != 0UL) ? rswBufferSize_ : hSizeAlignCombine;
     winDataSizeOffset_ =
-        dataState_ * (totalWinSize_ / BUFFER_NUM) + axisMaxBS_ * (axisK_ + sharedExpertNum_) * hSizeAlignCombine;
+        dataState_ * (totalWinSize_ / BUFFER_NUM) + axisMaxBS_ * (axisK_ + sharedExpertNum_) * combineSlotBytes;
 }
 
 template <DISPATCH_V2_A6_TEMPLATE_PARAMS>

@@ -2485,6 +2485,45 @@ ge::graphStatus CheckInputParam(gert::TilingContext* context, const char* nodeNa
     return ge::GRAPH_SUCCESS;
 }
 
+// rsw_buffer挡位决策: 与combine侧同为A5 MTE、非跨超、window足够时启用; 否则保持0(旧协议)
+// 必须与combine侧决策完全一致, 否则dispatch区起始偏移会与combine实际接收区错位
+static void SetRswBufferSize(gert::TilingContext* context, MoeDistributeDispatchV2TilingData& tilingData,
+                             uint32_t localMoeExpertNum, bool isLayered)
+{
+    tilingData.moeDistributeDispatchV2Info.rswBufferSize = 0UL;
+    NpuArch npuArch = mc2tiling::GetNpuArch(context);
+    if (npuArch != Ops::Base::DAV_9201 && npuArch != Ops::Base::DAV_9202) {
+        return;
+    }
+    if (isLayered) {
+        return;
+    }
+    const uint64_t h = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.h);
+    const uint64_t axisBS = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.bs);
+    const uint64_t epWorldSize = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.epWorldSize);
+    const uint64_t flagRcvCount = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.k) +
+                                  static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.sharedExpertNum);
+    if ((epWorldSize == 0UL) || (flagRcvCount == 0UL)) {
+        return;
+    }
+    const uint64_t rswTier = GetRswBufferSize(h);
+    if (rswTier == 0UL) {
+        return;
+    }
+    uint64_t maxBs = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.globalBs) / epWorldSize;
+    maxBs = maxBs > axisBS ? maxBs : axisBS;
+    const uint64_t tokenActualLen =
+        ((h * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN + SCALE_EXPAND_IDX_BUFFER;
+    const uint64_t tokenNeedSizeDispatch = ((tokenActualLen + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN) * WIN_ADDR_ALIGN;
+    const uint64_t dispatchNeed =
+        maxBs * tokenNeedSizeDispatch * epWorldSize * static_cast<uint64_t>(localMoeExpertNum);
+    const uint64_t rswCombineNeed = maxBs * flagRcvCount * rswTier;
+    if ((dispatchNeed + rswCombineNeed) * DOUBLE_DATA_BUFFER > tilingData.moeDistributeDispatchV2Info.totalWinSizeEp) {
+        return;
+    }
+    tilingData.moeDistributeDispatchV2Info.rswBufferSize = rswTier;
+}
+
 ge::graphStatus CheckSizeAndSetRelevantCfg(gert::TilingContext* context, MoeDistributeDispatchV2TilingData* tilingData,
                                            const char* nodeName, const uint32_t localMoeExpertNum,
                                            const std::string groupEp, const bool isLayered, const bool isSetFullMeshV2,
@@ -2504,6 +2543,8 @@ ge::graphStatus CheckSizeAndSetRelevantCfg(gert::TilingContext* context, MoeDist
                                                          localMoeExpertNum, isLayered, config) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Tiling check window size failed."), return ge::GRAPH_FAILED);
 
+    // rsw_buffer挡位决策(须在totalWinSizeEp确定后), 与combine侧一致, 决定dispatch区起始偏移
+    SetRswBufferSize(context, *tilingData, localMoeExpertNum, isLayered);
     OP_TILING_CHECK(SetWorkSpace(context, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Tiling set workspace failed."), return ge::GRAPH_FAILED);
 

@@ -53,6 +53,8 @@ struct MoeDistributeDispatchV2Info {
     uint64_t roceDispatchOffset;
     uint64_t roceExpertOffset;
     uint64_t roceTokenMapOffset;
+    // combine接收区rsw_buffer挡位(0=旧协议480/512槽位), 与combine侧同口径决策, 决定dispatch区起始偏移
+    uint64_t rswBufferSize;
 };
 
 struct MoeDistributeDispatchV2TilingData {

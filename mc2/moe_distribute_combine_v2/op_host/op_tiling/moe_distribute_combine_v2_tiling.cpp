@@ -111,6 +111,10 @@ constexpr uint64_t TRIPLE = 3;
 constexpr uint64_t ASSIST_NUM_PER_A = 128UL;
 constexpr int64_t ELASTIC_METAINFO_OFFSET = 4;
 constexpr uint32_t HAS_ADD_RMS_NORM = 1;
+// rsw_buffer：每个slot(一个bs的专家结果)单独分配一个rsw_buffer，挡位按hsize选择
+// 挡位选择与dispatch侧共用 Mc2Tiling::GetRswBufferSize, 保证两侧窗口布局一致
+constexpr uint64_t RSW_TRAILER_SIZE = 128UL;  // rsw_buffer尾部特殊区大小
+constexpr uint64_t RSW_COUNT_BLK_SIZE = 32UL; // count按32B块读写(头8B有效)
 
 enum class CommQuantMode : int32_t {
     NON_QUANT = 0,
@@ -156,6 +160,7 @@ static void PrintTilingDataInfo(const char* nodeName, MoeDistributeCombineV2Tili
     OP_LOGD(nodeName, "aivNum is %u.", tilingData.moeDistributeCombineV2Info.aivNum);
     OP_LOGD(nodeName, "totalUbSize is %lu.", tilingData.moeDistributeCombineV2Info.totalUbSize);
     OP_LOGD(nodeName, "totalWinSizeEP is %lu.", tilingData.moeDistributeCombineV2Info.totalWinSizeEp);
+    OP_LOGD(nodeName, "rswBufferSize is %lu.", tilingData.moeDistributeCombineV2Info.rswBufferSize);
     OP_LOGD(nodeName, "hasElastic is %d.", tilingData.moeDistributeCombineV2Info.hasElasticInfo);
     OP_LOGD(nodeName, "isPerformance is %d.", tilingData.moeDistributeCombineV2Info.isPerformance);
     OP_LOGD(nodeName, "hasExpertScales is %d.", tilingData.moeDistributeCombineV2Info.hasExpertScales);
@@ -2275,7 +2280,15 @@ static uint64_t GetDispatchBufferSize(const MoeDistributeCombineV2TilingData* ti
     uint32_t blockCntPerToken = packedDataBytes / SPLIT_BLOCK_DATA_SIZE;
     // calBeginBuf、fixedEndBuf、最小indexCountsBuf和calEndBuf各占一个UB block
     uint64_t dispatchBufferSize = static_cast<uint64_t>(UB_ALIGN) * 4UL;
-    if (quantBufferSize > 0U) {
+    if (tilingData->moeDistributeCombineV2Info.rswBufferSize != 0UL) {
+        // rsw协议: 串行发送, 单份输入buffer(moeQueueBytes覆盖其下限) + 32B计数写buffer, 挡位值不进UB预算
+        dispatchBufferSize += static_cast<uint64_t>(moeQueueBytes) + RSW_COUNT_BLK_SIZE;
+        if (quantBufferSize > 0U) {
+            uint32_t quantResultBufSize = (commDataBytes + UB_ALIGN - 1U) / UB_ALIGN * UB_ALIGN;
+            quantResultBufSize = std::max(quantResultBufSize, packedDataBytes);
+            dispatchBufferSize += quantBufferSize + quantResultBufSize;
+        }
+    } else if (quantBufferSize > 0U) {
         uint32_t quantResultBufSize = (commDataBytes + UB_ALIGN - 1U) / UB_ALIGN * UB_ALIGN;
         quantResultBufSize = std::max(quantResultBufSize, packedDataBytes);
         dispatchBufferSize += quantBufferSize + quantResultBufSize + blockCntPerToken * WIN_ADDR_ALIGN;
@@ -2363,19 +2376,30 @@ static uint64_t GetCommBufferSize(const gert::TilingContext* context,
         (hExpandXTypeSize + SPLIT_BLOCK_DATA_SIZE - 1) / SPLIT_BLOCK_DATA_SIZE * SPLIT_BLOCK_DATA_SIZE;
     moeQueueBytes = packedDataBytes > rawPackedDataBytes ? packedDataBytes : rawPackedDataBytes;
     moeQueueBytes = moeQueueBytes > hExpandXAlign32Size ? moeQueueBytes : hExpandXAlign32Size;
+    if (tilingData->moeDistributeCombineV2Info.rswBufferSize != 0UL) {
+        // rsw协议: 接收数据连续于rsw_buffer头部, 无480/512交错打包
+        moeQueueBytes = (commDataBytes + UB_ALIGN - 1U) / UB_ALIGN * UB_ALIGN;
+        moeQueueBytes = moeQueueBytes > hExpandXAlign32Size ? moeQueueBytes : hExpandXAlign32Size;
+    }
 
     // 清零buffer独立保留，轮询标志复用接收队列
     uint32_t clearFlagCount = flagRcvCount * blockCntPerToken * SPLIT_BLOCK_FLAG_COUNT;
+    if (tilingData->moeDistributeCombineV2Info.rswBufferSize != 0UL) {
+        // rsw协议: 清整个128B尾区
+        clearFlagCount = flagRcvCount * (RSW_TRAILER_SIZE / sizeof(float));
+    }
     uint32_t clearFlagBufSize = (clearFlagCount * sizeof(float) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
     uint64_t commBufferSize = static_cast<uint64_t>(scaleNumAlignSize) + clearFlagBufSize;
     dispatchBufferSize =
         GetDispatchBufferSize(tilingData, moeQueueBytes, quantResultDataBytes, packedDataBytes, quantBufferSize);
-    // 只扩接收队列，不改变发送侧预算
-    uint32_t maxSlotCount =
-        std::max(tilingData->moeDistributeCombineV2Info.k, tilingData->moeDistributeCombineV2Info.sharedExpertNum);
-    uint32_t flagBytes = maxSlotCount * blockCntPerToken * SPLIT_BLOCK_FLAG_COUNT * sizeof(float);
-    flagBytes = (flagBytes + ALIGNED_LEN - 1U) / ALIGNED_LEN * ALIGNED_LEN;
-    moeQueueBytes = std::max(moeQueueBytes, flagBytes);
+    // 只扩接收队列，不改变发送侧预算; rsw协议标志检查走CheckSlotArriveByCount, 不占接收队列
+    if (tilingData->moeDistributeCombineV2Info.rswBufferSize == 0UL) {
+        uint32_t maxSlotCount =
+            std::max(tilingData->moeDistributeCombineV2Info.k, tilingData->moeDistributeCombineV2Info.sharedExpertNum);
+        uint32_t flagBytes = maxSlotCount * blockCntPerToken * SPLIT_BLOCK_FLAG_COUNT * sizeof(float);
+        flagBytes = (flagBytes + ALIGNED_LEN - 1U) / ALIGNED_LEN * ALIGNED_LEN;
+        moeQueueBytes = std::max(moeQueueBytes, flagBytes);
+    }
     return commBufferSize;
 }
 
@@ -2475,6 +2499,68 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
     tilingData.moeDistributeCombineV2Info.totalWinSizeEp = winSizeData.totalWinSizeEp;
 
     return ge::GRAPH_SUCCESS;
+}
+
+// rsw_buffer挡位决策: 挡位选择失败或window不足时回退旧协议(rswBufferSize=0)
+static void SetRswBufferSize(gert::TilingContext* context, MoeDistributeCombineV2TilingData& tilingData,
+                             const char* nodeName, uint32_t localMoeExpertNum, bool isLayered,
+                             const CombineV2Config& config)
+{
+    tilingData.moeDistributeCombineV2Info.rswBufferSize = 0UL; // 默认旧协议
+    NpuArch npuArch = mc2tiling::GetNpuArch(context);
+    if (npuArch != Ops::Base::DAV_9201 && npuArch != Ops::Base::DAV_9202) { // 仅A6 MTE内核支持rsw协议
+        return;
+    }
+    if (isLayered) { // 跨超模板窗口模型不同, 不启用
+        return;
+    }
+    uint32_t axisH = tilingData.moeDistributeCombineV2Info.h;
+    uint32_t axisK = tilingData.moeDistributeCombineV2Info.k;
+    uint32_t axisBS = tilingData.moeDistributeCombineV2Info.bs;
+    uint32_t epWorldSize = tilingData.moeDistributeCombineV2Info.epWorldSize;
+    uint32_t sharedExpertNum = tilingData.moeDistributeCombineV2Info.sharedExpertNum;
+    auto expandXDesc = context->GetInputDesc(config.expandXIndex);
+    uint32_t expandXTypeSize = static_cast<uint32_t>(ge::GetSizeByDataType(expandXDesc->GetDataType()));
+    auto commQuantModePtr = context->GetAttrs()->GetAttrPointer<int64_t>((config.attrCommQuantModeIndex));
+    uint32_t commQuantMode = commQuantModePtr == nullptr ? 0U : static_cast<uint32_t>(*commQuantModePtr);
+    bool isInt8Quant = commQuantMode == INT8_COMM_QUANT;
+    bool isMxFp8Quant = (commQuantMode == static_cast<CommQuantModeType>(CommQuantMode::MXFP8_E5M2_QUANT)) ||
+                        (commQuantMode == static_cast<CommQuantModeType>(CommQuantMode::MXFP8_E4M3_QUANT));
+    // 与kernel侧commDataBytes_口径一致(含量化scale尾巴)
+    uint32_t hFloatAlign256Size =
+        GetFloatAlignSize(axisH * static_cast<uint32_t>(sizeof(float)), ALIGNED_LEN, isInt8Quant || isMxFp8Quant);
+    uint32_t scaleNumAlignSize = 0U;
+    uint32_t commDataBytes = axisH * expandXTypeSize;
+    if (isInt8Quant || isMxFp8Quant) {
+        uint32_t scaleBaseCnt = isInt8Quant ? (hFloatAlign256Size / sizeof(float)) : 0U;
+        commDataBytes = GetQuantCommDataBytes(axisH, expandXTypeSize, scaleBaseCnt, commQuantMode, scaleNumAlignSize);
+    }
+    // 挡位与dispatch侧同口径: combine单slot统一按最大输出dtype尺寸估算, 保证两侧窗口布局一致
+    uint64_t rswTier = GetRswBufferSize(axisH);
+    if ((rswTier == 0UL) || (static_cast<uint64_t>(commDataBytes) + RSW_TRAILER_SIZE > rswTier)) {
+        OP_LOGI(nodeName,
+                "H = %u, comm Data Bytes = %u, exceeds max support size which is 2048KB."
+                " RSW feature is not enabled",
+                axisH, commDataBytes);
+        return;
+    }
+    // window需求: (dispatch + rsw combine) * 2(双缓冲) ≤ 实际window, 口径与CheckActualWinSize一致
+    uint64_t maxBs = static_cast<uint64_t>(tilingData.moeDistributeCombineV2Info.globalBs) / epWorldSize;
+    maxBs = maxBs > axisBS ? maxBs : axisBS; // globalBs为0时按bs兜底
+    uint64_t tokenActualLen =
+        (axisH * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN * UB_ALIGN + SCALE_EXPAND_IDX_BUFFER;
+    uint64_t tokenNeedSizeDispatch = (tokenActualLen + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN * WIN_ADDR_ALIGN;
+    uint64_t flagRcvCount = axisK + sharedExpertNum;
+    uint64_t dispatchNeed = maxBs * tokenNeedSizeDispatch * epWorldSize * localMoeExpertNum;
+    uint64_t rswCombineNeed = maxBs * flagRcvCount * rswTier;
+    uint64_t totalRswNeed = (dispatchNeed + rswCombineNeed) * DOUBLE_DATA_BUFFER;
+    if (totalRswNeed > tilingData.moeDistributeCombineV2Info.totalWinSizeEp) {
+        OP_LOGI(nodeName, "RSW feature is not enabled. need win Size(%lu) > totalWinSize(%lu).", totalRswNeed,
+                tilingData.moeDistributeCombineV2Info.totalWinSizeEp);
+        return;
+    }
+    tilingData.moeDistributeCombineV2Info.rswBufferSize = rswTier;
+    OP_LOGI(nodeName, "rswBuffer enabled, rsw buffer size = %lu.", rswTier);
 }
 
 static ge::graphStatus CheckCombineOrARN(gert::TilingContext* context, MoeDistributeCombineV2TilingData& tilingData,
@@ -2660,6 +2746,9 @@ ge::graphStatus MoeDistributeCombineV2TilingFuncBase::MoeDistributeCombineA3Tili
 
     uint64_t tilingKey = config.isRoce ? GET_TPL_TILING_KEY(commQuantMode, TILINGKEY_TPL_ROCE, TILINGKEY_TPL_A5) :
                                          CalTilingKey(commQuantMode, isLayered);
+
+    // rsw_buffer挡位决策(挡位超限或window不足时回退旧协议, 须在UbUsedCal之前)
+    SetRswBufferSize(context, *tilingData, nodeName, localMoeExpertNum, isLayered, config);
     OP_TILING_CHECK(
         FinalizeTiling(context, tilingData, nodeName, groupEp, isLayered, tilingKey, config) != ge::GRAPH_SUCCESS,
         OP_LOGE_WITHOUT_REPORT(nodeName, "Finalize tiling failed."), return ge::GRAPH_FAILED);

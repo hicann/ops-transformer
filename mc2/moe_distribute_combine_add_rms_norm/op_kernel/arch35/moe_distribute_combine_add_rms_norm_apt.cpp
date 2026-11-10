@@ -39,7 +39,7 @@ __global__ __aicore__ void moe_distribute_combine_add_rms_norm(
     TPipe pipe;
 #if (ORIG_DTYPE_EXPAND_X == DT_BF16 || ORIG_DTYPE_EXPAND_X == DT_FLOAT16)
     GM_ADDR contextGM0 = (GM_ADDR)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-    MoeDistributeCombineV2A5Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode == TILINGKEY_INT8_QUANT, true> op;
+    MoeDistributeCombineV2A5Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode == TILINGKEY_INT8_QUANT, true, false> op;
     op.Init(contextGM0, expandX, expertIds, assistInfoForCombine, epSendCount, residualX, gamma, scales, xActiveMask,
             sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV, nullptr, YOut,
             dynamicScaleOut, XOut, workspaceGM, &pipe, &tilingData);

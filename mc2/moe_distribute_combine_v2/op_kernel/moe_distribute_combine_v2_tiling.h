@@ -52,6 +52,7 @@ struct MoeDistributeCombineV2Info {
     float epsilon;
     uint32_t bufferNum;
     uint64_t roceCombineOffset;
+    uint64_t rswBufferSize; // 0=旧协议(480/512 flag)；非0=rsw_buffer挡位(16KB~2MB，每slot一个)
 };
 struct MoeDistributeCombineV2TilingData {
     Mc2InitTiling mc2InitTiling;

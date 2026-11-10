@@ -802,7 +802,8 @@ uint64_t MoeDistributeCombineV2TilingFuncA5::CalTilingKey(uint32_t commQuantMode
     if (commQuantMode >= INT8_COMM_QUANT) {
         quantMode = commQuantMode;
     }
-    uint64_t tilingKey = GET_TPL_TILING_KEY(quantMode, hierarchy, TILINGKEY_TPL_A5);
+    uint32_t archTag = isA6_ ? TILINGKEY_TPL_A6 : TILINGKEY_TPL_A5;
+    uint64_t tilingKey = GET_TPL_TILING_KEY(quantMode, hierarchy, archTag);
     return tilingKey;
 }
 
@@ -836,6 +837,10 @@ ge::graphStatus MoeDistributeCombineV2TilingFuncA5::MoeDistributeCombineTilingFu
     if (isCcu) {
         // CCU 调用 A5 tiling 实现
         return MoeDistributeCombineTilingImpl(context, OP_VERSION_2);
+    }
+    NpuArch npuArch = mc2tiling::GetNpuArch(context);
+    if (npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
+        isA6_ = true;
     }
     // 默认空指针和空字符走 MTE 方式，MTE 调用 A3 tiling 实现
     return MoeDistributeCombineA3TilingFuncImpl(context, config);

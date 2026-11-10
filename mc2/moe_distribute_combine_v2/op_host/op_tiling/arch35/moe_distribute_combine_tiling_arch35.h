@@ -39,6 +39,9 @@ public:
     ge::graphStatus MoeDistributeCombineTilingFuncImpl(gert::TilingContext* context,
                                                        const CombineV2Config& config) override;
     uint64_t CalTilingKey(uint32_t commQuantMode, bool isLayered) override;
+
+protected:
+    bool isA6_{false};
 };
 
 } // namespace optiling

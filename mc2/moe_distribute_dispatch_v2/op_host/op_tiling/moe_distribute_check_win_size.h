@@ -87,6 +87,27 @@ inline RoceWindowLayout GetRoceWindowLayout(const TilingInfo& info, uint64_t ser
     return layout;
 }
 
+// rsw_buffer挡位与dispatch/combine共用同一口径: combine单slot按最大输出dtype(2B)估算,
+// 保证dispatch侧combine区预留与combine侧实际接收区严格一致, 避免两块区域交叠。
+constexpr uint64_t RSW_TRAILER_BYTES = 128UL;
+constexpr uint64_t RSW_BUFFER_TIER_LIST_BYTES[] = {16UL << 10,  32UL << 10,  64UL << 10,   128UL << 10,
+                                                   256UL << 10, 512UL << 10, 1024UL << 10, 2048UL << 10};
+inline uint64_t SelectRswBufferTier(uint64_t commDataBytes)
+{
+    const uint64_t need = commDataBytes + RSW_TRAILER_BYTES;
+    for (uint64_t tier : RSW_BUFFER_TIER_LIST_BYTES) {
+        if (need <= tier) {
+            return tier;
+        }
+    }
+    return 0UL;
+}
+
+inline uint64_t GetRswBufferSize(uint64_t h)
+{
+    return SelectRswBufferTier(h * MAX_OUT_DTYPE_SIZE);
+}
+
 struct CheckWinSizeData {
     uint32_t localMoeExpertNum;
     uint32_t sharedExpertNum;
