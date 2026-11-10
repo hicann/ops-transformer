@@ -21,6 +21,8 @@ protected:
     using TILING_CLASS = typename BSA_TYPE::tiling_class;
     static constexpr bool DETERMINISTIC_ENABLE = BSA_TYPE::deterministic_enable;
     static constexpr bool INDEX_ENABLE = BSA_TYPE::index_enable;
+    static constexpr bool HIF8_ENABLE = BSA_TYPE::hif8_enable;
+    static constexpr int32_t MATRIX_ALIGN = HIF8_ENABLE ? 32 : 16;
     static_assert(DETERMINISTIC_ENABLE || INDEX_ENABLE,
                   "BSAG arch35: 非确定性路径必须使用 NonZero index 遍历，不能再读 blockSparseMask 判块");
     GM_ADDR actualQseqlen_;
@@ -65,6 +67,8 @@ protected:
     int32_t block_local_idx{0};
     uint64_t vaild_block_num{0};
     int32_t index_block_num_{16};
+    bool unique_kv_owner_{false};
+    int64_t unique_cursor_{0}, unique_end_{0};
 
 public:
     __aicore__ inline void Init(const TILING_CLASS* tilingData, GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen,
@@ -139,27 +143,92 @@ public:
         }
     }
 
+    __aicore__ inline bool CanUseUniqueKvOwner() const
+    {
+        return HIF8_ENABLE && !DETERMINISTIC_ENABLE && head_dim_ == 128 && base_m_ == 128 && base_n_ == 128 &&
+               block_x_ == 128 && block_y_ == 128 && q_block_num_ > 0 && q_block_num_ <= 128 &&
+               static_cast<uint64_t>(batch_num_) * q_head_num_ * q_block_num_ * kv_block_num_ <= 32768;
+    }
+    __aicore__ inline void SetUniqueKvOwner(bool value)
+    {
+        unique_kv_owner_ = value;
+    }
+
     __aicore__ inline uint32_t GetDeterMaxRound() const
     {
         return deter_max_round_;
     }
 
 private:
+    __aicore__ inline bool MaskBlockValid(int32_t b, int32_t n, int32_t q, int32_t k)
+    {
+        if constexpr (HIF8_ENABLE) {
+            if (block_x_ == 128 && block_y_ == 128 &&
+                static_cast<uint64_t>(batch_num_) * q_head_num_ * q_block_num_ * kv_block_num_ <= 32768) {
+                int64_t offset = ((static_cast<int64_t>(b) * q_head_num_ + n) * q_block_num_ + q) * kv_block_num_ + k;
+                return ((__gm__ uint8_t*)blockSparseMask_)[offset] != 0;
+            }
+        }
+        return IsValidBlock(const_info_, b, n, q, k, blockSparseMask_);
+    }
+
+    // Compare KV ownership in the globally sorted sparse index stream.
+    __aicore__ inline bool SameKvIndex(int64_t pos, int32_t b, int32_t n2, int32_t k)
+    {
+        if (pos < 0 || pos >= static_cast<int64_t>(vaild_block_num))
+            return false;
+        int32_t ib, in, iq, ik;
+        unravel_index(((__gm__ int32_t*)indexWorkspace_)[pos], ib, in, iq, ik);
+        return ib == b && in / q_group_ == n2 && ik == k;
+    }
+
+    // A monotonic left snap gives adjacent cores identical boundaries. A whole
+    // (batch, KV head, KV block), including all GQA heads, has exactly one writer.
+    __aicore__ inline int64_t SnapKvBoundary(int64_t pos)
+    {
+        if (pos >= static_cast<int64_t>(vaild_block_num))
+            return vaild_block_num;
+        if (pos <= 0)
+            return 0;
+        int32_t b, n, q, k;
+        unravel_index(((__gm__ int32_t*)indexWorkspace_)[pos], b, n, q, k);
+        while (pos > 0 && SameKvIndex(pos - 1, b, n / q_group_, k))
+            --pos;
+        return pos;
+    }
+
     __aicore__ inline void GetRunTimeInfoByIndex(RunTimeInfo& runTimeInfo)
     {
         runTimeInfo.need_compute = 0;
         if (unlikely(loop_num_ == 0)) {
             this->vaild_block_num = ((__gm__ uint64_t*)indexShapeWorkspace_)[2];
+            if constexpr (HIF8_ENABLE) {
+                // Give each core one contiguous span for short sparse launches.
+                // This balances the last wave without breaking KV reuse at
+                // every fixed 16-tile chunk. Long launches retain prior chunks.
+                const uint64_t tilesPerCore = (vaild_block_num + cube_core_num_ - 1) / cube_core_num_;
+                if (tilesPerCore > 0 && tilesPerCore <= 32) {
+                    index_block_num_ = static_cast<int32_t>(tilesPerCore);
+                }
+            }
+            if (unique_kv_owner_) {
+                const int64_t share = (vaild_block_num + cube_core_num_ - 1) / cube_core_num_;
+                unique_cursor_ = SnapKvBoundary(cube_core_idx_ * share);
+                unique_end_ = SnapKvBoundary((cube_core_idx_ + 1) * share);
+            }
             block_global_idx = cube_core_idx_;
             block_local_idx = 0;
         }
         while (true) {
-            if (block_local_idx >= index_block_num_) {
+            if (!unique_kv_owner_ && block_local_idx >= index_block_num_) {
                 block_global_idx += cube_core_num_;
                 block_local_idx = 0;
             }
+            if (unique_kv_owner_ && unique_cursor_ >= unique_end_)
+                return;
             int64_t index_workspace_offset =
-                static_cast<int64_t>(block_global_idx) * index_block_num_ + block_local_idx;
+                unique_kv_owner_ ? unique_cursor_++ :
+                                   static_cast<int64_t>(block_global_idx) * index_block_num_ + block_local_idx;
             if (index_workspace_offset >= static_cast<int64_t>(vaild_block_num)) {
                 return;
             }
@@ -185,6 +254,22 @@ private:
             }
             RunTimeInfoRecord(runTimeInfo, s1Idx_, s2Idx_, GetBlockLen(s1Idx_, cur_q_seq_len_, base_m_),
                               GetBlockLen(s2Idx_, cur_kv_seq_len_, base_n_));
+            runTimeInfo.taskId = block_sparse_idx;
+            if constexpr (HIF8_ENABLE && !DETERMINISTIC_ENABLE) {
+                const uint64_t tilesPerCore = (vaild_block_num + cube_core_num_ - 1) / cube_core_num_;
+                // Only the single contiguous span and globally KV-grouped order
+                // can establish exclusive ownership. All other paths stay atomic.
+                if (tilesPerCore > 0 && tilesPerCore <= 32 && block_x_ == 128 && block_y_ == 128 &&
+                    static_cast<uint64_t>(batch_num_) * q_head_num_ * q_block_num_ * kv_block_num_ <= 32768 &&
+                    (q_group_ == 1 || q_block_num_ <= 64)) {
+                    const int64_t start = static_cast<int64_t>(cube_core_idx_) * index_block_num_;
+                    const int64_t end = start + index_block_num_;
+                    runTimeInfo.exclusive_kv_group = !SameKvIndex(start - 1, b_idx, n1_idx / q_group_, s2_block) &&
+                                                     !SameKvIndex(end, b_idx, n1_idx / q_group_, s2_block);
+                }
+            }
+            if (unique_kv_owner_)
+                runTimeInfo.exclusive_kv_group = true;
             return;
         }
     }
@@ -202,8 +287,8 @@ private:
         runTimeInfo.n2Idx = n2Idx;
         runTimeInfo.s1Len = vaild_s1_len;
         runTimeInfo.s2Len = vaild_s2_len;
-        runTimeInfo.s1LenAlign = RoundUp(vaild_s1_len, 16);
-        runTimeInfo.s2LenAlign = RoundUp(vaild_s2_len, 16);
+        runTimeInfo.s1LenAlign = RoundUp(vaild_s1_len, MATRIX_ALIGN);
+        runTimeInfo.s2LenAlign = RoundUp(vaild_s2_len, MATRIX_ALIGN);
         runTimeInfo.queryGmOffset =
             GetQKVGmOffset<INPUT_LAYOUT>(runTimeInfo.last_q_seq_sum, runTimeInfo.cur_q_seq_len, q_head_num_, head_dim_,
                                          runTimeInfo.bIdx, runTimeInfo.s1Idx, runTimeInfo.n1Idx);
@@ -213,9 +298,15 @@ private:
         runTimeInfo.lseGmOffset =
             GetLseGmOffset<INPUT_LAYOUT>(runTimeInfo.last_q_seq_sum, runTimeInfo.cur_q_seq_len, q_head_num_,
                                          runTimeInfo.bIdx, runTimeInfo.s1Idx, runTimeInfo.n1Idx);
+        if constexpr (HIF8_ENABLE && INPUT_LAYOUT == BSND) {
+            runTimeInfo.lseGmOffset =
+                (static_cast<int64_t>(runTimeInfo.bIdx) * runTimeInfo.cur_q_seq_len + runTimeInfo.s1Idx) * q_head_num_ +
+                runTimeInfo.n1Idx;
+        }
         runTimeInfo.sftgGmOffset =
             GetSftgGmOffset<INPUT_LAYOUT>(runTimeInfo.last_q_seq_sum, runTimeInfo.cur_q_seq_len, q_head_num_,
                                           runTimeInfo.bIdx, runTimeInfo.s1Idx, runTimeInfo.n1Idx);
+        runTimeInfo.exclusive_kv_group = false;
         runTimeInfo.need_compute = 1;
     }
 
@@ -352,7 +443,7 @@ private:
                 cur_kv = GetSeqLen(bIdx, actualKvseqlen_);
             }
             if (s1Idx >= 0 && s2Idx >= 0 && s1Idx < cur_q && s2Idx < cur_kv &&
-                IsValidBlock(const_info_, bIdx, n1Idx, s1Idx / block_x_, s2Idx / block_y_, blockSparseMask_)) {
+                MaskBlockValid(bIdx, n1Idx, s1Idx / block_x_, s2Idx / block_y_)) {
                 return false;
             }
         }
@@ -409,7 +500,7 @@ private:
         if (s1Idx >= cur_q || s2Idx >= cur_kv || s1Idx < 0 || s2Idx < 0) {
             return;
         }
-        if (!IsValidBlock(const_info_, bIdx, n1Idx, s1Idx / block_x_, s2Idx / block_y_, blockSparseMask_)) {
+        if (!MaskBlockValid(bIdx, n1Idx, s1Idx / block_x_, s2Idx / block_y_)) {
             return;
         }
         int32_t s1Len = GetBlockLen(s1Idx, cur_q, base_m_);
@@ -425,14 +516,20 @@ private:
         runTimeInfo.n2Idx = n2Idx;
         runTimeInfo.s1Len = s1Len;
         runTimeInfo.s2Len = s2Len;
-        runTimeInfo.s1LenAlign = RoundUp(s1Len, 16);
-        runTimeInfo.s2LenAlign = RoundUp(s2Len, 16);
+        runTimeInfo.s1LenAlign = RoundUp(s1Len, MATRIX_ALIGN);
+        runTimeInfo.s2LenAlign = RoundUp(s2Len, MATRIX_ALIGN);
         runTimeInfo.queryGmOffset =
             GetQKVGmOffset<INPUT_LAYOUT>(last_q, cur_q, q_head_num_, head_dim_, bIdx, s1Idx, n1Idx);
         runTimeInfo.keyGmOffset =
             GetQKVGmOffset<INPUT_LAYOUT>(last_kv, cur_kv, kv_head_num_, head_dim_, bIdx, s2Idx, n2Idx);
         runTimeInfo.lseGmOffset = GetLseGmOffset<INPUT_LAYOUT>(last_q, cur_q, q_head_num_, bIdx, s1Idx, n1Idx);
+        if constexpr (HIF8_ENABLE && INPUT_LAYOUT == BSND) {
+            runTimeInfo.lseGmOffset = (static_cast<int64_t>(bIdx) * cur_q + s1Idx) * q_head_num_ + n1Idx;
+        }
         runTimeInfo.sftgGmOffset = GetSftgGmOffset<INPUT_LAYOUT>(last_q, cur_q, q_head_num_, bIdx, s1Idx, n1Idx);
+        runTimeInfo.taskId =
+            ((bIdx * q_head_num_ + n1Idx) * kv_block_num_ + s2Idx / block_y_) * q_block_num_ + s1Idx / block_x_;
+        runTimeInfo.exclusive_kv_group = false;
         runTimeInfo.need_compute = 1;
         if (!dkv_group_open_) {
             kv_ping_pong_idx_ = 1 - kv_ping_pong_idx_;

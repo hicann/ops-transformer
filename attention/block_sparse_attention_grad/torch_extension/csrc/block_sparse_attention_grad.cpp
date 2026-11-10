@@ -47,8 +47,24 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> npu_block_sparse_attention_backwa
     c10::string_view kv_input_layout, int64_t num_key_value_heads, double scale_value,
     const c10::optional<std::vector<int64_t>>& actual_seq_lengths,
     const c10::optional<std::vector<int64_t>>& actual_seq_lengths_kv, const c10::optional<at::Tensor>& atten_mask,
-    int64_t mask_type)
+    int64_t mask_type, const c10::optional<at::Tensor>& q_dequant_scale,
+    const c10::optional<at::Tensor>& k_dequant_scale, const c10::optional<at::Tensor>& v_dequant_scale,
+    const c10::optional<at::Tensor>& do_dequant_scale, const c10::optional<at::Tensor>& p_quant_scale,
+    const c10::optional<at::Tensor>& ds_quant_scale, const c10::optional<int64_t>& quant_mode)
 {
+    const bool is_hif8 = query.scalar_type() == at::kByte;
+    const int64_t resolved_quant_mode = quant_mode.value_or(is_hif8 ? 5 : 0);
+    TORCH_CHECK(resolved_quant_mode == 0 || resolved_quant_mode == 5, "quant_mode only supports 0 or 5, got ",
+                resolved_quant_mode);
+    TORCH_CHECK(
+        (resolved_quant_mode == 5 && is_hif8) ||
+            (resolved_quant_mode == 0 && (query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16)),
+        "quant_mode must match query dtype: 0=FP16/BF16, 5=HiF8-encoded uint8");
+    if (is_hif8) {
+        TORCH_CHECK(
+            key.scalar_type() == at::kByte && value.scalar_type() == at::kByte && d_out.scalar_type() == at::kByte,
+            "HiF8 requires HiF8-encoded uint8 query/key/value/d_out.");
+    }
     // mask_type 契约校验（只支持 0/1；0 ↔ 无 counts；1 ↔ 必传 counts）
     TORCH_CHECK(mask_type == 0 || mask_type == 1, "mask_type only supports 0 or 1, got ", mask_type);
     if (mask_type == 0) {
@@ -64,10 +80,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> npu_block_sparse_attention_backwa
     std::string kv_layout(kv_input_layout);
     check_params(query, key, value, actual_seq_lengths, actual_seq_lengths_kv, q_layout, kv_layout);
 
-    // 输出梯度：与 query/key/value 同形状同 dtype
-    at::Tensor d_query = at::empty(query.sizes(), query.options());
-    at::Tensor d_key = at::empty(key.sizes(), key.options());
-    at::Tensor d_value = at::empty(value.sizes(), value.options());
+    const auto grad_dtype = is_hif8 ? at::kBFloat16 : query.scalar_type();
+    at::Tensor d_query = at::empty(query.sizes(), query.options().dtype(grad_dtype));
+    at::Tensor d_key = at::empty(key.sizes(), key.options().dtype(grad_dtype));
+    at::Tensor d_value = at::empty(value.sizes(), value.options().dtype(grad_dtype));
 
     // block_shape 缺省 [128, 128]（与 op_plugin 参考实现一致）
     at::IntArrayRef block_shape_value = (block_shape.has_value() && block_shape->size() >= 2) ?
@@ -91,9 +107,25 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> npu_block_sparse_attention_backwa
     const int64_t pre_tokens = kMaxWindow;
     const int64_t next_tokens = kMaxWindow;
 
-    ACLNN_CMD(aclnnBlockSparseAttentionGrad, d_out, query, key, value, attention_out, softmax_lse, block_sparse_mask,
-              atten_mask, block_shape_value, actual_q_ref, actual_kv_ref, q_layout_ptr, kv_layout_ptr,
-              num_key_value_heads, mask_type, scale_value, pre_tokens, next_tokens, d_query, d_key, d_value);
+    if (is_hif8) {
+        TensorWrapper dout_hif8{d_out, ACL_HIFLOAT8};
+        TensorWrapper query_hif8{query, ACL_HIFLOAT8};
+        TensorWrapper key_hif8{key, ACL_HIFLOAT8};
+        TensorWrapper value_hif8{value, ACL_HIFLOAT8};
+        ACLNN_CMD(aclnnBlockSparseAttentionGradV2, dout_hif8, query_hif8, key_hif8, value_hif8, attention_out,
+                  softmax_lse, block_sparse_mask, atten_mask, block_shape_value, actual_q_ref, actual_kv_ref,
+                  q_dequant_scale, k_dequant_scale, v_dequant_scale, do_dequant_scale, p_quant_scale, ds_quant_scale,
+                  q_layout_ptr, kv_layout_ptr, num_key_value_heads, mask_type, scale_value, pre_tokens, next_tokens,
+                  resolved_quant_mode, d_query, d_key, d_value);
+    } else {
+        TORCH_CHECK(!q_dequant_scale.has_value() && !k_dequant_scale.has_value() && !v_dequant_scale.has_value() &&
+                        !do_dequant_scale.has_value() && !p_quant_scale.has_value() && !ds_quant_scale.has_value(),
+                    "All six scales must be None for FP16/BF16 inputs.");
+        ACLNN_CMD(aclnnBlockSparseAttentionGrad, d_out, query, key, value, attention_out, softmax_lse,
+                  block_sparse_mask, atten_mask, block_shape_value, actual_q_ref, actual_kv_ref, q_layout_ptr,
+                  kv_layout_ptr, num_key_value_heads, mask_type, scale_value, pre_tokens, next_tokens, d_query, d_key,
+                  d_value);
+    }
 
     return std::make_tuple(d_query, d_key, d_value);
 }

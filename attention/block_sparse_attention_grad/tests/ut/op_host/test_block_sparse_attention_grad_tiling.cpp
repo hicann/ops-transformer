@@ -33,7 +33,8 @@ protected:
 };
 
 namespace {
-void RunArch35BnsdTilingCase(int64_t s, int64_t s_kv, int64_t blockX, int64_t blockY, ge::graphStatus expectedResult)
+void RunArch35BnsdTilingCase(int64_t s, int64_t s_kv, int64_t blockX, int64_t blockY, ge::graphStatus expectedResult,
+                             int64_t nKv = 2, bool isHif8 = false, int32_t deterministic = 0, int64_t quantMode = -1)
 {
     optiling::BlockSparseAttentionGradCompileInfo compileInfo;
     compileInfo.socVersion = platform_ascendc::SocVersion::ASCEND950;
@@ -48,22 +49,26 @@ void RunArch35BnsdTilingCase(int64_t s, int64_t s_kv, int64_t blockX, int64_t bl
         }
     })";
 
-    int64_t b = 1, n = 4, n_kv = 2, d = 128;
+    int64_t b = 1, n = 4, n_kv = nKv, d = 128;
     int64_t ceilQ = (s + blockX - 1) / blockX;
     int64_t ceilKv = (s_kv + blockY - 1) / blockY;
 
     int64_t blockShapeData[2] = {blockX, blockY};
     int64_t actualSeqData[1] = {s};
     int64_t actualSeqKvData[1] = {s_kv};
+    float scaleData[1] = {1.0F};
+    ge::DataType inputType = isHif8 ? ge::DT_HIFLOAT8 : ge::DT_FLOAT16;
+    ge::DataType attentionType = isHif8 ? ge::DT_BF16 : ge::DT_FLOAT16;
+    ge::DataType outputType = isHif8 ? ge::DT_BF16 : ge::DT_FLOAT16;
 
     gert::TilingContextPara tilingContextPara(
         "BlockSparseAttentionGrad",
         {// --- Input Info ---
-         {{{b, n, s, d}, {b, n, s, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-         {{{b, n, s, d}, {b, n, s, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-         {{{b, n_kv, s_kv, d}, {b, n_kv, s_kv, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-         {{{b, n_kv, s_kv, d}, {b, n_kv, s_kv, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-         {{{b, n, s, d}, {b, n, s, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{b, n, s, d}, {b, n, s, d}}, inputType, ge::FORMAT_ND},
+         {{{b, n, s, d}, {b, n, s, d}}, inputType, ge::FORMAT_ND},
+         {{{b, n_kv, s_kv, d}, {b, n_kv, s_kv, d}}, inputType, ge::FORMAT_ND},
+         {{{b, n_kv, s_kv, d}, {b, n_kv, s_kv, d}}, inputType, ge::FORMAT_ND},
+         {{{b, n, s, d}, {b, n, s, d}}, attentionType, ge::FORMAT_ND},
          {{{b, n, s}, {b, n, s}}, ge::DT_FLOAT, ge::FORMAT_ND},
          {{{b, n, ceilQ, ceilKv}, {b, n, ceilQ, ceilKv}}, ge::DT_UINT8, ge::FORMAT_ND},
          {{{1}, {1}}, ge::DT_UINT8, ge::FORMAT_ND},
@@ -71,11 +76,17 @@ void RunArch35BnsdTilingCase(int64_t s, int64_t s_kv, int64_t blockX, int64_t bl
          // 将真实的内存地址传给框架，供 Tiling 内部解析
          {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)blockShapeData},
          {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqData},
-         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqKvData}},
+         {{{b}, {b}}, ge::DT_INT64, ge::FORMAT_ND, true, (void*)actualSeqKvData},
+         {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND, true, (void*)scaleData},
+         {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND, true, (void*)scaleData},
+         {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND, true, (void*)scaleData},
+         {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND, true, (void*)scaleData},
+         {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND, true, (void*)scaleData},
+         {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND, true, (void*)scaleData}},
         {// --- Output Info ---
-         {{{b, n, s, d}, {b, n, s, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-         {{{b, n_kv, s_kv, d}, {b, n_kv, s_kv, d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-         {{{b, n_kv, s_kv, d}, {b, n_kv, s_kv, d}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+         {{{b, n, s, d}, {b, n, s, d}}, outputType, ge::FORMAT_ND},
+         {{{b, n_kv, s_kv, d}, {b, n_kv, s_kv, d}}, outputType, ge::FORMAT_ND},
+         {{{b, n_kv, s_kv, d}, {b, n_kv, s_kv, d}}, outputType, ge::FORMAT_ND}},
         {// --- Attr Info ---
 
          {"qInputLayout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
@@ -84,10 +95,12 @@ void RunArch35BnsdTilingCase(int64_t s, int64_t s_kv, int64_t blockX, int64_t bl
          {"maskType", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"scaleValue", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
          {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)}},
-        &compileInfo, "3510", socInfo, 4096);
+         {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+         {"quantMode",
+          Ops::Transformer::AnyValue::CreateFrom<int64_t>(quantMode == -1 ? (isHif8 ? 5 : 0) : quantMode)}},
+        &compileInfo, "3510", socInfo, 4096, deterministic);
 
-    constexpr uint64_t expectTilingKey = 1003UL; // FP16 BNSD on DAV_3510.
+    const uint64_t expectTilingKey = (isHif8 ? 2002UL : 1003UL) + (deterministic == 1 ? 8UL : 0UL);
     ExecuteTestCase(tilingContextPara, expectedResult, expectTilingKey);
 }
 } // namespace
@@ -95,6 +108,16 @@ void RunArch35BnsdTilingCase(int64_t s, int64_t s_kv, int64_t blockX, int64_t bl
 TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_block64_regression)
 {
     RunArch35BnsdTilingCase(128, 128, 64, 64, ge::GRAPH_SUCCESS);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_block64_deterministic)
+{
+    RunArch35BnsdTilingCase(128, 128, 64, 64, ge::GRAPH_SUCCESS, 2, false, 1);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_hif8_block64_deterministic)
+{
+    RunArch35BnsdTilingCase(128, 128, 64, 64, ge::GRAPH_SUCCESS, 2, true, 1);
 }
 
 TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_block16_with_sequence_tail)
@@ -110,4 +133,29 @@ TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_asymmetric_block16x32)
 TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_rejects_non_multiple_of_16)
 {
     RunArch35BnsdTilingCase(96, 96, 24, 16, ge::GRAPH_FAILED);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_hif8_block64)
+{
+    RunArch35BnsdTilingCase(128, 128, 64, 64, ge::GRAPH_SUCCESS, 2, true);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_hif8_rejects_block16)
+{
+    RunArch35BnsdTilingCase(96, 96, 16, 16, ge::GRAPH_FAILED, 2, true);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_rejects_hif8_with_quant_mode_zero)
+{
+    RunArch35BnsdTilingCase(128, 128, 64, 64, ge::GRAPH_FAILED, 2, true, 0, 0);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_rejects_fp16_with_quant_mode_five)
+{
+    RunArch35BnsdTilingCase(128, 128, 64, 64, ge::GRAPH_FAILED, 2, false, 0, 5);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_rejects_unsupported_quant_mode)
+{
+    RunArch35BnsdTilingCase(128, 128, 64, 64, ge::GRAPH_FAILED, 2, true, 0, 6);
 }

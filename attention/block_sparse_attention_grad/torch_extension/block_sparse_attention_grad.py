@@ -16,6 +16,24 @@ from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 
+def _check_quant_mode(query: torch.Tensor, quant_mode: Optional[int]) -> None:
+    if quant_mode is None:
+        return  # Compatibility: infer the mode from dtype.
+    if quant_mode not in (0, 5):
+        raise ValueError(
+            "quant_mode only supports 0 (FP16/BF16) or 5 (HiF8 per-tensor)"
+        )
+    valid_dtype = (
+        query.dtype == torch.uint8
+        if quant_mode == 5
+        else query.dtype in (torch.float16, torch.bfloat16)
+    )
+    if not valid_dtype:
+        raise ValueError(
+            "quant_mode must match query dtype: 0=FP16/BF16, 5=HiF8-encoded uint8"
+        )
+
+
 class BlockSparseAttentionGradOpBuilder(OpBuilder):
     def __init__(self):
         super().__init__("block_sparse_attention_grad")
@@ -37,7 +55,14 @@ class BlockSparseAttentionGradOpBuilder(OpBuilder):
             "int[]? actual_seq_lengths=None, "
             "int[]? actual_seq_lengths_kv=None, "
             "Tensor? atten_mask=None, "
-            "int mask_type=0"
+            "int mask_type=0, "
+            "Tensor? q_dequant_scale=None, "
+            "Tensor? k_dequant_scale=None, "
+            "Tensor? v_dequant_scale=None, "
+            "Tensor? do_dequant_scale=None, "
+            "Tensor? p_quant_scale=None, "
+            "Tensor? ds_quant_scale=None, "
+            "int? quant_mode=None"
             ") -> (Tensor, Tensor, Tensor)"
         )
 
@@ -51,7 +76,7 @@ class BlockSparseAttentionGradOpBuilder(OpBuilder):
             attention_out: torch.Tensor,
             softmax_lse: torch.Tensor,
             block_sparse_mask: torch.Tensor,
-            block_shape: Optional[List[int]],
+            block_shape: Optional[List[int]] = None,
             *,
             q_input_layout: str = "BNSD",
             kv_input_layout: str = "BNSD",
@@ -61,10 +86,19 @@ class BlockSparseAttentionGradOpBuilder(OpBuilder):
             actual_seq_lengths_kv: Optional[List[int]] = None,
             atten_mask: Optional[torch.Tensor] = None,
             mask_type: int = 0,
+            q_dequant_scale: Optional[torch.Tensor] = None,
+            k_dequant_scale: Optional[torch.Tensor] = None,
+            v_dequant_scale: Optional[torch.Tensor] = None,
+            do_dequant_scale: Optional[torch.Tensor] = None,
+            p_quant_scale: Optional[torch.Tensor] = None,
+            ds_quant_scale: Optional[torch.Tensor] = None,
+            quant_mode: Optional[int] = None,
         ):
-            dq = query.new_empty(query.shape)
-            dk = key.new_empty(key.shape)
-            dv = value.new_empty(value.shape)
+            _check_quant_mode(query, quant_mode)
+            grad_dtype = torch.bfloat16 if query.dtype == torch.uint8 else query.dtype
+            dq = query.new_empty(query.shape, dtype=grad_dtype)
+            dk = key.new_empty(key.shape, dtype=grad_dtype)
+            dv = value.new_empty(value.shape, dtype=grad_dtype)
             return dq, dk, dv
 
 
@@ -91,13 +125,22 @@ def block_sparse_attention_grad(
     actual_seq_lengths_kv: Optional[List[int]] = None,
     atten_mask: Optional[torch.Tensor] = None,
     mask_type: int = 0,
+    q_dequant_scale: Optional[torch.Tensor] = None,
+    k_dequant_scale: Optional[torch.Tensor] = None,
+    v_dequant_scale: Optional[torch.Tensor] = None,
+    do_dequant_scale: Optional[torch.Tensor] = None,
+    p_quant_scale: Optional[torch.Tensor] = None,
+    ds_quant_scale: Optional[torch.Tensor] = None,
+    quant_mode: Optional[int] = None,
 ):
     """block sparse attention backward（aclnnBlockSparseAttentionGrad 的 torch 扩展封装）。
 
     mask_type=0 → atten_mask 必须为 None（无 counts）；
     mask_type=1 → atten_mask 必传（INT32 counts：4D [B,N,>=maxBlocks,2]）。
+    quant_mode=0 为非量化，5 为 HiF8 per-tensor；None 保留按 dtype 推断。
     返回 (dq, dk, dv)。
     """
+    _check_quant_mode(query, quant_mode)
     return _op_module.npu_block_sparse_attention_backward(
         d_out,
         query,
@@ -115,4 +158,11 @@ def block_sparse_attention_grad(
         actual_seq_lengths_kv,
         atten_mask,
         mask_type,
+        q_dequant_scale,
+        k_dequant_scale,
+        v_dequant_scale,
+        do_dequant_scale,
+        p_quant_scale,
+        ds_quant_scale,
+        quant_mode,
     )

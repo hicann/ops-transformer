@@ -240,6 +240,17 @@ ge::graphStatus BSAGradTiling::ProcessAttrs(gert::TilingContext* context)
         dataType_ = qInputDesc->GetDataType();
     }
 
+    constexpr size_t QUANT_MODE_ATTR_INDEX = 7;
+    const auto* attrs = context->GetAttrs();
+    const auto* quantModePtr = attrs != nullptr && attrs->GetAttrNum() > QUANT_MODE_ATTR_INDEX ?
+                                   attrs->GetAttrPointer<int64_t>(QUANT_MODE_ATTR_INDEX) :
+                                   nullptr;
+    const int64_t quantMode = quantModePtr != nullptr ? *quantModePtr : 0;
+    if (quantMode != 0 || (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16)) {
+        OP_LOGE(opName, "Atlas A2/A3 supports only quantMode=0 with FP16/BF16 inputs.");
+        return ge::GRAPH_FAILED;
+    }
+
     if (kvHeads_ == 0) {
         OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName, "key", (std::to_string(kvHeads_)).c_str(),
                                                   "The key/value head count must be greater than zero.");

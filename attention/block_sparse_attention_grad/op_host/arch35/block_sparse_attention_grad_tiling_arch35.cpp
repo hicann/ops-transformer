@@ -92,10 +92,10 @@ public:
 protected:
     bool IsCapable() override
     {
-        if (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16) {
+        if (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16 && dataType_ != ge::DT_HIFLOAT8) {
             OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "query",
                                                   std::to_string(static_cast<int64_t>(dataType_)),
-                                                  "supported dtypes are FP16 and BF16");
+                                                  "supported dtypes are FP16, BF16 and HiF8");
             return false;
         }
 
@@ -111,7 +111,6 @@ protected:
                                                   "both block dimensions must be nonzero multiples of 16");
             return false;
         }
-
         return true;
     }
 
@@ -146,6 +145,58 @@ protected:
             return ge::GRAPH_FAILED;
         } else {
             dataType_ = qInputDesc->GetDataType();
+        }
+
+        constexpr size_t QUANT_MODE_ATTR_INDEX = 7;
+        const auto* attrs = context_->GetAttrs();
+        const auto* quantModePtr = attrs != nullptr && attrs->GetAttrNum() > QUANT_MODE_ATTR_INDEX ?
+                                       attrs->GetAttrPointer<int64_t>(QUANT_MODE_ATTR_INDEX) :
+                                       nullptr;
+        // Missing optional attribute retains the legacy non-quantized behavior.
+        const int64_t quantMode = quantModePtr != nullptr ? *quantModePtr : 0;
+        if (quantMode != 0 && quantMode != 5) {
+            OP_LOGE(context_->GetNodeName(), "quantMode must be 0 or 5, got %ld.", quantMode);
+            return ge::GRAPH_FAILED;
+        }
+        isHif8_ = quantMode == 5;
+        if ((isHif8_ && dataType_ != ge::DT_HIFLOAT8) ||
+            (!isHif8_ && dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16)) {
+            OP_LOGE(context_->GetNodeName(),
+                    "quantMode/dtype mismatch: mode 0 requires FP16/BF16, mode 5 requires HiF8.");
+            return ge::GRAPH_FAILED;
+        }
+        if (isHif8_) {
+            constexpr uint32_t SCALE_BEGIN_INDEX = 11;
+            constexpr uint32_t SCALE_END_INDEX = 16;
+            constexpr const char* SCALE_NAMES[] = {"qDequantScaleOptional", "kDequantScaleOptional",
+                                                   "vDequantScaleOptional", "doDequantScaleOptional",
+                                                   "pQuantScaleOptional",   "dsQuantScaleOptional"};
+            for (uint32_t index = SCALE_BEGIN_INDEX; index <= SCALE_END_INDEX; ++index) {
+                auto scaleDesc = context_->GetOptionalInputDesc(index);
+                auto scaleShape = context_->GetOptionalInputShape(index);
+                const char* scaleName = SCALE_NAMES[index - SCALE_BEGIN_INDEX];
+                if (scaleDesc == nullptr || scaleShape == nullptr || scaleDesc->GetDataType() != ge::DT_FLOAT ||
+                    scaleShape->GetStorageShape().GetDimNum() != 1 || scaleShape->GetStorageShape().GetDim(0) != 1) {
+                    OP_LOGE(context_->GetNodeName(), "%s must be a FLOAT32 tensor with shape [1].", scaleName);
+                    return ge::GRAPH_FAILED;
+                }
+            }
+            auto doutDesc = context_->GetInputDesc(0);
+            auto keyDesc = context_->GetInputDesc(2);
+            auto valueDesc = context_->GetInputDesc(3);
+            auto attentionOutDesc = context_->GetInputDesc(4);
+            auto dqDesc = context_->GetOutputDesc(0);
+            auto dkDesc = context_->GetOutputDesc(1);
+            auto dvDesc = context_->GetOutputDesc(2);
+            if (doutDesc == nullptr || keyDesc == nullptr || valueDesc == nullptr || attentionOutDesc == nullptr ||
+                dqDesc == nullptr || dkDesc == nullptr || dvDesc == nullptr ||
+                doutDesc->GetDataType() != ge::DT_HIFLOAT8 || keyDesc->GetDataType() != ge::DT_HIFLOAT8 ||
+                valueDesc->GetDataType() != ge::DT_HIFLOAT8 || attentionOutDesc->GetDataType() != ge::DT_BF16 ||
+                dqDesc->GetDataType() != ge::DT_BF16 || dkDesc->GetDataType() != ge::DT_BF16 ||
+                dvDesc->GetDataType() != ge::DT_BF16) {
+                OP_LOGE(context_->GetNodeName(), "HiF8 requires Q/K/V/dO=HIFLOAT8 and O/dQ/dK/dV=BF16.");
+                return ge::GRAPH_FAILED;
+            }
         }
 
         if (strcmp(qInputLayout, kvInputLayout) != 0) {
@@ -372,6 +423,17 @@ protected:
         }
         tilingData_.set_sftgWorkspaceOffset(usr_workspace_offset);
         usr_workspace_offset += sftg_size * sizeof(float);
+        tilingData_.set_dsScaleWorkspaceOffset(usr_workspace_offset);
+        if (isHif8_) {
+            // Only two tiles per AIC are in flight. Each paired AIV uses
+            // the same ping-pong slot; existing Cube/Vector flags retire it
+            // before the slot is reused two loop iterations later.
+            const uint64_t max_task_count = static_cast<uint64_t>(cubeCoreNum_) * 2;
+            // Each task uses independent 64-byte DCache lines for two AIV
+            // maxima and the descale consumed by AIC Fixpipe.
+            constexpr uint64_t SCALE_SLOT_FLOATS = 64;
+            usr_workspace_offset += AlignTo(max_task_count * SCALE_SLOT_FLOATS * sizeof(float), 512);
+        }
         tilingData_.set_dqWorkspaceOffset(usr_workspace_offset);
         usr_workspace_offset += dq_size * sizeof(float);
         tilingData_.set_dkWorkspaceOffset(usr_workspace_offset);
@@ -392,7 +454,7 @@ protected:
 
     uint64_t GetTilingKey() const override
     {
-        uint64_t default_key = 1000;
+        uint64_t default_key = isHif8_ ? 2000 : 1000;
         /*
          *  0000: BF16 BSND
          *  0001: FP16 BSND
@@ -407,7 +469,9 @@ protected:
          *  1100: BF16 TND  DET
          *  1101: FP16 TND  DET
          */
-        default_key = (dataType_ == ge::DT_BF16) ? default_key : default_key + 0b001;
+        if (!isHif8_) {
+            default_key = (dataType_ == ge::DT_BF16) ? default_key : default_key + 0b001;
+        }
 
         if (strcmp(layout_, BSND_STR) == 0) {
             default_key += 0b000;
@@ -446,6 +510,7 @@ private:
     int32_t x_block_num_ = 0;
     int32_t y_block_num_ = 0;
     bool deterministic_ = false;
+    bool isHif8_ = false;
     uint32_t cubeCoreNum_ = 0;
     uint32_t baseM_ = 0;
     uint32_t baseN_ = 0;

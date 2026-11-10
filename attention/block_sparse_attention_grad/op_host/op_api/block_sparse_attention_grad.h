@@ -20,9 +20,12 @@ const std::array<const aclTensor*, 3> BlockSparseAttentionGrad(
     const aclTensor* dout, const aclTensor* query, const aclTensor* key, const aclTensor* value,
     const aclTensor* attentionOut, const aclTensor* softmaxLse, const aclTensor* blockSparseMaskOptional,
     const aclTensor* attenMaskOptional, const aclIntArray* blockShapeOptional,
-    const aclIntArray* actualSeqLengthsOptional, const aclIntArray* actualSeqLengthsKvOptional, char* qInputLayout,
+    const aclIntArray* actualSeqLengthsOptional, const aclIntArray* actualSeqLengthsKvOptional,
+    const aclTensor* qDequantScaleOptional, const aclTensor* kDequantScaleOptional,
+    const aclTensor* vDequantScaleOptional, const aclTensor* doDequantScaleOptional,
+    const aclTensor* pQuantScaleOptional, const aclTensor* dsQuantScaleOptional, char* qInputLayout,
     char* kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t preTokens,
-    int64_t nextTokens, aclOpExecutor* executor);
+    int64_t nextTokens, int64_t quantMode, aclOpExecutor* executor);
 
 } // namespace l0op
 

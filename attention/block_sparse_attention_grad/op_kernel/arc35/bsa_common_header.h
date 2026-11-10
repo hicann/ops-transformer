@@ -58,6 +58,7 @@ struct RunTimeInfo {
     int32_t cur_q_seq_len{0};
     int32_t need_compute{0}; // 是否存在任务需要计算
     int32_t is_kv_end{0};
+    bool exclusive_kv_group{false};
     int32_t is_kv_change{0};
     int32_t kv_ping_pong_idx{0}; // kv的ping pong idx
     int32_t last_kv_seq_sum{0};
