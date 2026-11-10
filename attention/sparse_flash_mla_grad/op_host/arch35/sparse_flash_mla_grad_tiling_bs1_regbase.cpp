@@ -689,8 +689,8 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetOriWinToken(int64_t oriMa
         return ge::GRAPH_SUCCESS;
     }
 
-    auto oriWinLeft = *context_->GetAttrs()->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::ORI_WIN_LEFT));
-    auto oriWinRight = *context_->GetAttrs()->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::ORI_WIN_RIGHT));
+    auto oriWinLeft = *context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::ORI_WIN_LEFT));
+    auto oriWinRight = *context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::ORI_WIN_RIGHT));
     oriWinLeft = oriWinLeft == -1 ? INT32_MAX : oriWinLeft;
     oriWinRight = oriWinRight == -1 ? INT32_MAX : oriWinRight;
     if (oriWinLeft < 0 || oriWinRight < 0) {
@@ -839,15 +839,15 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
         const gert::Shape& usedSeqOriKVShape = usedSeqOriKV->GetStorageShape();
     }
 
-    auto oriMaskMode = *context_->GetAttrs()->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::ORI_MASK_MODE));
+    auto oriMaskMode = *context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::ORI_MASK_MODE));
+    auto cmpMaskMode = *context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::CMP_MASK_MODE));
     baseParams_->set_oriSparseMode(oriMaskMode);
-    auto cmpMaskMode = *context_->GetAttrs()->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::CMP_MASK_MODE));
     baseParams_->set_cmpSparseMode(cmpMaskMode);
     if (GetOriWinToken(oriMaskMode) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    auto cmpRatio = *context_->GetAttrs()->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::CMP_RATIO));
+    auto cmpRatio = *context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::CMP_RATIO));
     if (cmpRatio < 1 || cmpRatio > 128) {
         OP_LOGE(context_, "cmp_ratio must be in the range [1, 128], but got [%ld].", cmpRatio);
         return ge::GRAPH_FAILED;

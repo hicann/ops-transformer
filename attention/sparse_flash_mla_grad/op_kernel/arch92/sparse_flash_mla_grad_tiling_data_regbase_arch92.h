@@ -40,8 +40,8 @@ public:
     int64_t formerCoreProcessNNum;
     int64_t remainCoreProcessNNum;
     int64_t layout;
-    int32_t cmpSparseMode;
-    int32_t oriSparseMode;
+    int64_t cmpSparseMode;
+    int64_t oriSparseMode;
     int64_t oriWinLeft;
     int64_t oriWinRight;
     float scaleValue;
@@ -50,7 +50,7 @@ public:
     int64_t mm4ResWorkSpaceOffset;
     int64_t mm5ResWorkSpaceOffset;
     int64_t dSinkWorkSpaceOffset;
-    int32_t cmpRatio;
+    int64_t cmpRatio;
     bool hasUsedSeqQ;
     bool hasUsedSeqOriKV;
     bool hasUsedSeqCmpKV;
@@ -128,19 +128,19 @@ public:
     {
         return layout;
     }
-    int32_t get_cmpSparseMode() const
+    int64_t get_cmpSparseMode() const
     {
         return cmpSparseMode;
     }
-    int32_t get_oriSparseMode() const
+    int64_t get_oriSparseMode() const
     {
         return oriSparseMode;
     }
-    int32_t get_oriWinLeft() const
+    int64_t get_oriWinLeft() const
     {
         return oriWinLeft;
     }
-    int32_t get_oriWinRight() const
+    int64_t get_oriWinRight() const
     {
         return oriWinRight;
     }
@@ -160,7 +160,7 @@ public:
     {
         return dSinkWorkSpaceOffset;
     }
-    int32_t get_cmpRatio() const
+    int64_t get_cmpRatio() const
     {
         return cmpRatio;
     }
@@ -257,19 +257,19 @@ public:
     {
         this->layout = layoutParam;
     }
-    void set_cmpSparseMode(int32_t cmpSparseModeParam)
+    void set_cmpSparseMode(int64_t cmpSparseModeParam)
     {
         this->cmpSparseMode = cmpSparseModeParam;
     }
-    void set_oriSparseMode(int32_t oriSparseModeParam)
+    void set_oriSparseMode(int64_t oriSparseModeParam)
     {
         this->oriSparseMode = oriSparseModeParam;
     }
-    void set_oriWinLeft(int32_t oriWinLeftParam)
+    void set_oriWinLeft(int64_t oriWinLeftParam)
     {
         this->oriWinLeft = oriWinLeftParam;
     }
-    void set_oriWinRight(int32_t oriWinRightParam)
+    void set_oriWinRight(int64_t oriWinRightParam)
     {
         this->oriWinRight = oriWinRightParam;
     }
@@ -289,7 +289,7 @@ public:
     {
         this->dSinkWorkSpaceOffset = dSinkWorkSpaceOffset;
     }
-    void set_cmpRatio(int32_t cmpRatio)
+    void set_cmpRatio(int64_t cmpRatio)
     {
         this->cmpRatio = cmpRatio;
     }

@@ -384,7 +384,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     constInfo.commonConstInfo.n2GDv = constInfo.commonConstInfo.n2GD;
     constInfo.commonConstInfo.bN2GDv = constInfo.commonConstInfo.bN2GD;
 
-    constInfo.cmpRatio = static_cast<int64_t>(tilingData->baseParams.cmpRatio);
+    constInfo.cmpRatio = tilingData->baseParams.cmpRatio;
     constInfo.scaleValue = tilingData->baseParams.scaleValue;
     constInfo.n2GS1oS2o = constInfo.commonConstInfo.n2G * constInfo.s1Outer * constInfo.s2Outer;
     constInfo.gS1oS2o = constInfo.commonConstInfo.gSize * constInfo.s1Outer * constInfo.s2Outer;
