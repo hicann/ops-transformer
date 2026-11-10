@@ -760,7 +760,7 @@ sym_buffer.update_group(group) -> None
         <td>combine_comm_mode</td>
         <td>int</td>
         <td>可选</td>
-        <td>combine阶段通信去重开关。0表示关闭，1表示开启（同一token在本卡命中的多个专家，其combine结果先在本卡合并为一行再发回源卡，combine阶段通信量从组内行数降为1）。2表示Server内归约及域间二级回传（URMA或URMA+RoCE混合拓扑）。取值支持0、1或2，是否开启完全由调用方决定，算子内部不做收益裁决。开启会改变通信缓冲区布局，必须在创建sym_buffer时指定，且同一通信域内所有Rank取值一致。各产品支持情况与开启条件见约束说明。默认值为0。</td>
+        <td>combine阶段通信去重开关。0表示关闭，1表示开启（同一token在本卡命中的多个专家，其combine结果先在本卡合并为一行再发回源卡，combine阶段通信量从组内行数降为1）。2表示Server内归约及域间二级回传（URMA或URMA+RoCE混合拓扑）。取值支持0、1或2。Atlas A3系列开启后算子内部仍有能力校验与收益门控（不可行配置报错或自动回退、低收益形状静默回退，详见约束说明）；<term>Ascend 950PR&950DT系列产品</term>是否开启完全由调用方决定，算子内部不做收益裁决。开启会改变通信缓冲区布局，必须在创建sym_buffer时指定，且同一通信域内所有Rank取值一致。各产品支持情况与开启条件见约束说明。默认值为0。</td>
     </tr>
     <tr>
         <td>topk_weights_type</td>
@@ -1312,6 +1312,7 @@ sym_buffer.update_group(group) -> None
 - **参数一致性约束**：
   - mega_moe接口的所有输入参数及其对应的张量维度，必须与get_symm_buffer_for_mega_moe的同名参数（例如 `num_experts`、`hidden`、`intermediate_hidden` 等）保持一致。
   - 调用算子过程中使用的`num_experts`、`max_recv_token_num`、`dispatch_quant_mode`、`dispatch_quant_out_dtype`、`num_max_tokens_per_rank`、`topk_weights_type`、`combine_comm_mode`等参数取值，所有卡需保持一致，网络中不同层中也需保持一致。其中`topk_weights_type`、`combine_comm_mode`与`dispatch_quant_out_dtype`决定通信记录的布局与通信缓冲区大小，跨卡取值不一致会导致读写错位。
+  - <term>Atlas A3系列产品</term>开启combine阶段通信去重（`combine_comm_mode` = 1）时，要求各卡的num_tokens（`x`.dim0）完全一致；num_tokens不一致（即使均不小于1024）会因各卡通信chunk轮次或尾chunk布局步长不一致导致算子挂起或结果错位。各卡num_tokens不一致的部署需在上层补齐后再调用。
 
 - **通信域约束**：
     - 所有卡的`ep_world_size`参数取值需保持一致。
@@ -1471,7 +1472,13 @@ sym_buffer.update_group(group) -> None
 
   <!-- end id17 -->
   <!-- npu="A3,910b" id26 -->
-  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持combine阶段通信去重，`combine_comm_mode`必须保持默认值0；`scales`为预留输入，当前必须传入None；输出`y`的数据类型与`x`一致。
+  - <term>Atlas A2系列产品</term>：不支持combine阶段通信去重，`combine_comm_mode`必须保持默认值0；`scales`为预留输入，当前必须传入None；输出`y`的数据类型与`x`一致。
+  - <term>Atlas A3系列产品</term>：`scales`为预留输入，当前必须传入None；输出`y`的数据类型与`x`一致。combine阶段通信去重仅`A8W4-INT`量化场景支持（`combine_comm_mode` = 1），其余场景必须保持默认值0，取值1时算子在tiling阶段报错。
+    - `combine_comm_mode` = 1时实际开启需同时满足能力约束与收益门控：`max_recv_token_num`不满足单轮接收约束（手动配置过小）时算子自动回退（不开启去重）并打日志说明原因；通信buffer不满足去重最小窗口需求时算子报错并给出建议值；收益门控不达标（小batch等低收益形状）时静默回退并打一条decision日志，不报错。
+    - 能力约束：`max_recv_token_num` ≥ min(num_tokens, 1024) × `ep_world_size` × min(`num_topk`, `num_experts_per_rank`)（保持缺省值0时由接口自动计算的取值恰好满足；不满足时自动回退）；通信buffer需满足去重布局的最小窗口需求，通过`get_symm_buffer_for_mega_moe`申请时（`combine_comm_mode` = 1）会自动按该需求计算，手动配置不满足时算子报错并给出建议值。
+    - 开启去重时要求各卡的num_tokens（`x`.dim0）完全一致；num_tokens不一致（即使均不小于1024）会因各卡通信chunk轮次或尾chunk布局步长不一致导致算子挂起或结果错位。
+    - `combine_comm_mode` = 1时，同一token在同一张卡上命中的多个专家输出改为在该卡按FP32加权累加后合并为一行再发送：与关闭态相比，除跨专家累加顺序外，加权位置与中间舍入次数也发生变化（关闭态：各专家输出先量化为BF16再乘以topk权重；开启态：FP32全程加权累加、末端一次舍入），因此即使`num_topk` = 1结果也可能不同；`y`与`combine_comm_mode` = 0不逐位相同属正常差异，且开启态通常更接近参考值；需要与关闭态逐位一致时请使用`combine_comm_mode` = 0。
+    - 适用场景：`num_topk`较大、同一token命中同卡多个专家的比例较高、性能瓶颈在通信的形状，开启后收益明显；小batch等低收益形状由收益门控自动回退（不开启去重），无需调用方逐形状判断，门控边界附近的边缘形状建议实测后再决定。
   <!-- end id26 -->
   <!-- npu="950" id18 -->
   - **<term>Ascend 950PR&950DT系列产品</term>：**

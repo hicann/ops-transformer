@@ -79,10 +79,14 @@ using namespace Mc2Tiling;
 //   TB2_   : transpose_weight2 attribute
 //   Nz_    : whether weight1/2 is in FRACTAL_NZ format (both are the same)
 //   IS_A2_ : whether running on Atlas A2 (910B); false means A3 (910_93)
-#define MegaMoeClass typename AType_, typename BType_, typename CType_, bool TB1_, bool TB2_, bool Nz_, bool IS_A2_
-#define MegaMoeFunc AType_, BType_, CType_, TB1_, TB2_, Nz_, IS_A2_
+//   DedupOn_    : 通信零冗余实例；false = 基线实例（if constexpr 裁剪后与基线逐位一致）。
+//            仅 A3+W4A8 链双实例化，其余链缺省 false。
+#define MegaMoeClass \
+    typename AType_, typename BType_, typename CType_, bool TB1_, bool TB2_, bool Nz_, bool IS_A2_, bool DedupOn_
+#define MegaMoeFunc AType_, BType_, CType_, TB1_, TB2_, Nz_, IS_A2_, DedupOn_
 
-template <MegaMoeClass>
+template <typename AType_, typename BType_, typename CType_, bool TB1_, bool TB2_, bool Nz_, bool IS_A2_,
+          bool DedupOn_ = false>
 class MegaMoe {
 public:
     __aicore__ inline MegaMoe(){};
@@ -136,6 +140,14 @@ private:
     float activationClamp_;
     float activationParams1_;
     float activationParams2_;
+    // 通信零冗余：dedupOn_=0 时下列字段全 0（基线布局）；=1 时偏移由 host dedup_layout
+    // 单一口径透传（kernel 不重算）
+    uint32_t dedupOn_{0};
+    int64_t offsetExpandedDstToSrcRow_{0};
+    int64_t dedupOffsetD_{0};
+    int64_t distTokenFirstPosSize_{0};
+    int64_t distTokenLastPosSize_{0};
+    int64_t dedupRowMetaSize_{0};
 
     // Quant/NonQuant 两种 tiling 结构的 common 字段类型一致，此处统一加载公共字段
     __aicore__ inline void LoadCommonTiling(const MegaMoeA2A3TilingData& common)
@@ -150,6 +162,13 @@ private:
         // maxOutputSize 语义 = 单轮接收预算 B（recvRoundBudget）；接收行超出 B 由 kernel 接收端轮次切分处理
         maxOutputSize_ = common.recvRoundBudget;
         recvRoundsMax_ = common.recvRoundsMax;
+        // Dedup 布局透传（全路径读取；dedupOn=0 时全 0，kernel 走基线布局）
+        dedupOn_ = common.dedupOn;
+        offsetExpandedDstToSrcRow_ = common.offsetExpandedDstToSrcRow;
+        dedupOffsetD_ = common.dedupOffsetD;
+        distTokenFirstPosSize_ = common.distTokenFirstPosSize;
+        distTokenLastPosSize_ = common.distTokenLastPosSize;
+        dedupRowMetaSize_ = common.dedupRowMetaSize;
         listLen_ = common.listLen;
         activationCode_ = common.activationCode;
         activationClamp_ = common.activationClamp;
@@ -291,6 +310,10 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Process()
         isW4A8,
         Epilogue::Block::BlockEpilogue<EpilogueDispatchPolicy3, CType, PerTokenScaleType, D2Type, TileCopy2, IS_A2>,
         Epilogue::Block::BlockEpilogue<EpilogueDispatchPolicy3, CType, PerTokenScaleType, D2Type, TileCopy2, IS_A2>>;
+    // Dedup combine 行级 epilogue，仅 DedupOn_=true 实例的 DedupCombineV2 使用
+    using EpilogueDispatchPolicyDedup = Epilogue::EpilogueAtlasA2W4A8PostPerTokenDedup<ubStages>;
+    using BlockEpilogueDedup =
+        Epilogue::Block::BlockEpilogue<EpilogueDispatchPolicyDedup, CType, PerTokenScaleType, D2Type, TileCopy2>;
 
     using BlockScheduler = typename Gemm::Block::GemmIdentityBlockSwizzle<9, 1>;
     using ElementGroupList = int64_t;
@@ -337,7 +360,7 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Process()
                            Gemm::Kernel::MegaMoeKernelA2BF16<BlockMmad, BlockScheduler, ElementGroupList,
                                                              BlockEpilogue1, BlockEpilogue2>>>;
     using A3MatmulKernel = Gemm::Kernel::MegaMoeKernel<BlockMmad, BlockScheduler, ElementGroupList, BlockEpilogue1,
-                                                       BlockEpilogue2, BlockEpilogue3>;
+                                                       BlockEpilogue2, BlockEpilogue3, BlockEpilogueDedup, DedupOn_>;
     using MatmulKernel = std::conditional_t<IS_A2_, A2MatmulKernel, A3MatmulKernel>;
 
     typename MatmulKernel::Params params{problemShape,
@@ -383,6 +406,14 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Process()
         // A3 has two additional routing fields; its Params constructor otherwise matches A2.
         params.ptrMaskBuffer = maskBufferGM_;
         params.recvRoundsMax = recvRoundsMax_;
+        // Dedup 布局透传（仅 A3 Params 具备 Dedup 字段；dedupOn=0 时全 0，
+        // PeermemInfo/WorkspaceInfo 走基线布局）
+        params.dedupOn = dedupOn_;
+        params.offsetExpandedDstToSrcRow = offsetExpandedDstToSrcRow_;
+        params.dedupOffsetD = dedupOffsetD_;
+        params.distTokenFirstPosSize = distTokenFirstPosSize_;
+        params.distTokenLastPosSize = distTokenLastPosSize_;
+        params.dedupRowMetaSize = dedupRowMetaSize_;
     }
 
     MatmulKernel kernel(params);

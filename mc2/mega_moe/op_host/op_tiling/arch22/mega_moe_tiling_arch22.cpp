@@ -30,6 +30,7 @@
 #include "../../../op_kernel/arch22/mega_moe_tiling_a2a3.h"
 #include "../../../op_kernel/arch22/mega_moe_tiling_key.h"
 #include "../../../op_kernel/arch22/moe_permute_prologue/moe_permute_prologue_tiling.h"
+#include "mega_moe_dedup_layout.h"
 
 using namespace AscendC;
 using namespace ge;
@@ -56,6 +57,9 @@ constexpr uint32_t ATTR_ACTIVATION_OUT_DTYPE_INDEX = 12;        // 激活函数�
 constexpr uint32_t ATTR_TRANSPOSE_WEIGHT1_INDEX = 13;           // weight1 是否转置
 constexpr uint32_t ATTR_TRANSPOSE_WEIGHT2_INDEX = 14;           // weight2 是否转置
 constexpr uint32_t ATTR_WEIGHT1_INTERLEAVE_INDEX = 15;          // weight1 交错模式
+// 属性位 16~18（topo_type/rank_num_per_server/topk_weights_type）arch22 不消费
+// 位序同 mega_moe_def.cpp 注册序
+constexpr uint32_t ATTR_COMBINE_COMM_MODE_INDEX = 19; // combine 通信去重开关（arch22 复用为 Dedup 总开关）
 
 constexpr uint32_t ACTIVATION_CODE_SWIGLU = 0;
 constexpr uint32_t ACTIVATION_CODE_SITU = 2;
@@ -1702,9 +1706,7 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
     int64_t expertNum = info.expertPerRank * info.worldSize;
     size_t initRoutingWorkspace = 0;
 
-    if (StoreMegaMoeCommonTiling(context, info, tilingData) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
+    // 公共 tiling 统一在各特性增量算完后落库（见下方 StoreMegaMoeCommonTiling 调用）。
     Mc2Tiling::MoePermutePrologueTilingBase permuteTilingBase;
     permuteTilingBase.DoTiling(info.M, info.topK, expertNum);
     initRoutingWorkspace = permuteTilingBase.workspaceSize_;
@@ -1721,6 +1723,89 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
         SetA3WorkspaceSize(info, n2, k2, megeMoeWorkspace);
     } else if (archCode == SOC_ASCEND910B) {
         SetA2WorkspaceSize(info, n2, k2, megeMoeWorkspace);
+    }
+
+    // ===== 通信零冗余（Dedup）=====
+    // 开启 = combineCommMode=1（属性位 19，arch22 复用为 Dedup 特性总开关）&& 单轮可行 &&
+    // winIn ≥ Dedup least && G > 门限（收益门控，常数见 mega_moe_dedup_layout.h）。门序：客观门
+    // fail-fast 在前（显式请求撞物理约束必报错），收益门控静默在后——可行但无收益时回基线 +
+    // decision 日志（阈值判断非正确性，不报错；回基线亦可显式设 combine_comm_mode=0）。
+    // 支持范围仅 A3 + W4A8 量化路径，其它路径显式请求 combine_comm_mode=1 直接报错。
+    // dedupOn=0 时 Dedup 字段全 0、kernel 走基线布局（逐位一致）；=1 时偏移由
+    // dedup_layout 单一口径透传。
+    info.dedupOn = 0U;
+    info.offsetExpandedDstToSrcRow = 0;
+    info.dedupOffsetD = 0;
+    info.distTokenFirstPosSize = 0;
+    info.distTokenLastPosSize = 0;
+    info.dedupRowMetaSize = 0;
+    {
+        auto attrs = context->GetAttrs();
+        auto combineCommModePtr =
+            (attrs == nullptr) ? nullptr : attrs->GetAttrPointer<int64_t>(ATTR_COMBINE_COMM_MODE_INDEX);
+        const int64_t combineCommMode = (combineCommModePtr == nullptr) ? 0 : *combineCommModePtr;
+        OP_TILING_CHECK(
+            combineCommMode != 0 && combineCommMode != 1,
+            OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "[DEDUP] combine_comm_mode only supports 0 or 1, but got %ld",
+                                   static_cast<long>(combineCommMode)),
+            return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            combineCommMode == 1 && !(archCode == SOC_ASCEND910_93 && info.isW4A8 != 0U),
+            OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "[DEDUP] combine_comm_mode=1 (combine dedup) currently "
+                                                  "supports only the W4A8 (A8W4-INT) quant path on Atlas A3; "
+                                                  "set combine_comm_mode=0 on this configuration"),
+            return ge::GRAPH_FAILED);
+        if (combineCommMode == 1) {
+            const int64_t chunkTokens = std::min(static_cast<int64_t>(info.M), MOE_PERMUTE_CHUNK);
+            const MegaMoeDedup::DedupFeasibility feasibility = MegaMoeDedup::CheckDedupFeasible(
+                chunkTokens, info.K, info.topK, info.worldSize, static_cast<int64_t>(info.expertPerRank),
+                static_cast<int64_t>(info.recvRoundBudget), info.cclBufferSize);
+            // 配置须人工调整的不可行（路径/位宽/窗口）→ fail-fast（原因见上方 [DEDUP] infeasible
+            // 日志；回基线须显式设 combine_comm_mode=0）
+            OP_TILING_CHECK(
+                feasibility == MegaMoeDedup::DedupFeasibility::kInfeasible,
+                OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "[DEDUP] requested by combine_comm_mode=1 but infeasible "
+                                                      "(see the [DEDUP] infeasible line above for reason); "
+                                                      "set combine_comm_mode=0 to stay on baseline"),
+                return ge::GRAPH_FAILED);
+            // 单轮不满足（手配 max_recv_token_num 过小）→ 自动回基线（[DEDUP] fallback 日志已在
+            // CheckDedupFeasible 内打出）：基线按同预算多轮跑，不违背调用方资源意图
+            if (feasibility == MegaMoeDedup::DedupFeasibility::kFeasible) {
+                // G 收益门控（可行性校验之后）：可行但 G ≤ 门限 → 静默回基线
+                // （阈值判断非正确性，不报错）+ decision 日志
+                const double dedupGateG = MegaMoeDedup::CalcDedupGateGBytes(
+                    static_cast<int64_t>(info.M), static_cast<int64_t>(info.K), static_cast<int64_t>(info.topK),
+                    static_cast<int64_t>(info.expertPerRank), static_cast<int64_t>(info.worldSize));
+                if (dedupGateG <= static_cast<double>(MegaMoeDedup::DEDUP_GATE_G_THRESHOLD_BYTES)) {
+                    OP_LOGI(K_INNER_DEBUG, "[DEDUP] decision: m=%u G=%ldB thetaG=%ldB ccm=1 -> master (gate)", info.M,
+                            static_cast<long>(dedupGateG),
+                            static_cast<long>(MegaMoeDedup::DEDUP_GATE_G_THRESHOLD_BYTES));
+                } else {
+                    MegaMoeDedup::DedupTilingOutput dedupOut;
+                    OP_TILING_CHECK(MegaMoeDedup::CalcDedupTiling(chunkTokens, info.K, info.topK, info.worldSize,
+                                                                  static_cast<int64_t>(info.recvRoundBudget),
+                                                                  dedupOut) != ge::GRAPH_SUCCESS,
+                                    OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "[DEDUP] CalcDedupTiling failed"),
+                                    return ge::GRAPH_FAILED);
+                    info.dedupOn = 1U;
+                    info.offsetExpandedDstToSrcRow = dedupOut.offsetExpandedDstToSrcRow;
+                    info.dedupOffsetD = dedupOut.offsetD;
+                    info.distTokenFirstPosSize = dedupOut.distTokenFirstPosSize;
+                    info.distTokenLastPosSize = dedupOut.distTokenLastPosSize;
+                    info.dedupRowMetaSize = dedupOut.rowMetaSize;
+                    // workspace Dedup 增量段：FP → LP → rowMeta（段序与 kernel 侧 WorkspaceInfo 一致）
+                    megeMoeWorkspace += static_cast<uint64_t>(dedupOut.distTokenFirstPosSize) +
+                                        static_cast<uint64_t>(dedupOut.distTokenLastPosSize) +
+                                        static_cast<uint64_t>(dedupOut.rowMetaSize);
+                    OP_LOGI(K_INNER_DEBUG, "[DEDUP] enabled: m=%u G=%ldB (combine_comm_mode=1)", info.M,
+                            static_cast<long>(dedupGateG));
+                }
+            }
+        }
+    }
+
+    if (StoreMegaMoeCommonTiling(context, info, tilingData) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
 
     workSpaces[0] = SYSTEM_NEED_WORKSPACE + std::max(megeMoeWorkspace, initRoutingWorkspace);

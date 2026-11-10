@@ -544,6 +544,32 @@ int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRou
     return (offsetTokenPerExpert + offsetTensor + offsetFlag + RESERVED_SPACE_SIZE + MB_SIZE) / MB_SIZE;
 }
 
+// 零冗余（Dedup）布局下 winIn 最小需求，与 op_tiling/arch22/mega_moe_dedup_layout.cpp 的
+// CalcLeastCclBufferSizeDedup 同源镜像（MB 向上取整）。仅 A3 + W4A8 路径。
+constexpr int64_t DEDUP_PACK_SECTION_COUNT =
+    2; // 打包区每 rank 段 [slots|probs] 等长两段（rankOrdinal 内联 slots 高 8bit，同源 mega_moe_dedup_layout.h）
+
+int64_t CalcLeastCclBufferSizeDedupA3(int64_t h, int64_t epWorldSize, int64_t bs, int64_t topK)
+{
+    int64_t offsetTokenPerExpert = epWorldSize * CeilAlign(epWorldSize * MAX_EXPERTS_PER_RANK_A2A3 + 1, ALIGN_128) *
+                                   static_cast<int64_t>(sizeof(int32_t));
+
+    const int64_t chunkTokens = std::min(bs, MOE_PERMUTE_CHUNK);
+    // A 区：原始序 chunkTokens 行 × (h+512)（不乘 topK——跨卡去重后同一 token 只发一次）
+    int64_t offsetA = chunkTokens * (h + ALIGN_512);
+    // 打包区：每 rank 段 [slots|probs] 各 chunkTokens·topK·i32，总 EP·chunkTokens·topK·8B
+    int64_t offsetPack =
+        epWorldSize * chunkTokens * topK * static_cast<int64_t>(sizeof(int32_t)) * DEDUP_PACK_SECTION_COUNT;
+    // D 区（token 块）：(min(topK,EP)·chunkTokens + 1 行防御 pad)·h·2B；无
+    // perTokenScale 保留区。D 基址 128B 对齐与 host 侧 dedup_layout 同口径
+    int64_t offsetD = (std::min(topK, epWorldSize) * chunkTokens + 1) * h * static_cast<int64_t>(sizeof(int16_t));
+    int64_t offsetTensor = CeilAlign(offsetA + offsetPack, ALIGN_128) + offsetD;
+
+    int64_t offsetFlag = std::max(epWorldSize * ALIGN_512, SYNC_STATE_RESERVED_SIZE);
+
+    return (offsetTokenPerExpert + offsetTensor + offsetFlag + RESERVED_SPACE_SIZE + MB_SIZE) / MB_SIZE;
+}
+
 int64_t CalcTokenScaleBytesA5(int64_t hidden, int64_t numTopk, int64_t topkWeightsType)
 {
     int64_t mxScaleNum = (hidden + MXFP_SCALE_GROUP_NUM - 1) / MXFP_SCALE_GROUP_NUM;
@@ -897,6 +923,15 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
         TORCH_CHECK(dispatchQuantMode == 0 || dispatchQuantMode == 2 || dispatchQuantMode == 4,
                     "dispatch_quant_mode only support {0, 2, 4} on A2/A3, but got ", dispatchQuantMode);
 
+        // 建通信 context 前拒绝必败配置；权重 dtype 的 W4A8 精判由算子 tiling 把关
+        TORCH_CHECK(combineCommMode == 0 || combineCommMode == 1,
+                    "combine_comm_mode only support 0 or 1 on A2/A3, but got ", combineCommMode);
+        TORCH_CHECK(!(isA2 && combineCommMode == 1),
+                    "combine_comm_mode=1 (combine dedup) is not supported on Atlas A2, keep combine_comm_mode=0");
+        TORCH_CHECK(!(isA3 && combineCommMode == 1 && dispatchQuantMode != 2),
+                    "combine_comm_mode=1 (combine dedup) currently supports only the W4A8 (A8W4-INT) quant "
+                    "path on Atlas A3, which requires dispatch_quant_mode=2; set combine_comm_mode=0 otherwise");
+
         bool isQuantRouting = (dispatchQuantMode == 4);
         // max_recv_token_num 为 0 时自动计算为 bs * epWorldSize * min(topK, expertPerRank)，
         if (maxRecvTokenNum == 0) {
@@ -904,7 +939,16 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
             maxRecvTokenNum = numMaxTokensPerRank * epWorldSize * std::min(numTopk, expertPerRank);
         }
         if (isA3) {
-            return CalcLeastCclBufferSizeA3(hidden, epWorldSize, isQuantRouting, numMaxTokensPerRank, numTopk);
+            // 与 host tiling [DEDUP] 同源：combine_comm_mode=1 时 tiling 走 Dedup、被 G 收益门
+            // 静默关回基线或直接报错三种结局，两公式大小关系随 EP/topK 翻转，取 max 以
+            // 兼容可行性校验前的容量咨询；=0 或非量化 dispatch（无 Dedup 实例）→ 基线公式
+            int64_t masterMb =
+                CalcLeastCclBufferSizeA3(hidden, epWorldSize, isQuantRouting, numMaxTokensPerRank, numTopk);
+            if (dispatchQuantMode != 0 && combineCommMode == 1) {
+                return std::max(masterMb,
+                                CalcLeastCclBufferSizeDedupA3(hidden, epWorldSize, numMaxTokensPerRank, numTopk));
+            }
+            return masterMb;
         }
         return CalcLeastCclBufferSizeA2(maxRecvTokenNum, hidden, epWorldSize, isQuantRouting, numMaxTokensPerRank,
                                         numTopk);

@@ -47,6 +47,8 @@
 #include "utils/layout3d.hpp"
 
 #include "moe_permute_prologue/moe_permute_prologue.hpp"
+#include "moe_permute_prologue/moe_permute_prologue_dedup.hpp"
+#include "utils/block_epilogue_w4a8post_pertoken_dedup.hpp"
 #include "unpermute/mc2_mega_moe_moe_token_unpermute.h"
 #include "utils/get_tensor_addr.hpp"
 #include "utils/weight_l2_prefetch.hpp"
@@ -74,11 +76,14 @@ constexpr uint16_t PERMUTE_CHUNK_FLAG_STRIDE = 0;
 constexpr int64_t PERMUTE_MAX_CORES = 128;
 
 // Atlas A3 (910_93) kernel.
+// DedupOn_：通信零冗余实例；false = 基线实例（if constexpr 裁剪后与基线逐位一致）。
+// 仅 W4A8 链双实例化（入口按 tilingData.common.dedupOn 运行时选择）。
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
-          class BlockEpilogue2_, class BlockEpilogue3_>
+          class BlockEpilogue2_, class BlockEpilogue3_, class BlockEpilogueDedup_, bool DedupOn_ = false>
 class MegaMoeKernel {
 public:
     using BlockMmad = BlockMmad_;
+    using BlockEpilogueDedup = BlockEpilogueDedup_;
     using ArchTag = typename BlockMmad::ArchTag;
     using L1TileShape = typename BlockMmad::L1TileShape;
     using ElementA = typename BlockMmad::ElementA;
@@ -170,6 +175,14 @@ public:
         GM_ADDR tilingGM{nullptr};
         GM_ADDR ptrMaskBuffer{nullptr};
         //--------------
+        // 通信零冗余：构造后由 Process 赋值。dedupOn=0 时下列字段全 0、布局与
+        // 基线逐位一致；=1 时偏移由 host mega_moe_dedup_layout 计算经 tilingData 透传。
+        uint32_t dedupOn{0};
+        int64_t offsetExpandedDstToSrcRow{0}; // peermem 打包区基址（rank 段 [slots|probs]）
+        int64_t dedupOffsetD{0};              // Dedup D 区基址（发送方 rank 分段）
+        int64_t distTokenFirstPosSize{0};     // workspace FP 表段字节数（EP·chunkTokens·4B）
+        int64_t distTokenLastPosSize{0};      // workspace LP 表段字节数
+        int64_t dedupRowMetaSize{0};          // workspace rowMeta 段字节数（recvRoundBudget·32B）
 
         // Methods
         CATLASS_HOST_DEVICE
@@ -1003,6 +1016,11 @@ private:
         AscendC::LocalTensor<int32_t> prevSumBuf = tmpBuffer[numPerCore];
 
         int32_t runtimeRank = RuntimeRank(params);
+        // Dedup 打包段元素数（slots+probs 两段，N = layoutChunkTokens·topK）
+        const int64_t dedupLayoutChunkTokens =
+            (params.problemShape.m() < PERMUTE_CHUNK) ? params.problemShape.m() : PERMUTE_CHUNK;
+        const int32_t dedupPackElems =
+            static_cast<int32_t>(DEDUP_PACK_SECTION_COUNT * dedupLayoutChunkTokens * params.topK);
         for (int32_t dstEpIdx = coreIdx; dstEpIdx < params.EP; dstEpIdx += coreNum) {
             if (dstEpIdx == runtimeRank || IsRankMasked(dstEpIdx)) {
                 continue;
@@ -1012,6 +1030,18 @@ private:
             AscendC::GlobalTensor<int32_t> dstAddress;
             __gm__ void* dstPeermemPtr = shmem(localTokenPerExpertOffset, dstEpIdx);
             dstAddress.SetGlobalBuffer((__gm__ int32_t*)dstPeermemPtr);
+
+            if constexpr (DedupOn_) {
+                // 打包段先于 TPE 推送：同核同源同目的 MTE3 按序，远端见 TPE flag 即知打包段
+                // 已落地，不新增跨卡同步点
+                const int64_t packOffset = peermemInfo.offsetExpandedDstToSrcRow +
+                                           runtimeRank * static_cast<int64_t>(dedupPackElems) * sizeof(int32_t);
+                AscendC::GlobalTensor<int32_t> packSrc;
+                packSrc.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(shmem() + packOffset));
+                AscendC::GlobalTensor<int32_t> packDst;
+                packDst.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(shmem(packOffset, dstEpIdx)));
+                CopyGMToGM<int32_t>(packDst, packSrc, dedupPackElems, DEDUP_PACK_UB_MOVE_ELEMS);
+            }
 
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
             using TType = Gemm::GemmType<int32_t, layout::RowMajor>;
@@ -1076,6 +1106,8 @@ private:
             AscendC::DataCopyPad(
                 preSumBeforeRank[dstEpIdx * params.expertPerRank], prevSumBuf,
                 AscendC::DataCopyParams{1, static_cast<uint16_t>(params.expertPerRank * sizeof(int32_t)), 0, 0});
+            // preSum 为 DMA 写，消费侧经 UB 缓存读取，由函数尾 SyncAll 收口可见，无需
+            // DCCI；若改为跨核标量直读 GM，须加 DCCI 清洗。
         }
 
         AscendC::SyncAll<true>();
@@ -1157,6 +1189,39 @@ private:
         }
     }
 
+    // Dedup 构件：此处仅声明，定义在 mega_moe_kernel_a3_dedup.hpp（本文件末尾包含）
+    CATLASS_DEVICE
+    void ResetDistTokenFirstPosV2(GM_ADDR distTokenFirstPos, GM_ADDR distTokenLastPos, int32_t num, uint32_t coreIdx,
+                                  uint32_t coreNum);
+
+    CATLASS_DEVICE
+    int32_t DedupGroupOf(int32_t row, const AscendC::LocalTensor<int32_t>& groupBase, int32_t er);
+
+    CATLASS_DEVICE
+    void DedupTokenDispatchV2(Params const& params, uint16_t& syncgmm1Idx, uint32_t& dequantSumTemp);
+
+    // ================= Dedup Combine v2 =================
+    // 切片发射：组第 s 片 = 组内行 [s·SR, min((s+1)·SR, coreLenG))，rowMeta 与 scale2
+    // 一次 MTE2_S Set 覆盖，缓冲/事件按 s 奇偶轮转（EVENT_ID6/7）。片宽/缓冲常量见
+    // const_args.hpp（DEDUP_COMBINE_SLICE_*）。
+    CATLASS_DEVICE
+    void DedupIssueRowMetaSlice(AscendC::GlobalTensor<int32_t>& rowMetaGm, int32_t preGroupSumG, uint32_t coreOffsetG,
+                                uint32_t coreLenG, uint32_t sliceRows, uint32_t s,
+                                AscendC::LocalTensor<int32_t> (&ubRowMetaSl)[2],
+                                AscendC::LocalTensor<float> (&ubScale2Sl)[2], AscendC::DataCopyExtParams& sliceParamsRM,
+                                AscendC::DataCopyExtParams& sliceParamsS2);
+
+    CATLASS_DEVICE
+    typename BlockEpilogueDedup::RowCtx DedupDeriveRow(
+        AscendC::GlobalTensor<int32_t>& rowMetaGm, AscendC::LocalTensor<int32_t> (&ubRowMetaSl)[2],
+        AscendC::LocalTensor<float> (&ubRowMetaSlF)[2], AscendC::LocalTensor<float> (&ubScale2Sl)[2],
+        AscendC::DataCopyExtParams& sliceParamsRM, AscendC::DataCopyExtParams& sliceParamsS2, uint32_t i,
+        uint32_t coreOffsetG, uint32_t coreLenG, int32_t preGroupSumG, int32_t n2T, int32_t layoutChunkTokensT,
+        uint32_t& issued, uint32_t totalSlices);
+
+    CATLASS_DEVICE
+    void DedupCombineV2(Params const& params);
+
     // 接收轮处理：轮内复用原有 dispatch → swiglu → combine 流水。
     // 前置条件：cumsumMM / preSumBeforeRank / UB 路由缓存已指向本轮数据
     // （rounds==1 时为 chunk 级表，rounds>1 时调用方已切换到轮表并刷新 UB 缓存）。
@@ -1171,76 +1236,81 @@ private:
         AscendC::CrossCoreSetFlag<0x2, PIPE_MTE3>(syncgmm1Idx / CROSS_CORE_FLAG_MAX_SET_COUNT);
         syncgmm1Idx++;
 
-        // dispatch（接收轮局部）
-        uint32_t prevGroupSum1 = 0;
-        uint32_t prevGroupSum2 = 0;
+        // dispatch（接收轮局部）；Dedup 实例改走 DedupTokenDispatchV2，下列基线局部量
+        // 在 if constexpr 裁剪后不引用
+        [[maybe_unused]] uint32_t prevGroupSum1 = 0;
         nSyncSwiglu = 0;
         dequantSum[0] = 0;
         uint32_t dequantSumTemp = 0;
-        uint32_t dequantSum1 = 0;
-        uint32_t dequantSum2 = 0;
-        int32_t pingpongIdx = 0;
+        [[maybe_unused]] uint32_t dequantSum1 = 0;
+        [[maybe_unused]] uint32_t dequantSum2 = 0;
+        [[maybe_unused]] int32_t pingpongIdx = 0;
         icache_preload(ICACHE_PRELOAD_LINES);
         if constexpr (std::is_same_v<ElementB, int8_t>) {
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
         }
         exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::DISPATCH);
-        for (int32_t groupIdx = 0; groupIdx < params.expertPerRank; ++groupIdx) {
-            // ----------------------------------------------------------
-            // Each core pulls its `dstEpIdx`'s tokens out of the remote
-            // rank's local peer-mem and runs the pre-process step.
-            // ----------------------------------------------------------
-            uint32_t currentM = cumsumMM.GetValue((params.EP - 1) * params.expertPerRank + groupIdx);
-            for (int32_t dstEpIdx = coreIdx; dstEpIdx < params.EP; dstEpIdx += coreNum) {
-                if (IsRankMasked(dstEpIdx)) {
-                    continue;
-                }
-                uint32_t rowStartInGroup =
-                    dstEpIdx == 0 ? 0 : cumsumMM.GetValue((dstEpIdx - 1) * params.expertPerRank + groupIdx);
-                uint32_t rowStart = rowStartInGroup + prevGroupSum1;
-                if (rowStart < params.maxOutputSize) {
-                    uint32_t rows = ubTokenPerExpertCache.GetValue(dstEpIdx * expertPerRankAligned + groupIdx);
-                    if (rowStart + rows > params.maxOutputSize) {
-                        rows = params.maxOutputSize - rowStart;
+        if constexpr (DedupOn_) {
+            // Dedup Dispatch v2：token 粒度去重 dispatch
+            DedupTokenDispatchV2(params, syncgmm1Idx, dequantSumTemp);
+        } else {
+            for (int32_t groupIdx = 0; groupIdx < params.expertPerRank; ++groupIdx) {
+                // ----------------------------------------------------------
+                // Each core pulls its `dstEpIdx`'s tokens out of the remote
+                // rank's local peer-mem and runs the pre-process step.
+                // ----------------------------------------------------------
+                uint32_t currentM = cumsumMM.GetValue((params.EP - 1) * params.expertPerRank + groupIdx);
+                for (int32_t dstEpIdx = coreIdx; dstEpIdx < params.EP; dstEpIdx += coreNum) {
+                    if (IsRankMasked(dstEpIdx)) {
+                        continue;
                     }
-                    uint32_t rowSrc = ubPreSumBeforeRankCache.GetValue(dstEpIdx * params.expertPerRank + groupIdx);
-                    GM_ADDR otherRankPtr = shmem(0, dstEpIdx);
-                    AscendC::GlobalTensor<ElementABefore> gmRemoteA;
-                    gmRemoteA.SetGlobalBuffer(
-                        reinterpret_cast<__gm__ ElementABefore*>(otherRankPtr + peermemInfo.offsetA));
+                    uint32_t rowStartInGroup =
+                        dstEpIdx == 0 ? 0 : cumsumMM.GetValue((dstEpIdx - 1) * params.expertPerRank + groupIdx);
+                    uint32_t rowStart = rowStartInGroup + prevGroupSum1;
+                    if (rowStart < params.maxOutputSize) {
+                        uint32_t rows = ubTokenPerExpertCache.GetValue(dstEpIdx * expertPerRankAligned + groupIdx);
+                        if (rowStart + rows > params.maxOutputSize) {
+                            rows = params.maxOutputSize - rowStart;
+                        }
+                        uint32_t rowSrc = ubPreSumBeforeRankCache.GetValue(dstEpIdx * params.expertPerRank + groupIdx);
+                        GM_ADDR otherRankPtr = shmem(0, dstEpIdx);
+                        AscendC::GlobalTensor<ElementABefore> gmRemoteA;
+                        gmRemoteA.SetGlobalBuffer(
+                            reinterpret_cast<__gm__ ElementABefore*>(otherRankPtr + peermemInfo.offsetA));
 
-                    // 在做dispatch的时候，因为复用了gmm1的A矩阵与swiglu的输出
-                    // 所以dispatch的时候每个专家之间间隔从密排改为max（k， k2）
-                    // 但是专家之内仍然是密排的
-                    int64_t gmOffsetA = static_cast<int64_t>(prevGroupSum1) * params.gmm1InputExpertSlotWidth +
-                                        static_cast<int64_t>(rowStartInGroup) * params.problemShape.k();
-                    if constexpr (std::is_same_v<ElementB, AscendC::int4b_t>) {
-                        int64_t gmOffsetPeer = rowSrc * (params.problemShape.k() + ALIGN_512);
-                        FetchAndPreprocessInt8ToInt4(static_cast<uint64_t>(gmOffsetA), gmPerTokenScale1[rowStart],
-                                                     gmRemoteA[gmOffsetPeer], rows, params.problemShape.k());
-                    } else if constexpr (std::is_same_v<ElementB, int8_t>) {
-                        // quant 路径：远端行步长 k+512（行尾含 per-token scale）
-                        int64_t gmOffsetPeer = rowSrc * (params.problemShape.k() + ALIGN_512);
-                        int32_t ubMoveNum = 2;
-                        CopyGMToGMPerToken(gmA[gmOffsetA], gmPerTokenScale1[rowStart], gmRemoteA[gmOffsetPeer], rows,
-                                           params.problemShape.k(), ubMoveNum, pingpongIdx);
-                    } else {
-                        // 非 quant 路径：远端 expandedX 行步长 = k（密排），可直接连续拷贝 rows * k
-                        int64_t gmOffsetPeer = rowSrc * params.problemShape.k();
-                        CopyGMToGM(gmA[gmOffsetA], gmRemoteA[gmOffsetPeer], rows * params.problemShape.k(),
-                                   UB_MOVE_NUM);
+                        // 在做dispatch的时候，因为复用了gmm1的A矩阵与swiglu的输出
+                        // 所以dispatch的时候每个专家之间间隔从密排改为max（k， k2）
+                        // 但是专家之内仍然是密排的
+                        int64_t gmOffsetA = static_cast<int64_t>(prevGroupSum1) * params.gmm1InputExpertSlotWidth +
+                                            static_cast<int64_t>(rowStartInGroup) * params.problemShape.k();
+                        if constexpr (std::is_same_v<ElementB, AscendC::int4b_t>) {
+                            int64_t gmOffsetPeer = rowSrc * (params.problemShape.k() + ALIGN_512);
+                            FetchAndPreprocessInt8ToInt4(static_cast<uint64_t>(gmOffsetA), gmPerTokenScale1[rowStart],
+                                                         gmRemoteA[gmOffsetPeer], rows, params.problemShape.k());
+                        } else if constexpr (std::is_same_v<ElementB, int8_t>) {
+                            // quant 路径：远端行步长 k+512（行尾含 per-token scale）
+                            int64_t gmOffsetPeer = rowSrc * (params.problemShape.k() + ALIGN_512);
+                            int32_t ubMoveNum = 2;
+                            CopyGMToGMPerToken(gmA[gmOffsetA], gmPerTokenScale1[rowStart], gmRemoteA[gmOffsetPeer],
+                                               rows, params.problemShape.k(), ubMoveNum, pingpongIdx);
+                        } else {
+                            // 非 quant 路径：远端 expandedX 行步长 = k（密排），可直接连续拷贝 rows * k
+                            int64_t gmOffsetPeer = rowSrc * params.problemShape.k();
+                            CopyGMToGM(gmA[gmOffsetA], gmRemoteA[gmOffsetPeer], rows * params.problemShape.k(),
+                                       UB_MOVE_NUM);
+                        }
                     }
                 }
+                AscendC::SyncAll<true>();
+                AscendC::CrossCoreSetFlag<0x2, PIPE_MTE3>(syncgmm1Idx / CROSS_CORE_FLAG_MAX_SET_COUNT);
+                syncgmm1Idx++;
+
+                prevGroupSum1 += currentM;
+
+                UpdateDequantSums(params, groupIdx, currentM, dequantSumTemp, dequantSum1, dequantSum2);
             }
-            AscendC::SyncAll<true>();
-            AscendC::CrossCoreSetFlag<0x2, PIPE_MTE3>(syncgmm1Idx / CROSS_CORE_FLAG_MAX_SET_COUNT);
-            syncgmm1Idx++;
-
-            prevGroupSum1 += currentM;
-
-            UpdateDequantSums(params, groupIdx, currentM, dequantSumTemp, dequantSum1, dequantSum2);
-        }
+        } // end else（基线 dispatch 组循环）
         if constexpr (std::is_same_v<ElementB, int8_t>) {
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
@@ -1353,8 +1423,15 @@ private:
         blockEpilogue1.Finalize();
         exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::COMBINE);
         if constexpr (std::is_same_v<ElementB, AscendC::int4b_t>) {
-            blockEpilogue3.InitFlag();
-            CombineV2(params, blockEpilogue3);
+            if constexpr (DedupOn_) {
+                // Dedup Combine v2：token 粒度锚点累加（FP32 (hi,lo) 双半行拆分）+ last 行
+                // 远端直传 D 区 + 组 flag 数据驱动消费。blockEpilogue3 构造仅记 UB 偏移、
+                // Dedup 实例不调用（零物理冲突）。
+                DedupCombineV2(params);
+            } else {
+                blockEpilogue3.InitFlag();
+                CombineV2(params, blockEpilogue3);
+            }
         } else if (isCombineV1) {
             blockEpilogue2.SetFlag();
             CombineV1(params, blockEpilogue2);
@@ -1425,27 +1502,62 @@ private:
             // 不改写输入 topk_ids）
             exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::MOE_INIT_ROUTING);
             {
-                typename MoePermute::MoePermutePrologue<PROLOGUE_UB_STAGES, ProloguePolicy, PrologueSrc,
-                                                        PrologueDst>::Params prologueParams(chunkTokens, hidden, topK,
-                                                                                            params.expertPerRank *
-                                                                                                params.EP);
-                MoePermute::MoePermutePrologue<PROLOGUE_UB_STAGES, ProloguePolicy, PrologueSrc, PrologueDst> prologue(
-                    resource, prologueParams);
-                AscendC::GlobalTensor<PrologueSrc> gmPermX;
-                gmPermX.SetGlobalBuffer(reinterpret_cast<__gm__ PrologueSrc*>(
-                    reinterpret_cast<GM_ADDR>(params.ptrA) + tokenBase * hidden * sizeof(PrologueSrc)));
-                AscendC::GlobalTensor<int32_t> gmPermTopkIds;
-                gmPermTopkIds.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(
-                    reinterpret_cast<GM_ADDR>(params.expertIdx) + tokenBase * topK * sizeof(int32_t)));
-                AscendC::GlobalTensor<PrologueDst> gmPermExpandX;
-                gmPermExpandX.SetGlobalBuffer(reinterpret_cast<__gm__ PrologueDst*>(shmem() + peermemInfo.offsetA));
-                AscendC::GlobalTensor<int32_t> gmTokenPerExpert;
-                gmTokenPerExpert.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(localTokenPerExpert));
-                AscendC::GlobalTensor<int32_t> gmPermExpandRowIdx;
-                gmPermExpandRowIdx.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspaceInfo.expandedRowIdx));
-                prologue(gmPermX, gmPermTopkIds, gmPermExpandX, gmPermExpandRowIdx, gmTokenPerExpert,
-                         workspaceInfo.ptrPermuteCounts,
-                         params.ptrXActiveMask != nullptr ? params.ptrXActiveMask + tokenBase : nullptr);
+                if constexpr (DedupOn_) {
+                    // Dedup Prologue（与基线 prologue 同调用形态）：原始序量化写 A 区 + 计数
+                    // 散射元数据排序流 + 打包段 + TPE
+                    typename MegaMoeDedup::DedupPrologue<PrologueSrc>::Params dedupPrologueParams(
+                        chunkTokens, hidden, topK, params.expertPerRank * params.EP, params.expertPerRank);
+                    MegaMoeDedup::DedupPrologue<PrologueSrc> dedupPrologue(resource, dedupPrologueParams);
+                    AscendC::GlobalTensor<PrologueSrc> gmDedupX;
+                    gmDedupX.SetGlobalBuffer(reinterpret_cast<__gm__ PrologueSrc*>(
+                        reinterpret_cast<GM_ADDR>(params.ptrA) + tokenBase * hidden * sizeof(PrologueSrc)));
+                    AscendC::GlobalTensor<int32_t> gmDedupTopkIds;
+                    gmDedupTopkIds.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(
+                        reinterpret_cast<GM_ADDR>(params.expertIdx) + tokenBase * topK * sizeof(int32_t)));
+                    AscendC::GlobalTensor<float> gmDedupProbs;
+                    gmDedupProbs.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(
+                        reinterpret_cast<GM_ADDR>(params.probs) + tokenBase * topK * sizeof(float)));
+                    AscendC::GlobalTensor<int8_t> gmDedupA;
+                    gmDedupA.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(shmem() + peermemInfo.offsetA));
+                    // 打包段本 rank 槽：[slots N·i32 | probs N·f32]，段步长 2N·4B（rankOrdinal
+                    // 内联 slots 高 8bit，不占独立平面）；N = layoutChunkTokens·topK
+                    // （尾 chunk 不改步长，布局口径见 dedup_layout）
+                    const int64_t layoutChunkTokens = (bs < PERMUTE_CHUNK) ? bs : PERMUTE_CHUNK;
+                    GM_ADDR packBase =
+                        shmem() + peermemInfo.offsetExpandedDstToSrcRow +
+                        runtimeRank * DEDUP_PACK_SECTION_COUNT * layoutChunkTokens * topK * sizeof(int32_t);
+                    AscendC::GlobalTensor<int32_t> gmPackSlots;
+                    gmPackSlots.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(packBase));
+                    AscendC::GlobalTensor<float> gmPackProbs;
+                    gmPackProbs.SetGlobalBuffer(
+                        reinterpret_cast<__gm__ float*>(packBase + layoutChunkTokens * topK * sizeof(int32_t)));
+                    AscendC::GlobalTensor<int32_t> gmDedupTokenPerExpert;
+                    gmDedupTokenPerExpert.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(localTokenPerExpert));
+                    dedupPrologue(gmDedupX, gmDedupTopkIds, gmDedupProbs, gmDedupA, gmPackSlots, gmPackProbs,
+                                  gmDedupTokenPerExpert, workspaceInfo.ptrPermuteCounts, workspaceInfo.expandedRowIdx,
+                                  params.ptrXActiveMask != nullptr ? params.ptrXActiveMask + tokenBase : nullptr);
+                } else {
+                    const uint32_t totalExperts = params.expertPerRank * params.EP;
+                    using MoePermutePrologueT =
+                        MoePermute::MoePermutePrologue<PROLOGUE_UB_STAGES, ProloguePolicy, PrologueSrc, PrologueDst>;
+                    typename MoePermutePrologueT::Params prologueParams(chunkTokens, hidden, topK, totalExperts);
+                    MoePermutePrologueT prologue(resource, prologueParams);
+                    AscendC::GlobalTensor<PrologueSrc> gmPermX;
+                    gmPermX.SetGlobalBuffer(reinterpret_cast<__gm__ PrologueSrc*>(
+                        reinterpret_cast<GM_ADDR>(params.ptrA) + tokenBase * hidden * sizeof(PrologueSrc)));
+                    AscendC::GlobalTensor<int32_t> gmPermTopkIds;
+                    gmPermTopkIds.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(
+                        reinterpret_cast<GM_ADDR>(params.expertIdx) + tokenBase * topK * sizeof(int32_t)));
+                    AscendC::GlobalTensor<PrologueDst> gmPermExpandX;
+                    gmPermExpandX.SetGlobalBuffer(reinterpret_cast<__gm__ PrologueDst*>(shmem() + peermemInfo.offsetA));
+                    AscendC::GlobalTensor<int32_t> gmTokenPerExpert;
+                    gmTokenPerExpert.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(localTokenPerExpert));
+                    AscendC::GlobalTensor<int32_t> gmPermExpandRowIdx;
+                    gmPermExpandRowIdx.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspaceInfo.expandedRowIdx));
+                    prologue(gmPermX, gmPermTopkIds, gmPermExpandX, gmPermExpandRowIdx, gmTokenPerExpert,
+                             workspaceInfo.ptrPermuteCounts,
+                             params.ptrXActiveMask != nullptr ? params.ptrXActiveMask + tokenBase : nullptr);
+                }
             }
             AscendC::SyncAll<true>();
 
@@ -1457,6 +1569,16 @@ private:
                 GetCumsumForMMAIV(tokenPerExpert, cumsumMM, params.expertPerRank, runtimeRank, params.EP);
             }
             AscendC::SyncAll<true>();
+            if constexpr (DedupOn_) {
+                // FP/LP 每 chunk 清零（cot 键空间 EP·layoutChunkTokens，尾 chunk 不改步长，
+                // 布局口径见 dedup_layout）。函数自带写侧回执 + PipeBarrier；全核 barrier 由
+                // 下方既有 SyncAll 合并收口，零新增 barrier。
+                const int64_t dedupBs = params.problemShape.m();
+                const int32_t dedupLayoutChunkTokens =
+                    static_cast<int32_t>(dedupBs < PERMUTE_CHUNK ? dedupBs : PERMUTE_CHUNK);
+                ResetDistTokenFirstPosV2(workspaceInfo.ptrDistTokenFirstPos, workspaceInfo.ptrDistTokenLastPos,
+                                         static_cast<int32_t>(params.EP) * dedupLayoutChunkTokens, coreIdx, coreNum);
+            }
             // 路由表刷新到本核 UB：此后 dispatch/combine/epilogue 的标量读取不再直接读 GM
             CacheRouteTablesToUb(params);
 
@@ -1519,6 +1641,21 @@ private:
                     } else {
                         shmem.CrossRankSyncV2SetWithMask(ctrBuffer, rankMaskLocal);
                     }
+                    if constexpr (DedupOn_) {
+                        // 全核反排：s0 亦参与 token 分片（就绪确认 = V2Set 尾部 wait RECV_SYNC，
+                        // 48 核上报齐 ⇒ 全部 EP 状态字已被见证，协议零改动）。全核编号 =
+                        // block_idx + subblockid(0)·blockNum，核数 = coreNum；索引源 = prologue
+                        // 行索引表，反排复用基线 kernel
+                        const int64_t kHat = (topK < params.EP) ? topK : params.EP;
+                        MoeTokenUnpermuteTilingData tilingData;
+                        MoeTokenUnpermuteTiling(chunkTokens * topK, n2, topK, tilingData, coreNum);
+                        tilingData.num_out_tokens = chunkTokens * kHat; // 行号上界（有效性判据）
+                        KernelMoeTokenUnpermute<ElementD2, int32_t, float, false> kernelMoeTokenUnpermuteOp;
+                        kernelMoeTokenUnpermuteOp.Init(
+                            shmem() + peermemInfo.offsetD, workspaceInfo.expandedRowIdx, nullptr,
+                            reinterpret_cast<GM_ADDR>(params.ptrOutput + tokenBase * hidden), &tilingData, true);
+                        kernelMoeTokenUnpermuteOp.Process();
+                    }
                 } else {
                     uint32_t uboffset = 0;
                     uint32_t aicCoreNum = coreNum / AIV_PER_AIC;
@@ -1547,14 +1684,28 @@ private:
                     }
 
                     exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::UNPERMUTE);
-                    MoeTokenUnpermuteTilingData tilingData;
-                    MoeTokenUnpermuteTiling(chunkTokens * topK, n2, topK, tilingData, coreNum / AIV_PER_AIC);
-                    KernelMoeTokenUnpermute<ElementD2, int32_t, float, true> kernelMoeTokenUnpermuteOp;
-                    kernelMoeTokenUnpermuteOp.Init(
-                        shmem() + peermemInfo.offsetD, workspaceInfo.expandedRowIdx,
-                        reinterpret_cast<GM_ADDR>(reinterpret_cast<__gm__ float*>(params.probs) + tokenBase * topK),
-                        reinterpret_cast<GM_ADDR>(params.ptrOutput + tokenBase * hidden), &tilingData);
-                    kernelMoeTokenUnpermuteOp.Process();
+                    if constexpr (DedupOn_) {
+                        // 与 s0 共用全核分片（编号 = block_idx + subblockid(1)·blockNum，核数 =
+                        // coreNum）；索引源 = prologue 行索引表，反排复用基线 kernel
+                        const int64_t kHat = (topK < params.EP) ? topK : params.EP;
+                        MoeTokenUnpermuteTilingData tilingData;
+                        MoeTokenUnpermuteTiling(chunkTokens * topK, n2, topK, tilingData, coreNum);
+                        tilingData.num_out_tokens = chunkTokens * kHat; // 行号上界（有效性判据）
+                        KernelMoeTokenUnpermute<ElementD2, int32_t, float, false> kernelMoeTokenUnpermuteOp;
+                        kernelMoeTokenUnpermuteOp.Init(
+                            shmem() + peermemInfo.offsetD, workspaceInfo.expandedRowIdx, nullptr,
+                            reinterpret_cast<GM_ADDR>(params.ptrOutput + tokenBase * hidden), &tilingData, true);
+                        kernelMoeTokenUnpermuteOp.Process();
+                    } else {
+                        MoeTokenUnpermuteTilingData tilingData;
+                        MoeTokenUnpermuteTiling(chunkTokens * topK, n2, topK, tilingData, coreNum / AIV_PER_AIC);
+                        KernelMoeTokenUnpermute<ElementD2, int32_t, float, true> kernelMoeTokenUnpermuteOp;
+                        kernelMoeTokenUnpermuteOp.Init(
+                            shmem() + peermemInfo.offsetD, workspaceInfo.expandedRowIdx,
+                            reinterpret_cast<GM_ADDR>(reinterpret_cast<__gm__ float*>(params.probs) + tokenBase * topK),
+                            reinterpret_cast<GM_ADDR>(params.ptrOutput + tokenBase * hidden), &tilingData);
+                        kernelMoeTokenUnpermuteOp.Process();
+                    }
                 }
             } else {
                 if (maskBufferAddr == nullptr) {
@@ -1747,6 +1898,11 @@ private:
         GM_ADDR ptrSumBeforeRank;
         GM_ADDR ptrRoundTables;
         __gm__ float* ptrSoftFlagBase;
+        // Dedup workspace 增量段（仅 DedupOn_=true 实例赋值，追加于基线段之后；
+        // 段序与 host tiling 同源）
+        GM_ADDR ptrDistTokenFirstPos;
+        GM_ADDR ptrDistTokenLastPos;
+        GM_ADDR ptrDedupRowMeta;
 
         CATLASS_DEVICE
         WorkspaceInfo() {}
@@ -1821,6 +1977,17 @@ private:
                 ptrSoftFlagBase = reinterpret_cast<__gm__ float*>(params.ptrWorkspace + workspaceOffset);
                 workspaceOffset += params.EP * sizeof(int32_t) * FLAGSTRIDE;
             }
+
+            // Dedup 增量段：FP → LP → rowMeta；段尺寸由 host dedup_layout 经 tilingData
+            // 透传，kernel 不重算
+            if constexpr (DedupOn_) {
+                ptrDistTokenFirstPos = params.ptrWorkspace + workspaceOffset;
+                workspaceOffset += static_cast<uint64_t>(params.distTokenFirstPosSize);
+                ptrDistTokenLastPos = params.ptrWorkspace + workspaceOffset;
+                workspaceOffset += static_cast<uint64_t>(params.distTokenLastPosSize);
+                ptrDedupRowMeta = params.ptrWorkspace + workspaceOffset;
+                workspaceOffset += static_cast<uint64_t>(params.dedupRowMetaSize);
+            }
         }
     };
 
@@ -1829,6 +1996,8 @@ private:
         int64_t offsetPeerPerTokenScale;
         int64_t offsetPeerTokenPerExpert;
         int64_t offsetD;
+        // Dedup 新增区（仅 DedupOn_=true 实例赋值）
+        int64_t offsetExpandedDstToSrcRow; // 打包区基址（rank 段 [slots|probs]）
 
         CATLASS_DEVICE
         PeermemInfo() {}
@@ -1868,7 +2037,13 @@ private:
             int64_t DSize = chunkTokens * topK * h * sizeof(int16_t);
 
             offsetA = RESERVED_SPACE_SIZE;
-            if constexpr (RoutingIsQuant) {
+            if constexpr (DedupOn_) {
+                // Dedup：A 区原始序 chunkTokens 行（行步长 h+512），后接打包区与 D 区；偏移由
+                // host dedup_layout 经 tilingData 透传（kernel 不重算）；无 perTokenScale 保留区
+                offsetPeerPerTokenScale = 0;
+                offsetExpandedDstToSrcRow = params.offsetExpandedDstToSrcRow;
+                offsetD = params.dedupOffsetD;
+            } else if constexpr (RoutingIsQuant) {
                 offsetPeerPerTokenScale = offsetA + offsetASize;
                 offsetD = offsetPeerPerTokenScale + perTokenScaleSize;
             } else {
@@ -1940,4 +2115,8 @@ private:
     AscendC::GlobalTensor<ElementD1> gmPermutedToken;
 };
 } // namespace Catlass::Gemm::Kernel
+
+// Dedup 构件类外成员定义（须在 MegaMoeKernel 完整定义之后包含；本文件为唯一包含点）
+#include "mega_moe_kernel_a3_dedup.hpp"
+
 #endif // MEGA_MOE_KERNEL_HPP

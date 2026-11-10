@@ -76,6 +76,17 @@ struct MegaMoeA2A3TilingData {
     //   单 chunk 接收行数 <= 总接收行数 <= maxRecvTokenNum，kernel 的 maxOutputSize 取 B）。
     uint64_t recvRoundBudget;
     uint64_t recvRoundsMax;
+
+    // ===== 通信零冗余（Dedup）=====
+    // host tiling 按算子属性 combine_comm_mode（=1 且单轮可行）置位。
+    // dedupOn=0 时下列字段全 0、kernel 布局与基线逐位一致；=1 时偏移由
+    // host mega_moe_dedup_layout 单一口径计算并经此透传（kernel 侧重算禁止）。
+    uint32_t dedupOn;
+    int64_t offsetExpandedDstToSrcRow; // peermem 打包区基址（rank 段 [slots|probs]）
+    int64_t dedupOffsetD;              // Dedup D 区基址
+    int64_t distTokenFirstPosSize;     // workspace FP 表段字节数
+    int64_t distTokenLastPosSize;      // workspace LP 表段字节数
+    int64_t dedupRowMetaSize;          // workspace rowMeta 段字节数
 };
 
 struct MegaMoeTilingDataQuant {

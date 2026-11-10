@@ -174,5 +174,13 @@ struct EpilogueAtlasA2W4A8PostPerTokenDequantV2 {
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
+// 通信零冗余（Dedup）combine 行级 epilogue：token 粒度单函数
+// （锚点累加 FP32 (hi,lo) 双半行同列拆分 + last 行 BF16 直写源卡 D 区段）。
+template <uint32_t UB_STAGES_>
+struct EpilogueAtlasA2W4A8PostPerTokenDedup {
+    using ArchTag = Arch::AtlasA2;
+    static constexpr uint32_t UB_STAGES = UB_STAGES_;
+};
+
 } // namespace Catlass::Epilogue
 #endif // DISPATH_POLICY_CUSTOM_HPP

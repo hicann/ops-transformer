@@ -52,6 +52,27 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
 #endif
         if constexpr (TPL_QUANT_MODE == MEGA_MOE_QUANT_MODE_PER_TOKEN) {
             GET_TILING_DATA_WITH_STRUCT(MegaMoeTilingDataQuant, tilingData, tilingGM);
+            // Dedup：仅 A3+W4A8 链双实例化，按 tilingData.common.dedupOn 选实例；
+            // DedupOn_=false 裁剪后与基线逐位一致。A2 与其它链走上游统一实例（见下方）。
+            constexpr bool isW4A8 =
+                std::is_same_v<DTYPE_WEIGHT1, AscendC::int4b_t> || std::is_same_v<DTYPE_WEIGHT1, int32_t>;
+            if constexpr (!isA2 && isW4A8) {
+                if (tilingData.common.dedupOn != 0U) {
+                    MegaMoe<DTYPE_X, DTYPE_WEIGHT1, DTYPE_Y, TPL_IS_TRANSPOSE_W1, TPL_IS_TRANSPOSE_W2, isNz, isA2, true>
+                        op;
+                    op.Init(context, x, topkIds, topkWeights, weight1, weight2, weightScales1, weightScales2, bias1,
+                            bias2, xActiveMask, scales, maskBuffer, yOut, expertTokenNumsOut, workspaceGM, tilingGM);
+                    op.Process();
+                } else {
+                    MegaMoe<DTYPE_X, DTYPE_WEIGHT1, DTYPE_Y, TPL_IS_TRANSPOSE_W1, TPL_IS_TRANSPOSE_W2, isNz, isA2,
+                            false>
+                        op;
+                    op.Init(context, x, topkIds, topkWeights, weight1, weight2, weightScales1, weightScales2, bias1,
+                            bias2, xActiveMask, scales, maskBuffer, yOut, expertTokenNumsOut, workspaceGM, tilingGM);
+                    op.Process();
+                }
+                return;
+            }
         } else {
             GET_TILING_DATA_WITH_STRUCT(MegaMoeTilingDataNonQuant, tilingData, tilingGM);
         }

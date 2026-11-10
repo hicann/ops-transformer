@@ -55,4 +55,29 @@ constexpr static uint32_t RDMA_UB_OFFSET_BYTES = 128 * 1024;
 constexpr static uint32_t PROLOGUE_UB_STAGES = 2;
 // GetSumPreRank 每核槽位步长（元素），16 元素 = 64B，避免跨核伪共享
 constexpr static int32_t PRE_SUM_SLOT_STRIDE = 16;
+// Dedup 打包段 AllGather 推送的 UB 单次搬运粒度（元素，int32 视图；8192×4B = 32KB，
+// 与 CopyGMToGM 内部 32KB pingpong 缓冲匹配）
+constexpr static int32_t DEDUP_PACK_UB_MOVE_ELEMS = 8192;
+// Dedup 布局 kernel 侧常量（与 op_host/op_tiling/arch22/mega_moe_dedup_layout.h 同源，改动须双侧同步）
+constexpr static int32_t DEDUP_PACK_SECTION_COUNT = 2;      // 打包区每 rank 段 = [slots|probs] 等长两段
+constexpr static int32_t DEDUP_ROWMETA_ROW_INT32S = 8;      // rowMeta 行宽 8×int32（同源 dedup_layout.h）
+constexpr static uint32_t DEDUP_ROWMETA_PAYLOAD_BYTES = 16; // rowMeta 有效载荷 16B/行（32B 行内）
+constexpr static int32_t DEDUP_ROWMETA_LASTROW_SLOT = 3;    // lastRow 槽位（int32 槽 3，字节偏移 12B）
+// combine 切片批读：每片行数与奇偶双缓冲总字节数（每行 rowMeta 8×i32 + scale2 1×f32）
+constexpr static uint32_t DEDUP_COMBINE_SLICE_ROWS = 64;
+constexpr static uint32_t DEDUP_COMBINE_SLICE_BYTES =
+    2 *
+    (DEDUP_COMBINE_SLICE_ROWS * DEDUP_ROWMETA_ROW_INT32S * sizeof(int32_t) + DEDUP_COMBINE_SLICE_ROWS * sizeof(float));
+// rankOrdinal 内联编码：不占独立平面/独立槽——slots 元素与 rowMeta 槽 1 均为低 24 bit 载
+// 数据（srcIdx / cot；cot 上界 ep·chunkTokens ≤ 256·1024 < 2^18，24 bit 恒容纳）、高 8 bit
+// 载 rankOrdinal；打包段哨兵以 rankOrdinal 段 0xFF 标记（有效值 < EP ≤ 256 恒不撞）。
+// 位宽由 host 能力门 fail-fast 保证（dedup_layout.cpp CheckDedupFeasible）
+constexpr static int32_t DEDUP_SLOT_RANK_ORDINAL_SHIFT = 24;  // slots 元素内 rankOrdinal 的起始 bit
+constexpr static int32_t DEDUP_SLOT_SRCIDX_MASK = 0x00FFFFFF; // slots 元素 srcIdx 掩码（低 24 bit）
+constexpr static int32_t DEDUP_SLOT_RANK_ORDINAL_MASK = 0xFF; // rankOrdinal 段掩码
+constexpr static int32_t DEDUP_SLOT_SENTINEL = static_cast<int32_t>(0xFF) << 24; // 打包段哨兵（rankOrdinal 段 0xFF）
+constexpr static int32_t DEDUP_ROWMETA_RANK_ORDINAL_SHIFT = 24;                  // 槽 1 内 rankOrdinal 的起始 bit
+constexpr static int32_t DEDUP_ROWMETA_COT_MASK = 0xFFFFFF;                      // 槽 1 cot 掩码（低 24 bit）
+constexpr static uint32_t DEDUP_SCALAR_AREA_MARGIN = 1024; // 路由缓存 UB 高址预留 1KB 标量区余量
+constexpr static int32_t DEDUP_ALIGN32_INT32S = 8;         // 32B 对齐粒度（int32 计），FP/LP 清零块粒度
 #endif
