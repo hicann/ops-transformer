@@ -153,6 +153,8 @@ private:
     TQue<QuePosition::VECOUT, 1> stage1OutQue; // 2份表示可能存在pingpong
     TBuf<> stage2OutBuf;
     TEventID mte3ToVId;
+    TEventID mte2ToSOffsetsId;
+    TEventID sToMte2OffsetsId;
     TEventID vToMte3Id;
     TEventID mte2ToVV0Id[2];
     TEventID vToMte2V0Id[2];
@@ -635,36 +637,55 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessSparseKv(
     WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
 
     if (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
-        uint32_t s2Stride = constInfo.dSizeVInput * sizeof(KV_T);
-        int32_t mLow;
-        int32_t mHigh;
-        int32_t p;
-        if (runInfo.isCmp) {
-            mLow = constInfo.cmpMLow;
-            mHigh = constInfo.cmpMHigh;
-            p = constInfo.cmpP;
+        if constexpr (TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
+            SetFlag<HardEvent::MTE2_S>(mte2ToSOffsetsId);
+            WaitFlag<HardEvent::MTE2_S>(mte2ToSOffsetsId);
+            LocalTensor<int64_t> offsets = totalOffsetTensor.ReinterpretCast<int64_t>();
+            const int64_t sparseBase = topkBS1Idx + runInfo.s2StartIdx + topkKIdx;
+            const int64_t pageStride = runInfo.isCmp ? constInfo.cmpKvStride : constInfo.oriKvStride;
+            for (int64_t row = 0; row < s2RealSize; ++row) {
+                const int64_t token = cmpSparseIndicesGm.GetValue(sparseBase + row);
+                const int64_t offset =
+                    token < 0 ?
+                        -1 :
+                        ((token / blockSize) * pageStride + (token % blockSize) * constInfo.dSizeVInput) * sizeof(KV_T);
+                offsets.SetValue(row, offset);
+            }
+            SetFlag<HardEvent::S_MTE2>(sToMte2OffsetsId);
+            WaitFlag<HardEvent::S_MTE2>(sToMte2OffsetsId);
         } else {
-            mLow = constInfo.oriMLow;
-            mHigh = constInfo.oriMHigh;
-            p = constInfo.oriP;
+            uint32_t s2Stride = constInfo.dSizeVInput * sizeof(KV_T);
+            int32_t mLow;
+            int32_t mHigh;
+            int32_t p;
+            if (runInfo.isCmp) {
+                mLow = constInfo.cmpMLow;
+                mHigh = constInfo.cmpMHigh;
+                p = constInfo.cmpP;
+            } else {
+                mLow = constInfo.oriMLow;
+                mHigh = constInfo.oriMHigh;
+                p = constInfo.oriP;
+            }
+            DivPABlockIdx(paBlockIdxOffsetTensor, tailBlockOffsetTensor, sparseIndiceTensor, constInfo.sparseBlockSize,
+                          blockSize, mHigh, mLow, p, s2Stride);
+            SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
+            WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
+            GatherParams gatherParams1{
+                static_cast<uint16_t>(s2RealSize),
+                static_cast<uint32_t>(4),
+                static_cast<uint32_t>(4),
+            };
+            GatherPadParams<int32_t> gatherPadparams1;
+            GatherDataCopy(paBlockIdTensor, blockTableGm[runInfo.boIdx * maxBlockNumPerBatch], paBlockIdxOffsetTensor,
+                           gatherParams1, gatherPadparams1);
+            SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
+            WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
+            uint32_t blockNumStrideL = (runInfo.isCmp ? constInfo.cmpKvStride : constInfo.oriKvStride) * sizeof(KV_T);
+            uint32_t blockNumStrideH = 0;
+            GetPaTotalOffset(totalOffsetTensor, paBlockIdTensor, tailBlockOffsetTensor, blockNumStrideL,
+                             blockNumStrideH);
         }
-        DivPABlockIdx(paBlockIdxOffsetTensor, tailBlockOffsetTensor, sparseIndiceTensor, constInfo.sparseBlockSize,
-                      blockSize, mHigh, mLow, p, s2Stride);
-        SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
-        WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
-        GatherParams gatherParams1{
-            static_cast<uint16_t>(s2RealSize),
-            static_cast<uint32_t>(4),
-            static_cast<uint32_t>(4),
-        };
-        GatherPadParams<int32_t> gatherPadparams1;
-        GatherDataCopy(paBlockIdTensor, blockTableGm[runInfo.boIdx * maxBlockNumPerBatch], paBlockIdxOffsetTensor,
-                       gatherParams1, gatherPadparams1);
-        SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
-        WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
-        uint32_t blockNumStrideL = (runInfo.isCmp ? constInfo.cmpKvStride : constInfo.oriKvStride) * sizeof(KV_T);
-        uint32_t blockNumStrideH = 0;
-        GetPaTotalOffset(totalOffsetTensor, paBlockIdTensor, tailBlockOffsetTensor, blockNumStrideL, blockNumStrideH);
     } else if (KV_LAYOUT_T == SMLA_LAYOUT::TND) {
         uint32_t tPrefix =
             runInfo.isCmp ? cuSeqlensCmpKvGm.GetValue(runInfo.boIdx) : cuSeqlensOriKvGm.GetValue(runInfo.boIdx); // n2=1
@@ -1011,6 +1032,10 @@ TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe* pipe, ConstInfo& constInfo)
 {
     SoftmaxInitBuffer();
+    if constexpr (isPa && TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
+        mte2ToSOffsetsId = GetTPipePtr()->AllocEventID<HardEvent::MTE2_S>();
+        sToMte2OffsetsId = GetTPipePtr()->AllocEventID<HardEvent::S_MTE2>();
+    }
 
     tPipe->InitBuffer(commonTBuf, 512); // commonTBuf内存申请512B
     tPipe->InitBuffer(sinksBuf, 512);   // sinksBuf内存申请512B
@@ -1071,6 +1096,10 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe* pipe, 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::FreeEvent()
 {
+    if constexpr (isPa && TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_S>(mte2ToSOffsetsId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::S_MTE2>(sToMte2OffsetsId);
+    }
     WaitFlag<HardEvent::MTE3_V>(mte3ToVId);
     WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
     WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[0]);

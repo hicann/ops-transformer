@@ -185,6 +185,8 @@ private:
     TQue<QuePosition::VECOUT, 1> stage1OutQue; // 2份表示可能存在pingpong
     TBuf<> stage2OutBuf;
     TEventID mte3ToVId;
+    TEventID mte2ToSOffsetsId;
+    TEventID sToMte2OffsetsId;
     TEventID vToMte3Id;
     TEventID mte2ToVV0Id[2];
     TEventID vToMte3V0Id[2];
@@ -231,8 +233,12 @@ __aicore__ inline int64_t MqsmlaCsaBlockVector<TEMPLATE_ARGS>::GetkeyOffset(int6
         int64_t blkTableIdx = s2Idx / blockSize;
         int64_t blkTableOffset = s2Idx % blockSize;
         int64_t paBlockStride = runInfo.isCmp ? constInfo.cmpKvStride : constInfo.oriKvStride;
-        realKeyOffset = blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + blkTableIdx) * paBlockStride +
-                        blkTableOffset * constInfo.dSizeVInput; // BlockNum, BlockSize, N(1), D
+        if constexpr (TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
+            realKeyOffset = blkTableIdx * paBlockStride + blkTableOffset * constInfo.dSizeVInput;
+        } else {
+            realKeyOffset = blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + blkTableIdx) * paBlockStride +
+                            blkTableOffset * constInfo.dSizeVInput;
+        } // BlockNum, BlockSize, N(1), D
     } else if constexpr (KV_LAYOUT_T == MQSMLA_LAYOUT::TND) {
         int64_t tPrefix =
             runInfo.isCmp ? cuSeqlensCmpKvGm.GetValue(runInfo.boIdx) : cuSeqlensOriKvGm.GetValue(runInfo.boIdx);
@@ -616,15 +622,28 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessSparseKv(outp
     int64_t topkKIdx = procS2Start + cmpS2LoopCnt * constInfo.s2BaseSize;
     GlobalTensor<int64_t> kvPhyAddrGm64 = kvPhyAddrGm.template ReinterpretCast<int64_t>();
     LocalTensor<int64_t> totalOffset64Tensor = totalOffsetTensor.ReinterpretCast<int64_t>();
-    static constexpr int64_t numPerBlock = 32;
-    // static constexpr int64_t numPerBlock = 8;
-    DataCopyParams dataCopyParams;
-    dataCopyParams.blockCount = 1U; // 每次处理1行
-    dataCopyParams.blockLen = (s2RealSize * sizeof(int64_t) + numPerBlock - 1) / numPerBlock;
-    dataCopyParams.srcGap = 0U;
-    dataCopyParams.dstGap = 0U;
-    DataCopy(totalOffset64Tensor, kvPhyAddrGm64[topkBS1Idx + runInfo.s2StartIdx + topkKIdx], dataCopyParams);
-    pipe_barrier(PIPE_MTE2);
+    if constexpr (TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
+        SetFlag<HardEvent::MTE2_S>(mte2ToSOffsetsId);
+        WaitFlag<HardEvent::MTE2_S>(mte2ToSOffsetsId);
+        const int64_t sparseBase = topkBS1Idx + runInfo.s2StartIdx + topkKIdx;
+        for (int64_t row = 0; row < s2RealSize; ++row) {
+            const int64_t token = cmpSparseIndicesGm.GetValue(sparseBase + row);
+            const int64_t offset = GetkeyOffset(token, runInfo, constInfo);
+            totalOffset64Tensor.SetValue(row, offset < 0 ? -1 : offset * static_cast<int64_t>(sizeof(KV_T)));
+        }
+        SetFlag<HardEvent::S_MTE2>(sToMte2OffsetsId);
+        WaitFlag<HardEvent::S_MTE2>(sToMte2OffsetsId);
+    } else {
+        static constexpr int64_t numPerBlock = 32;
+        // static constexpr int64_t numPerBlock = 8;
+        DataCopyParams dataCopyParams;
+        dataCopyParams.blockCount = 1U; // 每次处理1行
+        dataCopyParams.blockLen = (s2RealSize * sizeof(int64_t) + numPerBlock - 1) / numPerBlock;
+        dataCopyParams.srcGap = 0U;
+        dataCopyParams.dstGap = 0U;
+        DataCopy(totalOffset64Tensor, kvPhyAddrGm64[topkBS1Idx + runInfo.s2StartIdx + topkKIdx], dataCopyParams);
+        pipe_barrier(PIPE_MTE2);
+    }
     int64_t s2ProcessBaseLoop = CeilDiv(s2RealSize, s2ProcessBaseSize);
     int64_t s2Start = procS2Start;
     for (uint16_t i = 0; i < s2ProcessBaseLoop; ++i) {
@@ -1401,6 +1420,10 @@ TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitLocalBuffer(TPipe* pipe, ConstInfo& constInfo)
 {
     SoftmaxInitBuffer();
+    if constexpr (TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
+        mte2ToSOffsetsId = GetTPipePtr()->AllocEventID<HardEvent::MTE2_S>();
+        sToMte2OffsetsId = GetTPipePtr()->AllocEventID<HardEvent::S_MTE2>();
+    }
 
     tPipe->InitBuffer(commonTBuf, 512); // commonTBuf内存申请512B
     tPipe->InitBuffer(sinksBuf, 512);   // sinksBuf内存申请512B
@@ -1418,7 +1441,9 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitLocalBuffer(TPip
     tPipe->InitBuffer(paBlockIdxOffsetBuf, s2BaseSize * sizeof(int32_t));
     tPipe->InitBuffer(tailBlockOffsetBuf, s2BaseSize * sizeof(uint32_t));
     tPipe->InitBuffer(paBlockIdBuf, s2BaseSize * sizeof(int32_t));
-    tPipe->InitBuffer(totalOffsetBuf, s2BaseSize * sizeof(uint32_t));
+    tPipe->InitBuffer(
+        totalOffsetBuf,
+        s2BaseSize * (TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE ? sizeof(int64_t) : sizeof(uint32_t)));
 
     sparseIndiceTensor = sparseIndiceBuf.Get<int32_t>();
     paBlockIdxOffsetTensor = paBlockIdxOffsetBuf.Get<int32_t>();
@@ -1451,6 +1476,10 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitLocalBuffer(TPip
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::FreeEvent()
 {
+    if constexpr (TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_S>(mte2ToSOffsetsId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::S_MTE2>(sToMte2OffsetsId);
+    }
     WaitFlag<HardEvent::MTE3_V>(mte3ToVId);
     WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[0]);
     WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[1]);

@@ -218,7 +218,8 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     vecBlock.InitVecBlock(tPipe, cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedOriKv, sequsedCmpKv, cmpResidualKv);
     vecBlock.CleanOutput(attentionOut, constInfo);
     if ASCEND_IS_AIV {
-        if constexpr (TEMPLATE_MODE == MQSMLATemplateMode::CSA_TEMPLATE_MODE && IS_VEC_S2PHYADDR) {
+        if constexpr (TEMPLATE_MODE == MQSMLATemplateMode::CSA_TEMPLATE_MODE && IS_VEC_S2PHYADDR &&
+                      TOPK_VALUE_MODE == TopkValueMode::TOPK_INDEX_MODE) {
             this->vecBlock.GetKVPhyAddr(hasLoad, bN2StartIdx, bN2EndIdx, gS1StartIdx, nextGs1Idx, actualSeqQlenAddr,
                                         cuSeqlensQAddr, actualSeqKvlenAddr, workspace, constInfo);
         }

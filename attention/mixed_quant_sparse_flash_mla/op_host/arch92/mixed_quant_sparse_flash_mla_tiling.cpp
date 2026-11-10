@@ -99,11 +99,13 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
     uint32_t vectorizeUbSize = tilingInfo->cmpMaxBlockNumPerBatch * sizeof(int32_t) +
                                tilingInfo->cmpSparseBlockCount * sizeof(int32_t) +
                                tilingInfo->cmpSparseBlockCount * sizeof(int64_t); // 物理地址计算向量化所需ub大小
-    uint32_t vectorizeFlag = static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE) &&
-                                                   (vectorizeUbSize <= UB_SIZE) && blocksizeFlag); // 是否满足向量化条件
-    uint32_t tilingKey = GET_TPL_TILING_KEY(
-        0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_), static_cast<uint32_t>(tilingInfo->gSize > 64),
-        ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8), vectorizeFlag);
+    uint32_t vectorizeFlag =
+        static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE) && (vectorizeUbSize <= UB_SIZE) &&
+                              blocksizeFlag && tilingInfo->topkValueMode == 1); // 是否满足向量化条件
+    uint32_t tilingKey = GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_),
+                                            static_cast<uint32_t>(tilingInfo->gSize > 64),
+                                            ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8),
+                                            vectorizeFlag, static_cast<uint32_t>(tilingInfo->topkValueMode));
     context_->SetTilingKey(tilingKey);
     context_->SetScheduleMode(1);
 

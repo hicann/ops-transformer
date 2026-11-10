@@ -56,7 +56,7 @@ using namespace AscendC;
     } while (0)
 
 template <int FLASH_DECODE, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int SPLIT_G, int KV_DTYPE,
-          int IS_VEC_S2PHYADDR>
+          int IS_VEC_S2PHYADDR, int TOPK_VALUE_MODE>
 __global__ __aicore__ void mixed_quant_sparse_flash_mla(
     __gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV, __gm__ uint8_t* oriSparseIndices,
     __gm__ uint8_t* cmpSparseIndices, __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
@@ -73,12 +73,14 @@ __global__ __aicore__ void mixed_quant_sparse_flash_mla(
         MQSMLA_OP_IMPL(BaseApi::MixedQuantSparseFlashMlaCsa, MixedQuantSparseFlashMlaTilingData, bfloat16_t,
                        fp8_e4m3fn_t, float, bfloat16_t, FLASH_DECODE, KV_LAYOUT_T == MQSMLA_LAYOUT_PA_BBND,
                        static_cast<MQSMLA_LAYOUT>(LAYOUT_T), static_cast<MQSMLA_LAYOUT>(KV_LAYOUT_T),
-                       static_cast<MQSMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, IS_VEC_S2PHYADDR);
+                       static_cast<MQSMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, IS_VEC_S2PHYADDR,
+                       static_cast<TopkValueMode>(TOPK_VALUE_MODE));
     } else {
         MQSMLA_OP_IMPL(BaseApi::MixedQuantSparseFlashMlaCsa, MixedQuantSparseFlashMlaTilingData, bfloat16_t, hifloat8_t,
                        float, bfloat16_t, FLASH_DECODE, KV_LAYOUT_T == MQSMLA_LAYOUT_PA_BBND,
                        static_cast<MQSMLA_LAYOUT>(LAYOUT_T), static_cast<MQSMLA_LAYOUT>(KV_LAYOUT_T),
-                       static_cast<MQSMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, IS_VEC_S2PHYADDR);
+                       static_cast<MQSMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, IS_VEC_S2PHYADDR,
+                       static_cast<TopkValueMode>(TOPK_VALUE_MODE));
     }
 }
 
