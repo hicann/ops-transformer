@@ -2154,10 +2154,10 @@ ge::graphStatus ProcessDropoutInfo(const gert::TilingContext* context_, FuzzyBas
     // dropout mask
     fBaseParams.keepProbUint8 = static_cast<int64_t>(fBaseParams.keepProb * UINT8_MAX);
     if (context_->GetAttrs()->GetAttrNum() > SEED_ATTR_IDX) {
-        fBaseParams.seed = *(context_->GetAttrs()->GetAttrPointer<int>(SEED_ATTR_IDX));
+        fBaseParams.seed = *(context_->GetAttrs()->GetAttrPointer<int64_t>(SEED_ATTR_IDX));
     }
     if (context_->GetAttrs()->GetAttrNum() > OFFSET_ATTR_IDX) {
-        fBaseParams.offset = *(context_->GetAttrs()->GetAttrPointer<int>(OFFSET_ATTR_IDX));
+        fBaseParams.offset = *(context_->GetAttrs()->GetAttrPointer<int64_t>(OFFSET_ATTR_IDX));
     }
     auto dropMask = context_->GetOptionalInputDesc(DROP_MASK_IDX);
     auto dropMaskShape = context_->GetOptionalInputShape(DROP_MASK_IDX);
