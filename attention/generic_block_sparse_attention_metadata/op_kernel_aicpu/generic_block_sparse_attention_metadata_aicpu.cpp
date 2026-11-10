@@ -75,6 +75,10 @@ bool GenericBlockSparseAttentionMetadataAicpu::Prepare(CpuKernelContext& ctx)
         seqUsedKv_ = nullptr;
     }
 
+    // Optional for compatibility with callers predating quantization-aware scheduling.
+    // MXFP8 uses the base task list and must not construct an unused FD schedule.
+    quantType_ = 0;
+    GetAttrValueOpt(ctx, "quant_type", quantType_);
     const bool attrsValid =
         GetAttrValue(ctx, "max_q_seq_len", maxQSeqLen_) && GetAttrValue(ctx, "num_q_heads", numQHeads_) &&
         GetAttrValue(ctx, "num_kv_heads", numKvHeads_) && GetAttrValue(ctx, "head_dim", headDim_) &&
@@ -310,6 +314,7 @@ bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vecto
     input.residualBlockMode = residualBlockMode_;
     input.isConsistentTopk = isConsistentTopk_;
     input.maskType = maskType_;
+    input.quantType = quantType_;
     input.aicCoreNum = aicCoreNum_;
     input.qSeqLens = qSeqLens;
     input.validBlockNums = validBlockNums;

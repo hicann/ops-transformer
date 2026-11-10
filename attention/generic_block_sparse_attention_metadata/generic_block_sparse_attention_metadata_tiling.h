@@ -27,6 +27,8 @@ constexpr uint32_t MAX_FD_ACTIVE_CORE_NUM = MAX_DECODE_CORE_NUM;
 constexpr uint32_t MAX_FD_PARTIAL_PER_BASE_TASK = MAX_DECODE_CORE_NUM;
 constexpr MetadataType METADATA_MAGIC = 0x5341534D;
 constexpr MetadataType METADATA_VERSION = 8;
+// Optional MXFP8 count range; the v8 layout and schedule stay unchanged.
+constexpr MetadataType PACKED_COUNT_RANGE_TAG = 0x4D584343;
 
 enum FdScheduleFlag : uint32_t {
     FD_SCHEDULE_ENABLED = 1U << 0,
@@ -46,6 +48,9 @@ enum HeaderIndex : uint32_t {
     FD_TOTAL_FLAT_TASK_NUM_INDEX = 9U,
     FD_PARTIAL_TASK_NUM_INDEX = 10U,
     CONFIG_SIGNATURE_INDEX = 11U,
+    PACKED_COUNT_RANGE_TAG_INDEX = 12U,
+    MIN_SPARSE_COUNT_INDEX = 13U,
+    MAX_SPARSE_COUNT_INDEX = 14U,
     HEADER_SIZE = 16U,
 };
 

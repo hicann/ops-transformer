@@ -46,6 +46,7 @@ struct ScheduleInput {
     int64_t residualBlockMode = 0;
     int64_t isConsistentTopk = 0;
     int64_t maskType = 1;
+    int64_t quantType = 0;
     int64_t aicCoreNum = 0;
     std::vector<int64_t> qSeqLens; // seqUsed/cuQLens/maxQLen
     // qUnit-major, sparseHead-minor logical order.
@@ -79,6 +80,9 @@ struct ScheduleResult {
     int64_t fdTotalFlatTaskNum = 0;
     int64_t fdPartialTaskNum = 0;
     int64_t configSignature = 0;
+    bool hasPackedCountRange = false;
+    int64_t minSparseCount = 0;
+    int64_t maxSparseCount = 0;
     std::vector<int64_t> qLogicalStarts;
     std::vector<int64_t> blockPrefix;
     std::array<DecodeSchedule, optiling::generic_block_sparse_attention_metadata::MAX_DECODE_CORE_NUM>
@@ -270,11 +274,18 @@ inline BSAScheduleStatus BuildBlockPrefix(const ScheduleInput& input, ScheduleRe
     result.blockPrefix.resize(static_cast<size_t>(result.saTotalTaskNum) + 1U, 0);
     const int64_t qHeadCount = input.isPackedGQA == 1 ? result.groupSize : 1;
     const int64_t m16 = CeilDiv(qHeadCount, 16);
+    result.hasPackedCountRange = input.quantType == 6 && input.residualBlockMode == 0;
     for (int64_t task = 0; task < result.saTotalTaskNum; ++task) {
         const int64_t validBlockNum = input.validBlockNums[static_cast<size_t>(task)];
         const int64_t maxValidBlockNum = input.blockIndexStride + (input.residualBlockMode == 1 ? 1 : 0);
         if (validBlockNum < 0 || validBlockNum > maxValidBlockNum) {
             return BSAScheduleStatus::BSA_INVALID_PARAM;
+        }
+        // Reuse the existing validation pass over actual queries. Padding and
+        // empty batches never enter this range; index row capacity is unrelated.
+        if (result.hasPackedCountRange) {
+            result.minSparseCount = task == 0 ? validBlockNum : std::min(result.minSparseCount, validBlockNum);
+            result.maxSparseCount = std::max(result.maxSparseCount, validBlockNum);
         }
         // Keep empty tasks in the flat FD range so the kernel writes zero O and empty LSE.
         // This is only a scheduling slot; the actual sparse block count stays zero.
@@ -301,11 +312,29 @@ inline bool ShouldBuildDecodeSchedule(const ScheduleInput& input, const Schedule
     const int64_t totalSplitTaskNum = result.blockPrefix.back();
     // Decode scheduling partitions sparse-list block ranges. The kernel resolves each range with the runtime
     // blockShapeY, so the schedule is independent of the sparse block's token width.
+    const bool mxfp8ShapeSupported =
+        input.quantType != 6 || ((input.headDim == 192 || input.headDim == 256) && input.blockShapeX == 1 &&
+                                 (input.blockShapeY == 4 || input.blockShapeY == 8) && input.residualBlockMode == 0);
     const bool fdShapeSupported =
-        input.headDim > 0 && input.headDim <= 512 && input.blockIndexStride >= 12 && result.groupSize > 0 &&
-        result.groupSize <= 128 && result.saTotalTaskNum > 0 &&
+        mxfp8ShapeSupported && input.headDim > 0 && input.headDim <= 512 && input.blockIndexStride >= 12 &&
+        result.groupSize > 0 && result.groupSize <= 128 && result.saTotalTaskNum > 0 &&
         static_cast<uint64_t>(result.saTotalTaskNum) * 10U < static_cast<uint64_t>(input.aicCoreNum) * 3U;
-    return fdShapeSupported && totalSplitTaskNum > result.saUsedCoreNum && totalCost > 0U && totalValidBlockNum > 0U;
+    if (!fdShapeSupported || totalSplitTaskNum <= result.saUsedCoreNum || totalCost == 0U || totalValidBlockNum == 0U) {
+        return false;
+    }
+    if (input.quantType == 6) {
+        // Packed MXFP8 computes 512/256/128-token tiles rather than one
+        // micro-block per tile. Do not pay the global barrier/combine cost
+        // when the existing base tasks already cover this amount of work.
+        // Use effective counts, never the physical sparse-index capacity.
+        const uint64_t tileTokens = result.groupSize <= 32 ? 512U : (result.groupSize <= 64 ? 256U : 128U);
+        const uint64_t selectedTokens = totalValidBlockNum * static_cast<uint64_t>(input.blockShapeY);
+        const uint64_t tileWork = (selectedTokens + tileTokens - 1U) / tileTokens;
+        if (tileWork <= static_cast<uint64_t>(result.saUsedCoreNum)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 inline BSAScheduleStatus BuildDecodeCoreSchedules(ScheduleResult& result, int64_t totalSplitTaskNum)
@@ -471,6 +500,11 @@ inline BSAScheduleStatus EncodeMetadata(const ScheduleResult& result, MetadataTy
     metadata[FD_TOTAL_FLAT_TASK_NUM_INDEX] = static_cast<MetadataType>(result.fdTotalFlatTaskNum);
     metadata[FD_PARTIAL_TASK_NUM_INDEX] = static_cast<MetadataType>(result.fdPartialTaskNum);
     metadata[CONFIG_SIGNATURE_INDEX] = static_cast<MetadataType>(result.configSignature);
+    if (result.hasPackedCountRange) {
+        metadata[PACKED_COUNT_RANGE_TAG_INDEX] = PACKED_COUNT_RANGE_TAG;
+        metadata[MIN_SPARSE_COUNT_INDEX] = static_cast<MetadataType>(result.minSparseCount);
+        metadata[MAX_SPARSE_COUNT_INDEX] = static_cast<MetadataType>(result.maxSparseCount);
+    }
 
     for (uint32_t coreIdx = 0; coreIdx < MAX_DECODE_CORE_NUM; ++coreIdx) {
         const DecodeSchedule& schedule = result.decodeSchedules[coreIdx];

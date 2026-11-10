@@ -87,6 +87,7 @@ struct TileCopyPerTokenDequant {
 
 template <class ArchTag, class ElementO_, class LayoutTagO_, class LayoutTagOTmp_>
 struct TileCopyRescaleO {
+    static constexpr bool APPLY_MX_V_CHANNEL_SCALE = false;
     using ElementO = ElementO_;
     using LayoutTagO = LayoutTagO_;
     using LayoutTagOTmp = LayoutTagOTmp_;
@@ -98,6 +99,12 @@ struct TileCopyRescaleO {
         tla::Tensor<AscendC::GlobalTensor<ElementO>, LayoutO, tla::Coord<tla::_0, tla::_0>, AscendC::TPosition::GM>;
 
     using CopyUbToGmO = Tile::CopyUb2GmTla<ArchTag, TensorUbO, TensorGmO>;
+};
+template <class Base, bool GENERAL = false, bool CACHE_SCALE = false>
+struct TileCopyRescaleOMxV : Base {
+    static constexpr bool APPLY_MX_V_CHANNEL_SCALE = true;
+    static constexpr bool MX_V_GENERAL_DIM = GENERAL;
+    static constexpr bool CACHE_MX_V_CHANNEL_SCALE = CACHE_SCALE;
 };
 } // namespace NpuArch::Epilogue::Tile
 

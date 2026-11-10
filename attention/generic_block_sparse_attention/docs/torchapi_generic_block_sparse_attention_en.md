@@ -348,7 +348,7 @@ In the constraints, the definitions of common fields are as follows:
                 <li>tensor_type supports bfloat16, float16, and float8_e4m3fn.</li>
                 <li>PA_BBND -> (num_blocks, block_size, KV_N, D)</li>
                 <li>Currently, block_size must be 128 and equal to block_shape[1].</li>
-                <li>Non-contiguous tensor constraint: only dim0 of PA_BBND supports non-contiguous layout.</li>
+                <li>Non-contiguous tensor constraint: only dim0 of PA_BBND/PA_BNBD supports non-contiguous layout; MXFP8 normalizes page storage as described below.</li>
             </ul>
         </td>
     </tr>

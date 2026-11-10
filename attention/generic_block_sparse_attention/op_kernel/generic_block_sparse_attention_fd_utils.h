@@ -57,7 +57,7 @@ __aicore__ inline uint32_t CalculateConfigSignature(
 template <bool isCausal = true>
 __aicore__ inline bool ValidateMetadata(__gm__ const GbsaMetadata::Metadata* meta,
                                         const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData,
-                                        uint32_t physicalAicNum)
+                                        uint32_t physicalAicNum, uint32_t* validatedFlags = nullptr)
 {
     if (meta == nullptr || meta->magic != GbsaMetadata::METADATA_MAGIC ||
         meta->version != GbsaMetadata::METADATA_VERSION ||
@@ -71,6 +71,11 @@ __aicore__ inline bool ValidateMetadata(__gm__ const GbsaMetadata::Metadata* met
     constexpr uint32_t KNOWN_FLAGS = GbsaMetadata::FD_SCHEDULE_ENABLED | GbsaMetadata::FD_ACTUAL_BLOCK_PREFIX;
     if ((flags & ~KNOWN_FLAGS) != 0U || (flags & GbsaMetadata::FD_ACTUAL_BLOCK_PREFIX) == 0U) {
         return false;
+    }
+    // The caller may reuse these flags after successful validation instead
+    // of issuing a second scalar GM read solely to select its execution path.
+    if (validatedFlags != nullptr) {
+        *validatedFlags = flags;
     }
     if ((flags & GbsaMetadata::FD_SCHEDULE_ENABLED) == 0U) {
         return meta->fdActiveCoreNum == 0 && meta->combineTaskNum == 0 && meta->fdPartialTaskNum == 0;

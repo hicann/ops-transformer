@@ -27,6 +27,9 @@ constexpr uint32_t MAX_FD_ACTIVE_CORE_NUM = MAX_DECODE_CORE_NUM;
 constexpr uint32_t MAX_FD_PARTIAL_PER_BASE_TASK = MAX_DECODE_CORE_NUM;
 constexpr MetadataType METADATA_MAGIC = 0x5341534D;
 constexpr MetadataType METADATA_VERSION = 8;
+// Optional optimization hint in the existing v8 reserved header. Older
+// producers leave it zero; the kernel then uses the bounded worst-case plan.
+constexpr MetadataType PACKED_COUNT_RANGE_TAG = 0x4D584343;
 
 enum FdScheduleFlag : uint32_t {
     FD_SCHEDULE_ENABLED = 1U << 0,
@@ -46,6 +49,9 @@ enum HeaderIndex : uint32_t {
     FD_TOTAL_FLAT_TASK_NUM_INDEX = 9U,
     FD_PARTIAL_TASK_NUM_INDEX = 10U,
     CONFIG_SIGNATURE_INDEX = 11U,
+    PACKED_COUNT_RANGE_TAG_INDEX = 12U,
+    MIN_SPARSE_COUNT_INDEX = 13U,
+    MAX_SPARSE_COUNT_INDEX = 14U,
     HEADER_SIZE = 16U,
 };
 
@@ -107,7 +113,10 @@ struct Metadata {
     MetadataType fdTotalFlatTaskNum;
     MetadataType fdPartialTaskNum;
     MetadataType configSignature;
-    MetadataType headerReserved[HEADER_SIZE - 12U];
+    MetadataType packedCountRangeTag;
+    MetadataType minSparseCount;
+    MetadataType maxSparseCount;
+    MetadataType headerReserved[HEADER_SIZE - 15U];
     DecodeSchedule decodeSchedules[MAX_DECODE_CORE_NUM];
     CombineSchedule combineSchedules[MAX_COMBINE_TASK_NUM];
     MetadataType padding[METADATA_TOTAL_SIZE - METADATA_USED_SIZE];

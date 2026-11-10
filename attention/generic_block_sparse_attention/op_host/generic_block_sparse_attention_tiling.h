@@ -84,6 +84,7 @@ TILING_DATA_FIELD_DEF(uint64_t, totalQTokens);
 TILING_DATA_FIELD_DEF(uint64_t, totalKvTokens);
 TILING_DATA_FIELD_DEF_STRUCT(GbsaBaseTiling, baseTileInfo);
 TILING_DATA_FIELD_DEF_STRUCT(GbsaMmPhaseL1Tiling, mmPhaseL1TileInfo);
+// Nonquantized: descriptor base/words per tile. MXFP8 packed: head-cache base/words per tensor; base 0 disables.
 TILING_DATA_FIELD_DEF(uint64_t, kvOffsetInfoOffset);
 TILING_DATA_FIELD_DEF(uint32_t, kvOffsetTileWords);
 // Fixed per-batch storage capacities for BSND/BNSD. TND uses cuSeqLengths instead.
@@ -137,9 +138,11 @@ private:
     ge::graphStatus CheckQuantConfig(gert::TilingContext* context);
     ge::graphStatus CheckMetadata(gert::TilingContext* context);
     ge::graphStatus CheckReservedOptionalInputs(gert::TilingContext* context);
+    ge::graphStatus CheckMxfp8Scales(gert::TilingContext* context);
     ge::graphStatus ParseKvCacheStride0(gert::TilingContext* context);
     void CalcBaseTileTilingParams950();
     void CalcMatmulPhaseL1TileInfo950();
+    bool IsMxfp8PackedPath() const;
     uint64_t GenerateTilingKey();
 
     uint32_t batch_ = 0;

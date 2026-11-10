@@ -50,6 +50,7 @@ constexpr int64_t kMaxBlocks = (kS2 + kBlockSize - 1) / kBlockSize;
 constexpr int64_t kTotalQBlocks = kT;
 constexpr double kScale = 1.0 / sqrt(static_cast<double>(kD));
 constexpr int64_t kLayoutSparse = 4; // KVN_TotalQB_KB
+
 } // namespace
 
 // ============================================================================

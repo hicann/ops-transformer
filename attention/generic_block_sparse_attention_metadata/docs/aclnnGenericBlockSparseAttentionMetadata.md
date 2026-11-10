@@ -238,7 +238,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>blockShape</td>
       <td>输入</td>
       <td>代表稀疏块形状数组。</td>
-      <td>稀疏块形状[blockShapeX, blockShapeY]。blockShapeX=1。</td>
+      <td>稀疏块形状[blockShapeX, blockShapeY]。blockShapeX=1。<term>Ascend 950PR&950DT系列产品</term>非量化和MXFP8支持1≤blockShapeY≤128的任意整数；Atlas A2/A3非量化支持1、2、4、8、16、32、64、128；quantType=5仅支持128。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -279,7 +279,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>输入</td>
       <td>表示attention计算中的掩码类型。</td>
       <td>
-        取值0~5，含义见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#掩码说明">掩码说明</a>。<br>
+        取值0~6，含义见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#掩码说明">掩码说明</a>。<br>
         支持0（非因果）或1（causal），适用范围见<a href="#产品差异约束">产品差异约束</a>。
       </td>
       <td>INT64</td>
@@ -292,8 +292,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>输入</td>
       <td>代表采用的量化手段。</td>
       <td>
-        取值0~5，完整配置见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#量化相关说明">量化相关说明</a>：<br>
-        当前支持0或5，适用范围见<a href="#产品差异约束">产品差异约束</a>。取值1~4传入将校验失败。
+        取值0~6，完整配置见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#量化相关说明">量化相关说明</a>：<br>
+        当前支持0、5或6，适用范围见<a href="#产品差异约束">产品差异约束</a>。取值1~4传入将校验失败。
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -487,16 +487,18 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化FLOAT16/BFLOAT16场景：`headDim`支持1～256的任意值；`layoutQ/layoutKv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`；`blockShape=[1,Y]`，Y支持1、2、4、8、16、32、64、128；`maskType`支持0（非因果）和1（causal）；`residualBlockMode`支持0或1。TND KV须传入`cuSeqLengthsKvOptional`；causal模式下各batch须满足实际KV长度不小于实际Q长度。
 <!-- end id9 -->
 <!-- npu="950" id10 -->
-- <term>Ascend 950PR&950DT系列产品</term> FP8量化场景：`headDim`仅支持128，`layoutQ/layoutKv`仅支持`TND/PA_BBND`，`maskType=1`、`residualBlockMode=0`、`blockShape=[1,128]`。
+- <term>Ascend 950PR&950DT系列产品</term> MXFP8（`quantType=6`）的`headDim`、Q/KV布局组合、稀疏块大小、索引容量、因果模式、softmax精度和LSE输出范围与上述A5非量化场景一致；`residualBlockMode`仍仅支持0。
+- `quantType=6`的Q/K使用group-32、V使用per-channel、P使用per-tensor缩放；scale的shape和dtype由主算子校验，metadata不读取scale。Metadata保留常规任务列表，并禁用Flash Decoding分裂调度。
+- <term>Ascend 950PR&950DT系列产品</term> quantType=5的FP8量化场景：`headDim`仅支持128，`layoutQ/layoutKv`仅支持`TND/PA_BBND`，`maskType=1`、`residualBlockMode=0`、`blockShape=[1,128]`。
 <!-- end id10 -->
 <!-- npu="950,A3,910b" id11 -->
-- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> FP8量化支持1～256；容量均须不小于稀疏块有效计数的最大值。
+- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16和MXFP8支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> quantType=5的FP8量化支持1～256；容量均须不小于稀疏块有效计数的最大值。
 <!-- end id11 -->
 <!-- npu="950,A3,910b" id12 -->
-- `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）或5（FP8量化）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>仅支持0。
+- `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、5（FP8量化）或6（MXFP8）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>仅支持0。
 <!-- end id12 -->
 <!-- npu="950,A3,910b" id13 -->
-- `softmaxPrecision`：<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景支持0或1，FP8量化场景仅支持1；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>上FLOAT16支持0或1，BFLOAT16仅支持0。
+- `softmaxPrecision`：<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16和`MXFP8`场景支持0或1，quantType=5的FP8量化场景仅支持1；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>上FLOAT16支持0或1，BFLOAT16仅支持0。
 <!-- end id13 -->
 
 ### 基准说明
@@ -548,16 +550,16 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 
 - 本接口必须与`aclnnGenericBlockSparseAttention`配套使用。共同Tensor和属性须与随后调用的主算子完全一致，每次调用主算子前均须重新生成`metadataOptional`。主算子的完整约束见[aclnnGenericBlockSparseAttention](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#约束说明)。
 <!-- npu="950,A3,910b" id14 -->
-- 布局组合及适用范围见[产品差异约束](#产品差异约束)。`layoutSparsePattern=4`、`blockShapeX=1`、`winLeft=winRight=-1`；headDim范围见[产品差异约束](#产品差异约束)。<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>及<term>Ascend 950PR&950DT系列产品</term>非量化支持maskType为0或1，FP8量化仅支持1。
+- 布局组合及适用范围见[产品差异约束](#产品差异约束)。`layoutSparsePattern=4`、`blockShapeX=1`、`winLeft=winRight=-1`；headDim范围见[产品差异约束](#产品差异约束)。<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>及<term>Ascend 950PR&950DT系列产品</term>非量化支持maskType为0或1，<term>Ascend 950PR&950DT系列产品</term> `MXFP8`亦支持maskType为0或1，quantType=5的FP8量化仅支持1。
 <!-- end id14 -->
 <!-- npu="950,A3,910b" id15 -->
-- `sparseBlockIdx`的shape为`[numKvHeads, totalQBlocks, maxSparseBlockCount]`，`sparseBlockCount`的shape为`[numKvHeads, totalQBlocks]`。`maxSparseBlockCount`须大于0，且须不小于`sparseBlockCount`中所有元素的最大值。容量上限：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> FP8量化为256。
+- `sparseBlockIdx`的shape为`[numKvHeads, totalQBlocks, maxSparseBlockCount]`，`sparseBlockCount`的shape为`[numKvHeads, totalQBlocks]`。`maxSparseBlockCount`须大于0，且须不小于`sparseBlockCount`中所有元素的最大值。容量上限：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化和MXFP8为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> quantType=5的FP8量化为256。
 <!-- end id15 -->
 - 每组有效稀疏索引须非负、严格升序且不重复，位于前`sparseBlockCount`个位置；随机升序即可，不要求等步长或物理页连续。
 <!-- npu="A3,910b" id16 -->
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>在maskType=1时，第q个有效Q token的KV可见长度为`kvLen-qLen+q+1`，q从0开始；maskType=0时可见长度为`kvLen`。residualBlockMode=1时显式列表只包含可见范围内的完整KV块，尾部不完整块由主算子隐式加入，不计入sparseBlockCount及maxSparseBlockCount容量。Metadata与主算子的maskType、residualBlockMode、序列长度和有效计数须一致。
 <!-- end id16 -->
-- TND布局下，`cuSeqLengthsQOptional`必须传入；`sequsedQOptional`可传入nullptr。传入sequsedQ时，每个元素须位于`[0, 对应Batch存储长度]`范围内。稀疏块分块仍按cu前缀和描述的存储长度计算。
+- TND布局下，`cuSeqLengthsQOptional`必须传入；`sequsedQOptional`可传入`nullptr`。传入sequsedQ时，每个元素须位于`[0, 对应Batch存储长度]`范围内。分核按实际长度累加，稀疏块分块仍按cu前缀和描述的存储长度计算。
 - layoutKv为PA_BBND/PA_BNBD时须传`sequsedKvOptional`，不传`cuSeqLengthsKvOptional`。layoutKv为TND时，`sequsedKvOptional`可与`cuSeqLengthsKvOptional`并存，双长度语义同Q侧。
 - `numQHeads >= numKvHeads`且`numQHeads % numKvHeads == 0`，`groupSize = numQHeads / numKvHeads`不超过128。
 - 输出`metadataOptional`固定为INT32、shape为`(1024,)`，不得解析、修改或跨不同输入和属性复用。

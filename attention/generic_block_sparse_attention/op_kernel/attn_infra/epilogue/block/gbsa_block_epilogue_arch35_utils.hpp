@@ -21,6 +21,8 @@ struct UBufTileHelper {
     uint32_t qBaseTilePerSubCore;
     uint32_t kvBaseTilePerSubCore;
     uint32_t embedPerSubCore;
+    // PV slot capacity can exceed the active row width (MXFP8 D192 in D256).
+    uint32_t loUbColCapacity;
     uint32_t loUbBufNum;
     uint32_t loUbRowNum;
     uint32_t kvOffsetUbBufNum = 1U;
@@ -36,6 +38,8 @@ struct UBufTileHelper {
     uint32_t glStartOffset;
     uint32_t lseStartOffset;
     uint32_t maskStartOffset;
+    // Hybrid MXFP8 PV uses a packed E8M0 pair for each output channel.
+    uint32_t mxVScaleStartOffset = 0U;
 
     __aicore__ inline UBufTileHelper() {}
 
@@ -45,6 +49,7 @@ struct UBufTileHelper {
         : qBaseTilePerSubCore(qs),
           kvBaseTilePerSubCore(kvs),
           embedPerSubCore(d),
+          loUbColCapacity(d),
           loUbBufNum(loBufNum),
           loUbRowNum(qs),
           loGmTransit(false),

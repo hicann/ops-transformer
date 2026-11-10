@@ -131,6 +131,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | `FP4_E2M1_DYNAMIC_OCP` | 3 | FP4_E2M1 动态 OCP |
 | `FP4_E2M1_DYNAMIC_CX` | 4 | FP4_E2M1 动态 CX |
 | `FP8_E4M3_STATIC_CAST_P` | 5 | FP8_E4M3 静态 cast P |
+| `MXFP8_E4M3_PER_CHANNEL_V` | 6 | Q/K group-32 E8M0，V per-channel E8M0，P per-tensor |
 
 ### mask_mode 枚举
 
@@ -149,7 +150,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 > [!NOTE]
 >
-> 枚举为 `IntEnum`，可直接作为 int 传入底层算子；接口仅支持传入枚举或对应 int 值。mask_mode支持1（`CAUSAL`），<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景另支持0（`NO_MASK`）；quant_mode 当前仅支持 0（`NO_QUANT`）与 5（`FP8_E4M3_STATIC_CAST_P`）。
+> 枚举为 `IntEnum`，可直接作为 int 传入底层算子；接口仅支持传入枚举或对应 int 值。mask_mode支持1（`CAUSAL`），<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16和MXFP8场景另支持0（`NO_MASK`）；quant_mode 当前支持 0（`NO_QUANT`）、5（`FP8_E4M3_STATIC_CAST_P`）与6（`MXFP8_E4M3_PER_CHANNEL_V`）。
 
 ## layout_sparse_pattern 取值与sparse_block_idx/sparse_block_count的shape对应关系说明
 
@@ -209,10 +210,10 @@ cann_ops_transformer.generic_block_sparse_attention(
 | block_shape | list[int] | 必选 | 稀疏块形状 `[block_x, block_y]` | int64 | - | 长度为2 |
 | metadata | Tensor | 必选 | 必须传入`generic_block_sparse_attention_metadata`生成的配套任务切分结果 | int32 | ND | (1024,) |
 | attn_mask | Tensor | 可选 | 掩码矩阵 | bool | ND | - |
-| q_dequant_scale | Tensor | 可选 | query反量化缩放因子 | float32 | ND | - |
-| k_dequant_scale | Tensor | 可选 | key反量化缩放因子 | float32 | ND | - |
-| v_dequant_scale | Tensor | 可选 | value反量化缩放因子 | float32 | ND | - |
-| p_quant_scale | Tensor | 可选 | P量化缩放因子 | float32 | ND | - |
+| q_dequant_scale | Tensor | 条件必选 | quant_mode=6的query反量化缩放因子；0/5为None | float8_e8m0fnu | ND | query.shape[:-1] + (ceil(D/64), 2) |
+| k_dequant_scale | Tensor | 条件必选 | quant_mode=6的key反量化缩放因子；0/5为None | float8_e8m0fnu | ND | key.shape[:-1] + (ceil(D/64), 2) |
+| v_dequant_scale | Tensor | 条件必选 | quant_mode=6的value反量化缩放因子；0/5为None | float8_e8m0fnu | ND | `PA_BBND`: (P, 2, N2, D, 2)；`PA_BNBD`: (P, N2, 2, D, 2)；dense: (B, N2, D, 2) |
+| p_quant_scale | Tensor | 可选 | quant_mode=6的P per-tensor量化系数，缺省16.0；0/5为None | float32 | ND | (1,) |
 | cu_seqlens_q | Tensor | 条件必选 | TND必须传入Q存储长度前缀和；BSND/BNSD不使用，建议传入None；第一个元素为0 | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | 条件必选 | TND KV必须传入KV存储长度前缀和；BSND/BNSD不使用，建议传入None；PA_BBND/PA_BNBD必须为None | int64 | ND | (B+1,) |
 | seqused_q | Tensor | 条件必选 | BSND/BNSD必须传入，TND可选，指定每batch实际Q长度 | int32 | ND | (B,) |
@@ -246,7 +247,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | attention_out | Tensor | 必选 | generic_block_sparse_attention的计算输出 | bfloat16/float16 | ND | TND: (Q_T,Q_N,D)；BSND: (B,Sq,Q_N,D)；BNSD: (B,Q_N,Sq,D) |
-| softmax_lse | Tensor | 可选 | softmax的LSE结果 | float32 | ND | TND: (Q_T,Q_N,1)；BSND/BNSD: (B,Q_N,Sq,1)；或空 |
+| softmax_lse | Tensor | 可选 | softmax的LSE结果 | float32 | ND | TND: (Q_T,Q_N,1)；`BSND`/BNSD: (B,Q_N,Sq,1)；关闭时为空 |
 
 **说明**
 
@@ -267,19 +268,20 @@ cann_ops_transformer.generic_block_sparse_attention(
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化FLOAT16/BFLOAT16场景：`head_dim`支持1～256的任意值；`layout_q/layout_kv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`；`block_shape=[1,Y]`，Y支持1、2、4、8、16、32、64、128；`mask_mode`支持0（非因果）和1（causal）；`residual_block_mode`支持0或1。TND KV须传入`cu_seqlens_kv`，dense Q/K/V按对应布局连续存储；causal模式下各batch须满足实际KV长度不小于实际Q长度。
 <!-- end id8 -->
 <!-- npu="950" id9 -->
-- <term>Ascend 950PR&950DT系列产品</term> FP8量化场景：`head_dim`仅支持128，`layout_q/layout_kv`仅支持`TND/PA_BBND`，`mask_mode=1`、`residual_block_mode=0`、`block_shape=[1,128]`。
+- <term>Ascend 950PR&950DT系列产品</term> `MXFP8`（`quant_mode=6`）仅保留grouped路径：Q为TND/`BSND`/BNSD，KV为同布局dense或`PA_BBND`/`PA_BNBD`（页大小128），D=192/256且block_shape=[1,4/8]；D192/256均支持group_size=1～128，softmax_precision=0/1（均使用FP32 S），不输出LSE；D128不支持。完整条件见`MXFP8`量化契约，`residual_block_mode=0`，不满足grouped条件直接报不支持。
+- <term>Ascend 950PR&950DT系列产品</term> quantType=5的FP8量化场景：`head_dim`仅支持128，`layout_q/layout_kv`仅支持`TND/PA_BBND`，`mask_mode=1`、`residual_block_mode=0`、`block_shape=[1,128]`。
 <!-- end id9 -->
 <!-- npu="950,A3,910b" id10 -->
-- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> FP8量化支持1～256；容量均须不小于稀疏块有效计数的最大值。
+- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16和MXFP8支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> quantType=5的FP8量化支持1～256；容量均须不小于稀疏块有效计数的最大值。
 <!-- end id10 -->
 <!-- npu="950,A3,910b" id11 -->
-- `quant_mode`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）或5（FP8量化）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>仅支持0。
+- `quant_mode`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、5（FP8量化）或6（MXFP8）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>仅支持0。
 <!-- end id11 -->
 <!-- npu="950,A3,910b" id12 -->
-- `softmax_precision`：<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景支持0或1，FP8量化场景仅支持1；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>上FLOAT16支持0或1，BFLOAT16仅支持0。
+- `softmax_precision`：<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景支持0或1，`MXFP8`支持0或1且均使用FP32 S/Softmax，推荐0，1为兼容别名；quantType=5的FP8量化场景仅支持1；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>上FLOAT16支持0或1，BFLOAT16仅支持0。
 <!-- end id12 -->
 <!-- npu="A3,910b" id13 -->
-- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化场景支持在上述布局组合及`residual_block_mode=0`或1时输出LSE。FP8量化场景不支持输出LSE。
+- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化场景支持在上述布局组合及`residual_block_mode=0`或1时输出LSE。quantType=5的FP8量化场景不支持输出LSE。
 <!-- end id13 -->
 - 每组有效稀疏索引须非负、严格升序且不重复，位于前`sparse_block_count`个位置；随机升序即可，不要求等步长或物理页连续。
 <!-- npu="A3,910b" id14 -->
@@ -505,7 +507,7 @@ cann_ops_transformer.generic_block_sparse_attention(
         <td rowspan="3">
             <ul>
                 <li>maxKvBlockCount：容量上限见<a href="#产品差异约束">产品差异约束</a></li>
-                <li>block_shape=[1,Y]。</li>
+                <li>block_shape=[1,Y]。<term>Ascend 950PR&950DT系列产品</term>非量化支持1≤Y≤128的任意整数；MXFP8仅支持下述grouped条件中的Y；Atlas A2/A3非量化支持1、2、4、8、16、32、64、128；quantType=5仅支持128。</li>
             </ul>
         </td>
     </tr>
@@ -654,7 +656,7 @@ mask_mode参数解释见「mask_mode 枚举」。
             <td>attn_mask</td>
             <td>
                 <ul>
-                    <li>当前须为None</li>
+                    <li>须为None</li>
                 </ul>
             </td>
             <td>无</td>
@@ -829,7 +831,7 @@ quant_mode参数解释见「quant_mode 枚举」。
             <td>
                 <ul>
                     <li>data_type支持INT</li>
-                    <li>当前支持0、5</li>
+                    <li>当前支持0、5、6</li>
                 </ul>
             </td>
             <td>可选输入，默认值为0</td>
@@ -840,7 +842,7 @@ quant_mode参数解释见「quant_mode 枚举」。
             </td>
             <td rowspan="5">
                 <ul>
-                    <li>quant_mode=0时，q/k/v_dequant_scale须为None</li>
+                    <li>quant_mode=0/5时，q/k/v_dequant_scale须为None；quant_mode=6时须传E8M0</li>
                     <li>quant_mode!=0时attention_out_dtype必须传入，当前量化场景输出dtype须为float16或bfloat16</li>
                 </ul>
             </td>
@@ -849,7 +851,7 @@ quant_mode参数解释见「quant_mode 枚举」。
             <td>q_dequant_scale</td>
             <td rowspan="3">
                 <ul>
-                    <li>非量化场景须为None</li>
+                    <li>quant_mode=0/5须为None；quant_mode=6须为E8M0，shape见入参表</li>
                 </ul>
             </td>
             <td rowspan="3">可选参数</td>
@@ -864,13 +866,15 @@ quant_mode参数解释见「quant_mode 枚举」。
             <td>p_quant_scale</td>
             <td>
                 <ul>
-                    <li>当前须为None</li>
+                    <li>quant_mode=0/5须为None；quant_mode=6可传float32 [1]，缺省16.0</li>
                 </ul>
             </td>
             <td>无</td>
         </tr>
     </tbody>
 </table>
+
+`MXFP8`（`quant_mode=6`）仅支持下述grouped条件，Q为TND/`BSND`/BNSD，KV为同布局dense或`PA_BBND`/`PA_BNBD`（页大小128），`softmax_precision=0或1`（均使用FP32 S/Softmax，推荐0，1为兼容别名）、`return_softmax_lse=False`、`residual_block_mode=0`；D仅支持192/256。Q/K按D维每32个元素量化，scale以两个组打包；V每个逻辑KV序列/head/channel使用相同E8M0 scale，非分页shape为`[B,N2,D,2]`，最后两个byte相同。`p_quant_scale`是有限正数alpha，P先乘alpha再cast为FP8，PV结果除以alpha。详见[`MXFP8`契约](./aclnnGenericBlockSparseAttention.md#mxfp8quanttype6)。
 
 #### SoftmaxLSE参数组
 
@@ -897,7 +901,7 @@ quant_mode参数解释见「quant_mode 枚举」。
             <td>
                 <ul>
                     <li>data_type仅支持BOOL</li>
-                    <li>非量化支持False/True；FP8路径仅支持False</li>
+                    <li>非量化支持False/True；MXFP8和quant_mode=5仅支持False</li>
                 </ul>
             </td>
             <td>可选属性，默认值为False</td>

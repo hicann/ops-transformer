@@ -150,6 +150,10 @@ template <
     bool ReluEnable = false, ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT>
 struct PackedTileCopyTlaToUB : public PackedTileCopyTla<ArchTag, ElementA_, LayoutTagA, ElementB_, LayoutTagB,
                                                         ElementC_, LayoutTagC, ElementBias> {
+    static constexpr bool IS_MXFP8 = false;
+    static constexpr bool USE_MX_SCALE = false;
+    static constexpr bool IS_GENERAL_MX = false;
+    static constexpr bool IS_PACKED_MX = false;
     static constexpr CopyL0CToUBMode CopyMode = CopyMode_;
     // 重写 CopyL0CToDst
     using TensorL0C = typename PackedTileCopyTla<ArchTag, ElementA_, LayoutTagA, ElementB_, LayoutTagB, ElementC_,

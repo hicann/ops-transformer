@@ -54,6 +54,7 @@ constexpr int64_t GBSA_RESIDUAL_BLOCK_MODE_FORCE = 1;
 constexpr int64_t GBSA_ARCH35_QUANT_MAX_SPARSE_BLOCK_COUNT = 256;
 constexpr int64_t GBSA_QUANT_TYPE_NONE = 0;
 constexpr int64_t GBSA_QUANT_TYPE_FLOAT8 = 5;
+constexpr int64_t GBSA_QUANT_TYPE_MXFP8 = 6;
 constexpr int64_t GBSA_SOFTMAX_PRECISION_HIGH = 0;
 constexpr int64_t GBSA_SOFTMAX_PRECISION_MIXED = 1;
 constexpr int64_t GBSA_CURRENT_MASK_TYPE = 1;
@@ -173,8 +174,8 @@ aclnnStatus CheckGbsaBlockAttrs(int64_t blockShapeX, int64_t blockShapeY, int64_
     if (!supportedBlockY) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "blockShapeY=%lld is unsupported (arch35NonQuant=%d, arch22TndGeneralizedY=%d, "
-                "arch22PaGeneralizedY=%d); supported: 128, any in [1, 128] for arch35 non-quant, "
-                "powers of two in [1, %lld] for arch22 TND or PA.",
+                "arch22PaGeneralizedY=%d); supported: 128, any in [1, 128] for arch35 non-quant/MXFP8, "
+                "powers of two in [1, %lld] for arch22 dense or PA.",
                 blockShapeY, arch35NonQuant, arch22GeneralizedY, arch22PagedGeneralizedY, GBSA_MAX_BLOCK_SHAPE_Y);
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -189,7 +190,8 @@ aclnnStatus CheckGbsaBlockAttrs(int64_t blockShapeX, int64_t blockShapeY, int64_
 
 aclnnStatus CheckGbsaScalarAttrs(int64_t numQHeads, int64_t numKvHeads, int64_t headDim, int64_t blockShapeX,
                                  int64_t blockShapeY, int64_t layoutSparsePattern, bool isArch35, bool arch35NonQuant,
-                                 bool arch22GeneralizedY = false, bool arch22PagedGeneralizedY = false)
+                                 bool arch22GeneralizedY = false, bool arch22PagedGeneralizedY = false,
+                                 bool mxfp8 = false)
 {
     const struct {
         int64_t value;
@@ -207,7 +209,9 @@ aclnnStatus CheckGbsaScalarAttrs(int64_t numQHeads, int64_t numKvHeads, int64_t 
         return status;
     }
     if (isArch35) {
-        if (arch35NonQuant ? (headDim > GBSA_ARCH35_NONQUANT_MAX_HEAD_DIM) : (headDim != GBSA_CURRENT_HEAD_DIM)) {
+        if (mxfp8 ?
+                (headDim > GBSA_HEAD_DIM_256) :
+                (arch35NonQuant ? (headDim > GBSA_ARCH35_NONQUANT_MAX_HEAD_DIM) : headDim != GBSA_CURRENT_HEAD_DIM)) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "headDim=%lld is unsupported (arch35NonQuant=%d).", headDim,
                     arch35NonQuant);
             return ACLNN_ERR_PARAM_INVALID;
@@ -216,8 +220,8 @@ aclnnStatus CheckGbsaScalarAttrs(int64_t numQHeads, int64_t numKvHeads, int64_t 
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A2/A3 headDim must be in [1, 256], got %lld.", headDim);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    return CheckGbsaBlockAttrs(blockShapeX, blockShapeY, layoutSparsePattern, arch35NonQuant, arch22GeneralizedY,
-                               arch22PagedGeneralizedY);
+    return CheckGbsaBlockAttrs(blockShapeX, blockShapeY, layoutSparsePattern, arch35NonQuant || mxfp8,
+                               arch22GeneralizedY, arch22PagedGeneralizedY);
 }
 
 aclnnStatus CheckGbsaMaxSeqLenAttr(int64_t maxSeqLen, const char* attrName)
@@ -370,13 +374,13 @@ aclnnStatus CheckGbsaSeqLengthInputs(const aclTensor* cuSeqLengthsOptional, cons
 
 aclnnStatus CheckGbsaQuantType(int64_t quantType, bool isArch35)
 {
-    if (quantType != GBSA_QUANT_TYPE_NONE && quantType != GBSA_QUANT_TYPE_FLOAT8) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantType only supports %lld or %lld, but got %lld.", GBSA_QUANT_TYPE_NONE,
-                GBSA_QUANT_TYPE_FLOAT8, quantType);
+    if (quantType != GBSA_QUANT_TYPE_NONE && quantType != GBSA_QUANT_TYPE_FLOAT8 &&
+        quantType != GBSA_QUANT_TYPE_MXFP8) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantType only supports 0, 5 or 6, but got %lld.", quantType);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (quantType == GBSA_QUANT_TYPE_FLOAT8 && !isArch35) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantType %lld is only supported on Atlas A5.", GBSA_QUANT_TYPE_FLOAT8);
+    if (quantType != GBSA_QUANT_TYPE_NONE && !isArch35) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantType %lld is only supported on Atlas A5.", quantType);
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -390,7 +394,8 @@ aclnnStatus CheckGbsaSoftmaxPrecision(int64_t softmaxPrecision, int64_t quantTyp
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (quantType == GBSA_QUANT_TYPE_FLOAT8 && softmaxPrecision != GBSA_SOFTMAX_PRECISION_MIXED) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "FP8 quantization only supports softmaxPrecision=%lld, but got %lld.",
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "Per-tensor FP8 quantization only supports softmaxPrecision=%lld, but got %lld.",
                 GBSA_SOFTMAX_PRECISION_MIXED, softmaxPrecision);
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -422,7 +427,7 @@ aclnnStatus CheckGbsaMaskAttrs(int64_t maskType, int64_t windowSizeLeft, int64_t
                                bool arch35NonQuant)
 {
     if (maskType != GBSA_CURRENT_MASK_TYPE && !((!isArch35 || arch35NonQuant) && maskType == 0)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "maskType supports %lld, and 0 on A2/A3 or A5 non-quant, but got %lld.",
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "maskType supports %lld, and 0 on A2/A3 or A5 non-quant/MXFP8, but got %lld.",
                 GBSA_CURRENT_MASK_TYPE, maskType);
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -468,8 +473,8 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         return status;
     }
     if ((!GbsaIsLayout(kvInputLayout, "PA_BBND") || !GbsaIsLayout(qInputLayout, "TND")) &&
-        quantType != GBSA_QUANT_TYPE_NONE) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Batched Q and dense/PA_BNBD KV require quantType=0.");
+        quantType != GBSA_QUANT_TYPE_NONE && !(isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Batched Q and dense/PA_BNBD KV require quantType=0 or A5 MXFP8.");
         return ACLNN_ERR_PARAM_INVALID;
     }
     status = CheckGbsaMaxSeqLenAttrs(maxQSeqLen, maxKvSeqLen);
@@ -485,7 +490,8 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         isArch35 && quantType == GBSA_QUANT_TYPE_NONE,
         !isArch35 && quantType == GBSA_QUANT_TYPE_NONE && GbsaIsLayout(kvInputLayout, qInputLayout),
         !isArch35 && quantType == GBSA_QUANT_TYPE_NONE &&
-            (GbsaIsLayout(kvInputLayout, "PA_BBND") || GbsaIsLayout(kvInputLayout, "PA_BNBD")));
+            (GbsaIsLayout(kvInputLayout, "PA_BBND") || GbsaIsLayout(kvInputLayout, "PA_BNBD")),
+        isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8);
     if (status != ACLNN_SUCCESS) {
         return status;
     }
@@ -502,7 +508,9 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
     if (status != ACLNN_SUCCESS) {
         return status;
     }
-    status = CheckGbsaSparseBlockCapacity(sparseBlockIdx, isArch35 && quantType == GBSA_QUANT_TYPE_NONE, isArch35);
+    status = CheckGbsaSparseBlockCapacity(
+        sparseBlockIdx, isArch35 && (quantType == GBSA_QUANT_TYPE_NONE || quantType == GBSA_QUANT_TYPE_MXFP8),
+        isArch35);
     if (status != ACLNN_SUCCESS) {
         return status;
     }
@@ -521,7 +529,7 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         return status;
     }
     return CheckGbsaMaskAttrs(maskType, windowSizeLeft, windowSizeRight, isArch35,
-                              isArch35 && quantType == GBSA_QUANT_TYPE_NONE);
+                              isArch35 && (quantType == GBSA_QUANT_TYPE_NONE || quantType == GBSA_QUANT_TYPE_MXFP8));
 }
 
 aclnnStatus ParseBlockShape(const aclIntArray* blockShape, int64_t& blockShapeX, int64_t& blockShapeY)
@@ -591,7 +599,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
     const aclTensor* output = l0op::GenericBlockSparseAttentionMetadata(
         idxContiguous, countContiguous, cuQContiguous, cuKvContiguous, seqUsedQContiguous, seqUsedKvContiguous,
         maxQSeqLen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, isPackedGqaFlag, layoutQ, aicCoreNum,
-        residualBlockMode, isConsistentTopkFlag, maskType, metadataOptional, uniqueExecutor.get());
+        residualBlockMode, isConsistentTopkFlag, maskType, quantType, metadataOptional, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
     *workspaceSize = 0;
     uniqueExecutor.ReleaseTo(executor);

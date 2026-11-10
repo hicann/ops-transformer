@@ -28,6 +28,7 @@
 #include "../../../attn_infra/gemm/tile_common/gbsa_gemm_tile_copy.hpp"
 #include "../../../attn_infra/gemm/tile_common/gbsa_tile_mmad.hpp"
 #include "../../../tla/gbsa_tla_layout.hpp"
+#include "../tile_common/gbsa_mxfp8_tile.hpp"
 #include "../../../tla/gbsa_tla_tensor.hpp"
 #include "../../../arch35/gbsa_layout_utils.hpp"
 
@@ -35,6 +36,29 @@
 
 namespace NpuArch::Gemm::Block {
 ////////////////////////////////////////////////////////////////////
+
+// Page-pair and nonquantized QK keep their original object layout. Only
+// general MX instantiations carry the extra GM/scale geometry.
+template <bool GENERAL>
+struct GbsaMxQKGeometry {};
+
+template <>
+struct GbsaMxQKGeometry<true> {
+protected:
+    uint32_t mxValidD = 0;
+    uint64_t mxQScaleHeadStrideHalf = 0;
+    uint64_t mxKScaleTokenStrideHalf = 0;
+};
+
+template <bool PACKED>
+struct GbsaMxPackedQKGeometry {};
+
+template <>
+struct GbsaMxPackedQKGeometry<true> {
+protected:
+    Tile::GbsaMxPackedCursor mxPackedCursor;
+    AscendC::LocalTensor<uint8_t> mxPackedScale;
+};
 
 struct Mm1L1TileHelper {
     uint32_t mm1L1TileM;
@@ -60,7 +84,8 @@ template <bool PAGED_CACHE_FLAG_, bool HAS_RESIDUAL_BLOCK_, bool PRECOMPUTE_SPAR
           class L0TileShape_, class ElementA_, class ElementB_, class ElementC_, class ElementBias_, class TileCopy_,
           class TileMmad_>
 struct BlockMmadTla<MmadAtlasA5BsaQK<PAGED_CACHE_FLAG_, HAS_RESIDUAL_BLOCK_, PRECOMPUTE_SPARSE_>, L1TileShape_,
-                    L0TileShape_, ElementA_, ElementB_, ElementC_, ElementBias_, TileCopy_, TileMmad_> {
+                    L0TileShape_, ElementA_, ElementB_, ElementC_, ElementBias_, TileCopy_, TileMmad_>
+    : protected GbsaMxQKGeometry<TileCopy_::IS_GENERAL_MX>, protected GbsaMxPackedQKGeometry<TileCopy_::IS_PACKED_MX> {
 public:
     using DispatchPolicy = MmadAtlasA5BsaQK<PAGED_CACHE_FLAG_, HAS_RESIDUAL_BLOCK_, PRECOMPUTE_SPARSE_>;
     static constexpr bool PAGED_CACHE_FLAG = DispatchPolicy::PAGED_CACHE_FLAG;
@@ -113,10 +138,51 @@ public:
             l1BTensor[i] = resource.l1Buf.template GetBufferByByte<ElementB>(
                 l1ATileM * l1ATileK * sizeof(ElementA) * l1ABufNum + l1BTileK * l1BTileN * sizeof(ElementB) * i);
         }
+        if constexpr (TileCopy::IS_MXFP8) {
+            mxScaleA = resource.l1Buf.template GetBufferByByte<uint8_t>(Tile::GBSA_MX_SCALE_BASE +
+                                                                        0U * Tile::GBSA_MX_SCALE_SLOT);
+            for (uint32_t i = 0; i < 2; ++i) {
+                mxScaleB[i] = resource.l1Buf.template GetBufferByByte<uint8_t>(
+                    Tile::GBSA_MX_SCALE_BASE + (0U + 1U + i) * Tile::GBSA_MX_SCALE_SLOT);
+            }
+        }
         for (uint32_t i = 0; i < L0_STAGES; i++) {
             l0ATensor[i] = resource.l0ABuf.template GetBufferByByte<ElementA>(L0A_PINGPONG_BUF_SIZE * i);
             l0BTensor[i] = resource.l0BBuf.template GetBufferByByte<ElementB>(L0B_PINGPONG_BUF_SIZE * i);
             l0CTensor[i] = resource.l0CBuf.template GetBufferByByte<ElementAccumulator>(L0C_PINGPONG_BUF_SIZE * i);
+        }
+    }
+
+    __aicore__ inline void SetMxQScale(AscendC::GlobalTensor<uint8_t> scale)
+    {
+        mxGmA = scale;
+    }
+    // General MX uses actual GM D and a separate 64-aligned compute D. Scale
+    // strides are measured in packed E8M0 pairs (uint16 elements).
+    __aicore__ inline void SetMxGeometry(uint32_t validD, uint64_t qScaleHeadStrideHalf, uint64_t kScaleTokenStrideHalf)
+    {
+        if constexpr (TileCopy::IS_GENERAL_MX) {
+            this->mxValidD = validD;
+            this->mxQScaleHeadStrideHalf = qScaleHeadStrideHalf;
+            this->mxKScaleTokenStrideHalf = kScaleTokenStrideHalf;
+        }
+    }
+    __aicore__ inline void SetMxKScale(AscendC::GlobalTensor<uint8_t> scale, uint32_t heads, uint32_t embed,
+                                       AscendC::GlobalTensor<uint8_t> secondScale = {},
+                                       AscendC::GlobalTensor<ElementB> secondData = {})
+    {
+        mxGmB = scale;
+        mxGmSecondScale = secondScale;
+        mxGmSecondData = secondData;
+        mxHeads = heads;
+        mxEmbed = embed;
+    }
+
+    __aicore__ inline void SetMxPacked(Tile::GbsaMxPackedCursor cursor, AscendC::LocalTensor<uint8_t> scale)
+    {
+        if constexpr (TileCopy::IS_PACKED_MX) {
+            this->mxPackedCursor = cursor;
+            this->mxPackedScale = scale;
         }
     }
 
@@ -133,9 +199,21 @@ public:
         auto l1ALayoutTla = tla::MakeLayout<ElementA, LayoutTagL1A>(rowNum, embed);
         auto l1ATensorTla = tla::MakeTensor(l1ATensor[0], l1ALayoutTla, Arch::PositionL1{});
         auto l1ATensorTlaTile = GetTile(l1ATensorTla, tla::MakeCoord(0, 0), tla::MakeShape(rowNum, embed));
-        auto gATensorTlaTile = GetTile(gATensor, tla::MakeCoord(0, 0), tla::MakeShape(rowNum, embed));
+        uint32_t copyEmbed = embed;
+        if constexpr (TileCopy::IS_GENERAL_MX) {
+            copyEmbed = this->mxValidD;
+        }
+        auto gATensorTlaTile = GetTile(gATensor, tla::MakeCoord(0, 0), tla::MakeShape(rowNum, copyEmbed));
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID0);
+
         copyGmToL1A(l1ATensorTlaTile, gATensorTlaTile);
+        if constexpr (TileCopy::IS_GENERAL_MX) {
+            Tile::CopyGbsaMxQKScale(mxScaleA, mxGmA, rowNum, embed / 64U, this->mxQScaleHeadStrideHalf);
+            copyL1ToL0A.SetScale(mxScaleA, embed / 64U);
+        } else if constexpr (TileCopy::IS_MXFP8) {
+            Tile::CopyGbsaMxQKScale(mxScaleA, mxGmA, rowNum, embed / 64U, embed / 64U);
+            copyL1ToL0A.SetScale(mxScaleA, embed / 64U);
+        }
 
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID0);
@@ -185,6 +263,43 @@ public:
     {
         using CopyGmToL1B = typename TileCopy_::template CopyGmToL1B<TensorB>;
         CopyGmToL1B copyGmToL1B;
+        if constexpr (TileCopy::IS_PACKED_MX) {
+            auto cursor = this->mxPackedCursor;
+            if (cursor.packedRecords != nullptr && kvSBaseTileInnerOffset == 0U && l1BTileNAct == cursor.packedRows) {
+                AscendC::GlobalTensor<uint64_t> records;
+                records.SetGlobalBuffer(const_cast<__gm__ uint64_t*>(cursor.packedRecords));
+                Tile::CopyGbsaMxPackedRecords<false, ElementB, ArchTag>(
+                    gBTensor, l1BTensorTla, records, cursor.packedRecordCount, l1BTileKAct, embedInnerOffset);
+                return;
+            }
+            cursor.Advance(kvSBaseTileInnerOffset);
+            uint32_t token, rows, copied = 0;
+            while (copied < l1BTileNAct && cursor.NextSpan(l1BTileNAct - copied, token, rows)) {
+                const uint64_t sourceOffset = static_cast<uint64_t>(token) * tokenStride + embedInnerOffset;
+                auto gm = tla::MakeTensor(gBTensor.data()[sourceOffset], gBTensor.layout(), Arch::PositionGM{});
+                auto src = GetTile(gm, tla::MakeCoord(0, 0), tla::MakeShape(l1BTileKAct, rows));
+                auto dst = GetTile(l1BTensorTla, tla::MakeCoord(0, copied), tla::MakeShape(l1BTileKAct, rows));
+                copyGmToL1B(dst, src);
+                copied += rows;
+            }
+            return;
+        } else if constexpr (TileCopy::IS_MXFP8) {
+            // MX tiles hold one or two independent physical pages. The caller
+            // rebases both pages, so logical sparse indices are not revisited.
+            for (uint32_t copied = 0; copied < l1BTileNAct;) {
+                const uint32_t token = kvSBaseTileInnerOffset + copied;
+                const uint32_t pageToken = token % 128U;
+                const uint32_t rows = min(128U - pageToken, l1BTileNAct - copied);
+                auto source = token < 128U ? gBTensor.data() : mxGmSecondData;
+                auto gm = tla::MakeTensor(source[static_cast<uint64_t>(pageToken) * tokenStride + embedInnerOffset],
+                                          gBTensor.layout(), Arch::PositionGM{});
+                auto src = GetTile(gm, tla::MakeCoord(0, 0), tla::MakeShape(l1BTileKAct, rows));
+                auto dst = GetTile(l1BTensorTla, tla::MakeCoord(0, copied), tla::MakeShape(l1BTileKAct, rows));
+                copyGmToL1B(dst, src);
+                copied += rows;
+            }
+            return;
+        }
         if constexpr (PRECOMPUTE_SPARSE) {
             constexpr uint32_t recordWords = PAGED_CACHE_FLAG ? 4U : 2U;
             auto groupInfo = kvOffsetInfo[kvSBaseTileInnerOffset / l1BTileN * kvOffsetGroupWords];
@@ -314,17 +429,24 @@ public:
         auto l1ALayoutTla = tla::MakeLayout<ElementA, LayoutTagL1A>(rowNum, embed);
         auto l1ATensorTla = tla::MakeTensor(l1ATensor[0], l1ALayoutTla, Arch::PositionL1{});
 
-        uint32_t nL1LoopNum = CeilDiv(curBaseTileSize, l1BTileN);
-        uint32_t kL1LoopNum = CeilDiv(embed, l1BTileK);
+        // Packed dispatch has D192/256, <=128 query rows and a single full-D
+        // L1 tile spanning the complete 128/256/512-token fragment. Express only
+        // those proven constants; N loops still follow the runtime tile/tail.
+        static_assert(!TileCopy::IS_PACKED_MX || (L0_TILE_K == 128U || L0_TILE_K == 256U),
+                      "Recheck packed D192/256 loop constants for a new L0 K shape");
+        constexpr uint32_t packedKLoops = (256U + L0_TILE_K - 1U) / L0_TILE_K;
+        uint32_t nL1LoopNum = TileCopy::IS_PACKED_MX ? 1U : CeilDiv(curBaseTileSize, l1BTileN);
+        uint32_t kL1LoopNum = TileCopy::IS_PACKED_MX ? 1U : CeilDiv(embed, l1BTileK);
         // Non-quant tiling guarantees groupSize <= 128 and D <= 256.
         // Fold the single M slice and keep both Q K-slices resident in L0A.
-        const uint32_t mL0LoopNum = PRECOMPUTE_SPARSE ? 1U : CeilDiv(rowNum, L0_TILE_M);
+        const uint32_t mL0LoopNum = (PRECOMPUTE_SPARSE || TileCopy::IS_PACKED_MX) ? 1U : CeilDiv(rowNum, L0_TILE_M);
         uint32_t totalNL0LoopNum = CeilDiv(kvSBaseTile, L0_TILE_N);
-        uint32_t totalKL0LoopNum = CeilDiv(embed, L0_TILE_K);
+        uint32_t totalKL0LoopNum = TileCopy::IS_PACKED_MX ? packedKLoops : CeilDiv(embed, L0_TILE_K);
         uint32_t fullNL0LoopNum = CeilDiv(l1BTileN, L0_TILE_N);
-        uint32_t fullKL0LoopNum = CeilDiv(l1BTileK, L0_TILE_K);
+        uint32_t fullKL0LoopNum = TileCopy::IS_PACKED_MX ? packedKLoops : CeilDiv(l1BTileK, L0_TILE_K);
 
-        const bool l1ToL0ANoRepeatFlag = PRECOMPUTE_SPARSE || ((mL0LoopNum == 1) && (totalKL0LoopNum <= L0_STAGES));
+        const bool l1ToL0ANoRepeatFlag =
+            PRECOMPUTE_SPARSE || TileCopy::IS_PACKED_MX || ((mL0LoopNum == 1) && (totalKL0LoopNum <= L0_STAGES));
 
         if constexpr (PRECOMPUTE_SPARSE) {
             // Consume round 0 once per attention tile, outside the L1/D loops.
@@ -353,6 +475,7 @@ public:
                 auto l1BLayoutTla = tla::MakeLayout<ElementB, LayoutTagL1B>(l1TileKAct, l1TileNAct);
                 auto l1BTensorTla = tla::MakeTensor(l1BTensor[l1BBufId], l1BLayoutTla, Arch::PositionL1{});
                 AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventId);
+
                 SparseKL1TileNLoad(gBTensor, l1BTensorTla, gSparseBlockIdx, gatheredKvSTileIdx, kvSBaseTile,
                                    blockShapeY, l1TileNAct, l1TileKAct, nL1Itr * l1BTileN, kL1Itr * l1BTileK,
                                    gBlockTable, blockSize, pageStride, tokenStride, localExplicitBlockCount,
@@ -366,10 +489,32 @@ public:
                         PrefetchKvOffsetGroups(kvOffsetInfo, kvOffsetGroupWords, 2U, nL1LoopNum);
                     }
                 }
+                if constexpr (TileCopy::IS_PACKED_MX) {
+                    // AIV packed all scale rows in exact MX NZ order. The K
+                    // tile spans full D; each 16-token group starts on 32B.
+                    const uint32_t groups = embed / 64U;
+                    const uint32_t scaleOffset = nL1Itr * l1BTileN * groups * 2U;
+                    copyL1ToL0B.SetScale(this->mxPackedScale[scaleOffset], groups);
+                } else if constexpr (TileCopy::IS_MXFP8) {
+                    // Pack the scales of both physical pages into the same NZ
+                    // tile as K. A page boundary is also a 16-row NZ boundary.
+                    for (uint32_t copied = 0; copied < l1TileNAct;) {
+                        const uint32_t token = nL1Itr * l1BTileN + copied;
+                        const uint32_t pageToken = token % 128U;
+                        const uint32_t rows = min(128U - pageToken, l1TileNAct - copied);
+                        auto scaleSource = token < 128U ? mxGmB : mxGmSecondScale;
+                        const uint64_t scaleOffset =
+                            static_cast<uint64_t>(pageToken) * mxHeads * mxEmbed / 32U + kL1Itr * l1BTileK / 32U;
+                        Tile::CopyGbsaMxQKScale(mxScaleB[l1BBufId][copied * l1TileKAct / 32U], scaleSource[scaleOffset],
+                                                rows, l1TileKAct / 64U, mxHeads * mxEmbed / 64U);
+                        copied += rows;
+                    }
+                    copyL1ToL0B.SetScale(mxScaleB[l1BBufId], l1TileKAct / 64U);
+                }
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventId);
                 AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventId);
 
-                uint32_t kL0LoopNum = CeilDiv(l1TileKAct, L0_TILE_K);
+                uint32_t kL0LoopNum = TileCopy::IS_PACKED_MX ? packedKLoops : CeilDiv(l1TileKAct, L0_TILE_K);
                 for (uint32_t nL0Itr = 0; nL0Itr < nL0LoopNum; nL0Itr++) {
                     uint32_t l0TileNAct = (nL0Itr == nL0LoopNum - 1) ? (l1TileNAct - nL0Itr * L0_TILE_N) : L0_TILE_N;
                     uint32_t globalNL0Itr = nL1Itr * fullNL0LoopNum + nL0Itr;
@@ -484,6 +629,14 @@ protected:
     AscendC::LocalTensor<ElementB> l0BTensor[L0_STAGES];
     AscendC::LocalTensor<ElementAccumulator> l0CTensor[L0_STAGES];
 
+    AscendC::LocalTensor<uint8_t> mxScaleA;
+    AscendC::LocalTensor<uint8_t> mxScaleB[2];
+    AscendC::GlobalTensor<uint8_t> mxGmA;
+    AscendC::GlobalTensor<uint8_t> mxGmB;
+    AscendC::GlobalTensor<uint8_t> mxGmSecondScale;
+    AscendC::GlobalTensor<ElementB> mxGmSecondData;
+    uint32_t mxHeads = 0;
+    uint32_t mxEmbed = 0;
     TileMmad tileMmad;
     CopyL1ToL0A copyL1ToL0A;
     CopyL1ToL0B copyL1ToL0B;

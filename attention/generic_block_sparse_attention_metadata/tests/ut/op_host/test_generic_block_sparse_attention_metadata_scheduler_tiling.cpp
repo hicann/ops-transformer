@@ -505,6 +505,49 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ScheduleInputDefaultsMa
     EXPECT_EQ(input.isConsistentTopk, 0);
 }
 
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, OptionalMxfp8EffectiveCountRange)
+{
+    for (const int64_t capacity : {513, 514, 1024, 8193}) {
+        auto input = MakeInput();
+        input.quantType = 6;
+        input.blockIndexStride = capacity;
+        input.validBlockNums.assign(input.validBlockNums.size(), 512);
+        ScheduleResult result;
+        ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+        std::array<MetadataType, METADATA_TOTAL_SIZE> metadata{};
+        ASSERT_EQ(EncodeMetadata(result, metadata.data(), metadata.size()), BSAScheduleStatus::BSA_SUCCESS);
+        EXPECT_EQ(metadata[PACKED_COUNT_RANGE_TAG_INDEX], PACKED_COUNT_RANGE_TAG);
+        EXPECT_EQ(metadata[MIN_SPARSE_COUNT_INDEX], 512);
+        EXPECT_EQ(metadata[MAX_SPARSE_COUNT_INDEX], 512);
+
+        // An empty batch contributes no padded counts; every logical head/query
+        // in the other batches contributes, including zero and large counts.
+        input.batchSize = 3;
+        input.qSeqLens = {2, 0, 1};
+        input.validBlockNums = {0, 1, 512, 513, capacity, 64};
+        ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+        ASSERT_EQ(EncodeMetadata(result, metadata.data(), metadata.size()), BSAScheduleStatus::BSA_SUCCESS);
+        EXPECT_EQ(metadata[MIN_SPARSE_COUNT_INDEX], 0);
+        EXPECT_EQ(metadata[MAX_SPARSE_COUNT_INDEX], capacity);
+
+        input.quantType = 0;
+        ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+        ASSERT_EQ(EncodeMetadata(result, metadata.data(), metadata.size()), BSAScheduleStatus::BSA_SUCCESS);
+        EXPECT_EQ(metadata[PACKED_COUNT_RANGE_TAG_INDEX], 0);
+        EXPECT_EQ(metadata[MIN_SPARSE_COUNT_INDEX], 0);
+        EXPECT_EQ(metadata[MAX_SPARSE_COUNT_INDEX], 0);
+    }
+    auto empty = MakeInput();
+    empty.quantType = 6;
+    empty.qSeqLens = {0, 0};
+    empty.validBlockNums.clear();
+    ScheduleResult result;
+    ASSERT_EQ(BuildSchedule(empty, result), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_TRUE(result.hasPackedCountRange);
+    EXPECT_EQ(result.minSparseCount, 0);
+    EXPECT_EQ(result.maxSparseCount, 0);
+}
+
 TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ConfigSignatureTracksResidualAndConsistentTopk)
 {
     ScheduleInput base = MakeDecodeInput();
@@ -533,3 +576,133 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ConfigSignatureTracksRe
 }
 
 } // namespace
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp8FdPreservesBaseTasksAndSparseRangeSchedule)
+{
+    for (int64_t blockY : {4, 8}) {
+        for (int64_t maskType : {0, 1}) {
+            ScheduleInput input = MakeDecodeInput();
+            input.headDim = blockY == 4 ? 256 : 192;
+            input.blockShapeY = blockY;
+            input.blockIndexStride = 513;
+            input.validBlockNums.assign(DECODE_Q_BLOCK_STORAGE_NUM, 513);
+            input.maskType = maskType;
+            ScheduleResult baseline;
+            ASSERT_EQ(BuildSchedule(input, baseline), BSAScheduleStatus::BSA_SUCCESS);
+            ASSERT_NE(static_cast<uint32_t>(baseline.fdScheduleFlags) & FD_SCHEDULE_ENABLED, 0U);
+            for (int64_t quantType : {5, 6}) {
+                input.quantType = quantType;
+                ScheduleResult result;
+                ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+                EXPECT_EQ(result.configSignature, baseline.configSignature);
+                EXPECT_EQ(result.saTotalTaskNum, baseline.saTotalTaskNum);
+                EXPECT_EQ(result.saUsedCoreNum, baseline.saUsedCoreNum);
+                EXPECT_EQ(result.blockPrefix, baseline.blockPrefix);
+                EXPECT_EQ(result.fdScheduleFlags, baseline.fdScheduleFlags);
+                EXPECT_EQ(result.fdActiveCoreNum, baseline.fdActiveCoreNum);
+                EXPECT_EQ(result.fdPartialTaskNum, baseline.fdPartialTaskNum);
+                EXPECT_LE(result.fdPartialTaskNum, GetHostFdPartialCapacity(input.aicCoreNum));
+            }
+        }
+    }
+}
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp8FdCountAndTaskBoundaries)
+{
+    for (int64_t dim : {192, 256}) {
+        for (int64_t group : {1, 16, 17, 32, 33, 64, 65, 128}) {
+            for (int64_t capacity : {11, 12, 512, 513, 8193}) {
+                ScheduleInput input = MakeDecodeInput();
+                input.quantType = 6;
+                input.headDim = dim;
+                input.blockShapeY = dim == 192 ? 8 : 4;
+                input.numQHeads = group;
+                input.blockIndexStride = capacity;
+                input.validBlockNums = {capacity, 0};
+                ScheduleResult result;
+                ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+                EXPECT_EQ((result.fdScheduleFlags & FD_SCHEDULE_ENABLED) != 0, capacity >= 512);
+                EXPECT_EQ(result.saTotalTaskNum, 2);
+                EXPECT_EQ(result.blockPrefix.back(), capacity + 1);
+                EXPECT_LE(result.fdPartialTaskNum, GetHostFdPartialCapacity(input.aicCoreNum));
+                if (capacity < 512) {
+                    continue;
+                }
+                // Each valid sparse block, and the zero-output task's virtual
+                // block, must have exactly one owner in the flat partition.
+                int64_t expectedStart = 0;
+                for (int64_t core = 0; core < result.fdActiveCoreNum; ++core) {
+                    const auto& s = result.decodeSchedules[core];
+                    const int64_t start = result.blockPrefix[s.baseTaskStart] + s.firstBlockStart;
+                    const int64_t end = result.blockPrefix[s.baseTaskEnd - 1] + s.lastBlockEnd;
+                    EXPECT_EQ(start, expectedStart);
+                    EXPECT_GT(end, start);
+                    expectedStart = end;
+                }
+                EXPECT_EQ(expectedStart, result.blockPrefix.back());
+            }
+        }
+    }
+    for (int64_t tasks : {0, 9, 10}) {
+        ScheduleInput input = MakeDecodeInput();
+        input.quantType = 6;
+        input.headDim = 256;
+        input.blockShapeY = 4;
+        input.blockIndexStride = 512;
+        input.maxQSeqLen = 10;
+        input.qBlockStorageNum = 10;
+        input.qSeqLens = {tasks};
+        input.validBlockNums.assign(tasks, 512);
+        ScheduleResult result;
+        ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+        // 32 physical AICs: T=9 satisfies 10*T<96; T=10 does not.
+        EXPECT_EQ((result.fdScheduleFlags & FD_SCHEDULE_ENABLED) != 0, tasks == 9);
+    }
+}
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp8FdSkipsInsufficientPackedWork)
+{
+    ScheduleInput input = MakeDecodeInput();
+    input.headDim = 256;
+    input.blockShapeY = 4;
+    input.numQHeads = 12;
+    input.maxQSeqLen = 8;
+    input.qBlockStorageNum = 8;
+    input.qSeqLens = {8};
+    input.validBlockNums = {0, 1, 1, 12, 1, 12, 12, 31};
+    for (int64_t capacity : {512, 513, 8193}) {
+        input.blockIndexStride = capacity;
+        input.quantType = 0;
+        ScheduleResult unquantized;
+        ASSERT_EQ(BuildSchedule(input, unquantized), BSAScheduleStatus::BSA_SUCCESS);
+        EXPECT_NE(unquantized.fdScheduleFlags & FD_SCHEDULE_ENABLED, 0U);
+        input.quantType = 6;
+        ScheduleResult quantized;
+        ASSERT_EQ(BuildSchedule(input, quantized), BSAScheduleStatus::BSA_SUCCESS);
+        EXPECT_EQ(quantized.fdScheduleFlags & FD_SCHEDULE_ENABLED, 0U);
+        EXPECT_EQ(quantized.blockPrefix, unquantized.blockPrefix);
+        EXPECT_EQ(quantized.fdPartialTaskNum, 0);
+    }
+}
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp8FdPackedWorkTierBoundary)
+{
+    for (int64_t group : {1, 17, 33, 65}) {
+        for (int64_t blockY : {4, 8}) {
+            const int64_t tile = group <= 32 ? 512 : (group <= 64 ? 256 : 128);
+            const int64_t boundary = 2 * tile / blockY;
+            for (int64_t count : {boundary, boundary + 1}) {
+                ScheduleInput input = MakeDecodeInput();
+                input.quantType = 6;
+                input.headDim = blockY == 4 ? 256 : 192;
+                input.blockShapeY = blockY;
+                input.numQHeads = group;
+                input.blockIndexStride = 8193;
+                input.validBlockNums = {count, 0};
+                ScheduleResult result;
+                ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+                EXPECT_EQ((result.fdScheduleFlags & FD_SCHEDULE_ENABLED) != 0, count > boundary);
+            }
+        }
+    }
+}

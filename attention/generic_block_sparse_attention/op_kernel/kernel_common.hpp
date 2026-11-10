@@ -70,6 +70,8 @@ struct GenericBlockSparseAttentionTilingData {
     uint64_t totalKvTokens; // PA: physical page token capacity; Dense: Tkv.
     GbsaBaseTiling baseTileInfo;
     GbsaMmPhaseL1Tiling mmPhaseL1TileInfo;
+    // Nonquantized: descriptor workspace base and words per tile.
+    // MXFP8 packed: immutable batch/head cache base (0 disables) and words per K/V tensor.
     uint64_t kvOffsetInfoOffset;
     uint32_t kvOffsetTileWords;
     uint32_t qSeqCapacity;

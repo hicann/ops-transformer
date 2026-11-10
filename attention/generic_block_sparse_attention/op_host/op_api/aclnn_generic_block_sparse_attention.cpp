@@ -34,6 +34,7 @@ extern "C" {
 namespace {
 
 static constexpr int64_t LSE_OUT = 1;
+static constexpr int64_t MXFP8_QUANT_TYPE = 6;
 
 static bool CheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value)
 {
@@ -312,6 +313,10 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
 
     // Storage mode comes from blockTable presence; layout only constrains the tensor axes.
     const bool isPaged = blockTableOptional != nullptr;
+    const bool generalized = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 &&
+                             ((quantType == 0 && (query->GetDataType() == DataType::DT_FLOAT16 ||
+                                                  query->GetDataType() == DataType::DT_BF16)) ||
+                              (quantType == 6 && query->GetDataType() == DataType::DT_FLOAT8_E4M3FN));
     const bool layoutIsPa = (std::string(layoutKv) == "PA_BBND" || std::string(layoutKv) == "PA_BNBD");
     if (isPaged) {
         if (!layoutIsPa) {
@@ -323,9 +328,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "PA_BBND/PA_BNBD requires blockTable; it must not be nullptr.");
             return ACLNN_ERR_PARAM_NULLPTR;
         }
-        if (quantType != 0 ||
-            (query->GetDataType() != DataType::DT_FLOAT16 && query->GetDataType() != DataType::DT_BF16)) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dense non-paged KV requires FP16/BF16 and quantType=0.");
+        if (!generalized && (quantType != 0 || (query->GetDataType() != DataType::DT_FLOAT16 &&
+                                                query->GetDataType() != DataType::DT_BF16))) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dense non-paged KV requires FP16/BF16 quantType=0 or A5 MXFP8.");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (std::string(layoutQ) == "TND" && (cuSeqLengthsQOptional == nullptr || cuSeqLengthsKvOptional == nullptr)) {
@@ -339,9 +344,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "BSND/BNSD query requires sequsedQ and sequsedKv.");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        if (quantType != 0 ||
-            (query->GetDataType() != DataType::DT_FLOAT16 && query->GetDataType() != DataType::DT_BF16)) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "BSND/BNSD query requires FP16/BF16 non-quantization.");
+        if (!generalized && (quantType != 0 || (query->GetDataType() != DataType::DT_FLOAT16 &&
+                                                query->GetDataType() != DataType::DT_BF16))) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "BSND/BNSD query requires FP16/BF16 non-quantization or A5 MXFP8.");
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
@@ -374,11 +379,15 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     std::string layoutQStr = ConvertLayoutString(layoutQ);
     std::string layoutKvStr = ConvertLayoutString(layoutKv);
 
-    const aclTensor* keyFinal =
-        isPaged ? NormalizeDim0KvTensor(key, "key", executorImpl) : l0op::Contiguous(key, executorImpl);
+    // MXFP8 shares the physical page geometry of contiguous K/V and KScale.
+    // Preserve the existing dim0-hole support for the other quantization modes.
+    const aclTensor* keyFinal = isPaged && quantType != MXFP8_QUANT_TYPE ?
+                                    NormalizeDim0KvTensor(key, "key", executorImpl) :
+                                    l0op::Contiguous(key, executorImpl);
     CHECK_RET(keyFinal != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor* valueFinal =
-        isPaged ? NormalizeDim0KvTensor(value, "value", executorImpl) : l0op::Contiguous(value, executorImpl);
+    const aclTensor* valueFinal = isPaged && quantType != MXFP8_QUANT_TYPE ?
+                                      NormalizeDim0KvTensor(value, "value", executorImpl) :
+                                      l0op::Contiguous(value, executorImpl);
     CHECK_RET(valueFinal != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     auto outputs = l0op::GenericBlockSparseAttention(

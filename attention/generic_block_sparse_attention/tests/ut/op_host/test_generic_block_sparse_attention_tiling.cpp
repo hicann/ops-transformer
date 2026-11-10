@@ -18,6 +18,7 @@
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 #include "attention/generic_block_sparse_attention/op_host/generic_block_sparse_attention_tiling.h"
+#include "attention/generic_block_sparse_attention/op_kernel/arch35/gbsa_mxfp8_scale_cache_layout.h"
 
 using namespace std;
 using namespace ge;
@@ -151,6 +152,64 @@ std::vector<gert::TilingContextPara::OpAttr> MakeAttrs(
 }
 } // namespace
 
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_gather_reserves_descriptor_workspace)
+{
+    for (int64_t numHeads : {16, 128}) {
+        for (auto outDtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+            GenericBlockSparseAttentionCompileInfo compileInfo;
+            gert::TilingContextPara nonQuantCtx("GenericBlockSparseAttention", MakeInputs(outDtype, kD, numHeads),
+                                                MakeOutputs(outDtype, false, kD, numHeads), MakeAttrs(1, 0, 1, 0),
+                                                &compileInfo, "Ascend950", 32, 262144);
+            gert::TilingContextPara quantCtx("GenericBlockSparseAttention",
+                                             MakeInputs(ge::DT_FLOAT8_E4M3FN, kD, numHeads),
+                                             MakeOutputs(outDtype, false, kD, numHeads), MakeAttrs(1, 5, 1, 0),
+                                             &compileInfo, "Ascend950", 32, 262144);
+            TilingInfo nonQuantInfo;
+            TilingInfo quantInfo;
+            ASSERT_TRUE(ExecuteTiling(nonQuantCtx, nonQuantInfo));
+            ASSERT_TRUE(ExecuteTiling(quantCtx, quantInfo));
+            ASSERT_EQ(quantInfo.workspaceSizes.size(), 1U);
+            EXPECT_EQ(quantInfo.workspaceSizes, nonQuantInfo.workspaceSizes);
+            EXPECT_EQ(quantInfo.tilingKey,
+                      static_cast<int64_t>(outDtype == ge::DT_FLOAT16 ? kFp8Fp16Tiling950 : kFp8Bf16Tiling950));
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_d512_reserves_lo_gm_workspace)
+{
+    // D=512 + groupSize>64 enables LO GM transit (emb>256 && qBaseTile>64). Non-quant cannot
+    // reach this path on 950 (headDim capped at 256), so assert an absolute workspace floor.
+    constexpr int64_t kEmb512 = 512;
+    constexpr int64_t kNumHeads = 128; // groupSize = 128 / 1 > 64 → qBaseTile = 128
+    constexpr uint64_t kBlockDim = 32;
+    constexpr uint64_t kQBaseTile = 128;
+    constexpr uint64_t kMm1L1TileN = 128;
+    constexpr uint64_t kKvBaseTile = 128;
+    constexpr uint64_t kFdAlign = 512;
+    constexpr uint64_t kBlockShapeY = 128;
+    auto alignUp = [](uint64_t value, uint64_t alignment) { return (value + alignment - 1U) / alignment * alignment; };
+    const uint64_t loBytes = kBlockDim * 2U * kQBaseTile * alignUp(static_cast<uint64_t>(kEmb512), 16U) * sizeof(float);
+    const uint64_t sparseBlocks = (kMm1L1TileN + 2ULL * kBlockShapeY - 2U) / kBlockShapeY;
+    const uint64_t copyBlocks = std::min(kMm1L1TileN, sparseBlocks * 2U); // paged
+    const uint64_t groupBytes = alignUp(64U + copyBlocks * 4U * sizeof(uint64_t), 64U);
+    const uint64_t tileWords = ((kKvBaseTile + kMm1L1TileN - 1U) / kMm1L1TileN) * groupBytes / sizeof(uint64_t);
+    const uint64_t kvOffsetBytes = kBlockDim * 4U * tileWords * sizeof(uint64_t);
+    const int64_t workspaceFloor = static_cast<int64_t>(alignUp(loBytes, kFdAlign) + kvOffsetBytes);
+
+    const float scale512 = 1.0f / sqrt(static_cast<float>(kEmb512));
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    gert::TilingContextPara quantCtx(
+        "GenericBlockSparseAttention", MakeInputs(ge::DT_FLOAT8_E4M3FN, kEmb512, kNumHeads),
+        MakeOutputs(ge::DT_FLOAT16, false, kEmb512, kNumHeads),
+        MakeAttrs(1, 5, 1, 0, 0.0f, -1, -1, 4, "TND", "PA_BBND", 0, false, kBlockShape, scale512), &compileInfo,
+        "Ascend950", kBlockDim, 262144);
+    TilingInfo quantInfo;
+    ASSERT_TRUE(ExecuteTiling(quantCtx, quantInfo));
+    ASSERT_EQ(quantInfo.workspaceSizes.size(), 1U);
+    EXPECT_GE(quantInfo.workspaceSizes[0], workspaceFloor);
+}
+
 TEST_F(generic_block_sparse_attention_tiling_ut, generalized_y_arch35)
 {
     for (int64_t y : {1, 3, 16, 17, 63, 64, 65, 95, 127, 128}) {
@@ -275,62 +334,1054 @@ TEST_F(generic_block_sparse_attention_tiling_ut, tnd_paged_fp8_out_bf16_950)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, kFp8Bf16Tiling950);
 }
 
-TEST_F(generic_block_sparse_attention_tiling_ut, fp8_gather_reserves_descriptor_workspace)
+namespace {
+std::vector<gert::TilingContextPara::TensorDescription> MakeMxfp8Inputs(int64_t headDim = kD, bool withPScale = false)
 {
-    for (int64_t numHeads : {16, 128}) {
-        for (auto outDtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
-            GenericBlockSparseAttentionCompileInfo compileInfo;
-            gert::TilingContextPara nonQuantCtx("GenericBlockSparseAttention", MakeInputs(outDtype, kD, numHeads),
-                                                MakeOutputs(outDtype, false, kD, numHeads), MakeAttrs(1, 0, 1, 0),
-                                                &compileInfo, "Ascend950", 32, 262144);
-            gert::TilingContextPara quantCtx("GenericBlockSparseAttention",
-                                             MakeInputs(ge::DT_FLOAT8_E4M3FN, kD, numHeads),
-                                             MakeOutputs(outDtype, false, kD, numHeads), MakeAttrs(1, 5, 1, 0),
-                                             &compileInfo, "Ascend950", 32, 262144);
-            TilingInfo nonQuantInfo;
-            TilingInfo quantInfo;
-            ASSERT_TRUE(ExecuteTiling(nonQuantCtx, nonQuantInfo));
-            ASSERT_TRUE(ExecuteTiling(quantCtx, quantInfo));
-            ASSERT_EQ(quantInfo.workspaceSizes.size(), 1U);
-            EXPECT_EQ(quantInfo.workspaceSizes, nonQuantInfo.workspaceSizes);
-            EXPECT_EQ(quantInfo.tilingKey,
-                      static_cast<int64_t>(outDtype == ge::DT_FLOAT16 ? kFp8Fp16Tiling950 : kFp8Bf16Tiling950));
+    auto inputs = MakeInputs(ge::DT_FLOAT8_E4M3FN, headDim);
+    inputs[7] = {
+        {{kT, kN1, (headDim + 63) / 64, 2}, {kT, kN1, (headDim + 63) / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+    inputs[8] = {
+        {{kMaxBlocks, kBlockSize, kN2, (headDim + 63) / 64, 2}, {kMaxBlocks, kBlockSize, kN2, (headDim + 63) / 64, 2}},
+        ge::DT_FLOAT8_E8M0,
+        ge::FORMAT_ND};
+    inputs[9] = {{{kMaxBlocks, kBlockSize / 64, kN2, headDim, 2}, {kMaxBlocks, kBlockSize / 64, kN2, headDim, 2}},
+                 ge::DT_FLOAT8_E8M0,
+                 ge::FORMAT_ND};
+    if (withPScale) {
+        inputs[10] = {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND};
+    }
+    return inputs;
+}
+} // namespace
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_tnd_paged_shapes_and_outputs)
+{
+    for (int64_t headDim : {128, 256}) {
+        for (auto outputType : {ge::DT_FLOAT16, ge::DT_BF16}) {
+            for (bool withPScale : {false, true}) {
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx("GenericBlockSparseAttention", MakeMxfp8Inputs(headDim, withPScale),
+                                            MakeOutputs(outputType, false, headDim), MakeAttrs(1, 6, 1, 0),
+                                            &compileInfo, "Ascend950", 56, 262144);
+                ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+            }
         }
     }
 }
 
-TEST_F(generic_block_sparse_attention_tiling_ut, fp8_d512_reserves_lo_gm_workspace)
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_requires_all_e8m0_scales)
 {
-    // D=512 + groupSize>64 enables LO GM transit (emb>256 && qBaseTile>64). Non-quant cannot
-    // reach this path on 950 (headDim capped at 256), so assert an absolute workspace floor.
-    constexpr int64_t kEmb512 = 512;
-    constexpr int64_t kNumHeads = 128; // groupSize = 128 / 1 > 64 → qBaseTile = 128
-    constexpr uint64_t kBlockDim = 32;
-    constexpr uint64_t kQBaseTile = 128;
-    constexpr uint64_t kMm1L1TileN = 128;
-    constexpr uint64_t kKvBaseTile = 128;
-    constexpr uint64_t kFdAlign = 512;
-    constexpr uint64_t kBlockShapeY = 128;
-    auto alignUp = [](uint64_t value, uint64_t alignment) { return (value + alignment - 1U) / alignment * alignment; };
-    const uint64_t loBytes = kBlockDim * 2U * kQBaseTile * alignUp(static_cast<uint64_t>(kEmb512), 16U) * sizeof(float);
-    const uint64_t sparseBlocks = (kMm1L1TileN + 2ULL * kBlockShapeY - 2U) / kBlockShapeY;
-    const uint64_t copyBlocks = std::min(kMm1L1TileN, sparseBlocks * 2U); // paged
-    const uint64_t groupBytes = alignUp(64U + copyBlocks * 4U * sizeof(uint64_t), 64U);
-    const uint64_t tileWords = ((kKvBaseTile + kMm1L1TileN - 1U) / kMm1L1TileN) * groupBytes / sizeof(uint64_t);
-    const uint64_t kvOffsetBytes = kBlockDim * 4U * tileWords * sizeof(uint64_t);
-    const int64_t workspaceFloor = static_cast<int64_t>(alignUp(loBytes, kFdAlign) + kvOffsetBytes);
+    for (int index : {7, 8, 9}) {
+        for (auto invalidType : {ge::DT_UNDEFINED, ge::DT_FLOAT, ge::DT_UINT8}) {
+            auto inputs = MakeMxfp8Inputs();
+            // An absent scale, a scalar scale and raw uint8 must all be rejected.
+            inputs[index] = {{{1}, {1}}, invalidType, ge::FORMAT_ND};
+            if (invalidType == ge::DT_UNDEFINED) {
+                inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+            }
+            GenericBlockSparseAttentionCompileInfo compileInfo;
+            gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                        MakeAttrs(1, 6, 1, 0), &compileInfo, "Ascend950", 56, 262144);
+            ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+        }
+    }
+}
 
-    const float scale512 = 1.0f / sqrt(static_cast<float>(kEmb512));
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_paged_block_y128)
+{
+    constexpr int64_t headDim = 256;
+    constexpr int64_t queryHeads = 128;
+    auto inputs = MakeMxfp8Inputs(headDim);
+    inputs[0] = {{{kT, queryHeads, headDim}, {kT, queryHeads, headDim}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+    inputs[7] = {
+        {{kT, queryHeads, headDim / 64, 2}, {kT, queryHeads, headDim / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
     GenericBlockSparseAttentionCompileInfo compileInfo;
-    gert::TilingContextPara quantCtx(
-        "GenericBlockSparseAttention", MakeInputs(ge::DT_FLOAT8_E4M3FN, kEmb512, kNumHeads),
-        MakeOutputs(ge::DT_FLOAT16, false, kEmb512, kNumHeads),
-        MakeAttrs(1, 5, 1, 0, 0.0f, -1, -1, 4, "TND", "PA_BBND", 0, false, kBlockShape, scale512), &compileInfo,
-        "Ascend950", kBlockDim, 262144);
-    TilingInfo quantInfo;
-    ASSERT_TRUE(ExecuteTiling(quantCtx, quantInfo));
-    ASSERT_EQ(quantInfo.workspaceSizes.size(), 1U);
-    EXPECT_GE(quantInfo.workspaceSizes[0], workspaceFloor);
+    gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs,
+                                MakeOutputs(ge::DT_FLOAT16, false, headDim, queryHeads), MakeAttrs(1, 6, 1, 0),
+                                &compileInfo, "Ascend950", 56, 262144);
+    ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_paged_layout_for_all_groups)
+{
+    for (int64_t queryHeads : {4, 64, 128}) {
+        auto inputs = MakeMxfp8Inputs();
+        inputs[0] = {{{kT, queryHeads, kD}, {kT, queryHeads, kD}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+        inputs[7] = {{{kT, queryHeads, kD / 64, 2}, {kT, queryHeads, kD / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs,
+                                    MakeOutputs(ge::DT_FLOAT16, false, kD, queryHeads), MakeAttrs(1, 6, 1, 0),
+                                    &compileInfo, "Ascend950", 56, 262144);
+        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_direct_kv_workspace_independent_of_sequence)
+{
+    struct Geometry {
+        int64_t d, q, kv, nq, nkv;
+    };
+    for (const auto shape :
+         {Geometry{192, 128, 4096, 64, 4}, Geometry{192, 128, 6229, 16, 1}, Geometry{192, 128, 6230, 16, 1},
+          Geometry{192, 127, 4096, 16, 1}, Geometry{192, 128, 4096, 48, 3}, Geometry{256, 128, 4608, 24, 2},
+          Geometry{256, 128, 4672, 24, 2}, Geometry{256, 128, 4673, 24, 2}, Geometry{256, 127, 4096, 24, 2},
+          Geometry{256, 128, 4096, 12, 3}}) {
+        const int64_t y = shape.d == 192 ? 8 : 4;
+        auto inputs = MakeMxfp8Inputs(shape.d);
+        inputs[0] = {
+            {{1, shape.q, shape.nq, shape.d}, {1, shape.q, shape.nq, shape.d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+        inputs[1] = {{{1, shape.kv, shape.nkv, shape.d}, {1, shape.kv, shape.nkv, shape.d}},
+                     ge::DT_FLOAT8_E4M3FN,
+                     ge::FORMAT_ND};
+        inputs[2] = inputs[1];
+        inputs[3] = {{{shape.nkv, shape.q, 513}, {shape.nkv, shape.q, 513}}, ge::DT_INT32, ge::FORMAT_ND};
+        inputs[4] = {{{shape.nkv, shape.q}, {shape.nkv, shape.q}}, ge::DT_INT32, ge::FORMAT_ND};
+        inputs[7] = {{{1, shape.q, shape.nq, shape.d / 64, 2}, {1, shape.q, shape.nq, shape.d / 64, 2}},
+                     ge::DT_FLOAT8_E8M0,
+                     ge::FORMAT_ND};
+        inputs[8] = {{{1, shape.kv, shape.nkv, shape.d / 64, 2}, {1, shape.kv, shape.nkv, shape.d / 64, 2}},
+                     ge::DT_FLOAT8_E8M0,
+                     ge::FORMAT_ND};
+        inputs[9] = {{{1, shape.nkv, shape.d, 2}, {1, shape.nkv, shape.d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+        for (int index : {11, 12, 15})
+            inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+        inputs[13] = {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND};
+        inputs[14] = inputs[13];
+        auto outputs = MakeOutputs(ge::DT_BF16, false, shape.d, shape.nq);
+        outputs[0] = inputs[0];
+        outputs[0].dtype_ = ge::DT_BF16;
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, outputs,
+                                    MakeAttrs(1, 6, 1, 0, 0.0f, -1, -1, 4, "BSND", "BSND", 0, false, {1, y}),
+                                    &compileInfo, "Ascend950", 28, 262144);
+        TilingInfo info;
+        ASSERT_TRUE(ExecuteTiling(ctx, info));
+        ASSERT_EQ(info.tilingKey, 9250002900000021ULL);
+        ASSERT_EQ(info.blockNum, 28U);
+        ASSERT_EQ(info.workspaceSizes.size(), 1U);
+        // The task header was removed. Descriptor rings are followed by the
+        // aligned FD partial buffers, even when metadata selects prefill.
+        uint64_t bytes = 28U * 4U * 8U * GbsaMxScaleCache::DescriptorTileWords(512U, y);
+        constexpr uint64_t partialCapacity = 8U + 28U - 1U;
+        bytes = (bytes + 511U) / 512U * 512U;
+        bytes += partialCapacity * 2U * 8U * sizeof(float);
+        bytes = (bytes + 511U) / 512U * 512U;
+        bytes += partialCapacity * (shape.nq / shape.nkv) * shape.d * sizeof(float);
+        EXPECT_EQ(info.workspaceSizes[0], bytes + 16U * 1024U * 1024U);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_packed_runtime_batch_dispatch_and_descriptor_workspace)
+{
+    for (int64_t batch : {0, 1, 2, 3, 4, 8, 16}) {
+        for (int64_t d : {192, 256}) {
+            for (auto dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+                const int64_t q = 129, kv = 4608, nq = d == 192 ? 64 : 24, nkv = d == 192 ? 4 : 2;
+                const int64_t y = d == 192 ? 8 : 4;
+                auto inputs = MakeMxfp8Inputs(d);
+                inputs[0] = {{{batch, q, nq, d}, {batch, q, nq, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[1] = {{{batch, kv, nkv, d}, {batch, kv, nkv, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[2] = inputs[1];
+                inputs[3] = {{{nkv, batch * q, 513}, {nkv, batch * q, 513}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[4] = {{{nkv, batch * q}, {nkv, batch * q}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[7] = {{{batch, q, nq, d / 64, 2}, {batch, q, nq, d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                inputs[8] = {
+                    {{batch, kv, nkv, d / 64, 2}, {batch, kv, nkv, d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                inputs[9] = {{{batch, nkv, d, 2}, {batch, nkv, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                for (int index : {11, 12, 15})
+                    inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                inputs[13] = {{{batch}, {batch}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[14] = inputs[13];
+                auto outputs = MakeOutputs(dtype, false, d, nq);
+                outputs[0] = inputs[0];
+                outputs[0].dtype_ = dtype;
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, outputs,
+                                            MakeAttrs(1, 6, 1, 0, 0.0f, -1, -1, 4, "BSND", "BSND", 0, false, {1, y}),
+                                            &compileInfo, "Ascend950", 28, 262144);
+                if (batch == 0) {
+                    ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+                    continue;
+                }
+                TilingInfo info;
+                ASSERT_TRUE(ExecuteTiling(ctx, info));
+                const uint64_t expectedBase = 9250002900000020ULL;
+                EXPECT_EQ(info.tilingKey, expectedBase + (dtype == ge::DT_FLOAT16 ? 0U : 1U));
+                const uint64_t tile = 512U;
+                // Descriptor rings precede the independently aligned FP32 FD
+                // partials. Host reserves them even if metadata selects prefill.
+                uint64_t bytes = 28U * 4U * 8U * GbsaMxScaleCache::DescriptorTileWords(tile, y);
+                constexpr uint64_t partialCapacity = 8U + 28U - 1U;
+                bytes = (bytes + 511U) / 512U * 512U;
+                bytes += partialCapacity * 2U * 8U * sizeof(float);
+                bytes = (bytes + 511U) / 512U * 512U;
+                bytes += partialCapacity * (nq / nkv) * d * sizeof(float);
+                ASSERT_EQ(info.workspaceSizes.size(), 1U);
+                EXPECT_EQ(info.workspaceSizes[0], bytes + 16U * 1024U * 1024U);
+                // The retired K/V cache fields must remain disabled.
+                constexpr size_t cacheOffset = 232;
+                uint64_t cacheBegin = 0U;
+                uint32_t tensorWords = 0U;
+                ASSERT_GE(info.tilingDataSize, cacheOffset + sizeof(cacheBegin) + sizeof(tensorWords));
+                std::memcpy(&cacheBegin, info.tilingData.get() + cacheOffset, sizeof(cacheBegin));
+                std::memcpy(&tensorWords, info.tilingData.get() + cacheOffset + sizeof(cacheBegin),
+                            sizeof(tensorWords));
+                EXPECT_EQ(cacheBegin, 0U);
+                EXPECT_EQ(tensorWords, 0U);
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_scale_pipeline_explicit_dispatch)
+{
+    for (int64_t batch : {0, 1, 2, 3, 4, 8, 16}) {
+        for (int64_t d : {192, 256}) {
+            for (int64_t capacity : {513, 514, 8193}) {
+                for (int64_t kvLength : {4608, 16384, 21846, 65537}) {
+                    for (auto dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+                        const int64_t q = 129, kv = kvLength, nq = d == 192 ? 64 : 24, nkv = d == 192 ? 4 : 2;
+                        const int64_t y = d == 192 ? 8 : 4;
+                        auto inputs = MakeMxfp8Inputs(d);
+                        inputs[0] = {{{batch, q, nq, d}, {batch, q, nq, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                        inputs[1] = {{{batch, kv, nkv, d}, {batch, kv, nkv, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                        inputs[2] = inputs[1];
+                        inputs[3] = {
+                            {{nkv, batch * q, capacity}, {nkv, batch * q, capacity}}, ge::DT_INT32, ge::FORMAT_ND};
+                        inputs[4] = {{{nkv, batch * q}, {nkv, batch * q}}, ge::DT_INT32, ge::FORMAT_ND};
+                        inputs[7] = {
+                            {{batch, q, nq, d / 64, 2}, {batch, q, nq, d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                        inputs[8] = {{{batch, kv, nkv, d / 64, 2}, {batch, kv, nkv, d / 64, 2}},
+                                     ge::DT_FLOAT8_E8M0,
+                                     ge::FORMAT_ND};
+                        inputs[9] = {{{batch, nkv, d, 2}, {batch, nkv, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                        for (int index : {11, 12, 15})
+                            inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                        inputs[13] = {{{batch}, {batch}}, ge::DT_INT32, ge::FORMAT_ND};
+                        inputs[14] = inputs[13];
+                        auto outputs = MakeOutputs(dtype, false, d, nq);
+                        outputs[0] = inputs[0];
+                        outputs[0].dtype_ = dtype;
+                        GenericBlockSparseAttentionCompileInfo compileInfo;
+                        gert::TilingContextPara ctx(
+                            "GenericBlockSparseAttention", inputs, outputs,
+                            MakeAttrs(1, 6, 1, 0, 0.0f, -1, -1, 4, "BSND", "BSND", 0, false, {1, y}), &compileInfo,
+                            "Ascend950", 28, 262144);
+                        if (batch == 0) {
+                            ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+                        } else {
+                            TilingInfo info;
+                            ASSERT_TRUE(ExecuteTiling(ctx, info));
+                            EXPECT_EQ(info.tilingKey,
+                                      dtype == ge::DT_FLOAT16 ? 9250002900000020ULL : 9250002900000021ULL);
+                            EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(kv, nkv, d, y, 512),
+                                      GbsaMxScaleCache::UB_CAPACITY);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_coalesced_pipeline_prefill_boundaries)
+{
+    for (int64_t batch : {1, 3}) {
+        for (int64_t mask : {0, 1}) {
+            for (int64_t capacity : {513, 514}) {
+                for (int64_t kvLength :
+                     {127, 128, 129, 255, 256, 257, 511, 512, 513, 1023, 1024, 1025, 4096, 4320, 4608, 8192, 8193}) {
+                    for (auto dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+                        const int64_t d = 256, q = kvLength, kv = kvLength, nq = 24, nkv = 2;
+                        const int64_t y = 4;
+                        auto inputs = MakeMxfp8Inputs(d);
+                        inputs[0] = {{{batch, q, nq, d}, {batch, q, nq, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                        inputs[1] = {{{batch, kv, nkv, d}, {batch, kv, nkv, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                        inputs[2] = inputs[1];
+                        inputs[3] = {
+                            {{nkv, batch * q, capacity}, {nkv, batch * q, capacity}}, ge::DT_INT32, ge::FORMAT_ND};
+                        inputs[4] = {{{nkv, batch * q}, {nkv, batch * q}}, ge::DT_INT32, ge::FORMAT_ND};
+                        inputs[7] = {
+                            {{batch, q, nq, d / 64, 2}, {batch, q, nq, d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                        inputs[8] = {{{batch, kv, nkv, d / 64, 2}, {batch, kv, nkv, d / 64, 2}},
+                                     ge::DT_FLOAT8_E8M0,
+                                     ge::FORMAT_ND};
+                        inputs[9] = {{{batch, nkv, d, 2}, {batch, nkv, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                        for (int index : {11, 12, 15})
+                            inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                        inputs[13] = {{{batch}, {batch}}, ge::DT_INT32, ge::FORMAT_ND};
+                        inputs[14] = inputs[13];
+                        auto outputs = MakeOutputs(dtype, false, d, nq);
+                        outputs[0] = inputs[0];
+                        outputs[0].dtype_ = dtype;
+                        GenericBlockSparseAttentionCompileInfo compileInfo;
+                        gert::TilingContextPara ctx(
+                            "GenericBlockSparseAttention", inputs, outputs,
+                            MakeAttrs(mask, 6, 1, 0, 0.0f, -1, -1, 4, "BSND", "BSND", 0, false, {1, y}), &compileInfo,
+                            "Ascend950", 28, 262144);
+                        TilingInfo info;
+                        ASSERT_TRUE(ExecuteTiling(ctx, info));
+                        const uint64_t keyBase =
+                            mask == 1 && kv >= 1024 && kv <= 8192 ? 9250002900000022ULL : 9250002900000020ULL;
+                        EXPECT_EQ(info.tilingKey, keyBase + (dtype == ge::DT_FLOAT16 ? 0ULL : 1ULL));
+                        EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(kv, nkv, d, y, 512), GbsaMxScaleCache::UB_CAPACITY);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_removed_d128_specialization)
+{
+    // These BF16 causal shapes previously selected the D128 specialization.
+    // Reject both dense layouts, including zero batch and the FP16 variants.
+    constexpr int64_t d = 128, q = 129, kv = 4608, nq = 64, nkv = 4;
+    for (int64_t batch : {0, 1, 2, 8}) {
+        for (const std::string layout : {"BSND", "BNSD"}) {
+            for (auto dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+                for (int64_t precision : {0, 1}) {
+                    auto inputs = MakeMxfp8Inputs(d);
+                    const bool headMajor = layout == "BNSD";
+                    const int64_t qAxis1 = headMajor ? nq : q, qAxis2 = headMajor ? q : nq;
+                    const int64_t kvAxis1 = headMajor ? nkv : kv, kvAxis2 = headMajor ? kv : nkv;
+                    inputs[0] = {
+                        {{batch, qAxis1, qAxis2, d}, {batch, qAxis1, qAxis2, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                    inputs[1] = {{{batch, kvAxis1, kvAxis2, d}, {batch, kvAxis1, kvAxis2, d}},
+                                 ge::DT_FLOAT8_E4M3FN,
+                                 ge::FORMAT_ND};
+                    inputs[2] = inputs[1];
+                    inputs[3] = {{{nkv, batch * q, 514}, {nkv, batch * q, 514}}, ge::DT_INT32, ge::FORMAT_ND};
+                    inputs[4] = {{{nkv, batch * q}, {nkv, batch * q}}, ge::DT_INT32, ge::FORMAT_ND};
+                    inputs[7] = {{{batch, qAxis1, qAxis2, d / 64, 2}, {batch, qAxis1, qAxis2, d / 64, 2}},
+                                 ge::DT_FLOAT8_E8M0,
+                                 ge::FORMAT_ND};
+                    inputs[8] = {{{batch, kvAxis1, kvAxis2, d / 64, 2}, {batch, kvAxis1, kvAxis2, d / 64, 2}},
+                                 ge::DT_FLOAT8_E8M0,
+                                 ge::FORMAT_ND};
+                    inputs[9] = {{{batch, nkv, d, 2}, {batch, nkv, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                    for (int index : {11, 12, 15}) {
+                        inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                    }
+                    inputs[13] = {{{batch}, {batch}}, ge::DT_INT32, ge::FORMAT_ND};
+                    inputs[14] = inputs[13];
+                    auto outputs = MakeOutputs(dtype, false, d, nq);
+                    outputs[0] = inputs[0];
+                    outputs[0].dtype_ = dtype;
+                    GenericBlockSparseAttentionCompileInfo compileInfo;
+                    gert::TilingContextPara ctx(
+                        "GenericBlockSparseAttention", inputs, outputs,
+                        MakeAttrs(1, 6, precision, 0, 0.0f, -1, -1, 4, layout, layout, 0, false, {1, 128}),
+                        &compileInfo, "Ascend950", 28, 262144);
+                    ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_invalid_packed_shapes)
+{
+    for (int index : {7, 8, 9}) {
+        auto inputs = MakeMxfp8Inputs();
+        if (index == 7) {
+            inputs[index] = {{{kT, kN1, kD / 64, 1}, {kT, kN1, kD / 64, 1}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+        } else if (index == 8) {
+            inputs[index] = {{{kMaxBlocks, kBlockSize, kN2, kD / 64, 1}, {kMaxBlocks, kBlockSize, kN2, kD / 64, 1}},
+                             ge::DT_FLOAT8_E8M0,
+                             ge::FORMAT_ND};
+        } else {
+            // Unrepeated per-channel scales do not have the required packed shape.
+            inputs[index] = {{{kN2, kD}, {kN2, kD}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+        }
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                    MakeAttrs(1, 6, 1, 0), &compileInfo, "Ascend950", 56, 262144);
+        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_requires_fp32_scalar_p_scale)
+{
+    for (int invalidCase : {0, 1, 2}) {
+        auto inputs = MakeMxfp8Inputs();
+        inputs[10] = invalidCase == 0 ?
+                         gert::TilingContextPara::TensorDescription{{{1}, {1}}, ge::DT_FLOAT16, ge::FORMAT_ND} :
+                     invalidCase == 1 ?
+                         gert::TilingContextPara::TensorDescription{{{2}, {2}}, ge::DT_FLOAT, ge::FORMAT_ND} :
+                         gert::TilingContextPara::TensorDescription{{{1, 1}, {1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND};
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                    MakeAttrs(1, 6, 1, 0), &compileInfo, "Ascend950", 56, 262144);
+        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_unsupported_configuration)
+{
+    for (int invalidCase = 0; invalidCase < 4; ++invalidCase) {
+        const int64_t headDim = invalidCase == 0 ? 257 : 128;
+        auto inputs = invalidCase == 1 ? MakeInputs(ge::DT_FLOAT16) : MakeMxfp8Inputs(headDim);
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false, headDim),
+                                    MakeAttrs(1, 6, 1, 0, 0.0f, -1, -1, 4, "TND", "PA_BBND", invalidCase == 2 ? 1 : 0),
+                                    &compileInfo, invalidCase == 3 ? "Ascend910B" : "Ascend950", 56, 262144);
+        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_removed_generic_dispatch)
+{
+    for (auto outputType : {ge::DT_FLOAT16, ge::DT_BF16}) {
+        for (int64_t precision : {0, 1}) {
+            for (int64_t lse : {0, 1}) {
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx("GenericBlockSparseAttention", MakeMxfp8Inputs(192),
+                                            MakeOutputs(outputType, lse != 0, 192), MakeAttrs(0, 6, precision, lse),
+                                            &compileInfo, "Ascend950", 56, 262144);
+                ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_tnd_paged_grouped_shape_boundary)
+{
+    for (int64_t headDim : {1, 31, 32, 33, 63, 64, 65, 127, 128, 129, 192, 255, 256}) {
+        for (int64_t blockY : {1, 4, 8, 17, 127, 128}) {
+            auto inputs = MakeMxfp8Inputs(headDim);
+            inputs[3] = {{{kN2, kTotalQBlocks, 512}, {kN2, kTotalQBlocks, 512}}, ge::DT_INT32, ge::FORMAT_ND};
+            GenericBlockSparseAttentionCompileInfo compileInfo;
+            gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs,
+                                        MakeOutputs(ge::DT_FLOAT16, false, headDim),
+                                        MakeAttrs(1, 6, 1, 0, 0.0f, -1, -1, 4, "TND", "PA_BBND", 0, false, {1, blockY}),
+                                        &compileInfo, "Ascend950", 56, 262144);
+            const bool grouped = (headDim == 192 || headDim == 256) && (blockY == 4 || blockY == 8);
+            ExecuteTestCase(ctx, grouped ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED, 9250002900000052ULL);
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_tnd_layout_dispatch_and_lse_boundary)
+{
+    constexpr int64_t dim = 256;
+    for (const std::string layout : {"TND", "PA_BBND", "PA_BNBD"}) {
+        for (auto outputType : {ge::DT_FLOAT16, ge::DT_BF16}) {
+            for (bool lse : {false, true}) {
+                auto inputs = MakeMxfp8Inputs(dim);
+                if (layout == "TND") {
+                    inputs[1] = {{{kS2, kN2, dim}, {kS2, kN2, dim}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                    inputs[2] = inputs[1];
+                    inputs[8] = {{{kS2, kN2, dim / 64, 2}, {kS2, kN2, dim / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                    inputs[9] = {{{kBatch, kN2, dim, 2}, {kBatch, kN2, dim, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                    inputs[12] = inputs[11];
+                    inputs[14] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                    inputs[15] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                } else if (layout == "PA_BNBD") {
+                    inputs[1] = {{{kMaxBlocks, kN2, kBlockSize, dim}, {kMaxBlocks, kN2, kBlockSize, dim}},
+                                 ge::DT_FLOAT8_E4M3FN,
+                                 ge::FORMAT_ND};
+                    inputs[2] = inputs[1];
+                    inputs[8] = {
+                        {{kMaxBlocks, kN2, kBlockSize, dim / 64, 2}, {kMaxBlocks, kN2, kBlockSize, dim / 64, 2}},
+                        ge::DT_FLOAT8_E8M0,
+                        ge::FORMAT_ND};
+                    inputs[9] = {
+                        {{kMaxBlocks, kN2, kBlockSize / 64, dim, 2}, {kMaxBlocks, kN2, kBlockSize / 64, dim, 2}},
+                        ge::DT_FLOAT8_E8M0,
+                        ge::FORMAT_ND};
+                }
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, MakeOutputs(outputType, lse, dim),
+                                            MakeAttrs(0, 6, 0, lse, 0.0f, -1, -1, 4, "TND", layout, 0, false, {1, 4}),
+                                            &compileInfo, "Ascend950", 56, 262144);
+                if (lse) {
+                    ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+                    continue;
+                }
+                TilingInfo info;
+                ASSERT_TRUE(ExecuteTiling(ctx, info));
+                const uint64_t base = layout == "TND"     ? 9250002900000050ULL :
+                                      layout == "PA_BBND" ? 9250002900000052ULL :
+                                                            9250002900000054ULL;
+                EXPECT_EQ(info.tilingKey, base + (outputType == ge::DT_FLOAT16 ? 0U : 1U));
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_packed_scale_cache_boundary)
+{
+    // Crossing the old all-head cache capacity must retain packed execution.
+    // Zero KV capacity is rejected after removal of the generic dispatch.
+    struct Geometry {
+        int64_t d;
+        int64_t nq;
+        int64_t nkv;
+        int64_t y;
+        int64_t maxKv;
+    };
+    for (const auto shape : {Geometry{192, 64, 4, 8, 5461}, Geometry{256, 24, 2, 4, 8192}}) {
+        std::vector<int64_t> packedWorkspace[2];
+        size_t packedBlockNum[2] = {};
+        for (int64_t kv : {shape.maxKv, shape.maxKv + 1, int64_t(0)}) {
+            for (auto outputType : {ge::DT_FLOAT16, ge::DT_BF16}) {
+                const bool packed = kv != 0;
+                const size_t dtypeIndex = outputType == ge::DT_FLOAT16 ? 0U : 1U;
+                constexpr uint32_t packedTile = 512U;
+                auto inputs = MakeMxfp8Inputs(shape.d);
+                inputs[0] = {
+                    {{1, kS1, shape.nq, shape.d}, {1, kS1, shape.nq, shape.d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[1] = {
+                    {{1, kv, shape.nkv, shape.d}, {1, kv, shape.nkv, shape.d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[2] = inputs[1];
+                inputs[3] = {{{shape.nkv, kS1, 513}, {shape.nkv, kS1, 513}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[4] = {{{shape.nkv, kS1}, {shape.nkv, kS1}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[7] = {{{1, kS1, shape.nq, shape.d / 64, 2}, {1, kS1, shape.nq, shape.d / 64, 2}},
+                             ge::DT_FLOAT8_E8M0,
+                             ge::FORMAT_ND};
+                inputs[8] = {{{1, kv, shape.nkv, shape.d / 64, 2}, {1, kv, shape.nkv, shape.d / 64, 2}},
+                             ge::DT_FLOAT8_E8M0,
+                             ge::FORMAT_ND};
+                inputs[9] = {
+                    {{1, shape.nkv, shape.d, 2}, {1, shape.nkv, shape.d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                for (int index : {11, 12, 15}) {
+                    inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                }
+                inputs[13] = {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[14] = inputs[13];
+                auto outputs = MakeOutputs(outputType, false, shape.d, shape.nq);
+                outputs[0] = inputs[0];
+                outputs[0].dtype_ = outputType;
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx(
+                    "GenericBlockSparseAttention", inputs, outputs,
+                    MakeAttrs(1, 6, 1, 0, 0.0f, -1, -1, 4, "BSND", "BSND", 0, false, {1, shape.y}), &compileInfo,
+                    "Ascend950", 56, 262144);
+                if (!packed) {
+                    ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+                    continue;
+                }
+                TilingInfo info;
+                ASSERT_TRUE(ExecuteTiling(ctx, info));
+                const uint64_t expectedBase = 9250002900000020ULL;
+                EXPECT_EQ(info.tilingKey, expectedBase + (outputType == ge::DT_FLOAT16 ? 0U : 1U));
+                constexpr size_t l1TilingOffset = 184;
+                uint32_t l1[12] = {};
+                ASSERT_GE(info.tilingDataSize, l1TilingOffset + sizeof(l1));
+                std::memcpy(l1, info.tilingData.get() + l1TilingOffset, sizeof(l1));
+                EXPECT_EQ(l1[1], 128U);
+                EXPECT_EQ(l1[2], 256U);
+                EXPECT_EQ(l1[3], 256U);
+                EXPECT_EQ(l1[5], 256U);
+                ASSERT_EQ(info.workspaceSizes.size(), 1U);
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_fixed_tile_and_workspace)
+{
+    // Logical QK/softmax/PV extent is independent of the physical K L1 group.
+    // Both output dtypes stream K through three 128-token slots.
+    struct Geometry {
+        int64_t d;
+        int64_t nq;
+        int64_t nkv;
+        int64_t y;
+        int64_t max512Kv;
+    };
+    for (const auto shape : {Geometry{192, 64, 4, 8, 21589}, Geometry{256, 24, 2, 4, 7264},
+                             Geometry{192, 64, 4, 4, 21418}, Geometry{256, 24, 2, 8, 7328}}) {
+        for (int64_t kv : {int64_t(4096), int64_t(4320), int64_t(4608), shape.max512Kv, shape.max512Kv + 1}) {
+            int64_t fp16Workspace = 0;
+            size_t fp16BlockNum = 0;
+            for (auto outputType : {ge::DT_FLOAT16, ge::DT_BF16}) {
+                constexpr uint32_t expectedTile = 512U;
+                auto inputs = MakeMxfp8Inputs(shape.d);
+                inputs[0] = {
+                    {{1, kS1, shape.nq, shape.d}, {1, kS1, shape.nq, shape.d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[1] = {
+                    {{1, kv, shape.nkv, shape.d}, {1, kv, shape.nkv, shape.d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[2] = inputs[1];
+                inputs[3] = {{{shape.nkv, kS1, 513}, {shape.nkv, kS1, 513}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[4] = {{{shape.nkv, kS1}, {shape.nkv, kS1}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[7] = {{{1, kS1, shape.nq, shape.d / 64, 2}, {1, kS1, shape.nq, shape.d / 64, 2}},
+                             ge::DT_FLOAT8_E8M0,
+                             ge::FORMAT_ND};
+                inputs[8] = {{{1, kv, shape.nkv, shape.d / 64, 2}, {1, kv, shape.nkv, shape.d / 64, 2}},
+                             ge::DT_FLOAT8_E8M0,
+                             ge::FORMAT_ND};
+                inputs[9] = {
+                    {{1, shape.nkv, shape.d, 2}, {1, shape.nkv, shape.d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                for (int index : {11, 12, 15}) {
+                    inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                }
+                inputs[13] = {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[14] = inputs[13];
+                auto outputs = MakeOutputs(outputType, false, shape.d, shape.nq);
+                outputs[0] = inputs[0];
+                outputs[0].dtype_ = outputType;
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx(
+                    "GenericBlockSparseAttention", inputs, outputs,
+                    MakeAttrs(1, 6, 1, 0, 0.0f, -1, -1, 4, "BSND", "BSND", 0, false, {1, shape.y}), &compileInfo,
+                    "Ascend950", 56, 262144);
+                TilingInfo info;
+                ASSERT_TRUE(ExecuteTiling(ctx, info));
+                const bool perHead =
+                    shape.d == 192 && (kv > 5461 || (outputType == ge::DT_BF16 && kv > (shape.y == 8 ? 5397 : 5354)));
+                const uint64_t expectedBase = perHead ? 9250002900000020ULL : 9250002900000020ULL;
+                EXPECT_EQ(info.tilingKey, expectedBase + (outputType == ge::DT_FLOAT16 ? 0U : 1U));
+                constexpr size_t l1TilingOffset = 184;
+                uint32_t l1[12] = {};
+                ASSERT_GE(info.tilingDataSize, l1TilingOffset + sizeof(l1));
+                std::memcpy(l1, info.tilingData.get() + l1TilingOffset, sizeof(l1));
+                EXPECT_EQ(l1[0], 16U);
+                EXPECT_EQ(l1[1], 128U);
+                EXPECT_EQ(l1[2], 256U);
+                EXPECT_EQ(l1[3], 256U);
+                EXPECT_EQ(l1[5], 256U);
+                EXPECT_EQ(l1[6], expectedTile);
+                EXPECT_EQ(l1[7], expectedTile);
+                EXPECT_EQ(l1[9], 3U);
+                EXPECT_EQ(l1[10], 2U);
+                ASSERT_EQ(info.workspaceSizes.size(), 1U);
+                ASSERT_GT(info.blockNum, 0U);
+                if (outputType == ge::DT_FLOAT16) {
+                    fp16Workspace = info.workspaceSizes[0];
+                    fp16BlockNum = info.blockNum;
+                } else {
+                    ASSERT_EQ(info.blockNum, fp16BlockNum);
+                    // Four descriptor groups per tile. A repeated partial
+                    // block can generate one record per token, so reserve
+                    // 128 records in each group, independent of index capacity.
+                    EXPECT_EQ(info.workspaceSizes[0], fp16Workspace);
+                    const uint64_t dataL1 = 16U * 256U + 3U * 128U * 256U + 3U * 16U * 512U + 2U * 512U * 256U;
+                    EXPECT_LT(dataL1, 512U * 1024U - 16U * 1024U - 3U * 4096U);
+                    EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(kv, shape.nkv, shape.d, shape.y, 512U),
+                              GbsaMxScaleCache::UB_CAPACITY);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_bounded_scale_reservation)
+{
+    using namespace GbsaMxScaleCache;
+    for (uint64_t dim : {128U, 192U, 256U}) {
+        for (uint64_t kv : {1U, 127U, 129U, 4096U, 8192U, 8193U, 65537U, 635536U}) {
+            for (uint64_t heads : {1U, 2U, 4U, 13U, 64U, 100U}) {
+                const uint64_t block = dim == 128 ? 128U : 4U;
+                EXPECT_TRUE(StreamFits(heads, dim, 256U));
+                EXPECT_LE(PipelineUbEnd(kv, heads, dim, block, 512U), UB_CAPACITY);
+                EXPECT_EQ(StreamBytes(heads, dim, 256U), 8192U);
+            }
+        }
+    }
+    EXPECT_LE(PipelineUbEnd(65536U, 64U, 256U, 4U, 512U), UB_CAPACITY);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_fp32_scores_precision_compatibility)
+{
+    // Precision 0 is the FP32 interface; legacy value 1 must select the same
+    // kernel and workspace for both dense layouts and final output types.
+    for (const std::string layout : {"BSND", "BNSD"}) {
+        for (auto outputType : {ge::DT_FLOAT16, ge::DT_BF16}) {
+            TilingInfo previous;
+            for (int64_t precision : {0, 1, 2}) {
+                auto inputs = MakeMxfp8Inputs(256);
+                const bool headMajor = layout == "BNSD";
+                SCOPED_TRACE(layout + "/" + std::to_string(outputType) + "/" + std::to_string(precision));
+                const int64_t q1 = headMajor ? 24 : 4096;
+                const int64_t q2 = headMajor ? 4096 : 24;
+                const int64_t k1 = headMajor ? 2 : 16384;
+                const int64_t k2 = headMajor ? 16384 : 2;
+                inputs[0] = {{{1, q1, q2, 256}, {1, q1, q2, 256}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[1] = {{{1, k1, k2, 256}, {1, k1, k2, 256}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[2] = inputs[1];
+                inputs[3] = {{{2, 4096, 512}, {2, 4096, 512}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[4] = {{{2, 4096}, {2, 4096}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[7] = {{{1, q1, q2, 4, 2}, {1, q1, q2, 4, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                inputs[8] = {{{1, k1, k2, 4, 2}, {1, k1, k2, 4, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                inputs[9] = {{{1, 2, 256, 2}, {1, 2, 256, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                for (int index : {11, 12, 15}) {
+                    inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                }
+                inputs[13] = {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND};
+                inputs[14] = inputs[13];
+                auto outputs = MakeOutputs(outputType, false, 256, 24);
+                outputs[0] = inputs[0];
+                outputs[0].dtype_ = outputType;
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx(
+                    "GenericBlockSparseAttention", inputs, outputs,
+                    MakeAttrs(0, 6, precision, 0, 0.0f, -1, -1, 4, layout, layout, 0, false, {1, 4}), &compileInfo,
+                    "Ascend950", 56, 262144);
+                if (precision == 2) {
+                    ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+                    continue;
+                }
+                TilingInfo info;
+                ASSERT_TRUE(ExecuteTiling(ctx, info));
+                EXPECT_EQ(info.tilingKey, (headMajor ? 9250002900000032ULL : 9250002900000020ULL) +
+                                              (outputType == ge::DT_BF16 ? 1U : 0U));
+                if (precision == 0) {
+                    previous.tilingKey = info.tilingKey;
+                    previous.workspaceSizes = info.workspaceSizes;
+                } else {
+                    EXPECT_EQ(info.tilingKey, previous.tilingKey);
+                    EXPECT_EQ(info.workspaceSizes, previous.workspaceSizes);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_grouped_raw_ring_capacity)
+{
+    using namespace GbsaMxScaleCache;
+    EXPECT_EQ(PipelineRawStages(16384U, 2U, 256U, 4U, 512U), 3U);
+    EXPECT_EQ(PipelineUbEnd(16384U, 2U, 256U, 4U, 512U), 170496U);
+    EXPECT_EQ(PipelineUbEnd(16384U, 2U, 256U, 4U, 512U, true), 170496U);
+    EXPECT_EQ(PipelineRawStages(16384U, 4U, 192U, 8U, 512U), 3U);
+    EXPECT_EQ(PipelineUbEnd(16384U, 4U, 192U, 8U, 512U), 170496U);
+    EXPECT_EQ(PipelineUbEnd(16384U, 4U, 192U, 8U, 512U, true), 170496U);
+    // Each Raw row selects one head, so the third slot no longer overflows
+    // at Nkv=13. Total UB storage is independent of the GM head stride.
+    EXPECT_EQ(PipelineRawStages(16384U, 12U, 256U, 4U, 512U), 3U);
+    EXPECT_EQ(PipelineRawStages(16384U, 13U, 256U, 4U, 512U), 3U);
+    EXPECT_EQ(PipelineUbEnd(16384U, 13U, 256U, 4U, 512U), 170496U);
+    EXPECT_EQ(PipelineUbEnd(16384U, 100U, 256U, 4U, 512U), 170496U);
+    EXPECT_GT(PipelineUbEnd(16384U, 2U, 256U, 4U, 256U), UB_CAPACITY);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_head_group_tiers)
+{
+    // Independent tier expectations: cover both sides of every M/KV boundary,
+    // odd split rows, both sparse block sizes/output types, and rejection at 129.
+    constexpr int64_t nqKv = 2;
+    constexpr int64_t kv = 4099;
+    for (int64_t d : {192, 256}) {
+        for (int64_t group : {1, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129}) {
+            for (int64_t y : {4, 8}) {
+                for (auto dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+                    const int64_t nq = nqKv * group;
+                    auto inputs = MakeMxfp8Inputs(d);
+                    inputs[0] = {{{1, kS1, nq, d}, {1, kS1, nq, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                    inputs[1] = {{{1, kv, nqKv, d}, {1, kv, nqKv, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                    inputs[2] = inputs[1];
+                    inputs[3] = {{{nqKv, kS1, 513}, {nqKv, kS1, 513}}, ge::DT_INT32, ge::FORMAT_ND};
+                    inputs[4] = {{{nqKv, kS1}, {nqKv, kS1}}, ge::DT_INT32, ge::FORMAT_ND};
+                    inputs[7] = {{{1, kS1, nq, d / 64, 2}, {1, kS1, nq, d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                    inputs[8] = {
+                        {{1, kv, nqKv, d / 64, 2}, {1, kv, nqKv, d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                    inputs[9] = {{{1, nqKv, d, 2}, {1, nqKv, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                    for (int index : {11, 12, 15}) {
+                        inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                    }
+                    inputs[13] = {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND};
+                    inputs[14] = inputs[13];
+                    auto outputs = MakeOutputs(dtype, false, d, nq);
+                    outputs[0] = inputs[0];
+                    outputs[0].dtype_ = dtype;
+                    GenericBlockSparseAttentionCompileInfo compileInfo;
+                    gert::TilingContextPara ctx(
+                        "GenericBlockSparseAttention", inputs, outputs,
+                        MakeAttrs(0, 6, 0, 0, 0.0f, -1, -1, 4, "BSND", "BSND", 0, false, {1, y}), &compileInfo,
+                        "Ascend950", 56, 262144);
+                    if (group > 128) {
+                        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+                        continue;
+                    }
+                    TilingInfo info;
+                    ASSERT_TRUE(ExecuteTiling(ctx, info)) << "D=" << d << " G=" << group;
+                    // The original input width is not padded in the runtime shape.
+                    EXPECT_EQ(ReadTilingU32(info, 3U * sizeof(uint32_t)), d);
+                    const uint32_t m = group <= 16 ? 16U : group <= 32 ? 32U : group <= 64 ? 64U : 128U;
+                    const uint32_t tokens = group <= 32 ? 512U : group <= 64 ? 256U : 128U;
+                    constexpr size_t l1Offset = 184;
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset), m);
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset + 4U), 128U);
+                    // L1 reserves the D256 capacity for both supported D values.
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset + 2U * 4U), 256U);
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset + 3U * 4U), 256U);
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset + 4U * 4U), m);
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset + 5U * 4U), 256U);
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset + 6U * 4U), tokens);
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset + 7U * 4U), tokens);
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset + 9U * 4U), 3U);
+                    EXPECT_EQ(ReadTilingU32(info, l1Offset + 10U * 4U), 2U);
+                    EXPECT_LT(GbsaMxScaleCache::PipelineL1End(d, m, tokens), GbsaMxScaleCache::L1_DATA_CAPACITY);
+                    EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(kv, nqKv, d, y, tokens, false, m),
+                              GbsaMxScaleCache::UB_CAPACITY);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_large_head_group_buffer_capacity)
+{
+    using namespace GbsaMxScaleCache;
+    // Exact footprints include Raw, NZ, statistics and both descriptor scratch records.
+    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 256U, 4U, 512U, false, 32U), 170496U);
+    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 256U, 4U, 256U, false, 64U), 203136U);
+    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 256U, 4U, 128U, false, 128U), 235904U);
+    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 192U, 4U, 512U, false, 32U), 170496U);
+    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 192U, 4U, 256U, false, 64U), 203136U);
+    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 192U, 4U, 128U, false, 128U), 235904U);
+    EXPECT_EQ(PvUbStages(128U), 1U);
+    EXPECT_EQ(PvUbStages(64U), 2U);
+    EXPECT_EQ(DescriptorTileWords(128U, 4U), 528U); // includes AIV1's empty notification
+    EXPECT_EQ(DescriptorTileWords(256U, 8U), 528U);
+    EXPECT_EQ(DescriptorTileWords(512U, 4U), 1056U);
+    EXPECT_GT(PipelineUbEnd(4099U, 2U, 256U, 4U, 512U, false, 128U), UB_CAPACITY);
+    EXPECT_GT(PipelineUbEnd(4099U, 2U, 256U, 4U, 256U, false, 128U), UB_CAPACITY);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_grouped_indices_independent_of_ub_cache)
+{
+    using namespace GbsaMxScaleCache;
+    EXPECT_TRUE(DirectIndexMapFits(512U));
+    EXPECT_TRUE(DirectIndexMapFits(8192U));
+    EXPECT_FALSE(DirectIndexMapFits(8193U));
+    for (uint64_t kv : {4096U, 8193U, 16384U, 65537U, 635536U}) {
+        EXPECT_EQ(PipelineUbEnd(kv, 2U, 256U, 4U, 512U), 170496U);
+        EXPECT_EQ(PipelineUbEnd(kv, 2U, 256U, 4U, 512U, true), 170496U);
+    }
+    EXPECT_EQ(PipelineAuxBytes(256U, 512U, 3U), 2048U);
+    // D192 uses the same D256 buffer capacity while retaining actual-D strides.
+    EXPECT_EQ(PipelineAuxBytes(192U, 512U, 3U), 2048U);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_workspace_independent_of_index_capacity)
+{
+    for (int64_t batch : {1, 2, 3, 8}) {
+        for (int64_t d : {192, 256}) {
+            const int64_t q = 129, nq = d == 192 ? 64 : 24, nkv = d == 192 ? 4 : 2;
+            const int64_t y = d == 192 ? 8 : 4;
+            for (int64_t kv : {21846, 32600, 32707, 32708}) {
+                int64_t workspace = -1;
+                for (int64_t capacity : {512, 513, 514, 1024, 8192, 8193}) {
+                    auto inputs = MakeMxfp8Inputs(d);
+                    inputs[0] = {{{batch, q, nq, d}, {batch, q, nq, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                    inputs[1] = {{{batch, kv, nkv, d}, {batch, kv, nkv, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                    inputs[2] = inputs[1];
+                    inputs[3] = {{{nkv, batch * q, capacity}, {nkv, batch * q, capacity}}, ge::DT_INT32, ge::FORMAT_ND};
+                    inputs[4] = {{{nkv, batch * q}, {nkv, batch * q}}, ge::DT_INT32, ge::FORMAT_ND};
+                    inputs[7] = {
+                        {{batch, q, nq, d / 64, 2}, {batch, q, nq, d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                    inputs[8] = {
+                        {{batch, kv, nkv, d / 64, 2}, {batch, kv, nkv, d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                    inputs[9] = {{{batch, nkv, d, 2}, {batch, nkv, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                    for (int index : {11, 12, 15})
+                        inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+                    inputs[13] = {{{batch}, {batch}}, ge::DT_INT32, ge::FORMAT_ND};
+                    inputs[14] = inputs[13];
+                    auto outputs = MakeOutputs(ge::DT_BF16, false, d, nq);
+                    outputs[0] = inputs[0];
+                    outputs[0].dtype_ = ge::DT_BF16;
+                    GenericBlockSparseAttentionCompileInfo compileInfo;
+                    gert::TilingContextPara ctx(
+                        "GenericBlockSparseAttention", inputs, outputs,
+                        MakeAttrs(1, 6, 1, 0, 0.0f, -1, -1, 4, "BSND", "BSND", 0, false, {1, y}), &compileInfo,
+                        "Ascend950", 28, 262144);
+                    TilingInfo info;
+                    ASSERT_TRUE(ExecuteTiling(ctx, info));
+                    ASSERT_EQ(info.tilingKey, 9250002900000021ULL);
+                    ASSERT_EQ(info.workspaceSizes.size(), 1U);
+                    if (workspace < 0)
+                        workspace = info.workspaceSizes[0];
+                    EXPECT_EQ(info.workspaceSizes[0], workspace);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_preserves_old_capacity_boundaries)
+{
+    enum class CacheMode {
+        Dense,
+        PerHead,
+        Stream,
+        Hybrid
+    };
+    struct Shape {
+        int64_t d;
+        int64_t nq;
+        int64_t nkv;
+        int64_t y;
+        int64_t kv;
+        bool packed;
+        uint32_t tile;
+        CacheMode mode = CacheMode::PerHead;
+    };
+    // D128 specialization was removed; keep those shapes as rejection checks.
+    for (const auto s : {Shape{192, 64, 4, 8, 5397, true, 512, CacheMode::Dense},
+                         Shape{192, 64, 4, 8, 5398, true, 512},
+                         Shape{192, 64, 4, 8, 5462, true, 512},
+                         Shape{192, 64, 4, 8, 21845, true, 256},
+                         Shape{192, 64, 4, 8, 21846, true, 384, CacheMode::Hybrid},
+                         Shape{256, 24, 2, 4, 8193, true, 256},
+                         Shape{256, 24, 2, 4, 16384, true, 256},
+                         Shape{256, 24, 2, 4, 16385, true, 256, CacheMode::Hybrid},
+                         Shape{256, 24, 2, 4, 21846, true, 256, CacheMode::Hybrid},
+                         Shape{256, 24, 2, 4, 32768, true, 256, CacheMode::Hybrid},
+                         Shape{256, 24, 2, 4, 32769, true, 256, CacheMode::Stream},
+                         Shape{192, 64, 4, 8, 42496, true, 384, CacheMode::Hybrid},
+                         Shape{192, 64, 4, 8, 42497, true, 512, CacheMode::Stream},
+                         Shape{192, 48, 3, 8, 8193, true, 512, CacheMode::Stream},
+                         Shape{192, 64, 4, 8, 65537, true, 512, CacheMode::Stream},
+                         Shape{256, 24, 2, 4, 65537, true, 256, CacheMode::Stream},
+                         Shape{128, 64, 4, 128, 4096, false, 512, CacheMode::Dense},
+                         Shape{128, 64, 4, 128, 8192, false, 512, CacheMode::Dense},
+                         Shape{128, 64, 4, 128, 8193, false, 512},
+                         Shape{128, 64, 4, 128, 32768, false, 512},
+                         Shape{128, 64, 4, 128, 32769, false, 512, CacheMode::Stream},
+                         Shape{128, 64, 4, 128, 65536, false, 512, CacheMode::Stream},
+                         Shape{128, 64, 4, 128, 65537, false, 512, CacheMode::Stream},
+                         Shape{128, 48, 4, 128, 4096, false, 128},
+                         Shape{128, 32, 2, 128, 4096, false, 128},
+                         Shape{192, 1600, 100, 8, 1000, true, 512},
+                         Shape{192, 64, 4, 8, 5592406, false, 128}}) {
+        auto inputs = MakeMxfp8Inputs(s.d);
+        inputs[0] = {{{2, 129, s.nq, s.d}, {2, 129, s.nq, s.d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+        inputs[1] = {{{2, s.kv, s.nkv, s.d}, {2, s.kv, s.nkv, s.d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+        inputs[2] = inputs[1];
+        inputs[3] = {{{s.nkv, 258, 513}, {s.nkv, 258, 513}}, ge::DT_INT32, ge::FORMAT_ND};
+        inputs[4] = {{{s.nkv, 258}, {s.nkv, 258}}, ge::DT_INT32, ge::FORMAT_ND};
+        inputs[7] = {{{2, 129, s.nq, s.d / 64, 2}, {2, 129, s.nq, s.d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+        inputs[8] = {{{2, s.kv, s.nkv, s.d / 64, 2}, {2, s.kv, s.nkv, s.d / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+        inputs[9] = {{{2, s.nkv, s.d, 2}, {2, s.nkv, s.d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+        for (int index : {11, 12, 15})
+            inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+        inputs[13] = {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND};
+        inputs[14] = inputs[13];
+        auto outputs = MakeOutputs(ge::DT_BF16, false, s.d, s.nq);
+        outputs[0] = inputs[0];
+        outputs[0].dtype_ = ge::DT_BF16;
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, outputs,
+                                    MakeAttrs(1, 6, 1, 0, 0.0f, -1, -1, 4, "BSND", "BSND", 0, false, {1, s.y}),
+                                    &compileInfo, "Ascend950", 56, 262144);
+        if (!s.packed) {
+            ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+            continue;
+        }
+        TilingInfo info;
+        ASSERT_TRUE(ExecuteTiling(ctx, info));
+        // The former cache-mode boundaries now share one packed pipeline key.
+        constexpr uint64_t packedKey = 9250002900000021ULL;
+        EXPECT_EQ(info.tilingKey, packedKey);
+        uint32_t l1[12] = {};
+        ASSERT_GE(info.tilingDataSize, 184U + sizeof(l1));
+        std::memcpy(l1, info.tilingData.get() + 184U, sizeof(l1));
+        EXPECT_EQ(l1[1], 128U);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_generic_capacity_inputs)
+{
+    std::vector<int64_t> referenceWorkspace;
+    for (int64_t capacity : {257LL, 512LL, 2147483647LL, 2147483648LL}) {
+        auto inputs = MakeMxfp8Inputs(65);
+        inputs[3] = {{{kN2, kTotalQBlocks, capacity}, {kN2, kTotalQBlocks, capacity}}, ge::DT_INT32, ge::FORMAT_ND};
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false, 65),
+                                    MakeAttrs(1, 6, 0, 0), &compileInfo, "Ascend950", 56, 262144);
+        if (capacity > 2147483647LL) {
+            ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+            continue;
+        }
+        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_nonpacked_layout_precision_lse)
+{
+    constexpr int64_t d = 65;
+    for (const std::string qLayout : {"TND", "BSND", "BNSD"}) {
+        for (int kvLayout = 0; kvLayout < 3; ++kvLayout) {
+            const bool paged = kvLayout != 0;
+            const bool bnbd = kvLayout == 2;
+            auto inputs = MakeMxfp8Inputs(d);
+            if (qLayout == "TND") {
+                inputs[0] = {{{6, 6, d}, {6, 6, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[1] = {{{514, 3, d}, {514, 3, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+            } else if (qLayout == "BSND") {
+                inputs[0] = {{{2, 3, 6, d}, {2, 3, 6, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[1] = {{{2, 257, 3, d}, {2, 257, 3, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+            } else {
+                inputs[0] = {{{2, 6, 3, d}, {2, 6, 3, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+                inputs[1] = {{{2, 3, 257, d}, {2, 3, 257, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+            }
+            if (paged) {
+                inputs[1] = bnbd ?
+                                gert::TilingContextPara::TensorDescription{
+                                    {{8, 3, 128, d}, {8, 3, 128, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND} :
+                                gert::TilingContextPara::TensorDescription{
+                                    {{8, 128, 3, d}, {8, 128, 3, d}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND};
+            }
+            inputs[2] = inputs[1];
+            inputs[3] = {{{3, 6, 512}, {3, 6, 512}}, ge::DT_INT32, ge::FORMAT_ND};
+            inputs[4] = {{{3, 6}, {3, 6}}, ge::DT_INT32, ge::FORMAT_ND};
+            for (int index : {0, 1}) {
+                auto scaleShape = inputs[index].shape_.GetStorageShape();
+                const size_t rank = scaleShape.GetDimNum();
+                scaleShape.SetDimNum(rank + 1U);
+                scaleShape.SetDim(rank - 1U, (d + 63) / 64);
+                scaleShape.SetDim(rank, 2);
+                inputs[7 + index].shape_.MutableOriginShape() = scaleShape;
+                inputs[7 + index].shape_.MutableStorageShape() = scaleShape;
+                inputs[7 + index].dtype_ = ge::DT_FLOAT8_E8M0;
+            }
+            inputs[9] = !paged ?
+                            gert::TilingContextPara::TensorDescription{
+                                {{2, 3, d, 2}, {2, 3, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND} :
+                            (bnbd ?
+                                 gert::TilingContextPara::TensorDescription{
+                                     {{8, 3, 2, d, 2}, {8, 3, 2, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND} :
+                                 gert::TilingContextPara::TensorDescription{
+                                     {{8, 2, 3, d, 2}, {8, 2, 3, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND});
+            for (int index = 11; index < 16; ++index) {
+                inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+            }
+            if (qLayout == "TND") {
+                inputs[11] = {{{3}, {3}}, ge::DT_INT64, ge::FORMAT_ND};
+                if (!paged) {
+                    inputs[12] = inputs[11];
+                }
+            } else {
+                inputs[13] = {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND};
+            }
+            inputs[14] = {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND};
+            if (paged) {
+                inputs[15] = {{{2, 4}, {2, 4}}, ge::DT_INT32, ge::FORMAT_ND};
+            }
+            auto outputs = MakeOutputs(ge::DT_FLOAT16, true, d);
+            outputs[0] = inputs[0];
+            outputs[0].dtype_ = ge::DT_FLOAT16;
+            outputs[1] =
+                qLayout == "TND" ?
+                    gert::TilingContextPara::TensorDescription{{{6, 6, 1}, {6, 6, 1}}, ge::DT_FLOAT, ge::FORMAT_ND} :
+                    gert::TilingContextPara::TensorDescription{
+                        {{2, 6, 3, 1}, {2, 6, 3, 1}}, ge::DT_FLOAT, ge::FORMAT_ND};
+            const std::string layoutKv = paged ? (bnbd ? "PA_BNBD" : "PA_BBND") : qLayout;
+            for (bool invalidVScale : {false, true}) {
+                if (invalidVScale) {
+                    inputs[9] = {{{2, d, 2}, {2, d, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
+                }
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, outputs,
+                                            MakeAttrs(0, 6, 0, 1, 0.0f, -1, -1, 4, qLayout, layoutKv, 0, false, {1, 4}),
+                                            &compileInfo, "Ascend950", 56, 262144);
+                ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+            }
+        }
+    }
 }
 
 std::vector<gert::TilingContextPara::TensorDescription> MakeBnbdInputs(ge::DataType qkvDtype)
@@ -1439,6 +2490,80 @@ TEST_F(generic_block_sparse_attention_tiling_ut, lse_all_arch22_layouts_and_resi
                     }
                 }
             }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_and_nonquant_dispatch)
+{
+    for (int64_t quant : {0, 6}) {
+        for (int64_t precision : {0, 1}) {
+            auto inputs = quant == 6 ? MakeMxfp8Inputs() : MakeInputs(ge::DT_FLOAT16);
+            GenericBlockSparseAttentionCompileInfo compileInfo;
+            gert::TilingContextPara ctx(
+                "GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                MakeAttrs(1, quant, precision, 0, 0.0f, -1, -1, 4, "TND", "PA_BBND", 0, false, kBlockShape),
+                &compileInfo, "Ascend950", 28, 262144);
+            if (quant == 6) {
+                ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+            } else {
+                const uint64_t expectedKey = kFp16Tiling950 - (precision == 0 ? 100000U : 0U);
+                ExecuteTestCase(ctx, ge::GRAPH_SUCCESS, expectedKey);
+            }
+        }
+    }
+    EXPECT_EQ(GbsaMxScaleCache::PipelineAuxBytes(256, 512), 2048U);
+    EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(65536, 64, 256, 4, 512), GbsaMxScaleCache::UB_CAPACITY);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_nonpacked_without_optional_switch)
+{
+    for (int64_t d : {1, 31, 64, 128, 192, 256}) {
+        for (int64_t sm : {0, 1}) {
+            for (int64_t lse : {0, 1}) {
+                const auto attrs = MakeAttrs(1, 6, sm, lse, 0.0f, -1, -1, 4, "TND", "PA_BBND");
+                ASSERT_EQ(attrs.size(), 14U);
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx("GenericBlockSparseAttention", MakeMxfp8Inputs(d),
+                                            MakeOutputs(ge::DT_FLOAT16, lse != 0, d), attrs, &compileInfo, "Ascend950",
+                                            28, 262144);
+                ExecuteTestCase(ctx, ge::GRAPH_FAILED);
+            }
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_fd_workspace_capacity_boundary)
+{
+    for (int64_t dim : {192, 256}) {
+        for (int64_t capacity : {11, 12, 512, 8193}) {
+            auto inputs = MakeMxfp8Inputs(dim);
+            inputs[3] = {{{kN2, kTotalQBlocks, capacity}, {kN2, kTotalQBlocks, capacity}}, ge::DT_INT32, ge::FORMAT_ND};
+            GenericBlockSparseAttentionCompileInfo compileInfo;
+            gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_BF16, false, dim),
+                                        MakeAttrs(0, 6, 0, 0, 0.0f, -1, -1, 4, "TND", "PA_BBND", 0, false, {1, 4}),
+                                        &compileInfo, "Ascend950", 28, 262144);
+            TilingInfo info;
+            ASSERT_TRUE(ExecuteTiling(ctx, info));
+            ASSERT_GT(info.tilingDataSize, 152U);
+            EXPECT_EQ(ReadTilingU32(info, 120U), capacity >= 12 ? 1U : 0U);
+            const uint32_t partialCapacity = ReadTilingU32(info, 128U);
+            if (capacity < 12) {
+                EXPECT_EQ(partialCapacity, 0U);
+                continue;
+            }
+            EXPECT_EQ(partialCapacity, 35U);
+            uint64_t lseOffset = 0U, outputOffset = 0U;
+            std::memcpy(&lseOffset, info.tilingData.get() + 136U, sizeof(uint64_t));
+            std::memcpy(&outputOffset, info.tilingData.get() + 144U, sizeof(uint64_t));
+            EXPECT_EQ(lseOffset % 512U, 0U);
+            EXPECT_EQ(outputOffset % 512U, 0U);
+            const uint64_t descriptors = info.blockNum * 4U * 8U * GbsaMxScaleCache::DescriptorTileWords(512U, 4U);
+            EXPECT_GE(lseOffset, descriptors);
+            EXPECT_GE(outputOffset, lseOffset + partialCapacity * 2U * 8U * sizeof(float));
+            ASSERT_EQ(info.workspaceSizes.size(), 1U);
+            EXPECT_EQ(info.workspaceSizes[0],
+                      16U * 1024U * 1024U + outputOffset + partialCapacity * (kN1 / kN2) * dim * sizeof(float));
         }
     }
 }

@@ -45,7 +45,7 @@ public:
     static constexpr uint32_t RESCALE_ROW_MAX_ELEM_NUM = 64;
     static constexpr uint32_t RESCALE_COL_MAX_ELEM_NUM = 128;
     static constexpr uint32_t RESCALE_VREG_SIZE = 256 / sizeof(ElementOTmp);
-    static constexpr float MAX_VALUE_RECIPROCAL_FP8 = 1.0f / 448.0f;
+    float pDequantScale_ = 1.0f / 448.0f;
     static constexpr bool FULL_QUANT_FP8 = AscendC::IsSameType<ElementKV, fp8_e4m3fn_t>::value;
     __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, UBufTileHelper& uBufTileHelper)
     {
@@ -55,7 +55,7 @@ public:
         for (uint32_t i = 0; i < UB_OTMP_BUF_STAGES; i++) {
             loUbTensor[i] = resource.ubBuf.template GetBufferByByte<ElementOTmp>(
                 uBufTileHelper.loStartOffset +
-                loUbRowNum * uBufTileHelper.embedPerSubCore * sizeof(ElementOTmp) * (i % loUbBufNum));
+                loUbRowNum * uBufTileHelper.loUbColCapacity * sizeof(ElementOTmp) * (i % loUbBufNum));
         }
         goUbTensor32 = resource.ubBuf.template GetBufferByByte<ElementOTmp>(uBufTileHelper.goStartOffset);
         goUbTensor16 = resource.ubBuf.template GetBufferByByte<ElementO>(uBufTileHelper.goStartOffset);
@@ -63,6 +63,112 @@ public:
         dmUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper.dmStartOffset);
         gmUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper.gmStartOffset);
         lseUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper.lseStartOffset);
+        if constexpr (TileCopy::APPLY_MX_V_CHANNEL_SCALE) {
+            mxVScaleUb = resource.ubBuf.template GetBufferByByte<uint8_t>(uBufTileHelper.mxVScaleStartOffset);
+        }
+    }
+
+    __aicore__ inline void SetPQuantScale(float scale)
+    {
+        pDequantScale_ = 1.0f / scale;
+    }
+
+    __aicore__ inline void SetMxVScale(AscendC::GlobalTensor<uint8_t> scale)
+    {
+        mxVScaleGm = scale;
+    }
+
+    // Each uint16_t contains the equal E8M0 scales of two adjacent 32-element
+    // V groups. Unpack it to a uint32 lane, retain the upper byte, then construct
+    // the FP32 exponent. E8M0 zero denotes 2^-127, not floating-point zero.
+    static __simd_vf__ inline void ApplyMxVScaleFunc(__ubuf__ float* output, __ubuf__ uint16_t* packedScale,
+                                                     uint16_t rows, uint16_t columns, uint16_t rowStride)
+    {
+        using namespace AscendC::Reg;
+        RegTensor<uint16_t> packed;
+        RegTensor<uint32_t> scaleBits;
+        RegTensor<uint32_t> minScaleBits;
+        RegTensor<float> value;
+        MaskReg all = CreateMask<uint32_t, MaskPattern::ALL>();
+        Duplicate(minScaleBits, uint32_t(0x00400000U), all);
+        const uint16_t lanes = AscendC::GetVecLen() / sizeof(float);
+        const uint16_t loops = (columns + lanes - 1U) / lanes;
+        uint32_t remaining = columns;
+        for (uint16_t column = 0; column < loops; ++column) {
+            MaskReg mask = UpdateMask<uint32_t>(remaining);
+            LoadAlign<uint16_t, LoadDist::DIST_UNPACK_B16>(packed, packedScale + column * lanes);
+            ShiftRights(scaleBits, (RegTensor<uint32_t>&)packed, int16_t(8), mask);
+            ShiftLefts(scaleBits, scaleBits, int16_t(23), mask);
+            MaskReg zeroScale;
+            Compares<uint32_t, AscendC::CMPMODE::EQ>(zeroScale, scaleBits, uint32_t(0U), mask);
+            Select(scaleBits, minScaleBits, scaleBits, zeroScale);
+            for (uint16_t row = 0; row < rows; ++row) {
+                LoadAlign(value, output + row * rowStride + column * lanes);
+                Mul(value, value, (RegTensor<float>&)scaleBits, mask);
+                StoreAlign(output + row * rowStride + column * lanes, value, mask);
+            }
+        }
+    }
+
+    static __simd_vf__ inline void ClearMxVScaleTail(__ubuf__ uint16_t* packedScale, uint32_t columns)
+    {
+        using namespace AscendC::Reg;
+        RegTensor<uint16_t> zero;
+        Duplicate(zero, uint16_t(0U));
+        uint32_t tailGroupColumns = 64U;
+        MaskReg mask = UpdateMask<uint16_t>(tailGroupColumns);
+        StoreAlign(packedScale + columns / 64U * 64U, zero, mask);
+    }
+
+    __aicore__ inline void ApplyMxVScale(uint32_t rows, uint32_t columns, uint32_t rowStride)
+    {
+        // This private buffer is read only by final-output V instructions.
+        // IDs 0/1 belong to softmax input DMA and 6/7 to LO workspace DMA.
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
+        AscendC::DataCopy(mxVScaleUb, mxVScaleGm, columns * 2U);
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID2);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID2);
+        ApplyMxVScaleFunc(reinterpret_cast<__ubuf__ float*>(goUbTensor32.GetPhyAddr()),
+                          reinterpret_cast<__ubuf__ uint16_t*>(mxVScaleUb.GetPhyAddr()), rows, columns, rowStride);
+    }
+
+    __aicore__ inline void ApplyMxVScaleGeneral(uint32_t rows, uint32_t columns, uint32_t rowStride)
+    {
+        if constexpr (TileCopy::CACHE_MX_V_CHANNEL_SCALE) {
+            if (cachedMxVScaleColumns == columns &&
+                cachedMxVScaleAddress == reinterpret_cast<uint64_t>(mxVScaleGm.GetPhyAddr())) {
+                ApplyMxVScaleFunc(reinterpret_cast<__ubuf__ float*>(goUbTensor32.GetPhyAddr()),
+                                  reinterpret_cast<__ubuf__ uint16_t*>(mxVScaleUb.GetPhyAddr()), rows, columns,
+                                  rowStride);
+                return;
+            }
+        }
+        // This private buffer is read only by final-output V instructions.
+        // IDs 0/1 belong to softmax input DMA and 6/7 to LO workspace DMA.
+        if (columns % 64U != 0U) {
+            ClearMxVScaleTail(reinterpret_cast<__ubuf__ uint16_t*>(mxVScaleUb.GetPhyAddr()), columns);
+        }
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
+        if (columns % 64U == 0U) {
+            AscendC::DataCopy(mxVScaleUb, mxVScaleGm, columns * 2U);
+        } else {
+            // The remaining vector-load padding was cleared above. DMA only
+            // pads to 32 bytes and never reads beyond the per-head GM scales.
+            AscendC::DataCopyExtParams copyParams{1U, columns * 2U, 0U, 0U, 0U};
+            AscendC::DataCopyPadExtParams<uint8_t> padParams{
+                true, 0U, static_cast<uint8_t>((RoundUp(columns, 16U) - columns) * 2U), 0U};
+            AscendC::DataCopyPad(mxVScaleUb, mxVScaleGm, copyParams, padParams);
+        }
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID2);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID2);
+        if constexpr (TileCopy::CACHE_MX_V_CHANNEL_SCALE) {
+            cachedMxVScaleAddress = reinterpret_cast<uint64_t>(mxVScaleGm.GetPhyAddr());
+            cachedMxVScaleColumns = columns;
+        }
+        ApplyMxVScaleFunc(reinterpret_cast<__ubuf__ float*>(goUbTensor32.GetPhyAddr()),
+                          reinterpret_cast<__ubuf__ uint16_t*>(mxVScaleUb.GetPhyAddr()), rows, columns, rowStride);
     }
 
     __aicore__ inline ~BlockEpilogue() {}
@@ -90,12 +196,12 @@ public:
             AscendC::PipeBarrier<PIPE_V>();
         } else if (isFirst) {
             DivFuncLastAndFirst(goPtr, loPtr, glPtr, colStride, tail, vl, rows / 2U, cols / vl, rows % 2U,
-                                cols % vl != 0U);
+                                cols % vl != 0U, pDequantScale_);
         } else if (!isLast) {
             RescaleFunc(goPtr, loPtr, dmPtr, colStride, tail, vl, rows / 2U, cols / vl, rows % 2U, cols % vl != 0U);
         } else {
             RescaleFuncLastNotFirst(goPtr, loPtr, dmPtr, glPtr, colStride, tail, vl, rows / 2U, cols / vl, rows % 2U,
-                                    cols % vl != 0U);
+                                    cols % vl != 0U, pDequantScale_);
         }
     }
 
@@ -206,17 +312,26 @@ public:
                 AscendC::PipeBarrier<PIPE_V>();
             } else {
                 DivFuncLastAndFirst(goUb, loUb, glUb, colStrideCurSubCore, colTail, vlElemNum, mLoop, nLoop, hasMTail,
-                                    hasNTail);
+                                    hasNTail, pDequantScale_);
             }
         } else if (!isLastKvSTile) {
             RescaleFunc(goUb, loUb, dmUb, colStrideCurSubCore, colTail, vlElemNum, mLoop, nLoop, hasMTail, hasNTail);
         } else {
             RescaleFuncLastNotFirst(goUb, loUb, dmUb, glUb, colStrideCurSubCore, colTail, vlElemNum, mLoop, nLoop,
-                                    hasMTail, hasNTail);
+                                    hasMTail, hasNTail, pDequantScale_);
         }
         // release lo buf
         SetCrossCoreSync<4, PIPE_V>(mm2ToReFlag);
         if (isLastKvSTile) {
+            if constexpr (TileCopy::APPLY_MX_V_CHANNEL_SCALE) {
+                // Shared by the regular and GM-transit paths; keep FP32 until
+                // the channel dequantization is complete, then cast to output.
+                if constexpr (TileCopy::MX_V_GENERAL_DIM) {
+                    ApplyMxVScaleGeneral(rowNumCurSubCore, colNumCurSubCore, colStrideCurSubCore);
+                } else {
+                    ApplyMxVScale(rowNumCurSubCore, colNumCurSubCore, colStrideCurSubCore);
+                }
+            }
             if constexpr (IS_FD) {
                 const uint32_t rowCountAlign = RoundUp(rowNumCurSubCore, 8);
                 AscendC::Ln(lseUbTensor32, glUbTensor32, rowCountAlign);
@@ -363,7 +478,7 @@ public:
                                                            __ubuf__ ElementOTmp* dmUb, __ubuf__ ElementOTmp* glUb,
                                                            uint16_t colStride, uint32_t colTail, uint16_t vlElemNum,
                                                            uint16_t mLoop, uint16_t nLoop, uint16_t hasMTail,
-                                                           uint16_t hasNTail)
+                                                           uint16_t hasNTail, float pDequantScale)
     {
         using namespace AscendC::Reg;
         RegTensor<float> dmVreg0;
@@ -401,8 +516,8 @@ public:
                 Div(divVreg0, goCurVreg0, glVreg0, pregFull);
                 Div(divVreg1, goCurVreg1, glVreg1, pregFull);
                 if constexpr (FULL_QUANT_FP8) {
-                    Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregFull);
-                    Muls(divVreg1, divVreg1, MAX_VALUE_RECIPROCAL_FP8, pregFull);
+                    Muls(divVreg0, divVreg0, pDequantScale, pregFull);
+                    Muls(divVreg1, divVreg1, pDequantScale, pregFull);
                 }
                 StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + j * vlElemNum, divVreg0,
                                                                   pregFull);
@@ -425,8 +540,8 @@ public:
                 Div(divVreg0, goCurVreg0, glVreg0, pregTail);
                 Div(divVreg1, goCurVreg1, glVreg1, pregTail);
                 if constexpr (FULL_QUANT_FP8) {
-                    Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregTail);
-                    Muls(divVreg1, divVreg1, MAX_VALUE_RECIPROCAL_FP8, pregTail);
+                    Muls(divVreg0, divVreg0, pDequantScale, pregTail);
+                    Muls(divVreg1, divVreg1, pDequantScale, pregTail);
                 }
                 StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + (nLoop + j) * vlElemNum,
                                                                   divVreg0, pregTail);
@@ -447,7 +562,7 @@ public:
                 Add(goCurVreg0, mulVreg0, loVreg0, pregFull);
                 Div(divVreg0, goCurVreg0, glVreg0, pregFull);
                 if constexpr (FULL_QUANT_FP8) {
-                    Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregFull);
+                    Muls(divVreg0, divVreg0, pDequantScale, pregFull);
                 }
                 StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + (2U * mLoop + i) * colStride + j * vlElemNum,
                                                                   divVreg0, pregFull);
@@ -461,7 +576,7 @@ public:
                 Add(goCurVreg0, mulVreg0, loVreg0, pregTail);
                 Div(divVreg0, goCurVreg0, glVreg0, pregTail);
                 if constexpr (FULL_QUANT_FP8) {
-                    Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregTail);
+                    Muls(divVreg0, divVreg0, pDequantScale, pregTail);
                 }
                 StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(
                     goUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum, divVreg0, pregTail);
@@ -472,7 +587,7 @@ public:
     static __simd_vf__ inline void DivFuncLastAndFirst(__ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb,
                                                        __ubuf__ ElementOTmp* glUb, uint16_t colStride, uint32_t colTail,
                                                        uint16_t vlElemNum, uint16_t mLoop, uint16_t nLoop,
-                                                       uint16_t hasMTail, uint16_t hasNTail)
+                                                       uint16_t hasMTail, uint16_t hasNTail, float pDequantScale)
     {
         using namespace AscendC::Reg;
         RegTensor<float> glVreg0;
@@ -494,8 +609,8 @@ public:
                 Div(divVreg0, goCurVreg0, glVreg0, pregFull);
                 Div(divVreg1, goCurVreg1, glVreg1, pregFull);
                 if constexpr (FULL_QUANT_FP8) {
-                    Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregFull);
-                    Muls(divVreg1, divVreg1, MAX_VALUE_RECIPROCAL_FP8, pregFull);
+                    Muls(divVreg0, divVreg0, pDequantScale, pregFull);
+                    Muls(divVreg1, divVreg1, pDequantScale, pregFull);
                 }
                 StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + j * vlElemNum, divVreg0,
                                                                   pregFull);
@@ -510,8 +625,8 @@ public:
                 Div(divVreg0, goCurVreg0, glVreg0, pregTail);
                 Div(divVreg1, goCurVreg1, glVreg1, pregTail);
                 if constexpr (FULL_QUANT_FP8) {
-                    Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregTail);
-                    Muls(divVreg1, divVreg1, MAX_VALUE_RECIPROCAL_FP8, pregTail);
+                    Muls(divVreg0, divVreg0, pDequantScale, pregTail);
+                    Muls(divVreg1, divVreg1, pDequantScale, pregTail);
                 }
                 StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + (nLoop + j) * vlElemNum,
                                                                   divVreg0, pregTail);
@@ -527,7 +642,7 @@ public:
                                                             loUb + (2U * mLoop + i) * colStride + j * vlElemNum);
                 Div(divVreg0, goCurVreg0, glVreg0, pregFull);
                 if constexpr (FULL_QUANT_FP8) {
-                    Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregFull);
+                    Muls(divVreg0, divVreg0, pDequantScale, pregFull);
                 }
                 StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + (2U * mLoop + i) * colStride + j * vlElemNum,
                                                                   divVreg0, pregFull);
@@ -537,7 +652,7 @@ public:
                     goCurVreg0, loUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum);
                 Div(divVreg0, goCurVreg0, glVreg0, pregTail);
                 if constexpr (FULL_QUANT_FP8) {
-                    Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregTail);
+                    Muls(divVreg0, divVreg0, pDequantScale, pregTail);
                 }
                 StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(
                     goUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum, divVreg0, pregTail);
@@ -755,6 +870,10 @@ private:
     AscendC::LocalTensor<ElementO> goUbTensor16;
     AscendC::LocalTensor<ElementOTmp> goUbTensor32;
     AscendC::LocalTensor<float> lseUbTensor32;
+    AscendC::LocalTensor<uint8_t> mxVScaleUb;
+    AscendC::GlobalTensor<uint8_t> mxVScaleGm;
+    uint64_t cachedMxVScaleAddress = 0U;
+    uint32_t cachedMxVScaleColumns = 0U;
 
     CopyUbToGmO copyUbToGmO;
 };

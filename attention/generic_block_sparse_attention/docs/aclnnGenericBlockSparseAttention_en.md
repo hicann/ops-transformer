@@ -129,7 +129,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>key</td>
       <td>Input</td>
       <td>key in the formula.</td>
-      <td>Can be used as the original Key or Paged KV Cache. Currently only supports layoutKv="PA_BBND". For the shapes of other layouts and the original KV, see <a href="#layout-correspondence-description">layout Correspondence Description</a>, <a href="#paged-attention-related-description">Paged Attention Related Description</a>; for non-contiguous dim0, see <a href="#other-constraints">Other Constraints</a>.</td>
+      <td>Can be used as the original Key or Paged KV Cache. Supports PA_BBND/PA_BNBD KV or matching dense Q/KV layouts, subject to the product and quantization constraints below. For the shapes of other layouts and the original KV, see <a href="#layout-correspondence-description">layout Correspondence Description</a>, <a href="#paged-attention-related-description">Paged Attention Related Description</a>; for non-contiguous dim0, see <a href="#other-constraints">Other Constraints</a>.</td>
       <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, FLOAT4_E2M1FN, HIFLOAT8</td>
       <td>ND</td>
       <td>[numBlocks, blockSize, numKeyValueHeads, headDim]</td>
@@ -139,7 +139,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>value</td>
       <td>Input</td>
       <td>value in the formula.</td>
-      <td>Can be used as the original Value input or Paged KV Cache input, and its shape is the same as that of key. Currently only supports layoutKv="PA_BBND".</td>
+      <td>Can be used as the original Value input or Paged KV Cache input, and its shape is the same as that of key. Supports PA_BBND/PA_BNBD KV or matching dense Q/KV layouts, subject to the product and quantization constraints below.</td>
       <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, FLOAT4_E2M1FN, HIFLOAT8</td>
       <td>ND</td>
       <td>Same as key</td>
@@ -396,7 +396,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
           <li>0: fp32 is used for both online softmax and rescale. Suitable for use cases that require high computation precision.</li>
           <li>1: Mixed precision; fp16/bf16 (same as attentionOut) is used for online softmax, and fp32 is used for rescale. Numeric overflow may occur in the online softmax phase.</li>
         </ul>
-        Chip constraints: Ascend 950PR&950DT products only supports 1; on Atlas A2 products and Atlas A3 products, either 0 or 1 can be configured for FLOAT16, and only 0 is supported for BFLOAT16; only 1 is supported on the FP8 path.
+        On Ascend 950PR&950DT, MXFP8 (quantType=6) uses FP32 scores and softmax for both values: 0 is recommended and 1 is a compatibility alias. P is still quantized to FP8 using p_quant_scale. Nonquantized FLOAT16/BFLOAT16 supports 0 or 1; quantType=5 supports only 1. On Atlas A2 and Atlas A3, FLOAT16 supports 0 or 1 and BFLOAT16 supports only 0.
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -1000,7 +1000,7 @@ Currently only supports maskType=1 (causal is built in the operator, attenMaskOp
 - When layoutKv is PA_BBND, sequsedKvOptional must be passed in, and cuSeqLengthsKvOptional must not be passed.
 - When seqused and the corresponding cu prefix sum are passed in together (on the Q side, and on the KV side when layoutKv is TND): the core splitting/task space is accumulated based on the actual valid length (seqused) of each batch; the seqused element of each batch must be ≤ the corresponding cu storage length and must be exactly the same as that on the Metadata side.
 - The data types of the input query, key, and value must be consistent.
-- Under PA_BBND, only dim0 (physical page axis) of key/value can be non-contiguous; blockSize×numKeyValueHeads×headDim within a page must be contiguous; stride0 must be ≥ blockSize×numKeyValueHeads×headDim and aligned to numKeyValueHeads×headDim.
+- Under `PA_BBND`/`PA_BNBD`, only dim0 (physical page axis) of key/value can be non-contiguous; the elements within each page must be contiguous; stride0 must be ≥ blockSize×numKeyValueHeads×headDim and aligned to numKeyValueHeads×headDim. For `MXFP8`, ACLNN normalizes K/V to contiguous pages; direct GE calls must provide contiguous page strides.
 
 ## Example
 

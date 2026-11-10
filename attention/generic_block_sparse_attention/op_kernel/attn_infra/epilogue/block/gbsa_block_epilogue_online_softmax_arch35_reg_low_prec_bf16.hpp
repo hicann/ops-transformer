@@ -30,6 +30,13 @@ enum class KvBaseTileRegSplitStagesBf16 {
 
 template <class OutputType_, class LayoutS_>
 class BlockEpilogue<EpilogueOnlineSoftmaxBsa, OutputType_, Gemm::GemmType<bfloat16_t, LayoutS_>> {
+    // Private packed specialization reuses the exact BF16 scale/FP8-P math
+    // after applying its per-query sparse mask. Existing interfaces are unchanged.
+    template <class, class, class>
+    friend class GbsaPackedOnlineSoftmax512;
+    template <class, class, bool>
+    friend class GbsaPackedBf16OnlineSoftmaxHybrid;
+
 public:
     using DispatchPolicy = EpilogueOnlineSoftmaxBsa;
     using ArchTag = typename DispatchPolicy::ArchTag;
@@ -99,6 +106,11 @@ public:
         llUbFloatTensor = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper.llStartOffset);
     }
 
+    __aicore__ inline void SetPQuantScale(float scale)
+    {
+        pQuantScale_ = scale;
+    }
+
     __aicore__ inline ~BlockEpilogue() {}
 
     template <class TensorDst, class TensorSrc>
@@ -148,7 +160,7 @@ public:
     template <class TensorP>
     __aicore__ inline void operator()(TensorP& l1PTensorTla, GemmCoord actualBlockShape, uint32_t isFirstKvSTile,
                                       uint32_t ubSBufId, uint32_t l1PBufId, Arch::CrossCoreFlag mm1ToSmFlag,
-                                      Arch::CrossCoreFlag smToMm2Flag)
+                                      Arch::CrossCoreFlag smToMm2Flag, uint32_t paddedPColumns = 0)
     {
         uint32_t mCopyOffset = RoundUp(actualBlockShape.m(), 2) / 2;
         uint32_t m = actualBlockShape.m() < mCopyOffset ? actualBlockShape.m() : mCopyOffset;
@@ -204,16 +216,18 @@ public:
         uint32_t tailNEven = tailNOdd + tailN % 2;
         if (kvBaseTileRegStages == 1) {
             if constexpr (FULL_QUANT_FP8) {
-                ComputeExpSubSum16FP8<KvBaseTileRegSplitStagesBf16::ONE>(
-                    pAddr, sAddr, nowMaxFloatAddr, nowSumAddr, m, tailN, blockStride, nRound, tailNOdd, tailNEven);
+                ComputeExpSubSum16FP8<KvBaseTileRegSplitStagesBf16::ONE>(pAddr, sAddr, nowMaxFloatAddr, nowSumAddr, m,
+                                                                         tailN, blockStride, nRound, tailNOdd,
+                                                                         tailNEven, pQuantScale_);
             } else {
                 ComputeExpSubSum16<KvBaseTileRegSplitStagesBf16::ONE>(pAddr, sAddr, nowMaxFloatAddr, nowSumAddr, m,
                                                                       tailN, blockStride, nRound, tailNOdd, tailNEven);
             }
         } else if (kvBaseTileRegStages == 2) {
             if constexpr (FULL_QUANT_FP8) {
-                ComputeExpSubSum16FP8<KvBaseTileRegSplitStagesBf16::TWO>(
-                    pAddr, sAddr, nowMaxFloatAddr, nowSumAddr, m, tailN, blockStride, nRound, tailNOdd, tailNEven);
+                ComputeExpSubSum16FP8<KvBaseTileRegSplitStagesBf16::TWO>(pAddr, sAddr, nowMaxFloatAddr, nowSumAddr, m,
+                                                                         tailN, blockStride, nRound, tailNOdd,
+                                                                         tailNEven, pQuantScale_);
             } else {
                 ComputeExpSubSum16<KvBaseTileRegSplitStagesBf16::TWO>(pAddr, sAddr, nowMaxFloatAddr, nowSumAddr, m,
                                                                       tailN, blockStride, nRound, tailNOdd, tailNEven);
@@ -224,12 +238,15 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(ubSBufId);
         SetCrossCoreSync<4, PIPE_V>(mm1ToSmFlag);
 
-        uint32_t curNRound = FULL_QUANT_FP8 ? RoundUp(n, ELE_NUM_PER_C0_FP8) : RoundUp(n, ELE_NUM_PER_C0);
+        // MX PV reduces over complete 64-element scale groups. Copy the explicitly
+        // zeroed probability tail as well, while max/sum still use only valid n.
+        const uint32_t copyN = paddedPColumns != 0U ? paddedPColumns : n;
+        uint32_t curNRound = FULL_QUANT_FP8 ? RoundUp(copyN, ELE_NUM_PER_C0_FP8) : RoundUp(copyN, ELE_NUM_PER_C0);
         auto ubPLayoutTla = tla::MakeLayout<ElementOutput, LayoutOutput>(mRound, curNRound);
         auto ubPTensorTla = tla::MakeTensor(lpUbTensor[ubSBufId], ubPLayoutTla, Arch::PositionUB{});
-        auto ubPTensorTlaTile = GetTile(ubPTensorTla, tla::MakeCoord(0, 0), tla::MakeShape(m, n));
+        auto ubPTensorTlaTile = GetTile(ubPTensorTla, tla::MakeCoord(0, 0), tla::MakeShape(m, copyN));
         auto l1PTensorTlaTile =
-            GetTile(l1PTensorTla, tla::MakeCoord(subBlockIdx_ * mCopyOffset, 0), tla::MakeShape(m, n));
+            GetTile(l1PTensorTla, tla::MakeCoord(subBlockIdx_ * mCopyOffset, 0), tla::MakeShape(m, copyN));
         WaitCrossCoreSync<4, PIPE_MTE3>(smToMm2Flag);
 
         CopyPUbToPL1(l1PTensorTlaTile, ubPTensorTlaTile, m);
@@ -243,6 +260,7 @@ public:
     }
 
 private:
+    float pQuantScale_ = 448.0f;
     ElementInput scaleValue;
     AscendC::LocalTensor<ElementInput> lsUbTensor[UB_S_P_BUF_STAGES];
     AscendC::LocalTensor<ElementOutput> lpUbTensor[UB_S_P_BUF_STAGES];
@@ -624,7 +642,7 @@ private:
     __simd_vf__ inline void ComputeExpSubSum16FP8(__ubuf__ ElementOutput* expUb, __ubuf__ ElementInput* srcUb,
                                                   __ubuf__ float* nowMaxUb, __ubuf__ float* expSumUb, uint16_t m,
                                                   uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize,
-                                                  uint32_t tailNOdd, uint32_t tailNEven)
+                                                  uint32_t tailNOdd, uint32_t tailNEven, float pScale)
     {
         static_assert(kvBaseTileRegSplitStages == KvBaseTileRegSplitStagesBf16::ONE ||
                           kvBaseTileRegSplitStages == KvBaseTileRegSplitStagesBf16::TWO,
@@ -634,7 +652,8 @@ private:
     template <>
     __simd_vf__ inline void ComputeExpSubSum16FP8<KvBaseTileRegSplitStagesBf16::ONE>(
         __ubuf__ ElementOutput* expUb, __ubuf__ ElementInput* srcUb, __ubuf__ float* nowMaxUb, __ubuf__ float* expSumUb,
-        uint16_t m, uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize, uint32_t tailNOdd, uint32_t tailNEven)
+        uint16_t m, uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize, uint32_t tailNOdd, uint32_t tailNEven,
+        float pScale)
     {
         using namespace AscendC::Reg;
         constexpr static CastTrait castTraitZeroUNKNOWN = {
@@ -701,9 +720,13 @@ private:
             Add<float, MaskMergeMode::MERGING>(expSumVreg, expSumVreg, expDstFloatVreg0, pregFp32tailNEven);
             Add<float, MaskMergeMode::MERGING>(expSumVreg, expSumVreg, expDstFloatVreg1, pregFp32tailNOdd);
 
-            constexpr float maxValueFP8 = 448.0f;
+            const float maxValueFP8 = pScale;
             Muls(expDstFloatVreg0, expDstFloatVreg0, maxValueFP8, pregFp32tailNEven);
             Muls(expDstFloatVreg1, expDstFloatVreg1, maxValueFP8, pregFp32tailNOdd);
+            RegTensor<float> pZero;
+            Duplicate(pZero, 0);
+            Select(expDstFloatVreg0, expDstFloatVreg0, pZero, pregFp32tailNEven);
+            Select(expDstFloatVreg1, expDstFloatVreg1, pZero, pregFp32tailNOdd);
 
             Cast<ElementOutput, float, castTraitZeroRINT>(pVreg0, expDstFloatVreg0, pRegFp32All);
             Cast<ElementOutput, float, castTraitTwoRINT>(pVreg1, expDstFloatVreg1, pRegFp32All);
@@ -722,7 +745,8 @@ private:
     template <>
     __simd_vf__ inline void ComputeExpSubSum16FP8<KvBaseTileRegSplitStagesBf16::TWO>(
         __ubuf__ ElementOutput* expUb, __ubuf__ ElementInput* srcUb, __ubuf__ float* nowMaxUb, __ubuf__ float* expSumUb,
-        uint16_t m, uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize, uint32_t tailNOdd, uint32_t tailNEven)
+        uint16_t m, uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize, uint32_t tailNOdd, uint32_t tailNEven,
+        float pScale)
     {
         using namespace AscendC::Reg;
         constexpr static CastTrait castTraitZeroUNKNOWN = {
@@ -809,11 +833,15 @@ private:
             Add<float, MaskMergeMode::MERGING>(expSumVreg, expSumVreg, expDstFloatVreg2, pregFp32tailNEven);
             Add<float, MaskMergeMode::MERGING>(expSumVreg, expSumVreg, expDstFloatVreg3, pregFp32TailNOdd);
 
-            constexpr float maxValueFP8 = 448.0f;
+            const float maxValueFP8 = pScale;
             Muls(expDstFloatVreg0, expDstFloatVreg0, maxValueFP8, pRegFp32All);
             Muls(expDstFloatVreg1, expDstFloatVreg1, maxValueFP8, pRegFp32All);
             Muls(expDstFloatVreg2, expDstFloatVreg2, maxValueFP8, pregFp32tailNEven);
             Muls(expDstFloatVreg3, expDstFloatVreg3, maxValueFP8, pregFp32TailNOdd);
+            RegTensor<float> pZero;
+            Duplicate(pZero, 0);
+            Select(expDstFloatVreg2, expDstFloatVreg2, pZero, pregFp32tailNEven);
+            Select(expDstFloatVreg3, expDstFloatVreg3, pZero, pregFp32TailNOdd);
 
             Cast<ElementOutput, float, castTraitZeroRINT>(pVreg0, expDstFloatVreg0, pRegFp32All);
             Cast<ElementOutput, float, castTraitTwoRINT>(pVreg1, expDstFloatVreg1, pRegFp32All);

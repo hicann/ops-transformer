@@ -21,6 +21,7 @@ enum QuantMode : int64_t {
     FP4_E2M1_DYNAMIC_OCP = 3,
     FP4_E2M1_DYNAMIC_CX = 4,
     FP8_E4M3_STATIC_CAST_P = 5,
+    MXFP8_E4M3_PER_CHANNEL_V = 6,
 };
 
 at::Tensor GenericBlockSparseAttentionMetadata(
