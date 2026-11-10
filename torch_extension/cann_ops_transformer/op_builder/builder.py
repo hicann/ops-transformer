@@ -45,6 +45,21 @@ class OpBuilder(ABC):
         self.category = category
         self._initialized = False
 
+    def _is_op_registered(self):
+        """Return True if ``self.name`` is already in torch.ops.cann_ops_transformer.
+
+        Names may be nested (e.g. ``ds41.indexer_prologue_qw``). ``hasattr(ns, "a.b")``
+        is always False for such names, so walk each segment instead. Matching the
+        dispatcher layout avoids re-``define`` after a failed import left the schema
+        registered but dropped the OpBuilder instance.
+        """
+        obj = torch.ops.cann_ops_transformer
+        for part in self.name.split("."):
+            if not hasattr(obj, part):
+                return False
+            obj = getattr(obj, part)
+        return True
+
     def _ensure_initialized(self):
         if self._initialized:
             return
@@ -53,7 +68,7 @@ class OpBuilder(ABC):
         self._torch_npu_path = os.path.dirname(os.path.abspath(torch_npu.__file__))
         self._package_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self._cann_path = self.get_cann_path()
-        if not hasattr(torch.ops.cann_ops_transformer, self.name):
+        if not self._is_op_registered():
             self.register_schema(self.schema())
             self.register_meta()
         self._initialized = True
