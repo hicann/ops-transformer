@@ -38,8 +38,8 @@ private:
     __aicore__ inline void CopyInValue(int64_t loopIdx, int64_t k, int64_t valueOffset, int64_t handleNum);
     __aicore__ inline void CopyOutKey(int64_t loopIdx, int64_t startIdx, int64_t handleNum);
     __aicore__ inline void CopyOutValue(int64_t loopIdx, int64_t startIdx, int64_t handleNum);
-    __aicore__ inline void HandleKeyCache(int64_t iter, int64_t offsetIndex);
-    __aicore__ inline void HandleValueCache(int64_t iter, int64_t offsetIndex);
+    __aicore__ inline void HandleKeyCache(int64_t iter, int64_t offsetIndex, int64_t srcStartIdx);
+    __aicore__ inline void HandleValueCache(int64_t iter, int64_t offsetIndex, int64_t srcStartIdx);
     __aicore__ inline void UpdateKeyCache(int64_t k, int64_t startIdx, int64_t keyOffset);
     __aicore__ inline void UpdateValueCache(int64_t k, int64_t startIdx, int64_t valueOffset);
 
@@ -105,20 +105,21 @@ __aicore__ inline int64_t ScatterPaKvCacheOmniNotFullyLoad<T, IndexDtype, InOutM
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
 __aicore__ inline void ScatterPaKvCacheOmniNotFullyLoad<T, IndexDtype, InOutMode>::HandleKeyCache(int64_t iter,
-                                                                                                  int64_t offsetIndex)
+                                                                                                  int64_t offsetIndex,
+                                                                                                  int64_t srcStartIdx)
 {
     int64_t startIdx = slotMappingGm_.GetValue(iter);
     int64_t keyOffset = (kvBlockOffset_ + iter) / tilingData_->numHead * tilingData_->keyStride0 +
                         (kvBlockOffset_ + iter) % tilingData_->numHead * tilingData_->keyStride2;
     for (int64_t k = 0; k < offsetIndex; k++) {
-        if (k >= tilingData_->seqLen) {
+        if (srcStartIdx + k >= tilingData_->seqLen) {
             break;
         }
         int64_t kStartIdx = startIdx + k + count_;
         if (kStartIdx < 0 || kStartIdx >= tilingData_->numBlocks * tilingData_->blockSize) {
             continue;
         }
-        UpdateKeyCache(k, kStartIdx * tilingData_->kHeadSize, keyOffset);
+        UpdateKeyCache(srcStartIdx + k, kStartIdx * tilingData_->kHeadSize, keyOffset);
     }
 }
 
@@ -210,20 +211,21 @@ __aicore__ inline void ScatterPaKvCacheOmniNotFullyLoad<T, IndexDtype, InOutMode
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
 __aicore__ inline void ScatterPaKvCacheOmniNotFullyLoad<T, IndexDtype, InOutMode>::HandleValueCache(int64_t iter,
-                                                                                                    int64_t offsetIndex)
+                                                                                                    int64_t offsetIndex,
+                                                                                                    int64_t srcStartIdx)
 {
     int64_t startIdx = slotMappingGm_.GetValue(iter);
     int64_t valueOffset = (kvBlockOffset_ + iter) / tilingData_->numHead * tilingData_->valueStride0 +
                           (kvBlockOffset_ + iter) % tilingData_->numHead * tilingData_->valueStride2;
     for (int64_t k = 0; k < offsetIndex; k++) {
-        if (k >= tilingData_->seqLen) {
+        if (srcStartIdx + k >= tilingData_->seqLen) {
             break;
         }
         int64_t vStartIdx = startIdx + k + count_;
         if (vStartIdx < 0 || vStartIdx >= tilingData_->numBlocks * tilingData_->blockSize) {
             continue;
         }
-        UpdateValueCache(k, vStartIdx * tilingData_->vHeadSize, valueOffset);
+        UpdateValueCache(srcStartIdx + k, vStartIdx * tilingData_->vHeadSize, valueOffset);
     }
 }
 
@@ -256,19 +258,19 @@ __aicore__ inline void ScatterPaKvCacheOmniNotFullyLoad<T, IndexDtype, InOutMode
         // step1: update KvCache
         count_ = 0;
         offsetIndex = compressSeqOffsetGm_.GetValue(i);
-        HandleKeyCache(i, offsetIndex);
+        HandleKeyCache(i, offsetIndex, 0);
         if constexpr (InOutMode == DUAL_IN_OUT) {
-            HandleValueCache(i, offsetIndex);
+            HandleValueCache(i, offsetIndex, 0);
         }
         count_ += offsetIndex;
         wins = compressLensGm_.GetValue(i);
         // step2: update KvCache
-        offsetIndex =
-            seqLensGm_.GetValue((kvBlockOffset_ + i) / tilingData_->numHead) - wins - compressSeqOffsetGm_.GetValue(i);
+        int64_t srcStartIdx = compressSeqOffsetGm_.GetValue(i) + wins;
+        offsetIndex = seqLensGm_.GetValue((kvBlockOffset_ + i) / tilingData_->numHead) - srcStartIdx;
         if (offsetIndex > 0) {
-            HandleKeyCache(i, offsetIndex);
+            HandleKeyCache(i, offsetIndex, srcStartIdx);
             if constexpr (InOutMode == DUAL_IN_OUT) {
-                HandleValueCache(i, offsetIndex);
+                HandleValueCache(i, offsetIndex, srcStartIdx);
             }
         }
     }

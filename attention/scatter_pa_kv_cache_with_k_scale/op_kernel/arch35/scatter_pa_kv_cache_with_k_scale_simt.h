@@ -53,6 +53,11 @@ constexpr size_t STRIDE_IDX_SCALE_CACHE_OFFSET = 2;
 template <typename IDX_T>
 static constexpr uint32_t THREADS = (sizeof(IDX_T) == SIZEOF_32BIT_IDX) ? THREADS_FOR_32BIT_IDX : THREADS_FOR_64BIT_IDX;
 
+static __aicore__ inline uint64_t MaxDimOffset(uint64_t dim, int64_t stride)
+{
+    return dim > 0 ? (dim - 1) * static_cast<uint64_t>(stride) : 0;
+}
+
 // ==================== VF-A: 特化 Key+Value (全部参数直接传入) ====================
 
 template <typename T_FP8, typename T_SLOT, typename IDX_T>
@@ -260,8 +265,32 @@ __aicore__ inline void Process(GM_ADDR key, GM_ADDR value, GM_ADDR keyCache, GM_
     uint64_t kH = static_cast<uint64_t>(t->kHeadSize);
     uint64_t vH = static_cast<uint64_t>(t->vHeadSize);
     uint64_t bS = static_cast<uint64_t>(t->blockSize);
+    uint64_t nB = static_cast<uint64_t>(t->numBlocks);
     uint64_t total = nT * nH * ((kH > vH) ? kH : vH);
-    bool use32 = (total <= static_cast<uint64_t>(INT32_MAX));
+    uint64_t idxLimit = static_cast<uint64_t>(INT32_MAX);
+    uint64_t maxKeyOff = MaxDimOffset(nT, t->keyStride[STRIDE_IDX_TOKEN]) +
+                         MaxDimOffset(nH, t->keyStride[STRIDE_IDX_HEAD]) +
+                         MaxDimOffset(kH, t->keyStride[STRIDE_IDX_HEAD_SIZE]);
+    uint64_t maxValueOff = MaxDimOffset(nT, t->valueStride[STRIDE_IDX_TOKEN]) +
+                           MaxDimOffset(nH, t->valueStride[STRIDE_IDX_HEAD]) +
+                           MaxDimOffset(vH, t->valueStride[STRIDE_IDX_HEAD_SIZE]);
+    uint64_t maxKeyCacheOff = MaxDimOffset(nB, t->keyCacheStride[STRIDE_IDX_BLOCK]) +
+                              MaxDimOffset(nH, t->keyCacheStride[STRIDE_IDX_CACHE_HEAD]) +
+                              MaxDimOffset(bS, t->keyCacheStride[STRIDE_IDX_BLOCK_OFFSET]) +
+                              MaxDimOffset(kH, t->keyCacheStride[STRIDE_IDX_CACHE_ELEM]);
+    uint64_t maxValueCacheOff = MaxDimOffset(nB, t->valueCacheStride[STRIDE_IDX_BLOCK]) +
+                                MaxDimOffset(nH, t->valueCacheStride[STRIDE_IDX_CACHE_HEAD]) +
+                                MaxDimOffset(bS, t->valueCacheStride[STRIDE_IDX_BLOCK_OFFSET]) +
+                                MaxDimOffset(vH, t->valueCacheStride[STRIDE_IDX_CACHE_ELEM]);
+    uint64_t maxScaleOff = MaxDimOffset(nT, t->keyScaleStride[STRIDE_IDX_SCALE_TOKEN]) +
+                           MaxDimOffset(nH, t->keyScaleStride[STRIDE_IDX_SCALE_HEAD]);
+    uint64_t maxScaleCacheOff = MaxDimOffset(nB, t->keyScaleCacheStride[STRIDE_IDX_SCALE_CACHE_BLOCK]) +
+                                MaxDimOffset(nH, t->keyScaleCacheStride[STRIDE_IDX_SCALE_CACHE_HEAD]) +
+                                MaxDimOffset(bS, t->keyScaleCacheStride[STRIDE_IDX_SCALE_CACHE_OFFSET]);
+    uint64_t maxSlotMappingOff = MaxDimOffset(nT, t->slotMappingStride[STRIDE_IDX_TOKEN]);
+    bool use32 = total <= idxLimit && static_cast<uint64_t>(t->maxSlot) <= idxLimit && maxKeyOff <= idxLimit &&
+                 maxValueOff <= idxLimit && maxKeyCacheOff <= idxLimit && maxValueCacheOff <= idxLimit &&
+                 maxScaleOff <= idxLimit && maxScaleCacheOff <= idxLimit && maxSlotMappingOff <= idxLimit;
 
     __gm__ T_FP8* kg = (__gm__ T_FP8*)key;
     __gm__ T_FP8* vg = (__gm__ T_FP8*)value;

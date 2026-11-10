@@ -371,8 +371,13 @@ ge::graphStatus GatherPaKvCacheTiling::GetInputOutputKey()
     ge::DataType keyDType = keyDesc->GetDataType();
 
     // 校验数据类型是否合法
-    OP_CHECK_IF((KV_SUPPORT_DTYPE.find(keyDType) == KV_SUPPORT_DTYPE.end()),
-                OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "key"), return ge::GRAPH_FAILED);
+    if (isAscend96_) {
+        OP_CHECK_IF((KV_SUPPORT_DTYPE_96.find(keyDType) == KV_SUPPORT_DTYPE_96.end()),
+                    OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED_96, "key"), return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF((KV_SUPPORT_DTYPE.find(keyDType) == KV_SUPPORT_DTYPE.end()),
+                    OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "key"), return ge::GRAPH_FAILED);
+    }
 
     // 非连续场景下key可能为view，必须通过GetTensorInfo获取逻辑shape与stride。
     OP_CHECK_IF(GetTensorInfo(keyShape_, keyOutStride_, INDEX_INPUT_KEY) != ge::GRAPH_SUCCESS,

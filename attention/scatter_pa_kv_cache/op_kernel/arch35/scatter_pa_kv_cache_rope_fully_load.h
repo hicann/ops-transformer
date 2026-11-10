@@ -513,12 +513,15 @@ __aicore__ inline void ScatterPaKvCacheRopeFullyLoad<T, IndexDtype, InOutMode>::
 
         // step3: update KvCache
         count_++;
-        offsetIndex = seqLensGm_.GetValue((kvBlockOffset_ + i) / numHead_) - wins - compressSeqOffsetLocal.GetValue(i);
+        int64_t srcStartIdx = compressSeqOffsetLocal.GetValue(i) + wins;
+        int64_t seqLenB = seqLensGm_.GetValue((kvBlockOffset_ + i) / numHead_);
+        seqLenB = seqLenB < seqLen_ ? seqLenB : seqLen_;
+        offsetIndex = seqLenB - srcStartIdx;
         if (offsetIndex > 0) {
-            CopyInKey(i, offsetIndex, 0, curBlockFactor);
+            CopyInKey(i, seqLenB, srcStartIdx, curBlockFactor);
             CopyOutKey(i, offsetIndex, count_, curBlockFactor);
             if constexpr (InOutMode == DUAL_IN_OUT) {
-                CopyInValue(i, offsetIndex, 0, curBlockFactor);
+                CopyInValue(i, seqLenB, srcStartIdx, curBlockFactor);
                 CopyOutValue(i, offsetIndex, count_, curBlockFactor);
             }
         }

@@ -143,7 +143,9 @@
   - k_head_size：每个注意力头中key的特征维度（单头key的长度），取值为正整数。
   - num_blocks：keyCache中预分配的块总数，用于存储所有序列的key数据，取值为正整数。
   - block_size：每个缓存块包含的token数量，取值为正整数。
-- 输入值域限制：seqLensOptional和compressLensOptional里面的每个元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size（对应场景二、三）。
+- 输入值域限制（以下公式中的求和均覆盖所有batch和head对应的元素）：
+  - 场景二：seqLensOptional和compressLensOptional里面的每个元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size，且每个写入区间需满足：slotMapping[b][h] >= 0，slotMapping[b][h] + seqLensOptional[b] - compressLensOptional[b][h] + 1 <= num_blocks * block_size。
+  - 场景三：compressLensOptional里面的每个元素值必须满足公式：reduceSum(compressLensOptional[i]) <= num_blocks * block_size，且每个写入区间需满足：slotMapping[b][h] >= 0，slotMapping[b][h] + compressLensOptional[b * num_head + h] <= num_blocks * block_size。
 - 输入数据类型限制：HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1、FLOAT4_E1M2仅支持key是3维的场景（对应场景一）。
 
 ## 调用说明

@@ -47,8 +47,8 @@ using std::vector;
     placeholder##intputIndex##_desc.SetPlacement(ge::kPlacementHost); \
     placeholder##intputIndex##_desc.SetFormat(FORMAT_ND); \
     Tensor tensor_placeholder##intputIndex; \
-    ret = GenOnesDataFloat32(placeholder##intputIndex##_shape, tensor_placeholder##intputIndex, \
-                             placeholder##intputIndex##_desc, 2); \
+    ret = GenOnesData(placeholder##intputIndex##_shape, tensor_placeholder##intputIndex, \
+                      placeholder##intputIndex##_desc, intputDtype, 2); \
     if (ret != SUCCESS) { \
         printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str()); \
         return FAILED; \
@@ -59,6 +59,10 @@ using std::vector;
     graph.AddOp(placeholder##intputIndex); \
     add1.set_input_##intputName(placeholder##intputIndex); \
     inputs.push_back(placeholder##intputIndex);
+
+#define ADD_OUTPUT(outputIndex, outputName, outputDtype, outputShape) \
+    TensorDesc outputName##outputIndex##_desc = TensorDesc(ge::Shape(outputShape), FORMAT_ND, outputDtype); \
+    add1.update_output_desc_##outputName(outputName##outputIndex##_desc);
 
 #define ADD_CONST_INPUT(intputIndex, intputName, intputDtype, inputShape) \
     vector<int64_t> placeholder##intputIndex##_shape = inputShape; \
@@ -127,25 +131,29 @@ uint32_t GetDataTypeSize(DataType dt)
     return dilation;
 }
 
-int32_t GenOnesDataFloat32(vector<int64_t> shapes, Tensor& input_tensor, TensorDesc& input_tensor_desc, float value)
+// slot_mapping内的元素值必须互异，单独生成[0, size)的互异整数索引
+int32_t GenSlotMappingData(vector<int64_t> shapes, Tensor& input_tensor, TensorDesc& input_tensor_desc,
+                           DataType data_type)
 {
     input_tensor_desc.SetRealDimCnt(shapes.size());
     size_t size = 1;
     for (uint32_t i = 0; i < shapes.size(); i++) {
         size *= shapes[i];
     }
-    uint32_t byteSizeFloat32 = 4;
-    uint32_t data_len = size * byteSizeFloat32;
-    float* pData = new (std::nothrow) float[size];
+    uint32_t data_len = size * GetDataTypeSize(data_type);
+    uint8_t* pData = new (std::nothrow) uint8_t[data_len];
     if (pData == nullptr) {
         printf("%s - ERROR - [XIR]: Allocate input data failed\n", GetTime().c_str());
         return FAILED;
     }
-
     for (size_t i = 0; i < size; ++i) {
-        *(pData + i) = value;
+        if (data_type == ge::DT_INT64) {
+            *(reinterpret_cast<int64_t*>(pData) + i) = static_cast<int64_t>(i);
+        } else {
+            *(reinterpret_cast<int32_t*>(pData) + i) = static_cast<int32_t>(i);
+        }
     }
-    input_tensor = Tensor(input_tensor_desc, (uint8_t*)pData, data_len);
+    input_tensor = Tensor(input_tensor_desc, pData, data_len);
     delete[] pData;
     return SUCCESS;
 }
@@ -159,15 +167,31 @@ int32_t GenOnesData(vector<int64_t> shapes, Tensor& input_tensor, TensorDesc& in
         size *= shapes[i];
     }
     uint32_t data_len = size * GetDataTypeSize(data_type);
-    int32_t* pData = new (std::nothrow) int32_t[data_len];
+    uint8_t* pData = new (std::nothrow) uint8_t[data_len];
     if (pData == nullptr) {
         printf("%s - ERROR - [XIR]: Allocate input data failed\n", GetTime().c_str());
         return FAILED;
     }
-    for (uint32_t i = 0; i < size; ++i) {
-        *(pData + i) = value;
+    // 按输入dtype生成数据：浮点类型写入浮点值，整型写入整数值，避免字节解释错误
+    if (data_type == ge::DT_FLOAT) {
+        float* pFloat = reinterpret_cast<float*>(pData);
+        for (size_t i = 0; i < size; ++i) {
+            *(pFloat + i) = static_cast<float>(value);
+        }
+    } else if (data_type == ge::DT_FLOAT16 || data_type == ge::DT_BF16) {
+        uint16_t* pHalf = reinterpret_cast<uint16_t*>(pData);
+        for (size_t i = 0; i < size; ++i) {
+            *(pHalf + i) = static_cast<uint16_t>(value);
+        }
+    } else {
+        uint32_t dtypeSize = GetDataTypeSize(data_type);
+        for (size_t i = 0; i < size; ++i) {
+            for (uint32_t b = 0; b < dtypeSize; ++b) {
+                pData[i * dtypeSize + b] = (b == 0) ? static_cast<uint8_t>(value) : 0;
+            }
+        }
     }
-    input_tensor = Tensor(input_tensor_desc, reinterpret_cast<uint8_t*>(pData), data_len);
+    input_tensor = Tensor(input_tensor_desc, pData, data_len);
     delete[] pData;
     return SUCCESS;
 }
@@ -188,20 +212,41 @@ int CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor>& input, std::vect
     // 自定义代码：添加单算子定义到图中
     auto add1 = op::ScatterPaKvCache("scatter_pa_kv_cache");
 
+    // 场景一：key/value为3维，cache_mode默认为"Norm"
+    // key/value:[batch * seq_len, num_head, head_size]，cache:[num_blocks, block_size, num_head, head_size]
     std::vector<int64_t> keyShape = {2, 2, 32};
-    std::vector<int64_t> keyCacheShape = {1, 4, 32, 16};
+    std::vector<int64_t> keyCacheShape = {1, 4, 2, 32};
     std::vector<int64_t> slotMappingShape = {2};
     std::vector<int64_t> valueShape = {2, 2, 32};
-    std::vector<int64_t> valueCacheShape = {1, 4, 32, 16};
+    std::vector<int64_t> valueCacheShape = {1, 4, 2, 32};
 
+    // 添加输入（顺序严格匹配 proto.h，端口名与IR原型保持一致）
     ADD_INPUT(1, key, inDtype, keyShape);
-    ADD_INPUT(2, keyCache, DT_FLOAT16, keyCacheShape);
-    ADD_INPUT(3, slotMapping, DT_INT32, slotMappingShape);
-    ADD_INPUT(4, value, DT_FLOAT16, valueShape);
-    ADD_INPUT(5, valueCache, DT_FLOAT16, valueCacheShape);
+    ADD_INPUT(2, key_cache, inDtype, keyCacheShape);
+    // slot_mapping单独生成互异索引，不使用ADD_INPUT的常量填充
+    vector<int64_t> placeholder3_shape = slotMappingShape;
+    auto placeholder3 = op::Data("placeholder3").set_attr_index(0);
+    TensorDesc placeholder3_desc = TensorDesc(ge::Shape(placeholder3_shape), FORMAT_ND, DT_INT32);
+    placeholder3_desc.SetPlacement(ge::kPlacementHost);
+    placeholder3_desc.SetFormat(FORMAT_ND);
+    Tensor tensor_placeholder3;
+    ret = GenSlotMappingData(placeholder3_shape, tensor_placeholder3, placeholder3_desc, DT_INT32);
+    if (ret != SUCCESS) {
+        printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str());
+        return FAILED;
+    }
+    placeholder3.update_input_desc_x(placeholder3_desc);
+    placeholder3.update_output_desc_y(placeholder3_desc);
+    input.push_back(tensor_placeholder3);
+    graph.AddOp(placeholder3);
+    add1.set_input_slot_mapping(placeholder3);
+    inputs.push_back(placeholder3);
+    ADD_INPUT(4, value, inDtype, valueShape);
+    ADD_INPUT(5, value_cache, inDtype, valueCacheShape);
 
-    ADD_OUTPUT(1, keyCache, DT_FLOAT16, keyCacheShape);
-    ADD_OUTPUT(2, valueCache, DT_FLOAT16, valueCacheShape);
+    // 添加输出（顺序严格匹配 proto.h）
+    ADD_OUTPUT(1, key_cache, inDtype, keyCacheShape);
+    ADD_OUTPUT(2, value_cache, inDtype, valueCacheShape);
 
     outputs.push_back(add1);
     // 添加完毕

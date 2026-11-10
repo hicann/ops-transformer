@@ -314,7 +314,9 @@ aclnnStatus aclnnScatterPaCache(
   - k_head_size：每个注意力头中key的特征维度（单头key的长度），取值为正整数。
   - num_blocks：keyCache中预分配的块总数，用于存储所有序列的key数据，取值为正整数。
   - block_size：每个缓存块包含的token数量，取值为正整数。
-- 输入值域限制：seqLensOptional和compressLensOptional里面的每个元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size（对应场景二、三）。
+- 输入值域限制（以下公式中的求和均覆盖所有batch和head对应的元素）：
+  - 场景二：seqLensOptional和compressLensOptional里面的每个元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size，且每个写入区间需满足：slotMapping[b][h] >= 0，slotMapping[b][h] + seqLensOptional[b] - compressLensOptional[b][h] + 1 <= num_blocks * block_size。
+  - 场景三：compressLensOptional里面的每个元素值必须满足公式：reduceSum(compressLensOptional[i]) <= num_blocks * block_size，且每个写入区间需满足：slotMapping[b][h] >= 0，slotMapping[b][h] + compressLensOptional[b * num_head + h] <= num_blocks * block_size。
 
 ## 调用示例
 
@@ -363,7 +365,11 @@ aclnnStatus aclnnScatterPaCache(
   template <typename T>
   int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
                       aclDataType dataType, aclTensor** tensor) {
-    auto size = GetShapeSize(shape) * sizeof(T);
+    int64_t shapeSize = GetShapeSize(shape);
+    CHECK_RET(static_cast<int64_t>(hostData.size()) == shapeSize,
+              LOG_PRINT("hostData size[%zu] does not match shape size[%ld]\n", hostData.size(), shapeSize);
+              return 1);
+    auto size = shapeSize * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
@@ -392,12 +398,14 @@ aclnnStatus aclnnScatterPaCache(
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
     // 2. 构造输入与输出，需要根据API的接口自定义构造
-    std::vector<int64_t> keyShape = {2, 2, 3, 7};
-    std::vector<int64_t> keyCacheShape = {2, 2, 1, 7};
-    std::vector<int64_t> slotMappingShape = {2, 3};
+    // 场景二：key为4维，传入compressLens、compressSeqOffset和seqLens
+    // key:[batch, seq_len, num_head, k_head_size]，keyCache:[num_blocks, block_size, 1, k_head_size]
+    std::vector<int64_t> keyShape = {2, 4, 2, 7};
+    std::vector<int64_t> keyCacheShape = {4, 4, 1, 7};
+    std::vector<int64_t> slotMappingShape = {2, 2};
 
-    std::vector<int64_t> compressLensShape = {2, 3};
-    std::vector<int64_t> compressSeqOffsetShape = {6};
+    std::vector<int64_t> compressLensShape = {2, 2};
+    std::vector<int64_t> compressSeqOffsetShape = {4};
     std::vector<int64_t> seqLensShape = {2};
     void* keyDeviceAddr = nullptr;
     void* slotMappingDeviceAddr = nullptr;
@@ -414,12 +422,14 @@ aclnnStatus aclnnScatterPaCache(
     aclTensor* seqLens = nullptr;
     char* cacheMode = const_cast<char*>("Norm");
 
-    std::vector<float> hostKey = {1};
-    std::vector<int32_t> hostSlotMapping = {0, 3, 6, 9, 12, 15};
-    std::vector<float> hostKeyCacheRef = {1};
-    std::vector<int32_t> hostCompressLens = {1, 0, 0, 0, 1, 0};
-    std::vector<int32_t> hostCompressSeqOffset = {0, 0, 1, 0, 1, 1};
-    std::vector<int32_t> hostSeqLens = {2, 1};
+    // 每个batch/head的写入长度为seqLens - compressLens + 1，分别为2、3、3、3，写入区间互不重叠且均在
+    // [0, num_blocks * block_size)内：[0,2)、[2,5)、[5,8)、[8,11)
+    std::vector<float> hostKey(GetShapeSize(keyShape), 1.0f);
+    std::vector<int32_t> hostSlotMapping = {0, 2, 5, 8};
+    std::vector<float> hostKeyCacheRef(GetShapeSize(keyCacheShape), 0.0f);
+    std::vector<int32_t> hostCompressLens = {2, 1, 1, 1};
+    std::vector<int32_t> hostCompressSeqOffset = {0, 1, 0, 1};
+    std::vector<int32_t> hostSeqLens = {3, 3};
 
     // 创建key aclTensor
     ret = CreateAclTensor(hostKey, keyShape, &keyDeviceAddr, aclDataType::ACL_FLOAT, &key);
@@ -461,9 +471,10 @@ aclnnStatus aclnnScatterPaCache(
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
-    auto size = GetShapeSize(keyShape);
+    // 算子原地更新keyCache，输出shape与keyCacheShape一致
+    auto size = GetShapeSize(keyCacheShape);
     std::vector<float> resultData(size, 0);
-    ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), keyDeviceAddr,
+    ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), keyCacheDeviceAddr,
                       size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t i = 0; i < size; i++) {

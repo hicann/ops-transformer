@@ -140,6 +140,33 @@ int32_t GenOnesData(vector<int64_t> shapes, Tensor& input_tensor, TensorDesc& in
     return SUCCESS;
 }
 
+// slot_mapping内的元素值必须互异，单独生成[0, size)的互异索引
+int32_t GenSlotMappingData(vector<int64_t> shapes, Tensor& input_tensor, TensorDesc& input_tensor_desc,
+                           DataType data_type)
+{
+    input_tensor_desc.SetRealDimCnt(shapes.size());
+    size_t size = 1;
+    for (uint32_t i = 0; i < shapes.size(); i++) {
+        size *= shapes[i];
+    }
+    uint32_t data_len = size * GetDataTypeSize(data_type);
+    uint8_t* pData = new (std::nothrow) uint8_t[data_len];
+    if (pData == nullptr) {
+        printf("%s - ERROR - [XIR]: Allocate input data failed\n", GetTime().c_str());
+        return FAILED;
+    }
+    for (size_t i = 0; i < size; ++i) {
+        if (data_type == ge::DT_INT64) {
+            *(reinterpret_cast<int64_t*>(pData) + i) = static_cast<int64_t>(i);
+        } else {
+            *(reinterpret_cast<int32_t*>(pData) + i) = static_cast<int32_t>(i);
+        }
+    }
+    input_tensor = Tensor(input_tensor_desc, pData, data_len);
+    delete[] pData;
+    return SUCCESS;
+}
+
 int32_t WriteDataToFile(string bin_file, uint64_t data_size, uint8_t* inputData)
 {
     FILE* fp;
@@ -170,7 +197,23 @@ int CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor>& input, std::vect
     ADD_INPUT(2, value, inDtype, valueShape);
     ADD_INPUT(3, key_cache, inDtype, keyCacheShape);
     ADD_INPUT(4, value_cache, inDtype, valueCacheShape);
-    ADD_INPUT(5, slot_mapping, DT_INT32, slotMappingShape);
+    // slot_mapping单独生成互异索引，不使用ADD_INPUT的常量填充
+    vector<int64_t> placeholder5_shape = slotMappingShape;
+    auto placeholder5 = op::Data("placeholder5").set_attr_index(0);
+    TensorDesc placeholder5_desc = TensorDesc(ge::Shape(placeholder5_shape), FORMAT_ND, DT_INT32);
+    placeholder5_desc.SetPlacement(ge::kPlacementHost);
+    placeholder5_desc.SetFormat(FORMAT_ND);
+    Tensor tensor_placeholder5;
+    ret = GenSlotMappingData(placeholder5_shape, tensor_placeholder5, placeholder5_desc, DT_INT32);
+    if (ret != SUCCESS) {
+        printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str());
+        return FAILED;
+    }
+    placeholder5.update_input_desc_x(placeholder5_desc);
+    input.push_back(tensor_placeholder5);
+    graph.AddOp(placeholder5);
+    scatter_op.set_input_slot_mapping(placeholder5);
+    inputs.push_back(placeholder5);
     ADD_INPUT(6, key_scale, DT_FLOAT, keyScaleShape);
     ADD_INPUT(7, key_scale_cache, DT_FLOAT, keyScaleCacheShape);
 

@@ -232,6 +232,12 @@ static ge::graphStatus ValidateShape(gert::TilingContext* context, int64_t numTo
                                               "shape[1] must be numHead");
         return ge::GRAPH_FAILED;
     }
+    if (valueShape.GetDim(DIM_TOKEN) != numTokens) {
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("ScatterPaKvCacheWithKScale", "value",
+                                              std::to_string(valueShape.GetDim(DIM_TOKEN)).c_str(),
+                                              "shape[0] must be numTokens");
+        return ge::GRAPH_FAILED;
+    }
 
     auto kcShape = GetTensorShape(context, INPUT_KEY_CACHE_IDX);
     if (kcShape.GetDimNum() == 0) {

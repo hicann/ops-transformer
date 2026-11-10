@@ -276,13 +276,15 @@ __aicore__ inline void ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::
         wins = compressLensLocal.GetValue(i);
 
         // step2: update KvCache
-        offsetIndex = seqLensGm_.GetValue((kvBlockOffset_ + i) / tilingData_->numHead) - wins -
-                      compressSeqOffsetLocal.GetValue(i);
+        int64_t srcStartIdx = compressSeqOffsetLocal.GetValue(i) + wins;
+        int64_t seqLenB = seqLensGm_.GetValue((kvBlockOffset_ + i) / tilingData_->numHead);
+        seqLenB = seqLenB < tilingData_->seqLen ? seqLenB : tilingData_->seqLen;
+        offsetIndex = seqLenB - srcStartIdx;
         if (offsetIndex > 0) {
-            CopyInKey(i, offsetIndex, 0, curBlockFactor);
+            CopyInKey(i, seqLenB, srcStartIdx, curBlockFactor);
             CopyOutKey(i, offsetIndex, count_, curBlockFactor);
             if constexpr (InOutMode == DUAL_IN_OUT) {
-                CopyInValue(i, offsetIndex, 0, curBlockFactor);
+                CopyInValue(i, seqLenB, srcStartIdx, curBlockFactor);
                 CopyOutValue(i, offsetIndex, count_, curBlockFactor);
             }
         }

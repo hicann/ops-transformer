@@ -83,13 +83,13 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| key | Tensor | 必选 | 待更新的key值，当前step多个token的key。不支持空Tensor。 | float8_e5m2、float8_e4m3fn | (num_tokens, num_head, k_head_size) |
-| value | Tensor | 必选 | 待更新的value值，当前step多个token的value。不支持空Tensor。 | float8_e5m2、float8_e4m3fn | (num_tokens, num_head, v_head_size) |
-| key_cache | Tensor | 必选 | 需要更新的key cache，当前layer的key cache。不支持空Tensor。 | 与key保持一致 | (num_blocks, num_head, block_size, k_head_size) |
-| value_cache | Tensor | 必选 | 需要更新的value cache，当前layer的value cache。不支持空Tensor。 | 与value保持一致 | (num_blocks, num_head, block_size, v_head_size) |
-| slot_mapping | Tensor | 必选 | 每个token key或value在cache中的存储偏移。不支持空Tensor。 | int32、int64 | (num_tokens,) |
-| key_scale | Tensor | 必选 | 待更新的key scale值，当前step多个token的key scale，尾轴可以不连续。不支持空Tensor。 | float | (num_tokens, num_head) |
-| key_scale_cache | Tensor | 必选 | 需要更新的key scale cache，当前layer的key scale cache，最后一维为1，尾轴必须连续。不支持空Tensor。 | float | (num_blocks, num_head, block_size, 1) |
+| key | Tensor | 必选 | 待更新的key值，当前step多个token的key。不支持空Tensor（例外情况见约束说明）。 | float8_e5m2、float8_e4m3fn | (num_tokens, num_head, k_head_size) |
+| value | Tensor | 必选 | 待更新的value值，当前step多个token的value。不支持空Tensor（例外情况见约束说明）。 | float8_e5m2、float8_e4m3fn | (num_tokens, num_head, v_head_size) |
+| key_cache | Tensor | 必选 | 需要更新的key cache，当前layer的key cache。不支持空Tensor（例外情况见约束说明）。 | 与key保持一致 | (num_blocks, num_head, block_size, k_head_size) |
+| value_cache | Tensor | 必选 | 需要更新的value cache，当前layer的value cache。不支持空Tensor（例外情况见约束说明）。 | 与value保持一致 | (num_blocks, num_head, block_size, v_head_size) |
+| slot_mapping | Tensor | 必选 | 每个token key或value在cache中的存储偏移。不支持空Tensor（例外情况见约束说明）。 | int32、int64 | (num_tokens,) |
+| key_scale | Tensor | 必选 | 待更新的key scale值，当前step多个token的key scale，尾轴可以不连续。不支持空Tensor（例外情况见约束说明）。 | float | (num_tokens, num_head) |
+| key_scale_cache | Tensor | 必选 | 需要更新的key scale cache，当前layer的key scale cache，最后一维为1，尾轴必须连续。不支持空Tensor（例外情况见约束说明）。 | float | (num_blocks, num_head, block_size, 1) |
 | cache_layout | str | 可选 | 表示key_cache和value_cache的内存排布格式。当传"BNBD"时，表示格式为[num_blocks, num_head, block_size, head_size]。默认值为"BNBD"。 | STRING | - |
 
 ## 返回值说明
@@ -110,6 +110,10 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
 - num_tokens表示当前需要更新到cache中的token数量，num_tokens = batch * seq_len。
 - num_blocks表示KV cache分块的总数，block_size表示每个分块包含的token数。
 - num_head表示注意力头数，k_head_size和v_head_size分别表示key和value的头维度大小。
+- 空Tensor支持说明：在维度和dtype等前置检查通过的前提下，底层aclnn接口的workspace查询阶段存在以下空输入提前成功返回分支，此时调用返回成功且不更新缓存内容：
+  - slot_mapping为空Tensor；
+  - key与key_cache、value与value_cache、key_scale与key_scale_cache三组中，每组输入或对应缓存至少一个为空Tensor。
+  其余空Tensor组合不属于该成功分支，将被视为不支持空Tensor。
 
 ## 确定性计算
 
@@ -211,7 +215,6 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
     class ScatterPaKvCacheWithKScaleNetwork(nn.Module):
         def __init__(self):
             super(ScatterPaKvCacheWithKScaleNetwork, self).__init__()
-        @torch._dynamo.disable
         def forward(self, key, value, key_cache, value_cache, slot_mapping, key_scale, key_scale_cache,
                     cache_layout='BNBD'):
             torch.ops.cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(

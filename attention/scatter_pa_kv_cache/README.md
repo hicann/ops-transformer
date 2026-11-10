@@ -240,9 +240,12 @@
   * 输入值域限制：
       * slotMapping的取值范围[0,num_blocks*block_size-1]，且slotMapping内的元素值保证不重复，重复时不保证正确性。
       * 当key和value都是4维时，slotMapping是二维，且slotMapping的第一维值等于key的第一维为batch，slotMapping的第二维值等于key的第三维为num_head（对应场景三）。
-      * 当key和value都是4维时，seqLensOptional是一维，且seqLensOptional的值等于key的第一维为batch（对应场景三）。
+      * 当key和value都是4维时，seqLensOptional是一维，seqLensOptional的shape[0]等于key的第一维为batch，每个元素表示对应batch的实际序列长度（对应场景三）。
       * 当key和value是3维且存在seqLensOptional时，seqLensOptional中所有值的和等于key的第一维为num_blocks（对应场景四、五）。
-      * seqLensOptional和compressLensOptional里面的每个元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i]) <= num_blocks * block_size（对应场景三、四、五）。
+      * 压缩场景的缓存容量按模式分别计算，公式中的求和覆盖所有batch和head对应的元素；且每个写入区间需满足slotMapping >= 0、slotMapping + 写入长度 <= num_blocks * block_size：
+    * 场景三、场景五（scatterMode为"Rope"时）：每个batch/head的写入长度为seqLensOptional[i] - compressLensOptional[i] + 1（含1个均值token），元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size。
+    * 场景四（scatterMode为"Alibi"时）：每个batch/head的写入长度为compressLensOptional[i]，元素值必须满足公式：reduceSum(compressLensOptional[i]) <= num_blocks * block_size。
+    * 场景五（scatterMode为"Omni"时）：每个batch/head的写入长度为seqLensOptional[i] - compressLensOptional[i]，元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i]) <= num_blocks * block_size。
       * block_size *k_head_size和block_size* v_head_size必须小于UINT32_MAX（对应场景七）。
   * 输入属性限制：
       * key、value、keyCacheRef、valueCacheRef的数据类型必须一致。

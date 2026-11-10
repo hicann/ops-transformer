@@ -193,7 +193,7 @@ aclnnStatus aclnnScatterPaKvCache(
       <td class="tg-0pky">key（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">待更新的key值，当前step多个token的key。</td>
-      <td class="tg-0pky">不支持空Tensor。</td>
+      <td class="tg-0pky">不支持空Tensor（例外情况见约束说明）。</td>
       <td class="tg-0pky">FLOAT16、FLOAT、BFLOAT16、INT8、UINT8、INT16、UINT16、INT32、UINT32、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E1M2、FLOAT4_E2M1</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">3-4</td>
@@ -203,7 +203,7 @@ aclnnStatus aclnnScatterPaKvCache(
       <td class="tg-0pky">keyCacheRef（aclTensor*）</td>
       <td class="tg-0pky">输入/输出</td>
       <td class="tg-0pky">需要更新的key cache，当前layer的key cache。</td>
-      <td class="tg-0pky">不支持空Tensor。<br>当传空指针或"Norm"时，仅支持ND内存排布格式。<br>当传"PA_NZ"时，仅支持FRACTAL_NZ内存排布。</td>
+      <td class="tg-0pky">不支持空Tensor（例外情况见约束说明）。<br>当传空指针或"Norm"时，仅支持ND内存排布格式。<br>当传"PA_NZ"时，仅支持FRACTAL_NZ内存排布。</td>
       <td class="tg-0pky">与key保持一致</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4-5</td>
@@ -213,17 +213,17 @@ aclnnStatus aclnnScatterPaKvCache(
       <td class="tg-0pky">slotMapping（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">每个token key或value在cache中的存储偏移。</td>
-      <td class="tg-0pky">不支持空Tensor。<br></td>
+      <td class="tg-0pky">不支持空Tensor（例外情况见约束说明）。<br>场景一、二、四、五、六、七为一维；场景三为二维[batch, num_head]。</td>
       <td class="tg-0pky">INT32、INT64</td>
       <td class="tg-0pky">ND</td>
-      <td class="tg-0pky">1</td>
+      <td class="tg-0pky">1-2</td>
       <td class="tg-0pky">√</td>
     </tr>
     <tr>
       <td class="tg-0pky">value（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">待更新的value值，当前step多个token的value。</td>
-      <td class="tg-0pky">不支持空Tensor。<br>非0维下shape与key一致。</td>
+      <td class="tg-0pky">不支持空Tensor（例外情况见约束说明）。<br>非0维下与key的前两维（key为3维时）或前三维（key为4维时）shape相同，最后一维为v_head_size，可与key的k_head_size不同。</td>
       <td class="tg-0pky">与key保持一致</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">0、3、4</td>
@@ -233,7 +233,7 @@ aclnnStatus aclnnScatterPaKvCache(
       <td class="tg-0pky">valueCacheRef（aclTensor*）</td>
       <td class="tg-0pky">输入/输出</td>
       <td class="tg-0pky">需要更新的value cache，当前layer的value cache。</td>
-      <td class="tg-0pky">不支持空Tensor。<br>非0维下shape与keyCacheRef一致，当传空指针或"Norm"时，仅支持ND内存排布格式。<br>当传"PA_NZ"时，仅支持FRACTAL_NZ内存排布。</td>
+      <td class="tg-0pky">不支持空Tensor（例外情况见约束说明）。<br>非0维下与keyCacheRef除最后一维外的各维shape相同，最后一维为v_head_size，可与keyCacheRef的k_head_size不同。<br>当传空指针或"Norm"时，仅支持ND内存排布格式。<br>当传"PA_NZ"时，仅支持FRACTAL_NZ内存排布。</td>
       <td class="tg-0pky">与key保持一致</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">0、4、5</td>
@@ -243,10 +243,10 @@ aclnnStatus aclnnScatterPaKvCache(
       <td class="tg-0pky">compressLensOptional（aclTensor*）</td>
       <td class="tg-0pky">可选输入</td>
       <td class="tg-0pky">压缩量。</td>
-      <td class="tg-0pky">-</td>
+      <td class="tg-0pky">场景三为二维[batch, num_head]；其余场景为一维。</td>
       <td class="tg-0pky">与slotMapping保持一致</td>
       <td class="tg-0pky">ND</td>
-      <td class="tg-0pky">1</td>
+      <td class="tg-0pky">1-2</td>
       <td class="tg-0pky">√</td>
     </tr>
     <tr>
@@ -437,15 +437,21 @@ aclnnStatus aclnnScatterPaKvCache(
 - 当key和value都是4维，则key和value的前三维shape必须相同，且keyCacheRef和valueCacheRef的第三维必须是1；
 - 当key和value是4维时，compressLensOptional、seqLensOptional为必选参数；当key和value是3维时，compressLensOptional、compressSeqOffsetOptional、seqLensOptional为可选参数；
 - 当key和value都是4维时，slotMapping是二维，且slotMapping的第一维值等于key的第一维为batch，slotMapping的第二维值等于key的第三维为num_head（对应场景三）；
-- 当key和value都是4维时，seqLensOptional是一维，且seqLensOptional的值等于key的第一维为batch（对应场景三）；
+- 当key和value都是4维时，seqLensOptional是一维，seqLensOptional的shape[0]等于key的第一维为batch，每个元素表示对应batch的实际序列长度（对应场景三）；
 - 当key和value是3维且存在seqLensOptional时，seqLensOptional中所有值的和等于key的第一维为num_blocks（对应场景四、五）；
-- seqLensOptional和compressLensOptional里面的每个元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i]) <= num_blocks * block_size （对应场景三、四、五）。
+- 压缩场景的缓存容量按模式分别计算，公式中的求和覆盖所有batch和head对应的元素；且每个写入区间需满足slotMapping >= 0、slotMapping + 写入长度 <= num_blocks * block_size：
+  - 场景三、场景五（scatterModeOptional为"Rope"时）：每个batch/head的写入长度为seqLensOptional[i] - compressLensOptional[i] + 1（含1个均值token），元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size。
+  - 场景四（scatterModeOptional为"Alibi"时）：每个batch/head的写入长度为compressLensOptional[i]，元素值必须满足公式：reduceSum(compressLensOptional[i]) <= num_blocks * block_size。
+  - 场景五（scatterModeOptional为"Omni"时）：每个batch/head的写入长度为seqLensOptional[i] - compressLensOptional[i]，元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i]) <= num_blocks * block_size。
 - 当cacheModeOptional为“PA_NZ”时，keyCacheRef和valueCacheRef的倒数第二维必须小于UINT16_MAX（对应场景一）。
 - k_head_size和v_head_size的32字节对齐约束如下：
   - 场景七：必须满足`(k_head_size * sizeof(dtypeKey)) % 32 == 0`与`(v_head_size * sizeof(dtypeValue)) % 32 == 0`。
+  <!-- npu="A3,910b" id12 -->
   - 场景四、五：<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>必须满足上述32字节对齐约束。
+  <!-- end id12 -->
 - num_head必须小于4095（对应场景七）。
 - block_size *k_head_size和block_size* v_head_size必须小于UINT32_MAX（对应场景七）。
+- 空Tensor支持说明：在所有必选参数指针均非空、executor创建成功的前提下，aclnnScatterPaKvCacheGetWorkspaceSize存在以下空输入提前成功返回分支，此时workspaceSize为0，不进入后续shape/dtype校验与算子计算，第二段接口同样返回成功且不更新缓存内容：key与keyCacheRef至少一个为空Tensor，且value为空Tensor（或valueCacheRef为空Tensor）。其余空Tensor组合不属于该成功分支，将被视为不支持空Tensor。
 - （num_head *k_head_size + num_head* v_head_size） * sizeof(dtype_key)必须小于196608（对应场景七）。
 
 ## 调用示例

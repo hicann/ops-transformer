@@ -53,7 +53,11 @@ template <typename T>
 int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
                     aclDataType dataType, aclTensor** tensor, aclFormat format)
 {
-    auto size = GetShapeSize(shape) * sizeof(T);
+    int64_t shapeSize = GetShapeSize(shape);
+    CHECK_RET(static_cast<int64_t>(hostData.size()) == shapeSize,
+              LOG_PRINT("hostData size[%zu] does not match shape size[%ld]\n", hostData.size(), shapeSize);
+              return 1);
+    auto size = shapeSize * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
     ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
@@ -103,7 +107,7 @@ int main()
 
     std::vector<uint8_t> hostKey(256, 1);
     std::vector<uint8_t> hostValue(256, 1);
-    std::vector<int32_t> hostSlotMapping(2, 1);
+    std::vector<int32_t> hostSlotMapping = {0, 1};
     std::vector<uint8_t> hostKeyCacheRef(8192, 1);
     std::vector<uint8_t> hostValueCacheRef(8192, 1);
     std::vector<float> hostKeyScale(4, 1.0f);

@@ -242,9 +242,12 @@ English | [简体中文](./README.md)
   * Input value range restrictions:
       * The value range of slotMapping is [0,num_blocks*block_size-1], and the element values in slotMapping must be unique; correctness is not guaranteed when values are duplicated.
       * When both key and value are four-dimensional, slotMapping is two-dimensional; the first dimension of slotMapping equals the first dimension of key, which is batch, and the second dimension of slotMapping equals the third dimension of key, which is num_head (corresponding to Scenario 3).
-      * When both key and value are four-dimensional, seqLensOptional is one-dimensional, and the value of seqLensOptional equals the first dimension of key, which is batch (corresponding to Scenario 3).
+      * When both key and value are four-dimensional, seqLensOptional is one-dimensional, the shape[0] of seqLensOptional equals the first dimension of key, which is batch, and each element indicates the actual sequence length of the corresponding batch (corresponding to Scenario 3).
       * When key and value are three-dimensional and seqLensOptional exists, the sum of all values in seqLensOptional equals the first dimension of key, which is num_blocks (corresponding to Scenario 4 and Scenario 5).
-      * Each element value in seqLensOptional and compressLensOptional must satisfy the formula: reduceSum(seqLensOptional[i] - compressLensOptional[i]) <= num_blocks * block_size (corresponding to Scenarios 3, 4, and 5).
+      * The cache capacity of compression scenarios is calculated by mode, and the summation in the formulas covers the elements of all batches and heads. Each write range must satisfy slotMapping >= 0 and slotMapping + write length <= num_blocks * block_size:
+        * Scenario 3 and Scenario 5 (when scatterMode is "Rope"): the write length of each batch/head is seqLensOptional[i] - compressLensOptional[i] + 1 (including one mean token), and each element value must satisfy the formula: reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size.
+        * Scenario 4 (when scatterMode is "Alibi"): the write length of each batch/head is compressLensOptional[i], and each element value must satisfy the formula: reduceSum(compressLensOptional[i]) <= num_blocks * block_size.
+        * Scenario 5 (when scatterMode is "Omni"): the write length of each batch/head is seqLensOptional[i] - compressLensOptional[i], and each element value must satisfy the formula: reduceSum(seqLensOptional[i] - compressLensOptional[i]) <= num_blocks * block_size.
       * block_size *k_head_size and block_size* v_head_size must be less than UINT32_MAX (corresponding to Scenario 7).
   * Input attribute restrictions:
       * The data types of key, value, keyCacheRef, and valueCacheRef must be consistent.

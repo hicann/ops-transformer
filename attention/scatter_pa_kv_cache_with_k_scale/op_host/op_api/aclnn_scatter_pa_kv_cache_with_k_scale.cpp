@@ -10,6 +10,7 @@
 
 #include "aclnn_scatter_pa_kv_cache_with_k_scale.h"
 
+#include <cstring>
 #include <new>
 
 #include "scatter_pa_kv_cache_with_k_scale.h"
@@ -60,6 +61,16 @@ static aclnnStatus CheckNullptr(const aclTensor* key, const aclTensor* value, co
     CHECK_RET(executor != nullptr, ACLNN_ERR_PARAM_NULLPTR);
 
     return ACLNN_SUCCESS;
+}
+
+static aclnnStatus CheckCacheLayout(const char* cacheLayoutOptional)
+{
+    if (cacheLayoutOptional == nullptr || strcmp(cacheLayoutOptional, "BNBD") == 0) {
+        return ACLNN_SUCCESS;
+    }
+    OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The cacheLayoutOptional[%s] is invalid, only nullptr or \"BNBD\" is supported.",
+            cacheLayoutOptional);
+    return ACLNN_ERR_PARAM_INVALID;
 }
 
 static aclnnStatus CheckDtypeValid(const aclTensor* key, const aclTensor* value, const aclTensor* keyCacheRef,
@@ -134,6 +145,13 @@ static aclnnStatus CheckShape(const aclTensor* key, const aclTensor* value, cons
     auto valueLastDim = value->GetViewShape().GetDim(valueDimNum - 1);
     if (valueLastDim == 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The head_size of value cannot be 0.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    auto valueTokenNum = value->GetViewShape().GetDim(0);
+    auto keyTokenNum = key->GetViewShape().GetDim(0);
+    if (valueTokenNum != keyTokenNum) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The token num of key[%ld] and value[%ld] must be equal.", keyTokenNum,
+                valueTokenNum);
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -334,6 +352,8 @@ aclnnStatus aclnnScatterPaKvCacheWithKScaleGetWorkspaceSize(const aclTensor* key
     if (nullPtrRet != ACLNN_SUCCESS) {
         return nullPtrRet;
     }
+
+    CHECK_RET(CheckCacheLayout(cacheLayoutOptional) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     bool keyEmpty = key->GetViewShape().GetShapeSize() == 0 || keyCacheRef->GetViewShape().GetShapeSize() == 0;
     bool valueEmpty = value->GetViewShape().GetShapeSize() == 0 || valueCacheRef->GetViewShape().GetShapeSize() == 0;

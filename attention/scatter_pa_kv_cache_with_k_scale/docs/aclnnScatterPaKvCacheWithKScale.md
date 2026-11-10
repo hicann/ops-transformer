@@ -120,7 +120,7 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
       <td class="tg-0pky">key（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">待更新的key值，当前step多个token的key。</td>
-      <td class="tg-0pky"><ul><li>不支持空Tensor。</li></ul></td>
+      <td class="tg-0pky"><ul><li>不支持空Tensor（例外情况见约束说明）。</li></ul></td>
       <td class="tg-0pky">FLOAT8_E5M2、FLOAT8_E4M3FN</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">3</td>
@@ -130,7 +130,7 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
       <td class="tg-0pky">value（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">待更新的value值，当前step多个token的value。</td>
-      <td class="tg-0pky"><ul><li>不支持空Tensor。</li></ul></td>
+      <td class="tg-0pky"><ul><li>不支持空Tensor（例外情况见约束说明）。</li></ul></td>
       <td class="tg-0pky">FLOAT8_E5M2、FLOAT8_E4M3FN</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">3</td>
@@ -140,7 +140,7 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
       <td class="tg-0pky">keyCacheRef（aclTensor*）</td>
       <td class="tg-0pky">输入/输出</td>
       <td class="tg-0pky">需要更新的key cache，当前layer的key cache。</td>
-      <td class="tg-0pky"><ul><li>不支持空Tensor。</li></ul></td>
+      <td class="tg-0pky"><ul><li>不支持空Tensor（例外情况见约束说明）。</li></ul></td>
       <td class="tg-0pky">与key保持一致</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4</td>
@@ -150,7 +150,7 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
       <td class="tg-0pky">valueCacheRef（aclTensor*）</td>
       <td class="tg-0pky">输入/输出</td>
       <td class="tg-0pky">需要更新的value cache，当前layer的value cache。</td>
-      <td class="tg-0pky"><ul><li>不支持空Tensor。</li></ul></td>
+      <td class="tg-0pky"><ul><li>不支持空Tensor（例外情况见约束说明）。</li></ul></td>
       <td class="tg-0pky">与value保持一致</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4</td>
@@ -160,7 +160,7 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
       <td class="tg-0pky">slotMapping（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">每个token key或value在cache中的存储偏移。</td>
-      <td class="tg-0pky"><ul><li>不支持空Tensor。</li></ul></td>
+      <td class="tg-0pky"><ul><li>不支持空Tensor（例外情况见约束说明）。</li></ul></td>
       <td class="tg-0pky">INT32、INT64</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">1</td>
@@ -170,7 +170,7 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
       <td class="tg-0pky">keyScale（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">待更新的key scale值，当前step多个token的key scale。</td>
-      <td class="tg-0pky"><ul><li>不支持空Tensor。</li><li>两维tensor，尾轴可以不连续。</li></ul></td>
+      <td class="tg-0pky"><ul><li>不支持空Tensor（例外情况见约束说明）。</li><li>两维tensor，尾轴可以不连续。</li></ul></td>
       <td class="tg-0pky">FLOAT</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">2</td>
@@ -180,7 +180,7 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
       <td class="tg-0pky">keyScaleCacheRef（aclTensor*）</td>
       <td class="tg-0pky">输入/输出</td>
       <td class="tg-0pky">需要更新的key scale cache，当前layer的key scale cache。</td>
-      <td class="tg-0pky"><ul><li>不支持空Tensor。</li><li>四维tensor，最后一维为1。</li></ul></td>
+      <td class="tg-0pky"><ul><li>不支持空Tensor（例外情况见约束说明）。</li><li>四维tensor，最后一维为1。</li></ul></td>
       <td class="tg-0pky">FLOAT</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4</td>
@@ -313,6 +313,10 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
 - key和value的前两维shape必须相同；
 - keyScale是两维tensor，shape为[batch * seq_len, num_head]，尾轴可以不连续；
 - keyScaleCacheRef是四维tensor，shape为[num_blocks, num_head, block_size, 1]，最后一维必须为1，尾轴必须连续。
+- 空Tensor支持说明：在所有必选参数指针均非空、executor创建成功的前提下，aclnnScatterPaKvCacheWithKScaleGetWorkspaceSize存在以下空输入提前成功返回分支，此时workspaceSize为0，不进入后续shape/dtype校验与算子计算，第二段接口同样返回成功且不更新缓存内容：
+  - slotMapping为空Tensor；
+  - key与keyCacheRef、value与valueCacheRef、keyScale与keyScaleCacheRef三组中，每组输入或对应缓存至少一个为空Tensor。
+  其余空Tensor组合不属于该成功分支，将被视为不支持空Tensor。
 
 ## 调用示例
 
@@ -361,7 +365,11 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
   template <typename T>
   int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape,
                       void** deviceAddr, aclDataType dataType, aclTensor** tensor, aclFormat format) {
-    auto size = GetShapeSize(shape) * sizeof(T);
+    int64_t shapeSize = GetShapeSize(shape);
+    CHECK_RET(static_cast<int64_t>(hostData.size()) == shapeSize,
+              LOG_PRINT("hostData size[%zu] does not match shape size[%ld]\n", hostData.size(), shapeSize);
+              return 1);
+    auto size = shapeSize * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
     ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
@@ -410,10 +418,10 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
 
     std::vector<uint8_t> hostKey(256, 1);
     std::vector<uint8_t> hostValue(256, 1);
-    std::vector<int32_t> hostSlotMapping(4, 1);
+    std::vector<int32_t> hostSlotMapping = {0, 1};
     std::vector<uint8_t> hostKeyCacheRef(8192, 1);
     std::vector<uint8_t> hostValueCacheRef(8192, 1);
-    std::vector<float> hostKeyScale(2, 1.0f);
+    std::vector<float> hostKeyScale(4, 1.0f);
     std::vector<float> hostKeyScaleCacheRef(128, 1.0f);
 
     ret = CreateAclTensor(hostKey, keyShape, &keyDeviceAddr, aclDataType::ACL_FLOAT8_E5M2, &key, aclFormat::ACL_FORMAT_ND);

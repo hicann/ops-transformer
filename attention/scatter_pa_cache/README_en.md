@@ -145,7 +145,9 @@ English | [简体中文](./README.md)
   - k_head_size: feature dimension of key in each attention head (length of the key of a single head); the value is a positive integer.
   - num_blocks: total number of pre-allocated blocks in keyCache, used to store the key data of all sequences; the value is a positive integer.
   - block_size: number of tokens contained in each cache block; the value is a positive integer.
-- Input value range restriction: each element value in seqLensOptional and compressLensOptional must satisfy the formula: reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size (corresponding to Scenarios 2 and 3).
+- Input value range restriction (the summation in the following formulas covers the elements of all batches and heads):
+  - Scenario 2: each element value in seqLensOptional and compressLensOptional must satisfy the formula: reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size, and each write range must satisfy: slotMapping[b][h] >= 0, slotMapping[b][h] + seqLensOptional[b] - compressLensOptional[b][h] + 1 <= num_blocks * block_size.
+  - Scenario 3: each element value in compressLensOptional must satisfy the formula: reduceSum(compressLensOptional[i]) <= num_blocks * block_size, and each write range must satisfy: slotMapping[b][h] >= 0, slotMapping[b][h] + compressLensOptional[b * num_head + h] <= num_blocks * block_size.
 - Input data type restriction: HIFLOAT8, FLOAT8_E5M2, FLOAT8_E4M3FN, FLOAT4_E2M1, and FLOAT4_E1M2 support only the scenario where key is three-dimensional (corresponding to Scenario 1).
 
 ## Calling Description
