@@ -1,0 +1,60 @@
+{
+    "op_type": "MhcSinkhornBackward",
+    "op_list": [
+      {
+        "bin_filename": "MhcSinkhornBackward_cd345a94623931ac8fbf9b085a5f740d",
+        "inputs": [
+          {
+            "name": "grad_y",
+            "index": 0,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic",
+            "dtype_match_mode": "DtypeByte"
+          },
+          {
+            "name": "norm",
+            "index": 1,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic",
+            "dtype_match_mode": "DtypeByte"
+            },
+            {
+            "name": "sum",
+            "index": 2,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+                -2
+            ],
+            "format_match_mode": "FormatAgnostic",
+            "dtype_match_mode": "DtypeByte"
+            }
+        ],
+        "outputs": [
+          {
+            "name": "grad_input",
+            "index": 0,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic",
+            "dtype_match_mode": "DtypeByte"
+          }
+        ]
+      }
+    ]
+  }

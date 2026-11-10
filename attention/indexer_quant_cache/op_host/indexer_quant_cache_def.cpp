@@ -171,6 +171,7 @@ public:
                                  ge::FORMAT_ND});
 
         this->AICore().AddConfig("ascend960dt", config960dt);
+        this->AICore().AddConfig("ascend960pr", config960dt);
     }
 };
 

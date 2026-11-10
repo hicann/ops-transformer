@@ -219,7 +219,7 @@ __aicore__ inline void ScatterPaKvCacheNormalFullyLoad<T, IndexDtype, OffsetDtyp
     GlobalTensor<T>& outputGm, LocalTensor<T>& inputLocal, LocalTensor<OffsetDtype>& offsetLocal,
     LocalTensor<IndexDtype>& slotMapLocal, int64_t stride0, int64_t stride1, int64_t handleNum, int64_t curFactor)
 {
-#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202
     ScatterParams scatterDataCopyParams;
     scatterDataCopyParams.offsetNum = curFactor;
     scatterDataCopyParams.burstLen = handleNum * sizeof(T);
@@ -263,7 +263,7 @@ __aicore__ inline void ScatterPaKvCacheNormalFullyLoad<T, IndexDtype, OffsetDtyp
         kSlotMappingQue_.EnQue(kSlotMappingLocal);
         kSlotMappingLocal = kSlotMappingQue_.DeQue<IndexDtype>();
         LocalTensor<OffsetDtype> kOffsetLocal;
-#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202
         kOffsetLocal = kOffsetQue_.AllocTensor<OffsetDtype>();
         ComputeOutOffset(kOffsetLocal, kSlotMappingLocal, curUbFactor, tilingData_->keyCacheStride0,
                          tilingData_->keyCacheStride1);
@@ -276,7 +276,7 @@ __aicore__ inline void ScatterPaKvCacheNormalFullyLoad<T, IndexDtype, OffsetDtyp
                 tilingData_->keyCacheStride1, tilingData_->kHandleNumPerCore, curUbFactor);
         inputKeyQueue_.FreeTensor(inputKeyLocal);
         kSlotMappingQue_.FreeTensor(kSlotMappingLocal);
-#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202
         kOffsetQue_.FreeTensor(kOffsetLocal);
 #endif
         if constexpr (InOutMode == DUAL_IN_OUT) {
@@ -288,7 +288,7 @@ __aicore__ inline void ScatterPaKvCacheNormalFullyLoad<T, IndexDtype, OffsetDtyp
             vSlotMappingQue_.EnQue(vSlotMappingLocal);
             vSlotMappingLocal = vSlotMappingQue_.DeQue<IndexDtype>();
             LocalTensor<OffsetDtype> vOffsetLocal;
-#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202
             vOffsetLocal = vOffsetQue_.AllocTensor<OffsetDtype>();
             ComputeOutOffset(vOffsetLocal, vSlotMappingLocal, curUbFactor, tilingData_->valueCacheStride0,
                              tilingData_->valueCacheStride1);
@@ -302,7 +302,7 @@ __aicore__ inline void ScatterPaKvCacheNormalFullyLoad<T, IndexDtype, OffsetDtyp
                     curUbFactor);
             inputValueQueue_.FreeTensor(inputValueLocal);
             vSlotMappingQue_.FreeTensor(vSlotMappingLocal);
-#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202
             vOffsetQue_.FreeTensor(vOffsetLocal);
 #endif
         }

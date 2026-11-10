@@ -1,0 +1,143 @@
+{
+  "op_type": "KvCompressEpilog",
+  "op_list": [
+    {
+      "bin_filename": "KvCompressEpilog_uint8_bf16",
+      "inputs": [
+        {
+          "name": "cache",
+          "index": 0,
+          "dtype": "uint8",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        },
+        {
+          "name": "x",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        },
+        {
+          "name": "slot_mapping",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "cache",
+          "index": 0,
+          "dtype": "uint8",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ],
+      "attrs": [
+        {
+          "name": "quant_group_size",
+          "dtype": "int",
+          "value": 128
+        },
+        {
+          "name": "quant_mode",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "round_scale",
+          "dtype": "bool",
+          "value": true
+        },
+        {
+          "name": "x_scale",
+          "dtype": "float",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "bin_filename": "KvCompressEpilog_uint8_bf16_int64",
+      "inputs": [
+        {
+          "name": "cache",
+          "index": 0,
+          "dtype": "uint8",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        },
+        {
+          "name": "x",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        },
+        {
+          "name": "slot_mapping",
+          "index": 2,
+          "dtype": "int64",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "cache",
+          "index": 0,
+          "dtype": "uint8",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ],
+      "attrs": [
+        {
+          "name": "quant_group_size",
+          "dtype": "int",
+          "value": 128
+        },
+        {
+          "name": "quant_mode",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "round_scale",
+          "dtype": "bool",
+          "value": true
+        },
+        {
+          "name": "x_scale",
+          "dtype": "float",
+          "value": 1.0
+        }
+      ]
+    }
+  ]
+}

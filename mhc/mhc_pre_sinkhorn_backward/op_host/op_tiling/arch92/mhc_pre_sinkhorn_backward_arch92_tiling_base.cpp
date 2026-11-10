@@ -137,7 +137,7 @@ ge::graphStatus MhcPreSinkhornBackward960Tiling::GetPlatformInfo()
     OP_CHECK_IF((coreNumAic <= 0), OP_LOGE(opName, "MhcPreSinkhornBackwardTiling fails to get coreNumAic."),
                 return ge::GRAPH_FAILED);
     coreNumAic_ = coreNumAic;
-    // Ascend960DT 的 AIC:AIV 为 1:1（KERNEL_TYPE_MIX_AIC_1_1），AIV 核数按 AIC 核数对齐
+    // Ascend960系列(960DT/960PR) 的 AIC:AIV 为 1:1（KERNEL_TYPE_MIX_AIC_1_1），AIV 核数按 AIC 核数对齐
     if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9202) {
         coreNumAiv_ = coreNumAic_;
     }

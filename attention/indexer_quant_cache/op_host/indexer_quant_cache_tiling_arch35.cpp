@@ -222,7 +222,8 @@ ge::graphStatus IndexerQuantCacheTiling::GetShapeAttrsInfoInner()
                 OP_LOGE(context_->GetNodeName(), "quant_mode should be in [0,4], got %ld", quantMode_),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(quantMode_ == HIFP4_QUANT_MODE && (npuArch_ != Ops::Base::DAV_9201 || d_ % HIFP4_GROUP_SIZE != 0),
+    OP_CHECK_IF(quantMode_ == HIFP4_QUANT_MODE &&
+                    (npuArch_ != Ops::Base::DAV_9201 && npuArch_ != Ops::Base::DAV_9202 || d_ % HIFP4_GROUP_SIZE != 0),
                 OP_LOGE(context_->GetNodeName(), "HiFloat4 requires ASCEND960DT and d aligned to 64."),
                 return ge::GRAPH_FAILED);
 

@@ -55,3 +55,4 @@ codespell_reports/
 
 # OAT 远程 hook 报告目录
 oat_reports/
+pre-commit_reports/

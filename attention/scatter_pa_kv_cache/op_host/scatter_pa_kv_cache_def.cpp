@@ -724,6 +724,7 @@ public:
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "scatter_pa_kv_cache_apt");
         this->AICore().AddConfig("ascend960dt", config_960);
+        this->AICore().AddConfig("ascend960pr", config_960);
     }
 };
 OP_ADD(ScatterPaKvCache);

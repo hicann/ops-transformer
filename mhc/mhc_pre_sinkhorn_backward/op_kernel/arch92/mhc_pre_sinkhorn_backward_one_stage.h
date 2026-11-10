@@ -126,7 +126,8 @@ private:
         batchSize_ = tilingData->batchSize;
         seqLength_ = tilingData->seqLength;
         aivNum_ = tilingData->aivNum;
-#if defined(__DAV_920R1__) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+#if defined(__DAV_920R1__) || defined(__DAV_920R2__) || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
         aicNum_ = tilingData->aivNum;
 #else
         aicNum_ = tilingData->aivNum / 2;
@@ -493,7 +494,8 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::Process()
 
     if ASCEND_IS_AIC {
         int8_t ping = 0;
-#if defined(__DAV_920R1__) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+#if defined(__DAV_920R1__) || defined(__DAV_920R2__) || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
         // Ascend960 (MIX_AIC_1_1, AIC:AIV = 1:1)：AIC i 与 AIV i 一一配对，
         // AIV i 第 k 轮产出段 [i+kA, i+kA+1)*tile_，AIC i 第 k 轮消费同段，
         // 逐轮锁步、单 tile 消费，避免 AIC_1_2 的"每迭代聚 2 tile"几何

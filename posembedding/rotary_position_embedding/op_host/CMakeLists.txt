@@ -37,6 +37,13 @@ elseif("${CONDITION_UNIT}" STREQUAL "ascend960dt")
         COMPUTE_UNIT ascend960dt_968B7
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960pr")
+    set(rotary_position_embedding_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for rotary_position_embedding")
+    add_ops_compile_options(
+        OP_NAME RotaryPositionEmbedding
+        COMPUTE_UNIT Ascend960PR_969A1
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
 endif()
 
 if (BUILD_OPS_RTY_KERNEL)

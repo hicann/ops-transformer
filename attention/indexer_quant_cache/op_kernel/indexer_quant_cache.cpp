@@ -20,7 +20,7 @@
 #include "arch35/indexer_quant_cache_multi_row_mx_fp4.h"
 #include "arch35/indexer_quant_cache_single_row_mx_fp4.h"
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 #include "arch35/indexer_quant_cache_multi_row_hifp4.h"
 #include "arch35/indexer_quant_cache_single_row_hifp4.h"
 #endif
@@ -49,8 +49,8 @@ extern "C" __global__ __aicore__ void indexer_quant_cache(GM_ADDR cache, GM_ADDR
     GET_TILING_DATA(tilingData, tiling);
     TPipe pipe;
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201) && defined(ORIG_DTYPE_CACHE) && defined(DT_HIFLOAT4) && \
-    (ORIG_DTYPE_CACHE == DT_HIFLOAT4)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202) && defined(ORIG_DTYPE_CACHE) && \
+    defined(DT_HIFLOAT4) && (ORIG_DTYPE_CACHE == DT_HIFLOAT4)
     // HiFloat4 cache is byte packed; one 64-element group produces one uint32 scale.
     if (TILING_KEY_IS(10013)) {
         IndexerQuantCache::IndexerQuantCacheMultiRowHiFp4<DTYPE_X, int8_t, uint32_t> op;

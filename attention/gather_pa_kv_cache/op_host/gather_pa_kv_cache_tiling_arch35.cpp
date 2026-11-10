@@ -594,7 +594,8 @@ ge::graphStatus GatherPaKvCacheTiling::GetShapeAttrsInfo()
     auto platformInfo = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context_, "platformInfo is nullptr."), return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    isAscend96_ = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201;
+    isAscend96_ =
+        ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9202;
     OP_CHECK_IF(context_ == nullptr, OP_LOGE("GatherPaKvCacheTiling", "context is null."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(GetAttrs() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "get attrs failed."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(GetInputKeyCache() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "get input key_cache failed."),

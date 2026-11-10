@@ -27,7 +27,7 @@ namespace ge {
  * @li sin: A tensor for rotary position embedding sin. Must be one of the following types: float16, float32, bfloat16.
  * @li scale: Optional. HiFloat8 multiplier: single-element float32 tensor; absent means 1.0.
  * @par Attributes:
- * @li y_dtype: Optional. 0: HiFloat8 (Ascend950). Defaults to 0.
+ * @li y_dtype: Optional. 0: HiFloat8 (Ascend950), 1: HiFloat4 (Ascend960DT/Ascend960PR). Defaults to 0.
  * @li quant_mode: Optional. Quantization mode. Defaults to 0.
  * @li round_mode: Optional. HiFloat8 supports "round" and "hybrid" (CAST_HYBRID). Defaults to "round".
  * @li axis: Optional. Axis for quantization. Ignored for HiFloat8. Defaults to -1.

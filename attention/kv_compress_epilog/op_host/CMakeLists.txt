@@ -37,6 +37,14 @@ if (BUILD_OPEN_PROJECT)
                 -mllvm -cce-aicore-hoist-movemask=false
                 --op_relocatable_kernel_binary=true
         )
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960pr")
+        add_ops_compile_options(
+            OP_NAME KvCompressEpilog
+            COMPUTE_UNIT Ascend960PR_969A1
+            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
+                -mllvm -cce-aicore-hoist-movemask=false
+                --op_relocatable_kernel_binary=true
+        )
     else()
         add_ops_compile_options(
             OP_NAME KvCompressEpilog

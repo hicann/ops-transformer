@@ -34,6 +34,12 @@ elseif("${CONDITION_UNIT}" STREQUAL "ascend960dt")
         COMPUTE_UNIT ascend960dt_968B7
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960pr")
+    add_ops_compile_options(
+        OP_NAME InplacePartialRotaryMul
+        COMPUTE_UNIT Ascend960PR_969A1
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
 endif()
 
 if (BUILD_OPS_RTY_KERNEL)

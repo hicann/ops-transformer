@@ -42,6 +42,16 @@ if (BUILD_OPEN_PROJECT)
                     -Wno-deprecated-declarations
                     -Werror
         )
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960pr")
+        add_ops_compile_options(
+            OP_NAME FusedCausalConv1d
+            COMPUTE_UNIT Ascend960PR_969A1
+            OPTIONS --cce-auto-sync=off
+                    -mllvm
+                    -cce-aicore-dcci-before-kernel-end=false
+                    -Wno-deprecated-declarations
+                    -Werror
+        )
     else()
         add_ops_compile_options(
             OP_NAME FusedCausalConv1d

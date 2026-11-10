@@ -1237,7 +1237,8 @@ ge::graphStatus ScatterPaKvCacheTiling::GetShapeAttrsInfo()
     auto platformInfo = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context_, "platformInfo is nullptr."), return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    isAscend96_ = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201;
+    isAscend96_ =
+        ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9202;
     if (GetTensorInfo(inputKeyShape_, keyStride_, inputKey_) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }

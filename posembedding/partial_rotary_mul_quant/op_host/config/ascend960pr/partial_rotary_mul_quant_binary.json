@@ -1,0 +1,284 @@
+{
+  "op_type": "PartialRotaryMulQuant",
+  "op_list": [
+    {
+      "bin_filename": "PartialRotaryMulQuant_fp16",
+      "inputs": [
+        {
+          "name": "x",
+          "index": 0,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "cos",
+          "index": 1,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "sin",
+          "index": 2,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "scale",
+          "index": 3,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "index": 0,
+          "dtype": "hifloat4",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "y_scale",
+          "index": 1,
+          "dtype": "hifloat4_scale",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "y_dtype",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "quant_mode",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "round_mode",
+          "dtype": "string",
+          "value": "round"
+        },
+        {
+          "name": "axis",
+          "dtype": "int",
+          "value": -1
+        },
+        {
+          "name": "rotary_mode",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "partial_slice",
+          "dtype": "list_int",
+          "value": [0, 0]
+        }
+      ]
+    },
+    {
+      "bin_filename": "PartialRotaryMulQuant_bf16",
+      "inputs": [
+        {
+          "name": "x",
+          "index": 0,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "cos",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "sin",
+          "index": 2,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "scale",
+          "index": 3,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "index": 0,
+          "dtype": "hifloat4",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "y_scale",
+          "index": 1,
+          "dtype": "hifloat4_scale",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "y_dtype",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "quant_mode",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "round_mode",
+          "dtype": "string",
+          "value": "round"
+        },
+        {
+          "name": "axis",
+          "dtype": "int",
+          "value": -1
+        },
+        {
+          "name": "rotary_mode",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "partial_slice",
+          "dtype": "list_int",
+          "value": [0, 0]
+        }
+      ]
+    },
+    {
+      "bin_filename": "PartialRotaryMulQuant_fp32",
+      "inputs": [
+        {
+          "name": "x",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "cos",
+          "index": 1,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "sin",
+          "index": 2,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "scale",
+          "index": 3,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "index": 0,
+          "dtype": "hifloat4",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "y_scale",
+          "index": 1,
+          "dtype": "hifloat4_scale",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "y_dtype",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "quant_mode",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "round_mode",
+          "dtype": "string",
+          "value": "round"
+        },
+        {
+          "name": "axis",
+          "dtype": "int",
+          "value": -1
+        },
+        {
+          "name": "rotary_mode",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "partial_slice",
+          "dtype": "list_int",
+          "value": [0, 0]
+        }
+      ]
+    }
+  ]
+}

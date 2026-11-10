@@ -290,6 +290,7 @@ private:
             .NeedCheckSupportFlag(false)
             .ExtendCfgInfo("opFile.value", "gather_pa_kv_cache_apt");
         this->AICore().AddConfig("ascend960dt", config_96);
+        this->AICore().AddConfig("ascend960pr", config_96);
     }
 };
 

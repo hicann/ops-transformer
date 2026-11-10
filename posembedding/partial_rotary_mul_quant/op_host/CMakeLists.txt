@@ -10,8 +10,8 @@
 add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
-    if (ASCEND_COMPUTE_UNIT STREQUAL "ascend960dt")
-        # Register HiFloat4 outputs only when building for Ascend960DT.
+    if (ASCEND_COMPUTE_UNIT STREQUAL "ascend960dt" OR ASCEND_COMPUTE_UNIT STREQUAL "ascend960pr")
+        # Register HiFloat4 outputs only when building for Ascend960DT/Ascend960PR.
         set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/partial_rotary_mul_quant_def.cpp
             DIRECTORY ${PROJECT_SOURCE_DIR} APPEND PROPERTY COMPILE_OPTIONS
             -DPARTIAL_ROTARY_MUL_QUANT_ASCEND960_ONLY)

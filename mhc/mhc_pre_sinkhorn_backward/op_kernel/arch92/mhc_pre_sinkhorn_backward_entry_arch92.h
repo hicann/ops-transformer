@@ -37,7 +37,8 @@ extern "C" __global__ __aicore__ void mhc_pre_sinkhorn_backward(
     }
 
     REGISTER_TILING_DEFAULT(MhcPreSinkhornBackward960TilingData);
-#if defined(__DAV_920R1__) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+#if defined(__DAV_920R1__) || defined(__DAV_920R2__) || \
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
 #else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);

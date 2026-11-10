@@ -97,6 +97,7 @@ public:
             .ExtendCfgInfo("opFile.value", "mhc_pre_sinkhorn_apt");
         this->AICore().AddConfig("ascend950", regbaseCfg);
         this->AICore().AddConfig("ascend960dt", regbaseCfg);
+        this->AICore().AddConfig("ascend960pr", regbaseCfg);
     }
 };
 

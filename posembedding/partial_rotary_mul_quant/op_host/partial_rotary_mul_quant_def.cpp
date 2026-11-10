@@ -78,6 +78,7 @@ public:
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
         this->AICore().AddConfig("ascend960dt", ascend960dtCfg);
+        this->AICore().AddConfig("ascend960pr", ascend960dtCfg);
 #endif
 
         OpAICoreConfig ascend950Cfg;

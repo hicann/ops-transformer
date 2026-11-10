@@ -84,7 +84,7 @@ static aclnnStatus CheckDtypeValid(const aclTensor* key, const aclTensor* keyCac
     auto& platformInfo = op::GetCurrentPlatformInfo();
     auto socVersion = platformInfo.GetCurNpuArch();
     bool isArch35 = (socVersion == NpuArch::DAV_3510);
-    bool isAscend96 = (socVersion == NpuArch::DAV_9201);
+    bool isAscend96 = (socVersion == NpuArch::DAV_9201 || socVersion == NpuArch::DAV_9202);
     auto dtypeSupportList = isArch35 ?
                                 KEY_VALUE_DTYPE_SUPPORT_LIST :
                                 (isAscend96 ? KEY_VALUE_DTYPE_SUPPORT_LIST_960 : KEY_VALUE_DTYPE_SUPPORT_LIST_910);
