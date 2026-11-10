@@ -41,6 +41,7 @@
 - [low_latency_dispatch](../../mc2/common/docs/torchapi_low_latency_dispatch.md)
 - [mega_moe](../../mc2/mega_moe/docs/torchapi_mega_moe.md)
 - [mega_mhc](../../mhc/mega_mhc/docs/torchapi_mega_mhc.md)
+- [text_gated_residual](../../mhc/text_gated_residual/docs/torchapi_text_gated_residual.md)
 - [mhc_post](../../mhc/mhc_post/docs/torchapi_mhc_post.md)
 - [mhc_pre_sinkhorn](../../mhc/mhc_pre_sinkhorn/docs/torchapi_mhc_pre_sinkhorn.md)
 - [mixed_quant_sparse_flash_mla](../../attention/mixed_quant_sparse_flash_mla/docs/torchapi_mixed_quant_sparse_flash_mla.md)
