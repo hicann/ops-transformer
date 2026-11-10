@@ -1650,6 +1650,8 @@ ge::graphStatus FiaInfoParser::GetSystemPrefix()
 void FiaInfoParser::ProcessKVActualSeqLoop(const int64_t* actualLenData, uint32_t loop)
 {
     int64_t preActualLen = 0;
+    const bool isNoQuantTndLayout =
+        (quantMode_ == FiaQuantMode::NO_QUANT) && (qLayout_ == FiaLayout::TND || qLayout_ == FiaLayout::NTD);
     for (uint32_t i = 0; i < loop; i++) {
         int64_t actLen = actualLenData[i];
         if (antiQuantFlag_) {
@@ -1664,7 +1666,11 @@ void FiaInfoParser::ProcessKVActualSeqLoop(const int64_t* actualLenData, uint32_
                 actLen -= preActualLen;
                 preActualLen = actualLenData[i];
             }
-            needInit_ = needInit_ || (actLen == 0);
+            // 仅非量化+TND/NTD场景: 零长度batch(q无有效行)不占任何输出行, 无需初始化;
+            // 仅当该batch的q非空(存在需清零的输出行)而kv为空时才置needInit;
+            // 其余场景(量化模式/非TND布局)保持原有置位语义
+            bool qBatchNonEmpty = (i >= qSize_.size()) || (qSize_[i] != 0);
+            needInit_ = needInit_ || (actLen == 0 && (!isNoQuantTndLayout || qBatchNonEmpty));
             if (actLen != s2Size_ && qLayout_ != FiaLayout::TND && qLayout_ != FiaLayout::NTD) {
                 needInit_ = 1;
             }
@@ -1679,13 +1685,17 @@ void FiaInfoParser::ProcessKVActualSeqLoop(const int64_t* actualLenData, uint32_
 void FiaInfoParser::ProcessQActualSeqLoop(const int64_t* actualLenQData, uint32_t loop)
 {
     int64_t preActualLen = 0;
+    const bool isNoQuantTndLayout =
+        (quantMode_ == FiaQuantMode::NO_QUANT) && (qLayout_ == FiaLayout::TND || qLayout_ == FiaLayout::NTD);
     for (uint32_t i = 0; i < loop; i++) {
         int64_t actLen = actualLenQData[i];
         if (qLayout_ == FiaLayout::TND || qLayout_ == FiaLayout::NTD) {
             actLen -= preActualLen;
             preActualLen = actualLenQData[i];
         }
-        if (actLen != static_cast<int64_t>(s1Size_)) {
+        // 仅非量化+TND/NTD场景: 零长度batch(q无有效行)不占任何输出行, 跳过非均匀判定;
+        // 非TND/NTD布局q实际长度为0时, 该batch的S1行输出仍需清零; 量化模式保持原语义
+        if (!(isNoQuantTndLayout && actLen == 0) && actLen != static_cast<int64_t>(s1Size_)) {
             needInit_ = true;
             break;
         }
