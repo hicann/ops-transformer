@@ -66,6 +66,20 @@ aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
                 "The sinks input of aclnnSparseFlashAttentionGradV2 is only supported on Ascend950."}));
         return ACLNN_ERR_RUNTIME_ERROR;
     }
+    if (value != nullptr && dValueOut == nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "dValueOut is required when value is provided.");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    if (queryRopeOptional != nullptr && keyRopeOptional != nullptr) {
+        if (dQueryRopeOutOptional == nullptr) {
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "dQueryRopeOutOptional is required when RoPE is enabled.");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
+        if (dKeyRopeOutOptional == nullptr) {
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "dKeyRopeOutOptional is required when RoPE is enabled.");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
+    }
     return aclnnInnerSparseFlashAttentionGradGetWorkspaceSize(
         query, key, sparseIndices, dOut, out, softmaxMax, softmaxSum, sinks, value, actualSeqLengthsQueryOptional,
         actualSeqLengthsKvOptional, queryRopeOptional, keyRopeOptional, scaleValue, sparseBlockSize, layoutOptional,
