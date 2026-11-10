@@ -263,7 +263,7 @@ aclnnStatus CheckAttrs(const char* group, int64_t hcclBufferSize)
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (hcclBufferSize <= 0) {
-        OP_LOGE_WITH_INVALID_ATTR("aclnnAllGatherQuantMatmulV3", "hccl_buffer_size",
+        OP_LOGE_FOR_INVALID_VALUE("aclnnAllGatherQuantMatmulV3", "hccl_buffer_size",
                                   std::to_string(hcclBufferSize).c_str(), "positive integer");
         return ACLNN_ERR_PARAM_INVALID;
     }

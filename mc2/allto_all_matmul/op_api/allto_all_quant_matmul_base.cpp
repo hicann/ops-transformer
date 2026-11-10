@@ -419,19 +419,19 @@ static bool CheckFormat(const aclTensor* x1, const aclTensor* x2, const aclTenso
 {
     // 输入格式不支持私有格式
     if (IsPrivateFormat(x1->GetStorageFormat())) {
-        OP_LOGE_WITH_INVALID_INPUT_FORMAT("aclnnAlltoAllQuantMatmul", "x1",
-                                          op::ToString(x1->GetStorageFormat()).GetString(), "ND");
+        OP_LOGE_FOR_INVALID_FORMAT("aclnnAlltoAllQuantMatmul", "x1", op::ToString(x1->GetStorageFormat()).GetString(),
+                                   "ND");
         return false;
     }
     if (IsPrivateFormat(x2->GetStorageFormat())) {
-        OP_LOGE_WITH_INVALID_INPUT_FORMAT("aclnnAlltoAllQuantMatmul", "x2",
-                                          op::ToString(x2->GetStorageFormat()).GetString(), "ND");
+        OP_LOGE_FOR_INVALID_FORMAT("aclnnAlltoAllQuantMatmul", "x2", op::ToString(x2->GetStorageFormat()).GetString(),
+                                   "ND");
         return false;
     }
     if (biasOptional != nullptr) {
         if (IsPrivateFormat(biasOptional->GetStorageFormat())) {
-            OP_LOGE_WITH_INVALID_INPUT_FORMAT("aclnnAlltoAllQuantMatmul", "bias",
-                                              op::ToString(biasOptional->GetStorageFormat()).GetString(), "ND");
+            OP_LOGE_FOR_INVALID_FORMAT("aclnnAlltoAllQuantMatmul", "bias",
+                                       op::ToString(biasOptional->GetStorageFormat()).GetString(), "ND");
             return false;
         }
     }
@@ -439,25 +439,25 @@ static bool CheckFormat(const aclTensor* x1, const aclTensor* x2, const aclTenso
          GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) &&
         x1ScaleOptional != nullptr) {
         if (IsPrivateFormat(x1ScaleOptional->GetStorageFormat())) {
-            OP_LOGE_WITH_INVALID_INPUT_FORMAT("aclnnAlltoAllQuantMatmul", "x1Scale",
-                                              op::ToString(x1ScaleOptional->GetStorageFormat()).GetString(), "ND");
+            OP_LOGE_FOR_INVALID_FORMAT("aclnnAlltoAllQuantMatmul", "x1Scale",
+                                       op::ToString(x1ScaleOptional->GetStorageFormat()).GetString(), "ND");
             return false;
         }
     }
     if (IsPrivateFormat(x2Scale->GetStorageFormat())) {
-        OP_LOGE_WITH_INVALID_INPUT_FORMAT("aclnnAlltoAllQuantMatmul", "x2Scale",
-                                          op::ToString(x2Scale->GetStorageFormat()).GetString(), "ND");
+        OP_LOGE_FOR_INVALID_FORMAT("aclnnAlltoAllQuantMatmul", "x2Scale",
+                                   op::ToString(x2Scale->GetStorageFormat()).GetString(), "ND");
         return false;
     }
     if (IsPrivateFormat(output->GetStorageFormat())) {
-        OP_LOGE_WITH_INVALID_INPUT_FORMAT("aclnnAlltoAllQuantMatmul", "output",
-                                          op::ToString(output->GetStorageFormat()).GetString(), "ND");
+        OP_LOGE_FOR_INVALID_FORMAT("aclnnAlltoAllQuantMatmul", "output",
+                                   op::ToString(output->GetStorageFormat()).GetString(), "ND");
         return false;
     }
     if (alltoAllOutOptional != nullptr) {
         if (IsPrivateFormat(alltoAllOutOptional->GetStorageFormat())) {
-            OP_LOGE_WITH_INVALID_INPUT_FORMAT("aclnnAlltoAllQuantMatmul", "alltoAllOut",
-                                              op::ToString(alltoAllOutOptional->GetStorageFormat()).GetString(), "ND");
+            OP_LOGE_FOR_INVALID_FORMAT("aclnnAlltoAllQuantMatmul", "alltoAllOut",
+                                       op::ToString(alltoAllOutOptional->GetStorageFormat()).GetString(), "ND");
             return false;
         }
     }

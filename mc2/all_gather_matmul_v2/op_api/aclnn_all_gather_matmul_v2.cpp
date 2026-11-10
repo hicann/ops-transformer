@@ -190,7 +190,7 @@ static bool CheckAIVModeFormatValid(const aclTensor* x2)
 static bool CheckAttr(int64_t streamMode)
 {
     if (streamMode != NUM_ACL_STOP_ON_FAILURE) {
-        OP_LOGE_WITH_INVALID_ATTR("aclnnAllGatherMatmulV2", "streamMode", std::to_string(streamMode).c_str(), "1");
+        OP_LOGE_FOR_INVALID_VALUE("aclnnAllGatherMatmulV2", "streamMode", std::to_string(streamMode).c_str(), "1");
         return false;
     }
     return true;
@@ -556,12 +556,12 @@ static aclnnStatus CheckAndHandleCommMode(const char* commMode, uint8_t& commMod
     } else if (std::strncmp(commMode, "ccu", CMP_MAX_LEN) == 0) {
         if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) {
             // A6(ascend960)无CCU引擎，commMode为显式入参，直接拒绝
-            OP_LOGE_WITH_INVALID_ATTR("aclnnAllGatherMatmulV2", "commMode", commMode, "'ai_cpu' on A6");
+            OP_LOGE_FOR_INVALID_VALUE("aclnnAllGatherMatmulV2", "commMode", commMode, "'ai_cpu' on A6");
             return ACLNN_ERR_PARAM_INVALID;
         }
         commModeEnum = Mc2Comm::COMM_MODE_CCU;
     } else {
-        OP_LOGE_WITH_INVALID_ATTR("aclnnAllGatherMatmulV2", "commMode", commMode, "'ccu' or 'ai_cpu'");
+        OP_LOGE_FOR_INVALID_VALUE("aclnnAllGatherMatmulV2", "commMode", commMode, "'ccu' or 'ai_cpu'");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -658,7 +658,7 @@ aclnnStatus allGatherMatmulV2GetWorkspaceSizeAIVMode(const aclTensor* x1, const 
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     // 校验comm_mode取值
     if (std::strncmp(commMode, "aiv", CMP_MAX_LEN) != 0) {
-        OP_LOGE_WITH_INVALID_ATTR("aclnnAllGatherMatmulV2", "commMode", commMode, "'aiv'");
+        OP_LOGE_FOR_INVALID_VALUE("aclnnAllGatherMatmulV2", "commMode", commMode, "'aiv'");
         return ACLNN_ERR_PARAM_INVALID;
     }
     bool transposeX1 = IsTransposeLastTwoDims(x1);

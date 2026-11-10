@@ -50,7 +50,7 @@ ge::graphStatus MatmulAlltoAllTilingUtil::GetAndValidateRankSize(const gert::Til
         rankDim = *worldSize;
     }
     OP_TILING_CHECK(SUPPORT_RANK_SIZE.find(rankDim) == SUPPORT_RANK_SIZE.end(),
-                    OP_LOGE_WITH_INVALID_ATTR(opName, "world_size", std::to_string(rankDim).c_str(), "2/4/8/16"),
+                    OP_LOGE_FOR_INVALID_VALUE(opName, "world_size", std::to_string(rankDim).c_str(), "2/4/8/16"),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -141,7 +141,7 @@ ge::graphStatus MatmulAlltoAllTilingUtil::CheckAttrsInfo(const gert::TilingConte
     }
     const bool* isTransX1 = attrs->GetAttrPointer<bool>(indexSchema.x1Transpose);
     bool x1TransposeFlag = (isTransX1 != nullptr) ? *isTransX1 : false;
-    OP_TILING_CHECK(x1TransposeFlag, OP_LOGE_WITH_INVALID_ATTR(opName, "transpose_x1", "true", "false"),
+    OP_TILING_CHECK(x1TransposeFlag, OP_LOGE_FOR_INVALID_VALUE(opName, "transpose_x1", "true", "false"),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

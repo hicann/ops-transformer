@@ -630,7 +630,7 @@ static ge::graphStatus CheckHcclBufferSizeAttr(const gert::TilingContext* contex
                     return ge::GRAPH_FAILED);
     int64_t hcclBufferSize = *hcclBufferSizePtr;
     OP_TILING_CHECK(hcclBufferSize <= 0,
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "hccl_buffer_size", std::to_string(hcclBufferSize).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "hccl_buffer_size", std::to_string(hcclBufferSize).c_str(),
                                               "positive integer"),
                     return ge::GRAPH_FAILED);
 

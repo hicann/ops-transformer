@@ -124,7 +124,7 @@ static ge::graphStatus GetMatmulAxisInfoForMatmulAlltoAll(const gert::InferShape
 
     const bool* isTransX1 = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_X1);
     OPS_CHECK(isTransX1 == nullptr || *isTransX1,
-              OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "trans_x1", "true", "false"), return ge::GRAPH_FAILED);
+              OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "trans_x1", "true", "false"), return ge::GRAPH_FAILED);
     const bool* isTransX2 = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_X2);
     const bool transX2 = ((isTransX2 != nullptr) && (*isTransX2));
 
@@ -229,7 +229,7 @@ static ge::graphStatus InferDataTypeMatmulAlltoAll(gert::InferDataTypeContext* c
     OPS_CHECK(!(*x1QuantMode == 0 && *x2QuantMode == 0) &&
                   !(*x1QuantMode == X1_PERTOKEN_QUANT_NUM && *x2QuantMode == X2_PERCHANNEL_QUANT_NUM) &&
                   !(*x1QuantMode == X1_MXFP8_QUANT_NUM && *x2QuantMode == X2_MXFP8_QUANT_NUM),
-              OP_LOGE_WITH_INVALID_ATTR(INNER_DEBUG, "quant_mode",
+              OP_LOGE_FOR_INVALID_VALUE(INNER_DEBUG, "quant_mode",
                                         (std::to_string(*x1QuantMode) + "/" + std::to_string(*x2QuantMode)).c_str(),
                                         "valid quant mode combination"),
               return ge::GRAPH_FAILED);
@@ -240,7 +240,7 @@ static ge::graphStatus InferDataTypeMatmulAlltoAll(gert::InferDataTypeContext* c
         OP_LOGI(INNER_DEBUG, "The yDtype value is: %ld", *yDtypePtr);
         yType = static_cast<ge::DataType>(*yDtypePtr);
     } else {
-        OP_LOGE_WITH_INVALID_ATTR(INNER_DEBUG, "yDtype", "null or DT_UNDEFINED", "valid dtype");
+        OP_LOGE_FOR_INVALID_VALUE(INNER_DEBUG, "yDtype", "null or DT_UNDEFINED", "valid dtype");
         return ge::GRAPH_FAILED;
     }
     // 设置推导的datatype

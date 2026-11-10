@@ -57,21 +57,21 @@ ge::graphStatus MoeTilingBase::CheckSharedExpertAttrValue(const char* nodeName, 
         return ge::GRAPH_SUCCESS;
     }
     OP_TILING_CHECK((sharedExpertNum == 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "sharedExpertNum",
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertNum",
                                               (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
                                                ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
                                                   .c_str(),
                                               "sharedExpertNum != 0"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((sharedExpertNum > sharedExpertRankNum),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "sharedExpertNum",
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertNum",
                                               (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
                                                ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
                                                   .c_str(),
                                               "sharedExpertNum <= sharedExpertRankNum"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((sharedExpertRankNum % sharedExpertNum != 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "sharedExpertRankNum",
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertRankNum",
                                               (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
                                                ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
                                                   .c_str(),

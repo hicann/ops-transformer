@@ -190,7 +190,7 @@ ge::graphStatus CommonAddResNormTiling::CheckAddRmsNormInput(const gert::TilingC
     MC2_CHECK_LOG_RET(context->GetNodeName(), CheckAddRmsNormInputShape(context, x2Shape, gammaShape, yShape, xShape));
     OP_TILING_CHECK(
         (epsilon != nullptr && (*epsilon <= 0 || *epsilon >= 1)),
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "epsilon", std::to_string(*epsilon).c_str(), "(0, 1)"),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "epsilon", std::to_string(*epsilon).c_str(), "(0, 1)"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

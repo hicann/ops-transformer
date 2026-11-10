@@ -135,7 +135,7 @@ static ge::graphStatus GetAndCheckAttrActiveExpertRange(const gert::RuntimeAttrs
         expertStart = activeExpertRangePtr->GetData()[0];
         expertEnd = activeExpertRangePtr->GetData()[1];
         if (expertStart >= expertEnd || expertStart < 0 || expertEnd > MOE_INIT_ROUTING_V4_EXPERT_END_BOUND) {
-            OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "active_expert_range",
+            OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "active_expert_range",
                                       ("[" + std::to_string(expertStart) + ", " + std::to_string(expertEnd) + ")"),
                                       ("[0, " + std::to_string(MOE_INIT_ROUTING_V4_EXPERT_END_BOUND) + ")"));
             return ge::GRAPH_FAILED;
@@ -144,8 +144,8 @@ static ge::graphStatus GetAndCheckAttrActiveExpertRange(const gert::RuntimeAttrs
         expertStart = 0;
         expertEnd = expertNum;
     } else {
-        OP_LOGE_WITH_INVALID_ATTR_SIZE(context->GetNodeName(), "active_expert_range",
-                                       std::to_string(activeExpertRangeSize), "2");
+        OP_LOGE_FOR_INVALID_LISTSIZE(context->GetNodeName(), "active_expert_range",
+                                     std::to_string(activeExpertRangeSize), "2");
         return ge::GRAPH_FAILED;
     }
 
@@ -165,7 +165,7 @@ static ge::graphStatus GetAndCheckAttrExpertCapacity(const gert::RuntimeAttrs* a
     }
     expertCapacity = *expertCapacityPtr;
     if (dropPadMode == DropPadMode::DROP_PAD && xShape->GetDim(0) > 0 && expertCapacity > xShape->GetDim(0)) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expert_capacity", std::to_string(expertCapacity),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "expert_capacity", std::to_string(expertCapacity),
                                   ("between 0 and " + std::to_string(xShape->GetDim(0))));
         return ge::GRAPH_FAILED;
     }
@@ -184,7 +184,7 @@ static ge::graphStatus GetAndCheckAttrExpertNum(const gert::RuntimeAttrs* attrs,
     }
     expertNum = *expertNumPtr;
     if (expertNum <= 0 || expertNum > MOE_INIT_ROUTING_V4_EXPERT_END_BOUND) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expert_num", std::to_string(expertNum),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "expert_num", std::to_string(expertNum),
                                   ("in range [1, " + std::to_string(MOE_INIT_ROUTING_V4_EXPERT_END_BOUND) + "]"));
         return ge::GRAPH_FAILED;
     }
@@ -205,7 +205,7 @@ static ge::graphStatus GetAndCheckAttrDropPadMode(const gert::RuntimeAttrs* attr
 
     dropPadMode = *dropPadModePtr;
     if (dropPadMode < DropPadMode::DROP_LESS || dropPadMode > DropPadMode::DROP_PAD) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode), "0 or 1");
         return ge::GRAPH_FAILED;
     }
 
@@ -226,7 +226,7 @@ static ge::graphStatus GetAndCheckAttrExpertTokenNumType(const gert::RuntimeAttr
     }
     experTokenNumType = *experTokenNumTypePtr;
     if (experTokenNumType < ExpertTokenNumType::CUMSUM || experTokenNumType > ExpertTokenNumType::KEY_VALUE) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expert_token_num_type", std::to_string(experTokenNumType),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "expert_token_num_type", std::to_string(experTokenNumType),
                                   "0, 1 or 2");
         return ge::GRAPH_FAILED;
     }
@@ -265,7 +265,7 @@ static ge::graphStatus GetAndCheckAttrQuantMode(const gert::RuntimeAttrs* attrs,
     }
     quantMode = *quantModePtr;
     if (validQuantModes.count(quantMode) == 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "quant_mode", std::to_string(quantMode),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "quant_mode", std::to_string(quantMode),
                                   "-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 or 17");
         return ge::GRAPH_FAILED;
     }
@@ -290,13 +290,13 @@ static ge::graphStatus GetAndCheckAttrRowIdxType(const gert::RuntimeAttrs* attrs
     }
     rowIdxType = *rowIdxTypePtr;
     if (dropPadMode == DropPadMode::DROP_PAD && rowIdxType != 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "row_Idx_type", std::to_string(rowIdxType),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "row_Idx_type", std::to_string(rowIdxType),
                                   "0 when dropPadMode is 1");
         return ge::GRAPH_FAILED;
     }
 
     if (rowIdxType < 0 || rowIdxType > 1) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "row_Idx_type", std::to_string(rowIdxType), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "row_Idx_type", std::to_string(rowIdxType), "0 or 1");
         return ge::GRAPH_FAILED;
     }
 
@@ -632,11 +632,11 @@ static ge::graphStatus GetAndValidateAttrs(const gert::InferShapeContext* contex
     const int64_t* scaleAlgPtr = attrs->GetAttrPointer<int64_t>(MOE_INIT_ROUTING_V4_ATTR_SCALE_ALG);
     const int64_t scaleAlg = scaleAlgPtr == nullptr ? 0 : *scaleAlgPtr;
     if (scaleAlg != 0 && scaleAlg != 1) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "scale_alg", std::to_string(scaleAlg), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "scale_alg", std::to_string(scaleAlg), "0 or 1");
         return ge::GRAPH_FAILED;
     }
     if (scaleAlg == 1 && quantMode != QuantMode::HIF4_QUANT) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "scale_alg", std::to_string(scaleAlg),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "scale_alg", std::to_string(scaleAlg),
                                   "1 is only supported when quant_mode is 10");
         return ge::GRAPH_FAILED;
     }

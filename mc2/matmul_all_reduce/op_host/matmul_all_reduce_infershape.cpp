@@ -106,7 +106,7 @@ static ge::graphStatus InferShapeForMatmul(const gert::InferShapeContext* contex
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const bool* trans_a = attrs->GetAttrPointer<bool>(static_cast<size_t>(MmAllReduceAttrIdx::K_TRANS_X1));
     OPS_CHECK(trans_a != nullptr && *trans_a,
-              OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "trans_x1", "true", "false"), return ge::GRAPH_FAILED);
+              OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "trans_x1", "true", "false"), return ge::GRAPH_FAILED);
     const bool* trans_b = attrs->GetAttrPointer<bool>(static_cast<size_t>(MmAllReduceAttrIdx::K_TRANS_X2));
     const bool is_trans_b = ((trans_b != nullptr) && (*trans_b));
     if (dim_num_x1 == kMC2MaxShapeSize) {

@@ -126,50 +126,50 @@ ge::graphStatus StemIndexerInfoParser::GetAndCheckAttrParaInfo()
 
     OP_CHECK_IF(
         *opParamInfo_.stemBlockSize != STEM_BLOCK_SIZE_LIMIT,
-        OP_LOGE_WITH_INVALID_ATTR(opName_, "stem_block_size", std::to_string(*opParamInfo_.stemBlockSize).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "stem_block_size", std::to_string(*opParamInfo_.stemBlockSize).c_str(),
                                   std::to_string(STEM_BLOCK_SIZE_LIMIT).c_str()),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(*opParamInfo_.stemStride != STEM_STRIDE_LIMIT,
-                OP_LOGE_WITH_INVALID_ATTR(opName_, "stem_stride", std::to_string(*opParamInfo_.stemStride).c_str(),
+                OP_LOGE_FOR_INVALID_VALUE(opName_, "stem_stride", std::to_string(*opParamInfo_.stemStride).c_str(),
                                           std::to_string(STEM_STRIDE_LIMIT).c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         *opParamInfo_.initialBlocks != INITIAL_BLOCKS_LIMIT,
-        OP_LOGE_WITH_INVALID_ATTR(opName_, "initial_blocks", std::to_string(*opParamInfo_.initialBlocks).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "initial_blocks", std::to_string(*opParamInfo_.initialBlocks).c_str(),
                                   std::to_string(INITIAL_BLOCKS_LIMIT).c_str()),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(*opParamInfo_.windowSize != WINDOW_SIZE_LIMIT,
-                OP_LOGE_WITH_INVALID_ATTR(opName_, "window_size", std::to_string(*opParamInfo_.windowSize).c_str(),
+                OP_LOGE_FOR_INVALID_VALUE(opName_, "window_size", std::to_string(*opParamInfo_.windowSize).c_str(),
                                           std::to_string(WINDOW_SIZE_LIMIT).c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         std::isnan(*opParamInfo_.alpha) || (*opParamInfo_.alpha <= ALPHA_MIN) || (*opParamInfo_.alpha > ALPHA_MAX),
-        OP_LOGE_WITH_INVALID_ATTR(opName_, "alpha", std::to_string(*opParamInfo_.alpha).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "alpha", std::to_string(*opParamInfo_.alpha).c_str(),
                                   ("(" + std::to_string(ALPHA_MIN) + ", " + std::to_string(ALPHA_MAX) + "]").c_str()),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(!IsFloatEqual(*opParamInfo_.kBlockNumRateMedium, K_BLOCK_NUM_RATE_MEDIUM_LIMIT),
-                OP_LOGE_WITH_INVALID_ATTR(opName_, "k_block_num_rate_medium",
+                OP_LOGE_FOR_INVALID_VALUE(opName_, "k_block_num_rate_medium",
                                           std::to_string(*opParamInfo_.kBlockNumRateMedium).c_str(),
                                           std::to_string(K_BLOCK_NUM_RATE_MEDIUM_LIMIT).c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(*opParamInfo_.kBlockNumBiasMedium != K_BLOCK_NUM_BIAS_MEDIUM_LIMIT,
-                OP_LOGE_WITH_INVALID_ATTR(opName_, "k_block_num_bias_medium",
+                OP_LOGE_FOR_INVALID_VALUE(opName_, "k_block_num_bias_medium",
                                           std::to_string(*opParamInfo_.kBlockNumBiasMedium).c_str(),
                                           std::to_string(K_BLOCK_NUM_BIAS_MEDIUM_LIMIT).c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(!IsFloatEqual(*opParamInfo_.kBlockNumRateLarge, K_BLOCK_NUM_RATE_LARGE_LIMIT),
-                OP_LOGE_WITH_INVALID_ATTR(opName_, "k_block_num_rate_large",
+                OP_LOGE_FOR_INVALID_VALUE(opName_, "k_block_num_rate_large",
                                           std::to_string(*opParamInfo_.kBlockNumRateLarge).c_str(),
                                           std::to_string(K_BLOCK_NUM_RATE_LARGE_LIMIT).c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(*opParamInfo_.kBlockNumBiasLarge != K_BLOCK_NUM_BIAS_LARGE_LIMIT,
-                OP_LOGE_WITH_INVALID_ATTR(opName_, "k_block_num_bias_large",
+                OP_LOGE_FOR_INVALID_VALUE(opName_, "k_block_num_bias_large",
                                           std::to_string(*opParamInfo_.kBlockNumBiasLarge).c_str(),
                                           std::to_string(K_BLOCK_NUM_BIAS_LARGE_LIMIT).c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(*opParamInfo_.topkScorePrecision != TOPK_SCORE_PRECISION_UINT32 &&
                     *opParamInfo_.topkScorePrecision != TOPK_SCORE_PRECISION_UINT16,
-                OP_LOGE_WITH_INVALID_ATTR(opName_, "topk_score_precision",
+                OP_LOGE_FOR_INVALID_VALUE(opName_, "topk_score_precision",
                                           std::to_string(*opParamInfo_.topkScorePrecision).c_str(),
                                           (std::to_string(TOPK_SCORE_PRECISION_UINT32) + "(uint32) or " +
                                            std::to_string(TOPK_SCORE_PRECISION_UINT16) + "(uint16)")
@@ -397,14 +397,14 @@ ge::graphStatus StemIndexerInfoParser::GetBaseShapeInfo()
 
 ge::graphStatus StemIndexerInfoParser::ValidateInputShapesMatch()
 {
-    const auto &qShape = opParamInfo_.qflat.shape->GetStorageShape();
-    const auto &kShape = opParamInfo_.kflat.shape->GetStorageShape();
-    const auto &vShape = opParamInfo_.vbias.shape->GetStorageShape();
-    const auto &qSeqShape = opParamInfo_.qSeqLens.shape->GetStorageShape();
-    const auto &kvSeqShape = opParamInfo_.kvSeqLens.shape->GetStorageShape();
-    const auto &metadataShape = opParamInfo_.metadata.tensor->GetStorageShape();
-    const auto &sparseIndicesShape = opParamInfo_.sparseIndicesOut.shape->GetStorageShape();
-    const auto &sparseSeqLenShape = opParamInfo_.sparseSeqLenOut.shape->GetStorageShape();
+    const auto& qShape = opParamInfo_.qflat.shape->GetStorageShape();
+    const auto& kShape = opParamInfo_.kflat.shape->GetStorageShape();
+    const auto& vShape = opParamInfo_.vbias.shape->GetStorageShape();
+    const auto& qSeqShape = opParamInfo_.qSeqLens.shape->GetStorageShape();
+    const auto& kvSeqShape = opParamInfo_.kvSeqLens.shape->GetStorageShape();
+    const auto& metadataShape = opParamInfo_.metadata.tensor->GetStorageShape();
+    const auto& sparseIndicesShape = opParamInfo_.sparseIndicesOut.shape->GetStorageShape();
+    const auto& sparseSeqLenShape = opParamInfo_.sparseSeqLenOut.shape->GetStorageShape();
     const std::string qkShapeStr = Ops::Base::ToString(qShape) + " and " + Ops::Base::ToString(kShape);
 
     OP_CHECK_IF(
@@ -432,7 +432,7 @@ ge::graphStatus StemIndexerInfoParser::ValidateInputShapesMatch()
             ("The shapes of input q_seq_lens and kv_seq_lens should both be [" + std::to_string(bSize_) + "]").c_str()),
         return ge::GRAPH_FAILED);
     if (!useKvSeqLensAsNumPrompt_) {
-        const auto &numPromptShape = opParamInfo_.numPromptTokens.tensor->GetStorageShape();
+        const auto& numPromptShape = opParamInfo_.numPromptTokens.tensor->GetStorageShape();
         OP_CHECK_IF(numPromptShape.GetDim(DIM_IDX_ZERO) != bSize_,
                     OP_LOGE_FOR_INVALID_SHAPE(opName_, "num_prompt_tokens", Ops::Base::ToString(numPromptShape).c_str(),
                                               ("[" + std::to_string(bSize_) + "]").c_str()),
@@ -465,7 +465,7 @@ ge::graphStatus StemIndexerInfoParser::ValidateInputShapesMatch()
     return ge::GRAPH_SUCCESS;
 }
 
-void StemIndexerInfoParser::GenerateInfo(StemIndexerTilingInfo &stemInfo)
+void StemIndexerInfoParser::GenerateInfo(StemIndexerTilingInfo& stemInfo)
 {
     stemInfo.opName = opName_;
     stemInfo.platformInfo = platformInfo_;
@@ -497,7 +497,7 @@ void StemIndexerInfoParser::GenerateInfo(StemIndexerTilingInfo &stemInfo)
     stemInfo.outputType = outputType_;
 }
 
-ge::graphStatus StemIndexerInfoParser::ParseAndCheck(StemIndexerTilingInfo &stemInfo)
+ge::graphStatus StemIndexerInfoParser::ParseAndCheck(StemIndexerTilingInfo& stemInfo)
 {
     if (GetOpName() != ge::GRAPH_SUCCESS || GetNpuInfo() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -515,12 +515,12 @@ ge::graphStatus StemIndexerInfoParser::ParseAndCheck(StemIndexerTilingInfo &stem
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingPrepareForStemIndexer(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForStemIndexer(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus StemIndexerTiling::DoTiling(const StemIndexerTilingInfo *tilingInfo)
+ge::graphStatus StemIndexerTiling::DoTiling(const StemIndexerTilingInfo* tilingInfo)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -529,7 +529,7 @@ ge::graphStatus StemIndexerTiling::DoTiling(const StemIndexerTilingInfo *tilingI
     context_->SetBlockDim(blockDim);
 
     uint32_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = workspaceSize;
 
     tilingData_.set_bSize(tilingInfo->bSize);
@@ -568,7 +568,7 @@ ge::graphStatus StemIndexerTiling::DoTiling(const StemIndexerTilingInfo *tilingI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingForStemIndexer(gert::TilingContext *context)
+ge::graphStatus TilingForStemIndexer(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("StemIndexer", "Tiling context is null."),
                 return ge::GRAPH_FAILED);

@@ -746,7 +746,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::CheckQuantGroupSize()
                         OP_LOGE(opName_, "Failed to execute inferGroupSize."), return ge::GRAPH_FAILED);
         OP_TILING_CHECK((groupSizeM != SUPPORTED_BLOCK_SIZE) || (groupSizeN != SUPPORTED_BLOCK_SIZE) ||
                             (groupSizeK != SUPPORTED_BLOCK_SIZE),
-                        OP_LOGE_WITH_INVALID_ATTR(opName_, "groupSize",
+                        OP_LOGE_FOR_INVALID_VALUE(opName_, "groupSize",
                                                   (std::string("[groupSizeM=") + std::to_string(groupSizeM) +
                                                    ", groupSizeN=" + std::to_string(groupSizeN) +
                                                    ", groupSizeK=" + std::to_string(groupSizeK) + "]")
@@ -759,7 +759,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::CheckQuantGroupSize()
                         OP_LOGE(opName_, "Failed to execute inferGroupSize."), return ge::GRAPH_FAILED);
         OP_TILING_CHECK(
             (groupSizeM != MX_GROUP_SIZE_M) || (groupSizeN != MX_GROUP_SIZE_N) || (groupSizeK != MX_GROUP_SIZE_K),
-            OP_LOGE_WITH_INVALID_ATTR(opName_, "groupSize",
+            OP_LOGE_FOR_INVALID_VALUE(opName_, "groupSize",
                                       (std::string("[groupSizeM=") + std::to_string(groupSizeM) + ", groupSizeN=" +
                                        std::to_string(groupSizeN) + ", groupSizeK=" + std::to_string(groupSizeK) + "]")
                                           .c_str(),

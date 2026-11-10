@@ -131,11 +131,11 @@ bool ValidateInferYDtype(gert::InferShapeContext* context, const char* nodeName)
         return true;
     }
     if (*yDtypePtr != static_cast<int64_t>(ge::DT_BF16) && *yDtypePtr != static_cast<int64_t>(ge::DT_FLOAT16)) {
-        OP_LOGE_WITH_INVALID_ATTR(nodeName, "y_dtype", std::to_string(*yDtypePtr).c_str(), "BF16/FP16");
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "y_dtype", std::to_string(*yDtypePtr).c_str(), "BF16/FP16");
         return false;
     }
     if (outDtype != static_cast<ge::DataType>(*yDtypePtr)) {
-        OP_LOGE_WITH_INVALID_ATTR(nodeName, "y_dtype", Ops::Base::ToString(outDtype).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "y_dtype", Ops::Base::ToString(outDtype).c_str(),
                                   Ops::Base::ToString(static_cast<ge::DataType>(*yDtypePtr)).c_str());
         return false;
     }

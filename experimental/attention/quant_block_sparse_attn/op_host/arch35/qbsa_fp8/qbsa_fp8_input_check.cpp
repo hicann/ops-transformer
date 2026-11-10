@@ -459,7 +459,7 @@ ge::graphStatus QbsaFp8Arch35Tiling::CheckKeyValueShape() const
 ge::graphStatus QbsaFp8Arch35Tiling::CheckNoneOrCausalMask() const
 {
     if (tilingInfo_.maskModeVal != QBSA_MASK_MODE_NONE && tilingInfo_.maskModeVal != QBSA_MASK_MODE_CAUSAL) {
-        OP_LOGE_WITH_INVALID_ATTR(kOpName, "mask_mode", std::to_string(tilingInfo_.maskModeVal), "0 or 3");
+        OP_LOGE_FOR_INVALID_VALUE(kOpName, "mask_mode", std::to_string(tilingInfo_.maskModeVal), "0 or 3");
         return ge::GRAPH_FAILED;
     }
     const auto& opParamInfo = tilingInfo_.opParamInfo;

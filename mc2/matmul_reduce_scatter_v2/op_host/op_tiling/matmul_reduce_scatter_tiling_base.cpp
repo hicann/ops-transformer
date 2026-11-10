@@ -384,7 +384,7 @@ bool MatmulReduceScatterTilingBase::CheckAttrInfoValid(uint64_t kValue)
                     OP_LOGE_FOR_INVALID_VALUE(opName_, "blockSize", std::to_string(blockSize).c_str(), "0"),
                     return false);
     auto commMode = context_->GetAttrs()->GetAttrPointer<char>(COMMMODE_INDEX);
-    OP_TILING_CHECK(commMode == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "commMode", "null", "not null"),
+    OP_TILING_CHECK(commMode == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "commMode", "null", "not null"),
                     return false);
     if (npuArch_ == Ops::Base::DAV_9201) {
         // A6(ascend960)无CCU引擎，仅支持ai_cpu(gen_task按attr路由server，ccu必须在此拒绝)

@@ -96,7 +96,7 @@ ge::graphStatus MoeDistributeCombineSetupTilingA5::CheckEpWorldSize()
     OP_TILING_CHECK(
         (!((*epWorldSizePtr == GROUP_EP_SIZE_2) || (*epWorldSizePtr == GROUP_EP_SIZE_4) ||
            (*epWorldSizePtr == GROUP_EP_SIZE_8))),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "epWorldSize", std::to_string(*epWorldSizePtr).c_str(), "{2, 4, 8}"),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "epWorldSize", std::to_string(*epWorldSizePtr).c_str(), "{2, 4, 8}"),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -109,7 +109,7 @@ ge::graphStatus MoeDistributeCombineSetupTilingA5::CheckMoeExpertNum()
 
     OP_TILING_CHECK(
         !(*moeExpertNumPtr == MOE_EXPERT_NUM_32),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "moeExpertNum", std::to_string(*moeExpertNumPtr).c_str(), "32"),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "moeExpertNum", std::to_string(*moeExpertNumPtr).c_str(), "32"),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -124,14 +124,14 @@ ge::graphStatus MoeDistributeCombineSetupTilingA5::CheckSharedExpertAttr()
 
     OP_TILING_CHECK(
         (*expertShardTypePtr != 0),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "expertShardType", std::to_string(*expertShardTypePtr).c_str(), "0"),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "expertShardType", std::to_string(*expertShardTypePtr).c_str(), "0"),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         (*sharedExpertNumPtr != 0),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertNum", std::to_string(*sharedExpertNumPtr).c_str(), "0"),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "sharedExpertNum", std::to_string(*sharedExpertNumPtr).c_str(), "0"),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK((*sharedExpertRankNumPtr != 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertRankNum",
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "sharedExpertRankNum",
                                               std::to_string(*sharedExpertRankNumPtr).c_str(), "0"),
                     return ge::GRAPH_FAILED);
 

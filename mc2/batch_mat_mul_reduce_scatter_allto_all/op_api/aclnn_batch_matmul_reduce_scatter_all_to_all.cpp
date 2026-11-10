@@ -317,15 +317,15 @@ static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* weight, cons
     CHECK_RET(CheckNotNull(x, weight, groupEp, groupTp, out), ACLNN_ERR_PARAM_NULLPTR);
 
     if (strnlen(groupEp, HCCL_GROUP_NAME_MAX) >= HCCL_GROUP_NAME_MAX) {
-        OP_LOGE_WITH_INVALID_ATTR_SIZE(BMM_ACLNN_OP_NAME, "groupEp",
-                                       std::to_string(strnlen(groupEp, HCCL_GROUP_NAME_MAX)).c_str(),
-                                       std::to_string(HCCL_GROUP_NAME_MAX).c_str());
+        OP_LOGE_FOR_INVALID_LISTSIZE(BMM_ACLNN_OP_NAME, "groupEp",
+                                     std::to_string(strnlen(groupEp, HCCL_GROUP_NAME_MAX)).c_str(),
+                                     std::to_string(HCCL_GROUP_NAME_MAX).c_str());
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (strnlen(groupTp, HCCL_GROUP_NAME_MAX) >= HCCL_GROUP_NAME_MAX) {
-        OP_LOGE_WITH_INVALID_ATTR_SIZE(BMM_ACLNN_OP_NAME, "groupTp",
-                                       std::to_string(strnlen(groupTp, HCCL_GROUP_NAME_MAX)).c_str(),
-                                       std::to_string(HCCL_GROUP_NAME_MAX).c_str());
+        OP_LOGE_FOR_INVALID_LISTSIZE(BMM_ACLNN_OP_NAME, "groupTp",
+                                     std::to_string(strnlen(groupTp, HCCL_GROUP_NAME_MAX)).c_str(),
+                                     std::to_string(HCCL_GROUP_NAME_MAX).c_str());
         return ACLNN_ERR_PARAM_INVALID;
     }
 

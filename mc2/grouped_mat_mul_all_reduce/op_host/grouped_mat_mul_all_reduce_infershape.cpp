@@ -180,7 +180,7 @@ static graphStatus InferMAxisShape(gert::InferShapeContext* context)
     OP_CHECK_NULL_WITH_CONTEXT(context, splitItem);
     OPS_CHECK(
         CheckSplitItemGmmAr(*splitItem) != GRAPH_SUCCESS,
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "splitItem", std::to_string(*splitItem).c_str(), "0/1/2/3"),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "splitItem", std::to_string(*splitItem).c_str(), "0/1/2/3"),
         return GRAPH_FAILED);
     auto w0Shape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, w0Shape);

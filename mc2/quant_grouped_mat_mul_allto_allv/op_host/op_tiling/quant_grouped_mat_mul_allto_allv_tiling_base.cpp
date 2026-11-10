@@ -40,24 +40,24 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingBase::GetShapeAttrsInfo()
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return ge::GRAPH_FAILED);
     const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     // 判断为空或者空字符串
-    OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "group", "null", "not null"),
+    OP_TILING_CHECK(group == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "group", "null", "not null"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(group[0] == '\0', OP_LOGE_WITH_INVALID_ATTR(opName_, "group", "empty", "not empty"),
+    OP_TILING_CHECK(group[0] == '\0', OP_LOGE_FOR_INVALID_VALUE(opName_, "group", "empty", "not empty"),
                     return ge::GRAPH_FAILED);
     // 判断group是否超过127
     const char* nullTerminator = static_cast<const char*>(memchr(group, '\0', MAX_GROUP_BUFFER_SIZE));
     OP_TILING_CHECK(nullTerminator == nullptr,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "group", "length > 128", "length <= 127"),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "group", "length > 128", "length <= 127"),
                     return ge::GRAPH_FAILED);
 
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX);
     auto sendCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_SEND_COUNTS_INDEX);
     auto recvCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_RECV_COUNTS_INDEX);
-    OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "epWorldSize", "null", "not null"),
+    OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "epWorldSize", "null", "not null"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(sendCountsPtr == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "sendCounts", "null", "not null"),
+    OP_TILING_CHECK(sendCountsPtr == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "sendCounts", "null", "not null"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(recvCountsPtr == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "recvCounts", "null", "not null"),
+    OP_TILING_CHECK(recvCountsPtr == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "recvCounts", "null", "not null"),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;

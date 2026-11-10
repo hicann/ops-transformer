@@ -1599,13 +1599,13 @@ ge::graphStatus MatmulAllReduceTilingBase::GetAndConvertCommMode(uint8_t& commMo
     } else if (std::strcmp(commModeStr, "ccu") == 0) {
         if (npuArch_ == Ops::Base::DAV_9201) {
             // A6(ascend960)无CCU引擎，显式ccu直接报错(默认ai_cpu不受影响)
-            OP_LOGE_WITH_INVALID_ATTR(opName_, "comm_mode", commModeStr, "'ai_cpu'");
+            OP_LOGE_FOR_INVALID_VALUE(opName_, "comm_mode", commModeStr, "'ai_cpu'");
             return ge::GRAPH_FAILED;
         }
         commMode = Mc2Comm::COMM_MODE_CCU;
         OP_LOGI(opName_, "The input attr comm_mode is ccu, commMode will be set to CCU.");
     } else {
-        OP_LOGE_WITH_INVALID_ATTR(opName_, "comm_mode", commModeStr, "'ai_cpu' or 'ccu'");
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "comm_mode", commModeStr, "'ai_cpu' or 'ccu'");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -1640,7 +1640,7 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckCommModeA2() const
     if (commModeStr == nullptr || std::strcmp(commModeStr, "ai_cpu") == 0) {
         return ge::GRAPH_SUCCESS;
     } else {
-        OP_LOGE_WITH_INVALID_ATTR(opName_, "comm_mode", commModeStr, "nullptr or 'ai_cpu'");
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "comm_mode", commModeStr, "nullptr or 'ai_cpu'");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

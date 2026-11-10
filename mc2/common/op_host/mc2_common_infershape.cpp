@@ -198,7 +198,7 @@ ge::graphStatus InferMatmulOutputDataType(gert::InferDataTypeContext* context, s
 
     const int64_t* yDtype = attrs->GetInt(yDtypeAttrIndex);
     if (yDtype == nullptr || *yDtype == static_cast<int64_t>(ge::DataType::DT_UNDEFINED)) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "yDtype", "DT_UNDEFINED", "valid dtype value");
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "yDtype", "DT_UNDEFINED", "valid dtype value");
         return ge::GRAPH_FAILED;
     }
     context->SetOutputDataType(outputIndex, static_cast<ge::DataType>(*yDtype));

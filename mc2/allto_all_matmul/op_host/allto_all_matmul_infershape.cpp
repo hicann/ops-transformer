@@ -140,7 +140,7 @@ static ge::graphStatus GetMatmulAxisInfoForAlltoAllMatmul(const gert::InferShape
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const bool* isTransX1 = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_X1);
     OPS_CHECK(isTransX1 == nullptr || *isTransX1,
-              OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "trans_x1", "true", "false"), return ge::GRAPH_FAILED);
+              OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "trans_x1", "true", "false"), return ge::GRAPH_FAILED);
     const bool* isTransX2 = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_X2);
     const bool transX2 = ((isTransX2 != nullptr) && (*isTransX2));
 
@@ -297,7 +297,7 @@ static ge::graphStatus InferDataTypeAlltoAllMatmul(gert::InferDataTypeContext* c
         OP_LOGI(INNER_DEBUG, "The yDtype value is: %ld", *yDtypePtr);
         yType = static_cast<ge::DataType>(*yDtypePtr);
     } else {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "yDtype", "DT_UNDEFINED", "valid dtype value");
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "yDtype", "DT_UNDEFINED", "valid dtype value");
         return ge::GRAPH_FAILED;
     }
     // 设置推导的datatype

@@ -278,25 +278,25 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetLocalParamsA
 
     auto gmmXQuantModeptr = attrs->GetAttrPointer<int64_t>(ATTR_GMM_X_QUANT_MODE_INDEX);
     OP_TILING_CHECK(gmmXQuantModeptr == nullptr,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "gmmXQuantMode", "null", "not null"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "gmmXQuantMode", "null", "not null"), return ge::GRAPH_FAILED);
     localParams_.gmmXQuantMode = *gmmXQuantModeptr;
     auto gmmWeightQuantModeptr = attrs->GetAttrPointer<int64_t>(ATTR_GMM_WEIGHT_QUANT_MODE_INDEX);
     OP_TILING_CHECK(gmmWeightQuantModeptr == nullptr,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "gmmWeightQuantMode", "null", "not null"),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "gmmWeightQuantMode", "null", "not null"),
                     return ge::GRAPH_FAILED);
     localParams_.gmmWeightQuantMode = *gmmWeightQuantModeptr;
     auto gmmTransWeightptr = attrs->GetAttrPointer<bool>(ATTR_TRANS_GMM_WEIGHT_INDEX);
     OP_TILING_CHECK(gmmTransWeightptr == nullptr,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "transGmmWeight", "null", "not null"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "transGmmWeight", "null", "not null"), return ge::GRAPH_FAILED);
     localParams_.isGmmWeightTrans = *gmmTransWeightptr;
 
     auto commQuantModeptr = attrs->GetAttrPointer<int64_t>(ATTR_COMM_QUANT_MODE_INDEX);
     OP_TILING_CHECK(commQuantModeptr == nullptr,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "commQuantMode", "null", "not null"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "commQuantMode", "null", "not null"), return ge::GRAPH_FAILED);
     localParams_.commQuantMode = *commQuantModeptr;
     auto commQuantDtypeptr = attrs->GetAttrPointer<int64_t>(ATTR_COMM_QUANT_DTYPE_INDEX);
     OP_TILING_CHECK(commQuantDtypeptr == nullptr,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "commQuantDtype", "null", "not null"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "commQuantDtype", "null", "not null"), return ge::GRAPH_FAILED);
     localParams_.commQuantDtype = *commQuantDtypeptr;
     OP_TILING_CHECK(localParams_.commQuantMode != QUANT_NONE,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "commQuantMode",
@@ -305,17 +305,17 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetLocalParamsA
                     return ge::GRAPH_FAILED);
 
     auto mmXQuantModeptr = attrs->GetAttrPointer<int64_t>(ATTR_MM_X_QUANT_MODE_INDEX);
-    OP_TILING_CHECK(mmXQuantModeptr == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "mmXQuantMode", "null", "not null"),
+    OP_TILING_CHECK(mmXQuantModeptr == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "mmXQuantMode", "null", "not null"),
                     return ge::GRAPH_FAILED);
     localParams_.mmXQuantMode = *mmXQuantModeptr;
     auto mmWeightQuantModeptr = attrs->GetAttrPointer<int64_t>(ATTR_MM_WEIGHT_QUANT_MODE_INDEX);
     OP_TILING_CHECK(mmWeightQuantModeptr == nullptr,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "mmWeightQuantMode", "null", "not null"),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "mmWeightQuantMode", "null", "not null"),
                     return ge::GRAPH_FAILED);
     localParams_.mmWeightQuantMode = *mmWeightQuantModeptr;
     auto mmTransWeightptr = attrs->GetAttrPointer<bool>(ATTR_TRANS_MM_WEIGHT_INDEX);
     OP_TILING_CHECK(mmTransWeightptr == nullptr,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "transMmWeight", "null", "not null"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "transMmWeight", "null", "not null"), return ge::GRAPH_FAILED);
     localParams_.isMmWeightTrans = *mmTransWeightptr;
 
     return ge::GRAPH_SUCCESS;
@@ -482,12 +482,12 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsRelationGmm(
                     return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(localParams_.gmmXQuantMode != QUANT_PERTENSOR,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "gmmXQuantMode", std::to_string(localParams_.gmmXQuantMode),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "gmmXQuantMode", std::to_string(localParams_.gmmXQuantMode),
                                               std::to_string(QUANT_PERTENSOR) + " (PERTENSOR)"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         localParams_.gmmWeightQuantMode != QUANT_PERTENSOR,
-        OP_LOGE_WITH_INVALID_ATTR(opName_, "gmmWeightQuantMode", std::to_string(localParams_.gmmWeightQuantMode),
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "gmmWeightQuantMode", std::to_string(localParams_.gmmWeightQuantMode),
                                   std::to_string(QUANT_PERTENSOR) + " (PERTENSOR)"),
         return ge::GRAPH_FAILED);
     localParams_.gmmQuantSuit = QUANT_PAIR_TT;
@@ -573,13 +573,13 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsRelationMm()
                     return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(localParams_.mmXQuantMode != QUANT_PERTENSOR,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "mmXQuantMode", std::to_string(localParams_.mmXQuantMode),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "mmXQuantMode", std::to_string(localParams_.mmXQuantMode),
                                               std::to_string(QUANT_PERTENSOR) + " (PERTENSOR)"),
                     return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(
         localParams_.mmWeightQuantMode != QUANT_PERTENSOR,
-        OP_LOGE_WITH_INVALID_ATTR(opName_, "mmWeightQuantMode", std::to_string(localParams_.mmWeightQuantMode),
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "mmWeightQuantMode", std::to_string(localParams_.mmWeightQuantMode),
                                   std::to_string(QUANT_PERTENSOR) + " (PERTENSOR)"),
         return ge::GRAPH_FAILED);
 
@@ -609,11 +609,11 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsAttrEpAndSet
 {
     const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
-    OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "group", "null", "not null"),
+    OP_TILING_CHECK(group == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "group", "null", "not null"),
                     return ge::GRAPH_FAILED);
     int64_t rankDim = 0;
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX);
-    OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "epWorldSize", "null", "not null"),
+    OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "epWorldSize", "null", "not null"),
                     return ge::GRAPH_FAILED);
     if (*epWorldSizePtr == RANK_DEFAULT_NUM) {
         OP_TILING_CHECK(!mc2tiling::GetRankSize(opName_, group, rankDim), OP_LOGE(opName_, "GetRankSize failed."),
@@ -627,7 +627,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsAttrEpAndSet
     }
     OP_TILING_CHECK(
         SUPPORT_RANK_SIZE.find(rankDim) == SUPPORT_RANK_SIZE.end(),
-        OP_LOGE_WITH_INVALID_ATTR(opName_, "epWorldSize", std::to_string(rankDim), supportRankSizeRange.c_str()),
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "epWorldSize", std::to_string(rankDim), supportRankSizeRange.c_str()),
         return ge::GRAPH_FAILED);
     localParams_.epWorldSize = rankDim;
 
@@ -645,7 +645,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsAttrEpAndSet
     }
 
     auto groupSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_GROUP_SIZE_OPTIONAL_INDEX);
-    OP_TILING_CHECK(groupSizePtr == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "groupSize", "null", "not null"),
+    OP_TILING_CHECK(groupSizePtr == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "groupSize", "null", "not null"),
                     return ge::GRAPH_FAILED);
     localParams_.groupSize = *groupSizePtr;
     OP_TILING_CHECK(
@@ -663,9 +663,9 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetSendRecvCoun
     uint64_t expertNum = localParams_.ep * localParams_.epWorldSize;
     auto sendCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_SEND_COUNTS_INDEX);
     auto recvCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_RECV_COUNTS_INDEX);
-    OP_TILING_CHECK(sendCountsPtr == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "sendCounts", "null", "not null"),
+    OP_TILING_CHECK(sendCountsPtr == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "sendCounts", "null", "not null"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(recvCountsPtr == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "recvCounts", "null", "not null"),
+    OP_TILING_CHECK(recvCountsPtr == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "recvCounts", "null", "not null"),
                     return ge::GRAPH_FAILED);
     uint64_t sendCountsSize = sendCountsPtr->GetSize();
     uint64_t recvCountsSize = recvCountsPtr->GetSize();

@@ -83,13 +83,13 @@ bool AlltoAllMatmulV2TilingClass::CheckWorldSizeAttr(const char* opName)
         return false;
     }
     if (*wsPtr <= 0) {
-        OP_LOGE_WITH_INVALID_ATTR(opName, "world_size", std::to_string(*wsPtr).c_str(), "positive");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "world_size", std::to_string(*wsPtr).c_str(), "positive");
         return false;
     }
     uint64_t worldSize = static_cast<uint64_t>(*wsPtr);
     bool isPowerOfTwo = (worldSize & (worldSize - 1)) == 0;
     if (worldSize < MIN_WORLD_SIZE || worldSize > MAX_WORLD_SIZE || !isPowerOfTwo) {
-        OP_LOGE_WITH_INVALID_ATTR(opName, "world_size", std::to_string(worldSize).c_str(), "2/4/8/16");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "world_size", std::to_string(worldSize).c_str(), "2/4/8/16");
         return false;
     }
     return true;
@@ -229,7 +229,7 @@ bool AlltoAllMatmulV2TilingClass::CheckQuantAndYDtypeAttr(const char* opName)
     auto* yDtypePtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_Y_DTYPE);
     if (yDtypePtr != nullptr && *yDtypePtr != static_cast<int64_t>(ge::DT_BF16) &&
         *yDtypePtr != static_cast<int64_t>(ge::DT_FLOAT16)) {
-        OP_LOGE_WITH_INVALID_ATTR(opName, "y_dtype", std::to_string(*yDtypePtr).c_str(), "BF16/FP16");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "y_dtype", std::to_string(*yDtypePtr).c_str(), "BF16/FP16");
         return false;
     }
     return true;
@@ -239,24 +239,24 @@ bool AlltoAllMatmulV2TilingClass::CheckOtherAttrs(const char* opName)
 {
     auto* tx1 = context_->GetAttrs()->GetAttrPointer<bool>(IDX_ATTR_TRANSPOSE_X1);
     if (tx1 != nullptr && *tx1) {
-        OP_LOGE_WITH_INVALID_ATTR(opName, "transpose_x1", "true", "false");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "transpose_x1", "true", "false");
         return false;
     }
     auto* tx2 = context_->GetAttrs()->GetAttrPointer<bool>(IDX_ATTR_TRANSPOSE_X2);
     if (!tx2 || !(*tx2)) {
-        OP_LOGE_WITH_INVALID_ATTR(opName, "transpose_x2", tx2 ? std::to_string(static_cast<int>(*tx2)).c_str() : "nil",
+        OP_LOGE_FOR_INVALID_VALUE(opName, "transpose_x2", tx2 ? std::to_string(static_cast<int>(*tx2)).c_str() : "nil",
                                   "true");
         return false;
     }
     auto* x1QdPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_X1_QUANT_DTYPE);
     if (x1QdPtr != nullptr && *x1QdPtr != static_cast<int64_t>(ge::DT_UNDEFINED) &&
         *x1QdPtr != static_cast<int64_t>(ge::DT_FLOAT8_E8M0)) {
-        OP_LOGE_WITH_INVALID_ATTR(opName, "x1_quant_dtype", std::to_string(*x1QdPtr).c_str(), "fp8_e8m0");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "x1_quant_dtype", std::to_string(*x1QdPtr).c_str(), "fp8_e8m0");
         return false;
     }
     auto* pmPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_PRECISION_MODE);
     if (pmPtr != nullptr && (*pmPtr < 0 || *pmPtr > 2)) {
-        OP_LOGE_WITH_INVALID_ATTR(opName, "precision_mode", std::to_string(*pmPtr).c_str(), "0/1/2");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "precision_mode", std::to_string(*pmPtr).c_str(), "0/1/2");
         return false;
     }
     return CheckGroupSizeAttr(opName);
@@ -287,7 +287,7 @@ bool AlltoAllMatmulV2TilingClass::CheckGroupSizeAttr(const char* opName)
     }
 
     if (gsM != MX_GROUP_M || gsN != MX_GROUP_N || gsK != MX_GROUP_K) {
-        OP_LOGE_WITH_INVALID_ATTR(
+        OP_LOGE_FOR_INVALID_VALUE(
             opName, "group_size",
             ("[M=" + std::to_string(gsM) + ",N=" + std::to_string(gsN) + ",K=" + std::to_string(gsK) + "]").c_str(),
             ("[M=" + std::to_string(MX_GROUP_M) + ",N=" + std::to_string(MX_GROUP_N) +
@@ -564,7 +564,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
         if (hccBufPtr != nullptr && static_cast<uint64_t>(*hccBufPtr) < needBytes) {
             constexpr uint64_t BYTES_PER_MB = 1024UL * 1024UL;
             uint64_t needMb = (needBytes + BYTES_PER_MB - 1UL) / BYTES_PER_MB;
-            OP_LOGE_WITH_INVALID_ATTR(
+            OP_LOGE_FOR_INVALID_VALUE(
                 opName, "hccl_buffer_size", std::to_string(*hccBufPtr).c_str(),
                 ("no less than worldSize(" + std::to_string(worldSize_) + ") * mPerRank(" + std::to_string(m_) +
                  ") * (Ka(" + std::to_string(kPerRank) + ") * " + std::to_string(x1Bits) + " bits + scale(" +
@@ -654,7 +654,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
     // win 区 buffer 复用深度决策：budget 取自 context 的 hccl_buffer_size，
     // < 400MB 拦截，>= 400MB 用 400MB。data 复用、scale 恒全量，故预算需扣除 scale 固定占用。
     if (hccBufPtr != nullptr && *hccBufPtr > 0 && static_cast<uint64_t>(*hccBufPtr) < WIN_REUSE_BUDGET_CAP) {
-        OP_LOGE_WITH_INVALID_ATTR(opName, "hccl_buffer_size", std::to_string(*hccBufPtr).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(opName, "hccl_buffer_size", std::to_string(*hccBufPtr).c_str(),
                                   (std::string(">= ") + std::to_string(WIN_REUSE_BUDGET_CAP / (1024UL * 1024UL)) +
                                    " MB (400MB) for win buffer reuse")
                                       .c_str());

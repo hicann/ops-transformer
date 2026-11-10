@@ -162,7 +162,7 @@ static ge::graphStatus CheckCommAttrValuesValid(gert::TilingContext* context, co
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         *tpWorldSizePtr >= 2,
-        OP_LOGE_WITH_INVALID_ATTR(nodeName, "tp_world_size", std::to_string(*tpWorldSizePtr).c_str(), "less than 2"),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "tp_world_size", std::to_string(*tpWorldSizePtr).c_str(), "less than 2"),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -265,7 +265,7 @@ static ge::graphStatus CheckExpertAttrs(gert::TilingContext* context, const char
 
     // 校验ep能否均分共享专家
     if ((sharedExpertRankNum != 0) && (epWorldSize % sharedExpertRankNum != 0)) {
-        OP_LOGE_WITH_INVALID_ATTR(
+        OP_LOGE_FOR_INVALID_VALUE(
             nodeName, "epWorldSize", std::to_string(epWorldSize).c_str(),
             (std::string("divisible by sharedExpertRankNum (") + std::to_string(sharedExpertRankNum) + ")").c_str());
         return ge::GRAPH_FAILED;
@@ -274,13 +274,13 @@ static ge::graphStatus CheckExpertAttrs(gert::TilingContext* context, const char
     // 校验moe专家数量能否均分给多机
     localMoeExpertNum = moeExpertNum / (epWorldSize - sharedExpertRankNum);
     OP_TILING_CHECK(moeExpertNum % (epWorldSize - sharedExpertRankNum) != 0,
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
                                               (std::string("divisible by ep_world_size - shared_expert_rank_num (") +
                                                std::to_string(epWorldSize - sharedExpertRankNum) + ")")
                                                   .c_str()),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(localMoeExpertNum <= 0,
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
                                               "produce a positive local expert count"),
                     return ge::GRAPH_FAILED);
 
@@ -476,7 +476,7 @@ static ge::graphStatus CheckExpertScalesDtypeAndFormat(gert::TilingContext* cont
     }
     OP_TILING_CHECK(
         static_cast<ge::Format>(ge::GetPrimaryFormat(expertScalesDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
-        OP_LOGE_WITH_INVALID_INPUT_FORMAT(
+        OP_LOGE_FOR_INVALID_FORMAT(
             nodeName, "expert_scales",
             Ops::Base::ToString(static_cast<ge::Format>(ge::GetPrimaryFormat(expertScalesDesc->GetStorageFormat())))
                 .c_str(),

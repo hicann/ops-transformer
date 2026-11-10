@@ -274,7 +274,7 @@ static bool CheckExpertCountConfig(MoeDistributeCombineTilingData& tilingData, c
 
     // 校验ep能均分共享
     if ((sharedExpertRankNum != 0) && (epWorldSize % sharedExpertRankNum != 0)) {
-        OP_LOGE_WITH_INVALID_ATTR(
+        OP_LOGE_FOR_INVALID_VALUE(
             nodeName, "epWorldSize", std::to_string(epWorldSize).c_str(),
             (std::string("divisible by sharedExpertRankNum (") + std::to_string(sharedExpertRankNum) + ")").c_str());
         return false;
@@ -282,7 +282,7 @@ static bool CheckExpertCountConfig(MoeDistributeCombineTilingData& tilingData, c
 
     // 校验moe专家数量能否均分给多机
     if (moeExpertNum % (epWorldSize - sharedExpertRankNum) != 0) {
-        OP_LOGE_WITH_INVALID_ATTR(nodeName, "moeExpertNum",
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "moeExpertNum",
                                   (std::string("moeExpertNum=") + std::to_string(moeExpertNum) +
                                    ", epWorldSize=" + std::to_string(epWorldSize) +
                                    ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))

@@ -219,7 +219,7 @@ bool AllGatherMatmulTilingBase::CheckGatherOutPara()
 
     if ((*isGatherout) && (gatherOutShape != nullptr)) {
         OP_TILING_CHECK((*gatherIndex != 0),
-                        OP_LOGE_WITH_INVALID_ATTR(opName_, "gather_index", std::to_string(*gatherIndex).c_str(), "0"),
+                        OP_LOGE_FOR_INVALID_VALUE(opName_, "gather_index", std::to_string(*gatherIndex).c_str(), "0"),
                         return false);
         int64_t gatherOutDim0 = gatherOutShape->GetStorageShape().GetDim(0);
         OP_TILING_CHECK((gatherOutDim0 != mValue),
@@ -651,11 +651,11 @@ bool AllGatherMatmulTilingBase::AnalyzeAttrs()
                     return false);
     OP_TILING_CHECK(commTurn == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "commTurn"), return false);
     OP_TILING_CHECK(*commTurn != 0,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "commTurn", std::to_string(*commTurn).c_str(), "0"),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "commTurn", std::to_string(*commTurn).c_str(), "0"),
                     return false);
     OP_TILING_CHECK(gatherIndexPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gatherIndex"), return false);
     OP_TILING_CHECK((*gatherIndexPtr != 0),
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "gatherIndex", std::to_string(*gatherIndexPtr).c_str(), "0"),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "gatherIndex", std::to_string(*gatherIndexPtr).c_str(), "0"),
                     return false);
     args_.isATrans = isTransA ? *isTransA : 0;
     args_.isBTrans = isTransB ? *isTransB : 0;
@@ -663,7 +663,7 @@ bool AllGatherMatmulTilingBase::AnalyzeAttrs()
     args_.rankDim = static_cast<uint32_t>(rankSize_);
     args_.commTurn = commTurn ? *commTurn : 0;
     gatherIndex_ = gatherIndexPtr ? static_cast<uint32_t>(*gatherIndexPtr) : 0;
-    OP_TILING_CHECK((args_.isATrans != 0), OP_LOGE_WITH_INVALID_ATTR(opName_, "isTransA", "true", "false"),
+    OP_TILING_CHECK((args_.isATrans != 0), OP_LOGE_FOR_INVALID_VALUE(opName_, "isTransA", "true", "false"),
                     return false);
     // blockSize 语义:
     //   0      - 非量化 (fp16/bf16 V2 路径)
@@ -675,7 +675,7 @@ bool AllGatherMatmulTilingBase::AnalyzeAttrs()
     const int64_t blockSize = blockSizePtr != nullptr ? *blockSizePtr : 0;
     bool x1IsFp8 = CheckSupportDtype(context_->GetInputDesc(INPUT_X1)->GetDataType(), FP8_DTYPE_SUPPORT_LIST);
     OP_TILING_CHECK(!x1IsFp8 && blockSize != 0,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "blockSize", std::to_string(blockSize).c_str(), "0"),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "blockSize", std::to_string(blockSize).c_str(), "0"),
                     return false);
     OP_LOGD(opName_,
             " group=%s, rankSize=%ld, is_trans_a=%u, is_trans_b=%d, gather_index=%u,"

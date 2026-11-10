@@ -182,7 +182,7 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::CheckGroupSize(const gert::Tili
         "[groupSizeM=1, groupSizeN=1, groupSizeK=" + std::to_string(expectGroupSizeK) + "]";
     OP_TILING_CHECK(
         (groupSizeM != MX_SCALE_BLOCK_M) || (groupSizeN != MX_SCALE_BLOCK_N) || (groupSizeK != expectGroupSizeK),
-        OP_LOGE_WITH_INVALID_ATTR(opName, "groupSize",
+        OP_LOGE_FOR_INVALID_VALUE(opName, "groupSize",
                                   (std::string("[groupSizeM=") + std::to_string(groupSizeM) + ", groupSizeN=" +
                                    std::to_string(groupSizeN) + ", groupSizeK=" + std::to_string(groupSizeK) + "]")
                                       .c_str(),

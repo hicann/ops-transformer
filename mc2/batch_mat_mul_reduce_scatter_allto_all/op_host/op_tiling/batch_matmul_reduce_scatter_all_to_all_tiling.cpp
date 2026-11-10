@@ -558,7 +558,7 @@ static bool CheckTensorShape(const char* nodeName, const gert::Shape* xShape, co
             return false;
         }
     } else {
-        OP_LOGE_WITH_INVALID_ATTR(nodeName, "yShardType", std::to_string(yShard).c_str(), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "yShardType", std::to_string(yShard).c_str(), "0 or 1");
         return false;
     }
 
@@ -606,7 +606,7 @@ static bool CheckAttrs(const gert::TilingContext* context, int64_t& epSize, int6
     }
 
     if ((yShard != 1) && (yShard != 0)) { // 当前仅支持 shard = 0 or 1
-        OP_LOGE_WITH_INVALID_ATTR(nodeName, "yShardType", std::to_string(yShard).c_str(), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "yShardType", std::to_string(yShard).c_str(), "0 or 1");
         return false;
     }
 

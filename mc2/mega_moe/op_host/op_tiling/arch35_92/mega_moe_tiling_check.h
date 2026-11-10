@@ -390,7 +390,7 @@ static ge::graphStatus CheckAndSetQuantModeAttrs(const gert::TilingContext* cont
     auto dispatchQuantModePtr = attrs->GetAttrPointer<int64_t>((config.attrDispatchQuantModeIndex));
     OP_TILING_CHECK(
         *dispatchQuantModePtr != DISPATCH_QUANT_MODE_PASSTHROUGH && *dispatchQuantModePtr != DISPATCH_QUANT_MODE_MXFP,
-        OP_LOGE_WITH_INVALID_ATTR(nodeName, "dispatch_quant_mode", std::to_string(*dispatchQuantModePtr).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "dispatch_quant_mode", std::to_string(*dispatchQuantModePtr).c_str(),
                                   "0 (no internal quantization) or 4 (internal MXFP quantization)"),
         return ge::GRAPH_FAILED);
 
@@ -417,20 +417,20 @@ static ge::graphStatus CheckPreQuantizedXAttrs(const gert::TilingContext* contex
     // 预量化输入不再由 x dtype 反推类型，属性与接口补充的逻辑 descriptor 必须严格一致。
     OP_TILING_CHECK(
         xDesc->GetDataType() != moeQuantOutDtype,
-        OP_LOGE_WITH_INVALID_ATTR(nodeName, "dispatch_quant_out_dtype", std::to_string(moeQuantOutDtype).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "dispatch_quant_out_dtype", std::to_string(moeQuantOutDtype).c_str(),
                                   (std::string("the same dtype as x (") + Ops::Base::ToString(xDesc->GetDataType()) +
                                    ") for pre-quantized input")
                                       .c_str()),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(topoType != TOPO_TYPE_MTE,
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "topo_type", std::to_string(topoType).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "topo_type", std::to_string(topoType).c_str(),
                                               "0 (MTE), because pre-quantized x does not support URMA"),
                     return ge::GRAPH_FAILED);
 
     // 预量化 x 只有一份 data/scales；共享专家显式配置类型时只能与 MoE 专家保持一致。
     const bool hasExplicitSharedQuantDtype = sharedQuantOutDtype != ge::DT_UNDEFINED;
     OP_TILING_CHECK(hasExplicitSharedQuantDtype && sharedQuantOutDtype != moeQuantOutDtype,
-                    OP_LOGE_WITH_INVALID_ATTR(
+                    OP_LOGE_FOR_INVALID_VALUE(
                         nodeName, "shared_expert_quant_out_dtype", std::to_string(sharedQuantOutDtype).c_str(),
                         (std::string("DT_UNDEFINED or the same dtype as dispatch_quant_out_dtype (") +
                          std::to_string(moeQuantOutDtype) + ") for pre-quantized x")
@@ -453,7 +453,7 @@ static ge::graphStatus CheckAndSetQuantOutDtypes(const gert::TilingContext* cont
 
     // 两种 dispatch 模式均由 dispatch_quant_out_dtype 指定 GMM 收到的量化数据类型。
     OP_TILING_CHECK(!IsSupportedExpertQuantDtype(moeQuantOutDtype),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "dispatch_quant_out_dtype",
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "dispatch_quant_out_dtype",
                                               std::to_string(*dispatchQuantOutDtypePtr).c_str(),
                                               "fp8_e5m2, fp8_e4m3fn or fp4_e2m1"),
                     return ge::GRAPH_FAILED);
@@ -462,7 +462,7 @@ static ge::graphStatus CheckAndSetQuantOutDtypes(const gert::TilingContext* cont
     ge::DataType sharedQuantOutDtype = static_cast<ge::DataType>(*sharedQuantOutDtypePtr);
     bool hasExplicitSharedQuantDtype = sharedQuantOutDtype != ge::DT_UNDEFINED;
     OP_TILING_CHECK(hasExplicitSharedQuantDtype && !IsSupportedExpertQuantDtype(sharedQuantOutDtype),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "shared_expert_quant_out_dtype",
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "shared_expert_quant_out_dtype",
                                               std::to_string(*sharedQuantOutDtypePtr).c_str(),
                                               "DT_UNDEFINED, fp8_e5m2, fp8_e4m3fn or fp4_e2m1"),
                     return ge::GRAPH_FAILED);
@@ -546,7 +546,7 @@ static ge::graphStatus CheckAndSetExpertGmmModes(const gert::TilingContext* cont
         params.shared.gmmMode != params.moe.gmmMode || params.shared.quantOutDtype != params.moe.quantOutDtype;
     OP_TILING_CHECK(
         topoType != TOPO_TYPE_MTE && hasDifferentExpertGmmConfigs,
-        OP_LOGE_WITH_INVALID_ATTR(nodeName, "topo_type", std::to_string(topoType).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "topo_type", std::to_string(topoType).c_str(),
                                   "MTE when MoE and shared experts use different quantization configurations"),
         return ge::GRAPH_FAILED);
 

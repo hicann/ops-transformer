@@ -63,7 +63,7 @@ static aclnnStatus InnerMatmulAllReduceV3GetWorkspaceSize(const aclTensor* x1, c
         } else if (strcmp(commMode, COMM_MODE_CCU) == 0) {
             commModeEnum = Mc2Comm::COMM_MODE_CCU;
         } else {
-            OP_LOGE_WITH_INVALID_ATTR("InnerMatmulAllReduceV3GetWorkspaceSize", "commMode", commMode,
+            OP_LOGE_FOR_INVALID_VALUE("InnerMatmulAllReduceV3GetWorkspaceSize", "commMode", commMode,
                                       "'ccu' or 'ai_cpu'");
             return ACLNN_ERR_PARAM_INVALID;
         }

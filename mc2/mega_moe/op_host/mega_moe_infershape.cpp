@@ -56,7 +56,7 @@ static ge::graphStatus InferShapeMegaMoe(gert::InferShapeContext* context)
     OPS_CHECK_NULL_WITH_CONTEXT(context, epWorldSize);
 
     OP_CHECK_IF(*epWorldSize <= 0,
-                OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "ep_world_size", std::to_string(*epWorldSize).c_str(),
+                OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "ep_world_size", std::to_string(*epWorldSize).c_str(),
                                           "smaller than or equal to 0"),
                 return ge::GRAPH_FAILED);
 

@@ -216,33 +216,33 @@ static bool CheckAttrValues(const char* nodeName, const uint32_t moeExpertNum, c
 {
     OP_TILING_CHECK(
         (moeExpertNum <= 0) || (moeExpertNum > MOE_EXPERT_MAX_NUM),
-        OP_LOGE_WITH_INVALID_ATTR(ATTN_FFN_INNER_DEBUG, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(ATTN_FFN_INNER_DEBUG, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
                                   (std::string("(0, ") + std::to_string(MOE_EXPERT_MAX_NUM) + "]").c_str()),
         return false);
     if (allowMxQuantMode) {
         OP_TILING_CHECK(quantMode != UNQUANT_MODE && quantMode != DYNAMIC_QUANT_MODE &&
                             !IsMxQuantMode(static_cast<uint32_t>(quantMode)),
-                        OP_LOGE_WITH_INVALID_ATTR(ATTN_FFN_INNER_DEBUG, "quant_mode", std::to_string(quantMode).c_str(),
+                        OP_LOGE_FOR_INVALID_VALUE(ATTN_FFN_INNER_DEBUG, "quant_mode", std::to_string(quantMode).c_str(),
                                                   "0, 2, 3, 4, 5, 6 or 7"),
                         return false);
     } else {
         OP_TILING_CHECK(
             (quantMode < static_cast<int64_t>(NO_SCALES)) || (quantMode > static_cast<int64_t>(DYNAMIC_SCALES)),
-            OP_LOGE_WITH_INVALID_ATTR(ATTN_FFN_INNER_DEBUG, "quant_mode", std::to_string(quantMode).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(ATTN_FFN_INNER_DEBUG, "quant_mode", std::to_string(quantMode).c_str(),
                                       (std::string("[0, ") + std::to_string(DYNAMIC_SCALES) + "]").c_str()),
             return false);
     }
     OP_TILING_CHECK((syncFlag != 0) && (syncFlag != 1),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName, "sync_flag", std::to_string(syncFlag).c_str(), "0 or 1"),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "sync_flag", std::to_string(syncFlag).c_str(), "0 or 1"),
                     return false);
     OP_TILING_CHECK(
         (ffnStartRankId >= worldSizeRaw) || (ffnStartRankId < 0),
-        OP_LOGE_WITH_INVALID_ATTR(ATTN_FFN_INNER_DEBUG, "ffn_start_rank_id", std::to_string(ffnStartRankId).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(ATTN_FFN_INNER_DEBUG, "ffn_start_rank_id", std::to_string(ffnStartRankId).c_str(),
                                   (std::string("[0, ") + std::to_string(worldSizeRaw) + ")").c_str()),
         return false);
     OP_TILING_CHECK(
         (worldSize < MIN_WORLD_SIZE) || (static_cast<int64_t>(worldSize) > maxWorldSize),
-        OP_LOGE_WITH_INVALID_ATTR(
+        OP_LOGE_FOR_INVALID_VALUE(
             nodeName, "world_size", std::to_string(worldSize).c_str(),
             (std::string("[") + std::to_string(MIN_WORLD_SIZE) + ", " + std::to_string(maxWorldSize) + "]").c_str()),
         return false);
@@ -1038,7 +1038,7 @@ static ge::graphStatus CheckAttentionFFNRankRange(const char* nodeName, const At
     uint32_t ffnNum = tilingData->attentionToFFNInfo.worldSize - tilingData->attentionToFFNInfo.attentionWorkerNum;
     OP_TILING_CHECK(
         tilingData->attentionToFFNInfo.ffnStartRankId + ffnNum > tilingData->attentionToFFNInfo.worldSize,
-        OP_LOGE_WITH_INVALID_ATTR(
+        OP_LOGE_FOR_INVALID_VALUE(
             nodeName, "ffn_start_rank_id", std::to_string(tilingData->attentionToFFNInfo.ffnStartRankId).c_str(),
             (std::string("[0, ") + std::to_string(tilingData->attentionToFFNInfo.attentionWorkerNum) +
              "] (ffn_start_rank_id + ffn_num must not exceed world_size)")

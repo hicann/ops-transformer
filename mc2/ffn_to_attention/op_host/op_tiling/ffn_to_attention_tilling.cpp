@@ -135,7 +135,7 @@ static bool CheckAttrLimits(const char* nodeName, const int64_t worldSize, const
 {
     OP_TILING_CHECK(
         (worldSize < MIN_WORLD_SIZE) || (worldSize > MAX_WORLD_SIZE),
-        OP_LOGE_WITH_INVALID_ATTR(
+        OP_LOGE_FOR_INVALID_VALUE(
             nodeName, "worldSize", std::to_string(worldSize).c_str(),
             (std::string("[") + std::to_string(MIN_WORLD_SIZE) + ", " + std::to_string(MAX_WORLD_SIZE) + "]").c_str()),
         return false);
@@ -202,7 +202,7 @@ static bool CheckAndSetAttrs(const gert::TilingContext* context, const char* nod
     OP_TILING_CHECK(groupPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "group"), return false);
     OP_TILING_CHECK((strnlen(groupPtr, MAX_GROUP_NAME_LENGTH) == 0) ||
                         (strnlen(groupPtr, MAX_GROUP_NAME_LENGTH) == MAX_GROUP_NAME_LENGTH),
-                    OP_LOGE_WITH_INVALID_ATTR(
+                    OP_LOGE_FOR_INVALID_VALUE(
                         nodeName, "group",
                         (std::string("length=") + std::to_string(strnlen(groupPtr, MAX_GROUP_NAME_LENGTH))).c_str(),
                         "valid group name length"),

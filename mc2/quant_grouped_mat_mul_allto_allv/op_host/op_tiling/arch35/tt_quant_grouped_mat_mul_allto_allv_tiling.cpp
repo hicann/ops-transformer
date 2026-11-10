@@ -33,7 +33,7 @@ bool TTQuantGroupedMatmulAllToAllvTiling::IsCapable()
 {
     QuantModePair mode = GetQuantMode(context_, opName_);
     OP_TILING_CHECK(mode == QUANT_PAIR_ERROR,
-                    OP_LOGE_WITH_INVALID_ATTR(opName_, "quantMode", "QUANT_PAIR_ERROR", "valid quant mode"),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "quantMode", "QUANT_PAIR_ERROR", "valid quant mode"),
                     return false);
     if (mode == QUANT_PAIR_TT) {
         OP_LOGI(opName_, "TTQuantGroupedMatmulAllToAllvTiling TT mode capable.");

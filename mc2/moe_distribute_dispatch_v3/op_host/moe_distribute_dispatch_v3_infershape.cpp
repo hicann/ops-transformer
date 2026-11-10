@@ -168,11 +168,11 @@ static ge::graphStatus CheckSharedExpertAttr(const char* nodeName, int64_t epRan
                                              bool& isSharedDefault, bool& isNoShared)
 {
     OP_CHECK_IF((epRankId < 0) || (epRankId >= epWorldSize),
-                OP_LOGE_WITH_INVALID_ATTR(nodeName, "epRankId", std::to_string(epRankId).c_str(),
+                OP_LOGE_FOR_INVALID_VALUE(nodeName, "epRankId", std::to_string(epRankId).c_str(),
                                           (std::string("[0, ") + std::to_string(epWorldSize) + ")").c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF((sharedExpertRankNum < 0) || (sharedExpertRankNum >= epWorldSize),
-                OP_LOGE_WITH_INVALID_ATTR(nodeName, "sharedExpertRankNum", std::to_string(sharedExpertRankNum).c_str(),
+                OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertRankNum", std::to_string(sharedExpertRankNum).c_str(),
                                           (std::string("[0, ") + std::to_string(epWorldSize) + ")").c_str()),
                 return ge::GRAPH_FAILED);
     isSharedDefault = ((sharedExpertNum == 1) && (sharedExpertRankNum == 0));
@@ -181,7 +181,7 @@ static ge::graphStatus CheckSharedExpertAttr(const char* nodeName, int64_t epRan
                           ((sharedExpertRankNum % sharedExpertNum) == 0));
     bool isSharedSettingValid = (isSharedDefault || isNoShared || isValidShared);
     OP_CHECK_IF(!isSharedSettingValid,
-                OP_LOGE_WITH_INVALID_ATTR(nodeName, "sharedExpertRankNum",
+                OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertRankNum",
                                           (std::string("sharedExpertRankNum=") + std::to_string(sharedExpertRankNum) +
                                            ", sharedExpertNum=" + std::to_string(sharedExpertNum))
                                               .c_str(),
@@ -189,7 +189,7 @@ static ge::graphStatus CheckSharedExpertAttr(const char* nodeName, int64_t epRan
                 return ge::GRAPH_FAILED);
     moeRankNum = epWorldSize - sharedExpertRankNum;
     OP_CHECK_IF(moeRankNum <= 0,
-                OP_LOGE_WITH_INVALID_ATTR(nodeName, "sharedExpertRankNum", std::to_string(sharedExpertRankNum).c_str(),
+                OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertRankNum", std::to_string(sharedExpertRankNum).c_str(),
                                           (std::string("< ") + std::to_string(epWorldSize)).c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;

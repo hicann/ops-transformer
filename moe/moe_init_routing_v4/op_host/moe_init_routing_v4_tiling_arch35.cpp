@@ -77,7 +77,7 @@ protected:
         int64_t aerLen = aerPtr->GetSize();
         OP_CHECK_IF(
             aerLen != 2,
-            OP_LOGE_WITH_INVALID_ATTR_SIZE(context_->GetNodeName(), "active_expert_range", std::to_string(aerLen), "2"),
+            OP_LOGE_FOR_INVALID_LISTSIZE(context_->GetNodeName(), "active_expert_range", std::to_string(aerLen), "2"),
             return ge::GRAPH_FAILED);
         const int64_t* aerList = reinterpret_cast<const int64_t*>(aerPtr->GetData());
         expertStart_ = aerList[0];
@@ -91,10 +91,10 @@ protected:
             MIRV3_CHECK_GE_RET(GetInputAttr<int64_t>(scaleAlg, attrsPtr, V4_ATTR_SCALE_ALG_INDEX));
         }
         OP_CHECK_IF(scaleAlg != 0 && scaleAlg != 1,
-                    OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "scale_alg", std::to_string(scaleAlg), "0 or 1"),
+                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "scale_alg", std::to_string(scaleAlg), "0 or 1"),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(scaleAlg == 1 && quantMode_ != QUANT_MODE_HIF4,
-                    OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "scale_alg", std::to_string(scaleAlg),
+                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "scale_alg", std::to_string(scaleAlg),
                                               "1 is only supported when quant_mode is 10"),
                     return ge::GRAPH_FAILED);
         tilingDataPtr_->scaleAlg = scaleAlg;

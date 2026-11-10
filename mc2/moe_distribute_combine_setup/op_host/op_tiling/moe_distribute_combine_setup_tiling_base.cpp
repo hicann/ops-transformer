@@ -121,7 +121,7 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckRequiredAttrValue()
     auto epRankIdPtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_RANK_ID_INDEX);
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX);
     OP_TILING_CHECK(((*epRankIdPtr < 0) || (*epRankIdPtr >= *epWorldSizePtr)),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "epRankId", std::to_string(*epRankIdPtr).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "epRankId", std::to_string(*epRankIdPtr).c_str(),
                                               (std::string("[0, ") + std::to_string(*epWorldSizePtr) + ")").c_str()),
                     return ge::GRAPH_FAILED);
 
@@ -182,21 +182,21 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckOptionalAttrValue()
 
     // globalBs 会在后面获取 BS 后再次校验
     OP_TILING_CHECK((*globalBsPtr < 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "globalBs", std::to_string(*globalBsPtr).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "globalBs", std::to_string(*globalBsPtr).c_str(),
                                               "0 or maxBs * epWorldSize"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         (*commQuantModePtr != COMM_QUANT_NONE),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "commQuantMode", std::to_string(*commQuantModePtr).c_str(), "0"),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "commQuantMode", std::to_string(*commQuantModePtr).c_str(), "0"),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK((*commTypePtr != URMA_COMM),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "commType", std::to_string(*commTypePtr).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "commType", std::to_string(*commTypePtr).c_str(),
                                               std::to_string(URMA_COMM).c_str()),
                     return ge::GRAPH_FAILED);
     if (commAlgPtr != nullptr) {
         const std::string commAlg = std::string(commAlgPtr);
         OP_TILING_CHECK((commAlg != ""),
-                        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "commAlg", commAlg.c_str(), "null or empty string"),
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "commAlg", commAlg.c_str(), "null or empty string"),
                         return ge::GRAPH_FAILED);
     }
 
@@ -261,7 +261,7 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::GetComplexAttrAndSetTilingD
     const uint32_t& moeExpertNum = tilingData_->moeDistributeCombineSetupInfo.moeExpertNum;
 
     OP_TILING_CHECK((moeExpertNum % (epWorldSize - sharedExpertRankNum) != 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "moeExpertNum",
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "moeExpertNum",
                                               (std::string("moeExpertNum=") + std::to_string(moeExpertNum) +
                                                ", epWorldSize=" + std::to_string(epWorldSize) +
                                                ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
@@ -478,7 +478,7 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckTensorShapeSizeAndSetT
     uint32_t& epWorldSize = tilingData_->moeDistributeCombineSetupInfo.epWorldSize;
     OP_TILING_CHECK(
         (globalBs != 0) && ((globalBs < BS * epWorldSize) || (globalBs > MAX_BS * epWorldSize)),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "globalBs", std::to_string(globalBs).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "globalBs", std::to_string(globalBs).c_str(),
                                   (std::string("0 or [") + std::to_string(BS * epWorldSize) + std::string(", ") +
                                    std::to_string(MAX_BS * epWorldSize) + std::string("]"))
                                       .c_str()),

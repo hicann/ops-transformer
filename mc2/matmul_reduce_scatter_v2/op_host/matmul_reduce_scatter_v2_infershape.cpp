@@ -61,7 +61,7 @@ static ge::graphStatus InferDataTypeMatmulReduceScatterV2(gert::InferDataTypeCon
     } else {
         const int64_t* yDtypePtr = attrs->GetInt(INDEX_ATTR_Y_DTYPE);
         if (yDtypePtr == nullptr || *yDtypePtr == static_cast<int64_t>(ge::DataType::DT_UNDEFINED)) {
-            OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "yDtype", "DT_UNDEFINED", "valid dtype value");
+            OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "yDtype", "DT_UNDEFINED", "valid dtype value");
             return ge::GRAPH_FAILED;
         }
         yDtype = static_cast<ge::DataType>(*yDtypePtr);

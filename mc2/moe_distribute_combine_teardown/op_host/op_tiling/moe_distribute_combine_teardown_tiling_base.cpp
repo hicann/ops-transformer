@@ -434,7 +434,7 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorShapeRelation
 
     // 补充Attr的globalBs校验
     if ((globalBs != 0) && ((globalBs < Bs * epWorldSize) || (globalBs > MAX_BS * epWorldSize))) {
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "globalBs", std::to_string(globalBs).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "globalBs", std::to_string(globalBs).c_str(),
                                   (std::string("0 or [") + std::to_string(Bs * epWorldSize) + ", " +
                                    std::to_string(MAX_BS * epWorldSize) + "]")
                                       .c_str());

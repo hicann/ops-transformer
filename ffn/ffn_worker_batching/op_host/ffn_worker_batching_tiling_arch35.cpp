@@ -248,7 +248,7 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::GetAttrsInfo()
     const int64_t* expertNumPtr = attrs->GetAttrPointer<int64_t>(EXPERT_NUM_ATTR);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertNumPtr);
     OP_CHECK_IF(*expertNumPtr > EXPERT_IDX_MAX || *expertNumPtr <= 0,
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expert_num", std::to_string(*expertNumPtr),
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "expert_num", std::to_string(*expertNumPtr),
                                           "in (0, " + std::to_string(EXPERT_IDX_MAX) + "]"),
                 return ge::GRAPH_FAILED);
     expertNum_ = *expertNumPtr;
@@ -268,8 +268,8 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::ParseMaxOutShape(const gert::Runt
     const gert::ContinuousVector* maxOutShapePtr = attrs->GetAttrPointer<gert::ContinuousVector>(MAX_OUT_SHAPE_ATTR);
     OP_CHECK_NULL_WITH_CONTEXT(context_, maxOutShapePtr);
     OP_CHECK_IF(maxOutShapePtr->GetSize() != static_cast<size_t>(NUM_FOUR),
-                OP_LOGE_WITH_INVALID_ATTR_SIZE(context_->GetNodeName(), "max_out_shape",
-                                               std::to_string(maxOutShapePtr->GetSize()), std::to_string(NUM_FOUR)),
+                OP_LOGE_FOR_INVALID_LISTSIZE(context_->GetNodeName(), "max_out_shape",
+                                             std::to_string(maxOutShapePtr->GetSize()), std::to_string(NUM_FOUR)),
                 return ge::GRAPH_FAILED);
     const int64_t* maxOutShapeArray = reinterpret_cast<const int64_t*>(maxOutShapePtr->GetData());
     A_ = maxOutShapeArray[INDEX_ZERO];
@@ -277,20 +277,20 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::ParseMaxOutShape(const gert::Runt
     K_ = maxOutShapeArray[INDEX_TWO];
     H_ = maxOutShapeArray[INDEX_THREE];
     OP_CHECK_IF((A_ > MAX_SESSION_NUM || A_ <= 0),
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "max_out_shape[0]", std::to_string(A_),
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "max_out_shape[0]", std::to_string(A_),
                                           "in (0, " + std::to_string(MAX_SESSION_NUM) + "]"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         BS_ <= 0,
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "max_out_shape[1]", std::to_string(BS_), "greater than 0"),
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "max_out_shape[1]", std::to_string(BS_), "greater than 0"),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF((K_ > MAX_K_NUM || K_ <= 0),
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "max_out_shape[2]", std::to_string(K_),
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "max_out_shape[2]", std::to_string(K_),
                                           "in (0, " + std::to_string(MAX_K_NUM) + "]"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         H_ <= 0,
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "max_out_shape[3]", std::to_string(H_), "greater than 0"),
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "max_out_shape[3]", std::to_string(H_), "greater than 0"),
         return ge::GRAPH_FAILED);
 
     // Check before multiplying: a post-product bound cannot undo signed overflow.
@@ -323,11 +323,11 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::ParseOptionalAttrs(const gert::Ru
     const int64_t* tokenDtype = attrs->GetAttrPointer<int64_t>(TOKEN_DTYPE_ATTR);
     if (tokenDtype != nullptr) {
         OP_CHECK_IF((*tokenDtype < Arch35Config::TOKEN_FP16 || *tokenDtype > Arch35Config::TOKEN_FP4_E2M1),
-                    OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "token_dtype", std::to_string(*tokenDtype),
+                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "token_dtype", std::to_string(*tokenDtype),
                                               "one of [0, 1, 2, 3, 4, 5]"),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(*tokenDtype == Arch35Config::TOKEN_FP4_E2M1 && H_ % Arch35Config::FP4_VALUES_PER_BYTE != 0,
-                    OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "max_out_shape[3]", std::to_string(H_),
+                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "max_out_shape[3]", std::to_string(H_),
                                               "even when token_dtype is 5 (float4_e2m1)"),
                     return ge::GRAPH_FAILED);
         tokenDtype_ = *tokenDtype;
@@ -336,7 +336,7 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::ParseOptionalAttrs(const gert::Ru
     const int64_t* needSchedulePtr = attrs->GetAttrPointer<int64_t>(NEED_SCHEDULE_ATTR);
     if (needSchedulePtr != nullptr) {
         OP_CHECK_IF((*needSchedulePtr < 0 || *needSchedulePtr > 1),
-                    OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "need_schedule",
+                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "need_schedule",
                                               std::to_string(*needSchedulePtr), "one of [0, 1]"),
                     return ge::GRAPH_FAILED);
         needSchedule_ = *needSchedulePtr;
@@ -350,7 +350,7 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::ParseOptionalAttrs(const gert::Ru
     const int64_t* layNumPtr = attrs->GetAttrPointer<int64_t>(LAY_NUM_ATTR);
     if (layNumPtr != nullptr) {
         OP_CHECK_IF((*layNumPtr < 0 || *layNumPtr > expertNum),
-                    OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "layer_num", std::to_string(*layNumPtr),
+                    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "layer_num", std::to_string(*layNumPtr),
                                               "in [0, " + std::to_string(expertNum) + "]"),
                     return ge::GRAPH_FAILED);
         layerNum_ = *layNumPtr;
@@ -369,7 +369,7 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::ParseOptionalAttrs(const gert::Ru
     // deriving payload bytes. FP4 stores two values per byte; MX scale follows
     // the token and uses one byte per 32 logical elements (including tail).
     OP_CHECK_IF(H_ > std::numeric_limits<uint32_t>::max(),
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "max_out_shape[3]", std::to_string(H_),
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "max_out_shape[3]", std::to_string(H_),
                                           "at most " + std::to_string(std::numeric_limits<uint32_t>::max())),
                 return ge::GRAPH_FAILED);
     const int64_t tokenBytes =

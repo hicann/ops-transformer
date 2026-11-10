@@ -137,7 +137,7 @@ ge::graphStatus MxQuantMatmulAllToAllTilingBase::CheckX2Transpose(const gert::Ti
         // HiF4 支持转置与非转置两种 B 矩阵布局(kernel 侧通过 TransB 模板参数区分)
         return ge::GRAPH_SUCCESS;
     }
-    OP_TILING_CHECK(!(*isTransX2), OP_LOGE_WITH_INVALID_ATTR(opName, "transpose_x2", "false", "true"),
+    OP_TILING_CHECK(!(*isTransX2), OP_LOGE_FOR_INVALID_VALUE(opName, "transpose_x2", "false", "true"),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -689,7 +689,7 @@ ge::graphStatus MxQuantMatmulAllToAllTilingBase::CheckQuantGroupSize(const gert:
     const uint64_t expectGroupSizeK = isHiF4_ ? HIF4_SCALE_BLOCK_K : MX_GROUP_SIZE_K;
     OP_TILING_CHECK(
         (groupSizeM != MX_GROUP_SIZE_M) || (groupSizeN != MX_GROUP_SIZE_N) || (groupSizeK != expectGroupSizeK),
-        OP_LOGE_WITH_INVALID_ATTR(
+        OP_LOGE_FOR_INVALID_VALUE(
             opName_, "groupSize",
             (std::string("[groupSizeM=") + std::to_string(groupSizeM) + ", groupSizeN=" + std::to_string(groupSizeN) +
              ", groupSizeK=" + std::to_string(groupSizeK) + "]")

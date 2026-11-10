@@ -401,14 +401,14 @@ static ge::graphStatus CheckQuantMode(const gert::InferDataTypeContext* context,
 {
     if (static_cast<QuantMode>(*quantMode) == QuantMode::QUANT_MODE_STATIC) {
         if ((yDtype != static_cast<int64_t>(ge::DT_INT8)) && (yDtype != static_cast<int64_t>(ge::DT_HIFLOAT8))) {
-            OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(),
                                       "INT8 or HIFLOAT8");
             return ge::GRAPH_FAILED;
         }
     } else if (static_cast<QuantMode>(*quantMode) == QuantMode::QUANT_MODE_PERTOKEN) {
         if ((yDtype != static_cast<int64_t>(ge::DT_INT8)) && (yDtype != static_cast<int64_t>(ge::DT_FLOAT8_E4M3FN)) &&
             (yDtype != static_cast<int64_t>(ge::DT_FLOAT8_E5M2))) {
-            OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(),
                                       "INT8 or FLOAT8_E4M3FN or FLOAT8_E5M2");
             return ge::GRAPH_FAILED;
         }
@@ -416,7 +416,7 @@ static ge::graphStatus CheckQuantMode(const gert::InferDataTypeContext* context,
                (static_cast<QuantMode>(*quantMode) == QuantMode::QUANT_MODE_MX_CLIP)) {
         if ((yDtype != static_cast<int64_t>(ge::DT_FLOAT8_E4M3FN)) &&
             (yDtype != static_cast<int64_t>(ge::DT_FLOAT8_E5M2))) {
-            OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(),
                                       "FLOAT8_E4M3FN, FLOAT8_E5M2");
             return ge::GRAPH_FAILED;
         }
@@ -425,13 +425,13 @@ static ge::graphStatus CheckQuantMode(const gert::InferDataTypeContext* context,
             (yDtype != static_cast<int64_t>(ge::DT_FLOAT8_E5M2)) &&
             (yDtype != static_cast<int64_t>(ge::DT_FLOAT4_E2M1)) &&
             (yDtype != static_cast<int64_t>(ge::DT_FLOAT4_E1M2))) {
-            OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(),
                                       "FLOAT8_E4M3FN, FLOAT8_E5M2, FLOAT4_E2M1, FLOAT4_E1M2");
             return ge::GRAPH_FAILED;
         }
     } else if (static_cast<QuantMode>(*quantMode) == QuantMode::QUANT_MODE_HIF4) {
         if (yDtype != static_cast<int64_t>(Ops::Transformer::DT_HIFLOAT4)) {
-            OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(), "HIFLOAT4");
+            OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "y_dtype", std::to_string(yDtype).c_str(), "HIFLOAT4");
             return ge::GRAPH_FAILED;
         }
     }

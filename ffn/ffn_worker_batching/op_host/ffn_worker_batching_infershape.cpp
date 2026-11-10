@@ -59,14 +59,14 @@ static graphStatus InferShape4FfnWorkerBatching(gert::InferShapeContext* context
     OP_CHECK_NULL_WITH_CONTEXT(context, expertNumPtr);
     auto expertNum = *expertNumPtr;
     if (expertNum <= 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expert_num", std::to_string(expertNum), "greater than 0");
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "expert_num", std::to_string(expertNum), "greater than 0");
         return ge::GRAPH_FAILED;
     }
     auto maxOutShapePtr = attrs->GetAttrPointer<gert::TypedContinuousVector<int64_t>>(MAX_OUT_SHAPE_ATTR);
     OP_CHECK_NULL_WITH_CONTEXT(context, maxOutShapePtr);
     if (maxOutShapePtr->GetSize() != NUM_FOUR) {
-        OP_LOGE_WITH_INVALID_ATTR_SIZE(context->GetNodeName(), "max_out_shape",
-                                       std::to_string(maxOutShapePtr->GetSize()), std::to_string(NUM_FOUR));
+        OP_LOGE_FOR_INVALID_LISTSIZE(context->GetNodeName(), "max_out_shape", std::to_string(maxOutShapePtr->GetSize()),
+                                     std::to_string(NUM_FOUR));
         return ge::GRAPH_FAILED;
     }
 
@@ -76,7 +76,7 @@ static graphStatus InferShape4FfnWorkerBatching(gert::InferShapeContext* context
     const int64_t K = maxOutShapeArray[INDEX_TWO];
     const int64_t H = maxOutShapeArray[INDEX_THREE];
     if (A <= 0 || BS <= 0 || K <= 0 || H <= 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "max_out_shape",
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "max_out_shape",
                                   "[" + std::to_string(A) + ", " + std::to_string(BS) + ", " + std::to_string(K) +
                                       ", " + std::to_string(H) + "]",
                                   "all elements greater than 0");
@@ -85,7 +85,7 @@ static graphStatus InferShape4FfnWorkerBatching(gert::InferShapeContext* context
     // The runtime context stores H as uint32. Reject unsupported values during
     // inference, before deriving output shapes or reaching the later tiling checks.
     OP_CHECK_IF(H > std::numeric_limits<uint32_t>::max(),
-                OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "max_out_shape[3]", std::to_string(H),
+                OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "max_out_shape[3]", std::to_string(H),
                                           "at most " + std::to_string(std::numeric_limits<uint32_t>::max())),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(A > std::numeric_limits<int64_t>::max() / BS,
@@ -135,7 +135,7 @@ static graphStatus InferShape4FfnWorkerBatching(gert::InferShapeContext* context
     const int64_t* tokenDtypePtr = attrs->GetAttrPointer<int64_t>(TOKEN_DTYPE_ATTR);
     const int64_t tokenDtype = tokenDtypePtr == nullptr ? TOKEN_KIND_ZERO : *tokenDtypePtr;
     if (tokenDtype == TOKEN_DTYPE_E2M1 && H % EVEN_ALIGN != 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "max_out_shape[3]", std::to_string(H),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "max_out_shape[3]", std::to_string(H),
                                   "even when token_dtype is 5 (float4_e2m1)");
         return ge::GRAPH_FAILED;
     }

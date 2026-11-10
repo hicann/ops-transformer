@@ -136,17 +136,17 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckRequiredAttrVal
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_MOE_EXPERT_NUM_INDEX);
 
     OP_TILING_CHECK(((*epWorldSizePtr < MIN_GROUP_EP_SIZE) || (*epWorldSizePtr > MAX_GROUP_EP_SIZE)),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "epWorldSize", std::to_string(*epWorldSizePtr).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "epWorldSize", std::to_string(*epWorldSizePtr).c_str(),
                                               (std::string("[") + std::to_string(MIN_GROUP_EP_SIZE) + ", " +
                                                std::to_string(MAX_GROUP_EP_SIZE) + "]")
                                                   .c_str()),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(((*epRankIdPtr < 0) || (*epRankIdPtr >= *epWorldSizePtr)),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "epRankId", std::to_string(*epRankIdPtr).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "epRankId", std::to_string(*epRankIdPtr).c_str(),
                                               (std::string("[0, ") + std::to_string(*epWorldSizePtr) + ")").c_str()),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(((*moeExpertNumPtr <= 0) || (*moeExpertNumPtr > MAX_MOE_EXPERT_NUM)),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "moeExpertNum", std::to_string(*moeExpertNumPtr).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "moeExpertNum", std::to_string(*moeExpertNumPtr).c_str(),
                                               (std::string("(0, ") + std::to_string(MAX_MOE_EXPERT_NUM) + "]").c_str()),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
@@ -199,37 +199,37 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckOptionalAttrVal
 
     OP_TILING_CHECK(
         (*expertShardTypePtr != 0),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "expertShardType", std::to_string(*expertShardTypePtr).c_str(), "0"),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "expertShardType", std::to_string(*expertShardTypePtr).c_str(), "0"),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         ((*sharedExpertNumPtr < 0) || (*sharedExpertNumPtr > MAX_SHARED_EXPERT_NUM)),
-        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "sharedExpertNum", std::to_string(*sharedExpertNumPtr).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "sharedExpertNum", std::to_string(*sharedExpertNumPtr).c_str(),
                                   (std::string("[0, ") + std::to_string(MAX_SHARED_EXPERT_NUM) + "]").c_str()),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         ((*sharedExpertRankNumPtr < 0) ||
          (*sharedExpertRankNumPtr > (tilingData_->moeDistributeDispatchSetupInfo.epWorldSize / 2))),
-        OP_LOGE_WITH_INVALID_ATTR(
+        OP_LOGE_FOR_INVALID_VALUE(
             nodeName_, "sharedExpertRankNum", std::to_string(*sharedExpertRankNumPtr).c_str(),
             (std::string("[0, ") + std::to_string(tilingData_->moeDistributeDispatchSetupInfo.epWorldSize / 2) + "]")
                 .c_str()),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(((*quantModePtr < UNQUANT) || (*quantModePtr > MX_QUANT)),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "quantMode", std::to_string(*quantModePtr).c_str(), "0 to 4"),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "quantMode", std::to_string(*quantModePtr).c_str(), "0 to 4"),
                     return ge::GRAPH_FAILED);
     // globalBs 会在后面获取 BS 后再次校验
     OP_TILING_CHECK((*globalBsPtr < 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "globalBs", std::to_string(*globalBsPtr).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "globalBs", std::to_string(*globalBsPtr).c_str(),
                                               "0 or maxBs * epWorldSize"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((*commTypePtr != URMA_COMM),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "commType", std::to_string(*commTypePtr).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "commType", std::to_string(*commTypePtr).c_str(),
                                               std::to_string(URMA_COMM).c_str()),
                     return ge::GRAPH_FAILED);
     if (commAlgPtr != nullptr) {
         const std::string commAlg = std::string(commAlgPtr);
         OP_TILING_CHECK((commAlg != ""),
-                        OP_LOGE_WITH_INVALID_ATTR(nodeName_, "commAlg", commAlg.c_str(), "null or empty string"),
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName_, "commAlg", commAlg.c_str(), "null or empty string"),
                         return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -310,7 +310,7 @@ ge::graphStatus MoeDistributeDispatchSetupTilingBase::GetComplexAttrAndSetTiling
     }
 
     OP_TILING_CHECK((moeExpertNum % (epWorldSize - sharedExpertRankNum) != 0),
-                    OP_LOGE_WITH_INVALID_ATTR(nodeName_, "moeExpertNum",
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName_, "moeExpertNum",
                                               (std::string("moeExpertNum=") + std::to_string(moeExpertNum) +
                                                ", epWorldSize=" + std::to_string(epWorldSize) +
                                                ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
@@ -625,7 +625,7 @@ ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckTensorShapeSizeAndSet
 
     OP_TILING_CHECK(
         (globalBs != 0) && ((globalBs < BS * epWorldSize) || (globalBs > MAX_BS * epWorldSize)),
-        OP_LOGE_WITH_INVALID_ATTR(
+        OP_LOGE_FOR_INVALID_VALUE(
             nodeName_, "globalBs", std::to_string(globalBs).c_str(),
             (std::string(">= ") + std::to_string(BS * epWorldSize) + " and <= 512 * epWorldSize, or 0").c_str()),
         return ge::GRAPH_FAILED);

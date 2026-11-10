@@ -93,7 +93,7 @@ static ge::graphStatus GetRankSize(gert::InferShapeContext* context, QuantAllRed
     OP_LOGE_IF(rankSize == nullptr, ge::GRAPH_FAILED, context->GetNodeName(),
                "Get rank_size failed in quant_all_reduce");
     OP_TILING_CHECK(std::find(SUPPORT_RANK_SIZE.begin(), SUPPORT_RANK_SIZE.end(), *rankSize) >= SUPPORT_RANK_SIZE.end(),
-                    OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "rankSize", std::to_string(*rankSize).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "rankSize", std::to_string(*rankSize).c_str(),
                                               VectorToString(SUPPORT_RANK_SIZE).c_str()),
                     return ge::GRAPH_FAILED);
 

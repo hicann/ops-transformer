@@ -311,7 +311,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5GetWorkspaceSize(
         } else if (strcmp(commMode, COMM_MODE_CCU) == 0) {
             commModeEnum = Mc2Comm::COMM_MODE_CCU;
         } else {
-            OP_LOGE_WITH_INVALID_ATTR("aclnnQuantMatmulAllReduceV5GetWorkspaceSize", "commMode", commMode,
+            OP_LOGE_FOR_INVALID_VALUE("aclnnQuantMatmulAllReduceV5GetWorkspaceSize", "commMode", commMode,
                                       "'ccu' or 'ai_cpu'");
             return ACLNN_ERR_PARAM_INVALID;
         }

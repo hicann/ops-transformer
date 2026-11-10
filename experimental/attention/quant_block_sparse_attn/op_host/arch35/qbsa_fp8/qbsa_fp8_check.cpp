@@ -104,7 +104,7 @@ ge::graphStatus QbsaFp8Arch35Tiling::CheckFp8Attrs() const
     if (tilingInfo_.opParamInfo.maskMode != nullptr &&
         *tilingInfo_.opParamInfo.maskMode != static_cast<int64_t>(QBSA_MASK_MODE_NONE) &&
         *tilingInfo_.opParamInfo.maskMode != static_cast<int64_t>(QBSA_MASK_MODE_CAUSAL)) {
-        OP_LOGE_WITH_INVALID_ATTR(kOpName, "mask_mode", std::to_string(*tilingInfo_.opParamInfo.maskMode), "0 or 3");
+        OP_LOGE_FOR_INVALID_VALUE(kOpName, "mask_mode", std::to_string(*tilingInfo_.opParamInfo.maskMode), "0 or 3");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

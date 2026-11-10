@@ -106,7 +106,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckAttrs(const gert::TilingContext* con
         tilingData->balanceMode = 0;
     } else {
         OP_TILING_CHECK(((*balanceModePtr < 0) || (*balanceModePtr > 1)),
-                        OP_LOGE_WITH_INVALID_ATTR(MOE_UPDATE_EXPERT_DEBUG, "balanceMode",
+                        OP_LOGE_FOR_INVALID_VALUE(MOE_UPDATE_EXPERT_DEBUG, "balanceMode",
                                                   std::to_string(*balanceModePtr).c_str(), "[0, 1]"),
                         return ge::GRAPH_FAILED);
         tilingData->balanceMode = *balanceModePtr;
@@ -118,7 +118,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckAttrs(const gert::TilingContext* con
                         return ge::GRAPH_FAILED);
         OP_TILING_CHECK(
             (*worldSizePtr < MIN_WORLD_SIZE) || (*worldSizePtr > MAX_WORLD_SIZE),
-            OP_LOGE_WITH_INVALID_ATTR(
+            OP_LOGE_FOR_INVALID_VALUE(
                 MOE_UPDATE_EXPERT_DEBUG, "worldSize", std::to_string(*worldSizePtr).c_str(),
                 (std::string("[") + std::to_string(MIN_WORLD_SIZE) + ", " + std::to_string(MAX_WORLD_SIZE) + "]")
                     .c_str()),
@@ -130,7 +130,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckAttrs(const gert::TilingContext* con
                         return ge::GRAPH_FAILED);
         OP_TILING_CHECK(
             (*localRankIdPtr < 0) || (*localRankIdPtr >= worldSize),
-            OP_LOGE_WITH_INVALID_ATTR(MOE_UPDATE_EXPERT_DEBUG, "localRankId", std::to_string(*localRankIdPtr).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(MOE_UPDATE_EXPERT_DEBUG, "localRankId", std::to_string(*localRankIdPtr).c_str(),
                                       (std::string("[0, ") + std::to_string(worldSize) + ")").c_str()),
             return ge::GRAPH_FAILED);
         localRankId = *localRankIdPtr;
