@@ -237,15 +237,17 @@ bool SparseLightningIndexerGradKLLossTilingBaseRegbase::AnalyzeAttrs()
     idx++;
     scaleValue = *scaleValuePtr;
     inputLayout = inputLayoutPtr;
-    sparseMode = *sparseModePtr;
+    const int64_t sparseModeValue = *sparseModePtr;
     deterministic = (context_->GetDeterministic() == 1);
 
-    OP_CHECK_IF(sparseMode != SPARSE_MODE_SIZE_3,
-                OP_LOGE(opName, " The value of sparse_mode is [%d], but currently only supports mode [3].", sparseMode),
-                return false);
+    OP_CHECK_IF(
+        sparseModeValue != SPARSE_MODE_SIZE_3,
+        OP_LOGE(opName, " The value of sparse_mode is [%ld], but currently only supports mode [3].", sparseModeValue),
+        return false);
+    sparseMode = sparseModeValue;
     OP_CHECK_IF(strcmp(inputLayout, "TND") != 0 && strcmp(inputLayout, "BSND") != 0,
                 OP_LOGE(opName, "Layout only support TND or BSND, now layout is %s.", inputLayout), return false);
-    OP_LOGD(context_, "attrs: scaleValue[%f] input_layout[%s] sparse_mode[%ld].", scaleValue, inputLayout, sparseMode);
+    OP_LOGD(context_, "attrs: scaleValue[%f] input_layout[%s] sparse_mode[%d].", scaleValue, inputLayout, sparseMode);
 
     if (CheckOutPut() == ge::GRAPH_FAILED) {
         return false;
