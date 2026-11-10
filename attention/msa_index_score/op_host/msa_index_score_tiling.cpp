@@ -270,8 +270,19 @@ inline uint32_t EstKvChunksA2ByBatch(uint32_t aicNum, uint32_t mTasks, uint32_t 
     return bestChunks;
 }
 
+// 每请求只有一个 M-tile（短 decode）。packed+B 上界会让 chunks 对不齐真实 batch，950 上同样空核。
+inline bool OneTilePerRequest(const MsaIndexScoreInfo& info, uint32_t aicNum)
+{
+    if (info.batch < 1U || info.batch >= aicNum) {
+        return false;
+    }
+    const uint64_t rows = static_cast<uint64_t>(info.totalQ) * static_cast<uint64_t>(info.numQHeads);
+    return (rows > 0U) && (rows <= static_cast<uint64_t>(info.batch) * MSA_ROW_TILE_M);
+}
+
 // 950：M-task 填不满 AIC 且可见 KV stile 足够时，沿 S 切开打满核。A1 类 packedM≈aicNum 时 kvChunks=1。
-// A2/A3 走 EstKvChunksA2，不改变 950 的 chunks=aic/packedM。
+// 短 decode（每请求一个 M-tile）与 A2/A3 一样按真实 batch 取 chunks，避免 packed+B 上界留下空核。
+// 其余 950 形状仍用 chunks=aic/packedM。A2/A3 分支不改。
 inline uint32_t EstKvChunks(const MsaIndexScoreInfo& info, uint32_t aicNum, uint32_t packedM, uint32_t visBlocks)
 {
     if (packedM == 0U || aicNum == 0U) {
@@ -284,10 +295,7 @@ inline uint32_t EstKvChunks(const MsaIndexScoreInfo& info, uint32_t aicNum, uint
         return 1U;
     }
     if (!info.isAscend950) {
-        const uint64_t rows = static_cast<uint64_t>(info.totalQ) * static_cast<uint64_t>(info.numQHeads);
-        const bool oneTilePerReq = (info.batch >= 1U) && (info.batch < aicNum) && (rows > 0U) &&
-                                   (rows <= static_cast<uint64_t>(info.batch) * MSA_ROW_TILE_M);
-        if (oneTilePerReq) {
+        if (OneTilePerRequest(info, aicNum)) {
             const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
             return EstKvChunksA2ByBatch(aicNum, info.batch, nStiles);
         }
@@ -296,6 +304,9 @@ inline uint32_t EstKvChunks(const MsaIndexScoreInfo& info, uint32_t aicNum, uint
     const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
     if (nStiles <= 1U) {
         return 1U;
+    }
+    if (OneTilePerRequest(info, aicNum)) {
+        return EstKvChunksA2ByBatch(aicNum, info.batch, nStiles);
     }
     uint32_t chunks = aicNum / packedM;
     if (chunks > nStiles) {

@@ -164,6 +164,8 @@ private:
         MsaTask task;
         for (uint32_t taskIdx = coreIdx; taskIdx < totalTasks; taskIdx += coreNum) {
             scheduler_.Decode(taskIdx, task);
+            // block_table 按 256B 预取，盖住后续逐页 GetValue 的 HBM 延迟。
+            PreloadBlockTable(task);
             bool needLoadQ = true;
             bool qSynced = false;
             for (uint32_t st = task.sStileBegin; st < task.sStileEnd; ++st) {
@@ -196,6 +198,8 @@ private:
             if (task.sBlkBegin >= task.sBlkEnd) {
                 continue;
             }
+            // block_table 按 256B 预取，盖住后续逐页 GetValue 的 HBM 延迟。
+            PreloadBlockTable(task);
             bool needLoadQ = true;
             uint32_t pageSeq = 0;
             if constexpr (IS_BLOCK16) {
@@ -302,6 +306,23 @@ private:
         }
         const uint32_t seqRemain = static_cast<uint32_t>(task.kvLen) - seqTok;
         return seqRemain < MSA_BLOCK_SIZE ? seqRemain : MSA_BLOCK_SIZE;
+    }
+
+    /// PA block_table 一行可能有数百个 int32。dc_preload 每次 256B，在 QK 开始前发出。
+    __aicore__ inline void PreloadBlockTable(const MsaTask& task)
+    {
+        // TND/BSND/BNSD 没有 block_table，gBlockTable_ 未绑定。对空地址 dc_preload 会把设备打成 507015。
+        if (!MsaIsPaKeyLayout(tiling_->keyLayout) || task.sBlkEnd <= task.sBlkBegin) {
+            return;
+        }
+        const uint32_t nBlk = task.sBlkEnd - task.sBlkBegin;
+        const __gm__ int32_t* row = gBlockTable_.GetPhyAddr() +
+                                    static_cast<uint64_t>(task.batchIdx) * tiling_->maxBlocksPerBatch + task.sBlkBegin;
+        const uint32_t bytes = nBlk * static_cast<uint32_t>(sizeof(int32_t));
+        auto* base = reinterpret_cast<__gm__ uint64_t*>(const_cast<__gm__ int32_t*>(row));
+        for (uint32_t off = 0; off < bytes; off += 256U) {
+            dc_preload(base, static_cast<int64_t>(off));
+        }
     }
 
     __aicore__ inline uint64_t KeyBlockGmOffset(const MsaTask& task, uint32_t blk) const
