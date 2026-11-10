@@ -644,7 +644,7 @@ aclnnStatus aclnnGroupedMatmulV4(
 
       | x | weight | bias | scale | offset | antiquantScale | antiquantOffset | perTokenScale | groupList | activationInput | activationQuantScale | activationQuantOffset | out |
       |---------|----------------|--------------|--------|------------|----------------|-----------------|---------------|-----------|-----------------|----------------------|-----------------------|---------|
-      | INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | null | null | null | FLOAT | INT64 | null | null | null | BFLOAT16|
+      | INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | FLOAT/null | null | null | FLOAT | INT64 | null | null | null | BFLOAT16|
       | INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | FLOAT/null | null | null | FLOAT | INT64 | null | null | null | FLOAT16 |
 
     - **Constraints**
@@ -663,8 +663,9 @@ aclnnStatus aclnnGroupedMatmulV4(
         - In this scenario, scale is the result of offline fusion of pergroup and perchannel, with the shape requirement of $[E, quantGroupNum, N]$, where $quantGroupNum=k \div quantGroupSize$.
         - In this scenario, when the expected number of tokens processed by each expert is greater than n/4, that is, when the first value in tuningConfigOptional is greater than n/4, better performance is usually achieved, and the memory usage increases by $g\times k \times n$ bytes (where g is the number of matmul groups, i.e., the number of groups).
       - When offset is not empty
-        - scale is the result of offline fusion of pergroup and perchannel, with the shape required to be $[E, 1, N]$.
-        - In this scenario, offsetOptional is not empty. For asymmetric quantization, offsetOptional is an auxiliary result computed offline during the calculation process, i.e., $antiquantOffset \times scale$, with its shape required to be $[E, 1, N]$ and dtype being FLOAT32.
+        - scale is the result of offline fusion of pergroup and perchannel, with the shape required to be $[E, quantGroupNum, N]$, where $quantGroupNum = k \div quantGroupSize$. Currently, quantGroupSize values of 64, 128, and 256 are supported.
+        - In this scenario, offsetOptional is not empty. For asymmetric quantization, offsetOptional is an auxiliary result computed offline during the calculation process, i.e., $antiquantOffset \times scale$, with its shape required to be $[E, quantGroupNum, N]$ and dtype being FLOAT32.
+        - In this scenario, the second element of tuningConfigOptional cannot be enabled.
       - The second element of the tuningConfigOptional array can be set to 1 to enable the special format template of weight in the A8W4 use case for operator performance optimization (shape range with performance gains: K >= 2048 && N >= 2048). Note that this template requires the shape of weight to be (E, N, K), which is then converted using ND2NZ before being used as the operator input.
     </details>
 

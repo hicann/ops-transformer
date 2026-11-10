@@ -759,7 +759,7 @@ Data type requirements::
 
 | x | weight | bias | scale | offset | perTokenScale | out |
 |---------|----------------|--------------|--------|------------|---------------|---------|
-| INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | null | FLOAT | BFLOAT16 |
+| INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | FLOAT/null | FLOAT | BFLOAT16 |
 | INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | FLOAT/null | FLOAT | FLOAT16 |
 
 - Description
@@ -779,8 +779,9 @@ Data type requirements::
     - In this scenario, scale is the result of pergroup and perchannel offline fusion. The shape must be $[E, quantGroupNum, N]$, where $quantGroupNum = k \div quantGroupSize$
     - In this scenario, if the expected number of tokens processed by each expert is greater than n/4, that is, the first value in tuningConfigOptional is greater than n/4, better performance is achieved. In this case, the $g \times k \times n$ bytes are added to the video memory usage (g indicates the number of matmul groups, that is, the number of groups).
   - When `offset` is not null:
-    - scale is the result of pergroup and perchannel offline fusion. The shape must be $[E, 1, N]$.
-    - In this case, `offsetOptional` is not null. Asymmetric quantization offsetOptional is the offline computation auxiliary result during computation, that is, $antiquantOffset \times scale$. The shape must be $[E, 1, N]$, and the dtype must be FLOAT32.
+    - scale is the result of pergroup and perchannel offline fusion. The shape must be $[E, quantGroupNum, N]$, where $quantGroupNum = k \div quantGroupSize$. Currently, quantGroupSize values of 64, 128, and 256 are supported.
+    - In this case, `offsetOptional` is not null. Asymmetric quantization offsetOptional is the offline computation auxiliary result during computation, that is, $antiquantOffset \times scale$. The shape must be $[E, quantGroupNum, N]$, and the dtype must be FLOAT32.
+    - In this scenario, the second element of tuningConfigOptional cannot be enabled.
   - The second element in the tuningConfigOptional array can be set to 1 to enable the special weight template in the A8W4 scenario (only per-channel is supported) to optimize the operator performance. For details about the shape range with performance advantages, see K >= 2048 && N >= 2048. Note that the template requires that the shape of the weight be (E, N, K). Then, the weight is converted to ND2NZ and then used as the operator input.
 
 </details>

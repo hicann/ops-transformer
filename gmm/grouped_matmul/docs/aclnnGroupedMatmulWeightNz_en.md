@@ -573,13 +573,14 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
       - Asymmetric quantization scenario:
 
-        - The dtype of the output out is FLOAT16.
+        - The dtype of the output out is FLOAT16 or BFLOAT16.
         - Only the count mode is supported (the operator does not check the value of groupListType).
         - {k, n} must be {7168, 4096} or {2048, 7168}.
-        - scale is the result of offline fusion of pergroup and perchannel, with the shape required to be $[E, 1, N]$.
-        - offsetOptional is not empty. In asymmetric quantization, offsetOptional is an auxiliary result computed offline during the computation process, i.e., $antiquantOffset \times scale$, with the shape required to be $[E, 1, N]$ and dtype being FLOAT32.
+        - scale is the result of offline fusion of pergroup and perchannel, with the shape required to be $[E, quantGroupNum, N]$, where $quantGroupNum = k \div quantGroupSize$. Currently, quantGroupSize values of 64, 128, and 256 are supported.
+        - offsetOptional is not empty. In asymmetric quantization, offsetOptional is an auxiliary result computed offline during the computation process, i.e., $antiquantOffset \times scale$, with the shape required to be $[E, quantGroupNum, N]$ and dtype being FLOAT32.
         - Bias is an auxiliary result computed offline during the computation process, with the value required to be $8\times weight \times scale$ and accumulated along the first dimension, and the shape required to be $[E, N]$.
         - N must be an integer multiple of 8.
+        - The second element of tuningConfigOptional cannot be enabled.
 
     - In the pseudo-quantized scenario, if the weight type is INT8, only perchannel mode is supported; if the weight type is INT4, symmetric quantization supports both perchannel and pergroup modes. For pergroup, the number of pergroups G or $G_i$ must be divisible by the corresponding $k_i$. If the weight is multi-tensor, define the pergroup length $s_i = k_i / G_i$, and all $s_i(i=1,2,...g)$ must be equal. Asymmetric quantization supports perchannel mode.
 
