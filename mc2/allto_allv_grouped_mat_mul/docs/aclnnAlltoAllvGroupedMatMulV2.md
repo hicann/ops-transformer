@@ -390,7 +390,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
 - 通信引擎约束：
 
   <!-- npu="910b" id14 -->
-  - <term>Atlas A2系列产品</term>：支持AIV通信。
+  - <term>Atlas A2系列产品</term>：仅支持AIV通信，`commMode`必须为`"aiv"`，`epWorldSize`支持2、4、8；不支持`"ai_cpu"`。
   <!-- end id14 -->
   <!-- npu="A3" id8 -->
   - <term>Atlas A3系列产品</term>：支持AIV和AI CPU通信。
