@@ -275,7 +275,7 @@ cann_ops_transformer.quant_flash_attn(
 | 参数名          | 参数类型   | 可选/必选 | 描述                                                                                                           | 数据类型     | 数据格式 | 维度              | 非连续Tensor |
 | :----------- | :----- | :---- | :----------------------------------------------------------------------------------------------------------- | :------- | :--- | :-------------- | :-------- |
 | attn_out    | Tensor | 必选    | quant_flash_attn的计算输出                                                                                     | bfloat16 | ND   | <ul><li>(Q_T, Q_N, D)（TND）</li><li>(B, Q_S, Q_N, D)（BSND）</li><li>(B, Q_N, Q_S, D)（BNSD）</li></ul> | ×         |
-| softmax_lse | Tensor | 可选    | softmax的LSE结果。`return_softmax_lse`为True时，输出shape为(Q_N, Q_T)的Tensor；`return_softmax_lse`为False时，则输出空Tensor | float32  | ND   | (Q_N, Q_T)    | ×         |
+| softmax_lse | Tensor | 可选    | softmax的LSE结果。`return_softmax_lse`为True时，输出shape随layout_q变化的Tensor；`return_softmax_lse`为False时，则输出空Tensor | float32  | ND   | <ul><li>(Q_N, Q_T)（TND）</li><li>(B, Q_N, Q_S)（BSND）</li><li>(B, Q_N, Q_S)（BNSD）</li></ul> | ×         |
 
 ## 约束说明
 
@@ -589,7 +589,12 @@ layout匹配关系表：<a name="layout匹配关系表"></a>
         <td>BSND</td>
         <td>TND/BSND/BNSD</td>
         <td>TND/BSND/BNSD</td>
-        <td>(Q_N, Q_T)</td>
+        <td>
+            <ul>
+                <li>(Q_N, Q_T)（layout_q=TND）</li>
+                <li>(B, Q_N, Q_S)（layout_q=BSND/BNSD）</li>
+            </ul>
+        </td>
     </tr>
     <tr>
         <td>quant_mode=1（MxFP8）</td>
@@ -612,7 +617,12 @@ layout匹配关系表：<a name="layout匹配关系表"></a>
             </ul>
         </td>
         <td>TND/BNSD/BSND（须与layout_q一致）</td>
-        <td>(Q_N, Q_T)</td>
+        <td>
+            <ul>
+                <li>(Q_N, Q_T)（layout_q=TND）</li>
+                <li>(B, Q_N, Q_S)（layout_q=BNSD/BSND）</li>
+            </ul>
+        </td>
     </tr>
     <tr>
         <td>quant_mode=6（FP8）</td>

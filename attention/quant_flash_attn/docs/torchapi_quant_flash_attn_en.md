@@ -270,7 +270,7 @@ In the document constraints, common fields are defined as follows:
 | Name      | Type   | Required/Optional | Description | Data Type     | Data Format | Dimension              | Non-contiguous Tensor |
 | :----------- | :----- | :---- | :--- | :------- | :--- | :--- | :-------- |
 | attn_out    | Tensor | Required    | Computation output of quant_flash_attn. | bfloat16 | ND   | <ul><li>(Q_T, Q_N, D)</li><li>(B, Q_S, Q_N, D) (HIF8 use case)</li><li>(B, Q_N, Q_S, D) (HIF8 use case)</li></ul> | ×         |
-| softmax_lse | Tensor | Optional    | LSE result of softmax. When `return_softmax_lse` is True, a Tensor with shape (Q_N, Q_T) is output; when `return_softmax_lse` is False, an empty Tensor is output. | float32  | ND   | (Q_N, Q_T)    | ×         |
+| softmax_lse | Tensor | Optional    | LSE result of softmax. When `return_softmax_lse` is True, a Tensor is output with a shape that depends on the layout_q; when `return_softmax_lse` is False, an empty Tensor is output. | float32  | ND   | <ul><li>(Q_N, Q_T) (TND)</li><li>(B, Q_N, Q_S) (BSND)</li><li>(B, Q_N, Q_S) (BNSD)</li></ul> | ×         |
 
 ## Constraints
 
@@ -553,7 +553,12 @@ layout matching relationship table:<a name="layout-matching-relationship-table">
         <td>BSND</td>
         <td>TND/BSND/BNSD</td>
         <td>TND/BSND/BNSD</td>
-        <td>(Q_N, Q_T)</td>
+        <td>
+            <ul>
+                <li>(Q_N, Q_T) (layout_q=TND)</li>
+                <li>(B, Q_N, Q_S) (layout_q=BSND/BNSD)</li>
+            </ul>
+        </td>
     </tr>
     <tr>
         <td>quant_mode=1 (MxFP8)</td>
