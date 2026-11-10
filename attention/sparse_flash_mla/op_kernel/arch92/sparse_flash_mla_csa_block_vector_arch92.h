@@ -1032,7 +1032,7 @@ TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe* pipe, ConstInfo& constInfo)
 {
     SoftmaxInitBuffer();
-    if constexpr (isPa && TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
+    if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND && TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
         mte2ToSOffsetsId = GetTPipePtr()->AllocEventID<HardEvent::MTE2_S>();
         sToMte2OffsetsId = GetTPipePtr()->AllocEventID<HardEvent::S_MTE2>();
     }
@@ -1096,7 +1096,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe* pipe, 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::FreeEvent()
 {
-    if constexpr (isPa && TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
+    if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND && TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE) {
         GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_S>(mte2ToSOffsetsId);
         GetTPipePtr()->ReleaseEventID<HardEvent::S_MTE2>(sToMte2OffsetsId);
     }
