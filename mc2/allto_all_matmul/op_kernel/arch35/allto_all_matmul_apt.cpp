@@ -28,7 +28,7 @@
 #include "allto_all_kc_quant_matmul_pipeline.h"
 #include "allto_all_mx_quant_matmul_arch35.h"
 #include "allto_all_mx_quant_matmul_pipeline.h"
-#include "../../../common/op_kernel/apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h"
+#include "../../../common/op_kernel/apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_tiling_data.h"
 #include "../../../common/op_kernel/apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_mx_quant_matmul_hcomm_impl.h"
 
 using AscendC::HcclServerType;

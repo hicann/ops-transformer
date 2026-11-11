@@ -10,7 +10,7 @@
 
 #include <kernel_operator.h>
 #include "allto_all_matmul_v2_tiling_key.h"
-#include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h"
+#include "apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_tiling_data.h"
 #include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_mx_quant_matmul_urma_impl.h"
 
 using namespace AscendC;
@@ -24,8 +24,8 @@ __global__ __aicore__ void allto_all_matmul_v2(GM_ADDR context, GM_ADDR x1, GM_A
     (void)all2all_out;
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
 
-    REGISTER_TILING_DEFAULT(allToAllMatmulTilingData);
-    GET_TILING_DATA_WITH_STRUCT(allToAllMatmulTilingData, tilingData, tilingGM);
+    REGISTER_TILING_DEFAULT(allToAllQuantMatmulTilingData);
+    GET_TILING_DATA_WITH_STRUCT(allToAllQuantMatmulTilingData, tilingData, tilingGM);
 
     __gm__ CommContext* hcommCtx = reinterpret_cast<__gm__ CommContext*>(context);
 

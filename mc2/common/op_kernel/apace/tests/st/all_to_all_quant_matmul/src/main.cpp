@@ -32,7 +32,7 @@
 #include "apace/utils/comm_channel_builder.h"
 #include "../../utils/root_info_exchanger.h"
 #include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
-#include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h"
+#include "apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_tiling_data.h"
 #include "apace_a2a_kernel_launcher.h"
 #include "apace/core/aiv_comm/collective_comm_context.h"
 
@@ -125,7 +125,7 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
 
     uint32_t ka = k / rankNum;
 
-    allToAllMatmulTilingData tilingData;
+    allToAllQuantMatmulTilingData tilingData;
 
     QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN> tilingEngine;
 

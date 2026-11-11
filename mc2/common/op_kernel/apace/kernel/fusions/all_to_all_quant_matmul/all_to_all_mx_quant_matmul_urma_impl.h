@@ -28,7 +28,7 @@
 #include "../../matmul/quant_batch_matmul/all_to_all_qbmm_mx_kernel.h"
 #include "blaze/gemm/utils/common_utils.h"
 #include "blaze/gemm/policy/dispatch_policy.h"
-#include "all_to_all_matmul_tiling_data.h"
+#include "../all_to_all_matmul/all_to_all_matmul_tiling_data.h"
 
 #include "apace/core/aiv_comm/collective_comm_api.h"
 #include "apace/core/aiv_comm/collective_comm_context.h"
@@ -79,7 +79,7 @@ public:
      */
     __aicore__ inline void Init(__gm__ CommContext* hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM,
                                 GM_ADDR scaleBGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR workspaceGM,
-                                const allToAllMatmulTilingData* tilingData);
+                                const allToAllQuantMatmulTilingData* tilingData);
     /**
      * @brief 执行算子逻辑（包含 AIC/AIV 分离逻辑）
      */
@@ -157,13 +157,13 @@ private:
         uint64_t rankDataBytes{0};
     } baseParams_;
 
-    const allToAllMatmulTilingData* tilingData_{nullptr};
+    const allToAllQuantMatmulTilingData* tilingData_{nullptr};
     Mc2Kernel::OpStateDump opStateDump_{};
     static constexpr uint8_t POS_COMM_BEFORE = 0U;
     static constexpr uint8_t POS_COMP_CUBE_MATMUL_BEFORE = 1U;
     static constexpr uint8_t POS_COMP_LOCAL_BEFORE = 2U;
     // ---------------- 私有方法 ----------------
-    __aicore__ inline void InitBaseParams(const allToAllMatmulTilingData* tilingData);
+    __aicore__ inline void InitBaseParams(const allToAllQuantMatmulTilingData* tilingData);
     __aicore__ inline void SetupParams(const QuantMatmulTilingData* mmTile, Params& out, MatmulMode matmulMode);
 
     __aicore__ inline void RunAllToAll();    // AIV 通信任务
@@ -178,7 +178,7 @@ private:
 template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::Init(
     __gm__ CommContext* hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM, GM_ADDR cGM,
-    GM_ADDR biasGM, GM_ADDR workspaceGM, const allToAllMatmulTilingData* tilingData)
+    GM_ADDR biasGM, GM_ADDR workspaceGM, const allToAllQuantMatmulTilingData* tilingData)
 {
     tilingData_ = tilingData;
     baseParams_.aGm = aGM;
@@ -279,7 +279,7 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
 
 template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::InitBaseParams(
-    const allToAllMatmulTilingData* tilingData)
+    const allToAllQuantMatmulTilingData* tilingData)
 {
     baseParams_.headMSize = tilingData->commTilingData.splitAxisTileSize;
     baseParams_.commTurn = tilingData->commTilingData.splitAxisTileCnt + tilingData->commTilingData.splitAxisTailCnt;

@@ -582,13 +582,13 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
         return ge::GRAPH_FAILED;
     }
     auto cap = rt->GetCapacity();
-    if (cap < sizeof(allToAllMatmulTilingData)) {
+    if (cap < sizeof(allToAllQuantMatmulTilingData)) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "rawTilingData");
         return ge::GRAPH_FAILED;
     }
     memset_s(rt->GetData(), cap, 0, cap);
 
-    auto* td = reinterpret_cast<allToAllMatmulTilingData*>(rt->GetData());
+    auto* td = reinterpret_cast<allToAllQuantMatmulTilingData*>(rt->GetData());
 
     auto* x1DescTiling = context_->GetInputDesc(IDX_INPUT_X1);
     if (x1DescTiling == nullptr) {
@@ -764,7 +764,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::PostTiling()
 {
     // tiling 数据只声明结构体大小（capacity-8），尾部 8 字节留给框架写入 DFX 指针（atomicIndex），
     // 否则异常 dump 时 IDEDD 从 opParaSize-8 处读到 0，导致 exception_info 解析中止
-    context_->GetRawTilingData()->SetDataSize(sizeof(allToAllMatmulTilingData));
+    context_->GetRawTilingData()->SetDataSize(sizeof(allToAllQuantMatmulTilingData));
     context_->SetScheduleMode(1);
     context_->SetBlockDim(usedCoreNum_);
     return ge::GRAPH_SUCCESS;

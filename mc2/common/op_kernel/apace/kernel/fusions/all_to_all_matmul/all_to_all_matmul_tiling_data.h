@@ -11,12 +11,14 @@
 /*!
  * \file all_to_all_matmul_tiling_data.h
  * \brief Serialized tiling data passed from the host launcher to the kernel.
+ *        量/非量化统一 tiling 结构（并入非量化 tileMmTilingData，CommContext 唯一定义）。
  */
 
 #pragma once
 
 #include <cstdint>
 #include "kernel_tiling/kernel_tiling.h"
+#include "../../../tiling/matmul_tiling_data.h"
 #include "../../../tiling/matmul_tiling/quant_matmul_tiling_data.h"
 #include "../../../tiling/tiling_data_struct_define.h"
 #include "../../../core/aiv_comm/collective_comm_context.h"
@@ -24,12 +26,19 @@
 
 // DFX 头部约定: dumpInfo 必须是 tiling 结构的第一个成员(offset 0)，
 // 异常 dump 回调直接从 tiling blob 起始位置解析 DfxDumpInfo
-struct allToAllMatmulTilingData {
+struct allToAllQuantMatmulTilingData {
     Utils::DfxDumpInfo dumpInfo{};
     CommTilingData commTilingData;
     CommTilingData scaleCommTilingData;
     QuantMatmulTilingData tileQbmmTilingData;
     uint32_t localMatmul{0}; // 是否使能local块计算先行，0：不使能；1：使能atomiadd
+};
+
+struct allToAllMatmulTilingData {
+    Utils::DfxDumpInfo dumpInfo{};
+    CommTilingData commTilingData;
+    MatmulTilingData tileMmTilingData; // 非量化 matmul tiling（mL1/nL1/kL1/l1BufferNum/l0cDB 等，无 scale 字段）
+    uint32_t localMatmul{0};           // 是否使能local块计算先行，0：不使能；1：使能atomiadd
 };
 
 struct CommContext {

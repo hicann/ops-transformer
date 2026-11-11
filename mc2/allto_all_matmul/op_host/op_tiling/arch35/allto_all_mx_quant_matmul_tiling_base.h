@@ -20,7 +20,7 @@
 #include "../../../op_kernel/arch35/allto_all_matmul_tiling_key.h"
 #include "../allto_all_matmul_tiling_base.h"
 #include "./allto_all_matmul_fit_balance_tiling.h"
-#include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h"
+#include "apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_tiling_data.h"
 #include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
 #include "mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_common_advanced.h"
 #include "mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h"

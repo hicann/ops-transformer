@@ -18,7 +18,7 @@ ccu_alltoall/
 │   ├── main.cpp                         # 示例入口：读数据 → FillTiling → 调用 → 校验 → 释放
 │   ├── all_to_all_matmul_ccu.asc        # 锚点/高级接口（§1 host 编排 / §2 AIC kernel 入口 + Custom）
 │   ├── ccu_all_to_all.asc               # CCU 通信服务（契约+引擎+资源 / tiling 契约 / host 装配 / __ccu_host__ kernel）
-│   ├── all_to_all_matmul_tiling_data.h  # tiling 聚合结构体 + FillAllToAllMatmulTilingData（SWAT）
+│   ├── ccu_all_to_all_tiling_data.h  # tiling 聚合结构体 + FillAllToAllMatmulTilingData（SWAT）
 │   └── all_to_all_matmul_aic.h          # AIC 计算逻辑（同步原语 / WaitPolicy + matmul 编排）
 ├── scripts/
 │   ├── gen_data.py                      # 数据生成（位型闭式，与原 C++ 生成器逐位一致）
@@ -33,7 +33,7 @@ include 链（单 TU，顺序即依赖顺序）：
 
 ```
 main.cpp(-xasc) → all_to_all_matmul_ccu.asc（锚点，唯一引入）
-                → { ccu_all_to_all.asc → all_to_all_matmul_tiling_data.h → all_to_all_matmul_aic.h } → 锚点体
+                → { ccu_all_to_all.asc → ccu_all_to_all_tiling_data.h → all_to_all_matmul_aic.h } → 锚点体
 ```
 
 后缀规则：`.asc` = 定义 kernel 入口【单次引入】，`.h` = 纯逻辑。
@@ -43,7 +43,7 @@ matmul kernel / tiling / utils 继续**原位引用** apace 仓（不拷贝）�
 
 - `apace/kernel/matmul/quant_batch_matmul/all_to_all_qbmm_mx_kernel.h`
 - `apace/utils/op_state_dump.h`
-- `apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h`（hcomm/urma 共享件）
+- `apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_tiling_data.h`（hcomm/urma 共享件）
 - `apace/tiling/quant_matmul_tiling_swat.h`
 
 ## 机制摘要（引自源文件头）

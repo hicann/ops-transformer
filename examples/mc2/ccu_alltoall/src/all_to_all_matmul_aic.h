@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include "ccu_all_to_all.asc"              // CCU 通信服务（同步原语的依赖底座）
-#include "all_to_all_matmul_tiling_data.h" // ccuAllToAllMatmulTilingData
+#include "ccu_all_to_all.asc"           // CCU 通信服务（同步原语的依赖底座）
+#include "ccu_all_to_all_tiling_data.h" // ccuAllToAllMatmulTilingData
 
 // ══════════ §1 AIC 侧同步原语（__aicore__）══════════
 
@@ -87,7 +87,7 @@ public:
 
 #include "apace/kernel/matmul/quant_batch_matmul/all_to_all_qbmm_mx_kernel.h"
 #include "apace/utils/op_state_dump.h"
-#include "all_to_all_matmul_tiling_data.h"
+#include "ccu_all_to_all_tiling_data.h"
 
 #include "blaze/gemm/utils/common_utils.h"
 #include "blaze/gemm/policy/dispatch_policy.h"

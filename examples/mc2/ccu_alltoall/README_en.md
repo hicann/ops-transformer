@@ -20,7 +20,7 @@ ccu_alltoall/
 │   ├── main.cpp                         # Sample entry: read data → FillTiling → invoke → verify → release
 │   ├── all_to_all_matmul_ccu.asc        # Anchors/advanced APIs (§1 host orchestration / §2 AIC kernel entry + Custom)
 │   ├── ccu_all_to_all.asc               # CCU communication service (contract + engine + resources / tiling contract / host assembly / __ccu_host__ kernel)
-│   ├── all_to_all_matmul_tiling_data.h  # Tiling aggregate struct + FillAllToAllMatmulTilingData (SWAT)
+│   ├── ccu_all_to_all_tiling_data.h  # Tiling aggregate struct + FillAllToAllMatmulTilingData (SWAT)
 │   └── all_to_all_matmul_aic.h          # AIC computation logic (synchronization primitives / WaitPolicy + matmul orchestration)
 ├── scripts/
 │   ├── gen_data.py                      # Data generation (bitwise closed form, bitwise identical to the original C++ generator)
@@ -35,7 +35,7 @@ Include chain (single TU; the order is the dependency order):
 
 ```
 main.cpp(-xasc) → all_to_all_matmul_ccu.asc (anchor, the only inclusion)
-                → { ccu_all_to_all.asc → all_to_all_matmul_tiling_data.h → all_to_all_matmul_aic.h } → anchor body
+                → { ccu_all_to_all.asc → ccu_all_to_all_tiling_data.h → all_to_all_matmul_aic.h } → anchor body
 ```
 
 Suffix rules: `.asc` = defines a kernel entry [included only once]; `.h` = pure logic.
@@ -45,7 +45,7 @@ The matmul kernel / tiling / utils are still referenced **in place** from the ap
 
 - `apace/kernel/matmul/quant_batch_matmul/all_to_all_qbmm_mx_kernel.h`
 - `apace/utils/op_state_dump.h`
-- `apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h` (shared by hcomm/urma)
+- `apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_tiling_data.h` (shared by hcomm/urma)
 - `apace/tiling/quant_matmul_tiling_swat.h`
 
 ## Mechanism Summary (quoted from the source file header)

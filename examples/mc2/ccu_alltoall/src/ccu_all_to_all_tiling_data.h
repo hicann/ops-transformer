@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file all_to_all_matmul_tiling_data.h
+ * \file ccu_all_to_all_tiling_data.h
  * \brief 融合算子 tiling——聚合结构体（通信 + 计算切分）+ host 侧构造入口
  *
  * QuantMatmulTilingData 为 apace 仓内共享件，原位引用不拷入。
@@ -17,9 +17,9 @@
 
 #pragma once
 
-#include "ccu_all_to_all.asc" // CcuCommTilingData（通信契约）
-#include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h" // QuantMatmulTilingData
-#include "apace/tiling/quant_matmul_tiling_swat.h"                                      // host 侧 SWAT tiling 引擎
+#include "ccu_all_to_all.asc"                                                     // CcuCommTilingData（通信契约）
+#include "apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_tiling_data.h" // QuantMatmulTilingData
+#include "apace/tiling/quant_matmul_tiling_swat.h"                                // host 侧 SWAT tiling 引擎
 
 // 统一 tiling：通信切分 + 计算切分
 #pragma pack(push, 8)
