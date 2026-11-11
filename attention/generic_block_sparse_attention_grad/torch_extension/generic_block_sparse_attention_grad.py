@@ -176,9 +176,16 @@ def _check_qsag(
         or counts.dtype != torch.int32
     ):
         raise ValueError("QSAG requires FP32 LSE and INT32 indices/counts")
-    if lse.shape not in (q.shape[:-1], q.shape[:-1] + (1,)):
+    lse_head_axis = 1 if packed or layout_q == "BNSD" else 2
+    lse_seq_axis = 0 if packed else (2 if layout_q == "BNSD" else 1)
+    lse_shape = (
+        q.shape[:2]
+        if packed
+        else (q.shape[0], q.shape[lse_head_axis], q.shape[lse_seq_axis])
+    )
+    if lse.shape not in (lse_shape, lse_shape + (1,)):
         raise ValueError(
-            "QSAG LSE must follow Q layout with D removed or replaced by 1"
+            "QSAG LSE must be TN/TN1 for TND or BNS/BNS1 for dense layouts"
         )
     h = 1 if packed or layout_q == "BNSD" else 2
     sq_axis = 0 if packed else (2 if layout_q == "BNSD" else 1)

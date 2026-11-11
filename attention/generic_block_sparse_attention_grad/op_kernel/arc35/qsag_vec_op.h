@@ -356,14 +356,17 @@ public:
     {
         uint32_t first = info_->sub * info_->halfRows;
         uint32_t valid = first < rows ? Min(info_->halfRows, rows - first) : 0;
-        uint64_t stride = info_->tiling->inputLayout == 1 ? info_->tiling->qSeqLen : 1;
-        if ((stride * FLOATS_PER_BLOCK - 1) * sizeof(float) > MAX_FIXPIPE_STRIDE) {
+        const uint64_t lseStride = info_->LseHeadStride();
+        const uint64_t diStride = info_->tiling->inputLayout == 1 ? info_->tiling->qSeqLen : 1;
+        // Check both DMA strides before narrowing, without overflowing uint64_t.
+        const uint64_t maxStrideElements = MAX_FIXPIPE_STRIDE / sizeof(float) + 1;
+        if (lseStride > maxStrideElements || diStride > maxStrideElements / FLOATS_PER_BLOCK) {
             Fence<HardEvent::V_S>();
             for (uint32_t r = 0; r < info_->halfRows; ++r) {
                 float lse = 0.0f, di = 0.0f;
                 if (r < valid) {
                     uint64_t off = info_->Offset(token, head + first + r, true, 1);
-                    lse = lse_.GetValue(off);
+                    lse = lse_.GetValue(info_->LseOffset(token, head + first + r));
                     di = di_.GetValue(off * FLOATS_PER_BLOCK);
                 }
                 lseCache_[0].SetValue(r * FLOATS_PER_BLOCK, lse);
@@ -379,11 +382,12 @@ public:
         Fence<HardEvent::V_MTE2>();
         if (valid != 0) {
             uint64_t off = info_->Offset(token, head + first, true, 1);
+            const uint64_t lseOff = info_->LseOffset(token, head + first);
             DataCopyExtParams cp{static_cast<uint16_t>(valid), sizeof(float),
-                                 static_cast<uint32_t>((stride - 1) * sizeof(float)), 0, 0};
+                                 static_cast<uint32_t>((lseStride - 1) * sizeof(float)), 0, 0};
             DataCopyPadExtParams<float> pad{true, 0, FLOATS_PER_BLOCK - 1, 0.0f};
-            DataCopyPad(lseCache_[0], lse_[off], cp, pad);
-            cp.srcStride = static_cast<uint32_t>((stride * FLOATS_PER_BLOCK - 1) * sizeof(float));
+            DataCopyPad(lseCache_[0], lse_[lseOff], cp, pad);
+            cp.srcStride = static_cast<uint32_t>((diStride * FLOATS_PER_BLOCK - 1) * sizeof(float));
             DataCopyPad(lseCache_[1], di_[off * FLOATS_PER_BLOCK], cp, pad);
         }
         Fence<HardEvent::MTE2_V>();
@@ -643,7 +647,7 @@ private:
         for (uint64_t row = info_->vcore * batchRows; row < totalRows;
              row += info_->tiling->cubeCoreNum * AIV_PER_CUBE * batchRows) {
             uint32_t rows = Min(batchRows, totalRows - row);
-            // The flattened row is in the actual Q layout, as is Di and LSE.
+            // The flattened row and Di follow the actual Q layout; LSE uses its own layout.
             ReadRow(rawOut, out_, row * info_->d, rows);
             ReadRow(rawDout, dout_, row * info_->d, rows);
             Cast(fpOut, rawOut, RoundMode::CAST_NONE, rows * info_->dp);

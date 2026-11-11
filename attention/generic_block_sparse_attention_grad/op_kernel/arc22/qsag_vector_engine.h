@@ -72,7 +72,7 @@ public:
         for (uint64_t row = params.globalAivIndex * TRANSFER_ROWS; row < totalRows;
              row += ctx.tiling->cubeCoreNum * AIV_PER_CUBE * TRANSFER_ROWS) {
             const uint32_t rows = Min(TRANSFER_ROWS, totalRows - row);
-            // The flattened row is in the actual Q layout, as are Di and LSE.
+            // The flattened row and Di follow the actual Q layout; LSE uses its own layout.
             ReadRow(inputRowLocal_, ctx.attentionOut, row * params.headDim, rows, params);
             ReadRow(dOutRowLocal_, ctx.dOut, row * params.headDim, rows, params);
             Cast(floatRowLocal0_, inputRowLocal_, RoundMode::CAST_NONE, rows * params.headDimAligned);
@@ -303,8 +303,10 @@ private:
         const QsagParams& params = ctx.params;
         const uint32_t firstRow = params.aivIndex * params.rowsPerAiv;
         const uint32_t valid = firstRow < rows ? Min(params.rowsPerAiv, rows - firstRow) : 0;
-        const uint64_t stride = ctx.tiling->inputLayout == 1 ? ctx.tiling->qSeqLen : 1;
-        if ((stride * FLOATS_PER_BLOCK - 1) * sizeof(float) > MAX_FIXPIPE_STRIDE) {
+        const uint64_t lseStride = LseHeadStride(ctx.tiling);
+        const uint64_t diStride = ctx.tiling->inputLayout == 1 ? ctx.tiling->qSeqLen : 1;
+        const uint64_t maxStrideElements = MAX_FIXPIPE_STRIDE / sizeof(float) + 1;
+        if (lseStride > maxStrideElements || diStride > maxStrideElements / FLOATS_PER_BLOCK) {
             SetFlag<HardEvent::V_S>(EVENT_ID0);
             WaitFlag<HardEvent::V_S>(EVENT_ID0);
             for (uint32_t row = 0; row < params.rowsPerAiv; ++row) {
@@ -312,7 +314,7 @@ private:
                 float di = 0.0f;
                 if (row < valid) {
                     const uint64_t offset = Offset(ctx.tiling, token, head + firstRow + row, true, 1);
-                    lse = ctx.lse.GetValue(offset);
+                    lse = ctx.lse.GetValue(LseOffset(ctx.tiling, token, head + firstRow + row));
                     di = ctx.di.GetValue(offset * FLOATS_PER_BLOCK);
                 }
                 rowStatsLocal_[0].SetValue(row * FLOATS_PER_BLOCK, lse);
@@ -332,11 +334,12 @@ private:
         WaitFlag<HardEvent::V_MTE2>(EVENT_ID0);
         if (valid != 0) {
             const uint64_t offset = Offset(ctx.tiling, token, head + firstRow, true, 1);
+            const uint64_t lseOffset = LseOffset(ctx.tiling, token, head + firstRow);
             DataCopyExtParams copyParams{static_cast<uint16_t>(valid), sizeof(float),
-                                         static_cast<uint32_t>((stride - 1) * sizeof(float)), 0, 0};
+                                         static_cast<uint32_t>((lseStride - 1) * sizeof(float)), 0, 0};
             DataCopyPadExtParams<float> pad{true, 0, FLOATS_PER_BLOCK - 1, 0.0f};
-            DataCopyPad(rowStatsLocal_[0], ctx.lse[offset], copyParams, pad);
-            copyParams.srcStride = static_cast<uint32_t>((stride * FLOATS_PER_BLOCK - 1) * sizeof(float));
+            DataCopyPad(rowStatsLocal_[0], ctx.lse[lseOffset], copyParams, pad);
+            copyParams.srcStride = static_cast<uint32_t>((diStride * FLOATS_PER_BLOCK - 1) * sizeof(float));
             DataCopyPad(rowStatsLocal_[1], ctx.di[offset * FLOATS_PER_BLOCK], copyParams, pad);
         }
         SetFlag<HardEvent::MTE2_V>(EVENT_ID0);

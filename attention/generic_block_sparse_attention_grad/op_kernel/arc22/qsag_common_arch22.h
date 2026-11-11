@@ -161,5 +161,22 @@ __aicore__ inline uint64_t Offset(const Tiling* tiling, uint64_t token, uint64_t
     return (token * heads + head) * dim;
 }
 
+// LSE is independent of the Q/Di layout: dense BNS, packed TN.
+template <typename Tiling>
+__aicore__ inline uint64_t LseOffset(const Tiling* tiling, uint64_t token, uint64_t head)
+{
+    if (tiling->inputLayout == 0) {
+        return token * tiling->qHeadNum + head;
+    }
+    const uint64_t seq = tiling->qSeqLen;
+    return (token / seq * tiling->qHeadNum + head) * seq + token % seq;
+}
+
+template <typename Tiling>
+__aicore__ inline uint64_t LseHeadStride(const Tiling* tiling)
+{
+    return tiling->inputLayout == 0 ? 1 : tiling->qSeqLen;
+}
+
 } // namespace QSAG
 #endif // ATTENTION_QSAG_COMMON_ARCH22_H

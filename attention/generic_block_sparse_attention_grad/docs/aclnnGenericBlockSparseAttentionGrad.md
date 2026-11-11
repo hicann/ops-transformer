@@ -365,7 +365,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>maskType</td>
                   <td>输入</td>
                   <td>attention计算中的掩码类型。</td>
-                  <td>支持的mask模式详见<a href="#约束说明">约束说明</a>。当前仅支持1。</td>
+                  <td>支持的mask模式详见<a href="#约束说明">约束说明</a>。当前仅支持0或1。</td>
                   <td>INT64</td>
                   <td>-</td>
                   <td>-</td>
@@ -592,7 +592,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 - 要求D在[1,256]，N1%N2=0、G=N1/N2≤256；blockShape=[1,Bs]，0<Bs≤baseKtile（G≤128时baseKtile为128，否则为64）。
 - `sparseBlockIdx`为`(B,N2,maxQBlockCount,maxKvBlockCount)`，`sparseBlockCount`为`(B,N2,maxQBlockCount)`；`maxQBlockCount`是Q方向的索引容量，BNSD/BSND布局下等于`S1`，TND布局下须≥`ceil(T1/B)`且不小于每个batch的实际Q长度。`maxKvBlockCount`是每个Q token可保存的完整KV块数容量，取值为[1,INT32_MAX]。
 - `sparseBlockCount`仅统计选中的完整可见KV块，不得超过`maxKvBlockCount`。当前Q token可见KV长度为`limit`：NONE时为实际KV长度，CAUSAL时为`max(0,min(klen,klen-qlen+q_index+1))`，其中`q_index`从0开始；有效块索引范围为`[0,floor(limit/blockShapeY))`。尾部不完整块不写入索引，由算子自动加入计算。
-- 要求B、N1、N2为正数；value与key同shape，dout、out、dQuery与query同shape，dKey、dValue与key同shape；lse的shape随query布局（去掉末维D，或将末维替换为1）：BNSD为`(B,N1,S1,1)`，BSND为`(B,S1,N1,1)`。必选张量不支持零维长度或负维度。
+- 要求B、N1、N2为正数；value与key同shape，dout、out、dQuery与query同shape，dKey、dValue与key同shape；BNSD/BSND布局下lse的shape为(B,N1,S1)或(B,N1,S1,1)；TND布局下为(T1,N1)或(T1,N1,1)。必选张量不支持零维长度或负维度。
 - cuSeqLengths、seqused、稀疏索引和计数的实际数值不在tiling阶段校验，调用方须保证符合上述语义。
 
 ### layout对应关系说明

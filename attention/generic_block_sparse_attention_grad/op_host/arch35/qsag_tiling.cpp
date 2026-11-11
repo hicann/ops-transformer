@@ -109,13 +109,10 @@ protected:
                 "cu_seq_lengths_q, cu_seq_lengths_kv, seqused_q, seqused_kv, dQuery, dKey, dValue, "
                 "block_shape, layout_q, layout_kv, scale_value, mask_type, softmax_precision, win_left, "
                 "win_right, residual_block_mode, is_consistent_topk");
-        if (s_.group > 256 || s_.d > 256)
-            return Fail("QSAG arch35 supports G<=256 and D<=256", "query, key");
-        const uint64_t baseKtile = s_.group <= 128 ? 128 : 64;
-        // The small-G Ktile=256 optimization can still become n=128 in the kernel.
-        // Bound Bs by the base tile so n/Bs cannot become zero in sparse scheduling.
-        if (s_.bs > baseKtile)
-            return Fail("QSAG arch35 requires Bs<=128 for G<=128, Bs<=64 otherwise", "block_shape, query, key");
+        if (s_.group > 256)
+            return Fail((std::string("QSAG arch35 requires G<=256; actual G=") + std::to_string(s_.group)).c_str(),
+                        "query, key");
+        const uint64_t baseKtile = qsag::BaseKTile(s_.group);
         s_.ktile = s_.dtile = baseKtile;
         s_.dp = (s_.d + 15) / 16 * 16;
         if (s_.group <= 16 && s_.dp <= 128) {

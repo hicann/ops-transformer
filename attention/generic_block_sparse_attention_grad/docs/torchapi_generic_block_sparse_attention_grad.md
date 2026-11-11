@@ -273,12 +273,13 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 **`layout_sparse_pattern=1`：**
 
 - 要求`residual_block_mode=0`、`mask_mode=1`，`is_consistent_topk`支持False和True。须先调用`generic_block_sparse_attention_grad_metadata`生成`metadata`，两次调用的`layout_sparse_pattern`、`residual_block_mode`、`is_consistent_topk`须保持一致。
-- Softmax LSE：TND为`(T1,N1,1)`，BNSD为`(B,N1,S1,1)`；BSND在A5上GSAG须为`(B,N1,S1,1)`，在A2/A3上GSAG为`(B,S1,N1,1)`；QSAG（pattern=0）随query布局（BSND为`(B,S1,N1,1)`）。
+- Softmax LSE：TND为`(T1,N1,1)`，BNSD为`(B,N1,S1,1)`；BSND在A5上GSAG须为`(B,N1,S1,1)`，在A2/A3上GSAG为`(B,S1,N1,1)`。
 - `softmax_scale`须为float32可表示的有限值（非NaN/Inf，且转float后仍有限）。
 - `max_seqlen_q`/`max_seqlen_kv`可省略，由Torch扩展推断；显式传入时须≥0，且满足`J=ceilDiv(max_seqlen_kv, block_y)`与`maxS1≥max_seqlen_q`。
 
 **`layout_sparse_pattern=0`：**
 
+- Softmax LSE与前向输出一致：TND为`(T1,N1)`或`(T1,N1,1)`；BNSD和BSND均为`(B,N1,S1)`或`(B,N1,S1,1)`，不随query的head/seq轴顺序改变。
 - 要求`residual_block_mode=1`、`mask_mode=0`（NO_MASK）或`1`（CAUSAL）；`is_consistent_topk`支持False和True，两种取值均走通用计算路径。该排布不调用`generic_block_sparse_attention_grad_metadata`接口，`metadata`和`attn_mask`须为`None`；尾部不完整KV块自动参与计算。
 - `q`、`k`、`v`、`dout`、`attn_out`及`dq`、`dk`、`dv`均为float16或bfloat16且类型一致；`v`与`k`同shape，`dout`、`attn_out`、`dq`与`q`同shape，`dk`、`dv`与`k`同shape；必选张量不支持零维长度或负维度。
 - 要求B、N1、N2为正数，N1%N2=0、G=N1/N2≤256，Q/K的D相同且位于[1,256]；`block_shape=[1,block_y]`，`1≤block_y≤baseKtile`（G≤128时为128，否则为64）。`softmax_scale`须为有限值，`softmax_precision=0`，`win_left=win_right=-1`。

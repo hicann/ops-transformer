@@ -107,10 +107,8 @@ protected:
                 std::any_of(tensor.shape.begin(), tensor.shape.end(), [](int64_t dimension) { return dimension == 0; }))
                 return Fail("QSAG arch22 does not support zero-length tensor dimensions.", "QSAG tensors");
         }
-        if (s_.group > 256 || s_.d > 256)
-            return Fail((std::string("QSAG arch22 requires G<=256 and D<=256; actual G=") + std::to_string(s_.group) +
-                         ", D=" + std::to_string(s_.d))
-                            .c_str(),
+        if (s_.group > 256)
+            return Fail((std::string("QSAG arch22 requires G<=256; actual G=") + std::to_string(s_.group)).c_str(),
                         "query,key");
         if (s_.layout == 0 && s_.qcap < s_.sq / s_.batch + (s_.sq % s_.batch != 0))
             return Fail((std::string("TND requires Qcap>=ceil(T1/B); actual Qcap=") + std::to_string(s_.qcap) +
@@ -118,12 +116,7 @@ protected:
                          "; enlarge the sparse query capacity.")
                             .c_str(),
                         "query,sparse_block_idx,sparse_block_count");
-        const uint64_t baseKtile = s_.group <= 128 ? 128 : 64;
-        if (s_.bs > baseKtile)
-            return Fail((std::string("QSAG arch22 requires Bs<=") + std::to_string(baseKtile) +
-                         "; actual Bs=" + std::to_string(s_.bs) + ", G=" + std::to_string(s_.group))
-                            .c_str(),
-                        "block_shape,query,key");
+        const uint64_t baseKtile = qsag::BaseKTile(s_.group);
         // Arch22 UB capacity limits Ktile to 128 even for the small-group case.
         s_.ktile = s_.dtile = baseKtile;
         s_.dp = (s_.d + 15) / 16 * 16;

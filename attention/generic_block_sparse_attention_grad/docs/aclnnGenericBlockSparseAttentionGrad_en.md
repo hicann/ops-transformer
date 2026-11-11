@@ -555,7 +555,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 - HeadDim is fixed to 128; the value range of N1/N2 is [1, 128], with N1 > N2 and N1 % N2 == 0.
 - blockShape: blockShapeX supports only 1; blockShapeY must be ≥128 and a multiple of 64 (Cube splits S2 of each sparse block with baseN=128); isPackedGQA currently only supports 1; maskType currently only supports 1; softmaxPrecision currently only supports 0.
 - winLeft and winRight must be -1 when disabled; attenMaskOptional should currently be set to nullptr.
-- Softmax LSE: TND is `(T1,N1,1)`, BNSD is `(B,N1,S1,1)`; for BSND, Ascend 950 (A5) requires `(B,N1,S1,1)`, and A2/A3 use `(B,S1,N1,1)`.
+- For layoutSparsePattern=1 (GBSAG), Softmax LSE: TND is `(T1,N1,1)`, BNSD is `(B,N1,S1,1)`; for BSND, Ascend 950 (A5) requires `(B,N1,S1,1)`, and A2/A3 use `(B,S1,N1,1)`.
+- For layoutSparsePattern=0 (QSAG), LSE follows the forward output: `(T1,N1)` or `(T1,N1,1)` for TND, and `(B,N1,S1)` or `(B,N1,S1,1)` for both BNSD and BSND.
 - scaleValue must be finite in float32 (not NaN/Inf, and still finite after cast to float); this applies to both layoutSparsePattern=0 and layoutSparsePattern=1.
 - The 4th dimension maxS1 of `sparseBlockIdx` should be ≥ the maximum value of all elements in `sparseBlockCount`.
 

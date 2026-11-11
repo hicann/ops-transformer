@@ -19,7 +19,7 @@
 
 namespace qsag {
 // Architecture-independent descriptor validation shared by ACLNN and graph tiling.
-// Kernel limits and tiling parameters belong to each architecture's tiling.
+// Common shape limits apply to both entry points; architecture-specific tiling stays separate.
 // Device values (prefix sums, counts and indices) remain the documented input contract.
 struct TensorInfo {
     std::vector<int64_t> shape;
@@ -36,6 +36,11 @@ struct Config {
 struct ShapeInfo {
     uint64_t batch, sq, sk, nq, nk, d, group, qcap, topk, bs, layout;
 };
+inline constexpr uint64_t BaseKTile(uint64_t group)
+{
+    return group <= 128 ? 128 : 64;
+}
+
 inline bool Product(uint64_t a, uint64_t b, uint64_t& out)
 {
     if (b != 0 && a > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) / b)
@@ -86,12 +91,15 @@ inline std::string Validate(const std::array<TensorInfo, 17>& t, const Config& a
             return "Q/K/V and gradient dtypes must match";
     if (t[5].dtype != fp32 || t[6].dtype != int32 || t[7].dtype != int32)
         return "LSE must be FP32 and sparse tensors INT32";
-    auto lse = q;
-    lse.back() = 1;
-    auto squeezed = q;
-    squeezed.pop_back();
+    // The forward producer stores dense LSE in BNS order for both Q layouts.
+    const size_t lseHeadAxis = packed || a.layoutQ == "BNSD" ? 1 : 2;
+    const size_t lseSeqAxis = packed ? 0 : (a.layoutQ == "BNSD" ? 2 : 1);
+    std::vector<int64_t> squeezed =
+        packed ? std::vector<int64_t>{q[0], q[1]} : std::vector<int64_t>{q[0], q[lseHeadAxis], q[lseSeqAxis]};
+    auto lse = squeezed;
+    lse.push_back(1);
     if (t[5].shape != lse && t[5].shape != squeezed)
-        return "LSE must follow Q layout with trailing singleton or without D axis";
+        return "LSE must be TN/TN1 for TND or BNS/BNS1 for dense layouts";
     if (t[6].shape.size() != 4 || t[7].shape.size() != 3)
         return "indices/count ranks must be 4/3";
     s.layout = packed ? 0 : (a.layoutQ == "BNSD" ? 1 : 2);
@@ -106,6 +114,8 @@ inline std::string Validate(const std::array<TensorInfo, 17>& t, const Config& a
     s.topk = t[6].shape[3];
     if (!s.batch || !s.nq || !s.nk || s.nq % s.nk || !s.d || k.back() != static_cast<int64_t>(s.d))
         return "positive batch/heads, divisible head counts and common positive D required";
+    if (s.d > 256)
+        return "QSAG requires headDim D<=256; actual D=" + std::to_string(s.d);
     s.group = s.nq / s.nk;
     if (t[6].shape[1] != static_cast<int64_t>(s.nk) || !s.topk || s.topk > INT32_MAX ||
         t[7].shape != std::vector<int64_t>(
@@ -130,6 +140,11 @@ inline std::string Validate(const std::array<TensorInfo, 17>& t, const Config& a
     if (a.block.size() != 2 || a.block[0] != 1 || a.block[1] <= 0)
         return "QSAG block_shape must be [1,Bs] with Bs>0";
     s.bs = a.block[1];
+    // A larger K tile chosen by tiling may still use the base tile in sparse scheduling.
+    const auto maxBlockSize = BaseKTile(s.group);
+    if (s.bs > maxBlockSize)
+        return "QSAG block_shape requires Bs<=" + std::to_string(maxBlockSize) + " for G=" + std::to_string(s.group) +
+               "; actual Bs=" + std::to_string(s.bs);
     return {};
 }
 } // namespace qsag
