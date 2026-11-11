@@ -87,6 +87,10 @@ public:
     // candidate source 全选快速路径行末直出（可达块数 ≤ K：输出恒为 [0..N) + (-1) 补齐）
     __aicore__ inline void CopyOutCandTopkIndexFullSel(const LIV2Common::RunInfo& info, int32_t cuS1Idx,
                                                        int32_t realBlockNumTotal);
+    // 流式 TopK: 块幸存者压缩入攒批区, 攒满/行末归并刷阈值
+    __aicore__ inline void StreamGatherBlock(int32_t row, LocalTensor<float>& values, LocalTensor<float>& indices,
+                                             LocalTensor<float>& tmpSortBuf);
+    __aicore__ inline void StreamFlushRow(int32_t row);
 
 protected:
     GlobalTensor<MM1_OUT_T> mm1ResGm;
@@ -126,6 +130,22 @@ private:
     LocalTensor<float> globalTopkUb_;
     LocalTensor<float> SortedBasicBlock_;
     LocalTensor<float> globalBlockTopkUb_; // candidate source 块级累加器（mode=1 分配）
+
+    // 流式 TopK 状态与攒批区
+    static constexpr int32_t STREAM_MAX_ROWS = 8;        // CeilDiv(s1BaseSize_,2) 上限
+    static constexpr int32_t STREAM_ACC_CAP = 512;       // 每行攒批容量(对)
+    static constexpr int32_t STREAM_ACC_ALIGN = 8;       // gather 落点 32B 对齐推进
+    static constexpr int32_t STREAM_MIN_VIS_BLOCKS = 32; // 最短可见块数门槛, 不足回退原路径
+    static constexpr uint32_t STREAM_EVENT_VS = 4;       // V_S 同步 event id(V_MTE2 用 0-2)
+    TBuf<TPosition::VECCALC> streamAccBuf_;
+    TBuf<TPosition::VECCALC> streamMaskBuf_;
+    LocalTensor<float> streamAcc_;           // rows × [values CAP | indices CAP] float
+    LocalTensor<uint8_t> streamMask_;        // 512B compare mask，跨行复用
+    float streamThreshold_[STREAM_MAX_ROWS]; // 运行 top-k 第 k 值（-inf = 未武装）
+    int32_t streamUsed_[STREAM_MAX_ROWS];    // 攒批区已用（8 对齐）
+    int32_t streamBaselineBlocks_ = 0;       // ceil(k/512)+1
+    int32_t streamRowCount_ = 0;
+    bool streamStateReady_ = false;
 
     int32_t blockId_ = -1;
     // para for vector
@@ -185,6 +205,20 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitBuffers(TPipe* 
         pipe->InitBuffer(blockSortOutBuf_, CeilDiv(s1BaseSize_, 2) * CAND_BLOCK_ACC_PAIR_SIZE * sizeof(float)); // 32KB
         globalBlockTopkUb_ = blockSortOutBuf_.Get<float>();
         InitSortOutBuf(globalBlockTopkUb_, CeilDiv(s1BaseSize_, 2) * CAND_BLOCK_ACC_PAIR_SIZE);
+    }
+
+    // 流式 TopK 攒批区: rows × [values 512 | indices 512] float + 512B mask
+    // gather 暂存借 tmpSortBuf, 刷新 scratch 借 tmpUb_(排序段 db 已死)
+    if (!constInfo_.isSparseCountOver2K && constInfo_.candidateMode != CANDIDATE_MODE_SOURCE && s2BaseSize_ == 512) {
+        streamRowCount_ = CeilDiv(s1BaseSize_, 2);
+        if (streamRowCount_ > 0 && streamRowCount_ <= STREAM_MAX_ROWS) {
+            pipe->InitBuffer(streamAccBuf_, streamRowCount_ * STREAM_ACC_CAP * 2 * sizeof(float));
+            pipe->InitBuffer(streamMaskBuf_, static_cast<uint32_t>(s2BaseSize_));
+            streamAcc_ = streamAccBuf_.Get<float>();
+            streamMask_ = streamMaskBuf_.Get<uint8_t>();
+            streamBaselineBlocks_ = (constInfo_.sparseCount + s2BaseSize_ - 1) / s2BaseSize_ + 1;
+            streamStateReady_ = true;
+        }
     }
 
     // 基本块执行前初始化UB和GM
@@ -580,6 +614,70 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::CopyOutCandTopkInde
     outQueue_.FreeTensor(candIdxULocal);
 }
 
+// 流式 TopK: 块幸存者(≥阈值)先 gather 到 tmpSortBuf 暂存, 容量不足先刷攒批区再位精确拷入。
+template <typename LIT>
+__aicore__ inline void LightningIndexerV2ServiceVector<LIT>::StreamGatherBlock(int32_t row, LocalTensor<float>& values,
+                                                                               LocalTensor<float>& indices,
+                                                                               LocalTensor<float>& tmpSortBuf)
+{
+    CompareScalar(streamMask_, values, streamThreshold_[row], CMPMODE::GE, s2BaseSize_);
+    PipeBarrier<PIPE_V>();
+    LocalTensor<float> stageVal = tmpSortBuf[0];
+    LocalTensor<uint32_t> stageIdx = tmpSortBuf[s2BaseSize_].ReinterpretCast<uint32_t>();
+    GatherMaskParams gatherParams;
+    gatherParams.repeatTimes = 1;
+    gatherParams.src0BlockStride = 1;
+    gatherParams.src0RepeatStride = 8;
+    gatherParams.src1RepeatStride = 1;
+    uint64_t selectedCount = 0;
+    GatherMask(stageVal, values, streamMask_.ReinterpretCast<uint32_t>(), true, static_cast<uint32_t>(s2BaseSize_),
+               gatherParams, selectedCount);
+    PipeBarrier<PIPE_V>();
+    GatherMask(stageIdx, indices.ReinterpretCast<uint32_t>(), streamMask_.ReinterpretCast<uint32_t>(), true,
+               static_cast<uint32_t>(s2BaseSize_), gatherParams, selectedCount);
+    PipeBarrier<PIPE_V>();
+    // rsvdCnt 需待 vreducev2 退休并 V→S fence 后重读, 夹逼到 [0, 块长]
+    SetFlag<HardEvent::V_S>(STREAM_EVENT_VS);
+    WaitFlag<HardEvent::V_S>(STREAM_EVENT_VS);
+    int32_t selected = static_cast<int32_t>(AscendCUtils::GetRsvdCnt());
+    if (selected < 0 || selected > s2BaseSize_) {
+        selected = 0;
+    }
+    if (streamUsed_[row] + selected > STREAM_ACC_CAP) {
+        StreamFlushRow(row);
+    }
+    LocalTensor<float> accRow = streamAcc_[row * STREAM_ACC_CAP * 2];
+    if (selected > 0) {
+        // 位精确拷贝(V 管道); count=0 时 Adds 为退化指令, 守卫
+        LIServiceVec::VecCopyI32BitExact(accRow[streamUsed_[row]], stageVal, selected);
+        LIServiceVec::VecCopyI32BitExact(accRow[STREAM_ACC_CAP + streamUsed_[row]], tmpSortBuf[s2BaseSize_], selected);
+    }
+    streamUsed_[row] += (selected + STREAM_ACC_ALIGN - 1) & ~(STREAM_ACC_ALIGN - 1);
+}
+
+// 流式 TopK: 攒批区全 CAP 排序归并入运行 top-k, 刷新阈值并清场(scratch=tmpUb_)。
+template <typename LIT>
+__aicore__ inline void LightningIndexerV2ServiceVector<LIT>::StreamFlushRow(int32_t row)
+{
+    if (streamUsed_[row] == 0) {
+        return;
+    }
+    LocalTensor<float> accRow = streamAcc_[row * STREAM_ACC_CAP * 2];
+    LIServiceVec::SortAll(accRow, tmpUb_, STREAM_ACC_CAP);
+    PipeBarrier<PIPE_V>();
+    LIServiceVec::MergeSort(globalTopkUb_[row * virTopK * 2], virTopK, accRow, STREAM_ACC_CAP, tmpUb_);
+    streamUsed_[row] = 0;
+    // 刷新阈值: S 管道标量读 V 管道写过的 globalTopkUb_, 需 V→S 同步
+    PipeBarrier<PIPE_V>();
+    SetFlag<HardEvent::V_S>(STREAM_EVENT_VS);
+    WaitFlag<HardEvent::V_S>(STREAM_EVENT_VS);
+    streamThreshold_[row] =
+        globalTopkUb_[row * virTopK * 2 + 2 * (static_cast<int32_t>(constInfo_.sparseCount) - 1)].GetValue(0);
+    // 值域清场: 下一轮攒批洞位保持 -inf
+    Duplicate(accRow.ReinterpretCast<int32_t>(), LIServiceVec::NEG_INF, STREAM_ACC_CAP);
+    PipeBarrier<PIPE_V>();
+}
+
 template <typename LIT>
 __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LIV2Common::RunInfo& info)
 {
@@ -615,6 +713,17 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
         // candidate source：块级累加器与位置级累加器成对重置（UT 不变量）
         if (constInfo_.candidateMode == CANDIDATE_MODE_SOURCE) {
             InitSortOutBuf(globalBlockTopkUb_, CeilDiv(s1BaseSize_, 2) * CAND_BLOCK_ACC_PAIR_SIZE);
+        }
+        // 流式 TopK: 攒批状态与值域清场(防上一任务残留); 全任务行均低于门槛时跳过
+        int32_t streamTaskMaxVis = constInfo_.attenMaskFlag ? info.actS2SizeOrig : info.actS2Size;
+        if (streamStateReady_ && streamTaskMaxVis >= STREAM_MIN_VIS_BLOCKS * s2BaseSize_) {
+            for (int32_t r = 0; r < streamRowCount_; r++) {
+                streamUsed_[r] = 0;
+                streamThreshold_[r] = -__builtin_inff();
+                Duplicate(streamAcc_[r * STREAM_ACC_CAP * 2].ReinterpretCast<int32_t>(), LIServiceVec::NEG_INF,
+                          STREAM_ACC_CAP);
+            }
+            PipeBarrier<PIPE_V>();
         }
         blockS2StartIdx_ = info.s2Idx;
     } else if (info.loop == 0) {
@@ -713,16 +822,42 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
                 }
             }
             LocalTensor<float> tmpSortBuf = outQueue_.AllocTensor<float>();
-            // candidate 恒走 SortAll+MergeSort（s1Base=4 下 SortedBasicBlock_ 视图越界，缓存粗排禁用）
+            // 流式 TopK: 过基线且行守卫满足时, Compare+Gather 攒批替代逐块 SortAll+MergeSort
+            int64_t blocksSinceStart = info.s2Idx - blockS2StartIdx_;
+            bool streamTask = streamStateReady_ && info.actS1Size > 4 && !constInfo_.isSparseCountOver2K &&
+                              constInfo_.candidateMode != CANDIDATE_MODE_SOURCE;
+            bool streamRow = false;
+            int32_t streamMinVis =
+                (streamBaselineBlocks_ > STREAM_MIN_VIS_BLOCKS ? streamBaselineBlocks_ : STREAM_MIN_VIS_BLOCKS) *
+                s2BaseSize_;
+            if (streamTask && blocksSinceStart >= streamBaselineBlocks_ && cuRealAcSeq >= streamMinVis) {
+                streamRow = (streamThreshold_[innerS1Idx] != -__builtin_inff());
+            }
             if (info.actS1Size > 4 || constInfo_.isSparseCountOver2K ||
                 constInfo_.candidateMode == CANDIDATE_MODE_SOURCE) {
-                // info.actS1Size > 4 则单个vector核内处理的 s1>2，缓存方案无法处理
-                LIServiceVec::SortAll(reduceOutBuff, tmpSortBuf,
-                                      cuS2LenVecAlign); //  cuS2LenVecAlign <= s2BaseSize_, fill -inf
-                PipeBarrier<PIPE_V>();
-                LocalTensor<float> UbTmpSort = constInfo_.isSparseCountOver2K ? tmpUb_ : tmpSortBuf;
-                LIServiceVec::MergeSort(globalTopkUb_[innerS1Idx * virTopK * 2], virTopK, reduceOutBuff,
-                                        cuS2LenVecAlign, UbTmpSort);
+                if (streamRow) {
+                    StreamGatherBlock(innerS1Idx, sortScoreUb, sortIndiceUb, tmpSortBuf);
+                } else {
+                    LIServiceVec::SortAll(reduceOutBuff, tmpSortBuf,
+                                          cuS2LenVecAlign); //  cuS2LenVecAlign <= s2BaseSize_, fill -inf
+                    PipeBarrier<PIPE_V>();
+                    LocalTensor<float> UbTmpSort = constInfo_.isSparseCountOver2K ? tmpUb_ : tmpSortBuf;
+                    LIServiceVec::MergeSort(globalTopkUb_[innerS1Idx * virTopK * 2], virTopK, reduceOutBuff,
+                                            cuS2LenVecAlign, UbTmpSort);
+                    // 基线末块合并后武装阈值: V→S 同步读运行 top-k 第 k 值
+                    if (streamTask && blocksSinceStart == streamBaselineBlocks_ - 1 &&
+                        cuRealAcSeq >= (streamBaselineBlocks_ > STREAM_MIN_VIS_BLOCKS ? streamBaselineBlocks_ :
+                                                                                        STREAM_MIN_VIS_BLOCKS) *
+                                           s2BaseSize_) {
+                        PipeBarrier<PIPE_V>();
+                        SetFlag<HardEvent::V_S>(STREAM_EVENT_VS);
+                        WaitFlag<HardEvent::V_S>(STREAM_EVENT_VS);
+                        streamThreshold_[innerS1Idx] =
+                            globalTopkUb_[innerS1Idx * virTopK * 2 +
+                                          2 * (static_cast<int32_t>(constInfo_.sparseCount) - 1)]
+                                .GetValue(0);
+                    }
+                }
             } else {
                 int64_t globalTopkUbCacheIdx = (info.s2Idx - blockS2StartIdx_) % 4;
 
@@ -752,6 +887,10 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
                                    s2BaseSize_ * (globalTopkUbCacheIdx + 1));
                     }
                 }
+            }
+            // 行末/核任务末强制 flush, 保证攒批幸存者全部并入运行 top-k
+            if (streamRow && (isS2End || info.isAllLoopEnd)) {
+                StreamFlushRow(innerS1Idx);
             }
             if (constInfo_.isSparseCountOver2K) {
                 SetFlag<HardEvent::V_MTE2>(EVENTID_V_TO_MTE2_TMPUB);

@@ -1251,13 +1251,15 @@ static bool LiV2CanUseFastMetadataArch22(gert::TilingContext* context, const LIV
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(info.platformInfo);
     // Cube补Vector的优化只支持A2/A3平台
-    return (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201) && (info.inputQLayout == DataLayout::TND) &&
+    return (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201) &&
+           (info.inputQLayout == DataLayout::TND || info.inputQLayout == DataLayout::BSND) &&
            (info.qkHeadDim == HEAD_DIM_LIMIT) && (context->GetDeterministicLevel() != BATCH_CONSISTENCY_LEVEL) &&
-           (info.inputKLayout == DataLayout::TND || info.inputKLayout == DataLayout::PA_BBND) &&
-           (info.maskMode == SPARSE_MODE_LOWER) && (info.cmpRatio == 1) && (info.returnValue == 0) &&
-           (info.n1Size == QUERY_HEAD_24 || info.n1Size == QUERY_HEAD_32) && (info.n2Size == 1) &&
-           (info.candidateTopkBlocks == CANDIDATE_TOPK_BLOCKS_OFF) &&
-           (info.topk == TOPK_NUM_1024 || info.topk == TOPK_NUM_2048) &&
+           (info.inputKLayout == DataLayout::TND || info.inputKLayout == DataLayout::PA_BBND ||
+            info.inputKLayout == DataLayout::BSND) &&
+           (info.maskMode == SPARSE_MODE_LOWER || info.maskMode == 0) && (info.n1Size >= 8 && info.n1Size <= 64) &&
+           (info.n1Size % 8 == 0) && (info.n2Size == 1) && (info.candidateTopkBlocks == CANDIDATE_TOPK_BLOCKS_OFF) &&
+           ((info.topk > 0 && info.topk <= TOPK_NUM_2048) ||
+            (info.topk > TOPK_NUM_2048 && info.topk <= TOPK_MAX && info.topk % TOPK_MULTIPLE == 0)) &&
            (info.opParamInfo.outputIdxOffset.tensor == nullptr);
 }
 
@@ -1353,6 +1355,22 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
     tilingData_.set_candidateTopkBlocks(tilingInfo->candidateTopkBlocks);
     tilingData_.set_candidateBlockSize(tilingInfo->candidateBlockSize);
     tilingData_.set_batchInvariant(context_->GetDeterministicLevel() == BATCH_CONSISTENCY_LEVEL ? 1U : 0U);
+    // N1 泛化: 自适应 s1BaseSize, 与 AICPU CalcAdaptiveS1Base 同款公式
+    uint32_t adaptiveS1Base = 0U;
+    {
+        uint32_t raw = (192U + tilingInfo->n1Size - 1U) / tilingInfo->n1Size;
+        adaptiveS1Base = (raw % 2U != 0U) ? raw - 1U : raw;
+        adaptiveS1Base = (adaptiveS1Base > 8U) ? 8U : adaptiveS1Base; // cap 8 (Vector UB安全)
+        while (adaptiveS1Base * tilingInfo->n1Size > 192U && adaptiveS1Base > 2U) {
+            adaptiveS1Base -= 2U;
+        }
+        // TopK 联合 cap: >2048 时缩小 s1Base 保 perAIV×virTopK ≤8192
+        uint32_t topkS1Cap = 8192U / static_cast<uint32_t>(tilingInfo->topk) * 2U;
+        if (adaptiveS1Base > topkS1Cap) {
+            adaptiveS1Base = topkS1Cap;
+        }
+    }
+    tilingData_.set_s1BaseSize(adaptiveS1Base);
     tilingData_.set_usedCoreNum(blockDim);
     tilingData_.set_batchSupperFlag(tilingInfo->batchSupperFlag);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());

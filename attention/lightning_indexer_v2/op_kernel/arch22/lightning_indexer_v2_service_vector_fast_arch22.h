@@ -519,12 +519,6 @@ using namespace LIV2Common;
 using namespace LIServiceVec;
 constexpr uint32_t FAST_BASE_TOPK = 2048;
 constexpr uint32_t FAST_VECTOR_UB_BYTES = 192 * 1024;
-constexpr uint32_t FAST_SORTED_CACHE_OFFSET = 0;
-constexpr uint32_t FAST_OUT_WORK_OFFSET = 64 * 1024;
-constexpr uint32_t FAST_TMP_OFFSET = 80 * 1024;
-constexpr uint32_t FAST_SORT_OUT_OFFSET = 116 * 1024;
-constexpr uint32_t FAST_INDEX_OFFSET = 180 * 1024;
-constexpr uint32_t FAST_REDUCE_OUT_OFFSET = 182 * 1024;
 
 template <typename LIT>
 class LightningIndexerV2ServiceVectorFast {
@@ -535,7 +529,8 @@ public:
     __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void InitParams(const LIV2FastCommon::ConstInfo& constInfo,
                                       const LIV2TilingData* __restrict tilingData);
-    __aicore__ inline void InitDiagVecGlobalTensor(GlobalTensor<float> scoreGm, GlobalTensor<int32_t> indiceOutGm);
+    __aicore__ inline void InitDiagVecGlobalTensor(GlobalTensor<float> scoreGm, GlobalTensor<int32_t> indiceOutGm,
+                                                   GlobalTensor<float> valueOutGm);
     __aicore__ inline void InitCfvTopkState(GlobalTensor<float> state)
     {
         cfvTopkStateGm_ = state;
@@ -550,6 +545,7 @@ private:
     GlobalTensor<float> scoreGm;
     GlobalTensor<float> cfvTopkStateGm_;
     GlobalTensor<int32_t> indiceOutGm;
+    GlobalTensor<float> valueOutGm_; // rv=1 时输出 values(与 indices 同布局配对)
 
     TBuf<TPosition::VECCALC> workspaceBuf_;
 
@@ -557,6 +553,14 @@ private:
     LocalTensor<float> tmpUb_;
     LocalTensor<int32_t> globalTopkIndice_;
     LocalTensor<float> globalTopkUb_;
+
+    // TopK 泛化(二期)动态 UB 分区(单位: float), 总量 ≤192KB
+    uint32_t fastOutWorkOffset_ = 64 * 1024 / sizeof(float);
+    uint32_t fastTmpOffset_ = 80 * 1024 / sizeof(float);
+    uint32_t fastSortOutOffset_ = 116 * 1024 / sizeof(float);
+    uint32_t fastIndexOffset_ = 180 * 1024 / sizeof(float);
+    uint32_t fastReduceOutOffset_ = 182 * 1024 / sizeof(float);
+    uint32_t fastSelectedOffset_ = (FAST_BASE_TOPK + 512) * 2; // tmpUb_ 内 selected 列起始
 
     int32_t blockId_ = -1;
     int32_t groupInner_ = 0;
@@ -578,12 +582,28 @@ __aicore__ inline void LightningIndexerV2ServiceVectorFast<LIT>::InitBuffers(TPi
 {
     pipe->InitBuffer(workspaceBuf_, FAST_VECTOR_UB_BYTES);
     workspace_ = workspaceBuf_.Get<float>();
-    // 块级归并始终按 2048 个候选组织 UB。即使输出 TopK 为 1024，
-    // MrgBasicBlock/SparseTopK 仍会读写完整的 2048 容量。
-    virTopK = FAST_BASE_TOPK;
-    tmpUb_ = workspace_[FAST_TMP_OFFSET / sizeof(float)];
-    globalTopkIndice_ = workspace_[FAST_INDEX_OFFSET / sizeof(float)].template ReinterpretCast<int32_t>();
-    globalTopkUb_ = workspace_[FAST_SORT_OUT_OFFSET / sizeof(float)];
+    // TopK 泛化: ≤2048 保持 2048 宽过配; >2048 按 Align32(topk) 扩宽归并结构
+    virTopK = static_cast<int32_t>(FAST_BASE_TOPK);
+    if (constInfo_.sparseCount > FAST_BASE_TOPK) {
+        virTopK = static_cast<int32_t>((constInfo_.sparseCount + 31U) & ~31U);
+    }
+    // 动态分区: sortedCache | outWork 16KB | tmp(归并暂存+selected/spill) | sortOut | index | reduce
+    const uint32_t perAivTokens = static_cast<uint32_t>(CeilDiv(s1BaseSize_, 2));
+    const uint32_t scoreHalfFloats = 512U * 8U; // 16KB score tile
+    const uint32_t mergeTmpFloats = (static_cast<uint32_t>(virTopK) + 512U) * 2U;
+    fastSelectedOffset_ = mergeTmpFloats > scoreHalfFloats ? mergeTmpFloats : scoreHalfFloats;
+    const uint32_t sortedCacheFloats = perAivTokens * 4U * 1024U;
+    const uint32_t outWorkFloats = 4096U;                             // 16KB MrgBasicBlock 输出
+    const uint32_t tmpFloats = fastSelectedOffset_ + scoreHalfFloats; // 暂存区 + selected/spill
+    const uint32_t sortOutFloats = perAivTokens * static_cast<uint32_t>(virTopK) * 2U;
+    fastOutWorkOffset_ = sortedCacheFloats;
+    fastTmpOffset_ = fastOutWorkOffset_ + outWorkFloats;
+    fastSortOutOffset_ = fastTmpOffset_ + tmpFloats;
+    fastIndexOffset_ = fastSortOutOffset_ + sortOutFloats;
+    fastReduceOutOffset_ = fastIndexOffset_ + 512U;
+    tmpUb_ = workspace_[fastTmpOffset_];
+    globalTopkIndice_ = workspace_[fastIndexOffset_].template ReinterpretCast<int32_t>();
+    globalTopkUb_ = workspace_[fastSortOutOffset_];
     ArithProgression<int32_t>(globalTopkIndice_, 0, 1, s2BaseSize_);
     InitSortOutBuf(globalTopkUb_, CeilDiv(s1BaseSize_, 2) * virTopK * 2);
 }
@@ -602,10 +622,11 @@ __aicore__ inline void LightningIndexerV2ServiceVectorFast<LIT>::InitParams(cons
 
 template <typename LIT>
 __aicore__ inline void LightningIndexerV2ServiceVectorFast<LIT>::InitDiagVecGlobalTensor(
-    GlobalTensor<float> score, GlobalTensor<int32_t> indiceOut)
+    GlobalTensor<float> score, GlobalTensor<int32_t> indiceOut, GlobalTensor<float> valueOut)
 {
     scoreGm = score;
     indiceOutGm = indiceOut;
+    valueOutGm_ = valueOut;
 }
 
 template <typename LIT>
@@ -613,11 +634,11 @@ __aicore__ inline bool LightningIndexerV2ServiceVectorFast<LIT>::ProcessSequence
     const LIV2FastCommon::RunInfo& info)
 {
     constexpr int32_t SEQUENCE_TOPK_MIN_VISIBLE_ROWS = 32768;
-    // 仅完整 S1 tile 且可见区足够长时启用整段流水，其余形状回退逐 512 行路径。
+    // 仅完整 S1 tile 且可见区足够长时启用整段流水; rv=1 或 r>1 回落 TopkOnly
     bool useSequencePipeline =
         (((gSize_ == 24) && (s1BaseSize_ == 8)) || ((gSize_ == 32) && (s1BaseSize_ == 6))) && (s2BaseSize_ == 512) &&
-        (constInfo_.attenMaskFlag) && (constInfo_.sparseCount == 2048) && (constInfo_.realSparseCount == 2048) &&
-        (info.s2Idx == 0) &&
+        (!constInfo_.returnValue) && (constInfo_.cmpRatio == 1) && (constInfo_.attenMaskFlag) &&
+        (constInfo_.sparseCount == 2048) && (constInfo_.realSparseCount == 2048) && (info.s2Idx == 0) &&
         ((info.actS2Size - info.actS1Size + (info.gS1Idx + 1) * s1BaseSize_) >= SEQUENCE_TOPK_MIN_VISIBLE_ROWS) &&
         (info.actS1Size - (info.gS1Idx * s1BaseSize_) >= s1BaseSize_);
     if (!useSequencePipeline) {
@@ -687,11 +708,8 @@ __aicore__ inline void LightningIndexerV2ServiceVectorFast<LIT>::ProcessTopkOnly
     AscendC::DataCopyPad(scoreHalfUb, scoreGm[scoreGmOffset], scoreCopyParams, scorePadParams);
     AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventIdMTE2ToVPing);
     AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventIdMTE2ToVPing);
-    // 512x8 -> 8x512。AscendC TransDataTo5HD<float> 在 A2/A3 上对应scatter_vnchwconv_b32；仅保留本 AIV 的 3/4
-    // 个有效列，其余列写入 spill MergeSort 会在临时区写出 (virTopK + 512) 组 value/index，所需空间为(2048 + 512) * 2 =
-    // 5120 个 FP32；转置结果必须从该范围之后开始
-    constexpr int32_t MERGE_TMP_ELEMENTS = (FAST_BASE_TOPK + 512) * 2;
-    LocalTensor<float> selectedScoreUb = tmpUb_[MERGE_TMP_ELEMENTS];
+    // 512x8 -> 8x512 转置; 转置结果从 mergeTmp 区之后开始(fastSelectedOffset_ 已含保护)
+    LocalTensor<float> selectedScoreUb = tmpUb_[fastSelectedOffset_];
     LocalTensor<float> spillScoreUb = selectedScoreUb[cuS1ProcNumPerAiv * s2BaseSize_];
     uint64_t srcAddrList[16];
     uint64_t dstAddrList[16];
@@ -717,10 +735,10 @@ __aicore__ inline void LightningIndexerV2ServiceVectorFast<LIT>::ProcessTopkOnly
     constexpr int32_t CACHE_TILE_CAPACITY = 4;
     constexpr int32_t MAX_SEQUENCES_PER_AIV = 4;
     constexpr int32_t SORTED_BLOCK_ELEMENTS = 512 * 2;
-    LocalTensor<float> reduceOutBuff = workspace_[FAST_REDUCE_OUT_OFFSET / sizeof(float)];
+    LocalTensor<float> reduceOutBuff = workspace_[fastReduceOutOffset_];
     int32_t cuS2LenVecAlign = s2BaseSize_; // Score tile 固定 512，尾部以 -inf 补齐。
-    LocalTensor<float> sortWorkUb = workspace_[FAST_OUT_WORK_OFFSET / sizeof(float)];
-    LocalTensor<float> sortedCacheUb = workspace_[FAST_SORTED_CACHE_OFFSET / sizeof(float)];
+    LocalTensor<float> sortWorkUb = workspace_[fastOutWorkOffset_];
+    LocalTensor<float> sortedCacheUb = workspace_;
     LocalTensor<float> sortScratchUb = sortWorkUb;
     bool activeSequence[MAX_SEQUENCES_PER_AIV] = {false, false, false, false};
     bool endSequence[MAX_SEQUENCES_PER_AIV] = {false, false, false, false};
@@ -730,8 +748,9 @@ __aicore__ inline void LightningIndexerV2ServiceVectorFast<LIT>::ProcessTopkOnly
         int32_t cuS1Idx = cuS1BeginIdxPerAiv + innerS1Idx;
         int32_t cuRealAcSeq = info.actS2Size;
         if (constInfo_.attenMaskFlag) {
-            // 与原 ProcessVec 保持一致：当前 token 自身可见，因此首 token 也要 +1
-            cuRealAcSeq = info.actS2Size - (info.actS1Size - cuS1Idx) + 1;
+            // 因果可见长度在原始域计算后折算压缩域 /r(与通用模板同款)
+            cuRealAcSeq = static_cast<int32_t>(
+                (static_cast<int64_t>(info.actS2SizeOrig) - (info.actS1Size - cuS1Idx) + 1) / constInfo_.cmpRatio);
         }
         int32_t cuS2Len = cuBaseS2Idx + s2BaseSize_ >= cuRealAcSeq ? cuRealAcSeq - cuBaseS2Idx : s2BaseSize_;
         if (cuRealAcSeq <= 0) {
@@ -775,20 +794,24 @@ __aicore__ inline void LightningIndexerV2ServiceVectorFast<LIT>::ProcessTopkOnly
         } else {
             MrgBasicBlock(sortWorkUb, cachedBlocks, cacheTileCount, s2BaseSize_);
             AscendC::PipeBarrier<PIPE_V>();
-            SparseTopK(globalTopk, sortWorkUb, scoreHalfUb, FAST_BASE_TOPK, cacheTileCount * s2BaseSize_);
+            SparseTopK(globalTopk, sortWorkUb, scoreHalfUb, virTopK, cacheTileCount * s2BaseSize_);
         }
         AscendC::PipeBarrier<PIPE_V>();
-
         if (endSequence[innerS1Idx]) {
             int32_t cuS1Idx = cuS1BeginIdxPerAiv + innerS1Idx;
-            // 复用固定 UB 工作区的前半段，存放 Extract 输出
-            LocalTensor<float> outValueUb = sortWorkUb;
+            // Extract 输出复用固定 UB 工作区前半段; >2048 需 2×virTopK 暂存借用 tmp 归并区
+            LocalTensor<float> outValueUb = (virTopK <= static_cast<int32_t>(FAST_BASE_TOPK)) ? sortWorkUb : tmpUb_;
             LocalTensor<uint32_t> outIdxUb = outValueUb[virTopK].template ReinterpretCast<uint32_t>();
             Extract(outValueUb, outIdxUb, globalTopk, virTopK / 32);
             LocalTensor<int32_t> idxUb = outValueUb[virTopK].template ReinterpretCast<int32_t>();
             SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
             LIServiceVec::CopyOut(indiceOutGm[info.indiceOutOffset + cuS1Idx * constInfo_.sparseCount], idxUb,
                                   constInfo_.sparseCount);
+            // rv=1: values 与 indices 同序配对输出(outValueUb 前 sparseCount 个与 idxUb 一一对应)
+            if (constInfo_.returnValue) {
+                LIServiceVec::CopyOut(valueOutGm_[info.indiceOutOffset + cuS1Idx * constInfo_.sparseCount], outValueUb,
+                                      constInfo_.sparseCount);
+            }
             // 下一 token 的归并会覆盖该区域，复用前须等待 MTE3 读取完成
             SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
         }
@@ -825,8 +848,22 @@ __aicore__ inline void LightningIndexerV2ServiceVectorFast<LIT>::FreeEventID()
 template <typename LIT>
 __aicore__ inline void LightningIndexerV2ServiceVectorFast<LIT>::CleanInvalidOutput(int64_t invalidS1Offset)
 {
-    GlobalTensor<int32_t> invalidOut = indiceOutGm[invalidS1Offset];
-    AscendC::InitGlobalMemory(invalidOut, constInfo_.realSparseCount, constInfo_.INVALID_IDX);
+    // staging 借用 SORT_OUT 区(tile 间恒稳), 与 TopkOnly 输出同款 V→MTE3 事件保护
+    LocalTensor<int32_t> idxUb = globalTopkUb_.template ReinterpretCast<int32_t>();
+    Duplicate(idxUb, constInfo_.INVALID_IDX, constInfo_.realSparseCount);
+    LocalTensor<int32_t> valUb = idxUb[LIV2Common::Align(constInfo_.realSparseCount, 8U)];
+    if (constInfo_.returnValue) {
+        // -inf 的 float 位模式 0xFF800000 与 int32 表示一致
+        Duplicate(valUb, LIServiceVec::NEG_INF, constInfo_.realSparseCount);
+    }
+    AscendC::PipeBarrier<PIPE_V>();
+    SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
+    LIServiceVec::CopyOut(indiceOutGm[invalidS1Offset], idxUb, constInfo_.realSparseCount);
+    if (constInfo_.returnValue) {
+        GlobalTensor<float> valueSlice = valueOutGm_[invalidS1Offset];
+        LIServiceVec::CopyOut(valueSlice, valUb.template ReinterpretCast<float>(), constInfo_.realSparseCount);
+    }
+    SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
 }
 
 } // namespace LIV2Kernel

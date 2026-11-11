@@ -133,6 +133,8 @@ private:
     LocalTensor<float> wtL0b_;
 
     bool cfvStreamPrimed_ = false;
+    // 本 tile 实际参与 MM1/MM2 的 QK chunk 数: M<192 时跳过纯零填充 chunk, 减 Cube 无效功
+    uint32_t cfvActiveChunks_ = static_cast<uint32_t>(CFV_QK_CHUNKS);
     LIV2FastCommon::ConstInfo constInfo_;
     static constexpr bool PAGE_ATTENTION = LIT::pageAttention;
 };
@@ -281,11 +283,10 @@ __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::CfvLoadQueryAndWe
     constexpr uint64_t Q_SLOT = 0;
     AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(static_cast<event_t>(QUERY_MTE1_MTE2_EVENT + Q_SLOT));
 
-    // L1 固定为六个 [32,128] NZ 面板。完整 tile 保留一次 multi-ND 搬运；
-    // S1 尾块按有效行分段填入相同布局，未填充列由 Weight 的零列屏蔽。
-    if (runInfo.actMBaseSize == CFV_QK_CHUNKS * CFV_QK_CHUNK && constInfo_.kHeadNum == 1) {
+    // L1 固定为六个 [32,128] NZ 面板; 尾块按有效行分段填入, 未填充列由 Weight 零列屏蔽
+    if (runInfo.actMBaseSize == cfvActiveChunks_ * CFV_QK_CHUNK && constInfo_.kHeadNum == 1) {
         AscendC::Nd2NzParams qCopyParams;
-        qCopyParams.ndNum = CFV_QK_CHUNKS;
+        qCopyParams.ndNum = static_cast<uint16_t>(cfvActiveChunks_);
         qCopyParams.nValue = CFV_QK_CHUNK;
         qCopyParams.dValue = D_BASIC_BLOCK_L0;
         qCopyParams.srcNdMatrixStride = CFV_QK_CHUNK * D_BASIC_BLOCK_L0;
@@ -301,7 +302,7 @@ __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::CfvLoadQueryAndWe
         zeroParams.blockNum = CFV_QK_CHUNK;
         zeroParams.dstGap = 0;
         zeroParams.initValue = 0;
-        for (uint32_t chunk = 0; chunk < CFV_QK_CHUNKS; ++chunk) {
+        for (uint32_t chunk = 0; chunk < cfvActiveChunks_; ++chunk) {
             AscendC::InitConstValue(cfvL1_[CFV_Q_L1_BASE_BYTES + chunk * CFV_QK_CHUNK * D_BASIC_BLOCK_L0 * sizeof(Q_T)]
                                         .template ReinterpretCast<Q_T>(),
                                     zeroParams);
@@ -343,7 +344,7 @@ __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::CfvLoadQueryAndWe
     qParams.srcStride = 1;
     qParams.dstGap = 0;
     qParams.ifTranspose = false;
-    for (uint32_t chunk = 0; chunk < CFV_QK_CHUNKS; ++chunk) {
+    for (uint32_t chunk = 0; chunk < cfvActiveChunks_; ++chunk) {
         AscendC::LoadData(keyL0_[chunk * CFV_QK_CHUNK * D_BASIC_BLOCK_L0],
                           cfvL1_[CFV_Q_L1_BASE_BYTES + chunk * CFV_QK_CHUNK * D_BASIC_BLOCK_L0 * sizeof(K_T)]
                               .template ReinterpretCast<K_T>(),
@@ -462,6 +463,9 @@ template <uint32_t Phase, uint32_t Chunk>
 __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::CfvStartQkChunk()
 {
     static_assert(Phase < 2 && Chunk < CFV_QK_CHUNKS);
+    if (Chunk >= cfvActiveChunks_) {
+        return;
+    }
     constexpr uint32_t C_SLOT = (Phase * CFV_QK_CHUNKS + Chunk) & 3;
     AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(static_cast<event_t>(C_SLOT));
     AscendC::MmadParams params;
@@ -480,6 +484,9 @@ template <uint32_t Phase, uint32_t Chunk>
 __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::CfvFinishQkChunk()
 {
     static_assert(Phase < 2 && Chunk < CFV_QK_CHUNKS);
+    if (Chunk >= cfvActiveChunks_) {
+        return;
+    }
     constexpr uint32_t C_SLOT = (Phase * CFV_QK_CHUNKS + Chunk) & 3;
     AscendC::MmadParams params;
     params.m = S2_BASIC_BLOCK_L0;
@@ -539,6 +546,9 @@ template <uint32_t Phase, uint32_t Chunk, uint32_t L0aSlot>
 __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::CfvPrefetchQkChunk()
 {
     static_assert(Phase < 2 && Chunk < CFV_QK_CHUNKS && L0aSlot < 2);
+    if (Chunk >= cfvActiveChunks_) {
+        return;
+    }
     constexpr uint32_t QK_L0A_EVENT = EVENT_ID4 + L0aSlot;
     AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(static_cast<event_t>(QK_L0A_EVENT));
     constexpr uint64_t PHASE_BASE_BYTES = Phase == 0 ? CFV_QK_L1_PHASE0_BYTES : CFV_QK_L1_PHASE1_BYTES;
@@ -574,6 +584,9 @@ template <uint32_t Chunk, uint32_t L0aSlot, uint32_t OutputTile, uint32_t Output
 __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::CfvConsumeQkChunk()
 {
     static_assert(Chunk < CFV_QK_CHUNKS && L0aSlot < 2 && OutputTile < 2 && OutputSlot < 2);
+    if (Chunk >= cfvActiveChunks_) {
+        return;
+    }
     constexpr uint32_t QK_L0A_EVENT = EVENT_ID4 + L0aSlot;
     AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(static_cast<event_t>(QK_L0A_EVENT));
     AscendC::MmadParams params;
@@ -721,8 +734,10 @@ template <typename LIT>
 __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::ComputeCubeStages(const LIV2FastCommon::RunInfo& runInfo)
 {
     // causal 可见范围可能早于实际 K 序列结束，预取不得越过当前 gS1 的 s2LoopEnd
-    // 避免组尾留下未被消费的 K L1 就绪事件
     uint64_t remainingRows = (runInfo.s2LoopEnd - runInfo.s2Idx + 1) * constInfo_.s2BaseSize;
+
+    // 本 tile 的 M 行数决定实际 chunk 数, 尾块向上取整
+    cfvActiveChunks_ = static_cast<uint32_t>((runInfo.actMBaseSize + CFV_QK_CHUNK - 1U) / CFV_QK_CHUNK);
 
     if (runInfo.isFirstS2InnerLoop) {
         CfvLoadQueryAndWeight(runInfo);

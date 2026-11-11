@@ -189,7 +189,8 @@ __aicore__ inline void LightningIndexerV2KernelFast<LIT>::InitTilingData(const L
     constInfo.s2BaseSize = S2_BASE_SIZE;
     constInfo.isSparseCountOver2K = (constInfo.sparseCount <= BASE_TOPK) ? false : true;
 
-    constInfo.s1BaseSize = constInfo.gSize == 32 ? 6U : 8U;
+    // N1 泛化: s1BaseSize 由 host CalcAdaptiveS1Base 自适应下发(≤0 时回退 32头6/24头8 硬编码)
+    constInfo.s1BaseSize = (tilingData->s1BaseSize > 0U) ? tilingData->s1BaseSize : (constInfo.gSize == 32 ? 6U : 8U);
     constInfo.realSparseCount = constInfo.sparseCount;
     // The arch22 K input is AutoContiguous. Use the packed page stride of the
     // kernel input, rather than the stride of the original caller tensor.
@@ -331,7 +332,10 @@ __aicore__ inline void LightningIndexerV2KernelFast<LIT>::Init(
     if ASCEND_IS_AIV {
         indiceOutGm.SetGlobalBuffer((__gm__ int32_t*)sparseIndices);
         vectorService.InitParams(constInfo, tiling);
-        vectorService.InitDiagVecGlobalTensor(mm1ResGm, indiceOutGm);
+        // rv=1 泛化: values 输出接线(rv==0 时 sparseValues 为空张量, 绑定无效地址不消费)
+        GlobalTensor<float> valueOutGmTmp;
+        valueOutGmTmp.SetGlobalBuffer((__gm__ float*)sparseValues);
+        vectorService.InitDiagVecGlobalTensor(mm1ResGm, indiceOutGm, valueOutGmTmp);
         vectorService.InitCfvTopkState(vec1ResGm);
     } else {
         matmulService.InitParams(constInfo);
@@ -555,6 +559,18 @@ __aicore__ inline void LightningIndexerV2KernelFast<LIT>::ProcessCubeFillVector(
                 ++gloop;
             }
             splitCoreInfo.s2Start = 0;
+        }
+        // BSND 泛化: 实际 S1 小于 shape S1 时, 尾部 padding 行输出清理(-1/-inf)
+        if (tempLoopInfo.needDealActS1LessThanS1) {
+            if ASCEND_IS_AIV {
+                for (uint32_t s1Idx = tempLoopInfo.actS1Size; s1Idx < constInfo.qSeqSize; ++s1Idx) {
+                    // B,S1,N2,K
+                    uint64_t cleanOffset =
+                        tempLoopInfo.bIdx * constInfo.qSeqSize * constInfo.kHeadNum * constInfo.sparseCount +
+                        s1Idx * constInfo.kHeadNum * constInfo.sparseCount + tempLoopInfo.n2Idx * constInfo.sparseCount;
+                    vectorService.CleanInvalidOutput(cleanOffset);
+                }
+            }
         }
         splitCoreInfo.gS1Start = 0;
     }

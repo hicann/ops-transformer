@@ -173,10 +173,10 @@ TEST_F(LightningIndexerV2Tiling, LightningIndexerV2_910b_tiling_3)
          {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
         &compileInfo, "Ascend910B", 64, 262144, 16384);
     int64_t expectTilingKey = 203547;
-    // 尾部两个值: candidateTopkBlocks(-1) 与 returnValue(0) 打包为 -4294967296, candidateBlockSize(8)
-    // （candidate_topk_blocks 缺省 off，TilingData 布局见 tiling.h 尾部 candidate 字段）
+    // 尾槽: -4294967296=[returnValue(0)|candidateTopkBlocks(-1)], 8=[candidateBlockSize|batchInvariant],
+    // 8589934593=[fastPathCandidate(1)|s1BaseSize(2)](BSND 泛化准入 + N1=64 自适应)
     std::string expectTilingData = "2 167503724608 8796093022272 274877906944 0 3 "
-                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 0 ";
+                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 8589934593 ";
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
 }
 
@@ -216,10 +216,10 @@ TEST_F(LightningIndexerV2Tiling, LightningIndexerV2_910b_tiling_4)
          {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
         &compileInfo, "Ascend910B", 64, 262144, 16384);
     int64_t expectTilingKey = 1090722587;
-    // 尾部两个值: candidateTopkBlocks(-1) 与 returnValue(0) 打包为 -4294967296, candidateBlockSize(8)
-    // （candidate_topk_blocks 缺省 off，TilingData 布局见 tiling.h 尾部 candidate 字段）
+    // 尾槽: -4294967296=[returnValue(0)|candidateTopkBlocks(-1)], 8=[candidateBlockSize|batchInvariant],
+    // 8589934593=[fastPathCandidate(1)|s1BaseSize(2)](BSND 泛化准入 + N1=64 自适应)
     std::string expectTilingData = "2 167503724608 8796093022224 274877906944 4294967312 3 "
-                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 0 ";
+                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 8589934593 ";
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
 }
 
