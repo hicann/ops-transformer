@@ -404,8 +404,9 @@ void MixedQuantSparseFlashMlaMetadataCpuKernel::CalcCmpMaskMode()
 ValidSocVersion MixedQuantSparseFlashMlaMetadataCpuKernel::ProcessSocVersion()
 {
     const std::string ascend960Dt = "Ascend960DT";
+    const std::string ascend960Pr = "Ascend960PR";
     const std::string ascend950 = "Ascend950";
-    if (socVersion_.find(ascend960Dt) != std::string::npos) {
+    if (socVersion_.find(ascend960Dt) != std::string::npos || socVersion_.find(ascend960Pr) != std::string::npos) {
         return ValidSocVersion::ASCEND960;
     } else if (socVersion_.find(ascend950) != std::string::npos) {
         return ValidSocVersion::ASCEND950;
@@ -1519,8 +1520,9 @@ bool MixedQuantSparseFlashMlaMetadataCpuKernel::BalanceSchedule(SplitResult& spl
         if (splitRes.numOfFdHead > 0U) {
             SplitFD(splitRes);
         }
-    } else if (aicCoreNum_ <= 4U || batchSize_ > aicCoreNum_ - 4U) {
-        // Batch超过Cube核数减4时关闭FD，直接生成一次不开FD的方案。
+    } else if (ProcessSocVersion() == ValidSocVersion::ASCEND960 || aicCoreNum_ <= 4U ||
+               batchSize_ > aicCoreNum_ - 4U) {
+        // A6或Batch超过Cube核数减4时关闭FD，直接生成一次不开FD的方案。
         supportFd_ = false;
         CalcSplitPlan(splitRes.maxCost, splitContext, splitRes);
     } else {
