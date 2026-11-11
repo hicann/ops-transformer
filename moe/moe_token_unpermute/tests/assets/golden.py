@@ -18,6 +18,37 @@ __spec__ = {
 }
 
 
+_CROSS_CHECK_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+}
+
+
+class _TorchImpl:
+    def __call__(
+        self,
+        permutedTokens,
+        sortedIndices,
+        probsOptional=None,
+        paddedMode=False,
+        restoreShapeOptional=None,
+        *args,
+        **kwargs,
+    ):
+        tokens = permutedTokens.reshape(-1, permutedTokens.shape[-1])
+        topk = probsOptional.shape[-1] if probsOptional is not None else 1
+        rows = sortedIndices.shape[0] // topk
+        route = sortedIndices.reshape(rows, topk).to(torch.int64)
+        valid = (route >= 0) & (route < tokens.shape[0])
+        safe_route = route.clamp(0, max(tokens.shape[0] - 1, 0))
+        gathered = tokens.to(torch.float32)[safe_route]
+        if probsOptional is not None:
+            gathered = gathered * probsOptional.to(torch.float32).reshape(rows, topk, 1)
+        gathered = torch.where(valid.unsqueeze(-1), gathered, 0.0)
+        return [gathered.sum(dim=1).to(permutedTokens.dtype)]
+
+
 def _moe_finalize_routing_v2_np_torch(
     expanded_x, expanded_row_idx, scales, drop_pad_mode=2
 ):
@@ -57,6 +88,9 @@ def _moe_finalize_routing_v2_np_torch(
 
 
 class AclnnMoeTokenUnpermuteTestSpec:
+    third_party = {"torch": _TorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         permutedTokens,
@@ -85,9 +119,3 @@ class AclnnMoeTokenUnpermuteTestSpec:
         sortedIndices = args[1]
         n = sortedIndices.shape[0]
         sortedIndices.copy_(torch.randperm(n, dtype=torch.int32))
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }

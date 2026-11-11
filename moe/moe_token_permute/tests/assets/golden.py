@@ -18,7 +18,38 @@ __spec__ = {
 }
 
 
+_CROSS_CHECK_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+}
+
+
+class _TorchImpl:
+    def __call__(
+        self,
+        tokens,
+        indices,
+        numOutTokens=0,
+        paddedMode=False,
+        *args,
+        **kwargs,
+    ):
+        flat_indices = indices.reshape(-1)
+        order = torch.argsort(flat_indices, stable=True)
+        topk = indices.shape[-1] if indices.dim() == 2 else 1
+        count = (
+            tokens.shape[0] * topk
+            if numOutTokens == 0
+            else min(int(numOutTokens), tokens.shape[0] * topk)
+        )
+        return [tokens[order[:count] // topk], None]
+
+
 class AclnnMoeTokenPermuteTestSpec:
+    third_party = {"torch": _TorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         tokens,
@@ -59,9 +90,3 @@ class AclnnMoeTokenPermuteTestSpec:
         expanded_x = input_x[selected_indices]
 
         return [expanded_x.to(x_dtype), expanded_row_idx]
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }

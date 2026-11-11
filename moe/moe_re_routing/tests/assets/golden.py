@@ -11,13 +11,68 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import numpy
+import torch
 
 __spec__ = {
     "moe_re_routing": "MoeReRoutingTestSpec",
 }
 
 
+_CROSS_CHECK_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+}
+
+
+class _MoeReRoutingTorchImpl:
+    """Independent Torch reference for floating-point output slots."""
+
+    def __call__(
+        self,
+        tokens,
+        expert_token_num_per_rank,
+        per_token_scales=None,
+        *,
+        expert_token_num_type=0,
+        idx_type=0,
+        **kwargs,
+    ):
+        rank_num, expert_num = expert_token_num_per_rank.shape
+        permute_tokens = torch.zeros_like(tokens)
+        permute_scales = (
+            torch.zeros_like(per_token_scales) if per_token_scales is not None else None
+        )
+        expert_token_num = torch.sum(expert_token_num_per_rank, dim=0)
+        per_expert_offset = torch.zeros_like(expert_token_num)
+        if expert_num > 1:
+            per_expert_offset[1:] = torch.cumsum(expert_token_num, dim=0)[:-1]
+
+        src_offset = 0
+        for rank_idx in range(rank_num):
+            for expert_idx in range(expert_num):
+                count = int(expert_token_num_per_rank[rank_idx, expert_idx].item())
+                if count == 0:
+                    continue
+                dst_start = int(per_expert_offset[expert_idx].item())
+                dst_end = dst_start + count
+                src_end = src_offset + count
+                permute_tokens[dst_start:dst_end] = tokens[src_offset:src_end]
+                if permute_scales is not None:
+                    permute_scales[dst_start:dst_end] = per_token_scales[
+                        src_offset:src_end
+                    ]
+                src_offset = src_end
+                per_expert_offset[expert_idx] = dst_end
+
+        token_reference = permute_tokens if tokens.is_floating_point() else None
+        return [token_reference, permute_scales, None, None]
+
+
 class MoeReRoutingTestSpec:
+    third_party = {"torch": _MoeReRoutingTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         tokens,
@@ -145,43 +200,3 @@ class MoeReRoutingTestSpec:
                     new_etr[r, e] += 1 if diff > 0 else -1
 
         return (tokens, new_etr, per_token_scales)
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-        "int8": {"standard": "stat_rel_err"},
-        "int32": {"standard": "stat_rel_err"},
-        "int64": {"standard": "stat_rel_err"},
-    }
-
-    @staticmethod
-    def pre_compare(*outputs, **kwargs):
-        # ttk 传入顺序为 (*npu_outputs, *goldens)；golden 经框架管线会被提升为 float32，
-        # 对 fp8 输出恢复为 NPU 实际 dtype 后再走默认比对，避免 cross-dtype 不可比
-        half = len(outputs) // 2
-        npu_outputs = list(outputs[:half])
-        golden_outputs = list(outputs[half:])
-        for i, (npu_out, golden_out) in enumerate(zip(npu_outputs, golden_outputs)):
-            if npu_out is None or golden_out is None:
-                continue
-            try:
-                npu_name = str(npu_out.dtype).lower()
-                golden_name = str(golden_out.dtype).lower()
-                if "float32" not in golden_name and "float64" not in golden_name:
-                    continue
-                if "e8m0" in npu_name:
-                    import en_dtypes
-
-                    golden_outputs[i] = golden_out.astype(en_dtypes.float8_e8m0)
-                elif "e4m3" in npu_name:
-                    import ml_dtypes
-
-                    golden_outputs[i] = golden_out.astype(ml_dtypes.float8_e4m3fn)
-                elif "e5m2" in npu_name:
-                    import ml_dtypes
-
-                    golden_outputs[i] = golden_out.astype(ml_dtypes.float8_e5m2)
-            except Exception:
-                continue
-        return tuple(npu_outputs) + tuple(golden_outputs)

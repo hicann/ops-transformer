@@ -19,7 +19,41 @@ __spec__ = {
 }
 
 
+_CROSS_CHECK_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+}
+
+
+def _torch_cross_check(grad_expanded_x, expanded_row_idx, top_k):
+    output_dtype = grad_expanded_x.dtype
+    values = grad_expanded_x.to(torch.float32)
+    if values.dim() > 2:
+        values = values.reshape(-1, values.shape[-1])
+    batch = expanded_row_idx.shape[0] // int(top_k)
+    route = expanded_row_idx.reshape(batch, int(top_k)).to(torch.int64)
+    valid = (route >= 0) & (route < values.shape[0])
+    safe_route = route.clamp(0, max(values.shape[0] - 1, 0))
+    gathered = values[safe_route]
+    gathered = torch.where(valid.unsqueeze(-1), gathered, 0.0)
+    return [gathered.sum(dim=1).to(output_dtype)]
+
+
+class _KernelTorchImpl:
+    def __call__(self, grad_expanded_x, expanded_row_idx, *, top_k, **kwargs):
+        return _torch_cross_check(grad_expanded_x, expanded_row_idx, top_k)
+
+
+class _AclnnTorchImpl:
+    def __call__(self, gradExpandedX, expandedRowIdx, topK, *args, **kwargs):
+        return _torch_cross_check(gradExpandedX, expandedRowIdx, topK)
+
+
 class AclnnMoeInitRoutingV2GradTestSpec:
+    third_party = {"torch": _AclnnTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         gradExpandedX,
@@ -72,14 +106,11 @@ class AclnnMoeInitRoutingV2GradTestSpec:
             new_eri = torch.randint(0, A, (BSK,), dtype=torch.int32)
         expandedRowIdx.copy_(new_eri)
 
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
-
 
 class MoeInitRoutingV2GradTestSpec:
+    third_party = {"torch": _KernelTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         grad_expanded_x,
@@ -131,9 +162,3 @@ class MoeInitRoutingV2GradTestSpec:
         else:
             new_eri = numpy.random.randint(0, A, size=BSK, dtype=numpy.int32)
         return (grad_expanded_x, new_eri)
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }

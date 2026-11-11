@@ -19,6 +19,13 @@ __spec__ = {
 }
 
 
+_CROSS_CHECK_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+}
+
+
 def _softmax_numpy(x, axis=-1):
     if "float16" in x.dtype.name:
         x = x.astype(numpy.float32)
@@ -39,7 +46,30 @@ def _softmax_torch(x, axis=-1):
     return y / x_sum
 
 
+def _torch_cross_check(x, k):
+    output_dtype = x.dtype
+    gating = x.to(torch.float32)
+    if gating.dim() == 3:
+        gating = gating.reshape(-1, gating.shape[-1])
+    softmax = torch.softmax(gating, dim=-1)
+    indices = torch.argsort(softmax, dim=-1, descending=True, stable=True)[:, :k]
+    return [torch.gather(softmax, -1, indices).to(output_dtype), None, None]
+
+
+class _KernelTorchImpl:
+    def __call__(self, x, finished, *, k, **kwargs):
+        return _torch_cross_check(x, k)
+
+
+class _AclnnTorchImpl:
+    def __call__(self, x, finishedOptional=None, k=1, *args, **kwargs):
+        return _torch_cross_check(x, k)
+
+
 class AclnnMoeGatingTopKSoftmaxTestSpec:
+    third_party = {"torch": _AclnnTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -84,14 +114,11 @@ class AclnnMoeGatingTopKSoftmaxTestSpec:
 
         return [out, indices.to(torch.int32), row_idx]
 
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
-
 
 class MoeGatingTopKSoftmaxTestSpec:
+    third_party = {"torch": _KernelTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(x, finished, *, k, **kwargs):
         ori_dtype = x.dtype
@@ -122,9 +149,3 @@ class MoeGatingTopKSoftmaxTestSpec:
         out = out.astype(ori_dtype)
 
         return [out, indices.astype(numpy.int32), row_idx]
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }

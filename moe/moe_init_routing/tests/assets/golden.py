@@ -19,7 +19,37 @@ __spec__ = {
 }
 
 
+_CROSS_CHECK_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+}
+
+
+def _torch_cross_check(x, row_idx, expert_idx, active_num):
+    num_rows = x.shape[0]
+    topk = expert_idx.shape[-1]
+    order = torch.argsort(expert_idx.reshape(-1), stable=True)
+    source_rows = torch.gather(row_idx.reshape(-1).to(torch.int64), 0, order)
+    count = min(int(active_num), num_rows) * topk
+    expanded_x = x[source_rows[:count] % num_rows]
+    return [expanded_x, None, None]
+
+
+class _KernelTorchImpl:
+    def __call__(self, x, row_idx, expert_idx, *, active_num, **kwargs):
+        return _torch_cross_check(x, row_idx, expert_idx, active_num)
+
+
+class _AclnnTorchImpl:
+    def __call__(self, x, rowIdx, expertIdx, activeNum, *args, **kwargs):
+        return _torch_cross_check(x, rowIdx, expertIdx, activeNum)
+
+
 class AclnnMoeInitRoutingTestSpec:
+    third_party = {"torch": _AclnnTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -68,14 +98,11 @@ class AclnnMoeInitRoutingTestSpec:
         )
         rowIdx.copy_(new_row)
 
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
-
 
 class MoeInitRoutingTestSpec:
+    third_party = {"torch": _KernelTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(x, row_idx, expert_idx, *, active_num, **kwargs):
         ori_dtype = x.dtype
@@ -115,9 +142,3 @@ class MoeInitRoutingTestSpec:
             .transpose(1, 0)
         )
         return (x, row_idx, expert_idx)
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }

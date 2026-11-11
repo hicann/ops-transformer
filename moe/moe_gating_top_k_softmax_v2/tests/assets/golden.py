@@ -20,6 +20,13 @@ __spec__ = {
 }
 
 
+_CROSS_CHECK_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+}
+
+
 def _softmax_numpy(x, axis=-1):
     if "float16" in x.dtype.name:
         x = x.astype(numpy.float32)
@@ -40,7 +47,57 @@ def _softmax_torch(x, axis=-1):
     return y / x_sum
 
 
+def _torch_cross_check(x, k, renorm, output_softmax_result_flag):
+    """Compute floating outputs independently on the remote Torch device."""
+    output_dtype = x.dtype
+    gating = x.to(torch.float32)
+    if gating.dim() == 3:
+        gating = gating.reshape(-1, gating.shape[-1])
+    softmax = torch.softmax(gating, dim=-1)
+    indices = torch.argsort(gating, dim=-1, descending=True, stable=True)[:, :k]
+    if renorm == 1:
+        selected = torch.gather(gating, -1, indices)
+        out = torch.softmax(selected, dim=-1)
+    else:
+        out = torch.gather(softmax, -1, indices)
+    result = [out.to(output_dtype), None, None]
+    if renorm == 0 and output_softmax_result_flag:
+        result[2] = softmax
+    return result
+
+
+class _MoeGatingTopKSoftmaxV2TorchImpl:
+    def __call__(
+        self,
+        x,
+        finished,
+        *,
+        k,
+        renorm=0,
+        output_softmax_result_flag=False,
+        **kwargs,
+    ):
+        return _torch_cross_check(x, k, renorm, output_softmax_result_flag)
+
+
+class _AclnnMoeGatingTopKSoftmaxV2TorchImpl:
+    def __call__(
+        self,
+        x,
+        finishedOptional=None,
+        k=1,
+        renorm=0,
+        outputSoftmaxResultFlag=False,
+        *args,
+        **kwargs,
+    ):
+        return _torch_cross_check(x, k, renorm, outputSoftmaxResultFlag)
+
+
 class AclnnMoeGatingTopKSoftmaxV2TestSpec:
+    third_party = {"torch": _AclnnMoeGatingTopKSoftmaxV2TorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -86,16 +143,13 @@ class AclnnMoeGatingTopKSoftmaxV2TestSpec:
         if renorm == 0 and outputSoftmaxResultFlag:
             return [out, indices.to(torch.int32), softmax]
         else:
-            return [out, indices.to(torch.int32)]
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
+            return [out, indices.to(torch.int32), None]
 
 
 class MoeGatingTopKSoftmaxV2TestSpec:
+    third_party = {"torch": _MoeGatingTopKSoftmaxV2TorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(x, finished, *, k, renorm=0, output_softmax_result_flag=False, **kwargs):
         ori_dtype = x.dtype
@@ -129,10 +183,4 @@ class MoeGatingTopKSoftmaxV2TestSpec:
         if renorm == 0 and output_softmax_result_flag:
             return [out, indices.astype(numpy.int32), softmax]
         else:
-            return [out, indices.astype(numpy.int32)]
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
+            return [out, indices.astype(numpy.int32), None]

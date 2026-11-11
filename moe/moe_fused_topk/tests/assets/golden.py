@@ -28,12 +28,16 @@ __spec__ = {
 }
 
 _KERNEL_TOLERANCE = {
-    "float32": {"standard": "cross_check", "level": "L1"},
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
     "int32": {"standard": "binary_equal"},
 }
 
 _ACLNN_TOLERANCE = {
-    "float32": {"standard": "cross_check", "level": "L1"},
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
     "int32": {"standard": "binary_equal"},
 }
 

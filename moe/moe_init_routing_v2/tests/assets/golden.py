@@ -33,7 +33,117 @@ def _adapter_capacity(sorted_row_idx, sorted_expert_idx, capacity):
                 sorted_row_idx[i] = -1
 
 
+_CROSS_CHECK_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+}
+
+
+def _torch_moe_init_routing_v2_cross_check(
+    x,
+    expert_idx,
+    active_num,
+    expert_capacity,
+    expert_num,
+    drop_pad_mode,
+):
+    """Independent Torch reference for the floating-point output.
+
+    Only ``expanded_x`` is eligible for cross_check. Integer index/count
+    outputs keep their framework binary comparison and therefore use ``None``
+    in the corresponding third-party slots.
+    """
+    num_rows = x.shape[0]
+    hidden_size = x.shape[-1]
+    topk = expert_idx.shape[-1] if expert_idx.ndim == 2 else 1
+    flat_expert_idx = expert_idx.reshape(-1).to(torch.int64)
+    sorted_row_idx = torch.argsort(flat_expert_idx, stable=True)
+
+    if drop_pad_mode == 0:
+        expanded_count = (
+            num_rows * topk
+            if active_num == 0
+            else min(int(active_num), num_rows * topk)
+        )
+        selected_rows = torch.div(
+            sorted_row_idx[:expanded_count], topk, rounding_mode="floor"
+        )
+        expanded_x = x[selected_rows]
+        return [expanded_x, None, None, None]
+
+    slots = int(expert_num) * int(expert_capacity)
+    expanded_x = torch.zeros((slots, hidden_size), dtype=x.dtype, device=x.device)
+    if sorted_row_idx.numel() and slots:
+        sorted_expert_idx = flat_expert_idx[sorted_row_idx]
+        positions = torch.arange(
+            sorted_expert_idx.numel(), device=sorted_expert_idx.device
+        )
+        group_start = torch.ones_like(sorted_expert_idx, dtype=torch.bool)
+        group_start[1:] = sorted_expert_idx[1:] != sorted_expert_idx[:-1]
+        group_offsets = torch.where(group_start, positions, 0)
+        group_offsets = torch.cummax(group_offsets, dim=0).values
+        ranks = positions - group_offsets
+        valid = (
+            (sorted_expert_idx >= 0)
+            & (sorted_expert_idx < int(expert_num))
+            & (ranks < int(expert_capacity))
+        )
+        target_slots = sorted_expert_idx[valid] * int(expert_capacity) + ranks[valid]
+        source_rows = torch.div(sorted_row_idx[valid], topk, rounding_mode="floor")
+        expanded_x[target_slots] = x[source_rows]
+    expanded_x = expanded_x.reshape(int(expert_num), int(expert_capacity), hidden_size)
+    return [expanded_x, None, None, None]
+
+
+class _MoeInitRoutingV2TorchImpl:
+    def __call__(
+        self,
+        x,
+        expert_idx,
+        *,
+        active_num=0,
+        expert_capacity=0,
+        expert_num=0,
+        drop_pad_mode=0,
+        **kwargs,
+    ):
+        return _torch_moe_init_routing_v2_cross_check(
+            x,
+            expert_idx,
+            active_num,
+            expert_capacity,
+            expert_num,
+            drop_pad_mode,
+        )
+
+
+class _AclnnMoeInitRoutingV2TorchImpl:
+    def __call__(
+        self,
+        x,
+        expertIdx,
+        *,
+        activeNumOptional=0,
+        expertCapacityOptional=0,
+        expertNumOptional=0,
+        dropPadModeOptional=0,
+        **kwargs,
+    ):
+        return _torch_moe_init_routing_v2_cross_check(
+            x,
+            expertIdx,
+            activeNumOptional,
+            expertCapacityOptional,
+            expertNumOptional,
+            dropPadModeOptional,
+        )
+
+
 class AclnnMoeInitRoutingV2TestSpec:
+    third_party = {"torch": _AclnnMoeInitRoutingV2TorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -154,14 +264,11 @@ class AclnnMoeInitRoutingV2TestSpec:
             torch.randint(0, expert_num, expertIdx.shape, dtype=torch.int32)
         )
 
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
-
 
 class MoeInitRoutingV2TestSpec:
+    third_party = {"torch": _MoeInitRoutingV2TorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -252,9 +359,3 @@ class MoeInitRoutingV2TestSpec:
             0, expert_num, size=expert_idx.size, dtype=numpy.int32
         ).reshape(expert_idx.shape)
         return (x, expert_idx)
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }

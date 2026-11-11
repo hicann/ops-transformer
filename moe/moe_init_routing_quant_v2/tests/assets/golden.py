@@ -19,7 +19,123 @@ __spec__ = {
 }
 
 
+_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+    "int8": {"standard": "quant", "ptol": 0.001},
+}
+
+
+def _torch_dynamic_scale(
+    x,
+    expert_idx,
+    scale,
+    active_num,
+    expert_capacity,
+    expert_num,
+    drop_pad_mode,
+    quant_mode,
+):
+    if quant_mode == 0:
+        return [None, None, None, None, None]
+    rows, hidden_size = x.shape[0], x.shape[-1]
+    topk = expert_idx.shape[-1]
+    flat_experts = expert_idx.reshape(-1).to(torch.int64)
+    order = torch.argsort(flat_experts, stable=True)
+    sorted_experts = flat_experts[order]
+    if drop_pad_mode == 0:
+        count = rows * topk if active_num == 0 else min(int(active_num), rows * topk)
+        selected_experts = sorted_experts[:count]
+        values = x[order[:count] // topk].to(torch.float32)
+        if scale is not None:
+            values = values * (
+                scale if scale.shape[0] == 1 else scale[selected_experts]
+            ).to(torch.float32)
+    else:
+        slots = int(expert_num) * int(expert_capacity)
+        values = torch.zeros((slots, hidden_size), dtype=torch.float32, device=x.device)
+        if order.numel() and slots:
+            positions = torch.arange(order.numel(), device=x.device)
+            starts = torch.ones_like(sorted_experts, dtype=torch.bool)
+            starts[1:] = sorted_experts[1:] != sorted_experts[:-1]
+            offsets = torch.where(starts, positions, 0)
+            ranks = positions - torch.cummax(offsets, dim=0).values
+            valid = (
+                (sorted_experts >= 0)
+                & (sorted_experts < int(expert_num))
+                & (ranks < int(expert_capacity))
+            )
+            target = sorted_experts[valid] * int(expert_capacity) + ranks[valid]
+            source = order[valid] // topk
+            selected = x[source].to(torch.float32)
+            if scale is not None:
+                selected = selected * (
+                    scale if scale.shape[0] == 1 else scale[sorted_experts[valid]]
+                ).to(torch.float32)
+            values[target] = selected
+    dynamic_scale = torch.amax(torch.abs(values), dim=-1, keepdim=True) / 127
+    return [None, None, None, None, dynamic_scale]
+
+
+class _KernelTorchImpl:
+    def __call__(
+        self,
+        x,
+        expert_idx,
+        scale,
+        offset,
+        *,
+        active_num=0,
+        expert_capacity=0,
+        expert_num=0,
+        drop_pad_mode=0,
+        quant_mode=0,
+        **kwargs,
+    ):
+        return _torch_dynamic_scale(
+            x,
+            expert_idx,
+            scale,
+            active_num,
+            expert_capacity,
+            expert_num,
+            drop_pad_mode,
+            quant_mode,
+        )
+
+
+class _AclnnTorchImpl:
+    def __call__(
+        self,
+        x,
+        expertIdx,
+        scale,
+        offset,
+        activeNum=0,
+        expertCapacity=0,
+        expertNum=0,
+        dropPadMode=0,
+        quantMode=0,
+        *args,
+        **kwargs,
+    ):
+        return _torch_dynamic_scale(
+            x,
+            expertIdx,
+            scale,
+            activeNum,
+            expertCapacity,
+            expertNum,
+            dropPadMode,
+            quantMode,
+        )
+
+
 class AclnnMoeInitRoutingQuantV2TestSpec:
+    third_party = {"torch": _AclnnTorchImpl}
+    tolerance = _TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -164,16 +280,11 @@ class AclnnMoeInitRoutingQuantV2TestSpec:
             expertNum = 100
         expertIdx.copy_(torch.randint(0, expertNum, expertIdx.shape, dtype=torch.int32))
 
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-        "int8": {"standard": "stat_rel_err"},
-        "int32": {"standard": "stat_rel_err"},
-    }
-
 
 class MoeInitRoutingQuantV2TestSpec:
+    third_party = {"torch": _KernelTorchImpl}
+    tolerance = _TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -308,11 +419,3 @@ class MoeInitRoutingQuantV2TestSpec:
             0, expert_num, size=expert_idx.size, dtype=numpy.int32
         ).reshape(expert_idx.shape)
         return (x, expert_idx, scale, offset)
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-        "int8": {"standard": "stat_rel_err"},
-        "int32": {"standard": "stat_rel_err"},
-    }

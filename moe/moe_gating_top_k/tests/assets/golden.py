@@ -21,6 +21,211 @@ __spec__ = {
 }
 
 
+_CROSS_CHECK_TOLERANCE = {
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
+    "float32": {"standard": "cross_check", "level": "L2"},
+}
+
+
+def _torch_cross_check(
+    x,
+    bias,
+    input_ids,
+    tid2eid,
+    k,
+    k_group,
+    group_count,
+    group_select_mode,
+    renorm,
+    norm_type,
+    out_flag,
+    routed_scaling_factor,
+    eps,
+):
+    output_dtype = x.dtype
+    scores = x.to(torch.float32)
+    if norm_type == 0:
+        normalized = torch.softmax(scores, dim=-1)
+    elif norm_type in (1, 3):
+        normalized = torch.sigmoid(scores)
+    elif norm_type == 2:
+        normalized = torch.sqrt(torch.nn.functional.softplus(scores))
+    else:
+        raise ValueError(f"unsupported norm_type: {norm_type}")
+    ranking = normalized + bias.to(torch.float32) if bias is not None else normalized
+    if input_ids is not None and tid2eid is not None:
+        indices = tid2eid[input_ids.to(torch.int64)].to(torch.int64)
+    else:
+        if group_count > 1:
+            grouped = ranking.reshape(ranking.shape[0], int(group_count), -1)
+            if group_select_mode == 0:
+                group_scores = torch.amax(grouped, dim=-1)
+            else:
+                group_scores = torch.topk(grouped, 2, dim=-1).values.sum(dim=-1)
+            selected_groups = torch.argsort(
+                group_scores, dim=-1, descending=True, stable=True
+            )[:, : int(k_group)]
+            mask = torch.ones(
+                (grouped.shape[0], int(group_count)), dtype=torch.bool, device=x.device
+            )
+            mask.scatter_(1, selected_groups, False)
+            ranking = torch.where(mask.unsqueeze(-1), -torch.inf, grouped).reshape(
+                ranking.shape[0], -1
+            )
+        indices = torch.argsort(ranking, dim=-1, descending=True, stable=True)[
+            :, : int(k)
+        ]
+    y = torch.gather(normalized, 1, indices)
+    if norm_type in (1, 2) or (norm_type in (0, 3) and renorm == 1):
+        y = y / (y.sum(dim=-1, keepdim=True) + eps)
+    y = y * routed_scaling_factor
+    return [y.to(output_dtype), None, normalized if out_flag else None]
+
+
+class _KernelTorchImpl:
+    def __call__(
+        self,
+        x,
+        bias,
+        input_ids,
+        tid2eid,
+        *,
+        k,
+        k_group=1,
+        group_count=1,
+        group_select_mode=0,
+        renorm=0,
+        norm_type=0,
+        out_flag=False,
+        routed_scaling_factor=1.0,
+        eps=1e-20,
+        **kwargs,
+    ):
+        return _torch_cross_check(
+            x,
+            bias,
+            input_ids,
+            tid2eid,
+            k,
+            k_group,
+            group_count,
+            group_select_mode,
+            renorm,
+            norm_type,
+            out_flag,
+            routed_scaling_factor,
+            eps,
+        )
+
+
+class _AclnnV1TorchImpl:
+    def __call__(
+        self,
+        x,
+        biasOptional=None,
+        k=1,
+        kGroup=1,
+        groupCount=1,
+        groupSelectMode=0,
+        renorm=0,
+        normType=0,
+        outFlag=False,
+        routedScalingFactor=1.0,
+        eps=1e-20,
+        *args,
+        **kwargs,
+    ):
+        return _torch_cross_check(
+            x,
+            biasOptional,
+            None,
+            None,
+            k,
+            kGroup,
+            groupCount,
+            groupSelectMode,
+            renorm,
+            normType,
+            outFlag,
+            routedScalingFactor,
+            eps,
+        )
+
+
+class _AclnnV2TorchImpl:
+    def __call__(
+        self,
+        x,
+        biasOptional=None,
+        inputIdsOptional=None,
+        tid2eidOptional=None,
+        k=1,
+        kGroup=1,
+        groupCount=1,
+        groupSelectMode=0,
+        renorm=0,
+        normType=0,
+        outFlag=False,
+        routedScalingFactor=1.0,
+        eps=1e-20,
+        *args,
+        **kwargs,
+    ):
+        inputIdsOptional = kwargs.get("inputIdsOptional", inputIdsOptional)
+        tid2eidOptional = kwargs.get("tid2eidOptional", tid2eidOptional)
+        return _torch_cross_check(
+            x,
+            biasOptional,
+            inputIdsOptional,
+            tid2eidOptional,
+            k,
+            kGroup,
+            groupCount,
+            groupSelectMode,
+            renorm,
+            normType,
+            outFlag,
+            routedScalingFactor,
+            eps,
+        )
+
+
+class _E2eTorchImpl:
+    def __call__(
+        self,
+        x,
+        k,
+        bias=None,
+        input_ids=None,
+        tid2eid=None,
+        k_group=1,
+        group_count=1,
+        group_select_mode=0,
+        renorm=0,
+        norm_type=0,
+        out_flag=False,
+        routed_scaling_factor=1.0,
+        eps=1e-20,
+        **kwargs,
+    ):
+        return _torch_cross_check(
+            x,
+            bias,
+            input_ids,
+            tid2eid,
+            k,
+            k_group,
+            group_count,
+            group_select_mode,
+            renorm,
+            norm_type,
+            out_flag,
+            routed_scaling_factor,
+            eps,
+        )
+
+
 def _softmax_torch(x, axis=-1):
     if x.dtype == torch.float16:
         x = x.to(torch.float32)
@@ -37,7 +242,7 @@ def _pre_compare_topk(*arrays):
     选取的专家集合也可能不同, 属于实现自由度。比对前逐行按 (值降序, 索引升序) 规范
     化; golden 侧值完全相同的并列段(长度>=2 且输出侧同段值也完全一致)内, 以及值差
     在输出精度 4 ULP 内的位置, 索引替换为输出侧索引——不可区分值下任意等值选取均
-    合法, 值本身的精度由 out0 的 stat_rel_err 保证(阈值远大于 4 ULP, 不会掩盖真实
+    合法, 值本身的精度由 out0 的 cross_check/L2 保证，不会掩盖真实
     值错误)。normOut 为按位置对齐的全量输出, 不做处理。kernel 通路输出为 numpy,
     aclnn/e2e 通路为 torch。"""
 
@@ -79,7 +284,7 @@ def _pre_compare_topk(*arrays):
     if idx_out.shape != idx_gold.shape or idx_out.ndim != 2:
         return
     # 输出精度下的不可区分容差(4 ULP): 覆盖 kernel 与 golden 浮点路径微差引起的
-    # 相邻交换与 k 边界并列, 远小于 out0 的 stat_rel_err 阈值, 不掩盖真实值错误
+    # 相邻交换与 k 边界并列；out0 仍由 cross_check/L2 判定真实值误差
     # (bfloat16 无原生 numpy finfo, eps 固定为 2^-7; 需在 bf16->fp32 转换前判断)
     y_raw = arrays[0]
     y_dtype_str = str(
@@ -109,7 +314,7 @@ def _pre_compare_topk(*arrays):
                 ig[j:j2] = io[j:j2]
             j = j2
         # k 边界并列/相邻交换: 值在输出精度(4 ULP)内不可区分, 或绝对差低于
-        # stat_rel_err 的 FLOOR(1e-7, 如 exp 下溢 denormal 被 FTZ 为 0 的场景)时,
+        # 1e-7（如 exp 下溢 denormal 被 FTZ 为 0 的场景）时，
         # 被选专家视为等价——与 out0 的值判定口径保持一致
         scale = numpy.maximum(numpy.maximum(numpy.abs(yg), numpy.abs(yo)), 1e-30)
         diff = numpy.abs(yo - yg)
@@ -143,6 +348,9 @@ def _should_renormalize(norm_type, renorm):
 
 
 class AclnnMoeGatingTopKTestSpec:
+    third_party = {"torch": _AclnnV1TorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -218,16 +426,13 @@ class AclnnMoeGatingTopKTestSpec:
 
         return [y.to(ori_dtype), None, out]
 
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
-
     pre_compare = _pre_compare_topk
 
 
 class AclnnMoeGatingTopKV2TestSpec:
+    third_party = {"torch": _AclnnV2TorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -302,16 +507,13 @@ class AclnnMoeGatingTopKV2TestSpec:
 
         return [y.to(ori_dtype), None, out]
 
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
-
     pre_compare = _pre_compare_topk
 
 
 class MoeGatingTopKTestSpec:
+    third_party = {"torch": _KernelTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     @staticmethod
     def golden(
         x,
@@ -384,16 +586,13 @@ class MoeGatingTopKTestSpec:
 
         return [y.astype(ori_dtype), None, out]
 
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
-
     pre_compare = _pre_compare_topk
 
 
 class E2eMoeGatingTopKTestSpec:
+    third_party = {"torch": _E2eTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
     """E2E spec for torch_npu.npu_moe_gating_top_k — snake_case params, torch CPU golden.
 
     Signature mirrors the torch_npu API: golden(x, k, bias=..., input_ids=...,
@@ -472,11 +671,5 @@ class E2eMoeGatingTopKTestSpec:
             out = None
 
         return [y.to(ori_dtype), indices.to(torch.int32), out]
-
-    tolerance = {
-        "float32": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
 
     pre_compare = _pre_compare_topk
