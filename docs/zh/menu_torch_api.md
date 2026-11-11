@@ -63,6 +63,8 @@
 - [quant_lightning_indexer](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)
 - [quant_reduce_scatter](../../mc2/quant_reduce_scatter/docs/torchapi_quant_reduce_scatter.md)
 - [quant_sparse_flash_mla](../../attention/quant_sparse_flash_mla/docs/torchapi_quant_sparse_flash_mla.md)
+- [quant_sparse_lightning_indexer](../../attention/quant_sparse_lightning_indexer/docs/torchapi_quant_sparse_lightning_indexer.md)
+- [quant_sparse_lightning_indexer_metadata](../../attention/quant_sparse_lightning_indexer/docs/torchapi_quant_sparse_lightning_indexer.md)
 - [recurrent_kda](../../attention/recurrent_kda/docs/torchapi_recurrent_kda.md)
 - [scatter_pa_kv_cache_with_k_scale](../../attention/scatter_pa_kv_cache_with_k_scale/docs/torchapi_scatter_pa_kv_cache_with_k_scale.md)
 - [sparse_flash_mla](../../attention/sparse_flash_mla/docs/torchapi_sparse_flash_mla.md)

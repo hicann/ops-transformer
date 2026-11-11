@@ -229,6 +229,8 @@
 - [aclnnQuantLightningIndexer](../../attention/quant_lightning_indexer/docs/aclnnQuantLightningIndexer.md)
 - [aclnnQuantLightningIndexerV2](../../attention/quant_lightning_indexer_v2/docs/aclnnQuantLightningIndexerV2.md)
 - [aclnnQuantLightningIndexerV2Metadata](../../attention/quant_lightning_indexer_v2_metadata/docs/aclnnQuantLightningIndexerV2Metadata.md)
+- [aclnnQuantSparseLightningIndexer](../../attention/quant_sparse_lightning_indexer/docs/aclnnQuantSparseLightningIndexer.md)
+- [aclnnQuantSparseLightningIndexerMetadata](../../attention/quant_sparse_lightning_indexer_metadata/docs/aclnnQuantSparseLightningIndexerMetadata.md)
 - [aclnnQuantMatmulAllReduce](../../mc2/matmul_all_reduce/docs/aclnnQuantMatmulAllReduce.md)
 - [aclnnQuantMatmulAllReduceAddRmsNorm](../../mc2/matmul_all_reduce_add_rms_norm/docs/aclnnQuantMatmulAllReduceAddRmsNorm.md)
 - [aclnnQuantMatmulAllReduceV2](../../mc2/matmul_all_reduce/docs/aclnnQuantMatmulAllReduceV2.md)

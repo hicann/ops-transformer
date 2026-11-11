@@ -95,6 +95,8 @@
 |[quant_lightning_indexer](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)| 基于一系列操作得到每一个token对应的top-k个位置。|-|默认支持确定性计算。|
 |[quant_reduce_scatter](../../mc2/quant_reduce_scatter/docs/torchapi_quant_reduce_scatter.md)|实现quant + reduceScatter融合计算。|-|-|
 |[quant_sparse_flash_mla](../../attention/quant_sparse_flash_mla/docs/torchapi_quant_sparse_flash_mla.md)|调用`QuantSparseFlashMla`算子完成共享KV（Key和Value使用同一份输入）的稀疏注意力计算。|-|默认支持确定性计算。|
+|[quant_sparse_lightning_indexer](../../attention/quant_sparse_lightning_indexer/docs/torchapi_quant_sparse_lightning_indexer.md)|`quant_lightning_indexer`候选模式（candidate consumer）的torch接口，消费第一级输出的块级候选索引，只在候选块范围内做token级TopK。需与`quant_lightning_indexer`配对使用。|默认支持确定性计算|-|
+|[quant_sparse_lightning_indexer_metadata](../../attention/quant_sparse_lightning_indexer/docs/torchapi_quant_sparse_lightning_indexer.md)| quant_sparse_lightning_indexer接口的前置接口，用于计算quant_sparse_lightning_indexer的负载均衡。|默认确定性实现|-|
 |[recurrent_kda](../../attention/recurrent_kda/docs/torchapi_recurrent_kda.md)|完成KDA（Kimi Delta Attention）的递归前向计算，面向decode和MTP短序列场景。|默认确定性实现|默认确定性实现|
 |[scatter_pa_kv_cache_with_k_scale](../../attention/scatter_pa_kv_cache_with_k_scale/docs/torchapi_scatter_pa_kv_cache_with_k_scale.md)|训练场景下，更新KvCache中指定位置的key和value，同时更新key的scale值。|-|默认支持确定性计算|
 |[sparse_flash_mla](../../attention/sparse_flash_mla/docs/torchapi_sparse_flash_mla.md)|基于共享KV完成SparseFlashMla稀疏注意力计算。需与`sparse_flash_mla_metadata`配套使用。 |默认确定性实现|默认确定性实现|
