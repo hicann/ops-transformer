@@ -354,6 +354,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     if (ret != ACLNN_SUCCESS) {
         return ret;
     }
+    if (returnSoftmaxlse == LSE_OUT) {
+        OP_CHECK_NULL(softmaxLseOptional, return ACLNN_ERR_PARAM_NULLPTR);
+    }
 
     L2_DFX_PHASE_1(
         aclnnGenericBlockSparseAttention,
