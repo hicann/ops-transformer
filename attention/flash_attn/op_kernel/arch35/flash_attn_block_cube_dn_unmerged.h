@@ -367,7 +367,8 @@ public:
                 if constexpr (s2BaseSize == 256) {
                     // L0A/L0B 单缓冲 32KiB: 128 行 x baseK 128 x 2B = 32KiB, 恰好一槽;
                     // K 不再多切一片, 每 256 列的 Mmad 次数与 s2=128 基线持平(2 次)
-                    MatmulK<KV_T, Q_T, MM_T, 128, 128, 128, ABLayout::MK, ABLayout::KN>(
+                    const static uint32_t splitK = (dBaseSize == 192) ? 96U : 128U;
+                    MatmulK<KV_T, Q_T, MM_T, 128, 128, splitK, ABLayout::MK, ABLayout::KN>(
                         kL1ChunkTensor, qL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
                 } else if constexpr (dBaseSize > 128) {
                     MatmulK<KV_T, Q_T, MM_T, 128, 128, 128, ABLayout::MK, ABLayout::KN>(
