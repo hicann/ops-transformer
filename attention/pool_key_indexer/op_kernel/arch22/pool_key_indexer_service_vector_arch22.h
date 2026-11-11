@@ -493,15 +493,19 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe* pipe
     uint32_t reduceOutBufSize = s2BaseSize_ * 2 * sizeof(float);
     uint32_t brcBufSize = groupInner_ * 8 * sizeof(float);
     uint32_t paramBufSize = LD_PARAM_NUM * sizeof(int64_t);
-    uint32_t expandOutLenOld = PkiCommon::Align(static_cast<uint64_t>(EXPAND_CHUNK), (uint64_t)8);
+    uint32_t expandSegChunkBase = (poolSize_ % 8 != 0) ? EXPAND_GATHER_CHUNK : EXPAND_CHUNK;
+    uint32_t expandOutLenOld = PkiCommon::Align(static_cast<uint64_t>(expandSegChunkBase), (uint64_t)8);
 
     // ==== UB 余量门(静态核算, 门序: weights 预取 > 归并乒乓 > expand 乒乓 > queue 深度) ====
     // 先按 vgather 模板决策得到基础占用, 再在 UB 池余量内逐件启用, 任一件
     // 超限则该件不启用(走对应旧路径)
     uint32_t workSize = 0;
     if (poolSize_ > 1) {
-        workSize = PkiCommon::Align(static_cast<uint64_t>(poolSize_ + 64), (uint64_t)8) +
-                   PkiCommon::Align(static_cast<uint64_t>(constInfo_.sparseCount + 64), (uint64_t)8);
+        uint32_t idxCopyElems =
+            (constInfo_.sparseCount > SPARSE_COUNT_4K) ?
+                2 * PkiCommon::Align(static_cast<uint32_t>(constInfo_.sparseCount / 2), (uint32_t)8) :
+                PkiCommon::Align(static_cast<uint32_t>(virTopK), (uint32_t)8);
+        workSize = PkiCommon::Align(static_cast<uint64_t>(poolSize_), (uint64_t)8) + idxCopyElems;
 #if PKI_EXPAND_VEC
         // ps%8!=0 时 workLocal_ 尾部常驻 qOff/pTpl 模板; 按 UB 池上限核算,
         // 超限(如 ps=2/topk=8192→sc=4096)回退标量路径。
@@ -569,7 +573,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe* pipe
         uint32_t spillNow = mainNewFloats > sortOutFloats ? mainNewFloats - sortOutFloats : 0;
         needSortPPNow = static_cast<int64_t>(spillNow + mainNewFloats) * static_cast<int64_t>(sizeof(float));
     }
-    uint32_t expandSegChunk = (poolSize_ % 8 != 0 && expandGatherOn_) ? EXPAND_GATHER_CHUNK : EXPAND_CHUNK;
+    uint32_t expandSegChunk = (poolSize_ % 8 != 0) ? EXPAND_GATHER_CHUNK : EXPAND_CHUNK;
     int64_t needExpandPP = (poolSize_ > 1) ? static_cast<int64_t>(2 * expandSegChunk - expandOutLenOld) *
                                                  static_cast<int64_t>(sizeof(uint32_t)) :
                                              -1;
@@ -770,15 +774,14 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::InitBuffers(TPipe* pipe
     globalTopkNum_ = 0;
     accPPBits_ = 0;
 
-    // 基本块执行前初始化UB和GM
-    // step1. 初始化一个有序索引 0 - s2BaseSize_
+    // 累加器索引模板: [0, s2BaseSize_) 有序索引, 供排序输入的 idx 区加上 S2 块基址
     ArithProgression<int32_t>(globalTopkIndice_, 0, 1, s2BaseSize_);
-    // step2. globalTopkUb_ [CeilDiv(s1BaseSize_, 2), virTopK, 2]   -inf,-1
-    // (乒乓开启时行距为 accRowStride_, 连续铺满 rows*stride: (v,i) 交织模式周期
-    //  为 2, 偶偏移保相位, 各行 [0, virTopK) 初始化语义不变, spill 区一并初始化)
+    // 累加器铺底: globalTopkUb_ [CeilDiv(s1BaseSize_,2), virTopK, 2] 全部置 (-inf,-1) 交织对;
+    // 乒乓时按 accRowStride_ 连续铺满(交织周期 2, 偶偏移保相位, spill 区一并初始化)
     InitSortOutBuf(globalTopkUb_, CeilDiv(s1BaseSize_, 2) * accRowStride_);
 
-    // step3. 初始化 vec1ParamGm, LD 标志位设为 -1(needFd=-1), 布局 [aic, 2, s1BaseSize_, 16]
+    // LD 参数区铺底: vec1ParamGm 布局 [aic, 2, s1BaseSize_, 16], needFd 置 -1
+    // (LD 轮询到非 1 即跳过该行归约)
     LocalTensor<float> tmpBuff = outQueue_.AllocTensor<float>();
     Duplicate(tmpBuff.template ReinterpretCast<int32_t>(), -1, 2 * (s1BaseSize_ / 2) * paramNum_ * 2);
     outQueue_.EnQue<float>(tmpBuff);
@@ -1098,7 +1101,9 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ExpandAndAppendIndices(
 
     // 分段生成写出: expandOutBuf_ 2 槽乒乓(每槽 segChunk, 未启用乒乓时为单段),
     // 不随 outputLen 增长越 UB 上限; 段边界对齐到池粒度(向量路径保持 32B 对齐)
-    uint32_t segChunk = gatherPath ? EXPAND_GATHER_CHUNK : EXPAND_CHUNK;
+    // segChunk 必须等于 expandOutBuf_ 单槽容量(expandSegChunk_), 不可按展开路径另取:
+    // 段写(Duplicate/SetValue/Gather)按段长铺满, 超限越界覆写相邻 workBuf_ 的池索引区
+    uint32_t segChunk = expandSegChunk_;
     uint32_t poolsPerSeg = PkiCommon::Max((uint32_t)1, segChunk / poolSize);
 
     // ---- 展开区 [0, expandLimit): 按池对齐分段 ----
@@ -1617,7 +1622,12 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec(const PkiCom
             if (cuS2LenVecAlign == cuS2Len) {
                 // 池级分数乘 1/sqrt(headDim)(文档公式 S = Q@K^T/sqrt(headDim));
                 // 缩放为正数, 与 ReLU/加权求和可交换, 在聚合后统一应用
-                Muls(sortScoreUb, reduceOutInner, constInfo_.qkScale, cuS2Len);
+                // [键宽契约] int8 排序域不含 ×qkScale(1024/√d), 物理缩放到 values 输出补乘
+                if constexpr (LIT::isInt8) {
+                    Muls(sortScoreUb, reduceOutInner, 1.0f, cuS2Len);
+                } else {
+                    Muls(sortScoreUb, reduceOutInner, constInfo_.qkScale, cuS2Len);
+                }
                 PipeBarrier<PIPE_V>(); // WAR: Muls 读 reduceOutInner(=idx 区) 先于 Adds 覆写
                 Adds(sortIndiceUbInt, globalTopkIndice_, static_cast<int32_t>(cuBaseS2Idx), cuS2Len);
                 PipeBarrier<PIPE_V>();
@@ -1628,7 +1638,12 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec(const PkiCom
                 PipeBarrier<PIPE_V>();
                 // 池级分数乘 1/sqrt(headDim)(文档公式 S = Q@K^T/sqrt(headDim));
                 // 缩放为正数, 与 ReLU/加权求和可交换, 在聚合后统一应用
-                Muls(sortScoreUb, reduceOutInner, constInfo_.qkScale, cuS2Len);
+                // [键宽契约] 同上: int8 排序域不含 ×qkScale
+                if constexpr (LIT::isInt8) {
+                    Muls(sortScoreUb, reduceOutInner, 1.0f, cuS2Len);
+                } else {
+                    Muls(sortScoreUb, reduceOutInner, constInfo_.qkScale, cuS2Len);
+                }
                 PipeBarrier<PIPE_V>(); // WAR: Muls 读 idx 区滑片先于尾填覆写
                 Duplicate(sortIndiceUbInt[alignedLen], -1, cuS2LenVecAlign - alignedLen);
                 PipeBarrier<PIPE_V>(); // WAW: 尾填滑片先落地再被 Adds 覆写
@@ -1720,6 +1735,13 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec(const PkiCom
                         LocalTensor<uint32_t> outIdxUb = outValueUb[offset].template ReinterpretCast<uint32_t>();
                         Extract(outValueUb, outIdxUb, GetAccRow(innerS1Idx, accPPRow)[2 * i * offset], (offset / 32));
 
+                        // [键宽契约] int8 排序域不含 ×qkScale, values 在键反解(Extract)
+                        // 后补乘物理缩放(仅 value 区 [0,copyLen), idx 区不动); -inf×正常数=-inf。
+                        if constexpr (LIT::isInt8) {
+                            PipeBarrier<PIPE_V>();
+                            Muls(outValueUb, outValueUb, constInfo_.qkScale, static_cast<int32_t>(copyLen));
+                            PipeBarrier<PIPE_V>();
+                        }
                         PipeBarrier<PIPE_V>();
                         LocalTensor<int32_t> idxULocal1 = outValueUb[offset].template ReinterpretCast<int32_t>();
                         DataCopy(workLocal_[alignedPoolSize + i * copyLen], idxULocal1,
@@ -1759,6 +1781,13 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec(const PkiCom
                         LocalTensor<float> outValueUb = outQueue_.AllocTensor<float>();
                         LocalTensor<uint32_t> outIdxUb = outValueUb[offset].template ReinterpretCast<uint32_t>();
                         Extract(outValueUb, outIdxUb, GetAccRow(innerS1Idx, accPPRow)[2 * i * offset], (offset / 32));
+
+                        // [键宽契约] int8 values 补乘 ×qkScale, 同 ps>1 路径(仅 value 区)
+                        if constexpr (LIT::isInt8) {
+                            PipeBarrier<PIPE_V>();
+                            Muls(outValueUb, outValueUb, constInfo_.qkScale, static_cast<int32_t>(copyLen));
+                            PipeBarrier<PIPE_V>();
+                        }
 
                         if (constInfo_.returnValue) {
                             PipeBarrier<PIPE_V>();
@@ -2087,6 +2116,14 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessLD()
                 SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
                 SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
                 DataCopyPad(indiceOutGm[outOffset], idxULocal1, {1, idxOutBytes, 0, 0});
+            }
+            // [键宽契约] int8 LD 路径 values 补乘 ×qkScale, 与主路径同口径(value/idx 分离缓冲)
+            if constexpr (LIT::isInt8) {
+                if (constInfo_.returnValue) {
+                    PipeBarrier<PIPE_V>();
+                    Muls(outValueUb, outValueUb, constInfo_.qkScale, static_cast<int32_t>(constInfo_.sparseCount));
+                    PipeBarrier<PIPE_V>();
+                }
             }
             DataCopyPad(valueOutGm[valueOutOffsetLd], outValueUb,
                         {1, static_cast<uint16_t>(constInfo_.sparseCount * sizeof(float)), 0, 0});

@@ -96,11 +96,12 @@ constexpr uint32_t PKI_M_BASE_SIZE_SMALL = 128;
 constexpr uint32_t PKI_D_BASE_BLOCK = 128;
 constexpr uint32_t PKI_TOPK_6K = 6144;
 constexpr uint32_t PKI_GM_ALIGN_BYTES = 512;
-// arch35 uint16 score 键开关(host 侧影子, 必须与 kernel pool_key_indexer_common.h
-// 的 PKI_SCORE16 保持一致; arch22 分区不受影响, 其 scoreElemSize 在 tiling.cpp 单独算)
-constexpr bool PKI_SCORE16_HOST = true;
-constexpr uint32_t PKI_SCORE_T_SIZE_Q = PKI_SCORE16_HOST ? 2 : 4; // arch35 量化模式键宽
-constexpr uint32_t PKI_SCORE_T_SIZE = 4;                          // arch35 非量化/arch22 键宽
+// arch35 量化键宽(对齐 QLIV2, 模式感知; 须与 kernel common.h scoreType 保持一致,
+// arch22 分区不受影响, 其 scoreElemSize 在 tiling.cpp 单独算):
+//   mode0/1(FP8/MXFP8) = 2B uint16 bf16 键; mode2(INT8) = 4B uint32 fp32 直接稳定排序
+constexpr uint32_t PKI_SCORE_T_SIZE_FP8 = 2;
+constexpr uint32_t PKI_SCORE_T_SIZE_INT8 = 4;
+constexpr uint32_t PKI_SCORE_T_SIZE = 4; // arch35 非量化/arch22 键宽
 
 // Trunk lengths for TopK
 constexpr uint32_t PKI_TRUNK_LEN_16K = 16384;

@@ -459,9 +459,8 @@ __simd_vf__ void MulWeightQScaleSIMD(__local_mem__ W_T* weight_, __local_mem__ f
     Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(dst_, regW, maskAllB32);
 }
 
-// int8: fp32 -> ×2^-10 -> fp16 round-trip -> fp32(自 v1 quant_lightning_indexer_vector1.h
-// L36-55 移植); ×2^-10 为纯指数运算无舍入, fp16 cast(CAST_RINT=RNE)单次舍入,
-// 与 arch22 fixpipe DEQF16(0x3a800000)/golden fp16_cast(qk/1024) 逐位一致
+// int8: fp32 -> ×2^-10 -> fp16 round-trip -> fp32; ×2^-10 为纯指数运算无舍入,
+// fp16 cast(CAST_RINT=RNE)单次舍入, 结果与 fixpipe DEQF16 反量化(fp16 cast)同值
 __simd_callee__ inline void CastFP32ToFP16ToFP32(AscendC::Reg::RegTensor<float> (&regQK)[2],
                                                  AscendC::Reg::RegTensor<half> (&regQKHalf)[2],
                                                  AscendC::Reg::MaskReg& maskAllB32)
@@ -483,13 +482,10 @@ __simd_callee__ inline void CastFP32ToFP16ToFP32(AscendC::Reg::RegTensor<float> 
     Reg::Cast<float, half, castTraitFP16ToFP32>(regQK[1], regQKHalf[1], maskAllB16);
 }
 
-// int8: weight(half)×q_descale(half) SIMD 预乘(单 s1 行, 64 lanes): 双 half ->
-// fp32 cast -> fp32 Mul -> fp16 round-trip -> 落 fp32 UB。half×half 积的尾数
-// ≤22bit, fp32 域乘积精确, 单次 RNE 舍入到 fp16 = half 硬件乘的正确舍入, 与
-// arch22 half Mul / golden fp16 预乘逐位一致; [gSize,64) 为越界读垃圾,
-// 消费端 BRC 只取 i<gSize(同 mode0 的做法)
+// int8: weight(half)×q_descale(half) 单 s1 行 SIMD 预乘: 双 half->fp32->Mul->fp16 RNE round-trip->fp32;
+// 写满 128 lane([gSize,64) 掩码保留积, 其余置 0); fp32 域积+单次 RNE=half 硬件乘的正确舍入, N1≤64 由 PKI_N1_LIMIT 保证
 __simd_vf__ void MulWeightQScaleSIMDHalf(__local_mem__ half* weight_, __local_mem__ half* qScale_,
-                                         __local_mem__ float* dst_)
+                                         __local_mem__ float* dst_, int64_t gSize)
 {
     Reg::MaskReg maskAllB32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
     Reg::MaskReg maskAllB16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
@@ -511,7 +507,21 @@ __simd_vf__ void MulWeightQScaleSIMDHalf(__local_mem__ half* weight_, __local_me
     Reg::Mul(regW, regW, regQS, maskAllB32);
     Reg::Cast<half, float, castTraitFP32ToH>(regWTmpHalf, regW, maskAllB32);
     Reg::Cast<float, half, castTraitHToFP32>(regW, regWTmpHalf, maskAllB16);
+
+    // [gSize,64) 掩码清 0(lane 序号 < gSize 保留乘积, 其余置 0)
+    Reg::RegTensor<int32_t> regIdx;
+    Reg::RegTensor<int32_t> regGSize;
+    Reg::RegTensor<float> regZero;
+    Reg::Arange(regIdx, 0);
+    Reg::Duplicate(regGSize, static_cast<int32_t>(gSize), maskAllB32);
+    Reg::Duplicate(regZero, 0.0f, maskAllB32);
+    Reg::MaskReg pregLT;
+    Reg::Compare<int32_t, CMPMODE::LT>(pregLT, regIdx, regGSize, maskAllB32);
+    Reg::Select(regW, regW, regZero, pregLT);
+
+    // 写满 128 lane: [0,64) 乘积(掩码后) + [64,128) 恒 0
     Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(dst_, regW, maskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(dst_ + 64, regZero, maskAllB32);
 }
 
 // int8 聚合版: qk 为 fixpipe 直达 UB 的 int32 精确点积, int32 -> fp32 Cast ->
@@ -548,13 +558,13 @@ __aicore__ inline void MulWeightAndReduceSumWithScaleInt8(
         AscendC::Reg::RegTensor<half> regKScaleHalf[2];
         AscendC::Reg::RegTensor<float> regKScale[2];
         AscendC::Reg::RegTensor<float> regSum[2];
-        AscendC::Reg::RegTensor<float> regScale;
 
         AscendC::Reg::MaskReg maskAll = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
         AscendC::Reg::MaskReg maskAllB16 = AscendC::Reg::CreateMask<half, AscendC::Reg::MaskPattern::ALL>();
 
         FloatSortConstCtx<float> fp32Ctx;
         InitFloatSortConstCtx(fp32Ctx, maskAll);
+        (void)scale; // 排序键域不含 ×(1024/√d), 参数保留兼容调用点
 
         constexpr static Reg::CastTrait castTraitInt32ToFP32 = {Reg::RegLayout::UNKNOWN, Reg::SatMode::NO_SAT,
                                                                 Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
@@ -585,14 +595,36 @@ __aicore__ inline void MulWeightAndReduceSumWithScaleInt8(
             AscendC::Reg::MulAddDst(regSum[1], regQK[1], regwBrc, maskAll);
         }
 
-        // kScale(dk) 乘入聚合和(逐 s2 元素), 随后统一乘 qkScale'(1024/sqrt(d))
+        // kScale(dk) 乘入聚合和(逐 s2 元素)。
+        // [键宽契约] 量化模式排序键域 = Σ_g wq·relu(dot/1024)·dk, 不含 ×qkScale(1024/√d)
+        // 物理缩放; 物理分数由 values 输出侧统一补乘, 排序域与输出域分离。
         AscendC::Reg::Mul(regSum[0], regSum[0], regKScale[0], maskAll);
         AscendC::Reg::Mul(regSum[1], regSum[1], regKScale[1], maskAll);
 
-        AscendC::Reg::Duplicate(regScale, scale, maskAll);
-        AscendC::Reg::Mul(regSum[0], regSum[0], regScale, maskAll);
-        AscendC::Reg::Mul(regSum[1], regSum[1], regScale, maskAll);
+        // 非有限分数消毒(仅 NaN, PR#15559 意见2): dot 溢出 ±inf 再乘 0 可成 NaN
+        // (键位型 0xFFFF 抢占 TopK), 须置 -inf 沉底; 判据收紧为幅值位型 > +inf 位型
+        // (即指数域全 1 且尾数≠0, 符号位已掩除) —— ±inf 是契约正确值(如
+        // wq=256×256=65536 fp16 NO_SAT 上溢的有效池分数)须保留自然排序位,
+        // 垃圾 lane 治理走 lane 有效性而非值判别。
+        {
+            auto& s0u = (AscendC::Reg::RegTensor<uint32_t>&)regSum[0];
+            auto& s1u = (AscendC::Reg::RegTensor<uint32_t>&)regSum[1];
+            AscendC::Reg::RegTensor<uint32_t> regMagMask, regMag0, regMag1, regInfBits, regNegInf;
+            AscendC::Reg::MaskReg regSel0, regSel1;
+            AscendC::Reg::MaskReg maskAll32 = AscendC::Reg::CreateMask<uint32_t, AscendC::Reg::MaskPattern::ALL>();
+            AscendC::Reg::Duplicate(regMagMask, 0x7FFFFFFFu, maskAll32); // 幅值位(去符号)
+            AscendC::Reg::Duplicate(regInfBits, 0x7F800000u, maskAll32); // +inf 位型
+            AscendC::Reg::Duplicate(regNegInf, 0xFF800000u, maskAll32);  // -inf
+            AscendC::Reg::And(regMag0, s0u, regMagMask, maskAll32);
+            AscendC::Reg::And(regMag1, s1u, regMagMask, maskAll32);
+            // 幅值 > +inf 位型 <=> 指数全 1 且尾数≠0 <=> NaN; ±inf(尾数 0)不命中
+            AscendC::Reg::Compare<uint32_t, CMPMODE::GT>(regSel0, regMag0, regInfBits, maskAll32);
+            AscendC::Reg::Compare<uint32_t, CMPMODE::GT>(regSel1, regMag1, regInfBits, maskAll32);
+            AscendC::Reg::Select(s0u, regNegInf, s0u, regSel0);
+            AscendC::Reg::Select(s1u, regNegInf, s1u, regSel1);
+        }
 
+        // [键宽契约] 排序键域不含 ×qkScale(1024/√d) 物理缩放(见上注), scale 不参与排序键
         if constexpr (sizeof(KEY_T) == 4) {
             AscendC::Reg::RegTensor<uint32_t> regOut[2];
             FloatX2ToSortableKey<float>(regOut[0], regOut[1], regSum[0], regSum[1], fp32Ctx, maskAll);

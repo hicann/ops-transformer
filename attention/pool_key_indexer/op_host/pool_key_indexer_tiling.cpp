@@ -1170,14 +1170,17 @@ ge::graphStatus PoolKeyIndexerTiling::CalcWorkspaceSize(PoolKeyIndexerTilingInfo
         RoundUp64(static_cast<uint64_t>(aicNum) * PKI_WS_DOUBLE * mBaseSizeAlign * PKI_S2_BASE_SIZE * scoreElemSize,
                   PKI_GM_ALIGN_BYTES);
     uint64_t scoreGmSize = scoreGmSize22;
-    // arch35 kernel score 区域: aicNum × s1BaseSize(4|2) × Align(s2Size,128) × 4B;
+    // arch35 kernel score 区域: aicNum × s1BaseSize(4|2) × Align(s2Size,128) × 键宽(模式感知);
     // TND/PA 的 s2Size 可能更大, 需取 max 覆盖
-    // ⚠ int8 保持 PKI_SCORE_T_SIZE=4B 不变(arch35 score 区为 SCORE_T=uint32 sortable key,
-    //   AIV 在寄存器内完成换算): 误将此处替换为 fp16 尺寸会导致 A5 workspace
-    //   欠配且无卡可测, 静默越界
+    // 键宽对齐 QLIV2: mode0/1(FP8/MXFP8)=2B uint16 bf16 键(SCORE_T=uint16, AIV 寄存器内
+    // bf16 换算); mode2(INT8)=4B uint32 fp32 直接稳定排序 —— 误将 int8 替换为 2B 会导致
+    // workspace 欠配且静默越界
     uint64_t s1BaseSize35 = (info.sparseCount > PKI_BASE_TOPK) ? PKI35_S1_BASE_SIZE_SMALL : PKI35_S1_BASE_SIZE;
     uint64_t s2Size35Align = (info.s2Size + PKI35_S2_BASE_SIZE - 1) / PKI35_S2_BASE_SIZE * PKI35_S2_BASE_SIZE;
-    const uint64_t scoreElemSize35 = (info.quantMode >= 0) ? PKI_SCORE_T_SIZE_Q : PKI_SCORE_T_SIZE;
+    const uint64_t scoreElemSize35 = (info.quantMode == PKI_QUANT_FP8_PER_TOKEN || info.quantMode == PKI_QUANT_MXFP8) ?
+                                         PKI_SCORE_T_SIZE_FP8 :
+                                     (info.quantMode == PKI_QUANT_INT8) ? PKI_SCORE_T_SIZE_INT8 :
+                                                                          PKI_SCORE_T_SIZE;
     uint64_t scoreGmSize35 =
         RoundUp64(static_cast<uint64_t>(aicNum) * s1BaseSize35 * s2Size35Align * scoreElemSize35, PKI_GM_ALIGN_BYTES);
 #if PKI_WS_ARCH_BRANCH

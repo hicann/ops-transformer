@@ -16,9 +16,12 @@
 using namespace AscendC;
 namespace PkiCommon {
 
-// arch35 score 键宽开关: 仅对量化模板生效(uint16 bf16 sortable key, 对齐 QLIV2 arch35);
-// 非量化(bf16/fp16)恒 uint32 位键, 保持逐比特口径(lightning_indexer_v2 非量化亦 uint32)。arch22 不受影响。
-static constexpr bool PKI_SCORE16 = true;
+// arch35 score 键宽(对齐 QLIV2, 模式感知; arch22 不受影响, 其键宽在 tiling.cpp 单独算):
+//   FP8/MXFP8(mode0/1) = uint16 bf16 sortable key —— QLIV2 golden(mx/fp8 路径 SortAll 前
+//     to(bfloat16)) 与 arch35 kernel(FloatToSortableKey<bfloat16_t>) 同为 bf16 域;
+//   INT8(mode2) = uint32 fp32 直接稳定排序 —— QLIV2 golden(int8 路径 reduce_sum.clone(),
+//     无 bf16) 与 arch22 kernel(fp32 直排) 一致, 不做 bf16 键量化;
+//   非量化 = uint32。
 
 // mxFP8 scale 布局: 每 32 个 D 元素共享一个 E8M0 scale, 2 个 E8M0 打包成 1 个 bf16 寻址单位
 constexpr uint32_t PKI_MX_SCALE_GROUP_SIZE = 32;
@@ -56,8 +59,9 @@ struct PkiType {
     static constexpr bool isInt8 =
         std::is_same<Q_T, int8_t>::value && std::is_same<K_T, int8_t>::value && std::is_same<SCALE_T, half>::value;
     static constexpr bool isQuant = isMxFp8 || isFp8PerToken || isInt8;
-    // score 键宽真源: 量化模板 uint16 / 非量化 uint32(PKI_SCORE16=false 时全 uint32)
-    using scoreType = std::conditional_t<PKI_SCORE16 && isQuant, uint16_t, uint32_t>;
+    // score 键宽真源(对齐 QLIV2, 模式感知): 仅 FP8 家族(mode0/1)用 uint16 bf16 键,
+    // int8 与非量化恒 uint32 fp32 键
+    using scoreType = std::conditional_t<(isMxFp8 || isFp8PerToken), uint16_t, uint32_t>;
 };
 
 struct RunInfo {

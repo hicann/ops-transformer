@@ -898,6 +898,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCo
     if constexpr (LIT::isFp8PerToken) {
         // mode=0: weight 半精度 -> fp32 cast × qScale 的 SIMD 向量预乘落 UB,
         // 替代逐 g 标量循环; 行内 [gSize,64) 补 0(0 与无效 g 语义一致); 组级缓存仅段首执行
+        // (W_T 含 bfloat16_t 实例时后端不支持 bf16 标量 cast, 须走 __simd_vf__)
         if (info.isFirstS2InnerLoop) {
             for (int64_t s1IdxTmp = 0; s1IdxTmp < curAivS1ProcNum; s1IdxTmp++) {
                 uint64_t dstOff = s1IdxTmp * 128;
@@ -919,22 +920,18 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessVec1(const PkiCo
         }
     }
     if constexpr (LIT::isInt8) {
-        // int8: weight(half) × q_descale(half) SIMD 预乘, fp16 round-trip 保证与
-        // 与 arch22 half Mul 逐位一致; [gSize,64) 越界读垃圾, BRC 消费端只取
-        // i<gSize, 行内 [64,128) 恒 0(0 与无效 g 语义一致)
+        // int8: weight×q_descale 预乘(MulWeightQScaleSIMDHalf, 见其函数注释);
+        // 消费在 V 管道, 由本块前的 MTE2→V 同步覆盖可见性
         if (info.isFirstS2InnerLoop) {
-            for (int64_t s1IdxTmp = 0; s1IdxTmp < curAivS1ProcNum; s1IdxTmp++) {
-                uint64_t dstOff = s1IdxTmp * 128;
-                Duplicate<float>(weightScaleFp32UB_[dstOff], 0.0f, 128);
-            }
-            PipeBarrier<PIPE_V>();
             for (int64_t s1IdxTmp = 0; s1IdxTmp < curAivS1ProcNum; s1IdxTmp++) {
                 uint64_t srcOff = s1IdxTmp * gSizeAlign16;
                 uint64_t dstOff = s1IdxTmp * 128;
                 vector1::MulWeightQScaleSIMDHalf((__local_mem__ half*)weightUB_[srcOff].GetPhyAddr(),
                                                  (__local_mem__ half*)qScaleHalfUB_[srcOff].GetPhyAddr(),
-                                                 (__local_mem__ float*)weightScaleFp32UB_[dstOff].GetPhyAddr());
+                                                 (__local_mem__ float*)weightScaleFp32UB_[dstOff].GetPhyAddr(), gSize_);
             }
+            // VF 写落地后, 消费端(MulWeight 的 BRC 读)才可见(同 pipe 有序,
+            // 跨 ForEachS1 循环显式 barrier 保险)
             PipeBarrier<PIPE_V>();
         }
     }
@@ -1200,7 +1197,9 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessTopK(const PkiCo
         }
 
         if (poolSize_ > 1) {
-            PipeBarrier<PIPE_V>();
+            // TopK 结果由 V 管道 DataCopy 写 indicesOutLocal_, 下方展开以 S 管道 GetValue
+            // 读同一缓冲——须 VToSSync 保证 V 写对 S 可见(PipeBarrier 不跨管), 否则展开池错
+            VToSSync();
             ExpandAndAppendIndices(indicesOutLocal_.ReinterpretCast<int32_t>(), expandOutLocal_, workLocal_, topkCount_,
                                    poolSize_, static_cast<uint32_t>(validS2Len), info.poolTailK,
                                    static_cast<int32_t>(info.actS2SizeOrig), static_cast<uint32_t>(curAivS1Idx + i),
@@ -1223,6 +1222,12 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessTopK(const PkiCo
             WaitFlag<HardEvent::V_MTE2>(TOPK_V_MTE2_EVENT);
             // uint32_t -> float
             vector1::UIntToFloatReturnValue(valueOutLocal_, scoreOutLocal_, topkCountAlign256_);
+            if constexpr (LIT::isInt8) {
+                // [键宽契约] int8 排序键域不含 ×qkScale, values 在键反解后补乘物理缩放
+                // (正常数, 不影响 TopK 选池); 无效槽由 INVALID_VAL 覆盖
+                AscendC::Muls(valueOutLocal_, valueOutLocal_, constInfo_.qkScale, topkCount_);
+                PipeBarrier<PIPE_V>();
+            }
 
             if (validS2Len < topkCount_) {
                 uint64_t mask[1];
@@ -1257,8 +1262,7 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessTopK(const PkiCo
 // (segS2Hi+1)*s2BaseSize) 写有本段的 score(sortable key uint32); 列号全局一致,
 // 行→AIV 半区切分仅依赖 (gS1Idx, actS1Size) 逐核一致, 故同列同行为同一
 // (s1 行, s2 池) 的同一分数。本函数把它按 8KB 分块、逐行 GM→UB→GM 中转搬至
-// 本核区同列, 使本核 scoreGm 行与"整段单核计算"逐字节相同(逐位一致论证的
-// 落点)。
+// 本核区同列, 使本核 scoreGm 行与"整段单核计算"逐字节相同。
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::CopyScoreSegFromCore(uint32_t coreIdx, uint32_t segS2Lo,
                                                                               uint32_t segS2Hi,
