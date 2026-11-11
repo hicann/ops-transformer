@@ -10,7 +10,7 @@
 │    ├── vec_comp.h
 │    ├── utils.h
 ├── scripts                                 # 运行脚本工具
-│   ├── data_gen.py                         # 用例数据生成脚本
+│   ├── data_generate.py                         # 用例数据生成脚本
 │   ├── data_compare.py                     # 精度对比脚本
 │   └── QuantAllReduce.csv                  # 算子用例输入相关信息
 ├── quant_all_reduce.cpp                    # <<<>>>核函数入口
