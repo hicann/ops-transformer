@@ -531,6 +531,7 @@ aclnnStatus aclnnMoeGatingTopKV2(
     * tid2eid的shape必须为[numKeys, k]，其中numKeys为映射表总行数，k与参数k相等。
     * inputIds的shape必须为[batch]，与x的第一维相等。
     * inputIds中的每个值应在[0, numKeys-1]范围内。
+    * tid2eid中的每个值应在[0, x_shape[-1]-1]范围内，即合法的专家索引。
     * inputIdsOptional和tid2eidOptional的数据类型支持INT32和INT64的组合。
 
 ## 调用示例

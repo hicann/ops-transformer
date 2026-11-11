@@ -347,6 +347,36 @@ def _should_renormalize(norm_type, renorm):
     return norm_type in (1, 2) or (norm_type in (0, 3) and renorm == 1)
 
 
+def _check_hash_indices(input_ids, tid2eid, expert_count):
+    """Hash 模式索引值域预检(算子文档"Hash模式限制"): inputIds ∈ [0, numKeys-1],
+    tid2eid ∈ [0, expertCount-1]。算子侧不校验值域, 越界输入在 device 上直接触发
+    vector core exception; golden 侧提前抛语义化错误, 避免负索引进入 torch.gather
+    (不支持负索引)/numpy 索引后抛出难定位的裸异常或按 wrap 语义静默取错行。"""
+    if torch.is_tensor(input_ids):
+        ids = input_ids.to(torch.int64)
+        eids = tid2eid.to(torch.int64)
+        ids_n, eids_n = ids.numel(), eids.numel()
+    else:
+        ids = input_ids.astype(numpy.int64)
+        eids = tid2eid.astype(numpy.int64)
+        ids_n, eids_n = ids.size, eids.size
+    num_keys = tid2eid.shape[0]
+    if ids_n > 0:
+        lo, hi = int(ids.min()), int(ids.max())
+        if lo < 0 or hi >= num_keys:
+            raise ValueError(
+                f"hash mode: inputIds values must be in [0, {num_keys - 1}] "
+                f"(tid2eid has {num_keys} rows), got [{lo}, {hi}]"
+            )
+    if eids_n > 0:
+        lo, hi = int(eids.min()), int(eids.max())
+        if lo < 0 or hi >= expert_count:
+            raise ValueError(
+                f"hash mode: tid2eid values must be in [0, {expert_count - 1}] "
+                f"(x.shape[-1]={expert_count}), got [{lo}, {hi}]"
+            )
+
+
 class AclnnMoeGatingTopKTestSpec:
     third_party = {"torch": _AclnnV1TorchImpl}
     tolerance = _CROSS_CHECK_TOLERANCE
@@ -391,6 +421,7 @@ class AclnnMoeGatingTopKTestSpec:
 
         hashFlag = inputIdsOptional is not None and tid2eidOptional is not None
         if hashFlag:
+            _check_hash_indices(inputIdsOptional, tid2eidOptional, x.shape[-1])
             indices = tid2eidOptional[inputIdsOptional].to(torch.int64)
         else:
             if groupCount > 1:
@@ -472,6 +503,7 @@ class AclnnMoeGatingTopKV2TestSpec:
 
         hashFlag = inputIdsOptional is not None and tid2eidOptional is not None
         if hashFlag:
+            _check_hash_indices(inputIdsOptional, tid2eidOptional, x.shape[-1])
             indices = tid2eidOptional[inputIdsOptional].to(torch.int64)
         else:
             if groupCount > 1:
@@ -553,6 +585,7 @@ class MoeGatingTopKTestSpec:
 
         hashFlag = input_ids is not None and tid2eid is not None
         if hashFlag:
+            _check_hash_indices(input_ids, tid2eid, x.shape[-1])
             indices = tid2eid[input_ids]
         else:
             if group_count > 1:
@@ -637,6 +670,7 @@ class E2eMoeGatingTopKTestSpec:
 
         hash_flag = input_ids is not None and tid2eid is not None
         if hash_flag:
+            _check_hash_indices(input_ids, tid2eid, x.shape[-1])
             indices = tid2eid[input_ids.to(torch.int64)].to(torch.int64)
         else:
             if group_count > 1:

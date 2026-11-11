@@ -191,7 +191,7 @@ $$
       <tr>
         <td>biasOptional</td>
         <td>Input</td>
-        <td>Bias value computed with the input x, corresponding to `bias` in the formula.</td>
+        <td>Bias value computed with the input x, corresponding to `bias` in the formula. The data type must be the same as that of x, and the shape is equal to the last dimension of x.</td>
         <td>FLOAT16, BFLOAT16, FLOAT32</td>
         <td>ND</td>
       </tr>

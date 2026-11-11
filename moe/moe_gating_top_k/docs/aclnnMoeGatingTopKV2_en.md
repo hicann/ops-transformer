@@ -246,7 +246,7 @@ aclnnStatus aclnnMoeGatingTopKV2(
       <td>biasOptional</td>
       <td>Input</td>
       <td>Bias value used in computation with input x, corresponding to bias in the formula.</td>
-      <td>The shape value is equal to the last dimension of x.</td>
+      <td>Data type must be the same as that of x, and the shape value is equal to the last dimension of x.</td>
       <td>FLOAT16, BFLOAT16, FLOAT32</td>
       <td>ND</td>
       <td>1</td>
@@ -530,6 +530,7 @@ aclnnStatus aclnnMoeGatingTopKV2(
     - The shape of tid2eid must be [numKeys, k], where numKeys is the total number of rows in the mapping table and k is equal to parameter k.
     - The shape of inputIds must be [batch], which is equal to the first dimension of x.
     - Each value in inputIds must be in the range [0, numKeys-1].
+    - Each value in tid2eid must be in the range [0, x_shape[-1]-1], that is, a valid expert index.
     - The data types of inputIdsOptional and tid2eidOptional support the combination of INT32 and INT64.
 
 ## Example
