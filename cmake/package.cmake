@@ -35,10 +35,12 @@ function(pack_custom)
       ENABLE_DEFAULT_PACKAGE_NAME_RULE False
   )
 
-  npu_op_package_add(${PACK_CUSTOM_NAME}
-    LIBRARY
-      cust_opapi
-  )
+  if (TARGET cust_opapi)
+    npu_op_package_add(${PACK_CUSTOM_NAME}
+        LIBRARY
+        cust_opapi
+    )
+  endif()
   if (TARGET cust_proto)
     npu_op_package_add(${PACK_CUSTOM_NAME}
         LIBRARY

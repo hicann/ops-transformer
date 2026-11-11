@@ -179,14 +179,24 @@ function(gen_opgraph_symbol)
   )
 endfunction()
 
+# Call after registering all OpAPI object targets. This function collects them at configure time.
 function(gen_opapi_symbol)
-  # opapi shared
-  add_library(${OPAPI_NAME} SHARED
-    $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>>
-    $<$<TARGET_EXISTS:${OPHOST_NAME}_opapi_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_opapi_obj>>
-    $<$<TARGET_EXISTS:opbuild_gen_aclnn_all>:$<TARGET_OBJECTS:opbuild_gen_aclnn_all>>
-    $<$<TARGET_EXISTS:opbase_util_objs>:$<TARGET_OBJECTS:opbase_util_objs>>
+  set(opapi_sources)
+  foreach(obj_target IN ITEMS
+    ${OPHOST_NAME}_cannbotdsl_opapi_obj
+    ${OPHOST_NAME}_opapi_obj
+    opbuild_gen_aclnn_all
+    opbase_util_objs
   )
+    if(TARGET ${obj_target})
+      list(APPEND opapi_sources $<TARGET_OBJECTS:${obj_target}>)
+    endif()
+  endforeach()
+  # Native-only operators can have Host and Device artifacts without an opapi library.
+  if(NOT opapi_sources)
+    return()
+  endif()
+  add_library(${OPAPI_NAME} SHARED ${opapi_sources})
 
   target_link_libraries(${OPAPI_NAME}
     PUBLIC
@@ -207,9 +217,11 @@ function(gen_opapi_symbol)
 endfunction()
 
 function(gen_built_in_opapi_symbol)
-  install(TARGETS ${OPAPI_NAME}
-    LIBRARY DESTINATION ${ACLNN_LIB_INSTALL_DIR}
-  )
+  if(TARGET ${OPAPI_NAME})
+    install(TARGETS ${OPAPI_NAME}
+      LIBRARY DESTINATION ${ACLNN_LIB_INSTALL_DIR}
+    )
+  endif()
 endfunction()
 
 function(gen_cust_opapi_symbol)
@@ -537,7 +549,9 @@ endfunction()
 function(gen_cust_symbol)
   gen_opapi_symbol()
 
-  gen_cust_opapi_symbol()
+  if(TARGET ${OPAPI_NAME})
+    gen_cust_opapi_symbol()
+  endif()
 
   gen_cust_optiling_symbol()
 

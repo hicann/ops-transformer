@@ -785,8 +785,8 @@ endif()
 
 target_link_libraries(
     cust_proto
-    PUBLIC ${OPHOST_NAME}_infer_obj
-    PUBLIC $<$<TARGET_EXISTS:${OPGRAPH_NAME}_gentask_obj>:${OPGRAPH_NAME}_gentask_obj>
+    PUBLIC $<TARGET_NAME_IF_EXISTS:${OPHOST_NAME}_infer_obj>
+    PUBLIC $<TARGET_NAME_IF_EXISTS:${OPGRAPH_NAME}_gentask_obj>
 )
 
 function(filter_aclnn_headers_by_skip_flag input_headers output_headers)
