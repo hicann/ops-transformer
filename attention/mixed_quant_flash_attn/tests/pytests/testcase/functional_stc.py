@@ -2680,7 +2680,7 @@ TestCases = {
                 4096,
             ]
         ],
-        "max_seqlen_q": [1],
+        "max_seqlen_q": [2],
         "max_seqlen_kv": [4096],
         "softmax_scale": 0.08838834764831843,
         "q_range": [(0.001, 0.01)],

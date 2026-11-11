@@ -439,5 +439,7 @@ void MixedQuantFlashAttnTilingImpl::PrintAllTilingData()
 using mixed_quant_flash_attn::MixedQuantFlashAttnTilingImpl;
 
 REGISTER_TILING_TEMPLATE_FIA(MixedQuantFlashAttn, MixedQuantFlashAttnTilingImpl,
-                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_9201)}), 1);
+                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_9201),
+                                                   static_cast<int32_t>(NpuArch::DAV_9202)}),
+                             1);
 } // namespace optiling

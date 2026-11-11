@@ -158,6 +158,7 @@
              .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");   // set value of aclnn support
 #ifdef ENABLE_MQFA_DT_HIFLOAT4
          this->AICore().AddConfig("ascend960dt", aicore_config_96);
+         this->AICore().AddConfig("ascend960pr", aicore_config_96);
 #endif // ENABLE_MQFA_DT_HIFLOAT4
      }
  };

@@ -64,7 +64,7 @@ ASCENDC_TPL_ARGS_DECL(MixedQuantFlashAttn,
                       ASCENDC_TPL_UINT_DECL(QuantComputeMode, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 2), );
 
 ASCENDC_TPL_SEL(
-#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_NZ,
