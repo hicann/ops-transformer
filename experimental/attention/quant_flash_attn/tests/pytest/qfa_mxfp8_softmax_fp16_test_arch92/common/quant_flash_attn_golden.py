@@ -23,6 +23,7 @@ MxFP8 Softmax FP16 Golden（quant_mode=3 / BNSD / 非 PA）
 import logging
 import math
 import os
+import re
 
 import torch
 
@@ -179,6 +180,99 @@ DATA_OFFSET_V = 0.0
 
 ENABLE_LSE = False
 DEVICE_ID = 0
+
+# metadata 文件目录: --golden-mode 里带 metadata 时保存, 带 npu_meta 时读取
+METADATA_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "golden_cache", "metadata"
+)
+
+
+def configure_metadata_dir(directory=None):
+    """配置 metadata 文件目录 (默认 common/golden_cache/metadata)。"""
+    global METADATA_DIR
+    if directory is None:
+        directory = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "golden_cache", "metadata"
+        )
+    METADATA_DIR = directory
+
+
+def _metadata_path(case_name):
+    name = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(case_name or "default")).strip("._")
+    return os.path.join(METADATA_DIR, (name or "default") + ".pt")
+
+
+def save_metadata(case_name, metadata):
+    """metadata 模式下把算子生成的 metadata 落盘, 供 npu_meta 模式复用。"""
+    path = _metadata_path(case_name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    torch.save({"case": str(case_name), "metadata": metadata.detach().cpu()}, path)
+    logging.info("[metadata] saved %s (shape=%s)", path, tuple(metadata.shape))
+    return path
+
+
+def load_metadata(case_name):
+    """npu_meta 模式: 读取预生成的 metadata (CPU int32)。"""
+    path = _metadata_path(case_name)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"npu_meta mode requires a pre-generated metadata file, not found: {path}; "
+            "run once with --golden-mode=gen,metadata on NPU first"
+        )
+    payload = torch.load(path, map_location="cpu", weights_only=True)
+    metadata = payload.get("metadata") if isinstance(payload, dict) else payload
+    return metadata.to(dtype=torch.int32)
+
+
+def _metadata_args(seqused_q_t, seqused_kv_t):
+    """quant_flash_attn_metadata 的入参 (与 NPU 主算子调用处保持一致)。"""
+    return dict(
+        num_heads_q=N_q,
+        num_heads_kv=N_kv,
+        head_dim=D,
+        quant_mode=QUANT_MODE,
+        cu_seqlens_q=None,
+        cu_seqlens_kv=None,
+        seqused_q=seqused_q_t,
+        seqused_kv=seqused_kv_t,
+        mask_mode=SPARSE_MODE,
+        layout_q=INPUT_LAYOUT,
+        layout_q_descale=Q_SCALE_LAYOUT,
+        layout_kv=INPUT_LAYOUT,
+        layout_out=INPUT_LAYOUT,
+        max_seqlen_q=MAX_SEQLEN_Q,
+        max_seqlen_kv=MAX_SEQLEN_KV,
+    )
+
+
+def _metadata_args_from_config():
+    seqused_q_t = (
+        torch.tensor(SEQUSED_Q, dtype=torch.int32).npu()
+        if SEQUSED_Q is not None
+        else None
+    )
+    seqused_kv_t = (
+        torch.tensor(SEQUSED_KV, dtype=torch.int32).npu()
+        if SEQUSED_KV is not None
+        else None
+    )
+    return _metadata_args(seqused_q_t, seqused_kv_t)
+
+
+def generate_metadata(case_name):
+    """只调用 metadata 算子并保存 (--golden-mode=gen,metadata 用)。"""
+    if not _ensure_npu_imports():
+        raise ImportError(
+            "cann_ops_transformer.ops.quant_flash_attn_metadata is not available. "
+            "Please check that cann_ops_transformer is installed and all .so are compiled."
+        )
+    from cann_ops_transformer.ops import quant_flash_attn_metadata
+
+    metadata = quant_flash_attn_metadata(**_metadata_args_from_config())
+    save_metadata(case_name, metadata)
+    return metadata
+
+
 IS_CONTIGUOUS = True
 
 # ==============================================================================
@@ -568,6 +662,9 @@ def npu_mxfp8_fa(
     block_table_torch=None,
     qr_bf16=None,
     kr_bf16=None,
+    case_name=None,
+    metadata_source="metadata",
+    save_to_file=False,
 ):
     if not _ensure_npu_imports():
         raise ImportError(
@@ -600,23 +697,15 @@ def npu_mxfp8_fa(
 
     torch.npu.synchronize()
 
-    metadata = quant_flash_attn_metadata(
-        num_heads_q=N_q,
-        num_heads_kv=N_kv,
-        head_dim=D,
-        quant_mode=QUANT_MODE,
-        cu_seqlens_q=None,
-        cu_seqlens_kv=None,
-        seqused_q=seqused_q_t,
-        seqused_kv=seqused_kv_t,
-        mask_mode=SPARSE_MODE,
-        layout_q=INPUT_LAYOUT,
-        layout_q_descale=Q_SCALE_LAYOUT,
-        layout_kv=INPUT_LAYOUT,
-        layout_out=INPUT_LAYOUT,
-        max_seqlen_q=max_seqlen_q,
-        max_seqlen_kv=max_seqlen_kv,
-    )
+    if metadata_source == "npu_meta":
+        # 仿真环境: metadata 算子(AI_CPU)不可用, 直接读 NPU 上预生成的文件
+        metadata = load_metadata(case_name).npu()
+    else:
+        metadata = quant_flash_attn_metadata(
+            **_metadata_args(seqused_q_t, seqused_kv_t)
+        )
+        if save_to_file and case_name:
+            save_metadata(case_name, metadata)
 
     # Reuse device inputs and metadata for stable kernel-only profiling.
     # The default preserves the single-call functional test behavior.

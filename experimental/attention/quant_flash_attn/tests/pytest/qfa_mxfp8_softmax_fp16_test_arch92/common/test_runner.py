@@ -60,6 +60,46 @@ def execute_test(params, mode, cdir=None):
     apply_params(params)
     case_name = params["name"]
 
+    run_cpu = "cpu" in mode
+    run_npu = "npu" in mode
+    do_compare = "compare" in mode
+
+    if not (run_cpu or run_npu or do_compare):
+        # 只做生成阶段: gen 生成 input.pt, metadata 生成 metadata.pt
+        if "gen" in mode:
+            data = golden.generate_data()
+            (
+                q_fp8,
+                k_fp8,
+                v_fp8,
+                deq_q,
+                deq_k,
+                deq_v,
+                p_scale,
+                qr_bf16,
+                kr_bf16,
+                block_table_torch,
+            ) = data
+            golden_cache.save_input(
+                case_name,
+                golden_cache.build_input_dict(
+                    q_fp8,
+                    k_fp8,
+                    v_fp8,
+                    deq_q,
+                    deq_k,
+                    deq_v,
+                    p_scale,
+                    qr_bf16,
+                    kr_bf16,
+                    block_table_torch,
+                ),
+                cache_dir=cdir,
+            )
+        if "metadata" in mode:
+            golden.generate_metadata(case_name)
+        return None, None
+
     if "gen" in mode:
         data = golden.generate_data()
         (
@@ -91,6 +131,12 @@ def execute_test(params, mode, cdir=None):
             cache_dir=cdir,
         )
     else:
+        if not golden_cache.has_input(case_name, cache_dir=cdir):
+            raise FileNotFoundError(
+                f"input cache not found for {case_name!r}: run once with "
+                "--golden-mode=gen on NPU first, or add gen to this run "
+                "(generate_data uses fixed seeds, so regenerated inputs are identical)"
+            )
         (
             q_fp8,
             k_fp8,
@@ -103,14 +149,6 @@ def execute_test(params, mode, cdir=None):
             kr_bf16,
             block_table_torch,
         ) = golden_cache.load_input(case_name, cache_dir=cdir)
-
-    if (
-        "gen" in mode
-        and "cpu" not in mode
-        and "npu" not in mode
-        and "compare" not in mode
-    ):
-        return None, None
 
     cpu_out, cpu_lse = None, None
     if "cpu" in mode:
@@ -156,6 +194,9 @@ def execute_test(params, mode, cdir=None):
                 block_table_torch,
                 qr_bf16,
                 kr_bf16,
+                case_name=case_name,
+                metadata_source="npu_meta" if "npu_meta" in mode else "metadata",
+                save_to_file=("metadata" in mode),
             )
         golden_cache.save_npu_output(case_name, npu_out, lse_out, cache_dir=cdir)
     else:

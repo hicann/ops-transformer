@@ -10,6 +10,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+import logging
 import os
 import subprocess
 import sys
@@ -17,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-_VALID_MODES = {"all", "gen", "cpu", "npu", "compare"}
+_VALID_MODES = {"all", "gen", "metadata", "npu_meta", "cpu", "npu", "compare"}
 
 
 def _parse_golden_mode(raw):
@@ -27,8 +28,16 @@ def _parse_golden_mode(raw):
         raise pytest.UsageError(
             f"Invalid golden-mode: {invalid}. Valid: {_VALID_MODES}"
         )
+    if "metadata" in parts and "npu_meta" in parts:
+        raise pytest.UsageError(
+            "metadata 与 npu_meta 互斥: metadata=调用算子生成并保存, "
+            "npu_meta=读取已保存的 metadata 文件"
+        )
     if "all" in parts:
         return {"gen", "cpu", "npu", "compare"}
+    if "npu_meta" in parts:
+        # 用已保存的 metadata 跑一次 NPU
+        parts.add("npu")
     return parts
 
 
@@ -37,15 +46,22 @@ def pytest_addoption(parser):
         "--golden-mode",
         default="all",
         help=(
-            "Golden 执行模式，支持逗号组合: "
-            "all=全流程, gen=生成数据, cpu=跑CPU, npu=跑NPU, compare=精度对比. "
-            "例: --golden-mode=npu,compare"
+            "Golden 执行模式(逗号组合): "
+            "gen=生成 input.pt; metadata=调用算子生成并保存 metadata.pt; "
+            "npu_meta=读取已保存的 metadata.pt; cpu=跑CPU; npu=跑NPU; compare=精度对比; "
+            "all=gen,cpu,npu,compare. "
+            "例: --golden-mode=gen,metadata / --golden-mode=cpu,npu_meta,compare"
         ),
     )
     parser.addoption(
         "--cache-dir",
         default=None,
         help="golden 缓存目录路径（默认 common/golden_cache/）",
+    )
+    parser.addoption(
+        "--metadata-dir",
+        default=None,
+        help="metadata 文件目录（默认 common/golden_cache/metadata）",
     )
     parser.addoption(
         "--parse-prof",
@@ -168,6 +184,15 @@ def pytest_configure(config):
 
     _compare_baseline(config, results, tag="perf")
     pytest.exit("profiling report complete", returncode=0)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _metadata_dir_config(request):
+    from common import quant_flash_attn_golden as golden
+
+    directory = request.config.getoption("--metadata-dir")
+    golden.configure_metadata_dir(directory)
+    logging.info("[metadata] dir = %s", golden.METADATA_DIR)
 
 
 @pytest.fixture(scope="session")
