@@ -587,7 +587,11 @@ __aicore__ inline void CalcAIVMlaAttentionOutOffset(RunParamStr<isInfer>& runPar
         if (constInfo.gSize == 128) {
             curGIdx = (curS1Idx % 2 == 0) ? curGIdx : (uint32_t)s1TemplateType;
             curS1Idx /= 2;
-        } else if (constInfo.gSize <= 32) {
+        } else {
+            // fix: 按 gSize 分解 gs 折叠轴(MLA decode 将 51 头折为 S1 轴长 51),
+            // 与写回端 MlaTransposeDataCopyOut(sOuterOffset %/ / gSize) 保持一致。
+            // 原仅特判 gSize==128 与 <=32, 漏 32<gSize<128(如 MLA 51/72)导致
+            // head>32 输出清零。此处统一 32<gSize<128 与 gSize<=32 均按 gSize 分解。
             curGIdx = runParam.cubeSOuterOffset % constInfo.gSize;
             curS1Idx = runParam.cubeSOuterOffset / constInfo.gSize;
         }
