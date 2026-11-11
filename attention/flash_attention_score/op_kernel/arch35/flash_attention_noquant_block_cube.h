@@ -1424,7 +1424,15 @@ __aicore__ inline void FANoQuantBlockCube<TEMPLATE_ARGS>::IterateBmm1DnSplitK(
             2; // mmResUb上两行之间的间隔，单位：element。 // 128:根据比对dump文件得到, ND方案(S1*S2)时脏数据用mask剔除
         fixpipeParams.dualDstCtl = 2; // 双目标模式，按M维度拆分，M / 2 * N写入每个UB, M必须为2的倍数
     } else {
-        fixpipeParams.dstStride = s1BaseSize;
+        if constexpr (optionalDn) {
+            // Causal路径vec侧固定按s1BaseSize行距读取: ProcessVec1DnCausal在s1BaseSize=128时硬编码m=128
+            // 分两半处理, s1BaseSize=64时m=Align64(s1RealSize)恒等于s1BaseSize, dstStride须保持s1BaseSize
+            fixpipeParams.dstStride = s1BaseSize;
+        } else {
+            // classic DN路径vec侧m=s1RealSizeAlign32/CV_RATIO(=nSize), dstStride需与其一致;
+            // 尾块nSize<s1BaseSize时若写死s1BaseSize, 会与vec读取行距不一致导致softmax数据错位
+            fixpipeParams.dstStride = fixpipeParams.nSize;
+        }
         fixpipeParams.dualDstCtl = 0; // 单目标模式
     }
     fixpipeParams.params.ndNum = 1;
@@ -2130,7 +2138,15 @@ __aicore__ inline void FANoQuantBlockCube<TEMPLATE_ARGS>::IterateBmm1Dn(
 
         fixpipeParams.dualDstCtl = 2; // 双目标模式，按M维度拆分，M / 2 * N写入每个UB, M必须为2的倍数
     } else {
-        fixpipeParams.dstStride = s1BaseSize;
+        if constexpr (optionalDn) {
+            // Causal路径vec侧固定按s1BaseSize行距读取: ProcessVec1DnCausal在s1BaseSize=128时硬编码m=128
+            // 分两半处理, s1BaseSize=64时m=Align64(s1RealSize)恒等于s1BaseSize, dstStride须保持s1BaseSize
+            fixpipeParams.dstStride = s1BaseSize;
+        } else {
+            // classic DN路径vec侧m=s1RealSizeAlign32/CV_RATIO(=nSize), dstStride需与其一致;
+            // 尾块nSize<s1BaseSize时若写死s1BaseSize, 会与vec读取行距不一致导致softmax数据错位
+            fixpipeParams.dstStride = fixpipeParams.nSize;
+        }
         fixpipeParams.dualDstCtl = 0; // 单目标模式
     }
     fixpipeParams.params.ndNum = 1;
