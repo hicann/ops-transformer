@@ -206,7 +206,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | v                  | Tensor       | 必选      | 公式中的$V$，shape与k相同                                                           | bfloat16/float16 | ND       | 与k一致                                                                  |
 | dout               | Tensor       | 必选      | 注意力输出梯度$dO$                                                                  | bfloat16/float16 | ND       | 与q一致                                                                  |
 | attn_out           | Tensor       | 必选      | 注意力正向输出$O$                                                                   | bfloat16/float16 | ND       | 与q一致                                                                  |
-| softmax_lse        | Tensor       | 必选      | 正向保存的softmax LSE                                                                 | float32          | ND       | TND：`(T1, N1, 1)`；BNSD：`(B, N1, S1, 1)`；BSND：`(B, S1, N1, 1)` |
+| softmax_lse        | Tensor       | 必选      | 正向保存的softmax LSE                                                                | float32          | ND       | TND：`(T1,N1,1)`；BNSD：`(B,N1,S1,1)`；BSND：`(B,S1,N1,1)`或`(B,N1,S1,1)`，详见约束说明 |
 | sparse_block_idx   | Tensor       | 必选      | 稀疏块索引数组：`layout_sparse_pattern=1`时指定每个KV块选择的Q块/token索引；=0时指定每个Q token选择的完整KV块索引 | int32 | ND | =1：TND为`(B,N2,J,maxS1)`，BNSD/BSND为`(B,N2,J,S1)`；=0：`(B,N2,maxQBlockCount,maxKvBlockCount)` |
 | sparse_block_count | Tensor       | 必选      | `layout_sparse_pattern=1`时指定每个KV块实际选择的Q数量；=0时指定每个Q token选中的完整可见KV块数，不包含自动计算的尾部不完整块 | int32 | ND | =1：`(B,N2,J)`；=0：`(B,N2,maxQBlockCount)` |
 | metadata           | Tensor       | 可选      | `generic_block_sparse_attention_grad_metadata`生成的任务切分结果，须通过关键字参数传入；layout_sparse_pattern=1时必传，=0时须为None | int32            | ND       | `(metaSize,)`，见返回值说明 |
@@ -273,6 +273,8 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 **`layout_sparse_pattern=1`：**
 
 - 要求`residual_block_mode=0`、`mask_mode=1`，`is_consistent_topk`支持False和True。须先调用`generic_block_sparse_attention_grad_metadata`生成`metadata`，两次调用的`layout_sparse_pattern`、`residual_block_mode`、`is_consistent_topk`须保持一致。
+- Softmax LSE：TND为`(T1,N1,1)`，BNSD为`(B,N1,S1,1)`；BSND在A5上GSAG须为`(B,N1,S1,1)`，在A2/A3上GSAG为`(B,S1,N1,1)`；QSAG（pattern=0）随query布局（BSND为`(B,S1,N1,1)`）。
+- `softmax_scale`须为float32可表示的有限值（非NaN/Inf，且转float后仍有限）。
 - `max_seqlen_q`/`max_seqlen_kv`可省略，由Torch扩展推断；显式传入时须≥0，且满足`J=ceilDiv(max_seqlen_kv, block_y)`与`maxS1≥max_seqlen_q`。
 
 **`layout_sparse_pattern=0`：**
@@ -445,11 +447,11 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
         <td>
             <ul>
                 <li>tensor_type仅支持float32</li>
-                <li>TND：(T1, N1, 1)；BNSD：(B, N1, S1, 1)；BSND：(B, S1, N1, 1)</li>
+                <li>TND：(T1,N1,1)；BNSD：(B,N1,S1,1)；BSND：(B,S1,N1,1)或(B,N1,S1,1)，详见约束说明</li>
             </ul>
         </td>
         <td>必须存在</td>
-        <td>head/seq轴语义须与q布局一致</td>
+        <td>BSND轴序见约束说明</td>
         <td>无</td>
     </tr>
     </tbody>

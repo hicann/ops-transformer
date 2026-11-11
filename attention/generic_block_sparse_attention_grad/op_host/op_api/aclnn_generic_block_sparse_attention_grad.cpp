@@ -24,6 +24,7 @@
 #include "opdev/common_types.h"
 #include "opdev/platform.h"
 #include <acl/acl.h>
+#include <cmath>
 
 using namespace op;
 
@@ -206,6 +207,11 @@ aclnnStatus CheckCrossTensorShapes(const aclTensor* query, const aclTensor* key,
     return ACLNN_SUCCESS;
 }
 
+bool IsArch35Platform()
+{
+    return op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
+}
+
 aclnnStatus CheckLseShape(const aclTensor* lse, const aclTensor* query, const char* layout, int64_t qHeadNum)
 {
     const LayoutDims dims = GetLayoutDims(layout);
@@ -213,12 +219,41 @@ aclnnStatus CheckLseShape(const aclTensor* lse, const aclTensor* query, const ch
     const int64_t qSeqLen = qShape.GetDim(dims.seq);
     const int64_t batch = dims.batch >= 0 ? qShape.GetDim(dims.batch) : 1;
     const auto& lseShape = lse->GetViewShape();
-    if (lseShape.GetShapeSize() != batch * qHeadNum * qSeqLen ||
-        lseShape.GetDim(0) != (dims.batch >= 0 ? batch : qSeqLen)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "GenericBlockSparseAttentionGrad: lse shape[%s] must be [T1, N1] for TND or [B, N1, S1] otherwise, "
-                "query shape[%s] layout=%s.",
-                op::ToString(lseShape).GetString(), op::ToString(qShape).GetString(), layout);
+    const bool isTnd = IsTndLayout(layout);
+    const bool isBsnd = (strcmp(layout, "BSND") == 0);
+    const bool isA5 = IsArch35Platform();
+    const size_t rank = lseShape.GetDimNum();
+    const bool isBns =
+        (rank == 3 && lseShape.GetDim(0) == batch && lseShape.GetDim(1) == qHeadNum && lseShape.GetDim(2) == qSeqLen) ||
+        (rank == 4 && lseShape.GetDim(0) == batch && lseShape.GetDim(1) == qHeadNum && lseShape.GetDim(2) == qSeqLen &&
+         lseShape.GetDim(3) == 1);
+    const bool isBsn =
+        (rank == 3 && lseShape.GetDim(0) == batch && lseShape.GetDim(1) == qSeqLen && lseShape.GetDim(2) == qHeadNum) ||
+        (rank == 4 && lseShape.GetDim(0) == batch && lseShape.GetDim(1) == qSeqLen && lseShape.GetDim(2) == qHeadNum &&
+         lseShape.GetDim(3) == 1);
+    bool ok = false;
+    if (isTnd) {
+        ok = (rank == 2 && lseShape.GetDim(0) == qSeqLen && lseShape.GetDim(1) == qHeadNum) ||
+             (rank == 3 && lseShape.GetDim(0) == qSeqLen && lseShape.GetDim(1) == qHeadNum && lseShape.GetDim(2) == 1);
+    } else if (isA5 || !isBsnd) {
+        ok = isBns;
+    } else {
+        ok = isBns || isBsn;
+    }
+    if (!ok) {
+        if (isA5) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "GenericBlockSparseAttentionGrad: on Ascend950/A5, GSAG lse shape[%s] must be "
+                    "[T1,N1](/[T1,N1,1]) for TND or [B,N1,S1](/[B,N1,S1,1]) for BNSD/BSND "
+                    "(BSND query must not use [B,S1,N1]); query shape[%s] layout=%s.",
+                    op::ToString(lseShape).GetString(), op::ToString(qShape).GetString(), layout);
+        } else {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "GenericBlockSparseAttentionGrad: lse shape[%s] must be [T1,N1](/[T1,N1,1]) for TND, "
+                    "[B,N1,S1](/[B,N1,S1,1]) for BNSD, or [B,N1,S1]/[B,S1,N1](/with optional trailing 1) "
+                    "for BSND, query shape[%s] layout=%s.",
+                    op::ToString(lseShape).GetString(), op::ToString(qShape).GetString(), layout);
+        }
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -240,7 +275,6 @@ aclnnStatus CheckSparseAndSeqShapes(const aclTensor* query, const aclTensor* spa
                 op::ToString(idxShape).GetString(), op::ToString(cntShape).GetString());
         return ACLNN_ERR_PARAM_INVALID;
     }
-
     const bool isArch35 = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
     const int64_t minMetaElems = isArch35 ? GSAG_METADATA_HEADER_SIZE : GSAG_ARCH22_METADATA_MIN_ELEMS;
     const int64_t metaElems = metadata->GetViewShape().GetShapeSize();
@@ -565,6 +599,12 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+
+    if (!std::isfinite(static_cast<float>(scaleValue))) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "GenericBlockSparseAttentionGrad: scaleValue must be finite in float32, got %f.", scaleValue);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
 
     auto ret =
         layoutSparsePattern == 0 ?

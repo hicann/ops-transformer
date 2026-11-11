@@ -211,7 +211,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   </td>
                   <td>FLOAT32</td>
                   <td>ND</td>
-                  <td>TND：(T1,N1,1)；BNSD：(B,N1,S1,1)；BSND：(B,S1,N1,1)</td>
+                  <td>TND：(T1,N1,1)；BNSD：(B,N1,S1,1)；BSND：(B,S1,N1,1)或(B,N1,S1,1)，详见约束说明</td>
                   <td>√</td>
               </tr>
               <tr>
@@ -246,8 +246,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>由aclnnGenericBlockSparseAttentionGradMetadata生成的分核信息。</td>
                   <td>
                       <ul>
-                          <li>必须传入。</li>
-                          <li>不同产品metaSize支持长度不一样，具体见表格下方说明。</li>
+                          <li>layoutSparsePattern=1时须传入；layoutSparsePattern=0时须传nullptr。详见<a href="#约束说明">约束说明</a>。</li>
+                          <li>layoutSparsePattern=1时不同产品metaSize支持长度不一样，具体见表格下方说明。</li>
                       </ul>
                   </td>
                   <td>INT32</td>
@@ -345,7 +345,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>layoutSparsePattern</td>
                   <td>输入</td>
                   <td>代表输入的sparseBlockIdx、sparseBlockCount的数据排布格式。</td>
-                  <td>当前仅支持取"1"，详细参考<a href="#layout对应关系说明">layout对应关系说明</a>。</td>
+                  <td>当前支持取0和1，详细参考<a href="#layout对应关系说明">layout对应关系说明</a>及<a href="#约束说明">约束说明</a>。</td>
                   <td>INT64</td>
                   <td>-</td>
                   <td>-</td>
@@ -355,7 +355,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>scaleValue</td>
                   <td>输入</td>
                   <td>公式中的scale，代表缩放系数。</td>
-                  <td>建议值：公式中d开根号的倒数。</td>
+                  <td>须为有限值（非NaN/Inf）。建议值：公式中d开根号的倒数。</td>
                   <td>FLOAT</td>
                   <td>-</td>
                   <td>-</td>
@@ -512,7 +512,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
         <tr>
           <td>ACLNN_ERR_PARAM_NULLPTR</td>
           <td>161001</td>
-          <td>必选参数或输出为空指针；metadataOptional未传入；layoutQ为"TND"时未提供cuSeqLengthsQOptional；layoutKv为"TND"时未提供cuSeqLengthsKvOptional。</td>
+          <td>必选参数或输出为空指针；layoutSparsePattern=1时metadataOptional未传入。</td>
         </tr>
         <tr>
           <td class="merged-cell" rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
@@ -520,7 +520,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
           <td>输入、输出、属性的数据类型、数据格式或取值不在支持范围内；layoutQ与layoutKv不一致。</td>
         </tr>
         <tr>
-          <td>layoutSparsePattern、residualBlockMode、isConsistentTopk、winLeft/Right、blockShape不满足约束。</td>
+          <td>layoutSparsePattern、residualBlockMode、isConsistentTopk、winLeft/Right、blockShape不满足约束；layout为"TND"时未提供cuSeqLengthsQ/KvOptional；scaleValue非float32可表示有限值。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -575,12 +575,14 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
   - aclnnGenericBlockSparseAttentionGrad默认为非确定性实现，不支持通过aclrtSetSysParamOpt开启确定性。
 - 参数query、key、value、dout、out、dQuery、dKey、dValue的数据类型应保持一致，支持FLOAT16和BFLOAT16；lse为FLOAT32，sparseBlockIdx、sparseBlockCount为INT32，cuSeqLengthsQOptional/cuSeqLengthsKvOptional为INT64，sequsedQOptional/sequsedKvOptional为INT32。
 - layoutQ和layoutKv须相同，支持TND、BNSD、BSND。TND布局须传入对应的INT64 `(B+1,)` cuSeqLengths；BNSD/BSND布局下seqused须传nullptr。
-- softmaxPrecision仅支持0；winLeft和winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。Softmax LSE的head/seq轴语义须与query布局一致。
+- softmaxPrecision仅支持0；winLeft和winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
+- scaleValue须为float32可表示的有限值（非NaN/Inf，且转float后仍有限），对`layoutSparsePattern=0`与`layoutSparsePattern=1`均生效。
 
 **`layoutSparsePattern=1`：**
 
 - 要求`residualBlockMode=0`、`maskType=1`，须先调用[aclnnGenericBlockSparseAttentionGradMetadata](../../generic_block_sparse_attention_grad_metadata/docs/aclnnGenericBlockSparseAttentionGradMetadata.md)生成INT32的`metadataOptional`；两次调用的`layoutSparsePattern`、`residualBlockMode`、`isConsistentTopk`须保持一致。
 - HeadDim固定为128，N1/N2取值范围为[1,128]且N1≥N2、N1%N2=0；blockShapeX=1，blockShapeY≥128且为64的倍数。
+- Softmax LSE：TND为`(T1,N1,1)`，BNSD为`(B,N1,S1,1)`；BSND在Ascend 950（A5）上必须为`(B,N1,S1,1)`，在A2/A3上为`(B,S1,N1,1)`。
 - `sparseBlockIdx`第4维maxS1应≥`sparseBlockCount`中所有元素的最大值。
 
 **`layoutSparsePattern=0`：**
@@ -590,8 +592,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 - 要求D在[1,256]，N1%N2=0、G=N1/N2≤256；blockShape=[1,Bs]，0<Bs≤baseKtile（G≤128时baseKtile为128，否则为64）。
 - `sparseBlockIdx`为`(B,N2,maxQBlockCount,maxKvBlockCount)`，`sparseBlockCount`为`(B,N2,maxQBlockCount)`；`maxQBlockCount`是Q方向的索引容量，BNSD/BSND布局下等于`S1`，TND布局下须≥`ceil(T1/B)`且不小于每个batch的实际Q长度。`maxKvBlockCount`是每个Q token可保存的完整KV块数容量，取值为[1,INT32_MAX]。
 - `sparseBlockCount`仅统计选中的完整可见KV块，不得超过`maxKvBlockCount`。当前Q token可见KV长度为`limit`：NONE时为实际KV长度，CAUSAL时为`max(0,min(klen,klen-qlen+q_index+1))`，其中`q_index`从0开始；有效块索引范围为`[0,floor(limit/blockShapeY))`。尾部不完整块不写入索引，由算子自动加入计算。
-- 要求B、N1、N2为正数；value与key同shape，dout、out、dQuery与query同shape，dKey、dValue与key同shape；lse的shape为query去掉末维，或将末维替换为1。必选张量不支持零维长度或负维度。
-- scaleValue须为有限值。cuSeqLengths、seqused、稀疏索引和计数的实际数值不在tiling阶段校验，调用方须保证符合上述语义。
+- 要求B、N1、N2为正数；value与key同shape，dout、out、dQuery与query同shape，dKey、dValue与key同shape；lse的shape随query布局（去掉末维D，或将末维替换为1）：BNSD为`(B,N1,S1,1)`，BSND为`(B,S1,N1,1)`。必选张量不支持零维长度或负维度。
+- cuSeqLengths、seqused、稀疏索引和计数的实际数值不在tiling阶段校验，调用方须保证符合上述语义。
 
 ### layout对应关系说明
 
