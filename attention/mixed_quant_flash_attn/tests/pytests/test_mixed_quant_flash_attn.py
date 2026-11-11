@@ -30,12 +30,14 @@ from core.postprocess import PostProcessor
 _MARKER_TO_MODULE = {
     "func_redline": "functional_redline",
     "func_B250_redline": "functional_B250_redline",
+    "func_B280_0_1_stride_stc": "functional_B280_0_1_stride_stc",
+    "func_B280_0_1_stride_stc_checker": "functional_B280_0_1_stride_stc_checker",
     "func_stc": "functional_stc",
     "func_L0": "L0_0715",
     "perf_batch": "perf_batch_linearity",
     "perf_mtp": "perf_mtp_linearity",
     "perf_kvs": "perf_kvs_linearity",
-    "perf_load_balance": "perf_load_balance",
+    "perf_load_balance": "perf_load_balancing",
     "perf_low_latency": "perf_low_latency",
 }
 
@@ -246,6 +248,26 @@ def test_func_redline(
 
 @pytest.mark.func_B250_redline
 def test_func_B250_redline(
+    case_name, params_for_case, data_dir, mode, device_id, seed, postproc
+):
+    cmp = _execute_step(case_name, params_for_case, data_dir, mode, device_id, seed)
+    if cmp is not None:
+        postproc.record(case_name, cmp)
+    _check_results(cmp)
+
+
+@pytest.mark.func_B280_0_1_stride_stc
+def test_func_B280_0_1_stride_stc(
+    case_name, params_for_case, data_dir, mode, device_id, seed, postproc
+):
+    cmp = _execute_step(case_name, params_for_case, data_dir, mode, device_id, seed)
+    if cmp is not None:
+        postproc.record(case_name, cmp)
+    _check_results(cmp)
+
+
+@pytest.mark.func_B280_0_1_stride_stc_checker
+def test_func_B280_0_1_stride_stc_checker(
     case_name, params_for_case, data_dir, mode, device_id, seed, postproc
 ):
     cmp = _execute_step(case_name, params_for_case, data_dir, mode, device_id, seed)

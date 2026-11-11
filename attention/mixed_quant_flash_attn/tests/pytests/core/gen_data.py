@@ -659,6 +659,71 @@ def parse_quant_compute_mode(quant_compute_mode):
     return kv_dtype_str, kv_descale_dtype_str, kv_descale_range
 
 
+STRIDED_VIEW_TENSOR_NAMES = ("k", "v", "k_descale", "v_descale")
+
+
+def strided_view_span(shape, strides):
+    """非连续视图占用的底层元素跨度: 1 + Σ(dim-1)*stride; 任一维为 0 时返回 0。"""
+    span = 1
+    for dim, stride in zip(shape, strides):
+        if dim == 0:
+            return 0
+        span += (dim - 1) * stride
+    return span
+
+
+def make_strided_view(tensor, view_strides):
+    """把连续 tensor 重打包为自定义 strides 的非连续视图（元素值保持不变）。
+
+    分配 strided_view_span 大小的底层 storage（stride 间隙填充确定性随机数据，
+    与 ttk 对整个 storage 随机生成、再由 customize_inputs 覆写视图的语义一致），
+    用 as_strided 切出视图后把原值 copy_ 进去。
+
+    """
+    if tensor is None:
+        return None
+    if tensor.dim() == 0 or tensor.numel() == 0:
+        return tensor
+    view_strides = tuple(int(s) for s in view_strides)
+    if tensor.is_contiguous() and tuple(tensor.stride()) == view_strides:
+        return tensor
+    span = strided_view_span(tensor.shape, view_strides)
+    if tensor.dtype == torch.uint8:
+        storage = torch.randint(0, 256, (span,), dtype=torch.uint8)
+    elif tensor.element_size() == 1:
+        storage = torch.randint(0, 256, (span,), dtype=torch.uint8).view(tensor.dtype)
+    elif tensor.is_floating_point():
+        storage = torch.empty(span, dtype=tensor.dtype).uniform_(-1.0, 1.0)
+    else:
+        storage = torch.zeros(span, dtype=tensor.dtype)
+    view = torch.as_strided(storage, tuple(tensor.shape), view_strides)
+    view.copy_(tensor)
+    return view
+
+
+def apply_tensor_view_strides(tensors, view_strides_cfg):
+    """按用例的 tensor_view_strides 配置把 k/v/k_descale/v_descale 转为非连续视图。
+
+    view_strides_cfg: {"k": (s0,s1,...), "v": (...), "k_descale": (...), "v_descale": (...)}
+    （值 None 表示该 tensor 保持连续）。在 generate_inputs 末尾调用，保证同 seed 下
+    其余输入与连续场景完全一致。
+    """
+    if not view_strides_cfg:
+        return tensors
+    unknown = set(view_strides_cfg) - set(STRIDED_VIEW_TENSOR_NAMES)
+    if unknown:
+        raise ValueError(
+            f"tensor_view_strides only supports {STRIDED_VIEW_TENSOR_NAMES}, "
+            f"but got unknown keys: {sorted(unknown)}"
+        )
+    for name in STRIDED_VIEW_TENSOR_NAMES:
+        strides = view_strides_cfg.get(name)
+        if strides is None:
+            continue
+        tensors[name] = make_strided_view(tensors[name], strides)
+    return tensors
+
+
 def generate_sinks(sinks, num_heads_q, data_range=(-1.0, 1.0)):
     """Normalize the optional attention sink to a 1-D FP32 tensor."""
     if sinks is None or sinks is False:
@@ -1031,5 +1096,9 @@ def generate_inputs(params, seed=42):
     tensors["layout_kv"] = layout_kv
     tensors["layout_attn_out"] = layout_attn_out
     tensors["return_softmax_lse"] = return_softmax_lse
+
+    # 非连续输入: 按用例声明的 tensor_view_strides 把 k/v/k_descale/v_descale
+    # 重打包为非连续视图（放在最后, 保证同 seed 下其余输入与连续场景一致）
+    apply_tensor_view_strides(tensors, params.get("tensor_view_strides"))
 
     return tensors

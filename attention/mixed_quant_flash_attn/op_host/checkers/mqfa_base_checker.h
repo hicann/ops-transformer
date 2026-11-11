@@ -62,6 +62,11 @@ public:
         }
         return ge::GRAPH_SUCCESS;
     }
+    ge::graphStatus CheckTensorContiguous(const uint32_t tensorDimNum, const gert::Shape& inputShape,
+                                          const gert::Stride* strides, int32_t& index) const;
+    ge::graphStatus CheckTensorStridedViewNoOverlap(const uint32_t tensorDimNum, const gert::Shape& inputShape,
+                                                    const gert::Stride* strides, int32_t& overlapAxisIdx,
+                                                    int32_t& overlapPrevAxisIdx) const;
 
     std::string DataTypeToSerialString(ge::DataType type) const;
     static uint32_t GetTypeSize(ge::DataType dtype);

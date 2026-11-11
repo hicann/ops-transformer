@@ -283,7 +283,17 @@ void FaInfoParser::GetInputParaInfo()
     opParamInfo_.kDescale.shape = context_->GetInputShape(K_DESCALE_INDEX);
     opParamInfo_.vDescale.desc = context_->GetInputDesc(V_DESCALE_INDEX);
     opParamInfo_.vDescale.shape = context_->GetInputShape(V_DESCALE_INDEX);
+    GetStrides();
     GetOptionalInputParaInfo();
+}
+
+void FaInfoParser::GetStrides()
+{
+    // 老版本opbase为TensorV1，不携带stride视图信息，GetInputStride返回nullptr，按连续处理
+    opParamInfo_.key.strides = context_->GetInputStride(KEY_INDEX);
+    opParamInfo_.value.strides = context_->GetInputStride(VALUE_INDEX);
+    opParamInfo_.kDescale.strides = context_->GetInputStride(K_DESCALE_INDEX);
+    opParamInfo_.vDescale.strides = context_->GetInputStride(V_DESCALE_INDEX);
 }
 
 void FaInfoParser::GetOutputParaInfo()

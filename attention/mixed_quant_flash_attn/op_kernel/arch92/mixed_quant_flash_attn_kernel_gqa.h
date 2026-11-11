@@ -255,6 +255,14 @@ public:
                 constInfo.maxBlockNumPerBatch = pageAttentionParams.maxBlockNumPerBatch;
                 constInfo.blockSize = pageAttentionParams.blockSize;
                 constInfo.paLayoutType = pageAttentionParams.paLayoutType;
+                constInfo.keyStrides.bnStride = pageAttentionParams.keyStrides.bnStride;
+                constInfo.keyStrides.n2Stride = pageAttentionParams.keyStrides.n2Stride;
+                constInfo.valueStrides.bnStride = pageAttentionParams.valueStrides.bnStride;
+                constInfo.valueStrides.n2Stride = pageAttentionParams.valueStrides.n2Stride;
+                constInfo.kDescaleStrides.bnStride = pageAttentionParams.kDescaleStrides.bnStride;
+                constInfo.kDescaleStrides.n2Stride = pageAttentionParams.kDescaleStrides.n2Stride;
+                constInfo.vDescaleStrides.bnStride = pageAttentionParams.vDescaleStrides.bnStride;
+                constInfo.vDescaleStrides.n2Stride = pageAttentionParams.vDescaleStrides.n2Stride;
             }
         } else {
             constInfo.aivIdx = GetBlockIdx();

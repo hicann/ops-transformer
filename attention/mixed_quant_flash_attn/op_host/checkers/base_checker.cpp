@@ -13,8 +13,13 @@
  * \brief
  */
 
+#include <algorithm>
+#include <cstdint>
 #include <map>
 #include <numeric>
+#include <tuple>
+#include <utility>
+#include <vector>
 #include "tiling/tiling_api.h"
 #include "../mqfa_fa_tiling_info.h"
 #include "mqfa_base_checker.h"
@@ -61,6 +66,75 @@ ge::graphStatus FABaseChecker::CheckFormatSupport(const gert::CompileTimeTensorD
             (FORMAT_SUPPORT_SET.find(format) == FORMAT_SUPPORT_SET.end()),
             OP_LOGE_FOR_INVALID_FORMAT("MixedQuantFlashAttn", name.c_str(), Ops::Base::ToString(format).c_str(), "ND"),
             return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+// CheckTensorContiguous会判断当前Tensor是否是连续的，如果非连续会计算最内层的非连续轴索引(index)用于后续判断
+ge::graphStatus FABaseChecker::CheckTensorContiguous(const uint32_t tensorDimNum, const gert::Shape& inputShape,
+                                                     const gert::Stride* strides, int32_t& index) const
+{
+    // 根据shape推导连续场景的strides，如果存在某一维不相等则表示不连续
+    if (strides == nullptr || strides->GetDimNum() == 0 || strides->GetDimNum() != tensorDimNum) {
+        index = -1;
+        return ge::GRAPH_SUCCESS;
+    }
+    // 循环顶部expectedStride恒为当前维的连续期望stride（末维为1）；
+    // 每轮末尾expectedStride乘以当前维大小即得外一维的expectedStride
+    uint64_t expectedStride = 1;
+    for (index = static_cast<int32_t>(tensorDimNum) - 1; index >= 0; index--) {
+        // shape为1的维不影响访存，其stride可为任意值，跳过比对
+        if (inputShape.GetDim(static_cast<size_t>(index)) != 1 &&
+            strides->GetStride(static_cast<size_t>(index)) != static_cast<int64_t>(expectedStride)) {
+            return ge::GRAPH_FAILED;
+        }
+        if (index == 0) {
+            // 最外维比对完成，无需再推导外一维的期望stride
+            break;
+        }
+        uint64_t dimSize = static_cast<uint64_t>(inputShape.GetDim(static_cast<size_t>(index)));
+        // 外一维的期望stride超出int64可表示范围时，其stride不可能与之相等，判为不连续
+        if (dimSize != 0 && expectedStride > static_cast<uint64_t>(INT64_MAX) / dimSize) {
+            // 不匹配维为外一维
+            index--;
+            return ge::GRAPH_FAILED;
+        }
+        expectedStride = dimSize * expectedStride;
+    }
+    index = -1;
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus FABaseChecker::CheckTensorStridedViewNoOverlap(const uint32_t tensorDimNum,
+                                                               const gert::Shape& inputShape,
+                                                               const gert::Stride* strides, int32_t& overlapAxisIdx,
+                                                               int32_t& overlapPrevAxisIdx) const
+{
+    // 重叠视图校验：不同逻辑下标映射到同一底层元素
+    overlapAxisIdx = -1;
+    overlapPrevAxisIdx = -1;
+    if (strides == nullptr || strides->GetDimNum() == 0 || strides->GetDimNum() != tensorDimNum) {
+        return ge::GRAPH_SUCCESS;
+    }
+    std::vector<std::tuple<int64_t, int64_t, int32_t>> strideSizeAxis; // (stride, size, axisIdx)
+    for (uint32_t i = 0; i < tensorDimNum; i++) {
+        int64_t dimSize = inputShape.GetDim(static_cast<size_t>(i));
+        if (dimSize > 1) {
+            strideSizeAxis.push_back({strides->GetStride(static_cast<size_t>(i)), dimSize, static_cast<int32_t>(i)});
+        }
+    }
+    // 按stride升序排序后逐级要求 stride[i] >= stride[i-1] * size[i-1]
+    std::sort(strideSizeAxis.begin(), strideSizeAxis.end());
+    for (size_t i = 1; i < strideSizeAxis.size(); i++) {
+        const uint64_t prevStride = static_cast<uint64_t>(std::get<0>(strideSizeAxis[i - 1]));
+        const uint64_t prevSize = static_cast<uint64_t>(std::get<1>(strideSizeAxis[i - 1]));
+        const uint64_t currStride = static_cast<uint64_t>(std::get<0>(strideSizeAxis[i]));
+        // 真实乘积超出uint64范围时，当前维stride必然小于该乘积
+        if (prevStride > UINT64_MAX / prevSize || currStride < prevStride * prevSize) {
+            overlapAxisIdx = std::get<2>(strideSizeAxis[i]);
+            overlapPrevAxisIdx = std::get<2>(strideSizeAxis[i - 1]);
+            return ge::GRAPH_FAILED;
+        }
     }
     return ge::GRAPH_SUCCESS;
 }

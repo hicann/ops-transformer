@@ -48,22 +48,22 @@
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E2M1, Ops::Transformer::DT_HIFLOAT4, Ops::Transformer::DT_HIFLOAT4})
             .FormatList({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
+            .IgnoreContiguous();
          this->Input("v")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E2M1, Ops::Transformer::DT_HIFLOAT4, Ops::Transformer::DT_HIFLOAT4})
             .FormatList({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
+            .IgnoreContiguous();
          this->Input("k_descale")
              .ParamType(REQUIRED)
              .DataType({ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, Ops::Transformer::DT_HIFLOAT4_SCALE, Ops::Transformer::DT_HIFLOAT4_SCALE})
              .FormatList({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-             .AutoContiguous();
+             .IgnoreContiguous();
          this->Input("v_descale")
              .ParamType(REQUIRED)
              .DataType({ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, Ops::Transformer::DT_HIFLOAT4_SCALE, Ops::Transformer::DT_HIFLOAT4_SCALE})
              .FormatList({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
-             .AutoContiguous();
+             .IgnoreContiguous();
          this->Input("block_table")
              .ParamType(OPTIONAL)
              .DataTypeList({ge::DT_INT32})

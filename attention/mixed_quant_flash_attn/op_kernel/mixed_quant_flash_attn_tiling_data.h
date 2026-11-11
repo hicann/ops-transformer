@@ -76,10 +76,20 @@ struct MixedQuantFlashAttnAttenMaskParams {
     uint8_t isExistRowInvalid = 0;
 };
 
+struct MixedQuantFlashAttnStridesParams {
+    uint64_t bnStride = 0; // block_num轴(0轴)stride，单位：元素；0表示按连续处理
+    uint64_t n2Stride = 0; // kv_head_num轴(1轴)stride，单位：元素；0表示按连续处理
+};
+
 struct MixedQuantFlashAttnPageAttentionParams {
     uint8_t paLayoutType;
     uint32_t blockSize;
     uint32_t maxBlockNumPerBatch;
+    // PA场景kv cache、kv descale的0/1轴stride信息（TensorV2），0表示未携带（按连续处理）
+    MixedQuantFlashAttnStridesParams keyStrides;
+    MixedQuantFlashAttnStridesParams valueStrides;
+    MixedQuantFlashAttnStridesParams kDescaleStrides;
+    MixedQuantFlashAttnStridesParams vDescaleStrides;
 };
 
 struct MixedQuantFlashAttnWorkspaceParams {

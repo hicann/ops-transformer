@@ -348,10 +348,20 @@ struct CommonConstInfo {
     bool needInitOutput;
 };
 
+struct StridesConstInfo {
+    uint64_t bnStride = 0; // block_num轴(0轴)stride，0表示按连续处理
+    uint64_t n2Stride = 0; // kv_head_num轴(1轴)stride，0表示按连续处理
+};
+
 struct PAConstInfo {
     uint32_t blockSize;
     uint32_t maxBlockNumPerBatch;
     uint32_t paLayoutType;
+    // PA场景kv cache、kv descale的0/1轴stride
+    StridesConstInfo keyStrides;
+    StridesConstInfo valueStrides;
+    StridesConstInfo kDescaleStrides;
+    StridesConstInfo vDescaleStrides;
 };
 
 struct LseConstInfo {

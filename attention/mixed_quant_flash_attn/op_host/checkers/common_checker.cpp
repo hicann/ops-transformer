@@ -34,6 +34,31 @@ using namespace AscendC;
 using namespace arch35FA;
 using namespace Ops::Base;
 
+namespace {
+// 非连续校验日志的轴序号描述
+struct StridedViewAxisMqfa {
+    int32_t index;
+    const char* desc;
+};
+
+constexpr StridedViewAxisMqfa MQFA_STRIDED_VIEW_AXES[] = {
+    {0, "0th"},
+    {1, "1st"},
+    {2, "2nd"},
+    {3, "3rd"},
+};
+
+std::string StridedViewAxisIdxToDesc(int32_t axisIdx)
+{
+    for (const auto& axis : MQFA_STRIDED_VIEW_AXES) {
+        if (axis.index == axisIdx) {
+            return axis.desc;
+        }
+    }
+    return std::to_string(axisIdx) + "th";
+}
+} // namespace
+
 // ============================================================================
 // Layout - SinglePara
 // ============================================================================
@@ -433,12 +458,152 @@ ge::graphStatus CommonChecker::CheckShapeConsistency(const FaTilingInfo& faInfo)
 // MultiPara — combined
 // ============================================================================
 
+ge::graphStatus CommonChecker::CheckParamStridesPositive(const FaTilingInfo& faInfo, const char* paraName,
+                                                         const gert::Stride* strides) const
+{
+    // 每一维的stride必须大于0
+    if (strides == nullptr) {
+        return ge::GRAPH_SUCCESS;
+    }
+    for (uint32_t i = 0; i < strides->GetDimNum(); i++) {
+        if (strides->GetStride(static_cast<size_t>(i)) <= 0) {
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                faInfo.opName, paraName,
+                "The stride of all axes of " + std::string(paraName) + " must be greater than 0");
+            return ge::GRAPH_FAILED;
+        }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CommonChecker::CheckParamStridedViewOverlap(const FaTilingInfo& faInfo, const char* paraName,
+                                                            const gert::Shape& shape, const gert::Stride* strides) const
+{
+    // kv、kv descale的strided view不可重叠
+    if (strides == nullptr) {
+        return ge::GRAPH_SUCCESS;
+    }
+    int32_t overlapAxisIdx = -1;
+    int32_t overlapPrevAxisIdx = -1;
+    OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckTensorStridedViewNoOverlap(static_cast<uint32_t>(shape.GetDimNum()), shape,
+                                                                     strides, overlapAxisIdx, overlapPrevAxisIdx),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    faInfo.opName, paraName,
+                    "The stride (" + std::to_string(strides->GetStride(static_cast<size_t>(overlapAxisIdx))) +
+                        ") of the " + StridedViewAxisIdxToDesc(overlapAxisIdx) + " axis of " + std::string(paraName) +
+                        " must be greater than or equal to the product of the stride (" +
+                        std::to_string(strides->GetStride(static_cast<size_t>(overlapPrevAxisIdx))) +
+                        ") and the size (" + std::to_string(shape.GetDim(static_cast<size_t>(overlapPrevAxisIdx))) +
+                        ") of the " + StridedViewAxisIdxToDesc(overlapPrevAxisIdx) + " axis"),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+std::string CommonChecker::BuildNonContiguousReason(const FaTilingInfo& faInfo, const char* paraName,
+                                                    int32_t maxAllowedAxis, int32_t dimIndex) const
+{
+    std::string supportedAxes = (maxAllowedAxis == 1) ? "the 0th and 1st axes" : "the 0th axis";
+    if (maxAllowedAxis < 0) {
+        return "In non-PA scenarios, " + std::string(paraName) + " tensors must be contiguous";
+    } else {
+        return "When layout_kv is " + LayoutToSerialString(faInfo.kvLayout) + " and the dtype of kv is " +
+               DataTypeToSerialString(faInfo.inputKvType) + ", only " + supportedAxes + " of " + std::string(paraName) +
+               " can be non-contiguous, the " + StridedViewAxisIdxToDesc(dimIndex) + " axis of " +
+               std::string(paraName) + " must be contiguous";
+    }
+}
+
+ge::graphStatus CommonChecker::CheckKVContiguous(const FaTilingInfo& faInfo) const
+{
+    const int32_t maxAllowedAxis = faInfo.pageAttentionFlag ? ((faInfo.kvLayout == FaLayout::PA_BBND) ? 0 : 1) : -1;
+    const auto& keyShape = faInfo.opParamInfo.key.shape->GetStorageShape();
+    const auto& valueShape = faInfo.opParamInfo.value.shape->GetStorageShape();
+
+    int32_t dimIndex = -1;
+    OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckTensorContiguous(static_cast<uint32_t>(keyShape.GetDimNum()), keyShape,
+                                                           faInfo.opParamInfo.key.strides, dimIndex) &&
+                    dimIndex > maxAllowedAxis,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    faInfo.opName, "k", BuildNonContiguousReason(faInfo, "k", maxAllowedAxis, dimIndex)),
+                return ge::GRAPH_FAILED);
+    dimIndex = -1;
+    OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckTensorContiguous(static_cast<uint32_t>(valueShape.GetDimNum()), valueShape,
+                                                           faInfo.opParamInfo.value.strides, dimIndex) &&
+                    dimIndex > maxAllowedAxis,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    faInfo.opName, "v", BuildNonContiguousReason(faInfo, "v", maxAllowedAxis, dimIndex)),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CommonChecker::CheckDescaleContiguous(const FaTilingInfo& faInfo) const
+{
+    const int32_t kDescaleMaxAllowedAxis =
+        faInfo.pageAttentionFlag ? ((faInfo.kvLayout == FaLayout::PA_BBND) ? 0 : 1) : -1;
+    // v_descale在所有PA layout下前两维均为(block_num, kv_head_num)，支持0、1轴非连续
+    const int32_t vDescaleMaxAllowedAxis = faInfo.pageAttentionFlag ? 1 : -1;
+    const auto& kDescaleShape = faInfo.opParamInfo.kDescale.shape->GetStorageShape();
+    const auto& vDescaleShape = faInfo.opParamInfo.vDescale.shape->GetStorageShape();
+
+    int32_t dimIndex = -1;
+    OP_CHECK_IF(
+        ge::GRAPH_SUCCESS != CheckTensorContiguous(static_cast<uint32_t>(kDescaleShape.GetDimNum()), kDescaleShape,
+                                                   faInfo.opParamInfo.kDescale.strides, dimIndex) &&
+            dimIndex > kDescaleMaxAllowedAxis,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            faInfo.opName, "k_descale",
+            BuildNonContiguousReason(faInfo, "k_descale", kDescaleMaxAllowedAxis, dimIndex)),
+        return ge::GRAPH_FAILED);
+    dimIndex = -1;
+    OP_CHECK_IF(
+        ge::GRAPH_SUCCESS != CheckTensorContiguous(static_cast<uint32_t>(vDescaleShape.GetDimNum()), vDescaleShape,
+                                                   faInfo.opParamInfo.vDescale.strides, dimIndex) &&
+            dimIndex > vDescaleMaxAllowedAxis,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            faInfo.opName, "v_descale",
+            BuildNonContiguousReason(faInfo, "v_descale", vDescaleMaxAllowedAxis, dimIndex)),
+        return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CommonChecker::CheckStride(const FaTilingInfo& faInfo) const
+{
+    if (ge::GRAPH_SUCCESS != CheckParamStridesPositive(faInfo, "k", faInfo.opParamInfo.key.strides) ||
+        ge::GRAPH_SUCCESS != CheckParamStridesPositive(faInfo, "v", faInfo.opParamInfo.value.strides) ||
+        ge::GRAPH_SUCCESS != CheckParamStridesPositive(faInfo, "k_descale", faInfo.opParamInfo.kDescale.strides) ||
+        ge::GRAPH_SUCCESS != CheckParamStridesPositive(faInfo, "v_descale", faInfo.opParamInfo.vDescale.strides)) {
+        return ge::GRAPH_FAILED;
+    }
+    // 非连续轴支持范围校验
+    if (ge::GRAPH_SUCCESS != CheckKVContiguous(faInfo) || ge::GRAPH_SUCCESS != CheckDescaleContiguous(faInfo)) {
+        return ge::GRAPH_FAILED;
+    }
+    if (ge::GRAPH_SUCCESS != CheckParamStridedViewOverlap(faInfo, "k", faInfo.opParamInfo.key.shape->GetStorageShape(),
+                                                          faInfo.opParamInfo.key.strides) ||
+        ge::GRAPH_SUCCESS != CheckParamStridedViewOverlap(faInfo, "v",
+                                                          faInfo.opParamInfo.value.shape->GetStorageShape(),
+                                                          faInfo.opParamInfo.value.strides) ||
+        ge::GRAPH_SUCCESS != CheckParamStridedViewOverlap(faInfo, "k_descale",
+                                                          faInfo.opParamInfo.kDescale.shape->GetStorageShape(),
+                                                          faInfo.opParamInfo.kDescale.strides) ||
+        ge::GRAPH_SUCCESS != CheckParamStridedViewOverlap(faInfo, "v_descale",
+                                                          faInfo.opParamInfo.vDescale.shape->GetStorageShape(),
+                                                          faInfo.opParamInfo.vDescale.strides)) {
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus CommonChecker::CheckMultiPara(const FaTilingInfo& faInfo)
 {
     if (CheckMultiParaLayout(faInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckMixedQuantDataType(faInfo) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    // kv尾轴不支持非连续的校验需要在CheckAxis之前被调用，从而使stride报错作为首报错，明确报错信息
+    if (CheckStride(faInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckAxis(faInfo) != ge::GRAPH_SUCCESS) {

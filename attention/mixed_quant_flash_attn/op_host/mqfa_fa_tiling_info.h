@@ -172,6 +172,7 @@ std::string QuantModeToSerialString(FaQuantMode faQuantMode);
 struct FARequiredParaInfo {
     const gert::CompileTimeTensorDesc* desc;
     const gert::StorageShape* shape;
+    const gert::Stride* strides = nullptr; // TensorV2视图携带的stride信息，nullptr表示未携带（TensorV1/连续）
 };
 
 struct FAOptionalParaInfo {

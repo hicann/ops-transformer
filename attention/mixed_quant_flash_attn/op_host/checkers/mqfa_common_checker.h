@@ -49,6 +49,19 @@ private:
     ge::graphStatus CheckSingleParaLayout(const FaTilingInfo& faInfo);
     ge::graphStatus CheckMultiParaLayout(const FaTilingInfo& faInfo);
 
+    // --- Stride checks ---
+    ge::graphStatus CheckStride(const FaTilingInfo& faInfo) const;
+    ge::graphStatus CheckParamStridesPositive(const FaTilingInfo& faInfo, const char* paraName,
+                                              const gert::Stride* strides) const;
+    ge::graphStatus CheckParamStridedViewOverlap(const FaTilingInfo& faInfo, const char* paraName,
+                                                 const gert::Shape& shape, const gert::Stride* strides) const;
+    // kv cache / kv descale的0/1轴非连续支持范围校验
+    ge::graphStatus CheckKVContiguous(const FaTilingInfo& faInfo) const;
+    ge::graphStatus CheckDescaleContiguous(const FaTilingInfo& faInfo) const;
+    // 非连续轴支持范围校验的Reason构造
+    std::string BuildNonContiguousReason(const FaTilingInfo& faInfo, const char* paraName, int32_t maxAllowedAxis,
+                                         int32_t dimIndex) const;
+
     // --- Shape/dt checks ---
     ge::graphStatus CheckMixedQuantDataType(const FaTilingInfo& faInfo);
     ge::graphStatus CheckHeadNum(const FaTilingInfo& faInfo);

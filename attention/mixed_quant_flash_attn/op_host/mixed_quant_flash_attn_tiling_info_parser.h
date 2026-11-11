@@ -41,6 +41,7 @@ public:
 
     void GetOptionalInputParaInfo();
     void GetInputParaInfo();
+    void GetStrides();
     void GetOutputParaInfo();
     ge::graphStatus GetAttrParaInfo();
     ge::graphStatus GetOpParaInfo();

@@ -62,6 +62,17 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "func_redline: mark a test as a functional redline test"
     )
+    config.addinivalue_line(
+        "markers", "func_B250_redline: mark a test as a functional B250 redline test"
+    )
+    config.addinivalue_line(
+        "markers",
+        "func_B280_0_1_stride_stc: mark a test as a functional B280 0/1-axis stride non-contiguous STC test",
+    )
+    config.addinivalue_line(
+        "markers",
+        "func_B280_0_1_stride_stc_checker: mark a test as a B280 0/1-axis stride checker interception (negative) test",
+    )
     config.addinivalue_line("markers", "func_stc: mark a test as a functional STC test")
     config.addinivalue_line(
         "markers", "func_test: mark a test as a functional TEST test"

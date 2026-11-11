@@ -51,6 +51,56 @@ def _to_npu_quant_dtype(
     return tensor
 
 
+def _to_npu_tensor(tensor, device):
+    """将可选输入（list按int32转换，或CPU tensor）转为npu设备tensor；None原样返回。"""
+    if tensor is None:
+        return None
+    if isinstance(tensor, list):
+        tensor = torch.tensor(tensor, dtype=torch.int32)
+    return tensor.to(device)
+
+
+def _resolve_run_device(input_tensors, device_id):
+    """确定 NPU 执行设备。
+
+    ttk 上板路径（mqfa_ttk_ops.call_npu）的输入张量已由 ttk prepare_device_args
+    搬到所选卡（如 --devices 1 -> npu:1），此时以输入实际所在设备为准——否则
+    run_npu 默认 device_id=0 会把非 0 卡的张量强行搬回 npu:0，既偏离 ttk 的
+    设备调度，也会使非连续张量走入跨设备克隆分支触发 set_ 报错。
+    pytest 路径输入在 CPU，使用 --device_id 指定设备。
+    """
+    for tensor in input_tensors:
+        if isinstance(tensor, torch.Tensor) and tensor.device.type == "npu":
+            return str(tensor.device)
+    return "npu:%s" % device_id
+
+
+def _to_device_preserving_stride(tensor, device):
+    """把（可能非连续的）tensor 搬到目标设备并保持 stride 布局。
+
+    Tensor.to() 对非稠密视图（stride 存在间隙）会静默转成连续布局，使非连续
+    输入失效。克隆完整底层 storage（间隙数据一并搬运）后用 as_strided
+    重建视图，与 ttk TorchBackend._clone_full_storage 同款——src_flat 必须以
+    tensor 所在设备创建（torch.empty(0) 不带 device 默认在 CPU 创建，对
+    NPU 上的张量做 set_ 会报跨设备错误）；已在目标设备上时原样返回。
+    """
+    if tensor is None:
+        return None
+    if str(tensor.device) == str(device):
+        return tensor
+    if tensor.is_contiguous():
+        return tensor.to(device)
+    src_storage = tensor.untyped_storage()
+    storage_numel = src_storage.size() // tensor.element_size()
+    src_flat = torch.empty(0, dtype=tensor.dtype, device=tensor.device).set_(
+        src_storage, 0, (storage_numel,), (1,)
+    )
+    dst_flat = src_flat.to(device)
+    return torch.as_strided(
+        dst_flat, tensor.shape, tensor.stride(), tensor.storage_offset()
+    )
+
+
 class MixedFlashAttnGraphNetwork(torch.nn.Module):
     def __init__(self):
         super(MixedFlashAttnGraphNetwork, self).__init__()
@@ -139,13 +189,32 @@ def run_npu(input_data, device_id=0, mode="eager"):
     n2 = input_data["num_heads_kv"]
     d = input_data["head_dim"]
 
+    # 执行设备: ttk 路径输入已在所选卡(如 --devices 1 -> npu:1)则以其实际
+    # 所在设备为准; pytest 路径输入在 CPU, 用 --device_id
+    device = _resolve_run_device(
+        (
+            q,
+            k,
+            v,
+            k_descale,
+            v_descale,
+            block_table,
+            cu_seqlens_q,
+            seqused_q,
+            seqused_kv,
+            sinks,
+            attn_mask,
+        ),
+        device_id,
+    )
+
     # quant_compute_mode = 1
     has_empty_input = any(
         tensor.numel() == 0 for tensor in (q, k, v, k_descale, v_descale)
     )
     if has_empty_input:
         # Empty execution does not consume FA/FD scheduling metadata.
-        metadata = torch.zeros(16, dtype=torch.int32, device="npu:%s" % device_id)
+        metadata = torch.zeros(16, dtype=torch.int32, device=device)
     elif RUN_METHOD == "esl":
         meta_op = MixedQuantFlashAttnMetadataOp()
         metadata = meta_op.npu_mixed_quant_flash_attn_metadata(
@@ -172,8 +241,11 @@ def run_npu(input_data, device_id=0, mode="eager"):
             layout_kv=layout_kv,
             layout_out=layout_attn_out,
         )
-        metadata = torch.tensor(metadata, dtype=torch.int32).to("npu:%s" % device_id)
+        metadata = torch.tensor(metadata, dtype=torch.int32).to(device)
     elif RUN_METHOD == "npu":
+        cu_seqlens_q = _to_npu_tensor(cu_seqlens_q, device)
+        seqused_q = _to_npu_tensor(seqused_q, device)
+        seqused_kv = _to_npu_tensor(seqused_kv, device)
         metadata = torch.ops.cann_ops_transformer.mixed_quant_flash_attn_metadata(
             num_heads_q=n1,
             num_heads_kv=n2,
@@ -193,34 +265,19 @@ def run_npu(input_data, device_id=0, mode="eager"):
             layout_attn_out=layout_attn_out,
         )
 
-    q = q.to("npu:%s" % device_id)
-    k = k.to("npu:%s" % device_id)
-    v = v.to("npu:%s" % device_id)
-    k_descale = k_descale.to("npu:%s" % device_id)
-    v_descale = v_descale.to("npu:%s" % device_id)
-    if block_table is not None:
-        block_table = block_table.to("npu:%s" % device_id)
-
-    if cu_seqlens_q is not None:
-        cu_seqlens_q = cu_seqlens_q.to("npu:%s" % device_id)
-
-    if seqused_q is not None:
-        if isinstance(seqused_q, list):
-            seqused_q = torch.tensor(seqused_q, dtype=torch.int32)
-        seqused_q = seqused_q.to("npu:%s" % device_id)
-
-    if seqused_kv is not None:
-        if isinstance(seqused_kv, list):
-            seqused_kv = torch.tensor(seqused_kv, dtype=torch.int32)
-        seqused_kv = seqused_kv.to("npu:%s" % device_id)
-
-    if sinks is not None:
-        sinks = sinks.to("npu:%s" % device_id)
-
-    if attn_mask is not None:
-        print(f"attn_mask: device {attn_mask.device}")
-        attn_mask = attn_mask.to("npu:%s" % device_id)
-        print(f"attn_mask: device {attn_mask.device}")
+    q = q.to(device)
+    # k/v/k_descale/v_descale 支持非连续输入: 必须保 stride 搬运,
+    # Tensor.to() 对非稠密视图会静默转连续导致非连续测试失效
+    k = _to_device_preserving_stride(k, device)
+    v = _to_device_preserving_stride(v, device)
+    k_descale = _to_device_preserving_stride(k_descale, device)
+    v_descale = _to_device_preserving_stride(v_descale, device)
+    block_table = _to_npu_tensor(block_table, device)
+    cu_seqlens_q = _to_npu_tensor(cu_seqlens_q, device)
+    seqused_q = _to_npu_tensor(seqused_q, device)
+    seqused_kv = _to_npu_tensor(seqused_kv, device)
+    sinks = _to_npu_tensor(sinks, device)
+    attn_mask = _to_npu_tensor(attn_mask, device)
     if mode == "eager":
         attn_out, softmax_lse = torch.ops.cann_ops_transformer.mixed_quant_flash_attn(
             q=q,

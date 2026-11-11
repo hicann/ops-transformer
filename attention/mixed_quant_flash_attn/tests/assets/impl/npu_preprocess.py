@@ -80,7 +80,7 @@ def _batch_size(q_shape, layout_q, cu_seqlens_q, seqused_q, kwargs):
     from cu_seqlens_q / seqused_q (mirror torch_extension._calculate_batch_size)."""
     if layout_q == "TND":
         cu_q = _to_int_list(cu_seqlens_q)
-        if cu_q and cu_q[0] > 0:
+        if cu_q and len(cu_q) > 0:
             return len(cu_q) - 1
         seq_q = _to_int_list(seqused_q)
         if seq_q:

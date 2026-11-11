@@ -19,6 +19,7 @@
 #include "opdev/make_op_executor.h"
 #include "opdev/op_def.h"
 #include "opdev/op_log.h"
+#include "opdev/tensor_view_utils.h"
 #include "aclnn_mixed_quant_flash_attn_inner.h"
 
 using namespace op;
@@ -26,6 +27,29 @@ using namespace op;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// 新版本opbase存在TensorV2的新接口，用弱符号判断当前opbase是新版本还是旧版本，旧版本不支持传入非连续tensor
+bool NnopbaseSupportTensorV2() __attribute__((weak));
+
+// 逐参检查k/v/k_descale/v_descale的连续性，返回首个非连续tensor的参数名；
+// 全部连续（或参数为空指针，空指针交由inner接口统一返回ACLNN_ERR_PARAM_NULLPTR）时返回空串
+static std::string FindNonContiguousTensorName(const aclTensor* key, const aclTensor* value, const aclTensor* kDescale,
+                                               const aclTensor* vDescale)
+{
+    if (key != nullptr && !IsContiguous(key)) {
+        return "k";
+    }
+    if (value != nullptr && !IsContiguous(value)) {
+        return "v";
+    }
+    if (kDescale != nullptr && !IsContiguous(kDescale)) {
+        return "k_descale";
+    }
+    if (vDescale != nullptr && !IsContiguous(vDescale)) {
+        return "v_descale";
+    }
+    return "";
+}
 
 // 第一段接口：计算workspace大小
 aclnnStatus aclnnMixedQuantFlashAttnGetWorkspaceSize(
@@ -46,6 +70,20 @@ aclnnStatus aclnnMixedQuantFlashAttnGetWorkspaceSize(
     const aclTensor* tempTensor = nullptr;
 
     MixedQuantFlashAttnProcessSoftmaxLse(returnSoftmaxLse, softmaxLseOptional, tempTensor, placeHolder);
+
+    std::string nonContiguousTensor = FindNonContiguousTensorName(k, v, kDescale, vDescale);
+    // 旧版本opbase（弱符号未定义）不支持传入非连续tensor，直接报错；新版本opbase放行至tiling校验
+    if (!nonContiguousTensor.empty() && NnopbaseSupportTensorV2 == nullptr) {
+        OP_LOGE(ACLNN_ERR_INNER_TILING_ERROR,
+                "MixedQuantFlashAttn only supports non-contiguous "
+                "%s with new opbase, current opbase does not support TensorV2 stride info.",
+                nonContiguousTensor.c_str());
+        // 释放softmax_lse占位符
+        if (returnSoftmaxLse == false) {
+            aclDestroyTensor(tempTensor);
+        }
+        return ACLNN_ERR_INNER_TILING_ERROR;
+    }
 
     aclnnStatus ret = aclnnInnerMixedQuantFlashAttnGetWorkspaceSize(
         q, k, v, kDescale, vDescale, blockTableOptional, cuSeqlensQOptional, sequsedQOptional, sequsedKvOptional,

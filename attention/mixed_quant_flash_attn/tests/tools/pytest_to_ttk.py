@@ -30,6 +30,10 @@ pytest 用例字段是列表包装（如 "B": [64]），本脚本取 [0] 解包�
 CSV 中所有 shape 都是物理存储 shape（fp4 pack 后最后一维减半：PA_NZ →32，PA_BBND/PA_BNBD → D//2）。
 block_size 用 pytest block_size 字段（各布局通用）。支持 PA_NZ / PA_BBND / PA_BNBD。
 
+tensor_view_strides（dict: {"k": (...), "v": (...), "k_descale": (...), "v_descale": (...)}）
+转换为 CSV 的 tensor_view_strides 列，并把对应 tensor_storage_shapes 按与 view 相同的
+维度数目放大
+
 ================================================================================
 用法
 ================================================================================
@@ -98,6 +102,51 @@ SKIP_FIELDS = {
     "kv_scale_dtype_override",
     "attn_mask_shape_override",
 }
+
+# tensor_view_strides 支持的非连续输入 tensor 名（与 tensor 顺序中的槽位对应）
+STRIDED_TENSOR_SLOTS = {"k": 1, "v": 2, "k_descale": 3, "v_descale": 4}
+
+
+def view_span(shape, strides):
+    """非连续视图的元素跨度: 1 + Σ(dim-1)*stride; 任一维为 0 时返回 0。"""
+    span = 1
+    for dim, stride in zip(shape, strides):
+        if dim == 0:
+            return 0
+        span += (dim - 1) * stride
+    return span
+
+
+def rank_matched_storage_shape(shape, strides):
+    """从 tensor_view_strides 推导与 view 同秩的 tensor_storage_shapes 写法。
+
+    首选"前缀切片"构造: 令 storage 的行主序 strides 与 view strides 完全一致
+    (D_j = s_{j-1} / s_j, j >= 1; D_0 = shape[0])，此时视图恰好是 storage 的
+    前缀切片，形状自解释——如 k view (321,1,2,512,32) 行 stride 64 对应
+    storage (321,1,2,512,64)（每行 32 字节后 32 字节间隙）。
+    末维 stride 非 1 / 相邻 stride 不整除 / 派生维小于 view 维时无法构成前缀
+    切片（如转置类布局），回退为"内层维度不变、膨胀 dim0"的同秩形状。
+    两种构造均保证 prod(storage) >= span。
+    """
+    if strides[-1] == 1:
+        dims = [shape[0]]
+        exact = True
+        for j in range(1, len(shape)):
+            if strides[j - 1] % strides[j] != 0:
+                exact = False
+                break
+            dim = strides[j - 1] // strides[j]
+            if dim < shape[j]:
+                exact = False
+                break
+            dims.append(dim)
+        if exact:
+            return tuple(dims)
+    inner = math.prod(shape[1:])
+    if inner > 0:
+        d0 = max(shape[0], (view_span(shape, strides) + inner - 1) // inner)
+        return (d0,) + tuple(shape[1:])
+    return (view_span(shape, strides),)
 
 
 # ============================================================================
@@ -241,6 +290,8 @@ def parse_pytest_case(name, case):
     if sinks_range is None:
         sinks_range = (-1.0, 1.0)
 
+    tensor_view_strides = _val(case, "tensor_view_strides", None)
+
     # seqused_q/seqused_kv 可能是 [list]，_val 已取 [0]
     if isinstance(seqused_q, list) and seqused_q and isinstance(seqused_q[0], list):
         seqused_q = seqused_q[0]
@@ -281,6 +332,7 @@ def parse_pytest_case(name, case):
         "kv_range": kv_range,
         "sinks": sinks,
         "sinks_range": sinks_range,
+        "tensor_view_strides": tensor_view_strides,
     }
 
 
@@ -398,6 +450,47 @@ def build_csv_row(c, prefix):
         metadata_shape,
     ]
 
+    # 非连续输入: tensor_view_strides -> CSV strides 列 + storage shape 放大
+    strides_cfg = c["tensor_view_strides"] or {}
+    if strides_cfg:
+        unknown = set(strides_cfg) - set(STRIDED_TENSOR_SLOTS)
+        if unknown:
+            raise ValueError(
+                f"tensor_view_strides 只支持 {sorted(STRIDED_TENSOR_SLOTS)}, "
+                f"出现未知 key: {sorted(unknown)}"
+            )
+    stride_slots = {}
+    for slot_name, slot_idx in STRIDED_TENSOR_SLOTS.items():
+        strides = strides_cfg.get(slot_name)
+        if strides is None:
+            continue
+        strides = tuple(int(s) for s in strides)
+        shape = view_shapes[slot_idx]
+        if shape is None:
+            raise ValueError(f"tensor_view_strides[{slot_name}] 对应槽位无 shape")
+        stride_slots[slot_idx] = strides
+
+    storage_shapes = []
+    strides_col = []
+    for slot_idx, shape in enumerate(view_shapes):
+        strides = stride_slots.get(slot_idx)
+        if strides is not None and shape is not None:
+            span = view_span(shape, strides)
+            if span == 0:
+                storage_shapes.append(shape)
+            else:
+                storage_shape = rank_matched_storage_shape(shape, strides)
+                if math.prod(storage_shape) < span:
+                    raise ValueError(
+                        f"tensor_view_strides 槽位 {slot_idx}: 推导的 storage "
+                        f"{storage_shape} 小于视图跨度 {span}"
+                    )
+                storage_shapes.append(storage_shape)
+            strides_col.append(strides)
+        else:
+            storage_shapes.append(shape)
+            strides_col.append(None)
+
     q_csv_dtype = CSV_DTYPE_MAP.get(c["q_dtype"], "bfloat16")
     scale_csv_dtype = CSV_SCALE_DTYPE.get(qm, "float8_e8m0fnu")
     dtypes = [
@@ -471,7 +564,8 @@ def build_csv_row(c, prefix):
         API_NAME,
         _fmt_shapes(view_shapes),
         _fmt_dtypes(dtypes),
-        _fmt_storage_shapes(view_shapes),
+        _fmt_storage_shapes(storage_shapes),
+        _fmt_shapes(strides_col),
         _fmt_attrs(attrs),
         _fmt_ranges(ranges),
     ]
@@ -600,7 +694,7 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(args.csv)), exist_ok=True)
     csv_lines = [
         "testcase_name,api_name,tensor_view_shapes,tensor_dtypes,"
-        "tensor_storage_shapes,attributes,input_data_ranges"
+        "tensor_storage_shapes,tensor_view_strides,attributes,input_data_ranges"
     ]
     for c in parsed:
         csv_lines.append(build_csv_row(c, args.prefix))

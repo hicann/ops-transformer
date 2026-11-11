@@ -32,6 +32,19 @@ namespace optiling {
 namespace mixed_quant_flash_attn {
 constexpr uint64_t PRE_LOAD_NUM_GQA_ARCH35 = 3;
 
+namespace {
+// 从gert::Stride安全取指定轴的stride
+uint64_t GetSafeStride(const gert::Stride* strides, uint32_t axisIdx)
+{
+    // 未携带视图信息(TensorV1)或轴非法时返回0（按连续处理）
+    if (strides == nullptr || strides->GetDimNum() <= axisIdx) {
+        return 0ULL;
+    }
+    // strides->GetStride(axisIdx)为正值已在checker中先校验
+    return static_cast<uint64_t>(strides->GetStride(axisIdx));
+}
+} // namespace
+
 void MixedQuantFlashAttnTilingImpl::InitTilingInfo(TilingInfo* tilingInfo)
 {
     faInfo_ = static_cast<FaTilingInfo*>(tilingInfo);
@@ -367,6 +380,23 @@ void MixedQuantFlashAttnTilingImpl::SetFATilingData()
         maxBlockNumPerBatch = faInfo_->opParamInfo.blockTable.tensor->GetStorageShape().GetDim(1);
     }
     tilingData_.baseTiling.mixedQuantFlashAttnPageAttentionParams.maxBlockNumPerBatch = maxBlockNumPerBatch;
+    const uint32_t kvN2AxisIdx = (faInfo_->kvLayout == FaLayout::PA_BBND) ? 2U : 1U;
+    tilingData_.baseTiling.mixedQuantFlashAttnPageAttentionParams.keyStrides.bnStride =
+        GetSafeStride(faInfo_->opParamInfo.key.strides, 0U);
+    tilingData_.baseTiling.mixedQuantFlashAttnPageAttentionParams.keyStrides.n2Stride =
+        GetSafeStride(faInfo_->opParamInfo.key.strides, kvN2AxisIdx);
+    tilingData_.baseTiling.mixedQuantFlashAttnPageAttentionParams.valueStrides.bnStride =
+        GetSafeStride(faInfo_->opParamInfo.value.strides, 0U);
+    tilingData_.baseTiling.mixedQuantFlashAttnPageAttentionParams.valueStrides.n2Stride =
+        GetSafeStride(faInfo_->opParamInfo.value.strides, kvN2AxisIdx);
+    tilingData_.baseTiling.mixedQuantFlashAttnPageAttentionParams.kDescaleStrides.bnStride =
+        GetSafeStride(faInfo_->opParamInfo.kDescale.strides, 0U);
+    tilingData_.baseTiling.mixedQuantFlashAttnPageAttentionParams.kDescaleStrides.n2Stride =
+        GetSafeStride(faInfo_->opParamInfo.kDescale.strides, kvN2AxisIdx);
+    tilingData_.baseTiling.mixedQuantFlashAttnPageAttentionParams.vDescaleStrides.bnStride =
+        GetSafeStride(faInfo_->opParamInfo.vDescale.strides, 0U);
+    tilingData_.baseTiling.mixedQuantFlashAttnPageAttentionParams.vDescaleStrides.n2Stride =
+        GetSafeStride(faInfo_->opParamInfo.vDescale.strides, 1U);
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.needInitOutput = CheckNeedInitOutput();
 }
 
@@ -422,6 +452,17 @@ void MixedQuantFlashAttnTilingImpl::PrintAllTilingData()
     OP_LOGD(faInfo_->opName, "paLayoutType:%d", mixedQuantFlashAttnPageAttentionParams.paLayoutType);
     OP_LOGD(faInfo_->opName, "blockSize:%d", mixedQuantFlashAttnPageAttentionParams.blockSize);
     OP_LOGD(faInfo_->opName, "maxBlockNumPerBatch:%d", mixedQuantFlashAttnPageAttentionParams.maxBlockNumPerBatch);
+    OP_LOGD(faInfo_->opName, "keyStrides bn:%llu n2:%llu", mixedQuantFlashAttnPageAttentionParams.keyStrides.bnStride,
+            mixedQuantFlashAttnPageAttentionParams.keyStrides.n2Stride);
+    OP_LOGD(faInfo_->opName, "valueStrides bn:%llu n2:%llu",
+            mixedQuantFlashAttnPageAttentionParams.valueStrides.bnStride,
+            mixedQuantFlashAttnPageAttentionParams.valueStrides.n2Stride);
+    OP_LOGD(faInfo_->opName, "kDescaleStrides bn:%llu n2:%llu",
+            mixedQuantFlashAttnPageAttentionParams.kDescaleStrides.bnStride,
+            mixedQuantFlashAttnPageAttentionParams.kDescaleStrides.n2Stride);
+    OP_LOGD(faInfo_->opName, "vDescaleStrides bn:%llu n2:%llu",
+            mixedQuantFlashAttnPageAttentionParams.vDescaleStrides.bnStride,
+            mixedQuantFlashAttnPageAttentionParams.vDescaleStrides.n2Stride);
 
     OP_LOGD(faInfo_->opName, "accumOutSize:%d", mixedQuantFlashAttnWorkspaceParams.accumOutSize);
     OP_LOGD(faInfo_->opName, "logSumExpSize:%d", mixedQuantFlashAttnWorkspaceParams.logSumExpSize);
