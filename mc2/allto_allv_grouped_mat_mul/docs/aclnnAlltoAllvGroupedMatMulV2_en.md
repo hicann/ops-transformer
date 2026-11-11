@@ -410,7 +410,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
   - BS: batch sequence size.
   - K: indicates the number of TopK experts selected. K ranges from [2, 8].
   - A: the number of tokens received by the current card, which is the cumulative sum of the recvCounts parameter.
-  - The sum of the A parameters on all devices in the ep communicator equals the sum of the BSK parameters on all devices.
+  - The total number of received tokens in the ep communicator (the sum of A across all ranks) must equal the total number of sent tokens (the sum of BSK across all ranks). In addition, each rank's `sendCounts` and its peers' `recvCounts` must be transposes of each other along the source and destination rank dimensions, with the expert dimension unchanged.
 
 - Additional constraints and memory layout when commMode is `"aiv"`:
   - For Atlas A2, epWorldSize supports 2, 4, and 8; for Atlas A3, epWorldSize supports 2, 4, 8, 16, 32, 64, and 128. gmmX, gmmWeight, and gmmY must be of the same FLOAT16 or BFLOAT16 data type and ND format, and their shapes are 2D, 3D, and 2D respectively.

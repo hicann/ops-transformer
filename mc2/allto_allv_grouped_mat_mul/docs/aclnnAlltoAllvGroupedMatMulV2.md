@@ -426,7 +426,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
   - BS：batch sequence size。
   - K：表示选取TopK个专家，K的范围[2, 8]。
   - A：本卡收到的token数，是recvCounts参数累加之和。
-  - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
+  - ep通信域内的总接收token数（各rank的A之和）须等于总发送token数（各rank的BSK之和）。同时，各rank的`sendCounts`与对端`recvCounts`须在源、目的rank维度上互为转置，expert维度保持不变。
 
 - commMode为`"aiv"`时的附加约束与内存布局：
   - Atlas A2的epWorldSize支持2、4、8；Atlas A3支持2、4、8、16、32、64、128。gmmX、gmmWeight、gmmY必须为相同的FLOAT16或BFLOAT16类型、ND格式，shape分别为2维、3维、2维。
