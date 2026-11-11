@@ -11,6 +11,9 @@
 /*!
  * \file flash_mla_metadata_check.h
  * \brief MLA metadata checker.
+ * MLA uses M96/S2=112 on arch35 and M64/S2=128 on arch92.
+ * GenMetadata emits the architecture tile from flash_mla/op_kernel/utils/flash_mla_config.h;
+ * the main kernel checks the same dimensions in its Cube InitBuffers().
  */
 
 #ifndef FLASH_MLA_METADATA_CHECK_H

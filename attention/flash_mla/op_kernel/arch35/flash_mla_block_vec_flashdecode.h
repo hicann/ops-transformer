@@ -21,6 +21,7 @@
 
 #include "../utils/flash_mla_memory_copy_arch35.h"
 #include "flash_mla_public_define_arch35.h"
+#include "../utils/flash_mla_config.h"
 #include "../utils/flash_mla_type.h"
 
 namespace FlashMlaKernel {
@@ -66,6 +67,21 @@ private:
     static constexpr uint32_t BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(T); // 32/4=8
     static constexpr uint32_t FP32_BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(float);
     static constexpr uint32_t FP32_REPEAT_ELEMENT_NUM = REPEAT_BLOCK_BYTE / sizeof(float);
+
+    // Each 6 KiB FD state slot holds 192 rows across all KV splits (8 FP32 values per row).
+    static constexpr uint32_t FD_STATE_ROWS = 192U;
+    static constexpr uint32_t FD_MAX_BATCH_ROWS = 8U;
+
+    static __aicore__ inline constexpr uint32_t GetFdBatchRows(uint32_t splits)
+    {
+        if (splits == 0U) {
+            return 0U;
+        }
+        // The FD VF loads 256 B even when fewer than eight rows are active.
+        // For r rows, the final load ends at ((splits-1)*r+8)*32 bytes.
+        const uint32_t rows = splits == 1U ? FD_MAX_BATCH_ROWS : (FD_STATE_ROWS - FD_MAX_BATCH_ROWS) / (splits - 1U);
+        return rows < FD_MAX_BATCH_ROWS ? rows : FD_MAX_BATCH_ROWS;
+    }
 
     static constexpr uint32_t PRE_LOAD_NUM = 2U;
     uint32_t dSizeV_Align_;
@@ -183,6 +199,13 @@ public:
             fdLseUbBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, LSE_SUM_MAX_MM2_BYTES + 2U * BUFFER_SIZE_BYTE_256B,
                                                BUFFER_SIZE_BYTE_256B)
                               .template ReinterpretCast<T>();
+#if __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202
+            static_assert(LSE_SUM_MAX_MM2_BYTES + 3U * BUFFER_SIZE_BYTE_256B <= FlashMlaConfig::ARCH92.ubBytes,
+                          "FlashDecode exceeds arch92 UB budget");
+#else
+            static_assert(LSE_SUM_MAX_MM2_BYTES + 3U * BUFFER_SIZE_BYTE_256B <= FlashMlaConfig::ARCH35.ubBytes,
+                          "FlashDecode exceeds arch35 UB budget");
+#endif
         }
     }
 
@@ -361,7 +384,11 @@ public:
         if (!fd.fdCoreEnable) {
             return;
         }
-        uint32_t fdBalanceMBaseSize = 8U;
+        uint32_t fdBalanceMBaseSize = GetFdBatchRows(fd.fdS2SplitNum);
+        // Bound both packed states and the last unmasked 256-byte VF read in each 6 KiB slot.
+        if (fd.fdS2SplitNum == 0U || fdBalanceMBaseSize == 0U || fd.mLen == 0U) {
+            return;
+        }
         uint32_t fdBalanceMSplitNum = (fd.mLen + fdBalanceMBaseSize - 1) / fdBalanceMBaseSize;
         uint32_t fdBalanceMTailSize =
             (fd.mLen % fdBalanceMBaseSize == 0) ? fdBalanceMBaseSize : fd.mLen % fdBalanceMBaseSize;

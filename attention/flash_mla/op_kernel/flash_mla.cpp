@@ -25,6 +25,7 @@
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "adv_api/activation/softmax.h"
 #include "utils/flash_mla_type.h"
+#include "utils/flash_mla_config.h"
 #include "arch35/flash_mla_kernel.h"
 
 using namespace AscendC;
@@ -67,7 +68,7 @@ __global__ __aicore__ void flash_mla(__gm__ uint8_t* query, __gm__ uint8_t* kCac
 {
     REGISTER_TILING_DEFAULT(optiling::FlashMlaTilingData);
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+    KERNEL_TASK_TYPE_DEFAULT(ATTN_KERNEL_TYPE);
 
 #if (ORIG_DTYPE_Q == DT_BF16)
     using INPUT_T = bfloat16_t;
@@ -80,8 +81,14 @@ __global__ __aicore__ void flash_mla(__gm__ uint8_t* query, __gm__ uint8_t* kCac
     constexpr FLASH_MLA_LAYOUT qLayout = GetQueryLayout<inOutLayoutType>();
     constexpr FLASH_MLA_LAYOUT outLayout = GetOutLayout<inOutLayoutType>();
     static_assert(KvLayoutType <= KvLayoutType_PA_NZ, "KvLayoutType is incorrect");
+#if __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202
+    constexpr auto tile = FlashMlaConfig::ARCH92;
+    constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(tile.m);
+    constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(tile.s2);
+#else
     constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(ConfigValue[config].s1);
     constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(ConfigValue[config].s2);
+#endif
     constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(ConfigValue[config].d);
     constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(ConfigValue[config].dv);
 
@@ -95,7 +102,7 @@ __global__ __aicore__ void flash_mla(__gm__ uint8_t* query, __gm__ uint8_t* kCac
     using FA_T = FlashMlaKernel::FlashMlaType<INPUT_T, float, OUT_T, qLayout, outLayout, s1TemplateType, s2TemplateType,
                                               dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType>;
 
-#ifdef __DAV_C310_CUBE__
+#if defined(__DAV_CUBE__) || defined(__DAV_C310_CUBE__)
     using CubeBlock = FlashMlaKernel::FlashMlaNoQuantMlaBlockCube<FA_T>;
     using VecFaBlock = FlashMlaKernel::FlashMlaNoQuantMlaBlockVecDummy<FA_T>;
     using VecFdBlock = FlashMlaKernel::FlashMlaNoQuantMlaBlockVecDummy<FA_T>;

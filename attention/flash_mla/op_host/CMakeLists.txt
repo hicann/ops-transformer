@@ -19,8 +19,10 @@ if (BUILD_OPEN_PROJECT)
 endif()
 
 set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
-if("${CONDITION_UNIT}" STREQUAL "ascend950")
+if("${CONDITION_UNIT}" STREQUAL "ascend950" OR "${CONDITION_UNIT}" STREQUAL "ascend960dt")
     set(flash_mla_depends attention/common CACHE INTERNAL "Dependencies for flash_mla")
+endif()
+if("${CONDITION_UNIT}" STREQUAL "ascend950")
     add_ops_compile_options(
         OP_NAME FlashMla
         COMPUTE_UNIT Ascend950PR_9599

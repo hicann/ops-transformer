@@ -36,8 +36,7 @@ constexpr uint32_t HEAD_AIC_NUM_INDEX = 4U;
 constexpr uint32_t HEAD_AIV_NUM_INDEX = 5U;
 constexpr uint32_t HEAD_OUTPUT_LAYOUT_INDEX = 6U;
 
-constexpr uint32_t HEAD_M_BASE_SIZE_MLA = 96U;
-constexpr uint32_t HEAD_S2_BASE_SIZE_MLA = 112U;
+// Tile sizes in the header are selected by SoC through flash_mla/op_kernel/utils/flash_mla_config.h.
 
 constexpr uint32_t FA_BN2_START_INDEX = 0U;
 constexpr uint32_t FA_M_START_INDEX = 1U;

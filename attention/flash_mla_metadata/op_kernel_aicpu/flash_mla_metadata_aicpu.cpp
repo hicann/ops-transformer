@@ -22,6 +22,7 @@
 #include "status.h"
 #include "../../common/op_kernel/aicpu_common.h"
 #include "flash_mla_metadata.h"
+#include "../../flash_mla/op_kernel/utils/flash_mla_config.h"
 
 constexpr uint32_t FA_KERNEL_STATUS_OK = 0;
 constexpr uint32_t FA_KERNEL_STATUS_PARAM_INVALID = 1;
@@ -114,6 +115,11 @@ bool FlashMlaMetadataCpuKernel::CheckAttrs()
                        "layoutQ only supports TND, BNSD, BSND, but got %s", layoutQ_.c_str());
     KERNEL_CHECK_FALSE(aicCoreNum_ > 0, false, "aicCoreNum must be positive, but got %d", aicCoreNum_);
     KERNEL_CHECK_FALSE(aivCoreNum_ > 0, false, "aivCoreNum must be positive, but got %d", aivCoreNum_);
+    if (socVersion_.find("Ascend960") != std::string::npos) {
+        KERNEL_CHECK_FALSE(aicCoreNum_ <= 64 && aivCoreNum_ == aicCoreNum_, false,
+                           "arch92 MLA requires at most 64 AICs and CV 1:1, but got AIC=%d AIV=%d", aicCoreNum_,
+                           aivCoreNum_);
+    }
     return true;
 }
 
@@ -231,9 +237,14 @@ void FlashMlaMetadataCpuKernel::InitDeviceInfo()
 
 void FlashMlaMetadataCpuKernel::InitLoadBalanceParams()
 {
-    param.mBaseSize = 96;
-    param.s2BaseSize = 112;
-    // M 不足两个基本块时，多 section 只会增加调度和同步开销。
+    const auto tile =
+        socVersion_.find("Ascend960") != std::string::npos ? FlashMlaConfig::ARCH92 : FlashMlaConfig::ARCH35;
+    mBaseSize_ = tile.m;
+    s2BaseSize_ = tile.s2;
+    param.mBaseSize = mBaseSize_;
+    param.s2BaseSize = s2BaseSize_;
+    // M 方向总行数 = g * S1 = (N1/N2) * maxSeqlenQ。若总行数 <= 2*mBaseSize（M 最多 2 块），
+    // 多 section 切分无收益，仅增加 metadata/re-init/SyncAll 开销，故关闭。
     {
         uint32_t g = numHeadsQ_ / numHeadsKv_;
         if (g * maxSeqlenQ_ <= param.mBaseSize * 2) {
@@ -285,8 +296,9 @@ bool FlashMlaMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult& 
     faMetadata.Clear(); // set to all 0
 
     faMetadata.SetHeadMetadata(HEAD_SECTION_NUM_INDEX, splitRes.sectionNum);
-    faMetadata.SetHeadMetadata(HEAD_M_BASE_SIZE_INDEX, HEAD_M_BASE_SIZE_MLA);
-    faMetadata.SetHeadMetadata(HEAD_S2_BASE_SIZE_INDEX, HEAD_S2_BASE_SIZE_MLA);
+    // Emit the same architecture tile used to partition tasks.
+    faMetadata.SetHeadMetadata(HEAD_M_BASE_SIZE_INDEX, mBaseSize_);
+    faMetadata.SetHeadMetadata(HEAD_S2_BASE_SIZE_INDEX, s2BaseSize_);
     faMetadata.SetHeadMetadata(HEAD_AIC_NUM_INDEX, static_cast<FA_METADATA_T>(aicCoreNum_));
     faMetadata.SetHeadMetadata(HEAD_AIV_NUM_INDEX, static_cast<FA_METADATA_T>(aivCoreNum_));
     faMetadata.SetHeadMetadata(HEAD_OUTPUT_LAYOUT_INDEX,

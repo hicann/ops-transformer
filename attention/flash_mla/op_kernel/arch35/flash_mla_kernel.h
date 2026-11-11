@@ -17,8 +17,13 @@
 #define FLASH_MLA_KERNEL_H_
 
 #include "flash_mla_public_define_arch35.h"
+#if __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202
+#include "../arch92/flash_mla_block_cube_arch92.h"
+#include "../arch92/flash_mla_block_vec_arch92.h"
+#else
 #include "flash_mla_block_cube.h"
 #include "flash_mla_block_vec.h"
+#endif
 #include "../utils/flash_mla_memory_copy_arch35.h"
 #include "flash_mla_block_vec_flashdecode.h"
 
@@ -535,9 +540,9 @@ public:
         info.isS2SplitCore = false;
         info.faTmpOutWsPos = constInfo_.coreFirstTmpOutWsPos;
         info.isLastS2Loop = (s2Cur + 1 == curS2End_);
-        info.actVecMSize = (info.actMSize + 1) >> 1;
+        info.actVecMSize = (info.actMSize + CV_RATIO - 1) / CV_RATIO;
         info.vecMbaseIdx = 0;
-        if (constInfo_.subBlockIdx == 1) {
+        if (CV_RATIO == 2 && constInfo_.subBlockIdx == 1) {
             info.vecMbaseIdx = info.actVecMSize;
             info.actVecMSize = info.actMSize - info.actVecMSize;
         }

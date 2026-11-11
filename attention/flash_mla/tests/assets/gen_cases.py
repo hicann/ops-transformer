@@ -195,8 +195,10 @@ def coverage_cases():
     rows = list(cases())
     for row in rows:
         row["remark"] = "template_matrix"
-    # 20: S2 tile=112, page=128, two-tile=224; test both sides and exact boundaries.
-    for index, length in enumerate((1, 111, 112, 113, 127, 128, 129, 223, 224, 225)):
+    # S2 tiles: arch35=112, arch92=128; include both sides of two-tile boundaries.
+    for index, length in enumerate(
+        (1, 111, 112, 113, 127, 128, 129, 223, 224, 225, 255, 256, 257)
+    ):
         for dtype in DTYPES:
             rows.append(
                 coverage_row(
@@ -310,7 +312,19 @@ def coverage_cases():
                 num_blocks=pages,
             )
         )
-    assert len(rows) == 52 and len({r["testcase_name"] for r in rows}) == 52
+    for dtype in DTYPES:
+        rows.append(
+            coverage_row(
+                "arch92_long_fd",
+                dtype,
+                [65537],
+                [1],
+                num_heads_q=64,
+                num_blocks=2,
+                page_order="reverse",
+            )
+        )
+    assert len(rows) == 60 and len({r["testcase_name"] for r in rows}) == 60
     # Bound input storage independently of host golden intermediates/workspace.
     for row in rows:
         shapes = ast.literal_eval(
