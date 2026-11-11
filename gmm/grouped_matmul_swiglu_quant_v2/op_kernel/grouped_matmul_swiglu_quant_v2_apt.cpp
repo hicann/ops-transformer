@@ -23,7 +23,7 @@
 
 #if ORIG_DTYPE_X_SCALE == DT_FLOAT8_E8M0
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201) && ORIG_DTYPE_X == DT_FLOAT8_E4M3FN && \
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202) && ORIG_DTYPE_X == DT_FLOAT8_E4M3FN && \
     (ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1 || ORIG_DTYPE_WEIGHT == DT_HIFLOAT4)
 #define GMM_SWIGLU_QUANT_WEIGHT_QUANT_ASW
 #include "arch35/weight_quant_asw/grouped_matmul_swiglu_quant_v2_weight_quant_asw_tiling_data.h"
@@ -31,7 +31,7 @@
 #include "arch35/weight_quant_asw/grouped_matmul_swiglu_quant_v2_weight_quant_asw_kernel.h"
 using GMMSQWeightQuantAswTilingData = GMMSQArch35Tiling::GMMSQWeightQuantAswTilingData;
 #elif ORIG_DTYPE_X == DT_FLOAT8_E4M3FN && ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1
-// 3510 MxA8W4 uses the resplit controller; 9201 uses the ASW branch above.
+// 3510 MxA8W4 uses the resplit controller; 9201/9202 uses the ASW branch above.
 #define GMM_SWIGLU_QUANT_WEIGHT_QUANT
 #include "arch35/weight_quant_basic_block/grouped_matmul_swiglu_quant_v2_weight_quant_tiling_data.h"
 #include "arch35/weight_quant_basic_block/gmmsq_weight_quant_resplit_controller.h"
@@ -40,7 +40,7 @@ using GMMSQWeightQuantAswTilingData = GMMSQArch35Tiling::GMMSQWeightQuantAswTili
 // 全量化Mx量化
 #include "arch35/grouped_matmul_swiglu_quant_v2_tiling_data.h"
 #include "arch35/grouped_matmul_swiglu_quant_v2_mxquant.h"
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
 #define GMM_SWIGLU_QUANT_TENSOR_API_ENABLED 1
 #include "arch35/grouped_matmul_tensor_api_swiglu_quant_v2_mxfp8_kernel.h"
 #else

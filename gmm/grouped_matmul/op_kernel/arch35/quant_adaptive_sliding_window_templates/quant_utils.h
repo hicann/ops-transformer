@@ -29,7 +29,7 @@
 
 namespace QuantUtils {
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 namespace VectorApi = AscendC::MicroAPI;
 #else
 namespace VectorApi = AscendC::Reg;
@@ -66,7 +66,7 @@ constexpr uint16_t AIC_SYNC_AIV_FLAG = 4;
 constexpr uint16_t AIV_SYNC_AIC_FLAG = 6;
 constexpr MatmulConfig MM_CFG_NO_PRELOAD_OPEN_UNIT_FLAG = GetMDLConfig(false, false, 0, false, false, false, true);
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 constexpr uint8_t CV_RATIO = 1;
 #else
 constexpr uint8_t CV_RATIO = 2; // 分配给2个AIV计算
@@ -116,7 +116,7 @@ __aicore__ inline constexpr bool IsMxType()
 template <typename x1Dtype, typename scaleDytpe>
 __aicore__ inline constexpr bool IsMxOrHif4Type()
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     return AscendC::IsSameType<scaleDytpe, AscendC::fp8_e8m0_t>::value ||
            AscendC::IsSameType<x1Dtype, hifloat4x2_t>::value;
 #else
@@ -133,7 +133,7 @@ __aicore__ inline constexpr bool IsFp4()
 template <typename T>
 __aicore__ inline constexpr bool IsHifp4()
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     return (AscendC::IsSameType<T, hifloat4x2_t>::value);
 #else
     return false;

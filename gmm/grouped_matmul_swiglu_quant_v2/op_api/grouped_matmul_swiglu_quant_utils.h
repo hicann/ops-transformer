@@ -407,7 +407,8 @@ public:
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
         if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-            op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+            op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+            op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) {
             auto x1MDim = gmmDsqParams_.x->GetViewShape().GetDim(0);
             auto x2NIndex = (*gmmDsqParams_.weight)[0]->GetViewShape().GetDimNum() - 1;
             auto x2NDim = (*gmmDsqParams_.weight)[0]->GetViewShape().GetDim(x2NIndex);

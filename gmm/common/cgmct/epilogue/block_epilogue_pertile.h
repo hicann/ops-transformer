@@ -28,7 +28,7 @@
 namespace Cgmct {
 namespace Gemm {
 namespace Block {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 namespace GmmPerTileVectorApi = AscendC::MicroAPI;
 #else
 namespace GmmPerTileVectorApi = AscendC::Reg;

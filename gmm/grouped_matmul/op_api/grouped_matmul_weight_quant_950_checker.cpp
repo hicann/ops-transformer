@@ -629,8 +629,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTransposeStatus() 
         }
     }
 
-    if (IsA16F8ND() || IsMxA8W4NZ() || IsMxA8HiF4() || (IsA16MxFp4NZ() && npuArch_ == NpuArch::DAV_9201) ||
-        IsA16MxHiF4()) {
+    if (IsA16F8ND() || IsMxA8W4NZ() || IsMxA8HiF4() ||
+        (IsA16MxFp4NZ() && (npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202)) || IsA16MxHiF4()) {
         if (unlikely(!gmmParams_.transposeWeight)) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnName(), "transposeWeight", "false",
                                                   "In weight quant case fp16/bf16-int8, fp16/bf16-fp8/hif8 and "
@@ -1062,8 +1062,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4NZScaleShape()
 aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckUnsupportedApi() const
 {
     if (IsMxA8HiF4() || IsA16MxHiF4()) {
-        CHECK_COND(npuArch_ == NpuArch::DAV_9201, ACLNN_ERR_PARAM_INVALID, "Only DAV_9201 supports %s.",
-                   GetDataFlowString().c_str());
+        CHECK_COND(npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202, ACLNN_ERR_PARAM_INVALID,
+                   "Only DAV_9201/DAV_9202 supports %s.", GetDataFlowString().c_str());
     }
     if (IsA16W8ND()) {
         if (gmmParams_.groupType == NO_SPLIT) {

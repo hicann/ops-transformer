@@ -249,9 +249,9 @@ static aclnnStatus CheckDtype(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams
     static const std::vector<DataType> inputTypesDav3510 = {DataType::DT_FLOAT8_E4M3FN, DataType::DT_FLOAT8_E5M2,
                                                             DataType::DT_HIFLOAT8, DataType::DT_FLOAT4_E2M1};
     const auto curNpuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
-    const auto& supportedInputTypes = curNpuArch == NpuArch::DAV_9201 ?
-                                          inputTypesDav92 :
-                                          (curNpuArch == NpuArch::DAV_3510 ? inputTypesDav3510 : commonInputTypes);
+    const bool isDav92 = curNpuArch == NpuArch::DAV_9201 || curNpuArch == NpuArch::DAV_9202;
+    const auto& supportedInputTypes =
+        isDav92 ? inputTypesDav92 : (curNpuArch == NpuArch::DAV_3510 ? inputTypesDav3510 : commonInputTypes);
     auto x1Dtype = params.x1->GetDataType();
     auto x2Dtype = params.x2->GetDataType();
     QGMM_INPLACE_ADD_CHECK_REPORT(

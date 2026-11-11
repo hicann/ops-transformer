@@ -53,7 +53,7 @@ std::string ListToString(const Args&... args)
 }
 constexpr int64_t DYNAMIC_GRAPH_FIRST_INFERSHAPE_DIM_VALUE = -1;
 
-static std::set<std::string> GmmDavidSupportSoc = {"Ascend950", "Ascend960DT"};
+static std::set<std::string> GmmDavidSupportSoc = {"Ascend950", "Ascend960DT", "Ascend960PR"};
 static const std::unordered_set<ge::DataType> DavidSupportedInputDtypes = {
     ge::DataType::DT_FLOAT8_E5M2, ge::DataType::DT_FLOAT8_E4M3FN, ge::DataType::DT_FLOAT4_E2M1,
     ge::DataType::DT_FLOAT4_E1M2, ge::DataType::DT_INT8,          ge::DataType::DT_HIFLOAT8};
@@ -151,7 +151,8 @@ static graphStatus InferDataType4GroupedMatmulSwigluQuantV2(gert::InferDataTypeC
     if (ret == GRAPH_SUCCESS && GmmDavidSupportSoc.count(platformInfo.str_info.short_soc_version) > 0) {
         auto xDtype = context->GetInputDataType(X_INDEX);
         auto weightDtype = context->GetDynamicInputDataType(WEIGHT_INDEX, 0);
-        const bool is9201 = platformInfo.str_info.short_soc_version == "Ascend960DT";
+        const bool is9201 = platformInfo.str_info.short_soc_version == "Ascend960DT" ||
+                            platformInfo.str_info.short_soc_version == "Ascend960PR";
         const bool xSupported =
             isSupportedInputDtypeForDavid(xDtype) || (is9201 && xDtype == Ops::Transformer::DT_HIFLOAT4);
         const bool weightSupported =

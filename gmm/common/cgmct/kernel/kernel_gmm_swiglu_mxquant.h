@@ -181,7 +181,7 @@ public:
     __aicore__ inline void WaitForVector()
     {
         AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIV_SYNC_AIC_FLAG);
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         if (GetAicAivTaskRation() == 1) {
             return;
         }
@@ -191,7 +191,7 @@ public:
     __aicore__ inline void NotifyVector()
     {
         AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIC_SYNC_AIV_FLAG);
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         if (GetAicAivTaskRation() == 1) {
             return;
         }
@@ -212,7 +212,7 @@ public:
         }
     }
 
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
     __aicore__ inline void SetL2CacheDisableIfNeeded(int64_t mSize, int64_t curBaseM, int64_t baseN)
     {
         if constexpr (formatB != CubeFormat::ND) {
@@ -376,7 +376,7 @@ public:
         int64_t k = Get<K_VALUE>(problemShape_);
         CoordClass coord(m, n, k, params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
         BlockCoord tileIdx;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         if (!bs.GetTileIdx(tileIdx)) {
             return;
         }
@@ -387,7 +387,7 @@ public:
         while (bs.GetTileIdx(tileIdx)) {
 #endif
             BlockShape singleShape = bs.GetBlockShape(tileIdx);
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             if (initSingleGroup_) {
                 UpdateOffset(params, groupIdx);
                 UpdateGlobalBuffer(params, groupIdx);
@@ -432,7 +432,7 @@ public:
                 epilogueOp_(epilogueShape, epilogueOffset);
                 NotifyCube();
             }
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         } while (bs.GetTileIdx(tileIdx));
 #else
         }
@@ -464,7 +464,7 @@ public:
                                        Get<K_VALUE>(problemShape_)};
             bs.UpdateNextProblem(resProblemShape);
             epilogueOp_.UpdateNextProblem(resProblemShape);
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             initSingleGroup_ = true;
 #endif
             ProcessSingleGroup(params, bs, groupIdx);

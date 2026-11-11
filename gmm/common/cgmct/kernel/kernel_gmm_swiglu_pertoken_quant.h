@@ -96,7 +96,7 @@ public:
     using DataTypeX1Scale = DataTypeX1Scale_;
     static constexpr bool transA = BlockMmadBuilder::transA;
     static constexpr bool transB = BlockMmadBuilder::transB;
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
     static constexpr auto formatB = BlockMmadBuilder::formatB;
 #endif
     static constexpr int64_t l1M = BlockMmadBuilder::l1M;
@@ -138,7 +138,7 @@ public:
     BlockOffset blockOffset_{0, 0, 0, 0, 0, 0, 0};
     uint64_t preOffset_ = 0UL;
     uint32_t realM_ = 0UL;
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
     int64_t perGroupBOffset_ = 0L;
     int64_t bRightOffsetStep_ = 0L;
 #endif
@@ -148,7 +148,7 @@ public:
     AscendC::LocalTensor<CType> l0cOutUbFirst_;
     AscendC::LocalTensor<CType> l0cOutUbSecond_;
     bool isVecSetSyncCom_ = false;
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
     uint32_t curBaseM_ = 0U;
 #endif
 
@@ -194,7 +194,7 @@ public:
     __aicore__ inline void WaitForVector()
     {
         AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODES, PIPE_FIX>(AIV_SYNC_AIC_FLAGS);
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         if (GetAicAivTaskRation() == 1) {
             return;
         }
@@ -204,7 +204,7 @@ public:
     __aicore__ inline void NotifyVector()
     {
         AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODES, PIPE_FIX>(AIC_SYNC_AIV_FLAGS);
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         if (GetAicAivTaskRation() == 1) {
             return;
         }
@@ -265,7 +265,7 @@ public:
         uint64_t k = Get<K_VALUES>(problemShape_);
         // aBaseOffset += m * k
         Get<INDEX_A_OFFSET>(baseOffset_) = Get<INDEX_A_OFFSET>(baseOffset_) + m * k;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         Get<INDEX_B_OFFSET>(baseOffset_) = Get<INDEX_B_OFFSET>(baseOffset_) + n * k;
 #else
         Get<INDEX_B_OFFSET>(baseOffset_) = static_cast<int64_t>(groupIdx) * perGroupBOffset_;
@@ -295,7 +295,7 @@ public:
     {
         Get<N_VALUES>(problemShape_) = params.gmmParams.matmulTiling->N;
         Get<K_VALUES>(problemShape_) = params.gmmParams.matmulTiling->Ka;
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
         if constexpr (formatB == CubeFormat::NZ) {
             if constexpr (transB) {
                 perGroupBOffset_ = Align16(Get<N_VALUES>(problemShape_)) * Align32(Get<K_VALUES>(problemShape_));
@@ -313,7 +313,7 @@ public:
         groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(params.mmadParams.groupListGmAddr));
     }
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     __aicore__ inline void ComputeOffset(int64_t& bRightOffset, int64_t n, int64_t k)
     {
         int64_t resN = n >> 1;
@@ -346,12 +346,12 @@ public:
         int64_t k = Get<K_VALUES>(problemShape_);
         TupleShape resProblemShape{Get<M_VALUES>(problemShape_), Get<N_VALUES>(problemShape_) >> 1,
                                    Get<K_VALUES>(problemShape_)};
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         bs.UpdateNextProblem(resProblemShape);
 #endif
         epilogueDequantAndSwigluOp_.UpdateNextProblem(resProblemShape);
         UpdateGlobalBuffer(params);
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         CoordClass coord(m, n, k, params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
 #else
         CoordClass coord(m, n, k, curBaseM_, params.gmmParams.baseN, params.gmmParams.baseK);
@@ -359,7 +359,7 @@ public:
         BlockCoord tileIdx;
         while (bs.GetTileIdx(tileIdx)) {
             BlockShape singleShape = bs.GetBlockShape(tileIdx);
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             if (Get<M_VALUES>(singleShape) <= 0 || Get<N_VALUES>(singleShape) <= 0) {
                 continue;
             }
@@ -379,7 +379,7 @@ public:
                         l0cOutUbFirst_, mmSingleShape, transA, transB);
                 // right block
                 int64_t bRightOffset = Get<INDEX_B_OFFSET>(blockOffset_);
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
                 ComputeOffset(bRightOffset, n, k);
 #else
                 ComputeOffset(bRightOffset);
@@ -413,7 +413,7 @@ public:
         }
         InitParamsAndTensor(params);
         BlockSchedulerOp bs(params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
         if constexpr (transB) {
             bs.SetTailAlign(1, AscendC::BLOCK_CUBE);
         } else {
@@ -428,7 +428,7 @@ public:
             if (!UpdateGroupParams(params, groupIdx)) {
                 continue;
             }
-#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201)
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             int64_t m = Get<M_VALUES>(problemShape_);
             TupleShape resProblemShape{Get<M_VALUES>(problemShape_), Get<N_VALUES>(problemShape_) >> 1,
                                        Get<K_VALUES>(problemShape_)};

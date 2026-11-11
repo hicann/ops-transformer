@@ -29,7 +29,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
 #if ((defined(__CCE_AICORE__) && (__CCE_AICORE__ == 310)) && !(defined(__NPU_ARCH__) && __NPU_ARCH__ == 3113)) || \
-    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+    (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
 #if defined(ORIG_DTYPE_X) && defined(DT_INT8) && ORIG_DTYPE_X == DT_INT8
 #define DTYPE_L0C_LOCAL int32_t
 #elif defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && defined(DT_INT4) && ORIG_DTYPE_X == DT_INT4 && \
@@ -76,14 +76,14 @@
     (ORIG_DTYPE_X == DT_INT8 && (ORIG_DTYPE_WEIGHT == DT_INT4 || ORIG_DTYPE_WEIGHT == DT_INT32)) || \
     (ORIG_DTYPE_X == DT_FLOAT8_E4M3FN && \
      (ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1 || ORIG_DTYPE_WEIGHT == DT_FLOAT4_E1M2 || ORIG_DTYPE_WEIGHT == DT_FLOAT))
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 #define V9201_GMM_ANTI_QUANT_CUBE
 #else
 #define V310_GMM_ANTI_QUANT
 #endif
 #elif (defined(DT_HIFLOAT4) && \
        (ORIG_DTYPE_X == DT_FLOAT8_E4M3FN || ORIG_DTYPE_X == DT_FLOAT16 || ORIG_DTYPE_X == DT_BF16) && \
-       ORIG_DTYPE_WEIGHT == DT_HIFLOAT4 && defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+       ORIG_DTYPE_WEIGHT == DT_HIFLOAT4 && defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
 #define V9201_GMM_ANTI_QUANT_CUBE
 #endif
 #endif

@@ -122,7 +122,8 @@ static ge::graphStatus CheckRequiredTilingContext(gert::TilingContext* context)
     // Legacy V2 tiling does not consume output metadata. Both outputs are mandatory for the V3 interface.
     const auto* compileInfo = context->GetCompileInfo<GMMSwigluV2CompileInfo>();
     const auto* swigluMode =
-        compileInfo != nullptr && compileInfo->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201) ?
+        compileInfo != nullptr && (compileInfo->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201) ||
+                                   compileInfo->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9202)) ?
             nullptr :
             attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SWIGLU_MODE);
     if (swigluMode != nullptr && *swigluMode == SWIGLU_MODE_V3) {
@@ -157,7 +158,8 @@ static ge::graphStatus GroupedMatmulSwigluQuantV2TilingFunc(gert::TilingContext*
     OP_CHECK_IF(compileInfoPtr == nullptr,
                 OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulSwigluQuantV2TilingFunc", "compileInfo is null"),
                 return ge::GRAPH_FAILED);
-    if (compileInfoPtr->npuArch_ != static_cast<int32_t>(NpuArch::DAV_9201)) {
+    if (compileInfoPtr->npuArch_ != static_cast<int32_t>(NpuArch::DAV_9201) &&
+        compileInfoPtr->npuArch_ != static_cast<int32_t>(NpuArch::DAV_9202)) {
         const auto* attrs = context->GetAttrs();
         const auto* swigluMode = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SWIGLU_MODE);
         if (swigluMode != nullptr && *swigluMode != 0) {
@@ -172,7 +174,8 @@ static ge::graphStatus GroupedMatmulSwigluQuantV2TilingFunc(gert::TilingContext*
             return TilingRegistry::GetInstance().DoTilingImpl(context, {GMMSQ_950_TILING_TEMPLATE});
         }
     }
-    if (compileInfoPtr->supportL12BtBf16 || compileInfoPtr->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201)) {
+    if (compileInfoPtr->supportL12BtBf16 || compileInfoPtr->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201) ||
+        compileInfoPtr->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9202)) {
         std::vector<int32_t> registerList = {GMMSQ_950_TILING_TEMPLATE};
         auto xDesc = context->GetInputDesc(GroupedMatmulSwigluQuantV2Tiling::X_INDEX);
         auto wDesc = context->GetInputDesc(GroupedMatmulSwigluQuantV2Tiling::WEIGHT_INDEX);
@@ -184,10 +187,13 @@ static ge::graphStatus GroupedMatmulSwigluQuantV2TilingFunc(gert::TilingContext*
         ge::DataType wDtype = wDesc->GetDataType();
         ge::DataType xScaleDtype = xScaleDesc->GetDataType();
         ge::Format weightFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(wDesc->GetFormat().GetStorageFormat()));
-        if (compileInfoPtr->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201) && xDtype == ge::DT_FLOAT8_E4M3FN &&
+        if ((compileInfoPtr->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201) ||
+             compileInfoPtr->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9202)) &&
+            xDtype == ge::DT_FLOAT8_E4M3FN &&
             (wDtype == ge::DT_FLOAT4_E2M1 || wDtype == Ops::Transformer::DT_HIFLOAT4)) {
             registerList[0] = GMMSQ_WEIGHT_QUANT_ASW_TILING_TEMPLATE;
-        } else if (compileInfoPtr->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201) &&
+        } else if ((compileInfoPtr->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201) ||
+                    compileInfoPtr->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9202)) &&
                    xDtype == Ops::Transformer::DT_HIFLOAT4 && wDtype == Ops::Transformer::DT_HIFLOAT4) {
             registerList[0] = GMMSQ_TENSOR_API_TILING_TEMPLATE;
         } else if (xDtype == ge::DT_FLOAT8_E4M3FN && wDtype == ge::DT_FLOAT4_E2M1) {
@@ -195,6 +201,7 @@ static ge::graphStatus GroupedMatmulSwigluQuantV2TilingFunc(gert::TilingContext*
             OP_LOGD("GroupedMatmulSwigluQuantV2TilingFunc", "Using the weight quant tiling for MxA8W4");
             registerList[0] = GMMSQ_WEIGHT_QUANT_TILING_TEMPLATE;
         } else if (compileInfoPtr->npuArch_ != static_cast<int32_t>(NpuArch::DAV_9201) &&
+                   compileInfoPtr->npuArch_ != static_cast<int32_t>(NpuArch::DAV_9202) &&
                    xScaleDtype == ge::DT_FLOAT8_E8M0 &&
                    (weightFormat == ge::FORMAT_ND || weightFormat == ge::FORMAT_NCL)) {
             // Tensor API is preferred for MX quant with ND weight. Unsupported cases fall back to template 2.

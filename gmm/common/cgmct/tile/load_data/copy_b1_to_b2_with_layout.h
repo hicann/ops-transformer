@@ -225,7 +225,7 @@ public:
     template <class Coord>
     __aicore__ inline void operator()(const DstTensor& l0B, const SrcTensor& l1B, const Coord& coord)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         if constexpr (BType::isTrans) {
             TransposeLoadB2(l0B, l1B, coord);
         } else {
@@ -237,7 +237,7 @@ public:
     }
 
 private:
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     constexpr static int32_t C0_SIZE = AscendC::AuxGetC0Size<typename BType::T>();
 
     /**

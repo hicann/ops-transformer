@@ -66,7 +66,7 @@ static ge::graphStatus GroupedMatmulFinalizeRoutingTilingFunc(gert::TilingContex
         std::vector<int32_t> tilingRegisterList = {1};
         OP_LOGD("GroupedMatmulFinalizeRoutingTilingFunc", "Using the tiling strategy of A5");
         return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context, tilingRegisterList);
-    } else if (compileInfoPtr->npuArch == NpuArch::DAV_9201) {
+    } else if (compileInfoPtr->npuArch == NpuArch::DAV_9201 || compileInfoPtr->npuArch == NpuArch::DAV_9202) {
         auto atomicRet = context->SetNeedAtomic(true);
         OP_CHECK_IF(atomicRet != ge::GRAPH_SUCCESS,
                     OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "SetNeedAtomic failed"), return ge::GRAPH_FAILED);
@@ -78,9 +78,11 @@ static ge::graphStatus GroupedMatmulFinalizeRoutingTilingFunc(gert::TilingContex
         std::vector<int32_t> tilingRegisterList = {1};
         if (GetSizeByDataType(xDesc->GetDataType()) != GetSizeByDataType(w0Desc->GetDataType())) {
             tilingRegisterList[0] = GMMFR_WEIGHT_QUANT_ASW_TILING;
-            OP_LOGD("GroupedMatmulFinalizeRoutingTilingFunc", "Using the weight-quant tiling strategy of DAV_9201");
+            OP_LOGD("GroupedMatmulFinalizeRoutingTilingFunc",
+                    "Using the weight-quant tiling strategy of DAV_9201/DAV_9202");
         } else {
-            OP_LOGD("GroupedMatmulFinalizeRoutingTilingFunc", "Using the full-quant tiling strategy of DAV_9201");
+            OP_LOGD("GroupedMatmulFinalizeRoutingTilingFunc",
+                    "Using the full-quant tiling strategy of DAV_9201/DAV_9202");
         }
         return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context, tilingRegisterList);
     } else {

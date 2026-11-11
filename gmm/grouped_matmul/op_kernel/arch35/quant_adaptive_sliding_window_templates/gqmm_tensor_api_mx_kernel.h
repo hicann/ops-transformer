@@ -44,7 +44,7 @@ __aicore__ inline void GmmTensorApiMxKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR b
     using LayoutB = wLayout;
     using LayoutC = yLayout;
     using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     using BlockMmadPolicy = Blaze::Gemm::GroupedMatmulWithScaleMx<0>;
 #else
     using BlockMmadPolicy = Blaze::Gemm::GroupedMatmulWithScaleMx<0, false, Blaze::Gemm::KernelGroupedMmadWithScaleMx>;

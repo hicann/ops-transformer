@@ -24,7 +24,7 @@
 #include "lib/matmul_intf.h"
 #include "weight_quant_tool.h"
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 namespace GmmWeightQuantVectorApi = AscendC::MicroAPI;
 #else
 namespace GmmWeightQuantVectorApi = AscendC::Reg;

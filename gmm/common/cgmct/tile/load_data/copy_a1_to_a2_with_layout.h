@@ -226,7 +226,7 @@ public:
     template <class Coord>
     __aicore__ inline void operator()(const DstTensor& l0A, const SrcTensor& l1A, const Coord& coord)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         ASCENDC_ASSERT((AscendC::Std::is_same_v<typename DstTrait::LiteType, typename SrcTrait::LiteType>),
                        { KERNEL_LOG(KERNEL_ERROR, "l0A l1A type must be same"); });
         if constexpr (AType::isTrans) {
@@ -240,7 +240,7 @@ public:
     }
 
 private:
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     constexpr static int32_t C0_SIZE = AscendC::AuxGetC0Size<typename AType::T>();
 
     /**

@@ -157,7 +157,7 @@ TILING_DATA_FIELD_DEF_STRUCT(GMMSwigluQuantV2TensorApiMMTiling, mmTilingData);
 TILING_DATA_FIELD_DEF_STRUCT(GMMSwigluQuantSwigluParamsHost, swigluParams);
 END_TILING_DATA_DEF;
 
-// The 9201 HIF4 path uses the same matrix tiling fields as the Tensor API path,
+// The 9201/9202 HIF4 path uses the same matrix tiling fields as the Tensor API path,
 // but keeps its own tiling data class and key.
 BEGIN_TILING_DATA_DEF(GMMSwigluQuantBasicApiTilingDataParams)
 TILING_DATA_FIELD_DEF_STRUCT(GMMSwigluQuantParams, gmmSwigluQuantParams);

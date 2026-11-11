@@ -185,7 +185,10 @@ bool CheckCoreNumForInplaceAdd(const gert::TilingContext* context, const GQmmInp
     auto aivNum = compileInfo->aivNum;
     OP_CHECK_IF(aicNum == 0, OP_LOGE(inputParams.opName, "aicNum should be positive integer, actual is %u.", aicNum),
                 return false);
-    const uint32_t expectedAivRatio = compileInfo->npuArch == NpuArch::DAV_9201 ? 1U : GmmConstant::CORE_RATIO;
+    const uint32_t expectedAivRatio =
+        (compileInfo->npuArch == NpuArch::DAV_9201 || compileInfo->npuArch == NpuArch::DAV_9202) ?
+            1U :
+            GmmConstant::CORE_RATIO;
     OP_CHECK_IF(aivNum != expectedAivRatio * aicNum,
                 OP_LOGE(inputParams.opName, "aicNum:aivNum should be 1:%u, actual aicNum: %u, aivNum: %u.",
                         expectedAivRatio, aicNum, aivNum),

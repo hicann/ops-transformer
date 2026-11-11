@@ -774,7 +774,7 @@ should be 1 or 2, but the actual dim num is %zu.",
 bool GroupedQmmTiling::CheckFp4Shape(const gert::Shape& xShape, const gert::Shape& wShape) const
 {
     if (inputParams_.groupType == SPLIT_M) {
-        if (npuArch_ != NpuArch::DAV_9201 || !IsHif4Scale()) {
+        if ((npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_9202) || !IsHif4Scale()) {
             OP_CHECK_IF(
                 inputParams_.kSize % EVEN_FACTOR != 0 || inputParams_.kSize <= EVEN_FACTOR,
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
@@ -1251,7 +1251,9 @@ bool GroupedQmmTiling::CheckCoreNum() const
     OP_CHECK_IF(compileInfo == nullptr, OP_LOGE(inputParams_.opName, "compileInfo is nullptr."), return false);
     auto aicNum = compileInfo->aicNum;
     auto aivNum = compileInfo->aivNum;
-    uint32_t coreRatio = npuArch_ == NpuArch::DAV_9201 ? GmmConstant::CORE_RATIO_9201 : GmmConstant::CORE_RATIO;
+    uint32_t coreRatio = (npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) ?
+                             GmmConstant::CORE_RATIO_9201 :
+                             GmmConstant::CORE_RATIO;
     if (inputParams_.groupType == SPLIT_K) {
         OP_CHECK_IF(
             aivNum != coreRatio * aicNum,
@@ -1301,7 +1303,7 @@ bool GroupedQmmTiling::SetQuantMode(const gert::Shape& wScaleShape, const gert::
         if (inputParams_.aDtype != ge::DT_INT8 &&
             ((xScaleDims == 2 && xScaleShape[xScaleDims - 1] == 1) || // 2:（g,1) 2维
              (xScaleDims == 1 && static_cast<uint64_t>(xScaleShape[0]) == inputParams_.groupNum &&
-              ((npuArch_ != NpuArch::DAV_9201 && inputParams_.groupType == SPLIT_K) ||
+              ((npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_9202 && inputParams_.groupType == SPLIT_K) ||
                inputParams_.groupNum != inputParams_.mSize)))) {
             inputParams_.aQuantMode = optiling::QuantMode::PERTENSOR_MODE;
         } else {
@@ -1628,7 +1630,7 @@ void GroupedQmmTiling::PrintQuantParams()
 
 void GroupedQmmTiling::ReSplitBaseN()
 {
-    if (npuArch_ != NpuArch::DAV_9201) {
+    if (npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_9202) {
         return;
     }
 
@@ -1671,7 +1673,7 @@ void GroupedQmmTiling::CalBasicBlock()
         } else {
             basicTiling_.baseN = GmmConstant::BASIC_BLOCK_SIZE_256;
         }
-        if (npuArch_ == NpuArch::DAV_9201 && supportMmadF16S8_) {
+        if ((npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) && supportMmadF16S8_) {
             basicTiling_.baseM = std::min(basicTiling_.baseM, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));
             basicTiling_.baseN = std::min(basicTiling_.baseN, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));
         }
@@ -1687,7 +1689,8 @@ void GroupedQmmTiling::CalBasicBlock()
         GetShapeWithDataType(CUBE_REDUCE_BLOCK, inputParams_.aDtype));
 
     ReSplitBaseN();
-    if (npuArch_ == NpuArch::DAV_9201 && supportMmadF16S8_ && (isPertokenMode || isPerchannelMode)) {
+    if ((npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) && supportMmadF16S8_ &&
+        (isPertokenMode || isPerchannelMode)) {
         if (basicTiling_.baseM * basicTiling_.baseN > BASIC_BLOCK_LIMIT_ONE_VECTOR) {
             basicTiling_.baseM = MAX_BASEM_ONE_VECTOR;
         }
@@ -1707,7 +1710,7 @@ void GroupedQmmTiling::CalBasicBlock()
 
 bool GroupedQmmTiling::IsBiasInL1() const
 {
-    if (npuArch_ == NpuArch::DAV_9201) {
+    if (npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         return inputParams_.hasBias && inputParams_.biasDtype == ge::DT_INT32;
     }
     if (!inputParams_.hasBias) {

@@ -41,7 +41,7 @@ __aicore__
 } // namespace Gemm
 } // namespace Cgmct
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
 #else
@@ -57,7 +57,7 @@ __aicore__
 namespace Cgmct {
 namespace Gemm {
 namespace Block {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 using SwigluMxScaleCopyType = int8_t;
 #else
 using SwigluMxScaleCopyType = AscendC::fp8_e8m0_t;
@@ -95,7 +95,7 @@ constexpr uint64_t DATA_BLOCK_SIZE = 32UL;        // UB上一个DataBlock的大�
 constexpr uint32_t Y_IDX = 0;
 constexpr uint32_t Y_SCALE_IDX = 1;
 constexpr uint32_t BLOCK_SIZE = 32;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 constexpr uint32_t MAX_SINGLE_MN = 128 * 256;
 #else
 constexpr uint32_t MAX_SINGLE_MN = 64 * 256;
@@ -211,12 +211,12 @@ private:
     __aicore__ inline void ComputeMaxExp(__ubuf__ bfloat16_t* srcAddr, __ubuf__ uint16_t* maxExpAddr,
                                          uint32_t totalCountInUB, uint16_t loopNum);
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ != 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
     __aicore__ inline void ComputeMaxExpCublas(__ubuf__ bfloat16_t* srcAddr, __ubuf__ uint16_t* maxExpAddr,
                                                uint32_t totalCountInUB, uint16_t loopNum);
 #endif
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ != 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
     __aicore__ inline void ComputeScaleCublasFromBf16(__ubuf__ uint16_t* maxValueAddr,
                                                       __ubuf__ uint16_t* mxScaleLocalAddr,
                                                       __ubuf__ uint16_t* halfScaleLocalAddr, uint32_t totalScaleInUB,
@@ -305,7 +305,7 @@ __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_
     constexpr uint32_t afterIO =
         afterIn + MAX_SINGLE_MN * sizeof(int8_t) + MAX_SINGLE_MN / AscendC::ONE_BLK_SIZE * sizeof(int8_t);
     // swiglu res
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     gluRes_ = AscendC::LocalTensor<bfloat16_t>(AscendC::TPosition::VECCALC, 0, MAX_SINGLE_MN);
     constexpr uint32_t afterIOAndGlu = afterIO;
 #else
@@ -375,7 +375,7 @@ QMM_BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyScaleFromUb2Gm(
     uint64_t blockCount, uint64_t offset, AscendC::LocalTensor<SwigluMxScaleCopyType>& src)
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     AscendC::DataCopyExtParams ub2GmParams{1, 0, 0, 0, 0};
     auto blockScaleN =
         CeilDiv(static_cast<uint64_t>(singleN_), static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
@@ -470,7 +470,7 @@ __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_
     return;
 }
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ != 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
 QMM_BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeMaxExpCublas(
     __ubuf__ bfloat16_t* srcAddr, __ubuf__ uint16_t* maxExpAddr, uint32_t totalCountInUB, uint16_t loopNum)
@@ -515,7 +515,7 @@ BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeD
     __ubuf__ bfloat16_t* srcAddr, __ubuf__ uint16_t* halfScaleLocalAddr, __ubuf__ int8_t* outLocalAddr,
     uint32_t totalCountInUB, uint16_t loopNum)
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     // 2：为拆分转换和打包存储建立双倍计数的 mask。
     uint32_t totalCountInUB2 = totalCountInUB * 2;
     using T = bfloat16_t;
@@ -772,7 +772,7 @@ __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_
     uint16_t loopScaleNum = (totalScaleInUb + vlForHalfNumber_ - VECTOR_CEIL_ADJUSTMENT) / vlForHalfNumber_;
     __ubuf__ uint16_t* maxExpAddr = (__ubuf__ uint16_t*)maxExp_.GetPhyAddr();
     __ubuf__ uint16_t* halfScaleLocalAddr = (__ubuf__ uint16_t*)halfScale_.GetPhyAddr();
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     ComputeMaxExp(gluResAddr, maxExpAddr, totalDataInUb, loopDataNum);
     ComputeScale(maxExpAddr, scaleDst, halfScaleLocalAddr, totalScaleInUb, loopScaleNum);
 #else
@@ -796,7 +796,7 @@ __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_
     return;
 }
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ != 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
 QMM_BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void
 BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeScaleCublasFromBf16(
@@ -878,7 +878,7 @@ __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_
     __VEC_SCOPE__
     {
         for (uint16_t mIdx = 0; mIdx < mSize; ++mIdx) {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
             uint32_t elemNum = scaleBlockN;
 #else
             constexpr uint64_t scaleGroupSize = MXFP_DIVISOR_SIZE / MXFP_MULTI_BASE_SIZE;
@@ -920,7 +920,7 @@ __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_
     // ComputeScale emits one byte per 32 values. The public MX scale row
     // packs two such bytes for every 64 output values, so the UB source row
     // pitch is ceil(Align64(N), 64) * 2 rather than ceil(N, 64).
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     scaleBlockN_ =
         CeilDiv(static_cast<uint64_t>(singleN_), static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
 #else

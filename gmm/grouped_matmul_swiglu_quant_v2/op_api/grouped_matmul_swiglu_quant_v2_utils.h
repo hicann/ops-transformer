@@ -261,6 +261,7 @@ protected:
     bool IsMxWeightNzMultiTensorSupported() const
     {
         return op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9201 &&
+               op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9202 &&
                gmmDsqParams_.quantMode == QUNAT_MODE_MX && !gmmDsqParams_.isMxA8W4 && gmmDsqParams_.weight != nullptr &&
                gmmDsqParams_.weight->Size() > 0 && (*gmmDsqParams_.weight)[0] != nullptr &&
                op::IsPrivateFormat((*gmmDsqParams_.weight)[0]->GetStorageFormat()) &&
@@ -399,7 +400,8 @@ protected:
 
     bool CheckAttrs()
     {
-        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+            op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) {
             if (gmmDsqParams_.groupListType != 0 && gmmDsqParams_.groupListType != 1) {
                 OP_LOGE_FOR_INVALID_VALUE(apiName_.c_str(), "groupListType",
                                           std::to_string(gmmDsqParams_.groupListType), "{0, 1}");
@@ -427,7 +429,8 @@ protected:
             OP_LOGE_FOR_INVALID_VALUE(apiName_.c_str(), "tuningConfig", "nonnull", "nullptr");
             return false;
         }
-        bool hif4Supported = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201;
+        bool hif4Supported = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                             op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202;
         if ((gmmDsqParams_.dequantMode != QUNAT_MODE_MX && gmmDsqParams_.dequantMode != QUNAT_MODE_PERTOKEN &&
              !(hif4Supported && gmmDsqParams_.dequantMode == QUNAT_MODE_HIF4)) ||
             (gmmDsqParams_.quantMode != QUNAT_MODE_MX && gmmDsqParams_.quantMode != QUNAT_MODE_PERTOKEN &&
@@ -437,7 +440,7 @@ protected:
                 apiName_.c_str(), "dequantMode and quantMode",
                 "dequantMode=" + std::to_string(gmmDsqParams_.dequantMode) +
                     ", quantMode=" + std::to_string(gmmDsqParams_.quantMode),
-                "the values of dequantMode and quantMode must be 0 (pertoken), 2 (mx), or 3 (hif4 on 9201), "
+                "the values of dequantMode and quantMode must be 0 (pertoken), 2 (mx), or 3 (hif4 on 9201/9202), "
                 "and they must be equal; "
                 "FRACTAL_NZ weight supports pertoken mode for INT8, FLOAT8 or HIFLOAT8 x and weight");
             return false;
@@ -1085,8 +1088,9 @@ protected:
                 return false;
             }
         } else {
-            // 9201 permits even N for FP8 output; FP4 output and 3510 require N aligned to 4.
-            const int64_t nAlign = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 &&
+            // 9201/9202 permits even N for FP8 output; FP4 output and 3510 require N aligned to 4.
+            const int64_t nAlign = (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                                    op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
                                            IsFp8Dtype(gmmDsqParams_.output->GetDataType()) ?
                                        SWIGLU_N_CONSTRAINT :
                                        MXFP4_ND_N_ALIGN;
@@ -1115,8 +1119,10 @@ protected:
 
         // mxfp8、NZ场景下，N需满足64对齐
         if (IsMxfp8WeightNzFormat((*gmmDsqParams_.weight)[0])) {
-            int64_t nAlign =
-                op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ? MXFP4_NZ_N_ALIGN : MXFP8_NZ_N_ALIGN;
+            int64_t nAlign = (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                              op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) ?
+                                 MXFP4_NZ_N_ALIGN :
+                                 MXFP8_NZ_N_ALIGN;
             if (nValue % nAlign != 0 || nValue == 0) {
                 std::string weightDtypeStr = op::ToString((*gmmDsqParams_.weight)[0]->GetDataType()).GetString();
                 std::string reasonStr =
@@ -1145,10 +1151,11 @@ protected:
 
     bool CheckMxA8W4InputShape()
     {
-        if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 &&
+        if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+             op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
             gmmDsqParams_.x->GetViewShape().GetDim(0) <= 0) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(apiName_.c_str(), "x", ViewShapeToString(gmmDsqParams_.x),
-                                                  "MxA8W4 and MxA8Hif4 on 9201 require M greater than 0");
+                                                  "MxA8W4 and MxA8Hif4 on 9201/9202 require M greater than 0");
             return false;
         }
         int64_t k = gmmDsqParams_.x->GetViewShape().GetDim(1);
@@ -1249,9 +1256,10 @@ protected:
         }
 
         if (IsMultiTensorWeight()) {
-            if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+            if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) {
                 OP_LOGE_FOR_INVALID_VALUE(apiName_.c_str(), "weight", "multiple tensors",
-                                          "a single tensor on Ascend 9201");
+                                          "a single tensor on Ascend 9201/9202");
                 return false;
             }
             if (!gmmDsqParams_.isMxA8W4 && !IsMxWeightNzMultiTensorSupported()) {
@@ -1448,7 +1456,8 @@ protected:
         bool xDtypeNotSupportedPertoken =
             std::find(XW_DTYPE_SUPPORT_LIST_PERTOKEN.begin(), XW_DTYPE_SUPPORT_LIST_PERTOKEN.end(), xDtype) ==
             XW_DTYPE_SUPPORT_LIST_PERTOKEN.end();
-        bool hif4Supported = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201;
+        bool hif4Supported = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                             op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202;
         if (xDtypeNotSupported && xDtypeNotSupportedMxfp4 && xDtypeNotSupportedPertoken &&
             !(hif4Supported && xDtype == Ops::Transformer::DT_HIFLOAT4)) {
             OP_LOGE_FOR_INVALID_DTYPE(apiName_.c_str(), "x", op::ToString(xDtype).GetString(), dtypeSupportList);
@@ -1534,7 +1543,8 @@ protected:
         for (size_t i = 0; i < wLength; i++) {
             const aclTensor* weightScale = (*gmmDsqParams_.weightScale)[i];
             const aclTensor* weight = (*gmmDsqParams_.weight)[i];
-            if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 &&
+            if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                 op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
                 gmmDsqParams_.quantMode == QUNAT_MODE_PERTOKEN && op::IsPrivateFormat(weight->GetStorageFormat())) {
                 OP_LOGE_FOR_INVALID_FORMAT(apiName_.c_str(), "weight",
                                            op::ToString(weight->GetStorageFormat()).GetString(), "ND");

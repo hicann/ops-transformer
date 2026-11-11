@@ -42,7 +42,7 @@ protected:
     __aicore__ inline void SetMNK(uint32_t loopIdx, uint32_t groupIdx, int32_t& mSize, int32_t& nSize, int32_t& kSize);
     __aicore__ inline void CalcTailTile(uint64_t mTail, uint64_t nTail);
     __aicore__ inline void SetMMParaAndCompute();
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     __aicore__ inline void SetL2CacheDisableIfNeeded(int32_t mSize, int32_t nSize, int32_t kSize, uint64_t curBaseM_,
                                                      uint64_t baseN);
 #else
@@ -65,7 +65,7 @@ protected:
     TILING_TYPE* kListGm_;
     TILING_TYPE* nListGm_;
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     using scaleATypeTmp =
         typename AscendC::Conditional<IsSameType<inputScaleType, int64_t>::value, uint64_t, inputScaleType>::type;
     using scaleAType =
@@ -80,7 +80,7 @@ protected:
     GlobalTensor<yType> yGlobal_;
     GlobalTensor<biasType> biasGlobal_;
     GlobalTensor<int64_t> groupListGlobal_;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     GlobalTensor<scaleAType> scaleAGlobal_;
     GlobalTensor<scaleBType> scaleBGlobal_;
 #else
@@ -101,7 +101,7 @@ protected:
 
     // mxType定义
     using aType = typename AscendC::Conditional<
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         QuantUtils::IsMxOrHif4Type<xType, scaleAType>(),
         matmul::MatmulTypeWithScale<AscendC::TPosition::GM, AscendC::TPosition::GM, CubeFormat::ND, xType, aTrans,
                                     AscendC::TPosition::GM, CubeFormat::ND, aTrans, AscendC::TPosition::GM, scaleAType>,
@@ -111,7 +111,7 @@ protected:
 #endif
         matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, xType, aTrans>>::type;
     using bType = typename AscendC::Conditional<
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         QuantUtils::IsMxOrHif4Type<xType, scaleAType>(),
         matmul::MatmulTypeWithScale<AscendC::TPosition::GM, AscendC::TPosition::GM, CubeFormat::ND, wType, bTrans,
                                     AscendC::TPosition::GM, CubeFormat::ND, bTrans, AscendC::TPosition::GM, scaleAType>,
@@ -123,7 +123,7 @@ protected:
     using cType = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, yType>;
     using biasMatmulType = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, biasType>;
     using MmType = typename AscendC::Conditional<
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         QuantUtils::IsMxOrHif4Type<xType, scaleAType>(),
 #else
         QuantUtils::IsMxType<inputScaleType>(),
@@ -169,7 +169,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::InitAddrAndPara
     groupListPtr_ = groupList;
     perTokenScalePtr_ = perTokenScale;
     yTensorPtr_ = y;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     if constexpr (QuantUtils::IsMxOrHif4Type<xType, scaleAType>()) {
         scaleAGlobal_.SetGlobalBuffer((__gm__ scaleAType*)perTokenScale);
 #else
@@ -189,7 +189,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::InitAddrAndPara
 LOCAL_TEMPLATE_CLASS_PARAMS
 __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::UpdateMMGlobalAddr(uint32_t groupIdx)
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     if constexpr (QuantUtils::IsMxOrHif4Type<xType, scaleAType>()) {
         scaleBGlobal_.SetGlobalBuffer(GROUPED_MATMUL::GetTensorAddr<scaleAType>(0, scaleTensorPtr_) +
                                       block_.params_.wScaleGroupAddrOffset);
@@ -213,7 +213,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::UpdateMMGlobalA
         } else if (gmmQuantParams_->aQuantMode == static_cast<uint32_t>(QuantUtils::QuantMode::DEFAULT) &&
                    gmmQuantParams_->bQuantMode ==
                        static_cast<uint32_t>(QuantUtils::QuantMode::PERTENSOR_MODE)) { // pertensor, M_SPLIT
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
             if constexpr (!IsSameType<scaleAType, uint64_t>::value && !IsSameType<scaleAType, int64_t>::value) {
                 uint32_t uint32Scale = 0;
                 if constexpr (IsSameType<scaleAType, bfloat16_t>::value) {
@@ -314,7 +314,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::CalcTailTile(ui
 }
 
 LOCAL_TEMPLATE_CLASS_PARAMS
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::SetL2CacheDisableIfNeeded(int32_t mSize, int32_t nSize,
                                                                                            int32_t kSize,
                                                                                            uint64_t curBaseM_,
@@ -400,7 +400,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::Process()
         int32_t kSize;
         // 更新group内的输入参数M,N,K
         SetMNK(loopIdx, groupIdx, mSize, nSize, kSize);
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         block_.template UpdateGroupOffset<aTrans, bTrans, xType, scaleAType, wFormat>(mSize, nSize, kSize, groupIdx,
                                                                                       groupType_);
 #else
@@ -419,7 +419,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::Process()
             CalcTailTile(block_.params_.mBaseTail, block_.params_.nBaseTail);
             block_.UpdateTailTile();
         } else {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
             SetL2CacheDisableIfNeeded(mSize, nSize, kSize, mmTilingData_->baseM, mmTilingData_->baseN);
 #else
             SetL2CacheDisableIfNeeded(mSize, static_cast<int64_t>(mmTilingData_->baseM), static_cast<int64_t>(nSize),
@@ -436,7 +436,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::Process()
                 continue;
             }
             // 2. compute offset
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
             block_.template CalcGMOffset<aTrans, bTrans, xType, scaleAType, wFormat>();
 #else
             block_.template CalcGMOffset<aTrans, bTrans, xType, inputScaleType, wFormat>();
@@ -455,7 +455,7 @@ __aicore__ inline void GmmASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::SetMMParaAndCom
     }
     mm_.SetSingleShape(block_.params_.singleCoreM, block_.params_.singleCoreN, block_.params_.k);
     if constexpr (!AscendC::IsSameType<yType, int32_t>::value) {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         if constexpr (QuantUtils::IsMxOrHif4Type<xType, scaleAType>()) {
             mm_.SetTensorScaleA(scaleAGlobal_[block_.offset_.offsetPerTokenScale], aTrans);
             mm_.SetTensorScaleB(scaleBGlobal_[block_.offset_.offsetScale], bTrans);

@@ -345,7 +345,8 @@ public:
     bool CheckDtypeValid()
     {
         OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.x1, A8W4_X_TYPE_LIST, return false);
-        const auto& weightTypes = npuArch_ == NpuArch::DAV_9201 ? A8W4_HIF4_W_TYPE_LIST : A8W4_W_TYPE_LIST;
+        const auto& weightTypes =
+            npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202 ? A8W4_HIF4_W_TYPE_LIST : A8W4_W_TYPE_LIST;
         const auto& scaleTypes = IsMxA8Hif4() ? A8HIF4_SCALE_TYPE_LIST : A8W4_SCALE_TYPE_LIST;
         OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.x2, weightTypes, return false);
         OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.scale, scaleTypes, return false);

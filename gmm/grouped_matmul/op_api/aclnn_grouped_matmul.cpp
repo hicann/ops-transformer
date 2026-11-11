@@ -2362,7 +2362,8 @@ static aclnnStatus CheckParamDifferentGroupType(const gmm::GroupedMatmulParams& 
 
     DataType weightDtype = (*gmmParams.weight)[0]->GetDataType();
     if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
         IsWeightQuant(gmmParams.xDtype, weightDtype)) {
         // 伪量化场景DAV_3510除了单单单/单多单的GroupList，其他校验在AclnnGroupedMatmulWeightQuantDAV3510Checker均已完成，下方校验跳过
         if (gmmParams.groupType == gmm::SPLIT_M) {
@@ -2628,9 +2629,11 @@ static aclnnStatus TransWeightToNz(gmm::GroupedMatmulParams& gmmParams, aclOpExe
                 break;
             }
             if (!((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-                   op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+                   op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                   op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
                   (IsQuant(xDtype, weight->GetDataType()) || IsS8S4PseudoQuantDataFlow(gmmParams) ||
-                   (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 &&
+                   ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                     op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
                     gmmParams.apiVersion == gmm::GMMApiVersion::WeightNz &&
                     IsWeightQuant(xDtype, weight->GetDataType()))) &&
                   weight->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ)) {
@@ -2707,7 +2710,8 @@ static void SetAntiQuantParamsTensorEmptyDAV3510(gmm::GroupedMatmulParams& param
 {
     DataType weightDtype = (*params.weight)[0]->GetDataType();
     if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
         IsWeightQuant(params.xDtype, weightDtype)) {
         // MxA8W4 的bias和antiquantoffset的dtype要和ydtype一致
         if (params.xDtype == ge::DataType::DT_FLOAT8_E4M3FN) {
@@ -2804,7 +2808,8 @@ static aclnnStatus CheckOutputShape(const aclTensorList* l0Res, const aclTensorL
 static bool IsPerTileQuantMode(gmm::GroupedMatmulParams& params)
 {
     if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
         IsQuant(params.xDtype, (*params.weight)[0]->GetDataType())) {
         gmm::AclnnGroupedMatmulDAV3510Checker<aclTensorList> checker(params);
         return checker.IsPerTileQuantMode();
@@ -2837,7 +2842,8 @@ static aclnnStatus SetTransposedScaleTensorListContiguous(gmm::GroupedMatmulPara
         ((*params.antiquantScaleOptional)[0]->GetViewShape().GetDimNum() == ANTIQUANT_SCALE_3D_DIMS ||
          (*params.antiquantScaleOptional)[0]->GetViewShape().GetDimNum() == ANTIQUANT_SCALE_4D_DIMS) &&
         (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
         params.apiVersion == gmm::GMMApiVersion::WeightNz) {
         std::vector<aclTensor*> antiSTensorList;
         const auto* antiScale = (*params.antiquantScaleOptional)[0];
@@ -2900,7 +2906,8 @@ static aclnnStatus SetTransposedTensorListContiguous(gmm::GroupedMatmulParams& p
         params.weight = executorPtr->AllocTensorList(weightTensorList.data(), weightTensorList.size());
         CHECK_RET(params.weight != nullptr, ACLNN_ERR_INNER_NULLPTR);
         if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-             op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+             op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+             op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
             ((IsQuant(params.xDtype, weightDtype) &&
               (*params.weight)[0]->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) ||
              (params.apiVersion == gmm::GMMApiVersion::WeightNz && IsWeightQuant(params.xDtype, weightDtype)) ||
@@ -2922,7 +2929,8 @@ static aclnnStatus ParamsDataContiguous(gmm::GroupedMatmulParams& params, aclOpE
     DataType xDtype = (*params.x)[0]->GetDataType();
     DataType weightDtype = (*params.weight)[0]->GetDataType();
     if (!((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-           op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+           op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+           op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
           ((IsQuant(xDtype, weightDtype) && (*params.weight)[0]->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) ||
            (params.apiVersion == gmm::GMMApiVersion::WeightNz && IsWeightQuant(xDtype, weightDtype)) ||
            (IsS8S4PseudoQuantDataFlow(params) &&
@@ -3005,11 +3013,13 @@ static aclnnStatus CheckQuantGMMWeightNz(DataType x1Dtype, DataType weightDtype,
                    gmm::dTypeToString(yDtype).c_str());
         return ACLNN_SUCCESS;
     } else if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-                op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+                op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
                x1Dtype == DataType::DT_FLOAT8_E4M3FN && weightDtype == DataType::DT_FLOAT8_E4M3FN) {
         return ACLNN_SUCCESS;
     } else if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-                op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+                op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
                (x1Dtype == DataType::DT_FLOAT4_E2M1 || x1Dtype == DataType::DT_FLOAT4_E1M2) &&
                (weightDtype == DataType::DT_FLOAT4_E2M1 || weightDtype == DataType::DT_FLOAT4_E1M2)) {
         return ACLNN_SUCCESS;
@@ -3077,7 +3087,8 @@ static aclnnStatus SetStorageShape(gmm::GroupedMatmulParams& params, const std::
     DataType xDtype = (*params.x)[0]->GetDataType();
     DataType weightDtype = (*params.weight)[0]->GetDataType();
     if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) &&
         ((IsQuant(xDtype, weightDtype) && (*params.weight)[0]->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) ||
          (params.apiVersion == gmm::GMMApiVersion::WeightNz && IsWeightQuant(xDtype, weightDtype)) ||
          (IsS8S4PseudoQuantDataFlow(params) &&

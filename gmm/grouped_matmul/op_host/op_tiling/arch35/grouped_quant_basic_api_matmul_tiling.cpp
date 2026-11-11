@@ -223,8 +223,8 @@ ge::graphStatus GroupedQmmBasicApiTiling::DoLibApiTiling()
             inputParams_.kSize);
         tilingData_.mmTilingData.scaleKBL1 = tilingData_.mmTilingData.scaleKAL1;
     }
-    tilingData_.mmTilingData.l1BufferStage =
-        static_cast<uint8_t>(npuArch_ != NpuArch::DAV_9201 && CanEnableThreeL1Buffer() ? TB_SIZE : DB_SIZE);
+    tilingData_.mmTilingData.l1BufferStage = static_cast<uint8_t>(
+        npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_9202 && CanEnableThreeL1Buffer() ? TB_SIZE : DB_SIZE);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -277,8 +277,8 @@ ge::graphStatus GroupedQmmBasicApiTiling::CalL1Depth(uint64_t leftL1Size)
         basicTiling_.depthA1 = depthInit;
         basicTiling_.depthB1 = depthInit;
     }
-    // 960DT(9201)保持v121路径：恒两段L1 buffer，不启用3-buffer搜索（v121等价要求）
-    if (npuArch_ == NpuArch::DAV_9201) {
+    // 960DT(9201)/960PR(9202)：恒两段L1 buffer，不启用3-buffer搜索
+    if (npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         // 用剩余L1空间对内轴ND非对齐场景进行调整depth
         ModifyDepthForUnalign(leftL1Size, baseASize, baseBSize, baseScaleASize + baseScaleBSize);
         CalStepKs();

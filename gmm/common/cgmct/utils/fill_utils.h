@@ -38,7 +38,7 @@ __aicore__ inline void InitOutputWithZero(AscendC::GlobalTensor<T> yInitGlobal, 
     if (AscendC::GetSubBlockIdx() >= 1) {
         return;
     }
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     uint32_t blockIdx = AscendC::GetBlockIdx() / GetAicAivTaskRation();
 #else
     uint32_t blockIdx = AscendC::GetBlockIdx() / AscendC::GetTaskRation();

@@ -80,7 +80,8 @@ const std::tuple<aclTensor*, aclTensor*> GroupedMatmulSwigluQuantV2(
     auto out = executor->AllocTensor(outShape, DataType::DT_INT8, ge::FORMAT_ND);
     auto scaleOut = executor->AllocTensor(scaleOutShape, DataType::DT_FLOAT, ge::FORMAT_ND);
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) {
         bool isMxWeightNzMultiTensor = IsMxWeightNzMultiTensor(weight);
         if (quantMode == QUANT_MODE_PERTOKEN) {
             // A8W4/A4W4 weightScale is [E, N] for per-channel and [E, KGroup, N] for per-group.

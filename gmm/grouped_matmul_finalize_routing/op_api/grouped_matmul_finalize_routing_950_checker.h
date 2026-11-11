@@ -114,7 +114,8 @@ static const std::vector<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_PERTOKEN_FP8H
 // Select platform capabilities first; input validation and API entry checks share these lists.
 inline const std::vector<DataType>& GetMxDataTypeSupportList()
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) {
         static const std::vector<DataType> supportedTypes = {DataType::DT_FLOAT8_E4M3FN, DataType::DT_FLOAT8_E5M2,
                                                              DataType::DT_FLOAT4_E2M1, Ops::Transformer::DT_HIFLOAT4};
         return supportedTypes;
@@ -124,7 +125,8 @@ inline const std::vector<DataType>& GetMxDataTypeSupportList()
 
 inline const std::vector<DataType>& GetMxScaleTypeSupportList()
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) {
         static const std::vector<DataType> supportedTypes = {DataType::DT_FLOAT8_E8M0,
                                                              Ops::Transformer::DT_HIFLOAT4_SCALE};
         return supportedTypes;
@@ -164,9 +166,9 @@ public:
         } else if (gmm::CheckDTypeInVector(scaleDtype, SCALE_TYPE_SUPPORT_LIST_PERTOKEN)) {
             quantMode_ = QuantMode::PERTOKEN;
         } else {
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                GMMFR_ACLNN_OP_NAME, "scale", op::ToString(scaleDtype).GetString(),
-                "scale must be FLOAT8_E8M0, FLOAT32 or BFLOAT16; HIFLOAT4_SCALE is only supported on DAV_9201");
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(GMMFR_ACLNN_OP_NAME, "scale", op::ToString(scaleDtype).GetString(),
+                                                  "scale must be FLOAT8_E8M0, FLOAT32 or BFLOAT16; HIFLOAT4_SCALE is "
+                                                  "only supported on DAV_9201/DAV_9202");
             return ACLNN_ERR_PARAM_INVALID;
         }
         // 1. 检查参数是否为空指针
@@ -538,7 +540,7 @@ public:
                 GMMFR_ACLNN_OP_NAME, "x and weight",
                 "x=" + std::string(op::ToString(gmmParams_.x1->GetDataType()).GetString()) +
                     ", weight=" + op::ToString(gmmParams_.x2->GetDataType()).GetString(),
-                "x and weight must both be MXFP4, both be MXFP8, or both be HIFLOAT4 (DAV_9201 only)");
+                "x and weight must both be MXFP4, both be MXFP8, or both be HIFLOAT4 (DAV_9201/DAV_9202 only)");
             return false;
         }
         bool isWeightNz = gmmParams_.x2->GetStorageFormat() == Format::FORMAT_FRACTAL_NZ;

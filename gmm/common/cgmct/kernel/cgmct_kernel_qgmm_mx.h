@@ -73,7 +73,7 @@ public:
     using BiasType = typename BlockMmad::BiasType;
     using LayoutB = typename BlockMmad::LayoutB;
     static constexpr CubeFormat formatB = TagToFormat<LayoutB>::format;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     static constexpr bool IS_FP4_HIF4 = AscendC::IsSameType<AType, fp4x2_e2m1_t>::value ||
                                         AscendC::IsSameType<AType, fp4x2_e1m2_t>::value ||
                                         AscendC::IsSameType<AType, hifloat4x2_t>::value;
@@ -367,7 +367,7 @@ __aicore__ inline void KernelQGmmMx<QGMM_MX_KERNEL_FUN_TEM_PARAMS>::UpdateOffset
         // y:(m, n)
         Get<IDX_C_OFFSET>(baseOffset_) = (preOffset_ - m) * n;
     } else { // split k, weight ND only
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         if constexpr (IS_FP4_HIF4) {
             Get<IDX_A_OFFSET>(baseOffset_) = m * (preOffset_ - k) >> 1;
             Get<IDX_B_OFFSET>(baseOffset_) = n * (preOffset_ - k) >> 1;

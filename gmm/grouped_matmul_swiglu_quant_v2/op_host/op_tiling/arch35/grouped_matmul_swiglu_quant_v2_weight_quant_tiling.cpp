@@ -328,12 +328,13 @@ bool CheckDtypes(const gert::TilingContext& context, bool isAsw, NpuArch npuArch
     }
 
     const auto weightDtype = wDesc->GetDataType();
-    const bool validWeightDtype = weightDtype == ge::DT_FLOAT4_E2M1 || (isAsw && npuArch == NpuArch::DAV_9201 &&
-                                                                        weightDtype == Ops::Transformer::DT_HIFLOAT4);
+    const bool isHif4AswWeight = isAsw && (npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) &&
+                                 weightDtype == Ops::Transformer::DT_HIFLOAT4;
+    const bool validWeightDtype = weightDtype == ge::DT_FLOAT4_E2M1 || isHif4AswWeight;
     if (unlikely(!validWeightDtype)) {
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(OP_NAME, "weight",
-                                              ge::TypeUtils::DataTypeToSerialString(wDesc->GetDataType()),
-                                              "The dtype of weight must be FLOAT4_E2M1, or HIFLOAT4 on DAV_9201 ASW");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            OP_NAME, "weight", ge::TypeUtils::DataTypeToSerialString(wDesc->GetDataType()),
+            "The dtype of weight must be FLOAT4_E2M1, or HIFLOAT4 on DAV_9201/DAV_9202 ASW");
         return false;
     }
 
