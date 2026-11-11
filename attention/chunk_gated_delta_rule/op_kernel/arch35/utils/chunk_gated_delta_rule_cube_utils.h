@@ -11,11 +11,13 @@
 #pragma once
 
 #include "chunk_gated_delta_rule_utils_arch35.h"
-#include "catlass/gemm/tile/ascend950/copy_l0c_to_ub.hpp"
 
 namespace ChunkGatedDeltaRule {
 
 using namespace AscendC;
+
+// FIX 写 UB 的行主序配置；第二个配置位 isToUB=true，表示目标为 UB。
+static constexpr FixpipeConfig CGDR_CFG_ROW_MAJOR_UB = {CO2Layout::ROW_MAJOR, true};
 
 // 无状态的 Cube 指令辅助函数：只描述 tensor、shape 和 stride，不依赖 head/chunk 或缓冲槽。
 // 调用方负责 Lock/Unlock、跨核握手和缓冲生命周期；这里不隐含任何同步。
@@ -97,9 +99,9 @@ __aicore__ inline void CopyResultRowsL0CToUb(LocalTensor<outputType> dst, LocalT
     copy.params.srcNdStride = 0;
     copy.params.dstNdStride = 0;
     copy.subBlockId = 0;
-    Fixpipe<outputType, float, CFG_ROW_MAJOR_UB>(dst, src, copy);
+    Fixpipe<outputType, float, CGDR_CFG_ROW_MAJOR_UB>(dst, src, copy);
     copy.subBlockId = 1;
-    Fixpipe<outputType, float, CFG_ROW_MAJOR_UB>(dst, src[rows / 2 * MM_NZ_FRACTAL], copy);
+    Fixpipe<outputType, float, CGDR_CFG_ROW_MAJOR_UB>(dst, src[rows / 2 * MM_NZ_FRACTAL], copy);
 }
 
 // FIX：FP32 L0C [m,n] -> BF16 L1 NZ；dst 已指向目标子块，fullRows 为目标矩阵行跨度。

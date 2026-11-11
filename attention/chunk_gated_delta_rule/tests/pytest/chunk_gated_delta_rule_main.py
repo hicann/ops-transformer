@@ -15,7 +15,7 @@ import torch
 import torch_npu
 
 # from cann_ops_transformer.ops import chunk_gated_delta_rule
-from chunk_gated_delta_rule_benchmark_fused import chunk_gdn_benchmark_fused
+from chunk_gated_delta_rule_benchmark import chunk_gdn_benchmark_opt
 from chunk_gated_delta_rule_golden import chunk_gated_delta_rule_npu
 import torch.nn.functional as F
 import numpy as np
@@ -242,7 +242,7 @@ def cgdr_benchmark(
     if g is None:
         g = torch.zeros((v.shape[0], v.shape[1])).to(v.device).to(torch.float32)
     logger.info(f"[benchmark] device={q.device}, state_dtype={initial_state.dtype}")
-    o_bench, state_bench = chunk_gdn_benchmark_fused(
+    o_bench, state_bench = chunk_gdn_benchmark_opt(
         q.to(dtype),
         k.to(dtype),
         v.to(dtype),

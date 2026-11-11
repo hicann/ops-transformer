@@ -74,8 +74,8 @@ private:
     // 每stage最多 BF16[D,D]=32KiB；按MMAD步骤轮换，stage编号不等于chunk槽编号。
     // ComputeResidualAndStateOutput 的两次MMAD共用一份L0B状态，第二次完成才释放。
     static constexpr uint32_t L0AB_STAGES = 2;
-    static constexpr uint32_t L0A_STAGE_BYTES = ArchTag::L0A_SIZE / L0AB_STAGES;
-    static constexpr uint32_t L0B_STAGE_BYTES = ArchTag::L0B_SIZE / L0AB_STAGES;
+    static constexpr uint32_t L0A_STAGE_BYTES = L0A_SIZE / L0AB_STAGES;
+    static constexpr uint32_t L0B_STAGE_BYTES = L0B_SIZE / L0AB_STAGES;
     // 固定 ID 直接使用 MutexID；BASE + stage/slot 经整数提升，仅动态组合处显式转换。
     // stage/slot 均为 0/1：L0AB 使用 0/1，QK 使用 5/6。
     static constexpr MutexID AIC_L0AB_MUTEX_BASE = 0;
@@ -99,8 +99,7 @@ private:
     static_assert(DIM * DIM * sizeof(float) <= L0C_RESIDUAL_OFFSET, "AIC temporary accumulator overlaps residual");
     static_assert(L0C_RESIDUAL_OFFSET + CHUNK * DIM * sizeof(float) <= L0C_OUTPUT_OFFSET,
                   "AIC residual accumulator overlaps output");
-    static_assert(L0C_OUTPUT_OFFSET + CHUNK * DIM * sizeof(float) <= ArchTag::L0C_SIZE,
-                  "AIC accumulators exceed L0C capacity");
+    static_assert(L0C_OUTPUT_OFFSET + CHUNK * DIM * sizeof(float) <= L0C_SIZE, "AIC accumulators exceed L0C capacity");
     static_assert(AIC_L1_FIX_MUTEX < MUTEX_COUNT, "arch35 exact AIC mutex layout exceeds its allocation");
 
     // 一个 chunk 的内部工作集；shape 为补零后的计算范围，不分配缓冲区。

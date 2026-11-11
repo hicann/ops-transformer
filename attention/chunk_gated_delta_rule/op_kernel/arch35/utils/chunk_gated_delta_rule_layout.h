@@ -10,12 +10,7 @@
 
 #pragma once
 
-#ifndef CATLASS_ARCH
-#define CATLASS_ARCH 3510
-#endif
-
 #include "basic_api/kernel_basic_intf.h"
-#include "catlass/arch/arch.hpp"
 #include "chunk_gated_delta_rule_utils_arch35.h"
 
 namespace ChunkGatedDeltaRule {
@@ -25,33 +20,40 @@ using namespace AscendC;
 // 跨层共同约定：物理 tile、可用容量，以及 AIC/AIV 交换数据时必须一致的地址。
 // 各 Compute 的私有暂存区、锁编号和绑定结构放在各自实现内；这里只保留一份通信布局。
 struct FusedLayout {
-    using ArchTag = Catlass::Arch::Ascend950;
+    // Ascend950 物理暂存容量，单位字节。这里直接固化当前 arch35 kernel 的硬件约束；
+    // 如后续支持多代硬件，应随 arch 目录一起调整。
+    static constexpr uint32_t UB_SIZE = 248 * 1024;  // 248 KiB
+    static constexpr uint32_t L1_SIZE = 512 * 1024;  // 512 KiB
+    static constexpr uint32_t L0A_SIZE = 64 * 1024;  // 64 KiB
+    static constexpr uint32_t L0B_SIZE = 64 * 1024;  // 64 KiB
+    static constexpr uint32_t L0C_SIZE = 256 * 1024; // 256 KiB
+
     // 地址只是无状态的 SDK 张量视图。缓冲区的可复用时点仍由显式 Lock/Unlock 与跨核事件约束。
     struct BufferViews {
         template <typename T>
         __aicore__ static inline LocalTensor<T> Ub(uint32_t byteOffset)
         {
-            return At<T, TPosition::VECCALC, ArchTag::UB_SIZE>(byteOffset);
+            return At<T, TPosition::VECCALC, UB_SIZE>(byteOffset);
         }
         template <typename T>
         __aicore__ static inline LocalTensor<T> L1(uint32_t byteOffset)
         {
-            return At<T, TPosition::A1, ArchTag::L1_SIZE>(byteOffset);
+            return At<T, TPosition::A1, L1_SIZE>(byteOffset);
         }
         template <typename T>
         __aicore__ static inline LocalTensor<T> L0A(uint32_t byteOffset)
         {
-            return At<T, TPosition::A2, ArchTag::L0A_SIZE>(byteOffset);
+            return At<T, TPosition::A2, L0A_SIZE>(byteOffset);
         }
         template <typename T>
         __aicore__ static inline LocalTensor<T> L0B(uint32_t byteOffset)
         {
-            return At<T, TPosition::B2, ArchTag::L0B_SIZE>(byteOffset);
+            return At<T, TPosition::B2, L0B_SIZE>(byteOffset);
         }
         template <typename T>
         __aicore__ static inline LocalTensor<T> L0C(uint32_t byteOffset)
         {
-            return At<T, TPosition::CO1, ArchTag::L0C_SIZE>(byteOffset);
+            return At<T, TPosition::CO1, L0C_SIZE>(byteOffset);
         }
 
     private:
@@ -72,7 +74,7 @@ struct FusedLayout {
     static constexpr uint32_t SCORE_SLICE_ELEMS = HALF_CHUNK * CHUNK;
 
     // 使用架构给出的可用 UB 容量，不在布局中再维护一份硬件容量数字。
-    static constexpr uint32_t UB_WORKSPACE_BYTES = ArchTag::UB_SIZE;
+    static constexpr uint32_t UB_WORKSPACE_BYTES = UB_SIZE;
     static constexpr uint32_t MUTEX_COUNT = 8;
     static_assert(2 * HALF_DIM == DIM && 2 * HALF_CHUNK == CHUNK, "AIV halves must cover one physical tile");
 
@@ -110,7 +112,7 @@ struct FusedLayout {
     static constexpr uint32_t L1_MASKED_QKT_OFFSET = L1_KG_OFFSET + L1_TILE_BYTES;
     static constexpr uint32_t L1_SLOT_BYTES = L1_MASKED_QKT_OFFSET + CHUNK * CHUNK * sizeof(bfloat16_t) + 8 * 1024;
     // 槽容量和槽间距分开：160KiB 是存储范围，256KiB 是双缓冲的地址跨度。
-    static constexpr uint32_t L1_SLOT_STRIDE_BYTES = ArchTag::L1_SIZE / 2;
+    static constexpr uint32_t L1_SLOT_STRIDE_BYTES = L1_SIZE / 2;
     static constexpr uint32_t L1_STATE_OFFSET = L1_SLOT_BYTES; // 单份 S 放在槽0之后
 
     // Chunk 路径：每个 AIV 各有一份 UB；这里的“共享”指 AIC FIX 与目标 AIV 约定相同地址。
@@ -146,7 +148,7 @@ struct FusedLayout {
     static_assert(L1_STATE_OFFSET >= L1_SLOT_BYTES &&
                       L1_STATE_OFFSET + DIM * DIM * sizeof(bfloat16_t) <= L1_SLOT_STRIDE_BYTES,
                   "shared L1 state must fit between the two slots");
-    static_assert(L1_SLOT_STRIDE_BYTES + L1_SLOT_BYTES <= ArchTag::L1_SIZE, "L1 slot 1 exceeds capacity");
+    static_assert(L1_SLOT_STRIDE_BYTES + L1_SLOT_BYTES <= L1_SIZE, "L1 slot 1 exceeds capacity");
     static_assert(L1_VBETA_OFFSET == L1_RAW_KCD_OFFSET + CHUNK * DIM * sizeof(bfloat16_t),
                   "rawKcd and vBeta must stay contiguous for merged DMA");
     static_assert(UB_STATE_DELTA_BF16_OFFSET + STATE_SLICE_ELEMS * sizeof(bfloat16_t) <= UB_PREFIX_DIRECT0_OFFSET,
