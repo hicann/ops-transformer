@@ -436,6 +436,8 @@ __aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t* query, __gm__ uint8
     using OUT_T = bfloat16_t;
 
     fa_base_matmul::ResetIdCounter();
+    // 静态Tensor无TPipe，手动复位SoC全局状态，避免继承前序算子的状态
+    InitSocState();
 
     constexpr LayOutTypeEnum inputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][0]);
     constexpr LayOutTypeEnum outputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][1]);
@@ -478,12 +480,12 @@ __aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t* query, __gm__ uint8
     using Kernel = BaseApi::QuantFlashAttnKernelHif8<CubeBlockDummy, VecFaBlock, VecFdBlock>;
 #endif
 
-    TPipe tPipe;
+    // 静态Tensor: kernel/block 内部显式分配 UB/L1 地址, 不再使用 TPipe
     Kernel op;
     op.Init(query, key, value, sinks, attnMask, cuSeqLensQ, cuSeqLensKv, blockTable, dequantScaleQuery, dequantScaleKey,
-            dequantScaleValue, pScale, softmaxLse, attnOut, workspace, metadata, sequsedQ, sequsedKv, tilingData,
-            &tPipe);
+            dequantScaleValue, pScale, softmaxLse, attnOut, workspace, metadata, sequsedQ, sequsedKv, tilingData);
     op.Process();
+    AscendC::PipeBarrier<PIPE_ALL>();
 }
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,

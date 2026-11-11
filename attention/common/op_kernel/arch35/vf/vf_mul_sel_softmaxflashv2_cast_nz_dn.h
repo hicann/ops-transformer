@@ -4169,20 +4169,18 @@ template <typename T, typename T2, bool isUpdate = false, bool hasAtten = false,
           bool hasSink = false>
 __aicore__ inline void ProcessVec1VfDnHif8(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& expSumTensor,
                                            const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor,
-                                           const LocalTensor<T>& expMaxTensor, TBuf<>* vselrIndexesBuf,
-                                           const uint32_t m, const uint32_t n, const uint32_t originN, const T scale,
-                                           float deScaleQK, float pScale, const T minValue, float keepProb,
-                                           int64_t maskLine)
+                                           const LocalTensor<T>& expMaxTensor,
+                                           const LocalTensor<uint8_t>& vselrIndexesTensor, const uint32_t m,
+                                           const uint32_t n, const uint32_t originN, const T scale, float deScaleQK,
+                                           float pScale, const T minValue, float keepProb, int64_t maskLine)
 {
-    LocalTensor<uint8_t> indexesTensor;
-    indexesTensor = vselrIndexesBuf[static_cast<int>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();
     if constexpr (!isUpdate) {
         ProcessVec1DnNoUpdateHif8<T, T2, hasAtten, ubN, hasSink>(dstTensor, expSumTensor, maxTensor, srcTensor,
-                                                                 expMaxTensor, indexesTensor, m, n, originN, scale,
+                                                                 expMaxTensor, vselrIndexesTensor, m, n, originN, scale,
                                                                  deScaleQK, pScale, minValue, keepProb, maskLine);
     } else {
         ProcessVec1DnUpdateHif8<T, T2, hasAtten, ubN, hasSink>(dstTensor, expSumTensor, maxTensor, srcTensor,
-                                                               expMaxTensor, indexesTensor, m, n, originN, scale,
+                                                               expMaxTensor, vselrIndexesTensor, m, n, originN, scale,
                                                                deScaleQK, pScale, minValue, keepProb, maskLine);
     }
 }

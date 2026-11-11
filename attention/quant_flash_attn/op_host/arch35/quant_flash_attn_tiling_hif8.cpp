@@ -256,7 +256,6 @@ void QuantFlashAttnTilingHif8Impl::SetQFATilingData()
         !(cuSeqLenKVFlag_ && qfaInfo_->kvLayout == QfaLayout::TND);
     tilingData_.baseTiling.quantFlashAttnBaseParams.coreNum = numBlocks_;
     tilingData_.baseTiling.quantFlashAttnBaseParams.outputLayout = static_cast<uint32_t>(qfaInfo_->outLayout);
-    tilingData_.baseTiling.quantFlashAttnBaseParams.needInitOutput = CheckNeedInitOutput();
 
     tilingData_.baseTiling.quantFlashAttnAttenMaskParams.winLefts = qfaInfo_->winLeft;
     tilingData_.baseTiling.quantFlashAttnAttenMaskParams.winRights = qfaInfo_->winRight;
@@ -268,29 +267,6 @@ void QuantFlashAttnTilingHif8Impl::SetQFATilingData()
     }
     tilingData_.baseTiling.quantFlashAttnPageAttentionParams.blockSize = qfaInfo_->blockSize;
     tilingData_.baseTiling.quantFlashAttnPageAttentionParams.maxBlockNumPerBatch = 0;
-}
-
-bool QuantFlashAttnTilingHif8Impl::CheckNeedInitOutput() const
-{
-    if (seqUsedQFlag_ || seqUsedKvFlag_) {
-        return true;
-    }
-    if (qfaInfo_->qLayout == QfaLayout::TND && qfaInfo_->kvLayout == QfaLayout::TND) {
-        return qfaInfo_->maskMode != static_cast<int64_t>(MaskMode::NO_MASK);
-    }
-    if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
-        return false;
-    }
-    if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::CAUSAL)) {
-        return qfaInfo_->s1Size > qfaInfo_->s2Size;
-    }
-    if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::SLIDING_WINDOW)) {
-        if (qfaInfo_->winRight == -1) {
-            return false;
-        }
-        return (qfaInfo_->s1Size - qfaInfo_->s2Size) > qfaInfo_->winRight;
-    }
-    return false;
 }
 
 ge::graphStatus QuantFlashAttnTilingHif8Impl::SetTilingData(QuantFlashAttnTilingData& tilingData)
@@ -328,7 +304,6 @@ void QuantFlashAttnTilingHif8Impl::PrintAllTilingData()
     OP_LOGD(qfaInfo_->opName, "HIF8 isSoftMaxLseEnable:%d", params.isSoftMaxLseEnable);
     OP_LOGD(qfaInfo_->opName, "HIF8 coreNum:%d", params.coreNum);
     OP_LOGD(qfaInfo_->opName, "HIF8 outputLayout:%d", params.outputLayout);
-    OP_LOGD(qfaInfo_->opName, "HIF8 needInitOutput:%d", params.needInitOutput);
 
     OP_LOGD(qfaInfo_->opName, "HIF8 maskMode:%d", maskParams.sparseMode);
     OP_LOGD(qfaInfo_->opName, "HIF8 winLefts:%d", maskParams.winLefts);
