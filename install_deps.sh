@@ -14,10 +14,14 @@ set -euo pipefail
 
 run_command() {
     local cmd="$*"
+    local output
+    local exit_code
     echo "Executing command: $cmd"
 
-    if ! output=$("$@" 2>&1); then
-         local exit_code=$?
+    if output=$("$@" 2>&1); then
+         return 0
+    else
+         exit_code=$?
          echo -e "\nCommand execution failed!"
          echo -e "\nFailed command: $cmd"
          echo -e "\nError output: $output"
@@ -287,21 +291,40 @@ install_python() {
     fi
 }
 
+gcc_version() {
+    if [[ "$debian_13" == true ]]; then
+        local version
+        if version=$("$1" -dumpfullversion -dumpversion 2>/dev/null) && [[ -n "$version" ]]; then
+            echo "$version"
+        else
+            "$1" -dumpversion
+        fi
+    else
+        "$1" --version | head -n1 | awk '{print $3}'
+    fi
+}
+
 install_gcc() {
     # GCC version >= 7.3.0
     echo -e "\n==== Checking GCC ===="
     local req_ver="7.3.0"
     local gcc_curr_ver=""
     local gxx_curr_ver=""
+    local debian_13=false
+
+    if [[ "$OS" == "debian" ]] && grep -Eq '^ID="?debian"?$' /etc/os-release && \
+        grep -Eq '^VERSION_ID="?13(\.[0-9]+)*"?$' /etc/os-release; then
+        debian_13=true
+    fi
 
     if command -v gcc &> /dev/null; then
-        gcc_curr_ver=$(gcc --version | head -n1 | awk '{print $3}')
+        gcc_curr_ver=$(gcc_version gcc)
     else
         gcc_curr_ver="0.0.0"
     fi
 
     if command -v g++ &> /dev/null; then
-        gxx_curr_ver=$(g++ --version | head -n1 | awk '{print $3}')
+        gxx_curr_ver=$(gcc_version g++)
     else
         gxx_curr_ver="0.0.0"
     fi
@@ -317,9 +340,13 @@ install_gcc() {
     case "$OS" in
         debian)
             run_command $try_sudo $PKG_MANAGER update
-            run_command $try_sudo $PKG_MANAGER install -y gcc-9 g++-9
-            run_command $try_sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 90 \
-                --slave /usr/bin/g++ g++ /usr/bin/g++-9
+            if [[ "$debian_13" == true ]]; then
+                run_command $try_sudo $PKG_MANAGER install -y gcc g++
+            else
+                run_command $try_sudo $PKG_MANAGER install -y gcc-9 g++-9
+                run_command $try_sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 90 \
+                    --slave /usr/bin/g++ g++ /usr/bin/g++-9
+            fi
             ;;
         rhel)
             if grep -q "release 7" /etc/redhat-release; then
@@ -345,9 +372,9 @@ install_gcc() {
             ;;
     esac
 
-    if command -v gcc &> /dev/null; then
-        gcc_curr_ver=$(gcc --version | head -n1 | awk '{print $3}')
-        gxx_curr_ver=$(g++ --version | head -n1 | awk '{print $3}')
+    if command -v gcc &> /dev/null && command -v g++ &> /dev/null; then
+        gcc_curr_ver=$(gcc_version gcc)
+        gxx_curr_ver=$(gcc_version g++)
         if version_ge "$gcc_curr_ver" "$req_ver" && version_ge "$gxx_curr_ver" "$req_ver"; then
             echo "GCC ($gcc_curr_ver) and G++ ($gxx_curr_ver) installed successfully."
         else
