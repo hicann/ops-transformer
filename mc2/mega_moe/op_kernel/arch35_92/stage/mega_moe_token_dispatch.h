@@ -35,11 +35,11 @@ struct TokenDispatchConfig {
     DedupConfig dedup; // dedupMode==0 时所有去重字段为空，走基线路径
 };
 
-template <typename ActivationType, typename TopkIndexType>
+template <typename ActivationType>
 struct TokenDispatchScratch {
     __gm__ int32_t* expertRecvCountsGm = nullptr;
     __gm__ int32_t* cumsumGm = nullptr;
-    __ubuf__ TopkIndexType* validTopkIndexTensor = nullptr;
+    TopkIndexUbView validTopkIndexTensor;
     __ubuf__ int32_t* cumsumInfoTensor = nullptr;
     uint32_t copyTmpBaseAddr;
     __ubuf__ int32_t* metaInfoTensor = nullptr;
@@ -69,7 +69,6 @@ struct DispatchCopyTargets {
 };
 
 // 由 tiling/peermem/quant 配置装配 Token Dispatch 阶段配置（普通与 wave 编排模板共用）。
-template <typename TopkIndexType>
 __aicore__ inline TokenDispatchConfig CreateTokenDispatchConfig(const Params& params,
                                                                 const QuantProcessConfig& quantProcessConfig)
 {
@@ -85,19 +84,20 @@ __aicore__ inline TokenDispatchConfig CreateTokenDispatchConfig(const Params& pa
             .dedup = CreateDedupConfig(params)};
 }
 
-template <typename ActivationType, typename TopkIndexType>
-__aicore__ inline __ubuf__ ActivationType* GetDispatchCopyBuffer(
-    const TokenDispatchConfig& context, const TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
-    int32_t bufferIdx)
+template <typename ActivationType>
+__aicore__ inline __ubuf__ ActivationType* GetDispatchCopyBuffer(const TokenDispatchConfig& context,
+                                                                 const TokenDispatchScratch<ActivationType>& scratch,
+                                                                 int32_t bufferIdx)
 {
     return reinterpret_cast<__ubuf__ ActivationType*>(scratch.copyTmpBaseAddr + static_cast<uint32_t>(bufferIdx) *
                                                                                     context.quantTokenScaleAlignBytes);
 }
 
-template <bool IsBufferReuse, bool TopkWeightsPrefetch, typename ActivationType, typename TopkIndexType>
-__aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchConfig& context, const Params& params,
-                                                     TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
-                                                     int32_t bufferIdx, int32_t topkIndex, int32_t remoteRankIdx,
+template <bool IsBufferReuse, typename ActivationType>
+__aicore__ inline void FetchDispatchTokenAndMetaInfo(bool topkWeightsPrefetch, const TokenDispatchConfig& context,
+                                                     const Params& params,
+                                                     TokenDispatchScratch<ActivationType>& scratch, int32_t bufferIdx,
+                                                     int32_t topkIndex, int32_t remoteRankIdx,
                                                      __gm__ ActivationType* remoteRecordsGm)
 {
     TEventID eventId = static_cast<TEventID>(bufferIdx);
@@ -119,10 +119,9 @@ __aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchConfig& 
     scratch.metaInfoTensor[bufferIdx * INT32_PER_256B + TOKEN_ID] = tokenIndex;
     scratch.metaInfoTensor[(bufferIdx * INT32_PER_256B) + (TOPK_INDEX)] =
         topkIndex % static_cast<int32_t>(params.tilingData->compute.topK);
-    // 事件分叉与 Store 侧的消费条件同式：记录带权重段（prefetch 或 tkw=0 combine 去重）时
+    // 事件分叉与 Store 侧的消费条件同式：记录带权重段（topk 提前乘权或 tkw=0 combine 去重）时
     // Store 要标量读权重，走 MTE2_S；否则直接放行 S_MTE3。
-    if (TopkWeightsPrefetch ||
-        (params.tilingData->topkWeightsPrefetch == 1 || IsCombineDedupOn(params.tilingData->compute.dedupMode))) {
+    if (topkWeightsPrefetch || IsCombineDedupOn(params.tilingData->compute.dedupMode)) {
         PipeNotify<PIPE_MTE2, PIPE_S>(eventId);
     } else {
         PipeNotify<PIPE_S, PIPE_MTE3>(eventId);
@@ -130,10 +129,11 @@ __aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchConfig& 
 }
 
 // copyIdx 同时是段内目标行号：三个调用点的 ring 排空顺序保证写出行与匹配序恒一一对应。
-template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
-__aicore__ inline void StoreDispatchTokenAndMetaInfo(const TokenDispatchConfig& context, const Params& params,
-                                                     TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
-                                                     int32_t bufferIdx, __gm__ ActivationType* recvDataGm,
+template <typename ActivationType, typename QuantScaleType>
+__aicore__ inline void StoreDispatchTokenAndMetaInfo(bool topkWeightsPrefetch, const TokenDispatchConfig& context,
+                                                     const Params& params,
+                                                     TokenDispatchScratch<ActivationType>& scratch, int32_t bufferIdx,
+                                                     __gm__ ActivationType* recvDataGm,
                                                      __gm__ QuantScaleType* recvScaleGm, __gm__ int32_t* metadataGm,
                                                      __gm__ int32_t* recvWeightsGm, int32_t copyStartIdx,
                                                      int32_t copyIdx)
@@ -143,19 +143,18 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(const TokenDispatchConfig& 
     __ubuf__ ActivationType* tokenScaleBuffer = GetDispatchCopyBuffer(context, scratch, bufferIdx);
     __ubuf__ QuantScaleType* scaleBuffer =
         reinterpret_cast<__ubuf__ QuantScaleType*>(tokenScaleBuffer + (context.quantTokenAlignBytes));
-    if (TopkWeightsPrefetch ||
-        (params.tilingData->topkWeightsPrefetch == 1 || IsCombineDedupOn(params.tilingData->compute.dedupMode))) {
+    if (topkWeightsPrefetch || IsCombineDedupOn(params.tilingData->compute.dedupMode)) {
         PipeWait<PIPE_MTE2, PIPE_S>(eventId);
         uint32_t weightOffsetInUb = context.quantTokenAlignBytes + context.quantScaleAlignBytes;
         auto* weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(tokenScaleBuffer + weightOffsetInUb);
-        int32_t topkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor[copyStartIdx + copyIdx]);
+        int32_t topkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor.Read(copyStartIdx + copyIdx));
         int32_t weightBits =
             weightBitsTensor[static_cast<uint32_t>(topkIndex % static_cast<int32_t>(params.tilingData->compute.topK))];
         scratch.metaInfoTensor[(bufferIdx * INT32_PER_256B) + (WEIGHT_INDEX)] = weightBits;
         PipeNotify<PIPE_S, PIPE_MTE3>(eventId);
         // dc 单开（combine 去重 + dispatch 去重关）时本路径是唯一落地入口：每行把整 token
         // 权重段落到自己的 revWeights 槽，供 merge 在 LAST 行一次连续读回乘权。
-        if constexpr (!TopkWeightsPrefetch) {
+        if (!topkWeightsPrefetch) {
             if (IsCombineDedupOn(params.tilingData->compute.dedupMode)) {
                 const uint32_t topK = static_cast<uint32_t>(params.tilingData->compute.topK);
                 const uint32_t weightAlignInt32 =
@@ -177,10 +176,10 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(const TokenDispatchConfig& 
     PipeNotify<PIPE_MTE3, PIPE_S>(eventId);
 }
 
-template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
+template <typename ActivationType, typename QuantScaleType>
 __aicore__ inline DispatchCopyTargets<ActivationType, QuantScaleType> CreateDispatchCopyTargets(
-    const TokenDispatchConfig& context, const Params& params, GM_ADDR* winRankAddr,
-    const TokenDispatchScratch<ActivationType, TopkIndexType>& scratch, int32_t rowDstOffset, int32_t remoteRankIdx,
+    bool topkWeightsPrefetch, const TokenDispatchConfig& context, const Params& params, GM_ADDR* winRankAddr,
+    const TokenDispatchScratch<ActivationType>& scratch, int32_t rowDstOffset, int32_t remoteRankIdx,
     uint64_t physicalRowOffset)
 {
     const auto& workspace = params.workspace.layout;
@@ -196,7 +195,7 @@ __aicore__ inline DispatchCopyTargets<ActivationType, QuantScaleType> CreateDisp
     // tkw=0 的 combine 去重且 dispatch 去重未开（dc 单开）：本基线路径是唯一落地入口，每行把
     // 整 token 权重段写到自己的 revWeights 槽（merge 在 LAST 行上读，LAST 行也经本路径写过）。
     // full 模式走 DispatchOwnedExpertRowsDedup/StoreDedupEntry，由那边写 LAST 槽，与此互斥。
-    if constexpr (!TopkWeightsPrefetch) {
+    if (!topkWeightsPrefetch) {
         if (IsCombineDedupOn(params.tilingData->compute.dedupMode)) {
             uint32_t weightAlignInt32 = Ops::Base::CeilAlign(static_cast<uint32_t>(params.tilingData->compute.topK) *
                                                                  static_cast<uint32_t>(sizeof(float)),
@@ -210,48 +209,48 @@ __aicore__ inline DispatchCopyTargets<ActivationType, QuantScaleType> CreateDisp
     return targets;
 }
 
-template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
-__aicore__ inline void CopyTokensAndMetaForDispatch(const TokenDispatchConfig& context, const Params& params,
-                                                    GM_ADDR* winRankAddr,
-                                                    TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
-                                                    int32_t rowDstOffset, int32_t remoteRankIdx, int32_t copyStartIdx,
-                                                    int32_t copyNum, uint64_t physicalRowOffset)
+template <typename ActivationType, typename QuantScaleType>
+__aicore__ inline void CopyTokensAndMetaForDispatch(bool topkWeightsPrefetch, const TokenDispatchConfig& context,
+                                                    const Params& params, GM_ADDR* winRankAddr,
+                                                    TokenDispatchScratch<ActivationType>& scratch, int32_t rowDstOffset,
+                                                    int32_t remoteRankIdx, int32_t copyStartIdx, int32_t copyNum,
+                                                    uint64_t physicalRowOffset)
 {
     int32_t bufferCount = context.bufferConfig.bufferCount;
     DispatchCopyTargets<ActivationType, QuantScaleType> targets =
-        CreateDispatchCopyTargets<TopkIndexType, ActivationType, QuantScaleType, TopkWeightsPrefetch>(
-            context, params, winRankAddr, scratch, rowDstOffset, remoteRankIdx, physicalRowOffset);
+        CreateDispatchCopyTargets<ActivationType, QuantScaleType>(
+            topkWeightsPrefetch, context, params, winRankAddr, scratch, rowDstOffset, remoteRankIdx, physicalRowOffset);
 
-    int32_t firstTopkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor[copyStartIdx]);
-    FetchDispatchTokenAndMetaInfo<false, TopkWeightsPrefetch>(context, params, scratch, 0, firstTopkIndex,
-                                                              remoteRankIdx, targets.remoteRank);
+    int32_t firstTopkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor.Read(copyStartIdx));
+    FetchDispatchTokenAndMetaInfo<false>(topkWeightsPrefetch, context, params, scratch, 0, firstTopkIndex,
+                                         remoteRankIdx, targets.remoteRank);
 
     int32_t firstUseEnd = copyNum < bufferCount ? copyNum : bufferCount;
     for (int32_t issueIdx = 1; issueIdx < firstUseEnd; ++issueIdx) {
         int32_t copyIdx = issueIdx - 1;
-        int32_t topkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor[copyStartIdx + issueIdx]);
-        FetchDispatchTokenAndMetaInfo<false, TopkWeightsPrefetch>(context, params, scratch, issueIdx, topkIndex,
-                                                                  remoteRankIdx, targets.remoteRank);
-        StoreDispatchTokenAndMetaInfo<TopkIndexType, ActivationType, QuantScaleType, TopkWeightsPrefetch>(
-            context, params, scratch, copyIdx, targets.tokenRev, targets.scaleRev, targets.metaInfo, targets.revWeights,
-            copyStartIdx, copyIdx);
+        int32_t topkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor.Read(copyStartIdx + issueIdx));
+        FetchDispatchTokenAndMetaInfo<false>(topkWeightsPrefetch, context, params, scratch, issueIdx, topkIndex,
+                                             remoteRankIdx, targets.remoteRank);
+        StoreDispatchTokenAndMetaInfo<ActivationType, QuantScaleType>(
+            topkWeightsPrefetch, context, params, scratch, copyIdx, targets.tokenRev, targets.scaleRev,
+            targets.metaInfo, targets.revWeights, copyStartIdx, copyIdx);
     }
 
     for (int32_t issueIdx = bufferCount; issueIdx < copyNum; ++issueIdx) {
         int32_t copyIdx = issueIdx - 1;
         int32_t issueBufferIdx = issueIdx % bufferCount;
         int32_t copyBufferIdx = copyIdx % bufferCount;
-        int32_t topkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor[copyStartIdx + issueIdx]);
-        FetchDispatchTokenAndMetaInfo<true, TopkWeightsPrefetch>(context, params, scratch, issueBufferIdx, topkIndex,
-                                                                 remoteRankIdx, targets.remoteRank);
-        StoreDispatchTokenAndMetaInfo<TopkIndexType, ActivationType, QuantScaleType, TopkWeightsPrefetch>(
-            context, params, scratch, copyBufferIdx, targets.tokenRev, targets.scaleRev, targets.metaInfo,
-            targets.revWeights, copyStartIdx, copyIdx);
+        int32_t topkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor.Read(copyStartIdx + issueIdx));
+        FetchDispatchTokenAndMetaInfo<true>(topkWeightsPrefetch, context, params, scratch, issueBufferIdx, topkIndex,
+                                            remoteRankIdx, targets.remoteRank);
+        StoreDispatchTokenAndMetaInfo<ActivationType, QuantScaleType>(
+            topkWeightsPrefetch, context, params, scratch, copyBufferIdx, targets.tokenRev, targets.scaleRev,
+            targets.metaInfo, targets.revWeights, copyStartIdx, copyIdx);
     }
 
-    StoreDispatchTokenAndMetaInfo<TopkIndexType, ActivationType, QuantScaleType, TopkWeightsPrefetch>(
-        context, params, scratch, (copyNum - 1) % bufferCount, targets.tokenRev, targets.scaleRev, targets.metaInfo,
-        targets.revWeights, copyStartIdx, copyNum - 1);
+    StoreDispatchTokenAndMetaInfo<ActivationType, QuantScaleType>(
+        topkWeightsPrefetch, context, params, scratch, (copyNum - 1) % bufferCount, targets.tokenRev, targets.scaleRev,
+        targets.metaInfo, targets.revWeights, copyStartIdx, copyNum - 1);
 
     for (int32_t bufferIdx = 0; bufferIdx < firstUseEnd; ++bufferIdx) {
         TEventID eventId = static_cast<TEventID>(bufferIdx);
@@ -290,21 +289,21 @@ __aicore__ inline void PublishGmm1TileReady(const MoeSyncWorkspaceLayout& syncLa
  * 按单个 source rank 的 compact route-index ordinal 区间搬运 token 和 metadata。
  * compact index 已按 [expert][source rank] 分槽保存，因此这里只需按 ordinal 分批顺序读取，无需再次筛选 mask。
  */
-template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
-__aicore__ inline int32_t DispatchRankTokens(const TokenDispatchConfig& context, const MoeStageCommonConfig& common,
+template <typename ActivationType, typename QuantScaleType>
+__aicore__ inline int32_t DispatchRankTokens(bool topkWeightsPrefetch, uint32_t indexBytes,
+                                             const TokenDispatchConfig& context, const MoeStageCommonConfig& common,
                                              const Params& params, GM_ADDR* winRankAddr,
-                                             TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
-                                             uint32_t localExpertId, int32_t expertGlobalRowBegin,
-                                             uint32_t remoteRankIdx, int32_t rankSegmentRowBegin,
-                                             int32_t segmentMatchOrdinalBegin, int32_t segmentMatchOrdinalEnd,
-                                             uint64_t paddedExpertRowBegin)
+                                             TokenDispatchScratch<ActivationType>& scratch, uint32_t localExpertId,
+                                             int32_t expertGlobalRowBegin, uint32_t remoteRankIdx,
+                                             int32_t rankSegmentRowBegin, int32_t segmentMatchOrdinalBegin,
+                                             int32_t segmentMatchOrdinalEnd, uint64_t paddedExpertRowBegin)
 {
     const auto& peermem = params.communication.layout;
     const auto& commBuffer = params.communication.base;
     const MegaMoeDispatchBufferConfig& bufferConfig = context.bufferConfig;
     int32_t processedRouteCount = 0;
     int32_t dispatchedRowCount = 0;
-    __gm__ TopkIndexType* routeIndicesGm = nullptr;
+    __gm__ uint8_t* routeIndicesGm = nullptr;
     while (processedRouteCount < segmentMatchOrdinalEnd - segmentMatchOrdinalBegin) {
         int32_t remainingRouteCount = segmentMatchOrdinalEnd - segmentMatchOrdinalBegin - processedRouteCount;
         int32_t batchDispatchRowCount = remainingRouteCount < bufferConfig.routeItemsPerBatch ?
@@ -314,12 +313,11 @@ __aicore__ inline int32_t DispatchRankTokens(const TokenDispatchConfig& context,
         // 直接定位当前专家、source rank 的 route ordinal，不再扫描完整 topK mask。
         uint64_t slotOffset =
             (static_cast<uint64_t>(localExpertId) * common.worldSize + remoteRankIdx) * context.routeIndexAlignSize;
-        routeIndicesGm =
-            reinterpret_cast<__gm__ TopkIndexType*>(peermem.maskRecv.get_ptr(commBuffer) + slotOffset +
-                                                    static_cast<uint64_t>(routeOrdinal) * sizeof(TopkIndexType));
+        routeIndicesGm = reinterpret_cast<__gm__ uint8_t*>(peermem.maskRecv.get_ptr(commBuffer) + slotOffset +
+                                                           static_cast<uint64_t>(routeOrdinal) * indexBytes);
 
-        CopyGmToUb(scratch.validTopkIndexTensor, routeIndicesGm,
-                   static_cast<uint32_t>(batchDispatchRowCount * sizeof(TopkIndexType)));
+        CopyGmToUb(scratch.validTopkIndexTensor.data, routeIndicesGm,
+                   static_cast<uint32_t>(batchDispatchRowCount) * scratch.validTopkIndexTensor.elementBytes);
         PipeFence<PIPE_MTE2, PIPE_S, SYNC_EVENT_ID4>();
         // route ordinal 同时决定专家输出行位置，保证分批搬运后仍保持专家内连续布局。
         int32_t dispatchDstRowBegin = rankSegmentRowBegin + expertGlobalRowBegin + routeOrdinal;
@@ -329,9 +327,9 @@ __aicore__ inline int32_t DispatchRankTokens(const TokenDispatchConfig& context,
             dispatchRingEnabled ? CalcMteRingPhysicalRow(paddedExpertRowBegin + rankSegmentRowBegin + routeOrdinal,
                                                          params.tilingData->compute.ring.rows) :
                                   static_cast<uint64_t>(dispatchDstRowBegin);
-        CopyTokensAndMetaForDispatch<TopkIndexType, ActivationType, QuantScaleType, TopkWeightsPrefetch>(
-            context, params, winRankAddr, scratch, dispatchDstRowBegin, remoteRankIdx, 0, batchDispatchRowCount,
-            physicalRowOffset);
+        CopyTokensAndMetaForDispatch<ActivationType, QuantScaleType>(topkWeightsPrefetch, context, params, winRankAddr,
+                                                                     scratch, dispatchDstRowBegin, remoteRankIdx, 0,
+                                                                     batchDispatchRowCount, physicalRowOffset);
         processedRouteCount += batchDispatchRowCount;
         dispatchedRowCount += batchDispatchRowCount;
     }
@@ -343,9 +341,9 @@ __aicore__ inline int32_t DispatchRankTokens(const TokenDispatchConfig& context,
  * 在当前专家的 source-rank 累计行数中二分查找 globalRowIdx 所属的首个 rank。
  * 返回值作为 DispatchOwnedExpertRows 的扫描起点，后续只访问与本核范围相交的连续 rank 段。
  */
-template <typename ActivationType, typename TopkIndexType>
+template <typename ActivationType>
 __aicore__ inline uint32_t FindDispatchSourceRank(const MoeStageCommonConfig& common,
-                                                  const TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
+                                                  const TokenDispatchScratch<ActivationType>& scratch,
                                                   uint32_t localExpertId, uint32_t globalRowIdx)
 {
     uint32_t expertRankBegin = localExpertId * common.worldSize;
@@ -368,12 +366,11 @@ __aicore__ inline uint32_t FindDispatchSourceRank(const MoeStageCommonConfig& co
  * 该范围先按 source-rank prefix 拆段，再从 compact index 槽搬运 token/metadata；全部 rank 段完成后，
  * 按实际覆盖行数累加 GMM1 tile ready。AtomicAdd 允许同一 tile 被多个 range 分段发布。
  */
-template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, uint32_t PipelineTileM,
-          bool TopkWeightsPrefetch>
-__aicore__ inline void DispatchOwnedExpertRows(const TokenDispatchConfig& context, const MoeStageCommonConfig& common,
+template <typename ActivationType, typename QuantScaleType, uint32_t PipelineTileM>
+__aicore__ inline void DispatchOwnedExpertRows(bool topkWeightsPrefetch, uint32_t indexBytes,
+                                               const TokenDispatchConfig& context, const MoeStageCommonConfig& common,
                                                const MoeSyncWorkspaceLayout& syncLayout, const Params& params,
-                                               GM_ADDR* winRankAddr,
-                                               TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
+                                               GM_ADDR* winRankAddr, TokenDispatchScratch<ActivationType>& scratch,
                                                uint32_t localExpertId, const ExpertDispatchCoreRange& coreRange)
 {
     constexpr int32_t gmm1TileRowCount = static_cast<int32_t>(PipelineTileM);
@@ -396,13 +393,12 @@ __aicore__ inline void DispatchOwnedExpertRows(const TokenDispatchConfig& contex
             coreGlobalRowBegin > rankGlobalRowBegin ? coreGlobalRowBegin : rankGlobalRowBegin;
         uint32_t overlapGlobalRowEnd = coreGlobalRowEnd < rankGlobalRowEnd ? coreGlobalRowEnd : rankGlobalRowEnd;
         if (overlapGlobalRowBegin < overlapGlobalRowEnd) {
-            int32_t rankDispatchedRowCount =
-                DispatchRankTokens<TopkIndexType, ActivationType, QuantScaleType, TopkWeightsPrefetch>(
-                    context, common, params, winRankAddr, scratch, localExpertId,
-                    static_cast<int32_t>(coreRange.expertGlobalRowBegin), sourceRankIdx,
-                    static_cast<int32_t>(rankGlobalRowBegin - coreRange.expertGlobalRowBegin),
-                    static_cast<int32_t>(overlapGlobalRowBegin - rankGlobalRowBegin),
-                    static_cast<int32_t>(overlapGlobalRowEnd - rankGlobalRowBegin), coreRange.paddedExpertRowBegin);
+            int32_t rankDispatchedRowCount = DispatchRankTokens<ActivationType, QuantScaleType>(
+                topkWeightsPrefetch, indexBytes, context, common, params, winRankAddr, scratch, localExpertId,
+                static_cast<int32_t>(coreRange.expertGlobalRowBegin), sourceRankIdx,
+                static_cast<int32_t>(rankGlobalRowBegin - coreRange.expertGlobalRowBegin),
+                static_cast<int32_t>(overlapGlobalRowBegin - rankGlobalRowBegin),
+                static_cast<int32_t>(overlapGlobalRowEnd - rankGlobalRowBegin), coreRange.paddedExpertRowBegin);
             dispatchedRowCount += rankDispatchedRowCount;
         }
         ++sourceRankIdx;
@@ -451,9 +447,9 @@ __aicore__ inline bool CalcDispatchCoreRowRange(const TokenDispatchConfig& conte
  * AIV1 经 PrepareMoeExpertTokenCountTable 调用；AIV0 参与去重 prepass 建表时直接调用本函数，
  * 在自己的 UB 里得到一份本地前缀表（发布仍由 AIV1 独担；count 槽只被读，无并发写）。
  */
-template <typename ActivationType, typename TopkIndexType>
+template <typename ActivationType>
 __aicore__ inline void LoadAndComputeExpertCountTable(const MoeStageCommonConfig& common, const Params& params,
-                                                      TokenDispatchScratch<ActivationType, TopkIndexType>& scratch)
+                                                      TokenDispatchScratch<ActivationType>& scratch)
 {
     const auto& peermem = params.communication.layout;
     const auto& commBuffer = params.communication.base;

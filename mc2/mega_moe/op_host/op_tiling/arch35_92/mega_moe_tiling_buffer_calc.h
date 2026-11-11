@@ -202,34 +202,24 @@ static int64_t GetDedupMode(const gert::TilingContext* context, const MegaMoeCon
 }
 
 /*
- * 将专家权重类型、dispatch 输入处理模式、量化输出类型、通信拓扑和可选能力编码为 kernel tiling key。
+ * 将专家权重类型、专家量化输出类型和通信拓扑编码为 kernel tiling key。
  */
-static uint64_t CalcTilingKey(const gert::TilingContext* context, const MegaMoeConfig& config,
-                              const MegaMoeExpertParams& expertParams, const MegaMoeTilingData* tilingData)
+static uint64_t CalcTilingKey(const gert::TilingContext* context, const MegaMoeExpertParams& expertParams,
+                              const MegaMoeTilingData* tilingData)
 {
     auto moeWeightDesc = context->GetDynamicInputDesc(expertParams.moe.inputs.weightOne, 0);
     auto sharedWeightDesc = expertParams.shared.expertCount > 0 ?
                                 context->GetDynamicInputDesc(expertParams.shared.inputs.weightOne, 0) :
                                 moeWeightDesc;
-    auto dispatchQuantModePtr = context->GetAttrs()->GetAttrPointer<int64_t>(config.attrDispatchQuantModeIndex);
 
     int64_t topoType = TILINGKEY_TPL_MTE;
     if (IsLayeredTopology(tilingData->compute.topoType)) {
         topoType = TILINGKEY_TPL_URMA;
     }
-    int64_t topkIndexType = TILINGKEY_TOPK_INDEX_INT32;
-    if (topoType == TILINGKEY_TPL_MTE &&
-        UseInt16TopkIndex(tilingData->compute.numMaxTokensPerRank, tilingData->compute.topK)) {
-        topkIndexType = TILINGKEY_TOPK_INDEX_INT16;
-    }
-
-    // prefetch 位恒等于 attr（不强拉）：tkw=0 的 combine 去重走 tkw0 模板实例 + runtime 分支，
-    // key 无需感知 dedup。
-    return GET_TPL_TILING_KEY(
-        static_cast<int64_t>(moeWeightDesc->GetDataType()), static_cast<int64_t>(sharedWeightDesc->GetDataType()),
-        *dispatchQuantModePtr, EXPERT_QUANT_MODE_MAP.at(expertParams.moe.quantOutDtype),
-        EXPERT_QUANT_MODE_MAP.at(expertParams.shared.quantOutDtype), static_cast<int64_t>(tilingData->combineQuantMode),
-        topoType, static_cast<int64_t>(tilingData->topkWeightsPrefetch), topkIndexType);
+    return GET_TPL_TILING_KEY(static_cast<int64_t>(moeWeightDesc->GetDataType()),
+                              static_cast<int64_t>(sharedWeightDesc->GetDataType()),
+                              EXPERT_QUANT_MODE_MAP.at(expertParams.moe.quantOutDtype),
+                              EXPERT_QUANT_MODE_MAP.at(expertParams.shared.quantOutDtype), topoType);
 }
 
 #if RUNTIME_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION && METADEF_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION
@@ -297,7 +287,7 @@ static uint32_t CalcQuantTokenAndScaleBytes(const MegaMoeTilingData* tilingData,
 static uint32_t CalcDispatchCopyBufferBytes(const MegaMoeTilingData* tilingData, uint32_t activationElementsPerByte)
 {
     uint32_t copyBufferBytes = CalcQuantTokenAndScaleBytes(tilingData, activationElementsPerByte);
-    if (tilingData->topkWeightsPrefetch == 1 || IsCombineDedupOn(tilingData->compute.dedupMode) ||
+    if (tilingData->isTopkWeightsPrefetch || IsCombineDedupOn(tilingData->compute.dedupMode) ||
         IsServerCombineDedupOn(tilingData->compute.dedupMode)) {
         uint32_t weightBytes = ops::CeilAlign(static_cast<uint32_t>(tilingData->compute.topK * sizeof(float)),
                                               static_cast<uint32_t>(ALIGN_32));
@@ -646,7 +636,7 @@ static uint32_t CalcPreQuantStageBytes(const MegaMoeTilingData* tilingData, uint
     // 保存完整的 dispatch 记录，使 MTE3 能一次写出整个 tile。
     uint64_t stageBytes =
         static_cast<uint64_t>(CalcDispatchCopyBufferBytes(tilingData, activationElementsPerByte)) * tileTokens;
-    if (tilingData->topkWeightsPrefetch == 1 && topKWeightsDataType == ge::DT_BF16) {
+    if (tilingData->isTopkWeightsPrefetch && topKWeightsDataType == ge::DT_BF16) {
         uint64_t weightSrcRowBytes =
             ops::CeilAlign(static_cast<uint64_t>(tilingData->compute.topK) * ge::GetSizeByDataType(topKWeightsDataType),
                            static_cast<uint64_t>(ALIGN_32));

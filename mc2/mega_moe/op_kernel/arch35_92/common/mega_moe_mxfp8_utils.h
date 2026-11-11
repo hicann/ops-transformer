@@ -27,26 +27,30 @@ using namespace AscendC;
 namespace Mxfp8 {
 
 // 将一行 BF16 token 量化为带 padding 的 MXFP8 data + scale 记录。
-template <uint8_t QuantMode, typename ExpandXType>
-__aicore__ inline void QuantMxFp8(__ubuf__ ExpandXType* outLocal, __ubuf__ ExpandXType* inLocal,
+template <typename ExpandXType>
+__aicore__ inline void QuantMxFp8(uint8_t quantMode, __ubuf__ ExpandXType* outLocal, __ubuf__ ExpandXType* inLocal,
                                   __ubuf__ float* floatTemp, int32_t processLen)
 {
     uint32_t mxScaleNum = Ops::Base::CeilAlign(
         Ops::Base::CeilDiv(static_cast<uint32_t>(processLen), static_cast<uint32_t>(ALIGN_32)), 2U);
-    using Fp8Type = typename std::conditional<QuantMode == MXFP8_E4M3_COMM_QUANT, fp8_e4m3fn_t, fp8_e5m2_t>::type;
-    __ubuf__ Fp8Type* quantData = reinterpret_cast<__ubuf__ Fp8Type*>(outLocal);
     __ubuf__ ExpandXType* srcAddr = (__ubuf__ ExpandXType*)inLocal;
     __ubuf__ uint16_t* maxExpAddr = (__ubuf__ uint16_t*)floatTemp;
     __ubuf__ uint16_t* halfScaleLocalAddr =
         (__ubuf__ uint16_t*)(floatTemp + (Ops::Base::CeilAlign(mxScaleNum, static_cast<uint32_t>(ALIGN_32))));
-    __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)quantData;
+    __ubuf__ int8_t* outLocalAddr = reinterpret_cast<__ubuf__ int8_t*>(outLocal);
     uint32_t tokenStorageElementCount =
         Ops::Base::CeilAlign(static_cast<uint32_t>(processLen), static_cast<uint32_t>(ALIGN_256));
-    __ubuf__ uint16_t* mxScaleLocalAddr = (__ubuf__ uint16_t*)(quantData + (tokenStorageElementCount));
+    __ubuf__ uint16_t* mxScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(outLocalAddr + tokenStorageElementCount);
     Quant::ComputeMaxExp(srcAddr, maxExpAddr, static_cast<uint32_t>(processLen));
-    Quant::ComputeScale<Fp8Type>(maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr, mxScaleNum);
-    Quant::ComputeFp8Data<ExpandXType, Fp8Type, AscendC::RoundMode::CAST_TRUNC, AscendC::RoundMode::CAST_RINT>(
-        srcAddr, halfScaleLocalAddr, outLocalAddr, static_cast<uint32_t>(processLen));
+    if (quantMode == MXFP8_E4M3_COMM_QUANT) {
+        Quant::ComputeScale<fp8_e4m3fn_t>(maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr, mxScaleNum);
+        Quant::ComputeFp8Data<ExpandXType, fp8_e4m3fn_t, AscendC::RoundMode::CAST_TRUNC, AscendC::RoundMode::CAST_RINT>(
+            srcAddr, halfScaleLocalAddr, outLocalAddr, static_cast<uint32_t>(processLen));
+    } else {
+        Quant::ComputeScale<fp8_e5m2_t>(maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr, mxScaleNum);
+        Quant::ComputeFp8Data<ExpandXType, fp8_e5m2_t, AscendC::RoundMode::CAST_TRUNC, AscendC::RoundMode::CAST_RINT>(
+            srcAddr, halfScaleLocalAddr, outLocalAddr, static_cast<uint32_t>(processLen));
+    }
 }
 
 #if __NPU_ARCH__ != 3510

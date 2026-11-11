@@ -93,8 +93,9 @@ void PrintMegaMoeTilingData(const MegaMoeTilingData* tilingData, const char* nod
             tilingData->clampLimit);
     OP_LOGD(nodeName, "combineSync: slotCountPerExpert=%ld", tilingData->compute.combineSyncSlotCountPerExpert);
     OP_LOGD(nodeName, "dedup: dedupMode=%d, topkWeightsPrefetch=%d", tilingData->compute.dedupMode,
-            tilingData->topkWeightsPrefetch);
-    OP_LOGD(nodeName, "topkWeightsPrefetch is %d", tilingData->topkWeightsPrefetch);
+            tilingData->isTopkWeightsPrefetch);
+    OP_LOGD(nodeName, "topkWeightsPrefetch=%d, topkIndexTypeBytes=%u", tilingData->isTopkWeightsPrefetch,
+            tilingData->topkIndexTypeBytes);
     OP_LOGD(nodeName, "preQuant: tileTokens=%u, stageBytes=%u", tilingData->preQuantTileTokens,
             tilingData->preQuantStageBytes);
     OP_LOGD(nodeName, "mGroupsPerWave is %ld", tilingData->compute.mGroupsPerWave);

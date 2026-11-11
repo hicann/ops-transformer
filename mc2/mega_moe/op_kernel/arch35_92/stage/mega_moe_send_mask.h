@@ -28,12 +28,11 @@ struct SendMaskConfig {
     MegaMoeSendMaskBufferConfig bufferConfig;
 };
 
-template <typename TopkIndexType>
 struct SendMaskScratch {
     __gm__ int32_t* topkIdsGm = nullptr;
     __ubuf__ int32_t* topkIdsTensor = nullptr;
     // 当前批次元素在完整 topkIds 数组中的下标。
-    __ubuf__ TopkIndexType* topkIdsIndexTensor = nullptr;
+    TopkIndexUbView topkIdsIndexTensor;
     __ubuf__ uint8_t* routeRingTensor = nullptr;
     // 每个专家连续保存一个累计 count。
     __ubuf__ int32_t* sendCntAccTensor = nullptr;
@@ -49,7 +48,6 @@ struct ExpertRouteInfo {
 };
 
 // 装配 MTE 路径的 topK 有效下标发送配置。
-template <typename TopkIndexType>
 __aicore__ inline SendMaskConfig CreateSendMaskConfig(const Params& params, uint32_t aivCoreIdx)
 {
     const auto& peermem = params.communication.layout;
@@ -66,21 +64,28 @@ __aicore__ inline SendMaskConfig CreateSendMaskConfig(const Params& params, uint
 
 // 加载当前批次的 topkIds，并生成它们在完整数组中的下标。
 template <typename TopkIndexType>
-__aicore__ inline void PrepareTopkIdsForCurrentBatch(SendMaskScratch<TopkIndexType>& scratch, int32_t batchStart,
+__aicore__ inline void CreateTopkIndexBatchTyped(__ubuf__ uint8_t* indexBytes, int32_t batchStart, int32_t validLen)
+{
+#if defined(MEGA_MOE_ARCH92_DEVICE)
+    LocalTensor<TopkIndexType> indices(TPosition::VECCALC, reinterpret_cast<uint64_t>(indexBytes), validLen);
+    CreateVecIndex(indices, static_cast<TopkIndexType>(batchStart), validLen);
+#else
+    CreateRouteIndicesVF<TopkIndexType>(reinterpret_cast<__ubuf__ TopkIndexType*>(indexBytes), batchStart,
+                                        static_cast<uint32_t>(validLen));
+#endif
+}
+
+__aicore__ inline void PrepareTopkIdsForCurrentBatch(uint32_t indexBytes, SendMaskScratch& scratch, int32_t batchStart,
                                                      int32_t validLen)
 {
     CopyGmToUb(scratch.topkIdsTensor, scratch.topkIdsGm + batchStart,
                static_cast<uint32_t>(validLen * sizeof(int32_t)));
     PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID1>();
-#if defined(MEGA_MOE_ARCH92_DEVICE)
-    {
-        LocalTensor<TopkIndexType> indices(TPosition::VECCALC, reinterpret_cast<uint64_t>(scratch.topkIdsIndexTensor),
-                                           validLen);
-        CreateVecIndex(indices, static_cast<TopkIndexType>(batchStart), validLen);
+    if (indexBytes == sizeof(int16_t)) {
+        CreateTopkIndexBatchTyped<int16_t>(scratch.topkIdsIndexTensor.data, batchStart, validLen);
+    } else {
+        CreateTopkIndexBatchTyped<int32_t>(scratch.topkIdsIndexTensor.data, batchStart, validLen);
     }
-#else
-    CreateRouteIndicesVF<TopkIndexType>(scratch.topkIdsIndexTensor, batchStart, static_cast<uint32_t>(validLen));
-#endif
 }
 
 #if !defined(MEGA_MOE_ARCH92_DEVICE)
@@ -130,48 +135,60 @@ __simd_vf__ inline void SelectExpertIndicesVF(__ubuf__ int32_t* idsUb, __ubuf__ 
  * 调用方须先等待该槽上次搬出完成；返回前完成 V_S，调用方可读取命中数量。
  */
 template <typename TopkIndexType>
-__aicore__ inline uint64_t SelectTopkIdsIndexByExpert(const SendMaskConfig& config,
-                                                      SendMaskScratch<TopkIndexType>& scratch,
-                                                      const ExpertRouteInfo& routeInfo, int32_t validLen,
-                                                      __ubuf__ TopkIndexType*& selectedTopkIdsIndexTensor)
+__aicore__ inline void SelectTopkIndexElementsTyped(const SendMaskScratch& scratch, __ubuf__ uint8_t* maskBytes,
+                                                    uint32_t compareMaskBytes, TopkIndexUbView selectedView,
+                                                    int32_t expertId, int32_t validLen, uint64_t& selectedCount)
+{
+#if defined(MEGA_MOE_ARCH92_DEVICE)
+    LocalTensor<uint8_t> mask(TPosition::VECCALC, reinterpret_cast<uint64_t>(maskBytes), compareMaskBytes);
+    LocalTensor<int32_t> ids(TPosition::VECCALC, reinterpret_cast<uint64_t>(scratch.topkIdsTensor), validLen);
+    CompareScalar(mask, ids, expertId, AscendC::CMPMODE::EQ, validLen);
+    using CompareMaskPatternType =
+        typename std::conditional<sizeof(TopkIndexType) == sizeof(int16_t), uint16_t, uint32_t>::type;
+    auto maskPattern = mask.template ReinterpretCast<CompareMaskPatternType>();
+    LocalTensor<TopkIndexType> selected(TPosition::VECCALC, reinterpret_cast<uint64_t>(selectedView.data), validLen);
+    LocalTensor<TopkIndexType> indices(TPosition::VECCALC, reinterpret_cast<uint64_t>(scratch.topkIdsIndexTensor.data),
+                                       validLen);
+    GatherMask(selected, indices, maskPattern, true, static_cast<uint32_t>(validLen), {1, 1, 0, 0}, selectedCount);
+#else
+    (void)maskBytes;
+    (void)compareMaskBytes;
+    (void)selectedCount;
+    SelectExpertIndicesVF<TopkIndexType>(
+        scratch.topkIdsTensor, reinterpret_cast<__ubuf__ TopkIndexType*>(scratch.topkIdsIndexTensor.data),
+        reinterpret_cast<__ubuf__ TopkIndexType*>(selectedView.data), expertId, static_cast<uint32_t>(validLen));
+#endif
+}
+
+__aicore__ inline uint64_t SelectTopkIdsIndexByExpert(uint32_t indexBytes, const SendMaskConfig& config,
+                                                      SendMaskScratch& scratch, const ExpertRouteInfo& routeInfo,
+                                                      int32_t validLen, TopkIndexUbView& selectedTopkIdsIndexTensor)
 {
     const MegaMoeSendMaskBufferConfig& bufferConfig = config.bufferConfig;
     const uint32_t compareMaskBytes = static_cast<uint32_t>(bufferConfig.routeItemsPerBatch) / BITS_PER_BYTE;
     uint32_t slotOffset = routeInfo.bufferIdx * bufferConfig.bufferBytes;
     // 保留原 bitmap 预留区和输出偏移，首版不调整 ring 的 Host tiling。
     // 仅匹配非负的合法专家号，topk_ids 中的 -1 自然排除；保留有效项的原始下标位置。
-    selectedTopkIdsIndexTensor =
-        reinterpret_cast<__ubuf__ TopkIndexType*>((scratch.routeRingTensor + (slotOffset + compareMaskBytes)));
-
-#if defined(MEGA_MOE_ARCH92_DEVICE)
+    selectedTopkIdsIndexTensor = {scratch.routeRingTensor + slotOffset + compareMaskBytes, indexBytes};
     uint64_t selectedTopkIdsIndexCount = 0U;
     if (validLen > 0) {
-        LocalTensor<uint8_t> mask(TPosition::VECCALC, reinterpret_cast<uint64_t>(scratch.routeRingTensor + slotOffset),
-                                  compareMaskBytes);
-        LocalTensor<int32_t> ids(TPosition::VECCALC, reinterpret_cast<uint64_t>(scratch.topkIdsTensor), validLen);
-        CompareScalar(mask, ids, routeInfo.globalExpertId, AscendC::CMPMODE::EQ, validLen);
-        using CompareMaskPatternType =
-            typename std::conditional<sizeof(TopkIndexType) == sizeof(int16_t), uint16_t, uint32_t>::type;
-        auto maskPattern = mask.template ReinterpretCast<CompareMaskPatternType>();
-        LocalTensor<TopkIndexType> selected(TPosition::VECCALC, reinterpret_cast<uint64_t>(selectedTopkIdsIndexTensor),
-                                            validLen);
-        LocalTensor<TopkIndexType> indices(TPosition::VECCALC, reinterpret_cast<uint64_t>(scratch.topkIdsIndexTensor),
-                                           validLen);
-        GatherMask(selected, indices, maskPattern, true, static_cast<uint32_t>(validLen), {1, 1, 0, 0},
-                   selectedTopkIdsIndexCount);
+        if (indexBytes == sizeof(int16_t)) {
+            SelectTopkIndexElementsTyped<int16_t>(scratch, scratch.routeRingTensor + slotOffset, compareMaskBytes,
+                                                  selectedTopkIdsIndexTensor, routeInfo.globalExpertId, validLen,
+                                                  selectedTopkIdsIndexCount);
+        } else {
+            SelectTopkIndexElementsTyped<int32_t>(scratch, scratch.routeRingTensor + slotOffset, compareMaskBytes,
+                                                  selectedTopkIdsIndexTensor, routeInfo.globalExpertId, validLen,
+                                                  selectedTopkIdsIndexCount);
+        }
     }
     PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID2>();
+#if defined(MEGA_MOE_ARCH92_DEVICE)
     return selectedTopkIdsIndexCount;
 #else
-    if (validLen > 0) {
-        SelectExpertIndicesVF<TopkIndexType>(scratch.topkIdsTensor, scratch.topkIdsIndexTensor,
-                                             selectedTopkIdsIndexTensor, routeInfo.globalExpertId,
-                                             static_cast<uint32_t>(validLen));
-    }
-    PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID2>();
     // AR 累计压缩输出的字节数；零长度不发射 VF，也不读取上次调用遗留的 AR。
     if (validLen > 0) {
-        return static_cast<uint64_t>(asc_get_squeeze_status()) / sizeof(TopkIndexType);
+        return static_cast<uint64_t>(asc_get_squeeze_status()) / indexBytes;
     }
     return 0U;
 #endif
@@ -179,11 +196,10 @@ __aicore__ inline uint64_t SelectTopkIdsIndexByExpert(const SendMaskConfig& conf
 
 // 将筛选出的下标追加到专家所在卡，按剩余容量更新累计发送量。
 // 调用方在发送后发出 ring 槽复用事件，保护下次筛选对该槽的覆盖。
-template <typename TopkIndexType>
 __aicore__ inline void SendSelectedTopkIdsIndex(const MoeStageCommonConfig& common, GM_ADDR* winRankAddr,
-                                                const SendMaskConfig& config, SendMaskScratch<TopkIndexType>& scratch,
+                                                const SendMaskConfig& config, SendMaskScratch& scratch,
                                                 const ExpertRouteInfo& routeInfo,
-                                                __ubuf__ TopkIndexType* selectedTopkIdsIndexTensor,
+                                                TopkIndexUbView selectedTopkIdsIndexTensor,
                                                 uint64_t selectedTopkIdsIndexCount)
 {
     const uint32_t countOffset = routeInfo.ownedIdx;
@@ -203,11 +219,10 @@ __aicore__ inline void SendSelectedTopkIdsIndex(const MoeStageCommonConfig& comm
                              static_cast<uint64_t>(localExpertId * static_cast<int32_t>(common.worldSize) +
                                                    static_cast<int32_t>(common.rankId)) *
                                  config.routeIndexAlignSize +
-                             static_cast<uint64_t>(previousCount) * sizeof(TopkIndexType);
-        __gm__ TopkIndexType* dstRouteIndexGm =
-            reinterpret_cast<__gm__ TopkIndexType*>(winRankAddr[dstRank] + dstOffset);
-        CopyUbToGm(dstRouteIndexGm, selectedTopkIdsIndexTensor,
-                   static_cast<uint32_t>(copiedCount * sizeof(TopkIndexType)));
+                             static_cast<uint64_t>(previousCount) * selectedTopkIdsIndexTensor.elementBytes;
+        __gm__ uint8_t* dstRouteIndexGm = reinterpret_cast<__gm__ uint8_t*>(winRankAddr[dstRank] + dstOffset);
+        CopyUbToGm(dstRouteIndexGm, selectedTopkIdsIndexTensor.data,
+                   static_cast<uint32_t>(copiedCount) * selectedTopkIdsIndexTensor.elementBytes);
     }
 }
 
@@ -274,10 +289,9 @@ __aicore__ inline void SendTopkIdsCountToRank(__ubuf__ int32_t* countTensorToSen
 // 发送各专家的 topkIds 下标数量及本轮 epoch，目标布局为 [localExpert][sourceRank]。
 // 仅由 AIV 调用，专家范围非空；紧接同一范围的下标发送调用，期间不能覆盖 scratch 中的累计数量。
 // 返回时搬出可能尚未完成；调用方在复用源 UB 前同步 MTE3 与后续读写流水。
-template <typename TopkIndexType>
 __aicore__ inline void SendTopkIdsCountForExperts(const WorkRange& ownedExpertRange, const MoeStageCommonConfig& common,
                                                   int32_t syncCount, GM_ADDR* winRankAddr, const SendMaskConfig& config,
-                                                  const SendMaskScratch<TopkIndexType>& scratch)
+                                                  const SendMaskScratch& scratch)
 {
     int32_t ownedExpertBegin = static_cast<int32_t>(ownedExpertRange.start);
     int32_t ownedExpertNum = static_cast<int32_t>(ownedExpertRange.count);
@@ -327,10 +341,9 @@ __aicore__ inline void SendTopkIdsCountForExperts(const WorkRange& ownedExpertRa
 
 // 仅由 AIV 调用，为指定的非空连续专家范围发送 topkIds 下标，同时累计各专家的发送数量。
 // 返回前等待所有 ring 槽搬出完成，随后由调用方发送累计数量。
-template <typename TopkIndexType>
-__aicore__ inline void SendTopkIdsIndexForExperts(const WorkRange& ownedExpertRange, const MoeStageCommonConfig& common,
-                                                  GM_ADDR* winRankAddr, const SendMaskConfig& config,
-                                                  SendMaskScratch<TopkIndexType>& scratch)
+__aicore__ inline void SendTopkIdsIndexForExperts(uint32_t indexBytes, const WorkRange& ownedExpertRange,
+                                                  const MoeStageCommonConfig& common, GM_ADDR* winRankAddr,
+                                                  const SendMaskConfig& config, SendMaskScratch& scratch)
 {
     const MegaMoeSendMaskBufferConfig& bufferConfig = config.bufferConfig;
     int32_t ownedExpertBegin = static_cast<int32_t>(ownedExpertRange.start);
@@ -362,7 +375,7 @@ __aicore__ inline void SendTopkIdsIndexForExperts(const WorkRange& ownedExpertRa
 
         if (validLen > 0) {
             PipeFence<PIPE_V, PIPE_MTE2, SYNC_EVENT_ID1>();
-            PrepareTopkIdsForCurrentBatch(scratch, batchStart, validLen);
+            PrepareTopkIdsForCurrentBatch(indexBytes, scratch, batchStart, validLen);
         }
 
         const int32_t batchRingBegin = batchIdx * ownedExpertNum;
@@ -373,9 +386,9 @@ __aicore__ inline void SendTopkIdsIndexForExperts(const WorkRange& ownedExpertRa
                                       .bufferIdx = (batchRingBegin + ownedIdx) % bufferConfig.bufferCount};
             // 复用当前 ring 槽前，等待上次下标搬出完成。
             PipeWait<PIPE_MTE3, PIPE_V>(static_cast<TEventID>(routeInfo.bufferIdx));
-            __ubuf__ TopkIndexType* selectedTopkIdsIndexTensor = nullptr;
-            uint64_t selectedTopkIdsIndexCount =
-                SelectTopkIdsIndexByExpert(config, scratch, routeInfo, validLen, selectedTopkIdsIndexTensor);
+            TopkIndexUbView selectedTopkIdsIndexTensor;
+            uint64_t selectedTopkIdsIndexCount = SelectTopkIdsIndexByExpert(indexBytes, config, scratch, routeInfo,
+                                                                            validLen, selectedTopkIdsIndexTensor);
             SendSelectedTopkIdsIndex(common, winRankAddr, config, scratch, routeInfo, selectedTopkIdsIndexTensor,
                                      selectedTopkIdsIndexCount);
             // 零命中时也归还当前槽，与下一次复用或尾部等待配对。

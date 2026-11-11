@@ -92,7 +92,7 @@ struct GMMAddrInfo {
     uint32_t gmm2CombineLogicalCoreCount = 0U;
     Gmm1ActivationSync* gmm1ActivationSync = nullptr;
     Gmm2CombineSync* gmm2CombineSync =
-        nullptr; // per-tile credit 握手对象；是否参与握手由模板参 NotifyCombineTileReady 编译期决定
+        nullptr; // per-tile credit 握手对象；入口分发后由 NotifyCombineTileReady 模板参数决定是否参与握手
 };
 
 // A/ScaleA 以逻辑元素为单位记录相邻行起始地址的跨度。

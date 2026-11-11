@@ -42,27 +42,29 @@ struct ActivationMxQuantUbOffsets {
     uint32_t topkWeightElementCapacity;
 };
 
-template <typename InputType, uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch>
-__aicore__ constexpr inline ActivationMxQuantUbOffsets BuildActivationMxQuantUbOffsets(bool isGelu)
+template <typename InputType>
+__aicore__ constexpr inline ActivationMxQuantUbOffsets BuildActivationMxQuantUbOffsets(bool isGelu, uint32_t tileM,
+                                                                                       uint32_t tileN,
+                                                                                       bool topkWeightsPrefetch)
 {
-    constexpr uint32_t tileElementCount = TileM * TileN;
-    constexpr uint32_t tileBytes = tileElementCount * sizeof(InputType);
+    const uint32_t tileElementCount = tileM * tileN;
+    const uint32_t tileBytes = tileElementCount * sizeof(InputType);
     ActivationMxQuantUbOffsets offsets{};
     offsets.firstInputElementCapacity = tileElementCount;
-    // 两种激活共用相同物理边界：预取权重从此处开始，非预取的双槽在此处结束。
+    // 两种激活共用相同物理边界：topk 权重区从此处开始，未启用提前乘权时的双槽在此处结束。
     offsets.topkWeightOffsetBytes = tileBytes * 2U;
-    offsets.topkWeightElementCapacity = TileM * INT32_PER_256B;
+    offsets.topkWeightElementCapacity = tileM * INT32_PER_256B;
     if (isGelu) {
         // 容量表示 LocalTensor 视图范围，逐行量化只写入其中的有效字节。
-        offsets.activationOutputElementCapacity = (TopkWeightsPrefetch ? 1U : 2U) * tileElementCount;
-        if constexpr (TopkWeightsPrefetch) {
+        offsets.activationOutputElementCapacity = (topkWeightsPrefetch ? 1U : 2U) * tileElementCount;
+        if (topkWeightsPrefetch) {
             // 单个 BF16 输入槽之后，按 FP8 最大占用预留连续量化值和 scale 区域。
             offsets.quantOutputOffsetBytes = tileBytes;
             offsets.quantScaleOffsetBytes = tileBytes + tileElementCount * sizeof(int8_t);
         } else {
             // GELU 原位复用双槽；量化值位于行首，scale 位于该行 FP8 最大输出的末端。
             offsets.quantOutputOffsetBytes = 0U;
-            offsets.quantScaleOffsetBytes = TileN * sizeof(int8_t);
+            offsets.quantScaleOffsetBytes = tileN * sizeof(int8_t);
         }
         offsets.quantOutputElementCapacity = offsets.topkWeightOffsetBytes - offsets.quantOutputOffsetBytes;
         offsets.quantScaleElementCapacity = offsets.topkWeightOffsetBytes - offsets.quantScaleOffsetBytes;
@@ -92,14 +94,14 @@ struct ActivationMxQuantUbPointers {
     uint32_t selectedSlotOffsetBytes;
 };
 
-template <typename InputType, uint32_t MaxSingleElementCount>
+template <typename InputType>
 __aicore__ inline ActivationMxQuantUbPointers<InputType> ResolveActivationMxQuantUbPointers(
     __ubuf__ InputType* firstInputBase, __ubuf__ bfloat16_t* activationOutputBase, __ubuf__ int8_t* quantOutputBase,
     __ubuf__ uint16_t* quantScaleBase, __ubuf__ uint16_t* maxExpBase, __ubuf__ uint16_t* inverseMxScaleBase,
-    uint32_t validColumnCount, uint16_t pingpongIdx, bool isGelu)
+    uint32_t validColumnCount, uint16_t pingpongIdx, bool isGelu, uint32_t maxSingleElementCount)
 {
-    // 预取调用始终传入首槽；非预取按 ping/pong 下标切换完整输入槽。
-    const uint32_t selectedSlotOffsetBytes = pingpongIdx == 1U ? MaxSingleElementCount * sizeof(InputType) : 0U;
+    // topk 提前乘权路径始终传入首槽；未启用时按 ping/pong 下标切换完整输入槽。
+    const uint32_t selectedSlotOffsetBytes = pingpongIdx == 1U ? maxSingleElementCount * sizeof(InputType) : 0U;
     ActivationMxQuantUbPointers<InputType> pointers{};
     pointers.firstInput = firstInputBase + selectedSlotOffsetBytes / sizeof(InputType);
     pointers.activationOutput = activationOutputBase + selectedSlotOffsetBytes / sizeof(bfloat16_t);

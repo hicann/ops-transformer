@@ -212,7 +212,7 @@ struct MegaMoeTilingData {
     MegaMoeUnpermuteBufferConfig unpermuteConfigForFullTokenChunk;
     MegaMoeUnpermuteBufferConfig unpermuteConfigForTailTokenChunk;
     uint32_t unpermuteFullTokenChunkCoreCount;
-    int32_t topkWeightsPrefetch;
+    bool isTopkWeightsPrefetch;
     uint8_t actMode;       // MegaMoeImpl::MegaMoeActMode 的底层协议值
     uint8_t actSubMode;    // MegaMoeImpl::MegaMoeActSubMode 的底层协议值
     float activationAlpha; // situ: linear_beta; swigluoai: alpha(默认1.702); swiglu/swiglustep: 占位
@@ -229,5 +229,7 @@ struct MegaMoeTilingData {
     uint32_t dispatchTableUbBaseAddr;
     // HCCL 窗口总字节数（ccl_buffer_size），OOM 检测按整窗登记合法地址段。
     uint64_t cclBufferSize;
+    uint32_t dispatchQuantMode;
+    uint32_t topkIndexTypeBytes;
 };
 #endif

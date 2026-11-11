@@ -36,9 +36,8 @@
 #include "rowwise_mx_quant.h"
 
 #define BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS \
-    template <typename DataTypeOut, typename DataTypeIn, uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch>
-#define BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION \
-    BlockEpilogueActivationMxQuant<DataTypeOut, DataTypeIn, TileM, TileN, TopkWeightsPrefetch>
+    template <typename DataTypeOut, typename DataTypeIn, uint32_t TileN>
+#define BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION BlockEpilogueActivationMxQuant<DataTypeOut, DataTypeIn, TileN>
 
 namespace ActivationQuantMsg {
 using ActMode = MegaMoeImpl::MegaMoeActMode;
@@ -53,15 +52,13 @@ namespace MegaMoeImpl {
 using namespace AscendC;
 using namespace ActivationQuantMsg;
 
-template <typename DataTypeOut, typename DataTypeIn, uint32_t TileM = 256, uint32_t TileN = 256,
-          bool TopkWeightsPrefetch = false>
+// 两种提前乘权模式共用缓冲状态，仅在 tile 执行入口选择局部计算特化。
+template <typename DataTypeOut, typename DataTypeIn, uint32_t TileN = 256>
 class BlockEpilogueActivationMxQuant {
 public:
     using BlockShape = Shape<int64_t, int64_t, int64_t, int64_t>;
     using BlockCoord = Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>;
     using ProblemShape = Shape<int64_t, int64_t, int64_t, int64_t>;
-
-    static constexpr uint32_t MAX_SINGLE_MN = TileM * TileN;
 
     struct Arguments {
         GM_ADDR yGmAddr{nullptr};
@@ -71,6 +68,7 @@ public:
         uint8_t actSubMode{static_cast<uint8_t>(ActSubMode::DEFAULT)};
         float activationAlpha{1.0f};
         float activationBeta{1.0f};
+        bool topkWeightsPrefetch{false};
         Arguments() = default;
     };
 
@@ -84,8 +82,8 @@ public:
     __aicore__ inline auto GetTopkWeightTensor();
 
     // 计算并写回一个激活/量化 tile，不包含流水通知。
-    __aicore__ inline void operator()(const BlockShape& blockShape, const BlockCoord& blockCoord,
-                                      uint16_t pingpongIdx = 0);
+    __aicore__ inline void operator()(bool topkWeightsPrefetch, const BlockShape& blockShape,
+                                      const BlockCoord& blockCoord, uint16_t pingpongIdx = 0);
 
 private:
     using UbPointers = ActivationMxQuantUbPointers<DataTypeIn>;
@@ -110,16 +108,23 @@ private:
     __aicore__ static inline void ConfigureGatedActivationTail(
         Activation::GatedActivationTileContext<DataTypeIn>& context, uint16_t validColumnCount);
 
+    template <bool IsTopkWeightsPrefetch>
     __aicore__ inline Activation::GatedActivationTileContext<DataTypeIn> BuildGatedActivationContext(
         const TileExecutionContext& tileContext);
 
+    template <bool IsTopkWeightsPrefetch>
     __aicore__ inline void RunGatedActivationTile(const TileExecutionContext& tileContext);
 
+    template <bool IsTopkWeightsPrefetch>
     __aicore__ inline void RunGeluActivationTile(const TileExecutionContext& tileContext);
 
     __aicore__ inline void RunGatedMxQuantTile(const TileExecutionContext& tileContext);
 
+    template <bool IsTopkWeightsPrefetch>
     __aicore__ inline void RunGeluMxQuantTile(const TileExecutionContext& tileContext);
+
+    template <bool IsTopkWeightsPrefetch>
+    __aicore__ inline void RunActivationMxQuantTile(const TileExecutionContext& tileContext);
 
     __aicore__ inline void StoreQuantTile(const TileExecutionContext& tileContext);
 
@@ -156,6 +161,7 @@ private:
     uint8_t actSubMode_{static_cast<uint8_t>(ActSubMode::DEFAULT)};
     float activationAlpha_{1.0f};
     float activationBeta_{1.0f};
+    uint32_t tileM_{L1_TILE_M_256};
 };
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
@@ -172,9 +178,11 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::Init(P
     actSubMode_ = params.actSubMode;
     activationAlpha_ = params.activationAlpha;
     activationBeta_ = params.activationBeta;
+    tileM_ = params.topkWeightsPrefetch ? L1_TILE_M_128 : L1_TILE_M_256;
 
     const bool isGelu = actMode_ == static_cast<uint8_t>(ActMode::GELU);
-    const auto ubLayout = BuildActivationMxQuantUbOffsets<DataTypeIn, TileM, TileN, TopkWeightsPrefetch>(isGelu);
+    const auto ubLayout =
+        BuildActivationMxQuantUbOffsets<DataTypeIn>(isGelu, tileM_, TileN, params.topkWeightsPrefetch);
     activationInputUb_ = reinterpret_cast<__ubuf__ DataTypeIn*>(ubLayout.firstInputOffsetBytes);
     gluRes_ = reinterpret_cast<__ubuf__ bfloat16_t*>(ubLayout.activationOutputOffsetBytes);
     quantOutput_ = reinterpret_cast<__ubuf__ int8_t*>(ubLayout.quantOutputOffsetBytes);
@@ -184,8 +192,8 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::Init(P
         inverseMxScale_ = reinterpret_cast<__ubuf__ uint16_t*>(ubLayout.inverseMxScaleOffsetBytes);
     }
 
-    // 预取权重放在公共工作区之后，仅预取路径绑定。
-    if constexpr (TopkWeightsPrefetch) {
+    // 激活量化阶段同步计算的 topk 权重放在公共工作区之后，仅启用时绑定。
+    if (params.topkWeightsPrefetch) {
         weightUb_ = reinterpret_cast<__ubuf__ float*>(ubLayout.topkWeightOffsetBytes);
     }
 }
@@ -229,10 +237,10 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::PrepareTileExecutionContext(c
     tileContext.scaleOffset = Get<Y_SCALE_IDX>(blockCoord);
 
     const bool isGelu = actMode_ == static_cast<uint8_t>(ActMode::GELU);
-    tileContext.buffers = ResolveActivationMxQuantUbPointers<DataTypeIn, MAX_SINGLE_MN>(
+    tileContext.buffers = ResolveActivationMxQuantUbPointers<DataTypeIn>(
         activationInputUb_, gluRes_, quantOutput_, reinterpret_cast<__ubuf__ uint16_t*>(quantScaleOutput_),
         isGelu ? nullptr : maxExp_, isGelu ? nullptr : inverseMxScale_, tileContext.geometry.columnCount, pingpongIdx,
-        isGelu);
+        isGelu, tileM_ * TileN);
     if (isGelu) {
         tileContext.geometry.outputRowStrideElements = TileN;
     } else {
@@ -283,6 +291,7 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::Config
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
+template <bool IsTopkWeightsPrefetch>
 __aicore__ inline Activation::GatedActivationTileContext<DataTypeIn>
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::BuildGatedActivationContext(const TileExecutionContext& tileContext)
 {
@@ -298,7 +307,7 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::BuildGatedActivationContext(c
     gatedActivationContext.outputRowStrideElements = tileContext.geometry.outputRowStrideElements;
     gatedActivationContext.rowLoopCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
     ConfigureGatedActivationTail(gatedActivationContext, validColumnCount);
-    if constexpr (TopkWeightsPrefetch) {
+    if constexpr (IsTopkWeightsPrefetch) {
         gatedActivationContext.topkWeights = weightUb_;
     } else {
         gatedActivationContext.topkWeights = nullptr;
@@ -307,11 +316,12 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::BuildGatedActivationContext(c
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
+template <bool IsTopkWeightsPrefetch>
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGatedActivationTile(
     const TileExecutionContext& tileContext)
 {
     Activation::GatedActivationTileContext<DataTypeIn> gatedActivationContext =
-        BuildGatedActivationContext(tileContext);
+        BuildGatedActivationContext<IsTopkWeightsPrefetch>(tileContext);
 
     const ActMode actMode = static_cast<ActMode>(actMode_);
     const ActSubMode actSubMode = static_cast<ActSubMode>(actSubMode_);
@@ -321,36 +331,38 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGat
             const float invAlpha = activationAlpha_ != 0.0f ? 1.0f / activationAlpha_ : 1.0f;
             const Activation::SituGluParams situGluParams{clampLimit_, activationBeta_, invBeta, activationAlpha_,
                                                           invAlpha};
-            Activation::RunSiTUGLU<DataTypeIn, TopkWeightsPrefetch, true>(gatedActivationContext, situGluParams);
+            Activation::RunSiTUGLU<DataTypeIn, IsTopkWeightsPrefetch, true>(gatedActivationContext, situGluParams);
         } else {
             const Activation::SituGluParams situGluParams{clampLimit_, activationBeta_, invBeta, 1.0f, 1.0f};
-            Activation::RunSiTUGLU<DataTypeIn, TopkWeightsPrefetch, false>(gatedActivationContext, situGluParams);
+            Activation::RunSiTUGLU<DataTypeIn, IsTopkWeightsPrefetch, false>(gatedActivationContext, situGluParams);
         }
     } else if (actMode == ActMode::SWIGLU_STEP) {
-        Activation::RunSwiGLU<DataTypeIn, TopkWeightsPrefetch, true>(gatedActivationContext, clampLimit_);
+        Activation::RunSwiGLU<DataTypeIn, IsTopkWeightsPrefetch, true>(gatedActivationContext, clampLimit_);
     } else if (actMode == ActMode::SWIGLU_OAI) {
         const Activation::SwiGluOaiParams swiGluOaiParams{clampLimit_, activationAlpha_, activationBeta_};
-        Activation::RunSwiGLUOAI<DataTypeIn, TopkWeightsPrefetch>(gatedActivationContext, swiGluOaiParams);
+        Activation::RunSwiGLUOAI<DataTypeIn, IsTopkWeightsPrefetch>(gatedActivationContext, swiGluOaiParams);
     } else {
-        Activation::RunSwiGLU<DataTypeIn, TopkWeightsPrefetch, false>(gatedActivationContext, clampLimit_);
+        Activation::RunSwiGLU<DataTypeIn, IsTopkWeightsPrefetch, false>(gatedActivationContext, clampLimit_);
     }
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
+template <bool IsTopkWeightsPrefetch>
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGeluActivationTile(
     const TileExecutionContext& tileContext)
 {
     Activation::GeluActivationTileContext<DataTypeIn> context{};
     context.input = tileContext.buffers.firstInput;
     context.output = tileContext.buffers.activationOutput;
-    context.topkWeights = TopkWeightsPrefetch ? weightUb_ : nullptr;
+    context.topkWeights = IsTopkWeightsPrefetch ? weightUb_ : nullptr;
     context.rowStrideElements = TileN;
     context.rowCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
     context.validColumnCount = static_cast<uint16_t>(tileContext.geometry.columnCount);
-    Activation::RunGeluActivation<DataTypeIn, TopkWeightsPrefetch>(context);
+    Activation::RunGeluActivation<DataTypeIn, IsTopkWeightsPrefetch>(context);
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
+template <bool IsTopkWeightsPrefetch>
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGeluMxQuantTile(
     const TileExecutionContext& tileContext)
 {
@@ -362,9 +374,9 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGel
     context.scaleOutput = (__ubuf__ uint8_t*)ubPointers.quantScale;
     context.rowCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
     context.activationRowStrideElements = TileN;
-    context.quantRowStrideBytes = TopkWeightsPrefetch ? (isFp4 ? TileN / 2U : TileN) : TileN * sizeof(DataTypeIn);
+    context.quantRowStrideBytes = IsTopkWeightsPrefetch ? (isFp4 ? TileN / 2U : TileN) : TileN * sizeof(DataTypeIn);
     context.scaleRowStrideBytes =
-        TopkWeightsPrefetch ? (TileN / MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE : TileN * sizeof(DataTypeIn);
+        IsTopkWeightsPrefetch ? (TileN / MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE : TileN * sizeof(DataTypeIn);
     GeluQuant::RunGeluMxQuant<DataTypeOut, TileN>(context);
 }
 
@@ -461,32 +473,27 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQ
 {
     const uint32_t rowBytes =
         Ops::Base::CeilDiv(singleN, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-    // Scales are compact in UB: advance by the valid scale bytes, not Align32(rowBytes).
+    // scale 在 UB 中紧凑存放，按有效 scale 字节数推进，不按 32B 对齐步长推进。
     MegaMoeImpl::CopyUbToGm(dst + offset, src,
                             MegaMoeImpl::CopyRows{static_cast<uint16_t>(blockCount), rowBytes, scaleN, rowBytes});
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
-__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::operator()(const BlockShape& blockShape,
-                                                                                     const BlockCoord& blockCoord,
-                                                                                     uint16_t pingpongIdx)
+template <bool IsTopkWeightsPrefetch>
+__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunActivationMxQuantTile(
+    const TileExecutionContext& tileContext)
 {
-    if (Get<M_VALUE>(blockShape) == 0) {
-        return;
-    }
-
-    TileExecutionContext tileContext = PrepareTileExecutionContext(blockShape, blockCoord, pingpongIdx);
     const bool isGelu = actMode_ == static_cast<uint8_t>(ActMode::GELU);
     if (isGelu) {
-        RunGeluActivationTile(tileContext);
-        RunGeluMxQuantTile(tileContext);
+        RunGeluActivationTile<IsTopkWeightsPrefetch>(tileContext);
+        RunGeluMxQuantTile<IsTopkWeightsPrefetch>(tileContext);
     } else {
-        RunGatedActivationTile(tileContext);
+        RunGatedActivationTile<IsTopkWeightsPrefetch>(tileContext);
         RunGatedMxQuantTile(tileContext);
     }
     MegaMoeImpl::PipeNotify<PIPE_V, PIPE_MTE3>(0);
     MegaMoeImpl::PipeWait<PIPE_V, PIPE_MTE3>(0);
-    if constexpr (TopkWeightsPrefetch) {
+    if constexpr (IsTopkWeightsPrefetch) {
         StoreQuantTile(tileContext);
     } else {
         if (isGelu) {
@@ -499,6 +506,23 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::operat
     MegaMoeImpl::PipeWait<PIPE_MTE3, PIPE_V>(0);
     MegaMoeImpl::PipeNotify<PIPE_MTE3, PIPE_S>(0);
     MegaMoeImpl::PipeWait<PIPE_MTE3, PIPE_S>(0);
+}
+
+BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
+__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::operator()(bool topkWeightsPrefetch,
+                                                                                     const BlockShape& blockShape,
+                                                                                     const BlockCoord& blockCoord,
+                                                                                     uint16_t pingpongIdx)
+{
+    if (Get<M_VALUE>(blockShape) == 0) {
+        return;
+    }
+
+    const TileExecutionContext tileContext = PrepareTileExecutionContext(blockShape, blockCoord, pingpongIdx);
+    SelectRuntimeBool(
+        topkWeightsPrefetch, [&](auto prefetchTag) __attribute__((always_inline, cce_aicore)) {
+            RunActivationMxQuantTile<decltype(prefetchTag)::value>(tileContext);
+        });
 }
 
 } // namespace MegaMoeImpl

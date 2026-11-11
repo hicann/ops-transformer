@@ -136,7 +136,7 @@ __simd_vf__ inline void RunGeluMxQuant(TileContext context)
                 fp4SourceWordsPerRow);
         }
 
-        // StoreUnAlign 同时支持预取路径的紧凑布局和 UB 中按行留步长的布局。
+        // StoreUnAlign 同时支持topk 提前乘权路径的紧凑布局和 UB 中按行留步长的布局。
         Reg::UnalignRegForStore scaleStoreState;
         Reg::StoreUnAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE>(scaleOutput, scaleBytes, scaleStoreState,
                                                                        scaleBytesPerRow);

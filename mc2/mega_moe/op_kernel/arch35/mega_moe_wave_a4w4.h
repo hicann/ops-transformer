@@ -24,12 +24,10 @@ namespace MegaMoeImpl {
 #define TemplateMegaMoeA4W4WaveTypeClass \
     typename XType, typename OutputType, typename TopkWeightsType, typename MoeWeightType, int32_t MoeQuantMode, \
         typename SharedWeightType, int32_t SharedQuantMode, int32_t MoeWeight1Format, int32_t MoeWeight2Format, \
-        int32_t SharedWeight1Format, int32_t SharedWeight2Format, int32_t CombineQuantMode, bool TopkWeightsPrefetch, \
-        typename TopkIndexType
+        int32_t SharedWeight1Format, int32_t SharedWeight2Format
 #define TemplateMegaMoeA4W4WaveTypeFunc \
     XType, OutputType, TopkWeightsType, MoeWeightType, MoeQuantMode, SharedWeightType, SharedQuantMode, \
-        MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format, CombineQuantMode, \
-        TopkWeightsPrefetch, TopkIndexType
+        MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format
 
 template <TemplateMegaMoeA4W4WaveTypeClass>
 class MegaMoeA4W4Wave : public MegaMoe<TemplateMegaMoeA4W4WaveTypeFunc> {
@@ -47,7 +45,6 @@ private:
     using QuantScaleOutType = typename MegaMoeBase::QuantScaleOutType;
 
     static constexpr uint32_t GMM1_TILE_M = MegaMoeBase::GMM1_TILE_M;
-    static constexpr uint32_t EPILOGUE_TILE_M = MegaMoeBase::EPILOGUE_TILE_M;
 
     using MegaMoeBase::DispatchBuffInit;
     using MegaMoeBase::PrepareMoeExpertTokenCountTable;
@@ -111,21 +108,22 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::RunGmm1
     if (HandleWaveProblemWithoutWork(problemTileCount, gmmExecutionConfig_.blockJob, runtimeState.startBlockIdx)) {
         return;
     }
-    UpdateMoeExpertGmm1GlobalBuffer<
-        typename MoeQuantConfig::QuantStorageType, MoeWeightType, typename MoeQuantConfig::ActivationQuantOutType,
-        typename MoeQuantConfig::QuantScaleType, MoeQuantConfig::A_ELEMS_PER_BYTE, false, TopkWeightsPrefetch>(
-        gmmExecutionConfig_, syncWorkspaceLayout_, workspace, buffer, moeWeightTensorListAddrs_, epilogueOp_,
-        gmmAddrInfo, state, commonConfig_.gmm1OutputDim / commonConfig_.activationOutputDivisor,
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
+    UpdateMoeExpertGmm1GlobalBuffer<typename MoeQuantConfig::QuantStorageType, MoeWeightType,
+                                    typename MoeQuantConfig::ActivationQuantOutType,
+                                    typename MoeQuantConfig::QuantScaleType, MoeQuantConfig::A_ELEMS_PER_BYTE, false>(
+        TopkWeightsPrefetch, gmmExecutionConfig_, syncWorkspaceLayout_, workspace, buffer, moeWeightTensorListAddrs_,
+        epilogueOp_, gmmAddrInfo, state, commonConfig_.gmm1OutputDim / commonConfig_.activationOutputDivisor,
         tokenStartIndexInExpert);
     ProblemShape sliceProblemShape = state.problemShape;
     Get<M_VALUE>(sliceProblemShape) = sliceTokenCount;
     RunGmm1Generic<typename MoeQuantConfig::QuantOutType, typename MoeQuantConfig::ActivationQuantOutType,
                    typename MoeQuantConfig::QuantOutType, bfloat16_t, typename MoeQuantConfig::QuantScaleType,
-                   typename MoeQuantConfig::QuantScaleType, MoeWeight1Format != FORMAT_ND, GMM1_TILE_M, EPILOGUE_TILE_M,
-                   TopkWeightsPrefetch, false, true>(
-        epilogueOp_, params_, sliceProblemShape, gmmAddrInfo, runtimeState.startBlockIdx, runtimeState.vecSetSyncCom,
-        gmmExecutionConfig_.blockJob, static_cast<uint32_t>(state.globalTokenStartIndex) + tokenStartIndexInExpert,
-        state.expertIdx, runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor);
+                   typename MoeQuantConfig::QuantScaleType, MoeWeight1Format != FORMAT_ND, GMM1_TILE_M, false, true>(
+        TopkWeightsPrefetch, epilogueOp_, params_, sliceProblemShape, gmmAddrInfo, runtimeState.startBlockIdx,
+        runtimeState.vecSetSyncCom, gmmExecutionConfig_.blockJob,
+        static_cast<uint32_t>(state.globalTokenStartIndex) + tokenStartIndexInExpert, state.expertIdx,
+        runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor);
 }
 
 template <TemplateMegaMoeA4W4WaveTypeClass>
@@ -150,9 +148,10 @@ __aicore__ inline ExpertTokenPosition MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTyp
             firstDispatchRange.end = nextDispatchRange.end;
         }
         // count-table 准备刚完成，UB prefix 仍有效；首 WAVE 无需从 GM 备份重复恢复。
-        DispatchTokenRange<TopkIndexType, ActivationType, QuantScaleOutType, GMM1_TILE_M, TopkWeightsPrefetch>(
-            tokenDispatchConfig_, commonConfig_, gmmExecutionConfig_.blockJob, syncWorkspaceLayout_, params_,
-            g_winRankAddr_, tokenDispatchScratch_, firstDispatchRange);
+        DispatchTokenRange<ActivationType, QuantScaleOutType, GMM1_TILE_M>(
+            params_.tilingData->isTopkWeightsPrefetch, params_.tilingData->topkIndexTypeBytes, tokenDispatchConfig_,
+            commonConfig_, gmmExecutionConfig_.blockJob, syncWorkspaceLayout_, params_, g_winRankAddr_,
+            tokenDispatchScratch_, firstDispatchRange);
         // 首 WAVE 的全部数据和 ready flag 发布完成后，再提交 Dispatch 进度。
         dispatchPosition = plannedDispatchPosition;
     }
@@ -176,9 +175,10 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Dispatc
         if (nextExpertDispatchRange.end.globalTokenIndex > nextExpertDispatchRange.begin.globalTokenIndex) {
             // 当前 WAVE 的 Activation 可能覆盖 prefix UB；只恢复本专家 slice 所需的前缀。
             ReloadDispatchCumsumRange(nextExpertDispatchRange.begin.expertIdx, nextExpertDispatchRange.begin.expertIdx);
-            DispatchTokenRange<TopkIndexType, ActivationType, QuantScaleOutType, GMM1_TILE_M, TopkWeightsPrefetch>(
-                tokenDispatchConfig_, commonConfig_, gmmExecutionConfig_.blockJob, syncWorkspaceLayout_, params_,
-                g_winRankAddr_, tokenDispatchScratch_, nextExpertDispatchRange);
+            DispatchTokenRange<ActivationType, QuantScaleOutType, GMM1_TILE_M>(
+                params_.tilingData->isTopkWeightsPrefetch, params_.tilingData->topkIndexTypeBytes, tokenDispatchConfig_,
+                commonConfig_, gmmExecutionConfig_.blockJob, syncWorkspaceLayout_, params_, g_winRankAddr_,
+                tokenDispatchScratch_, nextExpertDispatchRange);
         }
         // 有效 slice 完成 Dispatch，或仅跳过空专家后，提交本次规划的末尾位置。
         dispatchPosition = nextExpertDispatchRange.end;
@@ -259,16 +259,16 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Process
     const ExpertTokenRange& waveRange, ExpertLoopState& gmm2State, GMMAddrInfo& gmm2AddrInfo,
     WaveCombineBufferConfig& combineBufferConfig, uint32_t& combineRowSequence)
 {
+    const uint8_t combineQuantMode = params_.tilingData->combineQuantMode;
     // 去重 combine：进 wave 前预挂事件（与函数尾的 Drain 配对，条件逐字一致）。
-    if constexpr (CombineQuantMode == COMBINE_NO_QUANT) {
+    if (combineQuantMode == COMBINE_NO_QUANT) {
         if (IsCombineDedupOn(params_.tilingData->compute.dedupMode)) {
             ArmWaveCombineDedupEvents();
         }
     }
     // GMM2 调度与 Combine 量化模式无关：统一按当前 WAVE 覆盖的专家 slice 顺序推进。
-    using Config =
-        GmmKernel::Config<true, 0, typename MoeQuantConfig::ActivationQuantOutType, MoeWeightType, bfloat16_t,
-                          typename MoeQuantConfig::QuantScaleType, typename MoeQuantConfig::QuantScaleType>;
+    using Config = GmmKernel::Config<true, typename MoeQuantConfig::ActivationQuantOutType, MoeWeightType, bfloat16_t,
+                                     typename MoeQuantConfig::QuantScaleType, typename MoeQuantConfig::QuantScaleType>;
     if (g_coreType == AscendC::AIC || MegaMoeHardwarePolicy::GetSubBlockIdx() == 0U) {
         typename Config::BlockContext::Block block(params_.tilingData->a8w4L1Layout);
         ProcessCurrentWaveGmm2Loop(waveRange, gmm2State, gmm2AddrInfo, combineBufferConfig, combineRowSequence,
@@ -276,7 +276,7 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Process
     } else {
         ProcessCurrentWaveGmm2Loop(waveRange, gmm2State, gmm2AddrInfo, combineBufferConfig, combineRowSequence, {});
     }
-    if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
+    if (combineQuantMode != COMBINE_NO_QUANT) {
         DrainCombineRowBuffers(combineRowSequence, combineBufferConfig.rowBufferCount);
     } else if (IsCombineDedupOn(params_.tilingData->compute.dedupMode)) {
         DrainCombineRowBuffersDedup(combineRowSequence, combineBufferConfig.rowBufferCount);
@@ -287,8 +287,8 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Process
 template <TemplateMegaMoeA4W4WaveTypeClass>
 __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::SyncBeforeMoeExpertStages()
 {
-    if constexpr (TopkWeightsPrefetch) {
-        // 预取路径从 GM 搬入 GMM1 结果，MTE2 写 UB 前等待前序搬出完成。
+    if (params_.tilingData->isTopkWeightsPrefetch) {
+        // topk 权重在激活量化阶段同步计算时，从 GM 搬入 GMM1 结果，MTE2 写 UB 前等待前序搬出完成。
         PipeFence<PIPE_MTE3, PIPE_MTE2, SYNC_EVENT_ID3>();
     } else {
         // 直接 UB 激活由 Vector 写入中间值，需等待前序搬出完成。
@@ -309,6 +309,8 @@ template <TemplateMegaMoeA4W4WaveTypeClass>
 __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::ProcessMoeExpertStages(
     Gmm1ActivationSync& gmm1ActivationSync, Gmm2CombineSync& gmm2CombineSync)
 {
+    const uint8_t combineQuantMode = params_.tilingData->combineQuantMode;
+    const bool topkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
     // GMM1/GMM2 交错流水只记录一次阶段入口，各 Wave 完成轮次由独立计数记录。
     exceptionDump_.UpdateStage(MegaMoeImpl::Stage::MOE_GMM1_ACTIVATION);
     uint64_t gmm1Count = 0U;
@@ -323,10 +325,10 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Process
         }
     }
     WaveCombineBufferConfig combineBufferConfig{};
-    if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
+    if (combineQuantMode != COMBINE_NO_QUANT) {
         if constexpr (g_coreType == AIV) {
             if (MegaMoeHardwarePolicy::GetSubBlockIdx() == 1U) {
-                combineBufferConfig = InitWaveCombineBuffers<CombineQuantMode>(commonConfig_, waveCombineScratch_);
+                combineBufferConfig = InitWaveCombineBuffers(combineQuantMode, commonConfig_, waveCombineScratch_);
             }
         }
     } else if (IsCombineDedupOn(params_.tilingData->compute.dedupMode)) {
@@ -344,11 +346,11 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Process
     ExpertLoopState gmm2State = CreateExpertLoopState(commonConfig_);
     GMMAddrInfo gmm1AddrInfo{};
     GMMAddrInfo gmm2AddrInfo{};
-    if constexpr (TopkWeightsPrefetch) {
+    if (topkWeightsPrefetch) {
         gmm1AddrInfo.gmm1ActivationSync = &gmm1ActivationSync;
     }
-    if constexpr (CombineQuantMode == COMBINE_NO_QUANT) {
-        // combine 去重开时不挂握手对象：W4 路径的握手启用位（NotifyCombineTileReady）编译期恒真
+    if (combineQuantMode == COMBINE_NO_QUANT) {
+        // combine 去重开时不挂握手对象：W4 路径的握手启用位在非量化 combine 下为真
         // （见 gmm2_combine.h 对编译器问题的说明），AIC 是否真握手靠这里挂/不挂 + mmad 处判空决定；
         // 去重开时 AIV1 不做逐 tile 消费，挂上 AIC 会死等 credit。
         if (!IsCombineDedupOn(params_.tilingData->compute.dedupMode)) {
@@ -377,7 +379,7 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Process
         UpdateGmmLoopCount(gmmLoopCount_, LoopCountIndex::GMM2, ++gmm2Count);
     }
 
-    if constexpr (!TopkWeightsPrefetch) {
+    if (!topkWeightsPrefetch) {
         Gmm1UbActivationSync::EndSync(gmm1RuntimeState.vecSetSyncCom, gmm1RuntimeState.pingpongIdx);
     }
 }

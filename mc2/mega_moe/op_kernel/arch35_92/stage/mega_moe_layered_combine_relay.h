@@ -314,10 +314,14 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReduceRel
     while (!IsServerContributionsReady(originServer, tokenIdsTensor, expectedTopkBitmapsTensor, batchRange.count,
                                        workUbOffset)) {
     }
-    for (uint32_t tokenIndex = 0; tokenIndex < batchRange.count; ++tokenIndex) {
-        ReduceRelayContributionsForToken(originServer, tokenIdsTensor.GetValue(tokenIndex),
-                                         expectedTopkBitmapsTensor.GetValue(tokenIndex), workUbOffset);
-    }
+    SelectRuntimeBool(
+        params_.tilingData->isTopkWeightsPrefetch, [&](auto prefetchTag) __attribute__((always_inline, cce_aicore)) {
+            for (uint32_t tokenIndex = 0; tokenIndex < batchRange.count; ++tokenIndex) {
+                ReduceRelayContributionsForToken<decltype(prefetchTag)::value>(
+                    originServer, tokenIdsTensor.GetValue(tokenIndex), expectedTopkBitmapsTensor.GetValue(tokenIndex),
+                    workUbOffset);
+            }
+        });
 }
 
 /*
@@ -325,6 +329,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReduceRel
  * 工作区依次为可选权重、BF16 贡献、FP32 输入和累加值，各区按 32B 对齐。
  */
 template <TemplateMegaMoeLayeredTypeClass>
+template <bool IsTopkWeightsPrefetch>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReduceRelayContributionsForToken(
     uint32_t originServer, uint32_t tokenIdx, uint32_t expectedTopkBitmap, uint32_t workUbOffset)
 {
@@ -334,7 +339,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReduceRel
     const uint64_t tokenBytes = static_cast<uint64_t>(k_) * sizeof(bfloat16_t);
     const uint64_t tokenSlot = static_cast<uint64_t>(originServer) * capacity + tokenIdx;
     LocalTensor<float> topkWeightsTensor;
-    if constexpr (!TopkWeightsPrefetch) {
+    if constexpr (!IsTopkWeightsPrefetch) {
         topkWeightsTensor = LocalTensor<float>(TPosition::VECIN, workUbOffset, topK_);
         workUbOffset +=
             Ops::Base::CeilAlign(topK_ * static_cast<uint32_t>(sizeof(float)), static_cast<uint32_t>(ALIGN_32));
@@ -363,8 +368,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReduceRel
         originServer == serverId_ ? peermem.combineReceive.get_ptr(commBuffer) +
                                         (static_cast<uint64_t>(tokenIdx) * serverNum_ + serverId_) * tokenBytes :
                                     peermem.contribution.get_ptr(commBuffer) + tokenSlot * topK_ * tokenBytes);
-    AccumulateRelayContributions(expectedTopkBitmap, contributionGlobalTensor, contributionTensor, inputTensor,
-                                 sumTensor, topkWeightsTensor);
+    AccumulateRelayContributions<IsTopkWeightsPrefetch>(expectedTopkBitmap, contributionGlobalTensor,
+                                                        contributionTensor, inputTensor, sumTensor, topkWeightsTensor);
     Cast(contributionTensor, sumTensor, RoundMode::CAST_RINT, k_);
     PipeFence<PIPE_V, PIPE_MTE3, SYNC_EVENT_ID2>();
     CopyUbToGm(resultGlobalTensor, reinterpret_cast<__ubuf__ bfloat16_t*>((contributionTensor).GetPhyAddr()),
@@ -374,6 +379,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReduceRel
 
 /* 按 topK 槽递增搬入有效贡献，按需乘权并在 FP32 中累加。 */
 template <TemplateMegaMoeLayeredTypeClass>
+template <bool IsTopkWeightsPrefetch>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AccumulateRelayContributions(
     uint32_t expectedTopkBitmap, __gm__ bfloat16_t* contributionGlobalTensor,
     const LocalTensor<bfloat16_t>& contributionTensor, const LocalTensor<float>& inputTensor,
@@ -390,7 +396,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Accumulat
                    k_ * static_cast<uint32_t>(sizeof(bfloat16_t)));
         PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID2>();
         Cast(inputTensor, contributionTensor, RoundMode::CAST_NONE, k_);
-        if constexpr (!TopkWeightsPrefetch) {
+        if constexpr (!IsTopkWeightsPrefetch) {
             Muls(inputTensor, inputTensor, topkWeightsTensor.GetValue(topk), k_);
         }
         Add(sumTensor, sumTensor, inputTensor, k_);

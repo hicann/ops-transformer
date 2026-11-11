@@ -158,6 +158,14 @@ HOST_DEVICE constexpr int64_t CalcTopkIndexTypeBytes(int64_t numMaxTokensPerRank
                                                           static_cast<int64_t>(sizeof(int32_t));
 }
 
+// 保留 MTE 的原索引宽度阈值；分层通信固定使用 int32 路由索引。
+HOST_DEVICE constexpr int64_t CalcTopkIndexTypeBytesForTopology(int64_t topoType, int64_t numMaxTokensPerRank,
+                                                                int64_t topK)
+{
+    return topoType == TOPO_TYPE_MTE ? CalcTopkIndexTypeBytes(numMaxTokensPerRank, topK) :
+                                       static_cast<int64_t>(sizeof(int32_t));
+}
+
 // 每个 (localExpert, srcRank) 槽直接保存有序 topkIndex。
 // 同一 token 的 topK expert id 不重复，因此单专家从一张源卡最多接收 numMaxTokensPerRank 个 index。
 // route index 接收区不携带槽尾 count；MTE count 使用独立的 512B 间隔表。
@@ -214,7 +222,7 @@ HOST_DEVICE constexpr int64_t CalcServerCombineTokenListStrideBytes(int64_t capa
     return (capacity + 1) * static_cast<int64_t>(sizeof(int32_t));
 }
 
-// 单 token 的量化记录字节数 = 量化数据 + mx scale（prefetch 场景再拼 topk 权重），按 32B 对齐。
+// 单 token 的量化记录字节数 = 量化数据 + mx scale（激活量化阶段同步计算 topk 权重时再拼接该权重），按 32B 对齐。
 HOST_DEVICE constexpr int64_t CalcQuantTokenScaleBytes(int64_t h, uint32_t elemsPerByte, int64_t topK,
                                                        bool topkWeightsPrefetch)
 {
@@ -619,7 +627,7 @@ private:
         // tkw=0 且 combine 去重：dispatch 把 LAST 行整 token 权重段落 revWeights 区、merge 读回乘权，
         // MTE 同样依赖本区。漏分配则 dispatchRevWeightsPtr 为 nullptr，首 launch 即 MTE invalid GM。
         // tkw=1 与去重关闭态在 MTE 下不使用本区，保持既有布局不变。
-        if (params.topkWeightsPrefetch == 0 && IsCombineDedupOn(params.dedupMode)) {
+        if (!params.topkWeightsPrefetch && IsCombineDedupOn(params.dedupMode)) {
             InitializeDispatchRevWeights(params);
         }
         // 每个 AIC 的计数跨度，以 int32_t 元素计。
@@ -709,10 +717,10 @@ private:
     HOST_DEVICE constexpr void InitializeDispatchRevWeights(const CclComputeLayoutParams& params)
     {
         // dispatch 接收侧权重区，两种场景共用、MTE 与 URMA 两条初始化路径都必须调用：
-        // tkw=1 的权重预取；tkw=0 且 combine 去重——dispatch 侧把 LAST 行
+        // tkw=1 的 topk 权重在激活量化阶段同步计算；tkw=0 且 combine 去重——dispatch 侧把 LAST 行
         // 整 token 的 topK 权重段落在这里，merge 一次连续读取后按成员 topkIndex 乘权。
-        const bool dedupCombineWeights = params.topkWeightsPrefetch == 0 && IsCombineDedupOn(params.dedupMode);
-        if (params.topkWeightsPrefetch == 1 || dedupCombineWeights) {
+        const bool dedupCombineWeights = !params.topkWeightsPrefetch && IsCombineDedupOn(params.dedupMode);
+        if (params.topkWeightsPrefetch || dedupCombineWeights) {
             uint32_t weightAlignBytes =
                 MemoryLayoutDetail::CeilAlign(static_cast<uint32_t>(params.topK * sizeof(float)),
                                               static_cast<uint32_t>(MemoryLayoutDetail::ALIGN_32));

@@ -309,7 +309,7 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     compute.serverNum = ops::CeilDiv(compute.epWorldSize, static_cast<int64_t>(rankNumPerServer));
     compute.activationOutputDivisor = GetActivationOutputDivisor(tilingData->actMode);
     compute.combineQuant = tilingData->combineQuantMode != COMBINE_NO_QUANT;
-    compute.topkWeightsPrefetch = tilingData->topkWeightsPrefetch == 1;
+    compute.topkWeightsPrefetch = tilingData->isTopkWeightsPrefetch;
     compute.dispatchFp4 = IsA4W4GmmMode(tilingData->moeGmmMode);
     compute.reserveGmm1Output = true;
     compute.reserveCumsum = false;
@@ -492,7 +492,7 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
     context->SetBlockDim(
         ascendcPlatform.CalcTschBlockDim(tilingData->blockAivNum, tilingData->compute.aicNum, tilingData->blockAivNum));
     context->SetScheduleMode(1);
-    uint64_t tilingKey = CalcTilingKey(context, config, expertParams, tilingData);
+    uint64_t tilingKey = CalcTilingKey(context, expertParams, tilingData);
     OP_LOGI(nodeName, "OP TilingKey is %lu", tilingKey);
     context->SetTilingKey(tilingKey);
 

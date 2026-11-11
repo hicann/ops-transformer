@@ -23,8 +23,8 @@ namespace MegaMoeImpl {
 // 阶段按专家从小到大消费。prepass 建表时保证了组内成员按专家升序、组内最大专家的那行
 // 是 LAST（合并驱动行）——所以轮到专家 e 时，e 组内的其它成员必然已经算完落盘，
 // 等一个 WaitWaveGmm2Ready(e) 就等于成员全就绪，不需要任何跨专家的等待标记。
-// 怎么合：每行在激活层已经乘过自己的权重（去重强制 prefetch 语义），合并就是 fp32 整行
-// 相加，加完一次 Cast、发到 (token, minTopkIdx) 槽。
+// 怎么合：提前乘权开启时，各成员已在激活量化阶段乘权；关闭时，在合并阶段按成员的 topk 权重乘加。
+// 合并使用 fp32 整行累加，加完一次 Cast、发到 (token, minTopkIdx) 槽。
 // 三类行：PLAIN（不在组里）走基线的行环直发；SKIP（组内非 LAST）直接跳过；LAST 走上面
 // 的合并发送。desc 描述表按批装载，每批只花一次 MTE2。
 // ==========================================================================
@@ -321,7 +321,7 @@ __aicore__ inline void SendWaveCombineTokenDedupMerge(const MoeStageCommonConfig
      * 发送与本行的累加/Cast 并行——跨卡 MTE3 写延迟不再卡住下一行计算。
      */
     PipeWait<PIPE_MTE3, PIPE_V>(mergeEvent);
-    const bool mulWeights = params.tilingData->topkWeightsPrefetch == 0;
+    const bool mulWeights = !params.tilingData->isTopkWeightsPrefetch;
     if (mulWeights) {
         LoadDedupMergeWeightBits(dedupScratch, params, descRowBase, memberCount, mergeEvent);
     }
@@ -434,11 +434,11 @@ __aicore__ inline void ProcessWaveCombineDedupBatch(const MoeStageCommonConfig& 
             uint32_t slot = rowSequence % bufferConfig.rowBufferCount;
             uint32_t tokenLocal = batchTokenLocalBase + batchTokenIdx;
             if (rowSequence < bufferConfig.rowBufferCount) {
-                SendWaveCombineToken<COMBINE_NO_QUANT, false>(common, bufferConfig, scratch, params, gmm2OutGm,
-                                                              gmRemoteBaseOffset, tokenLocal, tokenMetaInfo, slot);
+                SendWaveCombineToken<false>(COMBINE_NO_QUANT, common, bufferConfig, scratch, params, gmm2OutGm,
+                                            gmRemoteBaseOffset, tokenLocal, tokenMetaInfo, slot);
             } else {
-                SendWaveCombineToken<COMBINE_NO_QUANT, true>(common, bufferConfig, scratch, params, gmm2OutGm,
-                                                             gmRemoteBaseOffset, tokenLocal, tokenMetaInfo, slot);
+                SendWaveCombineToken<true>(COMBINE_NO_QUANT, common, bufferConfig, scratch, params, gmm2OutGm,
+                                           gmRemoteBaseOffset, tokenLocal, tokenMetaInfo, slot);
             }
             ++rowSequence;
             continue;

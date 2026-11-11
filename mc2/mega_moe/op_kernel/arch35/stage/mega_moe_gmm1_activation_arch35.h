@@ -16,7 +16,7 @@
 namespace MegaMoeImpl {
 namespace GmmKernel {
 
-template <typename BlockMmad, typename ElementC, typename MakeLayoutC, bool TopkWeightsPrefetch, bool IsShared = false,
+template <typename BlockMmad, typename ElementC, typename MakeLayoutC, bool IsShared = false,
           bool IsWaveFlagGrained = false, typename Scheduler, typename Config, typename ActivationQuantOp,
           typename LayoutBundle>
 __aicore__ inline void Gmm1ExecGeneric(Scheduler& scheduler, const Params& params, const GMMAddrInfo& gmmAddrInfo,
@@ -46,14 +46,16 @@ __aicore__ inline void Gmm1ExecGeneric(Scheduler& scheduler, const Params& param
         SetWaveWeightL2CacheHint<KernelConfig::IS_WEIGHT_NZ, KernelConfig>(config, allowWeightL2Bypass, gmB, gmScaleB);
     }
     GM_ADDR cGlobal = 0UL;
-    if constexpr (TopkWeightsPrefetch) {
+    if (config.topkWeightsPrefetch) {
         cGlobal = gmmAddrInfo.gmm1OutGlobal;
     }
     auto gmC = asc::te::make_tensor(
         asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ElementC*>(cGlobal)), layouts.c);
     __gm__ float* metaInfoGm = nullptr;
-    if constexpr (TopkWeightsPrefetch && g_coreType == AscendC::AIV) {
-        metaInfoGm = reinterpret_cast<__gm__ float*>(gmmAddrInfo.metaInfoGlobal);
+    if constexpr (g_coreType == AscendC::AIV) {
+        if (config.topkWeightsPrefetch) {
+            metaInfoGm = reinterpret_cast<__gm__ float*>(gmmAddrInfo.metaInfoGlobal);
+        }
     }
 
     using WorkSetType = Gmm1WorkSet<Scheduler, decltype(gmA), decltype(gmB), decltype(gmScaleA), decltype(gmScaleB),
@@ -61,8 +63,8 @@ __aicore__ inline void Gmm1ExecGeneric(Scheduler& scheduler, const Params& param
     WorkSetType workSet{scheduler, gmA, gmB, gmScaleA, gmScaleB, gmC, metaInfoGm};
     if constexpr (g_coreType == AscendC::AIC) {
         BlockMmadContext<BlockMmad> localBlockMmadContext;
-        if constexpr (TopkWeightsPrefetch) {
-            Gmm1AicMmadToGmGeneric<BlockMmadContext<BlockMmad>, IsShared, TopkWeightsPrefetch>(
+        if (config.topkWeightsPrefetch) {
+            Gmm1AicMmadToGmGeneric<BlockMmadContext<BlockMmad>, IsShared>(
                 workSet, params, gmmAddrInfo, config, startLoopIdx, tileNum, expertIdx, &localBlockMmadContext);
         } else {
             Gmm1AicMmadGeneric<BlockMmadContext<BlockMmad>, IsShared>(workSet, gmmAddrInfo, config, startLoopIdx,
@@ -70,7 +72,7 @@ __aicore__ inline void Gmm1ExecGeneric(Scheduler& scheduler, const Params& param
                                                                       &localBlockMmadContext);
         }
     } else {
-        if constexpr (TopkWeightsPrefetch) {
+        if (config.topkWeightsPrefetch) {
             Gmm1Aiv0PrefetchEpilogueGeneric<MakeLayoutC, ElementC, IsWaveFlagGrained>(
                 workSet, params, gmmAddrInfo, config, startLoopIdx, tileNum, activationQuantOp, expertBeforeCnt,
                 expertIdx);
@@ -82,8 +84,8 @@ __aicore__ inline void Gmm1ExecGeneric(Scheduler& scheduler, const Params& param
 }
 
 template <typename BlockMmad, typename BlockPrologue, typename ElementC, typename MakeLayoutC, bool IsShared,
-          typename Scheduler, typename Config, bool TopkWeightsPrefetch, bool IsWaveFlagGrained,
-          typename ActivationQuantOp, typename LayoutBundle>
+          typename Scheduler, typename Config, bool IsWaveFlagGrained, typename ActivationQuantOp,
+          typename LayoutBundle>
 __aicore__ inline void Gmm1ExecA8W4(Scheduler& scheduler, const Params& params, const GMMAddrInfo& gmmAddrInfo,
                                     const Config& config, uint32_t startLoopIdx, uint32_t tileNum,
                                     ActivationQuantOp& activationQuantOp, uint32_t expertBeforeCnt, uint32_t expertIdx,
@@ -111,21 +113,23 @@ __aicore__ inline void Gmm1ExecA8W4(Scheduler& scheduler, const Params& params, 
                                              reinterpret_cast<__gm__ ElementMxScaleB*>(gmmAddrInfo.bScaleGlobal)),
                                          layouts.scaleB);
     __gm__ float* metaInfoGm = nullptr;
-    if constexpr (TopkWeightsPrefetch && g_coreType == AscendC::AIV) {
-        metaInfoGm = reinterpret_cast<__gm__ float*>(gmmAddrInfo.metaInfoGlobal);
+    if constexpr (g_coreType == AscendC::AIV) {
+        if (config.topkWeightsPrefetch) {
+            metaInfoGm = reinterpret_cast<__gm__ float*>(gmmAddrInfo.metaInfoGlobal);
+        }
     }
 
     using WorkSetType = Gmm1WorkSet<Scheduler, decltype(gmA), decltype(gmB), decltype(gmScaleA), decltype(gmScaleB),
                                     decltype(gmC), decltype(metaInfoGm)>;
     WorkSetType workSet{scheduler, gmA, gmB, gmScaleA, gmScaleB, gmC, metaInfoGm};
     if constexpr (g_coreType == AscendC::AIC) {
-        Gmm1AicMmadA8W4<BlockMmad, IsShared, TopkWeightsPrefetch>(*pipeline.block, workSet, params, gmmAddrInfo, config,
-                                                                  startLoopIdx, tileNum, expertIdx);
+        Gmm1AicMmadA8W4<BlockMmad, IsShared>(*pipeline.block, workSet, params, gmmAddrInfo, config, startLoopIdx,
+                                             tileNum, expertIdx);
     } else if (MegaMoeHardwarePolicy::GetSubBlockIdx() == 0U) {
         Gmm1Aiv0PrologueA8W4<BlockPrologue>(*pipeline.block, workSet.scheduler, workSet.gmB, config, startLoopIdx,
                                             tileNum);
     } else {
-        if constexpr (TopkWeightsPrefetch) {
+        if (config.topkWeightsPrefetch) {
             Gmm1Aiv1PrefetchEpilogueA8W4<ElementC, MakeLayoutC, IsWaveFlagGrained>(
                 workSet, params, gmmAddrInfo, config, startLoopIdx, tileNum, activationQuantOp, expertBeforeCnt,
                 expertIdx);
@@ -139,20 +143,20 @@ __aicore__ inline void Gmm1ExecA8W4(Scheduler& scheduler, const Params& params, 
 } // namespace GmmKernel
 
 template <typename ElementA, typename EpilogueElementA, typename ElementB, typename ElementC, typename ElementMxScaleA,
-          typename ElementMxScaleB, bool IsWeightNZ = false, uint32_t Gmm1TileM = L1_TILE_M_256,
-          uint32_t EpilogueTileM = Gmm1TileM, bool TopkWeightsPrefetch = false, bool IsShared = false,
+          typename ElementMxScaleB, bool IsWeightNZ = false, uint32_t Gmm1TileM = L1_TILE_M_256, bool IsShared = false,
           bool IsWaveFlagGrained = false, typename BlockEpilogue, typename... LayoutArgs>
-__aicore__ inline void RunGmm1Generic(BlockEpilogue& epilogueOp, const Params& params,
+__aicore__ inline void RunGmm1Generic(bool topkWeightsPrefetch, BlockEpilogue& epilogueOp, const Params& params,
                                       const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                       const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx, int32_t& vecSetSyncCom,
                                       const BlockJobContext& blockJob, uint32_t expertBeforeCnt, uint32_t expertIdx,
                                       uint16_t& pingpongIdx, uint32_t activationOutputDivisor = ACTIVATION_N_HALF,
                                       bool allowWeightL2Bypass = false, const LayoutArgs&... layoutArgs)
 {
-    using GmmConfig =
-        GmmKernel::Config<false, COMBINE_NO_QUANT, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
-                          IsWeightNZ, TopkWeightsPrefetch, IsShared, false, IsWaveFlagGrained>;
+    using GmmConfig = GmmKernel::Config<false, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
+                                        IsWeightNZ, IsShared, false, IsWaveFlagGrained>;
     auto config = GmmConfig::BuildGmm1ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
+    config.topkWeightsPrefetch = topkWeightsPrefetch;
+    config.activationTileM = topkWeightsPrefetch ? L1_TILE_M_128 : Gmm1TileM;
 
     GmmKernel::BlockScheduler scheduler({config.m, config.schedulerN, config.k},
                                         GmmKernel::BlockScheduler::Params{asc::te::make_coord(
@@ -172,7 +176,7 @@ __aicore__ inline void RunGmm1Generic(BlockEpilogue& epilogueOp, const Params& p
     using BlockMmad = typename GmmConfig::BlockMmad;
     using MakeLayoutC = typename GmmConfig::MakeLayoutC;
     auto layouts = GmmConfig::BuildLayouts(config, layoutArgs...);
-    GmmKernel::Gmm1ExecGeneric<BlockMmad, ElementC, MakeLayoutC, TopkWeightsPrefetch, IsShared, IsWaveFlagGrained>(
+    GmmKernel::Gmm1ExecGeneric<BlockMmad, ElementC, MakeLayoutC, IsShared, IsWaveFlagGrained>(
         scheduler, params, gmmAddrInfo, config, startLoopIdx, tileNum, epilogueOp, vecSetSyncCom, expertBeforeCnt,
         expertIdx, pingpongIdx, allowWeightL2Bypass, layouts);
 
@@ -180,10 +184,9 @@ __aicore__ inline void RunGmm1Generic(BlockEpilogue& epilogueOp, const Params& p
 }
 
 template <typename ElementA, typename EpilogueElementA, typename ElementB, typename ElementC, typename ElementMxScaleA,
-          typename ElementMxScaleB, bool IsWeightNZ = false, uint32_t Gmm1TileM = L1_TILE_M_256,
-          uint32_t EpilogueTileM = Gmm1TileM, bool TopkWeightsPrefetch = false, bool IsShared = false,
+          typename ElementMxScaleB, bool IsWeightNZ = false, uint32_t Gmm1TileM = L1_TILE_M_256, bool IsShared = false,
           bool IsWaveFlagGrained = false, typename BlockEpilogue>
-__aicore__ inline void RunGmm1Generic(BlockEpilogue& epilogueOp, const Params& params,
+__aicore__ inline void RunGmm1Generic(bool topkWeightsPrefetch, BlockEpilogue& epilogueOp, const Params& params,
                                       const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                       const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx, int32_t& vecSetSyncCom,
                                       uint32_t expertBeforeCnt, uint32_t expertIdx, uint16_t& pingpongIdx,
@@ -193,16 +196,16 @@ __aicore__ inline void RunGmm1Generic(BlockEpilogue& epilogueOp, const Params& p
     BlockJobContext blockJob{MegaMoeHardwarePolicy::GetAicBlockIdx(),
                              static_cast<uint32_t>(MegaMoeHardwarePolicy::GetBlockNum())};
     RunGmm1Generic<ElementA, EpilogueElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, IsWeightNZ,
-                   Gmm1TileM, EpilogueTileM, TopkWeightsPrefetch, IsShared, IsWaveFlagGrained>(
-        epilogueOp, params, problemShape, gmmAddrInfo, startBlockIdx, vecSetSyncCom, blockJob, expertBeforeCnt,
-        expertIdx, pingpongIdx, activationOutputDivisor, allowWeightL2Bypass);
+                   Gmm1TileM, IsShared, IsWaveFlagGrained>(
+        topkWeightsPrefetch, epilogueOp, params, problemShape, gmmAddrInfo, startBlockIdx, vecSetSyncCom, blockJob,
+        expertBeforeCnt, expertIdx, pingpongIdx, activationOutputDivisor, allowWeightL2Bypass);
 }
 
 template <typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA, typename ElementMxScaleB,
-          uint32_t Gmm1TileM = L1_TILE_M_256, uint32_t EpilogueTileM = Gmm1TileM, bool TopkWeightsPrefetch = false,
-          bool IsShared = false, bool IsWaveFlagGrained = false, typename BlockContext, typename BlockEpilogue,
-          typename... LayoutArgs>
-__aicore__ inline void RunGmm1A8W4(const BlockContext& pipeline, BlockEpilogue& activationQuantOp, const Params& params,
+          uint32_t Gmm1TileM = L1_TILE_M_256, bool IsShared = false, bool IsWaveFlagGrained = false,
+          typename BlockContext, typename BlockEpilogue, typename... LayoutArgs>
+__aicore__ inline void RunGmm1A8W4(bool topkWeightsPrefetch, const BlockContext& pipeline,
+                                   BlockEpilogue& activationQuantOp, const Params& params,
                                    const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                    const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
                                    const BlockJobContext& blockJob, uint32_t expertBeforeCnt, uint32_t expertIdx,
@@ -212,9 +215,11 @@ __aicore__ inline void RunGmm1A8W4(const BlockContext& pipeline, BlockEpilogue& 
     static_assert(std::is_same_v<ElementA, __fp8e4m3>, "Activation must be __fp8e4m3");
     static_assert(std::is_same_v<ElementB, __fp4e2m1x2>, "Weight must be __fp4e2m1x2");
 
-    using GmmConfig = GmmKernel::Config<true, 0, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, false,
-                                        TopkWeightsPrefetch, IsShared, false, IsWaveFlagGrained>;
+    using GmmConfig = GmmKernel::Config<true, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, false,
+                                        IsShared, false, IsWaveFlagGrained>;
     auto config = GmmConfig::BuildGmm1ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
+    config.topkWeightsPrefetch = topkWeightsPrefetch;
+    config.activationTileM = topkWeightsPrefetch ? L1_TILE_M_128 : Gmm1TileM;
 
     if constexpr (g_coreType == AIV) {
         activationQuantOp.UpdateNextProblem({config.m, config.outputN, config.k, 0});
@@ -237,33 +242,33 @@ __aicore__ inline void RunGmm1A8W4(const BlockContext& pipeline, BlockEpilogue& 
 
     auto layouts = GmmConfig::BuildLayouts(config, layoutArgs...);
     GmmKernel::Gmm1ExecA8W4<BlockMmad, BlockPrologue, ElementC, MakeLayoutC, IsShared, GmmKernel::BlockScheduler,
-                            decltype(config), TopkWeightsPrefetch, IsWaveFlagGrained>(
-        scheduler, params, gmmAddrInfo, config, startLoopIdx, tileNum, activationQuantOp, expertBeforeCnt, expertIdx,
-        layouts, pipeline);
+                            decltype(config), IsWaveFlagGrained>(scheduler, params, gmmAddrInfo, config, startLoopIdx,
+                                                                 tileNum, activationQuantOp, expertBeforeCnt, expertIdx,
+                                                                 layouts, pipeline);
 
     startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
 }
 
 template <typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA, typename ElementMxScaleB,
-          uint32_t Gmm1TileM = L1_TILE_M_256, uint32_t EpilogueTileM = Gmm1TileM, bool TopkWeightsPrefetch = false,
-          bool IsShared = false, bool IsWaveFlagGrained = false, typename BlockContext, typename BlockEpilogue>
-__aicore__ inline void RunGmm1A8W4(const BlockContext& pipeline, BlockEpilogue& activationQuantOp, const Params& params,
+          uint32_t Gmm1TileM = L1_TILE_M_256, bool IsShared = false, bool IsWaveFlagGrained = false,
+          typename BlockContext, typename BlockEpilogue>
+__aicore__ inline void RunGmm1A8W4(bool topkWeightsPrefetch, const BlockContext& pipeline,
+                                   BlockEpilogue& activationQuantOp, const Params& params,
                                    const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                    const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx, uint32_t expertBeforeCnt,
                                    uint32_t expertIdx = 0, uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
 {
     BlockJobContext blockJob{MegaMoeHardwarePolicy::GetAicBlockIdx(),
                              static_cast<uint32_t>(MegaMoeHardwarePolicy::GetBlockNum())};
-    RunGmm1A8W4<ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, Gmm1TileM, EpilogueTileM,
-                TopkWeightsPrefetch, IsShared, IsWaveFlagGrained>(pipeline, activationQuantOp, params, problemShape,
-                                                                  gmmAddrInfo, startBlockIdx, blockJob, expertBeforeCnt,
-                                                                  expertIdx, activationOutputDivisor);
+    RunGmm1A8W4<ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, Gmm1TileM, IsShared, IsWaveFlagGrained>(
+        topkWeightsPrefetch, pipeline, activationQuantOp, params, problemShape, gmmAddrInfo, startBlockIdx, blockJob,
+        expertBeforeCnt, expertIdx, activationOutputDivisor);
 }
 
 // A5 的地址准备与 Activation 绑定按本架构 AIV 分工执行。
 template <typename ActivationType, typename WeightType, typename ActivationOutType, typename QuantScaleType,
-          uint32_t ActivationElementsPerByte, bool UseA8W4Gmm1, bool TopkWeightsPrefetch, typename BlockEpilogue>
-__aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(const GmmExecutionConfig& gmmConfig,
+          uint32_t ActivationElementsPerByte, bool UseA8W4Gmm1, typename BlockEpilogue>
+__aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(bool topkWeightsPrefetch, const GmmExecutionConfig& gmmConfig,
                                                        const MoeSyncWorkspaceLayout& syncLayout,
                                                        const WorkspaceLayout& workspace, GM_ADDR workspaceBase,
                                                        const ExpertWeightTensorListAddrs& weights,
@@ -293,7 +298,7 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(const GmmExecutionConfig&
     uint32_t expertMGroupOffset = rowOffsetInExpert / L1_TILE_M_256;
     int64_t scaleK = Ops::Base::CeilDiv(k, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
 
-    if constexpr (UseA8W4Gmm1 || TopkWeightsPrefetch) {
+    if (UseA8W4Gmm1 || topkWeightsPrefetch) {
         gmmAddrInfo.gmm1OutGlobal =
             workspace.routed.gmm1Output.get_ptr(workspaceBase) + physicalTokenStartIndex * n * sizeof(bfloat16_t);
     }

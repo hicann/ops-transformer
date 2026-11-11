@@ -86,6 +86,7 @@ constexpr uint32_t SYNC_EVENT_ID6 = 6;
 constexpr int64_t GM_FLAG_POLL_BACKOFF_CYCLES = 200;
 constexpr int64_t OVERFLOW_MODE_CTRL = 60U;
 constexpr uint8_t COMBINE_NO_QUANT = 0;
+constexpr uint8_t MXFP8_E5M2_COMM_QUANT = 3;
 constexpr uint8_t MXFP8_E4M3_COMM_QUANT = 4;
 constexpr uint32_t META_INFO_SIZE = 8U;
 constexpr uint8_t GROUPED_MATMUL_MODE_GENERAL = 0U;
@@ -122,7 +123,7 @@ constexpr uint32_t DEDUP_AIV0_PREPASS_MAX_HIDDEN_DIM = 2048U;
 constexpr uint32_t DEDUP_ROUTE_LOAD_UB_BYTES = 4U * 1024U;
 constexpr uint32_t DEDUP_COUNT_UB_BYTES = 4U * 1024U;
 constexpr uint32_t DEDUP_MEMBER_UB_BYTES =
-    54U * 1024U; // combine 生产卡预加权合并后单发（可选能力，强制 prefetch 语义）
+    54U * 1024U; // combine 生产卡预加权合并后单发（可选能力，激活量化阶段提前乘 topk 权重的语义）
 /*
  * rowDesc：去重 prepass 为每个接收行生成的定长描述符（布局尺寸见 peermem.h CalcDedupRowDescStrideInt32）。
  * [0] flags | memberCount：0 表示该 (srcRank, token) 在本卡只出现一次，走原路径；

@@ -439,13 +439,14 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendExper
 }
 
 // ======================================================================
-// LoadTopkWeightsToUb：prefetch 或 Server Combine 携带权重，否则仅做 MTE2_V 同步
+// LoadTopkWeightsToUb：topk 权重在激活量化阶段同步计算或 Server Combine 携带权重，否则仅做 MTE2_V 同步
 // ======================================================================
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadTopkWeightsToUb(
     __ubuf__ ActivationType* xOutTensor, int32_t currentOffset, int32_t index, TEventID event)
 {
-    if (RecordHasWeights()) {
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
+    if (RecordHasWeights(TopkWeightsPrefetch)) {
         QuantProcessConfig config{mxQuantTokenAlignBytes_, mxQuantScaleAlignBytes_, mxQuantTokenScaleAlignBytes_,
                                   mxQuantScaleNumAlignPerToken_};
         QuantProcessScratch<ActivationType> scratch{};
@@ -455,7 +456,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadTopkW
             params_.probsGmAddr + static_cast<uint64_t>(tokenIndex) * topK_ * sizeof(TopkWeightsType);
         PrefetchTopkWeights<TopkWeightsType>(tokenTopkWeightsAddr, topK_, config, scratch, xOutTensor, event);
     } else {
-        // Without weight prefetch, this event still waits for the input token copy.
+        // 未启用 topk 权重在激活量化阶段同步计算时，此事件仍等待输入 token 搬入。
         PipeNotify<PIPE_MTE2, PIPE_V>(event);
         PipeWait<PIPE_MTE2, PIPE_V>(event);
     }
@@ -965,7 +966,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PrepareEx
     CopyUbToGm(expertRecvCountsGm_ + countOffset, expertTokenNumsOutTensor_,
                moeExpertPerRank_ * static_cast<uint32_t>(sizeof(int32_t)));
     CopyUbToGm(cumsumGm_, cumsumInfoTensor_, worldSize_ * moeExpertPerRank_ * static_cast<uint32_t>(sizeof(int32_t)));
-    // 两张表写回完成后才发布就绪标志；预取权重由后续接收和消费位置的同步独立保护。
+    // 两张表写回完成后才发布就绪标志；topk 权重由后续接收和消费位置的同步独立保护。
     PipeFence<PIPE_MTE3, PIPE_S, SYNC_EVENT_ID2>();
 
     __gm__ int32_t* tokenCountReadyFlag =
@@ -999,7 +1000,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::UpdateLoc
                                                                                               int32_t outIdx,
                                                                                               TEventID eventId)
 {
-    if constexpr (TopkWeightsPrefetch) {
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
+    if (TopkWeightsPrefetch) {
         PipeWait<PIPE_MTE2, PIPE_S>(eventId);
         __ubuf__ ActivationType* weightBuf = copyTmpTensors_[outIdx];
         uint32_t weightOffsetInUb = mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_;
@@ -1014,10 +1016,11 @@ template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadLocalRelayToken(
     uint32_t srcServer, uint32_t tokenIndex, int32_t bufferIdx, uint32_t copyInNum, TEventID eventId)
 {
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
     PipeWait<PIPE_MTE3, PIPE_MTE2>(eventId);
     LoadTokenFromLocalRelay(srcServer, tokenIndex, bufferIdx, copyInNum);
     PipeNotify<PIPE_MTE2, PIPE_MTE3>(eventId);
-    if constexpr (TopkWeightsPrefetch) {
+    if (TopkWeightsPrefetch) {
         PipeNotify<PIPE_MTE2, PIPE_S>(eventId);
     }
 }
@@ -1135,6 +1138,7 @@ template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRemoteDispatchBatch(
     uint32_t relayRank, uint32_t batchTokenCount)
 {
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
     const auto& peermem = params_.communication.layout;
@@ -1161,7 +1165,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
         comm_.ReadNbi(batchHandle, tokenDstAddr, remoteRecordAddr, widthA * sizeof(ActivationType));
         comm_.ReadNbi(batchHandle, scaleDstAddr, remoteRecordAddr + mxQuantTokenAlignBytes_,
                       widthAScale * sizeof(QuantScaleOutType));
-        if constexpr (TopkWeightsPrefetch) {
+        if (TopkWeightsPrefetch) {
             GM_ADDR weightDstAddr =
                 workspace.routing.tokenWeights.get_ptr(buffer) + static_cast<uint64_t>(dstRow) * weightAlignBytes_;
             comm_.ReadNbi(batchHandle, weightDstAddr,
@@ -1170,8 +1174,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
     }
     comm_.BatchCommit(batchHandle);
 
-    if constexpr (TopkWeightsPrefetch) {
-        // 预取路径提交后立即读取刚收回的权重，必须先等这批 token/scale/weight 读取完成。
+    if (TopkWeightsPrefetch) {
+        // topk 提前乘权路径提交后立即读取刚收回的权重，必须先等这批 token/scale/weight 读取完成。
         comm_.Drain(batchHandle);
         for (uint32_t index = 0U; index < batchTokenCount; ++index) {
             __ubuf__ int32_t* record = (metaInfoTensor_ + (index * INT32_PER_256B));
@@ -1184,7 +1188,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
     }
 
     // 每个 expert/rank 段内的 metadata 连续。先写完全部 metadata，再发布专家就绪计数。
-    // 元数据及预取权重由标量更新，搬出前需保证这些 UB 写入已完成。
+    // 元数据及 topk 权重由标量更新，搬出前需保证这些 UB 写入已完成。
     PipeFence<PIPE_S, PIPE_MTE3, SYNC_EVENT_ID3>();
     uint32_t segmentStart = 0U;
     while (segmentStart < batchTokenCount) {
@@ -1198,8 +1202,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
     }
     PipeFence<PIPE_MTE3, PIPE_S, SYNC_EVENT_ID3>();
 
-    if constexpr (!TopkWeightsPrefetch) {
-        // 非预取时 metadata 由标量构造，与这批 token/scale 读取相互独立；搬出与通信等待重叠，
+    if (!TopkWeightsPrefetch) {
+        // 未启用 topk 提前乘权时，metadata 由标量构造，与这批 token/scale 读取相互独立；搬出与通信等待重叠，
         // 发布 ready 前汇合两者。
         comm_.Drain(batchHandle);
     }
@@ -1221,6 +1225,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CopyLocal
                                                                                                int32_t tokenOffset,
                                                                                                int32_t tokenCount)
 {
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
     if (tokenCount <= 0) {
         return;
     }
@@ -1228,7 +1233,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CopyLocal
     int64_t widthAScale = Ops::Base::CeilDiv(static_cast<int64_t>(k_), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
                           MXFP_MULTI_BASE_SIZE; // 输出 token-scale 长度,紧密排列
     uint32_t copyInNum = mxQuantTokenScaleAlignBytes_ / sizeof(ActivationType);
-    if constexpr (!TopkWeightsPrefetch) {
+    if (!TopkWeightsPrefetch) {
         // mode4 一级记录仍保留中继归约所需权重，二级只搬 token 和 scale。
         copyInNum =
             Ops::Base::CeilAlign(mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_, static_cast<uint32_t>(ALIGN_32)) /

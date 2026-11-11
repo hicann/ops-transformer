@@ -158,7 +158,7 @@ __aicore__ inline void Gmm1AicMmadTileA8W4(BlockMmad& blockMmad, TensorA& gmA, T
 }
 
 // GM 交接路径的 AIC 将 GMM1 tile 写入 GM，再通过硬同步通知 AIV 后处理。
-template <typename MmadContext, bool IsShared, bool TopkWeightsPrefetch, typename WorkSet, typename Config>
+template <typename MmadContext, bool IsShared, typename WorkSet, typename Config>
 __aicore__ inline void Gmm1AicMmadToGmGeneric(WorkSet& workSet, const Params& params, const GMMAddrInfo& gmmAddrInfo,
                                               const Config& config, uint32_t startLoopIdx, uint32_t tileNum,
                                               uint32_t expertIdx, MmadContext* blockMmadContext)
@@ -244,7 +244,7 @@ __aicore__ inline void Gmm1AicMmadGeneric(WorkSet& workSet, const GMMAddrInfo& g
 }
 
 // 执行 A8W4 GMM1 AIC tile 循环，并维持 Dispatch/GMM1 和 GMM1/Activation 的同步关系。
-template <typename BlockMmad, bool IsShared, bool TopkWeightsPrefetch, typename WorkSet, typename Config>
+template <typename BlockMmad, bool IsShared, typename WorkSet, typename Config>
 __aicore__ inline void Gmm1AicMmadA8W4(BlockMmad& blockMmad, WorkSet& workSet, const Params& params,
                                        const GMMAddrInfo& gmmAddrInfo, const Config& config, uint32_t startLoopIdx,
                                        uint32_t tileNum, uint32_t expertIdx)
@@ -322,7 +322,7 @@ __aicore__ inline void Gmm1Aiv0PrefetchEpilogueTileGeneric(const Config& config,
             static_cast<int64_t>(metaInfoRow),
             0};
         MegaMoeImpl::SetSaturationStrategy(SaturationStrategy::USE_API);
-        activationQuantOp(epilogueShape, epilogueOffset, 0U);
+        activationQuantOp(true, epilogueShape, epilogueOffset, 0U);
         NotifyGmm2InputReady<IsWaveFlagGrained>(gmmAddrInfo.activationToGmm2Flag, subMLoc / L1_TILE_M_256);
         PipeNotify<PIPE_V, PIPE_MTE2>(0);
     }
@@ -350,7 +350,7 @@ __aicore__ inline void Gmm1Aiv0EpilogueTileGeneric(const Config& config, Activat
         0,
         0};
     MegaMoeImpl::SetSaturationStrategy(SaturationStrategy::USE_API);
-    activationQuantOp(epilogueShape, epilogueOffset, pingpongIdx);
+    activationQuantOp(false, epilogueShape, epilogueOffset, pingpongIdx);
     NotifyGmm2InputReady<IsWaveFlagGrained>(gmmAddrInfo.activationToGmm2Flag, mLoc / L1_TILE_M_256);
 }
 

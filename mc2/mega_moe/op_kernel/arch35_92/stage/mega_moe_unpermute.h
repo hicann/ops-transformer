@@ -78,14 +78,13 @@ __aicore__ inline void LoadTokenUnpermuteWeights(const MoeStageCommonConfig& com
 }
 
 #if defined(MEGA_MOE_ARCH92_DEVICE)
-template <uint8_t CombineMode>
-__aicore__ inline void LoadMoeExpertInput(const TokenUnpermuteConfig& context, const MoeStageCommonConfig& common,
-                                          TokenUnpermuteScratch& scratch, __gm__ bfloat16_t* expandedX,
-                                          uint64_t expertInputIndex, TEventID event, __ubuf__ bfloat16_t* dataInBf16,
-                                          __ubuf__ float* dataInFp32)
+__aicore__ inline void LoadMoeExpertInput(uint8_t combineMode, const TokenUnpermuteConfig& context,
+                                          const MoeStageCommonConfig& common, TokenUnpermuteScratch& scratch,
+                                          __gm__ bfloat16_t* expandedX, uint64_t expertInputIndex, TEventID event,
+                                          __ubuf__ bfloat16_t* dataInBf16, __ubuf__ float* dataInFp32)
 {
     PipeWait<PIPE_V, PIPE_MTE2>(event);
-    if constexpr (CombineMode == COMBINE_NO_QUANT) {
+    if (combineMode == COMBINE_NO_QUANT) {
         CopyGmToUb(dataInBf16, (expandedX + (expertInputIndex * common.tokenHiddenDim)),
                    (common.tokenHiddenDim) * sizeof(bfloat16_t));
         PipeNotify<PIPE_MTE2, PIPE_V>(event);
@@ -100,15 +99,19 @@ __aicore__ inline void LoadMoeExpertInput(const TokenUnpermuteConfig& context, c
         PipeNotify<PIPE_MTE2, PIPE_V>(event);
         PipeWait<PIPE_MTE2, PIPE_V>(event);
         uint32_t nScale = Ops::Base::CeilDiv(common.tokenHiddenDim, static_cast<uint32_t>(MXFP_SCALE_GROUP_NUM));
-        using Fp8Type = typename std::conditional<CombineMode == MXFP8_E4M3_COMM_QUANT, fp8_e4m3fn_t, fp8_e5m2_t>::type;
-        Mxfp8::DeQuantMxFp8<Fp8Type, bfloat16_t>(dataInBf16, dataInFp32, scratch.bf16ScaleTensor,
-                                                 scratch.fp32ScaleTensor, nScale, common.tokenHiddenDim);
+        if (combineMode == MXFP8_E4M3_COMM_QUANT) {
+            Mxfp8::DeQuantMxFp8<fp8_e4m3fn_t, bfloat16_t>(dataInBf16, dataInFp32, scratch.bf16ScaleTensor,
+                                                          scratch.fp32ScaleTensor, nScale, common.tokenHiddenDim);
+        } else {
+            Mxfp8::DeQuantMxFp8<fp8_e5m2_t, bfloat16_t>(dataInBf16, dataInFp32, scratch.bf16ScaleTensor,
+                                                        scratch.fp32ScaleTensor, nScale, common.tokenHiddenDim);
+        }
     }
 }
 
-__aicore__ inline void AccumulateExpertSlotInput(const MoeStageCommonConfig& common, TokenUnpermuteScratch& scratch,
-                                                 __ubuf__ float* dataInFp32, int32_t localIdx, int32_t expertIdx,
-                                                 bool applyWeight, bool accumStarted)
+__aicore__ inline void AccumulateExpertSlotInput(bool applyWeight, const MoeStageCommonConfig& common,
+                                                 TokenUnpermuteScratch& scratch, __ubuf__ float* dataInFp32,
+                                                 int32_t localIdx, int32_t expertIdx, bool accumStarted)
 {
     auto* accum = scratch.dataResFp32Tensor;
     if (applyWeight) {
@@ -131,9 +134,9 @@ __aicore__ inline void AccumulateExpertSlotInput(const MoeStageCommonConfig& com
 }
 
 #else
-__aicore__ inline void AccumulateBf16ExpertSlotInput(const MoeStageCommonConfig& common, TokenUnpermuteScratch& scratch,
-                                                     __ubuf__ bfloat16_t* dataInBf16, int32_t localIdx,
-                                                     int32_t expertIdx, bool applyWeight, bool accumStarted)
+__aicore__ inline void AccumulateBf16ExpertSlotInput(bool applyWeight, const MoeStageCommonConfig& common,
+                                                     TokenUnpermuteScratch& scratch, __ubuf__ bfloat16_t* dataInBf16,
+                                                     int32_t localIdx, int32_t expertIdx, bool accumStarted)
 {
     auto* accumUb = scratch.dataResFp32Tensor;
     auto* inputUb = dataInBf16;
@@ -153,11 +156,40 @@ __aicore__ inline void AccumulateBf16ExpertSlotInput(const MoeStageCommonConfig&
     }
 }
 
-template <uint8_t CombineMode>
-__aicore__ inline void ProcessMoeExpertSlot(const TokenUnpermuteConfig& context, const MoeStageCommonConfig& common,
-                                            TokenUnpermuteScratch& scratch, __gm__ bfloat16_t* expandedX,
+template <typename Fp8Type>
+__aicore__ inline void AccumulateMxFp8ExpertSlot(bool applyWeight, const MoeStageCommonConfig& common,
+                                                 TokenUnpermuteScratch& scratch, __ubuf__ bfloat16_t* dataInBf16,
+                                                 int32_t localIdx, int32_t expertIdx, bool accumStarted)
+{
+    auto* tokenPtr = reinterpret_cast<__ubuf__ Fp8Type*>(dataInBf16);
+    uint32_t dataBytes = Ops::Base::CeilAlign(common.tokenHiddenDim, static_cast<uint32_t>(ALIGN_256));
+    auto* scalePtr = reinterpret_cast<__ubuf__ fp8_e8m0_t*>(tokenPtr + dataBytes);
+    uint32_t scaleLen = Ops::Base::CeilDiv(common.tokenHiddenDim, static_cast<uint32_t>(MXFP_SCALE_GROUP_NUM));
+    if (applyWeight) {
+        float weight = scratch.topKWeightsTensor[localIdx * common.topK + expertIdx];
+        if (accumStarted) {
+            Mxfp8::AccumulateMxFp8VF<Fp8Type, false, true>(tokenPtr, scalePtr, scratch.dataResFp32Tensor, scaleLen,
+                                                           common.tokenHiddenDim, weight);
+        } else {
+            Mxfp8::AccumulateMxFp8VF<Fp8Type, true, true>(tokenPtr, scalePtr, scratch.dataResFp32Tensor, scaleLen,
+                                                          common.tokenHiddenDim, weight);
+        }
+    } else {
+        if (accumStarted) {
+            Mxfp8::AccumulateMxFp8VF<Fp8Type, false, false>(tokenPtr, scalePtr, scratch.dataResFp32Tensor, scaleLen,
+                                                            common.tokenHiddenDim, 0.0f);
+        } else {
+            Mxfp8::AccumulateMxFp8VF<Fp8Type, true, false>(tokenPtr, scalePtr, scratch.dataResFp32Tensor, scaleLen,
+                                                           common.tokenHiddenDim, 0.0f);
+        }
+    }
+}
+
+__aicore__ inline void ProcessMoeExpertSlot(uint8_t combineMode, bool applyWeight, const TokenUnpermuteConfig& context,
+                                            const MoeStageCommonConfig& common, TokenUnpermuteScratch& scratch,
+                                            __gm__ bfloat16_t* expandedX,
                                             const MegaMoeUnpermuteBufferConfig& bufferConfig, int32_t tokenIdx,
-                                            int32_t localIdx, int32_t expertIdx, bool applyWeight, bool accumStarted)
+                                            int32_t localIdx, int32_t expertIdx, bool accumStarted)
 {
     int32_t accumulationItemIdx = localIdx * static_cast<int32_t>(common.topK + common.sharedExpertNum) + expertIdx;
     int32_t inputBufferIdx = accumulationItemIdx % bufferConfig.inputBufferCount;
@@ -165,12 +197,12 @@ __aicore__ inline void ProcessMoeExpertSlot(const TokenUnpermuteConfig& context,
     __ubuf__ bfloat16_t* dataInBf16 = scratch.dataResTensor + (inputBufferIdx + 1) * bufferConfig.bf16SlotElementCount;
     uint64_t expertInputIndex = static_cast<uint64_t>(tokenIdx) * common.topK + expertIdx;
     PipeWait<PIPE_V, PIPE_MTE2>(event);
-    if constexpr (CombineMode == COMBINE_NO_QUANT) {
+    if (combineMode == COMBINE_NO_QUANT) {
         CopyGmToUb(dataInBf16, expandedX + expertInputIndex * common.tokenHiddenDim,
                    common.tokenHiddenDim * sizeof(bfloat16_t));
         PipeNotify<PIPE_MTE2, PIPE_V>(event);
         PipeWait<PIPE_MTE2, PIPE_V>(event);
-        AccumulateBf16ExpertSlotInput(common, scratch, dataInBf16, localIdx, expertIdx, applyWeight, accumStarted);
+        AccumulateBf16ExpertSlotInput(applyWeight, common, scratch, dataInBf16, localIdx, expertIdx, accumStarted);
     } else {
         uint32_t quantTokenElementCount = context.quantTokenSizeBytes / sizeof(bfloat16_t);
         CopyGmToUb(dataInBf16, expandedX + expertInputIndex * quantTokenElementCount,
@@ -179,28 +211,12 @@ __aicore__ inline void ProcessMoeExpertSlot(const TokenUnpermuteConfig& context,
         PipeWait<PIPE_MTE2, PIPE_V>(event);
         PipeNotify<PIPE_S, PIPE_V>(event);
         PipeWait<PIPE_S, PIPE_V>(event);
-        using Fp8Type = typename std::conditional<CombineMode == MXFP8_E4M3_COMM_QUANT, fp8_e4m3fn_t, fp8_e5m2_t>::type;
-        auto* tokenPtr = reinterpret_cast<__ubuf__ Fp8Type*>(dataInBf16);
-        uint32_t dataBytes = Ops::Base::CeilAlign(common.tokenHiddenDim, static_cast<uint32_t>(ALIGN_256));
-        auto* scalePtr = reinterpret_cast<__ubuf__ fp8_e8m0_t*>(tokenPtr + dataBytes);
-        uint32_t scaleLen = Ops::Base::CeilDiv(common.tokenHiddenDim, static_cast<uint32_t>(MXFP_SCALE_GROUP_NUM));
-        if (applyWeight) {
-            float weight = scratch.topKWeightsTensor[localIdx * common.topK + expertIdx];
-            if (accumStarted) {
-                Mxfp8::AccumulateMxFp8VF<Fp8Type, false, true>(tokenPtr, scalePtr, scratch.dataResFp32Tensor, scaleLen,
-                                                               common.tokenHiddenDim, weight);
-            } else {
-                Mxfp8::AccumulateMxFp8VF<Fp8Type, true, true>(tokenPtr, scalePtr, scratch.dataResFp32Tensor, scaleLen,
-                                                              common.tokenHiddenDim, weight);
-            }
+        if (combineMode == MXFP8_E4M3_COMM_QUANT) {
+            AccumulateMxFp8ExpertSlot<fp8_e4m3fn_t>(applyWeight, common, scratch, dataInBf16, localIdx, expertIdx,
+                                                    accumStarted);
         } else {
-            if (accumStarted) {
-                Mxfp8::AccumulateMxFp8VF<Fp8Type, false, false>(tokenPtr, scalePtr, scratch.dataResFp32Tensor, scaleLen,
-                                                                common.tokenHiddenDim, 0.0f);
-            } else {
-                Mxfp8::AccumulateMxFp8VF<Fp8Type, true, false>(tokenPtr, scalePtr, scratch.dataResFp32Tensor, scaleLen,
-                                                               common.tokenHiddenDim, 0.0f);
-            }
+            AccumulateMxFp8ExpertSlot<fp8_e5m2_t>(applyWeight, common, scratch, dataInBf16, localIdx, expertIdx,
+                                                  accumStarted);
         }
     }
     PipeNotify<PIPE_V, PIPE_MTE2>(event);
@@ -250,8 +266,8 @@ __aicore__ inline bool JudgeDedupCanonicalSlot(const __ubuf__ int32_t* expertRan
 // combine 去重模式：生产卡已按卡合并（同卡多专家的贡献落在该卡首个 topk 槽、其余槽不再到达），
 // 归属卡只累加 canonical 槽。
 // 返回是否存在有效 MoE 路由，控制后续共享专家贡献。
-template <uint8_t CombineMode, bool TopkWeightsPrefetch>
-__aicore__ inline bool AccumulateMoeExpertsForToken(const TokenUnpermuteConfig& context,
+__aicore__ inline bool AccumulateMoeExpertsForToken(uint8_t combineMode, bool topkWeightsPrefetch,
+                                                    const TokenUnpermuteConfig& context,
                                                     const MoeStageCommonConfig& common, const Params& params,
                                                     TokenUnpermuteScratch& scratch, int32_t tokenIdx, int32_t localIdx,
                                                     __gm__ bfloat16_t* expandedX,
@@ -288,20 +304,20 @@ __aicore__ inline bool AccumulateMoeExpertsForToken(const TokenUnpermuteConfig& 
             dataInFp32 = scratch.dataResFp32Tensor + (inputBufferIdx + 1) * bufferConfig.fp32SlotElementCount;
         }
         uint64_t expertInputIndex = static_cast<uint64_t>(tokenIdx) * common.topK + expertIdx;
-        LoadMoeExpertInput<CombineMode>(context, common, scratch, expandedX, expertInputIndex, event, dataInBf16,
-                                        dataInFp32);
-        const bool applyWeight = !TopkWeightsPrefetch && (!dedupCombineActive || sameRankCount == 1);
+        LoadMoeExpertInput(combineMode, context, common, scratch, expandedX, expertInputIndex, event, dataInBf16,
+                           dataInFp32);
+        const bool applyWeight = (!topkWeightsPrefetch) && (!dedupCombineActive || sameRankCount == 1);
         {
             PipeNotify<PIPE_S, PIPE_V>(event);
             PipeWait<PIPE_S, PIPE_V>(event);
-            AccumulateExpertSlotInput(common, scratch, dataInFp32, localIdx, expertIdx, applyWeight, accumStarted);
+            AccumulateExpertSlotInput(applyWeight, common, scratch, dataInFp32, localIdx, expertIdx, accumStarted);
         }
         accumStarted = true;
         PipeNotify<PIPE_V, PIPE_MTE2>(event);
 #else
-        const bool applyWeight = !TopkWeightsPrefetch && (!dedupCombineActive || sameRankCount == 1);
-        ProcessMoeExpertSlot<CombineMode>(context, common, scratch, expandedX, bufferConfig, tokenIdx, localIdx,
-                                          expertIdx, applyWeight, accumStarted);
+        const bool applyWeight = (!topkWeightsPrefetch) && (!dedupCombineActive || sameRankCount == 1);
+        ProcessMoeExpertSlot(combineMode, applyWeight, context, common, scratch, expandedX, bufferConfig, tokenIdx,
+                             localIdx, expertIdx, accumStarted);
         accumStarted = true;
 #endif
     }
@@ -379,16 +395,14 @@ __aicore__ inline void AccumulateSharedExpertsForToken(const MoeStageCommonConfi
     }
 }
 
-template <uint8_t CombineMode, typename TopkWeightsType, bool TopkWeightsPrefetch, uint32_t Gmm1TileM>
-__aicore__ inline void ProcessTokenUnpermuteBatch(const TokenUnpermuteConfig& context,
-                                                  const MoeStageCommonConfig& common, const Params& params,
-                                                  TokenUnpermuteScratch& scratch,
-                                                  const MegaMoeUnpermuteBufferConfig& bufferConfig,
-                                                  __gm__ bfloat16_t* expandedX, __gm__ bfloat16_t* output,
-                                                  int32_t jobOffset, int32_t batchTokenOffset, int32_t batchTokenCount,
-                                                  TEventID outputBufferEvent)
+template <typename TopkWeightsType, uint32_t Gmm1TileM>
+__aicore__ inline void ProcessTokenUnpermuteBatch(
+    uint8_t combineMode, bool topkWeightsPrefetch, const TokenUnpermuteConfig& context,
+    const MoeStageCommonConfig& common, const Params& params, TokenUnpermuteScratch& scratch,
+    const MegaMoeUnpermuteBufferConfig& bufferConfig, __gm__ bfloat16_t* expandedX, __gm__ bfloat16_t* output,
+    int32_t jobOffset, int32_t batchTokenOffset, int32_t batchTokenCount, TEventID outputBufferEvent)
 {
-    if constexpr (!TopkWeightsPrefetch) {
+    if (!topkWeightsPrefetch) {
         LoadTokenUnpermuteWeights<TopkWeightsType>(common, params, scratch, jobOffset, batchTokenOffset,
                                                    batchTokenCount);
     }
@@ -397,8 +411,8 @@ __aicore__ inline void ProcessTokenUnpermuteBatch(const TokenUnpermuteConfig& co
     }
     for (int32_t localIdx = 0; localIdx < batchTokenCount; ++localIdx) {
         int32_t tokenIdx = jobOffset + batchTokenOffset + localIdx;
-        if (AccumulateMoeExpertsForToken<CombineMode, TopkWeightsPrefetch>(context, common, params, scratch, tokenIdx,
-                                                                           localIdx, expandedX, bufferConfig)) {
+        if (AccumulateMoeExpertsForToken(combineMode, topkWeightsPrefetch, context, common, params, scratch, tokenIdx,
+                                         localIdx, expandedX, bufferConfig)) {
             AccumulateSharedExpertsForToken<Gmm1TileM>(common, params, scratch, tokenIdx, localIdx, bufferConfig);
         }
         PipeWait<PIPE_MTE3, PIPE_V>(outputBufferEvent);
@@ -434,8 +448,9 @@ __aicore__ inline void ProcessTokenUnpermuteBatch(const TokenUnpermuteConfig& co
  *   [fp32Scale  ] 仅 Arch92 量化 combine 时存在，Align32(ceil(H/32)·4B·扩展系数)
  *   [expertRanks] 当前 token 的 topK 目标卡号，固定预留 128B，仅 Combine 去重时读写
  */
-template <typename TopkWeightsType, int32_t CombineQuantMode>
-__aicore__ inline MegaMoeUnpermuteBufferConfig CreateTokenUnpermuteBuffers(const TokenUnpermuteConfig& context,
+template <typename TopkWeightsType>
+__aicore__ inline MegaMoeUnpermuteBufferConfig CreateTokenUnpermuteBuffers(uint8_t combineMode,
+                                                                           const TokenUnpermuteConfig& context,
                                                                            uint32_t tokenHiddenDim,
                                                                            TokenUnpermuteScratch& scratch)
 {
@@ -446,7 +461,7 @@ __aicore__ inline MegaMoeUnpermuteBufferConfig CreateTokenUnpermuteBuffers(const
 #if defined(MEGA_MOE_ARCH92_DEVICE)
     uint32_t bf16ScaleBufAlign = 0U;
     uint32_t fp32ScaleBufAlign = 0U;
-    if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
+    if (combineMode != COMBINE_NO_QUANT) {
         uint32_t scaleNum = Ops::Base::CeilDiv(tokenHiddenDim, static_cast<uint32_t>(ALIGN_32));
         bf16ScaleBufAlign = Ops::Base::CeilAlign(
             scaleNum * static_cast<uint32_t>(sizeof(bfloat16_t)) * static_cast<uint32_t>(DEQUANT_BF16_SCALE_EXPANSION),
@@ -478,7 +493,7 @@ __aicore__ inline MegaMoeUnpermuteBufferConfig CreateTokenUnpermuteBuffers(const
         tempAddr += bufferConfig.topKWeightsConversionBufferBytes;
     }
 #if defined(MEGA_MOE_ARCH92_DEVICE)
-    if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
+    if (combineMode != COMBINE_NO_QUANT) {
         scratch.bf16ScaleTensor = reinterpret_cast<__ubuf__ bfloat16_t*>(tempAddr);
         tempAddr += bf16ScaleBufAlign;
         scratch.fp32ScaleTensor = reinterpret_cast<__ubuf__ float*>(tempAddr);
@@ -490,8 +505,9 @@ __aicore__ inline MegaMoeUnpermuteBufferConfig CreateTokenUnpermuteBuffers(const
 }
 
 // 执行当前 token 分区的完整 Unpermute 流水。
-template <uint8_t CombineMode, typename TopkWeightsType, bool TopkWeightsPrefetch, uint32_t Gmm1TileM>
-__aicore__ inline void UnpermuteTokens(const TokenUnpermuteConfig& context, const MoeStageCommonConfig& common,
+template <typename TopkWeightsType, uint32_t Gmm1TileM>
+__aicore__ inline void UnpermuteTokens(uint8_t combineMode, bool topkWeightsPrefetch,
+                                       const TokenUnpermuteConfig& context, const MoeStageCommonConfig& common,
                                        const Params& params, TokenUnpermuteScratch& scratch,
                                        const MegaMoeUnpermuteBufferConfig& bufferConfig)
 {
@@ -514,9 +530,9 @@ __aicore__ inline void UnpermuteTokens(const TokenUnpermuteConfig& context, cons
     for (int32_t batchTokenOffset = 0; batchTokenOffset < jobLen; batchTokenOffset += bufferConfig.tokensPerBatch) {
         int32_t batchTokenCount = batchTokenOffset + bufferConfig.tokensPerBatch > jobLen ? jobLen - batchTokenOffset :
                                                                                             bufferConfig.tokensPerBatch;
-        ProcessTokenUnpermuteBatch<CombineMode, TopkWeightsType, TopkWeightsPrefetch, Gmm1TileM>(
-            context, common, params, scratch, bufferConfig, expandedX, output, jobOffset, batchTokenOffset,
-            batchTokenCount, outputBufferEvent);
+        ProcessTokenUnpermuteBatch<TopkWeightsType, Gmm1TileM>(
+            combineMode, topkWeightsPrefetch, context, common, params, scratch, bufferConfig, expandedX, output,
+            jobOffset, batchTokenOffset, batchTokenCount, outputBufferEvent);
     }
     PipeWait<PIPE_MTE3, PIPE_V>(outputBufferEvent);
 }

@@ -279,9 +279,9 @@ static ge::graphStatus CheckDedupRequestAttrs(const gert::TilingContext* context
                         "enabling combine dedup does not support pre-quantized x together with topk_weights_type=0; "
                         "set topk_weights_type=1, or pass a non-pre-quantized x"),
                     return ge::GRAPH_FAILED);
-    // 去重请求位落库。combine 去重两种权重语义并存：tkw=1 沿用 prefetch（激活层乘权、合并与
+    // 去重请求位落库。combine 去重两种权重语义并存：tkw=1 沿用 topk 权重在激活量化阶段同步计算、合并与
     // unpermute 纯加）；tkw=0 时合并阶段在发送端按成员权重乘加，权重经记录尾段下发（布局判定
-    // 统一按「tkw=1 或 combine 去重开」判定，prefetch 位保持 attr 原值不强拉——强拉会偏离 tkw=0
+    // 统一按「tkw=1 或 combine 去重开」判定，topk 提前乘权开关保持 attr 原值不强拉——强拉会偏离 tkw=0
     // golden 的乘权位置语义）。
     tilingData->compute.dedupMode = static_cast<int32_t>(dedupMode);
     return ge::GRAPH_SUCCESS;
@@ -380,7 +380,7 @@ static uint8_t ResolveExpertGmmMode(ge::DataType quantOutDtype, ge::DataType wei
 }
 
 /*
- * 校验 dispatch 和 combine 阶段的量化模式，并将 combine 模式写入 tiling data。
+ * 校验 dispatch 和 combine 阶段的量化模式，并将两种模式写入 tiling data。
  * dispatch_quant_mode 为 0 表示不在算子内部量化，为 4 表示算子内部执行 MX 量化。
  */
 static ge::graphStatus CheckAndSetQuantModeAttrs(const gert::TilingContext* context, const MegaMoeConfig& config,
@@ -402,6 +402,7 @@ static ge::graphStatus CheckAndSetQuantModeAttrs(const gert::TilingContext* cont
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "combineQuantMode", std::to_string(*combineQuantModePtr).c_str(),
                                   "only support no_quant(0), fp8_e5m2(3) and fp8_e4m3fn(4)"),
         return ge::GRAPH_FAILED);
+    tilingData->dispatchQuantMode = static_cast<uint32_t>(*dispatchQuantModePtr);
     tilingData->combineQuantMode = static_cast<uint32_t>(*combineQuantModePtr);
     return ge::GRAPH_SUCCESS;
 }
@@ -594,11 +595,13 @@ static ge::graphStatus CheckAndSetMaxTokensPerRankAttr(const gert::TilingContext
                                   "route indexes and prefix sums should fit in INT32_MAX"),
         return ge::GRAPH_FAILED);
     tilingData->compute.numMaxTokensPerRank = static_cast<uint32_t>(numMaxTokensPerRank);
+    tilingData->topkIndexTypeBytes = static_cast<uint32_t>(CalcTopkIndexTypeBytesForTopology(
+        tilingData->compute.topoType, tilingData->compute.numMaxTokensPerRank, tilingData->compute.topK));
     return ge::GRAPH_SUCCESS;
 }
 
 /*
- * 校验 topK weight 预取开关并写入 tiling data。
+ * 校验 topk 权重在激活量化阶段同步计算的开关并写入 tiling data。
  */
 static ge::graphStatus CheckAndSetTopkWeightsTypeAttr(const gert::TilingContext* context, const MegaMoeConfig& config,
                                                       MegaMoeTilingData* tilingData, const char* nodeName)
@@ -610,7 +613,7 @@ static ge::graphStatus CheckAndSetTopkWeightsTypeAttr(const gert::TilingContext*
                                               "only support 0(disabled) or 1(enabled)"),
                     return ge::GRAPH_FAILED);
 
-    tilingData->topkWeightsPrefetch = static_cast<int32_t>(topkWeightsType);
+    tilingData->isTopkWeightsPrefetch = static_cast<bool>(topkWeightsType);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1742,7 +1745,7 @@ static ge::graphStatus ApplyDedupPrepassChunkGuard(MegaMoeTilingData* tilingData
  */
 static bool TryBuildDedupGateShape(const MegaMoeTilingData* tilingData, MegaMoeImpl::DedupGateShape& shape)
 {
-    if (tilingData->topkWeightsPrefetch != 0 || tilingData->compute.sharedExpertNum != 1U ||
+    if (tilingData->isTopkWeightsPrefetch != 0 || tilingData->compute.sharedExpertNum != 1U ||
         tilingData->actMode != static_cast<uint8_t>(MegaMoeImpl::MegaMoeActMode::SWIGLU)) {
         return false;
     }

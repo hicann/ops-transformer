@@ -666,7 +666,7 @@ void AccumulateDispatchSize(int64_t& cclDataSize, const CclDataBudget& budget)
     cclDataSize += CeilAlign(
         budget.maxOutput * CeilDiv(budget.hidden, ARCH35_MX_SCALE_DIVISOR) * ARCH35_MX_MULTI_BASE_SIZE, ALIGN_512);
 
-    // 保留 URMA 的保守权重预算，包含未启用预取的路径。
+    // 保留 URMA 的保守权重预算，包含未启用 topk 权重在激活量化阶段同步计算的路径。
     if (budget.isUrma || (budget.reserveCombineDedup && budget.topkWeightsType == 0)) {
         cclDataSize += CeilAlign(
             budget.maxOutput * CeilAlign(budget.numTopk * static_cast<int64_t>(sizeof(float)), ALIGN_32), ALIGN_512);

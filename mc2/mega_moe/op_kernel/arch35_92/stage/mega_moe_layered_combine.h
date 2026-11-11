@@ -96,9 +96,9 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CombineTo
     const GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& gmm2State, uint32_t expertIdx, const WorkRange& rowRange,
     CombineBatchState& batchState)
 {
+    const uint8_t CombineQuantMode = params_.tilingData->combineQuantMode;
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
-    constexpr bool IsQuantized = CombineQuantMode != COMBINE_NO_QUANT;
 
     uint32_t mExpert = Get<M_VALUE>(gmm2State.problemShape);
     uint32_t nTilesPerGroup = Ops::Base::CeilDiv(k_, L1_TILE_N);
@@ -132,9 +132,9 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CombineTo
                                                       gmmAddrInfo.gmm2OutGlobal, metaInfoAddr, params_, comm_,
                                                       batchState);
         } else {
-            CombineImpl::CombineTokenGroup<CombineQuantMode, bfloat16_t, IsQuantized>(
-                currentRow, batchCount, k_, expertIdx, rankId_, gmmAddrInfo.gmm2OutGlobal, metaInfoAddr,
-                combineUbTensorSize_, params_, comm_, batchState);
+            CombineImpl::CombineTokenGroup<bfloat16_t>(CombineQuantMode, currentRow, batchCount, k_, expertIdx, rankId_,
+                                                       gmmAddrInfo.gmm2OutGlobal, metaInfoAddr, combineUbTensorSize_,
+                                                       params_, comm_, batchState);
         }
         processedCount += batchCount;
     }
@@ -268,6 +268,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCo
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline MegaMoeUnpermuteBufferConfig MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::UnpermuteBuffInit()
 {
+    const uint8_t CombineQuantMode = params_.tilingData->combineQuantMode;
     const auto* tilingData = params_.tilingData;
     const auto bufferConfig = aivCoreIdx_ < tilingData->unpermuteFullTokenChunkCoreCount ?
                                   tilingData->unpermuteConfigForFullTokenChunk :
@@ -279,7 +280,7 @@ __aicore__ inline MegaMoeUnpermuteBufferConfig MegaMoeLayered<TemplateMegaMoeLay
     const uint32_t fp32SlotBytes = bufferConfig.fp32SlotElementCount * sizeof(float);
     const uint32_t dataResBytes = (bufferConfig.inputBufferCount + 1U) * bf16SlotBytes;
     uint32_t dataResFp32Bytes = fp32SlotBytes;
-    if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
+    if (CombineQuantMode != COMBINE_NO_QUANT) {
         dataResFp32Bytes += bufferConfig.inputBufferCount * fp32SlotBytes;
     }
     // BF16 槽 0 用于输出，其余槽用于输入；FP32 槽 0 累加，通信量化另有输入槽。
@@ -290,7 +291,7 @@ __aicore__ inline MegaMoeUnpermuteBufferConfig MegaMoeLayered<TemplateMegaMoeLay
     tempAddr += bufferConfig.topKWeightsBufferBytes;
     topKWeightsTempAddr_ = tempAddr;
     tempAddr += bufferConfig.topKWeightsConversionBufferBytes;
-    if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
+    if (CombineQuantMode != COMBINE_NO_QUANT) {
         const uint32_t scaleNum = Ops::Base::CeilDiv(k_, static_cast<uint32_t>(MXFP_SCALE_GROUP_NUM));
         const auto scaleBytes = CalcLayeredDequantScaleBufferBytes(scaleNum);
         bf16ScaleTensor_ = reinterpret_cast<__ubuf__ bfloat16_t*>(tempAddr);
@@ -350,7 +351,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadUnper
     __gm__ bfloat16_t* expandedX, int32_t tokenIdx, int32_t expId, TEventID event, __ubuf__ bfloat16_t* dataInBf16,
     __ubuf__ float* dataInFp32)
 {
-    if constexpr (CombineQuantMode == COMBINE_NO_QUANT) {
+    const uint8_t CombineQuantMode = params_.tilingData->combineQuantMode;
+    if (CombineQuantMode == COMBINE_NO_QUANT) {
         PipeWait<PIPE_V, PIPE_MTE2>(event);
         CopyGmToUb(dataInBf16, (expandedX + ((tokenIdx * topK_ + expId) * k_)), (k_) * sizeof(bfloat16_t));
         PipeNotify<PIPE_MTE2, PIPE_V>(event);
@@ -365,13 +367,34 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadUnper
                    (quantEleNum) * sizeof(bfloat16_t));
         PipeNotify<PIPE_MTE2, PIPE_V>(event);
         PipeWait<PIPE_MTE2, PIPE_V>(event);
-        using Fp8Type =
-            typename std::conditional<CombineQuantMode == MXFP8_E4M3_COMM_QUANT, fp8_e4m3fn_t, fp8_e5m2_t>::type;
         PipeNotify<PIPE_S, PIPE_V>(event);
         PipeWait<PIPE_S, PIPE_V>(event);
-        Mxfp8::DeQuantMxFp8<Fp8Type, bfloat16_t>(dataInBf16, dataInFp32, bf16ScaleTensor_, fp32ScaleTensor_, nScale,
-                                                 k_);
+        if (CombineQuantMode == MXFP8_E4M3_COMM_QUANT) {
+            Mxfp8::DeQuantMxFp8<fp8_e4m3fn_t, bfloat16_t>(dataInBf16, dataInFp32, bf16ScaleTensor_, fp32ScaleTensor_,
+                                                          nScale, k_);
+        } else {
+            Mxfp8::DeQuantMxFp8<fp8_e5m2_t, bfloat16_t>(dataInBf16, dataInFp32, bf16ScaleTensor_, fp32ScaleTensor_,
+                                                        nScale, k_);
+        }
     }
+}
+
+// 仅为 VF 输入类型及原有标量开关保留独立特化。
+template <typename InputType>
+__aicore__ inline void AccumulateLayeredUnpermuteInput(__ubuf__ float* accum, __ubuf__ InputType* input,
+                                                       __ubuf__ float* weight, uint32_t elementCount, bool applyWeight,
+                                                       bool initAccum)
+{
+    SelectRuntimeBool(
+        applyWeight, [&](auto weightTag) __attribute__((cce_aicore)) {
+            if (initAccum) {
+                AccumulateUnpermuteExpertVF<InputType, decltype(weightTag)::value, true>(accum, input, weight,
+                                                                                         elementCount);
+            } else {
+                AccumulateUnpermuteExpertVF<InputType, decltype(weightTag)::value, false>(accum, input, weight,
+                                                                                          elementCount);
+            }
+        });
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
@@ -379,33 +402,28 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Accumulat
     __gm__ bfloat16_t* expandedX, int32_t tokenIdx, int32_t localIdx, const MegaMoeUnpermuteBufferConfig& bufferConfig,
     uint32_t& inputBufferIdx)
 {
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
+    const uint8_t CombineQuantMode = params_.tilingData->combineQuantMode;
     for (int32_t expId = 0; expId < topK_; ++expId) {
         auto event = static_cast<TEventID>(inputBufferIdx);
         auto dataInBf16 = dataResTensor_ + (inputBufferIdx + 1U) * bufferConfig.bf16SlotElementCount;
         __ubuf__ float* dataInFp32 = nullptr;
-        if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
+        if (CombineQuantMode != COMBINE_NO_QUANT) {
             dataInFp32 = dataResFp32Tensor_ + (inputBufferIdx + 1U) * bufferConfig.fp32SlotElementCount;
         }
         LoadUnpermuteExpertInput(expandedX, tokenIdx, expId, event, dataInBf16, dataInFp32);
 
         __ubuf__ float* weightUb = nullptr;
-        if constexpr (!TopkWeightsPrefetch) {
+        if (!TopkWeightsPrefetch) {
             weightUb = topKWeightsTensor_ + localIdx * topK_ + expId;
         }
-        using InputType = typename std::conditional<CombineQuantMode == COMBINE_NO_QUANT, bfloat16_t, float>::type;
-        __ubuf__ InputType* inputUb = nullptr;
-        if constexpr (CombineQuantMode == COMBINE_NO_QUANT) {
-            inputUb = dataInBf16;
-        } else {
-            inputUb = dataInFp32;
-        }
         // 首槽与后续槽分别实例化，避免 VF 的每次向量迭代都判断初始化状态。
-        if (expId == 0) {
-            AccumulateUnpermuteExpertVF<InputType, !TopkWeightsPrefetch, true>(dataResFp32Tensor_, inputUb, weightUb,
-                                                                               k_);
+        if (CombineQuantMode == COMBINE_NO_QUANT) {
+            AccumulateLayeredUnpermuteInput(dataResFp32Tensor_, dataInBf16, weightUb, k_, !TopkWeightsPrefetch,
+                                            expId == 0);
         } else {
-            AccumulateUnpermuteExpertVF<InputType, !TopkWeightsPrefetch, false>(dataResFp32Tensor_, inputUb, weightUb,
-                                                                                k_);
+            AccumulateLayeredUnpermuteInput(dataResFp32Tensor_, dataInFp32, weightUb, k_, !TopkWeightsPrefetch,
+                                            expId == 0);
         }
         PipeNotify<PIPE_V, PIPE_MTE2>(event);
         inputBufferIdx = (inputBufferIdx + 1U) % static_cast<uint32_t>(bufferConfig.inputBufferCount);
@@ -418,6 +436,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
     const WorkRange& tokenRange, const MegaMoeUnpermuteBufferConfig& bufferConfig, uint32_t& inputBufferIdx,
     uint32_t& readySharedGroup)
 {
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
     // 权重区和输出区各使用一个核内 mutex，与输入 ring 的 Set/Wait 事件编号独立。
     constexpr uint8_t UNPERMUTE_WEIGHT_MUTEX_ID = 0U;
     constexpr uint8_t UNPERMUTE_OUTPUT_MUTEX_ID = 1U;
@@ -427,7 +446,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
     __gm__ bfloat16_t* expandedX =
         params_.communication.layout.combineSend.template get_ptr<bfloat16_t>(params_.communication.base);
     __gm__ bfloat16_t* output = reinterpret_cast<__gm__ bfloat16_t*>(params_.y2GmAddr);
-    if constexpr (!TopkWeightsPrefetch) {
+    if (!TopkWeightsPrefetch) {
         constexpr bool isBf16Weights = Std::IsSame<TopkWeightsType, bfloat16_t>::value;
         const uint32_t weightCount = chunkTokenCnt * topK_;
         __gm__ TopkWeightsType* weightsGm = reinterpret_cast<__gm__ TopkWeightsType*>(params_.probsGmAddr);

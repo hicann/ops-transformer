@@ -53,6 +53,35 @@ namespace MegaMoeImpl {
 
 using namespace AscendC;
 
+// 非持有的路由索引视图，宽度来自 host tiling data，偏移以元素计。
+struct TopkIndexUbView {
+    __ubuf__ uint8_t* data = nullptr;
+    uint32_t elementBytes = sizeof(int32_t);
+
+    __aicore__ inline int32_t Read(uint64_t index) const
+    {
+        if (elementBytes == sizeof(int16_t)) {
+            return static_cast<int32_t>(reinterpret_cast<__ubuf__ int16_t*>(data)[index]);
+        }
+        return reinterpret_cast<__ubuf__ int32_t*>(data)[index];
+    }
+};
+
+template <auto Value>
+struct RuntimeModeTag {
+    static constexpr auto value = Value;
+};
+
+// 仅在局部计算入口选择布尔特化，避免扩大整个 Wave 的模板组合。
+template <typename Function>
+__aicore__ inline decltype(auto) SelectRuntimeBool(bool value, Function&& function)
+{
+    if (value) {
+        return function(RuntimeModeTag<true>{});
+    }
+    return function(RuntimeModeTag<false>{});
+}
+
 constexpr uint32_t UINT64_BYTE_OFFSET_SHIFT = 3U;
 
 __aicore__ inline __gm__ int32_t* GetSyncCountAddress(GM_ADDR rankSyncBase, uint32_t aivCoreIdx)

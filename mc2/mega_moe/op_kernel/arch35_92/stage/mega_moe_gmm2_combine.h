@@ -150,8 +150,9 @@ __aicore__ inline void CombineQuantizedTokens(uint32_t batchStart, uint32_t curR
 } // namespace CombineImpl
 
 // 调用方决定参与核与阶段；这里只计算 Combine 行环布局并绑定当前核的 UB 视图。
-template <uint8_t CombineMode, uint32_t MaxRowBufferCount = WAVE_COMBINE_MAX_ROW_BUFFER_COUNT>
-__aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(const MoeStageCommonConfig& common,
+template <uint32_t MaxRowBufferCount = WAVE_COMBINE_MAX_ROW_BUFFER_COUNT>
+__aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(uint8_t combineMode,
+                                                                 const MoeStageCommonConfig& common,
                                                                  WaveCombineScratch& scratch)
 {
     static_assert(MaxRowBufferCount > 0U && MaxRowBufferCount <= WAVE_COMBINE_MAX_ROW_BUFFER_COUNT,
@@ -161,7 +162,7 @@ __aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(const MoeStageC
     bufferConfig.rowStrideBytes = static_cast<uint32_t>(
         Ops::Base::CeilAlign(static_cast<uint64_t>(bufferConfig.rowBytes), static_cast<uint64_t>(ALIGN_32)));
     bufferConfig.slotStrideBytes = bufferConfig.rowStrideBytes;
-    if constexpr (CombineMode != COMBINE_NO_QUANT) {
+    if (combineMode != COMBINE_NO_QUANT) {
         uint32_t nScale = Ops::Base::CeilDiv(common.tokenHiddenDim, static_cast<uint32_t>(MXFP_SCALE_GROUP_NUM));
         uint32_t tokenStorageBytes = Ops::Base::CeilAlign(common.tokenHiddenDim, static_cast<uint32_t>(ALIGN_256));
         uint32_t storedScaleBytes = Ops::Base::CeilAlign(nScale, 2U);
@@ -173,7 +174,7 @@ __aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(const MoeStageC
             Ops::Base::CeilAlign(storedScaleBytes, static_cast<uint32_t>(ALIGN_32)) + storedScaleBytes / 2U;
     }
     bufferConfig.rowBufferCount = MaxRowBufferCount;
-    if constexpr (CombineMode != COMBINE_NO_QUANT) {
+    if (combineMode != COMBINE_NO_QUANT) {
         uint32_t quantTempBytes = bufferConfig.quantTempElements * sizeof(float);
         uint32_t rowRingBudgetBytes = WAVE_COMBINE_UB_LIMIT - WAVE_COMBINE_UB_BASE - quantTempBytes;
         constexpr uint32_t minRowBufferCount = MaxRowBufferCount < WAVE_COMBINE_MIN_ROW_BUFFER_COUNT ?
@@ -188,7 +189,7 @@ __aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(const MoeStageC
     uint32_t rowRingBytes = bufferConfig.rowBufferCount * bufferConfig.slotStrideBytes;
     scratch.rowBufferTensor = reinterpret_cast<__ubuf__ bfloat16_t*>(WAVE_COMBINE_UB_BASE);
     scratch.metaInfoTensor = reinterpret_cast<__ubuf__ int32_t*>(META_INFO_TENSOR_ADDR);
-    if constexpr (CombineMode != COMBINE_NO_QUANT) {
+    if (combineMode != COMBINE_NO_QUANT) {
         scratch.quantTempTensor = reinterpret_cast<__ubuf__ float*>(WAVE_COMBINE_UB_BASE + rowRingBytes);
     }
     return bufferConfig;
@@ -266,8 +267,8 @@ __aicore__ inline void PreloadWaveCombineMetaInfo(const Params& params, WaveComb
 }
 
 // 搬运并按需量化一个 wave Combine token 后发送；函数内部不包含 GMM2-ready 依赖。
-template <uint8_t CombineMode, bool IsBufferReuse>
-__aicore__ inline void SendWaveCombineToken(const MoeStageCommonConfig& common,
+template <bool IsBufferReuse>
+__aicore__ inline void SendWaveCombineToken(uint8_t combineMode, const MoeStageCommonConfig& common,
                                             const WaveCombineBufferConfig& bufferConfig, WaveCombineScratch& scratch,
                                             const Params& params, __gm__ bfloat16_t* gmm2OutGm,
                                             uint64_t gmRemoteBaseOffset, uint32_t tokenLocal,
@@ -281,7 +282,7 @@ __aicore__ inline void SendWaveCombineToken(const MoeStageCommonConfig& common,
     __ubuf__ bfloat16_t* rowUb = (scratch.rowBufferTensor + (slotElementOffset));
 
     CopyGmToUb(rowUb, (gmm2OutGm + (static_cast<uint64_t>(tokenLocal) * common.tokenHiddenDim)), bufferConfig.rowBytes);
-    if constexpr (CombineMode == COMBINE_NO_QUANT) {
+    if (combineMode == COMBINE_NO_QUANT) {
         PipeNotify<PIPE_MTE2, PIPE_MTE3>(eventId);
         PipeWait<PIPE_MTE2, PIPE_MTE3>(eventId);
         CombineImpl::SendCombineTokenRow<bfloat16_t>(common.tokenHiddenDim, gmRemoteBaseOffset, tokenMetaInfo, rowUb,
@@ -291,20 +292,24 @@ __aicore__ inline void SendWaveCombineToken(const MoeStageCommonConfig& common,
             (scratch.rowBufferTensor + (slotElementOffset + bufferConfig.rowStrideBytes / sizeof(bfloat16_t)));
         PipeNotify<PIPE_MTE2, PIPE_V>(eventId);
         PipeWait<PIPE_MTE2, PIPE_V>(eventId);
-        Mxfp8::QuantMxFp8<CombineMode, bfloat16_t>(quantUb, rowUb, scratch.quantTempTensor, common.tokenHiddenDim);
+        Mxfp8::QuantMxFp8<bfloat16_t>(combineMode, quantUb, rowUb, scratch.quantTempTensor, common.tokenHiddenDim);
         PipeNotify<PIPE_V, PIPE_MTE3>(eventId);
         PipeWait<PIPE_V, PIPE_MTE3>(eventId);
-        using Fp8Type = typename std::conditional<CombineMode == MXFP8_E4M3_COMM_QUANT, fp8_e4m3fn_t, fp8_e5m2_t>::type;
-        __ubuf__ Fp8Type* quantSendUb = reinterpret_cast<__ubuf__ Fp8Type*>(quantUb);
-        CombineImpl::SendCombineTokenRow<Fp8Type>(bufferConfig.quantRowElements, gmRemoteBaseOffset, tokenMetaInfo,
-                                                  quantSendUb, params);
+        if (combineMode == MXFP8_E4M3_COMM_QUANT) {
+            CombineImpl::SendCombineTokenRow<fp8_e4m3fn_t>(bufferConfig.quantRowElements, gmRemoteBaseOffset,
+                                                           tokenMetaInfo,
+                                                           reinterpret_cast<__ubuf__ fp8_e4m3fn_t*>(quantUb), params);
+        } else {
+            CombineImpl::SendCombineTokenRow<fp8_e5m2_t>(bufferConfig.quantRowElements, gmRemoteBaseOffset,
+                                                         tokenMetaInfo, reinterpret_cast<__ubuf__ fp8_e5m2_t*>(quantUb),
+                                                         params);
+        }
     }
     PipeNotify<PIPE_MTE3, PIPE_MTE2>(eventId);
 }
 
 // 使用行级流水发送当前逻辑 AIV 任务负责的已就绪 token 区间。
-template <uint8_t CombineMode>
-__aicore__ inline void CombineWaveTokenRange(const MoeStageCommonConfig& common,
+__aicore__ inline void CombineWaveTokenRange(uint8_t combineMode, const MoeStageCommonConfig& common,
                                              const WaveCombineBufferConfig& bufferConfig, WaveCombineScratch& scratch,
                                              const Params& params, GM_ADDR gmm2OutGlobal, uint32_t tokenStart,
                                              uint32_t tokenCount, uint32_t metaInfoUbTokenOffset, uint32_t& rowSequence)
@@ -326,15 +331,15 @@ __aicore__ inline void CombineWaveTokenRange(const MoeStageCommonConfig& common,
         uint32_t slot = rowSequence % rowBufferCount;
         __ubuf__ int32_t* tokenMetaInfo =
             (scratch.metaInfoTensor + ((metaInfoUbTokenOffset + tokenIdxInSlice) * META_INFO_SIZE));
-        SendWaveCombineToken<CombineMode, false>(common, bufferConfig, scratch, params, gmm2OutGm, gmRemoteBaseOffset,
-                                                 tokenStart + tokenIdxInSlice, tokenMetaInfo, slot);
+        SendWaveCombineToken<false>(combineMode, common, bufferConfig, scratch, params, gmm2OutGm, gmRemoteBaseOffset,
+                                    tokenStart + tokenIdxInSlice, tokenMetaInfo, slot);
     }
     for (; tokenIdxInSlice < tokenCount; ++tokenIdxInSlice, ++rowSequence) {
         uint32_t slot = rowSequence % rowBufferCount;
         __ubuf__ int32_t* tokenMetaInfo =
             (scratch.metaInfoTensor + ((metaInfoUbTokenOffset + tokenIdxInSlice) * META_INFO_SIZE));
-        SendWaveCombineToken<CombineMode, true>(common, bufferConfig, scratch, params, gmm2OutGm, gmRemoteBaseOffset,
-                                                tokenStart + tokenIdxInSlice, tokenMetaInfo, slot);
+        SendWaveCombineToken<true>(combineMode, common, bufferConfig, scratch, params, gmm2OutGm, gmRemoteBaseOffset,
+                                   tokenStart + tokenIdxInSlice, tokenMetaInfo, slot);
     }
 }
 
@@ -395,15 +400,15 @@ __aicore__ inline void NotifySharedExpertTileCompletion(uint32_t rowTileOffset, 
 namespace GmmKernel {
 
 // 执行通用 GMM2 tile 循环。
-template <uint8_t CombineQuantMode, typename BlockMmad, bool IsShared, bool IsLayered = false,
-          bool NotifyCombineTileReady = false, typename WorkSet, typename Config>
+template <typename BlockMmad, bool IsShared, bool IsLayered = false, bool NotifyCombineTileReady = false,
+          typename WorkSet, typename Config>
 __aicore__ inline void Gmm2AicMmadGeneric(BlockMmad& blockMmad, WorkSet& workSet, const GMMAddrInfo& gmmAddrInfo,
                                           const Config& config, uint32_t startLoopIdx, uint32_t tileNum,
                                           uint32_t rowOffsetInExpert = 0U, uint32_t expertTokenCount = 0U)
 {
     uint32_t lastWaveWaited = static_cast<uint32_t>(-1);
     GroupSyncSlotLayout groupSyncSlotLayout{};
-    if constexpr ((CombineQuantMode != COMBINE_NO_QUANT || IsLayered) && !IsShared) {
+    if ((config.combineQuantMode != COMBINE_NO_QUANT || IsLayered) && !IsShared) {
         uint32_t logicalCoreCount = gmmAddrInfo.gmm2CombineLogicalCoreCount;
         if (logicalCoreCount == 0U) {
             logicalCoreCount = config.blockNum;
@@ -825,11 +830,12 @@ __aicore__ inline void WaitWaveGmm2Ready(const AivJobContext& job, const Params&
 }
 #endif
 
-template <uint8_t CombineMode, bool IncludeAiv0 = false>
-__aicore__ inline void RunWaveCombineStage(const MoeStageCommonConfig& common, const AivJobContext& job,
-                                           const WaveCombineBufferConfig& bufferConfig, WaveCombineScratch& scratch,
-                                           const Params& params, const GMMAddrInfo& gmmAddrInfo,
-                                           const ExpertLoopState& state, uint32_t expertIdx, uint32_t& rowSequence)
+template <bool IncludeAiv0 = false>
+__aicore__ inline void RunWaveCombineStage(uint8_t combineMode, const MoeStageCommonConfig& common,
+                                           const AivJobContext& job, const WaveCombineBufferConfig& bufferConfig,
+                                           WaveCombineScratch& scratch, const Params& params,
+                                           const GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& state,
+                                           uint32_t expertIdx, uint32_t& rowSequence)
 {
     uint32_t currentExpertTokenNum = static_cast<uint32_t>(Get<M_VALUE>(state.problemShape));
     WorkRange currentCoreTokenRange = GetWaveCombineOwnedRange<IncludeAiv0>(
@@ -846,9 +852,8 @@ __aicore__ inline void RunWaveCombineStage(const MoeStageCommonConfig& common, c
             params, scratch,
             static_cast<uint64_t>(state.globalTokenStartIndex) + currentCoreTokenRange.start + processedTokenNum,
             chunkTokenNum, 0U);
-        CombineWaveTokenRange<CombineMode>(common, bufferConfig, scratch, params, gmmAddrInfo.gmm2OutGlobal,
-                                           currentCoreTokenRange.start + processedTokenNum, chunkTokenNum, 0U,
-                                           rowSequence);
+        CombineWaveTokenRange(combineMode, common, bufferConfig, scratch, params, gmmAddrInfo.gmm2OutGlobal,
+                              currentCoreTokenRange.start + processedTokenNum, chunkTokenNum, 0U, rowSequence);
         processedTokenNum += chunkTokenNum;
     }
 }

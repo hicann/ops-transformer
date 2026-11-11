@@ -30,12 +30,13 @@ struct LayeredCombineBatchState {
 };
 
 // 通过本地 MTE 路径或远端 URMA 路径发送一个 layered 模板 token。
-template <typename DataType, bool IsQuantized, typename CommPolicy>
+template <typename DataType, typename CommPolicy>
 __aicore__ inline void CombineSendTokenToRemote(uint32_t batchStart, uint32_t curRows, uint32_t n, uint32_t nScale,
                                                 uint32_t groupIdx, uint32_t rankId, __ubuf__ int32_t* metaInfoTensor,
                                                 __ubuf__ DataType* ubQuant, const Params& params, GM_ADDR localSrcPtr,
                                                 CommPolicy& comm, typename CommPolicy::BatchHandle& batchHandle)
 {
+    constexpr bool IsQuantized = std::is_same_v<DataType, fp8_e4m3fn_t> || std::is_same_v<DataType, fp8_e5m2_t>;
     const auto& peermem = params.communication.layout;
     // metadata 的 MTE2_S 由 CombineTokensInRange 在每批搬入后统一完成。
     // FP8 记录的 scale 位于 Align256(n) 之后；发送长度同时也是接收 GM 的 record stride。
@@ -124,12 +125,13 @@ __aicore__ inline void CombineSendTokenToRelay(uint32_t batchStart, uint32_t n, 
 }
 
 // Layered 的逐 token 量化与发送；Group 自管本批 metadata 搬入与 UB 绑定，外层只给行范围和预算。
-template <uint8_t QuantMode, typename T, bool IsQuantized, typename CommPolicy>
-__aicore__ inline void CombineTokenGroup(uint32_t tokenStart, uint32_t tokenCount, uint32_t n, uint32_t groupIdx,
-                                         uint32_t rankId, GM_ADDR gmm2OutAddr, GM_ADDR metaInfoAddr,
+template <typename T, typename CommPolicy>
+__aicore__ inline void CombineTokenGroup(uint8_t QuantMode, uint32_t tokenStart, uint32_t tokenCount, uint32_t n,
+                                         uint32_t groupIdx, uint32_t rankId, GM_ADDR gmm2OutAddr, GM_ADDR metaInfoAddr,
                                          int64_t ubTensorSize, const Params& params, CommPolicy& comm,
                                          LayeredCombineBatchState<CommPolicy>& batchState)
 {
+    const bool IsQuantized = QuantMode != COMBINE_NO_QUANT;
     // metadata 从 UB 512B 起，整 token 搬运缓冲紧随其后；布局与 InitCombineBuffers 的预算一致。
     int64_t offset = ALIGN_512;
     __ubuf__ int32_t* metaInfoTensor = reinterpret_cast<__ubuf__ int32_t*>(offset);
@@ -150,7 +152,6 @@ __aicore__ inline void CombineTokenGroup(uint32_t tokenStart, uint32_t tokenCoun
     __ubuf__ float* floatTemp = reinterpret_cast<__ubuf__ float*>(offset);
 
     __gm__ T* gmm2OutGm = reinterpret_cast<__gm__ T*>(gmm2OutAddr);
-    using Fp8Type = typename std::conditional<QuantMode == MXFP8_E4M3_COMM_QUANT, fp8_e4m3fn_t, fp8_e5m2_t>::type;
 
     uint32_t singleTokenElems = (nAlign32 * sizeof(T) + quantTokenSizeBytes) / sizeof(T);
 
@@ -159,22 +160,27 @@ __aicore__ inline void CombineTokenGroup(uint32_t tokenStart, uint32_t tokenCoun
         __ubuf__ T* ubBf16 = combineUbTensor + pingPong * singleTokenElems;
         __ubuf__ T* ubQuantData = ubBf16 + nAlign32;
 
-        if constexpr (IsQuantized) {
+        if (IsQuantized) {
             PipeFence<PIPE_MTE3, PIPE_MTE2, SYNC_EVENT_ID3>();
             CopyGmToUb(ubBf16, gmm2OutGm + (tokenStart + i) * n, static_cast<uint32_t>(n * sizeof(T)));
             PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID4>();
-            Mxfp8::QuantMxFp8<QuantMode, T>(ubQuantData, ubBf16, floatTemp, n);
+            Mxfp8::QuantMxFp8<T>(QuantMode, ubQuantData, ubBf16, floatTemp, n);
             PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID5>();
         }
 
-        using SendType = typename std::conditional<IsQuantized, Fp8Type, T>::type;
-        __ubuf__ SendType* ubQuantSend = reinterpret_cast<__ubuf__ SendType*>(ubQuantData);
-        if constexpr (!IsQuantized) {
-            ubQuantSend = ubBf16;
-        }
         GM_ADDR localSrcPtr = gmm2OutAddr + (tokenStart + i) * n * sizeof(T);
-        CombineSendTokenToRemote<SendType, IsQuantized>(i, 1, n, nScale, groupIdx, rankId, metaInfoTensor, ubQuantSend,
-                                                        params, localSrcPtr, comm, batchState.batchHandle);
+        if (!IsQuantized) {
+            CombineSendTokenToRemote<T>(i, 1, n, nScale, groupIdx, rankId, metaInfoTensor, ubBf16, params, localSrcPtr,
+                                        comm, batchState.batchHandle);
+        } else if (QuantMode == MXFP8_E4M3_COMM_QUANT) {
+            CombineSendTokenToRemote<fp8_e4m3fn_t>(i, 1, n, nScale, groupIdx, rankId, metaInfoTensor,
+                                                   reinterpret_cast<__ubuf__ fp8_e4m3fn_t*>(ubQuantData), params,
+                                                   localSrcPtr, comm, batchState.batchHandle);
+        } else {
+            CombineSendTokenToRemote<fp8_e5m2_t>(i, 1, n, nScale, groupIdx, rankId, metaInfoTensor,
+                                                 reinterpret_cast<__ubuf__ fp8_e5m2_t*>(ubQuantData), params,
+                                                 localSrcPtr, comm, batchState.batchHandle);
+        }
         if (batchState.dstRankId != rankId) {
             ++batchState.pendingTokenCount;
             if (batchState.pendingTokenCount == L1_TILE_M_256) {

@@ -46,7 +46,7 @@ static void FinalizeTestLayoutParams(MegaMoeTilingData& tilingData)
     auto& params = tilingData.compute;
     params.activationOutputDivisor = GetActivationOutputDivisor(tilingData.actMode);
     params.combineQuant = tilingData.combineQuantMode != COMBINE_NO_QUANT;
-    params.topkWeightsPrefetch = tilingData.topkWeightsPrefetch == 1;
+    params.topkWeightsPrefetch = tilingData.isTopkWeightsPrefetch;
     params.dispatchFp4 = IsA4W4GmmMode(tilingData.moeGmmMode);
     params.reserveGmm1Output = tilingData.moeGmmMode == GMM_MODE_A8W4_NZ || params.topkWeightsPrefetch;
     params.reserveCumsum = IsW4GmmMode(tilingData.moeGmmMode);
@@ -345,7 +345,7 @@ TEST_F(MegaMoeArch35TilingTest, GmBuffersKeepCapacityOptionsIndependent)
     const PeermemInfo a4(fp4Comm);
     EXPECT_LT(a4.dispatchReceive.sizeBytes, a8.dispatchReceive.sizeBytes);
     EXPECT_LE(a4.totalSize, a8.totalSize); // Host 的 1 byte 容量上界覆盖 A4。
-    params.topkWeightsPrefetch = true;
+    params.isTopkWeightsPrefetch = true;
     FinalizeTestLayoutParams(params);
     params.comm.elemsPerByte = 2U;
     const PeermemInfo weights(params.comm);
@@ -454,11 +454,49 @@ static bool RunMteCclBufferCase(int64_t cclBufferSize, TilingInfo& tilingInfo, i
     return tilingSucceeded;
 }
 
+TEST_F(MegaMoeArch35TilingTest, RuntimeTopkIndexWidthKeepsInt16BoundaryAndLayeredInt32)
+{
+    using namespace MegaMoeImpl;
+    for (const int64_t topK : {1LL, 2LL, 4LL, 8LL, 16LL, 32LL}) {
+        const int64_t narrowLimit = 32768LL / topK;
+        EXPECT_EQ(CalcTopkIndexTypeBytesForTopology(TOPO_TYPE_MTE, narrowLimit - 1, topK), 2);
+        // 路由数为 32768 时，最大有效索引为 32767。
+        EXPECT_EQ(CalcTopkIndexTypeBytesForTopology(TOPO_TYPE_MTE, narrowLimit, topK), 2);
+        EXPECT_EQ(CalcTopkIndexTypeBytesForTopology(TOPO_TYPE_MTE, narrowLimit + 1, topK), 4);
+        for (const int64_t topology : {TOPO_TYPE_URMA, TOPO_TYPE_URMA_ROCE}) {
+            EXPECT_EQ(CalcTopkIndexTypeBytesForTopology(topology, narrowLimit - 1, topK), 4);
+            EXPECT_EQ(CalcTopkIndexTypeBytesForTopology(topology, narrowLimit + 1, topK), 4);
+        }
+    }
+}
+
+TEST_F(MegaMoeArch35TilingTest, RuntimeTopkIndexWidthsShareTheSameKernelKey)
+{
+    TilingInfo narrow;
+    TilingInfo wide;
+    constexpr int64_t capacity = 8LL * ARCH35_CCL_BUFFER_SIZE;
+    ASSERT_TRUE(RunMteCclBufferCase(capacity, narrow, 0, 4096));
+    ASSERT_TRUE(RunMteCclBufferCase(capacity, wide, 0, 4097));
+    ASSERT_GE(narrow.tilingDataSize, sizeof(MegaMoeTilingData));
+    ASSERT_GE(wide.tilingDataSize, sizeof(MegaMoeTilingData));
+    MegaMoeTilingData narrowData{};
+    MegaMoeTilingData wideData{};
+    std::memcpy(&narrowData, narrow.tilingData.get(), sizeof(narrowData));
+    std::memcpy(&wideData, wide.tilingData.get(), sizeof(wideData));
+    EXPECT_EQ(narrowData.topkIndexTypeBytes, 2U);
+    EXPECT_EQ(wideData.topkIndexTypeBytes, 4U);
+    EXPECT_EQ(narrow.tilingKey, wide.tilingKey);
+    EXPECT_EQ(MegaMoeImpl::CalcDispatchRouteIndexAlignSize(narrowData.compute),
+              Ops::Base::CeilAlign(narrowData.compute.numMaxTokensPerRank * 2LL, 32LL));
+    EXPECT_EQ(MegaMoeImpl::CalcDispatchRouteIndexAlignSize(wideData.compute),
+              Ops::Base::CeilAlign(wideData.compute.numMaxTokensPerRank * 4LL, 32LL));
+}
+
 TEST_F(MegaMoeArch35TilingTest, H4096_BS128_FP8E4M3FN)
 {
     TilingInfo tilingInfo;
     ASSERT_TRUE(RunMteCclBufferCase(ARCH35_CCL_BUFFER_SIZE, tilingInfo));
-    EXPECT_EQ(tilingInfo.tilingKey, 664612UL);
+    EXPECT_EQ(tilingInfo.tilingKey, 336932UL);
     ExpectCclBufferCapacity(tilingInfo);
 }
 
@@ -605,7 +643,7 @@ TEST_F(MegaMoeArch35TilingTest, CclDataOffsetFitsFp4CapacityBudget)
                     params.compute.h = 4096;
                     params.compute.moeExpertPerRank = 2;
                     params.compute.epWorldSize = 8;
-                    params.topkWeightsPrefetch = prefetch;
+                    params.isTopkWeightsPrefetch = prefetch;
                     params.compute.dedupMode = combineDedup ? 3 : 0;
                     params.combineQuantMode = combineQuantMode;
                     params.compute.topoType = topoType;
@@ -762,7 +800,7 @@ TEST_F(MegaMoeArch35TilingTest, H7168_BS512_MTE_RankNumIgnored)
         },
         &compileInfo);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 2}};
-    uint64_t expectTilingKey = 664612UL;
+    uint64_t expectTilingKey = 336932UL;
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
@@ -907,7 +945,7 @@ static void RunUrmaTilingCase(int64_t xBs, int64_t topkIdsBs, int64_t topkWeight
             "L2_SIZE": 33554432, "VECTOR_REG_WIDTH": 256, "load3d_constraints": "1"}})";
     }
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 2}};
-    const uint64_t expectedTilingKey = expectedStatus == ge::GRAPH_SUCCESS ? 42607652UL : 0UL;
+    const uint64_t expectedTilingKey = expectedStatus == ge::GRAPH_SUCCESS ? 1385508UL : 0UL;
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, expectedStatus, expectedTilingKey);
 
     if (expectedStatus != ge::GRAPH_SUCCESS || (result == nullptr && activation != "situglu" && combineCommMode != 2)) {
@@ -1328,7 +1366,7 @@ static void RunA8W4FormatCase(ge::Format weightOneFormat, ge::Format weightTwoFo
 
 TEST_F(MegaMoeArch35TilingTest, H4096_BS128_A8W4_URMA)
 {
-    RunA8W4FormatCase(ge::FORMAT_FRACTAL_NZ_C0_32, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 46802984UL);
+    RunA8W4FormatCase(ge::FORMAT_FRACTAL_NZ_C0_32, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 1386536UL);
 }
 
 TEST_F(MegaMoeArch35TilingTest, H4096_BS128_A8W4_URMA_InvalidWeight2Format)
@@ -1394,7 +1432,7 @@ TEST_F(MegaMoeArch35TilingTest, H4096_BS128_A4W4_URMA)
         },
         &compileInfo);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 4}};
-    uint64_t expectTilingKey = 62138408UL;
+    uint64_t expectTilingKey = 1714216UL;
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
@@ -1462,7 +1500,7 @@ static void RunA4W4NzFormatCase(ge::Format weightOneFormat, ge::Format weightTwo
 
 TEST_F(MegaMoeArch35TilingTest, H4096_BS128_A4W4_NZ_URMA)
 {
-    RunA4W4NzFormatCase(ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 62138408UL);
+    RunA4W4NzFormatCase(ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 1714216UL);
 }
 
 TEST_F(MegaMoeArch35TilingTest, UrmaH1088PaddedRecords)
@@ -1483,8 +1521,8 @@ TEST_F(MegaMoeArch35TilingTest, UrmaH64AlignmentQuantModes)
         SCOPED_TRACE(h);
         RunUrmaTilingCase(128, 128, 128, 256, 0, 2048, "swiglu", {std::numeric_limits<float>::max()}, ge::GRAPH_SUCCESS,
                           0, 0, 1, h);
-        RunA8W4FormatCase(ge::FORMAT_FRACTAL_NZ_C0_32, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 46802984UL, h);
-        RunA4W4NzFormatCase(ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 62138408UL, h);
+        RunA8W4FormatCase(ge::FORMAT_FRACTAL_NZ_C0_32, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 1386536UL, h);
+        RunA4W4NzFormatCase(ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 1714216UL, h);
     }
 }
 
@@ -1568,7 +1606,7 @@ static void RunPerExpertTensorListCase(uint32_t weightTwoTensorCount, ge::graphS
     gert::TilingContextPara tilingContextPara("MegaMoe", inputs, outputs, attrs, inputInstanceNum, outputInstanceNum,
                                               &compileInfo);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 4}};
-    const uint64_t expectedTilingKey = expectedStatus == ge::GRAPH_SUCCESS ? 42607652UL : 0UL;
+    const uint64_t expectedTilingKey = expectedStatus == ge::GRAPH_SUCCESS ? 1385508UL : 0UL;
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, expectedStatus, expectedTilingKey);
 }
 
@@ -1702,7 +1740,7 @@ TEST_F(MegaMoeArch35TilingTest, ServerCombineCountAndContributionSlotsStayWithin
                     WorkspaceLayout workspace(tiling.compute);
                     EXPECT_EQ(workspace.routing.tokenWeights.offsetBytes, INVALID_WORKSPACE_OFFSET);
                     auto prefetchTiling = tiling;
-                    prefetchTiling.topkWeightsPrefetch = 1;
+                    prefetchTiling.isTopkWeightsPrefetch = true;
                     FinalizeTestLayoutParams(prefetchTiling);
                     WorkspaceLayout prefetchWorkspace(prefetchTiling.compute);
                     EXPECT_NE(prefetchWorkspace.routing.tokenWeights.offsetBytes, INVALID_WORKSPACE_OFFSET);
@@ -1883,12 +1921,12 @@ TEST_F(MegaMoeArch35TilingTest, MteRingsOnlyAllocateActualGmm1GmResults)
     for (const uint8_t mode : {MegaMoeImpl::GMM_MODE_A8W8_ND, MegaMoeImpl::GMM_MODE_A8W8_NZ,
                                MegaMoeImpl::GMM_MODE_A4W4_ND, MegaMoeImpl::GMM_MODE_A4W4_NZ}) {
         tilingData.moeGmmMode = mode;
-        tilingData.topkWeightsPrefetch = 0;
+        tilingData.isTopkWeightsPrefetch = false;
         FinalizeTestLayoutParams(tilingData);
         MegaMoeImpl::WorkspaceLayout noPrefetch(tilingData.compute);
         EXPECT_EQ(noPrefetch.routed.gmm1Output.offsetBytes, MegaMoeImpl::INVALID_WORKSPACE_OFFSET);
         ExpectRoutedBufferRows(tilingData, 3LL * 14LL * 256LL);
-        tilingData.topkWeightsPrefetch = 1;
+        tilingData.isTopkWeightsPrefetch = true;
         FinalizeTestLayoutParams(tilingData);
         MegaMoeImpl::WorkspaceLayout prefetch(tilingData.compute);
         EXPECT_GE(prefetch.routed.gmm1Output.offsetBytes, 0);
@@ -1952,7 +1990,7 @@ TEST_F(MegaMoeArch35TilingTest, MteRingsDedupKeepPersistentStageInputsAndOtherFa
                   3LL * 14LL * 256LL);
         ExpectRoutedBufferRows(tilingData, 3LL * 14LL * 256LL);
         for (const int32_t prefetch : {0, 1}) {
-            tilingData.topkWeightsPrefetch = prefetch;
+            tilingData.isTopkWeightsPrefetch = prefetch;
             ExpectMteDedupLayouts(tilingData);
         }
     }
@@ -1996,7 +2034,7 @@ TEST_F(MegaMoeArch35TilingTest, MteCommunicationDedupKeepsFullInputAcrossQuantAn
         for (const int32_t dedupMode : {0, 1, 2, 3}) {
             tilingData.compute.dedupMode = dedupMode;
             for (const int32_t prefetch : {0, 1}) {
-                tilingData.topkWeightsPrefetch = prefetch;
+                tilingData.isTopkWeightsPrefetch = prefetch;
                 ExpectRoutedBufferRows(tilingData, 3LL * 14LL * 256LL);
                 ExpectMteDedupLayouts(tilingData);
             }
@@ -2011,7 +2049,7 @@ TEST_F(MegaMoeArch35TilingTest, MteDedupPersistentAreasRetainClippedLogicalRows)
         tilingData.compute.maxOutputSize = maxOutput;
         tilingData.compute.combineSyncSlotCountPerExpert = Ops::Base::CeilDiv<uint64_t>(maxOutput, 256U);
         tilingData.compute.dedupMode = 3;
-        tilingData.topkWeightsPrefetch = 0;
+        tilingData.isTopkWeightsPrefetch = false;
         ExpectRoutedBufferRows(tilingData, maxOutput);
         ExpectMteDedupLayouts(tilingData);
         FinalizeTestLayoutParams(tilingData);
@@ -2159,7 +2197,7 @@ static MegaMoeTilingData MakeMemoryPlannerCase(uint32_t aicNum, uint8_t gmmMode,
     tilingData.rankNumPerServer =
         topoType == MegaMoeImpl::TOPO_TYPE_URMA ? 4U : static_cast<uint32_t>(tilingData.compute.epWorldSize);
     tilingData.combineQuantMode = combineQuantMode;
-    tilingData.topkWeightsPrefetch = prefetch ? 1 : 0;
+    tilingData.isTopkWeightsPrefetch = prefetch;
     const int64_t gmm1Groups = Ops::Base::CeilDiv<int64_t>(4LL * aicNum, tilingData.compute.hiddenDim / 256LL);
     const int64_t gmm2Groups = Ops::Base::CeilDiv<int64_t>(aicNum, tilingData.compute.h / 256LL);
     tilingData.compute.mGroupsPerWave = gmm1Groups > gmm2Groups ? gmm1Groups : gmm2Groups;
@@ -2176,10 +2214,10 @@ static void ExpectPreparedLayoutParams(MegaMoeTilingData tilingData)
     const auto& params = tilingData.compute;
     EXPECT_EQ(params.dispatchFp4, MegaMoeImpl::IsA4W4GmmMode(tilingData.moeGmmMode));
     EXPECT_EQ(params.reserveGmm1Output,
-              tilingData.moeGmmMode == MegaMoeImpl::GMM_MODE_A8W4_NZ || tilingData.topkWeightsPrefetch == 1);
+              tilingData.moeGmmMode == MegaMoeImpl::GMM_MODE_A8W4_NZ || tilingData.isTopkWeightsPrefetch);
     EXPECT_EQ(params.reserveCumsum, MegaMoeImpl::IsW4GmmMode(tilingData.moeGmmMode));
     EXPECT_EQ(params.combineQuant, tilingData.combineQuantMode != MegaMoeImpl::COMBINE_NO_QUANT);
-    EXPECT_EQ(params.topkWeightsPrefetch, tilingData.topkWeightsPrefetch == 1);
+    EXPECT_EQ(params.topkWeightsPrefetch, tilingData.isTopkWeightsPrefetch);
     EXPECT_EQ(params.sharedInputElementsPerByte, MegaMoeImpl::IsA4W4GmmMode(tilingData.sharedGmmMode) ? 2U : 1U);
     EXPECT_EQ(params.activationOutputDivisor, MegaMoeImpl::GetActivationOutputDivisor(tilingData.actMode));
     EXPECT_EQ(tilingData.comm.numMaxTokensPerRank, params.numMaxTokensPerRank);

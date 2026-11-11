@@ -72,15 +72,12 @@ struct DispatchRoundSlice {
 
 #define TemplateMegaMoeLayeredTypeClass \
     typename XType, typename OutputType, typename TopkWeightsType, typename Weight1Type, int32_t QuantMode, \
-        int32_t Weight1Format, int32_t Weight2Format, int32_t CombineQuantMode, bool TopkWeightsPrefetch, \
-        typename CommPolicy
+        int32_t Weight1Format, int32_t Weight2Format, typename CommPolicy
 #define TemplateMegaMoeLayeredTypeFunc \
-    XType, OutputType, TopkWeightsType, Weight1Type, QuantMode, Weight1Format, Weight2Format, CombineQuantMode, \
-        TopkWeightsPrefetch, CommPolicy
+    XType, OutputType, TopkWeightsType, Weight1Type, QuantMode, Weight1Format, Weight2Format, CommPolicy
 
 template <typename XType, typename OutputType, typename TopkWeightsType, typename Weight1Type, int32_t QuantMode,
-          int32_t Weight1Format, int32_t Weight2Format, int32_t CombineQuantMode, bool TopkWeightsPrefetch,
-          typename CommPolicy = LayeredUrmaComm>
+          int32_t Weight1Format, int32_t Weight2Format, typename CommPolicy = LayeredUrmaComm>
 class MegaMoeLayered {
 public:
     using Channel = typename CommPolicy::Channel;
@@ -112,7 +109,7 @@ private:
     {
         return IsServerCombineDedupOn(params_.tilingData->compute.dedupMode);
     }
-    __aicore__ inline bool RecordHasWeights() const
+    __aicore__ inline bool RecordHasWeights(bool TopkWeightsPrefetch) const
     {
         return TopkWeightsPrefetch || IsCombineServerDedupEnabled();
     }
@@ -142,8 +139,10 @@ private:
                                                             const LocalTensor<uint32_t>& tokenIdsTensor,
                                                             const LocalTensor<uint32_t>& expectedTopkBitmapsTensor,
                                                             uint32_t workUbOffset);
+    template <bool IsTopkWeightsPrefetch>
     __aicore__ inline void ReduceRelayContributionsForToken(uint32_t originServer, uint32_t tokenIdx,
                                                             uint32_t expectedTopkBitmap, uint32_t workUbOffset);
+    template <bool IsTopkWeightsPrefetch>
     __aicore__ inline void AccumulateRelayContributions(uint32_t expectedTopkBitmap,
                                                         __gm__ bfloat16_t* contributionGlobalTensor,
                                                         const LocalTensor<bfloat16_t>& contributionTensor,
@@ -390,7 +389,7 @@ private:
     static constexpr int32_t DISPATCH_COPY_BUFFER_COUNT = 5;
     static constexpr uint32_t MX_QUANT_TEMP_UB_BYTES = 2U * 1024U;
     static constexpr uint32_t DISPATCH_MAX_TOPK = 32U;
-    // 二级读取在 TopkWeightsPrefetch 路径下每 token 需要 data/scale/weight 三条 WQE。
+    // 启用 topk 权重在激活量化阶段同步计算时，二级读取每 token 需要 data/scale/weight 三条 WQE。
     // 64 KiB 可容纳 1024 条 WQE，足够一次提交完整的 256-token 批次（最多 768 条 WQE）。
     static_assert(LAYERED_HCOMM_BATCH_WQE_CAPACITY >= L1_TILE_M_256 * 3U,
                   "Layered Hcomm UB must hold 256 three-WQE token records");
@@ -430,16 +429,13 @@ private:
 
     // GMM1 固定按 256 行切块；权重前移时后处理可按 128 行细分。
     static constexpr uint32_t GMM1_TILE_M = L1_TILE_M_256;
-    static constexpr uint32_t EPILOGUE_TILE_M = TopkWeightsPrefetch ? L1_TILE_M_128 : L1_TILE_M_256;
 
     // GMM1 的每个 tile 固定为 [gate128, up128]，由同一 epilogue 消费。
-    using A8W4Config = GmmKernel::Config<true, 0, ActivationQuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType,
-                                         QuantScaleOutType>;
+    using A8W4Config =
+        GmmKernel::Config<true, ActivationQuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType, QuantScaleOutType>;
     typename A8W4Config::BlockContext blockContext_{};
-    using BlockEpilogue = BlockEpilogueActivationMxQuant<ActivationQuantOutType, bfloat16_t, EPILOGUE_TILE_M, L1_TILE_N,
-                                                         TopkWeightsPrefetch>;
-    using SharedBlockEpilogue =
-        BlockEpilogueActivationMxQuant<ActivationQuantOutType, bfloat16_t, L1_TILE_M_256, L1_TILE_N, false>;
+    using BlockEpilogue = BlockEpilogueActivationMxQuant<ActivationQuantOutType, bfloat16_t, L1_TILE_N>;
+    using SharedBlockEpilogue = BlockEpilogueActivationMxQuant<ActivationQuantOutType, bfloat16_t, L1_TILE_N>;
     BlockEpilogue epilogueOp_;
     SharedBlockEpilogue sharedEpilogueOp_;
 };
@@ -580,7 +576,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitDispa
         mxQuantScaleNumAlignPerToken_ * static_cast<uint32_t>(sizeof(uint8_t)), static_cast<uint32_t>(ALIGN_32));
     mxQuantTokenScaleAlignBytes_ =
         Ops::Base::CeilAlign(mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_, static_cast<uint32_t>(ALIGN_32));
-    if (RecordHasWeights()) {
+    if (RecordHasWeights(params_.tilingData->isTopkWeightsPrefetch)) {
         weightAlignBytes_ =
             Ops::Base::CeilAlign(static_cast<uint32_t>(topK_ * sizeof(float)), static_cast<uint32_t>(ALIGN_32));
         mxQuantTokenScaleAlignBytes_ += weightAlignBytes_;
@@ -626,7 +622,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitWorks
                       .actMode = tilingData->actMode,
                       .actSubMode = tilingData->actSubMode,
                       .activationAlpha = tilingData->activationAlpha,
-                      .activationBeta = tilingData->activationBeta});
+                      .activationBeta = tilingData->activationBeta,
+                      .topkWeightsPrefetch = tilingData->isTopkWeightsPrefetch});
     InitDispatchLayout(tilingData);
 }
 
@@ -669,6 +666,7 @@ template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::UpdateGmm1GlobalBuffer(
     GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& state, uint32_t rowOffsetInExpert)
 {
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
     // 地址 = 专家前累计行数 + 专家内偏移；行相关项随行数线性增长，权重/flag 只依赖专家序号。
@@ -680,8 +678,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::UpdateGmm
     const uint64_t scaleK = Ops::Base::CeilDiv(k, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
     const uint64_t scaleN =
         Ops::Base::CeilDiv(activationCols, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-    // guard 与 WorkspaceInfo 分配条件一致，由 TilingKey 保证同步。
-    if constexpr (MoeQuantConfig::AXW_MODE == AxWMode::A8W4 || TopkWeightsPrefetch) {
+    // guard 与 WorkspaceInfo 分配条件一致，由量化配置和 tiling data 保证同步。
+    if (MoeQuantConfig::AXW_MODE == AxWMode::A8W4 || TopkWeightsPrefetch) {
         gmmAddrInfo.gmm1OutGlobal = workspace.routed.gmm1Output.get_ptr(buffer) + rows * n * sizeof(bfloat16_t);
     }
     gmmAddrInfo.metaInfoGlobal = workspace.routing.receivedTokenMetadata.get_ptr(buffer);
@@ -925,9 +923,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::RunGmm1Wi
     Epilogue& epilogue, const GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& state, uint32_t expertIdx,
     int32_t& vecSetSyncCom, uint32_t rowOffsetInExpert, const LayoutArgs&... layoutArgs)
 {
-    // Shared experts use the 256-row, non-prefetch epilogue; the caller binds A8W4 GM-output notifications.
-    constexpr uint32_t epilogueTileM = IsShared ? L1_TILE_M_256 : EPILOGUE_TILE_M;
-    constexpr bool prefetchWeights = !IsShared && TopkWeightsPrefetch;
+    const bool TopkWeightsPrefetch = IsShared ? false : params_.tilingData->isTopkWeightsPrefetch;
+    // 共享专家使用 256 行 epilogue，不在激活量化阶段乘 topk 权重；调用方绑定 A8W4 GM 输出通知。
     const uint32_t expertRowStart = static_cast<uint32_t>(state.globalTokenStartIndex) + rowOffsetInExpert;
     if constexpr (g_coreType == AIV) {
         const uint64_t rows = static_cast<uint64_t>(state.globalTokenStartIndex) + rowOffsetInExpert;
@@ -947,16 +944,15 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::RunGmm1Wi
     }
     const BlockJobContext blockJob{MegaMoeHardwarePolicy::GetAicBlockIdx(), blockNum_};
     if constexpr (MoeQuantConfig::AXW_MODE == AxWMode::A8W4) {
-        RunGmm1A8W4<QuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType, QuantScaleOutType, GMM1_TILE_M,
-                    epilogueTileM, prefetchWeights, IsShared, !IsShared>(
-            blockContext_, epilogue, params_, state.problemShape, gmmAddrInfo, startBlockIdx_, blockJob, expertRowStart,
-            expertIdx, activationOutputDivisor_, layoutArgs...);
+        RunGmm1A8W4<QuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType, QuantScaleOutType, GMM1_TILE_M, IsShared,
+                    !IsShared>(TopkWeightsPrefetch, blockContext_, epilogue, params_, state.problemShape, gmmAddrInfo,
+                               startBlockIdx_, blockJob, expertRowStart, expertIdx, activationOutputDivisor_,
+                               layoutArgs...);
     } else {
         RunGmm1Generic<QuantOutType, ActivationQuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType,
-                       QuantScaleOutType, Weight1Format != FORMAT_ND, GMM1_TILE_M, epilogueTileM, prefetchWeights,
-                       IsShared, !IsShared>(epilogue, params_, state.problemShape, gmmAddrInfo, startBlockIdx_,
-                                            vecSetSyncCom, blockJob, expertRowStart, expertIdx, gmm1PingPongIdx_,
-                                            activationOutputDivisor_, false, layoutArgs...);
+                       QuantScaleOutType, Weight1Format != FORMAT_ND, GMM1_TILE_M, IsShared, !IsShared>(
+            TopkWeightsPrefetch, epilogue, params_, state.problemShape, gmmAddrInfo, startBlockIdx_, vecSetSyncCom,
+            blockJob, expertRowStart, expertIdx, gmm1PingPongIdx_, activationOutputDivisor_, false, layoutArgs...);
     }
 }
 
@@ -985,12 +981,14 @@ template <bool IsShared>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::GroupMatmulWithCombine(
     const GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& state, uint32_t expertTokenCount, uint32_t rowOffsetInExpert)
 {
+    const bool TopkWeightsPrefetch = params_.tilingData->isTopkWeightsPrefetch;
+    const uint8_t CombineQuantMode = params_.tilingData->combineQuantMode;
     const BlockJobContext blockJob{blockIdx_, blockNum_};
     if constexpr (MoeQuantConfig::AXW_MODE == AxWMode::A8W4) {
         RunGmm2A8W4<ActivationQuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
-                    L1_TILE_M_256, TopkWeightsPrefetch, IsShared, true, !IsShared, false>(
-            blockContext_, state.problemShape, gmmAddrInfo, startBlockIdx_, blockJob, expertTokenCount,
-            rowOffsetInExpert, nullptr, activationOutputDivisor_);
+                    L1_TILE_M_256, IsShared, true, !IsShared, false>(
+            TopkWeightsPrefetch, blockContext_, state.problemShape, gmmAddrInfo, startBlockIdx_, blockJob,
+            expertTokenCount, rowOffsetInExpert, nullptr, activationOutputDivisor_);
     } else if constexpr (MoeQuantConfig::AXW_MODE == AxWMode::A4W4) {
         // 空 slice 三角色整对跳过，避免每 slice 局部构造的 BlockMmad/BlockPrologue 跨核额度收支失配。
         // 跳过后额度 flag（SYNC_AIV_AIC_FLAG）未消费计数恒 <16：AIC 侧构造 Set 与逐 chunk 就绪 Wait
@@ -1008,29 +1006,29 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::GroupMatm
             typename A8W4Config::BlockMmad block(params_.tilingData->a8w4L1Layout);
             typename A8W4Config::BlockContext context{&block};
             RunGmm2A8W4<ActivationQuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
-                        L1_TILE_M_256, TopkWeightsPrefetch, IsShared, true, !IsShared, false>(
-                context, state.problemShape, gmmAddrInfo, startBlockIdx_, blockJob, expertTokenCount, rowOffsetInExpert,
-                nullptr, activationOutputDivisor_);
+                        L1_TILE_M_256, IsShared, true, !IsShared, false>(
+                TopkWeightsPrefetch, context, state.problemShape, gmmAddrInfo, startBlockIdx_, blockJob,
+                expertTokenCount, rowOffsetInExpert, nullptr, activationOutputDivisor_);
         } else {
             if (GetSubBlockIdx() == 0U) {
                 typename A8W4Config::BlockPrologue block(params_.tilingData->a8w4L1Layout);
                 typename A8W4Config::BlockContext context{&block};
                 RunGmm2A8W4<ActivationQuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
-                            L1_TILE_M_256, TopkWeightsPrefetch, IsShared, true, !IsShared, false>(
-                    context, state.problemShape, gmmAddrInfo, startBlockIdx_, blockJob, expertTokenCount,
-                    rowOffsetInExpert, nullptr, activationOutputDivisor_);
+                            L1_TILE_M_256, IsShared, true, !IsShared, false>(
+                    TopkWeightsPrefetch, context, state.problemShape, gmmAddrInfo, startBlockIdx_, blockJob,
+                    expertTokenCount, rowOffsetInExpert, nullptr, activationOutputDivisor_);
             } else {
                 RunGmm2A8W4<ActivationQuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
-                            L1_TILE_M_256, TopkWeightsPrefetch, IsShared, true, !IsShared, false>(
-                    typename A8W4Config::BlockContext{}, state.problemShape, gmmAddrInfo, startBlockIdx_, blockJob,
-                    expertTokenCount, rowOffsetInExpert, nullptr, activationOutputDivisor_);
+                            L1_TILE_M_256, IsShared, true, !IsShared, false>(
+                    TopkWeightsPrefetch, typename A8W4Config::BlockContext{}, state.problemShape, gmmAddrInfo,
+                    startBlockIdx_, blockJob, expertTokenCount, rowOffsetInExpert, nullptr, activationOutputDivisor_);
             }
         }
     } else {
-        RunGmm2Generic<CombineQuantMode, QuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
-                       Weight2Format != FORMAT_ND, true, L1_TILE_M_256, TopkWeightsPrefetch, IsShared, !IsShared>(
-            state.problemShape, gmmAddrInfo, startBlockIdx_, false, rowOffsetInExpert, nullptr,
-            activationOutputDivisor_, expertTokenCount);
+        RunGmm2Generic<QuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
+                       Weight2Format != FORMAT_ND, true, L1_TILE_M_256, IsShared, !IsShared, false>(
+            CombineQuantMode, TopkWeightsPrefetch, state.problemShape, gmmAddrInfo, startBlockIdx_, false,
+            rowOffsetInExpert, nullptr, activationOutputDivisor_, expertTokenCount);
     }
 }
 
@@ -1243,8 +1241,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessMo
     ExpertLoopState gmm2State = CreateExpertLoopState(commonConfig_);
     GMMAddrInfo gmm1AddrInfo{};
     GMMAddrInfo gmm2AddrInfo{};
-    // GM 结果交接使用逐 tile 硬同步；A8W4 由 AIV1 激活，generic 预取由 AIV0 激活。
-    if constexpr (MoeQuantConfig::AXW_MODE == AxWMode::A8W4 || TopkWeightsPrefetch) {
+    // GM 结果交接使用逐 tile 硬同步；A8W4 由 AIV1 激活，generic 的 topk 提前乘权路径由 AIV0 激活。
+    if (MoeQuantConfig::AXW_MODE == AxWMode::A8W4 || params_.tilingData->isTopkWeightsPrefetch) {
         gmm1AddrInfo.gmm1ActivationSync = &gmm1ActivationSync;
     }
     int32_t vecSetSyncCom = 0;
@@ -1277,8 +1275,10 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessMo
     }
 
     // UB 双缓冲在本阶段回收；GM 硬同步的剩余 ACK 由 Process 末尾统一回收。
-    if constexpr (MoeQuantConfig::AXW_MODE != AxWMode::A8W4 && !TopkWeightsPrefetch) {
-        Gmm1UbActivationSync::EndSync(vecSetSyncCom, gmm1PingPongIdx_);
+    if constexpr (MoeQuantConfig::AXW_MODE != AxWMode::A8W4) {
+        if (!params_.tilingData->isTopkWeightsPrefetch) {
+            Gmm1UbActivationSync::EndSync(vecSetSyncCom, gmm1PingPongIdx_);
+        }
     }
     gmm1PingPongIdx_ = 0U;
 }

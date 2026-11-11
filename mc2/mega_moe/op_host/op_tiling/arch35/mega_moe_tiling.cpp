@@ -80,7 +80,7 @@ static ge::graphStatus CheckAndSetMteDedupMode(const gert::TilingContext* contex
         return ge::GRAPH_FAILED);
     const bool isPreQuantizedX = IsPreQuantizedXType(context->GetInputDesc(config.xIndex)->GetDataType());
     OP_TILING_CHECK(
-        combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP && tilingData->topkWeightsPrefetch == 0 && isPreQuantizedX,
+        combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP && !tilingData->isTopkWeightsPrefetch && isPreQuantizedX,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             nodeName, "combine_comm_mode", "1",
             "enabling combine dedup does not support pre-quantized x together with topk_weights_type=0; "
@@ -355,7 +355,7 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     compute.serverNum = ops::CeilDiv(compute.epWorldSize, static_cast<int64_t>(rankNumPerServer));
     compute.activationOutputDivisor = GetActivationOutputDivisor(tilingData->actMode);
     compute.combineQuant = tilingData->combineQuantMode != COMBINE_NO_QUANT;
-    compute.topkWeightsPrefetch = tilingData->topkWeightsPrefetch == 1;
+    compute.topkWeightsPrefetch = tilingData->isTopkWeightsPrefetch;
     compute.dispatchFp4 = IsA4W4GmmMode(tilingData->moeGmmMode);
     compute.reserveGmm1Output = tilingData->moeGmmMode == GMM_MODE_A8W4_NZ || compute.topkWeightsPrefetch;
     compute.reserveCumsum = IsW4GmmMode(tilingData->moeGmmMode);
@@ -513,7 +513,7 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
     context->SetBlockDim(
         ascendcPlatform.CalcTschBlockDim(tilingData->blockAivNum, tilingData->compute.aicNum, tilingData->blockAivNum));
     context->SetScheduleMode(1);
-    uint64_t tilingKey = CalcTilingKey(context, config, expertParams, tilingData);
+    uint64_t tilingKey = CalcTilingKey(context, expertParams, tilingData);
     OP_LOGI(nodeName, "OP TilingKey is %lu", tilingKey);
     context->SetTilingKey(tilingKey);
 

@@ -16,8 +16,8 @@
 namespace MegaMoeImpl {
 namespace GmmKernel {
 
-template <uint8_t CombineQuantMode, typename BlockMmad, typename ElementC, bool IsLayered = false,
-          bool IsShared = false, bool NotifyCombineTileReady = false, typename Scheduler, typename Config>
+template <typename BlockMmad, typename ElementC, bool IsLayered = false, bool IsShared = false,
+          bool NotifyCombineTileReady = false, typename Scheduler, typename Config>
 __aicore__ inline void Gmm2ExecGeneric(Scheduler& scheduler, const GMMAddrInfo& gmmAddrInfo, const Config& config,
                                        uint32_t startLoopIdx, uint32_t tileNum,
                                        BlockMmadContext<BlockMmad>* blockMmadContext, bool allowWeightL2Bypass,
@@ -59,7 +59,7 @@ __aicore__ inline void Gmm2ExecGeneric(Scheduler& scheduler, const GMMAddrInfo& 
 
     if constexpr (g_coreType == AscendC::AIC) {
         blockMmadContext->template Init<GmmStage::GMM2>(config);
-        Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered, NotifyCombineTileReady>(
+        Gmm2AicMmadGeneric<BlockMmad, IsShared, IsLayered, NotifyCombineTileReady>(
             blockMmadContext->blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum, rowOffsetInExpert,
             expertTokenCount);
     } else if constexpr (NotifyCombineTileReady) {
@@ -128,11 +128,11 @@ __aicore__ inline void Gmm2ExecA8W4(Scheduler& scheduler, const GMMAddrInfo& gmm
 
 } // namespace GmmKernel
 
-template <uint8_t CombineQuantMode, typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA,
-          typename ElementMxScaleB, bool IsWeightNZ = false, bool IsLayered = false, uint32_t Gmm1TileM = L1_TILE_M_256,
-          bool TopkWeightsPrefetch = false, bool IsShared = false, bool IsWaveFlagGrained = false,
-          bool NotifyCombineTileReady = false>
-__aicore__ inline void RunGmm2Generic(const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
+template <typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA, typename ElementMxScaleB,
+          bool IsWeightNZ = false, bool IsLayered = false, uint32_t Gmm1TileM = L1_TILE_M_256, bool IsShared = false,
+          bool IsWaveFlagGrained = false, bool NotifyCombineTileReady = false>
+__aicore__ inline void RunGmm2Generic(uint8_t combineQuantMode, bool topkWeightsPrefetch,
+                                      const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                       const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
                                       const BlockJobContext& blockJob, void* blockMmadContext,
                                       bool allowWeightL2Bypass = false, uint32_t rowOffsetInExpert = 0U,
@@ -142,19 +142,23 @@ __aicore__ inline void RunGmm2Generic(const AscendC::Shape<int64_t, int64_t, int
 {
     static_assert(!IsShared || !NotifyCombineTileReady, "Shared expert GMM2 has its own completion counter");
     static_assert(!IsLayered || !NotifyCombineTileReady, "Layered GMM2 selects its synchronization through IsLayered");
-    using GmmConfig =
-        GmmKernel::Config<false, CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
-                          IsWeightNZ, TopkWeightsPrefetch, IsShared, IsLayered, IsWaveFlagGrained>;
+    using GmmConfig = GmmKernel::Config<false, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
+                                        IsWeightNZ, IsShared, IsLayered, IsWaveFlagGrained>;
     auto config = GmmConfig::BuildGmm2ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
+    config.combineQuantMode = combineQuantMode;
+    config.topkWeightsPrefetch = topkWeightsPrefetch;
+    config.activationTileM = topkWeightsPrefetch ? L1_TILE_M_128 : Gmm1TileM;
 
     GmmKernel::BlockScheduler scheduler({config.m, config.schedulerN, config.k},
                                         GmmKernel::BlockScheduler::Params{asc::te::make_coord(
                                             static_cast<int64_t>(config.tileM), static_cast<int64_t>(L1_TILE_N))});
     uint32_t tileNum = scheduler.GetTileNum();
 
-    if constexpr (CombineQuantMode == COMBINE_NO_QUANT && g_coreType == AscendC::AIV && !NotifyCombineTileReady) {
-        startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
-        return;
+    if constexpr (g_coreType == AscendC::AIV && !NotifyCombineTileReady) {
+        if (combineQuantMode == COMBINE_NO_QUANT) {
+            startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
+            return;
+        }
     }
 
     uint32_t startLoopIdx =
@@ -162,7 +166,7 @@ __aicore__ inline void RunGmm2Generic(const AscendC::Shape<int64_t, int64_t, int
     using BlockMmad = typename GmmConfig::BlockMmad;
     using MmadContext = GmmKernel::BlockMmadContext<BlockMmad>;
     auto* typedBlockMmadContext = reinterpret_cast<MmadContext*>(blockMmadContext);
-    GmmKernel::Gmm2ExecGeneric<CombineQuantMode, BlockMmad, ElementC, IsLayered, IsShared, NotifyCombineTileReady>(
+    GmmKernel::Gmm2ExecGeneric<BlockMmad, ElementC, IsLayered, IsShared, NotifyCombineTileReady>(
         scheduler, gmmAddrInfo, config, startLoopIdx, tileNum, typedBlockMmadContext, allowWeightL2Bypass,
         rowOffsetInExpert, params, expertTokenCount);
 
@@ -170,10 +174,9 @@ __aicore__ inline void RunGmm2Generic(const AscendC::Shape<int64_t, int64_t, int
 }
 
 template <typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA, typename ElementMxScaleB,
-          uint32_t Gmm1TileM = L1_TILE_M_256, bool TopkWeightsPrefetch = false, bool IsShared = false,
-          bool IsLayered = false, bool IsWaveFlagGrained = false, bool NotifyCombineTileReady = false,
-          typename BlockContext>
-__aicore__ inline void RunGmm2A8W4(const BlockContext& pipeline,
+          uint32_t Gmm1TileM = L1_TILE_M_256, bool IsShared = false, bool IsLayered = false,
+          bool IsWaveFlagGrained = false, bool NotifyCombineTileReady = false, typename BlockContext>
+__aicore__ inline void RunGmm2A8W4(bool topkWeightsPrefetch, const BlockContext& pipeline,
                                    const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                    const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
                                    const BlockJobContext& blockJob, uint32_t expertTokenCount,
@@ -185,9 +188,11 @@ __aicore__ inline void RunGmm2A8W4(const BlockContext& pipeline,
     static_assert(std::is_same_v<ElementA, __fp8e4m3>, "Activation must be __fp8e4m3");
     static_assert(std::is_same_v<ElementB, __fp4e2m1x2>, "Weight must be __fp4e2m1x2");
 
-    using GmmConfig = GmmKernel::Config<true, 0, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, false,
-                                        TopkWeightsPrefetch, IsShared, IsLayered, IsWaveFlagGrained>;
+    using GmmConfig = GmmKernel::Config<true, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, false,
+                                        IsShared, IsLayered, IsWaveFlagGrained>;
     auto config = GmmConfig::BuildGmm2ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
+    config.topkWeightsPrefetch = topkWeightsPrefetch;
+    config.activationTileM = topkWeightsPrefetch ? L1_TILE_M_128 : Gmm1TileM;
 
     using BlockMmad = typename GmmConfig::BlockMmad;
     using BlockPrologue = typename GmmConfig::BlockPrologue;
