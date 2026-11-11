@@ -23,7 +23,8 @@
 
 namespace optiling {
 
-FagWorkspacePlan BuildWorkspacePlan(const FagParsedInfo& info);
+// Returns false if a dimension is negative or the byte offsets overflow int64.
+bool BuildWorkspacePlan(const FagParsedInfo& info, const FagKernelPlan& kernel, FagWorkspacePlan& plan);
 
 } // namespace optiling
 

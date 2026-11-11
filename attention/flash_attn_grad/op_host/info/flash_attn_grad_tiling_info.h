@@ -173,6 +173,8 @@ struct FagKernelPlan {
     // 运行时字段（不占 tilingkey）：kernel 的写侧（process_presfmg）与读侧
     // （process_vec1）用同一标志，避免多编一份二进制。判据见 DecidePreSfmg。
     int64_t enablePreSfmg = 0;
+    // bit16: dq/dk/dv use a padded, per-S128-tile FP32 NZ workspace.
+    int64_t nzOut = 0;
 };
 
 struct FagSchedulePlan {
@@ -194,6 +196,7 @@ struct FagWorkspaceSegment {
 
 struct FagWorkspacePlan {
     size_t libapiSize = 0;
+    // ND uses physical T*N*D; NZ uses S128 tiles at the kernel dAlign column pitch.
     FagWorkspaceSegment dq; // T1*N1*D  fp32（N1 = N2*G，非 TND 的 T1=B*S1）
     FagWorkspaceSegment dk; // T2*N2*D  fp32（非 TND 的 T2=B*S2）
     FagWorkspaceSegment dv; // T2*N2*Dv fp32
@@ -225,6 +228,7 @@ struct FagRouteTrace {
     size_t rejectedNum = 0;
     // swizzle 单独记：它不是候选之间的竞争，而是选中候选之后的一个开关。
     const char* swizzleReject = "accepted";
+    const char* nzOutReject = "accepted";
 
     void Reject(const char* name, const char* reason)
     {

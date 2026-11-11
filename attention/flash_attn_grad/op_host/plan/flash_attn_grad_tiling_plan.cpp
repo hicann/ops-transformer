@@ -11,6 +11,7 @@
 #include "flash_attn_grad_tiling_plan.h"
 
 #include "flash_attn_grad_tiling_key.h"
+#include "flash_attn_grad_tiling_nzout.h"
 #include "flash_attn_grad_tiling_route.h"
 #include "flash_attn_grad_tiling_schedule.h"
 #include "flash_attn_grad_tiling_swizzle.h"
@@ -82,7 +83,10 @@ ge::graphStatus BuildTilingPlan(gert::TilingContext* context, const FagParsedInf
     // 已完成的路由（template/isBn2MultiBlk）与 schedule（s1Outer）。
     plan.kernel.enablePreSfmg = DecidePreSfmg(info, plan.kernel, plan.schedule) ? 1 : 0;
 
-    plan.workspace = BuildWorkspacePlan(info);
+    DecideNzOut(info, plan.kernel, trace);
+    OP_CHECK_IF(!BuildWorkspacePlan(info, plan.kernel, plan.workspace),
+                OP_LOGE(context->GetNodeName(), "workspace dimensions exceed the addressable range."),
+                return ge::GRAPH_PARAM_INVALID);
     plan.tilingKey = EncodeTilingKey(info, plan.kernel, plan.schedule);
     return ge::GRAPH_SUCCESS;
 }

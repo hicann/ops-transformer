@@ -37,6 +37,7 @@ namespace optiling {
 //   bit13    bn2_need_zero    仅 MultiBlk + mask 3/4 的无效行/列
 //   bit14    deter            仅 template=0；BN2 单块保持 0
 //   bit15    sink            1 = 本次带 sinks 输入，kernel 额外算 dsink
+//   bit16    nz_out          仅 GS1S2、D/Dv 分档128；dqkv内部workspace为NZ
 uint64_t EncodeTilingKey(const FagParsedInfo& info, const FagKernelPlan& kernel, const FagSchedulePlan& schedule);
 
 } // namespace optiling

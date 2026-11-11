@@ -131,6 +131,8 @@ class FlashAttnGradTilingKey:
     # bit15：1 = 本次带 sinks 输入，kernel 额外算 dsink。编译期常量：非 sink 变体
     # 里 sink 代码被折叠掉，不再走运行期标量分支。两种 template 都放开。
     sink = TilingKeyField(bits=1, values=[0, 1])
+    # bit16: per-S-tile FP32 NZ workspace for the non-aligned D<=128 GS path.
+    nz_out = TilingKeyField(bits=1, values=[0, 1])
 
     def is_valid(self, key):
         """剪掉本实现未走到的组合，控制二进制数量。"""
@@ -145,7 +147,12 @@ class FlashAttnGradTilingKey:
             bn2_need_zero,
             deter,
             sink,
+            nz_out,
         ) = key
+        if nz_out == 1:
+            if template != Tmpl.BN2GS1S2 or d_align != 128 or dv_align != 128:
+                return False
+        # 2/3 保留。不剪会当 GS1S2 多编死二进制。
         if template != Tmpl.BN2GS1S2 and template != Tmpl.BN2:
             return False
         if deter == 1:

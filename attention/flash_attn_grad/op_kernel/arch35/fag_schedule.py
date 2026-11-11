@@ -663,6 +663,13 @@ def set_run_info(
         runInfo.boIdx * constInfo.coefB0KV + runInfo.n2oIdx * constInfo.coefN0
     )
     runInfo.idx2KV = runInfo.n2oIdx * constInfo.coefN2
+    if nz_out == 1:
+        runInfo.nzQTile = (
+            runInfo.boIdx * constInfo.n1Size + headQ
+        ) * constInfo.s1Outer + runInfo.s1oIdx
+        runInfo.nzKvTile = (
+            runInfo.boIdx * constInfo.n2Size + runInfo.n2oIdx
+        ) * constInfo.s2Outer + runInfo.s2oIdx
     rowBase = runInfo.queryOffset + subIdx * VECTOR_BASEM
     runInfo.loadBase = pl.max(pl.min(rowBase, constInfo.s1Size - VECTOR_BASEM), 0)
     runInfo.rowShift = rowBase - runInfo.loadBase
@@ -1038,6 +1045,21 @@ def _set_run_info_tnd_varlen(
     runInfo.idx2KV = runInfo.n2oIdx
     runInfo.tokenBaseQ = tokenBaseQ
     runInfo.tokenBaseKV = tokenBaseKV
+    if nz_out == 1:
+        physicalQ = pl.astype(pl.getval(cu_q_tensor, w + 1), pl.DT_INT64) - tokenBaseQ
+        physicalKv = (
+            pl.astype(pl.getval(cu_kv_tensor, w + 1), pl.DT_INT64) - tokenBaseKV
+        )
+        runInfo.nzQTile = (
+            (tokenBaseQ // 128 + w) * constInfo.n1Size
+            + headQ * ((physicalQ + 127) // 128)
+            + runInfo.s1oIdx
+        )
+        runInfo.nzKvTile = (
+            (tokenBaseKV // 128 + w) * constInfo.n2Size
+            + runInfo.n2oIdx * ((physicalKv + 127) // 128)
+            + runInfo.s2oIdx
+        )
     runInfo.batchS1Len = batchS1Len
     runInfo.batchS2Len = batchS2Len
     rowBase = runInfo.queryOffset + subIdx * VECTOR_BASEM

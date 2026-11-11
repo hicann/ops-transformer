@@ -52,6 +52,7 @@ import fag_deter
 import fag_deter_tnd_dense
 import fag_deter_tnd_sparse
 import fag_schedule
+import fag_nzout
 from fag_tiling import FlashAttnGradTilingData, Tmpl
 from fag_kernel_deter import (
     _run_preload2_cube_gs_deter,
@@ -92,6 +93,7 @@ def _bind_helpers():
         fag_deter_tnd_dense,
         fag_deter_tnd_sparse,
         fag_schedule,
+        fag_nzout,
     ):
         for name, val in vars(mod).items():
             if name.startswith("_") or inspect.ismodule(val):
@@ -160,17 +162,29 @@ def flash_attn_grad_preload3(
     # host 只在三段之后多留 128 行保护垫，不改这里的基地址。
     wsRowsQ = constInfo.t1Size * constInfo.n1Size
     wsRowsKV = constInfo.t2Size * constInfo.n2Size
+    dqWsElems = wsRowsQ * tiling.d
+    dkWsElems = wsRowsKV * tiling.d
+    dvWsElems = wsRowsKV * tiling.dv
+    wsPadCols = pl.max(tiling.d, tiling.dv)
+    if nz_out == 1:
+        qTiles = (
+            nz_workspace_tiles(constInfo.t1Size, tiling.b, tiling.s1) * constInfo.n1Size
+        )
+        kvTiles = (
+            nz_workspace_tiles(constInfo.t2Size, tiling.b, tiling.s2) * constInfo.n2Size
+        )
+        dqWsElems = qTiles * 128 * constInfo.dAlign
+        dkWsElems = kvTiles * 128 * constInfo.dAlign
+        dvWsElems = dkWsElems
+        wsPadCols = constInfo.dAlign
     ws_ptr = pl.make_ptr(workspace, dtype=pl.DT_FP32)
     dq_workspace = ws_ptr
     # 段宽按各自的 head dim：dq/dk 是 D，dv 是 Dv(可以短于 D)。
     # 必须与 host 的 dqElems/dkElems/dvElems 逐一对齐。
-    dk_workspace = pl.addptr(dq_workspace, wsRowsQ * tiling.d)
-    dv_workspace = pl.addptr(dk_workspace, wsRowsKV * tiling.d)
+    dk_workspace = pl.addptr(dq_workspace, dqWsElems)
+    dv_workspace = pl.addptr(dk_workspace, dkWsElems)
     # 128 行对齐垫之后是 dsink 槽位 [aivCount x N1]，与 host BuildWorkspacePlan 对齐。
-    # 垫宽仍按真实 max(d,dv)：两侧同口径，垫内容无语义。
-    dsink_workspace = pl.addptr(
-        dv_workspace, wsRowsKV * tiling.dv + 128 * pl.max(tiling.d, tiling.dv)
-    )
+    dsink_workspace = pl.addptr(dv_workspace, dvWsElems + 128 * wsPadCols)
     # dsink 槽位之后是 sfmg 前移缓存 [N1*T1] fp32，与 host 的 plan.sfmg 对齐。
     # dv_align>=128 时 pre 阶段全量写入、主循环 V1 只读现成值。
     sfmg_workspace = pl.addptr(dsink_workspace, constInfo.aivCount * constInfo.n1Size)
@@ -287,26 +301,37 @@ def flash_attn_grad_preload3(
         tensor_sfmg_ws = pl.make_tensor(
             softmax_lse, [1, lseElems], [lseElems, 1], dtype=pl.DT_FP32
         )
-    # dq/dk/dv workspace 为 fp32，供 atomicAdd 累加。
-    # dq/dk 是 D 宽，dv 是 Dv 宽 —— 行距按各自段宽。
-    tensor_dq_ws = pl.make_tensor(
-        dq_workspace,
-        [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
-        [s1ndQ, d2dQ, dQ, 1],
-        dtype=pl.DT_FP32,
-    )
-    tensor_dk_ws = pl.make_tensor(
-        dk_workspace,
-        [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
-        [s2ndKV, d2dKV, dQ, 1],
-        dtype=pl.DT_FP32,
-    )
-    tensor_dv_ws = pl.make_tensor(
-        dv_workspace,
-        [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dV],
-        [s2ndKVv, d2dKVv, dV, 1],
-        dtype=pl.DT_FP32,
-    )
+    # dq/dk/dv workspace 为 fp32，供 atomicAdd 累加
+    # dq/dk 是 D 宽，dv 是 Dv 宽 —— 与 workspace 的分段宽度一致
+    if nz_out == 1:
+        tensor_dq_ws = pl.make_tensor(
+            dq_workspace, [1, dqWsElems], [dqWsElems, 1], dtype=pl.DT_FP32
+        )
+        tensor_dk_ws = pl.make_tensor(
+            dk_workspace, [1, dkWsElems], [dkWsElems, 1], dtype=pl.DT_FP32
+        )
+        tensor_dv_ws = pl.make_tensor(
+            dv_workspace, [1, dvWsElems], [dvWsElems, 1], dtype=pl.DT_FP32
+        )
+    else:
+        tensor_dq_ws = pl.make_tensor(
+            dq_workspace,
+            [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
+            [s1ndQ, d2dQ, dQ, 1],
+            dtype=pl.DT_FP32,
+        )
+        tensor_dk_ws = pl.make_tensor(
+            dk_workspace,
+            [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
+            [s2ndKV, d2dKV, dQ, 1],
+            dtype=pl.DT_FP32,
+        )
+        tensor_dv_ws = pl.make_tensor(
+            dv_workspace,
+            [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dV],
+            [s2ndKVv, d2dKVv, dV, 1],
+            dtype=pl.DT_FP32,
+        )
     # ---- pre/post：一维视图 ----
     # InitOutput / Muls+Cast 按实际 T*N*D 个元素线性切（非 TND 的 T=B*S）。
     # dq 侧 head 数是 n1(=n2*G)，dk/dv 侧是 n2。
@@ -317,17 +342,43 @@ def flash_attn_grad_preload3(
     dkElems = dkvRows * dQ
     dvElems = dkvRows * dV
     tensor_dq_ws_flat = pl.make_tensor(
-        dq_workspace, [1, dqElems], [dqElems, 1], dtype=pl.DT_FP32
+        dq_workspace, [1, dqWsElems], [dqWsElems, 1], dtype=pl.DT_FP32
     )
     tensor_dk_ws_flat = pl.make_tensor(
-        dk_workspace, [1, dkElems], [dkElems, 1], dtype=pl.DT_FP32
+        dk_workspace, [1, dkWsElems], [dkWsElems, 1], dtype=pl.DT_FP32
     )
     tensor_dv_ws_flat = pl.make_tensor(
-        dv_workspace, [1, dvElems], [dvElems, 1], dtype=pl.DT_FP32
+        dv_workspace, [1, dvWsElems], [dvWsElems, 1], dtype=pl.DT_FP32
     )
-    tensor_dq_out = pl.make_tensor(dq, [1, dqElems], [dqElems, 1], dtype=input_dtype)
-    tensor_dk_out = pl.make_tensor(dk, [1, dkElems], [dkElems, 1], dtype=input_dtype)
-    tensor_dv_out = pl.make_tensor(dv, [1, dvElems], [dvElems, 1], dtype=input_dtype)
+    if nz_out == 1:
+        tensor_dq_out = pl.make_tensor(
+            dq,
+            [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
+            [s1ndQ, d2dQ, dQ, 1],
+            dtype=input_dtype,
+        )
+        tensor_dk_out = pl.make_tensor(
+            dk,
+            [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
+            [s2ndKV, d2dKV, dQ, 1],
+            dtype=input_dtype,
+        )
+        tensor_dv_out = pl.make_tensor(
+            dv,
+            [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dV],
+            [s2ndKVv, d2dKVv, dV, 1],
+            dtype=input_dtype,
+        )
+    else:
+        tensor_dq_out = pl.make_tensor(
+            dq, [1, dqElems], [dqElems, 1], dtype=input_dtype
+        )
+        tensor_dk_out = pl.make_tensor(
+            dk, [1, dkElems], [dkElems, 1], dtype=input_dtype
+        )
+        tensor_dv_out = pl.make_tensor(
+            dv, [1, dvElems], [dvElems, 1], dtype=input_dtype
+        )
     tensor_sinks = pl.make_tensor(sinks, [n1Size], [1], dtype=pl.DT_FP32)
     dsinkElems = constInfo.aivCount * n1Size
     tensor_dsink_ws = pl.make_tensor(
@@ -380,7 +431,53 @@ def flash_attn_grad_preload3(
     # 在 presfmg 的窗口循环里（每窗 kBatch 个，见 process_presfmg 的
     # _zero_step）——避免整段清零先灌满 MTE3 队列、拖延 sfmg 写的双缓冲
     # 周转（实测中小 S 用例清零占 pre 搬运 1/3~1/2）。
-    if dv_align >= 128:
+    if nz_out == 1:
+        with pl.section_vector():
+            zero_ub = make_pre_zero_buffer_f32()
+            # NZ 布局按整段 tile 口径清零（覆盖 padding 与 TND gap）。sfmg
+            # 前移的交错清零按 ND 行区间寻址，与 NZ tile 布局不兼容——这里
+            # 清零段传 0，复用 process_presfmg 的纯计算形态（同 BN2 调用点：
+            # zS 全 0 → zTotal=0 → 清零任务零循环），仅保留 y/dO 窗口计算与
+            # sfmg 落盘；enablePreSfmg=0 时内部自动跳过计算。
+            process_nz_pre(
+                tensor_dq_ws_flat, dqWsElems, constInfo.aivCount, zero_ub.current()
+            )
+            process_nz_pre(
+                tensor_dk_ws_flat, dkWsElems, constInfo.aivCount, zero_ub.current()
+            )
+            process_nz_pre(
+                tensor_dv_ws_flat, dvWsElems, constInfo.aivCount, zero_ub.current()
+            )
+            if sink == 1:
+                process_sink_zero(
+                    tensor_dsink_ws, constInfo, zero_ub.current(), pl.get_block_idx()
+                )
+            sp_y_ub = make_sp_y_ub(v1w)
+            sp_dy_ub = make_sp_dy_ub(v1w)
+            sp_out_ub = make_sp_out_ub(v1w)
+            sp_out_flat = make_sp_out_flat(v1w)
+            process_presfmg(
+                constInfo,
+                tensor_y,
+                tensor_dy,
+                tensor_sfmg_ws,
+                sp_y_ub,
+                sp_dy_ub,
+                sp_out_ub,
+                sp_out_flat,
+                fag_common.SP_WORK_W[v1w],
+                zero_ub.current(),
+                tensor_dq_ws_flat,
+                tensor_dk_ws_flat,
+                tensor_dv_ws_flat,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+            )
+    elif dv_align >= 128:
         with pl.section_vector():
             zero_ub = make_pre_zero_buffer_f32()
             zt = zero_ub.current()
@@ -593,35 +690,81 @@ def flash_attn_grad_preload3(
         dkvRowEndP = (
             pl.getval(meta, fagOff + META_FAG_DKV_ROW_ENDS + vBlockIdxP) * one64
         )
-        post_f32 = make_post_f32_buffer()
-        post_f16 = make_post_f16_buffer()
-        process_post(
-            tensor_dq_ws_flat,
-            tensor_dq_out,
-            post_f32,
-            post_f16,
-            constInfo.scaleValue,
-            dqRowStartP * dQ,
-            (dqRowEndP - dqRowStartP) * dQ,
-        )
-        process_post(
-            tensor_dk_ws_flat,
-            tensor_dk_out,
-            post_f32,
-            post_f16,
-            constInfo.scaleValue,
-            dkvRowStartP * dQ,
-            (dkvRowEndP - dkvRowStartP) * dQ,
-        )
-        process_post(
-            tensor_dv_ws_flat,
-            tensor_dv_out,
-            post_f32,
-            post_f16,
-            1.0,
-            dkvRowStartP * dV,
-            (dkvRowEndP - dkvRowStartP) * dV,
-        )
+        if nz_out == 1:
+            post_f32 = make_nz_post_f32_buffer()
+            post_f16 = make_nz_post_f16_buffer()
+            process_nz_post(
+                constInfo,
+                cu_q_tensor,
+                used_q_tensor,
+                constInfo.sequsedQOptional,
+                tensor_dq_ws_flat,
+                tensor_dq_out,
+                post_f32,
+                post_f16,
+                constInfo.n1Size,
+                constInfo.s1Size,
+                constInfo.coefB0Q,
+                constInfo.scaleValue,
+            )
+            process_nz_post(
+                constInfo,
+                cu_kv_tensor,
+                used_kv_tensor,
+                constInfo.sequsedKvOptional,
+                tensor_dk_ws_flat,
+                tensor_dk_out,
+                post_f32,
+                post_f16,
+                constInfo.n2Size,
+                constInfo.s2Size,
+                constInfo.coefB0KV,
+                constInfo.scaleValue,
+            )
+            process_nz_post(
+                constInfo,
+                cu_kv_tensor,
+                used_kv_tensor,
+                constInfo.sequsedKvOptional,
+                tensor_dv_ws_flat,
+                tensor_dv_out,
+                post_f32,
+                post_f16,
+                constInfo.n2Size,
+                constInfo.s2Size,
+                constInfo.coefB0KV,
+                1.0,
+            )
+        else:
+            post_f32 = make_post_f32_buffer()
+            post_f16 = make_post_f16_buffer()
+            process_post(
+                tensor_dq_ws_flat,
+                tensor_dq_out,
+                post_f32,
+                post_f16,
+                constInfo.scaleValue,
+                dqRowStartP * dQ,
+                (dqRowEndP - dqRowStartP) * dQ,
+            )
+            process_post(
+                tensor_dk_ws_flat,
+                tensor_dk_out,
+                post_f32,
+                post_f16,
+                constInfo.scaleValue,
+                dkvRowStartP * dQ,
+                (dkvRowEndP - dkvRowStartP) * dQ,
+            )
+            process_post(
+                tensor_dv_ws_flat,
+                tensor_dv_out,
+                post_f32,
+                post_f16,
+                1.0,
+                dkvRowStartP * dV,
+                (dkvRowEndP - dkvRowStartP) * dV,
+            )
         if sink == 1:
             if pl.get_block_idx() == 0:
                 sink_red_ub = make_sink_red_post_ub(v1w)

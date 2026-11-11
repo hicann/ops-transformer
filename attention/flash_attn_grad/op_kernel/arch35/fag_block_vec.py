@@ -714,6 +714,16 @@ def process_pre_from_meta(meta, fagOff, tensor_dq, tensor_dk, tensor_dv, dQ, dV,
     process_pre(tensor_dv, zt, dkvRowStart * dV, dvNElems)
 
 
+def process_nz_pre(tensor_ws, elems, aiv_count, zt):
+    """Clear padding and TND gaps as well as valid rows before NZ AtomicAdd."""
+    per_core = ((elems + aiv_count * 128 - 1) // (aiv_count * 128)) * 128
+    begin = pl.min(pl.get_block_idx() * per_core, elems)
+    count = pl.min(per_core, elems - begin)
+    pl.set_validshape(zt, [1, PRE_ELEMS[d_align]])
+    fill_zero_vf(zt, (pl.min(count, PRE_ELEMS[d_align]) + VF_LANES - 1) // VF_LANES)
+    process_pre(tensor_ws, zt, begin, count)
+
+
 # ==================================================================
 #  Post —— dQ/dK/dV 的 scale + cast
 # ==================================================================

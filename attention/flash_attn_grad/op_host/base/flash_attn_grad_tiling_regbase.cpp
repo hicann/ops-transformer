@@ -54,7 +54,8 @@ void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagT
             "layoutStr=%s, layout=%ld, maskMode=%ld, win=(%ld,%ld), sparseType=%ld, totalPerBatch=%ld, "
             "hasAttenMask=%d, hasSeqused=%d, hasSinks=%d, isEmptyShape=%d, "
             "template=%ld, isBn2MultiBlk=%ld, bn2NeedZero=%ld, swizzle=%ld, deter=%d, dAlign=%ld, dvAlign=%ld, "
-            "enablePreSfmg=%ld, B=%ld, S1=%ld, S2=%ld, N1=%ld, N2=%ld, G=%ld, D=%ld, Dv=%ld, "
+            "enablePreSfmg=%ld, nzOut=%ld, "
+            "B=%ld, S1=%ld, S2=%ld, N1=%ld, N2=%ld, G=%ld, D=%ld, Dv=%ld, "
             "viewQ=[%ld,S,%ld,D] b0=%ld, viewKV=[%ld,S,%ld,D] b0=%ld, coefN=(%ld,%ld), "
             "tilingKey=%llu, workspaceSize=%zu.",
             plan.schedule.usedCube, plan.schedule.blockDim, static_cast<int>(plan.schedule.useActualCores),
@@ -63,15 +64,15 @@ void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagT
             static_cast<int>(info.hasSeqused), static_cast<int>(info.hasSinks), static_cast<int>(IsEmptyShape(info)),
             plan.kernel.tmpl, plan.kernel.isBn2MultiBlk, plan.kernel.bn2NeedZero, plan.schedule.swizzle,
             static_cast<int>(info.isDeterministic && plan.kernel.tmpl == TMPL_BN2GS1S2), plan.kernel.dAlign,
-            plan.kernel.dvAlign, plan.kernel.enablePreSfmg, info.b, info.s1, info.s2, info.n1, info.n2, info.g, info.d,
-            info.dv, info.viewD0Q, info.viewD2Q, info.coefB0Q, info.viewD0KV, info.viewD2KV, info.coefB0KV, info.coefN0,
-            info.coefN2, plan.tilingKey, plan.workspace.totalSize);
+            plan.kernel.dvAlign, plan.kernel.enablePreSfmg, plan.kernel.nzOut, info.b, info.s1, info.s2, info.n1,
+            info.n2, info.g, info.d, info.dv, info.viewD0Q, info.viewD2Q, info.coefB0Q, info.viewD0KV, info.viewD2KV,
+            info.coefB0KV, info.coefN0, info.coefN2, plan.tilingKey, plan.workspace.totalSize);
 
     // 决策追溯：上板发现别的模板更快时，先看这行就知道今天为什么选了它。
     // l2CacheSize 一起打出来：swizzle 的阈值以它为分母，各 ascend950 变体
     // 16MB~128MB 不等，判据对不上时第一件事就是核对这个数。
-    OP_LOGI(context->GetNodeName(), "FlashAttnGrad route: chosen=%s, swizzle=%s, aicNum=%u, l2CacheSize=%lu.",
-            trace.chosen, trace.swizzleReject, info.aicNum, info.l2CacheSize);
+    OP_LOGI(context->GetNodeName(), "FlashAttnGrad route: chosen=%s, swizzle=%s, nzOut=%s, aicNum=%u, l2CacheSize=%lu.",
+            trace.chosen, trace.swizzleReject, trace.nzOutReject, info.aicNum, info.l2CacheSize);
     for (size_t i = 0; i < trace.rejectedNum; ++i) {
         OP_LOGI(context->GetNodeName(), "FlashAttnGrad route: rejected %s by %s.", trace.rejectedName[i],
                 trace.rejectedReason[i]);

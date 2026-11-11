@@ -40,6 +40,8 @@ BN2 wide的 dK/dV（192）与 dV（256），BN2 narrow的 dK/dV。
 
 import pypto_pro.language as pl
 
+from fag_nzout import store_nz_partial
+
 # --- generated imports (fag_fiximports.py) ---
 from fag_common import (
     CUBE_BASEM,
@@ -92,6 +94,8 @@ def _mm_n_chunk(
     dOff,
     validD,
     l1Off,
+    nz_index,
+    nz_cols,
     is_first=0,
 ):
     """N 轴一块：next() 必推进；validD==0 不算（768 空块 / Dv 截断）。
@@ -103,13 +107,19 @@ def _mm_n_chunk(
     rt = right.next()
     at = acc.next()
     if validD > 0:
+        if nz_out == 1:
+            # MAD packs L0C block columns at ceil16(M). Keep M equal to
+            # the physical NZ row pitch before computing, including tails.
+            mReal = CUBE_BASEM
         pl.set_validshape(lt, [mReal, kReal])
         pl.set_validshape(rt, [kReal, validD])
         pl.set_validshape(at, [mReal, validD])
         pl.move(lt, srcL)
         pl.move(rt, srcR, [0, l1Off])
         pl.matmul(at, lt, rt)
-        if is_first == 1:
+        if nz_out == 1:
+            store_nz_partial(tensor_out, at, nz_index, nz_cols)
+        elif is_first == 1:
             pl.store(
                 tensor_out,
                 at,
@@ -131,6 +141,8 @@ def _mm_resident_chunk(left, right, at, srcL, srcR, mReal, kReal, dOff, validD, 
     """C4/C5 驻留 L0C：D 在 N 轴，跨 s1 累加进同一块。"""
     lt = left.next()
     rt = right.next()
+    if nz_out == 1:
+        mReal = CUBE_BASEN
     pl.set_validshape(lt, [mReal, kReal])
     pl.set_validshape(rt, [kReal, validD])
     pl.set_validshape(at, [mReal, validD])
@@ -423,6 +435,8 @@ def iterate_mm_dsk(
                 dOff,
                 validD,
                 localOff,
+                runInfo.nzQTile,
+                constInfo.dAlign,
             )
 
 
@@ -484,6 +498,8 @@ def iterate_mm_n(
                 dOff,
                 validD,
                 localOff,
+                runInfo.nzKvTile,
+                constInfo.dAlign,
                 is_first,
             )
 
@@ -715,13 +731,18 @@ def flush_dk(constInfo, runInfo, tensor_dk_ws, dk_acc0, dk_acc1):
     i0 = runInfo.idx0KV
     i1 = runInfo.keyOffset
     i2 = runInfo.idx2KV
-    pl.store(
-        tensor_dk_ws,
-        dk_acc0.current(),
-        [i0, i1, i2, D_CHUNK_OFF0[d_align]],
-        order=[1, 3],
-        atomic=pl.AtomicType.AtomicAdd,
-    )
+    if nz_out == 1:
+        store_nz_partial(
+            tensor_dk_ws, dk_acc0.current(), runInfo.nzKvTile, constInfo.dAlign
+        )
+    else:
+        pl.store(
+            tensor_dk_ws,
+            dk_acc0.current(),
+            [i0, i1, i2, D_CHUNK_OFF0[d_align]],
+            order=[1, 3],
+            atomic=pl.AtomicType.AtomicAdd,
+        )
     if D_NCHUNKS[d_align] > 1:
         pl.store(
             tensor_dk_ws,
@@ -738,13 +759,18 @@ def flush_dv(constInfo, runInfo, tensor_dv_ws, dv_acc0, dv_acc1):
     i1 = runInfo.keyOffset
     i2 = runInfo.idx2KV
     if dv_chunk_valid(constInfo, 0) > 0:
-        pl.store(
-            tensor_dv_ws,
-            dv_acc0.current(),
-            [i0, i1, i2, D_CHUNK_OFF0[d_align]],
-            order=[1, 3],
-            atomic=pl.AtomicType.AtomicAdd,
-        )
+        if nz_out == 1:
+            store_nz_partial(
+                tensor_dv_ws, dv_acc0.current(), runInfo.nzKvTile, constInfo.dAlign
+            )
+        else:
+            pl.store(
+                tensor_dv_ws,
+                dv_acc0.current(),
+                [i0, i1, i2, D_CHUNK_OFF0[d_align]],
+                order=[1, 3],
+                atomic=pl.AtomicType.AtomicAdd,
+            )
     if D_NCHUNKS[d_align] > 1:
         if dv_chunk_valid(constInfo, 1) > 0:
             pl.store(
