@@ -899,7 +899,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetShapeAttrsInfo()
     const gert::StorageShape* keyShape = context_->GetInputShape(KEY_IDX);     // [B, N2, 1, S2, D]
     const gert::StorageShape* valueShape = context_->GetInputShape(VALUE_IDX); // [B, N2, 1, S2, D_V]
 
-    int64_t headNum = *context_->GetAttrs()->GetAttrPointer<int>(HEAD_ATTR_IDX);
+    int64_t headNum = *context_->GetAttrs()->GetAttrPointer<int64_t>(HEAD_ATTR_IDX);
     const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
 
     // get rope
@@ -2705,7 +2705,7 @@ void FlashAttentionScoreGradTilingNormalRegbase::FillBlockInfoLoadBalance(
 {
     acturalBlockInfo[fBaseParams.b][0] = 0;
     acturalBlockInfo[fBaseParams.b + 1][0] = 0;
-    OP_LOGD("FillBlockInfoLoadBalance", "SparseMode %u, find band index %u", fBaseParams.sparseMode,
+    OP_LOGD("FillBlockInfoLoadBalance", "SparseMode %ld, find band index %u", fBaseParams.sparseMode,
             fBaseParams.bandIdx);
 
     for (int64_t i = 0; i < fBaseParams.b; i++) {

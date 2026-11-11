@@ -450,7 +450,7 @@ struct FuzzyBaseInfoParamsRegbase { // 频繁使用的基础参数
 
     int64_t blockStarts[CORE_LIST_NUM];
     int64_t blockEnds[CORE_LIST_NUM];
-    uint32_t sparseMode;
+    int64_t sparseMode;
     uint32_t prefixN[BATCH_MAX_SIZE] = {0};
 
     bool isAllSame = false;

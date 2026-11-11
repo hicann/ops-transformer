@@ -2028,7 +2028,7 @@ protected:
     {
         acturalBlockInfo[fBaseParams.b][0] = 0;     // 存全部累积基本块: bn2g * acutalblocks1s2
         acturalBlockInfo[fBaseParams.b + 1][0] = 0; // 存最大的acutalblocks1s2，用于下界
-        OP_LOGD("FillBlockInfoLoadBalanceForBn2", "SparseMode %u, find band index %u", fBaseParams.sparseMode,
+        OP_LOGD("FillBlockInfoLoadBalanceForBn2", "SparseMode %ld, find band index %u", fBaseParams.sparseMode,
                 fBaseParams.bandIdx);
         float batchTotalValidBlk;
         std::vector<bool> invalidS1Array;
@@ -2251,7 +2251,7 @@ protected:
                        std::vector<std::vector<int64_t>>& totalBlockInfo)
     {
         OP_LOGD("FillBlockInfo", " Starting load balancing calculation in TND scenario");
-        OP_LOGD("FillBlockInfo", "SparseMode %u, find band index %u", fBaseParams.sparseMode, fBaseParams.bandIdx);
+        OP_LOGD("FillBlockInfo", "SparseMode %ld, find band index %u", fBaseParams.sparseMode, fBaseParams.bandIdx);
         for (int64_t i = 0; i < fBaseParams.b; i++) {
             int64_t actualS1Len = fBaseParams.actualSeqQlen[i];
             int64_t actualS2Len = fBaseParams.actualSeqKvlen[i];

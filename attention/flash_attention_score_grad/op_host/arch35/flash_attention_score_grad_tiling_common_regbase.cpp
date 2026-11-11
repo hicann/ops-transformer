@@ -615,10 +615,10 @@ void PrintShapeInfo(const gert::TilingContext* context_, FuzzyBaseInfoParamsRegb
 
 bool CheckSparseModeValue(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
-    if (fBaseParams.sparseMode > static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS)) {
+    if (fBaseParams.sparseMode < 0 || fBaseParams.sparseMode > static_cast<int64_t>(SparseMode::PREFIX_COMPRESS)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "sparseMode",
                                               std::to_string(fBaseParams.sparseMode).c_str(),
-                                              "the value of sparseMode cannot be greater than 6");
+                                              "the value of sparseMode must be in [0, 6]");
         return false;
     }
     return true;
@@ -626,11 +626,11 @@ bool CheckSparseModeValue(FuzzyBaseInfoParamsRegbase& fBaseParams)
 
 bool CheckVarLenSparseModeValue(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
-    if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::PREFIX) ||
-        fBaseParams.sparseMode > static_cast<uint32_t>(SparseMode::BAND_LEFT_UP_CASUAL)) {
+    if (fBaseParams.sparseMode < 0 || fBaseParams.sparseMode == static_cast<int64_t>(SparseMode::PREFIX) ||
+        fBaseParams.sparseMode > static_cast<int64_t>(SparseMode::BAND_LEFT_UP_CASUAL)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             "FlashAttentionScoreGrad", "sparseMode", std::to_string(fBaseParams.sparseMode).c_str(),
-            "When inputLayout is TND, the value of sparseMode cannot be 5 or greater than 8");
+            "When inputLayout is TND, the value of sparseMode must be in [0, 8] and cannot be 5");
         return false;
     }
     return true;
@@ -2100,7 +2100,7 @@ ge::graphStatus ProcessOptionalInput(const gert::TilingContext* context_, FuzzyB
     }
 
     fBaseParams.isSparse = SetSparseParams(context_, fBaseParams);
-    OP_LOGD("Sparse FLAG", "FAG Us1s2Bbn2gs1s2 sparse mode = %u, sparse %s.", fBaseParams.sparseMode,
+    OP_LOGD("Sparse FLAG", "FAG Us1s2Bbn2gs1s2 sparse mode = %ld, sparse %s.", fBaseParams.sparseMode,
             fBaseParams.isSparse ? "enable" : "disable");
 
     if (fBaseParams.isSparse == false && fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS)) {
@@ -2242,9 +2242,9 @@ ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext* context_, Fuzzy
 {
     // 新增SPARSE_MODE属性，上库兼容处理
     auto attrs = context_->GetAttrs();
-    fBaseParams.sparseMode = static_cast<uint32_t>(SparseMode::NO_MASK);
+    fBaseParams.sparseMode = static_cast<int64_t>(SparseMode::NO_MASK);
     if (attrs->GetAttrNum() > static_cast<size_t>(AttrIndex::SPARSE_MODE)) {
-        fBaseParams.sparseMode = *(attrs->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::SPARSE_MODE))); // 7
+        fBaseParams.sparseMode = *(attrs->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::SPARSE_MODE))); // 7
     }
 
     if (SupportTrans2BS2N2GD(fBaseParams)) {
@@ -2502,14 +2502,13 @@ ge::graphStatus ProcessPseInfo(const gert::TilingContext* context_, FuzzyBaseInf
                                const char* inputLayout)
 {
     if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(AttrIndex::PSETYPE)) {
-        fBaseParams.pseType =
-            *(context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::PSETYPE))); // 8
-        if (fBaseParams.pseType >= static_cast<uint32_t>(PseType::PSE_INVALID_TYPE)) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "pseType",
-                                                  std::to_string(fBaseParams.pseType).c_str(),
-                                                  "The value of pseType must be less than 4");
+        auto pseType = *(context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::PSETYPE))); // 8
+        if (pseType < 0 || pseType >= static_cast<int64_t>(PseType::PSE_INVALID_TYPE)) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "pseType", std::to_string(pseType).c_str(),
+                                                  "The value of pseType must be in [0, 3]");
             return ge::GRAPH_FAILED;
         }
+        fBaseParams.pseType = pseType;
     }
 
     auto pseShape = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::PSE_SHIFT));

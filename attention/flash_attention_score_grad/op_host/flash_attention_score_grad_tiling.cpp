@@ -342,7 +342,7 @@ static ge::graphStatus CheckAttrs(gert::TilingContext* context)
     auto keepProbPtr = attrs->GetAttrPointer<float>(idx++);
     auto preTokensPtr = attrs->GetAttrPointer<int64_t>(idx++);
     auto nextTokensPtr = attrs->GetAttrPointer<int64_t>(idx++);
-    auto n1SizePtr = attrs->GetAttrPointer<uint32_t>(idx++);
+    auto n1SizePtr = attrs->GetAttrPointer<int64_t>(idx++);
     auto inputLayoutPtr = attrs->GetAttrPointer<char>(idx++);
     size_t* workspaces = context->GetWorkspaceSizes(1);
 
@@ -383,7 +383,7 @@ static ge::graphStatus CheckBaseInput(gert::TilingContext* context)
     auto& queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
     auto& keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
     auto& valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
-    int64_t headNum = *context->GetAttrs()->GetAttrPointer<int>(HEAD_NUM_IDX);
+    int64_t headNum = *context->GetAttrs()->GetAttrPointer<int64_t>(HEAD_NUM_IDX);
     OP_CHECK_IF(
         headNum == 0,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "headNum", std::to_string(headNum).c_str(),
