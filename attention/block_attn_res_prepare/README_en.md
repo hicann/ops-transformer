@@ -140,7 +140,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>eps</td>
       <td>Attribute</td>
-      <td>Numerical stability term of RMS normalization. Optional. The default value is 1e-6, and it must be a finite positive number.</td>
+      <td>Numerical stability term of RMS normalization. Optional. The default value is 1e-6. Computed internally in FLOAT32; it must be finite and in `[FLT_MIN, FLT_MAX]`. Subnormal values are not supported.</td>
       <td>FLOAT</td>
       <td>-</td>
     </tr>
@@ -149,12 +149,12 @@ English | [简体中文](./README.md)
 
 ## Constraint Description
 
-- `T >= 0`, `S >= 0`, `1 <= N <= 64`, and `1 <= D <= 8192`.
+- `T >= 0`, `S >= 0`, `1 <= N <= 64`, and `1 <= D <= 8192`. Non-empty computation (`T > 0` and `S > 0`) additionally requires `T <= 4294967295` (`UINT32_MAX`, the maximum unsigned 32-bit integer), `S <= 4294967295` (`UINT32_MAX`), and `T * S <= 9223372036854775807` (`INT64_MAX`, the maximum signed 64-bit integer).
 - The shape of `block_res` is `[T, N, D]`, and the shape of `pseudo_query` is `[S, D]`. The shapes of `numerator`, `logit_max`, and `exp_sum` are `[S, T, D]`, `[S, T]`, and `[S, T]`, respectively.
 - The shape of `valid_blocks` must be `[1]`. When `valid_blocks[0] == 0`, `numerator` returns an all-0 tensor, `logit_max` returns a tensor whose elements are all the minimum finite FLOAT32 value, and `exp_sum` returns an all-0 tensor. When `valid_blocks[0] > N`, it is processed as `N`.
 - All input and output tensors must be contiguous tensors. Non-contiguous tensors are not supported.
-- `eps` must be a finite positive number.
-- When `T == 0` or `S == 0`, empty outputs of the corresponding shapes are returned.
+- `eps` must be finite and in the positive normal FLOAT32 range `[FLT_MIN, FLT_MAX]` (approximately `[1.1754943508222875e-38, 3.4028234663852886e+38]`). The double value received by ACLNN is validated against this range before conversion to a FLOAT32 attribute. Subnormal values and values that narrow to zero or Inf are not supported.
+- If `T == 0` or `S == 0`, empty outputs of the corresponding shapes are returned after parameter validation and shape inference, without launching AICore computation. The limits for non-empty computation above do not apply as checks on this path; the valid `eps` range and other API checks still apply.
 
 ## Invocation Description
 

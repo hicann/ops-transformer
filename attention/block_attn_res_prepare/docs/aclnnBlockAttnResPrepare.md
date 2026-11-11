@@ -214,7 +214,7 @@ aclnnStatus aclnnBlockAttnResPrepare(
       <td>eps（double）</td>
       <td>输入</td>
       <td>表示RMS归一化的稳定项，通常为1e-6。</td>
-      <td><li>必选。</li><li>内部按 FLOAT32 计算；必须为有限值，且位于 `[FLT_MIN, FLT_MAX]`（约 `[1.1754943508222875e-38, 3.4028234663852886e+38]`）。不支持次正规数或收窄后为零、Inf 的值。</li></td>
+      <td><li>必选。</li><li>eps经范围校验后转换为FLOAT32属性参与计算；必须为有限值，且位于`[FLT_MIN, FLT_MAX]`（约`[1.1754943508222875e-38, 3.4028234663852886e+38]`）。不支持次正规数或收窄后为零、Inf的值。</li></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -306,11 +306,11 @@ aclnnStatus aclnnBlockAttnResPrepare(
 
 - 确定性说明：aclnnBlockAttnResPrepare默认确定性实现。
 - Batch一致性说明：aclnnBlockAttnResPrepare默认Batch一致性实现。
-- `T >= 0`，`S >= 0`，`1 <= N <= 64`，`1 <= D <= 8192`。
+-维度约束：`T >= 0`，`S >= 0`，`1 <= N <= 64`，`1 <= D <= 8192`。当`T > 0`且`S > 0`时，`T`、`S`均不超过`4294967295`（`UINT32_MAX`，32位无符号整数最大值），且`T * S`不超过`9223372036854775807`（`INT64_MAX`，64位有符号整数最大值）。
+- `T == 0`或`S == 0`时，在参数校验和形状推导通过后返回对应shape的空输出，不发起AICore计算；上述非空计算的上限，不作为该路径的检查条件，`eps`有效范围及其他接口校验仍适用。
 - `blockRes` 与 `pseudoQuery` 的最后一维必须相同。
 - `validBlocks[0] == 0` 时，返回 online softmax 的空状态；`validBlocks[0] > N` 时按 `N` 处理。
 - 所有输入和输出 Tensor 均必须为连续 Tensor，不支持非连续 Tensor。
-- `T == 0` 或 `S == 0` 时返回对应形状的空输出。
 
 ## 调用示例
 

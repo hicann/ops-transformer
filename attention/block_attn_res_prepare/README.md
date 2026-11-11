@@ -138,7 +138,7 @@
     <tr>
       <td>eps</td>
       <td>属性</td>
-      <td>RMS归一化的数值稳定项，可选，默认值为1e-6，必须为有限正数。</td>
+      <td>RMS归一化的数值稳定项，可选，默认值为1e-6，内部按FLOAT32计算，必须为有限值且位于`[FLT_MIN, FLT_MAX]`，不支持次正规数。</td>
       <td>FLOAT</td>
       <td>-</td>
     </tr>
@@ -147,12 +147,12 @@
 
 ## 约束说明
 
-- `T >= 0`，`S >= 0`，`1 <= N <= 64`，`1 <= D <= 8192`。
+- `T >= 0`，`S >= 0`，`1 <= N <= 64`，`1 <= D <= 8192`。非空计算（`T > 0`且`S > 0`）还要求`T <= 4294967295`（`UINT32_MAX`，32位无符号整数最大值）、`S <= 4294967295`（`UINT32_MAX`），且`T * S <= 9223372036854775807`（`INT64_MAX`，64位有符号整数最大值）。
 - `block_res` 的 shape 为 `[T, N, D]`，`pseudo_query` 的 shape 为 `[S, D]`；`numerator`、`logit_max` 和 `exp_sum` 的 shape 分别为 `[S, T, D]`、`[S, T]` 和 `[S, T]`。
 - `valid_blocks` 的 shape 必须为 `[1]`；`valid_blocks[0] == 0` 时，`numerator` 返回全 0 Tensor、`logit_max` 返回所有元素均为 FLOAT32 最小有限值的 Tensor、`exp_sum` 返回全 0 Tensor；`valid_blocks[0] > N` 时按 `N` 处理。
 - 所有输入和输出 Tensor 均必须为连续 Tensor，不支持非连续 Tensor。
-- `eps` 必须为有限正数。
-- `T == 0` 或 `S == 0` 时，返回对应 shape 的空输出。
+- `eps`必须为有限值且位于FLOAT32正规正数范围`[FLT_MIN, FLT_MAX]`（约`[1.1754943508222875e-38, 3.4028234663852886e+38]`）。ACLNN接收的double值在范围校验后转换为FLOAT32属性，不支持次正规数或收窄后为零、Inf的值。
+- `T == 0`或`S == 0`时，在参数校验和形状推导通过后返回对应shape的空输出，不发起AICore计算；上述非空计算的上限，不作为该路径的检查条件，`eps`有效范围及其他接口校验仍适用。
 
 ## 调用说明
 

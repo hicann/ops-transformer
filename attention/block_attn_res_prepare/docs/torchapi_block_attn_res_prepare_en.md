@@ -111,7 +111,7 @@ cann_ops_transformer.block_attn_res_prepare(
 | block_res | Tensor | Required | Historical residual block, corresponding to $V$ in the formula. Data format: ND. $T$ is the number of tokens, $N$ is the number of historical residual blocks that can be stored, and $D$ is the hidden feature dimension. | float32 | [T, N, D] |
 | valid_blocks | Tensor | Required | Number of currently valid historical residual blocks $N_v$. Data format: ND. If the value is 0, `numerator` returns an all-zero Tensor, `logit_max` returns a Tensor in which all elements are the minimum finite value of float32, and `exp_sum` returns an all-zero Tensor. If the value is greater than $N$, it is treated as $N$. | uint64 | [1] |
 | pseudo_query | Tensor | Required | Pseudo Query, corresponding to $Q$ in the formula. Each target slot corresponds to one Query vector, and the last dimension must be the same as the last dimension of `block_res`. Data format: ND. | float32 | [S, D] |
-| eps | float | Optional | Numerical stability term for RMS normalization. Computed internally in FLOAT32. Must be finite and in `[FLT_MIN, FLT_MAX]` (approximately `[1.1754943508222875e-38, 3.4028234663852886e+38]`); subnormal values are not supported. The default value is `1.0e-6`. | float | - |
+| eps | float | Optional | Numerical stability term for RMS normalization. Validated against the range below, then passed as a FLOAT32 attribute for computation. Must be finite and in `[FLT_MIN, FLT_MAX]` (approximately `[1.1754943508222875e-38, 3.4028234663852886e+38]`); subnormal values are not supported. The default value is `1.0e-6`. | float | - |
 
 ## Return Values
 
@@ -127,11 +127,11 @@ Returns a tuple of `numerator`, `logit_max`, and `exp_sum`. If `valid_blocks[0] 
 
 - This API supports both training and inference use cases.
 - This API supports the single-operator call mode, but TorchAir graph mode calls are not yet supported.
-- Shape requirements: `T >= 0`, `S >= 0`, `1 <= N <= 64`, `1 <= D <= 8192`.
+- Dimension constraints: `T >= 0`, `S >= 0`, `1 <= N <= 64`, and `1 <= D <= 8192`. When both `T > 0` and `S > 0`, `T` and `S` must not exceed `4294967295` (`UINT32_MAX`, the maximum unsigned 32-bit integer), and `T * S` must not exceed `9223372036854775807` (`INT64_MAX`, the maximum signed 64-bit integer).
+- If `T == 0` or `S == 0`, empty outputs of the corresponding shapes are returned after parameter validation and shape inference, without launching AICore computation. The limits for non-empty computation above do not apply as checks on this path; the valid `eps` range and other API checks still apply.
 - `block_res.shape[2]` must be equal to `pseudo_query.shape[1]`.
 - All input and output Tensors must be contiguous. Non-contiguous Tensors are not supported.
 - If `valid_blocks[0] == 0`, `numerator` returns an all-zero Tensor, `logit_max` returns a Tensor whose elements are all the float32 minimum finite value, and `exp_sum` returns an all-zero Tensor; if `valid_blocks[0] > N`, it is processed as `N`.
-- If `T == 0` or `S == 0`, empty outputs of the corresponding shapes are returned.
 - If `block_res` or `pseudo_query` contains `NaN` or `Inf`, or FP32 squaring, multiplication, or accumulation overflows, the result may contain `NaN` or `Inf`.
 
 ## Deterministic/Batch Consistency

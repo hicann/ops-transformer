@@ -216,7 +216,7 @@ aclnnStatus aclnnBlockAttnResPrepare(
       <td>eps (double)</td>
       <td>Input</td>
       <td>Represents the stabilization term for RMS normalization, typically 1e-6.</td>
-      <td>Computed internally in FLOAT32. Must be finite and in `[FLT_MIN, FLT_MAX]` (approximately `[1.1754943508222875e-38, 3.4028234663852886e+38]`). Subnormal values and values that narrow to zero or Inf are not supported.</td>
+      <td>Validated against the range below, then converted to a FLOAT32 attribute for computation. Must be finite and in `[FLT_MIN, FLT_MAX]` (approximately `[1.1754943508222875e-38, 3.4028234663852886e+38]`). Subnormal values and values that narrow to zero or Inf are not supported.</td>
       <td>FLOAT</td>
       <td>-</td>
       <td>-</td>
@@ -308,11 +308,11 @@ aclnnStatus aclnnBlockAttnResPrepare(
 
 - Deterministic computation: aclnnBlockAttnResPrepare defaults to a deterministic implementation.
 - Batch consistency: aclnnBlockAttnResPrepare defaults to a batch consistency implementation.
-- `T >= 0`, `S >= 0`, `1 <= N <= 64`, `1 <= D <= 8192`.
+- Dimension constraints: `T >= 0`, `S >= 0`, `1 <= N <= 64`, and `1 <= D <= 8192`. When both `T > 0` and `S > 0`, `T` and `S` must not exceed `4294967295` (`UINT32_MAX`, the maximum unsigned 32-bit integer), and `T * S` must not exceed `9223372036854775807` (`INT64_MAX`, the maximum signed 64-bit integer).
+- If `T == 0` or `S == 0`, empty outputs of the corresponding shapes are returned after parameter validation and shape inference, without launching AICore computation. The limits for non-empty computation above do not apply as checks on this path; the valid `eps` range and other API checks still apply.
 - The last dimension of `blockRes` must be the same as that of `pseudoQuery`.
 - If `validBlocks[0] == 0`, the empty state of online softmax is returned; if `validBlocks[0] > N`, it is processed as `N`.
 - All input and output tensors must be contiguous tensors. Non-contiguous tensors are not supported.
-- If `T == 0` or `S == 0`, an empty output of the corresponding shape is returned.
 
 ## Example
 
