@@ -698,26 +698,6 @@
   </tr>
   <tr>
     <td>attention</td>
-    <td><a href="../../attention/quant_sparse_lightning_indexer/README.md">quant_sparse_lightning_indexer</a></td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✗</td>
-    <td>AI Core</td>
-    <td>两级TopK的第二级（候选消费级）算子，消费quant_lightning_indexer输出的块级候选索引，只在候选块范围内做token级TopK，选取每个token的Top-k稀疏位置。</td>
-  </tr>
-  <tr>
-    <td>attention</td>
-    <td><a href="../../attention/quant_sparse_lightning_indexer_metadata/README.md">quant_sparse_lightning_indexer_metadata</a></td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✗</td>
-    <td>AI CPU</td>
-    <td>quant_sparse_lightning_indexer算子的前置算子，用于计算quant_sparse_lightning_indexer的负载均衡。</td>
-  </tr>
-  <tr>
-    <td>attention</td>
     <td><a href="../../attention/quant_lightning_indexer_v2_metadata/README.md">quant_lightning_indexer_v2_metadata</a></td>
     <td>✓</td>
     <td>✓</td>
