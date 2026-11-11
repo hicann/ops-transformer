@@ -8,6 +8,7 @@
 [![contributing](https://img.shields.io/badge/贡献指南-teal)](CONTRIBUTING.md)
 [![SIG](https://img.shields.io/badge/SIG-ops_transformer-yellow)](https://atomgit.com/cann/community/blob/master/CANN/sigs/ops-transformer/README.md)
 [![Zread](https://img.shields.io/badge/Zread-Ask_AI-_.svg?style=flat&color=0052D9&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/hicann/ops-transformer)
+[![sample](https://img.shields.io/badge/sample-样例实践-orange.svg?style=flat)](https://atomgit.com/cann/cann-samples)
 
 </div>
 
@@ -66,6 +67,16 @@ git clone -b 9.0.0 https://atomgit.com/cann/ops-transformer.git
 
 - [快速入门](docs/QUICKSTART.md)：从零开始快速体验项目核心基础能力，涵盖源码编译、算子调用、开发与调试等操作。
 - [进阶教程](docs/README.md)：如需深入了解项目编译部署、算子调用、开发、调试调优等能力，请查阅文档中心获取详细指引。
+
+## 📘样例实践
+
+如需学习算子领域高性能实战案例，可参考[cann-samples Performance目录](https://atomgit.com/cann/cann-samples/blob/master/Samples/2_Performance/README.md)。
+
+| 算子分类 | 样例算子 | 说明 |
+| --- | --- | --- |
+| attention | [full_quant_fused_infer_attention_score_story](https://atomgit.com/cann/cann-samples/blob/master/Samples/2_Performance/full_quant_fused_infer_attention_score_story/README.md) | 围绕FIA（Fused Infer Attention Score）算子提供per-block全量化实现示例，包含输入数据生成、算子执行与结果校验流程。 |
+| mc2 | [moe_dispatch_and_combine_story](https://atomgit.com/cann/cann-samples/blob/master/Samples/2_Performance/moe_dispatch_and_combine_story/README.md) | 围绕moe dispatch/combine通信算子给出性能优化实践，包含构建运行命令、测试数据生成与精度校验流程。 |
+| moe | [moe_init_routing_story](https://atomgit.com/cann/cann-samples/blob/master/Samples/2_Performance/moe_init_routing_story/README.md) | 介绍MoeInitRoutingV3算子的完整性能优化实践。包括多核并行、内存带宽优化、核内流水线排布、SIMT编程、硬件特性适配等优化策略，从理论分析到代码实践的端到端调优指南。 |
 
 ## 💬相关信息
 

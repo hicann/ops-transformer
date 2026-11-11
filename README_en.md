@@ -10,6 +10,7 @@ English | [简体中文](./README.md)
 [![contributing](https://img.shields.io/badge/Contribution_Guide-teal)](CONTRIBUTING_en.md)
 [![SIG](https://img.shields.io/badge/SIG-ops_transformer-yellow)](https://atomgit.com/cann/community/blob/master/CANN/sigs/ops-transformer/README.md)
 [![Zread](https://img.shields.io/badge/Zread-Ask_AI-_.svg?style=flat&color=0052D9&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/hicann/ops-transformer)
+[![sample](https://img.shields.io/badge/sample-Sample_Practice-orange.svg?style=flat)](https://atomgit.com/cann/cann-samples)
 
 </div>
 
@@ -68,6 +69,16 @@ git clone -b 9.0.0 https://atomgit.com/cann/ops-transformer.git
 
 - [Quick Start](docs/QUICKSTART.md): Quickly experience the core basic capabilities of the project from scratch, covering source code compilation, operator invocation, development, debugging, and other operations.
 - [Advanced Tutorials](docs/README.md): If you need to learn more about project compilation and deployment, operator invocation, development, debugging and tuning, and other capabilities, see the documentation center for detailed guidance.
+
+## 📘Sample Practice
+
+To learn high-performance practical cases in the operator domain, see the [cann-samples Performance directory](https://atomgit.com/cann/cann-samples/blob/master/Samples/2_Performance/README.md).
+
+| Operator category | Sample | Description |
+| --- | --- | --- |
+| attention | [full_quant_fused_infer_attention_score_story](https://atomgit.com/cann/cann-samples/blob/master/Samples/2_Performance/full_quant_fused_infer_attention_score_story/README.md) | Provides a per-block full-quantization example for the FIA (Fused Infer Attention Score) operator, including input data generation, operator execution, and result verification. |
+| mc2 | [moe_dispatch_and_combine_story](https://atomgit.com/cann/cann-samples/blob/master/Samples/2_Performance/moe_dispatch_and_combine_story/README.md) | Performance optimization practice for the moe dispatch/combine communication operators, including build and run commands, test data generation, and precision verification. |
+| moe | [moe_init_routing_story](https://atomgit.com/cann/cann-samples/blob/master/Samples/2_Performance/moe_init_routing_story/README.md) | End-to-end tuning guide for the MoeInitRoutingV3 operator, covering multi-core parallelism, memory bandwidth optimization, in-core pipeline scheduling, SIMT programming, and hardware feature adaptation. |
 
 ## 💬Related Information
 
