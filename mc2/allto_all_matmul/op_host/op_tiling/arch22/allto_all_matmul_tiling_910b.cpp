@@ -91,7 +91,7 @@ constexpr int32_t ALLTOALL_MATMUL_NPU910B_EIGHT_RANK_A16W4_TILINGCODE_DEFAULT = 
 
 constexpr uint32_t COUNT_PARAMS_WITH_BIAS = 4;    // [x1, x2, bias, y]
 constexpr uint32_t COUNT_PARAMS_WITHOUT_BIAS = 3; // [x1, x2, y]
-const std::set<int> SUPPORT_RANK_SIZE_910{2, 4, 8};
+const std::set<int64_t> SUPPORT_RANK_SIZE_910{2, 4, 8};
 const std::vector<std::vector<uint32_t>> SUPPORTED_TYPES_WITH_BIAS = {
     {ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT, ge::DT_BF16},
     {ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16},
@@ -869,12 +869,24 @@ ge::graphStatus AlltoAllMatmulTiling910b::CheckAndSetAttrsInfo(AlltoAllMatmulInf
     const size_t maxLength = 4UL;
     OP_TILING_CHECK((strncmp(commMode, "aiv", maxLength) != 0),
                     OP_LOGE_FOR_INVALID_VALUE(opName_, "comm_mode", commMode, "aiv"), return ge::GRAPH_FAILED);
-    info.rankSize = mc2tiling::MatmulFormulaicTiling::GetRankSize(group);
-    rankSize = info.rankSize;
+    const int64_t* worldSize = attrs->GetAttrPointer<int64_t>(ATTR_WORLD_SIZE_INDEX);
+    OP_TILING_CHECK(worldSize == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "world_size"), return ge::GRAPH_FAILED);
+    // ACLNN uses -1 internally to request the rank size from the communication group.
+    const bool inferWorldSize = *worldSize == RANK_DEFAULT_NUM;
+    OP_TILING_CHECK(!inferWorldSize && SUPPORT_RANK_SIZE_910.find(*worldSize) == SUPPORT_RANK_SIZE_910.end(),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "world_size", std::to_string(*worldSize).c_str(), "2, 4 or 8"),
+                    return ge::GRAPH_FAILED);
+    const uint32_t groupRankSize = mc2tiling::MatmulFormulaicTiling::GetRankSize(group);
     OP_TILING_CHECK(
-        SUPPORT_RANK_SIZE_910.find(info.rankSize) == SUPPORT_RANK_SIZE_910.end(),
-        OP_LOGE_FOR_INVALID_VALUE(opName_, "world_size", std::to_string(info.rankSize).c_str(), "2, 4 or 8"),
+        SUPPORT_RANK_SIZE_910.find(groupRankSize) == SUPPORT_RANK_SIZE_910.end(),
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "group rank size", std::to_string(groupRankSize).c_str(), "2, 4 or 8"),
         return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(!inferWorldSize && *worldSize != static_cast<int64_t>(groupRankSize),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "world_size", std::to_string(*worldSize).c_str(),
+                                              "communication group rank size (" + std::to_string(groupRankSize) + ")"),
+                    return ge::GRAPH_FAILED);
+    info.rankSize = groupRankSize;
+    rankSize = info.rankSize;
 
     const int64_t* x1QuantMode = attrs->GetAttrPointer<int64_t>(ATTR_X1_QUANTMODE_INDEX);
     OP_TILING_CHECK(x1QuantMode == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "x1QuantMode"),

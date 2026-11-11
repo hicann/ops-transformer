@@ -32,7 +32,7 @@ English | [简体中文](./README.md)
         $$
         commOut = AlltoAll(x1.view(rankSize, BS/rankSize, H)) \\
         permutedOut = commOut.permute(1, 0, 2).view(BS/rankSize, rankSize*H) \\
-        output_{quant} = x1 @ x2 \\
+        output_{quant} = permutedOut @ x2 \\
         output = output_{quant} \times x1_{scale} \times x2_{scale} \\
         output = output + bias
         $$
@@ -168,8 +168,8 @@ English | [简体中文](./README.md)
     </tr>
     <tr>
     <td>alltoall_out</td>
-    <td>Output</td>
-    <td>Result received after AlltoAll and Permute, that is, permutedOut in the formula.</td>
+    <td>Optional output</td>
+    <td>Corresponds to all2all_out in the IR. When alltoall_out_flag is true, retains the result of AlltoAll and Permute, that is, permutedOut in the formula. When false, this optional output is not retained; the main computation still performs AlltoAll and Permute.</td>
     <td>Same as the input x1</td>
     <td>ND</td>
     </tr>
@@ -183,7 +183,7 @@ English | [简体中文](./README.md)
     <tr>
     <td>world_size</td>
     <td>Required attribute</td>
-    <td>Number of NPU cards used, that is, rankSize in the formula.</td>
+    <td>Number of NPU cards used, that is, rankSize in the formula. It must match the actual number of cards in the communicator specified by group.</td>
     <td>INT</td>
     <td>-</td>
     </tr>
@@ -193,6 +193,13 @@ English | [简体中文](./README.md)
     <td>Direction of the data exchange for AlltoAll and Permute. Supports empty or [-2, -1]. When empty is passed, [-2, -1] applies by default, which converts the input from (BS, H) to (BS/rankSize, H*rankSize).</td>
     <td>aclIntArray* (element type INT64)</td>
     <td>ND</td>
+    </tr>
+    <tr>
+    <td>y_dtype</td>
+    <td>Optional attribute</td>
+    <td>Data type of output y. The IR default is DT_UNDEFINED. Current data type inference does not accept DT_UNDEFINED, so callers must set a supported output type for the platform and computation scenario.</td>
+    <td>INT</td>
+    <td>-</td>
     </tr>
     <tr>
     <td>x1_quant_mode</td>
@@ -251,9 +258,16 @@ English | [简体中文](./README.md)
     <td>-</td>
     </tr>
     <tr>
+    <td>comm_mode</td>
+    <td>Optional attribute</td>
+    <td>Communication mode. The IR default is "ai_cpu". Atlas A2 products require "aiv"; Atlas A3 products support "ai_cpu"; Ascend 950PR&950DT products support "ai_cpu" or "ccu".</td>
+    <td>STRING</td>
+    <td>-</td>
+    </tr>
+    <tr>
     <td>alltoall_out_flag</td>
     <td>Optional attribute</td>
-    <td>Indicates whether to keep the result after AlltoAll and Permute.</td>
+    <td>Indicates whether to keep the result after AlltoAll and Permute. Defaults to true and controls the optional output alltoall_out.</td>
     <td>bool</td>
     <td>-</td>
     </tr>
@@ -279,7 +293,8 @@ The enumeration values of x1QuantMode, x2QuantMode, and commQuantMode map to the
     - <term>Ascend 950PR&950DT products</term>: supports 2, 4, 8, and 16 cards.
 * Support for empty tensors and non-contiguous tensors has different limits depending on the device model:
     - <term>Atlas A2 products</term>: does not support any empty tensors; does not support any non-contiguous tensors.
-    - <term>Atlas A3 products</term> and <term>Ascend 950PR&950DT products</term>: supports only the empty tensor whose first dimension (BS) of input x1 is 0 in the non-quantization scenario; other empty tensors are not supported. Supports only the transposed non-contiguous tensor of input x2; other non-contiguous tensors are not supported.
+    - <term>Atlas A3 products</term>: does not support any empty tensors. Supports only the transposed non-contiguous tensor of input x2; other non-contiguous tensors are not supported.
+    - <term>Ascend 950PR&950DT products</term>: supports only the empty tensor whose first dimension (BS) of input x1 is 0 in the non-quantization scenario; other empty tensors are not supported. Supports only the transposed non-contiguous tensor of input x2; other non-contiguous tensors are not supported.
 * The input x1 must be two-dimensional with shape (BS, H). BS must be divisible by the number of NPU cards. The values of BS and N must not exceed 2147483647 (INT32_MAX). Transposition is not supported.
 * The input x2 must be two-dimensional with shape (H\*rankSize, N). The range of H*rankSize has different constraints depending on the chip model and scenario. For details, see [quantization aclnn constraints](docs/aclnnAlltoAllQuantMatmul_en.md#constraints)
   and [non-quantization aclnn constraints](docs/aclnnAlltoAllMatmul_en.md#constraints). In the mx quantization scenario, x2 must be transposed with shape (N, H\*rankSize), and transpose_x2 is set to True.

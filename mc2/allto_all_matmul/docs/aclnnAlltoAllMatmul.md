@@ -318,11 +318,11 @@ aclnnStatus aclnnAlltoAllMatmul(
 
 * 空tensor的支持度根据不同设备型号有不同的限制：
 
-  <!-- npu="910b" id12 -->
-  - <term>Atlas A2系列产品</term>：不支持任何空tensor。
+  <!-- npu="910b,A3" id12 -->
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持任何空tensor。
   <!-- end id12 -->
-  <!-- npu="950,A3" id13 -->
-  - <term>Atlas A3系列产品</term>  、<term>Ascend 950PR&950DT系列产品</term>：仅支持输入x1的第一维度（BS）为0的空tensor，其它空tensor均不支持。
+  <!-- npu="950" id13 -->
+  - <term>Ascend 950PR&950DT系列产品</term>：仅支持输入x1的第一维度（BS）为0的空tensor，其它空tensor均不支持。
   <!-- end id13 -->
 
 * 非连续tensor的支持度根据不同设备型号有不同的限制：

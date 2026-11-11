@@ -30,7 +30,7 @@
         $$
         commOut = AlltoAll(x1.view(rankSize, BS/rankSize, H)) \\
         permutedOut = commOut.permute(1, 0, 2).view(BS/rankSize, rankSize*H) \\
-        output_{quant} = x1 @ x2 \\
+        output_{quant} = permutedOut @ x2 \\
         output = output_{quant} \times x1_{scale} \times x2_{scale} \\
         output = output + bias
         $$
@@ -166,8 +166,8 @@
     </tr>
     <tr>
     <td>alltoall_out</td>
-    <td>输出</td>
-    <td>接收AlltoAll和Permute后的结果，即公式中的输出permutedOut。</td>
+    <td>可选输出</td>
+    <td>对应IR中的all2all_out。alltoall_out_flag为true时，保留AlltoAll和Permute后的结果，即公式中的permutedOut；为false时不保留该可选输出，主计算仍执行AlltoAll和Permute。</td>
     <td>与输入x1保持一致</td>
     <td>ND</td>
     </tr>
@@ -181,7 +181,7 @@
     <tr>
     <td>world_size</td>
     <td>必选属性</td>
-    <td>使用的npu卡数，公式中的rankSize。</td>
+    <td>使用的NPU卡数，即公式中的rankSize，须与group对应通信域的实际卡数一致。</td>
     <td>INT</td>
     <td>-</td>
     </tr>
@@ -191,6 +191,13 @@
     <td>AlltoAll和Permute数据交换的方向，支持配置空或者[-2, -1]，传入空时默认按[-2, -1]处理，表示将输入由(BS, H)转为(BS/rankSize, H*rankSize)。</td>
     <td>aclIntArray*(元素类型INT64)</td>
     <td>ND</td>
+    </tr>
+    <tr>
+    <td>y_dtype</td>
+    <td>可选属性</td>
+    <td>输出y的数据类型，IR默认值为DT_UNDEFINED。当前类型推导不接受DT_UNDEFINED，调用时须设置为对应平台和计算场景支持的输出类型。</td>
+    <td>INT</td>
+    <td>-</td>
     </tr>
     <tr>
     <td>x1_quant_mode</td>
@@ -249,9 +256,16 @@
     <td>-</td>
     </tr>
     <tr>
+    <td>comm_mode</td>
+    <td>可选属性</td>
+    <td>通信模式，IR默认值为"ai_cpu"。Atlas A2系列产品须设置为"aiv"；Atlas A3系列产品支持"ai_cpu"；Ascend 950PR&950DT系列产品支持"ai_cpu"或"ccu"。</td>
+    <td>STRING</td>
+    <td>-</td>
+    </tr>
+    <tr>
     <td>alltoall_out_flag</td>
     <td>可选属性</td>
-    <td>用于标识是否需要保留AlltoAll和Permute后的结果。</td>
+    <td>用于标识是否需要保留AlltoAll和Permute后的结果，默认值为true，控制可选输出alltoall_out。</td>
     <td>bool</td>
     <td>-</td>
     </tr>
@@ -277,7 +291,8 @@ x1QuantMode、x2QuantMode、commQuantMode的枚举值与[量化模式](../../doc
     - <term>Ascend 950PR&950DT系列产品</term>：支持2、4、8、16卡。
 * 空tensor和非连续tensor的支持度根据不同设备型号有不同的限制：
     - <term>Atlas A2系列产品</term>：不支持任何空tensor；不支持任何非连续tensor。
-    - <term>Atlas A3系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：仅支持非量化场景下输入x1的第一维度（BS）为0的空tensor，其它空tensor均不支持；仅支持输入x2的转置非连续tensor，其它非连续tensor均不支持。
+    - <term>Atlas A3系列产品</term>：不支持任何空tensor；仅支持输入x2的转置非连续tensor，其它非连续tensor均不支持。
+    - <term>Ascend 950PR&950DT系列产品</term>：仅支持非量化场景下输入x1的第一维度（BS）为0的空tensor，其它空tensor均不支持；仅支持输入x2的转置非连续tensor，其它非连续tensor均不支持。
 * 输入x1必须是2维，其shape为(BS, H)，BS必须被NPU卡数整除，BS和N的值不得超过2147483647(INT32_MAX)，不支持转置。
 * 输入x2必须是2维，其shape为(H\*rankSize, N)，H*rankSize范围根据芯片型号和场景不同有不同约束，详见[量化aclnn约束说明](./docs/aclnnAlltoAllQuantMatmul.md#约束说明)
   和[非量化aclnn约束说明](./docs/aclnnAlltoAllMatmul.md#约束说明)。当处于mx量化场景时，x2必须转置，其shape为(N, H\*rankSize)，transpose_x2配置为True。

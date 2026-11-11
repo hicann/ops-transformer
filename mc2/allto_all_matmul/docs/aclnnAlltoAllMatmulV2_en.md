@@ -347,11 +347,11 @@ aclnnStatus aclnnAlltoAllMatmulV2(
 
 - The support for empty tensors varies by device model:
 
-  <!-- npu="910b" id15 -->
-  - <term>Atlas A2 products</term>: No empty tensors are supported.
+  <!-- npu="910b,A3" id15 -->
+  - <term>Atlas A2 products</term> and <term>Atlas A3 products</term>: No empty tensors are supported.
   <!-- end id15 -->
-  <!-- npu="950,A3" id16 -->
-  - <term>Atlas A3 products</term> and <term>Ascend 950PR&950DT products</term>: Only empty tensors whose first dimension (BS) of the input x1 is 0 are supported. Other empty tensors are not supported.
+  <!-- npu="950" id16 -->
+  - <term>Ascend 950PR&950DT products</term>: Only empty tensors whose first dimension (BS) of the input x1 is 0 are supported. Other empty tensors are not supported.
   <!-- end id16 -->
 
 - Support for non-contiguous tensors varies by device model:

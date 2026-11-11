@@ -2272,11 +2272,25 @@ static std::string GetCsvPath(const char* file)
 struct AlltoAllMatmulArch22CsvParam : public AlltoAllMatmulTilingUtParam {
     std::string expectedErrorId;
     std::string expectedParamName;
+    uint64_t groupRankSize;
+    std::string expectedIncorrectValue;
+    std::string expectedCorrectValue;
     explicit AlltoAllMatmulArch22CsvParam(const csv_map& csvMap)
         : AlltoAllMatmulTilingUtParam(csvMap),
           expectedErrorId(ReadMap(csvMap, "expectedErrorId")),
-          expectedParamName(ReadMap(csvMap, "expectedParamName"))
-    {}
+          expectedParamName(ReadMap(csvMap, "expectedParamName")),
+          expectedIncorrectValue(ReadMap(csvMap, "expectedIncorrectValue")),
+          expectedCorrectValue(ReadMap(csvMap, "expectedCorrectValue"))
+    {
+        const auto groupRankSizeStr = ReadMap(csvMap, "groupRankSize");
+        groupRankSize = groupRankSizeStr.empty() ? static_cast<uint64_t>(worldSize) : std::stoull(groupRankSizeStr);
+        if (expectedIncorrectValue.empty()) {
+            expectedIncorrectValue = "ai_cpu";
+        }
+        if (expectedCorrectValue.empty()) {
+            expectedCorrectValue = expectedParamName == "comm_mode" ? "aiv" : "2, 4 or 8";
+        }
+    }
 };
 
 class AlltoAllMatmulArch22CsvTilingTest : public testing::TestWithParam<AlltoAllMatmulArch22CsvParam> {
@@ -2338,7 +2352,7 @@ TEST_P(AlltoAllMatmulArch22CsvTilingTest, csv_param)
 
     gert::TilingContextPara tilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfoA3,
                                               param.soc);
-    Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValue("rankNum", static_cast<uint64_t>(param.worldSize));
+    Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValue("rankNum", param.groupRankSize);
     ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey, param.expectTilingData,
                     param.expectWorkspaces, param.mc2TilingDataReservedLen);
     if (!param.expectedErrorId.empty()) {
@@ -2347,10 +2361,11 @@ TEST_P(AlltoAllMatmulArch22CsvTilingTest, csv_param)
             << param.expectedErrorId;
         const auto reports = ErrorManager::GetInstance().GetRawErrorMessages();
         if (param.expectedErrorId == "EZ0024") {
-            CheckFormalReport(
-                reports, param.expectedErrorId,
-                {{"param_name", param.expectedParamName}, {"incorrect_value", "ai_cpu"}, {"correct_value", "aiv"}},
-                {"op_name"});
+            CheckFormalReport(reports, param.expectedErrorId,
+                              {{"param_name", param.expectedParamName},
+                               {"incorrect_value", param.expectedIncorrectValue},
+                               {"correct_value", param.expectedCorrectValue}},
+                              {"op_name"});
         } else {
             const char* actualField = param.expectedErrorId == "EZ0021" ? "incorrect_dtypes" : "incorrect_shapes";
             CheckFormalReport(reports, param.expectedErrorId, {}, {actualField, "reason"},
