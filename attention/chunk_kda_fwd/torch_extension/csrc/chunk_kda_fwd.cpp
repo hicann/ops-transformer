@@ -20,13 +20,6 @@
 #include <aclnn/acl_meta.h>
 #include <torch/extension.h>
 
-// CANN 9.1 does not define ACL_HIFLOAT4. It cannot be produced by that version's
-// aclnn API, so use an out-of-range sentinel only to keep the shared helper
-// compilable without changing torch_extension/common/aclnn_common.h.
-#ifndef ACL_HIFLOAT4
-#define ACL_HIFLOAT4 (static_cast<aclDataType>(-1))
-#endif
-
 #include "aclnn_common.h"
 
 namespace op_api {

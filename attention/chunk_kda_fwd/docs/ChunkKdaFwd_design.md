@@ -67,6 +67,10 @@ score 点积以 BF16/FP16 为输入、FP32 累积。`Akk=(I+L)^{-1}` 的 `L`、�
 对角块求逆、分块合并、Cube 输入/累积和 workspace 均为 FP32，并显式关闭 HF32；只在完整
 FP32 求解结束后将公开 `Akk` 写回为 q dtype。
 
+A2/A3 的 score 在 `K<=128` 时使用一个 L1 B slot 驻留右矩阵；`K>128` 时使用两个
+slot，使下一 K 分片的预取不会等待尚未消费的当前分片。Aqk 缩放与后续截断、类型转换之间
+使用 V pipe 屏障，保证短尾块也读取缩放后的 UB 数据。
+
 #### 2.2.3 Post-WU
 
 只读取 `k/gk/w_seed/Akk/u_seed`，产生：
@@ -100,6 +104,13 @@ final_state = h_after_last_chunk
 arch22 和 arch35 均使用 `ChunkKdaFwd` 目录内的 KDA 私有 FwdH 实现，不依赖其他算子的
 kernel 源码。跨 chunk 的 `h_prev/h_next` 固定保存在 FP32 workspace 或 FP32 `final_state` 中；
 公开 `h` 仅作为反向保存快照按 q dtype 写回，不能反向参与下一 chunk 的状态更新。
+
+A2/A3 Post-WU 的 W 矩阵乘沿输出 K 维以最多 128 列分块，FwdH 的 `kg^T@v_new`
+沿输出 K 维以最多 128 行分块，避免超过 L1/L0C tile 容量。尾块 Vector Post-WU 先将 W
+写入现有 FP32 scratch，经 AIV→AIC→AIV 握手确认两个 AIV 均已读完 seed 后再回写 W，
+防止 W 与 seed 复用同一 GM 区域时覆盖尚未读取的数据。
+FwdH 状态更新仅在子核矩阵不超过 32 KiB FP32 计算缓冲区时使用整块快路径；其余情况
+沿用 16 行分块路径，避免较大的 K/V 组合覆盖相邻 UB 缓冲区。
 
 #### 2.2.5 Finalize
 

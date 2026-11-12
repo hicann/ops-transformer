@@ -69,6 +69,10 @@ identity matrix, diagonal block inversion, block merging, Cube inputs/accumulati
 FP32, with HF32 explicitly disabled. The public `Akk` is written back as the q dtype only after the
 complete FP32 solve finishes.
 
+On A2/A3, score products keep the right matrix resident in one L1 B slot for `K<=128` and two slots
+for `K>128`, so prefetching the next K tile cannot wait on the unconsumed current tile. A V pipe
+barrier separates Aqk scaling from clamping and casting, including short tail chunks.
+
 #### 2.2.3 Post-WU
 
 Reads only `k/gk/w_seed/Akk/u_seed`, and produces:
@@ -104,6 +108,13 @@ Both arch22 and arch35 use the KDA private FwdH implementation inside the `Chunk
 not depend on kernel source code of other operators. The cross-chunk `h_prev/h_next` is always stored in
 the FP32 workspace or the FP32 `final_state`; the public `h` is written back as a snapshot for backward
 only, in the q dtype, and cannot participate in the state update of the next chunk.
+
+On A2/A3, Post-WU splits the output K dimension of the W product into at most 128-column tiles,
+and FwdH splits `kg^T@v_new` into at most 128-row tiles to respect L1/L0C capacity. Tail Vector
+Post-WU writes W into the existing FP32 scratch first. An AIV-to-AIC-to-AIV handshake confirms
+that both AIVs have finished reading the seed before copying W back to its aliased GM storage.
+The FwdH state-update fast path also requires the subblock matrix to fit its 32 KiB FP32 calculation
+buffer; larger matrices use the existing 16-row loop to avoid overlapping adjacent UB buffers.
 
 #### 2.2.5 Finalize
 

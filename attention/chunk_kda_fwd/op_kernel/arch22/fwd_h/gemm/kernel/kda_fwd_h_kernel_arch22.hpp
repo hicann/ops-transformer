@@ -544,24 +544,31 @@ public:
                                                                    vworkLayout, Catlass::Arch::PositionGM{});
                                 auto tensorHwork = tla::MakeTensor(gmHWorkspace[cube2Offsets.hWorkOffset], hworkLayout,
                                                                    Catlass::Arch::PositionGM{});
-                                GemmCoord cube2Shape{kHeadDim, cube2Offsets.vBlockDim, cube2Offsets.blockTokens};
-                                auto tensorBlockK = GetTile(tensorK, tla::MakeCoord(0, 0),
-                                                            tla::MakeShape(cube2Shape.m(), cube2Shape.k()));
-                                auto tensorBlockVwork = GetTile(tensorVwork, tla::MakeCoord(0, 0),
-                                                                tla::MakeShape(cube2Shape.k(), cube2Shape.n()));
-                                auto tensorBlockHwork = GetTile(tensorHwork, tla::MakeCoord(0, 0),
-                                                                tla::MakeShape(cube2Shape.m(), cube2Shape.n()));
-                                if (cube2Offsets.blockTokens < chunkSize) {
-                                    blockMmadKVTail.preSetFlags();
-                                    blockMmadKVTail(tensorBlockK, tensorBlockVwork, tensorBlockHwork, cube2Shape,
-                                                    EmptyClass{}, true);
-                                    blockMmadKVTail.finalWaitFlags();
-                                } else {
-                                    blockMmadKV.preSetFlags();
-                                    blockMmadKV(tensorBlockK, tensorBlockVwork, tensorBlockHwork, cube2Shape);
-                                    blockMmadKV.finalWaitFlags();
+                                // K is the output-row dimension of K^T @ v_new.
+                                // Bound each product by the allocated L1/L0C M
+                                // tile rather than copying all K rows into it.
+                                constexpr uint32_t kRowsPerTile = tla::get<0>(L1TileShapeVTla{});
+                                for (uint32_t kRow = 0; kRow < kHeadDim; kRow += kRowsPerTile) {
+                                    GemmCoord cube2Shape{Min(kRowsPerTile, kHeadDim - kRow), cube2Offsets.vBlockDim,
+                                                         cube2Offsets.blockTokens};
+                                    auto tensorBlockK = GetTile(tensorK, tla::MakeCoord(kRow, 0),
+                                                                tla::MakeShape(cube2Shape.m(), cube2Shape.k()));
+                                    auto tensorBlockVwork = GetTile(tensorVwork, tla::MakeCoord(0, 0),
+                                                                    tla::MakeShape(cube2Shape.k(), cube2Shape.n()));
+                                    auto tensorBlockHwork = GetTile(tensorHwork, tla::MakeCoord(kRow, 0),
+                                                                    tla::MakeShape(cube2Shape.m(), cube2Shape.n()));
+                                    if (cube2Offsets.blockTokens < chunkSize) {
+                                        blockMmadKVTail.preSetFlags();
+                                        blockMmadKVTail(tensorBlockK, tensorBlockVwork, tensorBlockHwork, cube2Shape,
+                                                        EmptyClass{}, true);
+                                        blockMmadKVTail.finalWaitFlags();
+                                    } else {
+                                        blockMmadKV.preSetFlags();
+                                        blockMmadKV(tensorBlockK, tensorBlockVwork, tensorBlockHwork, cube2Shape);
+                                        blockMmadKV.finalWaitFlags();
+                                    }
+                                    AscendC::PipeBarrier<PIPE_ALL>();
                                 }
-                                AscendC::PipeBarrier<PIPE_ALL>();
                             }
                             Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(cubeBlockScheduler.cube2Done[streamId]);
                         }

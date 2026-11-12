@@ -188,7 +188,10 @@ public:
             AscendC::WaitFlag<AscendC::HardEvent::S_V>(EVENT_ID3 + pingpongFlag);
         }
 
-        if (nActual <= 128 && nActual == outputStride) {
+        // calcUbTensor occupies 32 KiB before hUpdateUbTensor_ping. Wider K
+        // subblocks must use the bounded row loop to avoid overlapping buffers.
+        constexpr uint32_t CALC_BUF_ELEMENTS = 32 * 1024 / sizeof(float);
+        if (nActual <= 128 && nActual == outputStride && (rowEnd - rowBegin) * nActual <= CALC_BUF_ELEMENTS) {
             uint32_t mActualThisSubBlock = rowEnd - rowBegin;
             AscendC::GlobalTensor<HElementOutput> hOutputThisSubBlock = hOutput[rowBegin * outputStride];
             AscendC::GlobalTensor<HElementInput> hInputThisSubBlock = hInput[rowBegin * outputStride];

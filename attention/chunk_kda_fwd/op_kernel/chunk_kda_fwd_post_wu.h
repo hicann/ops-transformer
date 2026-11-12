@@ -547,19 +547,25 @@ private:
             LayoutTagC tagC = LayoutTagC::template MakeLayout<float>(BT_, K_);
             auto layoutB = tla::MakeLayoutFromTag(tagB);
             auto layoutC = tla::MakeLayoutFromTag(tagC);
-            Catlass::GemmCoord shape{static_cast<uint32_t>(curT), static_cast<uint32_t>(K_),
-                                     static_cast<uint32_t>(curT)};
             auto tensorB =
                 tla::MakeTensor(preparedQG_[KVOffset(b, hv, start, 0, K_)], layoutB, Catlass::Arch::PositionGM{});
             auto tensorC =
                 tla::MakeTensor(h_[WScratchOffset(b, hv, chunkIdx, 0, 0)], layoutC, Catlass::Arch::PositionGM{});
-            auto blockA = GetTile(tensorA, tla::MakeCoord(0, 0), tla::MakeShape(shape.m(), shape.k()));
-            auto blockB = GetTile(tensorB, tla::MakeCoord(0, 0), tla::MakeShape(shape.k(), shape.n()));
-            auto blockC = GetTile(tensorC, tla::MakeCoord(0, 0), tla::MakeShape(shape.m(), shape.n()));
-            Catlass::Arch::Resource<KdaArchTag> wResource;
-            WBlockMmad wBlockMmad(wResource);
-            wBlockMmad(blockA, blockB, blockC, shape);
-            PipeBarrier<PIPE_ALL>();
+            constexpr uint32_t columnsPerTile = tla::get<1>(PostL1TileShape128{});
+            for (uint32_t col = 0; col < K_; col += columnsPerTile) {
+                uint32_t columns = static_cast<uint32_t>(K_) - col;
+                if (columns > columnsPerTile) {
+                    columns = columnsPerTile;
+                }
+                Catlass::GemmCoord shape{static_cast<uint32_t>(curT), columns, static_cast<uint32_t>(curT)};
+                auto blockA = GetTile(tensorA, tla::MakeCoord(0, 0), tla::MakeShape(shape.m(), shape.k()));
+                auto blockB = GetTile(tensorB, tla::MakeCoord(0, col), tla::MakeShape(shape.k(), shape.n()));
+                auto blockC = GetTile(tensorC, tla::MakeCoord(0, col), tla::MakeShape(shape.m(), shape.n()));
+                Catlass::Arch::Resource<KdaArchTag> wResource;
+                WBlockMmad wBlockMmad(wResource);
+                wBlockMmad(blockA, blockB, blockC, shape);
+                PipeBarrier<PIPE_ALL>();
+            }
         }
 
         {
@@ -717,14 +723,16 @@ private:
         StoreFloatRow(dst, dstBase, acc, dim);
     }
 
-    __aicore__ inline void ComputeTailWuVector(uint64_t b, uint64_t hv, uint64_t start, uint64_t curT,
-                                               uint64_t subBlockIdx, uint64_t subBlockNum)
+    __aicore__ inline void ComputeTailWuVector(uint64_t b, uint64_t hv, uint64_t chunkIdx, uint64_t start,
+                                               uint64_t curT, uint64_t subBlockIdx, uint64_t subBlockNum)
     {
         uint64_t rowBegin = (curT * subBlockIdx) / subBlockNum;
         uint64_t rowEnd = (curT * (subBlockIdx + 1)) / subBlockNum;
         for (uint64_t row = rowBegin; row < rowEnd; ++row) {
-            ComputeTailWuRow(preparedQG_, w_, AOffset(b, hv, start + row, 0), KVOffset(b, hv, start, 0, K_),
-                             KVOffset(b, hv, start + row, 0, K_), curT, K_);
+            // W aliases its seed. Preserve every seed row until both AIVs have
+            // finished reading it, using the existing FP32 W scratch as output.
+            ComputeTailWuRow(preparedQG_, h_, AOffset(b, hv, start + row, 0), KVOffset(b, hv, start, 0, K_),
+                             WScratchOffset(b, hv, chunkIdx, row, 0), curT, K_);
             ComputeTailWuRow(propagatedVNew_, u_, AOffset(b, hv, start + row, 0), KVOffset(b, hv, start, 0, V_),
                              KVOffset(b, hv, start + row, 0, V_), curT, V_);
         }
@@ -764,9 +772,8 @@ private:
             return;
         }
         if (curT < BT_) {
-            ComputeTailWuVector(b, hv, start, curT, subBlockIdx, subBlockNum);
-            CopyScratchWAndFinalizeKg(b, h, hv, chunkIdx, start, curT, subBlockIdx, subBlockNum, false);
-            return;
+            ComputeTailWuVector(b, hv, chunkIdx, start, curT, subBlockIdx, subBlockNum);
+            Catlass::Arch::CrossCoreSetFlagWithReverse<0x2, PIPE_MTE3>(syncReadyFlag_);
         }
         Catlass::Arch::CrossCoreWaitFlagWithReverse<0x2, PIPE_MTE2>(syncDoneFlag_);
         CopyScratchWAndFinalizeKg(b, h, hv, chunkIdx, start, curT, subBlockIdx, subBlockNum, true);
@@ -787,9 +794,11 @@ private:
             return;
         }
         if (curT < BT_) {
-            return;
+            // Join both AIV readers before either overwrites the aliased seed.
+            Catlass::Arch::CrossCoreWaitFlagWithReverse<0x2, PIPE_FIX>(syncReadyFlag_);
+        } else {
+            ComputePostWuCube(b, hv, chunkIdx, start, curT);
         }
-        ComputePostWuCube(b, hv, chunkIdx, start, curT);
         Catlass::Arch::CrossCoreSetFlagWithReverse<0x2, PIPE_FIX>(syncDoneFlag_);
     }
 

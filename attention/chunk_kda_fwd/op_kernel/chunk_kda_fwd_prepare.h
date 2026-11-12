@@ -93,6 +93,10 @@ constexpr uint32_t KDA_AIV_UB_BUDGET_BYTES = 192 * 1024;
 using KdaArchTag = Catlass::Arch::AtlasA2;
 using KdaDispatchPolicy = Catlass::Gemm::MmadPingpong<KdaArchTag, true, false>;
 using KdaScoreDispatchPolicy = Catlass::Gemm::MmadPingpongTlaMulti<KdaArchTag, true, false, 1, true, 2, 1, 2, 2>;
+// A second K tile is prefetched before the current tile is consumed. It must
+// have a distinct L1 B slot; the single-slot resident policy is only safe when
+// K fits in one L1 tile. Both slots remain resident across the Aqk/Akk products.
+using KdaWideScoreDispatchPolicy = Catlass::Gemm::MmadPingpongTlaMulti<KdaArchTag, true, false, 1, true, 2, 2, 2, 2>;
 static_assert(KdaScoreDispatchPolicy::ENABLE_L1_RESIDENT,
               "KDA Aqk/Akk score MMAD must keep the shared right matrix resident in L1");
 static_assert(KdaScoreDispatchPolicy::L1B_STAGES == 1,
@@ -1045,6 +1049,20 @@ private:
                                                      bool readScoreScratch = false, uint64_t scoreSlot = 0,
                                                      uint64_t colCount = 0)
     {
+        if (K_ > static_cast<uint64_t>(tla::get<2>(KdaL1TileShape{}))) {
+            ComputeRawAqkAkkCubeBlockImpl<KdaWideScoreDispatchPolicy>(b, hv, start, curT, rowBegin, rowCount,
+                                                                      readScoreScratch, scoreSlot, colCount);
+        } else {
+            ComputeRawAqkAkkCubeBlockImpl<KdaScoreDispatchPolicy>(b, hv, start, curT, rowBegin, rowCount,
+                                                                  readScoreScratch, scoreSlot, colCount);
+        }
+    }
+
+    template <typename ScoreDispatchPolicy>
+    __aicore__ inline void ComputeRawAqkAkkCubeBlockImpl(uint64_t b, uint64_t hv, uint64_t start, uint64_t curT,
+                                                         uint64_t rowBegin, uint64_t rowCount, bool readScoreScratch,
+                                                         uint64_t scoreSlot, uint64_t colCount)
+    {
         using ElementA = SCORE_T;
         using ElementB = SCORE_T;
         using ElementC = float;
@@ -1053,7 +1071,7 @@ private:
         using LayoutTagC = Catlass::layout::RowMajor;
         using TileCopy = Catlass::Gemm::Tile::PackedTileCopyTla<KdaArchTag, ElementA, LayoutTagA, ElementB, LayoutTagB,
                                                                 ElementC, LayoutTagC>;
-        using BlockMmad = Catlass::Gemm::Block::BlockMmadTla<KdaScoreDispatchPolicy, KdaL1TileShape, KdaL0TileShape,
+        using BlockMmad = Catlass::Gemm::Block::BlockMmadTla<ScoreDispatchPolicy, KdaL1TileShape, KdaL0TileShape,
                                                              ElementA, ElementB, ElementC, void, TileCopy>;
 
         Catlass::Arch::Resource<KdaArchTag> resource;
@@ -1911,6 +1929,9 @@ private:
             WaitFlag<HardEvent::MTE2_V>(mte2ToVEvent_);
 
             Muls(aqkLocal, aqkLocal, scale_, static_cast<uint32_t>(matrixElems));
+            // Clamp/Cast consume the scaled UB values. In particular, a short
+            // second-AIV tail can otherwise read and overwrite unscaled data.
+            PipeBarrier<PIPE_V>();
             ClampFp32ToOutputType(aqkLocal, static_cast<uint32_t>(matrixElems));
             ClampFp32ToOutputType(akkLocal, static_cast<uint32_t>(matrixElems));
             Cast(aqkTyped, aqkLocal, RoundMode::CAST_RINT, static_cast<uint32_t>(matrixElems));
