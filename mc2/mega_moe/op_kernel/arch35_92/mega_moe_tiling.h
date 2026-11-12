@@ -189,6 +189,20 @@ struct MegaMoeL1Layout {
     uint64_t scaleBOffsets[2];
 };
 
+// BF16 使用 256 行逻辑任务，普通 MMAD 在 L0 按 128 行分条，不申请 MX scale。
+struct MegaMoeBf16GmmConfig {
+    static constexpr uint32_t TILE_M = 256U;
+    static constexpr uint32_t TILE_N = 256U;
+    static constexpr uint32_t L1_TILE_K = 128U;
+    static constexpr uint32_t L0_TILE_M = 128U;
+    static constexpr uint32_t L0_TILE_K = 64U;
+    static constexpr uint32_t BUFFER_COUNT = 2U;
+    static constexpr uint32_t GMM1_UB_BUFFER_COUNT = 1U;
+    // 固定输入槽、门控激活输出和逐行路由元数据的最大占用。
+    static constexpr uint32_t ACTIVATION_UB_BYTES =
+        TILE_M * (TILE_N * sizeof(uint16_t) * 3U / 2U + MegaMoeImpl::MemoryLayoutDetail::ALIGN_32);
+};
+
 struct MegaMoeTilingData {
     // 通信布局和本地计算布局直接供 host 与 kernel 共用；修改本结构后需配套更新算子包。
     MegaMoeImpl::CclCommLayoutParams comm;

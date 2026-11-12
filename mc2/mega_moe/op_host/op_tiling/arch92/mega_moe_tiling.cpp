@@ -241,18 +241,6 @@ static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData* tili
     uint32_t resetTensorBytes =
         ops::CeilAlign(resetBatchElementCount, static_cast<uint32_t>(INT32_PER_256B)) * sizeof(int32_t);
 
-    uint32_t moeQuantOutputBufferBytes = CalcDispatchCopyBufferBytes(tilingData, moeActivationElementsPerByte);
-    uint32_t quantOutputBufferBytes = moeQuantOutputBufferBytes;
-    if (isSharedQuantIndependent) {
-        // 独立共享量化增加一组输出双缓冲，输入和 mxTemp 共用；共享输出不包含 topK weight。
-        uint32_t sharedQuantOutputBufferBytes =
-            CalcQuantTokenAndScaleBytes(tilingData, sharedActivationElementsPerByte);
-        quantOutputBufferBytes += sharedQuantOutputBufferBytes;
-    }
-
-    uint32_t quantInputBufferBytes =
-        ops::CeilAlign(static_cast<uint32_t>(tilingData->compute.h), static_cast<uint32_t>(ALIGN_128)) *
-        sizeof(uint16_t);
     // sendCntAccTensor_ 按每个 topK 有效下标计算发送核负责的最大专家数分配，与 kernel 地址布局一致。
     uint32_t maxExpertCountPerCore = ops::CeilDiv(static_cast<uint32_t>(tilingData->compute.epWorldSize) *
                                                       static_cast<uint32_t>(tilingData->compute.moeExpertPerRank),
@@ -264,6 +252,17 @@ static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData* tili
         return resetTensorBytes + DOUBLE_BUFFER * tilingData->preQuantStageBytes + sendCountAccumulatorBytes;
     }
 
+    uint32_t moeQuantOutputBufferBytes = CalcDispatchCopyBufferBytes(tilingData, moeActivationElementsPerByte);
+    uint32_t quantOutputBufferBytes = moeQuantOutputBufferBytes;
+    if (isSharedQuantIndependent) {
+        // 独立共享量化增加一组输出双缓冲，输入和 mxTemp 共用；共享输出不包含 topK weight。
+        uint32_t sharedQuantOutputBufferBytes = CalcTokenAndScaleBytes(tilingData, sharedActivationElementsPerByte);
+        quantOutputBufferBytes += sharedQuantOutputBufferBytes;
+    }
+
+    uint32_t quantInputBufferBytes =
+        ops::CeilAlign(static_cast<uint32_t>(tilingData->compute.h), static_cast<uint32_t>(ALIGN_128)) *
+        sizeof(uint16_t);
     // mxTempTensor_ 占 2KB，xOutTensor_ 和 xInTensor_ 各使用双 buffer。
     constexpr uint32_t mxTempTensorBytes = 2U * 1024U;
     return resetTensorBytes + mxTempTensorBytes + 2U * quantOutputBufferBytes + 2U * quantInputBufferBytes +
@@ -314,6 +313,11 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     compute.reserveGmm1Output = true;
     compute.reserveCumsum = false;
     compute.sharedInputElementsPerByte = IsA4W4GmmMode(tilingData->sharedGmmMode) ? 2U : 1U;
+    compute.dispatchInputStorage = {compute.dispatchFp4 ? MemoryLayoutDetail::FP4_BITS : MemoryLayoutDetail::FP8_BITS};
+    compute.activationOutputStorage = compute.dispatchInputStorage;
+    compute.sharedInputStorage = {IsA4W4GmmMode(tilingData->sharedGmmMode) ? MemoryLayoutDetail::FP4_BITS :
+                                                                             MemoryLayoutDetail::FP8_BITS};
+    compute.sharedActivationStorage = compute.sharedInputStorage;
     // Arch92 keeps its existing full-row workspace and execution policy.
     compute.ring = {};
 
@@ -325,6 +329,7 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     comm.epWorldSize = compute.epWorldSize;
     comm.yDtypeSize = SIZE_BF_16;
     comm.elemsPerByte = compute.dispatchFp4 ? 2U : 1U;
+    comm.dispatchStorage = compute.dispatchInputStorage;
     comm.serverCombineReduce = IsServerCombineDedupOn(compute.dedupMode);
     comm.topkWeightsPrefetch =
         compute.topkWeightsPrefetch || IsCombineDedupOn(compute.dedupMode) || comm.serverCombineReduce;
@@ -483,6 +488,7 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
     // Preserve Arch92's existing FP8-sized admission bound for packed FP4 records.
     auto capacityComm = tilingData->comm;
     capacityComm.elemsPerByte = 1U;
+    capacityComm.dispatchStorage = {MemoryLayoutDetail::FP8_BITS};
     OP_TILING_CHECK(CheckCclBufferCapacity(context, config, tilingData, workspaceLayout, nodeName, &capacityComm) !=
                         ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "CCL buffer capacity is insufficient."), return ge::GRAPH_FAILED);

@@ -44,6 +44,8 @@ enum class MegaMoeGmmMode : uint8_t {
     A8W8_NZ = 2U,
     A4W4_ND = 3U,
     A4W4_NZ = 4U,
+    A16W16_ND = 5U,
+    A16W16_NZ = 6U,
 };
 
 constexpr uint8_t GMM_MODE_A8W8_ND = static_cast<uint8_t>(MegaMoeGmmMode::A8W8_ND);
@@ -51,6 +53,8 @@ constexpr uint8_t GMM_MODE_A8W4_NZ = static_cast<uint8_t>(MegaMoeGmmMode::A8W4_N
 constexpr uint8_t GMM_MODE_A8W8_NZ = static_cast<uint8_t>(MegaMoeGmmMode::A8W8_NZ);
 constexpr uint8_t GMM_MODE_A4W4_ND = static_cast<uint8_t>(MegaMoeGmmMode::A4W4_ND);
 constexpr uint8_t GMM_MODE_A4W4_NZ = static_cast<uint8_t>(MegaMoeGmmMode::A4W4_NZ);
+constexpr uint8_t GMM_MODE_A16W16_ND = static_cast<uint8_t>(MegaMoeGmmMode::A16W16_ND);
+constexpr uint8_t GMM_MODE_A16W16_NZ = static_cast<uint8_t>(MegaMoeGmmMode::A16W16_NZ);
 
 // 本头只计算容量和偏移，供容量申请、tiling 校验和核内地址绑定共同使用。
 namespace MemoryLayoutDetail {
@@ -60,6 +64,9 @@ constexpr int64_t ALIGN_512 = 512;
 constexpr int64_t INT_CACHELINE = 16;
 constexpr int64_t INT32_PER_32B = ALIGN_32 / sizeof(int32_t);
 constexpr int64_t BITS_PER_BYTE = 8;
+constexpr uint32_t FP4_BITS = 4U;
+constexpr uint32_t FP8_BITS = 8U;
+constexpr uint32_t BF16_BITS = 16U;
 constexpr int64_t MXFP_DIVISOR_SIZE = 64;
 constexpr int64_t MXFP_SCALE_GROUP_NUM = 32;
 constexpr int64_t MXFP_MULTI_BASE_SIZE = 2;
@@ -109,6 +116,11 @@ HOST_DEVICE constexpr bool IsW4GmmMode(uint8_t gmmMode)
 HOST_DEVICE constexpr bool IsA4W4GmmMode(uint8_t gmmMode)
 {
     return gmmMode == GMM_MODE_A4W4_ND || gmmMode == GMM_MODE_A4W4_NZ;
+}
+
+HOST_DEVICE constexpr bool IsA16W16GmmMode(uint8_t gmmMode)
+{
+    return gmmMode == GMM_MODE_A16W16_ND || gmmMode == GMM_MODE_A16W16_NZ;
 }
 
 HOST_DEVICE constexpr uint32_t GetActivationOutputDivisor(uint8_t actMode)
@@ -222,28 +234,6 @@ HOST_DEVICE constexpr int64_t CalcServerCombineTokenListStrideBytes(int64_t capa
     return (capacity + 1) * static_cast<int64_t>(sizeof(int32_t));
 }
 
-// 单 token 的量化记录字节数 = 量化数据 + mx scale（激活量化阶段同步计算 topk 权重时再拼接该权重），按 32B 对齐。
-HOST_DEVICE constexpr int64_t CalcQuantTokenScaleBytes(int64_t h, uint32_t elemsPerByte, int64_t topK,
-                                                       bool topkWeightsPrefetch)
-{
-    uint32_t mxScaleNum =
-        MemoryLayoutDetail::CeilDiv(static_cast<uint32_t>(h), static_cast<uint32_t>(MemoryLayoutDetail::ALIGN_32));
-    uint32_t dataBytes = MemoryLayoutDetail::CeilAlign(static_cast<uint32_t>(h) / elemsPerByte,
-                                                       static_cast<uint32_t>(MemoryLayoutDetail::ALIGN_256)) *
-                         static_cast<uint32_t>(sizeof(int8_t));
-    uint32_t scaleBytes = mxScaleNum * static_cast<uint32_t>(sizeof(int8_t));
-    uint32_t tokenScaleBytes =
-        MemoryLayoutDetail::CeilAlign(dataBytes + scaleBytes, static_cast<uint32_t>(MemoryLayoutDetail::ALIGN_32));
-    if (topkWeightsPrefetch) {
-        uint32_t weightBytes =
-            MemoryLayoutDetail::CeilAlign(static_cast<uint32_t>(topK) * static_cast<uint32_t>(sizeof(float)),
-                                          static_cast<uint32_t>(MemoryLayoutDetail::ALIGN_32));
-        tokenScaleBytes = MemoryLayoutDetail::CeilAlign(tokenScaleBytes + weightBytes,
-                                                        static_cast<uint32_t>(MemoryLayoutDetail::ALIGN_32));
-    }
-    return static_cast<int64_t>(tokenScaleBytes);
-}
-
 // 去重 rowDesc 每行的 int32 数：头 2 个 + 成员三元组 3*topK 个，向上对齐到 8 个 int32（32B），
 // 使描述符批量搬运天然 32B 对齐。字段语义见 mega_moe_constants.h 的 DEDUP_ROW_* 注释。
 HOST_DEVICE constexpr int64_t CalcDedupRowDescStrideInt32(int64_t topK)
@@ -265,6 +255,66 @@ HOST_DEVICE constexpr int64_t CalcCombineTokenBytes(int64_t h, int64_t yDtypeSiz
     return MemoryLayoutDetail::CeilAlign(tokenStorageBytes + storedScaleBytes, MemoryLayoutDetail::ALIGN_32);
 }
 
+// 位宽直接描述物理存储；当前 FP4/FP8 使用 MX scale，BF16 不使用。
+struct TensorStorageSpec {
+    uint32_t elementBits{MemoryLayoutDetail::FP8_BITS};
+
+    HOST_DEVICE constexpr bool HasMxScale() const
+    {
+        return elementBits == MemoryLayoutDetail::FP4_BITS || elementBits == MemoryLayoutDetail::FP8_BITS;
+    }
+};
+
+HOST_DEVICE constexpr int64_t CalcStorageDataBytes(int64_t elements, const TensorStorageSpec& storage)
+{
+    return MemoryLayoutDetail::CeilDiv(elements * storage.elementBits, MemoryLayoutDetail::BITS_PER_BYTE);
+}
+
+struct TokenScaleLayout {
+    int64_t dataValidBytes;
+    int64_t dataBytes;
+    int64_t weightOffsetBytes;
+    int64_t weightBytes;
+    int64_t tokenScaleBytes;
+};
+
+// TokenScale 统一包含数据、可选 MX scale 和可选 FP32 topK 路由权重。
+HOST_DEVICE constexpr TokenScaleLayout CalcTokenScaleLayout(int64_t h, const TensorStorageSpec& storage, int64_t topK,
+                                                            bool carryTopkWeights)
+{
+    const int64_t dataValidBytes = CalcStorageDataBytes(h, storage);
+    const int64_t dataBytes = MemoryLayoutDetail::CeilAlign(dataValidBytes, MemoryLayoutDetail::ALIGN_256);
+    const int64_t scaleBytes =
+        storage.HasMxScale() ?
+            MemoryLayoutDetail::CeilAlign(MemoryLayoutDetail::CeilDiv(h, MemoryLayoutDetail::MXFP_SCALE_GROUP_NUM),
+                                          MemoryLayoutDetail::ALIGN_32) :
+            0;
+    const int64_t weightOffsetBytes = dataBytes + scaleBytes;
+    const int64_t weightBytes =
+        carryTopkWeights ?
+            MemoryLayoutDetail::CeilAlign(topK * static_cast<int64_t>(sizeof(float)), MemoryLayoutDetail::ALIGN_32) :
+            0;
+    return {dataValidBytes, dataBytes, weightOffsetBytes, weightBytes, weightOffsetBytes + weightBytes};
+}
+
+// 量化调用点沿用每字节元素数，记录各段布局与 BF16 共用同一公式。
+HOST_DEVICE constexpr int64_t CalcQuantTokenScaleBytes(int64_t h, uint32_t elemsPerByte, int64_t topK,
+                                                       bool topkWeightsPrefetch)
+{
+    const TensorStorageSpec storage{static_cast<uint32_t>(MemoryLayoutDetail::BITS_PER_BYTE) / elemsPerByte};
+    return CalcTokenScaleLayout(h, storage, topK, topkWeightsPrefetch).tokenScaleBytes;
+}
+
+// 每个输入槽先保存完整 TokenScale，必要时在槽尾暂存待转换的 BF16 路由权重。
+HOST_DEVICE constexpr int64_t CalcBf16InputStageBytes(const TokenScaleLayout& layout, int64_t topK,
+                                                      bool bf16TopkWeights)
+{
+    const int64_t conversionBytes = layout.weightBytes != 0 && bf16TopkWeights ?
+                                        MemoryLayoutDetail::CeilAlign(topK * SIZE_BF_16, MemoryLayoutDetail::ALIGN_32) :
+                                        0;
+    return MemoryLayoutDetail::CeilAlign(layout.tokenScaleBytes + conversionBytes, MemoryLayoutDetail::ALIGN_512);
+}
+
 // CCL 通信数据及协议状态的布局参数，不依赖 tiling 类型。
 struct CclCommLayoutParams {
     int64_t numMaxTokensPerRank;
@@ -279,6 +329,7 @@ struct CclCommLayoutParams {
     int64_t topoType;
     int64_t serverNum;
     bool serverCombineReduce{false};
+    TensorStorageSpec dispatchStorage{};
 };
 
 // Offsets and capacities are bytes; the caller owns the supplied GM base.
@@ -400,7 +451,7 @@ HOST_DEVICE constexpr CclCommLayout CalcMteCclCommLayout(const CclCommLayoutPara
     sizes.expertCountRecv = sizes.AppendRegion(PEERMEM_MTE_COUNT_REGION_SIZE);
     sizes.maskRecv = sizes.AppendRegion(maskRecvSize);
     const int64_t tokenScaleBytes =
-        CalcQuantTokenScaleBytes(params.h, params.elemsPerByte, params.topK, params.topkWeightsPrefetch);
+        CalcTokenScaleLayout(params.h, params.dispatchStorage, params.topK, params.topkWeightsPrefetch).tokenScaleBytes;
     const int64_t dispatchRecordAreaSize =
         MemoryLayoutDetail::CeilAlign(params.numMaxTokensPerRank * tokenScaleBytes, MemoryLayoutDetail::ALIGN_512);
     sizes.quantTokenScale = sizes.AppendRegion(dispatchRecordAreaSize);
@@ -504,6 +555,10 @@ struct CclComputeLayoutParams {
     bool reserveCumsum{false};
     bool sharedInputIndependent{false};
     uint32_t sharedInputElementsPerByte{1};
+    TensorStorageSpec dispatchInputStorage{};
+    TensorStorageSpec activationOutputStorage{};
+    TensorStorageSpec sharedInputStorage{};
+    TensorStorageSpec sharedActivationStorage{};
 };
 
 HOST_DEVICE constexpr int64_t CalcDispatchRouteIndexAlignSize(const CclComputeLayoutParams& params)
@@ -593,6 +648,16 @@ struct WorkspaceLayout {
             params.topoType == TOPO_TYPE_MTE || modes.moeGmmMode == GMM_MODE_A8W4_NZ || params.topkWeightsPrefetch;
         archParams.reserveCumsum = false;
         archParams.sharedInputElementsPerByte = IsA4W4GmmMode(modes.sharedGmmMode) ? 2U : 1U;
+        archParams.dispatchInputStorage = {archParams.dispatchFp4 ? MemoryLayoutDetail::FP4_BITS :
+                                                                    MemoryLayoutDetail::FP8_BITS};
+        archParams.sharedInputStorage = {IsA4W4GmmMode(modes.sharedGmmMode) ? MemoryLayoutDetail::FP4_BITS :
+                                                                              MemoryLayoutDetail::FP8_BITS};
+        archParams.activationOutputStorage = {params.topoType == TOPO_TYPE_MTE ?
+                                                  archParams.dispatchInputStorage.elementBits :
+                                                  MemoryLayoutDetail::FP8_BITS};
+        archParams.sharedActivationStorage = {params.topoType == TOPO_TYPE_MTE ?
+                                                  archParams.sharedInputStorage.elementBits :
+                                                  MemoryLayoutDetail::FP8_BITS};
         Initialize(archParams, Architecture::Arch92);
     }
 
@@ -635,7 +700,7 @@ private:
             params.moeExpertPerRank, static_cast<uint32_t>(MemoryLayoutDetail::INT_CACHELINE)));
         int64_t expertRecvTokenCountBytes =
             expertRecvTokenCountStride * static_cast<int64_t>(sizeof(int32_t)) * params.aicNum;
-        InitializeActivationBuffers(params, arch == Architecture::Arch92 && params.dispatchFp4 ? 2U : 1U);
+        InitializeActivationBuffers(params);
         InitializeRoutingMetadata(params, expertRecvTokenCountBytes);
         InitializeMteSyncFlags(params);
         const bool needsReloadCumsum = params.reserveCumsum;
@@ -646,8 +711,7 @@ private:
             if (params.sharedInputIndependent) {
                 InitializeMteSharedExpertInput(params);
             }
-            InitializeSharedExpertActivationBuffers(
-                params, arch == Architecture::Arch92 ? params.sharedInputElementsPerByte : 1U);
+            InitializeSharedExpertActivationBuffers(params);
         }
     }
 
@@ -699,19 +763,20 @@ private:
     HOST_DEVICE constexpr void InitializeDispatchBuffers(const CclComputeLayoutParams& params)
     {
         const int64_t dataRows = params.ring.dispatch ? static_cast<int64_t>(params.ring.rows) : params.maxOutputSize;
-        // dispatchRevData 按 GMM1 激活的实际物理字节数分配：FP8 每字节 1 个元素，FP4 每字节 2 个元素。
-        const int64_t dispatchDataElementsPerByte = params.dispatchFp4 ? 2LL : 1LL;
-        const int64_t dispatchDataBytesPerToken = static_cast<int64_t>(params.h) / dispatchDataElementsPerByte;
+        // 接收矩阵使用有效数据行宽，BF16 不包含通信 TokenScale 记录的填充及权重段。
+        const int64_t dispatchDataBytesPerToken = CalcStorageDataBytes(params.h, params.dispatchInputStorage);
         Allocate(routed.gmm1Input.data,
                  MemoryLayoutDetail::CeilAlign(dataRows * dispatchDataBytesPerToken, MemoryLayoutDetail::ALIGN_512));
 
-        int64_t dispatchScaleElementsPerToken =
-            MemoryLayoutDetail::CeilDiv(static_cast<int64_t>(params.h),
-                                        static_cast<int64_t>(MemoryLayoutDetail::MXFP_DIVISOR_SIZE)) *
-            MemoryLayoutDetail::MXFP_MULTI_BASE_SIZE;
-        Allocate(routed.gmm1Input.scale,
-                 MemoryLayoutDetail::CeilAlign(SIZE_INT_8 * dataRows * dispatchScaleElementsPerToken,
-                                               MemoryLayoutDetail::ALIGN_512));
+        if (params.dispatchInputStorage.HasMxScale()) {
+            int64_t dispatchScaleElementsPerToken =
+                MemoryLayoutDetail::CeilDiv(static_cast<int64_t>(params.h),
+                                            static_cast<int64_t>(MemoryLayoutDetail::MXFP_DIVISOR_SIZE)) *
+                MemoryLayoutDetail::MXFP_MULTI_BASE_SIZE;
+            Allocate(routed.gmm1Input.scale,
+                     MemoryLayoutDetail::CeilAlign(SIZE_INT_8 * dataRows * dispatchScaleElementsPerToken,
+                                                   MemoryLayoutDetail::ALIGN_512));
+        }
     }
 
     HOST_DEVICE constexpr void InitializeDispatchRevWeights(const CclComputeLayoutParams& params)
@@ -730,23 +795,25 @@ private:
         }
     }
 
-    HOST_DEVICE constexpr void InitializeActivationBuffers(const CclComputeLayoutParams& params,
-                                                           uint32_t elementsPerByte = 1U)
+    HOST_DEVICE constexpr void InitializeActivationBuffers(const CclComputeLayoutParams& params)
     {
         const int64_t dataRows = params.ring.activation ? static_cast<int64_t>(params.ring.rows) : params.maxOutputSize;
         Allocate(routed.gmm2Input.data,
                  MemoryLayoutDetail::CeilAlign(
-                     SIZE_INT_8 * dataRows * params.hiddenDim / params.activationOutputDivisor / elementsPerByte,
+                     dataRows * CalcStorageDataBytes(params.hiddenDim / params.activationOutputDivisor,
+                                                     params.activationOutputStorage),
                      MemoryLayoutDetail::ALIGN_512));
 
-        Allocate(
-            routed.gmm2Input.scale,
-            MemoryLayoutDetail::CeilAlign(
-                SIZE_INT_8 * dataRows *
-                    MemoryLayoutDetail::CeilDiv(static_cast<int64_t>(params.hiddenDim / params.activationOutputDivisor),
-                                                static_cast<int64_t>(MemoryLayoutDetail::MXFP_DIVISOR_SIZE)) *
-                    MemoryLayoutDetail::MXFP_MULTI_BASE_SIZE,
-                MemoryLayoutDetail::ALIGN_512));
+        if (params.activationOutputStorage.HasMxScale()) {
+            Allocate(routed.gmm2Input.scale,
+                     MemoryLayoutDetail::CeilAlign(
+                         SIZE_INT_8 * dataRows *
+                             MemoryLayoutDetail::CeilDiv(
+                                 static_cast<int64_t>(params.hiddenDim / params.activationOutputDivisor),
+                                 static_cast<int64_t>(MemoryLayoutDetail::MXFP_DIVISOR_SIZE)) *
+                             MemoryLayoutDetail::MXFP_MULTI_BASE_SIZE,
+                         MemoryLayoutDetail::ALIGN_512));
+        }
     }
 
     HOST_DEVICE constexpr void InitializeRoutingMetadata(const CclComputeLayoutParams& params,
@@ -909,17 +976,18 @@ private:
         Allocate(shared.gmm2Output,
                  MemoryLayoutDetail::CeilAlign(SIZE_BF_16 * params.bs * params.sharedExpertNum * params.h,
                                                MemoryLayoutDetail::ALIGN_512));
-        // sharedExpertGmm1Out：共享专家 GMM1 输出 [sharedExpertNum × bs × hiddenDim]。
-        Allocate(shared.gmm1Output,
-                 MemoryLayoutDetail::CeilAlign(SIZE_BF_16 * params.bs * params.sharedExpertNum * params.hiddenDim,
-                                               MemoryLayoutDetail::ALIGN_512));
+        // BF16 的共享 GMM1 直接写 UB，其余路径保留 GM 中间结果区。
+        if (params.sharedActivationStorage.elementBits != SIZE_BF_16 * MemoryLayoutDetail::BITS_PER_BYTE) {
+            Allocate(shared.gmm1Output,
+                     MemoryLayoutDetail::CeilAlign(SIZE_BF_16 * params.bs * params.sharedExpertNum * params.hiddenDim,
+                                                   MemoryLayoutDetail::ALIGN_512));
+        }
     }
 
     HOST_DEVICE constexpr void InitializeMteSharedExpertInput(const CclComputeLayoutParams& params)
     {
         // MTE 共享专家使用逐 token 交织数据 [Align256(data) | Align32(scale)]，仅独立量化时分配。
-        uint32_t elementsPerByte = params.sharedInputElementsPerByte;
-        int64_t recordBytes = CalcQuantTokenScaleBytes(static_cast<int64_t>(params.h), elementsPerByte, 0LL, false);
+        int64_t recordBytes = CalcTokenScaleLayout(params.h, params.sharedInputStorage, 0, false).tokenScaleBytes;
         Allocate(shared.gmm1Input.data,
                  MemoryLayoutDetail::CeilAlign(static_cast<int64_t>(params.bs) * recordBytes,
                                                static_cast<int64_t>(MemoryLayoutDetail::ALIGN_512)));
@@ -939,23 +1007,25 @@ private:
                      MemoryLayoutDetail::ALIGN_512));
     }
 
-    HOST_DEVICE constexpr void InitializeSharedExpertActivationBuffers(const CclComputeLayoutParams& params,
-                                                                       uint32_t elementsPerByte = 1U)
+    HOST_DEVICE constexpr void InitializeSharedExpertActivationBuffers(const CclComputeLayoutParams& params)
     {
         // 共享专家激活输出宽度随激活类型变化：门控激活减半，GELU 保留完整宽度。
-        Allocate(shared.gmm2Input.data,
-                 MemoryLayoutDetail::CeilAlign(SIZE_INT_8 * params.bs * params.sharedExpertNum * params.hiddenDim /
-                                                   params.activationOutputDivisor / elementsPerByte,
-                                               MemoryLayoutDetail::ALIGN_512));
-        // sharedExpertActivationScale：每个 MXFP scale group 保存两个 multi-base 分量。
-        Allocate(
-            shared.gmm2Input.scale,
-            MemoryLayoutDetail::CeilAlign(
-                SIZE_INT_8 * params.bs * params.sharedExpertNum *
-                    MemoryLayoutDetail::CeilDiv(static_cast<int64_t>(params.hiddenDim / params.activationOutputDivisor),
-                                                static_cast<int64_t>(MemoryLayoutDetail::MXFP_DIVISOR_SIZE)) *
-                    MemoryLayoutDetail::MXFP_MULTI_BASE_SIZE,
-                MemoryLayoutDetail::ALIGN_512));
+        Allocate(shared.gmm2Input.data, MemoryLayoutDetail::CeilAlign(
+                                            params.bs * params.sharedExpertNum *
+                                                CalcStorageDataBytes(params.hiddenDim / params.activationOutputDivisor,
+                                                                     params.sharedActivationStorage),
+                                            MemoryLayoutDetail::ALIGN_512));
+        // 每个 MXFP scale group 保存两个分量；BF16 激活输出不分配 scale。
+        if (params.sharedActivationStorage.HasMxScale()) {
+            Allocate(shared.gmm2Input.scale,
+                     MemoryLayoutDetail::CeilAlign(
+                         SIZE_INT_8 * params.bs * params.sharedExpertNum *
+                             MemoryLayoutDetail::CeilDiv(
+                                 static_cast<int64_t>(params.hiddenDim / params.activationOutputDivisor),
+                                 static_cast<int64_t>(MemoryLayoutDetail::MXFP_DIVISOR_SIZE)) *
+                             MemoryLayoutDetail::MXFP_MULTI_BASE_SIZE,
+                         MemoryLayoutDetail::ALIGN_512));
+        }
     }
 };
 

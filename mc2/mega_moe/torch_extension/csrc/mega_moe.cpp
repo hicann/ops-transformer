@@ -111,11 +111,14 @@ static void CheckWeightType(const c10::optional<int64_t>& weightType, const char
         return;
     }
     const int64_t value = weightType.value();
-    TORCH_CHECK(value == static_cast<int64_t>(at::ScalarType::Float8_e5m2) ||
+    TORCH_CHECK(value == static_cast<int64_t>(at::ScalarType::BFloat16) || value == static_cast<int64_t>(DType::BF16) ||
+                    value == static_cast<int64_t>(at::ScalarType::Float8_e5m2) ||
                     value == static_cast<int64_t>(at::ScalarType::Float8_e4m3fn) ||
                     value == static_cast<int64_t>(DType::FLOAT4_E2M1),
-                name, " must be None, float8_e5m2 (", static_cast<int64_t>(at::ScalarType::Float8_e5m2),
-                "), float8_e4m3fn (", static_cast<int64_t>(at::ScalarType::Float8_e4m3fn), ") or float4_e2m1 (",
+                name, " must be None, bfloat16 (", static_cast<int64_t>(at::ScalarType::BFloat16), " or ",
+                static_cast<int64_t>(DType::BF16), "), float8_e5m2 (",
+                static_cast<int64_t>(at::ScalarType::Float8_e5m2), "), float8_e4m3fn (",
+                static_cast<int64_t>(at::ScalarType::Float8_e4m3fn), ") or float4_e2m1 (",
                 static_cast<int64_t>(DType::FLOAT4_E2M1), ") on ", socName, ", but got ", value, ".");
 }
 
@@ -126,6 +129,9 @@ static void CheckWeightDtype(at::TensorList weights, aclDataType expectedDtype, 
     }
     const char* expectedName = nullptr;
     switch (expectedDtype) {
+        case aclDataType::ACL_BF16:
+            expectedName = "bfloat16";
+            break;
         case aclDataType::ACL_FLOAT8_E5M2:
             expectedName = "float8_e5m2";
             break;
@@ -137,13 +143,15 @@ static void CheckWeightDtype(at::TensorList weights, aclDataType expectedDtype, 
             break;
         default:
             TORCH_CHECK(false, name, "[0] has unsupported dtype ", weights[0].scalar_type(), " on ", socName,
-                        ". Without an explicit weight type, only float8_e5m2 and float8_e4m3fn are supported. "
+                        ". Without an explicit weight type, only bfloat16, float8_e5m2 and float8_e4m3fn "
+                        "are supported. "
                         "For uint8 packed FP4, specify the corresponding weight type as ",
                         static_cast<int64_t>(DType::FLOAT4_E2M1), ".");
     }
     for (size_t i = 0; i < weights.size(); ++i) {
         const auto dtype = weights[i].scalar_type();
         const bool matches =
+            (expectedDtype == aclDataType::ACL_BF16 && dtype == at::ScalarType::BFloat16) ||
             (expectedDtype == aclDataType::ACL_FLOAT8_E5M2 && dtype == at::ScalarType::Float8_e5m2) ||
             (expectedDtype == aclDataType::ACL_FLOAT8_E4M3FN && dtype == at::ScalarType::Float8_e4m3fn) ||
             (expectedDtype == aclDataType::ACL_FLOAT4_E2M1 && dtype == at::ScalarType::Byte);
@@ -193,10 +201,6 @@ static void CheckMegaMoeMxInputs(const MegaMoeTensorInputs& inputs, int64_t epWo
                 ", but got num_experts=", moeExpertNum, " and ep_world_size=", epWorldSize);
     TORCH_CHECK(!inputs.weight1.empty(), "l1_weights must not be empty on ", socName, ".");
     TORCH_CHECK(!inputs.weight2.empty(), "l2_weights must not be empty on ", socName, ".");
-    TORCH_CHECK(inputs.weightScales1.has_value() && !inputs.weightScales1->empty(),
-                "l1_weights_sf must not be None or empty on ", socName, ".");
-    TORCH_CHECK(inputs.weightScales2.has_value() && !inputs.weightScales2->empty(),
-                "l2_weights_sf must not be None or empty on ", socName, ".");
     CheckInputAbsent(inputs.xActiveMask, "x_active_mask", socName);
     CheckInputAbsent(inputs.bias1, "l1_bias", socName);
     CheckInputAbsent(inputs.bias2, "l2_bias", socName);
@@ -216,31 +220,17 @@ static void CheckMegaMoeMxInputs(const MegaMoeTensorInputs& inputs, int64_t epWo
     CheckNpuInput(inputs.sharedWeightScales2, "shared_l2_weights_sf", socName);
     CheckNpuInput(inputs.scales, "scales", socName);
     CheckNpuInput(inputs.maskBuffer, "mask_buffer", socName);
-    const auto checkScaleDtype = [socName](const c10::optional<std::vector<at::Tensor>>& scales, const char* name) {
-        if (!scales.has_value()) {
-            return;
-        }
-        for (size_t i = 0; i < scales->size(); ++i) {
-            const auto dtype = (*scales)[i].scalar_type();
-            TORCH_CHECK(dtype == at::ScalarType::Float8_e8m0fnu, name, "[", i, "] dtype must be float8_e8m0fnu on ",
-                        socName, ", but got ", dtype, ".");
-        }
-    };
-    checkScaleDtype(inputs.weightScales1, "l1_weights_sf");
-    checkScaleDtype(inputs.weightScales2, "l2_weights_sf");
-    checkScaleDtype(inputs.sharedWeightScales1, "shared_l1_weights_sf");
-    checkScaleDtype(inputs.sharedWeightScales2, "shared_l2_weights_sf");
 }
 
 static void CheckMegaMoeInputs(const MegaMoeTensorInputs& inputs, int64_t epWorldSize, int64_t moeExpertNum,
-                               const char* socName, bool isMxPlatform)
+                               const char* socName, bool isArch35_92)
 {
     TORCH_CHECK((epWorldSize > 0), "The ep_world_sizes should be greater than 0, current is: ", epWorldSize);
-    if (isMxPlatform) {
+    if (isArch35_92) {
         CheckMegaMoeMxInputs(inputs, epWorldSize, moeExpertNum, socName);
     }
     TORCH_CHECK((inputs.x.dim() == DIM_TWO) && (inputs.topkIds.dim() == DIM_TWO), "The x and topk_ids should be 2D");
-    if (!isMxPlatform) {
+    if (!isArch35_92) {
         TORCH_CHECK(inputs.x.scalar_type() == at::kBFloat16 || inputs.x.scalar_type() == at::kHalf,
                     "dtype of x should be bfloat16 or float16.");
     }
@@ -296,10 +286,10 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     const char* socName = aclrtGetSocName();
     const bool isArch22 = socName != nullptr && (std::strstr(socName, "Ascend910B") != nullptr ||
                                                  std::strstr(socName, "Ascend910_93") != nullptr);
-    const bool isMxPlatform = socName != nullptr && (std::strstr(socName, "Ascend950") != nullptr ||
-                                                     std::strstr(socName, "Ascend960DT") != nullptr);
-    CheckMegaMoeInputs(inputs, epWorldSize, moeExpertNum, socName, isMxPlatform);
-    if (isMxPlatform) {
+    const bool isArch35_92 = socName != nullptr && (std::strstr(socName, "Ascend950") != nullptr ||
+                                                    std::strstr(socName, "Ascend960DT") != nullptr);
+    CheckMegaMoeInputs(inputs, epWorldSize, moeExpertNum, socName, isArch35_92);
+    if (isArch35_92) {
         CheckWeightType(weight1Type, "weight1_type", socName);
         CheckWeightType(weight2Type, "weight2_type", socName);
         CheckWeightType(sharedWeight1Type, "shared_weight1_type", socName);
@@ -309,12 +299,14 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     const auto xScalarType = x.scalar_type();
     const bool hasDispatchQuantOutDtype =
         dispatchQuantOutDtype.has_value() && dispatchQuantOutDtype.value() != GE_DTYPE_UNDEFINED;
+    // BF16 直通保留原生类型；显式量化属性冲突交由 tiling 校验，不将输入重解释为打包 FP4。
+    const bool isBf16PassthroughX = isArch35_92 && dispatchQuantMode == 0 && xScalarType == at::kBFloat16;
     const bool hasSharedExpertQuantOutDtype =
         sharedExpertQuantOutDtype.has_value() && sharedExpertQuantOutDtype.value() != GE_DTYPE_UNDEFINED;
     aclDataType dispatchQuantAclDtype =
         hasDispatchQuantOutDtype ? GetAclDataType(dispatchQuantOutDtype.value()) : ACL_DT_UNDEFINED;
     // 当前 Torch C++ ScalarType 未统一提供 FP4 枚举；只有协议明确声明 FP4 时，uint8 才承载两个 E2M1 元素。
-    const bool isPackedFp4X = dispatchQuantMode == 0 && dispatchQuantAclDtype == ACL_FLOAT4_E2M1;
+    const bool isPackedFp4X = !isBf16PassthroughX && dispatchQuantMode == 0 && dispatchQuantAclDtype == ACL_FLOAT4_E2M1;
     if (isPackedFp4X) {
         // TensorWrapper 会隐藏原始 Torch dtype，因此重解释前必须确认物理存储确实是 uint8。
         TORCH_CHECK(xScalarType == at::kByte, "FP4 pre-quantized x must use packed torch.uint8 storage.");
@@ -333,33 +325,28 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
 
     aclDataType weight1RefDtype = weight1Type.has_value() ? GetAclDataType(weight1Type.value()) :
                                                             ConvertToAclDataType(weight1Ref[0].scalar_type());
-    aclDataType weightScales1Dtype;
-    if (weight1RefDtype == aclDataType::ACL_FLOAT8_E5M2 || weight1RefDtype == aclDataType::ACL_FLOAT8_E4M3FN ||
-        weight1RefDtype == aclDataType::ACL_FLOAT4_E2M1) {
-        weightScales1Dtype = aclDataType::ACL_FLOAT8_E8M0;
-    } else {
-        weightScales1Dtype = aclDataType::ACL_UINT64;
-    }
-
     aclDataType weight2RefDtype = weight2Type.has_value() ? GetAclDataType(weight2Type.value()) :
                                                             ConvertToAclDataType(weight2Ref[0].scalar_type());
-    aclDataType weightScales2Dtype;
-    if (weight2RefDtype == aclDataType::ACL_FLOAT8_E5M2 || weight2RefDtype == aclDataType::ACL_FLOAT8_E4M3FN ||
-        weight2RefDtype == aclDataType::ACL_FLOAT4_E2M1) {
-        weightScales2Dtype = aclDataType::ACL_FLOAT8_E8M0;
-    } else {
-        weightScales2Dtype = aclDataType::ACL_UINT64;
-    }
+    const auto getWeightScaleDtype = [](aclDataType weightDtype) {
+        // 原有平台沿用 FP8/FP4 对应 E8M0，其余权重对应 UINT64 的转换约定。
+        return weightDtype == aclDataType::ACL_FLOAT8_E5M2 || weightDtype == aclDataType::ACL_FLOAT8_E4M3FN ||
+                       weightDtype == aclDataType::ACL_FLOAT4_E2M1 ?
+                   aclDataType::ACL_FLOAT8_E8M0 :
+                   aclDataType::ACL_UINT64;
+    };
+    const aclDataType weightScales1Dtype = getWeightScaleDtype(weight1RefDtype);
+    const aclDataType weightScales2Dtype = getWeightScaleDtype(weight2RefDtype);
 
     auto xSize = x.sizes();
     int64_t bs = xSize[0];
     int64_t h = xSize[1];
 
-    const bool dispatchQuantOutIsFp4 =
-        dispatchQuantOutDtype.has_value() && dispatchQuantOutDtype.value() == static_cast<int64_t>(DType::FLOAT4_E2M1);
-    const bool sharedQuantOutIsFp4 = hasSharedExpertQuantOutDtype ?
-                                         sharedExpertQuantOutDtype.value() == static_cast<int64_t>(DType::FLOAT4_E2M1) :
-                                         dispatchQuantOutIsFp4;
+    const bool dispatchQuantOutIsFp4 = !isBf16PassthroughX && dispatchQuantOutDtype.has_value() &&
+                                       dispatchQuantOutDtype.value() == static_cast<int64_t>(DType::FLOAT4_E2M1);
+    const bool sharedQuantOutIsFp4 =
+        !isBf16PassthroughX &&
+        (hasSharedExpertQuantOutDtype ? sharedExpertQuantOutDtype.value() == static_cast<int64_t>(DType::FLOAT4_E2M1) :
+                                        dispatchQuantOutIsFp4);
     if (dispatchQuantOutIsFp4 || sharedQuantOutIsFp4) {
         TORCH_CHECK(h % 2 == 0, "The last dim input shape must be divisible by 2 if "
                                 "an expert quant output type is torch_npu.float4_e2m1");
@@ -390,7 +377,7 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     const bool isPreQuantizedDtype = dispatchQuantAclDtype == ACL_FLOAT8_E5M2 ||
                                      dispatchQuantAclDtype == ACL_FLOAT8_E4M3FN ||
                                      dispatchQuantAclDtype == ACL_FLOAT4_E2M1;
-    const bool isPreQuantizedX = dispatchQuantMode == 0 && isPreQuantizedDtype;
+    const bool isPreQuantizedX = !isBf16PassthroughX && dispatchQuantMode == 0 && isPreQuantizedDtype;
     at::ScalarType outputScalarType = isPreQuantizedX ? at::kBFloat16 : xScalarType;
     if (isPackedFp4X) {
         h *= PACKED_FLOAT4_ELEMENTS_PER_BYTE;
@@ -400,15 +387,13 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     aclDataType xAclDtype = isPackedFp4X ? ACL_FLOAT4_E2M1 : ConvertToAclDataType(xScalarType);
     TensorWrapper xWrapper = {x, xAclDtype};
 
-    if (isMxPlatform) {
+    if (isArch35_92) {
         CheckWeightDtype(weight1Ref, weight1RefDtype, "l1_weights", socName);
         CheckWeightDtype(weight2Ref, weight2RefDtype, "l2_weights", socName);
     }
 
     MegaMoeWeightList weight1Wrapper = MakeWeightList(weight1Ref, weight1RefDtype, isArch22);
     MegaMoeWeightList weight2Wrapper = MakeWeightList(weight2Ref, weight2RefDtype, isArch22);
-    TensorListWrapper weightScales1Wrapper = {weightScales1Ref, weightScales1Dtype};
-    TensorListWrapper weightScales2Wrapper = {weightScales2Ref, weightScales2Dtype};
     TensorListWrapper bias1Wrapper = {bias1Ref, aclDataType::ACL_FLOAT};
     TensorListWrapper bias2Wrapper = {bias2Ref, aclDataType::ACL_FLOAT};
 
@@ -423,24 +408,30 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
         sharedWeight1Type.has_value() ? GetAclDataType(sharedWeight1Type.value()) : weight1RefDtype;
     aclDataType sharedWeight2RefDtype =
         sharedWeight2Type.has_value() ? GetAclDataType(sharedWeight2Type.value()) : weight2RefDtype;
-    const auto getWeightScaleDtype = [](aclDataType weightDtype) {
-        return weightDtype == aclDataType::ACL_FLOAT8_E5M2 || weightDtype == aclDataType::ACL_FLOAT8_E4M3FN ||
-                       weightDtype == aclDataType::ACL_FLOAT4_E2M1 ?
-                   aclDataType::ACL_FLOAT8_E8M0 :
-                   aclDataType::ACL_UINT64;
-    };
-
-    if (isMxPlatform) {
+    if (isArch35_92) {
         CheckWeightDtype(sharedWeight1Ref, sharedWeight1RefDtype, "shared_l1_weights", socName);
         CheckWeightDtype(sharedWeight2Ref, sharedWeight2RefDtype, "shared_l2_weights", socName);
     }
 
     MegaMoeWeightList sharedWeight1Wrapper = MakeWeightList(sharedWeight1Ref, sharedWeight1RefDtype, isArch22);
     MegaMoeWeightList sharedWeight2Wrapper = MakeWeightList(sharedWeight2Ref, sharedWeight2RefDtype, isArch22);
-    TensorListWrapper sharedWeightScales1Wrapper = {sharedWeightScales1Ref, getWeightScaleDtype(sharedWeight1RefDtype)};
-    TensorListWrapper sharedWeightScales2Wrapper = {sharedWeightScales2Ref, getWeightScaleDtype(sharedWeight2RefDtype)};
     TensorListWrapper sharedBias1Wrapper = {sharedBias1Ref, aclDataType::ACL_FLOAT};
     TensorListWrapper sharedBias2Wrapper = {sharedBias2Ref, aclDataType::ACL_FLOAT};
+
+    // Arch35 保留 scale 实际类型，Arch92 沿用现有透传行为；Arch22 使用原有 TensorListWrapper。
+    // 已转换的 ACL TensorList 由 ACLNN_CMD 的 ReleaseConvertTypes 统一释放。
+    auto weightScales1Wrapper = isArch35_92 ? ::ConvertType(weightScales1Ref) :
+                                              ::ConvertType(TensorListWrapper{weightScales1Ref, weightScales1Dtype});
+    auto weightScales2Wrapper = isArch35_92 ? ::ConvertType(weightScales2Ref) :
+                                              ::ConvertType(TensorListWrapper{weightScales2Ref, weightScales2Dtype});
+    auto sharedWeightScales1Wrapper =
+        isArch35_92 ?
+            ::ConvertType(sharedWeightScales1Ref) :
+            ::ConvertType(TensorListWrapper{sharedWeightScales1Ref, getWeightScaleDtype(sharedWeight1RefDtype)});
+    auto sharedWeightScales2Wrapper =
+        isArch35_92 ?
+            ::ConvertType(sharedWeightScales2Ref) :
+            ::ConvertType(TensorListWrapper{sharedWeightScales2Ref, getWeightScaleDtype(sharedWeight2RefDtype)});
 
     ACLNN_CMD(aclnnMegaMoe, context, xWrapper, topkIds, topkWeights, weight1Wrapper, weight2Wrapper,
               weightScales1Wrapper, weightScales2Wrapper, bias1Wrapper, bias2Wrapper, xActiveMask, scales,
@@ -848,11 +839,28 @@ MemoryBudgetParams BuildMemoryBudgetParams(int64_t epWorldSize, int64_t moeExper
     const bool isFp4 = dispatchQuantOutDtype == ACL_FLOAT4_E2M1;
     const bool isE5M2 = dispatchQuantOutDtype == ACL_FLOAT8_E5M2;
     params.dispatchFp4 = isFp4;
+    params.dispatchInputStorage = {isFp4 ? MegaMoeImpl::MemoryLayoutDetail::FP4_BITS :
+                                           MegaMoeImpl::MemoryLayoutDetail::FP8_BITS};
     // E5M2 仅支持 A8W8，FP4 仅支持 A4W4；两者的 GMM1 仅在权重前移时落 GM。
     params.reserveGmm1Output = params.topkWeightsPrefetch || (!isFp4 && !isE5M2);
     params.reserveCumsum = !isE5M2;
     // 共享专家的量化配置独立于 MoE，仍按 W4 与独立量化的上界预留。
     params.sharedInputIndependent = true;
+
+    // 查询入口已保证 BF16 使用 dispatch_quant_mode=0。
+    const bool isBf16 = dispatchQuantOutDtype == ACL_BF16;
+    if (isBf16) {
+        // 路由专家与共享专家的输入、激活输出均按 BF16 保存，不分配 MX scale。
+        params.dispatchInputStorage = {MegaMoeImpl::MemoryLayoutDetail::BF16_BITS};
+        params.activationOutputStorage = {MegaMoeImpl::MemoryLayoutDetail::BF16_BITS};
+        params.sharedInputStorage = {MegaMoeImpl::MemoryLayoutDetail::BF16_BITS};
+        params.sharedActivationStorage = {MegaMoeImpl::MemoryLayoutDetail::BF16_BITS};
+
+        // 与 A16W16 tiling 的中间结果及输入复用策略保持一致。
+        params.reserveGmm1Output = false;
+        params.reserveCumsum = false;
+        params.sharedInputIndependent = false;
+    }
 
     auto& comm = budget.comm;
     comm.numMaxTokensPerRank = numMaxTokensPerRank;
@@ -869,6 +877,7 @@ MemoryBudgetParams BuildMemoryBudgetParams(int64_t epWorldSize, int64_t moeExper
     comm.isQuantCombine = params.combineQuant;
     comm.topoType = params.topoType;
     comm.serverNum = serverNum;
+    comm.dispatchStorage = params.dispatchInputStorage;
     params.ring = MegaMoeImpl::CalcCclStageRingConfig(params);
     return budget;
 }
@@ -989,6 +998,18 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
                     "max_recv_token_num should not exceed the URMA maximum receive token capacity ", maxOutputCapacity,
                     ", but got ", maxRecvTokenNum);
     }
+    const bool hasDispatchQuantOutDtype =
+        dispatchQuantOutDtype.has_value() && dispatchQuantOutDtype.value() != GE_DTYPE_UNDEFINED;
+    const aclDataType quantOutDtype =
+        hasDispatchQuantOutDtype ? GetAclDataType(dispatchQuantOutDtype.value()) : ACL_DT_UNDEFINED;
+    if (quantOutDtype == ACL_BF16) {
+        // 当前 BF16 容量估算仅覆盖 Arch35 的 MTE 无量化通信路径。
+        const bool isArch35 = socName != nullptr && std::strstr(socName, "Ascend950") != nullptr;
+        TORCH_CHECK(isArch35, "BF16 CCL buffer sizing currently only supports Ascend950.");
+        TORCH_CHECK(dispatchQuantMode == 0, "BF16 CCL buffer sizing requires dispatch_quant_mode=0.");
+        TORCH_CHECK(serverNum == 0 && combineQuantMode == 0,
+                    "BF16 CCL buffer sizing requires MTE (server_num=0) and combine_quant_mode=0.");
+    }
     if (isArch92) {
         // Arch92 沿用主线全量分配和 64 核容量上界，不接入 Arch35 的布局优化。
         const int64_t layoutTopkWeights = (topkWeightsType == 1 || combineCommMode == 1) ? 1 : 0;
@@ -999,10 +1020,6 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
                                  maxRecvTokenNum, topkWeightsType, serverNum, combineQuantMode, combineCommMode,
                                  ARCH92_MAX_AIC_NUM);
     }
-    const bool hasDispatchQuantOutDtype =
-        dispatchQuantOutDtype.has_value() && dispatchQuantOutDtype.value() != GE_DTYPE_UNDEFINED;
-    const aclDataType quantOutDtype =
-        hasDispatchQuantOutDtype ? GetAclDataType(dispatchQuantOutDtype.value()) : ACL_DT_UNDEFINED;
     return CalcCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, intermediateHidden,
                                maxRecvTokenNum, topkWeightsType, serverNum, combineQuantMode, combineCommMode,
                                quantOutDtype);

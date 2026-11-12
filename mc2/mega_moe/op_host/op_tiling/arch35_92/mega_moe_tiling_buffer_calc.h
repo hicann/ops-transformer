@@ -103,6 +103,7 @@ struct ExpertParams {
     int64_t expertCount;
     ge::DataType quantOutDtype;
     uint8_t gmmMode;
+    bool hasWeightScales{true};
 };
 
 struct MegaMoeExpertParams {
@@ -115,6 +116,7 @@ static const std::unordered_map<ge::DataType, int64_t> EXPERT_QUANT_MODE_MAP = {
     {ge::DT_FLOAT8_E5M2, EXPERT_QUANT_OUT_DTYPE_E5M2},
     {ge::DT_FLOAT8_E4M3FN, EXPERT_QUANT_OUT_DTYPE_E4M3FN},
     {ge::DT_FLOAT4_E2M1, EXPERT_QUANT_OUT_DTYPE_E2M1},
+    {ge::DT_BF16, EXPERT_QUANT_OUT_DTYPE_BF16},
 };
 
 /*
@@ -269,15 +271,13 @@ static void SetWaveParams(MegaMoeTilingData* tilingData, const uint32_t aicNum)
 /*
  * 计算一个 token 的交织量化记录大小。dispatch peermem、SendMask UB 和共享专家量化都必须复用该口径。
  */
-static uint32_t CalcQuantTokenAndScaleBytes(const MegaMoeTilingData* tilingData, uint32_t activationElementsPerByte)
+static uint32_t CalcTokenAndScaleBytes(const MegaMoeTilingData* tilingData, uint32_t activationElementsPerByte)
 {
-    uint32_t quantTokenBytes = ops::CeilAlign(static_cast<uint32_t>(tilingData->compute.h) / activationElementsPerByte,
-                                              static_cast<uint32_t>(ALIGN_256));
-    uint32_t quantScaleAlignBytes =
-        ops::CeilAlign(ops::CeilDiv(static_cast<uint32_t>(tilingData->compute.h), static_cast<uint32_t>(ALIGN_32)) *
-                           static_cast<uint32_t>(sizeof(int8_t)),
-                       static_cast<uint32_t>(ALIGN_32));
-    return quantTokenBytes + quantScaleAlignBytes;
+    const TensorStorageSpec storage{IsA16W16GmmMode(tilingData->moeGmmMode) ?
+                                        MemoryLayoutDetail::BF16_BITS :
+                                        static_cast<uint32_t>(MemoryLayoutDetail::BITS_PER_BYTE) /
+                                            activationElementsPerByte};
+    return static_cast<uint32_t>(CalcTokenScaleLayout(tilingData->compute.h, storage, 0, false).tokenScaleBytes);
 }
 
 /*
@@ -286,7 +286,7 @@ static uint32_t CalcQuantTokenAndScaleBytes(const MegaMoeTilingData* tilingData,
  */
 static uint32_t CalcDispatchCopyBufferBytes(const MegaMoeTilingData* tilingData, uint32_t activationElementsPerByte)
 {
-    uint32_t copyBufferBytes = CalcQuantTokenAndScaleBytes(tilingData, activationElementsPerByte);
+    uint32_t copyBufferBytes = CalcTokenAndScaleBytes(tilingData, activationElementsPerByte);
     if (tilingData->isTopkWeightsPrefetch || IsCombineDedupOn(tilingData->compute.dedupMode) ||
         IsServerCombineDedupOn(tilingData->compute.dedupMode)) {
         uint32_t weightBytes = ops::CeilAlign(static_cast<uint32_t>(tilingData->compute.topK * sizeof(float)),

@@ -51,6 +51,11 @@ static void FinalizeTestLayoutParams(MegaMoeTilingData& tilingData)
     params.reserveGmm1Output = tilingData.moeGmmMode == GMM_MODE_A8W4_NZ || params.topkWeightsPrefetch;
     params.reserveCumsum = IsW4GmmMode(tilingData.moeGmmMode);
     params.sharedInputElementsPerByte = IsA4W4GmmMode(tilingData.sharedGmmMode) ? 2U : 1U;
+    params.dispatchInputStorage = {params.dispatchFp4 ? MemoryLayoutDetail::FP4_BITS : MemoryLayoutDetail::FP8_BITS};
+    params.activationOutputStorage = {MemoryLayoutDetail::FP8_BITS};
+    params.sharedInputStorage = {IsA4W4GmmMode(tilingData.sharedGmmMode) ? MemoryLayoutDetail::FP4_BITS :
+                                                                           MemoryLayoutDetail::FP8_BITS};
+    params.sharedActivationStorage = {MemoryLayoutDetail::FP8_BITS};
     const int64_t rankNumPerServer =
         tilingData.rankNumPerServer == 0 || tilingData.rankNumPerServer > params.epWorldSize ?
             params.epWorldSize :
@@ -71,6 +76,7 @@ static void FinalizeTestLayoutParams(MegaMoeTilingData& tilingData)
     comm.isQuantCombine = params.combineQuant;
     comm.topoType = params.topoType;
     comm.serverNum = params.serverNum;
+    comm.dispatchStorage = params.dispatchInputStorage;
 }
 
 TEST_F(MegaMoeArch35TilingTest, MemoryLayoutConstantsMatchKernelContract)
@@ -342,18 +348,21 @@ TEST_F(MegaMoeArch35TilingTest, GmBuffersKeepCapacityOptionsIndependent)
     EXPECT_GT(a8.maskRecv.offsetBytes, a8.syncCount.offsetBytes + a8.syncCount.sizeBytes);
     auto fp4Comm = params.comm;
     fp4Comm.elemsPerByte = 2U;
+    fp4Comm.dispatchStorage = {MemoryLayoutDetail::FP4_BITS};
     const PeermemInfo a4(fp4Comm);
     EXPECT_LT(a4.dispatchReceive.sizeBytes, a8.dispatchReceive.sizeBytes);
     EXPECT_LE(a4.totalSize, a8.totalSize); // Host 的 1 byte 容量上界覆盖 A4。
     params.isTopkWeightsPrefetch = true;
     FinalizeTestLayoutParams(params);
     params.comm.elemsPerByte = 2U;
+    params.comm.dispatchStorage = {MemoryLayoutDetail::FP4_BITS};
     const PeermemInfo weights(params.comm);
     EXPECT_GE(weights.dispatchReceive.sizeBytes, a4.dispatchReceive.sizeBytes);
     EXPECT_EQ(weights.combineSend.sizeBytes, a4.combineSend.sizeBytes);
     params.combineQuantMode = 1;
     FinalizeTestLayoutParams(params);
     params.comm.elemsPerByte = 2U;
+    params.comm.dispatchStorage = {MemoryLayoutDetail::FP4_BITS};
     const PeermemInfo quant(params.comm);
     EXPECT_EQ(quant.dispatchReceive.sizeBytes, weights.dispatchReceive.sizeBytes);
     EXPECT_LT(quant.combineSend.sizeBytes, weights.combineSend.sizeBytes);
@@ -653,6 +662,7 @@ TEST_F(MegaMoeArch35TilingTest, CclDataOffsetFitsFp4CapacityBudget)
                     FinalizeTestLayoutParams(params);
                     auto budgetParams = params;
                     budgetParams.comm.elemsPerByte = 1U;
+                    budgetParams.comm.dispatchStorage = {MegaMoeImpl::MemoryLayoutDetail::FP8_BITS};
                     const int64_t dumpBytes =
                         topoType == MegaMoeImpl::TOPO_TYPE_MTE ? MegaMoeImpl::EXCEPTION_DUMP_REGION_SIZE : 0;
                     const int64_t communicationCapacity = Ops::Base::CeilAlign(
@@ -2267,6 +2277,8 @@ static void ExpectSharedMemoryBudgetCoversExact(MegaMoeTilingData tilingData)
     budgetParams.reserveCumsum = true;
     budgetParams.sharedInputIndependent = true;
     budgetParams.sharedInputElementsPerByte = 1;
+    budgetParams.dispatchInputStorage = {MegaMoeImpl::MemoryLayoutDetail::FP8_BITS};
+    budgetParams.sharedInputStorage = {MegaMoeImpl::MemoryLayoutDetail::FP8_BITS};
     budgetParams.ring = MegaMoeImpl::CalcCclStageRingConfig(budgetParams);
     auto dispatchOnParams = budgetParams;
     if (budgetParams.topoType == MegaMoeImpl::TOPO_TYPE_MTE) {
@@ -2281,6 +2293,7 @@ static void ExpectSharedMemoryBudgetCoversExact(MegaMoeTilingData tilingData)
     EXPECT_GE(budget.workspaceSize, exact.workspaceSize);
     auto commBudgetParams = tilingData.comm;
     commBudgetParams.elemsPerByte = 1;
+    commBudgetParams.dispatchStorage = {MegaMoeImpl::MemoryLayoutDetail::FP8_BITS};
     EXPECT_GE(MegaMoeImpl::CalcCclCommLayout(commBudgetParams).totalSize,
               MegaMoeImpl::CalcCclCommLayout(tilingData.comm).totalSize);
 

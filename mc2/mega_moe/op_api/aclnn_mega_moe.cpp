@@ -98,7 +98,7 @@ aclnnStatus aclnnMegaMoeGetWorkspaceSize(
         uniqueExec.ReleaseTo(executor);
     }
 
-    // 可选 DYNAMIC 参数为 nullptr 时创建带 dtype 的 dummy tensor list 满足支持列表校验
+    // 可选动态参数为 nullptr 时创建带指定数据类型的空张量列表，以满足原型匹配。
     aclTensorList* tmpBiasList = nullptr;
     aclTensorList* tmpScaleList = nullptr;
     aclTensorList* tmpSharedBiasList = nullptr;

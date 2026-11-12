@@ -29,6 +29,8 @@ _ALLOWED_ACTIVATION_KEYS = {
 }
 
 
+# 采用 Torch ScalarType::BFloat16 的枚举值 15，由 C++ 接口转换为 ACL_BF16。
+_BF16_DTYPE_VALUE = 15
 _FLOAT8_E5M2_DTYPE_VALUE = 23
 _FLOAT8_E4M3FN_DTYPE_VALUE = 24
 _FLOAT4_E2M1_DTYPE_VALUE = 296
@@ -52,7 +54,8 @@ def _logical_hidden_size(
     torch._check(x.dim() == 2, lambda: "x must be 2D.")
     return (
         x.size(1) * 2
-        if _is_packed_fp4_x(dispatch_quant_mode, dispatch_quant_out_dtype)
+        if x.dtype != torch.bfloat16
+        and _is_packed_fp4_x(dispatch_quant_mode, dispatch_quant_out_dtype)
         else x.size(1)
     )
 
@@ -406,13 +409,19 @@ class SymmBuffer:
             _check_int_type(self.dispatch_quant_mode, "dispatch_quant_mode")
             if self.dispatch_quant_mode not in (0, 4):
                 raise ValueError(
-                    "dispatch_quant_mode only supports 0 (pre-quantized passthrough) "
+                    "dispatch_quant_mode only supports 0 (passthrough) "
                     f"or 4 (MXFP) on {soc_name}, "
                     f"got {self.dispatch_quant_mode!r} (type: {type(self.dispatch_quant_mode).__name__})."
                 )
-            if _dtype_to_int(self.dispatch_quant_out_dtype) not in (23, 24, 296):
+            quant_dtype = _dtype_to_int(self.dispatch_quant_out_dtype)
+            if quant_dtype not in (
+                _BF16_DTYPE_VALUE,
+                _FLOAT8_E5M2_DTYPE_VALUE,
+                _FLOAT8_E4M3FN_DTYPE_VALUE,
+                _FLOAT4_E2M1_DTYPE_VALUE,
+            ):
                 raise ValueError(
-                    "dispatch_quant_out_dtype only supports float8_e5m2 (23), "
+                    "dispatch_quant_out_dtype only supports bfloat16 (15), float8_e5m2 (23), "
                     f"float8_e4m3fn (24) and float4_e2m1 (296) on {soc_name}, "
                     f"got {self.dispatch_quant_out_dtype!r} (type: {type(self.dispatch_quant_out_dtype).__name__})."
                 )
@@ -546,6 +555,7 @@ class SymmBuffer:
 
 
 _TORCH_DTYPE_TO_INT = {  # torch枚举
+    torch.bfloat16: _BF16_DTYPE_VALUE,
     torch.float8_e5m2: _FLOAT8_E5M2_DTYPE_VALUE,
     torch.float8_e4m3fn: _FLOAT8_E4M3FN_DTYPE_VALUE,
     torch.int8: 1,

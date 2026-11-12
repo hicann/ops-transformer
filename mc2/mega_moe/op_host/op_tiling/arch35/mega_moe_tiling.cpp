@@ -171,6 +171,19 @@ static ge::graphStatus CheckAndSetExpertExecutionParams(const gert::TilingContex
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus CheckA16W16Compatibility(const MegaMoeTilingData* tilingData, const char* nodeName)
+{
+    const bool moeBf16 = IsA16W16GmmMode(tilingData->moeGmmMode);
+    const bool sharedBf16 = tilingData->compute.sharedExpertNum > 0 && IsA16W16GmmMode(tilingData->sharedGmmMode);
+    OP_TILING_CHECK(tilingData->compute.topoType != TOPO_TYPE_MTE ||
+                        tilingData->combineQuantMode != COMBINE_QUANT_OUT_TYPE_NO_QUANT,
+                    OP_LOGE(nodeName, "A16W16 requires MTE and combine_quant_mode=0."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(!moeBf16 || (tilingData->compute.sharedExpertNum > 0 && !sharedBf16),
+                    OP_LOGE(nodeName, "A16W16 requires BF16 MoE and shared experts when shared weights are present."),
+                    return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
 /*
  * 校验每张源卡的输入 token 数上限和本卡的专家路由行数上限，写入 numMaxTokensPerRank 和 maxOutputSize。
  * 这些上限用于后续去重判断和布局规划；CCL 字节容量在 CommitTilingResult 中按最终布局检查。
@@ -277,7 +290,8 @@ static uint64_t CalcCombineSyncSlotCountPerExpert(const MegaMoeTilingData* tilin
 static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData* tilingData,
                                                    uint32_t moeActivationElementsPerByte,
                                                    uint32_t sharedActivationElementsPerByte,
-                                                   bool isSharedQuantIndependent, uint32_t topkValidIndexCoreNum)
+                                                   bool isSharedQuantIndependent, uint32_t topkValidIndexCoreNum,
+                                                   uint32_t bf16TokenScaleStageBytes)
 {
     const WorkspaceLayout workspaceLayout(tilingData->compute);
     uint64_t totalFlagElementCount = static_cast<uint64_t>((workspaceLayout.reset.flags.sizeBytes / SIZE_INT_32));
@@ -287,29 +301,31 @@ static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData* tili
     uint32_t resetTensorBytes =
         ops::CeilAlign(resetBatchElementCount, static_cast<uint32_t>(INT32_PER_256B)) * sizeof(int32_t);
 
-    uint32_t moeQuantOutputBufferBytes = CalcDispatchCopyBufferBytes(tilingData, moeActivationElementsPerByte);
-    uint32_t quantOutputBufferBytes = moeQuantOutputBufferBytes;
-    if (isSharedQuantIndependent) {
-        // 独立共享量化增加一组输出双缓冲，输入和 mxTemp 共用；共享输出不包含 topK weight。
-        uint32_t sharedQuantOutputBufferBytes =
-            CalcQuantTokenAndScaleBytes(tilingData, sharedActivationElementsPerByte);
-        quantOutputBufferBytes += sharedQuantOutputBufferBytes;
-    }
-
-    uint32_t quantInputBufferBytes =
-        ops::CeilAlign(static_cast<uint32_t>(tilingData->compute.h), static_cast<uint32_t>(ALIGN_128)) *
-        sizeof(uint16_t);
     // sendCntAccTensor_ 按每个 topK 有效下标计算发送核负责的最大专家数分配，与 kernel 地址布局一致。
     uint32_t maxExpertCountPerCore =
         ops::CeilDiv(static_cast<uint32_t>(tilingData->compute.epWorldSize * tilingData->compute.moeExpertPerRank),
                      topkValidIndexCoreNum);
     uint32_t sendCountAccumulatorBytes = static_cast<uint32_t>(ops::CeilAlign(
         static_cast<uint64_t>(maxExpertCountPerCore) * sizeof(int32_t), static_cast<uint64_t>(ALIGN_32)));
+    if (IsA16W16GmmMode(tilingData->moeGmmMode)) {
+        return resetTensorBytes + DOUBLE_BUFFER * bf16TokenScaleStageBytes + sendCountAccumulatorBytes;
+    }
     if (tilingData->preQuantTileTokens != 0U) {
         // 预量化不申请动态量化的 mxTemp/xOut/xIn；两个 stage 按阶段复用。
         return resetTensorBytes + DOUBLE_BUFFER * tilingData->preQuantStageBytes + sendCountAccumulatorBytes;
     }
 
+    uint32_t moeQuantOutputBufferBytes = CalcDispatchCopyBufferBytes(tilingData, moeActivationElementsPerByte);
+    uint32_t quantOutputBufferBytes = moeQuantOutputBufferBytes;
+    if (isSharedQuantIndependent) {
+        // 独立共享量化增加一组输出双缓冲，输入和 mxTemp 共用；共享输出不包含 topK weight。
+        uint32_t sharedQuantOutputBufferBytes = CalcTokenAndScaleBytes(tilingData, sharedActivationElementsPerByte);
+        quantOutputBufferBytes += sharedQuantOutputBufferBytes;
+    }
+
+    uint32_t quantInputBufferBytes =
+        ops::CeilAlign(static_cast<uint32_t>(tilingData->compute.h), static_cast<uint32_t>(ALIGN_128)) *
+        sizeof(uint16_t);
     // mxTempTensor_ 占 2KB，xOutTensor_ 和 xInTensor_ 各使用双 buffer。
     constexpr uint32_t mxTempTensorBytes = 2U * 1024U;
     return resetTensorBytes + mxTempTensorBytes + 2U * quantOutputBufferBytes + 2U * quantInputBufferBytes +
@@ -323,13 +339,13 @@ static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData* tili
  */
 static void SetTopkValidIndexBufferConfigs(MegaMoeTilingData* tilingData, uint32_t moeActivationElementsPerByte,
                                            uint32_t sharedActivationElementsPerByte, bool isSharedQuantIndependent,
-                                           uint32_t availableUbBytes)
+                                           uint32_t availableUbBytes, uint32_t bf16TokenScaleStageBytes)
 {
     const bool sharedMte = tilingData->compute.sharedExpertNum > 0U && tilingData->compute.topoType == TOPO_TYPE_MTE;
     const uint32_t topkValidIndexCoreNum = sharedMte ? tilingData->compute.aicNum : tilingData->blockAivNum;
     uint32_t sendMaskFixedBufferBytes =
         CalcTopkValidIndexFixedBufferBytes(tilingData, moeActivationElementsPerByte, sharedActivationElementsPerByte,
-                                           isSharedQuantIndependent, topkValidIndexCoreNum);
+                                           isSharedQuantIndependent, topkValidIndexCoreNum, bf16TokenScaleStageBytes);
 
     /*
      * 按发送核数均衡分配专家，前 remainder 个发送核多处理一个专家。
@@ -360,6 +376,20 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     compute.reserveGmm1Output = tilingData->moeGmmMode == GMM_MODE_A8W4_NZ || compute.topkWeightsPrefetch;
     compute.reserveCumsum = IsW4GmmMode(tilingData->moeGmmMode);
     compute.sharedInputElementsPerByte = IsA4W4GmmMode(tilingData->sharedGmmMode) ? 2U : 1U;
+    compute.dispatchInputStorage = {compute.dispatchFp4 ? MemoryLayoutDetail::FP4_BITS : MemoryLayoutDetail::FP8_BITS};
+    compute.activationOutputStorage = {};
+    compute.sharedInputStorage = {IsA4W4GmmMode(tilingData->sharedGmmMode) ? MemoryLayoutDetail::FP4_BITS :
+                                                                             MemoryLayoutDetail::FP8_BITS};
+    compute.sharedActivationStorage = {};
+    if (IsA16W16GmmMode(tilingData->moeGmmMode)) {
+        compute.dispatchInputStorage = {MemoryLayoutDetail::BF16_BITS};
+        compute.activationOutputStorage = {MemoryLayoutDetail::BF16_BITS};
+        compute.reserveGmm1Output = false;
+    }
+    if (IsA16W16GmmMode(tilingData->sharedGmmMode)) {
+        compute.sharedInputStorage = {MemoryLayoutDetail::BF16_BITS};
+        compute.sharedActivationStorage = {MemoryLayoutDetail::BF16_BITS};
+    }
     compute.ring = CalcCclStageRingConfig(compute);
 
     auto& comm = tilingData->comm;
@@ -376,6 +406,7 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     comm.isQuantCombine = compute.combineQuant;
     comm.topoType = compute.topoType;
     comm.serverNum = compute.serverNum;
+    comm.dispatchStorage = compute.dispatchInputStorage;
 }
 
 /*
@@ -404,9 +435,18 @@ static void SetAdaptiveBufferConfigs(const gert::TilingContext* context, const M
     const bool isPreQuantizedX = xDesc != nullptr && IsPreQuantizedXType(xDesc->GetDataType());
     SetPreQuantTileConfig(tilingData, isPreQuantizedX, activationElementsPerByte,
                           topKWeightsDesc == nullptr ? ge::DT_FLOAT : topKWeightsDesc->GetDataType());
+    uint32_t bf16TokenScaleStageBytes = 0U;
+    if (IsA16W16GmmMode(tilingData->moeGmmMode)) {
+        const auto layout =
+            MegaMoeImpl::CalcTokenScaleLayout(tilingData->compute.h, tilingData->comm.dispatchStorage,
+                                              tilingData->compute.topK, tilingData->comm.topkWeightsPrefetch);
+        bf16TokenScaleStageBytes = static_cast<uint32_t>(MegaMoeImpl::CalcBf16InputStageBytes(
+            layout, tilingData->compute.topK, topKWeightsDesc->GetDataType() == ge::DT_BF16));
+    }
 
     SetTopkValidIndexBufferConfigs(tilingData, activationElementsPerByte, sharedActivationElementsPerByte,
-                                   tilingData->compute.sharedInputIndependent == 1U, availableUbBytes);
+                                   tilingData->compute.sharedInputIndependent == 1U, availableUbBytes,
+                                   bf16TokenScaleStageBytes);
 
     ge::DataType topKWeightsDataType = topKWeightsDesc->GetDataType();
     SetUnpermuteBufferConfigs(tilingData, topKWeightsDataType, availableUbBytes,
@@ -508,7 +548,6 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
         static_cast<uint64_t>(*context->GetAttrs()->GetAttrPointer<int64_t>(config.attrCclBufferSizeIndex));
     OP_TILING_CHECK(SetWorkspace(context, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Tiling set workspace failed."), return ge::GRAPH_FAILED);
-
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     context->SetBlockDim(
         ascendcPlatform.CalcTschBlockDim(tilingData->blockAivNum, tilingData->compute.aicNum, tilingData->blockAivNum));
@@ -563,6 +602,11 @@ ge::graphStatus MegaMoeTilingFuncImplArch35(gert::TilingContext* context, MegaMo
     uint64_t ubSize = 0U;
     OP_TILING_CHECK(CheckAndSetPlatformParams(context, tilingData, aicNum, ubSize, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "platform parameters are invalid."), return ge::GRAPH_FAILED);
+    if (IsA16W16GmmMode(tilingData->moeGmmMode) ||
+        (tilingData->compute.sharedExpertNum > 0 && IsA16W16GmmMode(tilingData->sharedGmmMode))) {
+        OP_TILING_CHECK(CheckA16W16Compatibility(tilingData, nodeName) != ge::GRAPH_SUCCESS,
+                        OP_LOGE(nodeName, "A16W16 compatibility check failed."), return ge::GRAPH_FAILED);
+    }
 
     // Token 数量上限：num_max_tokens_per_rank 和 max_recv_token_num。
     OP_TILING_CHECK(CheckAndSetTokenCapacityAttrs(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,

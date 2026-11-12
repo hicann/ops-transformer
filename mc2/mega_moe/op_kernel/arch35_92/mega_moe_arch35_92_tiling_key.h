@@ -23,6 +23,7 @@ namespace Mc2Tiling {
 #define EXPERT_QUANT_OUT_DTYPE_E5M2 3
 #define EXPERT_QUANT_OUT_DTYPE_E4M3FN 4
 #define EXPERT_QUANT_OUT_DTYPE_E2M1 5
+#define EXPERT_QUANT_OUT_DTYPE_BF16 15
 #define COMBINE_QUANT_OUT_TYPE_NO_QUANT 0
 #define COMBINE_QUANT_OUT_TYPE_E5M2 3
 #define COMBINE_QUANT_OUT_TYPE_E4M3FN 4
@@ -36,15 +37,17 @@ namespace Mc2Tiling {
 // Dispatch/combine 量化模式、topk 权重在激活量化阶段同步计算及路由下标宽度均由 tiling data 选择。
 ASCENDC_TPL_ARGS_DECL(MegaMoe,
                       ASCENDC_TPL_DATATYPE_DECL(TILINGKEY_MOE_WEIGHT_DTYPE, C_DT_FLOAT8_E5M2, C_DT_FLOAT8_E4M3FN,
-                                                C_DT_FLOAT4_E2M1, ASCENDC_TPL_INPUT(MOE_WEIGHT1_INPUT_INDEX)),
+                                                C_DT_FLOAT4_E2M1, C_DT_BF16,
+                                                ASCENDC_TPL_INPUT(MOE_WEIGHT1_INPUT_INDEX)),
                       ASCENDC_TPL_DATATYPE_DECL(TILINGKEY_SHARED_WEIGHT_DTYPE, C_DT_FLOAT8_E5M2, C_DT_FLOAT8_E4M3FN,
-                                                C_DT_FLOAT4_E2M1, ASCENDC_TPL_INPUT(SHARED_WEIGHT1_INPUT_INDEX)),
+                                                C_DT_FLOAT4_E2M1, C_DT_BF16,
+                                                ASCENDC_TPL_INPUT(SHARED_WEIGHT1_INPUT_INDEX)),
                       ASCENDC_TPL_UINT_DECL(TILINGKEY_DISPATCH_QUANT_OUT_DTYPE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,
                                             EXPERT_QUANT_OUT_DTYPE_E5M2, EXPERT_QUANT_OUT_DTYPE_E4M3FN,
-                                            EXPERT_QUANT_OUT_DTYPE_E2M1),
+                                            EXPERT_QUANT_OUT_DTYPE_E2M1, EXPERT_QUANT_OUT_DTYPE_BF16),
                       ASCENDC_TPL_UINT_DECL(TILINGKEY_SHARED_QUANT_OUT_DTYPE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,
                                             EXPERT_QUANT_OUT_DTYPE_E5M2, EXPERT_QUANT_OUT_DTYPE_E4M3FN,
-                                            EXPERT_QUANT_OUT_DTYPE_E2M1),
+                                            EXPERT_QUANT_OUT_DTYPE_E2M1, EXPERT_QUANT_OUT_DTYPE_BF16),
                       ASCENDC_TPL_UINT_DECL(TILINGKEY_COMM_MODE, ASCENDC_TPL_1_BW, ASCENDC_TPL_UI_LIST,
                                             TILINGKEY_TPL_MTE, TILINGKEY_TPL_URMA), );
 
@@ -90,6 +93,9 @@ ASCENDC_TPL_SEL(MEGA_MOE_TPL_CONFIG(C_DT_FLOAT8_E5M2, EXPERT_QUANT_OUT_DTYPE_E5M
                                     EXPERT_QUANT_OUT_DTYPE_E4M3FN, TILINGKEY_TPL_MTE),
                 MEGA_MOE_TPL_CONFIG(C_DT_FLOAT4_E2M1, EXPERT_QUANT_OUT_DTYPE_E2M1, C_DT_FLOAT4_E2M1,
                                     EXPERT_QUANT_OUT_DTYPE_E2M1, TILINGKEY_TPL_MTE),
+
+                MEGA_MOE_TPL_CONFIG(C_DT_BF16, EXPERT_QUANT_OUT_DTYPE_BF16, C_DT_BF16, EXPERT_QUANT_OUT_DTYPE_BF16,
+                                    TILINGKEY_TPL_MTE),
 
                 // URMA 保持 MoE/shared 量化配置一致的现有约束。
                 MEGA_MOE_TPL_CONFIG(C_DT_FLOAT8_E5M2, EXPERT_QUANT_OUT_DTYPE_E5M2, C_DT_FLOAT8_E5M2,
