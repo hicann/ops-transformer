@@ -17,7 +17,7 @@ from cannbotdsl import (
     const_expr,
     dtypes,
 )
-from cannbotdsl import make_layout, permute
+from cannbotdsl import make_layout
 from cannbotdsl.ring_buffer import RingBuffer
 from cannbotdsl.lang.jit import jit
 from cannbotdsl.lang.control_flow import range as drange
@@ -159,7 +159,7 @@ class StagedReverseState:
             for key in range(0, KEY_DIM, D_HALF):
                 decay = vexp(vload(self.gate_last, key), mask=mask)
                 for value in drange(self.live_rows):
-                    offset = value * self.state_gradient.physical_stride[0] + key
+                    offset = value * self.state_gradient.physical_layout.stride[0] + key
                     state = vmul(vload(self.state_gradient, offset), decay, mask=mask)
                     output = vmuls(
                         vload(self.output_state_gradient, offset), self.scale, mask=mask
@@ -300,10 +300,10 @@ class StagedReverseState:
                 direct = 0
                 if (
                     valid_rows == CHUNK_SIZE
-                    and kg_source.physical_stride[-1] == 1
-                    and w_source.physical_stride[-1] == 1
-                    and matrix_source.physical_stride[-1] == 1
-                    and output_source.physical_stride[-1] == 1
+                    and kg_source.physical_layout.stride[-1] == 1
+                    and w_source.physical_layout.stride[-1] == 1
+                    and matrix_source.physical_layout.stride[-1] == 1
+                    and output_source.physical_layout.stride[-1] == 1
                 ):
                     direct = 1
                 kg_tile = tile_slice(
@@ -428,8 +428,8 @@ class StagedReverseState:
                             do_tile, (CHUNK_SIZE, self.value_rows), (0, value_part)
                         ),
                     )
-                mem_copy(aqk_l0a.next_write(), permute(aqk_l1.next_read(), (1, 0)))
-                mem_copy(do_l0b.next_write(), permute(do_l1.next_read(), (1, 0)))
+                mem_copy(aqk_l0a.next_write(), aqk_l1.next_read().permute((1, 0)))
+                mem_copy(do_l0b.next_write(), do_l1.next_read().permute((1, 0)))
                 matmul(total, aqk_l0a.next_read(), do_l0b.next_read(), init=False)
                 summed = product.result_l0c.next_read()
                 # Preserve FP32 in GM; the Cube consumer still requires BF16 L1.
@@ -850,6 +850,12 @@ def run_staged_flash_kda_grad(
             stage_one_gm_task_metadata,
             stage_one_gm_public_dA,
             stage_one_gm_public_d_beta,
+            stage_one_gm_raw_gate,
+            stage_one_gm_A_log,
+            stage_one_gm_dt_bias,
+            stage_one_lower_bound,
+            stage_one_softplus,
+            stage_one_has_bias,
             stage_one_scale,
             stage_one_heads_per_key_head,
             stage_one_beta_fp32,

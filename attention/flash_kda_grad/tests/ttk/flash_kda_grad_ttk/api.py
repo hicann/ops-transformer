@@ -70,7 +70,7 @@ def _source_loader():
 
 
 def _load_operator():
-    """Return the backward entry and metadata from the adjacent op_kernel directory."""
+    """Return the backward entry and metadata from the adjacent op_dsl directory."""
     if "pair" not in _OPERATOR_CACHE:
         load_sample = _source_loader()
         integration = load_sample("flash_kda_grad/flash_kda_grad.py")

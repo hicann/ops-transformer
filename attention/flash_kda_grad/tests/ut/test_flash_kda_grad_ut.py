@@ -70,6 +70,29 @@ flash_kda_grad_npu = integration.flash_kda_grad_npu
 flash_kda_grad_metadata = metadata_module.flash_kda_grad_metadata
 
 
+@pytest.mark.parametrize("raises", (False, True))
+def test_native_safe_no_grad_preserves_runtime_contract(raises):
+    def implementation(value, *, factor=2):
+        assert not torch.is_grad_enabled()
+        if raises:
+            raise RuntimeError("guarded failure")
+        return value * factor
+
+    guarded = integration._runtime_no_grad(implementation)
+    assert inspect.signature(guarded) == inspect.signature(implementation)
+    assert guarded.__wrapped__ is implementation
+    with torch.enable_grad():
+        value = torch.ones(1, requires_grad=True)
+        if raises:
+            with pytest.raises(RuntimeError, match="guarded failure"):
+                guarded(value, factor=3)
+        else:
+            result = guarded(value, factor=3)
+            assert not result.requires_grad
+            torch.testing.assert_close(result, torch.tensor([3.0]))
+        assert torch.is_grad_enabled()
+
+
 @dataclass(frozen=True)
 class FlashKDAForward:
     out: torch.Tensor
@@ -7524,7 +7547,7 @@ def _execute_recompute_preprocess(
             ub_v_raw=padded(v[:, half]),
             ub_recurrent_operands_nz=SimpleNamespace(
                 values=torch.empty(8, 64, 64, dtype=torch.bfloat16),
-                physical_stride=(1024,),
+                physical_layout=SimpleNamespace(stride=(1024,)),
             ),
             saved_qg_nd=torch.empty(64, 64, dtype=torch.bfloat16),
             saved_kg_nd=torch.empty(64, 64, dtype=torch.bfloat16),
@@ -7661,7 +7684,7 @@ def test_recompute_state_recurrence_matches_forward(recompute_vector_cpu, zero_i
                 ),
                 ub_state_nz=SimpleNamespace(
                     values=torch.empty(128, 64, dtype=torch.bfloat16),
-                    physical_stride=(1024,),
+                    physical_layout=SimpleNamespace(stride=(1024,)),
                 ),
             )
             module._State.update_recurrent_state.fn(vector)
@@ -7691,12 +7714,18 @@ def test_fused_phases_publish_caches_for_the_selected_owners():
     assert [ast.unparse(call.func) for call in calls] == [
         "_initialize_backward_gradients",
         "_recompute_tracks",
-        "_sync_cube_vector_handoff",
         "_backward_template(staged)",
     ]
     assert calls[-1].args[-1].value is True
     assert calls[1].args[-1].value is True  # common chunk/value schedule
-    assert ast.unparse(calls[-2]) == "_sync_cube_vector_handoff(2, grid=True)"
+    handoff = next(node for node in scope.body if isinstance(node, ast.If))
+    assert ast.unparse(handoff.test) == (
+        "const_expr(use_full_chunks and needs_masked_chunks and cube_causal and (not staged))"
+    )
+    assert ast.unparse(handoff.body[0]) == (
+        "_sync_cube_vector_handoff(2, grid=True, reset_sync_id=True)"
+    )
+    assert ast.unparse(handoff.orelse[0]) == "_sync_cube_vector_handoff(2, grid=True)"
 
 
 @pytest.mark.ascendc_toolchain

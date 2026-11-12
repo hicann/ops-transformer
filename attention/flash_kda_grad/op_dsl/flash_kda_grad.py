@@ -27,6 +27,7 @@ import threading
 from collections import OrderedDict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import wraps
 from queue import Queue
 from typing import Optional
 
@@ -34,6 +35,8 @@ import cannbotdsl
 import torch
 
 from cannbotdsl import (
+    RoundingMode,
+    from_tensor,
     Buffer,
     Constexpr,
     MemLoc,
@@ -41,7 +44,6 @@ from cannbotdsl import (
     const_expr,
     dtypes,
     get_platform_info,
-    permute,
 )
 from cannbotdsl import make_layout
 from cannbotdsl.ring_buffer import RingBuffer
@@ -49,7 +51,6 @@ from cannbotdsl.lang.jit import jit
 from cannbotdsl.lang.vf import vf
 from cannbotdsl.ops.reg import (
     PackMode,
-    RoundingMode,
     UnpackMode,
     create_mask,
     update_mask,
@@ -103,7 +104,7 @@ from cannbotdsl.ops.sync import (
     vec_sync_block_arrive,
     vec_sync_block_wait,
 )
-from cannbotdsl.tensor import reinterpret, tile_slice
+from cannbotdsl.tensor import tile_slice
 from cannbotdsl.lang.host import host
 from cannbotdsl.lang.kernel import kernel
 
@@ -270,9 +271,11 @@ class BackwardCastVector:
             full = create_mask(pattern="all")
             for row in range(source.shape[-2]):
                 for half in range(self.width // D_HALF):
-                    source_offset = row * source.physical_stride[0] + half * D_HALF
+                    source_offset = (
+                        row * source.physical_layout.stride[0] + half * D_HALF
+                    )
                     destination_offset = (
-                        row * destination.physical_stride[0] + half * D_HALF
+                        row * destination.physical_layout.stride[0] + half * D_HALF
                     )
                     fp32 = vload(source, source_offset)
                     bf16 = vcast(fp32, dtypes.bfloat16, mask=full)
@@ -290,12 +293,15 @@ class BackwardCastVector:
             full = create_mask(pattern="all")
             for row in range(source.shape[-2]):
                 for half in range(self.width // D_HALF):
-                    source_offset = row * source.physical_stride[0] + half * D_HALF
+                    source_offset = (
+                        row * source.physical_layout.stride[0] + half * D_HALF
+                    )
                     high_offset = (
-                        row * high_destination.physical_stride[0] + half * D_HALF
+                        row * high_destination.physical_layout.stride[0] + half * D_HALF
                     )
                     residual_offset = (
-                        row * residual_destination.physical_stride[0] + half * D_HALF
+                        row * residual_destination.physical_layout.stride[0]
+                        + half * D_HALF
                     )
                     fp32 = vload(source, source_offset)
                     high = vcast(fp32, dtypes.bfloat16, mask=full)
@@ -373,8 +379,8 @@ class StageTwoReversePreVector:
                 # row order; keeping that FP32 value in a register avoids
                 # a redundant UB store/reload inside this DMA group.
                 total = vmadd(
-                    vload(state, row * state.physical_stride[0]),
-                    vload(saved_state, row * saved_state.physical_stride[0]),
+                    vload(state, row * state.physical_layout.stride[0]),
+                    vload(saved_state, row * saved_state.physical_layout.stride[0]),
                     total,
                     mask=full,
                 )
@@ -522,7 +528,7 @@ def _load_zero_padded(destination, source):
     the same selected RingBuffer slot for the fill, DMA and later consumer.
     """
     rows, columns = destination.shape
-    row_stride = destination.physical_stride[0]
+    row_stride = destination.physical_layout.stride[0]
     with vf(mode="simd"):
         for row in range(rows):
             for column in range(0, columns, LANES):
@@ -581,11 +587,11 @@ class StageTwoVector:
     ):
         rows = CHUNK_SIZE // 2
         if const_expr(fp32):
-            write = reinterpret(
+            write = from_tensor(
                 self.fp_window.next_write(), layout=make_layout((rows, width))
             )
         else:
-            write = reinterpret(
+            write = from_tensor(
                 self.low_window.next_write(), layout=make_layout((rows, width))
             )
         if valid_rows > 0:
@@ -613,11 +619,11 @@ class StageTwoVector:
                             pack_mode=PackMode.B32_TO_B16,
                         )
         if const_expr(fp32):
-            read = reinterpret(
+            read = from_tensor(
                 self.fp_window.next_read(), layout=make_layout((rows, width))
             )
         else:
-            read = reinterpret(
+            read = from_tensor(
                 self.low_window.next_read(), layout=make_layout((rows, width))
             )
         if const_expr(not fp32 and width == CHUNK_SIZE):
@@ -782,7 +788,7 @@ def _cube_scratch_view(mem_loc, dtype, layout, physical_layout, data_format, slo
         tensor = tile_slice(tensor, (maximum, maximum), (0, slot))
     else:
         assert slot == 0
-    return reinterpret(
+    return from_tensor(
         tensor,
         layout=layout,
         physical_layout=physical_layout
@@ -834,7 +840,7 @@ class _MatrixSlotView:
         )
 
     def _view(self, tensor):
-        return reinterpret(
+        return from_tensor(
             tensor,
             layout=self.layout,
             physical_layout=self.physical_layout,
@@ -909,7 +915,7 @@ class StageTwoMatmul:
         mem_copy(self.token_l0a.next_write(), self.token_left_l1.next_read())
         mem_copy(
             self.state_l0b.next_write(),
-            permute(self.state_l1.next_read(), (1, 0))
+            self.state_l1.next_read().permute((1, 0))
             if transpose_state
             else self.state_l1.next_read(),
         )
@@ -929,15 +935,11 @@ class StageTwoMatmul:
         mem_copy(self.token_left_l1.next_write(), gm_token)
         mem_copy(self.state_l1.next_write(), gm_state_high)
         mem_copy(self.token_l0a.next_write(), self.token_left_l1.next_read())
-        mem_copy(
-            self.state_l0b.next_write(), permute(self.state_l1.next_read(), (1, 0))
-        )
+        mem_copy(self.state_l0b.next_write(), self.state_l1.next_read().permute((1, 0)))
         token_left = self.token_l0a.next_read()
         matmul(result, token_left, self.state_l0b.next_read(), init=True)
         mem_copy(self.state_l1.next_write(), gm_state_residual)
-        mem_copy(
-            self.state_l0b.next_write(), permute(self.state_l1.next_read(), (1, 0))
-        )
+        mem_copy(self.state_l0b.next_write(), self.state_l1.next_read().permute((1, 0)))
         matmul(result, token_left, self.state_l0b.next_read(), init=False)
         mem_copy(gm_result, self.token_result_l0c.next_read())
 
@@ -946,11 +948,11 @@ class StageTwoMatmul:
         mem_copy(self.token_right_l1.next_write(), gm_saved_token)
         mem_copy(
             self.token_transposed_l0a.next_write(),
-            permute(self.token_left_l1.next_read(), (1, 0)),
+            self.token_left_l1.next_read().permute((1, 0)),
         )
         mem_copy(
             self.token_transposed_l0b.next_write(),
-            permute(self.token_right_l1.next_read(), (1, 0)),
+            self.token_right_l1.next_read().permute((1, 0)),
         )
         matmul(
             self.state_result_l0c.next_write(),
@@ -964,8 +966,8 @@ class StageTwoMatmul:
 @jit
 def _stage_two_cast_packed_nz(dst, src, scratch, rows, cols):
     """Cast one FP32 operand to BF16 NZ, preserving its logical axes."""
-    src_stride = src.physical_stride[0]
-    nz_stride = dst.physical_stride[0]
+    src_stride = src.physical_layout.stride[0]
+    nz_stride = dst.physical_layout.stride[0]
     if const_expr(cols == NZ_BLOCK_WIDTH and src_stride == cols):
         # One NZ column block has the same element order as packed ND.
         # Cast complete consecutive rows together; do not exchange any axes.
@@ -1112,8 +1114,8 @@ class StageTwoPipelineMatmul:
             mem_copy(self.right_l0b.next_write(), operand)
         else:
             # Transpose dR at Cube load, never in Vector: [L,V].T @ [L,K].
-            mem_copy(self.left_l0a.next_write(), permute(operand, (1, 0)))
-            mem_copy(self.right_l0b.next_write(), permute(token, (1, 0)))
+            mem_copy(self.left_l0a.next_write(), operand.permute((1, 0)))
+            mem_copy(self.right_l0b.next_write(), token.permute((1, 0)))
         matmul(
             self.result_l0c.next_write(),
             self.left_l0a.next_read(),
@@ -1121,18 +1123,18 @@ class StageTwoPipelineMatmul:
             init=True,
         )
         mem_copy(
-            reinterpret(
+            from_tensor(
                 self.result_to_vector.next_write(),
                 layout=make_layout((self.result_shape[0] // 2, self.result_shape[1])),
             ),
-            reinterpret(
+            from_tensor(
                 self.result_l0c.next_read(), layout=make_layout(self.result_shape)
             ).partition(dim=0),
         )
 
     @jit
     def next_read(self):
-        return reinterpret(
+        return from_tensor(
             self.result_to_vector.next_read(),
             layout=make_layout((self.result_shape[0] // 2, self.result_shape[1])),
         )
@@ -1213,15 +1215,15 @@ def _prepare_track_chunk(
         direct_gm = 0
         if (
             (qg_source.shape[-2] >= CHUNK_SIZE)
-            and (qg_source.physical_stride[-1] == 1)
+            and (qg_source.physical_layout.stride[-1] == 1)
             and (v_new_source.shape[-2] >= CHUNK_SIZE)
-            and (v_new_source.physical_stride[-1] == 1)
+            and (v_new_source.physical_layout.stride[-1] == 1)
             and (output_source.shape[-2] >= CHUNK_SIZE)
-            and (output_source.physical_stride[-1] == 1)
+            and (output_source.physical_layout.stride[-1] == 1)
             and (matrix_source.shape[-2] >= CHUNK_SIZE)
-            and (matrix_source.physical_stride[-1] == 1)
+            and (matrix_source.physical_layout.stride[-1] == 1)
             and (d_v_new_destination.shape[-2] >= CHUNK_SIZE)
-            and (d_v_new_destination.physical_stride[-1] == 1)
+            and (d_v_new_destination.physical_layout.stride[-1] == 1)
         ):
             if valid_rows == CHUNK_SIZE:
                 direct_gm = 1
@@ -1402,17 +1404,17 @@ def _finish_track_chunk(
         direct_gm = 0
         if (
             (v_new_source.shape[-2] >= CHUNK_SIZE)
-            and (v_new_source.physical_stride[-1] == 1)
+            and (v_new_source.physical_layout.stride[-1] == 1)
             and (output_source.shape[-2] >= CHUNK_SIZE)
-            and (output_source.physical_stride[-1] == 1)
+            and (output_source.physical_layout.stride[-1] == 1)
             and (d_v_new_source.shape[-2] >= CHUNK_SIZE)
-            and (d_v_new_source.physical_stride[-1] == 1)
+            and (d_v_new_source.physical_layout.stride[-1] == 1)
             and (d_qg_destination.shape[-2] >= CHUNK_SIZE)
-            and (d_qg_destination.physical_stride[-1] == 1)
+            and (d_qg_destination.physical_layout.stride[-1] == 1)
             and (d_kg_destination.shape[-2] >= CHUNK_SIZE)
-            and (d_kg_destination.physical_stride[-1] == 1)
+            and (d_kg_destination.physical_layout.stride[-1] == 1)
             and (d_w_destination.shape[-2] >= CHUNK_SIZE)
-            and (d_w_destination.physical_stride[-1] == 1)
+            and (d_w_destination.physical_layout.stride[-1] == 1)
         ):
             if valid_rows == CHUNK_SIZE:
                 direct_gm = 1
@@ -1837,15 +1839,15 @@ class StageOneMatmul:
         mem_copy(self.inverse_l1.next_write(), gm_inverse)
         mem_copy(self.gradient_l1.next_write(), gm_gradient)
         mem_copy(
-            self.inverse_l0a.next_write(), permute(self.inverse_l1.next_read(), (1, 0))
+            self.inverse_l0a.next_write(), self.inverse_l1.next_read().permute((1, 0))
         )
         mem_copy(
             self.gradient_l0b.next_write(),
-            permute(self.gradient_l1.next_read(), (1, 0)),
+            self.gradient_l1.next_read().permute((1, 0)),
         )
         matmul(
             (
-                reinterpret(
+                from_tensor(
                     self.gradient_l0c.next_write(),
                     data_format="nz",
                     layout=make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
@@ -1860,7 +1862,7 @@ class StageOneMatmul:
         mem_copy(
             gm_result,
             (
-                reinterpret(
+                from_tensor(
                     self.gradient_l0c.next_read(),
                     data_format="nz",
                     layout=make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
@@ -1882,7 +1884,7 @@ class StageOneMatmul:
         # FIXPIPE rounds each intermediate to BF16 directly in L1. Channel
         # dependencies order FIXPIPE -> MTE1 without GM or a Vector round-trip.
         pair_sum = (
-            reinterpret(
+            from_tensor(
                 self.pair_l0c.next_write(),
                 data_format="nz",
                 layout=make_layout((CHUNK_SIZE, CHUNK_SIZE)),
@@ -1913,7 +1915,7 @@ class StageOneMatmul:
         mem_copy(
             self.right_l1.next_write(),
             (
-                reinterpret(
+                from_tensor(
                     self.pair_l0c.next_read(),
                     data_format="nz",
                     layout=make_layout((CHUNK_SIZE, CHUNK_SIZE)),
@@ -1923,13 +1925,11 @@ class StageOneMatmul:
             ),
         )
         mem_copy(self.left_l1.next_write(), gm_inverse)
-        mem_copy(self.left_l0a.next_write(), permute(self.left_l1.next_read(), (1, 0)))
-        mem_copy(
-            self.right_l0b.next_write(), permute(self.right_l1.next_read(), (1, 0))
-        )
+        mem_copy(self.left_l0a.next_write(), self.left_l1.next_read().permute((1, 0)))
+        mem_copy(self.right_l0b.next_write(), self.right_l1.next_read().permute((1, 0)))
         matmul(
             (
-                reinterpret(
+                from_tensor(
                     self.inverse_result_l0c.next_write(),
                     data_format="nz",
                     layout=make_layout((CHUNK_SIZE, CHUNK_SIZE)),
@@ -1944,7 +1944,7 @@ class StageOneMatmul:
         mem_copy(
             self.left_l1.next_write(),
             (
-                reinterpret(
+                from_tensor(
                     self.inverse_result_l0c.next_read(),
                     data_format="nz",
                     layout=make_layout((CHUNK_SIZE, CHUNK_SIZE)),
@@ -1958,7 +1958,7 @@ class StageOneMatmul:
         mem_copy(self.right_l0b.next_write(), self.right_l1.next_read())
         matmul(
             (
-                reinterpret(
+                from_tensor(
                     self.inverse_result_l0c.next_write(),
                     data_format="nz",
                     layout=make_layout((CHUNK_SIZE, CHUNK_SIZE)),
@@ -1972,12 +1972,12 @@ class StageOneMatmul:
         )
         if const_expr(self.direct_results):
             mem_copy(
-                reinterpret(
+                from_tensor(
                     self.causal_results[2],
                     layout=make_layout((CHUNK_SIZE // 2, CHUNK_SIZE)),
                 ),
-                reinterpret(
-                    reinterpret(
+                from_tensor(
+                    from_tensor(
                         self.inverse_result_l0c.next_read(),
                         data_format="nz",
                         layout=make_layout((CHUNK_SIZE, CHUNK_SIZE)),
@@ -1991,7 +1991,7 @@ class StageOneMatmul:
             mem_copy(
                 gm_d_lower_unmasked,
                 (
-                    reinterpret(
+                    from_tensor(
                         self.inverse_result_l0c.next_read(),
                         data_format="nz",
                         layout=make_layout((CHUNK_SIZE, CHUNK_SIZE)),
@@ -2005,21 +2005,21 @@ class StageOneMatmul:
         if const_expr(self.direct_results):
             mem_copy(
                 self.matrix_l0a.next_write(),
-                permute(gm_matrix, (1, 0)) if transpose_matrix else gm_matrix,
+                gm_matrix.permute((1, 0)) if transpose_matrix else gm_matrix,
             )
-            mem_copy(self.feature_l0b.next_write(), permute(gm_feature, (1, 0)))
+            mem_copy(self.feature_l0b.next_write(), gm_feature.permute((1, 0)))
         else:
             mem_copy(self.matrix_l1.next_write(), gm_matrix)
             mem_copy(self.feature_l1.next_write(), gm_feature)
             mem_copy(
                 self.matrix_l0a.next_write(),
-                permute(self.matrix_l1.next_read(), (1, 0))
+                self.matrix_l1.next_read().permute((1, 0))
                 if transpose_matrix
                 else self.matrix_l1.next_read(),
             )
             mem_copy(
                 self.feature_l0b.next_write(),
-                permute(self.feature_l1.next_read(), (1, 0)),
+                self.feature_l1.next_read().permute((1, 0)),
             )
 
     def _accumulate_causal_feature_split(
@@ -2038,12 +2038,12 @@ class StageOneMatmul:
         matrix = self.matrix_l0a.next_read()
         matmul(result, matrix, self.feature_l0b.next_read(), init=initialize)
         if const_expr(self.direct_results):
-            mem_copy(self.feature_l0b.next_write(), permute(gm_feature_low, (1, 0)))
+            mem_copy(self.feature_l0b.next_write(), gm_feature_low.permute((1, 0)))
         else:
             mem_copy(self.feature_l1.next_write(), gm_feature_low)
             mem_copy(
                 self.feature_l0b.next_write(),
-                permute(self.feature_l1.next_read(), (1, 0)),
+                self.feature_l1.next_read().permute((1, 0)),
             )
         matmul(result, matrix, self.feature_l0b.next_read(), init=False)
 
@@ -2057,7 +2057,7 @@ class StageOneMatmul:
         output_plane: Constexpr[int] = 0,
     ):
         result = (
-            reinterpret(
+            from_tensor(
                 self.causal_result_l0c.next_write(),
                 data_format="nz",
                 layout=make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
@@ -2071,8 +2071,8 @@ class StageOneMatmul:
         if const_expr(self.direct_results):
             mem_copy(
                 self.causal_results[output_plane],
-                reinterpret(
-                    reinterpret(
+                from_tensor(
+                    from_tensor(
                         self.causal_result_l0c.next_read(),
                         data_format="nz",
                         layout=make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
@@ -2086,7 +2086,7 @@ class StageOneMatmul:
             mem_copy(
                 gm_output,
                 (
-                    reinterpret(
+                    from_tensor(
                         self.causal_result_l0c.next_read(),
                         data_format="nz",
                         layout=make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
@@ -2139,7 +2139,7 @@ class StageOneMatmul:
                 False,
             )
         column_sum = (
-            reinterpret(
+            from_tensor(
                 self.causal_result_l0c.next_write(),
                 data_format="nz",
                 layout=make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
@@ -2156,8 +2156,8 @@ class StageOneMatmul:
         if const_expr(self.direct_results):
             mem_copy(
                 self.causal_results[1],
-                reinterpret(
-                    reinterpret(
+                from_tensor(
+                    from_tensor(
                         self.causal_result_l0c.next_read(),
                         data_format="nz",
                         layout=make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
@@ -2171,7 +2171,7 @@ class StageOneMatmul:
             mem_copy(
                 gm_d_key_col_output,
                 (
-                    reinterpret(
+                    from_tensor(
                         self.causal_result_l0c.next_read(),
                         data_format="nz",
                         layout=make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
@@ -2196,10 +2196,10 @@ class StageOneMatmul:
     def _stacked_query_beta(self, feature_high, feature_low):
         mem_copy(self.stacked_a.next_write(), self.stacked_matrix)
         a = self.stacked_a.next_read()
-        mem_copy(self.feature_l0b.next_write(), permute(feature_high, (1, 0)))
+        mem_copy(self.feature_l0b.next_write(), feature_high.permute((1, 0)))
         result = self.shared_c.next_write()
         matmul(result, a, self.feature_l0b.next_read(), init=True)
-        mem_copy(self.feature_l0b.next_write(), permute(feature_low, (1, 0)))
+        mem_copy(self.feature_l0b.next_write(), feature_low.permute((1, 0)))
         matmul(result, a, self.feature_l0b.next_read(), init=False)
         result_read = self.shared_c.next_read()
         # Each half keeps the 128-row NZ panel stride of the stacked result.
@@ -2425,11 +2425,11 @@ class StageOneVector:
         """Copy up to 32 live rows per AIV, preserving strides and zeroing the tail."""
         rows = CHUNK_SIZE // 2
         if const_expr(gm_source.dtype == dtypes.bfloat16):
-            write = reinterpret(
+            write = from_tensor(
                 self.value_output.next_write(), layout=make_layout((rows, width))
             )
             self._load_chunk_input(write, gm_source, source_row, width, valid_rows)
-            read = reinterpret(
+            read = from_tensor(
                 self.value_output.next_read(), layout=make_layout((rows, width))
             )
             mem_copy(
@@ -2438,17 +2438,17 @@ class StageOneVector:
             )
         else:
             if const_expr(resident is None):
-                write = reinterpret(
+                write = from_tensor(
                     self.value_gradient.next_write(), layout=make_layout((rows, width))
                 )
                 self._load_chunk_input(write, gm_source, source_row, width, valid_rows)
-                read = reinterpret(
+                read = from_tensor(
                     self.value_gradient.next_read(), layout=make_layout((rows, width))
                 )
             else:
                 read = resident
             if const_expr(cast_bf16):
-                output = reinterpret(
+                output = from_tensor(
                     self.value_output.next_write(), layout=make_layout((rows, width))
                 )
                 with vf(mode="simd"):
@@ -2474,7 +2474,7 @@ class StageOneVector:
                         )
                     if const_expr(self.correct_wy_diagonal and wy_residual >= 0):
                         vmem_bar("vst_vld")
-                result = reinterpret(
+                result = from_tensor(
                     self.value_output.next_read(), layout=make_layout((rows, width))
                 )
             else:
@@ -2527,11 +2527,11 @@ class StageOneVector:
         source = tile_slice(window, (CHUNK_SIZE, 1), (0, 0))[:valid_rows, None]
         output = self.beta_values.next_write()
         if const_expr(gm_source.dtype == dtypes.float32):
-            _load_zero_padded(output.view(1, CHUNK_SIZE), permute(source, (1, 0)))
+            _load_zero_padded(output.view(1, CHUNK_SIZE), source.permute((1, 0)))
         else:
             _load_zero_padded(
                 self.bf16_scalars.next_write().view(1, CHUNK_SIZE),
-                permute(source, (1, 0)),
+                source.permute((1, 0)),
             )
             low = self.bf16_scalars.next_read()
             with vf(mode="simd"):
@@ -2557,7 +2557,7 @@ class StageOneVector:
             channel = self.bf16_scalars
         mem_copy(channel.next_write(), tile_slice(gm_source, (CHUNK_SIZE,), (chunk,)))
         packed = channel.next_read()
-        if gm_destination.physical_stride[-2] == 1:
+        if gm_destination.physical_layout.stride[-2] == 1:
             destination = gm_destination.view(gm_destination.shape[-2])
             mem_copy(
                 destination[destination_row : destination_row + valid_rows,],
@@ -2686,13 +2686,13 @@ class StageOneVector:
         if const_expr(gm_source.dtype == dtypes.float32):
             mem_copy(
                 output.view(1, CHUNK_SIZE),
-                permute(source, (1, 0)),
+                source.permute((1, 0)),
                 options=copy_options(engine="nddma"),
             )
         else:
             mem_copy(
                 self.bf16_scalars.next_write().view(1, CHUNK_SIZE),
-                permute(source, (1, 0)),
+                source.permute((1, 0)),
                 options=copy_options(engine="nddma"),
             )
             read = self.bf16_scalars.next_read()
@@ -2926,11 +2926,11 @@ class StageOneVector:
             fp_write = self.value_gradient.next_write()
             if const_expr(not self.fuse_base):
                 mem_copy(
-                    reinterpret(fp_write, layout=make_layout(shape)),
+                    from_tensor(fp_write, layout=make_layout(shape)),
                     tile_slice(gm_d_gate_base, shape, (flat_tile, raw_half)),
                 )
             mem_copy(
-                reinterpret(
+                from_tensor(
                     fp_write,
                     offset=GATE_BATCH_ROWS * D_HALF * FP32_ELEMENT_BYTES,
                     layout=make_layout(shape),
@@ -2940,7 +2940,7 @@ class StageOneVector:
             low_write = self.value_output.next_write()
             if const_expr(gm_raw_gate.dtype == dtypes.float32):
                 mem_copy(
-                    reinterpret(
+                    from_tensor(
                         fp_write,
                         offset=2 * GATE_BATCH_ROWS * D_HALF * FP32_ELEMENT_BYTES,
                         layout=make_layout(shape),
@@ -2951,32 +2951,32 @@ class StageOneVector:
                 )
             else:
                 mem_copy(
-                    reinterpret(low_write, layout=make_layout(shape)),
+                    from_tensor(low_write, layout=make_layout(shape)),
                     _token_rows_tile(
                         gm_raw_gate, raw_row, GATE_BATCH_ROWS, D_HALF, raw_half
                     ),
                 )
             fp_read = self.value_gradient.next_read()
             low_read = self.value_output.next_read()
-            base = reinterpret(fp_read, layout=make_layout(shape))
-            pair = reinterpret(
+            base = from_tensor(fp_read, layout=make_layout(shape))
+            pair = from_tensor(
                 fp_read,
                 offset=GATE_BATCH_ROWS * D_HALF * FP32_ELEMENT_BYTES,
                 layout=make_layout(shape),
             )
             if const_expr(gm_raw_gate.dtype == dtypes.float32):
-                raw = reinterpret(
+                raw = from_tensor(
                     fp_read,
                     offset=2 * GATE_BATCH_ROWS * D_HALF * FP32_ELEMENT_BYTES,
                     layout=make_layout(shape),
                 )
             else:
-                raw = reinterpret(low_read, layout=make_layout(shape))
+                raw = from_tensor(low_read, layout=make_layout(shape))
             if const_expr(gm_public_d_gate.dtype == dtypes.float32):
                 # Each raw row is dead after its derivative is evaluated.
                 output = raw
             else:
-                output = reinterpret(
+                output = from_tensor(
                     low_read,
                     offset=GATE_BATCH_ROWS * D_HALF * BF16_ELEMENT_BYTES,
                     layout=make_layout(shape),
@@ -3858,7 +3858,7 @@ class StageOneVector:
                         tile_slice(gm_d_key_pair, shape, (flat_tile, 0)),
                     )
                 q_rstd_tile = tile_slice(
-                    reinterpret(
+                    from_tensor(
                         fp_write,
                         offset=fp_planes
                         * self.head_batch_rows
@@ -3870,7 +3870,7 @@ class StageOneVector:
                     (0, 0),
                 )
                 k_rstd_tile = tile_slice(
-                    reinterpret(
+                    from_tensor(
                         fp_write,
                         offset=(
                             fp_planes * self.head_batch_rows * SUPPORTED_HEAD_DIM
@@ -3937,7 +3937,7 @@ class StageOneVector:
                 if const_expr(resident_pair):
                     query_norm = tile_slice(self.batch_bf16[0], shape, (group, 0))
                     key_norm = tile_slice(self.batch_bf16[1], shape, (group, 0))
-                query_rstd = reinterpret(
+                query_rstd = from_tensor(
                     fp_read,
                     offset=fp_planes
                     * self.head_batch_rows
@@ -3945,7 +3945,7 @@ class StageOneVector:
                     * FP32_ELEMENT_BYTES,
                     layout=make_layout((self.head_batch_rows, 8)),
                 )
-                key_rstd = reinterpret(
+                key_rstd = from_tensor(
                     fp_read,
                     offset=(
                         fp_planes * self.head_batch_rows * SUPPORTED_HEAD_DIM
@@ -4058,14 +4058,14 @@ class StageOneVector:
         shape = (CHUNK_SIZE, D_HALF)
         fp_write = self.value_gradient.next_write()
         self._load_gate_window(
-            reinterpret(fp_write, layout=make_layout(shape)),
+            from_tensor(fp_write, layout=make_layout(shape)),
             gm_d_gate_base,
             flat_chunk * CHUNK_SIZE,
             valid_rows,
             raw_half,
         )
         self._load_gate_window(
-            reinterpret(
+            from_tensor(
                 fp_write,
                 offset=CHUNK_SIZE * D_HALF * FP32_ELEMENT_BYTES,
                 layout=make_layout(shape),
@@ -4078,7 +4078,7 @@ class StageOneVector:
         low_write = self.value_output.next_write()
         if const_expr(gm_raw_gate.dtype == dtypes.float32):
             self._load_gate_window(
-                reinterpret(
+                from_tensor(
                     fp_write,
                     offset=2 * CHUNK_SIZE * D_HALF * FP32_ELEMENT_BYTES,
                     layout=make_layout(shape),
@@ -4090,7 +4090,7 @@ class StageOneVector:
             )
         else:
             self._load_gate_window(
-                reinterpret(low_write, layout=make_layout(shape)),
+                from_tensor(low_write, layout=make_layout(shape)),
                 gm_raw_gate,
                 raw_row_start,
                 valid_rows,
@@ -4098,24 +4098,24 @@ class StageOneVector:
             )
         fp_read = self.value_gradient.next_read()
         low_read = self.value_output.next_read()
-        base = reinterpret(fp_read, layout=make_layout(shape))
-        pair = reinterpret(
+        base = from_tensor(fp_read, layout=make_layout(shape))
+        pair = from_tensor(
             fp_read,
             offset=CHUNK_SIZE * D_HALF * FP32_ELEMENT_BYTES,
             layout=make_layout(shape),
         )
         if const_expr(gm_raw_gate.dtype == dtypes.float32):
-            raw = reinterpret(
+            raw = from_tensor(
                 fp_read,
                 offset=2 * CHUNK_SIZE * D_HALF * FP32_ELEMENT_BYTES,
                 layout=make_layout(shape),
             )
         else:
-            raw = reinterpret(low_read, layout=make_layout(shape))
+            raw = from_tensor(low_read, layout=make_layout(shape))
         if const_expr(gm_public_d_gate.dtype == dtypes.float32):
             output = raw
         else:
-            output = reinterpret(
+            output = from_tensor(
                 low_read,
                 offset=CHUNK_SIZE * D_HALF * BF16_ELEMENT_BYTES,
                 layout=make_layout(shape),
@@ -4143,13 +4143,13 @@ class StageOneVector:
         rows = CHUNK_SIZE // 2
         if valid_rows > 0:
             mem_copy(
-                reinterpret(
+                from_tensor(
                     self.value_output.next_write(),
                     layout=make_layout((rows, VALUE_DIM)),
                 ),
                 tile_slice(source, (rows, VALUE_DIM), (source_row // rows, 0)),
             )
-            packed = reinterpret(
+            packed = from_tensor(
                 self.value_output.next_read(), layout=make_layout((rows, VALUE_DIM))
             )
             window = destination[
@@ -4206,18 +4206,18 @@ class StageOneVector:
         if get_subblock_id() == 1:
             shape = (CHUNK_SIZE // 2, SUPPORTED_HEAD_DIM)
             mem_copy(
-                reinterpret(self.value_output.next_write(), layout=make_layout(shape)),
+                from_tensor(self.value_output.next_write(), layout=make_layout(shape)),
                 tile_slice(gm_kg, shape, (chunk * 2, 0)),
             )
             mem_copy(
-                reinterpret(
+                from_tensor(
                     self.value_gradient.next_write(), layout=make_layout(shape)
                 ),
                 tile_slice(gm_dkg, shape, (chunk * 2, 0)),
             )
             self._fused_terminal_prefix(
-                reinterpret(self.value_output.next_read(), layout=make_layout(shape)),
-                reinterpret(self.value_gradient.next_read(), layout=make_layout(shape)),
+                from_tensor(self.value_output.next_read(), layout=make_layout(shape)),
+                from_tensor(self.value_gradient.next_read(), layout=make_layout(shape)),
             )
         shape = (CHUNK_SIZE // 2, SUPPORTED_HEAD_DIM)
         tile = chunk * 2 + get_subblock_id()
@@ -4557,9 +4557,15 @@ class StageOneWyResultVector:
         out,
         diagonal_ready: Constexpr[bool] = 0,
     ):
-        dv_stride, dk_stride = d_value.physical_stride[0], d_key.physical_stride[0]
-        v_stride, k_stride = values.physical_stride[0], keys.physical_stride[0]
-        g_stride = gamma.physical_stride[0]
+        dv_stride, dk_stride = (
+            d_value.physical_layout.stride[0],
+            d_key.physical_layout.stride[0],
+        )
+        v_stride, k_stride = (
+            values.physical_layout.stride[0],
+            keys.physical_layout.stride[0],
+        )
+        g_stride = gamma.physical_layout.stride[0]
         with vf(mode="simd"):
             full = create_mask(pattern="all")
             one, _ = update_mask(1, elem_bits=32)
@@ -4677,7 +4683,7 @@ class BaseGradientVector:
     @jit
     def _batch_plane(self, slot, plane: Constexpr[int], element_bytes: Constexpr[int]):
         # Compact batch-by-64 planes do not inherit the slot's 128-column stride.
-        return reinterpret(
+        return from_tensor(
             slot,
             offset=plane * self.batch_rows * LANES * element_bytes,
             layout=make_layout((self.batch_rows, LANES)),
@@ -5106,18 +5112,22 @@ class DirectCausalDeltaVector:
         valid,
     ):
         feature = get_subblock_id()
-        q = reinterpret(self.query, layout=make_layout((CHUNK_SIZE, D_HALF)))
-        k = reinterpret(self.key, layout=make_layout((CHUNK_SIZE, D_HALF)))
-        g = reinterpret(self.gamma, layout=make_layout((CHUNK_SIZE, D_HALF)))
+        q = from_tensor(self.query, layout=make_layout((CHUNK_SIZE, D_HALF)))
+        k = from_tensor(self.key, layout=make_layout((CHUNK_SIZE, D_HALF)))
+        g = from_tensor(self.gamma, layout=make_layout((CHUNK_SIZE, D_HALF)))
         if const_expr(gm_q.dtype == dtypes.float32):
             mem_copy(q, tile_slice(gm_q, (CHUNK_SIZE, D_HALF), (chunk, feature)))
             mem_copy(k, tile_slice(gm_k, (CHUNK_SIZE, D_HALF), (chunk, feature)))
         else:
-            raw_q = self.shared.batch_bf16[0].reinterpret(
-                dtype=dtypes.bfloat16, layout=make_layout((CHUNK_SIZE, D_HALF))
+            raw_q = from_tensor(
+                self.shared.batch_bf16[0],
+                dtype=dtypes.bfloat16,
+                layout=make_layout((CHUNK_SIZE, D_HALF)),
             )
-            raw_k = self.shared.batch_bf16[1].reinterpret(
-                dtype=dtypes.bfloat16, layout=make_layout((CHUNK_SIZE, D_HALF))
+            raw_k = from_tensor(
+                self.shared.batch_bf16[1],
+                dtype=dtypes.bfloat16,
+                layout=make_layout((CHUNK_SIZE, D_HALF)),
             )
             mem_copy(raw_q, tile_slice(gm_q, (CHUNK_SIZE, D_HALF), (chunk, feature)))
             mem_copy(raw_k, tile_slice(gm_k, (CHUNK_SIZE, D_HALF), (chunk, feature)))
@@ -5131,19 +5141,23 @@ class DirectCausalDeltaVector:
                 tile_slice(gm_b, (CHUNK_SIZE,), (chunk,)),
             )
             self._convert_beta(self.shared.bf16_scalars.next_read())
-        work = reinterpret(
+        work = from_tensor(
             self.shared.value_gradient.next_write(),
             layout=make_layout((2 * CHUNK_SIZE, D_HALF)),
         )
         lower = tile_slice(work, (CHUNK_SIZE, D_HALF), (0, 0))
         dg = tile_slice(work, (CHUNK_SIZE, D_HALF), (1, 0))
-        coefficients = self.shared.value_output.next_write().reinterpret(
-            dtype=dtypes.float32, layout=make_layout((CHUNK_SIZE, CHUNK_SIZE))
+        coefficients = from_tensor(
+            self.shared.value_output.next_write(),
+            dtype=dtypes.float32,
+            layout=make_layout((CHUNK_SIZE, CHUNK_SIZE)),
         )
         mem_copy(coefficients, tile_slice(gm_a, (CHUNK_SIZE, CHUNK_SIZE), (chunk, 0)))
         mem_copy(lower, tile_slice(gm_l, (CHUNK_SIZE, CHUNK_SIZE), (chunk, 0)))
-        coefficients = self.shared.value_output.next_read().reinterpret(
-            dtype=dtypes.float32, layout=make_layout((CHUNK_SIZE, CHUNK_SIZE))
+        coefficients = from_tensor(
+            self.shared.value_output.next_read(),
+            dtype=dtypes.float32,
+            layout=make_layout((CHUNK_SIZE, CHUNK_SIZE)),
         )
         self._prepare_coefficients(coefficients, lower, scale, valid)
         # Only the aligned-only caller enables this specialization. That path
@@ -5163,16 +5177,16 @@ class DirectCausalDeltaVector:
         )
         mem_copy(
             tile_slice(gm_dq, (CHUNK_SIZE, D_HALF), (chunk, feature)),
-            reinterpret(self.dq, layout=make_layout((CHUNK_SIZE, D_HALF))),
+            from_tensor(self.dq, layout=make_layout((CHUNK_SIZE, D_HALF))),
         )
         mem_copy(
             tile_slice(gm_dk, (CHUNK_SIZE, D_HALF), (chunk, feature)),
-            reinterpret(self.dk, layout=make_layout((CHUNK_SIZE, D_HALF))),
+            from_tensor(self.dk, layout=make_layout((CHUNK_SIZE, D_HALF))),
         )
         mem_copy(
             tile_slice(gm_dg, (CHUNK_SIZE, D_HALF), (chunk, feature)),
             tile_slice(
-                reinterpret(
+                from_tensor(
                     self.shared.value_gradient.next_read(),
                     layout=make_layout((2 * CHUNK_SIZE, D_HALF)),
                 ),
@@ -5448,14 +5462,14 @@ class StageOneInverseMaskVector:
         if const_expr(self.batch_rows):
             half_rows = CHUNK_SIZE // 2
             row_tile = chunk * 2 + get_subblock_id()
-            source = reinterpret(
+            source = from_tensor(
                 self.block_source, layout=make_layout((half_rows, CHUNK_SIZE))
             )
-            result = reinterpret(
+            result = from_tensor(
                 self.block_result, layout=make_layout((half_rows, CHUNK_SIZE))
             )
             if const_expr(self.direct_result):
-                source = reinterpret(
+                source = from_tensor(
                     self.inverse_channel, layout=make_layout((half_rows, CHUNK_SIZE))
                 )
             else:
@@ -5484,7 +5498,7 @@ class StageOneInverseMaskVector:
             if const_expr(not self.direct_result):
                 mem_copy(
                     tile_slice(gm_d_lower, (half_rows, CHUNK_SIZE), (row_tile, 0)),
-                    reinterpret(
+                    from_tensor(
                         self.block_result, layout=make_layout((half_rows, CHUNK_SIZE))
                     ),
                 )
@@ -5965,42 +5979,57 @@ class StageOneCausalOperandVector:
             matrix_shape = (CHUNK_SIZE // 2, CHUNK_SIZE)
             fp_write = self.batch_float.next_write()
             mem_copy(
-                reinterpret(fp_write, layout=make_layout(matrix_shape)),
+                from_tensor(fp_write, layout=make_layout(matrix_shape)),
                 tile_slice(gm_d_Aqk, matrix_shape, (chunk * 2 + get_subblock_id(), 0)),
             )
             low_write = self.batch_low.next_write()
             fp_read = self.batch_float.next_read()
             low_read = self.batch_low.next_read()
-            d_aqk = reinterpret(fp_read, layout=make_layout(matrix_shape))
-            d_lower = reinterpret(self.inverse_mask, layout=make_layout(matrix_shape))
-            query_exp = low_read.reinterpret(
-                offset=0, data_format="nz", layout=make_layout(feature_shape)
+            d_aqk = from_tensor(fp_read, layout=make_layout(matrix_shape))
+            d_lower = from_tensor(self.inverse_mask, layout=make_layout(matrix_shape))
+            query_exp = from_tensor(
+                low_read, offset=0, data_format="nz", layout=make_layout(feature_shape)
             )
-            key_exp = low_read.reinterpret(
-                offset=8192, data_format="nz", layout=make_layout(feature_shape)
+            key_exp = from_tensor(
+                low_read,
+                offset=8192,
+                data_format="nz",
+                layout=make_layout(feature_shape),
             )
-            key_inverse = low_read.reinterpret(
-                offset=16384, data_format="nz", layout=make_layout(feature_shape)
+            key_inverse = from_tensor(
+                low_read,
+                offset=16384,
+                data_format="nz",
+                layout=make_layout(feature_shape),
             )
-            d_output = low_read.reinterpret(
-                offset=24576, data_format="nz", layout=make_layout(matrix_shape)
+            d_output = from_tensor(
+                low_read,
+                offset=24576,
+                data_format="nz",
+                layout=make_layout(matrix_shape),
             )
-            d_unweighted = low_read.reinterpret(
-                offset=28672, data_format="nz", layout=make_layout(matrix_shape)
+            d_unweighted = from_tensor(
+                low_read,
+                offset=28672,
+                data_format="nz",
+                layout=make_layout(matrix_shape),
             )
-            query_low = fp_read.reinterpret(
+            query_low = from_tensor(
+                fp_read,
                 dtype=dtypes.bfloat16,
                 offset=8192,
                 data_format="nz",
                 layout=make_layout(feature_shape),
             )
-            key_low = fp_read.reinterpret(
+            key_low = from_tensor(
+                fp_read,
                 dtype=dtypes.bfloat16,
                 offset=16384,
                 data_format="nz",
                 layout=make_layout(feature_shape),
             )
-            inverse_low = fp_read.reinterpret(
+            inverse_low = from_tensor(
+                fp_read,
                 dtype=dtypes.bfloat16,
                 offset=24576,
                 data_format="nz",
@@ -6106,7 +6135,7 @@ class StageOneCausalOperandVector:
                         tile_slice(gm_gamma, feature_shape, (row_tile, 0)),
                     )
                 mem_copy(
-                    reinterpret(
+                    from_tensor(
                         fp_write,
                         offset=self.operand_batch_rows
                         * SUPPORTED_HEAD_DIM
@@ -6117,7 +6146,7 @@ class StageOneCausalOperandVector:
                 )
                 if const_expr(not self.resident_inverse):
                     mem_copy(
-                        reinterpret(
+                        from_tensor(
                             fp_write,
                             offset=(
                                 self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6139,14 +6168,14 @@ class StageOneCausalOperandVector:
                     query = tile_slice(low_read, feature_shape, (0, 0))
                     key = tile_slice(low_read, feature_shape, (1, 0))
                     gamma = tile_slice(fp_read, feature_shape, (0, 0))
-                d_aqk = reinterpret(
+                d_aqk = from_tensor(
                     fp_read,
                     offset=self.operand_batch_rows
                     * SUPPORTED_HEAD_DIM
                     * FP32_ELEMENT_BYTES,
                     layout=make_layout(matrix_shape),
                 )
-                d_lower = reinterpret(
+                d_lower = from_tensor(
                     fp_read,
                     offset=(
                         self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6157,7 +6186,7 @@ class StageOneCausalOperandVector:
                 )
                 if const_expr(self.resident_inverse):
                     d_lower = tile_slice(
-                        reinterpret(
+                        from_tensor(
                             self.inverse_mask,
                             layout=make_layout((CHUNK_SIZE // 2, CHUNK_SIZE)),
                         ),
@@ -6168,7 +6197,7 @@ class StageOneCausalOperandVector:
                 key_exp = tile_slice(low_read, feature_shape, (3, 0))
                 key_inverse = tile_slice(low_read, feature_shape, (4, 0))
                 # Matrix outputs are compact batch-by-64 views, not 128-stride slices.
-                d_output = reinterpret(
+                d_output = from_tensor(
                     low_read,
                     offset=5
                     * self.operand_batch_rows
@@ -6176,7 +6205,7 @@ class StageOneCausalOperandVector:
                     * BF16_ELEMENT_BYTES,
                     layout=make_layout(matrix_shape),
                 )
-                d_inverse = reinterpret(
+                d_inverse = from_tensor(
                     low_read,
                     offset=(
                         5 * self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6185,7 +6214,7 @@ class StageOneCausalOperandVector:
                     * BF16_ELEMENT_BYTES,
                     layout=make_layout(matrix_shape),
                 )
-                d_unweighted = reinterpret(
+                d_unweighted = from_tensor(
                     low_read,
                     offset=(
                         5 * self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6194,7 +6223,8 @@ class StageOneCausalOperandVector:
                     * BF16_ELEMENT_BYTES,
                     layout=make_layout(matrix_shape),
                 )
-                residual = fp_read.reinterpret(
+                residual = from_tensor(
+                    fp_read,
                     dtype=dtypes.bfloat16,
                     offset=(
                         self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6209,29 +6239,29 @@ class StageOneCausalOperandVector:
                 key_low = tile_slice(residual, feature_shape, (1, 0))
                 inverse_low = tile_slice(residual, feature_shape, (2, 0))
                 if const_expr(self.resident_inverse):
-                    query_exp = query_exp.reinterpret(
-                        data_format="nz", layout=make_layout(feature_shape)
+                    query_exp = from_tensor(
+                        query_exp, data_format="nz", layout=make_layout(feature_shape)
                     )
-                    key_exp = key_exp.reinterpret(
-                        data_format="nz", layout=make_layout(feature_shape)
+                    key_exp = from_tensor(
+                        key_exp, data_format="nz", layout=make_layout(feature_shape)
                     )
-                    key_inverse = key_inverse.reinterpret(
-                        data_format="nz", layout=make_layout(feature_shape)
+                    key_inverse = from_tensor(
+                        key_inverse, data_format="nz", layout=make_layout(feature_shape)
                     )
-                    query_low = query_low.reinterpret(
-                        data_format="nz", layout=make_layout(feature_shape)
+                    query_low = from_tensor(
+                        query_low, data_format="nz", layout=make_layout(feature_shape)
                     )
-                    key_low = key_low.reinterpret(
-                        data_format="nz", layout=make_layout(feature_shape)
+                    key_low = from_tensor(
+                        key_low, data_format="nz", layout=make_layout(feature_shape)
                     )
-                    inverse_low = inverse_low.reinterpret(
-                        data_format="nz", layout=make_layout(feature_shape)
+                    inverse_low = from_tensor(
+                        inverse_low, data_format="nz", layout=make_layout(feature_shape)
                     )
-                    d_output = d_output.reinterpret(
-                        data_format="nz", layout=make_layout(matrix_shape)
+                    d_output = from_tensor(
+                        d_output, data_format="nz", layout=make_layout(matrix_shape)
                     )
-                    d_unweighted = d_unweighted.reinterpret(
-                        data_format="nz", layout=make_layout(matrix_shape)
+                    d_unweighted = from_tensor(
+                        d_unweighted, data_format="nz", layout=make_layout(matrix_shape)
                     )
                 if (
                     token_start >= block_start
@@ -6466,7 +6496,7 @@ class StageOneCausalOperandVector:
                     )
                     mem_copy(
                         tile_slice(gm_d_output_matrix, matrix_shape, (row_tile, 0)),
-                        reinterpret(
+                        from_tensor(
                             low_read,
                             offset=5
                             * self.operand_batch_rows
@@ -6479,7 +6509,7 @@ class StageOneCausalOperandVector:
                         tile_slice(
                             gm_d_inverse_unweighted, matrix_shape, (row_tile, 0)
                         ),
-                        reinterpret(
+                        from_tensor(
                             low_read,
                             offset=(
                                 5 * self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6542,7 +6572,7 @@ class StageOneCausalOperandVector:
                 tile_slice(gm_gamma, feature_shape, (row_tile, 0)),
             )
             mem_copy(
-                reinterpret(
+                from_tensor(
                     fp_write,
                     offset=self.operand_batch_rows
                     * SUPPORTED_HEAD_DIM
@@ -6552,7 +6582,7 @@ class StageOneCausalOperandVector:
                 tile_slice(gm_d_Aqk, matrix_shape, (row_tile, 0)),
             )
             mem_copy(
-                reinterpret(
+                from_tensor(
                     fp_write,
                     offset=(
                         self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6569,14 +6599,14 @@ class StageOneCausalOperandVector:
             query = tile_slice(low_read, feature_shape, (0, 0))
             key = tile_slice(low_read, feature_shape, (1, 0))
             gamma = tile_slice(fp_read, feature_shape, (0, 0))
-            d_aqk = reinterpret(
+            d_aqk = from_tensor(
                 fp_read,
                 offset=self.operand_batch_rows
                 * SUPPORTED_HEAD_DIM
                 * FP32_ELEMENT_BYTES,
                 layout=make_layout(matrix_shape),
             )
-            d_lower = reinterpret(
+            d_lower = from_tensor(
                 fp_read,
                 offset=(
                     self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6589,7 +6619,7 @@ class StageOneCausalOperandVector:
             key_exp = tile_slice(low_read, feature_shape, (3, 0))
             key_inverse = tile_slice(low_read, feature_shape, (4, 0))
             # Matrix outputs are compact batch-by-64 views, not 128-stride slices.
-            d_output = reinterpret(
+            d_output = from_tensor(
                 low_read,
                 offset=5
                 * self.operand_batch_rows
@@ -6597,7 +6627,7 @@ class StageOneCausalOperandVector:
                 * BF16_ELEMENT_BYTES,
                 layout=make_layout(matrix_shape),
             )
-            d_inverse = reinterpret(
+            d_inverse = from_tensor(
                 low_read,
                 offset=(
                     5 * self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6606,7 +6636,7 @@ class StageOneCausalOperandVector:
                 * BF16_ELEMENT_BYTES,
                 layout=make_layout(matrix_shape),
             )
-            d_unweighted = reinterpret(
+            d_unweighted = from_tensor(
                 low_read,
                 offset=(
                     5 * self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6659,7 +6689,7 @@ class StageOneCausalOperandVector:
             )
             mem_copy(
                 tile_slice(gm_d_output_matrix, matrix_shape, (row_tile, 0)),
-                reinterpret(
+                from_tensor(
                     low_read,
                     offset=5
                     * self.operand_batch_rows
@@ -6670,7 +6700,7 @@ class StageOneCausalOperandVector:
             )
             mem_copy(
                 tile_slice(gm_d_inverse_unweighted, matrix_shape, (row_tile, 0)),
-                reinterpret(
+                from_tensor(
                     low_read,
                     offset=(
                         5 * self.operand_batch_rows * SUPPORTED_HEAD_DIM
@@ -6855,10 +6885,10 @@ class StageOneCausalOperandVector:
                         )
                         vstore_strided(
                             query_exp,
-                            row * 16 + half * 4 * query_exp.physical_stride[0],
+                            row * 16 + half * 4 * query_exp.physical_layout.stride[0],
                             packed_value,
                             packed_mask,
-                            block_stride=query_exp.physical_stride[0] // 16,
+                            block_stride=query_exp.physical_layout.stride[0] // 16,
                             repeat_stride=0,
                         )
                     else:
@@ -6879,10 +6909,11 @@ class StageOneCausalOperandVector:
                         )
                         vstore_strided(
                             query_exp_low,
-                            row * 16 + half * 4 * query_exp_low.physical_stride[0],
+                            row * 16
+                            + half * 4 * query_exp_low.physical_layout.stride[0],
                             packed_value,
                             packed_mask,
-                            block_stride=query_exp_low.physical_stride[0] // 16,
+                            block_stride=query_exp_low.physical_layout.stride[0] // 16,
                             repeat_stride=0,
                         )
                     else:
@@ -6914,10 +6945,10 @@ class StageOneCausalOperandVector:
                         )
                         vstore_strided(
                             key_exp,
-                            row * 16 + half * 4 * key_exp.physical_stride[0],
+                            row * 16 + half * 4 * key_exp.physical_layout.stride[0],
                             packed_value,
                             packed_mask,
-                            block_stride=key_exp.physical_stride[0] // 16,
+                            block_stride=key_exp.physical_layout.stride[0] // 16,
                             repeat_stride=0,
                         )
                     else:
@@ -6934,10 +6965,10 @@ class StageOneCausalOperandVector:
                         )
                         vstore_strided(
                             key_exp_low,
-                            row * 16 + half * 4 * key_exp_low.physical_stride[0],
+                            row * 16 + half * 4 * key_exp_low.physical_layout.stride[0],
                             packed_value,
                             packed_mask,
-                            block_stride=key_exp_low.physical_stride[0] // 16,
+                            block_stride=key_exp_low.physical_layout.stride[0] // 16,
                             repeat_stride=0,
                         )
                     else:
@@ -6970,10 +7001,12 @@ class StageOneCausalOperandVector:
                         )
                         vstore_strided(
                             key_inverse_exp,
-                            row * 16 + half * 4 * key_inverse_exp.physical_stride[0],
+                            row * 16
+                            + half * 4 * key_inverse_exp.physical_layout.stride[0],
                             packed_value,
                             packed_mask,
-                            block_stride=key_inverse_exp.physical_stride[0] // 16,
+                            block_stride=key_inverse_exp.physical_layout.stride[0]
+                            // 16,
                             repeat_stride=0,
                         )
                     else:
@@ -6995,10 +7028,11 @@ class StageOneCausalOperandVector:
                         vstore_strided(
                             key_inverse_exp_low,
                             row * 16
-                            + half * 4 * key_inverse_exp_low.physical_stride[0],
+                            + half * 4 * key_inverse_exp_low.physical_layout.stride[0],
                             packed_value,
                             packed_mask,
-                            block_stride=key_inverse_exp_low.physical_stride[0] // 16,
+                            block_stride=key_inverse_exp_low.physical_layout.stride[0]
+                            // 16,
                             repeat_stride=0,
                         )
                     else:
@@ -7204,7 +7238,7 @@ class StageOneCausalOperandVector:
                         row * 16,
                         packed_value,
                         packed_mask,
-                        block_stride=d_output_matrix.physical_stride[0] // 16,
+                        block_stride=d_output_matrix.physical_layout.stride[0] // 16,
                         repeat_stride=0,
                     )
                 else:
@@ -7232,7 +7266,8 @@ class StageOneCausalOperandVector:
                         row * 16,
                         packed_value,
                         packed_mask,
-                        block_stride=d_inverse_unweighted.physical_stride[0] // 16,
+                        block_stride=d_inverse_unweighted.physical_layout.stride[0]
+                        // 16,
                         repeat_stride=0,
                     )
                 else:
@@ -7839,7 +7874,7 @@ class StageOneCausalResultVector:
                             tile_slice(gm_d_gate, shape, (row_tile, 0)),
                         )
                         mem_copy(
-                            reinterpret(
+                            from_tensor(
                                 fp_write,
                                 offset=10
                                 * self.result_batch_rows
@@ -7870,7 +7905,7 @@ class StageOneCausalResultVector:
                     prior_q = self._batch_plane(fp_read, 7)
                     prior_k = self._batch_plane(fp_read, 8)
                     prior_g = self._batch_plane(fp_read, 9)
-                    prior_beta = reinterpret(
+                    prior_beta = from_tensor(
                         fp_read,
                         offset=10
                         * self.result_batch_rows
@@ -7980,7 +8015,7 @@ class StageOneCausalResultVector:
                             (self.result_batch_rows,),
                             (full_row // self.result_batch_rows,),
                         ),
-                        reinterpret(
+                        from_tensor(
                             fp_read,
                             offset=10
                             * self.result_batch_rows
@@ -7997,7 +8032,7 @@ class StageOneCausalResultVector:
                     prior_q = self._batch_plane(fp_write, 7)
                     prior_k = self._batch_plane(fp_write, 8)
                     prior_g = self._batch_plane(fp_write, 9)
-                    prior_beta = reinterpret(
+                    prior_beta = from_tensor(
                         fp_write,
                         offset=10
                         * self.result_batch_rows
@@ -8031,7 +8066,7 @@ class StageOneCausalResultVector:
                             (self.result_batch_rows,),
                             (full_row // self.result_batch_rows,),
                         ),
-                        reinterpret(
+                        from_tensor(
                             fp_read,
                             offset=10
                             * self.result_batch_rows
@@ -9026,7 +9061,7 @@ def _finish_masked_track_chunk(
                     diagonal_ready = 1
             if get_subblock_id() == 0:
                 if valid_rows == CHUNK_SIZE:
-                    if beta_source.physical_stride[-2] == 1:
+                    if beta_source.physical_layout.stride[-2] == 1:
                         vector.load_contiguous_beta_chunk(
                             beta_source, raw_row_start, gm_beta, scratch_chunk
                         )
@@ -9160,7 +9195,7 @@ def _finish_masked_track_chunk(
                         beta_output_rows = 0
                 if (
                     beta_output_rows == CHUNK_SIZE
-                    and beta_destination.physical_stride[-2] == 1
+                    and beta_destination.physical_layout.stride[-2] == 1
                 ):
                     vector.store_contiguous_beta_chunk(
                         gm_d_beta, scratch_chunk, beta_destination, raw_row_start
@@ -9327,7 +9362,11 @@ def _finish_masked_track_chunk(
 class SingleChunkGateSensitivity:
     """Rebuild a short chunk's A_log and beta derivatives entirely in FP32.
 
-    A dot denotes d/dA_log. Only the softplus gate satisfies G_dot = G.
+    A dot denotes d/dA_log. Softplus satisfies G_dot = G, so cumulative
+    gamma doubles as its own derivative; bounded gates instead accumulate
+    gamma_dot = cumsum(x * B * sigmoid(x) * (1 - sigmoid(x))) from the raw
+    gate. Both modes publish the same gamma_dot buffer, and every derivative
+    position reads gamma_dot while value positions keep reading gamma.
     For each value column solve L*z = rhs, then L*zdot = rhsdot - Ldot*z,
     where L is the unit-lower chunk system and z is the corrected value.
     Differentiate the chunk output and final-state formulas using z/zdot;
@@ -9340,15 +9379,15 @@ class SingleChunkGateSensitivity:
         # The six windows total exactly 67,360 bytes; arithmetic scratch below
         # remains separate and total UB capacity is unchanged.
         io_storage = RingBuffer(
-            MemLoc.UB, dtypes.uint8, make_layout((67360,)), depth=1
+            MemLoc.UB, dtypes.uint8, make_layout((67872,)), depth=1
         ).next_write()
-        self.qk = reinterpret(
+        self.qk = from_tensor(
             io_storage,
             dtype=dtypes.bfloat16,
             layout=make_layout((2 * CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
             offset=0,
         )
-        self.gamma = reinterpret(
+        self.gamma = from_tensor(
             io_storage,
             dtype=dtypes.float32,
             layout=make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)),
@@ -9358,7 +9397,7 @@ class SingleChunkGateSensitivity:
         self.coefficients = Buffer(
             MemLoc.UB, dtypes.float32, make_layout((4, CHUNK_SIZE, CHUNK_SIZE))
         )
-        self.beta_partial = reinterpret(
+        self.beta_partial = from_tensor(
             io_storage,
             dtype=dtypes.float32,
             layout=make_layout((1, CHUNK_SIZE)),
@@ -9369,13 +9408,13 @@ class SingleChunkGateSensitivity:
         # U, dZ, and the cross-value beta sum. Zdot storage becomes the
         # triangular adjoint only after the last output has consumed it.
         self.beta_work = Buffer(MemLoc.UB, dtypes.float32, make_layout((3, CHUNK_SIZE)))
-        self.low_io = reinterpret(
+        self.low_io = from_tensor(
             io_storage,
             dtype=dtypes.bfloat16,
             layout=make_layout((2, SUPPORTED_HEAD_DIM)),
             offset=65792,
         )
-        self.state_io = reinterpret(
+        self.state_io = from_tensor(
             io_storage,
             dtype=dtypes.float32,
             layout=make_layout((2, SUPPORTED_HEAD_DIM)),
@@ -9387,12 +9426,191 @@ class SingleChunkGateSensitivity:
         self.loss = Buffer(
             MemLoc.UB, dtypes.float32, make_layout((1, GATE_SCALAR_TRANSFER_WIDTH))
         )
-        self.publish = reinterpret(
+        # Kahan compensation for the long dA accumulation: thousands of
+        # cancelling FP32 terms otherwise drift at the same order as the
+        # peer's own error, which the cross_check ratio then amplifies.
+        self.loss_error = Buffer(
+            MemLoc.UB, dtypes.float32, make_layout((1, GATE_SCALAR_TRANSFER_WIDTH))
+        )
+        self.publish = from_tensor(
             io_storage,
             dtype=dtypes.float32,
             layout=make_layout((1, GATE_SCALAR_TRANSFER_WIDTH)),
             offset=67328,
         )
+        # FP32 staging for one raw gate or bias row during the bounded build.
+        self.gate_io = from_tensor(
+            io_storage,
+            dtype=dtypes.float32,
+            layout=make_layout((1, SUPPORTED_HEAD_DIM)),
+            offset=67360,
+        )
+        # Cumulative d(gamma)/d(A_log); identical to gamma for softplus.
+        # Plain scratch: filled by vector code after the gamma loads, so no
+        # cross-pipe synchronization is needed.
+        self.gate_dot = Buffer(
+            MemLoc.UB, dtypes.float32, make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM))
+        )
+        self.gate_running = Buffer(
+            MemLoc.UB, dtypes.float32, make_layout((1, SUPPORTED_HEAD_DIM))
+        )
+        self.gate_bias = Buffer(
+            MemLoc.UB, dtypes.float32, make_layout((1, SUPPORTED_HEAD_DIM))
+        )
+
+    @jit
+    def _copy_gate_dot(self, gamma, valid_rows):
+        """Softplus: d(gamma)/d(A_log) equals gamma itself, row by row."""
+        with vf(mode="simd"):
+            full = create_mask(pattern="all")
+            for row in range(valid_rows):
+                for half in range(2):
+                    offset = row * SUPPORTED_HEAD_DIM + half * D_HALF
+                    vstore(
+                        self.gate_dot,
+                        offset,
+                        vload(gamma, offset),
+                        full,
+                    )
+            vmem_bar("vst_vld")
+
+    @jit
+    def _zero_gate_bias(self):
+        with vf(mode="simd"):
+            full = create_mask(pattern="all")
+            vstore(
+                self.gate_bias,
+                0,
+                vdups(0.0, dtypes.float32, mask=full),
+                full,
+            )
+            vmem_bar("vst_vld")
+
+    @jit
+    def _load_gate_bias(self, bias_source, value_head):
+        mem_copy(
+            tile_slice(self.gate_io, (1, SUPPORTED_HEAD_DIM), (0, 0)),
+            tile_slice(bias_source, (1, SUPPORTED_HEAD_DIM), (value_head, 0)),
+        )
+        with vf(mode="simd"):
+            full = create_mask(pattern="all")
+            for half in range(2):
+                offset = half * D_HALF
+                vstore(
+                    self.gate_bias,
+                    offset,
+                    vload(self.gate_io, offset),
+                    full,
+                )
+            vmem_bar("vst_vld")
+
+    @jit
+    def _build_gate_dot_bounded_rows(
+        self,
+        gate_source,
+        alog,
+        bound,
+        token_start,
+        valid_rows,
+        fp32_gate: Constexpr[bool],
+    ):
+        """Stage one full raw gate row per step, extend gamma_dot."""
+        for row in range(valid_rows):
+            if const_expr(fp32_gate):
+                mem_copy(
+                    tile_slice(self.gate_io, (1, SUPPORTED_HEAD_DIM), (0, 0)),
+                    tile_slice(
+                        gate_source, (1, SUPPORTED_HEAD_DIM), (token_start + row, 0)
+                    ),
+                )
+                staged = self.gate_io
+            else:
+                mem_copy(
+                    tile_slice(self.low_io, (1, SUPPORTED_HEAD_DIM), (0, 0)),
+                    tile_slice(
+                        gate_source, (1, SUPPORTED_HEAD_DIM), (token_start + row, 0)
+                    ),
+                )
+                staged = self.low_io
+            self._gate_dot_row(staged, row, alog, bound, fp32_gate)
+
+    @jit
+    def _gate_dot_row(
+        self, staged, row, alog, bound, fp32_gate: Constexpr[bool]
+    ):
+        # Both halves on every AIV: the coefficient and solve stages read the
+        # full gate_dot rows, so each AIV publishes a complete local copy.
+        with vf(mode="simd"):
+            full = create_mask(pattern="all")
+            for half in range(2):
+                offset = half * D_HALF
+                if const_expr(fp32_gate):
+                    raw = vload(staged, offset)
+                else:
+                    raw = vcast(
+                        vload_unpack(
+                            staged, offset, unpack_mode=UnpackMode.B16_TO_B32
+                        ),
+                        dtypes.float32,
+                        mask=full,
+                    )
+                bias = vload(self.gate_bias, offset)
+                pre = vadd(raw, bias, mask=full)
+                # Match the general dA path's logit convention: the bounded
+                # gate is B * sigmoid(+alpha * (bias + g)), so x here equals
+                # d(logit)/d(A_log) = alpha * (bias + g) with its own sign.
+                alpha = vexp(vdups(alog, dtypes.float32, mask=full), mask=full)
+                x = vmul(alpha, pre, mask=full)
+                sigmoid = vdiv(
+                    vdups(1.0, dtypes.float32, mask=full),
+                    vadds(vexp(x, mask=full), 1.0, mask=full),
+                    mask=full,
+                )
+                one_minus = vadds(vmuls(sigmoid, -1.0, mask=full), 1.0, mask=full)
+                # G_dot = x * B * s * (1 - s); x carries the sign, so the
+                # bound factor enters with its public negative value.
+                step = vmuls(
+                    vmul(vmul(x, sigmoid, mask=full), one_minus, mask=full),
+                    bound,
+                    mask=full,
+                )
+                running = vadd(vload(self.gate_running, offset), step, mask=full)
+                vstore(self.gate_running, offset, running, full)
+                vstore(
+                    self.gate_dot, row * SUPPORTED_HEAD_DIM + offset, running, full
+                )
+            vmem_bar("vst_vld")
+
+    @jit
+    def _build_gate_dot(
+        self,
+        gamma,
+        gate_source,
+        bias_source,
+        alog,
+        bound,
+        softplus,
+        has_bias,
+        value_head,
+        token_start,
+        valid_rows,
+    ):
+        """Publish cumulative d(gamma)/d(A_log) into gate_dot for both modes."""
+        if softplus:
+            self._copy_gate_dot(gamma, valid_rows)
+        else:
+            if has_bias:
+                self._load_gate_bias(bias_source, value_head)
+            else:
+                self._zero_gate_bias()
+            if const_expr(gate_source.dtype == dtypes.float32):
+                self._build_gate_dot_bounded_rows(
+                    gate_source, alog, bound, token_start, valid_rows, True
+                )
+            else:
+                self._build_gate_dot_bounded_rows(
+                    gate_source, alog, bound, token_start, valid_rows, False
+                )
 
     @jit
     def process_task(
@@ -9418,6 +9636,12 @@ class SingleChunkGateSensitivity:
         beta_fp32: Constexpr[bool],
         fused_beta: dtypes.int64,
         inverse_factor: dtypes.float32,
+        gate_source,
+        bias_source,
+        gate_alog: dtypes.float32,
+        gate_bound: dtypes.float32,
+        gate_softplus: dtypes.int64,
+        gate_has_bias: dtypes.int64,
     ):
         """One sequence/value-head task; caller ensures 0 < length <= 64.
 
@@ -9473,6 +9697,20 @@ class SingleChunkGateSensitivity:
             self._convert_value_output(self.low_io, row)
         qk = self.qk
         gamma = self.gamma
+        # Both gate modes publish cumulative d(gamma)/d(A_log) first; every
+        # derivative position below reads gate_dot, value positions read gamma.
+        self._build_gate_dot(
+            gamma,
+            gate_source,
+            bias_source,
+            gate_alog,
+            gate_bound,
+            gate_softplus,
+            gate_has_bias,
+            value_head,
+            token_start,
+            valid_rows,
+        )
         self._build_coefficients(qk, gamma, valid_rows)
         self._zero_loss()
         for value in range(
@@ -9599,6 +9837,12 @@ class SingleChunkGateSensitivity:
                 vdups(0.0, dtypes.float32, mask=scalar_storage),
                 scalar_storage,
             )
+            vstore(
+                self.loss_error,
+                0,
+                vdups(0.0, dtypes.float32, mask=scalar_storage),
+                scalar_storage,
+            )
             full = create_mask(pattern="all")
             vstore(
                 self.beta_work,
@@ -9657,22 +9901,34 @@ class SingleChunkGateSensitivity:
             vstore(self.beta_work, 0, zero, full)
             vstore(self.beta_work, CHUNK_SIZE, zero, full)
             loss = vload_broadcast(self.loss, 0)
+            loss_error = vload_broadcast(self.loss_error, 0)
             for half in range(2):
                 offset = half * D_HALF
                 last = vload(gamma, (valid_rows - 1) * SUPPORTED_HEAD_DIM + offset)
+                last_dot = vload(
+                    self.gate_dot, (valid_rows - 1) * SUPPORTED_HEAD_DIM + offset
+                )
                 initial = vload(state, offset)
                 seed = vload(state, SUPPORTED_HEAD_DIM + offset)
                 direct = vmul(
                     vmul(
-                        vmul(vexp(last, mask=full), last, mask=full),
+                        vmul(vexp(last, mask=full), last_dot, mask=full),
                         initial,
                         mask=full,
                     ),
                     seed,
                     mask=full,
                 )
-                loss = vadd(loss, vreduce_sum(direct, mask=full), mask=scalar)
+                increment = vsub(
+                    vreduce_sum(direct, mask=full), loss_error, mask=scalar
+                )
+                updated = vadd(loss, increment, mask=scalar)
+                loss_error = vsub(
+                    vsub(updated, loss, mask=scalar), increment, mask=scalar
+                )
+                loss = updated
             vstore_first(self.loss, 0, loss)
+            vstore_first(self.loss_error, 0, loss_error)
             vmem_bar("vst_vld")
 
     @jit
@@ -9720,12 +9976,17 @@ class SingleChunkGateSensitivity:
                             vload(gamma, col * SUPPORTED_HEAD_DIM + offset),
                             mask=full,
                         )
+                        delta_dot = vsub(
+                            vload(self.gate_dot, row * SUPPORTED_HEAD_DIM + offset),
+                            vload(self.gate_dot, col * SUPPORTED_HEAD_DIM + offset),
+                            mask=full,
+                        )
                         key_ratio = vmul(kj, vexp(delta, mask=full), mask=full)
                         kk = vmul(ki, key_ratio, mask=full)
                         lower = vadd(lower, vreduce_sum(kk, mask=full), mask=scalar)
                         lower_dot = vadd(
                             lower_dot,
-                            vreduce_sum(vmul(kk, delta, mask=full), mask=full),
+                            vreduce_sum(vmul(kk, delta_dot, mask=full), mask=full),
                             mask=scalar,
                         )
                         query_key = vmul(qi, key_ratio, mask=full)
@@ -9734,7 +9995,9 @@ class SingleChunkGateSensitivity:
                         )
                         output_dot = vadd(
                             output_dot,
-                            vreduce_sum(vmul(query_key, delta, mask=full), mask=full),
+                            vreduce_sum(
+                                vmul(query_key, delta_dot, mask=full), mask=full
+                            ),
                             mask=scalar,
                         )
                     offset = row * CHUNK_SIZE + col
@@ -9799,6 +10062,7 @@ class SingleChunkGateSensitivity:
                     mask=full,
                 )
                 g = vload(gamma, row * SUPPORTED_HEAD_DIM + offset)
+                g_dot = vload(self.gate_dot, row * SUPPORTED_HEAD_DIM + offset)
                 e = vexp(g, mask=full)
                 initial = vload(state, offset)
                 key_initial = vmul(vmul(e, k, mask=full), initial, mask=full)
@@ -9812,13 +10076,15 @@ class SingleChunkGateSensitivity:
                     zdot,
                     vmul(
                         beta,
-                        vreduce_sum(vmul(g, key_initial, mask=full), mask=full),
+                        vreduce_sum(vmul(g_dot, key_initial, mask=full), mask=full),
                         mask=scalar,
                     ),
                     mask=scalar,
                 )
                 q_direct = vmul(
-                    vmul(vmul(g, e, mask=full), q, mask=full), initial, mask=full
+                    vmul(vmul(g_dot, e, mask=full), q, mask=full),
+                    initial,
+                    mask=full,
                 )
                 odot = vadd(
                     odot,
@@ -9835,7 +10101,11 @@ class SingleChunkGateSensitivity:
                     mask=scalar,
                 )
                 last = vload(gamma, (valid_rows - 1) * SUPPORTED_HEAD_DIM + offset)
+                last_dot = vload(
+                    self.gate_dot, (valid_rows - 1) * SUPPORTED_HEAD_DIM + offset
+                )
                 delta = vsub(last, g, mask=full)
+                delta_dot = vsub(last_dot, g_dot, mask=full)
                 kg = vmul(vexp(delta, mask=full), k, mask=full)
                 seed = vload(state, SUPPORTED_HEAD_DIM + offset)
                 kg_seed = vmul(kg, seed, mask=full)
@@ -9844,7 +10114,7 @@ class SingleChunkGateSensitivity:
                 )
                 final_coefficient_dot = vadd(
                     final_coefficient_dot,
-                    vreduce_sum(vmul(delta, kg_seed, mask=full), mask=full),
+                    vreduce_sum(vmul(delta_dot, kg_seed, mask=full), mask=full),
                     mask=scalar,
                 )
             # Two unit-lower solves. j<i guarantees every exponential is of
@@ -9910,14 +10180,28 @@ class SingleChunkGateSensitivity:
                 self.value_output,
                 (CHUNK_SIZE + row) * D_HALF + value - get_subblock_id() * D_HALF,
             )
-            loss = vadd(loss, vmul(seed, odot, mask=scalar), mask=scalar)
+            loss_error = vload_broadcast(self.loss_error, 0)
+            increment = vsub(
+                vmul(seed, odot, mask=scalar), loss_error, mask=scalar
+            )
+            updated = vadd(loss, increment, mask=scalar)
+            loss_error = vsub(
+                vsub(updated, loss, mask=scalar), increment, mask=scalar
+            )
+            loss = updated
             term = vadd(
                 vmul(final_coefficient_dot, z, mask=scalar),
                 vmul(final_coefficient, zdot, mask=scalar),
                 mask=scalar,
             )
-            loss = vadd(loss, term, mask=scalar)
+            increment = vsub(term, loss_error, mask=scalar)
+            updated = vadd(loss, increment, mask=scalar)
+            loss_error = vsub(
+                vsub(updated, loss, mask=scalar), increment, mask=scalar
+            )
+            loss = updated
             vstore_first(self.loss, 0, loss)
+            vstore_first(self.loss_error, 0, loss_error)
             vmem_bar("vst_vld")
 
     @jit
@@ -10009,6 +10293,12 @@ def _run_single_chunk_gate_sensitivity(
     gm_metadata,
     gm_dA,
     gm_d_beta,
+    gm_raw_gate,
+    gm_A_log,
+    gm_dt_bias,
+    lower_bound: dtypes.float32,
+    softplus: dtypes.int64,
+    has_bias: dtypes.int64,
     scale: dtypes.float32,
     heads_per_key_head: dtypes.int64,
     beta_fp32: Constexpr[bool],
@@ -10086,6 +10376,12 @@ def _run_single_chunk_gate_sensitivity(
                     beta_fp32,
                     fused_beta,
                     inverse_factor,
+                    gm_raw_gate[token_batch, head, None, None],
+                    gm_dt_bias,
+                    gm_A_log[head],
+                    lower_bound,
+                    softplus,
+                    has_bias,
                 )
 
 
@@ -11754,14 +12050,14 @@ def _validate_backward_inputs(
     beta_sigmoid: Optional[torch.Tensor],
     A_log: Optional[torch.Tensor],
     dt_bias: Optional[torch.Tensor],
-    metadata: torch.Tensor,
+    metadata: Optional[torch.Tensor] = None,
     use_qk_l2norm_in_kernel: bool = True,
     use_gate_in_kernel: bool = True,
     use_beta_sigmoid_in_kernel: bool = True,
     allow_neg_eigval: bool = False,
     lower_bound: Optional[float] = None,
     layout: str = "TND",
-    disable_recompute: bool = True,
+    disable_recompute: bool = False,
     initial_state: Optional[torch.Tensor] = None,
 ):
     """Validate the saved-cache ABI before preparing any compute launch."""
@@ -11985,7 +12281,10 @@ def _track_chunk_plan(q, v, layout, metadata, block_size, staged=False):
 def _resolve_backward_metadata(q, v, layout, metadata, cu_seqlens, seqused):
     """Require caller-supplied metadata and check any explicit lengths."""
     if metadata is None:
-        raise ValueError("metadata is required; call flash_kda_grad_metadata first")
+        raise ValueError(
+            "metadata is required: passing None is not supported yet; "
+            "call flash_kda_grad_metadata first"
+        )
     if cu_seqlens is None and seqused is None:
         return metadata
     if cu_seqlens is not None and layout != "TND":
@@ -12254,11 +12553,18 @@ class _RecomputeBackwardKernel:
                 stage_one_fused_beta,
                 has_initial_state,
                 gm_owner_schedule,
-                True,
+                staged or needs_masked_chunks or not use_full_chunks,
             )
-            # Reconstruct chunk products and FP32 state with one common schedule.
+            # Full, unmasked persistent owners can reconstruct locally.
             # Publish every cache before either backward template changes owners.
-            _sync_cube_vector_handoff(2, grid=True)
+            if const_expr(
+                use_full_chunks and needs_masked_chunks and cube_causal and not staged
+            ):
+                # Reconstruction has drained and published its GM caches. Only
+                # the persistent full/tail Cube path needs a fresh ID epoch.
+                _sync_cube_vector_handoff(2, grid=True, reset_sync_id=True)
+            else:
+                _sync_cube_vector_handoff(2, grid=True)
             _backward_template(staged)(
                 stage_two_gm_Aqk,
                 stage_two_gm_qg,
@@ -12775,7 +13081,23 @@ def _export_recompute_programs(shard=(0, 1)):
         program.close()
 
 
-@torch.no_grad()
+def _disable_grad_at_call(fn):
+    """Run ``fn`` with grad recording disabled, entering ``no_grad`` per call.
+
+    The build-time torch stub used by host layout discovery only exposes
+    symbolic declarations and has no ``no_grad`` attribute, so the context
+    manager must not be created while this module is imported.
+    """
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        with torch.no_grad():
+            return fn(*args, **kwargs)
+
+    return wrapper
+
+
+@_disable_grad_at_call
 def flash_kda_grad_npu(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -12786,7 +13108,7 @@ def flash_kda_grad_npu(
     dht: torch.Tensor,
     Aqk: torch.Tensor,
     Akk: torch.Tensor,
-    metadata: torch.Tensor,
+    metadata: Optional[torch.Tensor] = None,
     initial_state: Optional[torch.Tensor] = None,
     chunk_states: Optional[torch.Tensor] = None,
     w: Optional[torch.Tensor] = None,
@@ -12807,7 +13129,7 @@ def flash_kda_grad_npu(
     use_gate_in_kernel: bool = True,
     use_beta_sigmoid_in_kernel: bool = True,
     allow_neg_eigval: bool = False,
-    disable_recompute: bool = True,
+    disable_recompute: bool = False,
     lower_bound: Optional[float] = None,
     layout: str = "TND",
 ):
@@ -12818,7 +13140,10 @@ def flash_kda_grad_npu(
     disable_recompute=False rebuilds w/u/v_new/qg/kg/g_cumsum and
     FP32 chunk_states, ignoring those seven supplied caches. initial_state
     is the forward's FP32 [B,Nv,128,128] state; None means a zero state.
-    True (default) uses the separate saved-cache kernel and requires all seven caches.
+    False (default) rebuilds the caches to save device memory; True uses the
+    separate saved-cache kernel and requires all seven caches.
+    metadata is a required input today: it is declared optional in the schema so
+    callers can omit it once metadata derivation lands, but passing None raises.
     Aqk/Akk are required Tensor arguments in both modes; conditional
     normalization/beta caches remain required when their fusion is enabled.
     g/beta independently accept BF16 or FP32. Reconstruction rounds raw g/beta
@@ -13039,12 +13364,12 @@ def flash_kda_grad_from_forward(
     forward_outputs: tuple[torch.Tensor | None, ...],
     A_log: Optional[torch.Tensor],
     dt_bias: Optional[torch.Tensor],
-    metadata: torch.Tensor,
+    metadata: Optional[torch.Tensor] = None,
     scale: Optional[float] = None,
     *,
     cu_seqlens: Optional[torch.Tensor] = None,
     seqused: Optional[torch.Tensor] = None,
-    disable_recompute: bool = True,
+    disable_recompute: bool = False,
     initial_state: Optional[torch.Tensor] = None,
     chunk_states_fp32: Optional[torch.Tensor] = None,
     use_qk_l2norm_in_kernel: bool = True,
@@ -13133,6 +13458,30 @@ def flash_kda_grad_from_forward(
 from cannbotdsl import aot  # noqa: E402 - Keep the existing module initialization order.
 
 
+def _compile_recompute_export_variant(*variant):
+    """Compile one recompute AOT variant (invoked by the AOT variant pool)."""
+    specs, scalars = _recompute_dynamic_compile_request(*variant)
+    cannbotdsl.compile(_RecomputeBackward().run, *specs, *scalars)
+
+
+def _compile_export_variant(kind, *variant):
+    """Compile exactly one AOT variant; entry point of the parallel variant pool."""
+    if kind == "backward":
+        _compile_backward_program(*variant)
+    elif kind == "recompute":
+        _compile_recompute_export_variant(*variant)
+    else:
+        raise ValueError(f"unknown AOT variant kind: {kind!r}")
+
+
+def _export_variant_calls():
+    """Enumerate every AOT variant without compiling, so the build can batch them."""
+    for variant in _backward_variants():
+        yield ("backward", *variant), {}
+    for variant in _backward_variants():
+        yield ("recompute", *variant), {}
+
+
 @aot.export("flash_kda_grad")
 def export_flash_kda_grad():
     """Export both templates, cache modes and independent g/beta storage types."""
@@ -13146,6 +13495,15 @@ def export_flash_kda_grad():
         for entry in entries:
             _close_backward_program(entry)
     _export_recompute_programs(shard)
+
+
+# Declare the variants so the build compiles them one call at a time in its worker
+# pool instead of running the whole export body serially. Builds that do not
+# understand this attribute keep calling ``export_flash_kda_grad`` above.
+export_flash_kda_grad.__cannbot_aot_variants__ = (
+    "_compile_export_variant",
+    _export_variant_calls,
+)
 
 
 __all__ = ["flash_kda_grad_npu", "flash_kda_grad_from_forward"]

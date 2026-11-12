@@ -31,6 +31,7 @@
 
 |    接口名   |   说明     |  确定性说明（A2/A3）  | 确定性说明（Ascend 950） |
 | ----------- | ------------------- | ------------------- | ------------------- |
+|[flash_kda_grad](../../attention/flash_kda_grad/docs/torchapi_flash_kda_grad.md)|FlashKDA DSL训练反向，支持保存缓存和重计算。|-|沿用DSL算子实现|
 |[block_attn_res_prepare](../../attention/block_attn_res_prepare/docs/torchapi_block_attn_res_prepare.md)|完成 Attention Residuals 历史残差注意力两阶段计算的第一阶段，返回 softmax 加权分子及统计量。|-|默认支持确定性计算|
 |[block_attn_res_update](../../attention/block_attn_res_update/docs/torchapi_block_attn_res_update.md)|将`delta`原地累加到`partial_block`，计算更新后`partial_block`的RMSNorm score，并与历史online softmax中间状态合并，返回当前层结果`h`。|-|默认确定性实现|
 |[block_attention_residuals](../../mhc/block_attention_residuals/docs/torchapi_block_attention_residuals.md)|将 `partial_block` 与 `block_res` 拼接后完成 RMS、投影打分与 Softmax 加权融合，输出 `hidden_states`。|默认支持确定性计算|默认支持确定性计算|

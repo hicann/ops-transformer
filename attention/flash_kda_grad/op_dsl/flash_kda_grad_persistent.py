@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 from cannbotdsl import (
+    RoundingMode,
+    from_tensor,
     Buffer,
     Constexpr,
     MemLoc,
@@ -18,13 +20,12 @@ from cannbotdsl import (
     const_expr,
     dtypes,
 )
-from cannbotdsl import make_layout, permute
+from cannbotdsl import make_layout
 from cannbotdsl.ring_buffer import RingBuffer
 from cannbotdsl.lang.jit import jit
 from cannbotdsl.lang.control_flow import range as drange
 from cannbotdsl.lang.vf import vf
 from cannbotdsl.ops.reg import (
-    RoundingMode,
     create_mask,
     update_mask,
     vadd,
@@ -57,7 +58,7 @@ from cannbotdsl.ops.sync import (
     vec_sync_block_arrive,
     vec_sync_block_wait,
 )
-from cannbotdsl.tensor import reinterpret, tile_slice
+from cannbotdsl.tensor import tile_slice
 
 # Shared arithmetic and metadata constants live in the public entry module.
 if __package__:
@@ -258,8 +259,8 @@ class StageTwoTrack:
         with vf(mode="simd"):
             full = create_mask(pattern="all")
             packed, _ = update_mask(D_HALF, elem_bits=16)
-            nz_stride = self.state_nz.physical_stride[0]
-            saved_stride = self.saved_nz.physical_stride[0]
+            nz_stride = self.state_nz.physical_layout.stride[0]
+            saved_stride = self.saved_nz.physical_layout.stride[0]
             total = vdups(0.0, dtypes.float32, mask=full)
             for row in range(VALUE_DIM):
                 value = vload(self.state, row * D_HALF)
@@ -361,19 +362,19 @@ class StageTwoTrack:
 
     @jit
     def _outer(self, left, right):
-        mem_copy(self.outer_a.next_write(), permute(left, (1, 0)))
+        mem_copy(self.outer_a.next_write(), left.permute((1, 0)))
         mem_copy(
-            reinterpret(
+            from_tensor(
                 self.token_b.next_write(),
                 data_format="nz",
                 layout=make_layout((KEY_DIM, CHUNK_SIZE)),
             ),
-            permute(right, (1, 0)),
+            right.permute((1, 0)),
         )
         matmul(
             self.state_c.next_write(),
             self.outer_a.next_read(),
-            reinterpret(
+            from_tensor(
                 self.token_b.next_read(),
                 data_format="nz",
                 layout=make_layout((KEY_DIM, CHUNK_SIZE)),
@@ -381,16 +382,16 @@ class StageTwoTrack:
             init=True,
         )
         mem_copy(
-            reinterpret(
+            from_tensor(
                 self.result.next_write(),
                 data_format="nd",
                 layout=make_layout((VALUE_DIM, D_HALF)),
             )
             if self.dqg_cache is not None
-            else reinterpret(
+            else from_tensor(
                 self.result.next_write(), layout=make_layout((VALUE_DIM, D_HALF))
             ),
-            reinterpret(
+            from_tensor(
                 self.state_c.next_read(), layout=make_layout((VALUE_DIM, KEY_DIM))
             ).partition(dim=1),
         )
@@ -398,27 +399,27 @@ class StageTwoTrack:
     @jit
     def _store_token_result(self, result, destination, resident=None):
         mem_copy(
-            reinterpret(
+            from_tensor(
                 self.result.next_write(),
                 data_format="nd",
                 layout=make_layout((CHUNK_SIZE // 2, KEY_DIM)),
             )
             if self.dqg_cache is not None
-            else reinterpret(
+            else from_tensor(
                 self.result.next_write(), layout=make_layout((CHUNK_SIZE // 2, KEY_DIM))
             ),
-            reinterpret(result, layout=make_layout((CHUNK_SIZE, KEY_DIM))).partition(
+            from_tensor(result, layout=make_layout((CHUNK_SIZE, KEY_DIM))).partition(
                 dim=0
             ),
         )
         local_result = (
-            reinterpret(
+            from_tensor(
                 self.result.next_read(),
                 data_format="nd",
                 layout=make_layout((CHUNK_SIZE // 2, KEY_DIM)),
             )
             if self.dqg_cache is not None
-            else reinterpret(
+            else from_tensor(
                 self.result.next_read(), layout=make_layout((CHUNK_SIZE // 2, KEY_DIM))
             )
         )
@@ -437,7 +438,7 @@ class StageTwoTrack:
         self, token, state, destination, scale: dtypes.float32, resident=None
     ):
         mem_copy(self.token_a.next_write(), token)
-        mem_copy(self.state_b.next_write(), permute(state, (1, 0)))
+        mem_copy(self.state_b.next_write(), state.permute((1, 0)))
         matmul(
             self.token_c.next_write(),
             self.token_a.next_read(),
@@ -445,27 +446,27 @@ class StageTwoTrack:
             init=True,
         )
         mem_copy(
-            reinterpret(
+            from_tensor(
                 self.result.next_write(),
                 data_format="nd",
                 layout=make_layout((CHUNK_SIZE // 2, KEY_DIM)),
             )
             if self.dqg_cache is not None
-            else reinterpret(
+            else from_tensor(
                 self.result.next_write(), layout=make_layout((CHUNK_SIZE // 2, KEY_DIM))
             ),
-            reinterpret(
+            from_tensor(
                 self.token_c.next_read(), layout=make_layout((CHUNK_SIZE, KEY_DIM))
             ).partition(dim=0),
         )
         result = (
-            reinterpret(
+            from_tensor(
                 self.result.next_read(),
                 data_format="nd",
                 layout=make_layout((CHUNK_SIZE // 2, KEY_DIM)),
             )
             if self.dqg_cache is not None
-            else reinterpret(
+            else from_tensor(
                 self.result.next_read(), layout=make_layout((CHUNK_SIZE // 2, KEY_DIM))
             )
         )
@@ -756,13 +757,13 @@ class StageTwoTrack:
             self._outer(output, qg)
             self._prepare_state(
                 (
-                    reinterpret(
+                    from_tensor(
                         self.result.next_read(),
                         data_format="nd",
                         layout=make_layout((VALUE_DIM, D_HALF)),
                     )
                     if self.dqg_cache is not None
-                    else reinterpret(
+                    else from_tensor(
                         self.result.next_read(), layout=make_layout((VALUE_DIM, D_HALF))
                     )
                 )
@@ -772,19 +773,19 @@ class StageTwoTrack:
         mem_copy(self.state_b.next_write(), high)
         total = self.token_c.next_write()
         matmul(total, self.token_a.next_read(), self.state_b.next_read(), init=True)
-        mem_copy(self.matrix_a.next_write(), permute(aqk, (1, 0)))
+        mem_copy(self.matrix_a.next_write(), aqk.permute((1, 0)))
         mem_copy(
-            reinterpret(
+            from_tensor(
                 self.token_b.next_write(),
                 data_format="nz",
                 layout=make_layout((KEY_DIM, CHUNK_SIZE)),
             ),
-            permute(output, (1, 0)),
+            output.permute((1, 0)),
         )
         matmul(
             total,
             self.matrix_a.next_read(),
-            reinterpret(
+            from_tensor(
                 self.token_b.next_read(),
                 data_format="nz",
                 layout=make_layout((KEY_DIM, CHUNK_SIZE)),
@@ -799,13 +800,13 @@ class StageTwoTrack:
             self._outer(output, qg)
             self._prepare_state(
                 (
-                    reinterpret(
+                    from_tensor(
                         self.result.next_read(),
                         data_format="nd",
                         layout=make_layout((VALUE_DIM, D_HALF)),
                     )
                     if self.dqg_cache is not None
-                    else reinterpret(
+                    else from_tensor(
                         self.result.next_read(), layout=make_layout((VALUE_DIM, D_HALF))
                     )
                 )
@@ -813,13 +814,13 @@ class StageTwoTrack:
         self._outer(dr, w)
         self._finish_state(
             (
-                reinterpret(
+                from_tensor(
                     self.result.next_read(),
                     data_format="nd",
                     layout=make_layout((VALUE_DIM, D_HALF)),
                 )
                 if self.dqg_cache is not None
-                else reinterpret(
+                else from_tensor(
                     self.result.next_read(), layout=make_layout((VALUE_DIM, D_HALF))
                 )
             )
@@ -835,10 +836,10 @@ class StageTwoTrack:
         self._token_state(output, saved, gm_dqg, self.scale, self.dqg_cache)
         mem_copy(self.token_a.next_write(), value)
         left = self.token_a.next_read()
-        mem_copy(self.state_b.next_write(), permute(high, (1, 0)))
+        mem_copy(self.state_b.next_write(), high.permute((1, 0)))
         dkg = self.token_c.next_write()
         matmul(dkg, left, self.state_b.next_read(), init=True)
-        mem_copy(self.state_b.next_write(), permute(low, (1, 0)))
+        mem_copy(self.state_b.next_write(), low.permute((1, 0)))
         matmul(dkg, left, self.state_b.next_read(), init=False)
         self._store_token_result(self.token_c.next_read(), gm_dkg)
         self._token_state(dr, saved, gm_dw, -1.0, self.dw_cache)
@@ -883,7 +884,7 @@ class StageTwoPersistentState:
             for key in range(0, KEY_DIM, D_HALF):
                 decay = vexp(vload(self.gate_last, key), mask=mask)
                 for value in drange(self.live_rows):
-                    offset = value * self.state_gradient.physical_stride[0] + key
+                    offset = value * self.state_gradient.physical_layout.stride[0] + key
                     state = vmul(vload(self.state_gradient, offset), decay, mask=mask)
                     output = vmuls(
                         vload(self.output_state_gradient, offset), self.scale, mask=mask
@@ -1028,10 +1029,10 @@ class StageTwoPersistentState:
             direct = 0
             if (
                 valid_rows == CHUNK_SIZE
-                and kg_source.physical_stride[-1] == 1
-                and w_source.physical_stride[-1] == 1
-                and matrix_source.physical_stride[-1] == 1
-                and output_source.physical_stride[-1] == 1
+                and kg_source.physical_layout.stride[-1] == 1
+                and w_source.physical_layout.stride[-1] == 1
+                and matrix_source.physical_layout.stride[-1] == 1
+                and output_source.physical_layout.stride[-1] == 1
             ):
                 direct = 1
             kg_tile = tile_slice(
@@ -1141,8 +1142,8 @@ class StageTwoPersistentState:
                     do_l1.next_write(),
                     tile_slice(do_tile, (CHUNK_SIZE, self.value_rows), (0, 0)),
                 )
-            mem_copy(aqk_l0a.next_write(), permute(aqk_l1.next_read(), (1, 0)))
-            mem_copy(do_l0b.next_write(), permute(do_l1.next_read(), (1, 0)))
+            mem_copy(aqk_l0a.next_write(), aqk_l1.next_read().permute((1, 0)))
+            mem_copy(do_l0b.next_write(), do_l1.next_read().permute((1, 0)))
             matmul(total, aqk_l0a.next_read(), do_l0b.next_read(), init=False)
             summed = product.result_l0c.next_read()
             # Preserve FP32 in GM; the Cube consumer still requires BF16 L1.
@@ -1284,6 +1285,7 @@ def _finish_full_track_chunk(
     selected_chunk: dtypes.int64,
     aligned_only: Constexpr[bool],
     cube_causal: Constexpr[bool],
+    suppress_single_chunk_dA: dtypes.int64,
     resident_dqg=None,
     resident_dr=None,
     resident_dw=None,
@@ -1378,6 +1380,7 @@ def _finish_full_track_chunk(
     compact_token_start = gm_task_metadata[task_record + TASK_COMPACT_TOKEN_START]
     seq_len = gm_task_metadata[task_record + TASK_LENGTH]
     value_head = gm_task_metadata[task_record + TASK_VALUE_HEAD]
+    task_chunks = gm_task_metadata[task_record + TASK_CHUNKS]
     raw_batch = 0
     raw_token_start = compact_token_start
     if padded_layout:
@@ -1460,7 +1463,7 @@ def _finish_full_track_chunk(
     )
     diagonal_ready = 1
     if get_subblock_id() == 0:
-        if beta_source.physical_stride[-2] == 1:
+        if beta_source.physical_layout.stride[-2] == 1:
             vector.load_contiguous_beta_chunk(
                 beta_source, raw_row_start, gm_beta, scratch_chunk
             )
@@ -1578,7 +1581,10 @@ def _finish_full_track_chunk(
     # ValueBetaEpilogue wrote the final dV tile directly.
     if get_subblock_id() == 0:
         beta_output_rows = valid_rows
-        if beta_output_rows == CHUNK_SIZE and beta_destination.physical_stride[-2] == 1:
+        if (
+            beta_output_rows == CHUNK_SIZE
+            and beta_destination.physical_layout.stride[-2] == 1
+        ):
             vector.store_contiguous_beta_chunk(
                 gm_d_beta, scratch_chunk, beta_destination, raw_row_start
             )
@@ -1610,7 +1616,16 @@ def _finish_full_track_chunk(
         aligned_only or cube_causal,
     )
 
-    vector.finish_gate_task_atomic(gm_public_dA, gm_public_dBias, value_head, has_bias)
+    if suppress_single_chunk_dA and task_chunks == 1:
+        # Short sequences replace only dA by the FP32 chunk JVP; dBias keeps
+        # its Stage-1 publication, matching the masked-track kernel.
+        vector.finish_gate_task_atomic(
+            gm_public_dA, gm_public_dBias, value_head, has_bias, False
+        )
+    else:
+        vector.finish_gate_task_atomic(
+            gm_public_dA, gm_public_dBias, value_head, has_bias
+        )
 
     if padded_layout and selected_chunk == 0:
         vector.zero_task_padding(
@@ -1968,6 +1983,17 @@ def run_persistent_flash_kda_grad(
                                 chunk,
                                 not needs_masked_chunks,
                                 cube_causal,
+                                stage_one_fused_gate
+                                # The FP32 single-chunk JVP below is the only
+                                # writer of dA for a one-chunk task and it is
+                                # launched for the softplus gate alone, so the
+                                # atomic dA store may only be suppressed when
+                                # that JVP will actually run. Mirrors the
+                                # staged schedule's condition.
+                                and stage_one_softplus
+                                and stage_one_gm_effective_query.shape[2] > 0
+                                and stage_one_gm_g_cumsum.shape[2] > 0
+                                and stage_two_gm_chunk_states.shape[2] > 0,
                                 stage_one_scratch.resident_dqg,
                                 stage_one_scratch.resident_dr,
                                 stage_one_scratch.resident_dw,
@@ -2074,6 +2100,12 @@ def run_persistent_flash_kda_grad(
                 stage_one_gm_task_metadata,
                 stage_one_gm_public_dA,
                 stage_one_gm_public_d_beta,
+                stage_one_gm_raw_gate,
+                stage_one_gm_A_log,
+                stage_one_gm_dt_bias,
+                stage_one_lower_bound,
+                stage_one_softplus,
+                stage_one_has_bias,
                 stage_one_scale,
                 stage_one_heads_per_key_head,
                 stage_one_beta_fp32,

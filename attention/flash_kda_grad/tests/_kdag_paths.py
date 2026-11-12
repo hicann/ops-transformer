@@ -24,7 +24,7 @@ def load_sample(relative_path):
         raise ValueError(f"expected operator/module.py, got {relative_path!r}")
     operator, filename = relative.parts
     if operator == "flash_kda_grad":
-        root = OPERATOR_ROOT / "op_kernel"
+        root = OPERATOR_ROOT / "op_dsl"
     elif operator == "flash_kda_fwd":
         external = os.environ.get("KDA_DSL_ROOT")
         if not external:

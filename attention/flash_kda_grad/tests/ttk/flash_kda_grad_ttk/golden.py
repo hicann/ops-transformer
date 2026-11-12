@@ -48,6 +48,73 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import torch
+
+# --- causal pair loop ------------------------------------------------------
+# The causal pair accumulation in ``staged_backward`` is the BF16 peer's hot
+# spot: a Python double loop of up to CHUNK_SIZE*(CHUNK_SIZE+1)/2 iterations per
+# chunk and head.  The loop body below is the original one, moved verbatim into
+# a function and compiled with TorchScript, which removes the per-pair Python
+# dispatch while keeping the operation order, the K=16 accumulation and the
+# BF16 rounding points identical.
+#
+# JIT fusions are switched off first: with fusion enabled the graph can merge
+# elementwise chains (for example the multiply feeding the in-place add of
+# ``dq_chunk``) and the last bits change.  With fusion off the scripted graph
+# runs exactly the same elementwise ops as the Python loop, so the gradients
+# stay byte-identical.
+torch._C._jit_set_profiling_executor(False)
+torch._C._jit_set_profiling_mode(False)
+torch._C._jit_override_can_fuse_on_cpu(False)
+torch._C._jit_override_can_fuse_on_gpu(False)
+
+
+def _pair_loop_impl(
+    g_cumsum: torch.Tensor,
+    dAqk_scaled: torch.Tensor,
+    dlower_beta: torch.Tensor,
+    dq_chunk: torch.Tensor,
+    dk_chunk: torch.Tensor,
+    q_chunk: torch.Tensor,
+    k_chunk: torch.Tensor,
+    dbeta_chunk: torch.Tensor,
+    dlower_operand: torch.Tensor,
+    dg_cumsum: torch.Tensor,
+    length: int,
+    gate_ratio: str,
+):
+    for row in range(length):
+        for col in range(row + 1):
+            if gate_ratio == "factorized":
+                gate_decay_ratio = g_cumsum[row].exp() / g_cumsum[col].exp()
+            elif gate_ratio == "clamped":
+                gate_decay_ratio = (
+                    (g_cumsum[row] - g_cumsum[col]).clamp(min=-20.0).exp()
+                )
+            else:
+                gate_decay_ratio = (g_cumsum[row] - g_cumsum[col]).exp()
+            dAqk_coeff = dAqk_scaled[row, col]
+            dlower_beta_coeff = dlower_beta[row, col]
+            dq_chunk[row] += dAqk_coeff * k_chunk[col] * gate_decay_ratio
+            dk_chunk[row] += dlower_beta_coeff * k_chunk[col] * gate_decay_ratio
+            dk_col_pair = (
+                dlower_beta_coeff * k_chunk[row] + dAqk_coeff * q_chunk[row]
+            ) * gate_decay_ratio
+            dk_chunk[col] += dk_col_pair
+            dbeta_chunk[row] += (
+                dlower_operand[row, col]
+                * (k_chunk[row] * k_chunk[col] * gate_decay_ratio).sum()
+            )
+            dg_cumsum_pair = dk_col_pair * k_chunk[col]
+            dg_cumsum[row] += dg_cumsum_pair
+            dg_cumsum[col] -= dg_cumsum_pair
+    return dq_chunk, dk_chunk, dbeta_chunk, dg_cumsum
+
+
+try:
+    _pair_loop = torch.jit.script(_pair_loop_impl)
+except Exception:  # pragma: no cover - keep the inline loop if scripting fails
+    _pair_loop = None
+import torch.utils.checkpoint
 import torch.nn.functional as F
 
 CHUNK_SIZE = 64
@@ -197,8 +264,8 @@ def _gate_beta(
         else:
             step_gate = float(lower_bound) * torch.sigmoid(alpha * biased)
     else:
-        if bool((raw_g > 0).any()):
-            raise ValueError("unfused g must be nonpositive single-step log-decay")
+        # The kernel imposes no sign restriction on an unfused gate: the caller
+        # supplies the per-step log decay directly, positive values included.
         step_gate = raw_g
 
     if use_beta_sigmoid_in_kernel:
@@ -1173,31 +1240,47 @@ def staged_backward(
                     dg_cumsum = dg_cumsum + pair_g
                     dbeta_chunk = dbeta_chunk + pair_b
                 else:
-                    for row in range(length):
-                        for col in range(row + 1):
-                            if gate_ratio == "factorized":
-                                gate_decay_ratio = g_cumsum[row].exp() / g_cumsum[col].exp()
-                            elif gate_ratio == "clamped":
-                                gate_decay_ratio = (
-                                    (g_cumsum[row] - g_cumsum[col]).clamp(min=-20.0).exp()
+                    if _pair_loop is not None:
+                        dq_chunk, dk_chunk, dbeta_chunk, dg_cumsum = _pair_loop(
+                            g_cumsum,
+                            dAqk_scaled,
+                            dlower_beta,
+                            dq_chunk,
+                            dk_chunk,
+                            q_chunk,
+                            k_chunk,
+                            dbeta_chunk,
+                            dlower_operand,
+                            dg_cumsum,
+                            length,
+                            gate_ratio,
+                        )
+                    else:
+                        for row in range(length):
+                            for col in range(row + 1):
+                                if gate_ratio == "factorized":
+                                    gate_decay_ratio = g_cumsum[row].exp() / g_cumsum[col].exp()
+                                elif gate_ratio == "clamped":
+                                    gate_decay_ratio = (
+                                        (g_cumsum[row] - g_cumsum[col]).clamp(min=-20.0).exp()
+                                    )
+                                else:
+                                    gate_decay_ratio = (g_cumsum[row] - g_cumsum[col]).exp()
+                                dAqk_coeff = dAqk_scaled[row, col]
+                                dlower_beta_coeff = dlower_beta[row, col]
+                                dq_chunk[row] += dAqk_coeff * k_chunk[col] * gate_decay_ratio
+                                dk_chunk[row] += dlower_beta_coeff * k_chunk[col] * gate_decay_ratio
+                                dk_col_pair = (
+                                    dlower_beta_coeff * k_chunk[row] + dAqk_coeff * q_chunk[row]
+                                ) * gate_decay_ratio
+                                dk_chunk[col] += dk_col_pair
+                                dbeta_chunk[row] += (
+                                    dlower_operand[row, col]
+                                    * (k_chunk[row] * k_chunk[col] * gate_decay_ratio).sum()
                                 )
-                            else:
-                                gate_decay_ratio = (g_cumsum[row] - g_cumsum[col]).exp()
-                            dAqk_coeff = dAqk_scaled[row, col]
-                            dlower_beta_coeff = dlower_beta[row, col]
-                            dq_chunk[row] += dAqk_coeff * k_chunk[col] * gate_decay_ratio
-                            dk_chunk[row] += dlower_beta_coeff * k_chunk[col] * gate_decay_ratio
-                            dk_col_pair = (
-                                dlower_beta_coeff * k_chunk[row] + dAqk_coeff * q_chunk[row]
-                            ) * gate_decay_ratio
-                            dk_chunk[col] += dk_col_pair
-                            dbeta_chunk[row] += (
-                                dlower_operand[row, col]
-                                * (k_chunk[row] * k_chunk[col] * gate_decay_ratio).sum()
-                            )
-                            dg_cumsum_pair = dk_col_pair * k_chunk[col]
-                            dg_cumsum[row] += dg_cumsum_pair
-                            dg_cumsum[col] -= dg_cumsum_pair
+                                dg_cumsum_pair = dk_col_pair * k_chunk[col]
+                                dg_cumsum[row] += dg_cumsum_pair
+                                dg_cumsum[col] -= dg_cumsum_pair
 
                 dq_heads[start:end, qk_head] += dq_chunk
                 dk_heads[start:end, qk_head] += dk_chunk
@@ -1326,6 +1409,132 @@ class _GoldenProgress:
         self.next_percent = min(100.0, (math.floor(percent / 5.0) + 1) * 5.0)
 
 
+# Chunkwise FP32 reference for the KDA recurrence (ported from cannbot-dsl PR395).
+# The maths is the same token-level recurrence as before; evaluating it chunk-major
+# keeps the Python interpreter out of the inner loop, which is what made the 8K
+# cases take close to an hour. Everything stays float32 on purpose: this is the
+# device-independent truth the suite compares against, not the quantised peer.
+_CHUNK_SIZE = 64
+_REFERENCE_BLOCK_SIZE = 16
+
+
+def _chunk_major(x):
+    batch, heads, seq_len, dim = x.shape
+    return x.reshape(batch, heads, seq_len // _CHUNK_SIZE, _CHUNK_SIZE, dim).contiguous()
+
+
+def _chunk_lower_matmul(left, right, cumulative_decay, *, diagonal):
+    """Causal QK / KKT tiles; the diagonal block uses the exact per-row decay."""
+    result = torch.zeros(*left.shape[:-1], right.shape[-2], dtype=torch.float32,
+                         device=left.device)
+    for row_start in range(0, _CHUNK_SIZE, _REFERENCE_BLOCK_SIZE):
+        row_end = row_start + _REFERENCE_BLOCK_SIZE
+        reference = cumulative_decay[..., row_start:row_start + 1, :]
+        left_rows = left[..., row_start:row_end, :] * (
+            cumulative_decay[..., row_start:row_end, :] - reference).exp()
+        for col_start in range(0, row_end, _REFERENCE_BLOCK_SIZE):
+            col_end = col_start + _REFERENCE_BLOCK_SIZE
+            if col_start == row_start:
+                for row in range(row_start, row_end):
+                    relative = (cumulative_decay[..., row:row + 1, :]
+                                - cumulative_decay[..., row_start:row + 1, :]).exp()
+                    right_cols = right[..., row_start:row + 1, :] * relative
+                    result[..., row:row + 1, row_start:row + 1] = (
+                        left[..., row:row + 1, :] @ right_cols.transpose(-1, -2))
+                continue
+            right_cols = right[..., col_start:col_end, :] * (
+                reference - cumulative_decay[..., col_start:col_end, :]).exp()
+            result[..., row_start:row_end, col_start:col_end] = (
+                left_rows @ right_cols.transpose(-1, -2))
+    return result * torch.tril(
+        torch.ones(_CHUNK_SIZE, _CHUNK_SIZE, dtype=torch.float32, device=left.device),
+        diagonal=diagonal)
+
+
+def _chunk_stage1(K, V, Q, beta, g, *, scale):
+    K_i, V_i, Q_i = _chunk_major(K), _chunk_major(V), _chunk_major(Q)
+    beta = _chunk_major(beta)
+    g_i = _chunk_major(g)
+    cumdec = torch.cumsum(g_i, dim=-2)
+    gamma = torch.exp(cumdec)
+    K_decayed = gamma * K_i
+    K_decayed_beta = beta * K_decayed
+    Q_decayed = gamma * Q_i * scale
+    T = _chunk_lower_matmul(beta * K_i, K_i, cumdec, diagonal=-1)
+    eye = torch.eye(_CHUNK_SIZE, dtype=torch.float32, device=K.device)
+    inverse = torch.linalg.solve_triangular(
+        eye + T, eye.expand_as(T), upper=False, unitriangular=True)
+    M = inverse * beta.transpose(-1, -2)
+    U_pre = M @ V_i
+    W = M @ K_decayed
+    Mqk = _chunk_lower_matmul(Q_i * scale, K_i, cumdec, diagonal=0)
+    gamma_C = gamma[..., -1, :, None].contiguous()
+    K_restored = K_i * (cumdec[..., -1:, :] - cumdec).exp()
+    return dict(K_decayed_beta=K_decayed_beta, K_decayed=K_decayed,
+                Q_decayed=Q_decayed, U_pre=U_pre, W=W, Mqk=Mqk,
+                K_restored=K_restored, gamma_C=gamma_C)
+
+
+def _chunk_stage2(s1, initial_state):
+    chunks = s1["U_pre"].shape[2]
+    U = torch.zeros_like(s1["U_pre"])
+    O_state = torch.zeros_like(s1["U_pre"])
+    state = initial_state.clone()
+    U_pre, W, Q_decayed = s1["U_pre"], s1["W"], s1["Q_decayed"]
+    K_restored, gamma_C = s1["K_restored"], s1["gamma_C"]
+    for c in range(chunks):
+        U_c = U_pre[:, :, c] - W[:, :, c] @ state
+        O_c = Q_decayed[:, :, c] @ state
+        state = gamma_C[:, :, c] * state + K_restored[:, :, c].transpose(-1, -2) @ U_c
+        U[:, :, c] = U_c
+        O_state[:, :, c] = O_c
+    return dict(U=U, O_state=O_state, S=state)
+
+
+def _chunk_stage3(s1, s2):
+    O_i = s2["O_state"] + s1["Mqk"] @ s2["U"]
+    batch, heads, chunks, chunk, dim = O_i.shape
+    return O_i.reshape(batch, heads, chunks * chunk, dim)
+
+
+def _chunkwise_forward(q, k, v, step_gate, beta_eff, h0, bounds, scale, heads_per_key=1):
+    """Token-major inputs -> (outputs, final_state), chunkwise, pure fp32."""
+    if heads_per_key != 1:
+        q = q.repeat_interleave(heads_per_key, dim=1)
+        k = k.repeat_interleave(heads_per_key, dim=1)
+    token_count, value_heads, value_dim = v.shape
+    outputs = torch.zeros(token_count, value_heads, value_dim,
+                          dtype=torch.float32, device=v.device)
+    final = torch.zeros_like(h0)
+    for seq_index, (start, end) in enumerate(bounds):
+        length = end - start
+        if length <= 0:
+            final[seq_index] = h0[seq_index]
+            continue
+        pad = (-length) % _CHUNK_SIZE
+        sl = slice(start, end)
+        q_s = q[sl].transpose(0, 1).unsqueeze(0)          # (1,Nv,S,D)
+        k_s = k[sl].transpose(0, 1).unsqueeze(0)
+        v_s = v[sl].transpose(0, 1).unsqueeze(0)
+        g_s = step_gate[sl].transpose(0, 1).unsqueeze(0)
+        b_s = beta_eff[sl].transpose(0, 1).unsqueeze(-1).unsqueeze(0)
+        if pad:
+            # padded rows must be the identity: zero log-decay and zero beta
+            q_s = F.pad(q_s, (0, 0, 0, pad))
+            k_s = F.pad(k_s, (0, 0, 0, pad))
+            v_s = F.pad(v_s, (0, 0, 0, pad))
+            g_s = F.pad(g_s, (0, 0, 0, pad))
+            b_s = F.pad(b_s, (0, 0, 0, pad))
+        s1 = _chunk_stage1(k_s, v_s, q_s, b_s, g_s, scale=scale)
+        # h0 is stored transposed; the chunk algebra works on the natural
+        # (Dk, Dv) orientation, so transpose in and back out.
+        s2 = _chunk_stage2(s1, h0[seq_index].transpose(-1, -2).unsqueeze(0))
+        out = _chunk_stage3(s1, s2)[0, :, :length, :]     # (Nv, S, D)
+        outputs[sl] = out.transpose(0, 1)
+        final[seq_index] = s2["S"][0].transpose(-1, -2)
+    return outputs, final
+
+
 def autograd_backward(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -1374,8 +1583,13 @@ def autograd_backward(
     q_t, k_t, v_t, g_t, beta_t, a_log, bias, h0 = leaves
 
     if use_qk_l2norm_in_kernel:
-        q_t = q_t * torch.rsqrt(q_t.square().sum(-1, keepdim=True) + NORM_EPS)
-        k_t = k_t * torch.rsqrt(k_t.square().sum(-1, keepdim=True) + NORM_EPS)
+        # q_t / k_t stay the raw leaves: the grouped path rebuilds this
+        # normalisation per head group so no subgraph is shared between
+        # backward passes.
+        qn_t = q_t * torch.rsqrt(q_t.square().sum(-1, keepdim=True) + NORM_EPS)
+        kn_t = k_t * torch.rsqrt(k_t.square().sum(-1, keepdim=True) + NORM_EPS)
+    else:
+        qn_t, kn_t = q_t, k_t
 
     token_count, value_heads, value_dim = v_t.shape
     key_heads, key_dim = q_t.shape[1], q_t.shape[-1]
@@ -1405,25 +1619,21 @@ def autograd_backward(
     final = torch.zeros_like(h0)
     bounds = sequence_bounds(q, initial_state, layout, cu_seqlens, seqused)
     progress = _GoldenProgress(sum(end - start for start, end in bounds) * value_heads)
-    for seq_index, (start, end) in enumerate(bounds):
-        for head in range(value_heads):
-            qk_head = head // heads_per_key
-            state = h0[seq_index, head].T
-            rows = []
-            for token in range(start, end):
-                key = k_t[token, qk_head]
-                state = step_gate[token, head].exp()[:, None] * state
-                delta = b_eff[token, head] * (v_t[token, head] - key @ state)
-                state = state + key[:, None] * delta[None]
-                rows.append(float(scale) * q_t[token, qk_head] @ state)
-                if (token - start + 1) % CHUNK_SIZE == 0:
-                    progress.update(CHUNK_SIZE)
-            progress.update((end - start) % CHUNK_SIZE)
-            if rows:
-                outputs[start:end, head] = torch.stack(rows)
-            final[seq_index, head] = state.T
+    print("[CPU Golden] chunkwise recurrence started", flush=True)
+    chunk_start = time.monotonic()
+    outputs, final = _chunkwise_forward(
+        qn_t, kn_t, v_t, step_gate, b_eff, h0, bounds, float(scale), heads_per_key
+    )
+    progress.update(token_count * value_heads)
+    print(
+        f"[CPU Golden] chunkwise recurrence done, "
+        f"elapsed={progress.duration(time.monotonic() - chunk_start)}",
+        flush=True,
+    )
 
-    loss = (outputs * do_t).sum() + (final * dht_t).sum() + sum(t.sum() * 0 for t in leaves if t is not None)
+    loss = (outputs * do_t).sum() + (final * dht_t).sum() + sum(
+        t.sum() * 0 for t in leaves if t is not None
+    )
     print("[CPU Golden] autograd backward started (ETA unavailable)", flush=True)
     backward_start = time.monotonic()
     active_leaves = [t for t in leaves if t is not None]

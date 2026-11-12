@@ -51,7 +51,7 @@ attention/flash_kda_grad/tests/ttk/
 ```
 
 The entry under test is `flash_kda_grad_ttk.npu`, which accepts PyTorch tensors, so the E2E path is used.
-The NPU branch only loads the operator in the adjacent `op_kernel` directory; an import failure reports an error directly, avoiding accidentally testing other installed versions.
+The NPU branch only loads the operator in the adjacent `op_dsl` directory; an import failure reports an error directly, avoiding accidentally testing other installed versions.
 The CPU branch calls the reference implementation.
 
 ## 2. Inputs, Outputs, and Caches
@@ -184,7 +184,7 @@ At runtime, `spec.py` is loaded through `--plugin`, and `--compare` is not passe
 ## 4. Environment Preparation
 
 Use the Conda/CANN environment already activated on the current machine; PyTorch, torch_npu,
-CANNBotDSL 0.8, and the TTK dependencies need to be installed in Python. The script does not switch Conda environments and does not source a fixed CANN path.
+CANNBotDSL and the TTK dependencies need to be installed in Python. The script does not switch Conda environments and does not source a fixed CANN path.
 
 ```bash
 export KDA_ROOT=/path/to/ops-transformer/attention/flash_kda_grad

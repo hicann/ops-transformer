@@ -50,7 +50,7 @@ attention/flash_kda_grad/tests/ttk/
 ```
 
 被测入口为 `flash_kda_grad_ttk.npu`，接受 PyTorch 张量，因此使用 E2E 通路。
-NPU 分支只加载相邻 `op_kernel` 中的算子，导入失败直接报错，避免误测其他已安装版本。
+NPU 分支只加载相邻 `op_dsl` 中的算子，导入失败直接报错，避免误测其他已安装版本。
 CPU 分支调用参考实现。
 
 ## 2. 输入、输出与缓存
@@ -183,7 +183,7 @@ tolerance = {
 ## 4. 环境准备
 
 使用当前机器已经激活的 Conda/CANN 环境，Python 中需安装 PyTorch、torch_npu、
-CANNBotDSL 0.8 及 TTK 依赖。脚本不切换 Conda、不 source 固定的 CANN 路径。
+CANNBotDSL 及 TTK 依赖。脚本不切换 Conda、不 source 固定的 CANN 路径。
 
 ```bash
 export KDA_ROOT=/path/to/ops-transformer/attention/flash_kda_grad

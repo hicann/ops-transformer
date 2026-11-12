@@ -13,7 +13,7 @@ All implementation lives here. The grad metadata and owner schedule are reused;
 no second launch or separate forward schedule is created. Aqk/Akk and activation/norm caches stay read-only.
 """
 
-from cannbotdsl import PIPE, MemLoc, dtypes
+from cannbotdsl import from_tensor, PIPE, MemLoc, dtypes
 from cannbotdsl.buffer import Buffer
 from cannbotdsl.lang import vf
 from cannbotdsl.lang.constexpr import const_expr
@@ -21,7 +21,7 @@ from cannbotdsl.lang.control_flow import range as dsl_range
 from cannbotdsl.lang.jit import jit
 from cannbotdsl.ops.arch import get_block_idx, get_block_num, get_subblock_id
 from cannbotdsl.ops.matmul import matmul
-from cannbotdsl.ops.memcpy import convert, copy_options, mem_copy
+from cannbotdsl.ops.memcpy import cube_fill_l1_zero, copy_options, mem_copy
 from cannbotdsl.ops.reg import (
     PackMode,
     UnpackMode,
@@ -54,16 +54,15 @@ from cannbotdsl.ops.reg import (
 )
 from cannbotdsl.ops.reg import vselect as vselect_raw
 from cannbotdsl.ops.sync import (
-    cube_fill_l1_zero,
     cube_sync_all,
     cube_sync_pipe,
     vec_sync_all,
     vec_sync_notify,
     vec_sync_wait,
 )
-from cannbotdsl.tensor import reinterpret, tile_slice
+from cannbotdsl.tensor import tile_slice
 from cannbotdsl import Constexpr
-from cannbotdsl import make_layout, permute
+from cannbotdsl import make_layout
 from cannbotdsl.ring_buffer import RingBuffer
 
 try:
@@ -308,6 +307,7 @@ class _Preprocess:
                 if const_expr(has_dt_bias):
                     dt_bias = vload(self.ub_dt_bias, 0)
             prefix = vdups(0.0, dtypes.float32, mask=lane_mask)
+            prefix_error = vdups(0.0, dtypes.float32, mask=lane_mask)
             if const_expr(raw_beta.dtype == dtypes.float32):
                 beta_value = vload(raw_beta, 0)
             else:
@@ -342,11 +342,14 @@ class _Preprocess:
                     biased_gate = vadd(gate_value, dt_bias, mask=lane_mask)
                     if const_expr(gate_mode == 2):
                         logit = vmul(negative_exp_a, biased_gate, mask=lane_mask)
-                        gate = vdiv(
-                            vdups(bound, dtypes.float32, mask=lane_mask),
+                        # Match the saved-cache FP32 activation boundary:
+                        # sigmoid is rounded before multiplication by the bound.
+                        sigmoid = vdiv(
+                            vdups(1.0, dtypes.float32, mask=lane_mask),
                             vadds(vexp(logit, mask=lane_mask), 1.0, mask=lane_mask),
                             mask=lane_mask,
                         )
+                        gate = vmuls(sigmoid, bound, mask=lane_mask)
                     else:
                         softplus_tail = vlog(
                             vadds(
@@ -369,7 +372,14 @@ class _Preprocess:
                             mask=lane_mask,
                         )
                         gate = vmul(negative_exp_a, softplus, mask=lane_mask)
-                prefix = vadd(prefix, gate, mask=lane_mask)
+                # Retain the low bits lost while accumulating FP32 log-decays.
+                # Long negative prefixes otherwise perturb every exp-derived cache.
+                increment = vsub(gate, prefix_error, mask=lane_mask)
+                next_prefix = vadd(prefix, increment, mask=lane_mask)
+                prefix_error = vsub(
+                    vsub(next_prefix, prefix, mask=lane_mask), increment, mask=lane_mask
+                )
+                prefix = next_prefix
                 vstore(self.ub_g_cumsum, row * D_HALF, prefix, lane_mask)
             if const_expr(self.has_tail):
                 for row in dsl_range(valid_rows, CHUNK_SIZE, 1):
@@ -497,7 +507,9 @@ class _Preprocess:
                         (operand_idx * CHUNK_SIZE + row) * 16,
                         operand_bf16,
                         low_mask,
-                        block_stride=self.ub_recurrent_operands_nz.physical_stride[0]
+                        block_stride=self.ub_recurrent_operands_nz.physical_layout.stride[
+                            0
+                        ]
                         // 16,
                     )
                 for operand_idx in (2, 3):
@@ -517,7 +529,9 @@ class _Preprocess:
                         ((operand_idx + 2) * CHUNK_SIZE + row) * 16,
                         residual,
                         low_mask,
-                        block_stride=self.ub_recurrent_operands_nz.physical_stride[0]
+                        block_stride=self.ub_recurrent_operands_nz.physical_layout.stride[
+                            0
+                        ]
                         // 16,
                     )
                     remainder = vsub(
@@ -530,7 +544,9 @@ class _Preprocess:
                         ((operand_idx + 4) * CHUNK_SIZE + row) * 16,
                         cast_and_pack_bf16(remainder, lane_mask),
                         low_mask,
-                        block_stride=self.ub_recurrent_operands_nz.physical_stride[0]
+                        block_stride=self.ub_recurrent_operands_nz.physical_layout.stride[
+                            0
+                        ]
                         // 16,
                     )
 
@@ -589,17 +605,17 @@ class _Matmul:
 
     @jit
     def state_delta(self, preprocess, state):
-        k_panel = reinterpret(
+        k_panel = from_tensor(
             self.l0b_recurrent, data_format="nz", layout=make_layout((D, HALF))
         )
         mem_copy(
-            k_panel, permute(preprocess.operand_tiles[K_RESTORED_OPERAND_INDEX], (1, 0))
+            k_panel, preprocess.operand_tiles[K_RESTORED_OPERAND_INDEX].permute((1, 0))
         )
         values = state.u_l1
-        u_l0a = reinterpret(
+        u_l0a = from_tensor(
             self.l0a_recurrent, data_format="nz", layout=make_layout((D, C))
         )
-        mem_copy(u_l0a, permute(values, (1, 0)))
+        mem_copy(u_l0a, values.permute((1, 0)))
         matmul(self.l0c_state, u_l0a, k_panel, init=True)
         mem_copy(state.ub_state_delta.next_write(), self.l0c_state.partition(dim=1))
 
@@ -615,7 +631,7 @@ class _Matmul:
         )
         matmul(
             self.l0c_w_product,
-            reinterpret(
+            from_tensor(
                 inverse_l0a, offset=0, layout=make_layout((CHUNK_SIZE, CHUNK_SIZE))
             ),
             k_beta_l0b,
@@ -624,7 +640,7 @@ class _Matmul:
         k_beta_low = self._load_beta_to_l0b(preprocessing.operand_tiles[4])
         matmul(
             self.l0c_w_product,
-            reinterpret(
+            from_tensor(
                 inverse_l0a, offset=0, layout=make_layout((CHUNK_SIZE, CHUNK_SIZE))
             ),
             k_beta_low,
@@ -633,18 +649,18 @@ class _Matmul:
         k_beta_remainder = self._load_beta_to_l0b(preprocessing.operand_tiles[6])
         matmul(
             self.l0c_w_product,
-            reinterpret(inverse_l0a, layout=make_layout((C, C))),
+            from_tensor(inverse_l0a, layout=make_layout((C, C))),
             k_beta_remainder,
             init=False,
         )
         # Round W once at the cache boundary, after all three operand products.
-        mem_copy(self.w_l1, convert(self.l0c_w_product, self.w_l1.dtype, scale=-1.0))
+        mem_copy(self.w_l1, self.l0c_w_product.convert(self.w_l1.dtype, scale=-1.0))
         v_beta_l0b = self._load_beta_to_l0b(
             preprocessing.operand_tiles[V_BETA_OPERAND_INDEX]
         )
         matmul(
             self.l0c_w,
-            reinterpret(
+            from_tensor(
                 inverse_l0a, offset=0, layout=make_layout((CHUNK_SIZE, CHUNK_SIZE))
             ),
             v_beta_l0b,
@@ -653,7 +669,7 @@ class _Matmul:
         v_beta_low = self._load_beta_to_l0b(preprocessing.operand_tiles[5])
         matmul(
             self.l0c_w,
-            reinterpret(
+            from_tensor(
                 inverse_l0a, offset=0, layout=make_layout((CHUNK_SIZE, CHUNK_SIZE))
             ),
             v_beta_low,
@@ -662,7 +678,7 @@ class _Matmul:
         v_beta_remainder = self._load_beta_to_l0b(preprocessing.operand_tiles[7])
         matmul(
             self.l0c_w,
-            reinterpret(inverse_l0a, layout=make_layout((C, C))),
+            from_tensor(inverse_l0a, layout=make_layout((C, C))),
             v_beta_remainder,
             init=False,
         )
@@ -686,7 +702,7 @@ class _Matmul:
     def _load_resident_inv_to_l0a(self):
         l0a_write = self.l0a_recurrent
         mem_copy(
-            reinterpret(
+            from_tensor(
                 l0a_write, offset=0, layout=make_layout((CHUNK_SIZE, CHUNK_SIZE))
             ),
             self.resident_inv_l1,
@@ -694,12 +710,12 @@ class _Matmul:
         return l0a_write
 
     def _load_beta_to_l0b(self, beta_read):
-        l0b_write = reinterpret(
+        l0b_write = from_tensor(
             self.l0b_recurrent,
             data_format="nz",
             layout=make_layout((SUPPORTED_HEAD_DIM, D_HALF)),
         )
-        mem_copy(l0b_write, permute(beta_read, (1, 0)))
+        mem_copy(l0b_write, beta_read.permute((1, 0)))
         return l0b_write
 
 
@@ -773,7 +789,7 @@ class _State:
                     row * 16,
                     state_bf16,
                     low_mask,
-                    block_stride=self.ub_state_nz.physical_stride[0] // 16,
+                    block_stride=self.ub_state_nz.physical_layout.stride[0] // 16,
                 )
 
     def publish_state_snapshot(self):
@@ -801,7 +817,7 @@ class _State:
                     row * 16,
                     state_bf16,
                     low_mask,
-                    block_stride=self.ub_state_nz.physical_stride[0] // 16,
+                    block_stride=self.ub_state_nz.physical_layout.stride[0] // 16,
                 )
 
     def store(self, gm_state_rows):
@@ -1014,10 +1030,10 @@ class _StagedState:
     def __init__(self, value_rows, operands, result, shared=None):
         self.value_rows = value_rows
         if shared is not None:
-            self.state = reinterpret(
+            self.state = from_tensor(
                 shared.state, layout=make_layout((value_rows, HALF))
             )
-            self.state_nz = reinterpret(
+            self.state_nz = from_tensor(
                 shared.state_nz,
                 data_format="nz",
                 layout=make_layout((2 * value_rows, HALF)),
@@ -1037,9 +1053,9 @@ class _StagedState:
                 ),
             )
             self.gamma = shared.gamma
-            self.u = reinterpret(shared.u, layout=make_layout((C // 2, value_rows)))
-            self.new = reinterpret(shared.new, layout=make_layout((C // 2, value_rows)))
-            self.new_nz = reinterpret(
+            self.u = from_tensor(shared.u, layout=make_layout((C // 2, value_rows)))
+            self.new = from_tensor(shared.new, layout=make_layout((C // 2, value_rows)))
+            self.new_nz = from_tensor(
                 shared.new_nz,
                 data_format="nz",
                 layout=make_layout((C // 2, value_rows)),
@@ -1062,19 +1078,19 @@ class _StagedState:
             self.state_l1, self.new_l1 = operands, operands
             self.w_l1, self.kg_l1 = shared.w_l1, shared.kg_l1
             self.w_l0a = shared.w_l0a
-            self.new_l0a = reinterpret(
+            self.new_l0a = from_tensor(
                 shared.new_l0a, data_format="nz", layout=make_layout((value_rows, C))
             )
-            self.state_l0b = reinterpret(
+            self.state_l0b = from_tensor(
                 shared.state_l0b, data_format="nz", layout=make_layout((value_rows, D))
             )
             self.kg_l0b = shared.kg_l0b
-            self.correction_l0c = reinterpret(
+            self.correction_l0c = from_tensor(
                 shared.correction_l0c,
                 data_format="nz",
                 layout=make_layout((C, value_rows)),
             )
-            self.delta_l0c = reinterpret(
+            self.delta_l0c = from_tensor(
                 shared.delta_l0c, data_format="nz", layout=make_layout((value_rows, D))
             )
             return
@@ -1125,7 +1141,7 @@ class _StagedState:
         self.state_l0b = _cube_buffer(
             MemLoc.L0B, dtypes.bfloat16, make_layout((value_rows, D))
         )
-        self.kg_l0b = reinterpret(
+        self.kg_l0b = from_tensor(
             self.state_l0b, data_format="nz", layout=make_layout((D, C))
         )
         self.correction_l0c = _cube_buffer(
@@ -1153,17 +1169,17 @@ class _StagedState:
                     row * 16,
                     packed,
                     low_mask,
-                    block_stride=self.state_nz.physical_stride[0] // 16,
+                    block_stride=self.state_nz.physical_layout.stride[0] // 16,
                 )
                 vstore_strided(
                     self.state_nz,
                     (self.value_rows + row) * 16,
                     packed_low,
                     low_mask,
-                    block_stride=self.state_nz.physical_stride[0] // 16,
+                    block_stride=self.state_nz.physical_layout.stride[0] // 16,
                 )
         mem_copy(
-            reinterpret(
+            from_tensor(
                 self.state_l1.next_write(),
                 data_format="nz",
                 layout=make_layout((2 * self.value_rows, D)),
@@ -1181,7 +1197,7 @@ class _StagedState:
 
     @jit
     def correct_values(self, destination, rows, part):
-        correction = reinterpret(
+        correction = from_tensor(
             self.correction.next_read(), layout=make_layout((C // 2, self.value_rows))
         )
         live_rows = min(C // 2, max(0, rows - part * (C // 2)))
@@ -1215,10 +1231,10 @@ class _StagedState:
                     row * 16,
                     low,
                     low_mask,
-                    block_stride=self.new_nz.physical_stride[0] // 16,
+                    block_stride=self.new_nz.physical_layout.stride[0] // 16,
                 )
         mem_copy(
-            reinterpret(
+            from_tensor(
                 self.new_l1.next_write(),
                 data_format="nz",
                 layout=make_layout((C, self.value_rows)),
@@ -1236,7 +1252,7 @@ class _StagedState:
 
     @jit
     def update_state(self):
-        delta = reinterpret(
+        delta = from_tensor(
             self.delta.next_read(), layout=make_layout((self.value_rows, HALF))
         )
         with vf(mode="simd"):
@@ -1317,7 +1333,7 @@ def _recompute_staged_states(
                     recurrence.kg_l1, kg[batch, head, start : start + rows, None], rows
                 )
                 mem_copy(recurrence.w_l0a, recurrence.w_l1)
-                state_panels = reinterpret(
+                state_panels = from_tensor(
                     recurrence.state_l1.next_read(),
                     data_format="nz",
                     layout=make_layout((2 * value_rows, D)),
@@ -1343,11 +1359,11 @@ def _recompute_staged_states(
                     init=False,
                 )
                 mem_copy(
-                    reinterpret(
+                    from_tensor(
                         recurrence.correction.next_write(),
                         layout=make_layout((C // 2, value_rows)),
                     ),
-                    reinterpret(
+                    from_tensor(
                         recurrence.correction_l0c, layout=make_layout((C, value_rows))
                     ).partition(dim=0),
                 )
@@ -1375,16 +1391,15 @@ def _recompute_staged_states(
                 recurrence.correct_values(destination, rows, part)
                 mem_copy(
                     recurrence.new_l0a,
-                    permute(
-                        reinterpret(
-                            recurrence.new_l1.next_read(),
-                            data_format="nz",
-                            layout=make_layout((C, value_rows)),
-                        ),
+                    from_tensor(
+                        recurrence.new_l1.next_read(),
+                        data_format="nz",
+                        layout=make_layout((C, value_rows)),
+                    ).permute(
                         (1, 0),
                     ),
                 )
-                mem_copy(recurrence.kg_l0b, permute(recurrence.kg_l1, (1, 0)))
+                mem_copy(recurrence.kg_l0b, recurrence.kg_l1.permute((1, 0)))
                 matmul(
                     recurrence.delta_l0c,
                     recurrence.new_l0a,
@@ -1392,11 +1407,11 @@ def _recompute_staged_states(
                     init=True,
                 )
                 mem_copy(
-                    reinterpret(
+                    from_tensor(
                         recurrence.delta.next_write(),
                         layout=make_layout((value_rows, HALF)),
                     ),
-                    reinterpret(
+                    from_tensor(
                         recurrence.delta_l0c, layout=make_layout((value_rows, D))
                     ).partition(dim=1),
                 )
