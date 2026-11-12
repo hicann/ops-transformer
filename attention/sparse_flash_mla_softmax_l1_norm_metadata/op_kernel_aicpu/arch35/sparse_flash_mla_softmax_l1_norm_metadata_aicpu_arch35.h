@@ -52,6 +52,43 @@ inline int64_t SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::CalcTotalSize() con
 
 inline bool SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::BuildMetadata()
 {
+    // Match the ACLNN entry: an empty optional tensor is treated as absent.
+    if (IsTensorValid(seqUsedKey_) && seqUsedKey_->GetTensorShape()->GetDims() > 0 &&
+        seqUsedKey_->GetTensorShape()->GetDimSize(0) > 0) {
+        auto seqUsedKeyShape = seqUsedKey_->GetTensorShape();
+        if (bSize_ <= 0 || seqUsedKeyShape->GetDims() != 1 || seqUsedKeyShape->GetDimSize(0) != bSize_) {
+            KERNEL_LOG_ERROR("seqused_k must be a 1D tensor with batch_size=%ld elements", bSize_);
+            return false;
+        }
+        const auto* seqUsedKeyData = reinterpret_cast<const int32_t*>(seqUsedKey_->GetData());
+        const int32_t* cuSeqLensKeyData = nullptr;
+        if (layoutK_ == "TND") {
+            if (!IsTensorValid(cuSeqLensKey_) || cuSeqLensKey_->GetTensorShape()->GetDims() != 1 ||
+                cuSeqLensKey_->GetTensorShape()->GetDimSize(0) - 1 != bSize_) {
+                KERNEL_LOG_ERROR("cu_seqlens_k must be a valid 1D tensor with batch_size+1 elements for TND");
+                return false;
+            }
+            cuSeqLensKeyData = reinterpret_cast<const int32_t*>(cuSeqLensKey_->GetData());
+        }
+        for (int64_t batch = 0; batch < bSize_; ++batch) {
+            int64_t maxSeqLenK = s2Size_;
+            if (cuSeqLensKeyData != nullptr) {
+                const int64_t start = cuSeqLensKeyData[batch];
+                const int64_t end = cuSeqLensKeyData[batch + 1];
+                if (start < 0 || end < start) {
+                    KERNEL_LOG_ERROR("Invalid cu_seqlens_k interval at batch %ld: [%ld, %ld]", batch, start, end);
+                    return false;
+                }
+                maxSeqLenK = end - start;
+            }
+            const int64_t seqUsedK = seqUsedKeyData[batch];
+            if (seqUsedK < 0 || seqUsedK > maxSeqLenK) {
+                KERNEL_LOG_ERROR("seqused_k[%ld]=%ld must be in [0, %ld]", batch, seqUsedK, maxSeqLenK);
+                return false;
+            }
+        }
+    }
+
     int64_t totalNum = CalcTotalSize();
     if (totalNum < 0) {
         KERNEL_LOG_ERROR("Total valid sequence should be >= 0, but got %ld", totalNum);
