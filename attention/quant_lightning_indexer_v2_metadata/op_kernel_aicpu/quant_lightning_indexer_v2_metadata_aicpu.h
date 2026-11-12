@@ -26,7 +26,7 @@
 #include "../../quant_lightning_indexer_v2/op_kernel/quant_lightning_indexer_v2_metadata.h"
 #include "../../common/op_kernel/aicpu_common.h"
 
-namespace aicpu {
+namespace aicpu::qliv2_metadata {
 constexpr int64_t FA_TOLERANCE_RATIO = 2;
 constexpr uint32_t COST_WEIGHT_M = 6U;
 constexpr uint32_t COST_WEIGHT_S2 = 10U;
@@ -357,5 +357,10 @@ private:
         metadata = 0,
     };
 };
+} // namespace aicpu::qliv2_metadata
+
+namespace aicpu {
+// Preserve the kernel class name used by existing callers and tests.
+using QuantLightningIndexerV2MetadataCpuKernel = qliv2_metadata::QuantLightningIndexerV2MetadataCpuKernel;
 } // namespace aicpu
 #endif

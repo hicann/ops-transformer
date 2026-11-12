@@ -1544,14 +1544,10 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
 {
     bool keyNonContiguous = false;
     bool scaleNonContiguous = false;
-    // A5/A3 PA_BBND: 0轴允许非连续，从1轴开始检查；其他: 从0轴开始检查
+    // PA_BBND: 0轴允许非连续，从1轴开始检查；非PA_BBND: 从0轴开始检查
     // PA_BBND: axis 0 allows non-contiguous, check starts from axis 1
     // Non-PA_BBND: check starts from axis 0
-    size_t checkStartIdx = ((npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 ||
-                             npuArch_ == NpuArch::DAV_9202 || npuArch_ == NpuArch::DAV_2201) &&
-                            kLayout_ == DataLayout::PA_BBND) ?
-                               1 :
-                               0;
+    size_t checkStartIdx = (kLayout_ == DataLayout::PA_BBND) ? 1 : 0;
     if (!keyStridesVec_.empty() && qliV2Params_.key.shape != nullptr) {
         auto& shape = qliV2Params_.key.shape->GetStorageShape();
         std::vector<uint32_t> expectedStrides;

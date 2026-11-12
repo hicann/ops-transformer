@@ -16,7 +16,7 @@
 
 using namespace optiling;
 
-namespace aicpu {
+namespace aicpu::liv2_metadata {
 uint32_t LightningIndexerV2MetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
@@ -1240,4 +1240,4 @@ namespace {
 static const char* kernelType = "LightningIndexerV2Metadata";
 REGISTER_CPU_KERNEL(kernelType, LightningIndexerV2MetadataCpuKernel);
 } // namespace
-}; // namespace aicpu
+}; // namespace aicpu::liv2_metadata

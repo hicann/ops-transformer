@@ -16,7 +16,7 @@
 
 using namespace optiling;
 
-namespace aicpu {
+namespace aicpu::qliv2_metadata {
 namespace {
 // fast负载差分数组的容量上限，不依赖metadata的动态存储布局
 constexpr uint32_t A5_FAST_MAX_AIC_CORE_NUM = 80U;
@@ -1222,4 +1222,4 @@ namespace {
 static const char* kernelType = "QuantLightningIndexerV2Metadata";
 REGISTER_CPU_KERNEL(kernelType, QuantLightningIndexerV2MetadataCpuKernel);
 } // namespace
-}; // namespace aicpu
+}; // namespace aicpu::qliv2_metadata
