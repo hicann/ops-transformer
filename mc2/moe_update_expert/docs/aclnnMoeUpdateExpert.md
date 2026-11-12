@@ -48,13 +48,19 @@
 
 * 专家剪枝：支持根据阈值对token发送的topK个专家进行剪枝。计算方法如下所示：
 
-  将shape为(BS,)的active_mask进行broadcast成为shape为(BS,K)的active_mask_tensor，其中BS对应为False的专家会直接被剪枝。对于active_mask_tensor为True的元素，满足条件也将被剪枝。
+  将shape为(BS,)的active_mask沿专家维度广播为shape为(BS,K)的active_mask_tensor；未传入active_mask时，默认所有token激活。未激活token对应的所有专家均被剪枝。对于激活的token，先对其topK个专家的scale权重求和，再乘以各专家对应的pruning_threshold，得到逐专家阈值。专家scale权重大于等于对应阈值时保留，小于阈值时剪枝。
+
+  balanced_active_mask中的True表示该token保留对应专家、参与后续通信，False表示剪枝、不发送至对应专家。以下伪代码使用NumPy表示计算过程：
 
     ```python
-    active_mask_tensor = broadcast(active_mask, (BS, K))
+    import numpy as np
+
+    active_mask_tensor = np.ones((BS, K), dtype=bool)
+    if active_mask is not None:
+        active_mask_tensor = np.broadcast_to(active_mask.reshape(BS, 1), (BS, K))
     for i in range(BS):
-        expert_scales_vec[:] = sum(expert_scales[i, :] * pruning_threshold[:])
-        balanced_active_mask[i, :] = (expert_scales[i, :] < expert_scales_vec[:]) && active_mask_tensor[i, :]
+        thresholds = np.sum(expert_scales[i, :], dtype=np.float32) * pruning_threshold.reshape(K)
+        balanced_active_mask[i, :] = (expert_scales[i, :] >= thresholds) & active_mask_tensor[i, :]
     ```
 
 ## 函数原型
@@ -321,23 +327,25 @@ aclnnStatus aclnnMoeUpdateExpert(
 
 ## 约束说明
 
-1. 确定性计算：
+- 确定性计算：
      - aclnnMoeUpdateExpert默认确定性实现。
 
-2. **接口配套与调用顺序**：
+- **接口配套与调用顺序**：
     该接口必须与`aclnnMoeDistributeDispatchV2`及`aclnnMoeDistributeCombineV2`/`aclnnMoeDistributeCombineAddRmsNorm`接口配套使用，**调用顺序固定为**：
     `aclnnMoeUpdateExpert` → `aclnnMoeDistributeDispatchV2` → `aclnnMoeDistributeCombineV2`/`aclnnMoeDistributeCombineAddRmsNorm`；
 
     或与`aclnnMoeDistributeDispatchV3`及`aclnnMoeDistributeCombineV3`/`aclnnMoeDistributeCombineAddRmsNormV2`接口配套使用，**调用顺序固定为**：
     `aclnnMoeUpdateExpert` → `aclnnMoeDistributeDispatchV3` → `aclnnMoeDistributeCombineV3`/`aclnnMoeDistributeCombineAddRmsNormV2`；具体参考[调用示例](#调用示例)。
 
-3. **参数一致性要求**：
+- **参数一致性要求**：
    调用过程中使用的`worldSize`、`moeExpertNum`参数取值，所有卡需保持一致，网络不同层中也需保持一致，且需与`aclnnMoeDistributeDispatchV2`、`aclnnMoeDistributeCombineV2`/`aclnnMoeDistributeCombineAddRmsNorm`的对应参数一致。
 
-4. **硬件相关定义**：
+- **硬件相关定义**：
+   <!-- npu="A3" id8 -->
    <term>Atlas A3系列产品</term>  ：单卡包含双DIE（“晶粒”或“裸片”），因此参数说明中的“本卡”均指**单DIE**。
+   <!-- end id8 -->
 
-5. **参数shape格式约束**：
+- **参数shape格式约束**：
    - **BS**：本卡最终输出的token数量，取值范围( 0 < BS ≤ 512 )。
    - **K**：选取的topK个专家，取值范围( 0 < K ≤ 16 )，且需满足( 0 < K ≤ moeExpertNum )。
    - **moeExpertNum**：MoE专家数量，取值范围(0, 1024]。
@@ -347,7 +355,9 @@ aclnnStatus aclnnMoeUpdateExpert(
 
 ## 调用示例
 
+<!-- npu="950,A3" id7 -->
 以<term>Atlas A3系列产品</term>  以及<term>Ascend 950PR&950DT系列产品</term>为例，调用MoeUpdateExpert，MoeDistributeDispatchV2和MoeDistributeCombineAddRmsNorm算子。
+<!-- end id7 -->
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
