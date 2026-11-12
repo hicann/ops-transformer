@@ -377,7 +377,7 @@ __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::Ini
     }
 
     vecBlock.InitGlobalBuffer(oriKV, cmpKV, oriSparseIndices, cmpSparseIndices, oriBlockTable, cmpBlockTable, sequsedQ,
-                              sinks, seqUsedOriKV, seqUsedCmpKV, cmpResidualKV);
+                              sinks, seqUsedOriKV, seqUsedCmpKV, cmpResidualKV, oriTopkLength, cmpTopkLength);
     cubeBlock.InitCubeInput(oriKV, cmpKV, cmpSparseIndices, oriBlockTable, cmpBlockTable, sequsedQ, cuSeqlensQ,
                             cuSeqlensOriKv, cuSeqlensCmpKv, seqUsedOriKV, seqUsedCmpKV, constInfo);
     if (oriTopkLength != nullptr) {
@@ -531,7 +531,8 @@ __aicore__ inline TaskDealMode SparseFlashMlaCsaKernel<CubeBlockType, VecBlockTy
         }
 
         bool s1NoNeedCalc = ComputeParamS1<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, gS1Cur, this->cuSeqlensQGm);
-        bool s2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo);
+        bool s2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, this->oriTopkLengthGm,
+                                                                  this->cmpTopkLengthGm, this->cuSeqlensQGm);
         bool isFirstS2RangeTask = (bN2Cur == bN2StartIdx && gS1Cur == runParam.gs1LoopStartIdx);
         bool isLastS2RangeTask = (lastBN && gS1Cur == runParam.gs1LoopEndIdx - 1);
         int64_t s2StartPoint = ConvertS2MetadataBlockToToken(runParam, this->constInfo, s2StartIdx);
@@ -577,7 +578,8 @@ __aicore__ inline TaskDealMode SparseFlashMlaCsaKernel<CubeBlockType, VecBlockTy
         }
 
         bool s1NoNeedCalc = ComputeParamS1<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, gS1Cur, this->cuSeqlensQGm);
-        bool s2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo);
+        bool s2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, this->oriTopkLengthGm,
+                                                                  this->cmpTopkLengthGm, this->cuSeqlensQGm);
         bool isFirstS2RangeTask = (bN2Cur == bN2StartIdx && gS1Cur == runParam.gs1LoopStartIdx);
         bool isLastS2RangeTask = (lastBN && gS1Cur == runParam.gs1LoopEndIdx - 1);
         int64_t s2StartPoint = ConvertS2MetadataBlockToToken(runParam, this->constInfo, s2StartIdx);

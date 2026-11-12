@@ -312,7 +312,9 @@ __aicore__ inline int64_t ClipSInnerTokenCube(int64_t sInnerToken, int64_t minVa
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo& constInfo)
+__aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo& constInfo,
+                                         GlobalTensor<int32_t>& oriTopkLengthGm, GlobalTensor<int32_t>& cmpTopkLengthGm,
+                                         GlobalTensor<int32_t>& cuSeqlensQGm)
 {
     if (TEMPLATE_MODE != SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
         TEMPLATE_MODE != SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
@@ -328,11 +330,23 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo&
 
     // 计算topk length
     if constexpr (LAYOUT_T == SMLA_LAYOUT::TND) {
-        runParam.oriSparseBlockCount = constInfo.oriSparseBlockCount;
-        runParam.cmpSparseBlockCount = constInfo.cmpSparseBlockCount;
+        uint64_t actualSeqQPrefixSum = cuSeqlensQGm.GetValue(runParam.boIdx);
+        runParam.oriSparseBlockCount =
+            constInfo.hasOriTopkLength ?
+                Min(oriTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.oriSparseBlockCount) :
+                constInfo.oriSparseBlockCount;
+        runParam.cmpSparseBlockCount =
+            constInfo.hasCmpTopkLength ?
+                Min(cmpTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.cmpSparseBlockCount) :
+                constInfo.cmpSparseBlockCount;
     } else {
-        runParam.oriSparseBlockCount = constInfo.oriSparseBlockCount;
-        runParam.cmpSparseBlockCount = constInfo.cmpSparseBlockCount;
+        uint64_t bsndTopkIdx = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
+        runParam.oriSparseBlockCount = constInfo.hasOriTopkLength ?
+                                           Min(oriTopkLengthGm.GetValue(bsndTopkIdx), constInfo.oriSparseBlockCount) :
+                                           constInfo.oriSparseBlockCount;
+        runParam.cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
+                                           Min(cmpTopkLengthGm.GetValue(bsndTopkIdx), constInfo.cmpSparseBlockCount) :
+                                           constInfo.cmpSparseBlockCount;
     }
 
     // orikv
@@ -340,6 +354,13 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo&
         runParam.cubeSOuterOffset - runParam.preTokensPerBatchOri, 0, runParam.actualS2OriSize);
     runParam.s2OriLineEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
         runParam.cubeSOuterOffset + runParam.nextTokensPerBatchOri + runParam.s1RealSize, 0, runParam.actualS2OriSize);
+    if constexpr (TEMPLATE_MODE == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                  TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+        int64_t oriSparseRangeLen = runParam.s2OriLineEndIdx - runParam.s2OriLineStartIdx;
+        runParam.s2OriLineStartIdx = 0;
+        runParam.s2OriLineEndIdx = Min(oriSparseRangeLen, runParam.oriSparseBlockCount);
+        runParam.s2OriLineEndIdx = Min(runParam.s2OriLineEndIdx, runParam.actualS2OriSize);
+    }
     runParam.oriKvLoopEndIdx = (runParam.s2OriLineEndIdx - runParam.s2OriLineStartIdx + s2BaseSize - 1) / s2BaseSize;
 
     // cmpkv
@@ -355,7 +376,8 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo&
             runParam.actualS2CmpSize);
         runParam.s2CmpLineEndIdx = Min(runParam.s2CmpLineEndIdx, runParam.actualS2CmpSize);
         runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
-    } else if constexpr (TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE) {
+    } else if constexpr (TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE ||
+                         TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         runParam.s2CmpLineStartIdx = 0;
         runParam.s2CmpLineEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
             (runParam.cubeSOuterOffset + runParam.s1RealSize + runParam.nextTokensPerBatchCmp) / constInfo.cmpRatio, 0,

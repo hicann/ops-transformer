@@ -127,4 +127,12 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
     CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARG_NAME) \
     CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARG_NAME) end
 
+// ===== GetKVPhyAddr 独立阶段, FREE/READY 同号配对 =====
+#define INNERCORE_PHYADDR_BLKTABLE_FREE (3)   // V_MTE2, blkTable 空闲
+#define INNERCORE_PHYADDR_BLKTABLE_READY (3)  // MTE2_V, blkTable 就绪
+#define INNERCORE_PHYADDR_SPARSEIDX_FREE (4)  // V_MTE2, sparseIdx 空闲
+#define INNERCORE_PHYADDR_SPARSEIDX_READY (4) // MTE2_V, sparseIdx 就绪
+#define INNERCORE_PHYADDR_KVADDR_READY (7)    // V_MTE3, kvPhyAddr 就绪
+#define INNERCORE_PHYADDR_KVADDR_FREE (7)     // MTE3_V, kvPhyAddr 空闲
+
 #endif

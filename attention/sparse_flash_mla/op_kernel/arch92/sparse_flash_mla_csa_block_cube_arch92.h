@@ -194,7 +194,8 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitCubeInput(
         if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
             this->oriBlockTableGm.SetGlobalBuffer((__gm__ int32_t*)oriBlockTable);
         }
-        if constexpr (TEMPLATE_MODE != SMLATemplateMode::SWA_TEMPLATE_MODE) {
+        if constexpr (TEMPLATE_MODE != SMLATemplateMode::SWA_TEMPLATE_MODE &&
+                      TEMPLATE_MODE != SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
             this->cmpKvGm.gmTensor.SetGlobalBuffer((__gm__ KV_T*)cmpKv);
             if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
                 this->cmpBlockTableGm.SetGlobalBuffer((__gm__ int32_t*)cmpBlockTable);

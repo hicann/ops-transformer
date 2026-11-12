@@ -37,9 +37,9 @@ enum class VselrIndexEnum {
     int64_t s2LoopEndIdx;       /* S2方向的循环控制信息 souter层确定 */ \
     int64_t s2LineStartIdx = 0; /* S2方向按行的起始位置 */ \
     int64_t s2LineOriEndIdx;    /* S2方向按行的结束位置 */ \
+    int64_t s2CmpLineStartIdx = 0; \
     int64_t s2CmpLineEndIdx; \
-    int64_t s2LineCmpEndIdx; \
-    /* cube视角的sOuter，在SAMEAB场景中cubeSOuterSize为两倍的 halfS1RealSize souter层确定 */ \
+    int64_t s2LineCmpEndIdx; /* cube视角的sOuter，在SAMEAB场景中cubeSOuterSize为两倍的 halfS1RealSize souter层确定 */ \
     uint32_t s1RealSize; \
     uint32_t halfS1RealSize; \
     uint32_t firstHalfS1RealSize; \
@@ -138,6 +138,7 @@ struct ConstInfo {
     SMLA_CONST_INFO_COMMON_FIELDS;
     SMLA_CONST_INFO_NOPE_ROPE_FIELDS;
     SMLA_CONST_INFO_KV_STRIDE_FIELDS;
+    SMLA_CONST_INFO_TOPK_FIELDS;
 };
 } // namespace regbaseutil
 

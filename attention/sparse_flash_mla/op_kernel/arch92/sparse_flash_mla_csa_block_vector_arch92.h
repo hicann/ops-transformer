@@ -91,7 +91,8 @@ public:
                                             __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
                                             __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sinks,
                                             __gm__ uint8_t* sequsedOriKv, __gm__ uint8_t* sequsedCmpKv,
-                                            __gm__ uint8_t* cmpResidualKv);
+                                            __gm__ uint8_t* cmpResidualKv, __gm__ uint8_t* oriTopkLength,
+                                            __gm__ uint8_t* cmpTopkLength);
     __aicore__ inline void InitOutputSingleCore(ConstInfo& constInfo);
     __aicore__ inline void ProcessVec0(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& outputL1,
                                        const RunInfo& runInfo, ConstInfo& constInfo);
@@ -147,6 +148,8 @@ private:
     GlobalTensor<int32_t> actualSeqLengthsKVGm;
     GlobalTensor<int32_t> actualSeqLengthsCmpKVGm;
     GlobalTensor<int32_t> cmpResidualKVGm;
+    GlobalTensor<int32_t> oriTopkLengthGm;
+    GlobalTensor<int32_t> cmpTopkLengthGm;
 
     TBuf<> commonTBuf; // common的复用空间
     TBuf<> sinksBuf;
@@ -190,6 +193,8 @@ private:
     int64_t sparseCalSize;
     int64_t sparseS2Start;
     int64_t sparseS2End;
+    bool hasOriTopkLength;
+    bool hasCmpTopkLength;
 
     TEventID initOutputEventId; // attenOut和lse，刷无效行会用到剩余ub，需要加同步
     TEventID mte3ToVLseOutId;
@@ -592,17 +597,45 @@ TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec0(
     Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& outputL1, const RunInfo& runInfo, ConstInfo& constInfo)
 {
-    if (runInfo.s2LoopCount < runInfo.oriKvLoopEndIdx) {
-        return;
-    }
-    keyGm = cmpKVGm;
-    keyGmBytes.SetGlobalBuffer((__gm__ uint8_t*)keyGm.GetPhyAddr());
-    cuSeqlensKvGm = cuSeqlensCmpKvGm;
-    sparseIndicesGm = cmpSparseIndicesGm;
-    if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
-        blockTableGm = cmpBlockTableGm;
-        blockSize = constInfo.cmpBlockSize;
-        maxBlockNumPerBatch = constInfo.cmpMaxBlockNumPerBatch;
+    if constexpr (TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE) {
+        if (runInfo.s2LoopCount < runInfo.oriKvLoopEndIdx) {
+            return;
+        }
+        keyGm = cmpKVGm;
+        keyGmBytes.SetGlobalBuffer((__gm__ uint8_t*)keyGm.GetPhyAddr());
+        cuSeqlensKvGm = cuSeqlensCmpKvGm;
+        sparseIndicesGm = cmpSparseIndicesGm;
+        if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
+            blockTableGm = cmpBlockTableGm;
+            blockSize = constInfo.cmpBlockSize;
+            maxBlockNumPerBatch = constInfo.cmpMaxBlockNumPerBatch;
+        }
+    } else if constexpr (TEMPLATE_MODE == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                         TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+        if (!runInfo.isCmp) {
+            keyGm = oriKVGm;
+            keyGmBytes.SetGlobalBuffer((__gm__ uint8_t*)keyGm.GetPhyAddr());
+            cuSeqlensKvGm = cuSeqlensOriKvGm;
+            sparseIndicesGm = oriSparseIndicesGm;
+            if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
+                blockTableGm = oriBlockTableGm;
+                blockSize = constInfo.oriBlockSize;
+                maxBlockNumPerBatch = constInfo.oriMaxBlockNumPerBatch;
+            }
+        } else {
+            if constexpr (TEMPLATE_MODE == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
+                return;
+            }
+            keyGm = cmpKVGm;
+            keyGmBytes.SetGlobalBuffer((__gm__ uint8_t*)keyGm.GetPhyAddr());
+            cuSeqlensKvGm = cuSeqlensCmpKvGm;
+            sparseIndicesGm = cmpSparseIndicesGm;
+            if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
+                blockTableGm = cmpBlockTableGm;
+                blockSize = constInfo.cmpBlockSize;
+                maxBlockNumPerBatch = constInfo.cmpMaxBlockNumPerBatch;
+            }
+        }
     }
     CalSparseCalSize(runInfo, constInfo);
     ProcessSparseKv(outputL1, runInfo, constInfo);
@@ -618,12 +651,24 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessSparseKv(
     int64_t topkBS1Idx = 0;
     if constexpr (LAYOUT_T == SMLA_LAYOUT::TND) {
         uint64_t actualSeqQPrefixSum = cuSeqlensQGm.GetValue(runInfo.boIdx);
-        topkBS1Idx += (actualSeqQPrefixSum + runInfo.s1oIdx) * constInfo.cmpSparseBlockCount; // T, N2(1), K
+        if (runInfo.isCmp) {
+            topkBS1Idx += (actualSeqQPrefixSum + runInfo.s1oIdx) * constInfo.cmpSparseBlockCount;
+        } else {
+            topkBS1Idx += (actualSeqQPrefixSum + runInfo.s1oIdx) * constInfo.oriSparseBlockCount;
+        }
     } else {
-        topkBS1Idx += runInfo.boIdx * constInfo.s1Size * constInfo.cmpSparseBlockCount +
-                      runInfo.s1oIdx * constInfo.cmpSparseBlockCount; // B, S1, N2(1), K
+        if (runInfo.isCmp) {
+            topkBS1Idx += runInfo.boIdx * constInfo.s1Size * constInfo.cmpSparseBlockCount +
+                          runInfo.s1oIdx * constInfo.cmpSparseBlockCount;
+        } else {
+            topkBS1Idx += runInfo.boIdx * constInfo.s1Size * constInfo.oriSparseBlockCount +
+                          runInfo.s1oIdx * constInfo.oriSparseBlockCount;
+        }
     }
-    int64_t cmpS2LoopCnt = runInfo.s2LoopCount - runInfo.oriKvLoopEndIdx;
+    int64_t cmpS2LoopCnt = runInfo.s2LoopCount;
+    if (runInfo.isCmp) {
+        cmpS2LoopCnt = runInfo.s2LoopCount - runInfo.oriKvLoopEndIdx;
+    }
     int64_t topkKIdx = cmpS2LoopCnt * constInfo.s2BaseSize;
     WaitFlag<HardEvent::MTE3_MTE2>(Mte3ToMte2V0Id);
     AscendC::DataCopyParams copyInParams;
@@ -631,8 +676,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessSparseKv(
     copyInParams.blockLen = (s2RealSize * sizeof(int32_t) + 31U) / 32U; // 32B 为单位，向上取整
     copyInParams.srcGap = 0U;
     copyInParams.dstGap = 0U;
-    DataCopy(sparseIndiceTensor,
-             cmpSparseIndicesGm[topkBS1Idx + runInfo.s2StartIdx + cmpS2LoopCnt * constInfo.s2BaseSize], copyInParams);
+    DataCopy(sparseIndiceTensor, sparseIndicesGm[topkBS1Idx + runInfo.s2StartIdx + cmpS2LoopCnt * constInfo.s2BaseSize],
+             copyInParams);
     SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
     WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
 
@@ -971,7 +1016,8 @@ TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitGlobalBuffer(
     __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV, __gm__ uint8_t* oriSparseIndices, __gm__ uint8_t* cmpSparseIndices,
     __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sinks,
-    __gm__ uint8_t* sequsedOriKv, __gm__ uint8_t* sequsedCmpKv, __gm__ uint8_t* cmpResidualKv)
+    __gm__ uint8_t* sequsedOriKv, __gm__ uint8_t* sequsedCmpKv, __gm__ uint8_t* cmpResidualKv,
+    __gm__ uint8_t* oriTopkLength, __gm__ uint8_t* cmpTopkLength)
 {
     if (oriKV != nullptr) {
         oriKVGm.SetGlobalBuffer((__gm__ KV_T*)(oriKV));
@@ -988,13 +1034,33 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitGlobalBuffer(
         }
     }
 
-    if constexpr (TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE) {
+    if constexpr (TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE ||
+                  TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         cmpSparseIndicesGm.SetGlobalBuffer((__gm__ int32_t*)cmpSparseIndices);
+    }
+
+    if constexpr (TEMPLATE_MODE == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                  TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+        oriSparseIndicesGm.SetGlobalBuffer((__gm__ int32_t*)oriSparseIndices);
     }
 
     if (sinks != nullptr) {
         sinksGm.SetGlobalBuffer((__gm__ T*)sinks);
         this->isSinks = true;
+    }
+
+    if (oriTopkLength != nullptr) {
+        hasOriTopkLength = true;
+        oriTopkLengthGm.SetGlobalBuffer((__gm__ int32_t*)oriTopkLength);
+    } else {
+        hasOriTopkLength = false;
+    }
+
+    if (cmpTopkLength != nullptr) {
+        hasCmpTopkLength = true;
+        cmpTopkLengthGm.SetGlobalBuffer((__gm__ int32_t*)cmpTopkLength);
+    } else {
+        hasCmpTopkLength = false;
     }
 }
 
@@ -1137,7 +1203,8 @@ public:
                                             __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
                                             __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sinks,
                                             __gm__ uint8_t* sequsedOriKv, __gm__ uint8_t* sequsedCmpKv,
-                                            __gm__ uint8_t* cmpResidualKv)
+                                            __gm__ uint8_t* cmpResidualKv, __gm__ uint8_t* oriTopkLength,
+                                            __gm__ uint8_t* cmpTopkLength)
     {}
     __aicore__ inline void InitVecBlock(TPipe* pipe, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv,
                                         __gm__ uint8_t* cuSeqlensCmpKv, __gm__ uint8_t* sequsedOriKv,

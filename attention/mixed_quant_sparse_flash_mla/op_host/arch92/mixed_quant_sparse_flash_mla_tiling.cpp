@@ -19,12 +19,22 @@ namespace optiling {
 ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* tilingInfo)
 {
     if (tilingInfo->opParamInfo.cmpKv.tensor == nullptr) {
-        OP_CHECK_IF(tilingInfo->opParamInfo.cmpSparseIndices.tensor != nullptr,
-                    OP_LOGE("MixedQuantSparseFlashMla", "cmpSparseIndices must be empty when cmpKv is not provided."),
-                    return ge::GRAPH_FAILED);
-        perfMode_ = QSMLATemplateMode::SWA_TEMPLATE_MODE;
+        OP_CHECK_IF(
+            tilingInfo->opParamInfo.cmpSparseIndices.tensor != nullptr,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("MixedQuantSparseFlashMla", "cmp_sparse_indices",
+                                                     "cmpSparseIndices must be empty when cmpKv is not provided"),
+            return ge::GRAPH_FAILED);
+        if (tilingInfo->opParamInfo.oriSparseIndices.tensor == nullptr) {
+            perfMode_ = QSMLATemplateMode::SWA_TEMPLATE_MODE;
+        } else {
+            perfMode_ = QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE;
+        }
     } else if (tilingInfo->opParamInfo.cmpSparseIndices.tensor != nullptr) {
-        perfMode_ = QSMLATemplateMode::CSA_TEMPLATE_MODE;
+        if (tilingInfo->opParamInfo.oriSparseIndices.tensor == nullptr) {
+            perfMode_ = QSMLATemplateMode::CSA_TEMPLATE_MODE;
+        } else {
+            perfMode_ = QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE;
+        }
     } else {
         perfMode_ = QSMLATemplateMode::HCA_TEMPLATE_MODE;
     }
@@ -43,18 +53,56 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
     constexpr uint32_t D_SIZE = 512;
     constexpr uint32_t VEC_RES_ELEM_SIZE = 2; // 2: fp16/bf16
     constexpr uint32_t TOPK_MAX_SIZE = 2048;  // TopK选取个数
-    uint32_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
+    constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128;
+    constexpr uint32_t UB_SIZE = 376 * 1024;
+    uint32_t alignedOriSparseBlockCount = (tilingInfo->oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
+                                          SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    uint32_t alignedCmpSparseBlockCount = (tilingInfo->cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
+                                          SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    uint64_t oriUbSize = static_cast<uint64_t>(tilingInfo->oriMaxBlockNumPerBatch) * sizeof(int32_t) +
+                         static_cast<uint64_t>(alignedOriSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
+    uint64_t cmpUbSize = static_cast<uint64_t>(tilingInfo->cmpMaxBlockNumPerBatch) * sizeof(int32_t) +
+                         static_cast<uint64_t>(alignedCmpSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
+    bool oriBlockSizePowerOfTwo =
+        tilingInfo->oriBlockSize > 0 && (tilingInfo->oriBlockSize & (tilingInfo->oriBlockSize - 1)) == 0;
+    bool cmpBlockSizePowerOfTwo =
+        tilingInfo->cmpBlockSize > 0 && (tilingInfo->cmpBlockSize & (tilingInfo->cmpBlockSize - 1)) == 0;
+    bool blockSizeSupported = (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE && cmpBlockSizePowerOfTwo) ||
+                              (perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE && oriBlockSizePowerOfTwo) ||
+                              (perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE && oriBlockSizePowerOfTwo &&
+                               cmpBlockSizePowerOfTwo);
+    uint64_t vectorizeUbSize =
+        (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE) ?
+            cmpUbSize :
+            ((perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) ? oriUbSize : std::max(oriUbSize, cmpUbSize));
+    uint32_t vectorizeFlag =
+        static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
+                               perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                               perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+                              tilingInfo->kvLayout == MQSMLALayout::PA_BBND && tilingInfo->topkValueMode == 1 &&
+                              blockSizeSupported && vectorizeUbSize <= UB_SIZE);
+
+    size_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     bool isSplitG = tilingInfo->gSize > M_BASE_SIZE; // gSize超过64时采用Split-G
     if (isSplitG) {
         workspaceSize += (S2_BASE_SIZE * D_SIZE * VEC_RES_ELEM_SIZE * TRIPLE_BUFFER_NUM * (aicNum >> 1));
     } else {
         workspaceSize += (S2_BASE_SIZE * D_SIZE * VEC_RES_ELEM_SIZE * TRIPLE_BUFFER_NUM * aicNum);
     }
-    constexpr uint32_t UB_SIZE = 376 * 1024; // UB大小共384KB,预留8k
 
-    uint32_t totalBS1 =
-        (tilingInfo->qLayout == MQSMLALayout::TND) ? tilingInfo->s1Size : (tilingInfo->bSize * tilingInfo->s1Size);
-    workspaceSize += (totalBS1 * tilingInfo->cmpSparseBlockCount * sizeof(int64_t));
+    if (vectorizeFlag != 0) {
+        uint64_t totalBS1 = (tilingInfo->qLayout == MQSMLALayout::TND) ?
+                                tilingInfo->s1Size :
+                                static_cast<uint64_t>(tilingInfo->bSize) * tilingInfo->s1Size;
+        if (perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+            perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+            workspaceSize += totalBS1 * alignedOriSparseBlockCount * sizeof(int64_t);
+        }
+        if (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
+            perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+            workspaceSize += totalBS1 * alignedCmpSparseBlockCount * sizeof(int64_t);
+        }
+    }
     size_t* workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
@@ -63,6 +111,7 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
     tilingData_.baseParams.set_kvSeqSize(tilingInfo->s2Size);
     tilingData_.baseParams.set_qSeqSize(tilingInfo->s1Size);
     tilingData_.baseParams.set_cmpKvSeqSize(tilingInfo->cmpS2Size);
+    tilingData_.baseParams.set_oriSparseBlockCount(tilingInfo->oriSparseBlockCount);
     tilingData_.baseParams.set_cmpSparseBlockCount(tilingInfo->cmpSparseBlockCount);
     tilingData_.baseParams.set_nNumOfQInOneGroup(tilingInfo->gSize);
     tilingData_.baseParams.set_paOriBlockSize(tilingInfo->oriBlockSize);
@@ -94,14 +143,6 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
     uint32_t outputType = static_cast<uint32_t>(tilingInfo->outputType);
     uint32_t qLayout = static_cast<uint32_t>(tilingInfo->qLayout);
     uint32_t inputKvLayout = static_cast<uint32_t>(tilingInfo->kvLayout);
-    uint32_t blocksizeFlag = static_cast<uint32_t>((tilingInfo->cmpBlockSize & (tilingInfo->cmpBlockSize - 1)) ==
-                                                   0); // blockSize2是否为2的幂次
-    uint32_t vectorizeUbSize = tilingInfo->cmpMaxBlockNumPerBatch * sizeof(int32_t) +
-                               tilingInfo->cmpSparseBlockCount * sizeof(int32_t) +
-                               tilingInfo->cmpSparseBlockCount * sizeof(int64_t); // 物理地址计算向量化所需ub大小
-    uint32_t vectorizeFlag =
-        static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE) && (vectorizeUbSize <= UB_SIZE) &&
-                              blocksizeFlag && tilingInfo->topkValueMode == 1); // 是否满足向量化条件
     uint32_t tilingKey = GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_),
                                             static_cast<uint32_t>(tilingInfo->gSize > 64),
                                             ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8),
