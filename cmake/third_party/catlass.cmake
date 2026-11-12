@@ -7,7 +7,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ----------------------------------------------------------------------------
-set(CATLASS_TAG_ID 769cd40a8716b28650b6bebb08db4834eea4462f) # v2.0.0
+set(CATLASS_TAG_ID 83073fedcac3d9df5b83f701b2cc00ec6a94f984) # v1.5.0
 
 if(EXISTS ${TOP_DIR}/open_source/catlass)
   get_filename_component(CATLASS_SOURCE_PATH
