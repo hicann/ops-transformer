@@ -25,6 +25,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 
 using RecurrentKdaTilingData = RecurrentKda::RecurrentKdaTilingData;
@@ -46,6 +47,7 @@ static constexpr size_t RKDA_DIM_3 = 3;
 
 static constexpr uint32_t RKDA_LAYOUT_BSND = 0;
 static constexpr uint32_t RKDA_LAYOUT_TND = 1;
+// A2/A3 input window capacity; A5 retains its sequence-length limit.
 static constexpr size_t RKDA_MAX_MTP = 8;
 static constexpr int64_t RKDA_INPUT_BUFFER_NUM = 2;
 static constexpr int64_t RKDA_UB_GUARD_BYTES = 2048;
@@ -88,6 +90,12 @@ struct RecurrentKdaTilingContext {
     ge::DataType cuSeqlensDtype = ge::DT_INT64;
     ge::DataType ssmStateIndicesDtype = ge::DT_INT64;
     ge::DataType acceptedTokensDtype = ge::DT_INT64;
+    std::array<int64_t, RKDA_RANK4_QKV_DIM_NUM> queryStrides = {};
+    std::array<int64_t, RKDA_RANK4_QKV_DIM_NUM> keyStrides = {};
+    std::array<int64_t, RKDA_RANK4_QKV_DIM_NUM> valueStrides = {};
+    bool hasQueryStrides = false;
+    bool hasKeyStrides = false;
+    bool hasValueStrides = false;
     std::array<int64_t, RKDA_STATE_DIM_NUM> stateInStrides = {};
     std::array<int64_t, RKDA_STATE_DIM_NUM> stateOutStrides = {};
     bool hasStateInStrides = false;
@@ -188,6 +196,101 @@ private:
     {
         return "[" + std::to_string(strides[0]) + ", " + std::to_string(strides[1]) + ", " +
                std::to_string(strides[2]) + ", " + std::to_string(strides[3]) + "]";
+    }
+
+    static std::string StridesToString(const std::array<int64_t, RKDA_RANK4_QKV_DIM_NUM>& strides, size_t rank)
+    {
+        std::string value = "[";
+        for (size_t i = 0; i < rank; ++i) {
+            value += (i == 0 ? "" : ", ") + std::to_string(strides[i]);
+        }
+        return value + "]";
+    }
+
+    std::array<int64_t, RKDA_RANK4_QKV_DIM_NUM> ResolveQkvStrides(
+        const gert::Shape& shape, const std::array<int64_t, RKDA_RANK4_QKV_DIM_NUM>& viewStrides, bool hasStrides) const
+    {
+        if (hasStrides) {
+            return viewStrides;
+        }
+        std::array<int64_t, RKDA_RANK4_QKV_DIM_NUM> strides = {};
+        int64_t denseStride = 1;
+        for (size_t dim = shape.GetDimNum(); dim > 0; --dim) {
+            const size_t index = dim - 1;
+            strides[index] = denseStride;
+            denseStride *= shape.GetDim(index);
+        }
+        return strides;
+    }
+
+    ge::graphStatus ValidateQkvStrides(const gert::Shape& shape,
+                                       const std::array<int64_t, RKDA_RANK4_QKV_DIM_NUM>& strides,
+                                       const char* name) const
+    {
+        const size_t rank = shape.GetDimNum();
+        const std::string strideString = StridesToString(strides, rank);
+        for (size_t i = 0; i < rank; ++i) {
+            OP_CHECK_IF(strides[i] <= 0,
+                        OP_LOGE_FOR_INVALID_STRIDE(ctx_.nodeName, name, strideString, "all strides must be positive"),
+                        return ge::GRAPH_FAILED);
+        }
+
+        const size_t tokenDim = rank == RKDA_RANK3_QKV_DIM_NUM ? RKDA_DIM_0 : RKDA_DIM_1;
+        const size_t headDim = rank == RKDA_RANK3_QKV_DIM_NUM ? RKDA_DIM_1 : RKDA_DIM_2;
+        const size_t featureDim = rank == RKDA_RANK3_QKV_DIM_NUM ? RKDA_DIM_2 : RKDA_DIM_3;
+        const uint64_t headCount = static_cast<uint64_t>(shape.GetDim(headDim));
+        const uint64_t featureCount = static_cast<uint64_t>(shape.GetDim(featureDim));
+        const uint64_t tokenStride = static_cast<uint64_t>(strides[tokenDim]);
+        const uint64_t headStride = static_cast<uint64_t>(strides[headDim]);
+        OP_CHECK_IF(strides[featureDim] != 1 || headStride < featureCount,
+                    OP_LOGE_FOR_INVALID_STRIDE(ctx_.nodeName, name, strideString,
+                                               "feature stride=1 and head stride>=" + std::to_string(featureCount)),
+                    return ge::GRAPH_FAILED);
+
+        const uint64_t maxUint64 = std::numeric_limits<uint64_t>::max();
+        OP_CHECK_IF(headCount > 1 && headStride > (maxUint64 - featureCount) / (headCount - 1),
+                    OP_LOGE_FOR_INVALID_STRIDE(ctx_.nodeName, name, strideString, "head span overflows"),
+                    return ge::GRAPH_FAILED);
+        const uint64_t minTokenStride = (headCount - 1) * headStride + featureCount;
+        OP_CHECK_IF(
+            tokenStride < minTokenStride,
+            OP_LOGE_FOR_INVALID_STRIDE(ctx_.nodeName, name, strideString,
+                                       "token stride overlaps heads; minimum=" + std::to_string(minTokenStride)),
+            return ge::GRAPH_FAILED);
+
+        const uint64_t srcGapElements = tokenStride - featureCount;
+        OP_CHECK_IF(srcGapElements > std::numeric_limits<uint32_t>::max() / sizeof(uint16_t),
+                    OP_LOGE_FOR_INVALID_STRIDE(ctx_.nodeName, name, strideString,
+                                               "token gap exceeds DataCopy source-stride range"),
+                    return ge::GRAPH_FAILED);
+
+        if (rank == RKDA_RANK4_QKV_DIM_NUM && shape.GetDim(RKDA_DIM_0) > 1) {
+            const uint64_t seqLen = static_cast<uint64_t>(shape.GetDim(RKDA_DIM_1));
+            OP_CHECK_IF(tokenStride > maxUint64 / seqLen,
+                        OP_LOGE_FOR_INVALID_STRIDE(ctx_.nodeName, name, strideString, "batch stride overflows"),
+                        return ge::GRAPH_FAILED);
+            const uint64_t expectedBatchStride = seqLen * tokenStride;
+            OP_CHECK_IF(
+                static_cast<uint64_t>(strides[RKDA_DIM_0]) != expectedBatchStride,
+                OP_LOGE_FOR_INVALID_STRIDE(ctx_.nodeName, name, strideString,
+                                           "batch stride must equal T * token stride for flattened BSND; expected=" +
+                                               std::to_string(expectedBatchStride)),
+                return ge::GRAPH_FAILED);
+        }
+        return ge::GRAPH_SUCCESS;
+    }
+
+    ge::graphStatus CheckQkvStrides() const
+    {
+        const auto queryStrides = ResolveQkvStrides(ctx_.queryShape, ctx_.queryStrides, ctx_.hasQueryStrides);
+        const auto keyStrides = ResolveQkvStrides(ctx_.keyShape, ctx_.keyStrides, ctx_.hasKeyStrides);
+        const auto valueStrides = ResolveQkvStrides(ctx_.valueShape, ctx_.valueStrides, ctx_.hasValueStrides);
+        if (ValidateQkvStrides(ctx_.queryShape, queryStrides, "query") != ge::GRAPH_SUCCESS ||
+            ValidateQkvStrides(ctx_.keyShape, keyStrides, "key") != ge::GRAPH_SUCCESS ||
+            ValidateQkvStrides(ctx_.valueShape, valueStrides, "value") != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+        return ge::GRAPH_SUCCESS;
     }
 
     ge::graphStatus ValidateStateStrides(const std::array<int64_t, RKDA_STATE_DIM_NUM>& strides, const char* name) const
@@ -428,7 +531,7 @@ private:
                         "V] otherwise; without ssm_state_indices, state_capacity must equal seq_num"),
                     return ge::GRAPH_FAILED);
 
-        if (CheckStateStrides() != ge::GRAPH_SUCCESS) {
+        if (CheckQkvStrides() != ge::GRAPH_SUCCESS || CheckStateStrides() != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
 
@@ -464,6 +567,17 @@ private:
         tiling.ssmStateStride = (ctx_.hasSsmStateIndices && ctx_.ssmStateShape.GetDimNum() == RKDA_METADATA_RANK2) ?
                                     static_cast<uint32_t>(ctx_.ssmStateShape.GetDim(RKDA_DIM_1)) :
                                     0;
+        const auto queryStrides = ResolveQkvStrides(queryShape, ctx_.queryStrides, ctx_.hasQueryStrides);
+        const auto keyStrides = ResolveQkvStrides(ctx_.keyShape, ctx_.keyStrides, ctx_.hasKeyStrides);
+        const auto valueStrides = ResolveQkvStrides(valueShape, ctx_.valueStrides, ctx_.hasValueStrides);
+        const size_t tokenDim = ctx_.layout == RKDA_LAYOUT_TND ? RKDA_DIM_0 : RKDA_DIM_1;
+        const size_t headDim = ctx_.layout == RKDA_LAYOUT_TND ? RKDA_DIM_1 : RKDA_DIM_2;
+        tiling.queryTokenStride = static_cast<uint64_t>(queryStrides[tokenDim]);
+        tiling.queryHeadStride = static_cast<uint64_t>(queryStrides[headDim]);
+        tiling.keyTokenStride = static_cast<uint64_t>(keyStrides[tokenDim]);
+        tiling.keyHeadStride = static_cast<uint64_t>(keyStrides[headDim]);
+        tiling.valueTokenStride = static_cast<uint64_t>(valueStrides[tokenDim]);
+        tiling.valueHeadStride = static_cast<uint64_t>(valueStrides[headDim]);
         const auto stateInStrides = ResolveStateStrides(false);
         const auto stateOutStrides = ResolveStateStrides(true);
         tiling.stateInStride0 = static_cast<uint64_t>(stateInStrides[RKDA_DIM_0]);
@@ -530,6 +644,11 @@ private:
         }
         uint64_t maxCoreNum = (ctx_.aivNum > 0) ? ctx_.aivNum : 1;
         uint64_t selectedCoreNum = (taskUnits < maxCoreNum) ? taskUnits : maxCoreNum;
+        if (ctx_.isA5 == 0) {
+            // Keep the minimum wave count while avoiding partially filled cores.
+            const uint64_t tasksPerCore = (taskUnits + maxCoreNum - 1) / maxCoreNum;
+            selectedCoreNum = (taskUnits + tasksPerCore - 1) / tasksPerCore;
+        }
         tiling.vectorCoreNum = static_cast<uint32_t>(selectedCoreNum);
         OP_LOGD(ctx_.nodeName, "taskUnits: [%llu], selected vectorCoreNum: [%u]",
                 static_cast<unsigned long long>(taskUnits), tiling.vectorCoreNum);
@@ -544,6 +663,23 @@ private:
 
     ge::graphStatus RuleFillTilingShapeData(RecurrentKdaTilingData& tiling) const
     {
+        if (ctx_.isA5 == 0) {
+            // Long-sequence offsets are 64-bit, but serialized capacities remain uint32.
+            const int64_t maxCapacity = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
+            const int64_t seqLen = ctx_.queryShape.GetDim(ctx_.layout == RKDA_LAYOUT_TND ? RKDA_DIM_0 : RKDA_DIM_1);
+            const int64_t batch = ctx_.layout == RKDA_LAYOUT_TND ? 1 : ctx_.queryShape.GetDim(RKDA_DIM_0);
+            const int64_t seqNum = SeqNum(ctx_.queryShape, ctx_.cuSeqlensShape);
+            OP_CHECK_IF(seqLen > maxCapacity || batch > maxCapacity / seqLen || seqNum > maxCapacity ||
+                            ctx_.stateShape.GetDim(RKDA_DIM_0) > maxCapacity ||
+                            (ctx_.hasSsmStateIndices && ctx_.ssmStateShape.GetDimNum() == RKDA_METADATA_RANK2 &&
+                             ctx_.ssmStateShape.GetDim(RKDA_DIM_1) > maxCapacity),
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                            ctx_.nodeName, "T, B, seq_num, state_capacity",
+                            std::to_string(seqLen) + ", " + std::to_string(batch) + ", " + std::to_string(seqNum) +
+                                ", " + std::to_string(ctx_.stateShape.GetDim(RKDA_DIM_0)),
+                            "token/state capacities must fit the uint32 tiling fields"),
+                        return ge::GRAPH_FAILED);
+        }
         FillTilingShapeData(ctx_.queryShape, ctx_.valueShape, ctx_.stateShape, ctx_.cuSeqlensShape, tiling);
         return ge::GRAPH_SUCCESS;
     }
@@ -559,20 +695,22 @@ private:
         return ge::GRAPH_SUCCESS;
     }
 
-    int64_t CalcFixedUbBytes(int64_t aNv, int64_t aDv, int64_t aDk) const
+    int64_t CalcFixedUbBytes(int64_t aNv, int64_t aDv, int64_t aDk, uint32_t nv) const
     {
-        int64_t usedUbBytes = 0;
-        usedUbBytes += RKDA_MAX_MTP * (4 * aDk + 2 * aDv); // q/k/v input queues, bf16.
-        usedUbBytes += RKDA_MAX_MTP * 4 * aDk;             // gate input queue, fp32.
-        usedUbBytes += RKDA_MAX_MTP * 4 * aNv;             // beta input queue, fp32.
-        usedUbBytes += 64 + RKDA_UB_GUARD_BYTES;           // scalar buffer and guard.
+        const int64_t rawBytes = RKDA_MAX_MTP * (8 * aDk + 2 * aDv);
+        const int64_t rawBufferNum = ctx_.isA5 != 0 ? 1 : 2;
+        const int64_t betaHeads = ctx_.isA5 != 0 ? aNv : static_cast<int64_t>(nv);
+        int64_t usedUbBytes = rawBufferNum * rawBytes;
+        usedUbBytes += RKDA_MAX_MTP * 4 * betaHeads; // beta input queue, fp32.
+        usedUbBytes += 64 + RKDA_UB_GUARD_BYTES;     // scalar buffer and guard.
         return usedUbBytes;
     }
 
-    int64_t CalcWorkingUbBytes(int64_t aNv, int64_t aDv, int64_t aDk) const
+    int64_t CalcWorkingUbBytes(int64_t aNv, int64_t aDv, int64_t aDk, uint32_t nv) const
     {
-        int64_t usedUbBytes = CalcFixedUbBytes(aNv, aDv, aDk);
-        usedUbBytes += RKDA_MAX_MTP * (4 * aDv + 12 * aDk + 4 * aNv);
+        const int64_t betaHeads = ctx_.isA5 != 0 ? aNv : static_cast<int64_t>(nv);
+        int64_t usedUbBytes = CalcFixedUbBytes(aNv, aDv, aDk, nv);
+        usedUbBytes += RKDA_MAX_MTP * (4 * aDv + 12 * aDk + 4 * betaHeads);
         return usedUbBytes;
     }
 
@@ -690,6 +828,24 @@ private:
         tiling.vStep = selected.vStep;
         tiling.stateOutBufferNum = selected.stateOutBufferNum;
         tiling.attnOutBufferNum = selected.attnOutBufferNum;
+        if (ctx_.isA5 == 0) {
+            const int64_t tmpBytes = ubCalcCtx.workingUbBytes - ubCalcCtx.fixedUbBytes +
+                                     CalcComputeUbCoeff(aDk) * static_cast<int64_t>(selected.vStep);
+            if (tmpBytes > ubRestBytes) {
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{
+                        ctx_.nodeName,
+                        ("ProcessUb: packed input buffers exceed the UB budget, tmpBytes=" + std::to_string(tmpBytes) +
+                         ", ubRestBytes=" + std::to_string(ubRestBytes) + ", ubSize=" + std::to_string(ubSize) +
+                         ", K=" + std::to_string(tiling.dk) + ", V=" + std::to_string(tiling.dv) +
+                         "; check the platform UB capacity and tiling buffer calculation.")
+                            .c_str()}));
+                return ge::GRAPH_FAILED;
+            }
+            // Generic A2/A3 kernels allocate only named live scratch slices.
+            ubRestBytes = tmpBytes;
+        }
         tiling.ubRestBytes = static_cast<uint32_t>(ubRestBytes);
         return ge::GRAPH_SUCCESS;
     }
@@ -705,15 +861,14 @@ private:
 
     ge::graphStatus RuleCalcFixedUbBytes(RecurrentKdaTilingData& tiling, UbCalcContext& ubCalcCtx) const
     {
-        ubCalcCtx.fixedUbBytes = CalcFixedUbBytes(ubCalcCtx.aNv, ubCalcCtx.aDv, ubCalcCtx.aDk);
+        ubCalcCtx.fixedUbBytes = CalcFixedUbBytes(ubCalcCtx.aNv, ubCalcCtx.aDv, ubCalcCtx.aDk, tiling.nv);
         tiling.ubRestBytes = static_cast<uint32_t>(ubCalcCtx.ubSize - ubCalcCtx.fixedUbBytes);
         return ge::GRAPH_SUCCESS;
     }
 
     ge::graphStatus RuleCalcWorkingUbBytes(RecurrentKdaTilingData& tiling, UbCalcContext& ubCalcCtx) const
     {
-        (void)tiling;
-        ubCalcCtx.workingUbBytes = CalcWorkingUbBytes(ubCalcCtx.aNv, ubCalcCtx.aDv, ubCalcCtx.aDk);
+        ubCalcCtx.workingUbBytes = CalcWorkingUbBytes(ubCalcCtx.aNv, ubCalcCtx.aDv, ubCalcCtx.aDk, tiling.nv);
         return ge::GRAPH_SUCCESS;
     }
 

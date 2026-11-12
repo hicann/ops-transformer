@@ -57,6 +57,26 @@ def _state_slot(
     )
 
 
+def written_state_slots(
+    cu_seqlens: Sequence[int], ssm_state_indices: Optional[torch.Tensor]
+) -> list[int]:
+    ranges = enumerate(zip(cu_seqlens, cu_seqlens[1:]))
+    if ssm_state_indices is None:
+        return [seq_idx for seq_idx, (start, end) in ranges if start < end]
+    return sorted(
+        {
+            _state_slot(ssm_state_indices, seq_idx, start, token)
+            for seq_idx, (start, end) in ranges
+            for token in range(start, end)
+        }
+    )
+
+
+def _l2_normalize(x: torch.Tensor, eps: float) -> torch.Tensor:
+    norm = (x.square().sum(dim=-1, keepdim=True) + eps).sqrt()
+    return x / torch.where(norm == 0, 1.0, norm)
+
+
 def recurrent_kda_reference(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -81,6 +101,7 @@ def recurrent_kda_reference(
     safe_gate: bool = False,
     lower_bound: float = -5.0,
     state_v_first: bool = True,
+    qk_l2norm_eps: float = 1e-6,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     del output_final_state, inplace_final_state
 
@@ -94,8 +115,8 @@ def recurrent_kda_reference(
     scale = (dk**-0.5) if scale is None else scale
 
     if use_qk_l2norm_in_kernel:
-        q_flat = F.normalize(q_flat, p=2, dim=-1)
-        k_flat = F.normalize(k_flat, p=2, dim=-1)
+        q_flat = _l2_normalize(q_flat, qk_l2norm_eps)
+        k_flat = _l2_normalize(k_flat, qk_l2norm_eps)
     q_flat = q_flat * scale
 
     if use_gate_in_kernel:

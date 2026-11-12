@@ -99,7 +99,11 @@ std::tuple<at::Tensor, at::Tensor> RecurrentKda(
         const auto localDevice = c10::Device(q.device());
         const c10::OptionalDeviceGuard deviceGuard(localDevice);
         out = at::empty_like(v);
-        finalState = at::empty_like(initialState);
+        // Allocate a separate state pool only when returning state from a non-inplace call.
+        finalState = initialState;
+        if (!inplaceFinalStateValue && outputFinalStateValue) {
+            finalState = at::empty_like(initialState, initialState.options(), at::MemoryFormat::Contiguous);
+        }
     }
 
     ACLNN_CMD(aclnnRecurrentKda, q, k, v, g, beta, initialState, cuSeqlens, ssmStateIndices, aLog, dtBias,

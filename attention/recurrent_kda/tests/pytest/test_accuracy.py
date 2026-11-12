@@ -18,6 +18,7 @@ import torch_npu
 from cann_ops_transformer.ops import recurrent_kda
 from utils import compare_tensors_by_ratio
 from recurrent_kda_reference import recurrent_kda_reference as recurrent_kda_golden
+from recurrent_kda_reference import written_state_slots
 
 
 def _device():
@@ -42,6 +43,7 @@ def make_inputs(
     state_dtype=torch.float32,
     state_capacity=None,
     state_slots=None,
+    qk_scale=1.0,
 ):
     torch.manual_seed(seed)
     if layout == "BSND":
@@ -62,8 +64,8 @@ def make_inputs(
     else:
         raise ValueError(layout)
 
-    q = torch.randn(q_shape, dtype=torch.bfloat16)
-    k = torch.randn(q_shape, dtype=torch.bfloat16)
+    q = torch.randn(q_shape, dtype=torch.bfloat16).mul_(qk_scale)
+    k = torch.randn(q_shape, dtype=torch.bfloat16).mul_(qk_scale)
     v = torch.randn(v_shape, dtype=torch.bfloat16)
     g = torch.randn(g_shape, dtype=gate_dtype) * 0.5
     beta = torch.randn(beta_shape, dtype=beta_dtype)
@@ -127,10 +129,13 @@ def run_case(
 ):
     print(f"\n=== {desc} ===")
     inp = make_inputs(**kwargs)
-    golden = recurrent_kda_golden(**inp, output_final_state=True, **op_kwargs)
-
     dev = _device()
     torch_npu.npu.set_device(dev)
+    device_name = torch_npu.npu.get_device_name(dev)
+    qk_l2norm_eps = 0.0 if "Ascend950" in device_name else 1e-6
+    golden = recurrent_kda_golden(
+        **inp, output_final_state=True, qk_l2norm_eps=qk_l2norm_eps, **op_kwargs
+    )
 
     call_kwargs = {**op_kwargs, "output_final_state": True, "layout": inp["layout"]}
     call_kwargs["cu_seqlens"] = (
@@ -182,44 +187,48 @@ def run_case(
     torch_npu.npu.synchronize()
 
     out_ok = compare_tensors_by_ratio(golden[0], out.cpu(), "out", rtol=rtol, atol=atol)
-    state_ok = compare_tensors_by_ratio(
-        golden[1], final_state.cpu(), "final_state", rtol=rtol, atol=atol
+    expected_state = golden[1]
+    if (
+        final_state is None
+        or final_state.shape != expected_state.shape
+        or final_state.dtype != expected_state.dtype
+    ):
+        print("final_state shape or dtype validation failed")
+        return False
+
+    written_slots = written_state_slots(inp["cu_seqlens"], inp["ssm_state_indices"])
+    final_storage = final_state.untyped_storage().data_ptr()
+    if op_kwargs.get("inplace_final_state", True):
+        actual_state = final_state.cpu()
+        layout_ok = (
+            final_storage == initial_storage and final_state.stride() == initial_stride
+        )
+        untouched_slots = sorted(set(range(final_state.shape[0])) - set(written_slots))
+        if untouched_slots:
+            layout_ok = layout_ok and torch.equal(
+                actual_state[untouched_slots], initial_before[untouched_slots].cpu()
+            )
+    else:
+        # The independent output pool only defines slots written by this call.
+        expected_state = expected_state[written_slots]
+        actual_state = final_state[written_slots].cpu()
+        layout_ok = final_storage != initial_storage and torch.equal(
+            initial_state_arg.cpu(), initial_before.cpu()
+        )
+
+    state_ok = expected_state.numel() == 0 or compare_tensors_by_ratio(
+        expected_state, actual_state, "final_state", rtol=rtol, atol=atol
     )
-    layout_ok = True
     if non_contiguous_state:
         layout_ok = (
-            not initial_state_arg.is_contiguous()
+            layout_ok
+            and not initial_state_arg.is_contiguous()
             and initial_state_arg.stride() == initial_stride
             and initial_state_arg.untyped_storage().data_ptr() == initial_storage
             and torch.equal(state_pool[:, 1].cpu(), state_guard.cpu())
         )
-        if op_kwargs.get("inplace_final_state", True):
-            layout_ok = layout_ok and (
-                final_state.untyped_storage().data_ptr() == initial_storage
-                and final_state.stride() == initial_stride
-            )
-        else:
-            layout_ok = layout_ok and torch.equal(
-                initial_state_arg.cpu(), initial_before.cpu()
-            )
-        if inp["ssm_state_indices"] is not None:
-            used_slots = set(inp["ssm_state_indices"].tolist())
-            untouched_slots = [
-                slot
-                for slot in range(initial_state_arg.shape[0])
-                if slot not in used_slots
-            ]
-            state_after = (
-                initial_state_arg
-                if op_kwargs.get("inplace_final_state", True)
-                else final_state
-            )
-            layout_ok = layout_ok and torch.equal(
-                state_after[untouched_slots].cpu(),
-                initial_before[untouched_slots].cpu(),
-            )
-        if not layout_ok:
-            print("state view/storage/guard validation failed")
+    if not layout_ok:
+        print("state view/storage/guard validation failed")
     return out_ok and state_ok and layout_ok
 
 
@@ -378,6 +387,11 @@ def test_recurrent_kda_accuracy():
             use_cu_seqlens=False,
         ),
         run_case(
+            "BSND Q/K L2Norm with small input norms",
+            {"batch": 1, "seq_len": 1, "h": 1, "hv": 1, "seed": 8, "qk_scale": 1e-5},
+            {"scale": 1.0, "use_qk_l2norm_in_kernel": True, "state_v_first": True},
+        ),
+        run_case(
             "BSND raw gate, safe_gate=False, beta sigmoid",
             {"layout": "BSND", "batch": 2, "seq_len": 2, "seed": 1},
             {
@@ -473,7 +487,7 @@ def test_recurrent_kda_accuracy():
             non_contiguous_state=True,
         ),
         run_case(
-            "TND BF16 non-contiguous K-first state, out of place",
+            "TND BF16 non-contiguous K-first state, out of place with an unwritten slot",
             {
                 "layout": "TND",
                 "batch": 2,
@@ -482,6 +496,8 @@ def test_recurrent_kda_accuracy():
                 "seed": 7,
                 "state_v_first": False,
                 "state_dtype": torch.bfloat16,
+                "state_capacity": 3,
+                "state_slots": [2, 0],
             },
             {
                 "use_gate_in_kernel": False,
