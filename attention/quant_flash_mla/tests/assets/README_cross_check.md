@@ -4,66 +4,171 @@ FP8 全量化下，CPU golden 与 kernel 的 P 量化路径不同（kernel 按�
 s2 分段独立取 running max 并量化 P）。直接用"NPU 对 golden"的两方判据，会把
 golden 自身的量化噪声当成误差，产生假失败。
 
-三方比对改为以一份高精度 bench 为共同基准：
+三方比对以一份高精度 CPU golden 为共同基准，判据是"NPU 相对基准的误差 /
+XPU 参考相对基准的误差"，即 NPU 的误差不超过 XPU 参考噪声的若干倍。
 
-| 角色 | 来源 | `CrossCheckComparison` 参数位 |
+| 角色 | 来源 | TTK 参数位 |
 | --- | --- | --- |
 | target | 被测 quant_flash_mla 算子输出 | `output` |
-| bench | 新增 fp64 CPU 参考（全局 running max） | `golden`（共同基准） |
-| third_party | 分段量化 CPU 参考 | `third_party` |
-
-判据是"NPU 相对 bench 的误差 / CPU 参考相对 bench 的误差"，即 NPU 的误差不超过
-参考噪声的若干倍。
+| bench | `--golden-mode promote` 的 CPU golden（fp32 输出） | `golden`（共同基准） |
+| third_party | XPU（原生精度、不升档的**分段量化** golden） | `third_party` |
 
 ## 调用链
 
 ```text
-customize_inputs  →  inputs.generate_qfmla_inputs()      固定种子生成算子输入
+customize_inputs → inputs.generate_qfmla_inputs()   固定种子生成算子输入
         │
-        ├─ 算子执行                          → outputs = [atten(bf16), lse(fp32)?]
+        ├─ 算子执行                     → outputs = [atten(bf16), lse(fp32)?]
         │
-golden  →  impl/golden.cpu_qfmla()
-             ├─ generate_data()  同种子重放，得到与算子逐位相同的 q/k/v/descale
-             ├─ fp8_fullquant_mla_golden()            → 两方 golden（全局量化）
-             └─ _cache_bench()
-                  ├─ fp8_fullquant_mla_bench()        → _BENCH_CACHE[case]
-                  └─ fp8_fullquant_mla_sectioned_golden() → _REF_CACHE[case]
+golden  → impl/golden.cpu_qfmla()     → CPU 参考，按 TTK golden_mode 决定是否升档
         │
-compare →  impl/compare.compare()  ← spec 按 compare_context.testcase_name 取两个缓存
+xpu     → spec._xpu_reference()       → 远端 xpu_server 调用分段量化 golden
+        │                             （固定 256 列分块，原生精度不升档）
+        │
+compare → spec.compare()
+             ├─ --compare cross_check：返回 None，由框架原生 CrossCheckComparison 三方比对
+             └─ 默认两方：impl/compare.compare() 按 CSV 精度阈值逐输出判定
 ```
 
-`spec.compare` 只在 `cross_check_enabled()` 为真时传 `bench_outputs` /
-`third_party_outputs`；否则走原有两方比较，不生成任何额外参考。
+`spec.third_party = {"torch": _xpu_reference}` 声明 XPU 参考实现（函数体内
+懒加载 `impl/golden.py`，避免主进程提前拉起 torch_npu）；远端执行时 spec 文件
+与 `impl/` 目录由 TTK 同步到 xpu_server。
 
-## bench 口径
+third_party 必须是**分段量化**参考（`fp8_fullquant_mla_sectioned_golden`，固定
+256 列分块 running max + P 量化），不能复用全局精确 golden：cross_check 的分母
+是 `|b-g|`，全局参考与升档 golden 同源时该值趋零，比值恒爆。只有带同等 P 量化
+噪声的分段参考才能提供有效的噪声地板。
 
-- 计算精度：fp64 累加、fp64 softmax，不复现 fp32 累加误差
-- 输入：反量化后的 q/k/v（只乘 descale），**不重新量化**
-- 保留算子语义的 P 固定 scale cast：FP8 为 `p*448 → e4m3 → fp32`
-- running max 为**全局**（整个 KV 一次），**不复现 metadata 分段**
-- 输出：fp32，按用例的输出布局（BSND/BNSD/TND）转换后缓存
+## 生成与回放
 
-## third_party（分段参考）口径
+### 0. 约定
 
-`fp8_fullquant_mla_sectioned_golden` 复刻 kernel 的分段量化行为：
+| 名称 | 取值 |
+|------|------|
+| ASSETS | `ops-transformer/attention/quant_flash_mla/tests/assets` |
+| RUN | `qfmla_run/`（工作目录，保存生成和回放产物） |
+| XPU 端口 | `127.0.0.1:9100` |
 
-- 切段：`m_base = 64`，`s2_base = 256`，**每个 s2 基本块单独成段**
-- 段内：独立 running max，P 按上述固定 scale cast，累加 `(o, sum, m)`
-- 段间：按 FD 语义合并 `o = o*exp(m_old-m_new) + o_seg*exp(m_seg-m_new)`
-- 输出：转 bf16 并与算子输出同形状
+`--plugin` 传的是 **ASSETS 目录**（内含 `spec.py`），不是 .py 文件。
 
-**故意不依赖 metadata 分核结果。** kernel 的真实分段是"若干连续基本块在分核后
-的并集"，按单块切段是其粒度最细的上界：段数只会更多，参考的量化噪声只会不小于
-target，因此 ratio 不会被过干净的参考抬高。代价是它与 kernel 不逐元素一致。
+### 1. 环境准备（每个新终端都要做）
 
-metadata 分核版本（`get_qfmla_section_info`）保留在 `qfmla_golden.py` 中，由
-`ENABLE_SECTION_GOLDEN` 控制，默认关闭。
+在两个终端中，先激活已安装 TTK 和 PyTorch 扩展的 Python 环境，并进入 `ops-transformer` 的上一级目录。将 `CANN_INSTALL_DIR` 设为本机 CANN 安装目录，将 `QFMLA_OPP_DIR` 设为已安装的 QFMLA 自定义算子包的 vendor 目录，然后执行：
+
+```bash
+source "${CANN_INSTALL_DIR}/set_env.sh"
+export ASCEND_CUSTOM_OPP_PATH="${QFMLA_OPP_DIR}"
+export TORCH_DEVICE_BACKEND_AUTOLOAD=0
+
+ASSETS="$PWD/ops-transformer/attention/quant_flash_mla/tests/assets"
+RUN="$PWD/qfmla_run"
+mkdir -p "$RUN"
+```
+
+### 2. 终端 A：启动 XPU 三方服务（常驻，不要退出）
+
+```bash
+python3 -m ttk.remote.server.xpu_server --port 9100
+```
+
+校验：
+
+```bash
+ss -lntp | grep 9100      # 应看到 LISTEN 127.0.0.1:9100
+```
+
+说明：xpu 不是另一块加速卡，而是本机 CPU 上跑分段量化参考（`spec._xpu_reference` →
+`cpu_qfmla(_force_global_reference=True, _sectioned_reference=True)`），TTK 通过该端口取数。
+
+### 3. 配置文件
+
+`$RUN/ttk_remote_demo.yaml`：
+
+```yaml
+remote:
+  endpoints:
+    - host: 127.0.0.1
+      port: 9100
+```
+
+不要只传 ttk 包内的 `default.yaml`：其中的 `endpoints` 是注释状态，只传它不会连三方。
+`--config` 会与 `default.yaml` 做深合并，所以这份最小 yaml 等价于「默认配置 + 三方端点」。
+
+### 4. 生成用例 CSV
+
+```bash
+cd "$ASSETS/../pytest"
+python3 pytest_paramset_to_csv.py --paramset qfmla_paramset_func_rdv \
+  --output "$RUN/qfmla_func_rdv_dyn.csv"
+```
+
+注意两个前提（转换器已保证，改脚本时别破坏）：
+
+- metadata 槽位写 `(-1, -1)`：动态槽位，由 `npu_preprocess` 在主算子调用前生成并回填。
+  写死 `(2, N)` 会被当成普通输入随机填充，kernel 读到非法调度表。
+- TND 用例的 `cu_seqlens_q` 必须是 `seqused_q` 的 packed 前缀和（`cu[-1] == sum(seqused_q)`），
+  按 padded 步长生成会让 golden 直接拒算。
+- 稠密用例（BSND/BNSD）反过来：q 行数必须是 `B * max_seqlen_q`（padded），cu 也用 padded 步长。
+  若这里按 packed 行数生成，q 与 cu 末端对不上，golden 会报 `Golden generation failure`。
+
+### 5. 终端 B：生成阶段（input + 升档 golden + XPU 一次产出）
+
+```bash
+cd "$RUN"
+ttk e2e -i qfmla_func_rdv_dyn.csv -o fp8_xpu_gen.csv \
+  --plugin "$ASSETS" \
+  --config "$RUN/ttk_remote_demo.yaml" \
+  --no-prof --golden-mode Promote --dump in,golden,xpu \
+  --manual-data-dirs "$RUN/manual_fp8"
+```
+
+想拆开跑也行：
+
+- 只要 CPU 升档真值：`--golden-mode Promote --dump in,golden`
+- 只要 XPU 分段参考（原生精度，不升档）：`--dump in,xpu`
+- 只跑某个用例：加 `--ti=0`（0-based 用例索引，不是设备号）
+
+成功后每个 case 目录下的文件：
+
+| 文件 | 含义 |
+|------|------|
+| `input_0..8_*.bin` | 9 个静态输入 |
+| `input_9_none.bin` | 动态 metadata（0 字节，由 preprocess 现场生成） |
+| `golden_0_float32_*.bin` | 升档 CPU golden（FP32，三方真值） |
+| `golden_1_*.bin` | LSE golden，LSE 关闭时为 0 字节 |
+| `xpu_torch_0_bfloat16_*.bin` | XPU 分段参考主输出（按 bf16 落盘） |
+| `xpu_torch_1_*.bin` | XPU 分段参考 LSE |
+
+### 6. 终端 B：回放阶段（跑 NPU 并做三方比对）
+
+```bash
+cd "$RUN"
+ttk e2e -i qfmla_func_rdv_dyn.csv -o fp8_cross.csv \
+  --plugin "$ASSETS" \
+  --manual-data-dirs "$RUN/manual_fp8" \
+  --compare cross_check
+```
+
+注意：**回放不能带 `--no-prof`**，与 `--manual-data-dirs` 冲突，会报
+`--no-prof manual-data output requires --dump in`。
+
+### 7. 看结果
+
+- `precision_status`：整体判定 PASS / FAIL
+- `precision_metrics`：每个输出的 `standard` / `level` / `config` / `result` / `pass`
+- `xpu_metrics`：三方数据来源（应为 `manual_xpu_binaries` / PASS）
+
+判定档位为 **L2**（在 `spec.py` 的 `tolerance` 里显式声明；TTK 代码默认是 L1）：
+
+```
+mare_ratio <= 2.0, mere_ratio <= 1.2, rmse_ratio <= 1.2
+```
 
 ## 判定方法
 
-`compare._run_cross_check` 逐输出通道处理，通常为 atten（bf16）+ lse（fp32）：
+走框架 `CrossCheckComparison`，逐输出通道处理（atten bf16 + lse fp32）：
 
-1. 三个数组统一升 fp32，形状必须一致；
+1. 三方统一升精度，形状必须一致；
 2. 大值域 `|bench| >= small_value`：
    - `mare = max|target-bench| / max|third-bench|`
    - `mere = mean|target-bench| / mean|third-bench|`
@@ -71,13 +176,12 @@ metadata 分核版本（`get_qfmla_section_info`）保留在 `qfmla_golden.py` �
 3. 小值域 `|bench| < small_value`：统计 `|x-bench| > small_value_atol` 的点数，
    `count_target / count_third <= small_value_ratio`；
 4. NaN/Inf 走框架内置的三方一致性判定；
-5. 除法分母保护、分子分母下限由 TTK `CrossCheckComparison` 内部实现。
-
-三项比值均不超过上表阈值即 PASS。
+5. 除法分母保护、分子分母下限由 TTK 内部实现。
 
 ## 阈值
 
-标准 `cross_check`、等级 `L0`、`mare/mere/rmse = 10/2/2`：
+标准 `cross_check`、等级 **L2**、`mare/mere/rmse = 2.0/1.2/1.2`（在
+`spec.py` 的 `tolerance` 中以 `"level": "L2"` 声明）：
 
 | 输出 dtype | small_value | small_value_atol | small_value_ratio |
 | --- | --- | --- | --- |
@@ -85,23 +189,4 @@ metadata 分核版本（`get_qfmla_section_info`）保留在 `qfmla_golden.py` �
 | bfloat16 | `2^-10` | `2^-16` | 2 |
 | float32（lse） | `2^-14` | `2^-30` | 2 |
 
-
-## CPU 离线生成与 NPU 回放
-
-使用同一版本的 assets，在 CPU 端以 `--no-prof --dump in,golden
---compare cross_check --manual-data-dirs DATA_ROOT` 生成数据。生成阶段会在
-`DATA_ROOT/_qfmla_cross_check/` 保存每个 case 的 bench 和固定块参考（NPZ，
-不使用 pickle）；输入及普通 golden 仍由 TTK 按原有 bin/npy/pt 格式保存。
-
-将 **整个 DATA_ROOT** 复制到 NPU 机器，包含 `_qfmla_cross_check` 子目录；
-NPU 端继续使用 `--manual-data-dirs DATA_ROOT --compare cross_check --plugin ASSETS`。
-插件在内存中没有 bench 时加载离线参考，不需要在 NPU 机器重新计算 CPU reference。
-新增文件是 plugin 的辅助数据，放在 TTK case 目录外，避免 TTK 写入时清理或读取时拒绝。
-
-参考文件校验 case 名、协议版本、九个实际数据输入的 shape/字节内容及主要算子属性。
-metadata 会由目标机器生成，不参与输入摘要。输入、布局、mask 或 scale 等属性变化后
-必须重新生成数据；缺失、不匹配或损坏的参考会使比较失败，不降级两方。
-同名数据重新准备时会覆盖该 case 的参考。
-
-旧版生成的数据没有这些离线参考，需更新 assets 后在 CPU 端重新生成。
-默认不启用 cross_check、或未执行离线 golden dump 时，不写这些辅助文件。
+默认两方比较仍走 `impl/compare.py` 的 CSV 阈值，不受 `level` 影响。

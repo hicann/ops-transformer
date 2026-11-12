@@ -19,8 +19,8 @@
   - 10 个 tensor slot:
       0 q  1 k_cache  2 q_descale  3 k_descale  4 block_table
       5 cache_seqlens  6 cu_seqlens_q  7 seqused_q  8 attn_mask  9 metadata
-  - metadata 默认写 (2, 4096): 当前 NPU metadata op 实际输出。
-    Excel 填 -1,-1 时走动态槽位（npu_preprocess 物化）。
+  - metadata 默认写 (-1, -1): 动态槽位，由 npu_preprocess 在主算子调用前生成并回填。
+    写死 (2, N) 会被当成普通输入按 data range 随机填充，导致 kernel 读到非法调度表。
 
 用法:
   python3 pytest_paramset_to_csv.py [--paramset quant_flash_mla_paramset_debug]
@@ -40,7 +40,7 @@ if _HERE not in sys.path:
 API_NAME = "torch.ops.cann_ops_transformer.quant_flash_mla"
 
 ATTN_MASK_SHAPE = (2048, 2048)
-METADATA_DEFAULT_SHAPE = (2, 4096)
+METADATA_DEFAULT_SHAPE = (-1, -1)
 DRANGE_PLACEHOLDER = (0, 1)
 DRANGE_REAL = (-1, 1)
 
@@ -183,16 +183,20 @@ def _derive_case(case):
     else:
         max_skv = int(max_skv)
 
-    # TND: T = sum(seqused_q) (变长拼接，非 padding)
+    # q 行数必须与 cu_seqlens_q 的末端一致:
+    #   TND  → T = sum(seqused_q) (变长拼接，非 padding)
+    #   稠密 → T = B * max_seqlen_q (padded 步长)，cu 也用 padded 步长
+    # 混用会让 golden 拿到的 q 行数与 dense 展开后的 B*S 对不上而拒算。
+    layout_is_tnd = str(case.get("layout", "TND")).upper().startswith("TND")
     Q_S = max_sq if max_sq > 0 else (max(act_q) if act_q else 1)
-    if act_q:
-        T_padded = sum(act_q)
+    if layout_is_tnd and act_q:
+        T_rows = sum(act_q)
     else:
-        T_padded = B * Q_S
+        T_rows = B * Q_S
 
     # q_shape: TND (T, N_q, D_total)
-    q_shape = (T_padded, N_q, D_total)
-    q_descale_shape = (T_padded, N_q)
+    q_shape = (T_rows, N_q, D_total)
+    q_descale_shape = (T_rows, N_q)
 
     # K cache
     if enable_pa and act_kv:
@@ -210,8 +214,15 @@ def _derive_case(case):
     if cu_q is not None:
         cu_seqlens_q_shape = (len(cu_q),)
     else:
-        # Auto-derive: [0, Q_S, 2*Q_S, ..., B*Q_S]
-        cu_q = [0] + [Q_S * (i + 1) for i in range(B)]
+        if layout_is_tnd and act_q:
+            # TND 的 cu 必须是 packed 前缀和，与 q 的 T=sum(seqused_q) 对齐；
+            # 变长 case 若按 padded 步长生成会得到 cu[-1] > T，golden 会直接拒绝。
+            cu_q = [0]
+            for length in act_q:
+                cu_q.append(cu_q[-1] + int(length))
+        else:
+            # 稠密布局不使用 cu，保持 padded 步长不变
+            cu_q = [0] + [Q_S * (i + 1) for i in range(B)]
         cu_seqlens_q_shape = (len(cu_q),)
 
     # seqused_q
@@ -294,13 +305,22 @@ def _derive_case(case):
     return shapes, data_ranges, attrs
 
 
+def _case_dtypes(case):
+    """HIF8(quant_mode=0) 的 q/k_cache 以 uint8 承载 hif8 编码(算子侧要求 uint8),
+    其余 dtype 同 _DTYPES。"""
+    dtypes = list(_DTYPES)
+    if int(case.get("quant_mode", 1)) == 0:
+        dtypes[0] = dtypes[1] = "uint8"
+    return tuple(dtypes)
+
+
 def case_to_csv_row(case):
     shapes, data_ranges, attrs = _derive_case(case)
     return [
         case["name"],
         API_NAME,
         repr(tuple(shapes)),
-        repr(tuple(_DTYPES)),
+        repr(_case_dtypes(case)),
         "",
         repr(attrs),
         "",

@@ -150,7 +150,7 @@ P_SCALE = 1.0
 EPSILON = 1e-20
 
 Q_BLOCK_SIZE = 64
-KV_BLOCK_SIZE = 128
+KV_BLOCK_SIZE = 256
 
 # 物理 block 数量，0 表示使用默认值（等于 total_blocks）
 NUM_BLOCKS = 0
@@ -1312,10 +1312,12 @@ def fp8_fullquant_mla_sectioned_golden(
     *,
     golden_device="cpu",
 ):
-    """分段量化 golden, 仅供三方 cross_check 作为 third_party 使用。
+    """分段量化 golden (固定256列分块 running max 的独立参考)。
 
-    默认两方golden使用全局量化；本函数使用固定256列分块的running max和P量化。
-    它是独立数值近似，不复现目标设备metadata分核规划，也不保证误差大小关系。
+    默认两方 golden 使用全局量化；本函数使用固定256列分块的 running max 和 P 量化。
+    它是独立数值近似，不复现目标设备 metadata 分核规划，也不保证误差大小关系。
+    spec.third_party 用它产出 cross_check 的 third_party：其 P 量化噪声与被测算子
+    同量级，才能给 |b-g| 提供有效的噪声地板。
     """
     device = torch.device(golden_device)
     if _is_hif8_mode():

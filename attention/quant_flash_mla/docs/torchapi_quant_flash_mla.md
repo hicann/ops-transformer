@@ -468,7 +468,7 @@ cann_ops_transformer.quant_flash_mla(
                 <td>(B, Q_N, Q_S)</td>
             </tr>
             <tr>
-                <td>TND/TND_NTD</td>
+                <td>TND</td>
                 <td>q_descale</td>
                 <td>(Q_T, Q_N)</td>
             </tr>

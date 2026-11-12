@@ -58,6 +58,21 @@ def _load_local(stem):
     return module
 
 
+def _promote_golden():
+    """当前是否在生成升档 golden: 显式 --golden-mode promote 或三方 cross_check。"""
+    try:
+        from ttk.switches import get_global_storage
+    except Exception:  # pylint: disable=broad-except
+        return False
+    try:
+        switches = get_global_storage()
+    except Exception:  # pylint: disable=broad-except
+        return False
+    if str(getattr(switches, "golden_mode", "")).lower() == "promote":
+        return True
+    return str(getattr(switches, "compare_method", "")).lower() == "cross_check"
+
+
 def _configure_reference(
     cfg,
     quant_mode,
@@ -70,10 +85,14 @@ def _configure_reference(
 ):
     # Match QFA's per-call numerical-reference configuration. Generation
     # seeds/ranges belong to inputs.py and are neither read nor reset here.
-    # Cross-check uses the global reference; two-way uses NPU sections if available.
+    # 两方比较在 NPU 上优先使用元数据分段参考; 升档 golden(三方基准)必须走全局参考。
     npu = getattr(torch, "npu", None)
+    force_global = bool(kwargs.get("_force_global_reference"))
     golden_mod.ENABLE_SECTION_GOLDEN = (
-        not _bench_enabled() and npu is not None and npu.is_available()
+        not force_global
+        and not _promote_golden()
+        and npu is not None
+        and npu.is_available()
     )
     logger.info(
         "[GOLDEN] NPU metadata section reference enabled: %s",
@@ -104,43 +123,6 @@ def _configure_reference(
     golden_mod.MAX_SEQLEN_KV = max_seqlen_kv
     # Only NPU two-way runs obtain metadata here. CPU-only and cross-check
     # runs use the global reference, without a separate metadata-selection switch.
-
-
-def _bench_enabled():
-    """是否生成三方 bench: 仅 CLI 显式 --compare cross_check 时生成。
-
-    默认(未指定 --compare)不生成, 避免两方回归白跑一遍 fp64 bench。
-    """
-    try:
-        from ttk.switches import get_global_storage
-    except Exception:
-        try:
-            from ttk.utilities.container_utils import get_global_storage
-        except Exception:
-            return False
-    try:
-        method = getattr(get_global_storage(), "compare_method", None)
-    except Exception:  # pylint: disable=broad-except
-        return False
-    return method is not None and str(method).lower() == "cross_check"
-
-
-_BENCH_CACHE = {}
-_LAST_BENCH = None
-# Independent fixed-block approximation for the cross-check third-party slot.
-_REF_CACHE = {}
-
-
-def peek_bench(testcase_name=None):
-    """取当前用例的 bench 输出; 未生成时返回 None。"""
-    if testcase_name is not None:
-        return _BENCH_CACHE.get(str(testcase_name))
-    return _LAST_BENCH
-
-
-def peek_sectioned_ref(testcase_name=None):
-    """取当前用例的分段量化参考; 未生成时返回 None。"""
-    return _REF_CACHE.get(str(testcase_name))
 
 
 def _convert_tnd_full_rows(
@@ -181,6 +163,7 @@ def _convert_outputs(
     return_softmax_lse,
     layout_q,
     to_bf16=True,
+    native_dtype=False,
 ):
     """Restore output layout; LSE layout follows query, not attention output."""
     output_layout = cfg["output_layout"]
@@ -217,77 +200,11 @@ def _convert_outputs(
             ).squeeze(-1)
         else:
             lse = lse_bnsd.squeeze(-1).contiguous()
-    return (result.to(torch.bfloat16) if to_bf16 else result), lse
-
-
-def _cache_bench(
-    testcase_name, cfg, kwargs, q, golden_seqused, return_softmax_lse, layout_q, tensors
-):
-    """生成并缓存当前用例的 fp64 bench, 供 compare 侧三方比对读取。"""
-    global _LAST_BENCH
-    name = str(testcase_name)
-    _BENCH_CACHE.pop(name, None)
-    _LAST_BENCH = None
-    _REF_CACHE.pop(name, None)
-    if not _bench_enabled():
-        return
-    q_fp8, k_fp8, v_fp8, deq_q, deq_k, deq_v = tensors
-    bench_bnsd, bench_lse_bnsd = golden_mod.fp8_fullquant_mla_bench(
-        q_fp8,
-        k_fp8,
-        v_fp8,
-        deq_q,
-        deq_k,
-        deq_v,
-        golden_seqused,
-        list(cfg["cache_seqlens_vals"]),
-    )
-    bench_result, bench_lse = _convert_outputs(
-        bench_bnsd,
-        bench_lse_bnsd,
-        q,
-        cfg,
-        kwargs,
-        golden_seqused,
-        return_softmax_lse,
-        layout_q,
-        to_bf16=False,
-    )
-    _LAST_BENCH = [bench_result, bench_lse]
-    _BENCH_CACHE[name] = _LAST_BENCH
-
-    # Fixed-block third-party approximation; it is not the target metadata schedule.
-    # Its failure must remain visible when cross_check was explicitly requested.
-    ref = golden_mod.fp8_fullquant_mla_sectioned_golden(
-        q_fp8,
-        k_fp8,
-        v_fp8,
-        deq_q,
-        deq_k,
-        deq_v,
-        golden_seqused,
-        list(cfg["cache_seqlens_vals"]),
-    )
-    if ref is not None:
-        ref_result, ref_lse = _convert_outputs(
-            ref[0],
-            ref[1],
-            q,
-            cfg,
-            kwargs,
-            golden_seqused,
-            return_softmax_lse,
-            layout_q,
-            to_bf16=True,
-        )
-        _REF_CACHE[name] = [ref_result, ref_lse]
-        logger.info("[%s] sectioned ref: result=%s", name, tuple(ref_result.shape))
-    logger.info(
-        "[%s] bench: result=%s lse=%s",
-        name,
-        tuple(bench_result.shape),
-        None if bench_lse is None else tuple(bench_lse.shape),
-    )
+    # 升档 golden(三方真值)保留高精度输出, 不回落到 bf16; 两方保持与算子输出同 dtype。
+    # native_dtype=True 用于 third_party(分段参考): 不受 promote 影响, 固定原生精度。
+    if to_bf16 and (native_dtype or not _promote_golden()):
+        result = result.to(torch.bfloat16)
+    return result, lse
 
 
 def cpu_qfmla(
@@ -314,16 +231,12 @@ def cpu_qfmla(
     return_softmax_lse=False,
     **kwargs,
 ):
-    """Compute CPU golden, bench and reference from the same actual inputs.
+    """Compute the CPU golden from the actual inputs.
 
     Negative cases without a meaningful numerical reference should select
     TTK's golden_api=disable. Do not repair them here or return a fake PASS.
     """
-    global _LAST_BENCH
     testcase_name = str(kwargs.get("testcase_name", "unknown"))
-    _BENCH_CACHE.pop(testcase_name, None)
-    _REF_CACHE.pop(testcase_name, None)
-    _LAST_BENCH = None
     cfg, tensors = _load_local("restore_inputs").restore_inputs(
         q,
         k_cache,
@@ -352,17 +265,30 @@ def cpu_qfmla(
         kwargs,
     )
     q_data, k_data, v_data, deq_q, deq_k, deq_v = tensors
-    result_bnsd, lse_bnsd = golden_mod.cpu_fp8_fullquant_mla_golden(
-        q_data,
-        k_data,
-        v_data,
-        deq_q,
-        deq_k,
-        deq_v,
-        torch.ones(1, dtype=torch.float32),
-        cfg["seqused_q_vals"],
-        cfg["cache_seqlens_vals"],
-    )
+    sectioned = bool(kwargs.get("_sectioned_reference"))
+    if sectioned:
+        result_bnsd, lse_bnsd = golden_mod.fp8_fullquant_mla_sectioned_golden(
+            q_data,
+            k_data,
+            v_data,
+            deq_q,
+            deq_k,
+            deq_v,
+            cfg["seqused_q_vals"],
+            cfg["cache_seqlens_vals"],
+        )
+    else:
+        result_bnsd, lse_bnsd = golden_mod.cpu_fp8_fullquant_mla_golden(
+            q_data,
+            k_data,
+            v_data,
+            deq_q,
+            deq_k,
+            deq_v,
+            torch.ones(1, dtype=torch.float32),
+            cfg["seqused_q_vals"],
+            cfg["cache_seqlens_vals"],
+        )
     outputs = _convert_outputs(
         result_bnsd,
         lse_bnsd,
@@ -372,46 +298,8 @@ def cpu_qfmla(
         cfg["seqused_q_vals"],
         return_softmax_lse,
         layout_q,
+        native_dtype=sectioned,
     )
-    _cache_bench(
-        testcase_name,
-        cfg,
-        kwargs,
-        q,
-        cfg["seqused_q_vals"],
-        return_softmax_lse,
-        layout_q,
-        tensors,
-    )
-    if _bench_enabled():
-        _load_local("offline_cross_check").save(
-            testcase_name,
-            [
-                q,
-                k_cache,
-                q_descale,
-                k_descale,
-                block_table,
-                cache_seqlens,
-                cu_seqlens_q,
-                seqused_q,
-                attn_mask,
-            ],
-            {
-                "quant_mode": quant_mode,
-                "softmax_scale": softmax_scale,
-                "mask_mode": mask_mode,
-                "max_seqlen_q": max_seqlen_q,
-                "max_seqlen_kv": max_seqlen_kv,
-                "head_dim_v": head_dim_v,
-                "layout_q": layout_q,
-                "layout_kv": layout_kv,
-                "layout_out": layout_out,
-                "return_softmax_lse": return_softmax_lse,
-            },
-            peek_bench(testcase_name),
-            peek_sectioned_ref(testcase_name),
-        )
     logger.info(
         "[%s] golden consumed actual slots: q=%s k=%s output=%s",
         testcase_name,
