@@ -368,11 +368,8 @@ private:
     uint32_t expertNumInServer_{0}; // 当前server中共享专家副本数 + moe专家数 totalExpertNum_ -> expertNumInServer_
     uint32_t dealRankPerCore_{0};
     uint32_t hOutSize_{0};
-    // uint32_t hAlignWinCnt_{0};
-    // uint32_t hOutAlignUbSize_{0};
     uint32_t hAlignSize_{0};
     uint32_t hCommuSize_{0};
-    // uint32_t axisHCommu_{0};
     uint32_t serverTripleOffset_{0};       // server窗记录：srcRank/tokenIndex起始，int32元素偏移
     uint32_t serverExpertIdsOffset_{0};    // server窗记录：expertIds列表起始，int32元素偏移
     uint32_t serverMoeCntOffset_{0};       // server窗记录：moeCnt列表起始，int16元素偏移
@@ -2092,7 +2089,6 @@ __aicore__ inline void MoeDistributeDispatchV2Roce<RoceDispatchTypeFunc>::WaitTo
             GM_ADDR dataAddr = serverRcvBase + dstPosition * serverRecordAlignLen_;
             LocalTensor<XCommInType> recvTmpTensor = tokenInQueue_.AllocTensor<XCommInType>();
             ReadDataFromWindows<XCommInType, true>(dataAddr, processTokenBlock, recvTmpTensor);
-            // CopyInAndOut(serverIdx, dstPosition, processTokenNumPerBatch);
             SendToExpert(recvTmpTensor, dstPosition);
             tokenRcvStatus_(rcvStatusIndex) = 1;
             rcvTokenSum++;
