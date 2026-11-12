@@ -17,6 +17,7 @@
 #   - 三方件源码包默认存放于 <业务仓根目录>/third_party (可通过 --cann_3rd_lib_path 指定其它目录),
 #     所有下载的 patch 统一存放于 <三方件目录>/patch 下;
 #   - 每个文件均带 SHA256 校验: 二次调用时先做缓存校验, hash 一致则直接复用, 无需重复下载;
+#   - 下载失败或校验失败时保留临时文件、响应头和 curl 日志, 便于排查代理/认证问题;
 #   - 本脚本的 URL/SHA256 与本地构建(cann-cmake master-059 third_party/*.cmake)保持一致。
 # =====================================================================
 set -euo pipefail
@@ -44,7 +45,7 @@ cat <<EOF
 
 说明:
   - 默认在业务仓根目录下生成 third_party 文件夹, 三方源包放入其中, 所有 patch 放入 third_party/patch;
-  - 已存在的同名文件会先做 SHA256 校验: hash 一致则复用(不重复下载), 不一致则删除后重新下载;
+  - 已存在的同名文件会先做 SHA256 校验: hash 一致则复用(不重复下载), 不一致则下载到临时文件并在校验通过后替换;
   - 校验所需的 SHA256 已写入本脚本, 下载后亦会复核完整性;
   - 离线编译时, 将 <三方件目录> 通过 build.sh 的 --cann_3rd_lib_path=<目录> 传入即可。
 EOF
@@ -72,11 +73,32 @@ fi
 
 # ---------- 下载工具检测: Windows(Git Bash) 与 Linux 通用 ----------
 if command -v curl >/dev/null 2>&1; then
-  # --ssl-no-revoke: Windows 内置 curl 在无外网吊销服务器时可能报 CRYPT_E_REVOCATION_OFFLINE,
-  # 仅跳过证书吊销列表查询, 不影响证书有效性校验。
-  dl() { curl -fSL --ssl-no-revoke --retry 3 --connect-timeout 30 -o "$2" "$1"; }
+  # 仅在当前 curl 声明支持时启用, 避免 Linux/macOS 上因不识别 Windows 专用参数导致下载直接失败。
+  curl_help="$(curl --help all 2>/dev/null || true)"
+  # TLS 证书链错误等不可重试错误应立即返回,
+  # 避免同一条证书错误被重复输出多次并延长失败等待时间。
+  CURL_ARGS=(--show-error --location --retry 3 --connect-timeout 30 --max-time 600)
+  if [[ "$curl_help" == *"--fail-with-body"* ]]; then
+    CURL_ARGS+=(--fail-with-body)
+  else
+    CURL_ARGS+=(--fail)
+  fi
+  if [[ "$curl_help" == *"--ssl-no-revoke"* ]]; then
+    CURL_ARGS+=(--ssl-no-revoke)
+  fi
+  if [[ "$curl_help" == *"--no-progress-meter"* ]]; then
+    CURL_ARGS+=(--no-progress-meter)
+  fi
+  dl() {
+    local url="$1" dest="$2" headers="$3" curl_log="$4"
+    curl "${CURL_ARGS[@]}" -D "$headers" -o "$dest" "$url" 2>"$curl_log"
+  }
 elif command -v wget >/dev/null 2>&1; then
-  dl() { wget -q --tries=3 --timeout=30 -O "$2" "$1"; }
+  dl() {
+    local url="$1" dest="$2" headers="$3" curl_log="$4"
+    wget --server-response --tries=3 --timeout=30 -O "$dest" "$url" \
+      >"$curl_log" 2>"$headers"
+  }
 else
   echo "[ERROR] 未找到 curl 或 wget(Windows 请先安装 Git Bash 或 curl)"
   exit 1
@@ -94,7 +116,7 @@ fi
 # fetch <url> <subdir:.|patch> <expected_sha256>
 fetch() {
   local url="$1" sub="$2" exp="$3"
-  local fname dest
+  local fname dest tmp headers curl_log act2 status content_type transfer_error
   fname="$(basename "$url")"
   dest="$CANN_3RD_LIB_PATH/$sub/$fname"
   mkdir -p "$(dirname "$dest")"
@@ -104,30 +126,55 @@ fetch() {
     if [ -n "$exp" ]; then
       local act; act="$(sha_of "$dest")"
       if [ -n "$act" ] && [ "$act" = "$exp" ]; then
-        echo "[复用] $fname (SHA256 匹配, 跳过下载)"
+        echo "[REUSE] $fname (SHA256 匹配, 跳过下载)"
         return 0
       else
-        echo "[删除] $fname (SHA256 不一致, 期望=$exp 实际=$act)"
-        rm -f "$dest"
+        echo "[INFO] $fname 已存在但 SHA256 不一致, 将重新下载"
+        echo "       期望=$exp 实际=${act:-<空>}"
       fi
     else
-      echo "[删除] $fname (无参考 hash, 重新下载)"
-      rm -f "$dest"
+      echo "[INFO] $fname 已存在但没有参考 hash, 将重新下载"
     fi
   fi
 
   echo "==> 下载 $fname  <-  $url"
-  dl "$url" "$dest" || { echo "[ERROR] 下载失败: $fname"; return 1; }
+  tmp="${dest}.tmp.$$.$RANDOM"
+  headers="${tmp}.headers"
+  curl_log="${tmp}.curl.log"
+  if ! dl "$url" "$tmp" "$headers" "$curl_log"; then
+    status="$(grep -E '^HTTP/' "$headers" 2>/dev/null | grep -Eiv '^[[:space:]]*HTTP/[^ ]+[[:space:]]+200[[:space:]]+Connection[[:space:]]+Established' | tail -1 || true)"
+    content_type="$(grep -i '^Content-Type:' "$headers" 2>/dev/null | tail -1 | tr -d '\r' || true)"
+    transfer_error="$({ cat "$curl_log" "$headers" 2>/dev/null || true; } | grep -Ei '(^curl:|^wget:|certificate|ssl|issuer|proxy|authentication|error|failed)' | awk '!seen[$0]++' | tail -5 || true)"
+    echo "[ERROR] 下载失败: $fname"
+    echo "        URL: $url"
+    echo "        ${status:-源站 HTTP 状态未知}"
+    [ -n "$content_type" ] && echo "        $content_type"
+    [ -n "$transfer_error" ] && echo "$transfer_error" | sed 's/^/        /'
+    echo "        curl 日志: $curl_log"
+    echo "        下载文件: $tmp"
+    return 1
+  fi
 
-  # 下载后完整性校验: 计算结果为空同样视为失败
+  # 下载后完整性校验: 计算结果为空同样视为失败。校验失败时保留文件和诊断信息。
   if [ -n "$exp" ]; then
-    local act2; act2="$(sha_of "$dest")"
+    act2="$(sha_of "$tmp")"
     if [ -z "$act2" ] || [ "$act2" != "$exp" ]; then
-      echo "[ERROR] $fname SHA256 校验失败, 已删除（期望=$exp 实际=${act2:-<空>}）"
-      rm -f "$dest"
+      status="$(grep -E '^HTTP/' "$headers" 2>/dev/null | grep -Eiv '^[[:space:]]*HTTP/[^ ]+[[:space:]]+200[[:space:]]+Connection[[:space:]]+Established' | tail -1 || true)"
+      content_type="$(grep -i '^Content-Type:' "$headers" 2>/dev/null | tail -1 | tr -d '\r' || true)"
+      echo "[ERROR] $fname SHA256 校验失败, 文件已保留"
+      echo "        URL: $url"
+      echo "        期望=$exp 实际=${act2:-<空>}"
+      echo "        ${status:-源站 HTTP 状态未知}"
+      [ -n "$content_type" ] && echo "        $content_type"
+      echo "        响应头: $headers"
+      echo "        下载文件: $tmp"
+      echo "        curl 日志: $curl_log"
       return 1
     fi
   fi
+
+  mv -f "$tmp" "$dest"
+  rm -f "$headers" "$curl_log"
 }
 
 echo "==> ops-transformer | CANN_CMAKE_TAG=${CANN_CMAKE_TAG}"
@@ -156,12 +203,13 @@ fetch "https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/fix/makeself-2
 # ---- git 仓库(opbase/ops-tensor/catlass, 离线场景需提前 clone 到 CANN_3RD_LIB_PATH 下) ----
 # clone_repo <git_url> <dir_name> <tag_id>
 clone_repo() {
-  local url="$1" name="$2" tag="$3"
+  local url="$1" name="$2" tag="$3" init_submodules="${4:-0}"
   local dest="$CANN_3RD_LIB_PATH/$name"
+  local git_log="${dest}.git.log"
 
   # 用 rev-parse 识别仓库, 兼容 .git 为文件的 worktree
   if git -C "$dest" rev-parse --git-dir >/dev/null 2>&1; then
-    local remote head
+    local remote head fetch_ok=1
     remote="$(git -C "$dest" remote get-url origin 2>/dev/null || true)"
     head="$(git -C "$dest" rev-parse HEAD 2>/dev/null || true)"
 
@@ -169,18 +217,51 @@ clone_repo() {
       if [ "$remote" != "$url" ]; then
         echo "[WARN] $name 远端为 $remote, 与预期 $url 不同, 但 HEAD 已匹配 $tag"
       fi
-      echo "[复用] $name (HEAD=$tag)"
+      if [ "$init_submodules" = "1" ] && ! git -C "$dest" submodule update --init --recursive >"$git_log" 2>&1; then
+        echo "[ERROR] 初始化 $name 的 submodule 失败"
+        sed 's/^/        /' "$git_log"
+        echo "        Git 日志: $git_log"
+        return 1
+      fi
+      rm -f "$git_log"
+      echo "[REUSE] $name (HEAD=$tag)"
       return 0
     fi
 
     echo "==> 更新 $name 到 $tag"
-    git -C "$dest" fetch --tags origin >/dev/null 2>&1 || true
-    git -C "$dest" checkout "$tag" || { echo "[ERROR] checkout $tag 失败: $name"; return 1; }
+    if ! git -C "$dest" fetch --tags origin >"$git_log" 2>&1; then
+      fetch_ok=0
+      echo "[WARN] 更新 $name 的远端 refs 失败, 将尝试使用本地 commit"
+    fi
+    if ! git -C "$dest" checkout --detach "$tag" >>"$git_log" 2>&1; then
+      if [ "$fetch_ok" = "0" ]; then
+        echo "[ERROR] $name 无法更新到目标 commit $tag: 远端 fetch 失败, 可能是网络、代理或证书链问题"
+      elif git -C "$dest" cat-file -e "$tag^{commit}" >/dev/null 2>&1; then
+        echo "[ERROR] checkout 目标 commit $tag 失败: $name"
+      else
+        echo "[ERROR] $name 本地缺少目标 commit $tag, 无法在离线环境继续"
+      fi
+      sed 's/^/        /' "$git_log"
+      echo "        Git 日志: $git_log"
+      return 1
+    fi
+    if [ "$init_submodules" = "1" ] && ! git -C "$dest" submodule update --init --recursive >>"$git_log" 2>&1; then
+      echo "[ERROR] 初始化 $name 的 submodule 失败"
+      sed 's/^/        /' "$git_log"
+      echo "        Git 日志: $git_log"
+      return 1
+    fi
     head="$(git -C "$dest" rev-parse HEAD 2>/dev/null || true)"
     if [ "$head" != "$tag" ]; then
       echo "[ERROR] $name HEAD=$head, 与目标提交 $tag 不一致"
+      echo "        Git 日志: $git_log"
       return 1
     fi
+    if [ "$fetch_ok" = "0" ]; then
+      echo "[WARN] $name 已使用本地目标 commit $tag, 远端 fetch 失败详情如下"
+      sed 's/^/        /' "$git_log"
+    fi
+    rm -f "$git_log"
     echo "[OK] $name checkout $tag"
     return 0
   fi
@@ -196,15 +277,38 @@ clone_repo() {
   fi
 
   echo "==> clone $name  <-  $url"
-  git clone "$url" "$dest" || { echo "[ERROR] clone 失败: $name"; return 1; }
-  (cd "$dest" && git checkout "$tag") || { echo "[ERROR] checkout $tag 失败: $name"; return 1; }
+  if ! git clone "$url" "$dest" >"$git_log" 2>&1; then
+    echo "[ERROR] clone 失败: $name"
+    sed 's/^/        /' "$git_log"
+    echo "        Git 日志: $git_log"
+    return 1
+  fi
+  if ! (cd "$dest" && git checkout --detach "$tag") >>"$git_log" 2>&1; then
+    echo "[ERROR] checkout $tag 失败: $name"
+    sed 's/^/        /' "$git_log"
+    echo "        Git 日志: $git_log"
+    return 1
+  fi
+  if [ "$init_submodules" = "1" ] && ! git -C "$dest" submodule update --init --recursive >>"$git_log" 2>&1; then
+    echo "[ERROR] 初始化 $name 的 submodule 失败"
+    sed 's/^/        /' "$git_log"
+    echo "        Git 日志: $git_log"
+    return 1
+  fi
+  head="$(git -C "$dest" rev-parse HEAD 2>/dev/null || true)"
+  if [ "$head" != "$tag" ]; then
+    echo "[ERROR] $name HEAD=$head, 与目标提交 $tag 不一致"
+    echo "        Git 日志: $git_log"
+    return 1
+  fi
+  rm -f "$git_log"
   echo "[OK] $name checkout $tag"
 }
 
 if command -v git >/dev/null 2>&1; then
   echo "==> 下载 git 仓库(opbase/ops-tensor/catlass)"
-  clone_repo "https://atomgit.com/cann/opbase.git"     "opbase"     "0a83b915a6f6be49a03b907713d6f000b3dea1ea"
-  clone_repo "https://atomgit.com/cann/ops-tensor.git" "ops-tensor" "deea03a7d112b002a986783e39d4f91c92949518"
+  clone_repo "https://atomgit.com/cann/opbase.git"     "opbase"     "de414d06cfb7bf2728a555bfb9fc1d26a4c83792"
+  clone_repo "https://atomgit.com/cann/ops-tensor.git" "ops-tensor" "fb30752ed5524744cee0cd21f26db5d52e54b6e4" 1
   clone_repo "https://atomgit.com/cann/catlass.git"     "catlass"    "769cd40a8716b28650b6bebb08db4834eea4462f"
 else
   echo "[WARN] 未找到 git, 跳过 opbase/ops-tensor/catlass 仓库下载"
