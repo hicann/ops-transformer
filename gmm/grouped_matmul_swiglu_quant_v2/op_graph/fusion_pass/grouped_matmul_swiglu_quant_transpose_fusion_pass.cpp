@@ -36,6 +36,8 @@ namespace ge {
 namespace fusion {
 class GraphFuseInspectorUtils {
 public:
+    // GE versions with ReportMatch account for structural matches separately from ReportFuse.
+    static Status ReportMatch(const std::vector<GNode>& matchedNodes, CustomPassContext& ctx) __attribute__((weak));
     static Status ReportFuse(const std::vector<GNode>& nodesBeforeFuse, const std::vector<GNode>& nodesAfterFuse,
                              CustomPassContext& ctx) __attribute__((weak));
 };
@@ -744,6 +746,10 @@ Status CommitFusion(const GraphPtr& graph, GNode& nodeGmmSwiglu, const std::vect
     std::vector<GNode> nodesBeforeFuse;
     std::vector<GNodePtr> nodesToRemove;
     AddNodesToReport(nodeGmmSwiglu, chains, nodesBeforeFuse, nodesToRemove);
+    const auto reportMatch = GraphFuseInspectorUtils::ReportMatch;
+    if (reportMatch != nullptr && reportMatch(nodesBeforeFuse, passContext) != SUCCESS) {
+        OP_LOGW(PASS_NAME, "Failed to report fusion match.");
+    }
 
     for (const auto& chain : chains) {
         if (!RelinkNode(graph, nodeGmmSwiglu, chain, chain.inputIndex)) {

@@ -29,6 +29,8 @@ namespace fusion {
 // compatibility with both GE versions.
 class GraphFuseInspectorUtils {
 public:
+    // GE versions with ReportMatch account for structural matches separately from ReportFuse.
+    static Status ReportMatch(const std::vector<GNode>& matchedNodes, CustomPassContext& ctx) __attribute__((weak));
     static Status ReportFuse(const std::vector<GNode>& nodesBeforeFuse, const std::vector<GNode>& nodesAfterFuse,
                              CustomPassContext& ctx) __attribute__((weak));
 };
@@ -347,15 +349,19 @@ ge::Status FuseNode(ge::GraphPtr& graph, ge::GNode& target, ge::CustomPassContex
         (!BuildInputPattern(target, kScale1Index, scale1Pattern) || !CheckPattern(scale1Pattern, kScale1Perm))) {
         return ge::GRAPH_NOT_CHANGED;
     }
-    if (!RelinkInput(graph, target, kX1Index, x1Pattern) ||
-        (isMx && !RelinkInput(graph, target, kScale1Index, scale1Pattern))) {
-        return ge::GRAPH_FAILED;
-    }
     std::vector<ge::GNode> nodesBeforeFuse;
     nodesBeforeFuse.emplace_back(target);
     AddNodeToReport(x1Pattern.transposeLike, nodesBeforeFuse);
     if (isMx) {
         AddNodeToReport(scale1Pattern.transposeLike, nodesBeforeFuse);
+    }
+    const auto reportMatch = ge::fusion::GraphFuseInspectorUtils::ReportMatch;
+    if (reportMatch != nullptr && reportMatch(nodesBeforeFuse, passContext) != ge::SUCCESS) {
+        OP_LOGW(kPassName, "Failed to report fusion match.");
+    }
+    if (!RelinkInput(graph, target, kX1Index, x1Pattern) ||
+        (isMx && !RelinkInput(graph, target, kScale1Index, scale1Pattern))) {
+        return ge::GRAPH_FAILED;
     }
     ReportFusion(nodesBeforeFuse, target, passContext);
     if (!RemoveNodeIfUnused(graph, x1Pattern.transposeLike) ||
