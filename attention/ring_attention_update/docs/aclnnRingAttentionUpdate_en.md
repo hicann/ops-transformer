@@ -266,7 +266,7 @@ aclnnStatus aclnnRingAttentionUpdate(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, attnOutOut, softmaxMaxOut, or softmaxSumOut is a null pointer.</td>
+      <td>prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, attnOutOut, softmaxMaxOut, or softmaxSumOut is a null pointer; or actualSeqQlenOptional is a null pointer when inputLayoutOptional is TND.</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>

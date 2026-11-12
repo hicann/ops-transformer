@@ -288,7 +288,7 @@ aclnnStatus aclnnRingAttentionUpdateV2(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入的prevAttnOut、prevSoftmaxMax、prevSoftmaxSum、curAttnOut、curSoftmaxMax、curSoftmaxSum、attnOutOut、softmaxMaxOut、softmaxSumOut是空指针。</td>
+      <td>传入的prevAttnOut、prevSoftmaxMax、prevSoftmaxSum、curAttnOut、curSoftmaxMax、curSoftmaxSum、attnOutOut、softmaxMaxOut、softmaxSumOut是空指针；或inputLayoutOptional为TND时actualSeqQlenOptional是空指针。</td>
     </tr>
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>

@@ -294,6 +294,11 @@ static aclnnStatus Contiguous(const aclTensor*& prevAttnOut, const aclTensor*& p
     curSoftmaxSum = l0op::Contiguous(curSoftmaxSum, executor);
     CHECK_RET(curSoftmaxSum != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     if (inputLayoutStr == "TND") {
+        if (actualSeqQlenOptional == nullptr) {
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
+                    "inputLayoutOptional is TND, actualSeqQlenOptional is null, it is required under TND layout");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
         actualSeqQlenOptional = l0op::Contiguous(actualSeqQlenOptional, executor);
         CHECK_RET(actualSeqQlenOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     }
