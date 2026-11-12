@@ -755,7 +755,7 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         <td>combine_comm_mode</td>
         <td>int</td>
         <td>Optional</td>
-        <td>Switch for communication deduplication in the combine stage. 0: disabled; 1: enabled (for the multiple experts hit by the same token on the local rank, the combine results are first merged into one row on the local rank and then sent back to the source rank, reducing the communication traffic in the combine stage from the number of rows in the group to 1). 2: intra-server reduction and inter-domain secondary return (URMA or hybrid URMA + RoCE topology). The value supports 0, 1, or 2. After <term>Atlas A3 products</term> enable it, the operator still performs capability validation and benefit gating internally (infeasible configurations report an error or fall back automatically, and low-benefit shapes fall back silently; see Constraints); for <term>Ascend 950PR&950DT products</term>, whether to enable it is entirely decided by the caller, and the operator does not make a benefit decision internally. Enabling it changes the communication buffer layout; it must be specified when creating sym_buffer, and all ranks in the same communicator must use the same value. For the support status of each product and the enabling conditions, see Constraints. Default value: 0.</td>
+        <td>Switch for communication deduplication in the combine stage. 0: disabled; 1: enabled (for the multiple experts hit by the same token on the local rank, the combine results are first merged into one row on the local rank and then sent back to the source rank, reducing the communication traffic in the combine stage from the number of rows in the group to 1). 2: intra-server reduction and inter-domain secondary return (URMA or hybrid URMA + RoCE topology). The value supports 0, 1, or 2. Enabling it changes the communication buffer layout; it must be specified when creating sym_buffer, and all ranks in the same communicator must use the same value. For the support status of each product and the enabling conditions, see Constraints. Default value: 0.</td>
     </tr>
     <tr>
         <td>topk_weights_type</td>
@@ -765,6 +765,13 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
     </tr>
 </tbody>
 </table>
+
+<!-- npu="A3" id32 -->
+- <term>Atlas A3 products</term>: after communication deduplication in the combine stage is enabled, the operator still performs capability validation and benefit gating internally. Infeasible configurations report an error or fall back automatically, and low-benefit shapes fall back silently. See Constraints.
+<!-- end id32 -->
+<!-- npu="950" id33 -->
+- <term>Ascend 950PR&950DT products</term>: whether to enable communication deduplication in the combine stage is entirely decided by the caller, and the operator does not make a benefit decision internally.
+<!-- end id33 -->
 
 <!-- npu="950" id28 -->
 - <term>Ascend 950PR&950DT products</term>: the actual number of tokens may differ across Ranks; `num_max_tokens_per_rank` only sets the common upper bound.
@@ -986,26 +993,6 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         <td>N/A</td>
         <td>N/A</td>
     </tr>
-    <!-- npu="950" id22 -->
-    <tr>
-        <td>weight1_type</td>
-        <td>int</td>
-        <td>Optional</td>
-        <td>Logical data type of weight1. Optional in the A8W8-FP use case; by default, it is inferred from the Tensor data type of l1_weights. In the A8W4-FP and A4W4-FP use cases, it must be set to the type enumeration corresponding to float4_e2m1fn_x2. The value must be the same as that of weight2_type.</td>
-        <td>int</td>
-        <td>N/A</td>
-        <td>N/A</td>
-    </tr>
-    <tr>
-        <td>weight2_type</td>
-        <td>int</td>
-        <td>Optional</td>
-        <td>Logical data type of weight2. Optional in the A8W8-FP use case, with the default value deduced from the Tensor data type of l2_weights. In the A8W4-FP and A4W4-FP use cases, it must be set to the type enumeration corresponding to float4_e2m1fn_x2. The value must be the same as that of weight1_type.</td>
-        <td>int</td>
-        <td>N/A</td>
-        <td>N/A</td>
-    </tr>
-    <!-- end id22 -->
     <tr>
         <td rowspan="3">shared_l1_weights<sup>1</sup></td>
         <td rowspan="3">list[Tensor]</td>
@@ -1090,6 +1077,13 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
 </tr>
 </tfoot>
 </table>
+
+<!-- npu="950" id22 -->
+<term>Ascend 950PR&950DT products</term> supports the following parameters:
+
+- **weight1_type** (int, Optional): Logical data type of weight1. Optional in the A8W8-FP use case; by default, it is inferred from the Tensor data type of l1_weights. In the A8W4-FP and A4W4-FP use cases, it must be set to the type enumeration corresponding to float4_e2m1fn_x2. The value must be the same as that of weight2_type.
+- **weight2_type** (int, Optional): Logical data type of weight2. Optional in the A8W8-FP use case, with the default value deduced from the Tensor data type of l2_weights. In the A8W4-FP and A4W4-FP use cases, it must be set to the type enumeration corresponding to float4_e2m1fn_x2. The value must be the same as that of weight1_type.
+<!-- end id22 -->
 
 ## Return Values
 
@@ -1257,7 +1251,9 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
 - **Parameter Consistency Constraints**:
   - All input parameters of the mega_moe API and their corresponding tensor dimensions must be consistent with the parameters of the same names in get_symm_buffer_for_mega_moe (for example, `num_experts`, `hidden`, `intermediate_hidden`, etc.).
   - The values of parameters such as `num_experts`, `max_recv_token_num`, `dispatch_quant_mode`, `dispatch_quant_out_dtype`, and `num_max_tokens_per_rank` used in the operator call must be consistent across all devices and across different layers in the network.
+  <!-- npu="A3" id34 -->
   - When <term>Atlas A3 products</term> enables communication deduplication in the combine stage (`combine_comm_mode` = 1), the num_tokens (`x`.dim0) of each rank must be exactly the same; inconsistent num_tokens (even if all values are not less than 1024) causes the operator to hang or produce misaligned results due to inconsistent communication chunk rounds or tail-chunk layout strides across ranks. Deployments where the num_tokens values differ across ranks must align them at the upper layer before invoking the operator.
+  <!-- end id34 -->
 
 - **Communicator constraints**:
     - The value of the `ep_world_size` parameter must be consistent across all devices.
@@ -1416,15 +1412,17 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         </table>
 
   <!-- end id17 -->
-  <!-- npu="A3,910b" id31 -->
+  <!-- npu="910b" id31 -->
   - <term>Atlas A2 products</term>: communication deduplication in the combine stage is not supported, and `combine_comm_mode` must keep the default value 0; `scales` is a reserved input and currently must be passed as None; the data type of the output `y` is the same as that of `x`.
+  <!-- end id31 -->
+  <!-- npu="A3" id35 -->
   - <term>Atlas A3 products</term>: `scales` is a reserved input and currently must be passed as None; the data type of the output `y` is the same as that of `x`. Communication deduplication in the combine stage is supported only in the `A8W4-INT` quantization use case (`combine_comm_mode` = 1); in the other use cases, the default value 0 must be kept, and when the value is 1, the operator reports an error in the tiling stage.
     - When `combine_comm_mode` = 1, actual enabling must satisfy both the capability constraints and the benefit gating: when `max_recv_token_num` does not satisfy the single-round receiving constraint (manually configured too small), the operator automatically falls back (without enabling deduplication) and prints a log describing the reason; when the communication buffer does not satisfy the minimum window requirement of deduplication, the operator reports an error with a suggested value; when the benefit gating is not met (low-benefit shapes such as small batches), the operator silently falls back and prints a decision log without reporting an error.
     - Capability constraints: `max_recv_token_num` ≥ min(num_tokens, 1024) × `ep_world_size` × min(`num_topk`, `num_experts_per_rank`) (the value automatically calculated by the interface when the default value 0 is kept exactly satisfies this constraint; when it is not satisfied, automatic fallback is performed); the communication buffer must satisfy the minimum window requirement of the deduplication layout. When the buffer is applied for through `get_symm_buffer_for_mega_moe` (`combine_comm_mode` = 1), the capacity is automatically calculated according to this requirement; when a manually configured buffer does not satisfy it, the operator reports an error with a suggested value.
     - When deduplication is enabled, the num_tokens (`x`.dim0) of each rank must be exactly the same; inconsistent num_tokens (even if all values are not less than 1024) causes the operator to hang or produce misaligned results due to inconsistent communication chunk rounds or tail-chunk layout strides across ranks.
     - When `combine_comm_mode` = 1, the outputs of multiple experts hit by the same token on the same rank are first accumulated with FP32 weighting on that rank and merged into one row before being sent: compared with the disabled state, in addition to the cross-expert accumulation order, the weighting position and the number of intermediate roundings also change (disabled state: each expert output is quantized to BF16 first and then multiplied by the topk weight; enabled state: FP32 weighted accumulation throughout and a single rounding at the end). Therefore, the result may differ even when `num_topk` = 1; it is a normal difference that `y` is not bitwise identical to that of `combine_comm_mode` = 0, and the enabled state is usually closer to the reference value. Use `combine_comm_mode` = 0 when bitwise consistency with the disabled state is required.
     - Applicable scenarios: shapes with a large `num_topk`, a high proportion of the same token hitting multiple experts on the same rank, and a performance bottleneck in communication benefit significantly after deduplication is enabled; low-benefit shapes such as small batches are automatically reverted by the benefit gating (deduplication is not enabled), so the caller does not need to evaluate each shape; for edge shapes near the gating boundary, it is recommended to run actual measurement before deciding.
-  <!-- end id31 -->
+  <!-- end id35 -->
   <!-- npu="950" id18 -->
   - **<term>Ascend 950PR&950DT products</term>:**
     - `activation` supports "swiglu", "swiglustep", "swigluoai", and "situglu". `activation_clamp` configures the clamp values of the first three activations; `activation_params` configures `alpha` and `beta` of "swigluoai" as well as `beta` and `linear_beta` of "situglu".
