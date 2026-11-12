@@ -134,6 +134,7 @@ void SetPlatformNpuArch(NpuArch npuArch)
     g_npuArchOverride = npuArch;
     static const std::map<NpuArch, SocVersion> NpuArchSocVersionMap = {
         {NpuArch::DAV_3510, SocVersion::ASCEND950},
+        {NpuArch::DAV_9201, SocVersion::ASCEND960DT},
         {NpuArch::DAV_RESV, SocVersion::RESERVED_VERSION},
     };
     g_socVersion = SocVersion::RESERVED_VERSION;
@@ -141,6 +142,20 @@ void SetPlatformNpuArch(NpuArch npuArch)
     if (it != NpuArchSocVersionMap.end()) {
         g_socVersion = it->second;
     }
+}
+
+ScopedPlatformNpuArch::ScopedPlatformNpuArch(NpuArch npuArch)
+    : originalSocVersion_(g_socVersion),
+      originalNpuArchOverride_(g_npuArchOverride)
+{
+    SetPlatformNpuArch(npuArch);
+}
+
+ScopedPlatformNpuArch::~ScopedPlatformNpuArch()
+{
+    // Restore the raw pair: several SoCs share an architecture, and DAV_RESV means no override.
+    g_socVersion = originalSocVersion_;
+    g_npuArchOverride = originalNpuArchOverride_;
 }
 
 } // namespace op

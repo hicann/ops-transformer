@@ -17,6 +17,7 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -35,7 +36,7 @@
 #include "../../../op_kernel/arch35/block_attn_res_update_tiling_key.h"
 
 struct BlockAttnResUpdateKernelTestParam {
-    std::string socVersion;
+    std::string npuArch;
     std::string caseName;
     std::string kernelUtTarget;
     std::string prefix;
@@ -57,8 +58,12 @@ class BlockAttnResUpdateKernelTestUtils {
 public:
     static constexpr uint32_t MAX_NUM_BLOCKS = 4U;
 
-    static BlockAttnResUpdateKernelCsvLoadResult GetParams(const std::string& socVersion, const std::string& testSuite)
+    static BlockAttnResUpdateKernelCsvLoadResult GetParams(const std::string& npuArch, const std::string& testSuite)
     {
+        static const std::map<std::string, std::string> npuArchMap = {
+            {"Ascend950", "3510"},
+            {"Ascend960DT", "9201"},
+        };
         BlockAttnResUpdateKernelCsvLoadResult result;
         const std::string csvPath = ops::ut::ResolveCsvPath(
             "test_block_attn_res_update.csv", "attention/block_attn_res_update/tests/ut/op_kernel", __FILE__);
@@ -91,12 +96,15 @@ public:
 
                 BlockAttnResUpdateKernelTestParam param;
                 size_t index = 0UL;
-                param.socVersion = ops::ut::Trim(fields[index++]);
+                const std::string platformName = ops::ut::Trim(fields[index++]);
                 param.caseName = ops::ut::Trim(fields[index++]);
                 param.kernelUtTarget = ops::ut::Trim(fields[index++]);
-                if (param.socVersion != socVersion || param.kernelUtTarget != testSuite) {
+                const auto archIterator = npuArchMap.find(platformName);
+                if (archIterator == npuArchMap.end() || archIterator->second != npuArch ||
+                    param.kernelUtTarget != testSuite) {
                     continue;
                 }
+                param.npuArch = archIterator->second;
 
                 param.prefix = ops::ut::Trim(fields[index++]);
                 ++index; // coreNum is part of the CSV schema; this launcher derives its block count from numBlocks.
@@ -120,7 +128,7 @@ public:
     }
 
 #ifdef __CCE_KT_TEST__
-    static void TestOneParamCase950(const BlockAttnResUpdateKernelTestParam& param)
+    static void TestOneParamCase(const BlockAttnResUpdateKernelTestParam& param)
     {
         ASSERT_TRUE(param.result) << "op_kernel CSV currently supports successful launch cases only";
 
@@ -169,8 +177,8 @@ public:
         const auto kernelFunc =
             param.tilingKey == GET_TPL_TILING_KEY(true) ? &block_attn_res_update<true> : &block_attn_res_update<false>;
         ICPU_SET_TILING_KEY(param.tilingKey);
-        // CANN 9.2 tikicpulib does not emulate Ascend950 Reg/VF arithmetic, so this UT validates CSV scheduling and a
-        // clean kernel launch rather than numerical results.
+        // The CPU-debug Reg/VF stubs only validate scheduling and a clean launch here.
+        // Numerical accuracy is checked by the on-device ST cases for each SoC.
         // partial_block_ref and workspace are ABI-only here; nullptr makes any accidental kernel access fail this UT.
         ASSERT_TRUE(KERNEL_RUN_KF(kernelFunc, launchBlocks, partialGm.Get(), deltaGm.Get(), pseudoQueryGm.Get(),
                                   numeratorGm.Get(), logitMaxGm.Get(), expSumGm.Get(), nullptr, hGm.Get(), nullptr,

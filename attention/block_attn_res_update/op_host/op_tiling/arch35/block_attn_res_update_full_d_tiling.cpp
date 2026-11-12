@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <vector>
 #include "log/log.h"
 #include "op_host/tiling_templates_registry.h"
 #include "platform/soc_spec.h"
@@ -40,6 +41,8 @@ constexpr uint32_t MAX_DATA_COPY_BLOCK_COUNT = 4095U;
 constexpr uint32_t SYSTEM_RESERVED_UB_BYTES = 8U * 1024U;
 // Keep the generic full-D strategy as a fallback. A preferred split-D strategy should use a numerically smaller value.
 constexpr int32_t FULL_D_TILING_PRIORITY = 1000;
+const std::vector<int32_t> supportedNpuArch = {static_cast<int32_t>(NpuArch::DAV_3510),
+                                               static_cast<int32_t>(NpuArch::DAV_9201)};
 
 } // namespace
 
@@ -195,8 +198,8 @@ ge::graphStatus BlockAttnResUpdateFullDTiling::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-REGISTER_TILING_TEMPLATE_WITH_ARCH(BlockAttnResUpdate, BlockAttnResUpdateFullDTiling,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), FULL_D_TILING_PRIORITY);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(BlockAttnResUpdate, BlockAttnResUpdateFullDTiling, supportedNpuArch,
+                                   FULL_D_TILING_PRIORITY);
 
 } // namespace block_attn_res_update
 } // namespace optiling

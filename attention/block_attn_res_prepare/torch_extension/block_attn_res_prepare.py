@@ -220,7 +220,7 @@ def block_attn_res_prepare(
     *,
     eps: float = DEFAULT_EPS,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Run the Ascend 950 BlockAttnResPrepare Phase 1 operator.
+    """Run the BlockAttnResPrepare Phase 1 operator on a supported Ascend platform.
 
     Args:
         block_res: FP32 tensor with shape ``[T, N, D]``.

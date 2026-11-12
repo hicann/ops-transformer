@@ -200,6 +200,19 @@ void SetPlatformSocVersion(SocVersion socVersion);
 
 void SetPlatformNpuArch(NpuArch npuArch);
 
+class ScopedPlatformNpuArch {
+public:
+    explicit ScopedPlatformNpuArch(NpuArch npuArch);
+    ~ScopedPlatformNpuArch();
+
+    ScopedPlatformNpuArch(const ScopedPlatformNpuArch&) = delete;
+    ScopedPlatformNpuArch& operator=(const ScopedPlatformNpuArch&) = delete;
+
+private:
+    SocVersion originalSocVersion_;
+    NpuArch originalNpuArchOverride_;
+};
+
 } // namespace op
 
 #endif // OPS_TRANSFORMER_DEV_TESTS_UT_OP_API_STUB_OPDEV_PLATFORM_H

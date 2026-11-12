@@ -7,7 +7,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ----------------------------------------------------------------------------
-set(OPTENSOR_TAG_ID fb30752ed5524744cee0cd21f26db5d52e54b6e4)
+set(OPTENSOR_TAG_ID 199a1d8f796e5608b54734f0a6f20e33add4daf4)
 
 if(EXISTS "${PROJECT_SOURCE_DIR}/../ops-tensor")
   get_filename_component(OPTENSOR_SOURCE_PATH
@@ -111,6 +111,8 @@ else()
     ops-tensor
     GIT_REPOSITORY ${OPTENSOR_GIT_URL}
     GIT_TAG ${OPTENSOR_TAG_ID}
+    # Fetch the pinned commit even when it is only reachable through a PR ref.
+    GIT_CONFIG "remote.origin.fetch=+${OPTENSOR_TAG_ID}:refs/ops-tensor/pinned"
     GIT_PROGRESS TRUE
     SOURCE_DIR ${CANN_3RD_LIB_PATH}/ops-tensor)
 

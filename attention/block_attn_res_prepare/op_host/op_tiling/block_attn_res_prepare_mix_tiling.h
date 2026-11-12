@@ -51,6 +51,7 @@ private:
     void FillTilingData(uint64_t totalWorkUnits);
 
     BlockAttnResPrepareMixTilingData tilingData_{};
+    uint64_t aivCoreNumPerAic_ = 2UL;
 };
 
 } // namespace optiling

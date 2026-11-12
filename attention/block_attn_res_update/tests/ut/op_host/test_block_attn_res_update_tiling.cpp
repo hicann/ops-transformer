@@ -10,7 +10,7 @@
 
 /*!
  * \file test_block_attn_res_update_tiling.cpp
- * \brief CSV-driven unit tests for BlockAttnResUpdate Ascend 950 tiling.
+ * \brief CSV-driven unit tests for BlockAttnResUpdate tiling.
  */
 
 #include <gtest/gtest.h>
@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <exception>
 #include <fstream>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -34,7 +35,6 @@
 namespace {
 
 constexpr const char* OP_NAME = "BlockAttnResUpdate";
-constexpr const char* SOC_VERSION = "Ascend950";
 constexpr const char* NPU_ARCH = "3510";
 constexpr size_t MIN_INPUT_COLUMN_COUNT = 25UL;
 constexpr size_t SUCCESS_COLUMN_COUNT = 36UL;
@@ -99,7 +99,7 @@ struct BlockAttnResUpdateTilingCase {
                                          {ParseShape(partialRefShape), partialRefDtype, ge::FORMAT_ND},
                                          {ParseShape(hShape), hDtype, ge::FORMAT_ND},
                                      },
-                                     attrs, &gCompileInfo, NPU_ARCH, aivNum, ubSize, tilingDataCapacity);
+                                     attrs, &gCompileInfo, npuArch, aivNum, ubSize, tilingDataCapacity);
 
         TilingInfo actual;
         const bool actualResult = ExecuteTiling(para, actual);
@@ -126,6 +126,8 @@ struct BlockAttnResUpdateTilingCase {
         EXPECT_EQ(tilingData->usedCoreNum, expectUsedCoreNum) << "case=" << caseName;
     }
 
+    std::string platformName;
+    std::string npuArch;
     std::string caseName;
     std::string prefix;
     uint32_t aivNum = 0U;
@@ -172,6 +174,10 @@ struct TilingCsvLoadResult {
 
 TilingCsvLoadResult LoadTilingCases()
 {
+    static const std::map<std::string, std::string> npuArchMap = {
+        {"Ascend950", NPU_ARCH},
+        {"Ascend960DT", "9201"},
+    };
     TilingCsvLoadResult result;
     const std::string csvPath = ops::ut::ResolveCsvPath("test_block_attn_res_update_tiling.csv",
                                                         "attention/block_attn_res_update/tests/ut/op_host", __FILE__);
@@ -202,12 +208,15 @@ TilingCsvLoadResult LoadTilingCases()
         const std::string caseName = items.size() > 1UL ? ops::ut::Trim(items[1]) : "";
         try {
             size_t index = 0UL;
-            const std::string socVersion = ops::ut::Trim(items[index++]);
-            if (socVersion != SOC_VERSION) {
+            const std::string platformName = ops::ut::Trim(items[index++]);
+            const auto archIterator = npuArchMap.find(platformName);
+            if (archIterator == npuArchMap.end()) {
                 continue;
             }
 
             BlockAttnResUpdateTilingCase testCase;
+            testCase.platformName = platformName;
+            testCase.npuArch = archIterator->second;
             testCase.caseName = ops::ut::Trim(items[index++]);
             const bool enable = ops::ut::ParseBool(items[index++]);
             if (!enable) {
@@ -260,7 +269,7 @@ TilingCsvLoadResult LoadTilingCases()
         }
     }
     if (result.cases.empty()) {
-        result.errors.emplace_back("No enabled Ascend950 tiling cases were loaded from: " + csvPath);
+        result.errors.emplace_back("No enabled tiling cases were loaded from: " + csvPath);
     }
     return result;
 }
@@ -273,7 +282,7 @@ const TilingCsvLoadResult& GetTilingCases()
 
 std::string MakeParamName(const testing::TestParamInfo<BlockAttnResUpdateTilingCase>& info)
 {
-    return ops::ut::MakeSafeParamName(info.param.prefix);
+    return ops::ut::MakeSafeParamName(info.param.platformName + "_" + info.param.prefix);
 }
 
 class BlockAttnResUpdateTilingTest : public testing::TestWithParam<BlockAttnResUpdateTilingCase> {};
@@ -344,7 +353,7 @@ TEST_P(BlockAttnResUpdateTilingTest, CsvDrivenCase)
     GetParam().Run();
 }
 
-INSTANTIATE_TEST_SUITE_P(BLOCK_ATTN_RES_UPDATE_ASCEND950, BlockAttnResUpdateTilingTest,
+INSTANTIATE_TEST_SUITE_P(BLOCK_ATTN_RES_UPDATE_TILING_CSV, BlockAttnResUpdateTilingTest,
                          testing::ValuesIn(GetTilingCases().cases), MakeParamName);
 
 } // namespace

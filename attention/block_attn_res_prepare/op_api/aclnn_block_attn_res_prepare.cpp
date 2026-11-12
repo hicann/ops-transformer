@@ -306,8 +306,9 @@ aclnnStatus aclnnBlockAttnResPrepareGetWorkspaceSize(const aclTensor* blockRes, 
     CHECK_RET(CheckNotNull(blockRes, validBlocks, pseudoQuery, numerator, logitMax, expSum, workspaceSize, executor) ==
                   ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_NULLPTR);
-    if (GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "BlockAttnResPrepare only supports Ascend 950 and Ascend 350.");
+    const auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
+    if (npuArch != NpuArch::DAV_3510 && npuArch != NpuArch::DAV_9201) {
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "BlockAttnResPrepare only supports Ascend 950, Ascend 350, and Ascend 960DT.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
 

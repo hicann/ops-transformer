@@ -141,17 +141,18 @@ inline aclnnStatus ParseAclnnStatus(const std::string& status)
     return iterator == statusMap.end() ? static_cast<aclnnStatus>(std::stoll(trimmed)) : iterator->second;
 }
 
-inline void SetPlatformSocVersion(const std::string& socVersion)
+inline NpuArch ParseNpuArch(const std::string& platformName)
 {
-    static const std::map<std::string, op::SocVersion> socVersionMap = {
-        {"Ascend910B", op::SocVersion::ASCEND910B},
-        {"Ascend950", op::SocVersion::ASCEND950},
+    static const std::map<std::string, NpuArch> npuArchMap = {
+        {"Ascend910B", NpuArch::DAV_2201},
+        {"Ascend950", NpuArch::DAV_3510},
+        {"Ascend960DT", NpuArch::DAV_9201},
     };
-    const auto iterator = socVersionMap.find(Trim(socVersion));
-    if (iterator == socVersionMap.end()) {
-        throw std::invalid_argument("Unsupported socVersion: " + socVersion);
+    const auto iterator = npuArchMap.find(Trim(platformName));
+    if (iterator == npuArchMap.end()) {
+        throw std::invalid_argument("Unsupported platform: " + platformName);
     }
-    op::SetPlatformSocVersion(iterator->second);
+    return iterator->second;
 }
 
 inline std::string JoinPath(const std::string& directory, const std::string& fileName)

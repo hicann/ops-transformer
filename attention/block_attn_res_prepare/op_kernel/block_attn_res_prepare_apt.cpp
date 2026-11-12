@@ -10,7 +10,7 @@
 
 /*!
  * \file block_attn_res_prepare_apt.cpp
- * \brief Kernel entry for BlockAttnResPrepare on Ascend 950.
+ * \brief Kernel entry for BlockAttnResPrepare on supported RegBase products.
  */
 
 #include "arch35/block_attn_res_prepare_apt_tiling_key.h"

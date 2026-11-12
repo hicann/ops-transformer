@@ -24,7 +24,8 @@
 
 namespace {
 
-const std::vector<int32_t> supportedNpuArch = {static_cast<int32_t>(NpuArch::DAV_3510)};
+const std::vector<int32_t> supportedNpuArch = {static_cast<int32_t>(NpuArch::DAV_3510),
+                                               static_cast<int32_t>(NpuArch::DAV_9201)};
 constexpr int32_t TILING_PRIORITY = 0;
 } // namespace
 
@@ -94,7 +95,13 @@ struct BlockAttnResPrepareMixTiling::ResourceUsage {
 
 bool BlockAttnResPrepareMixTiling::IsCapable()
 {
-    if (aicCoreNum_ == 0U || aivCoreNum_ != aicCoreNum_ * AIV_CORE_NUM_PER_AIC) {
+    const auto platform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
+    // 9201 uses MIX_AIC_1_1 (one AIV per AIC), while the default ratio is for 950's MIX_AIC_1_2.
+    // Match the kernel launch ratio for core-count checks and mixed-core work distribution.
+    if (platform.GetCurNpuArch() == NpuArch::DAV_9201) {
+        aivCoreNumPerAic_ = 1UL;
+    }
+    if (aicCoreNum_ == 0U || aivCoreNum_ != aicCoreNum_ * aivCoreNumPerAic_) {
         return false;
     }
     if (totalT_ < CUBE_MIN_T || totalS_ < CUBE_MIN_S || totalD_ < CUBE_MIN_D) {
@@ -112,7 +119,7 @@ bool BlockAttnResPrepareMixTiling::SelectMixTileShape()
 {
     const uint64_t usableUbBytes = ubSize_ - UB_RESERVED_BYTES;
     const uint64_t usableL1Bytes = l1Size_ - L1_RESERVED_BYTES;
-    const uint64_t mixedCoreNum = std::min<uint64_t>(aicCoreNum_, aivCoreNum_ / AIV_CORE_NUM_PER_AIC);
+    const uint64_t mixedCoreNum = std::min<uint64_t>(aicCoreNum_, aivCoreNum_ / aivCoreNumPerAic_);
     if (mixedCoreNum == 0U) {
         return false;
     }
@@ -290,7 +297,7 @@ ge::graphStatus BlockAttnResPrepareMixTiling::CalculateMixWork(uint64_t& totalWo
                         tilingData_.sTileNum),
                 return ge::GRAPH_FAILED);
     totalWorkUnits = tTileNum * tilingData_.sTileNum;
-    const uint64_t mixedCoreNum = std::min<uint64_t>(aicCoreNum_, aivCoreNum_ / AIV_CORE_NUM_PER_AIC);
+    const uint64_t mixedCoreNum = std::min<uint64_t>(aicCoreNum_, aivCoreNum_ / aivCoreNumPerAic_);
     WorkDistribution distribution;
     if (CalculateWorkDistribution(totalWorkUnits, mixedCoreNum, "Mix", distribution) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;

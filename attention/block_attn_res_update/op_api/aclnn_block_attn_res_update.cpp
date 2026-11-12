@@ -83,8 +83,9 @@ static bool CheckNotNull(const BlockAttnResUpdateParams& params)
 
 static aclnnStatus CheckAiCoreSupport()
 {
-    if (GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "BlockAttnResUpdate only supports Ascend 950 and Ascend 350.");
+    const auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
+    if (npuArch != NpuArch::DAV_3510 && npuArch != NpuArch::DAV_9201) {
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "BlockAttnResUpdate only supports Ascend 950, Ascend 350, and Ascend 960DT.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     return ACLNN_SUCCESS;

@@ -122,7 +122,7 @@ struct BlockAttnResUpdateOpApiCase {
         if (!enable) {
             GTEST_SKIP() << "Skip disabled case: " << caseName;
         }
-        test_utils::SetPlatformSocVersion(socVersion);
+        const op::ScopedPlatformNpuArch platformGuard(npuArch);
 
         const TensorDesc partialBlockRefDesc =
             MakeTensorDesc(partialBlockRefSpec, partialBlockRefDtype, partialBlockRefFormat);
@@ -148,7 +148,8 @@ struct BlockAttnResUpdateOpApiCase {
         EXPECT_EQ(ret, test_utils::ParseAclnnStatus(expectRet)) << "case=" << caseName;
     }
 
-    string socVersion;
+    string platformName;
+    NpuArch npuArch = NpuArch::DAV_RESV;
     string caseName;
     bool enable = true;
     string expectRet;
@@ -207,9 +208,12 @@ vector<BlockAttnResUpdateOpApiCase> LoadCases(const string& csvFilePath)
         try {
             BlockAttnResUpdateOpApiCase c;
             size_t i = 0U;
-            c.socVersion = test_utils::Trim(cols[i++]);
+            c.platformName = test_utils::Trim(cols[i++]);
             c.caseName = test_utils::Trim(cols[i++]);
             c.enable = test_utils::ParseBool(cols[i++]);
+            if (c.enable) {
+                c.npuArch = test_utils::ParseNpuArch(c.platformName);
+            }
             c.expectRet = test_utils::Trim(cols[i++]);
             c.partialBlockRefSpec = test_utils::Trim(cols[i++]);
             c.partialBlockRefDtype = test_utils::Trim(cols[i++]);
@@ -245,7 +249,7 @@ vector<BlockAttnResUpdateOpApiCase> LoadCases(const string& csvFilePath)
 
 string BuildCaseName(const testing::TestParamInfo<BlockAttnResUpdateOpApiCase>& info)
 {
-    return test_utils::MakeSafeParamName(info.param.socVersion + "_" + info.param.caseName);
+    return test_utils::MakeSafeParamName(info.param.platformName + "_" + info.param.caseName);
 }
 
 class BlockAttnResUpdateOpApiCsvTest : public testing::TestWithParam<BlockAttnResUpdateOpApiCase> {};

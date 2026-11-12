@@ -10,7 +10,7 @@
 
 /*!
  * \file block_attn_res_prepare_apt_tiling_key.h
- * \brief BlockAttnResPrepare tiling key definition for Ascend 950.
+ * \brief BlockAttnResPrepare tiling key definition for supported RegBase products.
  */
 #ifndef BLOCK_ATTN_RES_PREPARE_APT_TILING_KEY_H
 #define BLOCK_ATTN_RES_PREPARE_APT_TILING_KEY_H
@@ -32,10 +32,16 @@ ASCENDC_TPL_ARGS_DECL(BlockAttnResPrepare,
                                             ASCENDC_TPL_UI_LIST, BLOCK_ATTN_RES_PREPARE_TPL_ONLY_VECTOR,
                                             BLOCK_ATTN_RES_PREPARE_TPL_MIX));
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#define BLOCK_ATTN_RES_PREPARE_MIX_KERNEL_TYPE ASCENDC_TPL_MIX_AIC_1_1
+#else
+#define BLOCK_ATTN_RES_PREPARE_MIX_KERNEL_TYPE ASCENDC_TPL_MIX_AIC_1_2
+#endif
+
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_AIV_ONLY),
                                      ASCENDC_TPL_UINT_SEL(TEMPLATE_MODE, ASCENDC_TPL_UI_LIST,
                                                           BLOCK_ATTN_RES_PREPARE_TPL_ONLY_VECTOR)),
-                ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
+                ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(BLOCK_ATTN_RES_PREPARE_MIX_KERNEL_TYPE),
                                      ASCENDC_TPL_UINT_SEL(TEMPLATE_MODE, ASCENDC_TPL_UI_LIST,
                                                           BLOCK_ATTN_RES_PREPARE_TPL_MIX)));
 

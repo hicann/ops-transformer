@@ -55,8 +55,6 @@ public:
     ~BlockAttnResPrepareBaseTiling() override = default;
 
 protected:
-    static constexpr uint64_t AIV_CORE_NUM_PER_AIC = 2UL;
-
     template <typename T>
     static constexpr T CeilDiv(T value, T factor)
     {

@@ -21,6 +21,7 @@
 #include <iostream>
 #include <algorithm>
 #include <limits>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -148,7 +149,7 @@ struct BlockAttnResPrepareTilingCase {
                 SYSTEM_WORKSPACE_SIZE};
     }
 
-    std::string MakeSocInfoString() const
+    std::string MakePlatformInfoString() const
     {
         return std::string("{\"hardware_info\":{") + "\"BT_SIZE\":0," + "\"load3d_constraints\":\"1\"," +
                "\"Intrinsic_fix_pipe_l0c2out\":false," + "\"Intrinsic_data_move_l12ub\":true," +
@@ -160,7 +161,7 @@ struct BlockAttnResPrepareTilingCase {
                "\"L0C_SIZE\":" + std::to_string(ASCEND_950_L0C_SIZE) + "," +
                "\"CORE_NUM\":" + std::to_string(contextCoreNum) + "," +
                "\"cube_core_cnt\":" + std::to_string(aicCoreNum) + "," +
-               "\"vector_core_cnt\":" + std::to_string(aivCoreNum) + "," + "\"socVersion\":\"" + socVersion + "\"}}";
+               "\"vector_core_cnt\":" + std::to_string(aivCoreNum) + "," + "\"socVersion\":\"" + platformName + "\"}}";
     }
 
     gert::TilingContextPara MakeContext(optiling::BlockAttnResPrepareCompileInfo& compileInfo) const
@@ -184,8 +185,8 @@ struct BlockAttnResPrepareTilingCase {
                 {ops::ut::MakeGertStorageShape(std::vector<int64_t>{totalS, totalT}), ge::DT_FLOAT, ge::FORMAT_ND},
                 {ops::ut::MakeGertStorageShape(std::vector<int64_t>{totalS, totalT}), ge::DT_FLOAT, ge::FORMAT_ND},
             },
-            {{"eps", Ops::Transformer::AnyValue::CreateFrom<float>(eps)}}, &compileInfo, socVersion,
-            static_cast<uint64_t>(contextCoreNum), ASCEND_950_UB_SIZE, FAKE_L2_SIZE, MakeSocInfoString());
+            {{"eps", Ops::Transformer::AnyValue::CreateFrom<float>(eps)}}, &compileInfo, npuArch,
+            static_cast<uint64_t>(contextCoreNum), ASCEND_950_UB_SIZE, FAKE_L2_SIZE, MakePlatformInfoString());
     }
 
     void CheckVectorTiling(const TilingInfo& tilingInfo) const
@@ -210,6 +211,11 @@ struct BlockAttnResPrepareTilingCase {
         ExpectValueIfSpecified(tilingData->totalWorkUnits, expectTotalWorkUnits, "totalWorkUnits", caseName);
         ExpectValueIfSpecified(tilingData->nAlign, expectNAlign, "nAlign", caseName);
         ExpectValueIfSpecified(tilingData->mm1NAlign, expectMm1NAlign, "mm1NAlign", caseName);
+        EXPECT_EQ(tilingData->aicCoreNum, aicCoreNum) << "case=" << caseName;
+        EXPECT_EQ(tilingData->aivCoreNum, aivCoreNum) << "case=" << caseName;
+        const uint64_t expectedUsedCoreNum = std::min<uint64_t>(aicCoreNum, tilingData->totalWorkUnits);
+        EXPECT_EQ(tilingData->usedCoreNum, expectedUsedCoreNum) << "case=" << caseName;
+        EXPECT_EQ(tilingInfo.blockNum, expectedUsedCoreNum) << "case=" << caseName;
         if (checkWorkspaceFormula) {
             const uint64_t expectedWorkspaceElems = static_cast<uint64_t>(tilingData->baseS) * tilingData->mm1NAlign +
                                                     std::min<uint64_t>(tilingData->totalT, MAX_RUNTIME_BASE_T) *
@@ -236,7 +242,8 @@ struct BlockAttnResPrepareTilingCase {
         }
     }
 
-    std::string socVersion;
+    std::string platformName;
+    std::string npuArch;
     std::string caseName;
     std::string prefix;
     std::string blockResShape;
@@ -266,6 +273,10 @@ struct BlockAttnResPrepareTilingCase {
 
 std::vector<BlockAttnResPrepareTilingCase> LoadCases()
 {
+    static const std::map<std::string, std::string> npuArchMap = {
+        {"Ascend950", "3510"},
+        {"Ascend960DT", "9201"},
+    };
     std::vector<BlockAttnResPrepareTilingCase> cases;
     const std::string csvPath = ops::ut::ResolveCsvPath(CSV_FILE_NAME, CSV_REPO_DIR, __FILE__);
     std::ifstream csvData(csvPath, std::ios::in);
@@ -291,11 +302,13 @@ std::vector<BlockAttnResPrepareTilingCase> LoadCases()
         try {
             size_t index = 0U;
             BlockAttnResPrepareTilingCase testCase;
-            testCase.socVersion = ops::ut::Trim(items[index++]);
+            testCase.platformName = ops::ut::Trim(items[index++]);
             testCase.caseName = ops::ut::Trim(items[index++]);
-            if (!ops::ut::ParseBool(items[index++]) || testCase.socVersion != "Ascend950") {
+            const auto archIterator = npuArchMap.find(testCase.platformName);
+            if (!ops::ut::ParseBool(items[index++]) || archIterator == npuArchMap.end()) {
                 continue;
             }
+            testCase.npuArch = archIterator->second;
             testCase.prefix = ops::ut::Trim(items[index++]);
             testCase.blockResShape = ops::ut::Trim(items[index++]);
             testCase.pseudoQueryShape = ops::ut::Trim(items[index++]);
@@ -330,7 +343,7 @@ std::vector<BlockAttnResPrepareTilingCase> LoadCases()
 
 std::string MakeParamName(const testing::TestParamInfo<BlockAttnResPrepareTilingCase>& info)
 {
-    return ops::ut::MakeSafeParamName(info.param.prefix);
+    return ops::ut::MakeSafeParamName(info.param.platformName + "_" + info.param.prefix);
 }
 
 const std::vector<BlockAttnResPrepareTilingCase>& GetCases()

@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <exception>
 #include <fstream>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -32,7 +33,7 @@
 namespace {
 
 constexpr const char* OP_NAME = "BlockAttnResUpdate";
-constexpr const char* SOC_VERSION = "Ascend950";
+constexpr const char* NPU_ARCH = "3510";
 constexpr size_t CSV_COLUMN_COUNT = 15UL;
 
 ge::DataType ParseDtype(const std::string& value)
@@ -149,6 +150,10 @@ struct InferCsvLoadResult {
 
 InferCsvLoadResult LoadInferCases()
 {
+    static const std::map<std::string, std::string> npuArchMap = {
+        {"Ascend950", NPU_ARCH},
+        {"Ascend960DT", "9201"},
+    };
     InferCsvLoadResult result;
     const std::string csvPath = ops::ut::ResolveCsvPath("test_block_attn_res_update_infershape.csv",
                                                         "attention/block_attn_res_update/tests/ut/op_host", __FILE__);
@@ -180,8 +185,9 @@ InferCsvLoadResult LoadInferCases()
         const std::string caseName = items.size() > 1UL ? ops::ut::Trim(items[1]) : "";
         try {
             size_t index = 0UL;
-            const std::string socVersion = ops::ut::Trim(items[index++]);
-            if (socVersion != SOC_VERSION) {
+            const std::string platformName = ops::ut::Trim(items[index++]);
+            const auto archIterator = npuArchMap.find(platformName);
+            if (archIterator == npuArchMap.end() || archIterator->second != NPU_ARCH) {
                 continue;
             }
 

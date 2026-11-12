@@ -71,6 +71,7 @@ public:
             .ExtendCfgInfo("opFile.value", "block_attn_res_prepare_apt");
         this->AICore().AddConfig("ascend950", config950);
         this->AICore().AddConfig("ascend350", config950);
+        this->AICore().AddConfig("ascend960dt", config950);
     }
 };
 

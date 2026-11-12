@@ -18,6 +18,7 @@
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -35,6 +36,7 @@ using TensorDescription = gert::InfershapeContextPara::TensorDescription;
 constexpr size_t CSV_COLUMN_COUNT = 16U;
 constexpr const char* CSV_FILE_NAME = "test_block_attn_res_prepare_infershape.csv";
 constexpr const char* CSV_REPO_DIR = "attention/block_attn_res_prepare/tests/ut/op_host";
+constexpr const char* NPU_ARCH = "3510";
 
 struct BlockAttnResPrepareInfershapeCase {
     void RunShapeCase() const
@@ -114,7 +116,6 @@ struct BlockAttnResPrepareInfershapeCase {
         }
     }
 
-    std::string socVersion;
     std::string caseName;
     std::string prefix;
     std::string caseType;
@@ -133,6 +134,10 @@ struct BlockAttnResPrepareInfershapeCase {
 
 std::vector<BlockAttnResPrepareInfershapeCase> LoadCases()
 {
+    static const std::map<std::string, std::string> npuArchMap = {
+        {"Ascend950", NPU_ARCH},
+        {"Ascend960DT", "9201"},
+    };
     std::vector<BlockAttnResPrepareInfershapeCase> cases;
     const std::string csvPath = ops::ut::ResolveCsvPath(CSV_FILE_NAME, CSV_REPO_DIR, __FILE__);
     std::ifstream csvData(csvPath, std::ios::in);
@@ -158,9 +163,11 @@ std::vector<BlockAttnResPrepareInfershapeCase> LoadCases()
         try {
             size_t index = 0U;
             BlockAttnResPrepareInfershapeCase testCase;
-            testCase.socVersion = ops::ut::Trim(items[index++]);
+            const std::string platformName = ops::ut::Trim(items[index++]);
             testCase.caseName = ops::ut::Trim(items[index++]);
-            if (!ops::ut::ParseBool(items[index++]) || testCase.socVersion != "Ascend950") {
+            const auto archIterator = npuArchMap.find(platformName);
+            if (!ops::ut::ParseBool(items[index++]) || archIterator == npuArchMap.end() ||
+                archIterator->second != NPU_ARCH) {
                 continue;
             }
             testCase.prefix = ops::ut::Trim(items[index++]);

@@ -15,10 +15,16 @@
 
 namespace {
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+constexpr const char* KERNEL_NPU_ARCH = "9201";
+#else
+constexpr const char* KERNEL_NPU_ARCH = "3510";
+#endif
+
 const BlockAttnResUpdateKernelCsvLoadResult& GetKernelCases()
 {
     static const BlockAttnResUpdateKernelCsvLoadResult result =
-        BlockAttnResUpdateKernelTestUtils::GetParams("Ascend950", "BLOCK_ATTN_RES_UPDATE_FLOW");
+        BlockAttnResUpdateKernelTestUtils::GetParams(KERNEL_NPU_ARCH, "BLOCK_ATTN_RES_UPDATE_FLOW");
     return result;
 }
 
@@ -37,7 +43,7 @@ protected:
     }
 };
 
-TEST(BlockAttnResUpdateKernelCsv, LoadsAscend950Cases)
+TEST(BlockAttnResUpdateKernelCsv, LoadsSelectedSocCases)
 {
     const auto& result = GetKernelCases();
     for (const auto& error : result.errors) {
@@ -49,13 +55,13 @@ TEST(BlockAttnResUpdateKernelCsv, LoadsAscend950Cases)
 TEST_P(BlockAttnResUpdateKernelTest, RunKernel)
 {
 #ifdef __CCE_KT_TEST__
-    BlockAttnResUpdateKernelTestUtils::TestOneParamCase950(GetParam());
+    BlockAttnResUpdateKernelTestUtils::TestOneParamCase(GetParam());
 #else
     GTEST_SKIP() << "Kernel CPU simulator is unavailable";
 #endif
 }
 
-INSTANTIATE_TEST_SUITE_P(BLOCK_ATTN_RES_UPDATE_ASCEND950, BlockAttnResUpdateKernelTest,
+INSTANTIATE_TEST_SUITE_P(BLOCK_ATTN_RES_UPDATE_ARCH35, BlockAttnResUpdateKernelTest,
                          testing::ValuesIn(GetKernelCases().params), MakeParamName);
 
 } // namespace

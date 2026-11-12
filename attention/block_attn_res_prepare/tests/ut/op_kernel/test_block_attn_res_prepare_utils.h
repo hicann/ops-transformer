@@ -17,6 +17,7 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -35,7 +36,7 @@
 #include "../../../op_kernel/arch35/block_attn_res_prepare_tiling_data.h"
 
 struct BlockAttnResPrepareKernelTestParam {
-    std::string socVersion;
+    std::string npuArch;
     std::string caseName;
     std::string kernelUtTarget;
     std::string prefix;
@@ -60,8 +61,12 @@ class BlockAttnResPrepareKernelTestUtils {
 public:
     static constexpr uint32_t MAX_NUM_BLOCKS = 4U;
 
-    static BlockAttnResPrepareKernelCsvLoadResult GetParams(const std::string& socVersion, const std::string& testSuite)
+    static BlockAttnResPrepareKernelCsvLoadResult GetParams(const std::string& npuArch, const std::string& testSuite)
     {
+        static const std::map<std::string, std::string> npuArchMap = {
+            {"Ascend950", "3510"},
+            {"Ascend960DT", "9201"},
+        };
         BlockAttnResPrepareKernelCsvLoadResult result;
         const std::string csvPath = ops::ut::ResolveCsvPath(
             "test_block_attn_res_prepare.csv", "attention/block_attn_res_prepare/tests/ut/op_kernel", __FILE__);
@@ -94,12 +99,15 @@ public:
 
                 BlockAttnResPrepareKernelTestParam param;
                 size_t index = 0UL;
-                param.socVersion = ops::ut::Trim(fields[index++]);
+                const std::string platformName = ops::ut::Trim(fields[index++]);
                 param.caseName = ops::ut::Trim(fields[index++]);
                 param.kernelUtTarget = ops::ut::Trim(fields[index++]);
-                if (param.socVersion != socVersion || param.kernelUtTarget != testSuite) {
+                const auto archIterator = npuArchMap.find(platformName);
+                if (archIterator == npuArchMap.end() || archIterator->second != npuArch ||
+                    param.kernelUtTarget != testSuite) {
                     continue;
                 }
+                param.npuArch = archIterator->second;
 
                 param.prefix = ops::ut::Trim(fields[index++]);
                 ++index;
@@ -126,7 +134,7 @@ public:
     }
 
 #ifdef __CCE_KT_TEST__
-    static void TestOneParamCase950(const BlockAttnResPrepareKernelTestParam& param)
+    static void TestOneParamCase(const BlockAttnResPrepareKernelTestParam& param)
     {
         ASSERT_TRUE(param.result) << "op_kernel CSV currently supports successful launch cases only";
 

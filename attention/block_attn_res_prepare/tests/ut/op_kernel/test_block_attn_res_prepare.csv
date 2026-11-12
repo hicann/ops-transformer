@@ -7,3 +7,11 @@ Ascend950,uneven_multicore,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,2,5,64,2,6,TRUE
 Ascend950,valid_above_n,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,3,2,64,4,7,TRUE,2,1000,1 2 2 64 1 1 64 144 897988541 2 33620739 1,validBlocks above N is clipped to N
 Ascend950,max_n_tail_d257,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,64,1,257,64,8,TRUE,1,1000,1 1 1 257 1 1 257 144 897988541 1 33636416 1,maximum N with a non-register-aligned D tail
 Ascend950,extra_launched_cores,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,2,1,64,2,9,TRUE,4,1000,1 1 1 64 1 1 64 144 897988541 1 33620482 1,launched cores beyond usedCoreNum return without work
+Ascend960DT,valid_blocks_zero,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,8,1,63,0,1,TRUE,1,1000,1 1 1 63 1 1 63 144 897988541 1 33622024 1,empty online-softmax state with a D tail
+Ascend960DT,single_block_aligned,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,1,1,64,1,3,TRUE,1,1000,1 1 1 64 1 1 64 144 897988541 1 16843009 1,single-block specialization with one aligned vector
+Ascend960DT,tail_d63_multi_block,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,8,1,63,7,4,TRUE,1,1000,1 1 1 63 1 1 63 144 897988541 1 33622024 1,multi-block softmax with a masked D tail
+Ascend960DT,multi_tile_d65_reload,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,8,1,65,8,5,TRUE,1,1000,1 1 1 65 1 1 64 144 897988541 1 33687560 2,multiple D tiles force V reload and ping-pong buffers
+Ascend960DT,uneven_multicore,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,2,5,64,2,6,TRUE,2,1000,1 5 5 64 2 3 64 144 897988541 65538 33686018 1,uneven work distribution across two vector cores
+Ascend960DT,valid_above_n,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,3,2,64,4,7,TRUE,2,1000,1 2 2 64 1 1 64 144 897988541 2 33620739 1,validBlocks above N is clipped to N
+Ascend960DT,max_n_tail_d257,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,64,1,257,64,8,TRUE,1,1000,1 1 1 257 1 1 257 144 897988541 1 33636416 1,maximum N with a non-register-aligned D tail
+Ascend960DT,extra_launched_cores,BLOCK_ATTN_RES_PREPARE_FLOW,kernel,,1,2,1,64,2,9,TRUE,4,1000,1 1 1 64 1 1 64 144 897988541 1 33620482 1,launched cores beyond usedCoreNum return without work

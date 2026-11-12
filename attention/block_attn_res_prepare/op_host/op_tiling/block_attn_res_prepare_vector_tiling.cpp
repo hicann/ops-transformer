@@ -24,7 +24,8 @@
 
 namespace {
 
-const std::vector<int32_t> supportedNpuArch = {static_cast<int32_t>(NpuArch::DAV_3510)};
+const std::vector<int32_t> supportedNpuArch = {static_cast<int32_t>(NpuArch::DAV_3510),
+                                               static_cast<int32_t>(NpuArch::DAV_9201)};
 constexpr int32_t TILING_PRIORITY = 1000;
 } // namespace
 

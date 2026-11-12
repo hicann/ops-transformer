@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -93,7 +94,7 @@ std::vector<uint64_t> ParseU64List(const std::string& value)
 struct BlockAttnResPrepareOpApiCase {
     void Run() const
     {
-        op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
+        const op::ScopedPlatformNpuArch platformGuard(npuArch);
         TensorDesc blockRes = ops::ut::BuildAclTensorDescFromSpec(blockResShape, blockResDtype, blockResFormat);
         TensorDesc validBlocks(ops::ut::ParseAclTensorViewDims(validBlocksShape),
                                ops::ut::ParseAclDtype(validBlocksDtype), ops::ut::ParseAclFormat(validBlocksFormat));
@@ -113,7 +114,8 @@ struct BlockAttnResPrepareOpApiCase {
         EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), expectRet) << "case=" << caseName;
     }
 
-    std::string socVersion;
+    std::string platformName;
+    NpuArch npuArch = NpuArch::DAV_RESV;
     std::string caseName;
     std::string prefix;
     std::string blockResShape;
@@ -141,6 +143,10 @@ struct BlockAttnResPrepareOpApiCase {
 
 std::vector<BlockAttnResPrepareOpApiCase> LoadCases()
 {
+    static const std::map<std::string, NpuArch> npuArchMap = {
+        {"Ascend950", NpuArch::DAV_3510},
+        {"Ascend960DT", NpuArch::DAV_9201},
+    };
     std::vector<BlockAttnResPrepareOpApiCase> cases;
     const std::string csvPath = ops::ut::ResolveCsvPath(CSV_FILE_NAME, CSV_REPO_DIR, __FILE__);
     std::ifstream csvData(csvPath, std::ios::in);
@@ -166,11 +172,13 @@ std::vector<BlockAttnResPrepareOpApiCase> LoadCases()
         try {
             size_t index = 0U;
             BlockAttnResPrepareOpApiCase testCase;
-            testCase.socVersion = ops::ut::Trim(items[index++]);
+            testCase.platformName = ops::ut::Trim(items[index++]);
             testCase.caseName = ops::ut::Trim(items[index++]);
-            if (!ops::ut::ParseBool(items[index++]) || testCase.socVersion != "Ascend950") {
+            const auto archIterator = npuArchMap.find(testCase.platformName);
+            if (!ops::ut::ParseBool(items[index++]) || archIterator == npuArchMap.end()) {
                 continue;
             }
+            testCase.npuArch = archIterator->second;
             testCase.prefix = ops::ut::Trim(items[index++]);
             testCase.blockResShape = ops::ut::Trim(items[index++]);
             testCase.blockResDtype = ops::ut::Trim(items[index++]);
@@ -203,7 +211,7 @@ std::vector<BlockAttnResPrepareOpApiCase> LoadCases()
 
 std::string MakeParamName(const testing::TestParamInfo<BlockAttnResPrepareOpApiCase>& info)
 {
-    return ops::ut::MakeSafeParamName(info.param.prefix);
+    return ops::ut::MakeSafeParamName(info.param.platformName + "_" + info.param.prefix);
 }
 
 const std::vector<BlockAttnResPrepareOpApiCase>& GetCases()

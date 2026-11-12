@@ -21,3 +21,12 @@ Ascend950,eps_negative_zero,true,eps_negative_zero,1:8:7168,18:7168,FLOAT,UINT64
 Ascend950,eps_nan,true,eps_nan,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,nan,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false
 Ascend950,eps_positive_inf,true,eps_positive_inf,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,inf,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false
 Ascend950,eps_negative_inf,true,eps_negative_inf,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,-inf,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,one_to_one_ratio_falls_back,true,one_to_one_ratio_falls_back,32:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,32,32,true,0,vector,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend960DT,network_decode,true,network_decode,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,1e-6,32,32,32,true,0,vector,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend960DT,mix_workspace,true,mix_workspace,254:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,32,32,true,1,mix,-1,-1,-1,-1,-1,2,24,127,16,16,true
+Ascend960DT,mix_t_grouping,true,mix_t_grouping,32:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,32,32,true,1,mix,-1,-1,-1,-1,-1,1,24,32,16,16,true
+Ascend960DT,two_to_one_ratio_falls_back,true,two_to_one_ratio_falls_back,32:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,0,vector,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend960DT,no_cube_cores_falls_back,true,no_cube_cores_falls_back,32:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,0,32,32,true,0,vector,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend960DT,no_vector_cores,true,no_vector_cores,32:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,0,32,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend960DT,invalid_dtype,true,invalid_dtype,1:8:7168,18:7168,FLOAT16,UINT64,FLOAT,1e-6,32,32,32,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend960DT,non_positive_eps,true,non_positive_eps,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,0,32,32,32,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
