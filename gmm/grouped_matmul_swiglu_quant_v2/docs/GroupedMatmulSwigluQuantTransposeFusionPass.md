@@ -46,16 +46,6 @@ MX 场景要求 weight 和 weight_scale 两侧均匹配到可融合转置链，�
 
 ![MXFP8：配套消除转置链，保留 scale 的 Bitcast](../../../docs/zh/figures/GroupedMatmulSwigluQuantTransposeFusionPass_5.png)
 
-#### MXFP4
-
-下图表示 weight 使用字节载体、经 Bitcast 和尾部 Reshape 恢复逻辑 FP4 shape，weight_scale 经 Bitcast 解释为 E8M0 的调用路径。
-
-融合时，配套消除 weight、weight_scale 的可融合转置链；保留 weight 的 Bitcast、尾部打包 Reshape，以及 weight_scale 的 Bitcast，并更新打包链的 shape、输入描述及相关 Shape 依赖。
-
-![MXFP4：配套消除转置链，保留两侧 Bitcast 和 weight 打包 Reshape](../../../docs/zh/figures/GroupedMatmulSwigluQuantTransposeFusionPass_6.png)
-
-weight 的尾部打包 Reshape 不属于“可融合转置链”，不能随转置链一起删除。
-
 ## 使用约束
 
 - 算子的 `transpose_weight` 属性须为 `false`，融合后设为 `true`；已为 `true` 时不再融合。
