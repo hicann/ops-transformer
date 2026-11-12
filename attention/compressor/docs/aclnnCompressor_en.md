@@ -35,11 +35,11 @@
     1. Compute the matrix multiplication:
 
         $$
-        C4A: \left[kv\_state^a, score\_state^a\right] = X @ \left[W^{aKV}, W^{aGate}\right], \left[kv\_state^b, score\_state^b\right] = X @ \left[W^{bKV}, W^{bGate}\right];
+        C4A: \left[kv\_state^a, score\_state^a\right] = X @ \left[W^{aKV}, W^{aGate}\right]^{T}, \left[kv\_state^b, score\_state^b\right] = X @ \left[W^{bKV}, W^{bGate}\right]^{T};
         $$
 
         $$
-        C128A: \left[kv\_state, score\_state\right] = X @ \left[W^{KV}, W^{Gate}\right]
+        C128A: \left[kv\_state, score\_state\right] = X @ \left[W^{KV}, W^{Gate}\right]^{T}
         $$
 
     2. Compute the grouped addition:
@@ -454,12 +454,13 @@ aclnnStatus aclnnCompressor(
     - The input shape of cuSeqlensOptional must be [B+1,]. This parameter is a prefix sum array. The value of each element must be greater than or equal to that of the previous element, the first element must be 0, and the last element must be T.
     - sequsedOptional supports input shape [B,], and 0 ≤ sequsedOptional[n] ≤ cuSeqlensOptional[n+1] - cuSeqlensOptional[n] is required.
     - When cacheMode=1, stateBlockTableOptional supports input shape [B, ceil(Smax/block_size)], where Smax=max(start_pos)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n]); when cacheMode=2, the supported input shape is [B].
-    - The output shape of cmpKvOut is [min(T, T/cmp_ratio+B), D].
+    - The output shape of cmpKvOut is [min(T, T/cmp_ratio+B), D]: compressed_tokens + compressed_tokens + ... + compressed_tokens + pad.
   - When BS coaxial is not adopted for x, that is, the input shape of x is [B,S,H]:
     - A null pointer must be passed to cuSeqlensOptional.
     - sequsedOptional supports input shape [B,], and 0 ≤ sequsedOptional[n] ≤ S is required.
     - When cacheMode=1, stateBlockTableOptional supports input shape of [B, ceil(Smax/block_size)], where Smax=max(start_pos)+S; when cacheMode=2, the supported input shape is [B].
-    - The output shape of cmpKvOut is [B, ceil(S/cmp_ratio), D].
+    - The output shape of cmpKvOut is [B, ceil(S/cmp_ratio), D]: (compressed_tokens+pad0) + (compressed_tokens+pad1) + ... + (compressed_tokens+padN).
+- Valid output range: compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio, where Seqlen indicates the number of valid tokens in each batch. For the non-BS-merged layout, the valid results of each batch occupy the first compressed_tokens[n] rows; for the BS-merged layout, valid results are concatenated in batch order and the total valid range is the first sum(compressed_tokens[n]) rows. The remaining tail rows in the allocated capacity are not written by the operator.
 - Input value range restrictions:
   - This API supports generalization of B and S, with the following use case restrictions:
     - In some long-sequence use cases, an excessively large computation amount may cause an error that NPU memory is exceeded. Note: The computation amount here is affected by the input shape of x. The larger the value, the greater the computation amount. Typical long-sequence use cases (that is, the product of B and S is large or T is large) include but are not limited to:
@@ -625,7 +626,7 @@ int main()
 
     int64_t Smax = S;
     int64_t maxBlockNumPerBatch = (Smax + blockSize - 1) / blockSize;
-    int64_t blockNum = B * maxBlockNumPerBatch;
+    int64_t blockNum = B * maxBlockNumPerBatch + 1;
     int64_t coffD = coff * headDim;
     int64_t stateCacheStrideDim0 = blockSize * 2 * coffD; // state_cache dim0 stride = dim1 * dim2
 

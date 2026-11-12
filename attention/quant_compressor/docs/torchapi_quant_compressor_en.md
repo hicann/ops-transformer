@@ -37,11 +37,11 @@
     Perform Matmul with HIFLOAT8 input, then multiply the FLOAT32 output by the merged scaling factor (the product of x_descale and wkv/wgate_descale) to complete dequantization:
 
     $$
-    C4A: \left[kv\_state^a, score\_state^a\right] = (X_{hif8} @ \left[W^{aKV}_{hif8}, W^{aGate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale^a, wgate\_descale^a]), \left[kv\_state^b, score\_state^b\right] = (X_{hif8} @ \left[W^{bKV}_{hif8}, W^{bGate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale^b, wgate\_descale^b]);
+    C4A: \left[kv\_state^a, score\_state^a\right] = (X_{hif8} @ \left[W^{aKV}_{hif8}, W^{aGate}_{hif8}\right]^{T}) \cdot (x\_descale \cdot [wkv\_descale^a, wgate\_descale^a]), \left[kv\_state^b, score\_state^b\right] = (X_{hif8} @ \left[W^{bKV}_{hif8}, W^{bGate}_{hif8}\right]^{T}) \cdot (x\_descale \cdot [wkv\_descale^b, wgate\_descale^b]);
     $$
 
     $$
-    C128A: \left[kv\_state, score\_state\right] = (X_{hif8} @ \left[W^{KV}_{hif8}, W^{Gate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale, wgate\_descale])
+    C128A: \left[kv\_state, score\_state\right] = (X_{hif8} @ \left[W^{KV}_{hif8}, W^{Gate}_{hif8}\right]^{T}) \cdot (x\_descale \cdot [wkv\_descale, wgate\_descale])
     $$
 
     where x_descale is a per-tensor scalar (shape [1,]), and wkv_descale and wgate_descale are per-channel vectors (shape [coff\*D,], scaled along the output channel dimension of the weight). The two are multiplied and then merged into a per-channel scaling factor.
@@ -134,7 +134,7 @@ cann_ops_transformer.quant_compressor(
 
 | Name | Type | Required/Optional | Description | Data Type | Dimensions (shape) |
 | ---- | ---- | ---- | ---- | ---- | ---- |
-| cmp_kv | Tensor | Required | Compressed data. Does not support non-contiguous tensors. The data format supports ND; the content of the pad rows at the tail that do not form a complete compression group is undefined (the operator does not write them, and the memory content before the call is retained). The caller should consume only the valid compressed rows.<br>When the shape of x is [B,S,H], the output is concatenated as: (\<batch0\>compressed_tokens+pad0) +  (\<batch1\>compressed_tokens+pad1) + ... +  (\<batchN\>compressed_tokens+padN);<br>When the shape of x is [T,H], the output is concatenated as: \<batch0\>compressed_tokens + \<batch1\>compressed_tokens + ... + \<batchN\>compressed_tokens + pad. | bfloat16 | x=[B,S,H]: [B,ceil(S/cmp_ratio),D]<br>x=[T,H]: [min(T,T//cmp_ratio+B),D] |
+| cmp_kv | Tensor | Required | Compressed data. Does not support non-contiguous tensors. The data format supports ND; the content of the pad rows at the tail that do not form a complete compression group is undefined (the operator does not write them, and the memory content before the call is retained). The caller should consume only the valid compressed rows.<br>When the shape of x is [B,S,H], the output is concatenated as: (\<batch0\>compressed_tokens+pad0) +  (\<batch1\>compressed_tokens+pad1) + ... +  (\<batchN\>compressed_tokens+padN);<br>When the shape of x is [T,H], the output is concatenated as: \<batch0\>compressed_tokens + \<batch1\>compressed_tokens + ... + \<batchN\>compressed_tokens + pad.<br>Valid output range: compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio, where Seqlen indicates the number of valid tokens in each batch. For the BSH layout, the valid results of each batch occupy the first compressed_tokens[n] rows; for the TH layout, valid results are concatenated in batch order and the total valid range is the first sum(compressed_tokens[n]) rows. The remaining tail rows in the allocated capacity are not written by the operator. | bfloat16 | x=[B,S,H]: [B,ceil(S/cmp_ratio),D]<br>x=[T,H]: [min(T,T//cmp_ratio+B),D] |
 
 ## Constraints
 

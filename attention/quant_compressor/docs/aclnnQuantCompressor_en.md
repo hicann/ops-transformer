@@ -37,11 +37,11 @@
         Perform Matmul with the HIFLOAT8 input. Multiply the FLOAT32 output by the merged scale factor (product of x_descale and wkv/wgate_descale) to complete dequantization:
 
         $$
-        C4A: \left[kv\_state^a, score\_state^a\right] = (X_{hif8} @ \left[W^{aKV}_{hif8}, W^{aGate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale^a, wgate\_descale^a]), \left[kv\_state^b, score\_state^b\right] = (X_{hif8} @ \left[W^{bKV}_{hif8}, W^{bGate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale^b, wgate\_descale^b]);
+        C4A: \left[kv\_state^a, score\_state^a\right] = (X_{hif8} @ \left[W^{aKV}_{hif8}, W^{aGate}_{hif8}\right]^{T}) \cdot (x\_descale \cdot [wkv\_descale^a, wgate\_descale^a]), \left[kv\_state^b, score\_state^b\right] = (X_{hif8} @ \left[W^{bKV}_{hif8}, W^{bGate}_{hif8}\right]^{T}) \cdot (x\_descale \cdot [wkv\_descale^b, wgate\_descale^b]);
         $$
 
         $$
-        C128A: \left[kv\_state, score\_state\right] = (X_{hif8} @ \left[W^{KV}_{hif8}, W^{Gate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale, wgate\_descale])
+        C128A: \left[kv\_state, score\_state\right] = (X_{hif8} @ \left[W^{KV}_{hif8}, W^{Gate}_{hif8}\right]^{T}) \cdot (x\_descale \cdot [wkv\_descale, wgate\_descale])
         $$
 
         x_descale is a per-tensor scalar (shape [1,]). wkv_descale and wgate_descale are per-channel vectors (shape [coff\*D,], scaled along the weight output channel dimension). The product of the two is merged into a per-channel scale factor.
@@ -453,6 +453,7 @@ aclnnStatus aclnnQuantCompressor(
         - sequsedOptional: supports input shape[B,]. Requirement: the number of valid tokens in each batch must be less than or equal to the corresponding Sequence Length, that is, sequsedOptional[n] <= S, and not less than 0.
         - When cacheMode=1, stateBlockTable supports input shape [B,ceil(Smax/block_size)]. Smax indicates the maximum Sequence Length in each batch, that is, Smax=max(startPosOptional)+S. When cacheMode=2, stateBlockTable supports input shape [B].
         - cmpKv, output shape is [B,ceil(S/cmp_ratio),D]: (compressed_tokens+pad0) + (compressed_tokens+pad1) + ...  + (compressed_tokens+padN).
+- Valid output range: compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio, where Seqlen indicates the number of valid tokens in each batch. For the BSH layout, the valid results of each batch occupy the first compressed_tokens[n] rows; for the TH layout, valid results are concatenated in batch order and the total valid range is the first sum(compressed_tokens[n]) rows. The remaining tail rows in the allocated capacity are not written by the operator.
 - Input value range restrictions:
   - This API supports generalization of B and S and has the following use case constraints:
       - In some long-sequence use cases, an excessively large computation amount may cause an NPU out-of-memory error. Note: the computation amount is affected by the x input shape. A larger value indicates a larger computation amount. Typical long-sequence use cases (that is, a large product of B and S or a large T) include but are not limited to:
@@ -637,7 +638,7 @@ int main()
 
     int64_t Smax = S;
     int64_t maxBlockNumPerBatch = (Smax + blockSize - 1) / blockSize;
-    int64_t blockNum = B * maxBlockNumPerBatch;
+    int64_t blockNum = B * maxBlockNumPerBatch + 1;
     int64_t coffD = coff * headDim;
     int64_t stateCacheStrideDim0 = blockSize * 2 * coffD; // state_cache dim 0 stride = dim1 * dim2
 

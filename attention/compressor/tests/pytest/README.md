@@ -36,8 +36,8 @@
 # ${SOC}:       目标芯片(如 ascend910b)
 source ${CANN_PATH}/set_env.sh
 bash build.sh --pkg --soc=${SOC} --ops=compressor --vendor_name=cmpbit -j16
-# 产物: build_out/custom_opp_*.run，安装到CANN vendors目录（交互确认即可）
-bash build_out/custom_opp_*.run --install-path=${CANN_PATH}/latest
+# 产物: build_out/cann-ops-transformer-cmpbit_linux-*.run，安装到CANN vendors目录（交互确认即可）
+bash build_out/cann-ops-transformer-cmpbit_linux-*.run --install-path=${CANN_PATH}/latest
 
 # ② 构建并安装torch extension wheel（整包或单算子）
 bash build.sh --torch_extension --ops=compressor --vendor_name=cmpbit

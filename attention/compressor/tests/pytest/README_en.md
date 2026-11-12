@@ -38,8 +38,8 @@ Based on the pytest test framework, this framework implements functional verific
 # ${SOC}:       Target chip (for example, ascend910b)
 source ${CANN_PATH}/set_env.sh
 bash build.sh --pkg --soc=${SOC} --ops=compressor --vendor_name=cmpbit -j16
-# Artifact: build_out/custom_opp_*.run. Install it to the CANN vendors directory (confirm interactively)
-bash build_out/custom_opp_*.run --install-path=${CANN_PATH}/latest
+# Artifact: build_out/cann-ops-transformer-cmpbit_linux-*.run. Install it to the CANN vendors directory (confirm interactively)
+bash build_out/cann-ops-transformer-cmpbit_linux-*.run --install-path=${CANN_PATH}/latest
 
 # ② Build and install the torch extension wheel (full package or single operator)
 bash build.sh --torch_extension --ops=compressor --vendor_name=cmpbit

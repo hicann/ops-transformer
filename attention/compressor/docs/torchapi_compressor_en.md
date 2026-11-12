@@ -35,11 +35,11 @@
     1. Compute the matrix multiplication:
 
         $$
-        C4A: \left[kv\_state^a, score\_state^a\right] = X @ \left[W^{aKV}, W^{aGate}\right], \left[kv\_state^b, score\_state^b\right] = X @ \left[W^{bKV}, W^{bGate}\right];
+        C4A: \left[kv\_state^a, score\_state^a\right] = X @ \left[W^{aKV}, W^{aGate}\right]^{T}, \left[kv\_state^b, score\_state^b\right] = X @ \left[W^{bKV}, W^{bGate}\right]^{T};
         $$
 
         $$
-        C128A: \left[kv\_state, score\_state\right] = X @ \left[W^{KV}, W^{Gate}\right]
+        C128A: \left[kv\_state, score\_state\right] = X @ \left[W^{KV}, W^{Gate}\right]^{T}
         $$
 
     2. Compute the grouped addition:
@@ -126,7 +126,7 @@ cann_ops_transformer.compressor(
 
 | Name | Type | Type | Description | Data Type | Dimension (shape) |
 | ---- | ---- | ---- | ---- | ---- | ---- |
-| cmp_kv | Tensor | Required | Compressed data. Non-contiguous tensors are not supported. The supported data format is ND;<br>When the shape of x is [B,S,H], the output is the concatenation of (\<batch0\>compressed_tokens+pad0) +  (\<batch1\>compressed_tokens+pad1) + ... +  (\<batchN\>compressed_tokens+padN);<br>When the shape of x is [T,H], the output is the concatenation of \<batch0\>compressed_tokens + \<batch1\>compressed_tokens + ... + \<batchN\>compressed_tokens + pad. | bfloat16, float16 | x=[B,S,H]: [B,ceil(S/cmp_ratio),D]<br>x=[T,H]: [min(T,T//cmp_ratio+B),D] |
+| cmp_kv | Tensor | Required | Compressed data. Non-contiguous tensors are not supported. The supported data format is ND;<br>When the shape of x is [B,S,H], the output is the concatenation of (\<batch0\>compressed_tokens+pad0) +  (\<batch1\>compressed_tokens+pad1) + ... +  (\<batchN\>compressed_tokens+padN);<br>When the shape of x is [T,H], the output is the concatenation of \<batch0\>compressed_tokens + \<batch1\>compressed_tokens + ... + \<batchN\>compressed_tokens + pad.<br>Valid output range: compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio, where Seqlen indicates the number of valid tokens in each batch. For the non-BS-merged layout, the valid results of each batch occupy the first compressed_tokens[n] rows; for the BS-merged layout, valid results are concatenated in batch order and the total valid range is the first sum(compressed_tokens[n]) rows. The remaining tail rows in the allocated capacity are not written by the operator. | bfloat16, float16 | x=[B,S,H]: [B,ceil(S/cmp_ratio),D]<br>x=[T,H]: [min(T,T//cmp_ratio+B),D] |
 
 ## Constraints
 

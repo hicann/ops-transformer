@@ -25,11 +25,11 @@ English | [简体中文](./README.md)
     1. Computes the matmul:
 
         $$
-        C4A:\left[kv\_state^a, score\_state^a\right] = X @ \left[W^{aKV}, W^{aGate}\right], \left[kv\_state^b, score\_state^b\right] = X @ \left[W^{bKV}, W^{bGate}\right];
+        C4A:\left[kv\_state^a, score\_state^a\right] = X @ \left[W^{aKV}, W^{aGate}\right]^{T}, \left[kv\_state^b, score\_state^b\right] = X @ \left[W^{bKV}, W^{bGate}\right]^{T};
         $$
 
         $$
-        C128A:\left[kv\_state, score\_state\right] = X @ \left[W^{KV}, W^{Gate}\right]
+        C128A:\left[kv\_state, score\_state\right] = X @ \left[W^{KV}, W^{Gate}\right]^{T}
         $$
 
     2. Computes the grouped addition:
@@ -231,6 +231,7 @@ English | [简体中文](./README.md)
         - seqused supports the input shape [B,] and requires that the number of valid tokens of each batch be less than or equal to the corresponding Sequence Length, that is, seqused[n] <= S, and not less than 0.
         - When cache_mode=1, state_block_table supports the input shape [B, ceil(Smax/block_size)]. Smax is the maximum Sequence Length across batches, that is, Smax=max(start_pos)+S. When cache_mode=2, state_block_table supports the input shape [B].
         - cmp_kv has the output shape [B, ceil(S/cmp_ratio), D]: (compressed_tokens+pad0) + (compressed_tokens+pad1) + ... + (compressed_tokens+padN).
+- Valid output range: compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio, where Seqlen indicates the number of valid tokens in each batch. For the non-BS-merged layout, the valid results of each batch occupy the first compressed_tokens[n] rows; for the BS-merged layout, valid results are concatenated in batch order and the total valid range is the first sum(compressed_tokens[n]) rows. The remaining tail rows in the allocated capacity are not written by the operator.
 - Input value range restrictions:
   - This API supports generalization over B and S, with the following scenario restrictions:
       - In some long-sequence scenarios, an excessive computation amount may cause an error that the memory usage exceeds NPU memory. Note: the computation amount is affected by the input shape of x; the larger the values, the greater the computation amount. Typical long-sequence scenarios (that is, a large product of B and S, or a large T) include the following cases:

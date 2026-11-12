@@ -124,7 +124,7 @@ int main()
 
     int64_t Smax = S;
     int64_t maxBlockNumPerBatch = (Smax + blockSize - 1) / blockSize;
-    int64_t blockNum = B * maxBlockNumPerBatch;
+    int64_t blockNum = B * maxBlockNumPerBatch + 1;
     int64_t coffD = coff * headDim;
     int64_t stateCacheStrideDim0 = blockSize * 2 * coffD; // state_cache 0轴 stride = dim1 * dim2
 
