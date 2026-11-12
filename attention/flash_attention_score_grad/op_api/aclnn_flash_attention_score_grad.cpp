@@ -3353,6 +3353,10 @@ aclnnStatus aclnnFlashAttentionScoreGradV4GetWorkspaceSize(
              return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(dvOut != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "dvOut"),
              return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(workspaceSize != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "workspaceSize"),
+             return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(executor != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "executor"),
+             return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
              return ACLNN_ERR_PARAM_NULLPTR);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
