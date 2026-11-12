@@ -107,3 +107,9 @@ constexpr uint16_t BLOCK_BASE_M = 256UL;
 constexpr uint16_t BLOCK_BASE_N = 256UL;
 constexpr uint64_t L1_ALIGN_SIZE = 32UL;
 constexpr uint64_t L2_ALIGN_SIZE = 128UL;
+
+// HCCL ubmem 通信缓冲区布局常量：每个 rank 的 commBuffer 前段为状态区，
+// 之后为数据区，rank 间按 APACE_EP_RANK_OFFSET_STEP 步进错开。
+constexpr uint32_t APACE_MTE_MAX_RANK_NUM = 64;
+constexpr uint32_t APACE_EP_RANK_OFFSET_STEP = 1024;
+constexpr uint64_t APACE_MTE_STATE_WIN_SIZE = 1024UL * 1024UL;

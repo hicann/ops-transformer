@@ -33,7 +33,12 @@ import numpy as np
 import torch
 
 
-def verify_single_rank(m_total, n, rank_id, rank_num, base_dir="./output"):
+Y_TORCH = {"bf16": torch.bfloat16, "fp16": torch.float16}
+
+
+def verify_single_rank(
+    m_total, n, rank_id, rank_num, base_dir="./output", y_dtype="bf16"
+):
     """Check NPU output for a single rank.
 
     Each rank's output is [M/rank_num, N] (the scattered slice of the reduced result).
@@ -61,7 +66,7 @@ def verify_single_rank(m_total, n, rank_id, rank_num, base_dir="./output"):
         )
         return False, None, None, f"size mismatch: {output.size} != {expected_size}"
 
-    npu_tensor = torch.from_numpy(output).view(torch.bfloat16).reshape(m_per_rank, n)
+    npu_tensor = torch.from_numpy(output).view(Y_TORCH[y_dtype]).reshape(m_per_rank, n)
     print(f"[Rank {rank_id}] Output shape: ({m_per_rank}, {n})")
     print(
         f"[Rank {rank_id}] Output range: [{npu_tensor.float().min():.4f}, {npu_tensor.float().max():.4f}]"
@@ -73,7 +78,9 @@ def verify_single_rank(m_total, n, rank_id, rank_num, base_dir="./output"):
         return False, None, None, "no golden file"
 
     golden = np.fromfile(golden_path, dtype=np.uint16)
-    golden_tensor = torch.from_numpy(golden).view(torch.bfloat16).reshape(m_per_rank, n)
+    golden_tensor = (
+        torch.from_numpy(golden).view(Y_TORCH[y_dtype]).reshape(m_per_rank, n)
+    )
     diff = (npu_tensor.float() - golden_tensor.float()).abs()
     max_diff = diff.max().item()
     mean_diff = diff.mean().item()
@@ -107,7 +114,7 @@ def verify_single_rank(m_total, n, rank_id, rank_num, base_dir="./output"):
         return False, max_diff, mean_diff, f"raw_max={raw_max} > 1 ULP"
 
 
-def verify_result(m, n, rank_num, base_dir="./output"):
+def verify_result(m, n, rank_num, base_dir="./output", y_dtype="bf16"):
     """Verify results for all ranks.
 
     m is the total M dimension. Each rank's output is [M/rank_num, N].
@@ -125,7 +132,9 @@ def verify_result(m, n, rank_num, base_dir="./output"):
     all_pass = True
     failed_ranks = []
     for rank_id in range(rank_num):
-        ok, max_d, mean_d, msg = verify_single_rank(m, n, rank_id, rank_num, base_dir)
+        ok, max_d, mean_d, msg = verify_single_rank(
+            m, n, rank_id, rank_num, base_dir, y_dtype
+        )
         if not ok:
             all_pass = False
             failed_ranks.append(rank_id)
@@ -159,6 +168,9 @@ if __name__ == "__main__":
         "base_dir", nargs="?", default="./output", help="output directory"
     )
     parser.add_argument(
+        "--y-dtype", choices=["bf16", "fp16"], default="bf16", help="y output dtype"
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help="Silent mode: print only PASS or FAIL and exit",
@@ -180,13 +192,13 @@ if __name__ == "__main__":
 
             with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 try:
-                    all_pass = verify_result(m, n, rank_num, base_dir)
+                    all_pass = verify_result(m, n, rank_num, base_dir, args.y_dtype)
                 except Exception:
                     all_pass = False
             print("PASS" if all_pass else "FAIL")
             sys.exit(0 if all_pass else 1)
         else:
-            all_pass = verify_result(m, n, rank_num, base_dir)
+            all_pass = verify_result(m, n, rank_num, base_dir, args.y_dtype)
             print(
                 "\n[DONE] Output check completed. Kernel logs should be visible in the run output above.\n"
             )

@@ -104,11 +104,11 @@ print_perf_hint() {
 
 # ---- 单 case 执行函数 ----
 run_single() {
-    local M=$1 K=$2 N=$3 RANK_NUM=$4
+    local M=$1 K=$2 N=$3 RANK_NUM=$4 X1D=$5 X2D=$6 YD=$7 LY=$8
     echo ""
     echo "=========================================="
     echo "apace QuantMatmulReduceScatter ubmem ST"
-    echo "  M=$M K=$K N=$N rankNum=$RANK_NUM"
+    echo "  M=$M K=$K N=$N rankNum=$RANK_NUM x1=$X1D x2=$X2D y=$YD layout=$LY"
     echo "=========================================="
 
     cd "$SCRIPT_DIR"
@@ -116,7 +116,7 @@ run_single() {
 
     # ---- 1. 生成数据 ----
     echo "[1/4] Generate CPU golden + input data..."
-    python3 scripts/gen_data.py "$M" "$K" "$N" "$RANK_NUM"
+    python3 scripts/gen_data.py "$M" "$K" "$N" "$RANK_NUM" "$X1D" "$X2D" "$YD" "$LY"
 
 
     if [ "$GEN_ONLY" -eq 1 ]; then return 0; fi
@@ -165,17 +165,17 @@ run_single() {
                 local before_dirs after_dirs new_dirs
                 before_dirs=$(get_prof_dirs)
 
-                echo "  [msprof] Running $EXE_PATH $M $K $N $RANK_NUM $MODE ..."
+                echo "  [msprof] Running $EXE_PATH $M $K $N $RANK_NUM $X1D $X2D $YD $LY $MODE ..."
                 if command -v timeout >/dev/null 2>&1; then
                     set +e
                     timeout ${KERNEL_TIMEOUT}s msprof --output="$PROF_DIR" \
-                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE" 2>&1
+                        --application="$EXE_PATH $M $K $N $RANK_NUM $X1D $X2D $YD $LY $MODE" 2>&1
                     local MSPROF_RC=$?
                     set -e
                 else
                     set +e
                     msprof --output="$PROF_DIR" \
-                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE" 2>&1
+                        --application="$EXE_PATH $M $K $N $RANK_NUM $X1D $X2D $YD $LY $MODE" 2>&1
                     local MSPROF_RC=$?
                     set -e
                 fi
@@ -231,7 +231,7 @@ run_single() {
                 local precision="FAIL"
                 if [ -d "$SCRIPT_DIR/output" ]; then
                     set +e
-                    precision=$(python3 scripts/verify_result.py "$M" "$N" "$RANK_NUM" "$SCRIPT_DIR/output" --check 2>/dev/null)
+                    precision=$(python3 scripts/verify_result.py "$M" "$N" "$RANK_NUM" "$SCRIPT_DIR/output" --y-dtype "$YD" --check 2>/dev/null)
                     [ -z "$precision" ] && precision="FAIL"
                     set -e
                 fi
@@ -254,12 +254,12 @@ run_single() {
                 # ---- precision 模式: 直接调 exe ----
                 if command -v timeout >/dev/null 2>&1; then
                     set +e
-                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s "$EXE_PATH" $M $K $N $RANK_NUM "$MODE" 2>&1)
+                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s "$EXE_PATH" $M $K $N $RANK_NUM "$X1D" "$X2D" "$YD" "$LY" "$MODE" 2>&1)
                     KERNEL_RC=$?
                     set -e
                 else
                     set +e
-                    KERNEL_OUT=$("$EXE_PATH" $M $K $N $RANK_NUM "$MODE" 2>&1)
+                    KERNEL_OUT=$("$EXE_PATH" $M $K $N $RANK_NUM "$X1D" "$X2D" "$YD" "$LY" "$MODE" 2>&1)
                     KERNEL_RC=$?
                     set -e
                 fi
@@ -304,7 +304,7 @@ run_single() {
     # ---- 4. 精度比对（perf 模式已在步骤3内完成 verify，此处跳过）----
     if [ "$PERF_MODE" -eq 0 ]; then
         echo "[4/4] Verify..."
-        python3 scripts/verify_result.py "$M" "$N" "$RANK_NUM" "./output"
+        python3 scripts/verify_result.py "$M" "$N" "$RANK_NUM" "./output" --y-dtype "$YD"
         return $?
     fi
     echo "[4/4] Verify (done in perf loop)"
@@ -319,7 +319,7 @@ if [ "${CLI_MODE:-0}" -eq 1 ]; then
     [ $idx -lt ${#ARGS[@]} ] && { K=${ARGS[$idx]}; idx=$((idx+1)); }
     [ $idx -lt ${#ARGS[@]} ] && { N=${ARGS[$idx]}; idx=$((idx+1)); }
     [ $idx -lt ${#ARGS[@]} ] && { RANK_NUM=${ARGS[$idx]}; idx=$((idx+1)); }
-    run_single "$M" "$K" "$N" "$RANK_NUM"
+    run_single "$M" "$K" "$N" "$RANK_NUM" fp8_e4m3 fp8_e4m3 bf16 nz
     rc=$?
     print_perf_hint
     exit $rc
@@ -368,11 +368,15 @@ for row in "${SELECTED_ROWS[@]}"; do
     K=$(echo "$SELECTED" | awk -F, '{print $2}')
     N=$(echo "$SELECTED" | awk -F, '{print $3}')
     RANK_NUM=$(echo "$SELECTED" | awk -F, '{print $4}')
+    X1D=$(echo "$SELECTED" | awk -F, '{print $5}')
+    X2D=$(echo "$SELECTED" | awk -F, '{print $6}')
+    YD=$(echo "$SELECTED" | awk -F, '{print $7}')
+    LY=$(echo "$SELECTED" | awk -F, '{print $8}')
 
     echo ""
     echo "########## CSV row ${row}/${TOTAL_LINES} ##########"
 
-    if run_single "$M" "$K" "$N" "$RANK_NUM"; then
+    if run_single "$M" "$K" "$N" "$RANK_NUM" "$X1D" "$X2D" "$YD" "$LY"; then
         PASS_CNT=$((PASS_CNT + 1))
         RESULTS+=("PASS  row$row  M=$M K=$K N=$N rank=$RANK_NUM")
     else

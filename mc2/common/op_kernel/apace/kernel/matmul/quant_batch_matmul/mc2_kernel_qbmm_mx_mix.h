@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include "blaze/gemm/kernel/kernel_universal.h" // Note: 在transformer仓下的相对路径，合入ops tensor仓后可以直接用kernel_universal.h
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
 #else
@@ -24,29 +23,23 @@
 #endif
 #include "blaze/gemm/utils/common_utils.h"
 #include "blaze/gemm/utils/layout_utils.h"
+#include "blaze/gemm/utils/sync.h"
 #include "tensor_api/tensor.h"
 
 namespace Blaze {
 namespace Gemm {
 namespace Kernel {
-#define QBMM_MX_KERNEL_CLASS_TEM_PARAMS \
-    template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
-#define QBMM_MX_KERNEL_TEM_PARAMS \
-    ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler, \
-        AscendC::Std::enable_if_t< \
-            AscendC::Std::is_same_v<KernelMmadWithScaleMx, typename BlockMmad::DispatchPolicy::ScheduleType>>
 
-QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-class GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS> {
+template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
+class Mc2QbmmMxUniversal {
 public:
-    __aicore__ inline GemmUniversal() {}
-    __aicore__ inline ~GemmUniversal() {}
+    __aicore__ inline Mc2QbmmMxUniversal() {}
+    __aicore__ inline ~Mc2QbmmMxUniversal() {}
 
     using BlockMmadParams = typename BlockMmad::Params;
     using L1Params = typename BlockMmad::L1Params;
     using AType = typename BlockMmad::AType;
     using BType = typename BlockMmad::BType;
-    using CType = typename BlockMmad::CType;
     using BiasType = typename BlockMmad::BiasType;
     using LayoutA = typename BlockMmad::LayoutA;
     using LayoutB = typename BlockMmad::LayoutB;
@@ -101,12 +94,12 @@ private:
     static constexpr bool TRANS_B = IsTrans<LayoutB>::value;
     static constexpr bool IS_ATOMIC_ADD = BlockMmad::DispatchPolicy::IS_ATOMIC_ADD;
     static constexpr int64_t C0_SIZE = IsFp4<AType>() ? C0_SIZE_B4 : C0_SIZE_B8;
-    static constexpr uint16_t CROSS_CORE_NOTIFY_VEC_FLAG = 8;
-    static constexpr uint16_t CROSS_CORE_NOTIFY_CUBE_FLAG = 9;
+    // 同步旗语沿用 sync.h 约定：正向 AIC->AIV 用 MIX_AIC_SYNC_AIV_FLAG(=0)，
+    // 反向 AIV->AIC ack 用 MIX_AIV_SYNC_AIC_FLAG(=1)；INTRA 模式下 id 与 id+16
+    // 分别对应 vec0/vec1 两个子核域。
 
     using MakeLayoutA = asc::te::frame_layout_format<LayoutA, AscendC::Std::Int<C0_SIZE>>;
     using MakeLayoutB = asc::te::frame_layout_format<LayoutB, AscendC::Std::Int<C0_SIZE>>;
-    using MakeLayoutC = asc::te::frame_layout_format<LayoutC, AscendC::Std::Int<asc::te::c0_element<CType>>>;
     using MakeLayoutScaleA = AscendC::Std::conditional_t<
         TRANS_A, asc::te::frame_layout_format<asc::te::scalea_dn_layout_ptn, AscendC::Std::Int<SCALE_C0>>,
         asc::te::frame_layout_format<asc::te::scalea_nd_layout_ptn, AscendC::Std::Int<SCALE_C0>>>;
@@ -133,7 +126,6 @@ private:
 
     __gm__ AType* aGmAddr_;
     __gm__ BType* bGmAddr_;
-    __gm__ CType* cGmAddr_;
     __gm__ BiasType* biasGmAddr_ = nullptr; // optional input
     __gm__ AscendC::fp8_e8m0_t* scaleAGmAddr_;
     __gm__ AscendC::fp8_e8m0_t* scaleBGmAddr_;
@@ -147,8 +139,9 @@ private:
     bool needUpdateTail_{false};
 };
 
-QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Run(const Params& params)
+template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
+__aicore__ inline void Mc2QbmmMxUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::Run(
+    const Params& params)
 {
     if constexpr (IS_ATOMIC_ADD) {
         AscendC::SetAtomicAdd<float>();
@@ -179,20 +172,13 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Run(const Param
     if constexpr (IS_ATOMIC_ADD) {
         AscendC::SetAtomicNone();
     }
-
-    if ASCEND_IS_AIC {
-        if (!isFirstBlock_) {
-            AscendC::CrossCoreWaitFlag(CROSS_CORE_NOTIFY_CUBE_FLAG);
-        }
-    }
 }
 
-QBMM_MX_KERNEL_CLASS_TEM_PARAMS
+template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
 template <typename TensorB>
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::SetBL2Cache(const ProblemShape& problemShape,
-                                                                             uint64_t currentBasicBlockM,
-                                                                             uint64_t currentBasicBlockN,
-                                                                             uint32_t bMustHitL2, TensorB& gmB)
+__aicore__ inline void Mc2QbmmMxUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::SetBL2Cache(
+    const ProblemShape& problemShape, uint64_t currentBasicBlockM, uint64_t currentBasicBlockN, uint32_t bMustHitL2,
+    TensorB& gmB)
 {
     // 0xff: 256 cache line alignment for FP4 B matrix GM streaming
     // 0x7f: 128 cache line alignment for FP8 B matrix GM streaming
@@ -203,8 +189,9 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::SetBL2Cache(con
     gmB.set_l2_cache_hint(disableWeightL2 ? asc::te::cache_mode::disable : asc::te::cache_mode::normal);
 }
 
-QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Init(const Params& params)
+template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
+__aicore__ inline void Mc2QbmmMxUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::Init(
+    const Params& params)
 {
     const auto& qbmmParams = params.qbmmParams;
     if (qbmmParams.isBias == 1) {
@@ -216,12 +203,12 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Init(const Para
     ResetGmAddr(params);
 }
 
-QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ResetGmAddr(const Params& params)
+template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
+__aicore__ inline void Mc2QbmmMxUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::ResetGmAddr(
+    const Params& params)
 {
     aGmAddr_ = reinterpret_cast<__gm__ AType*>(params.mmadParams.aGmAddr);
     bGmAddr_ = reinterpret_cast<__gm__ BType*>(params.mmadParams.bGmAddr);
-    cGmAddr_ = reinterpret_cast<__gm__ CType*>(params.mmadParams.cGmAddr);
     scaleAGmAddr_ = reinterpret_cast<__gm__ AscendC::fp8_e8m0_t*>(params.mmadParams.scaleAGmAddr);
     scaleBGmAddr_ = reinterpret_cast<__gm__ AscendC::fp8_e8m0_t*>(params.mmadParams.scaleBGmAddr);
     if (isBias_) {
@@ -229,9 +216,9 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ResetGmAddr(con
     }
 }
 
-QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessWithBatch(const Params& params,
-                                                                                  BlockScheduler& bs)
+template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
+__aicore__ inline void Mc2QbmmMxUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::ProcessWithBatch(
+    const Params& params, BlockScheduler& bs)
 {
     const auto& qbmmParams = params.qbmmParams;
     const auto& problemShape = params.problemShape;
@@ -317,8 +304,8 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessWithBatc
     }
 }
 
-QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::AddBatchOffset(
+template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
+__aicore__ inline void Mc2QbmmMxUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::AddBatchOffset(
     const Params& params, uint64_t aBatchElementStride, uint64_t bBatchElementStride, uint64_t cBatchStride,
     uint64_t scaleABatchStride, uint64_t scaleBBatchStride, uint64_t biasBatchStride)
 {
@@ -326,7 +313,6 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::AddBatchOffset(
     constexpr uint64_t sizeShift = IsFp4<AType>() ? 1 : 0;
     aGmAddr_ += (batchAOffset_ * aBatchElementStride) >> sizeShift;
     bGmAddr_ += (batchBOffset_ * bBatchElementStride) >> sizeShift;
-    cGmAddr_ += batchCOffset_ * cBatchStride;
     if (isBiasThreeDim_) {
         biasGmAddr_ += batchCOffset_ * biasBatchStride;
     }
@@ -334,11 +320,9 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::AddBatchOffset(
     scaleBGmAddr_ += batchBOffset_ * scaleBBatchStride;
 }
 
-QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessSingleBatch(const Params& params,
-                                                                                    BlockScheduler& bs,
-                                                                                    uint64_t restBatch,
-                                                                                    bool isTailRound)
+template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
+__aicore__ inline void Mc2QbmmMxUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::ProcessSingleBatch(
+    const Params& params, BlockScheduler& bs, uint64_t restBatch, bool isTailRound)
 {
     const auto& problemShape = params.problemShape;
     const auto m = asc::te::get<MNK_M>(problemShape);
@@ -350,14 +334,12 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessSingleBa
     auto layoutB = MakeLayoutB{}(k, n);
     auto layoutScaleB = MakeLayoutScaleB{}(scaleKLen, n);
     auto layoutBias = asc::te::make_frame_layout<asc::te::nd_ext_layout_ptn>(1L, n);
-    auto layoutC = MakeLayoutC{}(m, n);
 
     auto gmA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(aGmAddr_), layoutA);
     auto gmScaleA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(scaleAGmAddr_), layoutScaleA);
     auto gmB = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(bGmAddr_), layoutB);
     auto gmScaleB = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(scaleBGmAddr_), layoutScaleB);
     auto gmBias = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(biasGmAddr_), layoutBias);
-    auto gmC = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(cGmAddr_), layoutC);
 
     const auto mTailTile = params.schParams.mTailTile;
     const auto nTailTile = params.schParams.nTailTile;
@@ -367,9 +349,6 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessSingleBa
                             AscendC::GetBlockNum())) {
         needUpdateTail_ = true;
         bs.UpdateTailTile(mTailTile, nTailTile);
-    }
-    if constexpr (IS_ATOMIC_ADD) {
-        gmC.set_l2_cache_hint(asc::te::cache_mode::disable);
     }
     BlockCoord blockCoord;
     int64_t mPos = 0L;
@@ -387,8 +366,11 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessSingleBa
 
         bs.GetTileCoord(blockCoord, mPos, nPos);
         if ASCEND_IS_AIC {
+            // 反向同步（INTRA 分域）：等两个 AIV 子核各自 ack（flag 1 与 1+16），即上一 tile 的
+            // UB FP32 槽已消费完（首 tile 除外）。挂 PIPE_FIX：与 L0C->UB fixpipe 同一 in-order
+            // 队列，保证等待先于下一次 UB 写入。
             if (!isFirstBlock_) {
-                AscendC::CrossCoreWaitFlag(CROSS_CORE_NOTIFY_CUBE_FLAG);
+                Sync::WaitForVector(MIX_AIV_SYNC_AIC_FLAG, true);
             }
 
             auto gmBlockA = gmA.slice(asc::te::make_coord(mPos, kPos), asc::te::make_shape(baseM, k));
@@ -396,15 +378,22 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessSingleBa
             auto gmBlockB = gmB.slice(asc::te::make_coord(kPos, nPos), asc::te::make_shape(k, baseN));
             auto gmBlockScaleB = gmScaleB.slice(asc::te::make_coord(kPos, nPos), asc::te::make_shape(scaleKLen, baseN));
             auto gmBlockBias = gmBias.slice(asc::te::make_coord(0L, nPos), asc::te::make_shape(1L, baseN));
-            auto gmBlockC = gmC.slice(asc::te::make_coord(mPos, nPos), asc::te::make_shape(baseM, baseN));
-            mmadOp_(gmBlockA, gmBlockB, gmBlockScaleA, gmBlockScaleB, gmBlockBias, gmBlockC, singleShape);
-            AscendC::CrossCoreSetFlag<0x2, PIPE_FIX>(CROSS_CORE_NOTIFY_VEC_FLAG);
+            // L0C->UB fixpipe 目的 tensor：DualDst SplitM 要求偶数行、列宽 32 元素对齐；
+            // 硬件把 evenRows 行对半写入两个 AIV 子核的 UB 视图（offset 0，行距 ubOutCols）
+            const int64_t ubOutRows = (baseM + 1) & ~1;
+            const int64_t ubOutCols = (baseN + 31) & ~31;
+            auto ubC =
+                asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, float>(0),
+                                     asc::te::make_frame_layout<asc::te::nd_ext_layout_ptn>(ubOutRows, ubOutCols));
+            mmadOp_(gmBlockA, gmBlockB, gmBlockScaleA, gmBlockScaleB, gmBlockBias, ubC, singleShape);
+            // 正向同步（INTRA 分域）：同时 arrive 两个 AIV 子核的域（flag 0 与 0+16）
+            Sync::NotifyVector(MIX_AIC_SYNC_AIV_FLAG, true);
             isFirstBlock_ = false;
         }
         if ASCEND_IS_AIV {
-            AscendC::CrossCoreWaitFlag(CROSS_CORE_NOTIFY_VEC_FLAG);
+            // 正向同步挂 PIPE_V（本子核域的 flag 0）：等待之后消费 UB 的是 V 管线上的 cast
+            Sync::WaitForCube();
             epilogueOp_(mPos, nPos, singleShape);
-            AscendC::CrossCoreSetFlag<0x2, PIPE_MTE3>(CROSS_CORE_NOTIFY_CUBE_FLAG);
         }
     }
     bs.UpdateNextBatchBlockRoundParams();

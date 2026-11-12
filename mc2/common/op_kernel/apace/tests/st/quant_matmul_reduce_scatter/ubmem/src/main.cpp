@@ -39,11 +39,13 @@
 #include "kernel_basic_intf.h"
 #include "acl/acl.h"
 #include "hccl/hccl.h"
+#include "hccl/hccl_rank_graph.h"
 #include "apace_st_utils.h"
 #include "apace/utils/apace_constant.h"
 #include "apace/utils/apace_common_utils.h"
 #include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
 #include "apace/tiling/matmul_tiling/quant_matmul_tiling_data.h"
+#include "apace/utils/comm_channel_builder.h"
 #include "tiling/hccl/hccl_tiling.h"
 #include "apace_qmrs_kernel_launcher.h"
 
@@ -76,14 +78,56 @@ inline uint64_t CeilDivHost(uint64_t a, uint32_t b)
     return (a + b - 1) / b;
 }
 
-void ParseArgs(int argc, char* argv[], int* m, int* k, int* n, int* rankNum, std::string& mode)
+STXDtype ParseXdtype(const std::string& s)
+{
+    if (s == "e4m3" || s == "fp8_e4m3")
+        return STXDtype::kE4M3;
+    if (s == "e5m2" || s == "fp8_e5m2")
+        return STXDtype::kE5M2;
+    if (s == "fp4" || s == "fp4_e2m1")
+        return STXDtype::kFP4;
+    throw std::invalid_argument("ERROR: x1dtype/x2dtype must be e4m3|fp8_e4m3|e5m2|fp8_e5m2|fp4|fp4_e2m1, got " + s);
+}
+
+STYDtype ParseYdtype(const std::string& s)
+{
+    if (s == "bf16")
+        return STYDtype::kBF16;
+    if (s == "fp16")
+        return STYDtype::kFP16;
+    throw std::invalid_argument("ERROR: ydtype must be bf16|fp16, got " + s);
+}
+
+STX2Layout ParseLayout(const std::string& s)
+{
+    if (s == "dn")
+        return STX2Layout::kDN;
+    if (s == "nd")
+        return STX2Layout::kND;
+    if (s == "zn")
+        return STX2Layout::kZN;
+    if (s == "nz")
+        return STX2Layout::kNZ;
+    throw std::invalid_argument("ERROR: x2layout must be dn|nd|zn|nz, got " + s);
+}
+
+inline bool IsTransB(STX2Layout ly)
+{
+    return (ly == STX2Layout::kDN || ly == STX2Layout::kZN);
+}
+
+void ParseArgs(int argc, char* argv[], int* m, int* k, int* n, int* rankNum, STXDtype* xa, STXDtype* xb, STYDtype* yt,
+               STX2Layout* ly, std::string& mode)
 {
     if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
-        std::cerr << "Usage: " << argv[0] << " m k n rankNum [mode]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " m k n rankNum [x1dtype x2dtype ydtype x2layout] [mode]" << std::endl;
         std::cerr << "  m: row of matrix A (total M, must be divisible by rankNum)" << std::endl;
         std::cerr << "  k: col of matrix A (= row of matrix B, full K)" << std::endl;
         std::cerr << "  n: col of matrix B (total N)" << std::endl;
         std::cerr << "  rankNum: number of ranks" << std::endl;
+        std::cerr << "  x1dtype/x2dtype: optional, e4m3|e5m2|fp4 (default e4m3/e4m3)" << std::endl;
+        std::cerr << "  ydtype: optional, bf16|fp16 (default bf16)" << std::endl;
+        std::cerr << "  x2layout: optional, dn|nd|zn|nz (default nz)" << std::endl;
         std::cerr << "  mode: optional, 'precision' (default) | 'perf'" << std::endl;
         exit(1);
     }
@@ -108,41 +152,44 @@ void ParseArgs(int argc, char* argv[], int* m, int* k, int* n, int* rankNum, std
         throw std::invalid_argument("ERROR: M must be divisible by rankNum for ReduceScatter");
     }
     if (*k % 32 != 0) {
-        throw std::invalid_argument("ERROR: K must be divisible by 32 for MXFP8 quantization");
+        throw std::invalid_argument("ERROR: K must be divisible by 32 for MX quantization");
     }
     if (CeilDiv(*k, static_cast<int>(::MXFP_DIVISOR_SIZE)) % 2 != 0) {
         throw std::invalid_argument("ERROR: CeilDiv(K, 64) must be an even number");
     }
-    mode = (argc >= 6) ? std::string(argv[5]) : std::string("precision");
+    *xa = STXDtype::kE4M3;
+    *xb = STXDtype::kE4M3;
+    *yt = STYDtype::kBF16;
+    *ly = STX2Layout::kNZ;
+    if (argc >= 9) {
+        *xa = ParseXdtype(argv[5]);
+        *xb = ParseXdtype(argv[6]);
+        *yt = ParseYdtype(argv[7]);
+        *ly = ParseLayout(argv[8]);
+    }
+    mode = (argc >= 10) ? std::string(argv[9]) : std::string("precision");
     if (mode != "precision" && mode != "perf") {
         throw std::invalid_argument("ERROR: mode must be 'precision' or 'perf'");
     }
+    // fp4 约束：仅 fp4+fp4，且仅 DN/ND（不支持 ZN/NZ）
+    if (*xa == STXDtype::kFP4 || *xb == STXDtype::kFP4) {
+        if (*xa != STXDtype::kFP4 || *xb != STXDtype::kFP4) {
+            throw std::invalid_argument("ERROR: FP4 requires both x1 and x2 to be fp4");
+        }
+        if (*ly == STX2Layout::kZN || *ly == STX2Layout::kNZ) {
+            throw std::invalid_argument("ERROR: FP4 does not support ZN/NZ x2 layout");
+        }
+    }
 }
 
-struct QuantMatmulReduceScatterTilingData {
-    Mc2InitTiling mc2InitTiling;
-    Mc2CcTiling mc2CcTiling;
-    QuantMatmulTilingData mmTile;
-};
-
-int CreateTilingDataAndContext(const char* hcomName, aclrtStream stream, int m, int k, int n, int rankNum,
+int CreateTilingDataAndContext(HcclComm comm, int m, int k, int n, int rankNum, STXDtype xa, bool transB,
                                void** deviceTilingAddr, void** deviceContextAddr, uint32_t* usedCoreNum)
 {
-    QuantMatmulReduceScatterTilingData* tilingData = new QuantMatmulReduceScatterTilingData();
-    if (tilingData == nullptr) {
-        ERROR_LOG("tilingData alloc failed");
-        return -1;
-    }
-    *tilingData = {};
+    QuantMatmulTilingData mmTile{};
 
     // Each rank computes the full M x N matmul (not M*rankNum).
     // The AlltoAll epilogue scatters the result, and ReduceAdd reduces.
     uint64_t totalM = static_cast<uint64_t>(m);
-    QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN, mm::BiasDataType::DT_FLOAT>
-        tilingEngine;
-    tilingEngine.SetOptimizeEnable(false);
-    tilingEngine.SetMTailAlignEnable(true);
-
     // Limit baseM to tpSizeM (per-rank M slice), matching experimental tiling logic.
     constexpr uint64_t CUBE_BLOCK_NUM = 16;
     constexpr uint64_t MAX_BASIC_BLOCK_SIZE = 256;
@@ -154,52 +201,54 @@ int CreateTilingDataAndContext(const char* hcomName, aclrtStream stream, int m, 
     if (dynMaxBaseM < CUBE_BLOCK_NUM) {
         dynMaxBaseM = std::min(MAX_BASIC_BLOCK_SIZE, totalM);
     }
-    tilingEngine.SetMaxBaseM(dynMaxBaseM);
+    // SWAT 引擎按 x1 dtype 分发（对齐 op tiling：fp8 统一 e4m3，fp4 用 e2m1）
+    if (xa == STXDtype::kFP4) {
+        QuantMatmulTilingSwat<mm::DataType::DT_FLOAT4_E2M1, mm::DataType::DT_FLOAT4_E2M1, mm::BiasDataType::DT_FLOAT>
+            tilingEngine;
+        tilingEngine.SetOptimizeEnable(false);
+        tilingEngine.SetMTailAlignEnable(true);
+        tilingEngine.SetMaxBaseM(dynMaxBaseM);
+        tilingEngine.GetTilingData(totalM, static_cast<uint64_t>(n), static_cast<uint64_t>(k), false, transB, mmTile);
+    } else {
+        QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN,
+                              mm::BiasDataType::DT_FLOAT>
+            tilingEngine;
+        tilingEngine.SetOptimizeEnable(false);
+        tilingEngine.SetMTailAlignEnable(true);
+        tilingEngine.SetMaxBaseM(dynMaxBaseM);
+        tilingEngine.GetTilingData(totalM, static_cast<uint64_t>(n), static_cast<uint64_t>(k), false, transB, mmTile);
+    }
 
-    tilingEngine.GetTilingData(totalM, static_cast<uint64_t>(n), static_cast<uint64_t>(k), false, false,
-                               tilingData->mmTile);
-
-    *usedCoreNum = tilingData->mmTile.usedCoreNum;
+    *usedCoreNum = mmTile.usedCoreNum;
     INFO_LOG("Tiling: M=%d, K=%d, N=%d, rankNum=%d, dynMaxBaseM=%lu, usedCoreNum=%u", m, k, n, rankNum, dynMaxBaseM,
              *usedCoreNum);
 
-    // opType=8 is ALL_TO_ALL (not 6 which is ALL_GATHER)
-    AscendC::Mc2CcTilingConfig mc2CcTilingConfig(hcomName, 8, "AlltoAll=level0:fullmesh;level1:pairwise");
-    mc2CcTilingConfig.SetCommEngine(3);
-    int ret = mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling);
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("GetTiling mc2InitTiling failed. ret = %d", ret); delete tilingData;
-              return ret);
-    ret = mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling);
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("GetTiling mc2CcTiling failed. ret = %d", ret); delete tilingData;
-              return ret);
+    void* commBuffer = nullptr;
+    uint64_t commBufferSize = 0;
+    auto ret = HcclGetHcclBuffer(comm, &commBuffer, &commBufferSize);
+    CHECK_RET(ret == ::HCCL_SUCCESS && commBuffer != nullptr, ERROR_LOG("HcclGetHcclBuffer failed. ret = %d", ret);
+              return -1);
+    uint64_t requiredBytes = APACE_MTE_STATE_WIN_SIZE + static_cast<uint64_t>(rankNum - 1) * APACE_EP_RANK_OFFSET_STEP +
+                             static_cast<uint64_t>(m) * static_cast<uint64_t>(n) * sizeof(uint16_t);
+    CHECK_RET(commBufferSize >= requiredBytes,
+              ERROR_LOG("Communication buffer too small: available=%lu, required=%lu", commBufferSize, requiredBytes);
+              return -1);
 
-    int mmTileSize = sizeof(QuantMatmulTilingData);
-    ret = aclrtMalloc(deviceTilingAddr, mmTileSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("aclrtMalloc TilingData failed. ret = %d", ret); delete tilingData;
-              return ret);
-    ret = aclrtMemcpy(*deviceTilingAddr, mmTileSize, &tilingData->mmTile, mmTileSize, ACL_MEMCPY_HOST_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("aclrtMemcpy TilingData failed. ret = %d", ret);
-              aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; delete tilingData; return ret);
+    // UBMEM builder exchanges directly accessible addresses and zeroes the buffer.
+    CommChannelBuilder<ChannelMode::UBMEM> builder(comm);
+    Apace::AivComm::CommUbmemContext hostContext{};
+    void* ubmemContext =
+        builder.CreateDeviceContext(&hostContext, sizeof(hostContext), "apace_qmrs_ubmem", &hostContext);
+    CHECK_RET(ubmemContext != nullptr, ERROR_LOG("CreateDeviceContext failed"); return -1);
 
-    HcclComm commHandle;
-    ret = HcomGetCommHandleByGroup(hcomName, reinterpret_cast<void**>(&commHandle));
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("HcomGetCommHandleByGroup failed. ret = %d", ret);
-              aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; delete tilingData; return ret);
-
-    void* mc2Context = nullptr;
-    ret = HcclAllocComResourceByTiling(commHandle, stream, tilingData, &mc2Context);
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("HcclAllocComResourceByTiling failed. ret = %d", ret);
-              aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; delete tilingData; return ret);
-    if (mc2Context == nullptr) {
-        ERROR_LOG("mc2Context is nullptr");
-        aclrtFree(*deviceTilingAddr);
-        *deviceTilingAddr = nullptr;
-        delete tilingData;
-        return -1;
-    }
-    *deviceContextAddr = mc2Context;
-
-    delete tilingData;
+    // gSetupCv ensures all ranks complete channel setup before launching the kernel.
+    int mmTileSize = sizeof(mmTile);
+    int aclRet = aclrtMalloc(deviceTilingAddr, mmTileSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(aclRet == ACL_SUCCESS, ERROR_LOG("aclrtMalloc TilingData failed. ret = %d", aclRet); return aclRet);
+    aclRet = aclrtMemcpy(*deviceTilingAddr, mmTileSize, &mmTile, mmTileSize, ACL_MEMCPY_HOST_TO_DEVICE);
+    CHECK_RET(aclRet == ACL_SUCCESS, ERROR_LOG("aclrtMemcpy TilingData failed. ret = %d", aclRet);
+              aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; return aclRet);
+    *deviceContextAddr = ubmemContext;
     return ACL_SUCCESS;
 }
 
@@ -212,6 +261,10 @@ struct Args {
     int m;
     int k;
     int n;
+    STXDtype x1dtype;
+    STXDtype x2dtype;
+    STYDtype ydtype;
+    STX2Layout layout;
     std::string mode;
 };
 
@@ -226,25 +279,38 @@ int LaunchOneThread(Args& args)
     INFO_LOG("rank=%d hcomName=%s", args.rankId, hcomName);
 
     void* tilingAddr = nullptr;
-    void* mc2ContextAddr = nullptr;
+    void* ubmemContextAddr = nullptr;
     uint32_t usedCoreNum = 0;
-    ret = CreateTilingDataAndContext(hcomName, args.stream, args.m, args.k, args.n, args.rankDim, &tilingAddr,
-                                     &mc2ContextAddr, &usedCoreNum);
+    ret = CreateTilingDataAndContext(args.hcclComm, args.m, args.k, args.n, args.rankDim, args.x1dtype,
+                                     IsTransB(args.layout), &tilingAddr, &ubmemContextAddr, &usedCoreNum);
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("CreateTilingDataAndContext failed. ret = %d", ret); return ret);
 
     uint64_t m = args.m, k = args.k, n = args.n, rankNum = args.rankDim;
     uint64_t tpSizeM = m / rankNum;
-    uint64_t sizeA = m * k * sizeof(uint8_t);
-    // B: NZ layout {ceil(N/32), ceil(K/16), 16, 32}
-    uint64_t ntNz = CeilDivHost(n, 32);
-    uint64_t ktNz = CeilDivHost(k, 16);
-    uint64_t sizeB = ntNz * ktNz * 16 * 32 * sizeof(uint8_t);
-    uint64_t sizeScaleA = m * CeilDivHost(k, ::MXFP_DIVISOR_SIZE) * ::MXFP_MULTI_BASE_SIZE * sizeof(uint8_t);
-    // ScaleB: NZ layout {ceil(K/64), N, 2}
-    uint64_t sizeScaleB = CeilDivHost(k, ::MXFP_DIVISOR_SIZE) * n * ::MXFP_MULTI_BASE_SIZE * sizeof(uint8_t);
-    // Output per rank: [M/rankNum, N] as BF16
+    // dtype 位宽：fp8 1B/元素；fp4 打包 2 元素/字节（沿 A 的 K、B 的 last dim）
+    bool isFp4 = (args.x1dtype == STXDtype::kFP4);
+    // A：[M, K]，fp4 打包 → m*(k/2) 字节
+    uint64_t sizeA = m * k / (isFp4 ? 2 : 1);
+    // B 按布局：DN [N,K]（fp4 打包 K）、ND [K,N]（fp4 打包 N）、ZN/NZ 分形 {*,*,16,32}（fp8 only）
+    uint64_t sizeB = 0;
+    if (args.layout == STX2Layout::kDN) {
+        sizeB = n * k / (isFp4 ? 2 : 1);
+    } else if (args.layout == STX2Layout::kND) {
+        sizeB = k * n / (isFp4 ? 2 : 1);
+    } else if (args.layout == STX2Layout::kZN) {
+        // [N,K] NZ：{ceil(K/32), ceil(N/16), 16, 32}
+        sizeB = CeilDivHost(k, 32) * CeilDivHost(n, 16) * 16 * 32;
+    } else {
+        // [K,N] NZ：{ceil(N/32), ceil(K/16), 16, 32}
+        sizeB = CeilDivHost(n, 32) * CeilDivHost(k, 16) * 16 * 32;
+    }
+    uint64_t kd = CeilDivHost(k, ::MXFP_DIVISOR_SIZE);
+    uint64_t sizeScaleA = m * kd * ::MXFP_MULTI_BASE_SIZE;
+    // ScaleB 语义随 transB：DN/ZN [n,kd,2]；ND/NZ [kd,n,2]（字节数相同）
+    uint64_t sizeScaleB = kd * n * ::MXFP_MULTI_BASE_SIZE;
+    // Output per rank: [M/rankNum, N]，y dtype bf16/fp16 均 2B
     uint64_t sizeOutput = tpSizeM * n * sizeof(uint16_t);
-    // Workspace: matmul output [M, N] as BF16 (NZ layout uses workspace, not y)
+    // Workspace: matmul output [M, N]，y dtype 2B
     uint64_t sizeWorkspace = m * n * sizeof(uint16_t);
 
     void *deviceA = nullptr, *deviceB = nullptr, *deviceScaleA = nullptr, *deviceScaleB = nullptr;
@@ -311,9 +377,9 @@ int LaunchOneThread(Args& args)
         }
     }
 
-    QuantMatmulReduceScatterUbmemKernel<<<usedCoreNum, nullptr, args.stream>>>(
-        (GM_ADDR)mc2ContextAddr, (GM_ADDR)deviceA, (GM_ADDR)deviceB, (GM_ADDR)deviceScaleA, (GM_ADDR)deviceScaleB,
-        (GM_ADDR)deviceOutput, (GM_ADDR)deviceWorkspace, (GM_ADDR)tilingAddr);
+    LaunchQmrsKernel(args.x1dtype, args.x2dtype, args.ydtype, args.layout, usedCoreNum, args.stream,
+                     (GM_ADDR)ubmemContextAddr, (GM_ADDR)deviceA, (GM_ADDR)deviceB, (GM_ADDR)deviceScaleA,
+                     (GM_ADDR)deviceScaleB, (GM_ADDR)deviceOutput, (GM_ADDR)deviceWorkspace, (GM_ADDR)tilingAddr);
 
     ret = aclrtSynchronizeStream(args.stream);
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("aclrtSynchronizeStream failed. ret = %d", ret); return ret);
@@ -337,9 +403,10 @@ int LaunchOneThread(Args& args)
         ACL_CHECK(aclrtCreateEvent(&kernelEndEvent));
         ACL_CHECK(aclrtRecordEvent(kernelStartEvent, args.stream));
         for (int i = 1; i < iterations; ++i) {
-            QuantMatmulReduceScatterUbmemKernel<<<usedCoreNum, nullptr, args.stream>>>(
-                (GM_ADDR)mc2ContextAddr, (GM_ADDR)deviceA, (GM_ADDR)deviceB, (GM_ADDR)deviceScaleA,
-                (GM_ADDR)deviceScaleB, (GM_ADDR)deviceOutput, (GM_ADDR)deviceWorkspace, (GM_ADDR)tilingAddr);
+            LaunchQmrsKernel(args.x1dtype, args.x2dtype, args.ydtype, args.layout, usedCoreNum, args.stream,
+                             (GM_ADDR)ubmemContextAddr, (GM_ADDR)deviceA, (GM_ADDR)deviceB, (GM_ADDR)deviceScaleA,
+                             (GM_ADDR)deviceScaleB, (GM_ADDR)deviceOutput, (GM_ADDR)deviceWorkspace,
+                             (GM_ADDR)tilingAddr);
         }
         ACL_CHECK(aclrtRecordEvent(kernelEndEvent, args.stream));
         ACL_CHECK(aclrtSynchronizeStream(args.stream));
@@ -363,7 +430,6 @@ int LaunchOneThread(Args& args)
     aclrtFree(deviceScaleB);
     aclrtFree(deviceOutput);
     aclrtFree(deviceWorkspace);
-    aclrtFree(mc2ContextAddr);
     aclrtFree(tilingAddr);
 
     {
@@ -384,14 +450,23 @@ int LaunchOneThread(Args& args)
 int main(int argc, char* argv[])
 {
     int m = 0, k = 0, n = 0, rankNum = 0;
+    STXDtype xa = STXDtype::kE4M3, xb = STXDtype::kE4M3;
+    STYDtype yt = STYDtype::kBF16;
+    STX2Layout ly = STX2Layout::kNZ;
     std::string mode;
     try {
-        ParseArgs(argc, argv, &m, &k, &n, &rankNum, mode);
+        ParseArgs(argc, argv, &m, &k, &n, &rankNum, &xa, &xb, &yt, &ly, mode);
     } catch (const std::invalid_argument& e) {
         std::cerr << e.what() << std::endl;
         return -1;
     }
-    INFO_LOG("Config: DEV_NUM=%d, M=%d, N=%d, K=%d, mode=%s", rankNum, m, n, k, mode.c_str());
+    const char* xdNames[] = {"e4m3", "e5m2", "fp4"};
+    const char* ydNames[] = {"bf16", "fp16"};
+    const char* lyNames[] = {"dn", "nd", "zn", "nz"};
+    INFO_LOG("Config: DEV_NUM=%d, M=%d, N=%d, K=%d, x1=%s x2=%s y=%s layout=%s mode=%s", rankNum, m, n, k,
+             xdNames[static_cast<int>(xa)], xdNames[static_cast<int>(xb)], ydNames[static_cast<int>(yt)],
+             lyNames[static_cast<int>(ly)], mode.c_str());
+    // (Config 已在 ParseArgs 后打印)
 
     int ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("aclInit failed. ret = %d", ret); return ret);
@@ -429,6 +504,10 @@ int main(int argc, char* argv[])
         args[rankId].m = m;
         args[rankId].k = k;
         args[rankId].n = n;
+        args[rankId].x1dtype = xa;
+        args[rankId].x2dtype = xb;
+        args[rankId].ydtype = yt;
+        args[rankId].layout = ly;
         args[rankId].mode = mode;
         threads[rankId].reset(
             new std::thread([&args, &returnCodes, rankId]() { returnCodes[rankId] = LaunchOneThread(args[rankId]); }));

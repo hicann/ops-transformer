@@ -15,8 +15,11 @@
 
 #pragma once
 
-#include "apace/utils/comm_resource_builder.h"
-#include "mc2_kernel_qbmm_mx_mix.h"
+#include "apace/core/aiv_comm/collective_comm_context.h"
+#include "apace/utils/apace_constant.h"
+#include "../../matmul/quant_batch_matmul/mc2_kernel_qbmm_mx_mix.h"
+#include "tensor_api/experimental/vector_ops.h"
+#include "apace/utils/asc_tensor_api_vector_compute.h"
 
 namespace Apace {
 
@@ -29,25 +32,11 @@ constexpr int32_t FLAG_ID_NUM_ONE = 1;
 constexpr float STATUS_FLAG_VAL = -1.0f;
 constexpr float STATUS_FLAG_THREDSHOLD = 0.5f;
 
-template <typename RoundMode, typename SatMode, typename IndexPos>
-struct CastTrait {
-    using roundMode = RoundMode;
-    using satMode = SatMode;
-    using indexPos = IndexPos;
-};
-
-using CastTraitF322Bf16 =
-    CastTrait<AscendC::Te::CastRoundMode::RN, AscendC::Te::CastSatMode::NoSat, AscendC::Te::CastIndexPos::Even>;
-
 template <typename ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
 class QuantMatmulReduceScatterImpl {
 public:
-    using KernelImpl =
-        Kernel::GemmUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler,
-                              AscendC::Std::enable_if_t<AscendC::Std::is_same_v<
-                                  KernelMmadWithScaleMx, typename BlockMmad::DispatchPolicy::ScheduleType>>>;
-
-    using CType = typename BlockMmad::CType;
+    using KernelImpl = Kernel::Mc2QbmmMxUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;
+    using CType = typename BlockEpilogue::TypeC;
     using LayoutC = typename BlockMmad::LayoutC;
     using LayoutStatus = asc::te::nd_ext_layout_ptn;
 
@@ -58,7 +47,7 @@ public:
     struct Params {
         typename KernelImpl::Params matmulKernelParams;
         GM_ADDR yGM{nullptr};
-        GM_ADDR hcclContext{nullptr};
+        GM_ADDR ubmemContext{nullptr};
     };
 
     __aicore__ inline QuantMatmulReduceScatterImpl() {}
@@ -85,7 +74,7 @@ private:
                                        uint32_t& startId, uint32_t& endId, uint32_t& sendNum);
 
 private:
-    __gm__ Apace::HcclOpParam* winContext_{nullptr};
+    __gm__ AivComm::CommUbmemContext* winContext_{nullptr};
     uint32_t rankId_{0};
     uint32_t coreVid_{0};
     uint32_t tpWorldSize_{0};
@@ -101,10 +90,10 @@ template <typename ProblemShape, class BlockMmad, class BlockEpilogue, class Blo
 __aicore__ inline void QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue,
                                                     BlockScheduler>::ReduceAddInit(const Params& params)
 {
-    winContext_ = (__gm__ Apace::HcclOpParam*)params.hcclContext;
-    rankId_ = Apace::GetRankId(winContext_);
+    winContext_ = (__gm__ AivComm::CommUbmemContext*)params.ubmemContext;
+    rankId_ = winContext_->rankId;
     coreVid_ = AscendC::GetBlockIdx();
-    tpWorldSize_ = Apace::GetRankDim(winContext_);
+    tpWorldSize_ = winContext_->rankSize;
     m_ = static_cast<uint64_t>(asc::te::get<MNK_M>(params.matmulKernelParams.problemShape));
     n_ = static_cast<uint64_t>(asc::te::get<MNK_N>(params.matmulKernelParams.problemShape));
     yGM_ = params.yGM;
@@ -153,11 +142,11 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
 
     auto layoutTensorC = asc::te::frame_layout_format<LayoutC, CType>{}(m_, n_);
     auto layoutTensorY = asc::te::frame_layout_format<LayoutC, CType>{}(tpRankM, n_);
-    auto gmC = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
-                                        (__gm__ CType*)Apace::GetBaseWindAddrByRankId(winContext_, rankId_)),
+    auto gmC = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((
+                                        __gm__ CType*)(winContext_->commBufferAddrs[rankId_] +
+                                                       APACE_MTE_STATE_WIN_SIZE + rankId_ * APACE_EP_RANK_OFFSET_STEP)),
                                     layoutTensorC);
-    auto gmY =
-        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ bfloat16_t*)yGM_), layoutTensorY);
+    auto gmY = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ CType*)yGM_), layoutTensorY);
 
     uint64_t rowPaddedBytes =
         Blaze::Gemm::CeilDiv(static_cast<uint64_t>(n_ * sizeof(CType)), UB_ALIGN_BYTES) * UB_ALIGN_BYTES;
@@ -167,12 +156,12 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
     uint64_t localfp32Offset = localbf16Offset + paddingN * sizeof(CType);
     uint64_t sumbf16Offset = localfp32Offset + paddingN * sizeof(float);
 
-    auto sumfp32UbTensor = AscendC::Te::MakeTensor(
-        AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, float>(0),
-        AscendC::Te::FrameLayoutFormat<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<float>>{}(
-            1, paddingN));
+    auto vectorLayout = asc::te::make_layout(asc::te::make_shape(paddingN));
+    auto sumfp32UbVecTensor =
+        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, float>(0), vectorLayout);
     for (uint32_t tileIdx = 0; tileIdx < rowNum; ++tileIdx) {
-        AscendC::Te::Transform<AscendC::Te::Inst::MulScalar>(sumfp32UbTensor, sumfp32UbTensor, 0.0f);
+        float zeroNum = 0.0f;
+        compute_fill(sumfp32UbVecTensor, zeroNum, paddingN);
         tokenIndex = startRowId + tileIdx;
         for (int tpIndex = 0; tpIndex < tpWorldSize_; ++tpIndex) {
             uint32_t mPos = tokenIndex + tpIndex * (tpRankM);
@@ -181,26 +170,33 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
             auto layoutPaddingUB = MakeLayoutUB{}(1, paddingN);
             auto ubTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, CType>(localbf16Offset),
                                                  layoutPaddingUB);
+            auto ubVecTensor = asc::te::make_tensor(
+                asc::te::make_mem_ptr<asc::te::location::ub, CType>(localbf16Offset), vectorLayout);
             auto gmTensor = gmC.slice(asc::te::make_coord(mPos, nPos), asc::te::make_shape(1, n_));
             asc::te::copy(copyGM2UB_, ubTensor, gmTensor);
+
             AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(FLAG_ID_NUM_ONE);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(FLAG_ID_NUM_ONE);
 
-            auto fp32UbTensor = AscendC::Te::MakeTensor(
-                AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, float>(localfp32Offset),
-                AscendC::Te::FrameLayoutFormat<AscendC::Te::NDExtLayoutPtn, AscendC::Te::LayoutTraitDefault<float>>{}(
-                    1, paddingN));
-            AscendC::Te::Transform<AscendC::Te::Inst::Cast>(fp32UbTensor, ubTensor);
+            auto fp32UbVecTensor = asc::te::make_tensor(
+                asc::te::make_mem_ptr<asc::te::location::ub, float>(localfp32Offset), vectorLayout);
+
+            cast_reg_loop(ubVecTensor, fp32UbVecTensor, paddingN); // src, dst
             AscendC::PipeBarrier<PIPE_V>();
-            AscendC::Te::Transform<AscendC::Te::Inst::Add>(sumfp32UbTensor, sumfp32UbTensor, fp32UbTensor);
+            compute_add(sumfp32UbVecTensor, fp32UbVecTensor, sumfp32UbVecTensor, paddingN);
+
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(FLAG_ID_NUM_ONE);
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(FLAG_ID_NUM_ONE);
         }
         auto sumbf16UbTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, CType>(sumbf16Offset),
                                                     MakeLayoutUB{}(1, paddingN));
+        auto sumbf16UbVecTensor =
+            asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, CType>(sumbf16Offset), vectorLayout);
         auto gmOutTensor = gmY.slice(asc::te::make_coord(tokenIndex, 0), asc::te::make_shape(1, n_));
+
         AscendC::PipeBarrier<PIPE_V>();
-        AscendC::Te::Transform<AscendC::Te::Inst::Cast, CastTraitF322Bf16>(sumbf16UbTensor, sumfp32UbTensor);
+        cast_reg_loop(sumfp32UbVecTensor, sumbf16UbVecTensor, paddingN); // src, dst
+
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(FLAG_ID_NUM_ONE);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(FLAG_ID_NUM_ONE);
         asc::te::copy(copyUB2GM_, gmOutTensor, sumbf16UbTensor);
@@ -219,7 +215,7 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
     auto ubStatusTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, float>(0), layoutStatus);
     auto gmStatusTensor = asc::te::make_tensor(
         asc::te::make_mem_ptr<asc::te::location::gm>(
-            (__gm__ float*)(Apace::GetBaseWindStateAddrByRankId(winContext_, coreVid_) + curOffset)),
+            (__gm__ float*)(winContext_->commBufferAddrs[coreVid_] + coreVid_ * APACE_EP_RANK_OFFSET_STEP + curOffset)),
         layoutStatus);
 
     ubStatusTensor[asc::te::make_coord(0, 0)] = (float)1;
@@ -244,10 +240,11 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
         asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, float>(ubStatusOffset), layoutStatus);
     auto ubResetTensor =
         asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, float>(ubResetOffset), layoutStatus);
-    auto gmStatusTensor = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(
-            (__gm__ float*)(Apace::GetBaseWindStateAddrByRankId(winContext_, rankId_) + gmStatusoffset)),
-        layoutStatus);
+    auto gmStatusTensor =
+        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
+                                 (__gm__ float*)(winContext_->commBufferAddrs[rankId_] +
+                                                 rankId_ * APACE_EP_RANK_OFFSET_STEP + gmStatusoffset)),
+                             layoutStatus);
 
     float flag = STATUS_FLAG_VAL;
     float minTarget = 1.0f - STATUS_FLAG_THREDSHOLD;
@@ -264,6 +261,8 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
     AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(FLAG_ID_NUM_ONE);
     AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(FLAG_ID_NUM_ONE);
     ubResetTensor[asc::te::make_coord(0, 0)] = 0.0f;
+    AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(FLAG_ID_NUM_ONE);
+    AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(FLAG_ID_NUM_ONE);
     asc::te::copy(copyUB2GM_, gmStatusTensor, ubResetTensor);
 }
 

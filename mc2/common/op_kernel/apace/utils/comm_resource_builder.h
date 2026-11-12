@@ -22,19 +22,16 @@
 #include "kernel_operator.h"
 #endif
 #include "adv_api/hccl/hccl.h"
-
-constexpr uint32_t HCCL_MTE_MAX_RANK_NUM = 64;
-constexpr uint32_t EP_RANK_OFFSET_STEP = 1024;
-constexpr uint64_t A5_MTE_STATE_WIN_SIZE = 1024UL * 1024UL;
+#include "apace/utils/apace_constant.h"
 
 struct HcclCombinOpParam {
-    uint64_t workSpace;                         // client-server communication address
-    uint64_t workSpaceSize;                     // client-server communication space size
-    uint32_t rankId;                            // current card rankId
-    uint32_t rankDim;                           // total card count
-    uint64_t winSize;                           // not used by ccu
-    uint64_t windowsIn[HCCL_MTE_MAX_RANK_NUM];  // MTE data area (windowsIn[rankId] = local card address)
-    uint64_t windowsOut[HCCL_MTE_MAX_RANK_NUM]; // MTE status area
+    uint64_t workSpace;                          // client-server communication address
+    uint64_t workSpaceSize;                      // client-server communication space size
+    uint32_t rankId;                             // current card rankId
+    uint32_t rankDim;                            // total card count
+    uint64_t winSize;                            // not used by ccu
+    uint64_t windowsIn[APACE_MTE_MAX_RANK_NUM];  // MTE data area (windowsIn[rankId] = local card address)
+    uint64_t windowsOut[APACE_MTE_MAX_RANK_NUM]; // MTE status area
 
     // for ccu
     uint64_t xnAddr;  // Xn register start address
@@ -58,12 +55,12 @@ __aicore__ inline uint32_t GetRankDim(__gm__ HcclOpParam* winContext)
 
 __aicore__ inline GM_ADDR GetBaseWindAddrByRankId(__gm__ HcclOpParam* winContext, const int32_t rankId)
 {
-    return (GM_ADDR)(winContext->windowsIn[rankId] + A5_MTE_STATE_WIN_SIZE + rankId * EP_RANK_OFFSET_STEP);
+    return (GM_ADDR)(winContext->windowsIn[rankId] + APACE_MTE_STATE_WIN_SIZE + rankId * APACE_EP_RANK_OFFSET_STEP);
 }
 
 __aicore__ inline GM_ADDR GetBaseWindStateAddrByRankId(__gm__ HcclOpParam* winContext, const int32_t rankId)
 {
-    return (GM_ADDR)(winContext->windowsIn[rankId] + rankId * EP_RANK_OFFSET_STEP);
+    return (GM_ADDR)(winContext->windowsIn[rankId] + rankId * APACE_EP_RANK_OFFSET_STEP);
 }
 } // namespace Apace
 
