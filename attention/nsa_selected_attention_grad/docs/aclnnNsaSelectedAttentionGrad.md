@@ -364,13 +364,13 @@ aclnnStatus aclnnNsaSelectedAttentionGrad(
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="3">161002</td>
-      <td>query、key、value、attentionOut、attentionOutGrad、softmaxMax、softmaxSum、topkIndices、attenMaskOptional、actualSeqQLenOptional、actualSeqKvLenOptional、dqOut、dkOut、dvOut的数据类型不在支持的范围内。</td>
+      <td>query、key、value、attentionOut、attentionOutGrad、dqOut、dkOut、dvOut的数据类型不一致，或不是FLOAT16、BFLOAT16。</td>
     </tr>
     <tr>
-      <td>query、key、value、attentionOut、attentionOutGrad、softmaxMax、softmaxSum、topkIndices、attenMaskOptional、actualSeqQLenOptional、actualSeqKvLenOptional、dqOut、dkOut、dvOut的数据格式不在支持的范围内。</td>
+      <td>softmaxMax或softmaxSum的数据类型不是FLOAT32，topkIndices的数据类型不是INT32，或提供的attenMaskOptional的数据类型不是BOOL、UINT8。</td>
     </tr>
     <tr>
-      <td>属性取值或张量形状不满足约束：inputLayout不是TND、sparseMode不在{0, 2}内、selectedBlockSize不在[16, 128]内或不是16的整数倍、selectedBlockCount不在[1, 128]内、headNum与query的N1不一致、D不在{128, 192}内、N1不是N2的整数倍、topkIndices末维不等于selectedBlockCount、softmaxMax/softmaxSum形状不是[T1, N1, 8]等。</td>
+      <td>属性或张量形状不满足约束，例如：非空inputLayout忽略大小写后不是TND；sparseMode不为0或2；selectedBlockSize不在[16, 128]内或不是16的整数倍；selectedBlockCount不在[1, 128]内；query、key、value、attentionOut、attentionOutGrad、softmaxMax、softmaxSum或topkIndices不是三维，或提供的attenMaskOptional不是二维；headNum与query的N1不一致、N2不为正数或N1不是N2的整数倍；query或value的头维度不为128或192、key头维度与query不同、value头维度大于query，或key和value的T维度不同；softmaxMax或softmaxSum形状不是[T1, N1, 8]，attentionOut形状不是[T1, N1, value的头维度]，attentionOutGrad形状与attentionOut不同，或topkIndices形状不是[T1, N2, selectedBlockCount]。query非空且底层算子成功返回结果后，dqOut、dkOut或dvOut的视图形状与对应结果不一致也会返回此错误。</td>
     </tr>
   </tbody>
   </table>

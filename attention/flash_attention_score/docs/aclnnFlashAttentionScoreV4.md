@@ -531,9 +531,9 @@ aclnnStatus aclnnFlashAttentionScoreV4(
       <td>传入参数是必选输入，输出或者必选属性，且是空指针。</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="2">161002</td>
-      <td>query、key、value、realShiftOptional、dropMaskOptional、paddingMaskOptional、attenMaskOptional、sinkOptional、softmaxMaxOut、softmaxSumOut、attentionOutOut的数据类型不在支持的范围内。</td>
+      <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="1">161002</td>
+      <td>softmaxMaxOut、softmaxSumOut、attentionOutOut不全为空时，参数不满足校验要求，例如：query、key、value的数据类型不一致；提供的realShiftOptional在pseType为2或3时不是FLOAT32，或在其他pseType下与attentionOutOut的数据类型不同；或pseType不为2、3时，提供的sinkOptional的数据类型不是FLOAT32。</td>
     </tr>
   </tbody>
   </table>

@@ -606,9 +606,12 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
         <td>参数x、weight、weightScale、xScale、groupList、output、outputScale是空指针。</td>
       </tr>
       <tr>
-        <td rowspan="10">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="10">161002</td>
+        <td rowspan="9">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="9">161002</td>
         <td>传入的x、weight、weightScale、xScale、groupList、output、outputScale的数据维度不满足约束。</td>
+      </tr>
+      <tr>
+        <td>经校验的参数（例如x、weight、weightScale、xScale、groupList、output或outputScale）的数据类型不满足对应场景的约束。</td>
       </tr>
       <tr>
         <td>传入的x、weight、weightScale、xScale、groupList、output、outputScale数据的shape不满足约束条件。</td>

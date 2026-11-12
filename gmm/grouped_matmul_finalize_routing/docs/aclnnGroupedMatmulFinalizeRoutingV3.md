@@ -410,9 +410,12 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>必选输入或输出参数为空指针。各参数的必选条件请参见参数说明和约束说明。</td>
     </tr>
     <tr>
-      <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="8">161002</td>
-      <td>x1、x2、scaleOptional、biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、pertokenScaleOptional、groupListOptional、sharedInputOptional、logitOptional、rowIndexOptional、sharedInputWeight、sharedInputOffset、transposeX1、transposeX2、或out的数据类型或数据格式不在支持的范围内。</td>
+      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="4">161002</td>
+      <td>经校验的张量数据类型不满足对应场景约束；或校验到不支持的存储格式（例如部分平台的out非ND）。</td>
+    </tr>
+    <tr>
+      <td>transposeX1与transposeX2的组合在当前平台不受支持。</td>
     </tr>
     <tr>
       <td>x1、x2、scaleOptional、biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、pertokenScaleOptional、groupListOptional、sharedInputOptional、logitOptional、rowIndexOptional或out的shape不满足校验条件。</td>

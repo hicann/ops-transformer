@@ -228,8 +228,8 @@ aclnnStatus aclnnApplyRotaryPosEmb(
   <td align="left">The queryRef, keyRef, cos, or sin passed in is a null pointer.</td>
   </tr>
   <tr>
-  <td rowspan="3" align="left">ACLNN_ERR_PARAM_INVALID</td>
-  <td rowspan="3" align="left">161002</td>
+  <td rowspan="2" align="left">ACLNN_ERR_PARAM_INVALID</td>
+  <td rowspan="2" align="left">161002</td>
   <td align="left">The data type or data format of the queryRef, keyRef, cos, or sin passed in is not within the supported range, or the shape does not match.</td>
   </tr>
   <tr><td align="left">The layout parameter passed in is not within the supported range.</td></tr>

@@ -415,9 +415,12 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       <td>The parameter passed in is a null pointer for a required input, output, or attribute.</td>
     </tr>
     <tr>
-      <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="8">161002</td>
-      <td>The data type or data format of x1, x2, scaleOptional, biasOptional, offsetOptional, antiquantScaleOptional, antiquantOffsetOptional, pertokenScaleOptional, groupListOptional, sharedInputOptional, logitOptional, rowIndexOptional, sharedInputWeight, sharedInputOffset, transposeX1, transposeX2, or out is not in the supported range.</td>
+      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="4">161002</td>
+      <td>The data type of a checked tensor does not meet the requirements for the applicable scenario, or an unsupported storage format is detected (for example, out is not ND on some platforms).</td>
+    </tr>
+    <tr>
+      <td>The combination of transposeX1 and transposeX2 is not supported on the current platform.</td>
     </tr>
     <tr>
       <td>The shape of x1, x2, scaleOptional, biasOptional, offsetOptional, antiquantScaleOptional, antiquantOffsetOptional, pertokenScaleOptional, groupListOptional, sharedInputOptional, logitOptional, rowIndexOptional, or out does not meet the validation conditions.</td>

@@ -425,8 +425,8 @@ aclnnStatus aclnnQuantFlashAttentionScoreGrad(
       <td>传入参数是必选输入，输出或者必选属性，且是空指针。</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="2">161002</td>
+      <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="1">161002</td>
       <td>query、keyIn、value、dy、softmaxMax、softmaxSum、attentionIn、dScaleQ、dScaleK、dScaleV、dScaleDy、dqOut、dkOut、dvOut的数据类型和shape不在支持的范围内。</td>
     </tr>
   </tbody>

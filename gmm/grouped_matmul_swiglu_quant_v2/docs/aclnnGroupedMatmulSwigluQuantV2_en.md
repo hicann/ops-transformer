@@ -605,9 +605,12 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
         <td>x, weight, weightScale, xScale, groupList, output, or outputScale is a null pointer.</td>
       </tr>
       <tr>
-        <td rowspan="10">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="10">161002</td>
+        <td rowspan="9">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="9">161002</td>
         <td>The dimensions of the input x, weight, weightScale, xScale, groupList, output, or outputScale do not satisfy the constraint.</td>
+      </tr>
+      <tr>
+        <td>The data type of a checked parameter, such as x, weight, weightScale, xScale, groupList, output, or outputScale, does not meet the requirements for the applicable scenario.</td>
       </tr>
       <tr>
         <td>The shape of the input x, weight, weightScale, xScale, groupList, output, or outputScale does not satisfy the constraint.</td>

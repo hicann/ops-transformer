@@ -583,8 +583,8 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <td>计算必选输入和必选输出存在空指针。</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="2">161002</td>
+      <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="1">161002</td>
       <td>计算输入和输出的数据类型不在支持范围内。</td>
     </tr>
   </tbody>

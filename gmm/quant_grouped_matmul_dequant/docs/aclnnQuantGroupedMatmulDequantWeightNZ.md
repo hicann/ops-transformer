@@ -287,17 +287,17 @@ aclnnStatus aclnnQuantGroupedMatmulDequantWeightNZ(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>如果传入参数是必选输入，输出或者必选属性，且是空指针。</td>
+      <td><li>必选输入或输出为空指针。</li><li>biasOptional或xOffsetOptional不为空指针，当前不支持。</li></td>
     </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td><li>如果传入参数类型为aclTensor且其数据类型不在支持的范围之内。</li><li>weight的storageShape维度不为5。</li></td>
+      <td>例如：<li>经检查的张量数据类型组合不受支持、out与x的数据类型不同，或设备不受支持。</li><li>transposeWeight为false。</li><li>非空输入场景下，weight或out不连续。</li><li>weight的storageShape维度不为5。</li></td>
     </tr>
     <tr>
-      <td rowspan="3">aclnnAdvanceStepGetWorkspaceSize failed</td>
-      <td rowspan="3">561002</td>
-      <td>如果传入参数类型为aclTensor且其shape与上述参数说明不符。</td>
+      <td rowspan="1">aclnnQuantGroupedMatmulDequantWeightNZGetWorkspaceSize failed</td>
+      <td rowspan="1">561002</td>
+      <td>返回该错误码时，请结合错误日志排查具体原因。</td>
     </tr>
   </tbody>
   </table>

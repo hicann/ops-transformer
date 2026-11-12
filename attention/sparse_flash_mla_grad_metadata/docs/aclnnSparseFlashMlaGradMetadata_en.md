@@ -436,8 +436,8 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
         <td>The parameter workspaceSize or executor is a null pointer, or cuSeqlensQOptional, cuSeqlensOriKvOptional, cuSeqlensCmpKvOptional, sequsedQOptional, sequsedOriKvOptional, sequsedCmpKvOptional, cmpResidualKvOptional, oriTopkLengthOptional, or cmpTopkLengthOptional is a null pointer after Contiguous processing.</td>
       </tr>
       <tr>
-        <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="2">161002</td>
+        <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="1">161002</td>
         <td>The specifications of parameters cuSeqlensQOptional, cuSeqlensOriKvOptional, cuSeqlensCmpKvOptional, sequsedQOptional, sequsedOriKvOptional, sequsedCmpKvOptional, cmpResidualKvOptional, oriTopkLengthOptional, cmpTopkLengthOptional, numHeadsQ, numHeadsKv, headDim, batchSize, maxSeqlenQ, maxSeqlenOriKv, maxSeqlenCmpKv, oriTopk, cmpTopk, cmpRatio, oriMaskMode, cmpMaskMode, oriWinLeft, oriWinRight, layoutQOptional, layoutKvOptional, hasOriKv, hasCmpKv are not in the supported range.</td>
       </tr>
     </tbody>

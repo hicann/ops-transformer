@@ -523,9 +523,9 @@ aclnnStatus aclnnFlashAttentionScoreV4(
       <td>The parameter is a required input, output, or attribute, and is a null pointer.</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="2">161002</td>
-      <td>The data types of query, key, value, realShiftOptional, dropMaskOptional, paddingMaskOptional, attenMaskOptional, sinkOptional, softmaxMaxOut, softmaxSumOut, softmaxOutOut, and attentionOutOut are out of the supported range.</td>
+      <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="1">161002</td>
+      <td>When softmaxMaxOut, softmaxSumOut, and attentionOutOut are not all empty, parameters fail validation, for example: query, key, and value have different data types; realShiftOptional, when provided, is not FLOAT32 if pseType is 2 or 3, or has a different data type from attentionOutOut for other pseType values; or sinkOptional, when provided and pseType is neither 2 nor 3, is not FLOAT32.</td>
     </tr>
   </tbody>
   </table>

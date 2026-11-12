@@ -585,8 +585,8 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <td>A required input or required output for computation contains a null pointer.</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="2">161002</td>
+      <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="1">161002</td>
       <td>The data type of a computation input or output is not within the supported range.</td>
     </tr>
   </tbody>

@@ -325,8 +325,8 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
         <td>参数workspaceSize、executor是空指针，或参数cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional进行Contiguous处理后为空指针。</td>
       </tr>
       <tr>
-        <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="2">161002</td>
+        <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="1">161002</td>
         <td>参数cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、batchSize、maxSeqlenQ、maxSeqlenK、numHeadsQ、numHeadsK、headDim、topk、layoutQOptional、layoutKOptional、maskMode、cmpRatio的规格不在支持范围内。</td>
       </tr>
     </tbody>

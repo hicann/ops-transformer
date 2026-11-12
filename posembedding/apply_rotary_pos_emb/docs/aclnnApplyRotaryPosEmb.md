@@ -231,8 +231,8 @@ aclnnStatus aclnnApplyRotaryPosEmb(
   <td align="left">传入的queryRef、keyRef、cos或sin是空指针。</td>
   </tr>
   <tr>
-  <td rowspan="3" align="left">ACLNN_ERR_PARAM_INVALID</td>
-  <td rowspan="3" align="left">161002</td>
+  <td rowspan="2" align="left">ACLNN_ERR_PARAM_INVALID</td>
+  <td rowspan="2" align="left">161002</td>
   <td align="left">传入的queryRef、keyRef、cos、sin的数据类型、数据格式不在支持的范围内或shape不匹配。</td>
   </tr>
   <tr><td align="left">传入的layout参数不在支持范围内。</td></tr>

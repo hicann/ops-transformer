@@ -327,8 +327,8 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
         <td>Parameter workspaceSize or executor is a null pointer, or parameters cuSeqLensQOptional, cuSeqLensKOptional, seqUsedQOptional, seqUsedKOptional, and cmpResidualKOptional are null pointers after Contiguous processing.</td>
       </tr>
       <tr>
-        <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="2">161002</td>
+        <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="1">161002</td>
         <td>The specifications of parameters cuSeqLensQOptional, cuSeqLensKOptional, seqUsedQOptional, seqUsedKOptional, cmpResidualKOptional, batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, headDim, topk, layoutQOptional, layoutKOptional, maskMode, and cmpRatio are not within the supported range.</td>
       </tr>
     </tbody>

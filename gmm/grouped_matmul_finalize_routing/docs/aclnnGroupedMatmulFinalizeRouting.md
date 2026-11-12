@@ -292,8 +292,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRouting(
       <td>必选输入或输出参数为空指针。各参数的必选条件请参见参数说明和约束说明。</td>
     </tr>
     <tr>
-      <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="8">161002</td>
+      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="4">161002</td>
       <td>x、w、scaleOptional、biasOptional、pertokenScaleOptional、groupListOptional、sharedInputOptional、logitOptional、rowIndexOptional、sharedInputWeight、sharedInputOffset、transposeX、transposeW、或y的数据类型或数据格式不在支持的范围内。</td>
     </tr>
     <tr>

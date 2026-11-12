@@ -678,8 +678,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV4(
       <td>The passed parameter, which is a required input, output, or required attribute, is a null pointer.</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="2">161002</td>
+      <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="1">161002</td>
       <td>The data type of query, keyIn, value, dy, pseShiftOptional, dropMaskOptional, paddingMaskOptional, attenMaskOptional, softmaxMaxOptional, softmaxSumOptional, softmaxInOptional, attentionInOptional, dqOut, dkOut, dvOut, or softmaxInLayout is not supported.</td>
     </tr>
   </tbody>

@@ -366,10 +366,13 @@ aclnnStatus aclnnNsaSelectedAttentionGrad(
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="3">161002</td>
-      <td>The data types of query, key, value, attentionOut, attentionOutGrad, pseShiftOptional, dropMaskOptional, paddingMaskOptional, attenMaskOptional, softmaxMaxOptional, softmaxSumOptional, softmaxInOptional, dqOut, dkOut, and dvOut are out of the supported range.</td>
+      <td>The data types of query, key, value, attentionOut, attentionOutGrad, dqOut, dkOut, and dvOut are not all the same or are not FLOAT16 or BFLOAT16.</td>
     </tr>
     <tr>
-      <td>The data formats of query, key, value, attentionOut, attentionOutGrad, pseShiftOptional, dropMaskOptional, paddingMaskOptional, attenMaskOptional, softmaxMaxOptional, softmaxSumOptional, softmaxInOptional, dqOut, dkOut, and dvOut are out of the supported range.</td>
+      <td>The data type of softmaxMax or softmaxSum is not FLOAT32, the data type of topkIndices is not INT32, or the data type of attenMaskOptional (when provided) is neither BOOL nor UINT8.</td>
+    </tr>
+    <tr>
+      <td>An attribute value or tensor shape does not meet the constraints. Examples include: a non-null inputLayout other than TND (case-insensitive); sparseMode other than 0 or 2; selectedBlockSize outside [16, 128] or not a multiple of 16; selectedBlockCount outside [1, 128]; query, key, value, attentionOut, attentionOutGrad, softmaxMax, softmaxSum, or topkIndices not being three-dimensional, or a provided attenMaskOptional not being two-dimensional; headNum different from query's N1, N2 not positive, or N1 not divisible by N2; the head dimension of query or value outside {128, 192}, the head dimension of key different from query, the head dimension of value greater than query, or the T dimensions of key and value differing; softmaxMax or softmaxSum having a shape other than [T1, N1, 8], attentionOut having a shape other than [T1, N1, value head dimension], attentionOutGrad having a different shape from attentionOut, or topkIndices having a shape other than [T1, N2, selectedBlockCount]. When query is nonempty and the underlying operator successfully returns results, a view shape of dqOut, dkOut, or dvOut that differs from its corresponding result also returns this error.</td>
     </tr>
   </tbody>
   </table>

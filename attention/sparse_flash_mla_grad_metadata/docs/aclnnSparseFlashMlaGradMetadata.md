@@ -434,8 +434,8 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
         <td>参数workspaceSize、executor是空指针，或参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional、sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional、cmpResidualKvOptional、oriTopkLengthOptional、cmpTopkLengthOptional进行Contiguous处理后为空指针。</td>
       </tr>
       <tr>
-        <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="2">161002</td>
+        <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="1">161002</td>
         <td>参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional、sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional、cmpResidualKvOptional、oriTopkLengthOptional、cmpTopkLengthOptional、numHeadsQ、numHeadsKv、headDim、batchSize、maxSeqlenQ、maxSeqlenOriKv、maxSeqlenCmpKv、oriTopk、cmpTopk、cmpRatio、oriMaskMode、cmpMaskMode、oriWinLeft、oriWinRight、layoutQOptional、layoutKvOptional、hasOriKv、hasCmpKv的规格不在支持范围内。</td>
       </tr>
     </tbody>

@@ -313,8 +313,8 @@ aclnnStatus aclnnNsaSelectedAttention(
       <td>The input parameter is a required input, output, or attribute and is a null pointer.</td>
     </tr>
     <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">161002</td>
+      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="2">161002</td>
       <td>The data types and data formats of query, key, value, attenMaskOptional, softmaxMaxOut, softmaxSumOut, and attentionOut are not in the supported range.</td>
     </tr>
     <tr>

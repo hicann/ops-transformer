@@ -293,22 +293,22 @@ aclnnStatus aclnnQuantGroupedMatmulDequant(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>If the input parameter is a required input, output, or required attribute and is a null pointer.</td>
+      <td><li>A required input or output is a null pointer.</li><li>biasOptional or xOffsetOptional is not a null pointer, which is not supported.</li></td>
     </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td><li>If the input parameter is of type aclTensor and its data type is not within the supported range.</li><li>n or k in the shape of weight is not divisible by 16.</li></td>
+      <td>Examples include:<li>The checked tensor data type combination is unsupported, out and x have different data types, or the device is unsupported.</li><li>transposeWeight is false.</li><li>For non-empty inputs, weight or out is not contiguous.</li><li>For non-empty inputs, weight is three-dimensional ND/NCL and N or K is not divisible by 16; or weight is not three-dimensional ND/NCL and either its storageShape is not five-dimensional or its storage format is not FRACTAL_NZ.</li></td>
     </tr>
     <tr>
-      <td rowspan="3">aclnnAdvanceStepGetWorkspaceSize failed</td>
-      <td rowspan="3">561002</td>
-      <td>If the input parameter type is aclTensor and its shape does not match the preceding parameter description.</td>
+      <td rowspan="1">aclnnQuantGroupedMatmulDequantGetWorkspaceSize failed</td>
+      <td rowspan="1">561002</td>
+      <td>If this error code is returned, check the error logs for the specific cause.</td>
     </tr>
   </tbody>
   </table>
 
-## aclnnFatreluMul
+## aclnnQuantGroupedMatmulDequant
 
 - **Parameters**
 

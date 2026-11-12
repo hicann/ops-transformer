@@ -289,17 +289,17 @@ aclnnStatus aclnnQuantGroupedMatmulDequantWeightNZ(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>If the passed-in parameter is a mandatory input, output, or mandatory attribute and is a null pointer.</td>
+      <td><li>A required input or output is a null pointer.</li><li>biasOptional or xOffsetOptional is not a null pointer, which is not supported.</li></td>
     </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td><li>If the passed-in parameter is of the aclTensor type and its data type is out of the supported range.</li><li>The storageShape dimension of weight is not 5.</li></td>
+      <td>Examples include:<li>The checked tensor data type combination is unsupported, out and x have different data types, or the device is unsupported.</li><li>transposeWeight is false.</li><li>For non-empty inputs, weight or out is not contiguous.</li><li>The storageShape of weight does not have five dimensions.</li></td>
     </tr>
     <tr>
-      <td rowspan="3">aclnnAdvanceStepGetWorkspaceSize failed</td>
-      <td rowspan="3">561002</td>
-      <td>If the passed-in parameter is of the aclTensor type and its shape does not match the preceding parameter description.</td>
+      <td rowspan="1">aclnnQuantGroupedMatmulDequantWeightNZGetWorkspaceSize failed</td>
+      <td rowspan="1">561002</td>
+      <td>If this error code is returned, check the error logs for the specific cause.</td>
     </tr>
   </tbody>
   </table>

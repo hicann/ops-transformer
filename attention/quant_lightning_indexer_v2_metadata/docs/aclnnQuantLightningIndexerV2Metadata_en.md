@@ -335,8 +335,8 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
         <td>The workspaceSize or executor parameter is a null pointer, or parameters cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, and cmpResidualKOptional are null pointers after Contiguous processing.</td>
       </tr>
       <tr>
-        <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="2">161002</td>
+        <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="1">161002</td>
         <td>The specifications of parameters cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional, numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK, layoutQOptional, layoutKOptional, maskMode, and cmpRatio are not within the supported range.</td>
       </tr>
     </tbody>

@@ -295,8 +295,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
       <td>x1, x2, scale, bias, or out is a null pointer.</td>
     </tr>
     <tr>
-      <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="8">161002</td>
+      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="4">161002</td>
       <td>The data type and data format of x1, x2, scale, bias, pertokenScaleOptional, groupList, sharedInput, logit, rowIndex, sharedInputWeight, sharedInputOffset, transposeX1, transposeX2, or out are not in the supported range.</td>
     </tr>
     <tr>
