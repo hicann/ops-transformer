@@ -366,20 +366,23 @@ ge::graphStatus MoeReRoutingTilingBase::CheckParam()
                                               "Please check output shapes against input shapes and derived sizes."),
         return ge::GRAPH_FAILED);
     if (tokenDtype_ == Ops::Transformer::DT_HIFLOAT4) {
-        OP_CHECK_IF(tokenSize_ % 2 != 0,
+        // tokenSize_ 已在 GetShapeAttrsInfo 中折半为打包字节宽度，H 的偶数与 64 分组约束
+        // 需按逻辑宽度 tokenSizeH_ 校验
+        OP_CHECK_IF(tokenSizeH_ % 2 != 0,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        context_->GetNodeName(), "tokenSize", std::to_string(tokenSize_).c_str(),
-                        "tokens is hif4, token size should be even number, actual odd number."),
+                        context_->GetNodeName(), "tokenSize", std::to_string(tokenSizeH_).c_str(),
+                        "When tokens dtype is hif4, token size should be an even number"),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(tokenSize_ % 64 != 0,
+        OP_CHECK_IF(tokenSizeH_ % 64 != 0,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "tokenSize",
-                                                          std::to_string(tokenSize_).c_str(),
-                                                          "tokens is hif4, token size shouldbe exactly divided by 64."),
+                                                          std::to_string(tokenSizeH_).c_str(),
+                                                          "When tokens dtype is hif4, token size should be divisible "
+                                                          "by 64"),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(tokenSizeH_ / 64 != scaleSize_,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        context_->GetNodeName(), "tokenSize", std::to_string(tokenSize_).c_str(),
-                        "tokens is hif4, the scale size must be the token size divided by 64."),
+                        context_->GetNodeName(), "tokenSize", std::to_string(tokenSizeH_).c_str(),
+                        "When tokens dtype is hif4, the scale size should be the token size divided by 64"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;

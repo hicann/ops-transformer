@@ -25,6 +25,11 @@ try:
     from torchair._ge_concrete_graph.compat_ir import ge_op, IrDef
     from torchair.ge._ge_graph import auto_convert_to_tensor
     from torchair.ge._ge_graph import get_default_ge_graph, next_unique_name
+    from torchair.ge._ge_graph import (
+        _ge_dtype_to_ge_proto_dtype,
+        torch_dtype_value_to_ge_proto_type,
+        torch_dtype_value_to_ge_type,
+    )
     from torchair.ge import attr
     from typing import Optional
 
@@ -33,10 +38,33 @@ except ImportError:
     _TORCHAIR_AVAILABLE = False
 
 if _TORCHAIR_AVAILABLE:
+    # torchair 旧版本无 DT_HIFLOAT4 枚举时跳过（hif4 仅 Ascend960 支持）
+    _DT_HIFLOAT4 = getattr(DataType, "DT_HIFLOAT4", None)
+    # torch_npu 暂无 hifloat4 dtype 枚举，以 g_toAclOffset(256) + ACL_HIFLOAT4(42) 数值承载
+    _HIF4_DTYPE_VALUE = getattr(torch_npu, "hifloat4", 256 + 42)
+
+    def _is_hif4_dtype(dtype: int) -> bool:
+        return dtype == _HIF4_DTYPE_VALUE
 
     def _is_fp4_dtype(dtype: int) -> bool:
+        # torchair 的 torch_dtype_value_to_ge_type 尚无 hifloat4(298) 映射，先短路判定，
+        # 避免 Unsupported torch dtype 异常
+        if _is_hif4_dtype(dtype):
+            return True
         ge_type = torch_dtype_value_to_ge_type(dtype)
         return ge_type in (DataType.DT_FLOAT4_E2M1, DataType.DT_FLOAT4_E1M2)
+
+    def _unpack_uint8_to_hif4(tokens: Tensor) -> Tensor:
+        """把 uint8 打包的 hif4 还原成 4bit 逻辑张量（末维 ×2）。
+
+        dtype 显式声明为 DT_HIFLOAT4，不依赖 torchair 对 hifloat4 枚举值的映射。
+        """
+        tokens_const = ge.Const([1] * (tokens.rank - 1) + [2])
+        tokens_shape = ge.Shape(tokens)
+        tokens_new_shape = ge.Mul(tokens_shape, tokens_const)
+        tokens = ge.Bitcast(tokens, type=_DT_HIFLOAT4)
+        tokens.desc.dtype = _ge_dtype_to_ge_proto_dtype(_DT_HIFLOAT4)
+        return ge.Reshape(tokens, tokens_new_shape)
 
     def _unpack_uint8_to_float4(tokens: Tensor, tokens_dtype: int) -> Tensor:
         target_dtype = torch_dtype_value_to_ge_type(tokens_dtype)
@@ -122,7 +150,7 @@ if _TORCHAIR_AVAILABLE:
             .input(
                 "tokens",
                 "DT_FLOAT16, DT_BF16, DT_INT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, "
-                "DT_HIFLOAT8, DT_FLOAT4_E2M1, DT_FLOAT4_E1M2",
+                "DT_HIFLOAT8, DT_FLOAT4_E2M1, DT_FLOAT4_E1M2, DT_HIFLOAT4",
             )
             .input("expert_token_num_per_rank", "DT_INT32, DT_INT64")
             .optional_input("per_token_scales", "DT_FLOAT, DT_FLOAT8_E8M0")
@@ -132,7 +160,7 @@ if _TORCHAIR_AVAILABLE:
             .output(
                 "permute_tokens",
                 "DT_FLOAT16, DT_BF16, DT_INT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, "
-                "DT_HIFLOAT8, DT_FLOAT4_E2M1, DT_FLOAT4_E1M2",
+                "DT_HIFLOAT8, DT_FLOAT4_E2M1, DT_FLOAT4_E1M2, DT_HIFLOAT4",
             )
             .output("permute_per_token_scales", "DT_FLOAT, DT_FLOAT8_E8M0")
             .output("permute_token_idx", "DT_INT32")
@@ -155,7 +183,16 @@ if _TORCHAIR_AVAILABLE:
         meta_outputs: TensorSpec = None,
     ):
         if tokens_dtype is not None:
-            if tokens.dtype == DataType.DT_UINT8 and _is_fp4_dtype(tokens_dtype):
+            if _is_hif4_dtype(tokens_dtype):
+                if _DT_HIFLOAT4 is None:
+                    raise RuntimeError(
+                        "tokens_dtype=hifloat4 requires a torchair version with "
+                        "DT_HIFLOAT4 support, please upgrade torchair."
+                    )
+                if tokens.dtype == DataType.DT_UINT8:
+                    tokens = _unpack_uint8_to_hif4(tokens)
+                # 图内 DT_HIFLOAT4 直通时无需转换
+            elif tokens.dtype == DataType.DT_UINT8 and _is_fp4_dtype(tokens_dtype):
                 tokens = _unpack_uint8_to_float4(tokens, tokens_dtype)
             else:
                 tokens = ge.Bitcast(

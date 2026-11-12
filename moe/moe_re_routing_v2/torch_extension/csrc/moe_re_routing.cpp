@@ -20,6 +20,9 @@
 
 namespace op_api {
 
+// torch_npu 暂无 hifloat4 dtype 枚举，tokens_dtype 以 g_toAclOffset + ACL_HIFLOAT4 数值传入
+constexpr int64_t HIFLOAT4_DTYPE_ENUM = g_toAclOffset + static_cast<int64_t>(cann_ops_transformer::ACL_HIFLOAT4);
+
 inline at::ScalarType MapDTypeToAtenScalarType(int64_t dtype_val)
 {
     aclDataType acl_dtype = GetAclDataType(dtype_val);
@@ -32,6 +35,7 @@ inline at::ScalarType MapDTypeToAtenScalarType(int64_t dtype_val)
             return at::kByte;
         case ACL_FLOAT4_E2M1:
         case ACL_FLOAT4_E1M2:
+        case cann_ops_transformer::ACL_HIFLOAT4:
             return at::kByte;
         default:
             return at::kByte;
@@ -49,8 +53,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> moe_re_ro
     if (tokens_dtype.has_value()) {
         auto td = tokens_dtype.value();
         TORCH_CHECK(td == static_cast<int64_t>(DType::HIFLOAT8) || td == static_cast<int64_t>(DType::FLOAT4_E2M1) ||
-                        td == static_cast<int64_t>(DType::FLOAT4_E1M2),
-                    "tokens_dtype only supports hifloat8, float4_e2m1fn_x2, float4_e1m2fn_x2 or None, but got ", td);
+                        td == static_cast<int64_t>(DType::FLOAT4_E1M2) || td == HIFLOAT4_DTYPE_ENUM,
+                    "tokens_dtype only supports hifloat8, float4_e2m1fn_x2, float4_e1m2fn_x2, hifloat4 or None, "
+                    "but got ",
+                    td);
     }
 
     const at::Tensor& per_token_scales = c10::value_or_else(per_token_scales_opt, [] { return at::Tensor(); });
@@ -90,7 +96,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> moe_re_ro
         at::TensorOptions permute_tokens_options = tokens.options();
         if (tokens_dtype.has_value()) {
             aclDataType acl_dtype = GetAclDataType(tokens_dtype.value());
-            if (acl_dtype == aclDataType::ACL_FLOAT4_E2M1 || acl_dtype == aclDataType::ACL_FLOAT4_E1M2) {
+            if (acl_dtype == aclDataType::ACL_FLOAT4_E2M1 || acl_dtype == aclDataType::ACL_FLOAT4_E1M2 ||
+                acl_dtype == cann_ops_transformer::ACL_HIFLOAT4) {
                 permute_tokens_options = permute_tokens_options.dtype(at::kByte);
             } else {
                 permute_tokens_options = permute_tokens_options.dtype(MapDTypeToAtenScalarType(tokens_dtype.value()));
@@ -127,11 +134,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> moe_re_ro
     if (per_token_scales_dtype == at::kByte) {
         TensorWrapper per_token_scales_wrapper = {per_token_scales, aclDataType::ACL_FLOAT8_E8M0};
         TensorWrapper permute_per_token_scales_wrapper = {permute_per_token_scales, aclDataType::ACL_FLOAT8_E8M0};
-        ACLNN_CMD(aclnnMoeReRoutingV2, tokens_wrapper, expert_token_num_per_rank, per_token_scales_wrapper,
+        ACLNN_CMD(aclnnInnerMoeReRoutingV2, tokens_wrapper, expert_token_num_per_rank, per_token_scales_wrapper,
                   expert_topk_weight_opt, expert_token_num_type, idx_type, permute_tokens_wrapper,
                   permute_per_token_scales_wrapper, permute_token_idx, expert_token_num, permute_topk_weight_opt);
     } else {
-        ACLNN_CMD(aclnnMoeReRoutingV2, tokens_wrapper, expert_token_num_per_rank, per_token_scales,
+        ACLNN_CMD(aclnnInnerMoeReRoutingV2, tokens_wrapper, expert_token_num_per_rank, per_token_scales,
                   expert_topk_weight_opt, expert_token_num_type, idx_type, permute_tokens_wrapper,
                   permute_per_token_scales, permute_token_idx, expert_token_num, permute_topk_weight_opt);
     }

@@ -19,13 +19,23 @@ _DTYPE_HIFLOAT8 = torch_npu.hifloat8
 _DTYPE_FLOAT4_E2M1 = torch_npu.float4_e2m1fn_x2
 _DTYPE_FLOAT4_E1M2 = torch_npu.float4_e1m2fn_x2
 
+# torch_npu 暂无 hifloat4 dtype 枚举，先以 g_toAclOffset(256) + ACL_HIFLOAT4(42) 数值承载，
+# 新版 torch_npu 提供枚举后自动切换
+_DTYPE_HIFLOAT4 = getattr(torch_npu, "hifloat4", 256 + 42)
+
 TORCH_DTYPE_ENUM_VALUE_TO_SCALAR_TYPE_MAP = {
     _DTYPE_HIFLOAT8: torch.uint8,
     _DTYPE_FLOAT4_E2M1: torch.uint8,
     _DTYPE_FLOAT4_E1M2: torch.uint8,
+    _DTYPE_HIFLOAT4: torch.uint8,
 }
 
-_TOKENS_DTYPE_ALLOWLIST = (_DTYPE_HIFLOAT8, _DTYPE_FLOAT4_E2M1, _DTYPE_FLOAT4_E1M2)
+_TOKENS_DTYPE_ALLOWLIST = (
+    _DTYPE_HIFLOAT8,
+    _DTYPE_FLOAT4_E2M1,
+    _DTYPE_FLOAT4_E1M2,
+    _DTYPE_HIFLOAT4,
+)
 
 
 class _MoeReRoutingOpBuilder(OpBuilder):
@@ -76,7 +86,7 @@ class _MoeReRoutingOpBuilder(OpBuilder):
                 torch._check(
                     tokens_dtype in _TOKENS_DTYPE_ALLOWLIST,
                     lambda: f"tokens_dtype only supports hifloat8, float4_e2m1fn_x2, "
-                    f"float4_e1m2fn_x2 or None.{ops_error(ErrCode.VALUE)}",
+                    f"float4_e1m2fn_x2, hifloat4 or None.{ops_error(ErrCode.VALUE)}",
                 )
 
             permute_tokens_size = list(tokens.size())
@@ -171,7 +181,9 @@ def moe_re_routing(
     Args:
         tokens: Input tensor of shape (A, H) or multi-dim with first dim A,
             dtype supports float16/bfloat16/int8/float8_e5m2/float8_e4m3fn/
-            hifloat8/float4_e2m1/float4_e1m2.
+            hifloat8/float4_e2m1/float4_e1m2. Ascend960 products additionally
+            support hifloat4 (H must be even and a multiple of 64, passed as
+            uint8 storage with last dim H/2 and tokens_dtype=hifloat4).
         expert_token_num_per_rank: Token counts per expert per rank of shape (N, E),
             dtype int32 or int64.
         per_token_scales: Optional scale tensor. Shape (A) for float32,
@@ -184,7 +196,9 @@ def moe_re_routing(
             Scatter index only supported on Ascend 950.
         tokens_dtype: Optional override for actual data type of tokens when stored
             as uint8. Use torch_npu.hifloat8, torch_npu.float4_e2m1fn_x2,
-            or torch_npu.float4_e1m2fn_x2. Default: None.
+            torch_npu.float4_e1m2fn_x2, or hifloat4 (Ascend960 only; when
+            torch_npu does not provide the enum, pass 298 = 256 + ACL_HIFLOAT4).
+            Default: None.
 
     Returns:
         A tuple of (permute_tokens, permute_per_token_scales, permute_token_idx,
