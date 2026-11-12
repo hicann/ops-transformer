@@ -32,28 +32,6 @@
 #include "base/registry/op_impl_space_registry_v2.h"
 #define private public
 #include "platform/platform_info.h"
-#undef private
-#include "aclnn/opdev/platform.h"
-
-namespace {
-thread_local NpuArch groupedMatmulTestArch = NpuArch::DAV_RESV;
-} // namespace
-
-// InferShape reads the current runtime architecture. Provide it from the Host UT case.
-namespace op {
-PlatformInfo::~PlatformInfo() = default;
-
-const PlatformInfo& GetCurrentPlatformInfo()
-{
-    static const PlatformInfo platformInfo;
-    return platformInfo;
-}
-
-NpuArch PlatformInfo::GetCurNpuArch() const
-{
-    return groupedMatmulTestArch;
-}
-} // namespace op
 
 using namespace std;
 
@@ -111,17 +89,11 @@ void AppendTensorDescs(vector<gert::InfershapeContextPara::TensorDescription>& d
     }
 }
 
-void SetupPlatformForCase(const string& socVersion, const string& runtimeSocVersion = {}, bool hasGeTarget = true)
+void SetupPlatformForCase(const string& socVersion)
 {
-    static const map<string, NpuArch> architectures = {
-        {"Ascend350", NpuArch::DAV_3510},  {"Ascend950", NpuArch::DAV_3510},    {"Ascend960DT", NpuArch::DAV_9201},
-        {"Ascend910B", NpuArch::DAV_2201}, {"Ascend910_93", NpuArch::DAV_2201}, {"None", NpuArch::DAV_RESV},
-    };
-    groupedMatmulTestArch = architectures.at(runtimeSocVersion.empty() ? socVersion : runtimeSocVersion);
-
     fe::PlatformInfo platformInfo;
     fe::OptionalInfo optiCompilationInfo;
-    optiCompilationInfo.soc_version = hasGeTarget ? socVersion : "";
+    optiCompilationInfo.soc_version = socVersion;
     platformInfo.str_info.short_soc_version = socVersion;
     fe::PlatformInfoManager::Instance().platform_info_map_[socVersion] = platformInfo;
     fe::PlatformInfoManager::Instance().SetOptionalCompilationInfo(optiCompilationInfo);
@@ -132,7 +104,7 @@ void SetupPlatformForCase(const string& socVersion, const string& runtimeSocVers
     ASSERT_TRUE(optionalInfos.Init());
     map<string, string> versions = {{"Short_SoC_version", socVersion}};
     platformInfos.SetPlatformRes("version", versions);
-    optionalInfos.SetSocVersion(optiCompilationInfo.soc_version);
+    optionalInfos.SetSocVersion(socVersion);
     fe::PlatformInfoManager::Instance().platform_infos_map_[socVersion] = platformInfos;
     fe::PlatformInfoManager::Instance().SetOptionalCompilationInfo(optionalInfos);
 }
@@ -184,7 +156,7 @@ struct GroupedMatmulInfershapeCase {
 
     void RunInferShape() const
     {
-        SetupPlatformForCase(socVersion, runtimeSocVersion, hasGeTarget);
+        SetupPlatformForCase(socVersion);
         vector<int64_t> groupListValues = ParseInt64List(groupListData);
         void* groupListValuePtr = groupListValues.empty() ? nullptr : static_cast<void*>(groupListValues.data());
         vector<gert::InfershapeContextPara::TensorDescription> inputTensorDescs;
@@ -347,8 +319,6 @@ struct GroupedMatmulInfershapeCase {
     int64_t actType = 0;
     string groupListData;
     string tuningConfigData;
-    string runtimeSocVersion;
-    bool hasGeTarget = true;
 };
 
 vector<GroupedMatmulInfershapeCase> LoadCases(const string& socVersion)
@@ -438,12 +408,6 @@ vector<GroupedMatmulInfershapeCase> LoadCases(const string& socVersion)
             if (idx < items.size()) {
                 tc.tuningConfigData = Trim(items[idx++]);
             }
-            if (idx < items.size()) {
-                tc.runtimeSocVersion = Trim(items[idx++]);
-            }
-            if (idx < items.size()) {
-                tc.hasGeTarget = ParseBool(Trim(items[idx++]));
-            }
             cases.push_back(tc);
         } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
@@ -472,12 +436,10 @@ const vector<GroupedMatmulInfershapeCase>& GetGroupedMatmulInfershapeCsvCases()
         }
         vector<GroupedMatmulInfershapeCase> ascend910b = LoadCases("Ascend910B");
         vector<GroupedMatmulInfershapeCase> ascend91093 = LoadCases("Ascend910_93");
-        vector<GroupedMatmulInfershapeCase> ascend960dt = LoadCases("Ascend960DT");
         vector<GroupedMatmulInfershapeCase> merged = ascend950;
         merged.insert(merged.end(), ascend350.begin(), ascend350.end());
         merged.insert(merged.end(), ascend910b.begin(), ascend910b.end());
         merged.insert(merged.end(), ascend91093.begin(), ascend91093.end());
-        merged.insert(merged.end(), ascend960dt.begin(), ascend960dt.end());
         return merged;
     }();
     return cases;
