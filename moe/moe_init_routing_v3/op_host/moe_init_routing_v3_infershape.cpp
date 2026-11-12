@@ -434,6 +434,10 @@ static ge::graphStatus CheckScaleShapeForHif8PerTensor(const gert::InferShapeCon
 static ge::graphStatus CheckScaleShapeForInt4DynamicQuant(const gert::InferShapeContext* context,
                                                           const gert::Shape* xShape, const gert::Shape* scaleShape)
 {
+    // Unknown rank is represented by {-2}; validate once the rank is known.
+    if (scaleShape->GetDimNum() == DIM_ONE && scaleShape->GetDim(0) == ge::UNKNOWN_DIM_NUM) {
+        return ge::GRAPH_SUCCESS;
+    }
     if (scaleShape->GetDimNum() != DIM_TWO) {
         OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "scale", std::to_string(scaleShape->GetDimNum()), "2");
         return ge::GRAPH_FAILED;

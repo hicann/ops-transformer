@@ -295,6 +295,14 @@ def _moe_init_routing_v3_numpy(
         expanded_x = numpy.clip(expanded_x, -128, 127)
         expanded_x = expanded_x.astype(numpy.int8)
 
+    elif quant_mode == 1 and h == 0:
+        # Zero-width inputs still route indices/counts, but the kernel skips
+        # quantization and leaves expanded_scale unwritten.
+        expanded_x = x[sorted_expert_indices[:actual_expert_total_num] // k, :].astype(
+            numpy.int8
+        )
+        expanded_scale = None
+
     elif quant_mode == 1:
         expanded_x = x[sorted_expert_indices // k, :]
         expanded_x = expanded_x.astype(numpy.float32)
@@ -1212,6 +1220,32 @@ class E2eMoeInitRoutingV3Spec:
                 continue
             npu_arr = _torch_to_numpy(npu_out)
             golden_arr = _torch_to_numpy(golden_out)
+            if quant_mode == -1 and i in (0, 3):
+                # Non-quantized outputs retain the input x/scale FP8 type,
+                # even when TTK supplies a uint8 carrier or promotes Golden.
+                dtype_ref = npu_arr
+                inputs = getattr(compare_context, "input_tensors", None)
+                source_idx = 0 if i == 0 else 2
+                if inputs is not None and len(inputs) > source_idx:
+                    source = inputs[source_idx]
+                    if any(
+                        name in str(getattr(source, "dtype", "")).lower()
+                        for name in ("e4m3", "e5m2", "e8m0")
+                    ):
+                        dtype_ref = source
+                golden_arr = _restore_fp8_golden_dtype(dtype_ref, golden_arr)
+                if any(
+                    name in str(golden_arr.dtype).lower()
+                    for name in ("e4m3", "e5m2", "e8m0")
+                ):
+                    if npu_arr.dtype.itemsize == 1 and npu_arr.dtype.kind in (
+                        "i",
+                        "u",
+                        "V",
+                    ):
+                        npu_arr = npu_arr.view(golden_arr.dtype)
+                    else:
+                        npu_arr = npu_arr.astype(golden_arr.dtype, copy=False)
             npu_flat = numpy.asarray(npu_arr).reshape(-1)
             golden_flat = numpy.asarray(golden_arr).reshape(-1)
             min_len = min(npu_flat.size, golden_flat.size)
@@ -1256,10 +1290,15 @@ class E2eMoeInitRoutingV3Spec:
                     or "hif8" in str(npu_arr.dtype).lower()
                 )
 
+                is_4bit = any(
+                    name in dtype_name or name in str(npu_arr.dtype).lower()
+                    for name in ("float4", "e2m1", "e1m2", "int4")
+                )
+
                 def _to_raw_uint8(arr):
                     if arr.dtype.kind in ("i", "u"):
                         vals = arr.reshape(-1).astype(numpy.uint8)
-                        if vals.size > 0 and numpy.max(vals) <= 15:
+                        if is_4bit and vals.size > 0 and numpy.max(vals) <= 15:
                             n = vals.size - vals.size % 2
                             lo = vals[:n:2]
                             hi = vals[1:n:2]
@@ -1269,15 +1308,15 @@ class E2eMoeInitRoutingV3Spec:
                         raw = arr.view(numpy.uint8).reshape(-1).astype(numpy.uint8)
                     except (ValueError, TypeError):
                         raw = numpy.frombuffer(arr.tobytes(), dtype=numpy.uint8)
-                    if raw.size > 0 and numpy.max(raw) <= 15:
+                    if is_4bit and raw.size > 0 and numpy.max(raw) <= 15:
                         n = raw.size - raw.size % 2
                         lo = raw[:n:2]
                         hi = raw[1:n:2]
                         return ((hi << 4) | lo).astype(numpy.uint8)
                     return raw
 
-                npu_raw = _to_raw_uint8(numpy.asarray(npu_arr))
-                golden_raw = _to_raw_uint8(numpy.asarray(golden_arr))
+                npu_raw = _to_raw_uint8(numpy.asarray(npu_cmp))
+                golden_raw = _to_raw_uint8(numpy.asarray(golden_cmp))
                 min_len_raw = min(npu_raw.size, golden_raw.size)
                 if is_hifloat8:
                     # hifloat8: 按 int8 解释，ULP 差 > 1 计为错误，NaN 位置双方一致视为相等

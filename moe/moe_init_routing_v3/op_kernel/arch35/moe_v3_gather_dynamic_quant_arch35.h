@@ -405,7 +405,8 @@ __aicore__ inline float MoeGatherOutDynamicQuant<T, QuantT>::ComputeMax(LocalTen
     inLocal = inputXInQueue_.DeQue<float>();
 
     if constexpr (IS_INPUT_SCALE) {
-        DataCopyPad(smoothLocal, quantSmoothGm_[j * perLoopCols_], intriParamsFp32, {false, 0, 0, 0});
+        DataCopyPad(smoothLocal, quantSmoothGm_[expertIdx * cols_ + j * perLoopCols_], intriParamsFp32,
+                    {false, 0, 0, 0});
         smoothInQueue_.EnQue(smoothLocal);
         smoothLocal = smoothInQueue_.DeQue<float>();
     }
