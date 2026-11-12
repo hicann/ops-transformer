@@ -240,7 +240,7 @@ int main()
 {
     // 1. （固定写法）device/stream初始化，参考AscendCL对外接口列表
     // 根据自己的实际device填写deviceId
-    int32_t deviceId = 4;
+    int32_t deviceId = 0;
     aclrtStream stream;
     auto ret = aclnnQuantGroupedMatmulInplaceAddTest(deviceId, stream);
     CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnQuantGroupedMatmulInplaceAddTest failed. ERROR: %d\n", ret);
