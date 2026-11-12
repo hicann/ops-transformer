@@ -403,8 +403,10 @@ class QuantLightningIndexerV2InputAdapter:
                     )
                 )
             input_ranges = resolved_ranges
-        output_range = kwargs.get("output_idx_offset_range")
-        output_range = None if output_range is None else repr(list(output_range))
+        output_range = kwargs.get("output_idx_offset_values")
+        if output_range is None:
+            output_range = kwargs.get("output_idx_offset_range")
+            output_range = None if output_range is None else repr(list(output_range))
         max_seqlen_q = kwargs.get("max_seqlen_q")
         max_seqlen_q = None if max_seqlen_q is None else int(max_seqlen_q)
         dtype_params = (self.qk_dtype_name(query, quant_mode),)

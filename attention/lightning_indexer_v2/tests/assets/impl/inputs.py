@@ -234,8 +234,10 @@ class LightningIndexerV2InputAdapter:
         residual = self.list_value(kwargs, "cmp_residual_k")
         geometry = self.geometry(q, k, layout_q, layout_k, cu_q, cu_k, seq_q, seq_k)
         input_ranges = kwargs.get("input_ranges") or ()
-        output_range = kwargs.get("output_idx_offset_range")
-        output_range = None if output_range is None else repr(list(output_range))
+        output_range = kwargs.get("output_idx_offset_values")
+        if output_range is None:
+            output_range = kwargs.get("output_idx_offset_range")
+            output_range = None if output_range is None else repr(list(output_range))
         max_seqlen_q = kwargs.get("max_seqlen_q")
         max_seqlen_q = None if max_seqlen_q is None else int(max_seqlen_q)
         params = geometry + (
