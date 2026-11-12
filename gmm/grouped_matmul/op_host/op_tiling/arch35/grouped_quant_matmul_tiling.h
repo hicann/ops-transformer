@@ -263,6 +263,10 @@ protected:
     {
         return "GroupedMatmul";
     }
+    virtual bool EnableResplitBaseN() const
+    {
+        return true;
+    }
     void CalBasicBlock();
     ge::graphStatus CalL1Tiling();
     ge::graphStatus CalL1Depth(uint64_t leftL1Size);

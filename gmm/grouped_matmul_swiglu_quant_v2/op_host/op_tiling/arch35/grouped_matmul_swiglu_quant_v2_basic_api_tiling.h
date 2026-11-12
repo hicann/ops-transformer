@@ -47,6 +47,10 @@ protected:
     {
         return "GroupedMatmulSwigluQuantV2";
     }
+    bool EnableResplitBaseN() const override
+    {
+        return false;
+    }
 
     bool IsCapable() override;
     ge::graphStatus GetPlatformInfo() override;

@@ -1688,7 +1688,9 @@ void GroupedQmmTiling::CalBasicBlock()
         std::min(GetShapeWithDataType(GmmConstant::BASIC_BLOCK_SIZE_128, inputParams_.aDtype), inputParams_.kSize),
         GetShapeWithDataType(CUBE_REDUCE_BLOCK, inputParams_.aDtype));
 
-    ReSplitBaseN();
+    if (EnableResplitBaseN()) {
+        ReSplitBaseN();
+    }
     if ((npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) && supportMmadF16S8_ &&
         (isPertokenMode || isPerchannelMode)) {
         if (basicTiling_.baseM * basicTiling_.baseN > BASIC_BLOCK_LIMIT_ONE_VECTOR) {

@@ -49,6 +49,10 @@ protected:
     {
         return activation_ ? "GroupedMatmulActivation" : "GroupedMatmulSwigluQuantV2";
     }
+    bool EnableResplitBaseN() const override
+    {
+        return false;
+    }
     ge::graphStatus GetPlatformInfo() override;
     // 0、获取INPUT/OUTPUT/ATTR信息
     ge::graphStatus GetShapeAttrsInfo() override;
