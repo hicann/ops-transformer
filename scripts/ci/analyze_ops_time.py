@@ -13,7 +13,6 @@
 import os
 import re
 import csv
-import glob
 import logging
 from collections import defaultdict
 
@@ -60,32 +59,12 @@ def parse_txt_content(content):
 
 
 def remove_apt_suffix(op_name):
-    """If op_name ends with generation suffix (_a2/_a3/_apt) remove it"""
+    """If op_name ends with generation/arch suffix (_a2/_a3/_apt/_archNN) remove it"""
+    op_name = re.sub(r"(?:_arch\d+(?:_\d+)?)$", "", op_name)
     for suffix in ("_a2", "_a3", "_apt"):
         if op_name.endswith(suffix):
             return op_name[: -len(suffix)]
     return op_name
-
-
-def extract_capital_name_from_binfile(bin_file):
-    """Extract capital_name from bin_file format {capital_name}_hashkey"""
-    # Match pattern: any characters before the first underscore
-    match = re.match(r"([^_]+)_", bin_file)
-    if match:
-        return match.group(1)
-    else:
-        return None
-
-
-def count_sh_files(base_dir, capital_name, op_name):
-    """Count total number of {capital_name}-{op_name}-{index}.sh files"""
-    # Build matching pattern
-    pattern = os.path.join(base_dir, f"{capital_name}-{op_name}-*.sh")
-
-    # Use glob to find matching files
-    matching_files = glob.glob(pattern)
-
-    return len(matching_files)
 
 
 def find_txt_files():
@@ -106,15 +85,15 @@ def find_txt_files():
         for file in os.listdir(gen_dir):
             match_txt = re.match(r"([^-]+)-(\d+)\.txt", file)
             if match_txt:
-                op_name = match_txt.group(1)
                 txt_files.append(os.path.join(gen_dir, file))
 
     return txt_files
 
 
 def process_txt_file(txt_files):
-    data_list = []
-    merge_dict = defaultdict(lambda: {"duration": 0, "size": 0})
+    merge_dict = defaultdict(
+        lambda: {"duration": 0, "max_duration": 0.0, "size": 0, "intervals": []}
+    )
     for txt_file in txt_files:
         try:
             # Extract op_name and index from filename
@@ -134,32 +113,40 @@ def process_txt_file(txt_files):
             if not parsed_data:
                 logger.warning(f"File content format mismatch: {txt_file}")
                 continue
-
-            # Extract capital name from bin_file
-            bin_file = parsed_data["bin_file"]
-            capital_name = extract_capital_name_from_binfile(bin_file)
-            if not capital_name:
-                logger.warning(f"Cannot extract capital_name from bin_file {bin_file}")
-                continue
-
-            # Get base directory for .sh files (same as txt file directory)
-            base_dir = os.path.dirname(txt_file)
-
-            # Count total number of {capital_name}-{op_name}-{index}.sh files
-            ops_kernel_num = count_sh_files(
-                base_dir, capital_name, parsed_data["op_name"]
-            )
-            new_kernel_name = f"{remove_apt_suffix(parsed_data['op_name'])},{ops_kernel_num}-{parsed_data['index']}"
             # Build data row
             key = (parsed_data["soc"], parsed_data["op_name"])
-            merge_dict[key]["duration"] += float(parsed_data["duration"])
+            duration = float(parsed_data["duration"])
+            merge_dict[key]["duration"] += duration
+            merge_dict[key]["max_duration"] = max(
+                merge_dict[key]["max_duration"], duration
+            )
             merge_dict[key]["size"] += float(parsed_data["size"])
+            merge_dict[key]["intervals"].append(
+                (float(parsed_data["start_time"]), float(parsed_data["end_time"]))
+            )
             merge_dict[key]["soc"] = parsed_data["soc"]
 
         except Exception as e:
             logger.error(f"Error processing file {txt_file}: {e}")
             continue
-    return data_list, merge_dict
+    return merge_dict
+
+
+def union_duration(intervals):
+    total = 0.0
+    cur_start = None
+    cur_end = None
+    for start, end in sorted(intervals):
+        if cur_start is None:
+            cur_start, cur_end = start, end
+        elif start > cur_end:
+            total += cur_end - cur_start
+            cur_start, cur_end = start, end
+        else:
+            cur_end = max(cur_end, end)
+    if cur_start is not None:
+        total += cur_end - cur_start
+    return total
 
 
 def parse_cmake_cache(filepath, key):
@@ -195,7 +182,7 @@ def main():
         logger.info("No txt files found")
         return
 
-    data_list, merge_dict = process_txt_file(txt_files)
+    merge_dict = process_txt_file(txt_files)
 
     value = parse_cmake_cache(
         os.path.join(build_dir, "CMakeCache.txt"), "ASCEND_OP_NAME:STRING"
@@ -210,13 +197,16 @@ def main():
                 group_trans_op_name[part] = part
                 last_part = part
 
+    data_list = []
     # Append merged rows
     for (soc, op_name), values in merge_dict.items():
         real_op_name = remove_apt_suffix(op_name)
         real_op_name = group_trans_op_name.get(real_op_name, real_op_name)
         merged_row = {
             "op_name": f"{real_op_name}",
-            "duration": int(values["duration"]),
+            "duration": int(union_duration(values["intervals"])),
+            "sum_duration": int(values["duration"]),
+            "max_duration": int(values["max_duration"]),
             "size": int(values["size"]),
             "soc": soc,
         }
@@ -226,18 +216,24 @@ def main():
 
     # Write to CSV file
     if data_list:
-        soc_version = data_list[0]["soc"]
-        csv_filename = os.path.join(build_dir, f"ops_cost_{soc_version}.csv")
-        fieldnames = ["op_name", "duration", "size", "soc"]
-
-        with open(csv_filename, "w", newline="", encoding="utf-8") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(data_list)
-
-        logger.info(
-            f"Successfully processed {len(data_list)} files, results saved to {csv_filename}"
-        )
+        fieldnames = [
+            "op_name",
+            "duration",
+            "sum_duration",
+            "max_duration",
+            "size",
+            "soc",
+        ]
+        by_soc = defaultdict(list)
+        for row in data_list:
+            by_soc[row["soc"]].append(row)
+        for soc_version, soc_rows in by_soc.items():
+            csv_filename = os.path.join(build_dir, f"ops_cost_{soc_version}.csv")
+            with open(csv_filename, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(soc_rows)
+            logger.info(f"CSV file generated: {csv_filename}")
 
         # Print statistics
         logger.info("Statistics:")
