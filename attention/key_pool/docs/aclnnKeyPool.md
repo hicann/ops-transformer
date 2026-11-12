@@ -335,7 +335,7 @@ aclnnStatus aclnnKeyPool(
   第b个Batch的起点为前面所有Batch的`n`之和。其余输出行未初始化。
 - `BSH`：Batch-Sequence-Hidden的输入布局，`hiddenStates`的shape为
   `[B,S,H]`。其中`B`表示BatchSize，`S`表示每个Batch当前输入的序列
-  长度，`H`表示hiddensize。
+  长度，`H`表示hidden size。
 - `TH`：Token-Hidden的输入布局，`hiddenStates`的shape为`[T,H]`。
   其中`T`表示所有Batch当前输入token数的总和；`cuSeqlensOptional`
   是shape为`[B+1]`的前缀和数组，用于描述各Batch在首轴上的token边界。
@@ -392,7 +392,7 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
   <tr>
     <td>ACLNN_ERR_RUNTIME_ERROR</td>
     <td>361001</td>
-    <td>调用NPURuntime接口时发生异常，例如Runtime服务未启动或内存申请失败。</td>
+    <td>调用NPU Runtime接口时发生异常，例如Runtime服务未启动或内存申请失败。</td>
   </tr>
 </tbody>
 </table>

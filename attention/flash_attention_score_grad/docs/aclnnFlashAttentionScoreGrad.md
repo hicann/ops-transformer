@@ -482,7 +482,7 @@ aclnnStatus aclnnFlashAttentionScoreGrad(
 - 确定性计算：
   - aclnnFlashAttentionScoreGrad默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- 输入query、key、value、dy的B：batchsize必须相等。
+- 输入query、key、value、dy的B：batch size必须相等。
 - 输入query、key、value的D：Head-Dim必须满足(qD == kD && kD >= vD)。
 - 输入query、key、value、dy的inputLayout必须一致。
 - 输入query、key、value、pseShiftOptional的数据类型必须一致。
@@ -505,7 +505,7 @@ aclnnStatus aclnnFlashAttentionScoreGrad(
   - 配置为0、4时，须保证attenMaskOptional与preTokens、nextTokens的范围一致。
   - 用户不特意指定时建议传入0。
   - sparse不同模式的详细说明请参见[sparse模式说明](../../../docs/zh/context/sparse_mode_introduction.md)。
-- 部分场景下，如果计算量过大可能会导致算子执行超时（aicore error类型报错，errorStr为：timeout or trap error），此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
+- 部分场景下，如果计算量过大可能会导致算子执行超时（AI Core error类型报错，errorStr为：timeout or trap error），此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 - 关于softmaxMax与softmaxSum参数的约束：输入格式固定为\[B, N, S, 8\]；TND的输入格式除外，此时为\[T, N, 8\]，注：T=B*S。
 - headNum的取值必须和传入的Query中的N值保持一致。
 - band场景，preTokens和nextTokens之间必须要有交集。

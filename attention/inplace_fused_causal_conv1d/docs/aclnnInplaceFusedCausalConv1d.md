@@ -409,7 +409,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
       <td>numAcceptedTokens（aclTensor*）</td>
       <td>可选输入</td>
       <td>公式中的numAcceptedTokens，表示每个batch的投机数。</td>
-      <td><ul><li>prefile对应的元素值为0, decode时，1<=numAcceptedTokens中的值<=seqlen -1，seqlen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
+      <td><ul><li>prefill对应的元素值为0, decode时，1<=numAcceptedTokens中的值<=seqlen -1，seqlen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
@@ -640,8 +640,8 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
     - convStates必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
+    - cuSeqLen范围[batch, 1024 \* 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 \* batch, 4G], batch范围[1, 256]。
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - prefill和decode混合场景：
     - x支持2维[cuSeqLen, dim]。
@@ -649,8 +649,8 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
     - convStates必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
+    - cuSeqLen范围[batch, 1024 \* 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 \* batch, 4G], batch范围[1, 256]。
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - decode场景（变长序列）：
     - x支持2维[cuSeqLen, dim]。
@@ -659,7 +659,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
     - cuSeqLen范围[batch, batch * 8]，每个batch的seqLen范围为[1, 8]。dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize)。
     - maxQueryLen范围[1, 8]。
   - decode场景（固定batch）：
     - x支持3维[batch, m+1, dim]。
@@ -667,7 +667,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
     - convStates必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
     - m范围[0, 7]，dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize)。
     - maxQueryLen范围[1, 8]，可为-1。
 
 - 输入值域限制：

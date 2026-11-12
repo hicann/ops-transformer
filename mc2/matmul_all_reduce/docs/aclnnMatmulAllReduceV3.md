@@ -292,7 +292,7 @@ aclnnStatus aclnnMatmulAllReduceV3(
 - 通信引擎commMode支持度：
 
   <!-- npu="910b" id7 -->
-  - <term>Atlas A2系列产品</term>：目前不支持指定通信引擎，commMode仅允许输入为"ai_cpu"，使用AICPU通信引擎。
+  - <term>Atlas A2系列产品</term>：目前不支持指定通信引擎，commMode仅允许输入为"ai_cpu"，使用AI CPU通信引擎。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：目前通信引擎支持AICPU和CCU，commMode允许输入为"ai_cpu"或者"ccu"。CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。

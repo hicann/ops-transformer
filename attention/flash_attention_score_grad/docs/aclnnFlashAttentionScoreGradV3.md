@@ -560,7 +560,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV3(
 - 确定性计算：
   - aclnnFlashAttentionScoreGradV3默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- 输入query、key、value、dy的B：batchsize必须相等。
+- 输入query、key、value、dy的B：Batch size必须相等。
 - 输入query、key、value的D：Head-Dim必须满足(qD == kD && kD >= vD)。
 - 输入query、key、value、dy的inputLayout必须一致。
 - 输入key/value的shape除D外必须一致，在query/key/value的D大小相同的情况下，query/dy的shape必须一致。

@@ -26,7 +26,7 @@
 - 接口功能：`aclnnQuantSparseFlashMlaMetadata`是`aclnnQuantSparseFlashMla`算子的前置算子，用于后续Attention计算生成负载均衡的任务划分方案。本算子不执行实际的Attention计算，而是根据输入参数在AI CPU计算出每个AI Core应处理的Attention计算起止范围，从而最大化计算资源的利用率，避免各Core间负载不均衡的问题。
 
   **该算子不建议单独使用，建议与aclnnQuantSparseFlashMla算子配合使用，形成完整的工作流。**
-    1. 接受aclnnQuantSparseFlashMla算子接口输入数据shape信息，包含batchSize、qSeqen、kvSeqlen、mask。通过对输入分块并模拟计算耗时，均匀分配分块到可用核上，以降低aclnnQuantSparseFlashMla算子的整体计算耗时，并提高硬件利用率。
+    1. 接受aclnnQuantSparseFlashMla算子接口输入数据shape信息，包含batchSize、qSeqlen、kvSeqlen、mask。通过对输入分块并模拟计算耗时，均匀分配分块到可用核上，以降低aclnnQuantSparseFlashMla算子的整体计算耗时，并提高硬件利用率。
     2. 分配结果输出后，后续作为输入供aclnnQuantSparseFlashMla算子使用。
     3. 分配结果包含每个AIC核基本块的起始点和终止点，以及每个AIV核的FD任务信息。详细内容可以参考[调用示例](#调用示例)。
 

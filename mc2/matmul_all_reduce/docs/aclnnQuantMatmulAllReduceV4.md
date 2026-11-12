@@ -80,7 +80,7 @@
 
   - 公式5，perchannel量化 && pertensor量化：
 
-    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x2Scale为UINT/INT64，可选bias为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
+    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x2Scale为UINT64/INT64，可选bias为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
 
   $$
   output = AllReduce((x1@x2 + biasOptional) * x2Scale  + x3Optional)

@@ -854,7 +854,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
               <td>FLOAT8_E4M3FN</td>
               <td>FLOAT、BFLOAT16</td>
               <td>FLOAT</td>
-              <td>FLOAT8_E4M3FN、FLOAT_E5M2</td>
+              <td>FLOAT8_E4M3FN、FLOAT8_E5M2</td>
               <td>FLOAT</td>
             </tr>
           </tbody>

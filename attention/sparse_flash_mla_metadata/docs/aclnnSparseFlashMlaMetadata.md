@@ -47,7 +47,7 @@
     | 7 | first_fd_data_workspace_idx，第一份FD归约数据的workspace偏移 |
     | 8 | max_s2_block_num，单核上分配到的最多的s2 block数 |
 
-  - FD Metadata区域（AIV_CORE_NUM × 8个INT32），每个AIVCore的FD归约任务信息：
+  - FD Metadata区域（AIV_CORE_NUM × 8个INT32），每个AIV Core的FD归约任务信息：
 
     | 索引 | 含义 |
     | :--- | :--- |
@@ -486,7 +486,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>
         <td>561103</td>
-        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AICPU任务失败。</td>
+        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AI CPU任务失败。</td>
       </tr>
       <tr>
         <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
@@ -541,7 +541,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>
         <td>561103</td>
-        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AICPU任务失败。</td>
+        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AI CPU任务失败。</td>
       </tr>
       <tr>
         <td rowspan="9">ACLNN_ERR_PARAM_INVALID</td>
@@ -599,7 +599,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>
         <td>561103</td>
-        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AICPU任务失败。</td>
+        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AI CPU任务失败。</td>
       </tr>
       <tr>
         <td rowspan="9">ACLNN_ERR_PARAM_INVALID</td>

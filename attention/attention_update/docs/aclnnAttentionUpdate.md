@@ -120,7 +120,7 @@ aclnnStatus aclnnAttentionUpdate(
       <tr>
         <td>localOut</td>
         <td>输入</td>
-        <td>各SP域的局部attentionout。</td>
+        <td>各SP域的局部attentionOut。</td>
         <td>分片输入长度为sp；首轴拼接输入长度为1，详见输入说明。</td>
         <td>FLOAT32，FLOAT16，BFLOAT16</td>
         <td>ND</td>

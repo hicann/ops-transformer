@@ -889,7 +889,7 @@ metadata校验
 
 #### Paged Attention参数组
 
-当layout_kv为PA_BBND时，开启Paged Attention
+当layout_kv为PA_BBND时，开启PagedAttention
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
         <col style="width: 147px">

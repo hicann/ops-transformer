@@ -106,7 +106,7 @@
 
     此时queryNorm为BFLOAT16类型，dequantScaleQNorm不输出（为nullptr）。
 
-    量化场景（weightQuantMode=1/2/4/5，per-token动态量化），smoothScaleCq可选传入，未传入时视为1：
+    量化场景（weightQuantMode=1/2/4/5，per-token动态量化），smoothScalesCq可选传入，未传入时视为1：
 
     $$
     \tilde{c}^Q = c^Q \cdot smoothScale
@@ -1047,7 +1047,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       <td>kvCache perchannel量化 </td>
       <td>
           weight_quant_mode=1,kv_cache_quant_mode=2,query_quant_mode=0<br>
-          入参：weightUqQr传入pertoken量化数据，kvCacheRef、krCacheRef传入perchannel量化数据，其余入参皆为非量化数据。dequantScaleWUqQr、quantScaleCkv、quant_scale_ckr字段必须传入，smoothScalesCq字段可选传入 <br>
+          入参：weightUqQr传入pertoken量化数据，kvCacheRef、krCacheRef传入perchannel量化数据，其余入参皆为非量化数据。dequantScaleWUqQr、quantScaleCkv、quantScaleCkr字段必须传入，smoothScalesCq字段可选传入 <br>
           出参：kvCacheRef、krCacheRef返回perchannel量化数据，其余出参返回非量化数据
       </td>
     </tr>

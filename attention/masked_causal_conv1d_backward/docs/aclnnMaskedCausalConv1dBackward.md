@@ -293,7 +293,7 @@ aclnnStatus aclnnMaskedCausalConv1dBackward(
   - aclnnMaskedCausalConv1dBackward默认确定性实现。
 - 输入限制：
   - 输入输出的shape数据范围约束如下：
-    - B（Batchsize）：取值范围为1~32。
+    - B（Batch size）：取值范围为1~32。
     - B *S（Batchsize* SeqLength）：取值范围为1~512K。
     - H（hiddenSize）：取值范围384~24576，且是64的整数倍。
     - W：W当前只支持3。

@@ -503,7 +503,6 @@ aclnnStatus aclnnBlockSparseAttentionV3(
           <li>1：表示FP8量化。</li>
           <li>2：表示MXFP4 OCP量化(量化scale向下截断)。</li>
           <li>3：表示MXFP4 CX量化(自定义量化量程, 量化scale向上截断)。</li>
-          <li>详见<a href="#constraint_rule">约束说明</a>。</li>
           <li>5：表示HIF8 per-tensor量化，约束见下文。</li>
         </ul>
       </td>

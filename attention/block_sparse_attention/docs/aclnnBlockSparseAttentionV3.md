@@ -508,7 +508,6 @@ aclnnStatus aclnnBlockSparseAttentionV3(
           <li>3：表示MXFP4 CX量化(自定义量化量程, 量化scale向上截断)。</li>
           <li>4：表示MXFP8 OCP量化(QKV为FLOAT8_E4M3FN，scale为FLOAT8_E8M0)。</li>
           <li>5：表示HIF8 per-tensor量化，产品支持及输入类型要求详见<a href="#constraint_rule">约束说明</a>。</li>
-          <li>详见<a href="#constraint_rule">约束说明</a>。</li>
         </ul>
       </td>
       <td>INT64</td>

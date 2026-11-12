@@ -410,9 +410,9 @@ aclnnStatus aclnnMoeFinalizeRoutingV4(
     - 2：drop less场景，expandedRowIdx按**行**排列（与[aclnnMoeInitRoutingV2](../../moe_init_routing_v2/docs/aclnnMoeInitRoutingV2.md)输出格式对应）。
     - 3：drop pad场景，expandedRowIdx按**行**排列（与[aclnnMoeInitRoutingV2](../../moe_init_routing_v2/docs/aclnnMoeInitRoutingV2.md)输出格式对应）。
 
-<!-- npu="950" id10 -->
+    <!-- npu="950" id10 -->
 8. <term>Ascend 950PR&950DT系列产品</term>：支持零计算专家、拷贝专家、常量专家特性，xOptional、alpha1Optional、alpha2Optional、vOptional、zeroExpertRange、copyExpertRange、constantExpertRange支持传入非空值，zeroExpertRange、copyExpertRange、constantExpertRange专家范围不能重叠。
-<!-- end id10 -->
+    <!-- end id10 -->
 
 ## 调用示例
 

@@ -420,7 +420,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
     - `layoutQueryOptional`：支持BSND、BNSD；query为BSND/BNSD时仅支持FLOAT16/BFLOAT16，逻辑块长固定为16。
     - `layoutKeyOptional`：key为BSND/BNSD且`poolBlockSize=16`时，query必须与key同布局，仅支持FLOAT16/BFLOAT16。
     - `poolBlockSize`：取值为16时走两级maxpool，仅支持FLOAT16/BFLOAT16；BBND/BNBD的存储页长另支持16。
-    - 按估计M-task数启动MIX（单batch为$\mathrm{CeilDiv}(T1\cdot N1,128)$；多batch取packed+$B$上界并截到AIC数），短decode不打满空核。在M-task填不满AIC且可见KV stile $>1$时沿S切`kvChunks`；宽`blockTable`只按可见page估核，避免短KV空转。
+    - 按估计M-task数启动MIX（单batch为$\mathrm{CeilDiv}(T1\cdot N1,128)$；多batch取packed+$B$上界并截到AIC数），短decode不打满空核。在M-task填不满AIC且可见KV tile $>1$时沿S切`kvChunks`；宽`blockTable`只按可见page估核，避免短KV空转。
     - C2UB路径对超过256列的score末维按256列滑窗flush，并补写后续$-inf$。
 <!-- end id9 -->
 

@@ -430,7 +430,7 @@ aclnnStatus aclnnScatterPaKvCache(
 - 确定性计算：
   - aclnnScatterPaKvCache默认确定性实现。
 - key、value、keyCacheRef、valueCacheRef的数据类型必须一致；
-- 当cacheModeOptional为“PA_NZ”时key、keyCacheRef和value、valueCacheRef的数据类可以不一致；
+- 当cacheModeOptional为“PA_NZ”时key、keyCacheRef和value、valueCacheRef的数据类型可以不一致；
 - slotMapping、compressLensOptional、compressSeqOffsetOptional、seqLensOptional的数据类型必须一致（对应场景一）；
 - slotMapping的取值范围[0,num_blocks*block_size-1]，且slotMapping内的元素值保证不重复，重复时不保证正确性；
 - 当key和value都是3维，则key和value的前两维shape必须相同；

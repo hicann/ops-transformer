@@ -486,7 +486,7 @@ metadata校验
 <ul>
     <li>ori_mask_mode/cmp_mask_mode=0，全计算模式（默认值）</li>
     <li>ori_mask_mode/cmp_mask_mode=3，Causal模式</li>
-    <li>ori_mask_mode=4，SlidingWindow模式</li>
+    <li>ori_mask_mode=4，Sliding Window模式</li>
 </ul>
 
 <table style="undefined;table-layout: fixed; width:1625px">
@@ -881,7 +881,7 @@ metadata校验
     </tbody>
 </table>
 
-#### Paged Attention参数组
+#### PagedAttention参数组
 
 当layout_kv为PA_BBND时，开启Paged Attention
 <table style="undefined;table-layout: fixed; width:1625px">

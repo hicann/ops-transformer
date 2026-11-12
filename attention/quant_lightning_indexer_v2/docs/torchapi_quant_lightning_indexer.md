@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  `quant_lightning_indexer_metadata`接口用于生成一个任务列表，包含每个AIcore的Attention计算任务的起止点的batch、head、以及Q和K的分块的索引，供后续`quant_lightning_indexer`算子使用。
+  `quant_lightning_indexer_metadata`接口用于生成一个任务列表，包含每个AI Core的Attention计算任务的起止点的batch、head、以及Q和K的分块的索引，供后续`quant_lightning_indexer`算子使用。
 
   `quant_lightning_indexer`接口基于一系列操作得到每一个token对应的top-k个位置。主要计算过程为：
 
@@ -97,7 +97,7 @@ cann_ops_transformer.quant_lightning_indexer(
 
 >**说明：**
 >
-> query、key、weights、query_dequant_scale、key_dequant_scale参数维度含义：b（batch Size）表示输入样本批量大小、q_s表示query的输入样本序列长度、k_s表示key的输入样本序列长度、q_n表示query的多头数、k_n表示key的多头数、d（head dim）表示注意力头的维度、q_t表示query的输入样本序列长度的累加和、k_t表示key的输入样本序列长度的累加和、block_num表示PageAttention场景下的block总数、block_size表示PageAttention场景下每个block的token数、g表示GQA的group size（g = q_n / k_n）。参数query中的d和参数key中的d值相等，当前仅支持128。
+> query、key、weights、query_dequant_scale、key_dequant_scale参数维度含义：b（batch Size）表示输入样本批量大小、q_s表示query的输入样本序列长度、k_s表示key的输入样本序列长度、q_n表示query的多头数、k_n表示key的多头数、d（head dim）表示注意力头的维度、q_t表示query的输入样本序列长度的累加和、k_t表示key的输入样本序列长度的累加和、block_num表示PagedAttention场景下的block总数、block_size表示PageAttention场景下每个block的token数、g表示GQA的group size（g = q_n / k_n）。参数query中的d和参数key中的d值相等，当前仅支持128。
 
 ### quant_lightning_indexer_metadata
 
@@ -373,7 +373,7 @@ metadata校验
             <td>
                 <ul>
                     <li>tensor_type仅支持INT32</li>
-                    <li>shape由quant_lightning_indexer_v2_metadata动态计算</li>
+                    <li>shape由quant_lightning_indexer_metadata动态计算</li>
                     <li>当前不支持不传入，未传入将发出拦截报警</li>
                 </ul>
             </td>

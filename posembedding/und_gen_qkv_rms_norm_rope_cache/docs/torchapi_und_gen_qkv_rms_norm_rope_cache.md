@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  本接口封装`aclnnUndGenQkvRmsNormRopeCache`，用于多模态大模型推理场景下的Q/K/V预处理与PagedAttention KV Cache更新。接口把理解阶段（undecoded）与生成阶段（generated）两段QKV输入按`cat_indices`间接寻址拼成一条输出序列，逐token沿头维度拆分出Q/K/V，对Q和K逐头执行RMSNorm归一化与MRoPE（多模态旋转位置编码），V不参与归一化与旋转；Q作为返回值输出，K和V按`slot_mapping`写入分页KV Cache。RMSNorm权重按源token落在理解段还是生成段在两套权重间选择。计算全程float32，返回值与KV Cache均为bfloat16。
+  本接口封装`aclnnUndGenQkvRmsNormRopeCache`，用于多模态大模型推理场景下的Q/K/V预处理与PagedAttention KV Cache更新。接口把理解阶段（undecoded）与生成阶段（generated）两段QKV输入按`cat_indices`间接寻址拼成一条输出序列，逐token沿头维度拆分出Q/K/V，对Q和K逐头执行RMSNorm归一化与M-RoPE（多模态旋转位置编码），V不参与归一化与旋转；Q作为返回值输出，K和V按`slot_mapping`写入分页KV Cache。RMSNorm权重按源token落在理解段还是生成段在两套权重间选择。计算全程float32，返回值与KV Cache均为bfloat16。
 
 - **原地更新**：
 

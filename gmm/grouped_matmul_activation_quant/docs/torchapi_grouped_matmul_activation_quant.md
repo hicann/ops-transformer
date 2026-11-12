@@ -139,7 +139,7 @@ MXFP4量化场景： 输入x和weight均为`torch_npu.float4_e2m1fn_x2`、`torch
 - `K`必须为偶数且不能为2。
 - `scale_alg=0`支持FLOAT4、FLOAT8输出；`scale_alg=1`仅支持FLOAT8输出；`scale_alg=2`仅支持FLOAT4_E2M1输出，且`dst_type_max`只能取0.0或`[6.0, 12.0]`。
 - 支持M为0或N为0的空Tensor场景，此时允许K为0。
-- 当`group_list_type=0`时表示每个group在M轴上的累计结束位置，最后一个值不大于M轴大小；`group_list_type=1`时表示每个group的M轴长度，数值总和不大于M轴大小。当`group_list_type=0`时，最后一个值不大于x中tensor的第一维，当groupListType为1时，数值的总和不大于x中tensor的第一维。group_list中的值约束了输出数据的有效部分，group_list中未指定的部分将不会参与更新。
+- 当`group_list_type=0`时表示每个group在M轴上的累计结束位置，最后一个值不大于M轴大小；`group_list_type=1`时表示每个group的M轴长度，数值总和不大于M轴大小。当`group_list_type=0`时，最后一个值不大于x中tensor的第一维，当`group_list_type`=1时，数值的总和不大于x中tensor的第一维。group_list中的值约束了输出数据的有效部分，group_list中未指定的部分将不会参与更新。
 
 ## 确定性计算
 

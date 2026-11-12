@@ -251,7 +251,7 @@ cann_ops_transformer.sparse_flash_mla(
 | metadata参数组 | num_heads_q、num_heads_kv、head_dim、batch_size、max_seqlen_q、max_seqlen_ori_kv、max_seqlen_cmp_kv、metadata、has_ori_kv、has_cmp_kv |
 | 稀疏压缩参数组 | ori_topk、cmp_topk、cmp_ratio、ori_sparse_indices、cmp_sparse_indices |
 | Mask和窗口参数组 | ori_mask_mode、cmp_mask_mode、ori_win_left、ori_win_right、cmp_residual_kv |
-| Paged Attention参数组 | ori_block_table、cmp_block_table |
+| PagedAttention参数组 | ori_block_table、cmp_block_table |
 | SeqLengths参数组 | cu_seqlens_q、cu_seqlens_ori_kv、cu_seqlens_cmp_kv、seqused_q、seqused_ori_kv、seqused_cmp_kv |
 | Sinks参数组 | sinks |
 | SoftmaxLse参数组 | return_softmax_lse、softmax_lse |
@@ -296,7 +296,7 @@ cann_ops_transformer.sparse_flash_mla(
 | seqused_q | `int32`、ND、shape为(b,)；每项非负且不超过对应`q`长度。 | 可选。 | b必须与`q`一致。 | Paged Attention不依赖此参数。Tensor值由用户保证。 |
 | seqused_ori_kv | `int32`、ND、shape为(b,)；每项非负且不超过对应`ori_kv`长度。 | PA场景必传；其他场景可选。 | b必须与`ori_kv`和Block Table一致。 | PA场景决定每个序列的有效kv前缀。Tensor值由用户保证。 |
 | seqused_cmp_kv | `int32`、ND、shape为(b,)；每项非负且不超过对应`cmp_kv`长度。 | 可选。 | b必须与`cmp_kv`一致。 | 显式传入时覆盖cmp侧逻辑有效长度。Tensor值由用户保证。 |
-| cmp_residual_kv | `int32`、ND、shape为(b,)；每项满足`0 <= value < cmp_ratio`。 | CSA/HCA时，cmp_mask_mode=3且cmp_ratio=!1时必传，cmp_mask_mode=0或cmp_ratio=1时不传；SWA不传。 | 必须同时传给`metadata`接口和主接口。 | 满足`cmp_len * cmp_ratio + residual = ori_len_for_cmp_mask`。Tensor值由用户保证。 |
+| cmp_residual_kv | `int32`、ND、shape为(b,)；每项满足`0 <= value < cmp_ratio`。 | CSA/HCA时，cmp_mask_mode=3且cmp_ratio!=1时必传，cmp_mask_mode=0或cmp_ratio=1时不传；SWA不传。 | 必须同时传给`metadata`接口和主接口。 | 满足`cmp_len * cmp_ratio + residual = ori_len_for_cmp_mask`。Tensor值由用户保证。 |
 | ori_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | ori_mask_mode=0且`ori_sparse_indices`不为空时，必须传入；其他场景不支持传入。 | 与`ori_topk=0`、`ori_sparse_indices=None`一致。 | 当ori_mask_mode不为0时，不支持传入。 |
 | cmp_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | 只有`cmp_kv`传入才校验；cmp_mask_mode=0且`cmp_sparse_indices`不为空时，必须传入；其他场景不支持传入。 | 与`cmp_topk`和`cmp_sparse_indices`的状态一致。 | 无。 |
 
@@ -339,7 +339,7 @@ layout匹配关系表：
 
 | 参数 | 单参数校验 | 存在性拦截 | 一致性拦截 | 特性交叉拦截 |
 | :--- | :--- | :--- | :--- | :--- |
-| ori_sparse_indices | `int32`、ND。 | 必须不传。 | 与`ori_topk=0`和`ori_topk_length=None`一致。 | 当mask mode ！=0时，有效长度必须与参与计算的序列长度保持一致， 且不支持传入topk_length。当mask mode ==0时，ori_kv_k 需要大于等于对应的topklength。 |
+| ori_sparse_indices | `int32`、ND。 | 必须不传。 | 与`ori_topk=0`和`ori_topk_length=None`一致。 | 当mask mode !=0时，有效长度必须与参与计算的序列长度保持一致， 且不支持传入topk_length。当mask mode ==0时，ori_kv_k 需要大于等于对应的topk_length。 |
 | cmp_sparse_indices | `int32`、ND；`BSND`为(b, q_s, kv_n, cmp_kv_k)，`TND`为(q_t, kv_n, cmp_kv_k)；值必须为-1或有效的cmp token索引。 | 仅CSA必传；SWA/HCA必须不传。 | b/q_t、kv_n必须与`q`一致，cmp_kv_k必须与`cmp_topk`一致。 | <term>Atlas A3系列产品</term>：cmp_kv_k取大于8192或小于等于0时拦截；<term>Ascend 950PR&950DT系列产品</term>：cmp_kv_k取小于等于0时拦截。无效位置填-1，索引具体取值由用户保证。 |
 | ori_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | `ori_topk_length` 在ori+cmp稀疏时必传。 | 与`ori_sparse_indices=None`和`ori_topk=0`一致。 | CSA/ALL_CSA场景可选，其他场景不能传；传入时，不需要传入`seqused_ori_kv`。 |
 | cmp_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | `cmp_topk_length` 在ori+cmp稀疏时必传。 | 与`cmp_sparse_indices`和`cmp_topk`的状态一致。 | CSA/ALL_CSA场景可选，其他场景不能传；传入时，不需要传入`seqused_cmp_kv`。 |
@@ -367,7 +367,7 @@ layout匹配关系表：
 | ori_win_left | `int32`；接口定义为-1或非负数。 | 可选。 | 必须与`metadata`一致。 | <term>Atlas A3系列产品</term>：取非127时拦截；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。 |
 | ori_win_right | `int32`；接口定义为-1或非负数。 | 可选。 | 必须与`metadata`一致。 | <term>Atlas A3系列产品</term>：取非0时拦截；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。 |
 
-#### Paged Attention参数组
+#### PagedAttention参数组
 
 - `layout_kv="PA_BBND"`时，必须传入`seqused_ori_kv`和`ori_block_table`；传入`cmp_kv`时，还必须传入`cmp_block_table`。
 - PageAttention的`block_size`取值必须大于0。对于<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>，取非16的倍数或大于1024时拦截；对于<term>Ascend 950PR&950DT系列产品</term>，取小于等于0时拦截。

@@ -35,7 +35,7 @@ $$
 <!-- npu="950" id6 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
     - query/key额外支持同型`torch.float8_e4m3fn` / `torch.float8_e5m2`（无`scale`）。
-    - 短decode按估计M-task启动MIX，不打满空核；短M长S再按KV stile切`kvChunks`。
+    - 短decode按估计M-task启动MIX，不打满空核；短M长S再按KV tile切`kvChunks`。
     - C2UB对score末维超过256列按窗flush。
 <!-- end id6 -->
 

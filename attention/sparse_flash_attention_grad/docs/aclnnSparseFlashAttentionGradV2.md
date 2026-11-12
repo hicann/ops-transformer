@@ -27,7 +27,7 @@
 - **与 V1 接口的关系**：V2 在 V1（aclnnSparseFlashAttentionGrad，商发兼容、5 输出）基础上，仅新增可选的可学习 OSS Sink 输入 `sinksOptional` 与对应梯度输出 `dSinksOptional`（6 输出），其余参数与 V1 完全一致。V1/V2 共用同一 OpDef 与 inner 实现。
 - **OSS Sink（可选）**：V2 支持可学习 OSS Sink 输入（`sinksOptional`）与对应梯度输出（`dSinksOptional`），传入 `sinksOptional` 时必须同时提供 `dSinksOptional` 输出。`sinksOptional` 仅支持 <term>Ascend 950PR&950DT系列产品</term>。
 
-- **计算公式**：根据传入的topkIndice对keyIn和value选取数量为selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
+- **计算公式**：根据传入的topkIndices对key和value选取数量为selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
 
   $$
    selectedKey\text{ }=\text{ }Gather \left( key,topkIndices \left[ i \left]  \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.

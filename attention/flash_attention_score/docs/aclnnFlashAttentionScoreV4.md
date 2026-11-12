@@ -397,7 +397,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
         <td>outDtype</td>
         <td>输入</td>
         <td>Host侧的int64_t。</td>
-        <td>只在量化场景下生效，0表示attenout输出是fp16格式，1表示输出是bf16格式。</td>
+        <td>只在量化场景下生效，0表示attentionOut输出是fp16格式，1表示输出是bf16格式。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>

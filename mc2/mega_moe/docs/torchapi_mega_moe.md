@@ -766,7 +766,7 @@ sym_buffer.update_group(group) -> None
         <td>topk_weights_type</td>
         <td>int</td>
         <td>可选</td>
-        <td>topkWeights前移开关。0表示关闭，1表示开启（将topkWeights随token数据一起在dispatch阶段提前发送至目标rank，减少combine阶段通信量）。默认值为0。</td>
+        <td>topk_weights前移开关。0表示关闭，1表示开启（将topk_weights随token数据一起在dispatch阶段提前发送至目标rank，减少combine阶段通信量）。默认值为0。</td>
     </tr>
 </tbody>
 </table>
@@ -1516,7 +1516,7 @@ sym_buffer.update_group(group) -> None
     - topo_type由通信域上下文自动推导。0表示MTE拓扑，1表示URMA跨超拓扑，2表示域内URMA、域间RoCE的混合拓扑。
     - URMA+RoCE混合拓扑要求UB域等宽且域内group rank连续，rank_num_per_server表示每个UB域的rank数，取值范围[1, ep_world_size]且必须整除ep_world_size（该校验对topo_type = 1与2同时生效），不满足时算子在tiling阶段报错；域内使用UB_CTP，域间使用RoCE，由extension查询RankGraph决定，不按物理主机数推断。支持combine_comm_mode=0（普通回传）或2（Server内归约及域间二级回传）；模式2要求combine_quant_mode=0，域内贡献通过URMA WriteWithNotifyNbi发送，域间聚合结果通过RoCE batch WriteNbi回传。
     - Layered拓扑（topo_type为1或2）下，`activation`仅支持"swiglu"、"situglu"和"gelu"，不支持"swiglustep"和"swigluoai"。
-    - topk_weights_type取值为0或1，0表示关闭topkWeights前移，1表示开启。
+    - topk_weights_type取值为0或1，0表示关闭topk_weights前移，1表示开启。
     - 通信buffer由`get_symm_buffer_for_mega_moe`自动计算并申请，用户无需自行计算或设置`ccl_buffer_size`。
     - l1_weights和l2_weights的数据类型必须一致，且仅支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。
     - topk_weights数据类型仅支持BF16或FP32。

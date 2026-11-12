@@ -358,7 +358,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
     <tr>
         <td>blockTableOptional</td>
         <td>输入</td>
-        <td>PageAttention中KV存储使用的block映射表。</td>
+        <td>PagedAttention中KV存储使用的block映射表。</td>
         <td>
         <ul>
             <li>不支持空Tensor。</li>
@@ -490,7 +490,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <td>ND</td>
         <td>
         <ul>
-            <li>input_layout为BSH时，shape为（1，prefix_S，H=KV_N*KV_D）</li>
+            <li>inputLayout为BSH时，shape为（1，prefix_S，H=KV_N*KV_D）</li>
             <li>input_layout为BSND时，shape为（1，prefix_S，KV_N，KV_D）</li>
             <li>input_layout为BNSD、BNSD_BSND时，shape为（1，KV_N，prefix_S，KV_D）</li>
         </ul>
@@ -512,7 +512,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <td>ND</td>
         <td>
         <ul>
-            <li>input_layout为BSH时，shape为（1，prefix_S，H=KV_N*KV_D）</li>
+            <li>inputLayout为BSH时，shape为（1，prefix_S，H=KV_N*KV_D）</li>
             <li>input_layout为BSND时，shape为（1，prefix_S，KV_N，KV_D）</li>
             <li>input_layout为BNSD、BNSD_BSND时，shape为（1，KV_N，prefix_S，KV_D）</li>
         </ul>
@@ -761,7 +761,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <li>innerPrecise为1时，代表高性能模式，且不做行无效修正。</li>
             <li>innerPrecise为2时，代表开启高精度模式，且做行无效修正。</li>
             <li>innerPrecise为3时，代表高性能模式，且做行无效修正。</li>
-            <li>sparse_mode为0或1，并传入用户自定义mask的情况下，建议开启行无效修正。</li>
+            <li>sparseMode为0或1，并传入用户自定义mask的情况下，建议开启行无效修正。</li>
             <li>BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLOAT16和INT8均生效。</li>
             <li>当前0、1为保留配置值，当计算过程中“参与计算的mask部分”存在某整行全为1的情况时，精度可能会有损失。此时可以尝试将该参数配置为2或3来开启行无效功能以提升精度，但是该配置会导致性能下降。</li>
             <li>如果算子可判断出存在无效行场景，会自动开启无效行计算，例如sparse_mode为3，Sq > Skv场景。</li>
@@ -795,7 +795,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
     <tr>
         <td>softmaxLseFlag</td>
         <td>输入</td>
-        <td>是否输出softmax_lse。</td>
+        <td>是否输出softmaxLse。</td>
         <td>
         <ul>
             <li>支持S轴外切（增加输出）。</li>
@@ -1148,7 +1148,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
     <td>int64</td>
   </tr>
   <tr>
-    <td rowspan="2">ActualSeqLens参数组</td>
+    <td rowspan="2">ActualSeqLen参数组</td>
     <td>actualSeqLengthsOptional</td>
     <td>INPUT(OPTIONAL)</td>
     <td>IntArray</td>
@@ -1779,7 +1779,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
   - 全量化场景
     - Decode MLA全量化
       - query、key、value的dtype为FLOAT8_E4M3FN/INT8/HIFLOAT8
-      - attenOut的dtype为BFLOAT16
+      - attentionOut的dtype为BFLOAT16
       - queryRope、keyRope的dtype为BFLOAT16
       - 当query/key/value是FLOAT8_E4M3FN/HIFLOAT8时， inputLayout仅支持BSH、BSND、BNSD、TND、BSH_NBSD、BSND_NBSD、BNSD_NBSD、TND_NTD；当query/key/value类型为INT8时, inputLayout仅支持BSH、BSND、TND、BSH_NBSD、BSND_NBSD、TND_NTD
       - 当query/key/value的类型为FLOAT8_E4M3FN且inputLayout为TND时，Q_N支持1、2、4、6、8、12、16、24、32、48、64、96、128，其他全量化场景Q_N支持1、2、4、8、16、32、64、128
@@ -1863,7 +1863,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
     - PagedAttention场景下，kv cache的layout为4维时，inputLayout必须为BNSD、BNSD_BSND或TND
   - 全量化
     - Decode MLA场景下：
-      - 当query的数据类型为FP8_E4M3FN/HIFLOAT8，且inputLayout为BSH、BSND、BSH_NBSD、BSND_NBSD时，kv cache排布只支持BnBsH（blocknum, blocksize, H）和NZ (blocknum，KV_N，D/D0，blocksize，D0)两种格式
+      - 当query的数据类型为FLOAT8_E4M3FN/HIFLOAT8，且inputLayout为BSH、BSND、BSH_NBSD、BSND_NBSD时，kv cache排布只支持BnBsH（blocknum, blocksize, H）和NZ (blocknum，KV_N，D/D0，blocksize，D0)两种格式
       - 当query的数据类型为FP8_E4M3FN/HIFLOAT8，且inputLayout为BNSD、TND、BNSD_NBSD、TND_NTD时，kv cache排布支持BnBsH（blocknum, blocksize, H）、BnNBsD（blocknum, KV_N, blocksize, D）和NZ（blocknum，KV_N，D/D0，blocksize，D0）三种格式
       - 当query的数据类型为INT8时，kv cache排布仅支持NZ，且kv cache排布为(blocknum，KV_N，D/D0，blocksize，D0)
       - 当kv cache排布为NZ时，最后一维D0是32, keyRope最后一维D0是16
@@ -1986,7 +1986,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
 
 - 单参数约束
   - 公共
-    - 输出lseOut仅支持数据类型FP32
+    - 输出softmaxLse仅支持数据类型FP32
 - 存在性约束
   - 公共
     - softmaxLSE场景下，输出lseOut不应为空

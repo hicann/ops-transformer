@@ -625,8 +625,8 @@ aclnnStatus aclnnKvRmsNormRopeCacheV2(
     * 当cacheModeOptional为PA_BNSD、PA_NZ、PA_BLK_BNSD、PA_BLK_NZ时，cache中的数据排布方式为：
       * 非量化模式下：kCacheRef 为 [block_num, Dk//16, block_size, 1, 16]；ckvCacheRef 为 [block_num, Dv//16, block_size, 1, 16]。
       * 静态量化模式下：kCacheRef 为 [block_num, Dk//32, block_size, 1, 32]；ckvCacheRef 为 [block_num, Dv//32, block_size, 1, 32]。
-    * 当cacheModeOptional为PA_BNSD、PA_NZ时，shape为1维[Bkv * Skv]，要求index的value值范围为[-1,block_num * block_size)。value数值不能重复。
-    * 当cacheModeOptional为PA_BLK_BNSD、PA_BLK_NZ时，shape为1维[Bkv * ceil_div(Skv,block_size)]，要求index的value的数值范围为[-1,block_num * block_size)。value/block_size的值不能重复。
+    * 当cacheModeOptional为PA_BNSD、PA_NZ时，shape为1维[Bkv \* Skv]，要求index的value值范围为[-1,block_num \* block_size)。value数值不能重复。
+    * 当cacheModeOptional为PA_BLK_BNSD、PA_BLK_NZ时，shape为1维[Bkv \* ceil_div(Skv,block_size)]，要求index的value的数值范围为[-1,block_num \* block_size)。value/block_size的值不能重复。
   * isOutputKv约束：
     * 作用是输出具体场景的中间处理结果，使能 kRopeOut 和 cKvOut 两项输出。
     * 在cacheModeOptional为PA, PA_BNSD, PA_NZ, PA_BLK_BNSD, PA_BLK_NZ模式时有效。

@@ -27,7 +27,7 @@
 
   `flash_attn`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`FlashAttn`算子完成共享KV（Key和Value使用同一份输入）的非量化注意力计算，训练推理归一化。
 
-  `flash_attn_metadata`是`flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AI Core/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
+  `flash_attn_metadata`是`flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AI Core/AIV Core的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
 
   1. 准备`q`、`k`、`v`等输入。
   2. 调用`flash_attn_metadata`生成`metadata`。
@@ -573,7 +573,7 @@ mask_mode参数解释
             <td>无</td>
             <td>
                 <ul>
-                    <li>PagedAttention开启情况下，必须传入seqused_kv</li>
+                    <li>Paged Attention开启情况下，必须传入seqused_kv</li>
                     <li>PagedAttention开启情况下，block_table必须不为空</li>
                     <li>layout_kv为PA_NZ时，D必须为16的倍数</li>
                 </ul>

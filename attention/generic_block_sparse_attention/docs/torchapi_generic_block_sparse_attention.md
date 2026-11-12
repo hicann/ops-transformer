@@ -27,7 +27,7 @@
 
   `generic_block_sparse_attention`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`GenericBlockSparseAttention`算子完成任意粒度块稀疏注意力计算。
 
-  `generic_block_sparse_attention_metadata`是`generic_block_sparse_attention`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AI Core/AIVCore的任务切分结果，当前主算子必须传入配套metadata；虽然Python签名默认值为None，实际调用不支持省略，也不会自动生成metadata。典型调用流程如下：
+  `generic_block_sparse_attention_metadata`是`generic_block_sparse_attention`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AI Core/AIV Core的任务切分结果，当前主算子必须传入配套metadata；虽然Python签名默认值为None，实际调用不支持省略，也不会自动生成metadata。典型调用流程如下：
 
   1. 准备`q`、`k`、`v`、`sparse_block_idx`、`sparse_block_count`等输入。
   2. 调用`generic_block_sparse_attention_metadata`生成`metadata`。

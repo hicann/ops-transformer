@@ -303,7 +303,7 @@ aclnnStatus aclnnUndGenQkvRmsNormRopeCache(
         <td>normEps（double）</td>
         <td>输入</td>
         <td>公式中的ε，表示RMSNorm防除零参数。</td>
-        <td><ul><li>必须为正数，推荐取<code>1e-6</code>。</li><li>接口内部按FLOAT参与计算。</li></ul></td>
+        <td><ul><li>必须为正数，推荐取<code>1e-6</code>。</li><li>接口内部按FLOAT32参与计算。</li></ul></td>
         <td>-</td>
         <td>-</td>
         <td>-</td>

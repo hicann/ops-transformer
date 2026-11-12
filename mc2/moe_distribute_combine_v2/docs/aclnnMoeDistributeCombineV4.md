@@ -535,7 +535,6 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     - sharedExpertNum当前版本不支持，传0即可。
     - sharedExpertRankNum当前版本不支持，传0即可。
     - commQuantMode取值范围0或2（0表示不量化，2表示int8量化），取值为2仅当commAlg为"hierarchy"或HCCL_INTRA_PCIE_ENABLE=1且HCCL_INTRA_ROCE_ENABLE=0且驱动版本≥25.0.RC1.1时支持。
-    - expandScalesOptional要求是一个1D的Tensor。
     - elasticInfoOptional当前版本不支持，传空指针即可。
     - oriXOptional当commAlg="hierarchy"时，当前版本不支持，传空指针即可。
     - constExpertAlpha1Optional预留参数，当前版本不支持，传空指针即可。

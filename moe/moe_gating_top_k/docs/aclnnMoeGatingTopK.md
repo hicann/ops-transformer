@@ -550,19 +550,19 @@ int main() {
   std::vector<int32_t> expertIdOutHostData(GetShapeSize(expertIdOutShape));
   std::vector<float> normOutHostData(GetShapeSize(normOutShape));
 
-  // 创建expandedPermutedRows aclTensor
+  // 创建input aclTensor
   ret = CreateAclTensor(inputHostData, inputShape, &inputAddr, aclDataType::ACL_FLOAT, &input);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  // 创建expandedPermutedRows aclTensor
+  // 创建bias aclTensor
   ret = CreateAclTensor(biasHostData, biasShape, &biasAddr, aclDataType::ACL_FLOAT, &bias);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   // 创建expertForSourceRow aclTensor
   ret = CreateAclTensor(outHostData, outShape, &outAddr, aclDataType::ACL_FLOAT, &out);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  // 创建expandedSrcToDstRow aclTensor
+  // 创建expertIdOut aclTensor
   ret = CreateAclTensor(expertIdOutHostData, expertIdOutShape, &expertIdOutAddr, aclDataType::ACL_INT32, &expertIdOut);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  // 创建expandedSrcToDstRow aclTensor
+  // 创建normOut aclTensor
   ret = CreateAclTensor(normOutHostData, normOutShape, &normOutAddr, aclDataType::ACL_FLOAT, &normOut);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 

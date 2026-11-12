@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-* 接口功能：训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。对标竞品适配gptoss模型支持sink功能。**跟[aclnnFlashAttentionVarLenScoreV3](./aclnnFlashAttentionVarLenScoreV3.md)接口的区别是：增加`sinkInOptional`可选输入，保留了[aclnnFlashAttentionVarLenScoreV4](./aclnnFlashAttentionVarLenScoreV4.md)的`softmaxOutLayout`可选输入。**
+* 接口功能：训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。对标竞品适配gpt-oss模型支持sink功能。**跟[aclnnFlashAttentionVarLenScoreV3](./aclnnFlashAttentionVarLenScoreV3.md)接口的区别是：增加`sinkInOptional`可选输入，保留了[aclnnFlashAttentionVarLenScoreV4](./aclnnFlashAttentionVarLenScoreV4.md)的`softmaxOutLayout`可选输入。**
 
   <!-- npu="950" id7 -->
   - <term>Ascend 950PR&950DT系列产品</term>：暂不支持sinkInOptional与softmaxOutLayout参数。
@@ -524,9 +524,9 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV5(
 - 确定性计算：
   - aclnnFlashAttentionVarLenScoreV5默认确定性实现。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- 输入query、key、value的B：batchsize必须相等。
+- 输入query、key、value的B：Batch size必须相等。
 - 输入query、key、value的D：Head-Dim必须满足（qD == kD && kD >= vD）。
-- 输入query、key、value的input_layout必须一致。
+- 输入query、key、value的inputLayout必须一致。
 - 输入query、key、value、realShiftOptional的数据类型必须一致。
 - 支持输入query的N和key/value的N不相等，但必须成比例关系，即Nq/Nkv必须是非0整数，Nq取值范围1~256。当Nq/Nkv > 1时，即为GQA（grouped-query attention）；当Nkv=1时，即为MQA（multi-query attention）。本文如无特殊说明，N表示的是Nq。
 - 关于数据shape的约束，其中：

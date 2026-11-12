@@ -27,7 +27,7 @@
 
   **该算子不建议单独使用，建议与aclnnSparseLightningIndexerKLLossGrad算子配合使用，形成完整的工作流。**
     1. 接收主算子的shape信息，包括batchSize、maxSeqlenQ、maxSeqlenK、numHeadsQ、numHeadsK、headDim、topk、layout和mask信息。
-    2. 根据每个q对应的有效sparse长度估算负载，并将B/S1合轴后的任务均衡切分到可用AIC核上。
+    2. 根据每个q对应的有效sparse长度估算负载，并将B/S1合轴后的任务均衡切分到可用AI Core上。
     3. 输出的metadata后续作为aclnnSparseLightningIndexerKLLossGrad算子的metadataOptional输入使用。
 
 ## 函数原型

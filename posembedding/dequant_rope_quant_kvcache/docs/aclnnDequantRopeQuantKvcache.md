@@ -50,7 +50,7 @@
   如果cacheModeOptional为contiguous则：
 
   $$
-  kCacheRef[i][indice[i]]=quantK[i]
+  kCacheRef[i][indices[i]]=quantK[i]
   $$
 
   $$
@@ -194,7 +194,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
         <td>indices</td>
         <td>输入</td>
         <td>公式中表示Kvcache的token位置信息的输入indices。</td>
-        <td>当cache_mode为page且x为3维时shape为[B*S]，否则shape为[B]。</td>
+        <td>当cacheMode为page且x为3维时shape为[B*S]，否则shape为[B]。</td>
         <td>INT32</td>
         <td>ND</td>
         <td>1</td>

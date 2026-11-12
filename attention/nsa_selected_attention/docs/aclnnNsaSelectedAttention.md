@@ -370,7 +370,7 @@ aclnnStatus aclnnNsaSelectedAttention(
 - 确定性计算：
   - aclnnNsaSelectedAttention默认确定性实现。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- 输入query、key、value的batchsize必须相等，即要求传入的actualSeqQLenOptional和actualSeqKvLenOptional具有相同的长度。
+- 输入query、key、value的Batch size必须相等，即要求传入的actualSeqQLenOptional和actualSeqKvLenOptional具有相同的长度。
 - 输入query、key、value的D：Head-Dim必须满足（D_q == D_k && D_k >= D_v）。
 - 输入query、key、value的数据类型必须一致。
 - 输入query、key、value的inputLayout必须一致。
@@ -383,7 +383,7 @@ aclnnStatus aclnnNsaSelectedAttention(
 - 当attenMaskOptional输入为nullptr时，sparseMode参数不生效，固定为全计算。
 - 关于数据shape的约束，以inputLayout的TND举例（注：T等于各batch S的长度累加和。当各batch的S相等时，T=B*S）。其中：
 
-  - B（Batchsize）：取值范围为1\~1024。
+  - B（Batch size）：取值范围为1\~1024。
   - N（Head-Num）：取值范围为1\~128。
   - G（Group）：取值范围为1\~32。
   - S（Seq-Length）：取值范围为1\~128K。同时需要满足S_kv >= selectedBlockSize * selectedBlockCount，且S_kv长度为selectedBlockSize的整数倍。

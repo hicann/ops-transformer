@@ -44,7 +44,7 @@
 
     其中的Reduce计算是将来自不同rank的数据进行reduce计算。
 
-    - 情形1：如果x数据类型为float8_e4m3fn、float8_e5m2、int8和hifloat8时，入参scale为float32时，先进行all_reduce通信，然后进行pertoken-pergroup反量化，得到bfloat16、float16或者float32数据类型的输出。
+    - 情形1：如果x数据类型为float8_e4m3fn、float8_e5m2、int8和hifloat8时，入参scales为float32时，先进行all_reduce通信，然后进行pertoken-pergroup反量化，得到bfloat16、float16或者float32数据类型的输出。
 
     - 情形2：如果x数据类型为float8_e4m3fn、float8_e5m2时，入参scales为float8_e8m0时，先进行all_reduce通信，然后进行MX反量化，得到bfloat16、float16或者float32数据类型的输出。
 

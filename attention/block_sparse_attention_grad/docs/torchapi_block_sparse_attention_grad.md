@@ -27,7 +27,7 @@
 
   `block_sparse_attention_grad`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`BlockSparseAttentionGrad`算子完成块级稀疏注意力反向计算。通过`block_sparse_mask`指定每个Q块需要参与计算的KV块，实现高效的稀疏注意力反向计算，并一次性返回`dq`、`dk`、`dv`。
 
-  该接口为正向接口`block_sparse_attention`的反向传播：正向的输出`attentionOut`与`softmaxLse`作为反向输入参与计算。
+  该接口为正向接口`block_sparse_attention`的反向传播：正向的输出`attentionOut`与`softmax_lse`作为反向输入参与计算。
 
 - **计算公式**：
 
@@ -134,7 +134,7 @@ cann_ops_transformer.block_sparse_attention_grad(
 | actual_seq_lengths | list[int] | TND时必选/其余可选 | 每个batch对应的query实际序列长度 | int64 | - | 长度为B | - |
 | actual_seq_lengths_kv | list[int] | TND时必选/其余可选 | 每个batch对应的key/value实际序列长度 | int64 | - | 长度为B | - |
 | atten_mask | Tensor | 可选 | 公式中的atten_mask。<ul><li>`mask_type=1`时必选，为块级变长掩码（INT32 counts）<br>支持的shape:[B, Nq, maxBlockNum, 2]，其中 $maxBlockNum=\max(\lceil Sq/block\_x\rceil, \lceil Skv/block\_y\rceil)$；</li><li>`mask_type=0`时必须为None。</li></ul> | int32 | ND | 4 | × |
-| mask_type | int | 可选 | attention计算中的掩码类型，默认0。<ul><li>当mask_type-0，即为不加mask场景（默认值），忽略`atten_mask`，按`block_sparse_mask`给定的块级稀疏模式计算；</li><li>当mask_type=1，即为块级变长掩码场景，按块级变长掩码计算，需配置`atten_mask`（INT32 counts）</li></ul> | int64 | - | - | - |
+| mask_type | int | 可选 | attention计算中的掩码类型，默认0。<ul><li>当mask_type=0，即为不加mask场景（默认值），忽略`atten_mask`，按`block_sparse_mask`给定的块级稀疏模式计算；</li><li>当mask_type=1，即为块级变长掩码场景，按块级变长掩码计算，需配置`atten_mask`（INT32 counts）</li></ul> | int64 | - | - | - |
 
 ## 返回值说明
 
@@ -172,7 +172,7 @@ cann_ops_transformer.block_sparse_attention_grad(
 
 ## 确定性计算
 
-- 默认不支持确定性计算，可通过Pytorch开关（torch.use_deterministic_algorithms）支持
+- 默认不支持确定性计算，可通过PyTorch开关（torch.use_deterministic_algorithms）支持
 
 ## 调用示例
 

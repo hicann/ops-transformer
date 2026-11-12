@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：DenseLightningIndexerGradKlLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，从而减少长序列场景下Attention的计算量，提升长序列网络的推理和训练性能。稠密场景下的LightningIndexerGrad的输入query、key、query_index、key_index不用做稀疏化处理。
+- 接口功能：DenseLightningIndexerGradKlLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，从而减少长序列场景下Attention的计算量，提升长序列网络的推理和训练性能。稠密场景下的LightningIndexerGrad的输入query、key、queryIndex、keyIndex不用做稀疏化处理。
 
 - 计算公式：
 
@@ -484,7 +484,7 @@ aclnnStatus aclnnDenseLightningIndexerGradKLLoss(
 - 公共约束
 
   - 确定性计算：
-    aclnnDenseLightningIndexerGradKLLoss默认非确定性实现，支持通过alcrtCtxSetSysParamOpt开启确定性。
+    aclnnDenseLightningIndexerGradKLLoss默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
   - 入参为空的场景处理：
     - query或key或query_index或key_index或weight为空Tensor：当前不支持，会报错。
 

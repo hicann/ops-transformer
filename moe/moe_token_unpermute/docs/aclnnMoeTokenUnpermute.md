@@ -286,7 +286,7 @@ aclnnStatus aclnnMoeTokenUnpermute(
   - out输出等同于aclnnMoeFinalizeRoutingV2接口的out输出。
 <!-- end id8 -->
 <!-- npu="310p" id9 -->
-- |<term>Atlas推理系列产品</term>：
+- <term>Atlas推理系列产品</term>：
   - permutedTokens与probsOptional支持的数据类型为FLOAT16、FLOAT32。
   - topK_num <= 512。
   - hidden_size是128的倍数且小于10240。

@@ -169,7 +169,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     <tr>
     <td>tpSendCountsOptional</td>
     <td>输入</td>
-    <td>预留参数，TP域通信不再支持，传空指针即可</td>
+    <td>对应`aclnnMoeDistributeDispatchV2`中的`tpRecvCounts`输出</td>
     <td>预留参数，TP域通信不再支持，传空指针即可。</td>
     <td>INT32</td>
     <td>ND</td>
