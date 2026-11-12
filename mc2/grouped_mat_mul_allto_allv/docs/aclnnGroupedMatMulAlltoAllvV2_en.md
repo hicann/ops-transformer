@@ -204,7 +204,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <tr>
     <td>epWorldSize (int64_t)</td>
     <td>Input</td>
-    <td>Size of the ep communicator.</td>
+    <td>Size of the ep communicator; -1 uses the actual size of group, while an explicit value must equal that size, which remains subject to the product constraints.</td>
     <td><ul><li><term>Atlas A2 products</term> supports 2, 4, and 8.</li><li><term>Atlas A3 products</term> supports 8, 16, 32, 64, and 128.</li><li><term>Ascend 950PR&950DT products</term> supports 2, 4, 8, 16, 32, and 64.</li></ul></td>
     <td>INT64</td>
     <td>-</td>
@@ -391,6 +391,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
   - N2: Indicates the head_num of the shared expert. Value range: (0, 65536).
   - BS: batch sequence size.
   - K: Number of selected TopK experts. AIV communication of Atlas A3 products supports [2, 16], and other use cases support [2, 8].
+  - When shared experts are enabled, BS is dimension 0 of mmXOptional and mmYOptional, BSK is dimension 0 of y, and `BSK=BS*K` must hold with K in the range above.
   - A: the number of tokens sent by the current card, which is the cumulative sum of the sendCounts parameter.
   - The sum of the A parameter of all devices in the ep communicator equals the sum of the BSK parameter of all devices.
 

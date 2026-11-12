@@ -276,17 +276,20 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckParamsAttrEpAndSetLocalParams
     const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "group"), return ge::GRAPH_FAILED);
 
-    int64_t rankDim = 0;
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX);
     OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "epWorldSize"),
                     return ge::GRAPH_FAILED);
-    if (*epWorldSizePtr == RANK_DEFAULT_NUM) {
-        OP_TILING_CHECK(!mc2tiling::GetRankSize(opName_, group, rankDim),
-                        OP_LOGE_WITHOUT_REPORT(opName_, "GetRankSize failed; preserve the shared HCCL lookup report"),
-                        return ge::GRAPH_FAILED);
-    } else {
-        rankDim = *epWorldSizePtr;
-    }
+    int64_t communicatorRankSize = 0;
+    OP_TILING_CHECK(
+        !mc2tiling::GetRankSize(opName_, group, communicatorRankSize),
+        OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get rank size for group %s; see the HCCL lookup error.", group),
+        return ge::GRAPH_FAILED);
+    const int64_t epWorldSize = (*epWorldSizePtr == RANK_DEFAULT_NUM) ? communicatorRankSize : *epWorldSizePtr;
+    OP_TILING_CHECK(epWorldSize != communicatorRankSize,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "epWorldSize", std::to_string(epWorldSize),
+                        "must equal communicator rank size=" + std::to_string(communicatorRankSize)),
+                    return ge::GRAPH_FAILED);
 
     std::string supportRankSizeRange;
     const std::set<int64_t>& supportRankSize = (npuArch_ == Ops::Base::DAV_3510 || npuArch_ == Ops::Base::DAV_9201) ?
@@ -295,11 +298,11 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckParamsAttrEpAndSetLocalParams
     for (const auto& v : supportRankSize) {
         supportRankSizeRange += (std::to_string(v) + " ");
     }
-    OP_TILING_CHECK(
-        supportRankSize.find(rankDim) == supportRankSize.end(),
-        OP_LOGE_FOR_INVALID_VALUE(opName_, "rankSize", std::to_string(rankDim).c_str(), supportRankSizeRange.c_str()),
-        return ge::GRAPH_FAILED);
-    localParams_.epWorldSize = rankDim;
+    OP_TILING_CHECK(supportRankSize.find(epWorldSize) == supportRankSize.end(),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "rankSize", std::to_string(epWorldSize).c_str(),
+                                              supportRankSizeRange.c_str()),
+                    return ge::GRAPH_FAILED);
+    localParams_.epWorldSize = epWorldSize;
 
     bool isEpNumMatch = (localParams_.ep > 0) && (localParams_.ep < 33);
     if (!isEpNumMatch) {
@@ -307,7 +310,7 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckParamsAttrEpAndSetLocalParams
                                   std::to_string(MAX_EXPERT_NUM_PER_RANK).c_str());
         return ge::GRAPH_FAILED;
     }
-    uint64_t expertNum = localParams_.ep * rankDim;
+    uint64_t expertNum = localParams_.ep * epWorldSize;
     OP_TILING_CHECK(expertNum > MAX_EXPERT_NUM,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "expertNum", std::to_string(expertNum).c_str(),
                                                           "exceeds max expert num"),

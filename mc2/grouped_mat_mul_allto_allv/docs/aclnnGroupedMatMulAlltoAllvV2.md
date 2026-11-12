@@ -202,7 +202,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <tr>
     <td>epWorldSize（int64_t）</td>
     <td>输入</td>
-    <td>ep通信域size。</td>
+    <td>ep通信域size；传入-1时使用group通信域的实际大小，显式指定时必须与该大小一致，实际大小仍须满足产品约束。</td>
     <td>支持2、4、8、16、32、64、128、256。</td>
     <td>INT64</td>
     <td>-</td>
@@ -402,6 +402,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
   - N2：表示共享专家的head_num，取值范围(0, 65536)。
   - BS：batch sequence size。
   - K：表示选取TopK个专家，Atlas A3系列产品的AIV通信支持[2, 16]，其他场景支持[2, 8]。
+  - 启用共享专家时，BS为mmXOptional和mmYOptional的第0维，BSK为y的第0维，必须满足`BSK=BS*K`，K须符合上述取值范围。
   - A：本卡发送的token数，是sendCounts参数累加之和。
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
 
