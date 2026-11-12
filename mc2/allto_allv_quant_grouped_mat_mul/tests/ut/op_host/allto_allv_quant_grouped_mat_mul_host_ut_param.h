@@ -30,6 +30,7 @@ struct AlltoAllvQuantGroupedMatMulTilingUTParamBase {
     bool mm_out_flag;
     int64_t world_size;
     std::string comm_mode;
+    std::string soc;
     int64_t ep_world_size;
     int64_t graph_type;
     int64_t group_size;
@@ -51,6 +52,7 @@ struct AlltoAllvQuantGroupedMatMulTilingUTParamBase {
         this->mm_out_flag = stoi(ReadMap(csvMap, "mm_out_flag"));
         this->world_size = stoll(ReadMap(csvMap, "world_size"));
         this->comm_mode = ReadMap(csvMap, "comm_mode", "ccu");
+        this->soc = ReadMap(csvMap, "soc", "3510");
         this->ep_world_size = stoll(ReadMap(csvMap, "ep_world_size"));
         this->graph_type = stoll(ReadMap(csvMap, "graph_type"));
         this->group_size = stoll(ReadMap(csvMap, "group_size"));

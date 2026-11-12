@@ -613,7 +613,7 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulV2NullptrTest, AiCpuCommMode)
     EXPECT_NE(ACLNN_ERR_PARAM_NULLPTR, ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));
 }
 
-TEST_F(AclnnAlltoAllvQuantGroupedMatMulV2NullptrTest, A6RejectCcu)
+TEST_F(AclnnAlltoAllvQuantGroupedMatMulV2NullptrTest, A6AcceptCcu)
 {
     TensorDesc gmmX = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
     TensorDesc gmmWeight = {{4, 7168, 4096}, ACL_HIFLOAT8, ACL_FORMAT_ND};
@@ -637,6 +637,36 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulV2NullptrTest, A6RejectCcu)
     auto ut = OP_API_UT(aclnnAlltoAllvQuantGroupedMatMulV2,
                         INPUT(gmmX, gmmWeight, gmmXScale, gmmWeightScale, nullptr, nullptr, mmXOptional,
                               mmWeightOptional, mmXScaleOptional, mmWeightScaleOptional, 1, 1, 1, 1, "group", "ccu", 0,
+                              sendCounts, recvCounts, 0, 0, 0, 1),
+                        OUTPUT(gmmY, mmYOptional, permuteOutOptional));
+    // 960dt+ccu 通过参数与 commMode 校验后进入 NNopbase 工作区流程；UT 无 device 上下文，预期在 runtime 阶段失败
+    EXPECT_EQ(ACLNN_ERR_RUNTIME_ERROR, ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));
+}
+
+TEST_F(AclnnAlltoAllvQuantGroupedMatMulV2NullptrTest, A6RejectUnsupportedCommMode)
+{
+    TensorDesc gmmX = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
+    TensorDesc gmmWeight = {{4, 7168, 4096}, ACL_HIFLOAT8, ACL_FORMAT_ND};
+    TensorDesc gmmXScale = {{1}, ACL_FLOAT, ACL_FORMAT_ND};
+    TensorDesc gmmWeightScale = {{1}, ACL_FLOAT, ACL_FORMAT_ND};
+    TensorDesc mmXOptional = {{4096, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
+    TensorDesc mmWeightOptional = {{7168, 4096}, ACL_HIFLOAT8, ACL_FORMAT_ND};
+    TensorDesc mmXScaleOptional = {{1}, ACL_FLOAT, ACL_FORMAT_ND};
+    TensorDesc mmWeightScaleOptional = {{1}, ACL_FLOAT, ACL_FORMAT_ND};
+    std::vector<int64_t> sendCountsList(8, 1024);
+    std::vector<int64_t> recvCountsList(8, 1024);
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
+    TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
+    TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
+    uint64_t workspace_size = 0;
+    aclOpExecutor* executor = nullptr;
+    op::SetPlatformNpuArch(Ops::Base::DAV_9201);
+
+    auto ut = OP_API_UT(aclnnAlltoAllvQuantGroupedMatMulV2,
+                        INPUT(gmmX, gmmWeight, gmmXScale, gmmWeightScale, nullptr, nullptr, mmXOptional,
+                              mmWeightOptional, mmXScaleOptional, mmWeightScaleOptional, 1, 1, 1, 1, "group", "aiv", 0,
                               sendCounts, recvCounts, 0, 0, 0, 1),
                         OUTPUT(gmmY, mmYOptional, permuteOutOptional));
     EXPECT_EQ(ACLNN_ERR_PARAM_INVALID, ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));

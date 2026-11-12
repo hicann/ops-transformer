@@ -256,13 +256,6 @@ ge::graphStatus AlltoAllvQuantGmmTilingCommon::QuantGetAndConvertCommMode(gert::
     if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
         commMode = Mc2Comm::COMM_MODE_AICPU;
     } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
-        auto platformInfo = context->GetPlatformInfo();
-        auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-        if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_9201) {
-            // A6(ascend960)无CCU引擎，显式ccu直接报错(默认ai_cpu不受影响)
-            OP_LOGE(context->GetNodeName(), "A6 has no CCU engine, commMode 'ccu' is not supported.");
-            return ge::GRAPH_FAILED;
-        }
         commMode = Mc2Comm::COMM_MODE_CCU;
     } else {
         OP_LOGD(context->GetNodeName(), "Currently, commMode only support 'ccu', 'ai_cpu', but got %s.", commModeStr);
@@ -300,6 +293,10 @@ ge::graphStatus AlltoAllvQuantGmmTilingCommon::SetHcclTiling() const
         hcclCcTilingConfig.SetCommEngine(Mc2Comm::ENGINE_AICPU);
     } else if (commMode == Mc2Comm::COMM_MODE_CCU) {
         hcclCcTilingConfig.SetCommEngine(Mc2Comm::ENGINE_CCU_SCHED);
+        OP_TILING_CHECK(!CheckCcuFullmesh1DTopoAndForceAlgo(context_, group_, Mc2Comm::ENGINE_CCU_SCHED,
+                                                            alltoAllvConfig, hcclCcTilingConfig),
+                        OP_LOGE(context_->GetNodeName(), "Tiling check comm topo and force algo name failed."),
+                        return ge::GRAPH_FAILED);
     }
     OP_TILING_CHECK(hcclCcTilingConfig.GetTiling(tilingData->hcclA2avTilingInfo.hcclInitTiling) != 0,
                     OP_LOGE(context_->GetNodeName(),

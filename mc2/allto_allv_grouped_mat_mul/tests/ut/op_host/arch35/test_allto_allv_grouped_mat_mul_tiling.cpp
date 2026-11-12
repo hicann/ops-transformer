@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "mc2_tiling_case_executor.h"
+#include "mc2_hcom_topo_info.h"
 
 using namespace std;
 
@@ -24,6 +25,8 @@ struct TestParam {
     std::vector<std::pair<string, std::vector<int64_t>>> tilingParamsVecPair{};
     std::vector<std::pair<size_t, ge::DataType>> tilingDTypesPair{};
     ge::graphStatus status;
+    std::string soc{"3510"};
+    std::string commMode{"ccu"};
 };
 
 struct TilingParams {
@@ -169,12 +172,57 @@ protected:
         std::cout << "AlltoAllvGroupedMatMulArch35TilingTest TearDown" << std::endl;
     }
 
+    void TearDown() override
+    {
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
+    }
+
 public:
     std::vector<int64_t> sendCounts{128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
                                     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128};
     std::vector<int64_t> recvCounts{128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
                                     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128};
 };
+
+// 960dt(a6)+CCU 组网白名单 mock 路由: 正向用例显式 mock 单层纯 fullmesh 1D
+// 主路径(六键显式设置, 不隐式依赖 mocker 默认值; mocker 默认为单层 Mesh+CLOS 混联, 是 960dt CCU
+// 拦截面, 正向用例不 mock 会被默认拦截); 四类拦截面负向按用例名逐类构造
+static Mc2Hcom::MockValues BuildHcomTopologyMockValues(const TestParam& testParam)
+{
+    Mc2Hcom::MockValues mockValues{{"rankNum", 8}};
+    if (testParam.soc != "9201") {
+        return mockValues;
+    }
+    auto addFullmesh1DMainPath = [&mockValues](uint64_t userRankSize, uint64_t levelNums = 1U,
+                                               uint64_t topoInfoRet = static_cast<uint64_t>(HCCL_SUCCESS)) {
+        mockValues.emplace_back("l0InstTypeSet", 1ULL << COMM_TOPO_1DMESH);  // 实例类型位图恰为 1DMESH 单位
+        mockValues.emplace_back("l0CoverTypeSet", 1ULL << COMM_TOPO_1DMESH); // 覆盖类型位图恰为 1DMESH 单位
+        mockValues.emplace_back("level0Topo", static_cast<uint64_t>(Mc2Hcom::Mc2Level0Topo::MESH_1D)); // 日志辅助字段
+        mockValues.emplace_back("topoLevelNums", levelNums);    // 单层组网(默认)
+        mockValues.emplace_back("getTopoInfoRet", topoInfoRet); // 组网查询结果(默认成功)
+        mockValues.emplace_back("userRankSize", userRankSize);  // 防御面正常态(<=16)
+    };
+    const auto& testName = testParam.testName;
+    if (testParam.commMode == "ccu") {
+        if (testName.find("_clos_blocked") != std::string::npos) { // 拦截面①: 纯CLOS
+            mockValues.emplace_back("l0InstTypeSet", 1ULL << COMM_TOPO_CLOS);
+            mockValues.emplace_back("l0CoverTypeSet", 1ULL << COMM_TOPO_CLOS);
+            mockValues.emplace_back("level0Topo", static_cast<uint64_t>(Mc2Hcom::Mc2Level0Topo::CLOS));
+        } else if (testName.find("_multilevel_blocked") != std::string::npos) { // 拦截面②: 跨机多层
+            addFullmesh1DMainPath(8U, 2U);
+        } else if (testName.find("_queryfail_blocked") != std::string::npos) { // 拦截面③: 组网查询失败
+            addFullmesh1DMainPath(8U, 1U, static_cast<uint64_t>(HCCL_E_PARA));
+        } else if (testName.find("_ranksize_blocked") != std::string::npos) { // 防御面: 超rank上限(>16)
+            addFullmesh1DMainPath(32U);
+        } else if (testName.find("fullmesh_mock") != std::string::npos || testParam.status == ge::GRAPH_SUCCESS) {
+            addFullmesh1DMainPath(8U); // 白名单正向主路径; meshclos 拦截面用默认混联零设置
+        }
+    } else if (testParam.commMode == "ai_cpu" && testName.find("fullmesh_mock") != std::string::npos) {
+        // 默认回归: AICPU 在白名单组网下行为一致(白名单函数步骤②引擎前置过滤零干预)
+        addFullmesh1DMainPath(8U);
+    }
+    return mockValues;
+}
 
 TEST_P(AlltoAllvGroupedMatMulArch35TilingTest, ShapeSize)
 {
@@ -217,16 +265,30 @@ TEST_P(AlltoAllvGroupedMatMulArch35TilingTest, ShapeSize)
             {"transGmmWeight", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"transMmWeight", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"permuteOutFlag", Ops::Transformer::AnyValue::CreateFrom<bool>(tilingParams.permuteOutFlag)},
-            {"commMode", Ops::Transformer::AnyValue::CreateFrom<std::string>("ccu")},
+            {"commMode", Ops::Transformer::AnyValue::CreateFrom<std::string>(testParam.commMode)},
         },
-        &compileInfo, "3510", coreNum, ubSize, tilingDataSize);
+        &compileInfo, testParam.soc, coreNum, ubSize, tilingDataSize);
 
-    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    Mc2Hcom::MockValues hcomTopologyMockValues = BuildHcomTopologyMockValues(testParam);
     if (testParam.status == ge::GRAPH_FAILED) {
         Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
     } else {
         // arch35 tilingKey 可能与 arch22 不同，跳过 tilingKey 校验
         Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, UINT64_MAX);
+    }
+    // 960dt+ccu 白名单正向: 断言生效算法名被强制为 sole[mesh](经 Mc2CcTilingConfig 写入
+    // tilingData 的 algConfig, 覆盖 legacy 默认名 AlltoAll=level0:fullmesh;level1:pairwise)
+    if (testParam.soc == "9201" && testParam.commMode == "ccu" && testParam.status == ge::GRAPH_SUCCESS) {
+        // Mc2ExecuteTestCase 内部已 Reset mocker, 断言用的二次执行前需重新注入白名单组网 mock
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValues(hcomTopologyMockValues);
+        TilingInfo tilingInfo;
+        const bool tilingOk = ExecuteTiling(tilingContextPara, tilingInfo);
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
+        ASSERT_TRUE(tilingOk);
+        const std::string rawTiling(reinterpret_cast<const char*>(tilingInfo.tilingData.get()),
+                                    tilingInfo.tilingDataSize);
+        EXPECT_NE(rawTiling.find("sole[mesh]"), std::string::npos)
+            << "960dt+ccu effective algConfig should be forced to sole[mesh]";
     }
 }
 
@@ -328,7 +390,63 @@ static TestParam testParams[] = {
      {},
      ge::GRAPH_FAILED},
     // 不带 MM 场景
-    {"Test_no_MM", {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}}, {}, {}, ge::GRAPH_SUCCESS}};
+    {"Test_no_MM", {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}}, {}, {}, ge::GRAPH_SUCCESS},
+    // ============ 960dt(DAV_9201)+CCU 组网白名单用例(对齐PR#15055, mock路由见BuildHcomTopologyMockValues) ============
+    // 正向: 单层纯 fullmesh 1D 主路径放行, 生效算法名强制为 sole[mesh]
+    {"Test_a6_ccu_fullmesh1d_succ",
+     {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}},
+     {},
+     {},
+     ge::GRAPH_SUCCESS,
+     "9201"},
+    // 拦截面(mocker 默认形态): 单层 Mesh+CLOS 混联, 1DMESH 不覆盖 L0 → 拦截报错
+    {"Test_a6_ccu_meshclos_blocked",
+     {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}},
+     {},
+     {},
+     ge::GRAPH_FAILED,
+     "9201"},
+    // 拦截面①: 纯 CLOS 组网(无 1DMESH 实例) → 拦截报错
+    {"Test_a6_ccu_clos_blocked", {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}}, {}, {}, ge::GRAPH_FAILED, "9201"},
+    // 拦截面②: 跨机多层组网(topoLevelNums=2) → 拦截报错
+    {"Test_a6_ccu_multilevel_blocked",
+     {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}},
+     {},
+     {},
+     ge::GRAPH_FAILED,
+     "9201"},
+    // 拦截面③: 组网查询失败(getTopoInfoRet=HCCL_E_PARA) → 拦截报错
+    {"Test_a6_ccu_queryfail_blocked",
+     {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}},
+     {},
+     {},
+     ge::GRAPH_FAILED,
+     "9201"},
+    // 防御面: 超rank上限(userRankSize=32 > 16) → 拦截报错
+    {"Test_a6_ccu_ranksize_blocked",
+     {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}},
+     {},
+     {},
+     ge::GRAPH_FAILED,
+     "9201"},
+    // 回归: 9201 + ai_cpu 在白名单组网下行为一致(白名单仅对 CCU 生效, 引擎前置过滤零干预)
+    {"Test_a6_aicpu_fullmesh_mock",
+     {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}},
+     {},
+     {},
+     ge::GRAPH_SUCCESS,
+     "9201",
+     "ai_cpu"},
+    // 回归: 9201 + ai_cpu 在默认混联组网下不受白名单影响
+    {"Test_a6_aicpu_meshclos_default",
+     {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}},
+     {},
+     {},
+     ge::GRAPH_SUCCESS,
+     "9201",
+     "ai_cpu"},
+    // 回归: 3510 + ccu 默认混联组网行为不变(白名单仅对 9201 生效)
+    {"Test_a5_ccu_meshclos_default", {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}}, {}, {}, ge::GRAPH_SUCCESS}};
 
 INSTANTIATE_TEST_SUITE_P(AlltoAllvGroupedMatMul, AlltoAllvGroupedMatMulArch35TilingTest, testing::ValuesIn(testParams),
                          [](const testing::TestParamInfo<AlltoAllvGroupedMatMulArch35TilingTest::ParamType>& info) {

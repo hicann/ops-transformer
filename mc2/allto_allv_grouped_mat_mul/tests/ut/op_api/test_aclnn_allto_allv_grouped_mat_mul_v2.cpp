@@ -78,6 +78,16 @@ TEST_F(L2AlltoAllvGroupedMatMulV2Test, Test)
     EXPECT_EQ(CallGetWorkspaceSize("aiv", ACL_BF16, ACL_FORMAT_FRACTAL_NZ), ACLNN_ERR_PARAM_INVALID);
 }
 
+TEST_F(L2AlltoAllvGroupedMatMulV2Test, TestA6CcuAccepted)
+{
+    // 960dt+ccu 通过参数与 commMode 校验后进入 NNopbase 工作区流程；UT 无 device 上下文，预期在 runtime 阶段失败
+    EXPECT_EQ(CallGetWorkspaceSize("ccu", ACL_FLOAT16, ACL_FORMAT_ND, op::SocVersion::ASCEND960DT),
+              ACLNN_ERR_RUNTIME_ERROR);
+    EXPECT_EQ(CallGetWorkspaceSize("aiv", ACL_FLOAT16, ACL_FORMAT_ND, op::SocVersion::ASCEND960DT),
+              ACLNN_ERR_PARAM_INVALID);
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND910_93);
+}
+
 TEST_F(L2AlltoAllvGroupedMatMulV2Test, TestAivSupportedOnA2AndA3)
 {
     EXPECT_NE(CallGetWorkspaceSize("aiv", ACL_BF16, ACL_FORMAT_ND, op::SocVersion::ASCEND910B),

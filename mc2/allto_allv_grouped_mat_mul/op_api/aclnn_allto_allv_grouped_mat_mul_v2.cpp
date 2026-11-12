@@ -53,7 +53,7 @@ static aclnnStatus CheckAndHandleCommMode(const char* commModeStr, uint8_t& comm
         commModeEnum = Mc2Comm::COMM_MODE_AIV;
         return ACLNN_SUCCESS;
     }
-    if (arch == Ops::Base::DAV_3510 && std::strcmp(commModeStr, "ccu") == 0) {
+    if ((arch == Ops::Base::DAV_3510 || arch == Ops::Base::DAV_9201) && std::strcmp(commModeStr, "ccu") == 0) {
         commModeEnum = Mc2Comm::COMM_MODE_CCU;
         return ACLNN_SUCCESS;
     }
@@ -237,7 +237,8 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(void* workspace, uint64_t workspaceSiz
             OP_LOGD("AlltoAllvGroupedMatMulV2 uses AIV/MTE communication mode");
             NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_MTE);
         } else if (commMode == Mc2Comm::COMM_MODE_CCU &&
-                   GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+                   (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510 ||
+                    GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201)) {
             OP_LOGD("AlltoAllvGroupedMatMulV2 uses CCU communication mode");
             NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_CCU);
         } else {

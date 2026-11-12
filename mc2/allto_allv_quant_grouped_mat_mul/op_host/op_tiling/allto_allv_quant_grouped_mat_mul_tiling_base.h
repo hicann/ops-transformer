@@ -182,4 +182,12 @@ private:
     ge::graphStatus CheckOptionalMatmulFormats();
     ge::graphStatus CheckFormat();
 };
+
+// 960dt(DAV_9201)+CCU: 组网白名单校验+算法名强制(alltoallvgmm算子族共用, gmm/quant两算子tiling调用,
+// 内部读取context的节点名与平台信息, 复用Mc2CommAlgoSelector的GetTopoFlags(与算法表匹配同一事实源)
+// flag按位与匹配, 仅单层纯fullmesh 1D + rank<=16放行, 并强制算法名sole[mesh]写入hcclCcTilingConfig;
+// 返回false=拦截(白名单不匹配/组网查询失败), 禁止静默降级; true=放行(含非CCU/非960dt零干预)
+bool CheckCcuFullmesh1DTopoAndForceAlgo(const gert::TilingContext* context, const std::string& group,
+                                        uint8_t commEngine, const std::string& defaultAlgoName,
+                                        AscendC::Mc2CcTilingConfig& hcclCcTilingConfig);
 } // namespace optiling

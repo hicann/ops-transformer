@@ -551,7 +551,8 @@ extern "C" aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(void* workspace, uint64_
 {
     if (NnopbaseSetHcclServerType) {
         if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510 ||
-            op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) { // A6复用A5路径(handle恒为AICPU)
+            op::GetCurrentPlatformInfo().GetCurNpuArch() ==
+                Ops::Base::DAV_9201) { // A6复用A5路径(V1 commMode固定ai_cpu，handle恒为AICPU)
             void* arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);

@@ -13,6 +13,8 @@
  * \brief
  */
 #include "allto_allv_quant_grouped_mat_mul_tiling_base.h"
+#include "mc2_comm_algo_selector.h"
+#include "mc2_comm_utils.h"
 #include <numeric>
 #include "mc2_tiling_failure_report.h"
 
@@ -752,5 +754,54 @@ ge::graphStatus AlltoAllvQuantGmmTilingBase::CheckFormat()
     }
     OP_LOGD(context_->GetNodeName(), "end CheckFormat.");
     return ge::GRAPH_SUCCESS;
+}
+
+// 960dt CCU组网白名单校验并强制算法名(alltoallvgmm算子族共用)
+bool CheckCcuFullmesh1DTopoAndForceAlgo(const gert::TilingContext* context, const std::string& group,
+                                        uint8_t commEngine, const std::string& defaultAlgoName,
+                                        AscendC::Mc2CcTilingConfig& hcclCcTilingConfig)
+{
+    const char* opName = context->GetNodeName();
+    auto platformInfo = context->GetPlatformInfo();
+    platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
+    // 步骤① 机型直接判断: 仅960dt(DAV_9201)走组网白名单, 其余机型(950等)不干预
+    if (ascendcPlatform.GetCurNpuArch() != Ops::Base::DAV_9201) {
+        return true;
+    }
+    // 步骤② 引擎过滤前置: 非CCU引擎(ai_cpu/aiv及缺省)全路径零干预
+    if (commEngine != Mc2Comm::ENGINE_CCU_SCHED) {
+        return true;
+    }
+    // 步骤③ 白名单判定: 直接调用Mc2CommAlgoSelector的GetTopoFlags(与算法表匹配同一事实源,
+    // 单次查询装配+拼flag), flag按位与匹配——纯fullmesh 1D = SINGLE_LEVEL + 1DMESH存在 + 1DMESH覆盖
+    // (混联/纯CLOS天然缺位不命中); 降级推导结果由flag拼接统一处理, 无需区分主/降级路径
+    Mc2Hcom::Mc2TopoInfo topoInfo;
+    uint64_t topoFlags = Mc2Hcom::TOPO_FLAG_NONE;
+    if (!Mc2Hcom::Mc2CommAlgoSelector::GetTopoFlags(group.c_str(), topoInfo, topoFlags)) {
+        OP_LOGE(opName,
+                "Failed to get group topology info for group=%s, CCU engine is not allowed on ascend960dt. "
+                "Please use ai_cpu engine or check the group topology.",
+                group.c_str());
+        return false;
+    }
+    constexpr uint64_t CCU_WHITELIST_FLAGS =
+        Mc2Hcom::TOPO_FLAG_SINGLE_LEVEL | Mc2Hcom::TOPO_FLAG_L0_1DMESH | Mc2Hcom::TOPO_FLAG_L0_1DMESH_COVER;
+    constexpr uint32_t CCU_MESH1D_MAX_RANK_SIZE = 16U;
+    if ((topoFlags & CCU_WHITELIST_FLAGS) != CCU_WHITELIST_FLAGS || topoInfo.userRankSize > CCU_MESH1D_MAX_RANK_SIZE) {
+        std::string reason = "CCU engine on ascend960dt is not allowed (requires single-level pure fullmesh 1D "
+                             "topology within rankSize <= 16), userRankSize=" +
+                             std::to_string(topoInfo.userRankSize) +
+                             ". Please use ai_cpu engine or check the group topology.";
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "comm_mode", "ccu", reason.c_str());
+        return false;
+    }
+    // 白名单通过: 强制算法名为sole[mesh], 不信任调用方传入的legacy算法名/后续表结果一律覆盖
+    constexpr char CCU_MESH1D_ALGO_NAME[] = "sole[mesh]";
+    if (defaultAlgoName != CCU_MESH1D_ALGO_NAME) {
+        OP_LOGI(opName, "Force AlltoAll algoName from [%s] to [%s] for CCU engine on ascend960dt.",
+                defaultAlgoName.c_str(), CCU_MESH1D_ALGO_NAME);
+    }
+    hcclCcTilingConfig.SetAlgConfig(CCU_MESH1D_ALGO_NAME);
+    return true;
 }
 } // namespace optiling
