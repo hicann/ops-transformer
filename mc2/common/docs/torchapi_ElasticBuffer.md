@@ -152,16 +152,20 @@ class ElasticBuffer:
 - **训练**（`with_grad=True`）：将 `storage` 的锁页内存直接映射为Engram storage（零拷贝，无数据搬运），`storage` 的原地更新对后续 [engram_fetch](#engram_fetch) 可见。当 `storage` 为FP8量化类型时，须同时传入SF量化表 `sf`。
 
 写入完成后，内部都会获取通信上下文tensor、本地storage地址和rank数等信息，供后续 [engram_fetch](#engram_fetch) 使用。
-> **host pinned共享内存段**（推理模式）：指通过 `aclrtMallocHost` 分配的页锁定（pinned）主机内存，并经 `aclrtHostRegisterV2` 映射后获得设备可访问地址。该内存段既可被本卡NPU直接访问，也可被远端rank的NPU通过URMA读取，从而实现跨rank的零拷贝数据共享。其大小由构造函数的 `num_cpu_bytes` 参数指定。
+> **推理模式内存说明**：Engram storage的内存形态由 `zero_copy` 参数决定。`zero_copy=False` 时，使用内部host pinned共享内存段，即通过 `aclrtMallocHost` 分配的页锁定（pinned）主机内存，经 `aclrtHostRegisterV2` 映射后获得设备可访问地址，`storage` 数据拷贝写入其中，其大小由构造函数的 `num_cpu_bytes` 参数指定；`zero_copy=True` 时，不经过内部拷贝，直接将调用方提供的 `storage` 主机内存经 `aclrtHostRegisterV2` 注册并映射到设备地址，即调用方内存原地成为本rank的Engram storage，注册或映射失败直接报错，不隐式回退到拷贝路径，注册后 `storage` 的原地更新对后续 [engram_fetch](#engram_fetch) 可见，且在本ElasticBuffer生命周期内必须保持存活且地址不变。两种方式的内存均既可被本卡NPU直接访问，也可被远端rank的NPU通过URMA读取，从而实现跨rank的零拷贝数据共享。
 > **训练模式内存映射**：`storage` 的锁页主机内存经 `aclrtHostRegisterV2` 注册并映射到设备地址，再注册到HCCL通信域供远端rank访问。要求：`storage` 必须为锁页内存（如 `pin_memory()` 或 `torch.empty(..., pin_memory=True)` 分配）；普通（非锁页）CPU内存在当前驱动的主机注册路径下不受支持，会在首次调用时报 `aclrtHostGetDevicePointer` 失败；`storage` 在本ElasticBuffer生命周期内必须保持存活且地址不变。重复调用本接口须传入同一 `storage`（可作为表原地更新后的跨rank同步点），传入其他地址会报错。
 
 **计算公式**：
 
-推理模式通过`memcpy_s`将`storage`的数据按字节拷贝到host pinned共享内存段起始位置：
+推理模式（`zero_copy=False`）通过`memcpy_s`将`storage`的数据按字节拷贝到内部host pinned共享内存段起始位置：
 
 $$HostPinnedBuf[0 : storage.nbytes()] \leftarrow storage.data()$$
 
-训练模式无拷贝，直接以 `storage` 作为本rank的Engram表：
+推理模式（`zero_copy=True`）无拷贝，调用方主机内存经主机注册映射后直接作为本rank的Engram表：
+
+$$EngramTable[rank\_id] \equiv storage$$
+
+训练模式无拷贝，`storage` 的锁页内存经主机注册映射后直接作为本rank的Engram表：
 
 $$EngramTable[rank\_id] \equiv storage$$
 
@@ -169,7 +173,7 @@ $$EngramTable[rank\_id] \equiv storage$$
 
 $$Barrier \rightarrow write(storage) \rightarrow Barrier$$
 
-其中 `storage.nbytes() = num_entries × hidden × dtype_size`，须满足 `storage.nbytes() ≤ num_cpu_bytes`。
+其中 `storage.nbytes() = num_entries × hidden × dtype_size`，`zero_copy=False` 时须满足 `storage.nbytes() ≤ num_cpu_bytes`。
 
 **函数原型**：
 
@@ -180,16 +184,16 @@ ElasticBuffer.engram_write(storage, sf=None, *, zero_copy=None) -> None
 **输入参数**：
 
 - **storage** (`Tensor`)：必选参数，待写入的CPU tensor，shape为 `(num_entries, hidden)`，表示有 `num_entries` 个条目，每个条目维度为 `hidden`。要求2维、连续、`hidden`必须大于0，数据类型支持 `bfloat16`、`float16`、`float32`（不带SF时）、`float8_e4m3fn`、`float8_e5m2`（带SF时）。
-- **sf** (`Optional[Tensor]`)：可选参数，FP8量化的缩放因子（Scale Factor）表。要求2维张量，shape为 `(行数, num_sf_packs)`，列数 `num_sf_packs = ceil(hidden / group_size)`，其中 `group_size` 为MX量化的分组大小（每分组一个SF），即对每个条目的 `hidden` 个元素按分组数向上取整，且 `num_sf_packs` 小于等于 `hidden` 大于0；行数按模式区分：训练模式为落在本rank分片SF表，且为cpu tensor,有 `num_entries_per_rank` 条；推理模式为全量SF表，且为npu tensor，有 `num_entries_per_rank × rank_size` 条，详见[约束说明](#约束说明)中的Engram SF量化约束。数据类型支持 `float32`、`float8_e8m0`，数据格式为 $ND$。仅当 `storage` 为 `float8_e4m3fn` 或 `float8_e5m2` 时传入。
+- **sf** (`Optional[Tensor]`)：可选参数，FP8量化的缩放因子（Scale Factor）表，仅当 `storage` 为 `float8_e4m3fn` 或 `float8_e5m2` 时传入（此时为必选）。要求2维张量，shape为 `(行数, num_sf_packs)`，列数 `num_sf_packs = ceil(hidden / group_size)`，其中 `group_size` 为MX量化的分组大小（每分组一个SF），即对每个条目的 `hidden` 个元素按分组数向上取整，须满足 `0 < num_sf_packs ≤ hidden`。行数按模式区分：训练模式为本rank分片SF表，有 `num_entries_per_rank` 行，且为CPU锁页（pinned）张量；推理模式为全量SF表，有 `num_entries_per_rank × rank_size` 行，且为NPU张量。数据类型支持 `float32`、`float8_e8m0`，数据格式为 $ND$。
 - **zero_copy** (`Optional[bool]`)：keyword-only参数。未传时按模式取默认值：推理为 `False`，训练为 `True`。推理时 `False` 表示拷贝到内部host pinned window，`True` 表示原地注册调用方内存，失败直接抛错；训练时始终原地注册pinned storage，显式传 `False` 会直接报错。
 
-**输出说明**：无返回值。推理模式数据写入host pinned内存；训练模式 `storage` 内存被注册为Engram storage。
+**输出说明**：无返回值。推理模式 `zero_copy=False` 时，数据拷贝写入内部host pinned共享内存段；推理模式 `zero_copy=True` 时，`storage` 调用方内存被原地注册为Engram storage（无数据搬运）；训练模式 `storage` 锁页内存被注册为Engram storage。
 
 ### engram_fetch
 
 **功能**：根据输入的全局索引，从对应rank抓取Engram数据。推理和训练的行为由构造时的 `with_grad` 决定：
 
-- **推理**（`with_grad=False`）：通过URMA one-sided read从远端rank的host pinned共享内存抓取数据。接口采用异步设计：调用后立即返回一个callable，执行该callable时阻塞等待URMA传输完成并返回结果tensor。[engram_write](#engram_write) 传入过 `sf` 时，callable额外返回每token对应的SF数据 `fetched_sf`，即返回 `(fetched, fetched_sf)`。
+- **推理**（`with_grad=False`）：通过URMA one-sided read从远端rank的Engram storage抓取数据，可读取远端 [engram_write](#engram_write) 写入内部host pinned共享内存段的数据，也可读取远端以 `zero_copy=True` 原地注册的调用方内存，两种注册方式对抓取侧透明。接口采用异步设计：调用后立即返回一个callable，执行该callable时阻塞等待URMA传输完成并返回结果tensor。[engram_write](#engram_write) 传入过 `sf` 时，callable额外返回每token对应的SF数据 `fetched_sf`，即返回 `(fetched, fetched_sf)`。
 - **训练**（`with_grad=True`）：通过all-to-all通信从远端rank抓取数据（桶排序 → a2a交换indices → 本地gather → a2a交换data → 还原），返回一个callable，执行该callable时等待传输完成并返回 `(fetched, fetch_ctx)` 二元组，其中 `fetch_ctx` 为save-for-backward上下文 [EngramFetchCtx](#engramfetchctx)。[engram_write](#engram_write) 传入过 `sf` 时，callable额外返回每token对应的SF数据 `fetched_sf`，即返回 `(fetched, fetched_sf, fetch_ctx)`；SF数据与hidden数据同行存放、随token一起交换，反向无SF梯度。
 
 **计算公式**：
@@ -207,9 +211,9 @@ $$fetched[i] = EngramTable[rank\_id][local\_idx]$$
 - $global\_idx$：输入索引张量 `indices` 的元素值，取值范围 $[0, world\_size \times num\_entries)$。
 - $num\_entries$：[engram_write](#engram_write) 时各rank写入的条目数，即 `storage.size(0)`。
 - $world\_size$：通信域中的rank总数。
-- $rank\_id$：$global\_idx$ 映射到的目标rank编号，取值范围 $[0, world\_size)$。当 $rank\_id$ 为本rank时，数据直接从本地host pinned内存读取；当 $rank\_id$ 为远端rank时，通过URMA跨卡读取。
+- $rank\_id$：$global\_idx$ 映射到的目标rank编号，取值范围 $[0, world\_size)$。当 $rank\_id$ 为本rank时，数据直接从本地的Engram storage（host pinned共享内存段或原地注册的调用方内存）读取；当 $rank\_id$ 为远端rank时，通过URMA跨卡读取。
 - $local\_idx$：目标rank内的本地条目索引，取值范围 $[0, num\_entries)$。
-- $EngramTable[rank\_id]$：目标rank通过 [engram_write](#engram_write) 提供的Engram表数据（推理模式位于host pinned共享内存，训练模式为直接映射的上层表内存），shape为 `(num_entries, hidden)`，
+- $EngramTable[rank\_id]$：目标rank通过 [engram_write](#engram_write) 提供的Engram表数据（推理模式位于host pinned共享内存段或 `zero_copy=True` 原地注册的调用方内存，训练模式为直接映射的上层锁页表内存），shape为 `(num_entries, hidden)`，
 $EngramTable[rank\_id][local\_idx]$ 表示其中第 $local\_idx$ 个条目。
 - $fetched[i]$：输出张量中第 $i$ 个token对应的Engram数据，$i \in [0, num\_tokens)$，$num\_tokens$ 为 `indices` 的长度。
 
@@ -507,7 +511,7 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 - **Engram SF量化约束**：
   - `sf` 与 `storage.dtype` 必须配套：`storage` 为 `float8_e4m3fn`/`float8_e5m2` 时必须传入 `sf`；`storage` 为 `bfloat16`/`float16`/`float32` 时不得传入 `sf`。
   - `sf` 必须为2维张量，`sf.dtype` 仅支持 `float32`、`float8_e8m0`。
-  - 训练模式：`sf` shape为 `(storage.size(0), num_sf_packs)`，列数 `num_sf_packs = ceil(hidden / group_size)`，`group_size` 为MX量化的分组大小，且 `num_sf_packs` 小于等于 `hidden` 大于0；`sf` 必须为CPU锁页内存（与 `storage` 同为直接映射，零拷贝）；`sf` 在ElasticBuffer生命周期内必须保持存活且地址不变，重复调用 [engram_write](#engram_write) 须传入同一 `sf`，其原地更新对后续 [engram_fetch](#engram_fetch) 可见。
+  - 训练模式：`sf` shape为 `(storage.size(0), num_sf_packs)`，列数 `num_sf_packs = ceil(hidden / group_size)`，`group_size` 为MX量化的分组大小，且须满足 `0 < num_sf_packs ≤ hidden`；`sf` 必须为CPU锁页内存（与 `storage` 同为直接映射，零拷贝）；`sf` 在ElasticBuffer生命周期内必须保持保活且地址不变。
   - 推理模式：`sf` shape为 `(world_size × num_entries, num_sf_packs)`（全量SF表，每个条目一组SF），为NPU张量，按全局索引寻址；local模式（`group=None`）下 `world_size=1`，行数即为 `num_entries`。
   - [engram_fetch_grad](#engram_fetch_grad) 不产生SF梯度：`fetched_sf` 视为不可导张量，反向仅对hidden数据回传梯度。
 
@@ -528,6 +532,10 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
   - 多进程共享同一词表推荐 `/dev/shm`、`mmap` 或 `SharedMemory`；不要把 `pin_memory()` 的私有副本当作跨进程共享方案。
   - `indices` 必须全部落在有效全局索引范围内；越界或负数索引属于调用方错误，输出行为未定义。
 
+- **Engram推理模式约束**：
+  - slice模式（`group` 非 `None`，跨rank分布式推理）中，仅支持创建offload内存通过URMA通信，通信暂不支持通过PCIE方式访问offload内存，仅支持通过UB访问。
+  - local模式（`group=None`，full-vocab local推理）中，offload内存为全量Engram表，不经过分布式通信。
+
 - **Engram训练模式约束**：
   - `with_grad=True` 时，`num_max_tokens_per_rank` 必须为正整数。
   - `with_grad=True` 时，[engram_fetch](#engram_fetch) 返回的 `fetch_ctx` 为局部变量，多次fetch不会覆盖（每次调用返回独立的ctx）。
@@ -538,10 +546,9 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 - **Engram数值约束**：
   - `num_cpu_bytes`、`num_entries`必须非负。
   - `hidden` 必须大于0。
-  - `storage.nbytes()` 必须小于等于 `num_cpu_bytes`。`storage.nbytes()` 表示tensor实际占用的字节数，即 `num_entries × hidden × dtype_size`（其中
-  `dtype_size` 为单个元素的字节大小，如 `bfloat16` 为2 字节、`float32` 为4 字节）。
-  - 全局条目总数 `world_size × num_entries` 必须小于2^31（int32 最大值），保证indices索引不溢出。
-  - `group=None` 时 `num_entries` 必须小于2^31。
+  - `zero_copy=False` 时（数据写入内部host pinned共享内存段），须满足 `storage.nbytes() ≤ num_cpu_bytes`。`storage.nbytes()` 表示tensor实际占用的字节数，即 `num_entries × hidden × dtype_size`（其中 `dtype_size` 为单个元素的字节大小，如 `bfloat16` 为2字节、`float32` 为4字节）。
+  - 全局条目总数须满足 `world_size × num_entries < 2^31`（int32 最大值），保证indices索引不溢出。
+  - `group=None` 时须满足 `num_entries < 2^31`。
 
 - **Engram netlayer约束**：
   - `netlayer` 仅作用于Engram建链选层（[engram_write](#engram_write) 触发的链路探测与channel创建）；Dispatch/Combine路径不使用该参数。
