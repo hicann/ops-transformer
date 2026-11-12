@@ -166,6 +166,17 @@ protected:
             return ge::GRAPH_FAILED;
         }
         if (isHif8_) {
+            constexpr int64_t hif8BlockAlignment = 16;
+            constexpr int64_t hif8MaxBlockSize = 128;
+            const int64_t blockX = blockShapeList[0];
+            const int64_t blockY = blockShapeList[1];
+            if (blockX < hif8BlockAlignment || blockY < hif8BlockAlignment || blockX > hif8MaxBlockSize ||
+                blockY > hif8MaxBlockSize || blockX % hif8BlockAlignment != 0 || blockY % hif8BlockAlignment != 0) {
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "blockShapeOptional",
+                                                      std::to_string(blockX) + ", " + std::to_string(blockY),
+                                                      "HiF8 block dimensions must each be multiples of 16 in [16,128]");
+                return ge::GRAPH_FAILED;
+            }
             constexpr uint32_t SCALE_BEGIN_INDEX = 11;
             constexpr uint32_t SCALE_END_INDEX = 16;
             constexpr const char* SCALE_NAMES[] = {"qDequantScaleOptional", "kDequantScaleOptional",

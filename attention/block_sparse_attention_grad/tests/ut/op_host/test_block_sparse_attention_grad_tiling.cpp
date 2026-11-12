@@ -140,9 +140,16 @@ TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_hif8_block64)
     RunArch35BnsdTilingCase(128, 128, 64, 64, ge::GRAPH_SUCCESS, 2, true);
 }
 
-TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_hif8_rejects_block16)
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_hif8_block16)
 {
-    RunArch35BnsdTilingCase(96, 96, 16, 16, ge::GRAPH_FAILED, 2, true);
+    RunArch35BnsdTilingCase(96, 96, 16, 16, ge::GRAPH_SUCCESS, 2, true);
+}
+
+TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_hif8_rejects_truncated_block_shape)
+{
+    constexpr int64_t oversizedBlock = (1LL << 32) + 16;
+    RunArch35BnsdTilingCase(16, 16, oversizedBlock, 16, ge::GRAPH_FAILED, 2, true);
+    RunArch35BnsdTilingCase(16, 16, 16, oversizedBlock, ge::GRAPH_FAILED, 2, true);
 }
 
 TEST_F(BlockSparseAttentionGradTilingTest, tiling_arch35_rejects_hif8_with_quant_mode_zero)
