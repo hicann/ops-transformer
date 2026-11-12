@@ -212,7 +212,8 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline int64_t SFAVectorService<TEMPLATE_ARG
         int64_t sfaBlkTableIdx = s2Idx / blockSize;
         int64_t blkTableOffset = s2Idx % blockSize;
         realkeyOffset =
-            blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + sfaBlkTableIdx) * constInfo.keyStride0 +
+            static_cast<int64_t>(blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + sfaBlkTableIdx)) *
+                constInfo.keyStride0 +
             blkTableOffset; // BlockNum, BlockSize, N(1), D
     } else {
         if constexpr (LAYOUT_T == SFA_LAYOUT::BSND) {
