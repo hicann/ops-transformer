@@ -257,8 +257,8 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::CheckContex
     // 输入属性参数验证
     auto layoutQueryPtr = attrs->GetAttrPointer<char>(idx++);
     auto layoutKeyPtr = attrs->GetAttrPointer<char>(idx++);
-    auto sparseModePtr = attrs->GetAttrPointer<int32_t>(idx++);
-    auto cmpRatioPtr = attrs->GetAttrPointer<int32_t>(idx++);
+    auto sparseModePtr = attrs->GetAttrPointer<int64_t>(idx++);
+    auto cmpRatioPtr = attrs->GetAttrPointer<int64_t>(idx++);
     size_t* workspaces = context_->GetWorkspaceSizes(1);
 
     OP_CHECK_NULL_WITH_CONTEXT(context_, layoutQueryPtr);
@@ -303,13 +303,13 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeAttrs()
     size_t idx = 0;
     auto layoutQueryPtr = attrs->GetAttrPointer<char>(idx++);
     auto layoutKeyPtr = attrs->GetAttrPointer<char>(idx++);
-    auto sparseModePtr = attrs->GetAttrPointer<int32_t>(idx++);
-    auto cmpRatioPtr = attrs->GetAttrPointer<int32_t>(idx++);
+    auto sparseModePtr = attrs->GetAttrPointer<int64_t>(idx++);
+    auto cmpRatioPtr = attrs->GetAttrPointer<int64_t>(idx++);
     auto cmpResidualK = context_->GetOptionalInputShape(CMP_RESIDUAL_KEY_INPUT_INDEX);
     layoutQuery = layoutQueryPtr;
     layoutKey = layoutKeyPtr;
-    sparseMode = *sparseModePtr;
-    cmpRatio = *cmpRatioPtr;
+    const int64_t sparseModeValue = *sparseModePtr;
+    const int64_t cmpRatioValue = *cmpRatioPtr;
     deterministic = (context_->GetDeterministic() == 1);
     OP_CHECK_IF(strcmp(layoutQuery, "TND") != 0 && strcmp(layoutQuery, "BSND") != 0,
                 OP_LOGE(opName, "LayoutQ only support TND or BSND, now LayoutQ is %s.", layoutQuery), return false);
@@ -327,17 +327,20 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeAttrs()
     OP_CHECK_IF(
         strcmp(layoutKey, "TND") == 0 && context_->GetOptionalInputTensor(CU_SEQLENS_KEY_INPUT_INDEX) == nullptr,
         OP_LOGE(opName, "cuSeqlensK must be provided when layoutK is TND."), return false);
-    OP_CHECK_IF((sparseMode != SPARSE_MODE_SIZE_3 && sparseMode != SPARSE_MODE_SIZE_0),
-                OP_LOGE(opName, " The value of mask_mode is [%d], but currently only supports mode [0,3].", sparseMode),
-                return false);
     OP_CHECK_IF(
-        (cmpRatio < CMP_RATIO_1 || cmpRatio > CMP_RATIO_128),
-        OP_LOGE(opName, " The value of cmpRatio is [%d], but currently only supports ranging from 1 to 128.", cmpRatio),
+        (sparseModeValue != SPARSE_MODE_SIZE_3 && sparseModeValue != SPARSE_MODE_SIZE_0),
+        OP_LOGE(opName, " The value of mask_mode is [%ld], but currently only supports mode [0,3].", sparseModeValue),
         return false);
-    OP_CHECK_IF((sparseMode == SPARSE_MODE_SIZE_3 && cmpRatio != 1 && cmpResidualK == nullptr),
+    OP_CHECK_IF((cmpRatioValue < CMP_RATIO_1 || cmpRatioValue > CMP_RATIO_128),
+                OP_LOGE(opName, " The value of cmpRatio is [%ld], but currently only supports ranging from 1 to 128.",
+                        cmpRatioValue),
+                return false);
+    OP_CHECK_IF((sparseModeValue == SPARSE_MODE_SIZE_3 && cmpRatioValue != 1 && cmpResidualK == nullptr),
                 OP_LOGE(opName, " cmp_residual_k is required when mask_mode is 3 with cmp_ratio not equal to 1!"),
                 return false);
 
+    sparseMode = sparseModeValue;
+    cmpRatio = cmpRatioValue;
     OP_LOGD(context_, "attrs: layout_query[%s] layout_key[%s] mask_mode[%d] cmp_ratio[%d].", layoutQuery, layoutKey,
             sparseMode, cmpRatio);
 
