@@ -10,7 +10,7 @@
 - <term>Ascend 950PR&950DT products</term>: Not supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Not supported
+- <term>Atlas A3 products</term>: Supported
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
 - <term>Atlas A2 products</term>: Supported
