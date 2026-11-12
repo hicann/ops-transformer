@@ -186,16 +186,17 @@ for (int64_t j = 0; j < rows; j++) {
 inQueue_.EnQue<int8_t>(xLocal);  // 入队等待输出
 ```
 
-SIMT采用线程级并行模型，每个线程独立处理元素：
+以下为 SIMD 与 SIMT 混合编程的示例。快除参数 `m0` 和 `shift0` 由标量逻辑预计算，详见 [asc_uintdiv](https://asc.gitcode.com/api/SIMT-API/math_functions/integer_math_functions/asc_uintdiv.html)。
 
 ```cpp
 // SIMT: 使用线程级并行，无需显式buffer管理
-__simt_vf__ LAUNCH_BOUND(2048) void GatherSimt(...) {
-    for (INDEX_SIZE_T index = Simt::GetThreadIdx();
+__simt_vf__ __launch_bounds__(2048) void GatherSimt(...) {
+    for (INDEX_SIZE_T index = threadIdx.x;
          index < currentCoreElements;
-         index += Simt::GetThreadNum()) {  // 线程跳跃式并行
+         index += blockDim.x) {  // 线程跳跃式并行
         // 每个线程独立计算单点索引并访问
-        INDEX_SIZE_T gatherI = Simt::UintDiv(yIndex, m0, shift0);
+        INDEX_SIZE_T yIndex = yIndexBase + index;
+        INDEX_SIZE_T gatherI = asc_uintdiv(yIndex, m0, shift0);
         INDICES_T indicesValue = indices[gatherI];  // 根据单点索引gatherI直接访问GM
         y[yIndex] = idxOutOfBound ? 0 : x[xIndex];  // 直接写回GM
     }
