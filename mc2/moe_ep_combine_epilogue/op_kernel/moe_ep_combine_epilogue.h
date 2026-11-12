@@ -112,9 +112,9 @@ private:
     uint32_t topK_{0};
     uint32_t axisH_{0};
     uint32_t hAlignSize_{0};
+    uint32_t tokenBytes_{0};
     uint64_t combineStateWinOffset_{0};
     uint64_t combineDataWinOffset_{0};
-    uint64_t totalWinSizeEp_{0};
 
     uint32_t aivNum_{0};
     uint32_t aivId_{0};
@@ -184,8 +184,9 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     axisH_ = tilingData_->cfg.hidden;
     aivNum_ = tilingData->aivNum;
     recvCapacity_ = tilingData->recvCapacity;
-    hAlignSize_ = Ceil(axisH_ * sizeof(XType), UB_ALIGN) * UB_ALIGN;
-    xCopyParams_ = {1U, static_cast<uint16_t>(hAlignSize_), 0U, 0U};
+    tokenBytes_ = axisH_ * sizeof(XType);
+    hAlignSize_ = Ceil(tokenBytes_, UB_ALIGN) * UB_ALIGN;
+    xCopyParams_ = {1U, static_cast<uint16_t>(tokenBytes_), 0U, 0U};
     mc2Context_ = context;
     useSharedJetty_ = tilingData->commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY;
     if (useSharedJetty_) {
@@ -206,14 +207,11 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
 
     combineStateWinOffset_ = tilingData->combineStateWinOffset;
     combineDataWinOffset_ = tilingData->combineDataWinOffset;
-    totalWinSizeEp_ = tilingData->totalWinSizeEp;
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
-    for (uint32_t oomRankId = 0; oomRankId < epWorldSize_; ++oomRankId) {
-        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(GetUrmaWinAddrByRankId(oomRankId, 0)),
-                                   totalWinSizeEp_);
-    }
+    // The local window covers states, payloads and dump records for either context layout.
+    OOMCheckAddrRange<uint8_t>(tilingGM, sizeof(MoeEpCombineEpilogueTilingData));
+    OOMCheckAddrRange<uint8_t>(winRankAddr_[rankId_], tilingData->totalWinSizeEp);
 #endif
-
     xGm_.SetGlobalBuffer((__gm__ XType*)x);
     localRecvIndexGm_.SetGlobalBuffer(
         reinterpret_cast<__gm__ int32_t*>(recvSrcMetadata + tilingData_->localRecvIndexOffset));
@@ -444,7 +442,9 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
             if (localRecvXIdx >= 0) {
                 DataCopyPad(weightLocal, topkWeightsGm_[localRecvXIdx], weightCopyParams_, padParams_);
             } else {
-                GM_ADDR weightAddr = GetUrmaWinAddrByRankId(rankId_, combineDataWinOffset_) + slotOffset + hAlignSize_;
+                // Match Combine's packed multi-SGE layout: x bytes followed by one float weight.
+                GM_ADDR weightAddr = GetUrmaWinAddrByRankId(rankId_, combineDataWinOffset_) + slotOffset +
+                                     static_cast<uint64_t>(tokenBytes_);
                 GlobalTensor<float> srcWeightTensor;
                 srcWeightTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(weightAddr));
                 DataCopyPad(weightLocal, srcWeightTensor, weightCopyParams_, padParams_);
@@ -507,11 +507,10 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
         tpipe_->InitBuffer(weightQue_, bufferNum, UB_ALIGN);
     }
 
-    DataCopyParams xCopyParams = {1U, static_cast<uint16_t>(axisH_ * sizeof(XType)), 0U, 0U};
     for (uint32_t tokenIdx = tStart_; tokenIdx < tEnd_; ++tokenIdx) {
         ProcessTopKToken(tokenIdx);
         LocalTensor<XType> ubResult = xOutQue_.DeQue<XType>();
-        DataCopyPad(combinedXGm_[tokenIdx * axisH_], ubResult, xCopyParams);
+        DataCopyPad(combinedXGm_[tokenIdx * axisH_], ubResult, xCopyParams_);
         xOutQue_.FreeTensor(ubResult);
     }
     diagWriter_.RunPosRecord(MOE_EP_COMBINE_EPILOGUE_RUN_POS_OUTPUT_DONE);

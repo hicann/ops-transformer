@@ -134,10 +134,8 @@ private:
     uint32_t numMaxTokensPerRank_{0};
     uint32_t topK_{0};
     uint32_t axisH_{0};
-    uint32_t hAlignSize_{0};
     uint64_t combineStateWinOffset_{0};
     uint64_t combineDataWinOffset_{0};
-    uint64_t totalWinSizeEp_{0};
 
     // WQEBBs occupied per token write: multi-SGE (x + weight) rounds up to 2, single-SGE is 1.
     static constexpr uint32_t kTokenWqebbCount = (HasTopkWeight == 1) ? 2U : 1U;
@@ -200,7 +198,6 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
     numMaxTokensPerRank_ = tilingData_->cfg.numMaxTokensPerRank;
     topK_ = tilingData_->cfg.topK;
     axisH_ = tilingData_->cfg.hidden;
-    hAlignSize_ = Ceil(axisH_ * sizeof(XType), UB_ALIGN) * UB_ALIGN;
     perSlotBytes_ = tilingData_->cfg.perSlotBytes;
     aivNum_ = tilingData_->aivNum;
     recvCapacity_ = tilingData_->recvCapacity;
@@ -209,6 +206,18 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
 
     mc2Context_ = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context);
     rankId_ = mc2Context_->epRankId;
+#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
+    // Register OOM address.
+    uint64_t totalWinSizeEp = tilingData->totalWinSizeEp;
+    OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(mc2Context_->epHcclBuffer[rankId_]), totalWinSizeEp);
+    OOMCheckAddrRange<uint8_t>(tilingGM, sizeof(MoeEpCombineTilingData));
+    for (uint32_t rankId = 0; rankId < epWorldSize_; ++rankId) {
+        if (rankId != rankId_) {
+            OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(mc2Context_->epHcclBuffer[rankId]),
+                                       totalWinSizeEp);
+        }
+    }
+#endif
     constexpr size_t metadataOffset =
         offsetof(MoeEpCombineTilingData, moeEpCombineInfo) + offsetof(MoeEpCombineInfo, dumpMetadata);
     MoeEpExceptionDump::WriteMetadata(context, tilingGM + metadataOffset);
@@ -227,13 +236,6 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
     combineStateWinOffset_ = tilingData->combineStateWinOffset;
     combineDataWinOffset_ = tilingData->combineDataWinOffset;
     flagSourceWinAddr_ = GetUrmaStateAddrByRankId(rankId_, tilingData->combineFlagSourceWinOffset);
-    totalWinSizeEp_ = tilingData->totalWinSizeEp;
-#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
-    for (uint32_t oomRankId = 0; oomRankId < epWorldSize_; ++oomRankId) {
-        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(GetUrmaWinAddrByRankId(oomRankId, 0)),
-                                   totalWinSizeEp_);
-    }
-#endif
 
     xGm_.SetGlobalBuffer((__gm__ XType*)x);
     recvSrcMetadataGm_.SetGlobalBuffer((__gm__ int32_t*)recvSrcMetadata);
@@ -434,8 +436,9 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::EmitTokenWrit
     GM_ADDR dst = remoteDataBase + addrUb.GetValue(regionOff + tokenIdx);
     GM_ADDR src = xBase + addrUb.GetValue(regionOff + X_OFFSET_REGION + tokenIdx);
     if constexpr (HasTopkWeight == 1) {
+        // Multi-SGE concatenates the weight immediately after the packed x row.
         AscendC::BufDesc srcDescs[2] = {
-            {src, hAlignSize_},
+            {src, static_cast<uint32_t>(tokenBytes)},
             {weightBase + addrUb.GetValue(regionOff + WEIGHT_OFFSET_REGION + tokenIdx), sizeof(float)}};
         (void)hcomm_.WriteNbi<config>(activeBatchHandle_, dst, srcDescs, 2U);
     } else {

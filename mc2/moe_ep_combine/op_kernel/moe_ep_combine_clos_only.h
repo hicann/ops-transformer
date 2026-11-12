@@ -146,7 +146,6 @@ private:
     uint32_t numMaxTokensPerRank_{0};
     uint32_t topK_{0};
     uint32_t axisH_{0};
-    uint32_t hAlignSize_{0};
     uint64_t combineStateWinOffset_{0};
     uint64_t combineDataWinOffset_{0};
 
@@ -200,7 +199,6 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(
     numMaxTokensPerRank_ = tilingData_->cfg.numMaxTokensPerRank;
     topK_ = tilingData_->cfg.topK;
     axisH_ = tilingData_->cfg.hidden;
-    hAlignSize_ = Ceil(axisH_ * sizeof(XType), UB_ALIGN) * UB_ALIGN;
     perSlotBytes_ = tilingData_->cfg.perSlotBytes;
     recvCapacity_ = tilingData_->recvCapacity;
     tpipe_->InitBuffer(hcommBuf_, HCOMM_INIT_SIZE);
@@ -212,6 +210,19 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(
     SyncFunc<AscendC::HardEvent::V_S>();
 
     InitContext(context);
+#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
+    // Register OOM address.
+    uint64_t totalWinSizeEp = tilingData->totalWinSizeEp;
+    OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(mc2Context_->epHcclBuffer[rankId_]), totalWinSizeEp);
+    OOMCheckAddrRange<uint8_t>(tilingGM, sizeof(MoeEpCombineTilingData));
+    for (uint32_t rankId = 0; rankId < epWorldSize_; ++rankId) {
+        if (rankId != rankId_) {
+            OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(mc2Context_->epHcclBuffer[rankId]),
+                                       totalWinSizeEp);
+        }
+    }
+#endif
+
     constexpr size_t metadataOffset =
         offsetof(MoeEpCombineTilingData, moeEpCombineInfo) + offsetof(MoeEpCombineInfo, dumpMetadata);
     MoeEpExceptionDump::WriteMetadata<ContextType>(context, tilingGM + metadataOffset);
@@ -437,7 +448,8 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendRemoteMet
     GM_ADDR remoteSlotBase = remoteDataBase + dstSlot * perSlotBytes_;
     if constexpr (HasTopkWeight == 1) {
         GM_ADDR weightAddr = reinterpret_cast<GM_ADDR>(topkWeightsGm_.GetPhyAddr(recvXIdx));
-        AscendC::BufDesc srcDescs[2] = {{tokenAddr, hAlignSize_}, {weightAddr, sizeof(float)}};
+        // Multi-SGE concatenates the weight immediately after the packed x row.
+        AscendC::BufDesc srcDescs[2] = {{tokenAddr, static_cast<uint32_t>(tokenBytes)}, {weightAddr, sizeof(float)}};
         PrepareMultiSgeWrite<DEFAULT_WQE_CONFIG>(remoteSlotBase, srcDescs, 2U);
     } else {
         PrepareWrite<DEFAULT_WQE_CONFIG, DEFAULT_CQE_WQE_CONFIG>(remoteSlotBase, tokenAddr, tokenBytes);

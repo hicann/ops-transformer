@@ -343,6 +343,9 @@ __aicore__ inline void MoeEpDispatchHybrid<TemplateMoeEpDispatchHybridTypeFunc>:
     workspaceGM_ = workspaceGM;
     mc2Context_ = (__gm__ Mc2Aclnn::MoeCommContext*)context;
     epRankId_ = mc2Context_->epRankId;
+#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
+    MoeEpDispatchBase::RegisterOomRanges<DoCpuSync>(mc2Context_, epRankId_, tilingGM, tilingData);
+#endif
     constexpr size_t metadataOffset =
         offsetof(MoeEpDispatchTilingData, moeEpDispatchInfo) + offsetof(MoeEpDispatchInfo, dumpMetadata);
     MoeEpExceptionDump::WriteMetadata(context, tilingGM + metadataOffset);

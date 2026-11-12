@@ -61,8 +61,6 @@ namespace MoeEpDispatchImpl {
 using namespace AscendC;
 using namespace Mc2Kernel;
 
-constexpr uint32_t UB_ALIGN = 32U;
-constexpr uint32_t WIN_ADDR_ALIGN = 512U;
 constexpr uint32_t ALIGNED_LEN_256 = 256U;
 constexpr uint32_t TOPK_INFO_SIZE = 4U;  // sizeof(int32_t)=sizeof(float)=4B
 constexpr uint32_t UB_STRIDE = 8U;       // UB_ALIGN/sizeof(int32_t)=8
@@ -247,7 +245,6 @@ private:
     uint64_t dstRankWinOffset_{0};
     uint64_t dstRankStateOffset_{0};
     uint64_t dstStateWinOffset_{0};
-    uint64_t totalWinSizeEp_{0};
     bool coreAssigned_{false};
 
     DataCopyParams statusCopyParams_;
@@ -273,12 +270,15 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::Init(
     mc2Context_ = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context);
     epRankId_ = mc2Context_->epRankId;
     channelsPerRank_ = mc2Context_->channelsPerRank;
+    const auto& info = tilingData->moeEpDispatchInfo;
+#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
+    MoeEpDispatchBase::RegisterOomRanges<DoCpuSync>(mc2Context_, epRankId_, tilingGM, tilingData);
+#endif
     constexpr size_t metadataOffset =
         offsetof(MoeEpDispatchTilingData, moeEpDispatchInfo) + offsetof(MoeEpDispatchInfo, dumpMetadata);
     MoeEpExceptionDump::WriteMetadata(context, tilingGM + metadataOffset);
     diagWriter_.Init(context, MOE_EP_CORE_DIAG_DISPATCH, tpipe_);
 
-    const auto& info = tilingData->moeEpDispatchInfo;
     xAddr_ = x;
     metaSlotBytes_ = info.metaSlotBytes;
     metaBatch_ = info.metaBatch == 0U ? 1U : info.metaBatch;
@@ -300,13 +300,6 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::Init(
     payloadStashWinOffset_ = info.window.payloadStashWinOffset;
     dispatchNotifyCount_ = info.dispatchNotifyCount;
     hostPinnedCounterAddrGM_ = reinterpret_cast<GM_ADDR>(info.hostPinnedCounterAddr);
-    totalWinSizeEp_ = info.totalWinSizeEp;
-#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
-    for (uint32_t rankId = 0; rankId < epWorldSize_; ++rankId) {
-        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(GetWinAddrByRankId(mc2Context_, rankId, 0)),
-                                   totalWinSizeEp_);
-    }
-#endif
 
     tokenSize_ = axisH_ * sizeof(XType);
     kAlignSize_ = Ceil(axisK_ * TOPK_INFO_SIZE, UB_ALIGN) * UB_ALIGN;

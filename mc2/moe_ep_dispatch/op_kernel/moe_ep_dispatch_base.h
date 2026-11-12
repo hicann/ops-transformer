@@ -34,6 +34,7 @@
 
 #include "../../common/op_kernel/mc2_moe_context.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
+#include "moe_ep_dispatch_tiling.h"
 
 namespace MoeEpDispatchBase {
 
@@ -167,6 +168,26 @@ __aicore__ inline uint32_t GetServerEndRank(uint32_t epRankId, uint32_t rankNumP
     uint32_t serverEndRank = GetServerStartRank(epRankId, rankNumPerServer) + rankNumPerServer;
     return serverEndRank > epWorldSize ? epWorldSize : serverEndRank;
 }
+
+#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
+template <bool DoCpuSync, typename ContextType>
+__aicore__ inline void RegisterOomRanges(__gm__ ContextType* context, uint32_t epRankId, GM_ADDR tilingGM,
+                                         const MoeEpDispatchTilingData* tilingData)
+{
+    const auto& info = tilingData->moeEpDispatchInfo;
+    const uint64_t totalWinSizeEp = info.totalWinSizeEp;
+    OOMCheckAddrRange<uint8_t>(tilingGM, sizeof(*tilingData));
+    OOMCheckAddrRange<uint8_t>(GetWindowAddrByRankId(context, epRankId, 0), totalWinSizeEp);
+    if constexpr (DoCpuSync) {
+        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(info.hostPinnedCounterAddr), UB_ALIGN);
+    }
+    for (uint32_t rankId = 0; rankId < info.cfg.epWorldSize; ++rankId) {
+        if (rankId != epRankId) {
+            OOMCheckAddrRange<uint8_t>(GetWindowAddrByRankId(context, rankId, 0), totalWinSizeEp);
+        }
+    }
+}
+#endif
 
 #endif
 

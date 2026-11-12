@@ -250,7 +250,6 @@ private:
     uint32_t totalNotifyCnt_{0};
     uint64_t winDataOffset_{0};
     uint64_t slotWinStateOffset_{0};
-    uint64_t totalWinSizeEp_{0};
     // 三处自管环的事件，份数各自等于对应 *_RING。全部走 AllocEventID 拿真份数：FetchEventID 不置占用位、
     // 恒返回同一个下标，一份以上的环会退化成一条 id，等待就分不出是哪一份。
     int32_t metaEvtMte2ToS_[META_RING] = {0};
@@ -304,12 +303,10 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     useSharedJetty_ = tilingData->commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY;
     epRankId_ = useSharedJetty_ ? reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(context)->epRankId :
                                   reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context)->epRankId;
-    totalWinSizeEp_ = tilingData->totalWinSizeEp;
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
-    for (uint32_t oomRankId = 0; oomRankId < epWorldSize_; ++oomRankId) {
-        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(GetWinAddrByRankId(oomRankId, 0)),
-                                   totalWinSizeEp_);
-    }
+    // The local window covers states, payloads and dump records for either context layout.
+    OOMCheckAddrRange<uint8_t>(tilingGM, sizeof(MoeEpDispatchEpilogueTilingData));
+    OOMCheckAddrRange<uint8_t>(GetWinAddrByRankId(epRankId_, 0), tilingData->totalWinSizeEp);
 #endif
     constexpr size_t metadataOffset = offsetof(MoeEpDispatchEpilogueTilingData, moeEpDispatchEpilogueInfo) +
                                       offsetof(MoeEpDispatchEpilogueInfo, dumpMetadata);
