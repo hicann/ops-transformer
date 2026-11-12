@@ -19,10 +19,11 @@ __spec__ = {
 }
 
 
+# Default to local comparison; --compare cross_check selects the L2 preset.
 _TOLERANCE = {
-    "float16": {"standard": "cross_check", "level": "L2"},
-    "bfloat16": {"standard": "cross_check", "level": "L2"},
-    "float32": {"standard": "cross_check", "level": "L2"},
+    "float16": {"standard": "stat_rel_err", "level": "L2"},
+    "bfloat16": {"standard": "stat_rel_err", "level": "L2"},
+    "float32": {"standard": "stat_rel_err", "level": "L2"},
     "int8": {"standard": "quant", "ptol": 0.001},
 }
 
@@ -110,12 +111,14 @@ class _AclnnTorchImpl:
         self,
         x,
         expertIdx,
-        scale,
-        offset,
+        scaleOptional=None,
+        offsetOptional=None,
         activeNum=0,
         expertCapacity=0,
         expertNum=0,
         dropPadMode=0,
+        expertTokensCountOrCumsumFlag=0,
+        expertTokensBeforeCapacityFlag=False,
         quantMode=0,
         *args,
         **kwargs,
@@ -123,7 +126,7 @@ class _AclnnTorchImpl:
         return _torch_dynamic_scale(
             x,
             expertIdx,
-            scale,
+            scaleOptional,
             activeNum,
             expertCapacity,
             expertNum,

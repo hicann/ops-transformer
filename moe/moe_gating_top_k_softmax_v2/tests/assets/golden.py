@@ -20,10 +20,11 @@ __spec__ = {
 }
 
 
-_CROSS_CHECK_TOLERANCE = {
-    "float16": {"standard": "cross_check", "level": "L2"},
-    "bfloat16": {"standard": "cross_check", "level": "L2"},
-    "float32": {"standard": "cross_check", "level": "L2"},
+# Default to local comparison; --compare cross_check selects the L2 preset.
+_TOLERANCE = {
+    "float16": {"standard": "stat_rel_err", "level": "L2"},
+    "bfloat16": {"standard": "stat_rel_err", "level": "L2"},
+    "float32": {"standard": "stat_rel_err", "level": "L2"},
 }
 
 
@@ -96,7 +97,7 @@ class _AclnnMoeGatingTopKSoftmaxV2TorchImpl:
 
 class AclnnMoeGatingTopKSoftmaxV2TestSpec:
     third_party = {"torch": _AclnnMoeGatingTopKSoftmaxV2TorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     @staticmethod
     def golden(
@@ -148,7 +149,7 @@ class AclnnMoeGatingTopKSoftmaxV2TestSpec:
 
 class MoeGatingTopKSoftmaxV2TestSpec:
     third_party = {"torch": _MoeGatingTopKSoftmaxV2TorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     @staticmethod
     def golden(x, finished, *, k, renorm=0, output_softmax_result_flag=False, **kwargs):

@@ -21,10 +21,11 @@ __spec__ = {
 }
 
 
-_CROSS_CHECK_TOLERANCE = {
-    "float16": {"standard": "cross_check", "level": "L2"},
-    "bfloat16": {"standard": "cross_check", "level": "L2"},
-    "float32": {"standard": "cross_check", "level": "L2"},
+# Default to local comparison; --compare cross_check selects the L2 preset.
+_TOLERANCE = {
+    "float16": {"standard": "stat_rel_err", "level": "L2"},
+    "bfloat16": {"standard": "stat_rel_err", "level": "L2"},
+    "float32": {"standard": "stat_rel_err", "level": "L2"},
 }
 
 
@@ -379,7 +380,7 @@ def _check_hash_indices(input_ids, tid2eid, expert_count):
 
 class AclnnMoeGatingTopKTestSpec:
     third_party = {"torch": _AclnnV1TorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     @staticmethod
     def golden(
@@ -462,7 +463,7 @@ class AclnnMoeGatingTopKTestSpec:
 
 class AclnnMoeGatingTopKV2TestSpec:
     third_party = {"torch": _AclnnV2TorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     @staticmethod
     def golden(
@@ -544,7 +545,7 @@ class AclnnMoeGatingTopKV2TestSpec:
 
 class MoeGatingTopKTestSpec:
     third_party = {"torch": _KernelTorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     @staticmethod
     def golden(
@@ -624,7 +625,7 @@ class MoeGatingTopKTestSpec:
 
 class E2eMoeGatingTopKTestSpec:
     third_party = {"torch": _E2eTorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     """E2E spec for torch_npu.npu_moe_gating_top_k — snake_case params, torch CPU golden.
 

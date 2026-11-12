@@ -19,10 +19,11 @@ __spec__ = {
 }
 
 
-_CROSS_CHECK_TOLERANCE = {
-    "float16": {"standard": "cross_check", "level": "L2"},
-    "bfloat16": {"standard": "cross_check", "level": "L2"},
-    "float32": {"standard": "cross_check", "level": "L2"},
+# Default to local comparison; --compare cross_check selects the L2 preset.
+_TOLERANCE = {
+    "float16": {"standard": "stat_rel_err", "level": "L2"},
+    "bfloat16": {"standard": "stat_rel_err", "level": "L2"},
+    "float32": {"standard": "stat_rel_err", "level": "L2"},
 }
 
 
@@ -48,7 +49,7 @@ class _AclnnTorchImpl:
 
 class AclnnMoeInitRoutingTestSpec:
     third_party = {"torch": _AclnnTorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     @staticmethod
     def golden(
@@ -101,7 +102,7 @@ class AclnnMoeInitRoutingTestSpec:
 
 class MoeInitRoutingTestSpec:
     third_party = {"torch": _KernelTorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     @staticmethod
     def golden(x, row_idx, expert_idx, *, active_num, **kwargs):

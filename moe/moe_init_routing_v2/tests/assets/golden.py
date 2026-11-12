@@ -33,10 +33,11 @@ def _adapter_capacity(sorted_row_idx, sorted_expert_idx, capacity):
                 sorted_row_idx[i] = -1
 
 
-_CROSS_CHECK_TOLERANCE = {
-    "float16": {"standard": "cross_check", "level": "L2"},
-    "bfloat16": {"standard": "cross_check", "level": "L2"},
-    "float32": {"standard": "cross_check", "level": "L2"},
+# Default to local comparison; --compare cross_check selects the L2 preset.
+_TOLERANCE = {
+    "float16": {"standard": "stat_rel_err", "level": "L2"},
+    "bfloat16": {"standard": "stat_rel_err", "level": "L2"},
+    "float32": {"standard": "stat_rel_err", "level": "L2"},
 }
 
 
@@ -142,7 +143,7 @@ class _AclnnMoeInitRoutingV2TorchImpl:
 
 class AclnnMoeInitRoutingV2TestSpec:
     third_party = {"torch": _AclnnMoeInitRoutingV2TorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     @staticmethod
     def golden(
@@ -267,7 +268,7 @@ class AclnnMoeInitRoutingV2TestSpec:
 
 class MoeInitRoutingV2TestSpec:
     third_party = {"torch": _MoeInitRoutingV2TorchImpl}
-    tolerance = _CROSS_CHECK_TOLERANCE
+    tolerance = _TOLERANCE
 
     @staticmethod
     def golden(

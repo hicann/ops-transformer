@@ -27,17 +27,18 @@ __spec__ = {
     "aclnnMoeFusedTopk": "AclnnMoeFusedTopkTestSpec",
 }
 
+# Default to local comparison; --compare cross_check selects the L2 preset.
 _KERNEL_TOLERANCE = {
-    "float16": {"standard": "cross_check", "level": "L2"},
-    "bfloat16": {"standard": "cross_check", "level": "L2"},
-    "float32": {"standard": "cross_check", "level": "L2"},
+    "float16": {"standard": "stat_rel_err", "level": "L2"},
+    "bfloat16": {"standard": "stat_rel_err", "level": "L2"},
+    "float32": {"standard": "stat_rel_err", "level": "L2"},
     "int32": {"standard": "binary_equal"},
 }
 
 _ACLNN_TOLERANCE = {
-    "float16": {"standard": "cross_check", "level": "L2"},
-    "bfloat16": {"standard": "cross_check", "level": "L2"},
-    "float32": {"standard": "cross_check", "level": "L2"},
+    "float16": {"standard": "stat_rel_err", "level": "L2"},
+    "bfloat16": {"standard": "stat_rel_err", "level": "L2"},
+    "float32": {"standard": "stat_rel_err", "level": "L2"},
     "int32": {"standard": "binary_equal"},
 }
 
