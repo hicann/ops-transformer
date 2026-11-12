@@ -33,6 +33,8 @@ add_modules_sources(
     ACLNNTYPE aclnn_inner
 )
 
+include("${CMAKE_CURRENT_LIST_DIR}/../op_dsl/CMakeLists.txt")
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../sparse_flash_mla/op_host/checkers/checker_sources.cmake)
 set(MIXED_QUANT_SPARSE_MLA_CHECKER_SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/checkers/mixed_quant_sparse_flash_mla_checker.cpp

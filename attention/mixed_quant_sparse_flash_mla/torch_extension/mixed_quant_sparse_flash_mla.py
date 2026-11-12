@@ -152,6 +152,11 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
             key_dtype=None,
             value_dtype=None,
         ):
+            if quant_mode == 4:
+                layout_q = str(layout_q).upper()
+                layout_kv = str(layout_kv).upper()
+                if layout_kv == "PA":
+                    layout_kv = "PA_BBND"
             turbo_quant_empty_query = (
                 quant_mode == 3
                 and layout_q == "TND"
@@ -198,7 +203,7 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
                         dtype=torch.float32,
                         device=q.device,
                     )
-            elif quant_mode == 3:
+            elif quant_mode in (3, 4):
                 softmax_lse = torch.empty((0,), dtype=torch.float32, device=q.device)
             else:
                 softmax_lse = torch.empty([], dtype=torch.float32, device=q.device)
@@ -406,6 +411,47 @@ def mixed_quant_sparse_flash_mla(
     dispatcher implementation for NPU
     'PrivateUse1' is the combine key for custom NPU backends.
     """
+    if quant_mode == 4:
+        from .op_dsl.mixed_quant_sparse_flash_mla import (
+            mixed_quant_sparse_flash_mla as dsl_implementation,
+        )
+
+        with torch.npu.device(q.device):
+            return dsl_implementation(
+                q=q,
+                quant_mode=quant_mode,
+                ori_kv=ori_kv,
+                cmp_kv=cmp_kv,
+                ori_sparse_indices=ori_sparse_indices,
+                cmp_sparse_indices=cmp_sparse_indices,
+                ori_block_table=ori_block_table,
+                cmp_block_table=cmp_block_table,
+                cu_seqlens_q=cu_seqlens_q,
+                cu_seqlens_ori_kv=cu_seqlens_ori_kv,
+                cu_seqlens_cmp_kv=cu_seqlens_cmp_kv,
+                seqused_q=seqused_q,
+                seqused_ori_kv=seqused_ori_kv,
+                seqused_cmp_kv=seqused_cmp_kv,
+                cmp_residual_kv=cmp_residual_kv,
+                ori_topk_length=ori_topk_length,
+                cmp_topk_length=cmp_topk_length,
+                sinks=sinks,
+                metadata=metadata,
+                rope_head_dim=rope_head_dim,
+                softmax_scale=softmax_scale,
+                cmp_ratio=cmp_ratio,
+                ori_mask_mode=ori_mask_mode,
+                cmp_mask_mode=cmp_mask_mode,
+                ori_win_left=ori_win_left,
+                ori_win_right=ori_win_right,
+                layout_q=layout_q,
+                layout_kv=layout_kv,
+                topk_value_mode=topk_value_mode,
+                return_softmax_lse=return_softmax_lse,
+                key_dtype=key_dtype,
+                value_dtype=value_dtype,
+            )
+
     op_module = mixed_quant_sparse_flash_mla_op_builder.load()
     return op_module.mixed_quant_sparse_flash_mla(
         q,

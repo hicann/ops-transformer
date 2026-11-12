@@ -9,6 +9,8 @@
 # -----------------------------------------------------------------------------------------------------------
 
 file(GLOB CURRENT_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
+# op_host includes op_dsl after registering the operator.
+list(REMOVE_ITEM CURRENT_DIRS op_dsl)
 if(NOT ENABLE_TEST AND NOT BENCHMARK)
     list(REMOVE_ITEM CURRENT_DIRS tests)
 endif()
