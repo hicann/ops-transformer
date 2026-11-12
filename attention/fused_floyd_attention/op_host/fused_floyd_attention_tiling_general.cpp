@@ -941,6 +941,13 @@ bool FusedFloydAttentionTilingBase::CaclBmmBatch(int64_t tmpS1BasicBlock, int64_
     tilingData.coreParams.set_bmm1Num(bmm1Num);
 
     int64_t bmmv2Num = aicoreParams_.l1Size / 2 / s2Size / (dSize + n2BasicBlock);
+    if (bmmv2Num == 0) {
+        OP_LOGE(context_,
+                "Parameters (S3, D) of FusedFloydAttention has incorrect shape size (%ld, %ld). "
+                "Reason: The shape must satisfy 2 * S3 * (D + %ld) <= %lu.",
+                s2Size, dSize, n2BasicBlock, aicoreParams_.l1Size);
+        return false;
+    }
     bmmv2Num = std::min(bmmv2Num, static_cast<int64_t>(4));
     if (bmmv2Num == 3) {
         bmmv2Num = 2;
