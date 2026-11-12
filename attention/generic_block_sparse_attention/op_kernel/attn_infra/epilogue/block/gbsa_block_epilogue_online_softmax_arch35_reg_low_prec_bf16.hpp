@@ -30,13 +30,6 @@ enum class KvBaseTileRegSplitStagesBf16 {
 
 template <class OutputType_, class LayoutS_>
 class BlockEpilogue<EpilogueOnlineSoftmaxBsa, OutputType_, Gemm::GemmType<bfloat16_t, LayoutS_>> {
-    // Private packed specialization reuses the exact BF16 scale/FP8-P math
-    // after applying its per-query sparse mask. Existing interfaces are unchanged.
-    template <class, class, class>
-    friend class GbsaPackedOnlineSoftmax512;
-    template <class, class, bool>
-    friend class GbsaPackedBf16OnlineSoftmaxHybrid;
-
 public:
     using DispatchPolicy = EpilogueOnlineSoftmaxBsa;
     using ArchTag = typename DispatchPolicy::ArchTag;

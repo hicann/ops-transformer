@@ -125,7 +125,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>blockShape</td>
       <td>Attribute</td>
-      <td>Sparse block shape [blockShapeX, blockShapeY]. blockShapeX is 1. On <term>Ascend 950PR&950DT products</term>, non-quantized inputs support any integer blockShapeY from 1 to 128; use 4 or 8 with the current MXFP8 main operator. Non-quantized inputs on Atlas A2/A3 support 1, 2, 4, 8, 16, 32, 64, and 128; quantType=5 supports only 128. The value must match the main operator.</td>
+      <td>Sparse block shape [blockShapeX, blockShapeY]. blockShapeX is 1. On <term>Ascend 950PR&950DT products</term>, non-quantized inputs support any integer blockShapeY from 1 to 128; MXFP8 supports only blockShapeY=4 or 8. Non-quantized inputs on Atlas A2/A3 support 1, 2, 4, 8, 16, 32, 64, and 128; quantType=5 supports only 128. The value must match the main operator.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -210,7 +210,7 @@ English | [简体中文](./README.md)
 </table>
 
 - Sparse block shape [blockShapeX, blockShapeY]. blockShapeX is 1. For <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, Y supports 1, 2, 4, 8, 16, 32, 64, and 128.
-- For <term>Ascend 950PR&950DT products</term>, Y in the non-quantized scenario supports any integer from 1 to 128. `quantType=5` supports only `[1,128]`; use `[1,4]` or `[1,8]` with the current `MXFP8` main operator. The value must match the main operator.
+- For <term>Ascend 950PR&950DT products</term>, Y in the non-quantized scenario supports any integer from 1 to 128. `quantType=5` supports only `[1,128]`; `MXFP8` supports only `[1,4]` or `[1,8]`. The value must match the main operator.
 
 
 ## Constraints
@@ -228,7 +228,7 @@ English | [简体中文](./README.md)
 
 - Non-quantized FLOAT16/BFLOAT16 scenario of <term>Ascend 950PR&950DT products</term>: `headDim` supports any value from 1 to 256; `layoutQ/layoutKv` supports `TND/PA_BBND`, `TND/PA_BNBD`, `TND/TND`, `BSND/BSND`, `BNSD/BNSD`, `BSND/PA_BBND`, `BNSD/PA_BBND`, `BSND/PA_BNBD`, and `BNSD/PA_BNBD`, and other combinations are not supported; `maskType` supports 0 (non-causal) and 1 (causal); `residualBlockMode` supports 0 or 1.
 - Non-quantized FLOAT16/BFLOAT16 scenario of <term>Atlas A2 products</term> and <term>Atlas A3 products</term>: `headDim` supports any value from 1 to 256; `layoutQ/layoutKv` supports `TND/PA_BBND` and `TND/TND`; `blockShape=[1,Y]`, where Y supports 1, 2, 4, 8, 16, 32, 64, and 128; `maskType` supports 0 (non-causal) and 1 (causal); `residualBlockMode` supports 0 or 1. For TND KV, `cuSeqLengthsKvOptional` must be passed in; in causal mode, each batch must satisfy that the actual KV length is not less than the actual Q length.
-- On <term>Ascend 950PR&950DT products</term>, `MXFP8` (`quantType=6`) must match the grouped path of the current main operator: `headDim=192/256`, `blockShape=[1,4]` or `[1,8]`, and `numQHeads/numKvHeads=1..128`. Q uses `TND`, `BSND`, or `BNSD`; KV uses the same nonpaged layout or `PA_BBND`/`PA_BNBD` with 128-token pages. `maskType=0/1` and `softmaxPrecision=0/1` are supported; the main operator does not output LSE, and `residualBlockMode=0` is required. See the [main operator's product-specific constraints](../generic_block_sparse_attention/README_en.md#product-specific-constraints) for the complete conditions. Passing Metadata validation does not replace the main operator's scale, address, and buffer-capacity checks.
+- On <term>Ascend 950PR&950DT products</term>, `MXFP8` (`quantType=6`) must match the grouped path of the current main operator: `headDim=192/256`, `blockShape=[1,4]` or `[1,8]`, and `numQHeads/numKvHeads=1..128`. Q uses `TND`, `BSND`, or `BNSD`; KV uses the same nonpaged layout or `PA_BBND`/`PA_BNBD` with 128-token pages. `maskType=0/1` and `softmaxPrecision=0/1` are supported; the main operator does not output LSE, and `residualBlockMode=0` is required. See the [main operator's product-specific constraints](../generic_block_sparse_attention/README_en.md#product-specific-constraints) for the complete conditions. The Metadata API rejects other `headDim` values or sparse block sizes with `ACLNN_ERR_PARAM_INVALID`. Passing Metadata validation does not replace the main operator's scale, address, and buffer-capacity checks.
 - With `quantType=6`, Q/K use scales per 32 channels, V uses per-channel scales, and P uses a per-tensor scale. The main operator validates scale shapes and data types; Metadata does not read scales. Metadata may generate Flash Decoding split schedules when the shape, task-count, and workload conditions are met. Workload is estimated from effective sparse block counts and `blockShapeY`; insufficient workload retains regular scheduling.
 - FP8 with `quantType=5` on <term>Ascend 950PR&950DT products</term> supports only `headDim=128`, `layoutQ/layoutKv=TND/PA_BBND`, `maskType=1`, `residualBlockMode=0`, and `blockShape=[1,128]`.
 - The last dimension of sparse indexes supports 1 to `INT32_MAX` for non-quantized <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and for non-quantized FLOAT16/BFLOAT16 or `MXFP8` inputs on <term>Ascend 950PR&950DT products</term>. FP8 with `quantType=5` on <term>Ascend 950PR&950DT products</term> supports 1 to 256. The capacity must be at least the maximum effective sparse block count.

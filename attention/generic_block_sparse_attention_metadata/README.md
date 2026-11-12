@@ -123,7 +123,7 @@
     <tr>
       <td>blockShape</td>
       <td>属性</td>
-      <td>稀疏块形状[blockShapeX, blockShapeY]。blockShapeX=1。<term>Ascend 950PR&950DT系列产品</term>非量化支持1≤blockShapeY≤128的任意整数；与当前MXFP8主算子配套时blockShapeY仅支持4或8；Atlas A2/A3非量化支持1、2、4、8、16、32、64、128；quantType=5仅支持128。须与主算子一致。</td>
+      <td>稀疏块形状[blockShapeX, blockShapeY]。blockShapeX=1。<term>Ascend 950PR&950DT系列产品</term>非量化支持1≤blockShapeY≤128的任意整数；MXFP8仅支持blockShapeY=4或8；Atlas A2/A3非量化支持1、2、4、8、16、32、64、128；quantType=5仅支持128。须与主算子一致。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -208,7 +208,7 @@
 </table>
 
 - 稀疏块形状[blockShapeX, blockShapeY]。blockShapeX=1；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的Y支持1、2、4、8、16、32、64、128。
-- <term>Ascend 950PR&950DT系列产品</term>非量化的Y支持1～128任意整数；`quantType=5`仅支持`[1,128]`，与当前`MXFP8`主算子配套时仅支持`[1,4]`或`[1,8]`。须与主算子一致。
+- <term>Ascend 950PR&950DT系列产品</term>非量化的Y支持1～128任意整数；`quantType=5`仅支持`[1,128]`，`MXFP8`仅支持`[1,4]`或`[1,8]`。须与主算子一致。
 
 
 ## 约束说明
@@ -226,7 +226,7 @@
 
 - <term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景：`headDim`支持1～256的任意值；`layoutQ/layoutKv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`，不支持其他组合；`maskType`支持0（非因果）和1（causal）；`residualBlockMode`支持0或1。
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化FLOAT16/BFLOAT16场景：`headDim`支持1～256的任意值；`layoutQ/layoutKv`支持`TND/PA_BBND`和`TND/TND`；`blockShape=[1,Y]`，Y支持1、2、4、8、16、32、64、128；`maskType`支持0（非因果）和1（causal）；`residualBlockMode`支持0或1。TND KV须传入`cuSeqLengthsKvOptional`；causal模式下各batch须满足实际KV长度不小于实际Q长度。
-- <term>Ascend 950PR&950DT系列产品</term> `MXFP8`（`quantType=6`）须与当前主算子的grouped路径配套：`headDim=192/256`、`blockShape=[1,4]`或`[1,8]`、`numQHeads/numKvHeads=1～128`；Q为`TND/BSND/BNSD`，KV为同布局非分页输入或`PA_BBND/PA_BNBD`（页大小128）。支持`maskType=0/1`、`softmaxPrecision=0/1`，主算子不输出LSE；`residualBlockMode=0`。完整使用条件见[主算子产品差异约束](../generic_block_sparse_attention/README.md#产品差异约束)。Metadata参数校验通过不替代主算子的scale、地址及缓冲容量检查。
+- <term>Ascend 950PR&950DT系列产品</term> `MXFP8`（`quantType=6`）须与当前主算子的grouped路径配套：`headDim=192/256`、`blockShape=[1,4]`或`[1,8]`、`numQHeads/numKvHeads=1～128`；Q为`TND/BSND/BNSD`，KV为同布局非分页输入或`PA_BBND/PA_BNBD`（页大小128）。支持`maskType=0/1`、`softmaxPrecision=0/1`，主算子不输出LSE；`residualBlockMode=0`。完整使用条件见[主算子产品差异约束](../generic_block_sparse_attention/README.md#产品差异约束)。Metadata接口直接拒绝其他`headDim`或稀疏块大小，返回`ACLNN_ERR_PARAM_INVALID`。Metadata参数校验通过不替代主算子的scale、地址及缓冲容量检查。
 - `quantType=6`的Q/K使用group-32、V使用per-channel、P使用per-tensor缩放；scale的shape和dtype由主算子校验，metadata不读取scale。满足形状、任务数及工作量条件时，Metadata可生成Flash Decoding分裂调度；工作量根据实际有效稀疏块计数与`blockShapeY`估算，工作量不足时保留常规调度。
 - <term>Ascend 950PR&950DT系列产品</term> quantType=5的FP8量化场景：`headDim`仅支持128，`layoutQ/layoutKv`仅支持`TND/PA_BBND`，`maskType=1`、`residualBlockMode=0`、`blockShape=[1,128]`。
 - 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16和MXFP8支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> quantType=5的FP8量化支持1～256；容量均须不小于稀疏块有效计数的最大值。

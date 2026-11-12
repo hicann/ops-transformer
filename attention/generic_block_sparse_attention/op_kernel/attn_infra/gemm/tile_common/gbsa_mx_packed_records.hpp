@@ -15,6 +15,24 @@
 // matrix, L0 or cross-core event handling.
 namespace NpuArch::Gemm::Tile {
 
+namespace Mxfp8DescriptorLayout {
+constexpr uint32_t GROUP_TOKENS = 128U;
+constexpr uint32_t RING_SLOTS = 4U;
+
+__aicore__ inline uint64_t DescriptorGroupWords()
+{
+    // Reserve an eight-word header and two words per possible token span.
+    // Keep this conservative descriptor capacity independent of blockY.
+    return 8U + 2U * GROUP_TOKENS;
+}
+
+__aicore__ inline uint64_t DescriptorTileWords(uint64_t tile)
+{
+    // Keep a header for AIV1's empty group in the single-group tier.
+    return 2U * static_cast<uint32_t>((tile / GROUP_TOKENS + 1U) / 2U) * DescriptorGroupWords();
+}
+} // namespace Mxfp8DescriptorLayout
+
 // Caller must first wait for the producer's MTE3-ready cross-core event on PIPE_S.
 // The same GM slot may hold a previous tile: a ready flag alone does not invalidate
 // the AIC scalar data cache. QK refreshes once, and PV reuses these cache lines.

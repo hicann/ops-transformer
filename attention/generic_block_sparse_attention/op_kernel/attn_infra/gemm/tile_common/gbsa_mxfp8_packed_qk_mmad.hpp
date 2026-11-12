@@ -11,7 +11,7 @@
 #ifndef GBSA_MXFP8_PACKED_QK_MMAD_HPP
 #define GBSA_MXFP8_PACKED_QK_MMAD_HPP
 
-#include "../attn_infra/gemm/tile_common/gbsa_mxfp8_tile.hpp"
+#include "gbsa_mxfp8_tile.hpp"
 
 namespace NpuArch::Gemm::Tile {
 

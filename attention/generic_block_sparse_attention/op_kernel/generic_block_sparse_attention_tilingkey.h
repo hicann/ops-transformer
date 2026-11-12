@@ -13,6 +13,11 @@
 
 #include "kernel_tiling/kernel_tiling.h"
 
+namespace GbsaTilingKeyEncoding {
+constexpr auto DECIMAL_RADIX = 10U;
+constexpr auto MASK_DIVISOR = 1000U;
+} // namespace GbsaTilingKeyEncoding
+
 /**
  * GBSA TilingKey — BSA-style decimal bitfields (64-bit):
  * - [0-1]   Q Layout（个位）           2=TND, 3=BNSD, 4=BSND

@@ -12,20 +12,17 @@
  * \file generic_block_sparse_attention_kernel_interface.cpp
  * \brief Generic Sparse Attention Kernel Interface
  */
-#include "arch35/gbsa_mxfp8_constants.h"
 #include "kernel_operator.h"
 #if (__CCE_AICORE__ == 220)
 #include "arch22/generic_block_sparse_attention_kernel_arch22.h"
 #endif
 #if (__CCE_AICORE__ == 310)
 #include "arch35/generic_block_sparse_attention_kernel_arch35.h"
-#include "arch35/generic_block_sparse_attention_kernel_arch35_full_quant.h"
 #if !defined(TILING_KEY_VAR) || (TILING_KEY_VAR >= 9250002900000020ULL && TILING_KEY_VAR <= 9250002900000023ULL) || \
     (TILING_KEY_VAR >= 9250002900000032ULL && TILING_KEY_VAR <= 9250002900000035ULL) || \
     (TILING_KEY_VAR >= 9250002900000040ULL && TILING_KEY_VAR <= 9250002900000047ULL) || \
     (TILING_KEY_VAR >= 9250002900000050ULL && TILING_KEY_VAR <= 9250002900000055ULL)
-#include "arch35/gbsa_mxfp8_packed_pipeline.hpp"
-#include "attn_infra/epilogue/block/gbsa_packed_softmax_bf16_512.hpp"
+#include "arch35/generic_block_sparse_attention_kernel_arch35_mxfp8_full_quant.h"
 #endif
 #endif
 
@@ -241,6 +238,11 @@ __global__ __aicore__ void GbsaInferInterfaceFullQuant(GM_ADDR q, GM_ADDR k, GM_
     (TILING_KEY_VAR >= 9250002900000032ULL && TILING_KEY_VAR <= 9250002900000035ULL) || \
     (TILING_KEY_VAR >= 9250002900000040ULL && TILING_KEY_VAR <= 9250002900000047ULL) || \
     (TILING_KEY_VAR >= 9250002900000050ULL && TILING_KEY_VAR <= 9250002900000055ULL)
+namespace GbsaMxScaleMode {
+constexpr auto PIPELINE = 4U;           // Grouped K-scale streaming.
+constexpr auto COALESCED_PIPELINE = 5U; // Retained prefill dispatch alias of grouped streaming.
+} // namespace GbsaMxScaleMode
+
 template <class OutDtype, uint32_t ScaleMode = GbsaMxScaleMode::PIPELINE, Format QFormat = Format::BSND,
           Format KvFormat = QFormat, bool IsPaged = false>
 __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
@@ -251,6 +253,8 @@ __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, G
                                                          GM_ADDR softmaxLse, GM_ADDR workspace, GM_ADDR tiling,
                                                          GM_ADDR pQuantScale = nullptr)
 {
+    static_assert(ScaleMode == GbsaMxScaleMode::PIPELINE || ScaleMode == GbsaMxScaleMode::COALESCED_PIPELINE,
+                  "Unsupported MXFP8 scale mode");
     using ArchTag = Arch::AtlasA5;
     using ElementQ = fp8_e4m3fn_t;
     using ElementK = fp8_e4m3fn_t;
@@ -274,7 +278,7 @@ __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, G
     // Packed tiles contain one, two or four N128 groups, selected by the head ratio.
     using L0TileShapeQK = Shape<Int<128>, Int<128>, Int<256>>;
     // The packed matrix loader gathers dense sparse blocks in logical index order.
-    using DispatchPolicyQK = Gemm::MmadAtlasA5BsaQK<false>;
+    using DispatchPolicyQK = Gemm::MmadAtlasA5GbsaQKMxfp8;
     static constexpr auto MM1_COPY_MODE = AscendC::IsSameType<ElementS, float>::value ?
                                               Gemm::Tile::CopyL0CToUBMode::SPLIT_M :
                                               Gemm::Tile::CopyL0CToUBMode::NO_SPLIT;
@@ -285,15 +289,15 @@ __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, G
     using BlockMmadQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, ElementQ, ElementK,
                                                   ElementS, void, TileCopyQK, TileMmadQK>;
 
-    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxBsa;
+    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxGbsaMxfp8;
     using PType = Gemm::GemmType<ElementP, LayoutPDummy>;
     using SType = Gemm::GemmType<ElementS, LayoutS>;
-    using EpilogueOnlineSoftmax = typename Epilogue::Block::GbsaPackedSoftmax512Selector<PType, SType>::Type;
+    using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType>;
 
     using L1TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
     using L0TileShapePV = Shape<Int<128>, Int<128>, Int<256>>;
     // The packed matrix loader gathers dense sparse blocks in logical index order.
-    using DispatchPolicyPV = Gemm::MmadAtlasA5BsaPV<false>;
+    using DispatchPolicyPV = Gemm::MmadAtlasA5GbsaPVMxfp8;
     using TileCopyPVBase =
         Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementP, LayoutPDummy, ElementV, LayoutV, ElementOTmp, LayoutOTmp,
                                           void, Gemm::Tile::CopyL0CToUBMode::SPLIT_M>;
@@ -303,15 +307,14 @@ __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, G
                                                   ElementOTmp, void, TileCopyPV, TileMmadPV>;
 
     using DispatchPolicyRescaleO =
-        Epilogue::EpilogueAtlasA5BsaRescaleO<Epilogue::LseMode::NONE, Epilogue::LseFormat::TN1>;
+        Epilogue::EpilogueAtlasA5GbsaRescaleOMxfp8<Epilogue::LseMode::NONE, Epilogue::LseFormat::TN1>;
     using TileCopyRescaleOBase = Epilogue::Tile::TileCopyRescaleO<ArchTag, ElementO, LayoutO, LayoutOTmp>;
     using TileCopyRescaleO = Epilogue::Tile::TileCopyRescaleOMxV<TileCopyRescaleOBase, true, true>;
     using EpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, ElementO, ElementOTmp, ElementS,
                                                             ElementK, TileCopyRescaleO, Arch::PositionL0C>;
 
-    using GbsaKernel =
-        typename GbsaMxfp8PackedPipelineSelector<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
-                                                 ScaleMode, 0U, QFormat, KvFormat, IsPaged>::Type;
+    using GbsaKernel = GbsaMxfp8PackedKernelArch35<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
+                                                   GbsaMxQkVariant::D192, QFormat, KvFormat, IsPaged>;
 
     GbsaFullQuantKernelParamsArch35 params{q,
                                            k,
@@ -339,9 +342,8 @@ __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, G
         using WideL0Shape = Shape<Int<128>, Int<128>, Int<256>>;
         using WideQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, WideL0Shape, ElementQ, ElementK,
                                                  ElementS, void, TileCopyQK, Gemm::Tile::GbsaMxMmad>;
-        using WideKernel =
-            typename GbsaMxfp8PackedPipelineSelector<WideQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
-                                                     ScaleMode, 256U, QFormat, KvFormat, IsPaged>::Type;
+        using WideKernel = GbsaMxfp8PackedKernelArch35<WideQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
+                                                       GbsaMxQkVariant::D256, QFormat, KvFormat, IsPaged>;
         WideKernel kernel;
         kernel(params);
     } else if (packedTiling.embeddingSize == 256U) {
@@ -349,9 +351,8 @@ __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, G
         using WideL0Shape = Shape<Int<128>, Int<128>, Int<256>>;
         using WideQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, WideL0Shape, ElementQ, ElementK,
                                                  ElementS, void, TileCopyQK, Gemm::Tile::GbsaMxMmad>;
-        using WideKernel =
-            typename GbsaMxfp8PackedPipelineSelector<WideQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
-                                                     ScaleMode, 256U, QFormat, KvFormat, IsPaged>::Type;
+        using WideKernel = GbsaMxfp8PackedKernelArch35<WideQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
+                                                       GbsaMxQkVariant::D256, QFormat, KvFormat, IsPaged>;
         WideKernel kernel;
         kernel(params);
     } else if (!IsPaged && packedTiling.embeddingSize == 192U && packedTiling.blockShapeY == 8U &&
@@ -359,12 +360,11 @@ __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, G
                AscendC::IsSameType<OutDtype, bfloat16_t>::value &&
                packedTiling.qSeqCapacity == packedTiling.kvSeqCapacity && packedTiling.qSeqCapacity >= 1024U &&
                packedTiling.qSeqCapacity <= 8192U) {
-        // Dense CSA shares the coalesced prefill scale producer policy. Keep
-        // sparse long-KV tasks on their existing single-producer schedule.
+        // Retain the dense CSA dispatch alias with an explicit actual D192.
+        // Both aliases use grouped KScale preparation on the two AIVs.
         using DenseCsaKernel =
-            typename GbsaMxfp8PackedPipelineSelector<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
-                                                     GbsaMxScaleMode::COALESCED_PIPELINE, 192U, QFormat, KvFormat,
-                                                     IsPaged>::Type;
+            GbsaMxfp8PackedKernelArch35<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
+                                        GbsaMxQkVariant::D192_PREFILL, QFormat, KvFormat, IsPaged>;
         DenseCsaKernel kernel;
         kernel(params);
     } else {

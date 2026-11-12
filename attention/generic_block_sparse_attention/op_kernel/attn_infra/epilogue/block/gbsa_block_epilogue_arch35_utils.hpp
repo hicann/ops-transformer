@@ -15,6 +15,55 @@
 
 namespace NpuArch::Epilogue::Block {
 
+namespace Mxfp8UbLayout {
+constexpr uint32_t UB_QUERY_ROW_ALIGNMENT = 16U;
+constexpr uint32_t UB_STATS_ROWS = 64U;
+constexpr uint32_t UB_COMPUTE_STAGES = 2U;
+constexpr uint32_t UB_DELTA_STAGES = 3U;
+constexpr uint32_t SCORE_ELEMENT_BYTES = sizeof(float);
+constexpr uint32_t PROBABILITY_ELEMENT_BYTES = sizeof(uint8_t);
+
+// D192 reserves D256 capacity; active tensor strides still use the original D.
+__aicore__ inline uint64_t Align(uint64_t value, uint64_t alignment)
+{
+    return (value + alignment - 1U) / alignment * alignment;
+}
+
+__aicore__ inline uint64_t BufferDim(uint64_t dim)
+{
+    // D192 and D256 share the D256 capacity tier. This is a reservation width,
+    // never the active tensor width or a GM/scale address stride.
+    return Align(dim, 128U);
+}
+
+__aicore__ inline uint32_t VectorRows(uint64_t qTile)
+{
+    // Each AIV reserves half the Q tile, rounded up to a 16-row capacity.
+    return static_cast<uint32_t>(Align(qTile / 2U, UB_QUERY_ROW_ALIGNMENT));
+}
+
+__aicore__ inline uint64_t ScoreUbSlotBytes(uint64_t qTile, uint64_t tile)
+{
+    // All four supported M/KV tiers reserve 32 KiB per FP32 S slot per AIV.
+    return VectorRows(qTile) * tile * SCORE_ELEMENT_BYTES;
+}
+
+__aicore__ inline uint32_t PvUbStages(uint64_t qTile)
+{
+    return qTile <= 64U ? UB_COMPUTE_STAGES : 1U;
+}
+
+__aicore__ inline uint64_t OutputUbSlotBytes(uint64_t dim, uint64_t qTile)
+{
+    return VectorRows(qTile) * BufferDim(dim) * sizeof(float);
+}
+
+__aicore__ inline uint64_t ValueScaleUbBytes(uint64_t dim)
+{
+    return BufferDim(dim) * sizeof(uint16_t);
+}
+} // namespace Mxfp8UbLayout
+
 struct UBufTileHelper {
     // Statistics retain their maximum row capacity independently of S/P/LO tiling.
     static constexpr uint32_t STATS_ROW_NUM = 64U;

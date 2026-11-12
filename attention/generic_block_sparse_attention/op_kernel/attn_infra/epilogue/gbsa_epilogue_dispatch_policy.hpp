@@ -68,6 +68,17 @@ struct EpilogueAtlasA5BsaRescaleO {
     static constexpr LseFormat LSE_FORMAT = LSE_FORMAT_;
 };
 
+struct EpilogueOnlineSoftmaxGbsaMxfp8 {
+    using ArchTag = Arch::AtlasA5;
+};
+
+template <LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::TN1>
+struct EpilogueAtlasA5GbsaRescaleOMxfp8 {
+    using ArchTag = Arch::AtlasA5;
+    static constexpr LseMode LSE_MODE = LSE_MODE_;
+    static constexpr LseFormat LSE_FORMAT = LSE_FORMAT_;
+};
+
 } // namespace NpuArch::Epilogue
 
 #endif // EPILOGUE_DISPATCH_POLICY_HPP

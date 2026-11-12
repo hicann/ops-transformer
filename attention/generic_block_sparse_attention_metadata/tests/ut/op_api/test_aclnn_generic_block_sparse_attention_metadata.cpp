@@ -144,9 +144,10 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, dtype_sparse_block_idx_fp1
 
 TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_mxfp8_platform_and_precision)
 {
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 1), ACLNN_SUCCESS);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 6, 1), ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 0), ACLNN_SUCCESS);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 1, 256, 4), ACLNN_SUCCESS);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 6, 1, 256, 4), ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 0, 256, 4), ACLNN_SUCCESS);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 2, 256, 4), ACLNN_ERR_PARAM_INVALID);
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 0), ACLNN_ERR_PARAM_INVALID);
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 0, 1), ACLNN_SUCCESS);
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1), ACLNN_SUCCESS);
@@ -154,18 +155,38 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_mxfp8_platform_an
 
 TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_mxfp8_shape_contract)
 {
-    for (int64_t headDim : {1, 31, 32, 33, 64, 65, 128, 192, 255, 256}) {
-        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 1, headDim), ACLNN_SUCCESS);
+    for (int64_t headDim : {192, 256}) {
+        for (int64_t blockY : {4, 8}) {
+            for (int64_t precision : {0, 1}) {
+                SCOPED_TRACE(::testing::Message()
+                             << "D=" << headDim << ", blockY=" << blockY << ", precision=" << precision);
+                EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, precision, headDim, blockY), ACLNN_SUCCESS);
+            }
+        }
     }
-    for (int64_t headDim : {0, 257, 512}) {
-        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 1, headDim), ACLNN_ERR_PARAM_INVALID);
+    for (int64_t headDim : {-1, 0, 1, 31, 32, 33, 64, 65, 128, 191, 193, 255, 257, 512}) {
+        SCOPED_TRACE(::testing::Message() << "D=" << headDim);
+        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 1, headDim, 4), ACLNN_ERR_PARAM_INVALID);
     }
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1, 256), ACLNN_ERR_PARAM_INVALID);
-    for (int64_t blockY : {1, 4, 8, 17, 64, 127, 128}) {
-        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 1, 192, blockY), ACLNN_SUCCESS);
-    }
-    for (int64_t blockY : {0, 129}) {
+    for (int64_t blockY : {-1, 0, 1, 2, 3, 5, 7, 9, 17, 64, 127, 128, 129}) {
+        SCOPED_TRACE(::testing::Message() << "blockY=" << blockY);
         EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 1, 192, blockY), ACLNN_ERR_PARAM_INVALID);
     }
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 1, kD, kBlockSize, 1), ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 1, 192, 8, 1), ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_non_mxfp8_shape_contract)
+{
+    // Restricting MXFP8 must not narrow the non-quantized or per-tensor FP8 contracts.
+    for (int64_t headDim : {1, 31, 32, 33, 64, 65, 128, 192, 255, 256}) {
+        SCOPED_TRACE(::testing::Message() << "non-quant D=" << headDim);
+        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 0, 1, headDim), ACLNN_SUCCESS);
+    }
+    for (int64_t blockY : {1, 4, 8, 17, 64, 127, 128}) {
+        SCOPED_TRACE(::testing::Message() << "non-quant blockY=" << blockY);
+        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 0, 1, 192, blockY), ACLNN_SUCCESS);
+    }
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1), ACLNN_SUCCESS);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1, 256), ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1, kD, 4), ACLNN_ERR_PARAM_INVALID);
 }

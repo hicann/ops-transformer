@@ -43,6 +43,7 @@ constexpr int64_t GBSA_TND_BLOCK_CAPACITY_DIM_INDEX = 2;
 
 constexpr int64_t GBSA_CURRENT_HEAD_DIM = 128;
 constexpr int64_t GBSA_ARCH35_NONQUANT_MAX_HEAD_DIM = 512;
+constexpr int64_t GBSA_HEAD_DIM_192 = 192;
 constexpr int64_t GBSA_HEAD_DIM_256 = 256;
 constexpr int64_t GBSA_CURRENT_MAX_GROUP_SIZE = 128;
 constexpr int64_t GBSA_CURRENT_BLOCK_SHAPE_X = 1;
@@ -159,22 +160,27 @@ aclnnStatus CheckGbsaHeadAttrs(int64_t numQHeads, int64_t numKvHeads)
 
 aclnnStatus CheckGbsaBlockAttrs(int64_t blockShapeX, int64_t blockShapeY, int64_t layoutSparsePattern,
                                 bool arch35NonQuant = false, bool arch22GeneralizedY = false,
-                                bool arch22PagedGeneralizedY = false)
+                                bool arch22PagedGeneralizedY = false, bool mxfp8 = false)
 {
     if (blockShapeX != GBSA_CURRENT_BLOCK_SHAPE_X) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "blockShapeX currently only supports %lld, but got %lld.",
                 GBSA_CURRENT_BLOCK_SHAPE_X, blockShapeX);
         return ACLNN_ERR_PARAM_INVALID;
     }
+    if (mxfp8 && blockShapeY != 4 && blockShapeY != 8) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 blockShapeY only supports 4 or 8, but got %lld.", blockShapeY);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     const bool isPowerOfTwoY = blockShapeY > 0 && (blockShapeY & (blockShapeY - 1)) == 0;
-    const bool supportedBlockY = arch35NonQuant     ? (blockShapeY >= 1 && blockShapeY <= GBSA_CURRENT_BLOCK_SHAPE_Y) :
+    const bool supportedBlockY = mxfp8              ? true :
+                                 arch35NonQuant     ? (blockShapeY >= 1 && blockShapeY <= GBSA_CURRENT_BLOCK_SHAPE_Y) :
                                  arch22GeneralizedY ? (blockShapeY <= GBSA_MAX_BLOCK_SHAPE_Y && isPowerOfTwoY) :
                                  arch22PagedGeneralizedY ? (blockShapeY <= GBSA_MAX_BLOCK_SHAPE_Y && isPowerOfTwoY) :
                                                            (blockShapeY == GBSA_CURRENT_BLOCK_SHAPE_Y);
     if (!supportedBlockY) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "blockShapeY=%lld is unsupported (arch35NonQuant=%d, arch22TndGeneralizedY=%d, "
-                "arch22PaGeneralizedY=%d); supported: 128, any in [1, 128] for arch35 non-quant/MXFP8, "
+                "arch22PaGeneralizedY=%d); supported: 128, any in [1, 128] for arch35 non-quant, "
                 "powers of two in [1, %lld] for arch22 dense or PA.",
                 blockShapeY, arch35NonQuant, arch22GeneralizedY, arch22PagedGeneralizedY, GBSA_MAX_BLOCK_SHAPE_Y);
         return ACLNN_ERR_PARAM_INVALID;
@@ -208,10 +214,13 @@ aclnnStatus CheckGbsaScalarAttrs(int64_t numQHeads, int64_t numKvHeads, int64_t 
     if (status != ACLNN_SUCCESS) {
         return status;
     }
-    if (isArch35) {
-        if (mxfp8 ?
-                (headDim > GBSA_HEAD_DIM_256) :
-                (arch35NonQuant ? (headDim > GBSA_ARCH35_NONQUANT_MAX_HEAD_DIM) : headDim != GBSA_CURRENT_HEAD_DIM)) {
+    if (mxfp8) {
+        if (headDim != GBSA_HEAD_DIM_192 && headDim != GBSA_HEAD_DIM_256) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 headDim only supports 192 or 256, but got %lld.", headDim);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    } else if (isArch35) {
+        if (arch35NonQuant ? (headDim > GBSA_ARCH35_NONQUANT_MAX_HEAD_DIM) : headDim != GBSA_CURRENT_HEAD_DIM) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "headDim=%lld is unsupported (arch35NonQuant=%d).", headDim,
                     arch35NonQuant);
             return ACLNN_ERR_PARAM_INVALID;
@@ -220,8 +229,8 @@ aclnnStatus CheckGbsaScalarAttrs(int64_t numQHeads, int64_t numKvHeads, int64_t 
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A2/A3 headDim must be in [1, 256], got %lld.", headDim);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    return CheckGbsaBlockAttrs(blockShapeX, blockShapeY, layoutSparsePattern, arch35NonQuant || mxfp8,
-                               arch22GeneralizedY, arch22PagedGeneralizedY);
+    return CheckGbsaBlockAttrs(blockShapeX, blockShapeY, layoutSparsePattern, arch35NonQuant, arch22GeneralizedY,
+                               arch22PagedGeneralizedY, mxfp8);
 }
 
 aclnnStatus CheckGbsaMaxSeqLenAttr(int64_t maxSeqLen, const char* attrName)

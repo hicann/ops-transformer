@@ -18,7 +18,6 @@
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 #include "attention/generic_block_sparse_attention/op_host/generic_block_sparse_attention_tiling.h"
-#include "attention/generic_block_sparse_attention/op_kernel/arch35/gbsa_mxfp8_scale_cache_layout.h"
 
 using namespace std;
 using namespace ge;
@@ -461,7 +460,7 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_direct_kv_workspace_indep
         ASSERT_EQ(info.workspaceSizes.size(), 1U);
         // The task header was removed. Descriptor rings are followed by the
         // aligned FD partial buffers, even when metadata selects prefill.
-        uint64_t bytes = 28U * 4U * 8U * GbsaMxScaleCache::DescriptorTileWords(512U, y);
+        uint64_t bytes = 28U * 4U * 8U * Mxfp8Tiling::DescriptorTileWords(512U);
         constexpr uint64_t partialCapacity = 8U + 28U - 1U;
         bytes = (bytes + 511U) / 512U * 512U;
         bytes += partialCapacity * 2U * 8U * sizeof(float);
@@ -510,7 +509,7 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_packed_runtime_batch_disp
                 const uint64_t tile = 512U;
                 // Descriptor rings precede the independently aligned FP32 FD
                 // partials. Host reserves them even if metadata selects prefill.
-                uint64_t bytes = 28U * 4U * 8U * GbsaMxScaleCache::DescriptorTileWords(tile, y);
+                uint64_t bytes = 28U * 4U * 8U * Mxfp8Tiling::DescriptorTileWords(tile);
                 constexpr uint64_t partialCapacity = 8U + 28U - 1U;
                 bytes = (bytes + 511U) / 512U * 512U;
                 bytes += partialCapacity * 2U * 8U * sizeof(float);
@@ -574,8 +573,7 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_scale_pipeline_explicit_d
                             ASSERT_TRUE(ExecuteTiling(ctx, info));
                             EXPECT_EQ(info.tilingKey,
                                       dtype == ge::DT_FLOAT16 ? 9250002900000020ULL : 9250002900000021ULL);
-                            EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(kv, nkv, d, y, 512),
-                                      GbsaMxScaleCache::UB_CAPACITY);
+                            EXPECT_LE(Mxfp8Tiling::PipelineUbEnd(d, 512), Mxfp8Tiling::UB_CAPACITY);
                         }
                     }
                 }
@@ -624,7 +622,7 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_coalesced_pipeline_prefil
                         const uint64_t keyBase =
                             mask == 1 && kv >= 1024 && kv <= 8192 ? 9250002900000022ULL : 9250002900000020ULL;
                         EXPECT_EQ(info.tilingKey, keyBase + (dtype == ge::DT_FLOAT16 ? 0ULL : 1ULL));
-                        EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(kv, nkv, d, y, 512), GbsaMxScaleCache::UB_CAPACITY);
+                        EXPECT_LE(Mxfp8Tiling::PipelineUbEnd(d, 512), Mxfp8Tiling::UB_CAPACITY);
                     }
                 }
             }
@@ -959,8 +957,7 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_fixed_tile_and_w
                     EXPECT_EQ(info.workspaceSizes[0], fp16Workspace);
                     const uint64_t dataL1 = 16U * 256U + 3U * 128U * 256U + 3U * 16U * 512U + 2U * 512U * 256U;
                     EXPECT_LT(dataL1, 512U * 1024U - 16U * 1024U - 3U * 4096U);
-                    EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(kv, shape.nkv, shape.d, shape.y, 512U),
-                              GbsaMxScaleCache::UB_CAPACITY);
+                    EXPECT_LE(Mxfp8Tiling::PipelineUbEnd(shape.d, 512U), Mxfp8Tiling::UB_CAPACITY);
                 }
             }
         }
@@ -969,18 +966,14 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_fixed_tile_and_w
 
 TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_bounded_scale_reservation)
 {
-    using namespace GbsaMxScaleCache;
+    using namespace Mxfp8Tiling;
     for (uint64_t dim : {128U, 192U, 256U}) {
-        for (uint64_t kv : {1U, 127U, 129U, 4096U, 8192U, 8193U, 65537U, 635536U}) {
-            for (uint64_t heads : {1U, 2U, 4U, 13U, 64U, 100U}) {
-                const uint64_t block = dim == 128 ? 128U : 4U;
-                EXPECT_TRUE(StreamFits(heads, dim, 256U));
-                EXPECT_LE(PipelineUbEnd(kv, heads, dim, block, 512U), UB_CAPACITY);
-                EXPECT_EQ(StreamBytes(heads, dim, 256U), 8192U);
-            }
+        for (uint64_t heads : {1U, 2U, 4U, 13U, 64U, 100U}) {
+            EXPECT_TRUE(StreamFits(heads, dim, 256U));
         }
+        EXPECT_LE(PipelineUbEnd(dim, 512U), UB_CAPACITY);
+        EXPECT_EQ(StreamBytes(dim, 256U), 8192U);
     }
-    EXPECT_LE(PipelineUbEnd(65536U, 64U, 256U, 4U, 512U), UB_CAPACITY);
 }
 
 TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_fp32_scores_precision_compatibility)
@@ -1041,20 +1034,13 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_fp32_scores_precision_com
 
 TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_grouped_raw_ring_capacity)
 {
-    using namespace GbsaMxScaleCache;
-    EXPECT_EQ(PipelineRawStages(16384U, 2U, 256U, 4U, 512U), 3U);
-    EXPECT_EQ(PipelineUbEnd(16384U, 2U, 256U, 4U, 512U), 170496U);
-    EXPECT_EQ(PipelineUbEnd(16384U, 2U, 256U, 4U, 512U, true), 170496U);
-    EXPECT_EQ(PipelineRawStages(16384U, 4U, 192U, 8U, 512U), 3U);
-    EXPECT_EQ(PipelineUbEnd(16384U, 4U, 192U, 8U, 512U), 170496U);
-    EXPECT_EQ(PipelineUbEnd(16384U, 4U, 192U, 8U, 512U, true), 170496U);
-    // Each Raw row selects one head, so the third slot no longer overflows
-    // at Nkv=13. Total UB storage is independent of the GM head stride.
-    EXPECT_EQ(PipelineRawStages(16384U, 12U, 256U, 4U, 512U), 3U);
-    EXPECT_EQ(PipelineRawStages(16384U, 13U, 256U, 4U, 512U), 3U);
-    EXPECT_EQ(PipelineUbEnd(16384U, 13U, 256U, 4U, 512U), 170496U);
-    EXPECT_EQ(PipelineUbEnd(16384U, 100U, 256U, 4U, 512U), 170496U);
-    EXPECT_GT(PipelineUbEnd(16384U, 2U, 256U, 4U, 256U), UB_CAPACITY);
+    using namespace Mxfp8Tiling;
+    // Both layouts and all KV heads share the same current-head Raw capacity.
+    EXPECT_EQ(PipelineRawStages(256U, 512U), 3U);
+    EXPECT_EQ(PipelineUbEnd(256U, 512U), 170496U);
+    EXPECT_EQ(PipelineRawStages(192U, 512U), 3U);
+    EXPECT_EQ(PipelineUbEnd(192U, 512U), 170496U);
+    EXPECT_GT(PipelineUbEnd(256U, 256U), UB_CAPACITY);
 }
 
 TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_head_group_tiers)
@@ -1113,9 +1099,8 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_head_group_tiers)
                     EXPECT_EQ(ReadTilingU32(info, l1Offset + 7U * 4U), tokens);
                     EXPECT_EQ(ReadTilingU32(info, l1Offset + 9U * 4U), 3U);
                     EXPECT_EQ(ReadTilingU32(info, l1Offset + 10U * 4U), 2U);
-                    EXPECT_LT(GbsaMxScaleCache::PipelineL1End(d, m, tokens), GbsaMxScaleCache::L1_DATA_CAPACITY);
-                    EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(kv, nqKv, d, y, tokens, false, m),
-                              GbsaMxScaleCache::UB_CAPACITY);
+                    EXPECT_LT(Mxfp8Tiling::PipelineL1End(d, m, tokens), Mxfp8Tiling::L1_DATA_CAPACITY);
+                    EXPECT_LE(Mxfp8Tiling::PipelineUbEnd(d, tokens, m), Mxfp8Tiling::UB_CAPACITY);
                 }
             }
         }
@@ -1124,36 +1109,30 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_head_group_tiers)
 
 TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_large_head_group_buffer_capacity)
 {
-    using namespace GbsaMxScaleCache;
+    using namespace Mxfp8Tiling;
     // Exact footprints include Raw, NZ, statistics and both descriptor scratch records.
-    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 256U, 4U, 512U, false, 32U), 170496U);
-    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 256U, 4U, 256U, false, 64U), 203136U);
-    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 256U, 4U, 128U, false, 128U), 235904U);
-    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 192U, 4U, 512U, false, 32U), 170496U);
-    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 192U, 4U, 256U, false, 64U), 203136U);
-    EXPECT_EQ(PipelineUbEnd(4099U, 2U, 192U, 4U, 128U, false, 128U), 235904U);
+    EXPECT_EQ(PipelineUbEnd(256U, 512U, 32U), 170496U);
+    EXPECT_EQ(PipelineUbEnd(256U, 256U, 64U), 203136U);
+    EXPECT_EQ(PipelineUbEnd(256U, 128U, 128U), 235904U);
+    EXPECT_EQ(PipelineUbEnd(192U, 512U, 32U), 170496U);
+    EXPECT_EQ(PipelineUbEnd(192U, 256U, 64U), 203136U);
+    EXPECT_EQ(PipelineUbEnd(192U, 128U, 128U), 235904U);
     EXPECT_EQ(PvUbStages(128U), 1U);
     EXPECT_EQ(PvUbStages(64U), 2U);
-    EXPECT_EQ(DescriptorTileWords(128U, 4U), 528U); // includes AIV1's empty notification
-    EXPECT_EQ(DescriptorTileWords(256U, 8U), 528U);
-    EXPECT_EQ(DescriptorTileWords(512U, 4U), 1056U);
-    EXPECT_GT(PipelineUbEnd(4099U, 2U, 256U, 4U, 512U, false, 128U), UB_CAPACITY);
-    EXPECT_GT(PipelineUbEnd(4099U, 2U, 256U, 4U, 256U, false, 128U), UB_CAPACITY);
+    EXPECT_EQ(DescriptorTileWords(128U), 528U); // includes AIV1's empty notification
+    EXPECT_EQ(DescriptorTileWords(256U), 528U);
+    EXPECT_EQ(DescriptorTileWords(512U), 1056U);
+    EXPECT_GT(PipelineUbEnd(256U, 512U, 128U), UB_CAPACITY);
+    EXPECT_GT(PipelineUbEnd(256U, 256U, 128U), UB_CAPACITY);
 }
 
 TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_grouped_indices_independent_of_ub_cache)
 {
-    using namespace GbsaMxScaleCache;
-    EXPECT_TRUE(DirectIndexMapFits(512U));
-    EXPECT_TRUE(DirectIndexMapFits(8192U));
-    EXPECT_FALSE(DirectIndexMapFits(8193U));
-    for (uint64_t kv : {4096U, 8193U, 16384U, 65537U, 635536U}) {
-        EXPECT_EQ(PipelineUbEnd(kv, 2U, 256U, 4U, 512U), 170496U);
-        EXPECT_EQ(PipelineUbEnd(kv, 2U, 256U, 4U, 512U, true), 170496U);
-    }
-    EXPECT_EQ(PipelineAuxBytes(256U, 512U, 3U), 2048U);
+    using namespace Mxfp8Tiling;
+    EXPECT_EQ(PipelineUbEnd(256U, 512U), 170496U);
+    EXPECT_EQ(PipelineAuxBytes(256U), 2048U);
     // D192 uses the same D256 buffer capacity while retaining actual-D strides.
-    EXPECT_EQ(PipelineAuxBytes(192U, 512U, 3U), 2048U);
+    EXPECT_EQ(PipelineAuxBytes(192U), 2048U);
 }
 
 TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_workspace_independent_of_index_capacity)
@@ -2512,8 +2491,8 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_pipeline_and_nonquant_dis
             }
         }
     }
-    EXPECT_EQ(GbsaMxScaleCache::PipelineAuxBytes(256, 512), 2048U);
-    EXPECT_LE(GbsaMxScaleCache::PipelineUbEnd(65536, 64, 256, 4, 512), GbsaMxScaleCache::UB_CAPACITY);
+    EXPECT_EQ(Mxfp8Tiling::PipelineAuxBytes(256), 2048U);
+    EXPECT_LE(Mxfp8Tiling::PipelineUbEnd(256, 512), Mxfp8Tiling::UB_CAPACITY);
 }
 
 TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_nonpacked_without_optional_switch)
@@ -2558,7 +2537,7 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_fd_workspace_capacity_bou
             std::memcpy(&outputOffset, info.tilingData.get() + 144U, sizeof(uint64_t));
             EXPECT_EQ(lseOffset % 512U, 0U);
             EXPECT_EQ(outputOffset % 512U, 0U);
-            const uint64_t descriptors = info.blockNum * 4U * 8U * GbsaMxScaleCache::DescriptorTileWords(512U, 4U);
+            const uint64_t descriptors = info.blockNum * 4U * 8U * Mxfp8Tiling::DescriptorTileWords(512U);
             EXPECT_GE(lseOffset, descriptors);
             EXPECT_GE(outputOffset, lseOffset + partialCapacity * 2U * 8U * sizeof(float));
             ASSERT_EQ(info.workspaceSizes.size(), 1U);

@@ -238,7 +238,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>blockShape</td>
       <td>输入</td>
       <td>代表稀疏块形状数组。</td>
-      <td>稀疏块形状[blockShapeX, blockShapeY]。blockShapeX=1。<term>Ascend 950PR&950DT系列产品</term>非量化和MXFP8支持1≤blockShapeY≤128的任意整数；Atlas A2/A3非量化支持1、2、4、8、16、32、64、128；quantType=5仅支持128。</td>
+      <td>稀疏块形状[blockShapeX, blockShapeY]。blockShapeX=1。<term>Ascend 950PR&950DT系列产品</term>非量化支持1≤blockShapeY≤128的任意整数，MXFP8仅支持blockShapeY=4或8；Atlas A2/A3非量化支持1、2、4、8、16、32、64、128；quantType=5仅支持128。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -487,8 +487,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化FLOAT16/BFLOAT16场景：`headDim`支持1～256的任意值；`layoutQ/layoutKv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`；`blockShape=[1,Y]`，Y支持1、2、4、8、16、32、64、128；`maskType`支持0（非因果）和1（causal）；`residualBlockMode`支持0或1。TND KV须传入`cuSeqLengthsKvOptional`；causal模式下各batch须满足实际KV长度不小于实际Q长度。
 <!-- end id9 -->
 <!-- npu="950" id10 -->
-- <term>Ascend 950PR&950DT系列产品</term> MXFP8（`quantType=6`）的`headDim`、Q/KV布局组合、稀疏块大小、索引容量、因果模式、softmax精度和LSE输出范围与上述A5非量化场景一致；`residualBlockMode`仍仅支持0。
-- `quantType=6`的Q/K使用group-32、V使用per-channel、P使用per-tensor缩放；scale的shape和dtype由主算子校验，metadata不读取scale。Metadata保留常规任务列表，并禁用Flash Decoding分裂调度。
+- <term>Ascend 950PR&950DT系列产品</term> MXFP8（`quantType=6`）仅支持`headDim=192/256`、`blockShape=[1,4]`或`[1,8]`、`numQHeads/numKvHeads=1～128`。Metadata接口直接拒绝其他`headDim`或稀疏块大小，返回`ACLNN_ERR_PARAM_INVALID`。Q支持`TND/BSND/BNSD`，KV支持同布局非分页输入或`PA_BBND/PA_BNBD`；主算子要求分页KV的页大小为128。支持`maskType=0/1`、`softmaxPrecision=0/1`，两种精度值均使用FP32 score；`residualBlockMode=0`，主算子不支持输出LSE。Metadata不接收Q/K/V及scale，参数校验通过不替代主算子的scale、地址及缓冲容量检查。
+- `quantType=6`的Q/K使用group-32、V使用per-channel、P使用per-tensor缩放；scale的shape和dtype由主算子校验，metadata不读取scale。满足形状、任务数及工作量条件时，Metadata可生成Flash Decoding分裂调度；工作量根据实际有效稀疏块计数与`blockShapeY`估算，工作量不足时保留常规调度。
 - <term>Ascend 950PR&950DT系列产品</term> quantType=5的FP8量化场景：`headDim`仅支持128，`layoutQ/layoutKv`仅支持`TND/PA_BBND`，`maskType=1`、`residualBlockMode=0`、`blockShape=[1,128]`。
 <!-- end id10 -->
 <!-- npu="950,A3,910b" id11 -->

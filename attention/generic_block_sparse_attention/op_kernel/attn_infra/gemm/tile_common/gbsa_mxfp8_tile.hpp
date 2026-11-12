@@ -14,8 +14,10 @@
 #include "gbsa_mx_packed_records.hpp"
 
 namespace NpuArch::Gemm::Tile {
-// Reserve the final 16 KiB of L1 for scales. Supported GBSA geometry uses
-// at most 192 KiB of data buffers; scale slots are independent of data strides.
+// Reserve the final 16 KiB of L1 for the base GEMM scale slots. Grouped KScale
+// uses three additional 4-KiB slots immediately below this region. Host checks
+// data buffers against Mxfp8Tiling::L1_DATA_CAPACITY; D256 with
+// Q16/KV512 reserves 380 KiB for Q/K/P/V data, independent of scale slots.
 constexpr uint32_t GBSA_MX_SCALE_BASE = Arch::AtlasA5::L1_SIZE - 16384U;
 constexpr uint32_t GBSA_MX_SCALE_SLOT = 2048U;
 

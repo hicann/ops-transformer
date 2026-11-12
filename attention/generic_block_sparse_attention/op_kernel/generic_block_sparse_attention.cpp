@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "arch35/gbsa_mxfp8_constants.h"
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "generic_block_sparse_attention_tilingkey.h"

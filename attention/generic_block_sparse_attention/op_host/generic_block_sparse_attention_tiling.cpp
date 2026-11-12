@@ -8,9 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "../op_kernel/arch35/gbsa_mxfp8_constants.h"
 #include "generic_block_sparse_attention_tiling.h"
-#include "../op_kernel/arch35/gbsa_mxfp8_scale_cache_layout.h"
 #include <cmath>
 #include <cstring>
 #include <cstdint>
@@ -23,6 +21,28 @@
 #include "graph/tensor.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "op_host/tiling_base.h"
+
+namespace GbsaTilingKeyEncoding {
+constexpr auto DECIMAL_RADIX = 10U;
+constexpr auto MASK_DIVISOR = 1000U;
+constexpr auto KV_LAYOUT_DIVISOR = 10000000ULL;
+
+// Serialized additives used by host key generation. Do not change the key ABI.
+constexpr auto BF16_DTYPE_FIELD = 22220ULL;
+constexpr auto FP8_OUT_FP16_FIELD = 10ULL;
+constexpr auto FP8_OUT_BF16_FIELD = 20ULL;
+constexpr auto KV_PA_BBND_FIELD = 70000000ULL;
+constexpr auto KV_PA_BNBD_FIELD = 80000000ULL;
+constexpr auto KV_BNSD_FIELD = 10000000ULL;
+constexpr auto KV_BSND_FIELD = 20000000ULL;
+constexpr auto KV_TND_FIELD = 30000000ULL;
+constexpr auto PAGED_FIELD = 1000000ULL;
+constexpr auto LOW_PRECISION_SOFTMAX_FIELD = 100000ULL;
+constexpr auto MASK_FIELD = 1000ULL;
+constexpr auto Q_TND_FIELD = 2ULL;
+constexpr auto Q_BNSD_FIELD = 3ULL;
+constexpr auto Q_BSND_FIELD = 4ULL;
+} // namespace GbsaTilingKeyEncoding
 
 constexpr int QUERY_INDEX = 0;
 constexpr int KEY_INDEX = 1;
@@ -885,9 +905,8 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
             // Four AIV-produced K/V descriptor slots per AIC.
             // Each slot has a cache-line header plus at most one 16-byte record
             // per sparse block. Match the packed kernel's descriptor lookahead ring.
-            const uint64_t descriptorBytes =
-                GbsaMxScaleCache::DescriptorTileWords(kvBaseTile_, blockShapeY_) * sizeof(uint64_t);
-            constexpr uint64_t descriptorSlots = GbsaMxScaleCache::DESCRIPTOR_RING_SLOTS;
+            const uint64_t descriptorBytes = Mxfp8Tiling::DescriptorTileWords(kvBaseTile_) * sizeof(uint64_t);
+            constexpr uint64_t descriptorSlots = Mxfp8Tiling::DESCRIPTOR_RING_SLOTS;
             pipelineWorkspaceSize = blockDim_ * descriptorSlots * descriptorBytes;
             // K/V payloads remain in their input layout and go directly to L1.
             // Only bounded descriptor rings occupy the packed workspace.
@@ -1270,8 +1289,8 @@ bool GBSATiling::IsMxfp8PackedPath() const
                                 layoutKv_ == "TND" ? totalKvTokens_ :
                                                      kvSeqCapacity_;
     const uint64_t kScaleRowBytes = static_cast<uint64_t>(kvHeads_) * (embeddingSize_ / 32U);
-    const uint32_t qTile = GbsaMxScaleCache::QueryTileRows(groupSize_);
-    const uint32_t tile = GbsaMxScaleCache::KvTileTokens(groupSize_);
+    const uint32_t qTile = Mxfp8Tiling::QueryTileRows(groupSize_);
+    const uint32_t tile = Mxfp8Tiling::KvTileTokens(groupSize_);
     return socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_MXFP8 && batch_ != 0U && packedLayout &&
            (embeddingSize_ == 192U || embeddingSize_ == GBSA_TILE_SIZE_256) &&
            (blockShapeY_ == 4U || blockShapeY_ == 8U) &&
@@ -1283,11 +1302,10 @@ bool GBSATiling::IsMxfp8PackedPath() const
            kvCapacity * kvHeads_ <= UINT32_MAX / embeddingSize_ &&
            // Output DataCopyPad's GM head stride is a uint32_t byte count.
            (!qHeadMajor || static_cast<uint64_t>(qSeqCapacity_) * embeddingSize_ * sizeof(uint16_t) <= UINT32_MAX) &&
-           GbsaMxScaleCache::StreamFits(kvHeads_, embeddingSize_, GbsaMxScaleCache::RawTileTokens(tile), blockShapeY_,
-                                        headMajor) &&
-           GbsaMxScaleCache::PipelineL1End(embeddingSize_, qTile, tile) <= GbsaMxScaleCache::L1_DATA_CAPACITY &&
-           GbsaMxScaleCache::PipelineUbEnd(kvSeqCapacity_, kvHeads_, embeddingSize_, blockShapeY_, tile, headMajor,
-                                           qTile) <= GbsaMxScaleCache::UB_CAPACITY;
+           Mxfp8Tiling::StreamFits(kvHeads_, embeddingSize_, Mxfp8Tiling::RawTileTokens(tile), blockShapeY_,
+                                   headMajor) &&
+           Mxfp8Tiling::PipelineL1End(embeddingSize_, qTile, tile) <= Mxfp8Tiling::L1_DATA_CAPACITY &&
+           Mxfp8Tiling::PipelineUbEnd(embeddingSize_, tile, qTile) <= Mxfp8Tiling::UB_CAPACITY;
 }
 
 uint64_t GBSATiling::GenerateTilingKey()
@@ -1536,16 +1554,16 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
     } else if (socVer_ != SOC_VER_950_CODE) {
         kvBaseTile_ = GBSA_TILE_SIZE_256;
     } else if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
-        qBaseTile_ = GbsaMxScaleCache::QueryTileRows(groupSize_);
-        kvBaseTile_ = GbsaMxScaleCache::KvTileTokens(groupSize_);
+        qBaseTile_ = Mxfp8Tiling::QueryTileRows(groupSize_);
+        kvBaseTile_ = Mxfp8Tiling::KvTileTokens(groupSize_);
         mm1L1TileM_ = qBaseTile_;
         // QK streams 1/2/4 K groups through three physical L1 slots.
         // P/V retain the full 128/256/512-token logical tile selected by the head group.
-        mm1L1TileN_ = GbsaMxScaleCache::GROUP_TOKENS;
-        mm1L1TileKLeft_ = GbsaMxScaleCache::BufferDim(embeddingSize_);
+        mm1L1TileN_ = Mxfp8Tiling::GROUP_TOKENS;
+        mm1L1TileKLeft_ = Mxfp8Tiling::BufferDim(embeddingSize_);
         mm1L1TileKRight_ = mm1L1TileKLeft_;
         mm2L1TileM_ = qBaseTile_;
-        mm2L1TileN_ = GbsaMxScaleCache::BufferDim(embeddingSize_);
+        mm2L1TileN_ = Mxfp8Tiling::BufferDim(embeddingSize_);
         mm2L1TileKLeft_ = kvBaseTile_;
         mm2L1TileKRight_ = kvBaseTile_;
         kL1BufNum_ = 3U;
