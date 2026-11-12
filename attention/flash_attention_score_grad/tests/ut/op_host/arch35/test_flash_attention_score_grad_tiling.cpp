@@ -10175,3 +10175,602 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_86_tnd_
     EXPECT_EQ(tilingData.s1s2BNGS1S2SplitCoreParams.get_blockOuter(), 32);
     EXPECT_EQ(tilingData.s1s2BNGS1S2SplitCoreParams.get_maxValidBBLen(), 271);
 }
+
+// ---------------------------------------------------------------------------
+// 覆盖补充用例（合并自 test_flash_attention_score_grad_tiling_coverage.cpp；该文件名不
+// 匹配 CMake 的 test_*_tiling.cpp 收集规则，此前未参与编译，合并后纳入 tiling UT 目标）。
+// ---------------------------------------------------------------------------
+// 覆盖补充（函数覆盖率优先）：静态分析发现的 0 覆盖/低覆盖函数族。
+//   1. GQA BAND deter（非 TND）：SelectGqaBandSchedule + 10 个 static 辅助函数
+//   2. GQA BAND deter + 负 token：SelectGqaBandNegativeSchedule + grouped 搜索
+//   3. GQA CAUSAL deter（非 TND）：CalcleCausalDeterParam grouped 主体 + 10 函数
+//   4. GQA CAUSAL deter + RIGHT_DOWN：RD 分支
+//   5. 空输出 tiling：RunEmptyTilingRegbase + CalculateTschBlockDim
+//   6. HIFLOAT8 量化成功路径：ProcessQuantInfo 接受分支等
+//   7. E4M3FN dtype：DetermineMode/GetS1S2TemplateType 判定分支
+// 断言采用 ExecuteTiling 的结果校验（成功用例不比对 tiling data 全串，
+// 未运行环境下避免硬编码错误期望；上板跑通后可升级为精确断言）。
+// ---------------------------------------------------------------------------
+
+// 27 输入 / 6 输出的 BSND 参数构造（GQA deter / 量化覆盖用）。
+static gert::TilingContextPara MakeGqaDeterPara(
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo* compileInfo, int64_t b, int64_t s1, int64_t s2,
+    int64_t n1, int64_t n2, int64_t d, int64_t sparseMode, int64_t preTokens, int64_t nextTokens,
+    ge::DataType dtype = ge::DT_FLOAT16, int64_t deter = 1)
+{
+    return gert::TilingContextPara("FlashAttentionScoreGrad",
+                                   {
+                                       // q: [B, S1, N1, D]
+                                       {{{b, s1, n1, d}, {b, s1, n1, d}}, dtype, ge::FORMAT_ND},
+                                       // k: [B, S2, N2, D]
+                                       {{{b, s2, n2, d}, {b, s2, n2, d}}, dtype, ge::FORMAT_ND},
+                                       // v: [B, S2, N2, D]
+                                       {{{b, s2, n2, d}, {b, s2, n2, d}}, dtype, ge::FORMAT_ND},
+                                       // dy
+                                       {{{b, s1, n1, d}, {b, s1, n1, d}}, dtype, ge::FORMAT_ND},
+                                       // pse_shift
+                                       {{{}, {}}, dtype, ge::FORMAT_ND},
+                                       // drop_mask
+                                       {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                       // padding_mask
+                                       {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                       // atten_mask
+                                       {{{2048, 2048}, {2048, 2048}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                       // softmax_max: [B, N1, S1, 8]，dim0 必须等于 b
+                                       {{{b, n1, s1, 8}, {b, n1, s1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       // softmax_sum
+                                       {{{b, n1, s1, 8}, {b, n1, s1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       // softmax_in
+                                       {{{}, {}}, dtype, ge::FORMAT_ND},
+                                       // attention_in
+                                       {{{b, s1, n1, d}, {b, s1, n1, d}}, dtype, ge::FORMAT_ND},
+                                       // prefix
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       // actual_seq_qlen
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       // actual_seq_kvlen
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       // q_start_idx
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       // kv_start_idx
+                                       {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                       // dScaleQ
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       // dScaleK
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       // dScaleV
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       // dScaledy
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       // dScaleo
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                       // queryRope
+                                       {{{}, {}}, dtype, ge::FORMAT_ND},
+                                       // keyRope
+                                       {{{}, {}}, dtype, ge::FORMAT_ND},
+                                       // sink
+                                       {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                   },
+                                   {
+                                       // dq
+                                       {{{b, s1, n1, d}, {b, s1, n1, d}}, dtype, ge::FORMAT_ND},
+                                       // dk
+                                       {{{b, s2, n2, d}, {b, s2, n2, d}}, dtype, ge::FORMAT_ND},
+                                       // dv
+                                       {{{b, s2, n2, d}, {b, s2, n2, d}}, dtype, ge::FORMAT_ND},
+                                       // dpse
+                                       {{{}, {}}, dtype, ge::FORMAT_ND},
+                                       // dq_rope
+                                       {{{}, {}}, dtype, ge::FORMAT_ND},
+                                       // dk_rope
+                                       {{{}, {}}, dtype, ge::FORMAT_ND},
+                                   },
+                                   {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
+                                    {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+                                    {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(preTokens)},
+                                    {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(nextTokens)},
+                                    {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(n1)},
+                                    {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+                                    {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                    {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(sparseMode)},
+                                    {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                    {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                    {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                    {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                    {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
+                                   compileInfo, "Ascend950", A5SocInfoHybrid, 262144, deter);
+}
+
+// ---------------------------------------------------------------------------
+// P0-1: GQA BAND deter（非 TND）—— SelectGqaBandSchedule 及 10 个 static 辅助。
+// 条件：BN2GS1S2 + g>1 + DETER_BAND + isSwizzle（Hybrid soc 使 coreNum==2*aicNum）。
+// ---------------------------------------------------------------------------
+TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeter_Bsnd_G2)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
+    auto para = MakeGqaDeterPara(&compileInfo, 4, 4096, 4096, 2, 1, 64, 4, 65536, 65536);
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
+}
+
+// P0-2: GQA BAND deter + 负 token——SelectGqaBandNegativeSchedule + grouped 搜索。
+// s1、s2 均 128 对齐；pre_tockens 为负触发负 token 变换。
+TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeter_NegativeTokens)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
+    auto para = MakeGqaDeterPara(&compileInfo, 4, 4096, 4096, 2, 1, 64, 4, -256, 1024);
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
+}
+
+// P0-3: GQA CAUSAL deter（非 TND）—— CalcleCausalDeterParam grouped 主体 + 10 函数。
+TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaCausalDeter_Bsnd_G2)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
+    auto para = MakeGqaDeterPara(&compileInfo, 5, 2048, 2048, 2, 1, 64, 2, 65536, 65536);
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
+}
+
+// P0-4: GQA CAUSAL deter + RIGHT_DOWN（sparse_mode=3、s1==s2）——RD 分支。
+TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaCausalDeter_RightDown)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
+    auto para = MakeGqaDeterPara(&compileInfo, 5, 2048, 2048, 2, 1, 64, 3, 65536, 65536);
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
+}
+
+// P0-5: 空输出 tiling——RunEmptyTilingRegbase + CalculateTschBlockDim。
+// dq 输出 shape 含 0 维（shapeSize==0），其余输入合法；3 维输入按 SBH 声明，
+// compileInfo 带 NpuArch::DAV_3510 走 regbase 空输出分支。
+TEST_F(FlashAttentionScoreGradTiling, Coverage_EmptyOutput_DqDimZero)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64,
+        32,
+        196608,
+        524288,
+        65536,
+        65536,
+        131072,
+        134217728,
+        32,
+        platform_ascendc::SocVersion::ASCEND950,
+        NpuArch::DAV_3510};
+    gert::TilingContextPara para("FlashAttentionScoreGrad",
+                                 {
+                                     // q: SBH [S, B, H*D]
+                                     {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                     {{{1, 1, 128, 8}, {1, 1, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{1, 1, 128, 8}, {1, 1, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     // dq: shape 含 0 维 -> 空输出 tiling 路径
+                                     {{{1, 0, 1, 64}, {1, 0, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     // dk / dv 合法
+                                     {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
+                                  {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+                                  {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+                                  {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+                                  {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                  {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
+                                  {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                  {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
+                                 &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
+}
+
+// P0-6: HIFLOAT8 输入——当前 arch35 ProcessQuantInfo（common_regbase 拒绝列表）对
+// DT_HIFLOAT8 返回失败；本用例覆盖 DetermineMode HIFLOAT8 档与拒绝分支，
+// 产品侧恢复量化支持后可升级为成功断言（isQuant/GetS1S2TemplateType 档等）。
+TEST_F(FlashAttentionScoreGradTiling, Coverage_Hifloat8Rejected)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
+    gert::TilingContextPara para("FlashAttentionScoreGrad",
+                                 {
+                                     // q/k/dy: HIFLOAT8 [B, S1, N, D]
+                                     {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+                                     {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+                                     // v: HIFLOAT8 [B, S2, N, D]
+                                     {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+                                     {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+                                     // pse_shift
+                                     {{{}, {}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+                                     // drop_mask
+                                     {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                     // padding_mask
+                                     {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                     // atten_mask
+                                     {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                     // softmax_max: isQuant 形状 [B, N1, S1, 1]
+                                     {{{1, 1, 256, 1}, {1, 1, 256, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     // softmax_sum
+                                     {{{1, 1, 256, 1}, {1, 1, 256, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     // softmax_in
+                                     {{{}, {}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+                                     // attention_in
+                                     {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+                                     // prefix
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                     // dScaleQ/K/V/Dy/O: [1] FP32
+                                     {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                     {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                 },
+                                 {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
+                                  {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+                                  {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+                                  {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+                                  {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                  {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+                                  {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                  {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
+                                 &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
+    TilingInfo tilingInfo;
+    // HIFLOAT8 当前在 ProcessQuantInfo 被拒绝（common_regbase.cpp:2203），预期失败返回。
+    EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
+}
+
+// P0-7: E4M3FN dtype——同构参数下 FP16 完整 tiling 成功作为对照；E4M3FN 输入在
+// ProcessQuantInfo 的拒绝列表中（common_regbase.cpp 拒绝分支），断言失败返回。
+// s1=s2=2048 与 MakeGqaDeterPara 固定的 [2048, 2048] atten_mask 匹配（sparse_mode=0）。
+TEST_F(FlashAttentionScoreGradTiling, Coverage_E4m3fn_Dtype)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
+    // 合法 dtype 对照：同构夹具 FP16 走完整 tiling，验证参数构造可通过全部前置检查。
+    auto fp16Para = MakeGqaDeterPara(&compileInfo, 1, 2048, 2048, 1, 1, 128, 0, 65536, 65536, ge::DT_FLOAT16, 0);
+    TilingInfo fp16TilingInfo;
+    ASSERT_TRUE(ExecuteTiling(fp16Para, fp16TilingInfo));
+
+    auto para = MakeGqaDeterPara(&compileInfo, 1, 2048, 2048, 1, 1, 128, 0, 65536, 65536, ge::DT_FLOAT8_E4M3FN, 0);
+    TilingInfo tilingInfo;
+    // E4M3FN 输入在 ProcessQuantInfo 被拒绝，预期失败返回。
+    EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
+}
+
+// ---------------------------------------------------------------------------
+// 第二批覆盖补充（P1 缺口）：
+//   8.  Sink 错误族（4 条 fail：shape≠[n1]、dsinkOut 形状、dtype≠FP32、query=FP32）
+//   9.  CheckBaseInput 错误族（head_num=0、BSH b 不匹配、非法 layout）
+//   10. pse_type=0 成功路径
+//   11. TND sparse_mode=9 fail
+//   12. TND RIGHT_DOWN causal deter（GetTNDRightDownVirt/RowShift）
+//   13. TND deter 含零长度批次
+//   14. TND GQA deter 变长 batch（Exclusive 深层分支）
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// P1-8: Sink 错误族——ProcessSinkInfo 的 4 个失败分支。
+// ---------------------------------------------------------------------------
+
+// sink shape 不为 [n1]（n1=1 时传 [2]）
+TEST_F(FlashAttentionScoreGradTiling, Coverage_SinkWrongShape)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
+    // 直接构造完整 para：sink shape 为 [2]（应为 [n1]=[1]）
+    gert::TilingContextPara sinkPara(
+        "FlashAttentionScoreGrad",
+        {
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{1, 1, 256, 8}, {1, 1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 256, 8}, {1, 1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            // sink: shape=[2] 而不是 [n1]=[1]
+            {{{2}, {2}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            // faker drops dimNum==0 outputs; keep placeholders so dsink stays at IR index 6
+            {{{1}, {1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            // dsink: [n1]=[1]
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
+         {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+         {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
+        &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(sinkPara, tilingInfo));
+}
+
+// sink dtype 不为 FP32（传 FP16）
+TEST_F(FlashAttentionScoreGradTiling, Coverage_SinkWrongDtype)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
+    gert::TilingContextPara sinkPara(
+        "FlashAttentionScoreGrad",
+        {
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{1, 1, 256, 8}, {1, 1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 256, 8}, {1, 1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            // sink: shape 正确 [1] 但 dtype=FP16（应为 FP32）
+            {{{1}, {1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            // faker drops dimNum==0 outputs; keep placeholders so dsink stays at IR index 6
+            {{{1}, {1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
+         {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+         {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
+        &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(sinkPara, tilingInfo));
+}
+
+// ---------------------------------------------------------------------------
+// P1-9: CheckBaseInput 错误族。
+// ---------------------------------------------------------------------------
+
+// head_num=0 —— CheckBaseInput 的 headNum 非法值分支（headNum 必须大于 0）。
+TEST_F(FlashAttentionScoreGradTiling, Coverage_HeadNumZero)
+{
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
+    // attrs 构造后不可修改，head_num=0 需直接构造完整 para。
+    gert::TilingContextPara headNumZeroPara(
+        "FlashAttentionScoreGrad",
+        {
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{1, 1, 256, 8}, {1, 1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 256, 8}, {1, 1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
+         {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+         {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
+        &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(headNumZeroPara, tilingInfo));
+}
+
+// ---------------------------------------------------------------------------
+// P1-11: TND sparse_mode=9 fail（CheckVarLenSparseModeValue > 8 分支）。
+// ---------------------------------------------------------------------------
+
+// TND 布局参数构造（与 tiling_25_tnd_all_same 同构，仅 sparse_mode 可变）：
+// 3 维 Q/K/V/DY + 合法累计序列长度，保证夹具本身可通过 TND 前置检查。
+// 注意：const tensor 的 constValue_ 是裸指针，数组必须用 static 存储期，
+// 避免 helper 返回后栈帧失效导致 use-after-return。
+static gert::TilingContextPara MakeTndSparseModePara(
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo* compileInfo, int64_t sparseMode)
+{
+    static int64_t actualSeqQlist[3] = {64, 128, 192};
+    static int64_t actualSeqKvlist[3] = {64, 128, 192};
+    return gert::TilingContextPara(
+        "FlashAttentionScoreGrad",
+        {
+            {{{192, 2, 32}, {192, 2, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{192, 2, 32}, {192, 2, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{192, 2, 32}, {192, 2, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{192, 2, 32}, {192, 2, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{192, 2, 8}, {192, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{192, 2, 8}, {192, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{192, 2, 32}, {192, 2, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{3}, {3}}, ge::DT_INT64, ge::FORMAT_ND, true, actualSeqQlist},
+            {{{3}, {3}}, ge::DT_INT64, ge::FORMAT_ND, true, actualSeqKvlist},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {{{192, 2, 32}, {192, 2, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{192, 2, 32}, {192, 2, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{192, 2, 32}, {192, 2, 32}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.17677669529663687f)},
+         {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+         {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(sparseMode)},
+         {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
+        compileInfo, "Ascend950", A5SocInfo, 4096);
+}
+
+TEST_F(FlashAttentionScoreGradTiling, Coverage_TndSparseMode9)
+{
+    auto compileInfo = MakeA5CompileInfo();
+    // 合法模式对照：sparse_mode=0 走完整 TND tiling 成功，验证夹具本身有效。
+    auto validPara = MakeTndSparseModePara(&compileInfo, 0);
+    TilingInfo validTilingInfo;
+    ASSERT_TRUE(ExecuteTiling(validPara, validTilingInfo));
+
+    // TND 布局 + sparse_mode=9（超过合法范围 0-8），CheckVarLenSparseModeValue 拒绝。
+    auto para = MakeTndSparseModePara(&compileInfo, 9);
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
+}
