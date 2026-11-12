@@ -251,6 +251,12 @@ public:
         customDeviceBuffer_ = customDeviceBuffer;
         customMemHandle_ = customMemHandle;
         multiChannel_ = multiChannel;
+        // 两种 CCL buffer 供给方式并存：调用方显式给出 ccl_buffer_size（或外部 window 地址）时，
+        // 由算子内部申请并注册通信 buffer；未给出时沿用通信域侧配置的 HCCL 默认 buffer（原路径），
+        // 不在本接口内申请任何内存。
+        useInternalBuffer_ = (customCclBufferSize > 0) || (userDeviceBuffer != nullptr);
+        TORCH_CHECK(customCclBufferSizeResolver.is_none() || useInternalBuffer_,
+                    "customCclBufferSizeResolver requires customCclBufferSize > 0 or an external device buffer");
 
         HcclComm hcclHandle;
         AcquireHcclHandle(group, hcclHandle);
@@ -264,6 +270,16 @@ public:
         GetCommProtocol(hcclHandle, protocol);
         rankNumPerServer_ = rankNumPerUbDomain_;
         ResolveCustomCclBufferSize(worldSize, customCclBufferSizeResolver);
+        TORCH_CHECK(!useInternalBuffer_ || customCclBufferSize_ > 0,
+                    "internal CCL buffer requires a positive size after resolution, got ", customCclBufferSize_);
+        if (useInternalBuffer_) {
+            ASCEND_LOGI("CCL buffer of group %s is allocated by operator: aclrtMalloc + HcclCommMemReg, size: %ld",
+                        group.c_str(), customCclBufferSize_);
+        } else {
+            ASCEND_LOGI("CCL buffer of group %s comes from communicator default HCCL buffer "
+                        "(configured by ProcessGroup hccl_buffer_size or HCCL_BUFFSIZE)",
+                        group.c_str());
+        }
 
         if (commAlg == "urma" && multiChannel_) {
             CheckIsMixLayered(hcclHandle);
@@ -856,8 +872,10 @@ public:
                 }
                 channelDesc[channelId].localEndpoint = links->srcEndpointDesc;
                 channelDesc[channelId].remoteEndpoint = links->dstEndpointDesc;
-                channelDesc[channelId].memHandles = customMemHandle_;
-                channelDesc[channelId].memHandleNum = 1;
+                // 只有内部 buffer 路径才把自建 buffer 的注册句柄绑定到 channel 上；
+                // 外部 buffer 路径沿用通信域默认 buffer，保持 descriptor 初始化后的默认值。
+                channelDesc[channelId].memHandles = useInternalBuffer_ ? customMemHandle_ : nullptr;
+                channelDesc[channelId].memHandleNum = useInternalBuffer_ ? 1U : 0U;
             }
         }
     }
@@ -988,10 +1006,15 @@ public:
         ASCEND_LOGI("Get HCCL communication channel success, channel num is: %u, channelsPerRank is: %u",
                     (rankSize - 1) * (channelsPerRank == 0U ? 1U : channelsPerRank), channelsPerRank);
 
-        GetRegisteredCommResource(commHandle, commContextStruct, rankSize, targetTag);
-        hcclBuffSize = static_cast<uint64_t>(customCclBufferSize_);
+        if (useInternalBuffer_) {
+            GetRegisteredCommResource(commHandle, commContextStruct, rankSize, targetTag);
+            hcclBuffSize = static_cast<uint64_t>(customCclBufferSize_);
+        } else {
+            // 外部 buffer 路径：不申请、不注册任何内存，各 rank 地址直接取自通信域已配置的 HCCL buffer。
+            GetDefaultCommResource(commHandle, commContextStruct, rankSize, hcclBuffSize);
+        }
 
-        ASCEND_LOGI("Get HCCL CommResource success");
+        ASCEND_LOGI("Get HCCL CommResource success, ccl_buffer_size: %lu", hcclBuffSize);
     }
 
     void AllocateAndRegisterDeviceBuffer(const HcclComm& commHandle, const std::string& memBufferTag)
@@ -1026,17 +1049,18 @@ public:
         }
     }
 
+    // 内部 buffer 路径：本 rank 用自建 buffer，其余 rank 从 channel 上报的远端内存里按注册 tag 取地址。
     void GetRegisteredCommResource(const HcclComm& commHandle, CommContext* commContextStruct, uint32_t rankSize,
                                    const std::string& targetTag)
     {
         uint32_t rankId = commContextStruct->epRankId;
-        commContextStruct->epHcclBuffer_[rankId] = reinterpret_cast<uint64_t>(*customDeviceBuffer_);
+        localBuffer_ = *customDeviceBuffer_;
+        commContextStruct->epHcclBuffer_[rankId] = reinterpret_cast<uint64_t>(localBuffer_);
         for (uint32_t peer = 0; peer < rankSize; ++peer) {
             if (peer == rankId) {
                 continue;
             }
-            uint32_t idx = (commContextStruct->channelsPerRank == 0U) ? ((peer < rankId) ? peer : (peer - 1)) :
-                                                                        peer * commContextStruct->channelsPerRank;
+            uint32_t idx = ChannelIndex(commContextStruct, rankId, peer);
             uint32_t memNum = 0;
             CommMem* remoteMems = nullptr;
             char** memTags = nullptr;
@@ -1054,8 +1078,44 @@ public:
                     break;
                 }
             }
-            TORCH_CHECK(hasTargetMem, "Target Mem : ", targetTag, " is not found.");
+            TORCH_CHECK(hasTargetMem, "Target Mem : ", targetTag, " is not found, peer: ", peer);
         }
+    }
+
+    // 外部 buffer 路径（改造前行为）：buffer 由通信域侧（ProcessGroup 的 hccl_buffer_size 或
+    // HCCL_BUFFSIZE 环境变量）配置，这里只查询各 rank 的地址与容量，不申请、不注册任何内存。
+    void GetDefaultCommResource(const HcclComm& commHandle, CommContext* commContextStruct, uint32_t rankSize,
+                                uint64_t& hcclBuffSize)
+    {
+        uint32_t rankId = commContextStruct->epRankId;
+        hcclBuffSize = 0;
+        for (uint32_t peer = 0; peer < rankSize; ++peer) {
+            void* buffer = nullptr;
+            uint64_t bufSize = 0;
+            HcclResult hcclRet;
+            if (peer == rankId) {
+                hcclRet = static_cast<HcclResult>(HcclGetHcclBufferFunc(commHandle, &buffer, &hcclBuffSize));
+            } else {
+                uint32_t idx = ChannelIndex(commContextStruct, rankId, peer);
+                hcclRet = static_cast<HcclResult>(
+                    HcclChannelGetHcclBufferFunc(commHandle, commContextStruct->hcommHandle_[idx], &buffer, &bufSize));
+            }
+            TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Get HCCL buffer failed, src: ", rankId, ", dst: ", peer,
+                        ", ret: ", hcclRet);
+            TORCH_CHECK(buffer != nullptr, "HCCL buffer is null, src: ", rankId, ", dst: ", peer);
+            commContextStruct->epHcclBuffer_[peer] = reinterpret_cast<uint64_t>(buffer);
+        }
+        localBuffer_ = reinterpret_cast<void*>(commContextStruct->epHcclBuffer_[rankId]);
+        TORCH_CHECK(hcclBuffSize > 0,
+                    "HCCL default CCL buffer size is 0, configure hccl_buffer_size (unit: MB) on the ProcessGroup "
+                    "or set HCCL_BUFFSIZE, or pass ccl_buffer_size explicitly so the operator allocates it");
+    }
+
+    // 多 channel 布局按 peer * channelsPerRank 展开；旧布局按远端 rank 压缩（排除本 rank）。
+    static uint32_t ChannelIndex(const CommContext* commContextStruct, uint32_t rankId, uint32_t peer)
+    {
+        return (commContextStruct->channelsPerRank == 0U) ? ((peer < rankId) ? peer : (peer - 1)) :
+                                                            peer * commContextStruct->channelsPerRank;
     }
 
     // ---- Context lifecycle helpers ----
@@ -1081,7 +1141,9 @@ public:
         std::string memBufferTag = mc2ContextTag + "_buffer";
         TORCH_CHECK(memBufferTag.size() <= HCCL_CONTEXT_TAG_MAX_LEN, "MemBufferTag is too long, max size is ",
                     HCCL_CONTEXT_TAG_MAX_LEN, ", got ", memBufferTag.size());
-        AllocateAndRegisterDeviceBuffer(commHandle, memBufferTag);
+        if (useInternalBuffer_) {
+            AllocateAndRegisterDeviceBuffer(commHandle, memBufferTag);
+        }
 
         GetHcclCommResource(commHandle, engine, protocol, commContextStruct, rankSize, hcclBuffSize, memBufferTag);
 
@@ -1099,6 +1161,9 @@ public:
         auto hcclRet = HcclEngineCtxGetFunc(commHandle, mc2ContextTag.c_str(), engine, &ctx, &ctxSize);
         if (hcclRet != HCCL_SUCCESS) {
             CreateContext(commHandle, mc2ContextTag, engine, protocol, ctx, &commContextStruct, hcclBuffSize);
+        } else if (useInternalBuffer_) {
+            // 内部 buffer 容量由入参决定，通信域默认 buffer 的查询值与之无关。
+            hcclBuffSize = static_cast<uint64_t>(customCclBufferSize_);
         } else {
             GetHcclBufferSize(commHandle, hcclBuffSize);
         }
@@ -1162,6 +1227,11 @@ public:
     {
         return rankNumPerServer_;
     }
+    // 本 rank 的 CCL buffer 起始地址：内部路径为自建 buffer，外部路径为通信域默认 buffer。
+    void* GetLocalBuffer() const
+    {
+        return localBuffer_;
+    }
 
     // Per-peer protocol and layer selected during topology discovery and consumed by channel creation.
     std::unordered_map<uint32_t, RankLinkInfo> rankLinkMap_;
@@ -1174,6 +1244,8 @@ public:
     void** customDeviceBuffer_ = nullptr;
     HcclMemHandle* customMemHandle_ = nullptr;
     bool multiChannel_ = false;
+    bool useInternalBuffer_ = false;
+    void* localBuffer_ = nullptr;
 };
 
 // ======================== CommContextManager ========================
@@ -1321,7 +1393,9 @@ private:
                                 "exists in this process; create only one buffer per group and pass window_addr "
                                 "and window_size to that single creation");
                 }
-                localDeviceBuffer_ = customDeviceBuffer_;
+                // 自建 buffer 沿用 manager 保存的地址；默认 buffer 地址仅在首次创建时由 builder 查询。
+                // get_local_buffer_tensor 当前仅用于 KFC 路径。
+                localDeviceBuffer_ = customDeviceBuffer_ != nullptr ? customDeviceBuffer_ : builder.GetLocalBuffer();
                 topoType_ = builder.GetTopoType();
                 rankNumPerServer_ = builder.GetRankNumPerServer();
                 return;

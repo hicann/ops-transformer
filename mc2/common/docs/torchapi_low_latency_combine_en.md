@@ -437,11 +437,15 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
   <!-- end id8 -->
 - HCCL communicator buffer size:
 
-    Before calling this API, check whether the communicator buffer size is reasonable. The unit is MB, and the default value is 200 MB when not configured.
-  - This use case only supports configuration through the environment variable HCCL_BUFFSIZE, which is managed at the communicator granularity. Each communicator exclusively occupies one group of memory of the size "2\*HCCL_BUFFSIZE".
+    Before calling this API, check whether the configured HCCL communicator buffer size is appropriate. The unit is MB.
+  - When the HCCL\_BUFFSIZE environment variable is used, the buffer size is managed at the communicator granularity and defaults to 200 MB. Each communicator exclusively occupies a memory region of size "2*HCCL\_BUFFSIZE".
   - In the EP communicator: the configured size must be >= 2 and satisfy >= 2 \* (local_expert_num \* max_bs \* ep_world_size \* Align512(Align32(2 \* h) + 64) + (k + shared_expert_num) \* max_bs\* Align512(2 \* h)).
   - where 480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32.
   - The size allocated in the communicator can be calculated by calling the MoeDistributeBuffer.get_low_latency_ccl_buffer_size API.
+  <!-- npu="950" id12 -->
+  - For <term>Ascend 950PR&950DT products</term>, you can specify the size of the internally allocated communicator buffer using `ccl_buffer_size` when initializing `MoeDistributeBuffer`. This parameter is in MB and can use the value returned by `MoeDistributeBuffer.get_low_latency_ccl_buffer_size`.
+  - For <term>Ascend 950PR&950DT products</term>, when both the HCCL\_BUFFSIZE environment variable and a positive `ccl_buffer_size` are configured, the buffer allocated through `ccl_buffer_size` takes precedence. When this parameter is 0, the default communicator buffer is used.
+  <!-- end id12 -->
 
 - The "/" in the formulas in this document indicates integer division.
 

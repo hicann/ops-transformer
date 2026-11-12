@@ -642,8 +642,8 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
   <!-- end id9 -->
   - 本文中的`Ceil(H, N)`表示`(H + N - 1) // N`，`Align2(x)`表示向上对齐到2的整数倍。
 - HCCL通信域缓存区大小:
-    调用本接口前需检查HCCL\_BUFFSIZE环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
-  - 该场景仅支持通过环境变量HCCL\_BUFFSIZE配置，该环境变量按通信域粒度管理，每个通信域独占一组“2*HCCL\_BUFFSIZE”大小的内存。
+    调用本接口前需检查通信域缓存区大小配置是否合理，单位MB。
+  - 通过环境变量HCCL\_BUFFSIZE配置时，该环境变量按通信域粒度管理，不配置时默认为200MB，每个通信域独占一组“2*HCCL\_BUFFSIZE”大小的内存。
   - ep通信域内，comm\_alg配置为"fullmesh_v1"或"": 设置大小要求 \>= 2 \* \(local\_expert\_num \* max\_bs \* ep\_world\_size \* Align512\(Align32\(2 \* H\) + <b>44</b>\) + \(K + shared\_expert\_num\) \* max\_bs \* Align512\(2 \* H\)\)。
   - ep通信域内，comm\_alg配置为"fullmesh_v2": 设置大小要求 \>= 2 \* \(local\_expert\_num \* max\_bs \* ep\_world\_size \* 480Align512\(Align32\(2 \* H\) + <b>44</b>\) + \(K + shared\_expert\_num\) \* max\_bs \* Align512\(2 \* H\)\)。
   - 其中480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32。
@@ -652,6 +652,10 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
   - 对于<term>Ascend 950PR&950DT系列产品</term>，上式中 combine 项按 `480Align512(2 * H)` 计算。
   <!-- end id18 -->
   - 通信域开设大小可通过调用MoeDistributeBuffer.get_low_latency_ccl_buffer_size接口计算。
+  <!-- npu="950" id19 -->
+  - 对于<term>Ascend 950PR&950DT系列产品</term>，支持在初始化`MoeDistributeBuffer`时，通过`ccl_buffer_size`参数指定内部申请的通信缓存区大小。该参数单位为MB，可直接使用`MoeDistributeBuffer.get_low_latency_ccl_buffer_size`接口的返回值。
+  - 对于<term>Ascend 950PR&950DT系列产品</term>，当同时设置HCCL\_BUFFSIZE环境变量和正数`ccl_buffer_size`参数时，优先使用通过`ccl_buffer_size`参数申请的通信缓存区；当该参数为0时，使用通信域默认缓存区。
+  <!-- end id19 -->
 
 - 本文公式中的“/”表示整除。
 

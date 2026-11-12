@@ -614,12 +614,20 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
   <!-- end id9 -->
   - In this document, `Ceil(H, N)` indicates `(H + N - 1) // N`, and `Align2(x)` indicates rounding up to an integer multiple of 2.
 - HCCL communicator buffer size:
-    Before calling this API, check whether the value of the HCCL\_BUFFSIZE environment variable is reasonable. This environment variable specifies the memory size occupied by a single communicator, in MB. If it is not configured, the default value is 200 MB.
-  - This use case can be configured only through the HCCL\_BUFFSIZE environment variable, which is managed at the communicator granularity. Each communicator exclusively occupies a group of memory of "2*HCCL\_BUFFSIZE" size.
-  - Within the EP communicator, when comm\_alg is set to "fullmesh_v1" or "": the size setting must meet the requirement \>= 2 \* \(local\_expert\_num \* max\_bs \* ep\_world\_size \* Align512\(Align32\(2 \* H\) + 64\) + \(K + shared\_expert\_num\) \* max\_bs \* Align512\(2 \* H\)\).
-  - Within the EP communicator, when comm\_alg is set to "fullmesh_v2": the size setting must meet the requirement \>= 2 \* \(local\_expert\_num \* max\_bs \* ep\_world\_size \* 480Align512\(Align32\(2 \* H\) + 64\) + \(K + shared\_expert\_num\) \* max\_bs \* Align512\(2 \* H\)\).
+    Before calling this API, check whether the configured HCCL communicator buffer size is appropriate. The unit is MB.
+  - When the HCCL\_BUFFSIZE environment variable is used, the buffer size is managed at the communicator granularity and defaults to 200 MB. Each communicator exclusively occupies a memory region of size "2*HCCL\_BUFFSIZE".
+  - Within the EP communicator, when comm\_alg is set to "fullmesh_v1" or "": the size setting must meet the requirement \>= 2 \* \(local\_expert\_num \* max\_bs \* ep\_world\_size \* Align512\(Align32\(2 \* H\) + <b>44</b>\) + \(K + shared\_expert\_num\) \* max\_bs \* Align512\(2 \* H\)\).
+  - Within the EP communicator, when comm\_alg is set to "fullmesh_v2": the size setting must meet the requirement \>= 2 \* \(local\_expert\_num \* max\_bs \* ep\_world\_size \* 480Align512\(Align32\(2 \* H\) + <b>44</b>\) + \(K + shared\_expert\_num\) \* max\_bs \* Align512\(2 \* H\)\).
   - where 480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32.
+  <!-- npu="950" id18 -->
+  - For <term>Ascend 950PR&950DT products</term>, when quant\_mode=0 and x\_smooth\_scale is not empty, the dispatch token length is max(Align32(2 \* H) + 44, Align32(Align32(2 \* H) + 4 \* H) + 16), followed by alignment according to the preceding rules.
+  - For <term>Ascend 950PR&950DT products</term>, the combine term in the preceding formulas is calculated using `480Align512(2 * H)`.
+  <!-- end id18 -->
   - The size of the communicator to create can be calculated by calling the MoeDistributeBuffer.get_low_latency_ccl_buffer_size API.
+  <!-- npu="950" id19 -->
+  - For <term>Ascend 950PR&950DT products</term>, you can specify the size of the internally allocated communicator buffer using `ccl_buffer_size` when initializing `MoeDistributeBuffer`. This parameter is in MB and can use the value returned by `MoeDistributeBuffer.get_low_latency_ccl_buffer_size`.
+  - For <term>Ascend 950PR&950DT products</term>, when both the HCCL\_BUFFSIZE environment variable and a positive `ccl_buffer_size` are configured, the buffer allocated through `ccl_buffer_size` takes precedence. When this parameter is 0, the default communicator buffer is used.
+  <!-- end id19 -->
 
 - The "/" in the formulas in this document indicates integer division.
 

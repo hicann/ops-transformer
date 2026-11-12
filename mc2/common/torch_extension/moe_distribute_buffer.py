@@ -30,6 +30,7 @@ def _get_hccl_comm_name(group, rank_id):
 
 class MoeDistributeBuffer:
     def __init__(self, group, ccl_buffer_size: int = 0, comm_alg: str = ""):
+        """A5 上正数 ccl_buffer_size 表示 HCCL 配置容量，单位为 MB。"""
         self.group = group
         self.rank_id = torch.distributed.get_rank(group)
         self.world_size = torch.distributed.get_world_size(group)
@@ -40,6 +41,10 @@ class MoeDistributeBuffer:
         self.ccl_buffer_size = ccl_buffer_size
         if self._is_a5 and comm_alg == "hierarchy":
             return
+        ccl_buffer_size_bytes = ccl_buffer_size
+        if self._is_a5 and ccl_buffer_size > 0:
+            # A5 实际窗口容量为估算接口返回的 HCCL MB 配置容量的两倍。
+            ccl_buffer_size_bytes *= 2 * 1024 * 1024
         self._ctx_manager = CommContextManager(
             self.group_name,
             self.world_size,
@@ -48,7 +53,7 @@ class MoeDistributeBuffer:
                 "Ascend910_93": "kfc",
                 "Ascend950": "channel",
             },
-            customCclBufferSize=ccl_buffer_size,
+            customCclBufferSize=ccl_buffer_size_bytes,
         )
         self.context = self._ctx_manager.create_context()
         self.ccl_buffer_size = self._ctx_manager.ccl_buffer_size
@@ -195,8 +200,8 @@ class MoeDistributeBuffer:
         )
         if is_a5:
             minimum_buffer_size += world_size * 1024
-        # Return the HCCL configuration in MiB, not the data-window size.
-        # HCCL allocates twice this value; the first MiB is reserved for state.
+        # 返回 HCCL 配置容量，单位为 MB。
+        # HCCL 实际申请两倍容量，首个 MB 用于状态区。
         ccl_buffer_size = (
             inline_align(
                 inline_align(minimum_buffer_size, mb_conversion) // mb_conversion, 2
