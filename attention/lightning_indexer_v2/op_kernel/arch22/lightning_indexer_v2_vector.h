@@ -33,6 +33,7 @@ constexpr uint64_t VEC_REPEAT_BYTES = 256;
 constexpr int32_t CONST_TWO = 2;
 constexpr int64_t VALUE_AND_INDEX_NUM = 2;
 constexpr int64_t BLOCK_BYTES = 32;
+constexpr int64_t MRG_SORT_QUEUE_MAX_LEN = 4095; // MrgSort 单条源队列长度上限
 constexpr int64_t MRG_QUE_0 = 0;
 constexpr int64_t MRG_QUE_1 = 1;
 constexpr int64_t MRG_QUE_2 = 2;
@@ -387,16 +388,44 @@ __aicore__ inline void SparseTopK(const LocalTensor<float>& dst, const LocalTens
         AscendC::DataCopy(dst, needsMerging, mergSize * VALUE_AND_INDEX_NUM);
         return;
     }
-    // 初始化合并排序参数
+    if (topk <= MRG_SORT_QUEUE_MAX_LEN) {
+        // 初始化合并排序参数
+        AscendC::MrgSort4Info params;
+        params.elementLengths[0] = topk;
+        params.elementLengths[1] = mergSize;
+        params.ifExhaustedSuspension = (topk == mergSize);
+        params.validBit = 0b0011;
+        // 初始化源列表
+        AscendC::MrgSortSrcList<float> srcList;
+        srcList.src1 = dst;
+        srcList.src2 = needsMerging;
+        // 执行合并排序
+        AscendC::MrgSort<float>(tmp, srcList, params);
+        AscendC::PipeBarrier<PIPE_V>();
+        // 将结果复制到目标张量
+        AscendC::DataCopy(dst, tmp, topk * VALUE_AND_INDEX_NUM);
+        return;
+    }
+    // MrgSort 单队列长度上限 4095: 大 topk 时把 dst 拆 3 路 + src 作第 4 路(同 MergeSort 分段)
+    constexpr int64_t unitElements = 1024;
+    const int64_t segNum = topk / unitElements;
+    const int64_t queLen1 = (segNum + 2) / 3 * unitElements;
+    const int64_t queLen2 = ((segNum - (segNum + 2) / 3) + 1) / 2 * unitElements;
+    const int64_t queLen3 = topk - queLen1 - queLen2;
     AscendC::MrgSort4Info params;
-    params.elementLengths[0] = topk;
-    params.elementLengths[1] = mergSize;
-    params.ifExhaustedSuspension = (topk == mergSize);
-    params.validBit = 0b0011;
+    params.elementLengths[0] = queLen1;
+    params.elementLengths[1] = queLen2;
+    params.elementLengths[2] = queLen3;
+    params.elementLengths[3] = mergSize;
+    params.ifExhaustedSuspension = false;
+    params.validBit = 0b1111;
+    params.repeatTimes = 1;
     // 初始化源列表
     AscendC::MrgSortSrcList<float> srcList;
     srcList.src1 = dst;
-    srcList.src2 = needsMerging;
+    srcList.src2 = dst[queLen1 * VALUE_AND_INDEX_NUM];
+    srcList.src3 = dst[(queLen1 + queLen2) * VALUE_AND_INDEX_NUM];
+    srcList.src4 = needsMerging;
     // 执行合并排序
     AscendC::MrgSort<float>(tmp, srcList, params);
     AscendC::PipeBarrier<PIPE_V>();

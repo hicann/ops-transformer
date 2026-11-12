@@ -218,6 +218,14 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitBuffers(TPipe* 
             streamMask_ = streamMaskBuf_.Get<uint8_t>();
             streamBaselineBlocks_ = (constInfo_.sparseCount + s2BaseSize_ - 1) / s2BaseSize_ + 1;
             streamStateReady_ = true;
+            // 首任务清场: 普通模式首任务不走 startNewTask, 栈残留会污染攒批状态
+            for (int32_t r = 0; r < streamRowCount_; r++) {
+                streamUsed_[r] = 0;
+                streamThreshold_[r] = -__builtin_inff();
+                Duplicate(streamAcc_[r * STREAM_ACC_CAP * 2].ReinterpretCast<int32_t>(), LIServiceVec::NEG_INF,
+                          STREAM_ACC_CAP);
+            }
+            PipeBarrier<PIPE_V>();
         }
     }
 
