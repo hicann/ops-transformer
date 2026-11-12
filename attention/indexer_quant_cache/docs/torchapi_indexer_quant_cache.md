@@ -109,7 +109,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>round_scale</td>
         <td>bool</td>
         <td>可选</td>
-        <td>MX-FP8模式（quant_mode=0）下是否对scale进行舍入。默认值True。</td>
+        <td>仅fp8模式（内部quant_mode=1，Normal）下控制整行scale是否向上取到2的幂；mxfp8固定取整，不受该开关控制。默认值True。</td>
         <td>BOOL</td>
         <td>-</td>
     </tr>
@@ -132,6 +132,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
 
 - 该接口支持推理场景下使用。
 - 该接口支持单算子模式调用。
+- 当前Torch接口不支持ACLNN/GE侧的HiFloat4（mode4）。`torch.uint8`是浮点编码载体：cache在mxfp8/fp8模式下承载E4M3，在hifloat8模式下承载HiFloat8，在mxfp4模式下承载每字节两个E2M1值；mxfp8/mxfp4的uint8 cache_scale承载E8M0。
 - 当前Torch接口的`mxfp8`模式仅支持`cache`为`torch.float8_e4m3fn`，或使用`torch.uint8`承载E4M3编码；暂不支持`torch.float8_e5m2`。`fp8`模式支持E4M3和E5M2。
 - cache与cache_scale的数据类型组合需与quant_mode匹配：fp8/hifloat8 模式cache_scale为float；mxfp8/mxfp4 模式cache_scale为float8_e8m0；mxfp4 模式cache为FP4（uint8打包）。
 - cache与cache_scale（所有量化模式，含HiFloat8）均仅支持四维shape `[blockNum, blockSize, 1, headDim]`，倒数第二维固定为1（每token一个量化向量）；num_slots = blockNum × blockSize。

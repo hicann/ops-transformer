@@ -111,7 +111,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>round_scale</td>
         <td>bool</td>
         <td>Optional</td>
-        <td>Whether to round the scale in MX-FP8 mode (quant_mode=0). Default value: True.</td>
+        <td>Whether to round the per-row scale up to a power of 2, only in fp8 mode (internal quant_mode=1, Normal). In mxfp8 mode, rounding is fixed and is not controlled by this flag. Default value: True.</td>
         <td>BOOL</td>
         <td>-</td>
     </tr>
@@ -131,6 +131,8 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
 This API has no return value. The computation results are written in-place directly to the input tensors `cache` and `cache_scale`. After the computation, the shapes and dtypes of both tensors remain unchanged. Rows not hit by `slot_mapping` retain their original values.
 
 ## Constraints
+
+- The current Torch API does not support HiFloat4 (mode4) available through ACLNN/GE. `torch.uint8` stores floating-point codes: cache carries E4M3 in mxfp8/fp8 mode, HiFloat8 in hifloat8 mode, and two E2M1 values per byte in mxfp4 mode; uint8 cache_scale carries E8M0 in mxfp8/mxfp4 mode.
 
 - This API supports use in inference scenarios.
 - This API can be called in single-operator mode.

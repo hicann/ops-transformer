@@ -206,7 +206,7 @@ aclnnStatus aclnnKvCompressEpilog(
 
   aclnnStatus: return status code. For details, see [aclnn Return Codes](../../../docs/en/context/aclnn_return_code.md).
 
-  The first-phase API performs input parameter validation and returns an error in the following scenarios:
+  The first-phase API performs the basic checks below. Success does not mean all shape, data type, and attribute constraints have been checked; subsequent tiling failures may be reported by the second-phase API:
 
   <table style="undefined;table-layout: fixed; width: 1000px"><colgroup>
   <col style="width: 300px">
@@ -256,6 +256,13 @@ aclnnStatus aclnnKvCompressEpilog(
 - **Return Value**
 
   aclnnStatus: return status value. For details, see [aclnn Return Codes](../../../docs/en/context/aclnn_return_code.md).
+
+  Violating the constraints below may cause execution preparation or tiling checks to fail with the following internal errors. The exact code depends on the failing stage and runtime version; 161002 is not guaranteed. Consult runtime logs rather than interpreting an internal error code alone as a parameter error.
+
+  | Return Value | Error Code | Description |
+  | --- | --- | --- |
+  | ACLNN_ERR_INNER_NULLPTR | 561103 | Internal nullptr exception; failures of constraints such as d or quantMode may be reported through this error. |
+  | ACLNN_ERR_INNER | 561000 | Internal API exception; execution preparation failures such as unsupported data type combinations may be reported through this error. |
 
 ## Constraints
 

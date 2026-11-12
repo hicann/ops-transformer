@@ -204,7 +204,7 @@ aclnnStatus aclnnKvCompressEpilog(
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-  第一段接口完成入参校验，出现以下场景时报错：
+  第一段接口执行下列基础检查；返回成功不表示全部形状、数据类型和属性约束检查已完成，后续tiling检查失败可能由第二段返回：
 
   <table style="undefined;table-layout: fixed; width: 1000px"><colgroup>
   <col style="width: 300px">
@@ -254,6 +254,13 @@ aclnnStatus aclnnKvCompressEpilog(
 - **返回值**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+
+  违反下文约束时，后续执行准备或tiling检查失败可能返回以下内部错误。具体错误码取决于失败环节和运行时版本，不保证统一返回161002；请结合运行日志定位，不能仅凭内部错误码判定为参数错误。
+
+  | 返回值 | 错误码 | 说明 |
+  | --- | --- | --- |
+  | ACLNN_ERR_INNER_NULLPTR | 561103 | API内部nullptr异常；d、quantMode等约束检查失败可能通过此错误返回。 |
+  | ACLNN_ERR_INNER | 561000 | API内部异常；不支持的数据类型组合等执行准备失败可能通过此错误返回。 |
 
 ## 约束说明
 
