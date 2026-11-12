@@ -405,20 +405,6 @@ def aclnn_mhc_pre_sinkhorn_backward_golden(
     """
     del kwargs
 
-    # Preserve existing output slot values when data inputs are empty.
-    if _backward_inputs_empty(
-        gradHin,
-        gradHPost,
-        gradHRes,
-        x,
-        hPre,
-        hcBeforeNorm,
-        invRms,
-        sumOut,
-        normOut,
-    ):
-        return gradX, gradPhi, gradAlpha, gradBias
-
     hc_eps_val = float(hcEps) if hcEps is not None else 1e-6
 
     result = _compute(
@@ -447,12 +433,12 @@ def aclnn_mhc_pre_sinkhorn_backward_golden(
 # ============================================================================
 
 
-def _ref_sigmoid_grad(z, dy):
+def _ref_sigmoid_grad(z, dy, scale=1.0):
     exp_neg = torch.exp(-z)
     denom = exp_neg + 1.0
     sigma = torch.ones_like(denom) / denom
     gate = torch.ones_like(z) / (torch.exp(z) + 1.0)
-    gz = sigma * gate
+    gz = (sigma * gate) * scale
     return gz * dy
 
 
@@ -506,6 +492,26 @@ def _ref_rms_norm_grad(x, inv_rms, grad_inv_rms):
     return x * coefficient
 
 
+def _ref_hf32_round(t):
+    """Round fp32 operands to HF32 precision (10-bit mantissa, RNE).
+
+    Explicit rounding makes CPU/CUDA references independent of backend TF32
+    selection. Non-finite values are preserved.
+    """
+    if t.dtype != torch.float32:
+        return t
+    t = t.contiguous()
+    bits = t.view(torch.int32)
+    rounding_bias = 0x0FFF + ((bits >> 13) & 1)
+    rounded = (bits + rounding_bias) & -0x2000
+    out = rounded.view(torch.float32)
+    return torch.where(torch.isfinite(t), out, t)
+
+
+def _ref_hf32_matmul(a, b):
+    return _ref_hf32_round(a) @ _ref_hf32_round(b)
+
+
 def _ref_torch_backward(
     grad_hin,
     grad_h_post,
@@ -521,10 +527,7 @@ def _ref_torch_backward(
     norm_out,
     hc_eps=1e-6,
 ):
-    """Independent fp32 reference.
-
-    Arithmetic uses the Torch backend without bitwise emulation of Ascend.
-    """
+    """Torch reference with explicit HF32 operand rounding for both GEMMs."""
     is_3d = x.dim() == 3
     if any(
         t.numel() == 0
@@ -540,11 +543,11 @@ def _ref_torch_backward(
             norm_out,
         )
     ):
-        # Return uninitialized output placeholders when data inputs are empty.
-        def _unwritten(t):
-            return torch.empty_like(t, dtype=torch.float32)
+        # Empty batches still have nonempty parameter gradients, all of which are zero.
+        def _zeros(t):
+            return torch.zeros_like(t, dtype=torch.float32)
 
-        return _unwritten(x), _unwritten(phi), _unwritten(alpha), _unwritten(bias)
+        return _zeros(x), _zeros(phi), _zeros(alpha), _zeros(bias)
 
     # Materialize non-contiguous inputs for subsequent view operations.
     x = x.float().contiguous()
@@ -582,8 +585,7 @@ def _ref_torch_backward(
     z_res = (nf[..., 2 * n :] * alpha[2] + bias[2 * n :]).reshape(b, s, n, n)
 
     grad_z_pre = _ref_sigmoid_grad(z_pre, grad_h_pre)
-    grad_z_post = _ref_sigmoid_grad(z_post, grad_h_post)
-    grad_z_post = grad_z_post * 2.0
+    grad_z_post = _ref_sigmoid_grad(z_post, grad_h_post, 2.0)
     grad_h_res_4d = (
         grad_h_res.reshape(b, s, n, n) if grad_h_res.dim() == 3 else grad_h_res
     )
@@ -606,17 +608,23 @@ def _ref_torch_backward(
         [grad_z_pre * alpha[0], grad_z_post * alpha[1], grad_z_res * alpha[2]], dim=-1
     )
     grad_hc_before_norm = grad_norm_out * inv_rms
-    # reduces pre/post/res separately, adding each partial to a zero scalar.
-    products = hc_before_norm * grad_norm_out
-    grad_inv_rms = torch.zeros_like(inv_rms)
-    for begin, end in ((0, n), (n, 2 * n), (2 * n, n * n + 2 * n)):
-        partial = products[..., begin:end].sum(-1, keepdim=True)
-        grad_inv_rms = grad_inv_rms + partial
+    # Match the kernel's AR reduction over the full fusion axis.
+    grad_inv_rms = (hc_before_norm * grad_norm_out).sum(-1, keepdim=True)
 
     x_flat = x.flatten(2)
     grad_x_from_rms = _ref_rms_norm_grad(x_flat, inv_rms, grad_inv_rms)
-    grad_x_from_matmul = grad_hc_before_norm @ phi
-    grad_phi = grad_hc_before_norm.flatten(0, 1).T @ x_flat.flatten(0, 1)
+    # Operands are rounded explicitly; disable backend TF32 to avoid double rounding.
+    previous_tf32 = torch.backends.cuda.matmul.allow_tf32 if x.is_cuda else None
+    try:
+        if x.is_cuda:
+            torch.backends.cuda.matmul.allow_tf32 = False
+        grad_x_from_matmul = _ref_hf32_matmul(grad_hc_before_norm, phi)
+        grad_phi = _ref_hf32_matmul(
+            grad_hc_before_norm.flatten(0, 1).T, x_flat.flatten(0, 1)
+        )
+    finally:
+        if x.is_cuda:
+            torch.backends.cuda.matmul.allow_tf32 = previous_tf32
 
     grad_x = (
         grad_x_from_hin.view(x.shape)

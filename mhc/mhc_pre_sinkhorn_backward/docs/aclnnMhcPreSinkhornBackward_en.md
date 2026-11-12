@@ -26,6 +26,7 @@
 ## Function
 
 - **Description**: MhcPreSinkhornBackward is the backward operator of MhcPreSinkhorn. It computes the backward propagation of the corresponding gradients.
+  - The interface uses HF32 as the computation mode for Cube operations.
 
 - **Formula**:
 

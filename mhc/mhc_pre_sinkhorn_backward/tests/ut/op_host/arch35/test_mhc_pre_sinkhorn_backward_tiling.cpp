@@ -11,13 +11,14 @@
 #include <iostream>
 #include <gtest/gtest.h>
 #include "../../../../op_host/op_tiling/mhc_pre_sinkhorn_backward_tiling.h"
+#include "../../../../op_kernel/arch35/mhc_pre_sinkhorn_backward_data_arch35.h"
 #include "../../../../op_kernel/arch92/mhc_pre_sinkhorn_backward_data_arch92.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 
 using namespace std;
 
-// Ascend 950 走 arch35 tiling 模板，模板会 SetTilingKey（DETERMINISTIC 位），SUCCESS 用例跳过 tilingKey 校验
+// Ascend 950 uses the arch35 tiling template; SUCCESS cases skip tilingKey validation.
 constexpr uint64_t SKIP_TILING_KEY_VALIDATION = UINT64_MAX;
 constexpr char kSocVersion950[] = "Ascend950";
 // Match Ascend950's 256 KiB L0C while preserving the other generic UT platform settings.
@@ -505,10 +506,11 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_T64_N9_C128_3d_fail)
 }
 
 namespace {
-void CheckPlatformRouting(const char* soc, int32_t deterministic, uint64_t expectedKey)
+void CheckPlatformRouting(const char* soc, int32_t deterministic, uint64_t expectedKey, int64_t batchSize = 2,
+                          int64_t sequenceLength = 128)
 {
-    int64_t B = 2;
-    int64_t S = 128;
+    int64_t B = batchSize;
+    int64_t S = sequenceLength;
     int64_t N = 4;
     int64_t C = 256;
     int64_t skIterCount = 20;
@@ -554,6 +556,15 @@ void CheckPlatformRouting(const char* soc, int32_t deterministic, uint64_t expec
     TilingInfo info;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, info));
     ASSERT_EQ(info.tilingKey, expectedKey);
+    if (tilingContextPara.socVersion_ == kSocVersion950) {
+        ASSERT_GE(info.tilingDataSize, sizeof(MhcPreSinkhornBackwardArch35TilingData));
+        const auto* data = reinterpret_cast<const MhcPreSinkhornBackwardArch35TilingData*>(info.tilingData.get());
+        const uint32_t expectedSmallM = B * S > 0 && B * S <= 512 ? 1U : 0U;
+        EXPECT_EQ(data->smallM, expectedSmallM);
+        using MhcPreSinkhornBackwardSinkhornNs::SinkhornPath;
+        EXPECT_EQ(data->sinkhornPlan.path,
+                  expectedSmallM != 0U ? SinkhornPath::N4_COMPACT : SinkhornPath::N4_ROW_PACKED);
+    }
     if (expectedKey == 4001) {
         ASSERT_GE(info.tilingDataSize, sizeof(MhcPreSinkhornBackward960DeterminiticTilingData));
         const auto* data =
@@ -573,4 +584,11 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_platform_routing_960_arch92)
 TEST_F(MhcPreSinkhornBackwardTiling, test_platform_routing_950_arch35)
 {
     CheckPlatformRouting(kSocVersion950, 0, 3000);
+}
+
+TEST_F(MhcPreSinkhornBackwardTiling, test_runtime_small_m_boundaries_950_arch35)
+{
+    for (int64_t rows : {0, 1, 511, 512, 513, 8192}) {
+        CheckPlatformRouting(kSocVersion950, 0, 3000, 1, rows);
+    }
 }
