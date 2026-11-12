@@ -126,7 +126,7 @@ torch.ops.cann_ops_transformer.key_pool(
 | gate_weight | Tensor | 必选 | Gate 投影权重，对应公式中的 `gate_weight`。数据格式为 ND，不支持非连续 Tensor。 | bfloat16、float16 | `[D,H]` |
 | ape | Tensor | 必选 | 位置偏置，对应公式中的 `ape`。数据格式为 ND，不支持非连续 Tensor。 | float32 | `[cmp_ratio,D]` |
 | state_cache | Tensor | 必选 | 保存历史 K 和 Gate 的分页 cache，并由算子原地更新。数据格式为 ND；支持第 0 轴非连续，实际第 0 轴 stride 由底层接口传入。前 `D` 列保存 K，后 `D` 列保存 Gate。 | float32 | `[block_num,block_size,2*D]` |
-| cache_block_table | Tensor | 必选 | 逻辑 block 到物理 cache block 的映射表。数据格式为 ND，不支持非连续 Tensor。 | int32 | `[B,L]` |
+| cache_block_table | Tensor | 必选 | 逻辑 block 到物理 cache block 的映射表。数据格式为 ND，不支持非连续 Tensor。二维映射表对应的线性分页缓存路径中，物理 block 0 为保留块，不写回状态；需保存有效状态的映射应使用 `[1,block_num-1]`，未使用表项可保留 0。 | int32 | `[B,L]` |
 | start_pos | Tensor | 必选 | 每个 Batch 当前输入在逻辑序列中的起始位置。数据格式为 ND，不支持非连续 Tensor。 | int32 | `[B]` |
 | norm_weight | Tensor | 可选 | LayerNorm 权重。数据格式为 ND，不支持非连续 Tensor。与 `norm_bias` 必须同时提供或同时为空。 | float32 | `[D]` |
 | norm_bias | Tensor | 可选 | LayerNorm 偏置。数据格式为 ND，不支持非连续 Tensor。与 `norm_weight` 必须同时提供或同时为空。 | float32 | `[D]` |
@@ -170,6 +170,11 @@ BSH 的有效输出位于 `pooled_key[b, :valid_count[b]]`；TH 按 Batch 顺序
 
 ## 约束说明
 
+- `D` 仅支持 `128/512`；`H` 必须在 `[1024,10240]` 范围内且为 `512` 的整数倍。
+- `state_cache` 的 `block_size` 必须在 `[1,1024]` 范围内。
+- 对于二维 `cache_block_table` 对应的线性分页缓存路径，物理 block 0 为保留块，
+  算子不会向该块写回状态。需要保存跨调用有效状态的逻辑 block 应映射到
+  `[1,block_num-1]`；未使用的表项可保留 0。
 - `hidden_states` 为 BSH 时，`cu_seqlens` 必须为空；为 TH 时，必须提供
   合法的 `[B+1]` 前缀和数组，首元素为 0，末元素为 `T`，且单调不减。
 - `cmp_ratio` 仅支持 `2/4/8/16/32/64/128`，默认值为 `4`。

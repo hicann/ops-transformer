@@ -94,7 +94,7 @@
   <tr>
     <td>cacheBlockTable（aclTensor*）</td>
     <td>输入</td>
-    <td>表示逻辑block到物理cache block的映射表。</td>
+    <td>表示逻辑block到物理cache block的映射表。二维映射表对应的线性分页缓存路径中，物理block 0为保留块，不写回状态；需保存有效状态的映射应使用[1,block_num-1]，未使用表项可保留0。</td>
     <td>INT32</td>
     <td>ND</td>
   </tr>
@@ -227,6 +227,10 @@
 ## 约束说明
 
 - `D`仅支持`128/512`；`H`必须在`[1024,10240]`范围内且为`512`的整数倍。
+- `block_size`（即`BS`）必须在`[1,1024]`范围内。
+- 对于二维`cacheBlockTable`对应的线性分页缓存路径，物理block 0为保留块，
+  算子不会向该块写回状态。需要保存跨调用有效状态的逻辑block应映射到
+  `[1,block_num-1]`（`block_num`即`N`）；未使用的表项可保留0。
 - 支持BSH和TH两种场景：
   - BSH场景`cuSeqlensOptional`必须为空；
   - TH场景必须提供合法的`cuSeqlensOptional`前缀和数组，首元素为0，

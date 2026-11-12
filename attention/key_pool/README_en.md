@@ -98,7 +98,7 @@ the intermediate state required by incomplete compression groups into the paged
   <tr>
     <td>cacheBlockTable (aclTensor*)</td>
     <td>Input</td>
-    <td>Represents the mapping table from logical blocks to physical cache blocks.</td>
+    <td>Represents the mapping table from logical blocks to physical cache blocks. In the linear paged cache path using a two-dimensional mapping table, physical block 0 is reserved and is not written back. Mappings that need to preserve valid state must use [1,block_num-1]; unused entries may remain 0.</td>
     <td>INT32</td>
     <td>ND</td>
   </tr>
@@ -231,6 +231,10 @@ compression groups across operator calls.
 ## Constraints
 
 - `D` supports only `128/512`; `H` must be within the range `[1024,10240]` and be an integer multiple of `512`.
+- `block_size` (that is, `BS`) must be within the range `[1,1024]`.
+- In the linear paged cache path using a two-dimensional `cacheBlockTable`, physical block 0 is reserved.
+  The operator does not write state back to this block. Logical blocks that need to preserve valid state across
+  calls must map to `[1,block_num-1]` (`block_num` is `N`); unused entries may remain 0.
 - Both the BSH and TH scenarios are supported:
   - In the BSH scenario, `cuSeqlensOptional` must be empty;
   - In the TH scenario, a valid `cuSeqlensOptional` prefix sum array must be provided. The first element is 0,
