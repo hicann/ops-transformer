@@ -20,9 +20,36 @@
 #include "opdev/platform.h"
 #include "aclnnInner_dequant_rope_quant_kvcache.h"
 
+// Process-global state defined by the API UT platform stub.
+namespace op {
+extern SocVersion g_socVersion;
+extern NpuArch g_npuArchOverride;
+} // namespace op
+
 namespace {
 using TensorPtr = std::unique_ptr<aclTensor, void (*)(aclTensor*)>;
 constexpr const char* API_NAME = "aclnnDequantRopeQuantKvcacheGetWorkspaceSize";
+
+class PlatformStateGuard {
+public:
+    PlatformStateGuard()
+        : socVersion_(op::g_socVersion),
+          npuArchOverride_(op::g_npuArchOverride)
+    {}
+
+    ~PlatformStateGuard()
+    {
+        op::g_socVersion = socVersion_;
+        op::g_npuArchOverride = npuArchOverride_;
+    }
+
+    PlatformStateGuard(const PlatformStateGuard&) = delete;
+    PlatformStateGuard& operator=(const PlatformStateGuard&) = delete;
+
+private:
+    op::SocVersion socVersion_;
+    NpuArch npuArchOverride_;
+};
 
 class DequantRopeQuantKvcacheApi : public testing::Test {
 protected:
@@ -36,6 +63,9 @@ protected:
     {
         drqk_test::ClearErrorMessages();
     }
+
+private:
+    PlatformStateGuard platformState_;
 };
 
 struct ApiInputs {
