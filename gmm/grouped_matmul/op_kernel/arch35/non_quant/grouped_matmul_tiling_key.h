@@ -36,8 +36,8 @@ ASCENDC_TPL_ARGS_DECL(
 
 // 模板参数组合
 // 用于调用GET_TPL_TILING_KEY获取TilingKey时，接口内部校验TilingKey是否合法
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
-// V121 only supports non-quant matmul without activation; mixed kernels use AIC:AIV = 1:1.
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+// DAV_9201/DAV_9202 only support non-quant matmul without activation; mixed kernels use AIC:AIV = 1:1.
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_AIC_ONLY),
                                      ASCENDC_TPL_UINT_SEL(NO_QUANT_B_TRANS, ASCENDC_TPL_UI_LIST, GMM_NO_TRANS),
                                      ASCENDC_TPL_UINT_SEL(NO_QUANT_A_TRANS, ASCENDC_TPL_UI_LIST, GMM_NO_TRANS),

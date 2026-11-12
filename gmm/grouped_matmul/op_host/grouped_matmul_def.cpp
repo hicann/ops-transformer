@@ -995,7 +995,7 @@ public:
         this->AICore().AddConfig("ascend950", config950);
         this->AICore().AddConfig("ascend350", config950);
 
-        // temp 960DT
+        // DAV_9201/DAV_9202
         OpAICoreConfig config91096;
         config91096.Input("x")
             .ParamType(DYNAMIC)
@@ -1504,6 +1504,7 @@ public:
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
             .ExtendCfgInfo("opFile.value", "grouped_matmul_apt");
         this->AICore().AddConfig("ascend960dt", config91096);
+        this->AICore().AddConfig("ascend960pr", config91096);
         OpAICoreConfig config_kirin = GetKirinCoreConfig();
         this->AICore().AddConfig("kirinx90", config_kirin);
         this->AICore().AddConfig("kirin9030", config_kirin);

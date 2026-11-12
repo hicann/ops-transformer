@@ -126,7 +126,8 @@ static aclnnStatus CheckShape(gmm_add_advanced::GroupedMatmulAddParams params, c
                opName, "yRef", actualYSize, expectedYSize);
 
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
-        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202) {
         auto groupNum = params.groupList->GetViewShape().GetDim(0);
         auto yDimNum = params.yRef->GetViewShape().GetDimNum();
         if (yDimNum != Dim3) {
