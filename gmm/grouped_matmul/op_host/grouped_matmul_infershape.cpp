@@ -16,6 +16,7 @@
 #include <algorithm>
 #include "gmm/common/op_host/log_format_util.h"
 
+#include "aclnn/opdev/platform.h"
 #include "register/op_impl_registry.h"
 #include "log/log.h"
 #include "platform/platform_info.h"
@@ -487,11 +488,6 @@ static bool IsS8S4PseudoQuant(const gert::InferShapeContext* context)
 
 static bool IsS8S4SpecialWeightFormat(const gert::InferShapeContext* context)
 {
-    const auto& platformInfo = GetGmmPlatformCache();
-    const auto ret = platformInfo.ret;
-    if (ret != GRAPH_SUCCESS || !IsGmmDavidSupportSoc(platformInfo.shortSocVersion)) {
-        return false;
-    }
     if (!IsS8S4PseudoQuant(context)) {
         return false;
     }
@@ -501,11 +497,16 @@ static bool IsS8S4SpecialWeightFormat(const gert::InferShapeContext* context)
     }
     const auto tuningConfigPtr =
         attrs->GetAttrPointer<gert::TypedContinuousVector<int64_t>>(GMM_INDEX_ATTR_TUNING_CONFIG);
-    if (tuningConfigPtr == nullptr || tuningConfigPtr->GetSize() <= 1) {
+    if (tuningConfigPtr == nullptr || tuningConfigPtr->GetSize() <= 1 || tuningConfigPtr->GetData()[1] != 1) {
         return false;
     }
-    const auto tuningConfig = tuningConfigPtr->GetData();
-    return tuningConfig[1] == 1;
+
+    const auto& platformInfo = GetGmmPlatformCache();
+    if (platformInfo.ret == GRAPH_SUCCESS && !platformInfo.shortSocVersion.empty()) {
+        return IsGmmDavidSupportSoc(platformInfo.shortSocVersion);
+    }
+    const auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
+    return npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201;
 }
 
 static GMMWeightAxisInfo GetWeightAxisInfo(const gert::InferShapeContext* context, size_t weightDimNum,
