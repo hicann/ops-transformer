@@ -193,8 +193,8 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | cmp_kv | tensor | Optional | Represents the compressed quantized KV input. Key and Value share the same data. | fp8_e4m3 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
 | ori_sparse_indices | tensor | Optional | Represents the topK indices of the original KV. -1 is filled at invalid positions. | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>
 | cmp_sparse_indices | tensor | Optional | Represents the topK indices of the compressed KV. -1 is filled at invalid positions. | int32 | ND | <ul><li>(q_t, kv_n, cmp_kv_k)</li><li>(b, q_s, kv_n, cmp_kv_k)</li></ul>
-| ori_block_table | tensor | Optional | Represents the block mapping table used by ori_kv in the PageAttention use case. | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
-| cmp_block_table | tensor | Optional | Represents the block mapping table used by cmp_kv in the PageAttention use case. | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>
+| ori_block_table | tensor | Optional | Represents the block mapping table used by ori_kv in the PagedAttention use case. | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
+| cmp_block_table | tensor | Optional | Represents the block mapping table used by cmp_kv in the PagedAttention use case. | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>
 | cu_seqlens_q | tensor | Optional | Represents the cumulative sequence lengths for processing the variable-length sequences of input q. | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_ori_kv | tensor | Optional | Represents the cumulative sequence lengths for processing the variable-length sequences of input ori_kv. | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_cmp_kv | tensor | Optional | Represents the cumulative sequence lengths for processing the variable-length sequences of input cmp_kv. | int32 | ND | <ul><li>(b+1,)</li></ul>

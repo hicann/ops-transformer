@@ -253,7 +253,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
     <tr>
       <td>oriBlockTableOptional (aclTensor*)</td>
       <td>Input</td>
-      <td>Block mapping table used for oriKvCache storage in PageAttention.</td>
+      <td>Block mapping table used for oriKvCache storage in PagedAttention.</td>
       <td>Must be passed in when layoutKv is PA_BBND. The length of the second dimension must be greater than or equal to the number of blocks corresponding to the maximum S2 among all batches.</td>
       <td>INT32</td>
       <td>ND</td>
@@ -263,7 +263,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
     <tr>
       <td>cmpBlockTableOptional (aclTensor*)</td>
       <td>Input</td>
-      <td>Block mapping table used for cmpKvCache storage in PageAttention.</td>
+      <td>Block mapping table used for cmpKvCache storage in PagedAttention.</td>
       <td>Must be passed in when cmpKv is passed and layoutKv is PA_BBND.</td>
       <td>INT32</td>
       <td>ND</td>

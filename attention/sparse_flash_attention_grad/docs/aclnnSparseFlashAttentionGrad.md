@@ -23,16 +23,16 @@
 
 ## 功能说明
 
-- **接口功能**：根据topkIndices对key和value选取大小为selectedBlockSize的数据重排，接着进行训练场景下计算注意力的反向输出。
+- **接口功能**：根据sparseIndices从key和value中选取大小为sparseBlockSize的数据块并重排，计算训练场景下注意力的反向传播结果。
 
-- **计算公式**：根据传入的topkIndices对keyIn和value选取数量为selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
-
-  $$
-   selectedKey\text{ }=\text{ }Gather \left( key,topkIndices \left[ i \left]  \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.
-  $$
+- **计算公式**：根据传入的sparseIndices从key和value中选取大小为sparseBlockSize的数据块并重排。K为sparseIndices的最后一维大小，按第i个有效索引选取数据块的公式如下：
 
   $$
-   selectedValue\text{ }=\text{ }Gather \left( value,topkIndices \left[ i \left]  \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.
+   selectedKey_i = \operatorname{Gather}(key, sparseIndices[i]), \quad 0 \le i < K
+  $$
+
+  $$
+   selectedValue_i = \operatorname{Gather}(value, sparseIndices[i]), \quad 0 \le i < K
   $$
 
   KV merge场景下，若value为空指针，则上述公式中的value按key处理，selectedValue等价于selectedKey。该场景的反向输出不单独返回dValue，dKeyOut表示合并后的梯度：

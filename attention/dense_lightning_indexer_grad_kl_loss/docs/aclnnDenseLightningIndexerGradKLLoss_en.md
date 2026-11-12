@@ -488,7 +488,7 @@ aclnnStatus aclnnDenseLightningIndexerGradKLLoss(
   - Deterministic computation:
     aclnnDenseLightningIndexerGradKLLoss defaults to a non-deterministic implementation, and supports enabling deterministic computation through alcrtCtxSetSysParamOpt.
   - Handling of empty input parameters:
-    - If query, key, query_index, key_index, or weight is an empty tensor: currently not supported, and an error is reported.
+    - If query, key, queryIndex, keyIndex, or weights is an empty tensor: currently not supported, and an error is reported.
 
   <table style="undefined;table-layout: fixed; width: 942px"><colgroup>
       <col style="width: 100px">

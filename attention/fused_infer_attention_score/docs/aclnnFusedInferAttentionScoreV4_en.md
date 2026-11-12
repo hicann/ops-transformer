@@ -1668,7 +1668,7 @@ If the operator can determine that invalid rows exist, the invalid row calculati
             <td>When the shape is five-dimensional, the constraints on each dimension are <code>[blockNum, N, D/16, blockSize, 16]</code>.</td>
         </tr>
         <tr>
-            <td>attention</td>
+            <td>attentionOut</td>
             <td>The data type is the same as that of <code>query</code>.</td>
             <td>-</td>
         </tr>
@@ -1705,7 +1705,7 @@ If the operator can determine that invalid rows exist, the invalid row calculati
             <td>When the shape is five-dimensional, the constraints on each dimension are <code>[blockNum, N, D/32, blockSize, 32]</code>.</td>
         </tr>
         <tr>
-            <td>attention</td>
+            <td>attentionOut</td>
             <td>BFLOAT16</td>
             <td>-</td>
         </tr>
@@ -1726,12 +1726,12 @@ If the operator can determine that invalid rows exist, the invalid row calculati
         </tr>
         <tr>
             <td>keyAntiquantScaleOptional</td>
-            <td>FLOAT32. This parameter must coexist with dequantScaleQueryOptional and valueAntiquantScaleOptional. keyAntiquantOffsetOptional and valueAntiquantOffsetOptional cannot be passed. Only the pertensor mode is supported.</td>
+            <td>FLOAT32. This parameter must coexist with dequantScaleQueryOptional and valueAntiquantScaleOptional. keyAntiquantOffsetOptional and valueAntiquantOffsetOptional cannot be passed. Only the per-tensor mode is supported.</td>
             <td>shape is (1)</td>
         </tr>
         <tr>
             <td>valueAntiquantScaleOptional</td>
-            <td>FLOAT32. This parameter must coexist with dequantScaleQueryOptional and keyAntiquantScaleOptional. keyAntiquantOffsetOptional and valueAntiquantOffsetOptional cannot be passed. Only the pertensor mode is supported.</td>
+            <td>FLOAT32. This parameter must coexist with dequantScaleQueryOptional and keyAntiquantScaleOptional. keyAntiquantOffsetOptional and valueAntiquantOffsetOptional cannot be passed. Only the per-tensor mode is supported.</td>
             <td>shape is (1)</td>
         </tr>
         <tr>

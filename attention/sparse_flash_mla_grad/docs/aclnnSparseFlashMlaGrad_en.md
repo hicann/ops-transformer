@@ -159,7 +159,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>query (aclTensor*)</td>
             <td>Input</td>
             <td>Input Q of the attention structure.</td>
-            <td>            The shape dimensions of query, oriKvOptional, cmpKvOptional, dOut, outOptional, lse, oriSparseIndicesOptional, and cmpSparseIndicesOptional must be consistent.
+            <td>            The shape dimensions of query, oriKvOptional, cmpKvOptional, dOut, out, lse, oriSparseIndicesOptional, and cmpSparseIndicesOptional must be consistent.
             </td>
             <td>BFLOAT16, FLOAT16</td>
             <td>ND</td>

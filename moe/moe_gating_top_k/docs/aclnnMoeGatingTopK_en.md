@@ -555,7 +555,7 @@ int main() {
   // Create the expandedPermutedRows aclTensor.
   ret = CreateAclTensor(biasHostData, biasShape, &biasAddr, aclDataType::ACL_FLOAT, &bias);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  // Create the expertForSourceRow aclTensor.
+  // Create the out aclTensor.
   ret = CreateAclTensor(outHostData, outShape, &outAddr, aclDataType::ACL_FLOAT, &out);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   // Create the expandedSrcToDstRow aclTensor.

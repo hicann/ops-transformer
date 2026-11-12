@@ -52,15 +52,15 @@ $$
 则注意力的反向计算公式为：
 
 $$
-V=P^TdY
+dV=P^TdY
 $$
 
 $$
-Q=\frac{((dS)*K)}{\sqrt{d}}
+dQ=\frac{((dS)*K)}{\sqrt{d}}
 $$
 
 $$
-K=\frac{((dS)^T*Q)}{\sqrt{d}}
+dK=\frac{((dS)^T*Q)}{\sqrt{d}}
 $$
 
 其中增加**sink**之后计算逻辑见下，主要修改相关softmax_max和softmax_sum逻辑计算部分

@@ -31,7 +31,7 @@
 
 ## Function
 
-- Description: aclnnBlockSparseAttention performs backward computation for sparse attention. It supports flexible block-level sparsity patterns and uses BlockSparseMask to specify the KV blocks selected for each Q block, enabling efficient sparse attention computation.
+- Description: Computes the backward pass of block-sparse attention. It supports flexible block-level sparsity patterns and uses BlockSparseMask to specify the KV blocks selected for each Q block.
 - Formula:
 
   The sparse block size is $blockShapeX×blockShapeY$, where blockShapeX indicates the sparse granularity in the Q direction and blockShapeY indicates the sparse granularity in the KV direction. The granularities of the two directions are independent of each other and can be set to different values.

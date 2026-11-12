@@ -45,7 +45,7 @@
 
     The Reduce computation here performs a reduce operation on data from different ranks.
 
-    - Case 1: If x is of the float8_e4m3fn, float8_e5m2, int8, or hifloat8 data type and the input parameter scale is float32, reduce_scatter communication is performed first, followed by pertoken-pergroup dequantization. The output is of the bfloat16, float16, or float32 data type.
+    - Case 1: If x is of the float8_e4m3fn, float8_e5m2, int8, or hifloat8 data type and the input parameter scales is float32 and has the same number of dimensions as x, reduce_scatter communication is performed first, followed by pertoken-pergroup dequantization. The output is of the bfloat16, float16, or float32 data type.
 
     - Case 2: If x is of the float8_e4m3fn or float8_e5m2 data type and the input parameter scales is float8_e8m0, reduce_scatter communication is performed first, followed by MX dequantization. The output is of the bfloat16, float16, or float32 data type.
 

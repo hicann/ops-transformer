@@ -391,7 +391,7 @@ int main() {
   // Create bias aclTensor.
   ret = CreateAclTensor(biasHostData, biasShape, &biasAddr, aclDataType::ACL_FLOAT, &bias);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  // Create scale aclTensor.
+  // Create scales aclTensor.
   ret = CreateAclTensor(scalesHostData, scalesShape, &scalesDeviceAddr, aclDataType::ACL_FLOAT, &scales);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 

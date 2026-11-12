@@ -385,7 +385,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - x1, x2, scaleOptional, pertokenScaleOptional, groupListOptional, logitOptional, and rowIndexOptional are mandatory parameters; biasOptional and sharedInputOptional are optional parameters. The offsetOptional parameter is currently not supported.
     - When groupListType is 0, groupListOptional must be a non-negative, monotonically non-decreasing sequence (cumulative sum), and the last value must not be greater than the first dimension of the tensor in x1; when groupListType is 1, groupListOptional must be a non-negative array (size of each group), and the sum of the values must not be greater than the first dimension of the tensor in x1.
     - batch (the first dimension of out) and sharedInputOffset must be greater than or equal to 0 and less than or equal to m.
-    - When sharedInputOptional is not empty, the length of its first dimension is shareInputLen. sharedInputOffset, shareInputLen, and their sum must be less than or equal to batch, the first dimension of out.
+    - When sharedInputOptional is not empty, the length of its first dimension is sharedInputLen. sharedInputOffset, sharedInputLen, and their sum must be less than or equal to batch, the first dimension of out.
     - x1 supports M being 0, and x2 supports N being 0. Other empty tensor use cases are not supported.
 
   <!-- end id10 -->
@@ -647,7 +647,7 @@ The following is sample code for reference only. For details about how to compil
       int64_t batch = 1;
       int64_t bsdp = 1;
       int64_t dtype = 0;
-      float shareInputWeight = 1.0;
+      float sharedInputWeight = 1.0;
       int64_t sharedInputOffset = 0;
       bool transposeX = false;
       bool transposeW = false;
@@ -768,7 +768,7 @@ The following is sample code for reference only. For details about how to compil
 
       // Call the first-phase API of aclnnGroupedMatmulFinalizeRoutingV3.
       workspaceSize = 0;
-      ret = aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(x, w, scale, bias, offset, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, shareInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, tuningConfig, out, &workspaceSize, &executor);
+      ret = aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(x, w, scale, bias, offset, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, sharedInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, tuningConfig, out, &workspaceSize, &executor);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
       // Allocate device memory based on the workspaceSize calculated by the first-phase API.
@@ -957,7 +957,7 @@ The following is sample code for reference only. For details about how to compil
       int64_t batch = 8;
       int64_t bsdp = 1;
       int64_t dtype = 0;
-      float shareInputWeight = 1.0;
+      float sharedInputWeight = 1.0;
       int64_t sharedInputOffset = 0;
       bool transposeX = false;
       bool transposeW = false;
@@ -1085,7 +1085,7 @@ The following is sample code for reference only. For details about how to compil
       void *workspaceAddr = nullptr;
 
       // Call the first-phase API of aclnnGroupedMatmulFinalizeRoutingV3.
-      ret = aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(x, w, scale, bias, nullptr, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, shareInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, nullptr, out, &workspaceSize, &executor);
+      ret = aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(x, w, scale, bias, nullptr, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, sharedInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, nullptr, out, &workspaceSize, &executor);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize failed. ERROR: %d\n", ret);
                 return ret);
       // Allocate device memory based on the workspaceSize calculated by the first-phase API.

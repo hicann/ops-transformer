@@ -25,16 +25,16 @@
 
 ## Function
 
-- **Description**: Rearranges data of size selectedBlockSize selected from key and value based on topkIndices, and then computes the backward output of attention in training scenarios.
+- **Description**: Selects and rearranges data blocks of size sparseBlockSize from key and value based on sparseIndices, then computes the attention backward results for training.
 
-- **Formula**: Rearranges data of selectedBlockCount blocks, each of size selectedBlockSize, selected from keyIn and value based on the input topkIndices. The formula is as follows:
-
-  $$
-   selectedKey\text{ }=\text{ }Gather \left( key,topkIndices \left[ i \left] \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.
-  $$
+- **Formula**: Selects and rearranges data blocks of size sparseBlockSize from key and value based on sparseIndices. K is the size of the last dimension of sparseIndices. The following formulas show how a data block is selected using the i-th valid index:
 
   $$
-   selectedValue\text{ }=\text{ }Gather \left( value,topkIndices \left[ i \left] \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.
+   selectedKey_i = \operatorname{Gather}(key, sparseIndices[i]), \quad 0 \le i < K
+  $$
+
+  $$
+   selectedValue_i = \operatorname{Gather}(value, sparseIndices[i]), \quad 0 \le i < K
   $$
 
   In the KV merge use case, if value is a null pointer, value in the preceding formulas is treated as key, and selectedValue is equivalent to selectedKey. The backward output in this use case does not return dValue separately; dKeyOut indicates the merged gradient:

@@ -572,7 +572,7 @@ int main()
     int64_t headNum = 16;
     int64_t selectedBlockSize = 64;
     int64_t selectedBlockCount = 16;
-    int64_t sparseMod = 2;
+    int64_t sparseMode = 2;
     char layOut[] = "TND";
 
     void *qDeviceAddr = nullptr;
@@ -661,7 +661,7 @@ int main()
     // Call the first-phase API of aclnnNsaSelectedAttention.
     ret = aclnnNsaSelectedAttentionGetWorkspaceSize(
         q, k, v, topKIndices, attenMaskOptional, actualSeqQLenOptional, actualSeqKvLenOptional, scaleValue, headNum,
-        layOut, sparseMod, selectedBlockSize, selectedBlockCount, softmaxMax, softmaxSum, attentionOut, &workspaceSize, &executor);
+        layOut, sparseMode, selectedBlockSize, selectedBlockCount, softmaxMax, softmaxSum, attentionOut, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnNsaSelectedAttentionGetWorkspaceSize failed. ERROR: %d\n", ret);
               FreeResource(q, k, v, attentionOut, softmaxMax, softmaxSum, qDeviceAddr, kDeviceAddr, vDeviceAddr,
                   attentionOutDeviceAddr, softmaxMaxDeviceAddr, softmaxSumDeviceAddr, workspaceSize, workspaceAddr,

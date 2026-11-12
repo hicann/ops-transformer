@@ -313,7 +313,7 @@ aclnnStatus aclnnNsaSelectedAttentionInfer(
           <td style="white-space: nowrap;">output</td>
           <td>Output</td>
           <td>Attention output in the formula.</td>
-          <td>      Reserved parameter, not used yet.
+          <td>      Receives the attention computation result.
           </td>
           <td>FLOAT16, BFLOAT16</td>
           <td>ND</td>

@@ -196,8 +196,8 @@ cann_ops_transformer.quant_sparse_flash_mla(
 | cmp_kv_descale | tensor | Optional | Quantization parameter corresponding to cmp_kv. | float32 | ND | <ul><li>[1]</li></ul>
 | ori_sparse_indices | tensor | Optional | TopK indices of the original KV. Invalid positions are filled with -1. | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>
 | cmp_sparse_indices | tensor | Optional | TopK indices of the compressed KV. Invalid positions are filled with -1. | int32 | ND | <ul><li>(q_t, kv_n, cmp_kv_k)</li><li>(b, q_s, kv_n, cmp_kv_k)</li></ul>
-| ori_block_table | tensor | Optional | Block mapping table used by ori_kv in PageAttention use cases. | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
-| cmp_block_table | tensor | Optional | Block mapping table used by cmp_kv in PageAttention use cases. | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>
+| ori_block_table | tensor | Optional | Block mapping table used by ori_kv in PagedAttention use cases. | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
+| cmp_block_table | tensor | Optional | Block mapping table used by cmp_kv in PagedAttention use cases. | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>
 | cu_seqlens_q | tensor | Optional | Cumulative sequence lengths for variable-length sequences of input q. | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_ori_kv | tensor | Optional | Cumulative sequence lengths for variable-length sequences of input ori_kv. | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_cmp_kv | tensor | Optional | Cumulative sequence lengths for variable-length sequences of input cmp_kv. | int32 | ND | <ul><li>(b+1,)</li></ul>

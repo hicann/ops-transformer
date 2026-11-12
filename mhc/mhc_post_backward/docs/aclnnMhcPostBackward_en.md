@@ -25,7 +25,7 @@
 
 ## Function
 
-- Description: mhc_post performs Post Mapping on the previous layer output $h_{t}^{out}$ in the MHC (Manifold-Constrained Hyper-Connection) architecture through a series of computations, performs ResMapping on the previous layer input $x_j$, and then performs residual connection on the two to obtain the next layer input $x_{l+1}$. This operator implements the backward function of the preceding process.
+- Description: mhc_post performs Post Mapping on the previous layer output $h_{t}^{out}$ in the MHC (Manifold-Constrained Hyper-Connection) architecture through a series of computations, performs ResMapping on the previous layer input $x_l$, and then performs residual connection on the two to obtain the next layer input $x_{l+1}$. This operator implements the backward function of the preceding process.
 
 - Formula:
 
@@ -205,7 +205,7 @@ aclnnStatus aclnnMhcPostBackward(
     <tr>
       <td>gradHPost</td>
       <td>Output</td>
-      <td>Gradient of the MHC layer input data h_post in the network.</td>
+      <td>Gradient of the MHC layer input data hPost in the network.</td>
       <td>-</td>
       <td>Data type consistent with hPost</td>
       <td>ND</td>

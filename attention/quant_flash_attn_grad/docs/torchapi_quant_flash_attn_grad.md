@@ -414,7 +414,7 @@ cann_ops_transformer.quant_flash_attn_grad(
             <td>Tensor</td>
         </tr>
         <tr>
-            <td rowspan="6">SeqLens参数组</td>
+            <td rowspan="6">SeqLengths参数组</td>
             <td>cu_seqlens_q</td>
             <td>INPUT(OPTIONAL)</td>
             <td>Tensor</td>

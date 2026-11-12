@@ -25,7 +25,7 @@
 
 ## Function
 
-- Description: Fuses GroupedMatmul, dquant, swiglu, and quant. For details, see Formula.
+- Description: Fuses GroupedMatmul, dequant, swiglu, and quant. For details, see Formula.
 
 - Formula:
 

@@ -276,7 +276,7 @@
 
         - $X∈\mathbb{Z_8}^{M \times K}$: activation matrix (left matrix), where M is the total number of tokens and K is the feature dimension.
         - $W∈\mathbb{Z_8}^{E \times K \times N}$: grouped weight matrix (right matrix), where E is the number of experts, K is the feature dimension, and N is the output dimension.
-        - $w\_scale∈\mathbb{R}^{E \times N}$: per-channel scaling factor of the grouped weight matrix (right matrix), E is the number of experts, K is the feature dimension, N is the output dimension.
+        - $w\_scale∈\mathbb{R}^{E \times N}$: per-channel scaling factor of the grouped weight matrix (right matrix), E is the number of experts, N is the output dimension.
         - $x\_scale∈\mathbb{R}^{M}$: per-token scaling factor of the activation matrix (left matrix), M is the total number of tokens, K is the feature dimension.
         - $grouplist∈\mathbb{N}^{E}$: group index list of cumsum or count.
       - **Output**:

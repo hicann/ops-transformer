@@ -188,8 +188,8 @@ cann_ops_transformer.sparse_flash_mla(
 | cmp_kv | Tensor | Optional | Compressed KV input. Key and Value share the same data. | bfloat16/float16 | ND | `BSND`: (b, cmp_kv_s, kv_n, d)<br>`TND`: (cmp_kv_t, kv_n, d)<br>`PA_BBND`: (cmp_kv_block_nums, cmp_kv_block_size, kv_n, d) |
 | ori_sparse_indices | Tensor | Optional | Original KV sparse index. Reserved field. | int32 | ND | `TND`: (q_t, kv_n, ori_kv_k) `BSND`: (b, q_s, kv_n, ori_kv_k) |
 | cmp_sparse_indices | Tensor | Optional | TopK indices of the compressed KV. Invalid positions are filled with -1. Passed in only for CSA use cases. | int32 | ND | `BSND`: (b, q_s, kv_n, cmp_kv_k)<br>`TND`: (q_t, kv_n, cmp_kv_k) |
-| ori_block_table | Tensor | Optional | Block mapping table used by `ori_kv` in PageAttention use cases. | int32 | ND | (b, max_num_blocks_per_seq) |
-| cmp_block_table | Tensor | Optional | Block mapping table used by `cmp_kv` in PageAttention use cases. | int32 | ND | (b, max_num_blocks_per_seq) |
+| ori_block_table | Tensor | Optional | Block mapping table used by `ori_kv` in PagedAttention use cases. | int32 | ND | (b, max_num_blocks_per_seq) |
+| cmp_block_table | Tensor | Optional | Block mapping table used by `cmp_kv` in PagedAttention use cases. | int32 | ND | (b, max_num_blocks_per_seq) |
 | cu_seqlens_q | Tensor | Optional | Cumulative sum of the number of effective tokens in each batch of `q` in TND use cases. | int32 | ND | (b+1,) |
 | cu_seqlens_ori_kv | Tensor | Optional | Cumulative sum of the number of effective tokens in each batch of `ori_kv` in TND use cases. | int32 | ND | (b+1,) |
 | cu_seqlens_cmp_kv | Tensor | Optional | Cumulative sum of the number of effective tokens in each batch of `cmp_kv` in TND use cases. | int32 | ND | (b+1,) |
@@ -372,7 +372,7 @@ Layout matching relationship table:
 #### Paged Attention Parameter Group
 
 - When `layout_kv="PA_BBND"`, `seqused_ori_kv` and `ori_block_table` must be passed in; when `cmp_kv` is passed in, `cmp_block_table` must also be passed in.
-- The `block_size` of PageAttention must be greater than 0. For <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, an error is reported when the value is not a multiple of 16 or is greater than 1024; for <term>Ascend 950PR&950DT products</term>, an error is reported when the value is less than or equal to 0.
+- The `block_size` of PagedAttention must be greater than 0. For <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, an error is reported when the value is not a multiple of 16 or is greater than 1024; for <term>Ascend 950PR&950DT products</term>, an error is reported when the value is less than or equal to 0.
 - When topk_value_mode=2, `ori_block_table` and `cmp_block_table` can be omitted.
 
 | Parameter | Single-Parameter Check | Existence Check | Consistency Check | Feature Cross-Check |

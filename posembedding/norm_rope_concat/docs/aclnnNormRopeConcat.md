@@ -31,21 +31,23 @@
     - 旋转位置编码（Rope）支持Interleave和Half类型。
     - 特征拼接（Concat）支持在sequence维度上进行拼接，拼接有顺序区别。
 
-- 计算公式（以Query（视频）和EncoderQuery（文本）为例）：
+- 计算公式（以Query（视频）和EncoderQuery（文本）为例，`concatOrder=0`）：
 
     $$
     \begin{aligned}
     hiddenState_q &= \text{Norm}(query, normQueryWeight, normQueryBias, eps) \\
-    hiddenState_{eq} &= \text{Norm}(encoderQuery, normEncoderQueryWeight, normEncoderQueryBias, eps) \\
-    concatedHiddenState &= \text{Concat}(hiddenState_q, hiddenState_{eq}) \\
-    transposedHiddenState &= \text{Transpose}(concatedHiddenState, (0, 2, 1, 3)) \\
-    hiddenState &= \text{RoPE}(concatedHiddenState, ropeSin, ropeCos)
+    hiddenState_{eq} &= \text{Norm}(encoderQuery, normAddedQueryWeight, normAddedQueryBias, eps) \\
+    concatenatedHiddenState &= \text{Concat}(hiddenState_q, hiddenState_{eq}) \\
+    transposedHiddenState &= \text{Transpose}(concatenatedHiddenState, (0, 2, 1, 3)) \\
+    hiddenState &= \text{RoPE}(transposedHiddenState, ropeSin, ropeCos)
     \end{aligned}
     $$
 
+    当`ropeType`为`NONE`时，RoPE不做变换；其他模式下，RoPE仅作用于拼接后序列的前`seqRope`个位置，其余位置不变。
+
 - 说明：
-    1. 输入输出布局如下：输入`query`的shape为`(B, S, N, D)`，输出`hiddenState`的shape为`(B, N, S, D)`，其中
-    B为batch，S为sequenceLen，N为headNum，D为headDim。
+    1. 输入输出布局如下：输入`query`的shape为`(B, S_q, N, D)`，`encoderQuery`的shape为`(B, S_eq, N, D)`，输出`hiddenState`的shape为`(B, N, S_q + S_eq, D)`，其中
+    `B`为批次大小，`S_q`和`S_eq`分别为`query`和`encoderQuery`的序列长度，`N`为注意力头数，`D`为头维度。
     2. Norm有五种模式(`normType`)：`NONE(0), LAYER_NORM(1), LAYER_NORM_AFFINE(2), RMS_NORM(3), RMS_NORM_AFFINE(4)`，其中：
         当`normType = NONE`时:
         $$
@@ -56,8 +58,8 @@
 
         $$
         \begin{aligned}
-        queryMean_{b,s,n} &= \frac{1}{D}\sum_{i=0}^{D-1}query_{b,s,n} \\
-        queryVar_{b,s,n} &= \frac{1}{D}\sum_{i=0}^{D-1}(query-queryMean_{b,s,n})^2 \\
+        queryMean_{b,s,n} &= \frac{1}{D}\sum_{i=0}^{D-1}query_{b,s,n,i} \\
+        queryVar_{b,s,n} &= \frac{1}{D}\sum_{i=0}^{D-1}(query_{b,s,n,i}-queryMean_{b,s,n})^2 \\
         queryRstd_{b,s,n} &= \frac{1}{\sqrt{queryVar_{b,s,n}+\epsilon}} \\
         hiddenState_q &= (query-queryMean)*queryRstd
         \end{aligned}
@@ -73,7 +75,7 @@
 
         $$
         \begin{aligned}
-        queryMs &= \frac{1}{D}\sum_{i=0}^{D-1}(query_{b,s,n})^2 \\
+        queryMs &= \frac{1}{D}\sum_{i=0}^{D-1}(query_{b,s,n,i})^2 \\
         queryRms &= \frac{1}{\sqrt{queryMs+\epsilon}} \\
         hiddenState_q &= query * queryRms
         \end{aligned}

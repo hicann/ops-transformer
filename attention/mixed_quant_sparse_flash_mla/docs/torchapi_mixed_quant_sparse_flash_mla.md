@@ -205,8 +205,8 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | cmp_kv | tensor | 可选 | 压缩KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入uint8 TQ4数据、kv_d=258。 | fp8_e4m3、uint8 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
 | ori_sparse_indices | tensor | 可选 | 表示原始KV topK索引，无效位置填-1 | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>
 | cmp_sparse_indices | tensor | 可选 | 表示压缩KV topK索引，无效位置填-1；quant_mode=3时必须传入且cmp_kv_k仅支持512或1024。 | int32 | ND | <ul><li>(q_t, kv_n, cmp_kv_k)</li><li>(b, q_s, kv_n, cmp_kv_k)</li></ul>
-| ori_block_table | tensor | 可选 | 表示PageAttention场景下ori_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
-| cmp_block_table | tensor | 可选 | 表示PageAttention场景下cmp_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>
+| ori_block_table | tensor | 可选 | 表示PagedAttention场景下ori_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
+| cmp_block_table | tensor | 可选 | 表示PagedAttention场景下cmp_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>
 | cu_seqlens_q | tensor | 可选 | 表示处理输入q变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_ori_kv | tensor | 可选 | 表示处理输入ori_kv变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_cmp_kv | tensor | 可选 | 表示处理输入cmp_kv变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>

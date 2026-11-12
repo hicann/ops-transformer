@@ -29,8 +29,8 @@
 - **Formula**:
 
     $$
-    ataOut = AllToAllV(expandX)\\
-    xOut = Sum(expertScales * ataOut + expertScales * sharedExpertX)
+    dataOut = AllToAllV(expandX)\\
+    xOut = Sum(expertScales * dataOut + expertScales * sharedExpertX)
     $$
 
     Data collected by the MoeDistributeDispatchSetup and MoeDistributeDispatchTeardown operators is returned along the original path. This operator only performs communication status confirmation and data sorting. It confirms the communication status of the data sent by the aclnnMoeDistributeCombineSetup API and performs a weighted sum based on the expert scale weights.

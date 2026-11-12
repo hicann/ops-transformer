@@ -340,7 +340,7 @@ aclnnStatus aclnnNsaSelectedAttentionInfer(
           <td>输出</td>
           <td>公式中attention的输出。</td>
           <td>
-      预留参数，暂未使用。
+      用于接收attention计算结果。
           </td>
           <td>FLOAT16、BFLOAT16</td>
           <td>ND</td>

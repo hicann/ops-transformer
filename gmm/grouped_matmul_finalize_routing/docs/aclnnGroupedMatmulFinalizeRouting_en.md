@@ -493,7 +493,7 @@ The following sample code is for reference only. For details about compilation a
       int64_t batch = 8;
       int64_t bsdp = 1;
       int64_t dtype = 0;
-      float shareInputWeight = 1.0;
+      float sharedInputWeight = 1.0;
       int64_t sharedInputOffset = 0;
       bool transposeX = false;
       bool transposeW = false;
@@ -602,7 +602,7 @@ The following sample code is for reference only. For details about compilation a
 
       // Call the first-phase API of aclnnGroupedMatmulFinalizeRouting.
       workspaceSize = 0;
-      ret = aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize(x, w, scale, bias, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, shareInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, out, &workspaceSize, &executor);
+      ret = aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize(x, w, scale, bias, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, sharedInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, out, &workspaceSize, &executor);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize failed. ERROR: %d\n", ret);
                 return ret);
       // Allocate device memory based on the workspaceSize calculated by the first-phase API.

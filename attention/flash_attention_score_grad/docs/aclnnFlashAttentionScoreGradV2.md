@@ -33,13 +33,13 @@
   已知注意力的正向计算公式为（pseType=1时，与[aclnnFlashAttentionScoreGrad](./aclnnFlashAttentionScoreGrad.md)计算公式相同，pseType=其他取值公式如下）：
 
   $$
-  Y=Dropout(Softmax(Mask(\frac{QK^T}{\sqrt{d}}+pse),atten\_mask),keep\_prob)V
+  Y=Dropout(Softmax(Mask(\frac{QK^T}{\sqrt{d}}+pse,atten\_mask)),keep\_prob)V
   $$
 
   为方便表达，以变量$S$和$P$表示计算公式：
 
   $$
-  S=Mask(\frac{QK^T}{\sqrt{d}}+pse),atten\_mask
+  S=Mask(\frac{QK^T}{\sqrt{d}}+pse,atten\_mask)
   $$
 
   $$

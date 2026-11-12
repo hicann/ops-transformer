@@ -119,7 +119,7 @@
 
     In this case, queryNorm is of the BFLOAT16 type, and dequantScaleQNorm is not output (nullptr).
 
-    Quantization scenario (weightQuantMode=1/2/4/5, per-token dynamic quantization). smoothScaleCq is optional. If not passed in, it is treated as 1:
+    Quantization scenario (weightQuantMode=1/2/4/5, per-token dynamic quantization). smoothScalesCq is optional. If not passed in, it is treated as 1:
 
     $$
     \tilde{c}^Q = c^Q \cdot smoothScale

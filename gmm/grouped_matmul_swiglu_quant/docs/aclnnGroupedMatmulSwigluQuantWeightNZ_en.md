@@ -25,7 +25,7 @@
 
 ## Function
 
-- Description: Fuses GroupedMatmul, dquant, swiglu, and quant. For details, see the formula. This is a weightNZ-specific version of the [aclnnGroupedMatmulSwigluQuant](./aclnnGroupedMatmulSwigluQuant_en.md) API.
+- Description: Fuses GroupedMatmul, dequant, swiglu, and quant. For details, see the formula. This is a weightNZ-specific version of the [aclnnGroupedMatmulSwigluQuant](./aclnnGroupedMatmulSwigluQuant_en.md) API.
 
 - Formula:
 

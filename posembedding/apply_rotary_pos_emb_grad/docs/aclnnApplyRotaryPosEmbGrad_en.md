@@ -171,7 +171,7 @@ aclnnStatus aclnnApplyRotaryPosEmbGrad(
     <tr>
       <td>queryOptional</td>
       <td>Optional input</td>
-      <td>Query of the forward computation. If the pointer is null, gradCosOutOptional and gradSinOutOptional are not computed.</td>
+      <td>Query of the forward computation. If the pointer is null, gradCosOut and gradSinOut are not computed.</td>
       <td>Must be consistent with gradQueryEmbed in data type and dimensions, and must be passed in together with keyOptional or not passed in.</td>
       <td>BFLOAT16, FLOAT16, FLOAT32</td>
       <td>ND</td>
@@ -181,7 +181,7 @@ aclnnStatus aclnnApplyRotaryPosEmbGrad(
     <tr>
       <td>keyOptional</td>
       <td>Optional input</td>
-      <td>Forward computation input key. If it is a null pointer, gradCosOutOptional and gradSinOutOptional are not computed.</td>
+      <td>Forward computation input key. If it is a null pointer, gradCosOut and gradSinOut are not computed.</td>
       <td>The data type and dimensions must be the same as those of gradQueryEmbed. Must be passed in together with queryOptional or omitted together.</td>
       <td>BFLOAT16, FLOAT16, FLOAT32</td>
       <td>ND</td>
@@ -359,7 +359,7 @@ aclnnStatus aclnnApplyRotaryPosEmbGrad(
   - The shape of `gradQueryEmbed` and `gradQueryOut` must be the same, and the shape of `gradKeyEmbed` and `gradKeyOut` must be the same.
   - For any `layout`, all dimensions except N must be the same between `gradQueryEmbed` and `gradKeyEmbed`.
   - The N dimension of `cos` and `sin` must be equal to 1. If `layout` is 1 (BSND) or 2 (SBND), the B dimension of `cos` and `sin` can be 1 or consistent with the B dimension of `gradQueryEmbed`. If `layout` is 4 (TND), the T dimension of `cos` and `sin` must be consistent with the T dimension of `gradQueryEmbed`. All dimensions except N (and the optionally broadcast B dimension under BSND and SBND layouts) must be consistent with those of `gradQueryEmbed`.
-  - The shapes of `cos`, `sin`, `gradCosOutOptional`, and `gradSinOutOptional` must be the same.
+  - The shapes of `cos`, `sin`, `gradCosOut`, and `gradSinOut` must be the same.
   - The dimensions of `query` must be consistent with `gradQueryEmbed`, and the dimensions of `key` must be consistent with `gradKeyEmbed`. `query` and `key` must be both passed in or both omitted.
   - `rotaryModeOptional` only supports "half".
   - `layout` only supports {1, 2, 4}, corresponding to {BSND, SBND, TND}.

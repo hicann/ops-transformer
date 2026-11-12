@@ -65,6 +65,7 @@
   其中，$S_{t-1},S_t \in R^{V_{dim}\times K_{dim}}$，$q_t,k_t\in R^{K_{dim}}$，$v_t,o_t\in R^{V_{dim}}$。$d_t$ 沿状态矩阵的 K 维广播。多个 value head 可以共享同一个 query/key head，要求 $H_v$ 能被 $H_k$ 整除。
 
 - 符号说明
+
   | 符号        | 含义                                                                               |
   | ----------- | ---------------------------------------------------------------------------------- |
   | B           | Batch Size，输入样本批量大小                                                       |
@@ -286,7 +287,7 @@ aclnnStatus aclnnRecurrentKda(
       <td>outputFinalState（bool）</td>
       <td>输入</td>
       <td>是否输出有效最终状态。</td>
-      <td>为 true 时 finalState 返回有效最终状态；是否原位更新由 inplaceFinalState 决定。</td>
+      <td>为 true 时 finalState 返回有效最终状态；是否原地更新由 inplaceFinalState 决定。</td>
       <td>BOOL</td>
       <td>-</td>
       <td>-</td>

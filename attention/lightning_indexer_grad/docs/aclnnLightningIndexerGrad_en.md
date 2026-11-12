@@ -583,7 +583,7 @@ int main()
     int64_t headNum = 64;
     int64_t sparseMode = 3;
     char layoutStr[] = "BSND";
-    bool deteminstic = true;
+    bool deterministic = true;
     int64_t preToken = 65536;
     int64_t nextToken = 65536;
 
@@ -674,7 +674,7 @@ int main()
 
     // Call the first-phase API of aclnnLightningIndexerGrad.
     ret = aclnnLightningIndexerGradGetWorkspaceSize(q, k, dy, sparseIndices, weights, nullptr, nullptr, headNum,
-                                                    layoutStr, sparseMode, preToken, nextToken, deteminstic, dQuery,
+                                                    layoutStr, sparseMode, preToken, nextToken, deterministic, dQuery,
                                                     dKey, dWeights, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnLightningIndexerGradGetWorkspaceSize failed. ERROR: %d\n", ret);
               FreeResource(q, k, dy, sparseIndices, weights, dQuery, dKey, dWeights, qDeviceAddr, kDeviceAddr,

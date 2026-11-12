@@ -117,7 +117,7 @@
 
     此时queryNorm为BFLOAT16类型，dequantScaleQNorm不输出（为nullptr）。
 
-    量化场景（weightQuantMode=1/2/4/5，per-token动态量化），smoothScaleCq可选传入，未传入时视为1：
+    量化场景（weightQuantMode=1/2/4/5，per-token动态量化），smoothScalesCq可选传入，未传入时视为1：
 
     $$
     \tilde{c}^Q = c^Q \cdot smoothScale

@@ -186,8 +186,8 @@ cann_ops_transformer.sparse_flash_mla(
 | cmp_kv | Tensor | 可选 | 压缩kv输入，Key和Value共享同一份数据。 | bfloat16/float16 | ND | `BSND`：(b, cmp_kv_s, kv_n, d)<br>`TND`：(cmp_kv_t, kv_n, d)<br>`PA_BBND`：(cmp_kv_block_nums, cmp_kv_block_size, kv_n, d) |
 | ori_sparse_indices | Tensor | 可选 | 原始kv稀疏索引，无效位置填-1。 | int32 | ND | `BSND`：(b, q_s, kv_n, ori_kv_k)<br>`TND`：(q_t, kv_n, ori_kv_k) |
 | cmp_sparse_indices | Tensor | 可选 | 压缩kv的TopK索引，无效位置填-1；仅CSA场景传入。 | int32 | ND | `BSND`：(b, q_s, kv_n, cmp_kv_k)<br>`TND`：(q_t, kv_n, cmp_kv_k) |
-| ori_block_table | Tensor | 可选 | PageAttention场景下`ori_kv`使用的Block映射表。 | int32 | ND | (b, max_num_blocks_per_seq) |
-| cmp_block_table | Tensor | 可选 | PageAttention场景下`cmp_kv`使用的Block映射表。 | int32 | ND | (b, max_num_blocks_per_seq) |
+| ori_block_table | Tensor | 可选 | PagedAttention场景下`ori_kv`使用的Block映射表。 | int32 | ND | (b, max_num_blocks_per_seq) |
+| cmp_block_table | Tensor | 可选 | PagedAttention场景下`cmp_kv`使用的Block映射表。 | int32 | ND | (b, max_num_blocks_per_seq) |
 | cu_seqlens_q | Tensor | 可选 | TND场景下`q`各Batch有效token数的累积和。 | int32 | ND | (b+1,) |
 | cu_seqlens_ori_kv | Tensor | 可选 | TND场景下`ori_kv`各Batch有效token数的累积和。 | int32 | ND | (b+1,) |
 | cu_seqlens_cmp_kv | Tensor | 可选 | TND场景下`cmp_kv`各Batch有效token数的累积和。 | int32 | ND | (b+1,) |
@@ -370,7 +370,7 @@ layout匹配关系表：
 #### PagedAttention参数组
 
 - `layout_kv="PA_BBND"`时，必须传入`seqused_ori_kv`和`ori_block_table`；传入`cmp_kv`时，还必须传入`cmp_block_table`。
-- PageAttention的`block_size`取值必须大于0。对于<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>，取非16的倍数或大于1024时拦截；对于<term>Ascend 950PR&950DT系列产品</term>，取小于等于0时拦截。
+- PagedAttention的`block_size`取值必须大于0。对于<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>，取非16的倍数或大于1024时拦截；对于<term>Ascend 950PR&950DT系列产品</term>，取小于等于0时拦截。
 - topk_value_mode=2时 `ori_block_table`、`cmp_block_table`均可不传。
 
 | 参数 | 单参数校验 | 存在性拦截 | 一致性拦截 | 特性交叉拦截 |

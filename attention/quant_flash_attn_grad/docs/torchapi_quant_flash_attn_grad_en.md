@@ -415,7 +415,7 @@ In the Python API, `mask_mode` supports passing the `IntEnum` enumeration or the
             <td>Tensor</td>
         </tr>
         <tr>
-            <td rowspan="6">SeqLens parameter group</td>
+            <td rowspan="6">SeqLengths parameter group</td>
             <td>cu_seqlens_q</td>
             <td>INPUT(OPTIONAL)</td>
             <td>Tensor</td>

@@ -630,9 +630,9 @@ aclnnStatus aclnnMoeDistributeDispatchSetupTeardownCalcOutputSize(
     <td>-</td>
     </tr>
     <tr>
-    <td>assisInfoForCombineOutSize</td>
+    <td>assistInfoForCombineOutSize</td>
     <td>Output</td>
-    <td>Memory size of assisInfoForCombineOut of the aclnnMoeDistributeDispatchSetup API.</td>
+    <td>Memory size of assistInfoForCombineOut of the aclnnMoeDistributeDispatchSetup API.</td>
     <td>-</td>
     <td>INT64</td>
     <td>-</td>

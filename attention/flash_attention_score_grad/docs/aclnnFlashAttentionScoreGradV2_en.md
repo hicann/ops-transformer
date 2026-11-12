@@ -35,13 +35,13 @@
   The known attention forward computation formula is (when pseType = 1, it is the same as the formula of [aclnnFlashAttentionScoreGrad](./aclnnFlashAttentionScoreGrad_en.md); when pseType takes other values, the formula is as follows):
 
   $$
-  Y=Dropout(Softmax(Mask(\frac{QK^T}{\sqrt{d}}+pse),atten\_mask),keep\_prob)V
+  Y=Dropout(Softmax(Mask(\frac{QK^T}{\sqrt{d}}+pse,atten\_mask)),keep\_prob)V
   $$
 
   For ease of expression, variables $S$ and $P$ are used to represent the formulas:
 
   $$
-  S=Mask(\frac{QK^T}{\sqrt{d}}+pse),atten\_mask
+  S=Mask(\frac{QK^T}{\sqrt{d}}+pse,atten\_mask)
   $$
 
   $$

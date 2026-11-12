@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：融合GroupedMatmul、dquant、swiglu和quant，详细解释见计算公式，[aclnnGroupedMatmulSwigluQuant](./aclnnGroupedMatmulSwigluQuant.md)接口的weightNZ特化版本。
+- 接口功能：融合GroupedMatmul、dequant、swiglu和quant，详细解释见计算公式，[aclnnGroupedMatmulSwigluQuant](./aclnnGroupedMatmulSwigluQuant.md)接口的weightNZ特化版本。
 
 - 计算公式：
 

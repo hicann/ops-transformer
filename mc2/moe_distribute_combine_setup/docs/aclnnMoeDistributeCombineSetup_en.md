@@ -29,7 +29,7 @@
 - **Formula**:
 
     $$
-    ataOut = AllToAllV(expandX)\\
+    dataOut = AllToAllV(expandX)\\
     $$
 
     Data is returned along the same path used by the MoeDistributeDispatchSetup and MoeDistributeDispatchTeardown operators to collect data. This operator only sends communication status and communication data, and exits immediately after the data is sent without waiting for communication completion. Communication status confirmation and data post-processing are completed by aclnnMoeDistributeCombineTeardown.

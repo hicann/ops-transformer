@@ -41,7 +41,7 @@ $$
 \end{aligned}
 $$
 
-Iteration $i$ ($i = 1, 2, \dots, \mathbf({num\_iters}-1)$):
+Iteration $i$ ($i = 1, 2, \dots, \mathbf{num\_iters}-1$):
 
 $$
 \begin{aligned}

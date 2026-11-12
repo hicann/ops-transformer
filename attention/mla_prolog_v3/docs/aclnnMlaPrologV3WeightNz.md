@@ -25,15 +25,15 @@
 
 - **功能更新**：（相对于aclnnMlaPrologV2weightNz的差异）
     - 新增Query与Key的尺度矫正因子，分别对应qcQrScale（$\alpha_q$）与kcScale（$\alpha_{kv}$）。
-    - 新增可选输入参数（例如actualSeqLenOptional、kNopeClipAlphaOptional、queryNormFlag、weightQuantMode、kvCacheQuantMode、queryQuantMode、ckvkrRepoMode、quantScaleRepoMode、tileSize、queryNormOutOptional和dequantScaleQNormOptional等），将cache_mode由必选改为可选。
+    - 新增参数（例如actualSeqLenOptional、kNopeClipAlphaOptional、weightQuantMode、kvCacheQuantMode、queryQuantMode、ckvkrRepoMode、quantScaleRepoMode和tileSize等），新增可选输出queryNormOutOptional和dequantScaleQNormOutOptional。
     - 调整cacheIndex参数的名称与位置，对应当前的cacheIndexOptional。
 - **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路:
     - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后，再乘以Query尺度矫正因子$\alpha_q$得到$q^N$；第二路乘以$W^{QR}$后经过旋转位置编码（ROPE）得到$q^R$。
     - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后，乘以Key尺度矫正因子$\alpha_{kv}$传入Cache中得到$k^C$；
     - 第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码传入另一个Cache中得到$k^R$；
     - 第五路是输出$q^N$经过DynamicQuant后得到的量化参数。
-    - 第六路是queryNormFlag=true时，输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后得到压缩结果$c^Q$，作为queryNormOutOptional输出。
-    - 第七路是queryNormFlag=true且量化场景（weightQuantMode≠0）下，对$c^Q$做DynamicQuant，最终得到量化后的queryNormOutOptional和对应量化参数dequantScaleQNormOutOptional。
+    - 第六路是queryNormOutOptional非空且非量化场景（weightQuantMode=0）下，输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后得到压缩结果$c^Q$，作为queryNormOutOptional输出。
+    - 第七路是queryNormOutOptional非空且量化场景（weightQuantMode≠0）下，对$c^Q$做DynamicQuant，最终得到量化后的queryNormOutOptional和对应量化参数dequantScaleQNormOutOptional。
     - 权重参数WeightDq、WeightUqQr和WeightDkvKr需要以NZ格式传入。
 
 - **计算公式**：
@@ -96,7 +96,7 @@
     q^{N} = {\mathrm{round}(q^{N} / \mathrm{dequantScaleQNope})}
     $$
 
-    Query Norm及Dequant Scale Query Norm计算公式（queryNormFlag=true时输出）
+    Query Norm及Dequant Scale Query Norm计算公式（queryNormOutOptional非空时输出）
 
     非量化场景（weightQuantMode=0）：
 
@@ -566,16 +566,6 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
         <td>-</td>
       </tr>
       <tr>
-        <td>queryNormFlag</td>
-        <td>输入</td>
-        <td>表示是否输出queryNormOutOptional、dequantScaleQNormOutOptional。</td>
-        <td>false表示不输出，true表示输出，默认值为false</td>
-        <td>BOOL</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
         <td>weightQuantMode</td>
         <td>输入</td>
         <td>表示weightDq、weightUqQr、weightUk、weightDkvKr的量化模式。</td>
@@ -714,7 +704,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
         <td>queryNormOutOptional</td>
         <td>输出</td>
         <td>公式中tokenX做rmsNorm后的输出tensor（对应<i>c<sup><i>Q</i></sup></i>）。</td>
-        <td>queryNormFlag=true时输出</td>
+        <td>可选输出，不需要时传入nullptr。</td>
         <td>BFLOAT16、INT8、FLOAT8_E4M3FN、HIFLOAT8</td>
         <td>ND</td>
         <td>
@@ -729,7 +719,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
         <td>dequantScaleQNormOutOptional</td>
         <td>输出</td>
         <td>queryNormOutOptional的反量化参数。</td>
-        <td>queryNormFlag=true，weightQuantMode=1/2/3/4/5时输出，weightQuantMode=0时为nullptr</td>
+        <td>queryNormOutOptional非空且weightQuantMode不为0时必须传入，其他场景必须为nullptr。</td>
         <td>FLOAT、FLOAT8_E8M0</td>
         <td>ND</td>
         <td>

@@ -131,7 +131,7 @@ cann_ops_transformer.lightning_indexer(
 | seqused_q | Tensor | Optional | Actual used length of q in different batches. Data format: ND. | int32 | (b,) |
 | seqused_k | Tensor | Optional | Actual used length of k in different batches. Data format: ND. | int32 | (b,) |
 | cmp_residual_k | Tensor | Optional | Remainder of dividing the number of k tokens before compression by cmp_ratio. Required when mask_mode is 3 and cmp_ratio is not 1. Data format: ND. | int32 | (b,) |
-| block_table | Tensor | Optional | Block mapping table used for KV storage in PageAttention. Empty tensors are not supported. Data format: ND. | int32 | (b, k_s_max/block_size) |
+| block_table | Tensor | Optional | Block mapping table used for KV storage in PagedAttention. Empty tensors are not supported. Data format: ND. | int32 | (b, k_s_max/block_size) |
 | output_idx_offset | Tensor | Optional | Offset to add to the output indices of the topK result. The value must be greater than or equal to 0, and the topK index plus the offset must not exceed the maximum value of int32. Data format: ND. | int32 | (b,q_s,k_n) when layout_q is BSND; (q_t,k_n) when layout_q is TND |
 | metadata | Tensor | Optional | Core splitting information obtained from lightning_indexer_metadata, including the number of used cores, block size, and the start point of the data processed by each core. Empty tensors are not supported. Data format: ND. | int32 | (1024,) |
 | max_seqlen_q | int | Optional | Maximum sequence length of q. -1 indicates any possible length. Default value: -1. | int64 | - |

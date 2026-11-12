@@ -341,7 +341,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 |    T1    |             输入q所有batch序列长度的累加和             |
 |    T2    |             输入kv所有batch序列长度的累加和             |
 |     D     |          `layout_sparse_pattern=1`固定128；`layout_sparse_pattern=0`时`1<=D<=256`          |
-|     J     | $\lceil max\_kv\_seqlen / blockShapeY \rceil$，KV块数 |
+|     J     | $\lceil max\_seqlen\_kv / blockShapeY \rceil$，KV块数 |
 |   maxS1   | `layout_sparse_pattern=1`时为`sparse_block_idx`最后一维容量，须≥`max_seqlen_q` |
 
 ### 参数组约束

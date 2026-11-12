@@ -486,7 +486,7 @@ aclnnStatus aclnnDenseLightningIndexerGradKLLoss(
   - 确定性计算：
     aclnnDenseLightningIndexerGradKLLoss默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
   - 入参为空的场景处理：
-    - query或key或query_index或key_index或weight为空Tensor：当前不支持，会报错。
+    - query或key或queryIndex或keyIndex或weights为空Tensor：当前不支持，会报错。
 
   <table style="undefined;table-layout: fixed; width: 942px"><colgroup>
       <col style="width: 100px">

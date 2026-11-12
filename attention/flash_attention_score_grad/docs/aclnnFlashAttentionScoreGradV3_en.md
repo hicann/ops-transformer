@@ -54,15 +54,15 @@ $$
 The backward propagation formula for attention is:
 
 $$
-V=P^TdY
+dV=P^TdY
 $$
 
 $$
-Q=\frac{((dS)*K)}{\sqrt{d}}
+dQ=\frac{((dS)*K)}{\sqrt{d}}
 $$
 
 $$
-K=\frac{((dS)^T*Q)}{\sqrt{d}}
+dK=\frac{((dS)^T*Q)}{\sqrt{d}}
 $$
 
 The computation logic after adding **sink** is as follows, mainly modifying the relevant softmax_max and softmax_sum logic computation parts.

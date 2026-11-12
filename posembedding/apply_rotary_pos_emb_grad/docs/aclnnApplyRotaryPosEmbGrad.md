@@ -169,7 +169,7 @@ aclnnStatus aclnnApplyRotaryPosEmbGrad(
     <tr>
       <td>queryOptional</td>
       <td>可选输入</td>
-      <td>正向计算输入query，空指针时不计算gradCosOutOptional和gradSinOutOptional。</td>
+      <td>正向计算输入query，空指针时不计算gradCosOut和gradSinOut。</td>
       <td>与gradQueryEmbed的数据类型和维度一致，必须与keyOptional同时传入或同时不传入。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
@@ -179,7 +179,7 @@ aclnnStatus aclnnApplyRotaryPosEmbGrad(
     <tr>
       <td>keyOptional</td>
       <td>可选输入</td>
-      <td>正向计算输入key，空指针时不计算gradCosOutOptional和gradSinOutOptional。</td>
+      <td>正向计算输入key，空指针时不计算gradCosOut和gradSinOut。</td>
       <td>与gradQueryEmbed的数据类型和维度一致，必须与queryOptional同时传入或同时不传入。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
@@ -357,7 +357,7 @@ aclnnStatus aclnnApplyRotaryPosEmbGrad(
   - `gradQueryEmbed`、`gradQueryOut`的shape必须相同，`gradKeyEmbed`、`gradKeyOut`的shape必须相同。
   - 对于任意`layout`，`gradQueryEmbed`和`gradKeyEmbed`除N维度外其它维度必须相同。
   - `cos`、`sin`的N维度必须等于1；`layout`为1（BSND）或2（SBND）时，`cos`、`sin`的B维度可以等于1，也可以和`gradQueryEmbed`的B维度一致；`layout`为4（TND）时，`cos`、`sin`的T维度必须和`gradQueryEmbed`的T维度一致；除N（及BSND、SBND布局下可选广播的B）维度外，其余维度需与`gradQueryEmbed`一致。
-  - `cos`、`sin`、`gradCosOutOptional`、`gradSinOutOptional`的shape必须相同。
+  - `cos`、`sin`、`gradCosOut`、`gradSinOut`的shape必须相同。
   - `query`维度需与`gradQueryEmbed`一致，`key`维度需与`gradKeyEmbed`一致，且`query`和`key`必须同时传入或同时不传入。
   - `rotaryModeOptional`仅支持"half"。
   - `layout`仅支持{1, 2, 4}，对应{BSND, SBND, TND}。

@@ -312,7 +312,7 @@ In data constraints, common fields are defined as follows:
 |    T1    |             Cumulative sum of sequence lengths of all batches in input q.             |
 |    T2    |             Cumulative sum of sequence lengths of all batches in input kv.             |
 |     D     |                  headdim, currently fixed to 128.                  |
-|     J     | $\lceil max\_kv\_seqlen / blockShapeY \rceil$, number of KV blocks. |
+|     J     | $\lceil max\_seqlen\_kv / blockShapeY \rceil$, number of KV blocks. |
 |   maxS1   | Capacity of the last dimension of `sparse_block_idx`, must be ≥ `max_seqlen_q`. |
 
 ### Parameter Group Constraints

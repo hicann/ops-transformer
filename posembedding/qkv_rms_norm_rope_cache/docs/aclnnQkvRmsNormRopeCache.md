@@ -488,7 +488,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
 
 - 输入shape限制：
     * B<sub>qkv</sub>为输入qkv的batch_size，S<sub>qkv</sub>为输入qkv的sequence length，大小由qkvSize决定。
-    * N<sub>qkv</sub>为输入qkv的head number。D<sub>qkv</sub>为输入qkv的head dim，目前仅支持128。D<sub>q</sub>、D<sub>k</sub>和D<sub>k</sub>分别为q、k、v的head dim，要求D<sub>qkv</sub> = D<sub>q</sub> = D<sub>k</sub> = D<sub>v</sub>，D<sub>qkv</sub>需要满足（D<sub>qkv</sub>*qkv数据类型占字节数）可以被32整除。
+    * N<sub>qkv</sub>为输入qkv的head number。D<sub>qkv</sub>为输入qkv的head dim，目前仅支持128。D<sub>q</sub>、D<sub>k</sub>和D<sub>v</sub>分别为q、k、v的head dim，要求D<sub>qkv</sub> = D<sub>q</sub> = D<sub>k</sub> = D<sub>v</sub>，D<sub>qkv</sub>需要满足（D<sub>qkv</sub>*qkv数据类型占字节数）可以被32整除。
     * 根据rope规则，D<sub>k</sub>和D<sub>q</sub>为偶数。若cacheMode为PA_NZ场景下，D<sub>k</sub>、D<sub>q</sub>需32 Byte对齐；BlockSize需32 Byte对齐。
     * 关于上述32B对齐的情形，对齐值由cache的数据类型决定。以BlockSize为例，若cache的数据类型为int8，则需要满足BlockSize % 32 = 0；若cache的数据类型为float16，则需要满足BlockSize % 16 = 0；若kCache与vCache参数的dtype不一致，BlockSize需同时满足BlockSize % 32 = 0和BlockSize % 16 = 0。
     * BlockNum为写入cache的内存块数，大小由用户输入场景决定，要求BlockNum >= Ceil(S<sub>qkv</sub> / BlockSize) * B<sub>qkv</sub>。

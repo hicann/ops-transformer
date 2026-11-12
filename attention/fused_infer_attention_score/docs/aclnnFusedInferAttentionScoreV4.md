@@ -1669,7 +1669,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             <td>shape为五维时，各维度约束为：[blockNum, N, D/16, blockSize, 16]</td>
         </tr>
         <tr>
-            <td>attention</td>
+            <td>attentionOut</td>
             <td>dtype与query一致</td>
             <td>-</td>
         </tr>
@@ -1706,7 +1706,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             <td>shape为五维时，各维度约束为[blockNum, N, D/32, blockSize, 32]</td>
         </tr>
         <tr>
-            <td>attention</td>
+            <td>attentionOut</td>
             <td>BFLOAT16</td>
             <td>-</td>
         </tr>
@@ -1727,12 +1727,12 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         </tr>
         <tr>
             <td>keyAntiquantScaleOptional</td>
-            <td>FLOAT32;需与dequantScaleQueryOptional, valueAntiquantScaleOptional同时存在，不支持传入keyAntiquantOffsetOptional和valueAntiquantOffsetOptional;仅支持pertensor模式</td>
+            <td>FLOAT32;需与dequantScaleQueryOptional, valueAntiquantScaleOptional同时存在，不支持传入keyAntiquantOffsetOptional和valueAntiquantOffsetOptional;仅支持per-tensor模式</td>
             <td>shape为(1)</td>
         </tr>
         <tr>
             <td>valueAntiquantScaleOptional</td>
-            <td>FLOAT32;需与dequantScaleQueryOptional, keyAntiquantScaleOptional同时存在，不支持传入keyAntiquantOffsetOptional和valueAntiquantOffsetOptional;仅支持pertensor模式</td>
+            <td>FLOAT32;需与dequantScaleQueryOptional, keyAntiquantScaleOptional同时存在，不支持传入keyAntiquantOffsetOptional和valueAntiquantOffsetOptional;仅支持per-tensor模式</td>
             <td>shape为(1)</td>
         </tr>
         <tr>

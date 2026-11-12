@@ -526,7 +526,7 @@ The following sample code is for reference only. For details about the compilati
       int64_t batch = 8;
       int64_t bsdp = 1;
       int64_t dtype = 0;
-      float shareInputWeight = 1.0;
+      float sharedInputWeight = 1.0;
       int64_t sharedInputOffset = 0;
       bool transposeX = false;
       bool transposeW = false;
@@ -646,7 +646,7 @@ The following sample code is for reference only. For details about the compilati
 
       // Call the first-phase API of aclnnGroupedMatmulFinalizeRoutingV2
       workspaceSize = 0;
-      ret = aclnnGroupedMatmulFinalizeRoutingV2GetWorkspaceSize(x, w, scale, bias, offset, antiquantScaleOptional, antiquantOffsetOptional, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, shareInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, out, &workspaceSize, &executor);
+      ret = aclnnGroupedMatmulFinalizeRoutingV2GetWorkspaceSize(x, w, scale, bias, offset, antiquantScaleOptional, antiquantOffsetOptional, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, sharedInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, out, &workspaceSize, &executor);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingV2GetWorkspaceSize failed. ERROR: %d\n", ret);
                 return ret);
       // Allocate device memory based on the workspaceSize computed by the first-phase API

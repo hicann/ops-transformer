@@ -330,7 +330,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     <td>sharedExpertRankNum</td>
     <td>输入</td>
     <td>共享专家卡数量。（一个共享专家可复制部署到多个卡上）</td>
-    <td>数据类型需与expandX保持一致。</td>
+    <td>-</td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>

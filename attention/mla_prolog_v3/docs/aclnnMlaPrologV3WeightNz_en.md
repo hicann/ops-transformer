@@ -18,15 +18,15 @@
 
 - **Function updates**: (differences from aclnnMlaPrologV2weightNz)
     - Added scale correction factors for Query and Key, corresponding to qcQrScale ($\alpha_q$) and kcScale ($\alpha_{kv}$), respectively.
-    - Added optional input parameters (for example, actualSeqLenOptional, kNopeClipAlphaOptional, queryNormFlag, weightQuantMode, kvCacheQuantMode, queryQuantMode, ckvkrRepoMode, quantScaleRepoMode, tileSize, queryNormOutOptional, and dequantScaleQNormOptional). Changed cache_mode from mandatory to optional.
+    - Added parameters such as actualSeqLenOptional, kNopeClipAlphaOptional, weightQuantMode, kvCacheQuantMode, queryQuantMode, ckvkrRepoMode, quantScaleRepoMode, and tileSize, as well as optional outputs queryNormOutOptional and dequantScaleQNormOutOptional.
     - Adjusted the name and position of the cacheIndex parameter, corresponding to the current cacheIndexOptional.
 - **Description**: Inference use case. Computes the preprocessing of Multi-Head Latent Attention. The main computation process consists of seven branches:
     - First, the input $x$ is multiplied by $W^{DQ}$, downsampled, and normalized with RmsNorm. The result is then split into two branches. In the first branch, it is multiplied by $W^{UQ}$ and $W^{UK}$, upsampled twice, and then multiplied by the Query scale correction factor $\alpha_q$ to obtain $q^N$. In the second branch, it is multiplied by $W^{QR}$ and then goes through rotary position encoding (ROPE) to obtain $q^R$.
     - The third branch: the input $x$ is multiplied by $W^{DKV}$, downsampled, and normalized with RmsNorm. The result is then multiplied by the Key scale correction factor $\alpha_{kv}$ and written into the Cache to obtain $k^C$.
     - The fourth path: the input $x$ is multiplied by $W^{KR}$, then undergoes rotary position encoding and is passed into another Cache to obtain $k^R$;
     - The fifth path: the quantization parameter obtained after the output $q^N$ undergoes DynamicQuant.
-    - The sixth branch: when queryNormFlag=true, the input $x$ is multiplied by $W^{DQ}$, downsampled, and normalized with RmsNorm to obtain the compressed result $c^Q$, which is output as queryNormOutOptional.
-    - The seventh branch: when queryNormFlag=true and in the quantization scenario (weightQuantMode≠0), DynamicQuant is performed on $c^Q$ to obtain the quantized queryNormOutOptional and the corresponding quantization parameter dequantScaleQNormOutOptional.
+    - The sixth branch: when queryNormOutOptional is non-null and weightQuantMode is 0, the input $x$ is multiplied by $W^{DQ}$, downsampled, and normalized with RmsNorm to obtain the compressed result $c^Q$, which is output as queryNormOutOptional.
+    - The seventh branch: when queryNormOutOptional is non-null and in the quantization scenario (weightQuantMode≠0), DynamicQuant is performed on $c^Q$ to obtain the quantized queryNormOutOptional and the corresponding quantization parameter dequantScaleQNormOutOptional.
     - The weight parameters WeightDq, WeightUqQr, and WeightDkvKr must be passed in NZ format.
 
 - **Formula**:
@@ -89,7 +89,7 @@
     q^{N} = {\mathrm{round}(q^{N} / \mathrm{dequantScaleQNope})}
     $$
 
-    Query Norm and Dequant Scale Query Norm Formula (output when queryNormFlag=true)
+    Query Norm and Dequant Scale Query Norm Formula (output when queryNormOutOptional is non-null)
 
     Non-quantized field (weightQuantMode=0):
 
@@ -542,16 +542,6 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
         <td>-</td>
       </tr>
       <tr>
-        <td>queryNormFlag</td>
-        <td>Input</td>
-        <td>Indicates whether to output queryNormOutOptional and dequantScaleQNormOutOptional.</td>
-        <td>false indicates no output, true indicates output, default value is false</td>
-        <td>BOOL</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
         <td>weightQuantMode</td>
         <td>Input</td>
         <td>Indicates the quantization mode of weightDq, weightUqQr, weightUk, and weightDkvKr.</td>
@@ -686,7 +676,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
         <td>queryNormOutOptional</td>
         <td>Output</td>
         <td>Output tensor of tokenX after rmsNorm in the formula (corresponding to <i>c<sup><i>Q</i></sup></i>).</td>
-        <td>Output when queryNormFlag=true</td>
+        <td>Optional output. Pass nullptr when this output is not needed.</td>
         <td>BFLOAT16, INT8, FLOAT8_E4M3FN, HIFLOAT8</td>
         <td>ND</td>
         <td>          <ul>
@@ -700,7 +690,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
         <td>dequantScaleQNormOutOptional</td>
         <td>Output</td>
         <td>Dequantization parameter of queryNormOutOptional.</td>
-        <td>Output when queryNormFlag=true and weightQuantMode=1/2/3/4/5; nullptr when weightQuantMode=0</td>
+        <td>Required when queryNormOutOptional is non-null and weightQuantMode is nonzero; must be nullptr otherwise.</td>
         <td>FLOAT, FLOAT8_E8M0</td>
         <td>ND</td>
         <td>          <ul>

@@ -380,7 +380,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - x1、x2、scaleOptional、pertokenScaleOptional、groupListOptional、logitOptional、rowIndexOptional是必选参数，biasOptional，sharedInputOptional是可选参数。目前暂不支持offsetOptional参数。
     - 当groupListType为0时，groupListOptional须为非负单调非递减数列（累积和），且最后一个值不大于x1中tensor的第一维；当groupListType为1时，groupListOptional须为非负数组（各组大小），且数值的总和不大于x1中tensor的第一维。
     - out的第一维batch、sharedInputOffset必须大于等于0，且小于等于m。
-    - 当sharedInputOptional不为空时，其第一维长度为shareInputLen。sharedInputOffset、shareInputLen以及两者之和均需小于等于out的第一维batch。
+    - 当sharedInputOptional不为空时，其第一维长度为sharedInputLen。sharedInputOffset、sharedInputLen以及两者之和均需小于等于out的第一维batch。
     - x1支持M为0，x2支持N为0；其他空Tensor场景不支持。
 
   <!-- end id10 -->
@@ -642,7 +642,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       int64_t batch = 1;
       int64_t bsdp = 1;
       int64_t dtype = 0;
-      float shareInputWeight = 1.0;
+      float sharedInputWeight = 1.0;
       int64_t sharedInputOffset = 0;
       bool transposeX = false;
       bool transposeW = false;
@@ -763,7 +763,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 
       // 调用aclnnGroupedMatmulFinalizeRoutingV3第一段接口
       workspaceSize = 0;
-      ret = aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(x, w, scale, bias, offset, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, shareInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, tuningConfig, out, &workspaceSize, &executor);
+      ret = aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(x, w, scale, bias, offset, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, sharedInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, tuningConfig, out, &workspaceSize, &executor);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
       // 根据第一段接口计算出的workspaceSize申请device内存
@@ -952,7 +952,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       int64_t batch = 8;
       int64_t bsdp = 1;
       int64_t dtype = 0;
-      float shareInputWeight = 1.0;
+      float sharedInputWeight = 1.0;
       int64_t sharedInputOffset = 0;
       bool transposeX = false;
       bool transposeW = false;
@@ -1080,7 +1080,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       void *workspaceAddr = nullptr;
 
       // 调用aclnnGroupedMatmulFinalizeRoutingV3第一段接口
-      ret = aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(x, w, scale, bias, nullptr, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, shareInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, nullptr, out, &workspaceSize, &executor);
+      ret = aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(x, w, scale, bias, nullptr, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, sharedInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, nullptr, out, &workspaceSize, &executor);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize failed. ERROR: %d\n", ret);
                 return ret);
       // 根据第一段接口计算出的workspaceSize申请device内存

@@ -29,7 +29,7 @@
 
 ## 功能说明
 
-- ​算子功能​：aclnnBlockSparseAttention稀疏注意力反向计算，支持灵活的块级稀疏模式，通过BlockSparseMask指定每个Q块选择的KV块，实现高效的稀疏注意力计算。
+- ​算子功能​：计算块稀疏注意力的反向传播，支持灵活的块级稀疏模式，通过BlockSparseMask指定每个Q块选择的KV块。
 - ​计算公式​：
 
   稀疏块大小为 $blockShapeX×blockShapeY$，其中blockShapeX表示Q方向的稀疏粒度，blockShapeY表示KV方向的稀疏粒度。两个方向的粒度相互独立，可以配置为不同值。

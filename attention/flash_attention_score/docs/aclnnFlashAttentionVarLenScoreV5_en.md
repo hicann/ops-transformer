@@ -25,10 +25,10 @@
 
 ## Function
 
-- Description: In training scenarios, the FlashAttention algorithm is used to implement self-attention computation. It is adapted to competitor gptoss models and supports the sink function. **The difference from the [aclnnFlashAttentionVarLenScoreV3](./aclnnFlashAttentionVarLenScoreV3_en.md) API is: the `sinkInOptional` optional input is added, while the `softmaxOutLayout` optional input from [aclnnFlashAttentionVarLenScoreV4](./aclnnFlashAttentionVarLenScoreV4_en.md) is retained.**
+- Description: In training scenarios, the FlashAttention algorithm is used to implement self-attention computation. It supports the sink function for gpt-oss models. **The difference from the [aclnnFlashAttentionVarLenScoreV3](./aclnnFlashAttentionVarLenScoreV3_en.md) API is: the `sinkOptional` optional input is added, while the `softmaxOutLayout` optional input from [aclnnFlashAttentionVarLenScoreV4](./aclnnFlashAttentionVarLenScoreV4_en.md) is retained.**
 
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR&950DT products</term>: The sinkInOptional and softmaxOutLayout parameters are not supported.
+  - <term>Ascend 950PR&950DT products</term>: The sinkOptional and softmaxOutLayout parameters are not supported.
 
   <!-- end id7 -->
 

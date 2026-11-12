@@ -317,7 +317,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 |                      |      win_left       | ATTR(OPTIONAL) |   int   |
 |                      |     win_right      | ATTR(OPTIONAL) |   int   |
 |                      |      attn_mask      | INPUT(OPTIONAL) |   Tensor   |
-| SeqLens参数组  |   cu_seqlens_q   | INPUT(OPTIONAL) |  Tensor  |
+| SeqLengths参数组  |   cu_seqlens_q   | INPUT(OPTIONAL) |  Tensor  |
 |                      |  cu_seqlens_kv  | INPUT(OPTIONAL) |  Tensor  |
 |                      |    seqused_q    | INPUT(OPTIONAL) |  Tensor  |
 |                      |   seqused_kv   | INPUT(OPTIONAL) |  Tensor  |

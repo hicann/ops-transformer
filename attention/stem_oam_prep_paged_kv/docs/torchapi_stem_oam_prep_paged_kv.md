@@ -29,7 +29,7 @@
 
 - **输入输出支持以下数据场景**：
 
-    ```
+    ```text
     k_cache: [total_blocks, kv_block_size, H_kv, 128] 或 [total_blocks, H_kv, kv_block_size, 128]
     v_cache: [total_blocks, kv_block_size, H_kv, 128] 或 [total_blocks, H_kv, kv_block_size, 128]
     kv_indices: [batch, max_kv_blocks]

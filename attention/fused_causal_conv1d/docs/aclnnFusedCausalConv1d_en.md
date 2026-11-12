@@ -359,7 +359,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     <tr>
       <td>convStates(aclTensor*)</td>
       <td>Input/Output</td>
-      <td>cacheState in the Formula. It represents the cache state tensor, stores historical token data of each sequence, and is updated in place after each sequence is computed.</td>
+      <td>cachedState in the formula. It represents the cache state tensor, stores historical token data of each sequence, and is updated in place after each sequence is computed.</td>
       <td><ul><li>Empty tensors are not supported.</li><li>The shape is [..., stateLen, dim], and the size of dimension 0 is not fixed.</li><li>stateLen == K-1+m, where m=0 in the prefill use case and m=[0,7] in the decode and PD mixed deployment use cases.</li><li>m indicates the count of speculative tokens, which maps to the value of the numAcceptedTokens parameter.</li><li>Non-contiguous dim0 and dim1 with stride greater than or equal to 1 are supported.</li></ul></td>
       <td>Data type consistent with that of x</td>
       <td>ND</td>

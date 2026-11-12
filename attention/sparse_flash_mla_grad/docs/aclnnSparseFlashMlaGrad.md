@@ -168,7 +168,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>输入</td>
             <td>attention结构的输入Q。</td>
             <td>
-            query、oriKvOptional、cmpKvOptional、dOut、outOptional、lse、oriSparseIndicesOptional、cmpSparseIndicesOptional的Shape维度保持一致。
+            query、oriKvOptional、cmpKvOptional、dOut、out、lse、oriSparseIndicesOptional、cmpSparseIndicesOptional的Shape维度保持一致。
             </td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>

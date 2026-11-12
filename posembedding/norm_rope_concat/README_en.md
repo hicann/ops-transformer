@@ -21,20 +21,22 @@ English | [简体中文](./README.md)
     - Rotary position encoding (Rope) supports the Interleave and Half types.
     - Feature concatenation (Concat) supports concatenation along the sequence dimension, and the concatenation order matters.
 
-- Computation formula (taking Query (video) and EncoderQuery (text) as an example):
+- Computation formula (taking Query (video) and EncoderQuery (text) as an example, with `concatOrder=0`):
 
 	  $$
     hiddenState_q = \text{Norm}(query, normQueryWeight, normQueryBias, eps) \\
-    hiddenState_{eq} = \text{Norm}(encoderQuery, normEncoderQueryWeight, normEncoderQueryBias, eps) \\
+    hiddenState_{eq} = \text{Norm}(encoderQuery, normAddedQueryWeight, normAddedQueryBias, eps) \\
     concatenatedHiddenState = \text{Concat}(hiddenState_q, hiddenState_{eq}) \\
     transposedHiddenState = \text{Transpose}(concatenatedHiddenState, (0, 2, 1, 3)) \\
-    hiddenState = \text{RoPE}(concatenatedHiddenState, ropeSin, ropeCos)
+    hiddenState = \text{RoPE}(transposedHiddenState, ropeSin, ropeCos)
     $$
+
+    When `ropeType` is `NONE`, RoPE does not transform the input. Otherwise, RoPE applies only to the first `seqRope` positions of the concatenated sequence. The remaining positions are unchanged.
 
 - Notes:
 
-    1. The input and output layouts are as follows: the shape of the input `query` is `(B, S, N, D)`, and the shape of the output `hiddenState` is `(B, N, S, D)`, where
-    B is batch, S is sequenceLen, N is headNum, and D is headDim.
+    1. The input `query` has shape `(B, S_q, N, D)`, `encoderQuery` has shape `(B, S_eq, N, D)`, and the output `hiddenState` has shape `(B, N, S_q + S_eq, D)`, where
+    `B` is the batch size, `S_q` and `S_eq` are the sequence lengths of `query` and `encoderQuery`, respectively, `N` is the number of attention heads, and `D` is the head dimension.
     2. Norm has five modes (`normType`): `NONE(0), LAYER_NORM(1), LAYER_NORM_AFFINE(2), RMS_NORM(3), RMS_NORM_AFFINE(4)`, where:
         When `normType = NONE`:
 
@@ -45,8 +47,8 @@ English | [简体中文](./README.md)
         When `normType = LAYER_NORM`
 
         $$
-        queryMean_{b,s,n} = \frac{1}{D}\sum_{i=0}^{D-1}query_{b,s,n} \\
-        queryVar_{b,s,n} = \frac{1}{D}\sum_{i=0}^{D-1}(query-queryMean_{b,s,n})^2 \\
+        queryMean_{b,s,n} = \frac{1}{D}\sum_{i=0}^{D-1}query_{b,s,n,i} \\
+        queryVar_{b,s,n} = \frac{1}{D}\sum_{i=0}^{D-1}(query_{b,s,n,i}-queryMean_{b,s,n})^2 \\
         queryRstd_{b,s,n}=  \frac{1}{\sqrt{queryVar_{b,s,n}+\epsilon}} \\
         hiddenState_q = (query-queryMean)*queryRstd$$
         When `normType = LAYER_NORM_AFFINE`, based on the preceding formulas:
@@ -58,7 +60,7 @@ English | [简体中文](./README.md)
         When `normType = RMS_NORM`:
 
         $$
-        queryMs = \frac{1}{D}\sum_{i=0}^{D-1}(query_{b,s,n})^2 \\
+        queryMs = \frac{1}{D}\sum_{i=0}^{D-1}(query_{b,s,n,i})^2 \\
         queryRms = \frac{1}{\sqrt{queryMs+\epsilon}} \\
         hiddenState_q = query * queryRms
         $$

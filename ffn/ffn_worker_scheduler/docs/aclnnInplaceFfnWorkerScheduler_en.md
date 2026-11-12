@@ -31,7 +31,7 @@
 
     1. Receive the data sent from the AttentionToFFN operator. The data is stored in the memory layout of the ScheduleContext structure. For details, see [Example](#example). The structure contains the CommonArea, ControlArea, AttentionArea, and FfnArea domains. This API involves CommonArea (stores configuration information such as session_num, micro_batch_num, micro_batch_size, and selected_expert_num), ControlArea (used by the upper layer to control whether the process exits), and the FfnArea domain (manages the input and output buffers required for computation of this operator, where the token_info_buf field stores the input information of this operator).
 
-    2. Scans the information stored in token_info_buf. When the communication data is ready, this operator starts data reorganization. The reorganization is shown in the following figure: layer id, session id, micro batch id, and expert ids are written to the device memory of layer_id_buf, session_id_buf, micro_batch_id_buf, and expert_ids_buf, respectively.
+    2. Scans the information stored in token_info_buf. When the communication data is ready, this operator starts data reorganization. The reorganization is shown in the following figure: layer id, session id, micro batch id, and expert ids are written to the device memory of layer_ids_buf, session_ids_buf, micro_batch_ids_buf, and expert_ids_buf, respectively.
 
       ```mermaid
       graph TB

@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：mhc_post基于一系列计算对MHC（Manifold-Constrained Hyper-Connection）架构中上一层输出$h_{t}^{out}$进行Post Mapping，对上一层的输入$x_j$进行Res Mapping，然后对二者进行残差连接，得到下一层的输入$x_{l+1}$。该算子实现前述过程的反向功能。
+- 接口功能：mhc_post基于一系列计算对MHC（Manifold-Constrained Hyper-Connection）架构中上一层输出$h_{t}^{out}$进行Post Mapping，对上一层的输入$x_l$进行Res Mapping，然后对二者进行残差连接，得到下一层的输入$x_{l+1}$。该算子实现前述过程的反向功能。
 
 - 计算公式：
 
@@ -208,7 +208,7 @@ aclnnStatus aclnnMhcPostBackward(
     <tr>
       <td>gradHPost</td>
       <td>输出</td>
-      <td>网络中MHC层的输入数据h_post的梯度</td>
+      <td>网络中MHC层的输入数据hPost的梯度</td>
       <td>-</td>
       <td>数据类型与hPost一致</td>
       <td>ND</td>

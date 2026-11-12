@@ -39,7 +39,7 @@ $$
 \end{aligned}
 $$
 
-第$i$次迭代（$i = 1, 2, \dots, \mathbf({num\_iters}-1)$）：
+第$i$次迭代（$i = 1, 2, \dots, \mathbf{num\_iters}-1$）：
 
 $$
 \begin{aligned}

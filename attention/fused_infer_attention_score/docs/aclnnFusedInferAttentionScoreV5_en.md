@@ -450,7 +450,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <li>When used, the shape must keep consistent with valueAntiquantScaleOptional.</li>
             <li>Pass in nullptr when this function is not used.</li>
             <li>Supports non-contiguous tensors in partial scenarios. For details, see <a href="#constraints">Constraints</a>.</li>
-            <li>Supports per-tensor, per-channel, per-token, per-tensor stacked with per-head, per-token stacked with per-head, per-token stacked with page attention mode for scale/offset management, and per-token stacked with per-head and page attention mode for scale/offset management.</li>
+            <li>Supports per-tensor, per-channel, per-token, per-tensor stacked with per-head, per-token stacked with per-head, per-token stacked with PagedAttention mode for scale/offset management, and per-token stacked with per-head and PagedAttention mode for scale/offset management.</li>
             <li>For comprehensive constraints, see <a href="#constraints">Constraints</a>.</li>
         </ul>
         </td>
@@ -740,7 +740,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
     <tr>
         <td>blockSize</td>
         <td>Input</td>
-        <td>Maximum number of tokens in each block of KV storage in PageAttention.</td>
+        <td>Maximum number of tokens in each block of KV storage in PagedAttention.</td>
         <td>Processed as 0 if not passed in.</td>
         <td>INT64</td>
         <td>-</td>

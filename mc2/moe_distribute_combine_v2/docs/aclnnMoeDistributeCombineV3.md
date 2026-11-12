@@ -27,8 +27,8 @@
 - 计算公式：
 
     $$
-    ataOut = AllToAllV(expandX)\\
-    xOut = Sum(expertScales * ataOut) + sharedExpertX
+    dataOut = AllToAllV(expandX)\\
+    xOut = Sum(expertScales * dataOut) + sharedExpertX
     $$
 
     `expertScales`为空Tensor时，路由专家结果直接求和；若传入`sharedExpertXOptional`，仍直接累加，不乘路由权重。

@@ -332,7 +332,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     <td>sharedExpertRankNum</td>
     <td>Input</td>
     <td>Number of devices for shared experts. (One shared expert can be copied and deployed to multiple devices)</td>
-    <td>The data type must be the same as that of expandX.</td>
+    <td>-</td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>

@@ -135,7 +135,7 @@ cann_ops_transformer.lightning_indexer(
 | seqused_q | Tensor | 可选 | 不同batch中q的真实使用长度。数据格式为ND。 shape为(b,)。 | int32 | 1 |
 | seqused_k | Tensor | 可选 | 不同batch中k的真实使用长度。数据格式为ND。 shape为(b,)。 | int32 | 1 |
 | cmp_residual_k | Tensor | 可选 | 表示k压缩前token数量除以cmp_ratio的余数。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。 shape为(b,)。 | int32 | 1 |
-| block_table | Tensor | 可选 | 表示PageAttention中KV存储使用的block映射表。不支持空tensor。数据格式为ND。 shape为(b, k_s_max/block_size)。 | int32 | 2 |
+| block_table | Tensor | 可选 | 表示PagedAttention中KV存储使用的block映射表。不支持空tensor。数据格式为ND。 shape为(b, k_s_max/block_size)。 | int32 | 2 |
 | output_idx_offset | Tensor | 可选 | 表示topK结果输出索引所需要加上的偏移。值必须大于等于0，加上偏移后topK index不能超过int32最大值。数据格式为ND。 支持的shape为：layout_q为BSND时shape为(b,q_s,k_n)；layout_q为TND时shape为(q_t,k_n)。 | int32 | 2-3 |
 | metadata | Tensor | 可选 | 由lightning_indexer_metadata得到的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。不支持空tensor。数据格式为ND。 shape为(2048,)。 | int32 | 1 |
 | max_seqlen_q | int | 可选 | q的最大序列长度。-1表示任意可能长度，默认值为-1。 | int64 | - |

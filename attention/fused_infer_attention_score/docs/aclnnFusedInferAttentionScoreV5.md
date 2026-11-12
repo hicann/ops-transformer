@@ -466,7 +466,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <li>使用时，shape必须与valueAntiquantScaleOptional保持一致。</li>
             <li>不使用该功能时可传入nullptr。</li>
             <li>部分场景支持非连续tensor，具体见<a href="#约束说明">约束说明</a>。</li>
-            <li>支持per-tensor，per-channel，per-token，per-tensor叠加per-head，per-token叠加per-head，per-token叠加使用page attention模式管理scale/offset、per-token叠加per head并使用page attention模式管理scale/offset。</li>
+            <li>支持per-tensor、per-channel、per-token、per-tensor叠加per-head、per-token叠加per-head、per-token叠加使用PagedAttention模式管理scale/offset、per-token叠加per-head并使用PagedAttention模式管理scale/offset。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
         </td>
@@ -775,7 +775,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
     <tr>
         <td>blockSize</td>
         <td>输入</td>
-        <td>PageAttention中KV存储每个block中最大的token个数。</td>
+        <td>PagedAttention中KV存储每个block中最大的token个数。</td>
         <td>不传时按照0处理。</td>
         <td>INT64</td>
         <td>-</td>

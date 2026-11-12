@@ -29,8 +29,8 @@
 - Formula:
 
     $$
-    ataOut = AllToAllV(expandX)\\
-    xOut = Sum(expertScales * ataOut + expertScales * sharedExpertX)
+    dataOut = AllToAllV(expandX)\\
+    xOut = Sum(expertScales * dataOut) + sharedExpertX
     $$
 
     When `expertScales` is an empty tensor, weight multiplication is skipped and the expert outputs are summed directly.

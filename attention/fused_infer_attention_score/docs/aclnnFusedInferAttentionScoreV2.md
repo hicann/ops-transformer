@@ -1190,7 +1190,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV2(
       - keyAntiquantMode和valueAntiquantMode需要保持一致
       - keyAntiquantScale和valueAntiquantScale要么都为空，要么都不为空；keyAntiquantOffset和valueAntiquantOffset要么都为空，要么都不为空
       - KeyAntiquantScale和valueAntiquantScale都不为空时，其shape需要保持一致；keyAntiquantOffset和valueAntiquantOffset都不为空时，其shape需要保持一致
-      - 仅支持per-token和per-channel模式，per-token模式下要求两个参数的shape均为\(B, S\)，数据类型固定为FLOAT32；per-channel模式下要求两个参数的shape为(N, D\)，(N, 1, D\)或(H\)，数据类型固定为BF16。
+      - 仅支持per-token和per-channel模式，per-token模式下要求两个参数的shape均为\(B, S\)，数据类型固定为FLOAT32；per-channel模式下要求两个参数的shape为\(N, D\)，\(N, 1, D\)或\(H\)，数据类型固定为BF16。
       - 当伪量化参数和KV分离量化参数同时传入时，以KV分离量化参数为准。
       - keyAntiquantScale与valueAntiquantScale非空场景，要求query的s小于等于16。
       - keyAntiquantScale与valueAntiquantScale非空场景，要求query的dtype为BFLOAT16,key、value的dtype为INT8，输出的dtype为BFLOAT16。

@@ -71,7 +71,7 @@
 Each operator uses a [two-phase API](../../../docs/en/context/two_phase_api.md). You must first call the "aclnnMoeFusedTopkGetWorkspaceSize" API to obtain the workspace size required for computation and the executor that contains the operator computation process, and then call the "aclnnMoeFusedTopk" API to perform the computation.
 
 ```Cpp
-aclnnMoeFusedTopkGetWorkspaceSize(
+aclnnStatus aclnnMoeFusedTopkGetWorkspaceSize(
   const aclTensor* x,
   const aclTensor* addNum,
   const aclTensor* mappingNum,

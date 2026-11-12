@@ -25,7 +25,7 @@
 
 ## Function
 
-- Description: MhcPreBackward is the backward operator of MhcPre. The MhcPre operator obtains the $H^{res}$ and $H^{post}$ projection matrices and the Atten or MLP layer input matrix $h^{in}$ in the mHC (Manifold-Constrained Hyper-Connections) architecture through a series of computations.
+- Description: MhcPreBackward is the backward operator of MhcPre. The MhcPre operator obtains the $H^{res}$ and $H^{post}$ projection matrices and the Attention or MLP layer input matrix $h^{in}$ in the mHC (Manifold-Constrained Hyper-Connections) architecture through a series of computations.
 
 - Formula:
 
@@ -278,7 +278,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>gradHIn (aclTensor*)</td>
             <td>Input</td>
-            <td>hIn serves as the layer input of the Atten/MLP layers. Outputs the corresponding gradient of the forward output hIn.</td>
+            <td>hIn serves as the layer input of the Attention/MLP layers. Outputs the corresponding gradient of the forward output hIn.</td>
             <td><ul><li>Empty tensors are not supported.</li><li>shape is (B, S, D) or (T, D). Where B keeps consistent with the B of `x`; S keeps consistent with the S of `x`; T=B*S; D keeps consistent with the D of `x`.</li></ul></td>
             <td>BFLOAT16, FLOAT16</td>
             <td>ND</td>

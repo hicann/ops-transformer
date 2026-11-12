@@ -343,7 +343,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
     - x1, x2, scale, groupList, logit, and rowIndex are required parameters; pertokenScaleOptional, sharedInput, and bias are optional parameters. In the MxA8W4 use case, pertokenScaleOptional is a required parameter. Currently, the offsetOptional parameter is not supported and must be nullptr.
     - When groupListType is 0, groupList must be a non-negative monotonically non-decreasing sequence (cumulative sum), and the last value must not be greater than the first dimension of the tensor in x1; when groupListType is 1, groupList must be a non-negative array (size of each group), and the sum of the values must not be greater than the first dimension of the tensor in x1.
     - The first dimension batch of out and sharedInputOffset must be greater than or equal to 0 and less than or equal to m.
-    - When sharedInput is not empty, its first dimension is shareInputLen. sharedInputOffset, shareInputLen, and their sum must be less than or equal to the first dimension batch of out.
+    - When sharedInput is not empty, its first dimension is sharedInputLen. sharedInputOffset, sharedInputLen, and their sum must be less than or equal to the first dimension batch of out.
     - x1 supports M = 0 and x2 supports N = 0; other empty tensor use cases are not supported.
 
   <!-- end id10 -->
@@ -628,7 +628,7 @@ The following sample code is for reference only. For details about compilation a
         int64_t batch = 24;
         int64_t bsdp = 8;
         int64_t dtype = 0;
-        float shareInputWeight = 1.0;
+        float sharedInputWeight = 1.0;
         int64_t sharedInputOffset = 0;
         bool transposeX = false;
         bool transposeW = false;
@@ -751,7 +751,7 @@ The following sample code is for reference only. For details about compilation a
 
         // Call the first-phase API of aclnnGroupedMatmulFinalizeRoutingWeightNzV2.
         workspaceSize = 0;
-        ret = aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(x, w, scale, nullptr, nullptr, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, shareInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, tuningConfig, out, &workspaceSize, &executor);
+        ret = aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(x, w, scale, nullptr, nullptr, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype, sharedInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, tuningConfig, out, &workspaceSize, &executor);
 
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize failed. ERROR: %d\n", ret);
                   return ret);
@@ -951,7 +951,7 @@ The following sample code is for reference only. For details about compilation a
       int64_t batch = 24;
       int64_t bsdp = 8;
       int64_t dtype = 0;
-      float shareInputWeight = 1.0;
+      float sharedInputWeight = 1.0;
       int64_t sharedInputOffset = 0;
       bool transposeX = false;
       bool transposeW = false;
@@ -1038,7 +1038,7 @@ The following sample code is for reference only. For details about compilation a
       // Call the first-phase API of aclnnGroupedMatmulFinalizeRoutingWeightNzV2.
       ret = aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(
           x, w, scale, nullptr, nullptr, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype,
-          shareInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, nullptr, out, &workspaceSize,
+          sharedInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, nullptr, out, &workspaceSize,
           &executor);
       CHECK_FREE_RET(ret == ACL_SUCCESS,
                     LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize failed. ERROR: %d\n", ret);
@@ -1300,7 +1300,7 @@ The following sample code is for reference only. For details about compilation a
       int64_t batch = 24;
       int64_t bsdp = 8;
       int64_t dtype = 0;
-      float shareInputWeight = 1.0;
+      float sharedInputWeight = 1.0;
       int64_t sharedInputOffset = 0;
       bool transposeX = false;
       bool transposeW = true;
@@ -1403,7 +1403,7 @@ The following sample code is for reference only. For details about compilation a
 
       ret = aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(
           x, w, scale, nullptr, nullptr, nullptr, nullptr, pertokenScale, groupList, sharedInput, logit, rowIndex, dtype,
-          shareInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, nullptr, out, &workspaceSize,
+          sharedInputWeight, sharedInputOffset, transposeX, transposeW, groupListType, nullptr, out, &workspaceSize,
           &executor);
       CHECK_RET(ret == ACL_SUCCESS,
                 LOG_PRINT("aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize failed. ERROR: %d\n", ret);

@@ -297,9 +297,9 @@ In the documentation constraints, the meanings of common fields are as follows:
         <td>q</td>
         <td>            <ul>
                 <li>tensor_type supports bfloat16 and float16.</li>
-                <li>BNSD -> (B, N_Q, S_Q, D)</li>
-                <li>BSND -> (B, S_Q, N_Q, D)</li>
-                <li>TND -> (T_Q, N_Q, D)</li>
+                <li>BNSD -> (B, Q_N, Q_S, D)</li>
+                <li>BSND -> (B, Q_S, Q_N, D)</li>
+                <li>TND -> (Q_T, Q_N, D)</li>
             </ul>
         </td>
         <td rowspan="4">            Must exist
@@ -329,9 +329,9 @@ In the documentation constraints, the meanings of common fields are as follows:
         <td>k</td>
         <td rowspan="2">            <ul>
                 <li>tensor_type supports bfloat16 and float16.</li>
-                <li>BNSD -> (B, N_KV, S_KV, D)</li>
-                <li>BSND -> (B, S_KV, N_KV, D)</li>
-                <li>TND -> (T_KV, N_KV, D)</li>
+                <li>BNSD -> (B, KV_N, KV_S, D)</li>
+                <li>BSND -> (B, KV_S, KV_N, D)</li>
+                <li>TND -> (KV_T, KV_N, D)</li>
                 <li>PA_BBND -> (num_blocks, block_size, KV_N, D)</li>
                 <li>PA_BNBD -> (num_blocks, KV_N, block_size, D)</li>
                 <li>PA_NZ -> (num_blocks, KV_N, D//16, block_size, 16)</li>

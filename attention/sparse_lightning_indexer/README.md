@@ -16,7 +16,7 @@
 - 算子功能：SparseLightningIndexer（candidate consumer）在
   LightningIndexerV2 的加权 ReLU 打分 + TopK 框架上，**消费上游 source 算子输出的候选块索引**
   （`candidate_block_indices`），对每个 query 行做**无 leak 候选内 TopK**：
-  可达且命中介候选块的位置以真实分数参与排序，其余位置（不可达 / 可达但不在候选内）一律无效不入选；
+  可达且命中候选块的位置以真实分数参与排序，其余位置（不可达 / 可达但不在候选内）一律无效不入选；
   **非候选块索引一律不进入 topk 输出**，候选内有效数不足 topk 时剩余槽位填 -1。
   与 `lightning_indexer`（source 模式，`candidate_topk_blocks != -1`）
   配对使用，构成候选块两级 TopK 的 consumer 侧。

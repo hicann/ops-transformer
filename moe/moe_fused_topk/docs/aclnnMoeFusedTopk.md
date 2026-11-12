@@ -78,7 +78,7 @@
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnMoeFusedTopkGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnMoeFusedTopk”接口执行计算。
 
 ```Cpp
-aclnnMoeFusedTopkGetWorkspaceSize(
+aclnnStatus aclnnMoeFusedTopkGetWorkspaceSize(
   const aclTensor* x,
   const aclTensor* addNum,
   const aclTensor* mappingNum,

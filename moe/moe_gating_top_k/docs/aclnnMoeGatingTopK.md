@@ -556,7 +556,7 @@ int main() {
   // 创建bias aclTensor
   ret = CreateAclTensor(biasHostData, biasShape, &biasAddr, aclDataType::ACL_FLOAT, &bias);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
-  // 创建expertForSourceRow aclTensor
+  // 创建out aclTensor
   ret = CreateAclTensor(outHostData, outShape, &outAddr, aclDataType::ACL_FLOAT, &out);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   // 创建expertIdOut aclTensor
