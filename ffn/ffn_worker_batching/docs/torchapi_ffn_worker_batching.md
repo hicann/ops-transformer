@@ -41,25 +41,25 @@ cann_ops_transformer.ffn_worker_batching(
 | schedule_context | Tensor | 必选 | 连续一维 NPU int8 张量，至少1024字节，按`ScheduleContext`布局保存维度及有效Device地址。 |
 | expert_num | int | 必选 | 专家数，范围[1,8192]。异步混层模式表示本卡所有参与层的专家总数。 |
 | max_out_shape | List[int] | 必选 | `[A, BS, K, H]`，分别为session容量、micro batch大小、每token的专家选择数、逻辑hidden维度。 |
-| token_dtype | int | 可选 | 0：FP16；1：BF16；2：INT8；3：FP8 E5M2；4：FP8 E4M3FN；5：FP4 E2M1。示例使用0。 |
+| token_dtype | int | 可选 | 0：FP16；1：BF16；2：INT8；3：FLOAT8_E5M2；4：FLOAT8_E4M3FN；5：FLOAT4_E2M1。示例使用0。输出dtype与shape随token_dtype变化，全面信息见[返回值说明](#返回值说明)。 |
 | need_schedule | int | 可选 | 0：NORM；1：RECV。示例使用1，直接消费接收描述符。 |
 | layer_num | int | 可选 | 参与层数。异步RECV必须大于0且整除`expert_num`；示例使用2。 |
 | sync_flag | bool | 可选 | False：同步接收，等待全部session；True：异步接收，处理ready快照选中的session。仅RECV解释该属性。 |
-| mx_output_uint8 | bool | 可选 | 默认False。True时MX scale以uint8返回，FP4 y也以uint8返回，保持原始编码；FP16示例无需设置。 |
+| mx_output_uint8 | bool | 可选 | 默认False。True时token_dtype≥3的`dynamic_scale`以uint8类型返回（E8M0原始指数字节），token_dtype=5的`y`也以uint8返回（实际存放float4_e2m1fn_x2类型的数据），均不做数值转换，FP8的`y`保留原生dtype。aclgraph（`npugraph_ex`）图模式下MX（token_dtype≥3）须设为True，原生float8_e8m0fnu/float4_e2m1fn_x2输出无法通过aclgraph图编译；GE图模式下FP4须设为True，或使用支持float4_e2m1fn_x2映射的TorchAir。 |
 
 ## 返回值说明
 
-令`Y=A*BS*K`，返回值顺序如下。示例采用FP16，输出shape如下表。
+令`Y=A*BS*K`，`H`为`max_out_shape[3]`（逻辑hidden维度），返回8个输出。**`y`与`dynamic_scale`的dtype、shape随`token_dtype`及`mx_output_uint8`取值变化**，逐场景说明如下（其余输出在全部`token_dtype`下相同）：
 
 | 返回值 | dtype | shape | 描述 |
 | --- | --- | --- | --- |
-| y | float16 | `[Y,H]` | 按跨层专家号排序后的token。 |
+| y | token_dtype为0时类型为float16；为1时为bfloat16；为2时为int8；为3时为float8_e5m2；为4时为float8_e4m3fn；为5且`mx_output_uint8=False`时为float4_e2m1fn_x2（H须为偶数）；为5且`mx_output_uint8=True`时为uint8（实际存放float4_e2m1fn_x2类型的数据，H须为偶数） | token_dtype为0~4时为`[Y,H]`；为5时为`[Y,H/2]` | 按跨层专家号排序后的token。 |
 | group_list | int64 | `[expert_num,2]` | 每个非空专家占一行，内容为`[跨层专家号, token数]`，其余行补零。 |
 | session_ids | int32 | `[Y]` | 原始session编号。 |
 | micro_batch_ids | int32 | `[Y]` | 原始micro batch编号。 |
 | token_ids | int32 | `[Y]` | 原始micro batch内的token编号。 |
 | expert_offsets | int32 | `[Y]` | token的专家选择位置，范围[0,K)。 |
-| dynamic_scale | float32 | `[Y]` | FP16/BF16下无有效含义。量化数据的scale布局见[V2接口文档](aclnnFfnWorkerBatchingV2.md)。 |
+| dynamic_scale | token_dtype为0/1/2时类型为float32；为3/4/5且`mx_output_uint8=False`时类型为float8_e8m0fnu；为3/4/5且`mx_output_uint8=True`时类型为uint8（存放float8_e8m0fnu的原始指数字节） | token_dtype为0/1/2时`[Y]`；为3/4/5时`[Y,⌈H/32⌉]` | token_dtype为0/1时无有效含义（占位）；为2时为每token的动态量化scale；为3/4/5时每32个元素一个scale。 |
 | actual_token_num | int64 | `[1]` | 本次有效输出行数。 |
 
 `y`、来源索引及有意义的scale只读取前`actual_token_num`行，不读取未使用的输出容量。
