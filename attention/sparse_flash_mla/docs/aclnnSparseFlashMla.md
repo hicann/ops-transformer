@@ -528,7 +528,7 @@ aclnnStatus aclnnSparseFlashMla(
   </table>
 
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N1/N2支持1、2、4、8、16、32、64、128；SWA不传入cmpKvOptional，cmpRatio不参与计算，CSA支持传入1、2或4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏oriKvOptional场景支持oriSparseIndicesOptional及oriTopkLengthOptional，layoutQOptional和layoutKvOptional仅支持"TND"/"PA_BBND"组合，oriWinLeft和oriWinRight支持非负数，cmpSparseIndicesOptional的最后一维K2当前支持[1, 8192]内的任意整数。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N1/N2支持[1, 128]内的任意整数；SWA不传入cmpKvOptional，cmpRatio不参与计算，CSA支持传入1、2或4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏oriKvOptional场景支持oriSparseIndicesOptional及oriTopkLengthOptional，layoutQOptional和layoutKvOptional仅支持"TND"/"PA_BBND"组合，oriWinLeft和oriWinRight支持非负数，cmpSparseIndicesOptional的最后一维K2当前支持[1, 8192]内的任意整数。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：N1支持1-128，N2只支持1。
@@ -568,7 +568,7 @@ aclnnStatus aclnnSparseFlashMla(
         <td>输入变量的数据类型和数据格式不在支持的范围内。</td>
       </tr>
       <tr>
-        <td>N1不在[1,128]范围内，或N2不为1，或N1不能被N2整除，或N1/N2不是[1,128]范围内的2的幂。</td>
+        <td>N1不在[1,128]范围内，或N2不为1，或N1不能被N2整除，或N1/N2不在[1,128]范围内。</td>
       </tr>
       <tr>
         <td>D不为512。</td>

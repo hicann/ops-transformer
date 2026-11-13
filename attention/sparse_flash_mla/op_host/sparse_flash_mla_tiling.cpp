@@ -88,11 +88,6 @@ static bool IsNonEmptyOptionalTensor(const gert::Tensor* tensor)
     return tensor != nullptr && tensor->GetShapeSize() > 0;
 }
 
-static bool IsPowerOfTwoInRange(uint32_t value, uint32_t minValue, uint32_t maxValue)
-{
-    return value >= minValue && value <= maxValue && (value & (value - 1U)) == 0U;
-}
-
 static bool IsA5Arch(NpuArch npuArch)
 {
     return npuArch == NpuArch::DAV_3510;
@@ -2055,9 +2050,9 @@ ge::graphStatus SMLATilingCheck::CheckFeatureShape() const
                     (IsA6Arch(npuArch_) ? A6_PLATFORM_LOG : A5_PLATFORM_LOG) + ", but got " + std::to_string(n1Size_)),
             return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(!IsPowerOfTwoInRange(n1Size_, 1, 128),
+        OP_CHECK_IF(n1Size_ < 1 || n1Size_ > 128,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query",
-                                                             "q_head_num should be power of two in [1, 128] on " +
+                                                             "q_head_num should be in [1, 128] on " +
                                                                  std::string(A2_A3_PLATFORM_LOG.c_str()) +
                                                                  ", but got " + std::to_string(n1Size_)),
                     return ge::GRAPH_FAILED);
@@ -2122,9 +2117,9 @@ ge::graphStatus SMLATilingCheck::CheckFeatureShape() const
                         return ge::GRAPH_FAILED);
         }
     } else {
-        OP_CHECK_IF(!IsPowerOfTwoInRange(gSize_, 1, 128),
+        OP_CHECK_IF(gSize_ < 1 || gSize_ > 128,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query, key",
-                                                             "group num should be power of two in [1, 128] on " +
+                                                             "group num should be in [1, 128] on " +
                                                                  std::string(A2_A3_PLATFORM_LOG.c_str()) +
                                                                  ", but got " + std::to_string(gSize_)),
                     return ge::GRAPH_FAILED);

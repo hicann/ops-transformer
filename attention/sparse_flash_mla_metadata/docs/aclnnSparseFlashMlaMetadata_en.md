@@ -451,10 +451,10 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 
   <ul>
     <!-- npu="A3" id7 -->
-    <li><term>Atlas A3 products</term>: sequsedQOptional and cmpTopkLengthOptional are not supported; numHeadsQ/numHeadsKv support only 1, 2, 4, 8, 16, 32, 64, 128; the SWA sparse ori_kv use case supports oriTopkLengthOptional, oriTopk greater than 0, and oriMaskMode of 0, and oriWinLeft and oriWinRight support non-negative values; in other SWA use cases, oriTopk is 0, oriMaskMode is 4, oriWinLeft is 127, and oriWinRight is 0; cmpTopk supports [0, 8192], where 0 indicates non-sparse compressed KV, cmpMaskMode supports only 3, cmpKv is not passed in for SWA, cmpRatio does not participate in the computation, CSA supports 1, 2, or 4, and HCA supports 128.</li>
+    <li><term>Atlas A3 products</term>: sequsedQOptional and cmpTopkLengthOptional are not supported; numHeadsQ/numHeadsKv support any integer in [1, 128]; the SWA sparse ori_kv use case supports oriTopkLengthOptional, oriTopk greater than 0, and oriMaskMode of 0, and oriWinLeft and oriWinRight support non-negative values; in other SWA use cases, oriTopk is 0, oriMaskMode is 4, oriWinLeft is 127, and oriWinRight is 0; cmpTopk supports [0, 8192], where 0 indicates non-sparse compressed KV, cmpMaskMode supports only 3, cmpKv is not passed in for SWA, cmpRatio does not participate in the computation, CSA supports 1, 2, or 4, and HCA supports 128.</li>
     <!-- end id7 -->
     <!-- npu="910b" id8 -->
-    <li><term>Atlas A2 products</term>: sequsedQOptional and cmpTopkLengthOptional are not supported; numHeadsQ/numHeadsKv support only 1, 2, 4, 8, 16, 32, 64, 128; the SWA sparse ori_kv use case supports oriTopkLengthOptional, oriTopk greater than 0, and oriMaskMode of 0, and oriWinLeft and oriWinRight support non-negative values; in other SWA use cases, oriTopk is 0, oriMaskMode is 4, oriWinLeft is 127, and oriWinRight is 0; cmpTopk supports [0, 8192], where 0 indicates non-sparse compressed KV, cmpMaskMode supports only 3, cmpKv is not passed in for SWA, cmpRatio does not participate in the computation, CSA supports 1, 2, or 4, and HCA supports 128.</li>
+    <li><term>Atlas A2 products</term>: sequsedQOptional and cmpTopkLengthOptional are not supported; numHeadsQ/numHeadsKv support any integer in [1, 128]; the SWA sparse ori_kv use case supports oriTopkLengthOptional, oriTopk greater than 0, and oriMaskMode of 0, and oriWinLeft and oriWinRight support non-negative values; in other SWA use cases, oriTopk is 0, oriMaskMode is 4, oriWinLeft is 127, and oriWinRight is 0; cmpTopk supports [0, 8192], where 0 indicates non-sparse compressed KV, cmpMaskMode supports only 3, cmpKv is not passed in for SWA, cmpRatio does not participate in the computation, CSA supports 1, 2, or 4, and HCA supports 128.</li>
     <!-- end id8 -->
   </ul>
 
@@ -551,7 +551,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
         <td>batchSize or maxSeqlenQ is negative.</td>
       </tr>
       <tr>
-        <td>numHeadsQ is not within the range of [1,128], numHeadsKv is not 1, numHeadsQ cannot be divided by numHeadsKv, or numHeadsQ/numHeadsKv is not a power of 2 within the range of [1,128].</td>
+        <td>numHeadsQ is not within the range of [1,128], numHeadsKv is not 1, numHeadsQ cannot be divided by numHeadsKv, or numHeadsQ/numHeadsKv is not within the range of [1,128].</td>
       </tr>
       <tr>
         <td>headDim is not 512.</td>
@@ -609,7 +609,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
         <td>batchSize or maxSeqlenQ is negative.</td>
       </tr>
       <tr>
-        <td>numHeadsQ is not within the range of [1,128], numHeadsKv is not 1, numHeadsQ cannot be evenly divided by numHeadsKv, or numHeadsQ/numHeadsKv is not a power of 2 within the range of [1,128].</td>
+        <td>numHeadsQ is not within the range of [1,128], numHeadsKv is not 1, numHeadsQ cannot be evenly divided by numHeadsKv, or numHeadsQ/numHeadsKv is not within the range of [1,128].</td>
       </tr>
       <tr>
         <td>headDim is not 512.</td>

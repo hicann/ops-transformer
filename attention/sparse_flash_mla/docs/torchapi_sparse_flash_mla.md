@@ -271,7 +271,7 @@ cann_ops_transformer.sparse_flash_mla(
 
 | 参数 | 单参数校验 | 存在性拦截 | 一致性拦截 | 特性交叉拦截 |
 | :--- | :--- | :--- | :--- | :--- |
-| num_heads_q | int32；范围1~128。 | 必选。 | 必须与`q`的`q_n`维一致。 | <term>Atlas A3系列产品</term>：取值非1、2、4、8、16、32、64、128时拦截；<term>Ascend 950PR&950DT系列产品</term>：取值小于1或大于128时拦截。 |
+| num_heads_q | int32；范围1~128。 | 必选。 | 必须与`q`的`q_n`维一致。 | <term>Atlas A3系列产品</term>：取值小于1或大于128时拦截；<term>Ascend 950PR&950DT系列产品</term>：取值小于1或大于128时拦截。 |
 | num_heads_kv | int32；仅支持1。 | 必选。 | 必须与`ori_kv`、`cmp_kv`的kv_n维一致。 | 与`num_heads_q`、`softmax_lse`的分组维度一致。 |
 | head_dim | int32；仅支持512。 | 必选。 | 必须与`q`、`ori_kv`、`cmp_kv`的d维一致。 | 不满足时拦截；不允许依赖自动推导。 |
 | batch_size | int32；必须大于0。 | BSND场景必传。 | 必须与BSND布局下`q`和kv的b维一致。 | TND场景由`cu_seqlens_q`长度推导时，仍须与所有长度类Tensor一致。 |

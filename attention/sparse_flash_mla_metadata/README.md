@@ -236,8 +236,8 @@
   </tbody>
 </table>
 <ul>
-  <li><term>Atlas A3系列产品</term> ：num_heads_q/num_heads_kv仅支持1、2、4、8、16、32、64、128，不支持seqused_q、cmp_topk_length；SWA稀疏ori_kv场景支持ori_topk_length、ori_topk大于0及ori_mask_mode为0，ori_win_left和ori_win_right支持非负数；其他SWA场景ori_topk为0、ori_mask_mode为4、ori_win_left为127、ori_win_right为0；cmp_topk支持[0, 8192]，cmp_mask_mode仅支持3，SWA不传入cmp_kv，cmp_ratio不参与计算、CSA支持1、2或4、HCA支持128。</li>
-  <li><term>Atlas A2系列产品</term> ：num_heads_q/num_heads_kv仅支持1、2、4、8、16、32、64、128，不支持seqused_q、cmp_topk_length；SWA稀疏ori_kv场景支持ori_topk_length、ori_topk大于0及ori_mask_mode为0，ori_win_left和ori_win_right支持非负数；其他SWA场景ori_topk为0、ori_mask_mode为4、ori_win_left为127、ori_win_right为0；cmp_topk支持[0, 8192]，cmp_mask_mode仅支持3，SWA不传入cmp_kv，cmp_ratio不参与计算、CSA支持1、2或4、HCA支持128。</li>
+  <li><term>Atlas A3系列产品</term> ：num_heads_q/num_heads_kv支持[1, 128]内的任意整数，不支持seqused_q、cmp_topk_length；SWA稀疏ori_kv场景支持ori_topk_length、ori_topk大于0及ori_mask_mode为0，ori_win_left和ori_win_right支持非负数；其他SWA场景ori_topk为0、ori_mask_mode为4、ori_win_left为127、ori_win_right为0；cmp_topk支持[0, 8192]，cmp_mask_mode仅支持3，SWA不传入cmp_kv，cmp_ratio不参与计算、CSA支持1、2或4、HCA支持128。</li>
+  <li><term>Atlas A2系列产品</term> ：num_heads_q/num_heads_kv支持[1, 128]内的任意整数，不支持seqused_q、cmp_topk_length；SWA稀疏ori_kv场景支持ori_topk_length、ori_topk大于0及ori_mask_mode为0，ori_win_left和ori_win_right支持非负数；其他SWA场景ori_topk为0、ori_mask_mode为4、ori_win_left为127、ori_win_right为0；cmp_topk支持[0, 8192]，cmp_mask_mode仅支持3，SWA不传入cmp_kv，cmp_ratio不参与计算、CSA支持1、2或4、HCA支持128。</li>
   <li><term>Ascend 950PR&950DT系列产品</term> ：cmp_ratio在SWA场景传1，CSA/HCA场景支持1到128。</li>
 </ul>
 

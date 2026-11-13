@@ -268,7 +268,7 @@ Parameters involved in task splitting in `sparse_flash_mla_metadata` and `sparse
 
 | Parameter | Single-Parameter Check | Existence Check | Consistency Check | Feature Cross-Check |
 | :--- | :--- | :--- | :--- | :--- |
-| num_heads_q | int32; range 1-128. | Required. | Must be consistent with the `q_n` dimension of `q`. | <term>Atlas A3 products</term>: Blocked if the value is not 1, 2, 4, 8, 16, 32, 64, or 128; <term>Ascend 950PR&950DT products</term>: Blocked if the value is less than 1 or greater than 128. |
+| num_heads_q | int32; range 1-128. | Required. | Must be consistent with the `q_n` dimension of `q`. | <term>Atlas A3 products</term>: Blocked if the value is less than 1 or greater than 128; <term>Ascend 950PR&950DT products</term>: Blocked if the value is less than 1 or greater than 128. |
 | num_heads_kv | int32; only 1 is supported. | Required. | Must be consistent with the kv_n dimension of `ori_kv` and `cmp_kv`. | Must be consistent with the group dimension of `num_heads_q` and `softmax_lse`. |
 | head_dim | int32; only 512 is supported. | Required. | Must be consistent with the d dimension of `q`, `ori_kv`, and `cmp_kv`. | Blocked if this is not satisfied; automatic inference is not allowed. |
 | batch_size | int32; must be greater than 0. | Required in the BSND scenario. | Must be consistent with the b dimension of `q` and kv in the BSND layout. | In the TND scenario, even when derived from the length of `cu_seqlens_q`, it must still be consistent with all length-related tensors. |

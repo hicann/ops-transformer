@@ -43,11 +43,6 @@ inline constexpr int64_t SMLA_CMP_RATIO_UPPER_BOUND = 128;
 inline constexpr int64_t SMLA_NUM_HEADS_Q_LOWER_BOUND = 1;
 inline constexpr int64_t SMLA_NUM_HEADS_Q_UPPER_BOUND = 128;
 
-inline bool IsPowerOfTwoInRangeSmla(int64_t value, int64_t minValue, int64_t maxValue)
-{
-    return value >= minValue && value <= maxValue && ((value & (value - 1)) == 0);
-}
-
 inline bool IsA5Smla(const char* socVersion)
 {
     return socVersion != nullptr && (strstr(socVersion, "Ascend950") != nullptr);
@@ -188,11 +183,11 @@ aclnnStatus CheckSingleParamSmla(int64_t batchSize, int64_t maxSeqlenQ, int64_t 
                                                       std::to_string(SMLA_NUM_HEADS_Q_UPPER_BOUND) + "]");
             return ACLNN_ERR_PARAM_INVALID;
         }
-    } else if (!IsPowerOfTwoInRangeSmla(headRatio, SMLA_NUM_HEADS_Q_LOWER_BOUND, SMLA_NUM_HEADS_Q_UPPER_BOUND)) {
+    } else if (headRatio < SMLA_NUM_HEADS_Q_LOWER_BOUND || headRatio > SMLA_NUM_HEADS_Q_UPPER_BOUND) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLA_ACLNN_OP_NAME, "num_heads_q / num_heads_kv",
                                               std::to_string(headRatio),
                                               "The current value is not within the valid range. "
-                                              "The valid range is power of two in [" +
+                                              "The valid range is [" +
                                                   std::to_string(SMLA_NUM_HEADS_Q_LOWER_BOUND) + ", " +
                                                   std::to_string(SMLA_NUM_HEADS_Q_UPPER_BOUND) + "]");
         return ACLNN_ERR_PARAM_INVALID;

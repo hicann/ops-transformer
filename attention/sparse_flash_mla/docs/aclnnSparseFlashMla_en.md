@@ -524,7 +524,7 @@ aclnnStatus aclnnSparseFlashMla(
   </table>
 
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: N1/N2 supports 1, 2, 4, 8, 16, 32, 64, and 128; for SWA, cmpKv is not passed in and cmpRatio does not participate in the computation; CSA supports passing in 1, 2, or 4, and HCA supports passing in 128; block_size must be a multiple of 16, with a maximum of 1024; the SWA sparse ori_kv scenario supports ori_sparse_indices and ori_topk_length, oriWinLeft and oriWinRight support non-negative values, and the last dimension K2 of cmp_sparse_indices currently supports any integer within [1, 8192].
+  - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: N1/N2 supports any integer in [1, 128]; for SWA, cmpKv is not passed in and cmpRatio does not participate in the computation; CSA supports passing in 1, 2, or 4, and HCA supports passing in 128; block_size must be a multiple of 16, with a maximum of 1024; the SWA sparse ori_kv scenario supports ori_sparse_indices and ori_topk_length, oriWinLeft and oriWinRight support non-negative values, and the last dimension K2 of cmp_sparse_indices currently supports any integer within [1, 8192].
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT products</term>: N1 supports 1-128, and N2 only supports 1.
@@ -564,7 +564,7 @@ aclnnStatus aclnnSparseFlashMla(
         <td>The data type or data format of the input variable is not in the supported range.</td>
       </tr>
       <tr>
-        <td>N1 is not in the range of [1,128], or N2 is not equal to 1, or N1 is not divisible by N2, or N1/N2 is not a power of 2 in the range of [1,128].</td>
+        <td>N1 is not in the range of [1,128], or N2 is not equal to 1, or N1 is not divisible by N2, or N1/N2 is not in the range of [1,128].</td>
       </tr>
       <tr>
         <td>D is not equal to 512.</td>
