@@ -15,6 +15,7 @@
 
 #include "common/utils/op_mc2.h"
 #include "mc2_log.h"
+#include "mc2_comm_algo_selector.h"
 #include "quant_grouped_mat_mul_allto_allv_tiling_base.h"
 
 using namespace Mc2Log;
@@ -127,5 +128,47 @@ QuantModePair QuantGroupedMatmulAllToAllvTilingBase::GetQuantMode(const gert::Ti
     }
     OP_LOGD(opName, "Detected QUANT_PAIR_ERROR");
     return QUANT_PAIR_ERROR;
+}
+
+// 960dt(ascend960) CCU组网白名单校验并强制算法名(gmma2av算子族gmm/quant共用):
+// 仅960dt+CCU生效, 其余机型与引擎直接放行; 查询组网flags(与算法表同一事实源)按位与匹配,
+// 仅"单层纯fullmesh 1D且rank数<=16"的组网放行并强制算法名为sole[mesh];
+// 组网查询失败或组网不满足条件时报错拦截(不静默降级), 需改用ai_cpu或调整组网。
+bool CheckCcuFullmesh1DTopoAndForceAlgo(const char* opName, NpuArch arch, const std::string& group, uint8_t commMode,
+                                        std::string& algoName)
+{
+    if (arch != Ops::Base::DAV_9201) {
+        return true;
+    }
+    if (commMode != mc2tiling::A5_CCU_ENGINE) {
+        return true;
+    }
+    Mc2Hcom::Mc2TopoInfo topoInfo;
+    uint64_t topoFlags = Mc2Hcom::TOPO_FLAG_NONE;
+    if (!Mc2Hcom::Mc2CommAlgoSelector::GetTopoFlags(group.c_str(), topoInfo, topoFlags)) {
+        OP_LOGE(opName,
+                "Failed to get group topology info for group=%s, cannot verify CCU topology constraints on "
+                "ascend960dt. Please check the group topology or use ai_cpu engine.",
+                group.c_str());
+        return false;
+    }
+    constexpr uint64_t CCU_WHITELIST_FLAGS =
+        Mc2Hcom::TOPO_FLAG_SINGLE_LEVEL | Mc2Hcom::TOPO_FLAG_L0_1DMESH | Mc2Hcom::TOPO_FLAG_L0_1DMESH_COVER;
+    constexpr uint32_t CCU_MESH1D_MAX_RANK_SIZE = 16U;
+    if ((topoFlags & CCU_WHITELIST_FLAGS) != CCU_WHITELIST_FLAGS || topoInfo.userRankSize > CCU_MESH1D_MAX_RANK_SIZE) {
+        std::string reason = "CCU engine on ascend960dt requires single-level fullmesh 1D topology with rankSize "
+                             "<= 16, current userRankSize=" +
+                             std::to_string(topoInfo.userRankSize) +
+                             ". Please check the group topology or use ai_cpu engine.";
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "comm_mode", "ccu", reason.c_str());
+        return false;
+    }
+    constexpr char CCU_MESH1D_ALGO_NAME[] = "sole[mesh]";
+    if (algoName != CCU_MESH1D_ALGO_NAME) {
+        OP_LOGI(opName, "Force AlltoAll algoName from [%s] to [%s] for CCU engine on ascend960dt.", algoName.c_str(),
+                CCU_MESH1D_ALGO_NAME);
+    }
+    algoName = CCU_MESH1D_ALGO_NAME;
+    return true;
 }
 } // namespace Mc2Tiling

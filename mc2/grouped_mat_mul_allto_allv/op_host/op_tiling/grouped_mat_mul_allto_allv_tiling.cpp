@@ -366,15 +366,10 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::GetAndConvertCommMode(gert::Tiling
         return ge::GRAPH_FAILED);
     const size_t maxLength = 7UL;
     if (npuArch_ == Ops::Base::DAV_3510 || npuArch_ == Ops::Base::DAV_9201) {
+        // A6(ascend960)复用A5通路，CCU/AICPU通信模式均支持
         if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
             commMode = Mc2Comm::COMM_MODE_AICPU;
         } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
-            if (npuArch_ == Ops::Base::DAV_9201) {
-                // A6(ascend960)无CCU引擎，显式ccu直接报错(默认ai_cpu不受影响)
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "comm_mode", commModeStr,
-                                                      "Ascend960 has no CCU engine; use ai_cpu");
-                return ge::GRAPH_FAILED;
-            }
             commMode = Mc2Comm::COMM_MODE_CCU;
         } else {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "comm_mode", commModeStr,

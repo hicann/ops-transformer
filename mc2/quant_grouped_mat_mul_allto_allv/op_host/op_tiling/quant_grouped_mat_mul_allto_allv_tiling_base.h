@@ -152,6 +152,9 @@ protected:
 
     NpuArch npuArch_;
 };
+
+bool CheckCcuFullmesh1DTopoAndForceAlgo(const char* opName, NpuArch arch, const std::string& group, uint8_t commMode,
+                                        std::string& algoName);
 } // namespace Mc2Tiling
 
 #endif // MC2_GROUPED_MATMUL_ALLTO_ALLV_TILING_H

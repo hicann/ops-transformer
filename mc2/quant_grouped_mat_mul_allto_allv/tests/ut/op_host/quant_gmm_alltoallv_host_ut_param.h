@@ -15,6 +15,25 @@
 #include <algorithm>
 #include "op_host_csv_case_loader.h"
 
+// 与 all_gather_matmul_v2 UT 同款 devkit 版本守卫: devkit < 9.3 的平台层
+// 不支持 Ascend960DT(9201), soc=9201 用例在该环境必然于 tiling 分发处失败,
+// 由测试体按此宏 GTEST_SKIP 跳过
+#if defined(ASC_DEVKIT_MAJOR)
+#if ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR >= 3)
+#define QUANT_GMM_A2AV_UT_A6_SUPPORTED 1
+#endif
+#elif defined(__has_include)
+#if __has_include("version/asc_devkit_version.h")
+#include "version/asc_devkit_version.h"
+#if ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR >= 3)
+#define QUANT_GMM_A2AV_UT_A6_SUPPORTED 1
+#endif
+#endif
+#endif
+#ifndef QUANT_GMM_A2AV_UT_A6_SUPPORTED
+#define QUANT_GMM_A2AV_UT_A6_SUPPORTED 0
+#endif
+
 namespace QuantGmmAlltoAllvUT {
 
 inline int64_t SafeStoll(const std::string& str, int64_t defaultValue = 0)
@@ -97,6 +116,7 @@ struct QuantGmmAlltoAllvTilingUtParam {
     int64_t worldSize = 0;
     int64_t epWorldSize = 0;
     int64_t graphType = 0;
+    std::string soc = "3510";
 
     ge::graphStatus expectResult = ge::GRAPH_FAILED;
     uint64_t expectTilingKey = 0;
@@ -162,6 +182,7 @@ struct QuantGmmAlltoAllvTilingUtParam {
         this->worldSize = SafeStoll(ReadMap(csvMap, "worldSize", "0"));
         this->epWorldSize = SafeStoll(ReadMap(csvMap, "epWorldSize", "0"));
         this->graphType = SafeStoll(ReadMap(csvMap, "graphType", "0"));
+        this->soc = ReadMap(csvMap, "soc", "3510");
 
         this->expectResult = Str2StatusGE(ReadMap(csvMap, "expectStatus"));
         this->expectTilingKey = SafeStoull(ReadMap(csvMap, "expectTilingKey", "0"));

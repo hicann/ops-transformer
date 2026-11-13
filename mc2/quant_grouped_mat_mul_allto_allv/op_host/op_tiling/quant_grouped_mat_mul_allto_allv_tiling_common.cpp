@@ -945,13 +945,6 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::QuantGetAndConvertCommM
     if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
         commMode = Mc2Comm::COMM_MODE_AICPU;
     } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
-        auto platformInfo = context->GetPlatformInfo();
-        auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-        if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_9201) {
-            // A6(ascend960)无CCU引擎，显式ccu直接报错(默认ai_cpu不受影响).
-            OP_LOGE(context->GetNodeName(), "A6 has no CCU engine, commMode 'ccu' is not supported.");
-            return ge::GRAPH_FAILED;
-        }
         commMode = Mc2Comm::COMM_MODE_CCU;
     } else {
         OP_LOGD(context->GetNodeName(), "Currently, commMode only support 'ccu', 'ai_cpu', but got %s.", commModeStr);
@@ -985,7 +978,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::SetHcclTiling()
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     uint8_t commMode = 0;
     if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_3510 ||
-        ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_9201) { // A6复用A5 commMode解析(ccu已在其中拒绝)
+        ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_9201) { // A6复用A5 commMode解析(ccu/ai_cpu均支持)
         if (QuantGetAndConvertCommMode(context_, commMode) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -996,6 +989,15 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::SetHcclTiling()
         hcclCcTilingConfig.SetCommEngine(Mc2Comm::ENGINE_AICPU);
     } else if (commMode == Mc2Comm::COMM_MODE_CCU) {
         hcclCcTilingConfig.SetCommEngine(Mc2Comm::ENGINE_CCU_SCHED);
+        if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_9201) {
+            // 960dt CCU: 组网白名单校验(仅单层纯fullmesh 1D放行)并强制算法名sole[mesh](见函数注释)
+            std::string algoName = alltoAllvConfig;
+            OP_TILING_CHECK(!CheckCcuFullmesh1DTopoAndForceAlgo(opName_, ascendcPlatform.GetCurNpuArch(), groupEpPtr,
+                                                                mc2tiling::A5_CCU_ENGINE, algoName),
+                            OP_LOGE(opName_, "Tiling check comm topo and force algo name failed."),
+                            return ge::GRAPH_FAILED);
+            hcclCcTilingConfig.SetAlgConfig(algoName);
+        }
     }
     OP_TILING_CHECK(hcclCcTilingConfig.GetTiling(localTilingData_.hcclA2avTiling.hcclInitTiling) != 0,
                     OP_LOGE(opName_, "mc2CcTilingConfig GetTiling hcclInitTiling failed"), return ge::GRAPH_FAILED);

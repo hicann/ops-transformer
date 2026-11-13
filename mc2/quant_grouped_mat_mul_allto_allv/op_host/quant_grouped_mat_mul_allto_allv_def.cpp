@@ -54,7 +54,7 @@ static const std::vector<ge::DataType> yDtypes = {ge::DT_FLOAT16, ge::DT_FLOAT16
 
 class QuantGroupedMatMulAlltoAllv : public OpDef {
 public:
-    explicit QuantGroupedMatMulAlltoAllv(const char *name)
+    explicit QuantGroupedMatMulAlltoAllv(const char* name)
         : OpDef(name)
     {
         // 16 scenarios total:
@@ -165,7 +165,6 @@ public:
         this->AICore().AddConfig("ascend950", aicore_config);
         this->AICore().AddConfig("ascend960dt", aicore_config);
         this->MC2().HcclGroup({"group"});
-        this->MC2().HcclServerType(HcclServerType::AICPU, "ascend960dt");
     }
 };
 

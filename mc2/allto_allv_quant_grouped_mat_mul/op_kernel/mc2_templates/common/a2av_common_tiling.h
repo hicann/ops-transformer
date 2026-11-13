@@ -19,8 +19,8 @@
 #include "../../../../3rd/grouped_matmul/op_kernel/grouped_matmul_tiling_data_apt.h"
 
 namespace MC2KernelTemplate {
-#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
-// DAV_3510支持epWorldSize=256(HcclMsgExt原生256 rank)，通信数组容量覆盖256
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
+// DAV_3510/DAV_9201(A6)支持epWorldSize=256(HcclMsgExt原生256 rank)，通信数组容量覆盖256
 static constexpr uint32_t MAX_EP_RANK_SIZE = 256U;
 #else
 static constexpr uint32_t MAX_EP_RANK_SIZE = 128U;

@@ -13,6 +13,7 @@
 #include <iostream>
 #include "../quant_gmm_alltoallv_host_ut_param.h"
 #include "mc2_tiling_case_executor.h"
+#include "mc2_hcom_topo_info.h"
 #include "../../../../op_host/op_tiling/arch35/tt_quant_grouped_mat_mul_allto_allv_tiling.h"
 #include "../../../../op_host/op_tiling/arch35/mx_quant_grouped_mat_mul_allto_allv_tiling.h"
 
@@ -43,12 +44,68 @@ protected:
     {
         std::cout << "QuantGmmAlltoAllvTilingTest TearDown." << std::endl;
     }
+
+    void TearDown() override
+    {
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
+    }
 };
+
+// 960dt(a6)+CCU 组网白名单 mock 路由: 正向用例显式 mock 单层纯 fullmesh 1D 主路径
+// (六键显式设置, 不隐式依赖 mocker 默认值; mocker 默认为单层 Mesh+CLOS 混联, 是 960dt CCU
+// 拦截面, 正向用例不 mock 会被默认拦截); 拦截面及边界用例按用例名逐类构造
+static Mc2Hcom::MockValues BuildHcomTopologyMockValues(const QuantGmmAlltoAllvTilingUtParam& param)
+{
+    Mc2Hcom::MockValues mockValues{{"rankNum", 8}};
+    if (param.soc != "9201") {
+        return mockValues;
+    }
+    auto addFullmesh1DMainPath = [&mockValues](uint64_t userRankSize, uint64_t levelNums = 1U,
+                                               uint64_t topoInfoRet = static_cast<uint64_t>(HCCL_SUCCESS)) {
+        mockValues.emplace_back("l0InstTypeSet", 1ULL << COMM_TOPO_1DMESH);  // 实例类型位图恰为 1DMESH 单位
+        mockValues.emplace_back("l0CoverTypeSet", 1ULL << COMM_TOPO_1DMESH); // 覆盖类型位图恰为 1DMESH 单位
+        mockValues.emplace_back("level0Topo", static_cast<uint64_t>(Mc2Hcom::Mc2Level0Topo::MESH_1D)); // 日志辅助字段
+        mockValues.emplace_back("topoLevelNums", levelNums);    // 单层组网(默认)
+        mockValues.emplace_back("getTopoInfoRet", topoInfoRet); // 组网查询结果(默认成功)
+        mockValues.emplace_back("userRankSize", userRankSize);  // 防御面正常态(<=16)
+    };
+    const auto& caseName = param.case_name;
+    if (param.commMode == "ccu") {
+        if (caseName.find("_clos_blocked") != std::string::npos) { // 拦截面①: 纯CLOS
+            mockValues.emplace_back("l0InstTypeSet", 1ULL << COMM_TOPO_CLOS);
+            mockValues.emplace_back("l0CoverTypeSet", 1ULL << COMM_TOPO_CLOS);
+            mockValues.emplace_back("level0Topo", static_cast<uint64_t>(Mc2Hcom::Mc2Level0Topo::CLOS));
+        } else if (caseName.find("_multilevel_blocked") != std::string::npos) { // 拦截面②: 跨机多层
+            addFullmesh1DMainPath(8U, 2U);
+        } else if (caseName.find("_queryfail_blocked") != std::string::npos) { // 拦截面③: 组网查询失败
+            addFullmesh1DMainPath(8U, 1U, static_cast<uint64_t>(HCCL_E_PARA));
+        } else if (caseName.find("_rank16_pass") != std::string::npos) { // 放行边界: rankSize恰为16
+            addFullmesh1DMainPath(16U);
+        } else if (caseName.find("_rank17_blocked") != std::string::npos) { // 拦截边界: rankSize超1(17>16)
+            addFullmesh1DMainPath(17U);
+        } else if (caseName.find("_ranksize_blocked") != std::string::npos) { // 拦截面④: 超rank上限(>16)
+            addFullmesh1DMainPath(32U);
+        } else if (caseName.find("fullmesh_mock") != std::string::npos || param.expectResult == ge::GRAPH_SUCCESS) {
+            addFullmesh1DMainPath(8U); // 白名单正向主路径; meshclos 拦截面用默认混联零设置
+        }
+    } else if (param.commMode == "ai_cpu" && caseName.find("fullmesh_mock") != std::string::npos) {
+        // 默认回归: AICPU 在白名单组网下行为一致(白名单函数引擎前置过滤零干预)
+        addFullmesh1DMainPath(8U);
+    }
+    return mockValues;
+}
 
 TEST_P(QuantGmmAlltoAllvTilingTest, test_grouped_quant_mat_mul_allto_allv_tiling)
 {
     auto param = GetParam();
     std::cout << "[TEST_CASE] " << param.case_name << std::endl;
+
+#if !QUANT_GMM_A2AV_UT_A6_SUPPORTED
+    // devkit < 9.3 无 Ascend960DT(9201) tiling 支持, A6 用例在该环境必然失败, 跳过
+    if (param.soc == "9201") {
+        GTEST_SKIP() << "A6(9201) cases require devkit >= 9.3 (Ascend960DT), skip";
+    }
+#endif
 
     if (param.gmmXShape.size() < 2 || param.gmmWeightShape.size() < 3 || param.gmmYShape.size() < 2) {
         FAIL() << "Invalid shape dimensions in test case: " << param.case_name;
@@ -184,11 +241,25 @@ TEST_P(QuantGmmAlltoAllvTilingTest, test_grouped_quant_mat_mul_allto_allv_tiling
             {"comm_quant_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
             {"comm_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.commMode)},
         },
-        &compileInfo, "3510", coreNum, ubSize, tilingDataSize);
+        &compileInfo, param.soc, coreNum, ubSize, tilingDataSize);
 
-    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    Mc2Hcom::MockValues hcomTopologyMockValues = BuildHcomTopologyMockValues(param);
 
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, param.expectResult, param.expectTilingKey);
+    // 960dt+ccu 白名单正向: 断言生效算法名被强制为 sole[mesh](经 Mc2CcTilingConfig 写入
+    // tilingData 的 algConfig, 覆盖 legacy 默认名 AlltoAll=level0:fullmesh;level1:pairwise)
+    if (param.soc == "9201" && param.commMode == "ccu" && param.expectResult == ge::GRAPH_SUCCESS) {
+        // Mc2ExecuteTestCase 内部已 Reset mocker, 断言用的二次执行前需重新注入白名单组网 mock
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValues(hcomTopologyMockValues);
+        TilingInfo tilingInfo;
+        const bool tilingOk = ExecuteTiling(tilingContextPara, tilingInfo);
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
+        ASSERT_TRUE(tilingOk);
+        const std::string rawTiling(reinterpret_cast<const char*>(tilingInfo.tilingData.get()),
+                                    tilingInfo.tilingDataSize);
+        EXPECT_NE(rawTiling.find("sole[mesh]"), std::string::npos)
+            << "960dt+ccu effective algConfig should be forced to sole[mesh]";
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(QuantGmmAlltoAllvTilingUT, QuantGmmAlltoAllvTilingTest,

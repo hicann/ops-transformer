@@ -45,15 +45,10 @@ static aclnnStatus CheckAndHandleCommMode(const char* commModeStr, uint8_t& comm
     const size_t maxLength = 7UL;
     // 获取通信引擎参数
     if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510 ||
-        GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) {
+        GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) { // A6(ascend960)复用A5通路，支持ai_cpu/ccu
         if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
             commModeEnum = Mc2Comm::COMM_MODE_AICPU;
         } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
-            if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) {
-                // A6(ascend960)无CCU引擎，v2的commMode为显式入参，直接拒绝
-                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A6 only support commMode 'ai_cpu', but got %s.", commModeStr);
-                return ACLNN_ERR_PARAM_INVALID;
-            }
             commModeEnum = Mc2Comm::COMM_MODE_CCU;
         } else {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Currently, commMode only support 'ccu', 'ai_cpu', but got %s.",
@@ -190,8 +185,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(void* workspace, uint64_t workspaceSiz
     if (NnopbaseSetHcclServerType) {
         if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510 ||
             op::GetCurrentPlatformInfo().GetCurNpuArch() ==
-                Ops::Base::
-                    DAV_9201) { // A6复用A5路径；commMode在GetWorkspaceSize阶段经CheckAndHandleCommMode校验，A6下handle只能为AICPU
+                Ops::Base::DAV_9201) { // A6复用A5路径；commMode在GetWorkspaceSize阶段经CheckAndHandleCommMode校验
             if (commMode == Mc2Comm::COMM_MODE_AICPU) {
                 OP_LOGD("Arch35 platform, use AICPU mode");
                 NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_AICPU);

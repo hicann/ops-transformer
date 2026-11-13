@@ -13,6 +13,7 @@
 #include "../../../../op_host/op_tiling/grouped_mat_mul_allto_allv_tiling.h"
 #include "mc2_tiling_case_executor.h"
 #include "mc2/common/tests/ut/formal_error_assertions.h"
+#include "mc2_hcom_topo_info.h"
 
 namespace GroupedMatMulAlltoAllvUT {
 
@@ -25,6 +26,10 @@ struct TestParam {
     bool omitCommMode{false};
     std::string socVersion{"Ascend910_93"};
     std::string commMode{"ai_cpu"};
+    // 960dt+ccu 组网 mock 形态: default(单层Mesh+CLOS混联,白名单拦截面)/fullmesh(纯fullmesh 1D主路径)/
+    // clos(纯CLOS)/multilevel(跨机多层)/queryfail(组网查询失败)/ranksize(超rank上限>16)
+    std::string topoMock{"default"};
+    uint64_t expectTilingKey{9UL};
 };
 
 struct TilingParams {
@@ -98,7 +103,46 @@ protected:
     {
         std::cout << "GroupedMatMulAlltoAllvArch22TilingTest TearDown" << std::endl;
     }
+
+    void TearDown() override
+    {
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
+    }
 };
+
+// 960dt(a6)+CCU 组网白名单 mock 路由: 正向用例显式 mock 单层纯 fullmesh 1D 主路径
+// (六键显式设置, 不隐式依赖 mocker 默认值; mocker 默认为单层 Mesh+CLOS 混联, 是 960dt CCU
+// 拦截面, 正向用例不 mock 会被默认拦截); 四类拦截面负向按 topoMock 逐类构造
+static void ApplyCcuTopoMock(Mc2Hcom::MockValues& mockValues, const std::string& socVersion,
+                             const std::string& commMode, const std::string& topoMock)
+{
+    if (socVersion != "Ascend960DT" || commMode != "ccu") {
+        return;
+    }
+    auto addFullmesh1DMainPath = [&mockValues](uint64_t userRankSize, uint64_t levelNums = 1U,
+                                               uint64_t topoInfoRet = static_cast<uint64_t>(HCCL_SUCCESS)) {
+        mockValues.emplace_back("l0InstTypeSet", 1ULL << COMM_TOPO_1DMESH);  // 实例类型位图恰为 1DMESH 单位
+        mockValues.emplace_back("l0CoverTypeSet", 1ULL << COMM_TOPO_1DMESH); // 覆盖类型位图恰为 1DMESH 单位
+        mockValues.emplace_back("level0Topo", static_cast<uint64_t>(Mc2Hcom::Mc2Level0Topo::MESH_1D)); // 日志辅助字段
+        mockValues.emplace_back("topoLevelNums", levelNums);    // 单层组网(默认)
+        mockValues.emplace_back("getTopoInfoRet", topoInfoRet); // 组网查询结果(默认成功)
+        mockValues.emplace_back("userRankSize", userRankSize);  // 防御面正常态(<=16)
+    };
+    if (topoMock == "fullmesh") {
+        addFullmesh1DMainPath(8U);
+    } else if (topoMock == "clos") { // 拦截面①: 纯CLOS
+        mockValues.emplace_back("l0InstTypeSet", 1ULL << COMM_TOPO_CLOS);
+        mockValues.emplace_back("l0CoverTypeSet", 1ULL << COMM_TOPO_CLOS);
+        mockValues.emplace_back("level0Topo", static_cast<uint64_t>(Mc2Hcom::Mc2Level0Topo::CLOS));
+    } else if (topoMock == "multilevel") { // 拦截面②: 跨机多层
+        addFullmesh1DMainPath(8U, 2U);
+    } else if (topoMock == "queryfail") { // 拦截面③: 组网查询失败
+        addFullmesh1DMainPath(8U, 1U, static_cast<uint64_t>(HCCL_E_PARA));
+    } else if (topoMock == "ranksize") { // 防御面: 超rank上限(>16)
+        addFullmesh1DMainPath(32U);
+    }
+    // "default": 保持默认混联形态, 即 960dt CCU 拦截面
+}
 
 TEST_P(GroupedMatMulAlltoAllvArch22TilingTest, ShapeSize)
 {
@@ -159,12 +203,13 @@ TEST_P(GroupedMatMulAlltoAllvArch22TilingTest, ShapeSize)
     // attrs_ is already RuntimeAttrs storage: removing its last entry simulates
     // a missing materialized default slot, not legal omission at the public IR.
     (void)ErrorManager::GetInstance().GetRawErrorMessages();
+    Mc2Hcom::MockValues hcomTopologyMockValues{
+        {"rankNum", testParam.status == ge::GRAPH_FAILED ? 8U : tilingParams.epWorldSize}};
+    ApplyCcuTopoMock(hcomTopologyMockValues, socVersion, testParam.commMode, testParam.topoMock);
     if (testParam.status == ge::GRAPH_FAILED) {
-        Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
         Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
     } else {
-        Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", tilingParams.epWorldSize}};
-        Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, 9UL);
+        Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, testParam.expectTilingKey);
     }
     if (testParam.testName == "Test_missing_comm_mode_retains_internal_fallback_a3") {
         Mc2ErrorCodeUT::ExpectInternalFallbackReport(
@@ -177,6 +222,20 @@ TEST_P(GroupedMatMulAlltoAllvArch22TilingTest, ShapeSize)
                                                {{"correct_value", "[2, 8]"}, {"op_name", "GroupedMatMulAlltoAllv"}});
     }
     (void)ErrorManager::GetInstance().GetRawErrorMessages();
+    // 960dt+ccu 白名单正向: 断言生效算法名被强制为 sole[mesh](经 Mc2CcTilingConfig 写入
+    // tilingData 的 algConfig, 覆盖 legacy 默认名 AlltoAll=level0:fullmesh;level1:pairwise)
+    if (socVersion == "Ascend960DT" && testParam.commMode == "ccu" && testParam.status == ge::GRAPH_SUCCESS) {
+        // Mc2ExecuteTestCase 内部已 Reset mocker, 断言用的二次执行前需重新注入白名单组网 mock
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValues(hcomTopologyMockValues);
+        TilingInfo tilingInfo;
+        const bool tilingOk = ExecuteTiling(tilingContextPara, tilingInfo);
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
+        ASSERT_TRUE(tilingOk);
+        const std::string rawTiling(reinterpret_cast<const char*>(tilingInfo.tilingData.get()),
+                                    tilingInfo.tilingDataSize);
+        EXPECT_NE(rawTiling.find("sole[mesh]"), std::string::npos)
+            << "960dt+ccu effective algConfig should be forced to sole[mesh]";
+    }
 }
 
 static TestParam g_testParams[] = {
@@ -205,6 +264,18 @@ static TestParam g_testParams[] = {
      ge::GRAPH_FAILED,
      false,
      "Ascend950"},
+    // A5 CCU: 白名单对非960dt零干预, 默认算法配置, key=1(有共享专家/无转置/CCU)
+    {"Test_a5_ccu", {}, {}, {}, ge::GRAPH_SUCCESS, false, "Ascend950", "ccu", "default", 1UL},
+    // A6(960dt) ai_cpu: 与A5行为一致, key=9
+    {"Test_a6_aicpu_unchanged", {}, {}, {}, ge::GRAPH_SUCCESS, false, "Ascend960DT", "ai_cpu", "default", 9UL},
+    // A6 ccu 白名单正向: 单层纯fullmesh 1D mock放行并强制sole[mesh], key=1
+    {"Test_a6_ccu_fullmesh", {}, {}, {}, ge::GRAPH_SUCCESS, false, "Ascend960DT", "ccu", "fullmesh", 1UL},
+    // A6 ccu 拦截面: 默认混联/纯CLOS/跨机多层/组网查询失败/超rank上限(>16)
+    {"Test_a6_ccu_meshclos_blocked", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend960DT", "ccu", "default"},
+    {"Test_a6_ccu_clos_blocked", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend960DT", "ccu", "clos"},
+    {"Test_a6_ccu_multilevel_blocked", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend960DT", "ccu", "multilevel"},
+    {"Test_a6_ccu_queryfail_blocked", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend960DT", "ccu", "queryfail"},
+    {"Test_a6_ccu_ranksize_blocked", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend960DT", "ccu", "ranksize"},
     {"Test_BSK_1", {{"BSK", "52428800"}}, {}, {}, ge::GRAPH_FAILED},
     {"Test_BS_1", {{"BS", "52428800"}}, {}, {}, ge::GRAPH_FAILED},
     {"Test_H1", {{"H1", "65536"}}, {}, {}, ge::GRAPH_FAILED},
