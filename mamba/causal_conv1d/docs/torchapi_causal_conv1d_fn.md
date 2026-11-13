@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-    因果一维卷积前向计算（prefill/chunk-prefill），封装aclnnCausalConv1dFn。沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后可选施加SiLU激活；计算完成后将当前序列部分数据更新到缓存。支持缓存索引（cacheIndices）、初始状态模式（initialStateMode）等特性。
+    因果一维卷积前向计算（prefill/chunk-prefill），封装aclnnCausalConv1dFn。沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后可选施加SiLU激活；计算完成后将当前序列部分数据更新到缓存。支持缓存索引（`cache_indices`）、初始状态标志（`has_initial_state`）与初始状态索引（`initial_state_idx`）等特性。
 
 - **计算公式**：
 
@@ -69,7 +69,7 @@ cann_ops_transformer.causal_conv1d_fn(
 | cache_indices | Tensor | 可选 | 缓存索引，指定每个序列对应的缓存状态在conv_states中的索引。默认None使用恒等映射。 | int32 | [batch] |
 | has_initial_state | Tensor | 可选 | 初始状态标志。1=使用缓存历史，0=零初始化（冷启动）。默认None全部零初始化。 | int32 | [batch] |
 | activation | str | 可选 | 激活函数类型，"silu"或"none"。默认值为"silu"。 | - | - |
-| pad_slot_id | int | 可选 | padding slot id。默认值为-1。 | - | - |
+| pad_slot_id | int | 可选 | 填充槽位ID，标识无需参与卷积计算的padding位置，命中该槽位的序列按padding处理。默认值为-1。 | - | - |
 | null_block_id | int | 可选 | 无效缓存槽位标记ID，cache_indices[i]==null_block_id时跳过该序列并输出填零。默认值为0。 | - | - |
 | block_idx_first_scheduled_token | Tensor | 可选 | 首个调度token块索引。 | int32 | [batch] |
 | block_idx_last_scheduled_token | Tensor | 可选 | 最后调度token块索引。 | int32 | [batch] |

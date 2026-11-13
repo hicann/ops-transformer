@@ -69,7 +69,7 @@ cann_ops_transformer.grouped_matmul_activation_quant(
 | --- | --- | --- | --- | --- | --- |
 | `x` | Tensor | 必选 | 左矩阵。MXFP4场景使用`torch.uint8`承载FLOAT4数据，并通过`x_dtype`指定对应类型。 | `torch.float8_e4m3fn`、`torch.float8_e5m2`、`torch_npu.float4_e2m1fn_x2`、`torch_npu.float4_e1m2fn_x2` | 2维 |
 | `group_list` | Tensor | 必选 | 分组信息。 | `torch.int64` | `(E,)` |
-| `weight` | List[Tensor] | 必选 | 右矩阵TensorList，长度仅支持1。调用者必须传入FRACTAL_NZ格式的`weight`；MXFP4场景使用`torch.uint8`承载FLOAT4数据，并通过`weight_dtype`指定对应类型。转置场景先对源Weight执行`npu_format_cast(..., 29)`，再对末两维执行transpose并传入该view。 | `torch.float8_e4m3fn`、`torch_npu.float4_e2m1fn_x2`、`torch_npu.float4_e1m2fn_x2` | 3维 |
+| `weight` | List[Tensor] | 必选 | 右矩阵TensorList，长度仅支持1。调用者必须传入FRACTAL_NZ格式的`weight`；MXFP4场景使用`torch.uint8`承载FLOAT4数据，并通过`weight_dtype`指定对应类型。转置场景先对源`weight`执行`npu_format_cast(..., 29)`，再对末两维执行transpose并传入该view。 | `torch.float8_e4m3fn`、`torch_npu.float4_e2m1fn_x2`、`torch_npu.float4_e1m2fn_x2` | 3维 |
 | `weight_scale` | List[Tensor] | 必选 | `weight`的量化scale，TensorList长度仅支持1。转置场景由源scale对中间两维执行transpose后传入。 | 通过`weight_scale_dtype`按`torch_npu.float8_e8m0fnu`解析 | 4维 |
 | `activation_type` | str | 必选 | 激活函数类型，当前仅支持`"gelu_tanh"`。 | string | - |
 | `bias` | List[Tensor] | 可选 | bias TensorList，默认值为`None`。当前MX场景必须为空，支持`None`、空TensorList或单个空Tensor。 | `torch.float32` | - |
@@ -139,7 +139,7 @@ MXFP4量化场景： 输入x和weight均为`torch_npu.float4_e2m1fn_x2`、`torch
 - `K`必须为偶数且不能为2。
 - `scale_alg=0`支持FLOAT4、FLOAT8输出；`scale_alg=1`仅支持FLOAT8输出；`scale_alg=2`仅支持FLOAT4_E2M1输出，且`dst_type_max`只能取0.0或`[6.0, 12.0]`。
 - 支持M为0或N为0的空Tensor场景，此时允许K为0。
-- 当`group_list_type=0`时表示每个group在M轴上的累计结束位置，最后一个值不大于M轴大小；`group_list_type=1`时表示每个group的M轴长度，数值总和不大于M轴大小。当`group_list_type=0`时，最后一个值不大于x中tensor的第一维，当`group_list_type`=1时，数值的总和不大于x中tensor的第一维。group_list中的值约束了输出数据的有效部分，group_list中未指定的部分将不会参与更新。
+- 当`group_list_type=0`时表示每个group在M轴上的累计结束位置，最后一个值不大于M轴大小；`group_list_type=1`时表示每个group的M轴长度，数值总和不大于M轴大小。当`group_list_type=0`时，最后一个值不大于x中Tensor的第一维，当`group_list_type`=1时，数值的总和不大于x中tensor的第一维。group_list中的值约束了输出数据的有效部分，group_list中未指定的部分将不会参与更新。
 
 ## 确定性计算
 

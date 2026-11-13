@@ -645,7 +645,7 @@ metadata校验
                     <li>dtype支持int32</li>
                     <li>shape为(b,)</li>
                     <li>取值仅支持非负整数</li>
-                    <li>seqused_cmp_kv中的值需小于等于kv_s</li>
+                    <li>seqused_cmp_kv中的值需小于等于cmp_kv_s</li>
                 </ul>
             </td>
             <td >
@@ -703,7 +703,7 @@ metadata校验
                     <li>dtype支持int32</li>
                     <li>shape为(b+1,)</li>
                     <li>取值仅支持非负整数</li>
-                    <li>其值应非递减（大于等于前一个值）排列，第一个元素为0且最后一个元素等于kv_t</li>
+                    <li>其值应非递减（大于等于前一个值）排列，第一个元素为0且最后一个元素等于cmp_kv_t</li>
                 </ul>
             </td>
             <td>

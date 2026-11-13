@@ -195,7 +195,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 - **sinks**（`Tensor`）：可选参数，注意力下沉tensor。shape为 `[N1]`。支持非连续，数据格式支持ND，数据类型支持`float32`。
 
-- **metadata**（`Tensor`）：可选参数，表示tiling下沉的aicpu算子输出结果。支持非连续，数据格式支持ND，数据类型支持`int32`。
+- **metadata**（`Tensor`）：可选参数，表示Tiling下沉的AI CPU算子输出结果。支持非连续，数据格式支持ND，数据类型支持`int32`。
 
 - **softmax_scale**（`double`）：可选参数，代表缩放系数。数据类型支持`double`，默认值：1.0 / sqrt(D)。
 
@@ -273,7 +273,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| metadata | Tensor | 必选 | 每个cube核上FlashAttention计算任务的Batch、Head、以及Q和K的分块的索引，以及每个vector核上FlashDecode的规约任务索引。数据格式为ND，不支持非连续的Tensor。 | int32 | (1024, ) |
+| metadata | Tensor | 必选 | 每个Cube核上FlashAttention计算任务的Batch、Head、以及Q和K的分块的索引，以及每个Vector核上FlashDecode的规约任务索引。数据格式为ND，不支持非连续的Tensor。 | int32 | (1024, ) |
 
 ## 约束说明
 

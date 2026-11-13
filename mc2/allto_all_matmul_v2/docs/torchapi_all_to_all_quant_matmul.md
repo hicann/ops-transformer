@@ -93,7 +93,7 @@ cann_ops_transformer.all_to_all_quant_matmul(
 | `group_sizes`    | List[int]    | 可选      | MX量化group大小，默认值为`None`；MX场景传`[1, 1, 32]`。                                                                    | int                                            | -              | -                                 |
 | `x1_dtype`       | int          | 可选      | `x1`的dtype，默认值为`None`（使用tensor的dtype）；MXFP4场景传296（float4_e2m1）。                                                 | int                                            | -              | -                                 |
 | `x2_dtype`       | int          | 可选      | `x2`的dtype，默认值为`None`（使用tensor的dtype）；MXFP4场景传296（float4_e2m1）。                                                 | int                                            | -              | -                                 |
-| `x1_scale_dtype` | int          | 可选      | `x1_scale`的dtype，默认值为`None`（使用tensor的dtype）；MX场景传293（float8_e8m0）。                                                           | int                                            | -              | -                                 |
+| `x1_scale_dtype` | int          | 可选      | `x1_scale`的dtype，默认值为`None`（使用Tensor的dtype）；MX场景传293（float8_e8m0）。                                                           | int                                            | -              | -                                 |
 | `x2_scale_dtype` | int          | 可选      | `x2_scale`的dtype，默认值为`None`（使用tensor的dtype）；MX场景传293（float8_e8m0）。                                                           | int                                            | -              | -                                 |
 | `y_dtype`        | int          | 可选      | 输出`y`的数据类型，默认值为`15`（BF16，ACL dtype 枚举）。                                           | int                                            | -              | -                                 |
 | `comm_mode`      | str          | 可选      | 通信模式，默认值为`"aiv_urma"`，当前仅支持`"aiv_urma"`。             | str                                         | -              | -                                 |
@@ -115,7 +115,7 @@ cann_ops_transformer.all_to_all_quant_matmul(
 - `H`需能被64整除。
 - `x1`、`x2`需为2D Tensor。
 - `x1`与`x2`需同为FP8或同为FP4。
-- 通信buffer大小约束：本算子使用HCCL内置通信buffer完成All-to-All通信，该buffer大小由环境变量`HCCL_BUFFSIZE`（单位MB，不配置时默认200MB，传入到框架层时会分配两倍，为400MB）控制。每个rank的commBuffer需容纳所有rank写来的数据，要求满足：`HCCL_BUFFSIZE * 2` >= `BS * (H * sizeof(x1_dtype) + ceil(H / 64) * 2) + 2MB`（字节），其中`sizeof(x1_dtype)`在FP8场景为1字节、FP4场景为0.5字节，`ceil(H / 64) * 2`为x1_scale的通信量（每64个元素1字节scale、末维2字节）。若不满足，算子执行时会在tiling阶段报错，此时可通过`export HCCL_BUFFSIZE=<建议值>`调大buffer后重试。
+- 通信buffer大小约束：本算子使用HCCL内置通信buffer完成All-to-All通信，该buffer大小由环境变量`HCCL_BUFFSIZE`（单位MB，不配置时默认200MB，传入到框架层时会分配两倍，为400MB）控制。每个rank的commBuffer需容纳所有rank写入的数据，要求满足：`HCCL_BUFFSIZE * 2` >= `BS * (H * sizeof(x1_dtype) + ceil(H / 64) * 2) + 2兆字节，其中`sizeof(x1_dtype)`在FP8场景为1字节、FP4场景为半字节（0.5字节），`ceil(H / 64) * 2`为x1_scale的通信量（每64个元素1字节scale、末维2字节）。若不满足，算子执行时会在Tiling阶段报错，此时可通过`export HCCL_BUFFSIZE=<建议值>`调大buffer后重试。
 - 接口的返回值为输出张量y和一个占位None，详见调用说明
 - 当前仅支持MX量化场景，`x1_quant_mode` 和 `x2_quant_mode` 都必须为 6 。
 

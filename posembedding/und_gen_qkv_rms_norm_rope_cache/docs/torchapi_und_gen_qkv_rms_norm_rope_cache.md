@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  本接口封装`aclnnUndGenQkvRmsNormRopeCache`，用于多模态大模型推理场景下的Q/K/V预处理与PagedAttention KV Cache更新。接口把理解阶段（undecoded）与生成阶段（generated）两段QKV输入按`cat_indices`间接寻址拼成一条输出序列，逐token沿头维度拆分出Q/K/V，对Q和K逐头执行RMSNorm归一化与M-RoPE（多模态旋转位置编码），V不参与归一化与旋转；Q作为返回值输出，K和V按`slot_mapping`写入分页KV Cache。RMSNorm权重按源token落在理解段还是生成段在两套权重间选择。计算全程float32，返回值与KV Cache均为bfloat16。
+  本接口封装`aclnnUndGenQkvRmsNormRopeCache`，用于多模态大模型推理场景下的Q/K/V预处理与PagedAttention KV Cache更新。接口把理解阶段（undecoded）与生成阶段（generated）两段QKV输入按`cat_indices`间接寻址拼成一条输出序列，逐token沿头维度拆分出Q/K/V，对Q和K逐头执行RMSNorm归一化与M-RoPE（多模态旋转位置编码），V不参与归一化与旋转；Q作为返回值输出，K和V按`slot_mapping`写入分页KV Cache。RMSNorm权重按源token落在理解段还是生成段在两套权重间选择。计算全程Float32，返回值与KV Cache均为BFloat16。
 
 - **原地更新**：
 
@@ -88,11 +88,11 @@ cann_ops_transformer.und_gen_qkv_rms_norm_rope_cache(
 
 ## 约束说明
 
-- 该接口支持推理场景下的单算子模式调用，同时在`ops/graph_convert/`下提供了TorchAir图模式converter。
+- 该接口支持推理场景下的单算子模式调用，同时在`ops/graph_convert/`下提供了TorchAir图模式转换器。
 - 仅支持`D=128`；`(num_heads_q, num_heads_k, num_heads_v)`仅支持`(8,1,1)`和`(16,2,2)`两种组合，且三者之和必须等于`und_qkv`的N维。
 - 当前版本要求`gen_qkv`、`gen_weights_q`、`gen_weights_k`、`cat_indices`四个参数全部传入，且`gen_len`为正数。传入`None`对应的退化路径（纯prefill、单序列恒等映射）暂不支持，调用时会返回失败。后续版本放开。
 - `Bs`不设限，它不参与寻址与切分，唯一约束是容量`Bn * Bs >= T`。
-- `T`不设上限，只要求为正；真实上限由KV Cache容量`Bn * Bs >= T`决定。上板已验证到`T = 64K`。
+- `T`不设上限，只要求为正；真实上限由KV Cache容量`Bn * Bs >= T`决定。上板已验证到`T = 64k`。
 - `mrope_section`的三项必须非负，且三项之和不超过`D/2`。
 - `k_cache`和`v_cache`必须内存连续；两者的`Bn`和`Bs`必须一致。
 - 以下取值属运行期数据，Host侧无法校验，由调用方保证：`slot_mapping`取值须落在`[0, Bn*Bs)`且互不重复，`positions`取值须落在`[0, max_pos)`，`cat_indices`取值须落在`[0, T)`。

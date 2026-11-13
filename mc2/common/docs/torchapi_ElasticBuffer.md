@@ -336,7 +336,7 @@ num_bytes_per_entry = Align32(hidden_size_bytes)
 num_cpu_bytes = Align2MB(num_bytes_per_entry × num_entries)
 ```
 
-其中 `AlignX(value) = ((value + X - 1) / X) × X`，`/` 表示整除。`num_bytes_per_entry` 按32 字节对齐，最终结果按2MB对齐。
+其中 `AlignX(value) = ((value + X - 1) / X) × X`，`/` 表示整除。`num_bytes_per_entry` 按32字节对齐，最终结果按2兆字节对齐。
 
 **函数原型**：
 
@@ -354,7 +354,7 @@ ElasticBuffer.get_engram_storage_size_hint(
 
 **输出说明**：
 
-- **num_cpu_bytes** (`int`)：CPU buffer大小（字节），用于engram_write的本地存储区（仅推理模式使用），已2MB对齐。
+- **num_cpu_bytes** (`int`)：CPU buffer大小（MB），用于engram_write的本地存储区（仅推理模式使用），已按2MB对齐。
 
 ### dispatch
 

@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-    为提升网络性能，将query和key两路旋转位置编码融合为一次kernel调用，返回旋转位置编码后的query和key输出张量，输入张量不被修改。
+    为提升网络性能，将query和key两路旋转位置编码融合为一次Kernel调用，返回旋转位置编码后的query和key输出张量，输入张量不被修改。
 
 - **计算公式**：
 
@@ -62,7 +62,7 @@ cann_ops_transformer.apply_rotary_pos_emb(query, key, cos, sin, layout="BSND", r
 | cos | Tensor | 必选 | 旋转位置编码余弦值张量，N维度必须等于1。 | 同query | 同query |
 | sin | Tensor | 必选 | 旋转位置编码正弦值张量，shape需与cos一致。 | 同query | 同cos |
 | layout | str | 可选 | 输入张量布局格式，支持"BSND"、"BSH"、"SBND"、"BNSD"、"TND"。默认值为"BSND"。 | - | - |
-| rotary_mode | str | 可选 | 旋转编码模式，支持"half"、"quarter"、"interleave"。默认值为"half"。 | - | - |
+| rotary_mode | str | 可选 | 旋转位置编码模式，支持"half"、"quarter"、"interleave"。默认值为"half"。 | - | - |
 
 ## 返回值说明
 

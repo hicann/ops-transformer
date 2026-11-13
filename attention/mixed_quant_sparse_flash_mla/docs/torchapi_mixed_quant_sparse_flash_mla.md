@@ -185,7 +185,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | ori_topk | int | 可选 | 表示ori_kv中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为None | int32 | - | -
 | cmp_topk | int | 可选 | 表示cmp_kv中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为None | int32 | - | -
 | rope_head_dim | int | 可选 | 表示rope头的维度。默认值为None | int32 | - | -
-| cmp_ratio | int | 可选 | 表示对cmp_kv的压缩率。默认值为None | int32 | - | -
+| cmp_ratio | int | 可选 | 表示对cmp_kv的压缩倍率。默认值为None | int32 | - | -
 | ori_mask_mode | int | 可选 | 表示q和ori_kv计算的mask模式。0：No mask。3：rightDownCausal模式。4：sliding window模式。默认值为None | int32 | - | -
 | cmp_mask_mode | int | 可选 | 表示q和cmp_kv计算的mask模式。0：No mask。3：rightDownCausal模式。默认值为None | int32 | - | -
 | ori_win_left | int | 可选 | 表示q和ori_kv计算中q对历史token计算的数量，-1表示无穷大，即全部参与运算。默认值为None | int32 | - | -
@@ -485,7 +485,7 @@ metadata校验
 
 <ul>
     <li>ori_mask_mode/cmp_mask_mode=0，全计算模式（默认值）</li>
-    <li>ori_mask_mode/cmp_mask_mode=3，Causal模式</li>
+    <li>ori_mask_mode/cmp_mask_mode=3，rightDownCausal模式</li>
     <li>ori_mask_mode=4，Sliding Window模式</li>
 </ul>
 

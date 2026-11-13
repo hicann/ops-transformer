@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-    在KV Cache的Epilog阶段对cache进行原地量化压缩更新，封装aclnnKvCompressEpilog。将bfloat16激活值x量化压缩后，按slot_mapping散写到cache，slot_mapping中值为-1的token跳过不处理。x尾轴d的后64列为rope段、前d-64列为nope段。支持三种量化模式：
+    在KV Cache的Epilog阶段对cache进行原地量化压缩更新，封装aclnnKvCompressEpilog。将bfloat16激活值x量化压缩后，按slot_mapping散写到cache，slot_mapping中值为-1的token跳过不处理。x尾轴d的后64列为RoPE段、前d-64列为nope段。支持三种量化模式：
   - `"fp8_bf16"`/`"fp8_e8m0"`（内部0/1）：逐组动态量化压缩为FP8（uint8打包），rope段保留bfloat16；两者区别仅为每组scale的表示（bf16 / e8m0）；
   - `"hifloat8_fp4"`（内部2）：rope段hifloat8**静态**量化（乘x_scale后取hifloat8），nope段per-group **float4_E2M1 动态**量化（scale=组内amax/6以bfloat16写出）。
 

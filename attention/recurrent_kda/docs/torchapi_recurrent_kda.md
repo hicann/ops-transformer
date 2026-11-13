@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：aclnnRecurrentKda 是基于 Gated Delta Rule 的线性注意力前向计算接口的递归（recurrent）实现，面向 decode / MTP（Multi-Token Prediction）短序列场景。该接口按 token 逐步推进递归状态 $S_t$，支持变长输入（配合 `cuSeqlensOptional`）、MTP 槽位复用（配合 `ssmStateIndicesOptional` 与 `numAcceptedTokensOptional`），并可选在 kernel 内将 `gate` 解释为 raw gate、对 q/k 做 L2 normalize、对 beta 做 sigmoid 等数值稳定处理。
+- 接口功能：aclnnRecurrentKda 是基于 Gated Delta Rule 的线性注意力前向计算接口的递归（recurrent）实现，面向 decode / MTP（Multi-Token Prediction）短序列场景。该接口按 token 逐步推进递归状态 $S_t$，支持变长输入（配合 `cuSeqlensOptional`）、MTP 槽位复用（配合 `ssmStateIndicesOptional` 与 `numAcceptedTokensOptional`），并可选在Kernel内将 `gate` 解释为 raw gate、对 q/k 做 L2 normalize、对 beta 做 sigmoid 等数值稳定处理。
 - 计算公式：
 
   设内部状态矩阵按 `[V_dim, K_dim]` 参与计算。`useQkL2normInKernel=true` 时，算子先对每个 token 的 $q_t$、$k_t$ 做 L2 normalize；随后仅对 $q_t$ 乘缩放系数 `scale`，得到 $\bar q_t$、$\bar k_t$。
@@ -127,7 +127,7 @@ cann_ops_transformer.recurrent_kda(
 | initial_state | Tensor | 必选 | 初始递归状态；在原地模式下会被更新。 | bfloat16、float32 | state_v_first=False: [state_capacity,HV,K,V]；为 True: [state_capacity,HV,V,K] |
 | cu_seqlens | Tensor | 可选 | 变长序列累计长度。 | int32、int64 | [seq_num+1] |
 | ssm_state_indices | Tensor | 可选 | 每个逻辑序列对应的状态槽索引。 | int32、int64 | [seq_num] |
-| A_log | Tensor | 可选 | 内核门控模式使用的 A_log。 | float32 | [HV] |
+| A_log | Tensor | 可选 | Kernel门控模式使用的A_log。 | float32 | [HV] |
 | dt_bias | Tensor | 可选 | 内核门控模式使用的 dt bias。 | float32 | [HV*K] |
 | num_accepted_tokens | Tensor | 可选 | 投机解码中每个序列已接受的 token 数。 | int32、int64 | [seq_num] |
 | layout | str | 可选 | 输入布局，可选 BSND 或 TND，默认 BSND。 | - | - |

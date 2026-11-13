@@ -85,7 +85,7 @@
 
 > [!NOTE]
 >
-> dOut、query、key、value、attentionOut数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim，且满足D=H/N、T表示B和S合轴紧密排列的长度（Total tokens）。Tq表示输入query tensor的总token数、Nq表示输入query tensor的头数、Tkv表示输入key/value tensor的总token数、Nkv表示输入key/value tensor的头数。
+> dOut、query、key、value、attentionOut数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸HeadDim，且满足D=H/N、T表示B和S合轴紧密排列的长度（Total tokens）。Tq表示输入query tensor的总token数、Nq表示输入query tensor的头数、Tkv表示输入key/value tensor的总token数、Nkv表示输入key/value tensor的头数。
 
 ## 函数原型
 
@@ -134,7 +134,7 @@ cann_ops_transformer.block_sparse_attention_grad(
 | actual_seq_lengths | list[int] | TND时必选/其余可选 | 每个batch对应的query实际序列长度 | int64 | - | 长度为B | - |
 | actual_seq_lengths_kv | list[int] | TND时必选/其余可选 | 每个batch对应的key/value实际序列长度 | int64 | - | 长度为B | - |
 | atten_mask | Tensor | 可选 | 公式中的atten_mask。<ul><li>`mask_type=1`时必选，为块级变长掩码（INT32 counts）<br>支持的shape:[B, Nq, maxBlockNum, 2]，其中 $maxBlockNum=\max(\lceil Sq/block\_x\rceil, \lceil Skv/block\_y\rceil)$；</li><li>`mask_type=0`时必须为None。</li></ul> | int32 | ND | 4 | × |
-| mask_type | int | 可选 | attention计算中的掩码类型，默认0。<ul><li>当mask_type=0，即为不加mask场景（默认值），忽略`atten_mask`，按`block_sparse_mask`给定的块级稀疏模式计算；</li><li>当mask_type=1，即为块级变长掩码场景，按块级变长掩码计算，需配置`atten_mask`（INT32 counts）</li></ul> | int64 | - | - | - |
+| mask_type | int | 可选 | 注意力计算中的掩码类型，默认0。<ul><li>当mask_type=0，即为不加mask场景（默认值），忽略`atten_mask`，按`block_sparse_mask`给定的块级稀疏模式计算；</li><li>当mask_type=1，即为块级变长掩码场景，按块级变长掩码计算，需配置`atten_mask`（INT32 counts）</li></ul> | int64 | - | - | - |
 
 ## 返回值说明
 

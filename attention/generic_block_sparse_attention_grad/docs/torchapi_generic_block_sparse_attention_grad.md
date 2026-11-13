@@ -224,7 +224,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | softmax_precision  | int          | 可选      | Softmax精度级别，当前仅支持0，默认0                                           | int32            | -        | -                                                                        |
 | win_left           | int          | 可选      | 滑窗向前包含token数，不使能时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
 | win_right          | int          | 可选      | 滑窗向后包含token数，不使能时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
-| residual_block_mode | int/ResidualBlockMode/str | 可选 | 尾部不完整KV块的处理模式；默认0，由稀疏索引决定是否参与；=1时使用0；=0时必须使用1，尾部不完整块自动参与计算，且不包含在sparse_block_idx中；可传枚举、对应整数或枚举名字符串 | int64 | - | - |
+| residual_block_mode | int/ResidualBlockMode/str | 可选 | 尾部不完整KV块的处理模式；默认0，由稀疏索引决定是否参与；当layout_sparse_pattern=1时使用0；当layout_sparse_pattern=0时必须使用1，尾部不完整块自动参与计算，且不包含在sparse_block_idx中；可传枚举、对应整数或枚举名字符串 | int64 | - | - |
 | is_consistent_topk | bool | 可选 | 前置稀疏选择中，同一batch同一head内每个Q块选择的KV块最大数量是否一致，默认False；False代表不一致，True代表一致；=0 时False和True均按每行实际索引和数量计算；=1 时须与generic_block_sparse_attention_grad_metadata接口的配置一致 | bool | - | - |
 
 ## 返回值说明

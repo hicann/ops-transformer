@@ -27,7 +27,7 @@
 
     在Indexer注意力机制的Epilog阶段对KV Cache进行原地动态量化压缩更新，封装aclnnIndexerQuantCache。将float16/bfloat16激活值x按量化粒度（mxfp8/mxfp4 模式每32个元素一组，fp8/hifloat8 模式整行一组）量化为FP8（E4M3/E5M2）、HiFloat8、MX-FP4或HiFloat4，并按slot_mapping将量化结果与对应scale散写到cache/cache_scale，slot_mapping中值为-1的token跳过不处理。支持mxfp8、fp8、hifloat8、mxfp4、hifloat4 五种量化模式（各模式含义见参数说明quant_mode）。
 
-- 语义说明：
+- **语义说明**：
 
     底层aclnn接口对cacheRef、cacheScaleRef为原地实现；本Python接口同为原地语义：直接在输入cache、cache_scale上更新，未被slot_mapping命中的行保留原值。schema中cache、cache_scale分别标注为`Tensor(a!)`、`Tensor(b!)`，**本接口无返回值**，调用后直接使用入参cache、cache_scale。
 
@@ -96,7 +96,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>可选</td>
         <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧int）。默认值<code>"fp8"</code>。可选值与含义：
             <ul>
-                <li><code>"mxfp8"</code>(内部0)：MX-FP8 微缩放量化，x每32 个元素一组，输出FP8(e4m3)，每组一个e8m0(2 的幂指数) scale，cache_scale为float8_e8m0。</li>
+                <li><code>"mxfp8"</code>(内部0)：MX-FP8 微缩放量化，x每32个元素一组，输出FP8(e4m3)，每组一个e8m0(2 的幂指数) scale，cache_scale为float8_e8m0。</li>
                 <li><code>"fp8"</code>(内部1)：逐token动态FP8 量化，整行（headDim）一组，输出FP8(e4m3/e5m2)，每行一个float32 scale（scaleCol=1），cache_scale为float。</li>
                 <li><code>"hifloat8"</code>(内部2)：HiFloat8 静态量化（按x_scale缩放后取HiFloat8），整行一组，cache_scale为float。</li>
                 <li><code>"mxfp4"</code>(内部3)：MX-FP4 微缩放量化，x每32 个元素一组，输出FP4(每字节打包2 个值)，每组一个e8m0 scale，cache_scale为float8_e8m0。</li>

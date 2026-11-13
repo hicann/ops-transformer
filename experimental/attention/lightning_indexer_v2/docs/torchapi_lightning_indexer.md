@@ -162,7 +162,7 @@ cann_ops_transformer.lightning_indexer_candidate(
 | seqused_q | Tensor | 可选 | arch22 kernel 不消费，非空即 host 拒绝；输入位仅为算子原型 IR 兼容保留。 | int32 | (b,) |
 | seqused_k | Tensor | 可选 | 不同batch中k的真实使用长度。数据格式为ND。 | int32 | (b,) |
 | cmp_residual_k | Tensor | 可选 | 表示k压缩前token数量除以cmp_ratio的余数。可选传入，传入即参与k的有效长度计算；建议cmp_ratio不等于1且mask_mode等于3场景下传入以保证因果前缀精确。数据格式为ND。 | int32 | (b,) |
-| block_table | Tensor | 可选 | 表示PageAttention中KV存储使用的block映射表。layout_k为PA_BBND时必传，非PA_BBND时不传。数据格式为ND。 | int32 | (b, k_s_max/block_size) |
+| block_table | Tensor | 可选 | 表示PagedAttention中KV存储使用的block映射表。layout_k为PA_BBND时必传，非PA_BBND时不传。数据格式为ND。 | int32 | (b, k_s_max/block_size) |
 | output_idx_offset | Tensor | 可选 | arch22 kernel 不消费且输出索引恒不加 offset；非空即 host 拒绝（Atlas A2/A3 不支持该功能）。 | int32 | layout_q为BSND时shape为(b,q_s,k_n)；layout_q为TND时shape为(q_t,k_n) |
 | metadata | Tensor | 可选 | 950 平台分核协议专用；arch22 不消费且非空即 host 拒绝，传 None。| int32 | (1024,) |
 | max_seqlen_q | int | 可选 | arch22 kernel 不消费，仅接受 -1（缺省），其余取值 host 拒绝。 | int64 | - |

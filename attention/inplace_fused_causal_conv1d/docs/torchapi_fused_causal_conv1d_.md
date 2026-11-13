@@ -233,7 +233,7 @@ cann_ops_transformer.fused_causal_conv1d_(
   - decode场景（变长序列）：
     - x支持2维[cu_seq_len, dim]。
     - weight必须是2维[K, dim]，其中K固定为3。
-    - conv_states必须是3维[..., k-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
+    - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, max_num_blocks]，其中1维表示未开启APC，2维表示开启APC。
     - cu_seq_len范围[batch, batch * (max_draft_tokens + 1)]，每个batch的seq_len范围为[1, max_draft_tokens + 1]。dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
@@ -250,7 +250,7 @@ cann_ops_transformer.fused_causal_conv1d_(
 
 - 输入值域限制：
   - query_start_loc是累计偏移量，取值范围[0, cu_seq_len]，长度为batch+1，query_start_loc[i]表示第i个序列的起始偏移，query_start_loc[batch]表示最后一个序列的结束位置。
-  - block_size 为0或者大于等于2，apc开启时不为0。
+  - block_size 为0或者大于等于2，APC开启时不为0。
   - block_idx_first_scheduled_token、block_idx_last_scheduled_token、initial_state_idx、num_computed_tokens和cache_indices均存在时表示APC开启，且满足以下条件（i为batch的索引）：
     - cache_indices为2维
     - initial_state_idx[i] <= block_idx_first_scheduled_token[i] + 1

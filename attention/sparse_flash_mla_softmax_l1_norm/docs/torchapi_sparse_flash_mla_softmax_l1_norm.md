@@ -123,7 +123,7 @@ cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
 | seqused_k | Tensor | 可选 | 表示不同batch中k实际参与运算的token数。 | int32 | (B,) |
 | cmp_residual_k | Tensor | 可选 | 表示每个batch S2 // cmp_ratio后的余数。当k不为空且mask_mode=3时必须传入。 | int32 | (B,) |
 | topk_length | Tensor | 可选 | 表示每行q对应的k实际可选的topk长度。mask_mode=0且sparse_indices不为空时需要传，且必须为准确值。 | int32 | (B,S1,N2)、(T1,N2) |
-| metadata | Tensor | 必选 | 表示tiling下沉的aicpu算子输出结果，由`sparse_flash_mla_softmax_l1_norm_metadata`算子生成。 | int32 | (x) |
+| metadata | Tensor | 必选 | 表示tiling下沉的AI CPU算子输出结果，由`sparse_flash_mla_softmax_l1_norm_metadata`算子生成。 | int32 | (x) |
 | softmax_scale | float | 可选 | 表示缩放系数，默认值为1.0。推荐值：sqrt(head_dim)的倒数。 | float32 | - |
 | max_seqlen_k | int | 可选 | 表示k的最大序列长度，TND dense场景用于输出shape推导，默认值为0。 | int | - |
 | cmp_ratio | int | 可选 | 表示对k的压缩率，取值范围1~128，默认值为1。 | int | - |

@@ -139,7 +139,7 @@ cann_ops_transformer.sparse_flash_mla(
 | q_s / ori_kv_s / cmp_kv_s | `q`、`ori_kv`、`cmp_kv`的单Batch序列长度。 |
 | q_t / ori_kv_t / cmp_kv_t | TND布局下`q`、`ori_kv`、`cmp_kv`所有Batch序列长度的累加和。 |
 | d | 每个注意力头的维度，当前仅支持512。 |
-| ori_kv_k / cmp_kv_k | 输入`ori_sparse_indices`、`cmp_sparse_indices`中topK选出的token个数。 |
+| ori_kv_k / cmp_kv_k | 输入`ori_sparse_indices`、`cmp_sparse_indices`中TopK选出的token个数。 |
 | ori_kv_s_max / cmp_kv_s_max | 输入`ori_kv`、`cmp_kv`的最大序列长度。 |
 | ori_kv_block_size / cmp_kv_block_size | 输入`ori_kv`、`cmp_kv`在PagedAttention场景下的block大小。 |
 | ori_kv_block_nums / cmp_kv_block_nums | 输入`ori_kv`、`cmp_kv`在PagedAttention场景下的block数量。 |
@@ -237,7 +237,7 @@ cann_ops_transformer.sparse_flash_mla(
   - 当`ori_mask_mode`、`cmp_mask_mode`为0时，`ori_kv_k`、`cmp_kv_k`需要大于等于`ori_topk_length`、`cmp_topk_length`的最大值。
   - `ori_topk_length`、`cmp_topk_length`表示ori/cmp sparse_indices实际参与计算的长度。其值不能大于sparse_indices的最后一维大小，且当`seqused_q`传入时，topk_length对应有效部分的值需要大于等于0。
   - `cmp_residual_kv`配合`cmp_ratio`使用，可恢复压缩前KV长度。且每个batch的值需要小于`cmp_ratio`，即`cmp_residual_kv[i]` < `cmp_ratio`。仅当`cmp_kv`存在、`cmp_mask_mode=3`且`cmp_ratio!=1`时传入；`cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入。
-  - `attention_out`：tensor类型，公式中的输出，数据类型支持bfloat16和float16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
+  - `attention_out`：Tensor类型，公式中的输出，数据类型支持bfloat16和float16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
   - `return_softmax_lse`为False时返回shape为[0]的空tensor；`return_softmax_lse`为True时返回float32的log-sum-exp结果。
   <!-- npu="A3,910b" id5 -->
   - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>:`topk_value_mode`在上仅支持1。

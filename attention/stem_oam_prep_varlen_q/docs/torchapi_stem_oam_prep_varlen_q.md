@@ -77,7 +77,7 @@ cann_ops_transformer.stem_oam_prep_varlen_q(q, q_seq_lens, cu_seq_lens_q, *, q_s
         <td>q</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>表示变长Q tensor，所有batch的token拼接存储。对应公式中q。最后一维必须等于128。</td>
+        <td>表示变长Q Tensor，所有batch的token拼接存储。对应公式中q。最后一维必须等于128。</td>
         <td>float8_e4m3fn</td>
         <td>(total_tokens, H_q, D)，D=128</td>
     </tr>

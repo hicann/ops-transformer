@@ -98,7 +98,7 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
 
 ## 约束说明
 
-- 声明：参数slot_mapping属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+- 声明：参数slot_mapping属于Tensor。由于算子在Tiling阶段无法获取Tensor的具体数值，Tiling侧不对值进行校验，正确性需要用户自行保证。若传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - 该接口支持推理场景下使用。
 - 该接口支持单算子模式和图模式（torchair）调用。
 - key、value、key_cache、value_cache的数据类型必须一致，且必须为float8_e5m2或float8_e4m3fn。

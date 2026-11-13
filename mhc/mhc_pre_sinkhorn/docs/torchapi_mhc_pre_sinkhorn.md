@@ -273,7 +273,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
     <!-- end id9 -->
     <!-- npu="950" id10 -->
     - <term>Ascend 950PR&950DT系列产品</term>：
-        - 默认不支持Batch一致性，可通过Pytorch开关（[《TorchNPU自定义API》](https://www.hiascend.com/document/detail/zh/Pytorch/latest/apiref/customapi/docs/zh/custom_APIs/overview.md)中torch_npu.npu.set_deterministic_level）支持。开启Batch一致性后性能可能会有一定程度的劣化。
+        - 默认不支持Batch一致性，可通过PyTorch开关（[《TorchNPU自定义API》](https://www.hiascend.com/document/detail/zh/Pytorch/latest/apiref/customapi/docs/zh/custom_APIs/overview.md)中torch_npu.npu.set_deterministic_level）支持。开启Batch一致性后性能可能会有一定程度的劣化。
     <!-- end id10 -->
 
 ## 调用说明
