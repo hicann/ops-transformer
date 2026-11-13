@@ -407,9 +407,11 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
-    param.l2Byte = 96U * 1024U * 1024U; // 96: 96MB, 1024: Mb2Kb, 1024:Kb2Mb
-    param.fdTolerance = 10;             // 10: tolerance block
-    param.fdLeastBlock = 3;             // 3: least block
+    // Reserve one quarter of Ascend350's 64 MiB L2, matching the existing 950 budget ratio.
+    const uint32_t l2BudgetMiB = socVersion_.find("Ascend350") != std::string::npos ? 48U : 96U;
+    param.l2Byte = l2BudgetMiB * 1024U * 1024U;
+    param.fdTolerance = 10; // 10: tolerance block
+    param.fdLeastBlock = 3; // 3: least block
     param.fdOn = true;
     param.kernelSplitMode =
         dnUnmergedRouted ? load_balance::KernelSplitMode::BN1_S1_S2 : load_balance::KernelSplitMode::BN2_S1G_S2;
