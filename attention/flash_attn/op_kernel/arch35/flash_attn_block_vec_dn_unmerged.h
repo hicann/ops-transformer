@@ -27,6 +27,7 @@
 #include "../memory_copy_arch35.h"
 #include "../../../common/op_kernel/attn_sink_gs1.h"
 #include "../utils/attn_softmax_dn_bn1s1s2_vf.h"
+#include "vf_flashupdate_dn.h"
 #include "../../../common/op_kernel/arch_info.h"
 
 using namespace AscendC;
@@ -135,12 +136,26 @@ public:
     LocalTensor<uint8_t> ubLseOutBuffers_;
     uint32_t lseOutUbBufId_ = 0;
 
+    // 尾轮转置输出：能放得下就单独开一块（D=64/72），否则借 vec1 槽（D=128）。
+    // 借用 vec1 槽会与 vec1 的 P->L1 生产者共用同一个 Mutex id，单 S2 轮任务下会把
+    // vec1(n+1) 卡在 vec2(n) 的 MTE3 之后，丢失流水重叠（实测 D=64 S2=256 小 case 慢 ~20%）。
     // 这些缓冲区加起来不能超过 UB 可用大小, 超了直接编译报错(不含 FD block 复用的那块空间)
     static constexpr uint32_t UB_TOTAL_BYTES =
         UB_MM_RES_TOTAL_BYTES + UB_VEC2_RES_BUF_BYTES + UB_VEC1_RES_BUFCNT * UB_VEC1_RES_BUF_BYTES +
         UB_SOFTMAX_SUM_BUFCNT * UB_SOFTMAX_SUM_BUF_BYTES + UB_SOFTMAX_MAX_BUFCNT * UB_SOFTMAX_MAX_BUF_BYTES +
         UB_SOFTMAX_EXP_BUFCNT * UB_SOFTMAX_EXP_BUF_BYTES + UB_LSE_OUT_BUFCNT * UB_LSE_OUT_BUF_BYTES;
-    static_assert(UB_TOTAL_BYTES <= 254016U, "DN vec UB buffers exceed device capacity (248KB)");
+
+    // 尾轮转置输出：能放得下就单独开一块（D=64/72），否则借 vec1 槽（D=128）。
+    // 借用 vec1 槽会与 vec1 的 P->L1 生产者共用同一个 Mutex id，单 S2 轮任务下会把
+    // vec1(n+1) 卡在 vec2(n) 的 MTE3 之后，丢失流水重叠（实测 D=64 S2=256 小 case 慢 ~20%）。
+    static constexpr uint32_t dTransCT = (((uint32_t)FA_T::originalDV) + 15U) & ~15U;
+    static constexpr uint32_t UB_TRANS_BUF_BYTES = (mBaseSize / CV_RATIO) * (dTransCT + 16U) * sizeof(OUTPUT_T);
+    static constexpr bool USE_DEDICATED_TRANS_BUF = (UB_TOTAL_BYTES + UB_TRANS_BUF_BYTES <= 254016U);
+    LocalTensor<uint8_t> ubTransBuf_; // 仅 USE_DEDICATED_TRANS_BUF 时有效
+
+    static constexpr uint32_t UB_TOTAL_BYTES_FINAL =
+        UB_TOTAL_BYTES + (USE_DEDICATED_TRANS_BUF ? UB_TRANS_BUF_BYTES : 0U);
+    static_assert(UB_TOTAL_BYTES_FINAL <= 254016U, "DN vec UB buffers exceed device capacity (248KB)");
 
     const ConstInfo_t& constInfo_;
 
@@ -239,6 +254,11 @@ public:
                 UB_LSE_OUT_BUF_BYTES); // 输出BUF:
                                        // FD中间结果SUM和MAX拷出至GM，或者LSE结果拷出；按actVecMSize*8(fp32块对齐)定容
         addrUb += UB_LSE_OUT_BUFCNT * UB_LSE_OUT_BUF_BYTES;
+
+        if constexpr (USE_DEDICATED_TRANS_BUF) {
+            ubTransBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_TRANS_BUF_BYTES);
+            addrUb += UB_TRANS_BUF_BYTES;
+        }
     }
 
     __aicore__ inline void ResetSoftmaxBuffer(uint32_t slotIdx, const RunInfo& runInfo)
@@ -487,7 +507,10 @@ public:
     __aicore__ inline void Bmm2DataCopyOutTrans(const RunInfo& info, LocalTensor<OUTPUT_T>& attenOutUb,
                                                 uint32_t vecMIdx, uint32_t dealRowCount)
     {
-        FaUbTensor<OUTPUT_T> ubTensor{.tensor = attenOutUb, .rowCount = dealRowCount, .colCount = dTemplateAlign64};
+        // 转置输出的行距 = dTrans + 16（每行多 1 个 32B pad 块）
+        FaUbTensor<OUTPUT_T> ubTensor{.tensor = attenOutUb,
+                                      .rowCount = dealRowCount,
+                                      .colCount = AttentionCommon::Align((uint32_t)constInfo_.dSizeV, 16U) + 16U};
         GmCoordS1Only gmCoord{.bIdx = info.bIdx,
                               .n2Idx = info.n2Idx,
                               .gIdx = info.gIdx,
@@ -569,74 +592,91 @@ public:
             return;
         }
 
+        // 转置覆盖的列数（D=72 时为 80，组数 5）与输出行距（多 1 个 32B pad 块）
+        const uint32_t dSizeV = (uint32_t)constInfo_.dSizeV;
+        const uint32_t dTrans = AttentionCommon::Align(dSizeV, 16U);
+        const uint16_t groups = (uint16_t)(dTrans >> 4);
+
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
         {
             Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
             LocalTensor<T> mm2ResUbTensor = ubMmResBuffers_[mm2BufOffset].template ReinterpretCast<T>();
             if (unlikely(runInfo.isFirstS2Loop)) {
-                uint32_t vec2CalcSize = runInfo.actVecMSize * dTemplateAlign64;
-                DataCopy(ubVec2Res_, mm2ResUbTensor, vec2CalcSize);
+                // 首轮：DN 结果就是 mm2，整槽拷入累加器（含 D=72 的 72..79 列）
+                DataCopy(ubVec2Res_, mm2ResUbTensor, dTrans * (mBaseSize / CV_RATIO));
             } else {
                 LocalTensor<T> expUb =
                     softmaxExpBuf_[(runInfo.loop % UB_SOFTMAX_EXP_BUFCNT) * (UB_SOFTMAX_EXP_BUF_BYTES / sizeof(T))];
-                LocalTensor<T> pScaleUb;
-
-                float deSCalePreVValue = 1.0f;
-                if (!runInfo.isLastS2Loop) {
-                    FlashUpdateNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false, false>(
-                        ubVec2Res_, mm2ResUbTensor, ubVec2Res_, expUb, pScaleUb, runInfo.actVecMSize, dTemplateAlign64,
-                        1.0, 1.0);
-                } else {
-                    LocalTensor<float> sumUb = softmaxSumBuf_[(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) *
-                                                              (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
-                    FlashUpdateLastNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false, false>(
-                        ubVec2Res_, mm2ResUbTensor, ubVec2Res_, expUb, pScaleUb, sumUb, runInfo.actVecMSize,
-                        dTemplateAlign64, 1.0, 1.0);
-                }
+                FlashUpdateDn(ubVec2Res_, mm2ResUbTensor, expUb, runInfo.actVecMSize, (uint16_t)dTrans);
             }
             Mutex::Unlock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
         }
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx); // 通知下个BMM1: Vec2已读完mmRes, slot空闲
 
         if (runInfo.isLastS2Loop) {
-            if (unlikely(runInfo.isFirstS2Loop)) {
-                Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
-                LocalTensor<float> sumUb =
-                    softmaxSumBuf_[(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) * (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
-                LastDivNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false>(
-                    ubVec2Res_, ubVec2Res_, sumUb, runInfo.actVecMSize, (uint16_t)dTemplateAlign64, 0.0F);
-                Mutex::Unlock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
-            }
-            uint32_t mStartVec = 0;
-            uint32_t mDealSize = runInfo.actVecMSize;
-            if (constInfo_.enableFlashDecode && runInfo.isS2SplitCore) {
-                Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
-                Bmm2ResForFDCopyOut(runInfo, ubVec2Res_, mStartVec, mDealSize);
-                Mutex::Unlock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
+            LocalTensor<float> sumUb =
+                softmaxSumBuf_[(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) * (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
+            LocalTensor<OUTPUT_T> outNd;
+            if constexpr (USE_DEDICATED_TRANS_BUF) {
+                // 专用缓冲：不与 vec1 的生产者抢同一个 Mutex id，流水可重叠
+                outNd = ubTransBuf_.template ReinterpretCast<OUTPUT_T>();
             } else {
-                LocalTensor<OUTPUT_T> attenOut;
-                int64_t dSizeAligned64 = (int64_t)dVBaseSize;
+                outNd = ubVec1ResBuffers_[vec1ResUbBufId_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<OUTPUT_T>();
+            }
 
-                attenOut.SetAddr(ubVec2Res_.address_);
+            if (constInfo_.enableFlashDecode && runInfo.isS2SplitCore) {
+                uint32_t vec1SyncIdx = UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_;
+                // FD：update 已在上面完成，这里只做 Gather 转置 + 归一（fp32 行主序）
+                static_assert(UB_VEC1_RES_BUF_BYTES >= (uint32_t)(mBaseSize / CV_RATIO) * dTemplateAlign64 * sizeof(T),
+                              "Vec1 slot must hold the fd workspace tile");
+                LocalTensor<float> vec2TmpUb =
+                    ubVec1ResBuffers_[vec1ResUbBufId_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<float>();
                 Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
+                Mutex::Lock<PIPE_V>(vec1SyncIdx);
+                FlashOutputDnWorkspace(vec2TmpUb, ubVec2Res_, sumUb, (uint16_t)runInfo.actVecMSize, (uint16_t)dSizeV,
+                                       (uint16_t)dTemplateAlign64);
+                Mutex::Unlock<PIPE_V>(vec1SyncIdx);
+                Mutex::Unlock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
+                Mutex::Lock<PIPE_MTE3>(vec1SyncIdx);
+                Bmm2ResForFDCopyOut(runInfo, vec2TmpUb, 0, runInfo.actVecMSize);
+                Mutex::Unlock<PIPE_MTE3>(vec1SyncIdx);
+            } else {
+                static_assert(
+                    USE_DEDICATED_TRANS_BUF ||
+                        UB_VEC1_RES_BUF_BYTES >= (uint32_t)(mBaseSize / CV_RATIO) * (dTransCT + 16U) * sizeof(OUTPUT_T),
+                    "Vec1 slot must hold the transposed attention output");
+                uint16_t needInvalid = 0U;
                 if constexpr (HAS_MASK) {
-                    // 块内可能存在整行不可见(窗口无交集)的行时, 逐行清零输出并打 max 哨兵(LSE 置正无穷)
+                    // 与 ND 完全相同的 coarse 判定：至少一行不可见时才做逐 lane 清零
                     const int64_t firstRow = runInfo.s1Idx + runInfo.vecMbaseIdx;
-                    const int64_t lastRow = firstRow + mDealSize - 1;
+                    const int64_t lastRow = firstRow + (int64_t)runInfo.actVecMSize - 1;
                     if (firstRow + runInfo.nextTokensLeftUp < 0 ||
-                        lastRow - runInfo.preTokensLeftUp >= runInfo.actS2Size) {
-                        LocalTensor<float> maxUb = softmaxMaxBuf_[(runInfo.mloop % UB_SOFTMAX_MAX_BUFCNT) *
-                                                                  (UB_SOFTMAX_MAX_BUF_BYTES / sizeof(T))];
-                        RowInvalidUpdateVF<float>(ubVec2Res_, maxUb, mDealSize, constInfo_.dSizeV, dSizeAligned64,
-                                                  negativeIntScalar_);
+                        lastRow - runInfo.preTokensLeftUp >= (int64_t)runInfo.actS2Size) {
+                        needInvalid = 1U;
                     }
                 }
-                Cast(attenOut, ubVec2Res_, RoundMode::CAST_ROUND, mDealSize * dSizeAligned64);
-                Mutex::Unlock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
-
-                Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
-                Bmm2DataCopyOutTrans(runInfo, attenOut, mStartVec, mDealSize);
-                Mutex::Unlock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
+                LocalTensor<float> maxUb =
+                    softmaxMaxBuf_[(runInfo.mloop % UB_SOFTMAX_MAX_BUFCNT) * (UB_SOFTMAX_MAX_BUF_BYTES / sizeof(T))];
+                if constexpr (USE_DEDICATED_TRANS_BUF) {
+                    Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
+                    FlashUpdateDnLastTrans<OUTPUT_T, HAS_MASK>(outNd, ubVec2Res_, sumUb, maxUb, runInfo.actVecMSize,
+                                                               needInvalid, groups, negativeFloatScalar_);
+                    Mutex::Unlock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
+                    Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
+                    Bmm2DataCopyOutTrans(runInfo, outNd, 0, runInfo.actVecMSize);
+                    Mutex::Unlock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
+                } else {
+                    uint32_t vec1SyncIdx = UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_;
+                    Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
+                    Mutex::Lock<PIPE_V>(vec1SyncIdx);
+                    FlashUpdateDnLastTrans<OUTPUT_T, HAS_MASK>(outNd, ubVec2Res_, sumUb, maxUb, runInfo.actVecMSize,
+                                                               needInvalid, groups, negativeFloatScalar_);
+                    Mutex::Unlock<PIPE_V>(vec1SyncIdx);
+                    Mutex::Unlock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
+                    Mutex::Lock<PIPE_MTE3>(vec1SyncIdx);
+                    Bmm2DataCopyOutTrans(runInfo, outNd, 0, runInfo.actVecMSize);
+                    Mutex::Unlock<PIPE_MTE3>(vec1SyncIdx);
+                }
             }
         }
     }
