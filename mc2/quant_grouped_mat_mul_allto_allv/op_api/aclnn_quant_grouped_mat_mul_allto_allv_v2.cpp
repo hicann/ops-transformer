@@ -21,6 +21,7 @@
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
+#include "mc2_log_compat.h"
 #include "op_host/util/op_const_def.h"
 #include "opdev/platform.h"
 #include "securec.h"
@@ -102,10 +103,9 @@ static bool CheckMmOptionalConsistency(const aclTensor* mmXOptional, const aclTe
     const bool allPresent = hasMmX && hasMmWeight && hasMmY;
     const bool allAbsent = !hasMmX && !hasMmWeight && !hasMmY;
     if (!allPresent && !allAbsent) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "mmXOptional, mmWeightOptional, and mmYOptional must be either all empty or all non-empty, "
-                "but got: mmXOptional is %s, mmWeightOptional is %s, mmYOptional is %s.",
-                hasMmX ? "non-empty" : "empty", hasMmWeight ? "non-empty" : "empty", hasMmY ? "non-empty" : "empty");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnQuantGroupedMatMulAlltoAllvV2",
+                                                 "mmXOptional, mmWeightOptional, and mmYOptional",
+                                                 "These tensors must be either all empty or all non-empty");
         return false;
     }
     return true;
@@ -117,10 +117,9 @@ static bool CheckNullStatus(const aclTensor* sendCountsTensorOptional, const acl
                             const aclTensor* mmYOptional)
 {
     if ((sendCountsTensorOptional != nullptr) || (recvCountsTensorOptional != nullptr)) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
-                "sendCountsTensorOptional and recvCountsTensorOptional should be all empty, "
-                "but got: sendCountsTensorOptional is %s, recvCountsTensorOptional is %s.",
-                sendCountsTensorOptional ? "non-empty" : "empty", recvCountsTensorOptional ? "non-empty" : "empty");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnQuantGroupedMatMulAlltoAllvV2",
+                                                 "sendCountsTensorOptional and recvCountsTensorOptional",
+                                                 "Both tensors must be empty");
         return false;
     }
     if ((group == nullptr) || (strnlen(group, HCCL_GROUP_NAME_MAX) == 0)) { // HCCL_GROUP_NAME_MAX = 128U
@@ -159,11 +158,15 @@ static bool CheckRequiredScaleTensor(const aclTensor* xScale, const aclTensor* w
                                      const char* weightName, const char* modeName)
 {
     if (xScale == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "%sScale must not be null when %s quant mode is used.", xName, modeName);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            "aclnnQuantGroupedMatMulAlltoAllvV2", xName, "null",
+            (std::string(xName) + "Scale must not be null in " + modeName + " quant mode").c_str());
         return false;
     }
     if (weightScale == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "%sScale must not be null when %s quant mode is used.", weightName, modeName);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            "aclnnQuantGroupedMatMulAlltoAllvV2", weightName, "null",
+            (std::string(weightName) + "Scale must not be null in " + modeName + " quant mode").c_str());
         return false;
     }
     return true;
@@ -171,7 +174,8 @@ static bool CheckRequiredScaleTensor(const aclTensor* xScale, const aclTensor* w
 
 static bool CheckUnsupportQuantMode(QuantModeType mode, const char* xName)
 {
-    OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s quantMode (%ld) is not supported yet.", xName, static_cast<int64_t>(mode));
+    OP_LOGE_FOR_INVALID_VALUE("aclnnQuantGroupedMatMulAlltoAllvV2", xName,
+                              std::to_string(static_cast<int64_t>(mode)).c_str(), "a supported quant mode");
     return false;
 }
 
@@ -182,8 +186,12 @@ static bool CheckQuantMode(int64_t xQuantMode, int64_t weightQuantMode, const ac
     QuantModeType xMode = static_cast<QuantModeType>(xQuantMode);
     QuantModeType wMode = static_cast<QuantModeType>(weightQuantMode);
     if (xMode != wMode) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s QuantMode and %s QuantMode should be the same, but got %ld and %ld.",
-                xName, weightName, static_cast<int64_t>(xMode), static_cast<int64_t>(wMode));
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            "aclnnQuantGroupedMatMulAlltoAllvV2", "xQuantMode and weightQuantMode",
+            (std::string(xName) + "QuantMode=" + std::to_string(static_cast<int64_t>(xMode)) + ", " + weightName +
+             "QuantMode=" + std::to_string(static_cast<int64_t>(wMode)))
+                .c_str(),
+            "The x and weight quant modes must be the same");
         return false;
     }
     // 按量化模式分支校验
@@ -223,10 +231,10 @@ static bool CheckQuantParams(int64_t gmmXQuantMode, int64_t gmmWeightQuantMode, 
     }
     // 3) mm 存在时，mm 不能是非量化，且必须与 gmm 保持完全一致
     if (mmXQuantMode != gmmXQuantMode || mmWeightQuantMode != gmmWeightQuantMode) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "When mm inputs are set, mm quant modes should be exactly the same as gmm quant modes. "
-                "Expect (%ld, %ld), but got (%ld, %ld).",
-                gmmXQuantMode, gmmWeightQuantMode, mmXQuantMode, mmWeightQuantMode);
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            "aclnnQuantGroupedMatMulAlltoAllvV2", "mmXQuantMode and mmWeightQuantMode",
+            (std::to_string(mmXQuantMode) + " and " + std::to_string(mmWeightQuantMode)).c_str(),
+            "When mm inputs are set, mm quant modes must be the same as gmm quant modes");
         return false;
     }
     if (!CheckQuantMode(mmXQuantMode, mmWeightQuantMode, mmXScaleOptional, mmWeightScaleOptional, "mmX", "mmWeight")) {
@@ -261,13 +269,14 @@ static aclnnStatus CheckMxScaleShape(const aclTensor* scale, const char* name)
     }
     uint64_t scaleDimNum = scale->GetViewShape().GetDimNum();
     if (scaleDimNum < DIM_THREE) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In MX quant mode, %s dim num should be >= 3, but got %lu.", name,
-                scaleDimNum);
+        OP_LOGE_FOR_INVALID_SHAPEDIM("aclnnQuantGroupedMatMulAlltoAllvV2", name, std::to_string(scaleDimNum).c_str(),
+                                     "at least 3D");
         return ACLNN_ERR_PARAM_INVALID;
     }
     int64_t lastDim = scale->GetViewShape().GetDim(scaleDimNum - 1);
     if (lastDim != DIM_TWO) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In MX quant mode, %s last dim should be 2, but got %ld.", name, lastDim);
+        OP_LOGE_FOR_INVALID_SHAPE("aclnnQuantGroupedMatMulAlltoAllvV2", name, std::to_string(lastDim).c_str(),
+                                  "last dimension = 2");
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;

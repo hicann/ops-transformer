@@ -15,6 +15,7 @@
 #include "common/utils/op_mc2.h"
 #include "common/utils/op_mc2_def.h"
 #include "opdev/op_log.h"
+#include "mc2_log_compat.h"
 #include "opdev/common_types.h"
 #include "aclnnInner_bandwidth_test.h"
 
@@ -66,17 +67,18 @@ static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* dstRankId, c
     CHECK_RET(CheckNotNull(x, dstRankId, group, y, receiveCnt), ACLNN_ERR_PARAM_NULLPTR);
 
     if (worldSize <= 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "worldSize must be positive, got %ld", worldSize);
+        OP_LOGE_FOR_INVALID_VALUE("aclnnBandwidthTest", "worldSize", std::to_string(worldSize).c_str(),
+                                  "a positive value");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     if (maxBs <= 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "maxBs must be positive, got %ld", maxBs);
+        OP_LOGE_FOR_INVALID_VALUE("aclnnBandwidthTest", "maxBs", std::to_string(maxBs).c_str(), "a positive value");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     if (mode < 0 || mode > 1) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "mode must be 0 or 1, got %ld", mode);
+        OP_LOGE_FOR_INVALID_VALUE("aclnnBandwidthTest", "mode", std::to_string(mode).c_str(), "0 or 1");
         return ACLNN_ERR_PARAM_INVALID;
     }
 

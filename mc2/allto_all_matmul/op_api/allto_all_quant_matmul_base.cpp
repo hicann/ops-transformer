@@ -144,9 +144,9 @@ static bool Check1DScaleShape(const aclTensor* x2, const aclTensor* x2Scale, boo
     auto nVal = transposeX2 ? x2->GetViewShape().GetDim(0) : x2->GetViewShape().GetDim(1);
     auto x2ScaleDim = x2Scale->GetViewShape().GetDim(0);
     if (x2ScaleDim != nVal) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "The n-axis of x2 and x2ScaleDim should be same, but x2's n-axis is: %ld and x2ScaleDim is: %ld.", nVal,
-                x2ScaleDim);
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("aclnnAlltoAllQuantMatmul", "x2 and x2Scale",
+                                               (std::to_string(nVal) + " and " + std::to_string(x2ScaleDim)).c_str(),
+                                               "The N dimension of x2Scale must be equal to the N dimension of x2");
         return false;
     }
     return true;
@@ -174,19 +174,19 @@ static bool Check3DScaleShape(const aclTensor* x2, const aclTensor* x1Scale, con
     auto x1ScaleLastDim = x1Scale->GetViewShape().GetDim(2);
     auto x2ScaleLastDim = x2Scale->GetViewShape().GetDim(2);
     if (x2ScaleNVal != nVal) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "The n-axis of x2 and x2ScaleDim should be same, but x2's n-axis is: %ld and x2ScaleDim is: %ld.", nVal,
-                x2ScaleNVal);
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("aclnnAlltoAllQuantMatmul", "x2 and x2Scale",
+                                               (std::to_string(nVal) + " and " + std::to_string(x2ScaleNVal)).c_str(),
+                                               "The N dimension of x2Scale must be equal to the N dimension of x2");
         return false;
     }
     if (x1ScaleLastDim != expectedScaleLastDim) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The last dim of x1scale should be %ld, but now it is: %ld.",
-                expectedScaleLastDim, x1ScaleLastDim);
+        OP_LOGE_FOR_INVALID_SHAPE("aclnnAlltoAllQuantMatmul", "x1Scale", std::to_string(x1ScaleLastDim).c_str(),
+                                  (std::string("last dimension = ") + std::to_string(expectedScaleLastDim)).c_str());
         return false;
     }
     if (x2ScaleLastDim != expectedScaleLastDim) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The last dim of x2scale should be %ld, but now it is: %ld.",
-                expectedScaleLastDim, x2ScaleLastDim);
+        OP_LOGE_FOR_INVALID_SHAPE("aclnnAlltoAllQuantMatmul", "x2Scale", std::to_string(x2ScaleLastDim).c_str(),
+                                  (std::string("last dimension = ") + std::to_string(expectedScaleLastDim)).c_str());
         return false;
     }
     return true;
@@ -200,7 +200,8 @@ static bool CheckScaleShape(const aclTensor* x2, const aclTensor* x1Scale, const
     if (static_cast<QuantModeType>(x1QuantMode) == QuantModeType::MX_QUANT &&
         static_cast<QuantModeType>(x2QuantMode) == QuantModeType::MX_QUANT) {
         OP_API_CHECK(!transposeX2, {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In the mx quantization scenario, x2 must be transposed.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnAlltoAllQuantMatmul", "x2 and transpose_x2",
+                                                     "In MX quant mode, x2 must be transposed");
             return false;
         });
         constexpr int64_t MX_SCALE_LAST_DIM = 2;
@@ -327,9 +328,12 @@ static bool CheckMXQuantDtypesValidA5(const aclTensor* x1, const aclTensor* x2, 
                                              MX_SCENE, return false);
     if (x1->GetDataType() != x2->GetDataType() &&
         (x1->GetDataType() == op::DataType::DT_FLOAT4_E2M1 || x2->GetDataType() == op::DataType::DT_FLOAT4_E2M1)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "In mxquant scenario, x1 and x2 must have same dtype when one is fp4_e2m1, but found x1: %s, x2: %s.",
-                op::ToString(x1->GetDataType()).GetString(), op::ToString(x2->GetDataType()).GetString());
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            "aclnnAlltoAllQuantMatmul", "x1 and x2",
+            (std::string(op::ToString(x1->GetDataType()).GetString()) + " and " +
+             op::ToString(x2->GetDataType()).GetString())
+                .c_str(),
+            "In MX quant mode, x1 and x2 must have the same dtype when one uses FP4_E2M1");
         return false;
     }
     OP_CHECK_DTYPE_NOT_SUPPORT_WITH_SCENARIO("aclnnAlltoAllQuantMatmul", x1ScaleOptional,
@@ -360,9 +364,11 @@ static bool CheckHiF4QuantDtypesValidA6(const aclTensor* x1, const aclTensor* x2
     OP_CHECK_DTYPE_NOT_SUPPORT_WITH_SCENARIO("aclnnAlltoAllQuantMatmul", x2, X_DTYPE_HIF4_SUPPORT_LIST_A6, HIF4_SCENE,
                                              return false);
     if (x1->GetDataType() != x2->GetDataType()) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "In hif4 quant scenario, x1 and x2 must have same dtype, but found x1: %s, x2: %s.",
-                op::ToString(x1->GetDataType()).GetString(), op::ToString(x2->GetDataType()).GetString());
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON("aclnnAlltoAllQuantMatmul", "x1 and x2",
+                                               (std::string(op::ToString(x1->GetDataType()).GetString()) + " and " +
+                                                op::ToString(x2->GetDataType()).GetString())
+                                                   .c_str(),
+                                               "In HIF4 quant mode, x1 and x2 must have the same dtype");
         return false;
     }
     OP_CHECK_DTYPE_NOT_SUPPORT_WITH_SCENARIO("aclnnAlltoAllQuantMatmul", x1ScaleOptional,
@@ -372,7 +378,8 @@ static bool CheckHiF4QuantDtypesValidA6(const aclTensor* x1, const aclTensor* x2
     OP_CHECK_DTYPE_NOT_SUPPORT_WITH_SCENARIO("aclnnAlltoAllQuantMatmul", output, OUTPUT_DTYPE_HIF4_SUPPORT_LIST_A6,
                                              HIF4_SCENE, return false);
     if (biasOptional != nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "In hif4 quant scenario, bias is not supported, it must be None.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnAlltoAllQuantMatmul", "biasOptional",
+                                                 "In HIF4 quant mode, biasOptional must be null");
         return false;
     }
     if (alltoAllOutOptional != nullptr) {
@@ -658,7 +665,7 @@ extern "C" aclnnStatus aclnnAlltoAllQuantMatmulBaseGetWorkspaceSize(
     } else {
         // 对于 A2 和 A3，非连续则报错
         OP_API_CHECK(!MC2Aclnn::IsTensorContiguous(x2), {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The x2 must be contiguous, but it is non-contiguous.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnAlltoAllQuantMatmul", "x2", "x2 must be contiguous");
             return ACLNN_ERR_PARAM_INVALID;
         });
     }

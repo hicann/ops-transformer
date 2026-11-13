@@ -735,7 +735,9 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckInput()
 ge::graphStatus MatmulAllReduceTilingBase::CheckA16W16()
 {
     uint64_t nValue = GetNValue();
-    OP_TILING_CHECK(!CheckBiasShape(nValue), OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"),
+    OP_TILING_CHECK(!CheckBiasShape(nValue),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "bias", "unknown",
+                                                          "The shape of bias must be [n] or [1, n]"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(((mmrCtxInfo_.antiquant_scale_shape != nullptr) ||
                      (mmrCtxInfo_.antiquant_offset_shape != nullptr) || (mmrCtxInfo_.dequant_scale_shape != nullptr)),
@@ -756,7 +758,11 @@ bool MatmulAllReduceTilingBase::CheckBiasShape(const uint64_t nValue) const
 {
     const auto bias = mmrCtxInfo_.bias_shape;
     if (bias != nullptr) {
-        OP_TILING_CHECK(isPerBlock_, OP_LOGE_WITH_INVALID_INPUT(opName_, "bias"), return false);
+        OP_TILING_CHECK(
+            isPerBlock_,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "bias", "per-block mode",
+                                                  "The value of bias must not be provided in per-block mode"),
+            return false);
         const auto biasShapeSize = static_cast<size_t>(bias->GetStorageShape().GetShapeSize());
         uint64_t dimNum = bias->GetStorageShape().GetDimNum();
         OP_TILING_CHECK(
@@ -776,12 +782,18 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckA8W8()
     uint64_t mValue = GetMValue();
     uint64_t nValue = GetNValue();
     uint64_t kValue = GetKValue();
-    OP_TILING_CHECK(!CheckBiasShape(nValue), OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"),
+    OP_TILING_CHECK(!CheckBiasShape(nValue),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "bias", "unknown",
+                                                          "The shape of bias must be [n] or [1, n]"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(!CheckDequantScaleShape(nValue),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "dequantScale"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "dequantScale", "unknown",
+                                                          "The shape of dequantScale must be [n] or [1, n]"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(!CheckPertokenScaleShape(mValue, kValue),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "pertokenScale"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "pertokenScale", "unknown",
+                                                          "The shape of pertokenScale must be [m]"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         ((mmrCtxInfo_.antiquant_scale_shape != nullptr) || (mmrCtxInfo_.antiquant_offset_shape != nullptr)),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "antiquantScale/antiquantOffset", "not null",
@@ -790,7 +802,9 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckA8W8()
     if ((socVersion_ == platform_ascendc::SocVersion::ASCEND910B) || (npuArch_ == Ops::Base::DAV_3510) ||
         (npuArch_ == Ops::Base::DAV_9201)) { // A6与950一致，校验commQuantScale
         OP_TILING_CHECK(!CheckCommQuantScaleShape(nValue),
-                        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "commQuantScale"), return ge::GRAPH_FAILED);
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "commQuantScale", "unknown",
+                                                              "The shape of commQuantScale must be [n] or [1, n]"),
+                        return ge::GRAPH_FAILED);
     } else if (npuArch_ == Ops::Base::DAV_2002) {
         OP_TILING_CHECK(
             ((mmrCtxInfo_.comm_quant_scale_1_shape != nullptr) || (mmrCtxInfo_.comm_quant_scale_2_shape != nullptr)),
@@ -811,12 +825,18 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckEmptyTensor()
     // n为0的时候，框架拦截，走不进tiling逻辑。
     OP_TILING_CHECK(
         (mmrCtxInfo_.bias_shape != nullptr) && (mmrCtxInfo_.bias_shape->GetStorageShape().GetShapeSize() == 0),
-        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "bias", "0",
+                                                  "The shape size of bias must be greater than 0"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK((mmrCtxInfo_.x3_shape != nullptr) && (mmrCtxInfo_.x3_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "x3"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "x3", "0",
+                                                              "The shape size of x3 must be greater than 0"),
+                    return ge::GRAPH_FAILED);
     // 校验过input中的batch，M，N和out中的必须相等，所以这里只校验out是否是空tensor
     OP_TILING_CHECK(mmrCtxInfo_.y_shape->GetStorageShape().GetShapeSize() == 0,
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "y"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "y", "0",
+                                                              "The shape size of y must be greater than 0"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -825,24 +845,40 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckQuantEmptyTensor()
 {
     OP_TILING_CHECK(
         (mmrCtxInfo_.bias_shape != nullptr) && (mmrCtxInfo_.bias_shape->GetStorageShape().GetShapeSize() == 0),
-        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "bias", "0",
+                                                  "The shape size of bias must be greater than 0"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK((mmrCtxInfo_.x3_shape != nullptr) && (mmrCtxInfo_.x3_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "x3"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "x3", "0",
+                                                              "The shape size of x3 must be greater than 0"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK((mmrCtxInfo_.dequant_scale_shape != nullptr) &&
                         (mmrCtxInfo_.dequant_scale_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "dequantScale"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "dequantScale", "unknown",
+                                                          "The shape of dequantScale must be [n] or [1, n]"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK((mmrCtxInfo_.pertoken_scale_shape != nullptr) &&
                         (mmrCtxInfo_.pertoken_scale_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "pertokenScale"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((mmrCtxInfo_.comm_quant_scale_1_shape != nullptr) &&
-                        (mmrCtxInfo_.comm_quant_scale_1_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "commQuantScale1"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((mmrCtxInfo_.comm_quant_scale_2_shape != nullptr) &&
-                        (mmrCtxInfo_.comm_quant_scale_2_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "commQuantScale2"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "pertokenScale", "unknown",
+                                                          "The shape of pertokenScale must be [m]"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (mmrCtxInfo_.comm_quant_scale_1_shape != nullptr) &&
+            (mmrCtxInfo_.comm_quant_scale_1_shape->GetStorageShape().GetShapeSize() == 0),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "commQuantScale1", "0",
+                                                  "The shape size of commQuantScale1 must be greater than 0"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (mmrCtxInfo_.comm_quant_scale_2_shape != nullptr) &&
+            (mmrCtxInfo_.comm_quant_scale_2_shape->GetStorageShape().GetShapeSize() == 0),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "commQuantScale2", "0",
+                                                  "The shape size of commQuantScale2 must be greater than 0"),
+        return ge::GRAPH_FAILED);
     // 校验过input中的batch，M，N和out中的必须相等，所以这里只校验out是否是空tensor
     OP_TILING_CHECK((GetKValue() == 0) || (mmrCtxInfo_.y_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "y"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "y", "0",
+                                                              "The shape size of y must be greater than 0"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -850,19 +886,31 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckQuantEmptyTensor()
 ge::graphStatus MatmulAllReduceTilingBase::CheckWeightQuantEmptyTensor()
 {
     OP_TILING_CHECK((mmrCtxInfo_.x3_shape != nullptr) && (mmrCtxInfo_.x3_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "x3"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "x3", "0",
+                                                              "The shape size of x3 must be greater than 0"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         (mmrCtxInfo_.bias_shape != nullptr) && (mmrCtxInfo_.bias_shape->GetStorageShape().GetShapeSize() == 0),
-        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((mmrCtxInfo_.antiquant_scale_shape != nullptr) &&
-                        (mmrCtxInfo_.antiquant_scale_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "antiquantScale"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((mmrCtxInfo_.antiquant_offset_shape != nullptr) &&
-                        (mmrCtxInfo_.antiquant_offset_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "antiquantOffset"), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "bias", "0",
+                                                  "The shape size of bias must be greater than 0"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (mmrCtxInfo_.antiquant_scale_shape != nullptr) &&
+            (mmrCtxInfo_.antiquant_scale_shape->GetStorageShape().GetShapeSize() == 0),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "antiquantScale", "0",
+                                                  "The shape size of antiquantScale must be greater than 0"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (mmrCtxInfo_.antiquant_offset_shape != nullptr) &&
+            (mmrCtxInfo_.antiquant_offset_shape->GetStorageShape().GetShapeSize() == 0),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "antiquantOffset", "0",
+                                                  "The shape size of antiquantOffset must be greater than 0"),
+        return ge::GRAPH_FAILED);
     // 校验过input中的batch，M，N和out中的必须相等，所以这里只校验out是否是空tensor
     OP_TILING_CHECK(mmrCtxInfo_.y_shape->GetStorageShape().GetShapeSize() == 0,
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "y"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "y", "0",
+                                                              "The shape size of y must be greater than 0"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -871,7 +919,9 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckA16W8()
 {
     uint64_t kValue = GetKValue();
     uint64_t nValue = GetNValue();
-    OP_TILING_CHECK(!CheckBiasShape(nValue), OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"),
+    OP_TILING_CHECK(!CheckBiasShape(nValue),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "bias", "unknown",
+                                                          "The shape of bias must be [n] or [1, n]"),
                     return ge::GRAPH_FAILED);
     if (kValue == 0) {
         OP_LOGD(context_->GetNodeName(),
@@ -1341,7 +1391,10 @@ bool MatmulAllReduceTilingBase::CheckCommQuantScaleShape(const uint64_t nValue) 
         return true;
     }
     OP_TILING_CHECK((commQuantScale1Shape == nullptr) || (commQuantScale2Shape == nullptr),
-                    OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_quant_scale_1/comm_quant_scale_2"), return false);
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "comm_quant_scale_1/comm_quant_scale_2", "null",
+                        "The values of comm_quant_scale_1 and comm_quant_scale_2 must both be provided"),
+                    return false);
 
     uint64_t commQuantScaleOneDimNum = commQuantScale1Shape->GetStorageShape().GetDimNum();
     uint64_t commQuantScaleTwoDimNum = commQuantScale2Shape->GetStorageShape().GetDimNum();

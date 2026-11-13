@@ -115,23 +115,25 @@ static ge::graphStatus CheckAttrValuesValid(gert::TilingContext* context, const 
     auto maxBsPtr = attrs->GetAttrPointer<int64_t>(ATTR_MAX_BS_INDEX);
     auto modePtr = attrs->GetAttrPointer<int64_t>(ATTR_MODE_INDEX);
 
-    OP_TILING_CHECK((strnlen(groupPtr, MAX_GROUP_NAME_LENGTH) == 0) ||
-                        (strnlen(groupPtr, MAX_GROUP_NAME_LENGTH) == MAX_GROUP_NAME_LENGTH),
-                    OP_LOGE(nodeName, "group name is invalid, length should be in (0, %zu), but got length=%zu.",
-                            MAX_GROUP_NAME_LENGTH, strnlen(groupPtr, MAX_GROUP_NAME_LENGTH)),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (strnlen(groupPtr, MAX_GROUP_NAME_LENGTH) == 0) ||
+            (strnlen(groupPtr, MAX_GROUP_NAME_LENGTH) == MAX_GROUP_NAME_LENGTH),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "group", std::to_string(strnlen(groupPtr, MAX_GROUP_NAME_LENGTH)).c_str(),
+            (std::string("The length of group must be in (0, ") + std::to_string(MAX_GROUP_NAME_LENGTH) + ")").c_str()),
+        return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(
         (*worldSizePtr < MIN_WORLD_SIZE),
-        OP_LOGE(nodeName, "worldSize is invalid, should be positive, but got worldSize=%ld.", *worldSizePtr),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "worldSize", std::to_string(*worldSizePtr).c_str(), "a positive value"),
         return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK((*maxBsPtr <= 0),
-                    OP_LOGE(nodeName, "maxBs is invalid, should be positive, but got maxBs=%ld.", *maxBsPtr),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "maxBs", std::to_string(*maxBsPtr).c_str(), "a positive value"),
                     return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK((*modePtr < 0) || (*modePtr > 1),
-                    OP_LOGE(nodeName, "mode is invalid, should be 0 or 1, but got mode=%ld.", *modePtr),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "mode", std::to_string(*modePtr).c_str(), "0 or 1"),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -276,11 +278,15 @@ static ge::graphStatus CheckOutputTensorShape(gert::TilingContext* context, cons
 static ge::graphStatus CheckTensorShape(gert::TilingContext* context, const char* nodeName,
                                         BandwidthTestTilingData& tilingData)
 {
-    OP_TILING_CHECK(CheckInputTensorShape(context, nodeName, tilingData) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check input tensor shape failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckInputTensorShape(context, nodeName, tilingData) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors", "The shape of an input tensor is invalid"),
+        return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(CheckOutputTensorShape(context, nodeName, tilingData) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check output tensor shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "output tensors",
+                                                             "The shape of an output tensor is invalid"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -345,11 +351,16 @@ static ge::graphStatus BandwidthTestTilingCheckAttr(gert::TilingContext* context
     BandwidthTestTilingData* tilingData = context->GetTilingData<BandwidthTestTilingData>();
     std::string group = "";
 
-    OP_TILING_CHECK(GetAttrAndSetTilingData(context, nodeName, *tilingData, group) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Get attr and set tiling data failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        GetAttrAndSetTilingData(context, nodeName, *tilingData, group) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "operator attributes", "An operator attribute is invalid"),
+        return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(CheckTensorShape(context, nodeName, *tilingData) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check tensor shape failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckTensorShape(context, nodeName, *tilingData) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors and output tensors",
+                                                 "The shape of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(CheckWinSize(context, tilingData, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Tiling check winsize failed."), return ge::GRAPH_FAILED);

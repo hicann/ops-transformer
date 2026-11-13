@@ -315,7 +315,7 @@ extern "C" aclnnStatus aclnnAlltoAllMatmulBaseGetWorkspaceSize(
     } else {
         // 对于 A2 和 A3，非连续则报错
         OP_API_CHECK(!MC2Aclnn::IsTensorContiguous(x2), {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The x2 must be contiguous, but it is non-contiguous.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnAlltoAllMatmul", "x2", "x2 must be contiguous");
             return ACLNN_ERR_PARAM_INVALID;
         });
     }

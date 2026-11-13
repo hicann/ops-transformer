@@ -272,14 +272,23 @@ static ge::graphStatus TilingCheckEngramFetch(const gert::TilingContext* context
     OP_TILING_CHECK(CheckTensorPtrNullptr(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "params check nullptr failed."), return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(CheckTensorDataType(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "params dataType is invalid."),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckTensorDataType(context) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors and output tensors",
+                                                 "The dtype of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(CheckTensorDim(context, numTokens) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "params shape is invalid."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckTensorDim(context, numTokens) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors and output tensors",
+                                                 "The shape of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(CheckTensorFormat(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "params format is invalid."),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckTensorFormat(context) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors and output tensors",
+                                                 "The format of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -495,10 +504,9 @@ static ge::graphStatus CheckFetchedSf(const char* nodeName, const gert::CompileT
     int64_t fetchedSfDim0 = storageShape.GetDim(0);
     dim1 = storageShape.GetDim(1);
     OP_TILING_CHECK(dim1 <= 0 || !IsSfValueDtype(desc->GetDataType()),
-                    OP_LOGE(nodeName,
-                            "invalid fetchedSf: dim0=%ld, dim1=%ld, dtype=%s; when fetchedSf is 2D, dim1 must be "
-                            "positive and dtype must be DT_FLOAT or DT_FLOAT8_E8M0.",
-                            fetchedSfDim0, dim1, Ops::Base::ToString(desc->GetDataType()).c_str()),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        nodeName, "fetchedSf",
+                        "dim1 must be positive and the dtype must be DT_FLOAT or DT_FLOAT8_E8M0 when fetchedSf is 2D"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(fetchedSfDim0 != numTokens,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
@@ -514,8 +522,9 @@ static ge::graphStatus CheckTrainingSfTable(const char* nodeName, const gert::Co
     OP_TILING_CHECK(
         desc == nullptr || shape == nullptr || shape->GetStorageShape().GetDimNum() != DIM_ONE ||
             shape->GetStorageShape().GetDim(0) != 1 || desc->GetDataType() != ge::DT_INT64,
-        OP_LOGE(nodeName, "training sfTable must be a 1-element DT_INT64 device-address tensor when fetchedSf "
-                          "is provided."),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            nodeName, "sfTable",
+            "In training mode, sfTable must be a 1-element DT_INT64 device-address tensor when fetchedSf is provided"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -568,8 +577,8 @@ static ge::graphStatus CheckSfTensors(const gert::TilingContext* context, bool i
     const bool hasSfTable = !IsEmptySfPlaceholder(sfTableDesc, sfTableShape);
     const bool hasFetchedSf = !IsEmptySfPlaceholder(fetchedSfDesc, fetchedSfShape);
     OP_TILING_CHECK(hasSfTable != hasFetchedSf,
-                    OP_LOGE(nodeName, "sfTable and fetchedSf must be provided together; got sfTable=", hasSfTable,
-                            ", fetchedSf=", hasFetchedSf),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "sfTable and fetchedSf",
+                                                             "sfTable and fetchedSf must be provided together"),
                     return ge::GRAPH_FAILED);
     if (!hasFetchedSf) {
         return ge::GRAPH_SUCCESS;
@@ -584,9 +593,11 @@ static ge::graphStatus CheckSfTensors(const gert::TilingContext* context, bool i
                         OP_LOGE(nodeName, "check training sfTable failed."), return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
-    OP_TILING_CHECK(CheckInferenceSfTable(nodeName, sfTableDesc, sfTableShape, fetchedSfDim1,
-                                          fetchedSfDesc->GetDataType(), numEntriesPerRank) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check inference sfTable failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckInferenceSfTable(nodeName, sfTableDesc, sfTableShape, fetchedSfDim1, fetchedSfDesc->GetDataType(),
+                              numEntriesPerRank) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "sfTable", "The shape or dtype of sfTable is invalid"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -826,7 +837,9 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext* context, const EngramFe
         int64_t numRanks = static_cast<int64_t>(tilingData.rankSize);
         int64_t numTokens = tilingData.numTokens;
         int64_t aivNum = static_cast<int64_t>(tilingData.aivNum);
-        OP_TILING_CHECK(aivNum <= 0, OP_LOGE(nodeName, "aivNum is %ld, must be positive.", aivNum),
+        OP_TILING_CHECK(aivNum <= 0,
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "aivNum", std::to_string(aivNum).c_str(),
+                                                              "The value of aivNum must be positive"),
                         return ge::GRAPH_FAILED);
 
         int64_t wsSdispls = AlignTo(numRanks * static_cast<int64_t>(sizeof(int64_t)), UB_ALIGN);

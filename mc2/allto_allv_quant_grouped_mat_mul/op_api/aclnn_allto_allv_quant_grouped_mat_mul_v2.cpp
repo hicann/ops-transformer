@@ -62,11 +62,15 @@ static bool CheckNullStatus(const aclTensor* sendCountsTensorOptional, const acl
 {
     // // 检查必选入参出参为非空
     if ((sendCountsTensorOptional != nullptr) || (recvCountsTensorOptional != nullptr)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "sendCountsTensorOptional and recvCountsTensorOptional should be empty.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnAlltoAllvQuantGroupedMatMulV2",
+                                                 "sendCountsTensorOptional and recvCountsTensorOptional",
+                                                 "Both tensors must be empty");
         return false;
     }
     if (permuteOutFlag == (permuteOutOptional == nullptr)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Optional output flag does not match optional output ptr.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnAlltoAllvQuantGroupedMatMulV2",
+                                                 "permuteOutFlag and permuteOutOptional",
+                                                 "The optional output flag and the optional output pointer must match");
         return false;
     }
     return true;
@@ -104,10 +108,8 @@ static bool CheckQuantModeValid(int64_t gmmXQuantMode)
 {
     if ((gmmXQuantMode != static_cast<int64_t>(QuantModeType::PERTENSOR_QUANT)) &&
         (gmmXQuantMode != static_cast<int64_t>(QuantModeType::MX_QUANT))) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "gmmXQuantMode should be 1(pertensor quant) or 6(mx quant), "
-                "but actual is %ld.",
-                gmmXQuantMode);
+        OP_LOGE_FOR_INVALID_VALUE("aclnnAlltoAllvQuantGroupedMatMulV2", "gmmXQuantMode",
+                                  std::to_string(gmmXQuantMode).c_str(), "1 or 6");
         return false;
     }
     return true;
@@ -357,11 +359,9 @@ static aclnnStatus CheckWeightScaleTransposeConsistency(const aclTensor* gmmWeig
         bool gmmWeightNotContiguous = IsTransposeTwoDims(gmmWeight, -1, -2);
         bool gmmWeightScaleNotContiguous = IsTransposeTwoDims(gmmWeightScale, -2, -3);
         if (gmmWeightNotContiguous != gmmWeightScaleNotContiguous) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "gmmWeight and gmmWeightScale transpose state must be consistent. "
-                    "gmmWeight is %s, but gmmWeightScale is %s.",
-                    gmmWeightNotContiguous ? "transposed(non-contiguous)" : "not transposed(contiguous)",
-                    gmmWeightScaleNotContiguous ? "transposed(non-contiguous)" : "not transposed(contiguous)");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                "aclnnAlltoAllvQuantGroupedMatMulV2", "gmmWeight and gmmWeightScale",
+                "The transpose states of gmmWeight and gmmWeightScale must be consistent");
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
@@ -372,11 +372,9 @@ static aclnnStatus CheckWeightScaleTransposeConsistency(const aclTensor* gmmWeig
         bool mmWeightNotContiguous = IsTransposeTwoDims(mmWeightOptional, -1, -2);
         bool mmWeightScaleNotContiguous = IsTransposeTwoDims(mmWeightScaleOptional, -2, -3);
         if (mmWeightNotContiguous != mmWeightScaleNotContiguous) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "mmWeight and mmWeightScale transpose state must be consistent. "
-                    "mmWeight is %s, but mmWeightScale is %s.",
-                    mmWeightNotContiguous ? "transposed(non-contiguous)" : "not transposed(contiguous)",
-                    mmWeightScaleNotContiguous ? "transposed(non-contiguous)" : "not transposed(contiguous)");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                "aclnnAlltoAllvQuantGroupedMatMulV2", "mmWeight and mmWeightScale",
+                "The transpose states of mmWeight and mmWeightScale must be consistent");
             return ACLNN_ERR_PARAM_INVALID;
         }
     }

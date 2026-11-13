@@ -548,13 +548,14 @@ static bool CheckTensorShape(const char* nodeName, const gert::Shape* xShape, co
     }
 
     if (!CommonCheckTensorShape(nodeName, xShape, weightShape, wDimM)) {
-        OP_LOGE(nodeName, "common tensor shape check failed.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x and weight", "The shape of x or weight is invalid");
         return false;
     }
 
     if (yShard == 0 || yShard == 1) {
         if (!YShardCheckTensorShape(nodeName, xShape, weightShape, yShard, epSize, tpSize, wDimH, wDimM)) {
-            OP_LOGE(nodeName, "yShard = [%ld] tensor shape check failed.", yShard);
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x, weight, and y",
+                                                     "The shape relation in the yShard scenario is invalid");
             return false;
         }
     } else {
@@ -564,7 +565,7 @@ static bool CheckTensorShape(const char* nodeName, const gert::Shape* xShape, co
 
     if (biasShape != nullptr) {
         if (!(CheckBiasShape(nodeName, weightShape, biasShape, yShard, tpSize, wDimH))) {
-            OP_LOGE(nodeName, "bias shape check failed.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "bias", "The shape of bias is invalid");
             return false;
         }
     }
@@ -662,7 +663,8 @@ static ge::graphStatus TilingCheckBatchMatMulReduceScatterAlltoAll(gert::TilingC
 
     // tensor shape 检查
     if (!CheckTensorShape(nodeName, xShape, weightShape, biasShape, epSize, tpSize, wDimM, wDimH, yShard)) {
-        OP_LOGE(nodeName, "Tensor shape check failed.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x, weight, and bias",
+                                                 "The shape of x, weight, or bias is invalid");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

@@ -515,7 +515,8 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::GetShapeAttrsInfo()
     // x1 shape: [M_total, Ka]; kernel expects M_per_rank = M_total / world_size
     auto* wsPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_WORLD_SIZE);
     if (!wsPtr || *wsPtr <= 0) {
-        OP_LOGE_WITH_INVALID_INPUT(opName, "world_size");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "world_size", wsPtr ? std::to_string(*wsPtr).c_str() : "null",
+                                              "The value of world_size must be positive");
         return ge::GRAPH_FAILED;
     }
     worldSize_ = static_cast<uint64_t>(*wsPtr);

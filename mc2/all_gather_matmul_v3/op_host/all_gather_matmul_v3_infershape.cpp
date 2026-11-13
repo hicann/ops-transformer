@@ -58,7 +58,8 @@ ge::graphStatus ResolveRankSize(const gert::InferShapeContext* context, int64_t&
     const int64_t* rankSizeAttr = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_RANK_SIZE);
     OPS_CHECK(rankSizeAttr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "rank_size"), return ge::GRAPH_FAILED);
     rankSize = *rankSizeAttr;
-    OPS_CHECK(rankSize <= 0, OP_LOGE(nodeName, "rank_size attr must be set, got %ld", rankSize),
+    OPS_CHECK(rankSize <= 0,
+              OP_LOGE_FOR_INVALID_VALUE(nodeName, "rank_size", std::to_string(rankSize).c_str(), "a positive value"),
               return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

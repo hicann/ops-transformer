@@ -422,10 +422,12 @@ static ge::graphStatus CheckScaleShapes(const gert::TilingContext* context, cons
     int64_t scaleKDim = (shapeInfo.k + static_cast<int64_t>(MX_SCALE_BLOCK) - 1) / static_cast<int64_t>(MX_SCALE_BLOCK);
     OP_TILING_CHECK(CheckOneScaleShape(context->GetOptionalInputShape(IDX_INPUT_X1_SCALE), nodeName, "x1_scale",
                                        shapeInfo.mPerRank, scaleKDim) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check x1_scale shape failed"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x1_scale", "The shape of x1_scale is invalid"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckOneScaleShape(context->GetOptionalInputShape(IDX_INPUT_X2_SCALE), nodeName, "x2_scale",
                                        shapeInfo.n, scaleKDim) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check x2_scale shape failed"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x2_scale", "The shape of x2_scale is invalid"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -437,14 +439,21 @@ static ge::graphStatus CheckTensorShape(const gert::TilingContext* context, Shap
 {
     const char* nodeName = context->GetNodeName();
 
-    OP_TILING_CHECK(CheckInputShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check input shape failed"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckInputShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors", "The shape of an input tensor is invalid"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckOutputShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check output shape failed"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "output tensors",
+                                                             "The shape of an output tensor is invalid"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckBiasShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check bias shape failed"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "bias", "The shape of bias is invalid"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckScaleShapes(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check scale shape failed"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x1_scale and x2_scale",
+                                                             "The shape of x1_scale or x2_scale is invalid"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -458,12 +467,21 @@ static ge::graphStatus CheckTensor(const gert::TilingContext* context, ShapeInfo
 
     OP_TILING_CHECK(CheckTensorPtrNullptr(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "check tensor nullptr failed"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckTensorDataType(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check tensor dtype failed"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckTensorFormat(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "check tensor format failed"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckTensorShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "check tensor shape failed"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckTensorDataType(context) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors and output tensors",
+                                                 "The dtype of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckTensorFormat(context) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors and output tensors",
+                                                 "The format of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckTensorShape(context, shapeInfo) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors and output tensors",
+                                                 "The shape of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

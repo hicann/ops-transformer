@@ -355,13 +355,23 @@ const ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckTensorShape(
     OP_TILING_CHECK((expertTokenNumsOutShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(nodeName_, "expertTokenNumsOut"),
                     return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(!CheckInputTensorShapeDim(), OP_LOGE(nodeName_, "Check input dims failed!"),
+    OP_TILING_CHECK(!CheckInputTensorShapeDim(),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName_, "input tensors",
+                                                             "The dimensions of an input tensor are invalid"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!CheckOutputTensorShapeDim(), OP_LOGE(nodeName_, "Check output dims failed!"),
+    OP_TILING_CHECK(!CheckOutputTensorShapeDim(),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName_, "output tensors",
+                                                             "The dimensions of an output tensor are invalid"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!CheckTensorShapeRelation(), OP_LOGE(nodeName_, "Check shape relation failed!"),
+    OP_TILING_CHECK(!CheckTensorShapeRelation(),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        nodeName_, "input tensors and output tensors",
+                        "The shape relation between input tensors and output tensors is invalid"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!CheckTensorShapeSize(), OP_LOGE(nodeName_, "Check shape size failed!"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(!CheckTensorShapeSize(),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName_, "input tensors and output tensors",
+                                                             "The size of an input tensor or output tensor is invalid"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -773,7 +783,8 @@ const ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckHcclBuffSize
     // arch35: totalWin 按 D/C 各半、区内 /4 乒乓
     OP_TILING_CHECK(
         (hcclBuffSize % 4) != 0,
-        OP_LOGE(nodeName_, "totalWinSize [%ld] must be divisible by 4 for D/C data partition.", hcclBuffSize),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName_, "HCCL_BUFFSIZE", std::to_string(hcclBuffSize).c_str(),
+                                              "The total window size must be divisible by 4 for D/C data partition"),
         return ge::GRAPH_FAILED);
     const int64_t dataBankSize = hcclBuffSize / 4;
     const int64_t dataNeed = epWorldSize * localExpertNum * maxBs * align;

@@ -79,13 +79,24 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::CheckOpInputInfo()
     OP_TILING_CHECK(CheckMxTensorFormat(context_, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check format failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckX2Transpose(context_, opName_, ALLTOALL_MATMUL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check x2transpose failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "x2 and transpose_x2",
+                                                             "In MX quant mode, x2 must be transposed"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckMatrixMulShapes(context_, opName_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check shape input and output shape failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckMxQuantTensorDataType(context_, opName_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check Dtype failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckMxQuantShapeInfo(context_, opName_, ALLTOALL_MATMUL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "input tensors and output tensors",
+                        "The shape relation between input tensors and output tensors is invalid"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckMxQuantTensorDataType(context_, opName_) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "input tensors and output tensors",
+                                                 "The dtype of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckMxQuantShapeInfo(context_, opName_, ALLTOALL_MATMUL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "input tensors and output tensors",
+                                                 "The shape of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckAlltoAllOut(context_, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check allToAllOut failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckGroupSize(context_, opName_, ALLTOALL_MATMUL_INDEX_SCHEMA) == ge::GRAPH_FAILED,
@@ -251,8 +262,10 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::CheckMxQuantTensorDataType(cons
     // 校验 bias 数据类型（如果存在）; HiF4 量化场景不支持 bias，仅允许为 None
     auto biasTensorDesc = context->GetOptionalInputDesc(INPUT_BIAS_INDEX);
     if (biasTensorDesc != nullptr) {
-        OP_TILING_CHECK(isHiF4_, OP_LOGE(opName, "The bias is not supported in HIFLOAT4 quant mode, it must be None."),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            isHiF4_,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "bias", "In HIFLOAT4 quant mode, bias must be None"),
+            return ge::GRAPH_FAILED);
         ge::DataType biasDtype = biasTensorDesc->GetDataType();
         OP_TILING_CHECK((biasDtype != ge::DT_FLOAT),
                         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "bias", Ops::Base::ToString(biasDtype).c_str(),
@@ -325,7 +338,9 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::CheckMxQuantShapeInfo(const ger
 {
     OP_TILING_CHECK(
         MatmulAlltoAllTilingUtil::CheckShapeInfo(context, opName, ALLTOALL_MATMUL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
-        OP_LOGE(opName, "Tiling common info check shape failed."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "input tensors and output tensors",
+                                                 "The shape of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
     const gert::StorageShape* x1Shape = context->GetInputShape(INPUT_X1_INDEX);
     const gert::StorageShape* x2Shape = context->GetInputShape(INPUT_X2_INDEX);
     const gert::StorageShape* x1ScaleShape = context->GetOptionalInputShape(INPUT_X1_SCALE_INDEX);
@@ -512,8 +527,11 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::InitTilingContextParameters()
     }
     // HiF4 量化仅支持 Hcomm(apace) 通路: all2all_out 非空或卡数超过上限时直接报错
     if (isHiF4_ && !usingApaceImpl_) {
-        OP_LOGE(opName_, "HIFLOAT4 quant mode only supports the hcomm path: rankDim must be no more than %lu.",
-                APACE_IMPL_MAX_RANK_DIM);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName_, "group rankDim", std::to_string(contextInfo_.args_.rankDim).c_str(),
+            (std::string("In HIFLOAT4 quant mode, the hcomm path requires rankDim to be no more than ") +
+             std::to_string(APACE_IMPL_MAX_RANK_DIM))
+                .c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -758,10 +776,10 @@ ge::graphStatus AlltoAllMxQuantMatmulHelper::GetShapeAttrsInfo()
     int64_t yDType = *yDtypePtr;
     auto x1ScaleTensorDesc = context_->GetOptionalInputDesc(INPUT_X1_SCALE_INDEX);
     auto x2ScaleTensorDesc = context_->GetOptionalInputDesc(INPUT_X2_SCALE_INDEX);
-    OP_TILING_CHECK((x1ScaleTensorDesc == nullptr),
-                    OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "x1scale tensor"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((x2ScaleTensorDesc == nullptr),
-                    OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "x2scale tensor"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK((x1ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "x1Scale"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK((x2ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "x2Scale"),
+                    return ge::GRAPH_FAILED);
     inputParams_.scaleDtype = x1ScaleTensorDesc->GetDataType();
     inputParams_.perTokenScaleDtype = x2ScaleTensorDesc->GetDataType();
     inputParams_.cDtype = static_cast<ge::DataType>(yDType);

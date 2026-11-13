@@ -118,7 +118,9 @@ ge::graphStatus CheckQuantMode(const char* nodeName, uint32_t quantMode, bool is
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "quant_mode", std::to_string(quantMode).c_str(), "0, 2, 3, 4, 5, 6 or 7"),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(IsMxQuantMode(quantMode) && isScales,
-                    OP_LOGE(nodeName, "scales must be absent in MX/MX_CLIP modes"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "quant_mode and scales",
+                                                             "scales must be absent in MX and MX_CLIP quant modes"),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -400,7 +402,9 @@ ge::graphStatus TilingNewQuantMode(gert::TilingContext* context, uint32_t quantM
     const int64_t sharedExpertNum = static_cast<int64_t>(info.expertNum) - info.moeExpertNum;
     const int64_t kAndShared = static_cast<int64_t>(info.K) + sharedExpertNum;
     OP_TILING_CHECK(static_cast<int64_t>(ffnDataShape[3]) != kAndShared,
-                    OP_LOGE(nodeName, "ffn_token_data_shape[3] must be equal to K + sharedExpertNum"),
+                    OP_LOGE_FOR_INVALID_LISTSIZE_WITH_REASON(
+                        nodeName, "ffn_token_data_shape", "index 3 is inconsistent with K + sharedExpertNum",
+                        "Element 3 of ffn_token_data_shape must be equal to K + sharedExpertNum"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(static_cast<int64_t>(ffnInfoShape[2]) != 2 + static_cast<int64_t>(info.BS) * kAndShared,
                     OP_LOGE(nodeName, "ffn_token_info_table_shape[2] is inconsistent with inputs"),
@@ -435,7 +439,9 @@ ge::graphStatus AttentionToFfnV2TilingFunc(gert::TilingContext* context)
     const gert::StorageShape* scalesShape = context->GetOptionalInputShape(7U); // scales输入索引
     bool isScales = scalesShape != nullptr && scalesShape->GetStorageShape().GetDimNum() != 0U;
     OP_TILING_CHECK(CheckQuantMode(context->GetNodeName(), quantMode, isScales) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context->GetNodeName(), "quant mode validation failed"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "quant_mode and scales",
+                                                             "The quant mode and scales combination is invalid"),
+                    return ge::GRAPH_FAILED);
     // Legacy path: quantMode 0 (FP16/BF16) and 2 (PERTOKEN+INT8) use v1 tiling
     bool useNewTiling = IsMxQuantMode(quantMode);
     if (useNewTiling) {

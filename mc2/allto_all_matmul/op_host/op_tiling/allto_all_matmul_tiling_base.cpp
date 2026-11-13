@@ -274,8 +274,10 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOut(const gert::TilingCon
                                                      "The shape dim of allToAllOut must be 2D"),
             return ge::GRAPH_FAILED);
         // shape校验
-        OP_TILING_CHECK(CheckAlltoAllOutShape(context, opName) != ge::GRAPH_SUCCESS,
-                        OP_LOGE(opName_, "Tiling check allToAllOutShape failed."), return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            CheckAlltoAllOutShape(context, opName) != ge::GRAPH_SUCCESS,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "allToAllOut", "The shape of allToAllOut is invalid"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -427,7 +429,9 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantShapeInfo(const gert::Tili
 {
     OP_TILING_CHECK(
         MatmulAlltoAllTilingUtil::CheckShapeInfo(context, opName, ALLTOALL_MATMUL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
-        OP_LOGE(opName, "Tiling common info check shape failed."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "input tensors and output tensors",
+                                                 "The shape of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
     ge::graphStatus status;
     const gert::StorageShape* x1Shape = context->GetInputShape(INPUT_X1_INDEX);
     const gert::StorageShape* x2Shape = context->GetInputShape(INPUT_X2_INDEX);

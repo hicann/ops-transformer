@@ -122,7 +122,9 @@ ge::graphStatus FFNToAttentionV2TilingFunc(gert::TilingContext* context)
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "tilingData"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(tilingData->ffnToAttentionV2Info.H > tilingData->ffnToAttentionV2Info.HS,
-                    OP_LOGE(context->GetNodeName(), "token_data_shape HS must be greater than or equal to x H"),
+                    OP_LOGE_FOR_INVALID_LISTSIZE_WITH_REASON(
+                        context->GetNodeName(), "token_data_shape", "HS is smaller than x H",
+                        "The HS element of token_data_shape must be greater than or equal to H of x"),
                     return ge::GRAPH_FAILED);
     const gert::StorageShape* xShape = context->GetInputShape(config.xIndex);
     OP_TILING_CHECK(xShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "xShape"),

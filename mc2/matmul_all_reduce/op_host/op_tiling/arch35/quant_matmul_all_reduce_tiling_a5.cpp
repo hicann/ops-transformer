@@ -635,7 +635,9 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::CheckDequantScaleType()
         if (dequantScaleType == ge::DT_FLOAT) {
             // fp8/hif8场景下，pertoken+pertensor/perchannel场景必须提供两个scale，类型为float
             OP_TILING_CHECK(mmrCtxInfo_.pertoken_scale == nullptr,
-                            OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "per_token_scale"),
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                context_->GetNodeName(), "per_token_scale", "null",
+                                "The value of per_token_scale must be provided when dequantScale is float"),
                             return ge::GRAPH_FAILED);
             auto perTokenScaleType = mmrCtxInfo_.pertoken_scale->GetDataType();
             OP_TILING_CHECK(
@@ -665,7 +667,9 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::CheckMXFPScenarioScaleType()
     auto dequantScaleType = mmrCtxInfo_.dequant_scale->GetDataType();
     if ((scenario_ == AllReduceScenario::MXFP4) || (scenario_ == AllReduceScenario::MXFP8)) {
         OP_TILING_CHECK(mmrCtxInfo_.pertoken_scale == nullptr,
-                        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "per_token_scale"),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            context_->GetNodeName(), "per_token_scale", "null",
+                            "The value of per_token_scale must be provided in the MXFP4/MXFP8 scenario"),
                         return ge::GRAPH_FAILED);
         auto perTokenScaleType = mmrCtxInfo_.pertoken_scale->GetDataType();
         OP_TILING_CHECK((dequantScaleType != ge::DT_FLOAT8_E8M0) || (perTokenScaleType != ge::DT_FLOAT8_E8M0),

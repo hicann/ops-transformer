@@ -524,8 +524,10 @@ inline ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context,
                         return ge::GRAPH_FAILED);
     }
     // 校验epSendCount的维度
-    OP_TILING_CHECK(CheckEpSendCountShape(context, tilingData) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CheckEpSendCountShape failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckEpSendCountShape(context, tilingData) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "epSendCount", "The shape of epSendCount is invalid"),
+        return ge::GRAPH_FAILED);
 
     // 校验expertScales的维度
     const gert::StorageShape* expertScalesStorageShape = context->GetInputShape(EXPERT_SCALES_INDEX);
@@ -547,8 +549,10 @@ inline ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context,
             ("[" + std::to_string(expertScalesDim0) + ", " + std::to_string(expertScalesDim1) + "]").c_str(),
             ("expertScales' dim1 should equal to k=" + std::to_string(expertIdsDim1)).c_str()),
         return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckSharedExpertXShape(context, tilingData) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CheckSharedExpertXShape failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckSharedExpertXShape(context, tilingData) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "sharedExpertX", "The shape of sharedExpertX is invalid"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -598,12 +602,12 @@ static bool CheckTensorShape(gert::TilingContext* context, MoeDistributeCombineV
     const gert::StorageShape* expandXStorageShape = context->GetInputShape(EXPAND_X_INDEX);
     int64_t expandXDim0 = expandXStorageShape->GetStorageShape().GetDim(0);
     int64_t expandXDim1 = expandXStorageShape->GetStorageShape().GetDim(1);
-    OP_TILING_CHECK(expandXDim0 < static_cast<int64_t>(A),
-                    OP_LOGE(nodeName,
-                            "expandX's dim0 should be greater than or equal to A, "
-                            "expandXDim0 = %ld, A = %ld",
-                            expandXDim0, static_cast<int64_t>(A)),
-                    return false);
+    OP_TILING_CHECK(
+        expandXDim0 < static_cast<int64_t>(A),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            nodeName, "expandX", (std::string("dim0=") + std::to_string(expandXDim0)).c_str(),
+            (std::string("Dim0 of expandX must be greater than or equal to A (") + std::to_string(A) + ")").c_str()),
+        return false);
     if (OpVersionManager::GetInstance().GetVersion() == OP_VERSION_1) {
         OP_TILING_CHECK((expandXDim1 != H_V1),
                         OP_LOGE_FOR_INVALID_VALUE(nodeName, "expandX(H)", std::to_string(expandXDim1).c_str(),
@@ -627,8 +631,10 @@ static bool CheckTensorShape(gert::TilingContext* context, MoeDistributeCombineV
                     return false);
     tilingData.moeDistributeCombineV2Info.k = static_cast<uint32_t>(expertIdsDim1);
     // 校验expandIdx、epSendCount、expertScales的维度
-    OP_TILING_CHECK(CheckInputTensorShape(context, tilingData) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CheckInputTensorShape failed."), return false);
+    OP_TILING_CHECK(
+        CheckInputTensorShape(context, tilingData) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors", "The shape of an input tensor is invalid"),
+        return false);
     // 校验x的维度
     const gert::StorageShape* xStorageShape = context->GetOutputShape(OUTPUT_X_INDEX);
     OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "x"), return false);
@@ -760,10 +766,15 @@ ge::graphStatus MoeDistributeCombineTilingImpl(gert::TilingContext* context, con
     }
     // Check and Set Attrs
     OP_TILING_CHECK(!CheckAndSetAttrs(context, *tilingData, localMoeExpertNum),
-                    OP_LOGE(nodeName, "attr check and set failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "operator attributes",
+                                                             "One or more operator attributes are invalid"),
+                    return ge::GRAPH_FAILED);
     // Shape
-    OP_TILING_CHECK(!CheckTensorShape(context, *tilingData, localMoeExpertNum),
-                    OP_LOGE(nodeName, "param dim check failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !CheckTensorShape(context, *tilingData, localMoeExpertNum),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors and output tensors",
+                                                 "The shape of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
     // Comm
     OP_TILING_CHECK(CheckCommAttrs(nodeName, *tilingData, localMoeExpertNum) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "CheckCommAttrs failed."), return ge::GRAPH_FAILED);

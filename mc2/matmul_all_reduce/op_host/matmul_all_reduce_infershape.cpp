@@ -80,7 +80,9 @@ static ge::graphStatus CheckMatmulKAndScale(const gert::InferShapeContext* conte
     const int64_t group_size = (p != nullptr ? *p : 0);
     OPS_CHECK(
         CheckScaleShape(context->GetOptionalInputShape(scale_idx), group_size, shape, is_trans_b) != ge::GRAPH_SUCCESS,
-        OP_LOGE(context->GetNodeName(), "Failed to check antiquant scale shape."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "scale", "unknown",
+                                              "The shape of scale must match the expected antiquant scale shape"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -131,7 +133,9 @@ static ge::graphStatus InferShapeForMatmulAllReduce(gert::InferShapeContext* con
     OPS_CHECK_NULL_WITH_CONTEXT(context, shape_out);
     MatmulShapeInfo shape;
     OPS_CHECK(InferShapeForMatmul(context, shape, false) != ge::GRAPH_SUCCESS,
-              OP_LOGE(context->GetNodeName(), "Failed to infer shape for matmul all reduce."), return ge::GRAPH_FAILED);
+              OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "matmul all reduce inputs",
+                                                       "The shapes of matmul all reduce inputs are invalid"),
+              return ge::GRAPH_FAILED);
     shape_out->SetDimNum(shape.output_dim);
     if (shape.output_dim == kMC2MaxShapeSize) {
         shape_out->SetDim(0U, shape.s);

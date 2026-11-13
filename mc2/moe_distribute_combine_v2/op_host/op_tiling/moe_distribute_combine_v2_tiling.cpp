@@ -1728,13 +1728,14 @@ static bool CheckAndSetGlobalBs(const gert::TilingContext* context, MoeDistribut
                                               "should be 0 or configured maxBs per rank * epWorldSize"),
                     return false);
 
-    OP_TILING_CHECK(mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
-                        *globalBsPtr > static_cast<int64_t>(epWorldSize) * BS_UPPER_BOUND,
-                    OP_LOGE(nodeName,
-                            "Configured maxBs per rank must not exceed %ld on A5, but got "
-                            "globalBs=%ld, epWorldSize=%u.",
-                            BS_UPPER_BOUND, *globalBsPtr, epWorldSize),
-                    return false);
+    OP_TILING_CHECK(
+        mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
+            *globalBsPtr > static_cast<int64_t>(epWorldSize) * BS_UPPER_BOUND,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "globalBs", std::to_string(*globalBsPtr).c_str(),
+            (std::string("The configured maxBs per rank must not exceed ") + std::to_string(BS_UPPER_BOUND) + " on A5")
+                .c_str()),
+        return false);
     tilingData.moeDistributeCombineV2Info.globalBs = static_cast<uint32_t>(*globalBsPtr);
     if (*globalBsPtr == 0) {
         tilingData.moeDistributeCombineV2Info.globalBs = static_cast<uint32_t>(expertIdsDim0) * epWorldSize;
@@ -1889,20 +1890,27 @@ static ge::graphStatus CheckRoceInputs(const gert::TilingContext* context, const
                         return ge::GRAPH_FAILED);
     }
     OP_TILING_CHECK(tiling.globalBs / tiling.epWorldSize > BS_UPPER_BOUND,
-                    OP_LOGE(nodeName, "ROCE common BS capacity globalBs / epWorldSize must not exceed 512"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        nodeName, "globalBs and epWorldSize",
+                        (std::to_string(tiling.globalBs) + " and " + std::to_string(tiling.epWorldSize)).c_str(),
+                        "In ROCE mode, globalBs divided by epWorldSize must not exceed 512"),
                     return ge::GRAPH_FAILED);
     if (!tiling.enablePreReduce || !tiling.hasExpertScales || tiling.epRankId < tiling.sharedExpertRankNum) {
         return ge::GRAPH_SUCCESS;
     }
     auto scales = context->GetOptionalInputShape(config.expandScalesIndex);
     auto desc = context->GetOptionalInputDesc(config.expandScalesIndex);
-    OP_TILING_CHECK(scales == nullptr || desc == nullptr,
-                    OP_LOGE(nodeName, "ROCE pre-reduce requires expandScales when expertScales is present"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        scales == nullptr || desc == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            nodeName, "expandScales", "expandScales is required when expertScales is present in ROCE pre-reduce mode"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(scales->GetStorageShape().GetDimNum() != ONE_DIM ||
                         scales->GetStorageShape().GetDim(0) < tiling.a || desc->GetDataType() != ge::DT_FLOAT ||
                         ge::GetPrimaryFormat(desc->GetStorageFormat()) != ge::FORMAT_ND,
-                    OP_LOGE(nodeName, "ROCE expandScales must be FP32 ND [A] with at least %u expert rows", tiling.a),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        nodeName, "expandScales",
+                        "In ROCE pre-reduce mode, expandScales must be FP32, ND, 1D, and have at least A expert rows"),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

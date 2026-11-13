@@ -605,7 +605,10 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::CheckInput()
                         OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "antiquant_offset"),
                         return ge::GRAPH_FAILED);
     }
-    OP_TILING_CHECK(CheckBiasInput(), OP_LOGE(context_->GetNodeName(), "Check bias failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckBiasInput(),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "bias", "unknown",
+                                                          "The shape of bias must be [n] or [1, n]"),
+                    return ge::GRAPH_FAILED);
     // x1,antiquantScale数据类型相同
     auto antiquantScaleType = mmrCtxInfo_.antiquant_scale->GetDataType();
     OP_TILING_CHECK(

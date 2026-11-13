@@ -865,10 +865,10 @@ static ge::graphStatus CheckTensorListEntryMatchesReference(const gert::StorageS
     const uint32_t referenceDimNum = referenceShape->GetStorageShape().GetDimNum();
     const uint32_t currentDimNum = currentShape->GetStorageShape().GetDimNum();
     OP_TILING_CHECK(currentDimNum != referenceDimNum,
-                    OP_LOGE(nodeName,
-                            "%s has %u dimensions, but %s[0] has %u dimensions; "
-                            "tensors in the same list must have matching dimensions.",
-                            entryName.c_str(), currentDimNum, tensorName.c_str(), referenceDimNum),
+                    OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                        nodeName, (entryName + " and " + tensorName + "[0]").c_str(),
+                        (std::to_string(currentDimNum) + "D and " + std::to_string(referenceDimNum) + "D").c_str(),
+                        "Tensors in the same dynamic input list must have matching shape dims"),
                     return ge::GRAPH_FAILED);
 
     bool shapeMismatch = false;
@@ -930,12 +930,13 @@ static ge::graphStatus CheckWeightDimRelation(const gert::StorageShape* shape, u
                                               const char* referenceName, const char* nodeName)
 {
     const uint32_t actualDimNum = shape->GetStorageShape().GetDimNum();
-    OP_TILING_CHECK(
-        actualDimNum != expectedDimNum,
-        OP_LOGE(nodeName, "%s must have %s %s, but got %u and %u dimensions, respectively.", tensorName,
-                expectedDimNum == referenceDimNum ? "the same number of dimensions as" : "one more dimension than",
-                referenceName, actualDimNum, referenceDimNum),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(actualDimNum != expectedDimNum,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        nodeName, tensorName, (std::to_string(actualDimNum) + "D").c_str(),
+                        expectedDimNum == referenceDimNum ?
+                            (std::string("The shape dim must match ") + referenceName) :
+                            (std::string("The shape dim must have one more dimension than ") + referenceName)),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1071,17 +1072,21 @@ static ge::graphStatus CheckStackedExpertDimConsistency(const gert::TilingContex
     auto weightScalesOneShape = context->GetDynamicInputShape(inputs.weightScalesOne, 0);
     auto weightScalesTwoShape = context->GetDynamicInputShape(inputs.weightScalesTwo, 0);
     int64_t expertCount = weightOneShape->GetStorageShape().GetDim(0);
-    OP_TILING_CHECK(
-        weightTwoShape->GetStorageShape().GetDim(0) != expertCount,
-        OP_LOGE(nodeName, "weight1 and weight2 expert counts must match for %s.", expertParams.expertTypeName),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(weightTwoShape->GetStorageShape().GetDim(0) != expertCount,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        nodeName, "weight1, weight2", "mismatched",
+                        (std::string("The first dimensions must have matching expert counts for ") +
+                         expertParams.expertTypeName + " inputs")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
     if (expertParams.hasWeightScales) {
         OP_TILING_CHECK(weightScalesOneShape->GetStorageShape().GetDim(0) != expertCount ||
                             weightScalesTwoShape->GetStorageShape().GetDim(0) != expertCount,
-                        OP_LOGE(nodeName,
-                                "Dim0 of weight1, weight2, weight_scales1 and weight_scales2 must have matching expert "
-                                "counts for %s inputs.",
-                                expertParams.expertTypeName),
+                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                            nodeName, "weight_scales1, weight_scales2", "mismatched",
+                            (std::string("The first dimensions must have matching expert counts for ") +
+                             expertParams.expertTypeName + " inputs")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -1174,11 +1179,14 @@ static ge::graphStatus CheckAndSetWeightAndScaleLayout(const gert::TilingContext
         OP_TILING_CHECK(CheckAndSetWeightScalePolicy(context, params.shared, nodeName) != ge::GRAPH_SUCCESS,
                         OP_LOGE(nodeName, "Shared expert weight scale policy is invalid."), return ge::GRAPH_FAILED);
     }
-    OP_TILING_CHECK(hasSharedWeightOne != hasSharedWeightTwo ||
-                        (params.shared.hasWeightScales &&
-                         (hasSharedWeightOne != hasSharedScalesOne || hasSharedWeightOne != hasSharedScalesTwo)),
-                    OP_LOGE(nodeName, "Shared expert weights and required weight scales must be provided together."),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        hasSharedWeightOne != hasSharedWeightTwo ||
+            (params.shared.hasWeightScales &&
+             (hasSharedWeightOne != hasSharedScalesOne || hasSharedWeightOne != hasSharedScalesTwo)),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "shared expert weights and weight scales", "partially provided",
+                                              "Shared expert weights and weight scales must be provided "
+                                              "together"),
+        return ge::GRAPH_FAILED);
     if (hasSharedWeightOne) {
         OP_TILING_CHECK(
             CheckExpertWeightAndScaleLayout(context, params.shared, weightDimNum, nodeName) != ge::GRAPH_SUCCESS,
@@ -1470,9 +1478,12 @@ static ge::graphStatus CheckDispatchInputShapes(const gert::TilingContext* conte
     const int64_t bs = xStorageShape->GetOriginShape().GetDim(0);
     const int64_t h = xStorageShape->GetOriginShape().GetDim(1);
     OP_TILING_CHECK(CheckXScalesShape(context, config, bs, h, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "x scales shape is invalid."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckRoutingInputShapes(context, config, bs, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "routing input shapes are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x scales", "The shape of x scales is invalid"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckRoutingInputShapes(context, config, bs, nodeName) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "routing inputs", "The shape of a routing input is invalid"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1486,7 +1497,9 @@ static ge::graphStatus CheckWeightAndScaleShapeRelations(const gert::TilingConte
 {
     OP_TILING_CHECK(
         CheckWeightShapeRelations(context, expertParams, config.xIndex, actMode, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE(nodeName, "weight shape relation is invalid."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "weight tensors",
+                                                 "The shape relation between weight tensors is invalid"),
+        return ge::GRAPH_FAILED);
 
     if (expertParams.shared.expertCount > 0) {
         // 两侧 W1 column 和 W2 row 已分别校验为 x.H，且各自满足相同的激活输出宽度关系。
@@ -1507,14 +1520,19 @@ static ge::graphStatus CheckWeightAndScaleShapeRelations(const gert::TilingConte
     if (expertParams.moe.hasWeightScales) {
         OP_TILING_CHECK(CheckWeightScaleShapeRelations(context, expertParams.moe, expertParams.isPerExpertWeightTensor,
                                                        nodeName) == ge::GRAPH_FAILED,
-                        OP_LOGE(nodeName, "MoE weight scale shape is invalid."), return ge::GRAPH_FAILED);
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "MoE weight scales",
+                                                                 "The shape relation of MoE weight scales is "
+                                                                 "invalid"),
+                        return ge::GRAPH_FAILED);
     }
 
     OP_TILING_CHECK(
         expertParams.shared.expertCount > 0 && expertParams.shared.hasWeightScales &&
             CheckWeightScaleShapeRelations(context, expertParams.shared, expertParams.isPerExpertWeightTensor,
                                            nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE(nodeName, "shared weight scale shape is invalid."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "shared weight scales",
+                                                 "The shape relation of shared weight scales is invalid"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

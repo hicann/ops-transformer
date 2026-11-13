@@ -79,13 +79,20 @@ ge::graphStatus MxQuantMatmulAllToAllTilingBase::CheckOpInputInfo()
                     OP_LOGE(opName_, "Tiling check x2transpose failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckMxTensorFormat(context_, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check format failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckMxQuantTensorDataType(context_, opName_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "tiling check Dtype failed in mx quant matmul all to all."),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckMxQuantShapeInfo(context_, opName_, MATMUL_ALLTOALL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check mx quant shape info failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckMxQuantTensorDataType(context_, opName_) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "input tensors and output tensors",
+                                                 "The dtype of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckMxQuantShapeInfo(context_, opName_, MATMUL_ALLTOALL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "input tensors and output tensors",
+                                                 "The shape of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckMxQuantMatrixMulShapes(context_, opName_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Tiling check mx quant matrix shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "x1, x2, and output", "The shape relation between x1, x2, and output is invalid"),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -557,10 +564,14 @@ ge::graphStatus MxQuantMatmulAllToAllTilingBase::CheckMxQuantMatrixMulShapes(con
 {
     OP_TILING_CHECK(MatmulAllToAllTilingBase::Check2DMatrixMulShapes(context, opName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Mx quant tiling check x1 x2 and y shape failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckQuantGroupSize(context, opName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Mx quant tiling check groupSize failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckQuantGroupSize(context, opName) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "groupSize", "invalid", "The value of groupSize is invalid"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckMxQuantScaleShapes(context, opName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "Mx quant tiling check scale shape failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "x1Scale and x2Scale",
+                                                             "The shape of x1Scale or x2Scale is invalid"),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -870,13 +881,12 @@ ge::graphStatus MxQuantMatmulAlltoAllHelper::GetShapeAttrsInfo()
     inputParams_.libApiWorkSpaceSize = tilingProcesser_.libApiWorkSpaceSize_;
     int64_t yDType = *context_->GetAttrs()->GetAttrPointer<int64_t>(ATTR_Y_DTYPE_INDEX);
     auto scaleTensorDesc = context_->GetOptionalInputDesc(INPUT_X2_SCALE_INDEX);
-    OP_TILING_CHECK((scaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "scale tensor"),
+    OP_TILING_CHECK((scaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "x2Scale"),
                     return ge::GRAPH_FAILED);
     inputParams_.scaleDtype = scaleTensorDesc->GetDataType();
     auto perTokenScaleTensorDesc = context_->GetOptionalInputDesc(INPUT_X1_SCALE_INDEX);
     OP_TILING_CHECK((perTokenScaleTensorDesc == nullptr),
-                    OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "perToken scale tensor"),
-                    return ge::GRAPH_FAILED);
+                    OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "x1Scale"), return ge::GRAPH_FAILED);
     inputParams_.perTokenScaleDtype = perTokenScaleTensorDesc->GetDataType();
     inputParams_.outDtype = static_cast<int64_t>(yDType);
     inputParams_.cDtype = static_cast<ge::DataType>(yDType);

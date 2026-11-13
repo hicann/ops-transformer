@@ -176,7 +176,9 @@ ge::graphStatus QuantBmmReduceScatterTiling::CheckGroupSize() const
         groupSizeN = groupSizeN == 0 ? 1 : groupSizeN;
         groupSizeK = groupSizeK == 0 ? HIF4_GROUP_SIZE : groupSizeK;
         OP_TILING_CHECK(groupSizeM != 1 || groupSizeN != 1 || groupSizeK != HIF4_GROUP_SIZE,
-                        OP_LOGE(opName_, "HiFP4 groupSize must be [1,1,64]"), return ge::GRAPH_FAILED);
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "groupSize", "invalid",
+                                                              "In HiFP4 mode, groupSize must be [1, 1, 64]"),
+                        return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
     if (quantMode_ == mc2tiling::Mc2QuantMode::MXFP_MODE) {
@@ -258,11 +260,15 @@ ge::graphStatus QuantBmmReduceScatterTiling::CheckMxScaleDim(const gert::Storage
         const bool isNFirstScale = x2ScaleDim0 == 1 && x2ScaleDim1 == x1Dim1DivMxFp8Size;
         const bool isKFirstScale = x2ScaleDim0 == x1Dim1DivMxFp8Size && x2ScaleDim1 == 1;
         OP_TILING_CHECK((!isNFirstScale && !isKFirstScale) || x2ScaleDim2 != EVEN_ALIGN,
-                        OP_LOGE(opName_,
-                                "When N is 1, x2Scale shape must be (1, %lu, %lu) or (%lu, 1, %lu), "
-                                "but got (%lu, %lu, %lu).",
-                                x1Dim1DivMxFp8Size, EVEN_ALIGN, x1Dim1DivMxFp8Size, EVEN_ALIGN, x2ScaleDim0,
-                                x2ScaleDim1, x2ScaleDim2),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            opName_, "x2Scale",
+                            (std::string("[") + std::to_string(x2ScaleDim0) + ", " + std::to_string(x2ScaleDim1) +
+                             ", " + std::to_string(x2ScaleDim2) + "]")
+                                .c_str(),
+                            (std::string("When N is 1, the shape of x2Scale must be [1, ") +
+                             std::to_string(x1Dim1DivMxFp8Size) + ", " + std::to_string(EVEN_ALIGN) + "] or [" +
+                             std::to_string(x1Dim1DivMxFp8Size) + ", 1, " + std::to_string(EVEN_ALIGN) + "]")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
     } else {
         // Transposed Scenario
@@ -454,14 +460,26 @@ bool QuantBmmReduceScatterTiling::HiF4SceneParamCheck(const gert::StorageShape* 
     const uint64_t scaleK = Ops::Base::CeilDiv(args_.kValue, HIF4_GROUP_SIZE);
     const uint64_t bScaleDim0 = args_.isBTrans ? args_.nValue : scaleK;
     const uint64_t bScaleDim1 = args_.isBTrans ? scaleK : args_.nValue;
-    OP_TILING_CHECK(aScale.GetDimNum() != MX_SCALE_DIM || bScale.GetDimNum() != MX_SCALE_DIM,
-                    OP_LOGE(opName_, "HiFP4 x1Scale and x2Scale must both be 3-dimensional"), return false);
+    OP_TILING_CHECK(
+        aScale.GetDimNum() != MX_SCALE_DIM || bScale.GetDimNum() != MX_SCALE_DIM,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(
+            opName_, "x1Scale and x2Scale",
+            (std::to_string(aScale.GetDimNum()) + "D and " + std::to_string(bScale.GetDimNum()) + "D").c_str(), "3D"),
+        return false);
     OP_TILING_CHECK(aScale.GetDim(0) != static_cast<int64_t>(args_.orgMValue) ||
                         aScale.GetDim(1) != static_cast<int64_t>(scaleK) || aScale.GetDim(2) != HIF4_SCALE_LAST_DIM ||
                         bScale.GetDim(0) != static_cast<int64_t>(bScaleDim0) ||
                         bScale.GetDim(1) != static_cast<int64_t>(bScaleDim1) || bScale.GetDim(2) != HIF4_SCALE_LAST_DIM,
-                    OP_LOGE(opName_, "HiFP4 scale shapes must be x1Scale=[%lu,%lu,1], x2Scale=[%lu,%lu,1]",
-                            args_.orgMValue, scaleK, bScaleDim0, bScaleDim1),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        opName_, "x1Scale and x2Scale",
+                        (std::string("[") + std::to_string(aScale.GetDim(0)) + ", " + std::to_string(aScale.GetDim(1)) +
+                         ", " + std::to_string(aScale.GetDim(2)) + "] and [" + std::to_string(bScale.GetDim(0)) + ", " +
+                         std::to_string(bScale.GetDim(1)) + ", " + std::to_string(bScale.GetDim(2)) + "]")
+                            .c_str(),
+                        (std::string("In HiFP4 mode, the shapes must be x1Scale=[") + std::to_string(args_.orgMValue) +
+                         ", " + std::to_string(scaleK) + ", 1] and x2Scale=[" + std::to_string(bScaleDim0) + ", " +
+                         std::to_string(bScaleDim1) + ", 1]")
+                            .c_str()),
                     return false);
     return true;
 }
@@ -506,20 +524,39 @@ ge::graphStatus QuantBmmReduceScatterTiling::CheckScale() const
                     return ge::GRAPH_FAILED);
 
     const bool hasFp4Input = args_.geAType == ge::DT_FLOAT4_E2M1 || args_.geBType == ge::DT_FLOAT4_E2M1;
-    OP_TILING_CHECK(hasFp4Input && (x1ScaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0 ||
-                                    x2ScaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0 ||
-                                    x1ScaleShape->GetStorageShape().GetDimNum() != MX_SCALE_DIM ||
-                                    x2ScaleShape->GetStorageShape().GetDimNum() != MX_SCALE_DIM),
-                    OP_LOGE(opName_, "MXFP4 requires two 3-D FLOAT8_E8M0 scale tensors"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        hasFp4Input &&
+            (x1ScaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0 || x2ScaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0 ||
+             x1ScaleShape->GetStorageShape().GetDimNum() != MX_SCALE_DIM ||
+             x2ScaleShape->GetStorageShape().GetDimNum() != MX_SCALE_DIM),
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(opName_, "x1Scale and x2Scale",
+                                               (std::string(Ops::Base::ToString(x1ScaleDesc->GetDataType())) + " and " +
+                                                Ops::Base::ToString(x2ScaleDesc->GetDataType()))
+                                                   .c_str(),
+                                               "In MXFP4 mode, both scales must be FLOAT8_E8M0 and 3D"),
+        return ge::GRAPH_FAILED);
 
     const bool hasHiF4Input =
         args_.geAType == Ops::Transformer::DT_HIFLOAT4 || args_.geBType == Ops::Transformer::DT_HIFLOAT4;
     const bool hasHiF4Scale = x1ScaleDesc->GetDataType() == Ops::Transformer::DT_HIFLOAT4_SCALE;
     OP_TILING_CHECK(hasHiF4Input != hasHiF4Scale,
-                    OP_LOGE(opName_, "HiFP4 inputs and HiFP4_SCALE scales must be paired"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(hasHiF4Input && (x1ScaleShape->GetStorageShape().GetDimNum() != MX_SCALE_DIM ||
-                                     x2ScaleShape->GetStorageShape().GetDimNum() != MX_SCALE_DIM),
-                    OP_LOGE(opName_, "HiFP4 requires two 3-D scale tensors"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                        opName_, "x1, x2, x1Scale, and x2Scale",
+                        (std::string(Ops::Base::ToString(args_.geAType)) + ", " + Ops::Base::ToString(args_.geBType) +
+                         ", " + Ops::Base::ToString(x1ScaleDesc->GetDataType()) + ", and " +
+                         Ops::Base::ToString(x2ScaleDesc->GetDataType()))
+                            .c_str(),
+                        "HiFP4 inputs and HIFLOAT4_SCALE scales must be paired"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        hasHiF4Input && (x1ScaleShape->GetStorageShape().GetDimNum() != MX_SCALE_DIM ||
+                         x2ScaleShape->GetStorageShape().GetDimNum() != MX_SCALE_DIM),
+        OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "x1Scale and x2Scale",
+                                     (std::to_string(x1ScaleShape->GetStorageShape().GetDimNum()) + "D and " +
+                                      std::to_string(x2ScaleShape->GetStorageShape().GetDimNum()) + "D")
+                                         .c_str(),
+                                     "3D"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1227,10 +1264,10 @@ ge::graphStatus QuantBmmReduceScatterHelper::GetShapeAttrsInfo()
     inputParams_.biasDtype = tilingArgs_.isBias ? tilingArgs_.geBiasType : ge::DT_FLOAT;
     auto scaleTensorDesc = context_->GetOptionalInputDesc(X2SCALE_INDEX);
     auto perTokenScaleTensorDesc = context_->GetOptionalInputDesc(X1SCALE_INDEX);
-    OP_TILING_CHECK((scaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(inputParams_.opName, "scale"),
+    OP_TILING_CHECK((scaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(inputParams_.opName, "x2Scale"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((perTokenScaleTensorDesc == nullptr),
-                    OP_LOGE_WITH_INVALID_INPUT(inputParams_.opName, "pertoken_scale"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK((perTokenScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(inputParams_.opName, "x1Scale"),
+                    return ge::GRAPH_FAILED);
     inputParams_.scaleDtype = scaleTensorDesc->GetDataType();
     inputParams_.perTokenScaleDtype = perTokenScaleTensorDesc->GetDataType();
     inputParams_.isPerTensor = ((tilingProcesser_.GetQuantMode() == mc2tiling::Mc2QuantMode::PERTENSOR_MODE) ||

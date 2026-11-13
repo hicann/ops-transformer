@@ -129,36 +129,45 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const
     int64_t epWorldSize = *epWorldSizePtr;
     int64_t requestedNetworkMode = *requestedNetworkModePtr;
     int64_t rankNumPerServer = *rankNumPerServerPtr;
-    OP_TILING_CHECK((epWorldSize < MIN_EP_WORLD_SIZE) || (epWorldSize > MAX_EP_WORLD_SIZE),
-                    OP_LOGE(nodeName, "ep_world_size is invalid, should be in [%ld, %ld], but got %ld.",
-                            MIN_EP_WORLD_SIZE, MAX_EP_WORLD_SIZE, epWorldSize),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (epWorldSize < MIN_EP_WORLD_SIZE) || (epWorldSize > MAX_EP_WORLD_SIZE),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "ep_world_size", std::to_string(epWorldSize).c_str(),
+                                              "The value of ep_world_size must be in the supported range"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         (*epRankIdPtr < 0) || (*epRankIdPtr >= epWorldSize),
-        OP_LOGE(nodeName, "ep_rank_id is invalid, should be in [0, %ld), but got %ld.", epWorldSize, *epRankIdPtr),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "ep_rank_id", std::to_string(*epRankIdPtr).c_str(),
+                                              "The value of ep_rank_id must be in the range [0, ep_world_size)"),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         (*numExpertsPtr < MIN_NUM_EXPERTS) || (*numExpertsPtr > MAX_NUM_EXPERTS) || (*numExpertsPtr % epWorldSize != 0),
-        OP_LOGE(nodeName,
-                "num_experts is invalid, should be in [%ld, %ld] and divisible by ep_world_size, but got "
-                "num_experts=%ld, ep_world_size=%ld.",
-                MIN_NUM_EXPERTS, MAX_NUM_EXPERTS, *numExpertsPtr, epWorldSize),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "num_experts", std::to_string(*numExpertsPtr).c_str(),
+            "The value of num_experts must be in the supported range and divisible by ep_world_size"),
         return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(*nmtPtr <= 0, OP_LOGE(nodeName, "num_max_tokens_per_rank must be positive, but got %ld.", *nmtPtr),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(*cclBufferSizePtr <= 0,
-                    OP_LOGE(nodeName, "ccl_buffer_size must be positive, but got %ld.", *cclBufferSizePtr),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!Mc2Aclnn::IsValidMoeEpCommAlg(commAlgPtr), OP_LOGE(nodeName, "Invalid comm_alg=%s.", commAlgPtr),
+    OP_TILING_CHECK(
+        *nmtPtr <= 0,
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "num_max_tokens_per_rank", std::to_string(*nmtPtr).c_str(), "positive"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        *cclBufferSizePtr <= 0,
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "ccl_buffer_size", std::to_string(*cclBufferSizePtr).c_str(), "positive"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(!Mc2Aclnn::IsValidMoeEpCommAlg(commAlgPtr),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "comm_alg", commAlgPtr == nullptr ? "null" : commAlgPtr,
+                                              "a supported communication algorithm"),
                     return ge::GRAPH_FAILED);
     if (Mc2Aclnn::IsMoeEpClosOnly(commAlgPtr)) {
         OP_TILING_CHECK(epWorldSize < Mc2Aclnn::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE,
-                        OP_LOGE(nodeName, "clos_only requires at least %ld ranks, but got %ld.",
-                                Mc2Aclnn::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE, epWorldSize),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            nodeName, "ep_world_size", std::to_string(epWorldSize).c_str(),
+                            "clos_only requires at least MOE_EP_SHARED_JETTY_MIN_RANK_SIZE ranks"),
                         return ge::GRAPH_FAILED);
-        OP_TILING_CHECK(requestedNetworkMode != NETWORK_DIRECT,
-                        OP_LOGE(nodeName, "clos_only dispatch epilogue supports direct topology only."),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            requestedNetworkMode != NETWORK_DIRECT,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "topo_type", "non-direct topology",
+                                                  "clos_only dispatch epilogue supports direct topology only"),
+            return ge::GRAPH_FAILED);
     }
     MoeEpTopology topology{};
     OP_TILING_CHECK(ResolveMoeEpTopology(static_cast<uint32_t>(epWorldSize), requestedNetworkMode, rankNumPerServer,
@@ -188,49 +197,53 @@ static ge::graphStatus CheckInputDataType(const gert::TilingContext* context, co
 {
     auto contextDesc = context->GetInputDesc(CONTEXT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, contextDesc);
-    OP_TILING_CHECK(contextDesc->GetDataType() != ge::DT_INT32,
-                    OP_LOGE(nodeName, "context dtype must be DT_INT32, but got %s.",
-                            ge::TypeUtils::DataTypeToSerialString(contextDesc->GetDataType()).c_str()),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        contextDesc->GetDataType() != ge::DT_INT32,
+        OP_LOGE_FOR_INVALID_DTYPE(
+            nodeName, "context", ge::TypeUtils::DataTypeToSerialString(contextDesc->GetDataType()).c_str(), "DT_INT32"),
+        return ge::GRAPH_FAILED);
 
     auto xDesc = context->GetInputDesc(X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xDesc);
-    OP_TILING_CHECK((xDesc->GetDataType() != ge::DT_BF16) && (xDesc->GetDataType() != ge::DT_FLOAT16) &&
-                        (xDesc->GetDataType() != ge::DT_FLOAT8_E5M2) && (xDesc->GetDataType() != ge::DT_FLOAT8_E4M3FN),
-                    OP_LOGE(nodeName,
-                            "x dtype must be in support list [DT_BF16, DT_FLOAT16, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN], "
-                            "but got %s.",
-                            ge::TypeUtils::DataTypeToSerialString(xDesc->GetDataType()).c_str()),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (xDesc->GetDataType() != ge::DT_BF16) && (xDesc->GetDataType() != ge::DT_FLOAT16) &&
+            (xDesc->GetDataType() != ge::DT_FLOAT8_E5M2) && (xDesc->GetDataType() != ge::DT_FLOAT8_E4M3FN),
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "x", ge::TypeUtils::DataTypeToSerialString(xDesc->GetDataType()).c_str(),
+                                  "DT_BF16/DT_FLOAT16/DT_FLOAT8_E5M2/DT_FLOAT8_E4M3FN"),
+        return ge::GRAPH_FAILED);
 
     auto topkIdxDesc = context->GetInputDesc(TOPK_IDX_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, topkIdxDesc);
     OP_TILING_CHECK(topkIdxDesc->GetDataType() != ge::DT_INT32,
-                    OP_LOGE(nodeName, "topk_idx dtype must be DT_INT32, but got %s.",
-                            ge::TypeUtils::DataTypeToSerialString(topkIdxDesc->GetDataType()).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE(nodeName, "topk_idx",
+                                              ge::TypeUtils::DataTypeToSerialString(topkIdxDesc->GetDataType()).c_str(),
+                                              "DT_INT32"),
                     return ge::GRAPH_FAILED);
 
     if (cached) {
         auto recvSrcMetaDesc = context->GetInputDesc(CACHED_RECV_SRC_METADATA_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context, recvSrcMetaDesc);
         OP_TILING_CHECK(recvSrcMetaDesc->GetDataType() != ge::DT_INT32,
-                        OP_LOGE(nodeName, "cached_recv_src_metadata dtype must be DT_INT32, but got %s.",
-                                ge::TypeUtils::DataTypeToSerialString(recvSrcMetaDesc->GetDataType()).c_str()),
+                        OP_LOGE_FOR_INVALID_DTYPE(
+                            nodeName, "cached_recv_src_metadata",
+                            ge::TypeUtils::DataTypeToSerialString(recvSrcMetaDesc->GetDataType()).c_str(), "DT_INT32"),
                         return ge::GRAPH_FAILED);
     }
 
     auto numRecvRankDesc = context->GetInputDesc(NUM_RECV_PER_RANK_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numRecvRankDesc);
     OP_TILING_CHECK(numRecvRankDesc->GetDataType() != ge::DT_INT32,
-                    OP_LOGE(nodeName, "num_recv_tokens_per_rank dtype must be DT_INT32, but got %s.",
-                            ge::TypeUtils::DataTypeToSerialString(numRecvRankDesc->GetDataType()).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE(
+                        nodeName, "num_recv_tokens_per_rank",
+                        ge::TypeUtils::DataTypeToSerialString(numRecvRankDesc->GetDataType()).c_str(), "DT_INT32"),
                     return ge::GRAPH_FAILED);
 
     auto numRecvExpertDesc = context->GetInputDesc(NUM_RECV_PER_EXPERT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numRecvExpertDesc);
     OP_TILING_CHECK(numRecvExpertDesc->GetDataType() != ge::DT_INT64,
-                    OP_LOGE(nodeName, "num_recv_tokens_per_expert dtype must be DT_INT64, but got %s.",
-                            ge::TypeUtils::DataTypeToSerialString(numRecvExpertDesc->GetDataType()).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE(
+                        nodeName, "num_recv_tokens_per_expert",
+                        ge::TypeUtils::DataTypeToSerialString(numRecvExpertDesc->GetDataType()).c_str(), "DT_INT64"),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -246,30 +259,36 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context,
     // ---- context: dim 必须 = 1 ----
     const gert::StorageShape* contextStorageShape = context->GetInputShape(CONTEXT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, contextStorageShape);
-    OP_TILING_CHECK(
-        contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
-        OP_LOGE(nodeName, "context dims must be 1, but got %lu.", contextStorageShape->GetStorageShape().GetDimNum()),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM(
+                        nodeName, "context",
+                        (std::to_string(contextStorageShape->GetStorageShape().GetDimNum()) + "D").c_str(), "1D"),
+                    return ge::GRAPH_FAILED);
     // Preserve the legacy auto-context shape contract; clos_only has a new, fixed shared-Jetty context ABI.
     if (info.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY) {
         constexpr int64_t expectedContextElements = sizeof(Mc2Kernel::MoeSharedJettyContext) / sizeof(int32_t);
-        OP_TILING_CHECK(contextStorageShape->GetStorageShape().GetDim(0) != expectedContextElements,
-                        OP_LOGE(nodeName, "Shared Jetty context length must be %ld, but got %ld.",
-                                expectedContextElements, contextStorageShape->GetStorageShape().GetDim(0)),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            contextStorageShape->GetStorageShape().GetDim(0) != expectedContextElements,
+            OP_LOGE_FOR_INVALID_SHAPESIZE(nodeName, "context",
+                                          std::to_string(contextStorageShape->GetStorageShape().GetDim(0)).c_str(),
+                                          std::to_string(expectedContextElements).c_str()),
+            return ge::GRAPH_FAILED);
     }
     // ---- x [num_tokens, hidden]，hidden 为 cfg 唯一真值来源 ----
     const gert::StorageShape* xShape = context->GetInputShape(X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
     OP_TILING_CHECK(xShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-                    OP_LOGE(nodeName, "x dims must be 2, but got %lu.", xShape->GetStorageShape().GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM(
+                        nodeName, "x", (std::to_string(xShape->GetStorageShape().GetDimNum()) + "D").c_str(), "2D"),
                     return ge::GRAPH_FAILED);
     const int64_t numTokens = xShape->GetStorageShape().GetDim(0);
     const int64_t hidden = xShape->GetStorageShape().GetDim(1);
-    OP_TILING_CHECK(numTokens <= 0, OP_LOGE(nodeName, "x dim0(num_tokens) must be positive, but got %ld.", numTokens),
+    OP_TILING_CHECK(numTokens <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "x", std::to_string(numTokens).c_str(), "positive"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((hidden <= 0) || (hidden > H_MAX),
-                    OP_LOGE(nodeName, "x dim1(hidden) must be in (0, %ld], but got %ld.", H_MAX, hidden),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "x", std::to_string(hidden).c_str(),
+                                                          "The second dimension of x must be in the range (0, H_MAX]"),
                     return ge::GRAPH_FAILED);
 
     // ---- topkIdx [num_tokens, top_k] int32 ----
@@ -277,16 +296,21 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context,
     OP_CHECK_NULL_WITH_CONTEXT(context, topkIdxShape);
     OP_TILING_CHECK(
         topkIdxShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-        OP_LOGE(nodeName, "topk_idx dims must be 2, but got %lu.", topkIdxShape->GetStorageShape().GetDimNum()),
+        OP_LOGE_FOR_INVALID_SHAPEDIM(nodeName, "topk_idx",
+                                     (std::to_string(topkIdxShape->GetStorageShape().GetDimNum()) + "D").c_str(), "2D"),
         return ge::GRAPH_FAILED);
     const int64_t topK = topkIdxShape->GetStorageShape().GetDim(1);
-    OP_TILING_CHECK((topK <= 0) || (topK > K_MAX),
-                    OP_LOGE(nodeName, "topk_idx dim1(top_k) must be in (0, %ld], but got %ld.", K_MAX, topK),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (topK <= 0) || (topK > K_MAX),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "topk_idx", std::to_string(topK).c_str(),
+                                              "The second dimension of topk_idx must be in the range (0, K_MAX]"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         topkIdxShape->GetStorageShape().GetDim(0) != numTokens,
-        OP_LOGE(nodeName, "topk_idx dim0 must equal x dim0(num_tokens), but got topk_idx dim0=%ld, num_tokens=%ld.",
-                topkIdxShape->GetStorageShape().GetDim(0), numTokens),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            nodeName, "topk_idx and x",
+            (std::to_string(topkIdxShape->GetStorageShape().GetDim(0)) + " and " + std::to_string(numTokens)).c_str(),
+            "The first dimension of topk_idx must be equal to the first dimension of x"),
         return ge::GRAPH_FAILED);
     info.cfg.numTokens = static_cast<uint32_t>(numTokens);
     info.cfg.hidden = static_cast<uint32_t>(hidden);
@@ -298,26 +322,30 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context,
     const gert::StorageShape* numRecvRankShape = context->GetInputShape(NUM_RECV_PER_RANK_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numRecvRankShape);
     OP_TILING_CHECK(numRecvRankShape->GetStorageShape().GetDimNum() != ONE_DIM,
-                    OP_LOGE(nodeName, "num_recv_tokens_per_rank dims must be 1, but got %lu.",
-                            numRecvRankShape->GetStorageShape().GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM(
+                        nodeName, "num_recv_tokens_per_rank",
+                        (std::to_string(numRecvRankShape->GetStorageShape().GetDimNum()) + "D").c_str(), "1D"),
                     return ge::GRAPH_FAILED);
     const int64_t numRecvRankDim0 = numRecvRankShape->GetStorageShape().GetDim(0);
     OP_TILING_CHECK(numRecvRankDim0 != static_cast<int64_t>(info.cfg.epWorldSize),
-                    OP_LOGE(nodeName, "num_recv_tokens_per_rank dim0 must equal ep_world_size=%u, but got %ld.",
-                            info.cfg.epWorldSize, numRecvRankDim0),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        nodeName, "num_recv_tokens_per_rank", std::to_string(numRecvRankDim0).c_str(),
+                        "The first dimension of num_recv_tokens_per_rank must be equal to ep_world_size"),
                     return ge::GRAPH_FAILED);
 
     // ---- numRecvPerExpert [num_local_experts] int64 ----
     const gert::StorageShape* numRecvExpertShape = context->GetInputShape(NUM_RECV_PER_EXPERT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numRecvExpertShape);
     OP_TILING_CHECK(numRecvExpertShape->GetStorageShape().GetDimNum() != ONE_DIM,
-                    OP_LOGE(nodeName, "num_recv_tokens_per_expert dims must be 1, but got %lu.",
-                            numRecvExpertShape->GetStorageShape().GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM(
+                        nodeName, "num_recv_tokens_per_expert",
+                        (std::to_string(numRecvExpertShape->GetStorageShape().GetDimNum()) + "D").c_str(), "1D"),
                     return ge::GRAPH_FAILED);
     const int64_t numRecvExpertDim0 = numRecvExpertShape->GetStorageShape().GetDim(0);
     OP_TILING_CHECK(numRecvExpertDim0 != static_cast<int64_t>(info.cfg.numLocalExperts),
-                    OP_LOGE(nodeName, "num_recv_tokens_per_expert dim0 must equal num_local_experts=%u, but got %ld.",
-                            info.cfg.numLocalExperts, numRecvExpertDim0),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        nodeName, "num_recv_tokens_per_expert", std::to_string(numRecvExpertDim0).c_str(),
+                        "The first dimension of num_recv_tokens_per_expert must be equal to num_local_experts"),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -335,29 +363,36 @@ static ge::graphStatus CheckRecvScalesTensor(const gert::TilingContext* context,
 
     OP_CHECK_NULL_WITH_CONTEXT(context, recvScalesDesc);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvScalesShape);
-    OP_TILING_CHECK(
-        recvScalesShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-        OP_LOGE(nodeName, "recv_scales dims must be 2, but got %lu.", recvScalesShape->GetStorageShape().GetDimNum()),
-        return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(recvScalesShape->GetStorageShape().GetDim(0) != aAlloc,
-                    OP_LOGE(nodeName, "recv_scales dim0 must equal recv_x dim0=%ld, but got %ld.", aAlloc,
-                            recvScalesShape->GetStorageShape().GetDim(0)),
+    OP_TILING_CHECK(recvScalesShape->GetStorageShape().GetDimNum() != TWO_DIMS,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM(
+                        nodeName, "recv_scales",
+                        (std::to_string(recvScalesShape->GetStorageShape().GetDimNum()) + "D").c_str(), "2D"),
                     return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        recvScalesShape->GetStorageShape().GetDim(0) != aAlloc,
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            nodeName, "recv_scales and recv_x",
+            (std::to_string(recvScalesShape->GetStorageShape().GetDim(0)) + " and " + std::to_string(aAlloc)).c_str(),
+            "The first dimension of recv_scales must be equal to the first dimension of recv_x"),
+        return ge::GRAPH_FAILED);
 
     const ge::DataType scalesDtype = recvScalesDesc->GetDataType();
-    OP_TILING_CHECK(scalesDtype != ge::DT_FLOAT && scalesDtype != ge::DT_FLOAT8_E8M0,
-                    OP_LOGE(nodeName, "recv_scales dtype must be DT_FLOAT or DT_FLOAT8_E8M0, but got %s.",
-                            ge::TypeUtils::DataTypeToSerialString(scalesDtype).c_str()),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        scalesDtype != ge::DT_FLOAT && scalesDtype != ge::DT_FLOAT8_E8M0,
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "recv_scales", ge::TypeUtils::DataTypeToSerialString(scalesDtype).c_str(),
+                                  "DT_FLOAT/DT_FLOAT8_E8M0"),
+        return ge::GRAPH_FAILED);
     const int64_t groupSize = (scalesDtype == ge::DT_FLOAT) ? SCALES_GROUP_SIZE_PERGROUP : SCALES_GROUP_SIZE_MXFP;
     int64_t expectedDim1 = (hidden + groupSize - 1) / groupSize;
     if (scalesDtype == ge::DT_FLOAT8_E8M0) {
         expectedDim1 = (expectedDim1 + SCALES_ALIGN_EVEN - 1) / SCALES_ALIGN_EVEN * SCALES_ALIGN_EVEN;
     }
-    OP_TILING_CHECK(recvScalesShape->GetStorageShape().GetDim(1) != expectedDim1,
-                    OP_LOGE(nodeName, "recv_scales dim1 must be %ld, but got %ld.", expectedDim1,
-                            recvScalesShape->GetStorageShape().GetDim(1)),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        recvScalesShape->GetStorageShape().GetDim(1) != expectedDim1,
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            nodeName, "recv_scales", std::to_string(recvScalesShape->GetStorageShape().GetDim(1)).c_str(),
+            "The second dimension of recv_scales must be aligned according to the scale dtype and hidden size"),
+        return ge::GRAPH_FAILED);
 
     uint32_t scalesSize = (scalesDtype == ge::DT_FLOAT) ? sizeof(float) : FP8_DTYPE_SIZE;
     info.cfg.scalesBytes = static_cast<uint32_t>(expectedDim1 * scalesSize);
@@ -372,9 +407,11 @@ static ge::graphStatus CheckOutputTensors(const gert::TilingContext* context, co
     // ---- recvX [A_alloc, hidden] bf16/fp16 ----
     auto recvXShape = context->GetOutputShape(OUT_RECV_X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvXShape);
-    OP_TILING_CHECK(recvXShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-                    OP_LOGE(nodeName, "recv_x dims must be 2, but got %lu.", recvXShape->GetStorageShape().GetDimNum()),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        recvXShape->GetStorageShape().GetDimNum() != TWO_DIMS,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(nodeName, "recv_x",
+                                     (std::to_string(recvXShape->GetStorageShape().GetDimNum()) + "D").c_str(), "2D"),
+        return ge::GRAPH_FAILED);
     const int64_t aAlloc = recvXShape->GetStorageShape().GetDim(0);
     const int64_t hidden = static_cast<int64_t>(info.cfg.hidden);
     const int64_t minTopKLocalExperts =
@@ -383,50 +420,66 @@ static ge::graphStatus CheckOutputTensors(const gert::TilingContext* context, co
                            static_cast<int64_t>(info.cfg.numMaxTokensPerRank) * minTopKLocalExperts;
     OP_TILING_CHECK(
         aAlloc < 0 || aAlloc > aUpper,
-        OP_LOGE(nodeName, "recv_x dim0(A_alloc) must be in [0, ep*nmt*min(top_k,num_local_experts)=%ld], but got %ld.",
-                aUpper, aAlloc),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "recv_x", std::to_string(aAlloc).c_str(),
+                                              "The first dimension of recv_x must be in the range [0, ep_world_size * "
+                                              "num_max_tokens_per_rank * min(top_k, num_local_experts)]"),
         return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(aAlloc > INT32_MAX,
-                    OP_LOGE(nodeName,
-                            "recv_x dim0(A_alloc) must not exceed INT32_MAX because metadata stores "
-                            "recv_x_idx as int32, but got %ld.",
-                            aAlloc),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(recvXShape->GetStorageShape().GetDim(1) != hidden,
-                    OP_LOGE(nodeName, "recv_x dim1(hidden) must equal x dim1=%ld, but got %ld.", hidden,
-                            recvXShape->GetStorageShape().GetDim(1)),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        aAlloc > INT32_MAX,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "recv_x", std::to_string(aAlloc).c_str(),
+            "The first dimension of recv_x must not exceed INT32_MAX because metadata stores recv_x_idx as int32"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        recvXShape->GetStorageShape().GetDim(1) != hidden,
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            nodeName, "recv_x and x",
+            (std::to_string(recvXShape->GetStorageShape().GetDim(1)) + " and " + std::to_string(hidden)).c_str(),
+            "The second dimension of recv_x must be equal to the second dimension of x"),
+        return ge::GRAPH_FAILED);
 
     auto recvXDesc = context->GetOutputDesc(OUT_RECV_X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvXDesc);
     const ge::DataType recvXDtype = recvXDesc->GetDataType();
     auto xDesc = context->GetInputDesc(X_INDEX);
-    OP_TILING_CHECK(recvXDtype != xDesc->GetDataType(),
-                    OP_LOGE(nodeName, "recv_x dtype must equal x dtype, but got recv_x=%s, x=%s.",
-                            ge::TypeUtils::DataTypeToSerialString(recvXDtype).c_str(),
-                            ge::TypeUtils::DataTypeToSerialString(xDesc->GetDataType()).c_str()),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        recvXDtype != xDesc->GetDataType(),
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(nodeName, "recv_x and x",
+                                               (std::string(ge::TypeUtils::DataTypeToSerialString(recvXDtype)) +
+                                                " and " + ge::TypeUtils::DataTypeToSerialString(xDesc->GetDataType()))
+                                                   .c_str(),
+                                               "The dtype of recv_x must be equal to the dtype of x"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckRecvScalesTensor(context, nodeName, recvXDtype, aAlloc, hidden, info) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check recvScales tensor failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "recv_scales",
+                                                             "The shape or dtype of recv_scales is invalid"),
+                    return ge::GRAPH_FAILED);
 
     // ---- recvTopkWeights [A_alloc] float when topk weights are enabled ----
     auto recvTopkWeightsShape = context->GetOutputShape(OUT_RECV_TOPK_WEIGHTS_INDEX);
     if (hasTopkWeights) {
         OP_CHECK_NULL_WITH_CONTEXT(context, recvTopkWeightsShape);
         OP_TILING_CHECK(recvTopkWeightsShape->GetStorageShape().GetDimNum() != ONE_DIM,
-                        OP_LOGE(nodeName, "recv_topk_weights dims must be 1, but got %lu.",
-                                recvTopkWeightsShape->GetStorageShape().GetDimNum()),
+                        OP_LOGE_FOR_INVALID_SHAPEDIM(
+                            nodeName, "recv_topk_weights",
+                            (std::to_string(recvTopkWeightsShape->GetStorageShape().GetDimNum()) + "D").c_str(), "1D"),
                         return ge::GRAPH_FAILED);
-        OP_TILING_CHECK(recvTopkWeightsShape->GetStorageShape().GetDim(0) != aAlloc,
-                        OP_LOGE(nodeName, "recv_topk_weights dim0 must equal recv_x dim0=%ld, but got %ld.", aAlloc,
-                                recvTopkWeightsShape->GetStorageShape().GetDim(0)),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            recvTopkWeightsShape->GetStorageShape().GetDim(0) != aAlloc,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                nodeName, "recv_topk_weights and recv_x",
+                (std::to_string(recvTopkWeightsShape->GetStorageShape().GetDim(0)) + " and " + std::to_string(aAlloc))
+                    .c_str(),
+                "The first dimension of recv_topk_weights must be equal to the first dimension of recv_x"),
+            return ge::GRAPH_FAILED);
         auto recvTopkWeightsDesc = context->GetOutputDesc(OUT_RECV_TOPK_WEIGHTS_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context, recvTopkWeightsDesc);
-        OP_TILING_CHECK(recvTopkWeightsDesc->GetDataType() != ge::DT_FLOAT,
-                        OP_LOGE(nodeName, "recv_topk_weights dtype must be DT_FLOAT, but got %s.",
-                                ge::TypeUtils::DataTypeToSerialString(recvTopkWeightsDesc->GetDataType()).c_str()),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            recvTopkWeightsDesc->GetDataType() != ge::DT_FLOAT,
+            OP_LOGE_FOR_INVALID_DTYPE(nodeName, "recv_topk_weights",
+                                      ge::TypeUtils::DataTypeToSerialString(recvTopkWeightsDesc->GetDataType()).c_str(),
+                                      "DT_FLOAT"),
+            return ge::GRAPH_FAILED);
     }
 
     // Full storage descriptor includes five-column rows, rank offsets, and the local reverse index.
@@ -444,23 +497,31 @@ static ge::graphStatus CheckOutputTensors(const gert::TilingContext* context, co
     auto recvSrcMetaShape = context->GetOutputShape(OUT_RECV_SRC_METADATA_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvSrcMetaShape);
     OP_TILING_CHECK(recvSrcMetaShape->GetStorageShape().GetDimNum() != ONE_DIM,
-                    OP_LOGE(nodeName, "recv_src_metadata must be a 1D packed tensor."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(recvSrcMetaShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(packedElements),
-                    OP_LOGE(nodeName, "recv_src_metadata packed length must be %lu.", packedElements),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "recv_src_metadata", "unknown",
+                                                             "The shape dim of recv_src_metadata must be 1D"),
                     return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        recvSrcMetaShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(packedElements),
+        OP_LOGE_FOR_INVALID_SHAPESIZE(nodeName, "recv_src_metadata", "unknown", std::to_string(packedElements).c_str()),
+        return ge::GRAPH_FAILED);
     auto recvSrcMetaDesc = context->GetOutputDesc(OUT_RECV_SRC_METADATA_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvSrcMetaDesc);
     OP_TILING_CHECK(recvSrcMetaDesc->GetDataType() != ge::DT_INT32,
-                    OP_LOGE(nodeName, "recv_src_metadata dtype must be DT_INT32."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "recv_src_metadata", "unknown",
+                                                          "The dtype of recv_src_metadata must be DT_INT32"),
+                    return ge::GRAPH_FAILED);
     if (cached) {
         auto cachedShape = context->GetInputShape(CACHED_RECV_SRC_METADATA_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context, cachedShape);
-        OP_TILING_CHECK(cachedShape->GetStorageShape().GetDimNum() != ONE_DIM,
-                        OP_LOGE(nodeName, "cached_recv_src_metadata must be a 1D packed tensor."),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            cachedShape->GetStorageShape().GetDimNum() != ONE_DIM,
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "cached_recv_src_metadata", "unknown",
+                                                     "The shape dim of cached_recv_src_metadata must be 1D"),
+            return ge::GRAPH_FAILED);
         // Cached input and output use the same A_alloc, hence the same tail offset.
         OP_TILING_CHECK(cachedShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(packedElements),
-                        OP_LOGE(nodeName, "cached_recv_src_metadata packed length must be %lu.", packedElements),
+                        OP_LOGE_FOR_INVALID_SHAPESIZE(nodeName, "cached_recv_src_metadata", "unknown",
+                                                      std::to_string(packedElements).c_str()),
                         return ge::GRAPH_FAILED);
     }
 
@@ -529,19 +590,25 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
                     return ge::GRAPH_FAILED);
     bool hasTopkWeights = *hasTopkWeightsPtr;
 
-    OP_TILING_CHECK(CheckInputDataType(context, nodeName, cached) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check input dtype failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckInputDataType(context, nodeName, cached) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors", "The dtype of an input tensor is invalid"),
+        return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(CheckInputTensorShape(context, nodeName, info) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check input tensor shape failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckInputTensorShape(context, nodeName, info) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors", "The shape of an input tensor is invalid"),
+        return ge::GRAPH_FAILED);
 
     const int64_t topK = static_cast<int64_t>(info.cfg.topK);
 
     OP_TILING_CHECK(CheckOutputTensors(context, nodeName, info, topK, hasTopkWeights, cached) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check output tensors failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "output tensors",
+                                                             "The shape or dtype of an output tensor is invalid"),
+                    return ge::GRAPH_FAILED);
 
     auto recvXDesc = context->GetOutputDesc(OUT_RECV_X_INDEX);
-    OP_TILING_CHECK(recvXDesc == nullptr, OP_LOGE(nodeName, "recv_x desc is nullptr."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(recvXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "recv_x"), return ge::GRAPH_FAILED);
     ge::DataType recvXDtype = recvXDesc->GetDataType();
     bool isFp8 = (recvXDtype == ge::DT_FLOAT8_E5M2 || recvXDtype == ge::DT_FLOAT8_E4M3FN);
     uint32_t recvXDtypeSize = isFp8 ? FP8_DTYPE_SIZE : MAX_OUT_DTYPE_SIZE;
@@ -573,9 +640,11 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
     info.aivNum = aivNum;
     info.totalUbSize = ubSize;
 
-    OP_TILING_CHECK(BuildAndCheckWindowLayout(context, nodeName, info, networkMode, serverNum, rankNumPerServer) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Check HCCL Window size failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        BuildAndCheckWindowLayout(context, nodeName, info, networkMode, serverNum, rankNumPerServer) !=
+            ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "window layout", "The computed HCCL window size is invalid"),
+        return ge::GRAPH_FAILED);
 
     size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);

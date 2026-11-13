@@ -11,6 +11,7 @@
 #include "common/utils/op_mc2_def.h"
 #include "aclnn_kernels/common/op_error_check.h"
 #include "opdev/op_log.h"
+#include "mc2_log_compat.h"
 #include "opdev/platform.h"
 #include "op_host/util/op_const_def.h"
 #include "opdev/common_types.h"
@@ -133,8 +134,9 @@ static aclnnStatus CheckParams(const aclTensor* gmmX, const aclTensor* gmmWeight
 {
     // 可选参数sendCountsTensorOptional/recvCountsTensorOptional不支持传入，必须为空
     if ((sendCountsTensorOptional != nullptr) || (recvCountsTensorOptional != nullptr)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "sendCountsTensorOptional and recvCountsTensorOptional are unsupported and must both be nullptr.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnGroupedMatMulAlltoAllvV2GetWorkspaceSize",
+                                                 "sendCountsTensorOptional and recvCountsTensorOptional",
+                                                 "Both tensors must be nullptr");
         return ACLNN_ERR_PARAM_INVALID;
     }
     CHECK_RET(CheckNullStatus(gmmX, gmmWeight, mmXOptional, mmWeightOptional, group, y, mmYOptional),

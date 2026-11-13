@@ -70,8 +70,9 @@ static aclnnStatus CheckOptionalCountTensors(const aclTensor* sendCountsTensorOp
     if (sendCountsTensorOptional == nullptr && recvCountsTensorOptional == nullptr) {
         return ACLNN_SUCCESS;
     }
-    OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-            "sendCountsTensorOptional and recvCountsTensorOptional are unsupported and must both be nullptr.");
+    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnAlltoAllvGroupedMatMulGetWorkspaceSize",
+                                             "sendCountsTensorOptional and recvCountsTensorOptional",
+                                             "Both tensors must be nullptr");
     return ACLNN_ERR_PARAM_INVALID;
 }
 

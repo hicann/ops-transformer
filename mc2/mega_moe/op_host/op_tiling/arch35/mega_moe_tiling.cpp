@@ -23,22 +23,40 @@ static ge::graphStatus CheckAndSetTensorMetadata(const gert::TilingContext* cont
                                                  const char* nodeName)
 {
     OP_TILING_CHECK(CheckAndSetWeightAndScaleLayout(context, expertParams, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "expert weight or scale layout is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        nodeName, "expert weight and scale tensors",
+                        "The layout, dtype, or format of expert weight or scale tensors is invalid"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckNonWeightInputDataTypes(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "non-weight input dtype is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "non-weight inputs",
+                                                             "The dtype of a non-weight input is invalid"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckNonWeightTensorFormats(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "non-weight tensor format is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "non-weight inputs",
+                                                             "The format of a non-weight tensor is invalid"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckOutputDataTypes(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "output dtype is invalid."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckWeightScaleDataTypesAndFormats(context, expertParams, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "weight scale dtypes or formats are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "output tensors",
+                                                             "The dtype of an output tensor is invalid"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckWeightScaleDataTypesAndFormats(context, expertParams, nodeName) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "weight and scale tensors",
+                                                 "The dtype or format of a weight or scale tensor is invalid"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckDispatchInputShapes(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "dispatch input shapes are invalid."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckWeightAndScaleShapeRelations(context, config, expertParams, tilingData->actMode, nodeName) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "weight or scale shape relation is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "dispatch inputs",
+                                                             "The shape of a dispatch input tensor is invalid"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckWeightAndScaleShapeRelations(context, config, expertParams, tilingData->actMode, nodeName) !=
+            ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "weight and scale tensors",
+                                                 "The shape relation between weight and scale tensors is invalid"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckYShape(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "y tensor shape is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "y", "The shape of y is invalid"),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -164,10 +182,14 @@ static ge::graphStatus CheckAndSetExpertExecutionParams(const gert::TilingContex
                     OP_LOGE(nodeName, "hiddenDim is invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         CheckAndSetExpertCountAttrs(context, config, expertParams, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE(nodeName, "expert counts are invalid."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "expert count attributes",
+                                                 "One or more expert count attributes are invalid"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         CheckExpertTokenNumsShape(context, config, tilingData->compute.moeExpertPerRank, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE(nodeName, "expertTokenNums tensor shape is invalid."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "expertTokenNums",
+                                                 "The shape of expertTokenNums is invalid"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

@@ -69,8 +69,11 @@ ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineA5TilingCheckA
     }
 
     // 检查shape各维度并赋值h,k
-    OP_TILING_CHECK(!CheckTensorShape(context, *tilingData, nodeName, isShared, localMoeExpertNum),
-                    OP_LOGE(nodeName, "param dim check failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !CheckTensorShape(context, *tilingData, nodeName, isShared, localMoeExpertNum),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors and output tensors",
+                                                 "The shape of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
 
     // 校验win区大小
     OP_TILING_CHECK(CheckWinSize(context, tilingData, nodeName, localMoeExpertNum) != ge::GRAPH_SUCCESS,
@@ -136,7 +139,8 @@ bool MoeDistributeCombineTilingA5::CheckEpWorldSize(const char* nodeName, uint32
     // 为支持在 A5 上的验证，放开 epWorldSize 为 2 或 4 的校验
     // 检验epWorldSize是否是2的倍数
     OP_TILING_CHECK(epWorldSize % 2 != 0,
-                    OP_LOGE(nodeName, "epWorldSize should be divisible by 2, but got epWorldSize = %u.", epWorldSize),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "epWorldSize", std::to_string(epWorldSize).c_str(),
+                                                          "The value of epWorldSize must be divisible by 2"),
                     return false);
 
     OP_TILING_CHECK((256 % epWorldSize != 0) && (epWorldSize % 144 != 0),

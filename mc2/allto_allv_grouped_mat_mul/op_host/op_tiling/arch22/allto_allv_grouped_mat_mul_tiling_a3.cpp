@@ -154,7 +154,7 @@ ge::graphStatus FillAivTiling(gert::TilingContext* context)
     const auto* gmmYDesc = context->GetOutputDesc(optiling::OUTPUT_GMM_Y_INDEX);
     OP_TILING_CHECK(gmmXShape == nullptr || gmmWeightShape == nullptr || gmmYShape == nullptr || gmmXDesc == nullptr ||
                         gmmWeightDesc == nullptr || gmmYDesc == nullptr,
-                    OP_LOGE_WITH_INVALID_INPUT(nodeName, "gmm_x/gmm_weight/gmm_y"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITH_INVALID_INPUT(nodeName, "gmmX, gmmWeight, and gmmY"), return ge::GRAPH_FAILED);
     const ge::DataType aivDtype = gmmXDesc->GetDataType();
     OP_TILING_CHECK(!IsSupportedAivDType(aivDtype) || gmmWeightDesc->GetDataType() != aivDtype ||
                         gmmYDesc->GetDataType() != aivDtype,

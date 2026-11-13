@@ -617,7 +617,9 @@ ge::graphStatus MatmulReduceScatterTilingBase::SetReduceScatterTilingArgsCommAlg
 ge::graphStatus MatmulReduceScatterTilingBase::GetShapeAttrsInfo()
 {
     opName_ = context_->GetNodeName();
-    OP_TILING_CHECK((!ReduceScatterCheckShapeInfo()), OP_LOGE(opName_, "fail to check context info"),
+    OP_TILING_CHECK((!ReduceScatterCheckShapeInfo()),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "input tensors and output tensors",
+                                                             "One or more input tensors or output tensors are invalid"),
                     return ge::GRAPH_FAILED);
     SetReduceScatterTilingArgs();
     OP_TILING_CHECK((SetReduceScatterTilingArgsCommAlgo() != ge::GRAPH_SUCCESS),

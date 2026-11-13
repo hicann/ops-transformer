@@ -154,7 +154,8 @@ static ge::graphStatus GetMatmulAxisInfoForAlltoAllMatmul(const gert::InferShape
 
     if (shape.m != NUM_MINUS_ONE) {
         OPS_CHECK(CheckAxisKShapeForAlltoAllMatmul(context, shape) != ge::GRAPH_SUCCESS,
-                  OP_LOGE(context->GetNodeName(), "Failed to check axis k for allto all matmul."),
+                  OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "x1 and x2",
+                                                           "The K dimensions of x1 and x2 are inconsistent"),
                   return ge::GRAPH_FAILED);
     }
 
@@ -238,9 +239,12 @@ static ge::graphStatus InferShapeAlltoAllMatmul(gert::InferShapeContext* context
               OP_LOGE(context->GetNodeName(), "Failed to check rank dim for allto all matmul."),
               return ge::GRAPH_FAILED);
     OPS_CHECK(GetMatmulAxisInfoForAlltoAllMatmul(context, shape) != ge::GRAPH_SUCCESS,
-              OP_LOGE(context->GetNodeName(), "Failed to check shape for allto all matmul."), return ge::GRAPH_FAILED);
+              OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "x1 and x2",
+                                                       "The shape of x1 or x2 is invalid"),
+              return ge::GRAPH_FAILED);
     OPS_CHECK(CheckAllToAllAxesShapeForAlltoAllMatmul(context) != ge::GRAPH_SUCCESS,
-              OP_LOGE(context->GetNodeName(), "Failed to check allto_all_axes for allto all matmul."),
+              OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "allto_all_axes",
+                                                       "The value of allto_all_axes is invalid for the input shapes"),
               return ge::GRAPH_FAILED);
     // 推导可选output，即all_to_all_out的shape
     OPS_CHECK(InferAllToAllOutShapeAlltoAllMatmul(context, shape) != ge::GRAPH_SUCCESS,

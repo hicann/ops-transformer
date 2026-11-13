@@ -13,6 +13,8 @@
 #include "common/utils/op_mc2_def.h"
 #include "aclnn_kernels/common/op_error_check.h"
 #include "opdev/op_log.h"
+#include "opdev/format_utils.h"
+#include "mc2_log_compat.h"
 #include "opdev/platform.h"
 #include "op_host/util/op_const_def.h"
 #include "opdev/common_types.h"
@@ -66,7 +68,8 @@ static aclnnStatus CheckAivTensor(const aclTensor* tensor, const char* tensorNam
 {
     const auto dtype = tensor->GetDataType();
     if (dtype != op::DataType::DT_BF16 && dtype != op::DataType::DT_FLOAT16) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s only supports FP16 or BF16 in AIV mode.", tensorName);
+        OP_LOGE_FOR_INVALID_DTYPE("aclnnAlltoAllvGroupedMatMulV2", tensorName,
+                                  op::ToString(tensor->GetDataType()).GetString(), "FP16 or BF16");
         return ACLNN_ERR_PARAM_INVALID;
     }
     const auto storageFormat = tensor->GetStorageFormat();
@@ -76,8 +79,8 @@ static aclnnStatus CheckAivTensor(const aclTensor* tensor, const char* tensorNam
     const bool isPtaNcl =
         allowPtaNcl && storageFormat == op::Format::FORMAT_NCL && tensor->GetViewShape().GetDimNum() == 3U;
     if (!isNd && !isPtaNcl) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s only supports ND format, but got format %d.", tensorName,
-                static_cast<int32_t>(storageFormat));
+        OP_LOGE_FOR_INVALID_FORMAT("aclnnAlltoAllvGroupedMatMulV2", tensorName, op::ToString(storageFormat).GetString(),
+                                   "ND");
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -120,8 +123,9 @@ static aclnnStatus CheckOptionalCountTensors(const aclTensor* sendCountsTensorOp
     if (sendCountsTensorOptional == nullptr && recvCountsTensorOptional == nullptr) {
         return ACLNN_SUCCESS;
     }
-    OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-            "sendCountsTensorOptional and recvCountsTensorOptional are unsupported and must both be nullptr.");
+    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnAlltoAllvGroupedMatMulV2GetWorkspaceSize",
+                                             "sendCountsTensorOptional and recvCountsTensorOptional",
+                                             "Both tensors must be nullptr");
     return ACLNN_ERR_PARAM_INVALID;
 }
 

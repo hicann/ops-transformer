@@ -158,9 +158,10 @@ static bool CheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor
     // 仅支持x2矩阵转置，x1不支持转置, x1.GetDimNum(1) == x2.GetDimNum(0)
     const size_t x1Len = x1->GetViewShape().GetDimNum();
     if (static_cast<uint64_t>(x1->GetViewShape().GetDim(x1Len - 1)) != x2Dim0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "Expected last dim of x1 to be equal to first dim of x2, but got x1 shape=%s, x2 shape=%s.",
-                op::ToString(x1->GetViewShape()).GetString(), x2ShapeStr.GetString());
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            "aclnnQuantMatmulAllReduceV5", "x1 and x2",
+            (std::string(op::ToString(x1->GetViewShape()).GetString()) + " and " + x2ShapeStr.GetString()),
+            "The last dimension of x1 must be equal to the first dimension of x2");
         return false;
     }
 

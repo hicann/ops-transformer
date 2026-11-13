@@ -814,7 +814,8 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckHcclBuffsize()
     // arch35: totalWin 按 D/C 各半、区内 /4 乒乓
     OP_TILING_CHECK(
         (hcclBuffSize % 4ULL) != 0ULL,
-        OP_LOGE(nodeName_, "totalWinSize [%lu] must be divisible by 4 for D/C data partition.", hcclBuffSize),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName_, "HCCL_BUFFSIZE", std::to_string(hcclBuffSize).c_str(),
+                                              "The total window size must be divisible by 4 for D/C data partition"),
         return ge::GRAPH_FAILED);
     const uint64_t dataBankSize = hcclBuffSize / 4ULL;
     auto globalBs = tilingData_->moeDistributeCombineTeardownInfo.globalBs;

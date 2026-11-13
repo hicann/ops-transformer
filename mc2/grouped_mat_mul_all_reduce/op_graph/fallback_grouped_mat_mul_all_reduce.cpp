@@ -11,6 +11,7 @@
 #include "fallback/fallback.h"
 #include "common/utils/op_mc2.h"
 #include "mc2_common_log.h"
+#include "mc2_log_compat.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,7 +63,8 @@ static graphStatus PrepareOutputTensorListGMMAllReduce(OpExecuteContext* host_ap
     } else if (2 == splitItem || 3 == splitItem) { // Length of tensorListY equals 1 when split_item = 2 / 3
         numGeY = 1;
     } else {
-        OP_LOGE("gmm_all_reduce_fallback", "Invalid value of split_item: %d, which must be one of 0/1/2/3.", splitItem);
+        OP_LOGE_FOR_INVALID_VALUE("gmm_all_reduce_fallback", "split_item", std::to_string(splitItem).c_str(),
+                                  "0, 1, 2, or 3");
         return GRAPH_FAILED;
     }
 

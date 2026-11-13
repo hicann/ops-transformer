@@ -129,9 +129,9 @@ static bool CheckAttr(const char* reduceOp, int64_t streamMode, int64_t antiquan
     if (antiquantGroupSize % ANTIQUANT_GROUP_SIZE_MIN_VALUE != 0 ||
         antiquantGroupSize < ANTIQUANT_GROUP_SIZE_MIN_VALUE ||
         antiquantGroupSize > std::min(static_cast<int32_t>(kLen - 1), INT32_MAX)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "antiquantGroupSize should be in range [%ld, min(%ld, INT_MAX)], Actual is %ld.",
-                ANTIQUANT_GROUP_SIZE_MIN_VALUE, (kLen - 1), antiquantGroupSize);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            "aclnnWeightQuantMatmulAllReduceV2", "antiquantGroupSize", std::to_string(antiquantGroupSize).c_str(),
+            "The value of antiquantGroupSize must be 0 or in the range [32, min(k - 1, INT_MAX)] and divisible by 32");
         return false;
     }
     return true;
@@ -251,20 +251,14 @@ static bool CheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor
     OP_CHECK_MAX_DIM(scale, TWO_DIMS, return false);
     if (!IsAntiquantScaleShapeValid(scale, x1, output, antiquantGroupSize)) {
         if (antiquantGroupSize == 0) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "Expected shape of antiquantScale to be [1] or [n] or [1,n] for per-tensor/per-channel."
-                    " in this case, n is %ld, last dim of scale should be %ld or 1, "
-                    "but got scale shape: %s.",
-                    output->GetViewShape().GetDim(x1Len - 1), output->GetViewShape().GetDim(x1Len - 1),
-                    op::ToString(scale->GetViewShape()).GetString());
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                "aclnnWeightQuantMatmulAllReduceV2", "antiquantScale", op::ToString(scale->GetViewShape()).GetString(),
+                "For per-tensor or per-channel antiquant, the shape of antiquantScale must be [1], [n], or [1, n]");
         }
         if (antiquantGroupSize != 0) {
-            size_t kValueGroup = CeilDiv(static_cast<size_t>(x1->GetViewShape().GetDim(x1Len - 1)),
-                                         static_cast<size_t>(antiquantGroupSize));
-            OP_LOGE(
-                ACLNN_ERR_PARAM_INVALID,
-                "Expected shape of antiquantScale to be [%zu,%ld] for per-group calculation, but got scale shape: %s.",
-                kValueGroup, output->GetViewShape().GetDim(x1Len - 1), op::ToString(scale->GetViewShape()).GetString());
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                "aclnnWeightQuantMatmulAllReduceV2", "antiquantScale", op::ToString(scale->GetViewShape()).GetString(),
+                "For per-group antiquant, the shape of antiquantScale must be [ceil(k / antiquantGroupSize), n]");
         }
         return false;
     }
@@ -301,11 +295,15 @@ static bool CheckContiguous(const aclTensor* x2, const aclTensor* scale, const a
         return true;
     }
     if (IsAffineInconsistent(scale, isX2Transposed)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "When x2 is contiguous or transpose, scale should be consistent with it.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            "aclnnWeightQuantMatmulAllReduceV2", "scale", "inconsistent layout",
+            "When x2 is contiguous or transposed, the layout of scale must be consistent with x2");
         return false;
     }
     if (IsAffineInconsistent(offset, isX2Transposed)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "When x2 is contiguous or transpose, offset should be consistent with it.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            "aclnnWeightQuantMatmulAllReduceV2", "offset", "inconsistent layout",
+            "When x2 is contiguous or transposed, the layout of offset must be consistent with x2");
         return false;
     }
     return true;

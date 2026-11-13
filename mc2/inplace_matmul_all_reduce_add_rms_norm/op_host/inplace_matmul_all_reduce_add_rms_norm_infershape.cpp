@@ -105,7 +105,9 @@ static ge::graphStatus InferShapeForMatmul(const gert::InferShapeContext* contex
         const int64_t group_size = (p != nullptr ? *p : 0);
         OPS_CHECK(CheckScaleShape(context->GetOptionalInputShape(scale_idx), group_size, shape, is_trans_b) !=
                       ge::GRAPH_SUCCESS,
-                  OP_LOGE(context->GetNodeName(), "Failed to check antiquant scale shape."), return ge::GRAPH_FAILED);
+                  OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "k_scale",
+                                                           "The shape of the antiquant scale is invalid"),
+                  return ge::GRAPH_FAILED);
     }
     shape.output_dim = dim_num_x1;
     OP_LOGD(kInnerDebug, "Matmul x1 dim %zu s %ld m %ld n %ld k %ld.", dim_num_x1, shape.s, shape.m, shape.n, shape.k);

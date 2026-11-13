@@ -377,12 +377,13 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckTensorShapeRelation()
         return ge::GRAPH_FAILED);
 
     auto contextStorageShape = context_->GetInputShape(CONTEXT_INDEX);
-    OP_TILING_CHECK(contextStorageShape == nullptr, OP_LOGE(nodeName_, "contextShape is null."),
+    OP_TILING_CHECK(contextStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "context"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
-                    OP_LOGE(nodeName_, "contextShape dims must be 1, but current dim num is %lu.",
-                            contextStorageShape->GetStorageShape().GetDimNum()),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(nodeName_, "context",
+                                     std::to_string(contextStorageShape->GetStorageShape().GetDimNum()).c_str(), "1"),
+        return ge::GRAPH_FAILED);
     int64_t contextDim0 = contextStorageShape->GetStorageShape().GetDim(0);
     OP_LOGD(nodeName_, "context dim0 = %ld", contextDim0);
     return ge::GRAPH_SUCCESS;
@@ -601,8 +602,8 @@ bool MoeDistributeCombineSetupTilingBase::CheckTensorDataType()
                                               Ops::Base::ToString(commCmdInfoOutDesc->GetDataType()).c_str(), "int32"),
                     return false);
     OP_TILING_CHECK(contextDesc->GetDataType() != ge::DT_INT32,
-                    OP_LOGE(nodeName_, "context dataType is invalid, dataType should be int32, but is %s.",
-                            Ops::Base::ToString(contextDesc->GetDataType()).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE(nodeName_, "context",
+                                              Ops::Base::ToString(contextDesc->GetDataType()).c_str(), "int32"),
                     return false);
     return true;
 }
@@ -650,8 +651,10 @@ bool MoeDistributeCombineSetupTilingBase::CheckTensorDataFormat()
                     return false);
 
     ge::Format contextFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(contextDesc->GetStorageFormat()));
-    OP_TILING_CHECK((contextFormat == ge::FORMAT_FRACTAL_NZ), OP_LOGE(nodeName_, "context format is invalid."),
-                    return false);
+    OP_TILING_CHECK(
+        (contextFormat == ge::FORMAT_FRACTAL_NZ),
+        OP_LOGE_FOR_INVALID_FORMAT(nodeName_, "context", Ops::Base::ToString(contextFormat).c_str(), "not FRACTAL_NZ"),
+        return false);
 
     return true;
 }
@@ -700,7 +703,8 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckHcclBuffSize()
     // arch35: totalWin 按 D/C 各半、区内 /4 乒乓；需 4 对齐，且单活跃 bank 装得下本算子数据/状态
     OP_TILING_CHECK(
         (hcclBuffSize % 4ULL) != 0ULL,
-        OP_LOGE(nodeName_, "totalWinSize [%lu] must be divisible by 4 for D/C data partition.", hcclBuffSize),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName_, "HCCL_BUFFSIZE", std::to_string(hcclBuffSize).c_str(),
+                                              "The total window size must be divisible by 4 for D/C data partition"),
         return ge::GRAPH_FAILED);
     const uint64_t dataBankSize = hcclBuffSize / 4ULL;
     // combine token 块按 H*2B 估上界（与既有 golden 一致），布局约 W*E*maxBs*tokenBytes

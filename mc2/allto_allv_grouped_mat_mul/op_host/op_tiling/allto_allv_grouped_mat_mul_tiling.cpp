@@ -771,26 +771,49 @@ ge::graphStatus AlltoAllvGmmTiling::Init(gert::TilingContext* context)
         OP_TILING_CHECK(!IsShapePresent(context_->GetOutputShape(OUTPUT_MM_Y_INDEX)),
                         OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "mmY"), return ge::GRAPH_FAILED);
     }
-    OP_TILING_CHECK(CheckShapeDims(context_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_->GetNodeName(), "Shape dim check failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckDType(context_) != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "Dtype check failed."),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckShapeDims(context_) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "input tensors and output tensors",
+                                                 "The dimensions of an input tensor or output tensor are invalid"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckDType(context_) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "input tensors and output tensors",
+                                                 "The dtype of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckShapeRelation(context_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_->GetNodeName(), "Shape relation check failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        context_->GetNodeName(), "input tensors and output tensors",
+                        "The shape relation between input tensors and output tensors is invalid"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(GetShapeAndFormat(context_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context_->GetNodeName(), "Failed to get shape and format."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckShapeSize(context_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_->GetNodeName(), "Shape size check failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckAttrsShapeSize(context_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_->GetNodeName(), "Attrs shape size check failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckAttrsShapeRelation(context_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_->GetNodeName(), "Attrs shape relation check failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckShapeSize(context_) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "input tensors and output tensors",
+                                                 "The size of an input tensor or output tensor is invalid"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckAttrsShapeSize(context_) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_LISTSIZE_WITH_REASON(context_->GetNodeName(), "shape list attributes", "invalid",
+                                                 "One or more shape list attributes have an invalid size"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckAttrsShapeRelation(context_) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "shape list attributes",
+                                                 "One or more shape list attributes have an invalid relation"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckSendRecvDataVolumn(context_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context_->GetNodeName(), "Send/recv data volume check failed."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckMKN(context_) != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "MKN check failed."),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckMKN(context_) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "input tensors and output tensors",
+                                                 "The M, K, or N dimensions are invalid"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckMmShapeDims(context_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_->GetNodeName(), "Mm shape dims check failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "mmX, mmWeight, and mmY",
+                                                             "The dimensions of the mm tensors are invalid"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

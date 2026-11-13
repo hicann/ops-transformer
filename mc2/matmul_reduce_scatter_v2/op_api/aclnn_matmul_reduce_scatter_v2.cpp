@@ -161,7 +161,8 @@ static bool CheckDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclT
         });
         OP_API_CHECK(
             output->GetDataType() != op::DataType::DT_FLOAT16 && output->GetDataType() != op::DataType::DT_BF16, {
-                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "HiFP4 only supports float16 or bfloat16 output.");
+                OP_LOGE_FOR_INVALID_DTYPE("aclnnMatmulReduceScatterV2GetWorkspaceSize", "output",
+                                          op::ToString(output->GetDataType()).GetString(), "float16 or bfloat16");
                 return false;
             });
     }
@@ -195,7 +196,8 @@ static bool CheckAivModeDtypeValid(const aclTensor* x1, const aclTensor* x2, con
 static aclnnStatus CheckReduceOpAndCommTurn(const char* reduceOp, int64_t commTurn)
 {
     if (reduceOp == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "[aclnnMatmulReduceScatterV2GetWorkspaceSize] reduceOp must not be nullptr.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMatmulReduceScatterV2GetWorkspaceSize", "reduceOp", "null",
+                                              "reduceOp must not be null");
         return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (std::strcmp(reduceOp, "sum") != 0) {
@@ -252,7 +254,8 @@ static aclnnStatus CheckAivModeParams(const aclTensor* x1, const aclTensor* x2, 
 static aclnnStatus CheckAndSetCommMode(const char* commMode, CommType& commModeEnum)
 {
     if (commMode == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "[aclnnMatmulReduceScatterV2GetWorkspaceSize] commMode must not be nullptr.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMatmulReduceScatterV2GetWorkspaceSize", "commMode", "null",
+                                              "commMode must not be null");
         return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (strncmp(commMode, "ai_cpu", AICPU_STRLEN) == 0) {
@@ -405,7 +408,11 @@ static enum CaseOption CheckLowAccuracyCase(const aclTensor* x1, const aclTensor
     if (hasFp4Input && (x1Scale->GetDataType() != ge::DT_FLOAT8_E8M0 || x2Scale->GetDataType() != ge::DT_FLOAT8_E8M0 ||
                         x1Scale->GetViewShape().GetDimNum() != DIM_NUM_THREE ||
                         x2Scale->GetViewShape().GetDimNum() != DIM_NUM_THREE)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP4 requires two 3-D FLOAT8_E8M0 scale tensors.");
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON("aclnnMatmulReduceScatterV2GetWorkspaceSize", "x1Scale and x2Scale",
+                                               (std::string(op::ToString(x1Scale->GetDataType()).GetString()) +
+                                                " and " + op::ToString(x2Scale->GetDataType()).GetString())
+                                                   .c_str(),
+                                               "In MXFP4 mode, both scales must be FLOAT8_E8M0 and 3D");
         return CaseOption::INVALID;
     }
     if (x1->GetDataType() == Ops::Transformer::DT_HIFLOAT4 || x2->GetDataType() == Ops::Transformer::DT_HIFLOAT4) {
@@ -414,7 +421,11 @@ static enum CaseOption CheckLowAccuracyCase(const aclTensor* x1, const aclTensor
             x2Scale->GetDataType() != Ops::Transformer::DT_HIFLOAT4_SCALE ||
             x1Scale->GetViewShape().GetDimNum() != DIM_NUM_THREE ||
             x2Scale->GetViewShape().GetDimNum() != DIM_NUM_THREE) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "HiFP4 requires two 3-D HIFLOAT4_SCALE tensors.");
+            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON("aclnnMatmulReduceScatterV2GetWorkspaceSize", "x1Scale and x2Scale",
+                                                   (std::string(op::ToString(x1Scale->GetDataType()).GetString()) +
+                                                    " and " + op::ToString(x2Scale->GetDataType()).GetString())
+                                                       .c_str(),
+                                                   "In HiFP4 mode, both scales must be HIFLOAT4_SCALE and 3D");
             return CaseOption::INVALID;
         }
         return CaseOption::LOW_ACCURACY_PER_TENSOR_WITHOUT_QUANT_AMAX;
@@ -572,7 +583,9 @@ aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeA5(const aclTensor* x1, const a
     bool transposeX2Scale = (x2Scale != nullptr) && MC2Aclnn::IsNeedScaleTrans(x2Scale);
     // HiFP4 的数据和 scale 必须采用同一布局；NN 的连续 [scaleK,N,1] 不做转置。
     OP_API_CHECK(x1->GetDataType() == Ops::Transformer::DT_HIFLOAT4 && !transposeX2 && transposeX2Scale, {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "HiFP4 requires non-transposed x2Scale when x2 is non-transposed.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            "aclnnMatmulReduceScatterV2GetWorkspaceSize", "x2Scale",
+            "In HiFP4 mode, x2Scale must be non-transposed when x2 is non-transposed");
         return ACLNN_ERR_PARAM_INVALID;
     });
     ret = CheckOutputShape(x1, x2, group, output);

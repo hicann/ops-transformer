@@ -267,7 +267,7 @@ ge::graphStatus AllGatherQuantBmmTiling::CheckScaleShapeValid(const char* scaleN
                                                               uint64_t expectSecondDim)
 {
     if (scaleName == nullptr) {
-        OP_LOGE(opName_, "scaleName of CheckScaleShapeValid must not be null.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "scaleName", "scaleName must not be null");
         return ge::GRAPH_FAILED;
     }
     OP_TILING_CHECK((firstDim != expectFirstDim) || (secondDim != expectSecondDim),
@@ -481,7 +481,9 @@ ge::graphStatus AllGatherQuantBmmTiling::CheckScaleInvShape()
         (scaleInv1Desc->GetDataType() == ge::DataType::DT_FLOAT)) {
         OP_LOGI(opName_, "Check pertensor scale input!");
         OP_TILING_CHECK(CheckPerTensorScaleInput() == ge::GRAPH_FAILED,
-                        OP_LOGE(opName_, "Check pertensor scale input failed."), return ge::GRAPH_FAILED);
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "scale_inv1 and scale_inv2",
+                                                                 "One or more per-tensor scale inputs are invalid"),
+                        return ge::GRAPH_FAILED);
     } else if ((quantMmMode_ == mc2tiling::Mc2QuantMode::PERTENSOR_MODE) &&
                (scaleInv1Desc->GetDataType() == Ops::Transformer::DT_HIFLOAT4_SCALE)) {
         OP_LOGI(opName_, "Check hif4 scale input!");
@@ -491,7 +493,9 @@ ge::graphStatus AllGatherQuantBmmTiling::CheckScaleInvShape()
     } else if ((quantMmMode_ == mc2tiling::Mc2QuantMode::PERTENSOR_MODE) &&
                (scaleInv1Desc->GetDataType() == ge::DataType::DT_FLOAT8_E8M0)) {
         OP_LOGI(opName_, "Check mxfp scale input!");
-        OP_TILING_CHECK(CheckMXFPScaleInput() == ge::GRAPH_FAILED, OP_LOGE(opName_, "Check mxfp scale input failed."),
+        OP_TILING_CHECK(CheckMXFPScaleInput() == ge::GRAPH_FAILED,
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "scale_inv1 and scale_inv2",
+                                                                 "One or more MXFP scale inputs are invalid"),
                         return ge::GRAPH_FAILED);
     } else if (quantMmMode_ == mc2tiling::Mc2QuantMode::PERBLOCK_MODE) {
         OP_LOGI(opName_, "Check perblock scale input!");
@@ -517,7 +521,7 @@ ge::graphStatus AllGatherQuantBmmTiling::CheckInputValid()
     auto scaleInv1Desc = context_->GetOptionalInputDesc(SCALE_INV1);
     auto scaleInv2Desc = context_->GetOptionalInputDesc(SCALE_INV2);
     OP_TILING_CHECK((scaleInv1Desc == nullptr) || (scaleInv2Desc == nullptr),
-                    OP_LOGE_WITH_INVALID_INPUT(opName_, "scale1 or scale2"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITH_INVALID_INPUT(opName_, "scale_inv1 or scale_inv2"), return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(scaleInv1Desc->GetDataType() != scaleInv2Desc->GetDataType(),
                     OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(opName_, "scale1 and scale2",
@@ -595,7 +599,9 @@ ge::graphStatus AllGatherQuantBmmTiling::CheckInput()
     OP_TILING_CHECK(CheckBiasInput() == ge::GRAPH_FAILED, OP_LOGE(opName_, "Check input bias failed."),
                     return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(CheckScaleInvShape() == ge::GRAPH_FAILED, OP_LOGE(opName_, "check scale inv shape failed."),
+    OP_TILING_CHECK(CheckScaleInvShape() == ge::GRAPH_FAILED,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "scale_inv1 and scale_inv2",
+                                                             "The shape of scale_inv1 or scale_inv2 is invalid"),
                     return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(CheckX1Input() == ge::GRAPH_FAILED, OP_LOGE(opName_, "Check x1 input failed."),
@@ -1318,10 +1324,10 @@ ge::graphStatus AllGatherQuantBmmHelper::GetShapeAttrsInfo()
     int yDType = *context_->GetAttrs()->GetAttrPointer<uint64_t>(Y_DTYPE);
     auto scaleTensorDesc = context_->GetOptionalInputDesc(SCALE_INV1);
     auto perTokenScaleTensorDesc = context_->GetOptionalInputDesc(SCALE_INV2);
-    OP_TILING_CHECK((scaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "scale"),
+    OP_TILING_CHECK((scaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "scale_inv1"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((perTokenScaleTensorDesc == nullptr),
-                    OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "pertokenScale"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITH_INVALID_INPUT(tilingProcesser_.opName_, "scale_inv2"), return ge::GRAPH_FAILED);
     inputParams_.scaleDtype = scaleTensorDesc->GetDataType();
     inputParams_.perTokenScaleDtype = perTokenScaleTensorDesc->GetDataType();
 
