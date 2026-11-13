@@ -8,6 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -25,7 +27,7 @@ inline T1 CeilA2B(T1 a, T2 b)
 }
 
 template <typename T>
-uint8_t* CreateTensorList(const std::vector<std::vector<uint64_t>>& shapeInfos)
+uint8_t* CreateTensorList(const std::vector<std::vector<uint64_t>>& shapeInfos, T value = 0)
 {
     uint64_t tensorListDescCount = 1 + shapeInfos.size() * 2;
     for (const auto& shape : shapeInfos) {
@@ -51,6 +53,7 @@ uint8_t* CreateTensorList(const std::vector<std::vector<uint64_t>>& shapeInfos)
         ++addrIndex;
         uint64_t dataSize = shapeSizeList[i] * sizeof(T);
         auto* dataPtr = reinterpret_cast<uint8_t*>(AscendC::GmAlloc(CeilA2B(dataSize, 32) * 32));
+        std::fill_n(reinterpret_cast<T*>(dataPtr), shapeSizeList[i], value);
         *(tensorListDesc + addrIndex) = reinterpret_cast<uint64_t>(dataPtr);
     }
     return reinterpret_cast<uint8_t*>(tensorListDesc);
@@ -95,6 +98,7 @@ TEST_P(AttentionUpdateTest, KernelSmoke)
 {
     AttentionUpdateTestParam param = GetParam();
     const DecodeUpdateTilingData& tilingParam = param.tiling;
+    SCOPED_TRACE(param.caseName);
 
     int64_t outputShapeSize = tilingParam.totalLength * tilingParam.hDim;
     int64_t lseoutShapeSize = tilingParam.totalLength;
@@ -108,11 +112,17 @@ TEST_P(AttentionUpdateTest, KernelSmoke)
     int64_t tilingSize = sizeof(DecodeUpdateTilingData);
 
     uint8_t* lse = CreateTensorList<float>(lseShapeInfos);
-    uint8_t* go = CreateTensorList<float>(goShapeInfos);
+    uint8_t* go = CreateTensorList<float>(goShapeInfos, 1.0f);
     auto* output = reinterpret_cast<uint8_t*>(AscendC::GmAlloc(outputByteSize));
     auto* lseout = tilingParam.updateType == 0 ? nullptr : reinterpret_cast<uint8_t*>(AscendC::GmAlloc(lseoutByteSize));
     auto* workspace = reinterpret_cast<uint8_t*>(AscendC::GmAlloc(WORKSPACE_SIZE));
     auto* tiling = reinterpret_cast<uint8_t*>(AscendC::GmAlloc(tilingSize));
+
+    // Equal LSEs and unit inputs give output=1 and lseout=log(sp); sentinels detect skipped writes.
+    std::fill_n(reinterpret_cast<float*>(output), outputShapeSize, -1.0f);
+    if (lseout != nullptr) {
+        std::fill_n(reinterpret_cast<float*>(lseout), lseoutShapeSize, -1.0f);
+    }
 
     *reinterpret_cast<DecodeUpdateTilingData*>(tiling) = tilingParam;
 
@@ -120,6 +130,15 @@ TEST_P(AttentionUpdateTest, KernelSmoke)
     ICPU_SET_TILING_KEY(param.tilingKey);
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_RUN_KF(attention_update, blockDim, lse, go, output, lseout, workspace, tiling);
+
+    for (int64_t i = 0; i < outputShapeSize; ++i) {
+        EXPECT_NEAR(reinterpret_cast<float*>(output)[i], 1.0f, 1e-4f) << "index=" << i;
+    }
+    if (lseout != nullptr) {
+        for (int64_t i = 0; i < lseoutShapeSize; ++i) {
+            EXPECT_NEAR(reinterpret_cast<float*>(lseout)[i], std::log(tilingParam.sp), 1e-4f) << "index=" << i;
+        }
+    }
 
     FreeTensorList(lse, lseShapeInfos);
     FreeTensorList(go, goShapeInfos);
@@ -135,13 +154,13 @@ static AttentionUpdateTestParam cases[] = {
     {
         "test_case_float32",
         sizeof(float),
-        0,
+        10010,
         {4, 3, 8, 32, 512, 0, 2, 128},
     },
     {
         "test_case_float32_updateType1_case0",
         sizeof(float),
-        0,
+        10010,
         {4, 3, 8, 32, 512, 1, 2, 128},
     },
 };
