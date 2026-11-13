@@ -23,15 +23,21 @@ using namespace std;
 
 class l2_rotary_position_embedding_test : public testing::Test {
 protected:
-    static void SetUpTestCase()
+    void SetUp() override
     {
+        originalSocVersion_ = op::GetCurrentPlatformInfo().GetSocVersion();
+        op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
         cout << "l2_rotary_position_embedding_test SetUp" << endl;
     }
 
-    static void TearDownTestCase()
+    void TearDown() override
     {
+        op::SetPlatformSocVersion(originalSocVersion_);
         cout << "l2_rotary_position_embedding_test TearDown" << endl;
     }
+
+private:
+    op::SocVersion originalSocVersion_ = op::SocVersion::ASCEND910B;
 };
 
 // dtype fp32
