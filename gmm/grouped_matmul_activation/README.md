@@ -72,7 +72,7 @@
 
 | 调用方式 | 调用样例 | 说明 |
 | :--- | :--- | :--- |
-| aclnn API | [调用示例](docs/aclnnGroupedMatmulActivationWeightNz.md#调用示例) | 通过[aclnnGroupedMatmulActivationWeightNz](docs/aclnnGroupedMatmulActivationWeightNz.md)两段式接口调用。 |
+| aclnn API | [可运行示例](examples/arch35/test_aclnn_grouped_matmul_activation_weight_nz.cpp) | 通过[aclnnGroupedMatmulActivationWeightNz](docs/aclnnGroupedMatmulActivationWeightNz.md)两段式接口调用；[编译运行说明](examples/README.md)。 |
 | PyTorch API | [调用示例](docs/torchapi_grouped_matmul_activation.md#调用示例) | 通过[grouped_matmul_activation](docs/torchapi_grouped_matmul_activation.md)接口调用。 |
 
 构建算子包的方法参见[源码构建](../../docs/zh/install/quick_install.md)。

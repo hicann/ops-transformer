@@ -74,7 +74,7 @@ The transposed shapes of weight and weight_scale in the table are the shapes pas
 
 | Invocation Method | Invocation Sample | Description |
 | :--- | :--- | :--- |
-| aclnn API | [Invocation Example](docs/aclnnGroupedMatmulActivationWeightNz.md#调用示例) | Invoked through the two-stage APIs of [aclnnGroupedMatmulActivationWeightNz](docs/aclnnGroupedMatmulActivationWeightNz.md). |
+| aclnn API | [Runnable Example](examples/arch35/test_aclnn_grouped_matmul_activation_weight_nz.cpp) | Invoked through the two-stage APIs of [aclnnGroupedMatmulActivationWeightNz](docs/aclnnGroupedMatmulActivationWeightNz.md). See [Build and Run](examples/README_en.md). |
 | PyTorch API | [Invocation Example](docs/torchapi_grouped_matmul_activation.md#调用示例) | Invoked through the [grouped_matmul_activation](docs/torchapi_grouped_matmul_activation.md) API. |
 
 For the method of building the operator package, see [Build from Source](../../docs/zh/install/quick_install.md).
