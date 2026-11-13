@@ -106,6 +106,7 @@ def _get_thresholds(dtype_str):
 
 
 def _tensor_compare(npu_out, golden_out, name):
+    dtype_str = str(npu_out.dtype).split(".")[-1]
     npu = as_numpy(npu_out)
     golden = as_numpy(golden_out)
 
@@ -140,7 +141,6 @@ def _tensor_compare(npu_out, golden_out, name):
             "error_info": f"{name} size mismatch: npu={real_data.size}, golden={data_compe.size}",
         }
 
-    dtype_str = str(golden.dtype).split(".")[-1]
     rtol, atol, pct_thd = _get_thresholds(dtype_str)
     if (
         name == _OUTPUT_NAMES[3]
@@ -444,10 +444,10 @@ def compare_aclnn(*outputs, **kwargs):
     mid_result_mask = kwargs.get("mid_result_mask", None)
     gradEnabled = kwargs.get("gradEnabled", None)
 
-    npu_cmp_kv = npu_outputs[0].to(torch.float32)
-    npu_state_cache = npu_outputs[-1].to(torch.float32)
-    cpu_cmp_kv = golden_outputs[0].to(npu_outputs[0].dtype).to(torch.float32)
-    cpu_state_cache = golden_outputs[-1].to(torch.float32)
+    npu_cmp_kv = npu_outputs[0]
+    npu_state_cache = npu_outputs[-1]
+    cpu_cmp_kv = golden_outputs[0].to(npu_outputs[0].dtype)
+    cpu_state_cache = golden_outputs[-1]
 
     update_kv = kwargs.get("update_kv", None)
     update_score = kwargs.get("update_score", None)
@@ -497,10 +497,10 @@ def compare_aclnn(*outputs, **kwargs):
         golden_sub_outputs.append(None)
 
     if gradEnabled:
-        npu_softmax_out = npu_outputs[1][mid_result_mask].to(torch.float32)
-        npu_kv_out = npu_outputs[2][mid_result_mask].to(torch.float32)
-        cpu_softmax_out = golden_outputs[1][mid_result_mask].to(torch.float32)
-        cpu_kv_out = golden_outputs[2][mid_result_mask].to(torch.float32)
+        npu_softmax_out = npu_outputs[1][mid_result_mask]
+        npu_kv_out = npu_outputs[2][mid_result_mask]
+        cpu_softmax_out = golden_outputs[1][mid_result_mask]
+        cpu_kv_out = golden_outputs[2][mid_result_mask]
         npu_sub_outputs.append(npu_softmax_out)
         npu_sub_outputs.append(npu_kv_out)
         golden_sub_outputs.append(cpu_softmax_out)
@@ -522,9 +522,7 @@ def compare_aclnn(*outputs, **kwargs):
         else:
             results.append(_tensor_compare(npu_out, golden_out, name))
 
-    result_consistency = _batch_consistency_check(
-        npu_outputs[0].to(torch.float32), kwargs
-    )
+    result_consistency = _batch_consistency_check(npu_outputs[0], kwargs)
     if result_consistency is not None:
         results.append(result_consistency)
     del npu_cmp_kv, npu_state_cache, cpu_cmp_kv, cpu_state_cache

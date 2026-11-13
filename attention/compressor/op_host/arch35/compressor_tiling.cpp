@@ -426,8 +426,8 @@ ge::graphStatus CompressorTiling::CheckSinglePara() const
     if (ge::GRAPH_SUCCESS != CheckSingleParaCmpRatio() || ge::GRAPH_SUCCESS != CheckSingleParaCoff() ||
         ge::GRAPH_SUCCESS != CheckSingleParaCacheMode() || ge::GRAPH_SUCCESS != CheckSingleParaX() ||
         ge::GRAPH_SUCCESS != CheckSingleParaWkv() || ge::GRAPH_SUCCESS != CheckSingleParaWgate() ||
-        ge::GRAPH_SUCCESS != CheckSingleParaStateCache() || ge::GRAPH_SUCCESS != CheckSingleParaApe() ||
-        ge::GRAPH_SUCCESS != CheckSingleParaStateBlockTable() || ge::GRAPH_SUCCESS != CheckSingleParaCuSeqlens() ||
+        ge::GRAPH_SUCCESS != CheckSingleParaCuSeqlens() || ge::GRAPH_SUCCESS != CheckSingleParaStateCache() ||
+        ge::GRAPH_SUCCESS != CheckSingleParaApe() || ge::GRAPH_SUCCESS != CheckSingleParaStateBlockTable() ||
         ge::GRAPH_SUCCESS != CheckSingleParaSeqused() || ge::GRAPH_SUCCESS != CheckSingleParaStartPos() ||
         ge::GRAPH_SUCCESS != CheckSingleParaCmpKv() || ge::GRAPH_SUCCESS != CheckSingleParaSoftmaxScore() ||
         ge::GRAPH_SUCCESS != CheckSingleParaKv()) {
@@ -716,6 +716,16 @@ ge::graphStatus CompressorTiling::CheckSingleParaCuSeqlens() const
         ge::GRAPH_SUCCESS != CheckDimNumSupport(context_->cuSeqlens.shape, CU_SEQLENS_NAME)) {
         return ge::GRAPH_FAILED;
     }
+    constexpr uint32_t CU_SEQLENS_MIN_DIM0 = 1;
+    // cuSeqlens 首维等于 batchSize + 1，因此不可能为 0：为 0 时 batchSize = 首维 - 1 会下溢，
+    // 后续 state_block_table / seqused / start_pos 的 batchSize 一致性校验会报出与入参无关的错误，故在此提前拦截
+    const uint32_t cuSeqlensDim0 = context_->cuSeqlens.shape->GetStorageShape().GetDim(COMPRESSOR_DIM_INDEX_0);
+    OP_CHECK_IF(cuSeqlensDim0 < CU_SEQLENS_MIN_DIM0,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->opName, CU_SEQLENS_NAME, "dim 0=" + std::to_string(cuSeqlensDim0),
+                    std::string(CU_SEQLENS_NAME) + " dim 0 should be equal to batchSize+1, therefore not less than " +
+                        std::to_string(CU_SEQLENS_MIN_DIM0)),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

@@ -45,6 +45,7 @@ class QuantCompressorSpec:
     tolerance = {
         "float16": {"standard": "stat_rel_err"},
         "bfloat16": {"standard": "stat_rel_err"},
+        "float32": {"standard": "stat_rel_err"},
     }
 
     def compare(*outputs, compare_context=None, **kwargs):
@@ -80,6 +81,7 @@ class KernelQuantCompressorSpec:
     tolerance = {
         "float16": {"standard": "stat_rel_err"},
         "bfloat16": {"standard": "stat_rel_err"},
+        "float32": {"standard": "stat_rel_err"},
     }
 
     def compare(*outputs, compare_context=None, **kwargs):
@@ -104,6 +106,7 @@ class AclnnQuantCompressorSpec:
     tolerance = {
         "float16": {"standard": "stat_rel_err"},
         "bfloat16": {"standard": "stat_rel_err"},
+        "float32": {"standard": "stat_rel_err"},
     }
 
     def compare(*outputs, compare_context=None, **kwargs):

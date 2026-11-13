@@ -47,53 +47,57 @@ def load_pytest_golden_module():
 
     pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
     module_path = pytest_dir / "compressor_golden.py"
+    temporary_modules = {}
+    previous_modules = {}
+    missing = object()
+    saved_path = sys.path[:]
+    saved_random_state = np.random.get_state()
 
-    for mod_name in ("torch_npu", "torchair"):
-        if mod_name not in sys.modules:
-            stub = types.ModuleType(mod_name)
-            if mod_name == "torch_npu":
-                stub.npu = types.SimpleNamespace(
-                    set_device=lambda *a, **kw: None,
-                    config=types.SimpleNamespace(allow_internal_format=True),
-                )
-                testing_mod = types.ModuleType("torch_npu.testing")
-                testcase_mod = types.ModuleType("torch_npu.testing.testcase")
-                testcase_mod.TestCase = object
-                testcase_mod.run_tests = lambda *a, **kw: None
-                testing_mod.testcase = testcase_mod
-                stub.testing = testing_mod
-            sys.modules[mod_name] = stub
+    def install_stub(name, module):
+        previous_modules[name] = sys.modules.get(name, missing)
+        temporary_modules[name] = module
+        sys.modules[name] = module
 
-    _saved_modules = {}
-    for _mod_name in ("cann_ops_transformer", "cann_ops_transformer.ops"):
-        if _mod_name in sys.modules:
-            _saved_modules[_mod_name] = sys.modules[_mod_name]
-    cann_stub = types.ModuleType("cann_ops_transformer")
-    ops_stub = types.ModuleType("cann_ops_transformer.ops")
-    ops_stub.compressor = lambda *a, **kw: None
-    cann_stub.ops = ops_stub
-    sys.modules["cann_ops_transformer"] = cann_stub
-    sys.modules["cann_ops_transformer.ops"] = ops_stub
-
-    _np_random_state = np.random.get_state()
-    sys.path.insert(0, str(pytest_dir))
     try:
+        for mod_name in ("torch_npu", "torchair"):
+            if mod_name not in sys.modules:
+                stub = types.ModuleType(mod_name)
+                if mod_name == "torch_npu":
+                    stub.npu = types.SimpleNamespace(
+                        set_device=lambda *a, **kw: None,
+                        config=types.SimpleNamespace(allow_internal_format=True),
+                    )
+                    testing_mod = types.ModuleType("torch_npu.testing")
+                    testcase_mod = types.ModuleType("torch_npu.testing.testcase")
+                    testcase_mod.TestCase = object
+                    testcase_mod.run_tests = lambda *a, **kw: None
+                    testing_mod.testcase = testcase_mod
+                    stub.testing = testing_mod
+                install_stub(mod_name, stub)
+
+        cann_stub = types.ModuleType("cann_ops_transformer")
+        ops_stub = types.ModuleType("cann_ops_transformer.ops")
+        ops_stub.compressor = lambda *a, **kw: None
+        cann_stub.ops = ops_stub
+        install_stub("cann_ops_transformer", cann_stub)
+        install_stub("cann_ops_transformer.ops", ops_stub)
+
+        sys.path.insert(0, str(pytest_dir))
         spec = importlib.util.spec_from_file_location(
             f"compressor_pytest_golden_{abs(hash(module_path))}", module_path
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
     finally:
-        try:
-            sys.path.remove(str(pytest_dir))
-        except ValueError:
-            pass
-        np.random.set_state(_np_random_state)
-        for _mod_name, _saved in _saved_modules.items():
-            sys.modules[_mod_name] = _saved
-        for _mod_name in ("cann_ops_transformer", "cann_ops_transformer.ops"):
-            if _mod_name not in _saved_modules and _mod_name in sys.modules:
-                del sys.modules[_mod_name]
+        for name, stub in reversed(list(temporary_modules.items())):
+            if sys.modules.get(name) is stub:
+                previous = previous_modules[name]
+                if previous is missing:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = previous
+        sys.path[:] = saved_path
+        np.random.set_state(saved_random_state)
 
     PYTEST_GOLDEN_MODULE = module
     return PYTEST_GOLDEN_MODULE

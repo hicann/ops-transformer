@@ -65,6 +65,7 @@ class CompressorSpec:
             "small_value": 2**-10,
             "small_value_atol": 2**-16,
         },
+        "float32": {"standard": "stat_rel_err"},
     }
 
     def compare(*outputs, compare_context=None, **kwargs):
@@ -117,6 +118,7 @@ class AclnnCompressorSpec:
             "small_value": 2**-10,
             "small_value_atol": 2**-16,
         },
+        "float32": {"standard": "stat_rel_err"},
     }
 
     def compare(*outputs, compare_context=None, **kwargs):
