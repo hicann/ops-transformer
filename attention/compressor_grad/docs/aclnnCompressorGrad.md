@@ -208,10 +208,7 @@ aclnnStatus aclnnCompressorGrad(
 ## 约束说明
 
 - 确定性计算：
-    - dX、dWkv、dWgate同输入逐bit确定；dApe为多核浮点原子累加（scatter-add），结果受加法次序影响，同输入重跑存在 ≤1e-5量级的数值抖动（远低于常用容差），非逐bit确定。
-- executor生命周期（两段式接口通用约束）：
-    - `aclnnCompressorGradGetWorkspaceSize` 返回的 `aclOpExecutor*` 默认为**单次使用**：每次执行计算前应重新调用GetWorkspaceSize获取新的executor（本仓 `torch_extension` 的ACLNN_CMD调用链即为此模式）。
-    - 若调用方需缓存并复用executor（例如避免重复构建tiling），必须在首次执行前调用 `aclSetAclOpExecutorRepeatable(executor)` 打标；复用时若输入/输出tensor地址发生变化，需配合 `aclSetAclOpTensorAddr` 系列接口更新地址。未打标的executor复用属未定义行为，第二次发射会因workspace实参失效产生设备侧错误（如507057）。
+  - aclnnCompressorGrad默认确定性实现。
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 输入shape限制：
     - wkv支持输入shape[coff* D,H]
@@ -229,17 +226,6 @@ aclnnStatus aclnnCompressorGrad(
     - 若x的维度不采用BS合轴，即x的输入shape为[B,S,H]
         - cuSeqlens，参数必须为空。
         - seqused，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length长度，即要求seqused[n] <= S，且不小于0。
-- 输入契约与违规行为（cuSeqlens/seqused/startPos值域）：cuSeqlens/seqused/startPos为设备侧张量，host在图编译期不可读取其值，上述值域要求（cuSeqlens首元素为0、单调不减、末元素<=T；seqused落在各batch的[0, 序列长度]区间；startPos非负）不做拒绝式拦截，而是在kernel侧硬化为如下确定行为（安全降级，非报错）：
-    - TH布局（x为[T,H]）：
-        - 某batch的cuSeqlens[b]/cuSeqlens[b+1]出现负值、大于T或cuSeqlens[b+1] < cuSeqlens[b]（非单调）时，该batch跳过不参与计算，其对应输出（dX的[cuSeqlens[b], cuSeqlens[b+1])行段及其它输出的该batch贡献）全零；其余batch正常计算。
-        - cuSeqlens[0] != 0时，[0, cuSeqlens[0])的token不属于任何batch，这些行不参与计算，dX对应行输出全零；各batch仍在自身的[cuSeqlens[b], cuSeqlens[b+1])窗口内正常计算。
-        - seqused[b]超出[0, cuSeqlens[b+1] - cuSeqlens[b]]时按区间端点截断（负值按0、超上界按窗口长度参与计算）。
-        - startPos[b]为全局序列锚点，合法值可以大于本batch窗口长度（不做上界截断）；负值非法，按0处理（等同不传startPos）。
-    - BSH布局（x为[B,S,H]）：
-        - seqused[b]超出[0, S]时按区间端点截断（负值按0处理即该batch无完整压缩块、输出全零；超上界按S处理即等同不传seqused）。
-        - startPos[b]取模cmpRatio后的偏移参与块锚点计算，负值/垃圾值不会造成越界访问。
-    - 所有违规输入均保证不产生越界读写与数值溢出；调用方应按上述值域构造输入以获得正确梯度。
-    - 结构性错误（shape/dtype/维度不一致、dCmpKv行数不足、空Tensor等）仍由host侧直接拒绝报错（返回ACLNN_ERR_INNER_TILING_ERROR）。
 - 输入值域限制：
     - 该接口支持B、S泛化，且存在如下场景限制：
         - **不支持B、S、T为0的空Tensor**：与正向Compressor不同，CompressorGrad所有输入/输出均不支持空Tensor，shapeSize必须大于0。

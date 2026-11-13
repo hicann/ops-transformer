@@ -95,17 +95,6 @@ English | [简体中文](./README.md)
         - cu\_seqlens: the parameter must be empty.
         - seqused supports the input shape [B,]. The number of valid tokens in each batch must be less than or equal to the corresponding Sequence Length, that is, seqused[n] <= S, and must not be less than 0.
 
-- Input contract and violation behavior (value ranges of cu\_seqlens/seqused/start\_pos): cu\_seqlens/seqused/start\_pos are device-side tensors. The host cannot read their values during graph compilation. Therefore, the preceding value range requirements (the first element of cu\_seqlens is 0, values are monotonically non-decreasing, and the last element is <= T; seqused falls within the [0, sequence length] interval of each batch; start\_pos is non-negative) are not rejected upfront. Instead, they are hardened on the kernel side into the following deterministic behaviors (safe degradation instead of errors):
-    - TH layout (x is [T,H]):
-        - If cu\_seqlens[b]/cu\_seqlens[b+1] of a batch is negative, greater than T, or cu\_seqlens[b+1] < cu\_seqlens[b] (non-monotonic), the batch is skipped and does not participate in the computation. The corresponding outputs (the [cu\_seqlens[b], cu\_seqlens[b+1]) row segment of d\_x and the contributions of this batch to other outputs) are all zeros. Other batches are computed normally.
-        - If cu\_seqlens[0] != 0, the tokens in [0, cu\_seqlens[0]) do not belong to any batch. These rows do not participate in the computation, and the corresponding rows of d\_x output all zeros. Each batch is still computed normally within its own [cu\_seqlens[b], cu\_seqlens[b+1]) window.
-        - If seqused[b] exceeds [0, cu\_seqlens[b+1] - cu\_seqlens[b]], it is truncated to the interval endpoints (a negative value is treated as 0, and a value exceeding the upper bound is treated as the window length for the computation).
-        - start\_pos[b] is the global sequence anchor. A valid value can be greater than the window length of the current batch (no upper-bound truncation is performed). A negative value is invalid and is treated as 0 (equivalent to not passing start\_pos).
-    - BSH layout (x is [B,S,H]):
-        - If seqused[b] exceeds [0, S], it is truncated to the interval endpoints (a negative value is treated as 0, meaning the batch has no complete compression block and the output is all zeros; a value exceeding the upper bound is treated as S, equivalent to not passing seqused).
-        - The offset of start\_pos[b] modulo cmp\_ratio participates in the block anchor computation. Negative or garbage values do not cause out-of-bounds access.
-    - All invalid inputs are guaranteed not to cause out-of-bounds reads or writes or numeric underflow. Callers should construct inputs according to the preceding value ranges to obtain correct gradients.
-    - Structural errors (inconsistent shape/dtype/dimensions, insufficient rows of d\_cmp\_kv, empty tensors, and so on) are still rejected directly with errors on the host side.
 - Input value range restrictions:
     - This API supports generalization of B and S, with the following scenario restrictions:
         - **Empty tensors with B, S, or T of 0 are not supported**: Different from the forward Compressor operator, none of the inputs/outputs of CompressorGrad support empty tensors. shapeSize must be greater than 0.
