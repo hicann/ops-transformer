@@ -24,7 +24,7 @@ NPU Simulator是一款面向算子开发场景的SoC级芯片仿真工具，用�
 * NPU Simulator工具仅支持Ascend950PR和Ascend950DT芯片，建议仿真器运行环境配置为16核CPU和32GB以上内存。
 * 目前不支持arm环境仿真。
 
-```
+```text
 名称变更通知：
 自2026年7月30号版本起，仿真器名称cannsim正式更名为npusim，所有命令行工具名称同步变更。旧命令cannsim作为别名保留一段时间，建议尽快迁移到npusim
 ```

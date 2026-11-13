@@ -59,7 +59,7 @@ bash build.sh --pkg --soc=${soc_version} --ops=add_example -j16
 
 <a id="soc-version-mapping"></a>
 
-产品名对应的${soc_version}取值如下，请按实际场景传参。
+产品名对应的${soc_version}取值如下，请按实际场景传参：
 
 - Atlas A2系列产品：取值为ascend910b
 - Atlas A3系列产品：取值为ascend910_93
@@ -67,7 +67,7 @@ bash build.sh --pkg --soc=${soc_version} --ops=add_example -j16
 
 若提示如下信息，说明编译成功。
 
-```bash
+```output
 Self-extractable archive "cann-ops-transformer-custom_linux-${arch}.run" successfully created.
 ```
 
@@ -79,7 +79,7 @@ Self-extractable archive "cann-ops-transformer-custom_linux-${arch}.run" success
 ./build_out/cann-ops-transformer-*linux*.run
 ```
 
-`AddExample`安装在```${ASCEND_HOME_PATH}/opp/vendors```路径中，```${ASCEND_HOME_PATH}```表示CANN软件安装目录。
+`AddExample`安装在`${ASCEND_HOME_PATH}/opp/vendors`路径中，`${ASCEND_HOME_PATH}`表示CANN软件安装目录。
 
 > 安装后执行 `grep load_priority ${ASCEND_HOME_PATH}/opp/vendors/config.ini` 校验，预期输出含本vendor。若无输出，通常是 `${ASCEND_HOME_PATH}/opp/vendors` 属主或权限不对，请排查后重新安装。
 
@@ -95,7 +95,7 @@ export LD_LIBRARY_PATH=${ASCEND_HOME_PATH}/opp/vendors/custom_transformer/op_api
 
 通用的运行命令格式：`bash build.sh --run_example <算子名> <运行模式> <包模式> --vendor_name=<自定义算子包名>`。
 
-以AddExample为例，其提供了简单算子样例`add_example/examples/test_aclnn_add_example.cpp`，运行该样例验证算子功能是否正常。
+以AddExample为例，其提供了简单算子样例`ops-transformer/examples/add_example/examples/test_aclnn_add_example.cpp`，运行该样例验证算子功能是否正常。
 
 ```bash
 bash build.sh --run_example add_example eager cust --vendor_name=custom --soc=${soc_version}
@@ -106,11 +106,11 @@ bash build.sh --run_example add_example eager cust --vendor_name=custom --soc=${
 - <算子名>：add_example
 - <运行模式>：eager
 - <包模式>：cust
-- --vendor_name(可选)：vendorname表示构建的自定义算子包名，默认名为custom
+- --vendor_name（可选）：vendor_name表示构建的自定义算子包名，默认名为custom
 
 预期输出：打印算子`AddExample`的加法计算结果，表明算子已成功部署并正确执行。
 
-```bash
+```output
 add_example first input[0] is: 1.000000, second input[0] is: 1.000000, result[0] is: 2.000000
 add_example first input[1] is: 1.000000, second input[1] is: 1.000000, result[1] is: 2.000000
 add_example first input[2] is: 1.000000, second input[2] is: 1.000000, result[2] is: 2.000000
@@ -128,7 +128,7 @@ add_example first input[7] is: 1.000000, second input[7] is: 1.000000, result[7]
 
 ### 1. 修改Kernel实现
 
-找到AddExample算子的核心kernel实现文件`ops-transformer/examples/add_example/op_kernel/add_example.h`，尝试将算子中的Add操作改为Mul操作：
+找到AddExample算子的核心Kernel实现文件`ops-transformer/examples/add_example/op_kernel/add_example.h`，尝试将算子中的Add操作改为Mul操作：
 
 ```cpp
 __aicore__ inline void AddExample<T>::Compute(int32_t progress)
@@ -247,14 +247,14 @@ __aicore__ inline void AddExample<T>::Compute(int32_t progress)
 
 找到并编辑`AddExample`的`ops-transformer/examples/add_example/examples/test_aclnn_add_example.cpp`，修改输入张量的形状和数值。
 
-**修改输入/输出数据**：修改输入、输出的shape信息，以及初始化数据，构造相应的输入、输出tensor。
+**修改输入/输出数据**：修改输入、输出的shape信息，以及初始化数据，构造相应的输入、输出Tensor。
 
 ```c++
 int main() {
     // ... 初始化代码 ...
 
     // === ① 修改selfX的输入 ===
-    // 修改前：shape = {32, 4, 4, 4},数值全为1
+    // 修改前：shape = {32, 4, 4, 4}，数值全为1
     // 修改后：将输入shape改为 {8, 8, 8, 8}，并填充不同的测试数据
     std::vector<int64_t> selfXShape = {8, 8, 8, 8};
     std::vector<float> selfXHostData(4096); // 4096 = 8 * 8 * 8 *8
@@ -268,7 +268,7 @@ int main() {
 }
 ```
 
-> **注意**：修改shape时需同步修改对应host侧数据vector的长度（本例`selfX`、`selfY`、`out`三者的vector长度都要从默认的2048改为4096 = 8×8×8×8），并保证三者shape一致，否则会出现数据越界或结果不匹配。
+> **注意**：修改shape时需同步修改对应Host侧数据Vector的长度（本例`selfX`、`selfY`、`out`三者的vector长度都要从默认的2048改为4096 = 8×8×8×8），并保证三者shape一致，否则会出现数据越界或结果不匹配。
 
 ### 2. 重新编译并验证
 
