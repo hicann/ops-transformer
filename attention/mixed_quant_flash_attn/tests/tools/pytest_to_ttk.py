@@ -56,7 +56,7 @@ tensor 顺序（12 个，与算子签名一致）
   8  seqused_kv    — (B,) 或 None，int32
   9  sinks         — None、空 tensor 或 (N1,)，float32
   10 attn_mask     — (2048, 2048) 或 None，int8
-  11 metadata      — (16384,)，int32（固定）
+  11 metadata      — (-1,)，int32，由 npu_preprocess 生成
 """
 
 import argparse
@@ -266,7 +266,7 @@ def parse_pytest_case(name, case):
     layout_kv = _val(case, "layout_kv", layout_q)
     layout_out = _val(case, "layout_attn_out", layout_q)
     q_dtype = _val(case, "q_dtype", "bf16")
-    quant_mode = _val(case, "quant_mode", None) or _val(case, "quant_mode", 1)
+    quant_mode = _val(case, "quant_mode", _val(case, "quant_compute_mode", 1))
     mask_mode = _val(case, "mask_mode", 0)
     softmax_scale = _val(case, "softmax_scale", 1.0 / (D**0.5) if D != 0 else 1.0)
 

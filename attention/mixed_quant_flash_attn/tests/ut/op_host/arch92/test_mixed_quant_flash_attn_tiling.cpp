@@ -9,10 +9,35 @@
  */
 
 #include <gtest/gtest.h>
+#include <limits>
 #include "../mixed_quant_flash_attn_param.h"
 #include "tiling_case_executor.h"
+#include "../../../../op_host/checkers/mqfa_mask_checker.h"
 
 namespace MixedQuantFlashAttnUT {
+
+TEST(MixedQuantFlashAttnBandWindow, RejectsNarrowingAndKeepsClosedEndpoints)
+{
+    using namespace optiling::mixed_quant_flash_attn;
+    FaTilingInfo info{};
+    info.opName = "MixedQuantFlashAttnBandWindow";
+    info.maskMode = 4;
+    info.winLeft = -1;
+    info.winRight = std::numeric_limits<int32_t>::max();
+    MaskChecker checker;
+    EXPECT_EQ(checker.CheckSinglePara(info), ge::GRAPH_SUCCESS);
+    info.winLeft = static_cast<int64_t>(std::numeric_limits<int32_t>::max()) + 1;
+    EXPECT_EQ(checker.CheckSinglePara(info), ge::GRAPH_FAILED);
+    info.winLeft = 0;
+    info.winRight = std::numeric_limits<int64_t>::max();
+    EXPECT_EQ(checker.CheckSinglePara(info), ge::GRAPH_FAILED);
+    info.winRight = -2;
+    EXPECT_EQ(checker.CheckSinglePara(info), ge::GRAPH_FAILED);
+    info.winRight = 0;
+    EXPECT_EQ(checker.CheckSinglePara(info), ge::GRAPH_SUCCESS);
+    // Presence checking is a separate checker phase and remains required.
+    EXPECT_EQ(checker.CheckParaExistence(info), ge::GRAPH_FAILED);
+}
 
 class MixedQuantFlashAttnArch9201TilingTest : public testing::TestWithParam<MixedQuantFlashAttnTilingUtParam> {
 protected:

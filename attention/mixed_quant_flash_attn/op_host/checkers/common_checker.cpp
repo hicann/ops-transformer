@@ -218,13 +218,6 @@ ge::graphStatus CommonChecker::CheckEmptyTensorPara(const FaTilingInfo& faInfo)
 
 ge::graphStatus CommonChecker::CheckHeadNum(const FaTilingInfo& faInfo)
 {
-    if ((faInfo.n1Size < 0) || (faInfo.n2Size < 0)) {
-        std::string shapeStr = ToString(faInfo.opParamInfo.query.shape->GetStorageShape()) + " and " +
-                               ToString(faInfo.opParamInfo.key.shape->GetStorageShape());
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(faInfo.opName, "query and key", shapeStr.c_str(),
-                                               "N of query and key must be greater than or equal to 0");
-        return ge::GRAPH_FAILED;
-    }
     OP_CHECK_IF(faInfo.n1Size < faInfo.n2Size,
                 OP_LOGE(faInfo.opName, "numHeads(%ld) should be greater than or equal to numKeyValueHeads(%ld)!",
                         faInfo.n1Size, faInfo.n2Size),
@@ -247,8 +240,8 @@ ge::graphStatus CommonChecker::CheckHeadNum(const FaTilingInfo& faInfo)
 
 ge::graphStatus CommonChecker::CheckAxis(const FaTilingInfo& faInfo)
 {
-    if (faInfo.bSize >= B_LIMIT || faInfo.bSize <= 0) {
-        std::string reason = "The value of B must be within the range (0, " + std::to_string(B_LIMIT) + ")";
+    if (faInfo.bSize >= B_LIMIT || faInfo.bSize < 0) {
+        std::string reason = "The value of B must be within the range [0, " + std::to_string(B_LIMIT) + ")";
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "axis B", std::to_string(faInfo.bSize).c_str(),
                                               reason.c_str());
         return ge::GRAPH_FAILED;
@@ -279,14 +272,15 @@ ge::graphStatus CommonChecker::CheckAxis(const FaTilingInfo& faInfo)
                                                       ToString(faInfo.opParamInfo.key.shape->GetStorageShape()).c_str(),
                                                       "N of key/value must be greater than 0"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(faInfo.s1Size <= 0,
+    OP_CHECK_IF(faInfo.s1Size < 0,
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                     faInfo.opName, "query", ToString(faInfo.opParamInfo.query.shape->GetStorageShape()).c_str(),
-                    "S of query must be greater than 0"),
+                    "S of query must be greater than or equal to 0"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(faInfo.s2Size <= 0,
-                OP_LOGE(faInfo.opName, "The axis KV_S must be greater than 0, the current is %ld.", faInfo.s2Size),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        faInfo.s2Size < 0,
+        OP_LOGE(faInfo.opName, "The axis KV_S must be greater than or equal to 0, the current is %ld.", faInfo.s2Size),
+        return ge::GRAPH_FAILED);
 
     const std::vector<int64_t> supportedHeadDims = {128};
     OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckValueSupport(faInfo.qkHeadDim, supportedHeadDims),
@@ -313,7 +307,7 @@ struct LayoutConstraintConfig {
 };
 
 static const std::map<FaLayout, LayoutConstraintConfig> LAYOUT_CONSTRAINT_TABLE = {
-    {FaLayout::BNSD, {{FaLayout::PA_NZ}, {FaLayout::BNSD, FaLayout::BSND}}},
+    {FaLayout::BNSD, {{FaLayout::PA_NZ}, {FaLayout::BNSD}}},
     {FaLayout::BSND, {{FaLayout::PA_NZ}, {FaLayout::BSND}}},
     {FaLayout::TND, {{FaLayout::PA_NZ}, {FaLayout::TND}}},
 };

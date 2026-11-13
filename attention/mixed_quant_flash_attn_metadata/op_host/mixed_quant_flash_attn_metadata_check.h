@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include <limits>
 #include "opdev/format_utils.h"
 #include "opdev/op_log.h"
 #include "opdev/data_type_utils.h"
@@ -37,6 +38,13 @@ static aclnnStatus ParamsCheck(const aclTensor* cuSeqlensQOptional, const aclTen
 
     if (maskMode != 0 && maskMode != 3 && maskMode != 4) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "maskMode only supports 0, 3, 4, but got %ld", maskMode);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
+    constexpr int64_t maxLength = std::numeric_limits<int32_t>::max();
+    if (maskMode == 4 &&
+        (winLeft > maxLength || winRight > maxLength || maxSeqlenQ > maxLength || maxSeqlenKv > maxLength)) {
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "BAND window and maximum sequence lengths must fit INT32");
         return ACLNN_ERR_PARAM_INVALID;
     }
 

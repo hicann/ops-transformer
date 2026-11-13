@@ -152,20 +152,22 @@ class MixedQuantFlashAttenOpBuilder(OpBuilder):
             if layout_q == "TND":
                 t_size = q.size(0)
                 n_size = q.size(1)
-                d_size = v.size(2)
                 softmax_out_size = (t_size, n_size)
             elif layout_q == "BSND":
                 b_size = q.size(0)
                 s_size = q.size(1)
                 n_size = q.size(2)
-                d_size = v.size(3)
                 softmax_out_size = (b_size, n_size, s_size)
             else:
                 b_size = q.size(0)
                 n_size = q.size(1)
                 s_size = q.size(2)
-                d_size = v.size(3)
                 softmax_out_size = (b_size, n_size, s_size)
+
+            # V 的末轴每字节存两个 FP4 元素，PA_NZ 的逻辑 D 还包含 D1 轴。
+            d_size = v.size(-1) * 2
+            if layout_kv == "PA_NZ":
+                d_size *= v.size(2)
 
             if layout_attn_out == "TND":
                 torch._check(

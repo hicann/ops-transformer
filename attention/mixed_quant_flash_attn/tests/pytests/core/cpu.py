@@ -492,11 +492,33 @@ def softmax_flash(x, block_sum, block_max, block_exp, is_first, sink=None):
     if is_first:
         block_sum = x_sum
         if sink is not None:
-            block_sum += torch.exp(sink - block_max)
+            # 首块已把 sink 计入最大值。最大值仍为 -inf 时，sink 权重为零。
+            block_sum += torch.where(
+                torch.isneginf(block_max), 0.0, torch.exp(sink - block_max)
+            )
     else:
         block_sum *= block_exp
         block_sum += x_sum
     return y, block_sum, block_max, block_exp
+
+
+def build_sparse_mask(
+    q_rows, kv_start, kv_count, sq, skv, mask_mode, win_left, win_right
+):
+    """Build a tile mask in logical token coordinates, after undoing GQA packing."""
+    columns = torch.arange(kv_start, kv_start + kv_count).reshape(1, -1)
+    center = q_rows.reshape(-1, 1) + skv - sq
+    if mask_mode == 3:
+        return columns > center
+    if mask_mode == 4:
+        # -1 removes only that side's bound. Both endpoints are inclusive.
+        masked = torch.zeros((q_rows.numel(), kv_count), dtype=torch.bool)
+        if win_left != -1:
+            masked |= columns < center - win_left
+        if win_right != -1:
+            masked |= columns > center + win_right
+        return masked
+    raise NotImplementedError(f"unimplemented sparse_mode: {mask_mode}")
 
 
 def get_sink_values_for_block(
@@ -1114,7 +1136,11 @@ def tforward(sinner=-1, souter=-1, mode="cpu", **kwargs):
             f"kvs_cur_batch: {kvs_cur_batch}, valid_qs_cur_batch: {valid_qs_cur_batch}"
         )
         for n2_idx in range(n2):
-            isinvalid = (kvs_cur_batch < valid_qs_cur_batch) and mask_mode != 0
+            first_valid_q = 0
+            if mask_mode == 3:
+                first_valid_q = valid_qs_cur_batch - kvs_cur_batch
+            elif mask_mode == 4 and win_right != -1:
+                first_valid_q = valid_qs_cur_batch - kvs_cur_batch - win_right
             souter_loop_times = (
                 math.ceil(g * valid_qs_cur_batch / souter) if souter > 0 else 1
             )
@@ -1205,6 +1231,25 @@ def tforward(sinner=-1, souter=-1, mode="cpu", **kwargs):
                                     kvs_cur_batch - valid_qs_cur_batch + 1 + s1_idx
                                 )
                                 mask_block[m_idx, -mask_num:] = 1
+                        elif mask_mode == 4:
+                            packed_rows = torch.arange(
+                                souter_idx * souter, souter_idx * souter + souter_actual
+                            )
+                            q_rows = (
+                                packed_rows % valid_qs_cur_batch
+                                if gs_flag
+                                else packed_rows // g
+                            )
+                            mask_block = build_sparse_mask(
+                                q_rows,
+                                sinner_idx * sinner,
+                                sinner_actual,
+                                valid_qs_cur_batch,
+                                kvs_cur_batch,
+                                mask_mode,
+                                win_left,
+                                win_right,
+                            )
                         else:
                             raise NotImplementedError(
                                 f"unimplemented sparse_mode: {mask_mode}"
@@ -1218,12 +1263,16 @@ def tforward(sinner=-1, souter=-1, mode="cpu", **kwargs):
                             q_block.to(compute_dtype),
                             k_block.to(compute_dtype).transpose(1, 0),
                         )
-                    if mask_block is not None:
+                    if mask_block is not None and mask_mode != 4:
                         mm1 = mm1 + torch.where(
                             mask_block.to(torch.bool), -torch.inf, 0.0
                         ).to(compute_dtype)
+                    mm1 = mm1 * softmax_scale
+                    if mask_block is not None and mask_mode == 4:
+                        # BAND 的屏蔽值在零或负 scale 下仍应为 -inf。
+                        mm1 = mm1.masked_fill(mask_block, -torch.inf)
                     p_block, block_sum, block_max, block_exp = softmax_flash(
-                        mm1 * softmax_scale,
+                        mm1,
                         block_sum,
                         block_max,
                         block_exp,
@@ -1245,15 +1294,19 @@ def tforward(sinner=-1, souter=-1, mode="cpu", **kwargs):
                     else:
                         out_block = out_block * block_exp + mm2
                     if sinner_idx == sinner_loop_times - 1:
-                        out_block /= block_sum
-                if isinvalid:
+                        denominator = block_sum
+                        if mask_mode in (3, 4):
+                            # 无有效 KV 或 sink 权重时避免 0/0，LSE 仍使用原始 block_sum。
+                            denominator = torch.where(block_sum == 0, 1.0, block_sum)
+                        out_block /= denominator
+                if first_valid_q > 0:
                     for m_idx in range(0, souter_actual):
                         s1_idx = (
                             (souter_idx * souter + m_idx) % valid_qs_cur_batch
                             if gs_flag
                             else (souter_idx * souter + m_idx) // g
                         )
-                        if s1_idx < (valid_qs_cur_batch - kvs_cur_batch):
+                        if s1_idx < first_valid_q:
                             out_block[m_idx] = 0
                             # A sink cannot make a fully masked row valid for LSE.
                             if return_softmax_lse and sinks is not None:

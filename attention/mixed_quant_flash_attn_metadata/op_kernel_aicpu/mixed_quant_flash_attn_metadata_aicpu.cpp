@@ -51,7 +51,12 @@ bool MixedQuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     if (!requiredAttrs) {
         return false;
     }
-    // attributes optional
+    // 复用实例时，各长度属性从本次调用的默认值开始读取。
+    batchSize_ = 0;
+    maxSeqlenQ_ = -1;
+    maxSeqlenKv_ = -1;
+    winLeft_ = -1;
+    winRight_ = -1;
     GetAttrValueOpt(ctx, "batch_size", batchSize_);
     GetAttrValueOpt(ctx, "max_seqlen_q", maxSeqlenQ_);
     GetAttrValueOpt(ctx, "max_seqlen_kv", maxSeqlenKv_);
@@ -134,6 +139,10 @@ inline int64_t MixedQuantFlashAttnMetadataCpuKernel::CalcCost(uint32_t basicM, u
 
 bool MixedQuantFlashAttnMetadataCpuKernel::ParamsInit()
 {
+    const int32_t maxSeqQForTiling = maxSeqlenQ_; // 和主算子一样使用原始属性选块
+    // resize 只初始化新增元素，复用实例时先清空上一轮的实际长度。
+    baseInfo.actualQuerySeqSize.clear();
+    baseInfo.actualKvSeqSize.clear();
     // Device info
     deviceInfo.aicCoreMaxNum = aicCoreNum_;
     deviceInfo.aivCoreMaxNum = aivCoreNum_;
@@ -223,7 +232,7 @@ bool MixedQuantFlashAttnMetadataCpuKernel::ParamsInit()
         qlayout = optiling::mixed_quant_flash_attn::fa_tiling_util::LAYOUT_TND;
     }
     optiling::mixed_quant_flash_attn::fa_tiling_util::AdjustSinnerAndSouter(
-        headDim_, groupSize_, baseInfo.querySeqSize, baseInfo.kvSeqSize, baseInfo.sparseMode, baseInfo.preToken,
+        headDim_, groupSize_, maxSeqQForTiling, baseInfo.kvSeqSize, baseInfo.sparseMode, baseInfo.preToken,
         baseInfo.nextToken, qlayout, mBaseSize_, s2BaseSize_);
 
     mBaseSize_ = mBaseSize_ * (aivCoreNum_ / aicCoreNum_); // CV_Radio
@@ -234,7 +243,7 @@ bool MixedQuantFlashAttnMetadataCpuKernel::ParamsInit()
     param.l2Byte = 0U; // Set sectionNum to 1
     param.fdTolerance = 0;
     param.fdLeastBlock = 0;
-    param.fdOn = (maskMode_ != 4); // TODO: turn off fd for flash attn
+    param.fdOn = true;
     return true;
 }
 

@@ -14,6 +14,7 @@
  */
 
 #include <map>
+#include <limits>
 #include <numeric>
 #include <vector>
 #include <graph/utils/type_utils.h>
@@ -81,6 +82,15 @@ ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const FaTilingInfo& faInfo)
 
 ge::graphStatus MaskChecker::CheckSingleParaWindowParams(const FaTilingInfo& faInfo)
 {
+    // BAND windows are serialized as int32_t in the kernel tiling data.
+    OP_CHECK_IF(faInfo.maskMode == static_cast<int64_t>(MaskMode::BAND) &&
+                    (faInfo.winLeft < -1 || faInfo.winLeft > std::numeric_limits<int32_t>::max() ||
+                     faInfo.winRight < -1 || faInfo.winRight > std::numeric_limits<int32_t>::max()),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    faInfo.opName, "win_left and win_right",
+                    (std::to_string(faInfo.winLeft) + " and " + std::to_string(faInfo.winRight)).c_str(),
+                    "The values of win_left and win_right must be within the range [-1, INT32_MAX]."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(faInfo.winLeft < -1,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "win_left", std::to_string(faInfo.winLeft).c_str(),
                                                       ">= -1"),

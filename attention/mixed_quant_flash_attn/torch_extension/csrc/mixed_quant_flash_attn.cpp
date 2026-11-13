@@ -35,7 +35,6 @@ std::tuple<at::Tensor, at::Tensor> mixed_quant_flash_attn(
 {
     int64_t tSize = 0;
     int64_t nSize = 0;
-    int64_t dSize = 0;
     int64_t sSize = 0;
     int64_t bSize = 0;
     at::SmallVector<int64_t, MAX_DIM_SIZE> attentionOutSize;
@@ -43,17 +42,14 @@ std::tuple<at::Tensor, at::Tensor> mixed_quant_flash_attn(
     if (layout_q == "TND") {
         tSize = q.size(0);
         nSize = q.size(1);
-        dSize = q.size(2);
     } else if (layout_q == "BSND") {
         bSize = q.size(0);
         sSize = q.size(1);
         nSize = q.size(2);
-        dSize = q.size(3);
     } else {
         bSize = q.size(0);
         nSize = q.size(1);
         sSize = q.size(2);
-        dSize = q.size(3);
     }
     if (return_softmax_lse) {
         if (q.dim() == DIM_THREE) {
@@ -66,6 +62,11 @@ std::tuple<at::Tensor, at::Tensor> mixed_quant_flash_attn(
     }
     at::Tensor softmaxLse = at::empty(softmaxOutSize, q.options().dtype(at::kFloat));
 
+    // V 的末轴每字节存两个 FP4 元素，PA_NZ 的逻辑 D 还包含 D1 轴。
+    int64_t dSize = v.size(-1) * FP4_IN_INT8;
+    if (layout_kv == "PA_NZ") {
+        dSize *= v.size(DIM_TWO);
+    }
     if (layout_attn_out == "TND") {
         attentionOutSize = {tSize, nSize, dSize};
     } else if (layout_attn_out == "BNSD") {

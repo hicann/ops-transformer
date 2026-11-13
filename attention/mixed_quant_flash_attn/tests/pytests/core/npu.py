@@ -207,6 +207,7 @@ def run_npu(input_data, device_id=0, mode="eager"):
         ),
         device_id,
     )
+    torch.npu.set_device(device)
 
     # quant_compute_mode = 1
     has_empty_input = any(

@@ -32,7 +32,7 @@ _MARKER_TO_MODULE = {
     "func_B250_redline": "functional_B250_redline",
     "func_B280_0_1_stride_stc": "functional_B280_0_1_stride_stc",
     "func_B280_0_1_stride_stc_checker": "functional_B280_0_1_stride_stc_checker",
-    "func_stc": "functional_stc",
+    "func_stc": ["functional_stc", "functional_stc_band"],
     "func_L0": "L0_0715",
     "perf_batch": "perf_batch_linearity",
     "perf_mtp": "perf_mtp_linearity",
@@ -73,7 +73,8 @@ def _get_modules_for_func(metafunc):
     func = metafunc.function
     for marker_name in marker_names:
         if marker_name in _MARKER_TO_MODULE:
-            return [_MARKER_TO_MODULE[marker_name]]
+            modules = _MARKER_TO_MODULE[marker_name]
+            return modules if isinstance(modules, list) else [modules]
     return None
 
 

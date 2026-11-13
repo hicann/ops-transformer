@@ -86,16 +86,21 @@ class MixedQuantFlashAttnSpec:
         compare_mod = load_impl_module("compare")
         compare_method = compare_mod._get_compare_method()
         if compare_method == "cross_check":
-            # Rebuild 第三方(高精度 use_npu=True) benchmark 结果，保证 compare 进程里有 bench_outputs。
+            if not compare_mod.is_cross_check_available():
+                raise RuntimeError("cross_check requires TTK CrossCheckComparison")
+            # Rebuild the selected third-party outputs; golden outputs are the FP64 CPU truth.
             golden_mod = load_impl_module("golden")
             golden_mod.rebuild_golden_context_from_compare_context(compare_context)
             ctx = golden_mod.get_golden_context()
             bench_outputs = ctx.get("bench_outputs")
             kwargs["data_type"] = ctx.get("data_type") or kwargs.get("data_type")
-            if bench_outputs is not None and compare_mod.is_cross_check_available():
-                return compare_mod._run_ttk_cross_check_e2e(
-                    outputs, kwargs, bench_outputs, CROSS_CHECK_TOLERANCE
+            if bench_outputs is None:
+                raise RuntimeError(
+                    "cross_check third-party golden outputs are unavailable"
                 )
+            return compare_mod._run_ttk_cross_check_e2e(
+                outputs, kwargs, bench_outputs, CROSS_CHECK_TOLERANCE
+            )
         return compare_mod.compare(*outputs)
 
 

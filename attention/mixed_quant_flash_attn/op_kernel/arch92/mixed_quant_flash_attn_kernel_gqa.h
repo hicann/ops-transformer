@@ -740,11 +740,9 @@ public:
         fdParams.mLen = faMetaDataGm.GetValue(GetFDMetaDataIndex(constInfo.aivIdx, MQFA_FD_M_NUM_INDEX));
         fdParams.fdCoreEnable = fdParams.mLen > 0 ? 1U : 0U;
 
-        vecFdBlock.AllocEventID();
         vecFdBlock.InitDecodeParams();
         SyncAll();
         vecFdBlock.FlashDecode(fdParams);
-        vecFdBlock.FreeEventID();
     }
 
     __aicore__ inline void Process()
@@ -752,8 +750,6 @@ public:
         FlashAttention();
         if ASCEND_IS_AIC {
             cubeBlock.FreeCube();
-        } else {
-            vecFaBlock.FreeVec();
         }
         FreeCrossCoreSync();
         if ASCEND_IS_AIV {
