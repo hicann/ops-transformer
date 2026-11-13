@@ -64,12 +64,38 @@ __aicore__ inline void GenPse(FagConstInfo& constInfo, FagRunInfo& runInfo, PseI
     }
 }
 
+// Only the non-transposed, non-TND TBuf path uses this predicate. Do not use
+// computeMode here: mask prefetch can already have updated it for the next tile.
+__aicore__ inline bool IsCausalMaskFullyValid(const FagConstInfo& constInfo, const FagRunInfo& runInfo,
+                                              const AttenMaskInfo& attenMaskInfo)
+{
+    if (constInfo.commonConstInfo.layoutType == TND || runInfo.commonRunInfo.halfS1RealSize <= 0 ||
+        runInfo.commonRunInfo.s2RealSize <= 0) {
+        return false;
+    }
+    const bool isLeftUp =
+        attenMaskInfo.compressMode == static_cast<uint8_t>(AttenMaskCompressMode::LEFT_UP_CAUSAL_MODE);
+    const bool isRightDown =
+        attenMaskInfo.compressMode == static_cast<uint8_t>(AttenMaskCompressMode::RIGHT_DOWN_CAUSAL_MODE);
+    if (!isLeftUp && !isRightDown) {
+        return false;
+    }
+    const int64_t firstQuery =
+        runInfo.commonRunInfo.s1oIdx * constInfo.commonConstInfo.s1BaseSize + runInfo.commonRunInfo.vecS1Offset;
+    const int64_t lastKey = runInfo.commonRunInfo.s2StartIdx +
+                            runInfo.commonRunInfo.s2LoopCount * constInfo.commonConstInfo.s2BaseSize +
+                            runInfo.commonRunInfo.s2RealSize - 1;
+    const int64_t causalShift =
+        isRightDown ? runInfo.commonRunInfo.s2SizeThisBatch - runInfo.commonRunInfo.s1SizeThisBatch : 0;
+    return lastKey <= firstQuery + causalShift;
+}
+
 template <const uint32_t IS_ATTEN_MASK = 0, const uint32_t VECTOR_BASEM = 64, const uint32_t VECTOR_BASEN = 128>
 __aicore__ inline void CopyInAttenMask(FagConstInfo& constInfo, FagRunInfo& runInfo, AttenMaskInfo& attenMaskInfo,
                                        TBuf<>& attenMaskBuf, GlobalTensor<uint8_t>& attenMaskGm)
 {
     if constexpr (IS_ATTEN_MASK) {
-        if (runInfo.commonRunInfo.halfS1RealSize == 0) {
+        if (runInfo.commonRunInfo.halfS1RealSize == 0 || IsCausalMaskFullyValid(constInfo, runInfo, attenMaskInfo)) {
             return;
         }
         AttenMaskCopyIn(attenMaskBuf, attenMaskGm, runInfo.commonRunInfo, constInfo.commonConstInfo, attenMaskInfo);
@@ -309,6 +335,15 @@ __aicore__ inline void CalculatePseMulsSelSimpleSoftMaxWithTbuf(
 {
     if (runInfo.commonRunInfo.halfS1RealSize == 0) {
         return;
+    }
+    if constexpr (IS_ATTEN_MASK && !useDn) {
+        if (IsCausalMaskFullyValid(constInfo, runInfo, attenMaskInfo)) {
+            // The matching CopyIn skipped this mask; never read the reused UB bytes.
+            CalculatePseMulsSelSimpleSoftMaxWithTbuf<T1, T2, 0, IS_PSE, IS_DETER, VECTOR_BASEM, CUBE_BASEN, useDn>(
+                constInfo, runInfo, pseInfo, attenMaskInfo, maxSumBuf, attenMaskBuf, dstPTensor, srcPTensor,
+                dstDsTensor, srcDsTensor, pseSlope, reusedBuf0, deqScaleQK, deqScaleDyV);
+            return;
+        }
     }
     LocalTensor<uint8_t> attenMaskTensor;
     LocalTensor<T1> pseTensor;

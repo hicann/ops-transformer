@@ -410,10 +410,9 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::FreeAsync(FagConstInfo& const
             maxSumEventPending[i] = false;
         }
         GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(maxSumMte2ToMte3[i]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(mte2ToV[i]);
     }
 
-    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(mte2ToV[0]);
-    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(mte2ToV[1]);
     WaitFlag<HardEvent::MTE3_MTE2>(postMte2ToMte3[0]);
     WaitFlag<HardEvent::MTE3_MTE2>(postMte2ToMte3[1]);
     GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(postMte2ToMte3[0]);

@@ -1264,9 +1264,8 @@ ge::graphStatus FlashAttentionScoreGradTilingUs1s2Bs2David::InitTilingData()
         preTilingData_ = &tilingData->preTilingData;
         postTilingData_ = &tilingData->postTilingData;
         preSfmgTilingData_ = &tilingData->preSfmgTilingData;
-        if (tndBaseInfo.isTndSwizzle) {
-            tndSwizzleParam_ = &tilingData->tndSwizzleParam;
-        }
+        // Non-TND uses only the column-count/core-count/mode scalar fields.
+        tndSwizzleParam_ = &tilingData->tndSwizzleParam;
     }
 
     if (s1s2BNGS1S2BaseParams_ == nullptr || s1s2BNGS1S2SplitCoreParams_ == nullptr ||
@@ -2917,6 +2916,62 @@ int64_t FlashAttentionScoreGradTilingUs1s2Bs2David::GetTotalPerBatchNum(FuzzyBas
     return totalPerBatchNum;
 }
 
+void FlashAttentionScoreGradTilingUs1s2Bs2David::SaveNonTndColumnSwizzleParam()
+{
+    if (fBaseParams.layoutType == INPUT_FORMAT_TND || tndSwizzleParam_ == nullptr) {
+        return;
+    }
+    // Zero tasks means use the preceding kernel decoder. Do not read or write
+    // TND prefix arrays for fixed-length layouts; the tiling ABI is unchanged.
+    tndSwizzleParam_->set_totalValidS2TaskNum(0);
+    tndSwizzleParam_->set_activeCoreNum(0);
+    tndSwizzleParam_->set_columnScheduleMode(TND_VALID_S2_COLUMN_SIMPLE_CYCLIC);
+    if (!fBaseParams.isSwizzle || fBaseParams.s1CvInner != 256 || fBaseParams.cvS2Inner != 128 ||
+        fBaseParams.s1 < 32768 || fBaseParams.s2 < 32768) {
+        return;
+    }
+    const bool isCausal = fBaseParams.sparseType == static_cast<uint8_t>(SparseType::CASUAL);
+    const bool isDense = fBaseParams.sparseType == static_cast<uint8_t>(SparseType::DENSE);
+    if ((!isDense && !isCausal) || (isCausal && fBaseParams.s1 != fBaseParams.s2)) {
+        return;
+    }
+    const uint64_t cores = static_cast<uint64_t>(fBaseParams.aicNum);
+    const uint64_t columnsPerHead = static_cast<uint64_t>(fBaseParams.s2Outer);
+    const uint64_t heads = static_cast<uint64_t>(fBaseParams.b) * fBaseParams.n2;
+    const uint64_t physicalColumns = heads * columnsPerHead;
+    // One causal work item joins (2*h,j) and (2*h+1,N-1-j).
+    // An odd final head contributes single columns, each visited exactly once.
+    const uint64_t taskNum = isCausal ? (heads / 2 + heads % 2) * columnsPerHead : physicalColumns;
+    if (cores == 0 || taskNum < cores) {
+        return;
+    }
+    std::vector<uint64_t> coreWork(cores, 0);
+    uint64_t totalWork = 0;
+    for (uint64_t rank = 0; rank < taskNum; ++rank) {
+        const uint64_t column = rank % columnsPerHead;
+        const uint64_t firstRow = isCausal ? column * fBaseParams.cvS2Inner / fBaseParams.s1CvInner : 0;
+        uint64_t weight = (fBaseParams.s1Outer - firstRow) * fBaseParams.g;
+        if (isCausal && (rank / columnsPerHead) * 2 + 1 < heads) {
+            const uint64_t secondRow = (columnsPerHead - 1 - column) * fBaseParams.cvS2Inner / fBaseParams.s1CvInner;
+            weight += (fBaseParams.s1Outer - secondRow) * fBaseParams.g;
+        }
+        coreWork[rank % cores] += weight;
+        totalWork += weight;
+    }
+    const uint64_t chosenMax = *std::max_element(coreWork.begin(), coreWork.end());
+    const bool balanced =
+        totalWork > 0 && static_cast<long double>(chosenMax) * cores * TND_VALID_S2_COLUMN_IMBALANCE_DENOMINATOR <=
+                             static_cast<long double>(totalWork) * TND_VALID_S2_COLUMN_IMBALANCE_NUMERATOR;
+    if (!balanced) {
+        return;
+    }
+    tndSwizzleParam_->set_totalValidS2TaskNum(physicalColumns);
+    tndSwizzleParam_->set_activeCoreNum(cores);
+    tndSwizzleParam_->set_columnScheduleMode(isCausal ? NON_TND_COLUMN_PAIRED : TND_VALID_S2_COLUMN_SIMPLE_CYCLIC);
+    OP_LOGI(context_, "non-TND column schedule: workItems=%lu, columns=%lu, cores=%lu, maxWork=%lu, mode=%u", taskNum,
+            physicalColumns, cores, chosenMax, isCausal ? NON_TND_COLUMN_PAIRED : TND_VALID_S2_COLUMN_SIMPLE_CYCLIC);
+}
+
 ge::graphStatus FlashAttentionScoreGradTilingUs1s2Bs2David::SaveToTilingData()
 {
     s1s2BNGS1S2BaseParams_->set_coreNum(fBaseParams.coreNum);
@@ -3012,6 +3067,7 @@ ge::graphStatus FlashAttentionScoreGradTilingUs1s2Bs2David::SaveToTilingData()
         tndSwizzleParam_->set_activeCoreNum(tndBaseInfo.validS2ActiveCoreNum);
         tndSwizzleParam_->set_columnScheduleMode(tndBaseInfo.columnScheduleMode);
     }
+    SaveNonTndColumnSwizzleParam();
     return ge::GRAPH_SUCCESS;
 }
 

@@ -408,6 +408,7 @@ protected:
                        std::vector<std::vector<int64_t>>& totalBlockInfo);
     // Tnd Swizzle
     void BuildTndBn2gs1s2SwizzleParam(const std::vector<std::vector<std::vector<int64_t>>>& calculatedBlockInfo);
+    void SaveNonTndColumnSwizzleParam();
     int64_t GetActualS2Outer(int64_t batchIdx);
     void CalcTndCubeColumnRange(int64_t batchIdx, int64_t s2Idx, int64_t& begin, int64_t& end);
 

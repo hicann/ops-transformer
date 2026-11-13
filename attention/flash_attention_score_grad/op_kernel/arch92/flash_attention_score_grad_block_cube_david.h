@@ -50,10 +50,13 @@ public:
         IS_FP32_INPUT ? 2 :
                         (IS_FP8_INPUT ? (HEAD_DIM_ALIGN <= 256 ? 4 : 2) :
                                         (HEAD_DIM_ALIGN <= 128 ? 4 : 2)); // D小于128 Q DX共用4块buff，Dk Dv做L1复用 4
+    constexpr static bool IS_V_L1_DOUBLE_BUFFER =
+        IS_FP16_INPUT && HEAD_DIM_ALIGN == 192 && CUBE_BASEM == 256 && CUBE_BASEN == 128 && SPLIT_AXIS == BN2GS1S2;
     constexpr static uint32_t KV_L1_BUF_NUM =
-        IS_FP32_INPUT ? 2 :
-                        (IS_FP8_INPUT ? (HEAD_DIM_ALIGN <= 256 ? 3 : 2) :
-                                        (HEAD_DIM_ALIGN <= 192 ? 3 : 2)); // D小于128 K V 共用3块buff，Dq做L1复用 3
+        IS_V_L1_DOUBLE_BUFFER ? 4 :
+        IS_FP32_INPUT         ? 2 :
+                                (IS_FP8_INPUT ? (HEAD_DIM_ALIGN <= 256 ? 3 : 2) :
+                                                (HEAD_DIM_ALIGN <= 192 ? 3 : 2)); // D小于128 K V 共用3块buff，Dq做L1复用 3
     constexpr static uint32_t Q_DX_L1_BUF_SIZE =
         IS_FP32_INPUT ? 128 * 128 :
                         (HEAD_DIM_ALIGN <= 256 ? CUBE_BASEM * HEAD_DIM_ALIGN : CUBE_BASEM * 256); // 128 * 256
@@ -64,13 +67,25 @@ public:
     constexpr static uint32_t L0AB_SIZE = 64 * 1024;
     constexpr static uint32_t L0AB_BUF_NUM = 2; // L0A L0B默认开DB
     constexpr static uint32_t L0AB_DB_SIZE = L0AB_SIZE / L0AB_BUF_NUM;
-    constexpr static uint32_t L0C_BUF_NUM = 4; // L0C开4 buf
-    constexpr static uint32_t L0C_DBBUF_SIZE = 256 * 1024 / L0C_BUF_NUM;
     constexpr static bool IS_DKV_RESIDENT_L0C =
         IS_DKV_RESIDENT_L0C(CUBE_BASEM, CUBE_BASEN, HEAD_DIM_ALIGN) && !IS_FP32_INPUT && (DETER_SPARSE_TYPE == 0);
-    constexpr static uint32_t L0C_SHARED_BUF_NUM = IS_DKV_RESIDENT_L0C ? 2 : L0C_BUF_NUM;
+    // D192 supports dV residency with or without RoPE; Dv<=128 also retains dK.
+    constexpr static bool IS_DV_RESIDENT_L0C =
+        !IS_DKV_RESIDENT_L0C && IS_FP16_INPUT && (!IS_ROPE || HEAD_DIM_ALIGN == 192) && (DETER_SPARSE_TYPE == 0) &&
+        (SPLIT_AXIS == BN2GS1S2 || SPLIT_AXIS == BN2S2) && (HEAD_DIM_ALIGN == 192 || HEAD_DIM_ALIGN == 256);
+    constexpr static uint32_t L0C_DBBUF_SIZE = 64 * 1024;
+    // Full-width dQ uses the remaining 32KB when D192/Dv128 retains both dK and dV.
+    constexpr static uint32_t D192_DQ_BUF_SIZE = 128 * 192 * sizeof(T2);
+    constexpr static uint32_t D192_DK_BUF_IDX = 1;
+    constexpr static uint32_t D192_DK_BUF_SIZE = 128 * 192 * sizeof(T2);
+    constexpr static uint32_t D128_DV_BUF_SIZE = 128 * 128 * sizeof(T2);
+    constexpr static uint32_t L0C_BUF_NUM = IS_DV_RESIDENT_L0C ? 3 : 4;
+    constexpr static uint32_t L0C_SHARED_BUF_NUM = (IS_DKV_RESIDENT_L0C || IS_DV_RESIDENT_L0C) ? 2 : L0C_BUF_NUM;
     constexpr static uint32_t L0C_DK_BUF_IDX = 2;
-    constexpr static uint32_t L0C_DV_BUF_IDX = 3;
+    constexpr static uint32_t L0C_DV_BUF_IDX = IS_DV_RESIDENT_L0C ? 2 : 3;
+    // Match the existing L1 input capacity; runtime Dv must fit the Q/K template dimension.
+    constexpr static uint32_t DV_L0C_BUF_SIZE =
+        IS_DV_RESIDENT_L0C ? CUBE_BASEN * HEAD_DIM_ALIGN * sizeof(T2) : L0C_DBBUF_SIZE;
 
     constexpr static uint32_t UB_BUF_NUM = (IS_FP32_INPUT || IS_DETER_OLD(DETER_SPARSE_TYPE)) ? 2 : 3;
     constexpr static bool IS_TSCM_REUSE =
@@ -98,6 +113,13 @@ public:
     uint32_t mmL0APingPong = 0;
     uint32_t mmL0BPingPong = 0;
     uint32_t mmL0CPingPong = 0;
+    bool isDkvL0CResidentForD192Dv128 = false;
+    bool isDvL0CResidentForD192ToD256 = false;
+    bool isVL1DoubleBuffer = false;
+    int64_t cachedVOffset[2] = {-1, -1};
+    int64_t cachedVRows[2] = {0, 0};
+    bool isVPrefetchPending = false;
+    uint32_t l0cSharedBufNum = L0C_SHARED_BUF_NUM;
 
     TPipe* pipe;
     FagTilingType tilingData;
@@ -148,7 +170,7 @@ public:
     __aicore__ inline void InitCubeBuffer();
     __aicore__ inline void FreeAlloc(int64_t innerMm12LoopIdx);
     __aicore__ inline void FreeBuffer();
-    template <typename AType, typename BType, const bool IS_TRANS_A, const bool IS_TRANS_B, const bool IS_DKDV>
+    template <typename AType, typename BType, const bool IS_TRANS_A, const bool IS_TRANS_B, const bool IS_RESIDENT_L0C>
     __aicore__ inline void SingleMatmul(LocalTensor<AType> L1ATensor, LocalTensor<BType> L1BTensor,
                                         LocalTensor<T2> L0CTensor, uint32_t m, uint32_t n, uint32_t k, uint32_t srcA,
                                         uint32_t srcB, uint32_t offsetA, uint32_t offsetB, bool isInitVal,
@@ -180,7 +202,7 @@ public:
     template <typename DataType>
     __aicore__ inline void LoadDataToL0(LocalTensor<DataType> dstTensor, LocalTensor<DataType> srcTensor, uint32_t m,
                                         uint32_t k, uint32_t srcM, uint64_t srcOffset, bool isTrans);
-    template <typename AType, typename BType, bool IsDkDv = false>
+    template <typename AType, typename BType, bool IsResidentL0C = false>
     __aicore__ inline void ComputeBaseMm(LocalTensor<T2>& L0CTensor, LocalTensor<AType>& L0ATensor,
                                          LocalTensor<BType>& L0BTensor, uint32_t m, uint32_t n, uint64_t k,
                                          bool isInitVal, bool isS2IdxNoChange = false, uint32_t unitFlag = 0);
@@ -221,6 +243,13 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(GM_ADDR que
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::InitCubeBuffer()
 {
+    // Dv is fixed for the invocation, so select the L0C layout once before allocation.
+    isVL1DoubleBuffer = IS_V_L1_DOUBLE_BUFFER && tilingData->s1s2BNGS1S2BaseParams.d1 == 128;
+    isDkvL0CResidentForD192Dv128 =
+        IS_DV_RESIDENT_L0C && HEAD_DIM_ALIGN == 192 && tilingData->s1s2BNGS1S2BaseParams.d1 <= 128;
+    isDvL0CResidentForD192ToD256 =
+        IS_DV_RESIDENT_L0C && !isDkvL0CResidentForD192Dv128 && tilingData->s1s2BNGS1S2BaseParams.d1 <= HEAD_DIM_ALIGN;
+    l0cSharedBufNum = isDkvL0CResidentForD192Dv128 ? 1 : L0C_SHARED_BUF_NUM;
     L1QDxBufferManager.Init();
     L1KVBufferManager.Init();
     l0aBufferManager.Init();
@@ -240,7 +269,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::InitCubeBuffer()
     }
 
     for (int32_t i = 0; i < KV_L1_BUF_NUM; ++i) {
-        pipe->InitBuffer(tBufL1KV[i], KV_L1_BUF_SIZE * sizeof(T1));
+        const uint32_t kvBufferSize = isVL1DoubleBuffer && i >= 2 ? CUBE_BASEN * 128 : KV_L1_BUF_SIZE;
+        pipe->InitBuffer(tBufL1KV[i], kvBufferSize * sizeof(T1));
         L1KVTensor[i] = tBufL1KV[i].template Get<T1>();
     }
 
@@ -253,7 +283,13 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::InitCubeBuffer()
         L0BTensorArr[i] = tBufL0B[i].template Get<T1>();
     }
     for (int32_t i = 0; i < L0C_BUF_NUM; ++i) {
-        pipe->InitBuffer(tBufL0C[i], L0C_DBBUF_SIZE);
+        uint32_t bufferSize = i == L0C_DV_BUF_IDX ? DV_L0C_BUF_SIZE : L0C_DBBUF_SIZE;
+        if (isDkvL0CResidentForD192Dv128) {
+            // Slot 0: 96KB shared dQ/MM1/MM2; slot 1: 96KB dK; slot 2: 64KB dV.
+            bufferSize =
+                i == D192_DK_BUF_IDX ? D192_DK_BUF_SIZE : (i == L0C_DV_BUF_IDX ? D128_DV_BUF_SIZE : D192_DQ_BUF_SIZE);
+        }
+        pipe->InitBuffer(tBufL0C[i], bufferSize);
         L0CTensorArr[i] = tBufL0C[i].template Get<T2>();
     }
 }
@@ -276,7 +312,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::FreeBuffer()
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-template <typename AType, typename BType, const bool IS_TRANS_A, const bool IS_TRANS_B, const bool IS_DKDV>
+template <typename AType, typename BType, const bool IS_TRANS_A, const bool IS_TRANS_B, const bool IS_RESIDENT_L0C>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::SingleMatmul(
     LocalTensor<AType> L1ATensor, LocalTensor<BType> L1BTensor, LocalTensor<T2> L0CTensor, uint32_t m, uint32_t n,
     uint32_t k, uint32_t srcA, uint32_t srcB, uint32_t offsetA, uint32_t offsetB, bool isInitVal, bool isSplitK,
@@ -316,11 +352,11 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::SingleMatmul(
             ComputeBaseMm(L0CTensor, L0ATensor, L0BTensor, m, n, k, isInitVal);
         }
     } else if constexpr (IS_FP16_INPUT) {
-        ComputeBaseMm<AType, BType, IS_DKDV>(L0CTensor, L0ATensor, L0BTensor, m, n, k, isInitVal, isS2IdxNoChange,
-                                             unitFlag);
+        ComputeBaseMm<AType, BType, IS_RESIDENT_L0C>(L0CTensor, L0ATensor, L0BTensor, m, n, k, isInitVal,
+                                                     isS2IdxNoChange, unitFlag);
     } else if constexpr (IS_FP32_INPUT) {
-        ComputeBaseMm<AType, BType, IS_DKDV>(L0CTensor, L0ATensor, L0BTensor, m, n, k, isInitVal, isS2IdxNoChange,
-                                             unitFlag);
+        ComputeBaseMm<AType, BType, IS_RESIDENT_L0C>(L0CTensor, L0ATensor, L0BTensor, m, n, k, isInitVal,
+                                                     isS2IdxNoChange, unitFlag);
     }
 
     l0aBufferManager.ReleaseBuffer(mmL0APingPong);
@@ -330,7 +366,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::SingleMatmul(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-template <typename AType, typename BType, bool IsDkDv>
+template <typename AType, typename BType, bool IsResidentL0C>
 __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::ComputeBaseMm(LocalTensor<T2>& L0CTensor,
                                                                   LocalTensor<AType>& L0ATensor,
                                                                   LocalTensor<BType>& L0BTensor, uint32_t m, uint32_t n,
@@ -346,7 +382,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::ComputeBaseMm(LocalTensor<T2
     }
     mmadParams.cmatrixInitVal = isInitVal; // 配置C矩阵初始值是否为0。默认值true。
     mmadParams.cmatrixSource = false;      // 配置C矩阵初始值是否来源于C2（存放Bias的硬件缓存区）
-    if constexpr (IsDkDv && IS_DKV_RESIDENT_L0C) {
+    if constexpr (IsResidentL0C) {
         mmadParams.cmatrixInitVal = isInitVal ? !isS2IdxNoChange : false;
     }
     mmadParams.unitFlag = unitFlag;
@@ -383,7 +419,12 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmQKAndDyV(LocalTenso
     if (innerLoopIdx == 0) {
         // 只在innerLoop的第一次调用
         if constexpr (IS_TSCM_REUSE_K) {
-            vBuffIdx = 2;
+            if (isVL1DoubleBuffer) {
+                // Keep the same V slot throughout a column, alternating on transitions.
+                vBuffIdx = vBuffIdx < 2 ? 2 : (runInfo.isS2IdxNoChange ? vBuffIdx : 5 - vBuffIdx);
+            } else {
+                vBuffIdx = 2;
+            }
             if (!runInfo.isS2IdxNoChange || IS_TSCM_FULL_LOAD) {
                 kBuffIdx = 1 - kBuffIdx;
             }
@@ -410,7 +451,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmQKAndDyV(LocalTenso
     bool isInnerBlockLast = (innerLoopIdx == innerLoopNum - 1);
     uint32_t mSize =
         (isInnerBlockLast) ? (runInfo.commonRunInfo.s1RealSize - innerLoopIdx * VECTOR_BASEM) : VECTOR_BASEM;
-    uint32_t sharedL0CIdx = mmL0CPingPong % L0C_SHARED_BUF_NUM;
+    uint32_t sharedL0CIdx = mmL0CPingPong;
     LocalTensor<T2> L0CTensorQk;
     if constexpr (ENABLE_UNITFLAG) {
         L0CTensorQk = L0CTensorArr[sharedL0CIdx];
@@ -418,12 +459,27 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmQKAndDyV(LocalTenso
         L0CTensorQk = L0CTensorArr[l0cBufferManager.GetBuffer(sharedL0CIdx)];
     }
     LocalTensor<T2> L0CTensorDxV = L0CTensorArr[sharedL0CIdx][VECTOR_BASEM * CUBE_BASEN];
+    if (innerLoopIdx == 0 && isVL1DoubleBuffer) {
+        // K occupies slots 0/1. V's slots 2/3 retain their contents after release.
+        L1KVBufferManager.GetBuffer(vBuffIdx);
+        const uint32_t cacheIdx = vBuffIdx - 2;
+        isVPrefetchPending = cachedVOffset[cacheIdx] != runInfo.valueGmOffset ||
+                             cachedVRows[cacheIdx] != runInfo.commonRunInfo.s2RealSize;
+        if (isVPrefetchPending) {
+            CopyGmToL1(L1KVTensor[vBuffIdx], valueGm, runInfo.commonRunInfo.s2RealSize,
+                       constInfo.commonConstInfo.dSizeV, constInfo.commonConstInfo.mm1Kb,
+                       runInfo.commonRunInfo.s2RealSize, runInfo.valueGmOffset, 0);
+            L1KVBufferManager.EnQue(vBuffIdx);
+            cachedVOffset[cacheIdx] = runInfo.valueGmOffset;
+            cachedVRows[cacheIdx] = runInfo.commonRunInfo.s2RealSize;
+        }
+    }
     IterateMmQK(mm2ResTensor, runInfo, constInfo, L0CTensorQk, innerLoopIdx, mSize, isInnerBlockLast);
     IterateMmDyV(mm1ResTensor, runInfo, constInfo, L0CTensorDxV, innerLoopIdx, mSize, isInnerBlockLast);
     if constexpr (!ENABLE_UNITFLAG) {
         l0cBufferManager.ReleaseBuffer(sharedL0CIdx);
     }
-    mmL0CPingPong = (mmL0CPingPong + 1) % L0C_SHARED_BUF_NUM;
+    mmL0CPingPong = (mmL0CPingPong + 1 == l0cSharedBufNum) ? 0 : mmL0CPingPong + 1;
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -442,10 +498,17 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDyV(LocalTensor<T2>
         L1ATensor = L1QDxTensor[qDxBufferIdx];
         L1BTensor = L1KVTensor[kvBuffIdx];
         if (mIdx == 0) {
-            L1KVBufferManager.GetBuffer(kvBuffIdx); // 可能会插一个空同步
-            if (!runInfo.isS2IdxNoChange || IS_TSCM_FULL_LOAD) {
-                CopyGmToL1(L1BTensor, valueGm, runInfo.commonRunInfo.s2RealSize, constInfo.commonConstInfo.dSizeV,
-                           constInfo.commonConstInfo.mm1Kb, runInfo.commonRunInfo.s2RealSize, runInfo.valueGmOffset, 0);
+            if (isVL1DoubleBuffer) {
+                if (isVPrefetchPending) {
+                    L1KVBufferManager.DeQue(kvBuffIdx);
+                }
+            } else {
+                L1KVBufferManager.GetBuffer(kvBuffIdx); // 可能会插一个空同步
+                if (!runInfo.isS2IdxNoChange || IS_TSCM_FULL_LOAD) {
+                    CopyGmToL1(L1BTensor, valueGm, runInfo.commonRunInfo.s2RealSize, constInfo.commonConstInfo.dSizeV,
+                               constInfo.commonConstInfo.mm1Kb, runInfo.commonRunInfo.s2RealSize, runInfo.valueGmOffset,
+                               0);
+                }
             }
             L1QDxBufferManager.GetBuffer(qDxBufferIdx);
         }
@@ -738,9 +801,9 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsK(FagRunInfo& run
             L1KVBufferManager.DeQue(kvBuffIdx);
         }
 
-        // L0 按128*128切分
+        // Dual residency leaves 96KB for full-width dQ; split N internally to fit 32KB L0B.
         uint32_t l0BaseM = IS_FP32_INPUT ? 64 : 128;
-        uint32_t l0BaseN = IS_FP32_INPUT ? 64 : 128;
+        uint32_t l0BaseN = isDkvL0CResidentForD192Dv128 ? 192 : (IS_FP32_INPUT ? 64 : 128);
         uint32_t mLoopTimes = (runInfo.commonRunInfo.s1RealSize + l0BaseM - 1) / l0BaseM;
         if (!constInfo.deterConstInfo.noNeedDeter && isDqNeedDeter) { // deter流程按照完整基本块处理
             mLoopTimes = (CUBE_BASEM + l0BaseM - 1) / l0BaseM;
@@ -763,11 +826,40 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsK(FagRunInfo& run
             uint32_t offsetA = mL0Idx * l0BaseM * 32 / sizeof(DsType);
             uint32_t offsetB = nL0Idx * runInfo.commonRunInfo.s2AlignedSize * l0BaseN;
             uint32_t unitFlag = ENABLE_UNITFLAG ? UNITFLAG_EN_OUTER_LAST : UNITFLAG_DISABLE;
-            SingleMatmul<DsType, T1, isTransA, isTransB, false>(L1DsTensor, L1BTensor, L0CTensor, mL0Size, nL0Size,
-                                                                runInfo.commonRunInfo.s2RealSize,             // m,n,k
-                                                                CUBE_BASEM, runInfo.commonRunInfo.s2RealSize, // A,B src
-                                                                offsetA, offsetB, // A,B offset
-                                                                true, false, false, false, unitFlag);
+            if (isDkvL0CResidentForD192Dv128) {
+                // Keep dS in L0A for both N slices. Each slice owns a disjoint part of the
+                // full-width L0C output, so initialize and publish UnitFlag for each one.
+                constexpr uint32_t l0BaseNInner = 128;
+                LocalTensor<DsType> L0ATensor = L0ATensorArrDsType[l0aBufferManager.GetBuffer(mmL0APingPong)];
+                LoadDataToL0(L0ATensor, L1DsTensor, mL0Size, runInfo.commonRunInfo.s2RealSize, CUBE_BASEM, offsetA,
+                             false);
+                l0aBufferManager.EnQue(mmL0APingPong);
+                l0aBufferManager.DeQue(mmL0APingPong);
+                for (uint32_t nStart = 0; nStart < nL0Size; nStart += l0BaseNInner) {
+                    const uint32_t nL0InnerSize = (nL0Size - nStart < l0BaseNInner) ? nL0Size - nStart : l0BaseNInner;
+                    const uint32_t splitOffsetB = offsetB + nStart * runInfo.commonRunInfo.s2AlignedSize;
+                    const uint32_t splitOffsetC = nStart * AlignTo16(mL0Size);
+                    LocalTensor<T1> L0BTensor = L0BTensorArr[l0bBufferManager.GetBuffer(mmL0BPingPong)];
+                    LoadDataToL0(L0BTensor, L1BTensor, runInfo.commonRunInfo.s2RealSize, nL0InnerSize,
+                                 runInfo.commonRunInfo.s2RealSize, splitOffsetB, true);
+                    l0bBufferManager.EnQue(mmL0BPingPong);
+                    l0bBufferManager.DeQue(mmL0BPingPong);
+                    LocalTensor<T2> L0CPartTensor = L0CTensor[splitOffsetC];
+                    ComputeBaseMm<DsType, T1, false>(L0CPartTensor, L0ATensor, L0BTensor, mL0Size, nL0InnerSize,
+                                                     runInfo.commonRunInfo.s2RealSize, true, false, unitFlag);
+                    l0bBufferManager.ReleaseBuffer(mmL0BPingPong);
+                    mmL0BPingPong = 1 - mmL0BPingPong;
+                }
+                l0aBufferManager.ReleaseBuffer(mmL0APingPong);
+                mmL0APingPong = 1 - mmL0APingPong;
+            } else {
+                SingleMatmul<DsType, T1, isTransA, isTransB, false>(L1DsTensor, L1BTensor, L0CTensor, mL0Size, nL0Size,
+                                                                    runInfo.commonRunInfo.s2RealSize, // m,n,k
+                                                                    CUBE_BASEM,
+                                                                    runInfo.commonRunInfo.s2RealSize, // A,B src
+                                                                    offsetA, offsetB,                 // A,B offset
+                                                                    true, false, false, false, unitFlag);
+            }
 
             if constexpr (!ENABLE_UNITFLAG) {
                 l0cBufferManager.EnQue(mmL0CPingPong);
@@ -810,7 +902,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsK(FagRunInfo& run
                     CopyL0CToGm</*FP8_TRANSA*/ false>(*deterGmPtr, L0CTensor, mL0Size, nL0Size, HEAD_DIM_ALIGN,
                                                       deterDqOff, 0.0, false, /*IS_ATOMIC*/ false);
                     l0cBufferManager.ReleaseBuffer(mmL0CPingPong);
-                    mmL0CPingPong = (mmL0CPingPong + 1) % L0C_BUF_NUM;
+                    mmL0CPingPong = (mmL0CPingPong + 1 == l0cSharedBufNum) ? 0 : mmL0CPingPong + 1;
                     continue;
                 }
             }
@@ -832,7 +924,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsK(FagRunInfo& run
             if constexpr (!ENABLE_UNITFLAG) {
                 l0cBufferManager.ReleaseBuffer(mmL0CPingPong);
             }
-            mmL0CPingPong = (mmL0CPingPong + 1) % L0C_SHARED_BUF_NUM;
+            mmL0CPingPong = (mmL0CPingPong + 1 == l0cSharedBufNum) ? 0 : mmL0CPingPong + 1;
         }
         if constexpr (!IS_TSCM_REUSE_K) {
             L1KVBufferManager.ReleaseBuffer(kvBuffIdx);
@@ -850,6 +942,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQ(FagRunInfo& run
                                                                  bool isDkDvNeedDeter, int64_t cBlockIdx,
                                                                  GlobalTensor<T2>* deterGmPtr, bool deterPpFlag)
 {
+    const bool isDkResident = IS_DKV_RESIDENT_L0C || isDkvL0CResidentForD192Dv128;
+    const uint32_t dkResidentBufIdx = isDkvL0CResidentForD192Dv128 ? D192_DK_BUF_IDX : L0C_DK_BUF_IDX;
     constexpr bool isTransA = true;
     constexpr bool isTransB = true;
     uint64_t dstStride = constInfo.commonConstInfo.n2D;
@@ -895,9 +989,9 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQ(FagRunInfo& run
         }
 
         // L0 Matmul: (s1=128, s2=128) ^ T x (s1=128, d=128)
-        uint32_t l0BaseM = 128;                      // i.e. s2.
-        uint32_t l0BaseN = IS_FP32_INPUT ? 64 : 128; // i.e. d.
-        uint32_t l0BaseK = IS_FP32_INPUT ? 64 : 128; // i.e. s1.
+        uint32_t l0BaseM = 128;
+        uint32_t l0BaseN = isDkvL0CResidentForD192Dv128 ? 192 : (IS_FP32_INPUT ? 64 : 128); // i.e. d.
+        uint32_t l0BaseK = (isDkvL0CResidentForD192Dv128 || IS_FP32_INPUT) ? 64 : 128;      // i.e. s1.
         uint32_t mLoopTimes = (runInfo.commonRunInfo.s2RealSize + l0BaseM - 1) / l0BaseM;
         uint32_t nLoopTimes = (nL1Size + l0BaseN - 1) / l0BaseN;
         uint32_t kLoopTimes = (runInfo.commonRunInfo.s1RealSize + l0BaseK - 1) / l0BaseK;
@@ -928,7 +1022,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQ(FagRunInfo& run
                 uint32_t kL0Size =
                     (kL0Idx == kLoopTimes - 1) ? (runInfo.commonRunInfo.s1RealSize - kL0Idx * l0BaseK) : l0BaseK;
                 uint32_t nL0Size = (nL0Idx == nLoopTimes - 1) ? (nL1Size - nL0Idx * l0BaseN) : l0BaseN;
-                uint32_t l0cIdx = IS_DKV_RESIDENT_L0C ? L0C_DK_BUF_IDX : mmL0CPingPong;
+                uint32_t l0cIdx = isDkResident ? dkResidentBufIdx : mmL0CPingPong;
                 if (kL0Idx == 0) {
                     L0CTensor =
                         ENABLE_UNITFLAG ? L0CTensorArr[l0cIdx] : L0CTensorArr[l0cBufferManager.GetBuffer(l0cIdx)];
@@ -942,21 +1036,21 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQ(FagRunInfo& run
                 uint32_t offsetB = kL0Idx * l0BaseK * FRACTAL_NZ_C0_SIZE +
                                    nL0Idx * AlignTo16(runInfo.commonRunInfo.s1RealSize) * l0BaseN;
                 bool isFixpOut = true;
-                if constexpr (IS_DKV_RESIDENT_L0C && !(SPLIT_AXIS == BN2)) {
+                if (isDkResident && !(SPLIT_AXIS == BN2)) {
                     isFixpOut = !runInfo.nextS2IdxNoChange;
                 }
-                if constexpr (IS_DKV_RESIDENT_L0C && IS_BN2_MULTIBLK) {
+                if (isDkResident && IS_BN2_MULTIBLK) {
                     isFixpOut = !runInfo.nextS2IdxNoChange;
                 }
                 uint32_t unitFlag =
                     !ENABLE_UNITFLAG ? UNITFLAG_DISABLE : (isFixpOut ? UNITFLAG_EN_OUTER_LAST : UNITFLAG_ENABLE);
                 bool isLastLoopK = (kL0Idx == kLoopTimes - 1);
-                SingleMatmul<DsType, T1, isTransA, isTransB, true>(
+                SingleMatmul<DsType, T1, isTransA, isTransB, (IS_DKV_RESIDENT_L0C || IS_DV_RESIDENT_L0C)>(
                     L1DsTensor, L1BTensor, L0CTensor, mL0Size, nL0Size,
                     kL0Size,                                      // m, n, k
                     CUBE_BASEM, runInfo.commonRunInfo.s1RealSize, // A, B src
                     offsetA, offsetB,                             // A, B offset
-                    mmadFirst, isSplitK, isLastLoopK, runInfo.isS2IdxNoChange, unitFlag);
+                    mmadFirst, isSplitK, isLastLoopK, isDkResident && runInfo.isS2IdxNoChange, unitFlag);
                 mmadFirst = false;
 
                 if (isLastLoopK) {
@@ -995,14 +1089,14 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQ(FagRunInfo& run
                             if constexpr (!ENABLE_UNITFLAG) {
                                 l0cBufferManager.ReleaseBuffer(mmL0CPingPong);
                             }
-                            mmL0CPingPong = (mmL0CPingPong + 1) % L0C_BUF_NUM;
+                            mmL0CPingPong = (mmL0CPingPong + 1 == l0cSharedBufNum) ? 0 : mmL0CPingPong + 1;
                             continue;
                         }
                     }
                     if constexpr (SPLIT_AXIS == BN2) {
                         if constexpr (IS_BN2_MULTIBLK) {
                             if (isFixpOut) {
-                                bool needAtomic = !IS_DKV_RESIDENT_L0C && runInfo.isS2IdxNoChange;
+                                bool needAtomic = !isDkResident && runInfo.isS2IdxNoChange;
                                 CopyL0CToGm</*FP8_TRANSA*/ false>(dkWorkSpaceGm, L0CTensor, mL0Size, nL0Size, dstStride,
                                                                   dkOffset, 0.0, unitFlag, needAtomic);
                             }
@@ -1023,8 +1117,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmDsQ(FagRunInfo& run
                     if constexpr (!ENABLE_UNITFLAG) {
                         l0cBufferManager.ReleaseBuffer(l0cIdx);
                     }
-                    if constexpr (!IS_DKV_RESIDENT_L0C) {
-                        mmL0CPingPong = (mmL0CPingPong + 1) % L0C_BUF_NUM;
+                    if (!isDkResident) {
+                        mmL0CPingPong = (mmL0CPingPong + 1 == l0cSharedBufNum) ? 0 : mmL0CPingPong + 1;
                     }
                 }
             }
@@ -1040,6 +1134,9 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDy(
     GlobalTensor<std::conditional_t<SPLIT_AXIS == BN2 && !IS_BN2_MULTIBLK, T1, float>>& dvWorkSpaceGm,
     bool isDkDvNeedDeter, int64_t cBlockIdx, GlobalTensor<T2>* deterGmPtr, bool deterPpFlag)
 {
+    // Dv is a runtime dimension and need not equal the query/key template D.
+    const bool isDvOnlyResident = isDvL0CResidentForD192ToD256;
+    const bool isDvResident = IS_DKV_RESIDENT_L0C || isDkvL0CResidentForD192Dv128 || isDvOnlyResident;
     constexpr bool isTransA = true;
     constexpr bool isTransB = true;
     uint64_t dstStride = constInfo.commonConstInfo.n2Dv;
@@ -1076,9 +1173,10 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDy(
         }
 
         // L0 Matmul: (s1=128, s2=128) ^ T x (s1=128, d=128)
-        uint32_t l0BaseM = 128;                      // i.e. s2.
-        uint32_t l0BaseN = IS_FP32_INPUT ? 64 : 128; // i.e. d.
-        uint32_t l0BaseK = IS_FP32_INPUT ? 64 : 128; // i.e. s1.
+        uint32_t l0BaseM = 128;
+        uint32_t l0BaseN = isDvOnlyResident ? HEAD_DIM_ALIGN : (IS_FP32_INPUT ? 64 : 128); // i.e. d.
+        // Full-width dV must still fit each 32KB L0A/L0B buffer.
+        uint32_t l0BaseK = (isDvOnlyResident || IS_FP32_INPUT) ? 64 : 128; // i.e. s1.
         uint32_t mLoopTimes = (runInfo.commonRunInfo.s2RealSize + l0BaseM - 1) / l0BaseM;
         uint32_t nLoopTimes = (nL1Size + l0BaseN - 1) / l0BaseN;
         uint32_t kLoopTimes = (runInfo.commonRunInfo.s1RealSize + l0BaseK - 1) / l0BaseK;
@@ -1110,7 +1208,7 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDy(
                     (kL0Idx == kLoopTimes - 1) ? (runInfo.commonRunInfo.s1RealSize - kL0Idx * l0BaseK) : l0BaseK;
                 uint32_t nL0Size = (nL0Idx == nLoopTimes - 1) ? (nL1Size - nL0Idx * l0BaseN) : l0BaseN;
 
-                uint32_t l0cIdx = IS_DKV_RESIDENT_L0C ? L0C_DV_BUF_IDX : mmL0CPingPong;
+                uint32_t l0cIdx = isDvResident ? L0C_DV_BUF_IDX : mmL0CPingPong;
                 if (kL0Idx == 0) {
                     L0CTensor =
                         ENABLE_UNITFLAG ? L0CTensorArr[l0cIdx] : L0CTensorArr[l0cBufferManager.GetBuffer(l0cIdx)];
@@ -1124,21 +1222,21 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDy(
                 uint32_t offsetB = kL0Idx * l0BaseK * FRACTAL_NZ_C0_SIZE +
                                    nL0Idx * AlignTo16(runInfo.commonRunInfo.s1RealSize) * l0BaseN;
                 bool isFixpOut = true;
-                if constexpr (IS_DKV_RESIDENT_L0C && !(SPLIT_AXIS == BN2)) {
+                if (isDvResident && !(SPLIT_AXIS == BN2)) {
                     isFixpOut = !runInfo.nextS2IdxNoChange;
                 }
-                if constexpr (IS_BN2_MULTIBLK && IS_DKV_RESIDENT_L0C) {
+                if (IS_BN2_MULTIBLK && isDvResident) {
                     isFixpOut = !runInfo.nextS2IdxNoChange;
                 }
                 uint32_t unitFlag =
                     !ENABLE_UNITFLAG ? UNITFLAG_DISABLE : (isFixpOut ? UNITFLAG_EN_OUTER_LAST : UNITFLAG_ENABLE);
                 bool isLastLoopK = (kL0Idx == kLoopTimes - 1);
-                SingleMatmul<T1, T1, isTransA, isTransB, true>(L1PTensor, L1BTensor, L0CTensor, mL0Size, nL0Size,
-                                                               kL0Size,                                      // m, n, k
-                                                               CUBE_BASEM, runInfo.commonRunInfo.s1RealSize, // A, B src
-                                                               offsetA, offsetB, // A, B offset
-                                                               mmadFirst, isSplitK, isLastLoopK,
-                                                               runInfo.isS2IdxNoChange, unitFlag);
+                SingleMatmul<T1, T1, isTransA, isTransB, (IS_DKV_RESIDENT_L0C || IS_DV_RESIDENT_L0C)>(
+                    L1PTensor, L1BTensor, L0CTensor, mL0Size, nL0Size,
+                    kL0Size,                                      // m, n, k
+                    CUBE_BASEM, runInfo.commonRunInfo.s1RealSize, // A, B src
+                    offsetA, offsetB,                             // A, B offset
+                    mmadFirst, isSplitK, isLastLoopK, isDvResident && runInfo.isS2IdxNoChange, unitFlag);
                 mmadFirst = false;
 
                 if (isLastLoopK) {
@@ -1165,14 +1263,14 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDy(
                             CopyL0CToGm</*FP8_TRANSA*/ false>(*deterGmPtr, L0CTensor, mL0Size, nL0Size, HEAD_DIM_ALIGN,
                                                               deterDvOff, 0.0, false, false);
                             l0cBufferManager.ReleaseBuffer(mmL0CPingPong);
-                            mmL0CPingPong = (mmL0CPingPong + 1) % L0C_BUF_NUM;
+                            mmL0CPingPong = (mmL0CPingPong + 1 == l0cSharedBufNum) ? 0 : mmL0CPingPong + 1;
                             continue;
                         }
                     }
                     if constexpr (SPLIT_AXIS == BN2) {
                         if constexpr (IS_BN2_MULTIBLK) {
                             if (isFixpOut) {
-                                bool needAtomic = (!IS_DKV_RESIDENT_L0C) && runInfo.isS2IdxNoChange;
+                                bool needAtomic = (!isDvResident) && runInfo.isS2IdxNoChange;
                                 CopyL0CToGm</*FP8_TRANSA*/ false>(dvWorkSpaceGm, L0CTensor, mL0Size, nL0Size, dstStride,
                                                                   dvOffset, 0.0, unitFlag, needAtomic);
                             }
@@ -1192,8 +1290,8 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDy(
                     if constexpr (!ENABLE_UNITFLAG) {
                         l0cBufferManager.ReleaseBuffer(l0cIdx);
                     }
-                    if constexpr (!IS_DKV_RESIDENT_L0C) {
-                        mmL0CPingPong = (mmL0CPingPong + 1) % L0C_BUF_NUM;
+                    if (!isDvResident) {
+                        mmL0CPingPong = (mmL0CPingPong + 1 == l0cSharedBufNum) ? 0 : mmL0CPingPong + 1;
                     }
                 }
             }
@@ -1345,7 +1443,7 @@ public:
     __aicore__ inline void InitCubeBuffer() {};
     __aicore__ inline void FreeAlloc(int64_t innerMm12LoopIdx) {};
     __aicore__ inline void FreeBuffer() {};
-    template <typename AType, typename BType, const bool IS_TRANS_A, const bool IS_TRANS_B, const bool IS_DKDV>
+    template <typename AType, typename BType, const bool IS_TRANS_A, const bool IS_TRANS_B, const bool IS_RESIDENT_L0C>
     __aicore__ inline void SingleMatmul(LocalTensor<AType> L1ATensor, LocalTensor<BType> L1BTensor,
                                         LocalTensor<T2> L0CTensor, uint32_t m, uint32_t n, uint32_t k, uint32_t srcA,
                                         uint32_t srcB, uint32_t offsetA, uint32_t offsetB, bool isInitVal,
@@ -1379,7 +1477,7 @@ public:
     template <typename DataType>
     __aicore__ inline void LoadDataToL0(LocalTensor<DataType> dstTensor, LocalTensor<DataType> srcTensor, uint32_t m,
                                         uint32_t k, uint32_t srcM, uint64_t srcOffset, bool isTrans) {};
-    template <typename AType, typename BType, bool IsDkDv = false>
+    template <typename AType, typename BType, bool IsResidentL0C = false>
     __aicore__ inline void ComputeBaseMm(LocalTensor<T2>& L0CTensor, LocalTensor<AType>& L0ATensor,
                                          LocalTensor<BType>& L0BTensor, uint32_t m, uint32_t n, uint64_t k,
                                          bool isInitVal, bool isS2IdxNoChange = false, uint32_t unitFlag = 0) {};

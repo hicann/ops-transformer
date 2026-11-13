@@ -65,6 +65,8 @@ public:
     __aicore__ inline int64_t GetNextValidIdx(FagRunInfo& runInfo, int64_t taskId, int64_t startIndex,
                                               int64_t curLoopIdx);
     __aicore__ inline int64_t GetNextValidIdxForSwizzle(FagRunInfo& runInfo, int64_t loopIdx);
+    __aicore__ inline int64_t GetNextValidIdxForColumnSwizzle(FagRunInfo& runInfo, int64_t loopIdx);
+    __aicore__ inline int64_t GetNextValidIdxForNonTndValidColumn(FagRunInfo& runInfo, int64_t loopIdx);
     __aicore__ inline int64_t FloorDivSigned(int64_t x, int64_t y);
     __aicore__ inline int64_t CeilDivSigned(int64_t x, int64_t y);
     __aicore__ inline int64_t ClampSigned(int64_t x, int64_t low, int64_t high);
@@ -124,6 +126,7 @@ public:
         IS_TND && SPLIT_AXIS == BN2GS1S2 && IS_SWIZZLE && DETER_SPARSE_TYPE == NO_DETER;
     constexpr static uint32_t TND_VALID_S2_COLUMN_SIMPLE_CYCLIC = 0;
     constexpr static uint32_t TND_VALID_S2_COLUMN_SERPENTINE = 1;
+    constexpr static uint32_t NON_TND_COLUMN_PAIRED = 2;
 
 protected:
     using DsType = std::conditional_t<is_e4m3_v<T1>, bfloat16_t, T1>;
@@ -199,6 +202,13 @@ protected:
     bool enableDenseSwizzle = false;
     bool enableCasualSwizzle = false;
     bool filledBySwizzle = false;
+    bool useTndStyleColumnSchedule = false;
+    int64_t nonTndColumnRound = 0;
+    int64_t nonTndColumnInnerTile = 0;
+    // Per-core cursor; Process requests successive loopIdx values, including its lookahead.
+    int64_t causalColumnPairRank = 0;
+    int64_t causalColumnRowPhase = 0;
+    bool causalSecondColumn = false;
 };
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
@@ -366,20 +376,44 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
         if constexpr (!IS_SWIZZLE) {
             return;
         }
-        // swizzle
+        // Long-sequence column scheduling is restricted to the 256x128 tile.
+        constexpr bool isColumnSwizzleTile = CUBE_BASEM == 256 && CUBE_BASEN == 128;
         enableDenseSwizzle = (!IS_ATTEN_MASK || tilingData->s1s2BNGS1S2BaseParams.sparseType ==
                                                     static_cast<uint8_t>(SparseType::DENSE)) &&
-                             constInfo.commonConstInfo.s1Size > M_SWIZZLE_SIZE &&
-                             constInfo.commonConstInfo.s2Size > N_SWIZZLE_SIZE;
+                             constInfo.commonConstInfo.s1Size >= M_SWIZZLE_SIZE &&
+                             constInfo.commonConstInfo.s2Size >= N_SWIZZLE_SIZE && isColumnSwizzleTile;
         enableCasualSwizzle =
             IS_ATTEN_MASK && tilingData->s1s2BNGS1S2BaseParams.sparseType == static_cast<uint8_t>(SparseType::CASUAL) &&
-            constInfo.commonConstInfo.s1Size > M_SWIZZLE_SIZE;
+            constInfo.commonConstInfo.s1Size >= M_SWIZZLE_SIZE &&
+            constInfo.commonConstInfo.s1Size == constInfo.commonConstInfo.s2Size && isColumnSwizzleTile;
+
+        if (enableDenseSwizzle || enableCasualSwizzle) {
+            const auto& columnParam = tilingData->tndSwizzleParam;
+            const uint64_t expectedColumns =
+                static_cast<uint64_t>(constInfo.bSize) * constInfo.n2Size * constInfo.s2Outer;
+            useTndStyleColumnSchedule =
+                columnParam.totalValidS2TaskNum == expectedColumns && expectedColumns > 0 &&
+                columnParam.activeCoreNum > 0 && columnParam.activeCoreNum <= constInfo.aicCoreNum &&
+                ((enableDenseSwizzle && columnParam.columnScheduleMode == TND_VALID_S2_COLUMN_SIMPLE_CYCLIC) ||
+                 (enableCasualSwizzle && columnParam.columnScheduleMode == NON_TND_COLUMN_PAIRED));
+            if (useTndStyleColumnSchedule) {
+                constInfo.totalValidS2TaskNum = columnParam.totalValidS2TaskNum;
+                constInfo.validS2ActiveCoreNum = columnParam.activeCoreNum;
+                constInfo.columnScheduleMode = columnParam.columnScheduleMode;
+            }
+        }
 
         uint32_t maxContinuousBlockNum =
             constInfo.commonConstInfo.s1Size < MIN_SWIZZLE_S1 ?
                 MAX_CONTINUOUS_BLOCK_NUM :
                 (constInfo.commonConstInfo.s1Size / MIN_SWIZZLE_S1) * BASE_SWIZZLE_BLOCK_NUM;
-        if (enableDenseSwizzle || enableCasualSwizzle) {
+        // Preserve the legacy group cap for tiles that do not use column scheduling.
+        if (((!IS_ATTEN_MASK ||
+              tilingData->s1s2BNGS1S2BaseParams.sparseType == static_cast<uint8_t>(SparseType::DENSE)) &&
+             constInfo.commonConstInfo.s1Size > M_SWIZZLE_SIZE && constInfo.commonConstInfo.s2Size > N_SWIZZLE_SIZE) ||
+            (IS_ATTEN_MASK &&
+             tilingData->s1s2BNGS1S2BaseParams.sparseType == static_cast<uint8_t>(SparseType::CASUAL) &&
+             constInfo.commonConstInfo.s1Size > M_SWIZZLE_SIZE)) {
             maxContinuousBlockNum = SWIZZLE_CONTINUOUS_BLOCK_NUM;
         }
 
@@ -1251,9 +1285,151 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::Solv
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t
+FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdxForColumnSwizzle(
+    FagRunInfo& runInfo, int64_t loopIdx)
+{
+    const int64_t m = constInfo.s1Outer;
+    const int64_t n = constInfo.s2Outer;
+    const int64_t coreNum = constInfo.aicCoreNum;
+    const int64_t flatBatchCount = constInfo.bSize * constInfo.commonConstInfo.n2G;
+    int64_t flatBatchIdx = 0;
+    int64_t s1Idx = 0;
+    int64_t s2Idx = 0;
+    if (enableDenseSwizzle) {
+        const int64_t flatColumn = (loopIdx / m) * coreNum + cBlockIdx;
+        if (flatColumn >= flatBatchCount * n) {
+            return -1;
+        }
+        flatBatchIdx = flatColumn / n;
+        s2Idx = flatColumn % n;
+        // Rotate each complete column to spread dQ atomic updates across S1 rows.
+        s1Idx = (s2Idx + loopIdx % m) % m;
+    } else if (n % NUM_TWO == 0) {
+        // Pair adjacent flat batches into n virtual columns of height m+1.
+        // Each virtual column joins column j of the first batch with n-1-j
+        // of the second batch.
+        const int64_t virtualHeight = m + 1;
+        const int64_t pairColumnCount = (flatBatchCount / NUM_TWO) * n;
+        const int64_t ownedPairColumns =
+            pairColumnCount <= cBlockIdx ? 0 : (pairColumnCount - 1 - cBlockIdx) / coreNum + 1;
+        const int64_t pairedTaskCount = ownedPairColumns * virtualHeight;
+        if (loopIdx < pairedTaskCount) {
+            const int64_t virtualColumn = (loopIdx / virtualHeight) * coreNum + cBlockIdx;
+            const int64_t column = virtualColumn % n;
+            int64_t row = (column + loopIdx % virtualHeight) % virtualHeight;
+            const int64_t firstHeight = m - column / NUM_TWO;
+            // With full D192/Dv128 residency, finish each physical column before
+            // switching batches. Rotate inside it to retain dQ row dispersion
+            // without splitting the resident dK/dV accumulator at virtual wrap.
+            if (HEAD_DIM_ALIGN == 192 && constInfo.commonConstInfo.dSize == 192 &&
+                constInfo.commonConstInfo.dSizeV == 128) {
+                const int64_t phase = loopIdx % virtualHeight;
+                if (phase < firstHeight) {
+                    row = (column + phase) % firstHeight;
+                } else {
+                    row = firstHeight + (column + phase - firstHeight) % (virtualHeight - firstHeight);
+                }
+            }
+            flatBatchIdx = (virtualColumn / n) * NUM_TWO;
+            if (row < firstHeight) {
+                s2Idx = column;
+                s1Idx = column / NUM_TWO + row;
+            } else {
+                flatBatchIdx += 1;
+                s2Idx = n - 1 - column;
+                s1Idx = s2Idx / NUM_TWO + row - firstHeight;
+            }
+        } else {
+            if (flatBatchCount % NUM_TWO == 0) {
+                return -1;
+            }
+            // Append the unpaired batch's complete columns to round-robin owners.
+            const int64_t ownerStart = pairColumnCount % coreNum;
+            const int64_t residue = (cBlockIdx - ownerStart + coreNum) % coreNum;
+            if (residue >= n) {
+                return -1;
+            }
+            const int64_t columnCount = (n - 1 - residue) / coreNum + 1;
+            const int64_t task = loopIdx - pairedTaskCount;
+            int64_t left = 0;
+            int64_t right = columnCount + 1;
+            // prefix(q) = sum(m - floor((residue + i*coreNum)/2), i<q).
+            while (left + 1 < right) {
+                const int64_t middle = (left + right) / NUM_TWO;
+                const int64_t oddCount = coreNum % NUM_TWO == 0 ?
+                                             middle * (residue % NUM_TWO) :
+                                             middle / NUM_TWO + (middle % NUM_TWO) * (residue % NUM_TWO);
+                const int64_t rowSum =
+                    (middle * residue + coreNum * middle * (middle - 1) / NUM_TWO - oddCount) / NUM_TWO;
+                const int64_t prefix = middle * m - rowSum;
+                if (prefix <= task) {
+                    left = middle;
+                } else {
+                    right = middle;
+                }
+            }
+            if (left == columnCount) {
+                return -1;
+            }
+            const int64_t oddCount = coreNum % NUM_TWO == 0 ? left * (residue % NUM_TWO) :
+                                                              left / NUM_TWO + (left % NUM_TWO) * (residue % NUM_TWO);
+            const int64_t rowSum = (left * residue + coreNum * left * (left - 1) / NUM_TWO - oddCount) / NUM_TWO;
+            const int64_t prefix = left * m - rowSum;
+            s2Idx = residue + left * coreNum;
+            s1Idx = s2Idx / NUM_TWO + task - prefix;
+            flatBatchIdx = flatBatchCount - 1;
+        }
+    } else {
+        const int64_t pairsPerBatch = (n + 1) / NUM_TWO;
+        if (loopIdx == 0) {
+            causalColumnPairRank = cBlockIdx;
+            causalColumnRowPhase = 0;
+            causalSecondColumn = false;
+        }
+        if (causalColumnPairRank >= flatBatchCount * pairsPerBatch) {
+            return -1;
+        }
+        flatBatchIdx = causalColumnPairRank / pairsPerBatch;
+        const int64_t lowColumn = causalColumnPairRank % pairsPerBatch;
+        const int64_t highColumn = n - 1 - lowColumn;
+        s2Idx = causalSecondColumn ? highColumn : lowColumn;
+        const int64_t firstRow = s2Idx * CUBE_BASEN / CUBE_BASEM;
+        const int64_t columnHeight = m - firstRow;
+        s1Idx = firstRow + (s2Idx + causalColumnRowPhase) % columnHeight;
+        ++causalColumnRowPhase;
+        if (causalColumnRowPhase == columnHeight) {
+            causalColumnRowPhase = 0;
+            if (!causalSecondColumn && lowColumn != highColumn) {
+                causalSecondColumn = true;
+            } else {
+                causalSecondColumn = false;
+                causalColumnPairRank += coreNum;
+            }
+        }
+    }
+    s2CvBegin = s2Idx * CUBE_BASEN;
+    s2CvEnd = s2CvBegin + (s2Idx == n - 1 ? constInfo.s2Tail : CUBE_BASEN);
+    filledBySwizzle = true;
+    runInfo.commonRunInfo.boIdx = flatBatchIdx / constInfo.commonConstInfo.n2G;
+    const int64_t batchTail = flatBatchIdx % constInfo.commonConstInfo.n2G;
+    runInfo.commonRunInfo.n2oIdx = batchTail / constInfo.commonConstInfo.gSize;
+    runInfo.commonRunInfo.goIdx = batchTail % constInfo.commonConstInfo.gSize;
+    runInfo.commonRunInfo.s1oIdx = s1Idx;
+    runInfo.s2oIdx = s2Idx;
+    return 0;
+}
+
+template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
+__aicore__ inline int64_t
 FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdxForSwizzle(
     FagRunInfo& runInfo, int64_t loopIdx)
 {
+    if (useTndStyleColumnSchedule) {
+        return GetNextValidIdxForNonTndValidColumn(runInfo, loopIdx);
+    }
+    if (enableDenseSwizzle || enableCasualSwizzle) {
+        return GetNextValidIdxForColumnSwizzle(runInfo, loopIdx);
+    }
     int64_t blockGroupIdx = loopIdx / constInfo.continuousBlockNum;      // 第几组
     int64_t blockGroupInnerIdx = loopIdx % constInfo.continuousBlockNum; // 组内第几个
 
@@ -1725,6 +1901,73 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetD
     return scaleOffset;
 }
 
+// Dense uses TND-style cyclic columns. Causal pairs opposite columns in
+// adjacent (B,N2) matrices, assigning the entire pair to one core.
+// Each physical column is completed in increasing S1 order, with G innermost.
+// Host eligibility restricts this to dense or equal-length causal 256x128.
+template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
+__aicore__ inline int64_t
+FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetNextValidIdxForNonTndValidColumn(
+    FagRunInfo& runInfo, int64_t loopIdx)
+{
+    if (loopIdx == 0) {
+        nonTndColumnRound = 0;
+        nonTndColumnInnerTile = 0;
+    }
+    int64_t rank = -1;
+    if (enableDenseSwizzle) {
+        rank = GetTndValidColumnTaskRank(nonTndColumnRound);
+    } else {
+        const int64_t heads = constInfo.bSize * constInfo.n2Size;
+        const int64_t pairTasks = (heads / 2 + heads % 2) * constInfo.s2Outer;
+        rank = nonTndColumnRound * constInfo.validS2ActiveCoreNum + cBlockIdx;
+        if (cBlockIdx >= constInfo.validS2ActiveCoreNum || rank >= pairTasks) {
+            return -1;
+        }
+    }
+    if (rank < 0) {
+        return -1;
+    }
+    int64_t s2Idx = rank % constInfo.s2Outer;
+    int64_t head = rank / constInfo.s2Outer;
+    int64_t beginS1 = enableDenseSwizzle ? 0 : s2Idx * CUBE_BASEN / CUBE_BASEM;
+    const int64_t groups = constInfo.commonConstInfo.gSize;
+    const int64_t firstTileNum = (constInfo.s1Outer - beginS1) * groups;
+    int64_t tileNum = firstTileNum;
+    int64_t innerTile = nonTndColumnInnerTile;
+    if (!enableDenseSwizzle) {
+        head *= 2;
+        if (head + 1 < constInfo.bSize * constInfo.n2Size) {
+            const int64_t secondColumn = constInfo.s2Outer - 1 - s2Idx;
+            const int64_t secondBegin = secondColumn * CUBE_BASEN / CUBE_BASEM;
+            tileNum += (constInfo.s1Outer - secondBegin) * groups;
+            if (innerTile >= firstTileNum) {
+                ++head;
+                s2Idx = secondColumn;
+                beginS1 = secondBegin;
+                innerTile -= firstTileNum;
+            }
+        }
+    }
+    if (firstTileNum <= 0 || groups <= 0) {
+        return -1;
+    }
+    runInfo.commonRunInfo.boIdx = head / constInfo.n2Size;
+    runInfo.commonRunInfo.n2oIdx = head % constInfo.n2Size;
+    runInfo.commonRunInfo.goIdx = innerTile % groups;
+    runInfo.commonRunInfo.s1oIdx = beginS1 + innerTile / groups;
+    runInfo.s2oIdx = s2Idx;
+    s2CvBegin = s2Idx * CUBE_BASEN;
+    s2CvEnd = s2CvBegin + (s2Idx == constInfo.s2Outer - 1 ? constInfo.s2Tail : CUBE_BASEN);
+    filledBySwizzle = true;
+    ++nonTndColumnInnerTile;
+    if (nonTndColumnInnerTile == tileNum) {
+        nonTndColumnInnerTile = 0;
+        ++nonTndColumnRound;
+    }
+    return loopIdx;
+}
+
 // tnd swizzle 优化
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::LoadTndValidBatch(
@@ -1910,6 +2153,9 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetT
     }
 
     const uint64_t activeCoreNum = constInfo.validS2ActiveCoreNum;
+    if (activeCoreNum == 0) {
+        return -1;
+    }
     const uint64_t base = static_cast<uint64_t>(round) * activeCoreNum;
     if (base >= constInfo.totalValidS2TaskNum) {
         return -1;
