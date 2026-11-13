@@ -21,6 +21,13 @@ import numpy as np
 import torch
 
 
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 def generate_quant_flash_mla_metadata_inputs(
     cache_seqlens,
     num_heads_q,
@@ -31,6 +38,9 @@ def generate_quant_flash_mla_metadata_inputs(
     seqused_q=None,
     **kwargs,
 ):
+    if expect_error(kwargs):
+        return None
+
     del num_heads_q, num_heads_kv, quant_mode
     # Core-slot passthrough never permits dropping an explicit vector request.
     policy = kwargs.get("input_mismatch_policy", "error")

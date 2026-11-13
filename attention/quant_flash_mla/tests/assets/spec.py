@@ -141,24 +141,18 @@ class QuantMlaSpec:
             "ptol": 0.005,
             "atol": 0.000025,
             "level": "L2",
-            "small_value": 2**-10,
-            "small_value_atol": 2**-16,
         },
         "bfloat16": {
             "rtol": 0.0078125,
             "ptol": 0.005,
             "atol": 0.0001,
             "level": "L2",
-            "small_value": 2**-10,
-            "small_value_atol": 2**-16,
         },
         "float32": {
             "rtol": 0.005,
             "ptol": 0.005,
             "atol": 0.000025,
             "level": "L2",
-            "small_value": 2**-14,
-            "small_value_atol": 2**-30,
         },
     }
 

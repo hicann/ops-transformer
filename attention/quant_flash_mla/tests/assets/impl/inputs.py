@@ -53,6 +53,13 @@ _KV_LAYOUT_REVERSE = {
 }
 
 
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 def generate_qfmla_inputs(
     q,
     k_cache,
@@ -85,6 +92,9 @@ def generate_qfmla_inputs(
     seed_q/seed_k/seed_block_table affect synthesis only. Metadata sidecars are
     forwarded separately by npu_preprocess and are not main-op shape arguments.
     """
+    if expect_error(kwargs):
+        return None
+
     mismatch_policy = kwargs.get("input_mismatch_policy", "passthrough")
     if mismatch_policy not in ("passthrough", "error"):
         raise ValueError("input_mismatch_policy must be 'passthrough' or 'error'")
