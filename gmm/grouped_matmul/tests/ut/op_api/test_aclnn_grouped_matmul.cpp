@@ -72,10 +72,9 @@ aclFormat ParseFormat(const string& format)
 void SetupPlatformForCase(const string& socVersion)
 {
     static const map<string, op::SocVersion> socMap = {
-        {"Ascend310P", op::SocVersion::ASCEND310P},
-        {"Ascend910B", op::SocVersion::ASCEND910B},
-        {"Ascend910_93", op::SocVersion::ASCEND910_93},
-        {"Ascend950", op::SocVersion::ASCEND950},
+        {"Ascend310P", op::SocVersion::ASCEND310P},     {"Ascend910B", op::SocVersion::ASCEND910B},
+        {"Ascend910_93", op::SocVersion::ASCEND910_93}, {"Ascend950", op::SocVersion::ASCEND950},
+        {"Ascend960DT", op::SocVersion::ASCEND960DT},
     };
     auto it = socMap.find(socVersion);
     op::SetPlatformSocVersion(it == socMap.end() ? op::SocVersion::ASCEND910B : it->second);

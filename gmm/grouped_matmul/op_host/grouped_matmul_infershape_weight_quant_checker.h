@@ -21,7 +21,8 @@ namespace ops {
 
 class GroupedMatmulWeightQuantChecker {
 public:
-    GroupedMatmulWeightQuantChecker() {};
+    explicit GroupedMatmulWeightQuantChecker(bool enableMxShapeGeneralization = false)
+        : enableMxShapeGeneralization_(enableMxShapeGeneralization) {};
     ~GroupedMatmulWeightQuantChecker() {};
     ge::graphStatus GetXAndWeightDimValue(const gert::InferShapeContext* context, const GMMAttrs& gmmAttrs);
     ge::graphStatus CheckShape(const gert::InferShapeContext* context, const GroupedMatmulCommonUtil& commonUtil);
@@ -98,6 +99,7 @@ private:
     size_t weightdimNum_;
     ge::DataType xDtype_ = ge::DT_UNDEFINED;
     ge::DataType weightDtype_ = ge::DT_UNDEFINED;
+    bool enableMxShapeGeneralization_ = false;
     bool hasBias_ = false;
     bool hasAntiquantOffset_ = false;
     bool isMultiTensorWeight_ = false;

@@ -437,6 +437,8 @@ const vector<GroupedMatmulInfershapeCase>& GetGroupedMatmulInfershapeCsvCases()
         vector<GroupedMatmulInfershapeCase> ascend910b = LoadCases("Ascend910B");
         vector<GroupedMatmulInfershapeCase> ascend91093 = LoadCases("Ascend910_93");
         vector<GroupedMatmulInfershapeCase> merged = ascend950;
+        const auto ascend960dt = LoadCases("Ascend960DT");
+        merged.insert(merged.end(), ascend960dt.begin(), ascend960dt.end());
         merged.insert(merged.end(), ascend350.begin(), ascend350.end());
         merged.insert(merged.end(), ascend910b.begin(), ascend910b.end());
         merged.insert(merged.end(), ascend91093.begin(), ascend91093.end());

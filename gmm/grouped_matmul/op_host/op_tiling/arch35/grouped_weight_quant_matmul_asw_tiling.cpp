@@ -50,10 +50,12 @@ bool GroupedWeightQuantMatmulAswTiling::GetPlatformInfo()
         auto compileInfoPtr = context_->GetCompileInfo<GMMCompileInfo>();
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(inputParams_.opName, "CompileInfoPtr is null."), return false);
 
+        inputParams_.enableMxShapeGeneralization = compileInfoPtr->npuArch == NpuArch::DAV_9201;
         aicoreParams_.aicNum = compileInfoPtr->aicNum;
         aicoreParams_.l0cSize = compileInfoPtr->l0CSize;
     } else {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+        inputParams_.enableMxShapeGeneralization = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201;
         aicoreParams_.aicNum = ascendcPlatform.GetCoreNumAic();
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, aicoreParams_.l0cSize);
     }
@@ -150,8 +152,10 @@ void GroupedWeightQuantMatmulAswTiling::CalBasicBlock()
             CeilAlign(basicTiling_.baseN, GmmConstants::CUBE_BLOCK) :
             CeilAlign(basicTiling_.baseN, GetShapeWithDataType(GmmConstants::L1_ALIGN_SIZE, inputParams_.weightDtype));
 
-    basicTiling_.baseK = CeilAlign(std::min(GmmConstants::BASIC_BLOCK_SIZE_128, inputParams_.kSize),
-                                   GetShapeWithDataType(GmmConstants::CUBE_REDUCE_BLOCK, inputParams_.xDtype));
+    const uint64_t kAlignment = inputParams_.enableMxShapeGeneralization && IsMxA8W4(inputParams_) ?
+                                    static_cast<uint64_t>(GmmConstants::MX_GROUP_SIZE_64) :
+                                    GetShapeWithDataType(GmmConstants::CUBE_REDUCE_BLOCK, inputParams_.xDtype);
+    basicTiling_.baseK = CeilAlign(std::min(GmmConstants::BASIC_BLOCK_SIZE_128, inputParams_.kSize), kAlignment);
 }
 
 bool GroupedWeightQuantMatmulAswTiling::GetWorkspaceSize()

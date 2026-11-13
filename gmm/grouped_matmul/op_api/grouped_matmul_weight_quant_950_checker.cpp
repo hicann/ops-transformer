@@ -10,6 +10,7 @@
 
 #include "common/include/op_host/op_const_def_transformer.h"
 #include "grouped_matmul_weight_quant_950_checker.h"
+#include "gmm/common/op_host/log_format_util.h"
 #include "log/log.h"
 
 using namespace gmm;
@@ -33,6 +34,8 @@ static constexpr int64_t TUNING_CONFIG_SPECIAL_WEIGHT_FORMAT = 1L;
 static constexpr int64_t GROUP_LIST_COUNT = 1L;
 static constexpr int64_t S8S4_PER_GROUP_MAX_K = 18432L;
 static constexpr int64_t S8S4_QUANT_GROUP_SIZE = 256L;
+static constexpr int64_t MX_PAIR_K_SIZE = 64L;
+static constexpr int64_t MX_PAIR_SIZE = 2L;
 } // namespace
 
 std::string AclnnGroupedMatmulWeightQuantDAV3510Checker::GetDataFlowString() const
@@ -714,7 +717,17 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimMatching(size_t
                                                incorrectValues, reason);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (!IsS8S4PseudoQuant() && (IsA16MxFp4NZ() || IsA16MxHiF4() || IsMxA8W4NZ() || IsMxA8HiF4() || IsS8S4NZ())) {
+    if (npuArch_ == NpuArch::DAV_9201 && IsMxA8W4NZ()) {
+        // Each byte packs 2 FP4 elements, so K=2 and N=1 make the transpose direction ambiguous.
+        if (unlikely(weightKDim % 2 != 0 || (weightKDim == 2 && weightNDim == 1))) {
+            const auto incorrectValues = Ops::Transformer::Gmm::FormatString("%zu, %zu", weightKDim, weightNDim);
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                GetAclnnName(), "K, N", incorrectValues,
+                "the value of K must be even, and N can not be 1 when K is 2 for 960DT MxA8W4 WeightNZ");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    } else if (!IsS8S4PseudoQuant() &&
+               (IsA16MxFp4NZ() || IsA16MxHiF4() || IsMxA8W4NZ() || IsMxA8HiF4() || IsS8S4NZ())) {
         if (unlikely(!((weightNDim % N_K_ALIGN_VALUE_WEIGHT_QUANT_4BIT == 0) &&
                        (weightKDim % N_K_ALIGN_VALUE_WEIGHT_QUANT_4BIT == 0)))) {
             std::string incorrectValues = "n=" + std::to_string(weightNDim) + ", k=" + std::to_string(weightKDim);
@@ -1004,12 +1017,28 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckScaleAndPerTokenSc
                                                   "The first dim of perTokenScale must be equal to the first dim of x");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        // 64含义：pertokenscale的shape应为(m,k/64,2)
-        if (unlikely(xShapeKDim != perTokenScaleShapeKDim * 64)) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                GetAclnnName(), "perTokenScale", std::to_string(perTokenScaleShapeKDim),
-                "The second dim of x must be 64 times the second dim of perTokenScale");
-            return ACLNN_ERR_PARAM_INVALID;
+        if (npuArch_ == NpuArch::DAV_9201 && IsMxA8W4NZ()) {
+            const int64_t expectedPairs = (xShapeKDim + MX_PAIR_K_SIZE - 1) / MX_PAIR_K_SIZE;
+            // Index 2 is the last axis of [M, ceil(K/64), 2], with 2 scales per pair.
+            const int64_t actualPairSize = perTokenScaleShape.GetDim(2);
+            if (unlikely(perTokenScaleShapeKDim != expectedPairs || actualPairSize != MX_PAIR_SIZE)) {
+                const std::string actualShape = std::to_string(perTokenScaleShapeMDim) + ", " +
+                                                std::to_string(perTokenScaleShapeKDim) + ", " +
+                                                std::to_string(actualPairSize);
+                const std::string reason = "the shape must be [" + std::to_string(xShapeMDim) + ", " +
+                                           std::to_string(expectedPairs) + ", " + std::to_string(MX_PAIR_SIZE) +
+                                           "] for 960DT MxA8W4 WeightNZ";
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(GetAclnnName(), "perTokenScale", actualShape, reason);
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+        } else {
+            // 64 is the K coverage of each pair in perTokenScale [M, K/64, 2].
+            if (unlikely(xShapeKDim != perTokenScaleShapeKDim * 64)) {
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    GetAclnnName(), "perTokenScale", std::to_string(perTokenScaleShapeKDim),
+                    "The second dim of x must be 64 times the second dim of perTokenScale");
+                return ACLNN_ERR_PARAM_INVALID;
+            }
         }
     } else if (IsS8S4NZ()) {
         if (IsS8S4PseudoQuant()) {
@@ -1138,6 +1167,25 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckGroupSize(size_t i
     auto weightShape = (*gmmParams_.weight)[idx]->GetViewShape();
     auto antiquantScaleDimNum = antiquantScaleShape.GetDimNum();
     int64_t groupSize = 0;
+
+    if (npuArch_ == NpuArch::DAV_9201 && IsMxA8W4NZ()) {
+        // dimNum - 2 is the K axis of the logical weight view [..., K, N].
+        const int64_t kSize = weightShape.GetDim(weightShape.GetDimNum() - 2);
+        // dimNum - 3 is the pair count axis of the scale view [..., ceil(K/64), N, 2].
+        const int64_t scalePairNum = antiquantScaleShape.GetDim(antiquantScaleDimNum - 3);
+        const int64_t scalePairSize = antiquantScaleShape.GetDim(antiquantScaleDimNum - 1);
+        const int64_t expectedScalePairNum = (kSize + MX_PAIR_K_SIZE - 1) / MX_PAIR_K_SIZE;
+        if (unlikely(scalePairNum != expectedScalePairNum || scalePairSize != MX_PAIR_SIZE)) {
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                GetAclnnName(), "antiquantScale pair count, antiquantScale pair size",
+                Ops::Transformer::Gmm::FormatString("%ld, %ld", scalePairNum, scalePairSize),
+                Ops::Transformer::Gmm::FormatString(
+                    "the values must be %ld and %ld respectively for 960DT MxA8W4 WeightNZ", expectedScalePairNum,
+                    MX_PAIR_SIZE));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        return ACLNN_SUCCESS;
+    }
 
     // 2含义: (g,k,n)的k轴索引
     int64_t kSize = weightShape.GetDim(weightShape.GetDimNum() - 2);

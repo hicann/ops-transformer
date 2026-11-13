@@ -393,6 +393,12 @@ __aicore__ inline void WeightQuantASWMxKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::Matmu
             bScaleL1GroupNum = Ops::Base::CeilDiv(
                 WeightQuantTools::Min<uint64_t>(block_.params_.k - kOffset, L1_BUFFER_CFG.scaleKL1Size),
                 MX_B_SCALE_GROUP_SIZE);
+            if constexpr (IsMxA8W4<xType, wType, antiquantScaleType>()) {
+                // Copy A scales in pairs of 2 E8M0 values, including the tail.
+                aScaleL1GroupNum = Ops::Base::CeilAlign(aScaleL1GroupNum, uint64_t{2});
+                // Copy B scales in pairs of 2 E8M0 values, including the tail.
+                bScaleL1GroupNum = Ops::Base::CeilAlign(bScaleL1GroupNum, uint64_t{2});
+            }
             WaitFlag<HardEvent::MTE1_MTE2>(MTE1_MTE2_SCALE_EVENT_ID + static_cast<uint8_t>(scaleL1DbFlag_));
             CopyScaleGmToL1(aScaleL1GroupNum, bScaleL1GroupNum, kOffset);
         }

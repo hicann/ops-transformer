@@ -161,6 +161,9 @@ TensorDescParam ParseTensorDesc(const RawTensorFields& rawFields, const map<stri
 platform_ascendc::SocVersion ParseSocVersion(const string& socVersion)
 {
     const string trimmed = Trim(socVersion);
+    if (trimmed == "Ascend960DT") {
+        return platform_ascendc::SocVersion::ASCEND960DT;
+    }
     if (trimmed == "Ascend950") {
         return platform_ascendc::SocVersion::ASCEND950;
     }
@@ -173,6 +176,9 @@ platform_ascendc::SocVersion ParseSocVersion(const string& socVersion)
 NpuArch ParseNpuArch(const string& socVersion)
 {
     const string trimmed = Trim(socVersion);
+    if (trimmed == "Ascend960DT") {
+        return NpuArch::DAV_9201;
+    }
     return trimmed == "Ascend950" ? NpuArch::DAV_3510 : NpuArch::DAV_2201;
 }
 
@@ -392,11 +398,18 @@ string MakeParamName(const testing::TestParamInfo<GroupedMatmulTilingCase>& info
 namespace GroupedMatmulTilingUT {
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestGroupedMatmulAscend950Tiling);
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestGroupedMatmulAscend960DTTiling);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestGroupedMatmulAscend910BTiling);
 
 const vector<GroupedMatmulTilingCase>& GetAscend950Cases()
 {
     static const vector<GroupedMatmulTilingCase> cases = LoadCases("Ascend950");
+    return cases;
+}
+
+const vector<GroupedMatmulTilingCase>& GetAscend960DTCases()
+{
+    static const vector<GroupedMatmulTilingCase> cases = LoadCases("Ascend960DT");
     return cases;
 }
 
@@ -419,6 +432,16 @@ TEST_P(TestGroupedMatmulAscend950Tiling, csvDrivenCase)
 }
 
 INSTANTIATE_TEST_SUITE_P(GMM_TILING_950, TestGroupedMatmulAscend950Tiling, testing::ValuesIn(GetAscend950Cases()),
+                         MakeParamName);
+
+class TestGroupedMatmulAscend960DTTiling : public testing::TestWithParam<GroupedMatmulTilingCase> {};
+
+TEST_P(TestGroupedMatmulAscend960DTTiling, csvDrivenCase)
+{
+    GetParam().Run();
+}
+
+INSTANTIATE_TEST_SUITE_P(GMM_TILING_960DT, TestGroupedMatmulAscend960DTTiling, testing::ValuesIn(GetAscend960DTCases()),
                          MakeParamName);
 
 class TestGroupedMatmulAscend910BTiling : public testing::TestWithParam<GroupedMatmulTilingCase> {};

@@ -27,6 +27,7 @@
 #include "acl/acl.h"
 #include "aclnn/aclnn_base.h"
 #include "aclnn_kernels/common/op_error_check.h"
+#include "gmm/common/op_host/log_format_util.h"
 #include "log/log.h"
 #include "opdev/common_types.h"
 #include "opdev/data_type_utils.h"
@@ -2579,14 +2580,25 @@ static aclnnStatus TransWeightToNzCheckAlign(gmm::GroupedMatmulParams& gmmParams
                 weight->GetDataType() == DataType::DT_FLOAT4_E1M2) &&
                (xDtype == DataType::DT_FLOAT16 || xDtype == DataType::DT_BF16 ||
                 xDtype == DataType::DT_FLOAT8_E4M3FN)) {
-        k_align = k % ALIGN_NZ_4BIT_K == 0;
-        n_align = n % ALIGN_NZ_4BIT_N == 0;
+        const bool is9201MxA8W4 =
+            op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 && xDtype == DataType::DT_FLOAT8_E4M3FN;
+        // 2 FP4 elements are packed into each byte along K.
+        k_align = is9201MxA8W4 ? k % 2 == 0 : k % ALIGN_NZ_4BIT_K == 0;
+        // K=2 packs into 1 byte, so N=1 makes the transpose direction ambiguous.
+        n_align = is9201MxA8W4 ? !(k == 2 && n == 1) : n % ALIGN_NZ_4BIT_N == 0;
     }
-    CHECK_COND(k_align == true && n_align == true, ACLNN_ERR_PARAM_INVALID,
-               "When weight(%s) format is FRACTAL_NZ, weight'shape(k[%lu], n[%lu]) should be divisible by the "
-               "following shape: INT8:[16, 32],BF16/FP16[16, 16],INT4[16, 64],FP4[64,64]). If the weight is transposed,"
-               "the k/n need to be reversed.",
-               gmm::dTypeToString(weight->GetDataType()).c_str(), k, n);
+    if (unlikely(!k_align || !n_align)) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            GetAclnnGetWorkspaceSizeOpName(gmmParams.apiVersion), "K, N",
+            Ops::Transformer::Gmm::FormatString("%lu, %lu", k, n),
+            Ops::Transformer::Gmm::FormatString(
+                "the values of K and N must satisfy the FRACTAL_NZ alignment for weight dtype %s "
+                "(INT8 [16, 32], BF16/FP16 [16, 16], INT4 [16, 64], FP4 [64, 64]). "
+                "Swap K and N when weight is transposed. "
+                "For 960DT MxA8W4 WeightNZ, K must be even, and N can not be 1 when K is 2",
+                gmm::dTypeToString(weight->GetDataType()).c_str()));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     return ACLNN_SUCCESS;
 }
 

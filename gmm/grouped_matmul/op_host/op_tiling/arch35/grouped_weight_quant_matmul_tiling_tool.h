@@ -125,6 +125,7 @@ struct GMMWeightQuantInputInfo {
 
     ge::Format weightFormat = ge::FORMAT_ND;
 
+    bool enableMxShapeGeneralization = false; // 960DT GroupedMatmul only
     bool transX = false;
     bool transWeight = false;
     bool hasBias = false;

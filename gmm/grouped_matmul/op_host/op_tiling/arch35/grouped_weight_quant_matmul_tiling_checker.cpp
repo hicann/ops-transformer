@@ -14,6 +14,7 @@
  */
 
 #include "grouped_weight_quant_matmul_tiling_checker.h"
+#include "gmm/common/op_host/log_format_util.h"
 
 namespace GmmConstants = optiling::GMMWeightQuantConstants;
 namespace GmmTilingTool = optiling::GMMWeightQuantTilingTool;
@@ -426,13 +427,24 @@ bool GMMWeightQuantTilingChecker::CheckXAndWeightShape(size_t tensorIdx) const
                 tensorIdx, tensorIdx, dimInfo_.xKDim, dimInfo_.weightKDim),
         return false);
 
-    OP_CHECK_IF(
-        dimInfo_.nDim % GmmConstants::N_K_ALIGN_VALUE_4BIT != 0 ||
-            dimInfo_.weightKDim % GmmConstants::N_K_ALIGN_VALUE_4BIT != 0,
-        OP_LOGE(inputParams_.opName,
+    if (inputParams_.enableMxShapeGeneralization && IsMxA8W4(inputParams_)) {
+        // Each byte packs 2 FP4 elements, so K=2 and N=1 make the transpose direction ambiguous.
+        OP_CHECK_IF(dimInfo_.weightKDim % 2 != 0 || (dimInfo_.weightKDim == 2 && dimInfo_.nDim == 1),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        inputParams_.opName, "K, N",
+                        Ops::Transformer::Gmm::FormatString("%ld, %ld", dimInfo_.weightKDim, dimInfo_.nDim),
+                        "the value of K must be even, and N can not be 1 when K is 2 for 960DT MxA8W4 WeightNZ"),
+                    return false);
+    } else {
+        OP_CHECK_IF(
+            dimInfo_.nDim % GmmConstants::N_K_ALIGN_VALUE_4BIT != 0 ||
+                dimInfo_.weightKDim % GmmConstants::N_K_ALIGN_VALUE_4BIT != 0,
+            OP_LOGE(
+                inputParams_.opName,
                 "The value of dim n, k should be an integer multiple of [%ld], but actual values are [%ld] and [%ld].",
                 GmmConstants::N_K_ALIGN_VALUE_4BIT, dimInfo_.nDim, dimInfo_.weightKDim),
-        return false);
+            return false);
+    }
 
     if (inputParams_.groupType == GmmConstants::SPLIT_M) {
         OP_CHECK_IF(dimInfo_.gDim != static_cast<int64_t>(inputParams_.groupNum),
@@ -446,6 +458,23 @@ bool GMMWeightQuantTilingChecker::CheckXAndWeightShape(size_t tensorIdx) const
     if (inputParams_.isWeightNz) {
         auto wNzShape = context_->GetDynamicInputShape(GmmConstants::WEIGHT_INDEX, tensorIdx)->GetStorageShape();
         auto wNzDimNum = wNzShape.GetDimNum();
+        if (inputParams_.enableMxShapeGeneralization && IsMxA8W4(inputParams_)) {
+            OP_CHECK_IF(
+                // The 4th axis from the end counts K blocks. Add 63 (64 - 1) to round up to blocks of 64.
+                wNzShape.GetDim(wNzDimNum - 4) != (dimInfo_.weightKDim + 63L) / 64L ||
+                    // The 3rd axis from the end counts N blocks. Add 15 (16 - 1) to round up to blocks of 16.
+                    wNzShape.GetDim(wNzDimNum - 3) != (dimInfo_.nDim + 15L) / 16L ||
+                    // The 2nd axis from the end is the N block size, fixed at 16.
+                    wNzShape.GetDim(wNzDimNum - 2) != 16L,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    inputParams_.opName, "weight NZ K block count, weight NZ N block count, weight NZ N block size",
+                    Ops::Transformer::Gmm::FormatString("%ld, %ld, %ld", wNzShape.GetDim(wNzDimNum - 4),
+                                                        wNzShape.GetDim(wNzDimNum - 3), wNzShape.GetDim(wNzDimNum - 2)),
+                    Ops::Transformer::Gmm::FormatString(
+                        "the values must be %ld, %ld and 16 respectively for 960DT MxA8W4 WeightNZ",
+                        (dimInfo_.weightKDim + 63L) / 64L, (dimInfo_.nDim + 15L) / 16L)),
+                return false);
+        }
         OP_CHECK_IF(wNzShape.GetDim(wNzDimNum - GmmConstants::LAST_FIRST_DIM_INDEX) != GmmConstants::C0_64,
                     OP_LOGE(inputParams_.opName,
                             "The C0 of weight with NZ format should be [%ld], but the actual value is [%ld].",
@@ -505,6 +534,24 @@ bool GMMWeightQuantTilingChecker::CheckTensorShape(size_t inputIdx, size_t tenso
 
 bool GMMWeightQuantTilingChecker::CheckGroupSize(const gert::Shape& scaleShape, const std::string& tensorType) const
 {
+    if (inputParams_.enableMxShapeGeneralization && IsMxA8W4(inputParams_)) {
+        const size_t dims = scaleShape.GetDimNum();
+        // Each pair covers 64 K elements. Add 63 (64 - 1) to round up the pair count.
+        const int64_t expectedPairs = (dimInfo_.weightKDim + 63L) / 64L;
+        OP_CHECK_IF(
+            // The 2nd axis from the end is the scale pair count.
+            scaleShape.GetDim(dims - 2) != expectedPairs ||
+                // The last axis is fixed at 2 scales per pair.
+                scaleShape.GetDim(dims - 1) != 2L,
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                inputParams_.opName, tensorType + " pair count, " + tensorType + " pair size",
+                Ops::Transformer::Gmm::FormatString("%ld, %ld", scaleShape.GetDim(dims - 2),
+                                                    scaleShape.GetDim(dims - 1)),
+                Ops::Transformer::Gmm::FormatString(
+                    "the values must be %ld and %ld respectively for 960DT MxA8W4 WeightNZ", expectedPairs, 2L)),
+            return false);
+        return true;
+    }
     // MxA8W4: antiquantScale shape (g, n, k/64, 2); perTokenScale shape (m, k/64, 2)
     // MxA8HiF4: antiquantScale shape (g, n, k/64, 1); perTokenScale shape (m, k/64, 2)
     // A16MxF4: antiquantScale shape (g, n, k/32)

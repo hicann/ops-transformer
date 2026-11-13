@@ -14,6 +14,7 @@
  */
 #include "grouped_matmul_infershape_weight_quant_checker.h"
 #include "grouped_matmul_infershape_common_util.h"
+#include "gmm/common/op_host/log_format_util.h"
 
 namespace ops {
 static const std::map<ge::DataType, std::unordered_set<ge::DataType>> BIAS_TYPE_SUPPORT_MAP = {
@@ -181,8 +182,16 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckShapeForXAndWeight(const g
                 OP_LOGE(context->GetNodeName(),
                         "The k dim value should not be negative, but the actual value is [%ld].", weightKDim_),
                 return ge::GRAPH_FAILED);
-    if (weightDtype_ == ge::DT_FLOAT4_E2M1 || weightDtype_ == ge::DT_FLOAT4_E1M2 || weightDtype_ == ge::DT_FLOAT ||
-        IsS8S4NZ(xDtype_, weightDtype_)) {
+    if (enableMxShapeGeneralization_ && IsMxA8W4NZ(xDtype_, weightDtype_)) {
+        // Each byte packs 2 FP4 elements, so K=2 and N=1 make the transpose direction ambiguous.
+        OP_CHECK_IF(weightKDim_ % 2 != 0 || (weightKDim_ == 2 && weightNDim_ == 1),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        context->GetNodeName(), "K, N",
+                        Ops::Transformer::Gmm::FormatString("%ld, %ld", weightKDim_, weightNDim_),
+                        "the value of K must be even, and N can not be 1 when K is 2 for 960DT MxA8W4 WeightNZ"),
+                    return ge::GRAPH_FAILED);
+    } else if (weightDtype_ == ge::DT_FLOAT4_E2M1 || weightDtype_ == ge::DT_FLOAT4_E1M2 ||
+               weightDtype_ == ge::DT_FLOAT || IsS8S4NZ(xDtype_, weightDtype_)) {
         // A16MxF4/MxA8W4/S8S4校验32B对齐
         OP_CHECK_IF(
             !((weightNDim_ % GMM_N_K_ALIGN_VALUE_WEIGHT_QUANT_4BIT == 0) &&
@@ -567,16 +576,23 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckPertokenScaleForA8W4(const
                         "The shape of PertokenScale should be (m), which is (%ld), but the actual shape is (%ld).",
                         xMDim_, tensorShape->GetDim(0)),
                 return ge::GRAPH_FAILED);
-    // 2: MxA8W4 PertokenScaleShape:(m, k / MX_GROUPSIZE / 2, 2)
     if (IsMxA8W4NZ(xDtype_, weightDtype_)) {
+        const auto actualM = tensorShape->GetDim(0);
+        const auto actualPairs = tensorShape->GetDim(1);
+        // Index 2 is the last axis, with 2 scales per pair.
+        const auto actualPairSize = tensorShape->GetDim(2);
+        const int64_t expectedPairs = enableMxShapeGeneralization_ ?
+                                          // Each pair covers 2 K32 groups. Add the coverage minus 1 to round up.
+                                          (weightKDim_ + MX_GROUP_SIZE * 2 - 1) / (MX_GROUP_SIZE * 2) :
+                                          // Each pair covers 2 K32 groups. The original path requires K64 alignment.
+                                          weightKDim_ / MX_GROUP_SIZE / 2;
         OP_CHECK_IF(
-            tensorShape->GetDim(1) != weightKDim_ / MX_GROUP_SIZE / 2,
-            OP_LOGE(
-                context->GetNodeName(),
-                "PerTokenScale shape should be (m, k/%ld, 2) when xDtype-weightDtype is fp8_e4m3-fp4_e2m1, which is "
-                "(%ld, %ld, 2), but the actual shape is (%ld, %ld, %ld).",
-                MX_GROUP_SIZE * 2, xMDim_, weightKDim_ / MX_GROUP_SIZE / 2, tensorShape->GetDim(0),
-                tensorShape->GetDim(1), tensorShape->GetDim(2)),
+            actualPairs != expectedPairs || (enableMxShapeGeneralization_ && actualPairSize != MX_A8W4_GROUP_FACTOR),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context->GetNodeName(), "perTokenScale",
+                Ops::Transformer::Gmm::FormatString("%ld, %ld, %ld", actualM, actualPairs, actualPairSize),
+                Ops::Transformer::Gmm::FormatString("the shape must be [%ld, %ld, %ld] for MxA8W4 WeightNZ", xMDim_,
+                                                    expectedPairs, MX_A8W4_GROUP_FACTOR)),
             return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -752,6 +768,23 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckGroupSize(const gert::Infe
 
     auto antiquantScaleShape = context->GetDynamicInputShape(GMM_INDEX_IN_ANTIQUANT_SCALE, tensorIdx);
     auto antiquantScaleDimNum = antiquantScaleShape->GetDimNum();
+    if (enableMxShapeGeneralization_ && IsMxA8W4NZ(xDtype_, weightDtype_)) {
+        const size_t scaleKAxis = gmmAttrs.transposeWeight ? PENULTIMATE_DIM : ANTEPENULTIMATE_DIM;
+        // Each scale pair covers 2 K32 groups. Add the coverage minus 1 to round up.
+        const int64_t expectedPairs = (weightKDim_ + MX_GROUP_SIZE * 2 - 1) / (MX_GROUP_SIZE * 2);
+        OP_CHECK_IF(antiquantScaleShape->GetDim(antiquantScaleDimNum - scaleKAxis) != expectedPairs ||
+                        antiquantScaleShape->GetDim(antiquantScaleDimNum - LAST_DIM) != MX_A8W4_GROUP_FACTOR,
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        context->GetNodeName(), "antiquantScale pair count, antiquantScale pair size",
+                        Ops::Transformer::Gmm::FormatString(
+                            "%ld, %ld", antiquantScaleShape->GetDim(antiquantScaleDimNum - scaleKAxis),
+                            antiquantScaleShape->GetDim(antiquantScaleDimNum - LAST_DIM)),
+                        Ops::Transformer::Gmm::FormatString(
+                            "the values must be %ld and %ld respectively for 960DT MxA8W4 WeightNZ", expectedPairs,
+                            MX_A8W4_GROUP_FACTOR)),
+                    return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
     // 2含义: (g, k/groupSize, n)的k轴索引，此处groupNum是K轴上量化分组的groupNum，与groupNum_含义不同
     int64_t groupNum;
     if (IsMxA8W4NZ(xDtype_, weightDtype_)) {

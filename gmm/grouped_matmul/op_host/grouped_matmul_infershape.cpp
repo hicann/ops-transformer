@@ -1960,7 +1960,8 @@ static ge::graphStatus GMMSetOutputShape(gert::InferShapeContext* context, GMMAt
 
 static graphStatus InferShape4DavidWeightQuantGMM(gert::InferShapeContext* context)
 {
-    GroupedMatmulWeightQuantChecker davidWeightQuantGMMChecker;
+    GroupedMatmulWeightQuantChecker davidWeightQuantGMMChecker(
+        GetGmmPlatformId(GetGmmPlatformCache().shortSocVersion) == PlatformID::ASCEND960DT);
     GroupedMatmulCommonUtil utilForDavidWeightQuantGMM;
     OP_CHECK_IF(GetAttrsValue(context, utilForDavidWeightQuantGMM.attrsInfo) != GRAPH_SUCCESS,
                 OP_LOGE(context->GetNodeName(), "GetAttrsValue failed"), return GRAPH_FAILED);
