@@ -242,17 +242,41 @@ private:
     }
 
     /// PA block_table 一行可能有数百个 int32。dc_preload 每次 256B，在 QK 开始前发出。
+    /// 只发完整落在 block_table 分配内的 256B；短尾不再补一笔，避免探出 GM 分配。
     __aicore__ inline void PreloadBlockTable(const MsaTask& task)
     {
         if (MsaIsSeqKeyLayout(tiling_->keyLayout) || task.sBlkEnd <= task.sBlkBegin) {
             return;
         }
-        const uint32_t nBlk = task.sBlkEnd - task.sBlkBegin;
-        const __gm__ int32_t* row =
-            gBlockTable_.GetPhyAddr() + static_cast<uint64_t>(task.batchIdx) * BlockTableRowStride() + task.sBlkBegin;
-        const uint32_t bytes = nBlk * static_cast<uint32_t>(sizeof(int32_t));
-        auto* base = reinterpret_cast<__gm__ uint64_t*>(const_cast<__gm__ int32_t*>(row));
-        for (uint32_t off = 0; off < bytes; off += 256U) {
+        const uint32_t rowStride = BlockTableRowStride();
+        if (rowStride == 0U || task.batchIdx >= tiling_->batch) {
+            return;
+        }
+        const uint64_t elemOff = static_cast<uint64_t>(task.batchIdx) * rowStride + task.sBlkBegin;
+        const uint64_t tensorElems = static_cast<uint64_t>(tiling_->batch) * rowStride;
+        if (elemOff >= tensorElems) {
+            return;
+        }
+        const uint64_t availBytes = (tensorElems - elemOff) * sizeof(int32_t);
+        const uint64_t sliceBytes = static_cast<uint64_t>(task.sBlkEnd - task.sBlkBegin) * sizeof(int32_t);
+        // 分配基址按 8B 对齐。elemOff 为奇数时起点只 4B 对齐，dc_preload 需要 uint64 指针，先跳过 1 个 int32。
+        const uint32_t leadElems = static_cast<uint32_t>(elemOff & 1ULL);
+        const uint64_t leadBytes = static_cast<uint64_t>(leadElems) * sizeof(int32_t);
+        if (leadBytes >= availBytes || leadBytes >= sliceBytes) {
+            return;
+        }
+        const uint64_t alignedAvail = availBytes - leadBytes;
+        uint64_t cover = sliceBytes - leadBytes;
+        if (cover > alignedAvail) {
+            cover = alignedAvail;
+        }
+        const __gm__ int32_t* alignedRow = gBlockTable_.GetPhyAddr() + (elemOff + leadElems);
+        auto* base = reinterpret_cast<__gm__ uint64_t*>(const_cast<__gm__ int32_t*>(alignedRow));
+        constexpr uint64_t kPreloadBytes = 256ULL;
+        for (uint64_t off = 0; off < cover; off += kPreloadBytes) {
+            if (off + kPreloadBytes > alignedAvail) {
+                break;
+            }
             dc_preload(base, static_cast<int64_t>(off));
         }
     }

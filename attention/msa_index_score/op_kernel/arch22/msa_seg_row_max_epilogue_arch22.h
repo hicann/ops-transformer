@@ -331,6 +331,10 @@ private:
             if (rows < MSA_ROWS_PER_PASS) {
                 AscendC::Duplicate(dst, static_cast<half>(MSA_FILL_VALUE), MSA_ROWS_PER_PASS * STILE_WIDTH);
                 AscendC::PipeBarrier<PIPE_V>();
+                // Duplicate 走 Vector，DataCopy 走 MTE2。PipeBarrier<PIPE_V> 不跨管道，
+                // 不排空 V 时 -inf 会盖掉已搬入的 S。满 16 行不走 Duplicate。
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(evt);
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(evt);
             }
             AscendC::DataCopy(dst, gS[static_cast<uint64_t>(rowOff) * STILE_WIDTH], rows * STILE_WIDTH);
             AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(evt);
