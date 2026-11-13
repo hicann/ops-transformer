@@ -386,7 +386,7 @@ __aicore__ inline void SFAVectorService<SFAT>::MergeSplitKV(GlobalTensor<T>& par
     //   result = inputBuff2 16 KiB = 16 head × 512 × 2 B：一次处理 16 个 head 的 fp16/bf16 输出
     const uint32_t queryCount =
         LAYOUT_T == SFA_LAYOUT::TND ? sfaVecConstInfo.qSeqSize : sfaVecConstInfo.batchSize * sfaVecConstInfo.qSeqSize;
-    AttentionCommon::MergeSparseSplitKV<KV_LAYOUT_T != SFA_LAYOUT::PA_BSND, TEMPLATE_MODE == C_TEMPLATE>(
+    AttentionCommon::MergeSparseSplitKV<true, TEMPLATE_MODE == C_TEMPLATE>(
         queryCount, queryIdx, splitCount, sfaVecConstInfo.gSize, partialOut, partialMax, partialSum, finalOut, finalMax,
         finalSum, returnSoftmaxLse, outputBuff1.template Get<T>(), tmpBuff1.template Get<T>(),
         inputBuff1.template Get<T>(), outputBuff2.template Get<T>(), inputBuff2.template Get<OUT_T>());
@@ -927,7 +927,7 @@ __aicore__ inline int64_t SFAVectorService<SFAT>::GetKeyGmOffset(int64_t realS2I
         int64_t blkTableIdx = realS2Idx / sfaVecConstInfo.kvCacheBlockSize;
         int64_t blkTableOffset = realS2Idx % sfaVecConstInfo.kvCacheBlockSize;
         realKeyGmOffset = blkTableGm_.GetValue(sfaVecRunInfo.bIdx * sfaVecConstInfo.maxBlockNumPerBatch + blkTableIdx) *
-                              static_cast<int64_t>(sfaVecConstInfo.kvCacheBlockSize) *
+                              static_cast<int64_t>(sfaVecConstInfo.keyStride0) *
                               static_cast<int64_t>(sfaVecConstInfo.kvHeadNum) +
                           blkTableOffset;
     } else {

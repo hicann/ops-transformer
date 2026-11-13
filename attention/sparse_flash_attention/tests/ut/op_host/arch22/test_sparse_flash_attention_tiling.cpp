@@ -13,6 +13,7 @@
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 #include "register/tilingdata_base.h"
+#include "../../../../op_host/sparse_flash_attention_tiling.h"
 using namespace std;
 
 class SparseFlashAttentionTiling : public testing::Test {
@@ -330,11 +331,120 @@ TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_7)
          {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
         &compileInfo, "Ascend910B", 64, 262144, 16384);
     int64_t expectTilingKey = 50306; // 17538 | HAS_ROPE(bit15)
+    // The framework compares tiling data as packed int64 words. The page stride
+    // is the high uint32 in this word; derive its value from the 128-row page.
+    constexpr uint32_t pageSize = 128;
+    const auto packedPageStride = static_cast<uint64_t>(pageSize) << 32;
     std::string expectTilingData = "549755813889 128 128 4407522836751581185 4294967424 1 3 "
-                                   "9223372036854775807 9223372036854775807 2 1 2048 0 36028797018963968 "
-                                   "262144 197525504 64 281474976727040 549755814016 ";
+                                   "9223372036854775807 9223372036854775807 2 1 2048 " +
+                                   std::to_string(packedPageStride) +
+                                   " 36028797018963968 262144 197525504 64 281474976727040 549755814016 ";
     std::vector<size_t> expectWorkspaces = {214302720};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
+
+    // Find the serialized field using the actual tiling schema, then read the
+    // value produced by Tiling instead of comparing an opaque packed number.
+    optiling::SparseFlashAttentionTilingDataMla schema;
+    std::vector<uint8_t> before(schema.GetDataSize());
+    std::vector<uint8_t> after(schema.GetDataSize());
+    schema.baseParams.set_keyStride0(0);
+    schema.SaveToBuffer(before.data(), before.size());
+    schema.baseParams.set_keyStride0(0x01010101);
+    schema.SaveToBuffer(after.data(), after.size());
+    size_t strideOffset = 0;
+    while (strideOffset < before.size() && before[strideOffset] == after[strideOffset]) {
+        ++strideOffset;
+    }
+    ASSERT_LT(strideOffset + sizeof(uint32_t), before.size());
+
+    auto expectPagePitch = [&](const gert::TilingContextPara& params, uint32_t expected) {
+        TilingInfo result;
+        ASSERT_TRUE(ExecuteTiling(params, result));
+        ASSERT_GE(result.tilingDataSize, strideOffset + sizeof(uint32_t));
+        uint32_t actual = 0;
+        std::memcpy(&actual, result.tilingData.get() + strideOffset, sizeof(actual));
+        EXPECT_EQ(actual, expected);
+    };
+    expectPagePitch(tilingContextPara, pageSize);
+
+    // PA pages contain 128 rows but their physical starts are 160 rows apart.
+    auto padded = tilingContextPara;
+    padded.inputTensorDesc_[1].stride_ = gert::Stride({160 * 512, 512, 512, 1});
+    padded.inputTensorDesc_[2].stride_ = gert::Stride({160 * 512, 512, 512, 1});
+    padded.inputTensorDesc_[8].stride_ = gert::Stride({160 * 64, 64, 64, 1});
+    for (auto index : {1, 2, 8}) {
+        padded.inputTensorDesc_[index].hasStride_ = true;
+    }
+    expectPagePitch(padded, 160);
+
+    // LSE enabled also accepts the padded PA layout and retains its page pitch.
+    auto paddedLse = padded;
+    paddedLse.attrs_[8].attr_ = Ops::Transformer::AnyValue::CreateFrom<bool>(true);
+    paddedLse.outputTensorDesc_[1] = {{{1, 1, 128, 128}, {1, 1, 128, 128}}, ge::DT_FLOAT, ge::FORMAT_ND};
+    paddedLse.outputTensorDesc_[2] = {{{1, 1, 128, 128}, {1, 1, 128, 128}}, ge::DT_FLOAT, ge::FORMAT_ND};
+    expectPagePitch(paddedLse, 160);
+
+    // RoPE tensors may both be omitted, including with LSE and PA stride.
+    auto noRope = paddedLse;
+    noRope.inputTensorDesc_[7] = {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND};
+    noRope.inputTensorDesc_[8] = {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND};
+    expectPagePitch(noRope, 160);
+
+    // Passing only one RoPE tensor is invalid.
+    auto oneRope = padded;
+    oneRope.inputTensorDesc_[7] = {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND};
+    ExecuteTestCase(oneRope, ge::GRAPH_FAILED);
+
+    // Use two physical pages and explicit contiguous strides as a control.
+    auto contiguousCaches = tilingContextPara;
+    contiguousCaches.inputTensorDesc_[1] = {{{2, 128, 1, 512}, {2, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND};
+    contiguousCaches.inputTensorDesc_[2] = {{{2, 128, 1, 512}, {2, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND};
+    contiguousCaches.inputTensorDesc_[8] = {{{2, 128, 1, 64}, {2, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND};
+    for (auto index : {1, 2}) {
+        contiguousCaches.inputTensorDesc_[index].stride_ = gert::Stride({128 * 512, 512, 512, 1});
+        contiguousCaches.inputTensorDesc_[index].hasStride_ = true;
+    }
+    contiguousCaches.inputTensorDesc_[8].stride_ = gert::Stride({128 * 64, 64, 64, 1});
+    contiguousCaches.inputTensorDesc_[8].hasStride_ = true;
+    expectPagePitch(contiguousCaches, pageSize);
+
+    // A contiguous K must not hide a padded V or K_rope with a different pitch.
+    auto valueOnlyPadded = contiguousCaches;
+    valueOnlyPadded.inputTensorDesc_[2].stride_ = gert::Stride({160 * 512, 512, 512, 1});
+    ExecuteTestCase(valueOnlyPadded, ge::GRAPH_FAILED);
+
+    auto ropeOnlyPadded = contiguousCaches;
+    ropeOnlyPadded.inputTensorDesc_[8].stride_ = gert::Stride({160 * 64, 64, 64, 1});
+    ExecuteTestCase(ropeOnlyPadded, ge::GRAPH_FAILED);
+
+    auto valueAndRopePadded = valueOnlyPadded;
+    valueAndRopePadded.inputTensorDesc_[8].stride_ = gert::Stride({160 * 64, 64, 64, 1});
+    ExecuteTestCase(valueAndRopePadded, ge::GRAPH_FAILED);
+
+    // K and V must use the same page pitch.
+    auto mismatched = padded;
+    mismatched.inputTensorDesc_[2].stride_ = gert::Stride({161 * 512, 512, 512, 1});
+    ExecuteTestCase(mismatched, ge::GRAPH_FAILED);
+
+    // Non-contiguity of an inner axis is not supported.
+    auto badInnerStride = padded;
+    badInnerStride.inputTensorDesc_[1].stride_ = gert::Stride({160 * 512, 1024, 512, 1});
+    ExecuteTestCase(badInnerStride, ge::GRAPH_FAILED);
+
+    // Adjacent physical pages must not overlap.
+    auto overlap = padded;
+    overlap.inputTensorDesc_[1].stride_ = gert::Stride({127 * 512, 512, 512, 1});
+    ExecuteTestCase(overlap, ge::GRAPH_FAILED);
+
+    // The leading stride must represent a whole number of token rows.
+    auto partialRow = padded;
+    partialRow.inputTensorDesc_[1].stride_ = gert::Stride({160 * 512 + 1, 512, 512, 1});
+    ExecuteTestCase(partialRow, ge::GRAPH_FAILED);
+
+    // RoPE cache must use the same page pitch as K and V.
+    auto mismatchRope = padded;
+    mismatchRope.inputTensorDesc_[8].stride_ = gert::Stride({161 * 64, 64, 64, 1});
+    ExecuteTestCase(mismatchRope, ge::GRAPH_FAILED);
 }
 
 // the layout_kv is PA_BSND, blockTable must be provided.
@@ -1122,11 +1232,6 @@ TEST_F(SparseFlashAttentionTiling, SplitKvUsesArch22InnerBlocks)
                             variant.inputTensorDesc_[8].shape_ = gert::StorageShape{};
                         }
                         TilingInfo info;
-                        if (returnLse) {
-                            EXPECT_FALSE(ExecuteTiling(variant, info))
-                                << "A2 PA_BSND must retain the original LSE rejection";
-                            continue;
-                        }
                         ASSERT_TRUE(ExecuteTiling(variant, info))
                             << "G=" << heads << ", B=" << batchCount << ", Q=" << queryCount << ", TopK=" << topK;
                         EXPECT_EQ(info.blockNum, expectedBlocks);
@@ -1251,10 +1356,6 @@ TEST_F(SparseFlashAttentionTiling, SplitKvNativeLayoutsUseTotalQueryCount)
                      {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(returnLse)}},
                     &compileInfo, "Ascend910B", 24, 262144, 16384);
                 TilingInfo info;
-                if (page && returnLse) {
-                    EXPECT_FALSE(ExecuteTiling(para, info));
-                    continue;
-                }
                 ASSERT_TRUE(ExecuteTiling(para, info)) << queryLayout << "/" << kvLayout;
                 EXPECT_EQ(info.tilingKey & 1, totalQueries <= 12);
                 EXPECT_EQ(info.blockNum, totalQueries <= 4 ? totalQueries * 4 : 24);

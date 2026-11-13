@@ -300,7 +300,7 @@ REG_OP(SparseFlashAttention)
           <li>默认值为false。</li>
         </ul>
       </td>
-      <td>True表示返回，False表示不返回。该参数仅在训练且layout_kv不为PA_BSND场景支持。</td>
+      <td>True表示返回，False表示不返回；A2/A3支持layout_kv为PA_BSND，返回softmax_max和softmax_sum，默认值仍为False。</td>
       <td>bool</td>
       <td>-</td>
       <td>-</td>
@@ -351,7 +351,8 @@ REG_OP(SparseFlashAttention)
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparse_block_size整除block_size。
 - Q_N支持情况：
   - <term>Ascend 950PR&950DT系列产品</term>：Q_N支持1~128；仅在layout_kv为PA_BSND时，key、value和key_rope支持0轴非连续。
-  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：Q_N支持1/2/4/8/16/32/64/128；key、value和key_rope不支持非连续。
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：Q_N支持1/2/4/8/16/32/64/128；仅在layout_kv为PA_BSND时，key、value和key_rope支持首轴非连续，其余轴必须连续。
+- A2/A3的PA_BSND场景下，key、value和传入的key_rope的首轴stride须为各自每个token元素数的整数倍，换算成token行数后的物理页间距必须一致且不小于逻辑页大小。
 - sinks仅支持<term>Ascend 950PR&950DT系列产品</term>。
 
 ## 调用示例

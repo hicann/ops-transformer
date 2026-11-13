@@ -160,6 +160,7 @@ struct ConstInfo {
     uint64_t headDimRope;
     uint64_t kvSeqSize = 0ULL;        // kv最大S长度
     uint64_t qSeqSize = 1ULL;         // q最大S长度
+    uint32_t keyStride0 = 0;          // 物理页间距
     int64_t kvCacheBlockSize = 0;     // PA场景的block size
     uint32_t maxBlockNumPerBatch = 0; // PA场景的最大单batch block number
     uint32_t splitKVNum = 0U;         // S2核间切分的切分份数

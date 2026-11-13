@@ -92,6 +92,21 @@ public:
         this->Attr("attention_mode").AttrType(OPTIONAL).Int(0);
         this->Attr("return_softmax_lse").AttrType(OPTIONAL).Bool(false);
         OpAICoreConfig aicore_config;
+        aicore_config.Input("key")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config.Input("value")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config.Input("key_rope")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .IgnoreContiguous();
         aicore_config.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
             .DynamicRankSupportFlag(true)

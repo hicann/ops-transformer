@@ -212,7 +212,7 @@ English | [简体中文](./README.md)
 - block_size is the number of tokens in a block. block_size is a multiple of 16, and the maximum value is 1024.
 - Q_D of query and KV_D of key and value must both be 512, and Dr of query_rope and Dr of key_rope must both be 64.
 - The data types of query, key, and value must be the same.
-- Currently, only non-empty query_rope and key_rope are supported. Empty rope inputs are not supported.
+- query_rope and key_rope must either both be provided or both be null. When both are null, the RoPE dimension is 0.
 - sinks is supported only on Ascend 950PR&950DT products.
 - <term>Ascend 950PR&950DT products</term>:
   - Q_N supports 1 to 128.
@@ -223,8 +223,8 @@ English | [简体中文](./README.md)
   - Q_N supports 1/2/4/8/16/32/64/128.
   - sparse_block_size supports [1,128] and must be a power of 2. In the PageAttention scenario, sparse_block_size must be a divisor of block_size.
   - sinks is not supported.
-  - key, value, and key_rope do not support non-contiguous tensors.
-  - When return_softmax_lse is True, layout_kv does not support PA_BSND.
+  - Only when layout_kv is PA_BSND, key, value, and key_rope support a non-contiguous axis 0.
+  - When return_softmax_lse is True, layout_kv supports PA_BSND and softmax_max and softmax_sum are returned. The default is False.
 
 ## Calling Example
 

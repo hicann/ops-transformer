@@ -137,7 +137,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
                 <li>When layout_kv is TND, the shape is (T2, KV_N, D).</li>
           </ul>
       </td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>value (aclTensor)</td>
@@ -147,7 +147,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
       <td>FLOAT16, BFLOAT16</td>
       <td>ND</td>
       <td>The shape is the same as that of key.</td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>sparseIndices (aclTensor)</td>
@@ -249,7 +249,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
                 <li>If layout_kv is PA_BSND, the shape is (block_num,block_size,N2,Dr).</li>
           </ul>
       </td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>sinksOptional (aclTensor)</td>
@@ -366,7 +366,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
       <td>Indicates whether to return softmax_max and softmax_sum.</td>
       <td>          <ul>
                 <li>True indicates returning, False indicates not returning; the default value is False.</li>
-                <li>This parameter is supported only in the training use case where layout_kv is not PA_BSND.</li>
+                <li>Atlas A2/A3 products also support PA_BSND.</li>
           </ul>
       </td>
       <td>BOOL</td>
@@ -543,6 +543,9 @@ aclnnStatus aclnnSparseFlashAttentionV2(
     - Supports [1,128], and the value must be a power of 2. In the PageAttention use case, sparse_block_size must be divisible by block_size
   <!-- end id10 -->
 
+- On Atlas A2/A3 products, key, value, and keyRopeOptional support axis-0 non-contiguity only when layoutKvOptional is PA_BSND; all other axes must be contiguous.
+- For PA_BSND on Atlas A2/A3 products, each cache axis-0 stride must be divisible by its number of elements per token. The physical page pitches, measured in token rows, must be equal across key, value, and a provided keyRopeOptional, and no smaller than the logical page size.
+- On Atlas A2/A3 products, returnSoftmaxLse=true supports PA_BSND and returns softmaxMax and softmaxSum for both contiguous and supported axis-0 non-contiguous inputs. The default remains false.
 - The sinks parameter is supported only on Ascend 950PR&950DT products.
 
 ## Example

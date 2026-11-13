@@ -238,6 +238,7 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitTilingData()
     sfaKernelConstInfo.qSeqSize = tilingData->baseParams.qSeqSize;
     sfaKernelConstInfo.maxBlockNumPerBatch = tilingData->baseParams.maxBlockNumPerBatch;
     sfaKernelConstInfo.kvCacheBlockSize = tilingData->baseParams.blockSize;
+    sfaKernelConstInfo.keyStride0 = tilingData->baseParams.keyStride0;
     sfaKernelConstInfo.outputLayout = static_cast<SFA_LAYOUT>(tilingData->baseParams.outputLayout);
     sfaKernelConstInfo.mBaseSize = tilingData->innerSplitParams.mBaseSize;
     sfaKernelConstInfo.s2BaseSize = tilingData->innerSplitParams.s2BaseSize;
@@ -485,7 +486,7 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
     finalAttentionOutGm.SetGlobalBuffer((__gm__ OUT_T*)attentionOut);
     softmaxMaxGm.SetGlobalBuffer((__gm__ T*)softmaxMax);
     softmaxSumGm.SetGlobalBuffer((__gm__ T*)softmaxSum);
-    if constexpr (FLASH_DECODE && KV_LAYOUT_T != SFA_LAYOUT::PA_BSND) {
+    if constexpr (FLASH_DECODE) {
         finalSoftmaxMaxGm.SetGlobalBuffer((__gm__ T*)softmaxMax);
         finalSoftmaxSumGm.SetGlobalBuffer((__gm__ T*)softmaxSum);
     }

@@ -138,7 +138,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
                 <li>layoutKvOptional为TND时，shape为(T2, KV_N, D)。</li>
           </ul>
       </td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>value（aclTensor）</td>
@@ -148,7 +148,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>shape与key的shape一致。</td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>sparseIndices（aclTensor）</td>
@@ -259,7 +259,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
                 <li>layoutKvOptional为PA_BSND时，shape为(block_num,block_size,N2,Dr)。</li>
           </ul>
       </td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>sinksOptional（aclTensor）</td>
@@ -569,9 +569,11 @@ aclnnStatus aclnnSparseFlashAttentionV2(
   <!-- end id11 -->
   <!-- npu="A3,910b" id12 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-    - layoutKvOptional不支持PA_BSND。
+    - 支持layoutKvOptional为PA_BSND，返回softmaxMax和softmaxSum；默认值仍为False。
   <!-- end id12 -->
 
+- 仅在layoutKvOptional为PA_BSND时，key、value和keyRopeOptional支持首轴非连续，其余轴必须连续。
+- A2/A3的PA_BSND场景下，key、value和传入的keyRopeOptional的首轴stride须为各自每个token元素数的整数倍，换算成token行数后的物理页间距必须一致且不小于逻辑页大小。
 - 参数sinksOptional仅支持Ascend 950PR&950DT系列产品。
 
 ## 调用示例

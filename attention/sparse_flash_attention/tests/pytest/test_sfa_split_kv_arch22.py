@@ -776,7 +776,8 @@ def test_native_layout_empty_kv_rejected(sfa_operator, kv_layout, dtype, replay_
 @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16], ids=["bf16", "fp16"])
 @pytest.mark.parametrize("use_rope", [False, True], ids=["no_rope", "rope64"])
 @pytest.mark.parametrize("topk", [128, 2048])
-def test_original_pa_lse_rejected(sfa_operator, dtype, use_rope, topk):
+@pytest.mark.parametrize("query_layout", ["BSND", "TND"])
+def test_pa_lse_supported(sfa_operator, dtype, use_rope, topk, query_layout):
     _run_reference_case(
         sfa_operator,
         1,
@@ -788,5 +789,5 @@ def test_original_pa_lse_rejected(sfa_operator, dtype, use_rope, topk):
         8,
         dtype,
         use_rope,
-        expect_lse_rejection=True,
+        query_layout=query_layout,
     )

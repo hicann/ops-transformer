@@ -30,6 +30,7 @@ struct PAShape {
     uint32_t actHeadDim;          // 实际拷贝col大小,考虑到N切块   s*d, 对应d
     uint32_t copyRowNum;          // 总共要拷贝的行数
     uint32_t copyRowNumAlign;
+    uint32_t pageStride; // 实际物理页间距
 };
 
 struct Position {
@@ -90,7 +91,7 @@ __aicore__ inline void DataCopyPA(LocalTensor<T>& dstTensor,  // l1
             copyRowCnt = shape.copyRowNum - copyFinishRowCnt; // 一个block未拷满
         }
         uint64_t dStride = shape.headDim;
-        uint64_t offset = idInBlockTable * shape.blockSize * shape.headNum * shape.headDim; // PA的偏移
+        uint64_t offset = idInBlockTable * shape.pageStride * shape.headNum * shape.headDim; // PA的偏移
 
         if constexpr (SRC_LAYOUT == SFA_LAYOUT::BSND || SRC_LAYOUT == SFA_LAYOUT::TND) {
             offset += (uint64_t)(startPos.n2Idx * shape.headDim) + reaminRowCnt * shape.headDim * shape.headNum +
@@ -666,6 +667,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm1NoRope(const RunInfo& s
                         startPos.dIdx = mm1NrKL1 * 256;
                         PAShape shape;
                         shape.blockSize = kvCacheBlockSize;
+                        shape.pageStride = sfaCubeConstInfo.keyStride0;
                         shape.headNum = sfaCubeConstInfo.kvHeadNum;
                         shape.headDim = sfaCubeConstInfo.headDim;
                         shape.actHeadDim = 256;
@@ -910,6 +912,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm1(const RunInfo& sfaCube
                         ropeStartPos.dIdx = kL1 * 32;
                         PAShape shape;
                         shape.blockSize = kvCacheBlockSize;
+                        shape.pageStride = sfaCubeConstInfo.keyStride0;
                         shape.headNum = sfaCubeConstInfo.kvHeadNum;
                         shape.headDim = sfaCubeConstInfo.headDim;
                         shape.actHeadDim = 256;
@@ -1178,6 +1181,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCube
                                 nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
                             PAShape shape;
                             shape.blockSize = kvCacheBlockSize;
+                            shape.pageStride = sfaCubeConstInfo.keyStride0;
                             shape.headNum = sfaCubeConstInfo.kvHeadNum;
                             shape.headDim = sfaCubeConstInfo.headDim;
                             shape.actHeadDim = nL1Size;

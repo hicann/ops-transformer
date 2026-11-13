@@ -571,6 +571,9 @@ public:
     void FillTilingInfoAttrsAndLayouts(SFATilingInfo& sfaInfo);
     ge::graphStatus Parse(SFATilingInfo& sfaInfo);
     ge::graphStatus CheckContiguous() const;
+    bool IsAxis0NonContiguous(uint32_t inputIndex, uint64_t headDim) const;
+    ge::graphStatus CheckCacheStride(uint32_t inputIndex, const gert::Shape& shape, const char* name,
+                                     uint64_t& sharedPagePitch) const;
 
     const gert::TilingContext* context_ = nullptr;
 

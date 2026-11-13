@@ -210,7 +210,7 @@
 - block_size为一个block的token数，block_size取值为16的倍数，且最大支持1024。
 - 参数query中的Q_D和key、value的KV_D值相等为512，参数query_rope中的Dr和key_rope的Dr值相等为64。
 - 参数query、key、value的数据类型必须保持一致。
-- 当前只支持query_rope和key_rope传入，不支持rope为空。
+- query_rope和key_rope须同时传入或同时为空；同时为空时，表示RoPE维度为0。
 - sinks仅支持Ascend 950PR&950DT系列产品。
 - <term>Ascend 950PR&950DT系列产品</term>：
   - Q_N支持1~128。
@@ -221,8 +221,8 @@
   - Q_N支持1/2/4/8/16/32/64/128。
   - 参数sparse_block_size支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparse_block_size整除block_size。
   - 不支持sinks。
-  - key、value和key_rope不支持非连续。
-  - return_softmax_lse为True时，layout_kv不支持PA_BSND。
+  - 仅在layout_kv为PA_BSND时，key、value和key_rope支持0轴非连续。
+  - return_softmax_lse为True时，支持layout_kv为PA_BSND，返回softmax_max和softmax_sum；该开关默认值为False。
 
 ## 调用示例
 

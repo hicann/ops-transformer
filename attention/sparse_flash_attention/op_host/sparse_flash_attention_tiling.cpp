@@ -19,6 +19,7 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <limits>
 #include <graph/utils/type_utils.h>
 #include "err/ops_err.h"
 #include "register/op_def_registry.h"
@@ -2076,13 +2077,6 @@ ge::graphStatus SFAInfoParser::GetKvLayout()
                                                  "When layout_kv is PA_BSND, the shape dim of key must be 4");
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF(
-        *opParamInfo_.returnSoftmaxLse && kvLayout_ == SFALayout::PA_BSND && !isA5_ && !isA6_,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            opName_, "layout_key", SFALayoutToSerialString(kvLayout_).c_str(),
-            "When return_softmax_lse is true, layout_kv does not support PA_BSND, it is only supported on Ascend "
-            "950PR/Ascend 950DT/Ascend 960DT"),
-        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -2261,12 +2255,130 @@ ge::graphStatus SFAInfoParser::GetActualseqInfo()
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus SFAInfoParser::CheckCacheStride(uint32_t inputIndex, const gert::Shape& shape, const char* name,
+                                                uint64_t& sharedPagePitch) const
+{
+    const bool isPa = kvLayout_ == SFALayout::PA_BSND;
+    const size_t rank = shape.GetDimNum();
+    if (rank == 0 || (isPa && rank != DIM_NUM_FOUR)) {
+        OP_LOGE(opName_, "%s has an invalid rank for stride validation", name);
+        return ge::GRAPH_FAILED;
+    }
+
+    // Preserve the existing empty non-PA input handling.
+    if (!isPa && shape.GetShapeSize() == 0) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    const auto* strides = context_->GetDynamicInputStride(inputIndex, 0);
+    if (strides != nullptr && strides->GetDimNum() != rank) {
+        OP_LOGE(opName_, "%s stride rank does not match its shape", name);
+        return ge::GRAPH_FAILED;
+    }
+
+    uint64_t dense = 1;
+    uint64_t stride0 = 0;
+
+    for (size_t axis = rank; axis > 0;) {
+        --axis;
+
+        const int64_t dim = shape.GetDim(axis);
+        const int64_t actual = strides == nullptr ? static_cast<int64_t>(dense) : strides->GetStride(axis);
+        if (dim < 0 || actual <= 0) {
+            OP_LOGE(opName_, "%s requires non-negative dimensions and positive strides", name);
+            return ge::GRAPH_FAILED;
+        }
+
+        if (axis == 0) {
+            stride0 = static_cast<uint64_t>(actual);
+        }
+
+        // PA: only axis 0 may be non-contiguous.
+        // Non-PA: all effective dimensions must be contiguous.
+        if ((!isPa || axis != 0) && dim > 1 && static_cast<uint64_t>(actual) != dense) {
+            OP_LOGE(opName_, "%s supports only axis-0 non-contiguity in PA_BSND", name);
+            return ge::GRAPH_FAILED;
+        }
+
+        if (isPa && axis == 0 && (dim <= 0 || stride0 < dense)) {
+            OP_LOGE(opName_, "%s PA pages must be non-empty and must not overlap", name);
+            return ge::GRAPH_FAILED;
+        }
+
+        if (dim > 0 &&
+            dense > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) / static_cast<uint64_t>(dim)) {
+            OP_LOGE(opName_, "%s shape is too large for stride calculation", name);
+            return ge::GRAPH_FAILED;
+        }
+
+        dense *= static_cast<uint64_t>(dim);
+    }
+
+    if (isPa) {
+        const uint64_t rowElements = static_cast<uint64_t>(shape.GetDim(2)) * static_cast<uint64_t>(shape.GetDim(3));
+        if (rowElements == 0 || stride0 % rowElements != 0) {
+            OP_LOGE(opName_, "%s page stride must be a whole number of token rows", name);
+            return ge::GRAPH_FAILED;
+        }
+
+        const uint64_t pagePitch = stride0 / rowElements;
+
+        if (pagePitch > std::numeric_limits<uint32_t>::max() ||
+            (sharedPagePitch != 0 && pagePitch != sharedPagePitch)) {
+            OP_LOGE(opName_, "K/V/K_rope must share a uint32 token-row page pitch");
+            return ge::GRAPH_FAILED;
+        }
+
+        if (static_cast<uint64_t>(shape.GetDim(0)) >
+            static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) / stride0) {
+            OP_LOGE(opName_, "%s PA storage span is too large", name);
+            return ge::GRAPH_FAILED;
+        }
+
+        sharedPagePitch = pagePitch;
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
+bool SFAInfoParser::IsAxis0NonContiguous(uint32_t inputIndex, uint64_t headDim) const
+{
+    const auto* strides = context_->GetDynamicInputStride(inputIndex, 0);
+    if (strides == nullptr) {
+        return false;
+    }
+
+    const uint64_t contiguousStride0 = static_cast<uint64_t>(blockSize_) * n2Size_ * headDim;
+    return static_cast<uint64_t>(strides->GetStride(0)) != contiguousStride0;
+}
+
 // 非连续校验：通过shape计算expected stride进行校验
 // PA_BSND时，只允许0轴非连续，其余轴必须连续
 // 非PA_BSND时，所有轴都必须连续
 ge::graphStatus SFAInfoParser::CheckContiguous() const
 {
     if (!isA5_ && !isA6_) {
+        if (kvLayout_ == SFALayout::PA_BSND) {
+            const bool keyNonContiguous = IsAxis0NonContiguous(KEY_INPUT_INDEX, qkHeadDim_);
+            const bool valueNonContiguous = IsAxis0NonContiguous(VALUE_INPUT_INDEX, vHeadDim_);
+            const bool keyRopeNonContiguous =
+                IsOptionalRopePresent(opParamInfo_.keyRope) && IsAxis0NonContiguous(KEY_ROPE_INPUT_INDEX, ropeHeadDim_);
+            if (keyNonContiguous || valueNonContiguous || keyRopeNonContiguous) {
+                uint64_t sharedPagePitch = 0;
+
+                if (CheckCacheStride(KEY_INPUT_INDEX, keyShape_, "key", sharedPagePitch) != ge::GRAPH_SUCCESS ||
+                    CheckCacheStride(VALUE_INPUT_INDEX, valueShape_, "value", sharedPagePitch) != ge::GRAPH_SUCCESS) {
+                    return ge::GRAPH_FAILED;
+                }
+
+                if (IsOptionalRopePresent(opParamInfo_.keyRope) &&
+                    CheckCacheStride(KEY_ROPE_INPUT_INDEX, opParamInfo_.keyRope.tensor->GetStorageShape(), "key_rope",
+                                     sharedPagePitch) != ge::GRAPH_SUCCESS) {
+                    return ge::GRAPH_FAILED;
+                }
+            }
+        }
+
         return ge::GRAPH_SUCCESS;
     }
 
@@ -2335,7 +2447,18 @@ void SFAInfoParser::GenerateInfo(SFATilingInfo& sfaInfo)
     sfaInfo.maxBlockNumPerBatch = maxBlockNumPerBatch_;
 
     if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_9202) {
-        sfaInfo.keyStride0 = 0; // 910无需使用stride
+        sfaInfo.keyStride0 = 0;
+        if (kvLayout_ == SFALayout::PA_BSND) {
+            // Convert the element stride into a page pitch in token rows.
+            // CheckContiguous() has checked the shared page-pitch constraints.
+            if (keyStride0_ != 0) {
+                const uint64_t elementsPerToken = static_cast<uint64_t>(n2Size_) * qkHeadDim_;
+                sfaInfo.keyStride0 = static_cast<uint32_t>(keyStride0_ / elementsPerToken);
+            } else {
+                // No explicit stride metadata: use the contiguous page pitch.
+                sfaInfo.keyStride0 = static_cast<uint32_t>(blockSize_);
+            }
+        }
     } else {
         if ((keyStride0_ != 0) && (n2Size_ != 0) && (qkHeadDim_ != 0)) {
             sfaInfo.keyStride0 = keyStride0_ / (n2Size_ * qkHeadDim_);
