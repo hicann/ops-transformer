@@ -209,3 +209,71 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     worker(args.worker, bool(args.lse), bool(args.sink), args.output)
+
+
+@pytest.mark.ci
+def test_pa_page_axis_noncontiguous_v1_v2():
+    """Both interfaces read packed KV through the physical page stride."""
+    import torch_npu
+
+    from cann_ops_transformer.ops.attention.kv_quant_sparse_flash_attention_v2 import (
+        kv_quant_sparse_flash_attention,
+    )
+
+    if not torch.npu.is_available() or "910B" not in torch.npu.get_device_name(0):
+        pytest.skip("Ascend 910B is required")
+    torch.npu.set_device(0)
+    case = ("pa_page_stride", 4, 8, 8, None)
+    query, cache, indices, table, expected_v1, _ = oracle._inputs_and_reference(
+        case, 18627, torch.float16
+    )
+    page_elements = cache.shape[1] * cache.shape[2] * cache.shape[3]
+    page_stride = page_elements + 128
+    storage = torch.full(
+        (cache.shape[0] * page_stride + 64,), -7, dtype=torch.int8, device="npu:0"
+    )
+    kv = torch.as_strided(
+        storage,
+        cache.shape,
+        (page_stride, cache.shape[2] * cache.shape[3], cache.shape[3], 1),
+        storage_offset=64,
+    )
+    kv.copy_(cache.npu())
+    assert kv.stride(0) > page_elements
+    assert kv.stride()[1:] == (528, 528, 1)
+    q, sparse, pages = (value.npu() for value in (query, indices, table))
+    common = dict(
+        scale_value=512**-0.5,
+        key_quant_mode=2,
+        value_quant_mode=2,
+        sparse_block_size=1,
+        layout_query="TND",
+        layout_kv="PA_BSND",
+        sparse_mode=3,
+        attention_mode=2,
+        quant_scale_repo_mode=1,
+        tile_size=128,
+        rope_head_dim=0,
+        block_table=pages,
+        actual_seq_lengths_query=torch.tensor([1], dtype=torch.int32).npu(),
+        actual_seq_lengths_kv=torch.tensor([4 * 128], dtype=torch.int32).npu(),
+    )
+    actual_v1 = torch_npu.npu_kv_quant_sparse_flash_attention(
+        q, kv, kv, sparse, **common
+    )
+    actual_v2 = kv_quant_sparse_flash_attention(
+        q, kv, kv, sparse, return_softmax_lse=True, **common
+    )
+    torch.npu.synchronize()
+    torch.testing.assert_close(actual_v1.cpu(), expected_v1, rtol=0.02, atol=2.0e-4)
+    expected_v2 = expected_v1 * (case[3] / (case[3] + 1))
+    torch.testing.assert_close(actual_v2[0].cpu(), expected_v2, rtol=0.02, atol=2.0e-4)
+    torch.testing.assert_close(
+        actual_v2[1].cpu(), torch.zeros_like(actual_v2[1].cpu()), rtol=0, atol=1.0e-6
+    )
+    torch.testing.assert_close(
+        actual_v2[2].cpu(),
+        torch.full_like(actual_v2[2].cpu(), case[3] + 1),
+        rtol=0,
+        atol=1.0e-5,
+    )

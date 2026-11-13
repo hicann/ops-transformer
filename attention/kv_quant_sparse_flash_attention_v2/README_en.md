@@ -204,7 +204,7 @@ The released `kv_quant_sparse_flash_attention_v2` is a new operator designed for
       <tr>
           <td>rope_head_dim</td>
           <td>Optional attribute</td>
-          <td>Represents the size of rope_head_dim in the MLA architecture. It is valid only when attention_mode is 2 and supports only 64. The default value is 64.</td>
+          <td>Represents the size of rope_head_dim in the MLA architecture. It is valid only when attention_mode is 2. The default value is 64. INT8 per-tile mode on Atlas A2/A3 products supports 0 and 64; other modes support only 64.</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
@@ -248,6 +248,12 @@ The released `kv_quant_sparse_flash_attention_v2` is a new operator designed for
   - sparse\_block\_size supports only 1.
   - Only when layout_kv is PA_BSND does key support non-contiguous input along axis 0.
   - The optional input sinks is supported.
+- <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
+  - Q_N of query supports all integers from 1 to 128.
+  - The data types of key and value support only int8.
+  - sparse\_block\_size supports [1,16] and must be a power of two. In the PageAttention scenario, sparse\_block\_size must divide block\_size exactly.
+  - Only when layout_kv is PA_BSND do key and value support non-contiguous input along axis 0; all other axes must be contiguous. Non-contiguous input is not supported in non-PageAttention scenarios.
+  - When rope\_head\_dim is 0, only key\_quant\_mode=value\_quant\_mode=2, quant\_scale\_repo\_mode=1, and tile\_size=128 are supported. The Q_D of query is 512, and the KV_D of key/value is 528. Each slot consists of 512 INT8 values and 4 FLOAT32 scales.
 
 ## Invocation Description
 

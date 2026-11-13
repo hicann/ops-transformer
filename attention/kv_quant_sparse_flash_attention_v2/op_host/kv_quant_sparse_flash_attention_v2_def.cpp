@@ -18,7 +18,7 @@
 namespace ops {
 class KvQuantSparseFlashAttentionV2 : public OpDef {
 public:
-    explicit KvQuantSparseFlashAttentionV2(const char *name)
+    explicit KvQuantSparseFlashAttentionV2(const char* name)
         : OpDef(name)
     {
         this->Input("query")
@@ -30,8 +30,8 @@ public:
             .ParamType(REQUIRED)
             .DataType({ge::DT_INT8, ge::DT_INT8})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("value").ParamType(REQUIRED).Follow("key").AutoContiguous();
+            .IgnoreContiguous();
+        this->Input("value").ParamType(REQUIRED).Follow("key").IgnoreContiguous();
         this->Input("sparse_indices")
             .ParamType(REQUIRED)
             .DataType({ge::DT_INT32, ge::DT_INT32})

@@ -104,6 +104,7 @@ public:
     __aicore__ inline void CopyOutMrgeResultOptimized(int64_t mte2Size, int64_t mte3Size, int64_t s2GmStartOffset,
                                                       int64_t mergeMte3Idx, const RunInfo& kvVecRunInfo);
     __aicore__ inline int64_t GetKeyBNBOffset(int64_t realS2Idx, const RunInfo& kvVecRunInfo, int64_t s2IdLimit);
+    __aicore__ inline int64_t GetPackedKvOffset(int64_t tokenOffset, int64_t rowSize) const;
     __aicore__ inline void GetRealS2Idx(int64_t s2GmOffset, int64_t& realS2Idx, int64_t topkGmBaseOffset,
                                         const RunInfo& kvVecRunInfo);
     __aicore__ inline void SetInfInBlk(const LocalTensor<T>& mmResUb, uint32_t kvDealRows, uint32_t kvColumns,
@@ -828,6 +829,17 @@ __aicore__ inline void QSFAVectorService<QSFAT>::GetRealS2Idx(int64_t s2GmOffset
 }
 
 template <typename QSFAT>
+__aicore__ inline int64_t QSFAVectorService<QSFAT>::GetPackedKvOffset(int64_t tokenOffset, int64_t rowSize) const
+{
+    if constexpr (PAGE_ATTENTION) {
+        const int64_t pageSize = kvVecConstInfo.kvCacheBlockSize * kvVecConstInfo.kvHeadNum;
+        const int64_t pageStride = tilingData->baseParams.keyStride0;
+        return (tokenOffset / pageSize) * pageStride + (tokenOffset % pageSize) * rowSize;
+    }
+    return tokenOffset * rowSize;
+}
+
+template <typename QSFAT>
 __aicore__ inline int64_t QSFAVectorService<QSFAT>::GetKeyBNBOffset(int64_t realS2Idx, const RunInfo& kvVecRunInfo,
                                                                     int64_t s2IdLimit)
 {
@@ -966,7 +978,7 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyInSingleKv(int64_t& mte2Siz
         padParams.paddingValue = 0;
         DataCopyPad(
             kvMergUb_[mergeMte3Idx % 2 * INPUT1_BUFFER_OFFSET / sizeof(KV_T) + (mte2Size - mte3Size) * combineDimAlign],
-            keyGm_[keyBNBOffset * combineDim], intriParams, padParams);
+            keyGm_[GetPackedKvOffset(keyBNBOffset, combineDim)], intriParams, padParams);
     }
     mte2Size += validS2Count;
 }
@@ -988,15 +1000,15 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyInKv(int64_t& mte2Size, int
         return;
     }
 
-    int64_t sparseBlockSrcStride =
-        ((keyBNBOffset1 > keyBNBOffset2 ? (keyBNBOffset1 - keyBNBOffset2) : (keyBNBOffset2 - keyBNBOffset1)) -
-         kvVecConstInfo.sparseBlockSize);
-    uint32_t combineBytes =
+    const uint32_t combineBytes =
         (kvVecConstInfo.keyQuantMode == QUANT_MODE::TQ4) ?
             (kvVecConstInfo.headDim / 2 + kvVecConstInfo.headDimRope * sizeof(K_ROPE_T) + sizeof(half)) :
             (kvVecConstInfo.headDim * sizeof(KV_T) + kvVecConstInfo.headDimRope * sizeof(K_ROPE_T) +
              kvVecConstInfo.headDim / kvVecConstInfo.tileSize * sizeof(T));
-    int64_t keySrcStride = sparseBlockSrcStride * combineBytes;
+    const int64_t firstOffset = GetPackedKvOffset(keyBNBOffset1, combineBytes);
+    const int64_t secondOffset = GetPackedKvOffset(keyBNBOffset2, combineBytes);
+    const int64_t offsetDistance = firstOffset > secondOffset ? firstOffset - secondOffset : secondOffset - firstOffset;
+    const int64_t keySrcStride = offsetDistance - static_cast<int64_t>(kvVecConstInfo.sparseBlockSize) * combineBytes;
     if (unlikely(keySrcStride >= INT32_MAX || keySrcStride < 0 ||
                  realS2Idx1 + kvVecConstInfo.sparseBlockSize >= s2IdLimit ||
                  realS2Idx2 + kvVecConstInfo.sparseBlockSize >= s2IdLimit) ||
@@ -1027,7 +1039,7 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyInKv(int64_t& mte2Size, int
             padParams.paddingValue = 0;
             DataCopyPad(kvMergUb_[mergeMte3Idx % 2 * INPUT1_BUFFER_OFFSET / sizeof(KV_T) +
                                   (mte2Size - mte3Size) * combineDimAlign],
-                        keyGm_[startGmOffset * combineDim], intriParams, padParams);
+                        keyGm_[GetPackedKvOffset(startGmOffset, combineDim)], intriParams, padParams);
         }
         mte2Size += ((keyBNBOffset1 > -1) + (keyBNBOffset2 > -1)) * kvVecConstInfo.sparseBlockSize;
     }
@@ -1905,7 +1917,7 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyInSingleKvOptimized(int64_t
         padParams.paddingValue = 0;
         DataCopyPad(
             kvMergUb_[(mergeMte3Idx % MTE2_SLOT_NUM) * mte2SlotElems_ + (mte2Size - mte3Size) * combineDimAlign_],
-            keyGm_[keyBNBOffset * combineDim_], intriParams, padParams);
+            keyGm_[GetPackedKvOffset(keyBNBOffset, combineDim_)], intriParams, padParams);
     }
     mte2Size += validS2Count;
 }
@@ -1922,10 +1934,10 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyInKvOptimized(int64_t& mte2
         return;
     }
 
-    int64_t sparseBlockSrcStride =
-        ((keyBNBOffset1 > keyBNBOffset2 ? (keyBNBOffset1 - keyBNBOffset2) : (keyBNBOffset2 - keyBNBOffset1)) -
-         sparseBlockSize_);
-    int64_t keySrcStride = sparseBlockSrcStride * static_cast<int64_t>(combineBytes_);
+    const int64_t firstOffset = GetPackedKvOffset(keyBNBOffset1, combineBytes_);
+    const int64_t secondOffset = GetPackedKvOffset(keyBNBOffset2, combineBytes_);
+    const int64_t offsetDistance = firstOffset > secondOffset ? firstOffset - secondOffset : secondOffset - firstOffset;
+    const int64_t keySrcStride = offsetDistance - static_cast<int64_t>(kvVecConstInfo.sparseBlockSize) * combineBytes_;
     if (unlikely(keySrcStride >= INT32_MAX || keySrcStride < 0 ||
                  realS2Idx1 + kvVecConstInfo.sparseBlockSize >= s2IdLimit ||
                  realS2Idx2 + kvVecConstInfo.sparseBlockSize >= s2IdLimit) ||
@@ -1954,7 +1966,7 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyInKvOptimized(int64_t& mte2
             padParams.paddingValue = 0;
             DataCopyPad(
                 kvMergUb_[(mergeMte3Idx % MTE2_SLOT_NUM) * mte2SlotElems_ + (mte2Size - mte3Size) * combineDimAlign_],
-                keyGm_[startGmOffset * combineDim_], intriParams, padParams);
+                keyGm_[GetPackedKvOffset(startGmOffset, combineDim_)], intriParams, padParams);
         }
         mte2Size += ((keyBNBOffset1 > -1) + (keyBNBOffset2 > -1)) * kvVecConstInfo.sparseBlockSize;
     }
@@ -2430,23 +2442,27 @@ __aicore__ inline void QSFAVectorService<QSFAT>::MergeKvOptimized(const RunInfo&
                 int64_t ubBase = (qsfaMergeMte3Idx % MTE2_SLOT_NUM) * mte2SlotElems_;
                 for (int32_t j = 0; j < rows; j += 2) {
                     int64_t p0, p1;
-                    p0 = v0ValidSizeUb_.GetValue(512 + queryCacheBase + row + j);
-                    p1 = j + 1 < rows ? v0ValidSizeUb_.GetValue(512 + queryCacheBase + row + j + 1) : -1;
+                    // The cache stores physical token offsets. Translate them to
+                    // actual GM offsets using the page stride before merging DMA reads.
+                    p0 = GetPackedKvOffset(v0ValidSizeUb_.GetValue(512 + queryCacheBase + row + j), combineDim_);
+                    p1 = j + 1 < rows ? GetPackedKvOffset(v0ValidSizeUb_.GetValue(512 + queryCacheBase + row + j + 1),
+                                                          combineDim_) :
+                                        -1;
                     int64_t lo = p0 < p1 ? p0 : p1;
                     int64_t gap = p0 > p1 ? p0 - p1 : p1 - p0;
-                    int64_t stride = (gap - 1) * 528;
+                    int64_t stride = gap - combineBytes_;
                     if (j + 1 < rows && p0 >= 0 && p1 >= 0 && stride >= 0 && stride < INT32_MAX) {
                         kvParams.blockCount = 2;
                         kvParams.srcStride = stride;
-                        DataCopyPad(kvMergUb_[ubBase + j * 544], keyGm_[lo * 528], kvParams, kvPadding);
+                        DataCopyPad(kvMergUb_[ubBase + j * 544], keyGm_[lo], kvParams, kvPadding);
                     } else {
                         kvParams.blockCount = 1;
                         kvParams.srcStride = 0;
                         if (p0 >= 0) {
-                            DataCopyPad(kvMergUb_[ubBase + j * 544], keyGm_[p0 * 528], kvParams, kvPadding);
+                            DataCopyPad(kvMergUb_[ubBase + j * 544], keyGm_[p0], kvParams, kvPadding);
                         }
                         if (j + 1 < rows && p1 >= 0) {
-                            DataCopyPad(kvMergUb_[ubBase + (j + 1) * 544], keyGm_[p1 * 528], kvParams, kvPadding);
+                            DataCopyPad(kvMergUb_[ubBase + (j + 1) * 544], keyGm_[p1], kvParams, kvPadding);
                         }
                     }
                 }

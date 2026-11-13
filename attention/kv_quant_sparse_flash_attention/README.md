@@ -240,6 +240,6 @@ TQ4 当前面向 Ascend 910B 的 MLA-absorb 场景，query 支持 FLOAT16/BFLOAT
   - query Q_N支持1-128；
   - 参数key、value数据类型仅支持int8数据类型。
   - 参数sparse\_block\_size支持[1,16]，且要求是2的幂次方，在PageAttention场景下要求sparse\_block\_size整除block\_size。
-  - key不支持非连续。
+  - 仅在layout_kv为PA_BSND时，key、value支持0轴非连续；其余轴必须连续。非PageAttention场景不支持非连续。
   - 当rope\_head\_dim为0时，仅支持key\_quant\_mode=value\_quant\_mode=2、quant\_scale\_repo\_mode=1、tile\_size=128；query的Q_D为512，key/value的KV_D为528，每个槽位由512个INT8值和4个FLOAT32 scale组成。
   - TQ4 INT4 模式（key\_quant\_mode=3、value\_quant\_mode=3）支持。

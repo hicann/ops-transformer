@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <array>
 #include <gtest/gtest.h>
 #include "tiling_case_executor.h"
 #include "tiling_context_faker.h"
@@ -20,7 +21,8 @@ gert::StorageShape MakeStorageShape(const gert::Shape& shape)
     result.MutableStorageShape() = shape;
     return result;
 }
-void CheckArch22Tiling(int64_t heads, const std::string& soc, bool statistics, bool tnd, ge::graphStatus expected)
+void CheckArch22Tiling(int64_t heads, const std::string& soc, bool statistics, bool tnd, ge::graphStatus expected,
+                       bool pageStride = false)
 {
     struct CompileInfo {
     } compileInfo;
@@ -59,6 +61,15 @@ void CheckArch22Tiling(int64_t heads, const std::string& soc, bool statistics, b
          {"rope_head_dim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
          {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(statistics)}},
         &compileInfo, soc, 64, 262144, 16384);
+    if (pageStride) {
+        for (size_t input : {1U, 2U}) {
+            auto& desc = context.inputTensorDesc_[input];
+            desc.hasStride_ = true;
+            for (size_t axis = 0; axis < 4; ++axis) {
+                desc.stride_.SetStride(axis, std::array<int64_t, 4>{11008, 656, 656, 1}[axis]);
+            }
+        }
+    }
     uint64_t expectedKey = 1154U + (tnd ? 4U : 0U) + (heads > 64 ? 16384U : 0U);
     ExecuteTestCase(context, expected, expectedKey);
 }
@@ -91,4 +102,11 @@ TEST(KvQuantSparseFlashAttentionV2Arch22, InvalidHeadCounts)
 {
     CheckArch22Tiling(0, "Ascend910B", true, false, ge::GRAPH_FAILED);
     CheckArch22Tiling(129, "Ascend910B", true, false, ge::GRAPH_FAILED);
+}
+
+TEST(KvQuantSparseFlashAttentionV2Arch22, NonContiguousPageStride)
+{
+    for (const std::string soc : {"Ascend910B", "Ascend910_93"}) {
+        CheckArch22Tiling(4, soc, true, true, ge::GRAPH_SUCCESS, true);
+    }
 }

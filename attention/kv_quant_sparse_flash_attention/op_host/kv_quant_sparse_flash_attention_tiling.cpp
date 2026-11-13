@@ -2156,6 +2156,24 @@ ge::graphStatus QSFAInfoParser::GetActualseqInfo()
 ge::graphStatus QSFAInfoParser::CheckContiguous() const
 {
     if (!(isA5_ || isA6_)) {
+        if (keyStride0_ != 0 && keyShape_.GetDimNum() > 0) {
+            const auto* strides = context_->GetDynamicInputStride(KEY_INPUT_INDEX, 0);
+            const int64_t lastAxis = static_cast<int64_t>(keyShape_.GetDimNum()) - 1;
+            int64_t expected = 1;
+            for (int64_t axis = lastAxis; axis >= 1; --axis) {
+                OP_CHECK_IF(keyShape_.GetDim(axis) > 1 && strides->GetStride(axis) != expected,
+                            OP_LOGE(opName_, "Key inner axes must be contiguous"), return ge::GRAPH_FAILED);
+                expected *= keyShape_.GetDim(axis);
+            }
+            if (kvLayout_ == QSFALayout::PA_BSND) {
+                OP_CHECK_IF(keyStride0_ < expected || static_cast<uint64_t>(keyStride0_) > UINT32_MAX,
+                            OP_LOGE(opName_, "Key page stride must cover a full page and fit in uint32"),
+                            return ge::GRAPH_FAILED);
+            } else {
+                OP_CHECK_IF(keyShape_.GetDim(0) > 1 && keyStride0_ != expected,
+                            OP_LOGE(opName_, "Key must be contiguous for non-PA layouts"), return ge::GRAPH_FAILED);
+            }
+        }
         return ge::GRAPH_SUCCESS;
     }
     bool keyNonContiguous = false;
@@ -2234,16 +2252,11 @@ void QSFAInfoParser::GenerateInfo(QSFATilingInfo& qsfaInfo)
     qsfaInfo.blockTypeSize = sizeof(float);
     qsfaInfo.maxBlockNumPerBatch = maxBlockNumPerBatch_;
 
-    if (!(isA5_ || isA6_)) {
-        qsfaInfo.keyStride0 = 0; // 910无需使用stride
-    } else {
-        if (keyStride0_ != 0) {
-            qsfaInfo.keyStride0 = keyStride0_;
-        } else if (kvLayout_ == QSFALayout::PA_BSND) {
-            qsfaInfo.keyStride0 = blockSize_ * dSizeKV_;
-        } else {
-            qsfaInfo.keyStride0 = 0; // 非PA无需使用stride
-        }
+    qsfaInfo.keyStride0 = 0;
+    if (keyStride0_ != 0) {
+        qsfaInfo.keyStride0 = keyStride0_;
+    } else if (kvLayout_ == QSFALayout::PA_BSND) {
+        qsfaInfo.keyStride0 = blockSize_ * dSizeKV_;
     }
 
     FillTilingInfoAttrsAndLayouts(qsfaInfo);

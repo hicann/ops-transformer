@@ -633,7 +633,7 @@ public:
     gert::Shape valueShape_{};
     gert::Shape sparseIndicesShape_{};
 
-    uint32_t keyStride0_ = 0;
+    int64_t keyStride0_ = 0;
     uint32_t keyStride1_ = 0;
 };
 
