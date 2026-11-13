@@ -403,6 +403,23 @@ aclnnStatus aclnnMhcPreSinkhornGetWorkspaceSize(const aclTensor* x, const aclTen
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
+    // 输出仅支持连续 tensor: kernel 按连续 flat 布局直写输出, 非连续输出直接报错。
+    // needBackward=false 时 kernel 不写后 5 个输出, 无需约束。
+    auto checkOutContiguous = [](const aclTensor* t, const char* name) -> bool {
+        if (!IsContiguous(t)) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must be contiguous: non-contiguous output is not supported.", name);
+            return false;
+        }
+        return true;
+    };
+    CHECK_RET(checkOutContiguous(hin, "hin") && checkOutContiguous(hPost, "hPost") && checkOutContiguous(hRes, "hRes"),
+              ACLNN_ERR_PARAM_INVALID);
+    if (needBackward) {
+        CHECK_RET(checkOutContiguous(hPre, "hPre") && checkOutContiguous(hcBeforeNorm, "hcBeforeNorm") &&
+                      checkOutContiguous(invRms, "invRms") && checkOutContiguous(sumOut, "sumOut") &&
+                      checkOutContiguous(normOut, "normOut"),
+                  ACLNN_ERR_PARAM_INVALID);
+    }
     const aclTensor* xContiguous = l0op::Contiguous(x, uniqueExecutor.get());
     CHECK_RET(xContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     const aclTensor* phiContiguous = l0op::Contiguous(phi, uniqueExecutor.get());

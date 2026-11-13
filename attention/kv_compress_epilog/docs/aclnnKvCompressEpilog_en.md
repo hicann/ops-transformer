@@ -118,7 +118,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>UINT8</td>
       <td>ND</td>
       <td>[blockNum, blockSize, 1, headDim]</td>
-      <td>×</td>
+      <td>√ (blockNum dimension only)</td>
     </tr>
     <tr>
       <td>x (const aclTensor*)</td>
@@ -128,7 +128,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>BFLOAT16</td>
       <td>ND</td>
       <td>[bs, d]</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>slotMapping (const aclTensor*)</td>
@@ -138,7 +138,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>INT32, INT64</td>
       <td>ND</td>
       <td>[bs]</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>quantGroupSize (int64_t)</td>
@@ -229,7 +229,7 @@ aclnnStatus aclnnKvCompressEpilog(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>cacheRef, x, or slotMapping is an empty tensor.</td>
+      <td>cacheRef, x, or slotMapping is an empty tensor; or the cacheRef layout violates the constraint (must be contiguous or non-contiguous only along the blockNum dimension).</td>
     </tr>
   </tbody></table>
 

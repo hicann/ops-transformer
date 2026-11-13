@@ -136,7 +136,7 @@ aclnnStatus aclnnIndexerQuantCache(
       <td>FLOAT16, BFLOAT16</td>
       <td>ND</td>
       <td>[bs, d]</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>slotMapping (const aclTensor*)</td>
@@ -146,7 +146,7 @@ aclnnStatus aclnnIndexerQuantCache(
       <td>INT32</td>
       <td>ND</td>
       <td>[bs]</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>quantMode (int64_t)</td>
@@ -229,7 +229,7 @@ aclnnStatus aclnnIndexerQuantCache(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>cacheRef, x, or slotMapping is an empty tensor.</td>
+      <td>cacheRef, x, or slotMapping is an empty tensor; or the cacheRef/cacheScaleRef layout violates the constraint (must be contiguous or non-contiguous only along the blockNum dimension).</td>
     </tr>
   </tbody></table>
 

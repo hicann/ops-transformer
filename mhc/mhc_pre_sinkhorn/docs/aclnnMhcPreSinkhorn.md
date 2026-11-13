@@ -364,8 +364,8 @@ aclnnStatus aclnnMhcPreSinkhorn(
       <td>传入参数是必选输入，输出或者必选属性，且是空指针。</td>
     </tr>
     <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">161002</td>
+      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="4">161002</td>
       <td>输入变量的数据类型、shape维度和数据格式不在支持的范围内。</td>
     </tr>
     <tr>
@@ -373,6 +373,9 @@ aclnnStatus aclnnMhcPreSinkhorn(
     </tr>
     <tr>
       <td>n值非4。</td>
+    </tr>
+    <tr>
+      <td>输出Tensor为非连续Tensor。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>

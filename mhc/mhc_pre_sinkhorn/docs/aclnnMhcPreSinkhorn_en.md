@@ -366,8 +366,8 @@ aclnnStatus aclnnMhcPreSinkhorn(
       <td>The input parameter is a required input, output, or attribute and is a null pointer.</td>
     </tr>
     <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">161002</td>
+      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="4">161002</td>
       <td>The data type, shape dimension, and data format of the input variables are not within the supported range.</td>
     </tr>
     <tr>
@@ -375,6 +375,9 @@ aclnnStatus aclnnMhcPreSinkhorn(
     </tr>
     <tr>
       <td>The value of n is not 4.</td>
+    </tr>
+    <tr>
+      <td>An output tensor is non-contiguous.</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>

@@ -116,7 +116,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>UINT8</td>
       <td>ND</td>
       <td>[blockNum, blockSize, 1, headDim]</td>
-      <td>×</td>
+      <td>√（仅blockNum维）</td>
     </tr>
     <tr>
       <td>x（const aclTensor*）</td>
@@ -126,7 +126,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>BFLOAT16</td>
       <td>ND</td>
       <td>[bs, d]</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>slotMapping（const aclTensor*）</td>
@@ -136,7 +136,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>INT32、INT64</td>
       <td>ND</td>
       <td>[bs]</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>quantGroupSize（int64_t）</td>
@@ -227,7 +227,7 @@ aclnnStatus aclnnKvCompressEpilog(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>cacheRef、x或slotMapping为空Tensor。</td>
+      <td>cacheRef、x或slotMapping为空Tensor；cacheRef布局不符合约束（须连续或仅blockNum维非连续）。</td>
     </tr>
   </tbody></table>
 

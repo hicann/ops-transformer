@@ -459,7 +459,7 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
         <td>FLOAT16, BFLOAT16</td>
         <td>ND</td>
         <td>(B,S,N,C) or (T,N,C)</td>
-        <td>-</td>
+        <td>√</td>
     </tr>
     <tr>
         <td>gradPhi(aclTensor *)</td>
@@ -469,7 +469,7 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
         <td>FLOAT32</td>
         <td>ND</td>
         <td>(2N+N^2, N*C)</td>
-        <td>-</td>
+        <td>√</td>
     </tr>
     <tr>
         <td>gradAlpha(aclTensor *)</td>
@@ -479,7 +479,7 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
         <td>FLOAT32</td>
         <td>ND</td>
         <td>(3)</td>
-        <td>-</td>
+        <td>√</td>
     </tr>
     <tr>
         <td>gradBias(aclTensor *)</td>
@@ -489,7 +489,7 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
         <td>FLOAT32</td>
         <td>ND</td>
         <td>(2N+N^2)</td>
-        <td>-</td>
+        <td>√</td>
     </tr>
     <tr>
       <td>workspaceSize(uint64_t *)</td>

@@ -134,7 +134,7 @@ aclnnStatus aclnnIndexerQuantCache(
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>[bs, d]</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>slotMapping（const aclTensor*）</td>
@@ -144,7 +144,7 @@ aclnnStatus aclnnIndexerQuantCache(
       <td>INT32</td>
       <td>ND</td>
       <td>[bs]</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>quantMode（int64_t）</td>
@@ -227,7 +227,7 @@ aclnnStatus aclnnIndexerQuantCache(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>cacheRef、x或slotMapping为空Tensor。</td>
+      <td>cacheRef、x或slotMapping为空Tensor；cacheRef/cacheScaleRef布局不符合约束（须连续或仅blockNum维非连续）。</td>
     </tr>
   </tbody></table>
 
