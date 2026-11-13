@@ -46,9 +46,8 @@ __aicore__ inline void AllGatherQuantMatmulUbmemKernelImpl(GM_ADDR hcclContext, 
     using LayoutB = typename AscendC::Std::conditional_t<!isX2Nz, asc::te::dn_ext_layout_ptn, asc::te::nz_layout_ptn>;
     using LayoutC = asc::te::nd_ext_layout_ptn;
 
-    using DispatchPolicy = MatmulWithScaleMx<0, false>;
     using BlockMmad =
-        Block::BlockMmad<DispatchPolicy, TypeA, LayoutA, TypeB, LayoutB, TypeC, LayoutC, BiasType, LayoutC>;
+        Block::QmmMxBlockMmadTileKWaitFlag<0, false, TypeA, LayoutA, TypeB, LayoutB, TypeC, LayoutC, BiasType, LayoutC>;
     using BlockScheduler = Block::BlockSchedulerQuantBatchMatmulV3<asc::te::shape<int64_t, int64_t, int64_t, int64_t>,
                                                                    0, LayoutA, LayoutB, TypeA>;
     using BlockEpilogue = Block::BlockEpilogueEmpty;
@@ -92,12 +91,13 @@ __aicore__ inline void AllGatherQuantMatmulUbmemKernelImpl(GM_ADDR hcclContext, 
                                                                            tilingData->baseK,
                                                                            0,
                                                                            tilingData->dbL0c};
+    (void)allGatherDataOut;
+    (void)allGatherScalesOut;
+
     params.hcclContext = hcclContext;
     params.tilingGM = tilingGM;
     params.x1Addr = x1;
     params.x1ScaleAddr = x1Scale;
-    params.allGatherDataOutAddr = allGatherDataOut;
-    params.allGatherScalesOutAddr = allGatherScalesOut;
 
     Impl impl;
     impl(params);

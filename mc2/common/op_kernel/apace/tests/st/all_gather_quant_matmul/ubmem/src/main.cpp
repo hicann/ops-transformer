@@ -31,6 +31,8 @@
 #include "hccl/hccl.h"
 #include "apace_st_utils.h"
 #include "apace/utils/apace_constant.h"
+#include "apace/core/aiv_comm/collective_comm_context.h"
+#include "apace/utils/comm_channel_builder.h"
 #include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
 #include "apace/tiling/matmul_tiling/quant_matmul_tiling_data.h"
 #include "tiling/hccl/hccl_tiling.h"
@@ -40,7 +42,6 @@ extern "C" HcclResult HcclCommInitAll(uint32_t commNum, int32_t* devIds, HcclCom
 extern "C" HcclResult HcclCommDestroy(HcclComm comm);
 extern "C" HcclResult HcclGetCommName(HcclComm comm, char* commName);
 extern "C" HcclResult HcomGetCommHandleByGroup(const char* groupName, void** commHandle);
-extern "C" HcclResult HcclAllocComResourceByTiling(HcclComm comm, void* stream, void* mc2Tiling, void** commContext);
 
 static constexpr int32_t BENCHMARK_ITERATIONS = 20;
 static constexpr int64_t MAX_RANK_NUM = 64;
@@ -114,21 +115,10 @@ void ParseArgs(int argc, char* argv[], int* m, int* k, int* n, int* rankNum, std
     }
 }
 
-struct UbmemHostTilingData {
-    Mc2InitTiling mc2InitTiling;
-    Mc2CcTiling mc2CcTiling;
-    QuantMatmulTilingData mmTile;
-};
-
-int CreateTilingDataAndContext(const char* hcomName, aclrtStream stream, int m, int k, int n, int rankNum, bool isNz,
+int CreateTilingDataAndContext(const char* hcomName, int m, int k, int n, int rankNum, bool isNz,
                                void** deviceTilingAddr, void** deviceContextAddr, uint32_t* usedCoreNum)
 {
-    UbmemHostTilingData* tilingData = new UbmemHostTilingData();
-    if (tilingData == nullptr) {
-        ERROR_LOG("tilingData alloc failed");
-        return -1;
-    }
-    *tilingData = {};
+    QuantMatmulTilingData mmTile = {};
 
     uint64_t totalM = static_cast<uint64_t>(m) * static_cast<uint64_t>(rankNum);
     QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN, mm::BiasDataType::DT_FLOAT>
@@ -136,49 +126,32 @@ int CreateTilingDataAndContext(const char* hcomName, aclrtStream stream, int m, 
     tilingEngine.SetOptimizeEnable(false);
     tilingEngine.SetMTailAlignEnable(true);
     bool transB = !isNz;
-    tilingEngine.GetTilingData(totalM, static_cast<uint64_t>(n), static_cast<uint64_t>(k), false, transB,
-                               tilingData->mmTile);
+    tilingEngine.GetTilingData(totalM, static_cast<uint64_t>(n), static_cast<uint64_t>(k), false, transB, mmTile);
 
-    *usedCoreNum = tilingData->mmTile.usedCoreNum;
+    *usedCoreNum = mmTile.usedCoreNum;
     INFO_LOG("Tiling: M=%d, K=%d, N=%d, rankNum=%d, isNz=%d, transB=%d, usedCoreNum=%u", m, k, n, rankNum, isNz, transB,
              *usedCoreNum);
 
-    AscendC::Mc2CcTilingConfig mc2CcTilingConfig(hcomName, 6, "AlltoAll=level0:fullmesh;level1:pairwise");
-    mc2CcTilingConfig.SetCommEngine(3);
-    int ret = mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling);
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("GetTiling mc2InitTiling failed. ret = %d", ret); delete tilingData;
-              return ret);
-    ret = mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling);
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("GetTiling mc2CcTiling failed. ret = %d", ret); delete tilingData;
-              return ret);
+    HcclComm commHandle;
+    int ret = HcomGetCommHandleByGroup(hcomName, reinterpret_cast<void**>(&commHandle));
+    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("HcomGetCommHandleByGroup failed. ret = %d", ret); return ret);
+
+    // 与 torch-ext 一致：CommChannelBuilder<UBMEM>::CreateDeviceContext 按 tag 幂等复用 engine ctx，
+    // 建链时清零内置 buffer 并填充 rankId/rankSize/commBufferAddrs[]
+    CommChannelBuilder<ChannelMode::UBMEM> builder(commHandle);
+    Apace::AivComm::CommUbmemContext hostContext = {};
+    void* ubmemContext =
+        builder.CreateDeviceContext(&hostContext, sizeof(hostContext), "apace_agm_ubmem", &hostContext);
+    CHECK_RET(ubmemContext != nullptr, ERROR_LOG("CreateDeviceContext failed"); return -1);
 
     int mmTileSize = sizeof(QuantMatmulTilingData);
     ret = aclrtMalloc(deviceTilingAddr, mmTileSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("aclrtMalloc TilingData failed. ret = %d", ret); delete tilingData;
-              return ret);
-    ret = aclrtMemcpy(*deviceTilingAddr, mmTileSize, &tilingData->mmTile, mmTileSize, ACL_MEMCPY_HOST_TO_DEVICE);
+    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("aclrtMalloc TilingData failed. ret = %d", ret); return ret);
+    ret = aclrtMemcpy(*deviceTilingAddr, mmTileSize, &mmTile, mmTileSize, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("aclrtMemcpy TilingData failed. ret = %d", ret);
-              aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; delete tilingData; return ret);
+              aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; return ret);
 
-    HcclComm commHandle;
-    ret = HcomGetCommHandleByGroup(hcomName, reinterpret_cast<void**>(&commHandle));
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("HcomGetCommHandleByGroup failed. ret = %d", ret);
-              aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; delete tilingData; return ret);
-
-    void* mc2Context = nullptr;
-    ret = HcclAllocComResourceByTiling(commHandle, stream, tilingData, &mc2Context);
-    CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("HcclAllocComResourceByTiling failed. ret = %d", ret);
-              aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; delete tilingData; return ret);
-    if (mc2Context == nullptr) {
-        ERROR_LOG("mc2Context is nullptr");
-        aclrtFree(*deviceTilingAddr);
-        *deviceTilingAddr = nullptr;
-        delete tilingData;
-        return -1;
-    }
-    *deviceContextAddr = mc2Context;
-
-    delete tilingData;
+    *deviceContextAddr = ubmemContext;
     return ACL_SUCCESS;
 }
 
@@ -208,8 +181,8 @@ int LaunchOneThread(Args& args)
     void* tilingAddr = nullptr;
     void* mc2ContextAddr = nullptr;
     uint32_t usedCoreNum = 0;
-    ret = CreateTilingDataAndContext(hcomName, args.stream, args.m, args.k, args.n, args.rankDim, args.isNz,
-                                     &tilingAddr, &mc2ContextAddr, &usedCoreNum);
+    ret = CreateTilingDataAndContext(hcomName, args.m, args.k, args.n, args.rankDim, args.isNz, &tilingAddr,
+                                     &mc2ContextAddr, &usedCoreNum);
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("CreateTilingDataAndContext failed. ret = %d", ret); return ret);
 
     uint64_t m = args.m, k = args.k, n = args.n, rankNum = args.rankDim;

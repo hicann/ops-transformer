@@ -1,0 +1,8 @@
+# 运行产物（精度/性能结果 CSV 与 profiler 导出目录）不入库
+Profiling_Result_*/
+PROF_*/
+all_gather_matmul_v3_precision_result.csv
+all_gather_matmul_v3_performance_result.csv
+logs/
+extra-info/
+__pycache__/
