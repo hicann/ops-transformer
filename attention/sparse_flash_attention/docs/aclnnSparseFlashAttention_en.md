@@ -730,7 +730,7 @@ int ExecuteSparseFlashAttention(TensorResources& resources, aclrtStream stream,
                               void** workspaceAddr, uint64_t* workspaceSize) {
     int64_t d = 2;
     double scaleValue = 1 / sqrt(d);
-    int64_t sparseBlockSize = 64;
+    int64_t sparseBlockSize = 1;
     constexpr const char layerOutStr[] = "BSND";
     constexpr size_t layerOutLen = sizeof(layerOutStr);
     char layoutQuery[layerOutLen];
