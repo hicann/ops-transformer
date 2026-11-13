@@ -25,10 +25,10 @@
 
 ## Function
 
-- Description: Computes self-attention using the FlashAttention algorithm in training use cases. Supports the sink function to adapt to the gptoss model, benchmarking against competitor products. **The difference from the [aclnnFlashAttentionScoreV2](./aclnnFlashAttentionScoreV2_en.md) API is that the optional input `sinkInOptional` is added.**
+- Description: Computes self-attention using the FlashAttention algorithm in training use cases. Supports the sink function to adapt to the gptoss model, benchmarking against competitor products. **The difference from the [aclnnFlashAttentionScoreV2](./aclnnFlashAttentionScoreV2_en.md) API is that the optional input `sinkOptional` is added.**
 
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR&950DT products</term>: The sinkInOptional parameter is not currently supported.
+  - <term>Ascend 950PR&950DT products</term>: The sinkOptional parameter is not currently supported.
 
   <!-- end id7 -->
 
