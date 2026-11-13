@@ -2,6 +2,7 @@ pyyaml
 absl-py>=2.0.0
 jinja2>=3.1.0
 numpy<2.0
+ml-dtypes<0.6.0
 decorator
 sympy
 scipy

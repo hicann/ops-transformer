@@ -150,12 +150,12 @@ done
 
 # 1. 统一的依赖包列表
 COMMON_PKGS=(
-    "numpy>=1.21.6"
+    "numpy>=1.21.6,<2.0"
     "sympy>=1.10.1"
     "psutil>=5.9"
     "scipy>=1.7.3"
     "cloudpickle"
-    "ml-dtypes"
+    "ml-dtypes<0.6.0"
     "tornado"
     "absl-py"
     "decorator>=5.1.0"
@@ -200,6 +200,7 @@ install_python_deps() {
         current_ver=$(python3 -c "import numpy; print(numpy.__version__)" 2>/dev/null)
         if [ -n "$current_ver" ]; then
             echo "numpy $current_ver already installed, skipping pinned version."
+            echo "To install the required Python dependencies, run 'pip3 install -r requirements.txt' in a virtual environment from the repository root."
             return
         fi
     fi
@@ -570,7 +571,7 @@ install_googletest() {
     local curr_ver=""
     local gtest_src_dir="/usr/src/gtest"
 
-    if pkg-config --exists gtest; then
+    if command -v pkg-config &> /dev/null && pkg-config --exists gtest; then
         curr_ver=$(pkg-config --modversion gtest)
         echo "Current googletest version: $curr_ver"
         if version_ge "$curr_ver" "$req_ver"; then
@@ -583,6 +584,29 @@ install_googletest() {
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo "Skipping googletest installation"
         return
+    fi
+
+    if ! command -v pkg-config &> /dev/null; then
+        echo "Installing pkg-config for googletest detection..."
+        case "$OS" in
+            debian)
+                run_command $try_sudo $PKG_MANAGER update
+                run_command $try_sudo $PKG_MANAGER install -y pkg-config
+                ;;
+            rhel)
+                run_command $try_sudo $PKG_MANAGER install -y pkgconfig
+                ;;
+            euler)
+                run_command $try_sudo $PKG_MANAGER install -y pkgconf-pkg-config
+                ;;
+            macos)
+                run_command brew install pkgconf
+                ;;
+        esac
+        if ! command -v pkg-config &> /dev/null; then
+            echo "pkg-config installation failed"
+            exit 1
+        fi
     fi
 
     echo "Installing googletest..."

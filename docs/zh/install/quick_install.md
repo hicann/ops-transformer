@@ -109,6 +109,7 @@ docker run --name cann_container --device /dev/davinci0 --device /dev/davinci_ma
 - dos2unix
 - make
 - patch
+- pkg-config（用于检测 googletest；选择安装 googletest 时若缺失将自动安装）
 - googletest（仅执行UT时依赖，建议版本 [release-1.11.0](https://github.com/google/googletest/releases/tag/release-1.11.0)）
 
 上述依赖可通过项目脚本一键安装，操作步骤如下：
