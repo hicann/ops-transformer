@@ -9,15 +9,10 @@
 # -----------------------------------------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.18.4)
-
-# Only Ascend 950 has a PyPTO kernel implementation for this operator.
-if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT)
-    message(STATUS "[sparse_flash_mla_softmax_l1_norm] Skipped: PyPTO kernel only supports ascend950 (soc=${ASCEND_COMPUTE_UNIT})")
-    return()
-endif()
-
 require_pypto_pro(sparse_flash_mla_softmax_l1_norm)
 add_op_to_compiled_list()
+
+set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
 
 if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnn PRIVATE
@@ -28,13 +23,28 @@ if (BUILD_OPEN_PROJECT)
 endif()
 
 # ascend950 条件编译——缺少此项会导致 kernel binary 未编译
-set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
 if("${CONDITION_UNIT}" STREQUAL "ascend950")
     # PyPTO kernel: runs codegen at configure time and exposes PYPTO_GEN_DIR for the host tiling -I below.
     # Must be called BEFORE add_modules_sources(...) (which reads PYPTO_GEN_DIR).
     add_ops_compile_options(
         OP_NAME SparseFlashMlaSoftmaxL1Norm
         COMPUTE_UNIT Ascend950PR_9599
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
+endif()
+
+if("${CONDITION_UNIT}" STREQUAL "ascend960dt")
+    add_ops_compile_options(
+        OP_NAME SparseFlashMlaSoftmaxL1Norm
+        COMPUTE_UNIT ascend960dt_968B7
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
+endif()
+
+if("${CONDITION_UNIT}" STREQUAL "ascend960pr")
+    add_ops_compile_options(
+        OP_NAME SparseFlashMlaSoftmaxL1Norm
+        COMPUTE_UNIT Ascend960PR_969A1
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
 endif()

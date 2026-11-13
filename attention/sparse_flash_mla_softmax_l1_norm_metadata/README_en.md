@@ -73,7 +73,7 @@ The metadata output is an INT32 tensor with the shape fixed to (64,). The field 
 | formerCoreProcessNum | 1 | Number of seqs processed by regular cores, that is, ceil(totalNum / totalCoreNum). |
 | remainCoreProcessNum | 2 | Number of seqs processed by tail cores, that is, floor(totalNum / totalCoreNum). |
 | remainCoreNum | 3 | Number of tail cores. This value is 0 when totalNum is divisible by totalCoreNum, and is totalCoreNum - (totalNum % totalCoreNum) otherwise. |
-| totalCoreNum | 4 | Number of AIC cores actually used, which is min(totalNum, aicCoreNum, 36). |
+| totalCoreNum | 4 | Number of AIC cores actually used, which is min(totalNum, aicCoreNum, 80). |
 
 The strided partitioning method is used. The seq indexes processed by each core are arranged in steps of totalCoreNum across cores.
 

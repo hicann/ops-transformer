@@ -36,7 +36,8 @@ enum class SmlaLayout {
 
 enum class ValidSocVersion {
     ASCEND910 = 0,
-    ASCEND950
+    ASCEND950,
+    ASCEND960
 };
 
 inline bool IsTensorValid(Tensor* tensor)
@@ -116,7 +117,7 @@ private:
     int64_t topk_ = 0;
     int64_t maskMode_ = 0;
     int64_t cmpRatio_ = 1;
-    int64_t aicCoreNum_ = 36;
+    int64_t aicCoreNum_ = 80;
     std::string socVersion_;
     std::string layout_ = "BSND";
     std::string layoutK_ = "BSND";

@@ -8,7 +8,11 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""SparseFlashMlaSoftmaxL1Norm kernel (pypto-pro)."""
+"""SparseFlashMlaSoftmaxL1Norm A5 kernel (pypto-pro).
+
+一个 AIC 配两个 AIV：Cube 按 M 对半写出，两个 Vector 各算一半 G 与一半 K，
+再靠 AtomicAdd 拼成完整结果。
+"""
 
 import math
 from dataclasses import dataclass
@@ -17,12 +21,15 @@ import pypto_pro.language as pl
 from pypto_pro.runtime.tilingkey import TilingKeyField
 
 
+ACC_TO_VEC_MODE = pl.AccToVecMode.DualModeSplitM
+CV_SYNC_MODE = pl.CrossCoreSyncMode.INTRA_BLOCK
+
 # ================================================================
 #  Tile dimensions and constants
 # ================================================================
 TS = 1
 TG = 128
-TG_HALF = TG // 2
+TG_VEC = TG // 2
 TKV = 128
 TD = 128
 D_TOTAL = 512
@@ -49,7 +56,7 @@ CA1 = QK_F32
 CUBE_BUFFER_NUM = 2
 VEC_BUFFER_NUM = 2
 GATHER_ROW_NUM = 32
-VB4_KV = TG_HALF * TKV * 4 * VEC_BUFFER_NUM  # [TG_HALF, TKV] FP32 = 64KB
+VB4_KV = TG_VEC * TKV * 4 * VEC_BUFFER_NUM  # [TG_VEC, TKV] FP32 = 64KB
 VB4_GATHER = GATHER_ROW_NUM * D_TOTAL * 2 * VEC_BUFFER_NUM  # 64KB
 VB4_LSE = TG * 4 * VEC_BUFFER_NUM  # 1k
 VB4_OUT = TKV * 4 * VEC_BUFFER_NUM  # 1k
@@ -119,18 +126,16 @@ class SmlaTilingKey:
     IS_SPARSE = TilingKeyField(bits=1, values=[0, 1])
 
 
-def get_sparse_offset(const_info, run_info, first_core_half_s2_base_size):
+def get_sparse_offset(const_info, run_info, first_core_sub_s2_base_size):
     offset = 0
     if IS_TND == 1:
-        offset = (
-            run_info.t1_offset + run_info.s1_idx
-        ) * const_info.k_length + const_info.sub_id * first_core_half_s2_base_size
+        offset = (run_info.t1_offset + run_info.s1_idx) * const_info.k_length
     else:
         offset = (
             run_info.batch_id * const_info.s1_size * const_info.k_length
             + run_info.s1_idx * const_info.k_length
-            + const_info.sub_id * first_core_half_s2_base_size
         )
+    offset = offset + const_info.sub_id * first_core_sub_s2_base_size
     return offset
 
 
@@ -147,27 +152,26 @@ def get_seqused(seq_dim, has_seqused, seqused_tensor, batch_id):
 def gather_k(
     k_l1_db, k, sparse_indices, gather_nd_db, gather_nz_db, const_info, run_info
 ):
-    half_s2_base_size = _ceil_div(run_info.s2_base_size, 2)
-    first_core_half_s2_base_size = half_s2_base_size
-    current_core_half_s2_base_size = first_core_half_s2_base_size
+    first_core_sub_s2_base_size = _ceil_div(run_info.s2_base_size, 2)
+    current_core_sub_s2_base_size = first_core_sub_s2_base_size
     if const_info.sub_id == 1:
-        current_core_half_s2_base_size = (
-            run_info.s2_base_size - first_core_half_s2_base_size
+        current_core_sub_s2_base_size = (
+            run_info.s2_base_size - first_core_sub_s2_base_size
         )
 
-    loop_num = (current_core_half_s2_base_size + GATHER_ROW_NUM - 1) // GATHER_ROW_NUM
+    loop_num = (current_core_sub_s2_base_size + GATHER_ROW_NUM - 1) // GATHER_ROW_NUM
     key_l1_slot = k_l1_db.next()
     pl.set_validshape(key_l1_slot, [D_TOTAL, run_info.s2_base_size])
 
     sparse_indices_s1_offset = get_sparse_offset(
-        const_info, run_info, first_core_half_s2_base_size
+        const_info, run_info, first_core_sub_s2_base_size
     )
     for loop_idx in pl.range(loop_num):
         sparse_indices_k_offset = run_info.ki + loop_idx * GATHER_ROW_NUM
         gather_k_slot = gather_nd_db.next()
 
         if loop_idx == loop_num - 1:
-            actual_row_num = current_core_half_s2_base_size - loop_idx * GATHER_ROW_NUM
+            actual_row_num = current_core_sub_s2_base_size - loop_idx * GATHER_ROW_NUM
         else:
             actual_row_num = GATHER_ROW_NUM
         sparse_indices_s1k_offset = sparse_indices_s1_offset + sparse_indices_k_offset
@@ -196,12 +200,14 @@ def gather_k(
         pl.set_validshape(gather_k_nz_slot, [actual_row_num, D_TOTAL])
         pl.set_validshape(gather_k_slot, [actual_row_num, D_TOTAL])
         pl.move(gather_k_nz_slot, gather_k_slot)  # ND → NZ
+        insert_row_offset = (
+            const_info.sub_id * first_core_sub_s2_base_size + loop_idx * GATHER_ROW_NUM
+        )
         pl.insert(
             key_l1_slot,
             gather_k_nz_slot,
             [
-                const_info.sub_id * first_core_half_s2_base_size
-                + loop_idx * GATHER_ROW_NUM,
+                insert_row_offset,
                 0,
             ],
         )  # UB → L1
@@ -256,8 +262,7 @@ def compute_qk(
             pl.matmul_acc(qk_acc, qk_acc, qk_left, qk_right)
 
     qk_vec_slot = qk_vec_db.next()
-
-    pl.move(qk_vec_slot, qk_acc, acc_to_vec_mode=pl.AccToVecMode.DualModeSplitM)
+    pl.move(qk_vec_slot, qk_acc, acc_to_vec_mode=ACC_TO_VEC_MODE)
 
 
 @pl.pipeline.stage
@@ -323,8 +328,7 @@ def compute_qk_dense(
             pl.matmul_acc(qk_acc, qk_acc, qk_left, qk_right)
 
     qk_vec_slot = qk_vec_db.next()
-
-    pl.move(qk_vec_slot, qk_acc, acc_to_vec_mode=pl.AccToVecMode.DualModeSplitM)
+    pl.move(qk_vec_slot, qk_acc, acc_to_vec_mode=ACC_TO_VEC_MODE)
 
 
 # Alternative implementation using multiple pre-configured tiles
@@ -778,8 +782,16 @@ def sparse_flash_mla_softmax_l1_norm(
     )
 
     total_num_cores = pl.get_block_num()
-    core_id = pl.get_block_idx() // pl.get_subblock_num()
+    block_idx = pl.get_block_idx()
+    core_id = block_idx // pl.get_subblock_num()
     sub_id = pl.get_subblock_idx()
+    vec_owner = 1
+    # with pl.section_vector():
+    #     pl.printf(
+    #         "[luo] enter vec core=%d sub=%d block=%d\n", core_id, sub_id, block_idx
+    #     )
+    # with pl.section_cube():
+    #     pl.printf("[luo] enter cube core=%d block=%d\n", core_id, block_idx)
 
     has_seqused_q = tiling.has_seqused_q
     has_seqused_k = tiling.has_seqused_k
@@ -788,11 +800,11 @@ def sparse_flash_mla_softmax_l1_norm(
     sq_tiles = tensor_metadata[0]
     num_cores = tensor_metadata[4]
 
-    first_half_g = (tiling.g + 2 - 1) // 2
-    second_half_g = tiling.g - first_half_g
-    current_half_g = first_half_g
+    first_sub_g = (tiling.g + 2 - 1) // 2
+    second_sub_g = tiling.g - first_sub_g
+    current_sub_g = first_sub_g
     if sub_id == 1:
-        current_half_g = second_half_g
+        current_sub_g = second_sub_g
 
     const_info = pl.make_tuple(
         b_size=tiling.b,
@@ -807,8 +819,8 @@ def sparse_flash_mla_softmax_l1_norm(
         is_tnd=IS_TND,
         has_seqused_q=tiling.has_seqused_q,
         has_seqused_k=tiling.has_seqused_k,
-        first_g_size=first_half_g,
-        current_g_size=current_half_g,
+        first_g_size=first_sub_g,
+        current_g_size=current_sub_g,
         softmax_scale=tiling.softmax_scale,
         softmax_l1_norm_scale=1.0 / tiling.g,
         sub_id=sub_id,
@@ -857,13 +869,13 @@ def sparse_flash_mla_softmax_l1_norm(
     if IS_TND:
         run_info.next_t1_offset = tensor_cu_seqlens_q[1]
 
-    # common
+    # TileType 要在 kernel 里创建。模块级的 TileType 不能作为闭包传进来。
+    # 放在 section 外面，Cube 和 Vector 两次解析都能看到 qk_vec_db。
     qk_vec_db = pl.make_tile_group(
         type=pl.TileType(
-            shape=[TG_HALF, TKV],
+            shape=[TG_VEC, TKV],
             dtype=pl.DT_FP32,
             target_memory=pl.MemorySpace.Vec,
-            compact=0,
         ),
         addrs=VA0,
         mutex_ids=[0, 1],
@@ -993,15 +1005,28 @@ def sparse_flash_mla_softmax_l1_norm(
     tick = 0
     q_count = 0
     with pl.section_vector():
-        pl.system.set_cross_core(pipe=pl.PipeType.V, event_id=QK_READY_BACKWARD_IDS[0])
-        pl.system.set_cross_core(pipe=pl.PipeType.V, event_id=QK_READY_BACKWARD_IDS[1])
+        if vec_owner == 1:
+            pl.system.set_cross_core(
+                sync_mode=CV_SYNC_MODE,
+                pipe=pl.PipeType.V,
+                event_id=QK_READY_BACKWARD_IDS[0],
+            )
+            pl.system.set_cross_core(
+                sync_mode=CV_SYNC_MODE,
+                pipe=pl.PipeType.V,
+                event_id=QK_READY_BACKWARD_IDS[1],
+            )
     with pl.section_cube():
         if IS_SPARSE == 1:
             pl.system.set_cross_core(
-                pipe=pl.PipeType.MTE1, event_id=GATHER_READY_BACKWARD_IDS[0]
+                sync_mode=CV_SYNC_MODE,
+                pipe=pl.PipeType.MTE1,
+                event_id=GATHER_READY_BACKWARD_IDS[0],
             )
             pl.system.set_cross_core(
-                pipe=pl.PipeType.MTE1, event_id=GATHER_READY_BACKWARD_IDS[1]
+                sync_mode=CV_SYNC_MODE,
+                pipe=pl.PipeType.MTE1,
+                event_id=GATHER_READY_BACKWARD_IDS[1],
             )
 
     # init output start
@@ -1050,7 +1075,10 @@ def sparse_flash_mla_softmax_l1_norm(
             pl.set_validshape(init_ub_dst_slot, [1, init_num])
             pl.store(tensor_softmax_l1_norm_init, init_ub_dst_slot, [0, init_offset])
 
+        # 清零按核切分，计算按 S1 行切分，两套下标不是同一份数据。
+        # 这里等的是全部 AIV 把输出清完，不是同一个 AIC 里的第二个 AIV。
         pl.system.sync_all(core_type=pl.SyncCoreType.AIV_ONLY)
+        # pl.printf("[luo] init vec core=%d sub=%d\n", core_id, sub_id)
     # init output end
 
     _pl_sync_id = 0
@@ -1127,32 +1155,34 @@ def sparse_flash_mla_softmax_l1_norm(
             cur_q_slot = q_mat_db.next()
             pl.set_validshape(cur_q_slot, [const_info.g_size, D_TOTAL])
         with pl.section_vector():
-            lse_vec_slot = lse_vec_db.next()
-            if current_half_g > 0 and run_info.s2_real_size > 0:
-                pl.set_validshape(lse_vec_slot, [1, current_half_g])
-                if IS_TND == 1:
-                    pl.load(
-                        lse_vec_slot,
-                        tensor_lse,
-                        [
-                            0,
-                            run_info.t1_offset + run_info.s1_idx,
-                            const_info.sub_id * const_info.first_g_size,
-                        ],
-                        order=[1, 2],
-                    )
-                else:
-                    pl.load(
-                        lse_vec_slot,
-                        tensor_lse,
-                        [
-                            run_info.batch_id,
-                            0,
-                            run_info.s1_idx,
-                            const_info.sub_id * const_info.first_g_size,
-                        ],
-                        order=[1, 3],
-                    )
+            if vec_owner == 1:
+                lse_vec_slot = lse_vec_db.next()
+                if current_sub_g > 0 and run_info.s2_real_size > 0:
+                    pl.set_validshape(lse_vec_slot, [1, current_sub_g])
+                    lse_g_offset = const_info.sub_id * const_info.first_g_size
+                    if IS_TND == 1:
+                        pl.load(
+                            lse_vec_slot,
+                            tensor_lse,
+                            [
+                                0,
+                                run_info.t1_offset + run_info.s1_idx,
+                                lse_g_offset,
+                            ],
+                            order=[1, 2],
+                        )
+                    else:
+                        pl.load(
+                            lse_vec_slot,
+                            tensor_lse,
+                            [
+                                run_info.batch_id,
+                                0,
+                                run_info.s1_idx,
+                                lse_g_offset,
+                            ],
+                            order=[1, 3],
+                        )
 
         for ki in pl.range(0, run_info.s2_real_size, TKV):
             cur_loop_preload_info = preload_infos[tick % 2]
@@ -1160,8 +1190,9 @@ def sparse_flash_mla_softmax_l1_norm(
             set_preload_info(run_info, cur_loop_preload_info, ki)
             if IS_SPARSE == 1:
                 with pl.section_vector():
-                    if IS_SPARSE == 1:
+                    if vec_owner == 1:
                         pl.system.wait_cross_core(
+                            sync_mode=CV_SYNC_MODE,
                             pipe=pl.PipeType.MTE3,
                             event_id=GATHER_READY_BACKWARD_IDS[_pl_sync_id % 2],
                         )
@@ -1175,16 +1206,19 @@ def sparse_flash_mla_softmax_l1_norm(
                             cur_loop_preload_info,
                         )
                         pl.system.set_cross_core(
+                            sync_mode=CV_SYNC_MODE,
                             pipe=pl.PipeType.MTE3,
                             event_id=GATHER_READY_FORWARD_IDS[_pl_sync_id % 2],
                         )
             with pl.section_cube():
                 if IS_SPARSE == 1:
                     pl.system.wait_cross_core(
+                        sync_mode=CV_SYNC_MODE,
                         pipe=pl.PipeType.MTE1,
                         event_id=GATHER_READY_FORWARD_IDS[_pl_sync_id % 2],
                     )
                     pl.system.wait_cross_core(
+                        sync_mode=CV_SYNC_MODE,
                         pipe=pl.PipeType.FIX,
                         event_id=QK_READY_BACKWARD_IDS[_pl_sync_id % 2],
                     )
@@ -1201,15 +1235,18 @@ def sparse_flash_mla_softmax_l1_norm(
                         cur_loop_preload_info,
                     )
                     pl.system.set_cross_core(
+                        sync_mode=CV_SYNC_MODE,
                         pipe=pl.PipeType.MTE1,
                         event_id=GATHER_READY_BACKWARD_IDS[_pl_sync_id % 2],
                     )
                     pl.system.set_cross_core(
+                        sync_mode=CV_SYNC_MODE,
                         pipe=pl.PipeType.FIX,
                         event_id=QK_READY_FORWARD_IDS[_pl_sync_id % 2],
                     )
                 else:
                     pl.system.wait_cross_core(
+                        sync_mode=CV_SYNC_MODE,
                         pipe=pl.PipeType.FIX,
                         event_id=QK_READY_BACKWARD_IDS[_pl_sync_id % 2],
                     )
@@ -1226,39 +1263,46 @@ def sparse_flash_mla_softmax_l1_norm(
                         cur_loop_preload_info,
                     )
                     pl.system.set_cross_core(
+                        sync_mode=CV_SYNC_MODE,
                         pipe=pl.PipeType.FIX,
                         event_id=QK_READY_FORWARD_IDS[_pl_sync_id % 2],
                     )
             if tick > 0:
                 with pl.section_vector():
-                    pl.system.wait_cross_core(
-                        pipe=pl.PipeType.V,
-                        event_id=QK_READY_FORWARD_IDS[(_pl_sync_id + 1) % 2],
-                    )
-                    if last_loop_preload_info.used_t1_index == run_info.used_t1_index:
-                        cur_lse_vec_slot = lse_vec_db.current()
-                        compute_softmax_l1_norm(
-                            tensor_softmax_l1_norm,
-                            qk_vec_db,
-                            cur_lse_vec_slot,
-                            out_vec_db,
-                            const_info,
-                            last_loop_preload_info,
+                    if vec_owner == 1:
+                        pl.system.wait_cross_core(
+                            sync_mode=CV_SYNC_MODE,
+                            pipe=pl.PipeType.V,
+                            event_id=QK_READY_FORWARD_IDS[(_pl_sync_id + 1) % 2],
                         )
-                    else:
-                        cur_lse_vec_slot = lse_vec_db.previous()
-                        compute_softmax_l1_norm(
-                            tensor_softmax_l1_norm,
-                            qk_vec_db,
-                            cur_lse_vec_slot,
-                            out_vec_db,
-                            const_info,
-                            last_loop_preload_info,
+                        if (
+                            last_loop_preload_info.used_t1_index
+                            == run_info.used_t1_index
+                        ):
+                            cur_lse_vec_slot = lse_vec_db.current()
+                            compute_softmax_l1_norm(
+                                tensor_softmax_l1_norm,
+                                qk_vec_db,
+                                cur_lse_vec_slot,
+                                out_vec_db,
+                                const_info,
+                                last_loop_preload_info,
+                            )
+                        else:
+                            cur_lse_vec_slot = lse_vec_db.previous()
+                            compute_softmax_l1_norm(
+                                tensor_softmax_l1_norm,
+                                qk_vec_db,
+                                cur_lse_vec_slot,
+                                out_vec_db,
+                                const_info,
+                                last_loop_preload_info,
+                            )
+                        pl.system.set_cross_core(
+                            sync_mode=CV_SYNC_MODE,
+                            pipe=pl.PipeType.V,
+                            event_id=QK_READY_BACKWARD_IDS[(_pl_sync_id + 1) % 2],
                         )
-                    pl.system.set_cross_core(
-                        pipe=pl.PipeType.V,
-                        event_id=QK_READY_BACKWARD_IDS[(_pl_sync_id + 1) % 2],
-                    )
             tick = tick + 1
             _pl_sync_id = _pl_sync_id + 1
         q_count = q_count + 1
@@ -1267,46 +1311,64 @@ def sparse_flash_mla_softmax_l1_norm(
         cur_loop_preload_info = preload_infos[tick % 2]
         last_loop_preload_info = preload_infos[(tick + 1) % 2]
         with pl.section_vector():
-            pl.system.wait_cross_core(
-                pipe=pl.PipeType.V, event_id=QK_READY_FORWARD_IDS[(_pl_sync_id + 1) % 2]
-            )
-            if last_loop_preload_info.used_t1_index == run_info.used_t1_index:
-                cur_lse_vec_slot = lse_vec_db.current()
-                compute_softmax_l1_norm(
-                    tensor_softmax_l1_norm,
-                    qk_vec_db,
-                    cur_lse_vec_slot,
-                    out_vec_db,
-                    const_info,
-                    last_loop_preload_info,
+            if vec_owner == 1:
+                pl.system.wait_cross_core(
+                    sync_mode=CV_SYNC_MODE,
+                    pipe=pl.PipeType.V,
+                    event_id=QK_READY_FORWARD_IDS[(_pl_sync_id + 1) % 2],
                 )
-            else:
-                cur_lse_vec_slot = lse_vec_db.previous()
-                compute_softmax_l1_norm(
-                    tensor_softmax_l1_norm,
-                    qk_vec_db,
-                    cur_lse_vec_slot,
-                    out_vec_db,
-                    const_info,
-                    last_loop_preload_info,
+                if last_loop_preload_info.used_t1_index == run_info.used_t1_index:
+                    cur_lse_vec_slot = lse_vec_db.current()
+                    compute_softmax_l1_norm(
+                        tensor_softmax_l1_norm,
+                        qk_vec_db,
+                        cur_lse_vec_slot,
+                        out_vec_db,
+                        const_info,
+                        last_loop_preload_info,
+                    )
+                else:
+                    cur_lse_vec_slot = lse_vec_db.previous()
+                    compute_softmax_l1_norm(
+                        tensor_softmax_l1_norm,
+                        qk_vec_db,
+                        cur_lse_vec_slot,
+                        out_vec_db,
+                        const_info,
+                        last_loop_preload_info,
+                    )
+                pl.system.set_cross_core(
+                    sync_mode=CV_SYNC_MODE,
+                    pipe=pl.PipeType.V,
+                    event_id=QK_READY_BACKWARD_IDS[(_pl_sync_id + 1) % 2],
                 )
-            pl.system.set_cross_core(
-                pipe=pl.PipeType.V,
-                event_id=QK_READY_BACKWARD_IDS[(_pl_sync_id + 1) % 2],
-            )
 
+    # with pl.section_vector():
+    #     pl.printf("[luo] drain vec core=%d sub=%d\n", core_id, sub_id)
     with pl.section_cube():
+        # pl.printf("[luo] drain cube core=%d\n", core_id)
         pl.system.wait_cross_core(
-            pipe=pl.PipeType.FIX, event_id=QK_READY_BACKWARD_IDS[0]
+            sync_mode=CV_SYNC_MODE,
+            pipe=pl.PipeType.FIX,
+            event_id=QK_READY_BACKWARD_IDS[0],
         )
         pl.system.wait_cross_core(
-            pipe=pl.PipeType.FIX, event_id=QK_READY_BACKWARD_IDS[1]
+            sync_mode=CV_SYNC_MODE,
+            pipe=pl.PipeType.FIX,
+            event_id=QK_READY_BACKWARD_IDS[1],
         )
+        # pl.printf("[luo] done cube core=%d\n", core_id)
     with pl.section_vector():
-        if IS_SPARSE == 1:
-            pl.system.wait_cross_core(
-                pipe=pl.PipeType.MTE3, event_id=GATHER_READY_BACKWARD_IDS[0]
-            )
-            pl.system.wait_cross_core(
-                pipe=pl.PipeType.MTE3, event_id=GATHER_READY_BACKWARD_IDS[1]
-            )
+        if vec_owner == 1:
+            if IS_SPARSE == 1:
+                pl.system.wait_cross_core(
+                    sync_mode=CV_SYNC_MODE,
+                    pipe=pl.PipeType.MTE3,
+                    event_id=GATHER_READY_BACKWARD_IDS[0],
+                )
+                pl.system.wait_cross_core(
+                    sync_mode=CV_SYNC_MODE,
+                    pipe=pl.PipeType.MTE3,
+                    event_id=GATHER_READY_BACKWARD_IDS[1],
+                )
+        # pl.printf("[luo] done vec core=%d sub=%d\n", core_id, sub_id)

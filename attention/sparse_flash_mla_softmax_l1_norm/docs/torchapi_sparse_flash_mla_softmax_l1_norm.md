@@ -175,7 +175,7 @@ Metadata字段布局：
 | formerCoreProcessNum | 1 | 常规核处理的seq数，即ceil(totalNum / totalCoreNum)。 |
 | remainCoreProcessNum | 2 | 尾核处理的seq数，即floor(totalNum / totalCoreNum)。 |
 | remainCoreNum | 3 | 尾核数目。 |
-| totalCoreNum | 4 | 实际使用的AIC核数，取min(totalNum, aicCoreNum, 36)。 |
+| totalCoreNum | 4 | 实际使用的AIC核数，取min(totalNum, aicCoreNum, 80)。 |
 
 ## 约束说明
 

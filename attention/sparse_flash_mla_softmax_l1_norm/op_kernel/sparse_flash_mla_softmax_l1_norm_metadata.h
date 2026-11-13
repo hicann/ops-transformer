@@ -21,7 +21,7 @@ namespace optiling {
 
 using SMLA_METADATA_T = int32_t;
 
-constexpr uint32_t SMLA_METADATA_MAX_CORE_NUM = 36;
+constexpr uint32_t SMLA_METADATA_MAX_CORE_NUM = 80;
 constexpr uint32_t SMLA_METADATA_SIZE = 64;
 
 namespace detail {

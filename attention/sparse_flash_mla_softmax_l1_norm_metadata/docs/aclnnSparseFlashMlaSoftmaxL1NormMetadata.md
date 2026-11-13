@@ -474,7 +474,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
         <tr>
         <td>totalCoreNum</td>
         <td>4</td>
-        <td>实际使用的AIC核数，取min(totalNum, aicCoreNum, 36)。</td>
+        <td>实际使用的AIC核数，取min(totalNum, aicCoreNum, 80)。</td>
         </tr>
     </tbody>
   </table>

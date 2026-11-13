@@ -71,7 +71,7 @@ metadata输出为INT32 Tensor，shape固定为(64,)，字段布局如下：
 | formerCoreProcessNum | 1 | 常规核处理的seq数，即ceil(totalNum / totalCoreNum)。 |
 | remainCoreProcessNum | 2 | 尾核处理的seq数，即floor(totalNum / totalCoreNum)。 |
 | remainCoreNum | 3 | 尾核数目。当totalNum能被totalCoreNum整除时为0，否则为totalCoreNum - (totalNum % totalCoreNum)。 |
-| totalCoreNum | 4 | 实际使用的AIC核数，取min(totalNum, aicCoreNum, 36)。 |
+| totalCoreNum | 4 | 实际使用的AIC核数，取min(totalNum, aicCoreNum, 80)。 |
 
 采用strided切分方式，每个核处理的seq索引按核间步进totalCoreNum排列。
 
