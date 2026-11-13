@@ -60,6 +60,9 @@ stages:
     name: compile
     jobs:
       JOB_check_examples_ut:
+        permissions:
+          repository: read
+          id-token: write
         name: Check_examples_ut
         if: env.TARGET_BRANCH == 'master'
         steps:
@@ -71,13 +74,20 @@ stages:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
               allow-unsafe-pr-checkout: true
           -
+            name: oidc_auth
+            uses: huaweicloud-oidc-auth
+            with:
+              audience: ${{ secrets.audience }}
+              agency_urn: ${{ secrets.agency_urn }}
+              provider_urn: ${{ secrets.provider_urn }}
+              region: cn-north-4
+              duration: 3600
+          -
             name: download_pr_filelist
             uses: obs-download
             with:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
               key: |
                 ${{ env.obs_path }}/pr_filelist.txt
               path: ${{ steps.process_checkout.outputs.path }}
@@ -94,8 +104,6 @@ stages:
             with:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
               artifact-path: |
                 ${{ steps.process_checkout.outputs.path }}/build/check_examples_ut.csv
               object-prefix: ${{ env.obs_path }}/
@@ -103,6 +111,9 @@ stages:
         container:
           image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ jobs.JOB_image.outputs.Compile_Ascend_X86 }}
       JOB_x86_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_x86
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -111,6 +122,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer_linux-x86_64.run'
       JOB_arm_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_arm
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -119,6 +133,9 @@ stages:
           arch: 'arm64'
           package_name: 'cann-ops-transformer_linux-aarch64.run'
       JOB_experimental_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_experimental_x86
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -128,6 +145,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer_experimental_linux-x86_64.run'
       JOB_arm_experimental_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_experimental_arm
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -137,6 +157,9 @@ stages:
           arch: 'arm64'
           package_name: 'cann-ops-transformer_experimental_linux-aarch64.run'
       JOB_x86_compile_ubuntu24:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_x86_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -145,6 +168,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer_linux-x86_64_ubuntu24.run'
       JOB_arm_compile_ubuntu24:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_arm_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -153,6 +179,9 @@ stages:
           arch: 'arm64'
           package_name: 'cann-ops-transformer_linux-aarch64_ubuntu24.run'
       JOB_experimental_compile_ubuntu24:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_experimental_x86_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -162,6 +191,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer_experimental_linux-x86_64_ubuntu24.run'
       JOB_arm_experimental_compile_ubuntu24:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_experimental_arm_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -171,6 +203,9 @@ stages:
           arch: 'arm64'
           package_name: 'cann-ops-transformer_experimental_linux-aarch64_ubuntu24.run'
       JOB_monitor_910b_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_monitor_910b
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -179,6 +214,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer-monitor-910b_linux-x86_64.run'
       JOB_monitor_910c_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_monitor_910c
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -187,6 +225,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer-monitor-910c_linux-x86_64.run'
       JOB_monitor_950_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_monitor_950
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -195,6 +236,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer-monitor-950_linux-x86_64.run'
       JOB_experimental_950_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_experimental_950_x86
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -204,6 +248,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer_experimental_950_linux-x86_64.run'
       JOB_arm_experimental_950_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_experimental_950_arm
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -213,6 +260,9 @@ stages:
           arch: 'arm64'
           package_name: 'cann-ops-transformer_experimental_950_linux-aarch64.run'
       JOB_experimental_950_compile_ubuntu24:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_experimental_950_x86_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -222,6 +272,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer_experimental_950_linux-x86_64_ubuntu24.run'
       JOB_arm_experimental_950_compile_ubuntu24:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_experimental_950_arm_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -231,6 +284,9 @@ stages:
           arch: 'arm64'
           package_name: 'cann-ops-transformer_experimental_950_linux-aarch64_ubuntu24.run'
       JOB_mobile_station_compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_kirinx90
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -240,6 +296,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer-kirinx90_linux-x86_64.run'
       JOB_mobile_station_compile_ubuntu24:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_kirinx90_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
         with:
@@ -249,6 +308,9 @@ stages:
           arch: 'x64'
           package_name: 'cann-ops-transformer-kirinx90_linux-x86_64_ubuntu24.run'
       JOB_mobile_station_compile_9030_ubuntu24:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_kirin9030_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
         if: env.TARGET_BRANCH == 'master'
@@ -271,6 +333,9 @@ stages:
           check_type: 'md_check'
           image_version: ${{ jobs.JOB_image.outputs.staticcheck }}
       JOB_Pre_Compile:
+        permissions:
+          repository: read
+          id-token: write
         name: Compile_pre
         uses: .gitcode/workflows/compile_action.yml
         if: env.TARGET_BRANCH != 'master'
@@ -302,6 +367,9 @@ stages:
           package_name: 'custom_host_ascend950.run'
       # ============ distest: kernel 只编 kernel, 产物 kernel_<soc>.tar.gz(*.o/*.json) ============
       Pre_compile_kernel_910B:
+        permissions:
+          repository: read
+          id-token: write
         name: Pre_compile_kernel_910B
         uses: .gitcode/workflows/compile_action_dis.yml
         if: env.TARGET_BRANCH == 'master'
@@ -312,6 +380,9 @@ stages:
           spec: '2xlarge'
           package_name: 'kernel_ascend910b.tar.gz'
       Pre_compile_kernel_950:
+        permissions:
+          repository: read
+          id-token: write
         name: Pre_compile_kernel_950
         uses: .gitcode/workflows/compile_action_dis.yml
         if: env.TARGET_BRANCH == 'master'
@@ -337,13 +408,19 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+          - name: oidc_auth
+            uses: huaweicloud-oidc-auth
+            with:
+              audience: ${{ secrets.audience }}
+              agency_urn: ${{ secrets.agency_urn }}
+              provider_urn: ${{ secrets.provider_urn }}
+              region: cn-north-4
+              duration: 3600
           - name: download
             uses: obs-download
             with:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
               key: |
                 ${{ env.obs_path }}/custom_host_ascend910b.run
                 ${{ env.obs_path }}/dis/kernel_ascend910b.tar.gz
@@ -376,8 +453,6 @@ stages:
             with:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
               artifact-path: ${{ steps.process_checkout.outputs.path }}/build_out_distest/cann-ops-transformer-custom_linux-aarch64.run
               object-prefix: ${{ env.obs_path }}/
       Pre_compile_package_950:
@@ -395,13 +470,19 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+          - name: oidc_auth
+            uses: huaweicloud-oidc-auth
+            with:
+              audience: ${{ secrets.audience }}
+              agency_urn: ${{ secrets.agency_urn }}
+              provider_urn: ${{ secrets.provider_urn }}
+              region: cn-north-4
+              duration: 3600
           - name: download
             uses: obs-download
             with:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
               key: |
                 ${{ env.obs_path }}/custom_host_ascend950.run
                 ${{ env.obs_path }}/dis/kernel_ascend950.tar.gz
@@ -434,8 +515,6 @@ stages:
             with:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
               artifact-path: ${{ steps.process_checkout.outputs.path }}/build_out_distest/cann-ops-transformer-ascend950-custom_linux-x86_64.run
               object-prefix: ${{ env.obs_path }}/
     pre:
@@ -476,13 +555,20 @@ stages:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
               allow-unsafe-pr-checkout: true
           -
+            name: oidc_auth
+            uses: huaweicloud-oidc-auth
+            with:
+              audience: ${{ secrets.audience }}
+              agency_urn: ${{ secrets.agency_urn }}
+              provider_urn: ${{ secrets.provider_urn }}
+              region: cn-north-4
+              duration: 3600
+          -
             name: download
             uses: obs-download
             with:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
               key: |
                 ${{ env.obs_path }}/pr_filelist.txt
                 ${{ env.obs_path }}/pr_filelist_mod.txt
@@ -496,8 +582,6 @@ stages:
               set -e
               export repo_name=${{env.repo_name}}
               export pr_id=${{ env.MERGE_ID }}
-              export AK=${{secrets.AK}}
-              export SK=${{secrets.SK}}
               export obs_smoke_path=${{ env.obs_smoke_path }}
               export obs_path=${{ env.obs_path }}
               export WORKSPACE=${{ steps.process_checkout.outputs.path }}
@@ -507,8 +591,6 @@ stages:
             with:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
               artifact-path: "${{ steps.process_checkout.outputs.path }}/slog*.tar.gz"
               object-prefix: ${{ env.obs_smoke_path }}/plog/
         if: env.TARGET_BRANCH == 'master'
@@ -552,6 +634,15 @@ stages:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
               allow-unsafe-pr-checkout: true
           -
+            name: oidc_auth
+            uses: huaweicloud-oidc-auth
+            with:
+              audience: ${{ secrets.audience }}
+              agency_urn: ${{ secrets.agency_urn }}
+              provider_urn: ${{ secrets.provider_urn }}
+              region: cn-north-4
+              duration: 3600
+          -
             name: download
             uses: obs-download
             with:
@@ -579,8 +670,6 @@ stages:
             with:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
               artifact-path: |
                 ${{ steps.process_checkout.outputs.path }}/ut_cov_*.tar.gz
               object-prefix: ${{ env.obs_path }}/
