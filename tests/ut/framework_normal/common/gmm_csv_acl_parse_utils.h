@@ -71,6 +71,7 @@ inline aclFormat ParseAclFormat(const std::string& format)
 {
     static const std::map<std::string, aclFormat> formatMap = {
         {"ND", ACL_FORMAT_ND},
+        {"NCL", ACL_FORMAT_NCL},
         {"FRACTAL_NZ", ACL_FORMAT_FRACTAL_NZ},
         {"FRACTAL_NZ_C0_2", ACL_FORMAT_FRACTAL_NZ_C0_2},
         {"FRACTAL_NZ_C0_4", ACL_FORMAT_FRACTAL_NZ_C0_4},

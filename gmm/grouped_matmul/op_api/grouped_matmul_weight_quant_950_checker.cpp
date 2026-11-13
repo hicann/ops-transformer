@@ -22,6 +22,7 @@ static constexpr int64_t Y_SEPARATED = 1L;   // x split
 static constexpr int64_t X_SEPARATED = 2L;   // y split
 static constexpr int64_t NO_SEPARATED = 3L;  // x,y split
 static constexpr int64_t MAX_GROUP_LIST_SIZE_ARRAY = 128L;
+static constexpr int64_t MAX_GROUP_NUM = 1024L;
 static constexpr int64_t MULTI_WEIGHT_DIM = 2UL;
 static constexpr int64_t MULTI_WEIGHT_NZ_DIM = 4UL;
 static constexpr size_t S8S4_MATRIX_DIM_NUM = 2UL;
@@ -1399,6 +1400,147 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckTensorListSize() c
     return ACLNN_SUCCESS;
 }
 
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckA16W8NDScenarioForDAV9201() const
+{
+    // A6 Vector antiquant supports a single tensor per list, split along M (ND, or NCL for weight).
+    if (unlikely(!(gmmParams_.groupType == SPLIT_M && gmmParams_.x->Size() == 1 && gmmParams_.weight->Size() == 1 &&
+                   gmmParams_.y->Size() == 1))) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            GetAclnnName(), "groupType, x, weight, y",
+            Ops::Transformer::Gmm::FormatString("%ld, %zu, %zu, %zu", gmmParams_.groupType, gmmParams_.x->Size(),
+                                                gmmParams_.weight->Size(), gmmParams_.y->Size()),
+            "groupType must be 0 and x, weight and y tensor counts must each be 1");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    const bool isV3 = gmmParams_.apiVersion == GMMApiVersion::V3;
+    const bool isV4OrV5 = gmmParams_.apiVersion == GMMApiVersion::V4 || gmmParams_.apiVersion == GMMApiVersion::V5;
+    if (unlikely(!(isV4OrV5 || (isV3 && IsA16W8ND())))) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            GetAclnnName(), "apiVersion, weight.dtype",
+            Ops::Transformer::Gmm::FormatString("%u, %s", static_cast<uint32_t>(gmmParams_.apiVersion),
+                                                op::ToString(weightDtype_).GetString()),
+            "When the dtype of weight is INT8, apiVersion must be 3, 4 or 5; "
+            "When the dtype of weight is FLOAT8_E4M3FN, FLOAT8_E5M2 or HIFLOAT8, "
+            "apiVersion must be 4 or 5");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (unlikely(!(gmmParams_.splitItem == X_SEPARATED || gmmParams_.splitItem == NO_SEPARATED))) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnName(), "splitItem", std::to_string(gmmParams_.splitItem),
+                                              "splitItem must be 2 or 3");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (unlikely(!(gmmParams_.activeType == 0 && !gmmParams_.transposeX))) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            GetAclnnName(), "activeType, transposeX",
+            Ops::Transformer::Gmm::FormatString("%ld, %s", gmmParams_.activeType,
+                                                gmmParams_.transposeX ? "true" : "false"),
+            "activeType must be 0 and transposeX must be false");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (unlikely(!(gmmParams_.groupListType == 0 || (isV4OrV5 && gmmParams_.groupListType == GROUP_LIST_COUNT)))) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            GetAclnnName(), "groupListType, apiVersion",
+            Ops::Transformer::Gmm::FormatString("%ld, %u", gmmParams_.groupListType,
+                                                static_cast<uint32_t>(gmmParams_.apiVersion)),
+            "groupListType must be 0 for V3 and 0 or 1 for V4/V5");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckA16W8NDGroupListForDAV9201() const
+{
+    const auto& weightShape = (*gmmParams_.weight)[0]->GetViewShape();
+    if (unlikely(!(weightShape.GetDimNum() == SPLIT_M_SINGLE_WEIGHT_DIM))) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(GetAclnnName(), "weight[0]",
+                                                 std::to_string(weightShape.GetDimNum()) + "D",
+                                                 "weight must be 3D with view shape [E, K, N]");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    const int64_t groupNum = weightShape.GetDim(0);
+    const auto* groupList = gmmParams_.groupTensorOptional;
+    if (unlikely(!(groupList != nullptr))) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnName(), "groupList", "nullptr", "groupList can not be null");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (unlikely(!(groupList->GetPlacement() == op::TensorPlacement::kOnDeviceHbm))) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnName(), "groupList.placement",
+                                              std::to_string(static_cast<int32_t>(groupList->GetPlacement())),
+                                              "groupList must be placed on device HBM");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (unlikely(!(groupList->GetDataType() == DataType::DT_INT64 && groupList->GetViewShape().GetDimNum() == 1))) {
+        if (groupList->GetDataType() != DataType::DT_INT64) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(GetAclnnName(), "groupList",
+                                                  op::ToString(groupList->GetDataType()).GetString(),
+                                                  "the dtype of groupList must be INT64");
+        } else {
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(GetAclnnName(), "groupList",
+                                                     std::to_string(groupList->GetViewShape().GetDimNum()) + "D",
+                                                     "groupList must be 1D with shape [E]");
+        }
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (unlikely(!(groupNum >= 1 && groupNum <= MAX_GROUP_NUM && groupList->GetViewShape().GetDim(0) == groupNum))) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            GetAclnnName(), "weight[0].shape[0], groupList.shape[0]",
+            Ops::Transformer::Gmm::FormatString("%ld, %ld", groupNum, groupList->GetViewShape().GetDim(0)),
+            Ops::Transformer::Gmm::FormatString("weight E must be in [1, %ld] and groupList length must equal weight E",
+                                                MAX_GROUP_NUM));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckA16W8NDTensorListFormatForDAV9201() const
+{
+    const struct {
+        const aclTensorList* tensorList;
+        const char* name;
+    } tensors[] = {{gmmParams_.x, "x"},
+                   {gmmParams_.weight, "weight"},
+                   {gmmParams_.y, "y"},
+                   {gmmParams_.biasOptional, "biasOptional"},
+                   {gmmParams_.antiquantScaleOptional, "antiquantScaleOptional"},
+                   {gmmParams_.antiquantOffsetOptional, "antiquantOffsetOptional"}};
+    for (const auto& tensorInfo : tensors) {
+        const auto* tensorList = tensorInfo.tensorList;
+        if (tensorList == nullptr) {
+            continue;
+        }
+        if (unlikely(!(tensorList->Size() == 1))) {
+            OP_LOGE_FOR_INVALID_TENSORNUM(GetAclnnName(), tensorInfo.name, tensorList->Size(), "1");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        const auto format = ge::GetPrimaryFormat((*tensorList)[0]->GetStorageFormat());
+        // op-plugin labels rank-3 base-format weights as NCL without changing their layout.
+        const bool isNclWeight = tensorList == gmmParams_.weight && format == op::Format::FORMAT_NCL;
+        if (unlikely(!(format == op::Format::FORMAT_ND || isNclWeight))) {
+            OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                GetAclnnName(), std::string(tensorInfo.name) + "[0]",
+                op::ToString((*tensorList)[0]->GetStorageFormat()).GetString(),
+                tensorList == gmmParams_.weight ? "weight format must be ND or NCL" : "tensor format must be ND");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckA16W8NDForDAV9201() const
+{
+    if (npuArch_ != NpuArch::DAV_9201 || !(IsA16W8ND() || IsA16F8ND())) {
+        return ACLNN_SUCCESS;
+    }
+
+    CHECK_RET(CheckA16W8NDScenarioForDAV9201() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckTensorNotNull(0, 0, 0) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(CheckA16W8NDGroupListForDAV9201() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckA16W8NDTensorListFormatForDAV9201() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    // Dtype, exact [E, N] parameter shapes, FP8 offset/NN exclusions and [M, N]
+    // output checks are shared with the existing weight-quant checker below.
+    return ACLNN_SUCCESS;
+}
+
 aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckGroupedMatmulWeightQuantDAV3510()
 {
     npuArch_ = op::GetCurrentPlatformInfo().GetCurNpuArch();
@@ -1406,6 +1548,8 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckGroupedMatmulWeigh
     weightDtype_ = (*gmmParams_.weight)[0]->GetDataType();
     yDtype_ = (*gmmParams_.y)[0]->GetDataType();
 
+    const auto status = CheckA16W8NDForDAV9201();
+    CHECK_RET(status == ACLNN_SUCCESS, status);
     CHECK_COND(CheckGroupTypeScenario() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "CheckGroupTypeScenario failed.");
     CHECK_COND(CheckUnsupportedApi() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "CheckUnsupportedApi failed.");
     CHECK_COND(CheckGroupListAndSplitItem() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,

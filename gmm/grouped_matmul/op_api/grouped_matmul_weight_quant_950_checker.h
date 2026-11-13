@@ -24,6 +24,10 @@ public:
     aclnnStatus CheckGroupedMatmulWeightQuantDAV3510();
 
 private:
+    aclnnStatus CheckA16W8NDForDAV9201() const;
+    aclnnStatus CheckA16W8NDScenarioForDAV9201() const;
+    aclnnStatus CheckA16W8NDGroupListForDAV9201() const;
+    aclnnStatus CheckA16W8NDTensorListFormatForDAV9201() const;
     aclnnStatus CheckGroupTypeScenario() const;
     aclnnStatus CheckUnsupportedApi() const;
     aclnnStatus CheckGroupListAndSplitItem() const;
