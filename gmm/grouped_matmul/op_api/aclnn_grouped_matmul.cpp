@@ -2427,6 +2427,11 @@ static aclnnStatus CheckGroupSize(const gmm::GroupedMatmulParams& gmmParams)
     // Only groupSizes of necessary inputs will be checked here.
     // The groupSizes of optional inputs and output will be checked in subsequent steps.
     int64_t maxWeightLength = MAX_GROUP_LIST_SIZE_ARRAY;
+    const auto soc = GetCurrentPlatformInfo().GetSocVersion();
+    if ((soc == SocVersion::ASCEND910B || soc == SocVersion::ASCEND910_93) && gmmParams.groupType == gmm::SPLIT_M &&
+        gmmParams.x->Size() == 1 && gmmParams.y->Size() == 1) {
+        maxWeightLength = MAX_GROUP_LIST_SIZE_TENSOR;
+    }
     if (IsNpuArch3510Series()) {
         if ((gmmParams.xDtype == DataType::DT_BF16 || gmmParams.xDtype == DataType::DT_FLOAT16 ||
              gmmParams.xDtype == DataType::DT_FLOAT) &&

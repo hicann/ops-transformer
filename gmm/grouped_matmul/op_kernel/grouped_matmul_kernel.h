@@ -232,6 +232,11 @@ __aicore__ inline void GMMProcess<ComputeType>::SetMKN(const int32_t splitValue,
 
     if (gmmBaseParams->groupType == 0) {
         mnConfig.m = splitValue;
+        if (singleX == 1 && singleY == 1 && gmmBaseParams->groupNum > MKN_LIST_LEN) {
+            mnConfig.k = gmmBaseParams->k;
+            mnConfig.n = gmmBaseParams->n;
+            return;
+        }
         mnConfig.k = kListGm[valueIdx];
         mnConfig.n = nListGm[valueIdx];
         return;

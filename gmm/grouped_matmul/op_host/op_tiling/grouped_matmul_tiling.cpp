@@ -236,8 +236,18 @@ void GMMTiling::SetTilingDataIsSingleTensor()
 
 bool GMMTiling::CheckTensorListLength(const gert::TilingContext* context)
 {
+    const auto* compileInfo = context->GetCompileInfo<GMMCompileInfo>();
+    const bool isA2A3 =
+        compileInfo != nullptr && (compileInfo->socVersion == platform_ascendc::SocVersion::ASCEND910B ||
+                                   compileInfo->socVersion == platform_ascendc::SocVersion::ASCEND910_93);
     auto xTensor = context->GetDynamicInputTensor(X_INDEX, MAX_TENSOR_CONT);
-    auto wTensor = context->GetDynamicInputTensor(WEIGHT_INDEX, MAX_TENSOR_CONT);
+    const auto* attrs = context->GetAttrs();
+    const auto* splitItem = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SPLIT_ITEM);
+    const auto* groupType = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPTYPE);
+    const bool isSingleMultiSingle = context->GetDynamicInputTensor(X_INDEX, 1) == nullptr && splitItem != nullptr &&
+                                     *splitItem == 3 && groupType != nullptr && *groupType == 0;
+    const uint32_t weightLimit = isA2A3 && isSingleMultiSingle ? 1024U : MAX_TENSOR_CONT;
+    auto wTensor = context->GetDynamicInputTensor(WEIGHT_INDEX, weightLimit);
     OP_CHECK_IF(xTensor != nullptr || wTensor != nullptr,
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "GMM tensorList length should between [1, %d]",
                                             MAX_TENSOR_CONT),
@@ -392,9 +402,13 @@ ge::graphStatus GMMTiling::SplitMSingleXSingleWeightSingleY(const gert::Shape& x
  */
 ge::graphStatus GMMTiling::SplitMSingleXSeparatedWeight(const gert::TilingContext* context, const gert::Shape& xShape)
 {
+    const auto* compileInfo = context->GetCompileInfo<GMMCompileInfo>();
+    const bool isA2A3 =
+        compileInfo != nullptr && (compileInfo->socVersion == platform_ascendc::SocVersion::ASCEND910B ||
+                                   compileInfo->socVersion == platform_ascendc::SocVersion::ASCEND910_93);
     int64_t m = GMMGetBS(xShape);
     int64_t k = xShape.GetDim(xKDim_);
-    for (uint32_t i = 0; i < MAX_TENSOR_CONT; i++) {
+    for (uint32_t i = 0; i < (isA2A3 && isSingleY_ ? 1024U : MAX_TENSOR_CONT); i++) {
         auto wTensor = context->GetDynamicInputTensor(WEIGHT_INDEX, i);
         if (wTensor == nullptr) {
             break;
@@ -406,6 +420,15 @@ ge::graphStatus GMMTiling::SplitMSingleXSeparatedWeight(const gert::TilingContex
         int64_t n = wShape.GetDim(weightNDim_) * nzFactor_;
         nList_[i] = static_cast<int32_t>(n);
         maxN_ = std::max(maxN_, n);
+    }
+    if (groupNum_ > MAX_TENSOR_CONT) {
+        for (uint32_t i = 1; i < groupNum_; ++i) {
+            OP_CHECK_IF(
+                nList_[i] != nList_[0],
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
+                                            "Single-multi-single with more than 128 groups requires a common N."),
+                return ge::GRAPH_FAILED);
+        }
     }
     mList_[0] = -1; // mList is unknown right now
     maxM_ = m;
