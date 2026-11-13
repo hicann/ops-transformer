@@ -778,6 +778,35 @@ TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_QueryKeyNkMismatch)
     EXPECT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
 }
 
+TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_QueryKeyDkMismatch)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+    uint32_t bs = 2, seqLen = 64, t = bs * seqLen;
+    uint32_t nk = 4, nv = 8, dk = 64, dv = 64;
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk / 2}, {t, nk, dk / 2}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {{queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND}},
+                                              {{{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                               {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_BF16, ge::FORMAT_ND}},
+                                              {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}},
+                                              &compileinfo);
+
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
 // final_state 的第一维错误地写成 T 而不是 B，期望在输出 shape 校验中被拦截
 TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_FinalStateShape_TInsteadOfB)
 {

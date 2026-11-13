@@ -101,9 +101,11 @@ public:
         finalState = TensorDesc({bs, nv, dv, dk}, ACL_BF16, ACL_FORMAT_ND).ValueRange(kValueLow, kValueHigh);
         ApplyInvalidDtype(validIdx, kValueLow, kValueHigh);
         aclnnStatus aclRet = utTest(nullIdx);
+        // 空指针返回 ACLNN_ERR_PARAM_NULLPTR；dtype 非法返回 ACLNN_ERR_PARAM_INVALID；
         // 仅 gOptional 允许为空（nullIdx == 7）时仍视为合法
+        bool nullPtrCase = (nullIdx != 0 && nullIdx != 7);
         aclnnStatus expected =
-            ((nullIdx == 0 || nullIdx == 7) && validIdx == 0) ? ACLNN_SUCCESS : ACLNN_ERR_PARAM_INVALID;
+            nullPtrCase ? ACLNN_ERR_PARAM_NULLPTR : (validIdx == 0 ? ACLNN_SUCCESS : ACLNN_ERR_PARAM_INVALID);
         EXPECT_EQ(aclRet, expected);
     }
 

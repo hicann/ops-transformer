@@ -138,7 +138,7 @@ aclnnStatus aclnnChunkGatedDeltaRuleGetWorkspaceSize(const aclTensor* query, con
 
     ChunkGatedDeltaRuleParams params{query,     key,        value, beta,      initialState, actualSeqLengths,
                                      gOptional, scaleValue, out,   finalState};
-    CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckParams(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     auto ret = PreProcess(params);
@@ -189,11 +189,8 @@ aclnnStatus aclnnChunkGatedDeltaRuleGetWorkspaceSize(const aclTensor* query, con
     // 调用 L0 接口，得到两个输出
     auto outRet = l0op::ChunkGatedDeltaRule(query_, key_, value_, beta_, initialState_, actualSeqLengths_, gOptional,
                                             scaleValue, uniqueExecutor.get());
-    if (outRet[0] == nullptr) {
-        return ACLNN_ERR_INNER_NULLPTR;
-    }
-    if (outRet[1] == nullptr) {
-        return ACLNN_ERR_INNER_NULLPTR;
+    if (outRet[0] == nullptr || outRet[1] == nullptr) {
+        return ACLNN_ERR_INNER_TILING_ERROR;
     }
 
     auto outRet0 = outRet[0];
