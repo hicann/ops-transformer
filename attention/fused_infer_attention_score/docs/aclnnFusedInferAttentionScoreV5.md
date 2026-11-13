@@ -951,7 +951,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <tr>
             <td>ACLNN_ERR_PARAM_INVALID</td>
             <td>161002</td>
-            <td>query、key、value、pseShiftOptional、attenMaskOptional、attentionOut的数据类型和数据格式不在支持的范围内。</td>
+            <td>query、key、value、pseShiftOptional、attenMaskOptional、attentionOut的数据类型和数据格式不在算子原型支持的范围内。</td>
         </tr>
         <tr>
             <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -961,7 +961,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <tr>
             <td>ACLNN_ERR_INNER_TILING_ERROR</td>
             <td>561002</td>
-            <td>入参的shape（维度/尺寸）、属性取值或参数组合不满足“约束说明”中的约束时，API内部执行tiling发生异常。</td>
+            <td>入参的数据类型、shape（维度/尺寸）、属性取值或参数组合不满足“约束说明”中的约束时，API内部执行tiling发生异常。</td>
         </tr>
     </tbody>
     </table>

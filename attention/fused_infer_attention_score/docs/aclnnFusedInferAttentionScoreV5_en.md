@@ -910,7 +910,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <tr>
             <td>ACLNN_ERR_PARAM_INVALID</td>
             <td>161002</td>
-            <td>The data types and data formats of query, key, value, pseShiftOptional, attenMaskOptional, and attentionOut are not in the supported range.</td>
+            <td>The data types and data formats of query, key, value, pseShiftOptional, attenMaskOptional, and attentionOut are not in the range supported by the operator prototype.</td>
         </tr>
         <tr>
             <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -920,7 +920,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <tr>
             <td>ACLNN_ERR_INNER_TILING_ERROR</td>
             <td>561002</td>
-            <td>When the shape (dimensions/sizes), attribute values, or parameter combinations of the input parameters do not meet the constraints in "Constraints", an exception occurs when the API internally performs tiling.</td>
+            <td>When the data types, shape (dimensions/sizes), attribute values, or parameter combinations of the input parameters do not meet the constraints in "Constraints", an exception occurs when the API internally performs tiling.</td>
         </tr>
     </tbody>
     </table>
