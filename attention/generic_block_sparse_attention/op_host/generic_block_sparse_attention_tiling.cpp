@@ -121,6 +121,11 @@ constexpr uint32_t GBSA_TILE_SIZE_384 = 384U;
 constexpr uint32_t GBSA_TILE_SIZE_512 = 512U;
 constexpr int64_t GBSA_QUANT_TYPE_NONE = 0;
 constexpr int64_t GBSA_QUANT_TYPE_FULL = 5;
+constexpr int64_t GBSA_MASK_TYPE_UNION = 3;
+// Union size is taken from blockShapeX; only 8 is supported today.
+constexpr uint32_t GBSA_SUPPORTED_UNION_SIZE = 8U;
+// Union and MXFP8 share the 2e9 field but are mutually exclusive (maskType=3 vs quantType=6).
+constexpr uint64_t GBSA_UNION_MODE_TILING_OFFSET = 2000000000ULL;
 constexpr int64_t GBSA_QUANT_TYPE_MXFP8 = 6;
 constexpr uint64_t GBSA_MXFP8_TILING_OFFSET = 2000000000ULL;
 constexpr uint64_t GBSA_MXFP8_SCALE_PIPELINE_DISPATCH_BASE = 9250002900000020ULL;
@@ -136,6 +141,7 @@ constexpr uint64_t GBSA_MXFP8_TND_PA_BBND_DISPATCH_BASE = 9250002900000052ULL;
 constexpr uint64_t GBSA_MXFP8_TND_PA_BNBD_DISPATCH_BASE = 9250002900000054ULL;
 constexpr uint32_t GBSA_MXFP8_COALESCED_PREFILL_MIN_TOKENS = 1024U;
 constexpr uint32_t GBSA_MXFP8_COALESCED_PREFILL_MAX_TOKENS = 8192U;
+
 constexpr int64_t GBSA_WIN_DISABLED = -1;
 constexpr float GBSA_DST_TYPE_MAX_DISABLED = 0.0f;
 constexpr uint32_t GSA_FD_MAX_ACTIVE_CORE_NUM = 32U;        // Maximum AIC cores used by FD.
@@ -191,15 +197,40 @@ ge::graphStatus ParseBlockShapeAttr(gert::TilingContext* context,
                                               "the data of blockShape must not be null");
         return ge::GRAPH_FAILED;
     }
-    if (data[0] != 1 || data[1] <= 0 || data[1] > 128) {
+    // X is validated against maskType later: non-union requires X=1; union mode
+    // takes unionSize from blockShapeX and currently only supports X=8.
+    if (data[0] <= 0 || data[1] <= 0 || data[1] > 128) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
             context->GetNodeName(), "blockShape",
             ("elem0=" + std::to_string(data[0]) + ", elem1=" + std::to_string(data[1])).c_str(),
-            "blockShape requires X=1 and 1<=Y<=128");
+            "blockShape requires X>0 and 1<=Y<=128");
         return ge::GRAPH_FAILED;
     }
     blockShapeX = static_cast<uint32_t>(data[0]);
     blockShapeY = static_cast<uint32_t>(data[1]);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus ValidateBlockShapeForMaskType(gert::TilingContext* context, int64_t maskType, uint32_t blockShapeX)
+{
+    if (maskType == GBSA_MASK_TYPE_UNION) {
+        // Union mode: blockShapeX is the unionSize (Q tokens per group).
+        if (blockShapeX != GBSA_SUPPORTED_UNION_SIZE) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                context->GetNodeName(), "blockShapeX", std::to_string(blockShapeX).c_str(),
+                ("Union mode (maskType=3) reads unionSize from blockShapeX; currently only " +
+                 std::to_string(GBSA_SUPPORTED_UNION_SIZE) + " is supported")
+                    .c_str());
+            return ge::GRAPH_FAILED;
+        }
+        return ge::GRAPH_SUCCESS;
+    }
+    if (blockShapeX != 1U) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "blockShapeX",
+                                              std::to_string(blockShapeX).c_str(),
+                                              "non-union modes require blockShapeX=1");
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -228,9 +259,9 @@ ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext* context)
     if (maskTypePtr != nullptr) {
         maskType_ = *maskTypePtr;
     }
-    if (maskType_ != 0 && maskType_ != 1) {
+    if (maskType_ != 0 && maskType_ != 1 && maskType_ != GBSA_MASK_TYPE_UNION) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "maskType", std::to_string(maskType_).c_str(),
-                                              "only maskType=0 (non-causal) or 1 (causal) is supported");
+                                              "only maskType=0/1/3 (union exactMask) is supported");
         return ge::GRAPH_FAILED;
     }
 
@@ -330,11 +361,15 @@ ge::graphStatus GBSATiling::ParseAttrs(gert::TilingContext* context)
         scaleValue_ = *scalePtr;
     }
 
+    // Parse maskType before validating blockShapeX: regular needs X=1, union uses X as unionSize.
+    if (ParseCapabilityAttrs(context) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (ParseBlockShapeAttr(context, attrs->GetListInt(ATTR_BLOCK_SHAPE_INDEX), blockShapeX_, blockShapeY_) !=
         ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    if (ParseCapabilityAttrs(context) != ge::GRAPH_SUCCESS) {
+    if (ValidateBlockShapeForMaskType(context, maskType_, blockShapeX_) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckReservedAttrs(context) != ge::GRAPH_SUCCESS) {
@@ -717,8 +752,26 @@ ge::graphStatus GBSATiling::ParseSparseTensors(gert::TilingContext* context)
     const int64_t topK = sparseIdxShape->GetStorageShape().GetDim(SPARSE_IDX_DIM_KV_BLOCK);
     qBlockNum_ =
         static_cast<uint32_t>(sparseIdxShape->GetStorageShape().GetDim(SPARSE_IDX_DIM_Q_BLOCK)); // totalQBlocks
-    if (sparseIdxShape->GetStorageShape().GetDim(SPARSE_IDX_DIM_Q_BLOCK) != static_cast<int64_t>(totalQTokens_) ||
-        topK <= 0) {
+    // groupSize_ and its bounds are validated earlier in ParseQueryKeyShapes.
+    if (maskType_ == GBSA_MASK_TYPE_UNION) {
+        // Union mode: dim1 is the group count G and dim2 is the union capacity
+        // U. qBlockNum_/topK_ keep carrying those two values so kernel sparse
+        // addressing and the metadata config signature stay unchanged.
+        unionGroupNum_ = qBlockNum_;
+        // unionSize == blockShapeX_ (validated to the supported value above).
+        if (groupSize_ * blockShapeX_ > GBSA_TILE_SIZE_128) {
+            OP_LOGE(context->GetNodeName(),
+                    "Union mode requires blockShapeX*groupSize <= 128 rows, but got blockShapeX=%u groupSize=%u.",
+                    blockShapeX_, groupSize_);
+            return ge::GRAPH_FAILED;
+        }
+        if (unionGroupNum_ == 0U || topK <= 0) {
+            OP_LOGE(context->GetNodeName(), "Union mode requires positive group count and union capacity.");
+            return ge::GRAPH_FAILED;
+        }
+    } else if (sparseIdxShape->GetStorageShape().GetDim(SPARSE_IDX_DIM_Q_BLOCK) !=
+                   static_cast<int64_t>(totalQTokens_) ||
+               topK <= 0) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
             context->GetNodeName(), "sparseBlockIdx",
             ("totalQBlocks=" + std::to_string(sparseIdxShape->GetStorageShape().GetDim(SPARSE_IDX_DIM_Q_BLOCK)) +
@@ -727,11 +780,12 @@ ge::graphStatus GBSATiling::ParseSparseTensors(gert::TilingContext* context)
             "for blockShapeX=1, totalQBlocks must equal the Q storage token capacity and topK must be positive");
         return ge::GRAPH_FAILED;
     }
+    // Arch35 non-quant / FP8 (incl. Union) and MXFP8 use INT32_MAX; keep 256 only for legacy non-950 FP8.
     constexpr int64_t GBSA_LEGACY_MAX_TOPK = 256;
-    const int64_t maxTopK =
-        quantType_ == GBSA_QUANT_TYPE_NONE || (socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_MXFP8) ?
-            std::numeric_limits<int32_t>::max() :
-            GBSA_LEGACY_MAX_TOPK;
+    const int64_t maxTopK = quantType_ == GBSA_QUANT_TYPE_NONE || socVer_ == SOC_VER_950_CODE ?
+                                std::numeric_limits<int32_t>::max() :
+                                GBSA_LEGACY_MAX_TOPK;
+
     if (topK > maxTopK) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             context->GetNodeName(), "sparseBlockIdx",
@@ -859,8 +913,8 @@ ge::graphStatus GBSATiling::ParseQkvDtype(gert::TilingContext* context)
                                               "only float16/bfloat16/float8_e4m3fn are supported for query/key/value");
         return ge::GRAPH_FAILED;
     }
-    // The legacy per-tensor FP8 path only instantiates PA_BBND.
-    if (isPaBnbd_ && quantType_ == GBSA_QUANT_TYPE_FULL) {
+    // Legacy per-tensor FP8 (quantType=5) only instantiates PA_BBND; Union FP8 allows PA_BNBD.
+    if (isPaBnbd_ && quantType_ == GBSA_QUANT_TYPE_FULL && maskType_ != GBSA_MASK_TYPE_UNION) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "kv_input_layout", layoutKv_.c_str(),
                                               "PA_BNBD does not support quantType=5; use PA_BBND");
         return ge::GRAPH_FAILED;
@@ -924,6 +978,7 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
     // Four per-AIC slots. Each L1-N group has a 64B header and
     // PA entries hold {K offset, V offset, K meta, V meta}; dense entries
     // pack {offset, meta} but retain the original four-word capacity.
+    // Arch35 Regular/FP8 gather and Union precompute KV gather descriptors; MXFP8 uses its own rings.
     if (socVer_ == SOC_VER_950_CODE && quantType_ != GBSA_QUANT_TYPE_MXFP8) {
         const uint64_t sparseBlocks = (mm1L1TileN_ + 2ULL * blockShapeY_ - 2U) / blockShapeY_;
         const uint64_t copyBlocks = isPaged_ ? std::min<uint64_t>(mm1L1TileN_, sparseBlocks * 2U) : sparseBlocks;
@@ -940,6 +995,27 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
         tilingData_->set_kvOffsetInfoOffset(offset);
         tilingData_->set_kvOffsetTileWords(static_cast<uint32_t>(tileWords));
         pipelineWorkspaceSize = offset + offsetBytes;
+    }
+    // Union packed O/LSE when a task's GQA rows are non-contiguous in GM
+    // (kvHeads>1 with UNION_SIZE>1). Always reserved so the device path can
+    // choose contiguous vs gather/scatter without a second tiling signature.
+    if (socVer_ == SOC_VER_950_CODE && maskType_ == GBSA_MASK_TYPE_UNION) {
+        unionIoPackORowStride_ = AlignUp(embeddingSize_, 16U);
+        const uint64_t oBytes = static_cast<uint64_t>(qBaseTile_) * unionIoPackORowStride_ * sizeof(uint16_t);
+        const uint64_t lseBytes = static_cast<uint64_t>(AlignUp(qBaseTile_, 8U)) * sizeof(float);
+        const uint64_t perCore = AlignUp(oBytes + lseBytes, GSA_FD_WORKSPACE_ALIGNMENT);
+        const uint64_t offset = AlignUp(pipelineWorkspaceSize, GSA_FD_WORKSPACE_ALIGNMENT);
+        if (offset > std::numeric_limits<uint64_t>::max() - static_cast<uint64_t>(blockDim_) * perCore) {
+            OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttention", "Union I/O pack workspace size overflow.");
+            return ge::GRAPH_FAILED;
+        }
+        unionIoPackOffset_ = offset;
+        tilingData_->set_unionIoPackOffset(offset);
+        tilingData_->set_unionIoPackORowStride(unionIoPackORowStride_);
+        pipelineWorkspaceSize = offset + static_cast<uint64_t>(blockDim_) * perCore;
+    } else {
+        tilingData_->set_unionIoPackOffset(0U);
+        tilingData_->set_unionIoPackORowStride(0U);
     }
     uint64_t userWorkspaceSize = pipelineWorkspaceSize;
     if (fdStaticEnabled_) {
@@ -1024,8 +1100,27 @@ ge::graphStatus GBSATiling::CheckMetadata(gert::TilingContext* context)
 
 ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext* context)
 {
-    // Reserved optional tensors must stay nullptr until the feature is wired.
-    if (context->GetOptionalInputTensor(ATTEN_MASK_INDEX) != nullptr) {
+    if (maskType_ == GBSA_MASK_TYPE_UNION) {
+        // Union mode consumes atten_mask as the int32 bit-packed exactMask
+        // [kvHeads, G, U * blockShapeY].
+        if (context->GetOptionalInputTensor(ATTEN_MASK_INDEX) == nullptr) {
+            OP_LOGE(context->GetNodeName(), "Union mode requires atten_mask (exactMask).");
+            return ge::GRAPH_FAILED;
+        }
+        const auto* maskShape = context->GetOptionalInputShape(ATTEN_MASK_INDEX);
+        const auto* maskDesc = context->GetOptionalInputDesc(ATTEN_MASK_INDEX);
+        if (maskShape == nullptr || maskDesc == nullptr || maskDesc->GetDataType() != ge::DT_INT32 ||
+            maskShape->GetStorageShape().GetDimNum() != 3U ||
+            maskShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(kvHeads_) ||
+            maskShape->GetStorageShape().GetDim(1) != static_cast<int64_t>(qBlockNum_) ||
+            maskShape->GetStorageShape().GetDim(2) !=
+                static_cast<int64_t>(topK_) * static_cast<int64_t>(blockShapeY_)) {
+            OP_LOGE(context->GetNodeName(), "Union exactMask must be INT32 [kvHeads=%u, G=%u, U*blockShapeY=%u].",
+                    kvHeads_, qBlockNum_, topK_ * blockShapeY_);
+            return ge::GRAPH_FAILED;
+        }
+    } else if (context->GetOptionalInputTensor(ATTEN_MASK_INDEX) != nullptr) {
+        // Reserved optional tensors must stay nullptr until the feature is wired.
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "atten_mask", "provided",
                                               "atten_mask is not supported yet and must be nullptr");
         return ge::GRAPH_FAILED;
@@ -1177,7 +1272,16 @@ ge::graphStatus GBSATiling::ParseSequenceInputs(gert::TilingContext* context)
 ge::graphStatus GBSATiling::CheckSoftmaxPrecision(gert::TilingContext* context)
 {
     if (socVer_ == SOC_VER_950_CODE) {
-        if (quantType_ == GBSA_QUANT_TYPE_FULL && softmaxPrecision_ != 1) {
+        // SoftmaxUnion always runs FP32 S; require softmaxPrecision=0 for both
+        // non-quant and FP8 union. Regular FullQuant still requires 1.
+        if (maskType_ == GBSA_MASK_TYPE_UNION) {
+            if (softmaxPrecision_ != 0U) {
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context->GetNodeName(), "softmaxPrecision", std::to_string(softmaxPrecision_).c_str(),
+                    "Union mode only supports softmaxPrecision=0 (FP32 SoftmaxUnion)");
+                return ge::GRAPH_FAILED;
+            }
+        } else if (quantType_ == GBSA_QUANT_TYPE_FULL && softmaxPrecision_ != 1) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "softmaxPrecision",
                                                   std::to_string(softmaxPrecision_).c_str(),
                                                   "on chip 950, FP8 full-quant only supports softmaxPrecision=1");
@@ -1194,17 +1298,17 @@ ge::graphStatus GBSATiling::CheckSoftmaxPrecision(gert::TilingContext* context)
 
 ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
 {
-    // Preserve arch22 non-quant capabilities while adding arch35 MXFP8.
+    // Preserve arch22 non-quant capabilities while adding arch35 MXFP8 and Union.
     const bool isMxfp8 = quantType_ == GBSA_QUANT_TYPE_MXFP8;
     const bool isQuant = quantType_ != GBSA_QUANT_TYPE_NONE;
     const bool generalizedMxfp8 = socVer_ == SOC_VER_950_CODE && isMxfp8 && dataType_ == ge::DT_FLOAT8_E4M3FN;
-    if ((!isPaged_ || layoutQ_ != "TND") && !generalizedMxfp8 &&
+    if (maskType_ != GBSA_MASK_TYPE_UNION && (!isPaged_ || layoutQ_ != "TND") && !generalizedMxfp8 &&
         (quantType_ != 0 || (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16))) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
             context->GetNodeName(), "quantType and query/key/value dtype",
             ("quantType=" + std::to_string(quantType_) + ", dtype=" + std::to_string(static_cast<int32_t>(dataType_)))
                 .c_str(),
-            "dense non-paged KV requires FP16/BF16 quantType=0 or arch35 MXFP8");
+            "dense non-paged KV requires FP16/BF16 quantType=0, arch35 MXFP8, or Union");
         return ge::GRAPH_FAILED;
     }
     const bool isFp8 = (dataType_ == ge::DT_FLOAT8_E4M3FN);
@@ -1222,12 +1326,41 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
                                               "non-causal attention (mask_type=0) only supports FP16/BF16 non-quant");
         return ge::GRAPH_FAILED;
     }
+    if (maskType_ == GBSA_MASK_TYPE_UNION) {
+        if (residualBlockMode_ != GBSA_RESIDUAL_BLOCK_MODE_NONE || isConsistentTopk_) {
+            OP_LOGE(context->GetNodeName(), "Union mode requires residualBlockMode=0 and isConsistentTopk=false.");
+            return ge::GRAPH_FAILED;
+        }
+        if (quantType_ == GBSA_QUANT_TYPE_NONE) {
+            if (socVer_ != SOC_VER_950_CODE &&
+                (softmaxPrecision_ != 0U || (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16))) {
+                OP_LOGE(context->GetNodeName(), "Union on Arch22 requires FP16/BF16 and softmaxPrecision=0.");
+                return ge::GRAPH_FAILED;
+            }
+        } else if (quantType_ == GBSA_QUANT_TYPE_FULL) {
+            if (embeddingSize_ != GBSA_TILE_SIZE_128) {
+                OP_LOGE(context->GetNodeName(), "Union FP8 currently requires headDim=128.");
+                return ge::GRAPH_FAILED;
+            }
+            // FP8+PA skips actualKvLen clip to keep SoftmaxUnion S aligned; the
+            // unread pad must still land inside page geometry (pageSize=128).
+            if (isPaged_ && (blockShapeY_ == 0U || (128U % blockShapeY_) != 0U)) {
+                OP_LOGE(context->GetNodeName(),
+                        "Union FP8 paged KV requires blockShapeY to divide the PA page size 128, but got Y=%u.",
+                        blockShapeY_);
+                return ge::GRAPH_FAILED;
+            }
+        } else {
+            OP_LOGE(context->GetNodeName(), "Union mode only supports quantType=0 or 5.");
+            return ge::GRAPH_FAILED;
+        }
+    }
     if (isQuant && socVer_ != SOC_VER_950_CODE) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "quantType", std::to_string(quantType_).c_str(),
-                                              "FP8 full-quant is only supported on chip 950");
+                                              "FP8 full-quant / MXFP8 is only supported on chip 950");
         return ge::GRAPH_FAILED;
     }
-    if (returnSoftmaxlse_ && isQuant5) {
+    if (returnSoftmaxlse_ && isQuant5 && maskType_ != GBSA_MASK_TYPE_UNION) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
             context->GetNodeName(), "return_softmax_lse and quantType",
             ("return_softmax_lse=1, quantType=" + std::to_string(quantType_)).c_str(),
@@ -1235,8 +1368,11 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
         return ge::GRAPH_FAILED;
     }
     if (blockShapeY_ != 128U) {
-        const bool arch35NonQuant =
-            socVer_ == SOC_VER_950_CODE && quantType_ == 0 && (dataType_ == ge::DT_FLOAT16 || dataType_ == ge::DT_BF16);
+        // Arch35: non-quant FP16/BF16 and FP8 both allow Y in [1, 128].
+        const bool arch35GeneralY =
+            socVer_ == SOC_VER_950_CODE && blockShapeY_ >= 1U && blockShapeY_ <= 128U &&
+            ((quantType_ == GBSA_QUANT_TYPE_NONE && (dataType_ == ge::DT_FLOAT16 || dataType_ == ge::DT_BF16)) ||
+             (quantType_ == GBSA_QUANT_TYPE_FULL && dataType_ == ge::DT_FLOAT8_E4M3FN));
         const bool arch22NonQuant =
             socVer_ != SOC_VER_950_CODE && quantType_ == 0 && (dataType_ == ge::DT_FLOAT16 || dataType_ == ge::DT_BF16);
         const bool supportedArch22DenseY =
@@ -1246,9 +1382,9 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
         const bool arch22DenseNonQuant = arch22NonQuant && !isPaged_ && supportedArch22DenseY;
         const bool arch22PagedNonQuant =
             arch22NonQuant && isPaged_ && blockSize_ == 128U && supportedArch22PagedY && (128U % blockShapeY_) == 0U;
-        if (!arch35NonQuant && !generalizedMxfp8 && !arch22DenseNonQuant && !arch22PagedNonQuant) {
+        if (!arch35GeneralY && !generalizedMxfp8 && !arch22DenseNonQuant && !arch22PagedNonQuant) {
             OP_LOGE(context->GetNodeName(),
-                    "Generalized blockShapeY=%u requires arch35 quantType=0 or 6, or arch22 "
+                    "Generalized blockShapeY=%u requires arch35 (non-quant/FP8 Y in [1,128] or MXFP8), or arch22 "
                     "FP16/BF16 quantType=0 with power-of-two Y in [1, 128] (PA page size 128).",
                     blockShapeY_);
             return ge::GRAPH_FAILED;
@@ -1270,7 +1406,8 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
         socVer_ == SOC_VER_950_CODE ?
             (embeddingSize_ == GBSA_TILE_SIZE_128 || ((!isQuant || isMxfp8) && embeddingSize_ <= GBSA_TILE_SIZE_256)) :
             (embeddingSize_ >= 1U && embeddingSize_ <= GBSA_TILE_SIZE_256);
-    fdStaticEnabled_ = topK_ >= 12U && fdHeadDimSupported;
+    // Union never builds FD; others keep master's topK gate.
+    fdStaticEnabled_ = maskType_ != GBSA_MASK_TYPE_UNION && topK_ >= 12U && fdHeadDimSupported;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1339,14 +1476,17 @@ uint64_t GBSATiling::GenerateTilingKey()
 
     // Arch22 shares its existing dense/paged dispatch across layouts. Layout strides
     // are carried in tiling data, including when static compilation folds the data.
-    // Arch35 retains its layout-specific template dispatch.
+    // Arch35 retains layout-specific template dispatch. Union dense KV uses the TND field
+    // (layout comes from tiling data); paged Union keeps PA_BBND/PA_BNBD keys.
     tilingKey += socVer_ != SOC_VER_950_CODE ?
                      (isPaged_ ? GbsaTilingKeyEncoding::KV_PA_BBND_FIELD : GbsaTilingKeyEncoding::KV_TND_FIELD) :
-                 layoutKv_ == "PA_BBND" ? GbsaTilingKeyEncoding::KV_PA_BBND_FIELD :
-                 layoutKv_ == "PA_BNBD" ? GbsaTilingKeyEncoding::KV_PA_BNBD_FIELD :
-                 layoutKv_ == "BNSD"    ? GbsaTilingKeyEncoding::KV_BNSD_FIELD :
-                 layoutKv_ == "BSND"    ? GbsaTilingKeyEncoding::KV_BSND_FIELD :
-                                          GbsaTilingKeyEncoding::KV_TND_FIELD;
+                 layoutKv_ == "PA_BBND"            ? GbsaTilingKeyEncoding::KV_PA_BBND_FIELD :
+                 layoutKv_ == "PA_BNBD"            ? GbsaTilingKeyEncoding::KV_PA_BNBD_FIELD :
+                 maskType_ == GBSA_MASK_TYPE_UNION ? GbsaTilingKeyEncoding::KV_TND_FIELD :
+                 layoutKv_ == "BNSD"               ? GbsaTilingKeyEncoding::KV_BNSD_FIELD :
+                 layoutKv_ == "BSND"               ? GbsaTilingKeyEncoding::KV_BSND_FIELD :
+                                                     GbsaTilingKeyEncoding::KV_TND_FIELD;
+
     if (isPaged_) {
         tilingKey += GbsaTilingKeyEncoding::PAGED_FIELD;
     }
@@ -1356,14 +1496,20 @@ uint64_t GBSATiling::GenerateTilingKey()
         tilingKey += GbsaTilingKeyEncoding::LOW_PRECISION_SOFTMAX_FIELD;
     }
 
-    // maskType: 0=non-causal, 1=causal.
-    tilingKey += static_cast<uint64_t>(maskType_) * GbsaTilingKeyEncoding::MASK_FIELD;
+    // maskType: 0=non-causal, 1=causal. Union (3) keeps the mask field at 0 and
+    // uses its own offset field instead; causality is encoded in exactMask.
+    if (maskType_ == GBSA_MASK_TYPE_UNION) {
+        tilingKey += GBSA_UNION_MODE_TILING_OFFSET;
+    } else {
+        tilingKey += static_cast<uint64_t>(maskType_) * GbsaTilingKeyEncoding::MASK_FIELD;
+    }
 
-    // Q layout: TND = 2, BNSD = 3, BSND = 4.
-    tilingKey += socVer_ != SOC_VER_950_CODE ? GbsaTilingKeyEncoding::Q_TND_FIELD :
-                 layoutQ_ == "BNSD"          ? GbsaTilingKeyEncoding::Q_BNSD_FIELD :
-                 layoutQ_ == "BSND"          ? GbsaTilingKeyEncoding::Q_BSND_FIELD :
-                                               GbsaTilingKeyEncoding::Q_TND_FIELD;
+    // Q layout: TND = 2, BNSD = 3, BSND = 4. Union folds Q layout into tiling data.
+    tilingKey += (socVer_ != SOC_VER_950_CODE || maskType_ == GBSA_MASK_TYPE_UNION) ?
+                     GbsaTilingKeyEncoding::Q_TND_FIELD :
+                 layoutQ_ == "BNSD" ? GbsaTilingKeyEncoding::Q_BNSD_FIELD :
+                 layoutQ_ == "BSND" ? GbsaTilingKeyEncoding::Q_BSND_FIELD :
+                                      GbsaTilingKeyEncoding::Q_TND_FIELD;
 
     if (returnSoftmaxlse_) {
         tilingKey += GBSA_LSE_OUT_OFFSET;
@@ -1379,11 +1525,15 @@ uint64_t GBSATiling::GenerateTilingKey()
 
 void GBSATiling::CalcBaseTileTilingParams950()
 {
-    if (groupSize_ <= GBSA_TILE_SIZE_16) {
+    // Union mode processes blockShapeX (=unionSize) Q tokens per task, so tile
+    // selection must use the effective row count instead of the bare GQA group size.
+    const uint32_t tileGroupSize = maskType_ == GBSA_MASK_TYPE_UNION ? groupSize_ * blockShapeX_ : groupSize_;
+
+    if (tileGroupSize <= GBSA_TILE_SIZE_16) {
         qBaseTile_ = GBSA_TILE_SIZE_16;
-    } else if (groupSize_ <= GBSA_TILE_SIZE_32) {
+    } else if (tileGroupSize <= GBSA_TILE_SIZE_32) {
         qBaseTile_ = GBSA_TILE_SIZE_32;
-    } else if (groupSize_ <= GBSA_TILE_SIZE_64) {
+    } else if (tileGroupSize <= GBSA_TILE_SIZE_64) {
         qBaseTile_ = GBSA_TILE_SIZE_64;
     } else {
         qBaseTile_ = GBSA_TILE_SIZE_128;
@@ -1402,6 +1552,14 @@ void GBSATiling::CalcBaseTileTilingParams950()
     // High-precision softmax supports up to 512 columns. Low precision still
     // supports at most 256, including the 384-column tile used by D > 256.
     if (softmaxPrecision_ == 1U && kvBaseTile_ > GBSA_TILE_SIZE_256) {
+        kvBaseTile_ = GBSA_TILE_SIZE_256;
+    }
+
+    // Union FP8 SoftmaxUnion stripe: with qBaseTile=128 the default policy picks
+    // kvBaseTile=128. Raise to 256 (softmaxPrecision=0 / FP32 SoftmaxUnion);
+    // the kernel keeps S double-buffered while dropping to one LO.
+    if (maskType_ == GBSA_MASK_TYPE_UNION && quantType_ == GBSA_QUANT_TYPE_FULL && qBaseTile_ == GBSA_TILE_SIZE_128 &&
+        embeddingSize_ <= GBSA_TILE_SIZE_128) {
         kvBaseTile_ = GBSA_TILE_SIZE_256;
     }
 }
@@ -1427,6 +1585,11 @@ void GBSATiling::CalcMatmulPhaseL1TileInfo950()
 
     if (embeddingSize_ <= GBSA_TILE_SIZE_128) {
         mm1L1TileN_ = qBaseTile_ <= GBSA_TILE_SIZE_64 ? GBSA_TILE_SIZE_256 : GBSA_TILE_SIZE_128;
+        // One complete FP8 K fragment per L1-N slot when the attention tile is 256.
+        if (maskType_ == GBSA_MASK_TYPE_UNION && quantType_ == GBSA_QUANT_TYPE_FULL &&
+            kvBaseTile_ == GBSA_TILE_SIZE_256) {
+            mm1L1TileN_ = GBSA_TILE_SIZE_256;
+        }
         mm1L1TileKRight_ = GBSA_TILE_SIZE_128;
         vL1BufNum_ = 2U;
     } else if (embeddingSize_ <= GBSA_TILE_SIZE_256) {
@@ -1513,6 +1676,8 @@ ge::graphStatus GBSATiling::FillTilingData(gert::TilingContext* context)
     tilingData_->set_kvSeqCapacity(kvSeqCapacity_);
     tilingData_->set_qLayout(layoutQ_ == "TND" ? 0U : layoutQ_ == "BSND" ? 1U : 2U);
     tilingData_->set_kvLayout(isPaBnbd_ ? 3U : layoutKv_ == "BNSD" ? 2U : layoutKv_ == "BSND" ? 1U : 0U);
+    tilingData_->set_unionIoPackOffset(unionIoPackOffset_);
+    tilingData_->set_unionIoPackORowStride(unionIoPackORowStride_);
     tilingData_->set_totalQTokens(totalQTokens_);
     tilingData_->set_totalKvTokens(totalKvTokens_);
     tilingData_->set_maskType(static_cast<uint32_t>(maskType_));
@@ -1548,11 +1713,20 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
                 layoutKv_.c_str(), static_cast<uint32_t>(softmaxPrecision_), static_cast<uint32_t>(returnSoftmaxlse_));
         return ge::GRAPH_FAILED;
     }
-    if (socVer_ == SOC_VER_950_CODE && quantType_ != GBSA_QUANT_TYPE_MXFP8) {
+    if (socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_FULL && maskType_ == GBSA_MASK_TYPE_UNION) {
+        // FP8 union: only specialize tiles when GQA would select qBaseTile=128.
+        const uint32_t tileGroupSize = groupSize_ * blockShapeX_;
+        if (tileGroupSize > GBSA_TILE_SIZE_64 && embeddingSize_ <= GBSA_TILE_SIZE_128) {
+            CalcBaseTileTilingParams950();
+        }
+        CalcMatmulPhaseL1TileInfo950();
+    } else if (socVer_ == SOC_VER_950_CODE && quantType_ != GBSA_QUANT_TYPE_MXFP8) {
         CalcBaseTileTilingParams950();
         CalcMatmulPhaseL1TileInfo950();
     } else if (socVer_ != SOC_VER_950_CODE) {
-        kvBaseTile_ = GBSA_TILE_SIZE_256;
+        // At D=256 the Arch22 union kernel shares the second K buffer with P.
+        const bool supportsWideKv = embeddingSize_ <= GBSA_TILE_SIZE_128 || embeddingSize_ == GBSA_TILE_SIZE_256;
+        kvBaseTile_ = maskType_ == GBSA_MASK_TYPE_UNION && supportsWideKv ? GBSA_TILE_SIZE_512 : GBSA_TILE_SIZE_256;
     } else if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
         qBaseTile_ = Mxfp8Tiling::QueryTileRows(groupSize_);
         kvBaseTile_ = Mxfp8Tiling::KvTileTokens(groupSize_);
@@ -1571,6 +1745,15 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
     } else {
         const bool smallM = groupSize_ <= GBSA_TILE_SIZE_16 && blockShapeX_ == 1U;
         kvBaseTile_ = smallM && embeddingSize_ <= GBSA_TILE_SIZE_256 ? GBSA_TILE_SIZE_512 : GBSA_TILE_SIZE_256;
+    }
+    // SoftmaxUnion adds exact-mask UB cost beyond regular 950 packing. Keep the
+    // shared 950 tile table, then dynamically shrink kvBaseTile when D is wide
+    // enough that kv>256 would overflow device UB. No op_kernel header on host.
+    if (socVer_ == SOC_VER_950_CODE && maskType_ == GBSA_MASK_TYPE_UNION) {
+        if (kvBaseTile_ > GBSA_TILE_SIZE_256 && embeddingSize_ > GBSA_TILE_SIZE_128) {
+            kvBaseTile_ /= 2U;
+            CalcMatmulPhaseL1TileInfo950();
+        }
     }
     ret = CalculateWorkSpace(context);
     if (ret != ge::GRAPH_SUCCESS) {

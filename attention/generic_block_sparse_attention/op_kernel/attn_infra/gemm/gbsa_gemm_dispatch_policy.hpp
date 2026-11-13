@@ -33,7 +33,8 @@ struct MmadAtlasA5Base {
 using MmadAtlasA2 = MmadAtlasA2Base<false>;
 using MmadAtlasA5 = MmadAtlasA5Base<false>;
 
-template <bool PAGED_CACHE_FLAG_ = false, bool ENABLE_UNIT_FLAG_ = false, bool HAS_RESIDUAL_BLOCK_ = false>
+template <bool PAGED_CACHE_FLAG_ = false, bool ENABLE_UNIT_FLAG_ = false, bool HAS_RESIDUAL_BLOCK_ = false,
+          bool PRESERVE_SPARSE_ORDER_ = false>
 struct MmadAtlasA2SFAIQK : public MmadAtlasA2 {
     static constexpr uint32_t STAGES = 2;
     static constexpr bool PAGED_CACHE_FLAG = PAGED_CACHE_FLAG_;
@@ -41,7 +42,8 @@ struct MmadAtlasA2SFAIQK : public MmadAtlasA2 {
     static constexpr bool HAS_RESIDUAL_BLOCK = HAS_RESIDUAL_BLOCK_;
 };
 
-template <bool PAGED_CACHE_FLAG_ = false, bool ENABLE_UNIT_FLAG_ = false, bool HAS_RESIDUAL_BLOCK_ = false>
+template <bool PAGED_CACHE_FLAG_ = false, bool ENABLE_UNIT_FLAG_ = false, bool HAS_RESIDUAL_BLOCK_ = false,
+          bool PRESERVE_SPARSE_ORDER_ = false>
 struct MmadAtlasA2SFAIPV : public MmadAtlasA2 {
     static constexpr uint32_t STAGES = 2;
     static constexpr bool PAGED_CACHE_FLAG = PAGED_CACHE_FLAG_;
@@ -49,8 +51,20 @@ struct MmadAtlasA2SFAIPV : public MmadAtlasA2 {
     static constexpr bool HAS_RESIDUAL_BLOCK = HAS_RESIDUAL_BLOCK_;
 };
 
+// feat/lch/gbsa A5 QK template (ND: Q * K^T). Keep this free of union flags so
+// the base path stays mergeable with upstream A5 work.
 template <bool PAGED_CACHE_FLAG_ = false, bool HAS_RESIDUAL_BLOCK_ = false, bool PRECOMPUTE_SPARSE_ = false>
 struct MmadAtlasA5BsaQK : public MmadAtlasA5 {
+    static constexpr uint32_t L0_STAGES = 2;
+    static constexpr bool PAGED_CACHE_FLAG = PAGED_CACHE_FLAG_;
+    static constexpr bool HAS_RESIDUAL_BLOCK = HAS_RESIDUAL_BLOCK_;
+    static constexpr bool PRECOMPUTE_SPARSE = PRECOMPUTE_SPARSE_;
+};
+
+// Union (maskType=3) QK: K * Q^T = S^T. Independent of MmadAtlasA5BsaQK so
+// union can evolve without touching the lch A5 ND template.
+template <bool PAGED_CACHE_FLAG_ = false, bool HAS_RESIDUAL_BLOCK_ = false, bool PRECOMPUTE_SPARSE_ = false>
+struct MmadAtlasA5UnionQK : public MmadAtlasA5 {
     static constexpr uint32_t L0_STAGES = 2;
     static constexpr bool PAGED_CACHE_FLAG = PAGED_CACHE_FLAG_;
     static constexpr bool HAS_RESIDUAL_BLOCK = HAS_RESIDUAL_BLOCK_;

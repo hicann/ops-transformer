@@ -277,6 +277,9 @@ TILING_DATA_FIELD_DEF(uint32_t, maskType);
 // Arch22 layout strides: 0=TND/PA_BBND, 1=BSND, 2=BNSD, 3=PA_BNBD.
 TILING_DATA_FIELD_DEF(uint32_t, qLayout);
 TILING_DATA_FIELD_DEF(uint32_t, kvLayout);
+// Union packed O/LSE scratch (per AIC) when multi-token GQA rows are non-contiguous in GM.
+TILING_DATA_FIELD_DEF(uint64_t, unionIoPackOffset);
+TILING_DATA_FIELD_DEF(uint32_t, unionIoPackORowStride);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttention, GenericBlockSparseAttentionTilingData)
 
@@ -331,12 +334,16 @@ private:
     uint32_t numHeads_ = 0;
     uint32_t kvHeads_ = 0;
     uint32_t embeddingSize_ = 0;
-    // Regular path only supports blockShapeX=1; default must match.
+    // Non-union: blockShapeX=1. Union (maskType=3): blockShapeX carries unionSize
+    // and currently only 8 is supported.
     uint32_t blockShapeX_ = 1;
     uint32_t blockShapeY_ = 128;
     uint32_t blockSize_ = 128;
     uint32_t topK_ = 16;
     uint32_t qBlockNum_ = 0;
+    // Union mode (maskType=3): group count G; qBlockNum_ carries it and topK_
+    // carries the union capacity U so existing addressing stays valid.
+    uint32_t unionGroupNum_ = 0;
     uint32_t maxBlocksPerBatch_ = 0;
     uint32_t groupSize_ = 0;
     float scaleValue_ = 0.0f;
@@ -396,6 +403,8 @@ private:
     uint32_t fdPartialCapacity_ = 0;
     uint64_t fdPartialLseOffset_ = 0;
     uint64_t fdPartialOOffset_ = 0;
+    uint64_t unionIoPackOffset_ = 0;
+    uint32_t unionIoPackORowStride_ = 0;
 
     GenericBlockSparseAttentionTilingData* tilingData_ = nullptr;
 };

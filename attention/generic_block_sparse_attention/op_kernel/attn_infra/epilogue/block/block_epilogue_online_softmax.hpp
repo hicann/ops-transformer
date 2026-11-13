@@ -53,6 +53,9 @@ public:
     static constexpr uint32_t ROW_OPS_SPEC_MASK_4 = 4;
     static constexpr uint32_t MAX_ROW_NUM_SUB_CORE = 256;
     static constexpr int64_t UB_FLOAT_LINE_SIZE = 64;
+    // Reserve three separate 512-column buffers for packed bits, expanded mask, and sentinel.
+    static constexpr uint32_t EXACT_MASK_TILE_COLUMNS = 512;
+    static constexpr float MIN_VALUE = -3.402823466e+38F;
 
     __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, float scaleValue_)
     {
@@ -79,6 +82,9 @@ public:
         maskUbTensor = resource.ubBuf.template GetBufferByByte<ElementMask>(MASK_UB_TENSOR_OFFSET);
         maskUbTensor16 = resource.ubBuf.template GetBufferByByte<half>(MASK16_UB_TENSOR_OFFSET);
         maskUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(MASK32_UB_TENSOR_OFFSET);
+        // Keep exactMask off the LP/mask shared region so DownCastP cannot clobber it.
+        // MASK16 is unused on the no-tri-mask (union) path.
+        exactMaskUbTensor = resource.ubBuf.template GetBufferByByte<int32_t>(MASK16_UB_TENSOR_OFFSET);
         lmUbTensor = resource.ubBuf.template GetBufferByByte<float>(LM_UB_TENSOR_OFFSET);
         hmUbTensor = resource.ubBuf.template GetBufferByByte<float>(HM_UB_TENSOR_OFFSET);
         gmUbTensor = resource.ubBuf.template GetBufferByByte<float>(GM_UB_TENSOR_OFFSET);
@@ -86,6 +92,39 @@ public:
         llUbTensor = resource.ubBuf.template GetBufferByByte<float>(LL_UB_TENSOR_OFFSET);
         tvUbTensor = resource.ubBuf.template GetBufferByByte<float>(TV_UB_TENSOR_OFFSET);
         glUbTensor = resource.ubBuf.template GetBufferByByte<float>(GL_UB_TENSOR_OFFSET);
+    }
+
+    // Union exact-mask mode: gExactMask holds one int32 bitmask per KV token
+    // (bit `slot` = visibility of the slot-th query of the group). Query rows
+    // are laid out [slot][head], so each slot owns groupSize consecutive lanes.
+    __aicore__ inline void SetExactMask(AscendC::GlobalTensor<int32_t>& exactMask, uint32_t groupSize)
+    {
+        gExactMask_ = exactMask;
+        exactMaskGroupSize_ = groupSize;
+        exactMaskEnabled_ = true;
+    }
+
+    __aicore__ inline void SetExactMaskTileOffset(uint64_t tileOffset)
+    {
+        exactMaskTileOffset_ = tileOffset;
+    }
+
+    // Fully-masked rows keep gm == MIN_VALUE after the last tile; give them
+    // gl = 1 so RescaleO yields O = 0/1 = 0 instead of 0/0 = NaN.
+    __aicore__ inline void FixEmptyRows(uint16_t totalRows)
+    {
+        if (!exactMaskEnabled_) {
+            return;
+        }
+        uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
+        uint32_t rowSplit = static_cast<uint32_t>(totalRows) / 2U;
+        uint32_t m = subBlockIdx == 0U ? rowSplit : static_cast<uint32_t>(totalRows) - rowSplit;
+        if (m == 0U) {
+            return;
+        }
+        // Every nonempty row has at least one exp(0) in its running sum.
+        AscendC::Maxs(glUbTensor, glUbTensor, 1.0F, m);
+        AscendC::PipeBarrier<PIPE_V>();
     }
 
     __aicore__ inline ~BlockEpilogue() {}
@@ -393,6 +432,70 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
+    __aicore__ inline void CopyExactMaskGmToUb(uint64_t gmOffset, uint32_t columnNum)
+    {
+        AscendC::DataCopyExtParams maskCopyParams{1U, static_cast<uint32_t>(columnNum * sizeof(int32_t)), 0U, 0U, 0U};
+        AscendC::DataCopyPadExtParams<int32_t> maskPadParams{false, 0U, 0U, 0};
+        AscendC::DataCopyPad(exactMaskUbTensor, gExactMask_[gmOffset], maskCopyParams, maskPadParams);
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID2);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID2);
+        // Flip visibility to a masked predicate once, before expanding any slots.
+        auto packed = exactMaskUbTensor.template ReinterpretCast<uint16_t>();
+        auto sentinel = exactMaskUbTensor[2 * EXACT_MASK_TILE_COLUMNS].template ReinterpretCast<float>();
+        AscendC::Not(packed, packed, columnNum * 2);
+        AscendC::Duplicate(sentinel, MIN_VALUE, columnNum);
+        AscendC::PipeBarrier<PIPE_V>();
+    }
+
+    // After ScaleS: for each row, slot = rowGlobal / groupSize; invisible columns
+    // get -3e38. Build a float add-mask once per slot and reuse across the
+    // groupSize consecutive rows that share it.
+    __aicore__ inline void ApplyExactMaskNd(uint32_t sUbOffset, uint32_t rowNumCurLoop, uint32_t columnNum,
+                                            uint32_t columnNumRound, uint32_t rowOffsetGlobal)
+    {
+        if (rowNumCurLoop == 0U || columnNum == 0U) {
+            return;
+        }
+        const uint32_t rowStride = columnNumRound / FLOAT_BLOCK_SIZE;
+        const AscendC::BinaryRepeatParams acrossRows(1, 1, 1, rowStride, rowStride, 0);
+        // Use the reserved mask region for the expanded tile, leaving row statistics untouched.
+        auto bits = exactMaskUbTensor[EXACT_MASK_TILE_COLUMNS];
+        auto mask = bits.template ReinterpretCast<float>();
+        auto maskBits = bits.template ReinterpretCast<uint16_t>();
+        auto sentinelBits = exactMaskUbTensor[2 * EXACT_MASK_TILE_COLUMNS].template ReinterpretCast<uint16_t>();
+        for (uint32_t row = 0; row < rowNumCurLoop;) {
+            const uint32_t globalRow = rowOffsetGlobal + row;
+            const uint32_t slot = globalRow / exactMaskGroupSize_;
+            const uint32_t rows = Min(rowNumCurLoop - row, exactMaskGroupSize_ - globalRow % exactMaskGroupSize_);
+            // Sign-extend the masked bit, then retain the FP32 sentinel bits only for masked columns.
+            AscendC::ShiftLeft(bits, exactMaskUbTensor, static_cast<int32_t>(31U - slot), columnNum);
+            AscendC::PipeBarrier<PIPE_V>();
+            AscendC::ShiftRight(bits, bits, int32_t{31}, columnNum);
+            AscendC::PipeBarrier<PIPE_V>();
+            AscendC::And(maskBits, maskBits, sentinelBits, columnNum * 2);
+            AscendC::PipeBarrier<PIPE_V>();
+            for (uint32_t col = 0; col < columnNum; col += FLOAT_VECTOR_SIZE) {
+                const uint32_t count = Min(columnNum - col, FLOAT_VECTOR_SIZE);
+                auto scores = lsUbTensor[sUbOffset + row * columnNumRound + col];
+                AscendC::Add(scores, scores, mask[col], static_cast<uint64_t>(count), rows, acrossRows);
+            }
+            AscendC::PipeBarrier<PIPE_V>();
+            row += rows;
+        }
+        // PV consumes a 16-aligned P tile. Clear its padded lanes via exp(MIN_VALUE).
+        if (columnNum < columnNumRound) {
+            const uint32_t lastVector = RoundDown(columnNum, FLOAT_VECTOR_SIZE);
+            const uint32_t valid = columnNum - lastVector;
+            const uint32_t width = columnNumRound - lastVector;
+            const uint64_t paddingMask = (~uint64_t{0} >> (FLOAT_VECTOR_SIZE - width)) & (~uint64_t{0} << valid);
+            AscendC::SetVectorMask<int8_t>(0U, paddingMask);
+            AscendC::Duplicate<float, false>(lsUbTensor[sUbOffset + lastVector], MIN_VALUE, uint64_t{0}, rowNumCurLoop,
+                                             1, rowStride);
+            AscendC::PipeBarrier<PIPE_V>();
+        }
+        AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
+    }
+
     template <typename ElementMaskDst, typename ElementMaskSrc>
     __aicore__ inline void UpCastMask(const AscendC::LocalTensor<ElementMaskDst>& maskUbTensorDst,
                                       const AscendC::LocalTensor<ElementMaskSrc>& maskUbTensorSrc,
@@ -610,6 +713,13 @@ public:
         CalcLocalRowMax(sUbOffset, rowNumCurLoopRound, columnNum, columnNumRound, rowOffset);
         UpdateGlobalRowMax(rowNumCurLoop, rowNumCurLoopRound, columnNum, columnNumRound, dmUbOffsetCurCycle, rowOffset,
                            isFirstStackTile);
+        // Keep the running maximum unchanged, but make masked scores
+        // underflow to zero even when no tile has a visible key for the row.
+        if (exactMaskEnabled_) {
+            AscendC::Maxs(hmUbTensor[rowOffset], hmUbTensor[rowOffset], -1.0e30F, rowNumCurLoop);
+            AscendC::PipeBarrier<PIPE_V>();
+            AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
+        }
 
         CalcExp(sUbOffset, rowNumCurLoop, rowNumCurLoopRound, columnNum, columnNumRound, rowOffset);
         if constexpr (!doTriUMask) {
@@ -644,7 +754,8 @@ public:
                                       AscendC::GlobalTensor<ElementInput> gInput, const LayoutOutput& layoutOutput,
                                       const LayoutInput& layoutInput, GemmCoord actualBlockShape,
                                       uint32_t isFirstStackTile, uint32_t isLastNoMaskStackTile, uint32_t qSBlockSize,
-                                      uint32_t qNBlockSize, uint32_t curStackTileMod, Arch::CrossCoreFlag softmaxFlag)
+                                      uint32_t qNBlockSize, uint32_t curStackTileMod, Arch::CrossCoreFlag softmaxFlag,
+                                      uint64_t exactMaskTileOffset = 0)
     {
         uint32_t rowNum = actualBlockShape.m();
         uint32_t columnNum = actualBlockShape.n();
@@ -655,9 +766,6 @@ public:
         uint32_t subBlockNum = AscendC::GetSubBlockNum();
 
         uint32_t qNSplitSubBlock = qNBlockSize / subBlockNum;
-        uint32_t qNThisSubBlock = (qNBlockSize == 1) ? 0 :
-                                  (subBlockIdx == 1) ? (qNBlockSize - qNSplitSubBlock) :
-                                                       qNSplitSubBlock;
         uint32_t rowSplitSubBlock = (qNBlockSize == 1) ? (qSBlockSize / 2) : (qSBlockSize * qNSplitSubBlock);
         uint32_t rowActualThisSubBlock = (subBlockIdx == 1) ? (rowNum - rowSplitSubBlock) : rowSplitSubBlock;
         uint32_t rowOffsetThisSubBlock = subBlockIdx * rowSplitSubBlock;
@@ -669,6 +777,14 @@ public:
         if (rowActualThisSubBlock == 0) {
             NpuArch::Arch::CrossCoreSetFlag<0x2, PIPE_MTE3>(softmaxFlag);
             return;
+        }
+
+        if (exactMaskEnabled_) {
+            exactMaskTileOffset_ = exactMaskTileOffset;
+            // Each AIV has private UB; both subcores copy the same column masks.
+            // MTE2 must not overwrite the packed mask until the previous tile's last vector reader finishes.
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
+            CopyExactMaskGmToUb(exactMaskTileOffset_, columnNum);
         }
 
         for (uint32_t rowLoopIdx = 0; rowLoopIdx < rowLoopNum + preLoad; rowLoopIdx++) {
@@ -700,6 +816,13 @@ public:
                 auto layoutOutputCurLoop = layoutOutput.GetTileLayout(MatrixCoord(rowNumCurLoop, columnNum));
                 AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(pingpongFlag);
                 ScaleS((pingpongFlag * MAX_UB_S_ELEM_NUM), rowNumCurLoop, columnNumRound);
+                if (exactMaskEnabled_) {
+                    ApplyExactMaskNd((pingpongFlag * MAX_UB_S_ELEM_NUM), rowNumCurLoop, columnNum, columnNumRound,
+                                     rowOffsetIoGm);
+                    if (delayedRowLoopIdx + 1U == rowLoopNum) {
+                        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
+                    }
+                }
                 SubCoreCompute<false>(gOutputCurLoop, layoutOutputCurLoop, rowOffsetCurLoop, isFirstStackTile,
                                       isLastNoMaskStackTile, (delayedRowLoopIdx == 0),
                                       (delayedRowLoopIdx == rowLoopNum - 1), columnNumRound, pingpongFlag,
@@ -854,6 +977,7 @@ private:
     AscendC::LocalTensor<ElementMask> maskUbTensor;
     AscendC::LocalTensor<half> maskUbTensor16;
     AscendC::LocalTensor<float> maskUbTensor32;
+    AscendC::LocalTensor<int32_t> exactMaskUbTensor;
     AscendC::LocalTensor<float> lmUbTensor;
     AscendC::LocalTensor<float> hmUbTensor;
     AscendC::LocalTensor<float> gmUbTensor;
@@ -861,6 +985,10 @@ private:
     AscendC::LocalTensor<float> llUbTensor;
     AscendC::LocalTensor<float> tvUbTensor;
     AscendC::LocalTensor<float> glUbTensor;
+    AscendC::GlobalTensor<int32_t> gExactMask_;
+    uint32_t exactMaskGroupSize_ = 1;
+    uint64_t exactMaskTileOffset_ = 0;
+    bool exactMaskEnabled_ = false;
 };
 } // namespace NpuArch::Epilogue::Block
 

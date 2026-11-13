@@ -28,14 +28,15 @@
 namespace NpuArch::Gemm::Block {
 ////////////////////////////////////////////////////////////////////
 
-template <bool PAGED_CACHE_FLAG_, bool ENABLE_UNIT_FLAG_, bool HAS_RESIDUAL_BLOCK_, class L1TileShape_,
-          class L0TileShape_, class AType_, class BType_, class CType_, class BiasType_, class TileCopy_,
-          class TileMmad_>
-struct BlockMmad<MmadAtlasA2SFAIPV<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, HAS_RESIDUAL_BLOCK_>, L1TileShape_,
-                 L0TileShape_, AType_, BType_, CType_, BiasType_, TileCopy_, TileMmad_> {
+template <bool PAGED_CACHE_FLAG_, bool ENABLE_UNIT_FLAG_, bool HAS_RESIDUAL_BLOCK_, bool PRESERVE_SPARSE_ORDER_,
+          class L1TileShape_, class L0TileShape_, class AType_, class BType_, class CType_, class BiasType_,
+          class TileCopy_, class TileMmad_>
+struct BlockMmad<MmadAtlasA2SFAIPV<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, HAS_RESIDUAL_BLOCK_, PRESERVE_SPARSE_ORDER_>,
+                 L1TileShape_, L0TileShape_, AType_, BType_, CType_, BiasType_, TileCopy_, TileMmad_> {
 public:
     // Type Aliases
-    using DispatchPolicy = MmadAtlasA2SFAIPV<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, HAS_RESIDUAL_BLOCK_>;
+    using DispatchPolicy =
+        MmadAtlasA2SFAIPV<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, HAS_RESIDUAL_BLOCK_, PRESERVE_SPARSE_ORDER_>;
     static constexpr bool HAS_RESIDUAL_BLOCK = DispatchPolicy::HAS_RESIDUAL_BLOCK;
     using ArchTag = typename DispatchPolicy::ArchTag;
     using L1TileShape = L1TileShape_;
@@ -76,12 +77,18 @@ public:
     static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only support RowMajor yet!");
 
     /// Construct
-    __aicore__ inline BlockMmad(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
+    __aicore__ inline BlockMmad(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0,
+                                uint32_t kvTileCapacity = L1TileShape::K, bool shareK1WithQk = false)
+        : shareK1WithQk_(shareK1WithQk),
+          l1PPingPongFlag(shareK1WithQk ? EVENT_ID1 : EVENT_ID0)
     {
-        // Allocate L1 memory space
-        l1BTensor = resource.l1Buf.template GetBufferByByte<ElementB>(l1BufAddrStart + L1A_SIZE * 2);
+        // PV keeps the entire probability tile in each P ping-pong buffer.
+        const uint32_t l1ASize = L1TileShape::M * kvTileCapacity * sizeof(ElementA);
+        const uint32_t pBufferCount = shareK1WithQk_ ? 1U : STAGES;
+        l1BTensor = resource.l1Buf.template GetBufferByByte<ElementB>(l1BufAddrStart + l1ASize * pBufferCount);
         for (uint32_t i = 0; i < STAGES; i++) {
-            l1ATensor[i] = resource.l1Buf.template GetBufferByByte<ElementA>(l1BufAddrStart + L1A_SIZE * i);
+            const uint32_t pOffset = shareK1WithQk_ ? 0U : l1ASize * i;
+            l1ATensor[i] = resource.l1Buf.template GetBufferByByte<ElementA>(l1BufAddrStart + pOffset);
             l0ATensor[i] = resource.l0ABuf.template GetBufferByByte<ElementA>(L0A_PINGPONG_BUF_SIZE * i);
             l0BTensor[i] = resource.l0BBuf.template GetBufferByByte<ElementB>(L0B_PINGPONG_BUF_SIZE * i);
             l0CTensor[i] = resource.l0CBuf.template GetBufferByByte<ElementAccumulator>(L0C_PINGPONG_BUF_SIZE * i);
@@ -128,8 +135,12 @@ public:
         // load V
         LayoutBInL1 layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(stackSeqTile, embed);
         constexpr uint32_t copySubTileTokens = GbsaSparsePairCopy::KV_COPY_SUB_TILE_TOKENS;
-        constexpr bool groupedV = L1TileShape::N == copySubTileTokens && L0TileShape::K == copySubTileTokens &&
-                                  L1TileShape::K == GbsaSparsePairCopy::KV_COPY_MAX_TILE_TOKENS;
+        constexpr bool groupedVGeometry = L1TileShape::N == copySubTileTokens && L0TileShape::K == copySubTileTokens;
+        constexpr bool groupedVDefault =
+            groupedVGeometry && L1TileShape::K == GbsaSparsePairCopy::KV_COPY_MAX_TILE_TOKENS;
+        // A 512-column paged union tile can reuse the same 128-column V-ready events.
+        const bool groupedV = groupedVDefault || (PRESERVE_SPARSE_ORDER_ && groupedVGeometry && PAGED_CACHE_FLAG_ &&
+                                                  shareK1WithQk_ && stackSeqTile > copySubTileTokens);
         // Arch22 tiling guarantees that Y divides 128.
         const uint32_t maxPlanRecords = copySubTileTokens / y;
         // Small M fits both 128-column accumulators in a single L0C slot.
@@ -139,10 +150,10 @@ public:
         constexpr bool streamVGeometry = L1TileShape::N == copySubTileTokens &&
                                          L1TileShape::K == 2U * copySubTileTokens &&
                                          copySubTileTokens % L0TileShape::K == 0U;
-        const bool streamV = PAGED_CACHE_FLAG_ && streamVGeometry && stackSeqTile == 2U * copySubTileTokens &&
-                             embed <= streamVMaxEmbed && kvCopyInfo != nullptr && kvCopyInfo[0].count > 0U &&
-                             kvCopyInfo[0].count <= maxPlanRecords && kvCopyInfo[1].count > 0U &&
-                             kvCopyInfo[1].count <= maxPlanRecords;
+        const bool streamV =
+            !groupedV && PAGED_CACHE_FLAG_ && streamVGeometry && stackSeqTile == 2U * copySubTileTokens &&
+            embed <= streamVMaxEmbed && kvCopyInfo != nullptr && kvCopyInfo[0].count > 0U &&
+            kvCopyInfo[0].count <= maxPlanRecords && kvCopyInfo[1].count > 0U && kvCopyInfo[1].count <= maxPlanRecords;
         // Both output panels use the same full P tile in L1.
         const auto layoutAInL1 = LayoutAInL1::template MakeLayout<ElementA>(rowNum, stackSeqTile);
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID4);
@@ -197,9 +208,10 @@ public:
                 currentYoffset = 0U;
             } else if (fastBlockCount != 0U) {
                 if constexpr (PAGED_CACHE_FLAG_) {
-                    GbsaSparsePairCopy::Load<false>(l1BTensor, gB, layoutBInL1, gSelectIdx, gBlockTable, firstSlot,
-                                                    fastBlockCount, blockStackIdx * L1TileShape::N, nActual, strideKV,
-                                                    pageStride, peerPageStride, y, kvYBlockNum, kvSeqlen);
+                    GbsaSparsePairCopy::Load<false, PRESERVE_SPARSE_ORDER_>(
+                        l1BTensor, gB, layoutBInL1, gSelectIdx, gBlockTable, firstSlot, fastBlockCount,
+                        blockStackIdx * L1TileShape::N, nActual, strideKV, pageStride, peerPageStride, y, kvYBlockNum,
+                        kvSeqlen);
                 } else {
                     GbsaSparsePairCopy::LoadDense<false>(l1BTensor, gB, layoutBInL1, gSelectIdx, firstSlot,
                                                          fastBlockCount, blockStackIdx * L1TileShape::N, nActual,
@@ -259,7 +271,7 @@ public:
                     }
                 }
             }
-            if constexpr (groupedV) {
+            if (groupedV) {
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4 + blockStackIdx);
                 // P shares MTE2 on Arch22. Queue it after the first V group so
                 // MTE1 can start PV while the remaining V groups arrive.
@@ -269,7 +281,7 @@ public:
             }
         }
 
-        if constexpr (!groupedV) {
+        if (!groupedV) {
             if (streamV) {
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
                 AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
@@ -295,7 +307,7 @@ public:
             if (kL0Idx + 1U == kL0Loop) {
                 AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1PPingPongFlag);
             }
-            if constexpr (groupedV) {
+            if (groupedV) {
                 AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4 + kOffset / copySubTileTokens);
             } else if (streamV && kOffset == copySubTileTokens) {
                 AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
@@ -334,7 +346,10 @@ public:
             AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0AStage);
             l0APingPongFlag = 1U - l0AStage;
         }
-        l1PPingPongFlag = 1U - l1PPingPongFlag;
+        // The shared P slot uses the same event as QK's K1 buffer.
+        if (!shareK1WithQk_) {
+            l1PPingPongFlag = 1U - l1PPingPongFlag;
+        }
 
         AscendC::SetFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
@@ -367,7 +382,8 @@ protected:
     CopyL1ToL0B copyL1ToL0B;
     CopyL0CToGm copyL0CToGm;
 
-    uint32_t l1PPingPongFlag = 0;
+    bool shareK1WithQk_;
+    uint32_t l1PPingPongFlag;
     uint32_t l0CPingPongFlag = 0;
     uint32_t l0APingPongFlag = 0;
     uint32_t l0BPingPongFlag = 0;

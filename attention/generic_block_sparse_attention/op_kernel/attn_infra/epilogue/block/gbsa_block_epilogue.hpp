@@ -33,6 +33,8 @@ class BlockEpilogue {
 #include "../../../attn_infra/epilogue/block/gbsa_block_epilogue_mask2idx_arch35.hpp"
 #include "../../../attn_infra/epilogue/block/gbsa_block_epilogue_rescale_o_arch35_reg_high_prec.hpp"
 #include "../../../attn_infra/epilogue/block/gbsa_block_epilogue_online_softmax_arch35_reg_high_prec.hpp"
+#include "../../../attn_infra/epilogue/block/gbsa_block_epilogue_online_softmax_arch35_reg_high_prec_dn.hpp"
+#include "../../../attn_infra/epilogue/block/gbsa_block_epilogue_online_softmax_arch35_reg_dn_S_fp32_P_fp8.hpp"
 #include "../../../attn_infra/epilogue/block/gbsa_block_epilogue_online_softmax_arch35_reg_low_prec.hpp"
 #include "../../../attn_infra/epilogue/block/gbsa_block_epilogue_online_softmax_arch35_reg_low_prec_bf16.hpp"
 #endif

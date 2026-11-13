@@ -191,7 +191,7 @@ __aicore__ inline bool TryEmitDenseRun(AscendC::LocalTensor<Element> dst, Ascend
     return true;
 }
 
-template <bool IS_QK, class Element, class Layout>
+template <bool IS_QK, bool PRESERVE_SPARSE_ORDER, class Element, class Layout>
 __aicore__ inline void Load(AscendC::LocalTensor<Element> dst, AscendC::GlobalTensor<Element> src, const Layout& layout,
                             AscendC::GlobalTensor<int32_t> indices, AscendC::GlobalTensor<int32_t> table,
                             uint32_t firstSlot, uint32_t blocks, uint32_t dstBegin, uint32_t embed,
@@ -254,11 +254,15 @@ __aicore__ inline void Load(AscendC::LocalTensor<Element> dst, AscendC::GlobalTe
             length += blockY;
             pendingSpan += geometry.blockStride;
         } else {
-            const bool reverse = source < pending;
+            // Union exactMask columns follow sparse-slot order. Regular attention can pair reversed slots.
+            const bool reverse = !PRESERVE_SPARSE_ORDER && source < pending;
+            const bool peerReverse = !PRESERVE_SPARSE_ORDER && peer < pendingPeer;
             const uint64_t gap = reverse ? pending - source : source - pending;
-            const uint64_t peerGap = peer < pendingPeer ? pendingPeer - peer : peer - pendingPeer;
-            if (length == blockY && reverse == (peer < pendingPeer) && gap != 0U && gap < 65536U && peerGap < 65536U &&
-                (gap & 15U) == 0U && (peerGap & 15U) == 0U) {
+            const uint64_t peerGap = peerReverse ? pendingPeer - peer : peer - pendingPeer;
+            const bool pairOrderOk =
+                PRESERVE_SPARSE_ORDER ? (source > pending && peer > pendingPeer) : (reverse == peerReverse);
+            if (length == blockY && pairOrderOk && gap != 0U && gap < 65536U && peerGap < 65536U && (gap & 15U) == 0U &&
+                (peerGap & 15U) == 0U) {
                 EmitAndRecord<IS_QK>(dst, src, layout, dstBegin + dealt, reverse ? source : pending,
                                      reverse ? peer : pendingPeer, blockY, 2U, static_cast<uint32_t>(gap),
                                      static_cast<uint32_t>(peerGap), embed, tokenStride, plan, recordBase);

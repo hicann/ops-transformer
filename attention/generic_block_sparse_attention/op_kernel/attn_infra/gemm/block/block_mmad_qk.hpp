@@ -27,13 +27,14 @@
 namespace NpuArch::Gemm::Block {
 ////////////////////////////////////////////////////////////////////
 
-template <bool PAGED_CACHE_FLAG_, bool ENABLE_UNIT_FLAG_, bool HAS_RESIDUAL_BLOCK_, class L1TileShape_,
-          class L0TileShape_, class AType_, class BType_, class CType_, class BiasType_, class TileCopy_,
-          class TileMmad_>
-struct BlockMmad<MmadAtlasA2SFAIQK<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, HAS_RESIDUAL_BLOCK_>, L1TileShape_,
-                 L0TileShape_, AType_, BType_, CType_, BiasType_, TileCopy_, TileMmad_> {
+template <bool PAGED_CACHE_FLAG_, bool ENABLE_UNIT_FLAG_, bool HAS_RESIDUAL_BLOCK_, bool PRESERVE_SPARSE_ORDER_,
+          class L1TileShape_, class L0TileShape_, class AType_, class BType_, class CType_, class BiasType_,
+          class TileCopy_, class TileMmad_>
+struct BlockMmad<MmadAtlasA2SFAIQK<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, HAS_RESIDUAL_BLOCK_, PRESERVE_SPARSE_ORDER_>,
+                 L1TileShape_, L0TileShape_, AType_, BType_, CType_, BiasType_, TileCopy_, TileMmad_> {
 public:
-    using DispatchPolicy = MmadAtlasA2SFAIQK<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, HAS_RESIDUAL_BLOCK_>;
+    using DispatchPolicy =
+        MmadAtlasA2SFAIQK<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, HAS_RESIDUAL_BLOCK_, PRESERVE_SPARSE_ORDER_>;
     static constexpr bool HAS_RESIDUAL_BLOCK = DispatchPolicy::HAS_RESIDUAL_BLOCK;
     using ArchTag = typename DispatchPolicy::ArchTag;
 
@@ -126,6 +127,21 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID3);
     }
 
+    // Pack [token][GQA head] into L1 while respecting the source token/head strides.
+    __aicore__ inline void LoadUnionQ(AscendC::GlobalTensor<ElementA> gA, uint32_t tokens, uint32_t heads,
+                                      uint32_t embed, uint64_t tokenStride, uint64_t headStride)
+    {
+        const uint32_t rows = tokens * heads;
+        auto layoutL1 = LayoutAInL1::template MakeLayout<ElementA>(rows, embed);
+        LayoutA layoutHeadGroup(heads, embed, headStride);
+        for (uint32_t token = 0; token < tokens; ++token) {
+            auto dst = l1ATensor[layoutL1.GetOffset(MakeCoord(token * heads, 0U))];
+            copyGmToL1A(dst, gA[token * tokenStride], layoutL1, layoutHeadGroup);
+        }
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID3);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID3);
+    }
+
     __aicore__ inline void getBlockShape(GemmCoord& actualShape, uint32_t nL1Idx, uint32_t nL1Loop,
                                          uint32_t stackSeqTile)
     {
@@ -191,10 +207,10 @@ public:
                 const uint32_t copyIndex = nL1Idx * (L1TileShape::N / copyTokens) + sub;
                 auto* plan = kvCopyInfo == nullptr ? nullptr : kvCopyInfo + copyIndex;
                 if constexpr (PAGED_CACHE_FLAG_) {
-                    GbsaSparsePairCopy::Load<true>(l1BTensor[stage], gB, layoutBInL1, gSelectIdx, gBlockTable,
-                                                   firstSlot + tokenOffset / y, subBlocks, tokenOffset, kActual,
-                                                   strideKV, pageStride, peerPageStride, y, kvYBlockNum, kvSeqlen, plan,
-                                                   tokenOffset);
+                    GbsaSparsePairCopy::Load<true, PRESERVE_SPARSE_ORDER_>(
+                        l1BTensor[stage], gB, layoutBInL1, gSelectIdx, gBlockTable, firstSlot + tokenOffset / y,
+                        subBlocks, tokenOffset, kActual, strideKV, pageStride, peerPageStride, y, kvYBlockNum, kvSeqlen,
+                        plan, tokenOffset);
                 } else {
                     GbsaSparsePairCopy::LoadDense<true>(l1BTensor[stage], gB, layoutBInL1, gSelectIdx,
                                                         firstSlot + tokenOffset / y, subBlocks, tokenOffset, kActual,

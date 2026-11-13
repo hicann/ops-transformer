@@ -43,9 +43,11 @@ __aicore__ inline uint32_t CalculateConfigSignature(
     // Must stay in sync with the metadata scheduler's CalculateConfigSignature.
     hash = HashConfigValue(hash, tilingData->residualBlockMode);
     hash = HashConfigValue(hash, tilingData->isConsistentTopk);
-    // Preserve the existing causal signature; tag the new non-causal configuration.
+    // Preserve the existing causal signature; tag non-causal configurations.
+    // On A2, both maskType=0 (non-causal) and maskType=3 (union/exactMask) share
+    // the same non-causal signature tag used by the metadata scheduler.
 #if (__CCE_AICORE__ == 220)
-    if (tilingData->maskType == 0U) {
+    if (tilingData->maskType == 0U || tilingData->maskType == 3U) {
 #else
     if constexpr (!isCausal) {
 #endif

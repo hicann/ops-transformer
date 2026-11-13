@@ -46,13 +46,15 @@ struct GbsaKernelParamsArch22 {
     GM_ADDR softmaxLse;
     GM_ADDR workSpace;
     GM_ADDR tiling;
+    // Union sparse mode only: bit-packed exactMask [kvHeads, G, U * blockShapeY].
+    GM_ADDR attenMask = nullptr;
 
     __aicore__ inline GbsaKernelParamsArch22() {}
     __aicore__ inline GbsaKernelParamsArch22(GM_ADDR q_, GM_ADDR k_, GM_ADDR v_, GM_ADDR sparseBlockIdx_,
                                              GM_ADDR sparseBlockCount_, GM_ADDR metaData_, GM_ADDR cuSeqLengths_,
                                              GM_ADDR cuSeqLengthsKv_, GM_ADDR sequsedQ_, GM_ADDR sequsedKv_,
                                              GM_ADDR blockTable_, GM_ADDR o_, GM_ADDR softmaxLse_, GM_ADDR workSpace_,
-                                             GM_ADDR tiling_)
+                                             GM_ADDR tiling_, GM_ADDR attenMask_ = nullptr)
         : q(q_),
           k(k_),
           v(v_),
@@ -67,7 +69,8 @@ struct GbsaKernelParamsArch22 {
           o(o_),
           softmaxLse(softmaxLse_),
           workSpace(workSpace_),
-          tiling(tiling_)
+          tiling(tiling_),
+          attenMask(attenMask_)
     {}
 };
 

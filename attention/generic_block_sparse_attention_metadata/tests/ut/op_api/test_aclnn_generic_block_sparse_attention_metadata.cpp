@@ -56,7 +56,8 @@ constexpr int64_t kLayoutSparse = 4;
 
 // Validate through the public API: metadata checks now live in its translation unit.
 aclnnStatus CheckMetadataContract(SocVersion soc, int64_t quantType, int64_t precision, int64_t headDim = kD,
-                                  int64_t blockY = kBlockSize, int64_t residualMode = 0)
+                                  int64_t blockY = kBlockSize, int64_t residualMode = 0, int64_t maskType = 1,
+                                  int64_t blockX = 1)
 {
     const auto previousSoc = op::GetCurrentPlatformInfo().GetSocVersion();
     op::SetPlatformSocVersion(soc);
@@ -66,14 +67,14 @@ aclnnStatus CheckMetadataContract(SocVersion soc, int64_t quantType, int64_t pre
     auto usedKv = TensorDesc({kBatch}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{kS2}).ToAclType();
     const int64_t metadataSize = optiling::generic_block_sparse_attention_metadata::METADATA_TOTAL_SIZE;
     auto metadata = TensorDesc({metadataSize}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0}).ToAclType();
-    const vector<int64_t> blockShape = {1, blockY};
+    const vector<int64_t> blockShape = {blockX, blockY};
     auto blocks = aclCreateIntArray(blockShape.data(), blockShape.size());
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     const auto status = aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
         idx.get(), count.get(), cuQ.get(), nullptr, nullptr, usedKv.get(), kS1, kS2, kN1, kN2, headDim, blocks, "TND",
-        "PA_BBND", kLayoutSparse, 1, quantType, precision, -1, -1, residualMode, true, metadata.get(), &workspaceSize,
-        &executor);
+        "PA_BBND", kLayoutSparse, maskType, quantType, precision, -1, -1, residualMode, true, metadata.get(),
+        &workspaceSize, &executor);
     if (executor != nullptr) {
         aclDestroyAclOpExecutor(executor);
     }
@@ -189,4 +190,15 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_non_mxfp8_shape_c
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1), ACLNN_SUCCESS);
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1, 256), ACLNN_ERR_PARAM_INVALID);
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1, kD, 4), ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_rejects_union_mxfp8)
+{
+    // Union (maskType=3) only supports quantType=0 or 5; quantType=6 must fail here,
+    // not only later in the main operator tiling.
+    constexpr int64_t kUnionX = 8;
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 0, kD, kBlockSize, 0, 3, kUnionX),
+              ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 0, kD, kBlockSize, 0, 3, kUnionX), ACLNN_SUCCESS);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 0, 0, kD, kBlockSize, 0, 3, kUnionX), ACLNN_SUCCESS);
 }

@@ -24,6 +24,7 @@ class MaskMode(IntEnum):
     NO_MASK = 0
     CAUSAL = 1
     WINDOW = 2
+    UNION = 3
 
 
 class QuantMode(IntEnum):

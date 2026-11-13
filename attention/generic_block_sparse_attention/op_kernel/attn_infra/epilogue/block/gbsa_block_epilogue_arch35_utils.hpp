@@ -87,6 +87,9 @@ struct UBufTileHelper {
     uint32_t glStartOffset;
     uint32_t lseStartOffset;
     uint32_t maskStartOffset;
+    // Union exactMask tile (maskType=3); unused / zero on Regular paths.
+    uint32_t exactMaskStartOffset = 0;
+    uint32_t partialMaxStartOffset = 0;
     // Hybrid MXFP8 PV uses a packed E8M0 pair for each output channel.
     uint32_t mxVScaleStartOffset = 0U;
 

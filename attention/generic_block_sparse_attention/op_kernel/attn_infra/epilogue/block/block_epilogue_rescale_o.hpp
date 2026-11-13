@@ -140,6 +140,19 @@ public:
         }
     }
 
+    // The union pipeline computes rows in [token][GQA head] order.
+    __aicore__ inline void SetUnionRowStrides(uint32_t heads, uint64_t oTokenStride, uint64_t lseTokenStride)
+    {
+        unionHeads_ = heads;
+        unionOTokenStride_ = oTokenStride;
+        unionLseTokenStride_ = lseTokenStride;
+    }
+
+    __aicore__ inline uint64_t UnionRowOffset(uint32_t row, uint64_t tokenStride, uint64_t headStride) const
+    {
+        return row / unionHeads_ * tokenStride + row % unionHeads_ * headStride;
+    }
+
     template <bool IS_FD>
     __aicore__ inline void SubCoreCompute(
         AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
@@ -282,8 +295,17 @@ public:
                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
 
                 // ***move O to GM
-                CopyOToGm(gOutput, proTokenIdx, proTokenNum, epiTokenNum, integralHeadNum, qSThisSubBlock, embed,
-                          embedRound, oHiddenSize);
+                if (unionHeads_ != 0U) {
+                    for (uint32_t r = 0; r < curRowNum; ++r) {
+                        const uint64_t offset =
+                            UnionRowOffset(groupRowOffset + r, unionOTokenStride_, outputHeadStride_);
+                        AscendC::DataCopyPad(gOutput[offset], goUbTensor16[r * embedRound],
+                                             AscendC::DataCopyExtParams(1, embed * sizeof(ElementOutput), 0, 0, 0));
+                    }
+                } else {
+                    CopyOToGm(gOutput, proTokenIdx, proTokenNum, epiTokenNum, integralHeadNum, qSThisSubBlock, embed,
+                              embedRound, oHiddenSize);
+                }
                 if constexpr (LSE_MODE == LseMode::OUT_ONLY) {
                     if (isLastRowLoop) {
                         AscendC::PipeBarrier<PIPE_V>();
@@ -301,7 +323,15 @@ public:
                         AscendC::PipeBarrier<PIPE_V>();
                         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID4);
                         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID4);
-                        if (qNThisSubBlock == 0U) {
+                        if (unionHeads_ != 0U) {
+                            const uint32_t firstRow = groupRowOffset - rowOffsetLoop;
+                            for (uint32_t r = 0; r < totalRowNum; ++r) {
+                                const uint64_t offset =
+                                    UnionRowOffset(firstRow + r, unionLseTokenStride_, lseHeadStride_);
+                                AscendC::DataCopyPad(gLse[offset], tvUbTensor[r * FLOAT_BLOCK_SIZE],
+                                                     AscendC::DataCopyExtParams(1, sizeof(float), 0, 0, 0));
+                            }
+                        } else if (qNThisSubBlock == 0U) {
                             AscendC::DataCopyPad(gLse, tvUbTensor,
                                                  AscendC::DataCopyExtParams(totalRowNum, sizeof(float), 0,
                                                                             (stride - 1) * sizeof(float), 0));
@@ -365,7 +395,7 @@ public:
         outLseColOffsetThisSubBlock *= lseHeadStride_;
         int64_t offsetLse =
             layoutLse.GetOffset(MatrixCoord(outLseRowOffsetThisSubBlock, 0)) + outLseColOffsetThisSubBlock;
-        auto gLseThisSubBlock = gLse[offsetLse];
+        auto gLseThisSubBlock = gLse[unionHeads_ == 0U ? offsetLse : 0];
 
         if (inRowActualThisSubBlock > 0U) {
             uint32_t rowLoop = CeilDiv(inRowActualThisSubBlock, rowNumTile);
@@ -388,7 +418,7 @@ public:
                 int64_t offsetOutput = static_cast<int64_t>(static_cast<uint64_t>(rowLoopIdx) * rowNumTile /
                                                             qSThisSubBlock * outputHeadStride_) +
                                        outOffsetSubBlock;
-                auto gOutputCurLoop = gOutput[offsetOutput];
+                auto gOutputCurLoop = gOutput[unionHeads_ == 0U ? offsetOutput : 0];
                 auto layoutOutputCurLoop = layoutOutput;
                 int64_t offsetInput = layoutInput.GetOffset(MatrixCoord(rowOffsetCurLoop, 0));
                 auto gInputCurLoop = gInput[offsetInput];
@@ -503,13 +533,22 @@ public:
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
         for (uint32_t r = 0; r < rowNum; ++r) {
-            AscendC::DataCopyPad(gOutput[static_cast<uint64_t>(rowOffset + r) * outputHeadStride_], goUbTensor16,
+            const uint32_t row = rowOffset + r;
+            const uint64_t offset = unionHeads_ == 0U ? row * outputHeadStride_ :
+                                                        UnionRowOffset(row, unionOTokenStride_, outputHeadStride_);
+            AscendC::DataCopyPad(gOutput[offset], goUbTensor16,
                                  AscendC::DataCopyExtParams(1, embed * sizeof(ElementOutput), 0, 0, 0));
         }
         if constexpr (LSE_MODE == LseMode::OUT_ONLY) {
             AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID4);
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID4);
-            if (lseHeadStride_ == 1U) {
+            if (unionHeads_ != 0U) {
+                for (uint32_t r = 0; r < rowNum; ++r) {
+                    const uint64_t offset = UnionRowOffset(rowOffset + r, unionLseTokenStride_, lseHeadStride_);
+                    AscendC::DataCopyPad(gLse[offset], lse32_ubuf_tensor,
+                                         AscendC::DataCopyExtParams(1, sizeof(float), 0, 0, 0));
+                }
+            } else if (lseHeadStride_ == 1U) {
                 AscendC::DataCopyPad(gLse[rowOffset], lse32_ubuf_tensor,
                                      AscendC::DataCopyExtParams(1, rowNum * sizeof(float), 0, 0, 0));
             } else {
@@ -524,6 +563,9 @@ public:
     }
 
 private:
+    uint32_t unionHeads_ = 0U;
+    uint64_t unionOTokenStride_ = 0U;
+    uint64_t unionLseTokenStride_ = 0U;
     uint64_t outputHeadStride_ = 0U;
     uint64_t lseHeadStride_ = 1U;
     AscendC::LocalTensor<float> loUbTensor;

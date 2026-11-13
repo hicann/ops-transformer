@@ -20,13 +20,13 @@ namespace NpuArch::Gemm::Tile {
 
 /// Partial specialization for CopyL1ToL0B, AtlasA5, not B8, zN in and nZ out.
 template <class ElementSrc, class ElementDst, class LayoutSrc, class LayoutDst, class CoordSrc, class CoordDst>
-struct TileCopyTla<Arch::AtlasA5,
-                   tla::Tensor<AscendC::LocalTensor<ElementSrc>, LayoutSrc, CoordSrc, AscendC::TPosition::A1>,
-                   tla::Tensor<AscendC::LocalTensor<ElementDst>, LayoutDst, CoordDst, AscendC::TPosition::B2>,
-                   std::enable_if_t<!AscendC::Std::is_one_of_v<ElementSrc, int8_t, float8_e4m3_t, float8_e5m2_t> &&
-                                    !AscendC::Std::is_one_of_v<ElementDst, int8_t, float8_e4m3_t, float8_e5m2_t> &&
-                                    tla::detail::iszN<ElementSrc, LayoutSrc>::value &&
-                                    tla::detail::isnZ<ElementDst, LayoutDst>::value>> {
+struct TileCopyTla<
+    Arch::AtlasA5, tla::Tensor<AscendC::LocalTensor<ElementSrc>, LayoutSrc, CoordSrc, AscendC::TPosition::A1>,
+    tla::Tensor<AscendC::LocalTensor<ElementDst>, LayoutDst, CoordDst, AscendC::TPosition::B2>,
+    std::enable_if_t<!AscendC::Std::is_one_of_v<ElementSrc, int8_t, float8_e4m3_t, fp8_e4m3fn_t, float8_e5m2_t> &&
+                     !AscendC::Std::is_one_of_v<ElementDst, int8_t, float8_e4m3_t, fp8_e4m3fn_t, float8_e5m2_t> &&
+                     tla::detail::iszN<ElementSrc, LayoutSrc>::value &&
+                     tla::detail::isnZ<ElementDst, LayoutDst>::value>> {
     static constexpr uint32_t ELE_NUM_PER_C0 = BYTE_PER_C0 / sizeof(ElementSrc);
     static constexpr uint32_t ELE_NUM_PER_FRACTAL = BYTE_PER_FRACTAL / sizeof(ElementSrc);
 
@@ -38,8 +38,10 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         static_assert(
-            !AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
-                !AscendC::Std::is_one_of_v<typename TensorDst::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
+            !AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, fp8_e4m3fn_t,
+                                       float8_e5m2_t> &&
+                !AscendC::Std::is_one_of_v<typename TensorDst::Element, int8_t, float8_e4m3_t, fp8_e4m3fn_t,
+                                           float8_e5m2_t> &&
                 tla::detail::iszN<typename TensorSrc::Element, typename TensorSrc::Layout>::value &&
                 tla::detail::isnZ<typename TensorDst::Element, typename TensorDst::Layout>::value &&
                 TensorSrc::position == AscendC::TPosition::A1 && TensorDst::position == AscendC::TPosition::B2,
@@ -68,8 +70,10 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t l0Batch)
     {
         static_assert(
-            !AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
-                !AscendC::Std::is_one_of_v<typename TensorDst::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
+            !AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, fp8_e4m3fn_t,
+                                       float8_e5m2_t> &&
+                !AscendC::Std::is_one_of_v<typename TensorDst::Element, int8_t, float8_e4m3_t, fp8_e4m3fn_t,
+                                           float8_e5m2_t> &&
                 tla::detail::iszN<typename TensorSrc::Element, typename TensorSrc::Layout>::value &&
                 tla::detail::isnZ<typename TensorDst::Element, typename TensorDst::Layout>::value &&
                 TensorSrc::position == AscendC::TPosition::A1 && TensorDst::position == AscendC::TPosition::B2,
@@ -100,13 +104,13 @@ struct TileCopyTla<Arch::AtlasA5,
 
 /// Partial specialization for CopyL1ToL0B, AtlasA5, B8, zN in and nZ out.
 template <class ElementSrc, class ElementDst, class LayoutSrc, class LayoutDst, class CoordSrc, class CoordDst>
-struct TileCopyTla<Arch::AtlasA5,
-                   tla::Tensor<AscendC::LocalTensor<ElementSrc>, LayoutSrc, CoordSrc, AscendC::TPosition::A1>,
-                   tla::Tensor<AscendC::LocalTensor<ElementDst>, LayoutDst, CoordDst, AscendC::TPosition::B2>,
-                   std::enable_if_t<AscendC::Std::is_one_of_v<ElementSrc, int8_t, float8_e4m3_t, float8_e5m2_t> &&
-                                    AscendC::Std::is_one_of_v<ElementDst, int8_t, float8_e4m3_t, float8_e5m2_t> &&
-                                    tla::detail::iszN<ElementSrc, LayoutSrc>::value &&
-                                    tla::detail::isnZ<ElementDst, LayoutDst>::value>> {
+struct TileCopyTla<
+    Arch::AtlasA5, tla::Tensor<AscendC::LocalTensor<ElementSrc>, LayoutSrc, CoordSrc, AscendC::TPosition::A1>,
+    tla::Tensor<AscendC::LocalTensor<ElementDst>, LayoutDst, CoordDst, AscendC::TPosition::B2>,
+    std::enable_if_t<AscendC::Std::is_one_of_v<ElementSrc, int8_t, float8_e4m3_t, fp8_e4m3fn_t, float8_e5m2_t> &&
+                     AscendC::Std::is_one_of_v<ElementDst, int8_t, float8_e4m3_t, fp8_e4m3fn_t, float8_e5m2_t> &&
+                     tla::detail::iszN<ElementSrc, LayoutSrc>::value &&
+                     tla::detail::isnZ<ElementDst, LayoutDst>::value>> {
     static constexpr uint32_t ELE_NUM_PER_C0 = BYTE_PER_C0 / sizeof(ElementSrc);
     static constexpr uint32_t ELE_NUM_PER_FRACTAL = BYTE_PER_FRACTAL / sizeof(ElementSrc);
 
@@ -118,8 +122,10 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         static_assert(
-            AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
-                AscendC::Std::is_one_of_v<typename TensorDst::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
+            AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, fp8_e4m3fn_t,
+                                      float8_e5m2_t> &&
+                AscendC::Std::is_one_of_v<typename TensorDst::Element, int8_t, float8_e4m3_t, fp8_e4m3fn_t,
+                                          float8_e5m2_t> &&
                 tla::detail::iszN<typename TensorSrc::Element, typename TensorSrc::Layout>::value &&
                 tla::detail::isnZ<typename TensorDst::Element, typename TensorDst::Layout>::value &&
                 TensorSrc::position == AscendC::TPosition::A1 && TensorDst::position == AscendC::TPosition::B2,
@@ -164,8 +170,10 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t l0Batch)
     {
         static_assert(
-            AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
-                AscendC::Std::is_one_of_v<typename TensorDst::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
+            AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, fp8_e4m3fn_t,
+                                      float8_e5m2_t> &&
+                AscendC::Std::is_one_of_v<typename TensorDst::Element, int8_t, float8_e4m3_t, fp8_e4m3fn_t,
+                                          float8_e5m2_t> &&
                 tla::detail::iszN<typename TensorSrc::Element, typename TensorSrc::Layout>::value &&
                 tla::detail::isnZ<typename TensorDst::Element, typename TensorDst::Layout>::value &&
                 TensorSrc::position == AscendC::TPosition::A1 && TensorDst::position == AscendC::TPosition::B2,

@@ -164,6 +164,50 @@ struct CopyL0CToUBTla<
     }
 };
 
+// SPLIT_M with the BSA 32-rounded split point (RoundUp(m, 32) halves), used
+// by the union (DN) PV fixpipe so the O tile partition matches the
+// transposed softmax and RescaleO SPLIT32 partition.
+template <class TensorSrc_, class ElementDst_, class LayoutDst_, class CoordDst_, bool ReluEnable_>
+struct CopyL0CToUBTla<
+    NpuArch::Arch::AtlasA5, TensorSrc_,
+    tla::Tensor<AscendC::LocalTensor<ElementDst_>, LayoutDst_, CoordDst_, AscendC::TPosition::VECCALC>,
+    CopyL0CToUBMode::SPLIT_M32, ScaleGranularity::NO_QUANT, ReluEnable_,
+    std::enable_if_t<tla::detail::isRowMajor<LayoutDst_>::value>> {
+    using ArchTag = NpuArch::Arch::AtlasA5;
+    using ElementDst = ElementDst_;
+    using ElementSrc = typename TensorSrc_::Element;
+    static constexpr auto quantPre =
+        CopyL0CToDstQuantMode<ArchTag, ElementSrc, ElementDst, ScaleGranularity::NO_QUANT>::VALUE;
+    static constexpr auto reluEn = ReluEnable_;
+
+    template <class TensorDst, class TensorSrc>
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint8_t unitFlag = 0)
+    {
+        static_assert(
+            tla::detail::isRowMajor<typename TensorDst::Layout>::value &&
+                TensorSrc::position == AscendC::TPosition::CO1 && TensorDst::position == AscendC::TPosition::VECCALC,
+            "The input parameters do not match. TensorSrc must be L0C, while TensorDst must be UB and RowMajor");
+
+        AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> intriParams;
+
+        intriParams.nSize = tla::get<1>(dstTensor.shape());
+        intriParams.mSize = RoundUp(tla::get<0>(dstTensor.shape()), 32); // split halves are 32-rounded
+        intriParams.srcStride = tla::get<1, 1>(srcTensor.stride()) / tla::get<0, 0>(srcTensor.stride());
+        intriParams.dstStride = tla::get<0>(dstTensor.stride());
+
+        intriParams.quantPre = quantPre;
+        intriParams.reluEn = reluEn;
+        intriParams.unitFlag = unitFlag;
+        intriParams.dualDstCtl = 1;
+
+        auto dstOffset = dstTensor.layout()(dstTensor.coord());
+        auto srcOffset = srcTensor.layout()(srcTensor.coord());
+
+        AscendC::Fixpipe<ElementDst, ElementSrc, CFG_ROW_MAJOR_UB>(dstTensor.data()[dstOffset],
+                                                                   srcTensor.data()[srcOffset], intriParams);
+    }
+};
+
 template <class TensorSrc_, class ElementDst_, class LayoutDst_, class CoordDst_, bool ReluEnable_>
 struct CopyL0CToUBTla<
     NpuArch::Arch::AtlasA5, TensorSrc_,

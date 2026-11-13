@@ -15,15 +15,18 @@
 #include "kernel_operator.h"
 #if (__CCE_AICORE__ == 220)
 #include "arch22/generic_block_sparse_attention_kernel_arch22.h"
+#include "arch22/generic_block_sparse_attention_kernel_arch22_union.h"
 #endif
 #if (__CCE_AICORE__ == 310)
 #include "arch35/generic_block_sparse_attention_kernel_arch35.h"
+#include "arch35/generic_block_sparse_attention_kernel_arch35_union.h"
 #if !defined(TILING_KEY_VAR) || (TILING_KEY_VAR >= 9250002900000020ULL && TILING_KEY_VAR <= 9250002900000023ULL) || \
     (TILING_KEY_VAR >= 9250002900000032ULL && TILING_KEY_VAR <= 9250002900000035ULL) || \
     (TILING_KEY_VAR >= 9250002900000040ULL && TILING_KEY_VAR <= 9250002900000047ULL) || \
     (TILING_KEY_VAR >= 9250002900000050ULL && TILING_KEY_VAR <= 9250002900000055ULL)
 #include "arch35/generic_block_sparse_attention_kernel_arch35_mxfp8_full_quant.h"
 #endif
+
 #endif
 
 using namespace NpuArch;
@@ -125,6 +128,93 @@ __global__ __aicore__ void GbsaInferIntfRegularArch22(GM_ADDR q, GM_ADDR k, GM_A
     }
 }
 
+// maskType=3 only — Union ND / exactMask on Arch22 (FP32 softmax).
+template <class InDtype, class SMDtype, class REDtype, Epilogue::LseMode lseMode, bool isPaged, bool wideSmallM>
+__aicore__ inline void GbsaInferIntfUnionArch22Impl(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
+                                                    GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
+                                                    GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
+                                                    GM_ADDR blockTable, GM_ADDR o, GM_ADDR softmaxLse,
+                                                    GM_ADDR workspace, GM_ADDR tiling, GM_ADDR attenMask)
+{
+    using ArchTag = Arch::AtlasA2;
+    using ElementQ = InDtype;
+    using ElementK = InDtype;
+    using ElementV = InDtype;
+    using ElementS = SMDtype;
+    using ElementP = InDtype;
+    using ElementO = InDtype;
+    using ElementOTmp = REDtype;
+
+    using LayoutQ = layout::RowMajor;
+    using LayoutK = layout::ColumnMajor;
+    using LayoutS = layout::RowMajor;
+    using LayoutP = layout::RowMajor;
+    using LayoutV = layout::RowMajor;
+    using LayoutO = layout::RowMajor;
+    using LayoutOTmp = layout::RowMajor;
+
+    using L1TileShapeQK = std::conditional_t<wideSmallM, GemmShape<16, 256, 128>, GemmShape<128, 128, 128>>;
+    using L0TileShapeQK = std::conditional_t<wideSmallM, GemmShape<16, 256, 64>, GemmShape<128, 128, 128>>;
+    using DispatchPolicyQK = Gemm::MmadAtlasA2SFAIQK<isPaged, false, false, true>;
+    using QType = Gemm::GemmType<ElementQ, LayoutQ>;
+    using KType = Gemm::GemmType<ElementK, LayoutK>;
+    using SType = Gemm::GemmType<ElementS, LayoutS>;
+    using BlockMmadQK = Gemm::Block::BlockMmad<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, QType, KType, SType>;
+
+    using PType = Gemm::GemmType<ElementP, LayoutP>;
+    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueAtlasA2OnlineSoftmax<lseMode, SMDtype>;
+    using MaskType = Gemm::GemmType<int8_t, layout::RowMajor>;
+    using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType, MaskType>;
+
+    using L1TileShapePV = std::conditional_t<wideSmallM, GemmShape<16, 128, 256>, GemmShape<128, 128, 256>>;
+    using L0TileShapePV = std::conditional_t<wideSmallM, GemmShape<16, 256, 64>, GemmShape<128, 128, 128>>;
+    using DispatchPolicyPV = Gemm::MmadAtlasA2SFAIPV<isPaged, false, false, true>;
+    using VType = Gemm::GemmType<ElementV, LayoutV>;
+    using OTmpType = Gemm::GemmType<ElementOTmp, LayoutOTmp>;
+    using BlockMmadPV = Gemm::Block::BlockMmad<DispatchPolicyPV, L1TileShapePV, L0TileShapePV, PType, VType, OTmpType>;
+
+    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA2RescaleO<lseMode, REDtype>;
+    using OType = Gemm::GemmType<ElementO, LayoutO>;
+    using OTmpUpdateType = Gemm::GemmType<ElementOTmp, LayoutOTmp>;
+    using LseType = Gemm::GemmType<float, layout::RowMajor>;
+    using EpilogueRescaleO =
+        Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, OType, OTmpType, OTmpUpdateType, LseType>;
+
+    using GbsaKernel =
+        GbsaUnionKernelArch22<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO, isPaged, false>;
+
+    GbsaKernelParamsArch22 params{
+        q,         k,          v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+        sequsedKv, blockTable, o, softmaxLse,     workspace,        tiling,   attenMask};
+    GbsaKernel gbsaKernel;
+    gbsaKernel(params);
+}
+
+template <class InDtype, class SMDtype, class REDtype = SMDtype, Epilogue::LseMode lseMode = Epilogue::LseMode::NONE,
+          bool isPaged = true>
+__global__ __aicore__ void GbsaInferIntfUnionArch22(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
+                                                    GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
+                                                    GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
+                                                    GM_ADDR blockTable, GM_ADDR o, GM_ADDR softmaxLse,
+                                                    GM_ADDR workspace, GM_ADDR tiling, GM_ADDR attenMask)
+{
+    GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, tilingDataLocal, tiling);
+    const auto* data = &tilingDataLocal;
+    // Effective union rows = groupSize * UNION_SIZE(8); keep wide-small-M when ≤16.
+    const bool wideSmallM = data->embeddingSize > 0U && data->embeddingSize <= 256U && data->groupSize > 0U &&
+                            data->groupSize * 8U <= 16U && data->blockShapeX == 1U &&
+                            data->baseTileInfo.kvBaseTile == 256U;
+    if (wideSmallM) {
+        GbsaInferIntfUnionArch22Impl<InDtype, SMDtype, REDtype, lseMode, isPaged, true>(
+            q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ, sequsedKv,
+            blockTable, o, softmaxLse, workspace, tiling, attenMask);
+    } else {
+        GbsaInferIntfUnionArch22Impl<InDtype, SMDtype, REDtype, lseMode, isPaged, false>(
+            q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ, sequsedKv,
+            blockTable, o, softmaxLse, workspace, tiling, attenMask);
+    }
+}
+
 #endif
 #if (__CCE_AICORE__ == 310)
 
@@ -219,6 +309,140 @@ __global__ __aicore__ void GbsaInferIntfRegular(GM_ADDR q, GM_ADDR k, GM_ADDR v,
                              lseFormat, OutDtype>(q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths,
                                                   cuSeqLengthsKv, sequsedQ, sequsedKv, blockTable, o, softmaxLse,
                                                   workspace, tiling);
+}
+
+// maskType=3 only — Union* templates + GbsaUnionKernelArch35 (DN / exactMask).
+template <class InDtype, class SMDtype, class REDtype, Format qFormat, Format kvFormat, bool isPaged,
+          Epilogue::LseMode lseMode = Epilogue::LseMode::NONE, Epilogue::LseFormat lseFormat = Epilogue::LseFormat::TN1>
+__global__ __aicore__ void GbsaInferIntfUnion(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
+                                              GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
+                                              GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
+                                              GM_ADDR blockTable, GM_ADDR o, GM_ADDR softmaxLse, GM_ADDR workspace,
+                                              GM_ADDR tiling, GM_ADDR attenMask)
+{
+    using ArchTag = Arch::AtlasA5;
+    using ElementQ = InDtype;
+    using ElementK = InDtype;
+    using ElementV = InDtype;
+    using ElementS = SMDtype;
+    using ElementP = InDtype;
+    using ElementO = InDtype;
+    using ElementOTmp = REDtype;
+
+    using LayoutQ = layout::RowMajor;
+    using LayoutK = layout::ColumnMajor;
+    using LayoutS = layout::RowMajor;
+    using LayoutPDummy = layout::nZ;
+    using LayoutV = layout::RowMajor;
+    using LayoutO = layout::RowMajor;
+    using LayoutOTmp = layout::RowMajor;
+
+    using DispatchPolicyPrepareKvOffsets = Epilogue::EpilogueAtlasA5PrepareKvOffsets<isPaged, false, sizeof(ElementK)>;
+    using EpiloguePrepareKvOffsets = Epilogue::Block::BlockEpilogue<DispatchPolicyPrepareKvOffsets>;
+
+    using L1TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
+    using L0TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
+    using DispatchPolicyQK = Gemm::MmadAtlasA5UnionQK<isPaged, false, true>;
+    using TileCopyQK = Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementQ, LayoutQ, ElementK, LayoutK, ElementS,
+                                                         LayoutS, void, Gemm::Tile::CopyL0CToUBMode::SPLIT_N>;
+    using BlockMmadQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, ElementQ, ElementK,
+                                                  ElementS, void, TileCopyQK>;
+
+    using PType = Gemm::GemmType<ElementP, LayoutPDummy>;
+    using SType = Gemm::GemmType<ElementS, LayoutS>;
+    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxUnion;
+    using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType>;
+
+    using L1TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
+    using L0TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
+    using DispatchPolicyPV = Gemm::MmadAtlasA5BsaPV<isPaged, false, true>;
+    using TileCopyPV =
+        Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementP, LayoutPDummy, ElementV, LayoutV, ElementOTmp, LayoutOTmp,
+                                          void, Gemm::Tile::CopyL0CToUBMode::SPLIT_M32>;
+    using BlockMmadPV = Gemm::Block::BlockMmadTla<DispatchPolicyPV, L1TileShapePV, L0TileShapePV, ElementP, ElementV,
+                                                  ElementOTmp, void, TileCopyPV>;
+
+    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA5UnionRescaleO<lseMode, lseFormat>;
+    using TileCopyRescaleO = Epilogue::Tile::TileCopyRescaleO<ArchTag, ElementO, LayoutO, LayoutOTmp>;
+    using EpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, ElementO, ElementOTmp, ElementS,
+                                                            ElementK, TileCopyRescaleO, Arch::PositionL0C>;
+
+    using GbsaKernel = GbsaUnionKernelArch35<EpiloguePrepareKvOffsets, BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV,
+                                             EpilogueRescaleO, kvFormat, isPaged, false>;
+
+    GbsaKernelParamsArch35 params{
+        q,         k,          v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+        sequsedKv, blockTable, o, softmaxLse,     workspace,        tiling,   attenMask};
+    GbsaKernel gbsaKernel;
+    gbsaKernel(params);
+}
+
+// maskType=3 + quantType=5: same Union DN / exactMask path as IntfUnion, but FP8
+// QKV/P with SoftmaxUnion ×448 and Rescale ÷448. O is SMDtype (fp16/bf16).
+template <class InDtype, class SMDtype, class REDtype, Format qFormat, Format kvFormat, bool isPaged,
+          Epilogue::LseMode lseMode = Epilogue::LseMode::NONE, Epilogue::LseFormat lseFormat = Epilogue::LseFormat::TN1>
+__global__ __aicore__ void GbsaInferIntfUnionFp8(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
+                                                 GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
+                                                 GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
+                                                 GM_ADDR blockTable, GM_ADDR o, GM_ADDR softmaxLse, GM_ADDR workspace,
+                                                 GM_ADDR tiling, GM_ADDR attenMask)
+{
+    using ArchTag = Arch::AtlasA5;
+    using ElementQ = InDtype;
+    using ElementK = InDtype;
+    using ElementV = InDtype;
+    using ElementS = float;
+    using ElementP = InDtype;
+    using ElementO = SMDtype;
+    using ElementOTmp = REDtype;
+
+    using LayoutQ = layout::RowMajor;
+    using LayoutK = layout::ColumnMajor;
+    using LayoutS = layout::RowMajor;
+    // SoftmaxUnion FP8 Step1 SoftmaxUnion-half baseline: nZ P (SoftmaxUnion CopyP + MergeHalfNz).
+    using LayoutPDummy = layout::nZ;
+    using LayoutV = layout::RowMajor;
+    using LayoutO = layout::RowMajor;
+    using LayoutOTmp = layout::RowMajor;
+
+    using DispatchPolicyPrepareKvOffsets = Epilogue::EpilogueAtlasA5PrepareKvOffsets<isPaged, false, sizeof(ElementK)>;
+    using EpiloguePrepareKvOffsets = Epilogue::Block::BlockEpilogue<DispatchPolicyPrepareKvOffsets>;
+
+    using L1TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
+    using L0TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
+    using DispatchPolicyQK = Gemm::MmadAtlasA5UnionQK<isPaged, false, true>;
+    using TileCopyQK = Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementQ, LayoutQ, ElementK, LayoutK, ElementS,
+                                                         LayoutS, void, Gemm::Tile::CopyL0CToUBMode::SPLIT_N>;
+    using BlockMmadQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, ElementQ, ElementK,
+                                                  ElementS, void, TileCopyQK>;
+
+    using PType = Gemm::GemmType<ElementP, LayoutPDummy>;
+    using SType = Gemm::GemmType<ElementS, LayoutS>;
+    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxUnion;
+    using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType>;
+
+    using L1TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
+    using L0TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
+    using DispatchPolicyPV = Gemm::MmadAtlasA5BsaPV<isPaged, false, true>;
+    using TileCopyPV =
+        Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementP, LayoutPDummy, ElementV, LayoutV, ElementOTmp, LayoutOTmp,
+                                          void, Gemm::Tile::CopyL0CToUBMode::SPLIT_M32>;
+    using BlockMmadPV = Gemm::Block::BlockMmadTla<DispatchPolicyPV, L1TileShapePV, L0TileShapePV, ElementP, ElementV,
+                                                  ElementOTmp, void, TileCopyPV>;
+
+    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA5UnionRescaleO<lseMode, lseFormat>;
+    using TileCopyRescaleO = Epilogue::Tile::TileCopyRescaleO<ArchTag, ElementO, LayoutO, LayoutOTmp>;
+    using EpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, ElementO, ElementOTmp, ElementS,
+                                                            ElementK, TileCopyRescaleO, Arch::PositionL0C>;
+
+    using GbsaKernel = GbsaUnionKernelArch35<EpiloguePrepareKvOffsets, BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV,
+                                             EpilogueRescaleO, kvFormat, isPaged, true>;
+
+    GbsaKernelParamsArch35 params{
+        q,         k,          v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+        sequsedKv, blockTable, o, softmaxLse,     workspace,        tiling,   attenMask};
+    GbsaKernel gbsaKernel;
+    gbsaKernel(params);
 }
 
 template <class InDtype, class SMDtype, class REDtype, Format qFormat,

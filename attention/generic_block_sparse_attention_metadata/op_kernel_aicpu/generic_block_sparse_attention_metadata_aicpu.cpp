@@ -21,6 +21,8 @@ constexpr uint32_t KERNEL_STATUS_PARAM_INVALID = 1U;
 constexpr int32_t TND_SPARSE_BLOCK_IDX_DIM_NUM = 3;
 constexpr int32_t TND_SPARSE_BLOCK_COUNT_DIM_NUM = 2;
 constexpr int32_t TND_BLOCK_CAPACITY_DIM_INDEX = 2;
+// Union size is read from block_shape_x; only 8 is supported today.
+constexpr int64_t GBSA_SUPPORTED_UNION_SIZE = 8;
 
 bool HasTensorShape(const Tensor* tensor)
 {
@@ -87,7 +89,7 @@ bool GenericBlockSparseAttentionMetadataAicpu::Prepare(CpuKernelContext& ctx)
         GetAttrValue(ctx, "aic_core_num", aicCoreNum_) &&
         GetAttrValue(ctx, "residual_block_mode", residualBlockMode_) &&
         GetAttrValue(ctx, "is_consistent_topk", isConsistentTopk_) && GetAttrValue(ctx, "mask_type", maskType_);
-    return attrsValid && (maskType_ == 0 || maskType_ == 1) && CheckInputs() && CheckKvSeqLens();
+    return attrsValid && (maskType_ == 0 || maskType_ == 1 || maskType_ == 3) && CheckInputs() && CheckKvSeqLens();
 }
 
 bool GenericBlockSparseAttentionMetadataAicpu::CheckOptionalTensor(const Tensor* tensor, DataType dataType,
@@ -120,13 +122,29 @@ bool GenericBlockSparseAttentionMetadataAicpu::CheckInputs()
         KERNEL_LOG_ERROR("sparse block tensors and metadata must be INT32 with valid shapes.");
         return false;
     }
+    if (maskType_ == 3 && (isPackedGQA_ != 1 || numKvHeads_ < 1 || residualBlockMode_ != 0 || isConsistentTopk_ != 0)) {
+        KERNEL_LOG_ERROR("Union mode requires packed GQA, kvHeads>=1, residual_block_mode=0 and is_consistent_topk=0.");
+        return false;
+    }
+    if (maskType_ == 3 && quantType_ == 6) {
+        KERNEL_LOG_ERROR("Union mode only supports quantType=0 or 5.");
+        return false;
+    }
+    // Regular: blockShapeX=1. Union: blockShapeX is unionSize (only 8 supported).
+    const int64_t expectedBlockShapeX = maskType_ == 3 ? GBSA_SUPPORTED_UNION_SIZE : 1;
+    if (blockShapeX_ != expectedBlockShapeX) {
+        KERNEL_LOG_ERROR("block_shape_x=%lld invalid for mask_type=%lld (expected %lld).", blockShapeX_, maskType_,
+                         expectedBlockShapeX);
+        return false;
+    }
+
     if (qInputLayout_ != "TND" && qInputLayout_ != "BSND" && qInputLayout_ != "BNSD") {
         KERNEL_LOG_ERROR("q_input_layout only supports TND, BSND or BNSD.");
         return false;
     }
     if ((qInputLayout_ != "TND" && maxQSeqLen_ <= 0) || numQHeads_ <= 0 || numKvHeads_ <= 0 || headDim_ <= 0 ||
-        blockShapeX_ != 1 || blockShapeY_ <= 0 || blockShapeY_ > 256 || (isPackedGQA_ != 0 && isPackedGQA_ != 1) ||
-        aicCoreNum_ <= 0 || aicCoreNum_ > MAX_AIC_CORE_NUM || (residualBlockMode_ != 0 && residualBlockMode_ != 1) ||
+        blockShapeY_ <= 0 || blockShapeY_ > 256 || (isPackedGQA_ != 0 && isPackedGQA_ != 1) || aicCoreNum_ <= 0 ||
+        aicCoreNum_ > MAX_AIC_CORE_NUM || (residualBlockMode_ != 0 && residualBlockMode_ != 1) ||
         (isConsistentTopk_ != 0 && isConsistentTopk_ != 1)) {
         KERNEL_LOG_ERROR("Invalid scheduling attrs for GenericBlockSparseAttentionMetadata.");
         return false;
@@ -149,6 +167,12 @@ bool GenericBlockSparseAttentionMetadataAicpu::CheckInputs()
             return false;
         }
         batchSize_ = cuSeqLengths_->GetTensorShape()->GetDimSize(0) - 1;
+    } else if (maskType_ == 3) {
+        if (!HasTensorShape(seqUsedQ_) || seqUsedQ_->GetTensorShape()->GetDims() != 1 || seqUsedKv_ == nullptr) {
+            KERNEL_LOG_ERROR("Batched union requires seq_used_q and seq_used_kv.");
+            return false;
+        }
+        batchSize_ = seqUsedQ_->GetTensorShape()->GetDimSize(0);
     } else {
         if (qBlockStorageNum_ % maxQSeqLen_ != 0 || seqUsedQ_ == nullptr || seqUsedKv_ == nullptr) {
             KERNEL_LOG_ERROR("Batched layouts require valid Q storage capacity and seq_used_q/seq_used_kv.");
@@ -197,6 +221,7 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
         qSeqLens.resize(static_cast<size_t>(batchSize_));
         kvSeqLens.resize(static_cast<size_t>(batchSize_));
         qStorageBlockStarts.resize(static_cast<size_t>(batchSize_));
+        int64_t groupCount = 0;
         for (int64_t batchIdx = 0; batchIdx < batchSize_; ++batchIdx) {
             if (qUsed[batchIdx] < 0 || qUsed[batchIdx] > maxQSeqLen_ || kvUsed[batchIdx] < 0) {
                 KERNEL_LOG_ERROR("Invalid batched sequence length at batch %lld.", batchIdx);
@@ -205,8 +230,9 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
             qSeqLens[static_cast<size_t>(batchIdx)] = qUsed[batchIdx];
             kvSeqLens[static_cast<size_t>(batchIdx)] = kvUsed[batchIdx];
             qStorageBlockStarts[static_cast<size_t>(batchIdx)] = batchIdx * maxQSeqLen_;
+            groupCount += (static_cast<int64_t>(qUsed[batchIdx]) + blockShapeX_ - 1) / blockShapeX_;
         }
-        return true;
+        return maskType_ != 3 || groupCount == qBlockStorageNum_;
     }
     const auto* kvPrefix =
         cuSeqLengthsKv_ == nullptr ? nullptr : static_cast<const int64_t*>(cuSeqLengthsKv_->GetData());
@@ -241,6 +267,7 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
         qSeqLens.resize(static_cast<size_t>(batchSize_));
         qStorageBlockStarts.resize(static_cast<size_t>(batchSize_));
         int64_t storageBlockBase = 0;
+        int64_t groupBase = 0;
         for (int64_t batchIdx = 0; batchIdx < batchSize_; ++batchIdx) {
             const int64_t storageQSeqLen = qPrefix[batchIdx + 1] - qPrefix[batchIdx];
             const int64_t actualQSeqLen = qUsed == nullptr ? storageQSeqLen : qUsed[batchIdx];
@@ -255,11 +282,14 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
                 return false;
             }
             storageBlockBase += storageBlockNum;
+            // Union mode: sparse tensor dim1 is the group count from actual (seqused) Q lengths.
+            // Union size is blockShapeX_ (validated to the supported value in CheckInputs).
+            groupBase += (actualQSeqLen + blockShapeX_ - 1) / blockShapeX_;
             if (!readKvSeqLen(batchIdx, kvSeqLens[static_cast<size_t>(batchIdx)])) {
                 return false;
             }
         }
-        return storageBlockBase == qBlockStorageNum_;
+        return maskType_ == 3 ? (groupBase == qBlockStorageNum_) : (storageBlockBase == qBlockStorageNum_);
     }
 
     return false;
@@ -272,6 +302,27 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseValidBlockNums(const std::ve
 {
     const auto* counts = static_cast<const int32_t*>(sparseBlockCount_->GetData());
     validBlockNums.clear();
+    if (maskType_ == 3) {
+        // Union mode: one count per (group, head); groups concatenated in batch order.
+        int64_t groupBase = 0;
+        for (int64_t batchIdx = 0; batchIdx < batchSize_; ++batchIdx) {
+            const int64_t groupNum = (qSeqLens[static_cast<size_t>(batchIdx)] + blockShapeX_ - 1) / blockShapeX_;
+            for (int64_t group = 0; group < groupNum; ++group) {
+                for (int64_t sparseHead = 0; sparseHead < sparseHeadNum_; ++sparseHead) {
+                    const int64_t offset = sparseHead * qBlockStorageNum_ + groupBase + group;
+                    const int64_t count = counts[offset];
+                    if (count < 0 || count > blockIndexStride_) {
+                        KERNEL_LOG_ERROR("union_sparse_count[%lld]=%lld exceeds capacity %lld.", offset, count,
+                                         blockIndexStride_);
+                        return false;
+                    }
+                    validBlockNums.push_back(count);
+                }
+            }
+            groupBase += groupNum;
+        }
+        return true;
+    }
     for (int64_t batchIdx = 0; batchIdx < batchSize_; ++batchIdx) {
         const int64_t qSeqLen = qSeqLens[static_cast<size_t>(batchIdx)];
         const int64_t kvSeqLen = kvSeqLens[static_cast<size_t>(batchIdx)];
@@ -306,6 +357,9 @@ bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vecto
     input.numKvHeads = numKvHeads_;
     input.maxQSeqLen = maxQSeqLen_;
     input.headDim = headDim_;
+    // Keep API blockShapeX_ in the schedule input so configSignature matches the
+    // main op (kernel hashes tilingData->blockShapeX). Scheduler math does not
+    // re-split by X; union mode converts token lengths into group counts below.
     input.blockShapeX = blockShapeX_;
     input.blockShapeY = blockShapeY_;
     input.blockIndexStride = blockIndexStride_;
@@ -313,11 +367,22 @@ bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vecto
     input.isPackedGQA = isPackedGQA_;
     input.residualBlockMode = residualBlockMode_;
     input.isConsistentTopk = isConsistentTopk_;
-    input.maskType = maskType_;
     input.quantType = quantType_;
+
     input.aicCoreNum = aicCoreNum_;
-    input.qSeqLens = qSeqLens;
     input.validBlockNums = validBlockNums;
+    if (maskType_ == 3) {
+        // Keep union distinct from ordinary non-causal attention so it cannot
+        // enter FD scheduling. The config signature keeps its non-causal tag.
+        input.maskType = 3;
+        input.qSeqLens.clear();
+        for (const int64_t qSeqLen : qSeqLens) {
+            input.qSeqLens.push_back((qSeqLen + blockShapeX_ - 1) / blockShapeX_);
+        }
+    } else {
+        input.maskType = maskType_;
+        input.qSeqLens = qSeqLens;
+    }
 
     generic_block_sparse_attention_metadata::ScheduleResult result;
     const auto scheduleStatus = generic_block_sparse_attention_metadata::BuildSchedule(input, result);

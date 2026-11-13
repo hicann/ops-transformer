@@ -81,6 +81,9 @@ struct GenericBlockSparseAttentionTilingData {
     // Arch22 layout strides: 0=TND/PA_BBND, 1=BSND, 2=BNSD, 3=PA_BNBD.
     uint32_t qLayout;
     uint32_t kvLayout;
+    // Union packed O/LSE scratch when multi-token GQA rows are non-contiguous in GM.
+    uint64_t unionIoPackOffset;
+    uint32_t unionIoPackORowStride;
 };
 
 } // namespace GenericBlockSparseAttn

@@ -144,7 +144,7 @@ inline uint32_t CalculateConfigSignature(const ScheduleInput& input)
     hash = HashConfigValue(hash, static_cast<uint32_t>(input.residualBlockMode));
     hash = HashConfigValue(hash, static_cast<uint32_t>(input.isConsistentTopk));
     // Keep legacy causal metadata compatible; tag non-causal metadata separately.
-    if (input.maskType == 0) {
+    if (input.maskType == 0 || input.maskType == 3) {
         hash = HashConfigValue(hash, 0U);
     }
     return hash;
@@ -230,11 +230,18 @@ inline BSAScheduleStatus AccumulateFdCost(int64_t m16, int64_t validBlockNum, ui
 inline bool IsScheduleInputValid(const ScheduleInput& input)
 {
     using namespace optiling::generic_block_sparse_attention_metadata;
-    return input.batchSize >= 0 && input.numQHeads > 0 && input.numKvHeads > 0 && input.headDim > 0 &&
-           input.blockShapeX == 1 && input.blockShapeY > 0 && input.blockIndexStride > 0 &&
-           input.qBlockStorageNum > 0 && (input.isPackedGQA == 0 || input.isPackedGQA == 1) &&
+    // Regular modes keep X=1. Union (maskType=3) feeds the real unionSize (currently 8) so
+    // CalculateConfigSignature stays aligned with the attention kernel's tiling->blockShapeX.
+    // qSeqLens are already converted to group counts before BuildSchedule for Union.
+    constexpr int64_t kSupportedUnionSize = 8;
+    const bool blockShapeXOk = (input.maskType == 3 && input.blockShapeX == kSupportedUnionSize) ||
+                               (input.maskType != 3 && input.blockShapeX == 1);
+    return input.batchSize >= 0 && input.numQHeads > 0 && input.numKvHeads > 0 && input.headDim > 0 && blockShapeXOk &&
+           input.blockShapeY > 0 && input.blockIndexStride > 0 && input.qBlockStorageNum > 0 &&
+           (input.isPackedGQA == 0 || input.isPackedGQA == 1) &&
            (input.residualBlockMode == 0 || input.residualBlockMode == 1) &&
-           (input.maskType == 0 || input.maskType == 1) && input.aicCoreNum > 0 &&
+           (input.maskType == 0 || input.maskType == 1 || input.maskType == 3) &&
+           !(input.maskType == 3 && input.quantType == 6) && input.aicCoreNum > 0 &&
            input.aicCoreNum <= MAX_AIC_CORE_NUM && input.qSeqLens.size() == static_cast<size_t>(input.batchSize);
 }
 
@@ -319,7 +326,8 @@ inline bool ShouldBuildDecodeSchedule(const ScheduleInput& input, const Schedule
         mxfp8ShapeSupported && input.headDim > 0 && input.headDim <= 512 && input.blockIndexStride >= 12 &&
         result.groupSize > 0 && result.groupSize <= 128 && result.saTotalTaskNum > 0 &&
         static_cast<uint64_t>(result.saTotalTaskNum) * 10U < static_cast<uint64_t>(input.aicCoreNum) * 3U;
-    if (!fdShapeSupported || totalSplitTaskNum <= result.saUsedCoreNum || totalCost == 0U || totalValidBlockNum == 0U) {
+    if (input.maskType == 3 || !fdShapeSupported || totalSplitTaskNum <= result.saUsedCoreNum || totalCost == 0U ||
+        totalValidBlockNum == 0U) {
         return false;
     }
     if (input.quantType == 6) {

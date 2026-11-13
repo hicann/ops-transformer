@@ -706,3 +706,72 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp8FdPackedWorkTierBo
         }
     }
 }
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionNeverBuildsFdSchedule)
+{
+    constexpr int64_t kUnionSize = 8;
+    ScheduleInput input = MakeDecodeInput();
+    input.maskType = 0;
+    input.blockShapeX = 1;
+    input.blockIndexStride = 512;
+    input.validBlockNums.assign(input.qBlockStorageNum, 512);
+    ScheduleResult regular;
+    ASSERT_EQ(BuildSchedule(input, regular), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_GT(regular.fdActiveCoreNum, 0);
+    // Union feeds unionSize as blockShapeX; X=1 with maskType=3 is rejected.
+    input.maskType = 3;
+    input.blockShapeX = kUnionSize;
+    ScheduleResult result;
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_EQ(result.saTotalTaskNum, regular.saTotalTaskNum);
+    EXPECT_NE(result.configSignature, regular.configSignature);
+    EXPECT_EQ(result.fdActiveCoreNum, 0);
+    EXPECT_EQ(result.combineTaskNum, 0);
+    EXPECT_EQ(result.fdPartialTaskNum, 0);
+    EXPECT_EQ(result.fdScheduleFlags, FD_ACTUAL_BLOCK_PREFIX);
+}
+
+// Runtime AICPU feeds unionSize as blockShapeX (currently 8). Signature must
+// accept X=8 and differ from maskType=0 (X=1) so kernel ValidateMetadata can
+// match tiling->blockShapeX without colliding with non-causal metadata.
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionRuntimeBlockShapeXAccepted)
+{
+    constexpr int64_t kUnionSize = 8;
+    ScheduleInput input = MakeDecodeInput();
+    input.maskType = 0;
+    input.blockShapeX = 1;
+    input.blockIndexStride = 16;
+    input.qBlockStorageNum = 2;
+    input.qSeqLens = {2};
+    input.validBlockNums = {4, 4};
+    ScheduleResult nonCausal;
+    ASSERT_EQ(BuildSchedule(input, nonCausal), BSAScheduleStatus::BSA_SUCCESS);
+
+    input.maskType = 3;
+    input.blockShapeX = kUnionSize;
+    ScheduleResult unionResult;
+    ASSERT_EQ(BuildSchedule(input, unionResult), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_EQ(unionResult.saTotalTaskNum, nonCausal.saTotalTaskNum);
+    EXPECT_NE(unionResult.configSignature, nonCausal.configSignature);
+    EXPECT_EQ(unionResult.fdActiveCoreNum, 0);
+    EXPECT_EQ(unionResult.combineTaskNum, 0);
+
+    input.blockShapeX = 4; // unsupported unionSize
+    ScheduleResult rejected;
+    EXPECT_EQ(BuildSchedule(input, rejected), BSAScheduleStatus::BSA_INVALID_PARAM);
+}
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionMxfp8IsRejected)
+{
+    // SoftmaxUnion (maskType=3) only supports quantType=0 or 5; MXFP8 must be rejected
+    // so metadata does not emit a Union schedule for an unsupported combination.
+    constexpr int64_t kUnionSize = 8;
+    ScheduleInput input = MakeDecodeInput();
+    input.maskType = 3;
+    input.blockShapeX = kUnionSize;
+    input.quantType = 6;
+    input.headDim = 256;
+    input.blockShapeY = 4;
+    ScheduleResult result;
+    EXPECT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_INVALID_PARAM);
+}

@@ -33,7 +33,7 @@
   attentionOut = Softmax(scaleValue \cdot query \cdot key_{sparse}^{T} + atten\_mask) \cdot value_{sparse}
   $$
 
-  The input layout is specified by layoutQ and layoutKv. Currently only supports layoutQ="TND" and layoutKv="PA_BBND".
+  The input layout is specified by layoutQ and layoutKv. Supported combinations are listed under <a href="#other-constraints">Other Constraints</a> (TND/BSND/BNSD with dense or PA_BBND/PA_BNBD on Ascend 950; see that section for product scope).
 
 ## Function Prototype
 
@@ -119,7 +119,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>query</td>
       <td>Input</td>
       <td>The query in the formula.</td>
-      <td>Currently only supports layoutQ="TND". For shapes of other layouts, see <a href="#layout-correspondence-description">Layout Correspondence Description</a>.</td>
+      <td>Supports layoutQ="TND"/"BSND"/"BNSD". For shapes and product scope, see <a href="#layout-correspondence-description">Layout Correspondence Description</a> and <a href="#other-constraints">Other Constraints</a>.</td>
       <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, FLOAT4_E2M1FN, HIFLOAT8</td>
       <td>ND</td>
       <td>[totalQTokens, headNum, headDim]</td>
@@ -129,7 +129,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>key</td>
       <td>Input</td>
       <td>key in the formula.</td>
-      <td>Can be used as the original Key or Paged KV Cache. Supports PA_BBND/PA_BNBD KV or matching dense Q/KV layouts, subject to the product and quantization constraints below. For the shapes of other layouts and the original KV, see <a href="#layout-correspondence-description">layout Correspondence Description</a>, <a href="#paged-attention-related-description">Paged Attention Related Description</a>; for non-contiguous dim0, see <a href="#other-constraints">Other Constraints</a>.</td>
+      <td>Can be used as the original Key or Paged KV Cache. Supports layoutKv="TND"/"BSND"/"BNSD"/"PA_BBND"/"PA_BNBD" within product scope, including matching dense Q/KV layouts or PA layouts subject to product and quantization constraints below. For shapes, see <a href="#layout-correspondence-description">Layout Correspondence Description</a> and <a href="#paged-attention-related-description">Paged Attention Related Description</a>; for non-contiguous dim0, see <a href="#other-constraints">Other Constraints</a>.</td>
       <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, FLOAT4_E2M1FN, HIFLOAT8</td>
       <td>ND</td>
       <td>[numBlocks, blockSize, numKeyValueHeads, headDim]</td>
@@ -139,7 +139,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>value</td>
       <td>Input</td>
       <td>value in the formula.</td>
-      <td>Can be used as the original Value input or Paged KV Cache input, and its shape is the same as that of key. Supports PA_BBND/PA_BNBD KV or matching dense Q/KV layouts, subject to the product and quantization constraints below.</td>
+      <td>Can be used as the original Value input or Paged KV Cache input, and its shape is the same as that of key. Supported layouts match key, including PA_BBND/PA_BNBD KV or matching dense Q/KV layouts, subject to the product and quantization constraints below. See <a href="#other-constraints">Other Constraints</a>.</td>
       <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, FLOAT4_E2M1FN, HIFLOAT8</td>
       <td>ND</td>
       <td>Same as key</td>
@@ -180,8 +180,13 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>attenMaskOptional</td>
       <td>Input</td>
       <td>atten_mask in the formula.</td>
-      <td>atten_mask is superimposed on the sparse pattern. See <a href="#mask-description">Mask Description</a> for details. Currently not supported; must be passed in as nullptr.</td>
-      <td>BOOL</td>
+      <td>
+        See <a href="#mask-description">Mask Description</a>.<br>
+        maskType=0/1: must be nullptr.<br>
+        maskType=3 (Union): must be INT32 exactMask with shape [kvHeads, G, U×blockShapeY];
+        bit <code>i</code> of each int32 (from the low bit, i&lt;unionSize) marks whether the i-th Q in the group can see that KV column.
+      </td>
+      <td>BOOL, INT32</td>
       <td>ND</td>
       <td>2</td>
       <td>×</td>
@@ -252,7 +257,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>        Optional input, used for variable-length sequence use cases.
         <ul>
           <li>Must be passed in when layoutKv is TND.</li>
-          <li>Not passed in when layoutKv is not TND (must be nullptr). Currently only supports PA_BBND.</li>
+          <li>Not passed in when layoutKv is not TND (must be nullptr). For PA_BBND/PA_BNBD, pass sequsedKvOptional instead.</li>
           <li>When layoutKv is BNSD/BSND: if passed in, the operator processes data based on the actual sequence length specified by this input; if nullptr is passed in, S in the key/value shape is used (currently not supported).</li>
           <li>Elements are prefix sums: the 0th element is 0, the last element equals the sum of KV storage lengths of all batches, and each subsequent element must be ≥ the previous element.</li>
         </ul>
@@ -281,7 +286,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>Input</td>
       <td>Actual sequence length of KV in each batch.</td>
       <td>        <ul>
-          <li>Must be passed in when layoutKv is PA_BBND, with shape (B,); each element must be ≥ 0.</li>
+          <li>Must be passed in when layoutKv is PA_BBND/PA_BNBD, with shape (B,); each element must be ≥ 0.</li>
           <li>When layoutKv is TND: if the actual length is not specified, nullptr can be passed in, indicating that the storage length is the same as that obtained by difference from cuSeqLengthsKvOptional; if passed in, shape is (B,) and each element must be ≥ 0 and ≤ the storage length of cu in the corresponding batch. For the dual-length semantics when coexisting with cu, see <a href="#other-constraints">Other Constraints</a>.</li>
         </ul>
       </td>
@@ -294,7 +299,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>blockTableOptional</td>
       <td>Input</td>
       <td>The block table is used for PagedAttention.</td>
-      <td>If this input is configured, PagedAttention is used. Currently it must be passed in, and layoutKv must be PA_BBND. See <a href="#paged-attention-related-description">Paged Attention Related Description</a> for details.</td>
+      <td>Must be passed in when layoutKv is PA_BBND/PA_BNBD; must be nullptr for non-PA layouts. See <a href="#paged-attention-related-description">Paged Attention Related Description</a> and <a href="#other-constraints">Other Constraints</a>.</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B, maxNumBlocksPerBatch)</td>
@@ -304,7 +309,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>blockShape</td>
       <td>Input</td>
       <td>Represents the sparse block shape array.</td>
-      <td>Contains two elements [blockShapeX, blockShapeY].<br>blockShapeX supports any value and must not exceed the int64 representation range.<br>blockShapeY supports any value aligned to 16 and must not exceed the int64 representation range.<br>For additional constraints when quantization is enabled, see <a href="#quantization-related-description">Quantization Related Description</a>.<br>Currently only blockShape=[1,128] is supported.</td>
+      <td>Contains two elements [blockShapeX, blockShapeY]. Non-union uses [1,Y]; union (maskType=3) uses [8,Y] (unionSize is read from blockShapeX; currently only 8). See product constraints in <a href="#other-constraints">Other Constraints</a> and the mask description.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -314,7 +319,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>layoutQ</td>
       <td>Input</td>
       <td>Represents the data layout format of the input query.</td>
-      <td>Supported targets: "TND", "BNSD", and "BSND". For details, see <a href="#layout-correspondence-description">Layout Correspondence Description</a>. Currently only "TND" is supported.</td>
+      <td>Supported targets: "TND", "BNSD", and "BSND". For details and product scope, see <a href="#layout-correspondence-description">Layout Correspondence Description</a> and <a href="#other-constraints">Other Constraints</a>.</td>
       <td>String</td>
       <td>-</td>
       <td>-</td>
@@ -324,7 +329,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>layoutKv</td>
       <td>Input</td>
       <td>Represents the data layout of the input key and value.</td>
-      <td>The target supports "TND", "BNSD", "BSND", "PA_BBND", and "PA_BNBD". See Details in <a href="#layout-correspondence-description">Layout Correspondence Description</a>. Currently only supports "PA_BBND".</td>
+      <td>The target supports "TND", "BNSD", "BSND", "PA_BBND", and "PA_BNBD". See <a href="#layout-correspondence-description">Layout Correspondence Description</a> and <a href="#other-constraints">Other Constraints</a> for product scope.</td>
       <td>String</td>
       <td>-</td>
       <td>-</td>
@@ -355,7 +360,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>Input</td>
       <td>Represents the mask type in the attention computation.</td>
       <td>        Value range: 0-5. For details, see <a href="#mask-description">Mask Description</a>.<br>
-        Currently, only 1 (causal mask) is supported.
+        Currently supports 0 (non-causal) and 1 (causal); Ascend 950PR&amp;950DT products and non-quantized Atlas A2/A3 products also support 3 (Union exactMask).
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -366,8 +371,8 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>quantType</td>
       <td>Input</td>
       <td>Represents the quantization method used.</td>
-      <td>        Value range: 0-5. See <a href="#quantization-related-description">Quantization Related Description</a> for the complete configuration:<br>
-        Currently available: 0; 5 is optional on Ascend 950PR&950DT products. If 1-4 is passed, the check fails.
+      <td>        Value range: 0-6. See <a href="#quantization-related-description">Quantization Related Description</a> for the complete configuration:<br>
+        Currently available: 0, 5, and 6 on Ascend 950PR&amp;950DT products. If 1-4 is passed, the check fails.
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -396,7 +401,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
           <li>0: fp32 is used for both online softmax and rescale. Suitable for use cases that require high computation precision.</li>
           <li>1: Mixed precision; fp16/bf16 (same as attentionOut) is used for online softmax, and fp32 is used for rescale. Numeric overflow may occur in the online softmax phase.</li>
         </ul>
-        On Ascend 950PR&950DT, MXFP8 (quantType=6) uses FP32 scores and softmax for both values: 0 is recommended and 1 is a compatibility alias. P is still quantized to FP8 using p_quant_scale. Nonquantized FLOAT16/BFLOAT16 supports 0 or 1; quantType=5 supports only 1. On Atlas A2 and Atlas A3, FLOAT16 supports 0 or 1 and BFLOAT16 supports only 0.
+        On Ascend 950PR&950DT: in non-Union scenarios (maskType=0/1), non-quantized FLOAT16/BFLOAT16 supports 0 or 1, quantType=5 FP8 supports only 1, and MXFP8 (quantType=6) uses FP32 scores and softmax for both values (0 is recommended, 1 is a compatibility alias). In Union scenarios (maskType=3), both non-quantized and FP8 quantization support only 0. On Atlas A2/A3, FLOAT16 supports 0 or 1 and BFLOAT16 supports only 0.
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -427,9 +432,10 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>returnSoftmaxlse</td>
       <td>Input</td>
       <td>Flag indicating whether to enable softmaxLse output.</td>
-      <td>    Currently only supports passing in 0
+      <td>    Non-quant supports 0 or 1; FP8 union (D=128) supports 0 or 1; MXFP8 and other FP8 paths with quantType=5 support only 0.
     <ul>
           <li>0: indicates that softmaxLse is not output, and softmaxLseOptional must be passed as nullptr</li>
+          <li>1: indicates that softmaxLse is output, and softmaxLseOptional is required</li>
         </ul>
       </td>
       <td>INT64</td>
@@ -441,7 +447,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>residualBlockMode</td>
       <td>Input</td>
       <td>Represents the state of the trailing incomplete block after the KV sequence is sparsified in units of blockShapeY.</td>
-      <td>Currently only supports 0 or 1. 0 indicates that whether the trailing incomplete block participates in the computation is determined by the value passed in for sparseBlockIdx. 1 indicates that the trailing incomplete block must participate in the computation but is definitely not included in sparseBlockIdx.</td>
+      <td>Supports 0 or 1 (union supports only 0). 0 indicates that whether the trailing incomplete block participates in the computation is determined by the value passed in for sparseBlockIdx. 1 indicates that the trailing incomplete block must participate in the computation but is definitely not included in sparseBlockIdx.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -460,7 +466,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>attentionOut</td>
       <td>Output</td>
       <td>attentionOut in the formula.</td>
-      <td>Data type and shape are the same as query. Currently, only layoutQ="TND" is supported.</td>
+      <td>Data type and shape are the same as query. layoutQ supports TND, BSND, or BNSD; for product scope, see <a href="#other-constraints">Other Constraints</a>.</td>
       <td>FLOAT16, BFLOAT16 (specified by this tensor for FP8 input)</td>
       <td>ND</td>
       <td>Same as query</td>
@@ -470,7 +476,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>softmaxLseOptional</td>
       <td>Output</td>
       <td>Intermediate log-sum-exp result of the Softmax computation.</td>
-      <td>Currently Not Supported; returnSoftmaxlse must be 0, and nullptr must be passed in.</td>
+      <td>When returnSoftmaxlse=1 (non-quant, or FP8 union with D=128), outputs FLOAT32; TND is [Tq,Nq,1], BSND/BNSD is [B,Nq,Sq,1]. LSE output is not supported for regular FP8 (non-Union quantType=5) or MXFP8 (quantType=6). When disabled, pass nullptr.</td>
       <td>FLOAT</td>
       <td>ND</td>
       <td>3</td>
@@ -608,7 +614,7 @@ The common fields in the constraints are defined as follows:
 | qStorageLen_i | Storage length of each batch obtained by difference of the prefix sum of cuSeqLengthsQ. |
 | totalQBlocks | Total number of Q blocks after chunking by storage length, i.e., $\sum_i \mathrm{ceilDiv}(qStorageLen_i, blockShapeX)$ |
 | totalKBlocks | Total number of KV blocks after chunking by storage length, i.e., $\sum_i \mathrm{ceilDiv}(kvStorageLen_i, blockShapeY)$ |
-| maxKvBlockCount | Last dimension of sparseBlockIdx, which must be no less than the maximum of all elements in sparseBlockCount. The current upper limit is 256. |
+| maxKvBlockCount | Last dimension of sparseBlockIdx, which must be no less than the maximum of all elements in sparseBlockCount. Capacity upper limit is INT32_MAX. |
 | blockShapeX / blockShapeY | Size of sparse blocks in the Q and KV directions. |
 
 ### Layout Correspondence Description
@@ -668,7 +674,7 @@ The common fields in the constraints are defined as follows:
   </tbody>
   </table>
 
-Currently supported combination: layoutQ="TND" + layoutKv="PA_BBND". Other layoutQ/layoutKv combinations are currently not supported.
+Supported combinations and product scope are listed under <a href="#other-constraints">Other Constraints</a>; other layoutQ/layoutKv combinations are not supported.
 
 The shapes of query and attentionOut are determined by layoutQ:
 
@@ -813,7 +819,7 @@ The shapes of key and value are determined by layoutKv and whether Paged Cache i
   </tbody>
   </table>
 
-Currently, a non-empty blockTable must be passed in, and layoutKv must be PA_BBND. blockTable set to nullptr (original KV) and PA_BNBD are currently not supported.
+PA_BBND/PA_BNBD require a non-empty blockTable. TND/BSND/BNSD require nullptr. For supported layout combinations and product scope, see <a href="#other-constraints">Other Constraints</a>.
 
 ### Quantization Related Description
 
@@ -981,7 +987,13 @@ Currently, quantType=0 is available; quantType=5 is optional on Ascend 950PR&950
       <td>Actual number of tokens to look forward/backward included in the window.</td>
     </tr>
     <tr>
-      <td>3-5</td>
+      <td>3</td>
+      <td>Union exactMask</td>
+      <td>Pass INT32 exactMask, shape [kvHeads, G, U×blockShapeY]; bit i marks whether the i-th Q in the group can see that column.</td>
+      <td>-1/-1</td>
+    </tr>
+    <tr>
+      <td>4-5</td>
       <td>Various specialized masks</td>
       <td>Mask descriptions to be added later.</td>
       <td>-1/-1</td>
@@ -989,15 +1001,21 @@ Currently, quantType=0 is available; quantType=5 is optional on Ascend 950PR&950
   </tbody>
   </table>
 
-Currently only supports maskType=1 (causal is built in the operator, attenMaskOptional must be nullptr, and winLeft/winRight are -1). maskType 0/2/3-5 is currently not supported.
+Supports maskType=0 (non-causal) and 1 (built-in causal); both require attenMaskOptional=nullptr and winLeft/winRight=-1. Ascend 950PR&amp;950DT products also support maskType=3 (Union), which requires INT32 exactMask (see the table above) with winLeft/winRight=-1; non-quantized Atlas A2/A3 products support Union as well. maskType 2/4/5 is not supported.
 
 ### Other Constraints
 
 - Deterministic computation: aclnnGenericBlockSparseAttention defaults to a deterministic implementation.
 - Before calling this API, run aclnnGenericBlockSparseAttentionMetadata to generate metadataOptional; the metadata must match the current inputs/attributes and must be regenerated for each call.
-- The headDim(D) of query/key/value currently only supports 128; the KV page blockSize currently only supports 128 and must be equal to blockShapeY.
+- Non-quantized FLOAT16/BFLOAT16 on Atlas A2/A3 and Ascend 950PR&amp;950DT supports any headDim from 1 to 256; `MXFP8` supports only D=192/256 under the grouped conditions; regular FP8 (quantType=5) on Ascend 950PR&amp;950DT supports only 128. The PA KV page blockSize is fixed at 128 and is independent of sparse blockShapeY.
+- Ascend 950PR&amp;950DT non-quant FLOAT16/BFLOAT16: `maskType` supports 0/1/3; non-union uses `blockShape=[1,Y]` (`1≤Y≤128`), union uses `blockShape=[8,Y]` (currently only 8); `residualBlockMode` supports 0 or 1 (union supports only 0). Layout combinations match the Chinese product constraints (TND/BSND/BNSD with dense or PA_BBND/PA_BNBD).
+- Atlas A2/A3 non-quant FLOAT16/BFLOAT16: `maskType` supports 0/1/3; non-union uses `blockShape=[1,Y]` (Y in {1,2,4,8,16,32,64,128}), union uses `blockShape=[8,Y]`; `residualBlockMode` supports 0 or 1 (union supports only 0). Union supports dense KV with the same layout (TND/BSND/BNSD) and paged KV (PA_BBND/PA_BNBD) with a page size of 128, requires INT32 exactMask, and requires the product of the GQA group size and blockShapeX to be no greater than 128.
+- Regular FP8 on Ascend 950PR&amp;950DT: `headDim=128`, `layoutQ/layoutKv=TND/PA_BBND`, `maskType=1`, `residualBlockMode=0`, `blockShape=[1,Y]` (`1≤Y≤128`). Union FP8 additionally allows the union layouts/`blockShape=[8,Y]` (`1≤Y≤128`)/`residualBlockMode=0` and requires INT32 exactMask; for paged KV, `Y` must also divide the PA page size 128 (`Y∈{1,2,4,8,16,32,64,128}`).
+- `MXFP8` (`quantType=6`) on Ascend 950PR&amp;950DT uses only the grouped path (D=192/256, `blockShape` `[1,4]` or `[1,8]`, no LSE). See the [MXFP8 quantization contract](./aclnnGenericBlockSparseAttention.md#mxfp8quanttype6) (Chinese) for full conditions.
+- `softmaxPrecision`: On Ascend 950PR&amp;950DT, non-Union scenarios (maskType=0/1) allow non-quantized FLOAT16/BFLOAT16 with 0 or 1, regular FP8 (quantType=5) with only 1, and `MXFP8` with 0 or 1 (both use FP32 scores/Softmax; 0 is recommended and 1 is a compatibility alias); Union scenarios (maskType=3) support only 0 for both non-quantized and FP8. On Atlas A2/A3, non-Union scenarios allow FLOAT16 with 0 or 1 and BFLOAT16 with only 0, and Union scenarios (maskType=3) support only 0.
+- Sparse index last-dimension capacity is 1 to `INT32_MAX` for non-quantized Atlas A2/A3, non-quantized FLOAT16/BFLOAT16 and `MXFP8` on Ascend 950PR&amp;950DT, and regular FP8 including FP8 Union.
 - For TND: totalQBlocks is blocked by the storage length obtained by differencing cuSeqLengthsQ, i.e., $\sum_i \mathrm{ceilDiv}(qStorageLen_i, blockShapeX)$; both sparse blocking and QKV addressing use this storage length and are not re-split by seqused.
-- When layoutKv is PA_BBND, sequsedKvOptional must be passed in, and cuSeqLengthsKvOptional must not be passed.
+- When layoutKv is PA_BBND/PA_BNBD, sequsedKvOptional must be passed in, and cuSeqLengthsKvOptional must not be passed.
 - When seqused and the corresponding cu prefix sum are passed in together (on the Q side, and on the KV side when layoutKv is TND): the core splitting/task space is accumulated based on the actual valid length (seqused) of each batch; the seqused element of each batch must be ≤ the corresponding cu storage length and must be exactly the same as that on the Metadata side.
 - The data types of the input query, key, and value must be consistent.
 - Under `PA_BBND`/`PA_BNBD`, only dim0 (physical page axis) of key/value can be non-contiguous; the elements within each page must be contiguous; stride0 must be ≥ blockSize×numKeyValueHeads×headDim and aligned to numKeyValueHeads×headDim. For `MXFP8`, ACLNN normalizes K/V to contiguous pages; direct GE calls must provide contiguous page strides.

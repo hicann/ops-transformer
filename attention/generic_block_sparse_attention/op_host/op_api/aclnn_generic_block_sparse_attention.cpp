@@ -311,6 +311,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
         return ret;
     }
 
+    const bool unionFp8 = maskType == 3 && quantType == 5 && query->GetDataType() == DataType::DT_FLOAT8_E4M3FN;
     // Storage mode comes from blockTable presence; layout only constrains the tensor axes.
     const bool isPaged = blockTableOptional != nullptr;
     const bool generalized = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 &&
@@ -328,9 +329,12 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "PA_BBND/PA_BNBD requires blockTable; it must not be nullptr.");
             return ACLNN_ERR_PARAM_NULLPTR;
         }
-        if (!generalized && (quantType != 0 || (query->GetDataType() != DataType::DT_FLOAT16 &&
-                                                query->GetDataType() != DataType::DT_BF16))) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Dense non-paged KV requires FP16/BF16 quantType=0 or A5 MXFP8.");
+        if (!unionFp8 && !generalized &&
+            (quantType != 0 ||
+             (query->GetDataType() != DataType::DT_FLOAT16 && query->GetDataType() != DataType::DT_BF16))) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "Dense non-paged KV requires FP16/BF16 quantType=0, A5 MXFP8, or Union FP8.");
+
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (std::string(layoutQ) == "TND" && (cuSeqLengthsQOptional == nullptr || cuSeqLengthsKvOptional == nullptr)) {
@@ -344,9 +348,12 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "BSND/BNSD query requires sequsedQ and sequsedKv.");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        if (!generalized && (quantType != 0 || (query->GetDataType() != DataType::DT_FLOAT16 &&
-                                                query->GetDataType() != DataType::DT_BF16))) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "BSND/BNSD query requires FP16/BF16 non-quantization or A5 MXFP8.");
+        if (!unionFp8 && !generalized &&
+            (quantType != 0 ||
+             (query->GetDataType() != DataType::DT_FLOAT16 && query->GetDataType() != DataType::DT_BF16))) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "BSND/BNSD query requires FP16/BF16 non-quantization, A5 MXFP8, or Union FP8.");
+
             return ACLNN_ERR_PARAM_INVALID;
         }
     }

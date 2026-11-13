@@ -152,6 +152,8 @@ enum class CopyL0CToUBMode {
     NO_SPLIT = 0,
     SPLIT_M,
     SPLIT_N,
+    SPLIT_M_DN,
+    SPLIT_M32,
     RESERVED
 };
 

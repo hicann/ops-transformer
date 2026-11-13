@@ -25,11 +25,11 @@ namespace NpuArch::Epilogue::Block {
 
 template <class ElementO_, class ElementOTmp_, class ElementS_, class ElementKV_, class TileCopy_,
           class OTmpSrcPos_, // the src TPosition of pv res, viable configurations: GM/L0C
-          LseMode LSE_MODE_, LseFormat LSE_FORMAT_>
-class BlockEpilogue<EpilogueAtlasA5BsaRescaleO<LSE_MODE_, LSE_FORMAT_>, ElementO_, ElementOTmp_, ElementS_, ElementKV_,
-                    TileCopy_, OTmpSrcPos_> {
+          bool SPLIT32_, LseMode LSE_MODE_, LseFormat LSE_FORMAT_>
+class BlockEpilogue<EpilogueAtlasA5RescaleOTag<SPLIT32_, LSE_MODE_, LSE_FORMAT_>, ElementO_, ElementOTmp_, ElementS_,
+                    ElementKV_, TileCopy_, OTmpSrcPos_> {
 public:
-    using DispatchPolicy = EpilogueAtlasA5BsaRescaleO<LSE_MODE_, LSE_FORMAT_>;
+    using DispatchPolicy = EpilogueAtlasA5RescaleOTag<SPLIT32_, LSE_MODE_, LSE_FORMAT_>;
     using ArchTag = typename DispatchPolicy::ArchTag;
     using ElementO = ElementO_;
     using ElementOTmp = ElementOTmp_;
@@ -172,6 +172,17 @@ public:
     }
 
     __aicore__ inline ~BlockEpilogue() {}
+
+    // Sub-block row partition point. The DN (union) path follows the BSA
+    // 32-rounded split used by its fixpipes and transposed softmax; the ND
+    // path keeps the plain half split.
+    static __aicore__ inline uint32_t RowNumSplit(uint32_t rows)
+    {
+        if constexpr (DispatchPolicy::SPLIT32) {
+            return RoundUp(rows, 32U) / AscendC::GetSubBlockNum();
+        }
+        return RoundUp(rows, 2U) / AscendC::GetSubBlockNum();
+    }
 
     __aicore__ inline void SetLoWorkspace(AscendC::GlobalTensor<ElementOTmp> workspace, uint64_t tileElems)
     {
@@ -725,12 +736,10 @@ public:
         uint32_t rowNumOri = actualOriShape[0];
         uint32_t colNumOri = actualOriShape[1];
         uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-        uint32_t subBlockNum = AscendC::GetSubBlockNum();
 
-        uint32_t rowNumOriAligned2 = RoundUp(rowNumOri, 2);
         uint32_t colNumOriAligned16 = RoundUp(colNumOri, 16);
 
-        uint32_t rowNumSplit = rowNumOriAligned2 / subBlockNum;
+        uint32_t rowNumSplit = RowNumSplit(rowNumOri);
         rowNumSplit = (rowNumOri < rowNumSplit) ? rowNumOri : rowNumSplit;
         uint32_t rowNumCurSubCore = (subBlockIdx == 0) ? rowNumSplit : (rowNumOri - rowNumSplit);
         uint32_t rowOffsetCurSubCore = rowNumSplit * subBlockIdx;
@@ -766,7 +775,7 @@ public:
         const uint32_t rowNumOri = actualOriShape[0];
         const uint32_t colNumOri = actualOriShape[1];
         const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-        uint32_t rowNumSplit = RoundUp(rowNumOri, 2) / AscendC::GetSubBlockNum();
+        uint32_t rowNumSplit = RowNumSplit(rowNumOri);
         rowNumSplit = (rowNumOri < rowNumSplit) ? rowNumOri : rowNumSplit;
         const uint32_t rowNumCurSubCore = subBlockIdx == 0 ? rowNumSplit : rowNumOri - rowNumSplit;
         const uint32_t rowOffsetCurSubCore = rowNumSplit * subBlockIdx;
@@ -791,7 +800,7 @@ public:
                                                uint32_t groupSize, uint32_t colNum, uint32_t fdLseSubStride)
     {
         const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-        uint32_t rowNumSplit = RoundUp(groupSize, 2) / AscendC::GetSubBlockNum();
+        uint32_t rowNumSplit = RowNumSplit(groupSize);
         rowNumSplit = groupSize < rowNumSplit ? groupSize : rowNumSplit;
         const uint32_t rowNum = subBlockIdx == 0 ? rowNumSplit : groupSize - rowNumSplit;
         const uint32_t rowOffset = rowNumSplit * subBlockIdx;
@@ -822,7 +831,7 @@ public:
         const uint32_t rowNumOri = actualOriShape[0];
         const uint32_t colNumOri = actualOriShape[1];
         const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-        uint32_t rowNumSplit = RoundUp(rowNumOri, 2) / AscendC::GetSubBlockNum();
+        uint32_t rowNumSplit = RowNumSplit(rowNumOri);
         rowNumSplit = rowNumOri < rowNumSplit ? rowNumOri : rowNumSplit;
         const uint32_t rowNum = subBlockIdx == 0 ? rowNumSplit : rowNumOri - rowNumSplit;
         const uint32_t rowOffset = rowNumSplit * subBlockIdx;

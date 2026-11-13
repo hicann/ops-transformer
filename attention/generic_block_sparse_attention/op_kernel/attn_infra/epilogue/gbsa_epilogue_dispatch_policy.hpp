@@ -57,16 +57,32 @@ struct EpilogueBsaMask2Idx {
     using ArchTag = Arch::AtlasA5;
 };
 
+// feat/lch/gbsa A5 online-softmax (ND S layout). No union flags here.
 struct EpilogueOnlineSoftmaxBsa {
     using ArchTag = Arch::AtlasA5;
 };
 
-template <LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::TN1>
-struct EpilogueAtlasA5BsaRescaleO {
+// Union (maskType=3) DN softmax over S^T. Separate type from EpilogueOnlineSoftmaxBsa.
+struct EpilogueOnlineSoftmaxUnion {
     using ArchTag = Arch::AtlasA5;
+};
+
+// Shared rescale tag: SPLIT32 selects the sub-block row partition.
+// Bsa (=feat/lch ND) and Union (maskType=3 DN) are distinct aliases so the
+// interface can pick by useUnion without polluting the lch-facing name.
+template <bool SPLIT32_, LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::TN1>
+struct EpilogueAtlasA5RescaleOTag {
+    using ArchTag = Arch::AtlasA5;
+    static constexpr bool SPLIT32 = SPLIT32_;
     static constexpr LseMode LSE_MODE = LSE_MODE_;
     static constexpr LseFormat LSE_FORMAT = LSE_FORMAT_;
 };
+
+template <LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::TN1>
+using EpilogueAtlasA5BsaRescaleO = EpilogueAtlasA5RescaleOTag<false, LSE_MODE_, LSE_FORMAT_>;
+
+template <LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::TN1>
+using EpilogueAtlasA5UnionRescaleO = EpilogueAtlasA5RescaleOTag<true, LSE_MODE_, LSE_FORMAT_>;
 
 struct EpilogueOnlineSoftmaxGbsaMxfp8 {
     using ArchTag = Arch::AtlasA5;

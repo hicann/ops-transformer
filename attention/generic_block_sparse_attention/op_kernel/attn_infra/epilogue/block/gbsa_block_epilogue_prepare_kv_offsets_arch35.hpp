@@ -47,6 +47,16 @@ public:
         }
     }
 
+    // Union exact-mask mode: gathered KV columns must stay in logical
+    // union order because the softmax applies the per-column exactMask to
+    // them. The reversed pair below gathers the two blocks swapped, which
+    // is invisible without a mask but corrupts masked attention, so the
+    // kernel forbids it in union mode (forward pairs keep logical order).
+    __aicore__ inline void SetForbidReversePair()
+    {
+        forbidReversePair_ = true;
+    }
+
     __aicore__ inline void operator()(AscendC::GlobalTensor<uint64_t> info,
                                       const __gm__ int32_t* __restrict__ sparseIdx,
                                       const __gm__ int32_t* __restrict__ blockTable, uint32_t tileIdx,
@@ -118,9 +128,9 @@ public:
                             previousLen += len;
                             records[word - 2U] = static_cast<uint64_t>(previousLen) << 1U;
                             records[word - 1U] = static_cast<uint64_t>(previousLen) << 1U;
-                        } else if (previousLen == blockY_ && len == blockY_ && reverse == (vOffset < previousVOffset) &&
-                                   kStride <= 0xFFFFFFFFULL && vStride <= 0xFFFFFFFFULL &&
-                                   kStride % DispatchPolicy::COPY_ALIGNMENT == 0U &&
+                        } else if (previousLen == blockY_ && len == blockY_ && !(forbidReversePair_ && reverse) &&
+                                   reverse == (vOffset < previousVOffset) && kStride <= 0xFFFFFFFFULL &&
+                                   vStride <= 0xFFFFFFFFULL && kStride % DispatchPolicy::COPY_ALIGNMENT == 0U &&
                                    vStride % DispatchPolicy::COPY_ALIGNMENT == 0U) {
                             // Reorder K and V together, only within this group. Short page/tail
                             // fragments stay single, so valid tokens never move into padded columns.
@@ -184,6 +194,7 @@ public:
 
 private:
     AscendC::LocalTensor<uint64_t> recordsBuf_[2];
+    bool forbidReversePair_ = false;
     uint32_t recordsBufIdx_ = 0;
     uint32_t recordsBufMask_;
     uint32_t tileSize_;
