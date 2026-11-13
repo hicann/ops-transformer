@@ -315,13 +315,65 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     mBaseSize_ = mBaseSize_ * (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
-    if (quantMode_ == 1) { // 模式 1 为 MXFP8；其他量化模式沿用原有不启用 FD 的策略。
+    const bool isAscend960 = socVersion_.find("Ascend960") != std::string::npos;
+    // quant_mode 0 为 HIF8、1 为 MXFP8；是否真正沿 S2 切分仍由 SectionStreamK 成本模型决定。
+    // MXFP8 全平台开启 FD（arch92/Ascend960 的 L2 容量按 128MiB 计）；HIF8 仅非 Ascend960 平台支持 FD。
+    if (quantMode_ == 1 || (quantMode_ == 0 && !isAscend960)) {
         // 调度成本模型使用的 L2 字节容量：arch92 为 128 MiB，其他既有平台保持 96 MiB。
         // 两次乘 1024 将 MiB 转为字节，不改变输入数据或 workspace 的计量单位。
-        param.l2Byte = socVersion_.find("Ascend960") != std::string::npos ? 128U * 1024U * 1024U : 96U * 1024U * 1024U;
+        param.l2Byte = isAscend960 ? 128U * 1024U * 1024U : 96U * 1024U * 1024U;
         param.fdTolerance = 10; // FD 切分允许的负载容差，单位为调度基本块，沿用既有策略。
         param.fdLeastBlock = 3; // 每份 FD 至少三个 S2 基本块，避免过细切分增加归并开销。
         param.fdOn = true;
+        // 以下行固定开销校准与 K/V L2 复用门控仅针对 HIF8 调参，避免改变 MXFP8 既有分核行为。
+        if (quantMode_ == 0) {
+            // 每行固定开销校准：当单个 batch 占全部算量 >= 85% 时（如 #1 的 b1 独占 92%），
+            // 其余 batch 的短 KV 行真实成本（Q 载入、K/V 预取、softmax 前的填充等）被线性成本
+            // 模型严重低估，会给这些短行定价过低，导致分核后短行核成为落后核。
+            // v0Cost 按行计入该固定开销，抬高短行定价；只在该类极度不均衡形状开启，避免在
+            // 核级已铺满的用例（#4/#6）上因过度切分而回退。
+            // 仅对 BSND 变长（seqused_kv 给出的逐 batch 长度）做校准；TND 用例核级
+            // 已铺满，抬高行价反而引起过度切分，实测回退 5~15pt。
+            int64_t totalWork = 0;
+            int64_t maxWork = 0;
+            for (uint32_t b = 0; b < baseInfo.batchSize; ++b) {
+                const int64_t querySeq = static_cast<int64_t>(baseInfo.GetQuerySeqSize(b));
+                const int64_t kvSeq = static_cast<int64_t>(baseInfo.GetKvSeqSize(b));
+                const int64_t work = querySeq * kvSeq;
+                totalWork += work;
+                maxWork = std::max(maxWork, work);
+            }
+            const bool bsndVarlen =
+                baseInfo.layoutQuery == load_balance::Layout::BSND && baseInfo.layoutKv == load_balance::Layout::BSND;
+            const bool oneBatchDominant = bsndVarlen && totalWork > 0 && maxWork * 100 >= totalWork * 85;
+            // 基线取 5 个满块的行固定开销，直接按调度 costFunc 公式折算为 v0Cost（单位与调度成本一致）
+            const int64_t fullBlockCost = 6 * static_cast<int64_t>(CeilDiv<uint32_t>(mBaseSize_, 16U)) +
+                                          10 * static_cast<int64_t>(CeilDiv<uint32_t>(s2BaseSize_, 64U));
+            param.v0Cost = oneBatchDominant ? 5 * fullBlockCost : 0;
+            // 跨行 K/V 复用能否成立取决于单 head 的 K/V 字节与 L2 容量的关系：同一 head 的多个行块
+            // 按 s2 顺序同相扫描时只需从 HBM 读一份 K/V，其余命中 L2；FD 沿 s2 把行切成多段后各段
+            // 起点不同，同 head 的行不再同相，复用被彻底打散（用例#6 实测 MTE2 忙时 2127→4068 us）。
+            // 命中该形状时退回单段 + 关闭 FD，恢复同相扫描。
+            const int64_t l2Bytes = static_cast<int64_t>(param.l2Byte);
+            // TND 场景 max_seqlen_kv 可能为 -1，baseInfo.kvSeqSize 会退化成极大值，故按 batch 取真实最大 KV 长度
+            int64_t maxKvSeq = 0;
+            int64_t maxRowsPerHead = 0;
+            for (uint32_t b = 0; b < baseInfo.batchSize; ++b) {
+                maxKvSeq = std::max(maxKvSeq, static_cast<int64_t>(baseInfo.GetKvSeqSize(b)));
+                const int64_t rows =
+                    (static_cast<int64_t>(baseInfo.GetQuerySeqSize(b)) * static_cast<int64_t>(baseInfo.GetGroupSize()) +
+                     static_cast<int64_t>(mBaseSize_) - 1) /
+                    static_cast<int64_t>(mBaseSize_);
+                maxRowsPerHead = std::max(maxRowsPerHead, rows);
+            }
+            const int64_t headKvBytes = maxKvSeq * (static_cast<int64_t>(baseInfo.GetHeadDimQk()) +
+                                                    static_cast<int64_t>(baseInfo.GetHeadDimV()));
+            const bool kvReusableInL2 = headKvBytes > l2Bytes / 4 && headKvBytes < l2Bytes * 2;
+            if (kvReusableInL2 && maxRowsPerHead >= 2) {
+                param.l2Byte = 0U;
+                param.fdOn = false;
+            }
+        }
     } else {
         param.l2Byte = 0;
         param.fdTolerance = 300;

@@ -173,6 +173,19 @@ __aicore__ inline void DataCopySoftmaxLseBSNDArch35(GlobalTensor<float> softmaxL
                                                     uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
                                                     const CONST_INFO_T& constInfo, uint64_t s1LeftPaddingSize = 0)
 {
+    // realGSize=1（预填充不合轴）时 GM 每行 LSE 连续，一次批量写出，省去逐行发起小拷贝的开销
+    if (constInfo.realGSize == 1U) {
+        if (dealCount == 0U) {
+            return;
+        }
+        DataCopyExtParams fastParams;
+        fastParams.blockCount = dealCount;
+        fastParams.blockLen = sizeof(float);
+        fastParams.srcStride = 0;
+        fastParams.dstStride = 0;
+        DataCopyPad(softmaxLseGm[bN2Offset + mOffset + s1LeftPaddingSize], lseSrc, fastParams);
+        return;
+    }
     // USE_DN时，realGSize=1(G合入N2)
     uint32_t startS1Idx = mOffset / constInfo.realGSize;
     uint32_t startGIdx = mOffset % constInfo.realGSize;

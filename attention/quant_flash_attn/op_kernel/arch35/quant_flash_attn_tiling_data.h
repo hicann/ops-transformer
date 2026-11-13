@@ -23,6 +23,8 @@ static constexpr uint32_t METADATA_HEADER_OFFSET = METADATA_STRIDE * sizeof(uint
 
 // Metadata Head Index Definitions (0-based, matching AICPU quant_flash_attn_metadata.h)
 constexpr uint32_t METADATA_HEADER_SECTION_NUM_INDEX = 0;
+// 由 AICPU SectionStreamK 写入，表示本次调度是否包含需要归并的 FD 分片。
+constexpr uint32_t METADATA_HEADER_IS_FD_INDEX = 1;
 constexpr uint32_t METADATA_HEADER_AIC_NUM_INDEX = 4;
 constexpr uint32_t METADATA_HEADER_AIV_NUM_INDEX = 5;
 
@@ -40,6 +42,9 @@ constexpr uint32_t QFA_FD_WORKSPACE_IDX_INDEX = 2;
 constexpr uint32_t QFA_FD_WORKSPACE_NUM_INDEX = 3;
 constexpr uint32_t QFA_FD_M_START_INDEX = 4;
 constexpr uint32_t QFA_FD_M_NUM_INDEX = 5;
+
+// FD 归并 M 轴基本块行数: host(workspace 尺寸) 与 kernel(FD buffer/归并行数) 共享的单一事实来源
+constexpr uint32_t FD_BALANCE_M_BASE = 8U;
 
 struct StridesParams {
     uint64_t bnStride = 0;

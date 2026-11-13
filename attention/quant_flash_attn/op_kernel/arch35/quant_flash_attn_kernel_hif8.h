@@ -160,6 +160,8 @@ public:
         sectionNum_ = ((__gm__ uint32_t*)metadata)[METADATA_HEADER_SECTION_NUM_INDEX];
         metadataAicNum_ = ((__gm__ uint32_t*)metadata)[METADATA_HEADER_AIC_NUM_INDEX];
         metadataAivNum_ = ((__gm__ uint32_t*)metadata)[METADATA_HEADER_AIV_NUM_INDEX];
+        constInfo_.enableFlashDecode =
+            FLASH_DECODE && (((__gm__ uint32_t*)metadata)[METADATA_HEADER_IS_FD_INDEX] != 0U);
 
         faMetaDataGm_.SetGlobalBuffer((__gm__ uint32_t*)(metadata + METADATA_HEADER_OFFSET),
                                       sectionNum_ * metadataAicNum_ * METADATA_STRIDE);
@@ -696,19 +698,22 @@ public:
         // FD静态Tensor业务区必须完全落在FA瞬态区内, 编译期校验布局容量
         static_assert(VecFdBlockType::GetFdTotalUbSize() <= VecFaBlockType::GetTransientUbSize(),
                       "FD static UB region exceeds FA transient region");
-        GetFDSectionInfo(sectionIdx);
-        if (!fdParams_.fdCoreEnable) {
+        if (!constInfo_.enableFlashDecode) {
             return;
         }
-        // FD静态Tensor业务区起始偏移: 跨核bmm区 + FA保留区, 落在FA瞬态区内分时复用
-        // (不再走 TPipe 版 InitBuffers(pipe), 避免其内部 pipe->Reset() 作废 FA 的 buffer 句柄)
-        vecFdBlock_.template InitBuffers<VecFaBlockType::GetMmUbTotalSize() + VecFaBlockType::GetPersistUbSize()>();
-        AscendC::ICachePreLoad(2);
-        vecFdBlock_.AllocEventID();
+        GetFDSectionInfo(sectionIdx);
+        const bool fdActive = (fdParams_.fdCoreEnable != 0U);
+        if (fdActive) {
+            vecFdBlock_.template InitBuffers<VecFaBlockType::GetMmUbTotalSize() + VecFaBlockType::GetPersistUbSize()>();
+            AscendC::ICachePreLoad(2);
+            vecFdBlock_.AllocEventID();
+        }
         SyncAll();
-        vecFdBlock_.FlashDecode(fdParams_);
-        vecFdBlock_.FreeEventID();
-        SyncAll(); // 多section场景: 保证所有核FD读workspace完成后, 才能进入下一section FA覆写
+        if (fdActive) {
+            vecFdBlock_.FlashDecode(fdParams_);
+            vecFdBlock_.FreeEventID();
+        }
+        SyncAll();
     }
 
     __aicore__ inline void GetFASectionInfo(uint32_t sectionIdx)

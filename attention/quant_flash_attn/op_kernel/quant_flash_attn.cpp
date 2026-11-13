@@ -447,16 +447,15 @@ __aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t* query, __gm__ uint8
     constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(ConfigValue[config].d);
     constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(ConfigValue[config].dv);
 
-    constexpr bool isFdConst = false;
     constexpr bool useDn = true;
 
     using CubeBlock =
         BaseApi::QuantFlashAttnBlockCubeHif8<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
                                              dTemplateType, dVTemplateType, KvLayoutType, useDn>;
-    using VecFaBlock =
-        BaseApi::QuantFlashAttnBlockVecHif8<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
-                                            s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType,
-                                            isFdConst, useDn>;
+    // 透传 tiling key 的 isFd，使 HIF8 vector block 编译出局部结果写 workspace 的 FD 路径。
+    using VecFaBlock = BaseApi::QuantFlashAttnBlockVecHif8<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+                                                           s1TemplateType, s2TemplateType, dTemplateType,
+                                                           dVTemplateType, hasAttenMask, KvLayoutType, isFd, useDn>;
     using VecFdBlock =
         BaseApi::QuantFlashAttnBlockVecFlashDecode<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
                                                    s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
@@ -468,7 +467,7 @@ __aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t* query, __gm__ uint8
     using VecFaBlockDummy =
         BaseApi::QuantFlashAttnBlockVecHif8Dummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
                                                  s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
-                                                 hasAttenMask, KvLayoutType, isFdConst, useDn>;
+                                                 hasAttenMask, KvLayoutType, isFd, useDn>;
     using VecFdBlockDummy =
         BaseApi::QuantFlashAttnBlockVecFlashDecodeDummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
                                                         s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,

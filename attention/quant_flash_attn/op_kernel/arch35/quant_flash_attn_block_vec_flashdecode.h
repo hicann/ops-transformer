@@ -22,6 +22,7 @@
 #include "memory_copy_arch35_quant_flash_attn.h"
 #include "lib/matrix/matmul/tiling.h"
 #include "quant_flash_attn_common_def.h"
+#include "quant_flash_attn_tiling_data.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
 
 namespace BaseApi {
@@ -110,8 +111,8 @@ private:
 
     // dV按64对齐后的元素数(与FA侧dTemplateAlign64推导一致, 不依赖头文件)
     static constexpr uint32_t FD_DV_ALIGN64 = ((static_cast<uint32_t>(dVTemplateType) + 63U) / 64U) * 64U;
-    // mm2系buffer实际最大行数(fdBalanceMBaseSize=8, 见FlashDecode主循环)
-    static constexpr uint32_t FD_BALANCE_M_BASE = 8U;
+    // mm2系buffer实际最大行数; 与 host tiling 共享同一常量(定义于 quant_flash_attn_tiling_data.h)
+    static constexpr uint32_t FD_BALANCE_M_BASE = optiling::FD_BALANCE_M_BASE;
     // lse系buffer(sum/max/exp)字节尺寸; mm2系buffer 8行*dAlign*fp32
     static constexpr uint32_t FD_LSE_BUF_BYTES = BUFFER_SIZE_BYTE_4K + BUFFER_SIZE_BYTE_2K; // 6144
     static constexpr uint32_t FD_MM2_BUF_BYTES = FD_BALANCE_M_BASE * FD_DV_ALIGN64 * sizeof(float);
@@ -531,7 +532,7 @@ public:
         if (!fd.fdCoreEnable) {
             return;
         }
-        uint32_t fdBalanceMBaseSize = 8U;
+        uint32_t fdBalanceMBaseSize = FD_BALANCE_M_BASE;
         uint32_t fdBalanceMSplitNum = (fd.mLen + fdBalanceMBaseSize - 1) / fdBalanceMBaseSize;
         uint32_t fdBalanceMTailSize =
             (fd.mLen % fdBalanceMBaseSize == 0) ? fdBalanceMBaseSize : fd.mLen % fdBalanceMBaseSize;

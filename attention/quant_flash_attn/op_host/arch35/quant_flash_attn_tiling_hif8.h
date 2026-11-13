@@ -61,6 +61,8 @@ private:
     QfaPlatFormInfo platformInfo_;
     uint32_t sOuterFactor_ = 0;
     uint32_t sInnerFactor_ = 0;
+    // 编译期能力开关：控制 HIF8 是否生成 FD tiling key 及预留 FD workspace。
+    bool flashDecodeFlag_ = false;
     bool cuSeqLenQFlag_ = false;
     bool cuSeqLenKVFlag_ = false;
     bool seqUsedQFlag_ = false;

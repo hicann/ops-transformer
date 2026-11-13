@@ -115,22 +115,66 @@ def execute_test(params, mode, cdir=None):
     ):
         return None, None
 
-    if "cpu" in mode:
-        cpu_out, cpu_lse = golden.cpu_hif8_golden(
-            q_fp8,
-            k_fp8,
-            v_fp8,
-            deq_q,
-            deq_k,
-            deq_v,
-            p_scale,
-            golden.SEQUSED_Q,
-            golden.SEQUSED_KV,
-            softmax_scale=golden.SOFTMAX_SCALE,
-            qr_bf16=qr_bf16,
-            kr_bf16=kr_bf16,
+    schedule = golden.get_hif8_schedule() if mode & {"cpu", "npu"} else None
+    cache_path = golden_cache._path(case_name, "cpu_output", cdir)
+    cached = (
+        torch.load(cache_path, weights_only=False)
+        if golden_cache.has_cpu_output(case_name, cdir)
+        else {}
+    )
+    cached_schedule = cached.get("schedule")
+    schedule_changed = schedule is not None and (
+        cached.get("reference_version") != 2
+        or cached_schedule is None
+        or not torch.equal(
+            schedule[: 16 + int(schedule[0]) * int(schedule[4]) * 16], cached_schedule
         )
+    )
+    if "cpu" in mode or schedule_changed or ("gen" in mode and "compare" in mode):
+        if schedule is not None:
+            cpu_out, cpu_lse = golden.cpu_hif8_scheduled_golden(
+                (
+                    q_fp8,
+                    k_fp8,
+                    v_fp8,
+                    deq_q,
+                    deq_k,
+                    deq_v,
+                    p_scale,
+                    qr_bf16,
+                    kr_bf16,
+                    block_table_torch,
+                ),
+                schedule,
+            )
+        else:
+            cpu_out, cpu_lse = golden.cpu_hif8_golden(
+                q_fp8,
+                k_fp8,
+                v_fp8,
+                deq_q,
+                deq_k,
+                deq_v,
+                p_scale,
+                golden.SEQUSED_Q,
+                golden.SEQUSED_KV,
+                softmax_scale=golden.SOFTMAX_SCALE,
+                qr_bf16=qr_bf16,
+                kr_bf16=kr_bf16,
+            )
         golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
+        if schedule is not None:
+            torch.save(
+                {
+                    "cpu_out": cpu_out,
+                    "cpu_lse": cpu_lse,
+                    "reference_version": 2,
+                    "schedule": schedule[
+                        : 16 + int(schedule[0]) * int(schedule[4]) * 16
+                    ],
+                },
+                cache_path,
+            )
     elif "compare" in mode:
         cpu_out, cpu_lse = golden_cache.load_cpu_output(case_name, cache_dir=cdir)
 

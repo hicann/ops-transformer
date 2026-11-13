@@ -92,7 +92,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BNBD),
                          ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
                          ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // HIF8
+    // HIF8 同时注册普通 FA 和 FD 模板，具体实例由 host tiling key 选择。
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND_BSND,
                                               InOutLayoutType_BNSD_BNSD, InOutLayoutType_TND_TND),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
@@ -100,7 +100,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_HIF8_FP32),
                          ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA),
-                         ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+                         ASCENDC_TPL_BOOL_SEL(IsFd, false, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
                          ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)));
 
 #endif // TEMPLATE_TILING_KEY_QUANT_FLASH_ATTN_H_

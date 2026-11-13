@@ -142,6 +142,8 @@ void QuantFlashAttnTilingHif8Impl::SplitPolicy()
                                            qfaInfo_->winRight, static_cast<uint32_t>(qfaInfo_->qLayout),
                                            static_cast<uint32_t>(qfaInfo_->quantMode), sOuterFactor_, sInnerFactor_);
     CalcNumBlocks(platformInfo_.aicNum);
+    // HIF8 编译支持 FD；本次任务是否实际执行 FD 由 metadata 的负载均衡结果动态决定。
+    flashDecodeFlag_ = true;
 }
 
 void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyConfig()
@@ -172,7 +174,7 @@ void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyInfo()
     UpdateTilingKeyQuantMode();
     tilingKeyInfo_.hasAttenMask = (qfaInfo_->maskMode != static_cast<int64_t>(MaskMode::NO_MASK));
     UpdateTilingKeyKvLayout();
-    tilingKeyInfo_.isFd = false;
+    tilingKeyInfo_.isFd = flashDecodeFlag_;
 }
 
 void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyQuantMode()
@@ -207,6 +209,20 @@ void QuantFlashAttnTilingHif8Impl::CalcNumBlocks(uint32_t aicNum)
 void QuantFlashAttnTilingHif8Impl::CalcWorkspaceSize()
 {
     workspaceSize_ = platformInfo_.defaultSysWorkspaceSize;
+
+    if (flashDecodeFlag_) {
+        uint32_t mSize = sOuterFactor_ * platformInfo_.cvRatio;
+        uint32_t dSize = qfaInfo_->vHeadDim;
+        // FD 归并需要保存各 S2 分片的局部 P*V，以及 softmax sum/max；系数 2 用于双缓冲。
+        // 因子保持 uint32，乘积用 uint64 承载，避免大 shape 下乘法在 uint32 中溢出翻转
+        uint64_t faTmpAttenGmSize = static_cast<uint64_t>(numBlocks_) * 2U * mSize * dSize;
+        // LSE(sum/max) workspace 尺寸按 FD M 轴基本块 FD_BALANCE_M_BASE(定义于 quant_flash_attn_tiling_data.h)计算
+        uint64_t faTmpResLseGmSize = static_cast<uint64_t>(numBlocks_) * 2U * mSize * FD_BALANCE_M_BASE;
+        workspaceSize_ += (faTmpAttenGmSize + 2U * faTmpResLseGmSize) * sizeof(float);
+        // Kernel 按 accumOut、sum、max 的顺序切分同一块 workspace；tiling 字段为 uint32，此处显式转换
+        tilingData_.baseTiling.quantFlashAttnWorkspaceParams.accumOutSize = static_cast<uint32_t>(faTmpAttenGmSize);
+        tilingData_.baseTiling.quantFlashAttnWorkspaceParams.logSumExpSize = static_cast<uint32_t>(faTmpResLseGmSize);
+    }
 
     OP_LOGI(qfaInfo_->opName, "HIF8 Workspaces: %lu", workspaceSize_);
 }

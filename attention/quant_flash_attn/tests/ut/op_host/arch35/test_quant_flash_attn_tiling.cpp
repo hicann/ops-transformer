@@ -8,9 +8,11 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <cstring>
 #include <gtest/gtest.h>
 #include "../quant_flash_attn_param.h"
 #include "../../../../op_host/quant_flash_attn_tiling_common.h"
+#include "../../../../op_kernel/arch35/quant_flash_attn_template_tiling_key.h"
 #include "tiling_case_executor.h"
 
 namespace QuantFlashAttnUT {
@@ -78,6 +80,44 @@ TEST_P(QuantFlashAttnArch35TilingTest, param)
         &compileInfo, "Ascend950", 64, 196608, 16384, A5SocInfo);
     ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey, param.expectTilingDataHash, {}, 0,
                     true);
+
+    // HIF8 FD 的新增行为不能只验证 tiling 成功：还需锁定 FD 模板 key 和三段 GM workspace 布局。
+    if (param.expectResult == ge::GRAPH_SUCCESS && param.quant_compute_mode == 0) {
+        TilingInfo tilingInfo;
+        ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+
+        uint64_t inputLayout = InOutLayoutType_BSND_BSND;
+        if (param.layout_q == "BNSD") {
+            inputLayout = InOutLayoutType_BNSD_BNSD;
+        } else if (param.layout_q == "TND") {
+            inputLayout = InOutLayoutType_TND_TND;
+        }
+        const uint64_t expectedFdKey =
+            GET_TPL_TILING_KEY(inputLayout, Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128, QFA_HIF8_FP32,
+                               param.mask_mode != 0, KvLayoutType_NO_PA, true, false);
+        EXPECT_EQ(static_cast<uint64_t>(tilingInfo.tilingKey), expectedFdKey);
+
+        ASSERT_EQ(tilingInfo.tilingDataSize, sizeof(optiling::QuantFlashAttnTilingData));
+        optiling::QuantFlashAttnTilingData tilingData{};
+        std::memcpy(&tilingData, tilingInfo.tilingData.get(), sizeof(tilingData));
+        const auto& baseParams = tilingData.baseTiling.quantFlashAttnBaseParams;
+        const auto& workspaceParams = tilingData.baseTiling.quantFlashAttnWorkspaceParams;
+        constexpr uint32_t HIF8_M_BASE_SIZE = 64U;
+        constexpr uint32_t HIF8_CV_RATIO = 2U;
+        constexpr uint32_t FD_DOUBLE_BUFFER = 2U;
+        constexpr uint32_t FD_LSE_VECTOR_WIDTH = 8U;
+        const uint32_t mSize = HIF8_M_BASE_SIZE * HIF8_CV_RATIO;
+        const uint32_t blockNum = static_cast<uint32_t>(tilingInfo.blockNum);
+        const uint32_t expectedAccumOutSize = blockNum * FD_DOUBLE_BUFFER * mSize * baseParams.dSizeV;
+        const uint32_t expectedLogSumExpSize = blockNum * FD_DOUBLE_BUFFER * mSize * FD_LSE_VECTOR_WIDTH;
+        EXPECT_EQ(workspaceParams.accumOutSize, expectedAccumOutSize);
+        EXPECT_EQ(workspaceParams.logSumExpSize, expectedLogSumExpSize);
+
+        ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1U);
+        const size_t fdWorkspaceBytes =
+            static_cast<size_t>(expectedAccumOutSize + 2U * expectedLogSumExpSize) * sizeof(float);
+        EXPECT_GE(tilingInfo.workspaceSizes[0], fdWorkspaceBytes);
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(

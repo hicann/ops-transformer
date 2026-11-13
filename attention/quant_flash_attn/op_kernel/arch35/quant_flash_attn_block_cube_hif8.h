@@ -83,7 +83,7 @@ public:
     // UnitFlag values follow the Matmul accumulation protocol: 2=partial K accumulation, 3=final K accumulation.
     static constexpr uint8_t UNIT_FLAG_NON_FINAL_ACCUMULATION = 2;
     static constexpr uint8_t UNIT_FLAG_FINAL_ACCUMULATION = 3;
-    static constexpr bool ENABLE_UNIT_FLAG = LAYOUT == LayOutTypeEnum::LAYOUT_TND && !PAGE_ATTENTION;
+    static constexpr bool ENABLE_UNIT_FLAG = !PAGE_ATTENTION;
 
     __aicore__ inline bool UseUnitFlag(const RunInfoX& runInfo) const
     {

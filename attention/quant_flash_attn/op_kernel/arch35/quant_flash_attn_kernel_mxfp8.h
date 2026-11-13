@@ -185,7 +185,7 @@ public:
 
         InitConstInfo(tiling);
         constInfo_.needInitOutput = ((__gm__ uint32_t*)metadata)[QFA_HEAD_NEED_INIT_OUTPUT_INDEX] != 0;
-        constInfo_.enableFlashDecode = static_cast<bool>(((__gm__ uint32_t*)metadata)[1]);
+        constInfo_.enableFlashDecode = static_cast<bool>(((__gm__ uint32_t*)metadata)[METADATA_HEADER_IS_FD_INDEX]);
 
         keyPtr_ = key;
         valuePtr_ = value;

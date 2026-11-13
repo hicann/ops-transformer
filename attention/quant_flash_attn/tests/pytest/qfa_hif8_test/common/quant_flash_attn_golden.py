@@ -35,20 +35,20 @@ logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
 
 try:
-    from cann_ops_transformer.ops import quant_flash_attn, quant_flash_attn_metadata
+    from cann_ops_transformer_custom.ops.attention.quant_flash_attn import (
+        quant_flash_attn,
+        quant_flash_attn_metadata,
+    )
 
     _HAS_NPU = True
 except ImportError as e:
     try:
-        from cann_ops_transformer_custom.ops.attention.quant_flash_attn import (
-            quant_flash_attn,
-            quant_flash_attn_metadata,
-        )
+        from cann_ops_transformer.ops import quant_flash_attn, quant_flash_attn_metadata
 
         _HAS_NPU = True
     except ImportError as e2:
         logger.warning(
-            "Failed to import quant_flash_attn (builtin: %s, custom: %s)", e, e2
+            "Failed to import quant_flash_attn (custom: %s, builtin: %s)", e, e2
         )
         _HAS_NPU = False
 
@@ -564,6 +564,155 @@ def cpu_hif8_golden(
     )
     out = torch.where(all_masked, torch.zeros_like(out), out)
     logger.info("[CPU Golden] output=%s", out.shape)
+    return out, lse
+
+
+def get_hif8_schedule():
+    """Read the AICPU schedule; no attention output is used by the reference."""
+    if not _HAS_NPU:
+        return None
+    torch_npu.npu.set_device(int(DEVICE_ID))
+
+    def seq(values):
+        return (
+            torch.tensor(values, dtype=torch.int32).npu()
+            if values is not None
+            else None
+        )
+
+    is_tnd = INPUT_LAYOUT == "TND"
+    metadata = quant_flash_attn_metadata(
+        num_heads_q=N_q,
+        num_heads_kv=N_kv,
+        head_dim=D,
+        quant_mode=0,
+        cu_seqlens_q=seq(CU_SEQLENS_Q) if is_tnd else None,
+        cu_seqlens_kv=seq(CU_SEQLENS_KV) if is_tnd else None,
+        seqused_q=seq(_get_seqused_q()),
+        seqused_kv=seq(_get_seqused_kv()),
+        batch_size=None if is_tnd else B,
+        mask_mode=SPARSE_MODE,
+        layout_q=INPUT_LAYOUT,
+        layout_q_descale=Q_SCALE_LAYOUT,
+        layout_kv=INPUT_LAYOUT,
+        layout_out=INPUT_LAYOUT,
+        max_seqlen_q=MAX_SEQLEN_Q,
+        max_seqlen_kv=MAX_SEQLEN_KV,
+    )
+    return metadata.cpu().reshape(-1).to(torch.int64)
+
+
+def cpu_hif8_scheduled_golden(data, schedule):
+    """Simulate local P quantization and weighted FD combine from FA task ranges.
+
+    Quantization is nonlinear: resetting the online maximum at a KV split
+    changes rounded P. A serial reference therefore cannot validate FD with
+    the same tolerance. Only scheduling metadata is shared with the device.
+    """
+    q8, k8, v8, dq, dk, dv, ps, qr, kr, _ = data
+    if not int(schedule[1]):
+        return cpu_hif8_golden(
+            q8,
+            k8,
+            v8,
+            dq,
+            dk,
+            dv,
+            ps,
+            _get_seqused_q(),
+            _get_seqused_kv(),
+            softmax_scale=SOFTMAX_SCALE,
+            qr_bf16=qr,
+            kr_bf16=kr,
+        )
+    if ENABLE_ROPE or SPARSE_MODE not in (0, 3):
+        raise ValueError("Scheduled HIF8 reference supports no-ROPE mask modes 0 and 3")
+    q = hif8_per_tensor_dequant(q8) * dq
+    k = hif8_per_tensor_dequant(k8) * dk
+    v = hif8_per_tensor_dequant(v8) * dv
+    if N_q != N_kv:
+        k = broadcast_kv(N_q, N_kv, k)
+        v = broadcast_kv(N_q, N_kv, v)
+    qlens, klens = _get_seqused_q(), _get_seqused_kv()
+    sn, ac, mb, kb = (int(schedule[i]) for i in (0, 4, 2, 3))
+    if mb != 128 or kb != 256:
+        raise ValueError(f"Unsupported HIF8 schedule tiles: {mb}, {kb}")
+    rows = schedule[16 : 16 + sn * ac * 16].reshape(-1, 16).tolist()
+    out = torch.zeros((*q.shape[:-1], v.shape[-1]), dtype=torch.float32)
+    lse = torch.full((*q.shape[:-1], 1), float("inf"), dtype=torch.float32)
+    scale = SOFTMAX_SCALE if SOFTMAX_SCALE is not None else 1 / math.sqrt(D)
+    ln_ps = math.log(float(ps.item()))
+    for b, (sq, sk) in enumerate(zip(qlens, klens)):
+        if sk == 0:
+            continue
+        for h in range(N_q):
+            bn = b * N_q + h
+            for mi, lo in enumerate(range(0, sq, mb)):
+                hi = min(lo + mb, sq)
+                parts = []
+                for row in rows:
+                    if (row[0], row[1]) <= (bn, mi) <= (row[3], row[4]):
+                        st = row[2] if (bn, mi) == tuple(row[:2]) else 0
+                        en = (
+                            row[5]
+                            if (bn, mi) == tuple(row[3:5])
+                            else (sk + kb - 1) // kb
+                        )
+                        if en > st:
+                            parts.append((st, en))
+                if not parts:
+                    raise ValueError(
+                        f"Schedule does not cover batch/head/Q tile {(b, h, mi)}"
+                    )
+                expected_end = (sk + kb - 1) // kb
+                if SPARSE_MODE == 3:
+                    expected_end = min(expected_end, (hi + sk - sq + kb - 1) // kb)
+                cursor = 0
+                parts = [
+                    (st, min(en, expected_end)) for st, en in parts if st < expected_end
+                ]
+                for st, en in sorted(parts):
+                    if st != cursor or en > expected_end:
+                        raise ValueError(
+                            f"Overlapping or missing KV schedule range: {parts}"
+                        )
+                    cursor = en
+                if cursor != expected_end:
+                    raise ValueError(
+                        f"Incomplete KV schedule: {parts}, expected end {expected_end}"
+                    )
+                nums, sums, maxes = [], [], []
+                for st, en in parts:
+                    m = torch.full((hi - lo, 1), -torch.finfo(torch.float32).max)
+                    su = torch.zeros_like(m)
+                    o = torch.zeros((hi - lo, v.shape[-1]))
+                    for j in range(st, en):
+                        ks, ke = j * kb, min((j + 1) * kb, sk)
+                        scores = q[b, h, lo:hi] @ k[b, h, ks:ke].T * scale
+                        if SPARSE_MODE == 3:
+                            mask = (
+                                torch.arange(ks, ke)[None, :]
+                                > torch.arange(lo, hi)[:, None] + sk - sq
+                            )
+                            scores = scores.masked_fill(
+                                mask, -torch.finfo(torch.float32).max
+                            )
+                        nm = torch.maximum(
+                            m, scores.max(-1, keepdim=True).values - ln_ps
+                        )
+                        pp = torch.exp(scores - nm)
+                        factor = torch.exp(m - nm)
+                        o = o * factor + hif8_cast_p(pp) @ v[b, h, ks:ke]
+                        su = su * factor + pp.sum(-1, keepdim=True)
+                        m = nm
+                    nums.append(o)
+                    sums.append(su)
+                    maxes.append(m)
+                mm = torch.stack(maxes).max(0).values
+                weights = [torch.exp(m - mm) for m in maxes]
+                total = sum(su * w for su, w in zip(sums, weights))
+                out[b, h, lo:hi] = sum(o * w for o, w in zip(nums, weights)) / total
+                lse[b, h, lo:hi] = mm + torch.log(total)
     return out, lse
 
 
