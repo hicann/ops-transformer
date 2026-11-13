@@ -90,7 +90,7 @@ ge::graphStatus AllGatherMatmulTilingV2::FitApaceMmTileToL1(uint32_t baseM, uint
     const uint64_t c0Elems = 32UL / args_.inputDtypeSize;                     // fp16/bf16: 16 元素/分形
     const uint64_t biasElemSize = args_.isBias ? args_.outputDtypeSize : 0UL; // BiasType = CType
 
-    auto l1Usage = [&](uint32_t curBaseM, uint32_t curBaseN, uint32_t curStepK) {
+    auto l1Usage = [this, baseK, c0Elems, biasElemSize](uint32_t curBaseM, uint32_t curBaseN, uint32_t curStepK) {
         uint64_t kL1 = mc2tiling::AlignUp(static_cast<uint64_t>(curStepK) * baseK, c0Elems);
         uint64_t aL1 = static_cast<uint64_t>(curBaseM) * kL1 * args_.inputDtypeSize;
         uint64_t bL1 = static_cast<uint64_t>(curBaseN) * kL1 * args_.inputDtypeSize;
@@ -281,8 +281,9 @@ ge::graphStatus AllGatherMatmulTilingV2::PostTiling()
         OP_LOGE(opName_, "TilingBuffer capacity %zu is smaller than final tiling size %zu.", tilingBufCap, finalSize),
         return ge::GRAPH_FAILED);
     if ((tilingBufCap >= finalSize) && (finalSize > apaceTilingSize)) {
-        errno_t zeroRet = memset_s(reinterpret_cast<uint8_t*>(outTilingData) + apaceTilingSize,
-                                   tilingBufCap - apaceTilingSize, 0, finalSize - apaceTilingSize);
+        auto* tilingBuf = static_cast<uint8_t*>(context_->GetRawTilingData()->GetData());
+        errno_t zeroRet =
+            memset_s(tilingBuf + apaceTilingSize, tilingBufCap - apaceTilingSize, 0, finalSize - apaceTilingSize);
         if (zeroRet != EOK) {
             OP_LOGE(opName_, "PostTiling: memset_s hcomm tiling padding failed, ret=%d.", zeroRet);
             return ge::GRAPH_FAILED;
@@ -462,6 +463,7 @@ AllGatherMatmulTilingV2::AllGatherMatmulTilingV2(gert::TilingContext* context)
 {}
 // 注册Tiling类
 REGISTER_TILING_TEMPLATE_WITH_ARCH(AllGatherMatmulV2, AllGatherMatmulTilingV2,
-                                   std::vector<int32_t>({(int32_t)Ops::Base::DAV_3510, (int32_t)Ops::Base::DAV_9201}),
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_3510),
+                                                         static_cast<int32_t>(Ops::Base::DAV_9201)}),
                                    0);
 } // namespace optiling

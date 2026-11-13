@@ -1405,7 +1405,8 @@ AllGatherQuantBmmHelper::AllGatherQuantBmmHelper(AllGatherQuantBmmTiling& allGat
 {}
 // 注册Tiling类
 REGISTER_TILING_TEMPLATE_WITH_ARCH(AllGatherMatmulV2, AllGatherQuantBmmTiling,
-                                   std::vector<int32_t>({(int32_t)Ops::Base::DAV_3510, (int32_t)Ops::Base::DAV_9201}),
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_3510),
+                                                         static_cast<int32_t>(Ops::Base::DAV_9201)}),
                                    1);
 } // namespace optiling
 

@@ -839,7 +839,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext* context, const ShapeIn
     tilingData->dumpInfo.workspaceLayout.segments[0] = {
         0UL, libApiSize, static_cast<uint8_t>(Utils::WS_SEG_LIB_API), {}};
     tilingData->dumpInfo.workspaceLayout.totalSize += Utils::STATE_DUMP_TOTAL_SIZE;
-    tilingData->dumpInfo.workspaceLayout.segCount = 2;
+    tilingData->dumpInfo.workspaceLayout.segCount = 2; // libapi and state_dump
     tilingData->dumpInfo.workspaceLayout.segments[1] = {
         libApiSize, Utils::STATE_DUMP_TOTAL_SIZE, static_cast<uint8_t>(Utils::WS_SEG_STATE_DUMP), {}};
     auto x1Dtype = context->GetInputDesc(IDX_INPUT_X1)->GetDataType();
@@ -849,7 +849,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext* context, const ShapeIn
     uint64_t scaleRegionBytes = rankSize * m * scaleKDim * 2;
     tilingData->dumpInfo.peermemDataSize = dataRegionBytes + scaleRegionBytes;
     tilingData->dumpInfo.peermemLayout.totalSize = tilingData->dumpInfo.peermemDataSize;
-    tilingData->dumpInfo.peermemLayout.segCount = 2;
+    tilingData->dumpInfo.peermemLayout.segCount = 2; // dataRegion and scaleRegion
     tilingData->dumpInfo.peermemLayout.segments[0] = {
         0UL, dataRegionBytes, static_cast<uint8_t>(Utils::PEERMEM_SEG_DATA), {}};
     tilingData->dumpInfo.peermemLayout.segments[1] = {
