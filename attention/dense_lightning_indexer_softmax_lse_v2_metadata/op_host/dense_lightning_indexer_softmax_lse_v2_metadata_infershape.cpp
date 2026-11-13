@@ -15,14 +15,33 @@
 #include "register/op_impl_registry.h"
 #include "../../dense_lightning_indexer_softmax_lse_v2/op_kernel/dense_lightning_indexer_softmax_lse_v2_metadata.h"
 
+#include <cstring>
+
 using namespace ge;
 
 namespace ops {
 static ge::graphStatus InferShapeDenseLightningIndexerSoftmaxLseV2Metadata(gert::InferShapeContext* context)
 {
+    auto attrs = context->GetAttrs();
+    if (attrs == nullptr) {
+        return GRAPH_FAILED;
+    }
+    const auto* batchSize = attrs->GetAttrPointer<int64_t>(0);
+    const auto* maxSeqLenQ = attrs->GetAttrPointer<int64_t>(1);
+    const char* const* layoutQPtr = attrs->GetAttrPointer<const char*>(6);
+    const char* layoutQ = (layoutQPtr != nullptr) ? *layoutQPtr : nullptr;
+    if (batchSize == nullptr || maxSeqLenQ == nullptr) {
+        return GRAPH_FAILED;
+    }
+    int64_t itemBound = 0;
+    if (layoutQ != nullptr && strcmp(layoutQ, "TND") == 0) {
+        itemBound = (*maxSeqLenQ > 0) ? *maxSeqLenQ : static_cast<int64_t>(optiling::DLI_SCHED_ITEM_MAX_NUM);
+    } else if (*batchSize > 0 && *maxSeqLenQ > 0) {
+        itemBound = (*batchSize) * (*maxSeqLenQ);
+    }
     gert::Shape* oShape = context->GetOutputShape(0);
     oShape->SetDimNum(1);
-    oShape->SetDim(0, optiling::DLI_METADATA_SIZE);
+    oShape->SetDim(0, optiling::DliSchedMetadataSize(itemBound));
     return GRAPH_SUCCESS;
 }
 

@@ -9,7 +9,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 # Only Ascend 950 has a PyPTO kernel implementation for this operator.
-if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT)
+if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT AND NOT "ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT)
     message(STATUS "[dense_lightning_indexer_softmax_lse_v2] Skipped: PyPTO kernel only supports ascend950 (soc=${ASCEND_COMPUTE_UNIT})")
     return()
 endif()

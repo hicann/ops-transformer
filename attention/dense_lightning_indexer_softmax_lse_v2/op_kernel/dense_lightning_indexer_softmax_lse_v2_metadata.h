@@ -24,6 +24,26 @@ using DLI_METADATA_T = int32_t;
 constexpr uint32_t DLI_METADATA_MAX_CORE_NUM = 36;
 constexpr uint32_t DLI_METADATA_SIZE = 64;
 
+constexpr uint32_t DLI_SCHED_CORE_NUM = 64;
+constexpr uint32_t DLI_SCHED_ITEM_MAX_NUM = 65536;
+constexpr uint32_t DLI_SCHED_FLAG_IDX = 4;
+constexpr uint32_t DLI_SCHED_CNT_IDX = 8;
+constexpr uint32_t DLI_SCHED_OFF_IDX = 72;
+constexpr uint32_t DLI_SCHED_ITEM_IDX = 136;
+constexpr uint32_t DLI_SCHED_ENTRY_STRIDE = 8;
+constexpr uint32_t DLI_METADATA_MAX_SIZE = DLI_SCHED_ITEM_IDX + DLI_SCHED_ENTRY_STRIDE * DLI_SCHED_ITEM_MAX_NUM;
+
+inline constexpr int64_t DliSchedMetadataSize(int64_t itemBound)
+{
+    if (itemBound <= 0) {
+        return static_cast<int64_t>(DLI_METADATA_SIZE);
+    }
+    if (itemBound > static_cast<int64_t>(DLI_SCHED_ITEM_MAX_NUM)) {
+        itemBound = static_cast<int64_t>(DLI_SCHED_ITEM_MAX_NUM);
+    }
+    return static_cast<int64_t>(DLI_SCHED_ITEM_IDX) + static_cast<int64_t>(DLI_SCHED_ENTRY_STRIDE) * itemBound;
+}
+
 namespace detail {
 struct DenseLISoftmaxLseV2MetaData {
     int32_t forecore_num;

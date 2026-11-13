@@ -73,6 +73,7 @@ class DenseLILseV2Tiling:
     n1: int
     d: int
     cmp_ratio: int
+    block_num: int
 
 
 # ================================================================

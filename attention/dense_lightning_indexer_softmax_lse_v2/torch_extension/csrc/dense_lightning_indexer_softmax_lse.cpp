@@ -14,6 +14,24 @@
 
 namespace op_api {
 constexpr int64_t DLI_METADATA_SIZE = 64;
+constexpr int64_t DLI_SCHED_ITEM_IDX = 136;
+constexpr int64_t DLI_SCHED_ITEM_MAX_NUM = 65536;
+
+int64_t DliSchedMetadataSize(int64_t batchSize, int64_t maxSeqLenQ, const std::string& layoutQ)
+{
+    int64_t itemBound = 0;
+    if (layoutQ == "TND") {
+        itemBound = (maxSeqLenQ > 0) ? maxSeqLenQ : DLI_SCHED_ITEM_MAX_NUM;
+    } else if (batchSize > 0 && maxSeqLenQ > 0) {
+        itemBound = batchSize * maxSeqLenQ;
+    } else {
+        return DLI_METADATA_SIZE;
+    }
+    if (itemBound > DLI_SCHED_ITEM_MAX_NUM) {
+        itemBound = DLI_SCHED_ITEM_MAX_NUM;
+    }
+    return DLI_SCHED_ITEM_IDX + 8 * itemBound;
+}
 
 at::Device get_dense_lightning_indexer_softmax_lse_v2_metadata_device(const c10::optional<at::Tensor>& cu_seqlens_q,
                                                                       const c10::optional<at::Tensor>& cu_seqlens_k,
@@ -51,7 +69,8 @@ at::Tensor dense_lightning_indexer_softmax_lse_v2_metadata(
         auto local_device = get_dense_lightning_indexer_softmax_lse_v2_metadata_device(
             cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k, cmp_residual_k);
         const c10::OptionalDeviceGuard device_guard(local_device);
-        output = at::empty({DLI_METADATA_SIZE}, at::TensorOptions().dtype(at::kInt).device(local_device));
+        output = at::empty({DliSchedMetadataSize(batch_size, max_seqlen_q, layout_q)},
+                           at::TensorOptions().dtype(at::kInt).device(local_device));
     }
 
     char* layout_q_ptr = const_cast<char*>(layout_q.c_str());

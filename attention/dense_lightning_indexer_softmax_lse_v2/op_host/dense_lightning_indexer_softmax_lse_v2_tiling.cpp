@@ -440,12 +440,18 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
     // Determine if S2 exceeds reduce_sum_vec UB capacity.
     constexpr int64_t TKV = 128;
     constexpr int64_t TKV_HALF = TKV / 2;
-    constexpr int64_t KV_CACHE_NUM = 46832;
+    constexpr int64_t KV_CACHE_NUM_ARCH35 = 46832;
+    constexpr int64_t KV_CACHE_NUM_ARCH92 = 30448;
+    auto npuArch = ascendcPlatform.GetCurNpuArch();
+    bool isArch35 = (npuArch == NpuArch::DAV_3510);
+    int64_t kvCacheNum = isArch35 ? KV_CACHE_NUM_ARCH35 : KV_CACHE_NUM_ARCH92;
+    int64_t kvTileElems = isArch35 ? TKV_HALF : TKV;
     int64_t s2Tiles = (s2Size + TKV - 1) / TKV;
-    int64_t maxUbS2Tiles = KV_CACHE_NUM / TKV_HALF;
+    int64_t maxUbS2Tiles = kvCacheNum / kvTileElems;
     int64_t isLongS2 = (s2Tiles > maxUbS2Tiles) ? 1 : 0;
 
     tilingData->cmp_ratio = cmpRatio;
+    tilingData->block_num = static_cast<int64_t>(blockDim);
 
     // Check if optional inputs seq_used_q (index 5) and seq_used_k (index 6) are provided
     int64_t hasSeqUsedQ = (context->GetOptionalInputShape(5) != nullptr) ? 1 : 0;
@@ -461,7 +467,6 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
     // Workspace: system reserve + workspace_max [1,72] FP32 (288 bytes) + workspace_sum [1,72] FP32 (288 bytes)
     //            + workspace [36, S2] FP32 (for long S2 reduce_sum spill).
     constexpr size_t WS_MAX_BYTES = 288;
-    constexpr int64_t WS_MAX_CORES = 36;
     size_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     workspaceSize += WS_MAX_BYTES * 2;
     if (isLongS2) {
@@ -471,7 +476,7 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
         // Without alignment, tail load reads beyond the per-core workspace allocation when
         // s2Size % TKV != 0.
         int64_t s2SizeAligned = (s2Size + TKV - 1) / TKV * TKV;
-        workspaceSize += static_cast<size_t>(WS_MAX_CORES) * static_cast<size_t>(s2SizeAligned) * sizeof(float);
+        workspaceSize += static_cast<size_t>(blockDim) * static_cast<size_t>(s2SizeAligned) * sizeof(float);
     }
     size_t* workSpaces = context->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;

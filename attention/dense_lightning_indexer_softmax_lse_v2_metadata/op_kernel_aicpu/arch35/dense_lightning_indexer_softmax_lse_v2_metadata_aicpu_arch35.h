@@ -24,27 +24,7 @@ using namespace optiling;
 
 namespace aicpu {
 
-inline int64_t DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CalcTotalSize() const
-{
-    if (IsTensorValid(seqUsedQuery_)) {
-        auto* data = reinterpret_cast<const int32_t*>(seqUsedQuery_->GetData());
-        int64_t total = 0;
-        for (int64_t i = 0; i < bSize_; ++i) {
-            total += static_cast<int64_t>(data[i]);
-        }
-        return total;
-    }
-    if (layoutType_ == DliLayout::TND) {
-        if (IsTensorValid(cuSeqLensQuery_)) {
-            auto* data = reinterpret_cast<const int32_t*>(cuSeqLensQuery_->GetData());
-            return static_cast<int64_t>(data[bSize_]);
-        }
-        return 0;
-    }
-    return bSize_ * s1Size_;
-}
-
-inline bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::BuildMetadata()
+inline bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::BuildMetadataArch35()
 {
     int64_t totalNum = CalcTotalSize();
     if (totalNum < 0) {

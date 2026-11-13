@@ -11,8 +11,8 @@
 cmake_minimum_required(VERSION 3.18.4)
 
 # Only Ascend 950 has a PyPTO kernel implementation for this operator.
-if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT)
-    message(STATUS "[dense_lightning_indexer_softmax_lse_v2] Skipped: PyPTO kernel only supports ascend950 (soc=${ASCEND_COMPUTE_UNIT})")
+if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT AND NOT "ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT)
+    message(STATUS "[dense_lightning_indexer_softmax_lse_v2] Skipped: PyPTO kernel only supports ascend950/ascend960dt (soc=${ASCEND_COMPUTE_UNIT})")
     return()
 endif()
 
@@ -32,6 +32,12 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
     add_ops_compile_options(
         OP_NAME DenseLightningIndexerSoftmaxLseV2
         COMPUTE_UNIT Ascend950PR_9599
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960dt")
+    add_ops_compile_options(
+        OP_NAME DenseLightningIndexerSoftmaxLseV2
+        COMPUTE_UNIT Ascend960DT_968B7
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
 endif()

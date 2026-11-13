@@ -36,7 +36,8 @@ enum class DliLayout {
 
 enum class ValidSocVersion {
     ASCEND910 = 0,
-    ASCEND950
+    ASCEND950,
+    ASCEND960
 };
 
 inline bool IsTensorValid(Tensor* tensor)
@@ -97,7 +98,8 @@ private:
     bool ParamsCheck();
     bool CheckTensorValues();
     ValidSocVersion ProcessSocVersion();
-    bool BuildMetadata();
+    bool BuildMetadataArch35();
+    bool BuildMetadataArch92();
     int64_t CalcTotalSize() const;
 
     Tensor* cuSeqLensQuery_ = nullptr;

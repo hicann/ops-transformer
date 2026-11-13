@@ -31,6 +31,7 @@ TILING_DATA_FIELD_DEF(int64_t, s2)
 TILING_DATA_FIELD_DEF(int64_t, n1)
 TILING_DATA_FIELD_DEF(int64_t, d)
 TILING_DATA_FIELD_DEF(int64_t, cmp_ratio)
+TILING_DATA_FIELD_DEF(int64_t, block_num)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(DenseLightningIndexerSoftmaxLseV2, DenseLISoftmaxLseV2TilingData)
 

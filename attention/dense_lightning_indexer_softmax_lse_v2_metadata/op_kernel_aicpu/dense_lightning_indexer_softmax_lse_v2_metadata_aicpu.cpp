@@ -18,6 +18,7 @@
 #include "../../dense_lightning_indexer_softmax_lse_v2/op_kernel/dense_lightning_indexer_softmax_lse_v2_metadata.h"
 #include "dense_lightning_indexer_softmax_lse_v2_metadata_aicpu.h"
 #include "arch35/dense_lightning_indexer_softmax_lse_v2_metadata_aicpu_arch35.h"
+#include "arch92/dense_lightning_indexer_softmax_lse_v2_metadata_aicpu_arch92.h"
 
 using namespace optiling;
 
@@ -30,7 +31,10 @@ uint32_t DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::Compute(CpuKernelCo
     }
     ValidSocVersion socVersion = ProcessSocVersion();
     if (socVersion == ValidSocVersion::ASCEND950) {
-        return BuildMetadata() ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
+        return BuildMetadataArch35() ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
+    }
+    if (socVersion == ValidSocVersion::ASCEND960) {
+        return BuildMetadataArch92() ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
     }
     KERNEL_LOG_ERROR("Unsupported soc version: %s", socVersion_.c_str());
     return KERNEL_STATUS_PARAM_INVALID;
@@ -84,8 +88,11 @@ bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::Prepare(CpuKernelContex
 ValidSocVersion DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::ProcessSocVersion()
 {
     const std::string ascend950 = "Ascend950";
+    const std::string ascend960 = "Ascend960";
     if (socVersion_.find(ascend950) != std::string::npos) {
         return ValidSocVersion::ASCEND950;
+    } else if (socVersion_.find(ascend960) != std::string::npos) {
+        return ValidSocVersion::ASCEND960;
     }
     return ValidSocVersion::ASCEND910;
 }
@@ -209,6 +216,26 @@ bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckTensorValues()
         }
     }
     return true;
+}
+
+int64_t DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CalcTotalSize() const
+{
+    if (IsTensorValid(seqUsedQuery_)) {
+        auto* data = reinterpret_cast<const int32_t*>(seqUsedQuery_->GetData());
+        int64_t total = 0;
+        for (int64_t i = 0; i < bSize_; ++i) {
+            total += static_cast<int64_t>(data[i]);
+        }
+        return total;
+    }
+    if (layoutType_ == DliLayout::TND) {
+        if (IsTensorValid(cuSeqLensQuery_)) {
+            auto* data = reinterpret_cast<const int32_t*>(cuSeqLensQuery_->GetData());
+            return static_cast<int64_t>(data[bSize_]);
+        }
+        return 0;
+    }
+    return bSize_ * s1Size_;
 }
 
 static const char* kernelTypeDenseLiV2 = "DenseLightningIndexerSoftmaxLseV2Metadata";

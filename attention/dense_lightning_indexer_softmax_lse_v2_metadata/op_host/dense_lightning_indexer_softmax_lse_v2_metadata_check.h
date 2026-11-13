@@ -18,6 +18,7 @@
 #include "opdev/format_utils.h"
 #include "opdev/data_type_utils.h"
 #include "opdev/tensor_view_utils.h"
+#include "../../dense_lightning_indexer_softmax_lse_v2/op_kernel/dense_lightning_indexer_softmax_lse_v2_metadata.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,7 +35,6 @@ inline constexpr int64_t DLI_CMP_RATIO_UPPER_BOUND = 128;
 inline constexpr int64_t DLI_NUM_HEADS_Q_LOWER_BOUND = 1;
 inline constexpr int64_t DLI_NUM_HEADS_Q_UPPER_BOUND = 128;
 inline constexpr int64_t DLI_HEAD_DIM_LIMIT = 128;
-inline constexpr int64_t DLI_METADATA_SIZE = 64;
 
 inline bool IsTensorExistDliSLse(const aclTensor* tensor)
 {
@@ -234,7 +234,7 @@ aclnnStatus CheckExistenceDliSLse(int64_t maskMode, int64_t cmpRatio, const aclT
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, const aclTensor* cuSeqlensQOptional,
+aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, int64_t maxSeqlenQ, const aclTensor* cuSeqlensQOptional,
                                     const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
                                     const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
                                     const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata)
@@ -319,10 +319,17 @@ aclnnStatus CheckConsistencyDliSLse(int64_t batchSize, const aclTensor* cuSeqlen
                                                   "The dtype of metadata must be int32");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        if (metadata->GetViewShape().GetDim(0) != DLI_METADATA_SIZE) {
+        int64_t itemBound = 0;
+        if (layoutQOptional != nullptr && strcmp(layoutQOptional, "TND") == 0) {
+            itemBound = (maxSeqlenQ > 0) ? maxSeqlenQ : static_cast<int64_t>(optiling::DLI_SCHED_ITEM_MAX_NUM);
+        } else if (batchSize > 0 && maxSeqlenQ > 0) {
+            itemBound = batchSize * maxSeqlenQ;
+        }
+        const int64_t expectedSize = optiling::DliSchedMetadataSize(itemBound);
+        if (metadata->GetViewShape().GetDim(0) != expectedSize) {
             OP_LOGE_FOR_INVALID_SHAPESIZE(DLI_ACLNN_OP_NAME, "metadata",
                                           std::to_string(metadata->GetViewShape().GetDim(0)),
-                                          std::to_string(DLI_METADATA_SIZE));
+                                          std::to_string(expectedSize));
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
@@ -419,8 +426,8 @@ aclnnStatus ParamsCheckDliSLseA5(const aclTensor* cuSeqlensQOptional, const aclT
                                 layoutQOptional, layoutKOptional, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
-    ret = CheckConsistencyDliSLse(batchSize, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
-                                  cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata);
+    ret = CheckConsistencyDliSLse(batchSize, maxSeqlenQ, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional,
+                                  sequsedKOptional, cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     return ACLNN_SUCCESS;

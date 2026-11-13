@@ -21,6 +21,29 @@ DLI_METADATA_SIZE = 64
 DLI_METADATA_OP_NAME = "dense_lightning_indexer_softmax_lse_metadata"
 DLI_OP_NAME = "dense_lightning_indexer_softmax_lse"
 
+DLI_SCHED_ITEM_IDX = 136
+DLI_SCHED_ITEM_MAX_NUM = 65536
+
+
+def _dli_sched_metadata_size(batch_size, max_seqlen_q, layout_q="BSND"):
+    if layout_q == "TND":
+        bound = (
+            max_seqlen_q
+            if (max_seqlen_q and max_seqlen_q > 0)
+            else DLI_SCHED_ITEM_MAX_NUM
+        )
+    elif (
+        batch_size is None
+        or max_seqlen_q is None
+        or batch_size <= 0
+        or max_seqlen_q <= 0
+    ):
+        return DLI_METADATA_SIZE
+    else:
+        bound = batch_size * max_seqlen_q
+    bound = min(bound, DLI_SCHED_ITEM_MAX_NUM)
+    return DLI_SCHED_ITEM_IDX + 8 * bound
+
 
 class DenseLightningIndexerSoftmaxLseOpBuilder(OpBuilder):
     def __init__(self):
@@ -68,7 +91,11 @@ class DenseLightningIndexerSoftmaxLseOpBuilder(OpBuilder):
             mask_mode=None,
             cmp_ratio=None,
         ):
-            return torch.empty((DLI_METADATA_SIZE,), dtype=torch.int32, device="meta")
+            return torch.empty(
+                (_dli_sched_metadata_size(batch_size, max_seqlen_q, layout_q),),
+                dtype=torch.int32,
+                device="meta",
+            )
 
         @impl(get_as_library(), self.name, "Meta")
         def dense_lightning_indexer_softmax_lse_meta(
