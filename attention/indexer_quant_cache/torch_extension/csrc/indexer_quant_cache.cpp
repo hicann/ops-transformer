@@ -22,11 +22,13 @@ using namespace at_npu::native;
 namespace {
 constexpr int64_t TAIL_DIM_ALIGN = 32; // x 尾轴 d 必须 32 对齐
 constexpr int64_t QUANT_MODE_MIN = 0;
-constexpr int64_t QUANT_MODE_MAX = 3; // 0:MX-FP8 1:Normal 2:HiFloat8 3:MX-FP4
+constexpr int64_t QUANT_MODE_MAX = 4; // 0:MX-FP8 1:Normal 2:HiFloat8 3:MX-FP4 4:HiFloat4
 constexpr int64_t MXFP8_QUANT_MODE = 0;
 constexpr int64_t FP8_QUANT_MODE = 1;
 constexpr int64_t HIFLOAT8_QUANT_MODE = 2;
 constexpr int64_t MXFP4_QUANT_MODE = 3;
+constexpr int64_t HIFLOAT4_QUANT_MODE = 4;
+constexpr int64_t HIFLOAT4_GROUP_SIZE = 64;
 
 enum class TensorRole {
     CACHE,
@@ -82,8 +84,19 @@ TensorWrapper MakeTensorWrapper(const at::Tensor& tensor, int64_t quantMode, Ten
                         "When quant_mode is mxfp4, cache_scale must be torch.uint8 or torch.float8_e8m0fnu, but got ",
                         tensorType);
             return {tensor, ACL_FLOAT8_E8M0};
+        case HIFLOAT4_QUANT_MODE:
+            if (role == TensorRole::CACHE) {
+                TORCH_CHECK(tensorType == at::kByte,
+                            "When quant_mode is hifloat4, cache must be packed torch.uint8, but got ", tensorType);
+                return {tensor, cann_ops_transformer::ACL_HIFLOAT4};
+            }
+            TORCH_CHECK(tensorType == at::kFloat,
+                        "When quant_mode is hifloat4, cache_scale must be torch.float32 carrying "
+                        "HIFLOAT4_SCALE encoded bits, but got ",
+                        tensorType);
+            return {tensor, cann_ops_transformer::ACL_HIFLOAT4_SCALE};
         default:
-            TORCH_CHECK(false, "quant_mode should be one of mxfp8, fp8, hifloat8 or mxfp4");
+            TORCH_CHECK(false, "quant_mode should be one of mxfp8, fp8, hifloat8, mxfp4 or hifloat4");
     }
     return {tensor, ACL_DT_UNDEFINED};
 }
@@ -99,10 +112,11 @@ void IndexerQuantCache(at::Tensor& cache, at::Tensor& cacheScale, const at::Tens
     TORCH_CHECK(slotMapping.dim() == x.dim() - 1, "slot_mapping dim should equal x dim - 1, but got slot_mapping dim ",
                 slotMapping.dim(), " and x dim ", x.dim());
     TORCH_CHECK(quantMode >= QUANT_MODE_MIN && quantMode <= QUANT_MODE_MAX,
-                "quant_mode should be one of mxfp8, fp8, hifloat8 or mxfp4");
+                "quant_mode should be one of mxfp8, fp8, hifloat8, mxfp4 or hifloat4");
     int64_t tailDim = x.size(x.dim() - 1);
-    TORCH_CHECK(tailDim > 0 && tailDim % TAIL_DIM_ALIGN == 0,
-                "The last dim (d) of x should be positive and 32-aligned, but got ", tailDim);
+    const int64_t tailAlign = quantMode == HIFLOAT4_QUANT_MODE ? HIFLOAT4_GROUP_SIZE : TAIL_DIM_ALIGN;
+    TORCH_CHECK(tailDim > 0 && tailDim % tailAlign == 0, "The last dim (d) of x should be positive and aligned to ",
+                tailAlign, ", but got ", tailDim);
 
     auto localDevice = c10::Device(cache.device());
     const c10::OptionalDeviceGuard deviceGuard(localDevice);

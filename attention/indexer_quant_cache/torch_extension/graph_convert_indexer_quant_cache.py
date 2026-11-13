@@ -125,12 +125,17 @@ if _TORCHAIR_AVAILABLE:
         # 对外 str quant_mode → 算子侧 int（与 eager 路径共用同一映射）
         from .indexer_quant_cache import _resolve_quant_mode
 
+        quant_mode_int = _resolve_quant_mode(quant_mode)
+        if quant_mode_int == 4:
+            raise NotImplementedError(
+                "IndexerQuantCache hifloat4 currently supports eager execution only."
+            )
         out = IndexerQuantCache(
             cache=cache,
             cache_scale=cache_scale,
             x=x,
             slot_mapping=slot_mapping,
-            quant_mode=_resolve_quant_mode(quant_mode),
+            quant_mode=quant_mode_int,
             round_scale=round_scale,
             x_scale=x_scale,
         )

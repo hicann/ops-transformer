@@ -21,6 +21,7 @@ class IndexerQuantMode(IntEnum):
     FP8 = 1  # "fp8"      逐 token 动态 FP8(e4m3/e5m2)，整行一个 float32 scale
     HIFLOAT8 = 2  # "hifloat8" HiFloat8 静态量化
     MXFP4 = 3  # "mxfp4"    MX-FP4：微缩放 FP4，每 32 元素一组，e8m0 scale
+    HIFLOAT4 = 4  # "hifloat4" HiFloat4：uint8打包数据、float32承载scale编码
 
 
 DEFAULT_QUANT_MODE = "fp8"

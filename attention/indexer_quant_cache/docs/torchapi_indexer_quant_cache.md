@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-    在Indexer注意力机制的Epilog阶段对KV Cache进行原地动态量化压缩更新，封装aclnnIndexerQuantCache。将float16/bfloat16激活值x按量化粒度（mxfp8/mxfp4 模式每32个元素一组，fp8/hifloat8 模式整行一组）动态量化为FP8（E4M3/E5M2）或MX-FP4，并按slot_mapping将量化结果与对应scale散写到cache/cache_scale，slot_mapping中值为-1的token跳过不处理。支持mxfp8、fp8、hifloat8、mxfp4 四种量化模式（各模式含义见参数说明quant_mode）。
+    在Indexer注意力机制的Epilog阶段对KV Cache进行原地动态量化压缩更新，封装aclnnIndexerQuantCache。将float16/bfloat16激活值x按量化粒度（mxfp8/mxfp4 模式每32个元素一组，fp8/hifloat8 模式整行一组）量化为FP8（E4M3/E5M2）、HiFloat8、MX-FP4或HiFloat4，并按slot_mapping将量化结果与对应scale散写到cache/cache_scale，slot_mapping中值为-1的token跳过不处理。支持mxfp8、fp8、hifloat8、mxfp4、hifloat4 五种量化模式（各模式含义见参数说明quant_mode）。
 
 - 语义说明：
 
@@ -62,7 +62,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>cache</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>当前层的分页KV Cache，<b>仅支持四维shape</b>（num_slots = blockNum × blockSize），<b>headDim须 ≥ d</b>（MX-FP4以fp4元素计）。在<b>blockNum维支持非连续</b>（分页）。MX-FP4模式下cache为FP4（每字节打包2个fp4值）。数据格式为$ND$。</td>
+        <td>当前层的分页KV Cache，<b>仅支持四维shape</b>（num_slots = blockNum × blockSize），<b>headDim须 ≥ d</b>（MX-FP4以fp4元素计；hifloat4以打包字节计，须 ≥ d/2）。在<b>blockNum维支持非连续</b>（分页）。MX-FP4模式下cache为FP4（每字节打包2个fp4值）。数据格式为$ND$。</td>
         <td>float8_e4m3fn、float8_e5m2、uint8、float4_E2M1、float4_e1m2</td>
         <td>(blockNum, blockSize, 1, headDim)</td>
     </tr>
@@ -100,8 +100,9 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
                 <li><code>"fp8"</code>(内部1)：逐token动态FP8 量化，整行（headDim）一组，输出FP8(e4m3/e5m2)，每行一个float32 scale（scaleCol=1），cache_scale为float。</li>
                 <li><code>"hifloat8"</code>(内部2)：HiFloat8 静态量化（按x_scale缩放后取HiFloat8），整行一组，cache_scale为float。</li>
                 <li><code>"mxfp4"</code>(内部3)：MX-FP4 微缩放量化，x每32 个元素一组，输出FP4(每字节打包2 个值)，每组一个e8m0 scale，cache_scale为float8_e8m0。</li>
+                <li><code>"hifloat4"</code>(内部4)：仅ascend960dt（DAV_9201）支持。cache使用torch.uint8，每字节打包两个HiFloat4值；cache_scale使用torch.float32承载HIFLOAT4_SCALE编码，每64个输入元素对应一个32位scale元素。</li>
             </ul>
-            下文约束说明中出现的quant_mode=0/1/2/3 指上表对应的内部int取值。</td>
+            下文约束说明中出现的quant_mode=0/1/2/3/4 指上表对应的内部int取值。</td>
         <td>STR</td>
         <td>-</td>
     </tr>
@@ -131,15 +132,17 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
 ## 约束说明
 
 - 该接口支持推理场景下使用。
-- 该接口支持单算子模式调用。
-- 当前Torch接口不支持ACLNN/GE侧的HiFloat4（mode4）。`torch.uint8`是浮点编码载体：cache在mxfp8/fp8模式下承载E4M3，在hifloat8模式下承载HiFloat8，在mxfp4模式下承载每字节两个E2M1值；mxfp8/mxfp4的uint8 cache_scale承载E8M0。
+- 该接口支持单算子模式调用；hifloat4模式暂不支持Torch图模式。
+- `torch.uint8`是浮点编码载体：cache在mxfp8/fp8模式下承载E4M3，在hifloat8模式下承载HiFloat8，在mxfp4模式下承载每字节两个E2M1值，在hifloat4模式下承载每字节两个HiFloat4值；mxfp8/mxfp4的uint8 cache_scale承载E8M0。
+- hifloat4模式要求`d % 64 == 0`。Torch侧cache形状为`[blockNum, blockSize, 1, cacheBytes]`，`cacheBytes >= d/2`；cache_scale形状为`[blockNum, blockSize, 1, scaleHeadDim]`，`scaleHeadDim >= d/64`。例如d=128时，cache末维至少64字节，cache_scale末维至少2个float32载体元素。scale是编码载体，不能按普通float数值做转换；无需添加DynamicHiF4Quant输出scale的额外尾轴。
+- hifloat4模式忽略`round_scale`和`x_scale`；仅在blockNum维支持非连续分页，保持原地更新语义。
 - 当前Torch接口的`mxfp8`模式仅支持`cache`为`torch.float8_e4m3fn`，或使用`torch.uint8`承载E4M3编码；暂不支持`torch.float8_e5m2`。`fp8`模式支持E4M3和E5M2。
 - cache与cache_scale的数据类型组合需与quant_mode匹配：fp8/hifloat8 模式cache_scale为float；mxfp8/mxfp4 模式cache_scale为float8_e8m0；mxfp4 模式cache为FP4（uint8打包）。
 - cache与cache_scale（所有量化模式，含HiFloat8）均仅支持四维shape `[blockNum, blockSize, 1, headDim]`，倒数第二维固定为1（每token一个量化向量）；num_slots = blockNum × blockSize。
 - cache/cache_scale仅在blockNum维支持非连续：各block可不紧密排布，但block内须连续。
 - headDim长度约束：
-  - cache.headDim ≥ d（MX-FP4以fp4元素计，d个fp4值占⌈d/2⌉字节）；
-  - cache_scale.headDim ≥ scaleCol，scaleCol = mxfp8/mxfp4：⌈d/32⌉；fp8/hifloat8：1；
+  - 除hifloat4外，cache.headDim ≥ d（MX-FP4以fp4元素计，d个fp4值占⌈d/2⌉字节）；
+  - cache_scale.headDim ≥ scaleCol，scaleCol = mxfp8/mxfp4：⌈d/32⌉；fp8/hifloat8：1；hifloat4：d/64；
   - 示例：d=128、quant_mode=0 → scaleCol=4 → cache.headDim ≥ 128 且cache_scale.headDim ≥ 4。
 - slot_mapping的维度应等于x的维度减1，即slot_mapping为x除最后一维外的所有维度展平。
 - slot_mapping中值为-1的token会被跳过不处理；其余有效元素取值范围为[0, num_slots - 1]，且元素值应保证不重复，重复时不保证结果正确性。
