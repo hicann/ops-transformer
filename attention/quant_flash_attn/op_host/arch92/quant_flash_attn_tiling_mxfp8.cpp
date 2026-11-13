@@ -193,16 +193,18 @@ void QuantFlashAttnTilingArch92::UpdateTilingKeyConfig()
     } else if (sOuter == SOUTER_64 && sInner == SINNER_512) {
         // decode 下其余 dSize 档位（如 512/576）兜底到 D256
         tilingKeyInfo_.config = Config_S1Aligned64_S2Aligned512_DAligned256_DVAligned256;
-    } else if (sOuter == SOUTER_128 && sInner == SINNER_256 && dSize == DSIZE_64 && dVsize == DSIZE_64) {
-        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned256_DAligned64_DVAligned64;
-    } else if (sOuter == SOUTER_128 && sInner == SINNER_256 && dSize == DSIZE_72 && dVsize == DSIZE_72) {
-        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned256_DAligned72_DVAligned72;
-    } else if (sOuter == SOUTER_128 && sInner == SINNER_256 && dSize == DSIZE_128 && dVsize == DSIZE_128) {
-        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128;
-    } else if (sOuter == SOUTER_128 && sInner == SINNER_128 && dSize == DSIZE_256 && dVsize == DSIZE_256) {
-        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned128_DAligned256_DVAligned256;
+        // prefill：D256 基本块为 128x256，其余为 128x512
+    } else if (sOuter == SOUTER_128 && sInner == SINNER_512 && dSize == DSIZE_64 && dVsize == DSIZE_64) {
+        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64;
+    } else if (sOuter == SOUTER_128 && sInner == SINNER_512 && dSize == DSIZE_72 && dVsize == DSIZE_72) {
+        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned72_DVAligned72;
+    } else if (sOuter == SOUTER_128 && sInner == SINNER_512 && dSize == DSIZE_128 && dVsize == DSIZE_128) {
+        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128;
+    } else if (sOuter == SOUTER_128 && sInner == SINNER_256 && dSize == DSIZE_256 && dVsize == DSIZE_256) {
+        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned256_DAligned256_DVAligned256;
     } else {
-        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128;
+        // 其余 prefill 组合统一按 128x512 的 D128 模板兜底
+        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128;
     }
 }
 

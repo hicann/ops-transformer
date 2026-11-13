@@ -110,7 +110,7 @@ struct VTailCase {
     uint64_t ExpectedKey(bool hasTail) const
     {
         const auto config = decode ? Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128 :
-                                     Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128;
+                                     Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128;
         const auto mode = decode ? QFA_MXFP8_FP32_DECODE : QFA_MXFP8_FP32_PREFILL;
         return GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, config, mode, false, KvLayoutType_PA_BNBD, true, hasTail);
     }
@@ -173,7 +173,7 @@ TEST(QuantFlashAttnArch92FdLayoutTiling, FixedLayoutsSelectRouteAndReservePartia
             ::TilingInfo result;
             ASSERT_TRUE(ExecuteTiling(params.Context(), result));
             const auto config = decode ? Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128 :
-                                         Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128;
+                                         Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128;
             const auto mode = decode ? QFA_MXFP8_FP32_DECODE : QFA_MXFP8_FP32_PREFILL;
             const auto layoutKey = bnsd ? InOutLayoutType_BNSD : InOutLayoutType_BSND;
             EXPECT_EQ(static_cast<uint64_t>(result.tilingKey),
@@ -211,10 +211,10 @@ TEST(QuantFlashAttnArch92VTailTiling, ZeroTailTensorRetainsSpecialization)
 TEST(QuantFlashAttnArch92VTailTiling, FdAndTailBitsPreserveExistingKeyEncoding)
 {
     // MXFP8 仅注册 IsFd=true；用受支持的 key 验证原编码位，避免调试版检查已删除的选择。
-    EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
+    EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128,
                                  QFA_MXFP8_FP32_PREFILL, false, KvLayoutType_PA_BNBD, true, false),
               LEGACY_DN_KEY | FD_KEY_BIT);
-    EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
+    EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128,
                                  QFA_MXFP8_FP32_PREFILL, false, KvLayoutType_PA_BNBD, true, true),
               LEGACY_DN_KEY | FD_KEY_BIT | VTAIL_KEY_BIT);
     EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128,

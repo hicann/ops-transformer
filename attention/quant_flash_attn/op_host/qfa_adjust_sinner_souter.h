@@ -110,16 +110,16 @@ inline void AdjustSinnerAndSouterArch92(uint32_t vHeadDim, int64_t maxSeqQ, int6
         sOuterFactor = SOUTER_64;
         sInnerFactor = SINNER_512;
     } else if (vHeadDim == DSIZE_256) {
-        // prefill，dim=256：128x128
+        // prefill，dim=256：128x256
         sOuterFactor = SOUTER_128;
-        sInnerFactor = SINNER_128;
+        sInnerFactor = SINNER_256;
     } else if (quantMode == 10) {
         sOuterFactor = SOUTER_128;
         sInnerFactor = SINNER_1024;
     } else {
-        // prefill，其余 dim：128x256
+        // prefill，其余 dim：128x512
         sOuterFactor = SOUTER_128;
-        sInnerFactor = SINNER_256;
+        sInnerFactor = SINNER_512;
     }
 }
 

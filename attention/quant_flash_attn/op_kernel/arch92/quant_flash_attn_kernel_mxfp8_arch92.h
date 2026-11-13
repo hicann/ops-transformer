@@ -51,7 +51,7 @@ public:
     static constexpr uint32_t s2BaseSize = CubeBlockType::s2BaseSize;
     static constexpr uint32_t dBaseSize = CubeBlockType::dBaseSize;
     static constexpr uint32_t dVBaseSize = CubeBlockType::dVBaseSize;
-    static constexpr uint32_t s2SplitSize = (dBaseSize == 256) ? 64U : 128U;
+    static constexpr uint32_t s2SplitSize = (dBaseSize == 256) ? 128U : 256U;
 
     static constexpr bool USE_DN = CubeBlockType::USE_DN;
     static constexpr bool HAS_MASK = VecFaBlockType::HAS_MASK;
@@ -74,13 +74,17 @@ public:
     using RunInfoX = typename CubeBlockType::RunInfoX;
     using PLayout = QfaPBufferLayout<mBaseSize, s2BaseSize, HAS_V_TAIL>;
 
+    // Mxfp8 Prefill 固定按 M128 分核、每次计算 64 行。
+    static constexpr uint32_t mScheduleSize = 128U;
+    static constexpr uint32_t mTileCount = mScheduleSize / mBaseSize;
+
     // CV buffers
     BufferManager<BufferType::GM> gmBufferManager_;
     BufferManager<BufferType::UB> ubBufferManager_;
     BufferManager<BufferType::L1> l1BufferManager_;
     BuffersPolicy3buff<BufferType::GM, SyncType::CROSS_CORE_SYNC_FORWARD> bmm2ResGmBuffers_;
     BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm1Buffers_;
-    BuffersPolicySingleBuffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm2Buffers_;
+    BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm2Buffers_;
     std::conditional_t<HAS_V_TAIL, BuffersPolicy4buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>,
                        BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>>
         l1PBuffers_;
@@ -245,7 +249,7 @@ public:
                         GetMmUbTotalSize() + 12U * BUFFER_SIZE_BYTE_512B + 2U * BUFFER_SIZE_BYTE_4K;
                     // FD 只借用 stage2 和第一份 stage1 的前 8 KiB；最小 stage1 仍有 8448 字节。
                     static_assert(VecFdBlockType::GetFdTotalUbSize() <=
-                                      mBaseSize * dVBaseSize * sizeof(float) + BUFFER_SIZE_BYTE_8K,
+                                      mScheduleSize * dVBaseSize * sizeof(float) + BUFFER_SIZE_BYTE_8K,
                                   "FD 超过可复用的 stage2 与 stage1 范围");
                     vecFdBlock_.template InitBuffers<fdBase>();
                 }
@@ -255,8 +259,9 @@ public:
 
     static __aicore__ inline constexpr uint32_t GetMmUbTotalSize()
     {
-        // 两个半 N 的 BMM1 槽加一个完整 BMM2 槽，arch92 每个 AIC 对应一个 AIV。
-        return (mBaseSize * s2BaseSize + mBaseSize * dVBaseSize) * sizeof(float);
+        // 两个半 N 的 BMM1 槽加两份 BMM2 槽，与 InitMMResBuf 的实际申请量一致。
+        // arch92 每个 AIC 对应一个 AIV。
+        return (mBaseSize * s2BaseSize + 2U * mBaseSize * dVBaseSize) * sizeof(float);
     }
 
     __aicore__ inline void InitMMResBuf(__gm__ uint8_t*& workspace)
@@ -265,12 +270,12 @@ public:
 
         uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * mm1OutDtype / 2;
         constexpr uint32_t mm2ResultSize = mBaseSize / CV_RATIO * dVBaseSize * sizeof(T);
-        constexpr uint32_t mm2LeftSize = PLayout::SLOT_BYTES;
+        constexpr uint32_t mm2LeftSize = PLayout::SLOT_BYTES * mTileCount;
         l1BufferManager_.Init(pipe_, 524288); // 512 * 1024
         // 保存p结果的L1内存必须放在第一个L1 policy上，保证和vec申请的地址相同
         // TODO，共享buffer初始化放到block层
         l1PBuffers_.Init(l1BufferManager_, mm2LeftSize);
-        ubBufferManager_.Init(pipe_, mm1ResultSize * 2 + mm2ResultSize);
+        ubBufferManager_.Init(pipe_, mm1ResultSize * 2 + mm2ResultSize * 2);
         bmm2Buffers_.Init(ubBufferManager_, mm2ResultSize);
         bmm1Buffers_.Init(ubBufferManager_, mm1ResultSize);
     }
@@ -388,6 +393,7 @@ public:
     {
         if ASCEND_IS_AIV {
             bmm2Buffers_.Get().SetCrossCore();
+            bmm2Buffers_.Get().SetCrossCore();
         }
 
         if ASCEND_IS_AIV {
@@ -403,6 +409,7 @@ public:
             bmm1Buffers_.Get().WaitCrossCore();
         }
         if ASCEND_IS_AIC {
+            bmm2Buffers_.Get().WaitCrossCore();
             bmm2Buffers_.Get().WaitCrossCore();
         }
     }
@@ -496,7 +503,7 @@ public:
         }
         uint64_t s2LoopTimes = (actSeqLensKv_ + s2BaseSize - 1) / s2BaseSize;
         uint64_t gS1Size = actSeqLensQ_ * constInfo_.realGSize;
-        uint64_t gS1LoopTimes = (gS1Size + mBaseSize - 1) / mBaseSize;
+        uint64_t gS1LoopTimes = (gS1Size + mScheduleSize - 1) / mScheduleSize;
         if (s2LoopTimes == 0 || gS1LoopTimes == 0) {
             if (gS1Cur == 0 && s2Cur == 0) {
                 return TASK_DEAL_MODE::DEAL_ZERO;
@@ -592,9 +599,9 @@ public:
         GetPreNextTokenLeftUp(actSeqLensQ_, actSeqLensKv_, preTokenLeftUp, nextTokenLeftUp);
 
         // 2. calc index of s2FirstToken, s2LastToken by index of s1GFirstToken, s1GLastToken
-        int64_t s1GFirstToken = static_cast<int64_t>(gS1Cur) * static_cast<int64_t>(mBaseSize);
+        int64_t s1GFirstToken = static_cast<int64_t>(gS1Cur) * static_cast<int64_t>(mScheduleSize);
         int64_t s1GLastToken =
-            AttentionCommon::Min(s1GFirstToken + static_cast<int64_t>(mBaseSize),
+            AttentionCommon::Min(s1GFirstToken + static_cast<int64_t>(mScheduleSize),
                                  static_cast<int64_t>(actSeqLensQ_) * static_cast<int64_t>(constInfo_.realGSize)) -
             1;
 
@@ -649,29 +656,53 @@ public:
         return;
     }
 
+    __aicore__ inline RunInfoX GetMTileInfo(const RunInfoX& task, uint32_t tile)
+    {
+        RunInfoX info = task;
+        info.mTileIdx = tile;
+        const uint32_t offset = tile * mBaseSize;
+        info.actMSize = AttentionCommon::Min((uint32_t)task.actMSize - offset, mBaseSize);
+        info.isLastMTile = offset + info.actMSize == task.actMSize;
+        info.gS1Idx += offset;
+        if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_BSH || LAYOUT_Q == LayOutTypeEnum::LAYOUT_SBH ||
+                      LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
+            info.s1Idx = info.gS1Idx / constInfo_.realGSize;
+        } else {
+            info.s1Idx = info.gS1Idx % info.actS1Size;
+        }
+        info.actMSizeAlign32 = (info.actMSize + 31U) / 32U * 32U;
+        info.actMSizeAlign16 = (info.actMSize + 15U) / 16U * 16U;
+        info.actVecMSize = info.actMSize;
+        return info;
+    }
+
     __aicore__ inline void ExecuteTask(uint64_t loop, RunInfoX taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
     {
-        RunInfoX& runInfo0 = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];                  // 本轮任务
-        RunInfoX& runInfoNegN = taskRunInfo[(loop - PRELOAD_N) % PRELOAD_TASK_CACHE_SIZE]; // 上PRELOAD_N轮任务
-        if (runInfo0.isValid) {
-            uint32_t c1v1Loop = CeilDiv(runInfo0.actSingleLoopS2Size, s2SplitSize);
-            for (uint32_t subLoop = 0; subLoop < c1v1Loop; ++subLoop) {
-                if ASCEND_IS_AIC {
-                    ComputeMm1(runInfo0, subLoop);
-                } else {
-                    ComputeVec1(runInfo0, subLoop);
+        RunInfoX& current = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];
+        if (current.isValid) {
+            for (uint32_t tile = 0; tile < CeilDiv(current.actMSize, mBaseSize); ++tile) {
+                RunInfoX info = GetMTileInfo(current, tile);
+                for (uint32_t sub = 0; sub < CeilDiv(info.actSingleLoopS2Size, s2SplitSize); ++sub) {
+                    if ASCEND_IS_AIC {
+                        ComputeMm1(info, sub);
+                    } else {
+                        ComputeVec1(info, sub);
+                    }
                 }
             }
         }
-
         if (loop >= PRELOAD_N) {
-            if (runInfoNegN.isValid) {
-                if ASCEND_IS_AIC {
-                    ComputeMm2(runInfoNegN);
-                } else {
-                    ComputeVec2(runInfoNegN);
+            RunInfoX& previous = taskRunInfo[(loop - PRELOAD_N) % PRELOAD_TASK_CACHE_SIZE];
+            if (previous.isValid) {
+                for (uint32_t tile = 0; tile < CeilDiv(previous.actMSize, mBaseSize); ++tile) {
+                    RunInfoX info = GetMTileInfo(previous, tile);
+                    if ASCEND_IS_AIC {
+                        ComputeMm2(info);
+                    } else {
+                        ComputeVec2(info);
+                    }
                 }
-                runInfoNegN.isValid = false;
+                previous.isValid = false;
             }
         }
     }
@@ -688,7 +719,7 @@ public:
 
     __aicore__ inline void ComputeVec1(RunInfoX& runInfo, uint32_t subLoop)
     {
-        if (subLoop % 2 == 0) {
+        if (runInfo.mTileIdx == 0 && subLoop % 2 == 0) {
             vecFaBlock_.ProcessVec1(this->l1PBuffers_.Get(), this->bmm1Buffers_.Get(), runInfo, subLoop);
         } else {
             vecFaBlock_.ProcessVec1(this->l1PBuffers_.GetPre(), this->bmm1Buffers_.Get(), runInfo, subLoop);
@@ -715,7 +746,7 @@ public:
         info.bIdx = bN2Cur / (constInfo_.realN2Size);
         info.n2Idx = (bN2Cur / (constInfo_.realN2Size / constInfo_.n2Size)) % constInfo_.n2Size;
         info.realN2Idx = bN2Cur % constInfo_.realN2Size;
-        info.gS1Idx = gS1Cur * mBaseSize;
+        info.gS1Idx = gS1Cur * mScheduleSize;
         if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_BSH || LAYOUT_Q == LayOutTypeEnum::LAYOUT_SBH ||
                       LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
             // S1G layout
@@ -728,10 +759,10 @@ public:
         info.actS1Size = actSeqLensQ_;
         info.actS2Size = actSeqLensKv_;
 
-        info.actMSize = mBaseSize;
+        info.actMSize = mScheduleSize;
         uint64_t gS1Size = info.actS1Size * constInfo_.realGSize;
-        if (((gS1Cur + 1) * mBaseSize) > gS1Size) {
-            info.actMSize = gS1Size - gS1Cur * mBaseSize;
+        if (((gS1Cur + 1) * mScheduleSize) > gS1Size) {
+            info.actMSize = gS1Size - gS1Cur * mScheduleSize;
         }
         info.actSingleLoopS2Size = s2BaseSize;
         if (((s2Cur + 1) * s2BaseSize) > info.actS2Size) {
@@ -810,7 +841,7 @@ public:
         }
         uint64_t s2LoopTimes = (actSeqLensKv_ + s2BaseSize - 1) / s2BaseSize;
         uint64_t gS1Size = actSeqLensQ_ * constInfo_.realGSize;
-        uint64_t gS1LoopTimes = (gS1Size + mBaseSize - 1) / mBaseSize;
+        uint64_t gS1LoopTimes = (gS1Size + mScheduleSize - 1) / mScheduleSize;
         // 尚未到达有效区间, 快进s2Cur到curS2Start_, 不跳行
         if (taskDealMode == TASK_DEAL_MODE::NOT_START) {
             s2Cur = curS2Start_;

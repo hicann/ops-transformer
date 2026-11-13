@@ -51,7 +51,8 @@ __aicore__ inline void quant_flash_attn_mxfp8_dn(
     constexpr LayOutTypeEnum inputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][0]);
     constexpr LayOutTypeEnum outputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][1]);
 
-    constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(ConfigValue[config].s1);
+    // Prefill 按 M128 分核、每次计算 64 行，S1 模板固定为 64；FD block 仍按 128 行调度。
+    constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(64);
     constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(ConfigValue[config].s2);
     constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(
         (static_cast<std::underlying_type_t<inferDTemplateType>>(ConfigValue[config].d) + 63) >> 6 << 6);
@@ -63,6 +64,7 @@ __aicore__ inline void quant_flash_attn_mxfp8_dn(
     constexpr bool isFdConst = isFd;
     constexpr bool useDn = true;
 
+    // FD block 负责跨核 partial，仍按 metadata 的 128 行调度单位工作
     using CubeBlock =
         BaseApi::QuantFlashAttnBlockCubeMxfp8<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
                                               dTemplateType, dVTemplateType, KvLayoutType, useDn, isDAligned, hasVTail>;
@@ -72,8 +74,8 @@ __aicore__ inline void quant_flash_attn_mxfp8_dn(
                                              isFdConst, useDn, isDAligned, hasVTail>;
     using VecFdBlock =
         BaseApi::QuantFlashAttnBlockVecFlashDecode<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
-                                                   s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
-                                                   hasAttenMask, KvLayoutType, useDn>;
+                                                   static_cast<S1TemplateType>(ConfigValue[config].s1), s2TemplateType,
+                                                   dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType, useDn>;
 
     using CubeBlockDummy =
         BaseApi::QuantFlashAttnBlockCubeMxfp8Dummy<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
@@ -82,17 +84,15 @@ __aicore__ inline void quant_flash_attn_mxfp8_dn(
         BaseApi::QuantFlashAttnBlockVecMxfp8Dummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
                                                   s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
                                                   hasAttenMask, KvLayoutType, isFdConst, useDn, hasVTail>;
-    using VecFdBlockDummy =
-        BaseApi::QuantFlashAttnBlockVecFlashDecodeDummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
-                                                        s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
-                                                        hasAttenMask, KvLayoutType, useDn>;
+    using VecFdBlockDummy = BaseApi::QuantFlashAttnBlockVecFlashDecodeDummy<
+        INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, static_cast<S1TemplateType>(ConfigValue[config].s1),
+        s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType, useDn>;
 
 #ifdef __DAV_CUBE__
     using Kernel = BaseApi::QuantFlashAttnKernelMxfp8<CubeBlock, VecFaBlockDummy, VecFdBlockDummy>;
 #else
     using Kernel = BaseApi::QuantFlashAttnKernelMxfp8<CubeBlockDummy, VecFaBlock, VecFdBlock>;
 #endif
-
     TPipe tPipe;
     Kernel op;
     op.Init(query, key, value, sinks, attnMask, cuSeqLensQ, cuSeqLensKv, blockTable, dequantScaleQuery, dequantScaleKey,

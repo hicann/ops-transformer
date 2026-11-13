@@ -130,13 +130,14 @@ struct ConfigParams {
     inferDTemplateType dv;
 };
 
-static constexpr ConfigParams ConfigValue[] = {{inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned256,
+// 0~3：MXFP8 Prefill（S1=128，D256 走 S2=256，其余 S2=512）；4~7：MXFP8 Decode（S1=64）；8：HiFP4
+static constexpr ConfigParams ConfigValue[] = {{inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned512,
                                                 inferDTemplateType::Aligned64, inferDTemplateType::Aligned64},
-                                               {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned256,
+                                               {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned512,
                                                 inferDTemplateType::Aligned72, inferDTemplateType::Aligned72},
-                                               {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned256,
+                                               {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned512,
                                                 inferDTemplateType::Aligned128, inferDTemplateType::Aligned128},
-                                               {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128,
+                                               {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned256,
                                                 inferDTemplateType::Aligned256, inferDTemplateType::Aligned256},
                                                {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned512,
                                                 inferDTemplateType::Aligned64, inferDTemplateType::Aligned64},
@@ -149,10 +150,10 @@ static constexpr ConfigParams ConfigValue[] = {{inferS1TemplateType::Aligned128,
                                                {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned1024,
                                                 inferDTemplateType::Aligned128, inferDTemplateType::Aligned128}};
 
-#define Config_S1Aligned128_S2Aligned256_DAligned64_DVAligned64 0
-#define Config_S1Aligned128_S2Aligned256_DAligned72_DVAligned72 1
-#define Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128 2
-#define Config_S1Aligned128_S2Aligned128_DAligned256_DVAligned256 3
+#define Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64 0
+#define Config_S1Aligned128_S2Aligned512_DAligned72_DVAligned72 1
+#define Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128 2
+#define Config_S1Aligned128_S2Aligned256_DAligned256_DVAligned256 3
 #define Config_S1Aligned64_S2Aligned512_DAligned64_DVAligned64 4
 #define Config_S1Aligned64_S2Aligned512_DAligned72_DVAligned72 5
 #define Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128 6
@@ -179,6 +180,8 @@ struct FDparamsX {
 struct RunInfoX {
     uint32_t loop = 0;
     uint32_t mloop = 0;
+    uint32_t mTileIdx = 0; // 64-row computation tile within a scheduling tile
+    bool isLastMTile = true;
     bool isValid = false;
     bool isChangeBatch = false;
     bool isFirstS2Loop = false;
