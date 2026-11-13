@@ -18,6 +18,7 @@
 #include <cstdint>
 #include "kernel_tiling/kernel_tiling.h"
 #include "../../../tiling/matmul_tiling/quant_matmul_tiling_data.h"
+#include "../../../tiling/matmul_tiling_data.h"
 #include "../../../tiling/tiling_data_struct_define.h"
 #include "../../../core/aiv_comm/collective_comm_context.h"
 
@@ -41,10 +42,10 @@ struct MatmulAllToAllApaceTilingInfo {
     uint32_t tileCnt{0};
     uint32_t tailM{0};
     uint32_t tailCnt{0};
-    uint32_t rankM{0};
-    uint32_t rankN{0};
-    uint32_t rankK{0};
-    uint32_t rankDim{0};
+    uint32_t rankM{0};   // 本 rank 的 M 行数
+    uint32_t rankN{0};   // 完整 N
+    uint32_t rankK{0};   // 完整 K
+    uint32_t rankDim{0}; // 通信 rank 数
     uint64_t hcclDataType{0};
 };
 
@@ -54,4 +55,13 @@ struct hcommMatmulAllToAllTilingData {
     MatmulAllToAllApaceTilingInfo matmulAllToAllTilingInfo;
     QuantMatmulTilingData tileQbmmTilingData;
     QuantMatmulTilingData tailQbmmTilingData;
+};
+
+// 非量化（FP16/BF16）Apace 路径的 tiling data
+struct hcommNonQuantMatmulAllToAllTilingData {
+    Mc2InitTiling mc2InitTiling;                            // HcclCommunicator 初始化片
+    Mc2CcTiling mc2CcTiling;                                // HCCL AllToAll 命令片
+    MatmulAllToAllApaceTilingInfo matmulAllToAllTilingInfo; // 通算切分
+    MatmulTilingData tileMmTilingData;                      // 主块批的 Blaze mm tiling
+    MatmulTilingData tailMmTilingData;                      // 尾块批的 Blaze mm tiling（tailCnt=0 时无效）
 };

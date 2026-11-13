@@ -22,6 +22,25 @@ using namespace Mc2Log;
 using namespace AscendC;
 using namespace Mc2Tiling;
 
+namespace {
+// GetTiling返回非0表示失败(如libruntime加载失败), 须在host侧拦下, 不下发无效通信配置
+template <typename TilingDataT>
+ge::graphStatus GetMc2CcTilingChecked(const char* opName, AscendC::Mc2CcTilingConfig& config, TilingDataT& tilingData)
+{
+    const auto initRet = config.GetTiling(tilingData.mc2InitTiling);
+    if (initRet != 0) {
+        OP_LOGE(opName, "MC2 tiling initialization failed: GetTiling(init) returned %u", initRet);
+        return ge::GRAPH_FAILED;
+    }
+    const auto commRet = config.GetTiling(tilingData.mc2CcTiling);
+    if (commRet != 0) {
+        OP_LOGE(opName, "MC2 tiling config generation failed: GetTiling(cc) returned %u", commRet);
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+} // namespace
+
 namespace MC2Tiling {
 
 /**
@@ -81,6 +100,12 @@ ge::graphStatus FpMatmulAllToAllTilingBase::InitTilingContextParameters()
     MC2_CHECK_LOG_RET(opName_, MatmulAlltoAllTilingUtil::SetDataTypeInfo(context_, opName_, contextInfo));
     MC2_CHECK_LOG_RET(opName_, MatmulAlltoAllTilingUtil::SetShapeInfo(context_, contextInfo));
     contextInfo.quantMode = QuantMode::NON_QUANT; // 在isCapable判断过，直接赋值即可
+    // 仅A6(DAV_9201)走Apace路径; A5实测性能劣化, 暂不切换, 保持APT
+    usingApaceImpl_ = (npuArch_ == Ops::Base::DAV_9201);
+    OP_LOGI(opName_, "[APACE] non-quant dispatch: path=%s(%s), M=%lu, N=%lu, K=%lu, rankDim=%lu.",
+            usingApaceImpl_ ? "APACE(Blaze+Hccl)" : "APT",
+            usingApaceImpl_ ? "3rd/MatmulV3 not used" : "3rd/MatmulV3+AIV pipeline", contextInfo.args_.mValue,
+            contextInfo.args_.nValue, contextInfo.args_.kValue, static_cast<unsigned long>(contextInfo.args_.rankDim));
     return ge::GRAPH_SUCCESS;
 }
 
@@ -111,6 +136,11 @@ ge::graphStatus FpMatmulAllToAllTilingBase::DoOpTiling()
  */
 ge::graphStatus FpMatmulAllToAllTilingBase::DoMMTiling()
 {
+    // Apace走SWAT tiling, APT走V3引擎
+    if (usingApaceImpl_) {
+        return DoHcommNonQuantMMTiling();
+    }
+
     // 非空校验已在GetPlatformInfo校验过
     fe::PlatFormInfos* platformInfo = context_->GetPlatformInfo();
     if (mc2_matmul_v3_advanced::InitCompileInfo(platformInfo, &compileInfo_) != ge::GRAPH_SUCCESS) {
@@ -209,9 +239,11 @@ ge::graphStatus FpMatmulAllToAllTilingBase::SetHcclTiling()
         OP_LOGE(opName_, "Build hccl tiling config failed: %s", allToAllBuilder.errorMsg().c_str());
         return ge::GRAPH_FAILED;
     }
-    allToAllTilingConfig.GetTiling(localTilingData_.mc2InitTiling);
-    allToAllTilingConfig.GetTiling(localTilingData_.mc2CcTiling);
-    return ge::GRAPH_SUCCESS;
+    // Apace: 通信配置写入hcommTilingData_; APT: 写入localTilingData_
+    if (usingApaceImpl_) {
+        return GetMc2CcTilingChecked(opName_, allToAllTilingConfig, hcommTilingData_);
+    }
+    return GetMc2CcTilingChecked(opName_, allToAllTilingConfig, localTilingData_);
 }
 
 /**
@@ -297,13 +329,14 @@ uint64_t FpMatmulAllToAllTilingBase::GetTilingKey() const
     }
     uint8_t commMode = (engineType == mc2tiling::A5_CCU_ENGINE) ? COMMMODE_CCU : COMMMODE_AICPU;
 
-    uint8_t addBiasSplitMode = contextInfo.args_.isBias ? ChooseAddBiasSplitMode() : ADDBIAS_OFF;
+    // Apace路径bias由mmad fixpipe加入, ADDBIASSPLITMODE恒OFF
+    uint8_t addBiasSplitMode = (contextInfo.args_.isBias && !usingApaceImpl_) ? ChooseAddBiasSplitMode() : ADDBIAS_OFF;
     const uint64_t tilingKey =
-        GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, false);
+        GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, usingApaceImpl_);
     OP_LOGD(opName_,
-            "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,COMMMODE,ADDBIASSPLITMODE,USING_APACE_IMPL: [%d,%d,%d,%d,%d,0], "
+            "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,COMMMODE,ADDBIASSPLITMODE,USING_APACE_IMPL: [%d,%d,%d,%d,%d,%d], "
             "TilingKey is [%lu].",
-            NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, tilingKey);
+            NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, usingApaceImpl_, tilingKey);
     return tilingKey;
 }
 
@@ -340,9 +373,33 @@ uint8_t FpMatmulAllToAllTilingBase::ChooseAddBiasSplitMode() const
  */
 ge::graphStatus FpMatmulAllToAllTilingBase::PostTiling()
 {
+    // Apace: 下发hcommTilingData_; APT: 下发localTilingData_
+    if (usingApaceImpl_) {
+        OP_LOGI(opName_, "[APACE] PostTiling: enter Apace path.");
+        SetHcommTilingInfo(hcommTilingData_.matmulAllToAllTilingInfo);
+
+        size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
+        auto* outTilingData = context_->GetTilingData<hcommNonQuantMatmulAllToAllTilingData>();
+        OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get Apace tiling data from context"),
+                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK((tilingBufCap < sizeof(hcommTilingData_)),
+                        OP_LOGE(opName_, "TilingBuffer capacity too small, capacity = %zu, need = %zu.", tilingBufCap,
+                                sizeof(hcommTilingData_)),
+                        return ge::GRAPH_FAILED);
+        errno_t ret = memcpy_s(outTilingData, tilingBufCap, &hcommTilingData_, sizeof(hcommTilingData_));
+        if (ret != EOK) {
+            OP_LOGE(opName_, "MatmulAlltoAll postTiling: copy Apace tiling data failed, ret=%d.", ret);
+            return ge::GRAPH_FAILED;
+        }
+        context_->GetRawTilingData()->SetDataSize(sizeof(hcommNonQuantMatmulAllToAllTilingData));
+        context_->SetBlockDim(contextInfo.args_.aicCoreNum);
+        return ge::GRAPH_SUCCESS;
+    }
+
     SetTilingInfo(localTilingData_.matmulAlltoAllTilingInfo);
-    MatmulAlltoAllTilingData* outTilingData = context_->GetTilingData<MatmulAlltoAllTilingData>();
+
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
+    auto* outTilingData = context_->GetTilingData<MatmulAlltoAllTilingData>();
     OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get tiling data from context"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((tilingBufCap < sizeof(localTilingData_)),
@@ -390,6 +447,42 @@ void FpMatmulAllToAllTilingBase::SetTilingInfo(MatmulAlltoAllTilingInfo& tilingI
 }
 
 /**
+ * @brief Apace路径的tilingInfo填充
+ */
+void FpMatmulAllToAllTilingBase::SetHcommTilingInfo(MatmulAllToAllApaceTilingInfo& tilingInfo) const
+{
+    tilingInfo.tileCnt = inferredInfo.tileCnt;
+    tilingInfo.tileM = inferredInfo.tileM;
+    tilingInfo.tailCnt = inferredInfo.tailCnt;
+    tilingInfo.tailM = inferredInfo.tailM;
+    tilingInfo.rankM = contextInfo.args_.mValue;
+    tilingInfo.rankN = contextInfo.args_.nValue;
+    tilingInfo.rankK = contextInfo.args_.kValue;
+    tilingInfo.rankDim = contextInfo.args_.rankDim;
+    tilingInfo.hcclDataType =
+        static_cast<uint64_t>(mc2tiling::ConvertGeTypeToHcclType(opName_, contextInfo.args_.geCType));
+}
+
+/**
+ * @brief Apace路径workspace——无AIV转置缓冲, 只留一份结果缓冲
+ */
+ge::graphStatus FpMatmulAllToAllTilingBase::GetWorkspaceSize()
+{
+    if (!usingApaceImpl_) {
+        return MatmulAllToAllTilingBase::GetWorkspaceSize(); // APT路径走基类(mm+permute两缓冲)
+    }
+
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
+    OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "Get workspace failed"), return ge::GRAPH_FAILED);
+    SetUserWorkSpace();
+    inferredInfo.permuteLen = 0; // 无AIV转置段
+    workspaces[0] = libApiWorkSpaceSize_ + inferredInfo.mmResultLen;
+    OP_LOGD(opName_, "Apace pure-AIC direct workspace size=%lu, mmResultLen=%lu, permuteLen=0.", workspaces[0],
+            inferredInfo.mmResultLen);
+    return ge::GRAPH_SUCCESS;
+}
+
+/**
  * @brief 获取tiling切分结果（arch35覆盖）
  *
  * @return CutResult
@@ -403,7 +496,79 @@ CutResult FpMatmulAllToAllTilingBase::GetTilingResult()
     }
 
     uint8_t commMode = (engineType == mc2tiling::A5_CCU_ENGINE) ? Mc2Comm::COMM_MODE_CCU : Mc2Comm::COMM_MODE_AICPU;
-    return GetArch35TilingResult(contextInfo.args_, KernelType::ALL_TO_ALL, npuArch_, contextInfo.quantMode, commMode);
+    CutResult cutRes =
+        GetArch35TilingResult(contextInfo.args_, KernelType::ALL_TO_ALL, npuArch_, contextInfo.quantMode, commMode);
+    // Apace计算内核要求主块长度256对齐(Blaze块形要求)
+    if (usingApaceImpl_) {
+        AlignCutResForKernel(cutRes, contextInfo.args_.mValue);
+    }
+    return cutRes;
+}
+
+/**
+ * @brief Apace路径的256对齐——主块长向上对齐到256倍数, 余量重分配进尾块
+ */
+void FpMatmulAllToAllTilingBase::AlignCutResForKernel(CutResult& cutRes, uint64_t mValue) const
+{
+    constexpr uint64_t KERNEL_ALIGN_M = 256;
+    if (cutRes.longTileLen == 0 || mValue == 0) {
+        return;
+    }
+    uint64_t longTile = mc2tiling::AlignUp(cutRes.longTileLen, KERNEL_ALIGN_M);
+    if (longTile >= mValue) {
+        // 对齐后单块覆盖全量: 退化为单块(无尾块)
+        cutRes.longTileLen = mValue;
+        cutRes.numLongTile = 1;
+        cutRes.shortTileLen = 0;
+        cutRes.numShortTile = 0;
+    } else {
+        cutRes.longTileLen = longTile;
+        cutRes.numLongTile = mValue / longTile;
+        cutRes.shortTileLen = mValue % longTile;
+        cutRes.numShortTile = cutRes.shortTileLen == 0 ? 0 : 1;
+    }
+    cutRes.shortTileAtBack = true;
+    OP_LOGI(opName_,
+            "[APACE] AlignCutResForKernel: mValue=%lu, aligned longTile=%lu, numLongTile=%lu, shortTile=%lu, "
+            "numShortTile=%lu.",
+            mValue, cutRes.longTileLen, cutRes.numLongTile, cutRes.shortTileLen, cutRes.numShortTile);
+}
+
+/**
+ * @brief Apace路径的mm tiling——直接调apace库的MatmulTilingSwat
+ */
+ge::graphStatus FpMatmulAllToAllTilingBase::DoHcommNonQuantMMTiling()
+{
+    // Apace路径显式拦截K=0: SWAT不校验会静默通过, APT路径在V3 tiling引擎内失败
+    OP_TILING_CHECK(contextInfo.args_.kValue == 0,
+                    OP_LOGE(opName_, "The K dim of x1 and x2 must be greater than 0, K = %lu.",
+                            static_cast<unsigned long>(contextInfo.args_.kValue)),
+                    return ge::GRAPH_FAILED);
+    const bool transB = contextInfo.args_.isBTrans;
+    const bool hasBias = contextInfo.args_.isBias;
+    const uint64_t rankN = contextInfo.args_.nValue / contextInfo.args_.rankDim; // 单rank列宽
+    const uint64_t dataTypeSize = contextInfo.args_.inputDtypeSize;
+
+    MatmulTilingSwat tilingSwat;
+    tilingSwat.SetPlatformInfoPtr(context_->GetPlatformInfo());
+    if (inferredInfo.tileCnt > 0) {
+        tilingSwat.GetTilingData(inferredInfo.tileM, rankN, contextInfo.args_.kValue, dataTypeSize, false, transB,
+                                 hcommTilingData_.tileMmTilingData, hasBias);
+    }
+    if (inferredInfo.tailCnt > 0) {
+        tilingSwat.GetTilingData(inferredInfo.tailM, rankN, contextInfo.args_.kValue, dataTypeSize, false, transB,
+                                 hcommTilingData_.tailMmTilingData, hasBias);
+    }
+
+    const auto& tile = hcommTilingData_.tileMmTilingData;
+    OP_LOGI(opName_,
+            "[APACE] SWAT tiling: tileM=%u tileCnt=%u tailM=%u tailCnt=%u rankN=%lu K=%lu transB=%d hasBias=%d | "
+            "baseM/N/K=%u/%u/%u mL1/nL1/kL1=%u/%u/%u l1Buf=%u l0cDB=%u mTailCnt=%u nTailCnt=%u.",
+            inferredInfo.tileM, inferredInfo.tileCnt, inferredInfo.tailM, inferredInfo.tailCnt,
+            static_cast<unsigned long>(rankN), static_cast<unsigned long>(contextInfo.args_.kValue),
+            static_cast<int>(transB), static_cast<int>(hasBias), tile.baseM, tile.baseN, tile.baseK, tile.mL1, tile.nL1,
+            tile.kL1, tile.l1BufferNum, tile.l0cDB, tile.mTailCnt, tile.nTailCnt);
+    return ge::GRAPH_SUCCESS;
 }
 
 /**

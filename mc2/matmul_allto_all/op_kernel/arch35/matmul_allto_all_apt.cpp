@@ -29,6 +29,7 @@
 #include "mx_quant_matmul_allto_all_arch35.h"
 #include "../../../common/op_kernel/apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_tiling_data.h"
 #include "../../../common/op_kernel/apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_mx_quant_matmul_hcomm_impl.h"
+#include "../../../common/op_kernel/apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_hcomm_impl.h"
 
 using AscendC::HcclServerType;
 using AscendC::TPipe;
@@ -139,6 +140,19 @@ using MC2KernelTemplate::MC2AlltoAllPrimitives;
     } while (0)
 #endif
 
+#ifndef MATMUL_ALLTO_ALL_APACE_IMPL
+// 非量化Apace路径, BiasType按DTYPEBIAS模板参选择(同dtype或fp32)
+#define MATMUL_ALLTO_ALL_APACE_IMPL(tilingData, ServerType, TransB) \
+    do { \
+        using BiasT = typename std::conditional<DTYPEBIAS == DTYPE_BIAS_FP32, float, DTYPE_X1>::type; \
+        Apace::MatmulAllToAllHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, BiasT, hcommNonQuantMatmulAllToAllTilingData, \
+                                       ServerType, TransB> \
+            op(&tilingData); \
+        op.Init(x1, x2, bias, y, workspaceGM); \
+        op.Run(); \
+    } while (0)
+#endif
+
 #ifndef MATMUL_ALLTO_ALL_APACE_HIF4_QUANT_IMPL
 #define MATMUL_ALLTO_ALL_APACE_HIF4_QUANT_IMPL(tilingData, ServerType, TransB) \
     do { \
@@ -162,13 +176,18 @@ __global__ __aicore__ void matmul_allto_all(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
 
 #if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && ((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)))
     REGISTER_TILING_DEFAULT(MatmulAlltoAllTilingData);
-    GET_TILING_DATA_WITH_STRUCT(MatmulAlltoAllTilingData, tilingData, tilingGM);
-
-    using DtypeBias = typename std::conditional<DTYPEBIAS == DTYPE_BIAS_FP32, float, DTYPE_X1>::type;
-    if constexpr (ADDBIASSPLITMODE == ADDBIAS_OFF) {
-        MATMUL_ALLTO_ALL_APT_FP_IMPL(tilingData, pipe, commServerType);
+    if constexpr (USING_APACE_IMPL) {
+        GET_TILING_DATA_WITH_STRUCT(hcommNonQuantMatmulAllToAllTilingData, tilingData, tilingGM);
+        MATMUL_ALLTO_ALL_APACE_IMPL(tilingData, commServerType, X2TRANSPOSE);
     } else {
-        MATMUL_ALLTO_ALL_APT_FP_SEP_BIAS_IMPL(tilingData, pipe, commServerType, ADDBIASSPLITMODE);
+        GET_TILING_DATA_WITH_STRUCT(MatmulAlltoAllTilingData, tilingData, tilingGM);
+
+        using DtypeBias = typename std::conditional<DTYPEBIAS == DTYPE_BIAS_FP32, float, DTYPE_X1>::type;
+        if constexpr (ADDBIASSPLITMODE == ADDBIAS_OFF) {
+            MATMUL_ALLTO_ALL_APT_FP_IMPL(tilingData, pipe, commServerType);
+        } else {
+            MATMUL_ALLTO_ALL_APT_FP_SEP_BIAS_IMPL(tilingData, pipe, commServerType, ADDBIASSPLITMODE);
+        }
     }
 #elif ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_FLOAT4_E2M1))
     REGISTER_TILING_DEFAULT(QuantMatmulAlltoAllTilingData);

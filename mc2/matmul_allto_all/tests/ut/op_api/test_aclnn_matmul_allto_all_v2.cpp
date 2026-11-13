@@ -1262,3 +1262,97 @@ TEST_F(TestAclnnMatmulAlltoAllV2, CasesParamsTest910B)
         }
     }
 }
+
+// A6(ascend960dt/DAV_9201)非量化场景: commMode支持ai_cpu和ccu
+static MatmulAlltoAllV2AclnnTestParam g_v2_casesParams_a6[] = {{"AclnnMatmulAlltoAllV2-A6-fp16-nd-notrans-ccu-01",
+                                                                2,
+                                                                {256, 128},
+                                                                {128, 256},
+                                                                {},
+                                                                {512, 128},
+                                                                ACL_FLOAT16,
+                                                                ACL_FLOAT16,
+                                                                ACL_FLOAT16,
+                                                                ACL_FLOAT16,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                {-1, -2},
+                                                                "ut_test_matmul_allto_all",
+                                                                "ccu",
+                                                                false,
+                                                                false,
+                                                                ACLNN_SUCCESS},
+                                                               {"AclnnMatmulAlltoAllV2-A6-bf16-biasf32-nd-trans-ccu-02",
+                                                                2,
+                                                                {256, 128},
+                                                                {256, 128},
+                                                                {256},
+                                                                {512, 128},
+                                                                ACL_BF16,
+                                                                ACL_BF16,
+                                                                ACL_FLOAT,
+                                                                ACL_BF16,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                {-1, -2},
+                                                                "ut_test_matmul_allto_all",
+                                                                "ccu",
+                                                                false,
+                                                                true,
+                                                                ACLNN_SUCCESS},
+                                                               {"AclnnMatmulAlltoAllV2-A6-fp16-nd-notrans-aicpu-03",
+                                                                2,
+                                                                {256, 128},
+                                                                {128, 256},
+                                                                {},
+                                                                {512, 128},
+                                                                ACL_FLOAT16,
+                                                                ACL_FLOAT16,
+                                                                ACL_FLOAT16,
+                                                                ACL_FLOAT16,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                {-1, -2},
+                                                                "ut_test_matmul_allto_all",
+                                                                "ai_cpu",
+                                                                false,
+                                                                false,
+                                                                ACLNN_SUCCESS},
+                                                               {"AclnnMatmulAlltoAllV2-A6-fp16-commode-invalid-04",
+                                                                2,
+                                                                {256, 128},
+                                                                {128, 256},
+                                                                {},
+                                                                {512, 128},
+                                                                ACL_FLOAT16,
+                                                                ACL_FLOAT16,
+                                                                ACL_FLOAT16,
+                                                                ACL_FLOAT16,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                ACL_FORMAT_ND,
+                                                                {-1, -2},
+                                                                "ut_test_matmul_allto_all",
+                                                                "mte",
+                                                                false,
+                                                                false,
+                                                                ACLNN_ERR_PARAM_INVALID}};
+
+TEST_F(TestAclnnMatmulAlltoAllV2, CasesParamsTestA6)
+{
+    op::SetPlatformNpuArch(Ops::Base::DAV_9201);
+    if (std::size(g_v2_casesParams_a6) != 0) {
+        uint64_t numCases = sizeof(g_v2_casesParams_a6) / sizeof(g_v2_casesParams_a6[0]);
+        for (size_t idx = 0; idx < numCases; idx += 1) {
+            TestV2OneParamCase(g_v2_casesParams_a6[idx]);
+        }
+    }
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
+}

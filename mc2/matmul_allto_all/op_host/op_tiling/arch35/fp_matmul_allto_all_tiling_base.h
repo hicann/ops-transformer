@@ -26,6 +26,10 @@
 #include "../common/matmul_allto_all_util_tiling.h"
 #include "../../../op_kernel/arch35/matmul_allto_all_tiling_data.h"
 #include "../../../op_kernel/arch35/matmul_allto_all_tiling_key.h"
+// Apace路径的host-device tiling契约
+#include "apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_tiling_data.h"
+// 非量化SWAT tiling引擎
+#include "apace/tiling/matmul_tiling_swat.h"
 
 namespace MC2Tiling {
 
@@ -43,6 +47,7 @@ protected:
     ge::graphStatus PostTiling() override;
     uint64_t GetTilingKey() const override;
     CutResult GetTilingResult() override;
+    ge::graphStatus GetWorkspaceSize() override; // Apace路径去转置缓冲
 
     ge::graphStatus CheckOpInputInfo();
     ge::graphStatus InitTilingContextParameters();
@@ -51,11 +56,21 @@ protected:
     ge::graphStatus DoMMTiling();
     ge::graphStatus SetHcclTiling();
     void SetTilingInfo(MatmulAlltoAllTilingInfo& tilingInfo) const;
+    // Apace路径的tilingInfo填充
+    void SetHcommTilingInfo(MatmulAllToAllApaceTilingInfo& tilingInfo) const;
+    // Apace路径的mm tiling(直接调MatmulTilingSwat)
+    ge::graphStatus DoHcommNonQuantMMTiling();
+    // Apace路径的主块256对齐
+    void AlignCutResForKernel(CutResult& cutRes, uint64_t mValue) const;
     uint8_t ChooseAddBiasSplitMode() const;
     void PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingData& outTilingData);
 
 private:
     MatmulAlltoAllTilingData localTilingData_;
+    // Apace路径tiling data(仅usingApaceImpl_=true时产出)
+    hcommNonQuantMatmulAllToAllTilingData hcommTilingData_;
+    // Apace路径选择标志
+    bool usingApaceImpl_ = false;
 
     Mc2MatMulV3Args mmV3Args_;
     Mc2MatmulV3CompileInfo compileInfo_;
