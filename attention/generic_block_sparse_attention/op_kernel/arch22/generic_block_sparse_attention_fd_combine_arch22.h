@@ -54,8 +54,8 @@ public:
         reduceTmpUb_ = resource.ubBuf.template GetBufferByByte<uint8_t>(REDUCE_TMP_OFFSET);
     }
 
-    template <class CuSeqTensor, class SeqUsedTensor>
-    __aicore__ inline void operator()(__gm__ const GbsaMetadata::Metadata* meta,
+    template <class CuSeqTensor, class SeqUsedTensor, class SchedulePtr>
+    __aicore__ inline void operator()(SchedulePtr meta,
                                       const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData,
                                       AscendC::GlobalTensor<float>& gPartialLse,
                                       AscendC::GlobalTensor<float>& gPartialO, AscendC::GlobalTensor<ElementO>& gO,
@@ -98,7 +98,7 @@ public:
             const uint32_t groupRowStart = (sourceSubBlock == 0 ? 0U : rowSplit) + sourceLocalRow;
             const uint32_t rowCountAlign = RoundUp(rowCount, FLOATS_PER_BLOCK);
 
-            const __gm__ GbsaMetadata::CombineSchedule& schedule = meta->combineSchedules[combineTask];
+            const auto& schedule = meta->combineSchedules[combineTask];
             const uint32_t baseTask = static_cast<uint32_t>(schedule.baseTask);
             const uint32_t splitCount = static_cast<uint32_t>(schedule.partialCount);
             const uint32_t splitCountAlign = RoundUp(splitCount, FLOATS_PER_BLOCK);

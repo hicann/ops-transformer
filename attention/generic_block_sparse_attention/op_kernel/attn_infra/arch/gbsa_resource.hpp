@@ -59,6 +59,28 @@ public:
     }
 };
 
+template <AscendC::TPosition Position, uint32_t Bytes>
+struct Int8StaticBuffer {
+    template <class Element = half>
+    __aicore__ inline AscendC::LocalTensor<Element> GetBufferByByte(uint32_t offset) const
+    {
+        return AscendC::LocalTensor<uint8_t>(Position, 0, Bytes)[offset].template ReinterpretCast<Element>();
+    }
+};
+struct Int8StaticResource {
+    Int8StaticBuffer<AscendC::TPosition::A1, AtlasA2::L1_SIZE> l1Buf;
+    Int8StaticBuffer<AscendC::TPosition::A2, AtlasA2::L0A_SIZE> l0ABuf;
+    Int8StaticBuffer<AscendC::TPosition::B2, AtlasA2::L0B_SIZE> l0BBuf;
+    Int8StaticBuffer<AscendC::TPosition::C2, AtlasA2::BIAS_SIZE> btBuf;
+    Int8StaticBuffer<AscendC::TPosition::CO1, AtlasA2::L0C_SIZE> l0CBuf;
+    Int8StaticBuffer<AscendC::TPosition::VECCALC, AtlasA2::UB_SIZE> ubBuf;
+    __aicore__ inline Int8StaticResource()
+    {
+        AscendC::InitSocState();
+        AscendC::PipeBarrier<PIPE_ALL>();
+    }
+};
+
 } // namespace NpuArch::Arch
 
 #endif // INCLUDE_ARCH_RESOURCE_HPP

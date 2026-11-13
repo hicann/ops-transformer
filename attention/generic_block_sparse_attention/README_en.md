@@ -35,6 +35,8 @@ English | [简体中文](./README.md)
 
 ## Parameter Description
 
+For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count, Tq/Tkv the total stored Q/KV token counts, and Sq/Sk the per-batch Q/KV storage capacities.
+
 > **Note:**<br>
 > Parameter dimension meanings: B indicates Batch Size, T indicates Total tokens, N1 indicates the number of query heads, N2 indicates the number of KV heads, D indicates Head Dim, and topK indicates the last dimension `maxSparseBlockCount` of `sparseBlockIdx`.<br>
 > All layouts use the preceding head count notation. Under GQA, N1 and N2 can differ. For constraints, see the following text.
@@ -60,21 +62,21 @@ English | [简体中文](./README.md)
       <td>query</td>
       <td>Input</td>
       <td>query in the formula. When layoutQ is "TND", the shape is [T, N1, D]; for BSND, it is [B,Sq,N1,D]; for BNSD, it is [B,N1,Sq,D]. N1 is the number of query heads.</td>
-      <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN</td>
+      <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>key</td>
       <td>Input</td>
       <td>key in the formula. For PA_BBND, the shape is [numBlocks, blockSize, N2, D]; for PA_BNBD, the shape is [numBlocks, N2, blockSize, D]; for TND, it is [Tkv,N2,D]; for BSND, it is [B,Sk,N2,D]; for BNSD, it is [B,N2,Sk,D]. N2 is the number of KV heads.</td>
-      <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN</td>
+      <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>value</td>
       <td>Input</td>
       <td>value in the formula. Its shape is the same as that of key.</td>
-      <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN</td>
+      <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, INT8</td>
       <td>ND</td>
     </tr>
     <tr>
@@ -108,28 +110,32 @@ English | [简体中文](./README.md)
     <tr>
       <td>qDequantScaleOptional</td>
       <td>Optional input</td>
-      <td>Query dequantization scale. For quantType=6, an E8M0 tensor is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr.</td>
-      <td>FLOAT8_E8M0</td>
+      <td>A2/A3 INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: TND: [Tq,qHeadNum]; BSND: [B,Sq,qHeadNum]; BNSD: [B,qHeadNum,Sq]. For A5 MXFP8 (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr.</td>
+      <td>FLOAT32 (A2/A3 INT8) or FLOAT8_E8M0 (A5 MXFP8)</td>
+
       <td>ND</td>
     </tr>
     <tr>
       <td>kDequantScaleOptional</td>
       <td>Optional input</td>
-      <td>Key dequantization scale. For quantType=6, an E8M0 tensor is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr.</td>
-      <td>FLOAT8_E8M0</td>
+      <td>A2/A3 INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: PA_BBND/PA_BNBD: [numBlocks,kvHeadNum,128]; TND: [kvHeadNum,Tkv]; BSND/BNSD: [B,kvHeadNum,Sk]. For A5 MXFP8 (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr.</td>
+      <td>FLOAT32 (A2/A3 INT8) or FLOAT8_E8M0 (A5 MXFP8)</td>
+
       <td>ND</td>
     </tr>
     <tr>
       <td>vDequantScaleOptional</td>
       <td>Optional input</td>
-      <td>Value dequantization scale. For quantType=6, an E8M0 tensor is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr.</td>
-      <td>FLOAT8_E8M0</td>
+      <td>A2/A3 INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [kvHeadNum,D]. For A5 MXFP8 (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr.</td>
+      <td>FLOAT32 (A2/A3 INT8) or FLOAT8_E8M0 (A5 MXFP8)</td>
+
       <td>ND</td>
     </tr>
     <tr>
       <td>pQuantScaleOptional</td>
       <td>Optional input</td>
-      <td>P per-tensor quantization scale. For quantType=6, an optional FLOAT32 tensor of shape [1] specifies the scale; the default is 16.0. For quantType=0/5, pass nullptr.</td>
+      <td>A2/A3 INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [1]. For A5 MXFP8 (quantType=6), P scale is optional FLOAT32 [1], default 16.0. For quantType=0/5, pass nullptr.</td>
+
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
@@ -150,7 +156,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>sequsedQOptional</td>
       <td>Conditionally required input</td>
-      <td>Actual valid query length in each batch. The shape is [B,]. It is required for BSND/BNSD and optional for TND. If it is not passed for TND, the storage length obtained by differencing cu is used.</td>
+      <td>Actual valid query length in each batch. The shape is [B,]. It is required for BSND/BNSD and optional for TND. If it is not passed for TND, the storage length obtained by differencing cu is used. For A2/A3 INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -213,7 +219,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>quantType</td>
       <td>Attribute</td>
-      <td>Quantization type. Supports 0, 5, or 6. For the scope of application, see <a href="#product-specific-constraints">Product-Specific Constraints</a>.</td>
+      <td>Quantization type: 0 for non-quantized inputs, 5 for A5 FP8, 6 for A5 MXFP8, and 7 for A2/A3 INT8. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -227,7 +233,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>softmaxPrecision</td>
       <td>Attribute</td>
-      <td>Softmax computation precision level. The value is 0 or 1.</td>
+      <td>Softmax computation precision level. The value is 0 or 1. A2/A3 INT8 (quantType=7) requires softmaxPrecision=0.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -248,7 +254,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>returnSoftmaxlse</td>
       <td>Attribute</td>
-      <td>Whether to output softmaxLse. Non-quant supports 0 or 1; FP8 union (D=128) supports 0 or 1; MXFP8 and other FP8 paths with quantType=5 support only 0.</td>
+      <td>Whether to output softmaxLse. Non-quantized inputs (quantType=0) and A2/A3 INT8 (quantType=7) support 0 or 1; A5 FP8 Union (quantType=5, maskType=3, D=128) supports 0 or 1; A5 regular FP8 (quantType=5, maskType!=3) and MXFP8 (quantType=6) support only 0.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -276,7 +282,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>softmaxLseOptional</td>
       <td>Output</td>
-      <td>Softmax log-sum-exp result. When returnSoftmaxlse=1 (non-quant, or FP8 union with D=128), outputs FLOAT32; TND is [Tq,N1,1], BSND/BNSD is [B,N1,Sq,1]. LSE output is not supported for regular FP8 (non-Union quantType=5) or MXFP8 (quantType=6). When disabled, pass nullptr.</td>
+      <td>Softmax log-sum-exp result. Supported for non-quantized inputs (quantType=0), A2/A3 INT8 (quantType=7), and A5 FP8 Union (quantType=5, maskType=3, D=128). When returnSoftmaxlse=1, a FLOAT32 Tensor is required, with shape [Tq,qHeadNum,1] for TND or [B,qHeadNum,Sq,1] for BSND/BNSD. When returnSoftmaxlse=0, pass nullptr. A5 regular FP8 (quantType=5, maskType!=3) and MXFP8 (quantType=6) do not support LSE output.</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
@@ -286,12 +292,15 @@ English | [简体中文](./README.md)
 - Sparse block shape [blockShapeX, blockShapeY]: non-union uses X=1; union (maskType=3) uses X=8. For <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, Y supports 1, 2, 4, 8, 16, 32, 64, and 128.
 - For <term>Ascend 950PR&950DT products</term>, non-quant and regular FP8 use `X=1` with `1≤Y≤128`; Union uses `[8,Y]` (`1≤Y≤128`). `MXFP8` (`quantType=6`) supports only `[1,4]` or `[1,8]`. Union does not support `quantType=6`.
 
-
 ## Constraints
+
+- A2/A3 INT8 quantization (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
+
+- For INT8 quantization, all four scale tensors are required. They must be FLOAT32, contiguous, finite, and positive; their shapes are specified in the parameter table.
 
 - Before the invocation, you must first run `aclnnGenericBlockSparseAttentionMetadata` to generate `metadataOptional` and then call this API. The metadata must match the current inputs/attributes, and it must be regenerated for each invocation.
 - In non-quantization FLOAT16/BFLOAT16 scenarios, <term>Atlas A2 products</term>, <term>Atlas A3 products</term>, and <term>Ascend 950PR&950DT products</term> support any headDim from 1 to 256; on <term>Ascend 950PR&950DT products</term>, `MXFP8` supports only D=192/256 under the grouped conditions below; regular FP8 quantization (quantType=5) supports only 128. The KV page blockSize of PA is fixed at 128 and is independent of the sparse blockShapeY.
-- When TND and layoutSparsePattern=4: totalQBlocks is blocked by the storage length obtained by differencing cuSeqLengthsQ; both sparse blocking and QKV addressing use this storage length and are not re-split by seqused; topK must be greater than or equal to the maximum of all elements in `sparseBlockCount`. The capacity limit is `INT32_MAX` for non-quantized <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and for non-quantized FLOAT16/BFLOAT16, `MXFP8`, and regular FP8 (including FP8 Union) on <term>Ascend 950PR&950DT products</term>.
+- When TND and layoutSparsePattern=4: totalQBlocks is blocked by the storage length obtained by differencing cuSeqLengthsQ; both sparse blocking and QKV addressing use this storage length and are not re-split by seqused; topK must be greater than or equal to the maximum of all elements in `sparseBlockCount`. The capacity limit is `INT32_MAX` for non-quantized and INT8 <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and for non-quantized FLOAT16/BFLOAT16, `MXFP8`, and regular FP8 (including FP8 Union) on <term>Ascend 950PR&950DT products</term>.
 - Each group of valid sparse indexes must be non-negative, strictly ascending, and duplicate-free, and located in the first `sparseBlockCount` positions. A random ascending order suffices; equal steps or physical page continuity are not required.
 - For <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, when `residualBlockMode=1`, the explicit list contains only complete blocks within the currently visible KV range, and the trailing incomplete block is implicitly added by the operator.
 - When `seqused` and the corresponding `cu` prefix sum are passed together (for Q when `layoutQ=TND`, and KV when `layoutKv=TND`), scheduling uses the actual per-batch lengths. Each `seqused` value must not exceed the corresponding storage length and must match the Metadata input.
@@ -309,8 +318,8 @@ English | [简体中文](./README.md)
 - Union (`maskType=3`) on <term>Ascend 950PR&950DT products</term> supports FP16/BF16 and FP8; INT32 exactMask is required, `blockShape=[8,Y]` (`1≤Y≤128`), and `residualBlockMode=0`. FP8 Union additionally requires `headDim=128`; for paged KV, `Y` must also divide the PA page size 128. Union does not support `quantType=6`. See the [aclnn doc](./docs/aclnnGenericBlockSparseAttention_en.md).
 - On <term>Ascend 950PR&950DT products</term>, `MXFP8` (`quantType=6`) uses only the grouped path: Q uses `TND`, `BSND`, or `BNSD`; KV uses the same nonpaged layout or `PA_BBND`/`PA_BNBD` with 128-token pages. D is 192 or 256, `blockShape` is `[1,4]` or `[1,8]`, and both D values support `groupSize=1..128`. Both `softmaxPrecision=0/1` use FP32 scores, and LSE output is disabled. D128 is unsupported. `residualBlockMode=0` is required; configurations outside the grouped conditions are rejected. See the MXFP8 quantization contract for the complete conditions.
 - Regular FP8 (quantType=5, non-union) on <term>Ascend 950PR&950DT products</term> supports only `headDim=128`, `layoutQ/layoutKv=TND/PA_BBND`, `maskType=1`, `residualBlockMode=0`, and `blockShape=[1,Y]` (`1≤Y≤128`). FP8 Union follows the Union constraints above; Union does not support `quantType=6`.
-- The last dimension of sparse indexes supports 1 to `INT32_MAX` for non-quantized <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and for non-quantized FLOAT16/BFLOAT16 , `MXFP8`, or regular FP8 (including FP8 Union) inputs on <term>Ascend 950PR&950DT products</term>. The capacity must be at least the maximum effective sparse block count.
-- `quantType`: <term>Ascend 950PR&950DT products</term> supports 0 (non-quantized), 5 (FP8), or 6 (`MXFP8`); <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support only 0.
+- The last dimension of sparse indexes supports 1 to `INT32_MAX` for non-quantized and INT8 <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and for non-quantized FLOAT16/BFLOAT16 , `MXFP8`, or regular FP8 (including FP8 Union) inputs on <term>Ascend 950PR&950DT products</term>. The capacity must be at least the maximum effective sparse block count.
+- `quantType`: <term>Ascend 950PR&950DT products</term> supports 0 (non-quantized), 5 (FP8), or 6 (`MXFP8`); <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support 0 (non-quantized) or 7 (INT8).
 - `softmaxPrecision`: In non-Union scenarios (maskType=0/1) on <term>Ascend 950PR&950DT products</term>, non-quantized FLOAT16/BFLOAT16 supports 0 or 1, FP8 with `quantType=5` supports only 1, and `MXFP8` accepts both values and uses FP32 scores/Softmax for both; 0 is recommended and 1 is a compatibility alias. In Union scenarios (maskType=3), both non-quantized and FP8 quantization support only 0; on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, non-Union scenarios allow FLOAT16 with 0 or 1 and BFLOAT16 with only 0, and Union scenarios (maskType=3) support only 0.
 
 For `MXFP8`, Q/K use E8M0 scales per 32 channels along D. V uses per-channel E8M0 scales, repeated by the caller to match the required layout. P uses an external per-tensor scale. For detailed shapes and constraints, see the [MXFP8 quantization contract (Chinese)](./docs/aclnnGenericBlockSparseAttention.md#mxfp8quanttype6).

@@ -775,3 +775,20 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionMxfp8IsRejected)
     ScheduleResult result;
     EXPECT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_INVALID_PARAM);
 }
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Int8SevenPreservesRegularFdSchedule)
+{
+    auto input = MakeDecodeInput();
+    ScheduleResult regular;
+    ASSERT_EQ(BuildSchedule(input, regular), BSAScheduleStatus::BSA_SUCCESS);
+    std::array<MetadataType, METADATA_TOTAL_SIZE> expected{};
+    ASSERT_EQ(EncodeMetadata(regular, expected.data(), expected.size()), BSAScheduleStatus::BSA_SUCCESS);
+    input.quantType = 7;
+    ScheduleResult quantized;
+    ASSERT_EQ(BuildSchedule(input, quantized), BSAScheduleStatus::BSA_SUCCESS);
+    std::array<MetadataType, METADATA_TOTAL_SIZE> actual{};
+    ASSERT_EQ(EncodeMetadata(quantized, actual.data(), actual.size()), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_EQ(actual, expected);
+    EXPECT_NE(actual[FD_SCHEDULE_FLAGS_INDEX] & FD_SCHEDULE_ENABLED, 0);
+    EXPECT_EQ(actual[PACKED_COUNT_RANGE_TAG_INDEX], 0);
+}

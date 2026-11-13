@@ -321,6 +321,7 @@ private:
     ge::graphStatus CheckAttentionOutDtype(gert::TilingContext* context);
     ge::graphStatus CheckSoftmaxPrecision(gert::TilingContext* context);
     ge::graphStatus CheckQuantConfig(gert::TilingContext* context);
+    ge::graphStatus CheckInt8Config(gert::TilingContext* context);
     ge::graphStatus CheckMetadata(gert::TilingContext* context);
     ge::graphStatus CheckReservedOptionalInputs(gert::TilingContext* context);
     ge::graphStatus CheckMxfp8Scales(gert::TilingContext* context);

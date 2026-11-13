@@ -34,8 +34,8 @@
 ## 参数说明
 
 > **说明：**<br>
-> 参数维度含义：B表示Batch Size，T表示Total tokens，N1表示query的head数，N2表示KV的head数，D表示Head Dim，topK表示`sparseBlockIdx`最后一维`maxSparseBlockCount`。<br>
-> 各布局均使用上述head数记号。GQA下N1与N2可以不同，约束见下文。
+> 参数维度含义：B表示Batch Size，T表示Total tokens，qHeadNum表示query的head数，kvHeadNum表示KV的head数，D表示Head Dim，topK表示`sparseBlockIdx`最后一维`maxSparseBlockCount`。<br>
+> 各布局均使用上述head数记号。GQA下qHeadNum与kvHeadNum可以不同，约束见下文。
 
 <table style="undefined;table-layout: fixed; width: 1200px"><colgroup>
   <col style="width: 220px">
@@ -57,35 +57,35 @@
     <tr>
       <td>query</td>
       <td>输入</td>
-      <td>公式中的query。layoutQ为"TND"时，shape为[T, N1, D]；BSND为[B,Sq,N1,D]，BNSD为[B,N1,Sq,D]，N1为query的head数。</td>
-      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN</td>
+      <td>公式中的query。layoutQ为"TND"时，shape为[T, qHeadNum, D]；BSND为[B,Sq,qHeadNum,D]，BNSD为[B,qHeadNum,Sq,D]，qHeadNum为query的head数。</td>
+      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>key</td>
       <td>输入</td>
-      <td>公式中的key。PA_BBND时shape为[numBlocks, blockSize, N2, D]；PA_BNBD时shape为[numBlocks, N2, blockSize, D]；TND时为[Tkv,N2,D]；BSND为[B,Sk,N2,D]，BNSD为[B,N2,Sk,D]，N2为KV的head数。</td>
-      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN</td>
+      <td>公式中的key。PA_BBND时shape为[numBlocks, blockSize, kvHeadNum, D]；PA_BNBD时shape为[numBlocks, kvHeadNum, blockSize, D]；TND时为[Tkv,kvHeadNum,D]；BSND为[B,Sk,kvHeadNum,D]，BNSD为[B,kvHeadNum,Sk,D]，kvHeadNum为KV的head数。</td>
+      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>value</td>
       <td>输入</td>
       <td>公式中的value，shape与key一致。</td>
-      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN</td>
+      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>sparseBlockIdx</td>
       <td>输入</td>
-      <td>稀疏块索引。layoutSparsePattern=4时，shape为[N2, totalQBlocks, topK]，N2为KV的head数。</td>
+      <td>稀疏块索引。layoutSparsePattern=4时，shape为[kvHeadNum, totalQBlocks, topK]，kvHeadNum为KV的head数。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>sparseBlockCount</td>
       <td>输入</td>
-      <td>每个Q块实际选择的KV块数量。layoutSparsePattern=4时，shape为[N2, totalQBlocks]，N2为KV的head数。</td>
+      <td>每个Q块实际选择的KV块数量。layoutSparsePattern=4时，shape为[kvHeadNum, totalQBlocks]，kvHeadNum为KV的head数。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -106,28 +106,32 @@
     <tr>
       <td>qDequantScaleOptional</td>
       <td>可选输入</td>
-      <td>Query反量化系数；quantType=6必传E8M0，布局见量化接口文档；quantType=0/5传入nullptr。</td>
-      <td>FLOAT8_E8M0</td>
+      <td>A2/A3 INT8量化（quantType=7）必传，要求FLOAT32、连续存储、有限且大于0。INT8场景：TND：[Tq,qHeadNum]；BSND：[B,Sq,qHeadNum]；BNSD：[B,qHeadNum,Sq]。A5 MXFP8（quantType=6）须传E8M0，shape见MXFP8量化契约；quantType=0/5传入nullptr。</td>
+      <td>FLOAT32（A2/A3 INT8）或FLOAT8_E8M0（A5 MXFP8）</td>
+
       <td>ND</td>
     </tr>
     <tr>
       <td>kDequantScaleOptional</td>
       <td>可选输入</td>
-      <td>Key反量化系数；quantType=6必传E8M0，布局见量化接口文档；quantType=0/5传入nullptr。</td>
-      <td>FLOAT8_E8M0</td>
+      <td>A2/A3 INT8量化（quantType=7）必传，要求FLOAT32、连续存储、有限且大于0。INT8场景：PA_BBND/PA_BNBD：[numBlocks,kvHeadNum,128]；TND：[kvHeadNum,Tkv]；BSND/BNSD：[B,kvHeadNum,Sk]。A5 MXFP8（quantType=6）须传E8M0，shape见MXFP8量化契约；quantType=0/5传入nullptr。</td>
+      <td>FLOAT32（A2/A3 INT8）或FLOAT8_E8M0（A5 MXFP8）</td>
+
       <td>ND</td>
     </tr>
     <tr>
       <td>vDequantScaleOptional</td>
       <td>可选输入</td>
-      <td>Value反量化系数；quantType=6必传E8M0，布局见量化接口文档；quantType=0/5传入nullptr。</td>
-      <td>FLOAT8_E8M0</td>
+      <td>A2/A3 INT8量化（quantType=7）必传，要求FLOAT32、连续存储、有限且大于0。INT8场景：[kvHeadNum,D]。A5 MXFP8（quantType=6）须传E8M0，shape见MXFP8量化契约；quantType=0/5传入nullptr。</td>
+      <td>FLOAT32（A2/A3 INT8）或FLOAT8_E8M0（A5 MXFP8）</td>
+
       <td>ND</td>
     </tr>
     <tr>
       <td>pQuantScaleOptional</td>
       <td>可选输入</td>
-      <td>P per-tensor量化系数；quantType=6可传FLOAT32 [1]，缺省16.0；quantType=0/5传入nullptr。</td>
+      <td>A2/A3 INT8量化（quantType=7）必传，要求FLOAT32、连续存储、有限且大于0。INT8场景：FLOAT32 [1]。A5 MXFP8（quantType=6）的P scale为可选FLOAT32 [1]，缺省16.0；quantType=0/5传入nullptr。</td>
+
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
@@ -148,7 +152,7 @@
     <tr>
       <td>sequsedQOptional</td>
       <td>条件必选输入</td>
-      <td>各batch中query实际有效长度，shape为[B,]；BSND/BNSD必传，TND可选且不传时按cu差分得到的存储长度处理。</td>
+      <td>各batch中query实际有效长度，shape为[B,]；BSND/BNSD必传，非量化TND可选且不传时按cu差分得到的存储长度处理；INT8的TND Q必须传入nullptr。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -211,7 +215,7 @@
     <tr>
       <td>quantType</td>
       <td>属性</td>
-      <td>量化类型；支持0、5或6，适用范围见<a href="#产品差异约束">产品差异约束</a>。</td>
+      <td>量化类型：0为非量化；5为A5常规FP8；6为A5 MXFP8；7为A2/A3 INT8。1～4为预留值，当前不支持。具体规格见产品差异约束。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -225,7 +229,7 @@
     <tr>
       <td>softmaxPrecision</td>
       <td>属性</td>
-      <td>Softmax计算精度级别，取值0或1。</td>
+      <td>Softmax计算精度级别，取值0或1。 A2/A3 INT8（quantType=7）要求softmaxPrecision=0。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -246,7 +250,8 @@
     <tr>
       <td>returnSoftmaxlse</td>
       <td>属性</td>
-      <td>是否输出softmaxLse。非量化支持0或1；FP8 union（D=128）支持0或1；MXFP8和quantType=5的其他FP8路径仅支持0。</td>
+      <td>是否输出softmaxLse。非量化（quantType=0）及A2/A3 INT8（quantType=7）支持0或1；A5 FP8 Union（quantType=5、maskType=3、D=128）支持0或1；A5常规FP8（quantType=5、maskType≠3）及MXFP8（quantType=6）仅支持0。</td>
+
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -267,14 +272,15 @@
     <tr>
       <td>attentionOut</td>
       <td>输出</td>
-      <td>shape与query一致；非量化时dtype与query一致，FP8量化输出为FLOAT16或BFLOAT16。</td>
+      <td>计算输出，shape与query一致；非量化时数据类型与query一致，INT8/FP8量化时由调用方指定FLOAT16或BFLOAT16输出。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>softmaxLseOptional</td>
       <td>输出</td>
-      <td>Softmax log-sum-exp结果；returnSoftmaxlse=1时输出FLOAT32（非量化，或 FP8 union 且 D=128）；TND为[Tq,N1,1]，BSND/BNSD为[B,N1,Sq,1]。常规 FP8（非 Union 的 quantType=5）和 MXFP8（quantType=6）不支持输出LSE；关闭时传入nullptr。</td>
+      <td>Softmax的log-sum-exp结果。非量化（quantType=0）、A2/A3 INT8（quantType=7）及A5 FP8 Union（quantType=5、maskType=3、D=128）支持输出。returnSoftmaxlse=1时必传FLOAT32 Tensor，shape为TND：[Tq,qHeadNum,1]，BSND/BNSD：[B,qHeadNum,Sq,1]；returnSoftmaxlse=0时传入nullptr。A5常规FP8（quantType=5、maskType≠3）及MXFP8（quantType=6）不支持输出LSE。</td>
+
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
@@ -284,19 +290,19 @@
 - 稀疏块形状[blockShapeX, blockShapeY]：非union时X=1；union（maskType=3）时X=8。<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的Y支持1、2、4、8、16、32、64、128。
 - <term>Ascend 950PR&950DT系列产品</term>非量化与常规 FP8：`X=1`，`1≤Y≤128`；Union：`[8,Y]`（`1≤Y≤128`）。`MXFP8`（`quantType=6`）仅支持`[1,4]`或`[1,8]`。Union 不支持 `quantType=6`。
 
-
 ## 约束说明
 
+- INT8量化场景下，四个scale均为必选输入，要求FLOAT32、连续存储，取值有限且大于0，shape见参数表；`attentionOut`可为FLOAT16或BFLOAT16，`returnSoftmaxlse=1`时输出FLOAT32 LSE。具体量化语义见[aclnn接口的量化相关说明](docs/aclnnGenericBlockSparseAttention.md#量化相关说明)。
 - 调用前须先执行`aclnnGenericBlockSparseAttentionMetadata`生成`metadataOptional`，再调用本接口；metadata须与当前输入/属性配套，每次调用须重新生成。
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>及<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景支持1～256的任意headDim；<term>Ascend 950PR&950DT系列产品</term> `MXFP8`仅支持下述grouped条件中的D=192/256；<term>Ascend 950PR&950DT系列产品</term>常规 FP8 量化（quantType=5）仅支持128。PA的KV页blockSize固定为128，与稀疏blockShapeY独立。
-- TND且layoutSparsePattern=4时：totalQBlocks按cuSeqLengthsQ差分得到的存储长度分块；sparse分块与QKV寻址均按该存储长度，不以seqused重切分；topK须≥`sparseBlockCount`中所有元素的最大值。容量上限：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16、MXFP8及常规 FP8（含 FP8 Union）为INT32_MAX。
+- TND且layoutSparsePattern=4时：totalQBlocks按cuSeqLengthsQ差分得到的存储长度分块；sparse分块与QKV寻址均按该存储长度，不以seqused重切分；topK须≥`sparseBlockCount`中所有元素的最大值。容量上限：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化和INT8全量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16、MXFP8及常规 FP8（含 FP8 Union）为INT32_MAX。
 - 每组有效稀疏索引须非负、严格升序且不重复，位于前`sparseBlockCount`个位置；随机升序即可，不要求等步长或物理页连续。
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>在`residualBlockMode=1`时，显式列表只包含当前可见KV范围内的完整块，尾部不完整块由算子隐式加入。
 - seqused与对应cu前缀和同时传入时（layoutQ为TND时的Q侧，及layoutKv为TND时的KV侧）：分核/任务空间按各batch实际有效长度（seqused）累加；各batch的seqused元素须≤对应cu存储长度，且须与Metadata侧完全一致。
 - layoutKv为"PA_BBND"/"PA_BNBD"时须传`sequsedKvOptional`，不传`cuSeqLengthsKvOptional`。
 - 输入query、key、value的数据类型必须一致。
-- 输入query的head数为N1，输入key和value的head数为N2，则N1 >= N2且N1 % N2 == 0；groupSize=N1/N2当前须≤128。
-- PA_BBND/PA_BNBD下key/value仅dim0（物理页轴）可非连续；页内元素须连续（PA_BBND为blockSize×N2×D，PA_BNBD为N2×blockSize×D）。
+- 输入query的head数为qHeadNum，输入key和value的head数为kvHeadNum，则qHeadNum >= kvHeadNum且qHeadNum % kvHeadNum == 0；groupSize=qHeadNum/kvHeadNum当前须≤128。
+- PA_BBND/PA_BNBD下key/value仅dim0（物理页轴）可非连续；页内元素须连续（PA_BBND为blockSize×kvHeadNum×D，PA_BNBD为kvHeadNum×blockSize×D）。
 
 ### 产品差异约束
 
@@ -307,11 +313,13 @@
 - <term>Ascend 950PR&950DT系列产品</term> Union（`maskType=3`）支持 FP16/BF16 和 FP8；须传 INT32 exactMask，`blockShape=[8,Y]`（`1≤Y≤128`），`residualBlockMode=0`；FP8 Union 另要求 `headDim=128`，分页 KV 下另要求 `Y` 整除页大小 128。Union 不支持 `quantType=6`。详情见[aclnn文档](./docs/aclnnGenericBlockSparseAttention.md)。
 - <term>Ascend 950PR&950DT系列产品</term> `MXFP8`（`quantType=6`）仅保留grouped路径：Q为TND/`BSND`/BNSD，KV为同布局dense或`PA_BBND`/`PA_BNBD`（页大小128），D=192/256且blockShape=[1,4/8]；D192/256均支持groupSize=1～128，softmaxPrecision=0/1（均使用FP32 S），不输出LSE；D128不支持。完整条件见`MXFP8`量化契约，`residualBlockMode=0`，不满足grouped条件直接报不支持。
 - <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（quantType=5，maskType≠3）：`headDim`仅支持128，`layoutQ/layoutKv`仅支持`TND/PA_BBND`，`maskType=1`、`residualBlockMode=0`、`blockShape=[1,Y]`（`1≤Y≤128`）。FP8 Union 见上条 Union 约束；Union 不支持 `quantType=6`。
-- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16、MXFP8及常规 FP8（含 FP8 Union）支持1～INT32_MAX；容量均须不小于稀疏块有效计数的最大值。
-- `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、5（FP8量化）或6（MXFP8）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>仅支持0。
+- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化和INT8全量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16、MXFP8及常规 FP8（含 FP8 Union）支持1～INT32_MAX；容量均须不小于稀疏块有效计数的最大值。
+- `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、5（FP8量化）或6（MXFP8）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持0（非量化）或7（INT8全量化）。
 - `softmaxPrecision`：<term>Ascend 950PR&950DT系列产品</term>非Union场景（maskType=0/1）下，非量化FLOAT16/BFLOAT16支持0或1，quantType=5的FP8量化场景仅支持1，`MXFP8`支持0或1且均使用FP32 S/Softmax，推荐0，1为兼容别名；Union场景（maskType=3）下，非量化与FP8量化均仅支持0；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>上FLOAT16支持0或1，BFLOAT16仅支持0。
 
 `MXFP8`的Q/K采用D维group-32 E8M0缩放，V采用per-channel E8M0缩放并由调用方repeat到kernel所需布局，P采用外部per-tensor缩放。详细shape与约束见[`MXFP8`量化契约](./docs/aclnnGenericBlockSparseAttention.md#mxfp8quanttype6)。
+
+- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的INT8全量化场景：`quantType=7`，Q/K/V的数据类型为INT8；`headDim`为1～256，Q head数必须是KV head数的整数倍，分组大小为1～128；Q支持TND、BSND、BNSD，KV为与Q相同的非PA布局或PA_BBND/PA_BNBD；PA的`blockSize=128`；`blockShape=[1,Y]`，Y为1、2、4、8、16、32、64、128；`maskType=0/1`、`residualBlockMode=0/1`、`softmaxPrecision=0`。mode=1隐式追加可见范围末尾的不完整块，不占用topK及`sparseBlockCount`。
 
 ## 调用说明
 

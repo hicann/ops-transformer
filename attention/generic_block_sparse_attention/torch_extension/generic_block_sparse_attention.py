@@ -37,6 +37,7 @@ class QuantMode(IntEnum):
     FP4_E2M1_DYNAMIC_CX = 4
     FP8_E4M3_STATIC_CAST_P = 5
     MXFP8_E4M3_PER_CHANNEL_V = 6
+    INT8_FULL_QUANT = 7  # A2/A3: dtype=int8, all four scales supplied by the caller.
 
 
 class ResidualBlockMode(IntEnum):

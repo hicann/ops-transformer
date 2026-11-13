@@ -59,6 +59,7 @@ constexpr int64_t GBSA_ARCH35_QUANT_MAX_SPARSE_BLOCK_COUNT = 256;
 constexpr int64_t GBSA_QUANT_TYPE_NONE = 0;
 constexpr int64_t GBSA_QUANT_TYPE_FLOAT8 = 5;
 constexpr int64_t GBSA_QUANT_TYPE_MXFP8 = 6;
+constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
 constexpr int64_t GBSA_SOFTMAX_PRECISION_HIGH = 0;
 constexpr int64_t GBSA_SOFTMAX_PRECISION_MIXED = 1;
 constexpr int64_t GBSA_CURRENT_MASK_TYPE = 1;
@@ -401,13 +402,10 @@ aclnnStatus CheckGbsaSeqLengthInputs(const aclTensor* cuSeqLengthsOptional, cons
 
 aclnnStatus CheckGbsaQuantType(int64_t quantType, bool isArch35)
 {
-    if (quantType != GBSA_QUANT_TYPE_NONE && quantType != GBSA_QUANT_TYPE_FLOAT8 &&
-        quantType != GBSA_QUANT_TYPE_MXFP8) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantType only supports 0, 5 or 6, but got %lld.", quantType);
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-    if (quantType != GBSA_QUANT_TYPE_NONE && !isArch35) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantType %lld is only supported on Atlas A5.", quantType);
+    if ((isArch35 && quantType != GBSA_QUANT_TYPE_NONE && quantType != GBSA_QUANT_TYPE_FLOAT8 &&
+         quantType != GBSA_QUANT_TYPE_MXFP8) ||
+        (!isArch35 && quantType != GBSA_QUANT_TYPE_NONE && quantType != GBSA_QUANT_TYPE_INT8)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantType is not supported on this platform: %lld.", quantType);
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -445,15 +443,19 @@ aclnnStatus CheckGbsaPlatformAttrs(int64_t quantType, int64_t softmaxPrecision, 
     if (status != ACLNN_SUCCESS) {
         return status;
     }
+    if (quantType == GBSA_QUANT_TYPE_INT8 && softmaxPrecision != GBSA_SOFTMAX_PRECISION_HIGH) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A2/A3 INT8 full quantization requires FP32 Softmax.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     return CheckGbsaSoftmaxPrecision(softmaxPrecision, quantType, maskType);
 }
 
-aclnnStatus CheckGbsaResidualBlockMode(int64_t residualBlockMode, bool arch35NonQuant, bool arch22NonQuant = false)
+aclnnStatus CheckGbsaResidualBlockMode(int64_t residualBlockMode, bool arch35NonQuant, bool arch22 = false)
 {
     if (residualBlockMode != GBSA_RESIDUAL_BLOCK_MODE_NONE &&
-        !((arch35NonQuant || arch22NonQuant) && residualBlockMode == GBSA_RESIDUAL_BLOCK_MODE_FORCE)) {
+        !((arch35NonQuant || arch22) && residualBlockMode == GBSA_RESIDUAL_BLOCK_MODE_FORCE)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "residual_block_mode=%lld is unsupported; mode 1 only supports non-quant currently.",
+                "residual_block_mode=%lld is unsupported; mode 1 supports non-quant and A2/A3 INT8.",
                 residualBlockMode);
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -515,6 +517,7 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
     if (status != ACLNN_SUCCESS) {
         return status;
     }
+    const bool int8Layout = !isArch35 && quantType == GBSA_QUANT_TYPE_INT8;
     if (maskType == GBSA_MASK_TYPE_UNION && quantType == GBSA_QUANT_TYPE_MXFP8) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "Union mode (maskType=3) only supports quantType=0 or 5, but got quantType=%lld.", quantType);
@@ -530,7 +533,7 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (maskType != 3 && (!GbsaIsLayout(kvInputLayout, "PA_BBND") || !GbsaIsLayout(qInputLayout, "TND")) &&
-        quantType != GBSA_QUANT_TYPE_NONE && !(isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8)) {
+        quantType != GBSA_QUANT_TYPE_NONE && !int8Layout && !(isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Batched Q and dense/PA_BNBD KV require quantType=0, A5 MXFP8, or Union.");
 
         return ACLNN_ERR_PARAM_INVALID;
@@ -548,12 +551,21 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
     status = CheckGbsaScalarAttrs(
         numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, layoutSparsePattern, maskType, isArch35,
         isArch35 && quantType == GBSA_QUANT_TYPE_NONE,
-        !isArch35 && quantType == GBSA_QUANT_TYPE_NONE && GbsaIsLayout(kvInputLayout, qInputLayout),
-        !isArch35 && quantType == GBSA_QUANT_TYPE_NONE &&
+        !isArch35 && (quantType == GBSA_QUANT_TYPE_NONE || int8Layout) && GbsaIsLayout(kvInputLayout, qInputLayout),
+        !isArch35 && (quantType == GBSA_QUANT_TYPE_NONE || int8Layout) &&
             (GbsaIsLayout(kvInputLayout, "PA_BBND") || GbsaIsLayout(kvInputLayout, "PA_BNBD")),
         isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8);
     if (status != ACLNN_SUCCESS) {
         return status;
+    }
+    if (!isArch35 && quantType == GBSA_QUANT_TYPE_INT8 &&
+        (headDim < 1 || headDim > 256 || numQHeads / numKvHeads > 128 || blockShapeX != 1 || blockShapeY < 1 ||
+         blockShapeY > 128 || (blockShapeY & (blockShapeY - 1)) != 0 || (maskType != 0 && maskType != 1) ||
+         (GbsaIsLayout(qInputLayout, "TND") && seqUsedQOptional != nullptr))) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "INT8 metadata requires D in [1,256], GQA group<=128, X=1, power-of-two Y in [1,128], "
+                "causal/no mask; sequsedQ is supported for BSND/BNSD.");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     status = CheckGbsaMetadataShape(metadata);
     if (status != ACLNN_SUCCESS) {
@@ -583,8 +595,7 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
     if (status != ACLNN_SUCCESS) {
         return status;
     }
-    status = CheckGbsaResidualBlockMode(residualBlockMode, isArch35 && quantType == GBSA_QUANT_TYPE_NONE,
-                                        !isArch35 && quantType == GBSA_QUANT_TYPE_NONE);
+    status = CheckGbsaResidualBlockMode(residualBlockMode, isArch35 && quantType == GBSA_QUANT_TYPE_NONE, !isArch35);
     if (status != ACLNN_SUCCESS) {
         return status;
     }

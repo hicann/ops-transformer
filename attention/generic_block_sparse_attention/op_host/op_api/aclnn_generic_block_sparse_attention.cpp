@@ -32,6 +32,7 @@ extern "C" {
 #endif
 
 namespace {
+constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
 
 static constexpr int64_t LSE_OUT = 1;
 static constexpr int64_t MXFP8_QUANT_TYPE = 6;
@@ -44,6 +45,7 @@ static bool CheckDataType(const aclTensor* query, const aclTensor* key, const ac
 
     static const std::unordered_map<DataType, std::vector<DataType>> validKvType = {
         {DataType::DT_FLOAT16, {DataType::DT_FLOAT16}},
+        {DataType::DT_INT8, {DataType::DT_INT8}},
         {DataType::DT_BF16, {DataType::DT_BF16}},
         {DataType::DT_FLOAT8_E4M3FN, {DataType::DT_FLOAT8_E4M3FN}},
     };
@@ -329,7 +331,10 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "PA_BBND/PA_BNBD requires blockTable; it must not be nullptr.");
             return ACLNN_ERR_PARAM_NULLPTR;
         }
-        if (!unionFp8 && !generalized &&
+        const bool denseInt8 = query->GetDataType() == DataType::DT_INT8 && quantType == GBSA_QUANT_TYPE_INT8 &&
+                               std::string(layoutQ) == std::string(layoutKv) &&
+                               op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510;
+        if (!denseInt8 && !unionFp8 && !generalized &&
             (quantType != 0 ||
              (query->GetDataType() != DataType::DT_FLOAT16 && query->GetDataType() != DataType::DT_BF16))) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
@@ -348,7 +353,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "BSND/BNSD query requires sequsedQ and sequsedKv.");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        if (!unionFp8 && !generalized &&
+        const bool int8Layout = query->GetDataType() == DataType::DT_INT8 && quantType == GBSA_QUANT_TYPE_INT8 &&
+                                op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510;
+        if (!int8Layout && !unionFp8 && !generalized &&
             (quantType != 0 ||
              (query->GetDataType() != DataType::DT_FLOAT16 && query->GetDataType() != DataType::DT_BF16))) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
@@ -391,13 +398,12 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
 
     // MXFP8 shares the physical page geometry of contiguous K/V and KScale.
     // Preserve the existing dim0-hole support for the other quantization modes.
-    const aclTensor* keyFinal = isPaged && quantType != MXFP8_QUANT_TYPE ?
-                                    NormalizeDim0KvTensor(key, "key", executorImpl) :
-                                    l0op::Contiguous(key, executorImpl);
+    const bool isMxfp8 = quantType == MXFP8_QUANT_TYPE;
+    const aclTensor* keyFinal =
+        isPaged && !isMxfp8 ? NormalizeDim0KvTensor(key, "key", executorImpl) : l0op::Contiguous(key, executorImpl);
     CHECK_RET(keyFinal != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor* valueFinal = isPaged && quantType != MXFP8_QUANT_TYPE ?
-                                      NormalizeDim0KvTensor(value, "value", executorImpl) :
-                                      l0op::Contiguous(value, executorImpl);
+    const aclTensor* valueFinal = isPaged && !isMxfp8 ? NormalizeDim0KvTensor(value, "value", executorImpl) :
+                                                        l0op::Contiguous(value, executorImpl);
     CHECK_RET(valueFinal != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     auto outputs = l0op::GenericBlockSparseAttention(

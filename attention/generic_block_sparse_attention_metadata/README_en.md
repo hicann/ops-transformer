@@ -76,7 +76,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>sequsedQOptional</td>
       <td>Conditionally Required Input</td>
-      <td>Actual sequence length of Query in each batch. The shape is (B,). This parameter is required for BSND/BNSD and optional for TND; when it is not passed in for TND, the Query storage length is used.</td>
+      <td>Actual sequence length of Query in each batch. The shape is (B,). This parameter is required for BSND/BNSD and optional for TND; when it is not passed in for TND, the Query storage length is used. For A2/A3 INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -160,14 +160,14 @@ English | [简体中文](./README.md)
     <tr>
       <td>quantType</td>
       <td>Attribute</td>
-      <td>Quantization type. 0, 5, or 6 is supported. For the application scope, see <a href="#product-specific-constraints">Product-Specific Constraints</a>.</td>
+      <td>Quantization type: 0 for non-quantized inputs, 5 for A5 FP8, 6 for A5 MXFP8, and 7 for A2/A3 INT8. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>softmaxPrecision</td>
       <td>Attribute</td>
-      <td>Precision level of the Softmax calculation. The value is 0 or 1.</td>
+      <td>Precision level of the Softmax calculation. The value is 0 or 1. A2/A3 INT8 (quantType=7) requires softmaxPrecision=0.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -212,13 +212,12 @@ English | [简体中文](./README.md)
 - Sparse block shape [blockShapeX, blockShapeY]: non-union uses X=1; union (maskType=3) uses X=8. For <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, Y supports 1, 2, 4, 8, 16, 32, 64, and 128.
 - For <term>Ascend 950PR&950DT products</term>, non-quant and regular FP8 use `X=1` with `1≤Y≤128`; Union uses `[8,Y]` (`1≤Y≤128`). `MXFP8` (`quantType=6`) supports only `[1,4]` or `[1,8]`. Union does not support `quantType=6`.
 
-
 ## Constraints
 
 - This operator must be used together with `GenericBlockSparseAttention`. All corresponding inputs and attributes must be the same as those of the main operator called later, and `metadataOptional` must be regenerated before each call to the main operator.
 - For the layout combinations and their application scopes, see [Product-Specific Constraints](#product-specific-constraints). `layoutSparsePattern=4`; non-union uses `blockShapeX=1`, union uses `blockShapeX=8`. For the range of headDim, see [Product-Specific Constraints](#product-specific-constraints).
 - `numQHeads >= numKvHeads` and `numQHeads % numKvHeads == 0`, and `numQHeads / numKvHeads` does not exceed 128.
-- The last dimension of `sparseBlockIdx` must be positive and at least the maximum value in `sparseBlockCount`. The capacity limit is `INT32_MAX` for non-quantized <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and for non-quantized FLOAT16/BFLOAT16, `MXFP8`, and regular FP8 (including FP8 Union) on <term>Ascend 950PR&950DT products</term>.
+- The last dimension of `sparseBlockIdx` must be positive and at least the maximum value in `sparseBlockCount`. The capacity limit is `INT32_MAX` for non-quantized and INT8 <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and for non-quantized FLOAT16/BFLOAT16, `MXFP8`, and regular FP8 (including FP8 Union) on <term>Ascend 950PR&950DT products</term>.
 - Each group of valid sparse indices must be non-negative, strictly ascending, and duplicate-free, located in the first `sparseBlockCount` positions. Random ascending order is acceptable; equal strides or physical page continuity is not required.
 - When `residualBlockMode=1`, the explicit list for <term>Atlas A2 products</term> and <term>Atlas A3 products</term> contains only complete KV blocks within the current visible range and does not contain implicit trailing blocks.
 - The output `metadataOptional` is opaque data fixed to INT32 with the shape (1024,). It must not be parsed, modified, or reused across different inputs and attributes.
@@ -233,9 +232,11 @@ English | [简体中文](./README.md)
 - On <term>Ascend 950PR&950DT products</term>, `MXFP8` (`quantType=6`) must match the grouped path of the current main operator: `headDim=192/256`, `blockShape=[1,4]` or `[1,8]`, and `numQHeads/numKvHeads=1..128`. Q uses `TND`, `BSND`, or `BNSD`; KV uses the same nonpaged layout or `PA_BBND`/`PA_BNBD` with 128-token pages. `maskType=0/1` and `softmaxPrecision=0/1` are supported; the main operator does not output LSE, and `residualBlockMode=0` is required. See the [main operator's product-specific constraints](../generic_block_sparse_attention/README_en.md#product-specific-constraints) for the complete conditions. The Metadata API rejects other `headDim` values or sparse block sizes with `ACLNN_ERR_PARAM_INVALID`. Passing Metadata validation does not replace the main operator's scale, address, and buffer-capacity checks.
 - With `quantType=6`, Q/K use scales per 32 channels, V uses per-channel scales, and P uses a per-tensor scale. The main operator validates scale shapes and data types; Metadata does not read scales. Metadata may generate Flash Decoding split schedules when the shape, task-count, and workload conditions are met. Workload is estimated from effective sparse block counts and `blockShapeY`; insufficient workload retains regular scheduling.
 - Regular FP8 (quantType=5, non-union) on <term>Ascend 950PR&950DT products</term> supports only `headDim=128`, `layoutQ/layoutKv=TND/PA_BBND`, `maskType=1`, `residualBlockMode=0`, and `blockShape=[1,Y]` (`1≤Y≤128`). FP8 Union follows the Union constraints above; Union does not support `quantType=6`.
-- The last dimension of sparse indexes supports 1 to `INT32_MAX` for non-quantized <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and for non-quantized FLOAT16/BFLOAT16 , `MXFP8`, or regular FP8 (including FP8 Union) inputs on <term>Ascend 950PR&950DT products</term>. The capacity must be at least the maximum effective sparse block count.
-- `quantType`: <term>Ascend 950PR&950DT products</term> supports 0 (non-quantized), 5 (FP8), or 6 (`MXFP8`); <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support only 0.
+- The last dimension of sparse indexes supports 1 to `INT32_MAX` for non-quantized and INT8 <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and for non-quantized FLOAT16/BFLOAT16 , `MXFP8`, or regular FP8 (including FP8 Union) inputs on <term>Ascend 950PR&950DT products</term>. The capacity must be at least the maximum effective sparse block count.
+- `quantType`: <term>Ascend 950PR&950DT products</term> supports 0 (non-quantized), 5 (FP8), or 6 (`MXFP8`); <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support 0 (non-quantized) or 7 (INT8).
 - `softmaxPrecision`: In non-Union scenarios (maskType=0/1) on <term>Ascend 950PR&950DT products</term>, non-quantized FLOAT16/BFLOAT16 supports 0 or 1, FP8 with `quantType=5` supports only 1, and `MXFP8` supports 0 or 1; in Union scenarios (maskType=3), both non-quantized and FP8 support only 0; on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, FLOAT16 supports 0 or 1 and BFLOAT16 supports only 0.
+
+- A2/A3 INT8 quantization (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
 
 ## Calling Instructions
 

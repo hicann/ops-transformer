@@ -12,6 +12,9 @@
 #include "kernel_operator_list_tensor_intf.h"
 #include "generic_block_sparse_attention_tilingkey.h"
 #include "generic_block_sparse_attention_kernel_interface.cpp"
+#if (__CCE_AICORE__ == 220)
+#include "arch22/generic_block_sparse_attention_kernel_arch22_full_quant.h"
+#endif
 
 extern "C" __global__ __aicore__ void generic_block_sparse_attention(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* sparseBlockIdx,
@@ -26,6 +29,25 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
         KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 
 #if (__CCE_AICORE__ == 220)
+        TILING_KEY_IS(GBSA_INT8_FP16_TILING);
+        TILING_KEY_IS(GBSA_INT8_BF16_TILING);
+        TILING_KEY_IS(GBSA_INT8_FP16_LSE_TILING);
+        TILING_KEY_IS(GBSA_INT8_BF16_LSE_TILING);
+#if TILING_KEY_VAR == GBSA_INT8_FP16_TILING || TILING_KEY_VAR == GBSA_INT8_BF16_TILING || \
+    TILING_KEY_VAR == GBSA_INT8_FP16_LSE_TILING || TILING_KEY_VAR == GBSA_INT8_BF16_LSE_TILING
+        GbsaKernelArch22::GbsaKernelParamsArch22 params{
+            query,    key,       value,      sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv,
+            sequsedQ, sequsedKv, blockTable, attentionOut,   softmaxLse,       user,     tiling};
+        GbsaKernelArch22::Int8::FullQuantScales scales{qDequantScale, kDequantScale, vDequantScale, pQuantScale};
+#if TILING_KEY_VAR == GBSA_INT8_FP16_TILING || TILING_KEY_VAR == GBSA_INT8_FP16_LSE_TILING
+        GbsaKernelArch22::Int8::GbsaFullQuantKernelArch22<half, TILING_KEY_VAR == GBSA_INT8_FP16_LSE_TILING> kernel;
+#else
+        GbsaKernelArch22::Int8::GbsaFullQuantKernelArch22<bfloat16_t, TILING_KEY_VAR == GBSA_INT8_BF16_LSE_TILING>
+            kernel;
+#endif
+        GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, int8Tiling, tiling);
+        kernel(params, scales, int8Tiling);
+#endif
         TILING_KEY_IS(GBSA_FP16_TND_PA_BBND_TILING_RESIDUAL);
         TILING_KEY_IS(GBSA_FP16_TND_PA_BBND_NOMASK_TILING_RESIDUAL);
         TILING_KEY_IS(GBSA_FP16_TND_PA_BBND_HALFSM_TILING_RESIDUAL);

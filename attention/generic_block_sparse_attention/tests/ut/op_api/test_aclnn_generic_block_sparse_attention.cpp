@@ -111,6 +111,39 @@ TEST_F(aclnn_generic_block_sparse_attention_ut, normal)
     EXPECT_EQ(aclRet, ACLNN_SUCCESS);
 }
 
+TEST_F(aclnn_generic_block_sparse_attention_ut, int8_dense_tnd_workspace)
+{
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+    for (int64_t headDim : {1, 17, 128, 129, 250, 255, 256}) {
+        auto query = TensorDesc({4, 8, headDim}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-8, 8);
+        auto key = TensorDesc({257, 2, headDim}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-8, 8);
+        auto sparseBlockIdx = TensorDesc({2, 4, 3}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0});
+        auto sparseBlockCount = TensorDesc({2, 4}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{1});
+        auto metadata = TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0});
+        auto qDequantScale = TensorDesc({4, 8}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(.01, .1);
+        auto kDequantScale = TensorDesc({2, 257}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(.01, .1);
+        auto vDequantScale = TensorDesc({2, headDim}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(.01, .1);
+        auto pQuantScale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).Value(vector<float>{127.0f});
+        auto cuSeqLengthsQ = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 4});
+        auto cuSeqLengthsKv = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 257});
+        for (int64_t residualBlockMode : {0, 1}) {
+            for (int64_t blockShapeY : {1, 2, 4, 8, 16, 32, 64, 128}) {
+                auto blockShape = IntArrayDesc(vector<int64_t>{1, blockShapeY});
+                auto output = TensorDesc({4, 8, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
+                char layout[] = "TND";
+                auto ut = OP_API_UT(aclnnGenericBlockSparseAttention,
+                                    INPUT(query, key, key, sparseBlockIdx, sparseBlockCount, metadata, nullptr,
+                                          qDequantScale, kDequantScale, vDequantScale, pQuantScale, cuSeqLengthsQ,
+                                          cuSeqLengthsKv, nullptr, nullptr, nullptr, blockShape, layout, layout, 4,
+                                          1.0 / 16, 1, 7, 0.0, 0, -1, -1, 0, residualBlockMode, false),
+                                    OUTPUT(output, nullptr));
+                uint64_t workspaceSize = 0;
+                EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
+            }
+        }
+    }
+}
+
 // ============================================================================
 // Case 2: required query is nullptr
 // ============================================================================
@@ -861,3 +894,40 @@ TEST_F(aclnn_generic_block_sparse_attention_ut, unsupported_query_dtype)
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
+
+TEST_F(aclnn_generic_block_sparse_attention_ut, int8_rejects_fp8_quant_type)
+{
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+    for (int64_t headDim : {128}) {
+        auto query = TensorDesc({4, 8, headDim}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-8, 8);
+        auto key = TensorDesc({257, 2, headDim}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-8, 8);
+        auto sparseBlockIdx = TensorDesc({2, 4, 3}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0});
+        auto sparseBlockCount = TensorDesc({2, 4}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{1});
+        auto metadata = TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0});
+        auto qDequantScale = TensorDesc({4, 8}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(.01, .1);
+        auto kDequantScale = TensorDesc({2, 257}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(.01, .1);
+        auto vDequantScale = TensorDesc({2, headDim}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(.01, .1);
+        auto pQuantScale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).Value(vector<float>{127.0f});
+        auto cuSeqLengthsQ = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 4});
+        auto cuSeqLengthsKv = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 257});
+        for (int64_t residualBlockMode : {0}) {
+            for (int64_t blockShapeY : {4}) {
+                auto blockShape = IntArrayDesc(vector<int64_t>{1, blockShapeY});
+                auto output = TensorDesc({4, 8, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
+                char layout[] = "TND";
+                auto ut = OP_API_UT(aclnnGenericBlockSparseAttention,
+                                    INPUT(query, key, key, sparseBlockIdx, sparseBlockCount, metadata, nullptr,
+                                          qDequantScale, kDequantScale, vDequantScale, pQuantScale, cuSeqLengthsQ,
+                                          cuSeqLengthsKv, nullptr, nullptr, nullptr, blockShape, layout, layout, 4,
+                                          1.0 / 16, 1, 5, 0.0, 0, -1, -1, 0, residualBlockMode, false),
+                                    OUTPUT(output, nullptr));
+                uint64_t workspaceSize = 0;
+                EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_ERR_PARAM_INVALID);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Case 2: required query is nullptr
+// ============================================================================

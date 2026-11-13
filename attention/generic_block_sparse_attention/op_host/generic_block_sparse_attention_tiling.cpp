@@ -9,6 +9,8 @@
  */
 
 #include "generic_block_sparse_attention_tiling.h"
+#include "../op_kernel/arch22/gbsa_full_quant_utils.hpp"
+#include <initializer_list>
 #include <cmath>
 #include <cstring>
 #include <cstdint>
@@ -142,6 +144,7 @@ constexpr uint64_t GBSA_MXFP8_TND_PA_BNBD_DISPATCH_BASE = 9250002900000054ULL;
 constexpr uint32_t GBSA_MXFP8_COALESCED_PREFILL_MIN_TOKENS = 1024U;
 constexpr uint32_t GBSA_MXFP8_COALESCED_PREFILL_MAX_TOKENS = 8192U;
 
+constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
 constexpr int64_t GBSA_WIN_DISABLED = -1;
 constexpr float GBSA_DST_TYPE_MAX_DISABLED = 0.0f;
 constexpr uint32_t GSA_FD_MAX_ACTIVE_CORE_NUM = 32U;        // Maximum AIC cores used by FD.
@@ -177,6 +180,13 @@ ge::graphStatus GBSATiling::GetNpuInfo(gert::TilingContext* context)
 }
 
 namespace {
+
+bool SupportsFdTopK(uint32_t topK, bool isArch35)
+{
+    constexpr uint32_t minTopK = 12U;
+    constexpr uint32_t arch22MaxFdTopK = 512U;
+    return topK >= minTopK && (isArch35 || topK <= arch22MaxFdTopK);
+}
 
 ge::graphStatus ParseBlockShapeAttr(gert::TilingContext* context,
                                     const gert::TypedContinuousVector<int64_t>* blockShapeArr, uint32_t& blockShapeX,
@@ -270,9 +280,9 @@ ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext* context)
         quantType_ = *quantTypePtr;
     }
     if (quantType_ != GBSA_QUANT_TYPE_NONE && quantType_ != GBSA_QUANT_TYPE_FULL &&
-        quantType_ != GBSA_QUANT_TYPE_MXFP8) {
+        quantType_ != GBSA_QUANT_TYPE_MXFP8 && quantType_ != GBSA_QUANT_TYPE_INT8) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "quantType", std::to_string(quantType_).c_str(),
-                                              "only 0 (none), 5 (FP8) or 6 (MXFP8) are supported");
+                                              "only 0 (none), 5 (FP8) or 6 (A5 MXFP8) or 7 (A2/A3 INT8) are supported");
         return ge::GRAPH_FAILED;
     }
 
@@ -293,11 +303,12 @@ ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext* context)
     }
     const bool residualModeSupported =
         residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_NONE ||
-        (residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_FORCE && quantType_ == GBSA_QUANT_TYPE_NONE);
+        (residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_FORCE &&
+         (quantType_ == GBSA_QUANT_TYPE_NONE || (socVer_ != SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_INT8)));
     if (!residualModeSupported) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "residual_block_mode",
                                               std::to_string(residualBlockMode_).c_str(),
-                                              "mode 1 only supports non-quant currently");
+                                              "mode 1 supports non-quant and A2/A3 INT8 full quantization");
         return ge::GRAPH_FAILED;
     }
 
@@ -421,7 +432,7 @@ ge::graphStatus GBSATiling::GetInputLayout(gert::TilingContext* context)
 
 ge::graphStatus GBSATiling::CheckAttentionOutDtype(gert::TilingContext* context)
 {
-    if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
+    if (dataType_ == ge::DT_FLOAT8_E4M3FN || dataType_ == ge::DT_INT8) {
         auto outDesc = context->GetOutputDesc(ATTENTION_OUT_INDEX);
         if (outDesc == nullptr) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "attentionOut", "nullptr",
@@ -434,7 +445,7 @@ ge::graphStatus GBSATiling::CheckAttentionOutDtype(gert::TilingContext* context)
                 context->GetNodeName(), "attentionOut",
                 std::to_string(static_cast<int32_t>(attentionOutDtype_)).c_str(),
                 "the supported dtype of attentionOut is float16 or bfloat16 when the dtype of query/key/value is all "
-                "float8_e4m3fn");
+                "float8_e4m3fn or int8");
             return ge::GRAPH_FAILED;
         }
     }
@@ -780,12 +791,7 @@ ge::graphStatus GBSATiling::ParseSparseTensors(gert::TilingContext* context)
             "for blockShapeX=1, totalQBlocks must equal the Q storage token capacity and topK must be positive");
         return ge::GRAPH_FAILED;
     }
-    // Arch35 non-quant / FP8 (incl. Union) and MXFP8 use INT32_MAX; keep 256 only for legacy non-950 FP8.
-    constexpr int64_t GBSA_LEGACY_MAX_TOPK = 256;
-    const int64_t maxTopK = quantType_ == GBSA_QUANT_TYPE_NONE || socVer_ == SOC_VER_950_CODE ?
-                                std::numeric_limits<int32_t>::max() :
-                                GBSA_LEGACY_MAX_TOPK;
-
+    const int64_t maxTopK = std::numeric_limits<int32_t>::max();
     if (topK > maxTopK) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             context->GetNodeName(), "sparseBlockIdx",
@@ -907,10 +913,11 @@ ge::graphStatus GBSATiling::ParseQkvDtype(gert::TilingContext* context)
             "the dtypes of query/key/value must match");
         return ge::GRAPH_FAILED;
     }
-    if (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16 && dataType_ != ge::DT_FLOAT8_E4M3FN) {
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "query",
-                                              std::to_string(static_cast<int32_t>(dataType_)).c_str(),
-                                              "only float16/bfloat16/float8_e4m3fn are supported for query/key/value");
+    if (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16 && dataType_ != ge::DT_FLOAT8_E4M3FN &&
+        dataType_ != ge::DT_INT8) {
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            context->GetNodeName(), "query", std::to_string(static_cast<int32_t>(dataType_)).c_str(),
+            "only float16/bfloat16/float8_e4m3fn/int8 are supported for query/key/value");
         return ge::GRAPH_FAILED;
     }
     // Legacy per-tensor FP8 (quantType=5) only instantiates PA_BBND; Union FP8 allows PA_BNBD.
@@ -943,7 +950,17 @@ ge::graphStatus GBSATiling::ParseInputTensors(gert::TilingContext* context)
 ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
 {
     uint64_t pipelineWorkspaceSize = 0;
-    if (socVer_ != SOC_VER_950_CODE) {
+    if (dataType_ == ge::DT_INT8) {
+        using Int8Layout = GbsaKernelArch22::Int8::FullQuantLayout;
+        const uint64_t rows = qBaseTile_;
+        mm1OutSize_ =
+            static_cast<uint64_t>(blockDim_) * Int8Layout::STAGES * rows * Int8Layout::KV_TILE * sizeof(int32_t);
+        smOnlineOutSize_ = static_cast<uint64_t>(blockDim_) * Int8Layout::STAGES * rows * Int8Layout::KV_TILE;
+        mm2OutSize_ =
+            static_cast<uint64_t>(blockDim_) * Int8Layout::STAGES * rows * Int8Layout::HEAD_DIM * sizeof(int32_t);
+        updateSize_ = 0;
+        pipelineWorkspaceSize = mm1OutSize_ + smOnlineOutSize_ + mm2OutSize_;
+    } else if (socVer_ != SOC_VER_950_CODE) {
         constexpr uint32_t WORKSPACE_BLOCK_SIZE_DB = 131072;
         constexpr uint32_t NUM3 = 3;
         mm1OutSize_ = static_cast<uint64_t>(blockDim_) * WORKSPACE_BLOCK_SIZE_DB * sizeof(float) * NUM3;
@@ -1046,6 +1063,30 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
         }
         userWorkspaceSize = fdPartialOOffset_ + partialOSize;
     }
+    // Internal page-NZ KV buffers amortize over long prefill; public input tensors and tiling ABI stay unchanged.
+    if (dataType_ == ge::DT_INT8 && groupSize_ <= 16U && embeddingSize_ >= 64U && embeddingSize_ % 32U == 0U &&
+        totalQTokens_ >= static_cast<uint64_t>(batch_) * 128U &&
+        (!isPaged_ || static_cast<uint64_t>(batch_) * maxBlocksPerBatch_ <=
+                          (totalKvTokens_ + static_cast<uint64_t>(batch_) * 128U) / 128U)) {
+        constexpr uint64_t ALIGNMENT = 512U;
+        const uint64_t paddingTokens = static_cast<uint64_t>(batch_) * 128U;
+        const uint64_t bytesPerToken = static_cast<uint64_t>(kvHeads_) * embeddingSize_;
+        const uint64_t maximum = std::numeric_limits<uint64_t>::max();
+        if (totalKvTokens_ > maximum - paddingTokens ||
+            totalKvTokens_ + paddingTokens > (maximum - (ALIGNMENT - 1U)) / bytesPerToken) {
+            OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttention", "Packed KV workspace size overflow.");
+            return ge::GRAPH_FAILED;
+        }
+        const uint64_t packedTokens =
+            isPaged_ ? static_cast<uint64_t>(batch_) * maxBlocksPerBatch_ * 128U : totalKvTokens_ + paddingTokens;
+        const uint64_t packedBytes = AlignUp(packedTokens * bytesPerToken, ALIGNMENT);
+        if (userWorkspaceSize > maximum - (ALIGNMENT - 1U) ||
+            packedBytes > (maximum - AlignUp(userWorkspaceSize, ALIGNMENT)) / 2U) {
+            OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttention", "Packed KV workspace offset overflow.");
+            return ge::GRAPH_FAILED;
+        }
+        userWorkspaceSize = AlignUp(userWorkspaceSize, ALIGNMENT) + 2U * packedBytes;
+    }
     if (userWorkspaceSize > std::numeric_limits<size_t>::max() - libapiSize_) {
         OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttention", "workspace size overflow.");
         return ge::GRAPH_FAILED;
@@ -1098,6 +1139,29 @@ ge::graphStatus GBSATiling::CheckMetadata(gert::TilingContext* context)
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus CheckInt8Scale(gert::TilingContext* context, uint32_t index,
+                                      std::initializer_list<int64_t> dimensions)
+{
+    const auto* desc = context->GetOptionalInputDesc(index);
+    const auto* shape = context->GetOptionalInputShape(index);
+    if (desc == nullptr || shape == nullptr || desc->GetDataType() != ge::DT_FLOAT ||
+        shape->GetStorageShape().GetDimNum() != dimensions.size()) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "INT8 scale", std::to_string(index).c_str(),
+                                              "all four scale tensors must be provided as FP32 with the required rank");
+        return ge::GRAPH_FAILED;
+    }
+    uint32_t axis = 0;
+    for (const int64_t dimension : dimensions) {
+        if (shape->GetStorageShape().GetDim(axis++) != dimension) {
+            OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                context->GetNodeName(), "INT8 scale", std::to_string(index).c_str(),
+                "scale shape must match the token/head, channel or per-tensor contract");
+            return ge::GRAPH_FAILED;
+        }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext* context)
 {
     if (maskType_ == GBSA_MASK_TYPE_UNION) {
@@ -1127,6 +1191,26 @@ ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext* con
     }
     if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
         return CheckMxfp8Scales(context);
+    }
+    if (dataType_ == ge::DT_INT8) {
+        const auto& key = context->GetInputShape(KEY_INDEX)->GetOriginShape();
+        const auto keyScaleStatus =
+            isPaged_ ?
+                CheckInt8Scale(context, K_DEQUANT_SCALE_INDEX, {key.GetDim(0), kvHeads_, blockSize_}) :
+            layoutKv_ == "TND" ?
+                CheckInt8Scale(context, K_DEQUANT_SCALE_INDEX, {kvHeads_, static_cast<int64_t>(totalKvTokens_)}) :
+                CheckInt8Scale(context, K_DEQUANT_SCALE_INDEX, {batch_, kvHeads_, kvSeqCapacity_});
+        const auto queryScaleStatus =
+            layoutQ_ == "TND" ?
+                CheckInt8Scale(context, Q_DEQUANT_SCALE_INDEX, {static_cast<int64_t>(totalQTokens_), numHeads_}) :
+            layoutQ_ == "BNSD" ? CheckInt8Scale(context, Q_DEQUANT_SCALE_INDEX, {batch_, numHeads_, qSeqCapacity_}) :
+                                 CheckInt8Scale(context, Q_DEQUANT_SCALE_INDEX, {batch_, qSeqCapacity_, numHeads_});
+        if (queryScaleStatus != ge::GRAPH_SUCCESS || keyScaleStatus != ge::GRAPH_SUCCESS ||
+            CheckInt8Scale(context, V_DEQUANT_SCALE_INDEX, {kvHeads_, embeddingSize_}) != ge::GRAPH_SUCCESS ||
+            CheckInt8Scale(context, P_QUANT_SCALE_INDEX, {1}) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+        return ge::GRAPH_SUCCESS;
     }
     if (context->GetOptionalInputTensor(P_QUANT_SCALE_INDEX) != nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "p_quant_scale", "provided",
@@ -1296,8 +1380,87 @@ ge::graphStatus GBSATiling::CheckSoftmaxPrecision(gert::TilingContext* context)
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus GBSATiling::CheckInt8Config(gert::TilingContext* context)
+{
+    if (socVer_ == SOC_VER_950_CODE) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "socVersion", std::to_string(socVer_).c_str(),
+                                              "INT8 quantization is supported only on A2/A3");
+        return ge::GRAPH_FAILED;
+    }
+    if (quantType_ != GBSA_QUANT_TYPE_INT8) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "quantType", std::to_string(quantType_).c_str(),
+                                              "INT8 quantization requires quantType=7");
+        return ge::GRAPH_FAILED;
+    }
+    if (embeddingSize_ == 0U || embeddingSize_ > 256U) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "headDim", std::to_string(embeddingSize_).c_str(),
+                                              "INT8 quantization requires headDim in [1,256]");
+        return ge::GRAPH_FAILED;
+    }
+    if (groupSize_ > 128U) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "groupSize", std::to_string(groupSize_).c_str(),
+                                              "INT8 quantization requires GQA group size <= 128");
+        return ge::GRAPH_FAILED;
+    }
+    if (!isPaged_ && layoutKv_ != layoutQ_) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "kvInputLayout", layoutKv_.c_str(),
+                                              "INT8 dense KV layout must match the Q layout");
+        return ge::GRAPH_FAILED;
+    }
+    if (isPaged_ && layoutKv_ != "PA_BBND" && layoutKv_ != "PA_BNBD") {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "kvInputLayout", layoutKv_.c_str(),
+                                              "INT8 paged KV supports only PA_BBND or PA_BNBD");
+        return ge::GRAPH_FAILED;
+    }
+    if (isPaged_ && blockSize_ != 128U) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "blockSize", std::to_string(blockSize_).c_str(),
+                                              "INT8 paged KV requires page size 128");
+        return ge::GRAPH_FAILED;
+    }
+    if (blockShapeX_ != 1U) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "blockShapeX",
+                                              std::to_string(blockShapeX_).c_str(),
+                                              "INT8 quantization requires blockShapeX=1");
+        return ge::GRAPH_FAILED;
+    }
+    if (blockShapeY_ == 0U || blockShapeY_ > 128U || (blockShapeY_ & (blockShapeY_ - 1U)) != 0U) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "blockShapeY",
+                                              std::to_string(blockShapeY_).c_str(),
+                                              "INT8 quantization requires a power-of-two blockShapeY in [1,128]");
+        return ge::GRAPH_FAILED;
+    }
+    if (maskType_ != 0 && maskType_ != 1) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "maskType", std::to_string(maskType_).c_str(),
+                                              "INT8 quantization supports only maskType=0 or 1");
+        return ge::GRAPH_FAILED;
+    }
+    if (residualBlockMode_ != 0 && residualBlockMode_ != 1) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "residualBlockMode",
+                                              std::to_string(residualBlockMode_).c_str(),
+                                              "INT8 quantization supports only residualBlockMode=0 or 1");
+        return ge::GRAPH_FAILED;
+    }
+    if (softmaxPrecision_ != 0) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "softmaxPrecision",
+                                              std::to_string(softmaxPrecision_).c_str(),
+                                              "INT8 quantization requires softmaxPrecision=0 (FP32 Softmax)");
+        return ge::GRAPH_FAILED;
+    }
+    if (layoutQ_ == "TND" && context->GetOptionalInputTensor(SEQUSED_Q_INDEX) != nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "sequsedQ", "provided",
+                                              "INT8 quantization with TND Q requires sequsedQ=nullptr");
+        return ge::GRAPH_FAILED;
+    }
+    // Reuse the FP16 metadata split-K schedule and FP32 partial-output merge.
+    fdStaticEnabled_ = SupportsFdTopK(topK_, false);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
 {
+    if (dataType_ == ge::DT_INT8) {
+        return CheckInt8Config(context);
+    }
     // Preserve arch22 non-quant capabilities while adding arch35 MXFP8 and Union.
     const bool isMxfp8 = quantType_ == GBSA_QUANT_TYPE_MXFP8;
     const bool isQuant = quantType_ != GBSA_QUANT_TYPE_NONE;
@@ -1313,12 +1476,12 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
     }
     const bool isFp8 = (dataType_ == ge::DT_FLOAT8_E4M3FN);
     const bool isQuant5 = (quantType_ == GBSA_QUANT_TYPE_FULL);
-    if (isFp8 != isQuant) {
+    if (quantType_ == GBSA_QUANT_TYPE_INT8 || isFp8 != isQuant) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
             context->GetNodeName(), "quantType and query/key/value dtype",
             ("quantType=" + std::to_string(quantType_) + ", dtype=" + std::to_string(static_cast<int32_t>(dataType_)))
                 .c_str(),
-            "FP8 requires quantType=5 or 6 with FLOAT8_E4M3FN query/key/value");
+            "Non-INT8 inputs require quantType=0 for FP16/BF16 or quantType=5/6 for FLOAT8_E4M3FN");
         return ge::GRAPH_FAILED;
     }
     if (maskType_ == 0 && isQuant5) {
@@ -1406,7 +1569,6 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
         socVer_ == SOC_VER_950_CODE ?
             (embeddingSize_ == GBSA_TILE_SIZE_128 || ((!isQuant || isMxfp8) && embeddingSize_ <= GBSA_TILE_SIZE_256)) :
             (embeddingSize_ >= 1U && embeddingSize_ <= GBSA_TILE_SIZE_256);
-    // Union never builds FD; others keep master's topK gate.
     fdStaticEnabled_ = maskType_ != GBSA_MASK_TYPE_UNION && topK_ >= 12U && fdHeadDimSupported;
     return ge::GRAPH_SUCCESS;
 }
@@ -1447,6 +1609,10 @@ bool GBSATiling::IsMxfp8PackedPath() const
 
 uint64_t GBSATiling::GenerateTilingKey()
 {
+    if (dataType_ == ge::DT_INT8) {
+        const uint64_t base = attentionOutDtype_ == ge::DT_FLOAT16 ? 9200000071001032ULL : 9200000071001042ULL;
+        return base + (returnSoftmaxlse_ ? GBSA_LSE_OUT_OFFSET : 0ULL);
+    }
     /**
      * BSA-style decimal bitfields (must match op_kernel tilingkey.h):
      * - [0-1]   Q Layout           2=TND, 3=BNSD, 4=BSND
@@ -1754,6 +1920,16 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
             kvBaseTile_ /= 2U;
             CalcMatmulPhaseL1TileInfo950();
         }
+    }
+    if (dataType_ == ge::DT_INT8) {
+        qBaseTile_ = AlignUp(groupSize_, GBSA_TILE_SIZE_16);
+        kvBaseTile_ = 512;
+        mm1L1TileM_ = mm2L1TileM_ = qBaseTile_;
+        mm1L1TileN_ = mm1L1TileKLeft_ = mm1L1TileKRight_ = 256;
+        mm2L1TileN_ = mm2L1TileKLeft_ = mm2L1TileKRight_ = 256;
+        qL1BufNum_ = 1;
+        kL1BufNum_ = vL1BufNum_ = 2;
+        pL1BufNum_ = 3;
     }
     ret = CalculateWorkSpace(context);
     if (ret != ge::GRAPH_SUCCESS) {

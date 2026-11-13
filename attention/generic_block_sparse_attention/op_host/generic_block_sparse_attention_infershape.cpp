@@ -192,13 +192,13 @@ ge::graphStatus InferDataTypeGenericBlockSparseAttention(gert::InferDataTypeCont
         return ge::GRAPH_FAILED;
     }
     auto dtype = context->GetInputDataType(QUERY_INDEX);
-    if (dtype == ge::DT_FLOAT8_E4M3FN) {
-        // FP8 input: derive output dtype from user-provided attentionOut tensor.
+    if (dtype == ge::DT_FLOAT8_E4M3FN || dtype == ge::DT_INT8) {
+        // Quantized input: derive output dtype from user-provided attentionOut tensor.
         dtype = context->GetOutputDataType(ATTENTION_OUT_INDEX);
         if (dtype != ge::DT_FLOAT16 && dtype != ge::DT_BF16) {
             OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                 context->GetNodeName(), "attentionOut", std::to_string(static_cast<int32_t>(dtype)).c_str(),
-                "when query is float8_e4m3fn, the dtype of attentionOut must be float16 or bfloat16");
+                "when query is float8_e4m3fn or int8, attentionOut must be float16 or bfloat16");
             return ge::GRAPH_FAILED;
         }
     }
