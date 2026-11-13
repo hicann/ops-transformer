@@ -73,7 +73,7 @@ public:
     static constexpr uint32_t vec1Srcstride = (s1BaseSize >> 1) + 1;
     static constexpr uint32_t dVTemplateType = 512;
     static constexpr uint32_t dTemplateAlign64 = Align64Func(dVTemplateType);
-    static constexpr uint32_t dVTemplateTypeInput = 608; // Dsize
+    static constexpr uint32_t dVTemplateTypeInput = 608; // 608: rope(64 * 2) + nope(448) + scale(7 * 2) + pad(18)
     static constexpr uint32_t v0BufferDSize = 640;
     static constexpr uint32_t dCombineBytes = 576; // rope(64 * 2) + nope(448)
     static constexpr uint32_t scaleBytes = 8;

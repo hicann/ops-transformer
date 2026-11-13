@@ -79,8 +79,8 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
         static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
                                perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                                perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
-                              tilingInfo->kvLayout == MQSMLALayout::PA_BBND && tilingInfo->topkValueMode == 1 &&
-                              blockSizeSupported && vectorizeUbSize <= UB_SIZE);
+                              tilingInfo->kvLayout == MQSMLALayout::PA_BBND && tilingInfo->quantMode == 1 &&
+                              tilingInfo->topkValueMode == 1 && blockSizeSupported && vectorizeUbSize <= UB_SIZE);
 
     size_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     bool isSplitG = tilingInfo->gSize > M_BASE_SIZE; // gSize超过64时采用Split-G
@@ -132,6 +132,7 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
     tilingData_.baseParams.set_sparseBlockSize(tilingInfo->sparseBlockSize);
     tilingData_.baseParams.set_dSize(tilingInfo->dSize);
     tilingData_.baseParams.set_dSizeVInput(tilingInfo->dSizeVInput);
+    tilingData_.baseParams.set_returnSoftmaxLse(tilingInfo->returnSoftmaxLse);
 
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
@@ -143,10 +144,10 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
     uint32_t outputType = static_cast<uint32_t>(tilingInfo->outputType);
     uint32_t qLayout = static_cast<uint32_t>(tilingInfo->qLayout);
     uint32_t inputKvLayout = static_cast<uint32_t>(tilingInfo->kvLayout);
-    uint32_t tilingKey = GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_),
-                                            static_cast<uint32_t>(tilingInfo->gSize > 64),
-                                            ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8),
-                                            vectorizeFlag, static_cast<uint32_t>(tilingInfo->topkValueMode));
+    uint32_t tilingKey = GET_TPL_TILING_KEY(
+        0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_), static_cast<uint32_t>(tilingInfo->gSize > 64),
+        ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8), vectorizeFlag,
+        static_cast<uint32_t>(tilingInfo->topkValueMode), static_cast<uint32_t>(tilingInfo->quantMode));
     context_->SetTilingKey(tilingKey);
     context_->SetScheduleMode(1);
 

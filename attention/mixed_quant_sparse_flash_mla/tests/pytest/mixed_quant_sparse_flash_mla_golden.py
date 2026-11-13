@@ -544,6 +544,8 @@ class GeneralizedSFAQuant:
                         )
                         if empty_flag is not True:
                             cur_ori_k_bnsd = cur_ori_k
+                        else:
+                            cur_ori_k_bnsd = ori_k_bnsd[i_B, i_N2, :0, :]
                         cur_cmp_k = []
                         empty_flag = True
                     elif (
@@ -575,6 +577,8 @@ class GeneralizedSFAQuant:
                         )
                         if ori_empty_flag is not True:
                             cur_ori_k_bnsd = cur_ori_k
+                        else:
+                            cur_ori_k_bnsd = ori_k_bnsd[i_B, i_N2, :0, :]
                         if cmp_empty_flag is True:
                             cur_cmp_k = []
                         empty_flag = cmp_empty_flag

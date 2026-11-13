@@ -645,7 +645,6 @@ void MQSMLAInfoParser::GenerateInfo(MQSMLATilingInfo& mqsmlaInfo)
     mqsmlaInfo.outLayout = mqsmlaOutputLayout_;
     mqsmlaInfo.returnSoftmaxLse = (mqsmlaParams_.returnSoftmaxLse != nullptr) ? *mqsmlaParams_.returnSoftmaxLse : false;
     if (npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
-        mqsmlaInfo.returnSoftmaxLse = false;
         mqsmlaInfo.tileSize = DEFAULT_TILE_SIZE_A6;
     }
 }

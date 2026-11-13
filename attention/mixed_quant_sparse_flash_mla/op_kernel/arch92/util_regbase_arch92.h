@@ -34,6 +34,7 @@ enum class VselrIndexEnum {
     int64_t s1oIdx; \
     int64_t n2oIdx; \
     int64_t goIdx; \
+    int64_t gSplitSize; \
     int64_t s2LoopEndIdx;       /* S2方向的循环控制信息 souter层确定 */ \
     int64_t s2LineStartIdx = 0; /* S2方向按行的起始位置 */ \
     int64_t s2LineOriEndIdx;    /* S2方向按行的结束位置 */ \
@@ -133,6 +134,7 @@ struct RunInfo {
 };
 
 struct ConstInfo {
+    bool isSoftmaxLseEnable;
     bool isActualLenDimsKVNull;
     uint32_t sparseBlockCount;
     SMLA_CONST_INFO_COMMON_FIELDS;

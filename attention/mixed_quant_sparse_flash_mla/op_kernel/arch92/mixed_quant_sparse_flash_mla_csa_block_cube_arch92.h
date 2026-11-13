@@ -354,24 +354,26 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
     fixpipeParams.params.dstNdStride = 0;
+    // MatmulN packs L0C segments using the actual M aligned to 16 rows.
+    const uint32_t resultSegmentStride = Align16Func(runInfo.mRealSize) * (constInfo.dSizeV / NUM_4);
     outputBuf.WaitCrossCore();
     Fixpipe<T, T, PFA_CFG_ROW_MAJOR_UB>(outputBuf.template GetTensor<T>(),
-                                        mm2ResL0C.GetTensor<T>(s1BaseSize * constInfo.dSizeV / NUM_4 * 0),
+                                        mm2ResL0C.GetTensor<T>(resultSegmentStride * 0),
                                         fixpipeParams); // 将matmul结果从L0C搬运到UB
     outputBuf.SetCrossCore();
     outputBuf1.WaitCrossCore();
     Fixpipe<T, T, PFA_CFG_ROW_MAJOR_UB>(outputBuf1.template GetTensor<T>(),
-                                        mm2ResL0C.GetTensor<T>(s1BaseSize * constInfo.dSizeV / NUM_4 * NUM_1),
+                                        mm2ResL0C.GetTensor<T>(resultSegmentStride * NUM_1),
                                         fixpipeParams); // 将matmul结果从L0C搬运到UB
     outputBuf1.SetCrossCore();
     outputBuf.WaitCrossCore();
     Fixpipe<T, T, PFA_CFG_ROW_MAJOR_UB>(outputBuf.template GetTensor<T>(),
-                                        mm2ResL0C.GetTensor<T>(s1BaseSize * constInfo.dSizeV / NUM_4 * NUM_2),
+                                        mm2ResL0C.GetTensor<T>(resultSegmentStride * NUM_2),
                                         fixpipeParams); // 将matmul结果从L0C搬运到UB
     outputBuf.SetCrossCore();
     outputBuf1.WaitCrossCore();
     Fixpipe<T, T, PFA_CFG_ROW_MAJOR_UB>(outputBuf1.template GetTensor<T>(),
-                                        mm2ResL0C.GetTensor<T>(s1BaseSize * constInfo.dSizeV / NUM_4 * NUM_3),
+                                        mm2ResL0C.GetTensor<T>(resultSegmentStride * NUM_3),
                                         fixpipeParams); // 将matmul结果从L0C搬运到UB
     outputBuf1.SetCrossCore();
     mm2ResL0C.Set<HardEvent::FIX_M>(); // 释放

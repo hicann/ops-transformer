@@ -504,9 +504,12 @@ __aicore__ inline TaskDealMode SparseFlashMlaSwaKernel<CubeBlockType, VecBlockTy
 
         runParam.s1oIdx = gS1Cur * runParam.qSNumInOneBlock;
         if constexpr (IS_SPLIT_G) {
-            runParam.goIdx = (aicIdx % 2 == 0) ? 0 : 64;
+            const int64_t halfG = (constInfo.gSize + 1) / 2;
+            runParam.goIdx = (aicIdx % 2 == 0) ? 0 : halfG;
+            runParam.gSplitSize = (aicIdx % 2 == 0) ? halfG : (constInfo.gSize - halfG);
         } else {
             runParam.goIdx = 0;
+            runParam.gSplitSize = constInfo.gSize;
         }
 
         // 增加 S1 无效行跳过
@@ -540,9 +543,12 @@ __aicore__ inline TaskDealMode SparseFlashMlaSwaKernel<CubeBlockType, VecBlockTy
 
         runParam.s1oIdx = gS1Cur * runParam.qSNumInOneBlock;
         if constexpr (IS_SPLIT_G) {
-            runParam.goIdx = (aicIdx % 2 == 0) ? 0 : 64;
+            const int64_t halfG = (constInfo.gSize + 1) / 2;
+            runParam.goIdx = (aicIdx % 2 == 0) ? 0 : halfG;
+            runParam.gSplitSize = (aicIdx % 2 == 0) ? halfG : (constInfo.gSize - halfG);
         } else {
             runParam.goIdx = 0;
+            runParam.gSplitSize = constInfo.gSize;
         }
 
         if (gS1Cur >= runParam.gs1LoopEndIdx) {

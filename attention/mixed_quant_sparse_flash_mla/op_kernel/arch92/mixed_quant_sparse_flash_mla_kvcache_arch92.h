@@ -70,8 +70,7 @@ __aicore__ inline void GetSingleCoreParam(
                 actualS2CmpSize = actualS2OriSize / constInfo.cmpRatio;
             }
         } else {
-            actualS2CmpSize =
-                (!hasActualSeqCmpKvlen) ? (actualS2OriSize / constInfo.cmpRatio) : actualSeqCmpKvlenGm.GetValue(bIdx);
+            actualS2CmpSize = (!hasActualSeqCmpKvlen) ? constInfo.cmpS2Size : actualSeqCmpKvlenGm.GetValue(bIdx);
         }
     }
 
@@ -184,7 +183,7 @@ __aicore__ inline void ComputeSouterParam(RunParamStr& runParam, const ConstInfo
         runParam.s1RealSize = Min(runParam.qSNumInOneBlock, runParam.actualS1Size - cubeSOuterOffset);
         runParam.mRealSize = runParam.s1RealSize * constInfo.gSize;
         if constexpr (IS_SPLIT_G) {
-            runParam.mRealSize = runParam.mRealSize >> 1;
+            runParam.mRealSize = runParam.s1RealSize * runParam.gSplitSize;
         }
     }
 
@@ -228,6 +227,20 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr& runParam, const ConstIn
         }
         if (constInfo.subBlockIdx == 1) {
             runParam.attentionOutOffset += runParam.halfMRealSize * constInfo.dSizeV;
+        }
+        if (constInfo.isSoftmaxLseEnable) {
+            if constexpr (LAYOUT_T == MQSMLA_LAYOUT::TND) {
+                runParam.softmaxLseOffset = runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
+                                            (seqOffset + runParam.sOuterOffset) * constInfo.gSize + runParam.goIdx;
+            } else {
+                runParam.softmaxLseOffset =
+                    ((sIdx * constInfo.n2Size + runParam.n2oIdx) * constInfo.s1Size + runParam.sOuterOffset) *
+                        constInfo.gSize +
+                    runParam.goIdx;
+            }
+            if (constInfo.subBlockIdx == 1) {
+                runParam.softmaxLseOffset += runParam.firstHalfMRealSize;
+            }
         }
     }
 }

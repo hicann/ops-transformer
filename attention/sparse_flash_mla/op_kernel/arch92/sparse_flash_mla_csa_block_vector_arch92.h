@@ -689,7 +689,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessSparseKv(
             const int64_t sparseBase = topkBS1Idx + runInfo.s2StartIdx + topkKIdx;
             const int64_t pageStride = runInfo.isCmp ? constInfo.cmpKvStride : constInfo.oriKvStride;
             for (int64_t row = 0; row < s2RealSize; ++row) {
-                const int64_t token = cmpSparseIndicesGm.GetValue(sparseBase + row);
+                const int64_t token = sparseIndicesGm.GetValue(sparseBase + row);
                 const int64_t offset =
                     token < 0 ?
                         -1 :
@@ -818,8 +818,12 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec1(
         }
     } else {
         if (runInfo.s2LoopCount == 0 && isSinks) {
-            int64_t sinksOffset =
-                (GetBlockIdx() & 1) ? (IS_SPLIT_G ? s1BaseSize : constInfo.gSize - runInfo.halfMRealSize) : 0;
+            int64_t sinksOffset = 0;
+            if constexpr (IS_SPLIT_G) {
+                sinksOffset = runInfo.goIdx;
+            } else {
+                sinksOffset = (GetBlockIdx() & 1) ? constInfo.gSize - runInfo.halfMRealSize : 0;
+            }
             LocalTensor<float> sinksUb = this->sinksBuf.template Get<float>();
             InitSoftmaxFromSinks<T>(sumUb, maxUb, sinksUb, sinksOffset, R0, runInfo.halfMRealSize);
         }
