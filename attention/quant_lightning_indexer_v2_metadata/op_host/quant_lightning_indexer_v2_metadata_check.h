@@ -216,7 +216,8 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
                        (strcmp(layoutKOptional, "PA_BBND") == 0),
                    ACLNN_ERR_PARAM_INVALID, "For Ascend 960DT, layout_k must be TND/BSND/PA_BBND, but got %s",
                    layoutKOptional);
-    } else if (socVersion.find("Ascend950") != std::string::npos) { // 校验 A5 参数
+    } else if ((socVersion.find("Ascend950") != std::string::npos) ||
+               (socVersion.find("Ascend350") != std::string::npos)) { // 校验 A5 参数
         // num_heads_q 校验
         CHECK_COND(numHeadsQ >= QLI_V2_NUM_HEADS_Q_LOWER_BOUND && numHeadsQ <= QLI_V2_NUM_HEADS_Q_UPPER_BOUND,
                    ACLNN_ERR_PARAM_INVALID,

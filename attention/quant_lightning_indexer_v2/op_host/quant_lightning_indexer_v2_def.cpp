@@ -183,6 +183,7 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true);
         this->AICore().AddConfig("ascend950", aicore_config_95);
+        this->AICore().AddConfig("ascend350", aicore_config_95);
 
 #ifdef ENABLE_DT_HIFLOAT4
         OpAICoreConfig aicore_config_96;
