@@ -250,7 +250,9 @@ void FlashMlaMetadataCpuKernel::InitLoadBalanceParams()
         if (g * maxSeqlenQ_ <= param.mBaseSize * 2) {
             param.l2Byte = 0U; // 0: disable section splitting
         } else {
-            param.l2Byte = 96U * 1024U * 1024U; // 96MB
+            // Reserve one quarter of Ascend350's 64 MiB L2, matching the existing 950 budget ratio.
+            const uint32_t l2BudgetMiB = socVersion_.find("Ascend350") != std::string::npos ? 48U : 96U;
+            param.l2Byte = l2BudgetMiB * 1024U * 1024U;
         }
     }
     param.fdTolerance = 10; // 10: tolerance block

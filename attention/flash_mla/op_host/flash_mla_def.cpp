@@ -105,6 +105,7 @@ public:
             .ExtendCfgInfo("opFile.value", "flash_mla");
 
         this->AICore().AddConfig("ascend950", aicore_config_95);
+        this->AICore().AddConfig("ascend350", aicore_config_95);
         this->AICore().AddConfig("ascend960dt", aicore_config_95);
     }
 };
