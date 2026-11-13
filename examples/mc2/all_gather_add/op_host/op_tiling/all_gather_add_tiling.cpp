@@ -19,6 +19,7 @@
 #include "tiling/tiling_api.h"
 #include "hccl/hccl_types.h"
 #include "tiling/platform/platform_ascendc.h"
+#include "platform/platform_info.h"
 #include "../../op_kernel/all_gather_add_tiling.h"
 
 using namespace AscendC;
@@ -51,9 +52,11 @@ static ge::graphStatus AllGatherParamsCheck(const gert::TilingContext* context)
 }
 
 // 设置hccl高阶API Tiling结构体
-static void InitHcclParam(AllGatherAddTilingData* tilingData, const char* group)
+static void InitHcclParam(AllGatherAddTilingData* tilingData, const char* group, const std::string& socVersion)
 {
-    std::string algConfig = "AllGather=level0:fullmesh";
+    // std::string algConfig = "AllGather=level0:fullmesh";
+    bool isA3 = (socVersion.find("910_93") != std::string::npos);
+    std::string algConfig = isA3 ? "AllGather=level0:doublering" : "AllGather=level0:fullmesh";
     Mc2CcTilingConfig mc2CcTilingConfig(group, HCCL_CMD_ALLGATHER, algConfig);
     mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling);
     mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling);
@@ -89,7 +92,11 @@ static ge::graphStatus AllGatherAddTilingFunc(gert::TilingContext* context)
     tilingData->gatherTileElemNum = tilingData->totalElemNum / rankSize / tilingData->commTurn; // 每轮通信的数据长度
 
     auto group = context->GetAttrs()->GetAttrPointer<char>(static_cast<int>(0));
-    InitHcclParam(tilingData, group);
+    auto platformInfo = context->GetPlatformInfo();
+    std::string socVersion;
+    platformInfo->GetPlatformResWithLock("version", "Short_SoC_version", socVersion);
+    InitHcclParam(tilingData, group, socVersion);
+    // InitHcclParam(tilingData, group);
     return ge::GRAPH_SUCCESS;
 }
 
