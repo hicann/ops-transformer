@@ -101,16 +101,17 @@ class Kernel {
 
     __aicore__ inline void FilterPatterns()
     {
-        for (uint64_t head = 0; head < info_.tiling->kvHeadNum; ++head) {
-            queryCache_ = {};
-            for (uint64_t token = info_.vcore; token < info_.tq; token += info_.tiling->cubeCoreNum * AIV_PER_CUBE) {
-                uint64_t batch, qlocal, kbase, qlen, klen;
-                if (!QueryInfo(token, batch, qlocal, kbase, qlen, klen)) {
-                    continue;
-                }
-                uint64_t row = (batch * info_.tiling->kvHeadNum + head) * info_.tiling->qCapacity + qlocal;
-                vector_.FilterQuery(row, VisibleLength(qlocal, qlen, klen), counts_.GetValue(row));
+        queryCache_ = {};
+        const uint64_t rows = info_.tq * info_.tiling->kvHeadNum;
+        for (uint64_t work = info_.vcore; work < rows; work += info_.tiling->cubeCoreNum * AIV_PER_CUBE) {
+            const uint64_t token = work / info_.tiling->kvHeadNum;
+            const uint64_t head = work % info_.tiling->kvHeadNum;
+            uint64_t batch, qlocal, kbase, qlen, klen;
+            if (!QueryInfo(token, batch, qlocal, kbase, qlen, klen)) {
+                continue;
             }
+            uint64_t row = (batch * info_.tiling->kvHeadNum + head) * info_.tiling->qCapacity + qlocal;
+            vector_.FilterQuery(row, VisibleLength(qlocal, qlen, klen), counts_.GetValue(row));
         }
         queryCache_ = {};
     }
@@ -316,58 +317,77 @@ public:
         }
         TileTask tasks[PIPELINE_STAGES];
         uint64_t nextTask = 0;
-        for (uint64_t h = 0; h < info_.tiling->kvHeadNum; ++h) {
-            queryCache_ = {};
-            for (uint64_t token = info_.core; token < info_.tq; token += info_.tiling->cubeCoreNum) {
-                uint64_t batch, qlocal, kbase, qlen, klen;
-                if (!QueryInfo(token, batch, qlocal, kbase, qlen, klen)) {
-                    continue;
-                }
-                uint64_t limit = VisibleLength(qlocal, qlen, klen);
-                uint64_t complete = limit / info_.blockSize, tailLen = limit % info_.blockSize;
-                uint64_t perTile = info_.n / info_.blockSize;
-                uint64_t patternRow = (batch * info_.tiling->kvHeadNum + h) * info_.tiling->qCapacity + qlocal;
-                uint64_t quota = static_cast<uint32_t>(filteredCounts_.GetValue(patternRow));
-                uint64_t sparseBase = patternRow * info_.tiling->topK;
-                uint64_t fullTiles = (quota + perTile - 1) / perTile;
-                uint32_t rows = info_.groupRows;
-                uint64_t head = h * info_.tiling->qGroup;
-                if ASCEND_IS_AIV {
-                    // AIV缓存LSE和Di
-                    if (info_.querySlots != SLOT_COUNT) {
-                        vector_.CacheQueryStatsVector(token, head, rows);
-                    }
-                }
-                uint64_t firstTask = nextTask;
-                uint64_t pipelineStart = info_.querySlots == SLOT_COUNT ? 0 : firstTask;
-                for (uint64_t tile = 0; tile < fullTiles + (tailLen != 0); ++tile) {
-                    bool tail = tile == fullTiles;
-                    uint64_t first = tile * perTile;
-                    uint32_t entries = tail ? 0 : Min(perTile, quota - first);
-                    uint32_t selected = tail ? tailLen : entries * info_.blockSize;
-                    auto& current = tasks[nextTask % PIPELINE_STAGES];
-                    current = {
-                        nextTask, token,    head, sparseBase, first,           complete * info_.blockSize,  kbase,
-                        h,        selected, tail, querySlot_, indexOwnerSlot_, static_cast<uint32_t>(quota)};
-                    ProcessGather(current);
-                    ProcessMm12(current, nextTask == firstTask);
-                    if (nextTask > pipelineStart) {
-                        const auto& previous = tasks[(nextTask - 1) % PIPELINE_STAGES];
-                        ProcessSoftmax(previous);
-                        ProcessMm345(previous);
-                    }
-                    if (nextTask - pipelineStart >= 2) {
-                        ProcessScatter(tasks[(nextTask - 2) % PIPELINE_STAGES]);
-                    }
-                    ++nextTask;
-                }
+        const uint64_t queryRows = info_.tq * info_.tiling->kvHeadNum;
+        const uint32_t queryParts = info_.tiling->queryParts;
+        const uint32_t queryGroups = info_.tiling->queryGroups;
+        const uint64_t firstQuery = info_.core < queryGroups * queryParts ? info_.core / queryParts : queryRows;
+        const uint32_t queryPart = info_.core % queryParts;
+        queryCache_ = {};
+        for (uint64_t work = firstQuery; work < queryRows; work += queryGroups) {
+            const uint64_t token = work / info_.tiling->kvHeadNum;
+            const uint64_t h = work % info_.tiling->kvHeadNum;
+            uint64_t batch, qlocal, kbase, qlen, klen;
+            if (!QueryInfo(token, batch, qlocal, kbase, qlen, klen)) {
+                continue;
+            }
+            uint64_t limit = VisibleLength(qlocal, qlen, klen);
+            uint64_t complete = limit / info_.blockSize, tailLen = limit % info_.blockSize;
+            uint64_t perTile = info_.n / info_.blockSize;
+            uint64_t patternRow = (batch * info_.tiling->kvHeadNum + h) * info_.tiling->qCapacity + qlocal;
+            uint64_t quota = static_cast<uint32_t>(filteredCounts_.GetValue(patternRow));
+            uint64_t sparseBase = patternRow * info_.tiling->topK;
+            uint64_t fullTiles = (quota + perTile - 1) / perTile;
+            uint32_t rows = info_.groupRows;
+            uint64_t head = h * info_.tiling->qGroup;
+            if ASCEND_IS_AIV {
+                // AIV缓存LSE和Di
                 if (info_.querySlots != SLOT_COUNT) {
-                    DrainPipeline(tasks, nextTask, firstTask);
+                    vector_.CacheQueryStatsVector(token, head, rows);
                 }
-                if (nextTask != firstTask) {
-                    querySlot_ = (querySlot_ + 1) % info_.querySlots;
-                    indexOwnerSlot_ = (indexOwnerSlot_ + 1) % PIPELINE_STAGES;
+            }
+            uint64_t firstTask = nextTask;
+            uint64_t pipelineStart = info_.querySlots == SLOT_COUNT ? 0 : firstTask;
+            const uint64_t tileCount = fullTiles + (tailLen != 0);
+            const uint64_t tileBegin = tileCount * queryPart / queryParts;
+            const uint64_t tileEnd = tileCount * (queryPart + 1) / queryParts;
+            for (uint64_t tile = tileBegin; tile < tileEnd; ++tile) {
+                bool tail = tile == fullTiles;
+                uint64_t first = tile * perTile;
+                uint32_t entries = tail ? 0 : Min(perTile, quota - first);
+                uint32_t selected = tail ? tailLen : entries * info_.blockSize;
+                auto& current = tasks[nextTask % PIPELINE_STAGES];
+                current = {nextTask,
+                           token,
+                           head,
+                           sparseBase,
+                           first,
+                           complete * info_.blockSize,
+                           kbase,
+                           h,
+                           selected,
+                           tail,
+                           querySlot_,
+                           indexOwnerSlot_,
+                           static_cast<uint32_t>(quota),
+                           nextTask == firstTask};
+                ProcessGather(current);
+                ProcessMm12(current, nextTask == firstTask);
+                if (nextTask > pipelineStart) {
+                    const auto& previous = tasks[(nextTask - 1) % PIPELINE_STAGES];
+                    ProcessSoftmax(previous);
+                    ProcessMm345(previous);
                 }
+                if (nextTask - pipelineStart >= 2) {
+                    ProcessScatter(tasks[(nextTask - 2) % PIPELINE_STAGES]);
+                }
+                ++nextTask;
+            }
+            if (info_.querySlots != SLOT_COUNT) {
+                DrainPipeline(tasks, nextTask, firstTask);
+            }
+            if (nextTask != firstTask) {
+                querySlot_ = (querySlot_ + 1) % info_.querySlots;
+                indexOwnerSlot_ = (indexOwnerSlot_ + 1) % PIPELINE_STAGES;
             }
         }
         if (info_.querySlots == SLOT_COUNT) {

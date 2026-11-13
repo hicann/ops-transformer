@@ -120,6 +120,7 @@ struct TileTask {
     uint32_t selected;
     bool tail;
     uint32_t querySlot, indexSlot, indexCount;
+    bool firstForQuery;
 };
 
 __aicore__ inline uint64_t Min(uint64_t a, uint64_t b)

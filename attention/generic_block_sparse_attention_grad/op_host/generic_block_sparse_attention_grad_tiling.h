@@ -52,6 +52,8 @@ TILING_DATA_FIELD_DEF(float, softmaxScale);
 TILING_DATA_FIELD_DEF(uint32_t, hasUsedQ);
 TILING_DATA_FIELD_DEF(uint32_t, hasUsedKv);
 TILING_DATA_FIELD_DEF(uint64_t, ubSize);
+TILING_DATA_FIELD_DEF(uint32_t, queryParts);
+TILING_DATA_FIELD_DEF(uint32_t, queryGroups);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttentionGrad_2000, QsagTilingDataArch35)
 REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttentionGrad_2001, QsagTilingDataArch35)

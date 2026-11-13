@@ -157,6 +157,12 @@ protected:
             return Fail("QSAG requires a valid UB capacity");
         data_.set_ubSize(ubSize);
         data_.set_cubeCoreNum(cores);
+        const uint64_t queryTokens = s_.layout == 0 ? s_.sq : s_.sq * s_.batch;
+        const uint64_t queryRows = queryTokens * s_.nk;
+        const uint32_t queryParts = queryRows != 0 && queryRows < cores ? cores / queryRows : 1;
+        const uint32_t queryGroups = cores / queryParts;
+        data_.set_queryParts(queryParts);
+        data_.set_queryGroups(queryGroups);
         context_->SetBlockDim(cores);
         context_->SetScheduleMode(1);
         return ge::GRAPH_SUCCESS;

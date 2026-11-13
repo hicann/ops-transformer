@@ -293,16 +293,32 @@ public:
             uint32_t size = Min(info_->transferElements, count - first);
             DataCopyExtParams load{1, static_cast<uint32_t>(size * sizeof(int32_t)), 0, 0, 0};
             DataCopyPad(input, rawIndices_[base + first], load, DataCopyPadExtParams<int32_t>{});
-            Fence<HardEvent::MTE2_S>();
-            uint32_t valid = 0;
-            for (uint32_t i = 0; i < size; ++i) {
-                int32_t block = input.GetValue(i);
-                if (block >= 0 && static_cast<uint64_t>(block) < complete) {
-                    output.SetValue(valid++, block);
+            Fence<HardEvent::MTE2_V>();
+            const uint32_t bound = static_cast<uint32_t>(Min(complete, 0x80000000ULL));
+            auto inputPtr = (__ubuf__ int32_t*)input.GetPhyAddr();
+            auto outputPtr = (__ubuf__ int32_t*)output.GetPhyAddr();
+            __VEC_SCOPE__
+            {
+                using namespace AscendC::Reg;
+                RegTensor<int32_t> values, compressed;
+                UnalignRegForStore unaligned;
+                AscendC::Reg::ClearSpr<AscendC::SpecialPurposeReg::AR>();
+                uint32_t remaining = size;
+                for (uint16_t i = 0; i < static_cast<uint16_t>((size + 63) / 64); ++i) {
+                    MaskReg active = UpdateMask<int32_t>(remaining);
+                    MaskReg validMask;
+                    LoadAlign(values, inputPtr + i * 64);
+                    CompareScalar<uint32_t, CMPMODE::LT>(validMask, (RegTensor<uint32_t>&)values, bound, active);
+                    Squeeze<int32_t, AscendC::Reg::GatherMaskMode::STORE_REG>(compressed, values, validMask);
+                    StoreUnAlign<int32_t, PostLiteral::POST_MODE_UPDATE>(outputPtr, compressed, unaligned);
                 }
+                StoreUnAlignPost(outputPtr, unaligned);
             }
+            Fence<HardEvent::V_S>();
+            const uint32_t valid = AscendC::Reg::GetSpr<AscendC::SpecialPurposeReg::AR>() / sizeof(int32_t);
+            Fence<HardEvent::V_MTE2>();
             if (valid != 0) {
-                Fence<HardEvent::S_MTE3>();
+                Fence<HardEvent::V_MTE3>();
                 DataCopyExtParams store{1, static_cast<uint32_t>(valid * sizeof(int32_t)), 0, 0, 0};
                 DataCopyPad(indices_[base + kept], output, store);
                 Fence<HardEvent::MTE3_S>();
@@ -399,7 +415,7 @@ public:
             topkCache_ = topkSlots_[info_->cacheQueryIndices ? task.indexSlot : task.id % PIPELINE_STAGES];
         }
         if (info_->cacheQueryIndices && !task.tail) {
-            if (task.first == 0) {
+            if (task.firstForQuery) {
                 LoadIndices(task.sparseBase, task.indexCount);
             }
             topkCache_ = topkCache_[task.first];

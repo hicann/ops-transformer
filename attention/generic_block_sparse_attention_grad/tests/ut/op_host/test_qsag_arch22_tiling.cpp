@@ -73,7 +73,7 @@ std::vector<TensorDescription> MakeInputs(const std::string& layout, ge::DataTyp
     } else {
         query = {kBatch, kSq, nq, headDim};
         key = {kBatch, kSk, nk, headDim};
-        lse = {kBatch, kSq, nq, 1};
+        lse = {kBatch, nq, kSq, 1};
     }
     const std::vector<int64_t> indices = {kBatch, nk, kQcap, kTopK};
     const std::vector<int64_t> counts = {kBatch, nk, kQcap};
