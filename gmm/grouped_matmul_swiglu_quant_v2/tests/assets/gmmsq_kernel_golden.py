@@ -1,0 +1,21 @@
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+"""TTK KERNEL golden entry point for grouped_matmul_swiglu_quant_v2."""
+
+from pathlib import Path
+from runpy import run_path
+
+
+_SHARED = Path(__file__).resolve().parents[3] / "common/tests/ttk/fused_spec.py"
+_make_spec = run_path(str(_SHARED))["make_spec"]
+KernelSpec = _make_spec("swiglu", "kernel")
+
+
+__spec__ = {
+    "grouped_matmul_swiglu_quant_v2": "KernelSpec",
+}

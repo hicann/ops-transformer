@@ -57,3 +57,42 @@ def quant_grouped_matmul_inplace_add_inputs(
         y,
         pertoken_scale,
     )
+
+
+def _copy_gmmia_input(target, values):
+    if hasattr(target, "new_tensor"):
+        target[...] = target.new_tensor(values)
+    else:
+        target[...] = values
+
+
+def _prepare_gmmia_inputs(
+    x1, x2, scale1, scale2, groups, group_list_type, *, hifloat8=False
+):
+    """Generate block-aligned groups and finite MX scales for all routes."""
+    import math
+
+    experts = int(groups.shape[0])
+    k = x2.shape[0]
+    counts = np.full(experts, (k // 64 // experts) * 64, dtype=np.int64)
+    counts[-1] += k - int(counts.sum())
+    _copy_gmmia_input(groups, counts if group_list_type == 1 else counts.cumsum())
+    if len(scale2.shape) == 3:
+        for scale in (scale1, scale2):
+            shape = tuple(scale.shape)
+            exponents = (np.arange(math.prod(shape)).reshape(shape) % 3) - 1
+            data = (
+                (exponents + 127).astype(np.uint8)
+                if str(scale.dtype).endswith("uint8")
+                else np.exp2(exponents)
+            )
+            _copy_gmmia_input(scale, data)
+    if hifloat8:
+        import en_dtypes
+
+        for value in (x1, x2):
+            shape = tuple(value.shape)
+            numbers = (np.arange(math.prod(shape)).reshape(shape) % 9 - 4).astype(
+                np.float32
+            ) * 0.25
+            _copy_gmmia_input(value, numbers.astype(en_dtypes.hifloat8).view(np.uint8))
