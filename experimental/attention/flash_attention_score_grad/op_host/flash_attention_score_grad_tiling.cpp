@@ -64,17 +64,19 @@ static uint32_t CalculateTschBlockDim(uint32_t sliceNum, uint32_t aicCoreNum, ui
 // tiling func + tiling prepare
 class FlashAttentionScoreGradTiling {
 public:
-
-    ge::graphStatus RunEmptyTiling(gert::TilingContext *context)
+    ge::graphStatus RunEmptyTiling(gert::TilingContext* context)
     {
-        FlashAttentionScoreGradTilingData *tilingData = context->GetTilingData<FlashAttentionScoreGradTilingData>();
+        FlashAttentionScoreGradTilingData* tilingData = context->GetTilingData<FlashAttentionScoreGradTilingData>();
         uint64_t aicNum = 40; // 40: B3 default aicNum
         uint64_t aivNum = 20; // 20: B3 default aivNum
         auto platformInfoPtr = context->GetPlatformInfo();
         if (platformInfoPtr == nullptr) {
-            auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context->GetCompileInfo());
-            OP_CHECK_IF(compilePtr == nullptr, OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-                       return ge::GRAPH_FAILED);
+            auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
+            OP_CHECK_IF(
+                compilePtr == nullptr,
+                OP_LOGE(context,
+                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
+                return ge::GRAPH_FAILED);
             aivNum = compilePtr->aivNum;
             aicNum = compilePtr->aicNum;
         } else {
@@ -82,9 +84,12 @@ public:
             aicNum = ascendcPlatform.GetCoreNumAic();
             aivNum = ascendcPlatform.GetCoreNumAiv();
         }
-        OP_CHECK_IF(aivNum == 0, OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of aiv is 0]"),
-                   return GRAPH_FAILED);
-        uint64_t dqNum = static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DQ)->GetStorageShape().GetShapeSize());
+        OP_CHECK_IF(
+            aivNum == 0,
+            OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of aiv is 0]"),
+            return GRAPH_FAILED);
+        uint64_t dqNum =
+            static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DQ)->GetStorageShape().GetShapeSize());
         if (dqNum % aivNum == 0ULL) {
             tilingData->emptyTensorTilingData.set_formerDqNum(aivNum);
             tilingData->emptyTensorTilingData.set_singleCoreDqNum(dqNum / aivNum);
@@ -94,7 +99,8 @@ public:
             tilingData->emptyTensorTilingData.set_singleCoreDqNum(dqNum / aivNum + 1);
             tilingData->emptyTensorTilingData.set_tailCoreDqNum(dqNum / aivNum);
         }
-        uint64_t dkNum = static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DK)->GetStorageShape().GetShapeSize());
+        uint64_t dkNum =
+            static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DK)->GetStorageShape().GetShapeSize());
         if (dkNum % aivNum == 0ULL) {
             tilingData->emptyTensorTilingData.set_formerDkNum(aivNum);
             tilingData->emptyTensorTilingData.set_singleCoreDkNum(dkNum / aivNum);
@@ -104,7 +110,8 @@ public:
             tilingData->emptyTensorTilingData.set_singleCoreDkNum(dkNum / aivNum + 1);
             tilingData->emptyTensorTilingData.set_tailCoreDkNum(dkNum / aivNum);
         }
-        uint64_t dvNum = static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DV)->GetStorageShape().GetShapeSize());
+        uint64_t dvNum =
+            static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DV)->GetStorageShape().GetShapeSize());
         if (dvNum % aivNum == 0ULL) {
             tilingData->emptyTensorTilingData.set_formerDvNum(aivNum);
             tilingData->emptyTensorTilingData.set_singleCoreDvNum(dvNum / aivNum);
@@ -114,8 +121,9 @@ public:
             tilingData->emptyTensorTilingData.set_singleCoreDvNum(dvNum / aivNum + 1);
             tilingData->emptyTensorTilingData.set_tailCoreDvNum(dvNum / aivNum);
         }
-        const gert::StorageShape *dpseShape = context->GetOutputShape(OUTPUT_IDX_DPSE);
-        uint64_t dpseNum = (dpseShape == nullptr) ? 0 : static_cast<uint64_t>(dpseShape->GetStorageShape().GetShapeSize());
+        const gert::StorageShape* dpseShape = context->GetOutputShape(OUTPUT_IDX_DPSE);
+        uint64_t dpseNum =
+            (dpseShape == nullptr) ? 0 : static_cast<uint64_t>(dpseShape->GetStorageShape().GetShapeSize());
         if (dpseNum % aivNum == 0ULL) {
             tilingData->emptyTensorTilingData.set_formerDpseNum(aivNum);
             tilingData->emptyTensorTilingData.set_singleCoreDpseNum(dpseNum / aivNum);
@@ -130,21 +138,25 @@ public:
         auto sliceNum =
             (dqNum < aivNum && dkNum < aivNum && dpseNum < aivNum) ? std::max(std::max(dqNum, dkNum), dpseNum) : aivNum;
         context->SetBlockDim(CalculateTschBlockDim(sliceNum, aicNum, aivNum));
-        size_t *workspaces = context->GetWorkspaceSizes(1);
+        size_t* workspaces = context->GetWorkspaceSizes(1);
         workspaces[0] = WORKSPACE_SIZE;
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus RunEmptyTilingRegbase(gert::TilingContext *context)
+    ge::graphStatus RunEmptyTilingRegbase(gert::TilingContext* context)
     {
-        fag::FlashAttentionScoreGradEmptyTensorTilingDataRegbase* emptyTensorTilingDataRegbase = context->GetTilingData<fag::FlashAttentionScoreGradEmptyTensorTilingDataRegbase>();
+        fag::FlashAttentionScoreGradEmptyTensorTilingDataRegbase* emptyTensorTilingDataRegbase =
+            context->GetTilingData<fag::FlashAttentionScoreGradEmptyTensorTilingDataRegbase>();
         uint64_t aicNum = 32; // 32: A5 default aicNum
         uint64_t aivNum = 64; // 64: A5 default aivNum
         auto platformInfoPtr = context->GetPlatformInfo();
         if (platformInfoPtr == nullptr) {
-            auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context->GetCompileInfo());
-            OP_CHECK_IF(compilePtr == nullptr, OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-                       return ge::GRAPH_FAILED);
+            auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
+            OP_CHECK_IF(
+                compilePtr == nullptr,
+                OP_LOGE(context,
+                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
+                return ge::GRAPH_FAILED);
             aivNum = compilePtr->aivNum;
             aicNum = compilePtr->aicNum;
         } else {
@@ -152,9 +164,12 @@ public:
             aicNum = ascendcPlatform.GetCoreNumAic();
             aivNum = ascendcPlatform.GetCoreNumAiv();
         }
-        OP_CHECK_IF(aivNum == 0, OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of aiv is 0]"),
-                   return GRAPH_FAILED);
-        uint64_t dqNum = static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DQ)->GetStorageShape().GetShapeSize());
+        OP_CHECK_IF(
+            aivNum == 0,
+            OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of aiv is 0]"),
+            return GRAPH_FAILED);
+        uint64_t dqNum =
+            static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DQ)->GetStorageShape().GetShapeSize());
         if (dqNum % aivNum == 0ULL) {
             emptyTensorTilingDataRegbase->set_formerDqNum(aivNum);
             emptyTensorTilingDataRegbase->set_singleCoreDqNum(dqNum / aivNum);
@@ -164,7 +179,8 @@ public:
             emptyTensorTilingDataRegbase->set_singleCoreDqNum(dqNum / aivNum + 1);
             emptyTensorTilingDataRegbase->set_tailCoreDqNum(dqNum / aivNum);
         }
-        uint64_t dkNum = static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DK)->GetStorageShape().GetShapeSize());
+        uint64_t dkNum =
+            static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DK)->GetStorageShape().GetShapeSize());
         if (dkNum % aivNum == 0ULL) {
             emptyTensorTilingDataRegbase->set_formerDkNum(aivNum);
             emptyTensorTilingDataRegbase->set_singleCoreDkNum(dkNum / aivNum);
@@ -174,7 +190,8 @@ public:
             emptyTensorTilingDataRegbase->set_singleCoreDkNum(dkNum / aivNum + 1);
             emptyTensorTilingDataRegbase->set_tailCoreDkNum(dkNum / aivNum);
         }
-        uint64_t dvNum = static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DV)->GetStorageShape().GetShapeSize());
+        uint64_t dvNum =
+            static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DV)->GetStorageShape().GetShapeSize());
         if (dvNum % aivNum == 0ULL) {
             emptyTensorTilingDataRegbase->set_formerDvNum(aivNum);
             emptyTensorTilingDataRegbase->set_singleCoreDvNum(dvNum / aivNum);
@@ -184,8 +201,9 @@ public:
             emptyTensorTilingDataRegbase->set_singleCoreDvNum(dvNum / aivNum + 1);
             emptyTensorTilingDataRegbase->set_tailCoreDvNum(dvNum / aivNum);
         }
-        const gert::StorageShape *dpseShape = context->GetOutputShape(OUTPUT_IDX_DPSE);
-        uint64_t dpseNum = (dpseShape == nullptr) ? 0 : static_cast<uint64_t>(dpseShape->GetStorageShape().GetShapeSize());
+        const gert::StorageShape* dpseShape = context->GetOutputShape(OUTPUT_IDX_DPSE);
+        uint64_t dpseNum =
+            (dpseShape == nullptr) ? 0 : static_cast<uint64_t>(dpseShape->GetStorageShape().GetShapeSize());
         if (dpseNum % aivNum == 0ULL) {
             emptyTensorTilingDataRegbase->set_formerDpseNum(aivNum);
             emptyTensorTilingDataRegbase->set_singleCoreDpseNum(dpseNum / aivNum);
@@ -197,9 +215,10 @@ public:
         }
 
         // rope场景清零的处理
-        const gert::StorageShape *dqRopeShape = context->GetOutputShape(OUTPUT_IDX_DQ_ROPE);
-        const gert::StorageShape *dkRopeShape = context->GetOutputShape(OUTPUT_IDX_DK_ROPE);
-        uint64_t dqRopeNum = (dqRopeShape == nullptr) ? 0 : static_cast<uint64_t>(dqRopeShape->GetStorageShape().GetShapeSize());
+        const gert::StorageShape* dqRopeShape = context->GetOutputShape(OUTPUT_IDX_DQ_ROPE);
+        const gert::StorageShape* dkRopeShape = context->GetOutputShape(OUTPUT_IDX_DK_ROPE);
+        uint64_t dqRopeNum =
+            (dqRopeShape == nullptr) ? 0 : static_cast<uint64_t>(dqRopeShape->GetStorageShape().GetShapeSize());
         dqRopeNum = (dqRopeNum < SMLEST_ROPE_SIZE) ? 0 : dqRopeNum;
         if (dqRopeNum % aivNum == 0ULL) {
             emptyTensorTilingDataRegbase->set_formerDqRopeNum(aivNum);
@@ -211,7 +230,8 @@ public:
             emptyTensorTilingDataRegbase->set_tailCoreDqRopeNum(dqRopeNum / aivNum);
         }
 
-        uint64_t dkRopeNum = (dkRopeShape == nullptr) ? 0 : static_cast<uint64_t>(dkRopeShape->GetStorageShape().GetShapeSize());
+        uint64_t dkRopeNum =
+            (dkRopeShape == nullptr) ? 0 : static_cast<uint64_t>(dkRopeShape->GetStorageShape().GetShapeSize());
         dkRopeNum = (dkRopeNum < SMLEST_ROPE_SIZE) ? 0 : dkRopeNum;
         if (dkRopeNum % aivNum == 0ULL) {
             emptyTensorTilingDataRegbase->set_formerDkRopeNum(aivNum);
@@ -224,23 +244,24 @@ public:
         }
         emptyTensorTilingDataRegbase->isRope = (dqRopeNum > 0 || dkRopeNum > 0);
 
-        context->SetTilingKey(GET_TPL_TILING_KEY(TILING_KEY_1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, TILING_KEY_1));
+        context->SetTilingKey(
+            GET_TPL_TILING_KEY(TILING_KEY_1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, TILING_KEY_1));
         auto sliceNum =
             (dqNum < aivNum && dkNum < aivNum && dpseNum < aivNum) ? std::max(std::max(dqNum, dkNum), dpseNum) : aivNum;
         context->SetBlockDim(CalculateTschBlockDim(sliceNum, aicNum, aivNum));
-        size_t *workspaces = context->GetWorkspaceSizes(1);
+        size_t* workspaces = context->GetWorkspaceSizes(1);
         workspaces[0] = WORKSPACE_SIZE;
         return ge::GRAPH_SUCCESS;
     }
 };
 
-static bool IsEmptyOutput(gert::TilingContext *context)
+static bool IsEmptyOutput(gert::TilingContext* context)
 {
-    const gert::StorageShape *dqShape = context->GetOutputShape(OUTPUT_IDX_DQ);
-    const gert::StorageShape *dqRopeShape = context->GetOutputShape(OUTPUT_IDX_DQ_ROPE);
-    const gert::StorageShape *dkShape = context->GetOutputShape(OUTPUT_IDX_DK);
-    const gert::StorageShape *dkRopeShape = context->GetOutputShape(OUTPUT_IDX_DK_ROPE);
-    const gert::StorageShape *dvShape = context->GetOutputShape(OUTPUT_IDX_DV);
+    const gert::StorageShape* dqShape = context->GetOutputShape(OUTPUT_IDX_DQ);
+    const gert::StorageShape* dqRopeShape = context->GetOutputShape(OUTPUT_IDX_DQ_ROPE);
+    const gert::StorageShape* dkShape = context->GetOutputShape(OUTPUT_IDX_DK);
+    const gert::StorageShape* dkRopeShape = context->GetOutputShape(OUTPUT_IDX_DK_ROPE);
+    const gert::StorageShape* dvShape = context->GetOutputShape(OUTPUT_IDX_DV);
     if (dqShape != nullptr && dkShape != nullptr && dvShape != nullptr) {
         if (dqShape->GetStorageShape().GetShapeSize() == 0 || dkShape->GetStorageShape().GetShapeSize() == 0 ||
             dvShape->GetStorageShape().GetShapeSize() == 0) {
@@ -255,7 +276,7 @@ static bool IsEmptyOutput(gert::TilingContext *context)
     return false;
 }
 
-static ge::graphStatus CheckAttrs(gert::TilingContext *context)
+static ge::graphStatus CheckAttrs(gert::TilingContext* context)
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
@@ -266,7 +287,7 @@ static ge::graphStatus CheckAttrs(gert::TilingContext *context)
     auto nextTokensPtr = attrs->GetAttrPointer<int64_t>(idx++);
     auto n1SizePtr = attrs->GetAttrPointer<uint32_t>(idx++);
     auto inputLayoutPtr = attrs->GetAttrPointer<char>(idx++);
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
 
     OP_CHECK_NULL_WITH_CONTEXT(context, scaleValuePtr);
     OP_CHECK_NULL_WITH_CONTEXT(context, keepProbPtr);
@@ -278,113 +299,134 @@ static ge::graphStatus CheckAttrs(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckBaseInput(gert::TilingContext *context){
-    auto &queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-    auto &keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
-    auto &valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
+static ge::graphStatus CheckBaseInput(gert::TilingContext* context)
+{
+    auto& queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+    auto& keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+    auto& valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
     int64_t headNum = *context->GetAttrs()->GetAttrPointer<int>(HEAD_NUM_IDX);
-    OP_CHECK_IF(headNum == 0,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "headNum",
-                    std::to_string(headNum).c_str(), "The value of headNum must be greater than 0"),
-                return ge::GRAPH_FAILED);
-    const char *inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
+    OP_CHECK_IF(
+        headNum == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "headNum", std::to_string(headNum).c_str(),
+                                              "The value of headNum must be greater than 0"),
+        return ge::GRAPH_FAILED);
+    const char* inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
     if (strlen(inputLayout) == 3) { // 3: BSH or SBH or TND
         if (inputLayout[0] == 'B') {
             // layout is BSH
             std::string shapeMsg = "{" + Ops::Base::ToString(queryShape) + ", " + Ops::Base::ToString(keyShape) + "}";
             OP_CHECK_IF((queryShape.GetDim(0) != keyShape.GetDim(0)),
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query, keyIn", shapeMsg.c_str(),
-                    "When inputLayout is BSH, b axis of query must be equal to b axis of keyIn"),
-                return ge::GRAPH_FAILED);
-            std::string reasonMsg = "When inputLayout is BSH, h axis of query must be exactly divisible " +
-                                    std::to_string(headNum);
-            OP_CHECK_IF(queryShape.GetDim(2) % headNum != 0,
+                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                            "FlashAttentionScoreGrad", "query, keyIn", shapeMsg.c_str(),
+                            "When inputLayout is BSH, b axis of query must be equal to b axis of keyIn"),
+                        return ge::GRAPH_FAILED);
+            std::string reasonMsg =
+                "When inputLayout is BSH, h axis of query must be exactly divisible " + std::to_string(headNum);
+            OP_CHECK_IF(
+                queryShape.GetDim(2) % headNum != 0,
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query",
-                    Ops::Base::ToString(queryShape).c_str(), reasonMsg.c_str()),
+                                                       Ops::Base::ToString(queryShape).c_str(), reasonMsg.c_str()),
                 return ge::GRAPH_FAILED);
         } else if (inputLayout[0] == 'T') { // TND  N1 != N2
-            std::string reasonMsg = "When inputLayout is TND, n axis of query must be equal to " +
-                                    std::to_string(headNum);
-            OP_CHECK_IF(headNum != queryShape.GetDim(1),
+            std::string reasonMsg =
+                "When inputLayout is TND, n axis of query must be equal to " + std::to_string(headNum);
+            OP_CHECK_IF(
+                headNum != queryShape.GetDim(1),
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query",
-                    Ops::Base::ToString(queryShape).c_str(), reasonMsg.c_str()),
+                                                       Ops::Base::ToString(queryShape).c_str(), reasonMsg.c_str()),
                 return ge::GRAPH_FAILED);
             return ge::SUCCESS;
         } else {
             // layout is SBH
             std::string shapeMsg = "{" + Ops::Base::ToString(queryShape) + ", " + Ops::Base::ToString(keyShape) + "}";
             OP_CHECK_IF((queryShape.GetDim(1) != keyShape.GetDim(1)),
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query, keyIn", shapeMsg.c_str(),
-                    "When inputLayout is SBH, b axis of query must be equal to b axis of keyIn"),
-                return ge::GRAPH_FAILED);
-            std::string reasonMsg = "When inputLayout is SBH, h axis of query must be exactly divisible " +
-                                    std::to_string(headNum);
-            OP_CHECK_IF(queryShape.GetDim(2) % headNum != 0,
+                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                            "FlashAttentionScoreGrad", "query, keyIn", shapeMsg.c_str(),
+                            "When inputLayout is SBH, b axis of query must be equal to b axis of keyIn"),
+                        return ge::GRAPH_FAILED);
+            std::string reasonMsg =
+                "When inputLayout is SBH, h axis of query must be exactly divisible " + std::to_string(headNum);
+            OP_CHECK_IF(
+                queryShape.GetDim(2) % headNum != 0,
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query",
-                    Ops::Base::ToString(queryShape).c_str(), reasonMsg.c_str()),
+                                                       Ops::Base::ToString(queryShape).c_str(), reasonMsg.c_str()),
                 return ge::GRAPH_FAILED);
         }
         // kD < vD
         std::string kvShapeMsg = "{" + Ops::Base::ToString(keyShape) + ", " + Ops::Base::ToString(valueShape) + "}";
-        OP_CHECK_IF((keyShape.GetDim(2) < valueShape.GetDim(2)),
+        OP_CHECK_IF(
+            (keyShape.GetDim(2) < valueShape.GetDim(2)),
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "keyIn, value", kvShapeMsg.c_str(),
-                "D axis of keyIn cannnot be less than d axis of value"),
+                                                   "D axis of keyIn cannnot be less than d axis of value"),
             return ge::GRAPH_FAILED);
     } else if (strlen(inputLayout) == 4) { // 4: layout is BNSD or BSND
         std::string shapeMsg = "{" + Ops::Base::ToString(queryShape) + ", " + Ops::Base::ToString(keyShape) + "}";
         OP_CHECK_IF((queryShape.GetDim(0) != keyShape.GetDim(0)),
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query, keyIn", shapeMsg.c_str(),
-                "When inputLayout is BNSD or BSND, b axis of query must be equal to b axis of keyIn"),
-            return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        "FlashAttentionScoreGrad", "query, keyIn", shapeMsg.c_str(),
+                        "When inputLayout is BNSD or BSND, b axis of query must be equal to b axis of keyIn"),
+                    return ge::GRAPH_FAILED);
         OP_CHECK_IF((queryShape.GetDim(3) != keyShape.GetDim(3)),
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query, keyIn", shapeMsg.c_str(),
-                "When inputLayout is BNSD or BSND, d axis of query must be equal to d axis of keyIn"),
-            return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        "FlashAttentionScoreGrad", "query, keyIn", shapeMsg.c_str(),
+                        "When inputLayout is BNSD or BSND, d axis of query must be equal to d axis of keyIn"),
+                    return ge::GRAPH_FAILED);
         if (inputLayout[1] == 'N') {
-            std::string qReasonMsg = "When inputLayout is BNSD, n axis of query must be equal to " +
-                                     std::to_string(headNum);
-            OP_CHECK_IF(headNum != queryShape.GetDim(1),
+            std::string qReasonMsg =
+                "When inputLayout is BNSD, n axis of query must be equal to " + std::to_string(headNum);
+            OP_CHECK_IF(
+                headNum != queryShape.GetDim(1),
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query",
-                    Ops::Base::ToString(queryShape).c_str(), qReasonMsg.c_str()),
+                                                       Ops::Base::ToString(queryShape).c_str(), qReasonMsg.c_str()),
                 return ge::GRAPH_FAILED);
         } else {
-            std::string qReasonMsg = "When inputLayout is BSND, n axis of query must be equal to " +
-                                     std::to_string(headNum);
-            OP_CHECK_IF(headNum != queryShape.GetDim(2),
+            std::string qReasonMsg =
+                "When inputLayout is BSND, n axis of query must be equal to " + std::to_string(headNum);
+            OP_CHECK_IF(
+                headNum != queryShape.GetDim(2),
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query",
-                    Ops::Base::ToString(queryShape).c_str(), qReasonMsg.c_str()),
+                                                       Ops::Base::ToString(queryShape).c_str(), qReasonMsg.c_str()),
                 return ge::GRAPH_FAILED);
         }
         std::string kvShapeMsg = "{" + Ops::Base::ToString(keyShape) + ", " + Ops::Base::ToString(valueShape) + "}";
         OP_CHECK_IF((keyShape.GetDim(3) < valueShape.GetDim(3)),
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "keyIn, value", kvShapeMsg.c_str(),
-                "When inputLayout is BNSD, d axis of keyIn cannot be less than d axis of value"),
-            return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        "FlashAttentionScoreGrad", "keyIn, value", kvShapeMsg.c_str(),
+                        "When inputLayout is BNSD, d axis of keyIn cannot be less than d axis of value"),
+                    return ge::GRAPH_FAILED);
     } else {
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout,
-            "BSH or SBH or TND or BSND or BNSD");
+                                   "BSH or SBH or TND or BSND or BNSD");
         return ge::GRAPH_FAILED;
     }
     return ge::SUCCESS;
 }
 
-static ge::graphStatus CheckParams(gert::TilingContext *context)
+static ge::graphStatus CheckParams(gert::TilingContext* context)
 {
-    OP_CHECK_IF(context == nullptr,
-        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckAttrs(context) != ge::GRAPH_SUCCESS,
-               OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [invalid attrs]"), return ge::GRAPH_FAILED);
-    if ((context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX) != nullptr && context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX) == nullptr) ||
-        (context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX) == nullptr && context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX) != nullptr)) {
-        auto &qRShapePtr = context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX)->GetStorageShape();
-        auto &kRShapePtr = context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX)->GetStorageShape();
+    OP_CHECK_IF(
+        context == nullptr,
+        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckAttrs(context) != ge::GRAPH_SUCCESS,
+        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [invalid attrs]"),
+        return ge::GRAPH_FAILED);
+    if ((context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX) != nullptr &&
+         context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX) == nullptr) ||
+        (context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX) == nullptr &&
+         context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX) != nullptr)) {
+        auto& qRShapePtr = context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX)->GetStorageShape();
+        auto& kRShapePtr = context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX)->GetStorageShape();
         std::string qRShape = context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX) != nullptr ?
-                              Ops::Base::ToString(qRShapePtr) : "null";
-        std::string kRShape = context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX) != nullptr ?
-                              Ops::Base::ToString(kRShapePtr) : "null";
+                                  Ops::Base::ToString(qRShapePtr) :
+                                  "null";
+        std::string kRShape =
+            context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX) != nullptr ? Ops::Base::ToString(kRShapePtr) : "null";
         std::string qkRShape = "{" + qRShape + ", " + kRShape + "}";
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "queryRopeOptional, keyRopeOptional",
-            qkRShape.c_str(), "If queryRopeOptional is an empty tensor, keyRopeOptional must also be and empty tensor");
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            "FlashAttentionScoreGrad", "queryRopeOptional, keyRopeOptional", qkRShape.c_str(),
+            "If queryRopeOptional is an empty tensor, keyRopeOptional must also be and empty tensor");
         return ge::GRAPH_FAILED;
     }
 
@@ -397,23 +439,33 @@ static ge::graphStatus CheckParams(gert::TilingContext *context)
             return ge::SUCCESS;
         }
     } else {
-        OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad",
+        OP_LOGE_WITH_INVALID_INPUT(
+            "FlashAttentionScoreGrad",
             "query or keyIn or value or dy or softmaxMaxOptional or softmaxSumOptional or attentionInOptional");
     }
     OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, "
-            "the reason is: [fail to get shape or attr from context]");
+                     "the reason is: [fail to get shape or attr from context]");
     return ge::GRAPH_FAILED;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingContext* context)
 {
     if (CheckParams(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context->GetCompileInfo());
-    OP_CHECK_IF(compilePtr == nullptr, OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-               return ge::GRAPH_FAILED);
+    auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
+    OP_CHECK_IF(
+        compilePtr == nullptr,
+        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
+        return ge::GRAPH_FAILED);
     auto npuArch = compilePtr->npuArch;
+    if (npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) {
+        if (context->GetInputDesc(0)->GetDataType() != ge::DT_HIFLOAT8 || IsEmptyOutput(context)) {
+            OP_LOGE(context, "Experimental arch92 FAG supports non-empty HIFLOAT8 quant inputs only.");
+            return ge::GRAPH_FAILED;
+        }
+        return TilingRegistryArch::GetInstance().DoTilingImpl(context);
+    }
     if (npuArch == NpuArch::DAV_3510) {
         OP_LOGW(context, "Current npu arch is dav-3510.");
         if (IsEmptyOutput(context)) {
@@ -430,18 +482,24 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingConte
     return TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScoreGrad(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScoreGrad(gert::TilingParseContext* context)
 {
-    OP_CHECK_IF(context == nullptr,
-        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"), return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr,
-        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [platformInfoPtr is null]"),
+    OP_CHECK_IF(
+        context == nullptr,
+        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
+        return ge::GRAPH_FAILED);
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
+    OP_CHECK_IF(
+        platformInfoPtr == nullptr,
+        OP_LOGE(context,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [platformInfoPtr is null]"),
         return ge::GRAPH_FAILED);
 
     auto compileInfoPtr = context->GetCompiledInfo<FlashAttentionScoreGradCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr,
-        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compileInfoPtr is null]"),
+    OP_CHECK_IF(
+        compileInfoPtr == nullptr,
+        OP_LOGE(context,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compileInfoPtr is null]"),
         return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
@@ -456,10 +514,10 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScoreGrad(gert::T
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, compileInfoPtr->l2CacheSize);
 
     OP_LOGI(context,
-              "parse TilingParseContext succ. aivNum:%u, aicNum:%u, "
-              "ubSize:%lu, l1Size:%lu, l0aSize:%lu, l0bSize:%lu, l0cSize:%lu, l2CacheSize:%lu",
-              compileInfoPtr->aivNum, compileInfoPtr->aicNum, compileInfoPtr->ubSize, compileInfoPtr->l1Size,
-              compileInfoPtr->l0aSize, compileInfoPtr->l0bSize, compileInfoPtr->l0cSize, compileInfoPtr->l2CacheSize);
+            "parse TilingParseContext succ. aivNum:%u, aicNum:%u, "
+            "ubSize:%lu, l1Size:%lu, l0aSize:%lu, l0bSize:%lu, l0cSize:%lu, l2CacheSize:%lu",
+            compileInfoPtr->aivNum, compileInfoPtr->aicNum, compileInfoPtr->ubSize, compileInfoPtr->l1Size,
+            compileInfoPtr->l0aSize, compileInfoPtr->l0bSize, compileInfoPtr->l0cSize, compileInfoPtr->l2CacheSize);
 
     return ge::GRAPH_SUCCESS;
 }

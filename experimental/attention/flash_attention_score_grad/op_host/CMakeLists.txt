@@ -23,6 +23,20 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
         COMPUTE_UNIT Ascend950PR_9599
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960dt")
+    set(flash_attention_score_grad_apt_depends attention/common CACHE INTERNAL "Dependencies for flash_attention_score_grad")
+    add_ops_compile_options(
+        OP_NAME FlashAttentionScoreGrad
+        COMPUTE_UNIT ascend960dt_968B7
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960pr")
+    set(flash_attention_score_grad_apt_depends attention/common CACHE INTERNAL "Dependencies for flash_attention_score_grad")
+    add_ops_compile_options(
+        OP_NAME FlashAttentionScoreGrad
+        COMPUTE_UNIT Ascend960PR_969A1
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
 endif()
 
 if (BUILD_OPS_RTY_KERNEL)
@@ -46,7 +60,16 @@ else()
         OP_API_INDEPENDENT ON
         # op_api新的地址
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
-        OPTYPE flash_attention_score_grad 
+        OPTYPE flash_attention_score_grad
         ACLNNTYPE aclnn_inner
+    )
+endif()
+
+if (NOT BUILD_OPS_RTY_KERNEL)
+    add_tiling_modules()
+    target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
+        ./arch35/flash_attention_score_grad_tiling_common_regbase.cpp
+        ./arch92/quant/flash_attention_score_grad_tiling_common_regbase_arch92.cpp
+        ./arch92/quant/flash_attention_score_grad_tiling_normal_regbase_arch92.cpp
     )
 endif()
