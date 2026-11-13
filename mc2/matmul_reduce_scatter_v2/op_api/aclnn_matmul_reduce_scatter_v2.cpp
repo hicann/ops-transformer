@@ -90,7 +90,7 @@ static void SetNnopbaseHcclServerTypeByArch(aclOpExecutor* executor, CommType co
     if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2201) {
         NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_MTE);
     } else if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510 ||
-               GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) { // A6无CCU，commMode已在入口拒绝ccu
+               GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) { // A6复用A5路径
         switch (commModeEnum) {
             case CommType::AI_CPU:
                 NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_AICPU);
@@ -507,11 +507,6 @@ aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeA5(const aclTensor* x1, const a
     CommType commModeEnum = CommType::INVALID;
     auto retCommmode = CheckAndSetCommMode(commMode, commModeEnum);
     CHECK_RET(retCommmode == ACLNN_SUCCESS, retCommmode);
-    if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201 && commModeEnum == CommType::CCU) {
-        // A6(ascend960)无CCU引擎，仅支持ai_cpu
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "[MatmulReduceScatterV2] A6 only support commMode \"ai_cpu\".");
-        return ACLNN_ERR_PARAM_INVALID;
-    }
     if (std::strcmp(commMode, "ai_cpu") != 0 && std::strcmp(commMode, "ccu") != 0 &&
         std::strcmp(commMode, GRAPH_CCU_MODE) != 0) {
         OP_LOGE_FOR_INVALID_VALUE("aclnnMatmulReduceScatterV2GetWorkspaceSize", "commMode", commMode,
@@ -711,7 +706,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(void* workspace, uint64_t workspaceSize, 
 
     CommType commModeEnum = CommType::INVALID;
     if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510 ||
-        GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) { // A6复用A5路径(ccu已在入口拒绝)
+        GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) { // A6复用A5路径
         void* arg = NnopbaseGetUserHandle(executor);
         uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
         commModeEnum = static_cast<CommType>(handleVal);

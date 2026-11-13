@@ -17,6 +17,8 @@ namespace Mc2Tiling {
 
 using Mc2Hcom::TOPO_FLAG_NONE;
 using Mc2Hcom::TOPO_FLAG_SINGLE_LEVEL;
+using Mc2Hcom::TOPO_FLAG_L0_1DMESH;
+using Mc2Hcom::TOPO_FLAG_L0_1DMESH_COVER;
 using Mc2Hcom::TOPO_FLAG_L0_MESH_1D_CLOS;
 // 通信数据量
 constexpr uint32_t MIN_DATA_BYTES_ZERO = 0ULL;
@@ -33,6 +35,11 @@ constexpr uint32_t RANK_SIZE_4 = 4;
 constexpr uint32_t RANK_SIZE_8 = 8;
 constexpr uint32_t RANK_SIZE_16 = 16;
 constexpr uint32_t MAX_RANK_SIZE = ~0U;
+// 960dt CCU组网白名单：单层纯fullmesh 1D标志组合（按位与全命中才放行）
+constexpr uint64_t CCU_WHITELIST_FLAGS = TOPO_FLAG_SINGLE_LEVEL | TOPO_FLAG_L0_1DMESH | TOPO_FLAG_L0_1DMESH_COVER;
+// 960dt CCU mesh1D组网rank上限（uint16事件掩码口径）
+constexpr uint32_t CCU_MESH1D_MAX_RANK_SIZE = 16U;
+constexpr char A6_CCU_ALGORITHM[] = "sole[mesh]";
 
 enum CommAlgoPriority : int32_t {
     LOW = 1,
@@ -104,10 +111,51 @@ const Mc2Hcom::CommAlgoEntry* GetReduceScatterCommAlgoTable(uint32_t& count)
     return REDUCE_SCATTER_COMM_ALGO_TABLE;
 }
 
+bool CheckA6CcuCommTopo(const char* opName, const std::string& group, NpuArch arch, uint8_t commEngine)
+{
+    // 机型直接判断（入参arch）：仅960dt（DAV_9201）走组网白名单，其余机型（950等）不干预
+    if (arch != Ops::Base::DAV_9201) {
+        return true;
+    }
+    // 引擎过滤前置：非CCU引擎（ai_cpu/aiv及缺省）全路径零干预
+    if (commEngine != mc2tiling::A5_CCU_ENGINE) {
+        return true;
+    }
+    Mc2Hcom::Mc2TopoInfo topoInfo;
+    uint64_t topoFlags = Mc2Hcom::TOPO_FLAG_NONE;
+    const bool topoValid = Mc2Hcom::Mc2CommAlgoSelector::GetTopoFlags(group.c_str(), topoInfo, topoFlags);
+    // 组网查询失败：fail-closed拦截（根因为组网查询内部错误）
+    if (!topoValid) {
+        OP_LOGE(opName,
+                "Failed to get group topology info for group=%s, CCU engine is not allowed on ascend960dt. "
+                "Please use ai_cpu engine or check the group topology.",
+                group.c_str());
+        return false;
+    }
+    // 组网白名单判定：按位与匹配——纯fullmesh 1D为单层+1DMESH实例存在+1DMESH覆盖（混联/纯CLOS天然缺位不命中）
+    if ((topoFlags & CCU_WHITELIST_FLAGS) != CCU_WHITELIST_FLAGS || topoInfo.userRankSize > CCU_MESH1D_MAX_RANK_SIZE) {
+        std::string reason = "CCU engine on ascend960dt is not allowed (requires single-level pure fullmesh 1D "
+                             "topology within rankSize <= 16), userRankSize=" +
+                             std::to_string(topoInfo.userRankSize) +
+                             ". Please use ai_cpu engine or check the group topology.";
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "comm_mode", "ccu", reason.c_str());
+        return false;
+    }
+    return true;
+}
+
 std::string SelectReduceScatterAlgoName(const std::string& opName, const std::string& group, uint8_t commEngine,
                                         uint64_t orgM, uint64_t orgN, uint64_t dtypeSize, uint32_t rankDim,
-                                        const std::string& defaultAlgoName)
+                                        const std::string& defaultAlgoName, NpuArch npuArch)
 {
+    // A6(DAV_9201)的CCU通信不区分ReduceScatter/AlltoAll，统一使用sole[mesh]；组网仅允许单层纯fullmesh 1D。
+    if (npuArch == Ops::Base::DAV_9201 && commEngine == mc2tiling::A5_CCU_ENGINE) {
+        if (!CheckA6CcuCommTopo(opName.c_str(), group, npuArch, commEngine)) {
+            return "";
+        }
+        OP_LOGI(opName.c_str(), "[SetMc2Hcomm] A6 CCU force algorithm to %s", A6_CCU_ALGORITHM);
+        return A6_CCU_ALGORITHM;
+    }
     uint64_t commDataBytes = Mc2Hcom::CalcCommDataBytes(opName.c_str(), orgM, orgN, dtypeSize);
     OP_LOGI(opName.c_str(),
             "[SetMc2Hcomm] commDataBytes=%llu, orgM=%llu, orgN=%llu, dtypeSize=%llu, rankDim=%u, commEngine=%u",

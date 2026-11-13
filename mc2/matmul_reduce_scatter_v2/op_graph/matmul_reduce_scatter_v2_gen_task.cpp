@@ -13,7 +13,6 @@
  * \brief
  */
 
-#include <set>
 #include "op_graph/mc2_gen_task_ops_utils.h"
 #include "op_graph/mc2_gen_task_ops_utils_arch35.h"
 #include "register/op_impl_registry.h"
@@ -23,14 +22,11 @@
 
 namespace {
 constexpr int64_t MAX_CCU_RANKSIZE = 8;
-// 公共 NPUARCH_A5 包含 A5/A6；MMRS 仅用此局部集合区分 A6 的通信限制。
-const std::set<std::string> NPUARCH_A6 = {std::to_string(static_cast<uint32_t>(Ops::Base::DAV_9201))};
 } // namespace
 
 namespace ops {
 static ge::Status MatmulReduceScatterV2CalcOpParam(gert::ExeResGenerationContext* context)
 {
-    const bool isA6 = IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A6);
     if (IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5)) {
         ge::AscendString comm_mode;
         if (!context->GetStrAttrVal("comm_mode", comm_mode)) {
@@ -40,22 +36,21 @@ static ge::Status MatmulReduceScatterV2CalcOpParam(gert::ExeResGenerationContext
         if (comm_mode == ge::AscendString("ai_cpu")) {
             OPS_LOG_D(context->GetNodeName(), "Do A5 AICPU GenTask CalcOpParam");
             return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, "aicpu kfc server", "kfc_stream");
-        } else if (!isA6 && comm_mode == ge::AscendString("ccu")) {
-            OPS_LOG_D(context->GetNodeName(), "Do A5 CCU GenTask CalcOpParam");
+        } else if (comm_mode == ge::AscendString("ccu")) {
+            OPS_LOG_D(context->GetNodeName(), "Do A5/A6 CCU GenTask CalcOpParam");
             return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, "ccu server", "ccu_stream");
         }
-        OPS_LOG_E(context->GetNodeName(), "Unsupported comm_mode: %s; A5 supports ai_cpu/ccu, A6 supports ai_cpu.",
+        OPS_LOG_E(context->GetNodeName(), "Unsupported comm_mode: %s; A5/A6 supports ai_cpu/ccu.",
                   comm_mode.GetString());
         return ge::GRAPH_FAILED;
     }
-    OPS_LOG_E(context->GetNodeName(), "Only support A5 or A6 (ai_cpu)");
+    OPS_LOG_E(context->GetNodeName(), "Only support A5/A6");
     return ge::GRAPH_FAILED;
 }
 
 static ge::Status MatmulReduceScatterV2GenTask(const gert::ExeResGenerationContext* context,
                                                std::vector<std::vector<uint8_t>>& tasks)
 {
-    const bool isA6 = IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A6);
     if (IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5)) {
         OPS_LOG_D(context->GetNodeName(), "Do A5 GenTaskFunc");
         ge::AscendString comm_mode;
@@ -66,15 +61,15 @@ static ge::Status MatmulReduceScatterV2GenTask(const gert::ExeResGenerationConte
         if (comm_mode == ge::AscendString("ai_cpu")) {
             OPS_LOG_D(context->GetNodeName(), "Do A5 AiCPU GenTaskFunc");
             return Mc2GenTaskOpsUtils::CommonKFCMc2GenTask(context, tasks);
-        } else if (!isA6 && comm_mode == ge::AscendString("ccu")) {
-            OPS_LOG_D(context->GetNodeName(), "Do A5 CCU GenTaskFunc");
+        } else if (comm_mode == ge::AscendString("ccu")) {
+            OPS_LOG_D(context->GetNodeName(), "Do A5/A6 CCU GenTaskFunc");
             return Mc2Arch35GenTaskOpsUtils::Mc2Arch35GenTaskCallBack(context, tasks);
         }
-        OPS_LOG_E(context->GetNodeName(), "Unsupported comm_mode: %s; A5 supports ai_cpu/ccu, A6 supports ai_cpu.",
+        OPS_LOG_E(context->GetNodeName(), "Unsupported comm_mode: %s; A5/A6 supports ai_cpu/ccu.",
                   comm_mode.GetString());
         return ge::GRAPH_FAILED;
     }
-    OPS_LOG_E(context->GetNodeName(), "Only support A5 AICPU/CCU or A6 AICPU");
+    OPS_LOG_E(context->GetNodeName(), "Only support A5/A6 with ai_cpu or ccu");
     return ge::GRAPH_FAILED;
 }
 

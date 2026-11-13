@@ -303,8 +303,8 @@ uint64_t MatmulReduceScatterTilingBase::GetTilingKey() const
 
 bool MatmulReduceScatterTilingBase::IsApaceSupported(mc2tiling::Mc2QuantMode quantMode, bool isHiF4) const
 {
-    // APACE 仅开放 960 的 AICPU 通路，950 沿用原模板。
-    const bool isSupportedArch = npuArch_ == Ops::Base::DAV_9201 && commMode_ == TPL_AICPU_COMM_MODE;
+    // APACE 仅开放 960 通路，950 沿用原模板。
+    const bool isSupportedArch = npuArch_ == Ops::Base::DAV_9201;
     if (!isSupportedArch || args_.isATrans || args_.rankDim > APACE_IMPL_MAX_RANK_DIM ||
         mc2tiling::Mc2TilingUtils::GetDebugMode() != 0) {
         return false;
@@ -446,15 +446,8 @@ bool MatmulReduceScatterTilingBase::CheckAttrInfoValid(uint64_t kValue)
     auto commMode = context_->GetAttrs()->GetAttrPointer<char>(COMMMODE_INDEX);
     OP_TILING_CHECK(commMode == nullptr, OP_LOGE_FOR_INVALID_VALUE(opName_, "commMode", "null", "not null"),
                     return false);
-    if (npuArch_ == Ops::Base::DAV_9201) {
-        // A6(ascend960)无CCU引擎，仅支持ai_cpu(gen_task按attr路由server，ccu必须在此拒绝)
-        OP_TILING_CHECK(std::strcmp(commMode, "ai_cpu") != 0,
-                        OP_LOGE_FOR_INVALID_VALUE(opName_, "commMode", commMode, "\"ai_cpu\""), return false);
-    } else {
-        OP_TILING_CHECK(SUPPORT_COMM_MODE_A5.find(commMode) == SUPPORT_COMM_MODE_A5.end(),
-                        OP_LOGE_FOR_INVALID_VALUE(opName_, "commMode", commMode, "\"ai_cpu\" or \"ccu\""),
-                        return false);
-    }
+    OP_TILING_CHECK(SUPPORT_COMM_MODE_A5.find(commMode) == SUPPORT_COMM_MODE_A5.end(),
+                    OP_LOGE_FOR_INVALID_VALUE(opName_, "commMode", commMode, "\"ai_cpu\" or \"ccu\""), return false);
     return CheckInputScale();
 }
 

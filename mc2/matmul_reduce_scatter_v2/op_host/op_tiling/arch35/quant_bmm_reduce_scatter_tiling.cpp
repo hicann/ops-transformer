@@ -588,12 +588,17 @@ ge::graphStatus QuantBmmReduceScatterTiling::SetMc2Hcomm()
         OP_LOGD(opName_, "[SetCommEngine] Set CommEngine to CCU for quant_bmm_reduce_scatter_tiling.");
     }
     const auto commMode = context_->GetAttrs()->GetAttrPointer<char>(COMMMODE_INDEX);
+    const uint8_t commEngine =
+        (commMode_ == TPL_CCU_COMM_MODE) ? mc2tiling::A5_CCU_ENGINE : mc2tiling::A5_AICPU_TS_ENGINE;
     const bool enablePeerOnly = std::strcmp(commMode, ACLNN_CCU_PEER_ONLY_MODE) == 0;
     // APACE 不使用 PeerOnly 优化，先剔除
     isPeerOnly_ = enablePeerOnly && !usingApaceImpl_ && !isA2APath_ && commMode_ == TPL_CCU_COMM_MODE &&
                   args_.rankDim == PEER_ONLY_RANK_SIZE && quantMode_ != mc2tiling::Mc2QuantMode::PERBLOCK_MODE &&
                   mc2tiling::Mc2TilingUtils::GetDebugMode() == 0;
     if (isPeerOnly_) {
+        OP_TILING_CHECK(!CheckA6CcuCommTopo(opName_, std::string(group), npuArch_, commEngine),
+                        OP_LOGE_WITHOUT_REPORT(opName_, "A6 CCU topo check failed for peer-only path."),
+                        return ge::GRAPH_FAILED);
         mc2CcTilingConfig.SetAlgConfig(PEER_ONLY_ALGORITHM);
         // The paired PeerOnly Matmul kernel writes the local contribution directly to output.
         OP_TILING_CHECK(mc2CcTilingConfig.SetSkipLocalRankCopy(1) != 0,
@@ -601,11 +606,13 @@ ge::graphStatus QuantBmmReduceScatterTiling::SetMc2Hcomm()
     } else {
         // 通信算法统一由算法表管理(组网/卡数/数据量/优先级)：单层Mesh+CLOS混联形态命中具体表项用组网算法，
         // 16p非混联形态命中benchmark优选表项，其余命中通路对应的fullmesh兜底表项；无匹配回退rsConfig
-        uint8_t commEngine =
-            (commMode_ == TPL_CCU_COMM_MODE) ? mc2tiling::A5_CCU_ENGINE : mc2tiling::A5_AICPU_TS_ENGINE;
-        std::string algoName =
-            SelectReduceScatterAlgoName(opName_, group, commEngine, args_.orgMValue, args_.orgNValue,
-                                        args_.outputDtypeSize, static_cast<uint32_t>(args_.rankDim), rsConfig);
+        std::string algoName = SelectReduceScatterAlgoName(opName_, group, commEngine, args_.orgMValue, args_.orgNValue,
+                                                           args_.outputDtypeSize, static_cast<uint32_t>(args_.rankDim),
+                                                           rsConfig, npuArch_);
+        OP_TILING_CHECK(
+            algoName.empty(),
+            OP_LOGE_WITHOUT_REPORT(opName_, "SelectReduceScatterAlgoName failed, empty algo name returned."),
+            return ge::GRAPH_FAILED);
         OP_LOGI(opName_, "[SetMc2Hcomm] selected algoName=%s, group=%s", algoName.c_str(), group);
         mc2CcTilingConfig.SetAlgConfig(algoName);
     }

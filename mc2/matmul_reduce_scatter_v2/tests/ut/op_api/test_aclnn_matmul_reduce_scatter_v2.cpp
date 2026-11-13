@@ -1243,8 +1243,6 @@ enum class Hif4InvalidParam {
     ODD_K,
     ODD_N,
     TRANSPOSE_NN_SCALE,
-    CCU_MODE,
-    CCU_GRAPH_MODE,
     EMPTY_X1,
     EMPTY_X2,
 };
@@ -1271,8 +1269,6 @@ const Hif4ApiInvalidCase HIF4_INVALID_CASES[] = {
     {"OddK", Hif4InvalidParam::ODD_K},
     {"OddN", Hif4InvalidParam::ODD_N},
     {"TransposedNnScale", Hif4InvalidParam::TRANSPOSE_NN_SCALE},
-    {"CcuMode", Hif4InvalidParam::CCU_MODE},
-    {"CcuGraphMode", Hif4InvalidParam::CCU_GRAPH_MODE},
     {"EmptyX1", Hif4InvalidParam::EMPTY_X1},
     {"EmptyX2", Hif4InvalidParam::EMPTY_X2},
 };
@@ -1320,9 +1316,7 @@ void CheckInvalidHif4Input(Hif4InvalidParam invalid)
                                                                        Ops::Transformer::DT_HIFLOAT4_SCALE);
     x2Scale->SetDataType(invalid == Hif4InvalidParam::X2_SCALE_DTYPE ? ge::DT_FLOAT8_E8M0 :
                                                                        Ops::Transformer::DT_HIFLOAT4_SCALE);
-    const char* commMode = invalid == Hif4InvalidParam::CCU_MODE ?
-                               "ccu" :
-                               (invalid == Hif4InvalidParam::CCU_GRAPH_MODE ? "ccu_graph" : "ai_cpu");
+    const char* commMode = "ai_cpu";
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     const auto ret = aclnnMatmulReduceScatterV2GetWorkspaceSize(
