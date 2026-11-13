@@ -212,7 +212,13 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<float>& out_, co
 {
     auto outBuf = (__local_mem__ float*)out_.GetPhyAddr();
     auto inBuf = (__local_mem__ uint16_t*)in.GetPhyAddr();
-    auto bfView = (__local_mem__ bfloat16_t*)out_.GetPhyAddr();
+    // [fix2] bf16 中转 scratch 改用键缓冲 in_(本函数为键的末代消费者, 反解后键即弃):
+    //   原实现以 out_ 原 bf16 视图作 scratch——outBuf/bfView 同址别名, 段 2(regHi)
+    //   的载入与段 1(regF[0]) 的 fp32 store 竞争, 段 2 读到被覆写的字节(实测
+    //   修复段 1 后 outputs[64..) 仍为残留垃圾)。in_ 上每轮 scratch 落在
+    //   [i*128, i*128+128) 键元素区, 恰为本轮已加载完毕的键, 跨轮零别名,
+    //   out_ 的 fp32 store 亦不再触碰 scratch。
+    auto bfView = (__local_mem__ bfloat16_t*)in.GetPhyAddr();
 
     const uint16_t repeatSize = 128;
     uint16_t topkLoopNum = (topK + repeatSize - 1) / repeatSize;
@@ -225,10 +231,9 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<float>& out_, co
         AscendC::Reg::RegTensor<bfloat16_t> regHi;
         AscendC::Reg::RegTensor<float> regF[2];
         AscendC::Reg::MaskReg maskAllB16 = AscendC::Reg::CreateMask<bfloat16_t, AscendC::Reg::MaskPattern::ALL>();
-        AscendC::Reg::MaskReg maskHalfB16 = AscendC::Reg::CreateMask<bfloat16_t, AscendC::Reg::MaskPattern::H>();
         AscendC::Reg::MaskReg maskAllF = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
-        constexpr static Reg::CastTrait castTraitBf16ToFP32 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
-                                                               Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+        constexpr static Reg::CastTrait castTraitBf16ToFP32 = {
+            Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
         UIntSortConstCtx<bfloat16_t> bf16KeyCtx;
         InitUIntSortConstCtx(bf16KeyCtx, maskAllB16);
         for (uint16_t i = 0; i < topkLoopNum; ++i) {
@@ -237,10 +242,20 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<float>& out_, co
             AscendC::Reg::StoreAlign<bfloat16_t, AscendC::Reg::StoreDist::DIST_NORM>(bfView + i * repeatSize, regBf,
                                                                                      maskAllB16);
             AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-            AscendC::Reg::LoadAlign<bfloat16_t>(regLo, bfView + i * repeatSize);
-            AscendC::Reg::LoadAlign<bfloat16_t>(regHi, bfView + i * repeatSize + 64);
-            AscendC::Reg::Cast<float, bfloat16_t, castTraitBf16ToFP32>(regF[0], regLo, maskHalfB16);
-            AscendC::Reg::Cast<float, bfloat16_t, castTraitBf16ToFP32>(regF[1], regHi, maskHalfB16);
+            // [fix] bf16->fp32 展宽 1:1: DIST_UNPACK_B16 展开载入(每 32bit 字一个
+            // 元素)+ maskAllB16 满掩码(镜像 MulWeightQScaleSIMDHalf/LoadKScaleFP16
+            // 已验证 idiom)。原 H 半掩码按"每字取半+非活跃 lane 清零"生效, 实测
+            // 输出退化为源缓冲隔位采样: value[j]=第 2j 池分值(j<32 有效, 其后
+            // 全 0x0000)——fp8(mode0/mxFP8, scoreType=uint16)values 全量错位,
+            // 被 skip_values_compare 掩盖、仅并列仲裁概率性暴露(gen 1277/1347
+            // 与 model {6,8,9} 族 16 例)。UNPACK 每次消费 64 元素, 与 +0/+64
+            // 两段载入及 64 lane fp32 双 store 的原步进算术一致。
+            AscendC::Reg::LoadAlign<bfloat16_t, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(regLo,
+                                                                                         bfView + i * repeatSize);
+            AscendC::Reg::LoadAlign<bfloat16_t, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(regHi,
+                                                                                         bfView + i * repeatSize + 64);
+            AscendC::Reg::Cast<float, bfloat16_t, castTraitBf16ToFP32>(regF[0], regLo, maskAllB16);
+            AscendC::Reg::Cast<float, bfloat16_t, castTraitBf16ToFP32>(regF[1], regHi, maskAllB16);
             AscendC::Reg::StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM>(outBuf + i * repeatSize, regF[0],
                                                                                 maskAllF);
             AscendC::Reg::StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM>(outBuf + i * repeatSize + 64, regF[1],
