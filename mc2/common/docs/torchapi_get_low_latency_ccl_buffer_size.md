@@ -120,7 +120,7 @@ MoeDistributeBuffer.get_low_latency_ccl_buffer_size(world_size, num_max_dispatch
         <td>num_moe_expert</td>
         <td>int</td>
         <td>必选</td>
-        <td>MoE专家数量，取值范围[1, 1024]；对于<term>Ascend 950PR&950DT系列产品</term>，取值范围为[1, 2048]。并且满足以下条件：num_experts % (ep_world_size - shared_expert_rank_num) = 0。</td>
+        <td>MoE专家数量，取值范围[1, 1024]；对于<term>Ascend 950PR&950DT系列产品</term>，取值范围为[1, 2048]。并且满足以下条件：num_moe_expert % (world_size - num_shared_expert_ranks) = 0。</td>
         <td>int</td>
         <td>-</td>
     </tr>

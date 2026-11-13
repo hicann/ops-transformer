@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **接口功能**：将 `partial_block` 与 `block_res` 按 block 维拼接后，完成 RMS 归一化、`norm_weight ⊙ proj_weight` 投影打分、Softmax 加权融合，输出 `hidden_states`。
+- **接口功能**：将 `partial_block` 与 `block_res` 沿逻辑行维（共 $B = N + 1$ 行，前 $N$ 行来自 `block_res`，最后一行来自 `partial_block`）拼接后，完成 RMS 归一化、`norm_weight ⊙ proj_weight` 投影打分、Softmax 加权融合，输出 `hidden_states`。
 
 - **计算公式**：
 
@@ -132,7 +132,7 @@ cann_ops_transformer.block_attention_residuals(
 
 - 确定性说明：默认支持确定性计算。
 
-- Batch一致性说明：默认Batch一致性实现。
+- Batch一致性说明：默认支持Batch一致性实现。
 
 ## 调用示例
 

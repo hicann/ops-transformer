@@ -32,22 +32,22 @@
 - **计算公式**：
 
   - 输入：
-    - $\mathbf{X} \in \mathbb{R}^{\text{Y} \times \text{H}}$：FFN节点上的token数据矩阵，对应入参 `x`。$\text{Y}$ 是本卡需要分发的最大token数量，$\text{H}$ 是隐藏层维度。
+    - $\mathbf{X} \in \mathbb{R}^{\text{Y} \times \text{H}}$：FFN节点上的token数据矩阵，对应入参 `x`。$\text{Y}$ 是本卡需要分发的最大token数量，$\text{H}$ 是隐藏层大小。
     - $\mathbf{S} \in \mathbb{Z}^{\text{Y}}$：每个token所属的Attention Worker索引，对应入参 `session_ids`。取值范围为$[0, \text{attnRankNum}-1]$。
     - $\mathbf{MB} \in \mathbb{Z}^{\text{Y}}$：每个token的microBatch索引，对应入参 `micro_batch_ids`。取值范围为$[0, \text{microBatchNum}-1]$。
     - $\mathbf{T} \in \mathbb{Z}^{\text{Y}}$：每个token在microBatch中的token索引，对应入参 `token_ids`。取值范围为$[0, \text{BS}-1]$。
     - $\mathbf{EO} \in \mathbb{Z}^{\text{Y}}$：每个token在专家维度的偏移，对应入参 `expert_offsets`。取值范围为$[0, \text{expertNumPerToken}-1]$。
     - $\text{N}$：本卡发送的实际token总数，对应入参 `actual_token_num`。取值范围为$[0, \text{Y}]$。
   - 输出：
-    - 无host可见输出。数据通过HCCL窗口发送至目标Attention卡，Attention卡从其CCL窗口中读取token数据。
+    - 无Host可见输出。数据通过HCCL窗口发送至目标Attention卡，Attention卡从该HCCL窗口中读取token数据。
   - 约定：
     - $\text{attnRankNum}$：Attention Worker数量。
     - $\text{ffnRankNum}$：FFN Worker数量。
     - $\text{microBatchNum}$：micro batch数量。
     - $\text{expertNumPerToken}$：每个token对应的专家总数（含共享专家）。
-    - $\text{HS}$：token数据表的隐藏层大小（含scale存储空间），满足$\text{HS} \ge \text{H}$。
+    - $\text{HS}$：Token数据表格的隐藏层大小（含scale存储空间），满足$\text{HS} \ge \text{H}$。
 
-- 计算说明：
+- **计算说明**：
 
     **数据路由**
 
@@ -122,7 +122,7 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
         <td>window_addr</td>
         <td>int</td>
         <td>可选</td>
-        <td>本卡（ffn侧）通信窗口内存的设备地址，与<code>window_size</code>必须成对传入。传入后该内存替代框架内部分配的通信窗口：框架会将其清零一次并注册进通信域，不会分配或释放该内存；调用方需保证该内存在buffer销毁前持续有效。默认值为None，表示由框架内部分配。</td>
+        <td>本卡（FFN侧）通信窗口内存的设备地址，与<code>window_size</code>必须成对传入。传入后该内存替代框架内部分配的通信窗口：框架会将其清零一次并注册进通信域，不会分配或释放该内存；调用方需保证该内存在buffer销毁前持续有效。默认值为None，表示由框架内部分配。</td>
     </tr>
     <tr>
         <td>window_size</td>
@@ -235,7 +235,7 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
 
 ## 返回值说明
 
-无返回值。数据通过HCCL窗口发送至目标Attention卡，无host可见的输出tensor。
+无返回值。数据通过HCCL窗口发送至目标Attention卡，无host可见的输出Tensor。
 
 ## 约束说明
 

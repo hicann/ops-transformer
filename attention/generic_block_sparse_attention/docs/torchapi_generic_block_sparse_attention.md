@@ -189,7 +189,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | max_seqlen_kv | int | 可选 | 允许-1或非负值，不用于推导BSND/BNSD的实际KV长度 | int32 | - | - |
 | layout_q | string | 可选 | 定义输入query张量的布局格式 | string | - | - |
 | layout_kv | string | 可选 | 定义输入key/value张量的布局格式 | string | - | - |
-| layout_sparse_pattern | int | 可选 | 代表输入的sparseBlockIdx、sparseBlockCount的数据排布格式，取值见「layout_sparse_pattern 取值与sparse_block_idx/sparse_block_count的shape对应关系说明」 | int64 | - | - |
+| layout_sparse_pattern | int | 可选 | 代表输入的sparse_block_idx、sparse_block_count的数据排布格式，取值见「layout_sparse_pattern 取值与sparse_block_idx/sparse_block_count的shape对应关系说明」 | int64 | - | - |
 | mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」 | int32 | - | - |
 | quant_mode | int/QuantMode | 可选 | 量化模式，支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」 | int32 | - | - |
 | softmax_precision | int | 可选 | Softmax精度模式 | int32 | - | - |
@@ -221,7 +221,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | block_table | Tensor | 条件必选 | PA_BBND/PA_BNBD必须传入页表；TND/BSND/BNSD KV必须为None | int32 | ND | (B, max_num_blocks_per_seq) |
 | layout_q | string | 可选 | 定义输入query张量的布局格式 | string | - | - |
 | layout_kv | string | 可选 | 定义输入key/value张量的布局格式 | string | - | - |
-| layout_sparse_pattern | int | 可选 | 代表输入的sparseBlockIdx、sparseBlockCount的数据排布格式，取值见「layout_sparse_pattern 取值与sparse_block_idx/sparse_block_count的shape对应关系说明」 | int64 | - | - |
+| layout_sparse_pattern | int | 可选 | 代表输入的sparse_block_idx、sparse_block_count的数据排布格式，取值见「layout_sparse_pattern 取值与sparse_block_idx/sparse_block_count的shape对应关系说明」 | int64 | - | - |
 | softmax_scale | float | 可选 | 可显式设置缩放因子，覆盖默认计算 | float32 | - | - |
 | mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」 | int32 | - | - |
 | quant_mode | int/QuantMode | 可选 | 量化模式，支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」 | int32 | - | - |
@@ -359,7 +359,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 - 入参为空的场景处理：
   - 空Tensor指必选输入和输出的shape size为0,即有任意轴为0。
-  - 触发空tensor的用例将全部拦截报错。
+  - 触发空Tensor的用例将全部拦截报错。
 
 - q、k、v、attention_out校验:
 
@@ -535,7 +535,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 - block_shape=[1,Y]：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的Y支持1、2、4、8、16、32、64、128。
 <!-- end id15 -->
 <!-- npu="950" id16 -->
-- <term>Ascend 950PR&950DT系列产品</term>非量化的Y支持1-128任意整数；量化场景为[1,128]。
+- <term>Ascend 950PR&950DT系列产品</term>非量化的Y支持1～128任意整数；量化场景为[1,128]。
 <!-- end id16 -->
 
 - metadata校验:

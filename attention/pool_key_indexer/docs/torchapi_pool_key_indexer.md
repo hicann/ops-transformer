@@ -42,7 +42,7 @@
 
 - **接口功能**：
 
-  `pool_key_indexer`接口基于一系列操作得到每一个token对应的top-k个位置。与`lightning_indexer`不同，`pool_key_indexer`在Key侧引入了 **池化（Pooling）** 机制，将原始Key序列按`pool_size`个token为一组进行聚合（每个pool为一个token），先在pool级别做TopK选取，再将选中的pool展开为原始token索引。
+  `pool_key_indexer`接口基于一系列操作得到每一个token对应的top-k个位置。与`lightning_indexer`不同，`pool_key_indexer`在Key侧引入了 **池化（Pooling）** 机制，将原始Key序列按`pool_size`个token为一组进行聚合（每个pool为一个token），先在pool级别做top-k选取，再将选中的pool展开为原始token索引。
 
   主要计算过程为：
 

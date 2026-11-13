@@ -211,7 +211,7 @@ cann_ops_transformer.quant_sparse_flash_mla(
 | cmp_ratio | int | 可选 | 表示cmp_kv相对于压缩前KV长度的压缩倍率，可恢复cmp侧mask使用的压缩前KV长度。默认值为1，取值范围1-128 | int32 | - | -
 | ori_mask_mode | int | 可选 | 表示q和ori_kv计算的mask模式。0：No mask。3：rightDownCausal模式。4：sliding window模式。默认值为0 | int32 | - | -
 | cmp_mask_mode | int | 可选 | 表示q和cmp_kv计算的mask模式。0：No mask。3：rightDownCausal模式。默认值为0 | int32 | - | -
-| ori_win_left | int | 可选 | 表示q和ori_kv计算中q对历史token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1 | int32 | - | -
+| ori_win_left | int | 可选 | 表示q和ori_kv计算中q对过去token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1 | int32 | - | -
 | ori_win_right | int | 可选 | 表示q和ori_kv计算中q对未来token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1 | int32 | - | -
 | layout_q | string | 可选 | 表示输入q的布局格式，默认值为BSND | string | - | -
 | layout_kv | string | 可选 | 表示输入ori_kv/cmp_kv的布局格式，默认值为BSND | string | - | -
@@ -242,10 +242,15 @@ cann_ops_transformer.quant_sparse_flash_mla(
   - 调用quant_sparse_flash_mla_metadata时，若主算子传入ori_sparse_indices或cmp_sparse_indices，对应的ori_topk或cmp_topk须等于该索引Tensor的最后一维大小，保证分核与主算子使用相同的索引宽度。
   - cmp_residual_kv配合cmp_ratio使用，可恢复压缩前KV长度。且每个batch的值需要小于cmp_ratio。仅当cmp_mask_mode=3且cmp_ratio!=1时允许传入；当cmp_mask_mode=0或cmp_ratio=1时不允许传入。
   - attention_out：tensor类型，公式中的输出，数据类型支持bfloat16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
-  - return_softmax_lse=False时返回shape为[0]的空tensor；return_softmax_lse=True时返回float32的log-sum-exp结果。
+  - return_softmax_lse=False时返回shape为[1]的值为0的tensor；return_softmax_lse=True时返回float32的log-sum-exp结果。
   - cu_seqlens_q、cu_seqlens_ori_kv、cu_seqlens_cmp_kv须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
   - 当layout_kv为PA_BBND时，ori_kv和cmp_kv支持0轴非连续。
-  - topk_value_mode在A2A3上只支持1，在A5上支持1和2。
+  <!-- npu="950" id7 -->
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>:`topk_value_mode`在上仅支持1。
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
+  - <term>Ascend 950PR&950DT系列产品</term>：`topk_value_mode`上支持1和2。
+  <!-- end id8 -->
   - 各参数shape中以相同符号表示的维度，其对应轴的实际数值需保持一致。
 
 ### 特性参数组
@@ -488,7 +493,7 @@ metadata校验
 
 <ul>
     <li>ori_mask_mode/cmp_mask_mode=0，全计算模式（默认值）</li>
-    <li>ori_mask_mode/cmp_mask_mode=3，Causal模式</li>
+    <li>ori_mask_mode/cmp_mask_mode=3，rightDownCausal模式</li>
     <li>ori_mask_mode=4，SlidingWindow模式</li>
 </ul>
 

@@ -135,7 +135,7 @@ cann_ops_transformer.block_sparse_attention(
 | actual_seq_lengths_kv | list[int] | TND时必选/其余可选 | 每个batch对应的key/value实际序列长度 | int64 | - | 长度为B | - |
 | return_softmax_lse | bool | 可选 | 是否使能softmaxLse输出，默认False | BOOL | - | - | - |
 | mask_type | int | 可选 | attention计算中的掩码类型，默认0，当前仅支持0 | int64 | - | - | - |
-| quant_mode | int/QuantMode | 可选 | 量化模式，默认 `NO_QUANT`（0）。支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」。量化公式见「约束说明」 | int64 | - | - | - |
+| quant_mode | int/QuantMode/str | 可选 | 量化模式，默认 `NO_QUANT`（0）。支持传入枚举名、枚举或对应 int 值，枚举定义见「quant_mode 枚举」。量化公式见「约束说明」 | int64 | - | - | - |
 | block_size | int | 可选 | PagedAttention的block大小，默认0，当前不支持PagedAttention，仅支持0 | int64 | - | - | - |
 | pre_tokens | int | 可选 | 滑窗attention需要向前包含的token数，默认2147483647，当前仅支持2147483647 | int64 | - | - | - |
 | next_tokens | int | 可选 | 滑窗attention需要向后包含的token数，默认2147483647，当前仅支持2147483647 | int64 | - | - | - |
@@ -227,7 +227,7 @@ cann_ops_transformer.block_sparse_attention(
     P_{\text{Scale}} = 2^{\lceil \log_2 \left( P_{\text{max}} / dst\_type\_max \right) \rceil} = 2^{\lceil \log_2 P_{\text{max}} - \log_2 dst\_type\_max \rceil}
     $$
 
-- 暂不支持atten_mask、PagedAttention、softmaxLse等高阶特性。
+- 暂不支持atten_mask、PagedAttention、softmax_lse等高阶特性。
 
 ### quant_mode=MXFP8_OCP_QUANT（4，MXFP8 OCP量化）相关约束
 

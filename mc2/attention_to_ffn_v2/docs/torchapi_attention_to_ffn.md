@@ -178,13 +178,13 @@ attention_to_ffn(buffer, x, session_id, micro_batch_id, layer_id, expert_ids, ex
         <td>ffn_token_info_table_shape</td>
         <td>List[int]</td>
         <td>必选</td>
-        <td>FFN节点上token信息表格的shape，长度为3，格式为<code>[attnWorkerNum, microBatchNum, infoTableLastDim]</code>。其中<code>infoTableLastDim</code>为信息表最后一维长度，等于<code>2 + BS × expertNumPerToken</code>（<code>expertNumPerToken = K + sharedExpertNum</code>）：前2个int32为保留表项，其余<code>BS × expertNumPerToken</code>个int32为每个token按专家存放的信息表项。<code>BS</code>、<code>K</code>、<code>sharedExpertNum</code>的取值需与<code>ffn_token_data_shape</code>中对应维度（<code>[attnWorkerNum, microBatchNum, BS, K+sharedExpertNum, HS]</code>）一致。</td>
+        <td>FFN节点上token信息表格的shape，长度为3，格式为<code>[attnWorkerNum, microBatchNum, infoTableLastDim]</code>。其中<code>infoTableLastDim</code>为信息表最后一维长度，等于<code>2 + BS × expertNumPerToken</code>（<code>expertNumPerToken = K + sharedExpertNum</code>）：前2个int32为保留表项，其余<code>BS × expertNumPerToken</code>个int32为每个token按专家存放的信息表项。<code>BS</code>、<code>K</code>、<code>sharedExpertNum</code>的取值需与<code>ffn_token_data_shape</code>中对应维度（<code>[attnWorkerNum, microBatchNum, BS, K+sharedExpertNum, H]</code>）一致。</td>
     </tr>
     <tr>
         <td>ffn_token_data_shape</td>
         <td>List[int]</td>
         <td>必选</td>
-        <td>FFN节点上token数据表格的shape，长度为5，格式为<code>[attnWorkerNum, microBatchNum, BS, K+sharedExpertNum, HS]</code>。</td>
+        <td>FFN节点上token数据表格的shape，长度为5，格式为<code>[attnWorkerNum, microBatchNum, BS, K+sharedExpertNum, H]</code>。</td>
     </tr>
     <tr>
         <td>quant_mode</td>
@@ -403,10 +403,10 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoS
     - `microBatchNum`：表示通信窗口布局中的micro batch数量，即`ffn_token_data_shape`第1维（与`ffn_token_info_table_shape`第1维、`attn_token_info_table_shape`第0维相等），取值范围为[1, 3]；运行时`micro_batch_id`取值需位于`[0, microBatchNum)`内。
     - `BS`：表示batch sequence size（本卡最终输出的token数量），取值范围为0 < `BS` ≤ 512。
     - `K`：表示选取topK个专家，取值范围为0 < `K` ≤ 16且满足0 < `K` ≤ moeExpertNum。
-    - `H`：表示hidden size（隐藏层大小），取值范围为1024 ≤ `H` ≤ 8192。
+    - `H`：表示hidden size（隐藏层维度），取值范围为1024 ≤ `H` ≤ 8192。
     - `L`：表示模型层数，取值范围为[1, 43]，且运行时`LayerId`取值需小于`L`。
     - `M`：表示expertRankTable最后一维的长度，具体体现为部署在FFN节点上数量最多的专家部署信息列表的长度，取值范围为0 < `M` ≤ 2049（每行布局为`[rankCnt, (toRankId, localExpId) × rankCnt]`，rankCnt不超过worldSize）。
-    - `moeExpertNum`：表示MoE专家数量，取值范围为0 < `moeExpertNum` ≤ 1024。
+    - `moeExpertNum`：表示MoE路由专家数量，取值范围为0 < `moeExpertNum` ≤ 1024。
     - `sharedExpertNum`：表示共享专家数量，取值范围为0 ≤ `sharedExpertNum` ≤ 4。
     - `worldSize`：通信域大小，取值区间[2, 1024]。
 

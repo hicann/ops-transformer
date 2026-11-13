@@ -109,7 +109,7 @@ cann_ops_transformer.compressor(
 | state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。支持0轴非连续，数据格式支持ND。计算后 kv_state 和 score_state 会原位更新到此 Tensor | float32 | [block_num, block_size, 2\*coff\*D]，要求block_num>0 |
 | ape | Tensor | 必选 | positional biases，对应公式中的 $Ape$。不支持非连续，数据格式支持ND。 | float32 | [cmp_ratio,coff\*D] |
 | cmp_ratio | int | 必选 | 数据压缩率。取值范围为[2, 128]内的整数。 | - | - |
-| state_block_table | Tensor | 可选 | state_cache存储使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B] |
+| state_block_table | Tensor | 可选 | state_cache内存使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B] |
 | cu_seqlens | Tensor | 可选 | 不同Batch上的有效token数。不支持非连续，数据格式支持ND。<br>当x的shape为[B,S,H]时，参数必须为空。<br>当x的shape为[T,H]时，输入shape必须为[B+1,]，该参数为前缀和数组，后一个元素≥前一个元素，第一位必须为0，最后一位必须为T。 | int32 | [B+1,] |
 | seqused | Tensor | 可选 | 不同Batch中实际参与压缩的token数。不支持非连续，数据格式支持ND。<br>指定为None时，数值等于每个Batch上的Sequence Length。<br>[B,S,H]场景：0 ≤ seqused[n] ≤ S<br>[T,H]场景：0 ≤ seqused[n] ≤ cu_seqlens[n+1] - cu_seqlens[n]。 | int32 | [B,] |
 | start_pos | Tensor | 可选 | 计算起始位置。不支持非连续，数据格式支持ND，输入为None时从0开始计算 | int32 | [B,] |
@@ -132,7 +132,7 @@ cann_ops_transformer.compressor(
 - 该接口支持单算子模式和TorchAir图模式(aclgraph)调用。
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 该接口支持B、S泛化，且存在如下场景限制：
-  - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
+  - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU存储的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
     <div style="overflow-x: auto;">
     <table style="undefined;table-layout: fixed; width: 400px"><colgroup>
     <col style="width: 100px">
@@ -182,10 +182,10 @@ cann_ops_transformer.compressor(
 
 - 默认支持确定性计算。
 <!-- npu="950" id8 -->
-- <term>Ascend 950PR&950DT系列产品</term>：batch一致性：通过torch_npu.npu.set_deterministic_level()设置确定性级别为3开启batch一致性，开启后可以满足计算结果和所在批次大小和所在批次位置无关。
+- <term>Ascend 950PR&950DT系列产品</term>：batch一致性：通过torch_npu.npu.set_deterministic_level()设置确定性级别为3开启batch一致性，开启后可以保证计算结果与所在批次大小和所在批次位置无关。
 <!-- end id8 -->
 <!-- npu="A3,910b" id9 -->
-- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过torch_npu.npu.set_deterministic_level()设置确定性级别为3开启batch一致性，开启后可以满足计算结果和所在批次大小和所在批次位置无关。
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过torch_npu.npu.set_deterministic_level()设置确定性级别为3开启batch一致性，开启后可以保证计算结果与所在批次大小和所在批次位置无关。
 <!-- end id9 -->
 ## 调用示例
 

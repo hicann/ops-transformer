@@ -188,7 +188,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | cmp_ratio | int | 可选 | 表示对cmp_kv的压缩率。默认值为None | int32 | - | -
 | ori_mask_mode | int | 可选 | 表示q和ori_kv计算的mask模式。0：No mask。3：rightDownCausal模式。4：sliding window模式。默认值为None | int32 | - | -
 | cmp_mask_mode | int | 可选 | 表示q和cmp_kv计算的mask模式。0：No mask。3：rightDownCausal模式。默认值为None | int32 | - | -
-| ori_win_left | int | 可选 | 表示q和ori_kv计算中q对过去token计算的数量，-1表示无穷大，即全部参与运算。默认值为None | int32 | - | -
+| ori_win_left | int | 可选 | 表示q和ori_kv计算中q对历史token计算的数量，-1表示无穷大，即全部参与运算。默认值为None | int32 | - | -
 | ori_win_right | int | 可选 | 表示q和ori_kv计算中q对未来token计算的数量，-1表示无穷大，即全部参与运算。默认值为None | int32 | - | -
 | layout_q | string | 可选 | 表示输入q的布局格式，默认值为None | string | - | -
 | layout_kv | string | 可选 | 表示输入ori_kv/cmp_kv的布局格式，默认值为None | string | - | -
@@ -205,8 +205,8 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | cmp_kv | tensor | 可选 | 压缩KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入uint8 TQ4数据、kv_d=258。 | fp8_e4m3、uint8 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
 | ori_sparse_indices | tensor | 可选 | 表示原始KV topK索引，无效位置填-1 | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>
 | cmp_sparse_indices | tensor | 可选 | 表示压缩KV topK索引，无效位置填-1；quant_mode=3时必须传入且cmp_kv_k仅支持512或1024。 | int32 | ND | <ul><li>(q_t, kv_n, cmp_kv_k)</li><li>(b, q_s, kv_n, cmp_kv_k)</li></ul>
-| ori_block_table | tensor | 可选 | 表示PagedAttention场景下ori_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
-| cmp_block_table | tensor | 可选 | 表示PagedAttention场景下cmp_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>
+| ori_block_table | tensor | 可选 | 表示Paged Attention场景下ori_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
+| cmp_block_table | tensor | 可选 | 表示Paged Attention场景下cmp_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>
 | cu_seqlens_q | tensor | 可选 | 表示处理输入q变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_ori_kv | tensor | 可选 | 表示处理输入ori_kv变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_cmp_kv | tensor | 可选 | 表示处理输入cmp_kv变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
@@ -734,7 +734,7 @@ metadata校验
             <td>cmp_ratio</td>
             <td>
                 <ul>
-                    <li>data_type支持int32</li>
+                    <li>dtype支持int32</li>
                     <li>表示cmp_kv相对于压缩前KV长度的压缩倍率，需大于0</li>
                     <li>默认值为1</li>
                 </ul>
@@ -870,7 +870,7 @@ metadata校验
             <td>topk_value_mode</td>
             <td>
                 <ul>
-                    <li>data_type支持int32</li>
+                    <li>dtype支持int32</li>
                     <li>topK索引取值模式</li>
                 </ul>
             </td>

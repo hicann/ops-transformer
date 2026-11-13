@@ -102,7 +102,7 @@ AlignUp(a, b)  = CeilDiv(a, b) * b
 
 > [!NOTE]
 >
-> MXFP4类型当前通过uint8 Tensor承载物理存储。调用aclnn接口时，`permuted_tokens`会被解释为`ACL_FLOAT4_E2M1`，`expanded_scale`会被解释为`ACL_FLOAT8_e8m0`。因此表中的uint8表示PyTorch侧的物理存储类型，不表示量化数据的逻辑类型。
+> MXFP4类型当前通过uint8 Tensor承载物理存储。调用aclnn接口时，`permuted_tokens`会被解释为`ACL_FLOAT4_E2M1`，`expanded_scale`会被解释为`ACL_FLOAT8_E8M0`。因此表中的uint8表示PyTorch侧的物理存储类型，不表示量化数据的逻辑类型。
 
 ## 约束说明
 

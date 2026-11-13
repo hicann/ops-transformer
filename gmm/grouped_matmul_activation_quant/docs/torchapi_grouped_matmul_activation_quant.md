@@ -70,7 +70,7 @@ cann_ops_transformer.grouped_matmul_activation_quant(
 | `x` | Tensor | 必选 | 左矩阵。MXFP4场景使用`torch.uint8`承载FLOAT4数据，并通过`x_dtype`指定对应类型。 | `torch.float8_e4m3fn`、`torch.float8_e5m2`、`torch_npu.float4_e2m1fn_x2`、`torch_npu.float4_e1m2fn_x2` | 2维 |
 | `group_list` | Tensor | 必选 | 分组信息。 | `torch.int64` | `(E,)` |
 | `weight` | List[Tensor] | 必选 | 右矩阵TensorList，长度仅支持1。调用者必须传入FRACTAL_NZ格式的`weight`；MXFP4场景使用`torch.uint8`承载FLOAT4数据，并通过`weight_dtype`指定对应类型。转置场景先对源Weight执行`npu_format_cast(..., 29)`，再对末两维执行transpose并传入该view。 | `torch.float8_e4m3fn`、`torch_npu.float4_e2m1fn_x2`、`torch_npu.float4_e1m2fn_x2` | 3维 |
-| `weight_scale` | List[Tensor] | 必选 | `weight`的量化scale，tensorList长度仅支持1。转置场景由源scale对中间两维执行transpose后传入。 | 通过`weight_scale_dtype`按`torch_npu.float8_e8m0fnu`解析 | 4维 |
+| `weight_scale` | List[Tensor] | 必选 | `weight`的量化scale，TensorList长度仅支持1。转置场景由源scale对中间两维执行transpose后传入。 | 通过`weight_scale_dtype`按`torch_npu.float8_e8m0fnu`解析 | 4维 |
 | `activation_type` | str | 必选 | 激活函数类型，当前仅支持`"gelu_tanh"`。 | string | - |
 | `bias` | List[Tensor] | 可选 | bias TensorList，默认值为`None`。当前MX场景必须为空，支持`None`、空TensorList或单个空Tensor。 | `torch.float32` | - |
 | `x_scale` | Tensor | 可选 | `x`的量化scale。当前仅支持MX场景，必须传入有效Tensor。 | 通过`x_scale_dtype`按`torch_npu.float8_e8m0fnu`解析 | 3维 |
@@ -88,7 +88,7 @@ cann_ops_transformer.grouped_matmul_activation_quant(
 
 以下表格列出不同量化场景下的参数类型和 shape 约束，公共参数描述见上表。
 
-MXFP8量化场景： 输入x和weight均为`torch.float8_e4m3fn`、`torch.float8_e5m2`的MX量化场景；
+MXFP8量化场景： 输入x为`torch.float8_e4m3fn`、`torch.float8_e5m2`，weight仅支持`torch.float8_e4m3fn`的MX量化场景；
 
 MXFP4量化场景： 输入x和weight均为`torch_npu.float4_e2m1fn_x2`、`torch_npu.float4_e1m2fn_x2`的MX量化场景
 

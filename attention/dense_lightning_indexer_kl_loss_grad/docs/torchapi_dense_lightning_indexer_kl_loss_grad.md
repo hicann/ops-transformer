@@ -46,7 +46,7 @@
    y_{t,:}=\operatorname{Softmax}(I_{t,:})
    $$
 
-   本接口将$y$写出到softmaxOut。目标分布$p$由attnSoftmaxL1Norm输入提供，等价于旧版kernel内部由main attention score经head求和及L1归一化得到的结果。若后续继续计算KL Loss，其形式与旧版保持一致：
+   本接口将$y$写出到softmax_out。目标分布$p$由attn_softmax_l1_norm输入提供，等价于旧版kernel内部由main attention score经head求和和L1归一化得到的结果。若后续继续计算KL Loss，其形式与旧版保持一致：
 
    $$
    L(I){=}\sum_tD_{KL}(p_{t,:}||\operatorname{Softmax}(I_{t,:}))
@@ -148,7 +148,7 @@ dense_lightning_indexer_kl_loss_grad(
 | seqused_k | Tensor | 可选输入 | 表示每个 batch 实际使用的 key 长度。 | `int32` | `[B]`。 |
 | cmp_residual_k | Tensor | 可选输入 | 压缩 key 场景下的残差长度。`mask_mode=3` 且 `cmp_ratio!=1` 时，用于还原压缩前 key 长度。 | `int32` | `[B]`。 |
 | metadata | Tensor | 可选输入 | `dense_lightning_indexer_kl_loss_grad_metadata` 生成的任务切分结果，建议传入。 | `int32` | `[64]`。 |
-| layout_q | str | 可选属性 | `q` 侧 layout。 | `str` | 支持 `"BSND"`、`"TND"`，默认 `"BSND"`。 |
+| layout_q | str | 可选属性 | `q` 侧 layout。 | `string` | 支持 `"BSND"`、`"TND"`，默认 `"BSND"`。 |
 | layout_k | str | 可选属性 | `k` 侧 layout。 | `str` | 支持 `"BSND"`、`"TND"`，默认 `"BSND"`。 |
 | mask_mode | int | 可选属性 | mask 模式。 | `int` | 当前支持 `0` 和 `3`，默认 `0`。 |
 | cmp_ratio | int | 可选属性 | key 压缩比例。 | `int` | 取值范围 `[1, 128]`，默认 `1`。 |

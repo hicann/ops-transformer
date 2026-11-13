@@ -651,7 +651,7 @@ sym_buffer.update_group(group) -> None
 `SymmBuffer` 默认不创建 `mask_buffer`，因此各代际默认均不会向算子传入该参数。第一次调用 `query_mask_buffer`、`update_mask_buffer` 或 `clean_mask_buffer` 时，才会在 NPU 上创建 shape 为 `[ep_world_size]` 的全 0 int32 掩码；0 表示正常 rank，1 表示失能 rank，失能 rank 会在后续计算和卡间通信中被跳过。
 
 - `query_mask_buffer` 接收调用者预先创建的 `mask_status`，其 dtype 必须为 `torch.int32`，shape、所在 NPU 必须与内部 `mask_buffer` 一致。接口通过 D2D 拷贝将当前掩码写入 `mask_status`，不返回 Tensor。
-- `update_mask_buffer` 只更新当前进程中的本地掩码，各 rank 的掩码一致性由调用者保证。当恢复 rank，即 `masked` 输入为 `False` 时，必须调用 `get_local_buffer_tensor` 清空算子现存通信缓存区标志位。样例如下：
+- `update_mask_buffer` 只更新当前进程中的本地掩码，各 rank 的掩码一致性由调用者保证。当恢复 rank，即 `masked` 输入为 `False` 时，必须调用 `get_local_buffer_tensor` 清空算子现存通信缓冲区标志位。样例如下：
 
   ```python
   symm_buffer.update_mask_buffer(0, False)  # 恢复 rank 0 通信
@@ -742,13 +742,13 @@ sym_buffer.update_group(group) -> None
         <td>dispatch_quant_out_dtype</td>
         <td>torch.dtype 或 int</td>
         <td>可选</td>
-        <td>dispatch量化后输出的数据类型。支持torch.int8、torch.float8_e5m2、torch.float8_e4m3fn、torch_npu.float4_e2m1fn_x2。其中FLOAT4_E2M1只能传类型枚举torch_npu.float4_e2m1fn_x2（int，取值296），不能传torch.dtype。dispatch_quant_mode为4时该参数表示算子内量化的输出类型；预量化直通场景（dispatch_quant_mode为0且该参数为float8_e5m2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下表示预量化x的逻辑类型，此时必须与x的实际数据类型一致。各产品支持的取值、以及该参数是否必须显式指定见约束说明。默认值为None。</td>
+        <td>dispatch量化后输出的数据类型。支持torch.int8、torch.FLOAT8_E5M2、torch.float8_e4m3fn、torch_npu.float4_e2m1fn_x2。其中FLOAT4_E2M1只能传类型枚举torch_npu.float4_e2m1fn_x2（int，取值296），不能传torch.dtype。dispatch_quant_mode为4时该参数表示算子内量化的输出类型；预量化直通场景（dispatch_quant_mode为0且该参数为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下表示预量化x的逻辑类型，此时必须与x的实际数据类型一致。各产品支持的取值、以及该参数是否必须显式指定见约束说明。默认值为None。</td>
     </tr>
     <tr>
         <td>combine_quant_mode</td>
         <td>int</td>
         <td>可选</td>
-        <td>combine通信时的量化模式。0表示非量化，3表示MXFP float8_e5m2类型，4表示MXFP float8_e4m3类型。各产品支持的取值见约束说明。默认值为0。</td>
+        <td>combine通信时的量化模式。0表示非量化，3表示MXFP FLOAT8_E5M2类型，4表示MXFP float8_e4m3类型。各产品支持的取值见约束说明。默认值为0。</td>
     </tr>
     <tr>
         <td>comm_alg</td>
@@ -816,13 +816,13 @@ sym_buffer.update_group(group) -> None
         <td rowspan="4">x</td>
         <td rowspan="4">Tensor</td>
         <td rowspan="4">必选</td>
-        <td rowspan="4">MoE层输入的token隐藏状态。除预量化直通场景外，x的数据类型必须为bfloat16，量化（若有）由算子内部完成；预量化直通场景（dispatch_quant_mode为0且dispatch_quant_out_dtype为float8_e5m2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下算子内部不做量化，此时x的数据类型必须与dispatch_quant_out_dtype指定的逻辑类型一致，并且必须同时传入scales。float4_e2m1在PyTorch侧以uint8打包传入，每字节2个元素。各产品支持的数据类型见约束说明。</td>
+        <td rowspan="4">MoE层输入的token隐藏状态。除预量化直通场景外，x的数据类型必须为bfloat16，量化（若有）由算子内部完成；预量化直通场景（dispatch_quant_mode为0且dispatch_quant_out_dtype为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下算子内部不做量化，此时x的数据类型必须与dispatch_quant_out_dtype指定的逻辑类型一致，并且必须同时传入scales。float4_e2m1在PyTorch侧以uint8打包传入，每字节2个元素。各产品支持的数据类型见约束说明。</td>
         <td>bfloat16</td>
         <td>ND</td>
         <td>(num_tokens, hidden)</td>
     </tr>
     <tr>
-        <td>float8_e5m2<sup>1</sup></td>
+        <td>FLOAT8_E5M2<sup>1</sup></td>
         <td>ND</td>
         <td>(num_tokens, hidden)</td>
     </tr>
@@ -832,7 +832,7 @@ sym_buffer.update_group(group) -> None
         <td>(num_tokens, hidden)</td>
     </tr>
     <tr>
-        <td>float4_E2M1(uint8)<sup>1</sup></td>
+        <td>FLOAT4_E2M1(uint8)<sup>1</sup></td>
         <td>ND</td>
         <td>(num_tokens, hidden / 2)</td>
     </tr>
@@ -874,7 +874,7 @@ sym_buffer.update_group(group) -> None
         <td>(hidden, 2 × intermediate_hidden // 8)</td>
     </tr>
     <tr>
-        <td>float8_e5m2<sup>1</sup></td>
+        <td>FLOAT8_E5M2<sup>1</sup></td>
         <td>ND</td>
         <td>(local_moe_expert_num, 2 × intermediate_hidden, hidden)</td>
     </tr>
@@ -884,7 +884,7 @@ sym_buffer.update_group(group) -> None
         <td>(local_moe_expert_num, 2 × intermediate_hidden, hidden)</td>
     </tr>
     <tr>
-        <td>float4_E2M1(uint8)<sup>1</sup></td>
+        <td>FLOAT4_E2M1(uint8)<sup>1</sup></td>
         <td>FRACTAL_NZ/FORMAT_FRACTAL_NZ_C0_32</td>
         <td>(local_moe_expert_num, 2 × intermediate_hidden, hidden / 2)</td>
     </tr>
@@ -903,12 +903,12 @@ sym_buffer.update_group(group) -> None
         <td>(intermediate_hidden, hidden)</td>
     </tr>
     <tr>
-        <td>int4<sup>2</sup></td>
+        <td>int4(int32)<sup>2</sup></td>
         <td>FRACTAL_NZ</td>
         <td>(intermediate_hidden, hidden)</td>
     </tr>
     <tr>
-        <td>float8_e5m2<sup>1</sup></td>
+        <td>FLOAT8_E5M2<sup>1</sup></td>
         <td>ND</td>
         <td>(local_moe_expert_num, hidden, intermediate_hidden)</td>
     </tr>
@@ -918,7 +918,7 @@ sym_buffer.update_group(group) -> None
         <td>(local_moe_expert_num, hidden, intermediate_hidden)</td>
     </tr>
     <tr>
-        <td>float4_E2M1(uint8)<sup>1</sup></td>
+        <td>FLOAT4_E2M1(uint8)<sup>1</sup></td>
         <td>FORMAT_FRACTAL_NZ_C0_32</td>
         <td>(local_moe_expert_num, hidden, intermediate_hidden / 2)</td>
     </tr>
@@ -990,7 +990,7 @@ sym_buffer.update_group(group) -> None
         <td>scales<sup>1</sup></td>
         <td>Tensor</td>
         <td>可选</td>
-        <td>dispatch阶段的缩放因子输入。预量化直通场景（dispatch_quant_mode为0且dispatch_quant_out_dtype为float8_e5m2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下为预量化x的MX反量化缩放因子，该场景下必选；其余场景必须传入None。各产品支持情况见约束说明。</td>
+        <td>dispatch阶段的缩放因子输入。预量化直通场景（dispatch_quant_mode为0且dispatch_quant_out_dtype为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下为预量化x的MX反量化缩放因子，该场景下必选；其余场景必须传入None。各产品支持情况见约束说明。</td>
         <td>float8_e8m0</td>
         <td>ND</td>
         <td>(num_tokens, CeilDiv(hidden, 32))</td>
@@ -1102,7 +1102,7 @@ sym_buffer.update_group(group) -> None
     <td colspan="7">表格中的<code>CeilDiv(<var>x</var>, <var>y</var>) = ⌈<var>x</var> / <var>y</var>⌉ = ⌊(<var>x</var> + <var>y</var> - 1) / <var>y</var>⌋</code></td>
 </tr>
 <tr>
-    <td colspan="7">表格中用T1(T2)表示逻辑数据类型T1在PyTorch侧以数据类型T2作为物理载体传入，表中的shape为T2载体的实际传入shape。例如，int4(int32)表示每个int32打包8个int4元素；float4_E2M1(uint8)表示每个uint8打包2个FLOAT4_E2M1元素，并需通过<code>weight1_type</code>和<code>weight2_type</code>将权重的逻辑数据类型指定为<code>float4_e2m1fn_x2</code>。</td>
+    <td colspan="7">表格中用T1(T2)表示逻辑数据类型T1在PyTorch侧以数据类型T2作为物理载体传入，表中的shape为T2载体的实际传入shape。例如，int4(int32)表示每个int32打包8个int4元素；FLOAT4_E2M1(uint8)表示每个uint8打包2个FLOAT4_E2M1元素，并需通过<code>weight1_type</code>和<code>weight2_type</code>将权重的逻辑数据类型指定为<code>float4_e2m1fn_x2</code>。</td>
 </tr>
 </tfoot>
 </table>
@@ -1231,13 +1231,13 @@ sym_buffer.update_group(group) -> None
         <tr>
             <td>l1_weights</td>
             <td>逐专家布局为local_moe_expert_num，堆叠布局为1；支持的布局与具体取值见表下方约束</td>
-            <td>否（bfloat16/int8/int4场景）/是（float8_e5m2/float8_e4m3fn/float4_E2M1场景）</td>
+            <td>否（bfloat16/int8/int4场景）/是（FLOAT8_E5M2/float8_e4m3fn/float4_E2M1场景）</td>
             <td>不支持</td>
         </tr>
         <tr>
             <td>l2_weights</td>
             <td>逐专家布局为local_moe_expert_num，堆叠布局为1；支持的布局与具体取值见表下方约束</td>
-            <td>否（bfloat16/int8/int4场景）/是（float8_e5m2/float8_e4m3fn/float4_E2M1场景）</td>
+            <td>否（bfloat16/int8/int4场景）/是（FLOAT8_E5M2/float8_e4m3fn/float4_E2M1场景）</td>
             <td>不支持</td>
         </tr>
         <tr>
@@ -1467,12 +1467,12 @@ sym_buffer.update_group(group) -> None
     - ep_world_size范围 [2, 1024]。
     - num_experts范围 [ep_world_size, 2048]，且num_experts % ep_world_size == 0。
     - max_recv_token_num范围 [0, num_max_tokens_per_rank × ep_world_size × min(num_topk, local_moe_expert_num)]；建议保持默认值0，由接口自动计算接收容量。实际生效的接收行数（取默认值0时为自动计算结果）必须不超过UINT32_MAX，超出时算子在tiling阶段报错，不做静默截断。
-    - dispatch_quant_out_dtype仅支持torch.float8_e5m2、torch.float8_e4m3fn或torch_npu.float4_e2m1fn_x2（该值是整型枚举，取值296；FLOAT4_E2M1只能以该整型枚举传入，不能传torch.dtype）。
+    - dispatch_quant_out_dtype仅支持torch.FLOAT8_E5M2、torch.float8_e4m3fn或torch_npu.float4_e2m1fn_x2（该值是整型枚举，取值296；FLOAT4_E2M1只能以该整型枚举传入，不能传torch.dtype）。
     - dispatch_quant_mode取值为0或4。4表示算子内部对bfloat16的x做MX逐组量化（group size = 32，量化缩放因子类型为FLOAT8_E8M0），对应A8W8-FP、A8W4-FP、A4W4-FP场景；0表示预量化直通，即x已经是量化后的数据、算子内部不再量化，缩放因子由scales入参给出。
     - 预量化直通（dispatch_quant_mode = 0）的约束：x的数据类型必须与dispatch_quant_out_dtype指定的逻辑类型一致；scales为必选；仅支持topo_type = 0（MTE拓扑），Layered拓扑（topo_type = 1或2）均不支持；shared_expert_quant_out_dtype只能取None或与dispatch_quant_out_dtype相同。
     - x_active_mask当前版本必须传入None，不支持非空输入。
-    - scales仅在预量化直通（dispatch_quant_mode = 0且dispatch_quant_out_dtype为float8_e5m2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）场景为必选，数据类型为FLOAT8_E8M0，shape为(num_tokens, CeilDiv(hidden, 32))；其余场景必须传入None。
-    - combine_quant_mode当前支持0（非量化），3（MX模式float8_e5m2类型），4（MX模式float8_e4m3类型）。
+    - scales仅在预量化直通（dispatch_quant_mode = 0且dispatch_quant_out_dtype为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）场景为必选，数据类型为FLOAT8_E8M0，shape为(num_tokens, CeilDiv(hidden, 32))；其余场景必须传入None。
+    - combine_quant_mode当前支持0（非量化），3（MX模式FLOAT8_E5M2类型），4（MX模式float8_e4m3类型）。
     - comm_alg为预留参数，保持默认空字符串""即可。
     - y的数据类型固定为bfloat16。
     - **通信去重约束**：
@@ -1481,7 +1481,7 @@ sym_buffer.update_group(group) -> None
         - combine_comm_mode = 1（开启combine卡内去重）有以下四条能力约束。任一条不满足，算子都在tiling阶段直接报错，不做静默回退，需要调用方把combine_comm_mode改回0。
             - **拓扑**：仅支持topo_type = 0（MTE拓扑）。topo_type = 1或2（Layered拓扑）下不支持combine_comm_mode = 1，该拓扑的去重请使用combine_comm_mode = 2。
             - **combine量化**：combine_quant_mode必须为0（combine不量化）。combine_comm_mode = 1不支持与combine侧MX量化（combine_quant_mode = 3或4）叠加。
-            - **预量化x**：combine_comm_mode = 1、topk_weights_type = 0、预量化x，这三者不能同时成立。此处的预量化x指预量化直通场景（dispatch_quant_mode = 0且dispatch_quant_out_dtype为float8_e5m2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下传入的已量化x。开启combine卡内去重又要用预量化x时，请把topk_weights_type置为1（topk_weights_type = 1叠加预量化x是支持的，被拦截的只有topk_weights_type = 0这一种组合）。
+            - **预量化x**：combine_comm_mode = 1、topk_weights_type = 0、预量化x，这三者不能同时成立。此处的预量化x指预量化直通场景（dispatch_quant_mode = 0且dispatch_quant_out_dtype为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下传入的已量化x。开启combine卡内去重又要用预量化x时，请把topk_weights_type置为1（topk_weights_type = 1叠加预量化x是支持的，被拦截的只有topk_weights_type = 0这一种组合）。
             - **单卡token数上限**：num_max_tokens_per_rank ≤ 128 × min(512, ⌊4608 / num_topk⌋)。该上限来自去重预处理（prepass）在UB上的分块容量，num_topk越大上限越小。常用取值：num_topk ≤ 9时上限65536，num_topk = 16时上限36864，num_topk = 32时上限18432。超限时报错会直接给出当前num_topk下的具体上限值。
         - combine_comm_mode = 1时，同一token在同一张卡上的多个专家输出改为在该卡按float32累加后一次转bfloat16发送，累加顺序与中间取整次数与关闭态不同，因此y与combine_comm_mode = 0的结果不逐位相同。偏差来源是bfloat16累加顺序与中间取整次数的差异，在存在数值抵消的元素上相对偏差可能明显放大；需要与关闭态逐位一致时请使用combine_comm_mode = 0，切换该开关后请按目标形状重新做精度验证。
     - 门控激活下l1_weights的Linear1输出维等于2 × intermediate_hidden、l2_weights的输入维等于intermediate_hidden；"gelu"下l1_weights的Linear1输出维等于2 × intermediate_hidden、l2_weights的输入维等于2 × intermediate_hidden。不满足时算子在tiling阶段报错。
@@ -1535,7 +1535,7 @@ sym_buffer.update_group(group) -> None
             <td>–</td>
             <td>BFLOAT16</td>
             <td>4</td>
-            <td>torch.float8_e5m2</td>
+            <td>torch.FLOAT8_E5M2</td>
             </tr>
             <tr>
             <td><strong>A8W8-FP</strong></td>

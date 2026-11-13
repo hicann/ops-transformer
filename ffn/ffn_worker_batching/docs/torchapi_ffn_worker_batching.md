@@ -67,7 +67,7 @@ cann_ops_transformer.ffn_worker_batching(
 ## 约束说明
 
 - 各层在本卡的专家数相同。`layer_id`为[0,layer_num)内的连续编号，输入专家号必须为层内局部编号，不能预先加层偏移。
-- 非法层号使该已选中描述符的token全部被mask；专家号不在[0,experts_per_layer)内时被mask，包含原有mask值。
+- 非法层号使该已选中描述符的token全部被mask；专家号不在[0,experts_per_layer)内时被mask，保留原有mask值。
 - 上下文中的地址必须来自Device分配，不能直接填CPU指针。上下文以及它引用的token、描述符缓冲区必须保持存活，直到执行完成。
 - 接收过程会清理已选中描述符的flag及expert_ids，并推进轮询游标。重复调用或图replay前必须重新发布数据；没有ready数据时算子会继续等待。
 - 示例在同一stream上先准备数据再调用消费者，以演示异步选择语义。实际跨stream或跨设备生产者应遵守“先完成数据写入，再发布ready”的接收协议。

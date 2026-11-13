@@ -87,13 +87,13 @@ cann_ops_transformer.moe_finalize_routing_grad(
 |  scales  |  Tensor |  可选  |  正向输入`scales`，即路由权重系数。传入`scales`时必须同时传入`expanded_x`。  |  float16、bfloat16、float32   | `(R, K)` |
 |  expert_idx  |  Tensor |  可选  |  正向输入`expert_idx`，即专家索引。传入`bias`时必须同时传入。值域为`[0, E-1]`。  |  int32   | `(R, K)` |
 |  bias  |  Tensor |  可选  |  正向输入`bias`，即偏置量。  |  与grad_y一致   | `(E, H)` |
-|  drop_pad_mode  |  int |  可选  |  丢弃/填充模式，需与正向保持一致。`0`：drop less；`1`：drop pad。默认值为0。  |  -   | - |
+|  drop_pad_mode  |  int |  可选  |  丢弃/填充模式，需与正向保持一致。`0`：Dropless；`1`：DropPad。默认值为0。  |  -   | - |
 |  active_num  |  int |  可选  |  Dropless场景下`grad_expanded_x`的最大输出行数，仅当大于0且小于`R * K`时生效；DropPad场景下不生效。默认值为0。  |  -   | - |
 |  expert_num  |  int |  可选  |  专家数。Dropless场景下不生效；DropPad场景下必须大于0，且当`bias`传入时必须等于`bias`的第0维大小（E）。默认值为0。  |  -   | - |
 |  expert_capacity  |  int |  可选  |  每个专家能够处理的tokens数，`drop_pad_mode=1`时必须传入且大于0。默认值为0。  |  -   | - |
 
 ## 返回值说明
-
+git
 |  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
 |---------|----------|----------|---------------|---------------|------------|
 |  grad_expanded_x  |  Tensor |  必选  |  `expanded_x`的梯度。Dropless场景下shape为`(dim0, H)`，其中`dim0`为`expanded_row_idx.numel()`（当`active_num=0`时）或`min(active_num, expanded_row_idx.numel())`（当`active_num > 0`时）；DropPad场景下shape为`(expert_num, expert_capacity, H)`。数据类型与`grad_y`一致。  |  与grad_y一致   | `(dim0, H)`或`(E, C, H)` |

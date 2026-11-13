@@ -27,7 +27,7 @@ ElasticBuffer类提供统一的分布式通信buffer管理能力：
 
 - Engram存储接口用于分布式Engram存储管理，支持将本rank的表注册为通信可达的存储（推理模式可写入host pinned共享段或显式零拷贝注册调用方内存，训练模式直接映射上层锁页表内存），以及通过URMA从远端rank抓取Engram数据。`group=None` 表示full-vocab local推理，不初始化HCCL。
 - Engram训练接口在推理接口的基础上，通过 `with_grad=True` 开启训练模式。前向 [engram_fetch](#engram_fetch) 在抓取数据的同时保存反向所需的通信元数据（封装为 [EngramFetchCtx](#engramfetchctx)），反向 [engram_fetch_grad](#engram_fetch_grad) 根据这些元数据将梯度沿前向路径反向交换并按local entry稀疏累加，产出稀疏梯度用于优化器更新。
-- Dispatch/Combine接口用于MoE的Expert Parallelism（EP）并行部署，支持通过[dispatch](#dispatch)将token数据分发到对应专家卡，再通过[combine](#combine)将专家输出按原路由聚合回原始序列。所需的CCL通信buffer由ElasticBuffer内部按算子参数自动计算并申请，无需手动配置。
+- Dispatch/Combine接口用于MoE的Expert Parallelism（EP）并行部署，支持通过[dispatch](#dispatch)将token数据分发到对应专家卡，再通过[combine](#combine)将专家输出按原路由聚合回原始序列。所需的HCCL通信buffer由ElasticBuffer内部按算子参数自动计算并申请，无需手动配置。
 
 ## 函数原型
 
@@ -130,7 +130,7 @@ class ElasticBuffer:
 
 **输入参数**：
 
-- **group** (`Optional[torch.distributed.ProcessGroup]`)：必选参数。非 `None` 时为HCCL分布式进程组；`None` 表示full-vocab local推理，固定 `rank_size=1`，不初始化HCCL、不支持训练。
+- **group** (`Optional[torch.distributed.ProcessGroup]`)：必选参数。非 `None` 时为HCCL分布式进程组；`None` 表示full-vocab local推理，固定 `world_size=1`，不初始化HCCL、不支持训练。
 - <strong>*</strong>：其之前的变量是位置相关的；之后的变量是可选参数，需要使用键值对赋值，不赋值会使用默认值。
 - **num_cpu_bytes** (`int`)：可选参数，CPU buffer大小（字节），用于host pinned存储区分配（仅推理模式生效；训练模式不分配内部存储区，该参数不生效）。默认值为0，且必须2MB对齐。
 - **num_max_tokens_per_rank** (`int`)：可选参数，表示每张卡上的最大token数量上限。使用 [dispatch](#dispatch) 和 [combine](#combine) 时必须与 `hidden`、`num_topk` 一起指定；使用 `with_grad=True` 训练模式时必须指定且大于0。
@@ -141,7 +141,7 @@ class ElasticBuffer:
 - **netlayer** (`str`)：可选参数，HCCL网络分层（netlayer）选择，仅作用于Engram建链。取值：`"auto"`（默认）自netlayer 0起逐层探测尝试建链；非负整数字符串（如 `"1"`）表示netlayer编号，仅在该分层内建链，失败则报错返回。建议按“d2d与h2d同die”的原则选择分层建链：使对端访问本卡host映射内存的d2d链路，与本卡NPU访问该内存的h2d路径位于同一die，避免跨die转发，获得更优通信带宽与时延。
 - **comm_alg** (`str`)：可选参数，指定Dispatch/Combine使用的通信端口策略。支持 `"auto"` 和 `"clos_only"`，默认值为 `"auto"`。`"auto"` 表示使用FullMesh口；`"clos_only"` 表示只使用Clos口、不使用FullMesh口。
 
-**输出**：无返回值，构造ElasticBuffer实例。
+**输出说明**：无返回值，构造ElasticBuffer实例。
 
 ### engram_write
 
@@ -491,7 +491,7 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 
 **输入参数**：无参数。
 
-**输出**：无返回值，实例资源释放完成。
+**输出说明**：无返回值，实例资源释放完成。
 
 ## 约束说明
 

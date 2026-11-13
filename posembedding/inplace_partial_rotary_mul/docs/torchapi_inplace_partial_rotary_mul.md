@@ -68,7 +68,7 @@ cann_ops_transformer.inplace_partial_rotary_mul(x, r1, r2, *, rotary_mode="inter
 
 ## 返回值说明
 
-该接口无返回值（`None`）。计算结果直接inplace写回输入张量 `x`，`x` 在计算后shape和数据类型保持不变，`partial_slice` 指定范围以外的数据保持原值。
+该接口无返回值（`None`）。计算结果直接inplace写回输入张量`x`，`x`在计算后shape和数据类型保持不变，`partial_slice`指定范围以外的数据保持原值。
 
 > **自动微分说明**：当 `x.requires_grad` 为True时，对loss执行 `.backward()` 即自动触发 `inplace_partial_rotary_mul_backward`，无需手动调用反向算子。`r1`（cos）、`r2`（sin）的梯度**不计算**，始终为None。反向算子 `inplace_partial_rotary_mul_backward` 支持空Tensor和切片长度为零的场景（执行no-op），自动微分可正常使用。
 

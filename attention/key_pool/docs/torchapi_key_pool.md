@@ -134,7 +134,7 @@ torch.ops.cann_ops_transformer.key_pool(
 | sin | Tensor | 可选 | RoPE 正弦参数。当前版本保留接口，必须为空。 | bfloat16 | 当前版本不适用 |
 | cu_seqlens | Tensor | 可选 | TH 场景中各 Batch 在 `hidden_states` 首轴上的累计 token 边界。数据格式为 ND，不支持非连续 Tensor；BSH 场景必须为空。 | int32 | TH：`[B+1]` |
 | seqused | Tensor | 可选 | 预留的有效序列长度参数，当前版本必须为空。 | int32 | 预留 |
-| cmp_ratio | int | 可选 | 压缩率，即每个池化组包含的 token 数。默认值为 `4`。 | - | - |
+| cmp_ratio | int | 可选 | 压缩率，即每个压缩组包含的 token 数。默认值为 `4`。。默认值为 `4`。 | - | - |
 | norm_eps | float | 可选 | LayerNorm 的 epsilon，默认值为 `1e-6`，必须大于 0。 | - | - |
 | rotary_mode | int | 可选 | RoPE 模式入口，默认值为 `1`。仅支持 `0/1`，当前版本不执行 RoPE。 | - | - |
 

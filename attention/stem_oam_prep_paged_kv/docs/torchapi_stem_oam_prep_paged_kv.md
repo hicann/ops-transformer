@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  `stem_oam_prep_paged_kv`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`StemOamPrepPagedKv`算子完成Stem OAM (Output-Aware Metric) 动态稀疏注意力机制的前置评分计算。从Paged KV Cache中提取K/V数据，经K Processing（per-token K-scale × group sum + anti-diagonal flip）和V Processing（per-head vScale × L2 Norm → Log → Global Normalize → ReLU → Block Average）计算，输出kFlat和vBias供Stem OAM score computation使用。
+  `stem_oam_prep_paged_kv`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`StemOamPrepPagedKv`算子完成Stem OAM (Output-Aware Metric) 动态稀疏注意力机制的前置评分计算。从Paged KV Cache中提取K/V数据，经K Processing（per-token K-scale × group sum + anti-diagonal flip）和V Processing（per-head vScale × L2 Norm → Log → Global Normalize → ReLU → Block Average）计算，输出k_flat和v_bias供Stem OAM score computation使用。
 
 - **输入输出支持以下数据场景**：
 

@@ -119,7 +119,7 @@ cann_ops_transformer.lightning_indexer(
 | max_seqlen_k | int | 可选 | 表示k的最长Sequence Length，-1表示任意可能长度，默认值为None。 | int64 | - |
 | layout_q | str | 可选 | 表示q的排列格式，支持BSND、TND，默认值为None。 | string | - |
 | layout_k | str | 可选 | 表示k的排列格式，支持BSND、TND、PA_BBND，默认值为None。 | string | - |
-| mask_mode | int | 可选 | 表示sparse模式，0表示No mask，3表示rightDownCausal模式，默认值为None。 | int64 | - |
+| mask_mode | int | 可选 | 表示mask的模式，0表示defaultMask模式，3表示rightDownCausal模式，默认值为None。 | int64 | - |
 | cmp_ratio | int | 可选 | 表示k的压缩率，取值范围[1, 128]，1表示无压缩，默认值为None。 | int64 | - |
 
 ### lightning_indexer
@@ -226,7 +226,7 @@ cann_ops_transformer.lightning_indexer(
 | :-------------------: | :-------------------: |
 |      公共参数组      | q、k、w、metadata、output_idx_offset、topk、layout_q、layout_k、sparse_indices、sparse_values |
 |      Mask参数组      | mask_mode |
-|   SeqLens参数组   | cu_seqlens_q、cu_seqlens_k、seqused_q、seqused_k、max_seqlen_q |
+|   SeqLengths参数组   | cu_seqlens_q、cu_seqlens_k、seqused_q、seqused_k、max_seqlen_q |
 |   稀疏压缩参数组    | cmp_ratio、cmp_residual_k |
 | Paged Attention参数组 | block_table |
 |   Candidate参数组    | candidate_topk_blocks、candidate_block_size、candidate_block_indices、candidate_block_length |
@@ -388,7 +388,7 @@ metadata校验
             <td>
                 <ul>
                     <li>tensor_type仅支持INT32</li>
-                    <li>shape由lightning_indexer_v2_metadata动态计算，固定为(2048,)</li>
+                    <li>shape由lightning_indexer_metadata动态计算，固定为(2048,)</li>
                     <li><term>Ascend 950PR&950DT系列产品</term>：必须传入，未传入将被host侧校验拦截</li>
                     <li><term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：可选传入，kernel不消费，传None即可（如传入需与lightning_indexer_v2_metadata生成的结果一致）</li>
                 </ul>

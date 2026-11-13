@@ -386,7 +386,7 @@ metadata校验
 
 mask_mode参数解释
 <ul>
-    <li>mask_mode=0，全计算模式（默认值）</li>
+    <li>mask_mode=0，defaultMask模式（默认值）</li>
     <li>mask_mode=3，Causal模式</li>
 </ul>
 

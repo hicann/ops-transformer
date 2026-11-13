@@ -74,7 +74,7 @@
 
 > [!NOTE]
 >
-> `cmp_residual_k` 同时是 `sparse_lightning_indexer_kl_loss_grad` 和 `sparse_lightning_indexer_kl_loss_grad_metadata` 的可选输入。压缩KV且 `mask_mode=3` 时，该参数用于恢复压缩前key长度：`pre_compress_k_len = compressed_k_len * cmp_ratio + cmp_residual_k[b]`，从而确定causal有效范围。
+> `cmp_residual_k` 同时是 `sparse_lightning_indexer_kl_loss_grad` 和 `sparse_lightning_indexer_kl_loss_grad_metadata` 的可选输入。压缩key且 `mask_mode=3` 时，该参数用于恢复压缩前key长度：`pre_compress_k_len = compressed_k_len * cmp_ratio + cmp_residual_k[b]`，从而确定causal有效范围。
 
 ## 函数原型
 
@@ -169,7 +169,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 | cmp_ratio | int | 可选 | key压缩比例，当前支持[1, 128]，默认值为1。 | int32 | - |
 
 <!-- npu="950" id6 -->
-- <term>Ascend 950PR&950DT系列产品</term> ：`topk`仅支持[1, 2048]。
+- <term>Ascend 950PR&950DT系列产品</term>：`topk`仅支持[1,2048]。
 <!-- end id6 -->
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持`seqused_q`、`seqused_k`、`cmp_residual_k`，`num_heads_q`仅支持8/16/32/64，`topk`仅支持512/1024/2048/4096/8192。

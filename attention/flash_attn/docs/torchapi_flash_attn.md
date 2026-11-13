@@ -213,7 +213,7 @@ cann_ops_transformer.flash_attn(
 **说明**
 
 - attn_out：限制：该输出参数的D维度与value的D保持一致，其余维度需要与入参query的shape保持一致。
-- softmax_lse：return_softmax_lse为True时，一般情况下，输出shape为(B, Q_N, Q_S)的Tensor，当input_q为TND时，输出shape为(Q_N, Q_T)的Tensor；return_softmax_lse为False时，则输出shape为[1]的值为0的Tensor。
+- softmax_lse：return_softmax_lse为True时，一般情况下，输出shape为(B, Q_N, Q_S)的Tensor，当layout_q为TND时，输出shape为(Q_N, Q_T)的Tensor；return_softmax_lse为False时，则输出shape为[1]的值为0的Tensor。
 
 ## 约束说明
 
@@ -238,7 +238,7 @@ cann_ops_transformer.flash_attn(
 |                      |       win_left       | ATTR(OPTIONAL) |   int   |
 |                      |      win_right      | ATTR(OPTIONAL) |   int   |
 |                      |      attn_mask      | INPUT(OPTIONAL) |   Tensor   |
-| SeqLens参数组  |   cu_seqlens_q   | INPUT(OPTIONAL) |  Tensor  |
+| SeqLengths参数组  |   cu_seqlens_q   | INPUT(OPTIONAL) |  Tensor  |
 |                      |  cu_seqlens_kv  | INPUT(OPTIONAL) |  Tensor  |
 |                      |  seqused_q  | INPUT(OPTIONAL) |  Tensor  |
 |                      |  seqused_kv  | INPUT(OPTIONAL) |  Tensor  |
@@ -357,7 +357,7 @@ cann_ops_transformer.flash_attn(
         <td>attn_out</td>
         <td>
             <ul>
-                <li>data_type支持bfloat16和float16</li>
+                <li>tensor_type支持bfloat16和float16</li>
                 <li>shape维度支持3、4</li>
             </ul>
         </td>

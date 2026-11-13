@@ -167,7 +167,7 @@ cann_ops_transformer.sparse_flash_mla(
 | ori_topk | int32 | 可选 | 表示`ori_kv`中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为None。 | int32 | - | - |
 | cmp_topk | int32 | 可选 | 表示`cmp_kv`中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为None。 | int32 | - | - |
 | cmp_ratio | int32 | 可选 | `cmp_kv`相对于压缩前kv的压缩倍率，取值范围为1-128，默认值为None。 | int32 | - | - |
-| ori_mask_mode | int32 | 可选 | `q`与`ori_kv`的mask模式：0（No Mask）、3（RightDownCausal）或4（Band）。 | int32 | - | - |
+| ori_mask_mode | int32 | 可选 | `q`与`ori_kv`的mask模式：0（No Mask）、3（RightDownCausal）或4（Band，即sliding window模式）。 | int32 | - | - |
 | cmp_mask_mode | int32 | 可选 | `q`与`cmp_kv`的mask模式：0（No Mask）或3（RightDownCausal）。 | int32 | - | - |
 | ori_win_left | int32 | 可选 | `ori_kv`滑动窗口左边界，取值为-1或不小于0；-1表示不限制。 | int32 | - | - |
 | ori_win_right | int32 | 可选 | `ori_kv`滑动窗口右边界，取值为-1或不小于0；-1表示不限制。 | int32 | - | - |
@@ -239,7 +239,12 @@ cann_ops_transformer.sparse_flash_mla(
   - `cmp_residual_kv`配合`cmp_ratio`使用，可恢复压缩前KV长度。且每个batch的值需要小于`cmp_ratio`，即`cmp_residual_kv[i]` < `cmp_ratio`。仅当`cmp_kv`存在、`cmp_mask_mode=3`且`cmp_ratio!=1`时传入；`cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入。
   - `attention_out`：tensor类型，公式中的输出，数据类型支持bfloat16和float16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
   - `return_softmax_lse`为False时返回shape为[0]的空tensor；`return_softmax_lse`为True时返回float32的log-sum-exp结果。
-  - `topk_value_mode`在A2A3上只支持1，在A5上支持1和2。
+  <!-- npu="A3,910b" id5 -->
+  - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>:`topk_value_mode`在上仅支持1。
+  <!-- end id5 -->
+  <!-- npu="950" id6 -->
+  - <term>Ascend 950PR&950DT系列产品</term>：`topk_value_mode`上支持1和2。
+  <!-- end id6 -->
   - `sparse_flash_mla_metadata`和`sparse_flash_mla`分两段调用。两次调用中参与任务切分的入参必须一致；不一致时可能产生未定义行为。
   - 本接口支持单算子模式和TorchAir图模式调用，可用于训练和推理场景。
 
@@ -341,8 +346,8 @@ layout匹配关系表：
 | :--- | :--- | :--- | :--- | :--- |
 | ori_sparse_indices | `int32`、ND。 | 必须不传。 | 与`ori_topk=0`和`ori_topk_length=None`一致。 | 当mask mode !=0时，有效长度必须与参与计算的序列长度保持一致， 且不支持传入topk_length。当mask mode ==0时，ori_kv_k 需要大于等于对应的topk_length。 |
 | cmp_sparse_indices | `int32`、ND；`BSND`为(b, q_s, kv_n, cmp_kv_k)，`TND`为(q_t, kv_n, cmp_kv_k)；值必须为-1或有效的cmp token索引。 | 仅CSA必传；SWA/HCA必须不传。 | b/q_t、kv_n必须与`q`一致，cmp_kv_k必须与`cmp_topk`一致。 | <term>Atlas A3系列产品</term>：cmp_kv_k取大于8192或小于等于0时拦截；<term>Ascend 950PR&950DT系列产品</term>：cmp_kv_k取小于等于0时拦截。无效位置填-1，索引具体取值由用户保证。 |
-| ori_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | `ori_topk_length` 在ori+cmp稀疏时必传。 | 与`ori_sparse_indices=None`和`ori_topk=0`一致。 | CSA/ALL_CSA场景可选，其他场景不能传；传入时，不需要传入`seqused_ori_kv`。 |
-| cmp_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | `cmp_topk_length` 在ori+cmp稀疏时必传。 | 与`cmp_sparse_indices`和`cmp_topk`的状态一致。 | CSA/ALL_CSA场景可选，其他场景不能传；传入时，不需要传入`seqused_cmp_kv`。 |
+| ori_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | CSA场景可选，其他场景不能传。 | 与`ori_sparse_indices=None`和`ori_topk=0`一致。 | 传入时，不需要传入`seqused_ori_kv`。 |
+| cmp_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | CSA场景可选，其他场景不能传。 | 与`cmp_sparse_indices`和`cmp_topk`的状态一致。 | 传入时，不需要传入`seqused_cmp_kv`。 |
 | cmp_ratio | int32；SWA场景取值为1，CSA/HCA场景取值范围1-128。 | 可选，默认1。 | 必须同时与`metadata`、`cmp_kv`长度和`cmp_residual_kv`一致。 | <term>Atlas A3系列产品</term>：SWA无限制、CSA取非1、2、4、HCA取非128时拦截；<term>Ascend 950PR&950DT系列产品</term>：SWA取非1或CSA/HCA取非1-128时拦截。 |
 | topk_value_mode | int32；A2A3仅支持1，A5支持1和2。 | 可选，默认1。 | 必须与`cmp_sparse_indices`的索引取值约定一致。 | 不参与`metadata`生成；取非1值应拦截。 |
 
@@ -351,7 +356,7 @@ layout匹配关系表：
 - `cu_seqlens_q`、`cu_seqlens_ori_kv`和`cu_seqlens_cmp_kv`必须为当前Batch与前序Batch有效token数的累加值，第一个元素为0，后一个元素不得小于前一个元素。
 - `seqused_q`、`seqused_ori_kv`和`seqused_cmp_kv`表示各Batch的实际有效token数。`seqused_cmp_kv`在所有kv布局下均可选，显式传入时用于覆盖cmp侧逻辑有效长度。
 - `cmp_residual_kv[i]`必须小于`cmp_ratio`；CSA和HCA场景下，其长度必须等于Batch大小。
-- `ori_mask_mode`及`cmp_mask_mode`的详细含义请参见[sparse_mode参数说明](../../../docs/zh/context/sparse_mode_introduction.md)。当前规格中`ori_mask_mode`支持0、3、4和`cmp_mask_mode`支持3和4，`ori_win_left`和`ori_win_right`支持-1和非负数。
+- `ori_mask_mode`及`cmp_mask_mode`的详细含义请参见[sparse_mode参数说明](../../../docs/zh/context/sparse_mode_introduction.md)。当前规格中`ori_mask_mode`支持0、3、4，`cmp_mask_mode`支持0、3，`ori_win_left`和`ori_win_right`支持-1和非负数。
 
 | 参数 | 单参数校验 | 存在性拦截 | 一致性拦截 | 特性交叉拦截 |
 | :--- | :--- | :--- | :--- | :--- |

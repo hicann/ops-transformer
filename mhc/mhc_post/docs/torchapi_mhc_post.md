@@ -25,7 +25,7 @@
 
 - 接口功能：
 
-    实现MHC Post组件的前向计算，用于Transformer模型中多层残差连接的后处理阶段。该算子将残差矩阵变换与输出状态投影融合为单次计算，避免多次独立算子调用带来的额外开销。
+    实现MHC Post算子的前向计算，用于Transformer模型中多层残差连接的后处理阶段。该算子将残差矩阵变换与输出状态投影融合为单次计算，避免多次独立算子调用带来的额外开销。
 
 - 计算公式：
 
@@ -120,7 +120,7 @@ cann_ops_transformer.mhc_post(x, h_res, h_out, h_post) -> Tensor
         <td>h_out</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>上一层的输出状态，对应公式中的H<sub>l</sub><sup>out</sup>。</td>
+        <td>上一层的输出状态，对应公式中的h<sub>l</sub><sup>out</sup>。。</td>
         <td>bfloat16、float16</td>
         <td>
             <ul>

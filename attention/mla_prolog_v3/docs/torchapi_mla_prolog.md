@@ -60,7 +60,7 @@
     $$
     其中 $\alpha_q$ 是Query的尺度校正参数。
 
-    对Query进行ROPE旋转位置编码
+    对Query进行RoPE旋转位置编码
 
     $$
     q^R = \mathrm{ROPE}(c^Q \cdot W^{QR})
@@ -202,7 +202,7 @@ cann_ops_transformer.mla_prolog(
 | rmsnorm_gamma_ckv | Tensor | 必选 | 计算 $c^{KV}$ 的 RMSNorm 公式中的 $\gamma$ 参数，不支持非连续，数据格式支持 ND，shape 为`[Hckv]`。 | 与`token_x`一致 | `[Hckv]` |
 | kv_cache | Tensor | 必选 | 表示 cache 的索引，计算结果原地更新（对应公式中的 $k^{C}$），仅支持首轴非连续，除首轴外的其余轴必须连续，数据格式支持 ND。PA 模式（`cache_mode`为"PA_BSND"/"PA_NZ"/"PA_BLK_BSND"/"PA_BLK_NZ"）下支持空 Tensor；"BSND"/"TND" 模式下不支持空 Tensor。Nkv 与 N 关联，N 是超参，故不支持 Nkv=0。 | torch.bfloat16；hifloat8 全量化 KV 场景为 torch.uint8 | PA 模式：4维`[BlockNum, BlockSize, Nkv, Dtile]`；"BSND"：4维`[B, S, Nkv, Dtile]`；"TND"：3维`[T, Nkv, Dtile]`，ND格式 |
 | kr_cache | Tensor | 必选 | 用于 key 位置编码的 cache，计算结果原地更新（对应公式中的 $k^{R}$），仅支持首轴非连续，除首轴外的其余轴必须连续，数据格式支持 ND。PA 模式下支持空 Tensor；"BSND"/"TND" 模式下不支持空 Tensor。`ckvkr_repo_mode=1`（kv/kr 合并存储）时必须为空 Tensor（shape 乘积为 0），维度应包含 0，支持 shape 为`(0)`。`rope_sin`/`rope_cos`均为空（或`None`）时不执行 RoPE。 | torch.bfloat16 | 与`kv_cache`布局一致：PA 模式`[BlockNum, BlockSize, Nkv, Dr]`；"BSND"`[B, S, Nkv, Dr]`；"TND"`[T, Nkv, Dr]`；`ckvkr_repo_mode=1`时维度含 0，支持`(0)`，ND格式 |
-| rope_sin | Tensor | 可选 | 用于计算旋转位置编码的正弦参数矩阵，不支持非连续，数据格式支持 ND。与`rope_cos`同时非空时执行 RoPE，维度与`token_x`一致；同时为空（或`None`）时不执行 RoPE；一空一非空为非法输入。默认值为`None`，支持 B=0、S=0、T=0 的空 Tensor。 | torch.bfloat16 | 2维`[T, Dr]`或3维`[B, S, Dr]` |
+| rope_sin | Tensor | 可选 | 用于计算旋转式位置嵌入的正弦参数矩阵，不支持非连续，数据格式支持 ND。与`rope_cos`同时非空时执行 RoPE，维度与`token_x`一致；同时为空（或`None`）时不执行 RoPE；一空一非空为非法输入。默认值为`None`，支持 B=0、S=0、T=0 的空 Tensor。 | torch.bfloat16 | 2维`[T, Dr]`或3维`[B, S, Dr]` |
 | rope_cos | Tensor | 可选 | 用于计算旋转位置编码的余弦参数矩阵，不支持非连续，数据格式支持 ND，约束同`rope_sin`。默认值为`None`。 | torch.bfloat16 | 与`rope_sin`一致 |
 | cache_index | Tensor | PA 模式必选，BSND/TND 可选 | 用于存储`kv_cache`和`kr_cache`的索引，不支持非连续，数据格式支持 ND。`cache_mode`为"PA_BSND"/"PA_NZ"：BS 合轴时 shape 为`[T]`，BS 非合轴时 shape 为`[B, S]`，取值范围需在 `[0, BlockNum*BlockSize)` 内；`cache_mode`为"PA_BLK_BSND"/"PA_BLK_NZ"：BS 合轴时 shape 为`[Sum(Ceil(S_i/BlockSize))]`（S_i 表示第 i 个 batch 的序列长度），BS 非合轴时 shape 为`[B, Ceil(S/BlockSize)]`，取值范围需在 `[0, BlockNum)` 内；`cache_mode`为"BSND"/"TND"：无需传入。PagedAttention 模式下不传该参数会被接口报错拦截。 | torch.int32/torch.int64 | 1维`[T]`或2维`[B, S]` |
 | dequant_scale_x | Tensor | 可选 | `token_x`的反量化参数，不支持非连续，数据格式支持 ND。`weight_quant_mode=2/4/5`时 shape 为`[T,1]`或`[B*S,1]`，`weight_quant_mode=3`时 shape 为`[T, He/32]`或`[B*S, He/32]`；mode=3 时 dtype 为`torch.float8_e8m0fnu`，mode=2/4/5 时 dtype 为 float32。默认值为`None`，支持 B=0、S=0、T=0 的空 Tensor。 | torch.float8_e8m0fnu（mode=3）/torch.float32（mode=2/4/5） | mode=2/4/5：`[T, 1]`或`[B*S, 1]`；mode=3：`[T, He/32]`或`[B*S, He/32]` |
@@ -218,7 +218,7 @@ cann_ops_transformer.mla_prolog(
 | rmsnorm_epsilon_ckv | float | 可选 | 计算 $c^{KV}$ 的 RMSNorm 公式中的 $\epsilon$ 参数，默认值为`1e-5`。 | float | - |
 | cache_mode | str | 可选 | kv_cache 的模式，可选值为"PA_BSND"、"PA_NZ"、"PA_BLK_BSND"、"PA_BLK_NZ"（对应 PagedAttention）、"TND"（对应 BS 合轴）和"BSND"（对应 BS 非合轴），默认为"PA_BSND"。 | str | - |
 | query_norm_flag | bool | 可选 | 是否输出 query_norm。False 表示不输出，True 表示输出（量化场景下伴随输出 dequant_scale_q_norm），默认值为 False。 | bool | - |
-| weight_quant_mode | int | 可选 | weight_dq、weight_uq_qr、weight_uk、weight_dkv_kr 的量化模式。0：非量化；1：weight_uq_qr 量化（半量化）；2：weight_dq、weight_uq_qr、weight_dkv_kr int8 全量化；3：mxfp8 全量化；4：fp8 全量化；5：hif8 全量化。默认值为 0。 | int | - |
+| weight_quant_mode | int | 可选 | weight_dq、weight_uq_qr、weight_uk、weight_dkv_kr 的量化模式。0：非量化；1：weight_uq_qr 量化（半量化）；2：weight_dq、weight_uq_qr、weight_dkv_kr int8 全量化；3：mxfp8 全量化；4：fp8 全量化；5：hifloat8 全量化。默认值为 0。 | int | - |
 | kv_cache_quant_mode | int | 可选 | kv_cache 的量化模式。0：非量化；1：per-tensor 量化；2：per-channel 量化；3：per-token-per-group 量化。默认值为 0。 | int | - |
 | query_quant_mode | int | 可选 | query 的量化模式。0：非量化；1：per-token-head 量化。默认值为 0。 | int | - |
 | ckvkr_repo_mode | int | 可选 | kv_cache 和 kr_cache 的存储模式。0：分别存储；1：合并存储。默认值为 0。值为 1 时`kr_cache`必须为空 Tensor，支持 shape 为`(0)`。 | int | - |
@@ -266,7 +266,7 @@ cann_ops_transformer.mla_prolog(
     | Nkv | kv 的 head 数 | 取值固定为：1 |
     | BlockNum | PagedAttention 场景下的块数 | 取值为计算 `B*Skv/BlockSize` 的结果后向上取整（Skv 表示 kv 的序列长度，允许取 0） |
     | BlockSize | PagedAttention 场景下的块大小 | 取值范围：16-1024，且为 16 的倍数 |
-    | T | BS 合轴后的大小 | 取值范围：不限制；注：若采用 BS 合轴，此时 token_x、query_norm 均为 2 维，query_out、query_rope_out 为 3 维，cache_index 为 1 维，rope_sin、rope_cos同为None（关闭RoPE）或同为2维（开启RoPE）|
+    | T | BS 合轴后的大小 | 取值范围：不限制；注：若采用 BS 合轴，此时 token_x、query_norm 均为 2 维，query、query_rope 为 3 维，cache_index 为 1 维，rope_sin、rope_cos同为None（关闭RoPE）或同为2维（开启RoPE）|
 
 - 接口内置校验：上述 shape 格式字段约束（He/Hcq/N/D/Hckv/Dr/Nkv/Dtile/BlockSize）在接口内部统一校验，不满足时报错拦截。其中 N（Head-Num 多头数）允许 `[1, 128]` 之间的任意整型值。
 

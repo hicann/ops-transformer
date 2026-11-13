@@ -47,7 +47,7 @@
 
   具体计算流程如下：
 
-  1. 各卡持有左矩阵本地分片`A_local[BS, H]`，通过URMA all-to-all通信重分布得到`A_permuted[BS/rankSize, H*rankSize]`。
+  1. 各卡持有左矩阵本地分片`A_local[BS, H]`，通过URMA All-to-All通信重分布得到`A_permuted[BS/rankSize, H*rankSize]`。
   2. `A_permuted`结合`x1_scale`、`x2_scale`完成MX反量化，与右矩阵`X2`做矩阵乘法。
   3. 对矩阵乘法结果累加`bias`（可选），得到输出`Y`。
 
@@ -96,7 +96,7 @@ cann_ops_transformer.all_to_all_quant_matmul(
 | `x1_scale_dtype` | int          | 可选      | `x1_scale`的dtype，默认值为`None`（使用tensor的dtype）；MX场景传293（float8_e8m0）。                                                           | int                                            | -              | -                                 |
 | `x2_scale_dtype` | int          | 可选      | `x2_scale`的dtype，默认值为`None`（使用tensor的dtype）；MX场景传293（float8_e8m0）。                                                           | int                                            | -              | -                                 |
 | `y_dtype`        | int          | 可选      | 输出`y`的数据类型，默认值为`15`（BF16，ACL dtype 枚举）。                                           | int                                            | -              | -                                 |
-| `comm_mode`      | str          | 可选      | 通信模式，默认值为`"aiv_urma"`，当前仅支持`"aiv_urma"`。             | string                                         | -              | -                                 |
+| `comm_mode`      | str          | 可选      | 通信模式，默认值为`"aiv_urma"`，当前仅支持`"aiv_urma"`。             | str                                         | -              | -                                 |
 | `precision_mode` | int          | 可选      | 精度模式，默认值为0。0/1/2性能由低到高，精度由高到低。                                                                         | int                                            | -              | -                                 |
 
 ## 返回值说明

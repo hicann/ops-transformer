@@ -116,8 +116,8 @@ cann_ops_transformer.kv_quant_sparse_flash_attention(
 | quant_scale_repo_mode | int64 | 可选 | 表示量化参数的存放模式，仅支持传入1，表示combine模式，即量化参数和数据混合存放。默认值为1。 | int64 | - | - |
 | tile_size | int64 | 可选 | 表示per_tile时每个参数对应的数据块大小，仅在per_tile时有效，仅支持128。默认值为128。 | int64 | - | - |
 | rope_head_dim | int64 | 可选 | 表示MLA架构下的rope_head_dim大小，仅在attention_mode为2时有效，仅支持64。默认值为64。 | int64 | - | - |
-| key_dtype | int | 可选 | 表示key的数据类型标识。当key为hifloat8类型时可传入`torch_npu.hifloat8`，其他数据类型下保持默认值None。 | int64 | - | - |
-| value_dtype | int | 可选 | 表示value的数据类型标识。当value为hifloat8类型时可传入`torch_npu.hifloat8`，其他数据类型下保持默认值None。 | int64 | - | - |
+| key_dtype | int64 | 可选 | 表示key的数据类型标识。当key为hifloat8类型时可传入`torch_npu.hifloat8`，其他数据类型下保持默认值None。 | int64 | - | - |
+| value_dtype | int64 | 可选 | 表示value的数据类型标识。当value为hifloat8类型时可传入`torch_npu.hifloat8`，其他数据类型下保持默认值None。 | int64 | - | - |
 | return_softmax_lse | bool | 可选 | 表示是否返回softmax的lse结果。为True时随attention_out返回softmax_max与softmax_sum两个输出；为False时返回空的占位Tensor。默认值为False。 | bool | - | - |
 
 ## 返回值说明
@@ -145,7 +145,7 @@ cann_ops_transformer.kv_quant_sparse_flash_attention(
 ## 确定性计算
 
 - 默认支持确定性计算。
-- batch一致性：可以满足计算结果和所在批次大小和所在批次位置无关。
+- Batch一致性：可以满足计算结果和所在批次大小和所在批次位置无关。
 
 ## 调用示例
 

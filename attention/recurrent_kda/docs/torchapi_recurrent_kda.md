@@ -150,7 +150,7 @@ cann_ops_transformer.recurrent_kda(
 ## 约束说明
 
 - 仅支持 K=128，V=128 或 256。
-- H 和 HV 必须为正数，且 HV 能被 H 整除。
+- H（即符号说明中的 H_k）和 HV（即符号说明中的 H_v）必须为正数，且 HV 能被 H 整除；K、V 分别对应符号说明中的 K_dim、V_dim。
 - TND 布局下 q、k、v、g 为 3 维，beta 为 2 维；BSND 布局下 q、k、v、g 为 4 维，beta 为 3 维。
 - safe_gate=True 时必须同时设置 use_gate_in_kernel=True，且 lower_bound 取值范围为 [-5, 0)。
 - 未提供 ssm_state_indices 时，initial_state 的 state_capacity 必须等于逻辑序列数；提供后由索引选择状态槽。

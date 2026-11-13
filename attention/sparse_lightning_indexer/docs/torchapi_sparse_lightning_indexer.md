@@ -105,7 +105,7 @@ cann_ops_transformer.sparse_lightning_indexer(
 |  q  |  Tensor |  必选  |  公式中的输入Q（与`lightning_indexer`相同）。不支持空tensor。layout_q为BSND时shape为(b,q_s,q_n,d)；layout_q为TND时shape为(q_t,q_n,d)。  |   bfloat16、float16（与k一致）   |  3-4  |
 |  k  |  Tensor |  必选  |  公式中的输入K（与`lightning_indexer`相同）。不支持空tensor。layout_k为BSND时shape为(b,k_s,k_n,d)；layout_k为TND时shape为(k_t,k_n,d)；layout_k为PA_BBND时shape为(block_num,block_size,k_n,d)，仅PA_BBND下0轴支持非连续。  |   bfloat16、float16   |  3-4  |
 |  w  |  Tensor |  必选  |  公式中的输入W（与`lightning_indexer`相同）。不支持空tensor。layout_q为BSND时shape为(b,q_s,q_n)；layout_q为TND时shape为(q_t,q_n)。  |   float   |  2-3  |
-|  topk  |  int  |  必选  |  Top-k的k值，取值(0, 2048]。  |   int64   |  -  |
+|  topk  |  int  |  必选  |  TopK的k值，取值(0, 2048]。  |   int64   |  -  |
 |  candidate_block_indices  |  Tensor  |  必选  |  候选块索引，source算子`lightning_indexer`第3个输出直连。不支持空tensor。layout_q为BSND时shape为(b,q_s,k_n,candBlocks)；layout_q为TND时shape为(q_t,k_n,candBlocks)。  |   int32   |  3-4  |
 |  cu_seqlens_q  |  Tensor  |  可选  |  q有效长度前缀和，第一个元素固定为0。layout_q为TND时必传。shape为(b+1,)。  |   int32   |  1  |
 |  cu_seqlens_k  |  Tensor  |  可选  |  k有效长度前缀和，第一个元素固定为0。layout_k为TND时必传、BSND时传入报错、PA_BBND时不传。shape为(b+1,)。  |   int32   |  1  |
@@ -129,7 +129,7 @@ cann_ops_transformer.sparse_lightning_indexer(
 |  参数名   | 参数类型|  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
 |---------|------------|----------|---------------|---------------|------------|
 |  sparse_indices  |  Tensor  |  必选  |  topk索引输出（无 leak TopK）。有效槽为候选内可达位置按分数降序排列；所有无效槽（不可达/可达但非候选）一律填-1，候选内有效数不足topk时剩余槽位全-1（不输出任何候选外索引），全无效行输出全-1。layout_q为BSND时shape为(b,q_s,k_n,topk)；layout_q为TND时shape为(q_t,k_n,topk)。  |   int32   |  3-4  |
-|  sparse_values  |  Tensor  |  必选  |  <li>return_value=0（或缺省）时恒为空tensor (0,)；return_value=1时与sparse_indices同shape，有效槽为入选位置真实TopK分数（fp32打分域直出），-1槽对应位填0。</li><li>shape为1（rv=0）或3-4（rv=1）</li>  |   float   |  1或3-4  |
+|  sparse_values  |  Tensor  |  必选  |  <li>return_value=0（或缺省）时恒为空tensor (0,)；return_value=1时与sparse_indices同shape，有效槽为入选位置真实TopK分数（fp32打分域直出），-1槽对应位填0。</li><li>shape为1（return_value=0）或3-4（return_value=1）</li>  |   float   |  1或3-4  |
 
 ## 约束说明
 

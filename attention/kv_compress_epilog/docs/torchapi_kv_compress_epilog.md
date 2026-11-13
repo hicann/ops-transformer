@@ -89,7 +89,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>int</td>
         <td>可选</td>
         <td>量化分组大小，默认值64。quant_mode=0/1时内核固定按64处理；quant_mode=2时仅支持16/32/64，且要求(d-64) % quant_group_size == 0。</td>
-        <td>INT</td>
+        <td>int</td>
         <td>-</td>
     </tr>
     <tr>
@@ -103,7 +103,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
                 <li><code>"hifloat8_fp4"</code>(内部2)：rope段（尾轴后64 列）HiFloat8 <b>静态</b>量化（乘x_scale后取HiFloat8）；nope段（前d-64 列）per-group <b>float4_E2M1 动态</b>量化（scale=组内amax/6，以bf16 写出）。</li>
             </ul>
             下文约束说明中出现的quant_mode=0/1/2 指上表对应的内部int取值。</td>
-        <td>STR</td>
+        <td>str</td>
         <td>-</td>
     </tr>
     <tr>
@@ -111,7 +111,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>bool</td>
         <td>可选</td>
         <td>group模式下是否对每组scale向上取到2的幂。默认值True。quant_mode=2下不生效。</td>
-        <td>BOOL</td>
+        <td>bool</td>
         <td>-</td>
     </tr>
     <tr>

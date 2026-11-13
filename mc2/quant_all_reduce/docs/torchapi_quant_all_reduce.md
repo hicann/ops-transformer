@@ -72,7 +72,7 @@ cann_ops_transformer.ops.quant_all_reduce(
 
 - scales（Tensor）：必选参数，代表通信数据的量化系数，数据类型支持float32、float8_e8m0，数据格式支持ND，当数据类型为float32，量化模式为pertoken-pergroup量化（KG量化），若x为2维(bs, h)，则scales为2维(bs, h/128)，若x为3维(b, s, h)，则scales为3维(b, s, h/128)。当数据类型为float8_e8m0，且x数据类型为float8_e4m3fn，float8_e5m2时，量化模式为MX量化，若x为2维，scales的shape则为3维(bs, h/64, 2)，若x为3维，scales的shape则为4维(b, s, h/64, 2)。h的范围在[1024, 8192]内，且h满足128对齐。该参数不支持空tensor。
 
-- hcom（str）：必须参数，表示通信域handle名。通过get_hccl_comm_name接口获取。
+- hcom（str）：必选参数，表示通信域handle名。通过get_hccl_comm_name接口获取。
 
 - world_size（int）：必选参数，表示通信域内rank总数，支持2卡、4卡、8卡。
 
@@ -90,7 +90,7 @@ cann_ops_transformer.ops.quant_all_reduce(
 
 ### quant_all_reduce
 
-- y（Tensor）：表示最终通信结果，数据类型支持float16、bfloat16、float32，shape为(b*s/world_size, h)，数据格式支持ND。
+- output（Tensor）：表示最终通信结果，数据类型支持float16、bfloat16、float32，shape为(b*s/world_size, h)，数据格式支持ND。
 
 ## 约束说明
 

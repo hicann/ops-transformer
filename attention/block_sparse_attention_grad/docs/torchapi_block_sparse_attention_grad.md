@@ -151,7 +151,7 @@ cann_ops_transformer.block_sparse_attention_grad(
 - softmax_lse的数据类型必须为float32，且其layout需要与query的layout保持一致。
 - query、key、value的D轴（HeadDim）必须等于128。
 - query的头数N1（由query的shape推断，接口不显式传入）与num_key_value_heads（N2）需满足 N1 >= N2 && N1 % N2 == 0。
-- block_shape为可选参数，传入时必须包含至少两个元素[block_x, block_y]，元素要求如下：
+- block_shape为可选参数，传入时必须包含两个元素[block_x, block_y]，元素要求如下：
   - block_x 和 block_y 分别为 Q、KV 方向的稀疏块大小，两者均须大于 0。Ascend 950 另要求两者均为 16 的整数倍。
   - 不传入时，算子kernel接口按[128, 128]处理。
 - block_sparse_mask当前必须传入，且shape为[B, Nq, qBlockNum, kvBlockNum]，其中qBlockNum = ceilDiv(Sq, block_x)、kvBlockNum = ceilDiv(Skv, block_y)，其数据类型支持uint8或bool：

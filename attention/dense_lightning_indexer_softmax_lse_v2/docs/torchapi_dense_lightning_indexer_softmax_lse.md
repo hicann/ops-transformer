@@ -153,8 +153,8 @@ dense_lightning_indexer_softmax_lse(
 | batch_size | int | 可选 | batch 大小。BSND 场景建议显式传入，TND 场景也可由 `cu_seqlens_q` 推导，默认值为0。 | int32 | - |
 | max_seqlen_q | int | 可选 | 单个 batch 中最大的 query 序列长度，默认值为0。 | int32 | - |
 | max_seqlen_k | int | 可选 | 单个 batch 中最大的压缩后 key 序列长度，默认值为0。 | int32 | - |
-| layout_q | str | 可选 | `q` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | string | - |
-| layout_k | str | 可选 | `k` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | string | - |
+| layout_q | str | 可选 | `q` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | str | - |
+| layout_k | str | 可选 | `k` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | str | - |
 | mask_mode | int | 可选 | sparse mask 模式。0表示No mask，3表示rightDownCausal模式，默认值为0。 | int32 | - |
 | cmp_ratio | int | 可选 | key 压缩比例，当前支持[1, 128]，默认值为 1。 | int32 | - |
 

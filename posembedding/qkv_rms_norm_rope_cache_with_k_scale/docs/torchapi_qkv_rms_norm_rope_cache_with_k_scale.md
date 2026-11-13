@@ -26,7 +26,7 @@
 - **接口功能**：
 
   本文档包含`qkv_rms_norm_rope_cache_with_k_scale_`和`qkv_rms_norm_rope_cache_with_k_scale`两个torch_extension接口，均封装`aclnnQkvRmsNormRopeCacheWithKScale`，用于大语言模型推理场景下的Q/K/V预处理与PagedAttention KV Cache更新。接口支持以下三种完整场景：
-  - RoPE：使用`query_start_loc/seq_lens`生成普通RoPE位置；Q/K执行`RMSNorm -> RoPE -> rotation -> PerTokenPerHead量化`，数据为FP8 E4M3FN，scale为FP32。
+  - RoPE：使用`query_start_loc/seq_lens`生成普通RoPE；Q/K执行`RMSNorm -> RoPE -> rotation -> PerTokenPerHead量化`，数据为FP8 E4M3FN，scale为FP32。
   - M-RoPE：使用`mrope_position/mrope_section`生成T/H/W交织位置；Q/K执行`RMSNorm -> M-RoPE -> rotation`，Q返回BF16且`q_scale=None`，K执行PerTokenPerHead INT8量化。
   - M-RoPE MX：Q/K执行`RMSNorm -> M-RoPE -> Dynamic MX Quant`，不执行`rotation`；每个D32 block使用cuBLAS MX FP8的FLOAT8_E8M0二次幂scale量化为FP8 E4M3FN。V按`v_scale[Nv,D]`执行per-head-per-channel静态量化并写入FP8 Cache。
   - `qkv_rms_norm_rope_cache_with_k_scale_`：原地更新调用方传入的`k_cache`、`v_cache`和`k_scale_cache`，返回`q_out`和`q_scale`。
@@ -114,7 +114,7 @@
   $$
 
   其中未被 H/W 覆盖的 lane 回退到同一列的 T 路；将
-  $\widehat c$ 和 $\widehat s$ 代入前述 RoPE 旋转公式即可。输出维度仍为
+  $\widehat c$ 和 $\widehat s$ 代入前述 RoPE公式即可。输出维度仍为
   $D$，不会扩展为 $3D$。
 
 - RoPE和M-RoPE的Q/K输出与PerTokenPerHead动态量化：
@@ -237,9 +237,9 @@ cann_ops_transformer.qkv_rms_norm_rope_cache_with_k_scale(
 | k_gamma | Tensor | 必选 | K分支RMSNorm权重。 | torch.float32 | `[D]` |
 | cos_sin | Tensor | 必选 | RoPE位置编码表，前`D/2`列为cos，后`D/2`列为sin；第一维必须覆盖本次调用访问的所有位置。 | torch.float32 | `[MaxSeqLen,D]` |
 | slot_mapping | Tensor | 必选 | 每个token写入cache的slot索引，每个元素必须位于`[0,BlockNum*BlockSize-1]`。 | torch.int32 | `[T]` |
-| k_cache | Tensor | 必选 | K Cache。原地接口直接更新该Tensor；functional接口更新其副本并返回。RoPE和M-RoPE MX为FP8 E4M3FN；M-RoPE为INT8。 | torch.float8_e4m3fn或torch.int8 | `[BlockNum,Nk,BlockSize,D]` |
-| v_cache | Tensor | 必选 | V Cache。原地接口直接更新该Tensor；functional接口更新其副本并返回。 | torch.float8_e4m3fn | `[BlockNum,Nv,BlockSize,D]` |
-| k_scale_cache | Tensor | 必选 | K动态量化scale cache。RoPE/M-RoPE为FP32 `[BlockNum,Nk,BlockSize,1]`；M-RoPE MX为FLOAT8_E8M0 `[BlockNum,Nk,BlockSize,ceil(D/32)]`。原地接口更新该Tensor；functional接口更新其副本并返回。 | torch.float32或torch.float8_e8m0fnu | 4维 |
+| k_cache | Tensor | 必选 | K Cache。原地接口直接更新该Tensor；函数式接口更新其副本并返回。RoPE和M-RoPE MX为FP8 E4M3FN；M-RoPE为INT8。 | torch.float8_e4m3fn或torch.int8 | `[BlockNum,Nk,BlockSize,D]` |
+| v_cache | Tensor | 必选 | V Cache。原地接口直接更新该Tensor；函数式接口更新其副本并返回。 | torch.float8_e4m3fn | `[BlockNum,Nv,BlockSize,D]` |
+| k_scale_cache | Tensor | 必选 | K动态量化scale cache。RoPE/M-RoPE为FP32 `[BlockNum,Nk,BlockSize,1]`；M-RoPE MX为FLOAT8_E8M0 `[BlockNum,Nk,BlockSize,ceil(D/32)]`。原地接口更新该Tensor；函数式接口更新其副本并返回。 | torch.float32或torch.float8_e8m0fnu | 4维 |
 | query_start_loc | Optional[Tensor] | 必选（位置参数） | RoPE的位置源之一，必须与`seq_lens`同时传有效Tensor；两个M-RoPE场景必须显式传`None`。 | torch.int32或None | `[Batch+1]`或None |
 | seq_lens | Optional[Tensor] | 必选（位置参数） | RoPE的位置源之一，必须与`query_start_loc`同时传有效Tensor；两个M-RoPE场景必须显式传`None`。 | torch.int32或None | `[Batch]`或None |
 | head_nums | List[int] | 必选 | Q/K/V头数数组，必须按`[Nq,Nk,Nv]`传入。 | int | 长度为3 |

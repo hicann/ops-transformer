@@ -187,7 +187,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 - **seqused_cmp_kv**（`Tensor`）：可选参数，表示不同batch中cmp_kv实际参与运算的token数。shape为 `[B]`。支持非连续，数据格式支持ND，数据类型支持`int32`。
 
-- **cmp_residual_kv**（`Tensor`）：可选参数，表示每个batch S2 // cmpRatio后的余数。shape为 `[B]`。当cmp_kv不为空且cmp_mask_mode=3 时必须传入。支持非连续，数据格式支持ND，数据类型支持`int32`。
+- **cmp_residual_kv**（`Tensor`）：可选参数，表示每个batch S2 // cmp_ratio后的余数。shape为 `[B]`。当cmp_kv不为空且cmp_mask_mode=3 时必须传入。支持非连续，数据格式支持ND，数据类型支持`int32`。
 
 - **ori_topk_length**（`Tensor`）：可选参数，表示每行query对应的ori_kv实际可选的topk长度。shape为 `[B, S1, N2]`（BSND）或 `[T1, N2]`（TND）。当ori_mask_mode=0 且ori_sparse_indices不为None时必须传入且必须为准确值。非 ori sparse 路径必须为 None。支持非连续，数据格式支持ND，数据类型支持`int32`。
 
@@ -209,9 +209,9 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 - **ori_win_right**（`int`）：可选参数，q和ori_kv计算中q对未来token计算的数量。SWA、CFA、SCFA 仅支持取值0。ori sparse（`ori_mask_mode=0`）不使用滑窗，不校验该值。数据类型支持`int`。
 
-- **layout_q**（`str`）：可选参数，q的数据排布格式。支持 "BSND"、"TND"。数据类型支持`str`。
+- **layout_q**（`str`）：可选参数，q的数据排布格式。支持 "BSND"、"TND"。数据类型支持`string`。
 
-- **layout_kv**（`str`）：可选参数，ori_kv、cmp_kv的数据排布格式。支持 "BSND"、"TND"，当前必须与layout_q保持一致。数据类型支持`str`。
+- **layout_kv**（`str`）：可选参数，ori_kv、cmp_kv的数据排布格式。支持 "BSND"、"TND"，当前必须与layout_q保持一致。数据类型支持`string`。
 
 <!-- npu="A3,910b" id5 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持seqused_q、seqused_ori_kv、seqused_cmp_kv、cmp_topk_length、metadata参数。
@@ -292,7 +292,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
     | :--- | :--- | :--- |
     | 0 | 不做mask操作 | 支持 |
     | 3 | rightDownCausal | 支持 |
-    | 4 | band（滑窗，起点右下角） | oriMaskMode支持 |
+    | 4 | band（滑窗，起点右下角） | ori_mask_mode支持 |
 
 - **规格约束**：
 

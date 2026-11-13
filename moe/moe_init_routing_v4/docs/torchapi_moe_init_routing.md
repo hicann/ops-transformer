@@ -52,8 +52,8 @@
     expertTokensCountOrCumsumOutOptional[i]=Histogram(sortedExpertIdx)
     $$
 
-  4.如果quantMode不等于-1, 计算quant结果：
-     - 静态quant
+  4.如果quantMode不等于-1, 计算量化结果：
+     - 静态量化
 
      $$
      quantResult=round((x∗scaleOptional)+offsetOptional)
@@ -82,7 +82,7 @@
 
         - 当quantMode为13时，动态量化使用对称量化范围[-8, 7]，scale计算中的分母为7，量化结果沿H维每两个INT4值打包为1个字节。
 
-  5.若活跃的expert范围为全专家范围时，按照Scatter索引搬运token；反之按照Gather索引搬运token。在dropPadMode为1时将每个专家需要处理的Token个数对齐为expertCapacity个，超过expertCapacity个的Token会被Drop，不足的会用0填充。得出expandedXOut：
+  5.若活跃的expert范围为全专家范围时，按照Scatter索引搬运token；反之按照Gather索引搬运token（下文公式中的scatterRowIdx即rowIdxType为1时的expandedRowIdxOut，gatherRowIdx即rowIdxType为0时的expandedRowIdxOut）。在dropPadMode为1时将每个专家需要处理的Token个数对齐为expertCapacity个，超过expertCapacity个的Token会被Drop，不足的会用0填充。得出expandedXOut：
     - 非量化场景
       - 按照Scatter索引搬运
 
@@ -172,7 +172,7 @@ cann_ops_transformer.moe_init_routing(
 |  active_num  |  Union[int, torch.SymInt] |  可选  |  表示总的最大处理row数，当前固定为NUM_ROWS*K；实际有效行数由专家范围过滤等路由规则决定。默认值为-1，表示按NUM_ROWS*K处理；显式指定处理数量时仅支持NUM_ROWS*K，当前不支持Active截断场景。支持`int`或`torch.SymInt`类型，图模式下传入`torch.SymInt`（如`x.size(0) * k`）可避免被固化为常量，实现动态shape编译缓存复用。eager模式下传入`int`即可，上层调用脚本无需感知类型差异，同一份代码在两种模式下均可正常运行。  |  int  | - |
 |  expert_capacity  |  int |  可选  |  表示每个专家能够处理的tokens数。默认值为-1，入参校验大于0小于NUM_ROWS。Dropless场景下仅校验其值，不使用该参数；DropPad场景下取值范围为(0, NUM_ROWS]。  |  -  | - |
 |  expert_num  |  int |  可选  |  表示专家数。默认值为-1，必须大于0。`expert_tokens_num_type`为key_value模式时，取值范围为[1, 5120]；其他模式取值范围为[1, 10240]。  |  -  | - |
-|  drop_pad_mode  |  int |  可选  |  表示是否为drop_pad场景。默认值为0，0表示Dropless场景，该场景下不校验`expert_capacity`；1表示Drop_Pad场景。  |  -  | - |
+|  drop_pad_mode  |  int |  可选  |  表示是否为drop_pad场景。默认值为0，0表示Dropless场景，该场景下不校验`expert_capacity`；1表示DropPad场景。  |  -  | - |
 |  expert_tokens_num_type  |  int |  可选  |  表示直方图的不同模式。默认值为0，取值为0、1和2。0表示cumsum模式；1表示count模式；2表示key_value模式。  |  -  | - |
 |  expert_tokens_num_flag  |  bool |  可选  |  表示是否输出`expert_token_cumsum_or_count`。默认值为True。为False时，返回shape为[0]、数据类型为int64的空Tensor。  |  -  | - |
 |  quant_mode  |  int |  可选  |  表示量化模式。默认值为-1，支持取值见下方说明。  |  -  | - |
@@ -185,9 +185,9 @@ cann_ops_transformer.moe_init_routing(
 
 - 非量化场景下，如果输入则要求为1维张量，shape为(NUM_ROWS,)。
 - 非量化场景且`x`数据类型为`float8_e5m2`、`float8_e4m3fn`或`float4_e2m1`（通过`x_dtype`指定）时，要求为3维张量，shape为(NUM_ROWS, CeilDiv(H, 64), 2)，数据类型为`float8_e8m0`。
-- 静态量化场景必须输入，输入要求为1D的Tensor，shape为(1,)。
+- 静态量化场景必须输入，输入要求为1维张量，shape为(1,)。
 - 动态量化场景下，如果输入则要求为2维张量，shape为(expert_end-expert_start, H)或(1, H)。
-- quantMode为1的INT8动态量化场景下为可选输入，如果输入则要求为2D的Tensor，shape为(expert_end-expert_start, H)；quantMode为13的INT4动态量化场景下为可选输入，如果输入则要求shape为(1, H)，表示按H维广播的smooth scale。
+- quantMode为1的INT8动态量化场景下为可选输入，如果输入则要求为2维张量，shape为(expert_end-expert_start, H)；quantMode为13的INT4动态量化场景下为可选输入，如果输入则要求shape为(1, H)，表示按H维广播的smooth scale。
 - MXFP8量化场景下（quantMode为2、3）不输入。
 
 **quant_mode支持取值：**
@@ -222,7 +222,7 @@ cann_ops_transformer.moe_init_routing(
 
 |  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
 |---------|----------|----------|---------------|---------------|------------|
-|  expanded_x  |  Tensor |  必选  |  根据expert_idx进行扩展过的特征。非量化场景下数据类型同`x`；量化场景下数据类型根据quant_mode确定。量化场景下，当`x`的数据类型为`int8`时，输出值无意义。Dropless场景shape为[NUM_ROWS *K, H]，Drop/Pad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, H]。  |  float16、bfloat16、float32、int8、float8_e5m2、float8_e4m3fn、hifloat8、float4_e2m1、int4   | 2-3  |
+|  expanded_x  |  Tensor |  必选  |  根据expert_idx进行扩展过的特征。非量化场景下数据类型同`x`；量化场景下数据类型根据quant_mode确定。量化场景下，当`x`的数据类型为`int8`时，输出值无意义。Dropless场景shape为[NUM_ROWS *K, H]，Drop/Pad场景下要求是一个3维张量，shape为[expertNum, expertCapacity, H]。  |  float16、bfloat16、float32、int8、float8_e5m2、float8_e4m3fn、hifloat8、float4_e2m1、int4   | 2-3  |
 |  expanded_row_idx  |  Tensor |  必选  |  expanded_x和x的映射关系，shape为[NUM_ROWS*K]。前availableIdxNum个元素为有效数据，其余无效数据由`row_idx_type`决定：为0时由-1填充，为1时未初始化。  |  int32   | 1-2  |
 |  expert_token_cumsum_or_count  |  Tensor |  必选  |  表示每个专家处理的token数量的统计结果或累加值。  |  int64   | 1-2  |
 |  expanded_scale  |  Tensor |  必选  |  输出不同量化过程中scale的中间值。不同场景下的输出shape和数据类型见下方说明。  |  float32、float8_e8m0   | 1-3  |
@@ -240,7 +240,7 @@ cann_ops_transformer.moe_init_routing(
 - 动态量化场景下，当`scale`输入时，前availableIdxNum个元素为有效数据。
 - 静态量化场景下、HIF8直转量化场景下、HIF8 PERTENSOR量化场景下，输出为空tensor。
 - HIF8 PERTOKEN量化场景下，shape为[NUM_ROWS*K]，输出`float32`类型。
-- MXFP8量化场景下（quantMode为2、3、16、17），输出`float8_e8m0`类型，Shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H, 32), 2)，前availableIdxNum行为有效数据。
+- MXFP8量化场景下（quantMode为2、3、16、17），输出`float8_e8m0`类型，shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H, 32), 2)，前availableIdxNum行为有效数据。
 - MXFP4量化场景下，输出`float8_e8m0`类型，Shape为[NUM_ROWS*K, M, 2]，其中M=CeilDiv(H, 64)，前availableIdxNum行为有效数据。
 - FP8 PerGroup量化场景下（quantMode为4、5、14、15），输出`float32`类型，Shape为[NUM_ROWS*K, CeilDiv(H, 128)]，前availableIdxNum行为有效数据。
 - FP8 PerBlock量化场景下（quantMode为11、12），输出`float32`类型，Shape为[NUM_ROWS*K, CeilDiv(H, 256), 2]，前availableIdxNum行为有效数据。

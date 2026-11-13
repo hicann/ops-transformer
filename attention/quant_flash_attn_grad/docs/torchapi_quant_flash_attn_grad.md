@@ -482,7 +482,7 @@ cann_ops_transformer.quant_flash_attn_grad(
   - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
   - 触发空Tensor的用例将全部拦截报错。
 
-- 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+- 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，Tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - quant_flash_attn_metadata和quant_flash_attn_grad的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 
 - q、k、v、dout、attn_out校验:

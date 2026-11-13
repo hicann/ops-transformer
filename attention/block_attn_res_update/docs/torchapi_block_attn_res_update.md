@@ -109,7 +109,7 @@ cann_ops_transformer.block_attn_res_update(
 | --------------- | --------- | --------- | ---------------------------------------------------------- | ------------------ | ----------- |
 | `partial_block` | Tensor    | 必选      | 当前已累计的`partial_block`。调用完成后被原地更新。         | `torch.float32`    | `(T, D)`    |
 | `delta`         | Tensor    | 必选      | 本次需要累加的`delta`。                                    | `torch.bfloat16`   | `(T, D)`    |
-| `pseudo_query`  | Tensor    | 必选      | 用于计算当前`partial_block` logit的`pseudo_query`。         | `torch.float32`    | `(D,)`      |
+| `pseudo_query`  | Tensor    | 必选      | 用于计算当前`partial_block`当前注意力打分`score`（即当前logit）的`pseudo_query`。         | `torch.float32`    | `(D,)`      |
 | `numerator`     | Tensor    | 必选      | `block_attn_res_prepare`输出的历史online softmax加权和。    | `torch.float32`    | `(T, D)`    |
 | `logit_max`     | Tensor    | 必选      | `block_attn_res_prepare`输出的历史最大logit。               | `torch.float32`    | `(T,)`      |
 | `exp_sum`       | Tensor    | 必选      | `block_attn_res_prepare`输出的历史softmax分母累积值。       | `torch.float32`    | `(T,)`      |

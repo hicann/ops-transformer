@@ -51,7 +51,7 @@
   output=\sum_{0}^{\left \lfloor \frac{K}{blockSize=32} \right \rfloor}(AllGather(x1)@x2*(AllGather(x1\_scale)*x2\_scale)) + bias
   $$
 
-  `bias`为可选累加项，输出形状为`(M * rankSize, N)`，其中 rankSize 为 参与allgather matmul计算的卡数。
+  `bias`为可选累加项，输出形状为`(M * rank_size, N)`，其中 rankSize 为 参与allgather matmul计算的卡数。
 
 ## 函数原型
 

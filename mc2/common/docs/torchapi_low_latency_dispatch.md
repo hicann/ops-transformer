@@ -131,7 +131,7 @@
       dynamic\_scales = alltoall\_dynamic\_scales\_out
       $$
 
-      如果quant_mode=4（mxfp8量化）
+      如果quant_mode=4（mx动态量化）
 
       $$
       shared\_exp = floor(log_2(max(x))) - emax
@@ -161,7 +161,7 @@
       dynamic\_scales = alltoall\_dynamic\_scales\_out
       $$
 
-      如果quant_mode=5（mxfp8量化chip方法）
+      如果quant_mode=5（mx clip动态量化）
 
       $$
       max\_abs = max(abs(x))
@@ -617,7 +617,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
 - 在不同产品型号、不同通信算法或不同版本中，`low_latency_dispatch`的Tensor输出`assist_info_for_combine`、`ep_recv_counts`、`expand_scales`中的元素值可能不同，使用时直接将上述Tensor传给`low_latency_combine`对应参数即可，模型其他业务逻辑不应对其存在依赖。
 - 调用接口过程中使用的`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_combine](torchapi_low_latency_combine.md)对应参数也保持一致。
 - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
-- num_experts + zero_expert_num + copy_expert_num + const_expert_num < MAX_int32。
+- `num_experts` + `zero_expert_num` + `copy_expert_num` + `const_expert_num` < `MAX_int32`。。
 - 相关约束：
   <!-- npu="910b" id7 -->
   - <term>Atlas A2系列产品</term>：
@@ -641,7 +641,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
     - `quant_mode=4`表示mx动态量化场景，`quant_mode=5`表示mx clip动态量化场景，`expand_x`支持float8_e4m3fn、float8_e5m2、float4_e2m1、float4_e1m2，`x_smooth_scale`必须为None，输出`dynamic_scales` shape为(A, Align2(Ceil(H, 32)))；当`expand_x`为float4_e2m1或float4_e1m2时，H必须为偶数。
   <!-- end id9 -->
   - 本文中的`Ceil(H, N)`表示`(H + N - 1) // N`，`Align2(x)`表示向上对齐到2的整数倍。
-- HCCL通信域缓存区大小:
+- HCCL通信域缓存区大小：
     调用本接口前需检查通信域缓存区大小配置是否合理，单位MB。
   - 通过环境变量HCCL\_BUFFSIZE配置时，该环境变量按通信域粒度管理，不配置时默认为200MB，每个通信域独占一组“2*HCCL\_BUFFSIZE”大小的内存。
   - ep通信域内，comm\_alg配置为"fullmesh_v1"或"": 设置大小要求 \>= 2 \* \(local\_expert\_num \* max\_bs \* ep\_world\_size \* Align512\(Align32\(2 \* H\) + <b>44</b>\) + \(K + shared\_expert\_num\) \* max\_bs \* Align512\(2 \* H\)\)。
