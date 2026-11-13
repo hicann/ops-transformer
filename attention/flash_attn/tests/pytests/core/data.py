@@ -302,7 +302,7 @@ def _generate(method, shape, dtype, device, rng, **kw):
     if method == "uniform":
         lo, hi = kw.get("low", 0.0), kw.get("high", 1.0)
         t = torch.rand(shape, dtype=dtype, device=device, generator=rng)
-        return t * (hi - lo) + lo
+        return t.mul_(hi - lo).add_(lo)
     if method == "fixed":
         return torch.full(shape, kw.get("value", 10.0), dtype=dtype, device=device)
     if method == "zeros":

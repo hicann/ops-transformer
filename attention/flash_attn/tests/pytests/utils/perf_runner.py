@@ -33,7 +33,7 @@ def build_case_script(case: Dict, runs: int, case_name: str, device_id: int = 0)
     params_repr = _serialize_params(case)
 
     lines = [
-        "import sys, os",
+        "import sys, os, json, time",
         f"_pytests_dir = {repr(str(Path(__file__).resolve().parent.parent))}",
         "sys.path.insert(0, _pytests_dir)",
         "import torch, torch_npu",
@@ -356,18 +356,32 @@ def build_batch_script(
     case_names: List[str] = None,
     device_id: int = 0,
     output_dir: str = ".",
+    gap_ms: int = 0,
+    big_gap_ms: int = 0,
+    big_case_regex: str = None,
 ) -> str:
-    """Build a single script with all cases for batch msprof."""
+    """Build a single script with all cases for batch msprof.
+
+    gap_ms/big_gap_ms: 每个 case 之间（大 case 之后）的 sleep 毫秒，用来避免 600W 功耗墙降频；
+    gap_ms 在单次 msprof 会话内生效，比"分段重启 msprof"快得多。
+    """
     hot = [(i, c) for i, c in enumerate(cases) if c.get("S1", 9999) > cold_thr]
     cold = [(i, c) for i, c in enumerate(cases) if c.get("S1", 9999) <= cold_thr]
     names = case_names or [f"case_{i}" for i in range(len(cases))]
+    import re as _re
+
+    ordered_names = [names[i] for i, _ in hot] + [names[i] for i, _ in cold]
+    sleeps = []
+    for _n in ordered_names:
+        _is_big = bool(big_case_regex) and _re.search(big_case_regex, _n) is not None
+        sleeps.append((big_gap_ms or gap_ms) if _is_big else gap_ms)
 
     case_dicts = _serialize_cases(cases)
     hot_names = repr([names[i] for i, _ in hot])
     cold_names = repr([names[i] for i, _ in cold])
 
     lines = [
-        "import sys, os",
+        "import sys, os, json, time",
         f"_pytests_dir = {repr(str(Path(__file__).resolve().parent.parent))}",
         "sys.path.insert(0, _pytests_dir)",
         "import torch, torch_npu",
@@ -384,11 +398,18 @@ def build_batch_script(
         "",
     ]
 
+    _pos = 0
     for idx, (orig_i, c) in enumerate(hot):
-        lines.extend(_gen_batch_hot(idx, runs, len(hot)))
+        lines.extend(_gen_batch_hot(idx, runs, len(cases), idx + 1))
+        if sleeps and sleeps[_pos] > 0 and _pos + 1 < len(sleeps):
+            lines.append(f"time.sleep({sleeps[_pos] / 1000.0})")
+        _pos += 1
 
     for idx, (orig_i, c) in enumerate(cold):
-        lines.extend(_gen_batch_cold(idx, runs, len(cold)))
+        lines.extend(_gen_batch_cold(idx, runs, len(cases), len(hot) + idx + 1))
+        if sleeps and sleeps[_pos] > 0 and _pos + 1 < len(sleeps):
+            lines.append(f"time.sleep({sleeps[_pos] / 1000.0})")
+        _pos += 1
 
     lines.append("print('PERF_DONE')")
     return "\n".join(lines)
@@ -420,12 +441,13 @@ def _serialize_one(c):
     return s
 
 
-def _gen_batch_hot(idx, runs, total):
+def _gen_batch_hot(idx, runs, total, case_no):
     return [
         f"c = _hot_cases[{idx}]",
         f"name = _hot_names[{idx}]",
-        f"print(f'  [batch] {idx + 1}/{total}  {{name}}')",
-        f"print('[CASE_START] hot{idx}')",
+        f"print(f'  [batch] {case_no}/{total}  {{name}}')",
+        f"print('[CASE_START] {case_no}/{total}')",
+        "inputs = q = k = v = None",
         "try:",
         "    layout_q = c.get('layout_q', c.get('input_layout', 'BNSD'))",
         "    layout_kv = c.get('layout_kv', layout_q)",
@@ -481,12 +503,14 @@ def _gen_batch_hot(idx, runs, total):
         "            return_softmax_lse=0)",
         "    torch.npu.synchronize()",
         f'    _perf_log.write(\'{{"tag":"hot{idx}","ok":true}}\\n\'); _perf_log.flush()',
-        f"    print(f'[CASE_END] hot{idx}  OK')",
+        f"    print(f'[CASE_END] {case_no}/{total}  OK')",
         "except Exception as e:",
         "    import traceback; traceback.print_exc()",
-        f'    _perf_log.write(f\'{{"tag":"hot{idx}","ok":false,"error":{{str(e)}}}}\\n\'); _perf_log.flush()',
-        f"    print(f'[CASE_END] hot{idx}  CRASH  {{e}}')",
+        f'    _perf_log.write(json.dumps({{"tag":"hot{idx}","ok":False,"error":str(e)}}) + "\\n"); _perf_log.flush()',
+        f"    print(f'[CASE_END] {case_no}/{total}  CRASH  {{e}}')",
         "finally:",
+        "    inputs = q = k = v = None",
+        "    _f1 = _f2 = None",
         "    torch.npu.synchronize()",
         "    torch.npu.empty_cache()",
         "    import gc; gc.collect()",
@@ -495,12 +519,13 @@ def _gen_batch_hot(idx, runs, total):
     ]
 
 
-def _gen_batch_cold(idx, runs, total):
+def _gen_batch_cold(idx, runs, total, case_no):
     return [
         f"c = _cold_cases[{idx}]",
         f"name = _cold_names[{idx}]",
-        f"print(f'  [batch] {idx + 1}/{total}  {{name}}')",
-        f"print('[CASE_START] cold{idx}')",
+        f"print(f'  [batch] {case_no}/{total}  {{name}}')",
+        f"print('[CASE_START] {case_no}/{total}')",
+        "inputs = q = k = v = None",
         "try:",
         "    layout_q = c.get('layout_q', c.get('input_layout', 'BNSD'))",
         "    layout_kv = c.get('layout_kv', layout_q)",
@@ -555,14 +580,20 @@ def _gen_batch_cold(idx, runs, total):
         "            win_left=_wl,win_right=_wr,max_seqlen_q=_msq,max_seqlen_kv=_msk,",
         "            layout_q=layout_q,layout_kv=layout_kv,layout_out=c.get('layout_out',layout_q),",
         "            return_softmax_lse=0)",
+        "        torch.npu.synchronize()",
+        "        inputs = q = k = v = None",
+        "        _f1 = _f2 = None",
+        "        torch.npu.empty_cache()",
         "    torch.npu.synchronize(); torch.npu.empty_cache()",
         f'    _perf_log.write(\'{{"tag":"cold{idx}","ok":true}}\\n\'); _perf_log.flush()',
-        f"    print(f'[CASE_END] cold{idx}  OK')",
+        f"    print(f'[CASE_END] {case_no}/{total}  OK')",
         "except Exception as e:",
         "    import traceback; traceback.print_exc()",
-        f'    _perf_log.write(f\'{{"tag":"cold{idx}","ok":false,"error":{{str(e)}}}}\\n\'); _perf_log.flush()',
-        f"    print(f'[CASE_END] cold{idx}  CRASH  {{e}}')",
+        f'    _perf_log.write(json.dumps({{"tag":"cold{idx}","ok":False,"error":str(e)}}) + "\\n"); _perf_log.flush()',
+        f"    print(f'[CASE_END] {case_no}/{total}  CRASH  {{e}}')",
         "finally:",
+        "    inputs = q = k = v = None",
+        "    _f1 = _f2 = None",
         "    torch.npu.synchronize()",
         "    torch.npu.empty_cache()",
         "    import gc; gc.collect()",

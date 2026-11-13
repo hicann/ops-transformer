@@ -190,6 +190,8 @@ if __name__ == "__main__":
             if c.get("S1", 9999) <= args.perf_cold_thr
         ]
         ordered = [(i, "hot") for i in hot_idxs] + [(i, "cold") for i in cold_idxs]
+        if args.one_by_one:
+            ordered = []
 
         fieldnames = (
             list(all_rows[0].keys())
@@ -197,8 +199,9 @@ if __name__ == "__main__":
             else ["Task Start Time(us)", "Task Duration(us)"]
         )
         pos = 0
+        hot_count = len(hot_idxs)
         for idx_ord, (case_idx, mode) in enumerate(ordered):
-            tag = f"{mode}{idx_ord}"
+            tag = f"{mode}{idx_ord if mode == 'hot' else idx_ord - hot_count}"
             info = perf_log.get(tag, {})
             case_dir = out / run_cases[case_idx].replace("/", "_")
             case_dir.mkdir(parents=True, exist_ok=True)
