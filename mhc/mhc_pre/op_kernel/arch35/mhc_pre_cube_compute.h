@@ -38,6 +38,8 @@ public:
     uint64_t baseK_{0};
     uint64_t kL1_{0};
     uint32_t implMode_{MHC_PRE_IMPL_MODE_FP32};
+    int64_t oriHf32Mode_{0};
+    int64_t oriHf32TransMode_{0};
     uint8_t bL1BufferID_{0};
     uint8_t l0PingPongID_{0};
     uint8_t cl0PingPongID_{0};
@@ -104,9 +106,13 @@ public:
 
         // HF32 is a Cube mode. Restrict the mode write to AIC to avoid an invalid AIV-side operation.
         if ASCEND_IS_AIC {
+            oriHf32Mode_ = AscendC::GetCtrlSpr<AscendC::HF32_MODE_BIT, AscendC::HF32_MODE_BIT>();
+            oriHf32TransMode_ = AscendC::GetCtrlSpr<AscendC::HF32_TRANS_MODE_BIT, AscendC::HF32_TRANS_MODE_BIT>();
             if (implMode == MHC_PRE_IMPL_MODE_HF32) {
                 AscendC::SetHF32Mode(1);
                 AscendC::SetHF32TransMode(1);
+            } else {
+                AscendC::SetHF32Mode(0);
             }
         }
     }
@@ -181,14 +187,18 @@ public:
 
             if (useGmStage) {
                 AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_X_READY_FLAG);
-                AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_X_READY_FLAG +
-                                                                                    MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+                if constexpr (MHC_PRE_AIV_PER_AIC == TWO_AIV_PER_AIC) {
+                    AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_X_READY_FLAG +
+                                                                                        MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+                }
                 uint64_t stageOffset = stageCoreOffset + aL1BufferId * stageSlotElements;
                 CopyInA1Nd2Nz(m, currentK, kL1Size, xStageGlobal[stageOffset], currentAL1);
             } else {
                 AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_READY_FLAG);
-                AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_READY_FLAG +
-                                                                                    MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+                if constexpr (MHC_PRE_AIV_PER_AIC == TWO_AIV_PER_AIC) {
+                    AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_READY_FLAG +
+                                                                                        MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+                }
             }
 
             bool isFirstKL1 = useSequentialPartials ? kOffset % partialK == 0U : kOffset == kStart;
@@ -201,8 +211,10 @@ public:
                 CopyOut(dstGlobal[partialIndex * dstGroupStride], n);
             }
             AscendC::CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_CONSUMED_FLAG);
-            AscendC::CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_CONSUMED_FLAG +
-                                                                               MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+            if constexpr (MHC_PRE_AIV_PER_AIC == TWO_AIV_PER_AIC) {
+                AscendC::CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_CONSUMED_FLAG +
+                                                                                   MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+            }
             aL1BufferId ^= 1U;
         }
     }
@@ -308,7 +320,7 @@ public:
         cl0PingPongID_ ^= 1;
     }
 
-    __aicore__ inline void End(uint32_t implMode)
+    __aicore__ inline void End()
     {
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(0);
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(1);
@@ -317,9 +329,8 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(0);
         AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(1);
         if ASCEND_IS_AIC {
-            if (implMode == MHC_PRE_IMPL_MODE_HF32) {
-                AscendC::SetHF32Mode(0);
-            }
+            AscendC::SetHF32TransMode(oriHf32TransMode_);
+            AscendC::SetHF32Mode(oriHf32Mode_);
         }
     }
 };

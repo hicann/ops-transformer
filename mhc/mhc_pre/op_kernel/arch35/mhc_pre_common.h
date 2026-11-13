@@ -20,9 +20,17 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+#define MHC_PRE_AIV_PER_AIC 1U
+#else
+#define MHC_PRE_AIV_PER_AIC 2U
+#endif
+
 namespace MhcPre {
 
 using namespace AscendC;
+
+constexpr uint32_t TWO_AIV_PER_AIC = 2U;
 
 struct InitParams {
     GM_ADDR x;

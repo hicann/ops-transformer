@@ -14,7 +14,11 @@
  */
 
 #include "mhc_pre_tiling.h"
+#include <algorithm>
 #include <initializer_list>
+#include <limits>
+#include <tuple>
+#include "util/math_util.h"
 #include <string>
 #include "op_host/tiling_templates_registry.h"
 #include "register/op_def_registry.h"
@@ -61,6 +65,7 @@ const constexpr uint32_t CHUNK_T_MAX = 128;
 const constexpr uint32_t V1_CHUNK_D_SIZE = 5120;
 const constexpr uint32_t CHUNK_T_CALC_FACTOR = 32;
 const constexpr uint64_t D_MIN = 16;
+const constexpr uint64_t TOTAL_LENGTH_MAX_ARCH92 = 65536;
 const constexpr uint64_t D_MAX = 16384;
 const constexpr size_t SYSTEM_WORKSPACE = 20 * 1024 * 1024;
 
@@ -80,16 +85,18 @@ const constexpr int64_t IMPL_MODE_HF32 = 1;
 const constexpr uint64_t DECODE_BS_THRESHOLD = 256;
 const constexpr uint32_t DECODE_CHUNK_T_SIZE = 2;
 const constexpr size_t DECODE_WORKSPACE_ALIGN = 32;
-const constexpr size_t SPLIT_BS_GAMMA_BUFFER_LENGTH = 256;
+const constexpr uint64_t SPLIT_BS_GAMMA_BUFFER_LENGTH = 256U;
 const constexpr size_t SPLIT_ND_GAMMA_BUFFER_LENGTH = 2048;
-const constexpr uint32_t BASIC_API_ALIGN_BYTES = 32;
-const constexpr uint32_t BASIC_API_FLOAT_ALIGN = BASIC_API_ALIGN_BYTES / sizeof(float);
+const constexpr uint64_t BASIC_API_ALIGN_BYTES = 32U;
+const constexpr uint64_t BASIC_API_FLOAT_ALIGN = BASIC_API_ALIGN_BYTES / sizeof(float);
 const constexpr uint32_t BASIC_API_M_L1_SIZE = 32;
 const constexpr uint32_t BASIC_API_K_UB_SIZE = 256;
 const constexpr uint32_t BASIC_API_K_L1_SIZE = 256;
-const constexpr uint32_t BASIC_API_X_STAGE_BUFFER_COUNT = 2;
+
 const constexpr uint32_t BASIC_API_BUFFER_POOL0_SIZE = 64 * 1024;
 const constexpr uint32_t BASIC_API_BUFFER_POOL1_SIZE = 96 * 1024;
+const constexpr uint64_t INPUT_ELEMENT_BYTES = 2U; // FP16/BF16 element size in bytes.
+const constexpr uint64_t BASIC_API_DOUBLE_BUFFER_COUNT = 2U;
 
 // M-K routing, tiling and workspace parameters.
 // Keep automatic M-K routing inside the range covered by the generalized
@@ -126,6 +133,11 @@ static constexpr uint32_t HAS_GAMMA_TRUE = 1;
 // Diagnostic tensor names.
 static constexpr const char* INPUT_NAMES[] = {"x", "phi", "alpha", "bias", "gamma"};
 static constexpr const char* OUTPUT_NAMES[] = {"hIn", "hPost", "hRes", "invRms", "hMix", "hPre"};
+
+static uint64_t AlignUbBytes(uint64_t bytes)
+{
+    return Ops::Base::CeilAlign(bytes, BASIC_API_ALIGN_BYTES);
+}
 
 static std::string ShapeToString(std::initializer_list<uint64_t> dims)
 {
@@ -432,6 +444,12 @@ ge::graphStatus MhcPreBaseTiling::CheckTndOutputShape(uint64_t t, uint64_t n, ui
 }
 ge::graphStatus MhcPreBaseTiling::CheckDataRange()
 {
+    OP_CHECK_IF(aivBlockDim_ == blockDim_ && (totalLength_ == 0 || totalLength_ > TOTAL_LENGTH_MAX_ARCH92),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "totalLength",
+                                                      std::to_string(totalLength_).c_str(),
+                                                      "B*S (BSND) or T (TND) must be in [1, 65536] on Ascend960"),
+                return ge::GRAPH_FAILED);
+
     OP_CHECK_IF(D_ < D_MIN || D_ > D_MAX,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "D", std::to_string(D_).c_str(),
                                           ("[" + std::to_string(D_MIN) + ", " + std::to_string(D_MAX) + "]").c_str()),
@@ -446,6 +464,12 @@ ge::graphStatus MhcPreBaseTiling::ParseBsndFormat(const gert::Tensor* xTensor)
     uint64_t sequence = xTensor->GetStorageShape().GetDim(INDEX_S_BSND);
     uint64_t numsResidual = xTensor->GetStorageShape().GetDim(INDEX_N_BSND);
     uint64_t dimens = xTensor->GetStorageShape().GetDim(INDEX_D_BSND);
+
+    OP_CHECK_IF(
+        sequence != 0 && batch > std::numeric_limits<uint64_t>::max() / sequence,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "B, S", ShapeToString({batch, sequence}).c_str(),
+                                              "B*S overflows uint64_t"),
+        return ge::GRAPH_FAILED);
 
     totalLength_ = batch * sequence;
     matK_ = numsResidual * dimens;
@@ -567,19 +591,26 @@ ge::graphStatus MhcPreBaseTiling::InitPlatformMemory()
                 return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    uint64_t ubSize;
+    uint64_t ubSize = 0U;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     blockDim_ = static_cast<uint32_t>(ascendcPlatform.GetCoreNumAic());
     aivBlockDim_ = static_cast<uint32_t>(ascendcPlatform.GetCoreNumAiv());
-
-    OP_CHECK_IF(
-        aivBlockDim_ != blockDim_ * AIV_AIC_RATIO,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "aivNum", std::to_string(aivBlockDim_).c_str(),
-                                              "MhcPre only support aivNum == aicNum * 2"),
-        return ge::GRAPH_FAILED);
-
+    auto npuArch = ascendcPlatform.GetCurNpuArch();
+    if (npuArch == NpuArch::DAV_9201) {
+        OP_CHECK_IF(ubSize == 0U, OP_LOGE(context_->GetNodeName(), "Failed to get UB size"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(blockDim_ == 0U || aivBlockDim_ != blockDim_,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "aivNum",
+                                                          std::to_string(aivBlockDim_).c_str(),
+                                                          "AIC and AIV counts must be nonzero and equal"),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(aivBlockDim_ != blockDim_ * AIV_AIC_RATIO,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "aivNum",
+                                                          std::to_string(aivBlockDim_).c_str(),
+                                                          "MhcPre only support aivNum == aicNum * 2"),
+                    return ge::GRAPH_FAILED);
+    }
     ubSize_ = ubSize; // Save UB size for later validation
-
     return ge::GRAPH_SUCCESS;
 }
 
@@ -640,12 +671,15 @@ ge::graphStatus MhcPreBaseTiling::ParseEpsAttributes()
 
 bool MhcPreBaseTiling::CanUseMk() const
 {
-    bool supportedN = N_ == N_VALID_VALUES[0] || N_ == N_VALID_VALUES[1] || N_ == N_VALID_VALUES[2];
-    uint64_t activeCoreNum = std::min<uint64_t>(blockDim_, aivBlockDim_ / 2U);
+    const bool supportedN = N_ == N_VALID_VALUES[0] || N_ == N_VALID_VALUES[1] || N_ == N_VALID_VALUES[2];
+    const uint64_t activeCoreNum =
+        aivBlockDim_ == blockDim_ ? blockDim_ : std::min<uint64_t>(blockDim_, aivBlockDim_ / AIV_AIC_RATIO);
     // Each M-K AIC owns one M tile; reject shapes that cannot be covered by all active AICs.
-    uint64_t maxCoveredM = activeCoreNum * M_K_M_L1_MAX_SIZE;
+    const uint64_t maxCoveredM = activeCoreNum * M_K_M_L1_MAX_SIZE;
+    // Ascend960 uses M-K for small-K shapes that would otherwise use ND.
+    const bool allowSmallKOnArch92 = aivBlockDim_ == blockDim_ && totalLength_ <= DECODE_BS_THRESHOLD;
     return supportedN && totalLength_ <= M_K_MAX_VALIDATED_TOTAL_LENGTH && totalLength_ <= maxCoveredM &&
-           matK_ >= M_K_MIN_MAT_K;
+           (matK_ >= M_K_MIN_MAT_K || allowSmallKOnArch92);
 }
 
 uint32_t MhcPreBaseTiling::SelectMkStage() const
@@ -680,7 +714,7 @@ ge::graphStatus MhcPreBaseTiling::CalculateBsTiling()
     //   [xStageWorkspaceSize, ...): compact FP32 hMix [M, fusionSize], only when outFlag is false.
     // SYSTEM_WORKSPACE follows the user workspace and is reserved for the runtime.
     size_t xStageWorkspaceSize = static_cast<size_t>(chunkTSize_) * BASIC_API_K_UB_SIZE *
-                                 BASIC_API_X_STAGE_BUFFER_COUNT * sizeof(float) * blockDim_;
+                                 BASIC_API_DOUBLE_BUFFER_COUNT * sizeof(float) * blockDim_;
     size_t hMixWorkspaceSize = outFlag_ ? 0U : static_cast<size_t>(matM_) * static_cast<size_t>(matN_) * sizeof(float);
     workspaceSize_ = xStageWorkspaceSize + hMixWorkspaceSize + SYSTEM_WORKSPACE;
     return CheckUbBufferSize();
@@ -688,40 +722,39 @@ ge::graphStatus MhcPreBaseTiling::CalculateBsTiling()
 
 ge::graphStatus MhcPreBaseTiling::CalculateMkTiling()
 {
-    auto ceilDiv = [](uint64_t value, uint64_t divisor) -> uint64_t { return (value + divisor - 1U) / divisor; };
-    auto roundUp = [&ceilDiv](uint64_t value, uint64_t align) -> uint64_t { return ceilDiv(value, align) * align; };
-
-    uint64_t activeCoreNum = std::min<uint64_t>(blockDim_, aivBlockDim_ / 2U);
+    const uint64_t activeCoreNum =
+        aivBlockDim_ == blockDim_ ? blockDim_ : std::min<uint64_t>(blockDim_, aivBlockDim_ / AIV_AIC_RATIO);
     usedCoreNum_ = static_cast<uint32_t>(activeCoreNum);
     scaleMean_ = 1.0f / static_cast<float>(matK_);
-    uint64_t minMDim = std::min<uint64_t>(activeCoreNum, ceilDiv(totalLength_, M_K_M_L1_MAX_SIZE));
-    uint64_t kDim = activeCoreNum / minMDim;
-    // Fill otherwise idle AIC slots without reducing K parallelism. For example,
-    // M=3072 uses 16x2 instead of 12x2 on a 32-AIC device.
-    uint64_t mDim = activeCoreNum / kDim;
-    uint64_t singleCoreM = roundUp(ceilDiv(totalLength_, mDim), AscendC::BLOCK_CUBE);
-    // Alignment can make the last planned M block empty. Remove such blocks so
-    // every launched M index starts inside the tensor (M=2561: 16 -> 15 blocks).
-    mDim = ceilDiv(totalLength_, singleCoreM);
-    uint64_t singleCoreK = roundUp(ceilDiv(matK_, kDim), M_K_SPLIT_ALIGN);
-    // Keep the Cube accumulation order independent of N and the optional residual
-    // segment. The kernel derives the same decision from multCoreSplitKSize.
-    bool useSequentialKPartials = singleCoreK >= M_K_SEQUENTIAL_PARTIAL_THRESHOLD;
-    uint64_t workspaceGroupK = useSequentialKPartials ? ceilDiv(matK_, M_K_SEQUENTIAL_PARTIAL_K) : 0U;
-    uint64_t splitK = useSequentialKPartials ? ceilDiv(workspaceGroupK, kDim) * M_K_SEQUENTIAL_PARTIAL_K : singleCoreK;
-    uint64_t actualKBlockNum = ceilDiv(matK_, splitK);
-    uint64_t mL1Size = std::min<uint64_t>(M_K_M_L1_MAX_SIZE, singleCoreM);
-    uint64_t fusionAlign = roundUp(matN_, BASIC_API_FLOAT_ALIGN);
-    uint64_t kL1Size = std::min<uint64_t>(M_K_A_L1_ELEMENT_COUNT / mL1Size, M_K_B_L1_ELEMENT_COUNT / fusionAlign);
-    kL1Size = std::min<uint64_t>(kL1Size, M_K_K_L1_MAX_SIZE);
-    kL1Size = std::max<uint64_t>(M_K_K_L1_ALIGN, kL1Size / M_K_K_L1_ALIGN * M_K_K_L1_ALIGN);
-    // Keep every L1 tile inside one sequential partial; only the final partial may be shorter.
-    if (useSequentialKPartials) {
-        while (M_K_SEQUENTIAL_PARTIAL_K % kL1Size != 0U) {
-            kL1Size -= M_K_K_L1_ALIGN;
-        }
+    uint64_t mDim = 0U;
+    uint64_t kDim = 0U;
+    uint64_t singleCoreM = 0U;
+    uint64_t kL1Size = 0U;
+    if (aivBlockDim_ == blockDim_) {
+        OP_CHECK_IF(!FindMkCoreGrid(mDim, kDim, singleCoreM, kL1Size),
+                    OP_LOGE(context_->GetNodeName(), "No feasible M_K grid"), return ge::GRAPH_FAILED);
+    } else {
+        const uint64_t minMDim = std::min<uint64_t>(
+            activeCoreNum, Ops::Base::CeilDiv(totalLength_, static_cast<uint64_t>(M_K_M_L1_MAX_SIZE)));
+        kDim = activeCoreNum / minMDim;
+        // Fill otherwise idle AIC slots without reducing K parallelism. For example,
+        // M=3072 uses 16x2 instead of 12x2 on a 32-AIC device.
+        mDim = activeCoreNum / kDim;
+        singleCoreM =
+            Ops::Base::CeilAlign(Ops::Base::CeilDiv(totalLength_, mDim), static_cast<uint64_t>(AscendC::BLOCK_CUBE));
+        // Alignment can make the last planned M block empty. Remove such blocks so
+        // every launched M index starts inside the tensor (M=2561: 16 -> 15 blocks).
+        mDim = Ops::Base::CeilDiv(totalLength_, singleCoreM);
     }
-
+    uint64_t singleCoreK = 0U;
+    uint64_t splitK = 0U;
+    uint64_t actualKBlockNum = 0U;
+    CalculateMkKSplit(kDim, singleCoreK, splitK, actualKBlockNum);
+    const uint64_t mL1Size = std::min<uint64_t>(M_K_M_L1_MAX_SIZE, singleCoreM);
+    if (aivBlockDim_ != blockDim_) {
+        kL1Size = SelectMkKTile(mL1Size, singleCoreK >= M_K_SEQUENTIAL_PARTIAL_THRESHOLD);
+    }
+    const uint64_t fusionAlign = Ops::Base::CeilAlign(matN_, static_cast<uint64_t>(BASIC_API_FLOAT_ALIGN));
     tilingData_.set_cubeBlockDimM(static_cast<uint32_t>(mDim));
     tilingData_.set_cubeBlockDimK(static_cast<uint32_t>(actualKBlockNum));
     tilingData_.set_multCoreSplitKSize(static_cast<uint32_t>(splitK));
@@ -730,13 +763,17 @@ ge::graphStatus MhcPreBaseTiling::CalculateMkTiling()
     tilingData_.set_kUbSize(static_cast<uint32_t>(kL1Size));
     tilingData_.set_fusionAlign(static_cast<uint32_t>(fusionAlign));
     // Keep enough rows per AIV to amortize setup while distributing all rows across the available AIVs.
-    uint64_t stage2RowsPerCore = std::min<uint64_t>(
-        totalLength_, std::max<uint64_t>(M_K_MIN_STAGE2_ROWS_PER_CORE, ceilDiv(totalLength_, aivBlockDim_)));
-    uint64_t stage2UsedAivNum = std::min<uint64_t>(aivBlockDim_, ceilDiv(totalLength_, stage2RowsPerCore));
+    const uint64_t stage2RowsPerCore = std::min<uint64_t>(
+        totalLength_, std::max<uint64_t>(M_K_MIN_STAGE2_ROWS_PER_CORE,
+                                         Ops::Base::CeilDiv(totalLength_, static_cast<uint64_t>(aivBlockDim_))));
+    const uint64_t stage2UsedAivNum =
+        std::min<uint64_t>(aivBlockDim_, Ops::Base::CeilDiv(totalLength_, stage2RowsPerCore));
     tilingData_.set_stage2UsedAivNum(static_cast<uint32_t>(stage2UsedAivNum));
     tilingData_.set_stage2RowsPerCore(static_cast<uint32_t>(stage2RowsPerCore));
 
-    uint64_t mmWorkspaceGroupK = useSequentialKPartials ? workspaceGroupK : actualKBlockNum;
+    const uint64_t mmWorkspaceGroupK = splitK >= M_K_SEQUENTIAL_PARTIAL_THRESHOLD ?
+                                           Ops::Base::CeilDiv(matK_, static_cast<uint64_t>(M_K_SEQUENTIAL_PARTIAL_K)) :
+                                           actualKBlockNum;
     // M-K user workspace layout, with every region boundary aligned to M_K_WORKSPACE_ALIGN:
     //   [mmOffset, rmsOffset): FP32 matmul partials [mmWorkspaceGroupK, M, fusionSize].
     //   [rmsOffset, finalOffset): FP32 RMS partials [actualKBlockNum, M].
@@ -744,23 +781,22 @@ ge::graphStatus MhcPreBaseTiling::CalculateMkTiling()
     //       [mDim * actualKBlockNum, 2, mL1Size, kL1Size], used only by the GM staging path.
     // Part2 reads the first two regions into UB; its reduced hMix stays in UB or goes to the optional output.
     // SYSTEM_WORKSPACE follows the user workspace and is reserved for the runtime.
-    size_t partialMmBytes = static_cast<size_t>(mmWorkspaceGroupK) * totalLength_ * matN_ * sizeof(float);
-    size_t partialRmsBytes = static_cast<size_t>(actualKBlockNum) * totalLength_ * sizeof(float);
-    size_t mmOffset = 0;
-    size_t rmsOffset = roundUp(partialMmBytes, M_K_WORKSPACE_ALIGN);
-    size_t finalOffset = roundUp(rmsOffset + partialRmsBytes, M_K_WORKSPACE_ALIGN);
-    tilingData_.set_mkWorkspaceMmOffset(static_cast<uint32_t>(mmOffset));
+    const uint64_t partialMmBytes = mmWorkspaceGroupK * totalLength_ * matN_ * sizeof(float);
+    const uint64_t partialRmsBytes = actualKBlockNum * totalLength_ * sizeof(float);
+    const uint64_t rmsOffset = Ops::Base::CeilAlign(partialMmBytes, static_cast<uint64_t>(M_K_WORKSPACE_ALIGN));
+    const uint64_t finalOffset =
+        Ops::Base::CeilAlign(rmsOffset + partialRmsBytes, static_cast<uint64_t>(M_K_WORKSPACE_ALIGN));
+    tilingData_.set_mkWorkspaceMmOffset(0U);
     tilingData_.set_mkWorkspaceRmsOffset(static_cast<uint32_t>(rmsOffset));
     tilingData_.set_mkWorkspaceFinalOffset(static_cast<uint32_t>(finalOffset));
-    uint32_t mkStage = SelectMkStage();
+    const uint32_t mkStage = SelectMkStage();
     tilingData_.set_mkUseGmStage(mkStage);
 
     chunkTSize_ = static_cast<uint32_t>(mL1Size);
     v1ChunkDSize_ = V1_CHUNK_D_SIZE;
-    size_t xStageBytes = mkStage == M_K_USE_L1_STAGE ?
-                             0U :
-                             static_cast<size_t>(mDim) * actualKBlockNum * BASIC_API_X_STAGE_BUFFER_COUNT * mL1Size *
-                                 kL1Size * sizeof(float);
+    const uint64_t xStageBytes = mkStage == M_K_USE_L1_STAGE ? 0U :
+                                                               mDim * actualKBlockNum * BASIC_API_DOUBLE_BUFFER_COUNT *
+                                                                   mL1Size * kL1Size * sizeof(float);
     workspaceSize_ = finalOffset + xStageBytes + SYSTEM_WORKSPACE;
     return CheckUbBufferSize();
 }
@@ -834,6 +870,11 @@ ge::graphStatus MhcPreBaseTiling::TilingProcess()
 
 ge::graphStatus MhcPreBaseTiling::CheckUbBufferSize()
 {
+    if (aivBlockDim_ == blockDim_) {
+        // BS and M-K Part2 fit in Ascend960 UB. M-K Part1 is checked during grid search.
+        return ge::GRAPH_SUCCESS;
+    }
+
     size_t fixedBufferSize = 0;
     size_t dynamicBufferSize = 0;
     const size_t floatSize = sizeof(float);
@@ -868,6 +909,102 @@ ge::graphStatus MhcPreBaseTiling::CheckUbBufferSize()
     }
 
     return ge::GRAPH_SUCCESS;
+}
+
+uint64_t MhcPreBaseTiling::CalculateMkPart1UbBytes(uint64_t rowCapacity, uint64_t kUbSize, bool useGmStage) const
+{
+    const uint64_t inputRowBytes = AlignUbBytes(kUbSize * INPUT_ELEMENT_BYTES);
+    const uint64_t fp32RowBytes = AlignUbBytes(kUbSize * sizeof(float));
+    const uint64_t xBytes = BASIC_API_DOUBLE_BUFFER_COUNT * rowCapacity * inputRowBytes; // xInQueue_
+    const uint64_t outBufferCount = useGmStage ? BASIC_API_DOUBLE_BUFFER_COUNT : 1U;
+    const uint64_t outBytes = outBufferCount * rowCapacity * fp32RowBytes; // outQueue_
+    const uint64_t invRmsBytes = AlignUbBytes(rowCapacity * sizeof(float));
+    const uint64_t gammaBytes = hasGamma_ ? BASIC_API_DOUBLE_BUFFER_COUNT * fp32RowBytes : 0U;
+    const uint64_t alignedRows = Ops::Base::CeilAlign(rowCapacity, BASIC_API_FLOAT_ALIGN);
+    const uint64_t nd2NzBytes = useGmStage ? 0U : alignedRows * fp32RowBytes; // nd2NzBuf_
+
+    return xBytes + outBytes + invRmsBytes + gammaBytes + nd2NzBytes;
+}
+
+void MhcPreBaseTiling::CalculateMkKSplit(uint64_t kDim, uint64_t& singleCoreK, uint64_t& splitK,
+                                         uint64_t& actualKBlockNum) const
+{
+    singleCoreK = Ops::Base::CeilAlign(Ops::Base::CeilDiv(matK_, kDim), static_cast<uint64_t>(M_K_SPLIT_ALIGN));
+    // Keep the Cube accumulation order independent of N and the optional residual
+    // segment. The kernel derives the same decision from multCoreSplitKSize.
+    const bool useSequentialKPartials = singleCoreK >= M_K_SEQUENTIAL_PARTIAL_THRESHOLD;
+    const uint64_t workspaceGroupK = Ops::Base::CeilDiv(matK_, static_cast<uint64_t>(M_K_SEQUENTIAL_PARTIAL_K));
+    splitK =
+        useSequentialKPartials ? Ops::Base::CeilDiv(workspaceGroupK, kDim) * M_K_SEQUENTIAL_PARTIAL_K : singleCoreK;
+    actualKBlockNum = Ops::Base::CeilDiv(matK_, splitK);
+}
+
+bool MhcPreBaseTiling::FindMkCoreGrid(uint64_t& mDim, uint64_t& kDim, uint64_t& singleCoreM, uint64_t& kL1Size) const
+{
+    const uint64_t rowAlign = AscendC::BLOCK_CUBE;
+    const uint64_t minRows =
+        Ops::Base::CeilAlign(Ops::Base::CeilDiv(totalLength_, static_cast<uint64_t>(blockDim_)), rowAlign);
+    const uint64_t maxRows = std::min<uint64_t>(M_K_M_L1_MAX_SIZE, Ops::Base::CeilAlign(totalLength_, rowAlign));
+    bool found = false;
+    std::tuple<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t> bestScore{};
+    for (uint64_t rows = minRows; rows <= maxRows; rows += rowAlign) {
+        const uint64_t candidateMDim = Ops::Base::CeilDiv(totalLength_, rows);
+        if (candidateMDim > blockDim_) {
+            continue;
+        }
+        const uint64_t candidateKDim = blockDim_ / candidateMDim;
+        uint64_t singleCoreK = 0U;
+        uint64_t splitK = 0U;
+        uint64_t actualKBlockNum = 0U;
+        CalculateMkKSplit(candidateKDim, singleCoreK, splitK, actualKBlockNum);
+        const bool useSequentialKPartials = singleCoreK >= M_K_SEQUENTIAL_PARTIAL_THRESHOLD;
+        const uint64_t candidateKL1Size = SelectMkKTile(rows, useSequentialKPartials);
+        if (candidateKL1Size == 0U || candidateMDim * actualKBlockNum > blockDim_) {
+            continue;
+        }
+        const uint64_t maxCoreK = std::min(matK_, splitK);
+        const uint64_t mmGroupNum = useSequentialKPartials ?
+                                        Ops::Base::CeilDiv(matK_, static_cast<uint64_t>(M_K_SEQUENTIAL_PARTIAL_K)) :
+                                        actualKBlockNum;
+        const std::tuple<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t> score =
+            std::make_tuple(rows * maxCoreK, Ops::Base::CeilDiv(maxCoreK, candidateKL1Size),
+                            static_cast<uint64_t>(blockDim_) - candidateMDim * actualKBlockNum,
+                            mmGroupNum * matN_ + actualKBlockNum, candidateMDim);
+        if (!found || score < bestScore) {
+            found = true;
+            bestScore = score;
+            mDim = candidateMDim;
+            kDim = candidateKDim;
+            singleCoreM = rows;
+            kL1Size = candidateKL1Size;
+        }
+    }
+    return found;
+}
+
+uint64_t MhcPreBaseTiling::SelectMkKTile(uint64_t mRows, bool useSequentialKPartials) const
+{
+    const uint64_t fusionAlign = Ops::Base::CeilAlign(matN_, static_cast<uint64_t>(BASIC_API_FLOAT_ALIGN));
+    uint64_t tile = std::min<uint64_t>(M_K_A_L1_ELEMENT_COUNT / mRows, M_K_B_L1_ELEMENT_COUNT / fusionAlign);
+    tile = std::min<uint64_t>(tile, M_K_K_L1_MAX_SIZE);
+    tile = std::max<uint64_t>(M_K_K_L1_ALIGN, tile / M_K_K_L1_ALIGN * M_K_K_L1_ALIGN);
+    // Keep every L1 tile inside one sequential partial; only the final partial may be shorter.
+    if (aivBlockDim_ != blockDim_) {
+        if (useSequentialKPartials) {
+            while (M_K_SEQUENTIAL_PARTIAL_K % tile != 0U) {
+                tile -= M_K_K_L1_ALIGN;
+            }
+        }
+        return tile;
+    }
+    const bool useGmStage = SelectMkStage() == M_K_USE_GM_STAGE;
+    for (; tile >= M_K_K_L1_ALIGN; tile -= M_K_K_L1_ALIGN) {
+        const bool sequentialOk = !useSequentialKPartials || M_K_SEQUENTIAL_PARTIAL_K % tile == 0U;
+        if (sequentialOk && CalculateMkPart1UbBytes(mRows, tile, useGmStage) <= ubSize_) {
+            return tile;
+        }
+    }
+    return 0U; // No valid K tile for this grid candidate; keep searching.
 }
 
 ge::graphStatus MhcPreBaseTiling::DoOpTiling()

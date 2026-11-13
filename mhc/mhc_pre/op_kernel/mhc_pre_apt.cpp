@@ -12,7 +12,7 @@
  * \file mhc_pre_apt.cpp
  * \brief
  */
-#if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
+#if (defined(__CCE_AICORE__) && (__CCE_AICORE__ == 310)) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
 #include "arch35/mhc_pre_common.h"
 #include "arch35/mhc_pre_split_bs.h"
 #include "arch35/mhc_pre_m_k_split.h"
@@ -30,7 +30,6 @@ __global__ __aicore__ void mhc_pre(GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADD
     GET_TILING_DATA(tilingData, tilingGM);
     __gm__ uint8_t* user = GetUserWorkspace(workspaceGM);
 
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     TPipe pipe;
     if constexpr (TILING_MODE == MHC_PRE_SPLIT_BS) {
         InitParams initParams{x,     phi,     alpha, bias,  gamma, hin,   h_post,

@@ -13,7 +13,7 @@
  * \brief
  */
 
-#if !defined(__CCE_AICORE__) || __CCE_AICORE__ != 310
+#if (!defined(__CCE_AICORE__) || (__CCE_AICORE__ != 310)) && (!defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201))
 
 #include "kernel_operator.h"
 #include "kernel_operator_intf.h"

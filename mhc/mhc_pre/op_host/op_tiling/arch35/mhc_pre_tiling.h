@@ -138,6 +138,11 @@ protected:
     size_t GetLastRequiredInputIndex() const;
 
 private:
+    uint64_t CalculateMkPart1UbBytes(uint64_t rowCapacity, uint64_t kUbSize, bool useGmStage) const;
+    void CalculateMkKSplit(uint64_t kDim, uint64_t& singleCoreK, uint64_t& splitK, uint64_t& actualKBlockNum) const;
+    uint64_t SelectMkKTile(uint64_t mRows, bool useSequentialKPartials) const;
+    bool FindMkCoreGrid(uint64_t& mDim, uint64_t& kDim, uint64_t& singleCoreM, uint64_t& kL1Size) const;
+
     MhcPreTilingData tilingData_;
     uint32_t blockDim_ = 32; // AIC
     uint32_t aivBlockDim_ = 64;

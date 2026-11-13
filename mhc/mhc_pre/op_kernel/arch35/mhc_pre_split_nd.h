@@ -215,7 +215,7 @@ __aicore__ inline void MhcPreSplitND<T, P, RESI_MODE>::Process()
         AscendC::CrossCoreSetFlag<0x0, PIPE_FIX>(SYNC_CtoC);
         AscendC::CrossCoreWaitFlag(SYNC_CtoC);
         AscendC::CrossCoreSetFlag<0x2, PIPE_FIX>(SYNC_CtoV1);
-        mmService_.End(this->vector_.implMode_);
+        mmService_.End();
     }
 
     if ASCEND_IS_AIV {

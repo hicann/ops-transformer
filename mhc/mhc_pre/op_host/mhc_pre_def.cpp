@@ -91,6 +91,7 @@ public:
             .ExtendCfgInfo("opFile.value", "mhc_pre_apt");
         this->AICore().AddConfig("ascend950", aicConfig);
         this->AICore().AddConfig("ascend350", aicConfig);
+        this->AICore().AddConfig("ascend960dt", aicConfig);
 
         this->Attr("out_flag").AttrType(OPTIONAL).Int(0);
         this->Attr("norm_eps").AttrType(OPTIONAL).Float(1e-6f);

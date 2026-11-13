@@ -572,15 +572,22 @@ public:
             mmService_.Init(vector_.implMode_);
             // Seed two availability tokens for each subblock because X staging
             // is ping-ponged. Every later token is returned after AIC consumes X.
-            CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_CONSUMED_FLAG);
-            CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_CONSUMED_FLAG +
-                                                                      MHC_PRE_SUBBLOCK_FLAG_OFFSET);
-            CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_CONSUMED_FLAG);
-            CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_CONSUMED_FLAG +
-                                                                      MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+            CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_CONSUMED_FLAG); // Ping
+            if constexpr (MHC_PRE_AIV_PER_AIC == TWO_AIV_PER_AIC) {
+                CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(
+                    MHC_PRE_X_CONSUMED_FLAG + MHC_PRE_SUBBLOCK_FLAG_OFFSET); // Ping token for the second AIV
+            }
+            CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(MHC_PRE_X_CONSUMED_FLAG); // Pong
+            if constexpr (MHC_PRE_AIV_PER_AIC == TWO_AIV_PER_AIC) {
+                CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE1>(
+                    MHC_PRE_X_CONSUMED_FLAG + MHC_PRE_SUBBLOCK_FLAG_OFFSET); // Pong token for the second AIV
+            }
         }
         if ASCEND_IS_AIV {
-            uint32_t rowCapacity = (vector_.tiling_->mL1Size + 1U) / 2U;
+            uint32_t rowCapacity = vector_.tiling_->mL1Size;
+            if constexpr (MHC_PRE_AIV_PER_AIC == TWO_AIV_PER_AIC) {
+                rowCapacity = (rowCapacity + vector_.kHalfSplitDivisor - 1U) / vector_.kHalfSplitDivisor;
+            }
             uint32_t kCapacity = BasicApiRoundUp<T>(vector_.tiling_->kUbSize);
             vector_.pipe_->InitBuffer(vector_.xInQueue_, 2, rowCapacity * kCapacity * sizeof(T));
             // GM staging is ping-ponged to overlap AIV MTE3, AIC MTE2 ND2NZ, and Cube execution.
@@ -605,7 +612,7 @@ public:
     {
         uint32_t aicIndex = GetBlockIdx();
         if ASCEND_IS_AIV {
-            aicIndex /= 2U;
+            aicIndex /= MHC_PRE_AIV_PER_AIC;
         }
         uint32_t usedCoreNum = vector_.tiling_->cubeBlockDimM * vector_.tiling_->cubeBlockDimK;
         if (aicIndex < usedCoreNum) {
@@ -624,7 +631,7 @@ public:
             }
         }
         if ASCEND_IS_AIC {
-            mmService_.End(vector_.implMode_);
+            mmService_.End();
         }
         SyncAll<false>();
     }
@@ -662,9 +669,16 @@ private:
     }
     __aicore__ inline void ProcessAiv(uint32_t mStart, uint32_t mReal, uint32_t kIndex, uint32_t kStart, uint32_t kEnd)
     {
-        uint32_t firstRows = (mReal + 1U) / 2U;
-        uint32_t rowStart = GetSubBlockIdx() == 0 ? 0U : firstRows;
-        uint32_t rowCount = GetSubBlockIdx() == 0 ? firstRows : mReal - firstRows;
+        uint32_t rowStart;
+        uint32_t rowCount;
+        if constexpr (MHC_PRE_AIV_PER_AIC == 1) {
+            rowStart = 0U;
+            rowCount = mReal;
+        } else {
+            uint32_t firstRows = (mReal + vector_.kHalfSplitDivisor - 1U) / vector_.kHalfSplitDivisor;
+            rowStart = GetSubBlockIdx() == 0 ? 0U : firstRows;
+            rowCount = GetSubBlockIdx() == 0 ? firstRows : mReal - firstRows;
+        }
         uint8_t aL1BufferId = 0;
         vector_.globalOffsetM_ = mStart;
         if (rowCount == 0U) {
@@ -743,7 +757,9 @@ private:
                 xCopyParams.srcStride = (BasicApiRoundUp<P>(currentK) - currentK) * sizeof(P);
                 xCopyParams.dstStride = (vector_.tiling_->kL1Size - currentK) * sizeof(P);
                 uint64_t stageSlotElements = static_cast<uint64_t>(vector_.tiling_->mL1Size) * vector_.tiling_->kL1Size;
-                uint64_t stageOffset = (2U * (GetBlockIdx() / 2U) + aL1BufferId) * stageSlotElements +
+                uint32_t mixCoreIndex = GetBlockIdx();
+                mixCoreIndex /= MHC_PRE_AIV_PER_AIC;
+                uint64_t stageOffset = (vector_.kDoubleBufferCount * mixCoreIndex + aL1BufferId) * stageSlotElements +
                                        static_cast<uint64_t>(rowStart) * vector_.tiling_->kL1Size;
                 DataCopyPad(xStageGm_[stageOffset], xFloatLocal, xCopyParams);
                 vector_.outQueue_.FreeTensor(xFloatLocal);
@@ -760,8 +776,7 @@ private:
                 copyParams.blockLen = rowCount * MHC_PRE_BASIC_API_C0_SIZE * sizeof(P) / MHC_PRE_BASIC_API_BLOCK_SIZE;
                 copyParams.srcStride = BasicApiAlign(rowCount, MHC_PRE_BASIC_API_C0_SIZE) - rowCount;
                 copyParams.dstStride = BasicApiAlign(mReal, AscendC::BLOCK_CUBE) - rowCount;
-                uint32_t dstRowOffset =
-                    GetSubBlockIdx() == 0 ? 0U : firstRows * (MHC_PRE_BASIC_API_BLOCK_SIZE / sizeof(P));
+                uint32_t dstRowOffset = rowStart * (MHC_PRE_BASIC_API_BLOCK_SIZE / sizeof(P));
                 BasicApiCopyToL1(currentNd2Nz, aL1_[aL1BufferId * MHC_PRE_BASIC_API_L1_BUF_OFFSET + dstRowOffset],
                                  copyParams);
                 SetFlag<HardEvent::MTE3_V>(eventId);

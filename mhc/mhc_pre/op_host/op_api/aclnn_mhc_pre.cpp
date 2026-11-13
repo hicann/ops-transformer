@@ -55,6 +55,9 @@ constexpr int64_t N_VALID_VALUES[] = {4, 6, 8};
 constexpr int64_t N_VALID_VALUE_A2 = 4;
 constexpr int64_t D_ALIGNMENT = 16;
 constexpr int64_t D_ALIGNMENT_A2 = 128;
+constexpr int64_t D_MIN_ARCH92 = 16;
+constexpr int64_t D_MAX_ARCH92 = 16384;
+constexpr int64_t TOTAL_LENGTH_MAX_ARCH92 = 65536;
 constexpr int64_t ALPHA_DIM_SIZE_3 = 3;
 constexpr int64_t ALPHA_DIM_SIZE_2 = 2;
 constexpr int64_t PHI_DIM_OFFSET = 2;
@@ -861,18 +864,43 @@ static bool CheckOpImplMode(const MhcParamsBase& params)
     return true;
 }
 
+static bool CheckShapeRangeArch92(const MhcParamsBase& params)
+{
+    const auto& xShape = params.x->GetViewShape();
+    int64_t batchOrTokens = xShape.GetDim(DIM_IDX_0);
+    int64_t sequence = xShape.GetDimNum() == DIM_NUM_4 ? xShape.GetDim(DIM_IDX_1) : 1;
+    if (batchOrTokens <= 0 || sequence <= 0 || batchOrTokens > TOTAL_LENGTH_MAX_ARCH92 / sequence) {
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(ACLNN_OP_NAME, "x", TensorShapeToString(params.x).c_str(),
+                                              "B*S (BSND) or T (TND) must be in [1, 65536] on Ascend960");
+        return false;
+    }
+
+    int64_t d = xShape.GetDim(xShape.GetDimNum() - 1);
+    if (d < D_MIN_ARCH92 || d > D_MAX_ARCH92) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "D", std::to_string(d).c_str(),
+                                              "D in x shape must be in [16, 16384] on Ascend960");
+        return false;
+    }
+    return true;
+}
+
 static aclnnStatus CheckParams(const MhcParamsBase& params)
 {
     CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckEmptyTensor(params), ACLNN_ERR_PARAM_INVALID);
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9201) {
         CHECK_RET(CheckInputDimsA2(params), ACLNN_ERR_PARAM_INVALID);
     } else {
         CHECK_RET(CheckInputDims(params), ACLNN_ERR_PARAM_INVALID);
     }
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+        CHECK_RET(CheckShapeRangeArch92(params), ACLNN_ERR_PARAM_INVALID);
+    }
     CHECK_RET(CheckAlphaShape(params.alpha), ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckRequiredHRes(params), ACLNN_ERR_PARAM_NULLPTR);
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9201) {
         CHECK_RET(CheckOutputDimsA2(params), ACLNN_ERR_PARAM_INVALID);
         CHECK_RET(CheckOptionalOutputGroup(params), ACLNN_ERR_PARAM_INVALID);
         CHECK_RET(CheckOptionalOutputDimsA2(params), ACLNN_ERR_PARAM_INVALID);
