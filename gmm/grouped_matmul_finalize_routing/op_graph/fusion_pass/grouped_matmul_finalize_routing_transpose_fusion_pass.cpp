@@ -25,6 +25,7 @@
 #include "acl/acl_rt.h"
 #include "graph/utils/type_utils.h"
 #include "log/log.h"
+#include "../../../../common/include/op_host/op_const_def_transformer.h"
 #include "platform/platform_info.h"
 #include "register/register_custom_pass.h"
 #include "securec.h"
@@ -67,6 +68,7 @@ constexpr char OP_TYPE_PACK[] = "Pack";
 constexpr char ATTR_TRANSPOSE_WEIGHT[] = "transpose_w";
 constexpr char ASCEND_950_SOC_VERSION[] = "Ascend950";
 constexpr char ASCEND_350_SOC_VERSION[] = "Ascend350";
+constexpr char ASCEND_960_DT_SOC_VERSION[] = "Ascend960DT";
 
 constexpr int64_t X_INDEX = 0;
 constexpr int64_t WEIGHT_INDEX = 1;
@@ -548,7 +550,8 @@ bool CheckPlatformSupportsTransposeFusion()
         return false;
     }
     return platformInfo.str_info.short_soc_version == ASCEND_950_SOC_VERSION ||
-           platformInfo.str_info.short_soc_version == ASCEND_350_SOC_VERSION;
+           platformInfo.str_info.short_soc_version == ASCEND_350_SOC_VERSION ||
+           platformInfo.str_info.short_soc_version == ASCEND_960_DT_SOC_VERSION;
 }
 
 bool CheckGroupedMatmulFinalizeRouting(const GNode& nodeGmmFr)

@@ -176,6 +176,28 @@ INSTANTIATE_TEST_SUITE_P(GMMFR_INFERSHAPE, TestInfershape, testing::ValuesIn(Loa
 
 class TestInferdtype : public testing::Test {};
 
+TEST_F(TestInferdtype, A8HiF4DtypeContract)
+{
+    ge::DataType d[] = {ge::DT_FLOAT8_E4M3FN,
+                        Ops::Transformer::DT_HIFLOAT4,
+                        Ops::Transformer::DT_HIFLOAT4_SCALE,
+                        ge::DT_UNDEFINED,
+                        ge::DT_FLOAT8_E8M0,
+                        ge::DT_INT64,
+                        ge::DT_UNDEFINED,
+                        ge::DT_FLOAT,
+                        ge::DT_INT64};
+    ge::DataType output = ge::DT_UNDEFINED;
+    EXPECT_EQ(RunInferDtype(d, true, 0, &output), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(output, ge::DT_FLOAT);
+    EXPECT_EQ(RunInferDtype(d, true, 2), ge::GRAPH_FAILED);
+    d[2] = ge::DT_FLOAT8_E8M0;
+    EXPECT_EQ(RunInferDtype(d, true), ge::GRAPH_FAILED);
+    d[2] = Ops::Transformer::DT_HIFLOAT4_SCALE;
+    d[0] = ge::DT_HIFLOAT8;
+    EXPECT_EQ(RunInferDtype(d, true), ge::GRAPH_FAILED);
+}
+
 TEST_F(TestInferdtype, W8A8ValidDtypes)
 {
     ge::DataType d[] = {ge::DT_INT8,  ge::DT_INT8,      ge::DT_FLOAT,     ge::DT_UNDEFINED, ge::DT_UNDEFINED,

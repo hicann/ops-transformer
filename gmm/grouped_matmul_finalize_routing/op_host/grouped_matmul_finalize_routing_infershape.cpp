@@ -12,6 +12,7 @@
  * \file grouped_matmul_finalize_routing.cc
  * \brief
  */
+#include "../../../common/include/op_host/op_const_def_transformer.h"
 #include <map>
 #include <string>
 #include <sstream>
@@ -302,6 +303,34 @@ static ge::graphStatus ValidateOffsetShape(const InferShapeContext* context, con
     return ge::GRAPH_SUCCESS;
 }
 
+// A8HiF4 uses the MX scale axes, but a single HiF4 scale per block.
+// Accept the pre-fusion view as well as FT; the execution path enforces FT/NZ.
+static ge::graphStatus CheckA8HiF4Shape(const InferShapeContext* context, bool transposeWeight)
+{
+    const auto* x = context->GetInputShape(xIndex);
+    const auto* w = context->GetInputShape(wIndex);
+    const auto* scale = context->GetOptionalInputShape(scaleOptionIndex);
+    const auto* xs = context->GetOptionalInputShape(pertokenScaleOptionIndex);
+    if (x == nullptr || w == nullptr || scale == nullptr || xs == nullptr || x->GetDimNum() != twoDimNum ||
+        w->GetDimNum() != threeDimNum || scale->GetDimNum() != fourDimNum || xs->GetDimNum() != threeDimNum) {
+        return ge::GRAPH_FAILED;
+    }
+    const int64_t m = x->GetDim(0);
+    const int64_t k = x->GetDim(1);
+    const auto same = [](int64_t a, int64_t b) { return a == DYNAMIC_DIM || b == DYNAMIC_DIM || a == b; };
+    if (scale->GetDim(threeDimNum) != 1 || xs->GetDim(twoDimNum) != GMMFR_QUANT_SCALE_PARAM_COUNT ||
+        !same(xs->GetDim(0), m) || !same(scale->GetDim(0), w->GetDim(0))) {
+        return ge::GRAPH_FAILED;
+    }
+    const int64_t q = k == DYNAMIC_DIM ? DYNAMIC_DIM : (k + GMMFR_SPLIT_SIZE - 1) / GMMFR_SPLIT_SIZE;
+    const size_t nDim = transposeWeight ? 1 : twoDimNum;
+    if (!same(scale->GetDim(transposeWeight ? twoDimNum : 1), q) || !same(xs->GetDim(1), q) ||
+        !same(scale->GetDim(nDim), w->GetDim(nDim))) {
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 static ge::graphStatus InferShapeGroupedMatmulFinalizeRouting(InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "context is null"),
@@ -327,6 +356,12 @@ static ge::graphStatus InferShapeGroupedMatmulFinalizeRouting(InferShapeContext*
     auto shape_scale = context->GetOptionalInputShape(scaleOptionIndex);
     OP_CHECK_IF(shape_scale == nullptr, OPS_REPORT_CUBE_INNER_ERR(op_name, "scale is not given."),
                 return ge::GRAPH_FAILED);
+    const auto* weightDesc = context->GetInputDesc(wIndex);
+    if (weightDesc != nullptr && weightDesc->GetDataType() == Ops::Transformer::DT_HIFLOAT4 &&
+        CheckA8HiF4Shape(context, transposeWeight) != ge::GRAPH_SUCCESS) {
+        OP_LOGE(op_name, "Invalid A8HiF4 scale shapes.");
+        return ge::GRAPH_FAILED;
+    }
     if (shape_scale->GetDimNum() == fourDimNum) {
         OP_CHECK_IF(SetXAndWShapesForMX(context, xAndWParams) != ge::GRAPH_SUCCESS,
                     OPS_REPORT_CUBE_INNER_ERR(op_name, "x or w is null."), return ge::GRAPH_FAILED);
@@ -463,12 +498,40 @@ static bool IsSupportMX(const gert::InferDataTypeContext* context, const int64_t
     return false;
 }
 
+static bool IsSupportA8HiF4(const gert::InferDataTypeContext* context, const int64_t* outputDtype)
+{
+    const auto optionalType = [context](size_t index, ge::DataType expected) {
+        auto dtype = context->GetOptionalInputDataType(index);
+        return dtype == ge::DT_UNDEFINED || dtype == expected;
+    };
+    if (context->GetInputDataType(xIndex) != ge::DT_FLOAT8_E4M3FN ||
+        context->GetOptionalInputDataType(scaleOptionIndex) != Ops::Transformer::DT_HIFLOAT4_SCALE ||
+        context->GetOptionalInputDataType(pertokenScaleOptionIndex) != ge::DT_FLOAT8_E8M0 ||
+        context->GetOptionalInputDataType(groupListOptionIndex) != ge::DT_INT64 ||
+        context->GetOptionalInputDataType(rowIndexOptionIndex) != ge::DT_INT64 ||
+        context->GetOptionalInputDataType(logitOptionIndex) != ge::DT_FLOAT ||
+        context->GetOptionalInputDataType(offsetOptionIndex) != ge::DT_UNDEFINED ||
+        !optionalType(biasOptionIndex, ge::DT_BF16) || !optionalType(sharedInputOptionIndex, ge::DT_BF16) ||
+        (outputDtype != nullptr && *outputDtype != 0)) {
+        return false;
+    }
+    return true;
+}
+
 static ge::graphStatus InferDataTypeGroupedMatmulFinalizeRouting(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "context is null"),
                 return ge::GRAPH_FAILED);
     auto attrs = context->GetAttrs();
     const int64_t* outputDtype = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(0);
+    if (context->GetInputDataType(wIndex) == Ops::Transformer::DT_HIFLOAT4) {
+        if (!IsSupportA8HiF4(context, outputDtype)) {
+            OP_LOGE(context->GetNodeName(), "Invalid A8HiF4 dtype combination.");
+            return ge::GRAPH_FAILED;
+        }
+        context->SetOutputDataType(0, ge::DT_FLOAT);
+        return ge::GRAPH_SUCCESS;
+    }
     bool supportDataTypeMX = IsSupportMX(context, outputDtype);
 
     bool supportDataTypeW8A8 = (context->GetInputDataType(xIndex) == ge::DT_INT8 ||
