@@ -19,15 +19,7 @@
 #include "../arch35_92/common/mega_moe_sync.h"
 #include "kernel_operator.h"
 
-#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
-#include "version/asc_devkit_version.h"
-#include "version/hcomm_version.h"
-
-#if (ASC_DEVKIT_VERSION_NUM >= 90200000) && (HCOMM_VERSION_NUM >= 90200000)
-#define ENABLE_MEGA_MOE_LAYERED_KERNEL
-#endif
-
-#endif
+#include "../arch35_92/common/mega_moe_hcomm_version.h"
 
 #include "kernel_tiling/kernel_tiling.h"
 #include "kernel_operator_list_tensor_intf.h"

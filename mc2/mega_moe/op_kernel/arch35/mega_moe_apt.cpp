@@ -12,19 +12,7 @@
  * \file mega_moe_apt.cpp
  */
 
-#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
-#include "version/asc_devkit_version.h"
-#include "version/hcomm_version.h"
-
-#if ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)
-#define ENABLE_TENSOR_API
-#endif
-
-#if (ASC_DEVKIT_VERSION_NUM >= 90200000) && (HCOMM_VERSION_NUM >= 90200000)
-#define ENABLE_MEGA_MOE_LAYERED_KERNEL
-#endif
-
-#endif
+#include "../arch35_92/common/mega_moe_hcomm_version.h"
 
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
@@ -117,6 +105,7 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
     } else if constexpr (CommModeType == TILINGKEY_TPL_URMA) {
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL) && (ORIG_DTYPE_X == DT_BF16)
         if (tilingData.dispatchQuantMode == DISPATCH_QUANT_MODE_MXFP) {
+#if defined(ENABLE_MEGA_MOE_LAYERED_ROCE_KERNEL)
             if (tilingData.compute.topoType == MegaMoeImpl::TOPO_TYPE_URMA_ROCE) {
                 MegaMoeImpl::MegaMoeLayered<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
                                             FORMAT_WEIGHT1, FORMAT_WEIGHT2, MegaMoeImpl::LayeredUbxComm>
@@ -125,7 +114,9 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
                         sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
                         expertTokenNumsOut, workspaceGM, &tilingData);
                 op.Process();
-            } else {
+            } else
+#endif
+                if (tilingData.compute.topoType == MegaMoeImpl::TOPO_TYPE_URMA) {
                 MegaMoeImpl::MegaMoeLayered<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
                                             FORMAT_WEIGHT1, FORMAT_WEIGHT2>
                     op(context);

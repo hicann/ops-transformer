@@ -11,6 +11,8 @@
 #ifndef MEGA_MOE_LAYERED_COMM_H
 #define MEGA_MOE_LAYERED_COMM_H
 
+#include "mega_moe_hcomm_version.h"
+
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
 #include "adv_api/hcomm/hcomm.h"
 #include "mega_moe_constants.h"
@@ -22,9 +24,11 @@ using namespace AscendC;
 
 // 本实现的分块长度小于协议上限；中间分块预留 512B，使后续地址保持原有对齐。
 constexpr uint32_t LAYERED_URMA_WRITE_BYTES_LIMIT = 256U * 1024U * 1024U;
-constexpr uint32_t LAYERED_ROCE_WRITE_BYTES_LIMIT = uint32_t(1) << 31U;
 constexpr uint32_t LAYERED_URMA_WRITE_CHUNK_BYTES = LAYERED_URMA_WRITE_BYTES_LIMIT - 512U;
+#if defined(ENABLE_MEGA_MOE_LAYERED_ROCE_KERNEL)
+constexpr uint32_t LAYERED_ROCE_WRITE_BYTES_LIMIT = uint32_t(1) << 31U;
 constexpr uint32_t LAYERED_ROCE_WRITE_CHUNK_BYTES = LAYERED_ROCE_WRITE_BYTES_LIMIT - 512U;
+#endif
 
 // 两种 Layered 通信策略共用的 URMA 写配置。
 static constexpr UrmaWqeEntry LAYERED_RELAXED_WRITE_WQE_CONFIG = {
@@ -181,6 +185,7 @@ private:
     Hcomm<COMM_PROTOCOL_UB_CTP> hcomm_;
 };
 
+#if defined(ENABLE_MEGA_MOE_LAYERED_ROCE_KERNEL)
 // The communication library owns SQ/CQ reclamation for consecutive commits.
 // Explicit completion waits follow the existing business dependencies.
 // The scheduling/peermem layout remains the real Layered path.
@@ -337,6 +342,8 @@ private:
     Hcomm<COMM_PROTOCOL_UB_CTP> urma_;
     Hcomm<COMM_PROTOCOL_ROCE> roce_;
 };
+
+#endif // ENABLE_MEGA_MOE_LAYERED_ROCE_KERNEL
 
 } // namespace MegaMoeImpl
 #endif
