@@ -81,6 +81,7 @@ public:
         this->AICore().AddConfig("ascend910b", aicore_config);
         this->AICore().AddConfig("ascend910_93", aicore_config);
         this->AICore().AddConfig("ascend950", aicore_config);
+        this->AICore().AddConfig("ascend350", aicore_config);
     }
 };
 OP_ADD(CompressorV2, optiling::CompressorV2CompileInfo);
