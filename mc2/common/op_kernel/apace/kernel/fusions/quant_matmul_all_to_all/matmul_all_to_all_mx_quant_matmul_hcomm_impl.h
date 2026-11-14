@@ -60,7 +60,7 @@ __aicore__ inline GM_ADDR MatmulAllToAllMxGmAddr(GM_ADDR baseAddr, uint64_t elem
  * The complete APACE path stays here: tiling interpretation, Blaze output
  * layout, main/tail address calculation and Hcomm submission. The legacy
  * MxQuantMatmulAlltoAllArch35 wrapper is intentionally not reused, matching
- * the isolation pattern of AllToAllMxQuantMatmulHcommImpl.
+ * the isolation pattern of AllToAllMatmulHcommImpl.
  */
 template <typename X1Type, typename X2Type, typename YType, typename TilingDataType, AscendC::HcclServerType ServerType,
           bool TransB>

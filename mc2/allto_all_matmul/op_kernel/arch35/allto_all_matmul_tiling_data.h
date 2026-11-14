@@ -20,6 +20,7 @@
 #include "../../../common/op_kernel/mc2_tiling_struct.h"
 #include "../../../3rd/mat_mul_v3/op_kernel/arch35/mat_mul_tiling_data.h"
 #include "../../../3rd/quant_batch_matmul_v3/op_kernel/arch35/qbmv3_arch35_tiling_data.h"
+#include "../../../common/op_kernel/apace/tiling/matmul_tiling_data.h"
 
 struct AlltoAllMatmulTilingInfo {
     uint32_t rankDim;            // 卡数:kernel能通过hccl接口获取到就直接删除
@@ -49,6 +50,8 @@ struct AlltoAllMatmulTilingData {
     AlltoAllMatmulTilingInfo alltoAllMatmulTilingInfo;
     Mc2MatMulV3TilingData mc2MmV3TileTilingData; // 通算切分头块matmul tiling数据
     Mc2MatMulV3TilingData mc2MmV3TailTilingData; // 通算切分尾块matmul tiling数据
+    MatmulTilingData apaceMmTilingData;          // 非量化 APACE 的 SWAT matmul tiling
+    uint32_t localMatmul; // APACE计算模式: 0-全rank REMOTE, 1-DEFERRED_SYNC, 2-LOCAL+REMOTE GM累加
 };
 
 // MX量化tiling结构体

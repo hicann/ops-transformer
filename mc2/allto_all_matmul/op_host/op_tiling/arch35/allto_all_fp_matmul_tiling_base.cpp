@@ -13,6 +13,7 @@
  * \brief
  */
 #include "allto_all_fp_matmul_tiling_base.h"
+#include "../../../../common/op_kernel/apace/tiling/matmul_tiling_swat.h"
 
 #include <algorithm>
 #include "common/utils/mc2_comm_utils.h"
@@ -130,7 +131,19 @@ ge::graphStatus AllToAllFpMatmulTilingBase::DoOpTiling()
     MC2_CHECK_LOG_RET(opName_, InitTilingContextParameters());
     // 进行通算切分
     MC2_CHECK_LOG_RET(opName_, TileCommAndCompute());
-    // 调用非量化Matmul的tiling方法进行切分
+    const bool isA6 = npuArch_ == Ops::Base::DAV_9201;
+    usingApaceImpl_ = isA6 && inferredInfo_.tileM > 0 && inferredInfo_.tileCnt > 0 && inferredInfo_.tileCnt <= 255 &&
+                      inferredInfo_.tailCnt <= 255;
+    OP_LOGD(opName_, "FP APACE platform gate: npuArch=%d, rankDim=%u, enabled=%d", static_cast<int32_t>(npuArch_),
+            contextInfo_.args_.rankDim, usingApaceImpl_);
+    if (usingApaceImpl_) {
+        int64_t groupRankDim = 0;
+        OP_TILING_CHECK(!mc2tiling::GetRankSize(opName_, contextInfo_.group.c_str(), groupRankDim),
+                        OP_LOGE(opName_, "Failed to query communication group rank size."), return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(groupRankDim != contextInfo_.args_.rankDim,
+                        OP_LOGE(opName_, "Communication group rank size differs from tiling."),
+                        return ge::GRAPH_FAILED);
+    }
     MC2_CHECK_LOG_RET(opName_, DoMMTiling());
     // hccl的tiling参数赋值处理
     MC2_CHECK_LOG_RET(opName_, SetHcclTiling());
@@ -146,6 +159,23 @@ ge::graphStatus AllToAllFpMatmulTilingBase::DoMMTiling()
 {
     // platform非空校验已在GetPlatformInfo校验过
     fe::PlatFormInfos* platformInfo = context_->GetPlatformInfo();
+    if (usingApaceImpl_) {
+        platform_ascendc::PlatformAscendC platform(platformInfo);
+        OP_TILING_CHECK(
+            platform.GetCoreNumAic() == 0 || platform.GetCoreNumAiv() == 0 || contextInfo_.args_.inputDtypeSize == 0,
+            OP_LOGE(opName_, "Invalid APACE FP platform or dtype size."), return ge::GRAPH_FAILED);
+        MatmulTilingSwat tilingSwat;
+        tilingSwat.SetPlatformInfoPtr(platformInfo);
+        // Use the post-AlltoAll per-rank output M, matching the device problemShape.
+        tilingSwat.GetTilingData(contextInfo_.args_.mValue, contextInfo_.args_.nValue, contextInfo_.args_.orgKValue,
+                                 contextInfo_.args_.inputDtypeSize, false, contextInfo_.args_.isBTrans,
+                                 localTilingData_.apaceMmTilingData, contextInfo_.args_.isBias);
+        const auto& mmTile = localTilingData_.apaceMmTilingData;
+        OP_TILING_CHECK(mmTile.usedCoreNum == 0 || mmTile.baseM == 0 || mmTile.baseN == 0 || mmTile.baseK == 0 ||
+                            mmTile.mL1 == 0 || mmTile.nL1 == 0 || mmTile.kL1 == 0,
+                        OP_LOGE(opName_, "Invalid APACE FP SWAT Matmul tiling."), return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
     if (mc2_matmul_v3_advanced::InitCompileInfo(platformInfo, &mmV3compileInfo_) != ge::GRAPH_SUCCESS) {
         OP_LOGE(opName_, "Fail to Init CompileInfo!");
         return ge::GRAPH_FAILED;
@@ -161,7 +191,7 @@ ge::graphStatus AllToAllFpMatmulTilingBase::DoMMTiling()
         mmV3Args_.hasBias = false;
     }
 
-    //  tile  tiling
+    // Use the same head-tile shape for MatmulV3 tiling on both paths.
     mmV3Args_.mValue = inferredInfo_.tileM;
     Mc2MatmulHelper::Mc2MatmulTilingCfg tileTilingCfg(reinterpret_cast<const void*>(&mmV3compileInfo_),
                                                       reinterpret_cast<const void*>(&mmV3Args_));
@@ -259,14 +289,16 @@ uint64_t AllToAllFpMatmulTilingBase::GetTilingKey() const
     }
     bool x2TransposeFlag = contextInfo_.args_.isBTrans ? true : false;
     uint8_t commMode = (hcclServerType_ == mc2tiling::A5_CCU_ENGINE) ? ALL2ALL_COMM_TYPE_CCU : ALL2ALL_COMM_TYPE_AICPU;
-    // 非量化+有bias: 按M/N规模选择分核策略; 否则关闭
-    uint8_t addBiasSplitMode = contextInfo_.args_.isBias ? ChooseAddBiasSplitMode() : ADDBIAS_OFF;
-    const uint64_t tilingKey =
-        GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, false, commMode, false, addBiasSplitMode, false);
+    // APACE 在 MMAD 的首个 split-K 分片随路加 bias；仅旧 pipeline 使用独立 AIV add_bias 分核策略。
+    uint8_t addBiasSplitMode = (!usingApaceImpl_ && contextInfo_.args_.isBias) ? ChooseAddBiasSplitMode() : ADDBIAS_OFF;
+    const bool enableOutput = usingApaceImpl_ && contextInfo_.allToAllOutFlag;
+    const uint64_t tilingKey = GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, false, commMode,
+                                                  usingApaceImpl_, addBiasSplitMode, enableOutput);
     OP_LOGD(opName_,
             "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,ISSMALLK,COMMMODE,USING_APACE_IMPL,ADDBIASSPLITMODE,"
-            "ENABLE_HCOMM_ALL_TO_ALL_OUT: [%d,%d,%d,0,%d,0,%d,0], TilingKey is [%lu].",
-            NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, tilingKey);
+            "ENABLE_HCOMM_ALL_TO_ALL_OUT: [%d,%d,%d,0,%d,%d,%d,%d], TilingKey is [%lu].",
+            NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, usingApaceImpl_, addBiasSplitMode, enableOutput,
+            tilingKey);
     return tilingKey;
 }
 
@@ -312,6 +344,7 @@ uint8_t AllToAllFpMatmulTilingBase::ChooseAddBiasSplitMode() const
 ge::graphStatus AllToAllFpMatmulTilingBase::PostTiling()
 {
     SetTilingInfo(localTilingData_.alltoAllMatmulTilingInfo);
+    localTilingData_.localMatmul = 0; // FP APACE当前固定使用全rank REMOTE确定性累加
     AlltoAllMatmulTilingData* outTilingData = context_->GetTilingData<AlltoAllMatmulTilingData>();
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
     OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get tiling data from context"),
@@ -366,7 +399,15 @@ void AllToAllFpMatmulTilingBase::SetTilingInfo(AlltoAllMatmulTilingInfo& tilingI
  */
 void AllToAllFpMatmulTilingBase::PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingData& alltoAllMatmulTilingData)
 {
+    OP_LOGD(opName_, "TilingData.localMatmul: %u", alltoAllMatmulTilingData.localMatmul);
     PrintAlltoAllMatmulTilingInfo(opName_, alltoAllMatmulTilingData.alltoAllMatmulTilingInfo);
+    if (usingApaceImpl_) {
+        const auto& mm = alltoAllMatmulTilingData.apaceMmTilingData;
+        OP_LOGD(opName_, "APACE FP MM SWAT: cores=%u base=(%u,%u,%u) L1=(%u,%u,%u) stages=(%u,%u)", mm.usedCoreNum,
+                mm.baseM, mm.baseN, mm.baseK, mm.mL1, mm.nL1, mm.kL1, static_cast<uint32_t>(mm.l1BufferNum),
+                static_cast<uint32_t>(mm.l0cDB));
+        return;
+    }
     PrintMMV3TilingData(opName_, alltoAllMatmulTilingData.mc2MmV3TileTilingData);
     if (alltoAllMatmulTilingData.alltoAllMatmulTilingInfo.tailCnt == 0) {
         return;

@@ -92,9 +92,12 @@ TEST_P(AlltoAllMatmulArch35TilingTest, param)
     gert::TilingContextPara tilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo,
                                               param.soc);
     if (param.worldSize > 0 && param.worldSize <= 64 &&
-        ((param.x1QuantMode == 6 && param.x2QuantMode == 6) ||
-         (param.x1QuantMode == 8 && param.x2QuantMode == 8))) { // MX与HiF4量化均需mock通信域rank数
-        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValue("rankNum", static_cast<uint64_t>(param.worldSize));
+        ((param.x1QuantMode == 0 && param.x2QuantMode == 0) || (param.x1QuantMode == 6 && param.x2QuantMode == 6) ||
+         (param.x1QuantMode == 8 && param.x2QuantMode == 8))) { // APACE 非量化、MX 与 HiF4 均需 mock 通信域 rank 数
+        const uint64_t groupRankSize = param.case_name == "fp_apace_rank_mismatch_noout" ?
+                                           static_cast<uint64_t>(param.worldSize * 2) :
+                                           static_cast<uint64_t>(param.worldSize);
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValue("rankNum", groupRankSize);
     }
     // 960dt+CCU 组网白名单 mock 路由: 正向用例显式 mock 单层纯 fullmesh 1D 主路径; 四类拦截面负向
     // 按用例名逐类构造(meshclos 为 mocker 默认形态零设置)

@@ -23,7 +23,7 @@ public:
     __aicore__ inline void Init(GM_ADDR rawInput, GM_ADDR output, uint64_t rows, uint32_t ranks, uint64_t bytesPerRank,
                                 uint32_t workerId, uint32_t workerCount, AscendC::TPipe* pipe)
     {
-        // The caller provides valid buffers, a 32-byte-aligned rank segment and a MIX_AIC_1_2 worker assignment.
+        // The caller provides valid buffers and a MIX_AIC_1_2 worker assignment.
         rows_ = rows;
         ranks_ = ranks;
         bytesPerRank_ = bytesPerRank;
@@ -54,10 +54,12 @@ public:
             // Source rank stride is the complete M, including when this is a short tail tile.
             const uint64_t src = (rank * rows_ + row) * bytesPerRank_ + byteStart;
             const uint64_t dst = (row * ranks_ + rank) * bytesPerRank_ + byteStart;
-            AscendC::DataCopy(local, input_[src], count);
+            AscendC::DataCopyExtParams copyParams(1, count, 0, 0, 0);
+            AscendC::DataCopyPadExtParams<uint8_t> padParams{true, 0, 0, static_cast<uint8_t>(0)};
+            AscendC::DataCopyPad<uint8_t>(local, input_[src], copyParams, padParams);
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(inputReady_);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(inputReady_);
-            AscendC::DataCopy(output_[dst], local, count);
+            AscendC::DataCopyPad<uint8_t>(output_[dst], local, copyParams);
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(bufferFree_);
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(bufferFree_);
         }

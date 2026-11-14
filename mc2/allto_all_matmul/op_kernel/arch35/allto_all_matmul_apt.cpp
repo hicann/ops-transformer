@@ -29,7 +29,7 @@
 #include "allto_all_mx_quant_matmul_arch35.h"
 #include "allto_all_mx_quant_matmul_pipeline.h"
 #include "../../../common/op_kernel/apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_tiling_data.h"
-#include "../../../common/op_kernel/apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_mx_quant_matmul_hcomm_impl.h"
+#include "../../../common/op_kernel/apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_hcomm_impl.h"
 
 using AscendC::HcclServerType;
 using AscendC::TPipe;
@@ -148,7 +148,13 @@ __global__ __aicore__ void allto_all_matmul(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
     GET_TILING_DATA_WITH_STRUCT(AlltoAllMatmulTilingData, tilingData, tilingGM);
 
     using DtypeBias = typename std::conditional<DTYPEBIAS == DTYPE_BIAS_FP32, float, DTYPE_X1>::type;
-    if constexpr (ADDBIASSPLITMODE == ADDBIAS_OFF) {
+    if constexpr (USING_APACE_IMPL) {
+        Apace::AllToAllMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1, AlltoAllMatmulTilingData, hcclServerType,
+                                       false, X2TRANSPOSE, ENABLE_HCOMM_ALL_TO_ALL_OUT, DtypeBias>
+            op(&tilingData);
+        op.Init(x1, x2, bias, y, all2all_out, nullptr, nullptr, workspaceGM, &pipe);
+        op.Run();
+    } else if constexpr (ADDBIASSPLITMODE == ADDBIAS_OFF) {
         ALLTO_ALL_MATMUL_APT_FP_IMPL(tilingData, pipe, hcclServerType);
     } else {
         ALLTO_ALL_MATMUL_APT_FP_SEP_BIAS_IMPL(tilingData, pipe, hcclServerType, ADDBIASSPLITMODE);
@@ -160,9 +166,8 @@ __global__ __aicore__ void allto_all_matmul(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
      ((ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X2 == DT_FLOAT8_E5M2)))
     if constexpr (USING_APACE_IMPL) {
         GET_TILING_DATA_WITH_STRUCT(Apace::hcommAllToAllMatmulTilingData, tilingData, tilingGM);
-        Apace::AllToAllMxQuantMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1,
-                                              Apace::hcommAllToAllMatmulTilingData, hcclServerType, false, X2TRANSPOSE,
-                                              ENABLE_HCOMM_ALL_TO_ALL_OUT>
+        Apace::AllToAllMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1, Apace::hcommAllToAllMatmulTilingData,
+                                       hcclServerType, false, X2TRANSPOSE, ENABLE_HCOMM_ALL_TO_ALL_OUT>
             op(&tilingData);
         op.Init(x1, x2, bias, y, all2all_out, x1_scale, x2_scale, workspaceGM, &pipe);
         op.Run();
@@ -177,9 +182,8 @@ __global__ __aicore__ void allto_all_matmul(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
 #elif ((ORIG_DTYPE_X1 == DT_FLOAT4_E2M1) && (ORIG_DTYPE_X2 == DT_FLOAT4_E2M1))
     if constexpr (USING_APACE_IMPL) {
         GET_TILING_DATA_WITH_STRUCT(Apace::hcommAllToAllMatmulTilingData, tilingData, tilingGM);
-        Apace::AllToAllMxQuantMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1,
-                                              Apace::hcommAllToAllMatmulTilingData, hcclServerType, true, X2TRANSPOSE,
-                                              ENABLE_HCOMM_ALL_TO_ALL_OUT>
+        Apace::AllToAllMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1, Apace::hcommAllToAllMatmulTilingData,
+                                       hcclServerType, true, X2TRANSPOSE, ENABLE_HCOMM_ALL_TO_ALL_OUT>
             op(&tilingData);
         op.Init(x1, x2, bias, y, all2all_out, x1_scale, x2_scale, workspaceGM, &pipe);
         op.Run();
@@ -192,8 +196,8 @@ __global__ __aicore__ void allto_all_matmul(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
     GET_TILING_DATA_WITH_STRUCT(Apace::hcommAllToAllMatmulTilingData, tilingData, tilingGM);
     // ScaleType 为 hif4_scale(devkit/blaze 提供, 4字节: E6M2+E1_8+E1_16);
     // TransB 由 X2TRANSPOSE 决定, 支持转置/非转置两种 B 布局
-    Apace::AllToAllMxQuantMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1, Apace::hcommAllToAllMatmulTilingData,
-                                          hcclServerType, false, X2TRANSPOSE, ENABLE_HCOMM_ALL_TO_ALL_OUT>
+    Apace::AllToAllMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1, Apace::hcommAllToAllMatmulTilingData,
+                                   hcclServerType, false, X2TRANSPOSE, ENABLE_HCOMM_ALL_TO_ALL_OUT>
         op(&tilingData);
     op.Init(x1, x2, bias, y, all2all_out, x1_scale, x2_scale, workspaceGM, &pipe);
     op.Run();

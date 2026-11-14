@@ -233,8 +233,8 @@ POS_TAG_MAP_ALLTO_ALL = {
 }
 
 # Apace 路径 (usingApaceImpl_) 的 position 枚举与主线不同:
-# 见 common/op_kernel/apace/kernel/fusions/all_to_all_quant_matmul/
-#     all_to_all_mx_quant_matmul_hcomm_impl.h 中的 POS_* 常量
+# 见 common/op_kernel/apace/kernel/fusions/all_to_all_matmul/
+#     all_to_all_matmul_hcomm_impl.h 中的 POS_* 常量
 POS_TAG_MAP_ALLTO_ALL_APACE = {
     0: "COMM_BEFORE",  # 通信下发前
     1: "COMP_LOCAL_BEFORE",  # local 块 matmul 前

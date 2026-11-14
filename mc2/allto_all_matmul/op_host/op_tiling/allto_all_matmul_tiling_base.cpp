@@ -225,7 +225,7 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOutShape(const gert::Tili
                                                   .c_str(),
                                               "The first dim of x1 should be rankSize times of allToAllOut first dim"),
         return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(x1Dim1 != (outDim1 / rankDim),
+    OP_TILING_CHECK(outDim1 != (x1Dim1 * static_cast<uint64_t>(rankDim)),
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                         opName, "x1 and allToAllOut",
                         (Ops::Base::ToString(x1Shape->GetStorageShape()) + " and " +
