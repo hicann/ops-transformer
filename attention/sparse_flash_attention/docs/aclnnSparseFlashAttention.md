@@ -530,7 +530,7 @@ aclnnStatus aclnnSparseFlashAttention(
   - returnSoftmaxLse为True时，支持layoutKvOptional为PA_BSND。
   - 当layoutKvOptional为PA_BSND时，key、value和keyRopeOptional支持0轴非连续，非连续Tensor的每一维的stride均不能为0。不支持其他非连续。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-  - N1支持1/2/4/8/16/32/64/128。
+  - N1支持1~128。
   - sparseBlockSizeOptional支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparseBlockSizeOptional整除blockSize。
   - 仅在layoutKvOptional为PA_BSND时，key、value和keyRopeOptional支持首轴非连续，其余轴必须连续。
   - A2/A3的PA_BSND场景下，key、value和传入的keyRopeOptional的首轴stride须为各自每个token元素数的整数倍，换算成token行数后的物理页间距必须一致且不小于逻辑页大小。

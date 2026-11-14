@@ -524,7 +524,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
   <!-- end id7 -->
   <!-- npu="A3,910b" id8 -->
   - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
-    - N1 supports 1/2/4/8/16/32/64/128.
+    - N1 supports any integer from 1 to 128.
   <!-- end id8 -->
 
 - N2 supports only 1.

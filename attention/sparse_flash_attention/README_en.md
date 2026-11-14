@@ -220,7 +220,7 @@ English | [简体中文](./README.md)
   - Only when layout_kv is PA_BSND, key, value, and key_rope support a non-contiguous axis 0.
   - When return_softmax_lse is True, layout_kv supports PA_BSND.
 - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
-  - Q_N supports 1/2/4/8/16/32/64/128.
+  - Q_N supports any integer from 1 to 128.
   - sparse_block_size supports [1,128] and must be a power of 2. In the PageAttention scenario, sparse_block_size must be a divisor of block_size.
   - sinks is not supported.
   - Only when layout_kv is PA_BSND, key, value, and key_rope support a non-contiguous axis 0.

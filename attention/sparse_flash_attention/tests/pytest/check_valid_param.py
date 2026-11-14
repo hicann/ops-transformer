@@ -18,7 +18,7 @@ import torch
 SUPPORTED_LAYOUT_QUERY = {"BSND", "TND"}
 SUPPORTED_LAYOUT_KV = {"BSND", "TND", "PA_BSND"}
 SUPPORTED_Q_TYPE = {torch.float16, torch.bfloat16}
-SUPPORTED_G = {1, 2, 4, 8, 16, 32, 64, 128}
+SUPPORTED_G = set(range(1, 129))
 
 
 def _check_actual_seq(actual_seq, B, upper_bound, name):

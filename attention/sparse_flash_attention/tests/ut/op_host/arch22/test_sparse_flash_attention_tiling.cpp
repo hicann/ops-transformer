@@ -1161,7 +1161,7 @@ TEST_F(SparseFlashAttentionTiling, SplitKvUsesArch22InnerBlocks)
 {
     struct SparseFlashAttentionCompileInfo {
     } compileInfo;
-    for (int64_t heads : {1, 2, 4, 8, 16, 32, 64, 128}) {
+    for (int64_t heads : {1, 2, 3, 4, 6, 8, 12, 15, 16, 17, 31, 32, 33, 63, 64, 65, 95, 96, 97, 127, 128}) {
         for (bool returnLse : {false, true}) {
             for (const auto& [batchCount, queryCount, topK, expectedBlocks, expectedFd] :
                  {std::tuple<int64_t, int64_t, int64_t, uint32_t, bool>{1, 1, 2048, 4, true},
@@ -1238,11 +1238,15 @@ TEST_F(SparseFlashAttentionTiling, SplitKvUsesArch22InnerBlocks)
                         EXPECT_EQ(info.tilingKey & 1, expectedFd);
                         if (heads == 1 && batchCount == 1 && queryCount == 1 && topK == 2048 && !returnLse &&
                             dtype == ge::DT_BF16 && !hasRope) {
-                            auto oddGroup = variant;
-                            oddGroup.inputTensorDesc_[0].shape_ = gert::StorageShape{{1, 3, 512}, {1, 3, 512}};
-                            oddGroup.outputTensorDesc_[0].shape_ = gert::StorageShape{{1, 3, 512}, {1, 3, 512}};
                             TilingInfo rejected;
-                            EXPECT_FALSE(ExecuteTiling(oddGroup, rejected));
+                            for (int64_t invalidHeads : {0, 129}) {
+                                auto invalidGroup = variant;
+                                invalidGroup.inputTensorDesc_[0].shape_ =
+                                    gert::StorageShape{{1, invalidHeads, 512}, {1, invalidHeads, 512}};
+                                invalidGroup.outputTensorDesc_[0].shape_ =
+                                    gert::StorageShape{{1, invalidHeads, 512}, {1, invalidHeads, 512}};
+                                EXPECT_FALSE(ExecuteTiling(invalidGroup, rejected)) << "G=" << invalidHeads;
+                            }
                             auto unsupportedType = variant;
                             unsupportedType.inputTensorDesc_[0].dtype_ = ge::DT_FLOAT;
                             unsupportedType.outputTensorDesc_[0].dtype_ = ge::DT_FLOAT;

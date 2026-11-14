@@ -218,7 +218,7 @@
   - 仅在layout_kv为PA_BSND时，key、value和key_rope支持0轴非连续。
   - return_softmax_lse为True时，支持layout_kv为PA_BSND。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-  - Q_N支持1/2/4/8/16/32/64/128。
+  - Q_N支持1~128。
   - 参数sparse_block_size支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparse_block_size整除block_size。
   - 不支持sinks。
   - 仅在layout_kv为PA_BSND时，key、value和key_rope支持0轴非连续。

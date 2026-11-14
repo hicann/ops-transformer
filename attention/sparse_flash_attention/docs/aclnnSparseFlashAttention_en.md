@@ -511,7 +511,7 @@ aclnnStatus aclnnSparseFlashAttention(
   - N1 supports 1-128.
   - Only sparseBlockSize 1 is supported.
 - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
-  - N1 supports 1/2/4/8/16/32/64/128.
+  - N1 supports any integer from 1 to 128.
   - sparseBlockSize supports [1,128] and must be a power of 2. In the PageAttention use case, sparseBlockSize must be divisible by blockSize.
   - On Atlas A2/A3 products, key, value, and keyRopeOptional support axis-0 non-contiguity only when layoutKvOptional is PA_BSND; all other axes must be contiguous.
   - For PA_BSND on Atlas A2/A3 products, each cache axis-0 stride must be divisible by its number of elements per token. The physical page pitches, measured in token rows, must be equal across key, value, and a provided keyRopeOptional, and no smaller than the logical page size.

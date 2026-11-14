@@ -351,7 +351,7 @@ REG_OP(SparseFlashAttention)
   - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: values in [1,128] are supported and must be powers of 2. In the PageAttention scenario, sparse_block_size must evenly divide block_size.
 - Q_N support:
   - <term>Ascend 950PR&950DT products</term>: Q_N values from 1 to 128 are supported. Only when layout_kv is PA_BSND, key, value, and key_rope support non-contiguous tensors on axis 0.
-  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: Q_N values 1/2/4/8/16/32/64/128 are supported. Only PA_BSND supports axis-0 non-contiguity of key, value, and key_rope; all other axes must be contiguous.
+  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: Q_N values from 1 to 128 (any integer) are supported. Only PA_BSND supports axis-0 non-contiguity of key, value, and key_rope; all other axes must be contiguous.
 - For PA_BSND on Atlas A2/A3 products, each cache axis-0 stride must be divisible by its number of elements per token. The physical page pitches, measured in token rows, must be equal across key, value, and a provided key_rope, and no smaller than the logical page size.
 - sinks is supported only on <term>Ascend 950PR&950DT products</term>.
 

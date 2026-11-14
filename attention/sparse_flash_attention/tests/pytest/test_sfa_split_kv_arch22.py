@@ -102,6 +102,7 @@ def _run_reference_case(
     query_layout=None,
     actual_query_counts=None,
     page_size=128,
+    actual_kv_lengths=None,
 ):
     if not torch.npu.get_device_name(0).startswith(("Ascend910B", "Ascend910_93")):
         pytest.skip("This test requires arch22 (Ascend 910B or Ascend 910_93)")
@@ -111,6 +112,16 @@ def _run_reference_case(
         query_counts = [1] * (batch_count - 1) + [query_count - batch_count + 1]
     query_layout = query_layout or ("BSND" if kv_layout == "BSND" else "TND")
     query_ends = [sum(query_counts[: idx + 1]) for idx in range(batch_count)]
+    actual_kv_lengths = (
+        [actual_kv_length] * batch_count
+        if actual_kv_lengths is None
+        else actual_kv_lengths
+    )
+    assert len(actual_kv_lengths) == batch_count
+    assert all(0 <= length <= kv_length for length in actual_kv_lengths)
+    row_batches = [
+        batch for batch, count in enumerate(query_counts) for _ in range(count)
+    ]
     query = torch.randn(query_count, heads, 512, generator=generator).to(dtype).npu()
     query_rope = (
         torch.randn(query_count, heads, 64, generator=generator).to(dtype).npu()
@@ -139,23 +150,39 @@ def _run_reference_case(
     selected = torch.stack(
         [
             torch.nn.functional.pad(
-                torch.randperm(actual_kv_length, generator=generator)[:count],
+                torch.randperm(
+                    actual_kv_lengths[row_batches[row]], generator=generator
+                )[:count],
                 (0, topk - count),
                 value=-1,
             )
-            for count in row_valid_counts
+            for row, count in enumerate(row_valid_counts)
         ]
     ).int()
     indices = selected.unsqueeze(1).npu()
     block_table = torch.arange(batch_count * kv_length // page_size, dtype=torch.int32)
     block_table = block_table.reshape(batch_count, kv_length // page_size).npu()
     query_lengths = torch.tensor(query_ends, dtype=torch.int32).npu()
-    kv_lengths = torch.full((batch_count,), actual_kv_length, dtype=torch.int32).npu()
+    kv_lengths = torch.tensor(actual_kv_lengths, dtype=torch.int32).npu()
     query_input, rope_input, indices_input = query, query_rope, indices
     if kv_layout == "TND":
-        assert actual_kv_length == kv_length
-        key_pages = key.reshape(-1, 1, 512)
-        rope_pages = key_rope.reshape(-1, 1, 64) if use_rope else None
+        key_batches = key.reshape(batch_count, kv_length, 1, 512)
+        key_pages = torch.cat(
+            [
+                key_batches[batch, :length]
+                for batch, length in enumerate(actual_kv_lengths)
+            ]
+        )
+        if use_rope:
+            rope_batches = key_rope.reshape(batch_count, kv_length, 1, 64)
+            rope_pages = torch.cat(
+                [
+                    rope_batches[batch, :length]
+                    for batch, length in enumerate(actual_kv_lengths)
+                ]
+            )
+        else:
+            rope_pages = None
         kv_lengths = kv_lengths.cumsum(0).int()
         block_table = None
     elif kv_layout == "BSND":
@@ -790,4 +817,33 @@ def test_pa_lse_supported(sfa_operator, dtype, use_rope, topk, query_layout):
         dtype,
         use_rope,
         query_layout=query_layout,
+    )
+
+
+@pytest.mark.ci
+@pytest.mark.parametrize("heads", [6, 12, 17, 65, 127])
+@pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16], ids=["bf16", "fp16"])
+@pytest.mark.parametrize("use_rope", [False, True], ids=["no_rope", "rope64"])
+@pytest.mark.parametrize("kv_layout", ["TND", "PA_BSND"])
+def test_non_power_of_two_heads_device_regression(
+    sfa_operator, heads, dtype, use_rope, kv_layout
+):
+    # Four query rows and four inner KV tiles exercise Split-KV on arch22.
+    # TND checks attention, max, sum and reconstructed LSE; PA checks attention.
+    _run_reference_case(
+        sfa_operator,
+        query_count=4,
+        batch_count=2,
+        topk=2048,
+        valid_count=2048,
+        replay_graph=False,
+        return_lse=kv_layout == "TND",
+        heads=heads,
+        dtype=dtype,
+        use_rope=use_rope,
+        row_valid_counts=[2048, 1024, 513, 1],
+        query_counts=[1, 3],
+        query_layout="TND",
+        kv_layout=kv_layout,
+        actual_kv_lengths=[4096, 2560],
     )

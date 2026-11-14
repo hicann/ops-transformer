@@ -1520,24 +1520,13 @@ ge::graphStatus SFATilingCheck::CheckFeatureMlaNoQuantShape() const
                         std::to_string(n2Size_) + ")"),
                 return ge::GRAPH_FAILED);
 
-    if (isA5_ || isA6_) {
-        OP_CHECK_IF(gSize_ < 1 || gSize_ > 128,
-                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        opName_, "query and key",
-                        Ops::Base::ToString(sfaParams.query.shape->GetStorageShape()) + " and " +
-                            Ops::Base::ToString(sfaParams.key.shape->GetStorageShape()).c_str(),
-                        "Group num should be in range [1, 128], but got " + std::to_string(gSize_)),
-                    return ge::GRAPH_FAILED);
-    } else {
-        std::vector<uint32_t> gSizeSupportList = {1, 2, 4, 8, 16, 32, 64, 128};
-        OP_CHECK_IF(std::find(gSizeSupportList.begin(), gSizeSupportList.end(), gSize_) == gSizeSupportList.end(),
-                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        opName_, "query and key",
-                        Ops::Base::ToString(sfaParams.query.shape->GetStorageShape()) + " and " +
-                            Ops::Base::ToString(sfaParams.key.shape->GetStorageShape()).c_str(),
-                        "Group num should be in [1, 2, 4, 8, 16, 32, 64, 128], but got " + std::to_string(gSize_)),
-                    return ge::GRAPH_FAILED);
-    }
+    OP_CHECK_IF(gSize_ < 1 || gSize_ > 128,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    opName_, "query and key",
+                    Ops::Base::ToString(sfaParams.query.shape->GetStorageShape()) + " and " +
+                        Ops::Base::ToString(sfaParams.key.shape->GetStorageShape()).c_str(),
+                    "Group num should be in range [1, 128], but got " + std::to_string(gSize_)),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(qkHeadDim_ != 512,
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(

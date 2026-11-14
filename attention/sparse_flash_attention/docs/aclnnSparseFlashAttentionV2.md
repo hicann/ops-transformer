@@ -542,7 +542,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
   <!-- end id7 -->
   <!-- npu="A3,910b" id8 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-    - N1支持1/2/4/8/16/32/64/128。
+    - N1支持1~128。
   <!-- end id8 -->
 
 - N2仅支持1。
