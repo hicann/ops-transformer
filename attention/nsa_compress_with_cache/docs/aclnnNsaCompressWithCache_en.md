@@ -284,8 +284,8 @@ aclnnStatus aclnnNsaCompressWithCache(
       <td>input, weight, or outputCache is an empty tensor.</td>
     </tr>
     <tr>
-      <td rowspan="6">ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td rowspan="6">561002</td>
+      <td rowspan="7">ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td rowspan="7">561002</td>
       <td>input and weight do not satisfy the broadcast relationship. That is, the third dimension size of input is not equal to the second dimension size of weight.</td>
     </tr>
     <tr>
@@ -293,6 +293,9 @@ aclnnStatus aclnnNsaCompressWithCache(
     </tr>
     <tr>
       <td>compress_block_size and compress_stride are not an integer multiple of 16.</td>
+    </tr>
+    <tr>
+      <td>compress_stride is less than or equal to 0.</td>
     </tr>
     <tr>
       <td>seq_lens_type!=1 or the value of layout is not one of BSH, SBH, BSND, BNSD, and TND.</td>

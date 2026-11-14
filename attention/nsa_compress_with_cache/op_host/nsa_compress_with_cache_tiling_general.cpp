@@ -112,6 +112,11 @@ protected:
         auto actSeqLenTypePtr = attrs->GetAttrPointer<int64_t>(idx++);
         auto pageBlockSizePtr = attrs->GetAttrPointer<int64_t>(idx++);
 
+        OP_CHECK_IF(*compressStridePtr <= 0,
+                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache",
+                                                "compressStride should be a positive integer multiple of 16."),
+                    return false);
+
         compressBlockSize = *compressBlockSizePtr;
         compressStride = *compressStridePtr;
         actSeqLenType = *actSeqLenTypePtr;
