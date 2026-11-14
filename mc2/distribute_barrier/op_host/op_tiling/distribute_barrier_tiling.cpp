@@ -42,6 +42,11 @@ using namespace Ops::Transformer::OpTiling;
 
 namespace optiling {
 const char* A_INNER_DEBUG_BARRIER = "DistributeBarrier Tiling Debug";
+constexpr uint32_t BARRIER_UB_ALIGN = 32U;
+constexpr uint32_t BARRIER_STATE_OFFSET = 512U;
+constexpr uint64_t BARRIER_WIN_STATE_OFFSET = 512UL * 1024UL;
+constexpr uint64_t BARRIER_STATE_WIN_OFFSET = 900UL * 1024UL;
+
 static void PrintTilingDataInfo(DistributeBarrierTilingData& tilingData)
 {
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "worldSize is %u.", tilingData.distributeBarrierInfo.worldSize);
@@ -249,6 +254,12 @@ static ge::graphStatus CheckMc2Context(const gert::TilingContext* context, const
     return ge::GRAPH_SUCCESS;
 }
 
+constexpr uint64_t CalcDistributeBarrierWinSize(uint32_t aivNum)
+{
+    return BARRIER_WIN_STATE_OFFSET + BARRIER_STATE_WIN_OFFSET +
+           static_cast<uint64_t>(aivNum) * BARRIER_UB_ALIGN * sizeof(float) * 2UL;
+}
+
 ge::graphStatus DistributeBarrierExtendTilingFuncNew(gert::TilingContext* context,
                                                      const DistributeBarrierConfig& config)
 {
@@ -318,6 +329,14 @@ ge::graphStatus DistributeBarrierExtendTilingFuncNew(gert::TilingContext* contex
                     return ge::GRAPH_FAILED);
     tilingData->distributeBarrierInfo.totalUbSize = ubSize;
     tilingData->distributeBarrierInfo.aivNum = aivNum;
+    if (config.isMc2Context) {
+        const uint64_t totalWinSize = CalcDistributeBarrierWinSize(aivNum);
+        OP_TILING_CHECK(static_cast<uint64_t>(BARRIER_STATE_OFFSET) * tilingData->distributeBarrierInfo.worldSize >
+                            BARRIER_STATE_WIN_OFFSET,
+                        Mc2Error::ReportTilingFailure(nodeName, "State region exceeds the flag window offset"),
+                        return ge::GRAPH_FAILED);
+        tilingData->distributeBarrierInfo.totalWinSize = totalWinSize;
+    }
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "numBlocks=%u, aivNum=%u, ubSize=%lu", numBlocks, aivNum, ubSize);
 
     PrintTilingDataInfo(*tilingData);

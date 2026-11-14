@@ -66,7 +66,7 @@ TEST_F(DistributeBarrierExtendArch35TilingTest, TestTiling)
                                               {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("group")},
                                                {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)}},
                                               &compileInfo, "3510", coreNum, ubSize);
-    std::string expectTilingData = "16 0 20 0 * 0 0 0 65536 0 ";
+    std::string expectTilingData = "16 0 20 0 * 0 1451008 0 65536 0 ";
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     auto tilingDataResult =
@@ -135,7 +135,7 @@ TEST_F(DistributeBarrierExtendArch35TilingTest, TestTilingTimeOut)
                                               {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("group")},
                                                {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)}},
                                               &compileInfo, "3510", coreNum, ubSize);
-    std::string expectTilingData = "16 0 20 0 * 0 0 0 65537 0 ";
+    std::string expectTilingData = "16 0 20 0 * 0 1451008 0 65537 0 ";
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     auto tilingDataResult =
@@ -163,7 +163,7 @@ TEST_F(DistributeBarrierExtendArch35TilingTest, TestTilingElasticInfo)
                                               {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("group")},
                                                {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)}},
                                               &compileInfo, "3510", coreNum, ubSize);
-    std::string expectTilingData = "16 0 20 0 * 0 0 0 65792 0 ";
+    std::string expectTilingData = "16 0 20 0 * 0 1451008 0 65792 0 ";
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     auto tilingDataResult =
@@ -191,7 +191,7 @@ TEST_F(DistributeBarrierExtendArch35TilingTest, TestTilingTimeOutElasticInfo)
                                               {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("group")},
                                                {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)}},
                                               &compileInfo, "3510", coreNum, ubSize);
-    std::string expectTilingData = "16 0 20 0 * 0 0 0 65793 0 ";
+    std::string expectTilingData = "16 0 20 0 * 0 1451008 0 65793 0 ";
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     auto tilingDataResult =

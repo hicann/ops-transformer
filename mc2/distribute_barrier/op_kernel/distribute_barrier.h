@@ -260,10 +260,29 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Ini
 
     sendAivNum_ = aivNum_ - 1;
     stateOffset_ = STATE_OFFSET;
-    InitStatus();
 
     // 分核计算，获取当前核处理的RankId范围
     SplitToCore();
+#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
+    if (isMc2Context_) {
+        const uint64_t totalWinSize = tilingData->distributeBarrierInfo.totalWinSize;
+        OOMCheckAddrRange<uint8_t>(statusDataSpaceGm_, totalWinSize);
+        for (uint32_t rankIndex = startRankId_; rankIndex < endRankId_; ++rankIndex) {
+            if (rankIndex >= worldSize_) {
+                continue;
+            }
+            uint32_t toRankId = rankIndex;
+            if (isElasticTrueFlag_) {
+                toRankId = static_cast<uint32_t>(
+                    elasticInfoTensor_.GetValue(ELASTIC_METAINFO_OFFSET + worldSizeOriginal_ + rankIndex));
+            }
+            if (toRankId != rankIdOriginal_) {
+                OOMCheckAddrRange<uint8_t>((GM_ADDR)mc2Context_->epHcclBuffer_[toRankId], totalWinSize);
+            }
+        }
+    }
+#endif
+    InitStatus();
 
     // 申请状态区的buffer
     uint32_t dataLen_ = worldSize_ >= UB_ALIGN / sizeof(float) ? worldSize_ : UB_ALIGN / sizeof(float);
