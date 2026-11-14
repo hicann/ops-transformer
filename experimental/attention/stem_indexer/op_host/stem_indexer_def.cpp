@@ -65,8 +65,9 @@ public:
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true);
-        // 当前仅适配 A5（ascend950），A2/A3 暂未适配，不注册
+        // 当前适配 ascend950、ascend350；A2/A3 暂未适配，不注册
         this->AICore().AddConfig("ascend950", aicoreConfig);
+        this->AICore().AddConfig("ascend350", aicoreConfig);
     }
 };
 
