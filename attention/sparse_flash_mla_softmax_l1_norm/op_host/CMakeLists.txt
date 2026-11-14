@@ -9,6 +9,13 @@
 # -----------------------------------------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.18.4)
+
+# Only Ascend 950/960dt has a PyPTO kernel implementation for this operator.
+if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT AND NOT "ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT)
+    message(STATUS "[sparse_flash_mla_softmax_l1_norm] Skipped: PyPTO kernel only supports ascend950/ascend960dt (soc=${ASCEND_COMPUTE_UNIT})")
+    return()
+endif()
+
 require_pypto_pro(sparse_flash_mla_softmax_l1_norm)
 add_op_to_compiled_list()
 
