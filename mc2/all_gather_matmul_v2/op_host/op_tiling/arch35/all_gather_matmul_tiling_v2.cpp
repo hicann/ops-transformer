@@ -381,16 +381,17 @@ ge::graphStatus AllGatherMatmulTilingV2::DoVersion2Tiling()
 
 ge::graphStatus AllGatherMatmulTilingV2::SetMc2Hcomm(Mc2Tiling::RCSTiling& rcsCfg)
 {
-    // Set hccl comm engine with comm_mode; A6(DAV_9201)仅支持AICPU通信引擎
+    // Set hccl comm engine with comm_mode
     uint8_t commEngine = Mc2Comm::ENGINE_AICPU;
-    if (npuArch_ == Ops::Base::DAV_3510 && std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0) {
+    if (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0) {
         commEngine = Mc2Comm::ENGINE_CCU_SCHED;
     }
     OP_LOGD(opName_, "Tiling SetMc2Hcom commMode_: %s", commMode_);
     OP_LOGD(opName_, "Tiling SetMc2Hcom commEngine: %d", commEngine);
     // 单轮通信量 = 每轮切分的 tileM × K × dtypeSize（对齐 alltoall 口径），算法表为空时回退默认算法
-    std::string algConfig = Mc2Tiling::SelectAllGatherAlgoName(opName_, group_, commEngine, tileMValue_, args_.kValue,
-                                                               args_.inputDtypeSize, args_.rankDim);
+    std::string algConfig =
+        Mc2Tiling::SelectAllGatherAlgoNameByArch(opName_, group_, commEngine, tileMValue_, args_.kValue,
+                                                 args_.inputDtypeSize, args_.rankDim, static_cast<uint32_t>(npuArch_));
     OP_LOGI(opName_, "[SetMc2Hcomm] selected algConfig=%s, group=%s", algConfig.c_str(), group_);
     Mc2CcTilingConfig mc2CcTilingConfig(
         group_, static_cast<uint32_t>(mc2tiling::AicpuComType::HCCL_CMD_ALLGATHER), algConfig, 0,
@@ -442,12 +443,9 @@ uint64_t AllGatherMatmulTilingV2::GetTilingKey() const
 {
     uint8_t outputType = (outputIsFp8_) ? static_cast<uint8_t>(1) : static_cast<uint8_t>(0);
 
-    // Non-A5 platform must use AICPU mode
     uint8_t commMode = Mc2Comm::COMM_MODE_AICPU;
-    if (npuArch_ == Ops::Base::DAV_3510) {
-        if (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0) {
-            commMode = Mc2Comm::COMM_MODE_CCU;
-        }
+    if (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0) {
+        commMode = Mc2Comm::COMM_MODE_CCU;
     }
     const uint64_t tilingKey = GET_TPL_TILING_KEY(inputIsBf16Fp16_, args_.isBTrans, outputType, TPL_DEFAULT_MODE,
                                                   SCALE_TYPE_NOT_IS_MX, commMode);

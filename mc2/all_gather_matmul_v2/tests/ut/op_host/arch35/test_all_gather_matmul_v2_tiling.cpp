@@ -70,10 +70,9 @@ TEST_P(AllGatherMatmulV2Arch35TilingTest, param)
 {
     auto param = GetParam();
 #if !ALL_GATHER_MATMUL_V2_UT_HIF4_SUPPORTED
-    // devkit < 9.3 无 Ascend960DT tiling 支持, ut_hif4 用例(soc=9201)在 tiling 分发处必然失败, 跳过
-    constexpr char kUtHif4Prefix[] = "ut_hif4";
-    if (param.case_name.compare(0, std::size(kUtHif4Prefix) - 1, kUtHif4Prefix) == 0) {
-        GTEST_SKIP() << "HiF4 scene requires devkit >= 9.3 (Ascend960DT unsupported), skip ut_hif4 cases";
+    // devkit < 9.3 无 Ascend960DT(9201) tiling 支持, soc=9201 用例在 tiling 分发处必然失败, 按soc维度跳过
+    if (param.soc == "9201") {
+        GTEST_SKIP() << "Ascend960DT(9201) requires devkit >= 9.3, skip soc=9201 cases";
     }
 #endif
     constexpr char kAscendMc2DebugMode[] = "ASCEND_MC2_DEBUG_MODE";

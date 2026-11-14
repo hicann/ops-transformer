@@ -50,7 +50,6 @@ public:
             .ExtendCfgInfo("opFile.value", "all_gather_matmul_v2_apt");
         this->AICore().AddConfig("ascend960dt", aicore_config_960dt);
         this->MC2().HcclGroup("group");
-        this->MC2().HcclServerType(HcclServerType::AICPU, "ascend960dt");
 #endif
 
         OpAICoreConfig aicore_config_910b;

@@ -84,8 +84,31 @@ static constexpr Mc2Hcom::CommAlgoEntry ALLGATHER_COMM_ALGO_TABLE[] = {
      MAX_RANK_SIZE, DEFAULT, ALLGATHER_DEFAULT_ALGO_NAME},
 };
 
+// A6(ascend960dt)专属AllGather通信算法表：不使用A5的Mesh+CLOS标定表项（A6拓扑不适用）。
+// CCU 实测仅支持 sole[mesh]（全数据量/卡数场景）；AICPU 维持默认 fullmesh。
+// 与A5表共用同一 Mc2CommAlgoSelector 选择流程，仅表数据按架构区分，不修改原先选择逻辑。
+static constexpr Mc2Hcom::CommAlgoEntry ALLGATHER_COMM_ALGO_TABLE_A6[] = {
+    // CCU 全场景 → sole[mesh]
+    {mc2tiling::A5_CCU_ENGINE, TOPO_FLAG_NONE, MIN_DATA_BYTES_ZERO, MAX_DATA_BYTES_UNLIMITED, RANK_SIZE_2,
+     MAX_RANK_SIZE, MEDIUM, ALLGATHER_A6_CCU_ALGO_NAME},
+    // AICPU 全场景 → 默认算法
+    {mc2tiling::A5_AICPU_TS_ENGINE, TOPO_FLAG_NONE, MIN_DATA_BYTES_ZERO, MAX_DATA_BYTES_UNLIMITED, RANK_SIZE_2,
+     MAX_RANK_SIZE, MEDIUM, ALLGATHER_DEFAULT_ALGO_NAME},
+};
+
 const Mc2Hcom::CommAlgoEntry* GetAllGatherCommAlgoTable(uint32_t& count)
 {
+    return GetAllGatherCommAlgoTable(count, static_cast<uint32_t>(Ops::Base::DAV_3510));
+}
+
+const Mc2Hcom::CommAlgoEntry* GetAllGatherCommAlgoTable(uint32_t& count, uint32_t npuArch)
+{
+    // A6(ascend960dt)使用专属算法表：不复用A5的Mesh+CLOS标定表项（A6拓扑不适用），
+    // CCU 全场景 sole[mesh]（实测约束）、AICPU 全场景默认算法；其余架构返回A5标定表
+    if (npuArch == static_cast<uint32_t>(Ops::Base::DAV_9201)) {
+        count = sizeof(ALLGATHER_COMM_ALGO_TABLE_A6) / sizeof(ALLGATHER_COMM_ALGO_TABLE_A6[0]);
+        return ALLGATHER_COMM_ALGO_TABLE_A6;
+    }
     count = sizeof(ALLGATHER_COMM_ALGO_TABLE) / sizeof(ALLGATHER_COMM_ALGO_TABLE[0]);
     return ALLGATHER_COMM_ALGO_TABLE;
 }
@@ -100,6 +123,27 @@ std::string SelectAllGatherAlgoName(const std::string& opName, const std::string
     uint32_t algoCount = 0;
     const Mc2Hcom::CommAlgoEntry* algoEntries = GetAllGatherCommAlgoTable(algoCount);
     // 组网事实单次查询后传入(SelectAlgoName纯匹配不自查)
+    Mc2Hcom::Mc2TopoInfo topoInfo;
+    uint64_t topoFlags = Mc2Hcom::TOPO_FLAG_NONE;
+    Mc2Hcom::Mc2CommAlgoSelector::GetTopoFlags(group.c_str(), topoInfo, topoFlags);
+    return Mc2Hcom::Mc2CommAlgoSelector::SelectAlgoName(opName, group.c_str(), commEngine, commDataBytes, rankDim,
+                                                        algoEntries, algoCount, ALLGATHER_DEFAULT_ALGO_NAME, topoFlags);
+}
+
+std::string SelectAllGatherAlgoNameByArch(const std::string& opName, const std::string& group, uint8_t commEngine,
+                                          uint64_t tileM, uint64_t kValue, uint64_t dtypeSize, uint32_t rankDim,
+                                          uint32_t npuArch)
+{
+    // 与 SelectAllGatherAlgoName 完全相同的选择流程（数据量计算 → 查表 → Mc2CommAlgoSelector），
+    // 仅按架构选取算法表：A6(ascend960dt)取专属表（CCU 全场景 sole[mesh]、AICPU 默认 fullmesh），
+    // 不复用A5的Mesh+CLOS标定表项；其余架构取A5表，选择行为与原先逻辑完全一致。
+    uint64_t commDataBytes = Mc2Hcom::CalcCommDataBytes(opName.c_str(), tileM, kValue, dtypeSize);
+    OP_LOGI(opName.c_str(),
+            "[SetMc2Hcomm] commDataBytes=%llu, tileM=%llu, kValue=%llu, dtypeSize=%llu, rankDim=%u, commEngine=%u",
+            commDataBytes, tileM, kValue, dtypeSize, rankDim, static_cast<uint32_t>(commEngine));
+    uint32_t algoCount = 0;
+    const Mc2Hcom::CommAlgoEntry* algoEntries = GetAllGatherCommAlgoTable(algoCount, npuArch);
+    // 组网事实单次查询后传入(SelectAlgoName纯匹配不自查)，与 SelectAllGatherAlgoName 流程一致
     Mc2Hcom::Mc2TopoInfo topoInfo;
     uint64_t topoFlags = Mc2Hcom::TOPO_FLAG_NONE;
     Mc2Hcom::Mc2CommAlgoSelector::GetTopoFlags(group.c_str(), topoInfo, topoFlags);

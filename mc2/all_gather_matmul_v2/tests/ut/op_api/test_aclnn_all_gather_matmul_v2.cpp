@@ -1675,22 +1675,26 @@ TEST_F(AllGatherMatmulV2AclnnTest, TestX2Not2DRejected)
     EXPECT_EQ(ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor), ACLNN_ERR_PARAM_INVALID);
 }
 
-TEST_F(AllGatherMatmulV2AclnnTest, TestCcuRejectedOnDav9201)
-{
-    op::SetPlatformNpuArch(Ops::Base::DAV_9201);
-    TensorDesc x1 = TensorDesc({256, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
-    TensorDesc x2 = TensorDesc({256, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
-    TensorDesc output = TensorDesc({1024, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
-    TensorDesc gatherOut = TensorDesc({1024, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto ut =
-        OP_API_UT(aclnnAllGatherMatmulV2,
-                  INPUT(x1, x2, nullptr, nullptr, nullptr, nullptr, 0, "test_all_gather_group", 0, 8, 1, 0, "ccu"),
-                  OUTPUT(output, gatherOut, nullptr));
-    uint64_t workspaceSize = 0;
-    aclOpExecutor* executor = nullptr;
-    EXPECT_EQ(ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor), ACLNN_ERR_PARAM_INVALID);
-    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
-}
+// A6(ascend960dt) 用例 fixture: 整块以 devkit 版本守卫编译期排除(与下方 CSV 驱动块同因,
+// devkit < 9.3 的平台层不支持 Ascend960DT, 含 SocVersion::ASCEND960DT 引用无法编译)
+// ccu 放开的正向路由覆盖由 op_api CSV 行(AGMMV2_A6_succ_fp16_ccu / AGMMV2_HIF4_A6_succ3_ccu)承载:
+// UT 中 tiling/HCCL 不可达, 正向断言沿用 CSV 宽松口径(期望 SUCCESS 时仅拒绝 PARAM_INVALID 回归)
+#if ALL_GATHER_MATMUL_V2_UT_HIF4_SUPPORTED
+class AllGatherMatmulV2Aclnn9201Test : public testing::Test {
+protected:
+    static void SetUpTestCase()
+    {
+        // A6(ascend960dt): 经框架 soc->arch 映射使 GetCurNpuArch()==DAV_9201
+        op::SetPlatformSocVersion(op::SocVersion::ASCEND960DT);
+        cout << "AllGatherMatmulV2Aclnn9201Test SetUp" << endl;
+    }
+    static void TearDownTestCase()
+    {
+        op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+        cout << "AllGatherMatmulV2Aclnn9201Test TearDown" << endl;
+    }
+};
+#endif // ALL_GATHER_MATMUL_V2_UT_HIF4_SUPPORTED
 
 TEST_F(AllGatherMatmulV2AclnnTest, TestExecuteNonEmptyWorkspaceAicpu)
 {
@@ -1917,6 +1921,26 @@ INSTANTIATE_TEST_SUITE_P(
     AllGatherMatmulV2Hif4, AclnnAllGatherMatmulV2Hif4Test,
     testing::ValuesIn(GetCasesFromCsv<AllGatherMatmulV2ApiUtParam>(ReplaceFileExtension2Csv(__FILE__))),
     PrintCaseInfoString<AllGatherMatmulV2ApiUtParam>);
+#endif // ALL_GATHER_MATMUL_V2_UT_HIF4_SUPPORTED
+
+// A6 HIF4 路由 + ccu 正向覆盖由 op_api CSV 行 AGMMV2_HIF4_A6_succ3_ccu 承载(与 ai_cpu 行共用宽松断言)
+#if ALL_GATHER_MATMUL_V2_UT_HIF4_SUPPORTED
+// 非法 comm_mode 在 A6 上仍然拒绝
+TEST_F(AllGatherMatmulV2Aclnn9201Test, TestCommModeInvalid9201)
+{
+    TensorDesc x1 = TensorDesc({8, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
+    TensorDesc x2 = TensorDesc({256, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
+    TensorDesc output = TensorDesc({8, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
+    TensorDesc gatherOut = TensorDesc({8, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
+    auto ut =
+        OP_API_UT(aclnnAllGatherMatmulV2,
+                  INPUT(x1, x2, nullptr, nullptr, nullptr, nullptr, 0, "test_all_gather_group", 0, 8, 1, 0, "bad_mode"),
+                  OUTPUT(output, gatherOut, nullptr));
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
+}
 #endif // ALL_GATHER_MATMUL_V2_UT_HIF4_SUPPORTED
 
 } // namespace

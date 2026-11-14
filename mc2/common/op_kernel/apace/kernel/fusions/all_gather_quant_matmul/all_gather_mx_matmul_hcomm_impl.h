@@ -188,7 +188,9 @@ private:
 #endif
     static constexpr int32_t SCALE_C0 = IS_HIF4 ? 1 : 2;
     static constexpr uint32_t kPaddingLength = 16;
-    static constexpr uint64_t scaleDataType_ = IS_HIF4 ? HCCL_DATA_TYPE_UINT32 : HCCL_DATA_TYPE_FP8E8M0;
+    // Scale 通信数据类型: MX 为 E8M0; HiF4 的 hif4_scale 为完整 4 字节元数据(E6M2+E1_8+E1_16),
+    // HCCL 未提供专用类型, E8M0和hif4_scale 均按 FP8E8M0 传输, 实际传输时乘数据类型(对齐 all_to_all impl 口径)
+    static constexpr uint64_t scaleDataType_ = HCCL_DATA_TYPE_FP8E8M0;
     static constexpr uint64_t dataDataType_ = GetHcclDataType<AType>();
     static constexpr uint64_t MXFP_DATA_NUM_PER_BYTE = 2UL;
 };
@@ -271,11 +273,12 @@ template <typename AType, typename BType, typename CType, AscendC::HcclServerTyp
 __aicore__ inline void
 AllGatherMxQuantMatmulHcommImpl<AType, BType, CType, ServerType, IsMxFp4, TransB>::CommitAllGather()
 {
-    // Scale: 全量一次性提交（repeat=1）
-    commState_.scaleHandle_ =
-        commState_.hccl_.template AllGather<true>(aScaleGM_, gatherScaleAddr_, static_cast<uint64_t>(m_) * scaleKLen_,
-                                                  static_cast<AscendC::HcclDataType>(scaleDataType_),
-                                                  static_cast<uint64_t>(m_) * scaleKLen_, static_cast<uint8_t>(1));
+    // Scale: 全量一次性提交（repeat=1）；hif4_scale 按 E8M0(1B) 传输，count/stride 为字节当量
+    // （= scale 元素数 * sizeof(ScaleType)，与 mc2CcTiling 的 1B dtype 口径一致；总字节数不变）
+    commState_.scaleHandle_ = commState_.hccl_.template AllGather<true>(
+        aScaleGM_, gatherScaleAddr_, static_cast<uint64_t>(m_) * scaleKLen_ * sizeof(ScaleType),
+        static_cast<AscendC::HcclDataType>(scaleDataType_), static_cast<uint64_t>(m_) * scaleKLen_ * sizeof(ScaleType),
+        static_cast<uint8_t>(1));
 
     // Data Head: 批量提交所有 head tile（repeat=tileCnt）；纯尾块路径（tileCnt=0）跳过
     // count/stride 用 kForComm_（FP4 = K/2 打包字节），地址偏移用 dataBytesPerMRow_（数值与 kForComm_ 一致）

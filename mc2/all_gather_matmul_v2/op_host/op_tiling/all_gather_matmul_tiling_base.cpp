@@ -631,16 +631,6 @@ bool AllGatherMatmulTilingBase::AnalyzeAttrs()
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "comm_mode", commMode_,
                                               "The value of comm_mode must be ccu, ai_cpu"),
         return false);
-    // A6(ascend960)无CCU引擎，显式ccu直接报错(默认ai_cpu不受影响)
-    auto platformInfo = context_->GetPlatformInfo();
-    if (platformInfo != nullptr) {
-        platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
-        OP_TILING_CHECK(
-            ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_9201 && std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0,
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "comm_mode", commMode_,
-                                                  "A6 has no CCU engine, only 'ai_cpu' is supported"),
-            return false);
-    }
     if (!mc2tiling::GetRankSize(opName_, group_, rankSize_)) {
         OP_LOGE(opName_, "GetRankSize failed.");
         return false;

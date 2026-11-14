@@ -617,7 +617,7 @@ ge::graphStatus AllGatherQuantBmmTiling::SetMc2Hcomm()
 {
     // Set hccl comm engine with comm_mode
     uint8_t commEngine = Mc2Comm::ENGINE_AICPU;
-    if (npuArch_ == Ops::Base::DAV_3510 && std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0) {
+    if (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0) {
         commEngine = Mc2Comm::ENGINE_CCU_SCHED;
     }
     OP_LOGD(opName_, "Tiling SetMc2Hcom commMode_: %s", commMode_);
@@ -625,8 +625,9 @@ ge::graphStatus AllGatherQuantBmmTiling::SetMc2Hcomm()
     // 单轮通信量 = 每轮切分的 tileM × K × dtypeSize（对齐 alltoall 口径；mxfp4场景使用int8类型通信，通信量减半）
     uint64_t commKValue = isFp4_ ? (args_.kValue / EVEN_ALIGN) : args_.kValue;
     uint64_t commDtypeSize = isFp4_ ? 1 : args_.inputDtypeSize;
-    std::string algConfig = Mc2Tiling::SelectAllGatherAlgoName(opName_, group_, commEngine, tileMValue_, commKValue,
-                                                               commDtypeSize, args_.rankDim);
+    std::string algConfig =
+        Mc2Tiling::SelectAllGatherAlgoNameByArch(opName_, group_, commEngine, tileMValue_, commKValue, commDtypeSize,
+                                                 args_.rankDim, static_cast<uint32_t>(npuArch_));
     OP_LOGI(opName_, "[SetMc2Hcomm] selected algConfig=%s, group=%s", algConfig.c_str(), group_);
     uint32_t hcclDataType;
     if (isFp4_ || isHiF4_) {
@@ -931,11 +932,6 @@ uint64_t AllGatherQuantBmmTiling::GetTilingKey() const
     if (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0) {
         commMode = Mc2Comm::COMM_MODE_CCU;
     }
-
-    // Non-A5 platform must use AICPU mode
-    if (npuArch_ != Ops::Base::DAV_3510) {
-        commMode = Mc2Comm::COMM_MODE_AICPU;
-    }
     const uint64_t tilingKey =
         GET_TPL_TILING_KEY(inputIsBf16Fp16_, args_.isBTrans, outputType, quanMmMode, scaleType, commMode);
     OP_LOGD(opName_,
@@ -1077,7 +1073,8 @@ CutResult AllGatherQuantBmmTiling::GetTilingResult()
 
     auto kValue = args_.kValue;
     auto inputDtypeSize = args_.inputDtypeSize;
-    if (isFp4_) {
+    if (isFp4_ || isHiF4_) {
+        // fp4/hif4 均为 2 元素打包 1 字节, 通信量按 1B/2元素 计
         kValue = args_.kValue / EVEN_ALIGN;
         inputDtypeSize = 1;
     }
