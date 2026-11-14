@@ -1890,9 +1890,14 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
         CalcBaseTileTilingParams950();
         CalcMatmulPhaseL1TileInfo950();
     } else if (socVer_ != SOC_VER_950_CODE) {
-        // At D=256 the Arch22 union kernel shares the second K buffer with P.
-        const bool supportsWideKv = embeddingSize_ <= GBSA_TILE_SIZE_128 || embeddingSize_ == GBSA_TILE_SIZE_256;
-        kvBaseTile_ = maskType_ == GBSA_MASK_TYPE_UNION && supportsWideKv ? GBSA_TILE_SIZE_512 : GBSA_TILE_SIZE_256;
+        if (maskType_ == GBSA_MASK_TYPE_UNION) {
+            // At D=256 the Arch22 union kernel shares the second K buffer with P.
+            const bool supportsWideKv = embeddingSize_ <= GBSA_TILE_SIZE_128 || embeddingSize_ == GBSA_TILE_SIZE_256;
+            kvBaseTile_ = supportsWideKv ? GBSA_TILE_SIZE_512 : GBSA_TILE_SIZE_256;
+        } else {
+            const bool smallM = groupSize_ <= GBSA_TILE_SIZE_16 && blockShapeX_ == 1U;
+            kvBaseTile_ = smallM && embeddingSize_ <= GBSA_TILE_SIZE_256 ? GBSA_TILE_SIZE_512 : GBSA_TILE_SIZE_256;
+        }
     } else if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
         qBaseTile_ = Mxfp8Tiling::QueryTileRows(groupSize_);
         kvBaseTile_ = Mxfp8Tiling::KvTileTokens(groupSize_);
@@ -1908,9 +1913,6 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
         mm2L1TileKRight_ = kvBaseTile_;
         kL1BufNum_ = 3U;
         vL1BufNum_ = 2U;
-    } else {
-        const bool smallM = groupSize_ <= GBSA_TILE_SIZE_16 && blockShapeX_ == 1U;
-        kvBaseTile_ = smallM && embeddingSize_ <= GBSA_TILE_SIZE_256 ? GBSA_TILE_SIZE_512 : GBSA_TILE_SIZE_256;
     }
     // SoftmaxUnion adds exact-mask UB cost beyond regular 950 packing. Keep the
     // shared 950 tile table, then dynamically shrink kvBaseTile when D is wide
