@@ -103,6 +103,16 @@ _op_category_inits = {}
 _op_py_files = []
 _op_cpp_files = [
     (
+        os.path.join("common", "moe_ep_comm_alg_def.h"),
+        os.path.join(
+            OPS_TRANSFORMER_ROOT,
+            "mc2",
+            "common",
+            "op_kernel",
+            "moe_ep_comm_alg_def.h",
+        ),
+    ),
+    (
         os.path.join("common", "moe_shared_jetty_context.h"),
         os.path.join(
             OPS_TRANSFORMER_ROOT,

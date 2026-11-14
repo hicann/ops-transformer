@@ -513,10 +513,14 @@ protected:
 static struct MoeEpCombineCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const MoeEpCombineTestParam& param)
+static gert::TilingContextPara BuildTilingContextPara(const MoeEpCombineTestParam& param,
+                                                      const std::string& commAlg = "auto", int64_t contextElements = 0)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     gert::StorageShape contextShape = {param.contextShape, param.contextShape};
+    if (contextElements > 0) {
+        contextShape = {{contextElements}, {contextElements}};
+    }
     gert::StorageShape xShape = {param.xShape, param.xShape};
     gert::StorageShape topkIdxShape = {param.topkIdxShape, param.topkIdxShape};
 
@@ -572,6 +576,7 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeEpCombineTestPara
         {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.cclBufferSize)},
         {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.topoType)},
         {"rank_num_per_server", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.rankNumPerServer)},
+        {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>(commAlg)},
     };
 
     return gert::TilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo, "3510");
@@ -585,5 +590,41 @@ TEST_P(MoeEpCombineArch35TilingTest, GeneralCases)
 }
 
 INSTANTIATE_TEST_CASE_P(MoeEpCombineTilingUT, MoeEpCombineArch35TilingTest, testing::ValuesIn(g_testCases));
+
+TEST(MoeEpCombineArch35RoutingTest, ClosOnlyUsesSharedTemplateStartingAt16Ranks)
+{
+    for (int64_t ep : {2, 8, 15, 16, 32, 64}) {
+        SCOPED_TRACE(ep);
+        auto param = g_testCases[0];
+        param.epWorldSize = ep;
+        param.epRankId = 0;
+        param.numExperts = ep * 2;
+        param.rankNumPerServer = ep;
+        param.topoType = 0;
+        param.cclBufferSize = 64 * 1024 * 1024;
+        TilingInfo automatic;
+        TilingInfo closOnly;
+        ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "auto", 2052), automatic));
+        const bool sharedJetty = ep >= 16;
+        ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "clos_only", sharedJetty ? 2116 : 2052), closOnly));
+        if (sharedJetty) {
+            EXPECT_NE(closOnly.tilingKey, automatic.tilingKey);
+            ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+        } else {
+            EXPECT_EQ(closOnly.tilingKey, automatic.tilingKey);
+        }
+        ExecuteTestCase(BuildTilingContextPara(param, "", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+    }
+}
+
+TEST(MoeEpCombineArch35RoutingTest, ClosOnlyRejectsHybridTopology)
+{
+    auto param = g_testCases[0];
+    param.epWorldSize = 8;
+    param.numExperts = 16;
+    param.topoType = 1;
+    param.rankNumPerServer = 4;
+    ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2116), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+}
 
 } // namespace MoeEpCombineUT

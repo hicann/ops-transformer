@@ -46,8 +46,7 @@ __global__ __aicore__ void moe_ep_dispatch_epilogue(GM_ADDR context, GM_ADDR x, 
     using ScalesType = typename std::conditional<IsMxQuant, fp8_e8m0_t, float>::type;
 
 #if defined(ENABLE_MOE_EP_DISPATCH_EPILOGUE_KERNEL)
-    (void)ClosOnly;
-    MoeEpDispatchEpilogue<DTYPE_RECV_X, ScalesType, IsCached, HasTopkWeights> op;
+    MoeEpDispatchEpilogue<DTYPE_RECV_X, ScalesType, IsCached, HasTopkWeights, ClosOnly> op;
     op.Init(context, x, topkIdx, numRecvPerRank, numRecvPerExpert, cachedRecvSrcMetadata, recvX, recvSrcMetadata,
             recvTopkWeights, recvScales, workspace, tilingGM, &pipe, &tilingData.moeEpDispatchEpilogueInfo);
     op.Process();

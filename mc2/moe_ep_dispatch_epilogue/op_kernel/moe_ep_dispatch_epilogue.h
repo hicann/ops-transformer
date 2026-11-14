@@ -44,7 +44,6 @@
 #include "../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../common/op_kernel/mc2_moe_context.h"
 #include "../../common/op_kernel/moe_shared_jetty_context.h"
-#include "../../common/op_kernel/moe_ep_comm_alg_def.h"
 #include "../../common/op_kernel/moe_ep_exception_dump_writer.h"
 #include "../../common/op_kernel/moe_ep_send_completion.h"
 
@@ -92,7 +91,7 @@ static constexpr uint32_t STAGE_RING = 3U;
 // 预读扫描的起点哨兵：表示「还没发过任何一拍的 meta」，从第一个有活的 rank 的第一拍开始找。
 static constexpr uint32_t TILE_NONE = 0xFFFFFFFFU;
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
 class MoeEpDispatchEpilogue {
 public:
     __aicore__ inline MoeEpDispatchEpilogue(){};
@@ -128,7 +127,7 @@ private:
                                        uint32_t& sendNum);
     __aicore__ inline GM_ADDR GetWinAddrByRankId(uint32_t rankId, uint64_t offset)
     {
-        if (useSharedJetty_) {
+        if constexpr (ClosOnly) {
             auto ctx = reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(mc2Context_);
             return (GM_ADDR)ctx->epHcclBuffer[rankId] + offset;
         }
@@ -146,7 +145,6 @@ private:
 
     TPipe* tpipe_{nullptr};
     GM_ADDR mc2Context_{nullptr};
-    bool useSharedJetty_{false};
     MoeEpExceptionDump::MoeEpCoreDiagWriter diagWriter_;
     uint32_t epRankId_{0};
     uint32_t networkMode_{0};      // 0 = direct(自段 x 直读输入), 1 = hybrid(自段 x 读win)
@@ -261,8 +259,8 @@ private:
     int32_t stageEvtSToMte3_{0};
 };
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::SplitToCore(
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::SplitToCore(
     uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startId, uint32_t& endId, uint32_t& sendNum)
 {
     sendNum = curSendCnt / curUseAivNum;
@@ -278,8 +276,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     endId = startId + sendNum;
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::Init(
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::Init(
     GM_ADDR context, GM_ADDR x, GM_ADDR topkIdx, GM_ADDR numRecvPerRank, GM_ADDR numRecvPerExpert,
     GM_ADDR cachedRecvSrcMetadata, GM_ADDR recvX, GM_ADDR recvSrcMetadata, GM_ADDR recvTopkWeights, GM_ADDR recvScales,
     GM_ADDR workspace, GM_ADDR tilingGM, TPipe* pipe, const MoeEpDispatchEpilogueInfo* tilingData)
@@ -300,9 +298,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     slotWinStateOffset_ = tilingData->slotWinStateOffset;
 
     mc2Context_ = context;
-    useSharedJetty_ = tilingData->commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY;
-    epRankId_ = useSharedJetty_ ? reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(context)->epRankId :
-                                  reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context)->epRankId;
+    epRankId_ = ClosOnly ? reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(context)->epRankId :
+                           reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context)->epRankId;
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
     // The local window covers states, payloads and dump records for either context layout.
     OOMCheckAddrRange<uint8_t>(tilingGM, sizeof(MoeEpDispatchEpilogueTilingData));
@@ -310,7 +307,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 #endif
     constexpr size_t metadataOffset = offsetof(MoeEpDispatchEpilogueTilingData, moeEpDispatchEpilogueInfo) +
                                       offsetof(MoeEpDispatchEpilogueInfo, dumpMetadata);
-    if (useSharedJetty_) {
+    if constexpr (ClosOnly) {
         MoeEpExceptionDump::WriteMetadata<Mc2Kernel::MoeSharedJettyContext>(context, tilingGM + metadataOffset);
         diagWriter_.Init<Mc2Kernel::MoeSharedJettyContext>(context, MOE_EP_CORE_DIAG_DISPATCH_EPILOGUE, tpipe_);
     } else {
@@ -401,8 +398,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     diagWriter_.RunPosRecord(MOE_EP_DISPATCH_EPILOGUE_RUN_POS_INIT_DONE);
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::InitSlotBuffers(
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::InitSlotBuffers(
     uint32_t tokenBytes, uint32_t sharedBytes, uint64_t ubBytes)
 {
     rankExpertRowStride_ = Ceil(numLocalExperts_, ELEM_ALIGN) * ELEM_ALIGN;
@@ -494,8 +491,9 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     }
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::InitLocalRecvIndex()
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void
+MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::InitLocalRecvIndex()
 {
     const uint32_t totalElements = numTokens_ * axisK_;
     if constexpr (IsCached) {
@@ -513,8 +511,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     SyncFunc<AscendC::HardEvent::MTE3_S>();
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::Process()
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::Process()
 {
     InitLocalRecvIndex();
     if constexpr (!IsCached) {
@@ -542,7 +540,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     // 所有输出在交给Combine前写完，包含metadata及slot索引。
     SyncFunc<AscendC::HardEvent::MTE3_S>();
     diagWriter_.RunPosRecord(MOE_EP_DISPATCH_EPILOGUE_RUN_POS_OUTPUT_DONE);
-    if (useSharedJetty_) {
+    if constexpr (ClosOnly) {
         MoeEpCompletion::DrainChannels(reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(mc2Context_),
                                        epWorldSize_, tpipe_);
     } else {
@@ -551,8 +549,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     }
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::WaitDispatch()
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::WaitDispatch()
 {
     if (aivId_ != aivNum_ - 1) {
         return;
@@ -588,8 +586,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     SyncFunc<AscendC::HardEvent::MTE3_S>();
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::ComputePrefixSums()
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::ComputePrefixSums()
 {
     int64_t cumulativeRowOffset = 0;
     for (uint32_t localExpertIdx = 0; localExpertIdx < numLocalExperts_; ++localExpertIdx) {
@@ -600,8 +598,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     SyncFunc<AscendC::HardEvent::S_V>();
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CountHits()
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::CountHits()
 {
     DataCopyExtParams recvCntCopyParams{1U, static_cast<uint32_t>(epWorldSize_ * sizeof(int32_t)), 0U, 0U, 0U};
     DataCopyPadExtParams<int32_t> recvCntPadParams{false, 0U, 0U, 0};
@@ -660,8 +658,9 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     SyncFunc<AscendC::HardEvent::MTE3_S>();
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::BuildRankRowStarts()
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void
+MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::BuildRankRowStarts()
 {
     // CountHits used ubRankExpertHitCount_ as an MTE3 source. Finish that read before reusing the buffer as the
     // per-rank prefix contributed by cores preceding this core.
@@ -711,8 +710,9 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     }
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CopyCachedRankOffsets()
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void
+MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::CopyCachedRankOffsets()
 {
     if (aivId_ != 0U) {
         return;
@@ -726,8 +726,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     SyncFunc<AscendC::HardEvent::MTE3_S>();
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline bool MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::NextTile(
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline bool MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::NextTile(
     uint32_t rankId, uint32_t tileStart, uint32_t& nextRank, uint32_t& nextTileStart, uint32_t& nextTileCnt,
     uint32_t& nextSlotStart)
 {
@@ -749,11 +749,9 @@ __aicore__ inline bool MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     return false;
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::IssueMeta(uint32_t rankId,
-                                                                                                     uint32_t slotIdx,
-                                                                                                     uint32_t tileCnt,
-                                                                                                     uint32_t buf)
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::IssueMeta(
+    uint32_t rankId, uint32_t slotIdx, uint32_t tileCnt, uint32_t buf)
 {
     DataCopyExtParams metaCopyParams{static_cast<uint16_t>(tileCnt), metaBytes_, perSlotBytes_ - metaBytes_, 0, 0};
     DataCopyPadExtParams<int32_t> metaPadParams{false, 0, 0, 0};
@@ -780,8 +778,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     SetFlag<AscendC::HardEvent::MTE2_S>(metaEvtMte2ToS_[buf]);
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline uint32_t MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::BuildSlotHits(
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline uint32_t MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::BuildSlotHits(
     uint32_t metaBuf, uint32_t localSlot, uint32_t globalTileSlot)
 {
     uint32_t hitCnt = 0U;
@@ -825,8 +823,8 @@ __aicore__ inline uint32_t MoeEpDispatchEpilogue<XType, ScalesType, IsCached, Ha
     return hitCnt;
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CopySlots()
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::CopySlots()
 {
     if constexpr (!IsCached) {
         // 保持原专家输出和Combine metadata顺序，只改变cached的读入分组。
@@ -1029,8 +1027,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     // 的可见性，环的事件又是 AllocEventID 私有、不会串到别处，所以函数返回时的 pipe 状态不需要在这里再等一次。
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline uint32_t MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::GlobalSlot(
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline uint32_t MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::GlobalSlot(
     uint32_t rankId, uint32_t slotId)
 {
     for (uint32_t r = 0; r < rankId; ++r) {
@@ -1039,8 +1037,8 @@ __aicore__ inline uint32_t MoeEpDispatchEpilogue<XType, ScalesType, IsCached, Ha
     return slotId;
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CopyCachedArray(
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::CopyCachedArray(
     GlobalTensor<int32_t> src, GlobalTensor<int32_t> dst, uint32_t count)
 {
     uint32_t start, end, blocks;
@@ -1059,16 +1057,18 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     }
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CopyCachedMetadata()
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline void
+MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::CopyCachedMetadata()
 {
     CopyCachedArray(cachedRecvSrcMetadataGm_, recvSrcMetadataGm_, expertSum_ * RECV_META_FIELDS);
     CopyCachedArray(cachedSlotEndsGm_, slotEndsGm_, GlobalSlot(epWorldSize_, 0U));
     CopyCachedArray(cachedSlotRowIdsGm_, slotRowIdsGm_, expertSum_);
 }
 
-template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline LocalTensor<XType> MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::IssueTokenRead(
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights, bool ClosOnly>
+__aicore__ inline LocalTensor<XType>
+MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights, ClosOnly>::IssueTokenRead(
     GM_ADDR slotAddr, int32_t tokenId, uint32_t sequence, const DataCopyParams& tokenCopyParams,
     const DataCopyParams& scalesCopyParams)
 {

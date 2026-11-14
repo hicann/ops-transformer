@@ -47,7 +47,7 @@ static aclnnStatus CheckParams(int64_t epWorldSize, int64_t epRankId, int64_t nu
     CHECK_RET(epWorldSize % rankNumPerServer == 0, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(Mc2Aclnn::IsValidMoeEpCommAlg(commAlg), ACLNN_ERR_PARAM_INVALID);
     if (Mc2Aclnn::IsMoeEpClosOnly(commAlg)) {
-        CHECK_RET(epWorldSize >= Mc2Aclnn::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE, ACLNN_ERR_PARAM_INVALID);
+        CHECK_RET(epWorldSize >= Mc2Aclnn::MOE_EP_CLOS_ONLY_MIN_RANK_SIZE, ACLNN_ERR_PARAM_INVALID);
         CHECK_RET(topoType == NETWORK_DIRECT, ACLNN_ERR_PARAM_INVALID);
     }
     return ACLNN_SUCCESS;

@@ -63,8 +63,9 @@ static constexpr uint32_t RECV_META_FIELDS = 5U;
 static constexpr uint32_t META_TOKEN_IDX_OFFSET = 1U;
 static constexpr uint32_t META_TOPK_IDX_OFFSET = 2U;
 static constexpr uint32_t META_RECV_X_IDX_OFFSET = 4U;
-// A peer SQ holds 32768 WQEBBs. The WQE crossing the 32767-pending boundary requests a CQE,
-// then that peer channel is drained before more WQEs are issued.
+// All peer channels attached to one shared physical Jetty consume the same SQ. The Jetty SQ holds 32768 WQEBBs.
+// The WQE crossing the 32767-pending boundary requests a CQE, then the shared Jetty SQ is drained before more WQEs
+// are issued.
 static constexpr uint32_t HCOMM_SQ_MAX_PENDING = 32767U;
 // PR 111 requires each committed batch to contain fewer WQEBBs than the SQ depth.
 static constexpr uint32_t HCOMM_BATCH_CAPACITY = 256;
@@ -183,7 +184,7 @@ private:
     uint32_t activePeerIndex_{0};
     GM_ADDR activeRemoteWindow_{nullptr};
     uint32_t preparedWriteCount_{0};
-    uint32_t activeSqPendingWqebb_{0};
+    uint32_t activeJettyPendingWqebb_{0};
     bool activeBatchInitialized_{false};
 };
 
@@ -314,13 +315,13 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::BeginPrepared
         activeBatchHandle_ = hcomm_.MakeBatchHandle(static_cast<CommHandle>(commHandle), hcommBatchTensor_,
                                                     HCOMM_BATCH_BUFFER_BYTES, winRankAddr_[dstRank]);
         activeJettyHandle_ = commHandle;
+        activeJettyPendingWqebb_ = 0U;
         activeBatchInitialized_ = true;
     }
     activePeerIndex_ = peerIndex;
     activeRemoteWindow_ = winRankAddr_[dstRank];
     // All payload/flag addresses for this peer belong to the same registered MoE window.
     hcomm_.GetHandleRef(activeBatchHandle_, activePeerIndex_, activeRemoteWindow_);
-    activeSqPendingWqebb_ = 0U;
 }
 
 template <TemplateMoeEpCombineTypeClass>
@@ -337,7 +338,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::DrainActivePe
     FlushPreparedWrites(true);
     auto& handle = hcomm_.GetHandleRef(activeBatchHandle_, activePeerIndex_, activeRemoteWindow_);
     (void)hcomm_.Drain(handle);
-    activeSqPendingWqebb_ = 0U;
+    activeJettyPendingWqebb_ = 0U;
 }
 
 template <TemplateMoeEpCombineTypeClass>
@@ -346,14 +347,14 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::PrepareWrite(
 {
     // Single-SGE WQE occupies 1 WQEBB (64 bytes).
     ReservePreparedWrites(1U);
-    const bool drainNow = activeSqPendingWqebb_ + 1U > HCOMM_SQ_MAX_PENDING;
+    const bool drainNow = activeJettyPendingWqebb_ + 1U > HCOMM_SQ_MAX_PENDING;
     if (drainNow) {
         hcomm_.WriteNbi<cqeConfig>(activeBatchHandle_.handle, dst, src, len);
     } else {
         hcomm_.WriteNbi<config>(activeBatchHandle_.handle, dst, src, len);
     }
     ++preparedWriteCount_;
-    activeSqPendingWqebb_ += 1U;
+    activeJettyPendingWqebb_ += 1U;
     if (drainNow) {
         DrainActivePeer();
     }
@@ -371,14 +372,14 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::PrepareMultiS
     uint32_t wqeBytes = sqeHeaderBytes + srcNum * sgeEntryBytes;
     uint32_t wqebbCount = (wqeBytes + wqebbSize - 1U) / wqebbSize;
     ReservePreparedWrites(wqebbCount);
-    const bool drainNow = activeSqPendingWqebb_ + wqebbCount > HCOMM_SQ_MAX_PENDING;
+    const bool drainNow = activeJettyPendingWqebb_ + wqebbCount > HCOMM_SQ_MAX_PENDING;
     if (drainNow) {
         hcomm_.WriteNbi<DEFAULT_CQE_WQE_CONFIG>(activeBatchHandle_.handle, dst, srcDescs, srcNum);
     } else {
         hcomm_.WriteNbi<config>(activeBatchHandle_.handle, dst, srcDescs, srcNum);
     }
     preparedWriteCount_ += wqebbCount;
-    activeSqPendingWqebb_ += wqebbCount;
+    activeJettyPendingWqebb_ += wqebbCount;
     if (drainNow) {
         DrainActivePeer();
     }
@@ -563,7 +564,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendPhaseFrom
     activeBatchHandle_ = {};
     activeJettyHandle_ = 0U;
     preparedWriteCount_ = 0U;
-    activeSqPendingWqebb_ = 0U;
+    activeJettyPendingWqebb_ = 0U;
     activeBatchInitialized_ = false;
 
     // Prefetch across peer boundaries too; typical peer slices fit in a single metadata chunk.

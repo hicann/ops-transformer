@@ -94,7 +94,6 @@ struct MoeEpDispatchInfo {
     uint32_t networkMode;
     uint32_t dispatchNotifyCount;
     uint32_t aivNum;
-    uint32_t commAlg;
 };
 
 struct MoeEpDispatchTilingData {

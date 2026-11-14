@@ -20,8 +20,8 @@ namespace Mc2Aclnn {
 
 constexpr char MOE_EP_COMM_ALG_AUTO_NAME[] = "auto";
 constexpr char MOE_EP_COMM_ALG_CLOS_ONLY_NAME[] = "clos_only";
-constexpr int64_t MOE_EP_CLOS_ONLY_MIN_RANK_SIZE = 64;
-constexpr int64_t MOE_EP_SHARED_JETTY_MIN_RANK_SIZE = MOE_EP_CLOS_ONLY_MIN_RANK_SIZE;
+constexpr int64_t MOE_EP_CLOS_ONLY_MIN_RANK_SIZE = 2;
+constexpr int64_t MOE_EP_SHARED_JETTY_MIN_RANK_SIZE = Mc2Tiling::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE;
 
 inline bool MoeEpCommAlgEquals(const char* lhs, const char* rhs)
 {
@@ -33,7 +33,7 @@ inline bool MoeEpCommAlgEquals(const char* lhs, const char* rhs)
 
 inline bool IsValidMoeEpCommAlg(const char* commAlg)
 {
-    return commAlg == nullptr || *commAlg == '\0' || MoeEpCommAlgEquals(commAlg, MOE_EP_COMM_ALG_AUTO_NAME) ||
+    return commAlg == nullptr || MoeEpCommAlgEquals(commAlg, MOE_EP_COMM_ALG_AUTO_NAME) ||
            MoeEpCommAlgEquals(commAlg, MOE_EP_COMM_ALG_CLOS_ONLY_NAME);
 }
 
@@ -42,10 +42,18 @@ inline bool IsMoeEpClosOnly(const char* commAlg)
     return MoeEpCommAlgEquals(commAlg, MOE_EP_COMM_ALG_CLOS_ONLY_NAME);
 }
 
-inline uint32_t ParseMoeEpCommAlg(const char* commAlg)
+inline bool UseMoeEpSharedJetty(const char* commAlg, int64_t epWorldSize)
 {
-    return IsMoeEpClosOnly(commAlg) ? static_cast<uint32_t>(Mc2Tiling::MOE_EP_COMM_ALG_CLOS_ONLY) :
-                                      static_cast<uint32_t>(Mc2Tiling::MOE_EP_COMM_ALG_AUTO);
+    return IsMoeEpClosOnly(commAlg) && epWorldSize >= MOE_EP_SHARED_JETTY_MIN_RANK_SIZE;
+}
+
+inline uint32_t ParseMoeEpCommAlg(const char* commAlg, int64_t epWorldSize)
+{
+    if (!IsMoeEpClosOnly(commAlg)) {
+        return static_cast<uint32_t>(Mc2Tiling::MOE_EP_COMM_ALG_AUTO);
+    }
+    return static_cast<uint32_t>(UseMoeEpSharedJetty(commAlg, epWorldSize) ? Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY :
+                                                                             Mc2Tiling::MOE_EP_COMM_ALG_CLOS_ONLY);
 }
 
 } // namespace Mc2Aclnn

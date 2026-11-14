@@ -42,7 +42,6 @@
 #include "../../common/op_kernel/mc2_moe_context.h"
 #include "../../common/op_kernel/moe_ep_exception_dump_writer.h"
 #include "../../common/op_kernel/moe_shared_jetty_context.h"
-#include "../../common/op_kernel/moe_ep_comm_alg_def.h"
 #include "../../common/op_kernel/moe_ep_send_completion.h"
 
 #include "moe_ep_combine_epilogue_tiling_key.h"
@@ -54,8 +53,8 @@ namespace MoeEpCombineEpilogueImpl {
 
 using namespace AscendC;
 
-#define TemplateMoeEpCombineEpilogueTypeClass typename XType, uint32_t HasTopkWeight
-#define TemplateMoeEpCombineEpilogueTypeFunc XType, HasTopkWeight
+#define TemplateMoeEpCombineEpilogueTypeClass typename XType, uint32_t HasTopkWeight, bool ClosOnly
+#define TemplateMoeEpCombineEpilogueTypeFunc XType, HasTopkWeight, ClosOnly
 
 static constexpr uint32_t WIN_ADDR_ALIGN = 512;
 constexpr uint64_t UB_ALIGN = 32UL;
@@ -101,7 +100,6 @@ private:
     TPipe* tpipe_{nullptr};
     const MoeEpCombineEpilogueInfo* tilingData_{nullptr};
     GM_ADDR mc2Context_{nullptr};
-    bool useSharedJetty_{false};
     MoeEpExceptionDump::MoeEpCoreDiagWriter diagWriter_;
 
     uint32_t rankId_{0};
@@ -188,8 +186,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     hAlignSize_ = Ceil(tokenBytes_, UB_ALIGN) * UB_ALIGN;
     xCopyParams_ = {1U, static_cast<uint16_t>(tokenBytes_), 0U, 0U};
     mc2Context_ = context;
-    useSharedJetty_ = tilingData->commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY;
-    if (useSharedJetty_) {
+    if constexpr (ClosOnly) {
         auto ctx = reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(context);
         rankId_ = ctx->epRankId;
         combineChannelCount_ = ctx->sharedJettyNum < aivNum_ ? ctx->sharedJettyNum : aivNum_;
@@ -227,7 +224,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
 
     constexpr size_t metadataOffset = offsetof(MoeEpCombineEpilogueTilingData, moeEpCombineEpilogueInfo) +
                                       offsetof(MoeEpCombineEpilogueInfo, dumpMetadata);
-    if (useSharedJetty_) {
+    if constexpr (ClosOnly) {
         MoeEpExceptionDump::WriteMetadata<Mc2Kernel::MoeSharedJettyContext>(context, tilingGM + metadataOffset);
         diagWriter_.Init<Mc2Kernel::MoeSharedJettyContext>(context, MOE_EP_CORE_DIAG_COMBINE_EPILOGUE, tpipe_);
     } else {
@@ -292,7 +289,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
 template <TemplateMoeEpCombineEpilogueTypeClass>
 __aicore__ inline uint32_t MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc>::GetCompletionChannelCount()
 {
-    if (useSharedJetty_) {
+    if constexpr (ClosOnly) {
         return combineChannelCount_;
     }
     if (aivNum_ < epWorldSize_) {
@@ -524,7 +521,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     LoadLocalRecvIndex();
     MaskCheck();
     RecvPhaseReduce();
-    if (useSharedJetty_) {
+    if constexpr (ClosOnly) {
         MoeEpCompletion::DrainChannels(reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(mc2Context_),
                                        epWorldSize_, tpipe_);
     } else {

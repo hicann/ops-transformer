@@ -16,10 +16,12 @@
 namespace Mc2Tiling {
 
 constexpr int64_t MOE_EP_COMM_ALG_AUTO = 0;
-constexpr int64_t MOE_EP_COMM_ALG_CLOS_ONLY = 1;
-// Internal compatibility aliases. The public comm_alg names are auto and clos_only.
+// Resolved implementation modes. The public clos_only policy selects by EP size.
+// Preserve the existing shared-Jetty value in device tiling data.
+constexpr int64_t MOE_EP_COMM_ALG_SHARED_JETTY = 1;
+constexpr int64_t MOE_EP_COMM_ALG_CLOS_ONLY = 2; // Legacy context/kernel, Clos channels only.
 constexpr int64_t MOE_EP_COMM_ALG_FULLMESH = MOE_EP_COMM_ALG_AUTO;
-constexpr int64_t MOE_EP_COMM_ALG_SHARED_JETTY = MOE_EP_COMM_ALG_CLOS_ONLY;
+constexpr int64_t MOE_EP_SHARED_JETTY_MIN_RANK_SIZE = 16;
 
 } // namespace Mc2Tiling
 

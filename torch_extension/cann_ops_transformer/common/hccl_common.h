@@ -64,6 +64,8 @@ using _HcclRankGraphGetTopoType = HcclResult (*)(HcclComm, uint32_t, uint32_t, C
 using _HcclRankGraphGetRanksByTopoInst = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t**, uint32_t*);
 using _HcclRankGraphGetEndpointNum = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t*);
 using _HcclRankGraphGetEndpointDesc = HcclResult (*)(HcclComm, uint32_t, uint32_t, uint32_t*, EndpointDesc*);
+using _HcclRankGraphGetEndpointInfo = HcclResult (*)(HcclComm, uint32_t, const EndpointDesc*, EndpointAttr, uint32_t,
+                                                     void*);
 // 获取每层rank数量
 using _HcclRankGraphGetRankSizeByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t*);
 // 初始化channel描述符
@@ -80,6 +82,7 @@ using _HcclEngineCtxGet = HcclResult (*)(HcclComm, const char*, CommEngine, void
 using _HcclEngineCtxCopy = HcclResult (*)(HcclComm, CommEngine, const char*, void*, uint64_t, uint64_t);
 // HcclBarrier
 using _HcclBarrier = HcclResult (*)(HcclComm, aclrtStream);
+using _HcclAllGather = HcclResult (*)(void*, void*, uint64_t, HcclDataType, HcclComm, aclrtStream);
 // 注册内存到通信域
 using _HcclCommMemReg = HcclResult (*)(HcclComm, const char*, const CommMem*, HcclMemHandle*);
 // 通过channel获取远端注册的内存
@@ -113,6 +116,7 @@ static _HcclRankGraphGetTopoType HcclRankGraphGetTopoTypeFunc = nullptr;
 static _HcclRankGraphGetRanksByTopoInst HcclRankGraphGetRanksByTopoInstFunc = nullptr;
 static _HcclRankGraphGetEndpointNum HcclRankGraphGetEndpointNumFunc = nullptr;
 static _HcclRankGraphGetEndpointDesc HcclRankGraphGetEndpointDescFunc = nullptr;
+static _HcclRankGraphGetEndpointInfo HcclRankGraphGetEndpointInfoFunc = nullptr;
 static _HcclRankGraphGetRankSizeByLayer HcclRankGraphGetRankSizeByLayerFunc = nullptr;
 static _HcclRankGraphGetRanksByLayer HcclRankGraphGetRanksByLayerFunc = nullptr;
 static _HcclChannelAcquire HcclChannelAcquireFunc = nullptr;
@@ -121,6 +125,7 @@ static _HcclEngineCtxCreate HcclEngineCtxCreateFunc = nullptr;
 static _HcclEngineCtxGet HcclEngineCtxGetFunc = nullptr;
 static _HcclEngineCtxCopy HcclEngineCtxCopyFunc = nullptr;
 static _HcclBarrier HcclBarrierFunc = nullptr;
+static _HcclAllGather HcclAllGatherFunc = nullptr;
 static _HcclCommMemReg HcclCommMemRegFunc = nullptr;
 static _HcclChannelGetRemoteMems HcclChannelGetRemoteMemsFunc = nullptr;
 static _HcclEngineCtxDestroy HcclEngineCtxDestroyFunc = nullptr;
@@ -263,6 +268,11 @@ static inline void InitHcclEngineCtxFunctions()
 static inline void InitHcclSharedJettyFunctions()
 {
     InitHcclEngineCtxFunctions();
+    HcclAllGatherFunc = GetHcclFuncAddr<_HcclAllGather>("HcclAllGather");
+    TORCH_CHECK(HcclAllGatherFunc != nullptr, "getHcclAllGather failed.");
+    HcclRankGraphGetEndpointInfoFunc =
+        GetHcclFwkFuncAddr<_HcclRankGraphGetEndpointInfo>("HcclRankGraphGetEndpointInfo");
+    TORCH_CHECK(HcclRankGraphGetEndpointInfoFunc != nullptr, "getHcclRankGraphGetEndpointInfo failed.");
     HcclEngineCtxDestroyFunc = GetHcclFwkFuncAddr<_HcclEngineCtxDestroy>("HcclEngineCtxDestroy");
     TORCH_CHECK(HcclEngineCtxDestroyFunc != nullptr, "getHcclEngineCtxDestroy failed.");
     HcclChannelConfigCreateFunc = GetHcclFwkFuncAddr<_HcclChannelConfigCreate>("HcclChannelConfigCreate");

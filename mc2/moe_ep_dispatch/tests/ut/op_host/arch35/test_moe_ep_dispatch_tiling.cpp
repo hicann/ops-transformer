@@ -17,6 +17,7 @@
 #include <iostream>
 #include <gtest/gtest.h>
 #include "tiling_case_executor.h"
+#include "../../../../../common/op_api/moe_ep_comm_alg.h"
 
 namespace MoeEpDispatchUT {
 
@@ -82,7 +83,8 @@ class MoeEpDispatchArch35TilingTest : public testing::TestWithParam<MoeEpDispatc
 static struct MoeEpDispatchCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const MoeEpDispatchTestParam& param)
+static gert::TilingContextPara BuildTilingContextPara(const MoeEpDispatchTestParam& param,
+                                                      const std::string& commAlg = "auto", int64_t contextElements = 0)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     using TD = gert::TilingContextPara::TensorDescription;
@@ -96,7 +98,8 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeEpDispatchTestPar
     int64_t topK = param.topK;
     int64_t hidden = param.hidden;
 
-    gert::StorageShape contextShape = {{2052}, {2052}};
+    const int64_t ctxElements = contextElements > 0 ? contextElements : 2052;
+    gert::StorageShape contextShape = {{ctxElements}, {ctxElements}};
     gert::StorageShape xShape = {{tokens, hidden}, {tokens, hidden}};
     gert::StorageShape topkShape = {{tokens, topK}, {tokens, topK}};
 
@@ -148,6 +151,7 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeEpDispatchTestPar
         {"host_pinned_counter_addr", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.topoType)},
         {"rank_num_per_server", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.rankNumPerServer)},
+        {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>(commAlg)},
     };
 
     return gert::TilingContextPara(OP_NAME, inputs, outputs, attrs, &compileInfo, "3510");
@@ -160,5 +164,64 @@ TEST_P(MoeEpDispatchArch35TilingTest, GeneralCases)
 }
 
 INSTANTIATE_TEST_CASE_P(MoeEpDispatchTilingUT, MoeEpDispatchArch35TilingTest, testing::ValuesIn(g_testCases));
+
+TEST(MoeEpDispatchArch35RoutingTest, ClosOnlyUsesSharedTemplateStartingAt16Ranks)
+{
+    for (int64_t ep : {2, 8, 15, 16, 32, 64}) {
+        SCOPED_TRACE(ep);
+        auto param = g_testCases[0];
+        param.epWorldSize = ep;
+        param.epRankId = 0;
+        param.numExperts = ep * 2;
+        param.rankNumPerServer = ep;
+        param.topoType = 0;
+        param.cclBufferSize = 64 * 1024 * 1024;
+        param.doCpuSync = false;
+        TilingInfo automatic;
+        TilingInfo closOnly;
+        ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "auto", 2052), automatic));
+        const bool sharedJetty = ep >= 16;
+        ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "clos_only", sharedJetty ? 2116 : 2052), closOnly));
+        if (sharedJetty) {
+            EXPECT_NE(closOnly.tilingKey, automatic.tilingKey);
+            ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+        } else {
+            EXPECT_EQ(closOnly.tilingKey, automatic.tilingKey);
+        }
+        ExecuteTestCase(BuildTilingContextPara(param, "", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+    }
+}
+
+TEST(MoeEpDispatchArch35RoutingTest, ClosOnlyRejectsHybridTopology)
+{
+    auto param = g_testCases[0];
+    param.epWorldSize = 8;
+    param.numExperts = 16;
+    param.topoType = 1;
+    param.rankNumPerServer = 4;
+    ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2116), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+}
+
+TEST(MoeEpCommAlgTest, AcceptsOnlySupportedNames)
+{
+    EXPECT_TRUE(Mc2Aclnn::IsValidMoeEpCommAlg("auto"));
+    EXPECT_TRUE(Mc2Aclnn::IsValidMoeEpCommAlg("clos_only"));
+    EXPECT_TRUE(Mc2Aclnn::IsValidMoeEpCommAlg(nullptr)); // Omitted optional attribute uses auto.
+    EXPECT_FALSE(Mc2Aclnn::IsValidMoeEpCommAlg(""));
+    EXPECT_FALSE(Mc2Aclnn::IsValidMoeEpCommAlg("shared_jetty"));
+    EXPECT_FALSE(Mc2Aclnn::IsValidMoeEpCommAlg("fullmesh"));
+}
+
+TEST(MoeEpCommAlgTest, PortPolicyAndTemplateAreResolvedSeparately)
+{
+    for (int64_t ep : {2, 8, 15, 16, 32, 64}) {
+        const auto expectedMode =
+            ep >= 16 ? Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY : Mc2Tiling::MOE_EP_COMM_ALG_CLOS_ONLY;
+        EXPECT_EQ(Mc2Aclnn::ParseMoeEpCommAlg("clos_only", ep), expectedMode);
+        EXPECT_EQ(Mc2Aclnn::ParseMoeEpCommAlg("auto", ep), Mc2Tiling::MOE_EP_COMM_ALG_AUTO);
+        EXPECT_EQ(Mc2Aclnn::ParseMoeEpCommAlg(nullptr, ep), Mc2Tiling::MOE_EP_COMM_ALG_AUTO);
+    }
+    EXPECT_NE(Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY, Mc2Tiling::MOE_EP_COMM_ALG_CLOS_ONLY);
+}
 
 } // namespace MoeEpDispatchUT

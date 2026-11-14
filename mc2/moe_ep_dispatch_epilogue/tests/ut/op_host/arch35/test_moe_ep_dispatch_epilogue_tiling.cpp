@@ -88,7 +88,8 @@ class MoeEpDispatchEpilogueArch35TilingTest : public testing::TestWithParam<MoeE
 static struct MoeEpDispatchEpilogueCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const MoeEpDispatchEpilogueTestParam& param)
+static gert::TilingContextPara BuildTilingContextPara(const MoeEpDispatchEpilogueTestParam& param,
+                                                      const std::string& commAlg = "auto", int64_t contextElements = 0)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     using TD = gert::TilingContextPara::TensorDescription;
@@ -104,7 +105,8 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeEpDispatchEpilogu
     int64_t aAlloc = param.aAlloc;
     int64_t packed = CalcPackedElements(ep, tokens, topK, aAlloc > 0 ? aAlloc : 8);
 
-    gert::StorageShape contextShape = {{2052}, {2052}};
+    const int64_t ctxElements = contextElements > 0 ? contextElements : 2052;
+    gert::StorageShape contextShape = {{ctxElements}, {ctxElements}};
     gert::StorageShape xShape = {{tokens, hidden}, {tokens, hidden}};
     gert::StorageShape topkShape = {{tokens, topK}, {tokens, topK}};
     gert::StorageShape numRecvRank = {{ep}, {ep}};
@@ -145,6 +147,7 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeEpDispatchEpilogu
         {"has_topk_weights", Ops::Transformer::AnyValue::CreateFrom<bool>(param.hasTopkWeights)},
         {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.topoType)},
         {"rank_num_per_server", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.rankNumPerServer)},
+        {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>(commAlg)},
     };
 
     return gert::TilingContextPara(OP_NAME, inputs, outputs, attrs, &compileInfo, "3510");
@@ -158,5 +161,41 @@ TEST_P(MoeEpDispatchEpilogueArch35TilingTest, GeneralCases)
 
 INSTANTIATE_TEST_CASE_P(MoeEpDispatchEpilogueTilingUT, MoeEpDispatchEpilogueArch35TilingTest,
                         testing::ValuesIn(g_testCases));
+
+TEST(MoeEpDispatchEpilogueArch35RoutingTest, ClosOnlyUsesSharedTemplateStartingAt16Ranks)
+{
+    for (int64_t ep : {2, 8, 15, 16, 32, 64}) {
+        SCOPED_TRACE(ep);
+        auto param = g_testCases[0];
+        param.epWorldSize = ep;
+        param.epRankId = 0;
+        param.numExperts = ep * 2;
+        param.rankNumPerServer = ep;
+        param.topoType = 0;
+        param.cclBufferSize = 64 * 1024 * 1024;
+        TilingInfo automatic;
+        TilingInfo closOnly;
+        ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "auto", 2052), automatic));
+        const bool sharedJetty = ep >= 16;
+        ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "clos_only", sharedJetty ? 2116 : 2052), closOnly));
+        if (sharedJetty) {
+            EXPECT_NE(closOnly.tilingKey, automatic.tilingKey);
+            ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+        } else {
+            EXPECT_EQ(closOnly.tilingKey, automatic.tilingKey);
+        }
+        ExecuteTestCase(BuildTilingContextPara(param, "", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+    }
+}
+
+TEST(MoeEpDispatchEpilogueArch35RoutingTest, ClosOnlyRejectsHybridTopology)
+{
+    auto param = g_testCases[0];
+    param.epWorldSize = 8;
+    param.numExperts = 16;
+    param.topoType = 1;
+    param.rankNumPerServer = 4;
+    ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2116), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+}
 
 } // namespace MoeEpDispatchEpilogueUT

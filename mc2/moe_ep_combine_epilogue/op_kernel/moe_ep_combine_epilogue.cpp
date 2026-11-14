@@ -47,8 +47,7 @@ __global__ __aicore__ void moe_ep_combine_epilogue(GM_ADDR context, GM_ADDR x, G
     TPipe pipe;
     GET_TILING_DATA_WITH_STRUCT(MoeEpCombineEpilogueTilingData, tilingData, tilingGM);
 #if defined(ENABLE_MOE_EP_COMBINE_EPILOGUE_KERNEL)
-    (void)ClosOnly;
-    MoeEpCombineEpilogue<DTYPE_COMBINED_X, HasTopkWeight> op;
+    MoeEpCombineEpilogue<DTYPE_COMBINED_X, HasTopkWeight, ClosOnly> op;
     op.Init(context, x, topkIdx, recvSrcMetadata, topkWeights, combinedX, combinedTopkWeights, workspace, tilingGM,
             &pipe, &tilingData.moeEpCombineEpilogueInfo);
     op.Process();

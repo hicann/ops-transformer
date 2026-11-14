@@ -102,7 +102,7 @@ static void PrintTilingDataInfo(const char* nodeName, const MoeEpDispatchEpilogu
 // ---------------------------------------------------------------------------
 static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const char* nodeName,
                                        MoeEpDispatchEpilogueInfo& info, uint32_t& networkMode, uint32_t& serverNum,
-                                       uint32_t& rankNumPerServerOut)
+                                       uint32_t& rankNumPerServerOut, uint32_t& commAlg)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE(nodeName, "attrs is nullptr."), return ge::GRAPH_FAILED);
@@ -158,11 +158,11 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const
                                               "a supported communication algorithm"),
                     return ge::GRAPH_FAILED);
     if (Mc2Aclnn::IsMoeEpClosOnly(commAlgPtr)) {
-        OP_TILING_CHECK(epWorldSize < Mc2Aclnn::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE,
-                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                            nodeName, "ep_world_size", std::to_string(epWorldSize).c_str(),
-                            "clos_only requires at least MOE_EP_SHARED_JETTY_MIN_RANK_SIZE ranks"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            epWorldSize < Mc2Aclnn::MOE_EP_CLOS_ONLY_MIN_RANK_SIZE,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "ep_world_size", std::to_string(epWorldSize).c_str(),
+                                                  "clos_only requires at least 2 ranks"),
+            return ge::GRAPH_FAILED);
         OP_TILING_CHECK(
             requestedNetworkMode != NETWORK_DIRECT,
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "topo_type", "non-direct topology",
@@ -185,7 +185,7 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const
     serverNum = topology.serverNum;
     networkMode = topology.networkMode;
     rankNumPerServerOut = topology.rankNumPerServer;
-    info.commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr);
+    commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr, epWorldSize);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -254,7 +254,7 @@ static ge::graphStatus CheckInputDataType(const gert::TilingContext* context, co
 // 必须先于本函数完成 attr 校验，依赖 epWorldSize / numLocalExperts / nmt
 // ---------------------------------------------------------------------------
 static ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context, const char* nodeName,
-                                             MoeEpDispatchEpilogueInfo& info)
+                                             MoeEpDispatchEpilogueInfo& info, const uint32_t commAlg)
 {
     // ---- context: dim 必须 = 1 ----
     const gert::StorageShape* contextStorageShape = context->GetInputShape(CONTEXT_INDEX);
@@ -265,7 +265,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context,
                         (std::to_string(contextStorageShape->GetStorageShape().GetDimNum()) + "D").c_str(), "1D"),
                     return ge::GRAPH_FAILED);
     // Preserve the legacy auto-context shape contract; clos_only has a new, fixed shared-Jetty context ABI.
-    if (info.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY) {
+    if (commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY) {
         constexpr int64_t expectedContextElements = sizeof(Mc2Kernel::MoeSharedJettyContext) / sizeof(int32_t);
         OP_TILING_CHECK(
             contextStorageShape->GetStorageShape().GetDim(0) != expectedContextElements,
@@ -530,7 +530,7 @@ static ge::graphStatus CheckOutputTensors(const gert::TilingContext* context, co
 
 static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* context, const char* nodeName,
                                                  MoeEpDispatchEpilogueInfo& info, uint32_t networkMode,
-                                                 uint32_t serverNum, uint32_t rankNumPerServer)
+                                                 uint32_t serverNum, uint32_t rankNumPerServer, const uint32_t commAlg)
 {
     auto attrs = context->GetAttrs();
     auto cclBufferSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_CCL_BUFFER_SIZE_INDEX);
@@ -546,7 +546,7 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* cont
                                             networkMode,
                                             rankNumPerServer,
                                             serverNum,
-                                            info.commAlg};
+                                            commAlg};
     MoeEpWindowLayout layout{};
     OP_TILING_CHECK(CalcMoeEpWindowLayout(params, layout) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Calculate Moe EP window layout failed."), return ge::GRAPH_FAILED);
@@ -571,13 +571,14 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE(nodeName, "tilingData is nullptr."), return ge::GRAPH_FAILED);
 
     MoeEpDispatchEpilogueInfo& info = tilingData->moeEpDispatchEpilogueInfo;
+    uint32_t commAlg = Mc2Tiling::MOE_EP_COMM_ALG_AUTO;
     uint32_t networkMode = NETWORK_DIRECT;
     uint32_t serverNum = 1U;
     uint32_t rankNumPerServer = 1U;
 
-    OP_TILING_CHECK(
-        CheckAttrParams(context, nodeName, info, networkMode, serverNum, rankNumPerServer) != ge::GRAPH_SUCCESS,
-        OP_LOGE(nodeName, "Check attr params failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckAttrParams(context, nodeName, info, networkMode, serverNum, rankNumPerServer, commAlg) !=
+                        ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "Check attr params failed."), return ge::GRAPH_FAILED);
 
     bool cached = (context->GetInputShape(CACHED_RECV_SRC_METADATA_INDEX) != nullptr);
     info.cached = cached ? 1U : 0U;
@@ -596,7 +597,7 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
         return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(
-        CheckInputTensorShape(context, nodeName, info) != ge::GRAPH_SUCCESS,
+        CheckInputTensorShape(context, nodeName, info, commAlg) != ge::GRAPH_SUCCESS,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "input tensors", "The shape of an input tensor is invalid"),
         return ge::GRAPH_FAILED);
 
@@ -641,7 +642,7 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
     info.totalUbSize = ubSize;
 
     OP_TILING_CHECK(
-        BuildAndCheckWindowLayout(context, nodeName, info, networkMode, serverNum, rankNumPerServer) !=
+        BuildAndCheckWindowLayout(context, nodeName, info, networkMode, serverNum, rankNumPerServer, commAlg) !=
             ge::GRAPH_SUCCESS,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "window layout", "The computed HCCL window size is invalid"),
         return ge::GRAPH_FAILED);
@@ -661,7 +662,7 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
 
     uint64_t tilingKey =
         GET_TPL_TILING_KEY(TILINGKEY_TPL_A5, cached ? 1U : 0U, hasTopkWeights ? 1U : 0U, info.isMxQuant ? 1U : 0U,
-                           info.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY);
+                           commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY);
     context->SetTilingKey(tilingKey);
     OP_LOGD(nodeName, "tilingKey=%lu, blockDim=%u, aivNum=%u, cached=%u, hasTopkWeights=%u, isMxQuant=%u", tilingKey,
             blockDim, aivNum, info.cached, hasTopkWeights ? 1U : 0U, info.isMxQuant);

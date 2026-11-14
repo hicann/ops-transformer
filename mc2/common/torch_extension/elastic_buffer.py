@@ -34,8 +34,9 @@ _MOE_EP_METADATA_FIELDS = 5
 _MOE_SHARED_JETTY_NUM = 32
 _MOE_COMM_ALG_AUTO = "auto"
 _MOE_COMM_ALG_CLOS_ONLY = "clos_only"
-_MOE_COMM_ALGS = ("", _MOE_COMM_ALG_AUTO, _MOE_COMM_ALG_CLOS_ONLY)
-_MOE_CLOS_ONLY_MIN_WORLD_SIZE = 64
+_MOE_COMM_ALGS = (_MOE_COMM_ALG_AUTO, _MOE_COMM_ALG_CLOS_ONLY)
+_MOE_CLOS_ONLY_MIN_WORLD_SIZE = 2
+_MOE_SHARED_JETTY_MIN_WORLD_SIZE = 16
 
 _MOE_EP_METADATA_ALIGN_ELEMENTS = 128  # 512 bytes, int32 elements
 
@@ -406,6 +407,13 @@ def _inline_align(value: int, base: int) -> int:
     return (value + base - 1) // base * base
 
 
+def _check_moe_comm_alg(comm_alg: str) -> None:
+    torch._check(
+        comm_alg in _MOE_COMM_ALGS,
+        lambda: f"comm_alg must be 'auto' or 'clos_only', but got {comm_alg!r}.",
+    )
+
+
 @dataclass(frozen=True)
 class _MoeEpWindowLayout:
     state_buffer_bytes: int
@@ -423,6 +431,7 @@ def _get_moe_ep_window_layout(
     topk: int,
     comm_alg: str,
 ) -> _MoeEpWindowLayout:
+    _check_moe_comm_alg(comm_alg)
     win_addr_align = 512
     ub_align = 32
     max_out_dtype_size = 2
@@ -435,7 +444,10 @@ def _get_moe_ep_window_layout(
     dispatch_count_size = world_size * _inline_align(
         local_experts_num * state_dtype_size, win_addr_align
     )
-    if comm_alg == _MOE_COMM_ALG_CLOS_ONLY:
+    if (
+        comm_alg == _MOE_COMM_ALG_CLOS_ONLY
+        and world_size >= _MOE_SHARED_JETTY_MIN_WORLD_SIZE
+    ):
         dispatch_notify_count = _MOE_SHARED_JETTY_NUM
         combine_flag_count = world_size * _MOE_SHARED_JETTY_NUM
     else:
@@ -725,10 +737,12 @@ class ElasticBuffer:
                 specified netlayer that does not exist fails the build
                 directly.
             comm_alg: MoE communication port mode. ``"auto"`` (default) uses
-                FullMesh ports only and disables Clos ports; ``""`` is kept
-                as a backward-compatible alias for ``"auto"``;
+                both FullMesh and Clos ports available in the topology;
                 ``"clos_only"`` uses Clos ports only and disables FullMesh
-                ports.
+                ports. EP sizes >= 16 use the shared-Jetty template;
+                EP sizes from 2 to 15 use the legacy Clos-only template.
+                Empty strings are not supported. Clos-only mode requires
+                direct topology and rejects UBG (UB_RTP) links.
         """
         moe_args = (num_max_tokens_per_rank, hidden, num_topk)
         self._validate_init_args(group, num_cpu_bytes, moe_args, with_grad)
@@ -763,12 +777,7 @@ class ElasticBuffer:
                 self._group_name is not None and len(self._group_name) > 0,
                 lambda: "HCCL comm name is empty, please check HCCL group initialization.",
             )
-        torch._check(
-            comm_alg in _MOE_COMM_ALGS,
-            lambda: (
-                f"comm_alg must be '', 'auto' or 'clos_only', but got {comm_alg!r}."
-            ),
-        )
+        _check_moe_comm_alg(comm_alg)
         torch._check(
             comm_alg != _MOE_COMM_ALG_CLOS_ONLY
             or self._ep_world_size >= _MOE_CLOS_ONLY_MIN_WORLD_SIZE,
