@@ -76,6 +76,7 @@ public:
 
 private:
     ge::graphStatus DoTurboQuantTiling(MQSMLATilingInfo* tilingInfo);
+    ge::graphStatus DoInt8CsaTiling(MQSMLATilingInfo* tilingInfo);
     ge::graphStatus DoCsaTiling(MQSMLATilingInfo* tilingInfo);
     ge::graphStatus DoA6CsaTiling(MQSMLATilingInfo* tilingInfo);
     gert::TilingContext* context_ = nullptr;

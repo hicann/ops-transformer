@@ -39,6 +39,8 @@
 
 ## 参数说明
 
+<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>的INT8 CSA场景，数据类型及存储协议见[INT8 CSA参数约束](#int8-csa参数约束)。下表`quant_mode=1/2`的FP8记录说明适用于<term>Ascend 950PR&950DT系列产品</term>；A2/A3的INT8场景使用该小节列出的类型组合。
+
 <table style="undefined;table-layout: fixed; width: 1576px">
   <colgroup>
   <col style="width: 220px">
@@ -68,14 +70,14 @@
       <td>ori_kv</td>
       <td>可选输入</td>
       <td>表示对应公式中K和V的一部分，为原始不经压缩的量化KV，Key和Value共享同一份数据。由nope、rope、scale、padding拼接而成，详见quant_mode。默认值为None。</td>
-      <td>FLOAT8_E4M3FN、FLOAT16、BFLOAT16</td>
+      <td>FLOAT8_E4M3FN、FLOAT16、BFLOAT16、INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_kv</td>
       <td>可选输入</td>
       <td>表示对应公式中K和V的一部分，为经过压缩的量化KV，Key和Value共享同一份数据。由nope、rope、scale、padding拼接而成，详见quant_mode。默认值为None。</td>
-      <td>FLOAT8_E4M3FN、UINT8</td>
+      <td>FLOAT8_E4M3FN、UINT8、INT8</td>
       <td>ND</td>
     </tr>
     <tr>
@@ -291,11 +293,13 @@
 <!-- end id1 -->
 
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：仅支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258，topk_value_mode只支持1。
+- <term>Atlas A3系列产品</term>：支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258，topk_value_mode只支持1。
+  - 新增支持INT8 CSA场景，q和attn_out支持FLOAT16、BFLOAT16且类型一致，ori_kv和cmp_kv均使用INT8、尾维为608；详细约束见下文“INT8 CSA参数约束”。
 <!-- end id2 -->
 
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：仅支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258，topk_value_mode只支持1。
+- <term>Atlas A2系列产品</term>：支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258，topk_value_mode只支持1。
+  - 新增支持INT8 CSA场景，q和attn_out支持FLOAT16、BFLOAT16且类型一致，ori_kv和cmp_kv均使用INT8、尾维为608；详细约束见下文“INT8 CSA参数约束”。
 <!-- end id3 -->
 
 - 该接口支持推理场景下使用。
@@ -361,6 +365,32 @@
 | -------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
 | aclnn API | [test_aclnn_mixed_quant_sparse_flash_mla](./examples/test_aclnn_mixed_quant_sparse_flash_mla.cpp) | 通过[aclnnMixedQuantSparseFlashMla](./docs/aclnnMixedQuantSparseFlashMla.md)调用MixedQuantSparseFlashMla算子 |
 | PyTorch API | [mixed_quant_sparse_flash_mla](../../attention/mixed_quant_sparse_flash_mla/docs/torchapi_mixed_quant_sparse_flash_mla.md) | 通过`cann_ops_transformer.mixed_quant_sparse_flash_mla`调用MixedQuantSparseFlashMla算子 |
+
+### INT8 CSA参数约束
+
+以下约束适用于<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>的INT8 CSA场景。通过`quant_mode=1`启用，ori_kv和cmp_kv均须为INT8，并使用下述参考A5 mode 1的608字节记录；INT8输入不支持`quant_mode=2/3`。沿用原有参数，不新增独立scale输入，也不在本算子内生成量化Cache；调用方应提供已按下述协议打包的两路KV。
+
+| 参数 | INT8 CSA约束 |
+| --- | --- |
+| `quant_mode` | 仅支持1；两路INT8输入按下述608字节协议解释 |
+| `q`、`attn_out` | FLOAT16或BFLOAT16，类型和shape一致；`q_n`为1到128，`q_d`为512 |
+| `ori_kv`、`cmp_kv` | 均必传INT8 Tensor，`kv_n`为1、`kv_d`为608；两路KV各自携带BFLOAT16 scale |
+| `layout_q`、`layout_kv` | 仅支持BSND/BSND、TND/TND、BSND/PA_BBND、TND/PA_BBND四种组合 |
+| KV shape | BSND为`(b, kv_s, 1, 608)`，TND为`(kv_t, 1, 608)`，PA_BBND为`(block_num, block_size, 1, 608)`；两路KV使用各自长度及页表 |
+| KV stride | 记录内部连续；PA_BBND允许0轴padding，stride0必须覆盖一个完整物理块并按32字节对齐；block_size为1到1024 |
+| `cmp_sparse_indices` | 必传INT32；BSND下为`(b, q_s, 1, K)`，TND下为`(q_t, 1, K)`，K大于0；值为逻辑token索引，遇到-1终止候选前缀，重复索引保留重复贡献 |
+| `ori_sparse_indices` | 不支持传入；原始侧按mask及窗口取KV |
+| `cmp_topk_length` | 可选INT32，BSND下为`(b, q_s, 1)`、TND下为`(q_t, 1)`；`cmp_mask_mode=0`时必传；候选长度与K、当前可见压缩长度取最小值 |
+| 长度和页表 | 沿用原有INT32类型及shape；Q为TND时必传`cu_seqlens_q`；KV为TND时必传两路`cu_seqlens`；KV为PA_BBND时必传两路`block_table`和`seqused` |
+| `cmp_ratio`、mask和窗口 | `cmp_ratio`为1到128，`ori_mask_mode`支持0/3/4，`cmp_mask_mode`支持0/3；`ori_mask_mode`非4时左右窗口均为-1 |
+| `cmp_residual_kv` | `cmp_mask_mode=3`且`cmp_ratio!=1`时必传；`cmp_mask_mode=0`或`cmp_ratio=1`时不传 |
+| `rope_head_dim`、`topk_value_mode` | 分别为64、1；量化group size固定64 |
+| `metadata` | 必传INT32，shape为`(2048,)`；由前置Metadata接口使用相同mode、布局、长度及属性生成 |
+| `sinks`、`softmax_lse` | sinks沿用可选参数位置，但当前版本Host要求必传FLOAT、shape为`(q_n,)`；LSE为可选FLOAT输出，BSND下shape为`(b, 1, q_s, q_n)`、TND下为`(1, q_t, q_n)` |
+| 空有效KV | 物理KV Tensor不支持空维度；可通过有效长度0表达空KV。没有有效KV参与计算时，attn_out和有效LSE均为0，即使提供sinks；padding query也输出0 |
+| batch一致性 | 不支持 |
+
+单token记录的字节区间为`[0,128)`的64个BFLOAT16 RoPE、`[128,576)`的448个signed INT8 nope、`[576,590)`的7个BFLOAT16 scale，以及`[590,608)`的18字节padding。按小端字节解释，反量化为`nope[d] = INT8[d] * scale[d / 64]`，无zero point；逻辑KV按`nope[448] + rope[64]`组织，再转换为q的类型参与浮点计算。padding不参与计算，RoPE和scale的字段类型不随q的FLOAT16/BFLOAT16选择改变。量化生产端需按该记录协议完成对接，不能直接将FP8负载解释为INT8数值。
 
 ### TurboQuant参数约束
 

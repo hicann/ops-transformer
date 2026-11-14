@@ -168,7 +168,16 @@ std::tuple<at::Tensor, at::Tensor> MixedQuantSparseFlashMla(
     TORCH_CHECK(q.numel() > 0 || turboQuantEmptyQuery, "Tensor query is empty.");
     TORCH_CHECK(oriKv.has_value(), "ori_kv must be provided.");
     const at::Tensor& oriKvVal = *oriKv;
-    if (quantMode == 3) {
+    const bool int8GroupQuant =
+        oriKvVal.scalar_type() == at::kChar || (cmpKv.has_value() && cmpKv->scalar_type() == at::kChar);
+    if (int8GroupQuant) {
+        TORCH_CHECK(quantMode == 1, "INT8 CSA requires quant_mode=1");
+        TORCH_CHECK(q.scalar_type() == at::kHalf || q.scalar_type() == at::kBFloat16,
+                    "INT8 CSA q must be float16 or bfloat16");
+        TORCH_CHECK(oriKvVal.scalar_type() == at::kChar && cmpKv.has_value() && cmpKv->scalar_type() == at::kChar,
+                    "INT8 CSA requires both ori_kv and cmp_kv to be int8 packed records");
+    }
+    if (quantMode == 3 && !int8GroupQuant) {
         TORCH_CHECK(q.scalar_type() == at::kHalf || q.scalar_type() == at::kBFloat16,
                     "TurboQuant q must be float16 or bfloat16");
         TORCH_CHECK(oriKvVal.scalar_type() == q.scalar_type(), "ori_kv dtype must match q");
@@ -189,8 +198,10 @@ std::tuple<at::Tensor, at::Tensor> MixedQuantSparseFlashMla(
     auto oriKvValue = oriKv.has_value() ? oriKv.value() : nullTensor;
     auto cmpKvValue = cmpKv.has_value() ? cmpKv.value() : nullTensor;
     const aclDataType tqOriKvType = q.scalar_type() == at::ScalarType::Half ? ACL_FLOAT16 : ACL_BF16;
-    TensorWrapper oriKvWrapper = MqsmlaMakeWrapper(oriKvValue, quantMode == 3 ? tqOriKvType : ACL_FLOAT8_E4M3FN);
-    TensorWrapper cmpKvWrapper = MqsmlaMakeWrapper(cmpKvValue, quantMode == 3 ? ACL_UINT8 : ACL_FLOAT8_E4M3FN);
+    TensorWrapper oriKvWrapper =
+        MqsmlaMakeWrapper(oriKvValue, int8GroupQuant ? ACL_INT8 : (quantMode == 3 ? tqOriKvType : ACL_FLOAT8_E4M3FN));
+    TensorWrapper cmpKvWrapper =
+        MqsmlaMakeWrapper(cmpKvValue, int8GroupQuant ? ACL_INT8 : (quantMode == 3 ? ACL_UINT8 : ACL_FLOAT8_E4M3FN));
     ACLNN_CMD(aclnnMixedQuantSparseFlashMla, q, oriKvWrapper, cmpKvWrapper, oriSparseIndices, cmpSparseIndices,
               oriBlockTable, cmpBlockTable, cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedQ, sequsedOriKv,
               sequsedCmpKv, cmpResidualKv, oriTopkLength, cmpTopkLength, sinks, metadata, quantMode, ropeHeadDim,

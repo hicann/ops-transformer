@@ -32,6 +32,8 @@
 
   <!-- npu="A3,910b" id10 -->
   <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持TurboQuant TQ4，通过原有量化模式参数`quant_mode=3`启用，仅支持CSA路径。DeepSeek V4框架当前仅对C4压缩KV启用此能力。
+
+  <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>新增支持INT8 CSA场景，详见[INT8 CSA使用说明](#int8-csa使用说明)。原有`quant_mode=1/2`的FP8记录说明适用于<term>Ascend 950PR&950DT系列产品</term>，新增INT8场景的类型组合和存储协议以该小节为准。
   <!-- end id10 -->
 
   <!-- npu="950" id11 -->
@@ -201,8 +203,8 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | q | tensor | 必选 | 表示公式中的q | float16、bfloat16 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>
 | quant_mode | int | 必选 | 量化模式。支持1、2、3，Q不量化。<ul><li>quant_mode=1：q使用BFLOAT16，ori_kv和cmp_kv的nope采用per-token-group量化，groupSize=64。每个token依次由rope（64个BFLOAT16）、nope（448个FLOAT8_E4M3FN）、scale（7个BFLOAT16）、pad（18字节）拼接，kv_d=608。</li><li>quant_mode=2：q使用BFLOAT16，ori_kv和cmp_kv的nope采用per-token-group量化，groupSize=64。每个token包含nope（448个FLOAT8_E4M3FN）、rope（64个BFLOAT16）、scale（7个FLOAT8_E8M0）、pad（1字节），kv_d=584；仅支持layout_kv为PA_BBND，块内按block_size*(nope+rope)+block_size*(scale+pad)组织。</li><li>quant_mode=1或quant_mode=2时，ori_kv和cmp_kv支持使用UINT8或FLOAT8_E4M3FN作为单字节存储视图，底层字节内容保持不变；各字段的实际类型如上所述。</li><li>quant_mode=3：表示融合TQ4反量化的TurboQuant路径，仅支持CSA场景。q使用FLOAT16或BFLOAT16；ori_kv保持非量化，数据类型与q一致，kv_d=512；cmp_kv使用UINT8存储TQ4数据，每个token的512维数据编码为256字节的4位码本索引，再拼接2字节FLOAT16逐token scale，共258字节，kv_d=258。两路KV均使用PA_BBND布局，shape分别为(block_num, block_size, 1, 512)和(block_num, block_size, 1, 258)。码本与TurboQuant量化端约定一致，不新增外部码本或scale参数。</li></ul> | int32 | - | -
-| ori_kv | tensor | 可选 | 原始KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入且dtype与q一致、kv_d=512。 | fp8_e4m3、float16、bfloat16 | ND | <ul><li>(b, ori_kv_s, kv_n, kv_d)</li><li>(ori_kv_t, kv_n, kv_d)</li><li>(ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d)</li></ul>
-| cmp_kv | tensor | 可选 | 压缩KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入uint8 TQ4数据、kv_d=258。 | fp8_e4m3、uint8 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
+| ori_kv | tensor | 可选 | 原始KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入且dtype与q一致、kv_d=512。 | fp8_e4m3、float16、bfloat16、int8 | ND | <ul><li>(b, ori_kv_s, kv_n, kv_d)</li><li>(ori_kv_t, kv_n, kv_d)</li><li>(ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d)</li></ul>
+| cmp_kv | tensor | 可选 | 压缩KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入uint8 TQ4数据、kv_d=258。 | fp8_e4m3、uint8、int8 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
 | ori_sparse_indices | tensor | 可选 | 表示原始KV topK索引，无效位置填-1 | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>
 | cmp_sparse_indices | tensor | 可选 | 表示压缩KV topK索引，无效位置填-1；quant_mode=3时必须传入且cmp_kv_k仅支持512或1024。 | int32 | ND | <ul><li>(q_t, kv_n, cmp_kv_k)</li><li>(b, q_s, kv_n, cmp_kv_k)</li></ul>
 | ori_block_table | tensor | 可选 | 表示Paged Attention场景下ori_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
@@ -272,7 +274,8 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 
 <!-- npu="A3,910b" id8 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
-  - 仅支持`quant_mode=3`的TurboQuant路径。
+  - 新增支持INT8 CSA场景，约束见下文“INT8 CSA使用说明”；以下各项为原有TurboQuant路径的约束。
+  - 支持`quant_mode=3`的TurboQuant路径。
   - q、attention_out：`layout_q`为TND；数据类型为float16或bfloat16且保持一致；q_n为4到128的4的倍数，q_d为512，q_t允许为0。
   - ori_kv、cmp_kv：均必须传入，`layout_kv`为PA_BBND。ori_kv的数据类型与q一致且kv_d为512；cmp_kv的数据类型为uint8且kv_d为258。两者block_size均为16到1024的16的倍数。
   - 稀疏与PA参数：cmp_sparse_indices、ori_block_table、cmp_block_table必须传入；cmp_sparse_indices的shape为(q_t, 1, 512)或(q_t, 1, 1024)。ori_sparse_indices、ori_topk_length、cmp_topk_length不支持传入。
@@ -1030,6 +1033,21 @@ metadata校验
         </tr>
     </tbody>
 </table>
+
+<!-- npu="A3,910b" id14 -->
+#### INT8 CSA使用说明
+
+<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：通过`quant_mode=1`启用INT8 CSA路径，两路KV均须为INT8；使用下述参考A5 mode 1的608字节排布，INT8输入不支持`quant_mode=2/3`。q和attention_out均为float16或bfloat16且类型、shape一致；Q头维512、头数1到128，KV头数为1。ori_kv、cmp_kv均必传torch.int8混合记录、尾维608；cmp_sparse_indices必传，ori_sparse_indices不传，`topk_value_mode=1`。
+
+- 支持layout_q/layout_kv为BSND/BSND、TND/TND、BSND/PA_BBND、TND/PA_BBND四种组合。
+- 每token依次存储64个BFLOAT16 RoPE、448个signed INT8 nope、7个BFLOAT16 scale和18字节padding，共608B；每64维nope共用一个scale。scale在KV记录内部，无需新增scale Tensor；q为float16时，记录中的scale和RoPE仍为BFLOAT16。量化端需按相同字节协议对接。
+- PA_BBND下两路block_table和seqused均必传；记录内部连续，0轴stride须覆盖完整物理块并按32字节对齐；TND下需传对应cu_seqlens。metadata必传、类型int32、shape为(2048,)，需由属性一致的真实Metadata接口生成。
+- cmp_mask_mode=3且cmp_ratio!=1时必须传cmp_residual_kv；cmp_mask_mode=0或cmp_ratio=1时不传；cmp_mask_mode=0时需传cmp_topk_length。
+- `sinks`沿用可选参数位置，但当前版本Host要求必传float32、shape为`(q_n,)`，不能省略。
+- 本路径不支持batch一致性。空有效KV时attention_out和有效Softmax LSE均为0；padding query也输出0。物理Tensor仍需满足非空shape约束。
+
+完整参数及记录协议见[README中的INT8 CSA参数约束](../README.md#int8-csa参数约束)。
+<!-- end id14 -->
 
 <!-- npu="A3,910b" id13 -->
 #### 量化模式3使用说明

@@ -152,16 +152,30 @@ __global__ __aicore__ void mixed_quant_sparse_flash_mla(
     }
 #else
     TPipe tPipe;
+    // Optional tensor dtypes are not part of the gen_placeholder binary key.
+    // Host validation and the tiling key select the KV representation instead.
+    if constexpr (QUANT_MODE == QUANT_CONTIGUOUS && KV_DTYPE == DTYPE_INT8 && TEMPLATE_MODE == CSA_TEMPLATE) {
+        if constexpr (ORIG_DTYPE_Q == DT_FLOAT16 && ORIG_DTYPE_ATTN_OUT == DT_FLOAT16) {
+            QSMLA_TQ_OP_IMPL(SASKernel::MixedQuantSparseFlashMlaTqCsaKernel,
+                             optiling::MixedQuantSparseFlashMlaTqTilingData, half, half, half, false,
+                             static_cast<SASKernel::SAS_LAYOUT>(LAYOUT_T),
+                             static_cast<SASKernel::SAS_LAYOUT>(KV_LAYOUT_T), CSA_TEMPLATE, true);
+        }
+        if constexpr (ORIG_DTYPE_Q == DT_BF16 && ORIG_DTYPE_ATTN_OUT == DT_BF16) {
+            QSMLA_TQ_OP_IMPL(SASKernel::MixedQuantSparseFlashMlaTqCsaKernel,
+                             optiling::MixedQuantSparseFlashMlaTqTilingData, bfloat16_t, bfloat16_t, bfloat16_t, false,
+                             static_cast<SASKernel::SAS_LAYOUT>(LAYOUT_T),
+                             static_cast<SASKernel::SAS_LAYOUT>(KV_LAYOUT_T), CSA_TEMPLATE, true);
+        }
+    }
     if constexpr (QUANT_MODE == TURBO_QUANT && TEMPLATE_MODE == CSA_TEMPLATE) {
-        if constexpr (ORIG_DTYPE_Q == DT_FLOAT16 && ORIG_DTYPE_ORI_KV == DT_FLOAT16 && ORIG_DTYPE_CMP_KV == DT_UINT8 &&
-                      ORIG_DTYPE_ATTN_OUT == DT_FLOAT16) {
+        if constexpr (ORIG_DTYPE_Q == DT_FLOAT16 && ORIG_DTYPE_ATTN_OUT == DT_FLOAT16) {
             QSMLA_TQ_OP_IMPL(SASKernel::MixedQuantSparseFlashMlaTqCsaKernel,
                              optiling::MixedQuantSparseFlashMlaTqTilingData, half, half, half, FLASH_DECODE,
                              static_cast<SASKernel::SAS_LAYOUT>(LAYOUT_T),
                              static_cast<SASKernel::SAS_LAYOUT>(KV_LAYOUT_T), CSA_TEMPLATE);
         }
-        if constexpr (ORIG_DTYPE_Q == DT_BF16 && ORIG_DTYPE_ORI_KV == DT_BF16 && ORIG_DTYPE_CMP_KV == DT_UINT8 &&
-                      ORIG_DTYPE_ATTN_OUT == DT_BF16) {
+        if constexpr (ORIG_DTYPE_Q == DT_BF16 && ORIG_DTYPE_ATTN_OUT == DT_BF16) {
             QSMLA_TQ_OP_IMPL(SASKernel::MixedQuantSparseFlashMlaTqCsaKernel,
                              optiling::MixedQuantSparseFlashMlaTqTilingData, bfloat16_t, bfloat16_t, bfloat16_t,
                              FLASH_DECODE, static_cast<SASKernel::SAS_LAYOUT>(LAYOUT_T),

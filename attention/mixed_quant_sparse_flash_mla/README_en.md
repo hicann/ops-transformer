@@ -41,6 +41,8 @@ English | [简体中文](./README.md)
 
 ## Parameter Description
 
+For INT8 CSA on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, see [INT8 CSA Parameter Constraints](#int8-csa-parameter-constraints) for data types and packing. The FP8 record descriptions for `quant_mode=1/2` in the table below apply to <term>Ascend 950PR&950DT products</term>; the INT8 type combinations are specified in that section.
+
 <table style="undefined;table-layout: fixed; width: 1576px">
   <colgroup>
   <col style="width: 220px">
@@ -70,14 +72,14 @@ English | [简体中文](./README.md)
       <td>ori_kv</td>
       <td>Optional input</td>
       <td>Represents part of K and V in the formula. It is the original uncompressed quantized KV, where Key and Value share the same data. It is concatenated from nope, rope, scale, and padding. For details, see quant_mode. The default value is None.</td>
-      <td>FLOAT8_E4M3FN, FLOAT16, BFLOAT16</td>
+      <td>FLOAT8_E4M3FN, FLOAT16, BFLOAT16, INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_kv</td>
       <td>Optional input</td>
       <td>Represents part of K and V in the formula. It is the compressed quantized KV, where Key and Value share the same data. It is concatenated from nope, rope, scale, and padding. For details, see quant_mode. The default value is None.</td>
-      <td>FLOAT8_E4M3FN, UINT8</td>
+      <td>FLOAT8_E4M3FN, UINT8, INT8</td>
       <td>ND</td>
     </tr>
     <tr>
@@ -293,16 +295,18 @@ English | [简体中文](./README.md)
 <!-- end id1 -->
 
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Only the TurboQuant CSA scenario of `quant_mode=3` is supported. q, ori_kv, and attn_out support FLOAT16 and BFLOAT16, and their data types must be the same. The last dimension of ori_kv is 512. cmp_kv supports only UINT8 and its last dimension is 258. topk_value_mode supports only 1.
+- <term>Atlas A3 products</term>: The TurboQuant CSA scenario of `quant_mode=3` is supported. q, ori_kv, and attn_out support FLOAT16 and BFLOAT16, and their data types must be the same. The last dimension of ori_kv is 512. cmp_kv supports only UINT8 and its last dimension is 258. topk_value_mode supports only 1.
+  - INT8 CSA is also supported. q and attn_out use FLOAT16 or BFLOAT16 with matching types; both ori_kv and cmp_kv use INT8 with a last dimension of 608. See "INT8 CSA Parameter Constraints" below.
 <!-- end id2 -->
 
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 products</term>: Only the TurboQuant CSA scenario of `quant_mode=3` is supported. q, ori_kv, and attn_out support FLOAT16 and BFLOAT16, and their data types must be the same. The last dimension of ori_kv is 512. cmp_kv supports only UINT8 and its last dimension is 258. topk_value_mode supports only 1.
+- <term>Atlas A2 products</term>: The TurboQuant CSA scenario of `quant_mode=3` is supported. q, ori_kv, and attn_out support FLOAT16 and BFLOAT16, and their data types must be the same. The last dimension of ori_kv is 512. cmp_kv supports only UINT8 and its last dimension is 258. topk_value_mode supports only 1.
+  - INT8 CSA is also supported. q and attn_out use FLOAT16 or BFLOAT16 with matching types; both ori_kv and cmp_kv use INT8 with a last dimension of 608. See "INT8 CSA Parameter Constraints" below.
 <!-- end id3 -->
 
 - This API is used in inference scenarios.
 - This API supports the aclgraph mode.
-- This API supports batch consistency.
+- Batch consistency is not supported for A2/A3 INT8 CSA; support for other paths follows their existing constraints.
 - This API currently supports three computation scenarios: in the SWA (Sliding Window Attention) scenario, only `ori_kv` is passed in; in the CSA (Compressed Sparse Attention) scenario, `ori_kv`, `cmp_kv`, and `cmp_sparse_indices` are passed in; in the HCA (Heavily Compressed Attention) scenario, `ori_kv` and `cmp_kv` are passed in.
 
 ### Common Field Definitions
@@ -363,6 +367,32 @@ English | [简体中文](./README.md)
 | -------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
 | aclnn API | [test_aclnn_mixed_quant_sparse_flash_mla](./examples/test_aclnn_mixed_quant_sparse_flash_mla.cpp) | Calls the MixedQuantSparseFlashMla operator through [aclnnMixedQuantSparseFlashMla](docs/aclnnMixedQuantSparseFlashMla_en.md) |
 | PyTorch API | [mixed_quant_sparse_flash_mla](docs/torchapi_mixed_quant_sparse_flash_mla_en.md) | Calls the MixedQuantSparseFlashMla operator through `cann_ops_transformer.mixed_quant_sparse_flash_mla` |
+
+### INT8 CSA Parameter Constraints
+
+The following constraints apply to INT8 CSA on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>. Enable this path with `quant_mode=1`; both ori_kv and cmp_kv must use INT8 and the 608-byte record below, whose packing references A5 mode 1. INT8 inputs do not support `quant_mode=2/3`. Existing parameters are reused, with no separate scale input. This operator consumes caches already packed by the caller and does not generate quantized caches.
+
+| Parameter | INT8 CSA Constraint |
+| --- | --- |
+| `quant_mode` | Only 1 is supported; both INT8 inputs use the 608-byte record below. |
+| `q`, `attn_out` | FLOAT16 or BFLOAT16, with the same type and shape; `q_n` is 1 to 128 and `q_d` is 512. |
+| `ori_kv`, `cmp_kv` | Both are mandatory INT8 Tensors; `kv_n` is 1 and `kv_d` is 608. Each KV path carries its own BFLOAT16 scales. |
+| `layout_q`, `layout_kv` | Only BSND/BSND, TND/TND, BSND/PA_BBND, and TND/PA_BBND are supported. |
+| KV shape | `(b, kv_s, 1, 608)` for BSND, `(kv_t, 1, 608)` for TND, and `(block_num, block_size, 1, 608)` for PA_BBND. The two KV paths use their respective lengths and block tables. |
+| KV stride | Records must be internally contiguous. PA_BBND permits padding on axis 0; stride0 must cover a complete physical block and be aligned to 32 bytes. block_size is 1 to 1024. |
+| `cmp_sparse_indices` | Mandatory INT32, with shape `(b, q_s, 1, K)` for BSND or `(q_t, 1, K)` for TND, where K is greater than 0. Values are logical token indices; -1 terminates the candidate prefix, and duplicate indices retain their repeated contributions. |
+| `ori_sparse_indices` | Must not be passed in. The original KV is selected according to the mask and window. |
+| `cmp_topk_length` | Optional INT32, with shape `(b, q_s, 1)` for BSND or `(q_t, 1)` for TND. Mandatory when `cmp_mask_mode=0`. The candidate length is bounded by K and the currently visible compressed length. |
+| Lengths and block tables | Existing INT32 types and shapes are retained. Q in TND requires `cu_seqlens_q`; KV in TND requires both KV `cu_seqlens`; KV in PA_BBND requires both KV `block_table` and `seqused` inputs. |
+| `cmp_ratio`, masks, and windows | `cmp_ratio` is 1 to 128; `ori_mask_mode` supports 0/3/4 and `cmp_mask_mode` supports 0/3. Both windows must be -1 when `ori_mask_mode` is not 4. |
+| `cmp_residual_kv` | Mandatory when `cmp_mask_mode=3` and `cmp_ratio!=1`; must not be passed in when `cmp_mask_mode=0` or `cmp_ratio=1`. |
+| `rope_head_dim`, `topk_value_mode` | 64 and 1 respectively. The quantization group size is fixed at 64. |
+| `metadata` | Mandatory INT32, with shape `(2048,)`. Generate it through the preceding Metadata API using the same mode, layouts, lengths, and attributes. |
+| `sinks`, `softmax_lse` | The optional parameter position of sinks is retained, but the current Host implementation requires FLOAT sinks with shape `(q_n,)`. LSE is an optional FLOAT output, with shape `(b, 1, q_s, q_n)` for BSND or `(1, q_t, q_n)` for TND. |
+| Empty effective KV | Physical KV Tensors must not have empty dimensions. An effective length of 0 can represent empty KV. If no valid KV participates, attn_out and valid LSE are both 0, even when sinks is provided. Padding queries also output 0. |
+| Batch consistency | Not supported. |
+
+Each token record contains 64 BFLOAT16 RoPE values in bytes `[0,128)`, 448 signed INT8 nope values in `[128,576)`, seven BFLOAT16 scales in `[576,590)`, and 18 padding bytes in `[590,608)`. Fields use little-endian byte order. Dequantization is `nope[d] = INT8[d] * scale[d / 64]`, with no zero point. The logical KV is ordered as `nope[448] + rope[64]` and converted to the type of q for floating-point computation. Padding is not used in computation. RoPE and scale remain BFLOAT16 whether q is FLOAT16 or BFLOAT16. The quantization producer must follow this packing protocol; FP8 payloads cannot be interpreted directly as INT8 values.
 
 ### TurboQuant Parameter Constraints
 

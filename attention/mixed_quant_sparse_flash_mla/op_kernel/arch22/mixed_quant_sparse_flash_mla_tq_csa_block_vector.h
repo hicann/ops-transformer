@@ -20,6 +20,7 @@
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
 #include "mixed_quant_sparse_flash_mla_tq_common.h"
+#include "mixed_quant_sparse_flash_mla_int8_csa_input.h"
 
 namespace SASKernel {
 using AscendC::CrossCoreSetFlag;
@@ -38,7 +39,24 @@ public:
     using MM2_OUT_T = float;
 
     __aicore__ inline KvQuantSparseFlashMlaCsaBlockVector(){};
+    template <bool INT8_FAST = true>
     __aicore__ inline void ProcessVec0L(const RunInfo& mqVecRunInfo);
+    __aicore__ inline void InitInt8Input(const Int8CsaInput<SAST>& input)
+    {
+        int8Input = input;
+    }
+    __aicore__ inline void InitInt8Outputs();
+    __aicore__ inline void PrepareInt8SelectionGeneric(Int8CsaInput<SAST>& selection, uint64_t planOffset,
+                                                       uint32_t& oriRows, uint32_t& cmpRows);
+    template <bool INT8_FAST = true>
+    __aicore__ inline void ProcessInt8Kv(const RunInfo& info, uint32_t stageRowStart, bool wrapOutput);
+    __aicore__ inline void ConvertInt8Batch(uint32_t slot, uint32_t staged, uint64_t outOffset, bool wrapOutput);
+    __aicore__ inline void SetInt8SelectionPrepared(bool prepared)
+    {
+        preparedInt8 = prepared;
+    }
+    __aicore__ inline void PrepareInt8Selection(Int8CsaInput<SAST>& selection, uint64_t planOffset, uint32_t& oriRows,
+                                                uint32_t& cmpRows);
     __aicore__ inline void ProcessVec1L(const RunInfo& mqVecInfo);
     __aicore__ inline void ProcessVec2L(const RunInfo& mqVecInfo);
     __aicore__ inline void InitBuffers(TPipe* pipe);
@@ -125,6 +143,9 @@ public:
     static constexpr uint32_t REPEATE_STRIDE_UP_BOUND = 256;
 
 private:
+    Int8CsaInput<SAST> int8Input;
+    bool preparedInt8 = false;
+    uint32_t preparedOriRows = 0;
     static constexpr bool PAGE_ATTENTION = SAST::pageAttention;
     static constexpr int TEMPLATE_MODE = SAST::templateMode;
     static constexpr bool FLASH_DECODE = SAST::flashDecode;
@@ -473,6 +494,12 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::ElewiseCompute
 {
     Muls(mmResUb, mmResUb, static_cast<T>(tilingData->tqBaseParams.softmaxScale), mqDealRows * mqColumns);
     PipeBarrier<PIPE_V>();
+
+    // INT8 input tiles contain only selected, valid tokens. The softmax
+    // implementation already masks the aligned tail using the actual N size.
+    if constexpr (SAST::int8Kv) {
+        return;
+    }
 
     // cmp_sparse_indices is capacity-sized and may be padded with -1.  The Cube
     // path still computes the capacity-sized tile, so mask the padded columns
@@ -1024,8 +1051,391 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::CopyOutMrgeRes
 
 // b s1 k
 template <typename SAST>
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::InitInt8Outputs()
+{
+    // Preserve full output/LSE initialization for padding and empty queries.
+    // inputBuff2 is allocated as two16KiB buffers; no extra UB is required.
+    constexpr uint32_t ZERO_BYTES = ConstInfo::MQ_BUFFER_BYTES_16K * 2U;
+    constexpr uint32_t OUTPUT_CHUNK_ELEMENTS = ZERO_BYTES / sizeof(OUT_T);
+    constexpr uint32_t LSE_CHUNK_ELEMENTS = ZERO_BYTES / sizeof(float);
+    static_assert(ZERO_BYTES == ConstInfo::MQ_BUFFER_BYTES_32K);
+    auto zeros = inputBuff2.Get<OUT_T>();
+    Duplicate(zeros, static_cast<OUT_T>(0), OUTPUT_CHUNK_ELEMENTS);
+    SetFlag<HardEvent::V_MTE3>(0);
+    WaitFlag<HardEvent::V_MTE3>(0);
+
+    uint64_t rows = int8Input.params.qTokens * int8Input.params.heads;
+    uint64_t outputElements = rows * 512U;
+    uint64_t aivCount = static_cast<uint64_t>(GetBlockNum()) * 2U;
+    uint64_t outputStep = aivCount * OUTPUT_CHUNK_ELEMENTS;
+    for (uint64_t offset = static_cast<uint64_t>(GetBlockIdx()) * OUTPUT_CHUNK_ELEMENTS; offset < outputElements;
+         offset += outputStep) {
+        uint32_t count =
+            static_cast<uint32_t>(Min(static_cast<uint64_t>(OUTPUT_CHUNK_ELEMENTS), outputElements - offset));
+        DataCopyExtParams copy{1U, count * static_cast<uint32_t>(sizeof(OUT_T)), 0U, 0U, 0U};
+        DataCopyPad(attentionOutGm[offset], zeros, copy);
+    }
+    if (int8Input.params.returnLse) {
+        // FP16/BF16 positive-zero bits are also FP32 positive zero. The buffer
+        // remains immutable until every MTE3 read has completed below.
+        auto lseZeros = zeros.template ReinterpretCast<float>();
+        uint64_t lseStep = aivCount * LSE_CHUNK_ELEMENTS;
+        for (uint64_t offset = static_cast<uint64_t>(GetBlockIdx()) * LSE_CHUNK_ELEMENTS; offset < rows;
+             offset += lseStep) {
+            uint32_t count = static_cast<uint32_t>(Min(static_cast<uint64_t>(LSE_CHUNK_ELEMENTS), rows - offset));
+            DataCopyExtParams copy{1U, count * static_cast<uint32_t>(sizeof(float)), 0U, 0U, 0U};
+            DataCopyPad(softmaxLseGm[offset], lseZeros, copy);
+        }
+    }
+    SetFlag<HardEvent::MTE3_V>(0);
+    WaitFlag<HardEvent::MTE3_V>(0);
+    SetFlag<HardEvent::MTE3_MTE2>(0);
+    WaitFlag<HardEvent::MTE3_MTE2>(0);
+}
+
+template <typename SAST>
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::PrepareInt8Selection(Int8CsaInput<SAST>& selection,
+                                                                                       uint64_t planOffset,
+                                                                                       uint32_t& oriRows,
+                                                                                       uint32_t& cmpRows)
+{
+    // Reuse the arch22 input-buffer events and its allocated page/index buffers.
+    static_assert((1024U + 128U + 8192U) * sizeof(int32_t) <= ConstInfo::MQ_BUFFER_BYTES_32K * 2U);
+    WaitFlag<HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG);
+    WaitFlag<HardEvent::V_MTE2>(SYNC_INPUT_BUF1_PONG_FLAG);
+    // The scheduler has already computed this query's dynamic range. Resolve
+    // it once using that same state; the Vector input object only owns KV handles.
+    selection.CacheQueryAddresses(inputBuff1.Get<int32_t>(), v0ValidSizeBuff.Get<uint32_t>(), oriRows, cmpRows);
+    SetFlag<HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG);
+    SetFlag<HardEvent::V_MTE2>(SYNC_INPUT_BUF1_PONG_FLAG);
+    preparedInt8 = true;
+    preparedOriRows = oriRows;
+
+    // Private two-tile/query experiment only. Vec2 accumulation slot1 is never
+    // read or written by computation: ori stores slot0, and final cmp reads slot0.
+    // Two separate 64B plan slots occupy the first128B of the unused slot1.
+    // Keep each AIV's original 32B payload and all existing synchronization.
+    auto counts = v0ValidSizeBuff.Get<float>()[ConstInfo::MQ_BUFFER_BYTES_8K / sizeof(float) - 8U];
+    counts.SetValue(0, static_cast<float>(static_cast<int32_t>(oriRows)));
+    counts.SetValue(1, static_cast<float>(static_cast<int32_t>(cmpRows)));
+    for (uint32_t i = 2; i < 8U; ++i) {
+        counts.SetValue(i, 0.0f);
+    }
+    SetFlag<HardEvent::S_MTE3>(0);
+    WaitFlag<HardEvent::S_MTE3>(0);
+    DataCopy(vec2ResGm[planOffset + GetSubBlockIdx() * 8U], counts, 8U);
+    SetFlag<HardEvent::MTE3_S>(0);
+    WaitFlag<HardEvent::MTE3_S>(0);
+}
+
+template <typename SAST>
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::PrepareInt8SelectionGeneric(
+    Int8CsaInput<SAST>& selection, uint64_t planOffset, uint32_t& oriRows, uint32_t& cmpRows)
+{
+    static_assert((1024U + 128U + 8192U) * sizeof(int32_t) <= ConstInfo::MQ_BUFFER_BYTES_32K * 2U);
+    WaitFlag<HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG);
+    WaitFlag<HardEvent::V_MTE2>(SYNC_INPUT_BUF1_PONG_FLAG);
+    selection.CacheQueryAddresses(inputBuff1.Get<int32_t>(), v0ValidSizeBuff.Get<uint32_t>(), oriRows, cmpRows);
+    SetFlag<HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG);
+    SetFlag<HardEvent::V_MTE2>(SYNC_INPUT_BUF1_PONG_FLAG);
+    preparedInt8 = true;
+
+    // Only head0's AIV may reuse the MM1 head cacheline. The other AIV still
+    // completes its address preparation and participates in plan-ready flag10.
+    if (GetSubBlockIdx() == 0U) {
+        auto counts = v0ValidSizeBuff.Get<uint32_t>()[ConstInfo::MQ_BUFFER_BYTES_8K / sizeof(uint32_t) - 8U];
+        counts.SetValue(0, oriRows);
+        counts.SetValue(1, cmpRows);
+        for (uint32_t i = 2U; i < 8U; ++i) {
+            counts.SetValue(i, 0U);
+        }
+        SetFlag<HardEvent::S_MTE3>(0);
+        WaitFlag<HardEvent::S_MTE3>(0);
+        GlobalTensor<uint32_t> plans;
+        plans.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(mm1ResGm.GetPhyAddr(0)),
+                              mqVecConstInfo.preLoadNum * mqVecConstInfo.mmResUbSize);
+        DataCopy(plans[planOffset], counts, 8U);
+        SetFlag<HardEvent::MTE3_S>(0);
+        WaitFlag<HardEvent::MTE3_S>(0);
+    }
+}
+
+template <typename SAST>
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::ConvertInt8Batch(uint32_t slot, uint32_t staged,
+                                                                                   uint64_t outOffset, bool wrapOutput)
+{
+    constexpr uint32_t DIM = Int8CsaInput<SAST>::HEAD_DIM;
+    constexpr uint32_t BATCH_ROWS = 16U;
+    constexpr uint32_t RECORD_BYTES = Int8CsaInput<SAST>::RECORD_BYTES;
+    constexpr uint32_t NOPE_DIM = Int8CsaInput<SAST>::NOPE_DIM;
+    constexpr uint32_t RAW_BYTES = BATCH_ROWS * RECORD_BYTES + BYTE_BLOCK;
+    constexpr uint32_t HALF_BYTES = BATCH_ROWS * DIM * sizeof(half);
+    constexpr uint32_t SCALE_COUNT = 8U;
+    static_assert(RAW_BYTES + HALF_BYTES + BATCH_ROWS * SCALE_COUNT * sizeof(float) <= INPUT1_BUFFER_OFFSET);
+    static_assert(BATCH_ROWS * DIM * sizeof(float) <= ConstInfo::MQ_BUFFER_BYTES_32K);
+    static_assert(BATCH_ROWS * DIM * sizeof(KV_T) <= INPUT2_BUFFER_OFFSET);
+    auto bytes = inputBuff1.Get<int8_t>()[slot * INPUT1_BUFFER_OFFSET];
+    auto raw = bytes;
+    auto halfValues = bytes.template ReinterpretCast<half>()[RAW_BYTES / sizeof(half)];
+    auto scales = bytes.template ReinterpretCast<float>()[(RAW_BYTES + HALF_BYTES) / sizeof(float)];
+    auto values = tmpBuff1.Get<float>();
+    auto output = inputBuff2.Get<KV_T>()[slot * INPUT2_BUFFER_OFFSET / sizeof(KV_T)];
+    WaitFlag<HardEvent::MTE2_V>(slot);
+    // A5 processes the same dimension group across multiple records.
+    // Use arch22 strided repeats instead of its register-based VF instructions.
+    // The final 64 code lanes are ignored and replaced by the BF16 rope values.
+    Duplicate(raw.template ReinterpretCast<float>()[staged * RECORD_BYTES / sizeof(float)], 0.0f, 8U);
+    PipeBarrier<PIPE_V>();
+    UnaryRepeatParams codeParams;
+    codeParams.dstBlkStride = 1;
+    codeParams.srcBlkStride = 1;
+    codeParams.dstRepStride = static_cast<uint8_t>(DIM * sizeof(half) / BYTE_BLOCK);
+    codeParams.srcRepStride = static_cast<uint8_t>(RECORD_BYTES / BYTE_BLOCK);
+    for (uint32_t part = 0; part < 4U; ++part) {
+        Cast(halfValues[part * 128U], raw[128U + part * 128U], RoundMode::CAST_NONE, 128U, static_cast<uint8_t>(staged),
+             codeParams);
+    }
+    PipeBarrier<PIPE_V>();
+    Cast(values, halfValues, RoundMode::CAST_NONE, staged * DIM);
+    PipeBarrier<PIPE_V>();
+    UnaryRepeatParams ropeParams;
+    ropeParams.dstBlkStride = 1;
+    ropeParams.srcBlkStride = 1;
+    ropeParams.dstRepStride = static_cast<uint8_t>(DIM * sizeof(float) / BYTE_BLOCK);
+    ropeParams.srcRepStride = static_cast<uint8_t>(RECORD_BYTES / BYTE_BLOCK);
+    Cast(values[NOPE_DIM], raw.template ReinterpretCast<bfloat16_t>(), RoundMode::CAST_NONE, 64U,
+         static_cast<uint8_t>(staged), ropeParams);
+    UnaryRepeatParams scaleCastParams = ropeParams;
+    scaleCastParams.dstRepStride = static_cast<uint8_t>(SCALE_COUNT * sizeof(float) / BYTE_BLOCK);
+    Cast(scales, raw.template ReinterpretCast<bfloat16_t>()[288], RoundMode::CAST_NONE, SCALE_COUNT,
+         static_cast<uint8_t>(staged), scaleCastParams);
+    PipeBarrier<PIPE_V>();
+    // All record reads are complete. Reuse the raw region for the same
+    // block broadcast and Mul stride pattern used by RowMuls below.
+    static_assert(BATCH_ROWS * SCALE_COUNT * FP32_BLOCK_ELEMENT_NUM * sizeof(float) <= RAW_BYTES);
+    auto scaleBrcb = raw.template ReinterpretCast<float>();
+    Brcb(scaleBrcb, scales, static_cast<uint8_t>(staged * SCALE_COUNT / FP32_BLOCK_ELEMENT_NUM),
+         {1, FP32_BLOCK_ELEMENT_NUM});
+    PipeBarrier<PIPE_V>();
+    BinaryRepeatParams scaleParams;
+    scaleParams.dstBlkStride = 1;
+    scaleParams.src0BlkStride = 1;
+    scaleParams.src1BlkStride = 0;
+    scaleParams.dstRepStride = FP32_REPEAT_ELEMENT_NUM / FP32_BLOCK_ELEMENT_NUM;
+    scaleParams.src0RepStride = FP32_REPEAT_ELEMENT_NUM / FP32_BLOCK_ELEMENT_NUM;
+    scaleParams.src1RepStride = 1;
+    scaleParams.dstRepStride = DIM * sizeof(float) / BYTE_BLOCK;
+    scaleParams.src0RepStride = DIM * sizeof(float) / BYTE_BLOCK;
+    scaleParams.src1RepStride = SCALE_COUNT;
+    for (uint32_t group = 0; group < 7U; ++group) {
+        Mul(values[group * 64U], values[group * 64U], scaleBrcb[group * FP32_BLOCK_ELEMENT_NUM], 64U,
+            static_cast<uint8_t>(staged), scaleParams);
+    }
+    PipeBarrier<PIPE_V>();
+    SetFlag<HardEvent::V_MTE2>(slot + SYNC_INPUT_BUF1_FLAG);
+    WaitFlag<HardEvent::MTE3_V>(slot);
+    if constexpr (IsSameType<KV_T, bfloat16_t>::value) {
+        Cast(output, values, RoundMode::CAST_RINT, staged * DIM);
+    } else {
+        Cast(output, values, RoundMode::CAST_ROUND, staged * DIM);
+    }
+    SetFlag<HardEvent::V_MTE3>(slot);
+    WaitFlag<HardEvent::V_MTE3>(slot);
+    if (!wrapOutput) {
+        DataCopy(kvMergeGm_[outOffset], output, staged * DIM);
+    } else {
+        const uint32_t row = static_cast<uint32_t>(outOffset / DIM) & 511U;
+        const uint32_t remaining = 512U - row;
+        const uint32_t firstRows = staged > remaining ? remaining : staged;
+        DataCopy(kvMergeGm_[static_cast<uint64_t>(row) * DIM], output, firstRows * DIM);
+        if (firstRows != staged) {
+            DataCopy(kvMergeGm_[0], output[firstRows * DIM], (staged - firstRows) * DIM);
+        }
+    }
+    SetFlag<HardEvent::MTE3_V>(slot);
+}
+
+template <typename SAST>
+template <bool INT8_FAST>
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::ProcessInt8Kv(const RunInfo& info,
+                                                                                uint32_t stageRowStart, bool wrapOutput)
+{
+    constexpr uint32_t DIM = Int8CsaInput<SAST>::HEAD_DIM;
+    constexpr uint32_t BATCH_ROWS = 16U;
+    constexpr uint32_t RECORD_BYTES = Int8CsaInput<SAST>::RECORD_BYTES;
+    // A2/A3: unit2KiB; len6 is below the AIV16KiB cache limit.
+    // Start the hint before existing buffer-credit waits; no polling or new barrier.
+    AscendC::ICachePreLoad(6);
+    WaitFlag<HardEvent::MTE3_MTE2>(SYNC_INPUT_BUF2_FLAG);
+    WaitFlag<HardEvent::MTE3_MTE2>(SYNC_INPUT_BUF2_PONG_FLAG);
+    SetFlag<HardEvent::MTE3_V>(0);
+    SetFlag<HardEvent::MTE3_V>(1);
+    // Private cmp512 path: two256-row waves, each AIV produces128 rows.
+    const bool wave256 = INT8_FAST && !info.isOriOnly && info.actualSingleProcessSInnerSize == 512U;
+    uint32_t halfRows = wave256 ? 128U : (info.actualSingleProcessSInnerSize + 1U) / 2U;
+    uint32_t first = GetSubBlockIdx() == 0 ? 0 : halfRows;
+    uint32_t end = wave256 ? first + halfRows : (GetSubBlockIdx() == 0 ? halfRows : info.actualSingleProcessSInnerSize);
+    uint32_t wave = 0U;
+    bool pendingWaveReady = false;
+    uint32_t row = preparedInt8 ? first : 0U;
+    uint32_t staged = 0U, loadSlot = 0U, pendingSlot = 0U, pendingRows = 0U;
+    uint64_t outOffset = static_cast<uint64_t>(stageRowStart + first) * DIM;
+    uint64_t pendingOffset = outOffset;
+    int64_t candidateStart = info.int8Start + (preparedInt8 ? first : 0U);
+    for (int64_t candidate = candidateStart; candidate < info.int8End && row < end; ++candidate) {
+        uint32_t physicalRow = preparedInt8 ? v0ValidSizeBuff.Get<uint32_t>().GetValue(
+                                                  static_cast<uint32_t>((info.isOriOnly ? 0U : 512U) + candidate)) :
+                                              0U;
+        int64_t offset = preparedInt8 ? static_cast<int64_t>(physicalRow) * RECORD_BYTES :
+                                        int8Input.CandidateOffset(info, candidate);
+        if (offset < 0) {
+            continue;
+        }
+        if (row++ < first) {
+            continue;
+        }
+        if (staged == 0U) {
+            WaitFlag<HardEvent::V_MTE2>(loadSlot + SYNC_INPUT_BUF1_FLAG);
+        }
+        auto raw = inputBuff1.Get<int8_t>()[loadSlot * INPUT1_BUFFER_OFFSET + staged * RECORD_BYTES];
+        // Prepared original KV stays in logical token order. Coalesce complete
+        // pairs within one physical page; boundary pairs keep the existing order.
+        uint32_t oriRunRows = 0U;
+        if (preparedInt8 && info.isOriOnly) {
+            uint32_t blockSize = int8Input.params.oriBlockSize;
+            uint32_t pageRows = blockSize - (physicalRow & (blockSize - 1U));
+            oriRunRows = Min(BATCH_ROWS - staged, end - row + 1U);
+            oriRunRows = Min(oriRunRows, static_cast<uint32_t>(info.int8End - candidate));
+            oriRunRows = Min(oriRunRows, pageRows) & ~1U;
+        }
+        if (oriRunRows != 0U) {
+            DataCopyExtParams copy{1U, oriRunRows * RECORD_BYTES, 0U, 0U, 0U};
+            DataCopyPadExtParams<int8_t> pad{false, 0, 0, 0};
+            DataCopyPad(raw, int8Input.oriGm[offset], copy, pad);
+            candidate += oriRunRows - 1U;
+            row += oriRunRows - 1U;
+            staged += oriRunRows;
+        } else if (preparedInt8 && !info.isOriOnly && candidate + 1 < info.int8End && row < end &&
+                   staged + 1U < BATCH_ROWS) {
+            // ori cache rows must retain logical order, including descending physical-page transitions.
+            // Keep arch22 SMLA's paired transfer for compressed KV and original page boundaries.
+            int64_t nextOffset = static_cast<int64_t>(v0ValidSizeBuff.Get<uint32_t>().GetValue(
+                                     static_cast<uint32_t>((info.isOriOnly ? 0U : 512U) + candidate + 1))) *
+                                 RECORD_BYTES;
+            int64_t gap = (offset > nextOffset ? offset - nextOffset : nextOffset - offset) - RECORD_BYTES;
+            if (gap >= 0 && gap < 0x7FFFFFFFLL) {
+                DataCopyExtParams copy;
+                copy.blockCount = 2U;
+                copy.blockLen = RECORD_BYTES;
+                copy.srcStride = static_cast<uint32_t>(gap);
+                copy.dstStride = 0U;
+                DataCopyPadExtParams<int8_t> pad{false, 0, 0, 0};
+                int64_t begin = offset < nextOffset ? offset : nextOffset;
+                if (info.isOriOnly) {
+                    DataCopyPad(raw, int8Input.oriGm[begin], copy, pad);
+                } else {
+                    DataCopyPad(raw, int8Input.cmpGm[begin], copy, pad);
+                }
+            } else {
+                if (info.isOriOnly) {
+                    DataCopy(raw, int8Input.oriGm[offset], RECORD_BYTES);
+                    DataCopy(raw[RECORD_BYTES], int8Input.oriGm[nextOffset], RECORD_BYTES);
+                } else {
+                    DataCopy(raw, int8Input.cmpGm[offset], RECORD_BYTES);
+                    DataCopy(raw[RECORD_BYTES], int8Input.cmpGm[nextOffset], RECORD_BYTES);
+                }
+            }
+            ++candidate;
+            ++row;
+            staged += 2U;
+        } else {
+            if (info.isOriOnly) {
+                DataCopy(raw, int8Input.oriGm[offset], RECORD_BYTES);
+            } else {
+                DataCopy(raw, int8Input.cmpGm[offset], RECORD_BYTES);
+            }
+            ++staged;
+        }
+        if (staged != BATCH_ROWS && row != end) {
+            continue;
+        }
+        SetFlag<HardEvent::MTE2_V>(loadSlot);
+        if (pendingRows != 0U) {
+            ConvertInt8Batch(pendingSlot, pendingRows, pendingOffset, wrapOutput);
+            if (pendingWaveReady) {
+                // Ordered after the final16-row MTE3 write of this wave.
+                CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE3>(6);
+            }
+        }
+        pendingWaveReady = wave256 && row == end;
+        pendingSlot = loadSlot;
+        pendingRows = staged;
+        pendingOffset = outOffset;
+        outOffset += staged * DIM;
+        staged = 0U;
+        loadSlot ^= 1U;
+        if (wave256 && wave == 0U && row == end) {
+            // Retain one-batch-ahead16-row prefetch across the wave boundary.
+            wave = 1U;
+            first += 256U;
+            row = first;
+            end = first + 128U;
+            candidate = info.int8Start + first - 1;
+            outOffset = static_cast<uint64_t>(stageRowStart + first) * DIM;
+        }
+    }
+    if (pendingRows != 0U) {
+        ConvertInt8Batch(pendingSlot, pendingRows, pendingOffset, wrapOutput);
+        if (pendingWaveReady) {
+            CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE3>(6);
+        }
+    }
+    WaitFlag<HardEvent::MTE3_V>(0);
+    WaitFlag<HardEvent::MTE3_V>(1);
+    if (GetSubBlockIdx() == 1 && info.actualSingleProcessSInnerSize < info.actualSingleProcessSInnerSizeAlign) {
+        auto output = inputBuff2.Get<KV_T>();
+        Duplicate(output, static_cast<KV_T>(0), 16U * DIM);
+        SetFlag<HardEvent::V_MTE3>(0);
+        WaitFlag<HardEvent::V_MTE3>(0);
+        uint64_t base = (info.cmpLoop % MERGE_CACHE_GM_BUF_NUM) * mqVecConstInfo.s2BaseSize * DIM;
+        for (uint32_t start = info.actualSingleProcessSInnerSize; start < info.actualSingleProcessSInnerSizeAlign;
+             start += 16U) {
+            uint32_t count = Min(16U, info.actualSingleProcessSInnerSizeAlign - start);
+            DataCopy(kvMergeGm_[base + start * DIM], output, count * DIM);
+        }
+        SetFlag<HardEvent::MTE3_V>(0);
+        WaitFlag<HardEvent::MTE3_V>(0);
+    }
+    SetFlag<HardEvent::MTE3_MTE2>(SYNC_INPUT_BUF2_FLAG);
+    SetFlag<HardEvent::MTE3_MTE2>(SYNC_INPUT_BUF2_PONG_FLAG);
+}
+
+template <typename SAST>
+template <bool INT8_FAST>
 __aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::ProcessVec0L(const RunInfo& mqVecRunInfo)
 {
+    if constexpr (SAST::int8Kv) {
+        if constexpr (!INT8_FAST) {
+            const uint32_t stage = (mqVecRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM) * mqVecConstInfo.s2BaseSize;
+            ProcessInt8Kv<false>(mqVecRunInfo, stage, false);
+            return;
+        }
+        // Keep queued ori128/online-softmax/two-tile semantics intact. Only
+        // the local V0 decoder skips the previous logical window's suffix.
+        RunInfo decodeInfo = mqVecRunInfo;
+        uint32_t stageRowStart = 512U + ((mqVecRunInfo.loop / 2U) & 1U) * 512U;
+        if (mqVecRunInfo.isOriOnly) {
+            decodeInfo.int8Start += mqVecRunInfo.oriReuseRows;
+            decodeInfo.actualSingleProcessSInnerSize -= mqVecRunInfo.oriReuseRows;
+            stageRowStart = mqVecRunInfo.oriCacheWriteRow;
+        }
+        // Contract: full ori128 and cmp512. Padding a 1-row append would
+        // destroy cached rows; leave all original RunInfo dimensions unchanged.
+        decodeInfo.actualSingleProcessSInnerSizeAlign = decodeInfo.actualSingleProcessSInnerSize;
+        ProcessInt8Kv<true>(decodeInfo, stageRowStart, mqVecRunInfo.isOriOnly);
+        return;
+    }
+
     int64_t s2ProcessSize = mqVecRunInfo.v0S2DealSize;
     int64_t s2Pair = CeilDiv(s2ProcessSize, 2 * mqVecConstInfo.sparseBlockSize);
     int64_t topkGmBaseOffset = mqVecRunInfo.topKBaseOffset + mqVecRunInfo.v0S2Start;
@@ -1313,6 +1723,10 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::DealBmm2ResBas
     LocalTensor<T> mqBmm2ResultUb = tmpBuff1.Get<T>();
     mqBmm2ResultUb.SetSize(vec2ComputeSize);
     DataCopy(mqBmm2ResultUb, tmpBmm2ResUb, vec2ComputeSize);
+    if constexpr (SAST::int8Kv) {
+        // The first KV tile can immediately copy this UB result to outUb.
+        PipeBarrier<PIPE_V>();
+    }
     SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG + pingpongFlag);
     pingpongFlag ^= 1; // pingpong 0 1切换
 

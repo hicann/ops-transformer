@@ -55,9 +55,20 @@ struct MixedQuantSparseFlashMlaTqCmpParams {
     int64_t cmpKvStride0;
 };
 
+struct MixedQuantSparseFlashMlaInt8Params {
+    uint64_t qTokens;
+    uint32_t batch, heads, qSeq, oriSeq, cmpSeq;
+    uint32_t oriBlockSize, cmpBlockSize, oriTableSize, cmpTableSize;
+    uint32_t oriBlocks, cmpBlocks, topk, cmpRatio, oriMask, cmpMask;
+    int64_t oriStride, cmpStride, winLeft, winRight;
+    float softmaxScale;
+    bool returnLse;
+};
+
 struct MixedQuantSparseFlashMlaTqTilingData {
     MixedQuantSparseFlashMlaTqBaseParams tqBaseParams;
     MixedQuantSparseFlashMlaTqCmpParams tqCmpParams;
+    MixedQuantSparseFlashMlaInt8Params int8Params;
 };
 } // namespace optiling
 

@@ -22,6 +22,9 @@
 namespace optiling {
 namespace sparse_mla_checker {
 
+constexpr int64_t TURBO_QUANT_MODE = 3;
+constexpr int64_t INT8_KV_RECORD_BYTES = 608;
+
 enum class OperatorVariant : uint32_t {
     SPARSE = 0,
     MIXED_QUANT = 1,
@@ -98,6 +101,24 @@ struct CheckContext {
     std::vector<int64_t> oriKvStrides;
     std::vector<int64_t> cmpKvStrides;
 };
+
+// Detect INT8 inputs independently of quant_mode so invalid mode/type combinations
+// reach the INT8 checks instead of falling back to TurboQuant. The mixed variant
+// checker requires quant_mode=1 on arch22; other variants keep their contracts.
+inline bool IsInt8GroupQuant(const CheckContext& context)
+{
+    return context.variant == OperatorVariant::MIXED_QUANT && context.npuArch == NpuArch::DAV_2201 &&
+           ((context.oriKv.present && context.oriKv.desc != nullptr &&
+             context.oriKv.desc->GetDataType() == ge::DT_INT8) ||
+            (context.cmpKv.present && context.cmpKv.desc != nullptr &&
+             context.cmpKv.desc->GetDataType() == ge::DT_INT8));
+}
+
+inline bool IsTurboQuant(const CheckContext& context)
+{
+    return context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE &&
+           !IsInt8GroupQuant(context);
+}
 
 } // namespace sparse_mla_checker
 } // namespace optiling

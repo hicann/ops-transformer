@@ -45,8 +45,13 @@ public:
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
+    template <bool INT8_FAST = true>
     __aicore__ inline void ComputeMm1(const RunInfo& mqCubeRunInfo, const MSplitInfo mqCubeSplitInfo);
+    template <bool INT8_FAST = true>
     __aicore__ inline void ComputeMm2(const RunInfo& mqCubeRunInfo, const MSplitInfo mqCubeSplitInfo);
+    template <bool INT8_FAST = true>
+    __aicore__ inline void CopyDecodedKvToL1(LocalTensor<KV_T>& dst, const RunInfo& info, uint32_t row, uint32_t rows,
+                                             uint32_t rowsAlign, uint32_t dOffset, uint32_t dSize);
 
 private:
     static constexpr bool PAGE_ATTENTION = SAST::pageAttention;
@@ -332,6 +337,34 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyInMm2AToL1(L
 }
 
 template <typename SAST>
+template <bool INT8_FAST>
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyDecodedKvToL1(LocalTensor<KV_T>& dst,
+                                                                                  const RunInfo& info, uint32_t row,
+                                                                                  uint32_t rows, uint32_t rowsAlign,
+                                                                                  uint32_t dOffset, uint32_t dSize)
+{
+    if constexpr (!INT8_FAST) {
+        const uint64_t stage = (info.cmpLoop % MERGE_CACHE_GM_BUF_NUM) * mqCubeConstInfo.s2BaseSize;
+        auto src = kvMergeGm_[(stage + row) * 512U + dOffset];
+        MqDataCopyGmNDToL1<KV_T>(dst, src, rows, rowsAlign, dSize, 512U);
+        return;
+    }
+
+    const uint32_t srcRow =
+        info.isOriOnly ? ((info.oriCacheStartRow + row) & 511U) : (512U + ((info.loop / 2U) & 1U) * 512U + row);
+    const uint32_t remaining = 512U - (srcRow & 511U);
+    const uint32_t firstRows = info.isOriOnly && rows > remaining ? remaining : rows;
+    auto src = kvMergeGm_[static_cast<uint64_t>(srcRow) * 512U + dOffset];
+    MqDataCopyGmNDToL1<KV_T>(dst, src, firstRows, rowsAlign, dSize, 512U);
+    if (firstRows != rows) {
+        auto tailDst = dst[firstRows * (32U / sizeof(KV_T))];
+        auto tailSrc = kvMergeGm_[dOffset];
+        MqDataCopyGmNDToL1<KV_T>(tailDst, tailSrc, rows - firstRows, rowsAlign, dSize, 512U);
+    }
+}
+
+template <typename SAST>
+template <bool INT8_FAST>
 __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const RunInfo& mqCubeRunInfo,
                                                                            const MSplitInfo mqCubeSplitInfo)
 {
@@ -340,7 +373,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
     uint32_t mL1SizeAlign = SASAlign(M_SPLIT_SIZE, 16);
     uint32_t mqsML1LoopCount = CeilDiv(mSize, M_SPLIT_SIZE);
 
-    uint32_t nSize = mqCubeRunInfo.actualSingleProcessSInnerSize;
+    uint32_t nSize =
+        SAST::int8Kv ? mqCubeRunInfo.actualSingleProcessSInnerSizeAlign : mqCubeRunInfo.actualSingleProcessSInnerSize;
     uint32_t nL1Size = N_SPLIT_SIZE;
     uint32_t nL1SizeAlign = SASAlign(N_SPLIT_SIZE, 16);
     uint32_t nL1Loops = CeilDiv(nSize, N_SPLIT_SIZE);
@@ -356,6 +390,14 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
 
     // L1 切n切k
     for (uint32_t nL1 = 0; nL1 < nL1Loops; nL1++) {
+        if constexpr (SAST::int8Kv) {
+            static_assert(N_SPLIT_SIZE == 128U, "Wave256 requires two N128 blocks per wave");
+            if (INT8_FAST && !mqCubeRunInfo.isOriOnly && mqCubeRunInfo.actualSingleProcessSInnerSize == 512U &&
+                (nL1 == 0U || nL1 == 2U)) {
+                // Before the first MTE2 read of either complete256-row wave.
+                CrossCoreWaitFlag(6);
+            }
+        }
         if (nL1 == (nL1Loops - 1)) {
             // 尾块重新计算size
             nL1Size = nSize - (nL1Loops - 1) * N_SPLIT_SIZE;
@@ -369,7 +411,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
             // 从k当中取当前的块
             bL1Tensor = l1KVTensor[mqsKvBufferIndex * L1_BLOCK_OFFSET];
             uint32_t curSeqIdx = mqCubeRunInfo.s2BatchOffset + nL1 * N_SPLIT_SIZE;
-            if (mqCubeRunInfo.isOriOnly) {
+            if (mqCubeRunInfo.isOriOnly && !SAST::int8Kv) {
                 if constexpr (KV_LAYOUT_T == SAS_LAYOUT::PA_BSND || KV_LAYOUT_T == SAS_LAYOUT::PA_BNSD) {
                     uint32_t curS2Offset = mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize +
                                            mqCubeRunInfo.s2StartPoint + nL1 * N_SPLIT_SIZE;
@@ -459,34 +501,40 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
                     }
                 }
             } else {
-                if (kL1 == 0) {
-                    Nd2NzParams mqCubeCopyParams;
-                    mqCubeCopyParams.ndNum = 1;
-                    mqCubeCopyParams.nValue = nL1Size;
-                    mqCubeCopyParams.dValue = mqCubeConstInfo.headDim >> 1;
-                    mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
-                    mqCubeCopyParams.dstNzC0Stride = nL1SizeAlign;
-                    mqCubeCopyParams.dstNzNStride = 1;
-                    mqCubeCopyParams.srcNdMatrixStride = 0;
-                    mqCubeCopyParams.dstNzMatrixStride = 0;
-                    DataCopy(bL1Tensor,
-                             kvMergeGm_[mqCubeRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * kSize +
-                                        nL1 * N_SPLIT_SIZE * mqCubeConstInfo.headDim],
-                             mqCubeCopyParams);
+                if constexpr (SAST::int8Kv) {
+                    CopyDecodedKvToL1<INT8_FAST>(bL1Tensor, mqCubeRunInfo, nL1 * N_SPLIT_SIZE, nL1Size, nL1SizeAlign,
+                                                 kL1 * (mqCubeConstInfo.headDim >> 1), mqCubeConstInfo.headDim >> 1);
                 } else {
-                    Nd2NzParams mqCubeCopyParams;
-                    mqCubeCopyParams.ndNum = 1;
-                    mqCubeCopyParams.nValue = nL1Size;
-                    mqCubeCopyParams.dValue = mqCubeConstInfo.headDim >> 1;
-                    mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
-                    mqCubeCopyParams.dstNzC0Stride = nL1SizeAlign;
-                    mqCubeCopyParams.dstNzNStride = 1;
-                    mqCubeCopyParams.srcNdMatrixStride = 0;
-                    mqCubeCopyParams.dstNzMatrixStride = 0;
-                    DataCopy(bL1Tensor,
-                             kvMergeGm_[mqCubeRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * kSize +
-                                        (mqCubeConstInfo.headDim >> 1) + nL1 * N_SPLIT_SIZE * mqCubeConstInfo.headDim],
-                             mqCubeCopyParams);
+                    if (kL1 == 0) {
+                        Nd2NzParams mqCubeCopyParams;
+                        mqCubeCopyParams.ndNum = 1;
+                        mqCubeCopyParams.nValue = nL1Size;
+                        mqCubeCopyParams.dValue = mqCubeConstInfo.headDim >> 1;
+                        mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                        mqCubeCopyParams.dstNzC0Stride = nL1SizeAlign;
+                        mqCubeCopyParams.dstNzNStride = 1;
+                        mqCubeCopyParams.srcNdMatrixStride = 0;
+                        mqCubeCopyParams.dstNzMatrixStride = 0;
+                        DataCopy(bL1Tensor,
+                                 kvMergeGm_[mqCubeRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * kSize +
+                                            nL1 * N_SPLIT_SIZE * mqCubeConstInfo.headDim],
+                                 mqCubeCopyParams);
+                    } else {
+                        Nd2NzParams mqCubeCopyParams;
+                        mqCubeCopyParams.ndNum = 1;
+                        mqCubeCopyParams.nValue = nL1Size;
+                        mqCubeCopyParams.dValue = mqCubeConstInfo.headDim >> 1;
+                        mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                        mqCubeCopyParams.dstNzC0Stride = nL1SizeAlign;
+                        mqCubeCopyParams.dstNzNStride = 1;
+                        mqCubeCopyParams.srcNdMatrixStride = 0;
+                        mqCubeCopyParams.dstNzMatrixStride = 0;
+                        DataCopy(
+                            bL1Tensor,
+                            kvMergeGm_[mqCubeRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * kSize +
+                                       (mqCubeConstInfo.headDim >> 1) + nL1 * N_SPLIT_SIZE * mqCubeConstInfo.headDim],
+                            mqCubeCopyParams);
+                    }
                 }
             }
             SetFlag<HardEvent::MTE2_MTE1>(mqsMte21KvEvents[mqsKvBufferIndex]);
@@ -583,6 +631,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
 }
 
 template <typename SAST>
+template <bool INT8_FAST>
 __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const RunInfo& mqCubeRunInfo,
                                                                            const MSplitInfo mqCubeSplitInfo)
 {
@@ -597,7 +646,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
     uint32_t nL1SizeAlign = N_SPLIT_SIZE; // 16对齐
     uint32_t nL1Size = N_SPLIT_SIZE;      // n的实际大小
 
-    uint32_t kSize = mqCubeRunInfo.actualSingleProcessSInnerSize;
+    uint32_t kSize =
+        SAST::int8Kv ? mqCubeRunInfo.actualSingleProcessSInnerSizeAlign : mqCubeRunInfo.actualSingleProcessSInnerSize;
     uint32_t kL1Size = 256;
     uint32_t kL1SizeAlign = SASAlign(kL1Size, 16U);
     uint32_t kL1Loops = (kSize + kL1Size - 1) / kL1Size;
@@ -644,7 +694,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
                 }
 
                 uint32_t curSeqIdx = mqCubeRunInfo.s2BatchOffset + (kL1 - kOffset) * 128 + k1 * 256;
-                if (mqCubeRunInfo.isOriOnly) {
+                if (mqCubeRunInfo.isOriOnly && !SAST::int8Kv) {
                     if constexpr (KV_LAYOUT_T == SAS_LAYOUT::PA_BSND || KV_LAYOUT_T == SAS_LAYOUT::PA_BNSD) {
                         uint32_t copyFinishRowCnt = 0;
                         uint32_t curS2Offset =
@@ -715,19 +765,25 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
                                  mqCubeCopyParams);
                     }
                 } else {
-                    Nd2NzParams mqCubeCopyParams;
-                    mqCubeCopyParams.ndNum = 1;
-                    mqCubeCopyParams.nValue = kL0Size;
-                    mqCubeCopyParams.dValue = N_SPLIT_SIZE;
-                    mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
-                    mqCubeCopyParams.dstNzC0Stride = kL0SizeAlign;
-                    mqCubeCopyParams.dstNzNStride = 1;
-                    mqCubeCopyParams.srcNdMatrixStride = 0;
-                    mqCubeCopyParams.dstNzMatrixStride = 0;
-                    DataCopy(bL1Tensor[(kL1 - kOffset) * 128 * N_SPLIT_SIZE],
-                             kvMergeGm_[mqCubeRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * 512 +
-                                        kL1 * 128 * mqCubeConstInfo.headDim + nL1 * N_SPLIT_SIZE],
-                             mqCubeCopyParams);
+                    if constexpr (SAST::int8Kv) {
+                        auto stageDst = bL1Tensor[(kL1 - kOffset) * 128 * N_SPLIT_SIZE];
+                        CopyDecodedKvToL1<INT8_FAST>(stageDst, mqCubeRunInfo, kL1 * 128U, kL0Size, kL0SizeAlign,
+                                                     nL1 * N_SPLIT_SIZE, N_SPLIT_SIZE);
+                    } else {
+                        Nd2NzParams mqCubeCopyParams;
+                        mqCubeCopyParams.ndNum = 1;
+                        mqCubeCopyParams.nValue = kL0Size;
+                        mqCubeCopyParams.dValue = N_SPLIT_SIZE;
+                        mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                        mqCubeCopyParams.dstNzC0Stride = kL0SizeAlign;
+                        mqCubeCopyParams.dstNzNStride = 1;
+                        mqCubeCopyParams.srcNdMatrixStride = 0;
+                        mqCubeCopyParams.dstNzMatrixStride = 0;
+                        DataCopy(bL1Tensor[(kL1 - kOffset) * 128 * N_SPLIT_SIZE],
+                                 kvMergeGm_[mqCubeRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * 512 +
+                                            kL1 * 128 * mqCubeConstInfo.headDim + nL1 * N_SPLIT_SIZE],
+                                 mqCubeCopyParams);
+                    }
                 }
             }
             SetFlag<HardEvent::MTE2_MTE1>(mqsMte21KvEvents[mqsKvBufferIndex]);

@@ -19,6 +19,48 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 
+ge::graphStatus MixedQuantSparseFlashMlaTiling::DoInt8CsaTiling(MQSMLATilingInfo* info)
+{
+    OP_CHECK_IF(info->batchConsistency, OP_LOGE(info->opName, "INT8 CSA does not support batch-consistency mode"),
+                return ge::GRAPH_FAILED);
+    // Reuse the arch22 CSA tile sizes and bounded QK/PV/merge workspaces.
+    if (DoTurboQuantTiling(info) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    auto* data = context_->GetTilingData<MixedQuantSparseFlashMlaTqTilingData>();
+    OP_CHECK_IF(data == nullptr, OP_LOGE(info->opName, "tiling data is nullptr"), return ge::GRAPH_FAILED);
+    // Use the mode-1 execution template after validating quant_mode=1 and INT8 inputs.
+    data->tqBaseParams.kvQuantMode = QUANT_CONTIGUOUS;
+    auto& p = data->int8Params;
+    p.batch = info->bSize;
+    p.heads = info->gSize;
+    p.qSeq = info->s1Size;
+    p.qTokens = info->qLayout == MQSMLALayout::TND ? info->qTSize : static_cast<uint64_t>(info->bSize) * info->s1Size;
+    p.oriSeq = info->s2Size;
+    p.cmpSeq = info->cmpS2Size;
+    p.oriBlockSize = info->oriBlockSize;
+    p.cmpBlockSize = info->cmpBlockSize;
+    p.oriTableSize = info->oriMaxBlockNumPerBatch;
+    p.cmpTableSize = info->cmpMaxBlockNumPerBatch;
+    p.oriBlocks = info->oriKvStorageShape.GetDim(0);
+    p.cmpBlocks = info->cmpKvStorageShape.GetDim(0);
+    p.oriStride = info->oriKvStride;
+    p.cmpStride = info->cmpKvStride;
+    p.topk = info->cmpSparseBlockCount;
+    p.cmpRatio = info->cmpRatio;
+    p.oriMask = info->oriMaskMode;
+    p.cmpMask = info->cmpMaskMode;
+    p.winLeft = info->oriWinLeft;
+    p.winRight = info->oriWinRight;
+    p.softmaxScale = info->softmaxScale;
+    p.returnLse = info->returnSoftmaxLse;
+    context_->SetTilingKey(GET_TPL_TILING_KEY(0U, static_cast<uint32_t>(info->qLayout),
+                                              static_cast<uint32_t>(info->kvLayout), CSA_TEMPLATE, 0U, QUANT_CONTIGUOUS,
+                                              DTYPE_INT8, 0U, 0U, 0U, TOPK_INDEX));
+    context_->SetScheduleMode(1);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus MixedQuantSparseFlashMlaTiling::DoTurboQuantTiling(MQSMLATilingInfo* tilingInfo)
 {
     constexpr uint32_t S2_BASE_SIZE = 512;

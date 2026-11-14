@@ -8,10 +8,10 @@
 - <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Not supported
+- <term>Atlas A3 products</term>: Supported (CSA)
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 products</term>: Not supported
+- <term>Atlas A2 products</term>: Supported (CSA)
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 inference products</term>: Not supported
@@ -31,6 +31,8 @@
   - **SWA (Sliding Window Attention)**: Pass in only `oriKvOptional` to perform sliding window attention on the original KV.
   - **CSA (Compressed Sparse Attention)**: Pass in `oriKvOptional`, `cmpKvOptional`, and `cmpSparseIndicesOptional` simultaneously to perform attention on the original KV window and the compressed KV selected by topK.
   - **HCA (Heavily Compressed Attention)**: Pass in `oriKvOptional` and `cmpKvOptional` to perform attention on both the original KV window and the contiguous compressed KV segments.
+
+  On <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, INT8 CSA is supported; see [INT8 CSA Usage](#int8-csa-usage). Enable INT8 CSA with `quantMode=1`; both KV inputs must use the 608-byte INT8 record. Mode values 2/3 are not supported for INT8 inputs. The FP8 packing descriptions for modes 1/2 below apply to <term>Ascend 950PR&950DT products</term>. The existing A2/A3 TurboQuant CSA path uses mode 3; see [TurboQuant Parameter Constraints](../README_en.md#turboquant-parameter-constraints).
 
   `aclnnMixedQuantSparseFlashMlaMetadata` is the core split information of `aclnnMixedQuantSparseFlashMla` and is generated before the main operator is executed. In the current version, this metadata must be passed in for the main operator. The typical call procedure is as follows:
 
@@ -179,7 +181,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>Input</td>
       <td>Query input tensor.</td>
       <td>Empty tensors are not supported. qN supports 1-128; D only supports 512.</td>
-      <td>BFLOAT16</td>
+      <td>FLOAT16, BFLOAT16</td>
       <td>ND</td>
       <td>        <ul>
           <li>When layoutQ is BSND: (b, qS, qN, qD)</li>
@@ -192,15 +194,15 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>oriKvOptional (aclTensor*)</td>
       <td>Input</td>
       <td>Original KV input tensor. Key and Value share the same data.</td>
-      <td>Must be passed in for SWA/CSA/HCA scenarios. The quantized KV layout is determined by quantMode: when quant_mode is 1, the quantized KV is concatenated in the order of rope (64, bfloat16), nope (448, FLOAT8_E4M3FN), scale (7, bfloat16), and pad (18B); when quant_mode is 2, the quantized KV is concatenated in the order of nope (448, FLOAT8_E4M3FN), rope (64, bfloat16), scale (7, FLOAT8_E8M0), and pad (1B). Currently, only 1 and 2 are supported, and quantization mode 2 supports only layout_kv set to PA_BBND. Each quantization mode supports UINT8 and FLOAT8_E4M3FN as single-byte storage views, with the underlying byte content unchanged.</td>
-      <td>See quantMode for details.</td>
+      <td>For A2/A3 INT8 CSA, mandatory INT8 packed records with kvD=608; see INT8 CSA Usage. For Ascend 950PR&950DT modes 1/2, the FP8 record packing is described under quantMode. For A2/A3 TurboQuant mode 3, use the same FLOAT16 or BFLOAT16 type as q, with kvD=512.</td>
+      <td>FLOAT8_E4M3FN, FLOAT16, BFLOAT16, INT8</td>
       <td>ND</td>
       <td>        <ul>
           <li>If layoutKv is PA_BBND: (oriKvBlockNums, oriKvBlockSize, kvN, kvD), where oriKvBlockSize supports 1 to 1024</li>
           <li>If layoutKv is BSND: (b, oriKvS, kvN, kvD)</li>
           <li>If layoutKv is TND: (oriKvT, kvN, kvD)</li>
         </ul>
-        kvN supports only 1, and kvD is determined by quantMode.
+        kvN supports only 1. For A2/A3 INT8 CSA, kvD=608 for all supported quantMode values; other paths use the kvD specified for their quantMode.
       </td>
       <td>√</td>
     </tr>
@@ -208,15 +210,15 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>cmpKvOptional (aclTensor*)</td>
       <td>Input</td>
       <td>Compressed KV input tensor. Key and Value share the same data.</td>
-      <td>Must be passed in for CSA/HCA scenarios and not passed in for SWA scenarios. The quantized KV layout is determined by quantMode, same as oriKvOptional.</td>
-      <td>See quantMode for details.</td>
+      <td>Mandatory for CSA/HCA and omitted for SWA. A2/A3 INT8 CSA requires INT8 packed records with kvD=608. Ascend 950PR&950DT modes 1/2 use the FP8 packing described under quantMode. A2/A3 TurboQuant mode 3 uses UINT8 TQ4 records with kvD=258.</td>
+      <td>FLOAT8_E4M3FN, UINT8, INT8</td>
       <td>ND</td>
       <td>        <ul>
           <li>When layoutKv is PA_BBND: (cmpKvBlockNums, cmpKvBlockSize, kvN, kvD), where cmpKvBlockSize supports values from 1 to 1024</li>
           <li>When layoutKv is BSND: (b, cmpKvS, kvN, kvD)</li>
           <li>When layoutKv is TND: (cmpKvT, kvN, kvD)</li>
         </ul>
-        kvN supports only 1, and kvD is determined by quantMode.
+        kvN supports only 1. For A2/A3 INT8 CSA, kvD=608 for all supported quantMode values; other paths use the kvD specified for their quantMode.
       </td>
       <td>√</td>
     </tr>
@@ -385,14 +387,14 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>Must be passed in. Generated by the aclnnMixedQuantSparseFlashMlaMetadata operator.</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(1024,)</td>
+      <td>(2048,)</td>
       <td>√</td>
     </tr>
     <tr>
       <td>quantMode (int64_t)</td>
       <td>Input</td>
       <td>Indicates the quantization mode.</td>
-      <td>Indicates the quantization mode. Quantization mode 1 indicates that K and V nope use per-token-group quantization, and the scale type is bfloat16. Quantization mode 2 indicates that K and V nope use per-token-group quantization, and the scale type is FLOAT8_E8M0. Currently, only 1 and 2 are supported, and for quantization mode 2, only PA_BBND is supported for layout_kv.</td>
+      <td>A2/A3 INT8 CSA requires quantMode=1 and the 608-byte INT8 record; see INT8 CSA Usage. A2/A3 TurboQuant uses 3. Ascend 950PR&950DT supports 1/2: mode 1 packs rope (64 BFLOAT16), nope (448 FLOAT8_E4M3FN), scale (7 BFLOAT16), and pad (18 bytes), totaling 608 bytes; mode 2 packs nope (448 FLOAT8_E4M3FN), rope (64 BFLOAT16), scale (7 FLOAT8_E8M0), and pad (1 byte), totaling 584 bytes, with PA_BBND only. FP8 storage views preserve the underlying bytes and must not be used as INT8 numeric payloads.</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -513,7 +515,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>Output</td>
       <td>Attention computation output.</td>
       <td>-</td>
-      <td>BFLOAT16</td>
+      <td>FLOAT16, BFLOAT16</td>
       <td>ND</td>
       <td>Same shape as q</td>
       <td>×</td>
@@ -657,6 +659,8 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
 
 ## Constraints
 
+For A2/A3 INT8 CSA, use [INT8 CSA Usage](#int8-csa-usage) for data types, packing, required inputs, and supported combinations. The detailed FP8 validation tables below describe the Ascend 950PR&950DT path. For A2/A3 TurboQuant, see [TurboQuant Parameter Constraints](../README_en.md#turboquant-parameter-constraints).
+
 - Deterministic computation
 
   - aclnnMixedQuantSparseFlashMla defaults to a deterministic implementation. The same input yields the same result across multiple calls.
@@ -668,7 +672,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
   - oriTopkLengthOptional and cmpTopkLengthOptional indicate the length of ori/cmp sparseIndices actually participating in computation. The values cannot be greater than the size of the last dimension of sparseIndicesOptional. When sequsedQOptional is passed in, the values of the valid part corresponding to topkLength must be greater than or equal to 0.
   - When oriMaskMode/cmpMaskMode is 0, oriKvK/cmpKvK must be greater than or equal to the maximum value of oriTopkLengthOptional/cmpTopkLengthOptional.
   - cmpResidualKvOptional is used with cmpRatio to restore the KV length before compression. The value of each batch must be less than cmpRatio. This parameter can be passed in only when cmpMaskMode is 3 and cmpRatio is not 1; it cannot be passed in when cmpMaskMode is 0 or cmpRatio is 1.
-  - attnOutOut: tensor type, the output in the formula. The supported data type is BFLOAT16. The supported data format is ND. Constraint: The shape of this output parameter must be the same as that of input parameter q, and the dtype must be the same as q.
+  - attnOutOut: tensor type, the output in the formula. The supported data types are FLOAT16 and BFLOAT16 for A2/A3 CSA, and BFLOAT16 for Ascend 950PR&950DT. The supported data format is ND. Constraint: The shape of this output parameter must be the same as that of input parameter q, and the dtype must be the same as q.
   - When returnSoftmaxLse=False, a tensor with shape [1] and value 0 is returned; when returnSoftmaxLse=True, a FLOAT32 log-sum-exp result is returned.
   - cuSeqlensQOptional, cuSeqlensOriKvOptional, and cuSeqlensCmpKvOptional must satisfy that the first element is 0 and the sequence is non-decreasing overall, that is, each element is not less than its previous value.
   - When layoutKv is PA_BBND, oriKvOptional and cmpKvOptional support non-contiguous storage along axis 0.
@@ -1352,7 +1356,24 @@ Paged Attention is enabled when layoutKv is PA_BBND.
     </tbody>
 </table>
 
+<!-- npu="A3,910b" id14 -->
+#### INT8 CSA Usage
+
+On <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, enable INT8 CSA with `quantMode=1` and both KV inputs using INT8. The 608-byte packing below references A5 mode 1. INT8 inputs do not support `quantMode=2/3`. q and attnOut use FLOAT16 or BFLOAT16, with matching types and shapes. The Q head dimension is 512, the number of Q heads is 1 to 128, and the number of KV heads is 1. oriKvOptional and cmpKvOptional are both mandatory INT8 Tensors with a last dimension of 608; cmpSparseIndicesOptional is mandatory, oriSparseIndicesOptional must not be passed in, and `topkValueMode=1`.
+
+- `layoutQOptional`/`layoutKvOptional` supports BSND/BSND, TND/TND, BSND/PA_BBND, and TND/PA_BBND.
+- Each token stores 64 BFLOAT16 RoPE values, 448 signed INT8 nope values, seven BFLOAT16 scales, and 18 padding bytes, totaling 608 bytes. Every 64 nope dimensions share one scale. Scales are embedded in the KV record, with no separate scale Tensor. RoPE and scale remain BFLOAT16 when q is FLOAT16. The quantization producer must follow the same byte protocol.
+- PA_BBND requires both KV block tables and effective lengths (seqused). Records must be internally contiguous; stride0 must cover a complete physical block and be aligned to 32 bytes. TND requires the corresponding cumulative sequence lengths (cu_seqlens). `metadataOptional` is mandatory INT32 with shape `(2048,)`, generated by the preceding Metadata API using the same mode, layouts, lengths, and attributes.
+- `cmpResidualKvOptional` is mandatory when `cmpMaskMode=3` and `cmpRatio!=1`; it must not be passed in when `cmpMaskMode=0` or `cmpRatio=1`. `cmpTopkLengthOptional` is mandatory when `cmpMaskMode=0`.
+- `sinksOptional` retains its optional parameter position, but the current Host implementation requires FLOAT with shape `(qN,)`; it cannot be omitted.
+- Batch consistency is not supported. When the effective KV is empty, attnOut and valid Softmax LSE are both 0. Padding queries also output 0. Physical KV Tensors must still satisfy the non-empty shape constraints.
+
+See [INT8 CSA Parameter Constraints in the README](../README_en.md#int8-csa-parameter-constraints) for the complete parameter and byte protocol constraints.
+<!-- end id14 -->
+
 ## Example
+
+The existing FP8 example below applies to Ascend 950PR&950DT products. For A2/A3 INT8 CSA, prepare the packed INT8 records and inputs specified above.
 
 The sample code is as follows, for reference only. For details about the compilation and execution process, see [Compile and Run Samples](../../../docs/en/context/compile_and_run_sample.md).
 

@@ -110,6 +110,9 @@ private:
     static constexpr uint32_t SYNC_C1_V1_FLAG = 7;
     static constexpr uint32_t SYNC_V1_C2_FLAG = 8;
     static constexpr uint32_t SYNC_C2_V2_FLAG = 9;
+    static constexpr uint32_t SYNC_INT8_PLAN_READY = 10;
+    static constexpr uint32_t SYNC_INT8_EMPTY_PLAN_READ = 11;
+    static constexpr uint32_t SYNC_INT8_FAST_DRAINED = 12;
 
     static constexpr uint64_t kvHeadNum = 1ULL;
     static constexpr uint64_t headDim = 512ULL;
@@ -131,6 +134,19 @@ private:
 
     ConstInfo constInfo{};
     TempLoopInfo tempLoopInfo{};
+    Int8CsaInput<SAST> int8Input;
+    RunInfo int8NextInfo{};
+    // Existing 3*512 decoded GM rows become ori512 + cmp512 + cmp512.
+    // Four query credits protect all live suffix windows of the append stream.
+    // Batch/head/query changes cold-append, never reset the ring cursor.
+    uint32_t oriCacheHead = 0U;
+    uint32_t oriCacheLastBatch = 0U;
+    uint32_t oriCacheLastHead = 0U;
+    uint32_t oriCacheLastQuery = 0U;
+    int64_t oriCacheLastBegin = 0;
+    int64_t oriCacheLastEnd = 0;
+    bool oriCacheValid = false;
+    __aicore__ inline void PlanOriReuse(RunInfo& info, int64_t begin, int64_t end);
 
     KvQuantSparseFlashMlaCsaBlockCube<SAST> cubeBlock;
     KvQuantSparseFlashMlaCsaBlockVector<SAST> vectorBlock;
@@ -172,6 +188,11 @@ private:
     __aicore__ inline void InitOutputSingleCore();
     // ================================Process functions================================
     __aicore__ inline void ProcessBalance();
+    __aicore__ inline void ProcessInt8Balance();
+    __aicore__ inline __attribute__((always_inline)) void ProcessInt8GenericTail(uint32_t startBatch,
+                                                                                 int64_t startQuery);
+
+    template <bool INT8_FAST = true>
     __aicore__ inline void PreloadPipeline(uint32_t loop, uint32_t cmpLoop, uint64_t s2Start, uint64_t s2LoopIdx,
                                            RunInfo extraInfo[SAS_PRELOAD_TASK_CACHE_SIZE]);
     // ================================Offset Calc=====================================
@@ -183,8 +204,10 @@ private:
     __aicore__ inline int32_t GetActualSeqLenKV(uint32_t bIdx);
     __aicore__ inline void GetBN2Idx(uint32_t bN2Idx, uint32_t& bIdx, uint32_t& n2Idx);
     // ================================Mm1==============================================
+    template <bool INT8_FAST = true>
     __aicore__ inline void ComputeMm1(const RunInfo& info);
     // ================================Mm2==============================================
+    template <bool INT8_FAST = true>
     __aicore__ inline void ComputeMm2(const RunInfo& info);
     __aicore__ inline void InitAllZeroOutput(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx);
 };
@@ -410,6 +433,11 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::Init(
     // init tiling data
     tilingData = tiling;
     InitTilingData();
+    if constexpr (SAST::int8Kv) {
+        int8Input.Init(oriKV, cmpKV, cmpSparseIndices, oriBlockTable, cmpBlockTable, cuSeqlensQ, cuSeqlensOriKV,
+                       cuSeqlensCmpKV, seqUsedQ, seqUsedOriKV, seqUsedCmpKV, cmpResidualKV, cmpTopkLength,
+                       tiling->int8Params);
+    }
     if (KV_LAYOUT_T == SAS_LAYOUT::TND && LAYOUT_T == SAS_LAYOUT::TND) {
         InitActualSeqLen(cuSeqlensQ, cuSeqlensOriKV, cuSeqlensCmpKV);
     } else if (KV_LAYOUT_T == SAS_LAYOUT::TND) {
@@ -483,6 +511,9 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::Init(
 
     if ASCEND_IS_AIV {
         vectorBlock.InitParams(constInfo, tilingData);
+        if constexpr (SAST::int8Kv) {
+            vectorBlock.InitInt8Input(int8Input);
+        }
         vectorBlock.InitVec0GlobalTensor(kvMergeGm_, oriKvGm, cmpKvGm, cmpTqGm, oriBlockTableGm, cmpBlockTableGm);
         vectorBlock.InitVec1GlobalTensor(mm1ResGm, vec1ResGm, actualSeqLengthsQGm, actualSeqLengthsKVGm, topKGm,
                                          sinksGm, softmaxLseGm);
@@ -519,6 +550,12 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::CalcParams(uin
                                                                              uint64_t s2Start, uint32_t s2LoopIdx,
                                                                              RunInfo& info)
 {
+    if constexpr (SAST::int8Kv) {
+        info = int8NextInfo;
+        info.loop = loop;
+        info.cmpLoop = loop; // Both ori/cmp use the three-slot floating KV buffer.
+        return;
+    }
     info.isValid = s2LoopIdx < tempLoopInfo.s2LoopTimes;
     info.loop = loop;
     info.cmpLoop = cmpLoop;
@@ -616,6 +653,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::CalcParams(uin
 }
 
 template <typename SAST>
+template <bool INT8_FAST>
 __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::ComputeMm1(const RunInfo& info)
 {
     uint32_t nBufferLoopTimes = CeilDiv(info.actMBaseSize, constInfo.nBufferMBaseSize);
@@ -624,12 +662,13 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::ComputeMm1(con
         MSplitInfo mSplitInfo;
         mSplitInfo.nBufferStartM = i * constInfo.nBufferMBaseSize;
         mSplitInfo.nBufferDealM = (i + 1 != nBufferLoopTimes) ? constInfo.nBufferMBaseSize : nBufferTail;
-        cubeBlock.ComputeMm1(info, mSplitInfo);
+        cubeBlock.template ComputeMm1<INT8_FAST>(info, mSplitInfo);
         CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_FIX>(constInfo.syncC1V1);
     }
 }
 
 template <typename SAST>
+template <bool INT8_FAST>
 __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::ComputeMm2(const RunInfo& info)
 {
     uint32_t nBufferLoopTimes = (info.actMBaseSize + constInfo.nBufferMBaseSize - 1) / constInfo.nBufferMBaseSize;
@@ -639,7 +678,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::ComputeMm2(con
         mSplitInfo.nBufferStartM = i * constInfo.nBufferMBaseSize;
         mSplitInfo.nBufferDealM = (i + 1 != nBufferLoopTimes) ? constInfo.nBufferMBaseSize : nBufferTail;
         CrossCoreWaitFlag(constInfo.syncV1C2);
-        cubeBlock.ComputeMm2(info, mSplitInfo);
+        cubeBlock.template ComputeMm2<INT8_FAST>(info, mSplitInfo);
         CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_FIX>(constInfo.syncC2V2);
     }
 }
@@ -647,6 +686,12 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::ComputeMm2(con
 template <typename SAST>
 __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::Process()
 {
+    if constexpr (SAST::int8Kv) {
+        if ASCEND_IS_AIV {
+            vectorBlock.InitInt8Outputs();
+        }
+        SyncAll<false>();
+    }
     uint32_t hasLoad = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, FA_CORE_ENABLE_INDEX, false));
     if (hasLoad == 0) {
         return;
@@ -674,8 +719,264 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::GetBN2Idx(uint
 }
 
 template <typename SAST>
+__aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::PlanOriReuse(RunInfo& info, int64_t begin,
+                                                                               int64_t end)
+{
+    uint32_t reuse = 0U;
+    if (oriCacheValid && info.bIdx == oriCacheLastBatch && info.n2IdxReal == oriCacheLastHead &&
+        info.s1Idx == oriCacheLastQuery + 1U && begin >= oriCacheLastBegin && begin < oriCacheLastEnd &&
+        end >= oriCacheLastEnd && end - begin == 128 && oriCacheLastEnd - oriCacheLastBegin == 128) {
+        reuse = static_cast<uint32_t>(oriCacheLastEnd - begin);
+    }
+    info.oriReuseRows = reuse;
+    info.oriCacheWriteRow = oriCacheHead;
+    info.oriCacheStartRow = (oriCacheHead + 512U - reuse) & 511U;
+    oriCacheHead = (oriCacheHead + info.actualSingleProcessSInnerSize - reuse) & 511U;
+    oriCacheLastBatch = info.bIdx;
+    oriCacheLastHead = info.n2IdxReal;
+    oriCacheLastQuery = info.s1Idx;
+    oriCacheLastBegin = begin;
+    oriCacheLastEnd = end;
+    oriCacheValid = true;
+}
+
+template <typename SAST>
+__aicore__ inline __attribute__((always_inline)) void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::ProcessInt8GenericTail(
+    uint32_t startBatch, int64_t startQuery)
+{
+    int8NextInfo = {};
+    RunInfo extraInfo[SAS_PRELOAD_TASK_CACHE_SIZE]{};
+    uint32_t loop = 0;
+    if ASCEND_IS_AIC {
+        for (uint32_t i = 0; i < 4; ++i) {
+            CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE2>(3);
+        }
+    }
+    uint32_t endBatch = constInfo.bN2End + (constInfo.gS1End != 0 ? 1U : 0U);
+    for (uint32_t b = startBatch; b < endBatch && b < int8Input.params.batch; ++b) {
+        int64_t qEnd = Min(int8Input.QLength(b), int8Input.QStorage(b));
+        if (b == constInfo.bN2End && constInfo.gS1End != 0) {
+            qEnd = Min(qEnd, int64_t(constInfo.gS1End));
+        }
+        for (int64_t s = b == startBatch ? startQuery : 0; s < qEnd; ++s) {
+            int8Input.BeginQuery(b, s);
+            if ASCEND_IS_AIV {
+                vectorBlock.SetInt8SelectionPrepared(false);
+            }
+            // Bounded address acceleration is optional. Every unsupported
+            // resource/layout case keeps the original scalar selection path.
+            const bool canPrepare = !FLASH_DECODE && constInfo.mmResUbSize >= 8U && int8Input.CanPrepareQuery();
+            if (canPrepare) {
+                uint32_t oriRows = 0U, cmpRows = 0U;
+                // V1(L-2) has already consumed MM1's head in iteration L-1.
+                // Only AIV0 publishes one32B plan before QK(L) overwrites it.
+                const uint64_t planOffset = static_cast<uint64_t>(loop % dbWorkspaceRatio) * constInfo.mmResUbSize;
+                if ASCEND_IS_AIV {
+                    vectorBlock.PrepareInt8SelectionGeneric(int8Input, planOffset, oriRows, cmpRows);
+                    CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE3>(SYNC_INT8_PLAN_READY);
+                    // Empty queries do not advance loop or consume a V0 credit.
+                    // Wait for AIC to read the reused plan location first.
+                    if (oriRows + cmpRows == 0U) {
+                        CrossCoreWaitFlag(SYNC_INT8_EMPTY_PLAN_READ);
+                    }
+                } else {
+                    CrossCoreWaitFlag(SYNC_INT8_PLAN_READY);
+                    GlobalTensor<uint32_t> plans;
+                    plans.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(mm1ResGm.GetPhyAddr(0)),
+                                          dbWorkspaceRatio * constInfo.mmResUbSize);
+                    auto plan = plans[planOffset];
+                    DataCacheCleanAndInvalid<uint32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(plan);
+                    oriRows = plan.GetValue(0);
+                    cmpRows = plan.GetValue(1);
+                    if (oriRows + cmpRows == 0U) {
+                        CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE2>(SYNC_INT8_EMPTY_PLAN_READ);
+                    }
+                }
+                int8Input.UsePreparedSelection(oriRows, cmpRows);
+            }
+            RunInfo current{}, next{};
+            bool valid = int8Input.NextTile(current, constInfo.s2BaseSize);
+            while (valid) {
+                // One-tile lookahead preserves the existing online-softmax
+                // first/last semantics even when selected indices are invalid.
+                bool hasNext = int8Input.NextTile(next, constInfo.s2BaseSize);
+                current.isLastS2Loop = !hasNext;
+                current.curSInnerLoopTimes = current.s2Idx + (hasNext ? 2U : 1U);
+                int8NextInfo = current;
+                PreloadPipeline<false>(loop, loop, 0, current.s2Idx, extraInfo);
+                ++loop;
+                current = next;
+                valid = hasNext;
+            }
+        }
+    }
+    int8NextInfo = {};
+    for (uint32_t flush = 0; flush < PRELOAD_NUM; ++flush) {
+        PreloadPipeline<false>(loop, loop, 0, 0, extraInfo);
+        ++loop;
+    }
+    if ASCEND_IS_AIV {
+        for (uint32_t i = 0; i < 4; ++i) {
+            CrossCoreWaitFlag(3);
+        }
+    }
+}
+
+template <typename SAST>
+__aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::ProcessInt8Balance()
+{
+    const auto& p = int8Input.params;
+    const bool qualified = !FLASH_DECODE && LAYOUT_T == SAS_LAYOUT::TND && PAGE_ATTENTION && p.heads == 64U &&
+                           p.topk == 512U && p.oriBlockSize == 128U &&
+                           (p.cmpBlockSize == 64U || p.cmpBlockSize == 128U) && p.oriMask == 4U && p.cmpMask == 3U &&
+                           p.winLeft == 127 && p.winRight == 0 && (p.cmpRatio == 1U || p.cmpRatio == 4U) &&
+                           constInfo.s2BaseSize == 512U && constInfo.bmm2ResUbSize == 64U * 512U;
+    uint32_t resumeBatch = constInfo.bN2Start;
+    int64_t resumeQuery = constInfo.gS1Start;
+    if (qualified) {
+        bool fallback = false;
+        RunInfo extraInfo[SAS_PRELOAD_TASK_CACHE_SIZE]{};
+        uint32_t loop = 0;
+        if ASCEND_IS_AIC {
+            for (uint32_t i = 0; i < 4; ++i) {
+                CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE2>(3);
+            }
+        }
+        uint32_t endBatch = constInfo.bN2End + (constInfo.gS1End != 0 ? 1U : 0U);
+        for (uint32_t b = constInfo.bN2Start; b < endBatch && b < int8Input.params.batch && !fallback; ++b) {
+            int64_t qEnd = Min(int8Input.QLength(b), int8Input.QStorage(b));
+            if (b == constInfo.bN2End && constInfo.gS1End != 0) {
+                qEnd = Min(qEnd, int64_t(constInfo.gS1End));
+            }
+            for (int64_t s = b == constInfo.bN2Start ? constInfo.gS1Start : 0; s < qEnd; ++s) {
+                int8Input.BeginQuery(b, s);
+                int64_t oriLogicalBegin = 0, oriLogicalEnd = 0;
+                int8Input.GetOriLogicalRange(oriLogicalBegin, oriLogicalEnd);
+                if (oriLogicalEnd - oriLogicalBegin != 128) {
+                    resumeBatch = b;
+                    resumeQuery = s;
+                    fallback = true;
+                    break;
+                }
+                if ASCEND_IS_AIV {
+                    vectorBlock.SetInt8SelectionPrepared(false);
+                }
+                bool canPrepare = int8Input.CanPrepareQuery();
+                if (!canPrepare || loop % 2U != 0U) {
+                    resumeBatch = b;
+                    resumeQuery = s;
+                    fallback = true;
+                    break;
+                }
+                uint32_t oriRows = 0, cmpRows = 0;
+                if (canPrepare) {
+                    // In this two-tile/query experiment, Vec2 only uses accumulation
+                    // slot0. Slot1's first128B hold two 64B plan slots, not QK data.
+                    uint64_t planOffset =
+                        constInfo.bmm2ResUbSize + static_cast<uint64_t>(loop % dbWorkspaceRatio) * 16U;
+                    if ASCEND_IS_AIV {
+                        vectorBlock.PrepareInt8Selection(int8Input, planOffset, oriRows, cmpRows);
+                        CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE3>(SYNC_INT8_PLAN_READY);
+                        // Empty queries do not advance the ring; wait until Cube has
+                        // read their counts before the next query reuses this slot.
+                        if (oriRows + cmpRows == 0U) {
+                            CrossCoreWaitFlag(SYNC_INT8_EMPTY_PLAN_READ);
+                        }
+                    } else {
+                        CrossCoreWaitFlag(SYNC_INT8_PLAN_READY);
+                        auto plan = vec2ResGm[planOffset];
+                        DataCacheCleanAndInvalid<float, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(plan);
+                        oriRows = static_cast<uint32_t>(static_cast<int32_t>(plan.GetValue(0)));
+                        cmpRows = static_cast<uint32_t>(static_cast<int32_t>(plan.GetValue(1)));
+                        if (oriRows + cmpRows == 0U) {
+                            CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE2>(SYNC_INT8_EMPTY_PLAN_READ);
+                        }
+                    }
+                    if (oriRows != 128U || cmpRows != 512U) {
+                        resumeBatch = b;
+                        resumeQuery = s;
+                        fallback = true;
+                        break;
+                    }
+                    int8Input.UsePreparedSelection(oriRows, cmpRows);
+                }
+                if (canPrepare) {
+                    // Preserve dynamic counts, zero-side handling and all task fields.
+                    // curSInnerLoopTimes intentionally matches the old one-tile
+                    // lookahead marker; it is NOT the query's total tile count.
+                    const uint32_t tileSize = constInfo.s2BaseSize;
+                    const uint32_t oriTileCount = oriRows / tileSize + (oriRows % tileSize != 0U);
+                    const uint32_t cmpTileCount = cmpRows / tileSize + (cmpRows % tileSize != 0U);
+                    const uint32_t tileCount = oriTileCount + cmpTileCount;
+                    for (uint32_t tileIdx = 0U; tileIdx < tileCount; ++tileIdx) {
+                        RunInfo current{};
+                        int8Input.MakePreparedTile(current, tileIdx, oriTileCount, tileSize);
+                        const bool hasNext = tileIdx + 1U < tileCount;
+                        current.isLastS2Loop = !hasNext;
+                        current.curSInnerLoopTimes = current.s2Idx + (hasNext ? 2U : 1U);
+                        if (current.isOriOnly) {
+                            PlanOriReuse(current, oriLogicalBegin, oriLogicalEnd);
+                        }
+                        int8NextInfo = current;
+                        PreloadPipeline(loop, loop, 0, current.s2Idx, extraInfo);
+                        ++loop;
+                    }
+                    int8Input.FinishPreparedTiles(tileCount);
+                } else {
+                    RunInfo current{}, next{};
+                    bool valid = int8Input.NextTile(current, constInfo.s2BaseSize);
+                    while (valid) {
+                        // One-tile lookahead preserves the existing online-softmax
+                        // first/last semantics even when selected indices are invalid.
+                        bool hasNext = int8Input.NextTile(next, constInfo.s2BaseSize);
+                        current.isLastS2Loop = !hasNext;
+                        current.curSInnerLoopTimes = current.s2Idx + (hasNext ? 2U : 1U);
+                        if (current.isOriOnly) {
+                            PlanOriReuse(current, oriLogicalBegin, oriLogicalEnd);
+                        }
+                        int8NextInfo = current;
+                        PreloadPipeline(loop, loop, 0, current.s2Idx, extraInfo);
+                        ++loop;
+                        current = next;
+                        valid = hasNext;
+                    }
+                }
+            }
+        }
+        int8NextInfo = {};
+        for (uint32_t flush = 0; flush < PRELOAD_NUM; ++flush) {
+            PreloadPipeline(loop, loop, 0, 0, extraInfo);
+            ++loop;
+        }
+        if ASCEND_IS_AIV {
+            for (uint32_t i = 0; i < 4; ++i) {
+                CrossCoreWaitFlag(3);
+            }
+        }
+        if (!fallback) {
+            return;
+        }
+        // The original fast drain above consumed all four credits, even if
+        // the first query failed. Join both AIVs before generic seeds again.
+        if ASCEND_IS_AIV {
+            CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE3>(SYNC_INT8_FAST_DRAINED);
+        } else {
+            CrossCoreWaitFlag(SYNC_INT8_FAST_DRAINED);
+        }
+        oriCacheValid = false;
+    }
+    // One fallback call site keeps generic code from being duplicated at
+    // each dynamic eligibility check. Actual failed query is retried here.
+    ProcessInt8GenericTail(resumeBatch, resumeQuery);
+}
+
+template <typename SAST>
 __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::ProcessBalance()
 {
+    if constexpr (SAST::int8Kv) {
+        ProcessInt8Balance();
+        return;
+    }
     RunInfo extraInfo[SAS_PRELOAD_TASK_CACHE_SIZE];
     uint32_t gloop = 0;
     uint32_t cmpLoop = 0;
@@ -795,6 +1096,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::ProcessBalance
 }
 
 template <typename SAST>
+template <bool INT8_FAST>
 __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::PreloadPipeline(
     uint32_t loop, uint32_t cmpLoop, uint64_t s2Start, uint64_t s2LoopIdx,
     RunInfo extraInfo[SAS_PRELOAD_TASK_CACHE_SIZE])
@@ -806,16 +1108,20 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::PreloadPipelin
     CalcParams(loop, cmpLoop, s2Start, s2LoopIdx, extraInfo0);
     if (extraInfo0.isValid) {
         if ASCEND_IS_AIC {
-            if (!extraInfo0.isOriOnly) {
+            const bool wave256 =
+                INT8_FAST && SAST::int8Kv && !extraInfo0.isOriOnly && extraInfo0.actualSingleProcessSInnerSize == 512U;
+            if ((!extraInfo0.isOriOnly || SAST::int8Kv) && !wave256) {
                 CrossCoreWaitFlag(constInfo.syncV0C1);
             }
-            ComputeMm1(extraInfo0);
+            ComputeMm1<INT8_FAST>(extraInfo0);
         } else {
             if (extraInfo0.isFirstSInnerLoop) {
                 CrossCoreWaitFlag(3);
             }
-            vectorBlock.ProcessVec0L(extraInfo0);
-            if (!extraInfo0.isOriOnly) {
+            vectorBlock.template ProcessVec0L<INT8_FAST>(extraInfo0);
+            const bool wave256 =
+                INT8_FAST && SAST::int8Kv && !extraInfo0.isOriOnly && extraInfo0.actualSingleProcessSInnerSize == 512U;
+            if ((!extraInfo0.isOriOnly || SAST::int8Kv) && !wave256) {
                 CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE3>(constInfo.syncV0C1);
             }
         }
@@ -825,7 +1131,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::PreloadPipelin
             vectorBlock.ProcessVec1L(extraInfo2);
         }
         if ASCEND_IS_AIC {
-            ComputeMm2(extraInfo2);
+            ComputeMm2<INT8_FAST>(extraInfo2);
             if (extraInfo2.isLastS2Loop) {
                 CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE2>(3);
             }

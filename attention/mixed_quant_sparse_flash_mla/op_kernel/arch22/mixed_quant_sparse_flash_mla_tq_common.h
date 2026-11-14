@@ -43,7 +43,7 @@ enum class SAS_LAYOUT {
 
 template <typename Q_T, typename KV_T, typename OUT_T, const bool FLASH_DECODE = false,
           SAS_LAYOUT LAYOUT_T = SAS_LAYOUT::BSND, SAS_LAYOUT KV_LAYOUT_T = SAS_LAYOUT::PA_BSND, int TEMPLATE_MODE = 0,
-          typename... Args>
+          bool INT8_KV = false, typename... Args>
 struct SASType {
     using queryType = Q_T;
     using kvType = KV_T;
@@ -53,6 +53,7 @@ struct SASType {
     static constexpr SAS_LAYOUT kvLayout = KV_LAYOUT_T;
     static constexpr bool pageAttention = (KV_LAYOUT_T == SAS_LAYOUT::PA_BSND || KV_LAYOUT_T == SAS_LAYOUT::PA_BNSD);
     static constexpr int templateMode = TEMPLATE_MODE;
+    static constexpr bool int8Kv = INT8_KV;
 };
 
 // ================================Util functions==================================
@@ -239,6 +240,13 @@ struct RunInfo {
     int32_t v0S2Start = 0;
     uint32_t oriDealSize = 0;
     int32_t cmpMaskRight = 0;
+    // Private all-valid ori128+cmp512 experiment: preserve original 128-row
+    // RunInfo for QK/Softmax/PV, and reduce only a local V0 decoder copy.
+    uint32_t oriCacheStartRow = 0U;
+    uint32_t oriCacheWriteRow = 0U;
+    uint32_t oriReuseRows = 0U;
+    int64_t int8Start = 0; // Raw candidate range for a compacted INT8 tile.
+    int64_t int8End = 0;
 };
 
 struct ConstInfo {

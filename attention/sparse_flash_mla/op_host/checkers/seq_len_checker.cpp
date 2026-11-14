@@ -13,7 +13,6 @@
 
 namespace optiling {
 namespace sparse_mla_checker {
-constexpr int64_t TURBO_QUANT_MODE = 3;
 namespace {
 const char* Op(const CheckContext& context)
 {
@@ -51,7 +50,7 @@ ge::graphStatus SeqLenChecker::CheckSinglePara(const CheckContext& context) cons
 
 ge::graphStatus SeqLenChecker::CheckParaExistence(const CheckContext& context) const
 {
-    if (context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE) {
+    if (IsTurboQuant(context)) {
         OP_CHECK_IF(!context.cuSeqlensQ.present || !context.sequsedOriKv.present,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "cu_seqlens_q/seqused_ori_kv",
                                                              "TurboQuant requires both inputs"),

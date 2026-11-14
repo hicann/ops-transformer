@@ -693,6 +693,10 @@ static ge::graphStatus TilingPrepareForMixedQuantSparseFlashMla(gert::TilingPars
 ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo* tilingInfo)
 {
     if (tilingInfo->npuArch == NpuArch::DAV_2201) {
+        if (tilingInfo->quantMode == 1 && tilingInfo->oriKvType == ge::DT_INT8 &&
+            tilingInfo->cmpKvType == ge::DT_INT8) {
+            return DoInt8CsaTiling(tilingInfo);
+        }
         return DoTurboQuantTiling(tilingInfo);
     } else if (tilingInfo->npuArch == NpuArch::DAV_9201 || tilingInfo->npuArch == NpuArch::DAV_9202) {
         return DoA6CsaTiling(tilingInfo);

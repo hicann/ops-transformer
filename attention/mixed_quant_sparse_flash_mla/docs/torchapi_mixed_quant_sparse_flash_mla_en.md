@@ -8,10 +8,10 @@
 - <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Not supported
+- <term>Atlas A3 products</term>: Supported (CSA)
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 products</term>: Not supported
+- <term>Atlas A2 products</term>: Supported (CSA)
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 inference products</term>: Not supported
@@ -31,6 +31,8 @@
   - **SWA (Sliding Window Attention)**: Passes in only `ori_kv` to perform sliding window attention on the original KV.
   - **CSA (Compressed Sparse Attention)**: Passes in `ori_kv`, `cmp_kv`, and `cmp_sparse_indices` to perform attention on both the original KV window and the compressed KV selected by topK.
   - **HCA (Heavily Compressed Attention)**: Both `ori_kv` and `cmp_kv` are passed in, and attention is computed on both the raw KV window and the continuously compressed KV segments.
+
+  On <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, INT8 CSA is supported; see [INT8 CSA Usage](#int8-csa-usage). Enable INT8 CSA with `quant_mode=1`; both KV inputs must use the 608-byte INT8 record. Mode values 2/3 are not supported for INT8 inputs. The FP8 packing descriptions for modes 1/2 below apply to <term>Ascend 950PR&950DT products</term>. The existing A2/A3 TurboQuant CSA path uses mode 3; see [TurboQuant Parameter Constraints](../README_en.md#turboquant-parameter-constraints).
 
   `mixed_quant_sparse_flash_mla_metadata` provides the core splitting information for `mixed_quant_sparse_flash_mla` and is generated before the main operator is executed. In the current version, this metadata must be passed in to the main operator. The typical call flow is as follows:
 
@@ -125,6 +127,8 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 
 ## Parameters
 
+For A2/A3 INT8 CSA, the Metadata API must receive `quant_mode=1` and the same layouts, lengths, and attributes as the main operator. The FP8 packing descriptions below refer to Ascend 950PR&950DT products.
+
 ### Common Field Definitions
 
 |    Name    |                            Meaning                            |
@@ -156,7 +160,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | num_heads_q | int | Required | Indicates the number of q heads. | int32 | - | -
 | num_heads_kv | int | Required | Indicates the number of ori_kv/cmp_kv heads. | int32 | - | -
 | head_dim | int | Required | Indicates the dimension of each attention head. | int32 | - | -
-| quant_mode | int | Required | Indicates the quantization mode. Currently only 1 and 2 are supported. When quant_mode is 1, the data is concatenated in the order of rope (64, bfloat16), nope (448, float8_e4m3fn), scale (7, bfloat16), and pad (18B). When quant_mode is 2, the data is concatenated in the order of nope (448, float8_e4m3fn), rope (64, bfloat16), scale (7, float8_e8m0), and pad (1B). | int32 | - | -
+| quant_mode | int | Required | Indicates the quantization mode. A2/A3 INT8 CSA requires quant_mode=1 and the 608-byte INT8 record; A2/A3 TurboQuant uses 3. On Ascend 950PR&950DT, only 1 and 2 are supported, with the following FP8 packing. When quant_mode is 1, the data is concatenated in the order of rope (64, bfloat16), nope (448, float8_e4m3fn), scale (7, bfloat16), and pad (18B). When quant_mode is 2, the data is concatenated in the order of nope (448, float8_e4m3fn), rope (64, bfloat16), scale (7, float8_e8m0), and pad (1B). | int32 | - | -
 | cu_seqlens_q | tensor | Optional | Indicates the cumulative sequence lengths of variable-length sequences for input q. | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_ori_kv | tensor | Optional | Indicates the cumulative sequence lengths of variable-length sequences for input ori_kv. | int32 | ND | <ul><li>(b+1,)</li></ul>
 | cu_seqlens_cmp_kv | tensor | Optional | Indicates the cumulative sequence lengths of variable-length sequences for input cmp_kv. | int32 | ND | <ul><li>(b+1,)</li></ul>
@@ -187,10 +191,10 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 
 | Name | Type | Type | Description | data type | data format | Dimension |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| q | tensor | Required | Represents q in the formula. | bfloat16 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>
-| quant_mode | int | Required | Represents the quantization mode. Currently, only 1 and 2 are supported. When quant_mode is 1, the quantized KV is concatenated in the following order: rope (64, bfloat16), nope (448, float8_e4m3fn), scale (7, bfloat16), and pad (18B). When quant_mode is 2, the quantized KV is concatenated in the following order: nope (448, float8_e4m3fn), rope (64, bfloat16), scale (7, float8_e8m0), and pad (1B). All quantization modes support UINT8 and FLOAT8_E4M3FN as the single-byte storage view, with the underlying byte content unchanged. | int32 | - | -
-| ori_kv | tensor | Optional | Represents the original quantized KV input. Key and Value share the same data. | fp8_e4m3 | ND | <ul><li>(b, ori_kv_s, kv_n, kv_d)</li><li>(ori_kv_t, kv_n, kv_d)</li><li>(ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d)</li></ul>
-| cmp_kv | tensor | Optional | Represents the compressed quantized KV input. Key and Value share the same data. | fp8_e4m3 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
+| q | tensor | Required | Represents q in the formula. | float16, bfloat16 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>
+| quant_mode | int | Required | Represents the quantization mode. A2/A3 INT8 CSA requires quant_mode=1 and the 608-byte INT8 record; A2/A3 TurboQuant uses 3. On Ascend 950PR&950DT, only 1 and 2 are supported, with the following FP8 packing. When quant_mode is 1, the quantized KV is concatenated in the following order: rope (64, bfloat16), nope (448, float8_e4m3fn), scale (7, bfloat16), and pad (18B). When quant_mode is 2, the quantized KV is concatenated in the following order: nope (448, float8_e4m3fn), rope (64, bfloat16), scale (7, float8_e8m0), and pad (1B). For the Ascend 950PR&950DT FP8 modes, UINT8 and FLOAT8_E4M3FN storage views preserve the underlying byte content. A2/A3 INT8 CSA requires signed INT8 numeric payloads instead. | int32 | - | -
+| ori_kv | tensor | Optional | Original KV shared by Key and Value. A2/A3 INT8 CSA requires torch.int8 records with kv_d=608. Ascend 950PR&950DT modes 1/2 use FP8. A2/A3 TurboQuant mode 3 uses the same floating-point type as q and kv_d=512. | fp8_e4m3, float16, bfloat16, int8 | ND | <ul><li>(b, ori_kv_s, kv_n, kv_d)</li><li>(ori_kv_t, kv_n, kv_d)</li><li>(ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d)</li></ul>
+| cmp_kv | tensor | Optional | Compressed KV shared by Key and Value. A2/A3 INT8 CSA requires torch.int8 records with kv_d=608. Ascend 950PR&950DT modes 1/2 use FP8. A2/A3 TurboQuant mode 3 uses uint8 TQ4 records with kv_d=258. | fp8_e4m3, uint8, int8 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
 | ori_sparse_indices | tensor | Optional | Represents the topK indices of the original KV. -1 is filled at invalid positions. | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>
 | cmp_sparse_indices | tensor | Optional | Represents the topK indices of the compressed KV. -1 is filled at invalid positions. | int32 | ND | <ul><li>(q_t, kv_n, cmp_kv_k)</li><li>(b, q_s, kv_n, cmp_kv_k)</li></ul>
 | ori_block_table | tensor | Optional | Represents the block mapping table used by ori_kv in the PagedAttention use case. | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
@@ -205,7 +209,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | ori_topk_length | tensor | Optional | Represents the length of ori_sparse_indices actually participating in computation. | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>
 | cmp_topk_length | tensor | Optional | Represents the length of cmp_sparse_indices actually participating in computation. | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>
 | sinks | tensor | Optional | Represents the independent learnable virtual offset set for each attention head, used to maintain stability during long-text inference. | float32 | ND | <ul><li>(q_n,)</li></ul>
-| metadata | tensor | Optional | Represents the core partitioning information generated by mixed_quant_sparse_flash_mla_metadata. | int32 | ND | <ul><li>(1024,)</li></ul>
+| metadata | tensor | Optional | Represents the core partitioning information generated by mixed_quant_sparse_flash_mla_metadata. | int32 | ND | <ul><li>(2048,)</li></ul>
 | rope_head_dim | int | Optional | Represents the dimension of the rope head. The default value is 64. | int32 | - | -
 | softmax_scale | float | Optional | Represents the scaling factor that can be explicitly set. The default value is 1.0. | float32 | - | -
 | cmp_ratio | int | Optional | Represents the compression ratio of cmp_kv relative to the KV length before compression. It can restore the KV length before compression used by the cmp-side mask. The default value is 1, and the value range is 1-128.| int32 | - | -
@@ -224,16 +228,18 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 
 | Name | Type | Type | Description | data type | data format | Dimensions |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| metadata | tensor | Required | Core splitting information of mixed_quant_sparse_flash_mla. | int32 | ND | <ul><li>(1024,)</li></ul>
+| metadata | tensor | Required | Core splitting information of mixed_quant_sparse_flash_mla. | int32 | ND | <ul><li>(2048,)</li></ul>
 
 ### mixed_quant_sparse_flash_mla
 
 | Name | Type | Type | Description | Data Type | Data Format | Dimensions |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| attention_out | tensor | Required | Computation output of mixed_quant_sparse_flash_mla. | bfloat16 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>
+| attention_out | tensor | Required | Computation output of mixed_quant_sparse_flash_mla. | float16, bfloat16 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>
 | softmax_lse | tensor | Optional | First, softmax_max is obtained by taking the max of the query × key result. Then, softmax_sum is obtained by subtracting softmax_max from the query × key result, taking exp, and summing. Finally, the result is obtained by taking the log of softmax_sum and adding softmax_max. | float32 | ND | <ul><li>(b, kv_n, q_s, q_n/kv_n)</li><li>(kv_n, q_t, q_n/kv_n)</li></ul>
 
 ## Constraints
+
+For A2/A3 INT8 CSA, use [INT8 CSA Usage](#int8-csa-usage) for data types, packing, required inputs, and supported combinations. The detailed FP8 validation tables below describe the Ascend 950PR&950DT path. For A2/A3 TurboQuant, see [TurboQuant Parameter Constraints](../README_en.md#turboquant-parameter-constraints).
 
 - Declaration
   - Inputs such as cu_seqlens_q, cu_seqlens_ori_kv, cu_seqlens_cmp_kv, seqused_q, seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, ori_block_table, and cmp_block_table are tensors. Because the operator cannot obtain the specific values of the tensors in the Tiling phase, tiling does not validate the values. You must ensure their correctness. If invalid values are passed in for the preceding parameters, undefined behavior is triggered (accuracy issues, program crashes caused by illegal memory access, etc.).
@@ -241,7 +247,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
   - ori_topk_length and cmp_topk_length indicate the length of ori/cmp sparse_indices that actually participates in the computation. The value cannot be greater than the size of the last dimension of sparse_indices. When seqused_q is passed in, the values of the valid part corresponding to topk_length must be greater than or equal to 0.
   - When ori_mask_mode/cmp_mask_mode is 0, ori_kv_k/cmp_kv_k must be greater than or equal to the maximum value of ori_topk_length/cmp_topk_length.
   - cmp_residual_kv is used with cmp_ratio to restore the KV length before compression. The value of each batch must be less than cmp_ratio, that is, cmp_residual_kv[i] < cmp_ratio. cmp_residual_kv can be passed in only when cmp_mask_mode=3 and cmp_ratio!=1. It cannot be passed in when cmp_mask_mode=0 or cmp_ratio=1.
-  - attention_out: tensor type, the output in the formula. bfloat16 is supported for the data type. ND is supported for the data format. Constraint: The shape of this output parameter must be the same as the shape of input parameter q, and the dtype must be the same as that of q.
+  - attention_out: tensor type, the output in the formula. float16 and bfloat16 are supported for A2/A3 CSA; bfloat16 is supported for Ascend 950PR&950DT. ND is supported for the data format. Constraint: The shape of this output parameter must be the same as the shape of input parameter q, and the dtype must be the same as that of q.
   - When return_softmax_lse=False, a tensor with shape [1] and value 0 is returned. When return_softmax_lse=True, the float32 log-sum-exp result is returned.
   - For cu_seqlens_q, cu_seqlens_ori_kv, and cu_seqlens_cmp_kv, the first element must be 0, and the sequence must be non-decreasing as a whole, that is, each element is not less than its previous value.
   - When layout_kv is PA_BBND, ori_kv and cmp_kv support non-contiguity on axis 0.
@@ -932,7 +938,24 @@ Paged Attention is enabled when layout_kv is PA_BBND.
     </tbody>
 </table>
 
+<!-- npu="A3,910b" id14 -->
+#### INT8 CSA Usage
+
+On <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, enable INT8 CSA with `quant_mode=1` and both KV inputs using INT8. The 608-byte packing below references A5 mode 1. INT8 inputs do not support `quant_mode=2/3`. q and attention_out use float16 or bfloat16, with matching types and shapes. The Q head dimension is 512, the number of Q heads is 1 to 128, and the number of KV heads is 1. ori_kv and cmp_kv are both mandatory torch.int8 Tensors with a last dimension of 608; cmp_sparse_indices is mandatory, ori_sparse_indices must not be passed in, and `topk_value_mode=1`.
+
+- `layout_q`/`layout_kv` supports BSND/BSND, TND/TND, BSND/PA_BBND, and TND/PA_BBND.
+- Each token stores 64 BFLOAT16 RoPE values, 448 signed INT8 nope values, seven BFLOAT16 scales, and 18 padding bytes, totaling 608 bytes. Every 64 nope dimensions share one scale. Scales are embedded in the KV record, with no separate scale Tensor. RoPE and scale remain BFLOAT16 when q is FLOAT16. The quantization producer must follow the same byte protocol.
+- PA_BBND requires both KV block tables and effective lengths (seqused). Records must be internally contiguous; stride0 must cover a complete physical block and be aligned to 32 bytes. TND requires the corresponding cumulative sequence lengths (cu_seqlens). `metadata` is mandatory INT32 with shape `(2048,)`, generated by the preceding Metadata API using the same mode, layouts, lengths, and attributes.
+- `cmp_residual_kv` is mandatory when `cmp_mask_mode=3` and `cmp_ratio!=1`; it must not be passed in when `cmp_mask_mode=0` or `cmp_ratio=1`. `cmp_topk_length` is mandatory when `cmp_mask_mode=0`.
+- `sinks` retains its optional parameter position, but the current Host implementation requires float32 with shape `(q_n,)`; it cannot be omitted.
+- Batch consistency is not supported. When the effective KV is empty, attention_out and valid Softmax LSE are both 0. Padding queries also output 0. Physical KV Tensors must still satisfy the non-empty shape constraints.
+
+See [INT8 CSA Parameter Constraints in the README](../README_en.md#int8-csa-parameter-constraints) for the complete parameter and byte protocol constraints.
+<!-- end id14 -->
+
 ## Example<a name="zh-cn_topic_0000002168254826_section14459801435"></a>
+
+The existing FP8 examples below apply to Ascend 950PR&950DT products. For A2/A3 INT8 CSA, prepare the packed INT8 records and inputs specified above.
 
 ### SWA, BSND Input
 

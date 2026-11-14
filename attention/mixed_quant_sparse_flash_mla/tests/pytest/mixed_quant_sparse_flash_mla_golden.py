@@ -142,6 +142,65 @@ def restore_cmp_kv_lengths(
     ]
 
 
+def gen_mode1_nope(left, right, shape, kv_type):
+    """Generate signed INT8 values, or preserve the existing FP8 sampler."""
+    if kv_type != torch.int8:
+        return gen_fp8_data_in_range(left, right, shape)
+    if not (
+        math.isfinite(left) and math.isfinite(right) and -128 <= left <= right <= 127
+    ):
+        raise ValueError(
+            "INT8 test payload range must be finite and within [-128, 127]"
+        )
+    low, high = math.ceil(left), math.floor(right)
+    if low > high:
+        raise ValueError("INT8 payload range must contain an integer")
+    return torch.randint(low, high + 1, shape, dtype=torch.int8)
+
+
+def decode_int8_cache(records, layout, lengths, prefixes=None, table=None):
+    """Read actual INT8 operator bytes into logical FP32 BNSD KV.
+
+    Each 608B record stores rope64 BF16, nope448 INT8, scale7 BF16,
+    then 18 ignored padding bytes. Scale is BF16 even when Q is FP16.
+    """
+    if records.dtype != torch.int8 or records.shape[-2:] != (1, 608):
+        raise ValueError("INT8 CSA requires one KV head and 608 bytes per record")
+    lengths = [int(value) for value in lengths]
+    result = torch.zeros(
+        (len(lengths), 1, max(1, max(lengths)), 512), dtype=torch.float32
+    )
+    for batch, length in enumerate(lengths):
+        if length < 0:
+            raise ValueError("KV lengths must be nonnegative")
+        tokens = torch.arange(length)
+        if layout == "PA_BBND":
+            blocks = table[batch, tokens // records.shape[1]].long()
+            if ((blocks < 0) | (blocks >= records.shape[0])).any():
+                raise ValueError("Invalid active physical block id")
+            selected = records[blocks, tokens % records.shape[1], 0]
+        elif layout == "TND":
+            if length > int(prefixes[batch + 1]) - int(prefixes[batch]):
+                raise ValueError("KV length exceeds its TND slot")
+            selected = records[int(prefixes[batch]) + tokens, 0]
+        elif layout == "BSND":
+            if length > records.shape[1]:
+                raise ValueError("KV length exceeds BSND storage")
+            selected = records[batch, :length, 0]
+        else:
+            raise ValueError(f"Unsupported INT8 KV layout: {layout}")
+        rope = selected[:, :128].contiguous().view(torch.bfloat16).float()
+        scales = selected[:, 576:590].contiguous().view(torch.bfloat16).float()
+        nope = selected[:, 128:576].float().reshape(length, 7, 64)
+        values = torch.cat(
+            ((nope * scales.unsqueeze(-1)).reshape(length, 448), rope), dim=-1
+        )
+        if not torch.isfinite(values).all():
+            raise ValueError("INT8 pytest reference currently requires finite KV")
+        result[batch, 0, :length] = values
+    return result
+
+
 def get_kv_compute_dtype(kv_type):
     """Use FP8 semantics when the operator input is stored as disguised uint8."""
     return torch.float8_e4m3fn if kv_type == torch.uint8 else kv_type
@@ -1689,6 +1748,8 @@ def gen_ori_kv(
     ori_win_left=-1,
     ori_win_right=-1,
 ):
+    aux_type = torch.bfloat16 if ori_kv_type == torch.int8 else q_type
+    compute_type = torch.float32 if ori_kv_type == torch.int8 else q_type
     if quant_mode == 10:
         quant_param = _nonfinite_value(quant_param_range_left, quant_param_range_right)
         if quant_param is None:
@@ -1704,9 +1765,9 @@ def gen_ori_kv(
         quant_range_left,
         quant_range_right,
         (B, N2, ori_max_s2, quant_scale_head_dim),
-        q_type,
+        aux_type,
     )
-    ori_kv_quant_param_tensor = ori_kv_quant_param_tensor_npu.to(q_type)
+    ori_kv_quant_param_tensor = ori_kv_quant_param_tensor_npu.to(compute_type)
 
     if quant_mode == 10:
         ori_k_nope_bnsd_npu = gen_data_in_range(
@@ -1720,18 +1781,19 @@ def gen_ori_kv(
         )
         ori_k_nope_bnsd = trans_hifuint8_tensor_to_float(ori_k_nope_bnsd_npu).to(q_type)
     else:
-        ori_k_nope_bnsd_npu = gen_fp8_data_in_range(
+        ori_k_nope_bnsd_npu = gen_mode1_nope(
             data_range_left,
             data_range_right,
             (B, N2, ori_max_s2, nope_head_dim),
+            ori_kv_type,
         )
-        ori_k_nope_bnsd = ori_k_nope_bnsd_npu.to(q_type)
+        ori_k_nope_bnsd = ori_k_nope_bnsd_npu.to(compute_type)
 
     ori_k_rope_bnsd = gen_data_in_range(
         data_range_left,
         data_range_right,
         (B, N2, ori_max_s2, rope_head_dim),
-        q_type,
+        aux_type,
     )
 
     for d_loop in range(quant_scale_head_dim):
@@ -1741,11 +1803,13 @@ def gen_ori_kv(
                 ori_k_nope_bnsd[:, :, :, offset : offset + 1],
                 ori_kv_quant_param_tensor[:, :, :, d_loop : d_loop + 1],
             )
-    ori_k_bnsd = torch.concat([ori_k_nope_bnsd, ori_k_rope_bnsd], dim=3)
+    ori_k_bnsd = torch.concat(
+        [ori_k_nope_bnsd.to(q_type), ori_k_rope_bnsd.to(q_type)], dim=3
+    )
 
     ori_pad_tensor = torch.tensor(
         np.random.uniform(0, 0, (B, N2, ori_max_s2, pad_d))
-    ).to(torch.float8_e8m0fnu)
+    ).to(torch.uint8 if ori_kv_type == torch.int8 else torch.float8_e8m0fnu)
     ori_k_bnsd_npu = torch.concat(
         [
             ori_k_rope_bnsd.view(ori_kv_type),
@@ -2299,6 +2363,8 @@ def gen_cmp_kv(
     cmp_sparse_indices_mode="full",
     cmp_topk_length_override=None,
 ):
+    aux_type = torch.bfloat16 if cmp_kv_type == torch.int8 else q_type
+    compute_type = torch.float32 if cmp_kv_type == torch.int8 else q_type
     if cmp_max_s2 == 0:
         return None, None, None, None, None
     if quant_mode == 10:
@@ -2316,9 +2382,9 @@ def gen_cmp_kv(
         quant_range_left,
         quant_range_right,
         (B, N2, cmp_max_s2, quant_scale_head_dim),
-        q_type,
+        aux_type,
     )
-    cmp_kv_quant_param_tensor = cmp_kv_quant_param_tensor_npu.to(q_type)
+    cmp_kv_quant_param_tensor = cmp_kv_quant_param_tensor_npu.to(compute_type)
 
     if quant_mode == 10:
         cmp_k_nope_bnsd_npu = gen_data_in_range(
@@ -2332,18 +2398,19 @@ def gen_cmp_kv(
         )
         cmp_k_nope_bnsd = trans_hifuint8_tensor_to_float(cmp_k_nope_bnsd_npu).to(q_type)
     else:
-        cmp_k_nope_bnsd_npu = gen_fp8_data_in_range(
+        cmp_k_nope_bnsd_npu = gen_mode1_nope(
             data_range_left,
             data_range_right,
             (B, N2, cmp_max_s2, nope_head_dim),
+            cmp_kv_type,
         )
-        cmp_k_nope_bnsd = cmp_k_nope_bnsd_npu.to(q_type)
+        cmp_k_nope_bnsd = cmp_k_nope_bnsd_npu.to(compute_type)
 
     cmp_k_rope_bnsd = gen_data_in_range(
         data_range_left,
         data_range_right,
         (B, N2, cmp_max_s2, rope_head_dim),
-        q_type,
+        aux_type,
     )
 
     for d_loop in range(quant_scale_head_dim):
@@ -2353,11 +2420,13 @@ def gen_cmp_kv(
                 cmp_k_nope_bnsd[:, :, :, offset : offset + 1],
                 cmp_kv_quant_param_tensor[:, :, :, d_loop : d_loop + 1],
             )
-    cmp_k_bnsd = torch.concat([cmp_k_nope_bnsd, cmp_k_rope_bnsd], dim=3)
+    cmp_k_bnsd = torch.concat(
+        [cmp_k_nope_bnsd.to(q_type), cmp_k_rope_bnsd.to(q_type)], dim=3
+    )
 
     cmp_pad_tensor = torch.tensor(
         np.random.uniform(0, 0, (B, N2, cmp_max_s2, pad_d))
-    ).to(torch.float8_e8m0fnu)
+    ).to(torch.uint8 if cmp_kv_type == torch.int8 else torch.float8_e8m0fnu)
     cmp_k_bnsd_npu = torch.concat(
         [
             cmp_k_rope_bnsd.view(cmp_kv_type),
@@ -2509,6 +2578,11 @@ def gen_data(params, generate_golden=True):
     return test_data
     """
 
+    int8_kv = torch.int8 in (params.get("ori_kv_type"), params.get("cmp_kv_type"))
+    if int8_kv:
+        from check_valid_param import check_valid_param
+
+        check_valid_param(params)
     Testcase_Name = params["Testcase_Name"]
     layout_q = params["layout_q"]
     layout_kv = params["layout_kv"]
@@ -2625,7 +2699,7 @@ def gen_data(params, generate_golden=True):
             math.ceil(cmp_max_s2 / block_size2) if cmp_max_s2 > 0 else 0
         )
 
-    if quant_mode != 1 and quant_mode != 2:
+    if not int8_kv and quant_mode != 1 and quant_mode != 2:
         raise ValueError(f"input quant_mode = {quant_mode}, only support 1 and 2")
 
     # 计算kv每个区域D轴长度
@@ -2929,7 +3003,7 @@ def gen_data(params, generate_golden=True):
         "return_softmax_lse": return_softmax_lse,
         "batch_consistency": batch_consistency,
     }
-    if generate_golden:
+    if generate_golden and not int8_kv:
         generate_cpu_golden({"golden_state": golden_state})
         cpu_result = golden_state["cpu_output"]
         cpu_lse = golden_state["cpu_lse"]
@@ -3055,12 +3129,38 @@ def gen_data(params, generate_golden=True):
         "cpu_lse": cpu_lse if return_softmax_lse else None,
     }
 
+    if generate_golden and int8_kv:
+        generate_cpu_golden(input_data)
     return input_data
 
 
 def generate_cpu_golden(input_data):
     """Calculate MQSMLA CPU Golden from input-stage state without new random data."""
     state = input_data["golden_state"]
+    if state["ori_kv_type"] == torch.int8:
+        op = input_data["op_input"]
+        for name in (
+            "q",
+            "sinks",
+            "ori_sparse_indices",
+            "cmp_sparse_indices",
+            "ori_topk_length",
+            "cmp_topk_length",
+            "seqused_q",
+            "seqused_ori_kv",
+            "seqused_cmp_kv",
+            "cmp_residual_kv",
+        ):
+            state[name] = op[name]
+        for stream in ("ori", "cmp"):
+            decoded = decode_int8_cache(
+                op[f"{stream}_kv"],
+                state["layout_kv"],
+                op[f"seqused_{stream}_kv"],
+                op[f"cu_seqlens_{stream}_kv"],
+                op[f"{stream}_block_table"],
+            )
+            state[f"{stream}_k_bnsd"] = decoded.to(state["q_type"])
     test_qsmla = GeneralizedSFAQuant(
         state["layout_q"],
         state["layout_kv"],
@@ -3114,6 +3214,8 @@ def generate_cpu_golden(input_data):
         state["return_softmax_lse"],
         state.get("batch_consistency", False),
     )
+    if state["ori_kv_type"] == torch.int8:
+        cpu_output = cpu_output.to(state["q_type"])
     state["cpu_output"] = cpu_output
     state["cpu_lse"] = cpu_lse
     input_data["cpu_output"] = cpu_output

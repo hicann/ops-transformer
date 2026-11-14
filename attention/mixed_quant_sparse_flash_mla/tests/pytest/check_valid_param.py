@@ -19,7 +19,42 @@ logger = logging.getLogger(__name__)
 
 
 def check_valid_param(params):
-    if params.get("q_type") not in [torch.bfloat16]:
+    int8_kv = torch.int8 in (params.get("ori_kv_type"), params.get("cmp_kv_type"))
+    if int8_kv:
+        if (
+            params.get("ori_kv_type") != torch.int8
+            or params.get("cmp_kv_type") != torch.int8
+        ):
+            raise ValueError("INT8 CSA requires both KV inputs to use int8")
+        if params.get("q_type") not in (torch.float16, torch.bfloat16):
+            raise ValueError("INT8 CSA Q must be float16 or bfloat16")
+        if params.get("quant_mode") != 1:
+            raise ValueError("INT8 CSA requires quant_mode=1")
+        if (params.get("tile_size"), params.get("rope_head_dim")) != (64, 64):
+            raise ValueError("INT8 CSA requires tile_size=64 and rope_head_dim=64")
+        if (
+            params.get("template_run_mode") != "CSA"
+            or params.get("topk_value_mode", 1) != 1
+        ):
+            raise ValueError("INT8 path requires CSA and topk_value_mode=1")
+        if params.get("D") != 512 or params.get("N2") != 1:
+            raise ValueError("INT8 CSA requires D=512 and one KV head")
+        if params.get("layout_kv") not in (params.get("layout_q"), "PA_BBND"):
+            raise ValueError("INT8 CSA requires matching Q/KV layouts or PA_BBND KV")
+        if params.get("batch_consistency"):
+            raise ValueError("INT8 CSA does not support batch consistency")
+        if params.get("ori_mask_mode") not in (0, 3, 4) or params.get(
+            "cmp_mask_mode"
+        ) not in (0, 3):
+            raise ValueError(
+                "INT8 CSA supports ori_mask_mode=0/3/4 and cmp_mask_mode=0/3"
+            )
+        if (
+            not 1 <= params.get("cmp_ratio", 0) <= 128
+            or not 1 <= params.get("N1", 0) <= 128
+        ):
+            raise ValueError("INT8 CSA requires cmp_ratio and Q head count in [1, 128]")
+    elif params.get("q_type") not in [torch.bfloat16]:
         raise ValueError("q_type should be: bfloat16")
 
     if params.get("layout_q") not in ["BSND", "TND"]:

@@ -26,9 +26,11 @@ extern "C" {
  * @brief First phase of aclnnMixedQuantSparseFlashMla: calculate workspace size.
  * @domain aclnn_ops_train_infer
  *
- * @param q                         [IN]  query tensor. BF16 for mode 1/2; FP16 or BF16 for mode 3.
- * @param oriKvOptional             [IN]  original KV. FLOAT8_E4M3FN for mode 1/2; same dtype as q for mode 3.
- * @param cmpKvOptional             [IN]  compressed KV. FLOAT8_E4M3FN for mode 1/2; UINT8 TQ4 for mode 3.
+ * @param q                         [IN]  query. FP16/BF16 for arch22 INT8 CSA/TQ4; BF16 for arch35/arch92 modes 1/2.
+ * @param oriKvOptional             [IN]  original KV. INT8 packed records for arch22 INT8 CSA;
+ *                                       FLOAT8_E4M3FN for arch35/arch92 modes 1/2; same dtype as q for TQ4.
+ * @param cmpKvOptional             [IN]  compressed KV. INT8 packed records for arch22 INT8 CSA;
+ *                                       FLOAT8_E4M3FN for arch35/arch92 modes 1/2; UINT8 for TQ4.
  * @param oriSparseIndicesOptional  [IN]  optional original KV sparse indices, INT32.
  * @param cmpSparseIndicesOptional  [IN]  optional compressed KV sparse indices, INT32.
  * @param oriBlockTableOptional     [IN]  optional original KV block table, INT32.
@@ -44,7 +46,8 @@ extern "C" {
  * @param cmpTopkLengthOptional     [IN]  optional compressed KV top-k lengths, INT32.
  * @param sinksOptional             [IN]  optional attention sink weights, FLOAT32.
  * @param metadataOptional          [IN]  optional pre-computed tiling metadata, INT32.
- * @param quantMode                 [IN]  ATTR. 1/2 on arch35, 3 (TurboQuant TQ4) on arch22.
+ * @param quantMode                 [IN]  ATTR. 1 for arch22 INT8 CSA, using the A5 mode-1 reference packing;
+ *                                       3 for arch22 TQ4; 1/2 for arch35/arch92.
  * @param ropeHeadDim               [IN]  ATTR. RoPE head dimension.
  * @param softmaxScale              [IN]  ATTR. Softmax scaling factor.
  * @param cmpRatio                  [IN]  ATTR. Compressed KV ratio.

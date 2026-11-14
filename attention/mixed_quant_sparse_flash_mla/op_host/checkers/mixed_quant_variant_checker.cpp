@@ -13,7 +13,6 @@
 
 namespace optiling {
 namespace sparse_mla_checker {
-constexpr int64_t TURBO_QUANT_MODE = 3;
 namespace {
 const char* Op(const CheckContext& context)
 {
@@ -41,26 +40,72 @@ ge::graphStatus MixedQuantVariantChecker::CheckSinglePara(const CheckContext& co
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(Op(context), "quant_mode",
                                                       std::to_string(context.quantMode).c_str(), "must be 1, 2 or 3"),
                 return ge::GRAPH_FAILED);
-    const bool turboQuant = context.quantMode == TURBO_QUANT_MODE;
+    const bool turboQuant = IsTurboQuant(context);
+    const bool int8GroupQuant = IsInt8GroupQuant(context);
     OP_CHECK_IF(
-        ((turboQuant && context.npuArch != NpuArch::DAV_2201) ||
-         (!turboQuant && context.npuArch != NpuArch::DAV_3510)) &&
-            ((!turboQuant && context.npuArch != NpuArch::DAV_9201) &&
-             (!turboQuant && context.npuArch != NpuArch::DAV_9202)),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            Op(context), "quant_mode", std::to_string(context.quantMode).c_str(),
-            "quant_mode 3 is supported only on arch22; quant_mode 1/2 are supported only on arch35 and arch 92"),
+        int8GroupQuant && context.quantMode != 1,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(Op(context), "quant_mode", std::to_string(context.quantMode).c_str(),
+                                              "INT8 CSA requires quant_mode=1"),
         return ge::GRAPH_FAILED);
+    const bool fp8Platform = context.npuArch == NpuArch::DAV_3510 || context.npuArch == NpuArch::DAV_9201 ||
+                             context.npuArch == NpuArch::DAV_9202;
+    const bool supportedPlatform =
+        context.npuArch == NpuArch::DAV_2201 ? (turboQuant || int8GroupQuant) : (fp8Platform && !turboQuant);
+    OP_CHECK_IF(!supportedPlatform,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    Op(context), "quant_mode", std::to_string(context.quantMode).c_str(),
+                    "arch22 supports INT8 CSA mode 1 or TurboQuant mode 3; arch35/arch92 support modes 1/2"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         context.npuArch == NpuArch::DAV_2201 && context.topkValueMode != 1,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(Op(context), "topk_value_mode",
                                               std::to_string(context.topkValueMode).c_str(), "must be 1 on A2/A3"),
         return ge::GRAPH_FAILED);
-    // The RoPE part of the TurboQuant layout has a fixed 64-dimensional head.
+    // Both packed group-quant and TurboQuant records contain 64 RoPE values.
     OP_CHECK_IF(
         context.ropeHeadDim != 64,
         OP_LOGE_FOR_INVALID_VALUE(Op(context), "rope_head_dim", std::to_string(context.ropeHeadDim).c_str(), "64"),
         return ge::GRAPH_FAILED);
+    if (int8GroupQuant) {
+        OP_CHECK_IF(!context.oriKv.present || !context.cmpKv.present || !context.cmpSparseIndices.present ||
+                        context.oriSparseIndices.present,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        Op(context), "CSA inputs",
+                        "INT8 CSA requires ori_kv, cmp_kv and cmp_sparse_indices, without ori_sparse_indices"),
+                    return ge::GRAPH_FAILED);
+        if (context.kvLayout == Layout::PA_BBND) {
+            OP_CHECK_IF(context.oriKvStrides.empty() || context.cmpKvStrides.empty() ||
+                            context.oriKvStrides[0] < context.oriBlockSize * INT8_KV_RECORD_BYTES ||
+                            context.cmpKvStrides[0] < context.cmpBlockSize * INT8_KV_RECORD_BYTES,
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                            Op(context), "KV stride", "The first-axis stride must cover one physical INT8 cache block"),
+                        return ge::GRAPH_FAILED);
+        }
+        auto supportedStride = [&context](const TensorParam& kv, const std::vector<int64_t>& strides) {
+            if (strides.size() != kv.shape->GetDimNum()) {
+                return true; // No full stride descriptor: the runtime supplies a contiguous tensor.
+            }
+            int64_t expected = 1;
+            for (int64_t axis = static_cast<int64_t>(strides.size()) - 1; axis >= 0; --axis) {
+                const int64_t size = kv.shape->GetDim(axis);
+                if (axis == 0 && context.kvLayout == Layout::PA_BBND) {
+                    return strides[axis] >= expected && strides[axis] % 32 == 0;
+                }
+                if (size > 1 && strides[axis] != expected) {
+                    return false;
+                }
+                expected *= size;
+            }
+            return true;
+        };
+        OP_CHECK_IF(!supportedStride(context.oriKv, context.oriKvStrides) ||
+                        !supportedStride(context.cmpKv, context.cmpKvStrides),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        Op(context), "KV stride",
+                        "INT8 records must be contiguous; PA first-axis padding must be aligned to 32 bytes"),
+                    return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
     OP_CHECK_IF(context.quantMode == 2 && context.kvLayout != Layout::PA_BBND,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(Op(context), "layout_kv", LayoutToString(context.kvLayout),
                                                       "quant_mode 2 only supports PA_BBND KV layout"),

@@ -32,6 +32,8 @@
 
   <!-- npu="A3,910b" id10 -->
   <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持TurboQuant TQ4，通过原有量化模式参数`quantMode=3`启用，仅支持CSA路径。DeepSeek V4框架当前仅对C4压缩KV启用此能力。
+
+  <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>新增支持INT8 CSA场景，详见[INT8 CSA使用说明](#int8-csa使用说明)。原有`quantMode=1/2`的FP8记录说明适用于<term>Ascend 950PR&950DT系列产品</term>，新增INT8场景的类型组合和存储协议以该小节为准。
   <!-- end id10 -->
 
   <!-- npu="950" id11 -->
@@ -61,6 +63,8 @@
   - 滑动窗口部分（oriKvOptional）：对第$i_{S1}$个Query token，其因果对角线位置为$\text{oriThreshold} = S2_{act} - S1_{act} + i_{S1} + 1$，窗口范围为$[\max(\text{oriThreshold} - \text{oriWinLeft} - 1, 0), \text{oriThreshold} + \text{oriWinRight})$。
 
   - 压缩KV部分（cmpKvOptional）：因果边界阈值为$\text{cmpThreshold} = \lfloor \frac{\text{oriThreshold}}{\text{cmpRatio}} \rfloor$。HCA场景取$[0, \text{cmpThreshold})$内的连续压缩KV；CSA场景通过TopK索引从压缩KV中按需收集，仅保留$\text{beginIdx} < \text{cmpThreshold}$的块。
+
+  Atlas A2/A3新增的INT8 CSA复用已有的S2方向512分块计算流程：Vector将两路KV的INT8记录反量化为与Q同类型的浮点块，交给Cube完成QK和PV矩阵乘；Softmax和输出更新沿用下述Online Softmax数学关系。
 
   注意力计算采用Online Softmax（Flash Attention V2），S2方向按512分块循环，sinks作为每行softmax的初始最大值：
 
@@ -204,7 +208,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>输入</td>
       <td>原始KV输入张量，Key与Value共享同一份数据。</td>
       <td>必须传入。quantMode=1/2保持原量化KV布局：模式1依次拼接rope（64，bfloat16）、nope（448，FLOAT8_E4M3FN）、scale（7，bfloat16）、pad（18B）；模式2依次拼接nope（448，FLOAT8_E4M3FN）、rope（64，bfloat16）、scale（7，FLOAT8_E8M0）、pad（1B）。quantMode=3使用与q相同的FLOAT16或BFLOAT16原始KV，kvD=512。</td>
-      <td>FLOAT8_E4M3FN、FLOAT16、BFLOAT16</td>
+      <td>FLOAT8_E4M3FN、FLOAT16、BFLOAT16、INT8</td>
       <td>ND</td>
       <td>
         <ul>
@@ -221,7 +225,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>输入</td>
       <td>压缩KV输入张量，Key与Value共享同一份数据。</td>
       <td>CSA/HCA场景必须传入，SWA场景不传入。quantMode=1/2的布局同oriKvOptional；quantMode=3使用UINT8 TQ4压缩KV，kvD=258。</td>
-      <td>FLOAT8_E4M3FN、UINT8</td>
+      <td>FLOAT8_E4M3FN、UINT8、INT8</td>
       <td>ND</td>
       <td>
         <ul>
@@ -702,7 +706,8 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
 
 <!-- npu="A3,910b" id8 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
-  - 仅支持`quantMode=3`的TurboQuant路径。
+  - 新增支持INT8 CSA场景，约束见下文“INT8 CSA使用说明”；以下各项为原有TurboQuant路径的约束。
+  - 支持`quantMode=3`的TurboQuant路径。
   - q、attnOut：`layoutQOptional`为TND；数据类型为FLOAT16或BFLOAT16且保持一致；qN为4到128的4的倍数，qD为512，qT允许为0。
   - oriKvOptional、cmpKvOptional：均必须传入，`layoutKvOptional`为PA_BBND。oriKvOptional的数据类型与q一致且kvD为512；cmpKvOptional的数据类型为UINT8且kvD为258。两者blockSize均为16到1024的16的倍数。
   - 稀疏与PA参数：cmpSparseIndicesOptional、oriBlockTableOptional、cmpBlockTableOptional必须传入；cmpSparseIndicesOptional的shape为(qT, 1, 512)或(qT, 1, 1024)。oriSparseIndicesOptional、oriTopkLengthOptional、cmpTopkLengthOptional不支持传入。
@@ -1452,6 +1457,21 @@ metadataOptional校验
         </tr>
     </tbody>
 </table>
+
+<!-- npu="A3,910b" id14 -->
+#### INT8 CSA使用说明
+
+<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：通过`quantMode=1`启用INT8 CSA路径，两路KV均须为INT8；使用下述参考A5 mode 1的608字节排布，INT8输入不支持`quantMode=2/3`。Q和attnOut均为FLOAT16或BFLOAT16且类型、shape一致；Q头维512、头数1到128，KV头数为1。oriKvOptional、cmpKvOptional均必传INT8 Tensor，尾维608；cmpSparseIndicesOptional必传，oriSparseIndicesOptional不传，`topkValueMode=1`。
+
+- 支持layoutQOptional/layoutKvOptional为BSND/BSND、TND/TND、BSND/PA_BBND、TND/PA_BBND四种组合。
+- 每token记录依次为64个BFLOAT16 RoPE、448个signed INT8 nope、7个BFLOAT16 scale和18字节padding，共608B。每64维nope共用一个scale；scale内嵌于记录，没有独立scale参数，Q为FLOAT16时也不改变scale和RoPE的字段类型。量化端需按相同字节协议对接。
+- PA_BBND下两路blockTable和seqused均必传；记录内部连续，0轴stride须覆盖完整物理块并按32字节对齐；TND下需传对应cuSeqlens。metadataOptional为必传INT32 Tensor、shape为(2048,)，使用相同输入属性的前置Metadata接口生成。
+- cmpMaskMode=3且cmpRatio!=1时必须传cmpResidualKvOptional；cmpMaskMode=0或cmpRatio=1时不传；cmpMaskMode=0时需传cmpTopkLengthOptional。
+- `sinksOptional`沿用可选参数位置，但当前版本Host要求必传FLOAT、shape为`(qN,)`，不能省略。
+- 本路径不支持batch一致性。空有效KV时attnOut和有效Softmax LSE均为0；padding query也输出0。物理Tensor仍需满足非空shape约束。
+
+完整参数及记录协议见[README中的INT8 CSA参数约束](../README.md#int8-csa参数约束)。
+<!-- end id14 -->
 
 <!-- npu="A3,910b" id13 -->
 #### 量化模式3使用说明
