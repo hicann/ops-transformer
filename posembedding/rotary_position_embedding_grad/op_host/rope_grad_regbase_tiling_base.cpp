@@ -129,13 +129,13 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckOutPutShapeAllPositive(const in
     return ge::GRAPH_SUCCESS;
 }
 
-bool RopeGradRegBaseTilingClass::IsRotaryPosEmbeddingMode(const int32_t mode) const
+bool RopeGradRegBaseTilingClass::IsRotaryPosEmbeddingMode(const int64_t mode) const
 {
     switch (mode) {
-        case static_cast<int32_t>(RotaryPosEmbeddingMode::HALF):
-        case static_cast<int32_t>(RotaryPosEmbeddingMode::INTERLEAVE):
-        case static_cast<int32_t>(RotaryPosEmbeddingMode::QUARTER):
-        case static_cast<int32_t>(RotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE):
+        case static_cast<int64_t>(RotaryPosEmbeddingMode::HALF):
+        case static_cast<int64_t>(RotaryPosEmbeddingMode::INTERLEAVE):
+        case static_cast<int64_t>(RotaryPosEmbeddingMode::QUARTER):
+        case static_cast<int64_t>(RotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE):
             return true;
         default:
             return false;
@@ -454,8 +454,10 @@ ge::graphStatus RopeGradRegBaseTilingClass::GetShapeAttrsInfo()
 {
     const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
-    const int32_t* mode = attrs->GetAttrPointer<int32_t>(0);
-    int32_t modeValue = (mode == nullptr) ? 0 : static_cast<int32_t>(*mode);
+    // mode 是 int64 attr，必须按 int64 读取：按 int32 读会截断高位，
+    // 2^32 这类超范围值低 32 位为 0，会被静默当成 mode=0 接受执行
+    const int64_t* mode = attrs->GetAttrPointer<int64_t>(0);
+    int64_t modeValue = (mode == nullptr) ? 0 : (*mode);
     if (IsRotaryPosEmbeddingMode(modeValue) != true) {
         std::string modeStr = std::to_string(modeValue);
         OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "mode", modeStr.c_str(), "0, 1, 2 or 3");

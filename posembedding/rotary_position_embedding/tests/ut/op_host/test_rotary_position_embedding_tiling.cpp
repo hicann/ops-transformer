@@ -559,3 +559,28 @@ TEST_F(RotaryPositionEmbeddingTiling, RotaryPositionEmbedding_rotate_matrix_fp32
     std::vector<size_t> expectWorkspaces = {50331648};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
+
+// int64 attr 截断回归：mode=2^32 的低 32 位为 0，若按 uint32 截断读取会被静默当成
+// mode=0 接受；按 int64 读取后应被范围校验拒绝（Alice_zhou/issue#497 衍生发现）
+TEST_F(RotaryPositionEmbeddingTiling, RotaryPositionEmbedding_mode_overflow_reject)
+{
+    optiling::RotaryPositionEmbeddingCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "RotaryPositionEmbedding",
+        {
+            // input info
+            {{{1, 64, 2, 64}, {1, 64, 2, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 64, 1, 64}, {1, 64, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 64, 1, 64}, {1, 64, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            // output info
+            {{{1, 64, 2, 64}, {1, 64, 2, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            // attr
+            {"mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4294967296L)},
+        },
+        &compileInfo);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}

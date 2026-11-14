@@ -328,7 +328,8 @@ ge::graphStatus RotateMatrixTiling::CheckMode()
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const uint32_t* modePtr = attrs->GetAttrPointer<uint32_t>(INDEX_ATTR_MODE);
+    // mode 是 int64 attr，按 int64 读取（与 membase 基类 GetShapeAttrsInfo 的口径一致）
+    const int64_t* modePtr = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_MODE);
     OP_CHECK_NULL_WITH_CONTEXT(context, modePtr);
     auto modeValue = *modePtr;
     uint64_t tilingMode = static_cast<uint64_t>(tilingData_.get_tilingMode());

@@ -266,7 +266,7 @@ public:
     }
 
 private:
-    bool IsRotaryPosEmbeddingMode(const int32_t mode) const;
+    bool IsRotaryPosEmbeddingMode(const int64_t mode) const;
     ge::graphStatus CheckNullptr();
     ge::graphStatus CheckShape();
     ge::graphStatus CheckDtypeAndAttr();

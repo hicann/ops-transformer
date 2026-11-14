@@ -207,3 +207,30 @@ TEST_F(RotaryPositionEmbeddingGradTiling, RotaryPositionEmbeddingGradTiling_fp32
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
+
+// int64 attr 截断回归：mode=256 的低 8 位为 0，若按 char 截断读取会被静默当成
+// mode=0 接受；按 int64 读取后应被范围校验拒绝（Alice_zhou/issue#498 衍生发现）
+TEST_F(RotaryPositionEmbeddingGradTiling, RotaryPositionEmbeddingGrad_mode_overflow_reject)
+{
+    optiling::RotaryPositionEmbeddingGradCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara("RotaryPositionEmbeddingGrad",
+                                              {
+                                                  // input info
+                                                  {{{2, 64, 4, 10}, {2, 64, 4, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1, 64, 1, 10}, {1, 64, 1, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1, 64, 1, 10}, {1, 64, 1, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{2, 64, 4, 10}, {2, 64, 4, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  // output info
+                                                  {{{2, 64, 4, 10}, {2, 64, 4, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1, 64, 1, 10}, {1, 64, 1, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1, 64, 1, 10}, {1, 64, 1, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  // attr
+                                                  {"mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(256)},
+                                              },
+                                              &compileInfo);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}

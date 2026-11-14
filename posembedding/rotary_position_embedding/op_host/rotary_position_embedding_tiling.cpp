@@ -48,9 +48,19 @@ ge::graphStatus RotaryPosEmbeddingMembaseTilingClass::GetShapeAttrsInfo()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
-    const uint32_t inputMode = *(attrs->GetAttrPointer<uint32_t>(MODE_ATTR_IDX));
-    OP_LOGI(context_->GetNodeName(), "[mode]: %d", inputMode);
-    inputMode_ = inputMode;
+    // mode 是 int64 attr，必须按 int64 读取：按 uint32 读会截断高位，
+    // 2^32 这类超范围值低 32 位为 0，会被静默当成 mode=0 接受执行
+    const int64_t* modeAttr = attrs->GetAttrPointer<int64_t>(MODE_ATTR_IDX);
+    const int64_t inputMode = (modeAttr == nullptr) ? 0 : (*modeAttr);
+    OP_LOGI(context_->GetNodeName(), "[mode]: %ld", inputMode);
+    // membase 通路内核只有 0/1 的实现，2/3 由适配层 warning 后按 half 语义计算（见
+    // aclnn_rotary_position_embedding.cpp CheckModeSupportAndWarn），故此处放行 0~3、拒绝其余
+    if (inputMode < 0 || inputMode > 3) {
+        std::string modeStr = std::to_string(inputMode);
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "mode", modeStr.c_str(), "0, 1, 2 or 3");
+        return ge::GRAPH_FAILED;
+    }
+    inputMode_ = static_cast<uint32_t>(inputMode);
     return ge::GRAPH_SUCCESS;
 }
 

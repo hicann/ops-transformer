@@ -47,8 +47,11 @@ ge::graphStatus RotaryPosEmbeddingGradMembaseTilingClass::GetShapeAttrsInfo()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null."), return ge::GRAPH_FAILED);
-    const uint32_t inputMode = *(attrs->GetAttrPointer<char>(MODE_ATTR_IDX));
-    OP_LOGI("[RotaryPositionEmbedding]", "[mode]: %d", inputMode);
+    // mode 是 int64 attr，必须按 int64 读取：按 char 读会截断高位，
+    // 256 这类超范围值低 8 位为 0，会被静默当成 mode=0 接受执行
+    const int64_t* modeAttr = attrs->GetAttrPointer<int64_t>(MODE_ATTR_IDX);
+    const int64_t inputMode = (modeAttr == nullptr) ? 0 : (*modeAttr);
+    OP_LOGI("[RotaryPositionEmbedding]", "[mode]: %ld", inputMode);
 
     auto platformInfo = context_->GetPlatformInfo();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
@@ -58,7 +61,7 @@ ge::graphStatus RotaryPosEmbeddingGradMembaseTilingClass::GetShapeAttrsInfo()
         OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "mode", modeStr.c_str(), "0 or 1");
         return ge::GRAPH_FAILED;
     }
-    inputMode_ = inputMode;
+    inputMode_ = static_cast<uint32_t>(inputMode);
     return ge::GRAPH_SUCCESS;
 }
 
