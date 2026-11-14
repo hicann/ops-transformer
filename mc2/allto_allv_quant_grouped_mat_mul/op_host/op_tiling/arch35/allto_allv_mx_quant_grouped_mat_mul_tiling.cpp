@@ -32,6 +32,8 @@ constexpr uint32_t BATCH_MODE_SCHEDULE = 1U;
 ge::graphStatus AlltoAllvMXQuantGmmTiling::GetShapeAttrsInfo()
 {
     MC2_CHECK_LOG_RET(context_->GetNodeName(), AlltoAllvQuantGmmTilingCommon::GetShapeAttrsInfo());
+    // MXFP4 计算bound场景性能劣化，回退legacy路径(MIX_AIC_1_2，AIV做通信重排)；
+    // MXFP8 保留 APACE(AIC-only)。待 APACE 的 MXFP4 compute 性能问题解决后，再放开 MXFP4。
     usingApaceImpl_ = CheckApaceImplCapable();
     OP_LOGI(context_->GetNodeName(), "AlltoAllvQuantGroupedMatMul MX implementation: %s.",
             usingApaceImpl_ ? "APACE AIC-only HCCL+Blaze" : "legacy");
@@ -45,13 +47,13 @@ bool AlltoAllvMXQuantGmmTiling::CheckApaceImplCapable() const
         return false;
     }
 
-    const bool xSupported = gmmXDataType_ == ge::DT_FLOAT8_E5M2 || gmmXDataType_ == ge::DT_FLOAT8_E4M3FN ||
-                            gmmXDataType_ == ge::DT_FLOAT4_E2M1;
-    const bool weightSupported = gmmWeightDataType_ == ge::DT_FLOAT8_E5M2 ||
-                                 gmmWeightDataType_ == ge::DT_FLOAT8_E4M3FN || gmmWeightDataType_ == ge::DT_FLOAT4_E2M1;
-    const bool xIsFp4 = gmmXDataType_ == ge::DT_FLOAT4_E2M1;
-    const bool weightIsFp4 = gmmWeightDataType_ == ge::DT_FLOAT4_E2M1;
-    return xSupported && weightSupported && xIsFp4 == weightIsFp4;
+    // MXFP4 回退 legacy，仅 MXFP8 走 APACE
+    if (gmmXDataType_ == ge::DT_FLOAT4_E2M1 || gmmWeightDataType_ == ge::DT_FLOAT4_E2M1) {
+        return false;
+    }
+    const bool xSupported = gmmXDataType_ == ge::DT_FLOAT8_E5M2 || gmmXDataType_ == ge::DT_FLOAT8_E4M3FN;
+    const bool weightSupported = gmmWeightDataType_ == ge::DT_FLOAT8_E5M2 || gmmWeightDataType_ == ge::DT_FLOAT8_E4M3FN;
+    return xSupported && weightSupported;
 }
 
 bool AlltoAllvMXQuantGmmTiling::IsCapable()
