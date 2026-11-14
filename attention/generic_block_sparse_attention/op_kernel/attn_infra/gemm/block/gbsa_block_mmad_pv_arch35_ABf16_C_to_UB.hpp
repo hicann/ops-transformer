@@ -177,6 +177,24 @@ public:
         }
     }
 
+    // A8C4 owns disjoint QK/PV halves; other dispatches keep the default layout.
+    __aicore__ inline void ConfigureA8C4(Arch::Resource<ArchTag>& resource)
+    {
+        static_assert(L0_TILE_M * L0_TILE_K * sizeof(ElementA) <= ArchTag::L0A_SIZE / 4U,
+                      "A8C4 operand exceeds its L0A slot");
+        static_assert(L0_TILE_K * L0_TILE_N * sizeof(ElementB) <= ArchTag::L0B_SIZE / 4U,
+                      "A8C4 operand exceeds its L0B slot");
+        a8c4_ = true;
+        for (uint32_t i = 0; i < L0_STAGES; ++i) {
+            l0ATensor[i] =
+                resource.l0ABuf.template GetBufferByByte<ElementA>(ArchTag::L0A_SIZE / 2U + i * ArchTag::L0A_SIZE / 4U);
+            l0BTensor[i] =
+                resource.l0BBuf.template GetBufferByByte<ElementB>(ArchTag::L0B_SIZE / 2U + i * ArchTag::L0B_SIZE / 4U);
+        }
+    }
+
+    bool a8c4_ = false;
+
     /// Destructor
     __aicore__ inline ~BlockMmadTla() {}
 
@@ -366,7 +384,7 @@ public:
         // Non-quantized tiling allocates one or two V buffers; P may use three.
         uint32_t l1BBufId =
             PRECOMPUTE_SPARSE ? (gatheredKvSTileIdx & (l1BBufNum - 1U)) : (gatheredKvSTileIdx % l1BBufNum);
-        uint32_t l1BEventId = l1BBufId + 3;
+        uint32_t l1BEventId = l1BBufId + (a8c4_ ? 4U : 3U);
         uint32_t l1ABufId = gatheredKvSTileIdx % l1ABufNum;
 
         const uint32_t storageK = TileCopy::IS_MXFP8 ? RoundUp(curBaseTileSize, 64U) : curBaseTileSize;
@@ -420,10 +438,12 @@ public:
             AscendC::CrossCoreSetFlag<4, PIPE_S>(freeFlag);
             AscendC::CrossCoreSetFlag<4, PIPE_S>(freeFlag + V0_V1_FLAG_ID_OFFSET);
         } else {
-            SparseVBaseTileL1FullLoad(gBTensor, l1BTensorTla, gSparseBlockIdx, gatheredKvSTileIdx, kvSBaseTile,
-                                      blockShapeY, curBaseTileSize, embed, gBlockTable, blockSize, pageStride,
-                                      tokenStride, localExplicitBlockCount, residualBlockId, kvOffsetInfo,
-                                      kvOffsetGroupWords, kvOffsetGroupN);
+            if (!a8c4_) {
+                SparseVBaseTileL1FullLoad(gBTensor, l1BTensorTla, gSparseBlockIdx, gatheredKvSTileIdx, kvSBaseTile,
+                                          blockShapeY, curBaseTileSize, embed, gBlockTable, blockSize, pageStride,
+                                          tokenStride, localExplicitBlockCount, residualBlockId, kvOffsetInfo,
+                                          kvOffsetGroupWords, kvOffsetGroupN);
+            }
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventId);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventId);
         }
@@ -506,8 +526,8 @@ public:
                     uint32_t l0ABufId = l0ALoopCounter % L0_STAGES;
                     // l0ABufId = (mLoopCounter % 2 == 0) ? (1 - l0ABufId) : l0ABufId;
                     uint32_t l0BBufId = l0BLoopCounter % L0_STAGES;
-                    uint32_t l0AEventId = l0ABufId;
-                    uint32_t l0BEventId = l0BBufId + 2;
+                    uint32_t l0AEventId = l0ABufId + (a8c4_ ? 4U : 0U);
+                    uint32_t l0BEventId = l0BBufId + (a8c4_ ? 6U : 2U);
                     // when L0B buffers wouldn't be reused across the k loop
                     // redundant L0B load caused by m loop can be avoided
                     auto l1BTensorTlaTile =

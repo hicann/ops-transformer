@@ -33,15 +33,26 @@ extern "C" {
 
 namespace {
 constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
+constexpr int64_t GBSA_QUANT_TYPE_A8C4 = 8;
 
 static constexpr int64_t LSE_OUT = 1;
 static constexpr int64_t MXFP8_QUANT_TYPE = 6;
 
-static bool CheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value)
+static bool CheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value, int64_t quantType)
 {
     const DataType qDtype = query->GetDataType();
     const DataType kDtype = key->GetDataType();
     const DataType vDtype = value->GetDataType();
+
+    const bool a8c4 = quantType == GBSA_QUANT_TYPE_A8C4;
+    if (a8c4 || kDtype == DataType::DT_FLOAT4_E2M1 || vDtype == DataType::DT_FLOAT4_E2M1) {
+        if (!a8c4 || qDtype != DataType::DT_FLOAT8_E4M3FN || kDtype != DataType::DT_FLOAT4_E2M1 ||
+            vDtype != DataType::DT_FLOAT4_E2M1) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires FP8 E4M3FN query and FP4 E2M1 key/value.");
+            return false;
+        }
+        return true;
+    }
 
     static const std::unordered_map<DataType, std::vector<DataType>> validKvType = {
         {DataType::DT_FLOAT16, {DataType::DT_FLOAT16}},
@@ -56,7 +67,7 @@ static bool CheckDataType(const aclTensor* query, const aclTensor* key, const ac
         return false;
     }
 
-    if (std::find(iter->second.begin(), iter->second.end(), kDtype) == iter->second.end() ||
+    if (kDtype != vDtype || std::find(iter->second.begin(), iter->second.end(), kDtype) == iter->second.end() ||
         std::find(iter->second.begin(), iter->second.end(), vDtype) == iter->second.end()) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Key/Value datatype mismatch with query.");
         return false;
@@ -107,13 +118,13 @@ static aclnnStatus ParseBlockShape(const aclIntArray* blockShape)
 static aclnnStatus ValidateParams(const aclTensor* query, const aclTensor* key, const aclTensor* value,
                                   const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
                                   const aclTensor* metadataOptional, const aclIntArray* blockShape, char* layoutQ,
-                                  char* layoutKv)
+                                  char* layoutKv, int64_t quantType)
 {
     if (CheckMandatoryTensors(query, key, value, sparseBlockIdx, sparseBlockCount, metadataOptional) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_NULLPTR;
     }
 
-    if (!CheckDataType(query, key, value)) {
+    if (!CheckDataType(query, key, value, quantType)) {
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -143,6 +154,38 @@ static aclnnStatus ValidateParams(const aclTensor* query, const aclTensor* key, 
     return ACLNN_SUCCESS;
 }
 
+static aclnnStatus ValidateA8C4Shape(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                     const aclIntArray* blockShape, const std::string& layoutKv, bool isPaged)
+{
+    constexpr int64_t headDim = 128;
+    constexpr int64_t blockSize = 128;
+    const auto* shape = blockShape->GetData();
+    if (shape[0] != 1 || shape[1] != blockSize) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires blockShape=[1,128].");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
+    for (const auto* tensor : {query, key, value}) {
+        const auto& tensorShape = tensor->GetViewShape();
+        const auto rank = tensorShape.GetDimNum();
+        if (rank == 0U || tensorShape.GetDim(rank - 1U) != headDim) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires headDim=128.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    if (isPaged) {
+        const size_t pageAxis = layoutKv == "PA_BNBD" ? 2U : 1U;
+        for (const auto* tensor : {key, value}) {
+            const auto& tensorShape = tensor->GetViewShape();
+            if (tensorShape.GetDimNum() != 4U || tensorShape.GetDim(pageAxis) != blockSize) {
+                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires paged block size 128.");
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
 static aclnnStatus ValidateAdditionalParams(int64_t softmaxPrecision, const aclTensor* attentionOut,
                                             uint64_t* workspaceSize, aclOpExecutor** executor)
 {
@@ -162,11 +205,13 @@ static std::string ConvertLayoutString(char* layoutStr)
     return op::ToString(layoutStr).GetString();
 }
 
+static const aclTensor* NormalizeDim0KvTensor(const aclTensor* tensor, const char* name, aclOpExecutor* executor);
+
 // Contiguous non-KV inputs for aclnn L0 InferShape (torch_npu often has view=ND, storage=1D;
 // GetInputShape may return storage unless Contiguous/CreateView normalizes the descriptor).
 // Keep Contiguous even when OpDef has AutoContiguous.
 // Do NOT Contiguous key/value here — dim0-strided KV is handled by NormalizeDim0KvTensor
-// (CreateView + SetStorageShape(viewShape)).
+// (CreateView + SetStorageShape(viewShape)). Reuse this view for paged A8C4 K/V scales.
 static aclnnStatus MakeContiguous(const aclTensor*& query, const aclTensor*& sparseBlockIdx,
                                   const aclTensor*& sparseBlockCount, const aclTensor*& metadataOptional,
                                   const aclTensor*& attenMaskOptional, const aclTensor*& qDequantScaleOptional,
@@ -174,7 +219,7 @@ static aclnnStatus MakeContiguous(const aclTensor*& query, const aclTensor*& spa
                                   const aclTensor*& pQuantScaleOptional, const aclTensor*& cuSeqLengthsQOptional,
                                   const aclTensor*& cuSeqLengthsKvOptional, const aclTensor*& sequsedQOptional,
                                   const aclTensor*& sequsedKvOptional, const aclTensor*& blockTableOptional,
-                                  aclOpExecutor* executor)
+                                  bool keepPagedA8C4ScaleStride, aclOpExecutor* executor)
 {
     query = l0op::Contiguous(query, executor);
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -194,11 +239,15 @@ static aclnnStatus MakeContiguous(const aclTensor*& query, const aclTensor*& spa
         CHECK_RET(qDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
     if (kDequantScaleOptional != nullptr) {
-        kDequantScaleOptional = l0op::Contiguous(kDequantScaleOptional, executor);
+        kDequantScaleOptional = keepPagedA8C4ScaleStride ?
+                                    NormalizeDim0KvTensor(kDequantScaleOptional, "kDequantScale", executor) :
+                                    l0op::Contiguous(kDequantScaleOptional, executor);
         CHECK_RET(kDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
     if (vDequantScaleOptional != nullptr) {
-        vDequantScaleOptional = l0op::Contiguous(vDequantScaleOptional, executor);
+        vDequantScaleOptional = keepPagedA8C4ScaleStride ?
+                                    NormalizeDim0KvTensor(vDequantScaleOptional, "vDequantScale", executor) :
+                                    l0op::Contiguous(vDequantScaleOptional, executor);
         CHECK_RET(vDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
     if (pQuantScaleOptional != nullptr) {
@@ -308,7 +357,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     aclnnStatus ret = ValidateParams(query, key, value, sparseBlockIdx, sparseBlockCount, metadataOptional, blockShape,
-                                     layoutQ, layoutKv);
+                                     layoutQ, layoutKv, quantType);
     if (ret != ACLNN_SUCCESS) {
         return ret;
     }
@@ -319,7 +368,8 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     const bool generalized = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 &&
                              ((quantType == 0 && (query->GetDataType() == DataType::DT_FLOAT16 ||
                                                   query->GetDataType() == DataType::DT_BF16)) ||
-                              (quantType == 6 && query->GetDataType() == DataType::DT_FLOAT8_E4M3FN));
+                              ((quantType == MXFP8_QUANT_TYPE || quantType == GBSA_QUANT_TYPE_A8C4) &&
+                               query->GetDataType() == DataType::DT_FLOAT8_E4M3FN));
     const bool layoutIsPa = (std::string(layoutKv) == "PA_BBND" || std::string(layoutKv) == "PA_BNBD");
     if (isPaged) {
         if (!layoutIsPa) {
@@ -338,7 +388,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             (quantType != 0 ||
              (query->GetDataType() != DataType::DT_FLOAT16 && query->GetDataType() != DataType::DT_BF16))) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "Dense non-paged KV requires FP16/BF16 quantType=0, A5 MXFP8, or Union FP8.");
+                    "Dense non-paged KV requires FP16/BF16 quantType=0, A5 MXFP8/A8C4, or Union FP8.");
 
             return ACLNN_ERR_PARAM_INVALID;
         }
@@ -359,9 +409,15 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             (quantType != 0 ||
              (query->GetDataType() != DataType::DT_FLOAT16 && query->GetDataType() != DataType::DT_BF16))) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "BSND/BNSD query requires FP16/BF16 non-quantization, A5 MXFP8, or Union FP8.");
+                    "BSND/BNSD query requires FP16/BF16 non-quantization, A5 MXFP8/A8C4, or Union FP8.");
 
             return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    if (quantType == GBSA_QUANT_TYPE_A8C4) {
+        ret = ValidateA8C4Shape(query, key, value, blockShape, layoutKv, isPaged);
+        if (ret != ACLNN_SUCCESS) {
+            return ret;
         }
     }
     ret = ValidateAdditionalParams(softmaxPrecision, attentionOut, workspaceSize, executor);
@@ -388,7 +444,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     ret = MakeContiguous(query, sparseBlockIdx, sparseBlockCount, metadataOptional, attenMaskOptional,
                          qDequantScaleOptional, kDequantScaleOptional, vDequantScaleOptional, pQuantScaleOptional,
                          cuSeqLengthsQOptional, cuSeqLengthsKvOptional, sequsedQOptional, sequsedKvOptional,
-                         blockTableOptional, executorImpl);
+                         blockTableOptional, isPaged && quantType == GBSA_QUANT_TYPE_A8C4, executorImpl);
     if (ret != ACLNN_SUCCESS) {
         return ret;
     }

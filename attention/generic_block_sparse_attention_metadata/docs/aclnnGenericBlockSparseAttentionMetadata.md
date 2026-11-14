@@ -291,7 +291,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>quantType</td>
       <td>输入</td>
       <td>代表采用的量化手段。</td>
-      <td>量化类型：0为非量化；5为A5常规FP8；6为A5 MXFP8；7为A2/A3 INT8。1～4为预留值，当前不支持。具体规格见产品差异约束。</td>
+      <td>量化类型：0为非量化；5为A5常规FP8；6为A5 MXFP8；7为A2/A3 INT8；8为A5 A8C4。1～4为预留值，当前不支持。具体规格见产品差异约束。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -496,7 +496,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 <!-- end id10 -->
 
 <!-- npu="950,A3,910b" id12 -->
-- `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、5（FP8量化）或6（MXFP8）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持0（非量化）或7（INT8全量化）。
+- `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、5（FP8量化）、6（MXFP8）或8（A8C4）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持0（非量化）或7（INT8全量化）。
 <!-- end id12 -->
 <!-- npu="950,A3,910b" id13 -->
 - `softmaxPrecision`：<term>Ascend 950PR&950DT系列产品</term>非Union场景（maskType=0/1）下，非量化FLOAT16/BFLOAT16支持0或1，quantType=5的FP8量化场景仅支持1，`MXFP8`支持0或1且均使用FP32 S/Softmax，推荐0，1为兼容别名；Union场景（maskType=3）下，非量化与FP8量化均仅支持0；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非Union场景下FLOAT16支持0或1，BFLOAT16仅支持0，Union场景（maskType=3）下仅支持0。
@@ -608,3 +608,9 @@ aclnnStatus RunMetadata(const aclTensor *sparseBlockIdx, const aclTensor *sparse
     return ret;
 }
 ```
+
+### A8C4 Metadata（quantType=8）
+
+Ascend 950PR/950DT 上要求 headDim=128、blockShape=[1,128]、GQA 分组大小为 1～32、softmaxPrecision=0、residualBlockMode=0。支持 maskType=0（非因果）和 1（causal）。Metadata 和主算子的量化类型、掩码、布局、稀疏输入及序列长度须一致。九种布局组合见[主算子接口](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md)。
+
+稀疏索引容量上限为 INT32_MAX，有效索引、计数和调度溢出约束保持不变。

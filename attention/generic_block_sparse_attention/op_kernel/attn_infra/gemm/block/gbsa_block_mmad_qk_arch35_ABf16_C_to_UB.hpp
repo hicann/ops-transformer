@@ -186,12 +186,30 @@ public:
         }
     }
 
+    // A8C4 owns disjoint QK/PV halves; other dispatches keep the default layout.
+    __aicore__ inline void ConfigureA8C4(Arch::Resource<ArchTag>& resource)
+    {
+        static_assert(L0_TILE_M * L0_TILE_K * sizeof(ElementA) <= ArchTag::L0A_SIZE / 4U,
+                      "A8C4 operand exceeds its L0A slot");
+        static_assert(L0_TILE_K * L0_TILE_N * sizeof(ElementB) <= ArchTag::L0B_SIZE / 4U,
+                      "A8C4 operand exceeds its L0B slot");
+        a8c4_ = true;
+        for (uint32_t i = 0; i < L0_STAGES; ++i) {
+            l0ATensor[i] = resource.l0ABuf.template GetBufferByByte<ElementA>(i * ArchTag::L0A_SIZE / 4U);
+            l0BTensor[i] = resource.l0BBuf.template GetBufferByByte<ElementB>(i * ArchTag::L0B_SIZE / 4U);
+        }
+    }
+
+    bool a8c4_ = false;
+    bool qResident_ = false;
+
     /// Destructor
     __aicore__ inline ~BlockMmadTla() {}
 
     template <class TensorA>
     __aicore__ inline void loadQGM(TensorA& gATensor, GemmCoord actualOriShape)
     {
+        qResident_ = false;
         using CopyGmToL1A = typename TileCopy_::template CopyGmToL1A<TensorA>;
         CopyGmToL1A copyGmToL1A;
         uint32_t rowNum = actualOriShape[0];
@@ -475,11 +493,12 @@ public:
                 auto l1BLayoutTla = tla::MakeLayout<ElementB, LayoutTagL1B>(l1TileKAct, l1TileNAct);
                 auto l1BTensorTla = tla::MakeTensor(l1BTensor[l1BBufId], l1BLayoutTla, Arch::PositionL1{});
                 AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventId);
-
-                SparseKL1TileNLoad(gBTensor, l1BTensorTla, gSparseBlockIdx, gatheredKvSTileIdx, kvSBaseTile,
-                                   blockShapeY, l1TileNAct, l1TileKAct, nL1Itr * l1BTileN, kL1Itr * l1BTileK,
-                                   gBlockTable, blockSize, pageStride, tokenStride, localExplicitBlockCount,
-                                   residualBlockId, kvOffsetInfo, kvOffsetGroupWords);
+                if (!a8c4_) {
+                    SparseKL1TileNLoad(gBTensor, l1BTensorTla, gSparseBlockIdx, gatheredKvSTileIdx, kvSBaseTile,
+                                       blockShapeY, l1TileNAct, l1TileKAct, nL1Itr * l1BTileN, kL1Itr * l1BTileK,
+                                       gBlockTable, blockSize, pageStride, tokenStride, localExplicitBlockCount,
+                                       residualBlockId, kvOffsetInfo, kvOffsetGroupWords);
+                }
                 if constexpr (PRECOMPUTE_SPARSE) {
                     if (nL1LoopNum > 2U && nL1Itr == 1U && kL1Itr == kL1LoopNum - 1U) {
                         // Round 0's K copies are already submitted. Prefetch round 1
@@ -531,7 +550,8 @@ public:
                             uint32_t l0TileKAct =
                                 (kL0Itr == kL0LoopNum - 1) ? (l1TileKAct - kL0Itr * L0_TILE_K) : L0_TILE_K;
                             uint32_t globalKL0Itr = kL1Itr * fullKL0LoopNum + kL0Itr;
-                            uint32_t l0ALoopCounter = prefixSumL0AStages + mL0Itr * totalKL0LoopNum + globalKL0Itr;
+                            uint32_t l0ALoopCounter =
+                                (a8c4_ ? 0U : prefixSumL0AStages) + mL0Itr * totalKL0LoopNum + globalKL0Itr;
                             uint32_t l0BLoopCounter =
                                 prefixSumL0BStages + globalNL0Itr * totalKL0LoopNum + globalKL0Itr;
                             uint32_t l0ABufId = l0ALoopCounter % L0_STAGES;
@@ -561,7 +581,10 @@ public:
                             const bool lastN = (nL1Itr == nL1LoopNum - 1U) && (nL0Itr == nL0LoopNum - 1U);
                             if (!l1ToL0ANoRepeatFlag || firstN) {
                                 AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0AEventId);
-                                copyL1ToL0A(l0ATensorTla, l1ATensorTlaTile);
+                                if (!a8c4_ || !qResident_) {
+                                    copyL1ToL0A(l0ATensorTla, l1ATensorTlaTile);
+                                    qResident_ = a8c4_;
+                                }
                                 AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(l0AEventId);
                             }
 

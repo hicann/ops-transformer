@@ -287,7 +287,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>quantType</td>
       <td>Input</td>
       <td>Represents the quantization method used.</td>
-      <td>Quantization type: 0 for non-quantized inputs, 5 for A5 FP8, 6 for A5 MXFP8, and 7 for A2/A3 INT8. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
+      <td>Quantization type: 0 for non-quantized inputs, 5 for A5 FP8, 6 for A5 MXFP8, 7 for A2/A3 INT8, and 8 for A5 A8C4. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -566,3 +566,9 @@ aclnnStatus RunMetadata(const aclTensor *sparseBlockIdx, const aclTensor *sparse
     return ret;
 }
 ```
+
+### A8C4 metadata (quantType=8)
+
+On Ascend 950PR and 950DT, use headDim=128, blockShape=[1,128], a GQA group size of 1 to 32, softmaxPrecision=0, and residualBlockMode=0. Both maskType=0 (non-causal) and maskType=1 (causal) are supported. Use the same quantType, mask, layouts, sparse inputs, and sequence lengths in Metadata and Attention. See the [Attention API](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention_en.md) for the nine layout pairs.
+
+The sparse-index capacity limit is INT32_MAX. Existing index, count, and scheduling overflow constraints apply.

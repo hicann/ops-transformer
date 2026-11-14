@@ -280,6 +280,9 @@ TILING_DATA_FIELD_DEF(uint32_t, kvLayout);
 // Union packed O/LSE scratch (per AIC) when multi-token GQA rows are non-contiguous in GM.
 TILING_DATA_FIELD_DEF(uint64_t, unionIoPackOffset);
 TILING_DATA_FIELD_DEF(uint32_t, unionIoPackORowStride);
+// A8C4 paged BF16 scale strides in elements, independent of the K/V cache strides.
+TILING_DATA_FIELD_DEF(uint64_t, kScaleStride0);
+TILING_DATA_FIELD_DEF(uint64_t, vScaleStride0);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttention, GenericBlockSparseAttentionTilingData)
 
@@ -379,6 +382,8 @@ private:
     // Default = contiguous PA_BBND page size; overwritten when KV is a dim0-strided view.
     uint64_t kStride0_ = 0;
     uint64_t vStride0_ = 0;
+    uint64_t kScaleStride0_ = 0;
+    uint64_t vScaleStride0_ = 0;
     uint32_t qSeqCapacity_ = 0;
     uint32_t kvSeqCapacity_ = 0;
     uint64_t totalQTokens_ = 0;

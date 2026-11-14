@@ -60,6 +60,7 @@ constexpr int64_t GBSA_QUANT_TYPE_NONE = 0;
 constexpr int64_t GBSA_QUANT_TYPE_FLOAT8 = 5;
 constexpr int64_t GBSA_QUANT_TYPE_MXFP8 = 6;
 constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
+constexpr int64_t GBSA_QUANT_TYPE_A8C4 = 8;
 constexpr int64_t GBSA_SOFTMAX_PRECISION_HIGH = 0;
 constexpr int64_t GBSA_SOFTMAX_PRECISION_MIXED = 1;
 constexpr int64_t GBSA_CURRENT_MASK_TYPE = 1;
@@ -403,7 +404,7 @@ aclnnStatus CheckGbsaSeqLengthInputs(const aclTensor* cuSeqLengthsOptional, cons
 aclnnStatus CheckGbsaQuantType(int64_t quantType, bool isArch35)
 {
     if ((isArch35 && quantType != GBSA_QUANT_TYPE_NONE && quantType != GBSA_QUANT_TYPE_FLOAT8 &&
-         quantType != GBSA_QUANT_TYPE_MXFP8) ||
+         quantType != GBSA_QUANT_TYPE_MXFP8 && quantType != GBSA_QUANT_TYPE_A8C4) ||
         (!isArch35 && quantType != GBSA_QUANT_TYPE_NONE && quantType != GBSA_QUANT_TYPE_INT8)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantType is not supported on this platform: %lld.", quantType);
         return ACLNN_ERR_PARAM_INVALID;
@@ -416,6 +417,10 @@ aclnnStatus CheckGbsaSoftmaxPrecision(int64_t softmaxPrecision, int64_t quantTyp
     if (softmaxPrecision != GBSA_SOFTMAX_PRECISION_HIGH && softmaxPrecision != GBSA_SOFTMAX_PRECISION_MIXED) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "softmaxPrecision only supports %lld or %lld, but got %lld.",
                 GBSA_SOFTMAX_PRECISION_HIGH, GBSA_SOFTMAX_PRECISION_MIXED, softmaxPrecision);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (quantType == GBSA_QUANT_TYPE_A8C4 && softmaxPrecision != GBSA_SOFTMAX_PRECISION_HIGH) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires FP32 softmaxPrecision=0.");
         return ACLNN_ERR_PARAM_INVALID;
     }
     // SoftmaxUnion (maskType=3) always runs FP32 S; require softmaxPrecision=0 for FP8 as well.
@@ -518,6 +523,21 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         return status;
     }
     const bool int8Layout = !isArch35 && quantType == GBSA_QUANT_TYPE_INT8;
+    const bool a8c4 = isArch35 && quantType == GBSA_QUANT_TYPE_A8C4;
+    if (a8c4 && blockShapeY != GBSA_CURRENT_BLOCK_SHAPE_Y) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires blockShapeY=%lld, but got %lld.", GBSA_CURRENT_BLOCK_SHAPE_Y,
+                blockShapeY);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (a8c4 && maskType != 0 && maskType != GBSA_CURRENT_MASK_TYPE) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 supports only maskType=0 or 1.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (a8c4 && !GbsaIsLayout(kvInputLayout, qInputLayout) && !GbsaIsLayout(kvInputLayout, "PA_BBND") &&
+        !GbsaIsLayout(kvInputLayout, "PA_BNBD")) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 dense KV layout must match Q.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     if (maskType == GBSA_MASK_TYPE_UNION && quantType == GBSA_QUANT_TYPE_MXFP8) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "Union mode (maskType=3) only supports quantType=0 or 5, but got quantType=%lld.", quantType);
@@ -533,8 +553,10 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (maskType != 3 && (!GbsaIsLayout(kvInputLayout, "PA_BBND") || !GbsaIsLayout(qInputLayout, "TND")) &&
-        quantType != GBSA_QUANT_TYPE_NONE && !int8Layout && !(isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Batched Q and dense/PA_BNBD KV require quantType=0, A5 MXFP8, or Union.");
+        quantType != GBSA_QUANT_TYPE_NONE && !int8Layout && !a8c4 &&
+        !(isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "Batched Q and dense/PA_BNBD KV require quantType=0, A5 MXFP8/A8C4, or Union.");
 
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -557,6 +579,10 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8);
     if (status != ACLNN_SUCCESS) {
         return status;
+    }
+    if (a8c4 && numQHeads / numKvHeads > 32) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires groupSize <= 32.");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     if (!isArch35 && quantType == GBSA_QUANT_TYPE_INT8 &&
         (headDim < 1 || headDim > 256 || numQHeads / numKvHeads > 128 || blockShapeX != 1 || blockShapeY < 1 ||
@@ -599,10 +625,10 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
     if (status != ACLNN_SUCCESS) {
         return status;
     }
-    return CheckGbsaMaskAttrs(maskType, windowSizeLeft, windowSizeRight, isArch35,
-                              isArch35 && (quantType == GBSA_QUANT_TYPE_NONE || quantType == GBSA_QUANT_TYPE_MXFP8),
-                              isArch35 && quantType == GBSA_QUANT_TYPE_FLOAT8,
-                              !isArch35 && quantType == GBSA_QUANT_TYPE_NONE);
+    return CheckGbsaMaskAttrs(
+        maskType, windowSizeLeft, windowSizeRight, isArch35,
+        isArch35 && (quantType == GBSA_QUANT_TYPE_NONE || quantType == GBSA_QUANT_TYPE_MXFP8 || a8c4),
+        isArch35 && quantType == GBSA_QUANT_TYPE_FLOAT8, !isArch35 && quantType == GBSA_QUANT_TYPE_NONE);
 }
 
 aclnnStatus ParseBlockShape(const aclIntArray* blockShape, int64_t& blockShapeX, int64_t& blockShapeY)

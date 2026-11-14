@@ -28,7 +28,579 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
         __gm__ uint8_t* user = AscendC::GetUserWorkspace(workspace);
         KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 
-#if (__CCE_AICORE__ == 220)
+#if (__CCE_AICORE__ == 310) && (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+#if ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_TND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_TND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_TND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_TND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_PA_BBND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_PA_BBND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_PA_BBND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_PA_BBND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_PA_BNBD_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_PA_BNBD_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_PA_BNBD_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_TND_PA_BNBD_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_BNSD_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_BNSD_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_BNSD_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_BNSD_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_PA_BBND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_PA_BBND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_PA_BBND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_PA_BBND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_BSND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_BSND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_BSND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_BSND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_PA_BBND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_PA_BBND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_PA_BBND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_PA_BBND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_PA_BNBD_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_PA_BNBD_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_PA_BNBD_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_FP16_BSND_PA_BNBD_MASK1_LSE1);
+#else
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_TND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_TND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_TND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_TND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_PA_BBND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_PA_BBND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_PA_BBND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_PA_BBND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_PA_BNBD_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_PA_BNBD_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_PA_BNBD_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_TND_PA_BNBD_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_BNSD_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_BNSD_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_BNSD_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_BNSD_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_PA_BBND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_PA_BBND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_PA_BBND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_PA_BBND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_BSND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_BSND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_BSND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_BSND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_PA_BBND_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_PA_BBND_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_PA_BBND_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_PA_BBND_MASK1_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_PA_BNBD_MASK0_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_PA_BNBD_MASK0_LSE1);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_PA_BNBD_MASK1_LSE0);
+        TILING_KEY_IS(GBSA_A8C4_BF16_BSND_PA_BNBD_MASK1_LSE1);
+#endif
+#endif
+
+#if (__CCE_AICORE__ == 310) && \
+    (TILING_KEY_VAR == GBSA_A8C4_FP16_TND_TND_MASK0_LSE0 || TILING_KEY_VAR == GBSA_A8C4_FP16_TND_TND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_TND_TND_MASK1_LSE0 || TILING_KEY_VAR == GBSA_A8C4_FP16_TND_TND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_TND_MASK0_LSE0 || TILING_KEY_VAR == GBSA_A8C4_BF16_TND_TND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_TND_MASK1_LSE0 || TILING_KEY_VAR == GBSA_A8C4_BF16_TND_TND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BBND_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BBND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BBND_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BBND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BBND_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BBND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BBND_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BBND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BNBD_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BNBD_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BNBD_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BNBD_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BNBD_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BNBD_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BNBD_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BNBD_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_BNSD_MASK0_LSE0 || TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_BNSD_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_BNSD_MASK1_LSE0 || TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_BNSD_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_BNSD_MASK0_LSE0 || TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_BNSD_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_BNSD_MASK1_LSE0 || TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_BNSD_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BBND_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BBND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BBND_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BBND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BBND_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BBND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BBND_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BBND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_BSND_MASK0_LSE0 || TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_BSND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_BSND_MASK1_LSE0 || TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_BSND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_BSND_MASK0_LSE0 || TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_BSND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_BSND_MASK1_LSE0 || TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_BSND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BBND_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BBND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BBND_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BBND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BBND_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BBND_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BBND_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BBND_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BNBD_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BNBD_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BNBD_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BNBD_MASK1_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BNBD_MASK0_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BNBD_MASK0_LSE1 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BNBD_MASK1_LSE0 || \
+     TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BNBD_MASK1_LSE1)
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_TND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::TND, false, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_TND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::TND, false, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_TND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::TND, false, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_TND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::TND, false, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_TND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::TND, false, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_TND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::TND, false, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_TND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::TND, false, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_TND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::TND, false, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BBND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::BSND, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BBND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::BSND, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BBND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::BSND, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BBND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::BSND, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BBND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::BSND, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BBND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::BSND, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BBND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::BSND, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BBND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::BSND, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BNBD_MASK0_LSE0
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::BNSD, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BNBD_MASK0_LSE1
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::BNSD, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BNBD_MASK1_LSE0
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::BNSD, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_TND_PA_BNBD_MASK1_LSE1
+        GbsaInferInterfaceA8C4<half, Format::TND, Format::BNSD, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BNBD_MASK0_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::BNSD, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BNBD_MASK0_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::BNSD, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BNBD_MASK1_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::BNSD, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_TND_PA_BNBD_MASK1_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::TND, Format::BNSD, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_BNSD_MASK0_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BNSD, false, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_BNSD_MASK0_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BNSD, false, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_BNSD_MASK1_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BNSD, false, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_BNSD_MASK1_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BNSD, false, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_BNSD_MASK0_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BNSD, false, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_BNSD_MASK0_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BNSD, false, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_BNSD_MASK1_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BNSD, false, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_BNSD_MASK1_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BNSD, false, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BBND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BSND, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BBND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BSND, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BBND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BSND, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BBND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BSND, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BBND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BSND, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BBND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BSND, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BBND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BSND, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BBND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BSND, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK0_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BNSD, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK0_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BNSD, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK1_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BNSD, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BNSD_PA_BNBD_MASK1_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BNSD, Format::BNSD, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK0_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BNSD, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK0_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BNSD, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK1_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BNSD, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BNSD_PA_BNBD_MASK1_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BNSD, Format::BNSD, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_BSND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BSND, false, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_BSND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BSND, false, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_BSND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BSND, false, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_BSND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BSND, false, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_BSND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BSND, false, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_BSND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BSND, false, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_BSND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BSND, false, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_BSND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BSND, false, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BBND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BSND, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BBND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BSND, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BBND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BSND, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BBND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BSND, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BBND_MASK0_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BSND, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BBND_MASK0_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BSND, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BBND_MASK1_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BSND, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BBND_MASK1_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BSND, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BNBD_MASK0_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BNSD, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BNBD_MASK0_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BNSD, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BNBD_MASK1_LSE0
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BNSD, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_FP16_BSND_PA_BNBD_MASK1_LSE1
+        GbsaInferInterfaceA8C4<half, Format::BSND, Format::BNSD, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BNBD_MASK0_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BNSD, true, false, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BNBD_MASK0_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BNSD, true, false, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BNBD_MASK1_LSE0
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BNSD, true, true, Epilogue::LseMode::NONE,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+#if TILING_KEY_VAR == GBSA_A8C4_BF16_BSND_PA_BNBD_MASK1_LSE1
+        GbsaInferInterfaceA8C4<bfloat16_t, Format::BSND, Format::BNSD, true, true, Epilogue::LseMode::OUT_ONLY,
+                               Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#endif
+
+#elif (__CCE_AICORE__ == 220)
         TILING_KEY_IS(GBSA_INT8_FP16_TILING);
         TILING_KEY_IS(GBSA_INT8_BF16_TILING);
         TILING_KEY_IS(GBSA_INT8_FP16_LSE_TILING);
@@ -262,7 +834,7 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #endif
-#elif (__CCE_AICORE__ == 310)
+#elif (__CCE_AICORE__ == 310) && (ORIG_DTYPE_KEY != DT_FLOAT4_E2M1)
         TILING_KEY_IS(GBSA_FP16_BNSD_BNSD_FP32SM_TILING);
         TILING_KEY_IS(GBSA_FP16_BNSD_BNSD_FP16SM_TILING);
         TILING_KEY_IS(GBSA_BF16_BNSD_BNSD_FP32SM_TILING);

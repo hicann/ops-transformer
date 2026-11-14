@@ -26,7 +26,9 @@
     (TILING_KEY_VAR >= 9250002900000050ULL && TILING_KEY_VAR <= 9250002900000055ULL)
 #include "arch35/generic_block_sparse_attention_kernel_arch35_mxfp8_full_quant.h"
 #endif
-
+#if defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+#include "arch35/generic_block_sparse_attention_kernel_arch35_a8c4.h"
+#endif
 #endif
 
 using namespace NpuArch;
@@ -597,4 +599,49 @@ __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, G
     }
 }
 #endif // Packed MXFP8 dispatch
+
+#if defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+template <class BaseCopy>
+struct A8C4PreloadedKvTileCopy : BaseCopy {
+    template <class TensorB>
+    struct CopyGmToL1B {
+        template <class Dst, class Src>
+        __aicore__ inline void operator()(const Dst&, const Src&)
+        {}
+    };
+};
+
+template <class OutDtype, Format qFormat, Format kvFormat, bool isPaged, bool isCausal, Epilogue::LseMode lseMode,
+          Epilogue::LseFormat lseFormat>
+__global__ __aicore__ void GbsaInferInterfaceA8C4(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseIdx,
+                                                  GM_ADDR sparseCount, GM_ADDR metadata, GM_ADDR cuQ, GM_ADDR cuKv,
+                                                  GM_ADDR usedQ, GM_ADDR usedKv, GM_ADDR pages, GM_ADDR kScale,
+                                                  GM_ADDR vScale, GM_ADDR out, GM_ADDR lse, GM_ADDR workspace,
+                                                  GM_ADDR tiling)
+{
+    using ArchTag = Arch::AtlasA5;
+    using Fp8 = fp8_e4m3fn_t;
+    using QKCopy = A8C4PreloadedKvTileCopy<
+        Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, Fp8, layout::RowMajor, Fp8, layout::ColumnMajor, float,
+                                          layout::RowMajor, void, Gemm::Tile::CopyL0CToUBMode::SPLIT_M>>;
+    using PVBaseCopy = A8C4PreloadedKvTileCopy<
+        Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, Fp8, layout::zN, Fp8, layout::RowMajor, float, layout::RowMajor,
+                                          void, Gemm::Tile::CopyL0CToUBMode::SPLIT_M>>;
+    using Tile = Shape<Int<128>, Int<128>, Int<128>>;
+    using QK = Gemm::Block::BlockMmadTla<Gemm::MmadAtlasA5BsaQK<isPaged>, Tile, Tile, Fp8, Fp8, float, void, QKCopy>;
+    using PV =
+        Gemm::Block::BlockMmadTla<Gemm::MmadAtlasA5BsaPV<isPaged>, Tile, Tile, Fp8, Fp8, float, void, PVBaseCopy>;
+    using RescaleCopy = Epilogue::Tile::TileCopyRescaleO<ArchTag, OutDtype, layout::RowMajor, layout::RowMajor>;
+    // FP4 storage tag disables the legacy A8C8 P*448 output compensation.
+    using Rescale = Epilogue::Block::BlockEpilogue<Epilogue::EpilogueAtlasA5BsaRescaleO<lseMode, lseFormat>, OutDtype,
+                                                   float, float, fp4x2_e2m1_t, RescaleCopy, Arch::PositionL0C>;
+    using Kernel = GbsaA8C4KernelArch35<QK, Epilogue::Block::A8C4OnlineSoftmax, PV, Rescale, qFormat, kvFormat, isPaged,
+                                        false, isCausal>;
+    GbsaFullQuantKernelParamsArch35 params{q,      k,      v,     sparseIdx, sparseCount, metadata,
+                                           cuQ,    cuKv,   usedQ, usedKv,    pages,       nullptr,
+                                           kScale, vScale, out,   lse,       workspace,   tiling};
+    Kernel kernel;
+    kernel(params);
+}
+#endif
 #endif // Ascend 950

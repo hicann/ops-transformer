@@ -145,6 +145,8 @@ constexpr uint32_t GBSA_MXFP8_COALESCED_PREFILL_MIN_TOKENS = 1024U;
 constexpr uint32_t GBSA_MXFP8_COALESCED_PREFILL_MAX_TOKENS = 8192U;
 
 constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
+constexpr int64_t GBSA_QUANT_TYPE_A8C4 = 8;
+constexpr uint64_t GBSA_A8C4_TILING_OFFSET = 1000000000000ULL;
 constexpr int64_t GBSA_WIN_DISABLED = -1;
 constexpr float GBSA_DST_TYPE_MAX_DISABLED = 0.0f;
 constexpr uint32_t GSA_FD_MAX_ACTIVE_CORE_NUM = 32U;        // Maximum AIC cores used by FD.
@@ -280,9 +282,11 @@ ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext* context)
         quantType_ = *quantTypePtr;
     }
     if (quantType_ != GBSA_QUANT_TYPE_NONE && quantType_ != GBSA_QUANT_TYPE_FULL &&
-        quantType_ != GBSA_QUANT_TYPE_MXFP8 && quantType_ != GBSA_QUANT_TYPE_INT8) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "quantType", std::to_string(quantType_).c_str(),
-                                              "only 0 (none), 5 (FP8) or 6 (A5 MXFP8) or 7 (A2/A3 INT8) are supported");
+        quantType_ != GBSA_QUANT_TYPE_MXFP8 && quantType_ != GBSA_QUANT_TYPE_INT8 &&
+        quantType_ != GBSA_QUANT_TYPE_A8C4) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "quantType", std::to_string(quantType_).c_str(),
+            "supported modes are 0 (none), 5 (FP8), 6 (A5 MXFP8), 7 (A2/A3 INT8), and 8 (A5 A8C4)");
         return ge::GRAPH_FAILED;
     }
 
@@ -444,8 +448,7 @@ ge::graphStatus GBSATiling::CheckAttentionOutDtype(gert::TilingContext* context)
             OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                 context->GetNodeName(), "attentionOut",
                 std::to_string(static_cast<int32_t>(attentionOutDtype_)).c_str(),
-                "the supported dtype of attentionOut is float16 or bfloat16 when the dtype of query/key/value is all "
-                "float8_e4m3fn or int8");
+                "attentionOut must be float16 or bfloat16 for float8_e4m3fn or int8 query");
             return ge::GRAPH_FAILED;
         }
     }
@@ -455,10 +458,9 @@ ge::graphStatus GBSATiling::CheckAttentionOutDtype(gert::TilingContext* context)
 
 // Validate paged key/value: only dim0 may be non-contiguous. Shape-driven, so it
 // covers PA_BBND and PA_BNBD alike.
-static ge::graphStatus ValidatePagedBbndDim0OnlyNonContig(gert::TilingContext* context, uint64_t inputIndex,
-                                                          const gert::Shape& shape, const char* tensorName)
+static ge::graphStatus ValidatePagedDim0OnlyNonContig(gert::TilingContext* context, const gert::Stride* stride,
+                                                      const gert::Shape& shape, const char* tensorName)
 {
-    auto* stride = context->GetRequiredInputStride(inputIndex);
     if (stride == nullptr || stride->GetDimNum() != shape.GetDimNum()) {
         return ge::GRAPH_SUCCESS;
     }
@@ -544,12 +546,12 @@ ge::graphStatus GBSATiling::ParseKvCacheStride0(gert::TilingContext* context)
         return ge::GRAPH_FAILED;
     }
 
-    if (ValidatePagedBbndDim0OnlyNonContig(context, KEY_INDEX, keyShape->GetOriginShape(), "key") !=
-        ge::GRAPH_SUCCESS) {
+    if (ValidatePagedDim0OnlyNonContig(context, context->GetRequiredInputStride(KEY_INDEX), keyShape->GetOriginShape(),
+                                       "key") != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    if (ValidatePagedBbndDim0OnlyNonContig(context, VALUE_INDEX, valueShape->GetOriginShape(), "value") !=
-        ge::GRAPH_SUCCESS) {
+    if (ValidatePagedDim0OnlyNonContig(context, context->GetRequiredInputStride(VALUE_INDEX),
+                                       valueShape->GetOriginShape(), "value") != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
@@ -903,14 +905,15 @@ ge::graphStatus GBSATiling::ParseQkvDtype(gert::TilingContext* context)
                                                "the descs of key and value must be provided");
         return ge::GRAPH_FAILED;
     }
-    if (keyDesc->GetDataType() != dataType_ || valueDesc->GetDataType() != dataType_) {
+    const auto kvDtype = quantType_ == GBSA_QUANT_TYPE_A8C4 ? ge::DT_FLOAT4_E2M1 : dataType_;
+    if (keyDesc->GetDataType() != kvDtype || valueDesc->GetDataType() != kvDtype) {
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
             context->GetNodeName(), "query, key and value",
             ("query=" + std::to_string(static_cast<int32_t>(dataType_)) +
              ", key=" + std::to_string(static_cast<int32_t>(keyDesc->GetDataType())) +
              ", value=" + std::to_string(static_cast<int32_t>(valueDesc->GetDataType())))
                 .c_str(),
-            "the dtypes of query/key/value must match");
+            "K/V must match query dtype, or use FP4 E2M1 for A8C4");
         return ge::GRAPH_FAILED;
     }
     if (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16 && dataType_ != ge::DT_FLOAT8_E4M3FN &&
@@ -1217,10 +1220,10 @@ ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext* con
                                               "p_quant_scale is not supported yet and must be nullptr");
         return ge::GRAPH_FAILED;
     }
-    // FP8 full-quant path does not consume dequant scales yet; reject non-null (tests pass null).
+    // A8C4 consumes independent KV scales. The remaining paths require null dequant scales.
     if (context->GetOptionalInputTensor(Q_DEQUANT_SCALE_INDEX) != nullptr ||
-        context->GetOptionalInputTensor(K_DEQUANT_SCALE_INDEX) != nullptr ||
-        context->GetOptionalInputTensor(V_DEQUANT_SCALE_INDEX) != nullptr) {
+        (quantType_ != GBSA_QUANT_TYPE_A8C4 && (context->GetOptionalInputTensor(K_DEQUANT_SCALE_INDEX) != nullptr ||
+                                                context->GetOptionalInputTensor(V_DEQUANT_SCALE_INDEX) != nullptr))) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(),
                                                "q_dequant_scale, k_dequant_scale and v_dequant_scale", "provided",
                                                "q/k/v_dequant_scale are not supported yet and must be nullptr");
@@ -1458,6 +1461,76 @@ ge::graphStatus GBSATiling::CheckInt8Config(gert::TilingContext* context)
 
 ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
 {
+    if (quantType_ == GBSA_QUANT_TYPE_A8C4) {
+        if (socVer_ != SOC_VER_950_CODE || dataType_ != ge::DT_FLOAT8_E4M3FN || embeddingSize_ != 128U ||
+            softmaxPrecision_ != 0U || (maskType_ != 0 && maskType_ != 1) || blockShapeX_ != 1U ||
+            blockShapeY_ != 128U || residualBlockMode_ != 0 || (isPaged_ && blockSize_ != 128U)) {
+            OP_LOGE(context->GetNodeName(),
+                    "A8C4 requires Ascend950, FP8 E4M3FN query, D=128, softmaxPrecision=0, blockShape=[1,128], "
+                    "maskType=0/1 and residualBlockMode=0.");
+            return ge::GRAPH_FAILED;
+        }
+        if (groupSize_ > GBSA_TILE_SIZE_32) {
+            OP_LOGE(context->GetNodeName(), "A8C4 requires groupSize <= 32.");
+            return ge::GRAPH_FAILED;
+        }
+        if (context->GetOptionalInputShape(Q_DEQUANT_SCALE_INDEX) != nullptr ||
+            context->GetOptionalInputShape(P_QUANT_SCALE_INDEX) != nullptr) {
+            OP_LOGE(context->GetNodeName(), "A8C4 fixes Q/P scales to one; qDequantScale/pQuantScale must be absent.");
+            return ge::GRAPH_FAILED;
+        }
+        constexpr uint32_t scaleGroupSize = 16U;
+        const uint32_t scalesPerTokenHead = embeddingSize_ / scaleGroupSize;
+        for (const int index : {K_DEQUANT_SCALE_INDEX, V_DEQUANT_SCALE_INDEX}) {
+            const auto* desc = context->GetOptionalInputDesc(index);
+            const auto* shape = context->GetOptionalInputShape(index);
+            const auto& kvShape = context->GetInputShape(KEY_INDEX)->GetOriginShape();
+            if (desc == nullptr || shape == nullptr || desc->GetDataType() != ge::DT_BF16 ||
+                shape->GetOriginShape().GetDimNum() != kvShape.GetDimNum()) {
+                OP_LOGE(context->GetNodeName(), "A8C4 requires both compact BF16 KV scales with the same rank as KV.");
+                return ge::GRAPH_FAILED;
+            }
+            const auto& scale = shape->GetOriginShape();
+            for (size_t axis = 0; axis < kvShape.GetDimNum(); ++axis) {
+                const int64_t expected = axis + 1U == kvShape.GetDimNum() ? scalesPerTokenHead : kvShape.GetDim(axis);
+                if (scale.GetDim(axis) != expected) {
+                    OP_LOGE(context->GetNodeName(), "A8C4 scale shape must match KV with D replaced by D/16.");
+                    return ge::GRAPH_FAILED;
+                }
+            }
+            if (isPaged_) {
+                const bool isKeyScale = index == K_DEQUANT_SCALE_INDEX;
+                const char* name = isKeyScale ? "kDequantScale" : "vDequantScale";
+                const auto* stride = context->GetOptionalInputStride(index);
+                const uint64_t rowElems = static_cast<uint64_t>(kvHeads_) * scalesPerTokenHead;
+                const uint64_t pageElems = blockSize_ * rowElems;
+                uint64_t pageStride = pageElems;
+                if (stride != nullptr && stride->GetDimNum() != 0) {
+                    if (stride->GetDimNum() != scale.GetDimNum()) {
+                        OP_LOGE(context->GetNodeName(), "%s stride rank must match its shape rank.", name);
+                        return ge::GRAPH_FAILED;
+                    }
+                    if (ValidatePagedDim0OnlyNonContig(context, stride, scale, name) != ge::GRAPH_SUCCESS) {
+                        return ge::GRAPH_FAILED;
+                    }
+                    if (scale.GetDim(0) > 1) {
+                        const int64_t stride0 = stride->GetStride(0);
+                        if (stride0 <= 0 || static_cast<uint64_t>(stride0) < pageElems ||
+                            static_cast<uint64_t>(stride0) % rowElems != 0) {
+                            OP_LOGE(context->GetNodeName(), "%s dim0 stride must cover one page and align to Nkv * 8.",
+                                    name);
+                            return ge::GRAPH_FAILED;
+                        }
+                        pageStride = static_cast<uint64_t>(stride0);
+                    }
+                }
+                (isKeyScale ? kScaleStride0_ : vScaleStride0_) = pageStride;
+            }
+        }
+        fdStaticEnabled_ = topK_ >= 12U;
+        return ge::GRAPH_SUCCESS;
+    }
+
     if (dataType_ == ge::DT_INT8) {
         return CheckInt8Config(context);
     }
@@ -1486,7 +1559,7 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
     }
     if (maskType_ == 0 && isQuant5) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "mask_type", std::to_string(maskType_).c_str(),
-                                              "non-causal attention (mask_type=0) only supports FP16/BF16 non-quant");
+                                              "non-causal attention is supported for quantType=0 or 6");
         return ge::GRAPH_FAILED;
     }
     if (maskType_ == GBSA_MASK_TYPE_UNION) {
@@ -1626,6 +1699,9 @@ uint64_t GBSATiling::GenerateTilingKey()
      */
     const bool isArch35 = (socVer_ == SOC_VER_950_CODE);
     uint64_t tilingKey = isArch35 ? GBSA_OP_ARCH35_BASE : GBSA_OP_ARCH22_BASE;
+    if (quantType_ == GBSA_QUANT_TYPE_A8C4) {
+        tilingKey += GBSA_A8C4_TILING_OFFSET;
+    }
 
     // dtype / attentionOut dtype additives
     if (dataType_ == ge::DT_FLOAT16) {
@@ -1695,7 +1771,9 @@ void GBSATiling::CalcBaseTileTilingParams950()
     // selection must use the effective row count instead of the bare GQA group size.
     const uint32_t tileGroupSize = maskType_ == GBSA_MASK_TYPE_UNION ? groupSize_ * blockShapeX_ : groupSize_;
 
-    if (tileGroupSize <= GBSA_TILE_SIZE_16) {
+    if (quantType_ == GBSA_QUANT_TYPE_A8C4) {
+        qBaseTile_ = groupSize_;
+    } else if (tileGroupSize <= GBSA_TILE_SIZE_16) {
         qBaseTile_ = GBSA_TILE_SIZE_16;
     } else if (tileGroupSize <= GBSA_TILE_SIZE_32) {
         qBaseTile_ = GBSA_TILE_SIZE_32;
@@ -1831,6 +1909,8 @@ ge::graphStatus GBSATiling::FillTilingData(gert::TilingContext* context)
     tilingData_->mmPhaseL1TileInfo.set_pL1BufNum(pL1BufNum_);
     tilingData_->set_kStride0(kStride0_);
     tilingData_->set_vStride0(vStride0_);
+    tilingData_->set_kScaleStride0(kScaleStride0_);
+    tilingData_->set_vScaleStride0(vScaleStride0_);
     tilingData_->set_fdStaticEnabled(fdStaticEnabled_ ? 1U : 0U);
     tilingData_->set_fdLseSubStride(fdLseSubStride_);
     tilingData_->set_fdPartialCapacity(fdPartialCapacity_);
@@ -1889,6 +1969,27 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
     } else if (socVer_ == SOC_VER_950_CODE && quantType_ != GBSA_QUANT_TYPE_MXFP8) {
         CalcBaseTileTilingParams950();
         CalcMatmulPhaseL1TileInfo950();
+        if (quantType_ == GBSA_QUANT_TYPE_A8C4) {
+            // Keep the logical Q tile size, and align the L1 Q/P allocations for NZ storage.
+            mm1L1TileM_ = static_cast<uint32_t>(AlignUp(qBaseTile_, GBSA_TILE_SIZE_16));
+            mm2L1TileM_ = mm1L1TileM_;
+            mm1L1TileN_ = kvBaseTile_;
+            // Reserve Q/P first, then size independent whole-tile K/V rings
+            // from the remaining L1 capacity. Three slots are a preference,
+            // not an unconditional allocation copied from MXFP4.
+            constexpr uint64_t l1Capacity = 512U * 1024U;
+            const uint64_t fixedBytes = static_cast<uint64_t>(mm1L1TileM_) * mm1L1TileKLeft_ * qL1BufNum_ +
+                                        static_cast<uint64_t>(mm2L1TileM_) * mm2L1TileKLeft_ * pL1BufNum_;
+            const uint64_t pairBytes = static_cast<uint64_t>(mm1L1TileKRight_) * mm1L1TileN_ +
+                                       static_cast<uint64_t>(mm2L1TileN_) * mm2L1TileKRight_;
+            const uint32_t pairs = fixedBytes < l1Capacity ? (l1Capacity - fixedBytes) / pairBytes : 0U;
+            if (pairs < 2U) {
+                OP_LOGE(context->GetNodeName(), "A8C4 tile cannot fit independent K/V pipeline buffers in L1.");
+                return ge::GRAPH_FAILED;
+            }
+            kL1BufNum_ = std::min(3U, pairs);
+            vL1BufNum_ = kL1BufNum_;
+        }
     } else if (socVer_ != SOC_VER_950_CODE) {
         if (maskType_ == GBSA_MASK_TYPE_UNION) {
             // At D=256 the Arch22 union kernel shares the second K buffer with P.
