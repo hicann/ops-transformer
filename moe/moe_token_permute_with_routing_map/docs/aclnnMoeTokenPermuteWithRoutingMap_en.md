@@ -285,7 +285,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(
         <td>The input or output data type is not within the supported range.</td>
       </tr>
       <tr>
-        <td>The input or output shape does not meet requirements.</td>
+        <td>The input or output shape does not meet requirements, except for an invalid second dimension of permuteTokensOut or an invalid rank or length of sortedIndicesOut.</td>
       </tr>
       <tr>
         <td>numOutTokens < 0 or numOutTokens > tokens_num * experts_num</td>
@@ -293,10 +293,12 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>
         <td>561103</td>
-        <td>The internal pointer is empty.</td>
+        <td>The internal pointer is null; or routingMap is non-empty, at least one of permuteTokensOut and sortedIndicesOut is non-empty, and the second dimension of permuteTokensOut or the rank or length of sortedIndicesOut does not meet requirements.</td>
       </tr>
     </tbody>
   </table>
+
+> When routingMap is empty, or both permuteTokensOut and sortedIndicesOut are empty, an invalid second dimension of permuteTokensOut or an invalid rank or length of sortedIndicesOut does not trigger error 561103 described above.
 
 ## aclnnMoeTokenPermuteWithRoutingMap
 

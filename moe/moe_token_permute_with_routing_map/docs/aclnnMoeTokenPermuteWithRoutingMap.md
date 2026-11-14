@@ -283,7 +283,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(
         <td>输入和输出的数据类型不在支持的范围内。</td>
       </tr>
       <tr>
-        <td>输入输出的shape不符合要求</td>
+        <td>输入输出的shape不符合要求（permuteTokensOut第1维、sortedIndicesOut的维数和长度不符合要求的情况除外）。</td>
       </tr>
       <tr>
         <td>numOutTokens < 0 或numOutTokens > tokens_num * experts_num</td>
@@ -291,10 +291,12 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>
         <td>561103</td>
-        <td>内部指针为空</td>
+        <td>内部指针为空；或routingMap非空且permuteTokensOut、sortedIndicesOut中至少一个为非空Tensor时，permuteTokensOut第1维、sortedIndicesOut的维数或长度不符合要求。</td>
       </tr>
     </tbody>
   </table>
+
+> 当routingMap为空Tensor，或permuteTokensOut和sortedIndicesOut均为空Tensor时，permuteTokensOut第1维、sortedIndicesOut的维数和长度不符合要求不会触发上述561103错误。
 
 ## aclnnMoeTokenPermuteWithRoutingMap
 
