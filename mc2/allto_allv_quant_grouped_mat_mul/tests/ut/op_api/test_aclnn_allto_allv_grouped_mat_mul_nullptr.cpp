@@ -68,7 +68,7 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
                         mmWeightQuantMode, group, epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight,
                         groupSize, permuteOutFlag),
                   OUTPUT(gmmY, mmYOptional, permuteOutOptional));
-    EXPECT_EQ(ACLNN_ERR_PARAM_INVALID, ut_null_gmm_x.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));
+    EXPECT_EQ(ACLNN_ERR_PARAM_NULLPTR, ut_null_gmm_x.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));
 }
 
 TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMatMulNullGmmWeight)
@@ -155,7 +155,7 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
                         mmWeightQuantMode, group, epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight,
                         groupSize, permuteOutFlag),
                   OUTPUT(gmmY, mmYOptional, permuteOutOptional));
-    EXPECT_EQ(ACLNN_ERR_PARAM_INVALID,
+    EXPECT_EQ(ACLNN_ERR_PARAM_NULLPTR,
               ut_null_gmm_x_scale.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));
 }
 
@@ -198,7 +198,7 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
               mmWeightScaleOptional, gmmXQuantMode, gmmWeightQuantMode, mmXQuantMode, mmWeightQuantMode, group,
               epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight, groupSize, permuteOutFlag),
         OUTPUT(gmmY, mmYOptional, permuteOutOptional));
-    EXPECT_EQ(ACLNN_ERR_PARAM_INVALID,
+    EXPECT_EQ(ACLNN_ERR_PARAM_NULLPTR,
               ut_null_gmm_weight_scale.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));
 }
 
@@ -461,7 +461,53 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
                         mmWeightQuantMode, group, epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight,
                         groupSize, permuteOutFlag),
                   OUTPUT(nullptr, mmYOptional, permuteOutOptional));
-    EXPECT_EQ(ACLNN_ERR_PARAM_INVALID, ut_null_gmm_y.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));
+    EXPECT_EQ(ACLNN_ERR_PARAM_NULLPTR, ut_null_gmm_y.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));
+}
+
+// Test: gmmWeight non-null but not 3D → should return ACLNN_ERR_PARAM_INVALID (161002)
+TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMatMulGmmWeightWrongDim)
+{
+    TensorDesc gmmX = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
+    TensorDesc gmmWeight = {{7168, 4096}, ACL_HIFLOAT8, ACL_FORMAT_ND}; // 2D invalid
+    TensorDesc gmmXScale = {{1}, ACL_FLOAT, ACL_FORMAT_ND};
+    TensorDesc gmmWeightScale = {{1}, ACL_FLOAT, ACL_FORMAT_ND};
+    TensorDesc mmXOptional = {{4096, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
+    TensorDesc mmWeightOptional = {{7168, 4096}, ACL_HIFLOAT8, ACL_FORMAT_ND};
+    TensorDesc mmXScaleOptional = {{1}, ACL_FLOAT, ACL_FORMAT_ND};
+    TensorDesc mmWeightScaleOptional = {{1}, ACL_FLOAT, ACL_FORMAT_ND};
+    int64_t gmmXQuantMode = 1;
+    int64_t gmmWeightQuantMode = 1;
+    int64_t mmXQuantMode = 1;
+    int64_t mmWeightQuantMode = 1;
+    int64_t epWorldSize = 0;
+    int64_t groupSize = 0;
+    int listSize = 8;
+    int listValue = 1024;
+    std::vector<int64_t> sendCountsList(listSize, listValue);
+    std::vector<int64_t> recvCountsList(listSize, listValue);
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    int32_t transGmmWeight = 0;
+    int32_t transMmWeight = 0;
+    int32_t permuteOutFlag = 1;
+    TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
+    TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
+    TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
+    const char* group = "group";
+    uint64_t workspace_size = 0;
+    aclOpExecutor* executor = nullptr;
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
+
+    auto ut_gmm_weight_wrong_dim =
+        OP_API_UT(aclnnAlltoAllvQuantGroupedMatMul,
+                  INPUT(gmmX, gmmWeight, gmmXScale, gmmWeightScale, nullptr, nullptr, mmXOptional, mmWeightOptional,
+                        mmXScaleOptional, mmWeightScaleOptional, gmmXQuantMode, gmmWeightQuantMode, mmXQuantMode,
+                        mmWeightQuantMode, group, epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight,
+                        groupSize, permuteOutFlag),
+                  OUTPUT(gmmY, mmYOptional, permuteOutOptional));
+    // 非空但维度非法应返回161002（参数非法），而非161001（空指针）
+    EXPECT_EQ(ACLNN_ERR_PARAM_INVALID,
+              ut_gmm_weight_wrong_dim.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor));
 }
 
 // Test: notContiguous gmmWeight + transGmmWeight=true → error

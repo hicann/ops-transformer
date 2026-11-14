@@ -757,7 +757,8 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulV2NullptrTest, GmmWeightWrongDim)
                               sendCounts, recvCounts, 0, 0, 0, 1),
                         OUTPUT(gmmY, mmYOptional, permuteOutOptional));
     auto ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
-    EXPECT_TRUE(ret == ACLNN_ERR_PARAM_INVALID || ret == ACLNN_ERR_PARAM_NULLPTR);
+    // 非空但维度非法应返回161002（参数非法），而非161001（空指针）
+    EXPECT_EQ(ACLNN_ERR_PARAM_INVALID, ret);
 }
 
 TEST_F(AclnnAlltoAllvQuantGroupedMatMulV2NullptrTest, ExecuteEntry)

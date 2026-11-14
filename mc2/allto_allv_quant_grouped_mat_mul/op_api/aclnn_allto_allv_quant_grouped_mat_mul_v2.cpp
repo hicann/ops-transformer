@@ -115,19 +115,19 @@ static bool CheckQuantModeValid(int64_t gmmXQuantMode)
     return true;
 }
 
-static bool CheckGmmWeightValid(const aclTensor* gmmWeight)
+static aclnnStatus CheckGmmWeightValid(const aclTensor* gmmWeight)
 {
     if (gmmWeight == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "In AlltoAllvQuantGroupedMatmul, input gmmWeight should not be null.");
-        return false;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (gmmWeight->GetViewShape().GetDimNum() != THREE_DIMS) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("aclnnAlltoAllvQuantGroupedMatMulV2GetWorkspaceSize", "gmmWeight",
                                                  (std::to_string(gmmWeight->GetViewShape().GetDimNum()) + "D").c_str(),
                                                  "The shape of gmmWeight must be 3D.");
-        return false;
+        return ACLNN_ERR_PARAM_INVALID;
     }
-    return true;
+    return ACLNN_SUCCESS;
 }
 
 static bool CheckMmWeightValid(const aclTensor* mmWeightOptional)
@@ -478,7 +478,9 @@ extern "C" aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2GetWorkspaceSize(
     aclOpExecutor** executor)
 {
     // 处理非连续Tensor，目前支持转置的gmmWeight涉及该处理
-    CHECK_RET(CheckGmmWeightValid(gmmWeight), ACLNN_ERR_PARAM_NULLPTR);
+    // 先检查gmmWeight是否合法，避免非法操作：空指针返回161001，非3维返回161002
+    aclnnStatus gmmWeightCheckRet = CheckGmmWeightValid(gmmWeight);
+    CHECK_RET(gmmWeightCheckRet == ACLNN_SUCCESS, gmmWeightCheckRet);
     bool notContiguous = IsTransposeTwoDims(gmmWeight, -1, -2);
     auto transposeGmmWeight = gmmWeight;   // 复制一个gmmWeight
     if (notContiguous && transGmmWeight) { // 当非连续和转置同时生效时，判断为错误用法，直接报错

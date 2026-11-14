@@ -75,10 +75,9 @@ static bool CheckNullStatus(const aclTensor* sendCountsTensorOptional, const acl
     return true;
 }
 
-// 检查必要输入是否为空/quantMode为1或6，必须非空/1或6
+// 检查必要输入是否为空
 static bool CheckNotNull(const aclTensor* gmmX, const aclTensor* gmmWeight, const aclTensor* gmmY,
-                         const aclTensor* gmmXScale, const aclTensor* gmmWeightScale, int64_t gmmXQuantMode,
-                         int64_t gmmWeightQuantMode)
+                         const aclTensor* gmmXScale, const aclTensor* gmmWeightScale)
 {
     if (gmmX == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnAlltoAllvQuantGroupedMatMulGetWorkspaceSize", "gmmX");
@@ -100,6 +99,12 @@ static bool CheckNotNull(const aclTensor* gmmX, const aclTensor* gmmWeight, cons
         OP_LOGE_WITH_INVALID_INPUT("aclnnAlltoAllvQuantGroupedMatMulGetWorkspaceSize", "gmmWeightScale");
         return false;
     }
+    return true;
+}
+
+// 检查quantMode取值为1或6
+static bool CheckQuantModeValid(int64_t gmmXQuantMode)
+{
     if ((gmmXQuantMode != static_cast<int64_t>(QuantModeType::PERTENSOR_QUANT)) &&
         (gmmXQuantMode != static_cast<int64_t>(QuantModeType::MX_QUANT))) {
         OP_LOGE_FOR_INVALID_VALUE("aclnnAlltoAllvQuantGroupedMatMulGetWorkspaceSize", "gmmXQuantMode",
@@ -109,19 +114,19 @@ static bool CheckNotNull(const aclTensor* gmmX, const aclTensor* gmmWeight, cons
     return true;
 }
 
-static bool CheckGmmWeightValid(const aclTensor* gmmWeight)
+static aclnnStatus CheckGmmWeightValid(const aclTensor* gmmWeight)
 {
     if (gmmWeight == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnAlltoAllvQuantGroupedMatMulGetWorkspaceSize", "gmmWeight");
-        return false;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (gmmWeight->GetViewShape().GetDimNum() != THREE_DIMS) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("aclnnAlltoAllvQuantGroupedMatMulGetWorkspaceSize", "gmmWeight",
                                                  (std::to_string(gmmWeight->GetViewShape().GetDimNum()) + "D").c_str(),
                                                  "The shape of gmmWeight must be 3D.");
-        return false;
+        return ACLNN_ERR_PARAM_INVALID;
     }
-    return true;
+    return ACLNN_SUCCESS;
 }
 
 static bool CheckMmWeightValid(const aclTensor* mmWeightOptional)
@@ -399,8 +404,9 @@ static aclnnStatus CheckParams(const aclTensor* gmmX, const aclTensor* gmmWeight
                               mmXScaleOptional, mmWeightScaleOptional, permuteOutFlag, mmYOptional, permuteOutOptional),
               ACLNN_ERR_PARAM_INVALID);
     // 检查参数是否为空
-    CHECK_RET(CheckNotNull(gmmX, gmmWeight, gmmY, gmmXScale, gmmWeightScale, gmmXQuantMode, gmmWeightQuantMode),
-              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckNotNull(gmmX, gmmWeight, gmmY, gmmXScale, gmmWeightScale), ACLNN_ERR_PARAM_NULLPTR);
+    // 检查quantMode取值
+    CHECK_RET(CheckQuantModeValid(gmmXQuantMode), ACLNN_ERR_PARAM_INVALID);
     OP_LOGD("AlltoAllvQuantGroupedMatmul checkParams success");
     return ACLNN_SUCCESS;
 }
@@ -458,7 +464,9 @@ extern "C" aclnnStatus aclnnAlltoAllvQuantGroupedMatMulGetWorkspaceSize(
     aclTensor* mmYOptional, aclTensor* permuteOutOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // 处理非连续Tensor，目前支持转置的gmmWeight涉及该处理
-    CHECK_RET(CheckGmmWeightValid(gmmWeight), ACLNN_ERR_PARAM_NULLPTR); // 先检查gmmWeight是否合法，避免非法操作
+    // 先检查gmmWeight是否合法，避免非法操作：空指针返回161001，非3维返回161002
+    aclnnStatus gmmWeightCheckRet = CheckGmmWeightValid(gmmWeight);
+    CHECK_RET(gmmWeightCheckRet == ACLNN_SUCCESS, gmmWeightCheckRet);
     bool notContiguous = IsTransposeTwoDims(gmmWeight, -1, -2);
     auto transposeGmmWeight = gmmWeight;   // 复制一个gmmWeight
     if (notContiguous && transGmmWeight) { // 当非连续和转置同时生效时，判断为错误用法，直接报错
