@@ -50,7 +50,7 @@ public:
                                 GM_ADDR oriX, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2,
                                 GM_ADDR constExpertV, GM_ADDR performanceInfo, GM_ADDR yOut, GM_ADDR rstdOut,
                                 GM_ADDR XOut, GM_ADDR workspaceGM, TPipe* pipe,
-                                const MoeDistributeCombineV2TilingData* tilingData);
+                                const MoeDistributeCombineV2Info* combineV2Info);
     __aicore__ inline void Process();
 
 private:
@@ -59,7 +59,7 @@ private:
     __aicore__ inline uint32_t GetSharedExpertRank(uint32_t sourceRank, uint32_t sharedId);
     __aicore__ inline uint32_t GetLocalSharedSlotMask(uint32_t sourceRank);
     __aicore__ inline GM_ADDR GetInterServerReceiveAddr(uint32_t computeServer, uint32_t token, uint32_t topk);
-    __aicore__ inline void InitTilingAttrs(const MoeDistributeCombineV2TilingData* tilingData);
+    __aicore__ inline void InitTilingAttrs(const MoeDistributeCombineV2Info* combineV2Info);
     __aicore__ inline void InitCommContext(GM_ADDR mc2Context);
     __aicore__ inline void AddRmsNormAddCompute(uint32_t tokenIndex, uint32_t tokenOffset, uint32_t numCol,
                                                 LocalTensor<float>& x1TmpFloatLocal,
@@ -323,42 +323,42 @@ __aicore__ inline GM_ADDR MoeDistributeCombineV2Roce<RoceCombineTypeFunc>::GetIn
 
 template <RoceCombineTypeClass>
 __aicore__ inline void MoeDistributeCombineV2Roce<RoceCombineTypeFunc>::InitTilingAttrs(
-    const MoeDistributeCombineV2TilingData* tilingData)
+    const MoeDistributeCombineV2Info* combineV2Info)
 {
-    axisBS_ = tilingData->moeDistributeCombineV2Info.bs;
-    axisH_ = tilingData->moeDistributeCombineV2Info.h;
-    axisK_ = tilingData->moeDistributeCombineV2Info.k;
-    globalBS_ = tilingData->moeDistributeCombineV2Info.globalBs;
-    aivNum_ = tilingData->moeDistributeCombineV2Info.aivNum;
+    axisBS_ = combineV2Info->bs;
+    axisH_ = combineV2Info->h;
+    axisK_ = combineV2Info->k;
+    globalBS_ = combineV2Info->globalBs;
+    aivNum_ = combineV2Info->aivNum;
     sendAivNum_ = aivNum_ / 2U;
     forwardAivNum_ = aivNum_ - sendAivNum_;
-    epRankId_ = tilingData->moeDistributeCombineV2Info.epRankId;
-    epWorldSize_ = tilingData->moeDistributeCombineV2Info.epWorldSize;
+    epRankId_ = combineV2Info->epRankId;
+    epWorldSize_ = combineV2Info->epWorldSize;
     maxBs_ = globalBS_ / epWorldSize_;
     alignedTokenNumPerRank_ = Ceil(maxBs_, TOKEN_BITMAPS_PER_BLOCK) * TOKEN_BITMAPS_PER_BLOCK;
-    moeExpertNum_ = tilingData->moeDistributeCombineV2Info.moeExpertNum;
-    moeExpertPerRankNum_ = tilingData->moeDistributeCombineV2Info.moeExpertPerRankNum;
-    sharedExpertNum_ = tilingData->moeDistributeCombineV2Info.sharedExpertNum;
-    sharedExpertRankNum_ = tilingData->moeDistributeCombineV2Info.sharedExpertRankNum;
+    moeExpertNum_ = combineV2Info->moeExpertNum;
+    moeExpertPerRankNum_ = combineV2Info->moeExpertPerRankNum;
+    sharedExpertNum_ = combineV2Info->sharedExpertNum;
+    sharedExpertRankNum_ = combineV2Info->sharedExpertRankNum;
     commSlotNum_ = axisK_ + (sharedExpertRankNum_ > 0U ? sharedExpertNum_ : 0U);
-    zeroExpertNum_ = tilingData->moeDistributeCombineV2Info.zeroExpertNum;
-    copyExpertNum_ = tilingData->moeDistributeCombineV2Info.copyExpertNum;
-    constExpertNum_ = tilingData->moeDistributeCombineV2Info.constExpertNum;
+    zeroExpertNum_ = combineV2Info->zeroExpertNum;
+    copyExpertNum_ = combineV2Info->copyExpertNum;
+    constExpertNum_ = combineV2Info->constExpertNum;
     hasLocalExpertCompute_ = copyExpertNum_ > 0U || constExpertNum_ > 0U;
-    hasSharedExpertX_ = tilingData->moeDistributeCombineV2Info.hasSharedExpertX;
-    totalUbSize_ = tilingData->moeDistributeCombineV2Info.totalUbSize;
-    totalWinSizeEp_ = tilingData->moeDistributeCombineV2Info.totalWinSizeEp;
-    roceCombineOffset_ = tilingData->moeDistributeCombineV2Info.roceCombineOffset;
-    hasExpertScales_ = tilingData->moeDistributeCombineV2Info.hasExpertScales;
-    enablePreReduce_ = tilingData->moeDistributeCombineV2Info.enablePreReduce;
+    hasSharedExpertX_ = combineV2Info->hasSharedExpertX;
+    totalUbSize_ = combineV2Info->totalUbSize;
+    totalWinSizeEp_ = combineV2Info->totalWinSizeEp;
+    roceCombineOffset_ = combineV2Info->roceCombineOffset;
+    hasExpertScales_ = combineV2Info->hasExpertScales;
+    enablePreReduce_ = combineV2Info->enablePreReduce;
     sendExpertScales_ = enablePreReduce_ && hasExpertScales_;
     quantizeScatter_ = QuantMode > UNQUANT && !enablePreReduce_;
     loadFinalExpertScales_ = hasExpertScales_ && (!enablePreReduce_ || hasLocalExpertCompute_);
-    isTokenMask_ = tilingData->moeDistributeCombineV2Info.isTokenMask;
-    isExpertMask_ = tilingData->moeDistributeCombineV2Info.isExpertMask;
+    isTokenMask_ = combineV2Info->isTokenMask;
+    isExpertMask_ = combineV2Info->isExpertMask;
     if constexpr (HasAddRmsNorm) {
-        armAvgFactor_ = tilingData->moeDistributeCombineV2Info.armAvgFactor;
-        epsilon_ = tilingData->moeDistributeCombineV2Info.epsilon;
+        armAvgFactor_ = combineV2Info->armAvgFactor;
+        epsilon_ = combineV2Info->epsilon;
     }
 }
 
@@ -389,7 +389,7 @@ __aicore__ inline void MoeDistributeCombineV2Roce<RoceCombineTypeFunc>::Init(
     GM_ADDR gamma, GM_ADDR expertScales, GM_ADDR expandScales, GM_ADDR xActiveMask, GM_ADDR sharedExpertX,
     GM_ADDR elasticInfo, GM_ADDR oriX, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR constExpertV,
     GM_ADDR performanceInfo, GM_ADDR yOut, GM_ADDR rstdOut, GM_ADDR XOut, GM_ADDR workspaceGM, TPipe* pipe,
-    const MoeDistributeCombineV2TilingData* tilingData)
+    const MoeDistributeCombineV2Info* combineV2Info)
 {
     tpipe_ = pipe;
     aivId_ = GetBlockIdx();
@@ -414,10 +414,10 @@ __aicore__ inline void MoeDistributeCombineV2Roce<RoceCombineTypeFunc>::Init(
     constExpertVGM_.SetGlobalBuffer((__gm__ ExpandXType*)constExpertV);
     performanceInfoGM_.SetGlobalBuffer((__gm__ int32_t*)performanceInfo);
     expandOutGlobal_.SetGlobalBuffer((__gm__ XType*)XOut);
-    InitTilingAttrs(tilingData);
+    InitTilingAttrs(combineV2Info);
     InitCommContext(mc2Context);
     const uint64_t assistBitmapOffsetBytes =
-        static_cast<uint64_t>(tilingData->moeDistributeCombineV2Info.a) * EXPAND_IDX_INFO * sizeof(int32_t);
+        static_cast<uint64_t>(combineV2Info->a) * EXPAND_IDX_INFO * sizeof(int32_t);
     serverCommInfoGM_.SetGlobalBuffer((__gm__ uint16_t*)(expandIdx + assistBitmapOffsetBytes));
     winDataSizeOffsetEp_ = static_cast<uint64_t>(dataState_) * (totalWinSizeEp_ / 2UL);
     winStatusOffset_ = COMBINE_STATE_OFFSET + dataState_ * WIN_STATE_OFFSET;

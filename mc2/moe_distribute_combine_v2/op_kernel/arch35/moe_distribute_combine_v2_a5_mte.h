@@ -71,7 +71,7 @@ public:
                                 GM_ADDR xActiveMask, GM_ADDR sharedExpertX, GM_ADDR elasticInfo, GM_ADDR oriX,
                                 GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR constExpertV,
                                 GM_ADDR performanceInfo, GM_ADDR yOut, GM_ADDR rstdOut, GM_ADDR XOut,
-                                GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeCombineV2TilingData* tilingData);
+                                GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeCombineV2Info* combineV2Info);
     __aicore__ inline void Process();
 
 private:
@@ -83,9 +83,9 @@ private:
                                               GM_ADDR oriX, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2,
                                               GM_ADDR constExpertV, GM_ADDR performanceInfo, GM_ADDR yOut,
                                               GM_ADDR rstdOut, GM_ADDR XOut);
-    __aicore__ inline void InitCommContext(GM_ADDR mc2Context, const MoeDistributeCombineV2TilingData* tilingData);
-    __aicore__ inline void InitAttrs(GM_ADDR mc2Context, const MoeDistributeCombineV2TilingData* tilingData);
-    __aicore__ inline void InitTilingAttrs(const MoeDistributeCombineV2TilingData* tilingData);
+    __aicore__ inline void InitCommContext(GM_ADDR mc2Context, const MoeDistributeCombineV2Info* combineV2Info);
+    __aicore__ inline void InitAttrs(GM_ADDR mc2Context, const MoeDistributeCombineV2Info* combineV2Info);
+    __aicore__ inline void InitTilingAttrs(const MoeDistributeCombineV2Info* combineV2Info);
     __aicore__ inline void RswInit();
     __aicore__ inline void AlltoAllBuffInitAndMaskCal();
     __aicore__ inline void AlltoAllCommBuffInit();
@@ -444,40 +444,40 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitIn
 
 template <A5MteCombineTypeClass>
 __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitTilingAttrs(
-    const MoeDistributeCombineV2TilingData* tilingData)
+    const MoeDistributeCombineV2Info* combineV2Info)
 {
-    axisBS_ = tilingData->moeDistributeCombineV2Info.bs;
-    axisH_ = tilingData->moeDistributeCombineV2Info.h;
-    axisK_ = tilingData->moeDistributeCombineV2Info.k;
-    aivNum_ = tilingData->moeDistributeCombineV2Info.aivNum;
-    ubSize_ = tilingData->moeDistributeCombineV2Info.totalUbSize;
-    globalBS_ = tilingData->moeDistributeCombineV2Info.globalBs;
-    hasElasticInfoFlag_ = tilingData->moeDistributeCombineV2Info.hasElasticInfo;
-    isPerformanceFlag_ = tilingData->moeDistributeCombineV2Info.isPerformance;
-    hasExpertScalesFlag_ = tilingData->moeDistributeCombineV2Info.hasExpertScales;
-    epWorldSizeOriginal_ = tilingData->moeDistributeCombineV2Info.epWorldSize;
-    epRankId_ = tilingData->moeDistributeCombineV2Info.epRankId;
-    epRankIdOriginal_ = tilingData->moeDistributeCombineV2Info.epRankId;
-    epWorldSize_ = tilingData->moeDistributeCombineV2Info.epWorldSize;
-    moeExpertPerRankNum_ = tilingData->moeDistributeCombineV2Info.moeExpertPerRankNum;
-    totalWinSizeEp_ = tilingData->moeDistributeCombineV2Info.totalWinSizeEp;
-    isInputTokenMaskFlag_ = tilingData->moeDistributeCombineV2Info.isTokenMask;
-    isInputExpertMaskFlag_ = tilingData->moeDistributeCombineV2Info.isExpertMask;
-    hasSharedExpertX_ = tilingData->moeDistributeCombineV2Info.hasSharedExpertX;
-    bufferNum_ = tilingData->moeDistributeCombineV2Info.bufferNum;
-    zeroExpertNum_ = tilingData->moeDistributeCombineV2Info.zeroExpertNum;
-    copyExpertNum_ = tilingData->moeDistributeCombineV2Info.copyExpertNum;
-    constExpertNum_ = tilingData->moeDistributeCombineV2Info.constExpertNum;
-    moeExpertNum_ = tilingData->moeDistributeCombineV2Info.moeExpertNum;
-    moeExpertOriginalNum_ = tilingData->moeDistributeCombineV2Info.moeExpertNum;
-    sharedExpertRankNum_ = tilingData->moeDistributeCombineV2Info.sharedExpertRankNum;
-    rswBufferSize_ = tilingData->moeDistributeCombineV2Info.rswBufferSize;
+    axisBS_ = combineV2Info->bs;
+    axisH_ = combineV2Info->h;
+    axisK_ = combineV2Info->k;
+    aivNum_ = combineV2Info->aivNum;
+    ubSize_ = combineV2Info->totalUbSize;
+    globalBS_ = combineV2Info->globalBs;
+    hasElasticInfoFlag_ = combineV2Info->hasElasticInfo;
+    isPerformanceFlag_ = combineV2Info->isPerformance;
+    hasExpertScalesFlag_ = combineV2Info->hasExpertScales;
+    epWorldSizeOriginal_ = combineV2Info->epWorldSize;
+    epRankId_ = combineV2Info->epRankId;
+    epRankIdOriginal_ = combineV2Info->epRankId;
+    epWorldSize_ = combineV2Info->epWorldSize;
+    moeExpertPerRankNum_ = combineV2Info->moeExpertPerRankNum;
+    totalWinSizeEp_ = combineV2Info->totalWinSizeEp;
+    isInputTokenMaskFlag_ = combineV2Info->isTokenMask;
+    isInputExpertMaskFlag_ = combineV2Info->isExpertMask;
+    hasSharedExpertX_ = combineV2Info->hasSharedExpertX;
+    bufferNum_ = combineV2Info->bufferNum;
+    zeroExpertNum_ = combineV2Info->zeroExpertNum;
+    copyExpertNum_ = combineV2Info->copyExpertNum;
+    constExpertNum_ = combineV2Info->constExpertNum;
+    moeExpertNum_ = combineV2Info->moeExpertNum;
+    moeExpertOriginalNum_ = combineV2Info->moeExpertNum;
+    sharedExpertRankNum_ = combineV2Info->sharedExpertRankNum;
+    rswBufferSize_ = combineV2Info->rswBufferSize;
     enableSpecialExpert_ = (constExpertNum_ + zeroExpertNum_ + copyExpertNum_ > 0U);
 }
 
 template <A5MteCombineTypeClass>
 __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitCommContext(
-    GM_ADDR mc2Context, const MoeDistributeCombineV2TilingData* tilingData)
+    GM_ADDR mc2Context, const MoeDistributeCombineV2Info* combineV2Info)
 {
     uint32_t epRankIdHccl{0};
     uint32_t epWorldSizeHccl{0};
@@ -487,7 +487,7 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitCo
         mc2Context_ = (__gm__ Mc2MoeContext*)mc2Context;
         enableGroupSend_ = mc2Context_->enableGroupSend;
         epRankIdHccl = mc2Context_->epRankId;
-        epWorldSizeHccl = tilingData->moeDistributeCombineV2Info.epWorldSize;
+        epWorldSizeHccl = combineV2Info->epWorldSize;
         statusDataSpaceGm_ = (GM_ADDR)(mc2Context_->epHcclBuffer_[epRankIdHccl]);
     } else {
         auto contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
@@ -512,10 +512,10 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitCo
 
 template <A5MteCombineTypeClass>
 __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitAttrs(
-    GM_ADDR mc2Context, const MoeDistributeCombineV2TilingData* tilingData)
+    GM_ADDR mc2Context, const MoeDistributeCombineV2Info* combineV2Info)
 {
-    InitTilingAttrs(tilingData);
-    InitCommContext(mc2Context, tilingData);
+    InitTilingAttrs(combineV2Info);
+    InitCommContext(mc2Context, combineV2Info);
     if (hasElasticInfoFlag_) {
         DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(elasticInfoGM_);
         isScalingDownFlag_ = elasticInfoGM_.GetValue(0);
@@ -523,7 +523,7 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitAt
         elasticInst_.InitElasticInfo(isScalingDownFlag_, epWorldSize_, sharedExpertRankNum_, moeExpertNum_, epRankId_,
                                      moeExpertPerRankNum_);
     }
-    sharedExpertNum_ = tilingData->moeDistributeCombineV2Info.sharedExpertNum;
+    sharedExpertNum_ = combineV2Info->sharedExpertNum;
     moeSendNum_ = epWorldSize_ * moeExpertPerRankNum_;
     if (epRankId_ < sharedExpertRankNum_) {
         isShareExpertRankFlag_ = true;
@@ -560,8 +560,8 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitAt
     RswInit();
     bsKNum_ = axisBS_ * axisK_;
     if constexpr (HasAddRmsNorm) {
-        armAvgFactor_ = tilingData->moeDistributeCombineV2Info.armAvgFactor;
-        epsilon_ = tilingData->moeDistributeCombineV2Info.epsilon;
+        armAvgFactor_ = combineV2Info->armAvgFactor;
+        epsilon_ = combineV2Info->epsilon;
     }
 }
 
@@ -613,7 +613,7 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::Init(
     GM_ADDR mc2Context, GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR expandIdx, GM_ADDR epSendCount, GM_ADDR residualX,
     GM_ADDR gamma, GM_ADDR expertScales, GM_ADDR xActiveMask, GM_ADDR sharedExpertX, GM_ADDR elasticInfo, GM_ADDR oriX,
     GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR constExpertV, GM_ADDR performanceInfo, GM_ADDR yOut,
-    GM_ADDR rstdOut, GM_ADDR XOut, GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeCombineV2TilingData* tilingData)
+    GM_ADDR rstdOut, GM_ADDR XOut, GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeCombineV2Info* combineV2Info)
 {
     tpipe_ = pipe;
     coreIdx_ = GetBlockIdx();
@@ -621,19 +621,18 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::Init(
     InitInputAndOutput(residualX, gamma, expandX, expertIds, expandIdx, epSendCount, expertScales, xActiveMask,
                        sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV,
                        performanceInfo, yOut, rstdOut, XOut);
-    if (tilingData->moeDistributeCombineV2Info.isMc2Context) {
+    if (combineV2Info->isMc2Context) {
         isMc2Context_ = true;
         mc2Context_ = (__gm__ Mc2MoeContext*)mc2Context;
     } else {
         auto realWinSize = Mc2Kernel::GetWinSize(epWinContext_);
         CheckWindowSize(totalWinSizeEp_, realWinSize, tpipe_, XOut);
     }
-    InitAttrs(mc2Context, tilingData);
+    InitAttrs(mc2Context, combineV2Info);
 
     PipeBarrier<PIPE_ALL>();
     // 当前win区划分为前后两半区，连续两次dispatch，切换半区
-    winDataSizeOffsetEp_ =
-        static_cast<uint64_t>(dataState_) * (tilingData->moeDistributeCombineV2Info.totalWinSizeEp / 2UL);
+    winDataSizeOffsetEp_ = static_cast<uint64_t>(dataState_) * (combineV2Info->totalWinSizeEp / 2UL);
     winStatusOffset_ = COMBINE_STATE_OFFSET + dataState_ * WIN_STATE_OFFSET; // 前面的预留给dispatch使用
     epWindowGM_ = GetWinAddrByRankId(epRankIdOriginal_, EP_DOMAIN);
     if (isShareExpertRankFlag_) {

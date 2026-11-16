@@ -35,14 +35,14 @@ __global__ __aicore__ void moe_distribute_combine_add_rms_norm(
     GM_ADDR dynamicScaleOut, GM_ADDR XOut, GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(MoeDistributeCombineV2TilingData);
-    GET_TILING_DATA_WITH_STRUCT(MoeDistributeCombineV2TilingData, tilingData, tilingGM);
+    GET_TILING_DATA_MEMBER(MoeDistributeCombineV2TilingData, moeDistributeCombineV2Info, combineV2Info, tilingGM);
     TPipe pipe;
 #if (ORIG_DTYPE_EXPAND_X == DT_BF16 || ORIG_DTYPE_EXPAND_X == DT_FLOAT16)
     GM_ADDR contextGM0 = (GM_ADDR)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
     MoeDistributeCombineV2A5Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode == TILINGKEY_INT8_QUANT, true, false> op;
     op.Init(contextGM0, expandX, expertIds, assistInfoForCombine, epSendCount, residualX, gamma, scales, xActiveMask,
             sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV, nullptr, YOut,
-            dynamicScaleOut, XOut, workspaceGM, &pipe, &tilingData);
+            dynamicScaleOut, XOut, workspaceGM, &pipe, &combineV2Info);
     op.Process();
 #endif
 }

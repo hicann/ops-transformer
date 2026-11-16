@@ -35,24 +35,19 @@ __global__ __aicore__ void moe_distribute_combine_v2(GM_ADDR expandX, GM_ADDR ex
 
 {
     REGISTER_TILING_DEFAULT(MoeDistributeCombineV2TilingData);
-    GET_TILING_DATA_WITH_STRUCT(MoeDistributeCombineV2TilingData, tilingData, tilingGM);
+    GET_TILING_DATA_MEMBER(MoeDistributeCombineV2TilingData, moeDistributeCombineV2Info, combineV2Info, tilingGM);
     TPipe pipe;
 
 #if ((ORIG_DTYPE_EXPAND_X == DT_BF16) || (ORIG_DTYPE_EXPAND_X == DT_FLOAT16))
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
-    if constexpr ((ArchTag == TILINGKEY_TPL_A5) && (LayeredMode == TILINGKEY_TPL_CCU)) {
-        MoeDistributeCombineA5Impl::MoeDistributeCombineA5<DTYPE_EXPAND_X, int32_t> op;
-        op.Init(expandX, expertIds, assistInfoForCombine, epSendCount, xActiveMask, scales, sharedExpertX, XOut,
-                workspaceGM, &pipe, &tilingData);
-        op.Process();
-    } else if constexpr (((ArchTag == TILINGKEY_TPL_A5) || (ArchTag == TILINGKEY_TPL_A6)) &&
-                         (LayeredMode == TILINGKEY_TPL_MTE)) {
+    if constexpr (((ArchTag == TILINGKEY_TPL_A5) || (ArchTag == TILINGKEY_TPL_A6)) &&
+                  (LayeredMode == TILINGKEY_TPL_MTE)) {
         GM_ADDR contextGM0 = (GM_ADDR)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
         MoeDistributeCombineV2A5Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode, false, (ArchTag == TILINGKEY_TPL_A6)>
             op;
         op.Init(contextGM0, expandX, expertIds, assistInfoForCombine, epSendCount, nullptr, nullptr, scales,
                 xActiveMask, sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV,
-                performanceInfo, nullptr, nullptr, XOut, workspaceGM, &pipe, &tilingData);
+                performanceInfo, nullptr, nullptr, XOut, workspaceGM, &pipe, &combineV2Info);
         op.Process();
     }
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);

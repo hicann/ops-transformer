@@ -41,7 +41,8 @@ __global__ __aicore__ void moe_distribute_combine_v3(GM_ADDR mc2Context, GM_ADDR
                                                      GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(MoeDistributeCombineV2TilingData);
-    GET_TILING_DATA_WITH_STRUCT(MoeDistributeCombineV2TilingData, tilingData, tilingGM);
+    GET_TILING_DATA_MEMBER(MoeDistributeCombineV2TilingData, moeDistributeCombineV2Info, combineV2Info, tilingGM);
+
     TPipe pipe;
 #if (ORIG_DTYPE_EXPAND_X == DT_BF16 || ORIG_DTYPE_EXPAND_X == DT_FLOAT16)
     if constexpr ((ArchTag == TILINGKEY_TPL_A5) || (ArchTag == TILINGKEY_TPL_A6)) {
@@ -52,7 +53,7 @@ __global__ __aicore__ void moe_distribute_combine_v3(GM_ADDR mc2Context, GM_ADDR
                 op;
             op.Init(mc2Context, expandX, expertIds, assistInfoForCombine, epSendCount, nullptr, nullptr, scales,
                     expandScales, xActiveMask, sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2,
-                    constExpertV, performanceInfo, nullptr, nullptr, XOut, workspaceGM, &pipe, &tilingData);
+                    constExpertV, performanceInfo, nullptr, nullptr, XOut, workspaceGM, &pipe, &combineV2Info);
             op.Process();
 #endif
         } else {
@@ -61,7 +62,7 @@ __global__ __aicore__ void moe_distribute_combine_v3(GM_ADDR mc2Context, GM_ADDR
                 op;
             op.Init(mc2Context, expandX, expertIds, assistInfoForCombine, epSendCount, nullptr, nullptr, scales,
                     xActiveMask, sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV,
-                    performanceInfo, nullptr, nullptr, XOut, workspaceGM, &pipe, &tilingData);
+                    performanceInfo, nullptr, nullptr, XOut, workspaceGM, &pipe, &combineV2Info);
             op.Process();
         }
     }

@@ -70,7 +70,7 @@ __attribute__((always_inline)) __aicore__ __inline__ void moe_distribute_combine
     GM_ADDR tilingGM, GM_ADDR mc2Context)
 {
     REGISTER_TILING_DEFAULT(MoeDistributeCombineV2TilingData);
-    GET_TILING_DATA_WITH_STRUCT(MoeDistributeCombineV2TilingData, tilingData, tilingGM);
+    GET_TILING_DATA_MEMBER(MoeDistributeCombineV2TilingData, moeDistributeCombineV2Info, combineV2Info, tilingGM);
     TPipe pipe;
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
     // A3 式直接传值：mc2Context 为 HcclCombinOpParam 布局上下文设备地址
@@ -79,7 +79,7 @@ __attribute__((always_inline)) __aicore__ __inline__ void moe_distribute_combine
     // residualX/gamma/yOut/rstdOut在apt.cpp中固定为nullptr
     op.Init(contextGM0, expandX, expertIds, assistInfoForCombine, epSendCount, nullptr, nullptr, scales, xActiveMask,
             sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV, performanceInfo,
-            nullptr, nullptr, XOut, workspaceGM, &pipe, &tilingData);
+            nullptr, nullptr, XOut, workspaceGM, &pipe, &combineV2Info);
     op.Process();
     if ASCEND_IS_AIV {
         PipeBarrier<PIPE_ALL>();
