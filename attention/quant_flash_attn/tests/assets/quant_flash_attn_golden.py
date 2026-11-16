@@ -1148,6 +1148,7 @@ def _cpu_mxfp8_golden_sectioned(
     softmax_scale=None,
     v_tail_bnsd=None,
     tail_lens=None,
+    block_sizes=None,
 ):
     """分段 golden: 按 kernel SectionStreamK 分核调度模拟 online softmax 与 P 量化
 
@@ -1162,15 +1163,18 @@ def _cpu_mxfp8_golden_sectioned(
     # 与 kernel 常量一致 (vf_basic_block_utils.h), 同 _online_softmax_update
     LN2 = 0.6931471824645996
     INV_LN2 = 1.4426950216293335
-    if D == 256:
-        K_BLOCK_SIZE = 128
-    else:
-        K_BLOCK_SIZE = 256
+    _, K_BLOCK_SIZE, _ = _resolve_cpu_block_sizes(block_sizes)
 
     m_base, s2_base, segments, head_num, is_decode = section_info
     if s2_base % K_BLOCK_SIZE != 0:
         raise ValueError(f"s2Base({s2_base}) 与 golden K block({K_BLOCK_SIZE}) 不对齐")
     chunks_per_s2 = s2_base // K_BLOCK_SIZE
+    logger.info(
+        "[CPU Golden Sectioned] M=%s S2=%s, K_BLOCK_SIZE=%s",
+        m_base,
+        s2_base,
+        K_BLOCK_SIZE,
+    )
 
     q_tensor = q_fp8.to(torch.float32)
     k_tensor = k_fp8.to(torch.float32)
@@ -1386,6 +1390,21 @@ def _cpu_mxfp8_golden_sectioned(
     return out.contiguous(), lse.contiguous()
 
 
+def _resolve_cpu_block_sizes(block_sizes):
+    if block_sizes is None:
+        return (128, 128, 256) if D == 256 else (128, 256, 512)
+    if len(block_sizes) != 3 or any(
+        type(size) is not int or size <= 0 for size in block_sizes
+    ):
+        raise ValueError(
+            f"Expected three positive integer block sizes, got {block_sizes!r}"
+        )
+    q_size, k_size, v_size = block_sizes
+    if k_size % QUANT_GROUP_SIZE or v_size != 2 * k_size:
+        raise ValueError("MXFP8 CPU blocks require K divisible by 32 and V == 2 * K")
+    return q_size, k_size, v_size
+
+
 def cpu_mxfp8_golden(
     q_fp8,
     k_fp8,
@@ -1399,6 +1418,7 @@ def cpu_mxfp8_golden(
     softmax_scale=None,
     v_tail_bnsd=None,
     tail_lens=None,
+    block_sizes=None,
 ):
     """CPU Flash Attention golden with MXFP8, C1V1C1V1C2V2 流水
 
@@ -1406,15 +1426,11 @@ def cpu_mxfp8_golden(
     (TTK: 由 golden 插件从 v_tail slot 反布局得到), tail_lens: 每 batch 尾长
     (0<tail<64, kv%64)。注入语义与 pytest 侧一致: 尾段 V 用 bf16 原值替换反量化值
     (尾段 scale 恒 1), 尾列 P 直存 bf16 不走 e4m3 量化往返。
+    block_sizes: 可选 (Q, K, V) CPU 切块配置; None 保持原配置。
+    是否分段仍由 NPU metadata 是否可用决定, 与 block_sizes/TTK backend 无关。
     """
     EPSILON = 1e-20
-    Q_BLOCK_SIZE = 128
-    if D == 256:
-        K_BLOCK_SIZE = 128
-        V_BLOCK_SIZE = 256
-    else:
-        K_BLOCK_SIZE = 256
-        V_BLOCK_SIZE = 512
+    Q_BLOCK_SIZE, K_BLOCK_SIZE, V_BLOCK_SIZE = _resolve_cpu_block_sizes(block_sizes)
 
     # FP8 → FP32 反量化
     q_tensor = q_fp8.to(torch.float32)
@@ -1446,6 +1462,7 @@ def cpu_mxfp8_golden(
                 v_tail_bnsd=v_tail_bnsd,
                 tail_lens=tail_lens,
                 softmax_scale=softmax_scale,
+                block_sizes=block_sizes,
             )
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("[Section] 分段 golden 计算失败(%s), 回退全局量化语义", exc)
@@ -1664,18 +1681,15 @@ def cpu_mxfp8_golden(
 # 三方比对支撑 (cross_check): fp64 bench 与固定分段量化参考
 # 仅 --compare cross_check 时由 impl/golden.py 调用, 两方回归路径不受影响。
 # ==============================================================================
-_SECTION_M_BASE = 64
-_SECTION_S2_BASE = 256
+def _fixed_block_section_info(actual_seq_q, actual_seq_kv, block_sizes=None):
+    """按所选平台的 S2 基本块固定切段, 不依赖 metadata 分核方案。
 
-
-def _fixed_block_section_info(actual_seq_q, actual_seq_kv):
-    """按 s2 基本块(256 列)固定切段, 与 kernel 分核分段解耦
-
-    kernel 的一个段是若干连续基本块在分核后的并集, 所以按单块切段的分段粒度
-    最细、段数最多; 作为三方 third_party 时其量化噪声只会不小于 target, 判据
-    不会因参考过干净而虚高。返回 (m_base, s2_base, segments, head_num, is_decode),
-    segments[bn][mi] 为该 (bn, m-block) 的 [(s2块起, s2块止), ...] 分段列表。
+    M 使用 Q 块大小, S2 使用 V 块大小; 每个 S2 基本块独立成段,
+    段内按 K 块大小执行 subLoop。None 保持 arch35 的原始目标块配置。
+    返回 (m_base, s2_base, segments, head_num, is_decode), segments[bn][mi]
+    为该 (bn, m-block) 的 [(s2块起, s2块止), ...] 分段列表。
     """
+    m_base, _, s2_base = _resolve_cpu_block_sizes(block_sizes)
     is_decode = resolve_q_scale_layout()[0] in ("N2TGD", "BN2SGD")
     head_num = N_kv if is_decode else N_q
     sched_group = N_q // head_num
@@ -1683,13 +1697,13 @@ def _fixed_block_section_info(actual_seq_q, actual_seq_kv):
     for bi in range(len(actual_seq_kv)):
         q_len = int(actual_seq_q[bi])
         kv_len = int(actual_seq_kv[bi])
-        m_blocks = (q_len * sched_group + _SECTION_M_BASE - 1) // _SECTION_M_BASE
+        m_blocks = (q_len * sched_group + m_base - 1) // m_base
         row_segments = []
         for mi in range(m_blocks):
             s2_start, s2_end = _qfa_calc_s2_block_range(
                 mi,
-                _SECTION_M_BASE,
-                _SECTION_S2_BASE,
+                m_base,
+                s2_base,
                 q_len,
                 kv_len,
                 sched_group,
@@ -1697,7 +1711,7 @@ def _fixed_block_section_info(actual_seq_q, actual_seq_kv):
             row_segments.append([(j, j + 1) for j in range(s2_start, s2_end)])
         for _ in range(head_num):
             segments.append([list(segs) for segs in row_segments])
-    return _SECTION_M_BASE, _SECTION_S2_BASE, segments, head_num, is_decode
+    return m_base, s2_base, segments, head_num, is_decode
 
 
 def cpu_mxfp8_sectioned_golden(
@@ -1713,14 +1727,14 @@ def cpu_mxfp8_sectioned_golden(
     softmax_scale=None,
     v_tail_bnsd=None,
     tail_lens=None,
+    block_sizes=None,
 ):
     """分段量化参考, 仅供三方 cross_check 作为 third_party 使用。
 
     两方 golden 走全局 / metadata 分段语义(cpu_mxfp8_golden); 本函数固定按
-    s2 基本块切段, 不依赖 metadata 分核规划, 使参考的 P 量化噪声水平与 target
-    可比。
+    所选平台的 S2 基本块切段, 不依赖 metadata 分核规划。
     """
-    section_info = _fixed_block_section_info(actual_seq_q, actual_seq_kv)
+    section_info = _fixed_block_section_info(actual_seq_q, actual_seq_kv, block_sizes)
     return _cpu_mxfp8_golden_sectioned(
         q_fp8,
         k_fp8,
@@ -1735,6 +1749,7 @@ def cpu_mxfp8_sectioned_golden(
         softmax_scale=softmax_scale,
         v_tail_bnsd=v_tail_bnsd,
         tail_lens=tail_lens,
+        block_sizes=block_sizes,
     )
 
 
@@ -1751,6 +1766,7 @@ def cpu_mxfp8_bench(
     softmax_scale=None,
     v_tail_bnsd=None,
     tail_lens=None,
+    block_sizes=None,
 ):
     """三方比对的 bench(标杆): 同语义、更高算术精度的参考实现。
 
@@ -1761,16 +1777,10 @@ def cpu_mxfp8_bench(
       - 输入只做反量化(乘 deq), 不重新量化; P 的 fp8 量化是算子语义, 必须保留
     """
     EPSILON = 1e-20
-    Q_BLOCK_SIZE = 128
+    Q_BLOCK_SIZE, K_BLOCK_SIZE, V_BLOCK_SIZE = _resolve_cpu_block_sizes(block_sizes)
     # 与 kernel 常量一致 (vf_basic_block_utils.h), 同 _online_softmax_update
     LN2 = 0.6931471824645996
     INV_LN2 = 1.4426950216293335
-    if D == 256:
-        K_BLOCK_SIZE = 128
-        V_BLOCK_SIZE = 256
-    else:
-        K_BLOCK_SIZE = 256
-        V_BLOCK_SIZE = 512
 
     q_tensor = q_fp8.to(torch.float32).double()
     k_tensor = k_fp8.to(torch.float32).double()

@@ -26,6 +26,7 @@ import quant_flash_attn_golden as mxfp8_golden_mod
 import quant_flash_attn_fp8_golden as fp8_golden_mod
 import quant_flash_attn_hif8_golden as hif8_golden_mod
 import quant_flash_attn_hifp4_golden as hifp4_golden_mod
+from mxfp8_golden_config import get_ttk_cpu_profile
 
 logger = logging.getLogger(__name__)
 
@@ -947,6 +948,20 @@ def cpu_qfa_mxfp8(
         v_tail, block_table_tail, seqused_v_tail, enable_pa, kv_cache_layout
     )
 
+    # --plat selects block sizes only; metadata availability still selects the path.
+    profile = get_ttk_cpu_profile(q_scale_layout, D, backend=kwargs.get("backend"))
+    block_sizes = None
+    if profile is not None:
+        arch, block_sizes = profile
+        logger.info(
+            "[MXFP8 CPU Golden] arch=%s layout=%s D=%s global_blocks(Q,K,V)=(%s,%s,%s); "
+            "sectioned path uses metadata M/S2 and profile K",
+            arch,
+            q_scale_layout,
+            D,
+            *block_sizes,
+        )
+
     # ----- 调 cpu_mxfp8_golden (BNSD fp8 + group 维 fp32 scale) -----
     # v_tail_bnsd: (B,N_kv,block_size,D) bf16 尾块原值, cpu_mxfp8_golden 内注入
     # 尾段V原值(scale=1) + 尾列P直存bf16 (与 kernel 纯尾task VF bf16 直出对齐)
@@ -963,6 +978,7 @@ def cpu_qfa_mxfp8(
         softmax_scale=softmax_scale,
         v_tail_bnsd=vtail_bnsd,
         tail_lens=vtail_tail_lens,
+        block_sizes=block_sizes,
     )
 
     # 输出布局: 优先算子 layout_out 参数 (redline 用例 BNSD); 老 CSV layout_out
@@ -1039,6 +1055,7 @@ def cpu_qfa_mxfp8(
             "softmax_scale": softmax_scale,
             "v_tail_bnsd": vtail_bnsd,
             "tail_lens": vtail_tail_lens,
+            "block_sizes": block_sizes,
         },
         actual_seq_q,
         compare_layout,
