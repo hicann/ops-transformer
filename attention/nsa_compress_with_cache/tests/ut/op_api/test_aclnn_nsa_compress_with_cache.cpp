@@ -9,6 +9,7 @@
  */
 
 #include <array>
+#include <string>
 #include <iostream>
 #include <vector>
 
@@ -89,3 +90,89 @@ TEST_F(NsaCompressWithCacheApiTest, aclnn_nsa_compress_with_cache_reject_stride_
     uint64_t workspaceSize = 0;
     EXPECT_NE(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
 }
+
+namespace {
+enum class NullParam {
+    Input,
+    Weight,
+    SlotMapping,
+    OutputCache,
+    WorkspaceSize,
+    Executor
+};
+
+class NsaCompressWithCacheNullptrTest : public testing::TestWithParam<NullParam> {};
+
+TEST_P(NsaCompressWithCacheNullptrTest, ReturnsParamNullptr)
+{
+    auto input = TensorDesc({1, 1, 16}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+    auto weight = TensorDesc({16, 16}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+    auto slotMapping = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto outputCache = TensorDesc({1, 128, 1, 16}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+    ASSERT_NE(input.get(), nullptr);
+    ASSERT_NE(weight.get(), nullptr);
+    ASSERT_NE(slotMapping.get(), nullptr);
+    ASSERT_NE(outputCache.get(), nullptr);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    char layout[] = "BSND";
+    const auto param = GetParam();
+
+    // Keep every other required pointer valid to test each API argument independently.
+    const auto ret = aclnnNsaCompressWithCacheGetWorkspaceSize(
+        param == NullParam::Input ? nullptr : input.get(), param == NullParam::Weight ? nullptr : weight.get(),
+        param == NullParam::SlotMapping ? nullptr : slotMapping.get(), nullptr, nullptr, layout, 16, 16, 0, 128,
+        param == NullParam::OutputCache ? nullptr : outputCache.get(),
+        param == NullParam::WorkspaceSize ? nullptr : &workspaceSize,
+        param == NullParam::Executor ? nullptr : &executor);
+
+    EXPECT_EQ(ret, ACLNN_ERR_PARAM_NULLPTR);
+    EXPECT_EQ(workspaceSize, 0U);
+    EXPECT_EQ(executor, nullptr);
+}
+
+std::string NullParamName(const testing::TestParamInfo<NullParam>& info)
+{
+    switch (info.param) {
+        case NullParam::Input:
+            return "Input";
+        case NullParam::Weight:
+            return "Weight";
+        case NullParam::SlotMapping:
+            return "SlotMapping";
+        case NullParam::OutputCache:
+            return "OutputCache";
+        case NullParam::WorkspaceSize:
+            return "WorkspaceSize";
+        case NullParam::Executor:
+            return "Executor";
+    }
+    return "Unknown";
+}
+
+INSTANTIATE_TEST_SUITE_P(RequiredPointers, NsaCompressWithCacheNullptrTest,
+                         testing::Values(NullParam::Input, NullParam::Weight, NullParam::SlotMapping,
+                                         NullParam::OutputCache, NullParam::WorkspaceSize, NullParam::Executor),
+                         NullParamName);
+
+TEST(NsaCompressWithCacheParamTest, EmptyTensorRemainsParamInvalid)
+{
+    auto input = TensorDesc({0, 1, 16}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+    auto weight = TensorDesc({16, 16}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+    auto slotMapping = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto outputCache = TensorDesc({1, 128, 1, 16}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+    ASSERT_NE(input.get(), nullptr);
+    ASSERT_NE(weight.get(), nullptr);
+    ASSERT_NE(slotMapping.get(), nullptr);
+    ASSERT_NE(outputCache.get(), nullptr);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    char layout[] = "BSND";
+    // Optional nulls must not be mistaken for missing required arguments.
+    EXPECT_EQ(
+        aclnnNsaCompressWithCacheGetWorkspaceSize(input.get(), weight.get(), slotMapping.get(), nullptr, nullptr,
+                                                  layout, 16, 16, 0, 128, outputCache.get(), &workspaceSize, &executor),
+        ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(executor, nullptr);
+}
+} // namespace

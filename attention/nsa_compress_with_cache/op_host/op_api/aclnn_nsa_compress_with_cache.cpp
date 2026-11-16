@@ -160,7 +160,7 @@ aclnnStatus aclnnNsaCompressWithCacheGetWorkspaceSize(
     // 检查入参
     CHECK_RET(CheckNsaCompressWithCacheParam(input, weight, slotMapping, outputCache, workspaceSize, executor) ==
                   ACLNN_SUCCESS,
-              ACLNN_ERR_INNER_NULLPTR);
+              ACLNN_ERR_PARAM_NULLPTR);
     // 检查空tensor
     if (CheckIsEmptyTensor(input, weight, outputCache)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "[NSACompressWithCache] do not support empty input/weight/outputCache.");
