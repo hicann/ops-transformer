@@ -180,6 +180,14 @@ def round_fp64_to_bf16_rne(value):
     return rounded.to(torch.float32).to(torch.bfloat16)
 
 
+def round_fp32_to_bf16_cast_round(value):
+    value = value.to(torch.float32).contiguous()
+    # Match CAST_ROUND: BF16 midpoint ties round away from zero.
+    rounded_bits = (value.view(torch.int32) + 0x8000) & -0x10000
+    rounded = rounded_bits.view(torch.float32)
+    return torch.where(torch.isfinite(value), rounded, value).to(torch.bfloat16)
+
+
 def reduce_mxfp4_weighted_qk(weight_matrix, qk_matrix):
     output_shape = (weight_matrix.shape[0], weight_matrix.shape[1], qk_matrix.shape[2])
     acc_bf16 = torch.zeros(
@@ -928,7 +936,7 @@ class GeneralizedQLIV2:
                 cur_m_broadcasted, (1, temp_n2, temp_s1, temp_s2)
             )
             reduce_sum[cur_m_broadcasted.to(dtype=torch.bool)] = -torch.inf
-        to_be_sort_ele = reduce_sum.clone().to(torch.bfloat16)
+        to_be_sort_ele = round_fp32_to_bf16_cast_round(reduce_sum)
         b_sorted_indices = torch.full(to_be_sort_ele.shape, -1, dtype=torch.int32)
         if sparse_mode == 3:
             for i in range(temp_s1):
@@ -989,8 +997,7 @@ class GeneralizedQLIV2:
             )
             # 根据布尔矩阵置-inf
             reduce_sum[cur_m_broadcasted.to(dtype=torch.bool)] = -torch.inf
-        to_be_sort_ele = reduce_sum.clone()
-        to_be_sort_ele = to_be_sort_ele.to(torch.bfloat16)
+        to_be_sort_ele = round_fp32_to_bf16_cast_round(reduce_sum)
         # 稳定排序
         b_sorted_indices = torch.full(to_be_sort_ele.shape, -1, dtype=torch.int32)
         if sparse_mode == 3:
@@ -1074,8 +1081,7 @@ class GeneralizedQLIV2:
                 cur_m_broadcasted, (1, temp_n2, temp_s1, temp_s2)
             )
             reduce_sum[cur_m_broadcasted.to(dtype=torch.bool)] = -torch.inf
-        to_be_sort_ele = reduce_sum.clone()
-        to_be_sort_ele = to_be_sort_ele.to(torch.bfloat16)
+        to_be_sort_ele = round_fp32_to_bf16_cast_round(reduce_sum)
         b_sorted_indices = torch.full(to_be_sort_ele.shape, -1, dtype=torch.int32)
         if sparse_mode == 3:
             for i in range(temp_s1):
@@ -1135,8 +1141,7 @@ class GeneralizedQLIV2:
             )
             # 根据布尔矩阵置-inf
             reduce_sum[cur_m_broadcasted.to(dtype=torch.bool)] = -torch.inf
-        to_be_sort_ele = reduce_sum.clone()
-        to_be_sort_ele = to_be_sort_ele.to(torch.bfloat16)
+        to_be_sort_ele = round_fp32_to_bf16_cast_round(reduce_sum)
         # 稳定排序
         b_sorted_indices = torch.full(to_be_sort_ele.shape, -1, dtype=torch.int32)
         if sparse_mode == 3:
@@ -1203,7 +1208,7 @@ class GeneralizedQLIV2:
             # 根据布尔矩阵置-inf
             reduce_sum[cur_m_broadcasted.to(dtype=torch.bool)] = -torch.inf
 
-        to_be_sort_ele = reduce_sum.clone()
+        to_be_sort_ele = round_fp32_to_bf16_cast_round(reduce_sum)
         # 稳定排序
         b_sorted_indices = torch.full(to_be_sort_ele.shape, -1, dtype=torch.int32)
         if sparse_mode == 3:
