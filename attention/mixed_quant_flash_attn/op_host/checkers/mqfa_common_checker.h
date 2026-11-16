@@ -67,6 +67,7 @@ private:
     ge::graphStatus CheckHeadNum(const FaTilingInfo& faInfo);
     ge::graphStatus CheckDtypeConsistency(const FaTilingInfo& faInfo);
     ge::graphStatus CheckAxis(const FaTilingInfo& faInfo);
+    ge::graphStatus CheckKvShapeConsistency(const FaTilingInfo& faInfo);
     ge::graphStatus CheckShapeConsistency(const FaTilingInfo& faInfo);
 
     ge::graphStatus CheckKVShapeForContinuous(const FaTilingInfo& faInfo) const;

@@ -86,10 +86,6 @@ ge::graphStatus FAChecker::CheckMultiPara(const FaTilingInfo& faInfo)
 
 ge::graphStatus FAChecker::Process(const FaTilingInfo& faInfo)
 {
-    if (faInfo.emptyTensorFlag) {
-        OP_LOGE(faInfo.opName, "Empty tensor detected: q, k, v or attn_out has dimension with size 0");
-        return ge::GRAPH_FAILED;
-    }
     if (ge::GRAPH_SUCCESS != CheckSinglePara(faInfo)) {
         return ge::GRAPH_FAILED;
     }

@@ -37,23 +37,31 @@ ge::graphStatus SinksChecker::CheckSinglePara(const FaTilingInfo& faInfo)
         return ge::GRAPH_SUCCESS;
     }
 
-    OP_CHECK_IF(faInfo.opParamInfo.sinks.tensor == nullptr || faInfo.opParamInfo.sinks.desc == nullptr,
-                OP_LOGE(faInfo.opName, "sinks tensor or desc is null."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        faInfo.opParamInfo.sinks.tensor == nullptr || faInfo.opParamInfo.sinks.desc == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "sinks", "sinks tensor or tensor desc cannot be null"),
+        return ge::GRAPH_FAILED);
 
     auto dtype = faInfo.opParamInfo.sinks.desc->GetDataType();
     OP_CHECK_IF(dtype != ge::DT_FLOAT,
-                OP_LOGE(faInfo.opName, "sinks dtype must be FLOAT32, but got %s.",
-                        ge::TypeUtils::DataTypeToSerialString(dtype).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE(faInfo.opName, "sinks", DataTypeToSerialString(dtype).c_str(), "FLOAT"),
                 return ge::GRAPH_FAILED);
 
     const auto& shape = faInfo.opParamInfo.sinks.tensor->GetStorageShape();
-    OP_CHECK_IF(shape.GetDimNum() != 1,
-                OP_LOGE(faInfo.opName, "sinks shape must be 1D (Q_N,), but got %lu dims.", shape.GetDimNum()),
-                return ge::GRAPH_FAILED);
     OP_CHECK_IF(
-        shape.GetDim(0) != faInfo.n1Size,
-        OP_LOGE(faInfo.opName, "sinks shape[0] must equal Q_N (%ld), but got %ld.", faInfo.n1Size, shape.GetDim(0)),
+        shape.GetDimNum() != 1,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(faInfo.opName, "sinks", (std::to_string(shape.GetDimNum()) + "D").c_str(), "1D"),
         return ge::GRAPH_FAILED);
+    OP_CHECK_IF(shape.GetDim(0) != faInfo.n1Size,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    faInfo.opName, "sinks", GetShapeStr(shape).c_str(),
+                    ("When layout_q is " + LayoutToSerialString(faInfo.qLayout) +
+                     ", the shape size of sinks must be "
+                     "equal to the size (" +
+                     std::to_string(faInfo.n1Size) + ") of the " + (faInfo.qLayout == FaLayout::BSND ? "2nd" : "1st") +
+                     " axis (num heads) of q")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

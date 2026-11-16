@@ -99,7 +99,7 @@ ge::graphStatus InferShapeMixedQuantFlashAttn(gert::InferShapeContext* context)
         if (qShape->GetDimNum() != 4) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q",
                                                      std::to_string(qShape->GetDimNum()).c_str(),
-                                                     "The shape dim of q must be 4 when layout_q is BSND");
+                                                     "When layout_q is BSND, the shape dim of q must be 4");
             return ge::GRAPH_FAILED;
         }
         batchSize = qShape->GetDim(0);
@@ -110,7 +110,7 @@ ge::graphStatus InferShapeMixedQuantFlashAttn(gert::InferShapeContext* context)
         if (qShape->GetDimNum() != 4) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q",
                                                      std::to_string(qShape->GetDimNum()).c_str(),
-                                                     "The shape dim of q must be 4 when layout_q is BNSD");
+                                                     "When layout_q is BNSD, the shape dim of q must be 4");
             return ge::GRAPH_FAILED;
         }
         batchSize = qShape->GetDim(0);
@@ -121,7 +121,7 @@ ge::graphStatus InferShapeMixedQuantFlashAttn(gert::InferShapeContext* context)
         if (qShape->GetDimNum() != 3) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q",
                                                      std::to_string(qShape->GetDimNum()).c_str(),
-                                                     "The shape dim of q must be 3 when layout_q is TND");
+                                                     "When layout_q is TND, the shape dim of q must be 3");
             return ge::GRAPH_FAILED;
         }
         seqLenQ = qShape->GetDim(0);
@@ -129,8 +129,7 @@ ge::graphStatus InferShapeMixedQuantFlashAttn(gert::InferShapeContext* context)
         headDim = qShape->GetDim(2);
         isTND = true;
     } else {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_q", layoutQStr.c_str(),
-                                              "The value of layout_q must be in BSND/BNSD/TND");
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "layout_q", layoutQStr.c_str(), "BSND, BNSD or TND");
         return ge::GRAPH_FAILED;
     }
 
@@ -162,8 +161,7 @@ ge::graphStatus InferShapeMixedQuantFlashAttn(gert::InferShapeContext* context)
         attnOutShape->SetDim(1, numHeadsQ);
         attnOutShape->SetDim(2, headDimV);
     } else {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_out", layoutOutStr.c_str(),
-                                              "The value of layout_out must be in BSND/BNSD/TND");
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "layout_attn_out", layoutOutStr.c_str(), "BSND, BNSD or TND");
         return ge::GRAPH_FAILED;
     }
 

@@ -89,12 +89,26 @@ const std::map<FaCompareType, CompareFunc<int64_t>> FaTilingShapeCompare::compar
 // 辅助函数
 // ============================================================================
 
-static ge::graphStatus GetLayoutAxes(std::vector<FaAxis>& layoutAxes, const FaLayout& layout, const std::string& opName,
-                                     const std::string& funcName)
+static std::string GetLayoutParamName(const std::string& tensorName)
 {
+    if (tensorName == KEY_NAME || tensorName == VALUE_NAME) {
+        return LAYOUT_KV_NAME;
+    }
+    if (tensorName == ATTN_OUT_NAME) {
+        return LAYOUT_ATTN_OUT_NAME;
+    }
+    return LAYOUT_Q_NAME;
+}
+
+static ge::graphStatus GetLayoutAxes(std::vector<FaAxis>& layoutAxes, const FaLayout& layout, const std::string& opName,
+                                     const std::string& funcName, const std::string& name)
+{
+    (void)funcName;
     auto it = FA_LAYOUT_AXIS_MAP.find(layout);
     if (it == FA_LAYOUT_AXIS_MAP.end()) {
-        OP_LOGE(opName, "[%s] Layout %s is unsupported.", funcName.c_str(), LayoutToSerialString(layout).c_str());
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, GetLayoutParamName(name).c_str(),
+                                              LayoutToSerialString(layout).c_str(),
+                                              ("The layout of " + name + " is unsupported").c_str());
         return ge::GRAPH_FAILED;
     }
     layoutAxes = it->second;
@@ -133,18 +147,22 @@ int64_t FaTilingShape::GetAxisNum(const FaAxis& axis) const
 ge::graphStatus FaTilingShape::CheckHasAxis(const FaAxis& axis, const std::string& funcName) const
 {
     if (shape_.GetDimNum() == 0) {
-        OP_LOGE(opName_, "[%s] The dim number of %s is 0.", funcName.c_str(), name_.c_str());
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, name_, "0",
+                                                 ("The shape dim of " + name_ + " must be greater than 0").c_str());
         return ge::GRAPH_FAILED;
     }
 
     std::vector<FaAxis> layoutAxes;
-    if (GetLayoutAxes(layoutAxes, layout_, opName_, funcName) != ge::GRAPH_SUCCESS) {
+    if (GetLayoutAxes(layoutAxes, layout_, opName_, funcName, name_) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
     if (shape_.GetDimNum() != layoutAxes.size()) {
-        OP_LOGE(opName_, "[%s] %s shape dimension is %zu, expected is %zu (layout %s).", funcName.c_str(),
-                name_.c_str(), shape_.GetDimNum(), layoutAxes.size(), LayoutToSerialString(layout_).c_str());
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            opName_, name_, (std::to_string(shape_.GetDimNum()) + "D").c_str(),
+            ("When layout is " + LayoutToSerialString(layout_) + ", the shape dim of " + name_ + " must be " +
+             std::to_string(layoutAxes.size()) + "D")
+                .c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -152,15 +170,19 @@ ge::graphStatus FaTilingShape::CheckHasAxis(const FaAxis& axis, const std::strin
         if (HasShapeD()) {
             return ge::GRAPH_SUCCESS;
         }
-        OP_LOGE(opName_, "[%s] %s's layout is %s, axis D or (D1, D0) does not exist.", funcName.c_str(), name_.c_str(),
-                LayoutToSerialString(layout_).c_str());
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            opName_, name_, std::to_string(shape_.GetDimNum()).c_str(),
+            ("The layout of " + name_ + " is " + LayoutToSerialString(layout_) + ", axis D or (D1, D0) does not exist")
+                .c_str());
         return ge::GRAPH_FAILED;
     } else if (HasAxis(axis)) {
         return ge::GRAPH_SUCCESS;
     }
 
-    OP_LOGE(opName_, "[%s] %s's layout is %s, %s is not exists.", funcName.c_str(), name_.c_str(),
-            LayoutToSerialString(layout_).c_str(), AxisToSerialString(axis).c_str());
+    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, name_, std::to_string(shape_.GetDimNum()).c_str(),
+                                             ("The layout of " + name_ + " is " + LayoutToSerialString(layout_) +
+                                              ", axis " + AxisToSerialString(axis) + " does not exist")
+                                                 .c_str());
     return ge::GRAPH_FAILED;
 }
 
@@ -193,6 +215,7 @@ ge::graphStatus FaTilingShapeCompare::GetExpectedShape(gert::Shape& shapeExpecte
                                                        const FaTilingShapeCompareParam& param,
                                                        const std::string& funcName) const
 {
+    (void)funcName;
     switch (layout_) {
         case FaLayout::BSND:
             shapeExpected = gert::Shape({param.B, param.S, param.N, param.D});
@@ -219,7 +242,9 @@ ge::graphStatus FaTilingShapeCompare::GetExpectedShape(gert::Shape& shapeExpecte
             shapeExpected = gert::Shape({param.N, param.T});
             break;
         default:
-            OP_LOGE(opName_, "[%s] Layout %s is unsupported.", funcName.c_str(), LayoutToSerialString(layout_).c_str());
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, GetLayoutParamName(name_).c_str(),
+                                                  LayoutToSerialString(layout_).c_str(),
+                                                  ("The layout of " + name_ + " is unsupported").c_str());
             return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -254,13 +279,16 @@ ge::graphStatus FaTilingShapeCompare::CompareShape(FaTilingShapeCompareParam& pa
     }
 
     std::vector<FaAxis> layoutAxes;
-    if (GetLayoutAxes(layoutAxes, layout_, opName_, funcName) != ge::GRAPH_SUCCESS) {
+    if (GetLayoutAxes(layoutAxes, layout_, opName_, funcName, name_) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
     if (shape_.GetDimNum() != shapeExpected.GetDimNum() || shape_.GetDimNum() != layoutAxes.size()) {
-        OP_LOGE(opName_, "[%s] %s shape dimension is %zu, expected is %zu (layout %s).", funcName.c_str(),
-                name_.c_str(), shape_.GetDimNum(), shapeExpected.GetDimNum(), LayoutToSerialString(layout_).c_str());
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            opName_, name_, (std::to_string(shape_.GetDimNum()) + "D").c_str(),
+            ("When layout is " + LayoutToSerialString(layout_) + ", the shape dim of " + name_ + " must be " +
+             std::to_string(shapeExpected.GetDimNum()) + "D")
+                .c_str());
         return ge::GRAPH_FAILED;
     }
 

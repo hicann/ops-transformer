@@ -31,22 +31,44 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35FA;
 
+namespace {
+string GetBlockSizeAxisOrdinal(FaLayout layout)
+{
+    switch (layout) {
+        case FaLayout::PA_BNBD:
+            return "2nd";
+        case FaLayout::PA_NZ:
+            return "3rd";
+        case FaLayout::PA_BBND:
+        default:
+            return "1st";
+    }
+}
+} // namespace
+
 ge::graphStatus PagedAttentionChecker::CheckSinglePara(const FaTilingInfo& faInfo)
 {
     if (!faInfo.pageAttentionFlag) {
         return ge::GRAPH_SUCCESS;
     }
 
-    OP_CHECK_IF(
-        faInfo.blockSize > BLOCK_SIZE_MAX || faInfo.blockSize < BLOCK_SIZE_ALIGN_SIZE_64,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "block_size", std::to_string(faInfo.blockSize).c_str(),
-                                              "The value of block_size must be within the range [64, 2048]"),
-        return ge::GRAPH_FAILED);
+    const string blockSizeAxis = GetBlockSizeAxisOrdinal(faInfo.kvLayout);
+    OP_CHECK_IF(faInfo.blockSize > BLOCK_SIZE_MAX || faInfo.blockSize < BLOCK_SIZE_ALIGN_SIZE_64,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    faInfo.opName, "k", Ops::Base::ToString(faInfo.opParamInfo.key.shape->GetStorageShape()).c_str(),
+                    ("When layout_kv is " + LayoutToSerialString(faInfo.kvLayout) + ", the size of the " +
+                     blockSizeAxis + " axis (block size) of k is not within the valid range. The valid range is [" +
+                     std::to_string(BLOCK_SIZE_ALIGN_SIZE_64) + ", " + std::to_string(BLOCK_SIZE_MAX) + "]")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(
         faInfo.blockSize % BLOCK_SIZE_ALIGN_SIZE_64 != 0,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "block_size", std::to_string(faInfo.blockSize).c_str(),
-                                              "The value of block_size must be 64-aligned"),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            faInfo.opName, "k", Ops::Base::ToString(faInfo.opParamInfo.key.shape->GetStorageShape()).c_str(),
+            ("When layout_kv is " + LayoutToSerialString(faInfo.kvLayout) + ", the size of the " + blockSizeAxis +
+             " axis (block size) of k must be " + std::to_string(BLOCK_SIZE_ALIGN_SIZE_64) + "-aligned")
+                .c_str()),
         return ge::GRAPH_FAILED);
 
     auto& blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
@@ -60,7 +82,7 @@ ge::graphStatus PagedAttentionChecker::CheckSinglePara(const FaTilingInfo& faInf
 
     OP_CHECK_IF(blockTableDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE(faInfo.opName, "block_table",
-                                          Ops::Base::ToString(blockTableDesc->GetDataType()).c_str(), "INT32"),
+                                          DataTypeToSerialString(blockTableDesc->GetDataType()).c_str(), "INT32"),
                 return ge::GRAPH_FAILED);
 
     if (ge::GRAPH_SUCCESS != CheckFormatSupport(blockTableDesc, BLOCK_TABLE_NAME)) {
@@ -80,8 +102,7 @@ ge::graphStatus PagedAttentionChecker::CheckParaExistence(const FaTilingInfo& fa
 {
     auto& blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
     OP_CHECK_IF(blockTableTensor == nullptr,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "block_table", "empty",
-                                                      "block_table must always be provided for MixedQuantFlashAttn"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "block_table", "block_table cannot be empty"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -97,9 +118,18 @@ ge::graphStatus PagedAttentionChecker::CheckMultiPara(const FaTilingInfo& faInfo
     int64_t dim0 = blockTableTensor->GetStorageShape().GetDim(0);
     if (dim0 != faInfo.bSize) {
         std::string shapeStr = Ops::Base::ToString(blockTableTensor->GetStorageShape());
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            faInfo.opName, "block_table", shapeStr.c_str(),
-            ("The first dim of block_table must be equal to the batch size " + std::to_string(faInfo.bSize)).c_str());
+        std::string reason;
+        if (faInfo.qLayout == FaLayout::TND) {
+            int64_t cuSeqLenQSize = faInfo.opParamInfo.cuSeqlensQ.tensor->GetShapeSize();
+            reason = "When layout_q is TND, the size of the 0th axis of block_table must be equal to the shape "
+                     "size (" +
+                     std::to_string(cuSeqLenQSize) + ") of the cu_seqlens_q minus 1";
+        } else {
+            reason = "When layout_q is " + LayoutToSerialString(faInfo.qLayout) +
+                     ", the size of the 0th axis of block_table must be equal to the size (" +
+                     std::to_string(faInfo.bSize) + ") of the 0th axis (batch) of q";
+        }
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "block_table", shapeStr.c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

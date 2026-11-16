@@ -26,6 +26,10 @@ public:
     ~MetadataChecker() = default;
 
     ge::graphStatus CheckSinglePara(const FaTilingInfo& faInfo) override;
+    ge::graphStatus CheckMultiPara(const FaTilingInfo& faInfo) override;
+
+private:
+    ge::graphStatus CheckScheduleSizeConsistency(const FaTilingInfo& faInfo, int64_t& expectedSize);
 };
 } // namespace mixed_quant_flash_attn
 } // namespace optiling

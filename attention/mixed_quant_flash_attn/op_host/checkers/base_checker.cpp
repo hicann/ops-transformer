@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <map>
 #include <numeric>
+#include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -37,10 +38,11 @@ ge::graphStatus FABaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDe
 {
     if (desc != nullptr) {
         const auto& it = DTYPE_SUPPORT_MAP.find(name);
-        OP_CHECK_IF(it == DTYPE_SUPPORT_MAP.end(),
-                    OP_LOGE("MixedQuantFlashAttn", "%s datatype support list should be specify in DTYPE_SUPPORT_MAP",
-                            name.c_str()),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            it == DTYPE_SUPPORT_MAP.end(),
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("MixedQuantFlashAttn", name.c_str(),
+                                                     "dtype support list should be specified in DTYPE_SUPPORT_MAP"),
+            return ge::GRAPH_FAILED);
         auto& expectDtypeList = it->second;
         if (std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) == expectDtypeList.end()) {
             std::string dtypeStr = DataTypeToSerialString(desc->GetDataType());
@@ -108,11 +110,11 @@ ge::graphStatus FABaseChecker::CheckTensorContiguous(const uint32_t tensorDimNum
 ge::graphStatus FABaseChecker::CheckTensorStridedViewNoOverlap(const uint32_t tensorDimNum,
                                                                const gert::Shape& inputShape,
                                                                const gert::Stride* strides, int32_t& overlapAxisIdx,
-                                                               int32_t& overlapPrevAxisIdx) const
+                                                               int64_t& overlapSpan) const
 {
     // 重叠视图校验：不同逻辑下标映射到同一底层元素
     overlapAxisIdx = -1;
-    overlapPrevAxisIdx = -1;
+    overlapSpan = 0;
     if (strides == nullptr || strides->GetDimNum() == 0 || strides->GetDimNum() != tensorDimNum) {
         return ge::GRAPH_SUCCESS;
     }
@@ -123,17 +125,22 @@ ge::graphStatus FABaseChecker::CheckTensorStridedViewNoOverlap(const uint32_t te
             strideSizeAxis.push_back({strides->GetStride(static_cast<size_t>(i)), dimSize, static_cast<int32_t>(i)});
         }
     }
-    // 按stride升序排序后逐级要求 stride[i] >= stride[i-1] * size[i-1]
+    // 按 stride 升序排序后逐级校验：当前维 stride 必须大于此前所有维度累积可达的最大偏移量
     std::sort(strideSizeAxis.begin(), strideSizeAxis.end());
-    for (size_t i = 1; i < strideSizeAxis.size(); i++) {
-        const uint64_t prevStride = static_cast<uint64_t>(std::get<0>(strideSizeAxis[i - 1]));
-        const uint64_t prevSize = static_cast<uint64_t>(std::get<1>(strideSizeAxis[i - 1]));
-        const uint64_t currStride = static_cast<uint64_t>(std::get<0>(strideSizeAxis[i]));
-        // 真实乘积超出uint64范围时，当前维stride必然小于该乘积
-        if (prevStride > UINT64_MAX / prevSize || currStride < prevStride * prevSize) {
-            overlapAxisIdx = std::get<2>(strideSizeAxis[i]);
-            overlapPrevAxisIdx = std::get<2>(strideSizeAxis[i - 1]);
+    uint64_t span = 0; // 已处理维度（stride 更小的维度）可达的最大偏移量
+    for (const auto& item : strideSizeAxis) {
+        const uint64_t curStride = static_cast<uint64_t>(std::get<0>(item));
+        const uint64_t curSize = static_cast<uint64_t>(std::get<1>(item));
+        if (curStride <= span) {
+            overlapAxisIdx = std::get<2>(item);
+            overlapSpan = static_cast<int64_t>(span);
             return ge::GRAPH_FAILED;
+        }
+        // 累积跨度溢出 uint64 时饱和为 UINT64_MAX，后续维度 stride（int64 范围内）必不大于 span，判为重叠
+        if (curSize - 1 > (UINT64_MAX - span) / curStride) {
+            span = UINT64_MAX;
+        } else {
+            span += (curSize - 1) * curStride;
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -144,10 +151,8 @@ std::string FABaseChecker::DataTypeToSerialString(ge::DataType type) const
     const auto it = DATATYPE_TO_STRING_MAP.find(type);
     if (it != DATATYPE_TO_STRING_MAP.end()) {
         return it->second;
-    } else {
-        OP_LOGE("MixedQuantFlashAttn", "datatype %d not support", type);
-        return "UNDEFINED";
     }
+    return std::to_string(static_cast<int32_t>(type));
 }
 
 // 获取数据类型大小，单位bit

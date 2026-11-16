@@ -40,8 +40,8 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FaTilingInfo&
 
     const gert::CompileTimeTensorDesc* sequsedQDesc = faInfo.opParamInfo.seqUsedQ.desc;
     OP_CHECK_IF(sequsedQDesc != nullptr && sequsedQDesc->GetDataType() != ge::DT_INT32,
-                OP_LOGE(faInfo.opName, "seqused_q dtype must be INT32, but got %s",
-                        DataTypeToSerialString(sequsedQDesc->GetDataType()).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE(faInfo.opName, "seqused_q",
+                                          DataTypeToSerialString(sequsedQDesc->GetDataType()).c_str(), "INT32"),
                 return ge::GRAPH_FAILED);
 
     if (ge::GRAPH_SUCCESS != CheckFormatSupport(sequsedQDesc, SEQUSED_Q_NAME)) {
@@ -49,12 +49,16 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FaTilingInfo&
     }
 
     uint32_t sequsedQDimNum = sequsedQTensor->GetStorageShape().GetDimNum();
-    OP_CHECK_IF(sequsedQDimNum != 1, OP_LOGE(faInfo.opName, "seqused_q dim num must be 1, but got %u.", sequsedQDimNum),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        sequsedQDimNum != 1,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(faInfo.opName, "seqused_q", (std::to_string(sequsedQDimNum) + "D").c_str(), "1D"),
+        return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(
         faInfo.seqUsedQSize != faInfo.bSize,
-        OP_LOGE(faInfo.opName, "seqused_q shape(%u) should be equal to batch(%d).", faInfo.seqUsedQSize, faInfo.bSize),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            faInfo.opName, "seqused_q", std::to_string(faInfo.seqUsedQSize).c_str(),
+            ("The shape size of seqused_q must be equal to batch_size (" + std::to_string(faInfo.bSize) + ")").c_str()),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -68,8 +72,8 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedKv(const FaTilingInfo
 
     const gert::CompileTimeTensorDesc* sequsedKvDesc = faInfo.opParamInfo.seqUsedKv.desc;
     OP_CHECK_IF(sequsedKvDesc != nullptr && sequsedKvDesc->GetDataType() != ge::DT_INT32,
-                OP_LOGE(faInfo.opName, "seqused_kv dtype must be INT32, but got %s",
-                        DataTypeToSerialString(sequsedKvDesc->GetDataType()).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE(faInfo.opName, "seqused_kv",
+                                          DataTypeToSerialString(sequsedKvDesc->GetDataType()).c_str(), "INT32"),
                 return ge::GRAPH_FAILED);
 
     if (ge::GRAPH_SUCCESS != CheckFormatSupport(sequsedKvDesc, SEQUSED_KV_NAME)) {
@@ -78,12 +82,15 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedKv(const FaTilingInfo
 
     uint32_t sequsedKvDimNum = sequsedKvTensor->GetStorageShape().GetDimNum();
     OP_CHECK_IF(sequsedKvDimNum != 1,
-                OP_LOGE(faInfo.opName, "seqused_kv dim num must be 1, but got %u.", sequsedKvDimNum),
+                OP_LOGE_FOR_INVALID_SHAPEDIM(faInfo.opName, "seqused_kv",
+                                             (std::to_string(sequsedKvDimNum) + "D").c_str(), "1D"),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(faInfo.seqUsedKvSize != faInfo.bSize,
-                OP_LOGE(faInfo.opName, "seqused_kv shape(%u) should be equal to batch(%d).", faInfo.seqUsedKvSize,
-                        faInfo.bSize),
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    faInfo.opName, "seqused_kv", std::to_string(faInfo.seqUsedKvSize).c_str(),
+                    ("The shape size of seqused_kv must be equal to batch_size (" + std::to_string(faInfo.bSize) + ")")
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -98,8 +105,8 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FaTilingInf
 
     const gert::CompileTimeTensorDesc* cuSeqlensQDesc = faInfo.opParamInfo.cuSeqlensQ.desc;
     OP_CHECK_IF(cuSeqlensQDesc != nullptr && cuSeqlensQDesc->GetDataType() != ge::DT_INT32,
-                OP_LOGE(faInfo.opName, "cu_seqlens_q dtype must be INT32, but got %s",
-                        DataTypeToSerialString(cuSeqlensQDesc->GetDataType()).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE(faInfo.opName, "cu_seqlens_q",
+                                          DataTypeToSerialString(cuSeqlensQDesc->GetDataType()).c_str(), "INT32"),
                 return ge::GRAPH_FAILED);
 
     if (ge::GRAPH_SUCCESS != CheckFormatSupport(cuSeqlensQDesc, CU_SEQLENS_Q_NAME)) {
@@ -108,63 +115,17 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FaTilingInf
 
     uint32_t cuSeqlensQDimNum = cuSeqlensQTensor->GetStorageShape().GetDimNum();
     OP_CHECK_IF(cuSeqlensQDimNum != 1,
-                OP_LOGE(faInfo.opName, "cu_seqlens_q dim num must be 1, but got %u.", cuSeqlensQDimNum),
+                OP_LOGE_FOR_INVALID_SHAPEDIM(faInfo.opName, "cu_seqlens_q",
+                                             (std::to_string(cuSeqlensQDimNum) + "D").c_str(), "1D"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(faInfo.cuSeqLensQSize != faInfo.bSize + 1,
-                OP_LOGE(faInfo.opName, "cu_seqlens_q shape(%u) should be equal to batch + 1(%d).",
-                        faInfo.cuSeqLensQSize, faInfo.bSize + 1),
-                return ge::GRAPH_FAILED);
-
-    const int32_t* cuSeqlensQData = gert::TensorPlacementUtils::IsOnHost(cuSeqlensQTensor->GetPlacement()) ?
-                                        cuSeqlensQTensor->GetData<int32_t>() :
-                                        nullptr;
-    if (cuSeqlensQData == nullptr) {
-        return ge::GRAPH_SUCCESS;
-    }
-
-    OP_CHECK_IF(cuSeqlensQData[0] != 0,
-                OP_LOGE(faInfo.opName, "cu_seqlens_q[0] must be 0, but got %d.", cuSeqlensQData[0]),
-                return ge::GRAPH_FAILED);
-
-    const gert::Tensor* sequsedQTensor = faInfo.opParamInfo.seqUsedQ.tensor;
-    const int32_t* sequsedQData =
-        (sequsedQTensor == nullptr || !gert::TensorPlacementUtils::IsOnHost(sequsedQTensor->GetPlacement())) ?
-            nullptr :
-            sequsedQTensor->GetData<int32_t>();
-
-    for (int64_t i = 0; i < faInfo.bSize; i++) {
-        int64_t physicalLen = static_cast<int64_t>(cuSeqlensQData[i + 1]) - cuSeqlensQData[i];
-        OP_CHECK_IF(physicalLen < 0,
-                    OP_LOGE(faInfo.opName,
-                            "cu_seqlens_q must be non-decreasing, but cu_seqlens_q[%ld]=%d is greater "
-                            "than cu_seqlens_q[%ld]=%d.",
-                            i, cuSeqlensQData[i], i + 1, cuSeqlensQData[i + 1]),
-                    return ge::GRAPH_FAILED);
-        if (faInfo.qLayout != FaLayout::TND) {
-            continue;
-        }
-        int64_t opSeqLen = (sequsedQData == nullptr) ? physicalLen : sequsedQData[i];
-        OP_CHECK_IF(sequsedQData != nullptr && opSeqLen > physicalLen,
-                    OP_LOGE(faInfo.opName,
-                            "The used seq len of batch %ld(%ld) must not be greater than the batch "
-                            "length(%ld) in cu_seqlens_q.",
-                            i, opSeqLen, physicalLen),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(faInfo.maxSeqQ != -1 && opSeqLen > faInfo.maxSeqQ,
-                    OP_LOGE(faInfo.opName,
-                            "The used seq len of batch %ld(%ld) must not be greater than "
-                            "max_seqlen_q(%ld).",
-                            i, opSeqLen, faInfo.maxSeqQ),
-                    return ge::GRAPH_FAILED);
-    }
-
-    if (faInfo.qLayout == FaLayout::TND) {
-        OP_CHECK_IF(static_cast<int64_t>(cuSeqlensQData[faInfo.bSize]) != faInfo.qTSize,
-                    OP_LOGE(faInfo.opName, "cu_seqlens_q[%ld](%d) must be equal to the T dim of query(%ld).",
-                            faInfo.bSize, cuSeqlensQData[faInfo.bSize], faInfo.qTSize),
-                    return ge::GRAPH_FAILED);
-    }
+    OP_CHECK_IF(
+        faInfo.cuSeqLensQSize != faInfo.bSize + 1,
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            faInfo.opName, "cu_seqlens_q", std::to_string(faInfo.cuSeqLensQSize).c_str(),
+            ("The shape size of cu_seqlens_q must be equal to batch_size (" + std::to_string(faInfo.bSize) + ") plus 1")
+                .c_str()),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -201,20 +162,21 @@ ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FaTilingInfo& faIn
     if (faInfo.pageAttentionFlag) {
         auto& sequsedKvTensor = faInfo.opParamInfo.seqUsedKv.tensor;
         OP_CHECK_IF(sequsedKvTensor == nullptr,
-                    OP_LOGE(faInfo.opName, "seqused_kv must be provided when PagedAttention is enabled."),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        faInfo.opName, "seqused_kv", "When PagedAttention is enabled, seqused_kv cannot be empty"),
                     return ge::GRAPH_FAILED);
     }
 
     auto& cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
     if (faInfo.qLayout == FaLayout::TND) {
         OP_CHECK_IF(cuSeqlensQTensor == nullptr,
-                    OP_LOGE(faInfo.opName, "cu_seqlens_q must be provided when layout_q is TND."),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "cu_seqlens_q",
+                                                             "When layout_q is TND, cu_seqlens_q cannot be empty"),
                     return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(cuSeqlensQTensor != nullptr,
-                    OP_LOGE(faInfo.opName,
-                            "cu_seqlens_q should not be provided when layout_q is %s, only supported in TND layout.",
-                            LayoutToSerialString(faInfo.qLayout).c_str()),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "cu_seqlens_q",
+                                                             "When layout_q is not TND, cu_seqlens_q cannot be passed"),
                     return ge::GRAPH_FAILED);
     }
 
@@ -236,24 +198,38 @@ ge::graphStatus ActualSeqLenChecker::CheckMultiPara(const FaTilingInfo& faInfo)
         bool aGroupProvided = (sequsedQTensor != nullptr) || (sequsedKvTensor != nullptr);
         bool bGroupProvided = (faInfo.maxSeqQ != -1) || (faInfo.maxSeqKv != -1);
         OP_CHECK_IF(!aGroupProvided && !bGroupProvided,
-                    OP_LOGE(faInfo.opName, "In the non-TND layout, at least one of group A (seqused_q/seqused_kv) or "
-                                           "group B (max_seqlen_q/max_seqlen_kv) must be provided."),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        faInfo.opName, "seqused_q/seqused_kv/max_seqlen_q/max_seqlen_kv",
+                        "When layout_q is not TND, at least one of seqused_q, seqused_kv, max_seqlen_q and "
+                        "max_seqlen_kv must be provided"),
+                    return ge::GRAPH_FAILED);
+
+        // 非TND场景下，max_seqlen_q必须等于q的S轴大小
+        OP_CHECK_IF(faInfo.maxSeqQ != static_cast<int64_t>(faInfo.s1Size),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        faInfo.opName, "max_seqlen_q", std::to_string(faInfo.maxSeqQ).c_str(),
+                        ("When layout_q is BSND or BNSD, the value of max_seqlen_q must be equal to the size (" +
+                         std::to_string(faInfo.s1Size) + ") of the axis S of q")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
         // 非TND场景下，若只传了B组(max_seqlen_q、max_seqlen_kv)参数，则max_seqlen_q需等于Q_S，max_seqlen_kv需等于KV_S
         if (!aGroupProvided && bGroupProvided) {
-            OP_CHECK_IF(
-                faInfo.maxSeqQ != static_cast<int64_t>(faInfo.s1Size),
-                OP_LOGE(
-                    faInfo.opName,
-                    "In the non-TND layout, if only group B is provided, max_seqlen_q(%ld) must be equal to Q_S(%ld).",
-                    faInfo.maxSeqQ, static_cast<int64_t>(faInfo.s1Size)),
-                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(faInfo.maxSeqQ != static_cast<int64_t>(faInfo.s1Size),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            faInfo.opName, "max_seqlen_q", std::to_string(faInfo.maxSeqQ).c_str(),
+                            ("When layout_q is not TND and neither seqused_q nor seqused_kv is provided, the value of "
+                             "max_seqlen_q must be equal to the sequence length of q (" +
+                             std::to_string(faInfo.s1Size) + ")")
+                                .c_str()),
+                        return ge::GRAPH_FAILED);
             OP_CHECK_IF(faInfo.maxSeqKv != static_cast<int64_t>(faInfo.s2Size),
-                        OP_LOGE(faInfo.opName,
-                                "In the non-TND layout, if only group B is provided, max_seqlen_kv(%ld) must be equal "
-                                "to KV_S(%ld).",
-                                faInfo.maxSeqKv, static_cast<int64_t>(faInfo.s2Size)),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            faInfo.opName, "max_seqlen_kv", std::to_string(faInfo.maxSeqKv).c_str(),
+                            ("When layout_q is not TND and neither seqused_q nor seqused_kv is provided, the value "
+                             "of max_seqlen_kv must be equal to the sequence length of k/v (" +
+                             std::to_string(faInfo.s2Size) + ")")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         }
     }

@@ -50,16 +50,16 @@ aclnnStatus aclnnMixedQuantFlashAttnMetadataGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    auto ret = ParamsCheck(cuSeqlensQOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv,
-                           numHeadsQ, numHeadsKv, headDim, quantComputeMode, maskMode, winLeft, winRight, layoutQ,
-                           layoutKv, layoutAttnOut, metaData);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-
     const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
     uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
     const std::string socVersionStr = npuInfo.GetSocLongVersion();
     const char* socVersion = socVersionStr.c_str();
+
+    auto ret = ParamsCheck(cuSeqlensQOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv,
+                           numHeadsQ, numHeadsKv, headDim, quantComputeMode, maskMode, winLeft, winRight, layoutQ,
+                           layoutKv, layoutAttnOut, aicCoreNum, aivCoreNum, metaData);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     auto output = l0op::MixedQuantFlashAttnMetadata(
         cuSeqlensQOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ,

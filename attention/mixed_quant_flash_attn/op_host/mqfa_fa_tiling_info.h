@@ -40,7 +40,7 @@ const std::string SEQUSED_Q_NAME = "seqused_q";
 const std::string SEQUSED_KV_NAME = "seqused_kv";
 const std::string SINKS_NAME = "sinks";
 const std::string METADATA_NAME = "metadata";
-const std::string QUANT_MODE_NAME = "quant_compute_mode";
+const std::string QUANT_MODE_NAME = "quant_mode";
 const std::string SOFTMAX_SCALE_NAME = "softmax_scale";
 const std::string MASK_MODE_NAME = "mask_mode";
 const std::string ATTN_MASK_NAME = "attn_mask";
@@ -122,9 +122,11 @@ enum class FaLayout : uint32_t {
     LSE_NT = 7
 };
 
-const std::map<std::string, FaLayout> layoutMap = {{"BSND", FaLayout::BSND},       {"BNSD", FaLayout::BNSD},
-                                                   {"TND", FaLayout::TND},         {"PA_BBND", FaLayout::PA_BBND},
-                                                   {"PA_BNBD", FaLayout::PA_BNBD}, {"PA_NZ", FaLayout::PA_NZ}};
+// q/attn_out 支持的布局：BSND、BNSD、TND；kv 支持的布局：PA_BBND、PA_BNBD、PA_NZ
+const std::map<std::string, FaLayout> layoutQMap = {
+    {"BSND", FaLayout::BSND}, {"BNSD", FaLayout::BNSD}, {"TND", FaLayout::TND}};
+const std::map<std::string, FaLayout> layoutKvMap = {
+    {"PA_BBND", FaLayout::PA_BBND}, {"PA_BNBD", FaLayout::PA_BNBD}, {"PA_NZ", FaLayout::PA_NZ}};
 
 enum class FaAxis : uint32_t {
     B = 0,
@@ -229,6 +231,7 @@ public:
     int64_t s1Size = 0;
     int64_t s2Size = 0;
     int64_t qkHeadDim = 0;
+    int64_t kHeadDim = 0;
     int64_t vHeadDim = 0;
     int64_t gSize = 0;
     int64_t qTSize = 0;
@@ -370,45 +373,49 @@ constexpr uint32_t NUM_1024 = 1024;
 constexpr uint32_t NUM_2048 = 2048;
 
 const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
-    {ge::DT_UNDEFINED, "DT_UNDEFINED"},
-    {ge::DT_FLOAT, "DT_FLOAT"},
-    {ge::DT_FLOAT16, "DT_FLOAT16"},
-    {ge::DT_INT8, "DT_INT8"},
-    {ge::DT_INT16, "DT_INT16"},
-    {ge::DT_UINT16, "DT_UINT16"},
-    {ge::DT_UINT8, "DT_UINT8"},
-    {ge::DT_INT32, "DT_INT32"},
-    {ge::DT_INT64, "DT_INT64"},
-    {ge::DT_UINT32, "DT_UINT32"},
-    {ge::DT_UINT64, "DT_UINT64"},
-    {ge::DT_BOOL, "DT_BOOL"},
-    {ge::DT_DOUBLE, "DT_DOUBLE"},
-    {ge::DT_DUAL, "DT_DUAL"},
-    {ge::DT_DUAL_SUB_INT8, "DT_DUAL_SUB_INT8"},
-    {ge::DT_DUAL_SUB_UINT8, "DT_DUAL_SUB_UINT8"},
-    {ge::DT_COMPLEX32, "DT_COMPLEX32"},
-    {ge::DT_COMPLEX64, "DT_COMPLEX64"},
-    {ge::DT_COMPLEX128, "DT_COMPLEX128"},
-    {ge::DT_QINT8, "DT_QINT8"},
-    {ge::DT_QINT16, "DT_QINT16"},
-    {ge::DT_QINT32, "DT_QINT32"},
-    {ge::DT_QUINT8, "DT_QUINT8"},
-    {ge::DT_QUINT16, "DT_QUINT16"},
-    {ge::DT_RESOURCE, "DT_RESOURCE"},
-    {ge::DT_STRING_REF, "DT_STRING_REF"},
-    {ge::DT_STRING, "DT_STRING"},
-    {ge::DT_VARIANT, "DT_VARIANT"},
-    {ge::DT_BF16, "DT_BFLOAT16"},
-    {ge::DT_INT4, "DT_INT4"},
-    {ge::DT_UINT1, "DT_UINT1"},
-    {ge::DT_INT2, "DT_INT2"},
-    {ge::DT_UINT2, "DT_UINT2"},
-    {ge::DT_HIFLOAT8, "DT_HIFLOAT8"},
-    {ge::DT_FLOAT8_E4M3FN, "DT_FLOAT8_E4M3FN"},
-    {ge::DT_FLOAT4_E2M1, "DT_FLOAT4_E2M1"},
-    {ge::DT_FLOAT8_E8M0, "DT_FLOAT8_E8M0"},
-    {Ops::Transformer::DT_HIFLOAT4, "DT_HIFLOAT4"},
-    {Ops::Transformer::DT_HIFLOAT4_SCALE, "DT_HIFLOAT4_SCALE"}};
+    {ge::DT_UNDEFINED, "UNDEFINED"},
+    {ge::DT_FLOAT, "FLOAT"},
+    {ge::DT_FLOAT16, "FLOAT16"},
+    {ge::DT_INT8, "INT8"},
+    {ge::DT_INT16, "INT16"},
+    {ge::DT_UINT16, "UINT16"},
+    {ge::DT_UINT8, "UINT8"},
+    {ge::DT_INT32, "INT32"},
+    {ge::DT_INT64, "INT64"},
+    {ge::DT_UINT32, "UINT32"},
+    {ge::DT_UINT64, "UINT64"},
+    {ge::DT_BOOL, "BOOL"},
+    {ge::DT_DOUBLE, "DOUBLE"},
+    {ge::DT_DUAL, "DUAL"},
+    {ge::DT_DUAL_SUB_INT8, "DUAL_SUB_INT8"},
+    {ge::DT_DUAL_SUB_UINT8, "DUAL_SUB_UINT8"},
+    {ge::DT_COMPLEX32, "COMPLEX32"},
+    {ge::DT_COMPLEX64, "COMPLEX64"},
+    {ge::DT_COMPLEX128, "COMPLEX128"},
+    {ge::DT_QINT8, "QINT8"},
+    {ge::DT_QINT16, "QINT16"},
+    {ge::DT_QINT32, "QINT32"},
+    {ge::DT_QUINT8, "QUINT8"},
+    {ge::DT_QUINT16, "QUINT16"},
+    {ge::DT_RESOURCE, "RESOURCE"},
+    {ge::DT_STRING_REF, "STRING_REF"},
+    {ge::DT_STRING, "STRING"},
+    {ge::DT_VARIANT, "VARIANT"},
+    {ge::DT_BF16, "BFLOAT16"},
+    {ge::DT_INT4, "INT4"},
+    {ge::DT_UINT1, "UINT1"},
+    {ge::DT_INT2, "INT2"},
+    {ge::DT_UINT2, "UINT2"},
+    {ge::DT_HIFLOAT8, "HIFLOAT8"},
+    {ge::DT_FLOAT8_E4M3FN, "FLOAT8_E4M3FN"},
+    {ge::DT_FLOAT4_E2M1, "FLOAT4_E2M1"},
+    {ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0"},
+    {ge::DT_FLOAT8_E5M2, "FLOAT8_E5M2"},
+    {ge::DT_FLOAT6_E3M2, "FLOAT6_E3M2"},
+    {ge::DT_FLOAT6_E2M3, "FLOAT6_E2M3"},
+    {ge::DT_FLOAT4_E1M2, "FLOAT4_E1M2"},
+    {Ops::Transformer::DT_HIFLOAT4, "HIFLOAT4"},
+    {Ops::Transformer::DT_HIFLOAT4_SCALE, "HIFLOAT4_SCALE"}};
 
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
     {QUERY_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},

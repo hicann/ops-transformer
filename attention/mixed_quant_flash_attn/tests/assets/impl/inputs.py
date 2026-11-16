@@ -30,6 +30,13 @@ import torch
 from core.gen_data import generate_inputs
 
 
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 def _to_int_list(val):
     if val is None:
         return None
@@ -204,6 +211,8 @@ def generate_mixed_quant_inputs(
     head_dim=128,
     **kwargs,
 ):
+    if expect_error(kwargs):
+        return None
     """In-place customize_inputs hook: 调用 pytest generate_inputs 生成全部输入并写回。
     兼容 quant_mode / quant_compute_mode 两种表头（后者经 kwargs 传入）。
     """
