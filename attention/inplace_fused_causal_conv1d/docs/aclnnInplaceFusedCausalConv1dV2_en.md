@@ -655,7 +655,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
     - queryStartLocOptional must exist.
     - cacheIndicesOptional is 1D [batch, ] or 2D [batch, maxNumBlocks], where 1D indicates that APC is not enabled and 2D indicates that APC is enabled.
     - cuSeqLen range [batch, 1024 * 1024], dim range [64, 16384] and dim must be a multiple of 16, and their product must be within [64 * batch, 4G]. batch range [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - maxQueryLen > maxDraftTokens + 1.
   - Mixed prefill and decode use case:
     - x supports 2D [cuSeqLen, dim].
@@ -664,7 +664,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
     - queryStartLocOptional must exist.
     - cacheIndicesOptional is 1D [batch, ] or 2D [batch, maxNumBlocks], where 1D indicates that APC is not enabled and 2D indicates that APC is enabled.
     - cuSeqLen is in the range [batch, 1024 * 1024]; dim is in the range [64, 16384] and must be a multiple of 16; the product of the two must be within [64 * batch, 4G]; batch is in the range [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - maxQueryLen > maxDraftTokens + 1.
   - Decode scenario (variable-length sequences):
     - x supports 2D [cuSeqLen, dim].
@@ -673,7 +673,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
     - queryStartLocOptional must exist.
     - cacheIndicesOptional is 1D [batch, ] or 2D [batch, maxNumBlocks], where 1D indicates APC is disabled and 2D indicates APC is enabled.
     - The cuSeqLen range is [batch, batch * (maxDraftTokens + 1)], and the seqLen range of each batch is [1, maxDraftTokens + 1]. The dim range is [64, 16384] and dim is a multiple of 16. The batch range is [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - The maxQueryLen range is [1, maxDraftTokens + 1].
   - decode use case (fixed batch):
     - x supports 3D [batch, m+1, dim].
@@ -681,7 +681,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
     - convStates must be 3D [..., K-1+m, dim]. Its dimension 0 size is not fixed and must be greater than or equal to the count of batches participating in the calculation (that is, the count of batches whose cacheIndicesOptional is not equal to padSlotId).
     - cacheIndicesOptional is 1D [batch, ] or 2D [batch, maxNumBlocks], where 1D indicates that APC is not enabled and 2D indicates that APC is enabled.
     - m: range [0, maxDraftTokens]; dim: range [64, 16384] and a multiple of 16; batch: range [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - maxQueryLen: range [1, maxDraftTokens + 1]; can be -1.
 
 - Input value range restrictions:

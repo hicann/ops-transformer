@@ -89,7 +89,7 @@ bool FusedCausalConv1dCutBSHTiling::IsCapable()
         }
     }
     // 短序列 (1..8) → BH；其他 (>8 或 -1 未知) → BSH
-    if (maxQueryLen >= 1 && maxQueryLen <= BH_MAX_QUERY_LEN_THRESHOLD) {
+    if (maxQueryLen >= 1 && maxQueryLen <= maxDraftTokens_ + 1) {
         return false;
     }
     return true;
@@ -610,6 +610,11 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::GetShapeAttrsInfo()
     runMode_ = 0;
     if (context_->GetAttrs() != nullptr && context_->GetAttrs()->GetInt(ATTR_RUN_MODE_INDEX) != nullptr) {
         runMode_ = *(context_->GetAttrs()->GetInt(ATTR_RUN_MODE_INDEX));
+    }
+
+    maxDraftTokens_ = 7;
+    if (context_->GetAttrs() != nullptr && context_->GetAttrs()->GetInt(ATTR_RUN_MODE_INDEX) != nullptr) {
+        maxDraftTokens_ = *(context_->GetAttrs()->GetInt(ATTR_MAX_DRAFT_TOKENS_INDEX));
     }
 
     auto attrs = context_->GetAttrs();

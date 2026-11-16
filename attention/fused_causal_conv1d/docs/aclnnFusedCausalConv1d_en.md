@@ -651,7 +651,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - queryStartLoc must exist.
     - cacheIndices is 1-D [batch, ] or 2-D [batch, maxNumBlocks], where 1-D indicates that APC is disabled and 2-D indicates that APC is enabled.
     - cuSeqLen: range [batch, 1024 * 1024]; dim: range [64, 16384] and must be a multiple of 16; the product of the two must be within [64 * batch, 4G]; batch: range [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - maxQueryLen > 8.
   - Mixed prefill and decode scenario:
     - x supports 2-D [cuSeqLen, dim].
@@ -660,7 +660,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - queryStartLoc must exist.
     - cacheIndices is 1D [batch, ] or 2D [batch, maxNumBlocks], where 1D indicates that APC is disabled and 2D indicates that APC is enabled.
     - cuSeqLen: range [batch, 1024 * 1024]; dim: range [64, 16384] and must be a multiple of 16; the product of the two must be in [64 * batch, 4G]; batch: range [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - maxQueryLen > 8.
   - decode scenario (variable-length sequences):
     - x supports 2D [cuSeqLen, dim].
@@ -669,7 +669,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - queryStartLoc must exist.
     - cacheIndices is 1-D [batch, ] or 2-D [batch, maxNumBlocks], where 1-D indicates that APC is not enabled and 2-D indicates that APC is enabled.
     - cuSeqLen: range [batch, batch * 8]; the seqLen range of each batch is [1, 8]. dim: range [64, 16384] and a multiple of 16; batch: range [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - maxQueryLen: range [1, 8].
   - decode scenario (fixed batch):
     - x supports 3-D [batch, m+1, dim].
@@ -677,7 +677,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - convStates must be 3-D [..., K-1+m, dim]. The size of dimension 0 is not fixed and must be greater than or equal to the count of batches participating in the computation (that is, the count of batches whose cacheIndices is not equal to padSlotId).
     - cacheIndices is a 1D tensor [batch, ] or a 2D tensor [batch, maxNumBlocks], where 1D indicates that APC is disabled and 2D indicates that APC is enabled.
     - m: range [0, 7]. dim: range [64, 16384], and must be a multiple of 16. batch: range [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - maxQueryLen: range [1, 8], and can be -1.
 
 - Input value range restrictions:

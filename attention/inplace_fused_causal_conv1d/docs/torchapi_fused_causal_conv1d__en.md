@@ -221,7 +221,7 @@ Returns the convolution output Tensor y. The shape and dtype are the same as x.
     - query_start_loc must exist.
     - cache_indices is 1D [batch, ] or 2D [batch, max_num_blocks], where 1D indicates that APC is not enabled, and 2D indicates that APC is enabled.
     - cu_seq_len range: [batch, 1024 * 1024]. dim range: [64, 16384] and is a multiple of 16. The product of the two must be in the range [64 * batch, 4G]. batch range: [1, 256].
-    - max_num_blocks >= ceiv(max_query_len, block_size).
+    - max_num_blocks >= ceil(max_query_len, block_size).
     - max_query_len > max_draft_tokens + 1.
   - Mixed prefill and decode scenario:
     - x supports the 2D shape [cu_seq_len, dim].
@@ -230,7 +230,7 @@ Returns the convolution output Tensor y. The shape and dtype are the same as x.
     - query_start_loc must exist.
     - cache_indices is 1D [batch, ] or 2D [batch, max_num_blocks], where 1D indicates that APC is not enabled and 2D indicates that APC is enabled.
     - The range of cu_seq_len is [batch, 1024 * 1024]. The range of dim is [64, 16384], and dim must be a multiple of 16. The product of the two must be in the range [64 * batch, 4G]. The range of batch is [1, 256].
-    - max_num_blocks >= ceiv(max_query_len, block_size).
+    - max_num_blocks >= ceil(max_query_len, block_size).
     - max_query_len > max_draft_tokens + 1.
   - decode scenario (variable-length sequences):
     - x supports 2D [cu_seq_len, dim].
@@ -239,7 +239,7 @@ Returns the convolution output Tensor y. The shape and dtype are the same as x.
     - query_start_loc must exist.
     - cache_indices is 1D [batch, ] or 2D [batch, max_num_blocks], where 1D indicates APC is not enabled and 2D indicates APC is enabled.
     - The cu_seq_len range is [batch, batch * (max_draft_tokens + 1)], and the seq_len range of each batch is [1, max_draft_tokens + 1]. The dim range is [64, 16384] and is a multiple of 16, and the batch range is [1, 256].
-    - max_num_blocks >= ceiv(max_query_len, block_size).
+    - max_num_blocks >= ceil(max_query_len, block_size).
     - The max_query_len range is [1, max_draft_tokens + 1].
   - decode scenario (fixed batch):
     - For x, only the 3D shape [batch, m+1, dim] is supported.
@@ -247,7 +247,7 @@ Returns the convolution output Tensor y. The shape and dtype are the same as x.
     - conv_states must be 3D [..., K-1+m, dim]. The 0th dimension size is not fixed and is greater than or equal to the count of batches participating in the computation (that is, the count of batches whose cache_indices is not equal to pad_slot_id).
     - cache_indices is 1D [batch, ] or 2D [batch, max_num_blocks], where 1D indicates that APC is not enabled and 2D indicates that APC is enabled.
     - m is in the range [0, max_draft_tokens], dim is in the range [64, 16384] and is a multiple of 16, and batch is in the range [1, 256].
-    - max_num_blocks >= ceiv(max_query_len, block_size).
+    - max_num_blocks >= ceil(max_query_len, block_size).
     - max_query_len is in the range [1, max_draft_tokens + 1], and can be -1.
 
 - Input value range restrictions:

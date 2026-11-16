@@ -452,7 +452,7 @@ English | [简体中文](./README.md)
     - queryStartLoc must exist.
     - cacheIndices is one-dimensional [batch, ] or two-dimensional [batch, maxNumBlocks], where one dimension indicates that APC is disabled and two dimensions indicate that APC is enabled.
     - The range of cuSeqLen is [batch, 1024 * 1024], the range of dim is [64, 16384] and dim must be a multiple of 16, and the product of the two must satisfy [64 * batch, 4G]. The range of batch is [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - maxQueryLen > maxDraftTokens + 1.
   - prefill and decode mixed scenario:
     - x supports two dimensions: [cuSeqLen, dim].
@@ -461,7 +461,7 @@ English | [简体中文](./README.md)
     - queryStartLoc must exist.
     - cacheIndices is one-dimensional [batch, ] or two-dimensional [batch, maxNumBlocks], where one dimension indicates that APC is disabled and two dimensions indicate that APC is enabled.
     - The range of cuSeqLen is [batch, 1024 * 1024], the range of dim is [64, 16384] and dim must be a multiple of 16, and the product of the two must satisfy [64 * batch, 4G]. The range of batch is [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - maxQueryLen > maxDraftTokens + 1.
   - decode scenario (variable-length sequences):
     - x supports two dimensions: [cuSeqLen, dim].
@@ -470,7 +470,7 @@ English | [简体中文](./README.md)
     - queryStartLoc must exist.
     - cacheIndices is one-dimensional [batch, ] or two-dimensional [batch, maxNumBlocks], where one dimension indicates that APC is disabled and two dimensions indicate that APC is enabled.
     - The range of cuSeqLen is [batch, batch * (maxDraftTokens + 1)], and the seqLen range of each batch is [1, maxDraftTokens + 1]. The range of dim is [64, 16384] and dim must be a multiple of 16. The range of batch is [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - The range of maxQueryLen is [1, maxDraftTokens + 1].
   - decode scenario (fixed batch):
     - x supports three dimensions: [batch, m+1, dim].
@@ -478,7 +478,7 @@ English | [简体中文](./README.md)
     - convStates must be three-dimensional: [..., K-1+m, dim]. The size of dimension 0 is not fixed and must be greater than or equal to the number of batches participating in the computation (that is, the number of batches whose cacheIndices does not equal padSlotId).
     - cacheIndices is one-dimensional [batch, ] or two-dimensional [batch, maxNumBlocks], where one dimension indicates that APC is disabled and two dimensions indicate that APC is enabled.
     - The range of m is [0, maxDraftTokens], the range of dim is [64, 16384] and dim must be a multiple of 16, and the range of batch is [1, 256].
-    - maxNumBlocks >= ceiv(maxQueryLen, blockSize).
+    - maxNumBlocks >= ceil(maxQueryLen, blockSize).
     - The range of maxQueryLen is [1, maxDraftTokens + 1], and -1 is allowed.
 
 - Input value range restrictions:

@@ -213,7 +213,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, max_num_blocks]，其中1维表示未开启APC，2维表示开启APC。
     - cu_seq_len范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
-    - max_num_blocks >= ceiv(max_query_len, block_size)。
+    - max_num_blocks >= ceil(max_query_len, block_size)。
     - max_query_len > max_draft_tokens + 1。
   - prefill和decode混合场景：
     - x支持2维[cu_seq_len, dim]。
@@ -222,7 +222,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, max_num_blocks]，其中1维表示未开启APC，2维表示开启APC。
     - cu_seq_len范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
-    - max_num_blocks >= ceiv(max_query_len, block_size)。
+    - max_num_blocks >= ceil(max_query_len, block_size)。
     - max_query_len > max_draft_tokens + 1。
   - decode场景（变长序列）：
     - x支持2维[cu_seq_len, dim]。
@@ -231,7 +231,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, max_num_blocks]，其中1维表示未开启APC，2维表示开启APC。
     - cu_seq_len范围[batch, batch * (max_draft_tokens + 1)]，每个batch的seq_len范围为[1, max_draft_tokens + 1]。dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
-    - max_num_blocks >= ceiv(max_query_len, block_size)。
+    - max_num_blocks >= ceil(max_query_len, block_size)。
     - max_query_len范围[1, max_draft_tokens + 1]。
   - decode场景（固定batch）：
     - x支持3维[batch, m+1, dim]。
@@ -239,7 +239,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - cache_indices为1维[batch, ]或2维[batch, max_num_blocks]，其中1维表示未开启APC，2维表示开启APC。
     - m范围[0, max_draft_tokens]，dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
-    - max_num_blocks >= ceiv(max_query_len, block_size)。
+    - max_num_blocks >= ceil(max_query_len, block_size)。
     - max_query_len范围[1, max_draft_tokens + 1]，可为-1。
 
 - 输入值域限制：
