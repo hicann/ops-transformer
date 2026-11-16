@@ -96,6 +96,12 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize,
                                                               const char* layoutQDescale, const char* layoutKv,
                                                               const char* layoutOut, bool isGradEnabled)
 {
+    // layout 为必选属性字符串, 判空需先于任何字符串构造/集合查询, 避免 std::string 构造 nullptr 抛出未捕获异常
+    CHECK_COND(layoutQ != nullptr, ACLNN_ERR_PARAM_NULLPTR, "layoutQ must not be null");
+    CHECK_COND(layoutQDescale != nullptr, ACLNN_ERR_PARAM_NULLPTR, "layoutQDescale must not be null");
+    CHECK_COND(layoutKv != nullptr, ACLNN_ERR_PARAM_NULLPTR, "layoutKv must not be null");
+    CHECK_COND(layoutOut != nullptr, ACLNN_ERR_PARAM_NULLPTR, "layoutOut must not be null");
+
     CHECK_COND((batchSize == -1 || batchSize > 0), ACLNN_ERR_RUNTIME_ERROR,
                "batchSize must be -1 or greater than 0, but got %ld", batchSize);
 
