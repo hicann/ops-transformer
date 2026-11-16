@@ -443,14 +443,12 @@ aclnnStatus aclnnMoeInitRoutingV4(
       <td>expandedScaleOut (aclTensor)</td>
       <td>Output</td>
       <td>Outputs intermediate values of scaleOptional in different quantization processes.</td>
-      <td> The output shape is the product of all dimensions of expandedXOut except the last one.
+      <td> This parameter is required and must not be nullptr. The output shape requirements for each scenario are as follows.
         <ul style="list-style-type: circle;">
         <li>In non-quantization scenarios, if scaleOptional is input, the shape is [NUM_ROWS*K], the first availableIdxNum elements are valid data, and the output is of the FLOAT32 type. If the data type of input x is FLOAT4_E2M1, FLOAT8_E4M3FN, or FLOAT8_E5M2 and scaleOptional is input, the shape of expandedScaleOut is [NUM_ROWS*K, CeilDiv(H, 64), 2], and the output is of the FLOAT8_E8M0 type. In the Drop/Pad use case, the output is a 1D tensor with shape [expertNum * expertCapacity] and is of the FLOAT32 type.</li>
-        <li>In dynamic quantization scenarios, if scaleOptional is input, the first availableIdxNum elements are valid data.</li>
-        <li>In static quantization scenario (quantMode is 0), HIF8 direct conversion quantization scenario (quantMode is 6), and HIF8 PERTENSOR quantization scenario (quantMode is 7), expandedScaleOut is not output.</li>
+        <li>In dynamic quantization scenarios, the output is a 1D tensor with shape [NUM_ROWS*K]. If scaleOptional is input, the first availableIdxNum elements are valid data.</li>
+        <li>In static quantization (quantMode is 0), HIF8 direct conversion (quantMode is 6), and HIF8 PERTENSOR quantization (quantMode is 7), no scale data is produced. An empty tensor with shape [0], data type FLOAT32, and format ND can be passed to expandedScaleOut.</li>
         <li>In MXFP8 quantization scenario (quantMode is 2, 3, 16, or 17), the output is of the FLOAT8_E8M0 type, with shape [NUM_ROWS*K, M], where M=CeilAlign(CeilDiv(H,32),2). The first availableIdxNum rows of the NUM_ROWS*K rows are valid data.</li>
-        <li>When data is quantized to HIFLOAT8 through direct conversion, expandedScaleOut is not output.</li>
-        <li>When data is quantized to HIFLOAT8 in PERTENSOR mode, expandedScaleOut is not output.</li>
         <li>When data is quantized to HIFLOAT8 in PERTOKEN mode, the output is of the FLOAT32 type, with shape [NUM_ROWS*K].</li>
         <li>In MXFP4 quantization scenario, the output is of the FLOAT8_E8M0 type, with shape [NUM_ROWS*K, M, 2], where M=CeilDiv(H, 64). The first availableIdxNum rows of the NUM_ROWS*K rows are valid data.</li>
         <li>In FP8 PerGroup quantization scenario (quantMode is 4, 5, 14, or 15), the output is of the FLOAT32 type, with shape [NUM_ROWS*K, CeilDiv(H, 128)]. The first availableIdxNum rows of the NUM_ROWS*K rows are valid data.</li>
@@ -528,8 +526,8 @@ aclnnStatus aclnnMoeInitRoutingV4(
       <td>The data types of the input and output are not in the supported range.</td>
     </tr>
     <tr>
-      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td>561002</td>
+      <td>ACLNN_ERR_INNER_NULLPTR</td>
+      <td>561103</td>
       <td>      The shapes of the input and output tensors are not in the supported range.<br>
       The input attributes are not in the supported range.<br>
       </td>

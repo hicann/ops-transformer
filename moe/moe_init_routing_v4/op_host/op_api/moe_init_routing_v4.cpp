@@ -64,11 +64,16 @@ std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*, aclTensor*> MoeInitRo
         zeroShape.AppendDim(0);
         expandedTopkWeightOut = executor->AllocTensor(zeroShape, ge::DT_FLOAT, Format::FORMAT_ND);
     }
-    ADD_TO_LAUNCHER_LIST_AICORE(MoeInitRoutingV4, OP_INPUT(x, expertIdx, scale, offset, activeNum, topkWeight),
-                                OP_OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut,
-                                          expandedScaleOut, expandedTopkWeightOut),
-                                OP_ATTR(expertCapacity, expertNum, dropPadMode, expertTokensNumType,
-                                        expertTokensNumFlag, quantMode, activeExpertRange, rowIdxType, scaleAlg));
+    const auto ret =
+        ADD_TO_LAUNCHER_LIST_AICORE(MoeInitRoutingV4, OP_INPUT(x, expertIdx, scale, offset, activeNum, topkWeight),
+                                    OP_OUTPUT(expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut,
+                                              expandedScaleOut, expandedTopkWeightOut),
+                                    OP_ATTR(expertCapacity, expertNum, dropPadMode, expertTokensNumType,
+                                            expertTokensNumFlag, quantMode, activeExpertRange, rowIdxType, scaleAlg));
+    const std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*, aclTensor*> emptyResult{nullptr, nullptr, nullptr,
+                                                                                             nullptr, nullptr};
+    OP_CHECK_ADD_TO_LAUNCHER_LIST_AICORE(ret != ACLNN_SUCCESS, return emptyResult,
+                                         "MoeInitRoutingV4 ADD_TO_LAUNCHER_LIST_AICORE failed.");
     return std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*, aclTensor*>(
         expandedXOut, expandedRowIdxOut, expertTokensCountOrCumsumOut, expandedScaleOut, expandedTopkWeightOut);
 }

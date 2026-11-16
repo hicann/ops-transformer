@@ -441,14 +441,12 @@ aclnnStatus aclnnMoeInitRoutingV4(
       <td>expandedScaleOut（aclTensor）</td>
       <td>输出</td>
       <td>输出不同量化过程中scaleOptional的中间值。</td>
-      <td> 输出shape为expandedXOut的shape去掉最后一维之后所有维度的乘积。
+      <td> 必选参数，不支持传入nullptr。各场景的输出shape要求如下。
         <ul style="list-style-type: circle;">
         <li>非量化场景下，当scaleOptional输入时，shape为[NUM_ROWS*K]，前availableIdxNum个元素为有效数据，输出FLOAT32类型。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果scaleOptional输入，则expandedScaleOut的shape为[NUM_ROWS*K, CeilDiv(H, 64), 2]，输出FLOAT8_E8M0类型。当Drop/Pad场景输出是一个1D的Tensor，shape为[expertNum * expertCapacity]，输出FLOAT32类型。</li>
-        <li>动态量化场景下，当scaleOptional输入时，前availableIdxNum个元素为有效数据。</li>
-        <li>静态量化场景下（quantMode为0）、HIF8直转量化场景下（quantMode为6）、HIF8 PERTENSOR量化场景下（quantMode为7），expandedScaleOut不输出。</li>
+        <li>动态量化场景下，输出为一维Tensor，shape为[NUM_ROWS*K]。当scaleOptional输入时，前availableIdxNum个元素为有效数据。</li>
+        <li>静态量化场景下（quantMode为0）、HIF8直转量化场景下（quantMode为6）、HIF8 PERTENSOR量化场景下（quantMode为7），不产生scale数据，expandedScaleOut可传入shape为[0]、数据类型为FLOAT32、格式为ND的空Tensor。</li>
         <li>MXFP8量化场景下（quantMode为2、3、16、17），输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H,32),2)，NUM_ROWS*K的前availableIdxNum行为有效数据。</li>
-        <li>按照直转方式量化到HIFLOAT8场景下，expandedScaleOut不输出。</li>
-        <li>按照PERTENSOR模式量化到HIFLOAT8场景下，expandedScaleOut不输出。</li>
         <li>按照PERTOKEN模式量化到HIFLOAT8场景下，输出FLOAT32类型，Shape为[NUM_ROWS*K]。</li>
         <li>MXFP4量化场景下，输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M, 2]，其中M=CeilDiv(H, 64)，NUM_ROWS*K的前availableIdxNum行为有效数据。</li>
         <li>FP8 PerGroup量化场景下（quantMode为4、5、14、15），输出FLOAT32类型，Shape为[NUM_ROWS*K, CeilDiv(H, 128)]，NUM_ROWS*K的前availableIdxNum行为有效数据。</li>
@@ -526,8 +524,8 @@ aclnnStatus aclnnMoeInitRoutingV4(
       <td>输入和输出的数据类型不在支持的范围内。</td>
     </tr>
     <tr>
-      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td>561002</td>
+      <td>ACLNN_ERR_INNER_NULLPTR</td>
+      <td>561103</td>
       <td>
       输入、输出Tensor的shape不在支持的范围内。<br />
       输入的属性不在支持的范围内。<br />
