@@ -442,7 +442,11 @@ public:
     __aicore__ inline void operator()(const Params& params)
     {
         // Init mmadOp epilogue
-        mmadOp_.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+        if constexpr (AscendC::Std::is_base_of_v<MatmulWithScale<>, typename BlockMmadBuilder::BlockMatmulPolicy>) {
+            mmadOp_.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling));
+        } else {
+            mmadOp_.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+        }
         InitParamsAndTensor(params);
         epilogueOp_.Init(params.epilogueParams);
         uint32_t groupNum = params.gmmParams.groupNum;

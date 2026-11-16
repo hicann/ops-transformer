@@ -40,7 +40,11 @@ __global__ __aicore__ void quant_grouped_matmul_inplace_add(GM_ADDR x1, GM_ADDR 
 #else
     REGISTER_NONE_TILING;
 #endif
+#if defined(V310_QGMM_QUANT_MX)
     TPipe tPipe;
+#else
+    AscendC::InitSocState();
+#endif
     AscendCUtils::SetOverflow(1);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIC_ONLY);
     GM_ADDR user1 = GetUserWorkspace(workspace);
@@ -62,6 +66,7 @@ __global__ __aicore__ void quant_grouped_matmul_inplace_add(GM_ADDR x1, GM_ADDR 
 #else
     if constexpr (QUANT_B_TRANS == QGMM_INPLACE_ADD_NO_TRANS && QUANT_A_TRANS == QGMM_INPLACE_ADD_TRANS &&
                   KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_VECTOR) { // transX = true, transW = false, T-C
+        TPipe tPipe;
         GET_TILING_DATA_WITH_STRUCT(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams, tilingData, tiling);
         QGmmInplaceAddMixAswt<Cgmct::Gemm::layout::ColumnMajor, Cgmct::Gemm::layout::RowMajor>(
             x1, x2, scale2, groupList, scale1, y, tiling);

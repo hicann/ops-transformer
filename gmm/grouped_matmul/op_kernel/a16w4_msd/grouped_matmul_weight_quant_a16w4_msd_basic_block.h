@@ -86,7 +86,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_BASIC_BLOCK_CLASS::InitMsd(__gm__ int8_t
     if ASCEND_IS_AIC {
         cubeCompute_.InitMsd(weightS8WsAddr, aUnfoldS8WsAddr, (__gm__ mm1OutputType*)cF32WsAddr, tPipe);
     } else {
-        vecCompute_.InitMsd(weightS8WsAddr, (__gm__ mm1OutputType*)cF32WsAddr, tPipe);
+        vecCompute_.InitMsd(weightS8WsAddr, (__gm__ mm1OutputType*)cF32WsAddr);
     }
     cvLoopIdx_ = 0;
 }

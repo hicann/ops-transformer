@@ -74,7 +74,7 @@ public:
                                             __gm__ xType* antiQuantOffset, __gm__ float* perTokenScale,
                                             __gm__ float* perChannelScale, __gm__ biasType* bias,
                                             const bool weightL2Cacheable);
-    __aicore__ inline void Init(TPipe* tPipe, bool hasBias, uint64_t antiquantGroupSize = 1);
+    __aicore__ inline void Init(bool hasBias, uint64_t antiquantGroupSize = 1);
     __aicore__ inline void InitKCG(uint32_t antiQuantGroupSize, bool hasBias,
                                    const LocalTensor<xType>& ubHighBitTotalBuffer, uint64_t highBitUbOffset);
     __aicore__ inline void WaitVToMTE2();
@@ -247,8 +247,7 @@ __aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::UpdateGlo
  * 初始化buffer和同步所需的EventID
  */
 GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::Init(TPipe* tPipe, bool hasBias,
-                                                                            uint64_t antiquantGroupSize)
+__aicore__ inline void GMM_WQ_VEC_ANTIQUANT_COMPUTE_BASIC_BLOCK_CLASS::Init(bool hasBias, uint64_t antiquantGroupSize)
 {
     hasBias_ = hasBias;
     antiQuantGroupSize_ = antiquantGroupSize;

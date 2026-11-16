@@ -76,13 +76,9 @@ class KernelGmmSwiGluPertokenQuant<
     ProblemShape_, BlockMmadBuilder_, BlockEpilogueDequantAndSwiglu_, BlockEpiloguePertokenQuant_, BlockScheduler_,
     DataTypeX2Scale_, DataTypeX1Scale_,
     AscendC::Std::enable_if_t<AscendC::Std::is_same_v<BlockScheduler_, GroupedMatmulAswtWithTailSplitScheduler>>> {
-private:
-    TPipe* pPipe_ = nullptr;
-
 public:
     __aicore__ inline KernelGmmSwiGluPertokenQuant(TPipe* pipe)
-        : pPipe_(pipe),
-          epiloguePertokenQuantOp_(pipe)
+        : epiloguePertokenQuantOp_(pipe)
     {}
 
     __aicore__ inline ~KernelGmmSwiGluPertokenQuant() {}

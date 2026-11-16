@@ -369,7 +369,11 @@ public:
             prologueOp_();
         }
         if ASCEND_IS_AIC {
-            mmadOp_.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+            if constexpr (AscendC::Std::is_base_of_v<MatmulWithScale<>, typename BlockMmadBuilder::BlockMatmulPolicy>) {
+                mmadOp_.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling));
+            } else {
+                mmadOp_.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+            }
             l0cOutUb_ = epilogueOp_.GetL0c2UbTensor();
         }
         InitParamsAndTensor(params);

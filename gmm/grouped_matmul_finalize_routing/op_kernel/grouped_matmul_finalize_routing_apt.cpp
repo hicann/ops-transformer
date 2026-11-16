@@ -216,7 +216,7 @@ __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x, GM_ADDR w,
 #endif
 #endif
 #elif defined(V9201_GMM_FINALIZE_ROUTING_WEIGHT_QUANT)
-    AscendC::TPipe pipe;
+    AscendC::InitSocState();
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
     if constexpr (ATRANS == GMM_FR_NO_TRANS && BTRANS == GMM_FR_TRANS && SCALETYPE == GMM_FR_SCALE_MX &&
                   ROWINDEXTYPE == GMM_FR_ROW_INDEX_INT64) {
@@ -225,7 +225,7 @@ __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x, GM_ADDR w,
             tilingGM);
     }
 #elif defined(V9201_GMM_FINALIZE_ROUTING_HIF4)
-    AscendC::TPipe pipe;
+    AscendC::InitSocState();
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
     if constexpr (ATRANS == GMM_FR_NO_TRANS && BTRANS == GMM_FR_NO_TRANS && SCALETYPE == GMM_FR_SCALE_MX &&
                   ROWINDEXTYPE == GMM_FR_ROW_INDEX_INT64) {
@@ -240,7 +240,7 @@ __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x, GM_ADDR w,
     }
 #elif defined(GMM_FR_BF16_OUTPUT)
 #if defined(GMM_FR_FULL_MX)
-    AscendC::TPipe pipe;
+    AscendC::InitSocState();
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     if constexpr (GMM_FR_WEIGHT_NZ && ATRANS == GMM_FR_NO_TRANS && BTRANS == GMM_FR_NO_TRANS &&
                   SCALETYPE == GMM_FR_SCALE_MX && ROWINDEXTYPE == GMM_FR_ROW_INDEX_INT32) {
@@ -253,7 +253,6 @@ __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x, GM_ADDR w,
     }
 #endif
 #else
-    AscendC::TPipe pipe;
     // Full Quantization scenario
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
@@ -262,6 +261,7 @@ __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x, GM_ADDR w,
 #endif
 #if ORIG_DTYPE_X != DT_FLOAT8_E4M3FN && ORIG_DTYPE_X != DT_FLOAT8_E5M2 && ORIG_DTYPE_X != DT_FLOAT4_E1M2 && \
     ORIG_DTYPE_X != DT_FLOAT4_E2M1
+    AscendC::TPipe pipe;
     if constexpr (ATRANS == GMM_FR_NO_TRANS && (BTRANS == GMM_FR_NO_TRANS || BTRANS == GMM_FR_TRANS) &&
                   (SCALETYPE == GMM_FR_SCALE_FP32 || SCALETYPE == BF16TYPE) &&
                   (ROWINDEXTYPE == GMM_FR_ROW_INDEX_INT64 || ROWINDEXTYPE == GMM_FR_ROW_INDEX_INT32)) {
@@ -270,6 +270,7 @@ __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x, GM_ADDR w,
     }
 #elif ORIG_DTYPE_X == DT_FLOAT4_E1M2 || ORIG_DTYPE_X == DT_FLOAT4_E2M1
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+    AscendC::TPipe pipe;
     if constexpr (ATRANS == GMM_FR_NO_TRANS && BTRANS == GMM_FR_NO_TRANS && SCALETYPE == GMM_FR_SCALE_MX &&
                   ROWINDEXTYPE == GMM_FR_ROW_INDEX_INT64) {
         grouped_matmul_finalize_routing_mx_legacy<Cgmct::Gemm::layout::RowMajor, Cgmct::Gemm::layout::RowMajor>(
@@ -282,6 +283,7 @@ __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x, GM_ADDR w,
             tilingGM);
     }
 #else
+    AscendC::InitSocState();
     if constexpr (ATRANS == GMM_FR_NO_TRANS && BTRANS == GMM_FR_NO_TRANS && SCALETYPE == GMM_FR_SCALE_MX &&
                   ROWINDEXTYPE == GMM_FR_ROW_INDEX_INT64) {
         RunGmmFrMx<GMM_FR_NO_TRANS, LOGITTYPE>(x, w, scale, bias, pertoken_scale, group_list, share_input, logit,
@@ -293,6 +295,7 @@ __global__ __aicore__ void grouped_matmul_finalize_routing(GM_ADDR x, GM_ADDR w,
     }
 #endif
 #else
+    AscendC::TPipe pipe;
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     if constexpr (ATRANS == GMM_FR_NO_TRANS && BTRANS == GMM_FR_NO_TRANS && SCALETYPE == GMM_FR_SCALE_MX &&
                   ROWINDEXTYPE == GMM_FR_ROW_INDEX_INT64) {

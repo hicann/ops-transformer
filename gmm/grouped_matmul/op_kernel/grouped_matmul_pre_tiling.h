@@ -30,7 +30,7 @@ constexpr uint32_t GROUP_LIST_SPARSE_M = 2U;
 class GMMPreTilingProcess {
 public:
     __aicore__ inline GMMPreTilingProcess(){};
-    __aicore__ inline void Init(GM_ADDR groupList, GMMBaseParams& tilingData, TCubeTiling& mmTilingData, TPipe* pipe);
+    __aicore__ inline void Init(GM_ADDR groupList, GMMBaseParams& tilingData, TCubeTiling& mmTilingData);
     __aicore__ inline void Process(GMMBaseParams& tilingData, TCubeTiling& mmTilingData);
 
 private:
@@ -69,7 +69,7 @@ __aicore__ inline void GMMPreTilingProcess::GetTokensPerGroup()
 }
 
 __aicore__ inline void GMMPreTilingProcess::Init(GM_ADDR groupList, GMMBaseParams& tilingData,
-                                                 TCubeTiling& mmTilingData, TPipe* pipe)
+                                                 TCubeTiling& mmTilingData)
 {
 #if ORIG_DTYPE_X != DT_INT8 || ORIG_DTYPE_WEIGHT != DT_INT8
     return;

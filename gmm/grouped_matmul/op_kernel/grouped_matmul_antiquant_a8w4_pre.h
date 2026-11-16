@@ -32,7 +32,7 @@ class GMMA8W4FakeQuantPreProcess {
 public:
     __aicore__ inline GMMA8W4FakeQuantPreProcess(){};
     __aicore__ inline void Init(GM_ADDR weight, GM_ADDR y, GM_ADDR groupList, GM_ADDR workspace,
-                                const GMMBaseParams& tilingData, TPipe* pipe);
+                                const GMMBaseParams& tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -61,8 +61,7 @@ private:
 
 template <CubeFormat wFormat>
 __aicore__ inline void GMMA8W4FakeQuantPreProcess<wFormat>::Init(GM_ADDR weight, GM_ADDR y, GM_ADDR scale,
-                                                                 GM_ADDR workspace, const GMMBaseParams& tilingData,
-                                                                 TPipe* pipe)
+                                                                 GM_ADDR workspace, const GMMBaseParams& tilingData)
 {
     this->tiling = &tilingData;
     isSingleTensor = tilingData.isSingleTensor;

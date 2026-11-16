@@ -143,7 +143,7 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::Init(bool hasBias, uint64_t ant
             cubeCompute_.MxA8W4Init(mxScaleAL1L1RemainSize, mxScaleAL1L1StartSize, biasL1DbOffset_, matmulTiling,
                                     biasL1_, mxScaleBL1DbOffset_, mxScaleBL1_);
         } else {
-            vectorCompute_.Init(tPipe, hasBias_);
+            vectorCompute_.Init(hasBias_);
         }
     } else {
         uint64_t weightL1Space = matmulTiling->baseN * matmulTiling->stepKb * matmulTiling->baseK; // weight单块大小
@@ -152,7 +152,7 @@ __aicore__ inline void GMM_WQ_BASIC_BLOCK_CLASS::Init(bool hasBias, uint64_t ant
         if ASCEND_IS_AIC {
             cubeCompute_.Init(L1_SIZE_BYTE, weightL1Space, aPrefetchSize, matmulTiling, tPipe, biasL1DbOffset_);
         } else {
-            vectorCompute_.Init(tPipe, hasBias_, antiQuantGroupSize);
+            vectorCompute_.Init(hasBias_, antiQuantGroupSize);
         }
     }
 }

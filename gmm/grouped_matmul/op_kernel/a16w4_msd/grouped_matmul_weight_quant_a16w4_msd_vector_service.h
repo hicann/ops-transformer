@@ -38,7 +38,7 @@ public:
     __aicore__ inline void CastW4ToW8(uint64_t cvLoopIdx, const A16W4MsdConstParam& constParams,
                                       const A16W4MsdBasicBlockOffsetParam& curOffsetParam);
     __aicore__ inline void InitPreProcess(TPipe* tPipe);
-    __aicore__ inline void InitMsd(__gm__ int8_t* wS8WsAddr, __gm__ float* cF32WsAddr, TPipe* tPipe);
+    __aicore__ inline void InitMsd(__gm__ int8_t* wS8WsAddr, __gm__ float* cF32WsAddr);
     __aicore__ inline void EndMsd();
     __aicore__ inline void PreProcess(uint64_t curMSize, uint64_t mPreOffset, uint64_t mIdx,
                                       const A16W4MsdConstParam& constParams, const GlobalTensor<xType>& xGlobal,
@@ -347,8 +347,7 @@ __aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::TransToS8(uint64_t un
 }
 
 GMM_WQ_A16W4_MSD_VEC_SERVICE_TEMPLATE_PARAM
-__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::InitMsd(__gm__ int8_t* wS8WsAddr, __gm__ float* cF32WsAddr,
-                                                                   TPipe* tPipe)
+__aicore__ inline void GMM_WQ_A16W4_MSD_VEC_SERVICE_CLASS::InitMsd(__gm__ int8_t* wS8WsAddr, __gm__ float* cF32WsAddr)
 {
     cF32Gm_.SetGlobalBuffer(cF32WsAddr);
     wS8Gm_.SetGlobalBuffer(wS8WsAddr);

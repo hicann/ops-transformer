@@ -38,6 +38,8 @@ __aicore__ inline void InitOutputWithZero(AscendC::GlobalTensor<T> yInitGlobal, 
     if (AscendC::GetSubBlockIdx() >= 1) {
         return;
     }
+    // PerTile epilogue uses V_MTE3 IDs 0/1; zero fill uses ID 2.
+    constexpr event_t ZERO_FILL_EVENT_ID = static_cast<event_t>(2);
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     uint32_t blockIdx = AscendC::GetBlockIdx() / GetAicAivTaskRation();
 #else
@@ -55,9 +57,8 @@ __aicore__ inline void InitOutputWithZero(AscendC::GlobalTensor<T> yInitGlobal, 
     }
     if (!isKZeroInit) { // Initialize all buffers in ub to zero when k==0 (first iter)
         AscendC::Duplicate<T>(initLocal, 0, initSize);
-        event_t eventIdVToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(AscendC::HardEvent::V_MTE3));
-        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(eventIdVToMte3);
-        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(eventIdVToMte3);
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(ZERO_FILL_EVENT_ID);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(ZERO_FILL_EVENT_ID);
         isKZeroInit = true;
     }
     uint64_t yOffset = perCoreSize * blockIdx;

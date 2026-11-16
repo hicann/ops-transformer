@@ -51,9 +51,8 @@ public:
     using ScaleBType = typename BlockMmadMxOp::ScaleBType;
     using TupleShape = AscendC::Shape<int64_t, int64_t, int64_t>;
 
-    __aicore__ inline void Init(TCubeTiling* __restrict matmulTiling, AscendC::TPipe* tpipe = nullptr)
+    __aicore__ inline void Init(TCubeTiling* __restrict matmulTiling)
     {
-        (void)tpipe;
         uint64_t scaleFactorA = matmulTiling->mxTypePara & MX_SCALE_FACTOR_MASK;
         uint64_t scaleFactorB = (matmulTiling->mxTypePara >> MX_SCALE_FACTOR_BIT) & MX_SCALE_FACTOR_MASK;
         uint64_t kAL1 = static_cast<uint64_t>(matmulTiling->stepKa) * static_cast<uint64_t>(matmulTiling->baseK);

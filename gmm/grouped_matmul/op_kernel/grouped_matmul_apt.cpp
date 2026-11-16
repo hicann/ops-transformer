@@ -247,7 +247,7 @@ using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_BIAS>;
         GET_TILING_DATA_MEMBER(GMMQuantTilingData, mmTilingData, mmTilingData_, tiling); \
         GmmCgmctPerTileKernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS, DTYPE_SCALE, float, DTYPE_Y, xLayout, wLayout, \
                               yLayout, DTYPE_L0C_LOCAL>(x, weight, bias, scale, groupList, perTokenScale, y, user1, \
-                                                        &gmmQuantParams_, &mmTilingData_, &tPipe); \
+                                                        &gmmQuantParams_, &mmTilingData_); \
     } while (0)
 
 #if IS_BLAZE
@@ -259,7 +259,7 @@ using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_BIAS>;
             AscendC::Std::conditional_t<scaleNz, AscendC::Std::tuple<wLayout, asc::te::nn_layout_ptn>, wLayout>; \
         GmmTensorApiMxKernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS, DTYPE_SCALE, float, DTYPE_Y, xLayout, \
                              wLayoutWithScale, yLayout, DTYPE_L0C_LOCAL>( \
-            x, weight, bias, scale, groupList, perTokenScale, y, user1, &gmmQuantParams_, &mmTilingData_, &tPipe); \
+            x, weight, bias, scale, groupList, perTokenScale, y, user1, &gmmQuantParams_, &mmTilingData_); \
     } while (0)
 #else
 #define GMM_QUANT_MX_IMPL_CLASS(cgmctXLayout, cgmctWLayout, cgmctYLayout, xLayout, wLayout, yLayout) \
@@ -268,7 +268,7 @@ using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_BIAS>;
         GET_TILING_DATA_MEMBER(GMMQuantBasicApiTilingData, mmTilingData, mmTilingData_, tiling); \
         GmmCgmctMxKernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS, DTYPE_SCALE, float, DTYPE_Y, cgmctXLayout, cgmctWLayout, \
                          cgmctYLayout, DTYPE_L0C_LOCAL>(x, weight, bias, scale, groupList, perTokenScale, y, user1, \
-                                                        &gmmQuantParams_, &mmTilingData_, &tPipe); \
+                                                        &gmmQuantParams_, &mmTilingData_); \
     } while (0)
 #endif
 
@@ -278,7 +278,7 @@ using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DTYPE_BIAS>;
         GET_TILING_DATA_MEMBER(GMMQuantBasicApiTilingData, mmTilingData, mmTilingData_, tiling); \
         GmmCgmctMxKernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS, DTYPE_SCALE, float, DTYPE_Y, xLayout, wLayout, yLayout, \
                          DTYPE_L0C_LOCAL>(x, weight, bias, scale, groupList, perTokenScale, y, user1, \
-                                          &gmmQuantParams_, &mmTilingData_, &tPipe); \
+                                          &gmmQuantParams_, &mmTilingData_); \
     } while (0)
 
 #if defined(V310_GMM_QUANT_S4S4) && IS_BLAZE
@@ -305,7 +305,11 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
                                           GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR groupList,
                                           GM_ADDR perTokenScale, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling)
 {
-#if !defined(V9201_GMM_ANTI_QUANT_CUBE) && \
+    // Low-level MX/HiF4 and PerTile kernels manage their own M_MTE1 events.
+#if (!defined(V310_GMM_QUANT) && !defined(V310_GMM_ANTI_QUANT) && !defined(V9201_GMM_ANTI_QUANT_CUBE)) || \
+    defined(V9201_GMM_QUANT_HIFP4) || (defined(V310_GMM_QUANT_MX) && !IS_BLAZE) || defined(V310_GMM_QUANT_PERTILE)
+    AscendC::InitSocState();
+#elif !defined(V9201_GMM_ANTI_QUANT_CUBE) && \
     (!defined(V310_GMM_ANTI_QUANT) || !defined(ORIG_DTYPE_X) || !defined(DT_FLOAT8_E4M3FN) || \
      ORIG_DTYPE_X != DT_FLOAT8_E4M3FN || !IS_BLAZE)
     TPipe tPipe;
@@ -386,71 +390,81 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
     }
 #endif
 
+#if defined(V310_GMM_QUANT_PERTILE)
+    if constexpr (KERNEL_TYPE != GMM_PERGROUP_PERBLOCK) {
+        TPipe tPipe;
+#endif
 #if defined(V310_GMM_QUANT_CUBE) || defined(V310_GMM_QUANT_PERTENSOR_CUBE) // scale64/perTensor/double perTensor
 #if IS_BLAZE
-    if constexpr (QUANT_A_TRANS == GMM_NO_TRANS && (QUANT_B_TRANS == GMM_NO_TRANS || QUANT_B_TRANS == GMM_TRANS) &&
-                  KERNEL_TYPE == GMM_DEQUANT_FIXP) {
-        // Keep this predicate in sync with GroupedQmmBasicApiTiling::IsCubeBasicApi().
-        constexpr bool isInt8 =
-            AscendC::IsSameType<DTYPE_X, int8_t>::value && AscendC::IsSameType<DTYPE_WEIGHT, int8_t>::value;
-        constexpr bool isHiFloat8 = ORIG_DTYPE_X == DT_HIFLOAT8 && ORIG_DTYPE_WEIGHT == DT_HIFLOAT8;
-        constexpr bool isFp8X = ORIG_DTYPE_X == DT_FLOAT8_E4M3FN || ORIG_DTYPE_X == DT_FLOAT8_E5M2;
-        constexpr bool isFp8W = ORIG_DTYPE_WEIGHT == DT_FLOAT8_E4M3FN || ORIG_DTYPE_WEIGHT == DT_FLOAT8_E5M2;
-        constexpr bool outputSupported =
-            AscendC::IsSameType<DTYPE_Y, half>::value || AscendC::IsSameType<DTYPE_Y, bfloat16_t>::value ||
-            (isInt8 ? (AscendC::IsSameType<DTYPE_Y, int8_t>::value || AscendC::IsSameType<DTYPE_Y, int32_t>::value) :
-                      AscendC::IsSameType<DTYPE_Y, float>::value);
-        constexpr bool scaleSupported =
-            AscendC::IsSameType<DTYPE_Y, int32_t>::value || AscendC::IsSameType<DTYPE_SCALE, uint64_t>::value ||
-            AscendC::IsSameType<DTYPE_SCALE, int64_t>::value || AscendC::IsSameType<DTYPE_SCALE, bfloat16_t>::value ||
-            AscendC::IsSameType<DTYPE_SCALE, float>::value;
-        if constexpr ((isInt8 || isHiFloat8 || (isFp8X && isFp8W)) && outputSupported && scaleSupported) {
-            // Both layouts start with GMMQuantParams. Do not read mmTilingData before selecting the layout.
-            GET_TILING_DATA_MEMBER(GMMQuantTilingData, gmmQuantParams, cubeRouteParams, tiling);
-            using NativeBiasType = AscendC::Std::conditional_t<isInt8, int32_t, float>;
-            constexpr bool biasSupported = AscendC::IsSameType<DTYPE_BIAS, NativeBiasType>::value;
-            if (!cubeRouteParams.hasBias || biasSupported) {
-                using CubeWLayout = AscendC::Std::conditional_t<
-                    wFormat == CubeFormat::NZ,
-                    AscendC::Std::conditional_t<QUANT_B_TRANS == GMM_TRANS, AscendC::Te::ZNLayoutPtn,
-                                                AscendC::Te::NZLayoutPtn>,
-                    AscendC::Std::conditional_t<QUANT_B_TRANS == GMM_TRANS, AscendC::Te::DNExtLayoutPtn,
-                                                AscendC::Te::NDExtLayoutPtn>>;
-                GmmCubeTensorApiKernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS, DTYPE_SCALE, DTYPE_Y,
-                                       AscendC::Te::NDExtLayoutPtn, CubeWLayout, AscendC::Te::NDExtLayoutPtn>(
-                    x, weight, bias, scale, groupList, perTokenScale, y, user1, tiling);
-                return;
+        if constexpr (QUANT_A_TRANS == GMM_NO_TRANS && (QUANT_B_TRANS == GMM_NO_TRANS || QUANT_B_TRANS == GMM_TRANS) &&
+                      KERNEL_TYPE == GMM_DEQUANT_FIXP) {
+            // Keep this predicate in sync with GroupedQmmBasicApiTiling::IsCubeBasicApi().
+            constexpr bool isInt8 =
+                AscendC::IsSameType<DTYPE_X, int8_t>::value && AscendC::IsSameType<DTYPE_WEIGHT, int8_t>::value;
+            constexpr bool isHiFloat8 = ORIG_DTYPE_X == DT_HIFLOAT8 && ORIG_DTYPE_WEIGHT == DT_HIFLOAT8;
+            constexpr bool isFp8X = ORIG_DTYPE_X == DT_FLOAT8_E4M3FN || ORIG_DTYPE_X == DT_FLOAT8_E5M2;
+            constexpr bool isFp8W = ORIG_DTYPE_WEIGHT == DT_FLOAT8_E4M3FN || ORIG_DTYPE_WEIGHT == DT_FLOAT8_E5M2;
+            constexpr bool outputSupported =
+                AscendC::IsSameType<DTYPE_Y, half>::value || AscendC::IsSameType<DTYPE_Y, bfloat16_t>::value ||
+                (isInt8 ?
+                     (AscendC::IsSameType<DTYPE_Y, int8_t>::value || AscendC::IsSameType<DTYPE_Y, int32_t>::value) :
+                     AscendC::IsSameType<DTYPE_Y, float>::value);
+            constexpr bool scaleSupported =
+                AscendC::IsSameType<DTYPE_Y, int32_t>::value || AscendC::IsSameType<DTYPE_SCALE, uint64_t>::value ||
+                AscendC::IsSameType<DTYPE_SCALE, int64_t>::value ||
+                AscendC::IsSameType<DTYPE_SCALE, bfloat16_t>::value || AscendC::IsSameType<DTYPE_SCALE, float>::value;
+            if constexpr ((isInt8 || isHiFloat8 || (isFp8X && isFp8W)) && outputSupported && scaleSupported) {
+                // Both layouts start with GMMQuantParams. Do not read mmTilingData before selecting the layout.
+                GET_TILING_DATA_MEMBER(GMMQuantTilingData, gmmQuantParams, cubeRouteParams, tiling);
+                using NativeBiasType = AscendC::Std::conditional_t<isInt8, int32_t, float>;
+                constexpr bool biasSupported = AscendC::IsSameType<DTYPE_BIAS, NativeBiasType>::value;
+                if (!cubeRouteParams.hasBias || biasSupported) {
+                    using CubeWLayout = AscendC::Std::conditional_t<
+                        wFormat == CubeFormat::NZ,
+                        AscendC::Std::conditional_t<QUANT_B_TRANS == GMM_TRANS, AscendC::Te::ZNLayoutPtn,
+                                                    AscendC::Te::NZLayoutPtn>,
+                        AscendC::Std::conditional_t<QUANT_B_TRANS == GMM_TRANS, AscendC::Te::DNExtLayoutPtn,
+                                                    AscendC::Te::NDExtLayoutPtn>>;
+                    GmmCubeTensorApiKernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS, DTYPE_SCALE, DTYPE_Y,
+                                           AscendC::Te::NDExtLayoutPtn, CubeWLayout, AscendC::Te::NDExtLayoutPtn>(
+                        x, weight, bias, scale, groupList, perTokenScale, y, user1, tiling);
+                    return;
+                }
             }
         }
-    }
 #endif
-    if constexpr (QUANT_B_TRANS == GMM_NO_TRANS && QUANT_A_TRANS == GMM_NO_TRANS && KERNEL_TYPE == GMM_DEQUANT_FIXP) {
-        GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
-        GMM_QUANT_IMPL_CLASS(false, false, GmmASWKernel);
-    } else if constexpr (QUANT_B_TRANS == GMM_TRANS && QUANT_A_TRANS == GMM_NO_TRANS &&
-                         KERNEL_TYPE == GMM_DEQUANT_FIXP) {
-        GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
-        GMM_QUANT_IMPL_CLASS(false, true, GmmASWKernel);
-    }
+        if constexpr (QUANT_B_TRANS == GMM_NO_TRANS && QUANT_A_TRANS == GMM_NO_TRANS &&
+                      KERNEL_TYPE == GMM_DEQUANT_FIXP) {
+            GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
+            GMM_QUANT_IMPL_CLASS(false, false, GmmASWKernel);
+        } else if constexpr (QUANT_B_TRANS == GMM_TRANS && QUANT_A_TRANS == GMM_NO_TRANS &&
+                             KERNEL_TYPE == GMM_DEQUANT_FIXP) {
+            GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
+            GMM_QUANT_IMPL_CLASS(false, true, GmmASWKernel);
+        }
 #endif
 #if defined(V310_GMM_QUANT_PERTENSOR_CUBE) // perTensor/double perTensor
-    if constexpr (QUANT_B_TRANS == GMM_NO_TRANS && QUANT_A_TRANS == GMM_TRANS && KERNEL_TYPE == GMM_DEQUANT_FIXP) {
-        GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
-        GMM_QUANT_WITH_EMPTY_TENSOR_IMPL_CLASS(true, false, GmmASWKernel);
-    }
+        if constexpr (QUANT_B_TRANS == GMM_NO_TRANS && QUANT_A_TRANS == GMM_TRANS && KERNEL_TYPE == GMM_DEQUANT_FIXP) {
+            GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
+            GMM_QUANT_WITH_EMPTY_TENSOR_IMPL_CLASS(true, false, GmmASWKernel);
+        }
 #endif
 #if defined(V310_GMM_QUANT_MIX) // perToken/SPLIT_K/scale bf16/fp32
-    if constexpr (QUANT_B_TRANS == GMM_NO_TRANS && QUANT_A_TRANS == GMM_NO_TRANS && KERNEL_TYPE == GMM_DEQUANT_VECTOR) {
-        GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
-        GMM_QUANT_MIX_IMPL_CLASS(false, false, GQmmMixRegbaseKernel);
-    } else if constexpr (QUANT_B_TRANS == GMM_TRANS && QUANT_A_TRANS == GMM_NO_TRANS &&
-                         KERNEL_TYPE == GMM_DEQUANT_VECTOR) {
-        GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
-        GMM_QUANT_MIX_IMPL_CLASS(false, true, GQmmMixRegbaseKernel);
-    } else if constexpr (QUANT_B_TRANS == GMM_NO_TRANS && QUANT_A_TRANS == GMM_TRANS &&
-                         KERNEL_TYPE == GMM_DEQUANT_VECTOR) {
-        GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
-        GMM_QUANT_MIX_IMPL_CLASS(true, false, GQmmMixRegbaseKernel);
+        if constexpr (QUANT_B_TRANS == GMM_NO_TRANS && QUANT_A_TRANS == GMM_NO_TRANS &&
+                      KERNEL_TYPE == GMM_DEQUANT_VECTOR) {
+            GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
+            GMM_QUANT_MIX_IMPL_CLASS(false, false, GQmmMixRegbaseKernel);
+        } else if constexpr (QUANT_B_TRANS == GMM_TRANS && QUANT_A_TRANS == GMM_NO_TRANS &&
+                             KERNEL_TYPE == GMM_DEQUANT_VECTOR) {
+            GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
+            GMM_QUANT_MIX_IMPL_CLASS(false, true, GQmmMixRegbaseKernel);
+        } else if constexpr (QUANT_B_TRANS == GMM_NO_TRANS && QUANT_A_TRANS == GMM_TRANS &&
+                             KERNEL_TYPE == GMM_DEQUANT_VECTOR) {
+            GET_TILING_DATA_WITH_STRUCT(GMMQuantTilingData, tilingData, tiling);
+            GMM_QUANT_MIX_IMPL_CLASS(true, false, GQmmMixRegbaseKernel);
+        }
+#endif
+#if defined(V310_GMM_QUANT_PERTILE)
     }
 #endif
 #if defined(V310_GMM_QUANT_PERTILE)

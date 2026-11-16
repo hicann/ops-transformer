@@ -132,10 +132,17 @@ __global__ __aicore__ void grouped_matmul_swiglu_quant_v2(GM_ADDR x, GM_ADDR xSc
     controller.Process();
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);
 #else
-    TPipe tPipe;
 #if ORIG_DTYPE_X_SCALE == DT_HIFLOAT4_SCALE
+    AscendC::InitSocState();
     REGISTER_TILING_DEFAULT(GMMSwigluQuantBasicApiTilingDataParams);
 #else
+#if ORIG_DTYPE_X_SCALE == DT_FLOAT8_E8M0 && defined(FORMAT_WEIGHT) && FORMAT_WEIGHT == FORMAT_FRACTAL_NZ && \
+    (ORIG_DTYPE_X == DT_FLOAT4_E2M1 || ORIG_DTYPE_X == DT_FLOAT4_E1M2) && \
+    (ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1 || ORIG_DTYPE_WEIGHT == DT_FLOAT4_E1M2)
+    AscendC::InitSocState();
+#else
+    TPipe tPipe;
+#endif
     REGISTER_TILING_DEFAULT(GMMSwigluQuantV2TilingDataParams);
 #endif
 #if ORIG_DTYPE_X_SCALE == DT_FLOAT8_E8M0 && GMM_SWIGLU_QUANT_TENSOR_API_ENABLED

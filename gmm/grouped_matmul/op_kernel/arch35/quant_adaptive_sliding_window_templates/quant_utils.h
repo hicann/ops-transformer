@@ -203,6 +203,8 @@ __aicore__ inline void InitOutputWithZero(AscendC::GlobalTensor<T> yInitGlobal, 
     if (AscendC::GetSubBlockIdx() >= 1) { // 搬运共享带宽，只需要把aiv0的0搬到GM即可，也兼容aic:aiv=1:1的场景
         return;
     }
+    // MIX output buffers use V_MTE3 IDs 0/1; zero fill uses ID 2.
+    constexpr event_t ZERO_FILL_EVENT_ID = static_cast<event_t>(2);
     uint32_t taskRatio = AscendC::GetTaskRation();
     if (taskRatio == 0) {
         return;
@@ -220,9 +222,8 @@ __aicore__ inline void InitOutputWithZero(AscendC::GlobalTensor<T> yInitGlobal, 
     }
     if (!isKZeroInit) { // 第一次k==0时，需要初始化ub中buffer全0
         AscendC::Duplicate<T>(initLocal, 0, initSize);
-        event_t eventIdVToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(AscendC::HardEvent::V_MTE3));
-        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(eventIdVToMte3);
-        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(eventIdVToMte3);
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(ZERO_FILL_EVENT_ID);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(ZERO_FILL_EVENT_ID);
         isKZeroInit = true;
     }
     uint64_t yOffset = perCoreSize * blockIndex;

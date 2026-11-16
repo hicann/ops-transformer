@@ -287,7 +287,11 @@ public:
         AscendC::SetAtomicAdd<float>(); // GMM res + yIn
         // Instantiate mmadOp
         BlockMmadOp blockMmadOp;
-        blockMmadOp.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+        if constexpr (AscendC::Std::is_base_of_v<MatmulWithScale<>, typename BlockMmadBuilder::BlockMatmulPolicy>) {
+            blockMmadOp.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling));
+        } else {
+            blockMmadOp.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+        }
         InitParamsAndTensor(params);
         uint32_t groupNum = params.gmmParams.groupNum;
         BlockSchedulerOp bs(params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);

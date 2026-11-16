@@ -220,7 +220,7 @@ constexpr static auto staticCFGtransB = GetGmmMatmulApiTiling(isWeightNZ, true);
         GET_TILING_DATA_MEMBER(GMMTilingData, mmTilingData, mmTilingData_, tiling); \
         GET_TILING_DATA_MEMBER_ADDR(GMMTilingData, gmmArray, gmmArrayAddr_, tiling); \
         GMMPreTilingProcess preTiling; \
-        preTiling.Init(groupList, gmmBaseParams_, mmTilingData_, &tPipe); \
+        preTiling.Init(groupList, gmmBaseParams_, mmTilingData_); \
         preTiling.Process(gmmBaseParams_, mmTilingData_); \
         if ASCEND_IS_AIC { \
             mm.SetSubBlockIdx(0); \
@@ -311,7 +311,7 @@ constexpr static auto staticCFGtransB = GetGmmMatmulApiTiling(isWeightNZ, true);
         GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
         if ASCEND_IS_AIV { \
             GMMA8W4FakeQuantPreProcess<wFormat> op1; \
-            op1.Init(weight, y, groupList, user1, gmmBaseParams_, &tPipe); \
+            op1.Init(weight, y, groupList, user1, gmmBaseParams_); \
             op1.Process(); \
             tPipe.Reset(); \
             tPipe.Destroy(); \
@@ -341,7 +341,7 @@ constexpr static auto staticCFGtransB = GetGmmMatmulApiTiling(isWeightNZ, true);
         GET_TILING_DATA_MEMBER(GMMTilingData, gmmBaseParams, gmmBaseParams_, tiling); \
         if ASCEND_IS_AIV { \
             GMMA8W4FakeQuantPreProcess<wFormat> op1; \
-            op1.Init(weight, y, scale, user1, gmmBaseParams_, &tPipe); \
+            op1.Init(weight, y, scale, user1, gmmBaseParams_); \
             op1.Process(); \
             tPipe.Reset(); \
             tPipe.Destroy(); \
