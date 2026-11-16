@@ -159,8 +159,8 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
             <td>(B,S1,N1,D)、(T1,N1,D)<br>
-            B：支持泛化；S1：支持泛化；N1：支持128、64、32、16、8、4、2、1；D：512；T1：B × S1<br>
-            <term>Ascend 950PR&950DT系列产品</term>的N1额外还支持48、24、12、6、3
+            B：支持泛化；S1：支持泛化；D：512；T1：B × S1<br>
+            N1：<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>支持1~128；<term>Ascend 950PR&950DT系列产品</term>支持1、2、3、4、6、8、12、16、24、32、48、64、128
             </td>
             <td>√</td>
         </tr>
@@ -670,8 +670,9 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         </tr>
         <tr>
             <td>N1</td>
-            <td>1、2、4、8、16、32、64、128<br>
-            <term>Ascend 950PR&950DT系列产品</term>额外还支持48、24、12、6、3
+            <td>
+            <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：1~128<br>
+            <term>Ascend 950PR&950DT系列产品</term>：1、2、3、4、6、8、12、16、24、32、48、64、128
             </td>
             <td>SparseFA为MQA。</td>
         </tr>

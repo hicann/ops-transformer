@@ -264,9 +264,9 @@ English | [简体中文](./README.md)
 - Only BSND or TND layout is supported. The constraints on data shapes are as follows:
   - B: value range 1 to 256.
   - S1 supports 1 to 128K, and S2 supports 1 to 1M. S1 and S2 support different lengths.
-  - N1 supports 1/2/4/8/16/32/64/128.
-    - <term>Ascend 950PR&950DT products</term>:
-      - Additionally, 48, 24, 12, 6, and 3 are supported.
+  - N1:
+    - <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support 1 to 128.
+    - <term>Ascend 950PR&950DT products</term> support 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, and 128.
   - N2: only 1 is supported.
   - D: only 512 is supported.
   - Drope: only 64 is supported.

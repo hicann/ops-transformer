@@ -17,6 +17,7 @@
 #include "sparse_flash_attention_grad_tiling_bs1_basic.h"
 #include "op_host/tiling_templates_registry.h"
 #include <algorithm>
+#include <limits>
 
 namespace optiling {
 namespace sfag {
@@ -26,6 +27,7 @@ constexpr uint32_t B32 = 4;                               // 4B
 constexpr uint32_t B16 = 2;
 constexpr uint32_t BASE_LEN_256 = 256;
 constexpr int64_t GM_ALIGN = 512;
+constexpr int64_t D_SIZE = 512;
 constexpr uint32_t PING_PONG_BUFFER = 2;
 constexpr uint32_t SCATTER_BUFFER_NUM = 3;
 constexpr uint64_t KERNEL_UB_SIZE = 191 * 1024;
@@ -39,6 +41,12 @@ struct OptimizedScatterGateDecision {
     int64_t gateS2 = 0;
     int64_t effectiveSelectedTokens = 0;
 };
+
+// This predicate is mirrored by VecOp::InitUB; other optimized shapes keep their original layout.
+bool IsTiledMlaShape(const TempParams& tmpData)
+{
+    return tmpData.g > 32 && tmpData.g <= 128 && tmpData.selected_block_size == 1;
+}
 
 OptimizedScatterGateDecision GetOptimizedScatterGateDecision(const TempParams& tmpData)
 {
@@ -58,8 +66,8 @@ OptimizedScatterGateDecision GetOptimizedScatterGateDecision(const TempParams& t
         decision.reason = "disabled: invalid s1/s2/selected block count/selected block size";
         return decision;
     }
-    if (n1 <= 0 || n1 >= 128) {
-        decision.reason = "disabled: N1 must be in [1, 127] for optimized scatter";
+    if (n1 <= 0 || n1 > 128 || (n1 == 128 && !IsTiledMlaShape(tmpData))) {
+        decision.reason = "disabled: N1 is outside the optimized scatter shape range";
         return decision;
     }
     int64_t gateS1 = s1;
@@ -95,6 +103,15 @@ OptimizedScatterGateDecision GetOptimizedScatterGateDecision(const TempParams& t
         return decision;
     }
 
+    // Tile row statistics independently of softmax for the supported MLA head range.
+    if (IsTiledMlaShape(tmpData)) {
+        // Keep the top-k bound while admitting the validated shorter sequences.
+        decision.enabled = selectedTokenLimit >= 2048 && effectiveSelectedTokens >= 1024 && gateS1 >= 1024;
+        decision.reason = decision.enabled ? "enabled: MLA tiled pipeline, 33<=N1<=128" :
+                                             "disabled: MLA shape below tiled pipeline thresholds";
+        return decision;
+    }
+
     if (n1 == 64) {
         if (effectiveSelectedTokens >= 4096) {
             decision.enabled = gateS2 >= 8192 || gateS1 >= 2048;
@@ -111,7 +128,7 @@ OptimizedScatterGateDecision GetOptimizedScatterGateDecision(const TempParams& t
         return decision;
     }
 
-    decision.reason = "disabled: block_size=1 optimization only supports N1<=64";
+    decision.reason = "disabled: block_size=1 shape is outside optimized scatter gates";
     return decision;
 }
 } // namespace
@@ -397,7 +414,8 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::DoSftTiling()
     constexpr uint32_t blockFp32 = BLOCK / B32;
     constexpr uint32_t optimizedUbRowSize = 4;
     constexpr uint32_t nonOptimizedUbRowSize = 16;
-    constexpr uint32_t optimizedMaxGatherSize = 32;
+    const bool tiledMla = tmpData.enableOptimizedScatter && IsTiledMlaShape(tmpData);
+    uint32_t optimizedMaxGatherSize = tiledMla ? 12 : 32;
     constexpr uint32_t nonOptimizedMaxGatherSize = 64;
 
     const uint32_t sftBaseN = tmpData.singleN;
@@ -410,13 +428,15 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::DoSftTiling()
     // Keep this calculation in the same order as VecOp::InitUB. The optimized
     // path persists row parameters; the non-optimized path recalculates one
     // tile and aliases Gather with the Process area.
-    auto calcUbUsed = [&](uint32_t baseM) -> uint64_t {
+    auto calcUbUsed = [&](uint32_t baseM, uint32_t gatherRows) -> uint64_t {
         const uint64_t alignedBaseM = CeilCommon(baseM, blockFp32) * blockFp32;
 
         // attention/dAttention FP16(or FP32) + FP32, p/dp workspaces and
         // softmax/softmax-grad cast output.
-        const uint64_t softmaxWorkSize = static_cast<uint64_t>(baseM) * (2ULL * tmpData.d2 * (inputTypeSize + B32) +
-                                                                         sftBaseN * (2ULL * B32 + inputTypeSize));
+        const uint32_t rowsumBaseM = tiledMla ? blockFp32 : baseM;
+        const uint64_t softmaxWorkSize =
+            static_cast<uint64_t>(rowsumBaseM) * 2ULL * tmpData.d2 * (inputTypeSize + B32) +
+            static_cast<uint64_t>(baseM) * sftBaseN * (2ULL * B32 + inputTypeSize);
 
         if (tmpData.enableOptimizedScatter) {
             // Optimized Process reuses rowSum/max/sum across K blocks, so the
@@ -427,8 +447,8 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::DoSftTiling()
             const uint64_t scatterVStride = tmpData.kvMerge ? dimDAlign : dimD2Align;
             const uint64_t scatterSize = 2ULL * optimizedUbRowSize * (dimDAlign + scatterVStride) * B32;
             const uint64_t scatterTmpSize = (2ULL * optimizedUbRowSize + 1) * (dimDAlign + dimD2Align) * B32;
-            const uint64_t gatherSize = 2ULL * optimizedMaxGatherSize *
-                                        (std::max<int64_t>(tmpData.d, tmpData.d2) + tmpData.ropeDim) * inputTypeSize;
+            const uint64_t gatherSize =
+                2ULL * gatherRows * (std::max<int64_t>(tmpData.d, tmpData.d2) + tmpData.ropeDim) * inputTypeSize;
             return persistentSize + softmaxWorkSize + scatterSize + scatterTmpSize + gatherSize;
         }
 
@@ -442,13 +462,39 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::DoSftTiling()
     };
 
     uint32_t sftBaseM = tmpData.singleM;
-    // Brcb works on eight FP32 rows per repeat. For G >= 8, keeping baseM a
-    // multiple of eight prevents one tile's broadcast from entering the next.
-    if (sftBaseM >= blockFp32) {
-        sftBaseM = sftBaseM / blockFp32 * blockFp32;
-    }
-    while (sftBaseM > 0 && calcUbUsed(sftBaseM) > availableUbSize) {
-        sftBaseM -= sftBaseM > blockFp32 ? blockFp32 : 1;
+    if (tiledMla) {
+        // Split at an eight-head boundary nearest the midpoint. Choose the fewest
+        // softmax iterations on the slower AIV, then retain the larger gather buffer.
+        const uint32_t firstAivRows = (tmpData.singleM + blockFp32) / (2 * blockFp32) * blockFp32;
+        const uint32_t maxAivRows = std::max(firstAivRows, tmpData.singleM - firstAivRows);
+        const uint64_t gatherRowBytes = 2ULL * (std::max(tmpData.d, tmpData.d2) + tmpData.ropeDim) * inputTypeSize;
+        uint32_t bestLoops = std::numeric_limits<uint32_t>::max();
+        sftBaseM = 0;
+        optimizedMaxGatherSize = 0;
+        for (uint32_t candidateM = blockFp32; candidateM <= 32; candidateM += blockFp32) {
+            const uint64_t baseBytes = calcUbUsed(candidateM, 0);
+            if (baseBytes >= KERNEL_UB_SIZE) {
+                continue;
+            }
+            // VecOp derives this same capacity from its actual allocation offset.
+            const uint32_t gatherRows = std::min<uint64_t>(12, (KERNEL_UB_SIZE - baseBytes) / gatherRowBytes) / 2 * 2;
+            if (gatherRows < 4 || calcUbUsed(candidateM, gatherRows) > availableUbSize) {
+                continue;
+            }
+            const uint32_t loops = CeilCommon(maxAivRows, candidateM);
+            if (loops < bestLoops || (loops == bestLoops && gatherRows > optimizedMaxGatherSize)) {
+                bestLoops = loops;
+                sftBaseM = candidateM;
+                optimizedMaxGatherSize = gatherRows;
+            }
+        }
+    } else {
+        if (sftBaseM >= blockFp32) {
+            sftBaseM = sftBaseM / blockFp32 * blockFp32;
+        }
+        while (sftBaseM > 0 && calcUbUsed(sftBaseM, optimizedMaxGatherSize) > availableUbSize) {
+            sftBaseM -= sftBaseM > blockFp32 ? blockFp32 : 1;
+        }
     }
     OP_CHECK_IF(
         sftBaseM == 0,
@@ -463,8 +509,10 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::DoSftTiling()
                             .c_str()})),
         return ge::GRAPH_FAILED);
 
-    OP_LOGI(context_->GetNodeName(), "SFAG sftBaseM=%u, estimated vector UB=%lu/%lu bytes, optimized=%d.", sftBaseM,
-            calcUbUsed(sftBaseM), availableUbSize, static_cast<int32_t>(tmpData.enableOptimizedScatter));
+    OP_LOGI(context_->GetNodeName(),
+            "SFAG sftBaseM=%u, gatherRows=%u, estimated vector UB=%lu/%lu bytes, optimized=%d.", sftBaseM,
+            optimizedMaxGatherSize, calcUbUsed(sftBaseM, optimizedMaxGatherSize), availableUbSize,
+            static_cast<int32_t>(tmpData.enableOptimizedScatter));
 
     tilingData.splitCoreParams.set_sftBaseM(sftBaseM);
     tilingData.splitCoreParams.set_sftBaseN(sftBaseN);
@@ -636,12 +684,12 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetBaseShapeInfo()
         return ge::GRAPH_FAILED;
     }
 
-    if (dimDq != dimDk) {
+    if (dimDq != D_SIZE || dimDk != D_SIZE) {
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
             Ops::Base::GetOpInfo(context_).c_str(), "query, key",
             (std::string() + std::to_string(dimDq) + ", " + std::to_string(dimDk)).c_str(),
             (std::string() + "head_dim of Query[" + std::to_string(dimDq) + "] should be equal to head_dim of Key[" +
-             std::to_string(dimDk) + "].")
+             std::to_string(dimDk) + "], and their value must be 512.")
                 .c_str());
         return ge::GRAPH_FAILED;
     }
@@ -751,11 +799,11 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetBaseShapeInfo()
     }
 
     int64_t n1 = tmpData.n2 * tmpData.g;
-    if (tmpData.n2 != 1 || n1 > 128 || (n1 & (n1 - 1)) != 0) {
+    if (tmpData.n2 != 1 || n1 > 128) {
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
             Ops::Base::GetOpInfo(context_).c_str(), "query, key, sparse_indices, d_out, out",
             (std::string() + std::to_string(tmpData.n2) + ", " + std::to_string(n1)).c_str(),
-            (std::string() + "SparseFlashAttentionGrad only support n2=1 and n1=1/2/4/8/16/32/64/128, but got n2=" +
+            (std::string() + "SparseFlashAttentionGrad only support n2=1 and 1<=n1<=128, but got n2=" +
              std::to_string(tmpData.n2) + " n1=" + std::to_string(n1) + ".")
                 .c_str());
         return ge::GRAPH_FAILED;

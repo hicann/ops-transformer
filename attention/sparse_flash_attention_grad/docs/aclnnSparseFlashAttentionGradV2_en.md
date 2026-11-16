@@ -211,8 +211,8 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
             <td>BFLOAT16, FLOAT16</td>
             <td>ND</td>
             <td>(B,S1,N1,D), (T1,N1,D)<br>
-            B: supports generalization; S1: supports generalization; N1: supports 128, 64, 32, 16, 8, 4, 2, 1; D: 512; T1: B × S1<br>
-            N1 of <term>Ascend 950PR&950DT products</term> additionally supports 48, 24, 12, 6, 3
+            B: supports generalization; S1: supports generalization; D: 512; T1: B × S1<br>
+            N1: <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support 1 to 128; <term>Ascend 950PR&950DT products</term> support 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, and 128
             </td>
             <td>√</td>
         </tr>
@@ -727,8 +727,9 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
         </tr>
         <tr>
             <td>N1</td>
-            <td>1, 2, 4, 8, 16, 32, 64, 128<br>
-            <term>Ascend 950PR&950DT products</term> additionally supports 48, 24, 12, 6, 3
+            <td>
+            <term>Atlas A2 products</term> and <term>Atlas A3 products</term>: 1 to 128<br>
+            <term>Ascend 950PR&950DT products</term>: 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 128
             </td>
             <td>SparseFA is MQA.</td>
         </tr>

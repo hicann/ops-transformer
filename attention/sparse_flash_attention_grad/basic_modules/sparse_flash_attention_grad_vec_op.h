@@ -66,13 +66,13 @@ protected:
     __aicore__ inline void GatherKVOptimized(const int64_t n2Index, uint64_t currentS1Offset, const RunInfo& runInfo);
     template <typename GM_TYPE>
     __aicore__ inline void DumpGmZero(GlobalTensor<GM_TYPE>& gm, int64_t num);
-    __aicore__ inline void CalRowsumAndSftCopyIn(const int32_t loopIdx, const int64_t dyGmOffset,
+    __aicore__ inline void CalRowsumAndSftCopyIn(const int32_t headOffset, const int64_t dyGmOffset,
                                                  const int64_t sumGmOffset, const int32_t processM,
                                                  const bool calcSoftmaxGradFront);
     __aicore__ inline void CalAttenMsk(const int32_t processM, const int32_t actualSelS2Align, const RunInfo& runInfo);
-    __aicore__ inline void CalSoftmax(const int32_t loopIdx, const int32_t processM, const int64_t mm12Addr,
+    __aicore__ inline void CalSoftmax(const int32_t headOffset, const int32_t processM, const int64_t mm12Addr,
                                       const int64_t mm345Addr, const RunInfo& runInfo);
-    __aicore__ inline void CalSoftmaxGrad(const int32_t loopIdx, const int32_t processM, const int64_t mm12Addr,
+    __aicore__ inline void CalSoftmaxGrad(const int32_t headOffset, const int32_t processM, const int64_t mm12Addr,
                                           const int64_t mm345Addr, const RunInfo& runInfo);
     __aicore__ inline void CalSub(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor, int32_t baseM,
                                   int32_t baseN);
@@ -137,6 +137,9 @@ protected:
     int64_t selectedKWspOffset{0};
     int64_t selectedVWspOffset{0};
     bool enableOptimizedScatter{false};
+    bool tiledMlaPipeline{false};
+    uint32_t optimizedGatherSize{32};
+    uint32_t rowsumBaseM{0};
 
     constexpr static const int32_t BLOCK = 32;
     constexpr static const int32_t BLOCK_T1 = BLOCK / sizeof(T1);
@@ -369,7 +372,11 @@ __aicore__ inline void VecOp<SFAGT>::InitGMBuffer(GM_ADDR key, GM_ADDR value, GM
 template <typename SFAGT>
 __aicore__ inline void VecOp<SFAGT>::InitUB(TPipe* pipe)
 {
-    uint32_t dataSize = params.sftBaseM * dimDv;
+    tiledMlaPipeline = enableOptimizedScatter && dimG > 32 && dimG <= 128 && selectedBlockSize == 1;
+    // Row-sum is evaluated once per query; its input tile need not match the steady-state softmax tile.
+    optimizedGatherSize = MAX_GATHER_SIZE;
+    rowsumBaseM = tiledMlaPipeline ? BLOCK_FP32 : params.sftBaseM;
+    uint32_t dataSize = rowsumBaseM * dimDv;
     uint32_t ubOffset = 0;
     uint32_t rowsumUbOffset = 0;
     uint32_t totalUbSpace = 191 * 1024;
@@ -399,14 +406,14 @@ __aicore__ inline void VecOp<SFAGT>::InitUB(TPipe* pipe)
         ubOffset += maxTmpSize * sizeof(float);
         rowsumUbOffset = ubOffset;
 
-        attentionGradT1Tensor = vecQue.GetWithOffset<T1>(params.sftBaseM * dimDv, ubOffset);
-        ubOffset += params.sftBaseM * dimDv * sizeof(T1);
-        attentionGradFP32Tensor = vecQue.GetWithOffset<float>(params.sftBaseM * dimDv, ubOffset);
-        ubOffset += params.sftBaseM * dimDv * sizeof(float);
-        attentionT1Tensor = vecQue.GetWithOffset<T1>(params.sftBaseM * dimDv, ubOffset);
-        ubOffset += params.sftBaseM * dimDv * sizeof(T1);
-        attentionFP32Tensor = vecQue.GetWithOffset<float>(params.sftBaseM * dimDv, ubOffset);
-        ubOffset += params.sftBaseM * dimDv * sizeof(float);
+        attentionGradT1Tensor = vecQue.GetWithOffset<T1>(rowsumBaseM * dimDv, ubOffset);
+        ubOffset += rowsumBaseM * dimDv * sizeof(T1);
+        attentionGradFP32Tensor = vecQue.GetWithOffset<float>(rowsumBaseM * dimDv, ubOffset);
+        ubOffset += rowsumBaseM * dimDv * sizeof(float);
+        attentionT1Tensor = vecQue.GetWithOffset<T1>(rowsumBaseM * dimDv, ubOffset);
+        ubOffset += rowsumBaseM * dimDv * sizeof(T1);
+        attentionFP32Tensor = vecQue.GetWithOffset<float>(rowsumBaseM * dimDv, ubOffset);
+        ubOffset += rowsumBaseM * dimDv * sizeof(float);
 
         int32_t sftDataSize = params.sftBaseM * params.sftBaseN;
         pTensor = vecQue.GetWithOffset<float>(sftDataSize, ubOffset);
@@ -433,7 +440,7 @@ __aicore__ inline void VecOp<SFAGT>::InitUB(TPipe* pipe)
         topkUbOffset += NON_OPT_MAX_GATHER_SIZE * dimRope * sizeof(T1);
         gatherRopePong = vecQue.GetWithOffset<T1>(NON_OPT_MAX_GATHER_SIZE * dimRope, topkUbOffset);
 
-        uint32_t attentionShape[2] = {params.sftBaseM, static_cast<uint32_t>(dimDv)};
+        uint32_t attentionShape[2] = {rowsumBaseM, static_cast<uint32_t>(dimDv)};
         uint32_t softmaxGradShape[2] = {params.sftBaseM, BLOCK_FP32};
         attentionGradFP32Tensor.SetShapeInfo(ShapeInfo(2, attentionShape, DataFormat::ND));
         attentionFP32Tensor.SetShapeInfo(ShapeInfo(2, attentionShape, DataFormat::ND));
@@ -481,14 +488,14 @@ __aicore__ inline void VecOp<SFAGT>::InitUB(TPipe* pipe)
     rowsumUbOffset = ubOffset;
 
     // rowsum cal
-    attentionGradT1Tensor = vecQue.GetWithOffset<T1>(params.sftBaseM * dimDv, ubOffset);
-    ubOffset += params.sftBaseM * dimDv * sizeof(T1); //
-    attentionGradFP32Tensor = vecQue.GetWithOffset<float>(params.sftBaseM * dimDv, ubOffset);
-    ubOffset += params.sftBaseM * dimDv * sizeof(float);
-    attentionT1Tensor = vecQue.GetWithOffset<T1>(params.sftBaseM * dimDv, ubOffset);
-    ubOffset += params.sftBaseM * dimDv * sizeof(T1);
-    attentionFP32Tensor = vecQue.GetWithOffset<float>(params.sftBaseM * dimDv, ubOffset);
-    ubOffset += params.sftBaseM * dimDv * sizeof(float);
+    attentionGradT1Tensor = vecQue.GetWithOffset<T1>(rowsumBaseM * dimDv, ubOffset);
+    ubOffset += rowsumBaseM * dimDv * sizeof(T1); //
+    attentionGradFP32Tensor = vecQue.GetWithOffset<float>(rowsumBaseM * dimDv, ubOffset);
+    ubOffset += rowsumBaseM * dimDv * sizeof(float);
+    attentionT1Tensor = vecQue.GetWithOffset<T1>(rowsumBaseM * dimDv, ubOffset);
+    ubOffset += rowsumBaseM * dimDv * sizeof(T1);
+    attentionFP32Tensor = vecQue.GetWithOffset<float>(rowsumBaseM * dimDv, ubOffset);
+    ubOffset += rowsumBaseM * dimDv * sizeof(float);
 
     // sftGard
     int32_t sftDataSize = params.sftBaseM * params.sftBaseN;
@@ -515,16 +522,21 @@ __aicore__ inline void VecOp<SFAGT>::InitUB(TPipe* pipe)
 
     maxSelCnt = selectedBlockSize <= 32 ? 2 : 1;
     int64_t gatherDim = Max(dimDqk, dimDv);
-    gatherTensorPing = vecQue.GetWithOffset<T1>(MAX_GATHER_SIZE * gatherDim, ubOffset);
-    ubOffset += MAX_GATHER_SIZE * gatherDim * sizeof(T1);
-    gatherTensorPong = vecQue.GetWithOffset<T1>(MAX_GATHER_SIZE * gatherDim, ubOffset);
-    ubOffset += MAX_GATHER_SIZE * gatherDim * sizeof(T1);
-    gatherRopePing = vecQue.GetWithOffset<T1>(MAX_GATHER_SIZE * dimRope, ubOffset);
-    ubOffset += MAX_GATHER_SIZE * dimRope * sizeof(T1);
-    gatherRopePong = vecQue.GetWithOffset<T1>(MAX_GATHER_SIZE * dimRope, ubOffset);
-    ubOffset += MAX_GATHER_SIZE * dimRope * sizeof(T1);
+    if (tiledMlaPipeline) {
+        // The host chooses sftBaseM; use the remaining UB for an even gather batch.
+        const uint32_t gatherRowBytes = 2 * (gatherDim + dimRope) * sizeof(T1);
+        optimizedGatherSize = Min(12U, (totalUbSpace - ubOffset) / gatherRowBytes) / 2 * 2;
+    }
+    gatherTensorPing = vecQue.GetWithOffset<T1>(optimizedGatherSize * gatherDim, ubOffset);
+    ubOffset += optimizedGatherSize * gatherDim * sizeof(T1);
+    gatherTensorPong = vecQue.GetWithOffset<T1>(optimizedGatherSize * gatherDim, ubOffset);
+    ubOffset += optimizedGatherSize * gatherDim * sizeof(T1);
+    gatherRopePing = vecQue.GetWithOffset<T1>(optimizedGatherSize * dimRope, ubOffset);
+    ubOffset += optimizedGatherSize * dimRope * sizeof(T1);
+    gatherRopePong = vecQue.GetWithOffset<T1>(optimizedGatherSize * dimRope, ubOffset);
+    ubOffset += optimizedGatherSize * dimRope * sizeof(T1);
 
-    uint32_t attentionShape[2] = {params.sftBaseM, static_cast<uint32_t>(dimDv)};
+    uint32_t attentionShape[2] = {rowsumBaseM, static_cast<uint32_t>(dimDv)};
     uint32_t softmaxGradShape[2] = {params.singleM, BLOCK_FP32};
     attentionGradFP32Tensor.SetShapeInfo(ShapeInfo(2, attentionShape, DataFormat::ND));
     attentionFP32Tensor.SetShapeInfo(ShapeInfo(2, attentionShape, DataFormat::ND));
@@ -622,7 +634,7 @@ __aicore__ inline void VecOp<SFAGT>::CalSub(LocalTensor<float>& dstTensor, Local
 }
 
 template <typename SFAGT>
-__aicore__ inline void VecOp<SFAGT>::CalRowsumAndSftCopyIn(const int32_t loopIdx, const int64_t dyGmOffset,
+__aicore__ inline void VecOp<SFAGT>::CalRowsumAndSftCopyIn(const int32_t headOffset, const int64_t dyGmOffset,
                                                            const int64_t sumGmOffset, const int32_t processM,
                                                            const bool calcSoftmaxGradFront)
 {
@@ -630,40 +642,52 @@ __aicore__ inline void VecOp<SFAGT>::CalRowsumAndSftCopyIn(const int32_t loopIdx
     DataCopyPadExtParams<float> padParams2{false, 0, 0, 0};
 
     if (calcSoftmaxGradFront) {
-        uint32_t dataSize = processM * dimDv;
-        DataCopyExtParams copyParams{1, static_cast<uint32_t>(dataSize * sizeof(T1)), 0, 0, 0};
-        DataCopyPadExtParams<T1> padParams{false, 0, 0, 0};
-        uint32_t softmaxParamOffset = enableOptimizedScatter ? loopIdx * params.sftBaseM * BLOCK_FP32 : 0;
-        LocalTensor<float> curRowSumTensor = rowSumOutTensor[softmaxParamOffset];
-        uint32_t alignedProcessM = AlignUp(processM, BLOCK_FP32);
-        uint32_t curSoftmaxGradShape[2] = {static_cast<uint32_t>(processM), BLOCK_FP32};
-        curRowSumTensor.SetShapeInfo(ShapeInfo(2, curSoftmaxGradShape, DataFormat::ND));
-        curRowSumTensor.SetSize(alignedProcessM * BLOCK_FP32);
+        for (uint32_t rowBase = 0; rowBase < static_cast<uint32_t>(processM); rowBase += rowsumBaseM) {
+            const uint32_t curM = Min(rowsumBaseM, static_cast<uint32_t>(processM) - rowBase);
+            copyParams2.blockLen = curM * sizeof(float);
+            uint32_t dataSize = curM * dimDv;
+            DataCopyExtParams copyParams{1, static_cast<uint32_t>(dataSize * sizeof(T1)), 0, 0, 0};
+            DataCopyPadExtParams<T1> padParams{false, 0, 0, 0};
+            uint32_t softmaxParamOffset = (enableOptimizedScatter ? headOffset * BLOCK_FP32 : 0) + rowBase * BLOCK_FP32;
+            LocalTensor<float> curRowSumTensor = rowSumOutTensor[softmaxParamOffset];
+            uint32_t alignedProcessM = AlignUp(curM, BLOCK_FP32);
+            uint32_t curSoftmaxGradShape[2] = {curM, BLOCK_FP32};
+            curRowSumTensor.SetShapeInfo(ShapeInfo(2, curSoftmaxGradShape, DataFormat::ND));
+            curRowSumTensor.SetSize(alignedProcessM * BLOCK_FP32);
 
-        DataCopyPad(attentionGradT1Tensor, attentionGradGm[dyGmOffset], copyParams, padParams);
-        DataCopyPad(attentionT1Tensor, attentionGm[dyGmOffset], copyParams, padParams);
-        SET_FLAG(MTE2, V, vWaitMte2);
-        WAIT_FLAG(MTE2, V, vWaitMte2);
+            DataCopyPad(attentionGradT1Tensor, attentionGradGm[dyGmOffset + rowBase * dimDv], copyParams, padParams);
+            DataCopyPad(attentionT1Tensor, attentionGm[dyGmOffset + rowBase * dimDv], copyParams, padParams);
+            SET_FLAG(MTE2, V, vWaitMte2);
+            WAIT_FLAG(MTE2, V, vWaitMte2);
 
-        Cast(attentionGradFP32Tensor, attentionGradT1Tensor, RoundMode::CAST_NONE, dataSize);
-        Cast(attentionFP32Tensor, attentionT1Tensor, RoundMode::CAST_NONE, dataSize);
-        PIPE_BARRIER(PIPE_V);
-        SoftmaxGradFront<float, false>(curRowSumTensor, attentionGradFP32Tensor, attentionFP32Tensor, helpTensor,
-                                       tilingData->softmaxGradTilingData);
+            Cast(attentionGradFP32Tensor, attentionGradT1Tensor, RoundMode::CAST_NONE, dataSize);
+            Cast(attentionFP32Tensor, attentionT1Tensor, RoundMode::CAST_NONE, dataSize);
+            PIPE_BARRIER(PIPE_V);
+            // SoftmaxGradFront derives its reduction extent from the input shape, including tail tiles.
+            uint32_t curAttentionShape[2] = {curM, static_cast<uint32_t>(dimDv)};
+            attentionGradFP32Tensor.SetShapeInfo(ShapeInfo(2, curAttentionShape, DataFormat::ND));
+            attentionFP32Tensor.SetShapeInfo(ShapeInfo(2, curAttentionShape, DataFormat::ND));
+            SoftmaxGradFront<float, false>(curRowSumTensor, attentionGradFP32Tensor, attentionFP32Tensor, helpTensor,
+                                           tilingData->softmaxGradTilingData);
 
-        // [N2, T1, G] or [B, N2, S1, G] --> current [sftBaseM, 1].
-        // The optimized path stores all tiles; the non-optimized path reuses tile 0.
-        DataCopyPad(maxTmp, softmaxMaxGm[sumGmOffset], copyParams2, padParams2);
-        DataCopyPad(sumTmp, softmaxSumGm[sumGmOffset], copyParams2, padParams2);
-        SET_FLAG(MTE2, V, vWaitMte2);
+            // [N2, T1, G] or [B, N2, S1, G] --> current [sftBaseM, 1].
+            // The optimized path stores all tiles; the non-optimized path reuses tile 0.
+            DataCopyPad(maxTmp, softmaxMaxGm[sumGmOffset + rowBase], copyParams2, padParams2);
+            DataCopyPad(sumTmp, softmaxSumGm[sumGmOffset + rowBase], copyParams2, padParams2);
+            SET_FLAG(MTE2, V, vWaitMte2);
 
-        WAIT_FLAG(MTE2, V, vWaitMte2);
-        LocalTensor<float> curMaxTensor = maxTensor[softmaxParamOffset];
-        LocalTensor<float> curSumTensor = sumTensor[softmaxParamOffset];
-        Brcb(curMaxTensor, maxTmp, CeilDiv(processM, BLOCK_FP32), {1, BLOCK_FP32});
-        PIPE_BARRIER(PIPE_V);
-        Brcb(curSumTensor, sumTmp, CeilDiv(processM, BLOCK_FP32), {1, BLOCK_FP32});
-        PIPE_BARRIER(PIPE_V);
+            WAIT_FLAG(MTE2, V, vWaitMte2);
+            LocalTensor<float> curMaxTensor = maxTensor[softmaxParamOffset];
+            LocalTensor<float> curSumTensor = sumTensor[softmaxParamOffset];
+            Brcb(curMaxTensor, maxTmp, CeilDiv(curM, BLOCK_FP32), {1, BLOCK_FP32});
+            PIPE_BARRIER(PIPE_V);
+            Brcb(curSumTensor, sumTmp, CeilDiv(curM, BLOCK_FP32), {1, BLOCK_FP32});
+            PIPE_BARRIER(PIPE_V);
+            // Finish vector reads before the next DMA overwrites the shared sub-tile buffers.
+            if (rowBase + rowsumBaseM < static_cast<uint32_t>(processM)) {
+                PIPE_BARRIER(PIPE_ALL);
+            }
+        }
     }
 }
 
@@ -720,8 +744,8 @@ __aicore__ inline void VecOp<SFAGT>::CalAttenMsk(const int32_t processM, const i
 }
 
 template <typename SFAGT>
-__aicore__ inline void VecOp<SFAGT>::CalSoftmax(const int32_t loopIdx, const int32_t processM, const int64_t mm12Addr,
-                                                const int64_t mm345Addr, const RunInfo& runInfo)
+__aicore__ inline void VecOp<SFAGT>::CalSoftmax(const int32_t headOffset, const int32_t processM,
+                                                const int64_t mm12Addr, const int64_t mm345Addr, const RunInfo& runInfo)
 {
     int64_t actualSelS2 = runInfo.isLastBasicBlock ?
                               (runInfo.actualSelCntOffset - 1) * selectedBlockSize + runInfo.lastBlockSize :
@@ -747,7 +771,7 @@ __aicore__ inline void VecOp<SFAGT>::CalSoftmax(const int32_t loopIdx, const int
 
     uint32_t dstSoftShape[2] = {static_cast<uint32_t>(processM), static_cast<uint32_t>(actualSelS2Align)};
     pTensor.SetShapeInfo(ShapeInfo(2, dstSoftShape, DataFormat::ND));
-    uint32_t softmaxParamOffset = enableOptimizedScatter ? loopIdx * params.sftBaseM * BLOCK_FP32 : 0;
+    uint32_t softmaxParamOffset = enableOptimizedScatter ? headOffset * BLOCK_FP32 : 0;
     LocalTensor<float> curSumTensor = sumTensor[softmaxParamOffset];
     LocalTensor<float> curMaxTensor = maxTensor[softmaxParamOffset];
     uint32_t alignedProcessM = AlignUp(processM, BLOCK_FP32);
@@ -778,7 +802,7 @@ __aicore__ inline void VecOp<SFAGT>::CalSoftmax(const int32_t loopIdx, const int
 }
 
 template <typename SFAGT>
-__aicore__ inline void VecOp<SFAGT>::CalSoftmaxGrad(const int32_t loopIdx, const int32_t processM,
+__aicore__ inline void VecOp<SFAGT>::CalSoftmaxGrad(const int32_t headOffset, const int32_t processM,
                                                     const int64_t mm12Addr, const int64_t mm345Addr,
                                                     const RunInfo& runInfo)
 {
@@ -794,7 +818,7 @@ __aicore__ inline void VecOp<SFAGT>::CalSoftmaxGrad(const int32_t loopIdx, const
     SET_FLAG(MTE2, V, vWaitMte2);
     WAIT_FLAG(MTE2, V, vWaitMte2);
 
-    uint32_t softmaxParamOffset = enableOptimizedScatter ? loopIdx * params.sftBaseM * BLOCK_FP32 : 0;
+    uint32_t softmaxParamOffset = enableOptimizedScatter ? headOffset * BLOCK_FP32 : 0;
     LocalTensor<float> curRowSumTensor = rowSumOutTensor[softmaxParamOffset];
     CalSub(dPTensor, curRowSumTensor, processM, actualSelS2Align);
     PIPE_BARRIER(PIPE_V);
@@ -1026,7 +1050,7 @@ __aicore__ inline void VecOp<SFAGT>::GatherKVOptimized(const int64_t n2Index, ui
     uint64_t outRopeOffset = subBlockIdx == 0 ? 0 : firstVecEnd * selectedBlockSize * dimRope;
     uint32_t i;
 
-    if (selectedBlockSize >= MAX_GATHER_SIZE) {
+    if (selectedBlockSize >= optimizedGatherSize) {
         for (i = curBlk; i < curActualSelCntEnd; ++i) {
             int64_t keyOffset = topkIndicesGm.GetValue(gmOffset + i) * selectedBlockSize;
             uint32_t blockRows = selectedBlockSize;
@@ -1034,9 +1058,9 @@ __aicore__ inline void VecOp<SFAGT>::GatherKVOptimized(const int64_t n2Index, ui
                 blockRows = static_cast<uint32_t>(runInfo.lastBlockSize);
             }
 
-            for (uint32_t rowOffset = 0; rowOffset < blockRows; rowOffset += MAX_GATHER_SIZE) {
+            for (uint32_t rowOffset = 0; rowOffset < blockRows; rowOffset += optimizedGatherSize) {
                 uint32_t copyRows =
-                    (blockRows - rowOffset) > MAX_GATHER_SIZE ? MAX_GATHER_SIZE : (blockRows - rowOffset);
+                    (blockRows - rowOffset) > optimizedGatherSize ? optimizedGatherSize : (blockRows - rowOffset);
                 uint64_t kOutOffset = i * selectedBlockSize * dimDqk + rowOffset * dimDqk;
                 uint64_t ropeOutOffset = i * selectedBlockSize * dimRope + rowOffset * dimRope;
 
@@ -1155,7 +1179,7 @@ __aicore__ inline void VecOp<SFAGT>::GatherKVOptimized(const int64_t n2Index, ui
         }
         curGatherSize += maxSelCnt * selectedBlockSize;
 
-        if (curGatherSize == MAX_GATHER_SIZE) {
+        if (curGatherSize == optimizedGatherSize) {
             SET_FLAG(MTE2, MTE3, mte3WaitMte2EventId);
             WAIT_FLAG(MTE2, MTE3, mte3WaitMte2EventId);
 
@@ -1229,42 +1253,34 @@ __aicore__ inline void VecOp<SFAGT>::GatherKVOptimized(const int64_t n2Index, ui
 template <typename SFAGT>
 __aicore__ inline void VecOp<SFAGT>::Process(const RunInfo& runInfo)
 {
-    int32_t loopEnd = (params.singleM + params.sftBaseM - 1) / params.sftBaseM;
-    int32_t firstLoopEnd = loopEnd / 2;
-    int32_t substart = subBlockIdx == 0 ? 0 : firstLoopEnd;
-    int32_t subLoopEnd = subBlockIdx == 0 ? firstLoopEnd : loopEnd;
+    const uint32_t loopCount = CeilDiv(params.singleM, params.sftBaseM);
+    const uint32_t firstAivRows = tiledMlaPipeline ? (params.singleM + BLOCK_FP32) / (2 * BLOCK_FP32) * BLOCK_FP32 :
+                                                     (loopCount / 2) * params.sftBaseM;
+    const uint32_t headBegin = subBlockIdx == 0 ? 0 : firstAivRows;
+    const uint32_t headEnd = subBlockIdx == 0 ? firstAivRows : params.singleM;
+    int64_t dyGmOffset = runInfo.dyGmOffset + headBegin * dimDv;
+    int64_t sumGmOffset = runInfo.sumGmOffset + headBegin;
+    int64_t mm12Addr = runInfo.mm12GmOffset + headBegin * params.sftBaseN;
+    int64_t mm345Addr = runInfo.mm345GmOffset + headBegin * params.sftBaseN;
 
-    int32_t processM = params.sftBaseM;
-    int32_t tailM = params.singleM % params.sftBaseM;
-    int64_t dataSize = processM * params.sftBaseN;
-
-    int64_t dyGmOffset = runInfo.dyGmOffset + subBlockIdx * (processM * dimDv * firstLoopEnd);
-    int64_t sumGmOffset = runInfo.sumGmOffset + subBlockIdx * (processM * firstLoopEnd);
-    int64_t mm12Addr = runInfo.mm12GmOffset + subBlockIdx * (dataSize * firstLoopEnd);
-    int64_t mm345Addr = runInfo.mm345GmOffset + subBlockIdx * (dataSize * firstLoopEnd);
-
-    for (int32_t i = substart; i < subLoopEnd; i++) {
-        if (i == loopEnd - 1 && tailM != 0) {
-            processM = tailM;
-        }
-        bool calcSoftmaxGradFront = !enableOptimizedScatter || runInfo.blkCntOffset == 0;
-        CalRowsumAndSftCopyIn(i, dyGmOffset, sumGmOffset, processM, calcSoftmaxGradFront);
-        dyGmOffset += (processM * dimDv);
+    for (uint32_t headOffset = headBegin; headOffset < headEnd; headOffset += params.sftBaseM) {
+        const uint32_t processM = Min(params.sftBaseM, headEnd - headOffset);
+        const bool calcSoftmaxGradFront = !enableOptimizedScatter || runInfo.blkCntOffset == 0;
+        CalRowsumAndSftCopyIn(headOffset, dyGmOffset, sumGmOffset, processM, calcSoftmaxGradFront);
+        dyGmOffset += processM * dimDv;
         sumGmOffset += processM;
 
-        CalSoftmax(i, processM, mm12Addr, mm345Addr, runInfo);
-
+        CalSoftmax(headOffset, processM, mm12Addr, mm345Addr, runInfo);
         SET_FLAG(MTE3, MTE2, mte2WaitMte3Proc);
         WAIT_FLAG(MTE3, MTE2, mte2WaitMte3Proc);
+        CalSoftmaxGrad(headOffset, processM, mm12Addr, mm345Addr, runInfo);
 
-        CalSoftmaxGrad(i, processM, mm12Addr, mm345Addr, runInfo);
-
-        if (i < subLoopEnd - 1) {
+        if (headOffset + processM < headEnd) {
             SET_FLAG(MTE3, MTE2, mte2WaitMte3Proc);
             WAIT_FLAG(MTE3, MTE2, mte2WaitMte3Proc);
         }
-        mm12Addr += dataSize;
-        mm345Addr += dataSize;
+        mm12Addr += processM * params.sftBaseN;
+        mm345Addr += processM * params.sftBaseN;
     }
 }
 
