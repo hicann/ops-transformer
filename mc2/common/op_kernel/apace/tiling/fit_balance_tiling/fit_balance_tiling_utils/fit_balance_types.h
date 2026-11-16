@@ -46,6 +46,7 @@ struct CutParams {
     uint64_t mAlignLen;
     uint64_t minTileLen;
     uint64_t maxTileCnt;
+    uint64_t minLongLen = 0U; // 长块下限(绝对长度)
 };
 
 // 通信轮次硬上限(通信 API 的 FFTS 队列大小限制)
@@ -102,8 +103,8 @@ struct FitBalanceTilingArgs {
 
 // 通算顺序
 enum class CommComputeOrder {
-    COMPUTE_FIRST, // 计算在前通信在后(输出侧通信: RS/AR/matmul_allto_all)
-    COMM_FIRST,    // 通信在前计算在后(输入侧通信: AG/allto_all_matmul)
+    COMPUTE_FIRST, // 计算在前通信在后(输出侧通信)
+    COMM_FIRST,    // 通信在前计算在后(输入侧通信)
 };
 
 // 本地 mm 块位置(不经通信的数据块在流水线中的位置)
@@ -121,6 +122,7 @@ struct FitBalanceFlow {
     CommComputeOrder order;
     TilingCommEngine commEngine;
     bool allowShortFront;
+    bool perRankM = true; // true: M 轴聚合(通信轮次不碎片化); false: K 轴散射(细切轮次碎片化)
 };
 
 // mm 输入事实: 形状/基本块/字节/核数——由入参与标定基本块构成
@@ -135,6 +137,9 @@ struct MatmulInputParams {
     uint64_t inMatrixBDtypeSize = 0;
     uint64_t outMatrixCDtypeSize = 0;
     uint64_t coreNum = 0;
+    // est 物理项参数(由 MakeMatmulInputParams 从标定注入, 默认中性)
+    bool elemAtLeast1Byte = false; // 元素宽度>=1字节(减半惩罚门控用)
+    double mmDtypeBytes = 1.0;     // A/B 每元素真实字节宽(fp4=0.5)
 };
 
 // 标定数据总集: 算子侧唯一编辑面, 一个实例传给 FitBalanceCut。

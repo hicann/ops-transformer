@@ -598,8 +598,14 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
     }
     auto x1Dtype = x1DescTiling->GetDataType();
     bool hasBias = context_->GetOptionalInputShape(IDX_INPUT_BIAS) != nullptr;
-    GetCoreOccupancyFirstTiling(context_->GetPlatformInfo(), m_, n_, ka, x1Dtype == ge::DT_FLOAT4_E2M1, hasBias,
-                                td->tileQbmmTilingData, td->commTilingData, td->scaleCommTilingData);
+    auto* yDescTiling = context_->GetOutputDesc(IDX_OUTPUT_Y);
+    const uint64_t outputDtypeSize = ge::GetSizeByDataType(yDescTiling->GetDataType());
+    auto* commModePtr = context_->GetAttrs()->GetAttrPointer<char>(IDX_ATTR_COMM_MODE);
+    const char* commMode = (commModePtr != nullptr) ? commModePtr : "aiv_urma";
+    const FitBalanceTilingResult a2aResult =
+        GetA2aMmTiling(context_->GetPlatformInfo(), x1Dtype == ge::DT_FLOAT4_E2M1, hasBias, m_, n_, ka, worldSize_,
+                       precisionMode_, x1Dtype, ge::GetSizeByDataType(x1Dtype), outputDtypeSize, commMode,
+                       td->tileQbmmTilingData, td->commTilingData, td->scaleCommTilingData);
 
     usedCoreNum_ = td->tileQbmmTilingData.usedCoreNum;
 
@@ -621,15 +627,8 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
         return ge::GRAPH_FAILED;
     }
 
-    auto* commModePtr = context_->GetAttrs()->GetAttrPointer<char>(IDX_ATTR_COMM_MODE);
-    const char* commMode = (commModePtr != nullptr) ? commModePtr : "aiv_urma";
-    CommCutResult cut{};
-    auto* yDesc = context_->GetOutputDesc(IDX_OUTPUT_Y);
-    const uint64_t outputDtypeSize = ge::GetSizeByDataType(yDesc->GetDataType());
-
-    const bool fitBalanceHit = GetA2aFitBalanceCut(m_, n_, ka, worldSize_, usedCoreNum_, precisionMode_, x1Dtype,
-                                                   ge::GetSizeByDataType(x1Dtype), outputDtypeSize, commMode,
-                                                   td->tileQbmmTilingData.baseM, td->tileQbmmTilingData.baseN, cut);
+    CommCutResult cut = a2aResult.cut;
+    const bool fitBalanceHit = a2aResult.fitBalanceHit;
     if (fitBalanceHit) {
         const bool shortFront = MapCutToHeadTail(cut, td->commTilingData);
         td->commTilingData.nonSplitAxisSize = ka;

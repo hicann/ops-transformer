@@ -102,11 +102,26 @@ inline bool ChooseShortTileAtBack(const FitBalanceFlow& flow, const EstimateTime
         // 计算 Bound 场景下，短块放在前面，这样第二块通信（长）和第一块计算（短）可以互相掩盖
         shortAtBack = estimate.totalCommTimeNoCut > estimate.totalMatmulTime;
     }
-    // kernel 不支持或输入 shape 不支持短块前置，固定后置
-    if (!flow.allowShortFront || mmInput.mValue % M_ALIGN_GRANULARITY != 0U) {
+    // kernel 不支持或输入 shape 不支持短块前置，固定后置(可交付前置要求总长为
+    // 切分对齐粒度——即 matmul baseM——的整数倍; 与 MakeCutPlanner 同口径)
+    const uint64_t alignLen = mmInput.baseM != 0UL ? mmInput.baseM : static_cast<uint64_t>(M_ALIGN_GRANULARITY);
+    if (!flow.allowShortFront || mmInput.mValue % alignLen != 0U) {
         return true;
     }
     return shortAtBack;
+}
+
+// 末轮计算按调度块量化计费: mm 按 baseM 块调度, 尾块残行实付 ceil 块数的整块时间。
+// 限定 M 轴聚合族: K 轴族 b 高估且切片开销未建模, 量化会错误推向粗切/NoCut。
+inline double QuantizedTailTime(const MatmulInputParams& mmInput, const MatmulModelParams& mmModel, uint64_t tileLen,
+                                uint64_t rowMul, bool quantize)
+{
+    if (!quantize) {
+        return MatmulTime(mmInput, mmModel, tileLen, rowMul);
+    }
+    const uint64_t baseM = (mmInput.baseM != 0UL) ? mmInput.baseM : static_cast<uint64_t>(M_ALIGN_GRANULARITY);
+    const uint64_t quantLen = ((tileLen + baseM - 1UL) / baseM) * baseM;
+    return MatmulTime(mmInput, mmModel, quantLen, rowMul);
 }
 
 // 流水线总时估计(切 N 轮的近似): 不可重叠段在流水线两端, 中段取瓶颈侧。
@@ -116,25 +131,86 @@ inline double EstimateCutTotalTime(const FitBalanceFlow& flow, const MatmulInput
                                    const MatmulModelParams& mmModel, const CommModelParams& comm,
                                    const CommCutResult& cut)
 {
+    // mm 物理惩罚项(标定注入, 默认中性):
+    // 候选级 mm 修正, 两项物理惩罚按引擎常量执行(不经标定):
+    // (1) 减半惩罚: 候选将触发 host 侧强制减半(头块==baseM ∧ 元素>=1B ∧ 多块)且 N 方向
+    //     块数超阈值——baseM 减半使 MMAD 指令数翻倍, 巨 N 时每块变薄、发射开销占比放大
+    // (2) A-L2 挤出: B 流量超 L2 且单轮 A 工作集超限——A 行被 B 流持续挤出, DDR 反复读
     const double totalMmTime = MatmulTime(mmInput, mmModel, mmInput.mValue, mmModel.mmRankMul);
+    double pipelineCorrectedMm = totalMmTime;
+    {
+        constexpr double MM_PENALTY_COEF = 1.57;
+        constexpr uint64_t HALVE_NTILES_LIMIT = 40;
+        constexpr double A_WS_LIMIT_MB = 40.0;
+        constexpr double L2_BYTES_MB = 32.0;
+        const uint64_t nTiles = (mmInput.baseN > 0U) ? (mmInput.nValue + mmInput.baseN - 1U) / mmInput.baseN : 0U;
+        const bool halvingCandidate = cut.totalTileCnt > 1U && cut.longTileLen == mmInput.baseM &&
+                                      mmInput.elemAtLeast1Byte && mmInput.baseM % 32UL == 0UL &&
+                                      mmInput.baseM < mmInput.mValue * mmModel.mmRankMul;
+        const double bBytesMbL2 = static_cast<double>(mmInput.nValue) * static_cast<double>(mmInput.kValue) *
+                                  mmInput.mmDtypeBytes / (1024.0 * 1024.0);
+        const double aWorkingSetMb = static_cast<double>(cut.longTileLen) * mmModel.mmRankMul *
+                                     static_cast<double>(mmInput.kValue) * mmInput.mmDtypeBytes / (1024.0 * 1024.0);
+        if ((halvingCandidate && nTiles > HALVE_NTILES_LIMIT) ||
+            (bBytesMbL2 > L2_BYTES_MB && aWorkingSetMb > A_WS_LIMIT_MB)) {
+            pipelineCorrectedMm = totalMmTime * MM_PENALTY_COEF;
+        }
+    }
     const double totalCommTimeNoCut = TotalCommTime(comm, mmInput.mValue, 1U);
-    const double serialTotalTime = totalCommTimeNoCut + totalMmTime;
+    const double serialTotalTime = totalCommTimeNoCut + pipelineCorrectedMm;
+    // 脆弱带: B 字节量贴近 L2 容量时驻留余量不足, 通信写入挤出 B → 重叠退化。
+    // 边界由 L2 容量推导(下界=L2/2, 上界=L2×1.2, 全失效分界=L2×0.84);
+    // 仅 M 轴聚合形态生效——K 轴散射形态的写入模式不挤出 B
+    constexpr double FRAGILE_BAND_L2_MB = 32.0;
+    const double bBytesMb = static_cast<double>(mmInput.nValue) * static_cast<double>(mmInput.kValue) *
+                            mmInput.mmDtypeBytes / (1024.0 * 1024.0);
+    const bool inFragileBand =
+        flow.perRankM && bBytesMb >= FRAGILE_BAND_L2_MB / 2.0 && bBytesMb <= FRAGILE_BAND_L2_MB * 1.2;
+    const bool inBrokenBand = inFragileBand && bBytesMb >= FRAGILE_BAND_L2_MB * 0.84;
     if (cut.totalTileCnt <= 1U) {
         if (flow.localMMPosition == LocalMMPosition::FRONT) {
-            return serialTotalTime - std::min(mmModel.localShareTime, totalCommTimeNoCut);
+            double noCutCredit = std::min(mmModel.localShareTime, totalCommTimeNoCut);
+            if (inFragileBand) {
+                noCutCredit = 0.0;
+            }
+            return serialTotalTime - noCutCredit;
         }
         return serialTotalTime;
     }
     const uint64_t mValue = mmInput.mValue;
+    const bool quantizeTail = (comm.commVolumeMul > 1U); // M 轴聚合族限定(与细向下降同域)
     const double totalCommTime = TotalCommTime(comm, mValue, cut.totalTileCnt);
     const uint64_t firstLen = (cut.numShortTile > 0U && !cut.shortTileAtBack) ? cut.shortTileLen : cut.longTileLen;
     const uint64_t lastLen = (cut.numShortTile > 0U && cut.shortTileAtBack) ? cut.shortTileLen : cut.longTileLen;
+    // 轮次碎片化暴露: 单轮数据时间 < 阈值×每轮开销 时轮启动开销无法与 mm 重叠,
+    // b×(轮数-1) 串行累加(K 轴族细切场景)
+    auto TurnFragExpose = [&flow, &comm, &mmInput, &cut](double firstTurnDataTime) {
+        return ((!flow.perRankM && cut.totalTileCnt > 1U && firstTurnDataTime < comm.roundOverheadUs)) ?
+                   comm.roundOverheadUs * static_cast<double>(cut.totalTileCnt - 1U) :
+                   0.0;
+    };
     if (flow.localMMPosition == LocalMMPosition::FRONT) {
         const double commFirst = comm.fixedOverheadUs + CommTime(comm, firstLen);
-        const double mmLast = MatmulTime(mmInput, mmModel, lastLen, mmModel.mmRankMul);
-        const double headTime = std::max(commFirst, mmModel.localMMTime);
-        const double mmRestTime = totalMmTime - mmModel.localMMTime - mmLast;
-        return headTime + std::max(totalCommTime - headTime, mmRestTime) + mmLast;
+        // mmLast 只计 remote 份(rankMul-1): 本地份已在 head 的 localMM 中算过, 全量
+        // rankMul 口径会重复计尾块的本地行(粗切尾块大 → 重复计多 → est 虚高偏细切)
+        const double mmLast = ((mmModel.mmRankMul > 1U) ?
+                                   QuantizedTailTime(mmInput, mmModel, lastLen, mmModel.mmRankMul - 1U, quantizeTail) :
+                                   QuantizedTailTime(mmInput, mmModel, lastLen, mmModel.mmRankMul, quantizeTail));
+        const double localMMScaled = mmModel.localMMTime;
+        const double headTime = std::max(commFirst, localMMScaled);
+        const double mmRestTime = pipelineCorrectedMm - localMMScaled - mmLast;
+        const double fragExpose = TurnFragExpose(CommTime(comm, firstLen) - comm.roundOverheadUs);
+        if (inBrokenBand) {
+            // 全失效域: 全量 mm + β×comm, β 按首块占比分档(近平局/均衡二块/细切)
+            const double firstFrac =
+                (mmInput.mValue > 0U) ? static_cast<double>(firstLen) / static_cast<double>(mmInput.mValue) : 1.0;
+            const double beta = (firstFrac >= 0.75) ? 1.14 : ((firstFrac >= 0.4) ? 0.83 : 1.21);
+            return pipelineCorrectedMm + totalCommTime * beta + fragExpose;
+        }
+        if (inFragileBand) {
+            return headTime + (totalCommTime - commFirst) + mmRestTime + mmLast + fragExpose;
+        }
+        return headTime + std::max(totalCommTime - headTime, mmRestTime) + mmLast + fragExpose;
     }
     if (flow.localMMPosition == LocalMMPosition::BACK) {
         const double mmFirst = MatmulTime(mmInput, mmModel, firstLen, mmModel.mmRankMul);
@@ -144,12 +220,110 @@ inline double EstimateCutTotalTime(const FitBalanceFlow& flow, const MatmulInput
     }
     if (flow.order == CommComputeOrder::COMM_FIRST) {
         const double commFirst = comm.fixedOverheadUs + CommTime(comm, firstLen);
-        const double mmLast = MatmulTime(mmInput, mmModel, lastLen, mmModel.mmRankMul);
-        return commFirst + std::max(totalCommTime - commFirst, totalMmTime - mmLast) + mmLast;
+        const double mmLast = QuantizedTailTime(mmInput, mmModel, lastLen, mmModel.mmRankMul, quantizeTail);
+        const double fragExpose = TurnFragExpose(CommTime(comm, firstLen) - comm.roundOverheadUs);
+        if (inBrokenBand) {
+            const double firstFrac =
+                (mmInput.mValue > 0U) ? static_cast<double>(firstLen) / static_cast<double>(mmInput.mValue) : 1.0;
+            const double beta = (firstFrac >= 0.75) ? 1.14 : ((firstFrac >= 0.4) ? 0.83 : 1.21);
+            return pipelineCorrectedMm + totalCommTime * beta + fragExpose;
+        }
+        if (inFragileBand) {
+            return commFirst + (totalCommTime - commFirst) + (pipelineCorrectedMm - mmLast) + mmLast + fragExpose;
+        }
+        return commFirst + std::max(totalCommTime - commFirst, pipelineCorrectedMm - mmLast) + mmLast + fragExpose;
     }
     const double mmFirst = MatmulTime(mmInput, mmModel, firstLen, mmModel.mmRankMul);
     const double commLast = CommTime(comm, lastLen);
     return mmFirst + std::max(totalMmTime - mmFirst, totalCommTime - commLast) + commLast;
+}
+
+// 细向下降: 长块粒度按对齐粒度递减, est 严格变低才继续(平局即停), 变高或触及
+// 家族长块下界/轮数上限即停。
+constexpr double CUT_DESCENT_EPS_US = 1e-9; // est(µs)严格改善判定容差(代数平坦域fp噪声量级)
+inline double DescendToFiner(const FitBalanceFlow& flow, const MatmulInputParams& mmInput,
+                             const MatmulModelParams& mmModel, const CommModelParams& comm, CommCutResult& cut)
+{
+    if (cut.numLongTile == 0U) {
+        return 0.0;
+    }
+    // 下降限定 M 轴聚合族: K 轴族的 est 粒度排序未经验证(实测方向有误), 不下探
+    if (comm.commVolumeMul <= 1U) {
+        return EstimateCutTotalTime(flow, mmInput, mmModel, comm, cut);
+    }
+    const uint64_t alignLen = mmInput.baseM != 0UL ? mmInput.baseM : static_cast<uint64_t>(M_ALIGN_GRANULARITY);
+    // 家族长块下界, 与 MakeCutPlanner 同口径(M 轴聚合族 1 粒度, K 轴族 2 粒度)
+    const uint64_t minLongLen = (comm.commVolumeMul > 1U ? 1U : 2U) * alignLen;
+    double bestTime = EstimateCutTotalTime(flow, mmInput, mmModel, comm, cut);
+    while (cut.longTileLen >= minLongLen + alignLen) {
+        const uint64_t newLen = cut.longTileLen - alignLen;
+        CommCutResult cand{};
+        cand.shortTileAtBack = cut.shortTileAtBack;
+        cand.numLongTile = mmInput.mValue / newLen;
+        if (cand.numLongTile == 0U) {
+            break;
+        }
+        cand.longTileLen = newLen;
+        cand.shortTileLen = mmInput.mValue - cand.numLongTile * newLen;
+        cand.numShortTile = (cand.shortTileLen > 0UL) ? 1UL : 0UL;
+        cand.totalTileCnt = cand.numLongTile + cand.numShortTile;
+        if (cand.totalTileCnt > MAX_COMM_ROUNDS) {
+            break;
+        }
+        const double candTime = EstimateCutTotalTime(flow, mmInput, mmModel, comm, cand);
+        if (candTime < bestTime - CUT_DESCENT_EPS_US) {
+            cut = cand;
+            bestTime = candTime;
+        } else {
+            break;
+        }
+    }
+    return bestTime;
+}
+
+// Q阶梯全扫: 每个Q生成 (N x Q·baseM + 尾) 均匀族候选, est统一裁判, 平局取粗
+inline CommCutResult QLadderSweep(const FitBalanceFlow& flow, const MatmulInputParams& mmInput,
+                                  const MatmulModelParams& mmModel, const CommModelParams& comm,
+                                  const uint64_t minLongLen)
+{
+    const uint64_t alignLen = (mmInput.baseM != 0UL) ? mmInput.baseM : static_cast<uint64_t>(M_ALIGN_GRANULARITY);
+    const uint64_t mValue = mmInput.mValue;
+    CommCutResult bestCut{};
+    double bestTime = 0.0;
+    bool hasBest = false;
+    const uint64_t qMax = mValue / alignLen; // Q上限: 长块不超过m(单块)
+    // Q下限: 轮数上限约束 numLong <= Nmax → Q >= m/(Nmax×align), 更小的候选必被轮数检查拒绝
+    const uint64_t qMin = std::max((mValue + MAX_COMM_ROUNDS * alignLen - 1UL) / (MAX_COMM_ROUNDS * alignLen), 1UL);
+    for (uint64_t q = qMin; q <= qMax; ++q) {
+        const uint64_t longLen = q * alignLen;
+        const uint64_t numLong = mValue / longLen;
+        if (numLong == 0UL) {
+            continue;
+        }
+        if (numLong == 1UL && (mValue - longLen) == 0UL) {
+            continue; // NoCut单块形态排除: 单块est分支(serial-credit)与多块不同构, NoCut由串行基准判定
+        }
+        CommCutResult cand{};
+        cand.shortTileAtBack = true;
+        cand.numLongTile = numLong;
+        cand.longTileLen = longLen;
+        cand.shortTileLen = mValue - numLong * longLen;
+        cand.numShortTile = (cand.shortTileLen > 0UL) ? 1UL : 0UL;
+        cand.totalTileCnt = cand.numLongTile + cand.numShortTile;
+        if (cand.totalTileCnt > MAX_COMM_ROUNDS) {
+            continue; // 轮数上限跳过
+        }
+        if (longLen < minLongLen && numLong > 1UL) {
+            continue; // 家族长块下界(K轴族2粒度等)
+        }
+        const double candTime = EstimateCutTotalTime(flow, mmInput, mmModel, comm, cand);
+        if (!hasBest || candTime < bestTime) { // 平局保先者(最细Q): 保住减半域的细粒度偏好
+            bestCut = cand;
+            bestTime = candTime;
+            hasBest = true;
+        }
+    }
+    return bestCut;
 }
 
 // 离散化 + 轮数搜索 + 切分收益判定: 配平种子先经 [4] 离散化整形出首个候选,
@@ -161,6 +335,21 @@ inline void SelectBestCut(const FitBalanceFlow& flow, const MatmulInputParams& m
     const bool localBlockProtected =
         (flow.localMMPosition == LocalMMPosition::FRONT) || (flow.localMMPosition == LocalMMPosition::BACK);
     const bool goodLinearity = localBlockProtected ? true : IsGoodLinearityShape(mmInput);
+    if (comm.commVolumeMul >
+        1U) { // M轴聚合族: Q阶梯全扫(种子+预算+下降+COF对比四机制归一); K轴族est(b+γ)不可信走原搜索
+        // 原型路径: 单条Q阶梯全扫(种子仅用于家族下界口径), NoCut判定沿用串行基准
+        const uint64_t alignLen = (mmInput.baseM != 0UL) ? mmInput.baseM : static_cast<uint64_t>(M_ALIGN_GRANULARITY);
+        const uint64_t minLongLen = (comm.commVolumeMul > 1U ? 1U : 2U) * alignLen; // 与 MakeCutPlanner 同口径
+        const CommCutResult swept = QLadderSweep(flow, mmInput, mmModel, comm, minLongLen);
+        const double totalMmTime = MatmulTime(mmInput, mmModel, mmInput.mValue, mmModel.mmRankMul);
+        const double serialTotalTime = TotalCommTime(comm, mmInput.mValue, 1U) + totalMmTime;
+        if (swept.totalTileCnt == 0U || EstimateCutTotalTime(flow, mmInput, mmModel, comm, swept) >= serialTotalTime) {
+            tilingM.NoCutTiling();
+        } else {
+            tilingM.cutRes = swept;
+        }
+        return;
+    }
     // 配平种子(轮数搜索的恢复点): 长块理想值 + 短块下限 + 位置; 块数尚未离散化
     const CommCutResult balancedSeed = tilingM.cutRes;
     tilingM.FitTileLengthDiscrete(goodLinearity, localBlockProtected);

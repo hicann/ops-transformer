@@ -289,6 +289,12 @@ public:
         enableBaseMHalving_ = enable;
     }
 
+    // 强制减半: 跳过"块数<双波"条件, 仍保留对齐与 baseM<m 守卫(调用方按切分形态门控)
+    void SetForceBaseMHalving(bool enable)
+    {
+        forceBaseMHalving_ = enable;
+    }
+
     void SetMaxBaseM(uint64_t v)
     {
         maxBaseM_ = v;
@@ -334,6 +340,7 @@ private:
     static constexpr uint64_t ALIGN_SPLIT_MAX_INCREMENT = 2UL;
 
     bool enableBaseMHalving_{false};
+    bool forceBaseMHalving_{false};
     uint64_t maxBaseM_{0};
     bool hasBias_{false};
     bool isHiF4_{false};
@@ -613,8 +620,8 @@ private:
         }
         uint64_t baseMAlignNum = args_.transA ? GetShapeWithDataType<aDataType>(L1_ALIGN_SIZE) : CUBE_BLOCK;
         uint64_t blockNumAfterAdjust = CeilDiv(args_.m, runInfo_.baseM) * CeilDiv(args_.n, runInfo_.baseN);
-        if (blockNumAfterAdjust < NUM_TWO * platformInfo_.aicNum && runInfo_.baseM % (NUM_TWO * baseMAlignNum) == 0UL &&
-            runInfo_.baseM < args_.m) {
+        if ((forceBaseMHalving_ || blockNumAfterAdjust < NUM_TWO * platformInfo_.aicNum) &&
+            runInfo_.baseM % (NUM_TWO * baseMAlignNum) == 0UL && runInfo_.baseM < args_.m) {
             runInfo_.baseM = runInfo_.baseM / NUM_TWO;
         }
     }

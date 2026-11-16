@@ -39,6 +39,10 @@ public:
     };
 
     void SetMinLenByMax(uint64_t newLen);
+    void SetMinLongLen(uint64_t len)
+    {
+        tileArgs.minLongLen = len;
+    };
     uint64_t GetMinLen()
     {
         return tileArgs.minTileLen;
@@ -115,7 +119,8 @@ inline void CutPlanner::GenerateInitialPartition()
     cutRes.longTileLen = std::max(cutRes.longTileLen, cutRes.shortTileLen);
     cutRes.longTileLen = std::min(cutRes.longTileLen, totalLen - cutRes.shortTileLen);
     uint64_t newTileLen = cutRes.longTileLen / tileArgs.mAlignLen * tileArgs.mAlignLen;
-    const uint64_t minLongLen = 2UL * tileArgs.mAlignLen;
+    // 长块下限钳位(绝对长度, 见 CutParams::minLongLen)
+    const uint64_t minLongLen = tileArgs.minLongLen;
     if (newTileLen > 0UL && newTileLen < minLongLen && minLongLen < totalLen) {
         newTileLen = minLongLen;
     }

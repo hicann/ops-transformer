@@ -12,7 +12,7 @@
  * \brief fit-balance tiling 公共引擎——对外总接口头文件
  *
  * 通信-计算流水线配平切分引擎
- * 算子侧接入：CALIBRATION 实例 + 枚举入参 + 一行调用 FitBalanceCut。
+ * 算子侧接入：CALIBRATION 实例 + 枚举入参 + 一行调用 GetFitBalanceCut。
  *
  * 分文件布局(消费方只 include 本头文件):
  *   fit_balance_tiling_utils/fit_balance_types.h  公共类型/枚举/常量/标定结构
@@ -33,6 +33,7 @@
 #include "fit_balance_tiling_utils/cut_planner.h"
 #include "fit_balance_tiling_utils/solver.h"
 #include "../core_occupancy_first_tiling.h"
+#include "../matmul_tiling/quant_matmul_tiling.h"
 #include "../tiling_data_struct_define.h"
 
 // 通信标定行查找: 按 (通信引擎, rankDim) 匹配首个命中行, miss 返回 nullptr。
@@ -68,7 +69,11 @@ inline CutPlanner MakeCutPlanner(const FitBalanceTilingArgs& args, const MatmulI
         tilingM.SetMinLenByMax(mmInput.mValue);
     }
     tilingM.SetMinLenByMax(mmInput.baseM);
-    tilingM.SetAlignLength(M_ALIGN_GRANULARITY);
+    const uint64_t alignLen = mmInput.baseM != 0UL ? mmInput.baseM : static_cast<uint64_t>(M_ALIGN_GRANULARITY);
+    // 对齐粒度跟随 matmul baseM(减半同步减半); 0 值防御回退常量
+    tilingM.SetAlignLength(alignLen);
+    // 长块下限: M 轴聚合族(commVolumeMul>1)取 1 个对齐粒度, K 轴族取 2 个
+    tilingM.SetMinLongLen((comm.commVolumeMul > 1U ? 1U : 2U) * alignLen);
     return tilingM;
 }
 
@@ -82,10 +87,10 @@ inline CutPlanner MakeCutPlanner(const FitBalanceTilingArgs& args, const MatmulI
 //   [6] CCU 整形: 单轮 256MB 上限
 // ============================================================================
 
-// 核利用率优先候选: 波量纯几何切分(DeriveCommCut), 映射与 CutResultFromCof 一致
+// 核利用率优先候选: 波量纯几何切分(DeriveCommCut), 短块固定后置
 // (long = 头块波 x 块数, short = 尾块)。usedCoreNum 取可用 AIC 核数(全量 COF 由
 // matmul tiling 决定核数, 此处为引擎侧近似)。推导失败返回零值(单块, 估时退化为
-// serial 参与比时)。短块位置同 CutResultFromCof 固定后置。
+// serial 参与比时)。短块位置固定后置。
 inline CommCutResult MakeCoreOccupancyCut(const MatmulInputParams& mmInput)
 {
     CommCutResult cut{};
@@ -148,20 +153,6 @@ inline CommCutResult Schedule(const FitBalanceFlow& flow, const MatmulInputParam
     }
 
     return tilingM.cutRes;
-}
-
-// 核利用率优先切分结果 → 本引擎切分结果转换。
-// 标定 miss 走核利用率优先切分兜底时, 用它统一输出形态。
-inline CommCutResult CutResultFromCof(const CommTilingData& data)
-{
-    CommCutResult result;
-    result.shortTileAtBack = true;
-    result.longTileLen = data.splitAxisTileSize;
-    result.numLongTile = data.splitAxisTileCnt;
-    result.shortTileLen = data.splitAxisTailSize;
-    result.numShortTile = data.splitAxisTailCnt;
-    result.totalTileCnt = data.splitAxisTileCnt + data.splitAxisTailCnt;
-    return result;
 }
 
 inline bool MapCutToHeadTail(const CommCutResult& cut, CommTilingData& data)
@@ -239,6 +230,11 @@ inline MatmulInputParams MakeMatmulInputParams(const FitBalanceTilingArgs& args,
         mmInput.inMatrixADtypeSize = 1;
         mmInput.inMatrixBDtypeSize = 1;
     }
+    // 注入 est 物理项参数(来自标定)
+    mmInput.elemAtLeast1Byte = (args.geAType != ge::DataType::DT_FLOAT4_E2M1) && (args.inputADtypeSize >= 1UL);
+    mmInput.mmDtypeBytes = (args.geAType == ge::DataType::DT_FLOAT4_E2M1) ?
+                               0.5 :
+                               (args.inputADtypeSize > 0UL ? static_cast<double>(args.inputADtypeSize) : 1.0);
     return mmInput;
 }
 
@@ -288,29 +284,48 @@ inline CommModelParams MakeCommModelParams(const FitBalanceTilingArgs& args, con
 }
 
 // mm 定参: 梯度与本地块时长一次算清——此后公式对入参纯读
-// localDiv: 本地块折算分母(本地块=通信前即可计算的部分)。perRankM=false(K 轴通信, 如
-// a2a)时 mValue 为本卡全量计算, 本地份额 = 1/rankDim; perRankM=true(M 轴聚合)时本地块
-// 即 mValue 行, 不折算。全量口径会使配平长块反解系统性偏长(种子塌缩)
+// localDiv: 本地块折算分母(本地块=通信前即可计算的部分)。perRankM=false(K 轴通信)时
+// mValue 为本卡全量计算, 本地份额 = 1/rankDim; perRankM=true(M 轴聚合)时本地块即
+// mValue 行, 不折算。全量口径会使配平长块反解系统性偏长(种子塌缩)
 inline void FinalizeMmModelParams(const MatmulInputParams& mmInput, MatmulModelParams& mmModel, const uint64_t shares,
                                   const uint64_t localDiv)
 {
     mmModel.matmulGradient = CalcMatmulGradient(mmInput, mmModel, shares);
-    // 本地块计算时长(悲观 util 口径, 配平长块反解消费)。更小块的本地 Matmul 预期利用率会更低
-    const double localMMUtil =
-        FindCubeUtil(mmInput, mmInput.mValue, 1, MatmulPerfConst::LOCAL_MM_UTIL_EXPONENT_COEFFICIENT);
-    const double localFullTime = (std::abs(localMMUtil) > 1e-10) ?
-                                     MatmulTime(mmInput, mmModel, mmInput.mValue, 1) / localMMUtil :
-                                     MatmulTime(mmInput, mmModel, mmInput.mValue, 1);
-    mmModel.localMMTime = localFullTime / static_cast<double>(std::max<uint64_t>(localDiv, 1U));
-    // localMMTime 为保守估计，在计算长块时使用为了防止最后的长短块整形或者模型预估的误差导致长块长度不足；
-    // FRONT 估时的头部取值也用该保守口径
-    // localShareTime 为物理估计，在耗时计算时使用，为了防止高估Local块带来的掩盖效果，导致模型过于倾向选择不切分
-    mmModel.localShareTime =
-        MatmulTime(mmInput, mmModel, mmInput.mValue, 1) / static_cast<double>(std::max<uint64_t>(localDiv, 1U));
+    // 流水bound: 计算三条搬运流水耗时, 任一超过 cube bound 则按比例修正行梯度
+    mmModel.mmDtypeBytes = mmInput.mmDtypeBytes + 1.0 / 32.0; // 含scale开销
+    mmModel.mte1Time = CalcMte1Time(mmInput, mmModel);
+    mmModel.mte2Time = CalcMte2Time(mmInput, mmModel);
+    mmModel.fixpipeTime = CalcFixpipeTime(mmInput, mmModel);
+    // T_cube 为全核聚合量, T_mte1 为单核量需除以核数
+    const double tCubeTotal = static_cast<double>(mmInput.mValue) * mmModel.mmRankMul * mmModel.matmulGradient;
+    const double tMte1PerCore = mmModel.mte1Time / std::max<uint64_t>(mmInput.coreNum, 1U);
+    const double pipelineBound =
+        std::max(tCubeTotal, std::max(tMte1PerCore, std::max(mmModel.mte2Time, mmModel.fixpipeTime)));
+    if (pipelineBound > tCubeTotal) {
+        // 流水bound超过cube bound: 按比例修正行梯度(保持每行梯度形式不变)
+        mmModel.matmulGradient *= pipelineBound / std::max(tCubeTotal, 1e-30);
+    }
+    // 本地块耗时: 行数取 max(baseM, mValue), 每行系数直取目标指数口径(份数恒为 1,
+    // 本地块仅本卡 own 行)
+    const double pessRowCost = CalcLocalRowCost(mmInput, mmModel, MatmulPerfConst::LOCAL_MM_UTIL_EXPONENT_COEFFICIENT);
+    const double physRowCost = CalcLocalRowCost(mmInput, mmModel, MatmulPerfConst::CUBE_UTIL_EXPONENT_COEFFICIENT);
+    const double div = static_cast<double>(std::max<uint64_t>(localDiv, 1U));
+    const double localRows = static_cast<double>(std::max<uint64_t>(mmInput.baseM, mmInput.mValue));
+    // localMMTime 为保守估计(0.6 指数)，在计算长块时使用为了防止最后的长短块整形或者模型
+    // 预估的误差导致长块长度不足；FRONT 估时的头部取值也用该保守口径
+    mmModel.localMMTime = (std::isfinite(pessRowCost) && pessRowCost > 0.0) ?
+                              localRows * pessRowCost / div :
+                              MatmulTime(mmInput, mmModel, mmInput.mValue, 1) / div;
+    // localShareTime 为物理估计(0.7 指数)，在耗时计算时使用，为了防止高估Local块带来的
+    // 掩盖效果，导致模型过于倾向选择不切分
+    mmModel.localShareTime = localRows * physRowCost / div;
 }
 
-// 对外唯一入口: 四件构造 → 切分器 → 求解, 顺序读完
-inline CommCutResult FitBalanceCut(const FitBalanceTilingArgs& args, const FitBalanceCalibration& calib)
+// 对外唯一入口: 四件构造 → 切分器 → 求解, 顺序读完。
+// halveBaseM 非空时输出减半决策: 候选满足减半条件(多块 ∧ 头块跨度==baseM ∧
+// 元素>=1B)时 est 显式比较 baseM vs baseM/2, 取优者——host 只执行结果
+inline CommCutResult GetFitBalanceCut(const FitBalanceTilingArgs& args, const FitBalanceCalibration& calib,
+                                      bool* halveBaseM = nullptr)
 {
     const CommComputeOrder order = calib.dataflow.order;
     const LocalMMPosition localMMPosition = calib.dataflow.localMMPosition;
@@ -331,7 +346,7 @@ inline CommCutResult FitBalanceCut(const FitBalanceTilingArgs& args, const FitBa
     const uint64_t localDiv = calib.dataflow.perRankM ? 1U : rankDim;
     FinalizeMmModelParams(mmInput, mmModel, shares, localDiv);
 
-    const FitBalanceFlow flow{localMMPosition, order, args.commEngine, args.allowShortFront};
+    const FitBalanceFlow flow{localMMPosition, order, args.commEngine, args.allowShortFront, calib.dataflow.perRankM};
     CutPlanner tilingM = MakeCutPlanner(args, mmInput, comm);
     CommCutResult cut = Schedule(flow, mmInput, mmModel, comm, tilingM);
 
@@ -343,6 +358,9 @@ inline CommCutResult FitBalanceCut(const FitBalanceTilingArgs& args, const FitBa
     // 回退成fit balance 切分（一般为不切分）
     if (occupancyCut.numLongTile <= 1U && occupancyCut.numShortTile > 0U) {
         occupancyCut = cut; // 配平侧(Schedule)结果优先
+    } else if (comm.commVolumeMul > 1U) {
+        // M 轴族: COF 侧同样细探——终局平局归 COF 的 tie-break 下, 细化候选须经 COF 侧投递
+        DescendToFiner(flow, mmInput, mmModel, comm, occupancyCut);
     }
     if (flow.commEngine == TilingCommEngine::CCU) {
         ApplySingleRoundCommLimit(occupancyCut, mmInput, comm);
@@ -356,6 +374,96 @@ inline CommCutResult FitBalanceCut(const FitBalanceTilingArgs& args, const FitBa
             cut = occupancyCut;
         }
     }
+    // 减半决策: 最终切分满足减半门控即减半——头块跨度==baseM 时 baseM 减半使 mm 块数
+    // 翻倍填满核波(wave 填充收益, est 梯度模型不可见, 不作 est 比较)
+    if (halveBaseM != nullptr) {
+        *halveBaseM = false;
+        const uint64_t halveHeadSpan =
+            (cut.numShortTile > 0U && !cut.shortTileAtBack) ? cut.shortTileLen : cut.longTileLen;
+        const bool halveElem1B = (args.geAType != ge::DataType::DT_FLOAT4_E2M1) && (args.inputADtypeSize >= 1UL);
+        *halveBaseM = (cut.totalTileCnt > 1U) && (halveHeadSpan == mmInput.baseM) && halveElem1B &&
+                      (mmInput.baseM % 32UL == 0UL) && (mmInput.baseM < mmInput.mValue * mmModel.mmRankMul);
+    }
     return cut;
 }
+
+// 引擎入参组装(编排入口共用): fp4 算术字节传 0(打包半字节由模型内部处理)
+inline FitBalanceTilingArgs MakeFitBalanceEngineArgs(uint64_t mValue, uint64_t nValue, uint64_t kValue,
+                                                     uint32_t rankDim, uint32_t aicCoreNum, ge::DataType x1Dtype,
+                                                     uint64_t inputADtypeSize, uint64_t outputDtypeSize,
+                                                     TilingCommEngine commEngine)
+{
+    FitBalanceTilingArgs args{};
+    args.mValue = mValue;
+    args.nValue = nValue;
+    args.kValue = kValue;
+    args.rankDim = rankDim;
+    args.aicCoreNum = aicCoreNum;
+    args.geAType = x1Dtype;
+    args.inputADtypeSize = (x1Dtype == ge::DataType::DT_FLOAT4_E2M1) ? 0UL : inputADtypeSize;
+    args.outputDtypeSize = outputDtypeSize;
+    args.commEngine = commEngine;
+    return args;
+}
+
+// 中阶入口: probe 底块已知时的切分+减半决策(不编排 mm tiling 重算; 编排入口内部亦经此)
+inline bool GetFitBalanceCutFromMmBase(const FitBalanceTilingArgs& args, const FitBalanceCalibration& calib,
+                                       CommCutResult& cut, bool* halveBaseM = nullptr, uint64_t mmBaseM = 0,
+                                       uint64_t mmBaseN = 0)
+{
+    FitBalanceCalibration calibLocal = calib;
+    if (mmBaseM > 0UL) {
+        calibLocal.mmFit.baseBlock.baseM = mmBaseM;
+    }
+    if (mmBaseN > 0UL) {
+        calibLocal.mmFit.baseBlock.baseN = mmBaseN;
+    }
+    if (!IsCommCalibrated(args.rankDim, args.commEngine, calibLocal)) {
+        return false;
+    }
+    cut = GetFitBalanceCut(args, calibLocal, halveBaseM);
+    return true;
+}
+
+// 切分结果防护(幂等): 退化零块→单块; 未对齐单块→"对齐头+未对齐尾"(m>=256)或"纯尾单块"(m<256)
+inline void NormalizeDegenerateCut(CommCutResult& cut, uint64_t mValue)
+{
+    if (cut.numLongTile == 0U && cut.numShortTile == 0U) {
+        cut.shortTileAtBack = true;
+        cut.totalTileCnt = 1U;
+        cut.numLongTile = 1U;
+        cut.numShortTile = 0U;
+        cut.longTileLen = mValue;
+        cut.shortTileLen = 0U;
+    }
+    if (cut.numLongTile == 1U && cut.numShortTile == 0U && mValue % M_ALIGN_GRANULARITY != 0U) {
+        const uint64_t alignedLen = mValue - mValue % M_ALIGN_GRANULARITY;
+        if (alignedLen >= M_ALIGN_GRANULARITY) {
+            cut.shortTileAtBack = true;
+            cut.totalTileCnt = 2U;
+            cut.longTileLen = alignedLen;
+            cut.numShortTile = 1U;
+            cut.shortTileLen = mValue - alignedLen;
+        } else {
+            cut.shortTileAtBack = true;
+            cut.totalTileCnt = 1U;
+            cut.numLongTile = 0U;
+            cut.longTileLen = 0U;
+            cut.numShortTile = 1U;
+            cut.shortTileLen = mValue;
+        }
+    }
+}
+
+// 编排结果
+struct FitBalanceTilingResult {
+    CommCutResult cut;            // 通信切分(fit-balance)
+    QuantMatmulTilingData mmTile; // matmul tiling(SWAT 族有效)
+    uint32_t usedCoreNum;         // probe 核数(减半重算后保持)
+    bool fitBalanceHit;           // 标定是否命中
+    bool halveBaseM;              // 是否执行了减半重算
+    uint64_t probeBaseM;          // probe 底块(减半前)
+    uint64_t probeBaseN;
+};
+
 #endif

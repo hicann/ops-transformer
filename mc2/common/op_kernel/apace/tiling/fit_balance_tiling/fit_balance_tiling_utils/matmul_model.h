@@ -13,6 +13,14 @@
 
 #include "fit_balance_types.h"
 
+namespace PipelineBwConst {
+// 流水硬件规格(芯片设计参数)。耗时模型统一微秒口径: 带宽常量单位为 B/us
+constexpr double BW_L0_BYTES_PER_CYCLE = 256.0;              // MTE1(L1→L0A/L0B)单核带宽 BPC(×频率得 B/us)
+constexpr double BW_L2_B_PER_US = 5.2e6;                     // L2总线带宽 5.2TB/s(多核共享)
+constexpr double BW_DDR_B_PER_US = 1.6e6;                    // HBM/DDR带宽 1.6TB/s(多核共享)
+constexpr double L2_CAPACITY_BYTES = 32.0 * 1024.0 * 1024.0; // L2容量(950PR)
+} // namespace PipelineBwConst
+
 namespace MatmulPerfConst {
 constexpr double COMPUTES_PER_CYCLE = 4096;
 constexpr double MAX_PARTICAL_ENHANCEMENT_FACTOR_CUBE_UTIL = 1.4;
@@ -32,6 +40,11 @@ struct MatmulModelParams {
     uint64_t mmRankMul = 1;      // 派生: mm 总行数倍数(perRankM ? rankDim : 1)
     double localMMTime = 0;      // 派生: 本地块计算耗时(悲观 util 口径, 配平长块反解消费)
     double localShareTime = 0; // 派生: 本地块物理耗时(主 util 口径, NoCut 重叠信用与结构守卫消费)
+    // 四流水模型派生: T_mm = max(T_cube, T_mte1, T_mte2, T_fixp)
+    double mmDtypeBytes = 1.0; // A/B每元素字节宽含scale开销
+    double mte1Time = 0.0;     // MTE1流水耗时(单核)
+    double mte2Time = 0.0;     // MTE2流水耗时(多核聚合)
+    double fixpipeTime = 0.0;  // FIXPIPE搬出耗时
 };
 
 // 整波填充率: 计算块数对核数的整波覆盖比。计算按 ceil(m/baseM)×ceil(n/baseN) 分块,
@@ -85,11 +98,66 @@ inline double FindCubeUtil(const MatmulInputParams& input, uint64_t mSize, uint6
     return std::min(MatmulPerfConst::MAX_CUBE_UTIL, result) * CalcWaveFill(input);
 }
 
+// 四流水模型: T = max(T_cube, T_mte1, T_mte2, T_fixp)
+// 字节开销含 scale: sizeof(dtype) + 1/32(MX 量化 pergroup 开销)
+// 注意: scale 开销已在 mmModel.mmDtypeBytes 字段统一计入一次(FinalizeMmModelParams 赋值),
+// 各 Calc 函数直接使用该字段, 不得再重复加 1/32。
+
+// MTE1: L1→L0A/L0B搬运(单核流水, 不随核数扩展)
+// T_mte1 = (baseM + baseN) × baseK × (dtypeBytes + 1/32) / BW_L0
+inline double CalcMte1Time(const MatmulInputParams& input, const MatmulModelParams& mmModel)
+{
+    const double trafficBytes = (static_cast<double>(input.baseM) + static_cast<double>(input.baseN)) *
+                                static_cast<double>(input.baseK) * (mmModel.mmDtypeBytes);
+    return trafficBytes / (PipelineBwConst::BW_L0_BYTES_PER_CYCLE * mmModel.cyclePerMicroSec);
+}
+
+// MTE2: GM→L1搬运(多核聚合, 重复搬运走L2或DDR); 耗时单位: 微秒
+// 重复搬运量 = (M×N/baseN + N×M/baseM) × K × (dtypeBytes + 1/32)
+// L2命中率 = min(1, L2容量 / 每轮工作集)
+inline double CalcMte2Time(const MatmulInputParams& input, const MatmulModelParams& mmModel)
+{
+    const double bytesPerElem = mmModel.mmDtypeBytes;
+    const double totalM = static_cast<double>(input.mValue) * static_cast<double>(mmModel.mmRankMul);
+    const double repeatTraffic = (totalM * static_cast<double>(input.nValue) / input.baseN +
+                                  static_cast<double>(input.nValue) * totalM / input.baseM) *
+                                 input.kValue * bytesPerElem;
+    // 每轮工作集 = (baseM×rankMul + baseN) × K × bytesPerElem
+    const double workingSet =
+        (static_cast<double>(input.baseM) * mmModel.mmRankMul + static_cast<double>(input.baseN)) * input.kValue *
+        bytesPerElem;
+    const double l2HitRatio = std::min(1.0, PipelineBwConst::L2_CAPACITY_BYTES / std::max(workingSet, 1.0));
+    const double effectiveBw =
+        l2HitRatio * PipelineBwConst::BW_L2_B_PER_US + (1.0 - l2HitRatio) * PipelineBwConst::BW_DDR_B_PER_US;
+    // 首次搬运走DDR, 重复搬运走L2或DDR
+    const double firstTraffic = (totalM + static_cast<double>(input.nValue)) * input.kValue * bytesPerElem;
+    const double ddrTime = firstTraffic / PipelineBwConst::BW_DDR_B_PER_US;
+    const double repeatTime = (repeatTraffic - firstTraffic) / effectiveBw;
+    return ddrTime + std::max(0.0, repeatTime);
+}
+
+// FIXPIPE: L0C→GM搬出(耗时单位: 微秒)
+// T_fixp = M × N × sizeof(output) / BW_fixp(BW取L2带宽, 通常不bind)
+inline double CalcFixpipeTime(const MatmulInputParams& input, const MatmulModelParams& mmModel)
+{
+    const double outputBytes = static_cast<double>(input.mValue) * mmModel.mmRankMul *
+                               static_cast<double>(input.nValue) * input.outMatrixCDtypeSize;
+    return outputBytes / PipelineBwConst::BW_L2_B_PER_US;
+}
+
 // 每行耗时系数: 利用率取 0.7 指数(份数 shares——FRONT 有一个 rank 的数据不经通信 → rankDim−1)
 // gradient = n × k / (computesPerCycle × 频率 × 核数 × util)
 inline double CalcMatmulGradient(const MatmulInputParams& input, const MatmulModelParams& mmModel, uint64_t shares)
 {
     const double cubeUtil = FindCubeUtil(input, input.mValue, shares, MatmulPerfConst::CUBE_UTIL_EXPONENT_COEFFICIENT);
+    return (static_cast<double>(input.nValue) * static_cast<double>(input.kValue)) /
+           (mmModel.computesPerCycle * mmModel.cyclePerMicroSec * input.coreNum * cubeUtil);
+}
+
+// 本地块每行耗时系数: 与 CalcMatmulGradient 同式, 但份数恒为 1 且 util 直取目标指数
+inline double CalcLocalRowCost(const MatmulInputParams& input, const MatmulModelParams& mmModel, double mnExponent)
+{
+    const double cubeUtil = FindCubeUtil(input, input.mValue, 1U, mnExponent);
     return (static_cast<double>(input.nValue) * static_cast<double>(input.kValue)) /
            (mmModel.computesPerCycle * mmModel.cyclePerMicroSec * input.coreNum * cubeUtil);
 }

@@ -28,6 +28,7 @@
 #include "ascendc/host_api/tiling/template_argument.h"
 #include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_tiling_data.h"
 #include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
+#include "all_gather_matmul_v3_fit_balance_tiling.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "../../../op_kernel/arch35/all_gather_matmul_v3_tiling_key.h"
 #include "mc2_exception_dump.h"
@@ -62,7 +63,6 @@ constexpr uint64_t SCALE_LAST_DIM = 2UL;
 constexpr int64_t MAX_INT32_VAL = 2147483647;
 constexpr int64_t K_MIN_VAL = 256;
 constexpr int64_t K_MAX_VAL = 65535;
-constexpr uint64_t COMM_TILE_M = 512UL;
 constexpr uint64_t M_TAIL_ALIGN = 16UL; // m方向对齐粒度，确保 L0C 拷出时首地址 1024 对齐
 constexpr uint64_t HCCL_BUFFER_RESERVED_BYTES = 2UL * 1024UL * 1024UL; // 通信 buffer 预留量（2MB）
 
@@ -735,19 +735,45 @@ static ge::graphStatus SetTilingData(gert::TilingContext* context, const ShapeIn
             Ops::Base::ToString(context->GetInputDesc(IDX_INPUT_X2)->GetDataType()).c_str(),
             Ops::Base::ToString(context->GetOutputDesc(IDX_OUTPUT_Y)->GetDataType()).c_str(), m, k, n, rankSize);
 
-    // comm tile: split per-rank M into 512-row tiles
-    uint64_t tileM = COMM_TILE_M;
-    uint64_t tileCnt = m / tileM;
-    uint64_t tailM = m % tileM;
-    uint64_t tailCnt = (tailM > 0) ? 1 : 0;
+    // mm tiling via SWAT engine：按 x1 实际 dtype 分发。 fp8 统一用 e4m3 实例化，fp4统一用 e2m1 实例化
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    bool hasBias = context->GetOptionalInputShape(IDX_INPUT_BIAS) != nullptr;
+
+    const bool isFp4Input = context->GetInputDesc(IDX_INPUT_X1)->GetDataType() == ge::DT_FLOAT4_E2M1;
+    auto* commModePtr = context->GetAttrs()->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
+    const char* commMode = (commModePtr != nullptr) ? commModePtr : "aiv_urma";
+    auto* x1DescTiling = context->GetInputDesc(IDX_INPUT_X1);
+    auto* yDescTiling = context->GetOutputDesc(IDX_OUTPUT_Y);
+    const uint64_t outputDtypeSize = ge::GetSizeByDataType(yDescTiling->GetDataType());
+
+    // 一步完成: 基准 SWAT → fit-balance 切分与减半决策 → 终版 SWAT
+    const AgmmTilingOutput agmm =
+        GetAgmmTiling(context->GetPlatformInfo(), ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv(),
+                      isFp4Input, hasBias, m, n, k, rankSize, x1DescTiling->GetDataType(),
+                      ge::GetSizeByDataType(x1DescTiling->GetDataType()), outputDtypeSize, commMode);
+    const uint32_t usedCoreNum = agmm.usedCoreNum;
+    if (agmm.fitBalanceHit) {
+        MapCutToHeadTail(agmm.cut, tilingData->commTile);
+        OP_LOGI(nodeName, "fit-balance comm tiling: engine=%d, totalCnt=%lu, tiling result=%lu x %lu + %lu x %lu",
+                static_cast<int32_t>(ParseCommEngine(commMode)), agmm.cut.totalTileCnt,
+                tilingData->commTile.splitAxisTileCnt, tilingData->commTile.splitAxisTileSize,
+                tilingData->commTile.splitAxisTailCnt, tilingData->commTile.splitAxisTailSize);
+    } else {
+        CommTilingData cofScaleTiling{};
+        CoreOccupancyFirstTiling::GetCommTilingData(m, n, k, agmm.mmTile, tilingData->commTile, cofScaleTiling);
+        OP_LOGI(nodeName, "comm tiling dispatch: cof fallback (m=%lu), tiling result=%lu x %lu + %lu x %lu", m,
+                tilingData->commTile.splitAxisTileCnt, tilingData->commTile.splitAxisTileSize,
+                tilingData->commTile.splitAxisTailCnt, tilingData->commTile.splitAxisTailSize);
+    }
+    tilingData->commTile.nonSplitAxisSize = k;
+
+    // 从最终 commTile 读取切分事实, 推导 padded 布局与 totalLogicalM(与 kernel 侧 Run 同口径)
+    uint64_t tileM = tilingData->commTile.splitAxisTileSize;
+    uint64_t tileCnt = tilingData->commTile.splitAxisTileCnt;
+    uint64_t tailM = tilingData->commTile.splitAxisTailSize;
+    uint64_t tailCnt = tilingData->commTile.splitAxisTailCnt;
     uint64_t paddedTailM = (tailM > 0) ? ((tailM + M_TAIL_ALIGN - 1) / M_TAIL_ALIGN * M_TAIL_ALIGN) : 0U;
     uint64_t totalLogicalM = rankSize * (tileCnt * tileM + tailCnt * paddedTailM);
-
-    tilingData->commTile.splitAxisTileSize = tileM;
-    tilingData->commTile.splitAxisTileCnt = tileCnt;
-    tilingData->commTile.splitAxisTailSize = tailM;
-    tilingData->commTile.splitAxisTailCnt = tailCnt;
-    tilingData->commTile.nonSplitAxisSize = k;
 
     // win 区 buffer 复用深度决策：fullWin ≤ 400MB 时不复用(slotNum=totalTiles)，
     // 否则在 400MB 预算内取最大复用深度（≤128 flag 同步安全上限，下限 2 保证双缓冲）。
@@ -776,49 +802,26 @@ static ge::graphStatus SetTilingData(gert::TilingContext* context, const ShapeIn
     }
     tilingData->commTile.slotNum = slotNum;
 
-    // mm tiling via SWAT engine：按 x1 实际 dtype 分发。 fp8 统一用 e4m3 实例化，fp4统一用 e2m1 实例化
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
-    bool hasBias = context->GetOptionalInputShape(IDX_INPUT_BIAS) != nullptr;
-    if (context->GetInputDesc(IDX_INPUT_X1)->GetDataType() == ge::DT_FLOAT4_E2M1) {
-        QuantMatmulTilingSwat<mm::DataType::DT_FLOAT4_E2M1, mm::DataType::DT_FLOAT4_E2M1, mm::BiasDataType::DT_FLOAT>
-            tilingEngine;
-        tilingEngine.SetPlatformInfoPtr(context->GetPlatformInfo());
-        tilingEngine.SetCoreLimit(ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv());
-        tilingEngine.SetOptimizeEnable(false);
-        tilingEngine.SetMTailAlignEnable(true);
-        tilingEngine.SetAdjustBasicBlockEnable(false);
-        tilingEngine.SetBiasInfo(hasBias);
-        tilingEngine.GetTilingData(totalLogicalM, n, k, tilingData->mmTile);
-    } else {
-        QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN,
-                              mm::BiasDataType::DT_FLOAT>
-            tilingEngine;
-        tilingEngine.SetPlatformInfoPtr(context->GetPlatformInfo());
-        tilingEngine.SetCoreLimit(ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv());
-        tilingEngine.SetOptimizeEnable(false);
-        tilingEngine.SetMTailAlignEnable(true);
-        tilingEngine.SetAdjustBasicBlockEnable(false);
-        tilingEngine.SetBiasInfo(hasBias);
-        tilingEngine.GetTilingData(totalLogicalM, n, k, tilingData->mmTile);
-    }
+    tilingData->mmTile = agmm.mmTile;
+
     OP_LOGD(nodeName, "mmTile(swat): baseM=%u baseN=%u baseK=%u dbL0c=%u swatUsedCoreNum=%u",
             static_cast<uint32_t>(tilingData->mmTile.baseM), static_cast<uint32_t>(tilingData->mmTile.baseN),
             static_cast<uint32_t>(tilingData->mmTile.baseK), static_cast<uint32_t>(tilingData->mmTile.dbL0c),
             static_cast<uint32_t>(tilingData->mmTile.usedCoreNum));
 
     // AIV comm loop requires rankSize <= launched cores
-    // 存在可用block数大于ranksize但是经过swat tiling后usedCoreNum可能小于rankSize的情况，需调整否则通信卡死
-    uint32_t usedCoreNum = tilingData->mmTile.usedCoreNum < static_cast<uint32_t>(rankSize) ?
-                               static_cast<uint32_t>(rankSize) :
-                               tilingData->mmTile.usedCoreNum;
-    tilingData->mmTile.usedCoreNum = usedCoreNum;
+    // 终版 SWAT 的核数不足 rankSize 时抬到 rankSize, 否则部分 rank 无核参与 allgather 导致死锁
+    const uint32_t finalCoreNum = (tilingData->mmTile.usedCoreNum < static_cast<uint32_t>(rankSize)) ?
+                                      static_cast<uint32_t>(rankSize) :
+                                      tilingData->mmTile.usedCoreNum;
+    tilingData->mmTile.usedCoreNum = finalCoreNum;
 
     // bias: 非空时设 isBias=1
     tilingData->isBias = hasBias ? 1 : 0;
 
     // 独占全核，设置以后会让所有核空闲以后才启动，有多核同步指令需要设置避免出现网络挂死
     context->SetScheduleMode(1);
-    context->SetBlockDim(usedCoreNum);
+    context->SetBlockDim(finalCoreNum);
     // tiling 数据只声明结构体大小（capacity-8），尾部 8 字节留给框架写入 DFX 指针（atomicIndex），
     // 否则异常 dump 时 IDEDD 从 opParaSize-8 处读到 0，导致 exception_info 解析中止
     rawTilingData->SetDataSize(sizeof(AllGatherMxMatmulUrmaTilingData));

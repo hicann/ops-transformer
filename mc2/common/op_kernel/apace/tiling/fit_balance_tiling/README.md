@@ -17,10 +17,24 @@
 ### 主入口
 
 ```cpp
-CommCutResult FitBalanceCut(const FitBalanceTilingArgs &args, const FitBalanceCalibration &calib);
+CommCutResult GetFitBalanceCut(const FitBalanceTilingArgs &args, const FitBalanceCalibration &calib,
+                               bool *halveBaseM = nullptr);
+
+bool GetFitBalanceCutFromMmBase(const FitBalanceTilingArgs &args, const FitBalanceCalibration &calib,
+                                CommCutResult &cut, bool *halveBaseM = nullptr,
+                                uint64_t mmBaseM = 0, uint64_t mmBaseN = 0);
 ```
 
-单入参 + 标定。内部顺序完成 四件构造（数据流形态 flow / mm 输入事实 mmInput / mm 模型参数 mmModel / 通信模型参数 commModel）→ 切分器构造（MakeCutPlanner）→ 键控求解（Schedule，四件入参）。
+两个接口的关系：
+- **GetFitBalanceCut**：基础入口。使用标定表里的默认基本块（`mmFit.baseBlock`）求解切分，返回切分结果。
+- **GetFitBalanceCutFromMmBase**：带 mm 底块入口。用真实 mm tiling 底块（`mmBaseM/mmBaseN`，传 0 回落标定默认）
+  覆盖标定默认基本块后求解——切分对齐粒度/短块下限/减半门控随真实底块走；并代查标定命中
+  （miss 返回 false，`cut` 保持调用方初值，等价先调 `IsCommCalibrated`）。
+
+两个接口均在 `halveBaseM` 非空时输出减半决策：最终切分满足减半门控（多块、头块跨度==baseM、
+元素>=1字节）时建议 baseM 减半（mm 块数翻倍填满核波的 wave 填充收益），调用方据此决定是否重跑 mm tiling。
+
+单入参 + 标定。内部顺序完成四件构造（数据流形态 flow / mm 输入事实 mmInput / mm 模型参数 mmModel / 通信模型参数 commModel）→ 切分器构造（MakeCutPlanner）→ 键控求解（Schedule，四件入参）。
 求解后与核利用率优先的波量几何候选（`DeriveCommCut`，见同目录 `core_occupancy_first_tiling.h`）
 在同一估时器下同台比时，择优返回。
 返回"1 短 + N 长"的 M 轴切分方案（或退化的等分/单块）。
@@ -33,7 +47,7 @@ bool IsCommCalibrated(uint32_t rankDim, TilingCommEngine commEngine, const FitBa
 ```
 
 通信标定表是否命中当前形态（通信引擎 + 卡数二维匹配）。算子用它做切分策略分派——
-**命中 → FitBalanceCut；miss → 核利用率优先切分兜底**（同目录公共引擎
+**命中 → GetFitBalanceCut / GetFitBalanceCutFromMmBase；miss → 核利用率优先切分兜底**（同目录公共引擎
 `core_occupancy_first_tiling.h`，纯几何、无标定依赖，见接入示例的 miss 分支）；
 算子有更合适的策略时也可替换兜底。
 
@@ -84,14 +98,19 @@ static const FitBalanceCalibration CALIBRATION = {
 ge::graphStatus MyOpTiling::DoTiling()
 {
     const auto commEngine = ParseCommEngine(commMode_);   // "ai_cpu"/"ccu" → 枚举
+    FitBalanceTilingArgs args = {mValue_, nValue_, kValue_, rankDim_, aicCoreNum_,
+                                 geAType_, inputADtypeSize_, outputDtypeSize_,
+                                 ParseCommEngine(commMode_)};
+    // mmBaseM/mmBaseN: 真实 mm tiling 底块(前置 probe 产出); 无 probe 时传 0
 
+    // ── 共通调用模板: 前置 mm tiling probe → 引擎切分(带真实底块) → 后续处理(如减半重跑) ──
+    // (probe/兜底/重跑等编排细节由各算子按自身 kernel 结构处理, 引擎只负责切分本身)
     CommCutResult cut;
-    if (IsCommCalibrated(rankDim_, commEngine, CALIBRATION)) {
-        // 命中: 构造引擎入参并调用(存量算子也可用 MakeFitBalanceArgs 从旧 TilingArgs 转换)
-        FitBalanceTilingArgs args = {mValue_, nValue_, kValue_, rankDim_, aicCoreNum_,
-                                     geAType_, inputADtypeSize_, outputDtypeSize_,
-                                     ParseCommEngine(commMode_)};
-        cut = FitBalanceCut(args, CALIBRATION);
+    bool halveBaseM = false;
+    const bool hit = GetFitBalanceCutFromMmBase(args, CALIBRATION, cut, &halveBaseM,
+                                                mmBaseM, mmBaseN);  // mm 底块传 0 走标定默认
+    if (hit) {
+        // 命中: 消费 cut(通信切分)与 halveBaseM(减半决策, 按需重跑 mm tiling)
     } else {
         // miss 兜底: 核利用率优先切分(纯几何、通信跟随 matmul 最优分核, 无标定依赖)。
         // SWAT 形态一行完成; 结果经 CutResultFromCof 转为本引擎切分形态, 输出统一
@@ -153,7 +172,7 @@ static const FitBalanceCalibration CALIB_NEW = {...};    // 频率/L2/有效算�
 // DoTiling 内: PlatformAscendC platform(context_->GetPlatformInfo()); 按其结果选芯片
 const FitBalanceCalibration &calib = IsNewChip(platform) ? CALIB_NEW : CALIB_950;
 if (!IsCommCalibrated(rankDim_, commEngine, calib)) { /* miss → 核利用率优先兜底(见上) */ }
-cut = FitBalanceCut(args, calib);
+cut = GetFitBalanceCut(args, calib);
 ```
 
 
@@ -216,6 +235,6 @@ const FitBalanceCalibration::MatmulFit MM_FITS[] = {                // 每元素
 const FitBalanceCalibration calib = MakeFitBalanceCalibration(
     DATAFLOWS[dataFlowIdx], COMM_ROWS, MM_FITS[mmFitsIdx]);
 if (IsCommCalibrated(rankDim_, commEngine, calib)) {
-    cut = FitBalanceCut(args, calib);
+    cut = GetFitBalanceCut(args, calib);
 }
 ```

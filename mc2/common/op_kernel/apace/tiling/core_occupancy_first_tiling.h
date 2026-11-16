@@ -102,7 +102,8 @@ public:
  */
 inline void GetCoreOccupancyFirstTiling(fe::PlatFormInfos* platformInfo, uint64_t m, uint64_t n, uint64_t ka,
                                         bool isFp4, bool hasBias, QuantMatmulTilingData& mmTiling,
-                                        CommTilingData& dataTiling, CommTilingData& scaleTiling)
+                                        CommTilingData& dataTiling, CommTilingData& scaleTiling,
+                                        bool forceBaseMHalve = false)
 {
     // ---- matmul tiling(SWAT): MXFP4 按 fp4 推导 baseK(256 vs 128)与 L1 布局, 其余按 fp8 ----
     if (isFp4) {
@@ -111,6 +112,7 @@ inline void GetCoreOccupancyFirstTiling(fe::PlatFormInfos* platformInfo, uint64_
         tilingEngine.SetPlatformInfoPtr(platformInfo);
         tilingEngine.SetBiasInfo(hasBias);
         tilingEngine.EnableBaseMHalving(true);
+        tilingEngine.SetForceBaseMHalving(forceBaseMHalve);
         tilingEngine.SetOptimizeEnable(false);
         tilingEngine.GetTilingData(m, n, ka, false, true, mmTiling);
     } else {
@@ -120,6 +122,7 @@ inline void GetCoreOccupancyFirstTiling(fe::PlatFormInfos* platformInfo, uint64_
         tilingEngine.SetPlatformInfoPtr(platformInfo);
         tilingEngine.SetBiasInfo(hasBias);
         tilingEngine.EnableBaseMHalving(true);
+        tilingEngine.SetForceBaseMHalving(forceBaseMHalve);
         tilingEngine.SetOptimizeEnable(false);
         tilingEngine.GetTilingData(m, n, ka, false, true, mmTiling);
     }

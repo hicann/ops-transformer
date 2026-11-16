@@ -19,8 +19,26 @@ All symbols are in the global namespace. Including this single header file makes
 ### Main Entry
 
 ```cpp
-CommCutResult FitBalanceCut(const FitBalanceTilingArgs &args, const FitBalanceCalibration &calib);
+CommCutResult GetFitBalanceCut(const FitBalanceTilingArgs &args, const FitBalanceCalibration &calib,
+                               bool *halveBaseM = nullptr);
+
+bool GetFitBalanceCutFromMmBase(const FitBalanceTilingArgs &args, const FitBalanceCalibration &calib,
+                                CommCutResult &cut, bool *halveBaseM = nullptr,
+                                uint64_t mmBaseM = 0, uint64_t mmBaseN = 0);
 ```
+
+Relationship between the two APIs:
+- **GetFitBalanceCut**: the basic entry. Solves the partitioning with the default base block in the calibration
+  table (`mmFit.baseBlock`) and returns the cut.
+- **GetFitBalanceCutFromMmBase**: the entry with the real matmul base block. The real mm tiling base block
+  (`mmBaseM/mmBaseN`; passing 0 falls back to the calibration default) overrides the calibrated default base
+  block before solving—the partitioning alignment granularity / short-block lower bound / halving gate all
+  follow the real base block. It also checks calibration matching on behalf of the caller (returns false on
+  miss, and `cut` keeps the caller's initial value, equivalent to calling `IsCommCalibrated` first).
+
+Both APIs output the halving decision when `halveBaseM` is non-null: when the final cut satisfies the halving
+gate (multi-block, head-span == baseM, element >= 1 byte), a baseM halving is recommended (doubling the mm
+block count to fill the core wave—wave-filling gain); the caller decides whether to re-run mm tiling.
 
 Single input parameter plus calibration. Internally, the function sequentially completes the four constructions (data flow shape flow / matmul input facts mmInput / matmul model parameters mmModel / communication model parameters commModel) → cut planner construction (MakeCutPlanner) → keyed solving (Schedule, with the four inputs).
 After solving, the result is compared for timing on the same estimator against the core-utilization-first wave-geometry candidate (`DeriveCommCut`, see `core_occupancy_first_tiling.h` in the same directory), and the better one is returned.
@@ -34,7 +52,7 @@ bool IsCommCalibrated(uint32_t rankDim, TilingCommEngine commEngine, const FitBa
 ```
 
 Checks whether the communication calibration table matches the current shape (two-dimensional matching on communication engine + number of cards). Operators use it to dispatch the partitioning strategy:
-**match → FitBalanceCut; miss → core-utilization-first partitioning as the fallback** (the common engine
+**match → GetFitBalanceCut / GetFitBalanceCutFromMmBase; miss → core-utilization-first partitioning as the fallback** (the common engine
 `core_occupancy_first_tiling.h` in the same directory is purely geometric and has no calibration dependency; see the miss branch in the integration example);
 operators can also replace the fallback when they have a more suitable strategy.
 
@@ -85,14 +103,19 @@ static const FitBalanceCalibration CALIBRATION = {
 ge::graphStatus MyOpTiling::DoTiling()
 {
     const auto commEngine = ParseCommEngine(commMode_);   // "ai_cpu"/"ccu" → enum
+    FitBalanceTilingArgs args = {mValue_, nValue_, kValue_, rankDim_, aicCoreNum_,
+                                 geAType_, inputADtypeSize_, outputDtypeSize_,
+                                 ParseCommEngine(commMode_)};
+    // mmBaseM/mmBaseN: the real mm tiling base block (produced by the preceding probe); pass 0 when there is no probe
 
+    // ── Common calling template: preceding mm tiling probe → engine cut (with the real base block) → follow-up (e.g. halving re-run) ──
+    // (Orchestration details such as probe / fallback / re-run are handled by each operator according to its own kernel structure; the engine is only responsible for the cut itself.)
     CommCutResult cut;
-    if (IsCommCalibrated(rankDim_, commEngine, CALIBRATION)) {
-        // Match: construct the engine input parameters and call the API (existing operators can also use MakeFitBalanceArgs to convert from legacy TilingArgs)
-        FitBalanceTilingArgs args = {mValue_, nValue_, kValue_, rankDim_, aicCoreNum_,
-                                     geAType_, inputADtypeSize_, outputDtypeSize_,
-                                     ParseCommEngine(commMode_)};
-        cut = FitBalanceCut(args, CALIBRATION);
+    bool halveBaseM = false;
+    const bool hit = GetFitBalanceCutFromMmBase(args, CALIBRATION, cut, &halveBaseM,
+                                                mmBaseM, mmBaseN);  // passing 0 for the mm base block falls back to the calibration default
+    if (hit) {
+        // Match: consume cut (communication partitioning) and halveBaseM (halving decision; re-run mm tiling as needed)
     } else {
         // Miss fallback: core-utilization-first partitioning (purely geometric; communication follows the optimal matmul core partitioning, with no calibration dependency).
         // The SWAT shape is completed in one line; the result is converted by CutResultFromCof into the partitioning shape of this engine, and the output is unified
@@ -153,7 +176,7 @@ static const FitBalanceCalibration CALIB_NEW = {...};    // Frequency/L2/effecti
 // Inside DoTiling: PlatformAscendC platform(context_->GetPlatformInfo()); select the chip based on the result
 const FitBalanceCalibration &calib = IsNewChip(platform) ? CALIB_NEW : CALIB_950;
 if (!IsCommCalibrated(rankDim_, commEngine, calib)) { /* miss → core-utilization-first fallback (see above) */ }
-cut = FitBalanceCut(args, calib);
+cut = GetFitBalanceCut(args, calib);
 ```
 
 
@@ -216,6 +239,6 @@ const FitBalanceCalibration::MatmulFit MM_FITS[] = {                // Each elem
 const FitBalanceCalibration calib = MakeFitBalanceCalibration(
     DATAFLOWS[dataFlowIdx], COMM_ROWS, MM_FITS[mmFitsIdx]);
 if (IsCommCalibrated(rankDim_, commEngine, calib)) {
-    cut = FitBalanceCut(args, calib);
+    cut = GetFitBalanceCut(args, calib);
 }
 ```
