@@ -41,7 +41,7 @@ false.
 * @li comm_turn: An int. Number of communications with AICPU. Default: 0. The comm_turn only supports 0 in current
 version.
 * @li rank_size: An int. Number of ranks in the group. Default: 0. \n
-  The Atlas A2 products support 2, 4, 8. \n The Atlas A3 products support 2, 4, 8, 16. \n
+  The Atlas A2 products support 2, 4, 8. \n The Atlas A3 products support 2, 4, 8, 16, 32. \n
 *
 * @par Outputs:
 * y: A matrix Tensor. The type support float16, bfloat16. The format supports ND. The y is 2 dimensions, for example
