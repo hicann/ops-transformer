@@ -139,10 +139,18 @@ __global__ __aicore__ void all_gather_matmul_v2(GM_ADDR aGM, GM_ADDR bGM, GM_ADD
     }
 #elif ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && ((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)))
     if constexpr (INPUT_IS_BF16FP16) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+        // A6(DAV_9201) 非量化走 apace Hcomm 路径
         constexpr HcclServerType hcclServerType = HCCL_COMM_MODE == HCCL_COMM_MODE_CCU ?
                                                       HcclServerType::HCCL_SERVER_TYPE_CCU :
                                                       HcclServerType::HCCL_SERVER_TYPE_AICPU;
         INVOKE_AGMV2_APACE_HCOMM_OP_IMPL(hcclServerType);
+#else
+        // 其余架构（含 A5 DAV_3510）沿用原 V2 路径
+        if constexpr (SCALETYPE == SCALE_TYPE_NOT_IS_MX && OUTPUTDTYPE == OUTPUT_TYPE_IS_FP16_BF16) {
+            INVOKE_ALLGATHERMM_FP16_BF16_V2_OP_IMPL(AllGatherMatmulFP16BF16, TRANS_B, HCCL_COMM_MODE);
+        }
+#endif
     }
 #endif
 }

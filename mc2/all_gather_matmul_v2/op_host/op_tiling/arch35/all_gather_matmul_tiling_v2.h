@@ -89,6 +89,8 @@ private:
 
     Mc2Tiling::AllGatherMatmulTilingDataV2 allGatherMatmulTilingDataV2Self_;
     Mc2Tiling::AllGatherMatmulTilingDataV2* allGatherMatmulTilingDataV2_;
+    // A5(DAV_3510) 非量化 apace 模板性能劣化，仅 A6(DAV_9201) 切 apace，其余走原 V2 路径
+    bool usingApaceImpl_{false};
     uint64_t myWorkSpaceSize_{0U};
     Mc2MatmulV3CompileInfo compileInfo_;
     Mc2MatMulV3Args mmV3Args_;

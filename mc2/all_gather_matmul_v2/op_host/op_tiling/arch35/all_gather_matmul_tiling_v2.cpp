@@ -56,7 +56,9 @@ static constexpr uint8_t APACE_L1_BUFFER_NUM = 2;
 bool AllGatherMatmulTilingV2::IsCapable()
 {
     if ((npuArch_ == Ops::Base::DAV_3510 || npuArch_ == Ops::Base::DAV_9201) && inputIsBf16Fp16_) {
-        OP_LOGI(opName_, "Start with AllGatherMatmulTilingV2 tiling.");
+        usingApaceImpl_ = (npuArch_ == Ops::Base::DAV_9201);
+        OP_LOGI(opName_, "Start with AllGatherMatmulTilingV2 tiling, implementation: %s.",
+                usingApaceImpl_ ? "APACE" : "legacy V2");
         return true;
     }
 
@@ -222,8 +224,10 @@ ge::graphStatus AllGatherMatmulTilingV2::DoOpTiling()
     DoAllGatherTiling(MutableRCSTilingData(), MutableMC2MatmulV3TileTilingData().tCubeTiling,
                       MutableMC2MatmulV3TailTilingData().tCubeTiling, allGatherMatmulTilingDataV2_->debugMode,
                       allGatherMatmulTilingDataV2_->dataType);
-    OP_TILING_CHECK(DoApaceTiling() != ge::GRAPH_SUCCESS, OP_LOGE(opName_, "Fail to do apace tiling."),
-                    return ge::GRAPH_FAILED);
+    if (usingApaceImpl_) {
+        OP_TILING_CHECK(DoApaceTiling() != ge::GRAPH_SUCCESS, OP_LOGE(opName_, "Fail to do apace tiling."),
+                        return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -258,6 +262,24 @@ void AllGatherMatmulTilingV2::PrintAllTilingData()
 
 ge::graphStatus AllGatherMatmulTilingV2::PostTiling()
 {
+    if (!usingApaceImpl_) {
+#if MC2_DFX_ENABLE
+        allGatherMatmulTilingDataV2_->dumpInfo.workspaceLayout = workspaceLayout_;
+#endif
+        OP_LOGD(opName_, "Final tiling data size=%zu and context capacity size=%zu.",
+                sizeof(Mc2Tiling::AllGatherMatmulTilingDataV2), context_->GetRawTilingData()->GetCapacity());
+        context_->GetRawTilingData()->SetDataSize(sizeof(Mc2Tiling::AllGatherMatmulTilingDataV2));
+
+        OP_TILING_CHECK(
+            sizeof(Mc2Tiling::AllGatherMatmulTilingDataV2) % sizeof(uint64_t) != 0,
+            OP_LOGE(opName_, "Tiling data size[%zu] not aligned to 8.", sizeof(Mc2Tiling::AllGatherMatmulTilingDataV2)),
+            return ge::GRAPH_FAILED);
+        PrintAllTilingData();
+        context_->SetBlockDim(args_.aicCoreNum);
+        // 独占全核，设置以后会让所有核空闲以后才启动，有多核同步指令需要设置避免出现网络挂死
+        context_->SetScheduleMode(1);
+        return ge::GRAPH_SUCCESS;
+    }
     auto* outTilingData = context_->GetTilingData<Apace::hcommAllGatherMatmulTilingData>();
     OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Fail to get hcomm tiling data from context"),
                     return ge::GRAPH_FAILED);
@@ -430,6 +452,9 @@ ge::graphStatus AllGatherMatmulTilingV2::CheckInput()
 
 ge::graphStatus AllGatherMatmulTilingV2::GetWorkspaceSize()
 {
+    if (!usingApaceImpl_) {
+        return AllGatherMatmulTilingBase::GetWorkspaceSize();
+    }
     size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "get workspace failed."), return ge::GRAPH_FAILED);
     workspaceSize_ = libApiWorkSpaceSize_ + storageA_;
@@ -449,8 +474,8 @@ uint64_t AllGatherMatmulTilingV2::GetTilingKey() const
     }
     const uint64_t tilingKey = GET_TPL_TILING_KEY(inputIsBf16Fp16_, args_.isBTrans, outputType, TPL_DEFAULT_MODE,
                                                   SCALE_TYPE_NOT_IS_MX, commMode);
-    OP_LOGD(opName_, "AllGatherMatmulV2(apace), inputIsBf16Fp16_, args_.isBTrans, outputType, commMode: [%d,%d,%u,%u]",
-            inputIsBf16Fp16_, args_.isBTrans, outputType, commMode);
+    OP_LOGD(opName_, "AllGatherMatmulV2(%s), inputIsBf16Fp16_, args_.isBTrans, outputType, commMode: [%d,%d,%u,%u]",
+            usingApaceImpl_ ? "apace" : "legacy", inputIsBf16Fp16_, args_.isBTrans, outputType, commMode);
     OP_LOGD(opName_, "tilingKey=%lu", tilingKey);
     return tilingKey;
 }
