@@ -91,7 +91,7 @@ static const aclTensor* TransX2Tensor(const aclTensor* x2)
 
 // CheckNullParams: 校验 REQUIRED 输入/输出非空（本次交付不使能 gather_out/amax_out，不做校验）
 static bool CheckNullParams(const aclTensor* context, const aclTensor* x1, const aclTensor* x2, const aclTensor* output,
-                            uint64_t* workspaceSize, aclOpExecutor** executor)
+                            const uint64_t* workspaceSize, aclOpExecutor* const* executor)
 {
     if (context == nullptr || x1 == nullptr || x2 == nullptr || output == nullptr || workspaceSize == nullptr ||
         executor == nullptr) {

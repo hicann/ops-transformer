@@ -45,7 +45,7 @@ inline void AlltoAllMatmulExceptionImplWrapper(aclrtExceptionInfo* args, void* u
                                                                            dumpInfo))); // dfxInfoOffset
 }
 
-__attribute__((constructor)) void RegisterAlltoAllMatmulExceptionFunc()
+__attribute__((constructor)) static void RegisterAlltoAllMatmulExceptionFunc()
 {
     IMPL_OP(AlltoAllMatmul).ExceptionDumpParseFunc(AlltoAllMatmulExceptionImplWrapper);
 }

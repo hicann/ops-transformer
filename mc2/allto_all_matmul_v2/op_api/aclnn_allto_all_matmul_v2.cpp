@@ -59,7 +59,8 @@ const std::initializer_list<op::DataType> X_DTYPE_SUPPORT_LIST = {
 const std::initializer_list<op::DataType> SCALE_DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT8_E8M0};
 
 // CheckDtype: dtype 校验（bitcast 场景校验声明的 dtype，与 op_def 白名单一致）
-aclnnStatus CheckDtype(const aclTensor* x1, const aclTensor* x2, const aclTensor* x1Scale, const aclTensor* x2Scale)
+static aclnnStatus CheckDtype(const aclTensor* x1, const aclTensor* x2, const aclTensor* x1Scale,
+                              const aclTensor* x2Scale)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, X_DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
     OP_CHECK_DTYPE_NOT_SUPPORT(x2, X_DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
@@ -105,8 +106,8 @@ static aclTensor* TransX2Tensor(const aclTensor* x2)
 }
 
 static bool CheckNullParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* x1ScaleOptional,
-                            const aclTensor* x2ScaleOptional, const aclTensor* output, uint64_t* workspaceSize,
-                            aclOpExecutor** executor)
+                            const aclTensor* x2ScaleOptional, const aclTensor* output, const uint64_t* workspaceSize,
+                            aclOpExecutor* const* executor)
 {
     if (x1 == nullptr || x2 == nullptr || x1ScaleOptional == nullptr || x2ScaleOptional == nullptr ||
         output == nullptr || workspaceSize == nullptr || executor == nullptr) {

@@ -449,6 +449,7 @@ static bool CheckAllReduceOutputShape(const gert::TilingContext* context, const 
                                       const char* nodeName)
 {
     (void)xDimNum; // Reserved for future extension
+    (void)runInfo; // Reserved for future extension
     uint64_t outputValueOne = outputShape->GetStorageShape().GetDim(DIM_ZERO);
     uint64_t outputValueTwo = outputShape->GetStorageShape().GetDim(DIM_ONE);
     uint64_t xValueOne = context->GetInputShape(X_INDEX)->GetStorageShape().GetDim(DIM_ZERO);

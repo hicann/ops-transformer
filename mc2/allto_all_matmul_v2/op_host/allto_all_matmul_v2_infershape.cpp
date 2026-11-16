@@ -39,7 +39,7 @@ constexpr int64_t MX_SCALE_BLOCK_SIZE = 64;
 constexpr int64_t MX_SCALE_LAST_DIM = 2;
 constexpr int64_t DIM_MINUS_ONE = -1;
 
-bool ValidateInferDtypes(gert::InferShapeContext* context, const char* nodeName)
+bool ValidateInferDtypes(const gert::InferShapeContext* context, const char* nodeName)
 {
     auto* x1Desc = context->GetInputDesc(INDEX_IN_X1);
     auto* x2Desc = context->GetInputDesc(INDEX_IN_X2);
@@ -73,7 +73,7 @@ bool ValidateInferKCrossCheck(const char* nodeName, int64_t ka, int64_t kTotal, 
     return true;
 }
 
-bool ValidateInferScaleShapes(gert::InferShapeContext* context, const char* nodeName, int64_t ka, int64_t kTotal,
+bool ValidateInferScaleShapes(const gert::InferShapeContext* context, const char* nodeName, int64_t ka, int64_t kTotal,
                               int64_t m, int64_t n)
 {
     if (m == DIM_MINUS_ONE || ka == DIM_MINUS_ONE || n == DIM_MINUS_ONE) {
@@ -118,7 +118,7 @@ bool ValidateInferScaleShapes(gert::InferShapeContext* context, const char* node
     return true;
 }
 
-bool ValidateInferYDtype(gert::InferShapeContext* context, const char* nodeName)
+bool ValidateInferYDtype(const gert::InferShapeContext* context, const char* nodeName)
 {
     auto* yDesc = context->GetOutputDesc(INDEX_OUT_Y);
     if (yDesc == nullptr) {

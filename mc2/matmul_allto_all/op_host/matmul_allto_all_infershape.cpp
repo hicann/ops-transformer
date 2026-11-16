@@ -100,7 +100,7 @@ static ge::graphStatus CheckAllToAllAxesShapeForMatmulAlltoAll(const gert::Infer
 }
 
 static ge::graphStatus CheckAxisKShapeForMatmulAlltoAll(const gert::InferShapeContext* context,
-                                                        MatmulAlltoAllShapeInfo& shape)
+                                                        const MatmulAlltoAllShapeInfo& shape)
 {
     OPS_CHECK(
         shape.k1 > AXIS_K_UPPER_LIMIT || shape.k2 > AXIS_K_UPPER_LIMIT,
