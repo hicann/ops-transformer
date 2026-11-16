@@ -480,9 +480,11 @@ aclnnStatus aclnnScatterPaKvCacheGetWorkspaceSize(const aclTensor* key, aclTenso
                seqLensOptional, cacheModeOptional, scatterModeOptional, stridesOptional, offsetsOptional),
         DFX_OUT(keyCacheRef, valueCacheRef));
 
-    CHECK_RET(
-        CheckNullptr(key, keyCacheRef, slotMapping, value, valueCacheRef, workspaceSize, executor) == ACLNN_SUCCESS,
-        ACLNN_ERR_INNER_NULLPTR);
+    const aclnnStatus nullPtrRet =
+        CheckNullptr(key, keyCacheRef, slotMapping, value, valueCacheRef, workspaceSize, executor);
+    if (nullPtrRet != ACLNN_SUCCESS) {
+        return nullPtrRet;
+    }
 
     bool keyEmpty = key->GetViewShape().GetShapeSize() == 0 || keyCacheRef->GetViewShape().GetShapeSize() == 0;
     bool valueEmpty = false;
