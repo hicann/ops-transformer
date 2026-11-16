@@ -377,24 +377,23 @@ install_whl_package() {
     # 创建目标目录
     comm_create_dir "${target_python_dir}" "${CREATE_DIR_PERM}" "${TARGET_USERNAME}:${TARGET_USERGROUP}" "${IS_FOR_ALL}"
 
-    # 使用 pip 安装到指定目录
-    local pip_installed=false
+    # 使用 pip 安装到指定目录。失败时保留 stderr，并终止安装，避免旧包仍被导入。
+    local ret=1
     if command -v pip3 &>/dev/null; then
-      if pip3 install --target="${target_python_dir}" "${whl_file}" --no-deps --force-reinstall 2>/dev/null; then
-        pip_installed=true
-      fi
+      pip3 install --target="${target_python_dir}" "${whl_file}" --no-deps --force-reinstall --upgrade 1>/dev/null
+      ret=$?
     fi
 
-    if [ "${pip_installed}" = "false" ] && command -v pip &>/dev/null; then
-      if pip install --target="${target_python_dir}" "${whl_file}" --no-deps --force-reinstall 2>/dev/null; then
-        pip_installed=true
-      fi
+    if [ "${ret}" -ne 0 ] && command -v pip &>/dev/null; then
+      pip install --target="${target_python_dir}" "${whl_file}" --no-deps --force-reinstall --upgrade 1>/dev/null
+      ret=$?
     fi
 
-    if [ "${pip_installed}" = "false" ]; then
-      logandprint "[WARNING]: pip not available, copying whl file directly..."
-      cp "${whl_file}" "${target_python_dir}/"
+    if [ "${ret}" -ne 0 ]; then
+      logandprint "[WARNING]: install cann_ops_transformer failed, error code: ${ret}."
+      exit 1
     fi
+
     chmod -R "${CUSTOM_PERM}" "${target_python_dir}"/cann_ops_transformer 2> /dev/null
     chmod -R "${CUSTOM_PERM}" "${target_python_dir}"/cann_ops_transformer-*.dist-info 2> /dev/null
 
@@ -410,12 +409,8 @@ install_opp() {
 
   setenv
 
-  logandprint "[INFO]: Update the opp install info."
-
-  update_install_infos "${TARGET_USERNAME}" "${TARGET_USERGROUP}" "${INSTALL_TYPE}" "${relative_path_val}"
-  log_with_errorlevel "$?" "error" "[ERROR]: ERR_NO:${INSTALL_FAILED};ERR_DES:Update opp install info failed."
-
-  # 先安装 whl 包，再通过 install_common_parser.sh 统一安装权限
+  # 先安装 whl 包，再通过 install_common_parser.sh 统一安装权限。
+  # 版本记录在文件都安装成功后再写，避免中途失败时记录已是新版本、文件仍是旧的。
   install_whl_package
 
   install_es_whl
@@ -425,6 +420,11 @@ install_opp() {
     --use-share-info --version-dir=$PKG_VERSION_DIR $INSTALL_OPTION ${INSTALL_FOR_ALL} "--feature=all" "--chip=all" \
     "${INSTALL_TYPE}" "${TARGET_INSTALL_PATH}" "${FILELIST_FILE}"
   log_with_errorlevel "$?" "error" "[ERROR]: ERR_NO:${INSTALL_FAILED};ERR_DES:Install opp module files failed."
+
+  logandprint "[INFO]: Update the opp install info."
+
+  update_install_infos "${TARGET_USERNAME}" "${TARGET_USERGROUP}" "${INSTALL_TYPE}" "${relative_path_val}"
+  log_with_errorlevel "$?" "error" "[ERROR]: ERR_NO:${INSTALL_FAILED};ERR_DES:Update opp install info failed."
 
   logandprint "[INFO]: upgradePercentage:30%"
 
