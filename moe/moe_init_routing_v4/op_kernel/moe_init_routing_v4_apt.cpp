@@ -288,6 +288,9 @@ extern "C" __global__ __aicore__ void moe_init_routing_v4(GM_ADDR x, GM_ADDR exp
                 static_cast<int32_t>(Align(expertCountElements, static_cast<int32_t>(sizeof(int64_t))) * 2));
             DataCopyExtParams dataCopyParams = {1, static_cast<uint32_t>(expertCountElements * sizeof(int64_t)), 0, 0,
                                                 0};
+            event_t eventId = static_cast<event_t>(pipe.FetchEventID(HardEvent::V_MTE3));
+            SetFlag<HardEvent::V_MTE3>(eventId);
+            WaitFlag<HardEvent::V_MTE3>(eventId);
             DataCopyPad(expertTokensCountGm, zeroLocal, dataCopyParams);
             pipe.Destroy();
         }
