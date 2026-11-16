@@ -399,6 +399,22 @@ __aicore__ inline void NotifySharedExpertTileCompletion(uint32_t rowTileOffset, 
 
 namespace GmmKernel {
 
+#ifndef MEGA_MOE_ARCH92_DEVICE
+// Combine 去重由 AIC 发布 Activation 输入读取完成，供下一代写入者复用。
+// 全量 C2 输出保留到独立的专家级 Combine 消费完成。
+__aicore__ inline void PublishGmm2InputReadComplete(const GMMAddrInfo& info, uint32_t mLoc)
+{
+    if (unlikely(info.ringReuse.gmm2ConsumedRowTiles == nullptr)) {
+        return;
+    }
+    PipeFence<PIPE_MTE2, PIPE_S, SYNC_EVENT_ID0>();
+    const uint64_t row = (info.gmm2LogicalPaddedRow + mLoc) % info.ringReuse.rows / L1_TILE_M_256;
+    atomicAdd(info.ringReuse.gmm2ConsumedRowTiles + row * INT_CACHELINE, int32_t(1));
+    GmDataBarrier();
+}
+
+#endif
+
 // 执行通用 GMM2 tile 循环。
 template <typename BlockMmad, bool IsShared, bool IsLayered = false, bool NotifyCombineTileReady = false,
           typename WorkSet, typename Config>
@@ -460,6 +476,11 @@ __aicore__ inline void Gmm2AicMmadGeneric(BlockMmad& blockMmad, WorkSet& workSet
             gmmAddrInfo.gmm2CombineSync->WaitForCombine();
         }
         blockMmad(gmBlockA, gmBlockB, gmBlockScaleA, gmBlockScaleB, workSet.gmBias, gmBlockC, singleShape);
+#ifndef MEGA_MOE_ARCH92_DEVICE
+        if constexpr (!NotifyCombineTileReady && !IsShared && !IsLayered) {
+            PublishGmm2InputReadComplete(gmmAddrInfo, mLoc);
+        }
+#endif
         if constexpr (NotifyCombineTileReady && !IsShared) {
             // GMM2 tile 与配对 AIV1 的 Combine tile 一对一通知。
             gmmAddrInfo.gmm2CombineSync->NotifyCombine();
@@ -505,6 +526,15 @@ __aicore__ inline void CombineTokenRange(Scheduler& scheduler, TensorC& l0cOutGm
         CopyGmToUb(metaInfoTensor, metaInfoGm, (lenTile * META_INFO_SIZE) * sizeof(int32_t));
         PipeNotify<PIPE_MTE2, PIPE_S>(0);
         PipeWait<PIPE_MTE2, PIPE_S>(0);
+#ifndef MEGA_MOE_ARCH92_DEVICE
+        if (gmmAddrInfo.ringReuse.gmm2ConsumedRowTiles != nullptr) {
+            // MTE2→S 已确保 C2 搬入 UB；整行 N 分块消费后才允许覆写 Activation。
+            // 下次 GMM2 必须等新 Activation ready，因此也不能提前覆写同一 C2 行槽。
+            const uint64_t row = (gmmAddrInfo.gmm2LogicalPaddedRow + mLoc) % gmmAddrInfo.ringReuse.rows / L1_TILE_M_256;
+            atomicAdd(gmmAddrInfo.ringReuse.gmm2ConsumedRowTiles + row * INT_CACHELINE, int32_t(1));
+            GmDataBarrier();
+        }
+#endif
         CombineImpl::CombineTokens<ElementC, decltype(actualShape)>(nLoc, config.n, metaInfoTensor, tileUb, actualShape,
                                                                     L1_TILE_N, params);
         PipeNotify<PIPE_MTE3, PIPE_MTE2>(0);
@@ -566,6 +596,13 @@ __aicore__ inline void Gmm2AicMmadA8W4(BlockMmad& blockMmad, Scheduler& schedule
             }
         }
         blockMmad(gmBlockA, gmBlockScaleA, gmBlockScaleB, tensorBlockGm);
+#ifndef MEGA_MOE_ARCH92_DEVICE
+        if constexpr (!IsShared && !IsLayered) {
+            if (gmmAddrInfo.gmm2CombineSync == nullptr) {
+                PublishGmm2InputReadComplete(gmmAddrInfo, mLoc);
+            }
+        }
+#endif
         if constexpr (NotifyCombineTileReady && !IsShared) {
             // AIV1 与本 AIC 重放同一 scheduler。FIX 完成后通知 Combine 读取 GM；
             // W4 prologue 仍由 AIV0 独立推进，不参与该一对一完成链路。
@@ -619,6 +656,9 @@ __aicore__ inline void UpdateMoeExpertGmm2GlobalBuffer(const GmmExecutionConfig&
             CalcMteRingPhysicalRow(state.paddedTokenStartIndex + rowOffsetInExpert, gmmConfig.ring.rows) :
             globalTokenStartIndex;
     uint32_t expertMGroupOffset = rowOffsetInExpert / L1_TILE_M_256;
+#ifndef MEGA_MOE_ARCH92_DEVICE
+    gmmAddrInfo.gmm2LogicalPaddedRow = state.paddedTokenStartIndex + rowOffsetInExpert;
+#endif
     uint64_t activationScaleWidth =
         Ops::Base::CeilDiv(static_cast<uint64_t>(activationOutputWidth), static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
         MXFP_MULTI_BASE_SIZE;

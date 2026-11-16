@@ -382,6 +382,9 @@ struct MteSyncBuffers {
     GmBuffer gmm2Ready{};
     GmBuffer sharedGmm2Tiles{};
     GmBuffer dedupReady{};
+    GmBuffer gmm1ConsumedEpoch{};
+    GmBuffer gmm1ConsumedRowTiles{};
+    GmBuffer gmm2ConsumedRowTiles{};
 };
 
 struct MteBuffers {
@@ -592,6 +595,22 @@ HOST_DEVICE constexpr int64_t CalcCclComputeOffset(const CclCommLayoutParams& pa
 HOST_DEVICE constexpr int64_t CalcMemoryRingRows(int64_t mGroupsPerWave)
 {
     return static_cast<int64_t>(MTE_RING_WAVE_COUNT) * mGroupsPerWave * MemoryLayoutDetail::L1_TILE_M_256;
+}
+
+struct MteRingTileSlot {
+    uint64_t index{0U};
+    uint64_t epoch{0U};
+};
+
+// 按 256×256 物理 tile 计算槽号和回绕代次，专家尾块与 N 尾块保留独立槽位。
+// 调用方已确认回收区有效，此时 ringRows > 0。
+HOST_DEVICE constexpr MteRingTileSlot CalcMteRingTileSlot(uint64_t logicalPaddedRow, uint64_t ringRows, int64_t hidden,
+                                                          uint32_t nLoc)
+{
+    const uint64_t nTiles = MemoryLayoutDetail::CeilDiv(hidden, MemoryLayoutDetail::L1_TILE_M_256);
+    return {(logicalPaddedRow % ringRows / MemoryLayoutDetail::L1_TILE_M_256) * nTiles +
+                nLoc / MemoryLayoutDetail::L1_TILE_M_256,
+            logicalPaddedRow / ringRows};
 }
 
 // 准入规则仅在此处维护；布局与核内寻址直接使用对应阶段的配置。
@@ -866,6 +885,25 @@ private:
 
             Allocate(mte.sync.aiv1TopkReady,
                      static_cast<int64_t>(params.aicNum) * MemoryLayoutDetail::INT_CACHELINE * SIZE_INT_32);
+        }
+        // Arch35 的三类 MX Wave 激活均为 FP8，BF16 不使用该回收区。
+        if (params.ring.activation && params.activationOutputStorage.elementBits == MemoryLayoutDetail::FP8_BITS) {
+            const int64_t rowTiles =
+                MemoryLayoutDetail::CeilDiv(static_cast<int64_t>(params.ring.rows), MemoryLayoutDetail::L1_TILE_M_256);
+            const int64_t rowCounterBytes = MemoryLayoutDetail::CeilAlign(
+                rowTiles * MemoryLayoutDetail::INT_CACHELINE * SIZE_INT_32, MemoryLayoutDetail::ALIGN_512);
+            if (params.ring.gmm1 && (params.reserveGmm1Output || params.topkWeightsPrefetch)) {
+                const int64_t nTiles = MemoryLayoutDetail::CeilDiv(params.hiddenDim, MemoryLayoutDetail::L1_TILE_M_256);
+                Allocate(
+                    mte.sync.gmm1ConsumedEpoch,
+                    MemoryLayoutDetail::CeilAlign(rowTiles * nTiles * MemoryLayoutDetail::INT_CACHELINE * SIZE_INT_32,
+                                                  MemoryLayoutDetail::ALIGN_512));
+            }
+            if (params.ring.dispatch) {
+                Allocate(mte.sync.gmm1ConsumedRowTiles, rowCounterBytes);
+            }
+            // 普通 Combine 读完 C2 后反馈，去重路径由 AIC 读完 Activation 后反馈。
+            Allocate(mte.sync.gmm2ConsumedRowTiles, rowCounterBytes);
         }
         reset.flags = GmBuffer{sync.activationReady.offsetBytes,
                                ((workspaceSize - flagRegionBeginOffset) / SIZE_INT_32) * SIZE_INT_32};

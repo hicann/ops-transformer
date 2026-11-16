@@ -285,6 +285,29 @@ __aicore__ inline void PublishGmm1TileReady(const MoeSyncWorkspaceLayout& syncLa
     }
 }
 
+// 每个 GMM1 N tile 读取完整的 Dispatch 行及 scale。
+// 复用行的全部写入者观察到旧代消费计数后，新代 ready 计数才能达到目标值。
+__aicore__ inline void WaitForDispatchRingRowsReuse(const Params& params, uint64_t logicalRow, uint32_t rows)
+{
+    const auto& compute = params.tilingData->compute;
+    auto* consumed = params.workspace.layout.mte.sync.gmm1ConsumedRowTiles.get_ptr<int32_t>(params.workspace.base);
+    if (unlikely(consumed == nullptr || rows == 0U)) {
+        return;
+    }
+    const uint64_t nTiles =
+        Ops::Base::CeilDiv(static_cast<uint64_t>(compute.hiddenDim), static_cast<uint64_t>(L1_TILE_N));
+    const uint64_t end = logicalRow + rows;
+    while (logicalRow < end) {
+        const uint64_t epoch = logicalRow / compute.ring.rows;
+        if (epoch != 0U) {
+            const uint64_t slot = logicalRow % compute.ring.rows / L1_TILE_M_256;
+            WaitUntilGmFlagEquals(consumed + slot * INT_CACHELINE,
+                                  static_cast<int32_t>(static_cast<uint32_t>(epoch * nTiles)));
+        }
+        logicalRow = (logicalRow / L1_TILE_M_256 + 1U) * L1_TILE_M_256;
+    }
+}
+
 /*
  * 按单个 source rank 的 compact route-index ordinal 区间搬运 token 和 metadata。
  * compact index 已按 [expert][source rank] 分槽保存，因此这里只需按 ordinal 分批顺序读取，无需再次筛选 mask。
@@ -327,6 +350,8 @@ __aicore__ inline int32_t DispatchRankTokens(bool topkWeightsPrefetch, uint32_t 
             dispatchRingEnabled ? CalcMteRingPhysicalRow(paddedExpertRowBegin + rankSegmentRowBegin + routeOrdinal,
                                                          params.tilingData->compute.ring.rows) :
                                   static_cast<uint64_t>(dispatchDstRowBegin);
+        WaitForDispatchRingRowsReuse(params, paddedExpertRowBegin + rankSegmentRowBegin + routeOrdinal,
+                                     static_cast<uint32_t>(batchDispatchRowCount));
         CopyTokensAndMetaForDispatch<ActivationType, QuantScaleType>(topkWeightsPrefetch, context, params, winRankAddr,
                                                                      scratch, dispatchDstRowBegin, remoteRankIdx, 0,
                                                                      batchDispatchRowCount, physicalRowOffset);

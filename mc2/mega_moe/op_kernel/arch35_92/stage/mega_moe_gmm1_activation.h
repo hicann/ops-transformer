@@ -44,6 +44,61 @@ __aicore__ inline void WaitForGmm1InputReady(const GMMAddrInfo& gmmAddrInfo, con
     WaitUntilGmFlagEquals(flagValueAddr, static_cast<int32_t>(targetValue));
 }
 
+#ifndef MEGA_MOE_ARCH92_DEVICE
+// 覆写 Activation 物理行前，等待旧代 GMM2 的全部 N tile 完成读取。
+__aicore__ inline void WaitForActivationRingRowReuse(const GMMAddrInfo& gmmAddrInfo, uint32_t mLoc,
+                                                     uint32_t tokenHiddenDim)
+{
+    const uint64_t logicalRow = gmmAddrInfo.gmm1LogicalPaddedRow + mLoc;
+    if (unlikely(gmmAddrInfo.ringReuse.gmm2ConsumedRowTiles == nullptr || logicalRow < gmmAddrInfo.ringReuse.rows)) {
+        return;
+    }
+    const uint64_t epoch = logicalRow / gmmAddrInfo.ringReuse.rows;
+    const uint64_t rowSlot = logicalRow % gmmAddrInfo.ringReuse.rows / L1_TILE_M_256;
+    // MegaMoe 约定 GMM2 输出宽 = token hidden = 调用方 GMM1 config.k。
+    // 消费端每个 GMM2 输出 N 分块累加一次，按相同的 L1_TILE_N 折算目标。
+    const uint64_t nTiles = Ops::Base::CeilDiv(tokenHiddenDim, static_cast<uint32_t>(L1_TILE_N));
+    // 下次复用同一行槽的 GMM2 需等待该次 Activation 的全部 N 分块就绪。
+    // 当前写入者发布 ready 前，消费计数不会推进到下一次复用。
+    // 目标值与 atomicAdd 的计数一致，均按低 32 位比较。
+    const uint32_t target = static_cast<uint32_t>(epoch * nTiles);
+    WaitUntilGmFlagEquals(gmmAddrInfo.ringReuse.gmm2ConsumedRowTiles + rowSlot * INT_CACHELINE,
+                          static_cast<int32_t>(target));
+}
+
+// 按物理 GM 槽位等待旧代消费完成，配对核 credit 继续约束本核的提交进度。
+__aicore__ inline void WaitForGmm1RingTileReuse(const GMMAddrInfo& info, uint32_t mLoc, uint32_t nLoc, uint32_t outputN)
+{
+    const uint64_t logicalRow = info.gmm1LogicalPaddedRow + mLoc;
+    if (unlikely(info.ringReuse.gmm1ConsumedEpoch == nullptr || logicalRow < info.ringReuse.rows)) {
+        return;
+    }
+    const auto slot = CalcMteRingTileSlot(logicalRow, info.ringReuse.rows, outputN, nLoc);
+    WaitUntilGmFlagEquals(info.ringReuse.gmm1ConsumedEpoch + slot.index * INT_CACHELINE,
+                          static_cast<int32_t>(slot.epoch));
+}
+
+// Activation 既有的 MTE3→S 完成点已覆盖此前的 FIX 完成和 GM→UB 输入读取。
+__aicore__ inline void PublishGmm1RingTileConsumed(const GMMAddrInfo& info, uint32_t mLoc, uint32_t nLoc,
+                                                   uint32_t outputN)
+{
+    if (unlikely(info.ringReuse.gmm1ConsumedEpoch == nullptr && info.ringReuse.gmm1ConsumedRowTiles == nullptr)) {
+        return;
+    }
+    const uint64_t logicalRow = info.gmm1LogicalPaddedRow + mLoc;
+    if (info.ringReuse.gmm1ConsumedEpoch != nullptr) {
+        const auto slot = CalcMteRingTileSlot(logicalRow, info.ringReuse.rows, outputN, nLoc);
+        GmWrite(info.ringReuse.gmm1ConsumedEpoch + slot.index * INT_CACHELINE, static_cast<int32_t>(slot.epoch + 1U));
+    }
+    if (info.ringReuse.gmm1ConsumedRowTiles != nullptr) {
+        const uint64_t row = logicalRow % info.ringReuse.rows / L1_TILE_M_256;
+        atomicAdd(info.ringReuse.gmm1ConsumedRowTiles + row * INT_CACHELINE, int32_t(1));
+    }
+    GmDataBarrier();
+}
+
+#endif
+
 namespace GmmKernel {
 
 template <typename Scheduler, typename TensorA, typename TensorB, typename TensorScaleA, typename TensorScaleB,
@@ -189,6 +244,9 @@ __aicore__ inline void Gmm1AicMmadToGmGeneric(WorkSet& workSet, const Params& pa
             lastWaveWaited = waveIdx;
         }
         sync.WaitForActivation();
+#ifndef MEGA_MOE_ARCH92_DEVICE
+        WaitForGmm1RingTileReuse(gmmAddrInfo, mLoc, nLoc, config.n);
+#endif
         Gmm1AicMmadTileToGmGeneric<BlockMmad>(blockMmad, config, workSet.gmB, workSet.gmScaleB, workSet.gmC,
                                               actualShape, mLoc, nLoc, kLoc, gmBlockA, gmBlockScaleA);
         sync.NotifyActivation();
@@ -270,6 +328,9 @@ __aicore__ inline void Gmm1AicMmadA8W4(BlockMmad& blockMmad, WorkSet& workSet, c
         }
 
         sync.WaitForActivation();
+#ifndef MEGA_MOE_ARCH92_DEVICE
+        WaitForGmm1RingTileReuse(gmmAddrInfo, mLoc, nLoc, config.n);
+#endif
         Gmm1AicMmadTileA8W4(blockMmad, workSet.gmA, workSet.gmScaleA, workSet.gmScaleB, workSet.gmC, config,
                             actualShape, mLoc, nLoc);
 
@@ -295,6 +356,9 @@ __aicore__ inline void Gmm1Aiv0PrefetchEpilogueTileGeneric(const Config& config,
     auto tensorBlockUb = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, ElementC>(0), layoutL0cUb);
     auto copyGm2Ub = asc::te::make_copy(asc::te::copy_gm_to_ub{});
     auto topkWeightTensor = activationQuantOp.GetTopkWeightTensor();
+#ifndef MEGA_MOE_ARCH92_DEVICE
+    WaitForActivationRingRowReuse(gmmAddrInfo, mLoc, config.k);
+#endif
 
     PipeNotify<PIPE_V, PIPE_MTE2>(0);
     for (uint32_t subOffset = 0; subOffset < mLen; subOffset += subTileM) {
@@ -327,6 +391,9 @@ __aicore__ inline void Gmm1Aiv0PrefetchEpilogueTileGeneric(const Config& config,
         PipeNotify<PIPE_V, PIPE_MTE2>(0);
     }
     PipeWait<PIPE_V, PIPE_MTE2>(0);
+#ifndef MEGA_MOE_ARCH92_DEVICE
+    PublishGmm1RingTileConsumed(gmmAddrInfo, mLoc, nLoc, config.n);
+#endif
 }
 
 // 非 Prefetch 交错路径直接消费 AIC 的 UB ping-pong tile。
@@ -349,8 +416,17 @@ __aicore__ inline void Gmm1Aiv0EpilogueTileGeneric(const Config& config, Activat
         0,
         0,
         0};
+#ifndef MEGA_MOE_ARCH92_DEVICE
+    using KernelConfig = typename Config::KernelConfig;
+    if constexpr (!KernelConfig::IS_SHARED) {
+        WaitForActivationRingRowReuse(gmmAddrInfo, mLoc, config.k);
+    }
+#endif
     MegaMoeImpl::SetSaturationStrategy(SaturationStrategy::USE_API);
     activationQuantOp(false, epilogueShape, epilogueOffset, pingpongIdx);
+#ifndef MEGA_MOE_ARCH92_DEVICE
+    PublishGmm1RingTileConsumed(gmmAddrInfo, mLoc, nLoc, config.n);
+#endif
     NotifyGmm2InputReady<IsWaveFlagGrained>(gmmAddrInfo.activationToGmm2Flag, mLoc / L1_TILE_M_256);
 }
 

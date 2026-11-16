@@ -74,26 +74,36 @@ TEST(MegaMoeWorkspace, LayoutsSupportConstantEvaluation)
     EXPECT_TRUE(valid);
 }
 
-TEST(MegaMoeWorkspace, ModeCombinationsHaveDisjointBoundedRegions)
+static void ExpectDisjointBoundedRegionsForModes(bool quantized)
 {
     for (int topo : {0, 1, 2}) {
         for (int mode : {0, 1, 2, 3, 4}) {
             for (bool prefetch : {false, true}) {
+                SCOPED_TRACE(testing::Message() << "topo=" << topo << ", mode=" << mode << ", prefetch=" << prefetch
+                                                << ", quantized=" << quantized);
                 auto p = MakeLayoutParams();
                 p.topoType = topo;
                 p.dedupMode = mode;
                 p.topkWeightsPrefetch = prefetch;
                 p.sharedExpertNum = 1;
-                p.sharedInputIndependent = true;
+                p.sharedInputIndependent = quantized;
+                const TensorStorageSpec storage{quantized ? MemoryLayoutDetail::FP8_BITS :
+                                                            MemoryLayoutDetail::BF16_BITS};
+                p.dispatchInputStorage = storage;
+                p.activationOutputStorage = storage;
+                p.sharedInputStorage = storage;
+                p.sharedActivationStorage = storage;
+                p.reserveGmm1Output = quantized;
                 p.ring = CalcCclStageRingConfig(p);
-                WorkspaceLayout w(p);
-                // 连续清零区仅包含仍有消费者的 GM 标志，不再预留 GMM1 软同步区。
+                const WorkspaceLayout w(p);
+                // 清零区连续覆盖所有已分配的 GM 标志。
                 const int64_t liveFlagBytes =
                     w.sync.activationReady.sizeBytes + w.sync.dispatchReady.sizeBytes + w.sync.countsReady.sizeBytes +
                     w.mte.sync.sharedActivationReady.sizeBytes + w.mte.sync.dedupReady.sizeBytes +
                     w.mte.sync.gmm2Ready.sizeBytes + w.mte.sync.sharedGmm2Tiles.sizeBytes +
-                    w.mte.sync.aiv1TopkReady.sizeBytes + w.urma.sync.combineCounters.sizeBytes +
-                    w.urma.sync.sharedGmm2Tiles.sizeBytes;
+                    w.mte.sync.aiv1TopkReady.sizeBytes + w.mte.sync.gmm1ConsumedEpoch.sizeBytes +
+                    w.mte.sync.gmm1ConsumedRowTiles.sizeBytes + w.mte.sync.gmm2ConsumedRowTiles.sizeBytes +
+                    w.urma.sync.combineCounters.sizeBytes + w.urma.sync.sharedGmm2Tiles.sizeBytes;
                 EXPECT_EQ(w.reset.flags.sizeBytes, liveFlagBytes);
                 std::vector<GmBuffer> regions{w.routed.gmm1Input.data,
                                               w.routed.gmm1Input.scale,
@@ -111,6 +121,9 @@ TEST(MegaMoeWorkspace, ModeCombinationsHaveDisjointBoundedRegions)
                                               w.mte.sync.sharedActivationReady,
                                               w.mte.sync.aiv1TopkReady,
                                               w.mte.sync.gmm2Ready,
+                                              w.mte.sync.gmm1ConsumedEpoch,
+                                              w.mte.sync.gmm1ConsumedRowTiles,
+                                              w.mte.sync.gmm2ConsumedRowTiles,
                                               w.mte.sync.sharedGmm2Tiles,
                                               w.mte.sync.dedupReady,
                                               w.mte.dedupRowDescriptors,
@@ -141,6 +154,13 @@ TEST(MegaMoeWorkspace, ModeCombinationsHaveDisjointBoundedRegions)
                 }
             }
         }
+    }
+}
+
+TEST(MegaMoeWorkspace, ModeCombinationsHaveDisjointBoundedRegions)
+{
+    for (bool quantized : {false, true}) {
+        ExpectDisjointBoundedRegionsForModes(quantized);
     }
 }
 
@@ -260,4 +280,124 @@ TEST(MegaMoeWorkspace, Arch92UrmaKeepsOptionalGmmOutputAndFp8Activation)
     WorkspaceLayout fp4(p, WorkspaceLayout::Arch92{GMM_MODE_A4W4_ND, GMM_MODE_A8W8_ND});
     EXPECT_EQ(fp4.routed.gmm2Input.data.sizeBytes, p.maxOutputSize * p.hiddenDim / 2);
 }
+
+TEST(MegaMoeWorkspace, MteRingSlotEpochUsesPaddedRowsAndNTail)
+{
+    constexpr uint64_t ringRows = 3U * 4U * 256U;
+    constexpr auto first = CalcMteRingTileSlot(256U, ringRows, 4800, 4608U);
+    constexpr auto reused = CalcMteRingTileSlot(ringRows + 256U, ringRows, 4800, 4608U);
+    static_assert(first.index == 37U && first.epoch == 0U);
+    static_assert(reused.index == first.index && reused.epoch == 1U);
+    EXPECT_EQ(CalcMteRingTileSlot(5U * ringRows + 256U, ringRows, 4800, 4608U).epoch, 5U);
+    EXPECT_NE(CalcMteRingTileSlot(256U, ringRows, 4800, 4352U).index, first.index);
+}
+
+TEST(MegaMoeWorkspace, ActivationReaderCountersCoverUbAndPrefetchWriters)
+{
+    auto p = MakeLayoutParams();
+    p.maxOutputSize = 253960;
+    p.h = 6272;
+    p.hiddenDim = 2304;
+    p.mGroupsPerWave = 15;
+    p.ring = CalcCclStageRingConfig(p);
+    const WorkspaceLayout layout(p);
+    const auto rows = layout.mte.sync.gmm2ConsumedRowTiles;
+    EXPECT_EQ(rows.sizeBytes, 3072);
+    EXPECT_EQ(rows.offsetBytes % 64, 0);
+    EXPECT_GE(rows.offsetBytes,
+              layout.mte.sync.gmm1ConsumedRowTiles.offsetBytes + layout.mte.sync.gmm1ConsumedRowTiles.sizeBytes);
+    EXPECT_EQ(rows.offsetBytes + rows.sizeBytes, layout.reset.flags.offsetBytes + layout.reset.flags.sizeBytes);
+    EXPECT_LE(rows.offsetBytes + rows.sizeBytes, layout.routed.gmm2Output.offsetBytes);
+    p.topkWeightsPrefetch = true;
+    EXPECT_EQ(WorkspaceLayout(p).mte.sync.gmm2ConsumedRowTiles.sizeBytes, rows.sizeBytes);
+    p.topkWeightsPrefetch = false;
+    auto fullRows = p;
+    fullRows.maxOutputSize = 1;
+    fullRows.ring = CalcCclStageRingConfig(fullRows);
+    EXPECT_EQ(WorkspaceLayout(fullRows).mte.sync.gmm2ConsumedRowTiles.sizeBytes, 0);
+    p.ring.activation = false;
+    EXPECT_EQ(WorkspaceLayout(p).mte.sync.gmm2ConsumedRowTiles.sizeBytes, 0);
+    p.ring = CalcCclStageRingConfig(p);
+    EXPECT_EQ(WorkspaceLayout(p, WorkspaceLayout::Arch92{GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND})
+                  .mte.sync.gmm2ConsumedRowTiles.sizeBytes,
+              0);
+}
+
+TEST(MegaMoeWorkspace, RingOwnershipFlagsFollowIndependentStageLifetimes)
+{
+    auto p = MakeLayoutParams();
+    p.maxOutputSize = 65536;
+    p.h = 4800;
+    p.hiddenDim = 6656;
+    p.mGroupsPerWave = 4;
+    p.ring = CalcCclStageRingConfig(p);
+    const WorkspaceLayout layout(p);
+    EXPECT_EQ(layout.mte.sync.gmm1ConsumedEpoch.sizeBytes, MemoryLayoutDetail::CeilAlign(12 * 26 * 64, 512));
+    EXPECT_EQ(layout.mte.sync.gmm1ConsumedRowTiles.sizeBytes, 1024);
+    EXPECT_EQ(layout.mte.sync.gmm2ConsumedRowTiles.sizeBytes, 1024);
+    std::vector<GmBuffer> flags{layout.mte.sync.gmm1ConsumedEpoch, layout.mte.sync.gmm1ConsumedRowTiles,
+                                layout.mte.sync.gmm2ConsumedRowTiles};
+    int64_t end = layout.reset.flags.offsetBytes;
+    for (const auto& flag : flags) {
+        EXPECT_GE(flag.offsetBytes, end);
+        EXPECT_EQ(flag.offsetBytes % 64, 0);
+        EXPECT_LE(flag.offsetBytes + flag.sizeBytes, layout.reset.flags.offsetBytes + layout.reset.flags.sizeBytes);
+        end = flag.offsetBytes + flag.sizeBytes;
+    }
+    p.reserveGmm1Output = false;
+    p.topkWeightsPrefetch = false;
+    EXPECT_EQ(WorkspaceLayout(p).mte.sync.gmm1ConsumedEpoch.sizeBytes, 0);
+    EXPECT_GT(WorkspaceLayout(p).mte.sync.gmm1ConsumedRowTiles.sizeBytes, 0);
+    p.topkWeightsPrefetch = true;
+    EXPECT_GT(WorkspaceLayout(p).mte.sync.gmm1ConsumedEpoch.sizeBytes, 0);
+}
+
+TEST(MegaMoeWorkspace, CombineDedupKeepsActivationReaderFeedback)
+{
+    for (bool prefetch : {false, true}) {
+        auto p = MakeLayoutParams();
+        p.maxOutputSize = 65536;
+        p.mGroupsPerWave = 4;
+        p.dedupMode = 3;
+        p.topkWeightsPrefetch = prefetch;
+        p.ring = CalcCclStageRingConfig(p);
+        ASSERT_TRUE(p.ring.activation);
+        ASSERT_TRUE(p.ring.gmm1);
+        ASSERT_FALSE(p.ring.dispatch);
+        ASSERT_FALSE(p.ring.gmm2);
+        const WorkspaceLayout layout(p);
+        EXPECT_GT(layout.mte.sync.gmm1ConsumedEpoch.sizeBytes, 0);
+        EXPECT_EQ(layout.mte.sync.gmm1ConsumedRowTiles.sizeBytes, 0);
+        EXPECT_EQ(layout.mte.sync.gmm2ConsumedRowTiles.sizeBytes, 1024);
+        EXPECT_GE(layout.mte.sync.gmm2ConsumedRowTiles.offsetBytes, layout.reset.flags.offsetBytes);
+        EXPECT_EQ(layout.mte.sync.gmm2ConsumedRowTiles.offsetBytes + 1024,
+                  layout.reset.flags.offsetBytes + layout.reset.flags.sizeBytes);
+    }
+}
+
+TEST(MegaMoeWorkspace, RingOwnershipIsAbsentForFullRowsAndOtherArchitectures)
+{
+    auto p = MakeLayoutParams();
+    p.maxOutputSize = 1;
+    p.ring = CalcCclStageRingConfig(p);
+    const auto empty = [](const WorkspaceLayout& layout) {
+        EXPECT_EQ(layout.mte.sync.gmm1ConsumedEpoch.sizeBytes, 0);
+        EXPECT_EQ(layout.mte.sync.gmm1ConsumedRowTiles.sizeBytes, 0);
+        EXPECT_EQ(layout.mte.sync.gmm2ConsumedRowTiles.sizeBytes, 0);
+    };
+    empty(WorkspaceLayout(p));
+    p.maxOutputSize = 65536;
+    p.ring = CalcCclStageRingConfig(p);
+    auto bf16 = p;
+    bf16.dispatchInputStorage = {MemoryLayoutDetail::BF16_BITS};
+    bf16.activationOutputStorage = {MemoryLayoutDetail::BF16_BITS};
+    empty(WorkspaceLayout(bf16));
+    empty(WorkspaceLayout(p, WorkspaceLayout::Arch92{GMM_MODE_A4W4_ND, GMM_MODE_A4W4_NZ}));
+    for (int64_t topology : {TOPO_TYPE_URMA, TOPO_TYPE_URMA_ROCE}) {
+        p.topoType = topology;
+        p.ring = CalcCclStageRingConfig(p);
+        empty(WorkspaceLayout(p));
+    }
+}
+
 } // namespace MegaMoeUT

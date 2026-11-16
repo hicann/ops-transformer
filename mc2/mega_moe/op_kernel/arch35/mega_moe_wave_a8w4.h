@@ -48,6 +48,7 @@ private:
     static constexpr uint32_t GMM1_TILE_M = MegaMoeBase::GMM1_TILE_M;
 
     using MegaMoeBase::DispatchBuffInit;
+    using MegaMoeBase::InitMoeRingReuseBuffers;
     using MegaMoeBase::PrepareMoeExpertTokenCountTable;
     using MegaMoeBase::BuildMoeDedupRowDescTable;
     using MegaMoeBase::ReloadDispatchCumsumRange;
@@ -317,6 +318,8 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::Process
 
     GMMAddrInfo gmm1AddrInfo{};
     GMMAddrInfo gmm2AddrInfo{};
+    InitMoeRingReuseBuffers(gmm1AddrInfo);
+    InitMoeRingReuseBuffers(gmm2AddrInfo);
     gmm1AddrInfo.gmm1ActivationSync = &gmm1ActivationSync;
     if (combineQuantMode == COMBINE_NO_QUANT) {
         // combine 去重开时不挂握手对象：W4 路径的握手启用位在非量化 combine 下为真

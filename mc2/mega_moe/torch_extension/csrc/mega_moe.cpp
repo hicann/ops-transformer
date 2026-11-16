@@ -893,11 +893,22 @@ int64_t CalcCclBufferSizeA5(int64_t epWorldSize, int64_t moeExpertNum, int64_t n
                                                 combineQuantMode, combineCommMode, dispatchQuantOutDtype);
     int64_t dataBytes = MegaMoeImpl::WorkspaceLayout(budget.compute).workspaceSize;
     if (budget.compute.topoType == MegaMoeImpl::TOPO_TYPE_MTE) {
-        // Dispatch 由 tiling 自动选择；分别计算开、关布局，覆盖数据区、去重描述符及标志区。
-        auto dispatchDedupParams = budget.compute;
-        dispatchDedupParams.dedupMode |= 2;
-        dispatchDedupParams.ring = MegaMoeImpl::CalcCclStageRingConfig(dispatchDedupParams);
-        dataBytes = std::max(dataBytes, MegaMoeImpl::WorkspaceLayout(dispatchDedupParams).workspaceSize);
+        // Dispatch 由 tiling 自动选择，两种模式均需覆盖完整布局上界。
+        for (int32_t dedupMode : {budget.compute.dedupMode, budget.compute.dedupMode | 2}) {
+            auto params = budget.compute;
+            params.dedupMode = dedupMode;
+            params.ring = MegaMoeImpl::CalcCclStageRingConfig(params);
+            dataBytes = std::max(dataBytes, MegaMoeImpl::WorkspaceLayout(params).workspaceSize);
+            // 较小 wave 仍可能启用 ring，不能遗漏其回收标记超过全行预算的边界。
+            if (!params.ring.activation &&
+                params.activationOutputStorage.elementBits == MegaMoeImpl::MemoryLayoutDetail::FP8_BITS) {
+                params.mGroupsPerWave = (params.maxOutputSize - 1) / MegaMoeImpl::CalcMemoryRingRows(1);
+                params.ring = MegaMoeImpl::CalcCclStageRingConfig(params);
+                if (params.ring.activation) {
+                    dataBytes = std::max(dataBytes, MegaMoeImpl::WorkspaceLayout(params).workspaceSize);
+                }
+            }
+        }
     }
     return MegaMoeImpl::CalcCclComputeOffset(budget.comm) + dataBytes;
 }

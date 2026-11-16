@@ -296,6 +296,7 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(bool topkWeightsPrefetch,
     const uint64_t dispatchTokenStartIndex =
         gmmConfig.ring.dispatch ? physicalTokenStartIndex : static_cast<uint64_t>(globalTokenStartIndex);
     uint32_t expertMGroupOffset = rowOffsetInExpert / L1_TILE_M_256;
+    gmmAddrInfo.gmm1LogicalPaddedRow = state.paddedTokenStartIndex + rowOffsetInExpert;
     int64_t scaleK = Ops::Base::CeilDiv(k, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
 
     if (UseA8W4Gmm1 || topkWeightsPrefetch) {

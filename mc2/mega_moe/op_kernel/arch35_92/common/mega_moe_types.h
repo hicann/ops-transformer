@@ -77,6 +77,16 @@ struct ExpertTokenRange {
 
 using Mc2MoeContext = Mc2Aclnn::Mc2MoeContext;
 
+#ifndef MEGA_MOE_ARCH92_DEVICE
+// 同次 MoE 调用共用的回收区地址，在进入专家流水前绑定一次。
+struct MteRingReuseBuffers {
+    __gm__ int32_t* gmm1ConsumedEpoch = nullptr;
+    __gm__ int32_t* gmm1ConsumedRowTiles = nullptr;
+    __gm__ int32_t* gmm2ConsumedRowTiles = nullptr;
+    uint64_t rows = 0U;
+};
+#endif
+
 struct GMMAddrInfo {
     GM_ADDR aGlobal;
     GM_ADDR bGlobal;
@@ -90,6 +100,11 @@ struct GMMAddrInfo {
     __gm__ int32_t* gmm2CombineSyncCounter = nullptr;
     __gm__ int32_t* sharedExpertGmm2TileCounter = nullptr;
     uint32_t gmm2CombineLogicalCoreCount = 0U;
+#ifndef MEGA_MOE_ARCH92_DEVICE
+    MteRingReuseBuffers ringReuse{};
+    uint64_t gmm1LogicalPaddedRow = 0U;
+    uint64_t gmm2LogicalPaddedRow = 0U;
+#endif
     Gmm1ActivationSync* gmm1ActivationSync = nullptr;
     Gmm2CombineSync* gmm2CombineSync =
         nullptr; // per-tile credit 握手对象；入口分发后由 NotifyCombineTileReady 模板参数决定是否参与握手

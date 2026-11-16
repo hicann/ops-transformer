@@ -54,6 +54,7 @@ private:
     static constexpr uint32_t GMM1_TILE_M = MegaMoeBase::GMM1_TILE_M;
 
     using MegaMoeBase::DispatchBuffInit;
+    using MegaMoeBase::InitMoeRingReuseBuffers;
     using MegaMoeBase::PrepareMoeExpertTokenCountTable;
     using MegaMoeBase::BuildMoeDedupRowDescTable;
     using MegaMoeBase::EnterSteadyDispatch;
@@ -691,6 +692,8 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::Process
     GMMAddrInfo gmm1AddrInfo{};
     ExpertLoopState gmm1ExpertState = CreateExpertLoopState(commonConfig_);
     Gmm2WaveState gmm2State{};
+    InitMoeRingReuseBuffers(gmm1AddrInfo);
+    InitMoeRingReuseBuffers(gmm2State.addrInfo);
     if (params_.tilingData->isTopkWeightsPrefetch) {
         gmm1AddrInfo.gmm1ActivationSync = &gmm1ActivationSync;
     }

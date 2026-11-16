@@ -90,6 +90,7 @@ protected:
                                                SharedQuantScaleType, SharedQuantScaleType>;
     typename SharedA8W4Config::BlockContext sharedBlockContext_{};
     __aicore__ inline void SendAndQuantBuffInit();
+    __aicore__ inline void InitMoeRingReuseBuffers(GMMAddrInfo& gmmAddrInfo) const;
     __aicore__ inline void DispatchBuffInit();
     template <bool NeedCumsumReload = false>
     __aicore__ inline void PrepareMoeExpertTokenCountTable();
@@ -216,6 +217,16 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitInputPrepareConfigs
     // 共享专家启用时仅 AIV1 计算发送 topK 有效下标，其余情况保留全 AIV 分工。
     const uint32_t topkValidIndexCoreIdx = sharedExpertNum_ > 0U ? blockIdx_ : aivCoreIdx_;
     sendMaskConfig_ = CreateSendMaskConfig(params_, topkValidIndexCoreIdx);
+}
+
+template <TemplateMegaMoeTypeClass>
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitMoeRingReuseBuffers(GMMAddrInfo& gmmAddrInfo) const
+{
+    const auto& workspace = params_.workspace;
+    gmmAddrInfo.ringReuse = {workspace.layout.mte.sync.gmm1ConsumedEpoch.template get_ptr<int32_t>(workspace.base),
+                             workspace.layout.mte.sync.gmm1ConsumedRowTiles.template get_ptr<int32_t>(workspace.base),
+                             workspace.layout.mte.sync.gmm2ConsumedRowTiles.template get_ptr<int32_t>(workspace.base),
+                             gmmExecutionConfig_.ring.rows};
 }
 
 template <TemplateMegaMoeTypeClass>

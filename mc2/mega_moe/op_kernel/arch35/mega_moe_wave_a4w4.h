@@ -47,6 +47,7 @@ private:
     static constexpr uint32_t GMM1_TILE_M = MegaMoeBase::GMM1_TILE_M;
 
     using MegaMoeBase::DispatchBuffInit;
+    using MegaMoeBase::InitMoeRingReuseBuffers;
     using MegaMoeBase::PrepareMoeExpertTokenCountTable;
     using MegaMoeBase::BuildMoeDedupRowDescTable;
     using MegaMoeBase::ReloadDispatchCumsumRange;
@@ -346,6 +347,8 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::Process
     ExpertLoopState gmm2State = CreateExpertLoopState(commonConfig_);
     GMMAddrInfo gmm1AddrInfo{};
     GMMAddrInfo gmm2AddrInfo{};
+    InitMoeRingReuseBuffers(gmm1AddrInfo);
+    InitMoeRingReuseBuffers(gmm2AddrInfo);
     if (topkWeightsPrefetch) {
         gmm1AddrInfo.gmm1ActivationSync = &gmm1ActivationSync;
     }
