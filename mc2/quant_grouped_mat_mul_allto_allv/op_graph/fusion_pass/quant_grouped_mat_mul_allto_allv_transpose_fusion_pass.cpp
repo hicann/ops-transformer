@@ -86,7 +86,7 @@ struct ReplaceGraphInputs {
 
 // 加载 EsTranspose 符号
 namespace {
-typedef EsCTensorHolder* (*EsTransposeFunc)(EsCTensorHolder*, EsCTensorHolder*);
+using EsTransposeFunc = EsCTensorHolder* (*)(EsCTensorHolder*, EsCTensorHolder*);
 
 EsTransposeFunc GetEsTransposeFunc()
 {
@@ -96,17 +96,21 @@ EsTransposeFunc GetEsTransposeFunc()
         return nullptr;
     }
     dlerror();
-    auto func = reinterpret_cast<EsTransposeFunc>(dlsym(handle, "EsTranspose"));
-    if (dlerror() != nullptr) {
+    void* symbol = dlsym(handle, "EsTranspose");
+    if (dlerror() != nullptr || symbol == nullptr) {
         OPS_LOG_E("QuantGroupedMatMulAlltoAllvTransposeFusionPass", "dlsym EsTranspose failed");
         return nullptr;
     }
-    return func;
+    return reinterpret_cast<EsTransposeFunc>(symbol);
 }
 
 ge::es::EsTensorHolder TransposeDL(const ge::es::EsTensorLike& x, const ge::es::EsTensorLike& perm)
 {
     static EsTransposeFunc func = GetEsTransposeFunc();
+    if (func == nullptr) {
+        OPS_LOG_E("QuantGroupedMatMulAlltoAllvTransposeFusionPass", "EsTranspose unavailable, skip transpose fusion");
+        return {};
+    }
     auto* builder = ge::es::ResolveBuilder(x, perm);
     auto result = func(x.ToTensorHolder(builder).GetCTensorHolder(), perm.ToTensorHolder(builder).GetCTensorHolder());
     return result;
@@ -264,6 +268,10 @@ ge::Status QuantGroupedMatMulAlltoAllvTransposeFusionPass::Run(ge::GraphPtr& gra
 std::vector<ge::fusion::PatternUniqPtr> QuantGroupedMatMulAlltoAllvTransposeFusionPass::Patterns()
 {
     OPS_LOG_D(FUSION_PASS_NAME.c_str(), "Enter Patterns for QuantGroupedMatMulAlltoAllvTransposeFusionPass");
+    if (GetEsTransposeFunc() == nullptr) {
+        OPS_LOG_E(FUSION_PASS_NAME.c_str(), "EsTranspose unavailable, skip Patterns.");
+        return {};
+    }
     // hasMm × 四路 Transpose（至少一路）× 对应 Bitcast（仅 Transpose 口）
     std::vector<ge::fusion::PatternUniqPtr> patternGraphs;
     for (bool hasMm : {false, true}) {
@@ -343,13 +351,15 @@ static bool GetTransposePerm(const ge::GNode& transposeNode, std::vector<int64_t
     size_t size = 0;
     if (permDType == ge::DT_INT32) {
         size = permTensor.GetSize() / sizeof(int32_t);
+        const int32_t* permInt32 = static_cast<int32_t*>(static_cast<void*>(permData));
         for (size_t i = 0; i < size; ++i) {
-            permValue.emplace_back(static_cast<int64_t>(*(reinterpret_cast<int32_t*>(permData) + i)));
+            permValue.emplace_back(static_cast<int64_t>(permInt32[i]));
         }
     } else if (permDType == ge::DT_INT64) {
         size = permTensor.GetSize() / sizeof(int64_t);
+        const int64_t* permInt64 = static_cast<int64_t*>(static_cast<void*>(permData));
         for (size_t i = 0; i < size; ++i) {
-            permValue.emplace_back(*(reinterpret_cast<int64_t*>(permData) + i));
+            permValue.emplace_back(permInt64[i]);
         }
     } else {
         OPS_LOG_D(FUSION_PASS_NAME.c_str(), "Transpose permutation dtype must be int32 or int64.");

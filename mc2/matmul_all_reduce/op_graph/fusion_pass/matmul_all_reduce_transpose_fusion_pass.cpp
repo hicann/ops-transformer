@@ -20,7 +20,7 @@
 #include "mc2_fusion_pass_utils.h"
 #include "mc2_common_log.h"
 #include "ge/ge_utils.h"
-#include <dlfcn.h>
+#include <dlfcn.h> // dlopen 动态加载
 #include "acl/acl_rt.h"
 
 namespace ops {
@@ -45,6 +45,8 @@ const size_t ONE_DIM_SIZE = 1;
 const size_t PERM_SIZE_ONE = 1;
 const size_t PERM_SIZE_TWO = 2;
 const size_t PERM_SIZE_THREE = 3;
+const size_t INPUT_NUM_X1_X2 = 2;     // x1 / x2 必选
+const size_t ARN_EXTRA_INPUT_NUM = 2; // residual / gamma 必选
 
 enum class Mc2OpKind {
     Mar,
@@ -73,7 +75,7 @@ struct ReplaceGraphInputs {
     ge::es::EsTensorHolder rDequantScale;
 };
 
-typedef EsCTensorHolder* (*EsTransposeFunc)(EsCTensorHolder*, EsCTensorHolder*);
+using EsTransposeFunc = EsCTensorHolder* (*)(EsCTensorHolder*, EsCTensorHolder*);
 
 EsTransposeFunc GetEsTransposeFunc()
 {
@@ -83,17 +85,21 @@ EsTransposeFunc GetEsTransposeFunc()
         return nullptr;
     }
     dlerror();
-    auto func = reinterpret_cast<EsTransposeFunc>(dlsym(handle, "EsTranspose"));
-    if (dlerror() != nullptr) {
+    void* symbol = dlsym(handle, "EsTranspose");
+    if (dlerror() != nullptr || symbol == nullptr) {
         OPS_LOG_E(PASS_NAME.c_str(), "dlsym EsTranspose failed");
         return nullptr;
     }
-    return func;
+    return reinterpret_cast<EsTransposeFunc>(symbol);
 }
 
 ge::es::EsTensorHolder TransposeDL(const ge::es::EsTensorLike& x, const ge::es::EsTensorLike& perm)
 {
     static EsTransposeFunc func = GetEsTransposeFunc();
+    if (func == nullptr) {
+        OPS_LOG_E(PASS_NAME.c_str(), "EsTranspose unavailable, skip transpose fusion");
+        return {};
+    }
     auto* builder = ge::es::ResolveBuilder(x, perm);
     return func(x.ToTensorHolder(builder).GetCTensorHolder(), perm.ToTensorHolder(builder).GetCTensorHolder());
 }
@@ -126,12 +132,12 @@ Mc2OpKind ParseOpKind(const std::string& patternNameStr)
 
 size_t GetPatternInputNum(const OriginalGraphInfo& info)
 {
-    size_t n = 2; // x1 / x2
+    size_t n = INPUT_NUM_X1_X2; // x1 / x2
     if (info.hasBias) {
         ++n;
     }
     if (IsArnKind(info.opKind)) {
-        n += 2; // residual / gamma 必选
+        n += ARN_EXTRA_INPUT_NUM; // residual / gamma 必选
     }
     if (info.hasScale) {
         ++n;
@@ -314,13 +320,15 @@ bool GetTransposePerm(const ge::GNode& transposeNode, std::vector<int64_t>& perm
     }
     if (permDType == ge::DT_INT32) {
         size_t size = permTensor.GetSize() / sizeof(int32_t);
+        const int32_t* permInt32 = static_cast<int32_t*>(static_cast<void*>(permData));
         for (size_t i = 0; i < size; ++i) {
-            permValue.emplace_back(static_cast<int64_t>(*(reinterpret_cast<int32_t*>(permData) + i)));
+            permValue.emplace_back(static_cast<int64_t>(permInt32[i]));
         }
     } else if (permDType == ge::DT_INT64) {
         size_t size = permTensor.GetSize() / sizeof(int64_t);
+        const int64_t* permInt64 = static_cast<int64_t*>(static_cast<void*>(permData));
         for (size_t i = 0; i < size; ++i) {
-            permValue.emplace_back(*(reinterpret_cast<int64_t*>(permData) + i));
+            permValue.emplace_back(permInt64[i]);
         }
     } else {
         OPS_LOG_D(PASS_NAME.c_str(), "Transpose permutation dtype must be int32 or int64.");
@@ -522,7 +530,7 @@ bool CreateReplaceGraphInputs(ReplaceGraphInputs& inputs, ge::es::EsGraphBuilder
     if (!CollectSubgraphInputsInfo(subgraphInputs, inputShapes, inputDTypes, inputFormats)) {
         return false;
     }
-    if (inputShapes.size() < 2) {
+    if (inputShapes.size() < INPUT_NUM_X1_X2) {
         return false;
     }
 
@@ -731,6 +739,10 @@ ge::Status MatmulAllReduceTransposeFusionPass::Run(ge::GraphPtr& graph, ge::Cust
 std::vector<ge::fusion::PatternUniqPtr> MatmulAllReduceTransposeFusionPass::Patterns()
 {
     OPS_LOG_D(PASS_NAME.c_str(), "Enter Patterns for MatmulAllReduceTransposeFusionPass");
+    if (GetEsTransposeFunc() == nullptr) {
+        OPS_LOG_E(PASS_NAME.c_str(), "EsTranspose unavailable, skip Patterns.");
+        return {};
+    }
     return BuildAllPatterns(PASS_NAME);
 }
 
