@@ -44,6 +44,9 @@ constexpr int64_t TWO_DIMS = 2;
 constexpr int64_t SCALE_DIMS = 3;
 constexpr int64_t MX_SCALE_BLOCK = 64;
 constexpr int64_t SCALE_LAST_DIM = 2;
+constexpr size_t SCALE_DIM0_INDEX = 0;
+constexpr size_t SCALE_DIM1_INDEX = 1;
+constexpr size_t SCALE_DIM2_INDEX = 2;
 constexpr size_t HCCL_GROUP_NAME_LENGTH_MAX = 128U; // HCCL group 名长度上限
 
 const std::initializer_list<op::DataType> X_DTYPE_SUPPORT_LIST = {
@@ -198,8 +201,9 @@ aclnnStatus CheckScaleShape(const aclTensor* scale, const char* paramName, int64
     }
     aclnnStatus ret = CheckTensorDimNum(scale, paramName, SCALE_DIMS);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    if (scale->GetViewShape().GetDim(0) != dim0 || scale->GetViewShape().GetDim(1) != scaleKDim ||
-        scale->GetViewShape().GetDim(2) != SCALE_LAST_DIM) {
+    if (scale->GetViewShape().GetDim(SCALE_DIM0_INDEX) != dim0 ||
+        scale->GetViewShape().GetDim(SCALE_DIM1_INDEX) != scaleKDim ||
+        scale->GetViewShape().GetDim(SCALE_DIM2_INDEX) != SCALE_LAST_DIM) {
         OP_LOGE_FOR_INVALID_SHAPE("aclnnAllGatherQuantMatmulV3", paramName,
                                   op::ToString(scale->GetViewShape()).GetString(),
                                   ("[" + std::to_string(dim0) + ", " + std::to_string(scaleKDim) + ", " +
@@ -312,8 +316,10 @@ extern "C" aclnnStatus aclnnAllGatherQuantMatmulV3GetWorkspaceSize(
         if (transX2Scale == nullptr) {
             return ACLNN_ERR_INNER_NULLPTR;
         }
-        OP_LOGI("x2Scale after trans: dim0=%ld dim1=%ld dim2=%ld", transX2Scale->GetViewShape().GetDim(0),
-                transX2Scale->GetViewShape().GetDim(1), transX2Scale->GetViewShape().GetDim(2));
+        OP_LOGI("x2Scale after trans: dim0=%ld dim1=%ld dim2=%ld",
+                transX2Scale->GetViewShape().GetDim(SCALE_DIM0_INDEX),
+                transX2Scale->GetViewShape().GetDim(SCALE_DIM1_INDEX),
+                transX2Scale->GetViewShape().GetDim(SCALE_DIM2_INDEX));
     }
 
     ret = CheckShape(x1, transX2, x1ScaleOptional, transX2Scale, output);

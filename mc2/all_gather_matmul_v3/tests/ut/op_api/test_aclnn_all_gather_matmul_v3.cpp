@@ -114,6 +114,44 @@ TEST_F(TestAclnnAllGatherMatmulV3, EmptyGroupTest)
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
 
+TEST_F(TestAclnnAllGatherMatmulV3, X2ScaleTransposedTest)
+{
+    TensorDesc contextDesc = TensorDesc({100}, ACL_INT32, ACL_FORMAT_ND);
+    TensorDesc x1Desc = TensorDesc({2048, 4096}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
+    TensorDesc x2Desc = TensorDesc({2560, 4096}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
+    TensorDesc x1ScaleDesc = TensorDesc({2048, 64, 2}, ACL_FLOAT8_E8M0, ACL_FORMAT_ND);
+    TensorDesc x2ScaleDesc = TensorDesc({64, 2560, 2}, ACL_FLOAT8_E8M0, ACL_FORMAT_ND, {2, 128, 1}, 0, {2560, 64, 2});
+    TensorDesc outputDesc = TensorDesc({8192, 2560}, ACL_BF16, ACL_FORMAT_ND);
+    TensorDesc gatherOutDesc = TensorDesc({8192, 4096}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
+    auto ut = OP_API_UT(aclnnAllGatherQuantMatmulV3,
+                        INPUT(contextDesc, x1Desc, x2Desc, nullptr, x1ScaleDesc, x2ScaleDesc,
+                              "all_gather_matmul_v3_test_group", 4, 200, 4295032864L, "aiv_urma"),
+                        OUTPUT(outputDesc, gatherOutDesc));
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+    EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST_F(TestAclnnAllGatherMatmulV3, X2ScaleLastDimInvalidTest)
+{
+    TensorDesc contextDesc = TensorDesc({100}, ACL_INT32, ACL_FORMAT_ND);
+    TensorDesc x1Desc = TensorDesc({2048, 4096}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
+    TensorDesc x2Desc = TensorDesc({2560, 4096}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
+    TensorDesc x1ScaleDesc = TensorDesc({2048, 64, 2}, ACL_FLOAT8_E8M0, ACL_FORMAT_ND);
+    TensorDesc x2ScaleDesc = TensorDesc({2560, 64, 1}, ACL_FLOAT8_E8M0, ACL_FORMAT_ND);
+    TensorDesc outputDesc = TensorDesc({8192, 2560}, ACL_BF16, ACL_FORMAT_ND);
+    TensorDesc gatherOutDesc = TensorDesc({8192, 4096}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
+    auto ut = OP_API_UT(aclnnAllGatherQuantMatmulV3,
+                        INPUT(contextDesc, x1Desc, x2Desc, nullptr, x1ScaleDesc, x2ScaleDesc,
+                              "all_gather_matmul_v3_test_group", 4, 200, 4295032864L, "aiv_urma"),
+                        OUTPUT(outputDesc, gatherOutDesc));
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     AllGatherMatmulV3, TestAclnnAllGatherMatmulV3,
     testing::ValuesIn(GetCasesFromCsv<AllGatherMatmulV3ApiUtParam>(ReplaceFileExtension2Csv(__FILE__))),
