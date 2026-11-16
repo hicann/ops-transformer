@@ -138,6 +138,7 @@ public:
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true);
+        this->AICore().AddConfig("ascend350", aicore_config_95);
         this->AICore().AddConfig("ascend950", aicore_config_95);
         this->AICore().AddConfig("ascend960dt", aicore_config_95);
     }

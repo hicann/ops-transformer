@@ -14,7 +14,7 @@ from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 import torch_npu
 
 SFA_TOKENS_DEFAULT = 9223372036854775807
-SFA_SUPPORTED_SOC_NAME = ["Ascend950", "Ascend960"]
+SFA_SUPPORTED_SOC_NAME = ["Ascend350", "Ascend950", "Ascend960"]
 
 
 class SparseFlashAttentionOpBuilder(OpBuilder):

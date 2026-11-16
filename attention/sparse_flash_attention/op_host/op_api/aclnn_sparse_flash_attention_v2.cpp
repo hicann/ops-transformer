@@ -59,7 +59,7 @@ aclnnStatus aclnnSparseFlashAttentionV2GetWorkspaceSize(
         op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9201 &&
         op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9202) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
-                "The sinks input of aclnnSparseFlashAttentionV2 is only supported on Ascend950 and Ascend960.");
+                "The sinks input of aclnnSparseFlashAttentionV2 is only supported on Ascend350/Ascend950/Ascend960 .");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     const aclTensor* valueTensor = (value == nullptr) ? key : value;
