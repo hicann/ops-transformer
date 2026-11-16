@@ -162,7 +162,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
           <li>TND下不指定实际长度可传入nullptr，表示与cuSeqLengthsQOptional差分得到的存储长度相同；BSND/BNSD下必须传入sequsedQ，不使用cu差分。</li>
           <li>传入时shape为(B,)，每个元素须≥0；TND下须≤对应batch的cu存储长度，BSND/BNSD下须≤Sq。与cu并存时的双长度语义见<a href="#其他约束">其他约束</a>。</li>
         </ul>
-       A2/A3 INT8（quantType=7）例外：TND Q必须传入nullptr；BSND/BNSD仍为必传。</td>
+       Atlas A2/A3系列产品 INT8（quantType=7）例外：TND Q必须传入nullptr；BSND/BNSD仍为必传。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -291,7 +291,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>quantType</td>
       <td>输入</td>
       <td>代表采用的量化手段。</td>
-      <td>量化类型：0为非量化；5为A5常规FP8；6为A5 MXFP8；7为A2/A3 INT8；8为A5 A8C4。1～4为预留值，当前不支持。具体规格见产品差异约束。</td>
+      <td>量化类型：0为非量化；5为Ascend 950PR&950DT系列产品常规FP8；6为Ascend 950PR&950DT系列产品 MXFP8；7为Atlas A2/A3系列产品 INT8；8为Ascend 950PR&950DT系列产品 A8C4。1～4为预留值，当前不支持。具体规格见产品差异约束。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -308,7 +308,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
           <li>1：混合精度；online softmax采取fp16/bf16（与attentionOut相同），rescale采取fp32，online softmax阶段可能数值溢出。</li>
         </ul>
         各精度模式的适用范围见<a href="#产品差异约束">产品差异约束</a>。
-       A2/A3 INT8（quantType=7）要求softmaxPrecision=0。</td>
+       Atlas A2/A3系列产品 INT8（quantType=7）要求softmaxPrecision=0。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>

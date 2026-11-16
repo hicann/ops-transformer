@@ -74,7 +74,7 @@
     <tr>
       <td>sequsedQOptional</td>
       <td>条件必选输入</td>
-      <td>各Batch中Query的实际序列长度，shape为(B,)；BSND/BNSD必传，TND可选且不传时使用Query存储长度。 A2/A3 INT8（quantType=7）例外：TND Q必须传入nullptr；BSND/BNSD仍为必传。</td>
+      <td>各Batch中Query的实际序列长度，shape为(B,)；BSND/BNSD必传，TND可选且不传时使用Query存储长度。 Atlas A2/A3系列产品 INT8（quantType=7）例外：TND Q必须传入nullptr；BSND/BNSD仍为必传。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -158,14 +158,14 @@
     <tr>
       <td>quantType</td>
       <td>属性</td>
-      <td>量化类型：0为非量化；5为A5常规FP8；6为A5 MXFP8；7为A2/A3 INT8；8为A5 A8C4。1～4为预留值，当前不支持。具体规格见产品差异约束。</td>
+      <td>量化类型：0为非量化；5为Ascend 950PR&950DT系列产品常规FP8；6为Ascend 950PR&950DT系列产品 MXFP8；7为Atlas A2/A3系列产品 INT8；8为Ascend 950PR&950DT系列产品 A8C4。1～4为预留值，当前不支持。具体规格见产品差异约束。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>softmaxPrecision</td>
       <td>属性</td>
-      <td>Softmax计算精度级别，取值为0或1。 A2/A3 INT8（quantType=7）要求softmaxPrecision=0。</td>
+      <td>Softmax计算精度级别，取值为0或1。 Atlas A2/A3系列产品 INT8（quantType=7）要求softmaxPrecision=0。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>

@@ -110,31 +110,31 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>qDequantScaleOptional</td>
       <td>Optional input</td>
-      <td>A2/A3 INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: TND: [Tq,qHeadNum]; BSND: [B,Sq,qHeadNum]; BNSD: [B,qHeadNum,Sq]. For A5 MXFP8 (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5/8, pass nullptr.</td>
-      <td>FLOAT32 (A2/A3 INT8) or FLOAT8_E8M0 (A5 MXFP8)</td>
+      <td>Atlas A2/A3 products INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: TND: [Tq,qHeadNum]; BSND: [B,Sq,qHeadNum]; BNSD: [B,qHeadNum,Sq]. For Ascend 950PR&950DT products MXFP8 (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5/8, pass nullptr.</td>
+      <td>FLOAT32 (Atlas A2/A3 products INT8) or FLOAT8_E8M0 (Ascend 950PR&950DT products MXFP8)</td>
 
       <td>ND</td>
     </tr>
     <tr>
       <td>kDequantScaleOptional</td>
       <td>Optional input</td>
-      <td>A2/A3 INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: PA_BBND/PA_BNBD: [numBlocks,kvHeadNum,128]; TND: [kvHeadNum,Tkv]; BSND/BNSD: [B,kvHeadNum,Sk]. For A5 MXFP8 (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale.</td>
-      <td>FLOAT32 (A2/A3 INT8) or FLOAT8_E8M0 (A5 MXFP8), BFLOAT16 (A8C4)</td>
+      <td>Atlas A2/A3 products INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: PA_BBND/PA_BNBD: [numBlocks,kvHeadNum,128]; TND: [kvHeadNum,Tkv]; BSND/BNSD: [B,kvHeadNum,Sk]. For Ascend 950PR&950DT products MXFP8 (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale.</td>
+      <td>FLOAT32 (Atlas A2/A3 products INT8) or FLOAT8_E8M0 (Ascend 950PR&950DT products MXFP8), BFLOAT16 (A8C4)</td>
 
       <td>ND</td>
     </tr>
     <tr>
       <td>vDequantScaleOptional</td>
       <td>Optional input</td>
-      <td>A2/A3 INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [kvHeadNum,D]. For A5 MXFP8 (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale.</td>
-      <td>FLOAT32 (A2/A3 INT8) or FLOAT8_E8M0 (A5 MXFP8), BFLOAT16 (A8C4)</td>
+      <td>Atlas A2/A3 products INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [kvHeadNum,D]. For Ascend 950PR&950DT products MXFP8 (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale.</td>
+      <td>FLOAT32 (Atlas A2/A3 products INT8) or FLOAT8_E8M0 (Ascend 950PR&950DT products MXFP8), BFLOAT16 (A8C4)</td>
 
       <td>ND</td>
     </tr>
     <tr>
       <td>pQuantScaleOptional</td>
       <td>Optional input</td>
-      <td>A2/A3 INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [1]. For A5 MXFP8 (quantType=6), P scale is optional FLOAT32 [1], default 16.0. For quantType=0/5/8, pass nullptr.</td>
+      <td>Atlas A2/A3 products INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [1]. For Ascend 950PR&950DT products MXFP8 (quantType=6), P scale is optional FLOAT32 [1], default 16.0. For quantType=0/5/8, pass nullptr.</td>
 
       <td>FLOAT</td>
       <td>ND</td>
@@ -156,7 +156,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>sequsedQOptional</td>
       <td>Conditionally required input</td>
-      <td>Actual valid query length in each batch. The shape is [B,]. It is required for BSND/BNSD and optional for TND. If it is not passed for TND, the storage length obtained by differencing cu is used. For A2/A3 INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
+      <td>Actual valid query length in each batch. The shape is [B,]. It is required for BSND/BNSD and optional for TND. If it is not passed for TND, the storage length obtained by differencing cu is used. For Atlas A2/A3 products INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -219,7 +219,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>quantType</td>
       <td>Attribute</td>
-      <td>Quantization type: 0 for non-quantized inputs, 5 for A5 FP8, 6 for A5 MXFP8, 7 for A2/A3 INT8, and 8 for A5 A8C4. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
+      <td>Quantization type: 0 for non-quantized inputs, 5 for Ascend 950PR&950DT products FP8, 6 for Ascend 950PR&950DT products MXFP8, 7 for Atlas A2/A3 products INT8, and 8 for Ascend 950PR&950DT products A8C4. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -233,7 +233,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>softmaxPrecision</td>
       <td>Attribute</td>
-      <td>Softmax computation precision level. The value is 0 or 1. A2/A3 INT8 (quantType=7) requires softmaxPrecision=0.</td>
+      <td>Softmax computation precision level. The value is 0 or 1. Atlas A2/A3 products INT8 (quantType=7) requires softmaxPrecision=0.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -254,7 +254,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>returnSoftmaxlse</td>
       <td>Attribute</td>
-      <td>Whether to output softmaxLse. Non-quantized inputs (quantType=0), A2/A3 INT8 (quantType=7), and A8C4 (quantType=8) support 0 or 1; A5 FP8 Union (quantType=5, maskType=3, D=128) supports 0 or 1; A5 regular FP8 (quantType=5, maskType!=3) and MXFP8 (quantType=6) support only 0.</td>
+      <td>Whether to output softmaxLse. Non-quantized inputs (quantType=0), Atlas A2/A3 products INT8 (quantType=7), and A8C4 (quantType=8) support 0 or 1; Ascend 950PR&950DT products FP8 Union (quantType=5, maskType=3, D=128) supports 0 or 1; Ascend 950PR&950DT products regular FP8 (quantType=5, maskType!=3) and MXFP8 (quantType=6) support only 0.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -282,7 +282,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>softmaxLseOptional</td>
       <td>Output</td>
-      <td>Softmax log-sum-exp result. Supported for non-quantized inputs (quantType=0), A2/A3 INT8 (quantType=7), A5 FP8 Union (quantType=5, maskType=3, D=128), and A8C4 (quantType=8). When returnSoftmaxlse=1, a FLOAT32 Tensor is required, with shape [Tq,qHeadNum,1] for TND or [B,qHeadNum,Sq,1] for BSND/BNSD. When returnSoftmaxlse=0, pass nullptr. A5 regular FP8 (quantType=5, maskType!=3) and MXFP8 (quantType=6) do not support LSE output.</td>
+      <td>Softmax log-sum-exp result. Supported for non-quantized inputs (quantType=0), Atlas A2/A3 products INT8 (quantType=7), Ascend 950PR&950DT products FP8 Union (quantType=5, maskType=3, D=128), and A8C4 (quantType=8). When returnSoftmaxlse=1, a FLOAT32 Tensor is required, with shape [Tq,qHeadNum,1] for TND or [B,qHeadNum,Sq,1] for BSND/BNSD. When returnSoftmaxlse=0, pass nullptr. Ascend 950PR&950DT products regular FP8 (quantType=5, maskType!=3) and MXFP8 (quantType=6) do not support LSE output.</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
@@ -294,7 +294,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
 
 ## Constraints
 
-- A2/A3 INT8 quantization (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
+- Atlas A2/A3 products INT8 quantization (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
 
 - For INT8 quantization, all four scale tensors are required. They must be FLOAT32, contiguous, finite, and positive; their shapes are specified in the parameter table.
 

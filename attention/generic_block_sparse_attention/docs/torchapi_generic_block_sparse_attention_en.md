@@ -147,7 +147,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 > [!NOTE]
 >
-> Pass an `IntEnum` or its corresponding integer. `quant_mode` supports 0 (NO_QUANT), 5 (FP8), 6 (MXFP8), 7 (A2/A3 INT8), and 8 (FP8 Q with FP4 K/V). Modes 5, 6, and 8 apply to <term>Ascend 950PR&950DT products</term>. INT8 supports `mask_mode=0/1` and requires `softmax_precision=0`. See the product-specific constraints for each mode.
+> Pass an `IntEnum` or its corresponding integer. `quant_mode` supports 0 (NO_QUANT), 5 (FP8), 6 (MXFP8), 7 (Atlas A2/A3 products INT8), and 8 (FP8 Q with FP4 K/V). Modes 5, 6, and 8 apply to <term>Ascend 950PR&950DT products</term>. INT8 supports `mask_mode=0/1` and requires `softmax_precision=0`. See the product-specific constraints for each mode.
 
 ## Parameters
 
@@ -190,10 +190,10 @@ cann_ops_transformer.generic_block_sparse_attention(
 | block_shape | list[int] | Required | Sparse block shape `[block_x, block_y]` | int64 | - | length of 2 |
 | metadata | Tensor | Required | Task split result from `generic_block_sparse_attention_metadata` with matching layout, inputs, and attributes. | int32 | ND | (1024,) |
 | attn_mask | Tensor | Optional | Must be None when mask_mode=0/1; must be INT32 exactMask when mask_mode=3 (Union) | bool/int32 | ND | Union: (KV_N, G, U×block_y) |
-| q_dequant_scale | Tensor | Required for INT8; conditional for other modes |query dequantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0 | ND | INT8: TND: [Q_T,Q_N]; BSND: [B,Q_S,Q_N]; BNSD: [B,Q_N,Q_S]; MXFP8: see the ACLNN quantization contract |
-| k_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8` | key dequantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0/bfloat16 | ND | INT8: PA_BBND/PA_BNBD: [num_blocks,KV_N,128]; TND: [KV_N,KV_T]; BSND/BNSD: [B,KV_N,KV_S]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. |
-| v_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8` | value dequantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0/bfloat16 | ND | INT8: [KV_N,D]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. |
-| p_quant_scale | Tensor | Required for INT8; conditional for other modes |P quantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32 | ND | INT8: [1]; MXFP8: see the ACLNN quantization contract |
+| q_dequant_scale | Tensor | Required for INT8; conditional for other modes |query dequantization scale factor; Atlas A2/A3 products INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0 | ND | INT8: TND: [Q_T,Q_N]; BSND: [B,Q_S,Q_N]; BNSD: [B,Q_N,Q_S]; MXFP8: see the ACLNN quantization contract |
+| k_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8` | key dequantization scale factor; Atlas A2/A3 products INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0/bfloat16 | ND | INT8: PA_BBND/PA_BNBD: [num_blocks,KV_N,128]; TND: [KV_N,KV_T]; BSND/BNSD: [B,KV_N,KV_S]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. |
+| v_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8` | value dequantization scale factor; Atlas A2/A3 products INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0/bfloat16 | ND | INT8: [KV_N,D]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. |
+| p_quant_scale | Tensor | Required for INT8; conditional for other modes |P quantization scale factor; Atlas A2/A3 products INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32 | ND | INT8: [1]; MXFP8: see the ACLNN quantization contract |
 | cu_seqlens_q | Tensor | Conditional | Required for TND Q. Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | Conditional | Required for TND KV. Pass `None` for paged KV. Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
 | seqused_q | Tensor | Conditional | Required for BSND/BNSD. For TND Q, this is optional with non-quantized inputs, MXFP8, or `quant_mode=8` on <term>Ascend 950PR&950DT products</term>. Pass `None` for INT8 TND. | int32 | ND | (B,) |
@@ -236,7 +236,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 ## Constraints
 
-- A2/A3 INT8 quantization (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
+- Atlas A2/A3 products INT8 quantization (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
 
 - Parameters cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, sparse_block_idx, sparse_block_count, and block_table are tensors. The operator cannot obtain the specific values of these tensors during the Tiling phase. Therefore, the tiling side does not validate the values, and users must ensure their correctness. If invalid values are passed for the preceding parameters, undefined behavior may occur (such as accuracy issues or program crashes caused by invalid memory access).
 - The input parameters of generic_block_sparse_attention_metadata and generic_block_sparse_attention must be consistent during the call. The operator is called in two phases through two APIs and cannot perform the check itself. Customers must ensure correctness. If the parameters passed to the APIs are inconsistent, undefined behavior may occur (such as accuracy issues or program crashes caused by invalid memory access).
@@ -764,7 +764,7 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
             <td>quant_mode</td>
             <td>                <ul>
                     <li>data_type supports INT.</li>
-                    <li>Supported values are 0 (non-quantized), 5 (FP8), 6 (MXFP8), 7 (A2/A3 INT8), and 8 (FP8 Q with FP4 K/V). Modes 5, 6, and 8 apply to <term>Ascend 950PR&950DT products</term>.</li>
+                    <li>Supported values are 0 (non-quantized), 5 (FP8), 6 (MXFP8), 7 (Atlas A2/A3 products INT8), and 8 (FP8 Q with FP4 K/V). Modes 5, 6, and 8 apply to <term>Ascend 950PR&950DT products</term>.</li>
                 </ul>
             </td>
             <td>Optional input. The default value is 0.</td>
@@ -827,7 +827,7 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
             <td>return_softmax_lse</td>
             <td>                <ul>
                     <li>data_type only supports BOOL.</li>
-                    <li>Non-quantized inputs (quant_mode=0), A2/A3 INT8 (quant_mode=7), and inputs with quant_mode=8 support False and True. On <term>Ascend 950PR&950DT products</term>, FP8 Union (quant_mode=5, mask_mode=3, D=128) supports False and True. Regular FP8 (quant_mode=5, mask_mode!=3) and MXFP8 (quant_mode=6) support only False.</li>
+                    <li>Non-quantized inputs (quant_mode=0), Atlas A2/A3 products INT8 (quant_mode=7), and inputs with quant_mode=8 support False and True. On <term>Ascend 950PR&950DT products</term>, FP8 Union (quant_mode=5, mask_mode=3, D=128) supports False and True. Regular FP8 (quant_mode=5, mask_mode!=3) and MXFP8 (quant_mode=6) support only False.</li>
                 </ul>
             </td>
             <td>Optional attribute, default value is False.</td>
@@ -926,6 +926,6 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
     assert attention_out.dtype == q.dtype
     ```
 
-## Atlas A2/A3 INT8 quantization
+## Atlas A2/A3 products INT8 quantization
 
 Use `quant_mode=QuantMode.INT8_FULL_QUANT` (7) for INT8 Q/K/V; pass the same value to both metadata and attention. All four external scales are required. `softmax_precision=0` is required; the output is `torch.float16` or `torch.bfloat16`. Scale shapes and layout constraints are described in the [ACLNN quantization contract](aclnnGenericBlockSparseAttention_en.md#quantization-related-description). `quant_mode=5` is for Ascend 950 FP8 and cannot be used for INT8.

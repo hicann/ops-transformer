@@ -76,7 +76,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>sequsedQOptional</td>
       <td>Conditionally Required Input</td>
-      <td>Actual sequence length of Query in each batch. The shape is (B,). This parameter is required for BSND/BNSD and optional for TND; when it is not passed in for TND, the Query storage length is used. For A2/A3 INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
+      <td>Actual sequence length of Query in each batch. The shape is (B,). This parameter is required for BSND/BNSD and optional for TND; when it is not passed in for TND, the Query storage length is used. For Atlas A2/A3 products INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -160,14 +160,14 @@ English | [简体中文](./README.md)
     <tr>
       <td>quantType</td>
       <td>Attribute</td>
-      <td>Quantization type: 0 for non-quantized inputs, 5 for A5 FP8, 6 for A5 MXFP8, 7 for A2/A3 INT8, and 8 for A5 A8C4. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
+      <td>Quantization type: 0 for non-quantized inputs, 5 for Ascend 950PR&950DT products FP8, 6 for Ascend 950PR&950DT products MXFP8, 7 for Atlas A2/A3 products INT8, and 8 for Ascend 950PR&950DT products A8C4. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>softmaxPrecision</td>
       <td>Attribute</td>
-      <td>Precision level of the Softmax calculation. The value is 0 or 1. A2/A3 INT8 (quantType=7) requires softmaxPrecision=0.</td>
+      <td>Precision level of the Softmax calculation. The value is 0 or 1. Atlas A2/A3 products INT8 (quantType=7) requires softmaxPrecision=0.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -238,7 +238,7 @@ English | [简体中文](./README.md)
 - `quantType`: <term>Ascend 950PR&950DT products</term> supports 0 (non-quantized), 5 (FP8), 6 (`MXFP8`), or 8 (A8C4); <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support 0 (non-quantized) or 7 (INT8).
 - `softmaxPrecision`: In non-Union scenarios (maskType=0/1) on <term>Ascend 950PR&950DT products</term>, non-quantized FLOAT16/BFLOAT16 supports 0 or 1, FP8 with `quantType=5` supports only 1, and `MXFP8` supports 0 or 1; in Union scenarios (maskType=3), both non-quantized and FP8 support only 0; on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, FLOAT16 supports 0 or 1 and BFLOAT16 supports only 0.
 
-- A2/A3 INT8 quantization (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
+- Atlas A2/A3 products INT8 quantization (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
 
 ## Calling Instructions
 
