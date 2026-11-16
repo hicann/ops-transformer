@@ -42,7 +42,13 @@ except ImportError:
     _TORCHAIR_AVAILABLE = False
 
 if _TORCHAIR_AVAILABLE:
-
+    # premix 必须放在 * 之后(keyword-only)且标志列表保持 4 项: torchair 的
+    # auto_convert_to_tensor 用 signature.bind() 绑定实参(不应用默认值), 若
+    # premix 为第 5 个位置参数则存量 4 实参调用会触发
+    # "The length of args can not be less than inputs_dynamic"; 且 flags 第二
+    # 列表为 inputs_optional, premix 标记非 optional 时转换器传 premix=None
+    # (无 premix 的图)会触发 "can not be None as it is not optional"。
+    # keyword-only 经 kwargs 传递不受上述两处校验影响, 函数体已有 None 处理。
     @auto_convert_to_tensor([False, False, False, False], [False, False, False, False])
     def MhcPreSinkhorn(
         x: Tensor,
@@ -50,11 +56,13 @@ if _TORCHAIR_AVAILABLE:
         alpha: Tensor,
         bias: Tensor,
         *,
+        premix: Optional[Tensor] = None,
         hc_mult: int = 4,
         num_iters: int = 20,
         hc_eps: float = 1e-6,
         norm_eps: float = 1e-6,
         need_backward: bool = True,
+        enable_hf32: bool = True,
         dependencies=None,
         node_name=None,
     ):
@@ -63,19 +71,21 @@ if _TORCHAIR_AVAILABLE:
         .INPUT(phi, TensorType({DT_FLOAT}))\n
         .INPUT(alpha, TensorType({DT_FLOAT}))\n
         .INPUT(bias, TensorType({DT_FLOAT}))\n
+        .OPTIONAL_INPUT(premix, TensorType({DT_FLOAT}))\n
         .OUTPUT(hin, TensorType({DT_BF16, DT_FLOAT16}))\n
-        .OUTPUT(hPost, TensorType({DT_FLOAT}))\n
-        .OUTPUT(hRes, TensorType({DT_FLOAT}))\n
-        .OUTPUT(hPre, TensorType({DT_FLOAT}))\n
-        .OUTPUT(hcBeforeNorm, TensorType({DT_FLOAT}))\n
-        .OUTPUT(invRms, TensorType({DT_FLOAT}))\n
-        .OUTPUT(sumOut, TensorType({DT_FLOAT}))\n
-        .OUTPUT(normOut, TensorType({DT_FLOAT}))\n
+        .OUTPUT(h_post, TensorType({DT_FLOAT}))\n
+        .OUTPUT(h_res, TensorType({DT_FLOAT}))\n
+        .OUTPUT(h_pre, TensorType({DT_FLOAT}))\n
+        .OUTPUT(hc_before_norm, TensorType({DT_FLOAT}))\n
+        .OUTPUT(inv_rms, TensorType({DT_FLOAT}))\n
+        .OUTPUT(sum_out, TensorType({DT_FLOAT}))\n
+        .OUTPUT(norm_out, TensorType({DT_FLOAT}))\n
         .ATTR(hc_mult, Int, 4)\n
         .ATTR(num_iters, Int, 20)\n
         .ATTR(hc_eps, Float, 1e-6)\n
         .ATTR(norm_eps, Float, 1e-6)\n
         .ATTR(need_backward, Bool, true)\n
+        .ATTR(enable_hf32, Bool, true)\n
         """
         if dependencies is None:
             dependencies = []
@@ -86,6 +96,8 @@ if _TORCHAIR_AVAILABLE:
             "alpha": alpha,
             "bias": bias,
         }
+        if premix is not None:
+            inputs["premix"] = premix
 
         attrs = {
             "hc_mult": attr.Int(hc_mult),
@@ -93,17 +105,18 @@ if _TORCHAIR_AVAILABLE:
             "hc_eps": attr.Float(hc_eps),
             "norm_eps": attr.Float(norm_eps),
             "need_backward": attr.Bool(need_backward),
+            "enable_hf32": attr.Bool(enable_hf32),
         }
 
         outputs = [
             "hin",
-            "hPost",
-            "hRes",
-            "hPre",
-            "hcBeforeNorm",
-            "invRms",
-            "sumOut",
-            "normOut",
+            "h_post",
+            "h_res",
+            "h_pre",
+            "hc_before_norm",
+            "inv_rms",
+            "sum_out",
+            "norm_out",
         ]
 
         return ge_op(
@@ -117,21 +130,25 @@ if _TORCHAIR_AVAILABLE:
             .input("phi", "DT_FLOAT")
             .input("alpha", "DT_FLOAT")
             .input("bias", "DT_FLOAT")
+            .optional_input("premix", "DT_FLOAT")
             .attr("hc_mult", attr.Int(4))
             .attr("num_iters", attr.Int(20))
             .attr("hc_eps", attr.Float(1e-6))
             .attr("norm_eps", attr.Float(1e-6))
             .attr("need_backward", attr.Bool(True))
+            .attr("enable_hf32", attr.Bool(True))
             .output("hin", "DT_BF16, DT_FLOAT16")
-            .output("hPost", "DT_FLOAT")
-            .output("hRes", "DT_FLOAT")
-            .output("hPre", "DT_FLOAT")
-            .output("hcBeforeNorm", "DT_FLOAT")
-            .output("invRms", "DT_FLOAT")
-            .output("sumOut", "DT_FLOAT")
-            .output("normOut", "DT_FLOAT"),
+            .output("h_post", "DT_FLOAT")
+            .output("h_res", "DT_FLOAT")
+            .output("h_pre", "DT_FLOAT")
+            .output("hc_before_norm", "DT_FLOAT")
+            .output("inv_rms", "DT_FLOAT")
+            .output("sum_out", "DT_FLOAT")
+            .output("norm_out", "DT_FLOAT"),
         )
 
+    # converter 形参名须与 schema 参数名(pre_mix/enable_hf32)一致: 图模式按名传 kwargs,
+    # 改成 snake_case 会报 unexpected keyword argument。
     @register_fx_node_ge_converter(
         torch.ops.cann_ops_transformer.mhc_pre_sinkhorn.default
     )
@@ -145,6 +162,8 @@ if _TORCHAIR_AVAILABLE:
         hc_eps: float,
         norm_eps: float,
         out_flag: bool,
+        pre_mix: Optional[Tensor] = None,
+        enable_hf32: bool = True,
         meta_outputs: TensorSpec = None,
     ):
         return MhcPreSinkhorn(
@@ -152,9 +171,11 @@ if _TORCHAIR_AVAILABLE:
             phi=phi,
             alpha=alpha,
             bias=bias,
+            premix=pre_mix,
             hc_mult=hc_mult,
             num_iters=num_iters,
             hc_eps=hc_eps,
             norm_eps=norm_eps,
             need_backward=out_flag,
+            enable_hf32=enable_hf32,
         )

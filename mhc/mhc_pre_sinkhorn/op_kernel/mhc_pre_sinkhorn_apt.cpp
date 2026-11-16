@@ -25,11 +25,15 @@ using namespace MhcPreSinkhornNs;
 
 using namespace AscendC;
 
-extern "C" __global__ __aicore__ void mhc_pre_sinkhorn(GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADDR bias, GM_ADDR hin,
-                                                       GM_ADDR hPost, GM_ADDR hRes, GM_ADDR hPre, GM_ADDR hcBeforeNorm,
-                                                       GM_ADDR invRms, GM_ADDR sumOut, GM_ADDR normOut,
-                                                       GM_ADDR workspace, GM_ADDR tiling)
+// premix 为可选输入形参, 仅用于与算子IR输入列表对齐; A5(RegBase)侧不使用premix,
+// 带premix的调用在aclnn层被拒绝, 此处不向Init传递
+extern "C" __global__ __aicore__ void mhc_pre_sinkhorn(GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADDR bias,
+                                                       GM_ADDR premix, GM_ADDR hin, GM_ADDR hPost, GM_ADDR hRes,
+                                                       GM_ADDR hPre, GM_ADDR hcBeforeNorm, GM_ADDR invRms,
+                                                       GM_ADDR sumOut, GM_ADDR normOut, GM_ADDR workspace,
+                                                       GM_ADDR tiling)
 {
+    (void)premix;
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     KERNEL_TASK_TYPE(3000, KERNEL_TYPE_MIX_AIC_1_1);
     KERNEL_TASK_TYPE(3001, KERNEL_TYPE_MIX_AIC_1_1);

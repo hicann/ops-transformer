@@ -10,7 +10,7 @@
 
 /*!
  * \file mhc_pre_sinkhorn_backward.cpp
- * \brief ACLNN Wrapper for aclnnMhcPreSinkhornBackward
+ * \brief ACLNN Wrapper for aclnnMhcPreSinkhornBackward / aclnnMhcPreSinkhornBackwardV2
  */
 
 #include <torch/extension.h>
@@ -18,6 +18,7 @@
 
 namespace op_api {
 
+// V1 接口: 与合入前行为一致(无 premix/gradPre/enableHf32), 固定 HF32 cube
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> MhcPreSinkhornBackward(
     const at::Tensor& gradHin, const at::Tensor& gradHPost, const at::Tensor& gradHRes, const at::Tensor& x,
     const at::Tensor& phi, const at::Tensor& alpha, const at::Tensor& bias, const at::Tensor& hPre,
@@ -35,9 +36,36 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> MhcPreSinkhornBackwar
     return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>(gradX, gradPhi, gradAlpha, gradBias);
 }
 
+// V2 接口: 可选 premix/gradPre(必须成对) + enableHf32 属性下发
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> MhcPreSinkhornBackwardV2(
+    const at::Tensor& gradHin, const at::Tensor& gradHPost, const at::Tensor& gradHRes, const at::Tensor& x,
+    const at::Tensor& phi, const at::Tensor& alpha, const at::Tensor& bias, const at::Tensor& hPre,
+    const at::Tensor& hcBeforeNorm, const at::Tensor& invRms, const at::Tensor& sumOut, const at::Tensor& normOut,
+    double hcEps, const c10::optional<at::Tensor>& preMix, const c10::optional<at::Tensor>& gradPre, bool enableHf32)
+{
+    at::Tensor gradX = at::empty_like(x);
+    at::Tensor gradPhi = at::empty_like(phi);
+    at::Tensor gradAlpha = at::empty_like(alpha);
+    at::Tensor gradBias = at::empty_like(bias);
+    // grad_pre_mix 仅在传入 pre_mix 时计算，shape 同 pre_mix（fp32 [B,S,N] / [T,N]）
+    c10::optional<at::Tensor> gradPreMix;
+    if (preMix.has_value()) {
+        gradPreMix = at::empty_like(preMix.value());
+    }
+
+    ACLNN_CMD(aclnnMhcPreSinkhornBackwardV2, gradHin, gradHPost, gradHRes, x, phi, alpha, bias, hPre, hcBeforeNorm,
+              invRms, sumOut, normOut, preMix, gradPre, hcEps, enableHf32, gradX, gradPhi, gradAlpha, gradBias,
+              gradPreMix);
+
+    return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>(
+        gradX, gradPhi, gradAlpha, gradBias,
+        gradPreMix.has_value() ? gradPreMix.value() : at::empty({0}, phi.options()));
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     m.def("mhc_pre_sinkhorn_backward", &MhcPreSinkhornBackward, "mhc_pre_sinkhorn_backward");
+    m.def("mhc_pre_sinkhorn_backward_v2", &MhcPreSinkhornBackwardV2, "mhc_pre_sinkhorn_backward_v2");
 }
 
 } // namespace op_api

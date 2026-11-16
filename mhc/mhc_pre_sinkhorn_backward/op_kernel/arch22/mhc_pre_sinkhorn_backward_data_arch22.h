@@ -32,6 +32,9 @@ struct MhcPreSinkhornBackwardArch22TilingData {
     int64_t tileSize = 0;
     int64_t skIterCount = 0;
     int64_t ubSize = 0;
+    int64_t hasPreMix = 0;
+    int64_t isHf32 = 1; // enable_hf32属性: A2侧Cube是否启用HF32, 缺省1(与premix合入前一致)
+    int64_t hasGradPre = 0;
     float eps = 0;
     TCubeTiling mm1TilingData;
     TCubeTiling mm2TilingData;

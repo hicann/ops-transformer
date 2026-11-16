@@ -29,11 +29,15 @@ namespace l0op {
  * @param [in] phi: Weight matrix, shape is [D, hcMix], dtype is FP32
  * @param [in] alpha: Scaling coefficients, shape is [hcMix], dtype is FP32
  * @param [in] bias: Bias vector, shape is [hcMix], dtype is FP32
+ * @param [in] premix: Optional pre-mix weights, shape is [T, n] or [B, S, n], dtype is FP32.
+ *                     When provided, hin is computed with premix instead of the internally computed hPre.
  * @param [in] hcMult: Number of heads (n)
  * @param [in] numIters: Number of Sinkhorn iterations
  * @param [in] hcEps: Epsilon value for Sinkhorn iteration
  * @param [in] normEps: Epsilon value for normalization
  * @param [in] needBackward: Whether backward outputs are needed
+ * @param [in] enableHf32: Whether to enable HF32 mode for A2/A3 cube computation (attr enable_hf32),
+ *                           default is true (pre-premix behavior)
  * @param [out] hin: Output tensor for Attention/MLP input, shape is [T, D] or [B, S, D], dtype is BF16
  * @param [out] hPost: Post-processing transformation matrix, shape is [T, n] or [B, S, n], dtype is FP32
  * @param [out] hRes: Combination matrix before Sinkhorn, shape is [T, n, n] or [B, S, n, n], dtype is FP32
@@ -48,11 +52,10 @@ namespace l0op {
  * @return aclTensor*: Output tensor hin
  */
 const aclTensor* MhcPreSinkhorn(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
-                                int64_t hcMult, int64_t numIters, double hcEps, double normEps, bool needBackward,
-                                aclTensor* hin, aclTensor* hPost, aclTensor* hRes, aclTensor* hPre,
-                                aclTensor* hcBeforeNorm, aclTensor* invRms, aclTensor* sumOut, aclTensor* normOut,
-                                aclOpExecutor* executor);
-
+                                const aclTensor* premix, int64_t hcMult, int64_t numIters, double hcEps, double normEps,
+                                bool needBackward, bool enableHf32, aclTensor* hin, aclTensor* hPost, aclTensor* hRes,
+                                aclTensor* hPre, aclTensor* hcBeforeNorm, aclTensor* invRms, aclTensor* sumOut,
+                                aclTensor* normOut, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // PTA_NPU_OP_API_INC_LEVEL0_OP_MHC_PRE_SINKHORN_OP_H_

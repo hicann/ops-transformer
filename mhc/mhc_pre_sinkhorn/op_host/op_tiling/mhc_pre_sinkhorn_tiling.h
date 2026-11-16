@@ -99,7 +99,27 @@ TILING_DATA_FIELD_DEF(int64_t, bufferPool0Size); // 缓冲池0大小
 TILING_DATA_FIELD_DEF(int64_t, bufferPool1Size); // 缓冲池1大小
 TILING_DATA_FIELD_DEF(int64_t, mUbSize);         // M维度UB缓冲大小
 
-TILING_DATA_FIELD_DEF(int64_t, needGrad);         // 是否需要梯度
+TILING_DATA_FIELD_DEF(int64_t, prePostCoreNum);                     // pre/post处理核数
+TILING_DATA_FIELD_DEF(int64_t, sinkhornCoreNum);                    // sinkhorn处理核数
+TILING_DATA_FIELD_DEF(int64_t, prePostRowOfFormerBlock);            // pre/post前核处理BS总数
+TILING_DATA_FIELD_DEF(int64_t, prePostRowOfTailBlock);              // pre/post尾核处理BS总数
+TILING_DATA_FIELD_DEF(int64_t, prePostRowLoopOfFormerBlock);        // pre/post前核处理行循环次数
+TILING_DATA_FIELD_DEF(int64_t, prePostRowLoopOfTailBlock);          // pre/post尾核处理行循环次数
+TILING_DATA_FIELD_DEF(int64_t, prePostRowFactor);                   // pre/post每次处理的行数
+TILING_DATA_FIELD_DEF(int64_t, prePostTailRowFactorOfFormerBlock);  // pre/post前核尾次处理的行数
+TILING_DATA_FIELD_DEF(int64_t, prePostTailRowFactorOfTailBlock);    // pre/post尾核尾次处理的行数
+TILING_DATA_FIELD_DEF(int64_t, sinkhornUsedCoreNum);                // sinkhorn实际使用核数
+TILING_DATA_FIELD_DEF(int64_t, sinkhornRowOfFormerBlock);           // sinkhorn前核处理BS总数
+TILING_DATA_FIELD_DEF(int64_t, sinkhornRowOfTailBlock);             // sinkhorn尾核处理BS总数
+TILING_DATA_FIELD_DEF(int64_t, sinkhornRowLoopOfFormerBlock);       // sinkhorn前核处理行循环次数
+TILING_DATA_FIELD_DEF(int64_t, sinkhornRowLoopOfTailBlock);         // sinkhorn尾核处理行循环次数
+TILING_DATA_FIELD_DEF(int64_t, sinkhornRowFactor);                  // sinkhorn每次处理的行数
+TILING_DATA_FIELD_DEF(int64_t, sinkhornTailRowFactorOfFormerBlock); // sinkhorn前核尾次处理的行数
+TILING_DATA_FIELD_DEF(int64_t, sinkhornTailRowFactorOfTailBlock);   // sinkhorn尾核尾次处理的行数
+
+TILING_DATA_FIELD_DEF(int64_t, needGrad);  // 是否需要梯度
+TILING_DATA_FIELD_DEF(int64_t, hasPremix); // 可选输入 premix 是否存在
+TILING_DATA_FIELD_DEF(int64_t, isHf32); // enable_hf32属性: A2侧Cube是否启用HF32, 缺省1(与premix合入前一致)
 TILING_DATA_FIELD_DEF(int64_t, bsSplitThreshold); // BS切分阈值
 TILING_DATA_FIELD_DEF(int64_t, bsLoop);           // BS循环次数
 TILING_DATA_FIELD_DEF(int64_t, tailBs);           // 尾批次BS数
@@ -129,6 +149,8 @@ TILING_DATA_FIELD_DEF(int64_t, stage1BsFactor);         // 每轮 BS 数
 TILING_DATA_FIELD_DEF(int64_t, stage1NcLoop);           // n*c 切分段数
 TILING_DATA_FIELD_DEF(int64_t, stage1NcFactor);         // 每段大小
 TILING_DATA_FIELD_DEF(int64_t, stage1TailNcFactor);     // 尾段大小
+TILING_DATA_FIELD_DEF(int64_t, stage1KSegNum);          // 大K精度分段数
+TILING_DATA_FIELD_DEF(int64_t, stage1KSegLen);          // 每个K段的元素数
 TILING_DATA_FIELD_DEF(int64_t, stage1XCastWsSize);      // X_cast workspace 大小
 TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, mm1TilingData)
 END_TILING_DATA_DEF;
@@ -205,11 +227,10 @@ public:
     ge::graphStatus GetAttr();
     ge::graphStatus GetShapeAttrsInfoInner();
     ge::graphStatus CalcOpTiling();
-    ge::graphStatus CalcMembaseOpTiling();
     ge::graphStatus CalcMKSplitCoreMembasePart2Tiling();
-    ge::graphStatus CalcBsSplit();
-    ge::graphStatus CalcTailBsTiling();
     ge::graphStatus CalcStage1Tiling();
+    void CalcVectorCoreNum();
+    ge::graphStatus CalcSinkhornTiling();
 
 private:
     gert::TilingContext* context_ = nullptr;
@@ -239,22 +260,17 @@ private:
     float hcEps_ = 0.0;
     float normEps_ = 0.0;
     bool needGrad_ = true;
-    int64_t bsLoop_ = 1;
-    int64_t tailBs_ = 0;
-    int64_t curBsSplit_ = 0;
-    // 尾批次专用参数
-    int64_t tailBsRowOfFormerBlock_ = 0;
-    int64_t tailBsRowOfTailBlock_ = 0;
-    int64_t tailBsRowLoopOfFormerBlock_ = 0;
-    int64_t tailBsRowLoopOfTailBlock_ = 0;
-    int64_t tailBsUsedCoreNum_ = 0;
-    int64_t tailBsRowFactor_ = 0;
-    int64_t tailBsTailRowFactorOfFormerBlock_ = 0;
-    int64_t tailBsTailRowFactorOfTailBlock_ = 0;
-    int64_t tailBsML1Size_ = 0;
-    int64_t tailBsKL1Size_ = 0;
-    int64_t tailBsMultCoreSplitMSize_ = 0;
-    int64_t tailBsCubeBlockDimM_ = 0;
+    bool isHf32_ = false;
+    int64_t prePostCoreNum_ = 0;
+    int64_t sinkhornCoreNum_ = 0;
+    int64_t sinkhornUsedCoreNum_ = 0;
+    int64_t sinkhornRowOfFormerBlock_ = 0;
+    int64_t sinkhornRowOfTailBlock_ = 0;
+    int64_t sinkhornRowLoopOfFormerBlock_ = 0;
+    int64_t sinkhornRowLoopOfTailBlock_ = 0;
+    int64_t sinkhornRowFactor_ = 0;
+    int64_t sinkhornTailRowFactorOfFormerBlock_ = 0;
+    int64_t sinkhornTailRowFactorOfTailBlock_ = 0;
     platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
 };
 

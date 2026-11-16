@@ -200,10 +200,6 @@ static bool CheckInputDims(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     bool is3D = params.x->GetViewShape().GetDimNum() == DIM_NUM_3D;
     if (is3D) {
-        if (!Ops::Transformer::AclnnUtil::IsRegbase()) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "3D (TND) input format is only supported on Ascend 950");
-            return false;
-        }
         return CheckDimNum(params.gradHin, DIM_NUM_2D, "gradHin") &&
                CheckDimNum(params.gradHPost, DIM_NUM_2D, "gradHPost") &&
                CheckDimNum(params.gradHRes, DIM_NUM_3D, "gradHRes", true, DIM_NUM_2D) &&
@@ -228,10 +224,6 @@ static bool CheckInputDims(const AclnnMhcPreSinkhornBackwardParams& params)
 static bool CheckOutputDims(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     bool is3D = params.x->GetViewShape().GetDimNum() == DIM_NUM_3D;
-    if (is3D && !Ops::Transformer::AclnnUtil::IsRegbase()) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "3D (TND) input format is only supported on Ascend 950");
-        return false;
-    }
     size_t gradXExpected = is3D ? DIM_NUM_3D : DIM_NUM_4D;
     return CheckDimNum(params.gradX, gradXExpected, "gradX") && CheckDimNum(params.gradPhi, DIM_NUM_2D, "gradPhi") &&
            CheckDimNum(params.gradAlpha, DIM_NUM_1D, "gradAlpha") &&
@@ -366,10 +358,6 @@ static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams& params)
 {
     auto& xShape = params.x->GetViewShape();
     if (xShape.GetDimNum() == 3) {
-        if (!Ops::Transformer::AclnnUtil::IsRegbase()) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "3D (TND) input format is only supported on Ascend 950");
-            return false;
-        }
         return CheckShape3D(params);
     }
 
@@ -504,6 +492,13 @@ static bool CheckDtype(const aclTensor* tensor, DataType expected, const char* n
 
 static bool CheckInputDtype(const AclnnMhcPreSinkhornBackwardParams& params)
 {
+    // x 与 gradHin 必须同数据类型, 否则 kernel 无对应 dtype 组合的二进制
+    if (params.x->GetDataType() != params.gradHin->GetDataType()) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "x tensor dtype must match gradHin. x is [%s], gradHin is [%s].",
+                op::ToString(params.x->GetDataType()).GetString(),
+                op::ToString(params.gradHin->GetDataType()).GetString());
+        return false;
+    }
     return CheckDtype(params.gradHin, DataType::DT_FLOAT16, "gradHin", true) &&
            CheckDtype(params.gradHPost, DataType::DT_FLOAT, "gradHPost") &&
            CheckDtype(params.gradHRes, DataType::DT_FLOAT, "gradHRes") &&
@@ -639,12 +634,14 @@ static aclnnStatus mhcPreSinkhornBackwardCommonProcess(AclnnMhcPreSinkhornBackwa
     auto ret = MhcSinkhornGradCovertDataContiguous(params, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
+    // V1接口不暴露preMix/gradPre/enable_hf32, L2层固定默认值: preMix/gradPre=nullptr,
+    // enableHf32=true(与premix合入前的HF32行为一致)
     auto outParams = l0op::MhcPreSinkhornBackward(
         params.gradHinContiguous, params.gradHPostContiguous, params.gradHResContiguous, params.xContiguous,
         params.phiContiguous, params.alphaContiguous, params.biasContiguous, params.hPreContiguous,
         params.hcBeforeNormContiguous, params.invRmsContiguous, params.sumOutContiguous, params.normOutContiguous,
-        static_cast<float>(params.hcEps), executor);
-    CHECK_RET(outParams != std::tuple(nullptr, nullptr, nullptr, nullptr), ACLNN_ERR_INNER_NULLPTR);
+        nullptr, nullptr, static_cast<float>(params.hcEps), true, executor);
+    CHECK_RET(outParams != std::tuple(nullptr, nullptr, nullptr, nullptr, nullptr), ACLNN_ERR_INNER_NULLPTR);
 
     CHECK_RET(CopyOutput(std::get<0>(outParams), params.gradX, executor), ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(CopyOutput(std::get<1>(outParams), params.gradPhi, executor), ACLNN_ERR_INNER_NULLPTR);

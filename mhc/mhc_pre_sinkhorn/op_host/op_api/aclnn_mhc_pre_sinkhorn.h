@@ -46,6 +46,19 @@ aclnnStatus aclnnMhcPreSinkhornGetWorkspaceSize(const aclTensor* x, const aclTen
 aclnnStatus aclnnMhcPreSinkhorn(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
+// V2接口: 支持可选premix输入(仅A2/A3支持, A5/RegBase平台拒绝)与TND(3D)格式(A2/950均可用)
+aclnnStatus aclnnMhcPreSinkhornV2GetWorkspaceSize(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha,
+                                                  const aclTensor* bias, const aclTensor* premix, int64_t hcMult,
+                                                  int64_t numIters, double hcEps, double normEps, bool needBackward,
+                                                  bool enableHf32, aclTensor* hin, aclTensor* hPost, aclTensor* hRes,
+                                                  aclTensor* hPre, aclTensor* hcBeforeNorm, aclTensor* invRms,
+                                                  aclTensor* sumOut, aclTensor* normOut, uint64_t* workspaceSize,
+                                                  aclOpExecutor** executor);
+
+/**
+ * @brief aclnnMhcPreSinkhorn的第二段接口，用于执行计算。
+ */
+aclnnStatus aclnnMhcPreSinkhornV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 }
 #endif
 

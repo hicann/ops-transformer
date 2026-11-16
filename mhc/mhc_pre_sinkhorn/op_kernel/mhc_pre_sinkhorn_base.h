@@ -37,6 +37,9 @@ constexpr uint64_t NUM_TWO = 2;
 constexpr uint64_t NUM_EIGHT = 8;
 constexpr uint64_t NUM_SIXTEEN = 16;
 constexpr uint64_t SQUARE_SUM_SIZE = 16;
+constexpr uint64_t MASK_PATTERN_BASE_SIZE = 16;  // GatherMask掩码基础维度大小
+constexpr uint64_t MASK_PATTERN_REPEAT_SIZE = 8; // 掩码重复子大小
+constexpr uint64_t MASK_PATTERN_DIM_SIZE = 16;   // 掩码单次处理的维度大小
 constexpr uint64_t MM_CACHE_LINE_BYTES = 512;
 constexpr uint64_t MAX_BS_PER_LOOP = 32;
 constexpr uint64_t ELEMENTS_SIZE_PER_BLOCK = BLOCK_SIZE / sizeof(float);
@@ -61,32 +64,33 @@ __aicore__ inline int32_t RoundUp(int32_t num)
     return CeilAlign(num, elemNum);
 }
 
-__aicore__ inline void SetGatherMaskPattern(const LocalTensor<uint32_t>& maskPattern)
+// 设置GatherMask的循环对角掩码：生成 patternRows 行，第 i 行 base = 1 << (i % 16)
+// 调用方按 rowFactor + MASK_PATTERN_DIM_SIZE - 1 行生成循环模式，
+// 保证后续 GatherMask 单次调用中所有操作数保持 32 字节对齐
+__aicore__ inline void SetGatherMaskPattern(const LocalTensor<uint32_t>& maskPattern, uint16_t patternRows)
 {
-    uint32_t base = ONE;
-    int32_t length = 8;
-    for (uint32_t i = 0; i < NUM_SIXTEEN; i++) {
-        Duplicate(maskPattern[i * length], base, length);
-        base = (base << 1);
+    for (uint32_t i = 0; i < patternRows; i++) {
+        uint32_t base = ONE << (i % MASK_PATTERN_DIM_SIZE);
+        Duplicate(maskPattern[i * MASK_PATTERN_REPEAT_SIZE], base, MASK_PATTERN_REPEAT_SIZE);
     }
     PipeBarrier<PIPE_V>();
 }
 
+// 使用循环对角掩码从NZ格式的平方和结果中提取对角线元素（单次GatherMask完成dim0行）
+// 输入input: NZ格式的平方和矩阵(dim0×16行×16列)
+// 输出output: 提取的对角线元素(dim0个)
+// maskPattern: 由SetGatherMaskPattern生成的循环对角掩码
+// dim0: 需要处理的行数
+// diagonalOffset: 当前行块在16×16 NZ块中的对角相位（globalRowOffset % SQUARE_SUM_SIZE）
 __aicore__ inline void GatherMaskByDiagonal(const LocalTensor<float>& output, const LocalTensor<float>& input,
-                                            const LocalTensor<uint32_t> maskPattern, uint16_t dim0)
+                                            const LocalTensor<uint32_t> maskPattern, uint16_t dim0,
+                                            uint16_t diagonalOffset)
 {
-    uint32_t totalCount = 16 * 16;
-    uint32_t maskCount = 16;
-    uint16_t src0StriRepeat = 2; // 16/8(block)=2
-    uint32_t remainCount = (dim0 % 16) * 16;
-    uint32_t loopCount = dim0 / 16;
+    uint16_t patternIdx = diagonalOffset % MASK_PATTERN_DIM_SIZE;
     uint64_t rsvdCnt = 0;
-    for (uint32_t loopIdx = 0; loopIdx < loopCount; loopIdx++) {
-        GatherMask(output[loopIdx * maskCount], input[loopIdx * totalCount], maskPattern, true, totalCount,
-                   {1, 1, 0, 0}, rsvdCnt);
-    }
-    GatherMask(output[loopCount * maskCount], input[loopCount * totalCount], maskPattern, true, maskCount,
-               {1, dim0, src0StriRepeat, 1}, rsvdCnt);
+    // 调用方提供 dim0 + 15 个循环模式, 单次调用中所有操作数保持 32 字节对齐
+    GatherMask(output, input, maskPattern[patternIdx * MASK_PATTERN_REPEAT_SIZE], true, MASK_PATTERN_DIM_SIZE,
+               {1, dim0, 2, 1}, rsvdCnt);
     PipeBarrier<PIPE_V>();
 }
 
@@ -734,8 +738,11 @@ __aicore__ inline void CopyInWithOuterFor(const GlobalTensor<T>& inputGm, const 
     uint32_t elemInOneBlock = BLOCK_SIZE / sizeof(T);
     uint32_t ubLastDimAlign = RoundUp<T>(copyLen);
     if (outerLoop <= nBurst) {
+        // k 分片基址: mmOut workspace 布局为 [k][gmFirstDim][gmLastDim], 切片步长必须用
+        // gmFirstDim(=bs); 原 nBurst(本核行数)仅在 rowFactor==bs 时碰巧成立,
+        // rowFactor<bs 且 cdK<=rowFactor 时读到同一切片的相邻行(数据错位)
         for (uint32_t i = 0; i < outerLoop; i++) {
-            CopyIn(inputGm[i * nBurst * gmLastDim], inputTensor[i * nBurst * ubLastDimAlign], nBurst, copyLen,
+            CopyIn(inputGm[i * gmFirstDim * gmLastDim], inputTensor[i * nBurst * ubLastDimAlign], nBurst, copyLen,
                    gmLastDim - copyLen);
         }
     } else {

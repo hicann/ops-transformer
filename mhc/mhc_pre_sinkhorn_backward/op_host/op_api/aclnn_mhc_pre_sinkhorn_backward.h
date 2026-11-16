@@ -61,6 +61,38 @@ aclnnStatus aclnnMhcPreSinkhornBackwardGetWorkspaceSize(
 aclnnStatus aclnnMhcPreSinkhornBackward(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream);
 
+/**
+ * @brief aclnnMhcPreSinkhornBackwardV2GetWorkspaceSize 的第一段接口。V2接口在V1原型基础上
+ * 新增可选输入 preMix/gradPre（位于 normOut 之后）与可选输出 gradPreMix（位于 gradBias 之后），
+ * 并放开 Atlas A2/A3 系列产品上的3维TND格式输入。
+ * 算子功能：MhcPreSinkhorn反向算子（支持premix可选链路）
+ * @param [in] preMix: 可选输入，正向实际使用的y折叠加权系数，shape为[B,S,N]或[T,N]，数据类型：FP32。
+ * @param [in] gradPre: 可选输入，下游回传的premix梯度，shape为[B,S,N]或[T,N]，数据类型：FP32。
+ *                    preMix与gradPre必须同时传入或同时缺省。
+ * @param [out] gradPreMix: 可选输出，y折叠加权系数的梯度，shape为[B,S,N]或[T,N]，数据类型：FP32。
+ *                        仅传入preMix时有效，否则须为nullptr。
+ * @return aclnnStatus: 返回状态码
+ */
+aclnnStatus aclnnMhcPreSinkhornBackwardV2GetWorkspaceSize(
+    const aclTensor* gradHin, const aclTensor* gradHPost, const aclTensor* gradHRes, const aclTensor* x,
+    const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias, const aclTensor* hPre,
+    const aclTensor* hcBeforeNorm, const aclTensor* invRms, const aclTensor* sumOut, const aclTensor* normOut,
+    const aclTensor* preMix, const aclTensor* gradPre, double hcEps, bool enableHf32, const aclTensor* gradX,
+    const aclTensor* gradPhi, const aclTensor* gradAlpha, const aclTensor* gradBias, const aclTensor* gradPreMix,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
+
+/**
+ * @brief aclnnMhcPreSinkhornBackwardV2 的第二段接口。
+ * @param [in] workspace: 在npu device侧申请的workspace内存起址。
+ * @param [in] workspaceSize: 在npu device侧申请的workspace大小，由第一段接口
+ * aclnnMhcPreSinkhornBackwardV2GetWorkspaceSize 获取。
+ * @param [in] executor: op执行器，包含了算子计算流程。
+ * @param [in] stream: acl stream流。
+ * @return aclnnStatus: 返回状态码
+ */
+aclnnStatus aclnnMhcPreSinkhornBackwardV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                          aclrtStream stream);
+
 #ifdef __cplusplus
 }
 #endif

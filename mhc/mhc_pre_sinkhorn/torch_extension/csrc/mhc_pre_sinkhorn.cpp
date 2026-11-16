@@ -4,7 +4,7 @@
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
@@ -20,7 +20,8 @@ namespace op_api {
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>
 MhcPreSinkhorn(const at::Tensor& x, const at::Tensor& phi, const at::Tensor& alpha, const at::Tensor& bias,
-               int64_t hcMult, int64_t numIters, double hcEps, double normEps, bool outFlag)
+               int64_t hcMult, int64_t numIters, double hcEps, double normEps, bool outFlag,
+               const c10::optional<at::Tensor>& preMix, bool enableHf32)
 {
     TORCH_CHECK(x.dim() == 3 || x.dim() == 4, "x dim must be 3 (t, n, d) or 4 (b, s, n, d), but got ", x.dim());
     bool isTnd = (x.dim() == 3);
@@ -50,7 +51,8 @@ MhcPreSinkhorn(const at::Tensor& x, const at::Tensor& phi, const at::Tensor& alp
             sumOut = at::empty({2 * skIterCount, t, n}, phi.options());
             normOut = at::empty({2 * skIterCount, t, n, n}, phi.options());
         } else {
-            hPre = at::empty({0}, phi.options());
+            // needGrad=false 但传入 preMix 时也要输出 hPre
+            hPre = preMix.has_value() ? at::empty({t, n}, phi.options()) : at::empty({0}, phi.options());
             hcBeforeNorm = at::empty({0}, phi.options());
             invRms = at::empty({0}, phi.options());
             sumOut = at::empty({0}, phi.options());
@@ -70,7 +72,8 @@ MhcPreSinkhorn(const at::Tensor& x, const at::Tensor& phi, const at::Tensor& alp
             sumOut = at::empty({2 * skIterCount, b, s, n}, phi.options());
             normOut = at::empty({2 * skIterCount, b, s, n, n}, phi.options());
         } else {
-            hPre = at::empty({0}, phi.options());
+            // needGrad=false 但传入 preMix 时也要输出 hPre
+            hPre = preMix.has_value() ? at::empty({b, s, n}, phi.options()) : at::empty({0}, phi.options());
             hcBeforeNorm = at::empty({0}, phi.options());
             invRms = at::empty({0}, phi.options());
             sumOut = at::empty({0}, phi.options());
@@ -78,8 +81,8 @@ MhcPreSinkhorn(const at::Tensor& x, const at::Tensor& phi, const at::Tensor& alp
         }
     }
 
-    ACLNN_CMD(aclnnMhcPreSinkhorn, x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, outFlag, hin, hPost, hRes,
-              hPre, hcBeforeNorm, invRms, sumOut, normOut);
+    ACLNN_CMD(aclnnMhcPreSinkhornV2, x, phi, alpha, bias, preMix, hcMult, numIters, hcEps, normEps, outFlag, enableHf32,
+              hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut);
 
     return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>(
         hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut);

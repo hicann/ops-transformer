@@ -100,14 +100,6 @@ static bool CheckShape(const aclTensor* x, const aclTensor* phi, const aclTensor
     auto xDim = xShape.GetDimNum();
     bool isTnd = (xDim == 3);
 
-    if (isTnd && !IsPlatformSupportTnd()) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "TND format (3D input) is only supported on Ascend950 and Ascend960DT, but got dim = %ld on current "
-                "platform.",
-                xDim);
-        return false;
-    }
-
     if (xDim != 3 && xDim != 4) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "x dim must be 3 (t, n, c) or 4 (b, s, n, c), but got dim = %ld.", xDim);
         return false;
@@ -429,9 +421,10 @@ aclnnStatus aclnnMhcPreSinkhornGetWorkspaceSize(const aclTensor* x, const aclTen
     const aclTensor* biasContiguous = l0op::Contiguous(bias, uniqueExecutor.get());
     CHECK_RET(biasContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
+    // V1接口不暴露premix/enable_hf32, L2层固定默认值: premix=nullptr, enableHf32=true(与premix合入前的HF32行为一致)
     const aclTensor* kernelOut = l0op::MhcPreSinkhorn(
-        xContiguous, phiContiguous, alphaContiguous, biasContiguous, hcMult, numIters, hcEps, normEps, needBackward,
-        hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut, uniqueExecutor.get());
+        xContiguous, phiContiguous, alphaContiguous, biasContiguous, nullptr, hcMult, numIters, hcEps, normEps,
+        needBackward, true, hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut, uniqueExecutor.get());
     CHECK_RET(kernelOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();

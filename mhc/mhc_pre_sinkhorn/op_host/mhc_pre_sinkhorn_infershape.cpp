@@ -21,6 +21,7 @@ using namespace ge;
 namespace ops {
 namespace {
 constexpr size_t INDEX_X = 0;
+constexpr size_t INDEX_PREMIX = 4;
 constexpr size_t OUTPUT_HIN = 0;
 constexpr size_t OUTPUT_HPOST = 1;
 constexpr size_t OUTPUT_HRES = 2;
@@ -82,7 +83,25 @@ static ge::graphStatus InferShapeForMhcPreSinkhorn(gert::InferShapeContext* cont
     const bool* needBackwardAttr = attrs->GetAttrPointer<bool>(ATTR_NEED_BACKWARD);
     const int64_t numIters = numItersAttr == nullptr ? DEFAULT_NUM_ITERS : *numItersAttr;
     const bool needBackward = needBackwardAttr == nullptr ? true : *needBackwardAttr;
+    // needGrad=false 但传入 premix 时也要输出 hPre
+    const bool hasPremix = context->GetOptionalInputShape(INDEX_PREMIX) != nullptr;
+    const bool needHPre = needBackward || hasPremix;
     const int64_t hcMix = hcMult * hcMult + 2 * hcMult;
+
+    // premix 为可选输入，传入时 shape 应为 x.shape[:-1]，即 (t, n) 或 (b, s, n)
+    const gert::Shape* premixShape = context->GetOptionalInputShape(INDEX_PREMIX);
+    if (premixShape != nullptr) {
+        OP_CHECK_IF(premixShape->GetDimNum() != xDimNum - 1,
+                    OP_LOGE(context->GetNodeName(), "premix dim must be x dim - 1 (%zu), but got %zu.", xDimNum - 1,
+                            premixShape->GetDimNum()),
+                    return ge::GRAPH_FAILED);
+        for (size_t i = 0; i + 1 < xDimNum; i++) {
+            OP_CHECK_IF(premixShape->GetDim(i) != xShape->GetDim(i),
+                        OP_LOGE(context->GetNodeName(), "premix shape[%zu] must equal x shape[%zu] (%ld), but got %ld.",
+                                i, i, xShape->GetDim(i), premixShape->GetDim(i)),
+                        return ge::GRAPH_FAILED);
+        }
+    }
 
     gert::Shape* hinShape = context->GetOutputShape(OUTPUT_HIN);
     gert::Shape* hPostShape = context->GetOutputShape(OUTPUT_HPOST);
@@ -112,7 +131,11 @@ static ge::graphStatus InferShapeForMhcPreSinkhorn(gert::InferShapeContext* cont
             SetShape(sumOutShape, {numIters * 2, seqLen, hcMult});
             SetShape(normOutShape, {numIters * 2, seqLen, hcMult, hcMult});
         } else {
-            SetShape(hPreShape, {EMPTY_DIM});
+            if (needHPre) {
+                SetShape(hPreShape, {seqLen, hcMult});
+            } else {
+                SetShape(hPreShape, {EMPTY_DIM});
+            }
             SetShape(hcBeforeNormShape, {EMPTY_DIM});
             SetShape(invRmsShape, {EMPTY_DIM});
             SetShape(sumOutShape, {EMPTY_DIM});
@@ -129,7 +152,11 @@ static ge::graphStatus InferShapeForMhcPreSinkhorn(gert::InferShapeContext* cont
             SetShape(sumOutShape, {numIters * 2, batch, seqLen, hcMult});
             SetShape(normOutShape, {numIters * 2, batch, seqLen, hcMult, hcMult});
         } else {
-            SetShape(hPreShape, {EMPTY_DIM});
+            if (needHPre) {
+                SetShape(hPreShape, {batch, seqLen, hcMult});
+            } else {
+                SetShape(hPreShape, {EMPTY_DIM});
+            }
             SetShape(hcBeforeNormShape, {EMPTY_DIM});
             SetShape(invRmsShape, {EMPTY_DIM});
             SetShape(sumOutShape, {EMPTY_DIM});

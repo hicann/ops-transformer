@@ -57,7 +57,7 @@
                     ]
                 },
                 {
-                    "name": "hPost",
+                    "name": "h_post",
                     "index": 1,
                     "dtype": "float32",
                     "format": "ND",
@@ -67,7 +67,7 @@
                     ]
                 },
                 {
-                    "name": "hRes",
+                    "name": "h_res",
                     "index": 2,
                     "dtype": "float32",
                     "format": "ND",
@@ -77,7 +77,7 @@
                     ]
                 },
                 {
-                    "name": "hPre",
+                    "name": "h_pre",
                     "index": 3,
                     "dtype": "float32",
                     "format": "ND",
@@ -87,7 +87,7 @@
                     ]
                 },
                 {
-                    "name": "hcBeforeNorm",
+                    "name": "hc_before_norm",
                     "index": 4,
                     "dtype": "float32",
                     "format": "ND",
@@ -97,7 +97,7 @@
                     ]
                 },
                 {
-                    "name": "invRms",
+                    "name": "inv_rms",
                     "index": 5,
                     "dtype": "float32",
                     "format": "ND",
@@ -107,7 +107,7 @@
                     ]
                 },
                 {
-                    "name": "sumOut",
+                    "name": "sum_out",
                     "index": 6,
                     "dtype": "float32",
                     "format": "ND",
@@ -117,7 +117,7 @@
                     ]
                 },
                 {
-                    "name": "normOut",
+                    "name": "norm_out",
                     "index": 7,
                     "dtype": "float32",
                     "format": "ND",
@@ -211,7 +211,7 @@
                     ]
                 },
                 {
-                    "name": "hPost",
+                    "name": "h_post",
                     "index": 1,
                     "dtype": "float32",
                     "format": "ND",
@@ -221,7 +221,7 @@
                     ]
                 },
                 {
-                    "name": "hRes",
+                    "name": "h_res",
                     "index": 2,
                     "dtype": "float32",
                     "format": "ND",
@@ -231,7 +231,7 @@
                     ]
                 },
                 {
-                    "name": "hPre",
+                    "name": "h_pre",
                     "index": 3,
                     "dtype": "float32",
                     "format": "ND",
@@ -241,7 +241,7 @@
                     ]
                 },
                 {
-                    "name": "hcBeforeNorm",
+                    "name": "hc_before_norm",
                     "index": 4,
                     "dtype": "float32",
                     "format": "ND",
@@ -251,7 +251,7 @@
                     ]
                 },
                 {
-                    "name": "invRms",
+                    "name": "inv_rms",
                     "index": 5,
                     "dtype": "float32",
                     "format": "ND",
@@ -261,7 +261,7 @@
                     ]
                 },
                 {
-                    "name": "sumOut",
+                    "name": "sum_out",
                     "index": 6,
                     "dtype": "float32",
                     "format": "ND",
@@ -271,7 +271,7 @@
                     ]
                 },
                 {
-                    "name": "normOut",
+                    "name": "norm_out",
                     "index": 7,
                     "dtype": "float32",
                     "format": "ND",

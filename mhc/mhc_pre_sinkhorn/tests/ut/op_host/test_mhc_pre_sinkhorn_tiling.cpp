@@ -21,7 +21,6 @@ using namespace std;
 
 namespace {
 constexpr char ASCEND950_SOC_VERSION[] = "Ascend950";
-constexpr char ASCEND910B_SOC_VERSION[] = "Ascend910B";
 constexpr int64_t HC_MULT = 4;
 constexpr int64_t HC_MIX = 24;
 constexpr int64_t NUM_ITERS = 20;
@@ -332,6 +331,10 @@ TEST_F(MhcPreSinkhornTiling, ascend950_regbase_core_tiling_boundary_branches)
     ExpectRegbaseTilingFailure(insufficientMBufferPool);
 }
 
+// A2 tiling期望数据说明: premix合并新增了 prePost*/sinkhorn* 17个MPMD计算字段与 hasPremix
+// 开关字段, enable_hf32合入新增 isHf32 开关字段; 其中17个MPMD字段由新tiling算法在宿主环境
+// 算出, 此处以框架支持的 '*' 掩码跳过; hasPremix 固定为0; isHf32 因 enable_hf32 缺省为true(与premix合入前一致),
+// 固定为1; 其余字段值与合并前基线一致, 新增大K分段字段后共123个token(98标量+25 mm1TilingData)。
 TEST_F(MhcPreSinkhornTiling, test_tiling_B1_S1024_N4_C512)
 {
     int64_t B = 1;
@@ -346,7 +349,7 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_B1_S1024_N4_C512)
     int64_t phiDim0 = hcMix;
     int64_t phiDim1 = N * C;
 
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, 262144, SYS_WORKSPACE_SIZE, 2};
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {};
 
     gert::TilingContextPara tilingContextPara(
         "MhcPreSinkhorn",
@@ -373,16 +376,16 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_B1_S1024_N4_C512)
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps)},
             {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
-        &compileInfo, ASCEND910B_SOC_VERSION, 64, 262144);
+        &compileInfo);
 
-    int64_t expectTilingKey = 0;
+    int64_t expectTilingKey = 1;
     string expectTilingData =
-        "1024 24 4 512 8 16 16 16 16 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 256 4 1 0 "
-        "1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 1 128 8 128 128 16 16 16 16 64 1 1 1 256 128 256 4 64 64 "
-        "16 16 1 32 8 256 256 33554432 274877906945 8796093022232 274877908992 8796093022232 137438953536 "
-        "8589934720 4294967298 1 0 422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 "
-        "0 0 0 ";
-    std::vector<size_t> expectWorkspaces = {184549376};
+        "1024 24 4 512 8 16 16 16 16 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 "
+        "128 256 4 8 0 1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 0 0 16 16 16 16 1 1 1 0 0 0 0 "
+        "0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 64 64 16 16 1 32 8 256 256 1 2048 33554432 "
+        "274877906945 8796093022232 274877908992 8796093022232 137438953536 8589934720 4294967298 "
+        "1 0 422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
+    std::vector<size_t> expectWorkspaces = {251658240};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
@@ -399,7 +402,7 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_3d_S1024_N4_C512)
     int64_t phiDim0 = hcMix;
     int64_t phiDim1 = N * C;
 
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, 262144, SYS_WORKSPACE_SIZE, 2};
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {};
 
     gert::TilingContextPara tilingContextPara(
         "MhcPreSinkhorn",
@@ -426,16 +429,16 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_3d_S1024_N4_C512)
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps)},
             {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
-        &compileInfo, ASCEND910B_SOC_VERSION, 64, 262144);
+        &compileInfo);
 
-    int64_t expectTilingKey = 0;
+    int64_t expectTilingKey = 1;
     string expectTilingData =
-        "1024 24 4 512 8 16 16 16 16 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 256 4 1 0 "
-        "1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 1 128 8 128 128 16 16 16 16 64 1 1 1 256 128 256 4 64 64 "
-        "16 16 1 32 8 256 256 33554432 274877906945 8796093022232 274877908992 8796093022232 137438953536 "
-        "8589934720 4294967298 1 0 422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 "
-        "0 0 0 ";
-    std::vector<size_t> expectWorkspaces = {184549376};
+        "1024 24 4 512 8 16 16 16 16 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 "
+        "128 256 4 8 0 1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 0 0 16 16 16 16 1 1 1 0 0 0 0 "
+        "0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 64 64 16 16 1 32 8 256 256 1 2048 33554432 "
+        "274877906945 8796093022232 274877908992 8796093022232 137438953536 8589934720 4294967298 "
+        "1 0 422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
+    std::vector<size_t> expectWorkspaces = {251658240};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
@@ -453,7 +456,7 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_B2_S128_N4_C256)
     int64_t phiDim0 = hcMix;
     int64_t phiDim1 = N * C;
 
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, 262144, SYS_WORKSPACE_SIZE, 2};
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {};
 
     gert::TilingContextPara tilingContextPara(
         "MhcPreSinkhorn",
@@ -480,15 +483,16 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_B2_S128_N4_C256)
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps)},
             {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
-        &compileInfo, ASCEND910B_SOC_VERSION, 64, 262144);
+        &compileInfo);
 
-    int64_t expectTilingKey = 0;
+    int64_t expectTilingKey = 1;
     string expectTilingData =
-        "256 24 4 256 8 4 4 4 4 0 1 1 1 256 256 20 3856831416675743677 0 0 0 0 1 1024 0 0 0 0 128 256 1 1 0 "
-        "1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 1 128 2 128 128 4 4 4 4 64 1 1 1 256 128 256 1 64 64 4 4 "
-        "1 32 4 256 256 16777216 274877906945 4398046511128 274877907968 4398046511128 137438953536 8589934720 "
-        "4294967304 1 0 844424930131968 8192 4294967297 4294967297 34359738369 0 8589934594 1 0 0 0 0 0 0 0 0 ";
-    std::vector<size_t> expectWorkspaces = {167772160};
+        "256 24 4 256 8 4 4 4 4 0 1 1 1 256 256 20 3856831416675743677 0 0 0 0 1 1024 0 0 0 0 128 "
+        "256 1 4 0 1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 0 0 4 4 4 4 1 1 1 0 0 0 0 0 0 0 0 "
+        "1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 64 64 4 4 1 32 4 256 256 1 1024 16777216 274877906945 "
+        "4398046511128 274877907968 4398046511128 137438953536 8589934720 4294967304 1 0 "
+        "844424930131968 8192 4294967297 4294967297 34359738369 0 8589934594 1 0 0 0 0 0 0 0 0 ";
+    std::vector<size_t> expectWorkspaces = {234881024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
@@ -506,7 +510,7 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_no_backward_B1_S256_N4_C512)
     int64_t phiDim0 = hcMix;
     int64_t phiDim1 = N * C;
 
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, 262144, SYS_WORKSPACE_SIZE, 2};
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {};
 
     gert::TilingContextPara tilingContextPara(
         "MhcPreSinkhorn",
@@ -528,14 +532,115 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_no_backward_B1_S256_N4_C512)
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps)},
             {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
         },
-        &compileInfo, ASCEND910B_SOC_VERSION, 64, 262144);
+        &compileInfo);
 
     int64_t expectTilingKey = 0;
     string expectTilingData =
-        "256 24 4 512 8 4 4 4 4 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 256 1 1 0 "
-        "1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 0 128 2 128 128 4 4 4 4 64 1 1 1 256 128 256 1 64 64 4 4 "
-        "1 32 8 256 256 33554432 274877906945 8796093022232 274877908992 8796093022232 137438953536 8589934720 "
-        "4294967298 1 0 422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
-    std::vector<size_t> expectWorkspaces = {184574976};
+        "256 24 4 512 8 22 14 2 2 0 11 3 1 512 512 20 3856831416675743677 0 0 0 0 11 2048 0 0 0 0 "
+        "128 256 1 8 0 1024 256 256 0 0 0 0 0 0 0 0 12 0 64 21 0 0 0 12 52 22 14 6 4 4 2 2 52 5 1 "
+        "1 1 5 5 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 64 64 4 4 1 32 8 256 256 1 2048 33554432 "
+        "274877906945 8796093022232 274877908992 8796093022232 137438953536 8589934720 4294967298 "
+        "1 0 422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
+    std::vector<size_t> expectWorkspaces = {251683840};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+TEST_F(MhcPreSinkhornTiling, test_tiling_premix_B1_S256_N4_C512)
+{
+    // membase(A2/A3) 传入可选 premix 输入: hasPremix=1, tiling 成功, 走 KEY=1(m_k original)
+    int64_t B = 1;
+    int64_t S = 256;
+    int64_t N = 4;
+    int64_t C = 512;
+    int64_t numIters = 20;
+    float hcEps = 1e-6f;
+    float normEps = 1e-6f;
+
+    int64_t hcMix = N * N + 2 * N;
+    int64_t phiDim0 = hcMix;
+    int64_t phiDim1 = N * C;
+
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {};
+
+    gert::TilingContextPara tilingContextPara(
+        "MhcPreSinkhorn",
+        {
+            {{{B, S, N, C}, {B, S, N, C}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{phiDim0, phiDim1}, {phiDim0, phiDim1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{3}, {3}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{hcMix}, {hcMix}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, N}, {B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{B, S, C}, {B, S, C}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{B, S, N}, {B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, N, N}, {B, S, N, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, N}, {B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, hcMix}, {B, S, hcMix}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, 1}, {B, S, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{numIters * 2, B, S, N}, {numIters * 2, B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{numIters * 2, B, S, N, N}, {numIters * 2, B, S, N, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"hc_mult", Ops::Transformer::AnyValue::CreateFrom<int64_t>(N)},
+            {"num_iters", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numIters)},
+            {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(hcEps)},
+            {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps)},
+            {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+        },
+        &compileInfo);
+
+    int64_t expectTilingKey = 1;
+    // 期望串为占位, 首次远程实跑后按实际输出回填基线
+    string expectTilingData =
+        "256 24 4 512 8 4 4 4 4 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 "
+        "256 1 8 0 1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 0 0 4 4 4 4 1 1 1 0 0 0 0 0 0 0 0 "
+        "1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 64 64 4 4 1 32 8 256 256 1 2048 33554432 274877906945 "
+        "8796093022232 274877908992 8796093022232 137438953536 8589934720 4294967298 1 0 "
+        "422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
+    std::vector<size_t> expectWorkspaces = {251658240};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+TEST_F(MhcPreSinkhornTiling, ascend950_regbase_rejects_premix)
+{
+    // RegBase(A5) arch35 tiling 未实现 premix 输入, 传入即拒绝(与 aclnn V2 层语义对齐)
+    int64_t B = 1;
+    int64_t S = 256;
+    int64_t N = 4;
+    int64_t C = 512;
+    int64_t hcMix = N * N + 2 * N;
+
+    // pin cvRatio=2 explicitly for the Ascend950 baselines.
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {20, 0, 196608, SYS_WORKSPACE_SIZE, 2};
+
+    gert::TilingContextPara tilingContextPara(
+        "MhcPreSinkhorn",
+        {
+            {{{B, S, N, C}, {B, S, N, C}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{hcMix, N * C}, {hcMix, N * C}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{3}, {3}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{hcMix}, {hcMix}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, N}, {B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{B, S, C}, {B, S, C}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{B, S, N}, {B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, N, N}, {B, S, N, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, N}, {B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, hcMix}, {B, S, hcMix}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{B, S, 1}, {B, S, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{NUM_ITERS * 2, B, S, N}, {NUM_ITERS * 2, B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{NUM_ITERS * 2, B, S, N, N}, {NUM_ITERS * 2, B, S, N, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"hc_mult", Ops::Transformer::AnyValue::CreateFrom<int64_t>(N)},
+            {"num_iters", Ops::Transformer::AnyValue::CreateFrom<int64_t>(NUM_ITERS)},
+            {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+            {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+            {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        },
+        &compileInfo, ASCEND950_SOC_VERSION, 20, 196608);
+
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0, "", {});
 }

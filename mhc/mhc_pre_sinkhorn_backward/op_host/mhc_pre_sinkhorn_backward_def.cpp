@@ -17,7 +17,8 @@
 namespace ops {
 class MhcPreSinkhornBackward : public OpDef {
 public:
-    explicit MhcPreSinkhornBackward(const char *name) : OpDef(name)
+    explicit MhcPreSinkhornBackward(const char* name)
+        : OpDef(name)
     {
         this->Input("grad_hin")
             .ParamType(REQUIRED)
@@ -79,6 +80,16 @@ public:
             .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
+        this->Input("pre_mix")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
+        this->Input("grad_pre")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
         this->Output("grad_x")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_FLOAT16})
@@ -99,7 +110,13 @@ public:
             .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
+        this->Output("grad_pre_mix")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
         this->Attr("hc_eps").AttrType(OPTIONAL).Float(1e-6f);
+        this->Attr("enable_hf32").AttrType(OPTIONAL).Bool(true);
 
         OpAICoreConfig aicore_Config_910b;
         aicore_Config_910b.DynamicCompileStaticFlag(true)

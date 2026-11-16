@@ -73,15 +73,20 @@ public:
 
         // 初始化 Cube Compute
         if ASCEND_IS_AIC {
+            // enable_hf32 属性控制: A2侧Cube Mmad(x@phi与平方和)是否启用HF32, 缺省启用(true=主线合入前mm1_的HF32行为;
+            // false=premix参考实现的FP32行为)
+            cubeCompute_.SetHf32Enable(tilingData->isHf32 != 0);
             // 计算当前 Cube Core 的输出偏移
             int64_t mmOutSize = tilingData->hcMult * tilingData->hcMult + 2 * tilingData->hcMult;
             // 根据 needGrad 决定输出地址
             if (needGrad_) {
                 cubeCompute_.Init(xCastWsGm, phiGm, hcBeforeNormGm, tilingData->stage1BsFactor, tilingData->hcMult,
-                                  tilingData->d, tilingData->stage1VecCoreNum);
+                                  tilingData->d, tilingData->stage1VecCoreNum, tilingData->stage1KSegNum,
+                                  tilingData->stage1KSegLen);
             } else {
                 cubeCompute_.Init(xCastWsGm, phiGm, hcBeforeNormWsGm, tilingData->stage1BsFactor, tilingData->hcMult,
-                                  tilingData->d, tilingData->stage1VecCoreNum);
+                                  tilingData->d, tilingData->stage1VecCoreNum, tilingData->stage1KSegNum,
+                                  tilingData->stage1KSegLen);
             }
             return;
         }
@@ -248,8 +253,9 @@ public:
     __aicore__ inline MhcPreSinkhornStage2() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcScale, GM_ADDR hcBase, GM_ADDR y, GM_ADDR post, GM_ADDR combFrag,
-                                GM_ADDR hPre, GM_ADDR hcBeforeNorm, GM_ADDR invRms, GM_ADDR sumOut, GM_ADDR normOut,
-                                GM_ADDR workspace, const MhcPreSinkhornTilingData* tilingDataPtr, TPipe* pipePtr)
+                                GM_ADDR premix, GM_ADDR hPre, GM_ADDR hcBeforeNorm, GM_ADDR invRms, GM_ADDR sumOut,
+                                GM_ADDR normOut, GM_ADDR workspace, const MhcPreSinkhornTilingData* tilingDataPtr,
+                                TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
@@ -261,10 +267,14 @@ public:
         yGm.SetGlobalBuffer((__gm__ T*)y);
         postGm.SetGlobalBuffer((__gm__ float*)post);
         combFragGm.SetGlobalBuffer((__gm__ float*)combFrag);
+        premixGm.SetGlobalBuffer((__gm__ float*)premix);
         workspaceGm.SetGlobalBuffer((__gm__ float*)workspace);
 
-        if (needGrad_) {
+        // needGrad=false 但传入 premix 时也要输出 hPre（供下一轮 premix 或梯度计算使用）
+        if (needGrad_ || tilingData->hasPremix != 0) {
             hPreGm.SetGlobalBuffer((__gm__ float*)hPre);
+        }
+        if (needGrad_) {
             hcBeforeNormGm.SetGlobalBuffer((__gm__ float*)hcBeforeNorm);
             invRmsGm.SetGlobalBuffer((__gm__ float*)invRms);
             sumOutGm.SetGlobalBuffer((__gm__ float*)sumOut);
@@ -301,6 +311,7 @@ public:
         pipe->InitBuffer(reduceBuf, tilingData->stage2RowFactor * tilingData->hcMultAlign * sizeof(float));
         pipe->InitBuffer(mxies01ReduceBuf,
                          tilingData->stage2RowFactor * tilingData->hcMultAlign * NUM_TWO * sizeof(float));
+        pipe->InitBuffer(premixBuf, tilingData->stage2RowFactor * tilingData->hcMultAlign * sizeof(float));
         pipe->InitBuffer(mxies02ReduceBuf,
                          tilingData->stage2RowFactor * tilingData->hcMultAlign * tilingData->hcMult * sizeof(float));
         pipe->InitBuffer(xCastBuf, xQueNum2 * sizeof(float));
@@ -313,6 +324,7 @@ public:
         hcBrcbLocal1 = hcBrcbBuf1.Get<float>();
         reduceLocal = reduceBuf.Get<float>();
         mxies01ReduceLocal = mxies01ReduceBuf.Get<float>();
+        premixLocal = premixBuf.Get<float>();
         mxies02ReduceLocal = mxies02ReduceBuf.Get<float>();
         xCastLocal = xCastBuf.Get<float>();
         yCastLocal = yCastBuf.Get<float>();
@@ -395,7 +407,16 @@ public:
                 ProcessPre(mxies01ReduceLocal, mxies01Local, hcBase0Local, squareSumOutLocal, rowBrcbLocal0,
                            hcBrcbLocal1, hcScaleGm.GetValue(0), tilingData->hcEps, curRowFactor, tilingData->hcMult);
 
-                if (needGrad_) {
+                if (tilingData->hasPremix != 0) {
+                    CopyIn(premixGm[stage2BlockIdx * curRowOfFormerBlock * tilingData->hcMult +
+                                    rowOuterIdx * curStage2RowFactor * tilingData->hcMult],
+                           premixLocal, 1, curRowFactor * tilingData->hcMult);
+                    event_t eventIdPremix = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
+                    SetFlag<HardEvent::MTE2_V>(eventIdPremix);
+                    WaitFlag<HardEvent::MTE2_V>(eventIdPremix);
+                }
+
+                if (needGrad_ || tilingData->hasPremix != 0) {
                     int64_t hPreBaseOffset = stage2BlockIdx * curRowOfFormerBlock * tilingData->hcMult +
                                              rowOuterIdx * curStage2RowFactor * tilingData->hcMult;
                     VToMTE3Sync();
@@ -413,8 +434,8 @@ public:
                     xLocal = xQue.template DeQue<T>();
                     yLocal = yQue.template AllocTensor<T>();
 
-                    ProcessY(yLocal, xLocal, mxies01ReduceLocal, hcBrcbLocal1, xCastLocal, yCastLocal, curRowFactor,
-                             tilingData->hcMult, curDFactor);
+                    ProcessY(yLocal, xLocal, tilingData->hasPremix != 0 ? premixLocal : mxies01ReduceLocal,
+                             hcBrcbLocal1, xCastLocal, yCastLocal, curRowFactor, tilingData->hcMult, curDFactor);
                     xQue.template FreeTensor(xLocal);
                     yQue.template EnQue(yLocal);
                     yLocal = yQue.template DeQue<T>();
@@ -475,6 +496,8 @@ public:
                 }
 
                 if (needGrad_) {
+                    // 口径对齐 mhc_pre_sinkhorn(m_split L481): sum_out[0] = softmax 行和 raw(未加 eps),
+                    // backward 末轮自行 +eps 还原 Div 除数, forward 不落 eps
                     VToMTE3Sync();
                     int64_t sumOutBaseOffset =
                         (stage2BlockIdx * curRowOfFormerBlock + rowOuterIdx * curStage2RowFactor) * tilingData->hcMult;
@@ -484,6 +507,8 @@ public:
 
                 ReduceSumARAPerf(reduceLocal, mxies02ReduceLocal, curRowFactor, tilingData->hcMult, tilingData->hcMult);
                 if (needGrad_) {
+                    // 口径对齐 mhc_pre_sinkhorn(m_split L491→L494): sum_out[1] = 首轮列和 raw(未加 eps),
+                    // 先落盘 raw, 再补 eps 作为 Div 除数(除数数值不变, 仅落盘口径对齐)
                     VToMTE3Sync();
                     int64_t sumOutBaseOffset =
                         (tilingData->bs + stage2BlockIdx * curRowOfFormerBlock + rowOuterIdx * curStage2RowFactor) *
@@ -491,10 +516,21 @@ public:
                     CopyOut(reduceLocal, sumOutGm[sumOutBaseOffset], curRowFactor, tilingData->hcMult);
                     MTE3ToVSync();
                 }
-                Adds(reduceLocal, reduceLocal, tilingData->hcEps, curRowFactor * tilingData->hcMult);
+                Adds(reduceLocal, reduceLocal, tilingData->hcEps, curRowFactor * tilingData->hcMultAlign);
                 PipeBarrier<PIPE_V>();
                 DivABABrcInline(combFragLocal, mxies02ReduceLocal, reduceLocal, curRowFactor, tilingData->hcMult,
                                 tilingData->hcMult);
+
+                if (needGrad_) {
+                    // 补齐 normOut[1]（首轮列归约后）的输出, 原实现缺失导致该区域全 0
+                    VToMTE3Sync();
+                    int64_t normOut1BaseOffset =
+                        (tilingData->bs + stage2BlockIdx * curRowOfFormerBlock + rowOuterIdx * curStage2RowFactor) *
+                        tilingData->hcMult * tilingData->hcMult;
+                    CopyOut(combFragLocal, normOutGm[normOut1BaseOffset], curRowFactor * tilingData->hcMult,
+                            tilingData->hcMult);
+                    MTE3ToVSync();
+                }
 
                 // 循环内norm输出通过拼接,减少搬运
                 for (int64_t iter = 1; iter < tilingData->iterTimes; iter++) {
@@ -516,35 +552,21 @@ public:
                     reduceQue.template FreeTensor(reduceLocal2);
 
                     if (needGrad_) {
-                        int64_t tileRepeatTimes_ =
-                            CeilDiv(tilingData->hcMult * curStage2RowFactor * 2 * tilingData->hcMult, 64);
-                        auto yLocal = yQue.template AllocTensor<float>();
-                        Copy(yLocal, combFragLocal, curStage2RowFactor * tilingData->hcMult * tilingData->hcMultAlign,
-                             1, {1, 1, 0, 0});
-                        PipeBarrier<PIPE_V>();
-                        Cast(yCastLocal.template ReinterpretCast<int64_t>(), yLocal.template ReinterpretCast<int32_t>(),
-                             RoundMode::CAST_NONE, curStage2RowFactor * tilingData->hcMult * 8);
-                        PipeBarrier<PIPE_V>();
-
-                        Copy(yLocal, yCastLocal, 64, tileRepeatTimes_, {1, 2, 8, 16});
-                        PipeBarrier<PIPE_V>();
-
-                        Cast(yLocal.template ReinterpretCast<int32_t>(), yLocal.template ReinterpretCast<int64_t>(),
-                             RoundMode::CAST_NONE, curStage2RowFactor * tilingData->hcMult * tilingData->hcMult);
-                        PipeBarrier<PIPE_V>();
-                        yQue.template EnQue(yLocal);
-                        yLocal = yQue.template DeQue<float>();
+                        // normOut 与 KEY(1) 同款逐块 CopyOut(UB 行距 hcMultAlign 与 GM
+                        // 行距 hcMult 恰为 32B 粒度整倍数)。原 int64 拼接搬运布局
+                        // 依赖特定 rowFactor 假设, 多核/多行场景下错位, 已废弃。
+                        VToMTE3Sync();
                         int64_t normOutBaseOffset =
                             ((iter * 2) * tilingData->bs + stage2BlockIdx * curRowOfFormerBlock +
                              rowOuterIdx * curStage2RowFactor) *
                             tilingData->hcMult * tilingData->hcMult;
-                        CopyOut(yLocal, normOutGm[normOutBaseOffset], 1,
-                                curRowFactor * tilingData->hcMult * tilingData->hcMult);
-                        yQue.template FreeTensor(yLocal);
+                        CopyOut(combFragLocal, normOutGm[normOutBaseOffset], curRowFactor * tilingData->hcMult,
+                                tilingData->hcMult);
+                        MTE3ToVSync();
                     }
                     auto reduceLocal3 = reduceQue.AllocTensor<float>();
                     ReduceSumARAPerf(reduceLocal3, combFragLocal, curRowFactor, tilingData->hcMult, tilingData->hcMult);
-                    Adds(reduceLocal3, reduceLocal3, tilingData->hcEps, curRowFactor * tilingData->hcMult);
+                    Adds(reduceLocal3, reduceLocal3, tilingData->hcEps, curRowFactor * tilingData->hcMultAlign);
                     PipeBarrier<PIPE_V>();
 
                     if (needGrad_) {
@@ -559,6 +581,18 @@ public:
                     reduceQue.template FreeTensor(reduceLocal3);
                     DivABABrcInline(combFragLocal, combFragLocal, reduceLocal3, curRowFactor, tilingData->hcMult,
                                     tilingData->hcMult);
+
+                    if (needGrad_) {
+                        // 补齐 normOut[2*iter+1]（列归约后）的输出, 原实现缺失导致该区域全 0
+                        VToMTE3Sync();
+                        int64_t normOutBaseOffset =
+                            ((iter * 2 + 1) * tilingData->bs + stage2BlockIdx * curRowOfFormerBlock +
+                             rowOuterIdx * curStage2RowFactor) *
+                            tilingData->hcMult * tilingData->hcMult;
+                        CopyOut(combFragLocal, normOutGm[normOutBaseOffset], curRowFactor * tilingData->hcMult,
+                                tilingData->hcMult);
+                        MTE3ToVSync();
+                    }
                 }
 
                 squareSumQue.template FreeTensor(squareSumOutLocal);
@@ -586,6 +620,7 @@ private:
     GlobalTensor<T> yGm;
     GlobalTensor<float> postGm;
     GlobalTensor<float> combFragGm;
+    GlobalTensor<float> premixGm;
 
     GlobalTensor<float> hPreGm;
     GlobalTensor<float> hcBeforeNormGm;
@@ -617,6 +652,7 @@ private:
     TBuf<QuePosition::VECCALC> rsqrtBuf;
     TBuf<QuePosition::VECCALC> squareReduceBuf;
     TBuf<QuePosition::VECCALC> mxies01ReduceBuf;
+    TBuf<QuePosition::VECCALC> premixBuf;
     TBuf<QuePosition::VECCALC> mxies02ReduceBuf;
 
     TBuf<QuePosition::VECCALC> xCastBuf;
@@ -639,6 +675,7 @@ private:
     LocalTensor<float> reduceLocal;
     LocalTensor<float> squareReduceLocal;
     LocalTensor<float> mxies01ReduceLocal;
+    LocalTensor<float> premixLocal;
     LocalTensor<float> mxies02ReduceLocal;
     LocalTensor<float> xCastLocal;
     LocalTensor<float> yCastLocal;
