@@ -26,6 +26,42 @@ namespace MoeDistributeV2Base {
 using namespace AscendC;
 using namespace Mc2Kernel;
 
+__aicore__ inline uint32_t GetRswCounterOffset(GM_ADDR address, uint32_t minPage, uint32_t trailer)
+{
+    return (2U * minPage - trailer - reinterpret_cast<uint64_t>(address) % minPage) % minPage;
+}
+
+__aicore__ inline void ClearWindowRecords(LocalTensor<uint8_t> zeros, uint32_t capacity, GM_ADDR begin, uint64_t span,
+                                          uint32_t offset, uint32_t bytes, uint32_t stride)
+{
+    if (span == 0U || capacity == 0U) {
+        return;
+    }
+    constexpr uint32_t maxBlockCount = 4095U;
+    capacity = capacity < maxBlockCount ? capacity : maxBlockCount;
+    GlobalTensor<uint8_t> dst;
+    dst.SetGlobalBuffer(begin);
+    // A marker can straddle a partition boundary. Only clear the bytes owned by this core.
+    if (offset + bytes > stride) {
+        const uint32_t overlap = offset + bytes - stride;
+        const uint32_t prefix = span < overlap ? static_cast<uint32_t>(span) : overlap;
+        DataCopyExtParams params{1U, prefix, 0U, 0U, 0U};
+        DataCopyPad(dst, zeros, params);
+    }
+    uint64_t pos = offset;
+    while (pos + bytes <= span) {
+        const uint64_t count = (span - pos - bytes) / stride + 1U;
+        const uint16_t batch = static_cast<uint16_t>(count < capacity ? count : capacity);
+        DataCopyExtParams params{batch, bytes, 0U, stride - bytes, 0U};
+        DataCopyPad(dst[pos], zeros, params);
+        pos += static_cast<uint64_t>(batch) * stride;
+    }
+    if (pos < span) {
+        DataCopyExtParams params{1U, static_cast<uint32_t>(span - pos), 0U, 0U, 0U};
+        DataCopyPad(dst[pos], zeros, params);
+    }
+}
+
 __aicore__ inline uint32_t InitWinState(GlobalTensor<uint32_t> selfDataStatusGMTensor, uint32_t epRankIdHccl,
                                         uint32_t epWorldSizeHccl, uint32_t epRankIdOriginal, uint32_t moeExpertNum,
                                         uint32_t epWorldSizeOriginal, uint32_t globalBS, TBuf<> dataStateBuf)

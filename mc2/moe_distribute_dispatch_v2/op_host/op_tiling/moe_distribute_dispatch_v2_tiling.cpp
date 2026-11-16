@@ -1623,13 +1623,19 @@ static uint64_t CalcA5DispatchTokenBytes(const MoeDistributeDispatchV2Info& info
            (info.hasExpertScales ? sizeof(float) : 0U);
 }
 
+static ge::graphStatus SetRecvSlotAndRSWBufferIdx(const gert::TilingContext* context, MoeDistributeDispatchV2Info& info,
+                                                  const char* nodeName, const CheckWinSizeData& winSizeData);
+static uint32_t CalcA5TokenOutAlignSize(const gert::TilingContext* context, const MoeDistributeDispatchV2Info& info,
+                                        const char* nodeName);
+
 static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
                                           MoeDistributeDispatchV2TilingData& tilingData, const char* nodeName,
                                           const bool isSetFullMeshV2, uint32_t localMoeExpertNum, bool isLayered,
                                           DispatchV2Config& config)
 {
     // win区的数据结构
-    CheckWinSizeData winSizeData;
+    CheckWinSizeData winSizeData{};
+    winSizeData.sharedExpertRankNum = tilingData.moeDistributeDispatchV2Info.sharedExpertRankNum;
     winSizeData.localMoeExpertNum = localMoeExpertNum;
     winSizeData.sharedExpertNum = tilingData.moeDistributeDispatchV2Info.sharedExpertNum;
     winSizeData.a = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.a);
@@ -1644,9 +1650,12 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
     winSizeData.isMc2Context = config.isMc2Context;
     const auto& info = tilingData.moeDistributeDispatchV2Info;
     uint64_t dispatchTokenBytes = 0UL;
-    if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_2201 &&
-        info.quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT) && info.scalesCol != 0U) {
-        dispatchTokenBytes = CalcA5DispatchTokenBytes(info);
+    const auto npuArch = mc2tiling::GetNpuArch(context);
+    if (npuArch != Ops::Base::DAV_2201 && info.quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT) &&
+        info.scalesCol != 0U) {
+        dispatchTokenBytes = (npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) && !isLayered ?
+                                 CalcA5TokenOutAlignSize(context, info, nodeName) :
+                                 CalcA5DispatchTokenBytes(info);
     }
     const bool useRuntimeWinSize =
         !isLayered && !config.isMc2Context && mc2tiling::GetSocVersion(context) == "Ascend910_93";
@@ -1655,7 +1664,8 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
     OP_TILING_CHECK(ret != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "Get WinSize failed."), return ge::GRAPH_FAILED);
     // 总的win区大小
     tilingData.moeDistributeDispatchV2Info.totalWinSizeEp = winSizeData.totalWinSizeEp;
-    return ge::GRAPH_SUCCESS;
+    tilingData.moeDistributeDispatchV2Info.rswBufferSize = winSizeData.rswBufferSize;
+    return SetRecvSlotAndRSWBufferIdx(context, tilingData.moeDistributeDispatchV2Info, nodeName, winSizeData);
 }
 
 static uint32_t Ceil(uint32_t dividend, uint32_t divisor, const char* nodeName)
@@ -1761,6 +1771,10 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
         const uint32_t inputTypeSize = ge::GetSizeByDataType(inputType);
         hAlignSize = (isMxQuant || isPerGroupQuant) ? Ceil(hSize, PERGROUP_BLOCK_SIZE, nodeName) * inputTypeSize :
                                                       Ceil(hSize * inputTypeSize, UB_ALIGN, nodeName);
+    }
+    if (!isArch22 && !isArch35 && quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
+        const auto& info = tilingData.moeDistributeDispatchV2Info;
+        hAlignSize = Ceil(hAlignSize + info.scalesCol * info.scalesTypeSize, UB_ALIGN, nodeName);
     }
     // xDesc与expandXDesc在之前的函数中已校验非空，此处不做校验
     if (xDesc->GetDataType() == expandXDesc->GetDataType()) {
@@ -1961,6 +1975,8 @@ static uint32_t CalcA5TokenOutAlignSize(const gert::TilingContext* context, cons
     } else if (isPerGroupQuant) {
         uint32_t paddedH = Ceil(info.h, PERGROUP_BLOCK_SIZE, nodeName);
         hOutSize = paddedH * outputTypeSize + paddedH / PERGROUP_BLOCK_SIZE * sizeof(float);
+    } else if (quantMode == static_cast<uint32_t>(QuantModeA5::HIF4_QUANT)) {
+        hOutSize += Ceil(info.h, HIF4_GROUP_SIZE, nodeName) / HIF4_GROUP_SIZE * sizeof(uint32_t);
     }
     return Ceil(
         Ceil(hOutSize, UB_ALIGN, nodeName) + TRIPLE * sizeof(int32_t) + (info.hasExpertScales ? sizeof(float) : 0U),
@@ -1973,6 +1989,24 @@ static bool NeedA5CastBuf(const gert::TilingContext* context, const MoeDistribut
     auto inputType = context->GetInputDesc(config.xIndex)->GetDataType();
     auto outputType = context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX)->GetDataType();
     return info.quantMode != static_cast<uint32_t>(QuantModeA5::NON_QUANT) || inputType != outputType;
+}
+
+static ge::graphStatus SetRecvSlotAndRSWBufferIdx(const gert::TilingContext* context, MoeDistributeDispatchV2Info& info,
+                                                  const char* nodeName, const CheckWinSizeData& winSizeData)
+{
+    (void)context;
+    info.rswBufferIdx = winSizeData.rswBufferIdx;
+    info.tokenNumPerSlot = winSizeData.tokenNumPerSlot;
+    if (winSizeData.rswBufferSize == 0U) {
+        return ge::GRAPH_SUCCESS;
+    }
+    // 初始 CheckWinSize 已按实际 token 行（A6 非量化带 scales 时）或 2B 上界完成档位与槽容量选择，
+    // 这里只校验下发值自洽，不再重复做窗口选择。
+    OP_TILING_CHECK((info.tokenNumPerSlot == 0U) || (info.rswBufferIdx >= RSW_BUFFER_TIER_COUNT),
+                    OP_LOGE(nodeName, "Invalid RSW plan: rswBufferIdx=%u, tokenNumPerSlot=%u.", info.rswBufferIdx,
+                            info.tokenNumPerSlot),
+                    return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
 }
 
 static ge::graphStatus CheckSerialReceiveUbSizeA5(const gert::TilingContext* context, const char* nodeName,
@@ -2490,45 +2524,6 @@ ge::graphStatus CheckInputParam(gert::TilingContext* context, const char* nodeNa
     return ge::GRAPH_SUCCESS;
 }
 
-// rsw_buffer挡位决策: 与combine侧同为A5 MTE、非跨超、window足够时启用; 否则保持0(旧协议)
-// 必须与combine侧决策完全一致, 否则dispatch区起始偏移会与combine实际接收区错位
-static void SetRswBufferSize(gert::TilingContext* context, MoeDistributeDispatchV2TilingData& tilingData,
-                             uint32_t localMoeExpertNum, bool isLayered)
-{
-    tilingData.moeDistributeDispatchV2Info.rswBufferSize = 0UL;
-    NpuArch npuArch = mc2tiling::GetNpuArch(context);
-    if (npuArch != Ops::Base::DAV_9201 && npuArch != Ops::Base::DAV_9202) {
-        return;
-    }
-    if (isLayered) {
-        return;
-    }
-    const uint64_t h = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.h);
-    const uint64_t axisBS = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.bs);
-    const uint64_t epWorldSize = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.epWorldSize);
-    const uint64_t flagRcvCount = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.k) +
-                                  static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.sharedExpertNum);
-    if ((epWorldSize == 0UL) || (flagRcvCount == 0UL)) {
-        return;
-    }
-    const uint64_t rswTier = GetRswBufferSize(h);
-    if (rswTier == 0UL) {
-        return;
-    }
-    uint64_t maxBs = static_cast<uint64_t>(tilingData.moeDistributeDispatchV2Info.globalBs) / epWorldSize;
-    maxBs = maxBs > axisBS ? maxBs : axisBS;
-    const uint64_t tokenActualLen =
-        ((h * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN + SCALE_EXPAND_IDX_BUFFER;
-    const uint64_t tokenNeedSizeDispatch = ((tokenActualLen + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN) * WIN_ADDR_ALIGN;
-    const uint64_t dispatchNeed =
-        maxBs * tokenNeedSizeDispatch * epWorldSize * static_cast<uint64_t>(localMoeExpertNum);
-    const uint64_t rswCombineNeed = maxBs * flagRcvCount * rswTier;
-    if ((dispatchNeed + rswCombineNeed) * DOUBLE_DATA_BUFFER > tilingData.moeDistributeDispatchV2Info.totalWinSizeEp) {
-        return;
-    }
-    tilingData.moeDistributeDispatchV2Info.rswBufferSize = rswTier;
-}
-
 ge::graphStatus CheckSizeAndSetRelevantCfg(gert::TilingContext* context, MoeDistributeDispatchV2TilingData* tilingData,
                                            const char* nodeName, const uint32_t localMoeExpertNum,
                                            const std::string groupEp, const bool isLayered, const bool isSetFullMeshV2,
@@ -2544,12 +2539,13 @@ ge::graphStatus CheckSizeAndSetRelevantCfg(gert::TilingContext* context, MoeDist
     }
 
     // 校验win区大小
+    tilingData->moeDistributeDispatchV2Info.rswBufferSize = 0UL;
+    tilingData->moeDistributeDispatchV2Info.rswBufferIdx = RSW_BUFFER_TIER_COUNT;
+    tilingData->moeDistributeDispatchV2Info.tokenNumPerSlot = 0U;
     OP_TILING_CHECK(!config.isRoce && CheckAndCalWinSize(context, *tilingData, nodeName, isSetFullMeshV2,
                                                          localMoeExpertNum, isLayered, config) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Tiling check window size failed."), return ge::GRAPH_FAILED);
 
-    // rsw_buffer挡位决策(须在totalWinSizeEp确定后), 与combine侧一致, 决定dispatch区起始偏移
-    SetRswBufferSize(context, *tilingData, localMoeExpertNum, isLayered);
     OP_TILING_CHECK(SetWorkSpace(context, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Tiling set workspace failed."), return ge::GRAPH_FAILED);
 

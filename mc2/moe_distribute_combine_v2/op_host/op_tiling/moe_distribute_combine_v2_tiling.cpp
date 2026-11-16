@@ -2480,9 +2480,10 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
                                           const bool isSetFullMeshV2, uint32_t localMoeExpertNum, bool isLayered,
                                           const CombineV2Config& config)
 {
-    CheckWinSizeData winSizeData;
+    CheckWinSizeData winSizeData{};
     winSizeData.localMoeExpertNum = localMoeExpertNum;
     winSizeData.sharedExpertNum = tilingData.moeDistributeCombineV2Info.sharedExpertNum;
+    winSizeData.sharedExpertRankNum = tilingData.moeDistributeCombineV2Info.sharedExpertRankNum;
     winSizeData.a = static_cast<uint64_t>(tilingData.moeDistributeCombineV2Info.a);
     winSizeData.h = static_cast<uint64_t>(tilingData.moeDistributeCombineV2Info.h);
     winSizeData.k = static_cast<uint64_t>(tilingData.moeDistributeCombineV2Info.k);
@@ -2501,28 +2502,25 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
     OP_TILING_CHECK(ret != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(nodeName, "Get WinSize failed."),
                     return ge::GRAPH_FAILED);
     tilingData.moeDistributeCombineV2Info.totalWinSizeEp = winSizeData.totalWinSizeEp;
+    tilingData.moeDistributeCombineV2Info.rswBufferSize = winSizeData.rswBufferSize;
 
     return ge::GRAPH_SUCCESS;
 }
 
-// rsw_buffer挡位决策: 挡位选择失败或window不足时回退旧协议(rswBufferSize=0)
+// 校验实际通信数据和尾区能否放入公共窗口检查选出的挡位。
 static void SetRswBufferSize(gert::TilingContext* context, MoeDistributeCombineV2TilingData& tilingData,
-                             const char* nodeName, uint32_t localMoeExpertNum, bool isLayered,
-                             const CombineV2Config& config)
+                             const char* nodeName, bool isLayered, const CombineV2Config& config)
 {
+    uint64_t rswTier = tilingData.moeDistributeCombineV2Info.rswBufferSize;
     tilingData.moeDistributeCombineV2Info.rswBufferSize = 0UL; // 默认旧协议
     NpuArch npuArch = mc2tiling::GetNpuArch(context);
     if (npuArch != Ops::Base::DAV_9201 && npuArch != Ops::Base::DAV_9202) { // 仅A6 MTE内核支持rsw协议
         return;
     }
-    if (isLayered) { // 跨超模板窗口模型不同, 不启用
+    if (isLayered || rswTier == 0UL) {
         return;
     }
     uint32_t axisH = tilingData.moeDistributeCombineV2Info.h;
-    uint32_t axisK = tilingData.moeDistributeCombineV2Info.k;
-    uint32_t axisBS = tilingData.moeDistributeCombineV2Info.bs;
-    uint32_t epWorldSize = tilingData.moeDistributeCombineV2Info.epWorldSize;
-    uint32_t sharedExpertNum = tilingData.moeDistributeCombineV2Info.sharedExpertNum;
     auto expandXDesc = context->GetInputDesc(config.expandXIndex);
     uint32_t expandXTypeSize = static_cast<uint32_t>(ge::GetSizeByDataType(expandXDesc->GetDataType()));
     auto commQuantModePtr = context->GetAttrs()->GetAttrPointer<int64_t>((config.attrCommQuantModeIndex));
@@ -2539,30 +2537,10 @@ static void SetRswBufferSize(gert::TilingContext* context, MoeDistributeCombineV
         uint32_t scaleBaseCnt = isInt8Quant ? (hFloatAlign256Size / sizeof(float)) : 0U;
         commDataBytes = GetQuantCommDataBytes(axisH, expandXTypeSize, scaleBaseCnt, commQuantMode, scaleNumAlignSize);
     }
-    // 挡位与dispatch侧同口径: combine单slot统一按最大输出dtype尺寸估算, 保证两侧窗口布局一致
-    uint64_t rswTier = GetRswBufferSize(axisH);
-    if ((rswTier == 0UL) || (static_cast<uint64_t>(commDataBytes) + RSW_TRAILER_SIZE > rswTier)) {
-        OP_LOGI(nodeName,
-                "H = %u, comm Data Bytes = %u, exceeds max support size which is 2048KB."
-                " RSW feature is not enabled",
-                axisH, commDataBytes);
-        return;
-    }
-    // window需求: (dispatch + rsw combine) * 2(双缓冲) ≤ 实际window, 口径与CheckActualWinSize一致
-    uint64_t maxBs = static_cast<uint64_t>(tilingData.moeDistributeCombineV2Info.globalBs) / epWorldSize;
-    maxBs = maxBs > axisBS ? maxBs : axisBS; // globalBs为0时按bs兜底
-    uint64_t tokenActualLen =
-        (axisH * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN * UB_ALIGN + SCALE_EXPAND_IDX_BUFFER;
-    uint64_t tokenNeedSizeDispatch = (tokenActualLen + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN * WIN_ADDR_ALIGN;
-    uint64_t flagRcvCount = axisK + sharedExpertNum;
-    uint64_t dispatchNeed = maxBs * tokenNeedSizeDispatch * epWorldSize * localMoeExpertNum;
-    uint64_t rswCombineNeed = maxBs * flagRcvCount * rswTier;
-    uint64_t totalRswNeed = (dispatchNeed + rswCombineNeed) * DOUBLE_DATA_BUFFER;
-    if (totalRswNeed > tilingData.moeDistributeCombineV2Info.totalWinSizeEp) {
-        OP_LOGI(nodeName, "RSW feature is not enabled. need win Size(%lu) > totalWinSize(%lu).", totalRswNeed,
-                tilingData.moeDistributeCombineV2Info.totalWinSizeEp);
-        return;
-    }
+    // 档位由 CheckWinSize 按 2B 上界（h * MAX_OUT_DTYPE_SIZE + 128）选出，实际通信数据不会超过该上界，
+    // 这里只记录实际口径，不再重复回退。
+    OP_LOGI(nodeName, "rswBuffer enabled, tier = %lu, comm data = %u B, scale tail = %u B.", rswTier, commDataBytes,
+            scaleNumAlignSize);
     tilingData.moeDistributeCombineV2Info.rswBufferSize = rswTier;
     OP_LOGI(nodeName, "rswBuffer enabled, rsw buffer size = %lu.", rswTier);
 }
@@ -2744,6 +2722,7 @@ ge::graphStatus MoeDistributeCombineV2TilingFuncBase::MoeDistributeCombineA3Tili
                                     localMoeExpertNum, isLayered, isShared, tilingData, config) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling check input param failed."), return ge::GRAPH_FAILED);
     // 校验win区大小
+    tilingData->moeDistributeCombineV2Info.rswBufferSize = 0UL;
     OP_TILING_CHECK(!config.isRoce && CheckAndCalWinSize(context, *tilingData, nodeName, false, localMoeExpertNum,
                                                          isLayered, config) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling check window size failed."), return ge::GRAPH_FAILED);
@@ -2752,7 +2731,7 @@ ge::graphStatus MoeDistributeCombineV2TilingFuncBase::MoeDistributeCombineA3Tili
                                          CalTilingKey(commQuantMode, isLayered);
 
     // rsw_buffer挡位决策(挡位超限或window不足时回退旧协议, 须在UbUsedCal之前)
-    SetRswBufferSize(context, *tilingData, nodeName, localMoeExpertNum, isLayered, config);
+    SetRswBufferSize(context, *tilingData, nodeName, isLayered, config);
     OP_TILING_CHECK(
         FinalizeTiling(context, tilingData, nodeName, groupEp, isLayered, tilingKey, config) != ge::GRAPH_SUCCESS,
         OP_LOGE_WITHOUT_REPORT(nodeName, "Finalize tiling failed."), return ge::GRAPH_FAILED);

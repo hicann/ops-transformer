@@ -148,6 +148,11 @@ public:
     {
         Cast(floatLocalTemp_, inLocal, RoundMode::CAST_NONE, axisH_);
         if constexpr (Std::IsSame<ExpandXOutType, int8_t>::value) {
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+            if (scalesCount_ != 1) {
+                SyncFunc<AscendC::HardEvent::V_MTE2>();
+            }
+#endif
             if (scalesCount_ == 1) { // 所有专家共享scales，维度为(1,)
                 DataCacheCleanAndInvalid<float, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(scalesGMTensor_);
                 float scaleVal = scalesGMTensor_(0);
@@ -209,6 +214,12 @@ public:
         dynamicScale = maxVal / floatLocalAbsTemp.GetValue(0);
         Muls(floatLocalTemp_, floatLocalTemp_, dynamicScale, axisH_);
         PipeBarrier<PIPE_V>();
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ != 2201) && (__NPU_ARCH__ != 3510))
+        LocalTensor<float> tokenF32Tmp = outLocal.template ReinterpretCast<float>();
+        tokenF32Tmp.SetValue((Ceil(axisH_, UB_ALIGN) * UB_ALIGN) / sizeof(float),
+                             float(1.0) / dynamicScale); // int8->float32
+        SyncFunc<AscendC::HardEvent::S_V>();
+#endif
         if constexpr (Std::IsSame<ExpandXOutType, int8_t>::value) {
             LocalTensor<half> halfLocalTemp = floatLocalTemp_.ReinterpretCast<half>();
             LocalTensor<int32_t> int32LocalTemp = floatLocalTemp_.ReinterpretCast<int32_t>();
@@ -226,10 +237,12 @@ public:
             Cast(outLocal, floatLocalTemp_, RoundMode::CAST_RINT, axisH_);
         }
 #endif
+#if !defined(__NPU_ARCH__) || ((__NPU_ARCH__ == 2201) || (__NPU_ARCH__ == 3510))
         LocalTensor<float> tokenF32Tmp = outLocal.template ReinterpretCast<float>();
         tokenF32Tmp.SetValue((Ceil(axisH_, UB_ALIGN) * UB_ALIGN) / sizeof(float),
                              float(1.0) / dynamicScale); // int8->float32
         SyncFunc<AscendC::HardEvent::S_MTE3>();
+#endif
     }
 
 #if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
@@ -239,6 +252,9 @@ public:
         if constexpr (Std::IsSame<ExpandXOutType, fp8_e4m3fn_t>::value ||
                       Std::IsSame<ExpandXOutType, fp8_e5m2_t>::value) {
             if constexpr (IsSmoothScaleExist) { // 平滑系数
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
+                SyncFunc<AscendC::HardEvent::V_MTE2>();
+#endif
                 DataCopyPad(smoothScalesTensor_, scalesGMTensor_[expertIndex * axisH_], scalesInParams_,
                             scalesPadParams_);
                 SyncFunc<AscendC::HardEvent::MTE2_V>();

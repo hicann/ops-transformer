@@ -19,6 +19,7 @@
 #include <algorithm>
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "mc2_log_compat.h"
+#include "../../op_kernel/moe_distribute_v2_constant.h"
 
 namespace {
 constexpr uint32_t ATTR_GROUP_EP_INDEX = 0;
@@ -92,6 +93,7 @@ inline RoceWindowLayout GetRoceWindowLayout(const TilingInfo& info, uint64_t ser
 constexpr uint64_t RSW_TRAILER_BYTES = 128UL;
 constexpr uint64_t RSW_BUFFER_TIER_LIST_BYTES[] = {16UL << 10,  32UL << 10,  64UL << 10,   128UL << 10,
                                                    256UL << 10, 512UL << 10, 1024UL << 10, 2048UL << 10};
+constexpr uint32_t RSW_BUFFER_TIER_COUNT = sizeof(RSW_BUFFER_TIER_LIST_BYTES) / sizeof(RSW_BUFFER_TIER_LIST_BYTES[0]);
 inline uint64_t SelectRswBufferTier(uint64_t commDataBytes)
 {
     const uint64_t need = commDataBytes + RSW_TRAILER_BYTES;
@@ -123,11 +125,16 @@ struct CheckWinSizeData {
     bool isSetFullMeshV2;
     bool isLayered;
     bool isMc2Context;
+    uint32_t sharedExpertRankNum = 0;
+    uint64_t rswBufferSize = 0;
+    uint32_t rswBufferIdx = RSW_BUFFER_TIER_COUNT;
+    uint32_t tokenNumPerSlot = 0;
 };
 
 inline uint64_t CalcMinWinSize(const CheckWinSizeData& winSizeData, uint64_t& tokenNeedSizeDispatch,
                                uint64_t& tokenNeedSizeCombine, uint64_t combineDataAlign = WIN_ADDR_ALIGN,
-                               uint64_t dispatchTokenBytes = 0UL)
+                               uint64_t dispatchTokenBytes = 0UL,
+                               uint64_t dispatchMetadataSize = SCALE_EXPAND_IDX_BUFFER)
 {
     // A3 Combine uses raw 512-byte-aligned data for both fullmesh variants.
     // A5 callers explicitly request the packed-data alignment.
@@ -137,7 +144,7 @@ inline uint64_t CalcMinWinSize(const CheckWinSizeData& winSizeData, uint64_t& to
     tokenNeedSizeCombine = ((h * MAX_OUT_DTYPE_SIZE + combineDataAlign - 1UL) / combineDataAlign) * WIN_ADDR_ALIGN;
     // expertScale 复用三元组后的对齐空间，不增加窗口占用。
     const uint64_t defaultTokenLen =
-        ((h * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN + SCALE_EXPAND_IDX_BUFFER;
+        ((h * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN + dispatchMetadataSize;
     const uint64_t tokenActualLen = std::max(defaultTokenLen, dispatchTokenBytes);
     const uint64_t tokenDataAlign = winSizeData.isSetFullMeshV2 ? FULL_MESH_DATA_ALIGN : WIN_ADDR_ALIGN;
     tokenNeedSizeDispatch = ((tokenActualLen + tokenDataAlign - 1UL) / tokenDataAlign) * WIN_ADDR_ALIGN;
@@ -196,10 +203,12 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext* context, co
     uint64_t sharedExpertNum = winSizeData.sharedExpertNum;
     uint64_t tokenNeedSizeDispatch = 0;
     uint64_t tokenNeedSizeCombine = 0;
-    const uint64_t combineDataAlign =
-        (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201) ? WIN_ADDR_ALIGN : FULL_MESH_DATA_ALIGN;
-    uint64_t actualSize =
-        CalcMinWinSize(winSizeData, tokenNeedSizeDispatch, tokenNeedSizeCombine, combineDataAlign, dispatchTokenBytes);
+    const auto npuArch = mc2tiling::GetNpuArch(context);
+    const uint64_t combineDataAlign = (npuArch == Ops::Base::DAV_2201) ? WIN_ADDR_ALIGN : FULL_MESH_DATA_ALIGN;
+    const uint64_t dispatchMetadataSize =
+        (npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) ? UB_ALIGN : SCALE_EXPAND_IDX_BUFFER;
+    uint64_t actualSize = CalcMinWinSize(winSizeData, tokenNeedSizeDispatch, tokenNeedSizeCombine, combineDataAlign,
+                                         dispatchTokenBytes, dispatchMetadataSize);
     OP_TILING_CHECK(CheckLayeredWinSizeParams(context, nodeName, winSizeData) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "Invalid hierarchy window parameters."), return ge::GRAPH_FAILED);
     if (winSizeData.isLayered) {
@@ -214,7 +223,7 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext* context, co
                             maxBs, h, actualSize / MB_SIZE + 1UL, hcclBufferSizeEp / MB_SIZE),
                         return ge::GRAPH_FAILED);
     } else {
-        if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
+        if (npuArch == Ops::Base::DAV_3510) {
             actualSize += epWorldSize * EP_RANK_OFFSET_STEP;
             OP_TILING_CHECK(
                 (actualSize > maxWindowSizeEp),
@@ -252,6 +261,130 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext* context, co
     return ge::GRAPH_SUCCESS;
 }
 
+inline uint32_t CalcSerialUbSizeForTokenCopy(const CheckWinSizeData& info, uint32_t aivNum, uint64_t ubRealSize)
+{
+    using mc2tiling::AlignUp;
+    uint32_t moeExpertNumPerRank = info.localMoeExpertNum;
+    uint32_t recvStatusNum = info.epWorldSize * moeExpertNumPerRank;
+    uint32_t recvStatusPerCore = mc2tiling::MathCeil(recvStatusNum, aivNum);
+
+    uint64_t fixedUbSize = Mc2Kernel::A5_CUMSUM_UB_RESERVE + 2U * UB_ALIGN;
+    fixedUbSize += AlignUp<uint32_t>(recvStatusPerCore * UB_ALIGN, Mc2Kernel::SIZE_ALIGN_256);
+    uint32_t gatherSize = std::max(AlignUp<uint32_t>(recvStatusPerCore * sizeof(float), UB_ALIGN),
+                                   AlignUp<uint32_t>(recvStatusNum * sizeof(float), UB_ALIGN));
+    fixedUbSize += std::max(gatherSize, AlignUp<uint32_t>(recvStatusNum * Mc2Kernel::STATE_OFFSET, UB_ALIGN));
+    fixedUbSize += 2U * aivNum * UB_ALIGN;
+    uint32_t expertPrefixNum = mc2tiling::MathCeil<uint32_t>(recvStatusPerCore, info.epWorldSize);
+    fixedUbSize += std::max(AlignUp<uint32_t>(aivNum * sizeof(float), UB_ALIGN),
+                            AlignUp<uint32_t>(expertPrefixNum * sizeof(int32_t), UB_ALIGN));
+    fixedUbSize += 3U * UB_ALIGN;
+    // 各 rank 使用同一套槽布局，按开启维测时的最大占用预留。
+    fixedUbSize += AlignUp<uint32_t>(info.epWorldSize * sizeof(int64_t), UB_ALIGN);
+    fixedUbSize += AlignUp<uint32_t>(recvStatusPerCore * sizeof(int32_t), UB_ALIGN);
+    fixedUbSize += AlignUp<uint32_t>(moeExpertNumPerRank * sizeof(int64_t), UB_ALIGN);
+    fixedUbSize += 4U * AlignUp<uint32_t>(recvStatusPerCore * sizeof(int32_t), UB_ALIGN);
+    fixedUbSize += 2 * UB_ALIGN;
+    return ubRealSize > fixedUbSize ? ubRealSize - fixedUbSize : 0U;
+}
+
+inline uint32_t CalcParallelUbSizeForTokenCopy(const CheckWinSizeData& info, uint32_t aivNum, uint64_t ubRealSize)
+{
+    using mc2tiling::AlignUp;
+    constexpr uint32_t HALF_NUM = 2U;
+    constexpr uint32_t A5_CUMSUM_MAX_CORE_NUM = 8U;
+    uint32_t moeExpertNumPerRank = info.localMoeExpertNum;
+    uint32_t recvStatusNum = info.epWorldSize * moeExpertNumPerRank;
+    uint32_t totalExpertNum = info.sharedExpertRankNum + info.moeExpertNum;
+    uint32_t aivUsedCumSum = totalExpertNum / 16; // 单核处理16个专家cnt发送
+    aivUsedCumSum = (aivUsedCumSum == 0) ? 1 : aivUsedCumSum;
+    aivUsedCumSum = (aivUsedCumSum >= (aivNum / HALF_NUM)) ? (aivNum / HALF_NUM) : aivUsedCumSum;
+    aivUsedCumSum = (aivUsedCumSum >= A5_CUMSUM_MAX_CORE_NUM) ? A5_CUMSUM_MAX_CORE_NUM : aivUsedCumSum;
+    aivUsedCumSum = (aivUsedCumSum >= recvStatusNum) ? recvStatusNum : aivUsedCumSum;
+    aivUsedCumSum = std::max(aivUsedCumSum, 1U);
+
+    uint32_t recvStatusPerCore = mc2tiling::MathCeil(recvStatusNum, aivNum);
+    uint32_t recvCntPrefixNum = recvStatusPerCore + Mc2Kernel::UB_ALIGN_DATA_COUNT;
+    uint32_t recvCntPrefixSize = AlignUp<uint32_t>(recvCntPrefixNum * sizeof(int32_t), UB_ALIGN);
+    uint32_t expInfoSize = AlignUp<uint32_t>(recvStatusPerCore * sizeof(uint32_t), UB_ALIGN);
+    uint32_t validExpertInfoExtraSize = AlignUp<uint32_t>(moeExpertNumPerRank * sizeof(int32_t), UB_ALIGN) +
+                                        AlignUp<uint32_t>(moeExpertNumPerRank * sizeof(int64_t), UB_ALIGN);
+
+    uint64_t fixedUbSize = Mc2Kernel::A5_CUMSUM_UB_RESERVE + UB_ALIGN + recvCntPrefixSize +
+                           2 * aivUsedCumSum * UB_ALIGN + 3 * expInfoSize + validExpertInfoExtraSize;
+    return ubRealSize > fixedUbSize ? ubRealSize - fixedUbSize : 0U;
+}
+
+inline uint64_t CalcRSWDispatchDataSectionSize(const gert::TilingContext* context, const char* nodeName,
+                                               const CheckWinSizeData& winSizeData, uint64_t dispatchWinSize,
+                                               uint32_t& rswBufferIdx, uint32_t& tokenNumPerSlot,
+                                               uint32_t dispatchTokenBytes)
+{
+    constexpr uint32_t LARGE_PACKET_SIZE = 4U * 1024U;
+    constexpr uint32_t SERIAL_MODE_BS_THRESHOLD = 32U;
+    constexpr uint32_t SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD = 16U;
+    // 公共检查按 FP16/BF16 透传行计算，三元组与可选 expertScale 共用末尾的 32B。
+    uint32_t tokenOutAlignSize =
+        dispatchTokenBytes != 0U ?
+            dispatchTokenBytes :
+            mc2tiling::AlignUp<uint32_t>(winSizeData.h * MAX_OUT_DTYPE_SIZE, UB_ALIGN) + UB_ALIGN;
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
+    OP_TILING_CHECK(aivNum == 0U, OP_LOGE(nodeName, "AIV core count must be positive."), return 0U);
+    uint64_t ubRealSize = 0;
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubRealSize);
+    uint32_t maxBs = winSizeData.globalBs / winSizeData.epWorldSize;
+    uint32_t ubSizeForCopy = CalcParallelUbSizeForTokenCopy(winSizeData, aivNum, ubRealSize);
+    if (maxBs <= SERIAL_MODE_BS_THRESHOLD && winSizeData.epWorldSize < SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD) {
+        // 缩容时可能切换到并行收，槽布局取两种模式共同满足的容量。
+        ubSizeForCopy = std::min(ubSizeForCopy, CalcSerialUbSizeForTokenCopy(winSizeData, aivNum, ubRealSize));
+    }
+    uint32_t counterSizeInUb = UB_ALIGN;
+    uint32_t ubBatch =
+        ubSizeForCopy > counterSizeInUb ?
+            std::min(maxBs, (ubSizeForCopy - counterSizeInUb) / Mc2Kernel::BUFFER_NUM / tokenOutAlignSize) :
+            0U;
+    uint32_t tokenOffsetInWin = mc2tiling::AlignUp(tokenOutAlignSize, LARGE_PACKET_SIZE);
+    uint32_t dispatchSectionNum = winSizeData.epWorldSize * winSizeData.localMoeExpertNum;
+    uint64_t dispatchDataSectionSize = 0U;
+    for (uint32_t idx = 0; ubBatch != 0 && idx < RSW_BUFFER_TIER_COUNT; ++idx) {
+        uint32_t rswBufferSize = RSW_BUFFER_TIER_LIST_BYTES[idx];
+        if (tokenOutAlignSize > rswBufferSize - RSW_TRAILER_BYTES) {
+            continue;
+        }
+        uint32_t capacity = 1U + (rswBufferSize - RSW_TRAILER_BYTES - tokenOutAlignSize) / tokenOffsetInWin;
+        uint32_t batch = std::min(ubBatch, capacity);
+        uint64_t sectionSize = mc2tiling::MathCeil<uint64_t>(maxBs, batch) * rswBufferSize;
+        // 每个半窗的 Dispatch 起点按绝对页地址对齐，最多额外占用 rswBufferSize - 1 字节。
+        if (sectionSize * dispatchSectionNum + rswBufferSize - 1U <= dispatchWinSize) {
+            dispatchDataSectionSize = sectionSize;
+            rswBufferIdx = idx;
+            tokenNumPerSlot = batch;
+            if (batch == ubBatch) {
+                break;
+            }
+        }
+    }
+    return dispatchDataSectionSize;
+}
+
+inline bool CheckRswWinSize(const gert::TilingContext* context, const char* nodeName,
+                            const CheckWinSizeData& winSizeData, uint32_t& rswBufferIdx, uint32_t& tokenNumPerSlot,
+                            uint32_t dispatchTokenBytes = 0U)
+{
+    rswBufferIdx = RSW_BUFFER_TIER_COUNT;
+    tokenNumPerSlot = 0U;
+    uint64_t maxBs = winSizeData.globalBs / winSizeData.epWorldSize;
+    uint64_t tokenNeedSizeCombine = GetRswBufferSize(winSizeData.h);
+    uint64_t combineDataRegionSize = maxBs * (winSizeData.k + winSizeData.sharedExpertNum) * tokenNeedSizeCombine;
+    uint64_t halfWinSize = winSizeData.totalWinSizeEp / DOUBLE_DATA_BUFFER;
+    if (tokenNeedSizeCombine == 0U || halfWinSize < MB_SIZE + combineDataRegionSize) {
+        return false;
+    }
+    uint64_t dispatchWinSize = halfWinSize - MB_SIZE - combineDataRegionSize;
+    return CalcRSWDispatchDataSectionSize(context, nodeName, winSizeData, dispatchWinSize, rswBufferIdx,
+                                          tokenNumPerSlot, dispatchTokenBytes) != 0U;
+}
+
 inline ge::graphStatus CheckWinSize(const gert::TilingContext* context, const char* nodeName,
                                     CheckWinSizeData& winSizeData, uint64_t dispatchTokenBytes = 0UL)
 {
@@ -277,13 +410,25 @@ inline ge::graphStatus CheckWinSize(const gert::TilingContext* context, const ch
         hcclBufferSizeEp = *cclBuffSizePtr;
     }
     OP_LOGD(nodeName, "windowSize = %lu", maxWindowSizeEp);
+    winSizeData.totalWinSizeEp = maxWindowSizeEp;
+    winSizeData.rswBufferSize = 0;
+    winSizeData.rswBufferIdx = RSW_BUFFER_TIER_COUNT;
+    winSizeData.tokenNumPerSlot = 0;
+    const auto npuArch = mc2tiling::GetNpuArch(context);
+    if ((npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) && !winSizeData.isLayered) {
+        if (CheckRswWinSize(context, nodeName, winSizeData, winSizeData.rswBufferIdx, winSizeData.tokenNumPerSlot)) {
+            winSizeData.rswBufferSize = GetRswBufferSize(winSizeData.h);
+            return ge::GRAPH_SUCCESS;
+        }
+        // arch92 双方一起回退。普通 Dispatch 每个 512B 块容纳 480B 有效载荷。
+        winSizeData.isSetFullMeshV2 = true;
+    }
     OP_TILING_CHECK(CheckActualWinSize(context, nodeName, winSizeData, maxWindowSizeEp, hcclBufferSizeEp,
                                        dispatchTokenBytes) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling check actual window size failed."),
                     return ge::GRAPH_FAILED);
 
-    winSizeData.totalWinSizeEp = maxWindowSizeEp;
-    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
+    if (npuArch == Ops::Base::DAV_3510) {
         uint64_t rankOffsetSize = winSizeData.epWorldSize * EP_RANK_OFFSET_STEP;
         OP_TILING_CHECK(
             maxWindowSizeEp < rankOffsetSize,
