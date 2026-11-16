@@ -191,6 +191,6 @@ TEST_F(SparseLightningIndexerGradKLLossTiling, tiling_invalid_topk_failed)
 TEST_F(SparseLightningIndexerGradKLLossTiling, tiling_invalid_query_head_num_failed)
 {
     auto compileInfo = MakeCompileInfo();
-    auto para = MakeBsndPara(compileInfo, ge::DT_FLOAT16, ge::DT_FLOAT16, "BSND", 3, 2048, 16);
+    auto para = MakeBsndPara(compileInfo, ge::DT_FLOAT16, ge::DT_FLOAT16, "BSND", 3, 2048, 129);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }

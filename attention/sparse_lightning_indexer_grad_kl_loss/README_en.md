@@ -332,7 +332,7 @@ English | [简体中文](./README.md)
         <tr>
             <td>N1</td>
             <td>
-            32, 64, 128
+            1~128
             </td>
             <td>SparseFA is MQA.</td>
         </tr>
@@ -376,7 +376,7 @@ English | [简体中文](./README.md)
         </tbody>
     </table>
 
-    <term>Ascend 950PR&950DT products</term>: N1 additionally supports 48, and Nidx1 additionally supports 24. Only the (48,24) combination is allowed, and pairing with other values is prohibited.
+    <term>Ascend 950PR&950DT products</term>: N1 supports only 32, 48, 64, and 128, and Nidx1 additionally supports 24. Only the (48,24) combination is allowed, and pairing with other values is prohibited.
 
     <term>Ascend 950PR&950DT products</term>: B, S1, and S2 all support generalization.
 

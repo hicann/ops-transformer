@@ -1062,7 +1062,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::VectorP(SLIGradKLLossRunInf
 
             DataCopyExtParams softmaxCopyParams(
                 static_cast<uint16_t>(1),
-                static_cast<uint32_t>(runInfo.nBaseSizeP * sizeof(T)), // 8 * 4 = 32Bytes
+                static_cast<uint32_t>(curNSize * sizeof(T)), // Copy only valid heads in the tail tile.
                 static_cast<uint32_t>(0), 0, 0);
             DataCopyPadExtParams<T> softmaxCopyPadParams(false, 0, 0, 0);
             int64_t softmaxInputOffset = 0;

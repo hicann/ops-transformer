@@ -660,14 +660,13 @@ bool SparseLightningIndexerGradKLLossTilingBase::CrossShapeVerify(const gert::Sh
                     return false);
         // 验证N Query数字是否正确
         OP_CHECK_IF(
-            queryShape[1] != NQUERY_SIZE_32 && queryShape[1] != NQUERY_SIZE_64 && queryShape[1] != NQUERY_SIZE_128,
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName, "query",
-                                                   (std::string() + std::to_string(queryShape[1])).c_str(),
-                                                   (std::string() +
-                                                    "CrossShapeVerify failed, shape N of query must be one of the {32, "
-                                                    "64, 128}, but the value of query[1] is (" +
-                                                    std::to_string(queryShape[1]) + ")")
-                                                       .c_str()),
+            queryShape[1] < 1 || queryShape[1] > NQUERY_SIZE_128,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                opName, "query", (std::string() + std::to_string(queryShape[1])).c_str(),
+                (std::string() +
+                 "CrossShapeVerify failed, shape N of query must be in [1, 128], but the value of query[1] is (" +
+                 std::to_string(queryShape[1]) + ")")
+                    .c_str()),
             return false);
         // 验证N Index数字是否正确
         OP_CHECK_IF(queryIndexShape[1] != NQUERYINDEX_SIZE_8 && queryIndexShape[1] != NQUERYINDEX_SIZE_16 &&
@@ -944,14 +943,13 @@ bool SparseLightningIndexerGradKLLossTilingBase::CrossShapeVerify(const gert::Sh
             return false);
         // 验证N Query数字是否正确
         OP_CHECK_IF(
-            queryShape[2] != NQUERY_SIZE_32 && queryShape[2] != NQUERY_SIZE_64 && queryShape[2] != NQUERY_SIZE_128,
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName, "query",
-                                                   (std::string() + std::to_string(queryShape[2])).c_str(),
-                                                   (std::string() +
-                                                    "CrossShapeVerify failed, shape N of query must be one of the {32, "
-                                                    "64, 128}, but the value of query[2] is (" +
-                                                    std::to_string(queryShape[2]) + ")")
-                                                       .c_str()),
+            queryShape[2] < 1 || queryShape[2] > NQUERY_SIZE_128,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                opName, "query", (std::string() + std::to_string(queryShape[2])).c_str(),
+                (std::string() +
+                 "CrossShapeVerify failed, shape N of query must be in [1, 128], but the value of query[2] is (" +
+                 std::to_string(queryShape[2]) + ")")
+                    .c_str()),
             return false);
         // 验证N Index数字是否正确
         OP_CHECK_IF(queryIndexShape[2] != NQUERYINDEX_SIZE_8 && queryIndexShape[2] != NQUERYINDEX_SIZE_16 &&
