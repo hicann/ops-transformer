@@ -252,7 +252,8 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline int64_t QSFAVectorService<TEMPLATE_AR
         int64_t qsfaBlkTableIdx = s2Idx / blockSize;
         int64_t blkTableOffset = s2Idx % blockSize;
         realkeyOffset =
-            blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + qsfaBlkTableIdx) * constInfo.keyStride0 +
+            static_cast<int64_t>(blockTableGm.GetValue(runInfo.boIdx * maxBlockNumPerBatch + qsfaBlkTableIdx)) *
+                constInfo.keyStride0 +
             blkTableOffset * constInfo.dSizeVInput; // BlockNum, BlockSize, N(1), D
     } else {
         if constexpr (LAYOUT_T == QSFA_LAYOUT::BSND) {
