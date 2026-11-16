@@ -31,8 +31,13 @@ struct FFNToAttentionV2Info {
     uint8_t windowType;
     uint64_t maxTokenNum;
     uint64_t cclBufferSize;
-    uint64_t addressTableWorkspaceOffset;
-    uint64_t addressTableBytes;
+    // Per-slot layout in AttentionFFNContext::payloadBufferAddr; token region starts at offset 0.
+    uint64_t payloadTokenRowStride;
+    uint64_t payloadAddressTableOffset;
+    uint64_t payloadCountRowsOffset;
+    uint64_t payloadCountRowStride;
+    uint64_t payloadFlagOffset;
+    uint64_t payloadRequiredSlotBytes;
 };
 
 struct FFNToAttentionV2TilingData {

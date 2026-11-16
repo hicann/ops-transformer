@@ -159,7 +159,7 @@ English | [简体中文](./README.md)
     <tr>
     <td style="white-space: nowrap">cclBufferSize</td>
     <td style="white-space: nowrap">Attribute</td>
-    <td style="white-space: nowrap">Total size of the CCL communication buffer (Bytes), automatically computed inside the <code>get_buffer_for_attention_to_ffn</code> API. The value must be >= token_info_size + token_data_size (aligned up to 2 MB). The staging area and the resident flag area are now requested from the operator workspace and do not occupy the window.</td>
+    <td style="white-space: nowrap">Total size of the CCL communication buffer (Bytes), automatically computed inside the <code>get_buffer_for_attention_to_ffn</code> API. The value must be >= token_info_size + token_data_size (aligned up to 2 MB). The staging area and the resident flag area have been changed to a resident payload area allocated through CommContextManager (via the <code>payloadBufferSize</code>/<code>payloadSlotNum</code> parameters) at buffer creation time (delivered with the context and slotted by microBatchId), which does not occupy the window.</td>
     <td style="white-space: nowrap">INT64</td>
     <td style="white-space: nowrap">-</td>
     </tr>
@@ -196,8 +196,6 @@ where:
   - `tokenDataSize = attentionWorkerNum × microBatchNum × BS × (K+shared) × HS × bytesPerElem`
   - `infoTableLastDim`: length of the last dimension of the token information table on the FFN side, that is, the last dimension of `ffnTokenInfoTableShape`, equal to `2 + BS × expertNumPerToken` (`expertNumPerToken = K + sharedExpertNum`; the first two int32 entries are reserved entries, and the remaining entries are information table entries stored for each token by expert, with each entry being 4B).
   - `bytesPerElem`: number of transmission bytes per element of the token data, determined by quantMode: in non-quantization mode (quantMode=0), it is 2B (FP16/BF16 is transmitted at the original precision); in quantization modes (quantMode=2~7, including INT8/FP8/FP4), it is 1B, where in FP4 mode two elements are packed into 1B, and `HS` is the number of bytes converted based on packing.
-
-> Only the token information table and the token data area are retained in the window. The staging area at the end of the original window (one staging slot per token, with the slot stride aligned up to 32 B) and the resident URMA flag area (one 4 B compact flag slot per token plus one 32 B layer flag slot) are now requested from the operator workspace, and their sizes are automatically computed by tiling, so you do not need to be aware of them. The non-quantization mode (quantMode=0) is consistent with the quantization mode: rows of the input `x` are first relayed through the UB (GM→UB→GM) and written into the staging area, the relay WQEs read data from the staging area and send it to the target card, and consecutive tokenOffsets can be merged into a single WQE for continuous transmission.
 
 This size is automatically computed inside the `get_buffer_for_attention_to_ffn` API. You do not need to compute or set `ccl_buffer_size` yourself.
 

@@ -7,6 +7,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
+import numbers
 from typing import Optional, List
 
 import torch
@@ -134,6 +135,64 @@ def _calc_window_size(token_info_table_shape, token_data_shape, world_size):
     )
 
 
+def _is_integer_list(value) -> bool:
+    """Return whether value is an integer list-like shape."""
+    if isinstance(value, (str, bytes, bytearray, memoryview, dict, torch.Tensor)):
+        return False
+    if not hasattr(value, "__iter__") or not hasattr(value, "__len__"):
+        return False
+    return all(isinstance(item, numbers.Integral) for item in value)
+
+
+def _validate_buffer_types(
+    group,
+    token_info_table_shape,
+    token_data_shape,
+    window_addr,
+    window_size,
+) -> None:
+    """Validate buffer argument types before using their values."""
+    if not isinstance(group, torch.distributed.ProcessGroup):
+        raise TypeError("group must be a torch.distributed.ProcessGroup.")
+    if not _is_integer_list(token_info_table_shape):
+        raise TypeError("token_info_table_shape must be a list of integers.")
+    if not _is_integer_list(token_data_shape):
+        raise TypeError("token_data_shape must be a list of integers.")
+    if window_addr is not None and not isinstance(window_addr, numbers.Integral):
+        raise TypeError("window_addr must be an integer when provided.")
+    if window_size is not None and not isinstance(window_size, numbers.Integral):
+        raise TypeError("window_size must be an integer when provided.")
+
+
+_PAYLOAD_ALIGN = 512
+_PAYLOAD_AIV_CAPACITY = 256
+_PAYLOAD_ROUND_NUM = 3
+_INT64_MAX = (1 << 63) - 1
+
+
+def _align_payload_size(value: int) -> int:
+    return (value + _PAYLOAD_ALIGN - 1) // _PAYLOAD_ALIGN * _PAYLOAD_ALIGN
+
+
+def _calc_payload_slot_stride(
+    max_token_num: int, hidden_size: int, world_size: int
+) -> int:
+    """Reserve token rows, per-rank address tables, count rows, and flag sources."""
+    token_row_bytes = (hidden_size * 2 + 31) // 32 * 32
+    token_bytes = _align_payload_size(max_token_num * token_row_bytes)
+    rank_table_bytes = world_size * _align_payload_size(max_token_num * 16)
+    count_row_bytes = (_PAYLOAD_AIV_CAPACITY + 1) * _align_payload_size(world_size * 4)
+    flag_bytes = _align_payload_size(_PAYLOAD_AIV_CAPACITY * 32)
+    slot_stride = _align_payload_size(
+        token_bytes + rank_table_bytes + count_row_bytes + flag_bytes
+    )
+    torch._check(
+        slot_stride <= _INT64_MAX,
+        lambda: f"payload slot size exceeds int64: {slot_stride}",
+    )
+    return slot_stride
+
+
 class FFNToAttentionBuffer:
     """Communication buffer for ffn_to_attention, wraps CommContextManager.
 
@@ -149,18 +208,17 @@ class FFNToAttentionBuffer:
     always equals the registered window size: the user-provided ``window_size``
     when custom memory is used, or the internally computed conservative
     capacity otherwise (it only hosts the attention_to_ffn dispatch receiving
-    area for the maximum possible attention worker count). Per-call flag
-    staging, address tables and count rows live in operator workspace. This
+    area for the maximum possible attention worker count). A separate context
+    payload region reserves all three supported micro-batch rounds up front,
+    using ``token_data_shape`` for the per-round shape, and grows from
+    ``x.shape[0]`` before a send only when that fixed capacity is exceeded. It
+    holds token copies, address tables, count rows, and flag sources. This
     class intentionally shares its
     registration tag with attention_to_ffn so peer ranks can discover this
     rank's window; create only one buffer per group in this process (attn
     workers create the attention_to_ffn buffer, FFN workers create this one).
 
-    The buffer also owns the async tensor keepalive state: a registered
-    (device-writable) host status table that kernels use to publish completed
-    send rounds, and the per-round references of in-flight input tensors.
-    Call ``destroy()`` (or drop the last reference) to wait for the final
-    round's in-flight sends and release everything.
+
     """
 
     def __init__(
@@ -172,6 +230,13 @@ class FFNToAttentionBuffer:
         window_addr: Optional[int] = None,
         window_size: Optional[int] = None,
     ):
+        _validate_buffer_types(
+            group,
+            token_info_table_shape,
+            token_data_shape,
+            window_addr,
+            window_size,
+        )
         if world_size != torch.distributed.get_world_size(group):
             raise ValueError("world_size must match the communication group size")
         self.group = group
@@ -180,6 +245,36 @@ class FFNToAttentionBuffer:
         self.ep_world_size = world_size
         self.token_info_table_shape = list(token_info_table_shape)
         self.token_data_shape = list(token_data_shape)
+        torch._check(
+            len(self.token_data_shape) == 4 and len(self.token_info_table_shape) == 3,
+            lambda: "token_data_shape must have 4 elements and token_info_table_shape must have 3 elements",
+        )
+        micro_batch_num, bs, expert_num_per_token, hs = self.token_data_shape
+        # The context can be reused by launches with one, two, or three active
+        # micro batches, so reserve the maximum supported round count up front.
+        max_token_num = _PAYLOAD_ROUND_NUM * bs * expert_num_per_token
+        self.max_token_num = max_token_num
+        self.payload_slot_num = _PAYLOAD_ROUND_NUM
+        torch._check(
+            isinstance(max_token_num, int) and 0 < max_token_num <= (1 << 31) - 1,
+            lambda: "max_token_num must be a positive int32 capacity",
+        )
+        torch._check(
+            hs > 0 and world_size > 0,
+            lambda: "token_data_shape must have a positive HS and world_size must be positive",
+        )
+        torch._check(
+            1 <= micro_batch_num <= _PAYLOAD_ROUND_NUM
+            and micro_batch_num == self.token_info_table_shape[0],
+            lambda: "microBatchNum must be 1, 2, or 3 in both token shapes",
+        )
+        self.payload_slot_stride = _calc_payload_slot_stride(
+            max_token_num, hs, world_size
+        )
+        torch._check(
+            self.payload_slot_stride <= _INT64_MAX // self.payload_slot_num,
+            lambda: "total payload size exceeds int64",
+        )
 
         torch._check(
             (window_addr is None) == (window_size is None),
@@ -218,23 +313,6 @@ class FFNToAttentionBuffer:
         self.window_addr = window_addr
         self.window_size = self.ccl_buffer_size
 
-        # Async send-completion status table: registered (device-writable) host memory. The
-        # kernel publishes the highest fully-completed send round into slot 0, and the Python
-        # side polls it without any device synchronization to release keepalive references.
-        op_module = _ffn_to_attention_op_builder.load()
-        self._status_table = op_module.FfnToAttentionHostStatusTable()
-        host_status_table_addr = self._status_table.device_ptr()
-        # 0 would silently disable the kernel-side completion report, so the keepalive
-        # references would never be released; fail loudly instead.
-        torch._check(
-            host_status_table_addr > 0,
-            lambda: (
-                f"hostStatusTableAddr should be a positive device address "
-                f"(status table device_ptr()), but got {host_status_table_addr}, "
-                f"{ops_error(ErrCode.VALUE)}."
-            ),
-        )
-
         self._ctx_manager = CommContextManager(
             self.group_name,
             self.ep_world_size,
@@ -248,38 +326,46 @@ class FFNToAttentionBuffer:
             customCclBufferSize=self.window_size,
             customDeviceBufferAddr=window_addr if window_addr is not None else 0,
             multiChannel=True,
-            hostStatusTableAddr=host_status_table_addr,
+            payloadBufferSize=self.payload_slot_stride * self.payload_slot_num,
+            payloadSlotNum=self.payload_slot_num,
         )
         self.context = self._ctx_manager.create_context()
         self._device = self.context.device
+        self._retired_contexts = []
 
-        # Tensor keepalive for async sends: round_id -> tensors still read by in-flight WQEs.
-        # Only references are held (no copy); entries are dropped once the device confirms the
-        # round completed. Round ids match the kernel launch ordinal on this buffer's context
-        # (both start at 0 and advance once per call, launches are stream-ordered), so all
-        # sends of one buffer must go through the ffn_to_attention wrapper of this buffer.
-        self._keepalive = {}
-        self._next_round_id = 0
-        self._launch_stream = None
+    def ensure_payload_capacity(self, token_num: int) -> None:
+        """Grow the payload for x rows before launching a send."""
+        torch._check(self.context is not None, lambda: "buffer has been destroyed")
+        torch._check(
+            isinstance(token_num, int) and 0 <= token_num <= (1 << 31) - 1,
+            lambda: "x.shape[0] must be a non-negative int32 token count",
+        )
+        if token_num <= self.max_token_num:
+            return
+        new_slot_stride = _calc_payload_slot_stride(
+            token_num, self.token_data_shape[3], self.ep_world_size
+        )
+        torch._check(
+            new_slot_stride <= _INT64_MAX // self.payload_slot_num,
+            lambda: "total payload size exceeds int64",
+        )
+        old_context = self.context
+        new_context = self._ctx_manager.grow_payload_buffer(
+            new_slot_stride * self.payload_slot_num, old_context
+        )
+        self._retired_contexts.append(old_context)
+        self.context = new_context
+        self.payload_slot_stride = new_slot_stride
+        self.max_token_num = token_num
 
     def destroy(self):
-        """Release the buffer and every retained resource.
-
-        This is the explicit end-of-life wait of the async tensor keepalive: a device-wide
-        synchronization retires all kernels and every in-flight WQE first, after which the
-        keepalive references are dropped and the registered status-table host memory is
-        unregistered. Skipping ``destroy`` and dropping the last reference also works (the
-        status table's destructor performs the same device drain), but the explicit call
-        makes the wait observable and deterministic.
-        """
+        """Release the buffer and every retained resource."""
         if self.context is None:
             return
         torch.npu.synchronize(self._device)
-        self._keepalive.clear()
-        self._status_table = None
         self._ctx_manager.destroy()
         self.context = None
-        self._launch_stream = None
+        self._retired_contexts.clear()
 
     def get_window_addr(self) -> int:
         """Get the local window memory device address from the context."""
@@ -320,6 +406,8 @@ def get_buffer_for_ffn_to_attention(
         world_size (int): Communication domain size.
         token_info_table_shape (List[int]): 3-element list [microBatchNum, BS, expertNumPerToken].
         token_data_shape (List[int]): 4-element list [microBatchNum, BS, expertNumPerToken, HS].
+            The context allocates one payload slot per microbatch and derives
+            its token row capacity from this shape.
         window_addr (int, optional): Device address of the user-provided local
             (FFN-side) communication window memory on this card. Must be
             provided together with ``window_size``. The memory is zeroed once,
@@ -334,8 +422,8 @@ def get_buffer_for_ffn_to_attention(
             attention_to_ffn dispatch receiving area (sized by the peer's
             actual quant_mode; use the conservative capacity computed by
             ``get_ffn_to_attention_ccl_buffer_size`` when the quant mode is
-            unknown); per-call flag staging, address tables and count rows use
-            operator workspace. The op tiling only validates the window
+            unknown); token copies, flag sources, address tables and count rows
+            use the separate context payload buffer. The op tiling only validates the window
             against this op's own attention-side landing zone (one session's
             flags plus the fp16/bf16 return data). When omitted, the
             framework allocates the window with the internally computed
@@ -348,6 +436,14 @@ def get_buffer_for_ffn_to_attention(
         name, world size, token table shapes and CCL buffer size (the
         registered FFN-side window size).
     """
+    _validate_buffer_types(
+        group,
+        token_info_table_shape,
+        token_data_shape,
+        window_addr,
+        window_size,
+    )
+
     return FFNToAttentionBuffer(
         group,
         world_size,
@@ -356,44 +452,6 @@ def get_buffer_for_ffn_to_attention(
         window_addr=window_addr,
         window_size=window_size,
     )
-
-
-def _release_completed_rounds(buffer: FFNToAttentionBuffer) -> None:
-    """Drop keepalive references of rounds the device already confirmed complete.
-
-    Non-blocking: reads slot 0 of the registered host status table (a volatile host-memory
-    read, no device synchronization). The kernel maintains the invariant that every WQE
-    posted before the launch of round N is retired once the table reports N - 1, so
-    releasing rounds <= completed is safe even though the current round is still in flight.
-    """
-    status_table = buffer._status_table
-    if status_table is None:
-        return
-    completed = status_table.completed_round()
-    if completed < 0 or not buffer._keepalive:
-        return
-    for round_id in [r for r in buffer._keepalive if r <= completed]:
-        del buffer._keepalive[round_id]
-
-
-def _check_launch_stream(buffer: FFNToAttentionBuffer) -> None:
-    """All launches on one buffer must share the launch stream.
-
-    The keepalive round ids mirror the kernel launch ordinal on the buffer's context, which
-    only holds while launches are stream-ordered; the shared channel state, context round
-    counter and cross-AIV synchronization assume sequential same-stream execution.
-    """
-    stream = torch.npu.current_stream(buffer._device)
-    if buffer._launch_stream is None:
-        buffer._launch_stream = stream
-    else:
-        torch._check(
-            stream == buffer._launch_stream,
-            lambda: (
-                "ffn_to_attention must use the stream of its first launch on this buffer "
-                f"while async sends are in flight, {ops_error(ErrCode.VALUE)}."
-            ),
-        )
 
 
 def ffn_to_attention(
@@ -430,13 +488,9 @@ def ffn_to_attention(
         None. Data is sent to peer ranks via the HCCL window; no host-visible output.
 
     Note:
-        The send is asynchronous: the kernel may return while the communication engine is
-        still reading ``x`` (the relay data WQEs read the x GM rows directly). This wrapper
-        therefore keeps ``x`` alive per round and releases it only after the device confirms
-        the round's sends completed (polled lazily on the next call, or on
-        ``FFNToAttentionBuffer.destroy()`` for the final round). Launches on one buffer must
-        stay on the launch stream, and every launch must go through this wrapper so the round
-        bookkeeping matches the kernel.
+        The send is asynchronous: the communication engine may still be reading the context
+        payload after the kernel returns. Tokens are copied into the slot selected by their
+        micro_batch_ids; the caller coordinates reuse of those slots externally.
     """
     torch._check(
         buffer.context is not None,
@@ -465,13 +519,7 @@ def ffn_to_attention(
         x.shape[1] <= buffer.token_data_shape[3],
         lambda: "x.shape[1] exceeds the window token slot width HS",
     )
-    _check_launch_stream(buffer)
-    round_id = buffer._next_round_id
-    buffer._next_round_id += 1
-    # Keepalive: hold the reference only (no copy); the in-flight WQEs of this round may
-    # still read x's storage after the kernel returns.
-    buffer._keepalive[round_id] = x
-
+    buffer.ensure_payload_capacity(x.shape[0])
     torch.ops.cann_ops_transformer.npu_ffn_to_attention(
         buffer.context,
         x,
@@ -487,7 +535,3 @@ def ffn_to_attention(
         buffer.ccl_buffer_size,
         attn_rank_table=attn_rank_table,
     )
-
-    # Lazy release: the kernel (when it already ran) published the completed round to the
-    # host status table; finished rounds' references are dropped here without blocking.
-    _release_completed_rounds(buffer)

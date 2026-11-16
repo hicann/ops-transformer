@@ -48,6 +48,7 @@ struct AttentionToFFNTilingConfig {
     bool allowMxQuantMode = false;
     bool allowMultiLayer = false;
     int64_t maxWorldSize = 768;
+    int64_t maxLayerNum = INT64_MAX;
 };
 
 ge::graphStatus AttentionToFFNTilingFuncBase(gert::TilingContext* context, const AttentionToFFNTilingConfig& config);

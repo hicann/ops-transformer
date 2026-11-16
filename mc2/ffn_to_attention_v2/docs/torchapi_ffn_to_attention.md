@@ -133,7 +133,9 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
 </tbody>
 </table>
 
-该接口返回<code>FFNToAttentionBuffer</code>对象，内部自动计算FFN侧CCL通信缓冲区大小（覆盖<code>attention_to_ffn</code>的下发接收区，作为算子<code>ccl_buffer_size</code>属性，等于实际注册的窗口大小；本算子flag source区与地址表区由算子workspace申请，不占用窗口），并创建通信上下文，供<code>ffn_to_attention</code>使用；传入<code>window_addr</code>和<code>window_size</code>时，本卡通信窗口以该地址和大小注册。本接口与<code>attention_to_ffn</code>共用注册tag以便对端rank查询本卡窗口。
+初始`max_token_num`由`token_data_shape`的前三维相乘得到；调用`ffn_to_attention`时，若本卡`x.shape[0]`超过当前容量，buffer会在发送前扩容context的payload区。payload槽位数由`microBatchNum`决定。每个槽位预留按32B对齐的token行，以及地址表、count行和flag发送源的容量。每个token根据输入`micro_batch_ids[i]`写入对应槽位；一次调用可以包含多个microbatch。若直接调用底层`torch.ops.cann_ops_transformer.npu_ffn_to_attention`（例如图模式），需在捕获或发送前调用`buffer.ensure_payload_capacity(x.shape[0])`。
+
+该接口返回<code>FFNToAttentionBuffer</code>对象，内部自动计算FFN侧CCL通信缓冲区大小（覆盖<code>attention_to_ffn</code>的下发接收区，作为算子<code>ccl_buffer_size</code>属性，等于实际注册的窗口大小；本算子的token副本、flag发送源、地址表和count行位于context申请的独立payload区，不占用窗口），并创建通信上下文，供<code>ffn_to_attention</code>使用；传入<code>window_addr</code>和<code>window_size</code>时，本卡通信窗口以该地址和大小注册。本接口与<code>attention_to_ffn</code>共用注册tag以便对端rank查询本卡窗口。
 
 ### ffn_to_attention
 
@@ -251,7 +253,7 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
   - `flagSize = microBatchNum × BS × expertNumPerToken × 4B`（本算子写入attention侧窗口的per-token flag区）
   - `returnDataSize = microBatchNum × BS × expertNumPerToken × HS × 2B`（本算子写入attention侧窗口的单会话紧凑FP16/BF16回写数据区，写入偏移与attention worker数量无关）
 
-原窗口尾部的本算子flag source区与地址表和 count 行区已改为从算子workspace申请（大小由tiling自动计算；下一轮kernel启动时先回收上一轮在途WQE再复用workspace）。
+本算子的token副本、flag发送源、地址表和count行使用context申请的独立payload区，按microbatch划分槽位。上一轮通信可能尚在读取某槽位，复用前须由外部协调。
 
 对端attention卡通信窗口大小由attention侧`get_buffer_for_attention_to_ffn`计算；量化模式下其结果（按1B/元素）即为本算子可接受的下限之上，tiling只校验上述落地区，因此两侧可共用同一窗口大小。
 
@@ -411,8 +413,7 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
               attn_rank_table=attn_rank_table,
           )
 
-      # 步骤4：收尾。destroy内部会先做device级同步，等待最后一轮在途发送完成后，
-      # 释放各轮保活的Tensor引用与注册的Host状态表内存。
+      # 步骤4：收尾。销毁buffer前，调用方需确保通信不再读取payload槽位。
       buffer.destroy()
       dist.barrier()
       dist.destroy_process_group()

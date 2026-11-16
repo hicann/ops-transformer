@@ -42,7 +42,6 @@ constexpr uint32_t ATTR_SYNC_FLAG_INDEX = 7U;
 constexpr uint32_t ATTR_FFN_START_RANK_ID_INDEX = 8U;
 constexpr uint32_t ATTR_CCL_BUFFER_SIZE_INDEX = 9U;
 
-constexpr size_t URMA_FLAG_SLOT_SIZE = 32U;
 constexpr size_t URMA_WIN_REGION_ALIGN = 512U;
 constexpr size_t UB_ALIGN_SIZE = 32U;
 constexpr size_t SCALE_PARAM_PAD_SIZE = 128U;
@@ -90,6 +89,7 @@ AttentionToFFNTilingConfig MakeTilingConfig(bool allowMxQuantMode)
     config.allowMxQuantMode = allowMxQuantMode;
     config.allowMultiLayer = true;
     config.maxWorldSize = 1024;
+    config.maxLayerNum = 43; // The maximum number of layers currently used in the entire network
     return config;
 }
 
@@ -348,9 +348,7 @@ ge::graphStatus CheckUrmaUbCapacity(gert::TilingContext* context, const Attentio
     return ge::GRAPH_SUCCESS;
 }
 
-// Extend workspace for the relay rank tables plus the staging/flag regions moved out of the win.
-static void ExtendWorkspaceForRankTables(gert::TilingContext* context, AttentionToFfnV2TilingData* tilingData,
-                                         uint32_t tilingKeyQuantMode, uint32_t outDtype)
+static void ExtendWorkspaceForRankTables(gert::TilingContext* context, AttentionToFfnV2TilingData* tilingData)
 {
     size_t* workSpaces = context->GetWorkspaceSizes(1);
     if (workSpaces == nullptr) {
@@ -370,12 +368,7 @@ static void ExtendWorkspaceForRankTables(gert::TilingContext* context, Attention
     const size_t countMatrixBytes =
         CeilAlignSize(static_cast<size_t>(info.aivNum) * countRowStride, WORKSPACE_ELEMENT_OFFSET);
     const size_t bucketTableBytes = CeilAlignSize(maxTotalSendNum * sizeof(int32_t), WORKSPACE_ELEMENT_OFFSET);
-    const size_t commuBytes = GetUrmaCommuBytes(tilingKeyQuantMode, outDtype, static_cast<size_t>(info.H));
-    const size_t stagingStride = CeilAlignSize(commuBytes, UB_ALIGN_SIZE);
-    const size_t stagingRegionBytes = CeilAlignSize(maxTotalSendNum * stagingStride, URMA_WIN_REGION_ALIGN);
-    const size_t flagRegionBytes =
-        CeilAlignSize(maxTotalSendNum * sizeof(int32_t), UB_ALIGN_SIZE) + URMA_FLAG_SLOT_SIZE;
-    workSpaces[0] += regionsOffset + countMatrixBytes + bucketTableBytes + stagingRegionBytes + flagRegionBytes;
+    workSpaces[0] += regionsOffset + countMatrixBytes + bucketTableBytes;
 }
 
 ge::graphStatus TilingNewQuantMode(gert::TilingContext* context, uint32_t quantMode)
@@ -414,13 +407,19 @@ ge::graphStatus TilingNewQuantMode(gert::TilingContext* context, uint32_t quantM
     uint32_t outDtype = ATTN_FFN_TILINGKEY_OUT_INT8;
     ResolveTilingKeyFields(quantMode, tilingKeyQuantMode, outDtype);
 
+    OP_TILING_CHECK(quantMode == USER_QUANT_MODE_MX_E2M1 && (info.H % 2U) != 0U,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "x", std::to_string(info.H).c_str(),
+                                                          "H dimension must be even for FP4 (quant_mode=5) output, "
+                                                          "because two FP4 elements are packed into one byte"),
+                    return ge::GRAPH_FAILED);
+
     OP_TILING_CHECK(context->SetScheduleMode(BATCH_MODE_SCHEDULE) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "failed to enable batch schedule mode"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckUrmaWinLayout(context, tilingData, tilingKeyQuantMode, outDtype) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "failed to check URMA win layout"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckUrmaUbCapacity(context, tilingData, tilingKeyQuantMode, outDtype) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "failed to check URMA UB capacity"), return ge::GRAPH_FAILED);
-    ExtendWorkspaceForRankTables(context, tilingData, tilingKeyQuantMode, outDtype);
+    ExtendWorkspaceForRankTables(context, tilingData);
     return SetV2TilingKey(context, tilingKeyQuantMode, outDtype, info.isScales, info.syncFlag == 1U, info.isActiveMask);
 }
 } // namespace
@@ -467,7 +466,7 @@ ge::graphStatus AttentionToFfnV2TilingFunc(gert::TilingContext* context)
     OP_TILING_CHECK(
         CheckUrmaUbCapacity(context, tilingData, info.quantMode, ATTN_FFN_TILINGKEY_OUT_INT8) != ge::GRAPH_SUCCESS,
         OP_LOGE(context->GetNodeName(), "failed to check URMA UB capacity"), return ge::GRAPH_FAILED);
-    ExtendWorkspaceForRankTables(context, tilingData, info.quantMode, ATTN_FFN_TILINGKEY_OUT_INT8);
+    ExtendWorkspaceForRankTables(context, tilingData);
     return SetV2TilingKey(context, info.quantMode, ATTN_FFN_TILINGKEY_OUT_INT8, info.isScales, info.syncFlag == 1U,
                           info.isActiveMask);
 }

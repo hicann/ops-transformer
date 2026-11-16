@@ -18,9 +18,11 @@
 #include <acl/acl_rt.h>
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstring>
 #include <limits>
 #include <utility>
+#include <vector>
 #include "hccl_common.h"
 
 namespace op_api {
@@ -79,7 +81,28 @@ struct CommContext {
     uint64_t roceBufferSize = 0; // 本地与各对端注册窗容量一致。
     uint64_t hostStatusTableAddr = 0;
     uint64_t completedRounds = static_cast<uint64_t>(-2);
+    // ---- 持久 payload 区元数据（第一步：context 只存指针/尺寸/槽位，数据在独立 device buffer 中）----
+    uint64_t payloadBufferAddr = 0; // payload device 基地址
+    uint64_t payloadBufferSize = 0; // payload 总字节
+    uint64_t payloadSlotStride = 0; // 单个在飞轮槽的字节跨度
+    uint32_t payloadSlotNum = 0;    // 在飞轮槽位数（= D）
 };
+
+// payload 区描述，构造 context 时由 manager 分配并注入到 CommContext 尾部字段。
+struct CommPayloadRegion {
+    uint64_t addr = 0;
+    uint64_t size = 0;
+    uint64_t slotStride = 0;
+    uint32_t slotNum = 0;
+};
+
+static void ApplyPayloadRegion(CommContext& context, const CommPayloadRegion& payload)
+{
+    context.payloadBufferAddr = payload.addr;
+    context.payloadBufferSize = payload.size;
+    context.payloadSlotStride = payload.slotStride;
+    context.payloadSlotNum = payload.slotNum;
+}
 
 // ======================== Common Types and Utilities ========================
 
@@ -144,12 +167,13 @@ static void CopyContextToTensor(const CommContext& context, at::Tensor& tensor)
 class KfcContextBuilder {
 public:
     void Build(const std::string& group, int64_t worldSize, int64_t& cclBufferSize, at::Tensor& contextTensor,
-               void** localDeviceBuffer)
+               void** localDeviceBuffer, const CommPayloadRegion& payload = {})
     {
         CommContext mc2ContextHost;
         GetMc2Context(mc2ContextHost, worldSize, cclBufferSize, group.c_str());
         TORCH_CHECK(mc2ContextHost.epRankId < HCCL_MAX_RANK_SIZE, "Invalid local rank id: ", mc2ContextHost.epRankId);
         *localDeviceBuffer = reinterpret_cast<void*>(mc2ContextHost.epHcclBuffer_[mc2ContextHost.epRankId]);
+        ApplyPayloadRegion(mc2ContextHost, payload);
 
         CopyContextToTensor(mc2ContextHost, contextTensor);
     }
@@ -242,7 +266,7 @@ public:
                const std::string& commAlg, const std::string& opName, int64_t customCclBufferSize = 0,
                const py::object& customCclBufferSizeResolver = py::none(), void* userDeviceBuffer = nullptr,
                void** customDeviceBuffer = nullptr, HcclMemHandle* customMemHandle = nullptr, bool multiChannel = false,
-               int64_t hostStatusTableAddr = 0)
+               int64_t hostStatusTableAddr = 0, const CommPayloadRegion& payload = {})
     {
         ASCEND_LOGI("Start to get CommContext Tensor, group: %s", group.c_str());
         InitHcclEngineCtxFunctions();
@@ -294,6 +318,7 @@ public:
                     "hostStatusTableAddr must be aligned to ", sizeof(uint64_t),
                     " bytes when enabled (kernel writes int64 slots), got ", hostStatusTableAddr);
         commContextStruct.hostStatusTableAddr = static_cast<uint64_t>(hostStatusTableAddr);
+        ApplyPayloadRegion(commContextStruct, payload);
 
         CopyContextToTensor(commContextStruct, contextTensor);
         ASCEND_LOGI("Get CommContext Tensor Success, group: %s, ccl_buffer_size: %ld", group.c_str(), cclBufferSize);
@@ -1255,7 +1280,8 @@ public:
     CommContextManager(const std::string& group, int64_t worldSize, const py::object& backend = py::str("kfc"),
                        const std::string& commAlg = "ub-mem", const std::string& opName = "moe_dispatch_ffn_combine",
                        int64_t customCclBufferSize = 0, const py::object& customCclBufferSizeResolver = py::none(),
-                       int64_t customDeviceBufferAddr = 0, bool multiChannel = false, int64_t hostStatusTableAddr = 0)
+                       int64_t customDeviceBufferAddr = 0, bool multiChannel = false, int64_t hostStatusTableAddr = 0,
+                       int64_t payloadBufferSize = 0, int64_t payloadSlotNum = 0)
         : group_(group),
           commAlg_(commAlg),
           opName_(opName),
@@ -1269,7 +1295,9 @@ public:
           customCclBufferSizeResolver_(customCclBufferSizeResolver),
           customDeviceBufferAddr_(customDeviceBufferAddr),
           multiChannel_(multiChannel),
-          hostStatusTableAddr_(hostStatusTableAddr)
+          hostStatusTableAddr_(hostStatusTableAddr),
+          payloadBufferSize_(payloadBufferSize),
+          payloadSlotNum_(payloadSlotNum)
     {}
 
     ~CommContextManager()
@@ -1292,6 +1320,44 @@ public:
         return context;
     }
 
+    at::Tensor GrowPayloadBuffer(int64_t newBufferSize, const at::Tensor& contextTensor)
+    {
+        TORCH_CHECK(payloadSlotNum_ > 0 && payloadDeviceBuffer_ != nullptr, "Payload buffer is not initialized.");
+        TORCH_CHECK(newBufferSize > payloadBufferSize_ && newBufferSize % payloadSlotNum_ == 0,
+                    "new payload size must exceed the current size and be divisible by payloadSlotNum");
+        TORCH_CHECK(contextTensor.scalar_type() == at::kInt && contextTensor.numel() >= ContextTensorSize(),
+                    "contextTensor has an invalid type or size");
+        static_assert(sizeof(CommPayloadRegion) == sizeof(CommContext) - offsetof(CommContext, payloadBufferAddr),
+                      "payload region must match the context tail layout");
+        const c10::OptionalDeviceGuard deviceGuard(contextTensor.device());
+
+        void* newBuffer = nullptr;
+        const uint64_t sizeBytes = static_cast<uint64_t>(newBufferSize);
+        aclError ar = aclrtMalloc(&newBuffer, sizeBytes, ACL_MEM_MALLOC_HUGE_FIRST);
+        TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMalloc(payloadBufferSize=", sizeBytes, ") failed, ret=", ar);
+        try {
+            ar = aclrtMemset(newBuffer, sizeBytes, 0, sizeBytes);
+            TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMemset(payload buffer) failed, ret=", ar);
+            CommPayloadRegion region;
+            region.addr = reinterpret_cast<uint64_t>(newBuffer);
+            region.size = sizeBytes;
+            region.slotStride = sizeBytes / static_cast<uint64_t>(payloadSlotNum_);
+            region.slotNum = static_cast<uint32_t>(payloadSlotNum_);
+            at::Tensor nextContext = contextTensor.clone();
+            at::Tensor hostRegion = at::from_blob(&region, {sizeof(region) / sizeof(int32_t)}, at::kInt);
+            nextContext
+                .narrow(0, offsetof(CommContext, payloadBufferAddr) / sizeof(int32_t), sizeof(region) / sizeof(int32_t))
+                .copy_(hostRegion);
+            retiredPayloadBuffers_.push_back(payloadDeviceBuffer_);
+            payloadDeviceBuffer_ = newBuffer;
+            payloadBufferSize_ = newBufferSize;
+            return nextContext;
+        } catch (...) {
+            (void)aclrtFree(newBuffer);
+            throw;
+        }
+    }
+
     void UpdateGroup(const std::string& group, at::Tensor& contextTensor)
     {
         TORCH_CHECK(
@@ -1306,7 +1372,7 @@ public:
 
     void Destroy()
     {
-        if (customMemHandle_ != nullptr || customDeviceBuffer_ != nullptr) {
+        if (customMemHandle_ != nullptr || customDeviceBuffer_ != nullptr || payloadDeviceBuffer_ != nullptr) {
             aclError aclRet = aclrtSynchronizeDevice();
             TORCH_CHECK(aclRet == ACL_SUCCESS, "aclrtSynchronizeDevice failed, ret=", aclRet);
         }
@@ -1319,6 +1385,16 @@ public:
         }
         customDeviceBuffer_ = nullptr;
         localDeviceBuffer_ = nullptr;
+        if (payloadDeviceBuffer_ != nullptr && ownsPayloadBuffer_) {
+            aclError aclRet = aclrtFree(payloadDeviceBuffer_);
+            TORCH_CHECK(aclRet == ACL_SUCCESS, "aclrtFree(payloadDeviceBuffer_) failed, ret=", aclRet);
+        }
+        payloadDeviceBuffer_ = nullptr;
+        for (void* retiredBuffer : retiredPayloadBuffers_) {
+            aclError aclRet = aclrtFree(retiredBuffer);
+            TORCH_CHECK(aclRet == ACL_SUCCESS, "aclrtFree(retiredPayloadBuffer) failed, ret=", aclRet);
+        }
+        retiredPayloadBuffers_.clear();
     }
 
     int64_t CclBufferSize() const
@@ -1352,6 +1428,29 @@ public:
         return at::from_blob(data, {totalElements - offset}, options);
     }
 
+    at::Tensor GetPayloadBufferTensor(const py::object& dtype, int64_t offset) const
+    {
+        TORCH_CHECK(payloadDeviceBuffer_ != nullptr, "Payload buffer is not initialized.");
+        TORCH_CHECK(offset >= 0, "offset must be non-negative, got ", offset, ".");
+        torch::ScalarType scalarType = torch::python::detail::py_object_to_dtype(dtype);
+        int64_t elementBytes = static_cast<int64_t>(c10::elementSize(scalarType));
+        TORCH_CHECK(elementBytes > 0, "Invalid element size for requested dtype.");
+        int64_t totalElements = payloadBufferSize_ / elementBytes;
+        TORCH_CHECK(offset <= totalElements, "offset must be in [0, ", totalElements, "], got ", offset, ".");
+
+        void* data = static_cast<void*>(static_cast<uint8_t*>(payloadDeviceBuffer_) + offset * elementBytes);
+        auto options = at::TensorOptions()
+                           .dtype(scalarType)
+                           .device(c10::DeviceType::PrivateUse1)
+                           .memory_format(c10::MemoryFormat::Contiguous);
+        return at::from_blob(data, {totalElements - offset}, options);
+    }
+
+    int64_t PayloadBufferSize() const
+    {
+        return payloadBufferSize_;
+    }
+
 private:
     static int64_t ContextTensorSize()
     {
@@ -1376,17 +1475,18 @@ private:
             userDeviceBuffer = ResolveUserDeviceBuffer();
         }
         ownsDeviceBuffer_ = (userDeviceBuffer == nullptr);
+        CommPayloadRegion payload = BuildPayloadRegion();
         switch (mode_) {
             case BackendMode::KFC: {
                 KfcContextBuilder builder;
-                builder.Build(group_, worldSize_, cclBufferSize_, tensor, &localDeviceBuffer_);
+                builder.Build(group_, worldSize_, cclBufferSize_, tensor, &localDeviceBuffer_, payload);
                 return;
             }
             case BackendMode::CHANNEL: {
                 HcclChannelContextBuilder builder;
                 builder.Build(group_, worldSize_, cclBufferSize_, tensor, commAlg_, opName_, customCclBufferSize_,
                               customCclBufferSizeResolver_, userDeviceBuffer, &customDeviceBuffer_, &customMemHandle_,
-                              multiChannel_, hostStatusTableAddr_);
+                              multiChannel_, hostStatusTableAddr_, payload);
                 if (userDeviceBuffer != nullptr) {
                     TORCH_CHECK(customDeviceBuffer_ == userDeviceBuffer,
                                 "customDeviceBuffer was not adopted: a context for this group/opName already "
@@ -1412,6 +1512,45 @@ private:
         return reinterpret_cast<void*>(static_cast<uintptr_t>(customDeviceBufferAddr_));
     }
 
+    // 分配持久 payload 区（第一步：只申请一段独立 device buffer，通过 context 尾部字段暴露给 device kernel）。
+    // 幂等：已分配时复用，避免 UpdateGroup 重建 context 时重复分配。
+    CommPayloadRegion BuildPayloadRegion()
+    {
+        CommPayloadRegion region;
+        if (payloadBufferSize_ <= 0) {
+            return region;
+        }
+        TORCH_CHECK(payloadSlotNum_ > 0, "payloadSlotNum must be positive when payloadBufferSize is set");
+        TORCH_CHECK(payloadBufferSize_ % payloadSlotNum_ == 0,
+                    "payloadBufferSize must be divisible by payloadSlotNum, got size=", payloadBufferSize_,
+                    ", slotNum=", payloadSlotNum_);
+        TORCH_CHECK(payloadBufferSize_ <= std::numeric_limits<int64_t>::max(),
+                    "payloadBufferSize is too large: ", payloadBufferSize_);
+
+        if (payloadDeviceBuffer_ == nullptr) {
+            uint64_t sizeBytes = static_cast<uint64_t>(payloadBufferSize_);
+            aclError ar = aclrtMalloc(&payloadDeviceBuffer_, sizeBytes, ACL_MEM_MALLOC_HUGE_FIRST);
+            TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMalloc(payloadBufferSize=", sizeBytes, ") failed, ret=", ar);
+            try {
+                ar = aclrtMemset(payloadDeviceBuffer_, sizeBytes, 0, sizeBytes);
+                TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMemset(payload buffer) failed, ret=", ar);
+            } catch (...) {
+                // Malloc 成功但清零失败：立即释放并回退状态，避免 Destroy 因 ownsPayloadBuffer_
+                // 为 false 跳过 aclrtFree 后置空指针导致整块 payload 显存泄漏。
+                (void)aclrtFree(payloadDeviceBuffer_);
+                payloadDeviceBuffer_ = nullptr;
+                throw;
+            }
+            ownsPayloadBuffer_ = true;
+        }
+
+        region.addr = reinterpret_cast<uint64_t>(payloadDeviceBuffer_);
+        region.size = static_cast<uint64_t>(payloadBufferSize_);
+        region.slotStride = static_cast<uint64_t>(payloadBufferSize_ / payloadSlotNum_);
+        region.slotNum = static_cast<uint32_t>(payloadSlotNum_);
+        return region;
+    }
+
     std::string group_;
     std::string commAlg_;
     std::string opName_;
@@ -1430,6 +1569,11 @@ private:
     void* customDeviceBuffer_ = nullptr;
     void* localDeviceBuffer_ = nullptr;
     HcclMemHandle customMemHandle_ = nullptr;
+    int64_t payloadBufferSize_ = 0;
+    int64_t payloadSlotNum_ = 0;
+    void* payloadDeviceBuffer_ = nullptr;
+    bool ownsPayloadBuffer_ = false;
+    std::vector<void*> retiredPayloadBuffers_;
 };
 
 // Bind the CommContextManager class to Python module
@@ -1437,16 +1581,22 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     py::class_<CommContextManager>(m, "CommContextManager")
         .def(py::init<const std::string&, int64_t, const py::object&, const std::string&, const std::string&, int64_t,
-                      const py::object&, int64_t, bool, int64_t>(),
+                      const py::object&, int64_t, bool, int64_t, int64_t, int64_t>(),
              py::arg("group"), py::arg("worldSize"), py::arg("backend") = std::string("kfc"),
              py::arg("commAlg") = std::string("ub-mem"), py::arg("opName") = std::string("moe_dispatch_ffn_combine"),
              py::arg("customCclBufferSize") = 0, py::arg("customCclBufferSizeResolver") = py::none(),
-             py::arg("customDeviceBufferAddr") = 0, py::arg("multiChannel") = false, py::arg("hostStatusTableAddr") = 0)
+             py::arg("customDeviceBufferAddr") = 0, py::arg("multiChannel") = false, py::arg("hostStatusTableAddr") = 0,
+             py::arg("payloadBufferSize") = 0, py::arg("payloadSlotNum") = 0)
         .def("create_context", &CommContextManager::CreateContext)
+        .def("grow_payload_buffer", &CommContextManager::GrowPayloadBuffer, py::arg("newBufferSize"),
+             py::arg("contextTensor").noconvert())
         .def("update_group", &CommContextManager::UpdateGroup, py::arg("group"), py::arg("contextTensor").noconvert())
         .def("destroy", &CommContextManager::Destroy)
         .def("get_local_buffer_tensor", &CommContextManager::GetLocalBufferTensor, py::arg("dtype"),
              py::arg("offset") = 0)
+        .def("get_payload_buffer_tensor", &CommContextManager::GetPayloadBufferTensor, py::arg("dtype"),
+             py::arg("offset") = 0)
+        .def_property_readonly("payload_buffer_size", &CommContextManager::PayloadBufferSize)
         .def_property_readonly("ccl_buffer_size", &CommContextManager::CclBufferSize)
         .def_property_readonly("topo_type", &CommContextManager::GetTopoType)
         .def_property_readonly("rank_num_per_server", &CommContextManager::GetRankNumPerServer);

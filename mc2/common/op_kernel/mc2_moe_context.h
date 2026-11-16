@@ -33,6 +33,10 @@ struct Mc2MoeContext {
     uint64_t roceBufferSize; // 本地与各对端注册窗容量一致。
     uint64_t hostStatusTableAddr;
     uint64_t completedRounds;
+    uint64_t payloadBufferAddr;
+    uint64_t payloadBufferSize;
+    uint64_t payloadSlotStride;
+    uint32_t payloadSlotNum;
 };
 
 struct MoeCommContext {

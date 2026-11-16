@@ -371,7 +371,12 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoS
   - `infoTableLastDim`：FFN侧token信息表最后一维长度，即`ffn_token_info_table_shape`的最后一维，等于`2 + BS × expertNumPerToken`（`expertNumPerToken = K + sharedExpertNum`；前2个int32为保留表项，其余为每个token按专家存放的信息表项，每项4B）。
   - `bytesPerElem`：token数据每个元素的传输字节数，由`quant_mode`决定：非量化模式（quantMode=0）为2B（FP16/BF16按原始精度传输）；量化模式（quantMode=2~7，含INT8/FP8/FP4）为1B，其中FP4模式下2个元素打包为1B，`HS`为按打包折算后的字节数。
 
-该大小由`get_buffer_for_attention_to_ffn`内部自动计算，用户无需自行计算或设置`ccl_buffer_size`。`ccl_buffer_size`描述对端FFN卡通信窗口大小；本卡（attention侧）通信窗口大小由`window_size`指定。窗口内仅保留token信息表与token数据区，原窗口尾部的紧凑staging区与URMA flag常驻区已改为从算子workspace申请（大小由tiling自动计算）。非量化模式（quantMode=0）与量化模式一致：输入`x`的行先经UB中转（GM→UB→GM）写入staging区，relay WQE从staging区读取数据发往目标卡，连续的tokenOffset可合并为单个WQE连续发送。
+该大小由`get_buffer_for_attention_to_ffn`内部自动计算，用户无需自行计算或设置`ccl_buffer_size`。`ccl_buffer_size`描述对端FFN卡通信窗口大小；本卡（attention侧）通信窗口大小由`window_size`指定。窗口内仅保留token信息表与token数据区。
+
+- 常驻payload区的生命周期约束：
+    - relay WQE（含data/flag/layer-flag WQE）在kernel返回后仍会异步读取payload区，因此该区域必须常驻（由buffer持有，`destroy()`前有效），不能使用每次调用自动分配的workspace（框架会在算子返回后复用）。
+    - 不同`microBatchId`使用不同槽位，相邻microbatch的发送可重叠，无需任何drain；同一槽位在一个完整流水线轮次后才会复用——调用方需保证下一轮同`microBatchId`的`attention_to_ffn`晚于上一轮数据被对端消费（正常流水线下由数据依赖天然满足：下一轮输入依赖`ffn_to_attention`回传）。禁止在`x`与回传无关的场景下对同一`microBatchId`背靠背重发，禁止同一buffer多stream并发调用。
+    - `buffer.destroy()`会先执行device同步（等待最后一轮在途WQE完成）再释放payload区；请勿在发送仍在途时释放buffer。
 
 - 与`ffn_to_attention`共用窗口的交叉约束：`ffn_to_attention`回传数据（单会话、2B元素）落在本卡窗口头部（token数据区内）。非量化模式下N会话数据区恒可覆盖回传区；量化模式下需满足`attnWorkerNum × 1B ≥ 2B`（即`attnWorkerNum ≥ 2`），否则tiling将拒绝该配置（单会话量化下发时数据区无法容纳回传数据区）。
 

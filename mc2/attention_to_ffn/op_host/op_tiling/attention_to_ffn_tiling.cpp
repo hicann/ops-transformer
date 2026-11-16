@@ -715,6 +715,11 @@ static bool CheckExpertRankTableShape(const char* nodeName, const int32_t expert
                 nodeName, "expert_rank_table", (std::string("[") + std::to_string(expertRankTableDim0) + "]").c_str(),
                 "Dim0 of expert_rank_table must greater than 0"),
             return false);
+        OP_TILING_CHECK(
+            static_cast<int64_t>(expertRankTableDim0) > config.maxLayerNum,
+            OP_LOGE_FOR_INVALID_VALUE(nodeName, "expert_rank_table", std::to_string(expertRankTableDim0).c_str(),
+                                      (std::string("[1, ") + std::to_string(config.maxLayerNum) + "]").c_str()),
+            return false);
     } else {
         OP_TILING_CHECK(
             expertRankTableDim0 != 1,

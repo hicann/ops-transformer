@@ -157,7 +157,7 @@
     <tr>
     <td style="white-space: nowrap">cclBufferSize</td>
     <td style="white-space: nowrap">属性</td>
-    <td style="white-space: nowrap">CCL通信缓冲区总大小（Bytes），由 <code>get_buffer_for_attention_to_ffn</code> 接口内部自动计算。需 >= token_info_size + token_data_size（按2MB向上对齐）。staging区与flag常驻区已改为从算子workspace申请，不占用窗口。</td>
+    <td style="white-space: nowrap">CCL通信缓冲区总大小（Bytes），由 <code>get_buffer_for_attention_to_ffn</code> 接口内部自动计算。需 >= token_info_size + token_data_size（按2MB向上对齐）。staging区与flag常驻区已改为buffer创建时经CommContextManager（<code>payloadBufferSize</code>/<code>payloadSlotNum</code>参数）分配的常驻payload区（随context下发，按microBatchId分槽），不占用窗口。</td>
     <td style="white-space: nowrap">INT64</td>
     <td style="white-space: nowrap">-</td>
     </tr>
@@ -194,8 +194,6 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoS
   - `tokenDataSize = attentionWorkerNum × microBatchNum × BS × (K+shared) × HS × bytesPerElem`
   - `infoTableLastDim`：FFN侧token信息表最后一维长度，即`ffnTokenInfoTableShape`的最后一维，等于`2 + BS × expertNumPerToken`（`expertNumPerToken = K + sharedExpertNum`；前2个int32为保留表项，其余为每个token按专家存放的信息表项，每项4B）。
   - `bytesPerElem`：token数据每个元素的传输字节数，由quantMode决定：非量化模式（quantMode=0）为2B（FP16/BF16按原始精度传输）；量化模式（quantMode=2~7，含INT8/FP8/FP4）为1B，其中FP4模式下2个元素打包为1B，`HS`为按打包折算后的字节数。
-
-> 窗口内仅保留token信息表与token数据区。原窗口尾部的staging区（每token一个staging槽，槽步长按32B向上对齐）与URMA flag常驻区（每token一个4B紧凑flag槽 + 1个32B layer flag槽）已改为从算子workspace申请，大小由tiling自动计算，用户无需感知。非量化模式（quantMode=0）与量化模式一致：输入`x`的行先经UB中转（GM→UB→GM）写入staging区，relay WQE从staging区读取数据发往目标卡，连续的tokenOffset可合并为单个WQE连续发送。
 
 该大小由 `get_buffer_for_attention_to_ffn` 接口内部自动计算，用户无需自行计算或设置`ccl_buffer_size`。
 

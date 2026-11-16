@@ -31,11 +31,19 @@ struct AttentionFFNContext {
     uint64_t roceBufferSize; // 本地与各对端注册窗容量一致。
     uint64_t hostStatusTableAddr;
     uint64_t completedRounds;
+    // ---- 持久 payload 区元数据（与 host 侧 CommContext 尾部字段二进制一致）----
+    uint64_t payloadBufferAddr;
+    uint64_t payloadBufferSize;
+    uint64_t payloadSlotStride;
+    uint32_t payloadSlotNum;
 };
 // 状态表字段必须紧跟channelsPerRank（含对齐填充），与host侧CommContext的二进制布局一致。
 static_assert(offsetof(AttentionFFNContext, completedRounds) ==
                   offsetof(AttentionFFNContext, hostStatusTableAddr) + sizeof(uint64_t),
               "AttentionFFNContext keepalive tail fields must stay contiguous uint64 pairs");
+static_assert(offsetof(AttentionFFNContext, payloadBufferAddr) ==
+                  offsetof(AttentionFFNContext, completedRounds) + sizeof(uint64_t),
+              "AttentionFFNContext payload fields must stay contiguous after completedRounds");
 } // namespace Mc2Aclnn
 
 #endif // ATTENTION_FFN_CONTEXT_H
