@@ -41,6 +41,25 @@ _selected_ops = (
     else None
 )
 
+# torch_extension of these ops is implemented in mc2/common/torch_extension,
+# selecting any of them packages mc2/common as well
+_COMMON_TORCH_EXTENSION_ALIASES = frozenset(
+    (
+        "moe_ep_combine",
+        "moe_ep_combine_epilogue",
+        "moe_ep_dispatch",
+        "moe_ep_dispatch_epilogue",
+        "engram_fetch",
+        "engram_fetch_wait",
+        "engram_fetch_grad",
+        "elasticbuffer",
+        "elastic_buffer",
+    )
+)
+
+if _selected_ops and _selected_ops & _COMMON_TORCH_EXTENSION_ALIASES:
+    _selected_ops = _selected_ops | frozenset(("common",))
+
 _vendor_env = os.environ.get("TORCH_EXTENSION_VENDOR", "").strip()
 
 _experimental_env = os.environ.get("TORCH_EXTENSION_EXPERIMENTAL", "").strip()
