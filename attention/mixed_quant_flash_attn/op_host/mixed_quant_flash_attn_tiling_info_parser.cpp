@@ -45,13 +45,13 @@ bool IsEmptyShape(const gert::StorageShape* shape, FaLayout layout)
         return shape->GetStorageShape().GetDim(0) == 0;
     }
     if (layout == FaLayout::PA_NZ && shape->GetStorageShape().GetDimNum() == 5U) {
-        return shape->GetStorageShape().GetDim(0) * shape->GetStorageShape().GetDim(3) == 0;
+        return shape->GetStorageShape().GetDim(0) == 0;
     }
     if (layout == FaLayout::PA_BBND && shape->GetStorageShape().GetDimNum() == 4U) {
-        return shape->GetStorageShape().GetDim(0) * shape->GetStorageShape().GetDim(1) == 0;
+        return shape->GetStorageShape().GetDim(0) == 0;
     }
     if (layout == FaLayout::PA_BNBD && shape->GetStorageShape().GetDimNum() == 4U) {
-        return shape->GetStorageShape().GetDim(0) * shape->GetStorageShape().GetDim(2) == 0;
+        return shape->GetStorageShape().GetDim(0) == 0;
     }
     return false;
 }
