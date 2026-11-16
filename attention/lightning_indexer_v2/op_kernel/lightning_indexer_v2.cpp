@@ -16,7 +16,7 @@
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
 #include "lightning_indexer_v2_template_tiling_key.h"
-#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)) || (__CCE_AICORE__ == 310)
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)) || (__CCE_AICORE__ == 310)
 #include "arch35/lightning_indexer_v2_kernel_arch35.h"
 #else
 #include "arch22/lightning_indexer_v2_kernel_arch22.h"
@@ -74,7 +74,7 @@ using namespace LIV2Kernel;
     } while (0)
 
 // candidate (two-level topk) 宏：arch22 分支专用——Init 多传 2 个 candidate 输出。
-// arch35(950/960, 含 __CCE_AICORE__==310 与 __NPU_ARCH__==9201) Init 签名无 candidate 参
+// arch35(950/960, 含 __CCE_AICORE__==310 与 __NPU_ARCH__==9201/9202) Init 签名无 candidate 参
 // （红线 1：arch35 逐字节不动），该分支继续走原宏 INVOKE_LI_NO_KFC_OP_IMPL；arch35 上本宏
 // 不展开，两个 candidate 形参恒为空 tensor 指针、不被消费（host 侧 tiling 入口守卫已在
 // DAV_3510 上拒绝 candidate 模式）。
@@ -101,14 +101,14 @@ __global__ __aicore__ void lightning_indexer_v2(
 {
     TPipe tPipe;
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
-#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
 #else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 #endif
 
     if (ORIG_DTYPE_Q == DT_BF16) {
-#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)) || (__CCE_AICORE__ == 310)
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)) || (__CCE_AICORE__ == 310)
         INVOKE_LI_NO_KFC_OP_IMPL(LightningIndexerV2Kernel, bfloat16_t, bfloat16_t, int32_t, float, uint32_t,
                                  PAGE_ATTENTION, LI_V2_LAYOUT(LAYOUT_T), LI_V2_LAYOUT(K_LAYOUT_T), true);
 #else
@@ -116,7 +116,7 @@ __global__ __aicore__ void lightning_indexer_v2(
                                     PAGE_ATTENTION, LI_V2_LAYOUT(LAYOUT_T), LI_V2_LAYOUT(K_LAYOUT_T), true);
 #endif
     } else if (ORIG_DTYPE_Q == DT_FLOAT16) {
-#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)) || (__CCE_AICORE__ == 310)
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)) || (__CCE_AICORE__ == 310)
         INVOKE_LI_NO_KFC_OP_IMPL(LightningIndexerV2Kernel, half, half, int32_t, float, uint32_t, PAGE_ATTENTION,
                                  LI_V2_LAYOUT(LAYOUT_T), LI_V2_LAYOUT(K_LAYOUT_T), true);
 #else

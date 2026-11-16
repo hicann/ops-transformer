@@ -183,7 +183,8 @@ ge::graphStatus LIV2InfoParser::GetNpuInfo()
 
     socVersion_ = liV2AscendcPlatform.GetSocVersion();
     npuArch_ = liV2AscendcPlatform.GetCurNpuArch();
-    if ((npuArch_ != NpuArch::DAV_2201) && (npuArch_ != NpuArch::DAV_3510) && (npuArch_ != NpuArch::DAV_9201)) {
+    if ((npuArch_ != NpuArch::DAV_2201) && (npuArch_ != NpuArch::DAV_3510) && (npuArch_ != NpuArch::DAV_9201) &&
+        (npuArch_ != NpuArch::DAV_9202)) {
         REPORT_PREDEFINED_ERR_MSG(
             "EZ3002", (std::vector<const char*>{"optype", "opskernel", "reason"}),
             (std::vector<const char*>{
@@ -310,7 +311,7 @@ ge::graphStatus LIV2InfoParser::GetAndCheckAttrParaInfo()
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "layout_q", std::string(liV2Params_.layOut).c_str(),
                                                       "Layout_q only supports BSND or TND"),
                 return ge::GRAPH_FAILED);
-    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201) {
+    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         OP_CHECK_IF(((std::string(liV2Params_.layOutKey) != "PA_BBND") &&
                      (std::string(liV2Params_.layOut)) != (std::string(liV2Params_.layOutKey))),
                     OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
@@ -479,7 +480,7 @@ ge::graphStatus LIV2InfoParser::GetAndCheckOptionalInput()
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "seqused_k",
                                                              "When layout_k is PA_BSND, seqused_k must not be null"),
                     return ge::GRAPH_FAILED);
-        if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201) {
+        if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
             OP_CHECK_IF(liV2Params_.cuSeqlensK.tensor != nullptr,
                         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                             opName_, "cu_seqlens_k", "When layout_k is PA_BBND, cu_seqlens_k must not be provided"),
@@ -502,7 +503,7 @@ ge::graphStatus LIV2InfoParser::GetAndCheckOptionalInput()
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cu_seqlens_k",
                                                              "When layout_k is TND, cu_seqlens_k must not be null"),
                     return ge::GRAPH_FAILED);
-        if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201) {
+        if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
             OP_CHECK_IF(liV2Params_.cuSeqlensK.desc->GetDataType() != ge::DT_INT32,
                         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                             opName_, "cu_seqlens_k",
@@ -535,7 +536,8 @@ ge::graphStatus LIV2InfoParser::GetAndCheckOptionalInput()
         }
     }
     // =============== cmpResidualK 校验 ===============
-    {
+    // cmpRatio 不等于 1 且 maskMode 不等于 0 时 cmpResidualK 必传
+    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         if (liV2Params_.cmpRatio != nullptr && *liV2Params_.cmpRatio != 1 && liV2Params_.maskMode != nullptr &&
             *liV2Params_.maskMode != 0) {
             OP_CHECK_IF(liV2Params_.cmpResidualK.tensor == nullptr,
@@ -585,7 +587,7 @@ ge::graphStatus LIV2InfoParser::GetAndCheckOptionalInput()
                                                              "When layout_q is TND, cu_seqlens_q must not be null"),
                     return ge::GRAPH_FAILED);
         // cuSeqlensQ 维度 & 类型校验
-        if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201) {
+        if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
             if (kLayout_ == DataLayout::PA_BBND) {
                 // k为PA_BBND必传sequsedK, 用sequsedK的维度校验
                 OP_CHECK_IF(liV2Params_.cuSeqlensQ.tensor->GetStorageShape().GetShapeSize() !=
@@ -637,7 +639,7 @@ ge::graphStatus LIV2InfoParser::CheckShapeDim()
                     opName_, "block_table",
                     std::to_string(liV2Params_.blockTable.tensor->GetStorageShape().GetDimNum()).c_str(), "2"),
                 return ge::GRAPH_FAILED);
-    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201) {
+    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         OP_CHECK_IF(
             ((kLayout_ == DataLayout::PA_BBND) || (kLayout_ == DataLayout::BSND)) &&
                 (liV2Params_.key.shape->GetStorageShape().GetDimNum() != DIM_NUM_FOUR),
@@ -767,13 +769,15 @@ ge::graphStatus LIV2InfoParser::GetGSize()
                                                "The head num of q must be a multiple of the head num of k");
     }
     gSize_ = n1Size_ / n2Size_;
-    OP_CHECK_IF(gSize_ > G_SIZE_LIMIT,
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                    opName_, "q and k",
-                    Ops::Base::ToString(liV2Params_.query.shape->GetStorageShape()) + " and " +
-                        Ops::Base::ToString(liV2Params_.key.shape->GetStorageShape()),
-                    "The value of (the head num of q divided by the head num of k) must <= 64"),
-                return ge::GRAPH_FAILED);
+    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
+        OP_CHECK_IF(gSize_ > G_SIZE_LIMIT,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        opName_, "q and k",
+                        Ops::Base::ToString(liV2Params_.query.shape->GetStorageShape()) + " and " +
+                            Ops::Base::ToString(liV2Params_.key.shape->GetStorageShape()),
+                        "The value of (the head num of q divided by the head num of k) must <= 64"),
+                    return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -939,7 +943,7 @@ ge::graphStatus LIV2InfoParser::ValidateInputShapesMatchQtnd()
                         std::to_string(liV2Params_.attenOut.shape->GetStorageShape().GetDim(0)) +
                         " respectively, they must be same"),
                 return ge::GRAPH_FAILED);
-    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201) {
+    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         if (*liV2Params_.returnValue == 1) {
             if (liV2Params_.valuesOut.shape != nullptr) {
                 OP_CHECK_IF((liV2Params_.valuesOut.shape->GetStorageShape().GetDim(0) != qTsize),
@@ -1088,7 +1092,7 @@ ge::graphStatus LIV2InfoParser::ValidateInputShapesMatch()
                         " respectively, they must be same"),
                 return ge::GRAPH_FAILED);
     // -----------------------check cmp_residual_k-------------------
-    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201) {
+    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         if (liV2Params_.cmpResidualK.tensor != nullptr) {
             OP_CHECK_IF(
                 (liV2Params_.cmpResidualK.tensor->GetShapeSize() != bSize_),
@@ -1107,7 +1111,8 @@ ge::graphStatus LIV2InfoParser::ValidateInputShapesMatch()
                         std::to_string(*liV2Params_.topk) + " respectively, they must be same"),
                 return ge::GRAPH_FAILED);
     // -----------------------check sparse_values------------------
-    if ((npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201) && *liV2Params_.returnValue == 1) {
+    if ((npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) &&
+        *liV2Params_.returnValue == 1) {
         OP_CHECK_IF((liV2Params_.valuesOut.shape->GetStorageShape().GetDim(liV2OutN2Dim) != n2Size_),
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                         opName_, "k and sparse_values",
@@ -1304,7 +1309,8 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
     constexpr uint32_t S1_BASE_SIZE = 8;              // S1轴基本块的大小
     constexpr uint32_t TOPK_MAX_SIZE = 8192;          // TopK选取个数
     uint64_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201) {
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201 ||
+        ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9202) {
         constexpr uint32_t li3510S1Base = 4;
         constexpr uint32_t li3510S2Base = 128;
         workspaceSize += li3510S1Base * ((tilingInfo->s2Size + li3510S2Base - 1) / li3510S2Base) * li3510S2Base *

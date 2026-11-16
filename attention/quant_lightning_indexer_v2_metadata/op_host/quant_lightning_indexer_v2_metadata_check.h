@@ -191,31 +191,32 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
         return ACLNN_ERR_PARAM_INVALID;
     }
     // 校验 A6 参数
-    if (socVersion.find("Ascend960DT") != std::string::npos) {
+    if (socVersion.find("Ascend960") != std::string::npos) {
         // num_heads_q 校验
         CHECK_COND(numHeadsQ >= QLI_V2_NUM_HEADS_Q_LOWER_BOUND && numHeadsQ <= QLI_V2_NUM_HEADS_Q_UPPER_BOUND,
-                   ACLNN_ERR_PARAM_INVALID, "For Ascend 960DT, num_heads_q should be [%lld, %lld], but got %lld",
+                   ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 960PR/Ascend 960DT, num_heads_q should be [%lld, %lld], but got %lld",
                    QLI_V2_NUM_HEADS_Q_LOWER_BOUND, QLI_V2_NUM_HEADS_Q_UPPER_BOUND, numHeadsQ);
         // topk 校验
         CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A5_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
-                   "For Ascend 960DT, topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND,
+                   "For Ascend 960PR/Ascend 960DT, topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND,
                    QLI_V2_A5_TOPK_UPPER_BOUND, topk);
         // quant_mode 校验
         CHECK_COND((quantMode == QLI_V2_QUANT_MODE_1) || (quantMode == QLI_V2_QUANT_MODE_3) ||
                        (quantMode == QLI_V2_QUANT_MODE_5) || (quantMode == QLI_V2_QUANT_MODE_6),
                    ACLNN_ERR_PARAM_INVALID,
-                   "For Ascend 950PR/Ascend 950DT, quant_mode should be %lld/%lld/%lld, but got %lld",
+                   "For Ascend 960PR/Ascend 960DT, quant_mode should be %lld/%lld/%lld/%lld, but got %lld",
                    QLI_V2_QUANT_MODE_1, QLI_V2_QUANT_MODE_3, QLI_V2_QUANT_MODE_5, QLI_V2_QUANT_MODE_6, quantMode);
         // cmp_ratio 校验
         CHECK_COND((cmpRatio >= QLI_V2_CMP_RATIO_LOWER_BOUND) && (cmpRatio <= QLI_V2_CMP_RATIO_UPPER_BOUND),
                    ACLNN_ERR_PARAM_INVALID,
-                   "For Ascend 960DT, cmp_ratio should be between [%lld, %lld], "
+                   "For Ascend 960PR/Ascend 960DT, cmp_ratio should be between [%lld, %lld], "
                    "but got %lld",
                    QLI_V2_CMP_RATIO_LOWER_BOUND, QLI_V2_CMP_RATIO_UPPER_BOUND, cmpRatio);
         CHECK_COND((strcmp(layoutKOptional, "TND") == 0) || (strcmp(layoutKOptional, "BSND") == 0) ||
                        (strcmp(layoutKOptional, "PA_BBND") == 0),
-                   ACLNN_ERR_PARAM_INVALID, "For Ascend 960DT, layout_k must be TND/BSND/PA_BBND, but got %s",
-                   layoutKOptional);
+                   ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 960PR/Ascend 960DT, layout_k must be TND/BSND/PA_BBND, but got %s", layoutKOptional);
     } else if ((socVersion.find("Ascend950") != std::string::npos) ||
                (socVersion.find("Ascend350") != std::string::npos)) { // 校验 A5 参数
         // num_heads_q 校验

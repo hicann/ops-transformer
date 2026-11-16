@@ -177,8 +177,8 @@ __simd_callee__ inline void ReduceSum2LoopBody(
         BroadcastLane(regwBrc[0], regW[0], i);
         BroadcastLane(regwBrc[1], brcWeight_, i);
 
-// 960: relu在cube随路做，vec1不做; 960: __NPU_ARCH__ 9201
-#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+// 960: relu在cube随路做，vec1不做; 960: __NPU_ARCH__ 9201/9202
+#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
         AscendC::Reg::Relu(regQK0[0], regQK0[0], maskAllB32);
         AscendC::Reg::Relu(regQK0[1], regQK0[1], maskAllB32);
         AscendC::Reg::Relu(regQK1[0], regQK1[0], maskAllB32);
