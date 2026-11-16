@@ -105,13 +105,14 @@ enum class TEMPLATE_ID : uint8_t {
     FULL_LOAD = 2
 };
 
-template <X_LAYOUT X_L, X_DTYPE X_T, COFF C, CACHE_MODE Cache_Mode, GRAD_ENABLED G, typename... Args>
+template <X_LAYOUT X_L, X_DTYPE X_T, COFF C, CACHE_MODE Cache_Mode, GRAD_ENABLED G, bool HAS_APE, typename... Args>
 struct COMPType {
     static constexpr X_LAYOUT xLayout = X_L;
     static constexpr X_DTYPE xDtype = X_T;
     static constexpr COFF coff = C;
     static constexpr CACHE_MODE cacheMode = Cache_Mode;
     static constexpr GRAD_ENABLED gradEnabled = G;
+    static constexpr bool hasApe = HAS_APE;
 };
 
 struct CmpBlockInfo {

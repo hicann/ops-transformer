@@ -295,6 +295,8 @@ ge::graphStatus CompressorGradTilingImpl::ConvertContext(gert::TilingContext& co
                 return ge::GRAPH_FAILED);
     compressorGradContext.coff = attrs->GetAttrPointer<uint32_t>(COFF_ATTR_INDEX);
     compressorGradContext.cmpRatio = attrs->GetAttrPointer<uint32_t>(CMP_RATIO_ATTR_INDEX);
+    compressorGradContext.enableApe = attrs->GetAttrPointer<bool>(ENABLE_APE_ATTR_INDEX);
+    compressorGradContext.hasApe = (compressorGradContext.enableApe == nullptr || *compressorGradContext.enableApe);
 
     OP_CHECK_IF(
         context.GetWorkspaceSizes(1) == nullptr,
@@ -418,12 +420,14 @@ ge::graphStatus CompressorGradTilingImpl::GenTilingKey() const
     }
 
     uint8_t coff = coff_;
+    uint8_t enableApe = context_->hasApe ? 1 : 0;
     // 通过 ASCENDC 宏编码 tilingKey（force-include 的 codegen 生成头
     // CompressorGradTilingKey_tilingkey.h 声明位布局，与 PyPTO 一致：
-    // Coff(2bit) | Layout(1bit) | DataType(2bit)，UINT 值自动映射为索引）
-    context_->tilingKey = GET_TPL_TILING_KEY(coff, layout, dtype);
+    // Coff(2bit) | Layout(1bit) | DataType(2bit) | EnableApe(1bit)，UINT 值自动映射为索引）
+    context_->tilingKey = GET_TPL_TILING_KEY(coff, layout, dtype, enableApe);
 
-    OP_LOGI(context_->opName, "CompressorGrad dtype:%hhu layout:%hhu  coff:%hhu", dtype, layout, coff);
+    OP_LOGI(context_->opName, "CompressorGrad dtype:%hhu layout:%hhu coff:%hhu enableApe:%hhu", dtype, layout, coff,
+            enableApe);
     OP_LOGI(context_->opName, "CompressorGrad tilingKey:%lu", context_->tilingKey);
     return ge::GRAPH_SUCCESS;
 }

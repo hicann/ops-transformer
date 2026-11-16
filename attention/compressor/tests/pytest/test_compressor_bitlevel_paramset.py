@@ -9,6 +9,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import torch
+from cann_ops_transformer.ops import compressor
 
 # =====================================================================================================================
 # Compressor 位级一致性测试参数配置
@@ -44,7 +45,7 @@ _COMMON = {
     "block_size": [128],
     "cmp_ratio": [4],
     "coff": [2],
-    "cache_mode": [1],
+    "cache_mode": [compressor.CacheMode.LINEAR_BUFFER],
     "data_type": [torch.bfloat16],
     # start_pos 取值说明(与 block_size=128、cmp_ratio=4 配合):
     #   default_start_p=256: 对齐(p%4==0), 每batch引用2个物理块(读前一块, 写当前块), nb=3

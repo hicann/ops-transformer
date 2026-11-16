@@ -11,7 +11,7 @@
 """
 compressor_grad_kernel — Compressor 反向传播 NPU Kernel（统一入口）。
 
-TilingKey:  Coff, Layout, DataType                  — 编译期常量
+TilingKey:  Coff, Layout, DataType, EnableApe       — 编译期常量
 TilingData: batch_size, token_size, seq_size,       — 运行时参数
             cmp_ratio, hidden_size, head_dim（另有 23 个 host 派生的分核/workspace 字段）
 
@@ -69,10 +69,16 @@ class CompressorGradTilingKey:
     Coff = tilingkey_field(bits=2, values=[1, 2])
     Layout = tilingkey_field(bits=1, values=[0, 1])
     DataType = tilingkey_field(bits=2, values=[0, 1])
+    EnableApe = tilingkey_field(bits=1, values=[0, 1])
 
     def is_valid(self, key):
-        coff, layout, dtype = key
-        return coff in (1, 2) and layout in (0, 1) and dtype in (0, 1)
+        coff, layout, dtype, enable_ape = key
+        return (
+            coff in (1, 2)
+            and layout in (0, 1)
+            and dtype in (0, 1)
+            and enable_ape in (0, 1)
+        )
 
 
 # ================================================================
@@ -1124,9 +1130,6 @@ def _zero_outputs(
         [zo_total_head_dim * zo_hidden_size, 1],
         dtype=zo_io_d_type,
     )
-    tensor_d_ape_flat = pl.make_tensor(
-        zo_d_ape, [1, zo_cmp_size], [zo_cmp_size, 1], dtype=pl.DT_FP32
-    )
     # ── 零 tile 初始化（一次）：清满 tile 物理空间（BASE_SIZE*BASE_SIZE=16384 元素），
     #    保证后续 d_w/d_ape 任意 cur_w_num/cur_rg_num（≤16384）的 store 读到的都是零 ──
     pl.set_validshape(zo_zero_cast, [1, BASE_SIZE * BASE_SIZE])
@@ -1165,19 +1168,23 @@ def _zero_outputs(
         pl.store(tensor_dw_gate_flat, zo_zero_cast, [0, cur_w_start])
 
     # ── d_ape [1, cmpSize] FP32：按 D_BASE_SIZE 块分片（_reduce_ape 同款）──
-    rg_chunk_num = zo_cmp_size // D_BASE_SIZE
-    rg_per_core = rg_chunk_num // zo_core_num
-    rg_remain = rg_chunk_num % zo_core_num
-    rg_start = zo_core_idx * rg_per_core + (
-        zo_core_idx if zo_core_idx < rg_remain else rg_remain
-    )
-    rg_end = rg_start + rg_per_core + (1 if zo_core_idx < rg_remain else 0)
-    rg_start = rg_start * D_BASE_SIZE
-    rg_end = rg_end * D_BASE_SIZE
-    for cur_rg_start in pl.range(rg_start, rg_end, BASE_SIZE * BASE_SIZE):
-        cur_rg_num = min(BASE_SIZE * BASE_SIZE, rg_end - cur_rg_start)
-        pl.set_validshape(zo_reduce_acc, [1, cur_rg_num])
-        pl.store(tensor_d_ape_flat, zo_reduce_acc, [0, cur_rg_start])
+    if EnableApe:
+        tensor_d_ape_flat = pl.make_tensor(
+            zo_d_ape, [1, zo_cmp_size], [zo_cmp_size, 1], dtype=pl.DT_FP32
+        )
+        rg_chunk_num = zo_cmp_size // D_BASE_SIZE
+        rg_per_core = rg_chunk_num // zo_core_num
+        rg_remain = rg_chunk_num % zo_core_num
+        rg_start = zo_core_idx * rg_per_core + (
+            zo_core_idx if zo_core_idx < rg_remain else rg_remain
+        )
+        rg_end = rg_start + rg_per_core + (1 if zo_core_idx < rg_remain else 0)
+        rg_start = rg_start * D_BASE_SIZE
+        rg_end = rg_end * D_BASE_SIZE
+        for cur_rg_start in pl.range(rg_start, rg_end, BASE_SIZE * BASE_SIZE):
+            cur_rg_num = min(BASE_SIZE * BASE_SIZE, rg_end - cur_rg_start)
+            pl.set_validshape(zo_reduce_acc, [1, cur_rg_num])
+            pl.store(tensor_d_ape_flat, zo_reduce_acc, [0, cur_rg_start])
 
 
 def _cast_to_l1_channel(
@@ -2358,20 +2365,21 @@ def _phase1_scatter(
     n_tile_rows = p1s_deal_tc_size * p1s_cmp_row_cnt
 
     # APE: local_ape 累加 + 写 workspace（round0 清零 / round>0 读旧值，VF 内累加，一次 MTE3）
-    _accumulate_ape(
-        p1s_vec_ctx,
-        p1s_round_idx,
-        p1s_core_idx,
-        p1s_group_idx,
-        p1s_n_start,
-        p1s_tile_ape_local,
-        p1s_tile_softmax,
-        tensor_ape,
-        p1s_deal_tc_size,
-        p1s_cmp_row_cnt,
-        p1s_d_deal_size,
-        p1s_coff_coef,
-    )
+    if EnableApe:
+        _accumulate_ape(
+            p1s_vec_ctx,
+            p1s_round_idx,
+            p1s_core_idx,
+            p1s_group_idx,
+            p1s_n_start,
+            p1s_tile_ape_local,
+            p1s_tile_softmax,
+            tensor_ape,
+            p1s_deal_tc_size,
+            p1s_cmp_row_cnt,
+            p1s_d_deal_size,
+            p1s_coff_coef,
+        )
     sub_idx = p1s_core_idx % 2
     # ── Cast dkv/dsb FP32→BF16/FP16 + ND→NZ + insert L1（子函数）──
     _cast_dkv_dsb_to_l1(
@@ -2586,15 +2594,6 @@ def _phase3_reduce(
         [p3r_hidden_size, 1],
         dtype=p3r_io_d_type,
     )
-    tensor_d_ape_flat = pl.make_tensor(
-        p3r_d_ape, [1, p3r_cmp_size], [p3r_cmp_size, 1], dtype=pl.DT_FP32
-    )
-    tensor_d_ape_ws_flat = pl.make_tensor(
-        p3r_work_space_ptr,
-        [p3r_vec_ctx.group_num * p3r_vec_ctx.coff_coef, p3r_cmp_size],
-        [p3r_cmp_size, 1],
-        dtype=pl.DT_FP32,
-    )
     tensor_dw_kv_ws_flat = pl.make_tensor(
         p3r_d_w_kv_work_space_ptr,
         [
@@ -2652,18 +2651,28 @@ def _phase3_reduce(
     # （不满轮时 groupIdx >= ceil(maxRoundBlocks/groupDealScNum) 的核未执行
     #  Phase 1/2 写入，其 ws 区域是初始值，不能参与归约）
     if p3r_round_idx == p3r_round_cnt:
-        _reduce_ape(
-            p3r_vec_ctx,
-            p3r_core_idx,
-            p3r_group_idx,
-            0,
-            p3r_max_round_blocks,
-            p3r_reduce_acc,
-            p3r_reduce_comp,
-            p3r_reduce_load_tile_group,
-            tensor_d_ape_flat,
-            tensor_d_ape_ws_flat,
-        )
+        if EnableApe:
+            tensor_d_ape_flat = pl.make_tensor(
+                p3r_d_ape, [1, p3r_cmp_size], [p3r_cmp_size, 1], dtype=pl.DT_FP32
+            )
+            tensor_d_ape_ws_flat = pl.make_tensor(
+                p3r_work_space_ptr,
+                [p3r_vec_ctx.group_num * p3r_vec_ctx.coff_coef, p3r_cmp_size],
+                [p3r_cmp_size, 1],
+                dtype=pl.DT_FP32,
+            )
+            _reduce_ape(
+                p3r_vec_ctx,
+                p3r_core_idx,
+                p3r_group_idx,
+                0,
+                p3r_max_round_blocks,
+                p3r_reduce_acc,
+                p3r_reduce_comp,
+                p3r_reduce_load_tile_group,
+                tensor_d_ape_flat,
+                tensor_d_ape_ws_flat,
+            )
         _reduce_d_weight(
             p3r_vec_ctx,
             p3r_core_idx,

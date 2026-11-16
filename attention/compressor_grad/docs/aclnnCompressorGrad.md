@@ -80,6 +80,7 @@ aclnnStatus aclnnCompressorGradGetWorkspaceSize(
     const aclTensor *startPosOptional,
     int64_t          cmpRatio,
     int64_t          coff,
+    bool             enableApe,
     const aclTensor *dXOut,
     const aclTensor *dWkvOut,
     const aclTensor *dWgateOut,
@@ -113,10 +114,15 @@ aclnnStatus aclnnCompressorGrad(
     | startPosOptional | 可选输入 | 表示计算起始位置。 | 为None时，表示从0开始进行计算。| INT32          | ND         |[B,]|×|
     | cmpRatio | 输入 | 用于稀疏计算，表示数据压缩率，与前向一致。 |取值范围为[2, 128]内的整数。| INT32          | -         |-|-|
     | coff | 可选输入 | 表示是否进行overlap数据重排，与前向一致。 |取值范围为[1, 2]。当coff=1时，无需进行overlap数据重排。当coff=2时，需要进行overlap数据重排。| INT32          | -         |-|-|
+    | enableApe | 可选输入 | 表示是否计算dApe梯度。 |默认值为true；为false时跳过dApe计算（dApeOut不保证内容有效），适用于前向未使用ape或ape不需要梯度的场景。| BOOL          | -         |-|-|
     | dXOut | 输出 | 公式中的$dX$，输入x的梯度。 | 不支持空Tensor。| FLOAT16、BFLOAT16         | ND          |与x相同：BS合轴：[T,H]、BS非合轴：[B,S,H]|×|
     | dWkvOut | 输出 | 公式中的$dW^{KV}$，权重wkv的梯度。 | 不支持空Tensor。| FLOAT16、BFLOAT16         | ND          |[coff* D,H]|×|
     | dWgateOut | 输出 | 公式中的$dW^{Gate}$，权重wgate的梯度。 | 不支持空Tensor。| FLOAT16、BFLOAT16         | ND          |[coff* D,H]|×|
-    | dApeOut | 输出 | 公式中的$dApe$，APE位置编码的梯度。 | 不支持空Tensor。| FLOAT32         | ND          |[cmp_ratio,coff* D]|×|
+    | dApeOut | 输出 | 公式中的$dApe$，APE位置编码的梯度。 | 不支持空Tensor；enableApe=false时算子跳过计算，内容无效。| FLOAT32         | ND          |[cmp_ratio,coff* D]|×|
+
+<!-- npu="A3,910b" id7 -->
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：enableApe不生效，dApe仍会正常计算。
+<!-- end id7 -->
 
 - **返回值**
 
@@ -235,14 +241,10 @@ aclnnStatus aclnnCompressorGrad(
     - 支持H为1K~10K，512对齐。
     - 支持coff为1/2。
     - 支持cmp\_ratio为2~128。
+- enableApe说明：
+    - enableApe默认为true，按[cmp\_ratio, coff\*D]生成dApe；enableApe=false时跳过dApe计算，dApeOut保持必选输出但内容无效，适用于前向未使用ape或ape不需要梯度的场景。
 
 ## 调用示例
-
-本示例与“产品支持情况”一致，适用于以下产品：
-
-<!-- npu="950,A3,910b" id7 -->
-Ascend 950PR&950DT系列、Atlas A3系列、Atlas A2系列产品。
-<!-- end id7 -->
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
@@ -259,8 +261,7 @@ Ascend 950PR&950DT系列、Atlas A3系列、Atlas A2系列产品。
 
 /*!
  * \file test_aclnn_compressor_grad.cpp
- * \brief CompressorGrad 算子 aclnn 调用示例（Ascend 950PR&950DT系列、Atlas A3系列、
- *        Atlas A2系列；BSH/TH 布局均支持）
+ * \brief CompressorGrad 算子 aclnn 调用示例
  *        场景：C4A（D=512, coff=2, cmp_ratio=4, BSH layout, BF16）
  */
 
@@ -475,7 +476,7 @@ int main()
     aclOpExecutor *executor = nullptr;
 
     ret = aclnnCompressorGradGetWorkspaceSize(x, wkv, wgate, dCmpKv, softmaxScore, kv, nullptr, nullptr, startPos,
-                                              cmpRatio, coff, dX, dWkv, dWgate, dApe, &workspaceSize, &executor);
+                                              cmpRatio, coff, true, dX, dWkv, dWgate, dApe, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGradGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 

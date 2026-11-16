@@ -14,6 +14,7 @@
 - [causal_conv1d_fn](../../mamba/causal_conv1d/docs/torchapi_causal_conv1d_fn.md)
 - [causal_conv1d_update](../../mamba/causal_conv1d/docs/torchapi_causal_conv1d_update.md)
 - [compressor](../../attention/compressor/docs/torchapi_compressor.md)
+- [compressor_v2](../../attention/compressor/docs/torchapi_compressor_v2.md)
 - [dense_lightning_indexer_kl_loss_grad](../../attention/dense_lightning_indexer_kl_loss_grad/docs/torchapi_dense_lightning_indexer_kl_loss_grad.md)
 - [dense_lightning_indexer_softmax_lse](../../attention/dense_lightning_indexer_softmax_lse_v2/docs/torchapi_dense_lightning_indexer_softmax_lse.md)
 - [ElasticBuffer](../../mc2/common/docs/torchapi_ElasticBuffer.md)

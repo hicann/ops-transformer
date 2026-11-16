@@ -117,7 +117,7 @@ cann_ops_transformer.compressor(
 | cache_mode | int | 可选 | state_cache的存储模式，默认值为1。<br>1：连续buffer。<br>2：循环buffer。 | int | - |
 
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A3系列产品</term>：cmp_ratio仅支持2/4/8/16/32/64/128。
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：cmp_ratio仅支持2/4/8/16/32/64/128。
 <!-- end id7 -->
 
 ## 返回值说明
@@ -178,15 +178,11 @@ cann_ops_transformer.compressor(
   - C4Li: D=128, coff=2, cmp_ratio=4;
   - C128A: D=512, coff=1, cmp_ratio=128.
 
-## 确定性计算
+## 确定性/Batch一致性
 
 - 默认支持确定性计算。
-<!-- npu="950" id8 -->
-- <term>Ascend 950PR&950DT系列产品</term>：batch一致性：通过torch_npu.npu.set_deterministic_level()设置确定性级别为3开启batch一致性，开启后可以保证计算结果与所在批次大小和所在批次位置无关。
-<!-- end id8 -->
-<!-- npu="A3,910b" id9 -->
-- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过torch_npu.npu.set_deterministic_level()设置确定性级别为3开启batch一致性，开启后可以保证计算结果与所在批次大小和所在批次位置无关。
-<!-- end id9 -->
+- batch一致性：通过torch_npu.npu.set_deterministic_level()设置确定性级别为3开启batch一致性，开启后可以保证计算结果与所在批次大小和所在批次位置无关。
+
 ## 调用示例
 
 > **说明：**<br>
@@ -208,7 +204,7 @@ cann_ops_transformer.compressor(
     D = 512
     coff = 1  # 1: no overlap  2: overlap
     cmp_ratio = 128
-    cache_mode = 1
+    cache_mode = cann_ops_transformer.compressor.CacheMode.LINEAR_BUFFER
     block_size = 128
 
     # block_table构造：cache_mode=1时shape为[B, ceil(Smax/block_size)]
@@ -265,7 +261,7 @@ cann_ops_transformer.compressor(
     D = 512
     coff = 1
     cmp_ratio = 128
-    cache_mode = 1
+    cache_mode = cann_ops_transformer.compressor.CacheMode.LINEAR_BUFFER
     block_size = 128
 
     block_num = (S + block_size - 1) // block_size

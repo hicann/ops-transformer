@@ -167,8 +167,10 @@ __aicore__ inline void CompressorBlockVectorNormal<COMP>::OverLap(
     }
 
     if constexpr (IS_SCORE) {
-        AddApeToScore(srcLocal, this->apeUb, sliceInfo, dDealSize);
-        PipeBarrier<PIPE_V>();
+        if (COMP::hasApe) {
+            AddApeToScore(srcLocal, this->apeUb, sliceInfo, dDealSize);
+            PipeBarrier<PIPE_V>();
+        }
     }
     this->SaveState(srcLocal, stateGm, blockTableGm, sliceInfo, dStartIdx, dDealSize, dDealSize,
                     static_cast<uint32_t>(IS_SCORE));
@@ -217,7 +219,7 @@ __aicore__ inline void CompressorBlockVectorNormal<COMP>::OverLapScoreKv(
     this->inputQue1.template FreeTensor(scoreUb);
 
     if constexpr (COMP::coff == COFF::OVERLAP) {
-        if (originSliceInfo.sIdx != 0 && originSliceInfo.compressTcSize > 0 &&
+        if (COMP::hasApe && originSliceInfo.sIdx != 0 && originSliceInfo.compressTcSize > 0 &&
             (!loopInfo.isCoreRowFirst || !loopInfo.isCoreLoopFirst)) {
             PipeBarrier<PIPE_V>();
             AddApe(scoreLocal, this->apeUb, originSliceInfo, dDealSize);
@@ -393,7 +395,9 @@ __aicore__ inline void CompressorBlockVectorNormal<COMP>::ComputeVec1(const Vec1
     for (uint32_t dLoopIdx = 0; dLoopIdx < splitInfo.dLoopCount; dLoopIdx++) {
         uint64_t dBaseOffset = baseOffset + dLoopIdx * splitInfo.dSplitSize;
 
-        CopyInApe(this->apeUb, dBaseOffset, splitInfo.dSplitSize);
+        if (COMP::hasApe) {
+            CopyInApe(this->apeUb, dBaseOffset, splitInfo.dSplitSize);
+        }
 
         sliceIterator.Reset(splitInfo.curBStart, splitInfo.curSStart, splitInfo.dealSeqStartIdx, 0U);
         this->compressedCnt_ = preCompressedCnt + splitInfo.curCompressedCnt;

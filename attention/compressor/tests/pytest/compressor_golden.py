@@ -16,7 +16,7 @@ from torch.fx.experimental import symbolic_shapes
 if not hasattr(symbolic_shapes, "hint_int"):
     symbolic_shapes.hint_int = symbolic_shapes.guard_int
 import torchair
-from cann_ops_transformer.ops import compressor
+from cann_ops_transformer.ops import compressor, compressor_v2
 import numpy as np
 import torch.nn as nn
 from torch_npu.testing.testcase import TestCase, run_tests
@@ -458,7 +458,8 @@ def cpu_compressor_fp64(
     wgate = wgate.to(torch.float64).numpy()
     kv_state = kv_state.numpy()
     score_state = score_state.numpy()
-    ape = ape.numpy()
+    if ape is not None:
+        ape = ape.numpy()
     matmul_dtype = np.float64
     for i in range(wkv.shape[1] // 128):
         leftH = i * 128
@@ -543,10 +544,11 @@ def cpu_compressor_fp64(
 
             start_seq_id_in_sc = start_seq_idx % cmp_ratio
             end_seq_idx_in_sc = start_seq_id_in_sc + (end_seq_idx - start_seq_idx)
-            new_score_state[start_offset:end_offset, :] = np.add(
-                new_score_state[start_offset:end_offset, :],
-                ape[start_seq_id_in_sc:end_seq_idx_in_sc, :],
-            )
+            if ape is not None:
+                new_score_state[start_offset:end_offset, :] = np.add(
+                    new_score_state[start_offset:end_offset, :],
+                    ape[start_seq_id_in_sc:end_seq_idx_in_sc, :],
+                )
 
             if cache_mode == 1:
                 save_flag = True
@@ -778,7 +780,8 @@ def cpu_compressor(
     wgate = wgate.to(torch.float32).numpy()
     kv_state = kv_state.numpy()
     score_state = score_state.numpy()
-    ape = ape.numpy()
+    if ape is not None:
+        ape = ape.numpy()
     matmul_dtype = np.float32
     for i in range(wkv.shape[1] // 128):
         leftH = i * 128
@@ -868,13 +871,14 @@ def cpu_compressor(
             start_offset = base_offset + (start_seq_idx - batch_start_pos)
             end_offset = base_offset + (end_seq_idx - batch_start_pos)
 
-            # add ape
-            start_seq_id_in_sc = start_seq_idx % cmp_ratio
-            end_seq_idx_in_sc = start_seq_id_in_sc + (end_seq_idx - start_seq_idx)
-            new_score_state[start_offset:end_offset, :] = np.add(
-                new_score_state[start_offset:end_offset, :],
-                ape[start_seq_id_in_sc:end_seq_idx_in_sc, :],
-            )
+            # add ape（ape 缺省时跳过）
+            if ape is not None:
+                start_seq_id_in_sc = start_seq_idx % cmp_ratio
+                end_seq_idx_in_sc = start_seq_id_in_sc + (end_seq_idx - start_seq_idx)
+                new_score_state[start_offset:end_offset, :] = np.add(
+                    new_score_state[start_offset:end_offset, :],
+                    ape[start_seq_id_in_sc:end_seq_idx_in_sc, :],
+                )
             # 1.判断块是否需要存储到state
             # 2.判断块是否需要压缩
             if cache_mode == 1:
@@ -1344,11 +1348,16 @@ def run_compressor_eager(
             wgate_datarange[0], wgate_datarange[1], (coff * head_dim, hidden_size)
         )
     ).to(data_type)
-    ape = torch.tensor(
-        np.random.uniform(
-            ape_datarange[0], ape_datarange[1], (cmp_ratio, coff * head_dim)
-        )
-    ).to(torch.float32)
+    has_ape = ape_datarange is not None
+    if has_ape:
+        ape = torch.tensor(
+            np.random.uniform(
+                ape_datarange[0], ape_datarange[1], (cmp_ratio, coff * head_dim)
+            )
+        ).to(torch.float32)
+    else:
+        # v2接口不传ape时跳过ape加法
+        ape = None
     print(f"start_pos={start_pos}")
     print(f"seqused={seqused}")
     print(f"cu_seqlens={cu_seqlens}")
@@ -1459,7 +1468,7 @@ def run_compressor_eager(
             f"state_cache: shape {state_cache.shape}, dtype: {state_cache.dtype}, is_contiguous: {state_cache.is_contiguous()}, stride0: {state_cache.stride(0)}"
         )
 
-    ape = ape.to("npu:%s" % DEVICE_ID)
+    npu_ape = ape.to("npu:%s" % DEVICE_ID) if has_ape else None
     block_table = block_table.to("npu:%s" % DEVICE_ID)
     start_pos = torch.tensor(start_pos).to(torch.int32).to("npu:%s" % DEVICE_ID)
     if cu_seqlens is not None:
@@ -1469,44 +1478,83 @@ def run_compressor_eager(
     # ======================== execute npu finish ================================
     # start run custom ops
     if grad_enabled:
-        npu_out, npu_softmax, npu_kv = (
-            torch.ops.cann_ops_transformer._compressor_forward(
+        if has_ape:
+            npu_out, npu_softmax, npu_kv = (
+                torch.ops.cann_ops_transformer._compressor_forward(
+                    x,
+                    wkv,
+                    wgate,
+                    state_cache,
+                    npu_ape,
+                    cmp_ratio,
+                    block_table,
+                    cu_seqlens,
+                    seqused,
+                    start_pos if exist_start_pos else None,
+                    coff,
+                    cache_mode,
+                    True,
+                )
+            )
+        else:
+            npu_out, npu_softmax, npu_kv = (
+                torch.ops.cann_ops_transformer._compressor_v2_forward(
+                    x,
+                    wkv,
+                    wgate,
+                    state_cache,
+                    cmp_ratio,
+                    None,
+                    block_table,
+                    cu_seqlens,
+                    seqused,
+                    start_pos if exist_start_pos else None,
+                    coff,
+                    cache_mode,
+                    True,
+                )
+            )
+    else:
+        if has_ape:
+            npu_out = compressor(
                 x,
                 wkv,
                 wgate,
                 state_cache,
-                ape,
-                cmp_ratio,
-                block_table,
-                cu_seqlens,
-                seqused,
-                start_pos if exist_start_pos else None,
-                coff,
-                cache_mode,
-                True,
+                npu_ape,
+                cmp_ratio=cmp_ratio,
+                state_block_table=block_table,
+                cu_seqlens=cu_seqlens,
+                seqused=seqused,
+                start_pos=start_pos if exist_start_pos else None,
+                coff=coff,
+                cache_mode=cache_mode,
             )
-        )
-    else:
-        npu_out = compressor(
-            x,
-            wkv,
-            wgate,
-            state_cache,
-            ape,
-            cmp_ratio=cmp_ratio,
-            state_block_table=block_table,
-            cu_seqlens=cu_seqlens,
-            seqused=seqused,
-            start_pos=start_pos if exist_start_pos else None,
-            coff=coff,
-            cache_mode=cache_mode,
-        )
+        else:
+            npu_out = compressor_v2(
+                x,
+                wkv,
+                wgate,
+                state_cache,
+                cmp_ratio=cmp_ratio,
+                ape=None,
+                state_block_table=block_table,
+                cu_seqlens=cu_seqlens,
+                seqused=seqused,
+                start_pos=start_pos if exist_start_pos else None,
+                coff=coff,
+                cache_mode=cache_mode,
+            )
     print(f"x: shape {x.shape}, dtype: {x.dtype}")
     print(f"wkv: shape {wkv.shape}, dtype: {wkv.dtype}")
     print(f"wgate: shape {wgate.shape}, dtype: {wgate.dtype}")
     print(f"kv_state: shape {kv_state.shape}, dtype: {kv_state.dtype}")
     print(f"score_state: shape {score_state.shape}, dtype: {score_state.dtype}")
-    print(f"ape: shape {ape.shape}, dtype: {ape.dtype}")
+    print(
+        "ape: None (compressor_v2 skips Ape add)"
+        if not has_ape
+        else f"ape: shape {ape.shape}, dtype {ape.dtype}"
+    )
     print(f"block_table: shape {block_table.shape}, dtype: {block_table.dtype}")
     print(f"cmp_kv: shape {npu_out.shape}, dtype: {npu_out.dtype}")
 

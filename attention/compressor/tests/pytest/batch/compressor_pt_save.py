@@ -219,7 +219,12 @@ def compressor_output_single(data_case):
     x_datarange = [float(x.strip()) for x in x_datarange.split(",")]
     wkv_datarange = [float(x.strip()) for x in wkv_datarange.split(",")]
     wgate_datarange = [float(x.strip()) for x in wgate_datarange.split(",")]
-    ape_datarange = [float(x.strip()) for x in ape_datarange.split(",")]
+    if ape_datarange is None or (
+        isinstance(ape_datarange, str) and ape_datarange.strip() == ""
+    ):
+        ape_datarange = None
+    else:
+        ape_datarange = [float(x.strip()) for x in ape_datarange.split(",")]
     kv_state_datarange = [float(x.strip()) for x in kv_state_datarange.split(",")]
     score_state_datarange = [float(x.strip()) for x in score_state_datarange.split(",")]
 
@@ -468,11 +473,17 @@ def compressor_output_single(data_case):
             wgate_datarange[0], wgate_datarange[1], (coff * head_dim, hidden_size)
         )
     ).to(data_type)
-    ape = torch.tensor(
-        np.random.uniform(
-            ape_datarange[0], ape_datarange[1], (cmp_ratio, coff * head_dim)
-        )
-    ).to(torch.float32)
+    if ape_datarange is None:
+        # ape缺省：算子走compressor_v2，CPU golden用全0 ape等价计算
+        ape = None
+        ape_golden = torch.zeros((cmp_ratio, coff * head_dim), dtype=torch.float32)
+    else:
+        ape = torch.tensor(
+            np.random.uniform(
+                ape_datarange[0], ape_datarange[1], (cmp_ratio, coff * head_dim)
+            )
+        ).to(torch.float32)
+        ape_golden = ape
     ### ======================== gen input data finish =============================
     ### ======================== execute cpu start =================================
     cpu_kv_state = kv_state.clone()
@@ -496,7 +507,7 @@ def compressor_output_single(data_case):
         cpu_score_state,
         update_kv,
         update_score,
-        ape,
+        ape_golden,
         block_table=block_table,
         cu_seqlens=cu_seqlens,
         seqused=seqused,
@@ -521,7 +532,7 @@ def compressor_output_single(data_case):
         "wgate": wgate,
         "kv_state": kv_state,
         "score_state": score_state,
-        "ape": ape,
+        "ape": ape,  # None表示该用例不传ape，加载侧走compressor_v2
         "block_table": block_table,
         "cu_seqlens": cu_seqlens,
         "seqused": seqused,

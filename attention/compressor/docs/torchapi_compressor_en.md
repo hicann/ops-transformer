@@ -119,7 +119,7 @@ cann_ops_transformer.compressor(
 | cache_mode | int | Optional | Storage mode of state_cache. The default value is 1.<br>1: contiguous buffer.<br>2: circular buffer. | int | - |
 
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A3 products</term>: cmp_ratio supports only 2/4/8/16/32/64/128; gradEnabled cannot be set to true.
+- <term>Atlas A3 products</term>, <term>Atlas A2 products</term>: cmp_ratio supports only 2/4/8/16/32/64/128.
 <!-- end id7 -->
 
 ## Return Values
@@ -180,12 +180,10 @@ cann_ops_transformer.compressor(
   - C4Li: D=128, coff=2, cmp_ratio=4;
   - C128A: D=512, coff=1, cmp_ratio=128.
 
-## Deterministic Computation
+## Determinism/Batch Consistency
 
 - Defaults to a deterministic implementation.
-<!-- npu="950" id8 -->
-- <term>Ascend 950PR&950DT products</term>: batch consistency: Set the deterministic level to 3 using torch_npu.npu.set_deterministic_level() to enable batch consistency. After it is enabled, computation results are independent of the batch size and batch position.
-<!-- end id8 -->
+- batch consistency: Set the deterministic level to 3 using torch_npu.npu.set_deterministic_level() to enable batch consistency. After it is enabled, computation results are independent of the batch size and batch position.
 
 ## Example
 
@@ -208,7 +206,7 @@ cann_ops_transformer.compressor(
     D = 512
     coff = 1  # 1: no overlap  2: overlap
     cmp_ratio = 128
-    cache_mode = 1
+    cache_mode = cann_ops_transformer.compressor.CacheMode.LINEAR_BUFFER
     block_size = 128
 
     # block_table construction: when cache_mode=1, the shape is [B, ceil(Smax/block_size)]
@@ -265,7 +263,7 @@ cann_ops_transformer.compressor(
     D = 512
     coff = 1
     cmp_ratio = 128
-    cache_mode = 1
+    cache_mode = cann_ops_transformer.compressor.CacheMode.LINEAR_BUFFER
     block_size = 128
 
     block_num = (S + block_size - 1) // block_size

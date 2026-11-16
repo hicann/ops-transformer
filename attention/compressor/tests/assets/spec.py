@@ -95,6 +95,28 @@ class CompressorSpec:
         return compare_module.compare(*outputs, **kwargs)
 
 
+def compressor_v2_golden(x, wkv, wgate, state_cache, cmp_ratio, ape=None, **kwargs):
+    """v2 API: cmp_ratio is positional-required; ape is keyword-only optional."""
+    return golden_module.cpu_compressor(
+        x, wkv, wgate, state_cache, ape, cmp_ratio, **kwargs
+    )
+
+
+def compressor_v2_inputs(x, wkv, wgate, state_cache, cmp_ratio, ape=None, **kwargs):
+    """v2 API: cmp_ratio is positional-required; ape is keyword-only optional."""
+    return inputs_module.generate_compressor_inputs(
+        x, wkv, wgate, state_cache, ape, cmp_ratio, **kwargs
+    )
+
+
+class CompressorV2Spec(CompressorSpec):
+    """compressor_v2：cmp_ratio必选、ape可选、coff/cache_mode带默认值。"""
+
+    golden = compressor_v2_golden
+    customize_inputs = compressor_v2_inputs
+    torch_graph = graph_module.CompressorV2GraphNetwork
+
+
 class AclnnCompressorSpec:
     golden = golden_module.aclnn_compressor_golden
     customize_inputs = inputs_module.aclnn_compressor_input
@@ -152,5 +174,6 @@ class AclnnCompressorSpec:
 
 __spec__ = {
     "cann_ops_transformer.ops.compressor": "CompressorSpec",
+    "cann_ops_transformer.ops.compressor_v2": "CompressorV2Spec",
     "aclnnCompressor": "AclnnCompressorSpec",
 }

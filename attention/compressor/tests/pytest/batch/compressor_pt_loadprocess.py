@@ -18,7 +18,7 @@ import pytest
 import random
 import math
 import ast
-from cann_ops_transformer.ops import compressor
+from cann_ops_transformer.ops import compressor, compressor_v2
 
 
 def test_compressor_process(filepath, device_id=0):
@@ -122,21 +122,40 @@ def test_compressor_process(filepath, device_id=0):
         kv_block_table = block_table.npu()
         score_block_table = block_table.npu()
 
-    # 调用compressor算子
-    npu_result = compressor(
-        x.npu(),
-        wkv.npu(),
-        wgate.npu(),
-        state_cache,
-        ape.npu(),
-        cmp_ratio=cmp_ratio,
-        state_block_table=kv_block_table,
-        cu_seqlens=cu_seqlens,
-        seqused=seqused,
-        start_pos=start_pos,
-        coff=coff,
-        cache_mode=cache_mode,
-    )
+    # 调用compressor算子：不传ape时走v2接口
+    if ape is None and "950" not in torch_npu.npu.get_device_name(device_id):
+        pytest.skip("ape optional is only supported on Ascend 950")
+    npu_ape = ape.npu() if ape is not None else None
+    if ape is None:
+        npu_result = compressor_v2(
+            x.npu(),
+            wkv.npu(),
+            wgate.npu(),
+            state_cache,
+            cmp_ratio=cmp_ratio,
+            ape=None,
+            state_block_table=kv_block_table,
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            start_pos=start_pos,
+            coff=coff,
+            cache_mode=cache_mode,
+        )
+    else:
+        npu_result = compressor(
+            x.npu(),
+            wkv.npu(),
+            wgate.npu(),
+            state_cache,
+            npu_ape,
+            cmp_ratio=cmp_ratio,
+            state_block_table=kv_block_table,
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            start_pos=start_pos,
+            coff=coff,
+            cache_mode=cache_mode,
+        )
     return (
         cpu_result,
         kv_mask_result,

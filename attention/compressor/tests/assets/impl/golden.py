@@ -77,7 +77,16 @@ def load_pytest_golden_module():
 
         cann_stub = types.ModuleType("cann_ops_transformer")
         ops_stub = types.ModuleType("cann_ops_transformer.ops")
-        ops_stub.compressor = lambda *a, **kw: None
+
+        def _noop_compressor(*args, **kwargs):
+            return None
+
+        # 与真实接口保持一致：暴露 CacheMode 枚举，同时保持可调用（TTK 下不执行 NPU 算子）
+        _noop_compressor.CacheMode = type(
+            "CacheMode", (), {"LINEAR_BUFFER": 1, "RING_BUFFER": 2}
+        )
+        ops_stub.compressor = _noop_compressor
+        ops_stub.compressor_v2 = _noop_compressor
         cann_stub.ops = ops_stub
         install_stub("cann_ops_transformer", cann_stub)
         install_stub("cann_ops_transformer.ops", ops_stub)

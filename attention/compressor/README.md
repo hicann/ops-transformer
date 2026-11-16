@@ -119,17 +119,10 @@
   </tr>
   <tr>
     <td>ape</td>
-    <td>输入</td>
-    <td>公式中的<em>Ape</em>，表示positional biases。</td>
+    <td>可选输入</td>
+    <td>公式中的<em>Ape</em>，表示positional biases。支持不传入，不传入时跳过Ape加法。</td>
     <td>FLOAT</td>
     <td>ND</td>
-  </tr>
-  <tr>
-    <td>cmp_ratio</td>
-    <td>属性</td>
-    <td>用于稀疏计算，表示数据压缩率，取值范围为[2, 128]内的整数。</td>
-    <td>INT32</td>
-    <td>-</td>
   </tr>
   <tr>
     <td>state_block_table</td>
@@ -158,6 +151,13 @@
     <td>表示计算起始位置。指定为None时，表示从0开始进行计算。</td>
     <td>INT32</td>
     <td>ND</td>
+  </tr>
+  <tr>
+    <td>cmp_ratio</td>
+    <td>属性</td>
+    <td>用于稀疏计算，表示数据压缩率，取值范围为[2, 128]内的整数。</td>
+    <td>INT32</td>
+    <td>-</td>
   </tr>
   <tr>
     <td>coff</td>
@@ -263,14 +263,7 @@
       - C4A：D=512，coff=2，cmp_ratio=4。
       - C4Li：D=128，coff=2，cmp_ratio=4。
       - C128A：D=512，coff=1，cmp_ratio=128。
-- 确定性计算与batch一致性：
-  - 默认确定性实现，相同输入多次调用结果一致。
-<!-- npu="950" id1 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
-<!-- end id1 -->
-<!-- npu="A3,910b" id2 -->
-  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
-<!-- end id2 -->
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：<em>ape</em>不支持不传入，必须传入。
 
 ## 调用说明
 
@@ -279,4 +272,4 @@
   | 调用方式   | 样例代码 | 说明                                          |
   | ---------- | -------- | --------------------------------------------- |
   | aclnn API  | [test_aclnn_compressor](./examples/arch35/test_aclnn_compressor.cpp) | 通过[aclnnCompressor](./docs/aclnnCompressor.md)接口调用Compressor算子。 |
-  | PyTorch API | -        | 通过[compressor](../../attention/compressor/docs/torchapi_compressor.md)接口调用Compressor算子。 |
+  | PyTorch API | -        | 通过[compressor](../../attention/compressor/docs/torchapi_compressor.md)接口调用Compressor算子；V2接口见[compressor_v2](../../attention/compressor/docs/torchapi_compressor_v2.md)。 |

@@ -10,6 +10,7 @@
 import pytest
 import torch
 
+from cann_ops_transformer.ops import compressor
 from compressor_golden import run_compressor_eager
 
 
@@ -17,7 +18,9 @@ from compressor_golden import run_compressor_eager
 @pytest.mark.parametrize("coff", [1, 2], ids=["no-overlap", "overlap"])
 @pytest.mark.parametrize("cmp_ratio", [2, 4, 8, 16])
 @pytest.mark.parametrize("block_size", [2, 16, 128])
-@pytest.mark.parametrize("cache_mode", [1], ids=["linear-cache"])
+@pytest.mark.parametrize(
+    "cache_mode", [compressor.CacheMode.LINEAR_BUFFER], ids=["linear-cache"]
+)
 def test_compressor_grad_enabled_single_precision(
     layout_th, coff, cmp_ratio, block_size, cache_mode
 ):
@@ -55,6 +58,6 @@ def test_compressor_grad_enabled_full_load(coff, cmp_ratio):
         block_size=4,
         data_type=torch.float16,
         hidden_size=4096,
-        cache_mode=1,
+        cache_mode=compressor.CacheMode.LINEAR_BUFFER,
         grad_enabled=True,
     )

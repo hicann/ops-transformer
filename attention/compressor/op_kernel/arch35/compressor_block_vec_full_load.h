@@ -380,7 +380,7 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::ComputeVec1()
     uint32_t singleLoopBatchNum = BUFFER_SIZE_BYTE_16K / (cnt * sizeof(T));
     uint32_t loopTimes = CeilDivT(splitInfo.dealBatchNum, singleLoopBatchNum);
     bool isApeFullLoad = this->coff_ * this->cmpRatio_ * splitInfo.dBaseSize * sizeof(T) <= BUFFER_SIZE_BYTE_16K;
-    if (isApeFullLoad) {
+    if (COMP::hasApe && isApeFullLoad) {
         CopyInApe(baseOffset, splitInfo.dBaseSize);
     }
     for (uint32_t idx = 0; idx < loopTimes; idx++) {
@@ -434,8 +434,10 @@ __aicore__ inline bool CompressorBlockVectorFullLoad<COMP>::ProcessSaveStateLoop
         sliceIterator.GetSlice();
         this->SaveState(kvUb, this->stateCacheGm_, this->stateBlockTableGm_, sliceInfo, baseOffset, splitInfo.dBaseSize,
                         splitInfo.dBaseSize, kvStateIdx_);
-        AddApeToScore(scoreUb, sliceInfo, splitInfo.dBaseSize, splitInfo.dBaseSize, baseOffset, isApeFullLoad);
-        PipeBarrier<PIPE_V>();
+        if (COMP::hasApe) {
+            AddApeToScore(scoreUb, sliceInfo, splitInfo.dBaseSize, splitInfo.dBaseSize, baseOffset, isApeFullLoad);
+            PipeBarrier<PIPE_V>();
+        }
         this->SaveState(scoreUb, this->stateCacheGm_, this->stateBlockTableGm_, sliceInfo, baseOffset,
                         splitInfo.dBaseSize, splitInfo.dBaseSize, scoreStateIdx_);
         sliceIterator.IteratorSlice();

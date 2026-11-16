@@ -62,3 +62,54 @@ class CompressorGraphNetwork(torch.nn.Module):
             False,
         )
         return cmp_kv, state_cache
+
+
+_V2_GRAPH_OP = None
+
+
+def _v2_graph_op():
+    global _V2_GRAPH_OP
+    if _V2_GRAPH_OP is None:
+        from cann_ops_transformer.ops.attention import (
+            compressor as _real,  # noqa: F401
+        )
+
+        _V2_GRAPH_OP = torch.ops.cann_ops_transformer._compressor_v2_forward_graph
+    return _V2_GRAPH_OP
+
+
+class CompressorV2GraphNetwork(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(
+        self,
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        cmp_ratio,
+        ape=None,
+        state_block_table=None,
+        cu_seqlens=None,
+        seqused=None,
+        start_pos=None,
+        coff=1,
+        cache_mode=1,
+    ):
+        cmp_kv, _, _ = _v2_graph_op()(
+            x=x,
+            wkv=wkv,
+            wgate=wgate,
+            state_cache=state_cache,
+            cmp_ratio=cmp_ratio,
+            ape=ape,
+            state_block_table=state_block_table,
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            start_pos=start_pos,
+            coff=coff,
+            cache_mode=cache_mode,
+            grad_enabled=False,
+        )
+        return cmp_kv, state_cache

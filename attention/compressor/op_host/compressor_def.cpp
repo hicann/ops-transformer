@@ -43,7 +43,7 @@ public:
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous(); // state_cache需要支持非连续，不使能aclnn自动转连续的功能
         this->Input("ape")
-            .ParamType(REQUIRED)
+            .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();

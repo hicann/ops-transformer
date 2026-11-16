@@ -342,7 +342,6 @@ aclnnStatus aclnnCompressor(
   <!-- npu="A3,910b" id7 -->
   - <term>Atlas A3 products</term>, <term>Atlas A2 products</term>:
     - cmpRatio supports only 2/4/8/16/32/64/128.
-    - Setting gradEnabled to true is not supported.
   <!-- end id7 -->
 
 - **Return Value**
@@ -444,9 +443,7 @@ aclnnStatus aclnnCompressor(
 
 - Deterministic computation:
   - aclnnCompressor defaults to a deterministic implementation.
-  <!-- npu="950" id8 -->
-  - <term>Ascend 950PR&950DT products</term>: batch consistency: Set ACL_OPT_DETERMINISTIC to 3 via aclrtSetSysParamOpt() to enable batch consistency. After batch consistency is enabled, computation results are independent of the batch size and position.
-  <!-- end id8 -->
+  - batch consistency: Set ACL_OPT_DETERMINISTIC to 3 via aclrtSetSysParamOpt() to enable batch consistency. After batch consistency is enabled, computation results are independent of the batch size and position.
 - Dimensions of x: B (Batch Size) indicates the batch size of input samples, S (Sequence Length) indicates the sequence length of input samples, H (Head Size) indicates the size of the hidden layer, D (Head Dim) indicates the size of the minimum unit of the hidden layer, and T indicates the accumulated sequence length of input samples across all batches.
 - Input shape constraints:
   - stateCacheRef supports input shape [block_num, block_size, 2\*coff\*D], and block_num must be greater than 0; when cacheMode=2, block_size >= coff * cmp_ratio + S - 1 must be satisfied.
@@ -512,7 +509,7 @@ The following sample code is for reference only. For details about the compilati
 
 /*!
  * \file test_aclnn_compressor.cpp
- * \brief Compressor operator aclnn call example (A5 / ascend950)
+ * \brief Compressor operator aclnn call example
  *        Use case: C4A (D=512, coff=2, cmp_ratio=4, cache_mode=1, BSH layout, BF16)
  *        For A5, when B=1, S=4, tokenSize=4 <= 256, the FULL_LOAD high-performance template is triggered.
  */

@@ -49,8 +49,8 @@ std::vector<bool> IsContiguousAxes(const at::Tensor& tensor)
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> ConstructCompressorOutputTensor(
-    const at::Tensor& x, const at::Tensor& wkv, const at::Tensor& ape, const c10::optional<at::Tensor>& cuSeqlens,
-    int64_t cmpRatio, int64_t coff)
+    const at::Tensor& x, const at::Tensor& wkv, const c10::optional<at::Tensor>& cuSeqlens, int64_t cmpRatio,
+    int64_t coff)
 {
     auto xDim = x.dim();
     at::SmallVector<int64_t, MAX_DIM_SIZE> cmpKvSize;
@@ -84,8 +84,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ConstructCompressorOutputTensor(
     }
 
     cmpKv = at::empty(cmpKvSize, x.options().dtype(x.dtype()));
-    softmaxScore = at::empty(softmaxScoreSize, ape.options().dtype(ape.dtype()));
-    kv = at::empty(kvSize, ape.options().dtype(ape.dtype()));
+    auto floatOptions = x.options().dtype(at::kFloat);
+    softmaxScore = at::empty(softmaxScoreSize, floatOptions);
+    kv = at::empty(kvSize, floatOptions);
     return std::tuple<at::Tensor, at::Tensor, at::Tensor>(cmpKv, softmaxScore, kv);
 }
 
@@ -101,7 +102,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> Compressor(
 
     TORCH_CHECK(cmpRatio >= CMP_RATIO_MIN && cmpRatio <= CMP_RATIO_MAX, "cmp_ratio should be in [2, 128], got ",
                 cmpRatio);
-    auto [cmpKv, softmaxScore, kv] = ConstructCompressorOutputTensor(x, wkv, ape, cuSeqlens, cmpRatio, coff);
+    auto [cmpKv, softmaxScore, kv] = ConstructCompressorOutputTensor(x, wkv, cuSeqlens, cmpRatio, coff);
     auto stateCacheDim = stateCache.dim();
     TORCH_CHECK(stateCacheDim == DIM_THREE, "state_cache dim num[", stateCacheDim, "] should be 3");
 
@@ -119,7 +120,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> Compressor(
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> CompressorBackward(
     at::Tensor& dCmpKv, const at::Tensor& x, const at::Tensor& wkv, const at::Tensor& wgate,
     const at::Tensor& softmaxScore, const at::Tensor& kv, const c10::optional<at::Tensor>& cuSeqlens,
-    const c10::optional<at::Tensor>& seqused, const c10::optional<at::Tensor>& startPos, int64_t cmpRatio, int64_t coff)
+    const c10::optional<at::Tensor>& seqused, const c10::optional<at::Tensor>& startPos, int64_t cmpRatio, int64_t coff,
+    bool enableApe)
 {
     auto xDim = x.dim();
     at::SmallVector<int64_t, MAX_DIM_SIZE> dxSize;
@@ -147,8 +149,15 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> CompressorBackward(
     dApe = at::empty(dApeSize, kv.options().dtype(kv.dtype()));
 
     ACLNN_CMD(aclnnCompressorGrad, x, wkv, wgate, dCmpKv, softmaxScore, kv, cuSeqlens, seqused, startPos, cmpRatio,
-              coff, dx, dWkv, dWgate, dApe);
+              coff, enableApe, dx, dWkv, dWgate, dApe);
 
+    // d_ape is a REQUIRED aclnn output and CompressorGrad tiling rejects an
+    // empty one, so the full buffer above must be passed in even when
+    // enable_ape=false (the kernel then skips writing it). Swap in an empty
+    // placeholder afterwards so callers never observe uninitialized memory.
+    if (!enableApe) {
+        dApe = at::empty({0}, kv.options().dtype(kv.dtype()));
+    }
     return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>(dx, dWkv, dWgate, dApe);
 }
 
@@ -165,7 +174,40 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> CompressorMeta(
     TORCH_CHECK(cmpRatio >= CMP_RATIO_MIN && cmpRatio <= CMP_RATIO_MAX, "cmp_ratio should be in [2, 128], got ",
                 cmpRatio);
 
-    auto [cmpKv, softmaxScore, kv] = ConstructCompressorOutputTensor(x, wkv, ape, cuSeqlens, cmpRatio, coff);
+    auto [cmpKv, softmaxScore, kv] = ConstructCompressorOutputTensor(x, wkv, cuSeqlens, cmpRatio, coff);
+    return std::tuple<at::Tensor, at::Tensor, at::Tensor>(cmpKv, softmaxScore, kv);
+}
+
+// ===========================================================================
+// V2 interface: peer of the public compressor() above. Backed by the unified
+// Compressor op with an optional ape. coff defaults to 1 and cache_mode to 1
+// (linear buffer). The forward returns the grad intermediates (softmax_score/kv)
+// as well so autograd can drive the V2 backward below.
+// ===========================================================================
+std::tuple<at::Tensor, at::Tensor, at::Tensor> CompressorV2(
+    const at::Tensor& x, const at::Tensor& wkv, const at::Tensor& wgate, at::Tensor& stateCache,
+    const c10::optional<at::Tensor>& ape, int64_t cmpRatio, const c10::optional<at::Tensor>& stateBlockTable,
+    const c10::optional<at::Tensor>& cuSeqlens, const c10::optional<at::Tensor>& seqused,
+    const c10::optional<at::Tensor>& startPos, int64_t coff, int64_t cacheMode, bool gradEnabled)
+{
+    TORCH_CHECK(x.defined(), "Check x != nullptr failed");
+    auto xDim = x.dim();
+    TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
+    TORCH_CHECK(cmpRatio >= CMP_RATIO_MIN && cmpRatio <= CMP_RATIO_MAX, "cmp_ratio should be in [2, 128], got ",
+                cmpRatio);
+
+    auto [cmpKv, softmaxScore, kv] = ConstructCompressorOutputTensor(x, wkv, cuSeqlens, cmpRatio, coff);
+    auto stateCacheDim = stateCache.dim();
+    TORCH_CHECK(stateCacheDim == DIM_THREE, "state_cache dim num[", stateCacheDim, "] should be 3");
+
+    auto contiguousAxesResult = IsContiguousAxes(stateCache);
+    TORCH_CHECK(contiguousAxesResult[DIM_ONE] && contiguousAxesResult[DIM_TWO],
+                "state_cache must be contiguous on all axes except axis 0");
+    int64_t stateCacheStrideDim0 = stateCache.stride(0);
+
+    ACLNN_CMD(aclnnCompressor, x, wkv, wgate, stateCache, ape, stateBlockTable, cuSeqlens, seqused, startPos, cmpRatio,
+              coff, cacheMode, stateCacheStrideDim0, gradEnabled, cmpKv, softmaxScore, kv);
+
     return std::tuple<at::Tensor, at::Tensor, at::Tensor>(cmpKv, softmaxScore, kv);
 }
 
@@ -173,5 +215,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     m.def("compressor", &Compressor, "compressor");
     m.def("compressor_backward", &CompressorBackward, "compressor_backward");
+    m.def("compressor_v2", &CompressorV2, "compressor_v2");
 }
 } // namespace op_api

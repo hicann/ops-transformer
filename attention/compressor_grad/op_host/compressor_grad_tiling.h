@@ -45,6 +45,7 @@ constexpr uint32_t START_POS_INPUT_INDEX = 8;
 // ATTR
 constexpr uint32_t CMP_RATIO_ATTR_INDEX = 0;
 constexpr uint32_t COFF_ATTR_INDEX = 1;
+constexpr uint32_t ENABLE_APE_ATTR_INDEX = 2;
 
 // OUTPUT
 constexpr uint32_t D_X_OUTPUT_INDEX = 0;
@@ -212,9 +213,11 @@ struct CompressorGradContext {
     RequiredParaInfo dWkv;
     RequiredParaInfo dWgate;
     RequiredParaInfo dApe;
+    bool hasApe = true; // enable_ape attr：false 时跳过 dApe 计算
 
     const uint32_t* coff;
     const uint32_t* cmpRatio;
+    const bool* enableApe;
     TemplateId templateId;
 
     ge::DataType dtype = ge::DT_BF16;

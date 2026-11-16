@@ -83,6 +83,9 @@ def output_operator(params):
         kv_state_datarange,
         score_state_datarange,
     ) = params
+    if ape_datarange is None and "950" not in torch.npu.get_device_name(0):
+        pytest.skip("ape optional is only supported on Ascend 950")
+
     S_max = 0
     save_state_seqlens = None
     bs_combine_flag = False

@@ -367,12 +367,15 @@ aclnnStatus aclnnCompressor(
       <td>x、wkv、wgate、stateCacheRef、ape、cmpKvOut等必选参数中存在空指针。</td>
     </tr>
     <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">161002</td>
+      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="4">161002</td>
       <td>x、wkv、wgate、stateCacheRef、ape、cmpKvOut的数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>x、wkv、wgate、stateCacheRef、ape的shape维度不在支持的范围之内。</td>
+    </tr>
+    <tr>
+      <td>cmpRatio、coff、cacheMode的取值不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>cuSeqlensOptional、sequsedOptional、startPosOptional与x的shape组合不满足约束。</td>
@@ -380,7 +383,7 @@ aclnnStatus aclnnCompressor(
     <tr>
       <td>ACLNN_ERR_INNER_TILING_ERROR</td>
       <td>561002</td>
-      <td>tiling发生异常，入参的dtype类型或者shape错误，或cmpRatio、coff、cacheMode的取值不在支持的范围之内。</td>
+      <td>tiling发生异常，入参的dtype类型或者shape错误。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -438,12 +441,7 @@ aclnnStatus aclnnCompressor(
 
 - 确定性计算：
   - aclnnCompressor默认确定性实现。
-  <!-- npu="950" id8 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
-  <!-- end id8 -->
-<!-- npu="A3,910b" id9 -->
-  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
-<!-- end id9 -->
+  - batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 输入shape限制：
   - stateCacheRef支持输入shape为[block_num, block_size, 2\*coff\*D]，要求block_num>0；cacheMode=2时，需满足block_size >= coff * cmp_ratio + S - 1。
@@ -509,7 +507,7 @@ aclnnStatus aclnnCompressor(
 
 /*!
  * \file test_aclnn_compressor.cpp
- * \brief Compressor 算子 aclnn 调用示例（A5 / ascend950）
+ * \brief Compressor 算子 aclnn 调用示例
  *        场景：C4A（D=512, coff=2, cmp_ratio=4, cache_mode=1, BSH layout, BF16）
  *        A5 版本，B=1,S=4 时 tokenSize=4 <= 256，会触发 FULL_LOAD 高性能模板。
  */

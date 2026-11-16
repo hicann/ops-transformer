@@ -67,10 +67,13 @@
 | start\_pos | 可选输入 | 表示计算起始位置。<br>如果指定为None时，表示从0开始进行计算。 | INT32          | ND         |
 | cmp\_ratio | 属性 | 用于稀疏计算，表示数据压缩率，取值范围为[2, 128]内的整数。 | INT32          | -         |
 | coff | 可选属性 | 表示是否进行overlap数据重排。 <br>coff=1：无需进行overlap数据重排，coff=2：需要进行overlap数据重排。<br>默认值为1。 | INT32          | -         |
+| enable\_ape | 可选属性 | 表示是否计算dApe梯度。<br>默认值为true；false时跳过dApe计算，dApe输出内容无效。 | BOOL          | -         |
 | d\_x | 输出 | 公式中的$dX$，输入x的梯度。 | FLOAT16、BFLOAT16         | ND          |
 | d\_wkv | 输出 | 公式中的$dW^{KV}$，权重wkv的梯度。 | FLOAT16、BFLOAT16         | ND          |
 | d\_wgate | 输出 | 公式中的$dW^{Gate}$，权重wgate的梯度。 | FLOAT16、BFLOAT16         | ND          |
-| d\_ape | 输出 | 公式中的$dApe$，APE位置编码的梯度。 | FLOAT32         | ND          |
+| d\_ape | 输出 | 公式中的$dApe$，APE位置编码的梯度。enable\_ape=false时算子跳过计算，内容无效。 | FLOAT32         | ND          |
+
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：enable_ape不生效，dApe仍会正常计算。
 
 ## 约束说明
 
@@ -102,10 +105,12 @@
     - 支持H为1K~10K，512对齐。
     - 支持coff为1/2。
     - 支持cmp\_ratio为2~128。
+- enableApe说明：
+    - enable\_ape默认为true，按[cmp\_ratio, coff\*D]生成dApe；false时跳过dApe计算，d\_ape仍为必选输出但内容无效。PyTorch侧共享反向接口通过`enable_ape`参数控制是否生成dApe。
 
 ## 调用说明
 
 | 调用方式  | 样例代码                                                                          | 说明                                                                          |
 | --------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | aclnn接口 | -| 通过[aclnnCompressorGrad](./docs/aclnnCompressorGrad.md)调用CompressorGrad算子。 |
-| PyTorch API | - | 通过[cann_ops_transformer.compressor](../../attention/compressor/docs/torchapi_compressor.md)调用Compressor算子，反向经其autograd自动调用CompressorGrad。 |
+| PyTorch API | - | 通过[cann_ops_transformer.compressor](../../attention/compressor/docs/torchapi_compressor.md)或[compressor_v2](../../attention/compressor/docs/torchapi_compressor_v2.md)调用Compressor算子，反向经其autograd自动调用CompressorGrad；v2在ape需要梯度时额外返回d_ape。 |

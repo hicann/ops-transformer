@@ -7,11 +7,17 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
+from enum import IntEnum
 from typing import Optional, Tuple
 
 import torch
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
+
+
+class CacheMode(IntEnum):
+    LINEAR_BUFFER = 1
+    RING_BUFFER = 2
 
 
 class CompressorOpBuilder(OpBuilder):
@@ -51,7 +57,7 @@ class CompressorOpBuilder(OpBuilder):
             seqused: Optional[torch.Tensor] = None,
             start_pos: Optional[torch.Tensor] = None,
             coff: Optional[int] = 1,
-            cache_mode: Optional[int] = 1,
+            cache_mode: CacheMode = CacheMode.LINEAR_BUFFER,
         ):
             cmp_kv, _, _ = _compressor_forward_fake(
                 x,
@@ -252,6 +258,7 @@ def _compressor_backward(
     seqused: Optional[torch.Tensor] = None,
     start_pos: Optional[torch.Tensor] = None,
     coff: Optional[int] = 1,
+    enable_ape: bool = True,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     op_module = compressor_op_builder.load()
     return op_module.compressor_backward(
@@ -266,6 +273,7 @@ def _compressor_backward(
         start_pos,
         cmp_ratio,
         coff,
+        enable_ape,
     )
 
 
@@ -282,12 +290,17 @@ def _compressor_backward_fake(
     seqused: Optional[torch.Tensor] = None,
     start_pos: Optional[torch.Tensor] = None,
     coff: Optional[int] = 1,
+    enable_ape: bool = True,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     d_x = torch.empty_like(x)
     d_wkv = torch.empty_like(wkv)
     d_wgate = torch.empty_like(wgate)
-    d_ape_size = (cmp_ratio, wkv.size(0))
-    d_ape = torch.empty(d_ape_size, dtype=torch.float32, device=x.device)
+    if enable_ape:
+        d_ape = torch.empty(
+            (cmp_ratio, wkv.size(0)), dtype=torch.float32, device=x.device
+        )
+    else:
+        d_ape = torch.empty((0,), dtype=torch.float32, device=x.device)
     return (d_x, d_wkv, d_wgate, d_ape)
 
 
@@ -444,7 +457,7 @@ def compressor(
     seqused: Optional[torch.Tensor] = None,
     start_pos: Optional[torch.Tensor] = None,
     coff: Optional[int] = 1,
-    cache_mode: Optional[int] = 1,
+    cache_mode: CacheMode = CacheMode.LINEAR_BUFFER,
 ) -> Tuple[torch.Tensor]:
     """
     dispatcher implementation for NPU.
@@ -466,3 +479,290 @@ def compressor(
         coff,
         cache_mode,
     )
+
+
+# ===========================================================================
+# V2 interface: peer of the public compressor() above. cmp_ratio is required;
+# ape is optional, and when omitted the Ape add is skipped. coff defaults to 1
+# and cache_mode to 1 (linear buffer). Forward keeps autograd support; the grad
+# interface exposes an optional enable_ape switch which, when true, also
+# returns d_ape.
+# ===========================================================================
+@torch.library.custom_op(
+    "cann_ops_transformer::_compressor_v2_forward", mutates_args=(), device_types="npu"
+)
+def _compressor_v2_forward(
+    x: torch.Tensor,
+    wkv: torch.Tensor,
+    wgate: torch.Tensor,
+    state_cache: torch.Tensor,
+    cmp_ratio: int,
+    ape: Optional[torch.Tensor] = None,
+    state_block_table: Optional[torch.Tensor] = None,
+    cu_seqlens: Optional[torch.Tensor] = None,
+    seqused: Optional[torch.Tensor] = None,
+    start_pos: Optional[torch.Tensor] = None,
+    coff: int = 1,
+    cache_mode: int = 1,
+    grad_enabled: bool = False,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    op_module = compressor_op_builder.load()
+    return op_module.compressor_v2(
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        ape,
+        cmp_ratio,
+        state_block_table,
+        cu_seqlens,
+        seqused,
+        start_pos,
+        coff,
+        cache_mode,
+        grad_enabled,
+    )
+
+
+@torch.library.register_fake("cann_ops_transformer::_compressor_v2_forward")
+def _compressor_v2_forward_fake(
+    x: torch.Tensor,
+    wkv: torch.Tensor,
+    wgate: torch.Tensor,
+    state_cache: torch.Tensor,
+    cmp_ratio: int,
+    ape: Optional[torch.Tensor] = None,
+    state_block_table: Optional[torch.Tensor] = None,
+    cu_seqlens: Optional[torch.Tensor] = None,
+    seqused: Optional[torch.Tensor] = None,
+    start_pos: Optional[torch.Tensor] = None,
+    coff: int = 1,
+    cache_mode: int = 1,
+    grad_enabled: bool = False,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    d = wkv.size(0) // coff
+    coff_cmp = coff * cmp_ratio
+    if x.dim() == 3:
+        b = x.size(0)
+        s = x.size(1)
+        cmp_size = (s + cmp_ratio - 1) // cmp_ratio
+        cmp_kv_size = (b, cmp_size, d)
+        softmax_score_size = (b, cmp_size, coff_cmp, d)
+        kv_size = (b, cmp_size, coff_cmp, d)
+    else:
+        b_size = cu_seqlens.size(0) - 1
+        t = x.size(0)
+        cmp_size = torch.sym_min(t, t // cmp_ratio + b_size)
+        cmp_kv_size = (cmp_size, d)
+        softmax_score_size = (cmp_size, coff_cmp, d)
+        kv_size = (cmp_size, coff_cmp, d)
+
+    cmp_kv_out = torch.empty(cmp_kv_size, dtype=x.dtype, device=x.device)
+    softmax_score_out = torch.empty(
+        softmax_score_size, dtype=torch.float32, device=x.device
+    )
+    kv_out = torch.empty(kv_size, dtype=torch.float32, device=x.device)
+    return (cmp_kv_out, softmax_score_out, kv_out)
+
+
+# ===========================================================================
+# V2 graph-mode forward: same as above but declared mutating so torch.compile /
+# npugraph_ex can observe the in-place state_cache refresh.
+# ===========================================================================
+@torch.library.custom_op(
+    "cann_ops_transformer::_compressor_v2_forward_graph",
+    mutates_args=("state_cache",),
+    device_types="npu",
+)
+def _compressor_v2_forward_graph(
+    x: torch.Tensor,
+    wkv: torch.Tensor,
+    wgate: torch.Tensor,
+    state_cache: torch.Tensor,
+    cmp_ratio: int,
+    ape: Optional[torch.Tensor] = None,
+    state_block_table: Optional[torch.Tensor] = None,
+    cu_seqlens: Optional[torch.Tensor] = None,
+    seqused: Optional[torch.Tensor] = None,
+    start_pos: Optional[torch.Tensor] = None,
+    coff: int = 1,
+    cache_mode: int = 1,
+    grad_enabled: bool = False,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    op_module = compressor_op_builder.load()
+    return op_module.compressor_v2(
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        ape,
+        cmp_ratio,
+        state_block_table,
+        cu_seqlens,
+        seqused,
+        start_pos,
+        coff,
+        cache_mode,
+        grad_enabled,
+    )
+
+
+@torch.library.register_fake("cann_ops_transformer::_compressor_v2_forward_graph")
+def _compressor_v2_forward_graph_fake(
+    x: torch.Tensor,
+    wkv: torch.Tensor,
+    wgate: torch.Tensor,
+    state_cache: torch.Tensor,
+    cmp_ratio: int,
+    ape: Optional[torch.Tensor] = None,
+    state_block_table: Optional[torch.Tensor] = None,
+    cu_seqlens: Optional[torch.Tensor] = None,
+    seqused: Optional[torch.Tensor] = None,
+    start_pos: Optional[torch.Tensor] = None,
+    coff: int = 1,
+    cache_mode: int = 1,
+    grad_enabled: bool = False,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    return _compressor_v2_forward_fake(
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        cmp_ratio,
+        ape,
+        state_block_table,
+        cu_seqlens,
+        seqused,
+        start_pos,
+        coff,
+        cache_mode,
+        grad_enabled,
+    )
+
+
+class _CompressorV2Function(torch.autograd.Function):
+    """Autograd wrapper for the public compressor_v2() entry."""
+
+    @staticmethod
+    def forward(
+        ctx,
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        cmp_ratio,
+        ape,
+        state_block_table,
+        cu_seqlens,
+        seqused,
+        start_pos,
+        coff,
+        cache_mode,
+    ):
+        grad_enabled = any(
+            t is not None and t.requires_grad for t in (x, wkv, wgate, ape)
+        )
+        enable_ape = grad_enabled and ape is not None and ape.requires_grad
+        cmp_kv, softmax_score, kv = _compressor_v2_forward_graph(
+            x,
+            wkv,
+            wgate,
+            state_cache,
+            cmp_ratio,
+            ape,
+            state_block_table,
+            cu_seqlens,
+            seqused,
+            start_pos,
+            coff,
+            cache_mode,
+            grad_enabled,
+        )
+        ctx.set_materialize_grads(False)
+        ctx.save_for_backward(
+            x, wkv, wgate, cu_seqlens, seqused, start_pos, softmax_score, kv
+        )
+        ctx.cmp_ratio = cmp_ratio
+        ctx.coff = coff
+        ctx.enable_ape = enable_ape
+        return cmp_kv
+
+    @staticmethod
+    def backward(ctx, dout, *grads):
+        """
+        Args:
+            dout: d_cmp_kv
+        """
+        x, wkv, wgate, cu_seqlens, seqused, start_pos, softmax_score, kv = (
+            ctx.saved_tensors
+        )
+        d_x, d_wkv, d_wgate, d_ape = _compressor_backward(
+            dout,
+            x,
+            wkv,
+            wgate,
+            softmax_score,
+            kv,
+            ctx.cmp_ratio,
+            cu_seqlens,
+            seqused,
+            start_pos,
+            ctx.coff,
+            ctx.enable_ape,
+        )
+        return (
+            d_x,
+            d_wkv,
+            d_wgate,
+            None,
+            None,
+            d_ape if ctx.enable_ape else None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+
+
+def compressor_v2(
+    x: torch.Tensor,
+    wkv: torch.Tensor,
+    wgate: torch.Tensor,
+    state_cache: torch.Tensor,
+    cmp_ratio: int,
+    *,
+    ape: Optional[torch.Tensor] = None,
+    state_block_table: Optional[torch.Tensor] = None,
+    cu_seqlens: Optional[torch.Tensor] = None,
+    seqused: Optional[torch.Tensor] = None,
+    start_pos: Optional[torch.Tensor] = None,
+    coff: Optional[int] = 1,
+    cache_mode: CacheMode = CacheMode.LINEAR_BUFFER,
+) -> torch.Tensor:
+    """
+    V2 interface for NPU. cmp_ratio is required; ape is optional (omitted -> no
+    Ape add); coff defaults to 1 and cache_mode to 1 (linear buffer). Supports
+    autograd; d_ape is produced only when ape requires grad.
+    """
+    if x is None or not isinstance(x, torch.Tensor):
+        raise ValueError("x must be a torch.Tensor, got {}".format(type(x).__name__))
+    return _CompressorV2Function.apply(
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        cmp_ratio,
+        ape,
+        state_block_table,
+        cu_seqlens,
+        seqused,
+        start_pos,
+        coff,
+        cache_mode,
+    )
+
+
+compressor.CacheMode = CacheMode
+compressor_v2.CacheMode = CacheMode

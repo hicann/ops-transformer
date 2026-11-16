@@ -8,10 +8,10 @@
 - <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Not supported
+- <term>Atlas A3 products</term>: Supported
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 products</term>: Not supported
+- <term>Atlas A2 products</term>: Supported
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 inference products</term>: Not supported
@@ -82,6 +82,7 @@ aclnnStatus aclnnCompressorGradGetWorkspaceSize(
     const aclTensor *startPosOptional,
     int64_t          cmpRatio,
     int64_t          coff,
+    bool             enableApe,
     const aclTensor *dXOut,
     const aclTensor *dWkvOut,
     const aclTensor *dWgateOut,
@@ -115,10 +116,15 @@ aclnnStatus aclnnCompressorGrad(
     | startPosOptional | Optional input | Start position of the computation. | When set to None, the computation starts from 0.| INT32 | ND |[B,]|×|
     | cmpRatio | Input | Data compression ratio used for sparse computation, consistent with the forward pass. |An integer in the range [2, 128].| INT32 | - |-|-|
     | coff | Optional input | Whether to perform overlap data rearrangement, consistent with the forward pass. |A value in the range [1, 2]. If coff=1, overlap data rearrangement is not required. If coff=2, overlap data rearrangement is required.| INT32 | - |-|-|
+    | enableApe | Optional input | Whether to compute the dApe gradient. |Default: true. When false, dApe computation is skipped (the contents of dApeOut are invalid). This is used when the forward pass does not use ape or ape does not require gradients.| BOOL | - |-|-|
     | dXOut | Output | $dX$ in the formula, gradient of input x. | Empty tensors are not supported.| FLOAT16, BFLOAT16 | ND |Same as x: BS merged: [T,H], BS non-merged: [B,S,H]|×|
     | dWkvOut | Output | $dW^{KV}$ in the formula, gradient of weight wkv. | Empty tensors are not supported.| FLOAT16, BFLOAT16 | ND |[coff* D,H]|×|
     | dWgateOut | Output | $dW^{Gate}$ in the formula, gradient of weight wgate. | Empty tensors are not supported.| FLOAT16, BFLOAT16 | ND |[coff* D,H]|×|
-    | dApeOut | Output | $dApe$ in the formula, gradient of the APE positional encoding. | Empty tensors are not supported.| FLOAT32 | ND |[cmp_ratio,coff* D]|×|
+    | dApeOut | Output | $dApe$ in the formula, gradient of the APE positional encoding. | Empty tensors are not supported; when enableApe=false the operator skips the computation and the contents are invalid.| FLOAT32 | ND |[cmp_ratio,coff* D]|×|
+
+<!-- npu="A3,910b" id7 -->
+- <term>Atlas A3 products</term>, <term>Atlas A2 products</term>: enableApe has no effect and dApe is still computed.
+<!-- end id7 -->
 
 - **Return Value**
 
@@ -237,6 +243,8 @@ aclnnStatus aclnnCompressorGrad(
   - Supports H in the range 1K-10K, aligned to 512.
   - Supports coff of 1/2.
   - Supports cmp\_ratio in the range 2-128.
+- enableApe:
+    - enableApe defaults to true, and dApe is generated with shape [cmp\_ratio, coff\*D]. When enableApe is false, dApe computation is skipped; dApeOut remains a required output but its contents are invalid. This is used when the forward pass does not use ape or ape does not require gradients.
 
 ## Example
 
@@ -255,7 +263,7 @@ The following sample code is for reference only. For details about compilation a
 
 /*!
  * \file test_aclnn_compressor_grad.cpp
- * \brief aclnn call example of the CompressorGrad operator (A5 / ascend950)
+ * \brief aclnn call example of the CompressorGrad operator
  *        Use case: C4A (D=512, coff=2, cmp_ratio=4, BSH layout, BF16)
  */
 
@@ -470,7 +478,7 @@ int main()
     aclOpExecutor *executor = nullptr;
 
     ret = aclnnCompressorGradGetWorkspaceSize(x, wkv, wgate, dCmpKv, softmaxScore, kv, nullptr, nullptr, startPos,
-                                              cmpRatio, coff, dX, dWkv, dWgate, dApe, &workspaceSize, &executor);
+                                              cmpRatio, coff, true, dX, dWkv, dWgate, dApe, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGradGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 

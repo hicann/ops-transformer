@@ -121,17 +121,10 @@ English | [简体中文](./README.md)
   </tr>
   <tr>
     <td>ape</td>
-    <td>Input</td>
-    <td><em>Ape</em> in the formula, indicating positional biases.</td>
+    <td>Optional input</td>
+    <td><em>Ape</em> in the formula, indicating positional biases. It can be omitted; when omitted, the Ape addition is skipped.</td>
     <td>FLOAT</td>
     <td>ND</td>
-  </tr>
-  <tr>
-    <td>cmp_ratio</td>
-    <td>Attribute</td>
-    <td>Used for sparse computation. It indicates the data compression ratio, and the value is an integer in the range [2, 128].</td>
-    <td>INT32</td>
-    <td>-</td>
   </tr>
   <tr>
     <td>state_block_table</td>
@@ -160,6 +153,13 @@ English | [简体中文](./README.md)
     <td>Indicates the computation start position. When set to None, computation starts from 0.</td>
     <td>INT32</td>
     <td>ND</td>
+  </tr>
+  <tr>
+    <td>cmp_ratio</td>
+    <td>Attribute</td>
+    <td>Used for sparse computation. It indicates the data compression ratio, and the value is an integer in the range [2, 128].</td>
+    <td>INT32</td>
+    <td>-</td>
   </tr>
   <tr>
     <td>coff</td>
@@ -265,14 +265,7 @@ English | [简体中文](./README.md)
       - C4A: D=512, coff=2, and cmp_ratio=4.
       - C4Li: D=128, coff=2, and cmp_ratio=4.
       - C128A: D=512, coff=1, and cmp_ratio=128.
-- Deterministic computation and batch consistency:
-  - A deterministic implementation is used by default, and multiple calls with the same input produce consistent results.
-<!-- npu="950" id1 -->
-  - <term>Ascend 950PR&950DT products</term>: batch consistency: set ACL_OPT_DETERMINISTIC to 3 through aclrtSetSysParamOpt() to enable batch consistency. After it is enabled, computation results are independent of the batch size and position.
-<!-- end id1 -->
-<!-- npu="A3,910b" id2 -->
-  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: batch consistency: set ACL_OPT_DETERMINISTIC to 3 through aclrtSetSysParamOpt() to enable batch consistency. After it is enabled, computation results are independent of the batch size and position.
-<!-- end id2 -->
+  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: <em>ape</em> cannot be omitted and must be passed.
 
 ## Invocation Description
 
@@ -281,4 +274,4 @@ English | [简体中文](./README.md)
   | Invocation Mode | Sample Code | Description |
   | ---------- | -------- | --------------------------------------------- |
   | aclnn API | [test_aclnn_compressor](./examples/arch35/test_aclnn_compressor.cpp) | Calls the Compressor operator through the [aclnnCompressor](docs/aclnnCompressor_en.md) API. |
-  | PyTorch API | - | Calls the Compressor operator through the [compressor](docs/torchapi_compressor_en.md) API. |
+  | PyTorch API | - | Calls the Compressor operator through the [compressor](docs/torchapi_compressor_en.md) API. For the V2 API, see [compressor_v2](docs/torchapi_compressor_v2_en.md). |

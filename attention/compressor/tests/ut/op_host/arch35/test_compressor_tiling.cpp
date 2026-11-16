@@ -42,6 +42,9 @@ std::string Compressor_tiling_A5SocInfo = "{\n"
 // ====================================================================
 // BSH Layout Tiling Tests
 // ====================================================================
+// NOTE: arch35 tilingKey includes HAS_APE at bit12 (1 when ape is present),
+// so success cases that pass ape use legacy_key + 4096; test1_no_ape keeps the
+// legacy key to cover the optional-ape (HAS_APE=0) branch.
 
 class CompressorTilingArch35 : public testing::Test {
 protected:
@@ -67,6 +70,41 @@ TEST_F(CompressorTilingArch35, test1)
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},      // wgate
             {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
             {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},           // ape
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},                 // state_block_table
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cu_seqlens
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // start_pos
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},        // cmp_kv
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache (in-place)
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    int64_t expectTilingKey = 4640;
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// C4A bf16 without ape: same config as test1 but ape is not provided,
+// expect legacy tilingKey (HAS_APE=0) and the optional-ape validation bypass.
+TEST_F(CompressorTilingArch35, test1_no_ape)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},      // x
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},      // wkv
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},      // wgate
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // ape (optional, absent)
             {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},                 // state_block_table
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cu_seqlens
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused
@@ -526,7 +564,7 @@ TEST_F(CompressorTilingArch35, test2)
             {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
         },
         &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 546;
+    int64_t expectTilingKey = 4642;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
@@ -560,7 +598,7 @@ TEST_F(CompressorTilingArch35, test3)
             {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
         },
         &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 544;
+    int64_t expectTilingKey = 4640;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
@@ -594,7 +632,7 @@ TEST_F(CompressorTilingArch35, test4)
             {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(131072)},
         },
         &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 512;
+    int64_t expectTilingKey = 4608;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
@@ -628,7 +666,7 @@ TEST_F(CompressorTilingArch35, test5)
             {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
         },
         &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 544;
+    int64_t expectTilingKey = 4640;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
@@ -666,7 +704,7 @@ TEST_F(CompressorTilingArch35, test6)
             {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
         },
         &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 545;
+    int64_t expectTilingKey = 4641;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 

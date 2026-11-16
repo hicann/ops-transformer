@@ -44,8 +44,9 @@ ge::graphStatus CompressorTiling::ConvertRequiredParams(gert::TilingContext& con
     compressorContext.wgate.shape = context.GetRequiredInputShape(WEIGHT_WGATE_INPUT_INDEX);
     compressorContext.stateCache.desc = context.GetRequiredInputDesc(STATE_CACHE_INPUT_INDEX);
     compressorContext.stateCache.shape = context.GetRequiredInputShape(STATE_CACHE_INPUT_INDEX);
-    compressorContext.ape.desc = context.GetRequiredInputDesc(APE_INPUT_INDEX);
-    compressorContext.ape.shape = context.GetRequiredInputShape(APE_INPUT_INDEX);
+    compressorContext.ape.desc = context.GetOptionalInputDesc(APE_INPUT_INDEX);
+    compressorContext.ape.shape = context.GetOptionalInputShape(APE_INPUT_INDEX);
+    compressorContext.hasApe = (compressorContext.ape.shape != nullptr);
 
     compressorContext.cmpKv.desc = context.GetOutputDesc(CMP_KV_OUTPUT_INDEX);
     compressorContext.cmpKv.shape = context.GetOutputShape(CMP_KV_OUTPUT_INDEX);
@@ -315,7 +316,7 @@ ge::graphStatus CompressorTiling::CheckEmptyTensor() const
             context_->wkv.shape->GetStorageShape().GetShapeSize() == 0 ||
             context_->wgate.shape->GetStorageShape().GetShapeSize() == 0 ||
             context_->stateCache.shape->GetStorageShape().GetShapeSize() == 0 ||
-            context_->ape.shape->GetStorageShape().GetShapeSize() == 0 ||
+            (context_->hasApe && context_->ape.shape->GetStorageShape().GetShapeSize() == 0) ||
             context_->stateBlockTable.shape->GetStorageShape().GetShapeSize() == 0) {
             std::string emptyParaName = X_NAME;
             if (context_->wkv.shape->GetStorageShape().GetShapeSize() == 0) {
@@ -324,7 +325,7 @@ ge::graphStatus CompressorTiling::CheckEmptyTensor() const
                 emptyParaName = WGATE_NAME;
             } else if (context_->stateCache.shape->GetStorageShape().GetShapeSize() == 0) {
                 emptyParaName = STATE_CACHE_NAME;
-            } else if (context_->ape.shape->GetStorageShape().GetShapeSize() == 0) {
+            } else if (context_->hasApe && context_->ape.shape->GetStorageShape().GetShapeSize() == 0) {
                 emptyParaName = APE_NAME;
             } else if (context_->stateBlockTable.shape->GetStorageShape().GetShapeSize() == 0) {
                 emptyParaName = STATE_BLOCK_TABLE_NAME;
@@ -398,6 +399,7 @@ ge::graphStatus CompressorTiling::GenTilingKey() const
     uint8_t templateId = static_cast<uint8_t>(context_->templateId);
     uint8_t cacheMode = static_cast<uint8_t>(*context_->cacheMode);
     uint8_t gradEnabled = static_cast<uint8_t>(context_->gradEnabled != nullptr && *context_->gradEnabled ? 1 : 0);
+    bool hasApe = context_->hasApe;
 
     auto xDtype = context_->x.desc->GetDataType();
     if (xDtype == ge::DT_BF16) {
@@ -412,10 +414,11 @@ ge::graphStatus CompressorTiling::GenTilingKey() const
         layout = 1;
     }
 
-    context_->tilingKey = GET_TPL_TILING_KEY(layout, dtype, coff, cacheMode, templateId, gradEnabled);
+    context_->tilingKey = GET_TPL_TILING_KEY(layout, dtype, coff, cacheMode, templateId, gradEnabled, hasApe);
     OP_LOGI(context_->opName,
-            "Compressor dtype:%hhu layout:%hhu  coff:%hhu, cacheMode: %u, template_id:%hhu grad_enabled:%hhu", dtype,
-            layout, coff, cacheMode, templateId, gradEnabled);
+            "Compressor dtype:%hhu layout:%hhu  coff:%hhu, cacheMode: %u, template_id:%hhu grad_enabled:%hhu "
+            "has_ape:%d",
+            dtype, layout, coff, cacheMode, templateId, gradEnabled, static_cast<int32_t>(hasApe));
     OP_LOGI(context_->opName, "Compressor tilingKey:%lu", context_->tilingKey);
 
     return ge::GRAPH_SUCCESS;
@@ -688,6 +691,9 @@ ge::graphStatus CompressorTiling::CheckSingleParaStateCache() const
 
 ge::graphStatus CompressorTiling::CheckSingleParaApe() const
 {
+    if (!context_->hasApe) {
+        return ge::GRAPH_SUCCESS;
+    }
     if (ge::GRAPH_SUCCESS != CheckDtypeSupport(context_->ape.desc, APE_NAME) ||
         ge::GRAPH_SUCCESS != CheckDimNumSupport(context_->ape.shape, APE_NAME)) {
         return ge::GRAPH_FAILED;
@@ -860,7 +866,6 @@ ge::graphStatus CompressorTiling::CheckRequiredInOutExistence() const
         {"wkv", context_->wkv.desc, context_->wkv.shape},
         {"wgate", context_->wgate.desc, context_->wgate.shape},
         {"stateCache", context_->stateCache.desc, context_->stateCache.shape},
-        {"ape", context_->ape.desc, context_->ape.shape},
         {"stateBlockTable", context_->stateBlockTable.desc, context_->stateBlockTable.shape},
         {"cmpKv", context_->cmpKv.desc, context_->cmpKv.shape},
         {"softmaxScore", context_->softmaxScore.desc, context_->softmaxScore.shape},

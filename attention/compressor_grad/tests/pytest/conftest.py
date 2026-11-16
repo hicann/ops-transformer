@@ -20,7 +20,7 @@ def pytest_addoption(parser):
         type=int,
         default=1,
         help="验证通路: 1=全链路(默认) 2=单反向PyPTO直跑 3=小算子拼接golden "
-        "4=单反向直调 5=单正向直调",
+        "4=单反向直调 5=单正向直调 6=v2反向不生成dApe",
     )
     parser.addoption(
         "--compare-mode",
@@ -49,6 +49,7 @@ def pytest_runtest_call(item):
         "test_compressor_grad_small_ops": 3,
         "test_compressor_grad_backward_direct": 4,
         "test_compressor_grad_forward_direct": 5,
+        "test_compressor_grad_v2_no_ape": 6,
     }
     test_name = item.name.split("[")[0]
     pathway = _PATHWAY_OF_TEST.get(test_name)

@@ -394,7 +394,7 @@ def generate_compressor_inputs(
     wkv,
     wgate,
     state_cache,
-    ape,
+    ape=None,
     cmp_ratio=4,
     *,
     state_block_table=None,

@@ -852,7 +852,9 @@ def run_forward_direct_case(case, p, b, totalValid, device, compare_mode=3):
     return result, {"cmp_kv": cmp_kv, "softmax_score": softmax_score, "kv": kv}
 
 
-def run_backward_direct_case(case, p, b, totalValid, device, fwd=None, compare_mode=3):
+def run_backward_direct_case(
+    case, p, b, totalValid, device, fwd=None, compare_mode=3, enable_ape=True
+):
     """通路 4：单反向——直调 _compressor_backward（不经 autograd）。
 
     中间量（softmax_score/kv）默认来自真实正向：fwd 为 None 时先直调一次
@@ -861,6 +863,7 @@ def run_backward_direct_case(case, p, b, totalValid, device, fwd=None, compare_m
 
     校验反向 4 输出：compare_mode=2 两方（vs compressor_grad_golden two）；
     compare_mode=3 三方（vs NPU 小算子 two + float64 高精度 high）。
+    enable_ape=False 时走共享反向接口并跳过 d_ape，仅校验其余三梯度。
     """
     batchSize, seqSize, headDim, hiddenSize = p["B"], p["S1"], p["D"], p["H"]
     cmpRatio, coff = p["cr"], p["coff"]
@@ -896,19 +899,36 @@ def run_backward_direct_case(case, p, b, totalValid, device, fwd=None, compare_m
         cmp_kv, softmax_score, kv = fwd["cmp_kv"], fwd["softmax_score"], fwd["kv"]
 
     # ── 直调反向（不经 autograd）──
-    d_x, d_wkv, d_wgate, d_ape = _compressor_backward(
-        dcNpu,
-        inputs["x"],
-        wkvInp,
-        wgateInp,
-        softmax_score,
-        kv,
-        cu_seqlens=cuArg,
-        seqused=sqNpu,
-        start_pos=spNpu,
-        cmp_ratio=cmpRatio,
-        coff=coff,
-    )
+    if enable_ape:
+        d_x, d_wkv, d_wgate, d_ape = _compressor_backward(
+            dcNpu,
+            inputs["x"],
+            wkvInp,
+            wgateInp,
+            softmax_score,
+            kv,
+            cu_seqlens=cuArg,
+            seqused=sqNpu,
+            start_pos=spNpu,
+            cmp_ratio=cmpRatio,
+            coff=coff,
+        )
+    else:
+        # 共享反向接口：enable_ape=False时不生成dApe，返回空tensor占位
+        d_x, d_wkv, d_wgate, d_ape = _compressor_backward(
+            dcNpu,
+            inputs["x"],
+            wkvInp,
+            wgateInp,
+            softmax_score,
+            kv,
+            cmpRatio,
+            cu_seqlens=cuArg,
+            seqused=sqNpu,
+            start_pos=spNpu,
+            coff=coff,
+            enable_ape=False,
+        )
     torch.npu.synchronize()
 
     # ── Golden（一份参数化实现：2=两方 two；3=三方 B two + C high）──
@@ -972,7 +992,7 @@ def run_backward_direct_case(case, p, b, totalValid, device, fwd=None, compare_m
     # ── 反向 4 输出比对 ──
     dWkvNp = d_wkv.cpu().float()
     dWgateNp = d_wgate.cpu().float()
-    apeNp = d_ape.cpu().view(cmpRatio, coff * headDim)
+    apeNp = d_ape.cpu().view(cmpRatio, coff * headDim) if enable_ape else None
     dXNp = d_x.cpu().float()
 
     print_log("=" * 80)
@@ -1001,15 +1021,18 @@ def run_backward_direct_case(case, p, b, totalValid, device, fwd=None, compare_m
             totalValid,
             p_pct_thd,
         )
-        r_ape = check_one_output(
-            "d_ape",
-            apeGold,
-            apeNp,
-            "float32",
-            ENABLE_APE_CHECK,
-            totalValid,
-            get_pct_thd("float32"),
-        )
+        if enable_ape:
+            r_ape = check_one_output(
+                "d_ape",
+                apeGold,
+                apeNp,
+                "float32",
+                ENABLE_APE_CHECK,
+                totalValid,
+                get_pct_thd("float32"),
+            )
+        else:
+            r_ape = {"status": "SKIP", "diff": float("nan"), "pct": float("nan")}
         r_dx = check_one_output(
             "d_x", dXGoldF, dXNp, dataType, ENABLE_DX_CHECK, totalValid, p_pct_thd
         )
@@ -1018,13 +1041,16 @@ def run_backward_direct_case(case, p, b, totalValid, device, fwd=None, compare_m
         c_dx, c_dwkv, c_dwgate, c_dape = c_ref
         r_dwkv = three_way_report("d_wkv", dWkvNp, b_dwkv, c_dwkv, dataType)
         r_dwgate = three_way_report("d_wgate", dWgateNp, b_dwgate, c_dwgate, dataType)
-        r_ape = three_way_report(
-            "d_ape",
-            apeNp,
-            b_dape.view(cmpRatio, coff * headDim),
-            c_dape.view(cmpRatio, coff * headDim),
-            "float32",
-        )
+        if enable_ape:
+            r_ape = three_way_report(
+                "d_ape",
+                apeNp,
+                b_dape.view(cmpRatio, coff * headDim),
+                c_dape.view(cmpRatio, coff * headDim),
+                "float32",
+            )
+        else:
+            r_ape = {"status": "SKIP", "diff": float("nan"), "pct": float("nan")}
         r_dx = three_way_report("d_x", dXNp, b_dx, c_dx, dataType)
 
     result = dict(
@@ -1448,6 +1474,7 @@ def run_backward_case(case, device, compare_mode=3):
             "Coff": coff,
             "Layout": layoutId,
             "DataType": 0 if ioDtype == torch.bfloat16 else 1,
+            "EnableApe": 1,
         },
     ](
         xNpu,
@@ -1628,6 +1655,36 @@ def test_compressor_grad_backward_direct(case, request):
     )
     result = run_backward_direct_case(
         case, p, b, totalValid, device, compare_mode=_compare_mode(request)
+    )
+    assert result["status"] == "PASS", format_case_line(result)
+
+
+@pytest.mark.parametrize(
+    "case",
+    [c for c in REDLINE_CASES if c.get("enable", True)],
+    ids=[c["testcase_name"] for c in REDLINE_CASES if c.get("enable", True)],
+)
+def test_compressor_grad_v2_no_ape(case, request):
+    """通路 6：v2反向路径 enable_ape=False——复用共享反向接口，不生成dApe，仅校验其余三梯度。
+
+    运行：pytest test_compressor_grad.py --pathway 6 -k <case名子串> -q
+    """
+    if _pathway(request) != 6:
+        pytest.skip(f"pathway={_pathway(request)}")
+    device = f"npu:{DEVICE_ID}"
+    torch.npu.set_device(device)
+    p, totalValid, cuNpu, sps, sqs, seed = _prepare_case(case, device)
+    b = _build_inputs(
+        case, p, device, seed, totalValid, cuNpu, sqs, sps, state_init="rand"
+    )
+    result = run_backward_direct_case(
+        case,
+        p,
+        b,
+        totalValid,
+        device,
+        compare_mode=_compare_mode(request),
+        enable_ape=False,
     )
     assert result["status"] == "PASS", format_case_line(result)
 

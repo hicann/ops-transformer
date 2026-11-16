@@ -40,15 +40,11 @@ std::string CompressorGrad_tiling_A5SocInfo = "{\n"
 
 // ====================================================================
 // Tiling key encoding (from compressor_grad.py CompressorGradTilingKey):
-//   key = coff * 16 + layout * 2 + dtype
-//   coff:     1 or 2   (2-bit field, values [1,2])
-//   layout:   0=BSH  1=TH  (1-bit field)
-//   dtype:    0=BF16  1=FP16  (2-bit field)
-//
-// Verification against forward compressor tests:
-//   coff=2, BSH, BF16 → 2*16+0*2+0 = 32  ✓
-//   coff=2, BSH, FP16 → 2*16+0*2+1 = 34  ✓
-//   coff=1, BSH, BF16 → 1*16+0*2+0 = 16
+//   key = (coff-1) + layout*4 + dtype*8 + enableApe*32
+//   coff:      1 or 2   (2-bit field, values [1,2] map to index coff-1)
+//   layout:    0=BSH  1=TH  (1-bit field)
+//   dtype:     0=BF16  1=FP16  (2-bit field)
+//   enableApe: 0=skip dApe  1=compute dApe  (1-bit field)
 // ====================================================================
 
 class CompressorGradTilingTest : public testing::Test {
@@ -68,7 +64,7 @@ protected:
 // ====================================================================
 
 // C4A bf16: B=2, S=8, H=4096, D=512, coff=2, cmp_ratio=4
-// tiling_key = 2*16 + 0*2 + 0 = 32
+// tiling_key = 1 + 0 + 0 + 32 = 33
 TEST_F(CompressorGradTilingTest, bsh_c4a_bf16)
 {
     optiling::CompressorGradCompileInfo compileInfo = {};
@@ -96,14 +92,15 @@ TEST_F(CompressorGradTilingTest, bsh_c4a_bf16)
         {
             {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
         &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 1;
+    int64_t expectTilingKey = 33;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
 // C4A fp16: B=2, S=8, H=4096, D=512, coff=2, cmp_ratio=4
-// tiling_key = 2*16 + 0*2 + 1 = 34
+// tiling_key = 1 + 0 + 8 + 32 = 41
 TEST_F(CompressorGradTilingTest, bsh_c4a_fp16)
 {
     optiling::CompressorGradCompileInfo compileInfo = {};
@@ -128,14 +125,15 @@ TEST_F(CompressorGradTilingTest, bsh_c4a_fp16)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 9;
+    int64_t expectTilingKey = 41;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
 // C4Li bf16: B=2, S=8, H=2048, D=128, coff=2, cmp_ratio=4
-// tiling_key = 2*16 + 0*2 + 0 = 32
+// tiling_key = 1 + 0 + 0 + 32 = 33
 TEST_F(CompressorGradTilingTest, bsh_c4li_bf16)
 {
     optiling::CompressorGradCompileInfo compileInfo = {};
@@ -160,14 +158,15 @@ TEST_F(CompressorGradTilingTest, bsh_c4li_bf16)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 1;
+    int64_t expectTilingKey = 33;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
 // C128A bf16: B=2, S=16, H=4096, D=512, coff=1, cmp_ratio=128
-// tiling_key = 1*16 + 0*2 + 0 = 16
+// tiling_key = 0 + 0 + 0 + 32 = 32
 TEST_F(CompressorGradTilingTest, bsh_c128a_bf16)
 {
     optiling::CompressorGradCompileInfo compileInfo = {};
@@ -192,14 +191,15 @@ TEST_F(CompressorGradTilingTest, bsh_c128a_bf16)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 0;
+    int64_t expectTilingKey = 32;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
 // Non-divisible S: B=1, S=6, H=2048, D=128, coff=2, cmp_ratio=4
-// Sr = ceil(6/4) = 2, tiling_key = 2*16 + 0*2 + 0 = 32
+// Sr = ceil(6/4) = 2, tiling_key = 1 + 0 + 0 + 32 = 33
 TEST_F(CompressorGradTilingTest, bsh_non_divisible_s)
 {
     optiling::CompressorGradCompileInfo compileInfo = {};
@@ -224,9 +224,10 @@ TEST_F(CompressorGradTilingTest, bsh_non_divisible_s)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 1;
+    int64_t expectTilingKey = 33;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
@@ -237,7 +238,7 @@ TEST_F(CompressorGradTilingTest, bsh_non_divisible_s)
 // TH C4A bf16: T=8, H=4096, B=2, cu_seqlens=[0,4,8], D=512, coff=2, cmp_ratio=4
 // For backward: dimNum(dCmpKv)==dimNum(x)==2, softmaxScore/kv are 3D
 // cmpKvRows = min(T, T/cmpRatio + B) = min(8, 2+2) = 4
-// tiling_key = 2*16 + 1*2 + 0 = 35
+// tiling_key = 1 + 4 + 0 + 32 = 37
 TEST_F(CompressorGradTilingTest, th_c4a_bf16)
 {
     optiling::CompressorGradCompileInfo compileInfo = {};
@@ -263,14 +264,15 @@ TEST_F(CompressorGradTilingTest, th_c4a_bf16)
         {
             {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
         &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 5;
+    int64_t expectTilingKey = 37;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
 // TH C4A fp16: T=8, H=4096, B=2, D=512, coff=2, cmp_ratio=4
-// tiling_key = 2*16 + 1*2 + 1 = 36
+// tiling_key = 1 + 4 + 8 + 32 = 45
 TEST_F(CompressorGradTilingTest, th_c4a_fp16)
 {
     optiling::CompressorGradCompileInfo compileInfo = {};
@@ -295,9 +297,10 @@ TEST_F(CompressorGradTilingTest, th_c4a_fp16)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
-    int64_t expectTilingKey = 13;
+    int64_t expectTilingKey = 45;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
@@ -330,6 +333,7 @@ TEST_F(CompressorGradTilingTest, err_cmp_ratio_3)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0);
@@ -360,6 +364,7 @@ TEST_F(CompressorGradTilingTest, err_coff_3)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0);
@@ -391,6 +396,7 @@ TEST_F(CompressorGradTilingTest, err_head_dim_256)
         {
             {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
         &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0);
@@ -421,6 +427,7 @@ TEST_F(CompressorGradTilingTest, err_hidden_size_not_aligned)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0);
@@ -451,6 +458,7 @@ TEST_F(CompressorGradTilingTest, err_hidden_size_too_small)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0);
@@ -481,6 +489,7 @@ TEST_F(CompressorGradTilingTest, err_empty_x_tensor)
                                               {
                                                   {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                                  {"enable_ape", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0);

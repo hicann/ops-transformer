@@ -45,7 +45,8 @@
 |[all_to_all_quant_matmul](../../mc2/allto_all_matmul_v2/docs/torchapi_all_to_all_quant_matmul.md)|完成All-to-All通信与MX量化矩阵乘法的融合计算。|-|默认支持确定性计算|
 |[causal_conv1d_fn](../../mamba/causal_conv1d/docs/torchapi_causal_conv1d_fn.md)| 因果一维卷积前向计算（prefill/chunk-prefill），封装aclnnCausalConv1dFn。| - | 默认支持确定性计算 |
 |[causal_conv1d_update](../../mamba/causal_conv1d/docs/torchapi_causal_conv1d_update.md)| 因果一维卷积状态更新（decode/update），封装aclnnCausalConv1dUpdate。 | - | 默认支持确定性计算 |
-|[compressor](../../attention/compressor/docs/torchapi_compressor.md)| 将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。| 默认支持确定性计算 | 默认支持确定性计算  |
+|[compressor](../../attention/compressor/docs/torchapi_compressor.md)| 将每cmp_ratio个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。| 默认支持确定性计算 | 默认支持确定性计算  |
+|[compressor_v2](../../attention/compressor/docs/torchapi_compressor_v2.md)| 将每cmp_ratio个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算，支持不传ape。| 默认支持确定性计算 | 默认支持确定性计算  |
 |[engram_fused_weight](../../engram/engram_fused_weight/docs/torchapi_engram_fused_weight.md)| 实现 Engram 门控的权重融合。 | - | 默认支持确定性计算 |
 |[engram_hash](../../engram/engram_hash/docs/torchapi_engram_hash.md)| 实现 Engram 门控的 n-gram 哈希索引计算 | - | 默认支持确定性计算 |
 |[ElasticBuffer](../../mc2/common/docs/torchapi_ElasticBuffer.md)|统一的分布式Engram存储与MoE dispatch/combine通信buffer管理；配套get_engram_storage_size_hint、engram_fetch/engram_fetch_grad等接口。|-|-|

@@ -1,4 +1,4 @@
-__all__ = ["compressor"]
+__all__ = ["compressor", "compressor_v2"]
 
-from .compressor import compressor
+from .compressor import compressor, compressor_v2
 from . import graph_convert_compressor

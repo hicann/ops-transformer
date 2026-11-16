@@ -312,7 +312,7 @@ def _batch_consistency_check(npu_cmp_kv, kwargs):
                             bidx, start_idx : (start_idx + compare_len), :
                         ]
                     else:
-                        slice_output = npu_np[start:stop, 1:, :]
+                        slice_output = npu_np[start:stop, :, :]
                 dl = "_".join(kl.split("_")[:2])
                 if dl not in batch_consistency_cache:
                     batch_consistency_cache[dl] = {

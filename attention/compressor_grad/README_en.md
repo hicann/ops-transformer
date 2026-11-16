@@ -69,10 +69,13 @@ English | [简体中文](./README.md)
 | start\_pos | Optional input | Starting position of the computation.<br>If set to None, the computation starts from 0. | INT32          | ND         |
 | cmp\_ratio | Attribute | Used for sparse computation. Indicates the data compression ratio. The value is an integer in the range [2, 128]. | INT32          | -         |
 | coff | Optional attribute | Indicates whether to perform overlap data rearrangement. <br>coff=1: overlap data rearrangement is not required; coff=2: overlap data rearrangement is required.<br>The default value is 1. | INT32          | -         |
+| enable\_ape | Optional attribute | Indicates whether to compute the dApe gradient.<br>The default value is true. When it is false, the dApe computation is skipped and the content of dApe is invalid. | BOOL          | -         |
 | d\_x | Output | $dX$ in the formulas. The gradient of the input x. | FLOAT16, BFLOAT16         | ND          |
 | d\_wkv | Output | $dW^{KV}$ in the formulas. The gradient of the weight wkv. | FLOAT16, BFLOAT16         | ND          |
 | d\_wgate | Output | $dW^{Gate}$ in the formulas. The gradient of the weight wgate. | FLOAT16, BFLOAT16         | ND          |
-| d\_ape | Output | $dApe$ in the formulas. The gradient of the APE position encoding. | FLOAT32         | ND          |
+| d\_ape | Output | $dApe$ in the formulas. The gradient of the APE position encoding. When enable\_ape is false, the operator skips the computation and the content is invalid. | FLOAT32         | ND          |
+
+- <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: enable_ape does not take effect, and dApe is still computed normally.
 
 ## Constraints
 
@@ -104,10 +107,12 @@ English | [简体中文](./README.md)
     - Supports H from 1K to 10K, aligned to 512.
     - Supports coff of 1/2.
     - Supports cmp\_ratio from 2 to 128.
+- enableApe description:
+    - enable\_ape defaults to true, and dApe is generated with shape [cmp\_ratio, coff\*D]. When it is false, the dApe computation is skipped; d\_ape remains a required output but its content is invalid. On the PyTorch side, the shared backward API controls whether dApe is generated through the `enable_ape` parameter.
 
 ## Invocation Description
 
 | Invocation Method | Sample Code                                                                       | Description                                                                    |
 | --------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | aclnn API | -| Calls the CompressorGrad operator through [aclnnCompressorGrad](docs/aclnnCompressorGrad_en.md). |
-| PyTorch API | - | Calls the Compressor operator through [cann_ops_transformer.compressor](../compressor/docs/torchapi_compressor_en.md). CompressorGrad is automatically called in the backward pass through its autograd. |
+| PyTorch API | - | Calls the Compressor operator through [cann_ops_transformer.compressor](../compressor/docs/torchapi_compressor_en.md) or [compressor_v2](../compressor/docs/torchapi_compressor_v2_en.md). CompressorGrad is automatically called in the backward pass through its autograd. V2 additionally returns d_ape when ape requires gradients. |

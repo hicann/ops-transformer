@@ -37,6 +37,8 @@ ASCENDC_TPL_ARGS_DECL(compressor, // 算子唯一标识，与opType保持一致
                       ASCENDC_TPL_UINT_DECL(TEMPLATE_ID, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2),
                       // bit:11  grad_enabled 0:关闭 1:开启
                       ASCENDC_TPL_BOOL_DECL(GRAD_ENABLED, 0, 1),
+                      // bit:12  has_ape 0:无ape输入 1:ape参与Add
+                      ASCENDC_TPL_BOOL_DECL(HAS_APE, 0, 1),
 
 );
 
@@ -45,7 +47,7 @@ ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(X_LAYOUT, ASCENDC_TPL_
                                      ASCENDC_TPL_UINT_SEL(COFF, ASCENDC_TPL_UI_LIST, 1, 2),
                                      ASCENDC_TPL_UINT_SEL(CACHE_MODE, ASCENDC_TPL_UI_LIST, 1, 2),
                                      ASCENDC_TPL_UINT_SEL(TEMPLATE_ID, ASCENDC_TPL_UI_LIST, 0, 1, 2),
-                                     ASCENDC_TPL_BOOL_SEL(GRAD_ENABLED, 0, 1),
+                                     ASCENDC_TPL_BOOL_SEL(GRAD_ENABLED, 0, 1), ASCENDC_TPL_BOOL_SEL(HAS_APE, 0, 1),
                                      ASCENDC_TPL_TILING_STRUCT_SEL(optiling::CompressorTilingData)),
 
                 ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(X_LAYOUT, ASCENDC_TPL_UI_LIST, 1),
@@ -53,7 +55,7 @@ ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(X_LAYOUT, ASCENDC_TPL_
                                      ASCENDC_TPL_UINT_SEL(COFF, ASCENDC_TPL_UI_LIST, 1, 2),
                                      ASCENDC_TPL_UINT_SEL(CACHE_MODE, ASCENDC_TPL_UI_LIST, 1, 2),
                                      ASCENDC_TPL_UINT_SEL(TEMPLATE_ID, ASCENDC_TPL_UI_LIST, 0, 1),
-                                     ASCENDC_TPL_BOOL_SEL(GRAD_ENABLED, 0, 1),
+                                     ASCENDC_TPL_BOOL_SEL(GRAD_ENABLED, 0, 1), ASCENDC_TPL_BOOL_SEL(HAS_APE, 0, 1),
                                      ASCENDC_TPL_TILING_STRUCT_SEL(optiling::CompressorTilingData)), );
 
 #endif // COMPRESSOR_TEMPLATE_TILING_KEY_H

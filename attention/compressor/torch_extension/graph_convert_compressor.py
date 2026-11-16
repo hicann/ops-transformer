@@ -67,13 +67,17 @@ if _TORCHAIR_AVAILABLE:
         result = x.new_empty(x.size())
         return result
 
-    @register_fx_node_ge_converter(
-        torch.ops.cann_ops_transformer._compressor_forward.default
-    )
-    def convert_compressor(
-        *args,
-        **kwargs,
-    ):
+    def _raise_compressor_ge_unsupported(*args, **kwargs):
         raise AssertionError(
             "compressor is not supported in GE graph mode. Please use aclgraph mode instead."
         )
+
+    # 公共接口实际调用的是 mutating 的 *_forward_graph 变体，四个 op 都需注册，
+    # 否则 TorchAir GE 模式会报 "converter not found" 而非明确的 aclgraph 提示。
+    for _compressor_op in (
+        torch.ops.cann_ops_transformer._compressor_forward.default,
+        torch.ops.cann_ops_transformer._compressor_forward_graph.default,
+        torch.ops.cann_ops_transformer._compressor_v2_forward.default,
+        torch.ops.cann_ops_transformer._compressor_v2_forward_graph.default,
+    ):
+        register_fx_node_ge_converter(_compressor_op)(_raise_compressor_ge_unsupported)

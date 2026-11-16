@@ -252,6 +252,7 @@ struct CompressorContext {
 
     ge::DataType dtype = ge::DT_BF16;
     LayoutType layout = LayoutType::LAYOUT_BSH;
+    bool hasApe = false;
 
     size_t* workSpaces;
     uint64_t tilingKey;

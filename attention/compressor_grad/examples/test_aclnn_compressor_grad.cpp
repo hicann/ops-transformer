@@ -131,6 +131,7 @@ int main()
     int64_t headDim = 512;
     int64_t coff = 2;
     int64_t cmpRatio = 4;
+    bool enableApe = true;
 
     int64_t coffD = coff * headDim;
     int64_t Sr = (S + cmpRatio - 1) / cmpRatio;
@@ -226,7 +227,8 @@ int main()
     aclOpExecutor* executor = nullptr;
 
     ret = aclnnCompressorGradGetWorkspaceSize(x, wkv, wgate, dCmpKv, softmaxScore, kv, nullptr, nullptr, startPos,
-                                              cmpRatio, coff, dX, dWkv, dWgate, dApe, &workspaceSize, &executor);
+                                              cmpRatio, coff, enableApe, dX, dWkv, dWgate, dApe, &workspaceSize,
+                                              &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGradGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
