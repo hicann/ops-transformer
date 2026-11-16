@@ -274,7 +274,10 @@ aclnnStatus aclnnGroupedMatmulV3(
     - weight supports FLOAT16, BFLOAT16, INT8, and FLOAT32.
     - biasOptional supports FLOAT16, FLOAT32, and INT32.
     - y supports FLOAT16, BFLOAT16, INT8, and FLOAT32.
-    - The input parameters x and weight, and the output parameter y support up to 128 tensors.
+    - The input parameters x and weight, and the output parameter y support up to 128 tensors. Except for the single-multiple-single extension described below.
+
+    > For Atlas A2/A3 products, in the split-M single-multiple-single scenario, the weight TensorList supports up to 1024 tensors when splitItem=3; the limit remains 128 when splitItem=2.
+
   <!-- end id9 -->
   <!-- npu="950" id10 -->
   - <term>Ascend 950PR&950DT products</term>:
@@ -404,7 +407,7 @@ aclnnStatus aclnnGroupedMatmulV3(
       |:---------:|:-------:|:-------:|:-------:|:--------:|:------------------|:--------| :-------|
       | -1 | Multiple|Multiple|Multiple | 0/1 | groupListOptional must be null. | 1) x does not support transpose.<br> 2) Weight transpose is supported, but whether each tensor in the weight tensorList is transposed must be consistent.| Tensors in x must have consistent dimensions and support 2D. Tensors in weight must be 2D. Tensors in y must have the same dimensions as x. |
       | 0 | Single|Single|Single | 2/3 | 1) groupListOptional must be passed. <br> 2) The first dimension of groupListOptional supports a maximum of 1024, that is, a maximum of 1024 groups. |1) x does not support transpose.<br> 2) Weight transpose is supported, but A8W4 and A4W4 scenarios do not support weight transpose. |Tensors in weight must be 3D. Tensors in x and y must be 2D.|
-      | 0 | Single|Multiple|Single | 2/3 | 1) groupListOptional must be passed. <br> 2) The first dimension of groupListOptional supports a maximum of 128, that is, a maximum of 128 groups.|1) x does not support transpose.<br> 2) Weight transpose is supported, but whether each tensor in the weight tensorList is transposed must be consistent. |1) Tensors in x, weight, and y must be 2D.<br> 2) The N axis of each tensor in weight must be equal. |
+      | 0 | Single|Multiple|Single | 2/3 | 1) groupListOptional must be passed. <br> 2) The first dimension of groupListOptional supports a maximum of 1024, that is, a maximum of 1024 groups.<br>The 1024-group limit applies only to splitItem=3; splitItem=2 remains limited to 128 groups. |1) x does not support transpose.<br> 2) Weight transpose is supported, but whether each tensor in the weight tensorList is transposed must be consistent. |1) Tensors in x, weight, and y must be 2D.<br> 2) The N axis of each tensor in weight must be equal. |
       | 0 | Multiple|Multiple|Single | 2/3 | 1) groupListOptional is optional. <br> 2) The first dimension of groupListOptional supports a maximum of 128, that is, a maximum of 128 groups. |1) x does not support transpose.<br> 2) Weight transpose is supported, but whether each tensor in the weight tensorList is transposed must be consistent.|1) Tensors in x, weight, and y must be 2D.<br> 2) The N axis of each tensor in weight must be equal. |
       | 2 | Single|Single|Single | 2/3 | 1) groupListOptional must be passed. <br> 2) The first dimension of groupListOptional supports a maximum of 1024, that is, a maximum of 1024 groups. | 1) x must be transposed.<br> 2) weight cannot be transposed. |1) Tensors in x and weight must be 2D. Tensors in y must be 3D.<br> 2) bias must be null.|
       | 2 | Single|Multiple|Multiple | 0/1 | groupListOptional must be null. | 1) x must be transposed.<br> 2) weight cannot be transposed.| 1) Tensors in x, weight, and y must be 2D.<br> 2) The weight length supports a maximum of 128, i.e., up to 128 groups.<br> 3) In the original shape, the sum of the first dimension of each tensor in weight must not exceed the first dimension of x.<br> 4) bias must be null. |

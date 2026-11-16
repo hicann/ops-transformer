@@ -630,7 +630,9 @@ aclnnGroupedMatmulV5默认确定性实现。
   - `[1]`：是否开启weight亲和格式（先转置再 NZ），适用场景：A8W4。
   - `[2]`：允许额外workspace上限（-1=不限），适用场景：A8W8定轴算法优化。
 - actType：仅A8W8（x、weight数据类型为INT8）且输出数据类型为FLOAT16/BFLOAT16时支持激活函数类型0/1/2/4/5（3不支持）；其余场景仅支持0。
-- 输入参数 x、weight，输出参数out支持最多128个Tensor。
+- 输入参数 x、weight，输出参数out默认支持最多128个Tensor，单多单扩展场景见下述说明。
+
+> Atlas A2/A3 系列产品的切 M 单多单场景，splitItem=3 时，weight 的 TensorList 最大支持1024个tensor；splitItem=2 时仍最多支持128个tensor。
 
 #### groupType 支持场景
 
@@ -645,7 +647,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 |:---:|:---:|:---:|:---:|:---:|:---|:---|:---|
 | -1 | 多 | 多 | 多 | 0/1 | 必须传空 | x不转置；weight可转置（统一） | x中tensor要求维度一致，支持2维，weight中tensor需为2维，y中tensor维度和x保持一致 |
 | 0 | 单 | 单 | 单 | 2/3 | 必须传；groupListType=0 末值 ≤ x 第一维；groupListType=1 总和 ≤ x 第一维；groupListType=2 第二列总和 ≤ x 第一维；非量化FLOAT16/BFLOAT16且groupListType=0/1时最大25600组，其他场景最大1024组 | x不转置；weight可转置（A8W4/A4W4 不可） | weight中tensor需为3维，x，y中tensor需为2维 |
-| 0 | 单 | 多 | 单 | 2/3 | 必须传；groupListType=0 末值 ≤ x 第一维；groupListType=1 总和 ≤ x 第一维；groupListType=2 第二列总和 ≤ x 第一维；最大 128 组 | x不转置；weight可转置（统一） | 1）x，weight，y中tensor需为2维；<br>2）weight中每个tensor的N轴必须相等 |
+| 0 | 单 | 多 | 单 | 2/3 | 必须传；groupListType=0 末值 ≤ x 第一维；groupListType=1 总和 ≤ x 第一维；groupListType=2 第二列总和 ≤ x 第一维；splitItem=3时最大1024组；splitItem=2时最大128组 | x不转置；weight可转置（统一） | 1）x，weight，y中tensor需为2维；<br>2）weight中每个tensor的N轴必须相等 |
 | 0 | 多 | 多 | 单 | 2/3 | 可选；若传则 groupListType=0 差值 = x 第一维、groupListType=1 数值 = x 第一维、groupListType=2 第二列 = x 第一维；最大 128 组 | x不转置；weight可转置（统一） | 1）x，weight，y中tensor需为2维；<br>2）weight中每个tensor的N轴必须相等 |
 | 2 | 单 | 单 | 单 | 2/3 | 必须传；groupListType=0 末值 ≤ x 第二维；groupListType=1 总和 ≤ x 第二维；groupListType=2 第二列总和 ≤ x 第二维；最大 1024 组 | x必须转置；weight不转置 | 1）x，weight中tensor需为2维，y中tensor需为3维；<br>2）bias必须传空 |
 | 2 | 单 | 多 | 多 | 0/1 | 必须传空 | x必须转置；weight不转置 | 1）x，weight，y中tensor需为2维；<br>2）weight长度最大支持128，即最多支持128个group；<br>3）原始shape中weight每个tensor的第一维之和不应超过x第一维；<br>4）bias必须传空 |

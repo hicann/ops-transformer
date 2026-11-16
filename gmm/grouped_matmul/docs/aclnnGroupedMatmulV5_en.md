@@ -327,6 +327,7 @@ aclnnStatus aclnnGroupedMatmulV5(
   - In full quantization, the data type of x and weight is INT8, and the data type of out is BFLOAT16/FLOAT16. The value can be 0, 1, 2, 4, or 5 when the static T-C, dynamic K-C, or scale data type is FLOAT32/BFLOAT16. (Note that 3 is not supported.) In other scenarios, only 0 is supported.
 - The input parameters x and weight and the output parameter out support a maximum of 1024 tensors in non-quantization scenarios, a maximum of 128 tensors in fake-quantization scenarios, and only one tensor in full quantization scenarios.
 
+
 #### Scenarios supported by groupType
 
 > x. The inputs x, weight, and y are of the aclTensorList type. "single" = single-element TensorList, "multiple" = multi-element TensorList.
@@ -629,7 +630,9 @@ Other fake-quantization scenarios:
   - [1]: whether to enable the weight affinity format (transpose before NZ). The application scenario is A8W4.
   - [2]: upper limit of the allowed extra workspace (-1 = unlimited). Application scenario: The A8W8 fixed-axis algorithm is optimized.
 - actType: The activation function type can be 0, 1, 2, 4, or 5 (the value 3 is not supported) only when the output data type is FLOAT16 or BFLOAT16 and the output data type is A8W8 (the data type of x and weight is INT8). In other scenarios, the value can only be 0.
-- The input parameters x and weight and the output parameter out support a maximum of 128 tensors.
+- The input parameters x and weight and the output parameter out support a maximum of 128 tensors. Except for the single-multiple-single extension described below.
+
+> For Atlas A2/A3 products, in the split-M single-multiple-single scenario, the weight TensorList supports up to 1024 tensors when splitItem=3; the limit remains 128 when splitItem=2.
 
 #### Scenarios supported by groupType
 
@@ -644,7 +647,7 @@ The following table lists the group types supported by each quantization type.
 |:---:|:---:|:---:|:---:|:---:|:---|:---|:---|
 | -1 | Many| Many| Many| 0/1 | Must be empty.| x is not transposed, and weight can be transposed (unified).| The tensors in `x` must have the same dimensionality, which can be 2D. The tensors in `weight` must be 2D. The dimensionality of tensors in `y` must match that of `x`.|
 | 0 | Single| Single| Single| 2/3 | Mandatory. groupListType=0 Last value ≤ x First dimension; groupListType=1 Sum ≤ x First dimension; groupListType=2 Sum of the second column ≤ x First dimension. A maximum of 1024 groups are supported.| x: not transposed; weight: transposed (not supported by A8W4/A4W4)| The tensor in weight must be 3D, and the tensors in x and y must be 2D.|
-| 0 | Single| Many| Single| 2/3 | Mandatory. groupListType=0 Last value ≤ x First dimension; groupListType=1 Sum ≤ x First dimension; groupListType=2 Sum of the second column ≤ x First dimension; A maximum of 128 groups are supported.| x is not transposed, and weight can be transposed (unified).| (1) Tensors in `x`, `weight`, and `y` must be 2D.<br>(2) The N-axis of each tensor in `weight` must be the same.|
+| 0 | Single| Many| Single| 2/3 | Mandatory. groupListType=0 Last value ≤ x First dimension; groupListType=1 Sum ≤ x First dimension; groupListType=2 Sum of the second column ≤ x First dimension; A maximum of 1024 groups are supported.<br>The 1024-group limit applies only to splitItem=3; splitItem=2 remains limited to 128 groups. | x is not transposed, and weight can be transposed (unified).| (1) Tensors in `x`, `weight`, and `y` must be 2D.<br>(2) The N-axis of each tensor in `weight` must be the same.|
 | 0 | Many| Many| Single| 2/3 | Optional. If groupListType = 0, difference = x first dimension, groupListType = 1, value = x first dimension, groupListType = 2, second column = x first dimension. A maximum of 128 groups are supported.| x is not transposed, and weight can be transposed (unified).| (1) Tensors in `x`, `weight`, and `y` must be 2D.<br>(2) The N-axis of each tensor in `weight` must be the same.|
 | 2 | Single| Single| Single| 2/3 | Mandatory; groupListType=0 (last value ≤ x second dimension); groupListType=1 (sum ≤ x second dimension); groupListType=2 (sum of the second column ≤ x second dimension); a maximum of 1024 groups| x must be transposed, and weight is not transposed.| (1) The tensors in `x` and `weight` must be 2D, and the tensor in `y` must be 3D.<br>(2) The bias must be empty.|
 | 2 | Single| Many| Many| 0/1 | Must be empty.| x must be transposed, and weight is not transposed.| (1) Tensors in `x`, `weight`, and `y` must be 2D.<br>(2) The maximum length of `weight` is 128, meaning a maximum of 128 groups are supported.<br>(3) The sum of the first dimensions of all tensors in the original `weight` shape should not exceed the first dimension of `x`.<br>(4) `bias` must be passed as null.|

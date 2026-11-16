@@ -383,7 +383,9 @@ aclnnStatus aclnnGroupedMatmulV4(
     - biasOptional支持FLOAT16、FLOAT32、INT32
     - scaleOptional支持UINT64、BFLOAT16、FLOAT32
     - perTokenScaleOptional支持FLOAT32
-    - 输入参数x、weight，输出参数out支持最多128个tensor。
+    - 输入参数x、weight，输出参数out默认支持最多128个tensor，单多单扩展场景见下述说明。
+
+    > Atlas A2/A3 系列产品的切 M 单多单场景，splitItem=3 时，weight 的 TensorList 最大支持1024个tensor；splitItem=2 时仍最多支持128个tensor。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
@@ -784,7 +786,7 @@ aclnnStatus aclnnGroupedMatmulV4(
       |:---------:|:-------:|:-------:|:-------:|:--------:|:------------------|:--------| :-------|
       | -1 | 多个|多个|多个 | 0/1 | groupListOptional必须传空 | 1）x不支持转置；<br> 2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一| x中tensor要求维度一致，支持2维，weight中tensor需为2维，y中tensor维度和x保持一致 |
       | 0 | 单个|单个|单个 | 2/3 | 1）必须传groupListOptional；<br> 2）当groupListType为0时，最后一个值应小于等于x中tensor的第一维；当groupListType为1时，数值的总和应小于等于x中tensor的第一维；当groupListType为2时，第二列数值的总和应小于等于x中tensor的第一维；<br> 3）groupListOptional第1维在非量化FLOAT16/BFLOAT16且groupListType为0/1时最大支持25600，其他场景最大支持1024 |1）x不支持转置；<br> 2）支持weight转置，A8W4与A4W4场景不支持weight转置 |weight中tensor需为3维，x，y中tensor需为2维|
-      | 0 | 单个|多个|单个 | 2/3 | 1）必须传groupListOptional；<br> 2）当groupListType为0时，最后一个值应小于等于x中tensor的第一维；当groupListType为1时，数值的总和应小于等于x中tensor的第一维；当groupListType为2时，第二列数值的总和应小于等于x中tensor的第一维；<br> 3）groupListOptional第1维最大支持128，即最多支持128个group|1）x不支持转置；<br> 2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一 |1）x，weight，y中tensor需为2维；<br> 2）weight中每个tensor的N轴必须相等 |
+      | 0 | 单个|多个|单个 | 2/3 | 1）必须传groupListOptional；<br> 2）当groupListType为0时，最后一个值应小于等于x中tensor的第一维；当groupListType为1时，数值的总和应小于等于x中tensor的第一维；当groupListType为2时，第二列数值的总和应小于等于x中tensor的第一维；<br> 3）groupListOptional在splitItem=3时第1维最大支持1024，即最多支持1024个group；splitItem=2时仍最多支持128个group|1）x不支持转置；<br> 2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一 |1）x，weight，y中tensor需为2维；<br> 2）weight中每个tensor的N轴必须相等 |
       | 0 | 多个|多个|单个 | 2/3 | 1）groupListOptional可选；<br> 2）若传入groupListOptional，当groupListType为0时，groupListOptional的差值需与x中tensor的第一维一一对应；当groupListType为1时，groupListOptional的数值需与x中tensor的第一维一一对应；当groupListType为2时，groupListOptional第二列的数值需与x中tensor的第一维一一对应；<br> 3）groupListOptional第1维最大支持128，即最多支持128个group |1）x不支持转置；<br> 2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一|1）x，weight，y中tensor需为2维；<br> 2）weight中每个tensor的N轴必须相等 |
       | 2 | 单个|单个|单个 | 2/3 | 1）必须传groupListOptional；<br> 2）当groupListType为0时，最后一个值应小于等于x中tensor的第二维；当groupListType为1时，数值的总和应小于等于x中tensor的第二维；当groupListType为2时，第二列数值的总和应小于等于x中tensor的第二维；<br> 3）groupListOptional第1维最大支持1024，即最多支持1024个group | 1）x必须转置；<br> 2）weight不能转置 |1）x，weight中tensor需为2维，y中tensor需为3维；<br> 2）bias必须传空|
       | 2 | 单个|多个|多个 | 0/1 | groupListOptional必须传空 | 1）x必须转置；<br> 2）weight不能转置| 1）x，weight，y中tensor需为2维。<br> 2）weight长度最大支持128，即最多支持128个group；<br> 3）原始shape中weight每个tensor的第一维之和不应超过x第一维；<br> 4）bias必须传空 |
