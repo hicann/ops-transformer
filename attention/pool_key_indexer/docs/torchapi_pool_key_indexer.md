@@ -140,7 +140,7 @@ cann_ops_transformer.pool_key_indexer(
 - 当quant_mode=-1时，不支持传入q_descale和k_descale。
 <!-- npu="A3,910b" id7 -->
 
-- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>:
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
   - 当layout_k为PA_BBND时，必须传入actual_seq_k。
   - 当layout_q为BSND时，不支持传入actual_seq_q；当layout_k为BSND时，不支持传入actual_seq_k。
@@ -151,7 +151,7 @@ cann_ops_transformer.pool_key_indexer(
 
 <!-- npu="950" id8 -->
 
-- <term>Ascend 950PR&950DT系列产品</term>:
+- <term>Ascend 950PR&950DT系列产品</term>：
   - 当layout_q为BSND时，不支持传入actual_seq_q；当layout_k为BSND或PA_BBND时，不支持传入actual_seq_k。
   - 当layout_q为TND时，必须传入actual_seq_q。
   - quant_mode支持-1（不量化）、0（FP8 per-token-head量化）、1（mxFP8量化）、2（int8量化）。

@@ -107,7 +107,7 @@ cann_ops_transformer.quant_lightning_indexer(
 | num_heads_k | int | 必选 | 表示key的head个数，当前仅支持1。 | int64 | - |
 | head_dim | int | 必选 | 表示注意力头的维度，当前仅支持128。 | int64 | - |
 | topk | int | 必选 | 表示topK阶段需要保留的key token索引数量，当前仅支持[1, 8192]。 | int64 | - |
-| quant_mode | int | 必选 | 表示量化模式，当前支持1/2/3/4/5。1表示qk: fp8(e4m3fn) per-token-head, scale: fp32；2表示qk: int8 per-token-head, scale: fp16, weights: fp16；3表示qk: mxfp8(e4m3fn), scale: fp8(e8m0)；4表示qk: hifloat8 per-tensor, scale: fp32；5表示qk: mxfp4(e2m1), scale: fp8(e8m0)。 | int64 | - |
+| quant_mode | int | 必选 | 表示量化模式，当前支持1/2/3/4/5。1表示qk: fp8(e4m3fn) per-token-head、scale: fp32；2表示qk: int8 per-token-head, scale: fp16, weights: fp16；3表示qk: mxfp8(e4m3fn)、scale: fp8(e8m0)；4表示qk: hifloat8 per-tensor, scale: fp32；5表示qk: mxfp4(e2m1), scale: fp8(e8m0)。 | int64 | - |
 | cu_seqlens_q | Tensor | 可选 | 表示不同batch中query的有效Sequence Length的累加前缀和，仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (b+1, ) |
 | cu_seqlens_k | Tensor | 可选 | 表示不同batch中key的有效Sequence Length的累加前缀和，仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (b+1, ) |
 | seqused_q | Tensor | 可选 | 表示不同batch中query实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 | int32 | (b, ) |
@@ -131,7 +131,7 @@ cann_ops_transformer.quant_lightning_indexer(
 | query_dequant_scale | Tensor | 必选 | 公式中的$Scale_Q$，表示Index query的反量化系数。不支持空tensor。数据格式为ND。 | float16、float32、float8_e8m0 | quant_mode为3/5时，layout_q为BSND时shape为(b,q_s,q_n,d/64,2)，layout_q为TND时shape为(q_t,q_n,d/64,2)；quant_mode为4时shape必须为(1,)；其他场景shape与weights保持一致 |
 | key_dequant_scale | Tensor | 必选 | 公式中的$Scale_K$，表示Index key的反量化系数。不支持空tensor。数据格式为ND，仅PA_BBND场景下0轴支持非连续。 | float16、float32、float8_e8m0 | quant_mode为3/5时，layout_k为PA_BBND时shape为(block_num,block_size,k_n,d/64,2)，layout_k为BSND时shape为(b,k_s,k_n,d/64,2)，layout_k为TND时shape为(k_t,k_n,d/64,2)；quant_mode为4时shape必须为(1,)；其他场景分别为(block_num,block_size,k_n)、(b,k_s,k_n)或(k_t,k_n) |
 | topk | int | 必选 | 表示topK阶段需要保留的key token索引数量，当前支持[1, 8192]。 | int64 | - |
-| quant_mode | int | 必选 | 表示量化模式，当前支持1/2/3/4/5。1表示qk: fp8(e4m3fn) per-token-head, scale: fp32；2表示qk: int8 per-token-head, scale: fp16, weights: fp16；3表示qk: mxfp8(e4m3fn), scale: fp8(e8m0)；4表示qk: hifloat8 per-tensor, scale: fp32；5表示qk: mxfp4(e2m1), scale: fp8(e8m0)。 | int64 | - |
+| quant_mode | int | 必选 | 表示量化模式，当前支持1/2/3/4/5。1表示qk: fp8(e4m3fn) per-token-head、scale: fp32；2表示qk: int8 per-token-head, scale: fp16, weights: fp16；3表示qk: mxfp8(e4m3fn)、scale: fp8(e8m0)；4表示qk: hifloat8 per-tensor, scale: fp32；5表示qk: mxfp4(e2m1), scale: fp8(e8m0)。 | int64 | - |
 | cu_seqlens_q | Tensor | 可选 | 当前batch及前序batch中query的有效token数的累加和，后一个元素的值必须大于等于前一个元素的值。仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND。 | int32 | (b+1,) |
 | cu_seqlens_k | Tensor | 可选 | 当前batch及前序batch中key的有效token数的累加和，后一个元素的值必须大于等于前一个元素的值。仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND。 | int32 | (b+1,) |
 | seqused_q | Tensor | 可选 | 不同batch中query的真实使用长度，每个batch的有效token数不超过query中的维度S大小且不小于0。数据格式为ND。 | int32 | (b,) |
@@ -284,7 +284,7 @@ cann_ops_transformer.quant_lightning_indexer(
                 <li>BSND -> (b, k_s, k_n, d)</li>
                 <li>TND -> (k_t, k_n, d)</li>
                 <li>PA_BBND -> (num_blocks, block_size, k_n, d)</li>
-                <li>1024 >= block_size >= 16，block_size % 16 == 0</li>
+                <li>1024 >= block_size >= 16, block_size % 16 == 0</li>
             </ul>
         </td>
     </tr>
@@ -349,7 +349,7 @@ layout匹配关系表：
 </tbody>
 </table>
 
-metadata校验
+metadata校验：
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
         <col style="width: 147px">
@@ -384,7 +384,7 @@ metadata校验
     </tbody>
 </table>
 
-mask_mode参数解释
+mask_mode参数解释：
 <ul>
     <li>mask_mode=0，defaultMask模式（默认值）</li>
     <li>mask_mode=3，Causal模式</li>
@@ -513,7 +513,7 @@ mask_mode参数解释
 
 #### Paged Attention参数组
 
-当block_table不为空时，开启Paged Attention
+当block_table不为空时，开启Paged Attention。
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
         <col style="width: 147px">

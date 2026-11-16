@@ -119,7 +119,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 ## 枚举说明
 
-`quant_mode` 、 `mask_mode` 与`residual_block_mode`在 Python 接口中支持传入 `IntEnum` 枚举或对应 int 值，枚举定义于 `cann_ops_transformer.ops.generic_block_sparse_attention`：
+`quant_mode`、`mask_mode`与`residual_block_mode`在 Python 接口中支持传入 `IntEnum` 枚举或对应 int 值，枚举定义于 `cann_ops_transformer.ops.generic_block_sparse_attention`：
 
 ### quant_mode 枚举
 
@@ -342,7 +342,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 |    命名    |                            含义                            |
 | :---------: | :---------------------------------------------------------: |
-|      B      |                Batch,表示输入样本批量大小                |
+|      B      |                Batch，表示输入样本批量大小                |
 |     Q_N     |        输入q tensor的头数，对应q shape中的N        |
 |    KV_N    |    输入k/v tensor的头数，对应k/v shape中的N    |
 |     Q_T     |          输入q tensor所有batch序列长度的累加和          |
@@ -362,10 +362,10 @@ cann_ops_transformer.generic_block_sparse_attention(
 #### 公共参数组
 
 - 入参为空的场景处理：
-  - 空Tensor指必选输入和输出的shape size为0,即有任意轴为0。
+  - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
   - 触发空Tensor的用例将全部拦截报错。
 
-- q、k、v、attention_out校验:
+- q、k、v、attention_out校验：
 
     <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 147px">
@@ -421,7 +421,7 @@ cann_ops_transformer.generic_block_sparse_attention(
                 <li>tensor_type支持bfloat16、float16、float8_e4m3fn、int8</li>
                 <li>PA_BBND -> (num_blocks, block_size, KV_N, D)</li>
                 <li>PA_BNBD -> (num_blocks, KV_N, block_size, D)</li>
-                <li>PA的block_size固定为128，与稀疏block_shape[1]独立；</li>
+                <li>PA的block_size固定为128，与稀疏block_shape[1]独立</li>
                 <li>TND -> (KV_T, KV_N, D)，适用范围见<a href="#产品差异约束">产品差异约束</a></li>
                 <li>非连续Tensor约束：PA_BBND/PA_BNBD仅dim0支持非连续</li>
             </ul>
@@ -474,7 +474,7 @@ cann_ops_transformer.generic_block_sparse_attention(
     </tbody>
     </table>
 
-- sparse_block_idx、sparse_block_count、block_shape校验:
+- sparse_block_idx、sparse_block_count、block_shape校验：
 
     <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 147px">
@@ -543,7 +543,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 - <term>Ascend 950PR&950DT系列产品</term>非量化与常规 FP8：`X=1`，`1≤Y≤128`；Union：`[8,Y]`（`1≤Y≤128`）；union（mask_mode=3）时X为unionSize，当前仅支持8。非union量化场景为`[1,128]`。
 <!-- end id16 -->
 
-- metadata校验:
+- metadata校验：
 
     <table style="undefined;table-layout: fixed; width:1625px">
         <colgroup>
@@ -579,7 +579,7 @@ cann_ops_transformer.generic_block_sparse_attention(
         </tbody>
     </table>
 
-- softmax_precision校验:
+- softmax_precision校验：
 
     <table style="undefined;table-layout: fixed; width:1625px">
         <colgroup>
@@ -770,7 +770,7 @@ mask_mode参数解释见「mask_mode 枚举」。
 
 #### Paged Attention参数组
 
-当block_table不为空时，开启Paged Attention
+当block_table不为空时，开启Paged Attention：
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
         <col style="width: 147px">

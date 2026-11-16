@@ -41,7 +41,7 @@
   <!-- end id11 -->
 
   <!-- npu="A3,910b" id12 -->
-  TurboQuant TQ4的KV数据类型、存储布局及码本约定详见`quant_mode`参数说明。相对512维BFLOAT16的1024字节，单个被量化token的有效载荷减少约74.8%（约3.97倍压缩）。整个KV cache的收益还需计入未量化部分、物理页步长和对齐开销，不能直接按此倍率估算。
+  TurboQuant TQ4的KV数据类型、存储布局及码本约定详见`quant_mode`参数说明。相对512维BFLOAT16的1千字节（1KB），单个被量化token的有效载荷减少约74.8%（约3.97倍压缩）。整个KV cache的收益还需计入未量化部分、物理页步长和对齐开销，不能直接按此倍率估算。
   <!-- end id12 -->
 
   `mixed_quant_sparse_flash_mla_metadata`是`mixed_quant_sparse_flash_mla`的分核信息，在主算子执行前生成。当前版本主算子必须传入该metadata。典型调用流程如下：
@@ -202,7 +202,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | q | tensor | 必选 | 表示公式中的q | float16、bfloat16 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>
-| quant_mode | int | 必选 | 量化模式。支持1、2、3，Q不量化。<ul><li>quant_mode=1：q使用BFLOAT16，ori_kv和cmp_kv的nope采用per-token-group量化，groupSize=64。每个token依次由rope（64个BFLOAT16）、nope（448个FLOAT8_E4M3FN）、scale（7个BFLOAT16）、pad（18字节）拼接，kv_d=608。</li><li>quant_mode=2：q使用BFLOAT16，ori_kv和cmp_kv的nope采用per-token-group量化，groupSize=64。每个token包含nope（448个FLOAT8_E4M3FN）、rope（64个BFLOAT16）、scale（7个FLOAT8_E8M0）、pad（1字节），kv_d=584；仅支持layout_kv为PA_BBND，块内按block_size*(nope+rope)+block_size*(scale+pad)组织。</li><li>quant_mode=1或quant_mode=2时，ori_kv和cmp_kv支持使用UINT8或FLOAT8_E4M3FN作为单字节存储视图，底层字节内容保持不变；各字段的实际类型如上所述。</li><li>quant_mode=3：表示融合TQ4反量化的TurboQuant路径，仅支持CSA场景。q使用FLOAT16或BFLOAT16；ori_kv保持非量化，数据类型与q一致，kv_d=512；cmp_kv使用UINT8存储TQ4数据，每个token的512维数据编码为256字节的4位码本索引，再拼接2字节FLOAT16逐token scale，共258字节，kv_d=258。两路KV均使用PA_BBND布局，shape分别为(block_num, block_size, 1, 512)和(block_num, block_size, 1, 258)。码本与TurboQuant量化端约定一致，不新增外部码本或scale参数。</li></ul> | int32 | - | -
+| quant_mode | int | 必选 | 量化模式。支持1、2、3，Q不量化。<ul><li>quant_mode=1：q使用BFLOAT16，ori_kv和cmp_kv的nope采用per-token-group量化，groupSize=64。每个token依次由rope（64个BFLOAT16）、nope（448个FLOAT8_E4M3FN）、scale（7个BFLOAT16）、pad（18字节）拼接，kv_d=608。</li><li>quant_mode=2：q使用BFLOAT16，ori_kv和cmp_kv的nope采用per-token-group量化，groupSize=64。每个token包含nope（448个FLOAT8_E4M3FN）、rope（64个BFLOAT16）、scale（7个FLOAT8_E8M0）、pad（1字节），kv_d=584；仅支持layout_kv为PA_BBND，块内按block_size*(nope+rope)+block_size*(scale+pad)组织。</li><li>quant_mode=1或quant_mode=2时，ori_kv和cmp_kv支持使用UINT8或FLOAT8_E4M3FN作为单字节存储视图，底层字节内容保持不变；各字段的实际类型如上所述。</li><li>quant_mode=3：表示融合TQ4反量化的TurboQuant路径，仅支持CSA场景。q使用FLOAT16或BFLOAT16；ori_kv保持非量化，数据类型与q一致，kv_d=512；cmp_kv使用UINT8存储TQ4数据，每个token的512维数据编码为256字节的4比特（bit）码本索引，再拼接2字节FLOAT16逐token scale，共258字节，kv_d=258。两路KV均使用PA_BBND布局，shape分别为(block_num, block_size, 1, 512)和(block_num, block_size, 1, 258)。码本与TurboQuant量化端约定一致，不新增外部码本或scale参数。</li></ul> | int32 | - | -
 | ori_kv | tensor | 可选 | 原始KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入且dtype与q一致、kv_d=512。 | fp8_e4m3、float16、bfloat16、int8 | ND | <ul><li>(b, ori_kv_s, kv_n, kv_d)</li><li>(ori_kv_t, kv_n, kv_d)</li><li>(ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d)</li></ul>
 | cmp_kv | tensor | 可选 | 压缩KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入uint8 TQ4数据、kv_d=258。 | fp8_e4m3、uint8、int8 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
 | ori_sparse_indices | tensor | 可选 | 表示原始KV topK索引，无效位置填-1 | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>

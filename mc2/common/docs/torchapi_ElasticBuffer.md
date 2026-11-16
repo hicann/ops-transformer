@@ -25,7 +25,7 @@
 
 ElasticBuffer类提供统一的分布式通信buffer管理能力：
 
-- Engram存储接口用于分布式Engram存储管理，支持将本rank的表注册为通信可达的存储（推理模式可写入host pinned共享段或显式零拷贝注册调用方内存，训练模式直接映射上层锁页表内存），以及通过URMA从远端rank抓取Engram数据。`group=None` 表示full-vocab local推理，不初始化HCCL。
+- Engram存储接口用于分布式Engram存储管理，支持将本rank的表注册为通信可达的存储（推理模式可写入host pinned共享内存段或显式零拷贝注册调用方内存，训练模式直接映射上层锁页表内存），以及通过URMA从远端rank抓取Engram数据。`group=None` 表示full-vocab local推理，不初始化HCCL。
 - Engram训练接口在推理接口的基础上，通过 `with_grad=True` 开启训练模式。前向 [engram_fetch](#engram_fetch) 在抓取数据的同时保存反向所需的通信元数据（封装为 [EngramFetchCtx](#engramfetchctx)），反向 [engram_fetch_grad](#engram_fetch_grad) 根据这些元数据将梯度沿前向路径反向交换并按local entry稀疏累加，产出稀疏梯度用于优化器更新。
 - Dispatch/Combine接口用于MoE的Expert Parallelism（EP）并行部署，支持通过[dispatch](#dispatch)将token数据分发到对应专家卡，再通过[combine](#combine)将专家输出按原路由聚合回原始序列。所需的HCCL通信buffer由ElasticBuffer内部按算子参数自动计算并申请，无需手动配置。
 
@@ -184,7 +184,7 @@ ElasticBuffer.engram_write(storage, sf=None, *, zero_copy=None) -> None
 **输入参数**：
 
 - **storage** (`Tensor`)：必选参数，待写入的CPU tensor，shape为 `(num_entries, hidden)`，表示有 `num_entries` 个条目，每个条目维度为 `hidden`。要求2维、连续、`hidden`必须大于0，数据类型支持 `bfloat16`、`float16`、`float32`（不带SF时）、`float8_e4m3fn`、`float8_e5m2`（带SF时）。
-- **sf** (`Optional[Tensor]`)：可选参数，FP8量化的缩放因子（Scale Factor）表，仅当 `storage` 为 `float8_e4m3fn` 或 `float8_e5m2` 时传入（此时为必选）。要求2维张量，shape为 `(行数, num_sf_packs)`，列数 `num_sf_packs = ceil(hidden / group_size)`，其中 `group_size` 为MX量化的分组大小（每分组一个SF），即对每个条目的 `hidden` 个元素按分组数向上取整，须满足 `0 < num_sf_packs ≤ hidden`。行数按模式区分：训练模式为本rank分片SF表，有 `num_entries_per_rank` 行，且为CPU锁页（pinned）张量；推理模式为全量SF表，有 `num_entries_per_rank × rank_size` 行，且为NPU张量。数据类型支持 `float32`、`float8_e8m0`，数据格式为 $ND$。
+- **sf** (`Optional[Tensor]`)：可选参数，FP8量化的缩放因子（Scale Factor）表，仅当 `storage` 为 `float8_e4m3fn` 或 `float8_e5m2` 时传入（此时为必选）。要求2维张量，shape为 `(行数, num_sf_packs)`，列数 `num_sf_packs = ceil(hidden / group_size)`，其中 `group_size` 为MX量化的分组大小（每分组一个SF），即对每个条目的 `hidden` 个元素按分组数向上取整，须满足 `0 < num_sf_packs ≤ hidden`。行数按模式区分：训练模式为本rank的分片SF表，有 `num_entries_per_rank` 行，且为CPU锁页（pinned）张量；推理模式为全量SF表，有 `num_entries_per_rank × rank_size` 行，且为NPU张量。数据类型支持 `float32`、`float8_e8m0`，数据格式为 $ND$。
 - **zero_copy** (`Optional[bool]`)：keyword-only参数。未传时按模式取默认值：推理为 `False`，训练为 `True`。推理时 `False` 表示拷贝到内部host pinned window，`True` 表示原地注册调用方内存，失败直接抛错；训练时始终原地注册pinned storage，显式传 `False` 会直接报错。
 
 **输出说明**：无返回值。推理模式 `zero_copy=False` 时，数据拷贝写入内部host pinned共享内存段；推理模式 `zero_copy=True` 时，`storage` 调用方内存被原地注册为Engram storage（无数据搬运）；训练模式 `storage` 锁页内存被注册为Engram storage。
@@ -247,7 +247,7 @@ ElasticBuffer.engram_fetch(indices) -> Callable
 
 **输入参数**：
 
-- **indices** (`Tensor`)：必选参数，查询索引的NPU tensor，shape为 `(num_tokens,)`，表示要抓取的条目全局索引（训练场景各卡`len(indices)`保持一致， 推理场景可以不一致）。数据类型支持 `int32`，数据格式为 $ND$。元素取值范围需在 `[0, world_size × num_entries)`，若某一位置的元素取值超过了该范围，则返回值中该位置对应的数据为0。
+- **indices** (`Tensor`)：必选参数，查询索引的NPU tensor，shape为 `(num_tokens,)`，表示要抓取的条目全局索引（训练场景各卡`len(indices)`保持一致，推理场景可以不一致）。数据类型支持 `int32`，数据格式为 $ND$。元素取值范围需在 `[0, world_size × num_entries)`，若某一位置的元素取值超过了该范围，则返回值中该位置对应的数据为0。
 
 **输出说明**：
 
@@ -415,9 +415,9 @@ ElasticBuffer.dispatch(
   - **dst_buffer_slot_idx** (`Tensor`)：发送侧索引，dtype为 `int32`。
   - **recv_src_metadata** (`Tensor`)：接收元数据，shape为 `(A_alloc, 5)`，dtype为 `int32`；仅前 `sum(num_recv_tokens_per_expert)` 行有效。
   - **recv_rank_offsets** (`Tensor`)：各源EP rank对应metadata行数的排他前缀和，shape为 `(ep_world_size + 1,)`，dtype为 `int32`；rank `r` 的metadata区间为 `[recv_rank_offsets[r], recv_rank_offsets[r + 1])`，最后一个元素等于有效metadata行数。它是下述 packed buffer 尾部的视图，cached模式复用其内容，不再是独立算子输入/输出。
-  - **recv_metadata_buffer** (`Tensor`)：连续一维 `int32` backing tensor，基址要求512B对齐。前 `A_alloc * 5` 个元素保留五列语义；offsets从 `align_up(A_alloc * 5 * 4, 512)` 字节处开始。总字节数为 `align_up(A_alloc * 5 * 4, 512) + align_up((ep_world_size + 1) * 4, 512)`。两段padding不参与计算或精度比较，内容未定义。`recv_src_metadata` 和 `recv_rank_offsets` 必须保持为此buffer的视图。
+  - **recv_metadata_buffer** (`Tensor`)：连续一维 `int32` backing tensor，基址要求512字节对齐。前 `A_alloc * 5` 个元素保留五列语义；offsets从 `align_up(A_alloc * 5 * 4, 512)` 字节处开始。总字节数为 `align_up(A_alloc * 5 * 4, 512) + align_up((ep_world_size + 1) * 4, 512)`。两段padding不参与计算或精度比较，内容未定义。`recv_src_metadata` 和 `recv_rank_offsets` 必须保持为此buffer的视图。
 
-  底层Dispatch Epilogue、cached输入和Combine仅传完整packed tensor，不能传五列子视图后越过其shape访问尾部；偏移使用分配容量 `A_alloc`，而非有效行数。cached输入输出使用相同容量。旧两tensor句柄需显式打包或重新dispatch，不能混用旧算子包与新wheel；复制到其他设备时先复制完整buffer，再按容量重建视图。请成套重新编译安装算子和wheel（包含 `moe_ep_metadata_layout.h`），并更新JIT缓存。
+  底层Dispatch Epilogue、cached输入和Combine仅传完整packed tensor，不能传五列子视图后越过其shape访问尾部；偏移使用分配容量 `A_alloc`，而非有效行数。cached输入输出使用相同容量。旧的两tensor句柄需显式打包或重新dispatch，不能混用旧算子包与新wheel；复制到其他设备时先复制完整buffer，再按容量重建视图。请成套重新编译安装算子和wheel（包含 `moe_ep_metadata_layout.h`），并更新JIT缓存。
   - **num_recv_tokens_per_rank** (`Tensor`)：各卡接收token数量，shape为 `(ep_world_size,)`，dtype为 `int32`。
   - **num_recv_tokens_per_expert** (`Tensor`)：每个本地专家接收的token数量，shape为 `(num_local_experts,)`，dtype为 `int64`。
   - **num_experts** (`int`)：专家总数量。

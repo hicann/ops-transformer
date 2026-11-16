@@ -239,7 +239,7 @@ cann_ops_transformer.mla_prolog(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |---|---|---|---|---|---|
 | query | Tensor | 必选 | Q 侧输出。全量化 KV 场景（`weight_quant_mode∈{2,3,4,5}`且`kv_cache_quant_mode=1`）dtype 与`token_x`一致，其余场景为 bfloat16。 | torch.float16/torch.bfloat16；hifloat8 场景为 torch.uint8 | `[T, N, Hckv]`或`[B, S, N, Hckv]` |
-| query_rope | Tensor | 必选 | RoPE 输出，rope_sin`/`rope_cos`均为空（或`None`）时不做RoPE计算直接输出。 | torch.bfloat16 | `[T, N, Dr]`或`[B, S, N, Dr]` |
+| query_rope | Tensor | 必选 | RoPE 输出，`rope_sin`/`rope_cos`均为空（或`None`）时不做RoPE计算直接输出。 | torch.bfloat16 | `[T, N, Dr]`或`[B, S, N, Dr]` |
 | dequant_scale_q_nope | Tensor | 必选 | Q 的 nope 部分反量化 scale，仅在`weight_quant_mode∈{2,3,4,5}`且`kv_cache_quant_mode=1`（全量化 KV per-tensor 场景）时有效，否则为空 Tensor。 | torch.float32 | `[T, N, 1]`或`[B*S, N, 1]`；否则为空 Tensor |
 | query_norm | Tensor | 必选 | Query 归一化输出，`query_norm_flag=True`时有效，否则为空 Tensor。 | 与`weight_uq_qr`一致 | `[T, Hcq]`或`[B, S, Hcq]`；否则为空 Tensor |
 | dequant_scale_q_norm | Tensor | 必选 | Query 归一化的反量化 scale，`query_norm_flag=True`且`weight_quant_mode!=0`时有效，否则为空 Tensor。 | torch.float32；`weight_quant_mode=3`时与`dequant_scale_x`一致 | `[T, 1]`或`[T, Hcq/32]`；否则为空 Tensor |
@@ -266,7 +266,7 @@ cann_ops_transformer.mla_prolog(
     | Nkv | kv 的 head 数 | 取值固定为：1 |
     | BlockNum | PagedAttention 场景下的块数 | 取值为计算 `B*Skv/BlockSize` 的结果后向上取整（Skv 表示 kv 的序列长度，允许取 0） |
     | BlockSize | PagedAttention 场景下的块大小 | 取值范围：16-1024，且为 16 的倍数 |
-    | T | BS 合轴后的大小 | 取值范围：不限制；注：若采用 BS 合轴，此时 token_x、query_norm 均为 2 维，query、query_rope 为 3 维，cache_index 为 1 维，rope_sin、rope_cos同为None（关闭RoPE）或同为2维（开启RoPE）|
+    | T | BS 合轴后的大小 | 取值范围：不限制；注：若采用 BS 合轴，此时 token_x、query_norm 均为 2 维，query、query_rope 为 3 维，cache_index 为 1 维，`rope_sin`、`rope_cos`同为None（关闭RoPE）或同为2维（开启RoPE）|
 
 - 接口内置校验：上述 shape 格式字段约束（He/Hcq/N/D/Hckv/Dr/Nkv/Dtile/BlockSize）在接口内部统一校验，不满足时报错拦截。其中 N（Head-Num 多头数）允许 `[1, 128]` 之间的任意整型值。
 

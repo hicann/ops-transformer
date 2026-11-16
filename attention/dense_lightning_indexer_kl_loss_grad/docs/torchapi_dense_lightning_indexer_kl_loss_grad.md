@@ -46,7 +46,7 @@
    y_{t,:}=\operatorname{Softmax}(I_{t,:})
    $$
 
-   本接口将$y$写出到softmax_out。目标分布$p$由attn_softmax_l1_norm输入提供，等价于旧版kernel内部由main attention score经head求和和L1归一化得到的结果。若后续继续计算KL Loss，其形式与旧版保持一致：
+   本接口将$y$写出到softmax_out。目标分布$p$由attn_softmax_l1_norm输入提供，等价于旧版kernel内部由main attention score经head求和及L1归一化得到的结果。若后续继续计算KL Loss，其形式与旧版保持一致：
 
    $$
    L(I){=}\sum_tD_{KL}(p_{t,:}||\operatorname{Softmax}(I_{t,:}))
@@ -200,7 +200,7 @@ dense_lightning_indexer_kl_loss_grad(
 - `layout_q` 和 `layout_k` 支持 `BSND` 和 `TND`。
 - `layout_q="TND"` 时需要传入 `cu_seqlens_q`；`layout_k="TND"` 时需要传入 `cu_seqlens_k`。
 - 当前 `num_heads_k` 仅支持 1。
-- `attn_softmax_l1_norm` 在TND场景下最后一维是max_seqlen_k，所有batch中最长的seqlens_k。
+- `attn_softmax_l1_norm` 在TND场景下最后一维是max_seqlen_k，所有batch中最长的seqlen_k。
 - `mask_mode` 当前支持 `0` 和 `3`。
 - `cmp_ratio` 取值范围为 `[1, 128]`。
 - 压缩 key 且 `mask_mode=3` 时，压缩前 key 长度通过 `compressed_k_len * cmp_ratio + cmp_residual_k[b]` 计算。CP 切分场景中，每个 CP shard 单独调用时，`q` 传入当前 shard 的 query 长度，`k` 传入该 shard 对应的压缩后 key 前缀长度，并按该公式传入对应的 `cmp_residual_k`。

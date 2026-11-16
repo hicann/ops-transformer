@@ -106,13 +106,13 @@ cann_ops_transformer.compressor(
 | x | Tensor | 必选 | 原始不经压缩的数据，对应公式中的 $X$。不支持非连续，数据格式支持ND。 | bfloat16、float16 | [B,S,H]、[T,H] |
 | wkv | Tensor | 必选 | kv压缩权重，对应公式中的 $W^{KV}$。不支持非连续，数据格式支持ND。 | bfloat16、float16 | [coff\*D,H] |
 | wgate | Tensor | 必选 | gate压缩权重，对应公式中的 $W^{Gate}$。不支持非连续，数据格式支持ND。 | bfloat16、float16 | [coff\*D,H] |
-| state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。支持0轴非连续，数据格式支持ND。计算后 kv_state 和 score_state 会原位更新到此 Tensor | float32 | [block_num, block_size, 2\*coff\*D]，要求block_num>0 |
+| state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。支持0轴非连续，数据格式支持ND。计算后 kv_state 和 score_state 会原位更新到此 Tensor。 | float32 | [block_num, block_size, 2\*coff\*D]，要求block_num>0 |
 | ape | Tensor | 必选 | positional biases，对应公式中的 $Ape$。不支持非连续，数据格式支持ND。 | float32 | [cmp_ratio,coff\*D] |
 | cmp_ratio | int | 必选 | 数据压缩率。取值范围为[2, 128]内的整数。 | - | - |
 | state_block_table | Tensor | 可选 | state_cache内存使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B] |
 | cu_seqlens | Tensor | 可选 | 不同Batch上的有效token数。不支持非连续，数据格式支持ND。<br>当x的shape为[B,S,H]时，参数必须为空。<br>当x的shape为[T,H]时，输入shape必须为[B+1,]，该参数为前缀和数组，后一个元素≥前一个元素，第一位必须为0，最后一位必须为T。 | int32 | [B+1,] |
 | seqused | Tensor | 可选 | 不同Batch中实际参与压缩的token数。不支持非连续，数据格式支持ND。<br>指定为None时，数值等于每个Batch上的Sequence Length。<br>[B,S,H]场景：0 ≤ seqused[n] ≤ S<br>[T,H]场景：0 ≤ seqused[n] ≤ cu_seqlens[n+1] - cu_seqlens[n]。 | int32 | [B,] |
-| start_pos | Tensor | 可选 | 计算起始位置。不支持非连续，数据格式支持ND，输入为None时从0开始计算 | int32 | [B,] |
+| start_pos | Tensor | 可选 | 计算起始位置。不支持非连续，数据格式支持ND，输入为None时从0开始计算。 | int32 | [B,] |
 | coff | int | 可选 | 表示是否进行overlap数据重排，默认值为1。<br>仅支持1/2：<br>coff=1：无需进行overlap数据重排。<br>coff=2：需要进行overlap数据重排。 | int | - |
 | cache_mode | int | 可选 | state_cache的存储模式，默认值为1。<br>1：连续buffer。<br>2：循环buffer。 | int | - |
 
@@ -124,12 +124,12 @@ cann_ops_transformer.compressor(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 | ---- | ---- | ---- | ---- | ---- | ---- |
-| cmp_kv | Tensor | 必选 | 压缩后的数据。不支持非连续，数据格式支持ND；<br>当x的shape为[B,S,H]时，输出拼接：(\<batch0\>compressed_tokens+pad0) +  (\<batch1\>compressed_tokens+pad1) + ... +  (\<batchN\>compressed_tokens+padN)；<br>当x的shape为[T,H]时，输出拼接：\<batch0\>compressed_tokens + \<batch1\>compressed_tokens + ... + \<batchN\>compressed_tokens + pad。<br>输出有效范围：compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio，其中，Seqlen表示不同Batch中的有效token数。BS非合轴时，每 batch 的有效结果位于输出的前 compressed_tokens[n] 行；BS合轴时，按 batch 顺序连续拼接，总有效范围为前 sum(compressed_tokens[n]) 行。输出分配容量中其余尾行算子不写入。 | bfloat16、float16 | x=[B,S,H]：[B,ceil(S/cmp_ratio),D]<br>x=[T,H]：[min(T,T//cmp_ratio+B),D] |
+| cmp_kv | Tensor | 必选 | 压缩后的数据。不支持非连续，数据格式支持ND；<br>当x的shape为[B,S,H]时，输出拼接：(\<batch0\>compressed_tokens+pad0) +  (\<batch1\>compressed_tokens+pad1) + ... +  (\<batchN\>compressed_tokens+padN)；<br>当x的shape为[T,H]时，输出拼接：\<batch0\>compressed_tokens + \<batch1\>compressed_tokens + ... + \<batchN\>compressed_tokens + pad。<br>输出有效范围：compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio，其中，Seqlen表示不同Batch中的有效token数。BS非合轴时，每 batch 的有效结果位于输出的前 compressed_tokens[n] 行；BS合轴时，按 batch 顺序连续拼接，总有效范围为前 sum(compressed_tokens[n]) 行。输出分配容量中其余尾行算子不写入。 | bfloat16、float16 | x=[B,S,H]:[B,ceil(S/cmp_ratio),D]<br>x=[T,H]:[min(T,T//cmp_ratio+B),D] |
 
 ## 约束说明
 
 - 该接口支持推理场景下使用。
-- 该接口支持单算子模式和TorchAir图模式(aclgraph)调用。
+- 该接口支持单算子模式和TorchAir图模式（aclgraph）调用。
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 该接口支持B、S泛化，且存在如下场景限制：
   - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU存储的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
@@ -169,14 +169,14 @@ cann_ops_transformer.compressor(
     </table>
     </div>
 - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下state_cache不做更新，输出cmp_kv为空tensor。
-- state_block_table元素取值范围为[0, block_num)，block_num为state_cache第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cache_mode=1（连续buffer）下写state_cache操作跳过该位置；cache_mode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cache_mode=1下元素值0为"未分配"哨兵值可重复出现，非0值须全局唯一；cache_mode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
+- state_block_table元素取值范围为[0, block_num)，block_num为state_cache第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cache_mode=1（连续buffer）下写state_cache操作跳过该位置；cache_mode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cache_mode=1下元素值0为“未分配”哨兵值可重复出现，非0值须全局唯一；cache_mode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
 - 支持D为128/512。
 - 支持H为1k~10k，512对齐。
 - 支持block_size为1~1024。
 - 支持如下三种典型组合场景：
   - C4A: D=512, coff=2, cmp_ratio=4;
   - C4Li: D=128, coff=2, cmp_ratio=4;
-  - C128A: D=512, coff=1, cmp_ratio=128。
+  - C128A: D=512, coff=1, cmp_ratio=128.
 
 ## 确定性计算
 

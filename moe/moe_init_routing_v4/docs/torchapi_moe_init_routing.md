@@ -34,13 +34,13 @@
     $$
 
   2.以sortedRowIdx做位置映射得出expandedRowIdxOut：
-    - rowIdxType等于1时, 输出scatter索引
+    - rowIdxType等于1时，输出scatter索引
 
       $$
       expandedRowIdxOut[i]=sortedRowIdx[i]
       $$
 
-    - rowIdxType等于0时, 输出gather索引
+    - rowIdxType等于0时，输出gather索引
 
       $$
       expandedRowIdxOut[sortedRowIdx[i]]=i
@@ -52,7 +52,7 @@
     expertTokensCountOrCumsumOutOptional[i]=Histogram(sortedExpertIdx)
     $$
 
-  4.如果quantMode不等于-1, 计算量化结果：
+  4.如果quantMode不等于-1，计算量化结果：
      - 静态量化
 
      $$
@@ -70,7 +70,7 @@
             quantResult = round(x / dynamicQuantScaleOutOptional)
             $$
 
-        - 若输入scale:
+        - 若输入scale：
 
             $$
             dynamicQuantScaleOutOptional = row_max(abs(x * scaleOptional)) / 127
@@ -130,7 +130,7 @@
 
       其中globalSortIdx为expertIdx在flatten布局中的位置（即globalSortIdx = rowIdx * K + colIdx，对应topkWeight[rowIdx, colIdx]），dstIdx为expandedRowIdxOut中对应位置的目标索引，未被分配的专家容量位置expandedTopkWeightOut填充为0。
 
-  7.expandedRowIdxOut的有效元素数量availableIdxNum，计算方式为expertIdx中activeExpertRangeOptional范围内的元素的个数
+  7.expandedRowIdxOut的有效元素数量availableIdxNum，计算方式为expertIdx中activeExpertRangeOptional范围内的元素的个数：
 
     $$
     availableIdxNum = |\{x\in expertIdx| expert_start \le x<expert_end \ \}|

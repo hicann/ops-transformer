@@ -39,7 +39,7 @@
 
     $$q\_embed = (query \cdot cos) + query\_rotate \cdot sin$$
 
-    `key`的计算方式与`query`相同，得到$k\_embed$。`rotary_mode`为`"interleave"`时，相邻两元素为一组配对旋转；`rotary_mode`为`"quarter"`时，将最后一维四等分后两两配对旋转。
+    `key`的计算方式与`query`相同，得到$k\_embed$。`rotary_mode`为`"interleave"`时，相邻两元素为一组进行配对旋转；`rotary_mode`为`"quarter"`时，将最后一维四等分后两两配对旋转。
 
 - **说明**：
 
@@ -66,7 +66,7 @@ cann_ops_transformer.apply_rotary_pos_emb(query, key, cos, sin, layout="BSND", r
 
 ## 返回值说明
 
-- **query_out**（`Tensor`）：旋转位置编码后的query输出张量，为新分配张量，shape和数据类型与输入`query`一致，输入`query`不被修改。
+- **query_out**（`Tensor`）：旋转位置编码后的query输出张量，为新分配的张量，shape和数据类型与输入`query`一致，输入`query`不被修改。
 - **key_out**（`Tensor`）：旋转位置编码后的key输出张量，为新分配张量，shape和数据类型与输入`key`一致，输入`key`不被修改。
 
 <!-- npu="950" id7 -->

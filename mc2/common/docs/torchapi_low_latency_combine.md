@@ -74,7 +74,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
     <th>可选/必选</th>
     <th>描述</th>
     <th>数据类型</th>
-    <th>维度(shape)</th>
+    <th>维度（shape）</th>
 </tr>
 </thead>
 <tbody>
@@ -296,7 +296,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
     <th>可选/必选</th>
     <th>描述</th>
     <th>数据类型</th>
-    <th>维度(shape)</th>
+    <th>维度（shape）</th>
 </tr>
 </thead>
 <tbody>
@@ -414,7 +414,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
     </table>
 
 - 参数里Shape使用的变量如下：
-  - A：表示本卡接收的最大token数量，取值范围如下
+  - A：表示本卡接收的最大token数量，取值范围如下：
     - 对于共享专家，要满足A=BS\*ep_world_size\*shared_expert_num/shared_expert_rank_num。
     - 对于MoE专家，当num_max_dispatch_tokens_per_rank为0时，要满足A >= BS\*ep_world_size \* min(local_expert_num, K)；当num_max_dispatch_tokens_per_rank不为0时，要满足A >= num_max_dispatch_tokens_per_rank \* ep_world_size \* min(local_expert_num, K)。
   - H：表示hidden size隐藏层大小。取值范围[1024, 8192]。
@@ -440,14 +440,14 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-    - `topk_weights`可传有效Tensor或None或空Tensor，传有效Tensor时使能topK专家权重功能，传None或空Tensor时不使能并直接对专家输出求和
+    - `topk_weights`可传有效Tensor或None或空Tensor，传有效Tensor时使能topK专家权重功能，传None或空Tensor时不使能并直接对专家输出求和。
   <!-- end id8 -->
 - HCCL通信域缓存区大小：
 
     调用本接口前需检查通信域缓存区大小配置是否合理，单位MB。
   - 通过环境变量HCCL\_BUFFSIZE配置时，该环境变量按通信域粒度管理，不配置时默认为200MB，每个通信域独占一组“2*HCCL\_BUFFSIZE”大小的内存。
   - EP通信域内：设置大小要求 >= 2 \* (local_expert_num \* max_bs \* ep_world_size \* Align512(Align32(2 \* h) + 64) + (k + shared_expert_num) \* max_bs\* Align512(2 \* h))。
-  - 其中480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32。
+  - 其中480Align512(x) = ((x+480-1)/480)\*512，Align512(x) = ((x+512-1)/512)\*512，Align32(x) = ((x+32-1)/32)\*32。
   <!-- npu="950" id11 -->
   - 对于<term>Ascend 950PR&950DT系列产品</term>，当dispatch侧quant\_mode=0且x\_smooth\_scale非空时，dispatch token长度取max(Align32(2 \* h) + 64, Align32(Align32(2 \* h) + 4 \* h) + 16)，再按上述规则对齐。
   - 对于<term>Ascend 950PR&950DT系列产品</term>，上式中 combine 项按 `480Align512(2 * h)` 计算。

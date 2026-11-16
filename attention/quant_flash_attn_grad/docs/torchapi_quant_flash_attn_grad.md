@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **接口功能**:
+- **接口功能**：
 
   `quant_flash_attn_grad`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantFlashAttnGrad`算子完成HIFLOAT8量化场景下的注意力反向梯度计算。该接口为`quant_flash_attn`正向算子的配套反向接口，用于计算Query、Key、Value的梯度（dq、dk、dv）以及sink梯度（dsink）。当前支持HIFLOAT8量化数据类型，支持BSND、BNSD、TND三种数据排布格式；支持全计算（mask_mode=0）、Causal（mask_mode=3）和Sliding Window（mask_mode=4）三种mask模式。
   在TND排布下，Q、K、V按变长序列打包存储，需通过cu_seqlens_q、cu_seqlens_kv描述各batch的序列长度，也可通过seqused_q、seqused_kv进一步指定各batch实际参与运算的序列长度；在BSND、BNSD排布下可通过seqused_q、seqused_kv截断各batch的冗余运算。
@@ -33,7 +33,7 @@
   2. 调用`quant_flash_attn_metadata`生成`metadata`。
   3. 调用`quant_flash_attn_grad`，将上一步得到的`metadata`传入主算子。
 
-- **计算公式**:
+- **计算公式**：
 
   量化注意力反向梯度计算分为以下几个阶段：
 
@@ -233,7 +233,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 
 ### quant_mode 枚举
 
-`quant_mode`在Python接口中支持传入`IntEnum`枚举或对应int值，枚举定义于`cann_ops_transformer.ops.quant_flash_attn_grad`
+`quant_mode`在Python接口中支持传入`IntEnum`枚举或对应int值，枚举定义于`cann_ops_transformer.ops.quant_flash_attn_grad`。
 
 | 枚举名 | 值 | 含义 |
 | :--- | :---: | :--- |
@@ -465,7 +465,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 
 |    命名    |                            含义                            |
 | :---------: | :---------------------------------------------------------: |
-|      B      |                Batch,表示输入样本批量大小                |
+|      B      |                Batch，表示输入样本批量大小                |
 |     Q_N     |        输入q tensor的头数，对应q shape中的N        |
 |    KV_N    |    输入k/v tensor的头数，对应k/v shape中的N    |
 |     Q_S     |      输入q tensor的序列长度，对应q shape中的S      |
@@ -485,7 +485,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 - 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，Tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - quant_flash_attn_metadata和quant_flash_attn_grad的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 
-- q、k、v、dout、attn_out校验:
+- q、k、v、dout、attn_out校验：
 
     <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 147px">
@@ -526,16 +526,16 @@ cann_ops_transformer.quant_flash_attn_grad(
                 BSND/BNSD轴校验：
                 <ul>
                     <li>65536 > B > 0</li>
-                    <li>Q_S ≥ 0；KV_S ≥ 0</li>
+                    <li>Q_S ≥ 0; KV_S ≥ 0</li>
                     <li>D仅支持128</li>
                     <li>Q_N % KV_N == 0且Q_N / KV_N > 0（GQA约束）</li>
-                    <li>Q_N ≤ 128；KV_N ≤ 128</li>
+                    <li>Q_N ≤ 128; KV_N ≤ 128</li>
                 </ul>
                 TND轴校验：
                 <ul>
                     <li>Q_T ≥ B > 0；KV_T ≥ B > 0（B由cu_seqlens_q的长度减1推导）</li>
                     <li>Q_N == KV_N（TND排布不支持GQA）</li>
-                    <li>Q_N ≤ 128；KV_N ≤ 128</li>
+                    <li>Q_N ≤ 128; KV_N ≤ 128</li>
                     <li>D仅支持128</li>
                 </ul>
             </td>
@@ -615,7 +615,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 
 #### 全量化参数组
 
-- quant_mode参数解释:
+- quant_mode参数解释：
 
     <ul>
         <li>quant_mode=0，HIF8_PER_TENSOR（HIFLOAT8 per-tensor量化场景）</li>
@@ -730,7 +730,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 
 #### Mask参数组
 
-mask_mode参数解释
+mask_mode参数解释：
 <ul>
     <li>mask_mode=0，ALL，全计算模式（默认值）</li>
     <li>mask_mode=3，CAUSAL，Causal模式（以右下角为划分的下三角场景）</li>

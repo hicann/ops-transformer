@@ -26,7 +26,7 @@
 - **接口功能**：
 
   - Mega MoE算子将MoE层的专家FFN的完整计算流程及前后数据通信（即Dispatch + Linear1 + Activation + Linear2 + Combine）融合为单个算子，实现了通信和计算的掩盖。
-  - 该算子提供了mega_moe与get_symm_buffer_for_mega_moe等接口配套使用。
+  - 该算子提供了mega_moe与get_symm_buffer_for_mega_moe等接口供配套使用。
   - get_symm_buffer_for_mega_moe：用于封装输入参数并创建SymmBuffer结构体，生成`context`、`ep_world_size`和`ccl_buffer_size`等mega_moe算子运行所需信息。
 
 - **计算公式**：
@@ -99,23 +99,23 @@
 
 - 计算说明：
 
-    各产品支持的**Linear计算时**的激活矩阵A和权重矩阵W的数据类型如下：
+  各产品支持的**Linear计算时**的激活矩阵A和权重矩阵W的数据类型如下：
 
-    | 场景名    |  A |  W   |
-    | --- | :---:  | :---:        |
-    | A16W16   | BFLOAT16     |BFLOAT16        |
-    | A8W8-INT | INT8   | INT8         |
-    | A8W8-FP  | FLOAT8_E4M3FN、FLOAT8_E5M2 |FLOAT8_E4M3FN、FLOAT8_E5M2 |
-    | A8W4-INT | INT8        | INT4            |
-    | A8W4-FP | FLOAT8_E4M3FN        | FLOAT4_E2M1          |
-    | A4W4-FP | FLOAT4_E2M1        | FLOAT4_E2M1            |
+  | 场景名    |  A |  W   |
+  | --- | :---:  | :---:        |
+  | A16W16   | BFLOAT16     |BFLOAT16        |
+  | A8W8-INT | INT8   | INT8         |
+  | A8W8-FP  | FLOAT8_E4M3FN、FLOAT8_E5M2 |FLOAT8_E4M3FN、  FLOAT8_E5M2 |
+  | A8W4-INT | INT8        | INT4            |
+  | A8W4-FP | FLOAT8_E4M3FN        | FLOAT4_E2M1          |
+  | A4W4-FP | FLOAT4_E2M1        | FLOAT4_E2M1            |
 
-    <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持A16W16、A8W8-INT和A8W4-INT场景。
-    <!-- end id7 -->
-    <!-- npu="950" id8 -->
-    - <term>Ascend 950PR&950DT系列产品</term>：支持A8W8-FP、A8W4-FP和A4W4-FP场景。
-    <!-- end id8 -->
+  <!-- npu="A3,910b" id7 -->
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持A16W16、A8W8-INT和A8W4-INT场景。
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
+  - <term>Ascend 950PR&950DT系列产品</term>：支持A8W8-FP、A8W4-FP和A4W4-FP场景。
+  <!-- end id8 -->
 
     <details>
     <summary> A16W16 非量化场景</summary>
@@ -130,11 +130,11 @@
 
     - **Expert Compute**
 
-        在MoE层中，每个专家本质上是一个独立的前馈网络（FFN），采用由 `activation` 指定的门控激活结构以提升表达能力。整个计算过程分为如下三个子步骤。
+        在MoE层中，每个专家本质上是一个独立的前馈网络（FFN），采用由 `activation` 指定的门控激活结构以提升表达能力。整个计算过程分为如下三个子步骤：
 
         **1. Linear1 投影**
 
-        Linear1 投影是专家网络的第一层线性变换，同时产生 **gate部分** 和 **up部分** 所需的预激活值。其计算公式为
+        Linear1 投影是专家网络的第一层线性变换，同时产生 **gate部分** 和 **up部分** 所需的预激活值。其计算公式为：
         $$
         \mathbf{H}_e = \mathbf{X}_e \cdot \mathbf{W}_1[e]
         \quad\bigl(\in \mathbb{R}^{N_e \times 2\cdot\text{intermediate\_hidden}}\bigr)
@@ -195,7 +195,7 @@
 
     - **Expert Compute**
 
-        在MoE层中，每个专家本质上是一个独立的前馈网络（FFN），采用由 `activation` 指定的门控激活结构以提升表达能力。在A8W8场景下，两个线性层都使用int8 输入和int8 权重进行矩阵乘，得到int32 中间结果并反量化。具体分为三个子步骤。
+        在MoE层中，每个专家本质上是一个独立的前馈网络（FFN），采用由 `activation` 指定的门控激活结构以提升表达能力。在A8W8场景下，两个线性层都使用int8 输入和int8 权重进行矩阵乘，得到int32 中间结果并反量化。具体分为三个子步骤：
 
         **1. Linear1 投影（int8 矩阵乘 + 反量化）**
 
@@ -360,7 +360,7 @@
         **4. Linear2 投影（量化 + int4 × int4 矩阵乘 + 反量化）**
 
         Linear2 投影作为第二层线性变换，将中间激活表示 $\mathbf{A}_e$ 从高维空间投影回原始的隐藏维度 $\text{hidden}$，使专家输出能够与残差连接等后续操作兼容。
-        在A8W4 场景下，首先将激活值量化为int8，再通过二进制重解释为两个int4 的拼接视图，以一次矩阵乘完成计算，过程如下。
+        在A8W4 场景下，首先将激活值量化为int8，再通过二进制重解释为两个int4 的拼接视图，以一次矩阵乘完成计算，过程如下：
 
         **(1) 激活量化**
 
@@ -1079,7 +1079,7 @@ sym_buffer.update_group(group) -> None
         <td>(shared_expert_num_per_rank, hidden, CeilDiv(intermediate_hidden, 64), 2)</td>
     </tr>
     <tr>
-        <td>shared_l1_bias<sup>1，2</sup></td>
+        <td>shared_l1_bias<sup>1,2</sup></td>
         <td>list[Tensor]</td>
         <td>可选</td>
         <td>共享专家网络第一线性层的偏置，暂不支持。</td>
@@ -1472,7 +1472,7 @@ sym_buffer.update_group(group) -> None
     - 预量化直通（dispatch_quant_mode = 0）的约束：x的数据类型必须与dispatch_quant_out_dtype指定的逻辑类型一致；scales为必选；仅支持topo_type = 0（MTE拓扑），Layered拓扑（topo_type = 1或2）均不支持；shared_expert_quant_out_dtype只能取None或与dispatch_quant_out_dtype相同。
     - x_active_mask当前版本必须传入None，不支持非空输入。
     - scales仅在预量化直通（dispatch_quant_mode = 0且dispatch_quant_out_dtype为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）场景为必选，数据类型为FLOAT8_E8M0，shape为(num_tokens, CeilDiv(hidden, 32))；其余场景必须传入None。
-    - combine_quant_mode当前支持0（非量化），3（MX模式FLOAT8_E5M2类型），4（MX模式float8_e4m3类型）。
+    - combine_quant_mode当前支持0（非量化）、3（MX模式FLOAT8_E5M2类型）、4（MX模式float8_e4m3类型）。
     - comm_alg为预留参数，保持默认空字符串""即可。
     - y的数据类型固定为bfloat16。
     - **通信去重约束**：
@@ -1488,7 +1488,7 @@ sym_buffer.update_group(group) -> None
     - l1_weights_sf和l2_weights_sf不可为空指针。
     - local_moe_expert_num = num_experts / ep_world_size；启用共享专家时，shared_expert_num_per_rank = shared_l1_weights.dim0；num_experts_per_rank = shared_expert_num_per_rank + local_moe_expert_num，未启用共享专家时 shared_expert_num_per_rank = 0。
     - shared_expert_num_per_rank范围 [0, 4]。
-    - topo_type由通信域上下文自动推导。0表示MTE拓扑，1表示URMA跨超拓扑，2表示域内URMA、域间RoCE的混合拓扑。
+    - topo_type由通信域上下文自动推导。0表示MTE拓扑，1表示URMA跨超节点拓扑，2表示域内URMA、域间RoCE的混合拓扑。
     - URMA+RoCE混合拓扑要求UB域等宽且域内group rank连续，rank_num_per_server表示每个UB域的rank数，取值范围[1, ep_world_size]且必须整除ep_world_size（该校验对topo_type = 1与2同时生效），不满足时算子在tiling阶段报错；域内使用UB_CTP，域间使用RoCE，由extension查询RankGraph决定，不按物理主机数推断。支持combine_comm_mode=0（普通回传）或2（Server内归约及域间二级回传）；模式2要求combine_quant_mode=0，域内贡献通过URMA WriteWithNotifyNbi发送，域间聚合结果通过RoCE batch WriteNbi回传。
     - Layered拓扑（topo_type为1或2）下，`activation`仅支持"swiglu"、"situglu"和"gelu"，不支持"swiglustep"和"swigluoai"。
     - topk_weights_type取值为0或1，0表示关闭topk_weights前移，1表示开启。

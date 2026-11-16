@@ -85,7 +85,7 @@ cann_ops_transformer.stem_oam_prep_varlen_q(q, q_seq_lens, cu_seq_lens_q, *, q_s
         <td>q_seq_lens</td>
         <td>List[int]</td>
         <td>必选</td>
-        <td>表示每个batch的Q序列长度。对应公式中q_seq_lens。长度等于batch，取值范围为(0, 1024]，每个值≥0。</td>
+        <td>表示每个batch的Q序列长度。对应公式中q_seq_lens。长度等于batch，取值范围为(0, 1024]。</td>
         <td>int64</td>
         <td>(batch,)</td>
     </tr>
@@ -149,7 +149,7 @@ cann_ops_transformer.stem_oam_prep_varlen_q(q, q_seq_lens, cu_seq_lens_q, *, q_s
         <td>q_flat</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>表示flattened Q输出，供OAM score计算使用。对应公式中qflat_out。其中max_Qb=ceil(max(q_seq_lens)/stem_block_size)，kflat_dim=stem_stride×D=2048。</td>
+        <td>表示flattened Q输出，供OAM score计算使用。对应公式中qflat_out。其中max_Qb=ceil(max(q_seq_lens)/stem_block_size)，qflat_dim=stem_stride×D=2048。</td>
         <td>bfloat16</td>
         <td>(batch, H_q, max_Qb, kflat_dim)</td>
     </tr>

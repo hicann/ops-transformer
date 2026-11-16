@@ -69,7 +69,7 @@
 |[key_pool](../../attention/key_pool/docs/torchapi_key_pool.md)|推理场景下的Key压缩算子：对输入token做K/Gate投影，按cmp_ratio分组加权池化为Key，未完成组状态经state_cache跨调用保存。|-|-|
 |[kv_compress_epilog](../../attention/kv_compress_epilog/docs/torchapi_kv_compress_epilog.md)| 在KV Cache的Epilog阶段对cache进行原地量化压缩更新，封装aclnnKvCompressEpilog。|默认支持确定性计算|-|
 |[kv_quant_sparse_flash_attention](../../attention/kv_quant_sparse_flash_attention_v2/docs/torchapi_kv_quant_sparse_flash_attention.md)|调用`KvQuantSparseFlashAttentionV2`完成量化和稀疏场景下的注意力计算，支持Per-Token-Head-Tile-128量化输入。|-|默认支持确定性计算|
-|[lightning_indexer_metadata](../../attention/lightning_indexer_v2/docs/torchapi_lightning_indexer.md)| 基于一系列操作得到每一个token对应的Top-k个位置。支持KV压缩场景。已融合candidate（两级 TopK）候选源模式：传入可选参数candidate_topk_blocks时额外返回候选块号两输出（供`sparse_lightning_indexer`消费），未传入时保持2输出不变。|默认支持确定性计算|-|
+|[lightning_indexer_metadata](../../attention/lightning_indexer_v2/docs/torchapi_lightning_indexer.md)| 基于一系列操作得到每一个token对应的Top-k个位置。支持KV压缩场景。已融合candidate（两级 TopK）候选源模式：传入可选参数candidate_topk_blocks时额外返回候选块号两个输出（供`sparse_lightning_indexer`消费），未传入时保持2输出不变。|默认支持确定性计算|-|
 |[lightning_indexer_metadata](../../attention/lightning_indexer_v2/docs/torchapi_lightning_indexer.md)| lightning_indexer接口的前置接口，用于计算lightning_indexer的负载均衡。|默认支持确定性计算|默认支持确定性计算|
 |[lightning_indexer_kl_loss](../../attention/lightning_indexer_kl_loss/docs/torchapi_lightning_indexer_kl_loss.md)|计算Lightning Indexer中teacher分布与student分布之间的KL散度损失。|默认非确定性，支持通过`torch.use_deterministic_algorithms`开启确定性计算。|-|
 |[low_latency_dispatch](../../mc2/common/docs/torchapi_low_latency_dispatch.md)|完成MoE并行部署下token的低时延dispatch分发，支持动态量化与EP域alltoallv通信，需与low_latency_combine配套使用。|默认支持确定性计算|默认支持确定性计算|

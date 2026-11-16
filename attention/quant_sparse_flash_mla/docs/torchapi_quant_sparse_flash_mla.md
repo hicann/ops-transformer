@@ -150,88 +150,88 @@ cann_ops_transformer.quant_sparse_flash_mla(
 
 ### quant_sparse_flash_mla_metadata
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度
-| :--- | :--- | :--- | :--- | :--- | :--- | :---
-| num_heads_q | int | 必选 | 表示q头数 | int32 | - | -
-| num_heads_kv | int | 必选 | 表示ori_kv/cmp_kv头数 | int32 | - | -
-| head_dim | int | 必选 | 表示每个注意力头的维度 | int32 | - | -
-| quant_mode | int | 必选 | 表示量化模式，当前仅支持1。1表示Q、K、V为per-tensor量化，数据类型为hifloat8。 | int32 | - | -
-| cu_seqlens_q | tensor | 可选 | 表示输入q处理的变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
-| cu_seqlens_ori_kv | tensor | 可选 | 表示输入ori_kv处理变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
-| cu_seqlens_cmp_kv | tensor | 可选 | 表示输入cmp_kv处理变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
-| seqused_q | tensor | 可选 | 表示输入q每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul>
-| seqused_ori_kv | tensor | 可选 | 表示输入ori_kv每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul>
-| seqused_cmp_kv | tensor | 可选 | 表示输入cmp_kv每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul>
-| cmp_residual_kv | tensor | 可选 | 表示每batch中cmp_kv压缩后序列长度的余数 | int32 | ND | <ul><li>(b,)</li></ul>
-| ori_topk_length | tensor | 可选 | 表示ori_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>
-| cmp_topk_length | tensor | 可选 | 表示cmp_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>
-| batch_size | int | 可选 | 表示batch大小 | int32 | - | -
-| max_seqlen_q | int | 可选 | 表示查询q序列的长度上限 | int32 | - | -
-| max_seqlen_ori_kv | int | 可选 | 表示ori_kv序列的长度上限 | int32 | - | -
-| max_seqlen_cmp_kv | int | 可选 | 表示cmp_kv序列的长度上限 | int32 | - | -
-| ori_topk | int | 可选 | 表示ori_kv中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为None | int32 | - | -
-| cmp_topk | int | 可选 | 表示cmp_kv中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为None | int32 | - | -
-| cmp_ratio | int | 可选 | 表示对cmp_kv的压缩率。默认值为None | int32 | - | -
-| ori_mask_mode | int | 可选 | 表示q和ori_kv计算的mask模式。0：No mask。3：rightDownCausal模式。4：sliding window模式。默认值为None | int32 | - | -
-| cmp_mask_mode | int | 可选 | 表示q和cmp_kv计算的mask模式。0：No mask。3：rightDownCausal模式。默认值为None | int32 | - | -
-| ori_win_left | int | 可选 | 表示q和ori_kv计算中q对过去token计算的数量，-1表示无穷大，即全部参与运算。默认值为None | int32 | - | -
-| ori_win_right | int | 可选 | 表示q和ori_kv计算中q对未来token计算的数量，-1表示无穷大，即全部参与运算。默认值为None | int32 | - | -
-| layout_q | string | 可选 | 表示输入q的布局格式，默认值为None | string | - | -
-| layout_kv | string | 可选 | 表示输入ori_kv/cmp_kv的布局格式，默认值为None | string | - | -
-| has_ori_kv | bool | 可选 | 表示是否含有ori_kv。默认值为None | bool | - | -
-| has_cmp_kv | bool | 可选 | 表示是否含有cmp_kv。默认值为None | bool | - | -
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| num_heads_q | int | 必选 | 表示q头数 | int32 | - | -|
+| num_heads_kv | int | 必选 | 表示ori_kv/cmp_kv头数 | int32 | - | -|
+| head_dim | int | 必选 | 表示每个注意力头的维度 | int32 | - | -|
+| quant_mode | int | 必选 | 表示量化模式，当前仅支持1。1表示Q、K、V为per-tensor量化，数据类型为hifloat8。 | int32 | - | -|
+| cu_seqlens_q | tensor | 可选 | 表示输入q处理的变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul> |
+| cu_seqlens_ori_kv | tensor | 可选 | 表示输入ori_kv处理变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>|
+| cu_seqlens_cmp_kv | tensor | 可选 | 表示输入cmp_kv处理变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul> |
+| seqused_q | tensor | 可选 | 表示输入q每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul> |
+| seqused_ori_kv | tensor | 可选 | 表示输入ori_kv每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul> |
+| seqused_cmp_kv | tensor | 可选 | 表示输入cmp_kv每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul> |
+| cmp_residual_kv | tensor | 可选 | 表示每batch中cmp_kv压缩后序列长度的余数 | int32 | ND | <ul><li>(b,)</li></ul> |
+| ori_topk_length | tensor | 可选 | 表示ori_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul> |
+| cmp_topk_length | tensor | 可选 | 表示cmp_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>|
+| batch_size | int | 可选 | 表示batch大小 | int32 | - | - |
+| max_seqlen_q | int | 可选 | 表示查询q序列的长度上限 | int32 | - | -|
+| max_seqlen_ori_kv | int | 可选 | 表示ori_kv序列的长度上限 | int32 | - | -|
+| max_seqlen_cmp_kv | int | 可选 | 表示cmp_kv序列的长度上限 | int32 | - | -|
+| ori_topk | int | 可选 | 表示ori_kv中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为None | int32 | - | -|
+| cmp_topk | int | 可选 | 表示cmp_kv中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为None | int32 | - | -|
+| cmp_ratio | int | 可选 | 表示对cmp_kv的压缩率。默认值为None | int32 | - | -|
+| ori_mask_mode | int | 可选 | 表示q和ori_kv计算的mask模式。0：No mask。3：rightDownCausal模式。4：sliding window模式。默认值为None | int32 | - | -|
+| cmp_mask_mode | int | 可选 | 表示q和cmp_kv计算的mask模式。0：No mask。3：rightDownCausal模式。默认值为None | int32 | - | -|
+| ori_win_left | int | 可选 | 表示q和ori_kv计算中q对过去token计算的数量，-1表示无穷大，即全部参与运算。默认值为None | int32 | - | - |
+| ori_win_right | int | 可选 | 表示q和ori_kv计算中q对未来token计算的数量，-1表示无穷大，即全部参与运算。默认值为None | int32 | - | -|
+| layout_q | string | 可选 | 表示输入q的布局格式，默认值为None | string | - | -|
+| layout_kv | string | 可选 | 表示输入ori_kv/cmp_kv的布局格式，默认值为None | string | - | -|
+| has_ori_kv | bool | 可选 | 表示是否含有ori_kv。默认值为None | bool | - | -|
+| has_cmp_kv | bool | 可选 | 表示是否含有cmp_kv。默认值为None | bool | - | -|
 
 ### quant_sparse_flash_mla
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度
-| :--- | :--- | :--- | :--- | :--- | :--- | :---
-| q | tensor | 必选 | 表示公式中的q | hifloat8 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>
-| quant_mode | int | 必选 | 表示量化模式，当前仅支持1。1表示Q、K、V为per-tensor量化，数据类型为hifloat8。 | int32 | - | -
-| ori_kv | tensor | 可选 | 表示原始量化KV输入，Key和Value共享同一份数据 | hifloat8 | ND | <ul><li>(b, ori_kv_s, kv_n, kv_d)</li><li>(ori_kv_t, kv_n, kv_d)</li><li>(ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d)</li></ul>
-| cmp_kv | tensor | 可选 | 表示压缩量化KV输入，Key和Value共享同一份数据 | hifloat8 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
-| q_descale | tensor | 可选 | q对应的量化参数 | float32 | ND | <ul><li>[1]</li></ul>
-| ori_kv_descale | tensor | 可选 | ori_kv对应的量化参数 | float32 | ND | <ul><li>[1]</li></ul>
-| cmp_kv_descale | tensor | 可选 | cmp_kv对应的量化参数 | float32 | ND | <ul><li>[1]</li></ul>
-| ori_sparse_indices | tensor | 可选 | 表示原始KV topK索引，无效位置填-1 | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>
-| cmp_sparse_indices | tensor | 可选 | 表示压缩KV topK索引，无效位置填-1 | int32 | ND | <ul><li>(q_t, kv_n, cmp_kv_k)</li><li>(b, q_s, kv_n, cmp_kv_k)</li></ul>
-| ori_block_table | tensor | 可选 | 表示PagedAttention场景下ori_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>
-| cmp_block_table | tensor | 可选 | 表示PagedAttention场景下cmp_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>
-| cu_seqlens_q | tensor | 可选 | 表示处理输入q变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
-| cu_seqlens_ori_kv | tensor | 可选 | 表示处理输入ori_kv变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
-| cu_seqlens_cmp_kv | tensor | 可选 | 表示处理输入cmp_kv变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>
-| seqused_q | tensor | 可选 | 表示输入q每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul>
-| seqused_ori_kv | tensor | 可选 | 表示输入ori_kv每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul>
-| seqused_cmp_kv | tensor | 可选 | 表示输入cmp_kv每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul>
-| cmp_residual_kv | tensor | 可选 | 表示每batch中cmp_kv压缩后序列长度的余数。当cmp_mask_mode=3且cmp_ratio!=1时必传；当cmp_mask_mode=0或cmp_ratio=1时不允许传入。 | int32 | ND | <ul><li>(b,)</li></ul>
-| ori_topk_length | tensor | 可选 | 表示ori_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>
-| cmp_topk_length | tensor | 可选 | 表示cmp_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>
-| sinks | tensor | 可选 | 表示各注意力头设置独立可学习虚拟偏移项，用于维持长文本推理时的稳定性 | float32 | ND | <ul><li>(q_n,)</li></ul>
-| metadata | tensor | 可选 | 表示quant_sparse_flash_mla_metadata生成的分核信息 | int32 | ND | <ul><li>(2048,)</li></ul>
-| softmax_scale | float | 可选 | 表示可显式设置缩放因子。默认值为None | float32 | - | -
-| cmp_ratio | int | 可选 | 表示cmp_kv相对于压缩前KV长度的压缩倍率，可恢复cmp侧mask使用的压缩前KV长度。默认值为1，取值范围1-128 | int32 | - | -
-| ori_mask_mode | int | 可选 | 表示q和ori_kv计算的mask模式。0：No mask。3：rightDownCausal模式。4：sliding window模式。默认值为0 | int32 | - | -
-| cmp_mask_mode | int | 可选 | 表示q和cmp_kv计算的mask模式。0：No mask。3：rightDownCausal模式。默认值为0 | int32 | - | -
-| ori_win_left | int | 可选 | 表示q和ori_kv计算中q对过去token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1 | int32 | - | -
-| ori_win_right | int | 可选 | 表示q和ori_kv计算中q对未来token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1 | int32 | - | -
-| layout_q | string | 可选 | 表示输入q的布局格式，默认值为BSND | string | - | -
-| layout_kv | string | 可选 | 表示输入ori_kv/cmp_kv的布局格式，默认值为BSND | string | - | -
-| topk_value_mode | int | 可选 | 表示topK索引取值模式。默认值为1 | int32 | - | -
-| return_softmax_lse | bool | 可选 | 表示是否返回softmax的lse结果。默认值为False | bool | - | -
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :---|
+| q | tensor | 必选 | 表示公式中的q | hifloat8 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>|
+| quant_mode | int | 必选 | 表示量化模式，当前仅支持1。1表示Q、K、V为per-tensor量化，数据类型为hifloat8。 | int32 | - | -|
+| ori_kv | tensor | 可选 | 表示原始量化KV输入，Key和Value共享同一份数据 | hifloat8 | ND | <ul><li>(b, ori_kv_s, kv_n, kv_d)</li><li>(ori_kv_t, kv_n, kv_d)</li><li>(ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d)</li></ul>|
+| cmp_kv | tensor | 可选 | 表示压缩量化KV输入，Key和Value共享同一份数据 | hifloat8 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>|
+| q_descale | tensor | 可选 | q对应的量化参数 | float32 | ND | <ul><li>[1]</li></ul>|
+| ori_kv_descale | tensor | 可选 | ori_kv对应的量化参数 | float32 | ND | <ul><li>[1]</li></ul>|
+| cmp_kv_descale | tensor | 可选 | cmp_kv对应的量化参数 | float32 | ND | <ul><li>[1]</li></ul> |
+| ori_sparse_indices | tensor | 可选 | 表示原始KV topK索引，无效位置填-1 | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>|
+| cmp_sparse_indices | tensor | 可选 | 表示压缩KV topK索引，无效位置填-1 | int32 | ND | <ul><li>(q_t, kv_n, cmp_kv_k)</li><li>(b, q_s, kv_n, cmp_kv_k)</li></ul>|
+| ori_block_table | tensor | 可选 | 表示PagedAttention场景下ori_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(ori_kv_s_max/ori_kv_block_size))</li></ul>|
+| cmp_block_table | tensor | 可选 | 表示PagedAttention场景下cmp_kv使用的block映射表 | int32 | ND | <ul><li>(b, ceil(cmp_kv_s_max/cmp_kv_block_size))</li></ul>|
+| cu_seqlens_q | tensor | 可选 | 表示处理输入q变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>|
+| cu_seqlens_ori_kv | tensor | 可选 | 表示处理输入ori_kv变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>|
+| cu_seqlens_cmp_kv | tensor | 可选 | 表示处理输入cmp_kv变长序列的累积序列长度 | int32 | ND | <ul><li>(b+1,)</li></ul>|
+| seqused_q | tensor | 可选 | 表示输入q每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul>|
+| seqused_ori_kv | tensor | 可选 | 表示输入ori_kv每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul>|
+| seqused_cmp_kv | tensor | 可选 | 表示输入cmp_kv每batch中实际参与运算的序列长度 | int32 | ND | <ul><li>(b,)</li></ul>|
+| cmp_residual_kv | tensor | 可选 | 表示每batch中cmp_kv压缩后序列长度的余数。当cmp_mask_mode=3且cmp_ratio!=1时必传；当cmp_mask_mode=0或cmp_ratio=1时不允许传入。 | int32 | ND | <ul><li>(b,)</li></ul>|
+| ori_topk_length | tensor | 可选 | 表示ori_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>|
+| cmp_topk_length | tensor | 可选 | 表示cmp_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>|
+| sinks | tensor | 可选 | 表示各注意力头设置独立可学习虚拟偏移项，用于维持长文本推理时的稳定性 | float32 | ND | <ul><li>(q_n,)</li></ul>|
+| metadata | tensor | 可选 | 表示quant_sparse_flash_mla_metadata生成的分核信息 | int32 | ND | <ul><li>(2048,)</li></ul>|
+| softmax_scale | float | 可选 | 表示可显式设置缩放因子。默认值为None | float32 | - | - |
+| cmp_ratio | int | 可选 | 表示cmp_kv相对于压缩前KV长度的压缩倍率，可恢复cmp侧mask使用的压缩前KV长度。默认值为1，取值范围1-128 | int32 | - | - |
+| ori_mask_mode | int | 可选 | 表示q和ori_kv计算的mask模式。0：No mask。3：rightDownCausal模式。4：sliding window模式。默认值为0 | int32 | - | - |
+| cmp_mask_mode | int | 可选 | 表示q和cmp_kv计算的mask模式。0：No mask。3：rightDownCausal模式。默认值为0 | int32 | - | -|
+| ori_win_left | int | 可选 | 表示q和ori_kv计算中q对过去token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1 | int32 | - | - |
+| ori_win_right | int | 可选 | 表示q和ori_kv计算中q对未来token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1 | int32 | - | - |
+| layout_q | string | 可选 | 表示输入q的布局格式，默认值为BSND | string | - | - |
+| layout_kv | string | 可选 | 表示输入ori_kv/cmp_kv的布局格式，默认值为BSND | string | - | -|
+| topk_value_mode | int | 可选 | 表示topK索引取值模式。默认值为1 | int32 | - | -|
+| return_softmax_lse | bool | 可选 | 表示是否返回softmax的lse结果。默认值为False | bool | - | - |
 
 ## 返回值说明
 
 ### quant_sparse_flash_mla_metadata
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度
-| :--- | :--- | :--- | :--- | :--- | :--- | :---
-| metadata | tensor | 必选 | quant_sparse_flash_mla的分核信息 | int32 | ND | <ul><li>(2048,)</li></ul>
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度|
+| :--- | :--- | :--- | :--- | :--- | :--- | :---|
+| metadata | tensor | 必选 | quant_sparse_flash_mla的分核信息 | int32 | ND | <ul><li>(2048,)</li></ul>|
 
 ### quant_sparse_flash_mla
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度
-| :--- | :--- | :--- | :--- | :--- | :--- | :---
-| attention_out | tensor | 必选 | quant_sparse_flash_mla的计算输出 | bfloat16 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>
-| softmax_lse | tensor | 可选 | 对query乘key的结果先取max得到softmax_max，query乘key的结果减去softmax_max后取exp再取sum得到softmax_sum，最后对softmax_sum取log再加上softmax_max得到的结果。 | float32 | ND | <ul><li>(b, kv_n, q_s, q_n/kv_n)</li><li>(kv_n, q_t, q_n/kv_n)</li></ul>
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度|
+| :--- | :--- | :--- | :--- | :--- | :--- | :---|
+| attention_out | tensor | 必选 | quant_sparse_flash_mla的计算输出 | bfloat16 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>|
+| softmax_lse | tensor | 可选 | 对query乘key的结果先取max得到softmax_max，query乘key的结果减去softmax_max后取exp再取sum得到softmax_sum，最后对softmax_sum取log再加上softmax_max得到的结果。 | float32 | ND | <ul><li>(b, kv_n, q_s, q_n/kv_n)</li><li>(kv_n, q_t, q_n/kv_n)</li></ul>|
 
 ## 约束说明
 

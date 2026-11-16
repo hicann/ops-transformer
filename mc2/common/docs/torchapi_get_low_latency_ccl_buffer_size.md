@@ -33,7 +33,7 @@
 
         $$token\_actual\_len = Align32(hidden * max\_out\_dtype\_size) + scale\_expand\_index\_buffer$$
 
-        其中max_out_dtype_size为token类型转为字节数，scale_expand_index_buffer为scale（32B）+ expand_idx（3 × 4B）
+        其中max_out_dtype_size为token类型转换为字节数，scale_expand_index_buffer为scale（32Byte）+ expand_idx（3 × 4Byte）
 
         对于<term>Ascend 950PR&950DT系列产品</term>，按scales最大占位（`hidden * 4B`）计算，`token_actual_len`取上式与`Align32(Align32(hidden * max_out_dtype_size) + hidden * 4) + 12B(expand_idx) + 4B(expert scale)`中的较大值。
 
@@ -55,7 +55,7 @@
 
         $$token\_need\_size\_combine = Align480(hidden * max\_out\_dtype\_size) / full\_mesh\_data\_align * win\_addr\_align$$
 
-        其中，full_mesh_data_align为480B对齐，win_addr_align为512B对齐
+        其中，full_mesh_data_align为480Byte对齐，win_addr_align为512Byte对齐
 
   - 计算ccl_buffer_size大小：
 

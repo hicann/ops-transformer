@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：MoE网络中，进行AlltoAll操作从其他卡上拿到需要算的token后，将token按照专家顺序重新排列。相较于`torch_npu.npu_moe_re_routing`，新增可选输入`expert_topk_weight`和可选输出`permute_topk_weight`，支持对topkWeight按专家顺序进行重排，使得`permute_topk_weight`与`permute_tokens`一一对应。`expert_topk_weight`与`permute_topk_weight`必须同时传入或同时不传入。
+- 接口功能：MoE网络中，进行AlltoAll操作从其他卡上拿到需要计算的token后，将token按照专家顺序重新排列。相较于`torch_npu.npu_moe_re_routing`，新增可选输入`expert_topk_weight`和可选输出`permute_topk_weight`，支持对topkWeight按专家顺序进行重排，使得`permute_topk_weight`与`permute_tokens`一一对应。`expert_topk_weight`与`permute_topk_weight`必须同时传入或同时不传入。
 
 - 计算公式：
 
@@ -39,7 +39,7 @@
 
   - SrcOffset指当前需要移动的token源偏移，根据输入`expert_token_num_per_rank`的值进行计算。
   - DstOffset指当前需要移动的token目的偏移。
-  - cur_rank是`expert_token_num_per_rank`的纵轴索引，表示该token原本在的卡。
+  - cur_rank是`expert_token_num_per_rank`的纵轴索引，表示该token原本所在的卡。
   - cur_expert是`expert_token_num_per_rank`的横轴索引，表示该token由卡上专家cur_expert计算。
   - k表示当前expert下第k个token的偏移（0 ≤ k < currTokenNum）。
   - topkWeight与token一一对应，搬运偏移量与token完全一致，直接复用token的SrcOffset和DstOffset。
@@ -83,7 +83,7 @@ cann_ops_transformer.moe_re_routing(
 |---------|----------|----------|---------------|---------------|------------|
 |  permute_tokens  |  Tensor |  必选  |  表示重新排布后的token。shape为[A, H]，数据类型同`tokens`。  |  与tokens一致  | 2  |
 |  permute_per_token_scales  |  Tensor |  必选  |  表示重新排布后的`per_token_scales`。`per_token_scales`输入时，shape和数据类型与`per_token_scales`一致；`per_token_scales`未输入时，shape为[A]，数据类型为`float32`，该输出无意义。  |  float32、float8_e8m0  | 1-3  |
-|  permute_token_idx  |  Tensor |  必选  |  表示每个token在原排布方式的索引。shape为[A]。  |  int32   | 1  |
+|  permute_token_idx  |  Tensor |  必选  |  表示每个token在原排布方式下的索引。shape为[A]。  |  int32   | 1  |
 |  expert_token_num  |  Tensor |  必选  |  表示每个专家处理的token数。shape为[E]，数据类型同`expert_token_num_per_rank`。  |  int32、int64   | 1  |
 |  permute_topk_weight  |  Tensor |  可选  |  表示重新排布后的`expert_topk_weight`，与`permute_tokens`一一对应。`expert_topk_weight`输入时必须同时输出，shape为[A, 1]；`expert_topk_weight`未输入时输出为空tensor（shape为(0,)）。  |  float32   | 2  |
 

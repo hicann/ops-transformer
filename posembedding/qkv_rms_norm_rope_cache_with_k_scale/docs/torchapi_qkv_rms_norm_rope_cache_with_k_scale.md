@@ -79,7 +79,7 @@
 
   令 $C=\mathrm{cos\_sin}$、$P=\mathrm{mrope\_position}$、$D_{\mathrm{half}}=D/2$，并定义
   $\iota(\mathrm T)=0,\ \iota(\mathrm H)=1,\ \iota(\mathrm W)=2$。
-  对token $u$、轴 $a\in\{\mathrm T,\mathrm H,\mathrm W\}$ 和列 $d$，三路原始位置编码定义如下。
+  对token $u$、轴 $a\in\{\mathrm T,\mathrm H,\mathrm W\}$ 和列 $d$，三路原始位置编码定义如下：
   `mrope_position` 的逻辑shape为 $[T,3]$，每一行对应一个token，三列依次对应T、H、W轴。
 
   $$
@@ -106,7 +106,7 @@
   \end{cases}
   $$
 
-  有效 cos/sin 按列定义为
+  有效 cos/sin 按列定义为：
 
   $$
   \widehat c_{u,\ell}=R_{\sigma(\ell),u,\ell},\qquad

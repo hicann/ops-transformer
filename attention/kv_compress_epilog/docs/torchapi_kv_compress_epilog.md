@@ -138,7 +138,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
 - headDim约束：cache末维headDim必须 ≥ 每行写出字节数kvCacheCol = 对齐(concatCol)，concatCol按量化模式计算：
   - quant_mode=0/1：concatCol = (d−64) + 128 + ⌈(d−64)/64⌉ × scaleBytes，scaleBytes为mode0=2、mode1=1；
   - quant_mode=2：concatCol = 64 + (d−64)/2 + (d−64)/quant_group_size × 2；
-  - 对齐规则：quant_mode=1不补齐，kvCacheCol = concatCol；quant_mode=0/2按32B对齐，kvCacheCol = ⌈concatCol / 32⌉ × 32。
+  - 对齐规则：quant_mode=1不补齐，kvCacheCol = concatCol；quant_mode=0/2按32字节（Byte）对齐，kvCacheCol = ⌈concatCol / 32⌉ × 32字节。
   - 示例：d=512、quant_mode=1 → kvCacheCol=583 → headDim ≥ 583（示例中取640）。
 - slot_mapping的维度应等于x的维度减1，即slot_mapping为x除最后一维外的所有维度展平。
 - x的最后一维（d轴）需满足d % 64 == 0且64 < d ≤ 8192，按每64个元素一组进行逐组量化。

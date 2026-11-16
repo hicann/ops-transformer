@@ -78,7 +78,7 @@
 
     - $V\in\mathbb{R}^{T\times N\times D}$ 表示输入 `block_res`，用于存放历史残差块；$V_{t,n,d}$ 表示第 $t$ 个 token、第 $n$ 个历史来源在第 $d$ 个 hidden dimension 上的值。
     - $Q\in\mathbb{R}^{S\times D}$ 表示输入 `pseudo_query`；$Q_{s,d}$ 表示第 $s$ 个目标 slot 在第 $d$ 个 hidden dimension 上的值。
-    - $\operatorname{valid\_blocks}$ 表示输入 `valid_blocks`，其唯一元素与 $N$ 的较小值得到当前参与计算的有效历史来源数 $N_v$。
+    - $\operatorname{valid\_blocks}$ 表示输入 `valid_blocks`，取其唯一元素与 $N$ 的较小值，得到当前参与计算的有效历史来源数 $N_v$。
     - $\epsilon$ 表示输入 `eps`，是计算 RMS 归一化因子时使用的数值稳定项。
     - $T$ 表示 token 数，$N$ 表示历史来源缓冲区容量，$S$ 表示目标 slot 数，$D$ 表示 hidden dimension。
     - $t\in[0,T)$、$n\in[0,N_v)$、$s\in[0,S)$、$d\in[0,D)$ 分别表示 token、有效历史来源、目标 slot 和 hidden dimension 的索引。

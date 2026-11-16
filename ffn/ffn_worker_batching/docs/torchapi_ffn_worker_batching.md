@@ -38,13 +38,13 @@ cann_ops_transformer.ffn_worker_batching(
 
 | 参数名 | 类型 | 必选/可选 | 描述 |
 | --- | --- | --- | --- |
-| schedule_context | Tensor | 必选 | 连续一维 NPU int8 张量，至少1024字节，按`ScheduleContext`布局保存维度及有效Device地址。 |
+| schedule_context | Tensor | 必选 | 连续一维 NPU int8 张量，至少1千字节（1KB），按`ScheduleContext`布局保存维度及有效Device地址。 |
 | expert_num | int | 必选 | 专家数，范围[1,8192]。异步混层模式表示本卡所有参与层的专家总数。 |
 | max_out_shape | List[int] | 必选 | `[A, BS, K, H]`，分别为session容量、micro batch大小、每token的专家选择数、逻辑hidden维度。 |
 | token_dtype | int | 可选 | 0：FP16；1：BF16；2：INT8；3：FLOAT8_E5M2；4：FLOAT8_E4M3FN；5：FLOAT4_E2M1。示例使用0。输出dtype与shape随token_dtype变化，全面信息见[返回值说明](#返回值说明)。 |
 | need_schedule | int | 可选 | 0：NORM；1：RECV。示例使用1，直接消费接收描述符。 |
 | layer_num | int | 可选 | 参与层数。异步RECV必须大于0且整除`expert_num`；示例使用2。 |
-| sync_flag | bool | 可选 | False：同步接收，等待全部session；True：异步接收，处理ready快照选中的session。仅RECV解释该属性。 |
+| sync_flag | bool | 可选 | False：同步接收，等待全部session；True：异步接收，处理ready快照选中的session。仅RECV解析该属性。 |
 | mx_output_uint8 | bool | 可选 | 默认False。True时token_dtype≥3的`dynamic_scale`以uint8类型返回（E8M0原始指数字节），token_dtype=5的`y`也以uint8返回（实际存放float4_e2m1fn_x2类型的数据），均不做数值转换，FP8的`y`保留原生dtype。aclgraph（`npugraph_ex`）图模式下MX（token_dtype≥3）须设为True，原生float8_e8m0fnu/float4_e2m1fn_x2输出无法通过aclgraph图编译；GE图模式下FP4须设为True，或使用支持float4_e2m1fn_x2映射的TorchAir。 |
 
 ## 返回值说明

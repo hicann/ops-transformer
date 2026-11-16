@@ -37,13 +37,13 @@
 
   self-attention（自注意力）利用输入样本自身的关系构建了一种注意力模型。其原理是假设有一个长度为$n$的输入样本序列$x$，$x$的每个元素都是一个$d$维向量，可以将每个$d$维向量看作一个token embedding，将这样一条序列经过3个权重矩阵变换得到3个维度为$n \times d$的矩阵。
 
-  self-attention的计算公式一般定义如下，其中$Q、K、V$为输入样本的重要属性元素，是输入样本经过空间变换得到，且可以统一到一个特征空间中。公式及算子名称中的"Attention"为"self-attention"的简写。
+  self-attention的计算公式一般定义如下，其中$Q、K、V$为输入样本的重要属性元素，是输入样本经过空间变换得到的矩阵，且可以统一到一个特征空间中。公式及算子名称中的"Attention"为"self-attention"的简写。
 
   $$
   Attention(Q,K,V)=Score(Q,K)V
   $$
 
-  本算子中Score函数采用Softmax函数，self-attention计算公式为:
+  本算子中Score函数采用Softmax函数，self-attention计算公式为：
 
   $$
   Attention(Q,K,V)=Softmax(\frac{QK^T}{\sqrt{d}})V
@@ -147,7 +147,7 @@ cann_ops_transformer.flash_attn(
 | num_heads_q | int | 必选 | Query head数 | int32 | - | - |
 | num_heads_kv | int | 必选 | Key/Value head数 | int32 | - | - |
 | head_dim | int | 必选 | Query/Key 每个注意力头的维度 | int32 | - | - |
-| head_dim_v | int | 可选 | Value 每个注意力头的维度。缺省 None（内部传 -1）表示等于 head_dim；QK 与 V 维度不同（如 QK 192 / V 128）时必须传入，且需与后续 flash_attn 调用中 value 的 head_dim 一致（连续布局为 value 末维；PA_NZ 布局 value 形状为 (blocks, N2, D/16, block_size, 16)，head_dim = dim2*dim4） | int32 | - | - |
+| head_dim_v | int | 可选 | Value 每个注意力头的维度。缺省 None（内部传 -1）表示等于 head_dim；QK 与 V 维度不同（如 QK 192 / V 128）时必须传入，且需与后续 flash_attn 调用中 value 的 head_dim 一致（连续布局为 value 末维；PA_NZ 布局 value 形状为 (blocks, N2, D/16, block_size, 16)，head_dim = dim2 × dim4） | int32 | - | - |
 | cu_seqlens_q | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)|
 | cu_seqlens_kv | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)|
 | seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)|
@@ -207,7 +207,7 @@ cann_ops_transformer.flash_attn(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| attn_out | Tensor | 必选 | flash_attn的计算输出 | bfloat16/float16 | ND | <ul><li>(B, Q_S, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(Q_T, Q_N, D )</li></ul> |
+| attn_out | Tensor | 必选 | flash_attn的计算输出 | bfloat16/float16 | ND | <ul><li>(B, Q_S, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(Q_T, Q_N, D)</li></ul> |
 | softmax_lse | Tensor | 可选 | softmax的LSE结果 | float32 | ND | <ul><li>(B, Q_N, Q_S)</li><li>(Q_N, Q_T)</li></ul> |
 
 **说明**
@@ -255,7 +255,7 @@ cann_ops_transformer.flash_attn(
 
 |    命名    |                            含义                            |
 | :---------: | :---------------------------------------------------------: |
-|      B      |                Batch,表示输入样本批量大小                |
+|      B      |                Batch，表示输入样本批量大小                |
 |     Q_N     |        输入q tensor的头数，对应q shape中的N        |
 |    KV_N    |    输入k/v tensor的头数，对应k/v shape中的N    |
 |     Q_S     |      输入q tensor的序列长度，对应q shape中的S      |
@@ -269,10 +269,10 @@ cann_ops_transformer.flash_attn(
 #### 公共参数组
 
 - 入参为空的场景处理：
-  - 空Tensor指必选输入和输出的shape size为0,即有任意轴为0。
+  - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
   - 触发空tensor的用例将全部拦截报错。
 
-- q、k、v、attn_out校验:
+- q、k、v、attn_out校验：
 
     <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 147px">
@@ -338,7 +338,7 @@ cann_ops_transformer.flash_attn(
                 <li>PA_BBND -> (num_blocks, block_size, KV_N, D)</li>
                 <li>PA_BNBD -> (num_blocks, KV_N, block_size, D)</li>
                 <li>PA_NZ -> (num_blocks, KV_N, D//16, block_size, 16)</li>
-                <li>1024 >= block_size >= 16，block_size % 16 == 0</li>
+                <li>1024 >= block_size >= 16, block_size % 16 == 0</li>
                 <li>非连续Tensor约束：
                     <ul>
                         <li>BNSD/BSND/TND：k/v必须连续，传入非连续Tensor会报错</li>
@@ -425,7 +425,7 @@ cann_ops_transformer.flash_attn(
     </tbody>
     </table>
 
-- metadata校验:
+- metadata校验：
 
     <table style="undefined;table-layout: fixed; width:1625px">
         <colgroup>
@@ -463,7 +463,7 @@ cann_ops_transformer.flash_attn(
 
 #### Mask参数组
 
-mask_mode参数解释
+mask_mode参数解释：
 <ul>
     <li>mask_mode=0，全计算模式（默认值）</li>
     <li>mask_mode=3，Causal模式</li>
@@ -527,7 +527,7 @@ mask_mode参数解释
             <td rowspan="2">
                 <ul>
                     <li>data_type支持INT</li>
-                    <li>不传或者传入-1,代表该值为正无穷</li>
+                    <li>不传或者传入-1，代表该值为正无穷</li>
                     <li>值需要 >= -1</li>
                 </ul>
             </td>
@@ -540,7 +540,7 @@ mask_mode参数解释
 
 #### Paged Attention参数组
 
-当block_table不为空时，开启Paged Attention
+当block_table不为空时，开启Paged Attention。
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
         <col style="width: 147px">
@@ -566,7 +566,7 @@ mask_mode参数解释
                     <li>tensor_type仅支持int32</li>
                     <li>tensor_shape为(B, max_num_blocks_per_seq)</li>
                     <li>值只能为正整数</li>
-                    <li>1024 >= block_size >= 16，block_size % 16 == 0</li>
+                    <li>1024 >= block_size >= 16, block_size % 16 == 0</li>
                 </ul>
             </td>
             <td>可选参数</td>

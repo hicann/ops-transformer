@@ -190,7 +190,7 @@ attention_to_ffn(buffer, x, session_id, micro_batch_id, layer_id, expert_ids, ex
         <td>quant_mode</td>
         <td>int</td>
         <td>可选</td>
-        <td>量化模式。0表示非量化，2表示PERTOKEN+INT8，3表示MX+FP8_E5M2，4表示MX+FP8_E4M3，5表示MX+FP4_E2M1，6表示MX_CLIP+FP8_E5M2，7表示MX_CLIP+FP8_E4M3。默认值为0。</td>
+        <td>量化模式：0表示非量化，2表示PERTOKEN+INT8，3表示MX+FP8_E5M2，4表示MX+FP8_E4M3，5表示MX+FP4_E2M1，6表示MX_CLIP+FP8_E5M2，7表示MX_CLIP+FP8_E4M3。默认值为0。</td>
     </tr>
     <tr>
         <td>window_addr</td>
@@ -228,7 +228,7 @@ attention_to_ffn(buffer, x, session_id, micro_batch_id, layer_id, expert_ids, ex
     <th>描述</th>
     <th>数据类型</th>
     <th>数据格式</th>
-    <th>维度(shape)</th>
+    <th>维度（shape）</th>
 </tr>
 </thead>
 <tbody>
@@ -317,7 +317,7 @@ attention_to_ffn(buffer, x, session_id, micro_batch_id, layer_id, expert_ids, ex
         <td>sync_flag</td>
         <td>int</td>
         <td>可选</td>
-        <td>同步模式。0表示同步，1表示异步。默认值为0。</td>
+        <td>同步模式：0表示同步，1表示异步。默认值为0。</td>
         <td>int</td>
         <td>-</td>
         <td>-</td>
@@ -368,8 +368,8 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoS
 
   - `tokenInfoSize = attnWorkerNum × microBatchNum × infoTableLastDim × 4B`
   - `tokenDataSize = attnWorkerNum × microBatchNum × BS × (K+shared) × HS × bytesPerElem`
-  - `infoTableLastDim`：FFN侧token信息表最后一维长度，即`ffn_token_info_table_shape`的最后一维，等于`2 + BS × expertNumPerToken`（`expertNumPerToken = K + sharedExpertNum`；前2个int32为保留表项，其余为每个token按专家存放的信息表项，每项4B）。
-  - `bytesPerElem`：token数据每个元素的传输字节数，由`quant_mode`决定：非量化模式（quantMode=0）为2B（FP16/BF16按原始精度传输）；量化模式（quantMode=2~7，含INT8/FP8/FP4）为1B，其中FP4模式下2个元素打包为1B，`HS`为按打包折算后的字节数。
+  - `infoTableLastDim`：FFN侧token信息表最后一维长度，即`ffn_token_info_table_shape`的最后一维，等于`2 + BS × expertNumPerToken`（`expertNumPerToken = K + sharedExpertNum`；前2个int32为保留表项，其余为每个token按专家存放的信息表项，每项4 Byte）。
+  - `bytesPerElem`：token数据每个元素的传输字节数，由`quant_mode`决定：非量化模式（quantMode=0）为2 Byte（FP16/BF16按原始精度传输）；量化模式（quantMode=2~7，含INT8/FP8/FP4）为1 Byte，其中FP4模式下2个元素打包为1 Byte，`HS`为按打包折算后的字节数。
 
 该大小由`get_buffer_for_attention_to_ffn`内部自动计算，用户无需自行计算或设置`ccl_buffer_size`。`ccl_buffer_size`描述对端FFN卡通信窗口大小；本卡（attention侧）通信窗口大小由`window_size`指定。窗口内仅保留token信息表与token数据区。
 
@@ -378,13 +378,13 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoS
     - 不同`microBatchId`使用不同槽位，相邻microbatch的发送可重叠，无需任何drain；同一槽位在一个完整流水线轮次后才会复用——调用方需保证下一轮同`microBatchId`的`attention_to_ffn`晚于上一轮数据被对端消费（正常流水线下由数据依赖天然满足：下一轮输入依赖`ffn_to_attention`回传）。禁止在`x`与回传无关的场景下对同一`microBatchId`背靠背重发，禁止同一buffer多stream并发调用。
     - `buffer.destroy()`会先执行device同步（等待最后一轮在途WQE完成）再释放payload区；请勿在发送仍在途时释放buffer。
 
-- 与`ffn_to_attention`共用窗口的交叉约束：`ffn_to_attention`回传数据（单会话、2B元素）落在本卡窗口头部（token数据区内）。非量化模式下N会话数据区恒可覆盖回传区；量化模式下需满足`attnWorkerNum × 1B ≥ 2B`（即`attnWorkerNum ≥ 2`），否则tiling将拒绝该配置（单会话量化下发时数据区无法容纳回传数据区）。
+- 与`ffn_to_attention`共用窗口的交叉约束：`ffn_to_attention`回传数据（单会话、2 Byte元素）落在本卡窗口头部（token数据区内）。非量化模式下N会话数据区恒可覆盖回传区；量化模式下需满足`attnWorkerNum × 1B ≥ 2B`（即`attnWorkerNum ≥ 2`），否则tiling将拒绝该配置（单会话量化下发时数据区无法容纳回传数据区）。
 
 - 自定义通信窗口约束（`window_addr`/`window_size`）：
-    - 两个参数必须成对传入，`window_size`为本卡窗口内存的实际大小（Bytes）。
-    - attention卡上传入的为attention侧内存大小，需不小于attention侧接收`ffn_to_attention`回传数据所需的窗口大小；FFN侧内存大小（FFN卡需注册的窗口大小）由本接口内部计算，可通过返回buffer的`ccl_buffer_size`属性获取。
-    - 窗口内存由调用方管理，需在`buffer.destroy()`之前保持有效；框架仅负责清零一次，不负责分配与释放。
-    - 同一进程同一group下只应创建一个通信buffer（attn卡创建`attention_to_ffn`的buffer，FFN卡创建`ffn_to_attention`的buffer）。
+  - 两个参数必须成对传入，`window_size`为本卡窗口内存的实际大小（Bytes）。
+  - attention卡上传入的为attention侧内存大小，需不小于attention侧接收`ffn_to_attention`回传数据所需的窗口大小；FFN侧内存大小（FFN卡需注册的窗口大小）由本接口内部计算，可通过返回buffer的`ccl_buffer_size`属性获取。
+  - 窗口内存由调用方管理，需在`buffer.destroy()`之前保持有效；框架仅负责清零一次，不负责分配与释放。
+  - 同一进程同一group下只应创建一个通信buffer（attn卡创建`attention_to_ffn`的buffer，FFN卡创建`ffn_to_attention`的buffer）。
 
 - 量化模式说明：
 
@@ -404,20 +404,20 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoS
   - MX_CLIP模式（quantMode 6/7）仅支持FP8输出（E5M2/E4M3），不支持FP4。
 
 - 参数说明里shape格式说明：
-    - `X`：表示micro batch sequence size（token组数），当前版本只支持`X` = 1。
-    - `microBatchNum`：表示通信窗口布局中的micro batch数量，即`ffn_token_data_shape`第1维（与`ffn_token_info_table_shape`第1维、`attn_token_info_table_shape`第0维相等），取值范围为[1, 3]；运行时`micro_batch_id`取值需位于`[0, microBatchNum)`内。
-    - `BS`：表示batch sequence size（本卡最终输出的token数量），取值范围为0 < `BS` ≤ 512。
-    - `K`：表示选取topK个专家，取值范围为0 < `K` ≤ 16且满足0 < `K` ≤ moeExpertNum。
-    - `H`：表示hidden size（隐藏层维度），取值范围为1024 ≤ `H` ≤ 8192。
-    - `L`：表示模型层数，取值范围为[1, 43]，且运行时`LayerId`取值需小于`L`。
-    - `M`：表示expertRankTable最后一维的长度，具体体现为部署在FFN节点上数量最多的专家部署信息列表的长度，取值范围为0 < `M` ≤ 2049（每行布局为`[rankCnt, (toRankId, localExpId) × rankCnt]`，rankCnt不超过worldSize）。
-    - `moeExpertNum`：表示MoE路由专家数量，取值范围为0 < `moeExpertNum` ≤ 1024。
-    - `sharedExpertNum`：表示共享专家数量，取值范围为0 ≤ `sharedExpertNum` ≤ 4。
-    - `worldSize`：通信域大小，取值区间[2, 1024]。
+  - `X`：表示micro batch sequence size（token组数），当前版本只支持`X` = 1。
+  - `microBatchNum`：表示通信窗口布局中的micro batch数量，即`ffn_token_data_shape`第1维（与`ffn_token_info_table_shape`第1维、`attn_token_info_table_shape`第0维相等），取值范围为[1, 3]；运行时`micro_batch_id`取值需位于`[0, microBatchNum)`内。
+  - `BS`：表示batch sequence size（本卡最终输出的token数量），取值范围为0 < `BS` ≤ 512。
+  - `K`：表示选取topK个专家，取值范围为0 < `K` ≤ 16且满足0 < `K` ≤ moeExpertNum。
+  - `H`：表示hidden size（隐藏层维度），取值范围为1024 ≤ `H` ≤ 8192。
+  - `L`：表示模型层数，取值范围为[1, 43]，且运行时`LayerId`取值需小于`L`。
+  - `M`：表示expertRankTable最后一维的长度，具体体现为部署在FFN节点上数量最多的专家部署信息列表的长度，取值范围为0 < `M` ≤ 2049（每行布局为`[rankCnt, (toRankId, localExpId) × rankCnt]`，rankCnt不超过worldSize）。
+  - `moeExpertNum`：表示MoE路由专家数量，取值范围为0 < `moeExpertNum` ≤ 1024。
+  - `sharedExpertNum`：表示共享专家数量，取值范围为0 ≤ `sharedExpertNum` ≤ 4。
+  - `worldSize`：通信域大小，取值区间[2, 1024]。
 
 - 通信域使用约束：
-    - attention_to_ffn算子的通信域中不允许有其他算子。
-    - 通信域各节点的驱动版本应当相同。
+  - attention_to_ffn算子的通信域中不允许有其他算子。
+  - 通信域各节点的驱动版本应当相同。
 
 ## 确定性计算
 

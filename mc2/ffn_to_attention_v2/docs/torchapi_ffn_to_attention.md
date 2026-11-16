@@ -55,7 +55,7 @@
 
     目标Attention卡的Rank Id通过以下方式确定：
     - 若提供了 `attn_rank_table`：$\text{toRankId}_i = \text{attnRankTable}[\mathbf{S}[i]]$
-    - 若未提供 `attn_rank_table`（默认）：$\text{toRankId}_i = \mathbf{S}[i]$，即Attention Worker索引等于Rank Id
+    - 若未提供 `attn_rank_table`（默认）：$\text{toRankId}_i = \mathbf{S}[i]$，即Attention Worker索引等于Rank Id。
 
     token数据写入目标Attention卡CCL窗口中对应的数据区域，位置由 $\mathbf{MB}[i]$（microBatch索引）、$\mathbf{T}[i]$（token索引）和 $\mathbf{EO}[i]$（专家偏移）共同确定。
 
@@ -128,7 +128,7 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
         <td>window_size</td>
         <td>int</td>
         <td>可选</td>
-        <td>本卡通信窗口内存大小（Bytes），即ffn侧内存大小，同时作为算子<code>ccl_buffer_size</code>（等于实际注册的窗口大小）。需不小于FFN侧窗口所需大小（承接<code>attention_to_ffn</code>的下发接收区，按对侧实际quant_mode；无法感知量化时可按保守容量<code>world_size - 1</code>个会话、非量化宽度估算）。算子tiling仅校验本算子attention侧落地区（单会话FP16/BF16回写数据区+flag区），不满足时算子执行报错。默认值为None，表示由框架按保守容量（覆盖<code>world_size - 1</code>个会话）内部分配。</td>
+        <td>本卡通信窗口内存大小（Byte），即ffn侧内存大小，同时作为算子<code>ccl_buffer_size</code>（等于实际注册的窗口大小），需不小于FFN侧窗口所需大小（承接<code>attention_to_ffn</code>的下发接收区，按对侧实际quant_mode；无法感知量化时可按保守容量<code>world_size - 1</code>个会话、非量化宽度估算）。算子tiling仅校验本算子attention侧落地区（单会话FP16/BF16回写数据区+flag区），不满足时算子执行报错。默认值为None，表示由框架按保守容量（覆盖<code>world_size - 1</code>个会话）内部分配。</td>
     </tr>
 </tbody>
 </table>
@@ -156,7 +156,7 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
     <th>描述</th>
     <th>数据类型</th>
     <th>数据格式</th>
-    <th>维度(shape)</th>
+    <th>维度（shape）</th>
 </tr>
 </thead>
 <tbody>
@@ -258,26 +258,26 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
 对端attention卡通信窗口大小由attention侧`get_buffer_for_attention_to_ffn`计算；量化模式下其结果（按1B/元素）即为本算子可接受的下限之上，tiling只校验上述落地区，因此两侧可共用同一窗口大小。
 
 - 自定义通信窗口约束（`window_addr`和`window_size`）：
-    - 两个参数必须成对传入，`window_size`为本卡窗口内存的实际大小（Bytes），同时作为算子`ccl_buffer_size`。
-    - FFN卡上传入的为ffn侧内存大小，需不小于FFN侧窗口所需大小（承接`attention_to_ffn`的下发接收区，按对侧实际quant_mode：量化按1B、非量化按2B。
-    - 窗口内存由调用方管理，需在`buffer.destroy()`之前保持有效；框架仅负责清零一次，不负责分配与释放。
-    - 同一进程同一group下只应创建一个通信buffer（attn卡创建`attention_to_ffn`的buffer，FFN卡创建`ffn_to_attention`的buffer）。
+  - 两个参数必须成对传入，`window_size`为本卡窗口内存的实际大小（Bytes），同时作为算子`ccl_buffer_size`。
+  - FFN卡上传入的为ffn侧内存大小，需不小于FFN侧窗口所需大小（承接`attention_to_ffn`的下发接收区，按对侧实际quant_mode：量化按1B、非量化按2B。
+  - 窗口内存由调用方管理，需在`buffer.destroy()`之前保持有效；框架仅负责清零一次，不负责分配与释放。
+  - 同一进程同一group下只应创建一个通信buffer（attn卡创建`attention_to_ffn`的buffer，FFN卡创建`ffn_to_attention`的buffer）。
 
 - 参数说明里shape格式说明：
-    - `Y`：表示本卡需要分发的最大token数量。
-    - `BS`：表示各Attention节点上的token数，取值范围为0 < `BS` ≤ 512。
-    - `H`：表示hidden size（隐藏层大小），取值范围为1024 ≤ `H` ≤ 8192。
-    - `HS`：表示hidden与scale隐藏层大小，取值范围为1152 ≤ `HS` ≤ 8320，满足`HS` ≥ `H`。
-    - `microBatchNum`：表示micro batch数量，取值范围为1 ≤ `H` ≤ 3。
-    - `expertNumPerToken`：表示每个token对应的专家总数（含共享专家）。
-    - `attnRankNum`：表示Attention Worker数量，取值范围为0 < `attnRankNum` < `worldSize`。
-    - `ffnRankNum`：表示FFN Worker数量，取值范围为0 < `ffnRankNum` < `worldSize`。
-    - `sharedExpertNum`：表示共享专家数量，取值范围为0 ≤ `sharedExpertNum` ≤ 4。
-    - `worldSize`：通信域大小，取值区间[2, 1024]。
+  - `Y`：表示本卡需要分发的最大token数量。
+  - `BS`：表示各Attention节点上的token数，取值范围为0 < `BS` ≤ 512。
+  - `H`：表示hidden size（隐藏层大小），取值范围为1024 ≤ `H` ≤ 8192。
+  - `HS`：表示hidden与scale隐藏层大小，取值范围为1152 ≤ `HS` ≤ 8320，满足`HS` ≥ `H`。
+  - `microBatchNum`：表示micro batch数量，取值范围为1 ≤ `H` ≤ 3。
+  - `expertNumPerToken`：表示每个token对应的专家总数（含共享专家）。
+  - `attnRankNum`：表示Attention Worker数量，取值范围为0 < `attnRankNum` < `worldSize`。
+  - `ffnRankNum`：表示FFN Worker数量，取值范围为0 < `ffnRankNum` < `worldSize`。
+  - `sharedExpertNum`：表示共享专家数量，取值范围为0 ≤ `sharedExpertNum` ≤ 4。
+  - `worldSize`：通信域大小，取值区间[2, 1024]。
 
 - 通信域使用约束：
-    - ffn_to_attention算子的通信域中不允许有其他算子。
-    - 通信域各节点的驱动版本应当相同。
+  - ffn_to_attention算子的通信域中不允许有其他算子。
+  - 通信域各节点的驱动版本应当相同。
 
 ## 确定性计算
 
