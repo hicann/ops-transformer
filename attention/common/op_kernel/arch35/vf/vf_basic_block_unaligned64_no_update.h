@@ -236,12 +236,10 @@ __simd_vf__ void ProcessVec1NoUpdateImpl64VF(
             uint32_t maskLen = 128;
             MaskReg preg_all_b8_128 = UpdateMask<T2>(maskLen);
             // float → half → Or → half → int8 → Gather
-            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
-                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            Cast<half, T, castTrait0>(vreg_exp_f16, vreg_exp, preg_all);
+            Cast<half, T, castTraitRintZero>(vreg_exp_f16, vreg_exp, preg_all);
             Reg::Pack<uint16_t, uint32_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint16_t>&)vreg_cast_res,
                                                                     (Reg::RegTensor<uint32_t>&)vreg_exp_f16);
-            Cast<T2, half, castTrait0>(vreg_exp_merge_tmp_int8, vreg_cast_res, preg_all_f16);
+            Cast<T2, half, castTraitRintZero>(vreg_exp_merge_tmp_int8, vreg_cast_res, preg_all_f16);
             Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_exp_merge_int8,
                                                                    (Reg::RegTensor<uint16_t>&)vreg_exp_merge_tmp_int8);
             StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(

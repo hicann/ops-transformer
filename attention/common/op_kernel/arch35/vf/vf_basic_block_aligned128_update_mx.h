@@ -312,16 +312,12 @@ __simd_vf__ void ProcessVec1UpdateImpl128Mxfp8FullquantVFSubloop0(
             uint32_t maskLen = 128;
             MaskReg preg_all_b8_128 = UpdateMask<T2>(maskLen);
             // float → half → Or → half → int8 → Gather
-            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
-                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::NO_SAT,
-                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            Cast<half, T, castTrait0>(vreg_exp_f16_even, vreg_exp_even, preg_all_float);
-            Cast<half, T, castTrait1>(vreg_exp_f16_odd, vreg_exp_odd, preg_all_float);
+            Cast<half, T, castTraitRintZero>(vreg_exp_f16_even, vreg_exp_even, preg_all_float);
+            Cast<half, T, castTraitRintOne>(vreg_exp_f16_odd, vreg_exp_odd, preg_all_float);
             Or<uint16_t, Reg::MaskMergeMode::ZEROING>((Reg::RegTensor<uint16_t>&)vreg_exp_f16,
                                                       (Reg::RegTensor<uint16_t>&)vreg_exp_f16_even,
                                                       (Reg::RegTensor<uint16_t>&)vreg_exp_f16_odd, preg_all_f16);
-            Cast<T2, half, castTrait0>(vreg_exp_merge_tmp_int8_algu0, vreg_exp_f16, preg_all_f16);
+            Cast<T2, half, castTraitRintZero>(vreg_exp_merge_tmp_int8_algu0, vreg_exp_f16, preg_all_f16);
             Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>(
                 (Reg::RegTensor<uint8_t>&)vreg_exp_merge_int8,
                 (Reg::RegTensor<uint16_t>&)vreg_exp_merge_tmp_int8_algu0);
@@ -660,16 +656,12 @@ __simd_vf__ void ProcessVec1UpdateImpl128Mxfp8FullquantVFSubloop1(
             uint32_t maskLen = 128;
             MaskReg preg_all_b8_128 = UpdateMask<T2>(maskLen);
             // float → half → Or → half → int8 → Gather
-            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
-                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::NO_SAT,
-                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            Cast<half, T, castTrait0>(vreg_exp_f16_even, vreg_exp_even, preg_all);
-            Cast<half, T, castTrait1>(vreg_exp_f16_odd, vreg_exp_odd, preg_all);
+            Cast<half, T, castTraitRintZero>(vreg_exp_f16_even, vreg_exp_even, preg_all);
+            Cast<half, T, castTraitRintOne>(vreg_exp_f16_odd, vreg_exp_odd, preg_all);
             Or<uint16_t, Reg::MaskMergeMode::ZEROING>((Reg::RegTensor<uint16_t>&)vreg_exp_f16,
                                                       (Reg::RegTensor<uint16_t>&)vreg_exp_f16_even,
                                                       (Reg::RegTensor<uint16_t>&)vreg_exp_f16_odd, preg_all_f16);
-            Cast<T2, half, castTrait0>(vreg_exp_tmp_merge_int8, vreg_exp_f16, preg_all_f16);
+            Cast<T2, half, castTraitRintZero>(vreg_exp_tmp_merge_int8, vreg_exp_f16, preg_all_f16);
             Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_exp_merge_int8,
                                                                    (Reg::RegTensor<uint16_t>&)vreg_exp_tmp_merge_int8);
             StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
