@@ -473,3 +473,27 @@ TEST_F(ApplyRotaryPosEmbGradBabTiling, a_fp32_bsnd_dcos0)
         "0 0 0 0 0 0 0 0 0 0 0 128 1 128 1 1 43 3 1 1 3 1 1 1 43 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12884901888 ";
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, {});
 }
+
+TEST_F(ApplyRotaryPosEmbGradBabTiling, broadcast_dcos_workspace)
+{
+    constexpr int64_t systemWorkspace = 16 * 1024 * 1024;
+    for (int64_t heads : {1, 2}) {
+        // One head broadcasts B (BAB), two heads broadcast only N (AB).
+        const int64_t cosB = heads == 1 ? 1 : 2;
+        SCOPED_TRACE(heads);
+        const gert::TilingContextPara::TensorDescription qk = {
+            {{2, 4, heads, 256}, {2, 4, heads, 256}}, ge::DT_FLOAT, ge::FORMAT_ND};
+        const gert::TilingContextPara::TensorDescription cs = {
+            {{cosB, 4, 1, 256}, {cosB, 4, 1, 256}}, ge::DT_FLOAT, ge::FORMAT_ND};
+        optiling::ApplyRotaryPosEmbGradCompileInfo compileInfo = {};
+        gert::TilingContextPara para("ApplyRotaryPosEmbGrad", {qk, qk, cs, cs, qk, qk}, {qk, qk, cs, cs},
+                                     {{"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")},
+                                      {"layout", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}},
+                                     &compileInfo, "Ascend950", 48, 253952);
+        TilingInfo info;
+        ASSERT_TRUE(ExecuteTiling(para, info));
+        ASSERT_EQ(info.workspaceSizes.size(), 1U);
+        const int64_t partialBytes = 2 * 4 * heads * 256 * sizeof(float);
+        EXPECT_GE(info.workspaceSizes[0], systemWorkspace + 2 * partialBytes);
+    }
+}

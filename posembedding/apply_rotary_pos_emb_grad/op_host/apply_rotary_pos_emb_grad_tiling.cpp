@@ -801,10 +801,9 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::SetTilingKeyBlockDim(ui
     auto usrWorkSpaceSize = b_ * s_ * std::max(nQ_, nK_) * d_ * partialTypeSize * INPUT_OUTPUT_NUM;
     if (dCosFlag_ == DCOS_FLAG_ON) {
         context_->SetScheduleMode(SCHEDULE_MODE_BATCH); // batch mode, all cores start simultaneously
-        if (dxTilingKey == static_cast<uint32_t>(ApplyRopeGradDxTilingKey::TILING_KEY_A)) {
-            constexpr int64_t SYS_WORKSPACE_SIZE = 16 * 1024 * 1024;
-            workspaces[0] = workspaces[0] + SYS_WORKSPACE_SIZE;
-        }
+        // GetUserWorkspace skips the system reserve for all dCos templates.
+        constexpr int64_t SYS_WORKSPACE_SIZE = 16 * 1024 * 1024;
+        workspaces[0] += SYS_WORKSPACE_SIZE;
     }
     workspaces[0] = workspaces[0] + usrWorkSpaceSize;
     OP_LOGD(context_->GetNodeName(), "workspaces[0] :%ld, usrWorkSpaceSize = %ld.\n", workspaces[0], usrWorkSpaceSize);
