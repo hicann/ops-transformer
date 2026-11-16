@@ -197,7 +197,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         </td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
-        <td>建议shape输入(B,Q_N,Q_S,KV_S)、(1,Q_N,Q_S,KV_S)</td>
+        <td>shape须为4维，常见形态包括(B,Q_N,Q_S,KV_S)、(1,Q_N,Q_S,KV_S)、(B,Q_N,1,KV_S)、(1,Q_N,1,KV_S)。第3维和第4维允许的范围及各场景限制详见约束说明。</td>
         <td>×</td>
     </tr>
     <tr>

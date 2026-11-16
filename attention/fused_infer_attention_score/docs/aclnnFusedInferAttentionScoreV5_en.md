@@ -196,7 +196,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         </td>
         <td>FLOAT16, BFLOAT16</td>
         <td>ND</td>
-        <td>Recommended shapes: (B,Q_N,Q_S,KV_S) or (1,Q_N,Q_S,KV_S)</td>
+        <td>The shape must be 4-dimensional. Common shapes include (B,Q_N,Q_S,KV_S), (1,Q_N,Q_S,KV_S), (B,Q_N,1,KV_S), and (1,Q_N,1,KV_S). For the permitted ranges of the third and fourth dimensions and scenario-specific restrictions, see Constraints.</td>
         <td>×</td>
     </tr>
     <tr>
