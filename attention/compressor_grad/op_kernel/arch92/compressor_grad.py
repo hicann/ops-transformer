@@ -1217,6 +1217,10 @@ def _zero_outputs(
         zo_core_idx if zo_core_idx < rows_remain else rows_remain
     )
     r_e = r_s + rows_per_core + (1 if zo_core_idx < rows_remain else 0)
+    # 按行 store 前重置 validshape 为[1, zo_hidden_size]：
+    # 重置前 validshape = [1, BASE_SIZE * BASE_SIZE] = [1, 16384]
+    # 当 zo_hidden_size < 16384 时触发越界写 GM
+    pl.set_validshape(zo_zero_cast, [1, zo_hidden_size])
     for r in pl.range(r_s, r_e):
         pl.store(d_x_out_gm, zo_zero_cast, [r, 0])
 
