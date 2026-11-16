@@ -1,0 +1,79 @@
+{
+  "op_type": "EngramFusedWeight",
+  "op_list": [
+    {
+      "bin_filename": "EngramFusedWeight_bf16_bf16",
+      "inputs": [
+        {
+          "name": "weight_hidden",
+          "index": 0,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        },
+        {
+          "name": "weight_embed",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "weight_fused",
+          "index": 0,
+          "dtype": "float",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ]
+    },
+    {
+      "bin_filename": "EngramFusedWeight_fp16_fp16",
+      "inputs": [
+        {
+          "name": "weight_hidden",
+          "index": 0,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        },
+        {
+          "name": "weight_embed",
+          "index": 1,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "weight_fused",
+          "index": 0,
+          "dtype": "float",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -41,6 +41,8 @@
 - [aclnnDequantRopeQuantKvcache](../../posembedding/dequant_rope_quant_kvcache/docs/aclnnDequantRopeQuantKvcache.md)
 - [aclnnDistributeBarrier](../../mc2/distribute_barrier/docs/aclnnDistributeBarrier.md)
 - [aclnnDistributeBarrierV2](../../mc2/distribute_barrier/docs/aclnnDistributeBarrierV2.md)
+- [aclnnEngramFusedWeight](../../engram/engram_fused_weight/docs/aclnnEngramFusedWeight.md)
+- [aclnnEngramHash](../../engram/engram_hash/docs/aclnnEngramHash.md)
 - [aclnnFFN](../../ffn/ffn/docs/aclnnFFN.md)
 - [aclnnFFNToAttention](../../mc2/ffn_to_attention/docs/aclnnFFNToAttention.md)
 - [aclnnFFNV2](../../ffn/ffn/docs/aclnnFFNV2.md)

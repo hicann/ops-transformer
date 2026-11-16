@@ -287,6 +287,14 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
                 if(ADD_CANNDEV_MC2)
                     List(APPEND CANNDEV_OPS_HOST_CMAKE_FILES ${MC2_CANNDEV_OPS_HOST_CMAKE_FILES})
                 endif()
+                file(GLOB ENGRAM_CANNDEV_OPS_HOST_CMAKE_FILES
+                "${CMAKE_CURRENT_SOURCE_DIR}/engram/**/op_host/CMakeLists.txt"
+                "${CMAKE_CURRENT_SOURCE_DIR}/engram/**/framework/CMakeLists.txt"
+                )
+            should_add_module("engram" ADD_CANNDEV_ENGRAM)
+            if(ADD_CANNDEV_ENGRAM)
+                List(APPEND CANNDEV_OPS_HOST_CMAKE_FILES ${ENGRAM_CANNDEV_OPS_HOST_CMAKE_FILES})
+            endif()
             endif()
 
             List(APPEND OP_HOST_CMAKE_FILES ${CANNDEV_OPS_HOST_CMAKE_FILES})

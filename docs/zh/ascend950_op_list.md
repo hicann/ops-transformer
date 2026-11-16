@@ -717,6 +717,26 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>计算变长Query的Stem OAM注意力前处理结果。</td>
   </tr>
   <tr>
+    <td>engram</td>
+    <td><a href="../../engram/engram_fused_weight/README.md">engram_fused_weight</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>实现 Engram 门控的权重融合。</td>
+  </tr>
+  <tr>
+    <td>engram</td>
+    <td><a href="../../engram/engram_hash/README.md">engram_hash</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>实现 Engram 门控的 n-gram 哈希索引计算。</td>
+  </tr>
+  <tr>
     <td>gmm</td>
     <td><a href="../../gmm/grouped_matmul/README.md">grouped_matmul</a></td>
     <td>✓</td>

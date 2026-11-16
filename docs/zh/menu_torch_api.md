@@ -17,6 +17,8 @@
 - [dense_lightning_indexer_kl_loss_grad](../../attention/dense_lightning_indexer_kl_loss_grad/docs/torchapi_dense_lightning_indexer_kl_loss_grad.md)
 - [dense_lightning_indexer_softmax_lse](../../attention/dense_lightning_indexer_softmax_lse_v2/docs/torchapi_dense_lightning_indexer_softmax_lse.md)
 - [ElasticBuffer](../../mc2/common/docs/torchapi_ElasticBuffer.md)
+- [engram_fused_weight](../../engram/engram_fused_weight/docs/torchapi_engram_fused_weight.md)
+- [engram_hash](../../engram/engram_hash/docs/torchapi_engram_hash.md)
 - [ffn_to_attention](../../mc2/ffn_to_attention_v2/docs/torchapi_ffn_to_attention.md)
 - [ffn_worker_batching](../../ffn/ffn_worker_batching/docs/torchapi_ffn_worker_batching.md)
 - [flash_attn](../../attention/flash_attn/docs/torchapi_flash_attn.md)

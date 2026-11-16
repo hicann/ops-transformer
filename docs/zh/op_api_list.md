@@ -70,6 +70,8 @@
 |[aclnnDenseLightningIndexerSoftmaxLse](../../attention/dense_lightning_indexer_softmax_lse/docs/aclnnDenseLightningIndexerSoftmaxLse.md)|dense场景DenseLightningIndexerGradKlLoss算子计算Softmax输入的一个分支算子。|默认确定性实现|默认确定性实现|默认确定性实现|
 |[aclnnDenseLightningIndexerSoftmaxLseV2](../../attention/dense_lightning_indexer_softmax_lse_v2/docs/aclnnDenseLightningIndexerSoftmaxLseV2.md)|dense场景DenseLightningIndexerGradKlLoss算子计算Softmax输入的一个分支算子。相比aclnnDenseLightningIndexerSoftmaxLse，新增了压缩注意力（Compressed Attention）支持，并支持通过metadata前置算子进行分核负载均衡。|-|-|默认确定性实现|
 |[aclnnDenseLightningIndexerSoftmaxLseV2Metadata](../../attention/dense_lightning_indexer_softmax_lse_v2_metadata/docs/aclnnDenseLightningIndexerSoftmaxLseV2Metadata.md)|aclnnDenseLightningIndexerSoftmaxLseV2接口的前置接口，用于计算aclnnDenseLightningIndexerSoftmaxLseV2的负载均衡。|-|-|默认确定性实现|
+|[aclnnEngramFusedWeight](../../engram/engram_fused_weight/docs/aclnnEngramFusedWeight.md)|该Engram算子提供实现 Engram 门控的权重融合功能。|-|-|默认确定性实现|
+|[aclnnEngramHash](../../engram/engram_hash/docs/aclnnEngramHash.md)|该Engram算子提供实现 Engram 门控的 n-gram 哈希索引计算功能。|-|-|默认确定性实现|
 |[aclnnFFN](../../ffn/ffn/docs/aclnnFFN.md)|该FFN算子提供MoeFFN和FFN的计算功能。|默认非确定性实现，支持配置开启|-|-|
 |[aclnnFFNV2](../../ffn/ffn/docs/aclnnFFNV2.md)|该FFN算子提供MoeFFN和FFN的计算功能。|默认非确定性实现，支持配置开启|-|-|
 |[aclnnFFNV3](../../ffn/ffn/docs/aclnnFFNV3.md)|该FFN算子提供MoeFFN和FFN的计算功能。|默认非确定性实现，支持配置开启|-|-|

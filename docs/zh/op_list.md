@@ -977,6 +977,26 @@
     <td>完成Swin Transformer场景的Attention计算，支持int8量化。</td>
   </tr>
   <tr>
+    <td>engram</td>
+    <td><a href="../../engram/engram_fused_weight/README.md">engram_fused_weight</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>实现 Engram 门控的权重融合。</td>
+  </tr>
+  <tr>
+    <td>engram</td>
+    <td><a href="../../engram/engram_hash/README.md">engram_hash</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>实现 Engram 门控的 n-gram 哈希索引计算。</td>
+  </tr>
+  <tr>
     <td>ffn</td>
     <td><a href="../../ffn/ffn/README.md">ffn</a></td>
     <td>✓</td>
