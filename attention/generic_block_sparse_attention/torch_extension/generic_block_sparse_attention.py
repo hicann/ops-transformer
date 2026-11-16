@@ -38,6 +38,7 @@ class QuantMode(IntEnum):
     FP8_E4M3_STATIC_CAST_P = 5
     MXFP8_E4M3_PER_CHANNEL_V = 6
     INT8_FULL_QUANT = 7  # A2/A3: dtype=int8, all four scales supplied by the caller.
+    Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP = 8
 
 
 class ResidualBlockMode(IntEnum):
@@ -168,6 +169,19 @@ class GenericBlockSparseAttentionOpBuilder(OpBuilder):
             is_consistent_topk: Optional[bool] = False,
             attention_out_dtype: Optional[torch.dtype] = None,
         ):
+            is_q_fp8_kv_fp4 = (
+                quant_mode == QuantMode.Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP
+            )
+            if is_q_fp8_kv_fp4:
+                if k.dtype != v.dtype:
+                    raise ValueError(
+                        "quant_mode=8 requires K and V to have the same dtype"
+                    )
+                if k_dequant_scale is None:
+                    raise ValueError("quant_mode=8 requires k_dequant_scale")
+                if v_dequant_scale is None:
+                    raise ValueError("quant_mode=8 requires v_dequant_scale")
+
             # 与 C++ 实现保持一致：quant_mode != NO_QUANT 时 attention_out_dtype 必填
             if attention_out_dtype is not None:
                 out_dtype = attention_out_dtype

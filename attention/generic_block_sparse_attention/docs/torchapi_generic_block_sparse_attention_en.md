@@ -69,14 +69,16 @@ cann_ops_transformer.generic_block_sparse_attention_metadata(
     seqused_kv=None,
     max_seqlen_q=-1,
     max_seqlen_kv=-1,
-    is_packed_gqa=True,
     layout_q="TND",
     layout_kv="PA_BBND",
+    layout_sparse_pattern=4,
     mask_mode=1,
     quant_mode=0,
     softmax_precision=1,
     win_left=-1,
     win_right=-1,
+    residual_block_mode=0,
+    is_consistent_topk=False,
 ) -> Tensor
 ```
 
@@ -100,9 +102,9 @@ cann_ops_transformer.generic_block_sparse_attention(
     seqused_q=None,
     seqused_kv=None,
     block_table=None,
-    is_packed_gqa=True,
     layout_q="TND",
     layout_kv="PA_BBND",
+    layout_sparse_pattern=4,
     softmax_scale=0.0,
     mask_mode=1,
     quant_mode=0,
@@ -111,6 +113,8 @@ cann_ops_transformer.generic_block_sparse_attention(
     win_left=-1,
     win_right=-1,
     return_softmax_lse=False,
+    residual_block_mode=0,
+    is_consistent_topk=False,
     attention_out_dtype=None,
 ) -> (Tensor, Tensor)
 ```
@@ -130,6 +134,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | `FP4_E2M1_DYNAMIC_CX` | 4 | FP4_E2M1 dynamic CX. |
 | `FP8_E4M3_STATIC_CAST_P` | 5 | FP8_E4M3 static cast P on Ascend 950PR&950DT products. |
 | `INT8_FULL_QUANT` | 7 | INT8 full quantization on Atlas A2/A3 products, with all four external scales required. |
+| `Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP` | 8 | FP8 E4M3FN Q, packed FP4 E2M1 K/V, and BF16 K/V scales. |
 
 ### mask_mode Enumeration
 
@@ -142,7 +147,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 > [!NOTE]
 >
-> Enumerations are IntEnum values or the corresponding integers. quant_mode supports 0 (NO_QUANT), 5 (A5 FP8), 6 (A5 MXFP8), and 7 (A2/A3 INT8). INT8 supports mask_mode=0/1 and requires softmax_precision=0; other modes follow their existing product-specific constraints.
+> Pass an `IntEnum` or its corresponding integer. `quant_mode` supports 0 (NO_QUANT), 5 (FP8), 6 (MXFP8), 7 (A2/A3 INT8), and 8 (FP8 Q with FP4 K/V). Modes 5, 6, and 8 apply to <term>Ascend 950PR&950DT products</term>. INT8 supports `mask_mode=0/1` and requires `softmax_precision=0`. See the product-specific constraints for each mode.
 
 ## Parameters
 
@@ -156,45 +161,47 @@ cann_ops_transformer.generic_block_sparse_attention(
 | num_heads_kv | int | Required | Number of Key/Value heads. | int32 | - | - |
 | head_dim | int | Required | Dimension of each attention head. | int32 | - | - |
 | block_shape | list[int] | Required | Sparse block shape `[block_x, block_y]`. | int64 | - | Length of 2 |
-| cu_seqlens_q | Tensor | Optional | Cumulative sequence lengths, used to process variable-length sequences. The first element must be 0. | int64 | ND | (B+1,) |
-| cu_seqlens_kv | Tensor | Optional | Cumulative sequence lengths, used to process variable-length sequences. The first element must be 0. | int64 | ND | (B+1,) |
-| seqused_q | Tensor | Conditional | Required for BSND/BNSD; optional for non-quantized or A5 MXFP8 TND; must be None for INT8 TND | int32 | ND | (B,) |
-| seqused_kv | Tensor | Optional | Specifies the KV sequence length actually used in each batch to truncate redundant computation. | int32 | ND | (B,) |
+| cu_seqlens_q | Tensor | Conditional | Required for TND Q. Cumulative sequence lengths, used to process variable-length sequences. The first element must be 0. | int64 | ND | (B+1,) |
+| cu_seqlens_kv | Tensor | Conditional | Required for TND KV. Pass `None` for paged KV. Cumulative sequence lengths, used to process variable-length sequences. The first element must be 0. | int64 | ND | (B+1,) |
+| seqused_q | Tensor | Conditional | Required for BSND/BNSD. For TND Q, this is optional with non-quantized inputs, MXFP8, or `quant_mode=8` on <term>Ascend 950PR&950DT products</term>. Pass `None` for INT8 TND. | int32 | ND | (B,) |
+| seqused_kv | Tensor | Conditional | Actual KV length for each batch. Required for BSND, BNSD, PA_BBND, and PA_BNBD KV. Optional for TND KV. | int32 | ND | (B,) |
 | max_seqlen_q | int | Optional | Specifies the upper limit of the query q sequence length. | int32 | - | - |
 | max_seqlen_kv | int | Optional | Specifies the upper limit of the key k and value v sequence lengths. | int32 | - | - |
-| is_packed_gqa | bool | Optional | Whether to enable Packed GQA. | bool | - | - |
 | layout_q | string | Optional | Defines the layout format of the input query tensor. | string | - | - |
 | layout_kv | string | Optional | Defines the layout format of the input key/value tensor. | string | - | - |
+| layout_sparse_pattern | int | Optional | Layout of `sparse_block_idx` and `sparse_block_count`. The supported value is `4`. | int64 | - | - |
 | mask_mode | int/MaskMode | Optional | Mask mode. Supports passing an enumeration or the corresponding int value. For the enumeration definition, see "mask_mode enumeration". | int32 | - | - |
 | quant_mode | int/QuantMode | Optional | Quantization mode. Supports passing an enumeration or the corresponding int value. For the enumeration definition, see "quant_mode enumeration". | int32 | - | - |
 | softmax_precision | int | Optional | Softmax precision mode. | int32 | - | - |
 | win_left | int | Optional | Left boundary of the window. | int32 | - | - |
 | win_right | int | Optional | Right boundary of the window. | int32 | - | - |
+| residual_block_mode | int | Optional | Controls how the final partial KV block is handled. Defaults to `0`. | int64 | - | - |
+| is_consistent_topk | bool | Optional | Indicates whether query blocks in the same batch and head share the same maximum selected KV block count. Defaults to `False`. | bool | - | - |
 
 ### generic_block_sparse_attention
 
 | Name | Type | Required/Optional | Description | Data Type | Data Format | Dimension |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| q | Tensor | Required | q in the formula | bfloat16/float16/float8_e4m3fn/int8 | ND | (Q_T, Q_N, D) |
-| k | Tensor | Required | k in the formula | bfloat16/float16/float8_e4m3fn/int8 | ND | (num_blocks, block_size, KV_N, D) |
-| v | Tensor | Required | v in the formula | bfloat16/float16/float8_e4m3fn/int8 | ND | (num_blocks, block_size, KV_N, D) |
+| q | Tensor | Required | Query in the formula | bfloat16/float16/float8_e4m3fn/int8 | ND | TND: (Q_T, Q_N, D); BSND: (B, Sq, Q_N, D); BNSD: (B, Q_N, Sq, D) |
+| k | Tensor | Required | Key in the formula. The last Torch dimension `D_kv` is logical `D/2` for `quant_mode=8` and `D` for other modes. In this mode, K and V must have the same data type. Use `float4_e2m1fn_x2` for both, or `uint8` containing packed FP4 data for both. | bfloat16/float16/float8_e4m3fn/int8/float4_e2m1fn_x2/uint8 | ND | PA_BBND: (num_blocks, block_size, KV_N, D_kv); PA_BNBD: (num_blocks, KV_N, block_size, D_kv); TND: (KV_T, KV_N, D_kv); BSND: (B, Sk, KV_N, D_kv); BNSD: (B, KV_N, Sk, D_kv) |
+| v | Tensor | Required | Value in the formula, with the same `D_kv` and supported data types as k. | bfloat16/float16/float8_e4m3fn/int8/float4_e2m1fn_x2/uint8 | ND | Same as k |
 | sparse_block_idx | Tensor | Required | KV block index selected by each Q block | int32 | ND | (KV_N, totalQBlocks, topK) |
 | sparse_block_count | Tensor | Required | Number of KV blocks actually retained for each Q block | int32 | ND | (KV_N, totalQBlocks) |
 | block_shape | list[int] | Required | Sparse block shape `[block_x, block_y]` | int64 | - | length of 2 |
-| metadata | Tensor | Optional | Task split result generated by `generic_block_sparse_attention_metadata`. Passing it optimizes scheduling | int32 | ND | (1024,) |
+| metadata | Tensor | Required | Task split result from `generic_block_sparse_attention_metadata` with matching layout, inputs, and attributes. | int32 | ND | (1024,) |
 | attn_mask | Tensor | Optional | Must be None when mask_mode=0/1; must be INT32 exactMask when mask_mode=3 (Union) | bool/int32 | ND | Union: (KV_N, G, U×block_y) |
 | q_dequant_scale | Tensor | Required for INT8; conditional for other modes |query dequantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0 | ND | INT8: TND: [Q_T,Q_N]; BSND: [B,Q_S,Q_N]; BNSD: [B,Q_N,Q_S]; MXFP8: see the ACLNN quantization contract |
-| k_dequant_scale | Tensor | Required for INT8; conditional for other modes |key dequantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0 | ND | INT8: PA_BBND/PA_BNBD: [num_blocks,KV_N,128]; TND: [KV_N,KV_T]; BSND/BNSD: [B,KV_N,KV_S]; MXFP8: see the ACLNN quantization contract |
-| v_dequant_scale | Tensor | Required for INT8; conditional for other modes |value dequantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0 | ND | INT8: [KV_N,D]; MXFP8: see the ACLNN quantization contract |
+| k_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8` | key dequantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0/bfloat16 | ND | INT8: PA_BBND/PA_BNBD: [num_blocks,KV_N,128]; TND: [KV_N,KV_T]; BSND/BNSD: [B,KV_N,KV_S]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. |
+| v_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8` | value dequantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0/bfloat16 | ND | INT8: [KV_N,D]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. |
 | p_quant_scale | Tensor | Required for INT8; conditional for other modes |P quantization scale factor; A2/A3 INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32 | ND | INT8: [1]; MXFP8: see the ACLNN quantization contract |
-| cu_seqlens_q | Tensor | Optional | Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
-| cu_seqlens_kv | Tensor | Optional | Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
-| seqused_q | Tensor | Conditional | Required for BSND/BNSD; optional for non-quantized or A5 MXFP8 TND; must be None for INT8 TND | int32 | ND | (B,) |
-| seqused_kv | Tensor | Optional | Specifies the kv sequence length actually used in each batch to truncate redundant computation | int32 | ND | (B,) |
+| cu_seqlens_q | Tensor | Conditional | Required for TND Q. Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
+| cu_seqlens_kv | Tensor | Conditional | Required for TND KV. Pass `None` for paged KV. Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
+| seqused_q | Tensor | Conditional | Required for BSND/BNSD. For TND Q, this is optional with non-quantized inputs, MXFP8, or `quant_mode=8` on <term>Ascend 950PR&950DT products</term>. Pass `None` for INT8 TND. | int32 | ND | (B,) |
+| seqused_kv | Tensor | Conditional | Actual KV length for each batch. Required for BSND, BNSD, PA_BBND, and PA_BNBD KV. Optional for TND KV. | int32 | ND | (B,) |
 | block_table | Tensor | Optional | Block index mapping used in Paged Attention computation | int32 | ND | (B, max_num_blocks_per_seq) |
-| is_packed_gqa | bool | Optional | Whether to enable Packed GQA | bool | - | - |
 | layout_q | string | Optional | Defines the layout format of the input query tensor | string | - | - |
 | layout_kv | string | Optional | Defines the layout format of the input key/value tensor | string | - | - |
+| layout_sparse_pattern | int | Optional | Layout of `sparse_block_idx` and `sparse_block_count`. The supported value is `4`. | int64 | - | - |
 | softmax_scale | float | Optional | Scale factor that can be explicitly set to override the default computation | float32 | - | - |
 | mask_mode | int/MaskMode | Optional | Mask mode. Supports passing an enumeration or the corresponding int value. See "mask_mode enumeration" for the enumeration definition | int32 | - | - |
 | quant_mode | int/QuantMode | Optional | Quantization mode. Supports passing an enumeration or the corresponding int value. See "quant_mode enumeration" for the enumeration definition | int32 | - | - |
@@ -203,6 +210,8 @@ cann_ops_transformer.generic_block_sparse_attention(
 | win_left | int | Optional | Window left boundary | int32 | - | - |
 | win_right | int | Optional | Window right boundary | int32 | - | - |
 | return_softmax_lse | bool | Optional | Whether to obtain the LSE result of softmax | bool | - | - |
+| residual_block_mode | int | Optional | Controls how the final partial KV block is handled. Defaults to `0`. | int64 | - | - |
+| is_consistent_topk | bool | Optional | Indicates whether query blocks in the same batch and head share the same maximum selected KV block count. Defaults to `False`. | bool | - | - |
 | attention_out_dtype | dtype | Optional | Output dtype. Required when `quant_mode!=0`. When `quant_mode=0` and not specified, it is the same as q | ScalarType | - | - |
 
 ## Return Values
@@ -217,13 +226,13 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 | Name | Type | Required/Optional | Description | Data Type | Data Format | Dimensions |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| attention_out | Tensor | Required | Computation output of generic_block_sparse_attention. | bfloat16/float16 | ND | (Q_T, Q_N, D) |
-| softmax_lse | Tensor | Optional | LSE result of softmax. | float32 | ND | (Q_T, Q_N, 1) or empty |
+| attention_out | Tensor | Required | Computation output of generic_block_sparse_attention. | bfloat16/float16 | ND | Same as q |
+| softmax_lse | Tensor | Optional | LSE result of softmax. | float32 | ND | TND: (Q_T, Q_N, 1); BSND/BNSD: (B, Q_N, Sq, 1); empty when disabled |
 
 **NOTE**
 
 - attention_out: Constraint: The shape of this output parameter must be the same as the shape of the input parameter query. When `quant_mode=0`, the dtype defaults to that of q. When `quant_mode!=0`, the dtype is specified by attention_out_dtype.
-- softmax_lse: If return_softmax_lse is True, the output is a Tensor with shape (Q_T, Q_N, 1) in TND layout. If return_softmax_lse is False, the output is an empty Tensor.
+- softmax_lse: When enabled, LSE has shape (Q_T, Q_N, 1) for TND or (B, Q_N, Sq, 1) for BSND/BNSD. If return_softmax_lse is False, the output is an empty Tensor.
 
 ## Constraints
 
@@ -233,6 +242,11 @@ cann_ops_transformer.generic_block_sparse_attention(
 - The input parameters of generic_block_sparse_attention_metadata and generic_block_sparse_attention must be consistent during the call. The operator is called in two phases through two APIs and cannot perform the check itself. Customers must ensure correctness. If the parameters passed to the APIs are inconsistent, undefined behavior may occur (such as accuracy issues or program crashes caused by invalid memory access).
 
 ### Product-Specific Constraints
+
+- On <term>Ascend 950PR&950DT products</term>, set `quant_mode=QuantMode.Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP` (8) in both Metadata and Attention. Call `generic_block_sparse_attention_metadata` first and explicitly pass its result as `metadata` to Attention. Use logical D=128, `block_shape=[1,128]`, GQA group size 1–32, `mask_mode=0` (non-causal) or `1` (causal), `softmax_precision=0`, and `residual_block_mode=0`. Set `attention_out_dtype` to float16 or bfloat16. LSE is optional.
+  - Q supports `TND`, `BSND`, and `BNSD`. Dense K/V must use the same layout as Q. Each Q layout can also use `PA_BBND` or `PA_BNBD` with 128-token pages. See the [layout matching relationship table](#layout-matching-relationship-table) for output shapes.
+  - Pass Q as `torch.float8_e4m3fn`. The operator uses a fixed Q scale of `1.0`. Pass `None` for `q_dequant_scale`. Pass both K and V as `torch.float4_e2m1fn_x2` or both as `torch.uint8` containing packed FP4 bytes. In either representation, the last Torch dimension is logical `D/2` (64 bytes for D=128). Each byte holds the even-indexed FP4 E2M1 value in the low four bits and the odd-indexed value in the high four bits. For each token and KV head, K and V each use a BF16 scale per group of 16 elements along D. The last dimension of each scale tensor is logical `D/16`. Use contiguous ND tensors for dense scales. Pass `None` for `p_quant_scale`.
+  - Paged K, V, K scale, and V scale can each use a different first-axis stride. Each page must be contiguous. For packed K/V, the Torch stride is measured in bytes and must be at least `block_size × KV_N × 64` and a multiple of `KV_N × 64`. For the scales, the stride is measured in BF16 elements and must be at least `block_size × KV_N × 8` and a multiple of `KV_N × 8`. See [ACLNN constraints](./aclnnGenericBlockSparseAttention_en.md).
 
 - Ascend 950PR&amp;950DT non-quant FLOAT16/BFLOAT16: `mask_mode` supports 0/1/3; non-union uses `block_shape=[1,Y]` (`1≤Y≤128`); union uses `block_shape=[8,Y]` (currently only 8); `residual_block_mode` supports 0 or 1 (union supports only 0).
 - Non-quant FLOAT16/BFLOAT16 on Atlas A2/A3 products: `head_dim` supports 1 to 256; `layout_q/layout_kv` supports `TND/PA_BBND`, `TND/PA_BNBD`, `TND/TND`, `BSND/BSND`, `BNSD/BNSD`, `BSND/PA_BBND`, `BNSD/PA_BBND`, `BSND/PA_BNBD`, and `BNSD/PA_BNBD`; `mask_mode` supports 0/1/3; non-union uses `block_shape=[1,Y]` (Y supports 1, 2, 4, 8, 16, 32, 64, 128) and union (mask_mode=3) uses `block_shape=[8,Y]`; `residual_block_mode` supports 0 or 1 (union supports only 0). TND KV requires `cu_seqlens_kv`, and dense Q/K/V are stored contiguously in the corresponding layout. In causal mode, the actual KV length of each batch must be no less than the actual Q length.
@@ -250,8 +264,10 @@ cann_ops_transformer.generic_block_sparse_attention(
 |                      |  sparse_block_idx  |      INPUT      |   Tensor   |
 |                      | sparse_block_count  |      INPUT      |   Tensor   |
 |                      |     block_shape     |   ATTR(REQUIRED) |  int[]  |
-|                      |    is_packed_gqa    | ATTR(OPTIONAL) |   bool   |
-|                      |       metadata       | INPUT(OPTIONAL) |   Tensor   |
+|                      | layout_sparse_pattern | ATTR(OPTIONAL) | int64 |
+|                      | residual_block_mode | ATTR(OPTIONAL) | int64 |
+|                      | is_consistent_topk | ATTR(OPTIONAL) | bool |
+|                      |       metadata       |      INPUT      |   Tensor   |
 |                      |    softmax_scale    | ATTR(OPTIONAL) |   float   |
 |                      |  softmax_precision  | ATTR(OPTIONAL) |   int   |
 |                      |      layout_q       | ATTR(OPTIONAL) |   string   |
@@ -332,13 +348,13 @@ In the constraints, the definitions of common fields are as follows:
         <td>q</td>
         <td>            <ul>
                 <li>tensor_type supports bfloat16, float16, and float8_e4m3fn.</li>
-                <li>TND -> (Q_T, Q_N, D)</li>
+                <li>See the q dimensions in the parameter table.</li>
             </ul>
         </td>
         <td rowspan="4">            Must exist.
         </td>
         <td rowspan="4">            <ul>
-                <li>The data types of q, k, and v must be the same.</li>
+                <li>For quant_mode=8, use FP8 E4M3FN q and packed FP4 E2M1 k/v. Other modes require matching q/k/v data types.</li>
                 <li>The shapes of k and v must be the same.</li>
                 <li>For the layout check rules, see <a href="#layout-matching-relationship-table">layout matching relationship table</a>.</li>
             </ul>
@@ -357,8 +373,7 @@ In the constraints, the definitions of common fields are as follows:
     <tr>
         <td>k</td>
         <td rowspan="2">            <ul>
-                <li>tensor_type supports bfloat16, float16, and float8_e4m3fn.</li>
-                <li>PA_BBND -> (num_blocks, block_size, KV_N, D)</li>
+                <li>See the k/v data types and dimensions in the parameter table. For quant_mode=8, the packed final Torch dimension is D/2.</li>
                 <li>Currently, block_size must be 128 and equal to block_shape[1].</li>
                 <li>Non-contiguous tensor constraint: only dim0 of PA_BBND/PA_BNBD supports non-contiguous layout; MXFP8 normalizes page storage as described below.</li>
             </ul>
@@ -378,7 +393,7 @@ In the constraints, the definitions of common fields are as follows:
     </tbody>
     </table>
 
-- layout matching relationship table: <a name="layout-matching-relationship-table"></a>
+- Layout matching relationship table. See [Product-Specific Constraints](#product-specific-constraints) for each mode's supported combinations. All combinations listed below are supported for `quant_mode=8`. <a name="layout-matching-relationship-table"></a>
 
     <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 247px">
@@ -397,14 +412,26 @@ In the constraints, the definitions of common fields are as follows:
     <tbody>
         <tr>
             <td>TND</td>
-            <td>PA_BBND</td>
+            <td>TND, PA_BBND, or PA_BNBD</td>
             <td>(Q_T, Q_N, D)</td>
             <td>(Q_T, Q_N, 1)</td>
+        </tr>
+        <tr>
+            <td>BSND</td>
+            <td>BSND, PA_BBND, or PA_BNBD</td>
+            <td>(B, Sq, Q_N, D)</td>
+            <td>(B, Q_N, Sq, 1)</td>
+        </tr>
+        <tr>
+            <td>BNSD</td>
+            <td>BNSD, PA_BBND, or PA_BNBD</td>
+            <td>(B, Q_N, Sq, D)</td>
+            <td>(B, Q_N, Sq, 1)</td>
         </tr>
     </tbody>
     </table>
 
-- Check of sparse_block_idx, sparse_block_count, block_shape, and is_packed_gqa:
+- Constraints for `sparse_block_idx`, `sparse_block_count`, and `block_shape`
 
     <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 147px">
@@ -457,17 +484,6 @@ In the constraints, the definitions of common fields are as follows:
             </ul>
         </td>
     </tr>
-    <tr>
-        <td>is_packed_gqa</td>
-        <td>            <ul>
-                <li>data_type only supports BOOL.</li>
-                <li>Currently only supports True.</li>
-            </ul>
-        </td>
-        <td>Optional attribute, default value is True.</td>
-        <td>The metadata API and main operator must be consistent.</td>
-        <td>None</td>
-    </tr>
     </tbody>
     </table>
 
@@ -496,12 +512,11 @@ In the constraints, the definitions of common fields are as follows:
                 <td>                    <ul>
                         <li>tensor_type only supports int32.</li>
                         <li>The shape is fixed to (1024,).</li>
-                        <li>Currently, omitting this parameter is not supported. An interception alarm is reported if it is not passed.</li>
                     </ul>
                 </td>
-                <td>Optional Parameter</td>
+                <td>Required.</td>
                 <td>None</td>
-                <td>If passed, it must be consistent with the result generated by generic_block_sparse_attention_metadata.</td>
+                <td>Pass the result of generic_block_sparse_attention_metadata for the same inputs and attributes.</td>
             </tr>
         </tbody>
     </table>
@@ -749,7 +764,7 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
             <td>quant_mode</td>
             <td>                <ul>
                     <li>data_type supports INT.</li>
-                    <li>Currently supported: 0 (non-quantized), 5 (950 FP8), and 7 (A2/A3 INT8).</li>
+                    <li>Supported values are 0 (non-quantized), 5 (FP8), 6 (MXFP8), 7 (A2/A3 INT8), and 8 (FP8 Q with FP4 K/V). Modes 5, 6, and 8 apply to <term>Ascend 950PR&950DT products</term>.</li>
                 </ul>
             </td>
             <td>Optional input. The default value is 0.</td>
@@ -758,7 +773,7 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
                 </ul>
             </td>
             <td rowspan="5">                <ul>
-                    <li>If quant_mode=0, q/k/v_dequant_scale must be None.</li>
+                    <li>If quant_mode=0, q/k/v_dequant_scale must be None. For quant_mode=8, the Q scale is fixed at 1.0. Pass independent BF16 K/V scales and leave q_dequant_scale and p_quant_scale as None.</li>
                     <li>If quant_mode!=0, attention_out_dtype must be passed, and the output dtype in current quantization use cases must be float16 or bfloat16.</li>
                 </ul>
             </td>
@@ -812,7 +827,7 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
             <td>return_softmax_lse</td>
             <td>                <ul>
                     <li>data_type only supports BOOL.</li>
-                    <li>Non-quant (quant_mode=0) and A2/A3 INT8 (quant_mode=7) support False/True; A5 FP8 Union (quant_mode=5, mask_mode=3, D=128) supports False/True; A5 regular FP8 (quant_mode=5, mask_mode!=3) and MXFP8 (quant_mode=6) support only False.</li>
+                    <li>Non-quantized inputs (quant_mode=0), A2/A3 INT8 (quant_mode=7), and inputs with quant_mode=8 support False and True. On <term>Ascend 950PR&950DT products</term>, FP8 Union (quant_mode=5, mask_mode=3, D=128) supports False and True. Regular FP8 (quant_mode=5, mask_mode!=3) and MXFP8 (quant_mode=6) support only False.</li>
                 </ul>
             </td>
             <td>Optional attribute, default value is False.</td>
@@ -880,7 +895,6 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
         seqused_kv=seqused_kv,
         max_seqlen_q=Q_S,
         max_seqlen_kv=KV_S,
-        is_packed_gqa=True,
         layout_q="TND",
         layout_kv="PA_BBND",
         mask_mode=1,
@@ -899,7 +913,6 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
         cu_seqlens_q=cu_seqlens_q,
         seqused_kv=seqused_kv,
         block_table=block_table,
-        is_packed_gqa=True,
         layout_q="TND",
         layout_kv="PA_BBND",
         softmax_scale=1.0 / (D ** 0.5),

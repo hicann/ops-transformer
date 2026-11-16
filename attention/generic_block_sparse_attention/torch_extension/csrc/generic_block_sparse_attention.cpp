@@ -13,6 +13,8 @@
 
 namespace op_api {
 
+constexpr auto torch_uint8 = at::kByte;
+
 // Keep values in sync with Python QuantMode / aclnn quantType.
 enum QuantMode : int64_t {
     NO_QUANT = 0,
@@ -23,7 +25,13 @@ enum QuantMode : int64_t {
     FP8_E4M3_STATIC_CAST_P = 5,
     MXFP8_E4M3_PER_CHANNEL_V = 6,
     INT8_FULL_QUANT = 7,
+    Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP = 8,
 };
+
+static TensorWrapper MakePackedFp4Wrapper(const at::Tensor& tensor)
+{
+    return TensorWrapper{tensor, ACL_FLOAT4_E2M1};
+}
 
 at::Tensor GenericBlockSparseAttentionMetadata(
     const at::Tensor& sparse_block_idx, const at::Tensor& sparse_block_count,
@@ -53,6 +61,17 @@ std::tuple<at::Tensor, at::Tensor> GenericBlockSparseAttention(
     double dst_type_max, int64_t softmax_precision, int64_t win_left, int64_t win_right, bool return_softmax_lse,
     int64_t residual_block_mode, bool is_consistent_topk, c10::optional<at::ScalarType> attention_out_dtype)
 {
+    TORCH_CHECK(q.defined() && k.defined() && v.defined(), "q, k and v must be defined tensors");
+    TORCH_CHECK(sparse_block_idx.defined() && sparse_block_count.defined(),
+                "sparse_block_idx and sparse_block_count must be defined tensors");
+
+    const bool is_q_fp8_kv_fp4 = quant_mode == Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP;
+    if (is_q_fp8_kv_fp4) {
+        TORCH_CHECK(k.scalar_type() == v.scalar_type(), "quant_mode=8 requires K and V to have the same dtype");
+        TORCH_CHECK(k_dequant_scale.has_value() && k_dequant_scale->defined(), "quant_mode=8 requires k_dequant_scale");
+        TORCH_CHECK(v_dequant_scale.has_value() && v_dequant_scale->defined(), "quant_mode=8 requires v_dequant_scale");
+    }
+
     // pybind 按值收下 std::vector，再在本作用域构建 IntArrayRef，避免悬垂指针。
     at::IntArrayRef block_shape_ref(block_shape);
 
@@ -86,11 +105,22 @@ std::tuple<at::Tensor, at::Tensor> GenericBlockSparseAttention(
     }
 
     const int64_t return_softmax_lse_flag = return_softmax_lse ? 1 : 0;
-    ACLNN_CMD(aclnnGenericBlockSparseAttention, q, k, v, sparse_block_idx, sparse_block_count, metadata, attn_mask,
-              q_dequant_scale, k_dequant_scale, v_dequant_scale, p_quant_scale, cu_seqlens_q, cu_seqlens_kv, seqused_q,
-              seqused_kv, block_table, block_shape_ref, layout_q, layout_kv, layout_sparse_pattern, softmax_scale,
-              mask_mode, quant_mode, dst_type_max, softmax_precision, win_left, win_right, return_softmax_lse_flag,
-              residual_block_mode, is_consistent_topk, attention_out, softmax_lse);
+    if (is_q_fp8_kv_fp4 && k.scalar_type() == torch_uint8) {
+        const auto key = MakePackedFp4Wrapper(k);
+        const auto value = MakePackedFp4Wrapper(v);
+        ACLNN_CMD(aclnnGenericBlockSparseAttention, q, key, value, sparse_block_idx, sparse_block_count, metadata,
+                  attn_mask, q_dequant_scale, k_dequant_scale, v_dequant_scale, p_quant_scale, cu_seqlens_q,
+                  cu_seqlens_kv, seqused_q, seqused_kv, block_table, block_shape_ref, layout_q, layout_kv,
+                  layout_sparse_pattern, softmax_scale, mask_mode, quant_mode, dst_type_max, softmax_precision,
+                  win_left, win_right, return_softmax_lse_flag, residual_block_mode, is_consistent_topk, attention_out,
+                  softmax_lse);
+    } else {
+        ACLNN_CMD(aclnnGenericBlockSparseAttention, q, k, v, sparse_block_idx, sparse_block_count, metadata, attn_mask,
+                  q_dequant_scale, k_dequant_scale, v_dequant_scale, p_quant_scale, cu_seqlens_q, cu_seqlens_kv,
+                  seqused_q, seqused_kv, block_table, block_shape_ref, layout_q, layout_kv, layout_sparse_pattern,
+                  softmax_scale, mask_mode, quant_mode, dst_type_max, softmax_precision, win_left, win_right,
+                  return_softmax_lse_flag, residual_block_mode, is_consistent_topk, attention_out, softmax_lse);
+    }
     return std::make_tuple(attention_out, softmax_lse);
 }
 
