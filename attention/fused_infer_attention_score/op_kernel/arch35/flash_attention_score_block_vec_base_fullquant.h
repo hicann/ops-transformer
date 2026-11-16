@@ -153,6 +153,7 @@ public:
     TBuf<> firstLoopSumBuf;
     TQue<QuePosition::VECIN, 1> queryScaleQue[2];
     TBuf<> vselrIndexesBuf[4];
+    LocalTensor<uint8_t> vselrDnIndexesTensor;
     TBuf<> mm2InBuf;
     /* 用来做Broadcast[S1,1]->[S2,8]的临时UB区域 */
     TQue<QuePosition::VECOUT, 1> maxBrdcst;
@@ -428,13 +429,13 @@ __aicore__ inline void FABlockVecBaseFullquant<TEMPLATE_BASE_ARGS>::ProcessVec1D
         if constexpr (isFp8) {
             if (attenMaskInfoPtr->computeMode != AttenMaskComputeMode::NO_NEED_COMPUTE_MODE) {
                 FaVectorApi::ProcessVec1VfDnMxfp8<T, INPUT_T, false, hasAtten, mxfp8s2BaseSize>(
-                    stage1CastTensor, sumUb, maxUb, mmRes, expUb, this->vselrIndexesBuf, attenMaskUb,
+                    stage1CastTensor, sumUb, maxUb, mmRes, expUb, this->vselrDnIndexesTensor, attenMaskUb,
                     ((runInfo.s1RealSizeAlign32 >> 1) + 63) >> 6 << 6, runInfo.s2AlignedSize / 2, mxfp8s2RealSize,
                     static_cast<T>(constInfo.scaleValue), descaleQK, constInfo.pScale, negativeFloatScalar,
                     constInfo.keepProb, true, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop);
             } else {
                 FaVectorApi::ProcessVec1VfDnMxfp8<T, INPUT_T, false, false, mxfp8s2BaseSize>(
-                    stage1CastTensor, sumUb, maxUb, mmRes, expUb, this->vselrIndexesBuf, attenMaskUb,
+                    stage1CastTensor, sumUb, maxUb, mmRes, expUb, this->vselrDnIndexesTensor, attenMaskUb,
                     ((runInfo.s1RealSizeAlign32 >> 1) + 63) >> 6 << 6, runInfo.s2AlignedSize / 2, mxfp8s2RealSize,
                     static_cast<T>(constInfo.scaleValue), descaleQK, constInfo.pScale, negativeFloatScalar,
                     constInfo.keepProb, false, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop);
@@ -444,13 +445,13 @@ __aicore__ inline void FABlockVecBaseFullquant<TEMPLATE_BASE_ARGS>::ProcessVec1D
         if constexpr (isFp8) {
             if (attenMaskInfoPtr->computeMode != AttenMaskComputeMode::NO_NEED_COMPUTE_MODE) {
                 FaVectorApi::ProcessVec1VfDnMxfp8<T, INPUT_T, true, hasAtten, mxfp8s2BaseSize>(
-                    stage1CastTensor, sumUb, maxUb, mmRes, expUb, this->vselrIndexesBuf, attenMaskUb,
+                    stage1CastTensor, sumUb, maxUb, mmRes, expUb, this->vselrDnIndexesTensor, attenMaskUb,
                     ((runInfo.s1RealSizeAlign32 >> 1) + 63) >> 6 << 6, runInfo.s2AlignedSize / 2, mxfp8s2RealSize,
                     static_cast<T>(constInfo.scaleValue), descaleQK, constInfo.pScale, negativeFloatScalar,
                     constInfo.keepProb, true, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop);
             } else {
                 FaVectorApi::ProcessVec1VfDnMxfp8<T, INPUT_T, true, false, mxfp8s2BaseSize>(
-                    stage1CastTensor, sumUb, maxUb, mmRes, expUb, this->vselrIndexesBuf, attenMaskUb,
+                    stage1CastTensor, sumUb, maxUb, mmRes, expUb, this->vselrDnIndexesTensor, attenMaskUb,
                     ((runInfo.s1RealSizeAlign32 >> 1) + 63) >> 6 << 6, runInfo.s2AlignedSize / 2, mxfp8s2RealSize,
                     static_cast<T>(constInfo.scaleValue), descaleQK, constInfo.pScale, negativeFloatScalar,
                     constInfo.keepProb, false, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop);
@@ -1963,11 +1964,11 @@ __aicore__ inline void FABlockVecBaseFullquant<TEMPLATE_BASE_ARGS>::InitLocalBuf
     if constexpr (isFp8 || isInt8) {
         if constexpr (useDn) {
             tPipe->InitBuffer(vselrIndexesBuf[static_cast<uint32_t>(VselrIndexEnum::DN_INDEX)], 256);
-            LocalTensor<uint8_t> vselrIndexesTensor =
+            vselrDnIndexesTensor =
                 vselrIndexesBuf[static_cast<uint32_t>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();
             for (uint32_t i = 0; i < 4; i++) {
                 for (uint32_t j = 0; j < (256 >> 2); j++) {
-                    vselrIndexesTensor.SetValue(i * (256 >> 2) + j, i + (j << 2));
+                    vselrDnIndexesTensor.SetValue(i * (256 >> 2) + j, i + (j << 2));
                 }
             }
         } else if constexpr (useNz) {

@@ -301,6 +301,8 @@ __aicore__ inline void quant_flash_attn_mxfp8(
     using OUT_T = bfloat16_t;
 
     fa_base_matmul::ResetIdCounter();
+    // 静态Tensor无TPipe，手动复位SoC全局状态，避免继承前序算子的状态
+    InitSocState();
 
     constexpr LayOutTypeEnum inputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][0]);
     constexpr LayOutTypeEnum outputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][1]);
@@ -348,12 +350,12 @@ __aicore__ inline void quant_flash_attn_mxfp8(
     using Kernel = BaseApi::QuantFlashAttnKernelMxfp8<CubeBlockDummy, VecFaBlock, VecFdBlock>;
 #endif
 
-    TPipe tPipe;
     Kernel op;
     op.Init(query, key, value, sinks, attnMask, cuSeqLensQ, cuSeqLensKv, blockTable, dequantScaleQuery, dequantScaleKey,
             dequantScaleValue, pScale, softmaxLse, attnOut, workspace, metadata, sequsedQ, sequsedKv, vTail,
-            blockTableTail, sequsedVTail, tilingData, &tPipe);
+            blockTableTail, sequsedVTail, tilingData);
     op.Process();
+    AscendC::PipeBarrier<PIPE_ALL>();
 }
 
 // ─────────────────────────────────────────────────────────

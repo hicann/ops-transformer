@@ -1502,21 +1502,19 @@ __aicore__ inline void ProcessVec1DnUpdateMxfp8(
  */
 
 template <typename T, typename T2, bool isUpdate = false, bool hasAtten = false, uint16_t ubN = 256>
-__aicore__ inline void ProcessVec1VfDnMxfp8(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& expSumTensor,
-                                            const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor,
-                                            const LocalTensor<T>& expMaxTensor, TBuf<>* vselrIndexesBuf,
-                                            const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor, const uint32_t m,
-                                            const uint32_t n, const uint32_t originN, const T scale, float deScaleQK,
-                                            float pScale, const T minValue, float keepProb,
-                                            const LocalTensor<T>& preLoopMaxTensor,
-                                            const LocalTensor<T>& preLoopSumTensor,
-                                            const LocalTensor<T>& firstLoopSumTensor, int32_t subLoop, int64_t maskLine)
+__aicore__ inline void ProcessVec1VfDnMxfp8(
+    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& expSumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor, const LocalTensor<uint8_t>& vselrIndexesTensor,
+    const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor, const uint32_t m, const uint32_t n, const uint32_t originN,
+    const T scale, float deScaleQK, float pScale, const T minValue, float keepProb,
+    const LocalTensor<T>& preLoopMaxTensor, const LocalTensor<T>& preLoopSumTensor,
+    const LocalTensor<T>& firstLoopSumTensor, int32_t subLoop, int64_t maskLine)
 {
     if constexpr (!isUpdate) {
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value) {
-            indexesTensor = vselrIndexesBuf[static_cast<int>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesTensor;
         }
         ProcessVec1DnNoUpdateMxfp8<T, T2, hasAtten, ubN>(dstTensor, expSumTensor, maxTensor, srcTensor, expMaxTensor,
                                                          indexesTensor, m, n, originN, scale, deScaleQK, pScale,
@@ -1525,7 +1523,7 @@ __aicore__ inline void ProcessVec1VfDnMxfp8(const LocalTensor<T2>& dstTensor, co
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value) {
-            indexesTensor = vselrIndexesBuf[static_cast<int>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesTensor;
         }
         ProcessVec1DnUpdateMxfp8<T, T2, hasAtten, ubN>(dstTensor, expSumTensor, maxTensor, srcTensor, expMaxTensor,
                                                        indexesTensor, m, n, originN, scale, deScaleQK, pScale, minValue,
@@ -2378,7 +2376,7 @@ __simd_vf__ inline void ProcessVec1DnTailUpdateMxfp8VF(
 template <typename T, typename T2, bool isUpdate = false>
 __aicore__ inline void ProcessVec1VfDnTailMxfp8(
     const LocalTensor<T2>& dstTensor, const LocalTensor<T>& expSumTensor, const LocalTensor<T>& maxTensor,
-    const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor, TBuf<>* vselrIndexesBuf,
+    const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor, const LocalTensor<uint8_t>& vselrIndexesTensor,
     const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor, const LocalTensor<float>& preLoopMaxTensor,
     const LocalTensor<float>& preLoopSumTensor, const LocalTensor<float>& firstLoopSumTensor, uint32_t subLoop,
     const uint16_t m, const uint32_t originN, const float scale, const float deScaleQK, const T minValue,

@@ -64,7 +64,7 @@ public:
     static constexpr uint32_t dVBaseSize = CubeBlockType::dVBaseSize;
     static constexpr uint32_t s2SplitSize = (dBaseSize == 256) ? 128U : 256U;
 
-    // kernel侧ubBufferManager_(跨核bmm1/bmm2)占用的UB字节数, 与InitMMResBuf的分配公式一致,
+    // 跨核bmm1/bmm2结果区占用的UB字节数, 与原InitMMResBuf分配公式一致,
     // 作为FD静态Tensor业务区(FD InitBuffers)的起始基准偏移
     static constexpr uint32_t GetMmUbTotalSize()
     {
@@ -97,20 +97,6 @@ public:
     using ConstInfoX = typename CubeBlockType::ConstInfoX;
     using RunInfoX = typename CubeBlockType::RunInfoX;
 
-    // CV buffers
-    BufferManager<BufferType::GM> gmBufferManager_;
-    BufferManager<BufferType::UB> ubBufferManager_;
-    BufferManager<BufferType::L1> l1BufferManager_;
-    BuffersPolicy3buff<BufferType::GM, SyncType::CROSS_CORE_SYNC_FORWARD> bmm2ResGmBuffers_;
-    BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm1Buffers_;
-    BuffersPolicySingleBuffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm2Buffers_;
-    // Reserve the fourth P slot only when VTAIL is enabled.
-    // D=192 / D_v=128 场景 L1 超预算, 定向回退 3 槽(见 USE_3_P_SLOTS 定义)
-    using L1PBuffersPolicy = std::conditional_t<HAS_V_TAIL && !USE_3_P_SLOTS,
-                                                BuffersPolicy4buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>,
-                                                BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>>;
-    L1PBuffersPolicy l1PBuffers_;
-
     GlobalTensor<int32_t> cuSeqLensGmQ_;
     GlobalTensor<int32_t> cuSeqLensGmKv_;
     GlobalTensor<int32_t> seqUsedGmQ_;
@@ -122,7 +108,6 @@ public:
     __gm__ uint8_t* valuePtr_ = nullptr;
 
     ConstInfoX constInfo_;
-    TPipe* pipe_ = nullptr;
     CubeBlockType cubeBlock_;
     VecFaBlockType vecFaBlock_;
     VecFdBlockType vecFdBlock_;
@@ -179,10 +164,8 @@ public:
                                 __gm__ uint8_t* attnOut, __gm__ uint8_t* workspace, __gm__ uint8_t* metadata,
                                 __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedKv, __gm__ uint8_t* vTail,
                                 __gm__ uint8_t* blockTableTail, __gm__ uint8_t* sequsedVTail,
-                                const QuantFlashAttnTilingData& tiling, TPipe* tPipe)
+                                const QuantFlashAttnTilingData& tiling)
     {
-        this->pipe_ = tPipe;
-
         InitConstInfo(tiling);
         constInfo_.needInitOutput = ((__gm__ uint32_t*)metadata)[QFA_HEAD_NEED_INIT_OUTPUT_INDEX] != 0;
         constInfo_.enableFlashDecode = static_cast<bool>(((__gm__ uint32_t*)metadata)[METADATA_HEADER_IS_FD_INDEX]);
@@ -217,15 +200,12 @@ public:
         InitQCuSeqLensParser(cuSeqLensQ, sequsedQ);
         InitKvCuSeqLensParser(cuSeqLensKv, sequsedKv);
 
-        InitMMResBuf(workspace);
-
         if ASCEND_IS_AIV {
             if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
-                vecFaBlock_.InitVecBlock(tPipe, cuSeqLensQ, cuSeqLensKv, pScale, attnMask, softmaxLse, attnOut,
-                                         workspace);
+                vecFaBlock_.InitVecBlock(cuSeqLensQ, cuSeqLensKv, pScale, attnMask, softmaxLse, attnOut, workspace);
                 vecFaBlock_.SetCuSeqLensParser(qCuSeqLensParser_);
             } else {
-                vecFaBlock_.InitVecBlock(tPipe, sequsedQ, sequsedKv, pScale, attnMask, softmaxLse, attnOut, workspace);
+                vecFaBlock_.InitVecBlock(sequsedQ, sequsedKv, pScale, attnMask, softmaxLse, attnOut, workspace);
                 vecFaBlock_.SetCuSeqLensParser(qSeqUsedParser_);
             }
             vecFaBlock_.ClearOutput();
@@ -233,13 +213,12 @@ public:
 
         if ASCEND_IS_AIC {
             if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
-                cubeBlock_.InitCubeBlock(tPipe, &l1BufferManager_, query, key, value, blockTable, dequantScaleQuery,
-                                         dequantScaleKey, dequantScaleValue, qCuSeqLensParser_, kvCuSeqLensParser_,
-                                         vTail, blockTableTail);
-            } else {
-                cubeBlock_.InitCubeBlock(tPipe, &l1BufferManager_, query, key, value, blockTable, dequantScaleQuery,
-                                         dequantScaleKey, dequantScaleValue, qSeqUsedParser_, kvSeqUsedParser_, vTail,
+                cubeBlock_.InitCubeBlock(query, key, value, blockTable, dequantScaleQuery, dequantScaleKey,
+                                         dequantScaleValue, qCuSeqLensParser_, kvCuSeqLensParser_, vTail,
                                          blockTableTail);
+            } else {
+                cubeBlock_.InitCubeBlock(query, key, value, blockTable, dequantScaleQuery, dequantScaleKey,
+                                         dequantScaleValue, qSeqUsedParser_, kvSeqUsedParser_, vTail, blockTableTail);
             }
         }
         if constexpr (FLASH_DECODE) {
@@ -266,23 +245,6 @@ public:
                 }
             }
         }
-    }
-
-    __aicore__ inline void InitMMResBuf(__gm__ uint8_t*& workspace)
-    {
-        uint32_t mm1OutDtype = sizeof(T);
-
-        uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * mm1OutDtype / 2;
-        constexpr uint32_t mm2ResultSize = mBaseSize / CV_RATIO * dVBaseSize * sizeof(T);
-        constexpr uint32_t mm2LeftSize = mBaseSize * s2BaseSize * sizeof(INPUT_T) + mBaseSize * s2BaseSize / 32 +
-                                         (HAS_V_TAIL ? mBaseSize * MXFP8_V_TAIL_BOUNDARY * sizeof(bfloat16_t) : 0);
-        l1BufferManager_.Init(pipe_, 524288); // 512 * 1024
-        // 保存p结果的L1内存必须放在第一个L1 policy上，保证和vec申请的地址相同
-        // TODO，共享buffer初始化放到block层
-        l1PBuffers_.Init(l1BufferManager_, mm2LeftSize);
-        ubBufferManager_.Init(pipe_, mm1ResultSize * 2 + mm2ResultSize);
-        bmm2Buffers_.Init(ubBufferManager_, mm2ResultSize);
-        bmm1Buffers_.Init(ubBufferManager_, mm1ResultSize);
     }
 
     __aicore__ inline void InitConstInfo(const QuantFlashAttnTilingData& tiling)
@@ -398,23 +360,18 @@ public:
     __aicore__ inline void CrossCoreBufferInit()
     {
         if ASCEND_IS_AIV {
-            bmm2Buffers_.Get().SetCrossCore();
-        }
-
-        if ASCEND_IS_AIV {
-            bmm1Buffers_.Get().SetCrossCore();
-            bmm1Buffers_.Get().SetCrossCore();
+            vecFaBlock_.InitCrossCoreSync();
+        } else {
+            cubeBlock_.InitCrossCoreSync();
         }
     }
 
     __aicore__ inline void CrossCoreBufferUnInit()
     {
-        if ASCEND_IS_AIC {
-            bmm1Buffers_.Get().WaitCrossCore();
-            bmm1Buffers_.Get().WaitCrossCore();
-        }
-        if ASCEND_IS_AIC {
-            bmm2Buffers_.Get().WaitCrossCore();
+        if ASCEND_IS_AIV {
+            vecFaBlock_.UnInitCrossCoreSync();
+        } else {
+            cubeBlock_.UnInitCrossCoreSync();
         }
     }
 
@@ -704,26 +661,22 @@ public:
 
     __aicore__ inline void ComputeMm1(RunInfoX& runInfo, uint32_t subLoop)
     {
-        cubeBlock_.IterateBmm1(this->bmm1Buffers_.Get(), runInfo, subLoop);
+        cubeBlock_.IterateBmm1(runInfo, subLoop);
     }
 
     __aicore__ inline void ComputeMm2(RunInfoX& runInfo)
     {
-        cubeBlock_.IterateBmm2(this->bmm2Buffers_.Get(), this->l1PBuffers_, runInfo);
+        cubeBlock_.IterateBmm2(runInfo);
     }
 
     __aicore__ inline void ComputeVec1(RunInfoX& runInfo, uint32_t subLoop)
     {
-        if (subLoop % 2 == 0) {
-            vecFaBlock_.ProcessVec1(this->l1PBuffers_.Get(), this->bmm1Buffers_.Get(), runInfo, subLoop);
-        } else {
-            vecFaBlock_.ProcessVec1(this->l1PBuffers_.GetPre(), this->bmm1Buffers_.Get(), runInfo, subLoop);
-        }
+        vecFaBlock_.ProcessVec1(runInfo, subLoop);
     }
 
     __aicore__ inline void ComputeVec2(RunInfoX& runInfo)
     {
-        this->vecFaBlock_.ProcessVec2(this->bmm2Buffers_.Get(), runInfo);
+        this->vecFaBlock_.ProcessVec2(runInfo);
     }
 
     __aicore__ inline void CreateTask(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur,

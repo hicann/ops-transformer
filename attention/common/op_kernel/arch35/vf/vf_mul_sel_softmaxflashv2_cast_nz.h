@@ -436,7 +436,7 @@ template <typename T, typename T2, typename pseShiftType, uint32_t s1BaseSize = 
           PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,
           bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
 __aicore__ inline void ProcessVec1NoUpdateMxfp8(
-    const LocalTensor<T2>& dstTensor, TBuf<>* vselrIndexesBuf, const LocalTensor<T>& expSumTensor,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<uint8_t>* vselrIndexesUb, const LocalTensor<T>& expSumTensor,
     const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor,
     const LocalTensor<T>& inExpSumTensor, const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& maskTensor,
     const LocalTensor<pseShiftType>& pseTensor, const LocalTensor<uint8_t>& dropTensor,
@@ -450,8 +450,7 @@ __aicore__ inline void ProcessVec1NoUpdateMxfp8(
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value || IsSameType<T2, int8_t>::value) {
-            indexesTensor =
-                vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesUb[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)];
         }
         ProcessVec1NoUpdateGeneralImpl256Mxfp8Fullquant<T, T2, pseShiftType, s1BaseSize, s2BaseSize, hasAtten, pseMode,
                                                         hasDrop, hasSink>(
@@ -463,8 +462,7 @@ __aicore__ inline void ProcessVec1NoUpdateMxfp8(
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value || IsSameType<T2, int8_t>::value) {
-            indexesTensor =
-                vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesUb[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)];
         }
         ProcessVec1NoUpdateImpl128Mxfp8Fullquant<T, T2, pseShiftType, s1BaseSize, s2BaseSize, hasAtten, pseMode,
                                                  hasDrop, isMlaSgd, isMlaFullQuant, hasSink>(
@@ -475,8 +473,7 @@ __aicore__ inline void ProcessVec1NoUpdateMxfp8(
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value || IsSameType<T2, int8_t>::value) {
-            indexesTensor =
-                vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_0_AND_LTE_64_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesUb[static_cast<int>(VselrIndexEnum::GT_0_AND_LTE_64_INDEX)];
         }
         ProcessVec1NoUpdateImpl64Mxfp8Fullquant<T, T2, pseShiftType, s1BaseSize, s2BaseSize, hasAtten, pseMode, hasDrop,
                                                 isMlaSgd, isMlaFullQuant, hasSink>(
@@ -487,8 +484,7 @@ __aicore__ inline void ProcessVec1NoUpdateMxfp8(
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value || IsSameType<T2, int8_t>::value) {
-            indexesTensor =
-                vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesUb[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)];
         }
         ProcessVec1NoUpdateGeneralImpl128Mxfp8Fullquant<T, T2, pseShiftType, s1BaseSize, s2BaseSize, hasAtten, pseMode,
                                                         hasDrop, isMlaSgd, isMlaFullQuant, hasSink>(
@@ -503,7 +499,7 @@ template <typename T, typename T2, typename pseShiftType, uint32_t s1BaseSize = 
           PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,
           bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
 __aicore__ inline void ProcessVec1UpdateMxfp8(
-    const LocalTensor<T2>& dstTensor, TBuf<>* vselrIndexesBuf, const LocalTensor<T>& expSumTensor,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<uint8_t>* vselrIndexesUb, const LocalTensor<T>& expSumTensor,
     const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor,
     const LocalTensor<T>& inExpSumTensor, const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& maskTensor,
     const LocalTensor<pseShiftType>& pseTensor, const LocalTensor<uint8_t>& dropTensor,
@@ -518,8 +514,7 @@ __aicore__ inline void ProcessVec1UpdateMxfp8(
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value || IsSameType<T2, int8_t>::value) {
-            indexesTensor =
-                vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesUb[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)];
         }
         ProcessVec1UpdateGeneralImpl256Mxfp8Fullquant<T, T2, pseShiftType, s1BaseSize, s2BaseSize, hasAtten, pseMode,
                                                       hasDrop, hasSink>(
@@ -532,8 +527,7 @@ __aicore__ inline void ProcessVec1UpdateMxfp8(
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value || IsSameType<T2, int8_t>::value) {
-            indexesTensor =
-                vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesUb[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)];
         }
         ProcessVec1UpdateImpl128Mxfp8Fullquant<T, T2, pseShiftType, s1BaseSize, s2BaseSize, hasAtten, pseMode, hasDrop,
                                                isMlaSgd, isMlaFullQuant, hasSink>(
@@ -545,8 +539,7 @@ __aicore__ inline void ProcessVec1UpdateMxfp8(
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value || IsSameType<T2, int8_t>::value) {
-            indexesTensor =
-                vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_0_AND_LTE_64_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesUb[static_cast<int>(VselrIndexEnum::GT_0_AND_LTE_64_INDEX)];
         }
         ProcessVec1UpdateImpl64Mxfp8Fullquant<T, T2, pseShiftType, s1BaseSize, s2BaseSize, hasAtten, pseMode, hasDrop,
                                               isMlaSgd, isMlaFullQuant, hasSink>(
@@ -558,8 +551,7 @@ __aicore__ inline void ProcessVec1UpdateMxfp8(
         LocalTensor<uint8_t> indexesTensor;
         if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
                       IsSameType<T2, hifloat8_t>::value || IsSameType<T2, int8_t>::value) {
-            indexesTensor =
-                vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)].template Get<uint8_t>();
+            indexesTensor = vselrIndexesUb[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)];
         }
         ProcessVec1UpdateGeneralImpl128Mxfp8Fullquant<T, T2, pseShiftType, s1BaseSize, s2BaseSize, hasAtten, pseMode,
                                                       hasDrop, isMlaSgd, isMlaFullQuant, hasSink>(
@@ -575,7 +567,7 @@ template <typename T, typename T2, typename pseShiftType, bool isUpdate = false,
           PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,
           bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
 __aicore__ inline void ProcessVec1VfMxfp8(
-    const LocalTensor<T2>& dstTensor, TBuf<>* vselrIndexesBuf, const LocalTensor<T>& expSumTensor,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<uint8_t>* vselrIndexesUb, const LocalTensor<T>& expSumTensor,
     const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor,
     const LocalTensor<T>& inExpSumTensor, const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& maskTensor,
     const LocalTensor<pseShiftType>& pseTensor, const LocalTensor<uint8_t>& dropTensor,
@@ -597,13 +589,13 @@ __aicore__ inline void ProcessVec1VfMxfp8(
     if constexpr (!isUpdate) {
         ProcessVec1NoUpdateMxfp8<T, T2, pseShiftType, s1BaseSize, s2BaseSize, oriNRange, hasAtten, pseMode, hasDrop,
                                  isMlaSgd, isMlaFullQuant, useNz, hasSink>(
-            dstTensor, vselrIndexesBuf, expSumTensor, maxTensor, srcTensor, expMaxTensor, inExpSumTensor, inMaxTensor,
+            dstTensor, vselrIndexesUb, expSumTensor, maxTensor, srcTensor, expMaxTensor, inExpSumTensor, inMaxTensor,
             maskTensor, pseTensor, dropTensor, pScaleSubLoop0Tensor, sharedTmpBuffer, subLoop, m, originN, pseStride,
             slopes, posShift, scale, dScaleQK, minValue, keepProb, queryScaleUb, deSCaleKValue, pScale, sinkValue);
     } else {
         ProcessVec1UpdateMxfp8<T, T2, pseShiftType, s1BaseSize, s2BaseSize, oriNRange, hasAtten, pseMode, hasDrop,
                                isMlaSgd, isMlaFullQuant, useNz, hasSink>(
-            dstTensor, vselrIndexesBuf, expSumTensor, maxTensor, srcTensor, expMaxTensor, inExpSumTensor, inMaxTensor,
+            dstTensor, vselrIndexesUb, expSumTensor, maxTensor, srcTensor, expMaxTensor, inExpSumTensor, inMaxTensor,
             maskTensor, pseTensor, dropTensor, pScaleSubLoop0Tensor, sharedTmpBuffer, preLoopMaxTensor,
             preLoopSumTensor, firstLoopSumTensor, subLoop, m, originN, pseStride, slopes, posShift, scale, dScaleQK,
             minValue, keepProb, queryScaleUb, deSCaleKValue, pScale, sinkValue);
