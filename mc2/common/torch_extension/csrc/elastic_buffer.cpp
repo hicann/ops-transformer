@@ -1895,9 +1895,10 @@ public:
         std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>;
     static EngramFetchTrainOutput EngramFetchTrain(const at::Tensor& context, const at::Tensor& indices,
                                                    int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
-                                                   const at::Tensor& localStorageAddr, const at::Tensor& sfTable,
-                                                   const at::Tensor& sfTableAddr, int64_t numMaxTokensPerRank,
-                                                   int64_t commBufferSize, int64_t rankSize);
+                                                   const at::Tensor& localStorageAddr, at::ScalarType sfDtype,
+                                                   int64_t sfPacks, const at::Tensor& sfTableAddr,
+                                                   int64_t numMaxTokensPerRank, int64_t commBufferSize,
+                                                   int64_t rankSize);
     static at::Tensor EngramFetchWait(const at::Tensor& context, const at::Tensor& fetched);
 
     // Stateless static method for training backward (graph-mode compatible).
@@ -2282,27 +2283,30 @@ ElasticBuffer::EngramFetchOutput ElasticBuffer::EngramFetch(const at::Tensor& co
 
 // EngramFetchTrain - stateless static method for training forward (graph-mode compatible).
 // Outputs: fetched, fetchedSf, and save-for-backward ctx tensors (perm, sendCounts, recvCounts, recvLocalEntry,
-// numRecv). sfTable provides the output shape/dtype; sfTableAddr remains the training kernel's mapped address.
+// numRecv). The scalar SF metadata provides the output shape/dtype; sfTableAddr
+// remains the training kernel's mapped host-table address.
 ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
     const at::Tensor& context, const at::Tensor& indices, int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
-    const at::Tensor& localStorageAddr, const at::Tensor& sfTable, const at::Tensor& sfTableAddr,
+    const at::Tensor& localStorageAddr, at::ScalarType sfDtype, int64_t sfPacks, const at::Tensor& sfTableAddr,
     int64_t numMaxTokensPerRank, int64_t commBufferSize, int64_t rankSize)
 {
     auto dtype = static_cast<at::ScalarType>(dtypeEnum);
-    int64_t numTokens = indices.size(0);
-    auto fetched = at::empty({numTokens, hiddenSize}, at::TensorOptions().dtype(dtype).device(indices.device()));
-    auto intOpts = at::TensorOptions().dtype(at::kInt).device(indices.device());
     TORCH_CHECK(rankSize > 0 && numMaxTokensPerRank <= INT64_MAX / rankSize,
                 "numMaxTokensPerRank * rankSize overflow, got numMaxTokensPerRank=", numMaxTokensPerRank,
                 ", rankSize=", rankSize);
+    TORCH_CHECK(sfPacks >= 0, "sf_packs must be non-negative, got ", sfPacks);
+    TORCH_CHECK(sfDtype == at::kFloat || sfDtype == at::kFloat8_e8m0fnu,
+                "sf_dtype must be float32 or float8_e8m0fnu, got ", sfDtype);
+    int64_t numTokens = indices.size(0);
+    auto fetched = at::empty({numTokens, hiddenSize}, at::TensorOptions().dtype(dtype).device(indices.device()));
+    auto intOpts = at::TensorOptions().dtype(at::kInt).device(indices.device());
     int64_t maxR = numMaxTokensPerRank * rankSize;
     at::Tensor perm = at::zeros({numTokens}, intOpts);
     at::Tensor sendCounts = at::zeros({rankSize * SEND_COUNTS_ALIGN_FACTOR}, intOpts); // 32b对齐
     at::Tensor recvCounts = at::zeros({rankSize}, intOpts);
     at::Tensor recvLocalEntry = at::zeros({maxR}, intOpts);
     at::Tensor numRecv = at::zeros({1}, intOpts);
-    int64_t sfPacks = (sfTable.dim() == 2 && sfTable.size(1) > 0) ? sfTable.size(1) : 0;
-    auto sfOpts = at::TensorOptions().dtype(sfTable.scalar_type()).device(indices.device());
+    auto sfOpts = at::TensorOptions().dtype(sfDtype).device(indices.device());
     at::Tensor fetchedSf = sfPacks > 0 ? at::empty({numTokens, sfPacks}, sfOpts) : at::empty({0}, sfOpts);
 
     if (numTokens > 0) {
@@ -2726,8 +2730,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
                     pybind11::arg("num_entries"), pybind11::arg("dtype"), pybind11::arg("sf_table"))
         .def_static("engram_fetch_train", &Mc2Api::ElasticBuffer::EngramFetchTrain, pybind11::arg("context"),
                     pybind11::arg("indices"), pybind11::arg("hidden_size"), pybind11::arg("num_entries"),
-                    pybind11::arg("dtype"), pybind11::arg("local_storage_addr"), pybind11::arg("sf_table"),
-                    pybind11::arg("sf_table_addr"), pybind11::arg("num_max_tokens_per_rank"),
+                    pybind11::arg("dtype"), pybind11::arg("local_storage_addr"), pybind11::arg("sf_dtype"),
+                    pybind11::arg("sf_packs"), pybind11::arg("sf_table_addr"), pybind11::arg("num_max_tokens_per_rank"),
                     pybind11::arg("comm_buffer_size"), pybind11::arg("rank_size"))
         .def_static("engram_fetch_wait", &Mc2Api::ElasticBuffer::EngramFetchWait, pybind11::arg("context"),
                     pybind11::arg("fetched"))

@@ -168,7 +168,7 @@ class ElasticBufferOpBuilder(OpBuilder):
             "int num_entries, int dtype, Tensor sf_table) -> (Tensor, Tensor)",
             "engram_fetch_train(Tensor context, Tensor indices, int hidden_size, "
             "int num_entries, int dtype, Tensor local_storage_addr, "
-            "Tensor sf_table, Tensor sf_table_addr, "
+            "ScalarType sf_dtype, int sf_packs, Tensor sf_table_addr, "
             "int num_max_tokens_per_rank, int comm_buffer_size, int rank_size) "
             "-> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)",
             "engram_fetch_wait(Tensor context, Tensor fetched) -> Tensor",
@@ -215,12 +215,21 @@ class ElasticBufferOpBuilder(OpBuilder):
             num_entries,
             dtype,
             local_storage_addr,
-            sf_table,
+            sf_dtype,
+            sf_packs,
             sf_table_addr,
             num_max_tokens_per_rank,
             comm_buffer_size,
             rank_size,
         ):
+            torch._check(
+                sf_packs >= 0,
+                lambda: f"sf_packs must be non-negative, got {sf_packs}",
+            )
+            torch._check(
+                sf_dtype in _ENGRAM_SF_DTYPES,
+                lambda: (f"sf_dtype must be float32 or float8_e8m0fnu, got {sf_dtype}"),
+            )
             num_tokens = indices.size(0)
             max_r = num_max_tokens_per_rank * rank_size
             data_dtype = _ENGRAM_INT_TO_DTYPE[dtype]
@@ -234,14 +243,11 @@ class ElasticBufferOpBuilder(OpBuilder):
             recv_counts = torch.empty((rank_size,), dtype=torch.int32, device="meta")
             recv_local_entry = torch.empty((max_r,), dtype=torch.int32, device="meta")
             num_recv = torch.empty((1,), dtype=torch.int32, device="meta")
-            if sf_table.dim() == 2 and sf_table.size(1) > 0:
-                fetched_sf = torch.empty(
-                    (num_tokens, sf_table.size(1)),
-                    dtype=sf_table.dtype,
-                    device="meta",
-                )
-            else:
-                fetched_sf = torch.empty((0,), dtype=sf_table.dtype, device="meta")
+            fetched_sf = (
+                torch.empty((num_tokens, sf_packs), dtype=sf_dtype, device="meta")
+                if sf_packs > 0
+                else torch.empty((0,), dtype=sf_dtype, device="meta")
+            )
             fetch_result = (
                 fetched,
                 fetched_sf,
@@ -345,7 +351,8 @@ def engram_fetch_train(
     num_entries,
     dtype,
     local_storage_addr,
-    sf_table,
+    sf_dtype,
+    sf_packs,
     sf_table_addr,
     num_max_tokens_per_rank,
     comm_buffer_size,
@@ -359,7 +366,8 @@ def engram_fetch_train(
         num_entries,
         dtype,
         local_storage_addr,
-        sf_table,
+        sf_dtype,
+        sf_packs,
         sf_table_addr,
         num_max_tokens_per_rank,
         comm_buffer_size,
@@ -807,6 +815,8 @@ class ElasticBuffer:
         self._engram_hidden_size = None
         self._engram_num_entries = None
         self._engram_dtype = None
+        self._engram_sf_dtype = torch.float32
+        self._engram_sf_packs = 0
         self._engram_fetch_in_progress = False
         self._engram_storage_ref = None
         self._engram_sf_ref = None
@@ -1071,6 +1081,8 @@ class ElasticBuffer:
         self._engram_num_entries = storage.size(0)
         self._engram_dtype = storage.dtype
         self._engram_sf = sf
+        self._engram_sf_dtype = sf.dtype if sf is not None else torch.float32
+        self._engram_sf_packs = sf.size(1) if sf is not None else 0
         self._local_storage_addr = self._runtime.get_local_storage_addr()
         if self._with_grad and sf is not None:
             self._local_sf_table_addr = self._runtime.get_local_sf_table_addr()
@@ -1097,10 +1109,12 @@ class ElasticBuffer:
         sf = self._engram_sf
 
         if self._with_grad:
-            sf_table = sf if sf is not None else torch.empty(0, device=indices.device)
+            has_sf = sf is not None
             sf_table_addr = torch.empty(0, device=indices.device)
-            if sf is not None:
+            if has_sf:
                 sf_table_addr = self._local_sf_table_addr
+            sf_dtype = self._engram_sf_dtype
+            sf_packs = self._engram_sf_packs
             (
                 fetched,
                 fetched_sf,
@@ -1116,7 +1130,8 @@ class ElasticBuffer:
                 self._engram_num_entries,
                 _ENGRAM_DTYPE_TO_INT[self._engram_dtype],
                 self._local_storage_addr,
-                sf_table,
+                sf_dtype,
+                sf_packs,
                 sf_table_addr,
                 self._num_max_tokens_per_rank,
                 self._comm_buffer_size,
@@ -1132,7 +1147,7 @@ class ElasticBuffer:
 
             def _wait_train():
                 self._engram_fetch_in_progress = False
-                if sf is not None:
+                if has_sf:
                     return fetched, fetched_sf, ctx
                 return fetched, ctx
 
@@ -1539,6 +1554,8 @@ class ElasticBuffer:
         self._engram_hidden_size = None
         self._engram_num_entries = None
         self._engram_dtype = None
+        self._engram_sf_dtype = torch.float32
+        self._engram_sf_packs = 0
         self._engram_fetch_in_progress = False
         self._engram_storage_ref = None
         self._engram_sf_ref = None
