@@ -702,6 +702,9 @@ __aicore__ inline void SMLAVectorBlock<SMLAT>::ProcessVec0L(const RunInfo& runIn
 template <typename SMLAT>
 __aicore__ inline void SMLAVectorBlock<SMLAT>::ProcessVec1L(const RunInfo& info)
 {
+    // 当前16行对齐划分在有效M为17/33时会产生单行AIV尾块，改由AIV0处理全部有效行。
+    const bool avoidSingleRowAiv = info.actMBaseSize == 17U || info.actMBaseSize == 33U;
+
     uint32_t nBufferLoopTimes = (info.actMBaseSize + constInfo.nBufferMBaseSize - 1) / constInfo.nBufferMBaseSize;
     uint32_t nBufferTail = info.actMBaseSize - (nBufferLoopTimes - 1) * constInfo.nBufferMBaseSize;
     for (uint32_t i = 0; i < nBufferLoopTimes; i++) {
@@ -710,8 +713,9 @@ __aicore__ inline void SMLAVectorBlock<SMLAT>::ProcessVec1L(const RunInfo& info)
         mSplitInfo.nBufferStartM = i * constInfo.nBufferMBaseSize;
         mSplitInfo.nBufferDealM = (i + 1 != nBufferLoopTimes) ? constInfo.nBufferMBaseSize : nBufferTail;
 
-        mSplitInfo.vecDealM = (mSplitInfo.nBufferDealM <= 16) ? mSplitInfo.nBufferDealM :
-                                                                (((mSplitInfo.nBufferDealM + 15) / 16 + 1) / 2 * 16);
+        mSplitInfo.vecDealM = (mSplitInfo.nBufferDealM <= 16U || avoidSingleRowAiv) ?
+                                  mSplitInfo.nBufferDealM :
+                                  (((mSplitInfo.nBufferDealM + 15U) / 16U + 1U) / 2U * 16U);
         mSplitInfo.vecStartM = 0;
         if (GetBlockIdx() % 2 == 1) {
             mSplitInfo.vecStartM = mSplitInfo.vecDealM;
@@ -753,6 +757,9 @@ __aicore__ inline void SMLAVectorBlock<SMLAT>::ProcessVec2SingleBuf(const RunInf
 template <typename SMLAT>
 __aicore__ inline void SMLAVectorBlock<SMLAT>::ProcessVec2L(const RunInfo& info)
 {
+    // 当前16行对齐划分在有效M为17/33时会产生单行AIV尾块，改由AIV0处理全部有效行。
+    const bool avoidSingleRowAiv = info.actMBaseSize == 17U || info.actMBaseSize == 33U;
+
     uint32_t nBufferLoopTimes = (info.actMBaseSize + constInfo.nBufferMBaseSize - 1) / constInfo.nBufferMBaseSize;
     uint32_t nBufferTail = info.actMBaseSize - (nBufferLoopTimes - 1) * constInfo.nBufferMBaseSize;
     for (uint32_t i = 0; i < nBufferLoopTimes; i++) {
@@ -761,8 +768,9 @@ __aicore__ inline void SMLAVectorBlock<SMLAT>::ProcessVec2L(const RunInfo& info)
         mSplitInfo.nBufferStartM = i * constInfo.nBufferMBaseSize;
         mSplitInfo.nBufferDealM = (i + 1 != nBufferLoopTimes) ? constInfo.nBufferMBaseSize : nBufferTail;
 
-        mSplitInfo.vecDealM = (mSplitInfo.nBufferDealM <= 16) ? mSplitInfo.nBufferDealM :
-                                                                (((mSplitInfo.nBufferDealM + 15) / 16 + 1) / 2 * 16);
+        mSplitInfo.vecDealM = (mSplitInfo.nBufferDealM <= 16U || avoidSingleRowAiv) ?
+                                  mSplitInfo.nBufferDealM :
+                                  (((mSplitInfo.nBufferDealM + 15U) / 16U + 1U) / 2U * 16U);
         mSplitInfo.vecStartM = 0;
         if (GetBlockIdx() % 2 == 1) {
             mSplitInfo.vecStartM = mSplitInfo.vecDealM;
