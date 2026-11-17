@@ -8,6 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 from typing import Optional
+from pathlib import Path
 import torch
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
@@ -48,6 +49,9 @@ class FlashAttenOpBuilder(OpBuilder):
 
     def sources(self):
         """Path to C++ source code."""
+        local_source = Path(__file__).resolve().parent / "csrc" / "flash_attn_exp.cpp"
+        if local_source.is_file():
+            return [str(local_source)]
         return ["csrc/attention/flash_attn_exp.cpp"]
 
     def schema(self) -> str:

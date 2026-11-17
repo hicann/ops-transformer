@@ -22,25 +22,27 @@ const int64_t DIM_TWO = 2;
 const int64_t DIM_THREE = 3;
 const int64_t MAX_DIM_SIZE = 8;
 
-at::Tensor FlashAttnMetadata(const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensKv,
-                             const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &sequsedKv,
+at::Tensor FlashAttnMetadata(const c10::optional<at::Tensor>& cuSeqlensQ, const c10::optional<at::Tensor>& cuSeqlensKv,
+                             const c10::optional<at::Tensor>& sequsedQ, const c10::optional<at::Tensor>& sequsedKv,
                              int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t batchSize,
                              int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t maskMode, int64_t winLeft,
                              int64_t winRight, std::string layoutQ, std::string layoutKv, std::string layoutOut,
-                             const at::Tensor &output)
+                             const at::Tensor& output)
 {
+    bool isGradEnabled = false;
     ACLNN_CMD(aclnnFlashAttnMetadata, cuSeqlensQ, cuSeqlensKv, sequsedQ, sequsedKv, batchSize, maxSeqlenQ, maxSeqlenKv,
-              numHeadsQ, numHeadsKv, headDim, maskMode, winLeft, winRight, layoutQ, layoutKv, layoutOut, output);
+              numHeadsQ, numHeadsKv, headDim, headDim, maskMode, winLeft, winRight, layoutQ, layoutKv, layoutOut,
+              isGradEnabled, output);
     return output;
 }
 
 std::tuple<at::Tensor, at::Tensor> FlashAttn(
-    const at::Tensor &q, const at::Tensor &k, const at::Tensor &v, const c10::optional<at::Tensor> &relH,
-    const c10::optional<at::Tensor> &relW, const c10::optional<at::Tensor> &blockTable,
-    const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensKv,
-    const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &sequsedKv,
-    const c10::optional<at::Tensor> &sinks, const c10::optional<at::Tensor> &attnMask,
-    const c10::optional<at::Tensor> &metadata, double softmaxScale, int64_t maskMode, int64_t winLeft, int64_t winRight,
+    const at::Tensor& q, const at::Tensor& k, const at::Tensor& v, const c10::optional<at::Tensor>& relH,
+    const c10::optional<at::Tensor>& relW, const c10::optional<at::Tensor>& blockTable,
+    const c10::optional<at::Tensor>& cuSeqlensQ, const c10::optional<at::Tensor>& cuSeqlensKv,
+    const c10::optional<at::Tensor>& sequsedQ, const c10::optional<at::Tensor>& sequsedKv,
+    const c10::optional<at::Tensor>& sinks, const c10::optional<at::Tensor>& attnMask,
+    const c10::optional<at::Tensor>& metadata, double softmaxScale, int64_t maskMode, int64_t winLeft, int64_t winRight,
     int64_t maxSeqlenQ, int64_t maxSeqlenKv, string layoutQ, string layoutKv, string layoutOut,
     int64_t returnSoftmaxLse)
 {
@@ -86,9 +88,9 @@ std::tuple<at::Tensor, at::Tensor> FlashAttn(
     }
     at::Tensor attentionOutput = at::empty(attentionOutSize, q.options().dtype(q.dtype()));
 
-    char *layoutQPtr = const_cast<char *>(layoutQ.c_str());
-    char *layoutKvPtr = const_cast<char *>(layoutKv.c_str());
-    char *layoutOutPtr = const_cast<char *>(layoutOut.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQ.c_str());
+    char* layoutKvPtr = const_cast<char*>(layoutKv.c_str());
+    char* layoutOutPtr = const_cast<char*>(layoutOut.c_str());
 
     // Python bool → C++ int64_t: pybind11 auto-converts return_softmax_lse (True→1, False→0) before reaching here
     ACLNN_CMD(aclnnFlashAttn, q, k, v, relH, relW, blockTable, cuSeqlensQ, cuSeqlensKv, sequsedQ, sequsedKv, sinks,

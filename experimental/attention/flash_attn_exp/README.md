@@ -98,6 +98,12 @@
 > Q_S表示seqlen_q，Q_N表示nheads_q，KV_S表示seqlen_kv，KV_N表示nheads_kv。
 > rel_h/rel_w中的H、W分别表示图像高、宽方向的网格数，满足KV_S = H × W，与上述Hidden-Size的H含义不同。
 
+## FA4 兼容接口
+
+新增 `flash_attn_func` 兼容入口，自动生成 metadata 并调用 `flash_attn_exp`。当前支持 FP16/BF16、64 维、BSND 布局的无掩码前向计算，不支持的参数会在入口拦截。接口原型、参数约束、编译安装及完整示例见 [FA4 兼容接口说明](docs/torchapi_fa4.md)。
+
+直接使用 `flash_attn_exp_metadata` 和 `flash_attn_exp` 时，仍按下文所述先生成 metadata，再调用主算子。迁移后的实验 metadata 说明见 [flash_attn_exp_metadata](../flash_attn_exp_metadata/README.md)。
+
 ## 函数原型
 
 调用flash_attn接口之前，请先调用前置接口flash_attn_metadata，完成flash_attn负载均衡的计算。
