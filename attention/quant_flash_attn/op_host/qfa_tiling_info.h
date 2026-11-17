@@ -159,7 +159,8 @@ enum class QfaQuantMode : uint32_t {
     A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 1,
     A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 6,
     A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32 = 0,
-    A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16 = 10
+    A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16 = 10,
+    A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR = 12
 };
 
 enum class KvStorageMode : uint32_t {
@@ -389,13 +390,13 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
     {QUERY_NAME,
      {Ops::Transformer::DT_FLOAT16, Ops::Transformer::DT_BF16, Ops::Transformer::DT_FLOAT8_E4M3FN,
-      Ops::Transformer::DT_HIFLOAT8, Ops::Transformer::DT_HIFLOAT4}},
+      Ops::Transformer::DT_HIFLOAT8, Ops::Transformer::DT_HIFLOAT4, Ops::Transformer::DT_INT8}},
     {KEY_NAME,
      {Ops::Transformer::DT_FLOAT16, Ops::Transformer::DT_BF16, Ops::Transformer::DT_FLOAT8_E4M3FN,
-      Ops::Transformer::DT_HIFLOAT8, Ops::Transformer::DT_HIFLOAT4}},
+      Ops::Transformer::DT_HIFLOAT8, Ops::Transformer::DT_HIFLOAT4, Ops::Transformer::DT_INT8}},
     {VALUE_NAME,
      {Ops::Transformer::DT_FLOAT16, Ops::Transformer::DT_BF16, Ops::Transformer::DT_FLOAT8_E4M3FN,
-      Ops::Transformer::DT_HIFLOAT8, Ops::Transformer::DT_HIFLOAT4}},
+      Ops::Transformer::DT_HIFLOAT8, Ops::Transformer::DT_HIFLOAT4, Ops::Transformer::DT_INT8}},
     {Q_DESCALE_NAME,
      {Ops::Transformer::DT_FLOAT, Ops::Transformer::DT_BF16, Ops::Transformer::DT_FLOAT8_E8M0,
       Ops::Transformer::DT_HIFLOAT4_SCALE}},

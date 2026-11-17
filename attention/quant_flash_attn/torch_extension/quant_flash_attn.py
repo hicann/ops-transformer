@@ -37,6 +37,7 @@ class QuantMode(IntEnum):
     A4C4_QKV_HIF4_P_HIF4_LEVEL3_SOFTMAX_FP16 = 9
     A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16 = 10
     A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16 = 12
+    A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR = 12
 
 
 _INT8_QUANT_MODE = int(
@@ -185,7 +186,7 @@ def _check_layout_constraint(quant_mode, layout_q, layout_kv, layout_out):
         )
 
 
-def _get_output_shape_sizes(q, v, layout_q, layout_kv):
+def _get_output_shape_sizes(q, v, layout_q, layout_kv, quant_mode=None):
     """提取决定输出 shape 的维度: q 的 B/T、S、N 维度(D 恒为 q 最后一维, 不提取)
     以及 v 的 D 维度; t_size/b_size/s_size 按各自 layout 有效, 不适用时为 None。
     调用前需保证 q/v 维度数已通过 _LAYOUT_EXPECTED_NDIM 校验。"""
@@ -199,7 +200,14 @@ def _get_output_shape_sizes(q, v, layout_q, layout_kv):
     else:
         t_size, b_size, s_size, n_size = None, q.size(0), q.size(2), q.size(1)
     if layout_kv == "PA_NZ":
-        d_size = v.size(2) * v.size(4)
+        # PA_NZ stores D in 32-element NZ blocks and may physically pad D=72 to
+        # 96. The output remains logical D, so take it from Q rather than V.
+        d_size = (
+            q.size(-1)
+            if quant_mode
+            == QuantMode.A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR
+            else v.size(2) * v.size(4)
+        )
     elif layout_kv == "TND":
         d_size = v.size(2)
     else:
@@ -443,7 +451,17 @@ class QuantFlashAttnOpBuilder(OpBuilder):
                 int(quant_mode) in (0, 1, 3, 5, 6, 10, _INT8_QUANT_MODE),
                 lambda: "Unsupported quant_mode",
             )
-            if int(quant_mode) == _INT8_QUANT_MODE:
+            torch._check(
+                int(quant_mode) != _INT8_QUANT_MODE
+                or layout_kv not in ("PA_BNBD", "PA_BBND", "PA_NZ")
+                or metadata is None,
+                lambda: "A2/A3 paged INT8 QFA does not support metadata",
+            )
+            if int(quant_mode) == _INT8_QUANT_MODE and layout_kv not in (
+                "PA_BNBD",
+                "PA_BBND",
+                "PA_NZ",
+            ):
                 out_shape = _check_int8_contract(
                     q,
                     k,
@@ -512,7 +530,7 @@ class QuantFlashAttnOpBuilder(OpBuilder):
                 lambda: f"v with layout {layout_kv} expects {kv_expected} dims, but got {v.dim()} dims",
             )
             t_size, b_size, s_size, n_size, d_size = _get_output_shape_sizes(
-                q, v, layout_q, layout_kv
+                q, v, layout_q, layout_kv, quant_mode
             )
             if layout_q in ("TND", "NTD"):
                 # NTD (GQA FP8, quant_mode=6) 的 lse 与 TND 同为 (N, T)
@@ -622,6 +640,11 @@ def quant_flash_attn_metadata(
     head_dim_v = head_dim if head_dim_v is None else head_dim_v
 
     _check_layout_constraint(quant_mode, layout_q, layout_kv, layout_out)
+    torch._check(
+        quant_mode != _INT8_QUANT_MODE
+        or layout_kv not in ("PA_BNBD", "PA_BBND", "PA_NZ"),
+        lambda: "A2/A3 paged INT8 QFA does not support metadata",
+    )
 
     max_schedule_size = _calculate_max_schedule_size(batch_size, num_heads_q)
     output = torch.empty((2, max_schedule_size), dtype=torch.int32, device="npu")
@@ -973,14 +996,24 @@ def quant_flash_attn(
         f"3 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16), "
         f"5 (A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16) "
         f"6 (A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
-        f"10 (A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) "
-        f"{_INT8_QUANT_MODE} ({QuantMode(_INT8_QUANT_MODE).name}, BF16 output), but got {quant_mode}",
+        f"10 (A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16), "
+        f"{_INT8_QUANT_MODE} (INT8 prefill or paged decode), but got {quant_mode}",
     )
     mask_mode = _resolve_mask_mode(mask_mode)
 
     win_left = -1 if win_left is None else win_left
     win_right = -1 if win_right is None else win_right
-    if quant_mode == _INT8_QUANT_MODE:
+    torch._check(
+        quant_mode != _INT8_QUANT_MODE
+        or layout_kv not in ("PA_BNBD", "PA_BBND", "PA_NZ")
+        or metadata is None,
+        lambda: "A2/A3 paged INT8 QFA does not support metadata",
+    )
+    if quant_mode == _INT8_QUANT_MODE and layout_kv not in (
+        "PA_BNBD",
+        "PA_BBND",
+        "PA_NZ",
+    ):
         _check_int8_contract(
             q,
             k,
@@ -1041,7 +1074,7 @@ def quant_flash_attn(
     # 异常拦截: 仅校验决定输出 shape 的维度(q 除 D 外的 B/T/S/N 维度及 v 的 D 维度),
     # 其余维度(如 q 的 D 维)不影响输出 shape, 不在此拦截
     t_size, b_size, s_size, n_size, d_size = _get_output_shape_sizes(
-        q, v, layout_q, layout_kv
+        q, v, layout_q, layout_kv, quant_mode
     )
     torch._check(
         all(
@@ -1075,6 +1108,15 @@ def quant_flash_attn(
                     f"float4_e2m1fn_x2, but got {tensor.dtype}"
                 )
 
+    if quant_mode == int(
+        QuantMode.A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR
+    ):
+        for name, tensor in (("q", q), ("k", k), ("v", v)):
+            if tensor.dtype != torch.int8:
+                raise ValueError(
+                    f"In A2/A3 paged INT8 mode (quant_mode=12), {name} must be int8, "
+                    f"but got {tensor.dtype}"
+                )
     dense_same_layout = layout_q == layout_kv == layout_out and layout_q in (
         "BNSD",
         "BSND",

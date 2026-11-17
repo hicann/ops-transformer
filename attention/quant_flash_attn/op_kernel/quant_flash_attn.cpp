@@ -24,6 +24,7 @@
 #include <type_traits>
 #include "arch22/quant_flash_attn_template_tiling_key_arch22.h"
 #include "arch22/quant_flash_attn_kernel_int8.h"
+#include "arch22/quant_flash_attn_entry_arch22.h"
 
 using namespace AscendC;
 
@@ -38,6 +39,13 @@ __global__ __aicore__ void quant_flash_attn(
     __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     using namespace BaseApi::Int8GqaTnd;
+    if constexpr (quantMode == QFA_INT8_QUANT_MODE && KvLayoutType == QFA_INT8_TPL_PAGED_KV_LAYOUT) {
+        quant_flash_attn_decode<rawConfig>(query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue,
+                                           blockTable, pScale, cuSeqLensQ, cuSeqLensKv, sequsedQ, sequsedKv, sinks,
+                                           attnMask, metadata, vTail, blockTableTail, sequsedVTail, attnOut, softmaxLse,
+                                           workspace, tiling);
+        return;
+    }
     constexpr uint16_t config = rawConfig & QFA_INT8_CFG_PIPELINE_MASK;
     constexpr bool WINDOWED = (rawConfig & QFA_INT8_CFG_WINDOW_FLAG) != 0U;
     constexpr bool RETURN_LSE = (rawConfig & QFA_INT8_CFG_LSE_FLAG) != 0U;

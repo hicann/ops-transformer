@@ -14,14 +14,17 @@
  */
 
 #include <cmath>
+#include <cstring>
 #include <register/op_impl_registry.h>
 #include "log/log.h"
 #include "op_host/tiling_templates_registry.h"
 #include "quant_flash_attn_tiling.h"
 #include "../op_kernel/arch22/quant_flash_attn_tiling_data_int8.h"
+#include "../op_kernel/arch22/quant_flash_attn_a8_c8_kernel_tiling.h"
 #include "quant_flash_attn_tiling_common.h"
 #include "qfa_tiling_info_parser.h"
 #include "checkers/qfa_checker.h"
+#include "arch22/quant_flash_attn_tiling_a8c8.h"
 #include "../../common/op_host/fia_tiling_templates_registry.h"
 
 using namespace ge;
@@ -51,11 +54,24 @@ ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttn(gert::TilingContext* conte
         OP_LOGE(context, "quant_compute_mode is required.");
         return ge::GRAPH_FAILED;
     }
-    if (*quantMode == QFA_INT8_QUANT_MODE) {
+    if (*quantMode == QFA_INT8_QUANT_MODE && ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201) {
+        const char* kvLayout = attrs->GetStr(ATTR_LAYOUT_KV_INDEX);
+        const bool pagedLayout =
+            kvLayout != nullptr && (std::strcmp(kvLayout, "PA_BNBD") == 0 || std::strcmp(kvLayout, "PA_BBND") == 0 ||
+                                    std::strcmp(kvLayout, "PA_NZ") == 0);
+        const auto* blockTable = context->GetOptionalInputTensor(BLOCK_TABLE_INDEX);
+        const bool hasBlockTable = blockTable != nullptr && blockTable->GetStorageShape().GetShapeSize() != 0;
+        OP_CHECK_IF(pagedLayout != hasBlockTable,
+                    OP_LOGE(context, "Paged KV layout and block_table must be supplied together"),
+                    return ge::GRAPH_FAILED);
+        if (!pagedLayout) {
+            return TilingQuantFlashAttnInt8(context, ascendcPlatform);
+        }
+    } else if (*quantMode == QFA_INT8_QUANT_MODE) {
         return TilingQuantFlashAttnInt8(context, ascendcPlatform);
     }
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201) {
-        OP_LOGE(context, "A2/A3 supports full INT8 GQA quant_mode=12 with required Q/K/V/P scales.");
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201 && *quantMode != QFA_INT8_QUANT_MODE) {
+        OP_LOGE(context, "A2/A3 requires quant_mode=12 for INT8 prefill or paged decode.");
         return ge::GRAPH_FAILED;
     }
     if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201) {
@@ -68,6 +84,10 @@ ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttn(gert::TilingContext* conte
     QfaInfoParser qfaInfoParser(context);
     if (qfaInfoParser.Parse(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
+    }
+
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201) {
+        return quant_flash_attn::TilingQuantFlashAttnA8C8(context, qfaInfo);
     }
 
     QfaChecker qfaChecker;
@@ -99,8 +119,11 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForQuantFlashAttn(gert::TilingPars
     return ge::GRAPH_SUCCESS;
 }
 
+static_assert(sizeof(QfaHostPlanTilingPayload) >= sizeof(QuantFlashAttnTilingQBlockPayloadInt8),
+              "The tiling buffer must also hold the prefill task map");
+
 IMPL_OP_OPTILING(QuantFlashAttn)
-    .Tiling(TilingQuantFlashAttn)
+    .Tiling(TilingQuantFlashAttn, sizeof(QfaHostPlanTilingPayload))
     .TilingParse<QuantFlashAttnCompileInfo>(TilingPrepareForQuantFlashAttn);
 
 } // namespace optiling

@@ -20,6 +20,7 @@
 #define QFA_INT8_TPL_TND 2U
 #define QFA_INT8_TPL_BSND_OR_MIXED 3U
 #define QFA_INT8_TPL_KV_LAYOUT 0U
+#define QFA_INT8_TPL_PAGED_KV_LAYOUT 1U
 #define QFA_INT8_CFG_PIPELINE_MASK 255U
 #define QFA_INT8_CFG_WINDOW_FLAG 256U
 #define QFA_INT8_CFG_LSE_FLAG 512U
@@ -109,6 +110,45 @@ constexpr uint16_t QFA_VEC_D64_TASK_MAP_FEATURES =
     QFA_VEC_SCORE_PREFETCH | QFA_VEC_DIRECT_FIRST_PV | QFA_VEC_OVERLAP_COEFF;
 constexpr uint16_t QFA_VEC_PREFILL_FEATURES = QFA_VEC_D64_TASK_MAP_FEATURES | QFA_VEC_P_BROADCAST;
 } // namespace BaseApi::Int8GqaTnd
+
+namespace optiling {
+constexpr uint32_t QFA_PLAN_MAX_CORES = 48U;
+constexpr uint32_t QFA_PLAN_MAX_BATCH = 256U;
+struct QfaHostPlanData {
+    uint32_t kvUnit;
+    uint32_t hpRows;
+    uint32_t hpVec2Rows;
+    uint32_t hpScratchBytes;
+    uint32_t m;
+    uint32_t cores;
+    uint32_t fdGroups;
+    uint32_t fdVectors;
+    uint32_t partials;
+    uint32_t fdColumns;
+    uint32_t fdRows;
+    uint32_t qBlocks[256];
+    uint32_t kvPanels[256];
+    uint32_t bnEnd[48];
+    uint32_t gsEnd[48];
+    uint32_t kvEnd[48];
+    uint32_t group0[48];
+    uint32_t slot0[48];
+    uint32_t group1[48];
+    uint32_t slot1[48];
+    uint32_t fdBN[48];
+    uint32_t fdGS[48];
+    uint32_t fdSplits[48];
+    uint32_t fdPrefix[48];
+    uint32_t fdItems[48];
+    uint32_t fdLastRows[48];
+    uint32_t fdEndGroup[96];
+    uint32_t fdEndItem[96];
+    uint32_t returnSoftmaxLse;
+    uint32_t headMajorOrder;
+    uint32_t headGroupSize;
+};
+
+} // namespace optiling
 
 // A2/A3 mode 12. One task owns a grouped query M tile and scans all KV tiles. Each active AIC is paired with two
 // AIV subcores and bounded FP16/P8 slots.

@@ -147,7 +147,7 @@ ge::graphStatus QfaInfoParser::GetNpuInfo()
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     OP_CHECK_IF(aicNum == 0 || aivNum == 0, OP_LOGE(opName_, "num of core obtained is 0."), return GRAPH_FAILED);
     npuArch_ = ascendcPlatform.GetCurNpuArch();
-    if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201) {
+    if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_2201) {
         OP_LOGE(opName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
     }
@@ -223,13 +223,31 @@ void QfaInfoParser::GetInputParaInfo()
     opParamInfo_.vDescale.desc = context_->GetInputDesc(V_DESCALE_INDEX);
     opParamInfo_.vDescale.shape = context_->GetInputShape(V_DESCALE_INDEX);
 
-    // 获取 k/v/k_descale/v_descale 的 stride，用于非连续 Tensor 校验
-    if (context_->InputIsView(KEY_INDEX) == true) {
-        hasStride_ = true;
-        keyStrides_ = context_->GetInputStride(KEY_INDEX);
-        valueStrides_ = context_->GetInputStride(VALUE_INDEX);
-        kDescaleStrides_ = context_->GetInputStride(K_DESCALE_INDEX);
-        vDescaleStrides_ = context_->GetInputStride(V_DESCALE_INDEX);
+    if (npuArch_ != NpuArch::DAV_2201) {
+        if (context_->InputIsView(KEY_INDEX) == true) {
+            hasStride_ = true;
+            keyStrides_ = context_->GetInputStride(KEY_INDEX);
+            valueStrides_ = context_->GetInputStride(VALUE_INDEX);
+            kDescaleStrides_ = context_->GetInputStride(K_DESCALE_INDEX);
+            vDescaleStrides_ = context_->GetInputStride(V_DESCALE_INDEX);
+        }
+    } else {
+        if (context_->InputIsView(KEY_INDEX) == true) {
+            keyStrides_ = context_->GetInputStride(KEY_INDEX);
+            hasStride_ = true;
+        }
+        if (context_->InputIsView(VALUE_INDEX) == true) {
+            valueStrides_ = context_->GetInputStride(VALUE_INDEX);
+            hasStride_ = true;
+        }
+        if (context_->InputIsView(K_DESCALE_INDEX) == true) {
+            kDescaleStrides_ = context_->GetInputStride(K_DESCALE_INDEX);
+            hasStride_ = true;
+        }
+        if (context_->InputIsView(V_DESCALE_INDEX) == true) {
+            vDescaleStrides_ = context_->GetInputStride(V_DESCALE_INDEX);
+            hasStride_ = true;
+        }
     }
 
     GetOptionalInputParaInfo();
@@ -280,7 +298,14 @@ ge::graphStatus QfaInfoParser::GetQuantMode()
     }
     int64_t quantModeVal = *opParamInfo_.quantMode;
     using QM = QfaQuantMode;
-    if (npuArch_ == NpuArch::DAV_3510) {
+    if (npuArch_ == NpuArch::DAV_2201) {
+        if (quantModeVal != static_cast<int64_t>(QM::A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR)) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
+                                                  "A2/A3 paged decode quant_mode must be 12 "
+                                                  "(A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR)");
+            return ge::GRAPH_FAILED;
+        }
+    } else if (npuArch_ == NpuArch::DAV_3510) {
         if (quantModeVal != static_cast<int64_t>(QM::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) &&
             quantModeVal !=
                 static_cast<int64_t>(

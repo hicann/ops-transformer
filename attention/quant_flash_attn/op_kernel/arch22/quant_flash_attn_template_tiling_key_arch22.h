@@ -13,6 +13,7 @@
 
 #include "ascendc/host_api/tiling/template_argument.h"
 #include "quant_flash_attn_tiling_data_int8.h"
+#include "quant_flash_attn_a8_c8_kernel_tiling.h"
 
 // Preserve the seven-field ABI. Config uses 10 bits (pipeline, window and LSE), quant mode 5 bits,
 // and KV layout 2 bits. Each unsigned field declares one inclusive range from zero to its bit-width limit.
@@ -25,6 +26,13 @@ ASCENDC_TPL_ARGS_DECL(QuantFlashAttn,
                       ASCENDC_TPL_BOOL_DECL(IsFd, 0, 1), ASCENDC_TPL_BOOL_DECL(HasVTail, 0, 1));
 
 ASCENDC_TPL_SEL(
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, QFA_INT8_TPL_TND),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 3, 4, 5, 6, 7, 8, 11),
+                         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_INT8_QUANT_MODE),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, 0),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, QFA_INT8_TPL_PAGED_KV_LAYOUT),
+                         ASCENDC_TPL_BOOL_SEL(IsFd, 0), ASCENDC_TPL_BOOL_SEL(HasVTail, 0),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(optiling::QfaHostPlanTilingPayload)),
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, QFA_INT8_TPL_BSND_OR_MIXED),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, QFA_INT8_CFG_D96_M512_FIXPIPE,
                                               QFA_INT8_CFG_D96_M256_CAUSAL_MHA, QFA_INT8_CFG_D96_M512_FIXPIPE_LSE,

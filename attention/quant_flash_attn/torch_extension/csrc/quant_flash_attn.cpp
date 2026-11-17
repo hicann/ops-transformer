@@ -149,7 +149,12 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_attn_impl(
                     quant_mode == 10 ||
                     quant_mode == QUANT_MODE_A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16,
                 "Unsupported quant_mode");
-    if (quant_mode == QUANT_MODE_A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16) {
+    const bool pagedInt8 =
+        quant_mode == QUANT_MODE_A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16 &&
+        (layout_kv == "PA_BNBD" || layout_kv == "PA_BBND" || layout_kv == "PA_NZ");
+    TORCH_CHECK(!pagedInt8 || !metadata, "A2/A3 paged INT8 QFA does not support metadata");
+    if (quant_mode == QUANT_MODE_A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16 &&
+        !pagedInt8) {
         CheckInt8Window(mask_mode, win_left, win_right);
         const int64_t rank = layout_q == "TND" ? 3 : 4;
         const int64_t kvHeadAxis = layout_kv == "BSND" ? 2 : 1;
@@ -203,7 +208,7 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_attn_impl(
     if (layout_kv == "TND") {
         dSize = v.size(2);
     } else if (layout_kv == "PA_NZ") {
-        dSize = v.size(2) * v.size(4);
+        dSize = pagedInt8 ? q.size(q.dim() - 1) : v.size(2) * v.size(4);
     } else {
         dSize = v.size(v.dim() - 1);
     }

@@ -60,7 +60,7 @@
   <!-- end id7 -->
 
   <!-- npu="A3,910b" id8 -->
-  <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support fully quantized INT8 MHA/GQA prefill with INT8 Q, K, and V inputs and BF16 output.
+  <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support fully quantized INT8 MHA/GQA prefill and paged decode with INT8 Q, K, and V inputs and BF16 output.
   <!-- end id8 -->
 
 - **Formula**:
@@ -1213,6 +1213,9 @@ Paged Attention is enabled when block_table is not empty.
 - `win_left` and `win_right` specify distances relative to the bottom-right-aligned position. Use `-1` for an unbounded side or a nonnegative value up to `INT32_MAX`. The visible range is the intersection of the window and the mask. Fully masked rows yield zero output and an LSE of `-inf`.
 - Call `quant_flash_attn` directly with `metadata=None`.
 - `softmax_scale` must be finite and positive. Pass `None` for `block_table`, `seqused_q`, `seqused_kv`, `sinks`, `attn_mask`, `v_tail`, `block_table_tail`, and `seqused_v_tail`.
+**Paged decode:**
+
+- INT8 paged decode uses `quant_mode=12`: Q and output use TND; Q descale uses NT; KV supports PA_BNBD, PA_BBND, and PA_NZ. Pass `block_table`, `cu_seqlens_q`, and `seqused_kv`, and set `metadata` to `None`. No mask and causal mask are supported. A paged KV layout together with `block_table` selects decode; calls without a cache use prefill.
 <!-- end id18 -->
 
 ## Example
@@ -1421,3 +1424,34 @@ attn_out, softmax_lse = quant_flash_attn(
 )
 ```
 <!-- end id20 -->
+
+<!-- npu="A3,910b" id22 -->
+### Atlas A2/A3 INT8 Paged Example
+
+```python
+import torch
+import torch_npu
+from cann_ops_transformer.ops import quant_flash_attn
+
+q_heads, kv_heads, head_dim, page_size = 8, 1, 128, 128
+q = torch.randint(-127, 128, (1, q_heads, head_dim), device="npu", dtype=torch.int8)
+k = torch.randint(-127, 128, (2, kv_heads, page_size, head_dim), device="npu", dtype=torch.int8)
+v = torch.randint(-127, 128, (2, kv_heads, page_size, head_dim), device="npu", dtype=torch.int8)
+q_descale = torch.full((q_heads, 1), 0.01, device="npu", dtype=torch.float32)  # NT
+k_descale = torch.full((2, kv_heads, page_size), 0.01, device="npu", dtype=torch.float32)
+v_descale = torch.full((kv_heads,), 0.01, device="npu", dtype=torch.float32)
+p_scale = torch.tensor([127.0], device="npu", dtype=torch.float32)
+block_table = torch.tensor([[0, 1]], device="npu", dtype=torch.int32)
+cu_seqlens_q = torch.tensor([0, 1], device="npu", dtype=torch.int32)
+seqused_kv = torch.tensor([2 * page_size], device="npu", dtype=torch.int32)
+
+attn_out, softmax_lse = quant_flash_attn(
+    q, k, v, q_descale, k_descale, v_descale, quant_mode=12,
+    block_table=block_table, cu_seqlens_q=cu_seqlens_q, seqused_kv=seqused_kv,
+    p_scale=p_scale, softmax_scale=head_dim ** -0.5, mask_mode=0,
+    max_seqlen_q=1, max_seqlen_kv=2 * page_size,
+    layout_q="TND", layout_q_descale="NT", layout_kv="PA_BNBD", layout_out="TND",
+    return_softmax_lse=True,
+)
+```
+<!-- end id22 -->

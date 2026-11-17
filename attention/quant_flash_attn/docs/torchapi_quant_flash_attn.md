@@ -58,7 +58,7 @@
   <!-- end id7 -->
 
   <!-- npu="A3,910b" id8 -->
-  <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>支持 INT8 全量化 MHA/GQA Prefill，输入 Q/K/V 为 INT8，输出为 BF16。
+  <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>支持 INT8 全量化 MHA/GQA Prefill 和分页 Decode，输入 Q/K/V 为 INT8，输出为 BF16。
   <!-- end id8 -->
 
 - **计算公式**：
@@ -1449,6 +1449,9 @@ mask_mode参数解释：
 - `win_left` 和 `win_right` 设置相对右下对齐位置的窗口距离，`-1` 表示该侧无界，非负值最大为 `INT32_MAX`。窗口和 mask 的可见范围取交集。完全被遮蔽的行输出 0，LSE 为 `-inf`。
 - 直接调用 `quant_flash_attn`，`metadata` 传 `None`。
 - `softmax_scale` 须为有限正数。`block_table`、`seqused_q`、`seqused_kv`、`sinks`、`attn_mask`、`v_tail`、`block_table_tail`、`seqused_v_tail` 均传 `None`。
+**分页 Decode：**
+
+- INT8 分页 Decode 使用 `quant_mode=12`：Q 和输出为 TND，Q descale 为 NT，KV 支持 PA_BNBD、PA_BBND、PA_NZ；须传 `block_table`、`cu_seqlens_q`、`seqused_kv`，`metadata` 须传 `None`，支持无 mask 和 causal。有分页 KV 布局和 `block_table` 时进入 Decode 路径，否则按无 cache 的 Prefill 路径处理。
 <!-- end id18 -->
 
 ## 调用示例
@@ -1771,3 +1774,34 @@ attn_out, softmax_lse = quant_flash_attn(
 )
 ```
 <!-- end id20 -->
+
+<!-- npu="A3,910b" id22 -->
+### Atlas A2/A3 INT8 分页 示例
+
+```python
+import torch
+import torch_npu
+from cann_ops_transformer.ops import quant_flash_attn
+
+q_heads, kv_heads, head_dim, page_size = 8, 1, 128, 128
+q = torch.randint(-127, 128, (1, q_heads, head_dim), device="npu", dtype=torch.int8)
+k = torch.randint(-127, 128, (2, kv_heads, page_size, head_dim), device="npu", dtype=torch.int8)
+v = torch.randint(-127, 128, (2, kv_heads, page_size, head_dim), device="npu", dtype=torch.int8)
+q_descale = torch.full((q_heads, 1), 0.01, device="npu", dtype=torch.float32)  # NT
+k_descale = torch.full((2, kv_heads, page_size), 0.01, device="npu", dtype=torch.float32)
+v_descale = torch.full((kv_heads,), 0.01, device="npu", dtype=torch.float32)
+p_scale = torch.tensor([127.0], device="npu", dtype=torch.float32)
+block_table = torch.tensor([[0, 1]], device="npu", dtype=torch.int32)
+cu_seqlens_q = torch.tensor([0, 1], device="npu", dtype=torch.int32)
+seqused_kv = torch.tensor([2 * page_size], device="npu", dtype=torch.int32)
+
+attn_out, softmax_lse = quant_flash_attn(
+    q, k, v, q_descale, k_descale, v_descale, quant_mode=12,
+    block_table=block_table, cu_seqlens_q=cu_seqlens_q, seqused_kv=seqused_kv,
+    p_scale=p_scale, softmax_scale=head_dim ** -0.5, mask_mode=0,
+    max_seqlen_q=1, max_seqlen_kv=2 * page_size,
+    layout_q="TND", layout_q_descale="NT", layout_kv="PA_BNBD", layout_out="TND",
+    return_softmax_lse=True,
+)
+```
+<!-- end id22 -->
