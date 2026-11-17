@@ -46,10 +46,10 @@
       - qInputLayout: "TND" "BNSD" "BSND"
       - kvInputLayout: "TND" "BNSD" "BSND"
 
-- **MXFP4特性说明(仅Ascend 950PR&950DT系列产品支持)**
+- **MXFP4/MXFP8特性说明(仅Ascend 950PR&950DT系列产品支持)**
 
-  本接口新增支持MXFP4数据类型(FLOAT4_E2M1)的输入，以提供计算效率并降低显存占用。当使用MXFP4输入时，需要提供相应的量化缩放因子用于反量化计算。
-- <summary><a id="MXFP4量化模式的量化缩放因子"></a><strong>MXFP4量化模式的量化缩放因子</strong></summary>
+  本接口支持MXFP4（FLOAT4_E2M1，quantMode=2/3）与MXFP8（FLOAT8_E4M3FN，quantMode=4）输入。MX量化模式下需要提供FLOAT8_E8M0缩放因子用于反量化计算，scale shape 与 MXFP4 一致。
+- <summary><a id="MXFP4量化模式的量化缩放因子"></a><strong>MX量化模式的量化缩放因子（quantMode=2/3/4）</strong></summary>
 
   - qDequantScaleOptional：
 
@@ -222,8 +222,12 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     <tr>
       <td>attenMaskOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>公式中的atten_mask。</td>
-      <td>可选块内有效行blockEffRows，与稀疏pattern共同作用；详见约束说明。HIF8模式下形状为[batch, qHeads, maxBlockNum, 2]。</td>
+      <td>块内有效行数（blockEffRows）。</td>
+      <td>
+        可选。INT32，shape 为 [batch, numHeads, maxBlockNum, 2]，最后一维为 [effectiveX, effectiveY]，表示对应稀疏块从第 0 行起的前缀有效长度。
+        experimental 路径下 mxfp8（quantMode=4）支持 KV 侧 effectiveY 块内 mask；启用时 blockShape 仅支持 [128, 128]。
+        HIF8（quantMode=5）模式下形状为[batch, qHeads, maxBlockNum, 2]。不传入则为 nullptr。
+      </td>
       <td>INT32</td>
       <td>ND</td>
       <td>4</td>
@@ -306,8 +310,8 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         </ul>
         当配置此输入时：
         <ul>
-            <li>当quantMode=1, shape为[batch, headNum, ceilDiv(maxQSeqLength, 128), 1]。</li>
-            <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
+          <li>当quantMode=1, shape为[batch, headNum, ceilDiv(maxQSeqLength, 128), 1]。</li>
+          <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
@@ -328,8 +332,8 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         </ul>
         当配置此输入时：
         <ul>
-            <li>当quantMode=1,shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 256), 1]或shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 512), 1]。</li>
-            <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
+          <li>当quantMode=1,shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 256), 1]或shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 512), 1]。</li>
+          <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
@@ -351,7 +355,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         当配置此输入时：
         <ul>
           <li>当quantMode=1, shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 256), 1]或shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 512), 1]。</li>
-         <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
+         <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
@@ -438,7 +442,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         <ul>
           <li>0：表示online softmax和rescale全部采取fp32数据类型，适合追求计算精度的场景使用。</li>
           <li>1：仅支持输入的query、key、value均为fp16数据类型时配置，表示online softmax和rescale全部采取fp16数据类型，性能更好，但精度较低，且可能发生计算时的数值溢出，使用者需根据值域范围自行判断是否使用。</li>
-          <li>4：表示混合精度运算，在性能与精度上取得一个折中。online softmax采取fp16/bf16数据类型（与query、key、value数据类型相同），rescale采取fp32数据类型，在online softmax阶段可能发生数值溢出。mxfp4量化模式下（quantMode=2/3），online softmax仅支持fp16数据类型。</li>
+          <li>4：表示混合精度运算，在性能与精度上取得一个折中。online softmax采取fp16/bf16数据类型（与query、key、value数据类型相同），rescale采取fp32数据类型，在online softmax阶段可能发生数值溢出。mxfp4量化模式（quantMode=2/3）与mxfp8量化模式（quantMode=4）下，online softmax仅支持fp16数据类型。</li>
         </ul>
       </td>
       <td>INT64</td>
@@ -497,13 +501,15 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>输入</td>
       <td>量化模式选择标志位。</td>
       <td>
-        当前支持传0、1、2、3、5和20。
+        当前支持传0、1、2、3、4、5和20。
         <ul>
           <li>0：表示非量化。</li>
           <li>1：表示FP8量化。</li>
           <li>2：表示MXFP4 OCP量化(量化scale向下截断)。</li>
           <li>3：表示MXFP4 CX量化(自定义量化量程, 量化scale向上截断)。</li>
+          <li>4：表示MXFP8 OCP量化(QKV为FLOAT8_E4M3FN，scale为FLOAT8_E8M0)。</li>
           <li>5：表示HIF8 per-tensor量化，约束见下文。</li>
+          <li>详见<a href="#constraint_rule">约束说明</a>。</li>
         </ul>
       </td>
       <td>INT64</td>
@@ -666,22 +672,22 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - qInputLayout当前仅支持"TND"和"BNSD"和"BSND"。
 - kvInputLayout当前仅支持"TND"和"BNSD"和"BSND"。
 - 当前query、key、value的InputLayout必须保持一致。
-- 输入query、key、value的数据类型必须一致：非量化模式（quantMode=0）支持FLOAT16和BFLOAT16；quantMode=1/20支持FLOAT8_E4M3FN；quantMode=2/3支持FLOAT4_E2M1；quantMode=5支持HIFLOAT8。量化模式仅Ascend 950PR&950DT系列产品支持。
+- 输入query、key、value的数据类型必须一致：非量化模式（quantMode=0）支持FLOAT16和BFLOAT16；quantMode=1/20支持FLOAT8_E4M3FN；quantMode=2/3支持FLOAT4_E2M1；quantMode=4支持FLOAT8_E4M3FN（MXFP8）；quantMode=5支持HIFLOAT8。量化模式仅Ascend 950PR&950DT系列产品支持。
 - query、key、value的D轴当前仅支持配置为64或128
 - blockShapeOptional如果传入，则必须包含两个元素[blockShapeX, blockShapeY]，且值必须大于0。blockShapeX/blockShapeY在不同产品上的倍数约束如下：
   <!-- npu="950" id7 -->
-  - 在<term>Ascend 950PR&950DT系列产品</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）时，blockShapeX和blockShapeY均只支持64的倍数；HIF8量化（quantMode=5）时，blockShapeX和blockShapeY均须为16的倍数。
+  - 在<term>Ascend 950PR&950DT系列产品</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）与MXFP8量化（quantMode=4）时，blockShapeX和blockShapeY均只支持64的倍数；HIF8量化（quantMode=5）时，blockShapeX和blockShapeY均须为16的倍数。
   <!-- end id7 -->
   <!-- npu="910b,A3" id8 -->
   - 在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上：blockShapeY须为128的倍数。
   <!-- end id8 -->
 - blockSparseMaskOptional当前必须传入，且shape为[batch, headNum, qBlockNum, kvBlockNum]。TND时，qBlockNum = ceilDiv(max(actualSeqLengths), blockShapeX)，kvBlockNum = ceilDiv(max(actualSeqLengthsKv), blockShapeY)。BNSD/BSND时，qBlockNum = ceilDiv(Q shape中的S, blockShapeX)，kvBlockNum = ceilDiv(K shape中的S, blockShapeY)；若传入actualSeqLengths和actualSeqLengthsKv，也可按实际长度计算：qBlockNum = ceilDiv(max(actualSeqLengths), blockShapeX)，kvBlockNum = ceilDiv(max(actualSeqLengthsKv), blockShapeY)。
-- attenMaskOptional可选。HIF8量化（quantMode=5）支持INT32的blockEffRows，形状为[batch, qHeads, maxBlockNum, 2]；最后一维分别为Q/KV块的有效前缀行数，maxBlockNum不小于Q/KV块数的最大值。
+- attenMaskOptional可选。mxfp8（quantMode=4）可作为 blockEffRows（INT32，[batch,numHeads,maxBlockNum,2]）传入，启用时 blockShape 仅支持 [128, 128]。HIF8量化（quantMode=5）支持INT32的blockEffRows，形状为[batch, qHeads, maxBlockNum, 2]；最后一维分别为Q/KV块的有效前缀行数，maxBlockNum不小于Q/KV块数的最大值。
 - actualSeqLengthsOptional在qInputLayout为“TND”时必选；actualSeqLengthsKvOptional在kvInputLayout为“TND”时必选。
 - actualSeqLengthsOptional与actualSeqLengthsKvOptional当前必须同时配置或同时不配置，仅配置其中之一的行为将被算子拦截。
 - blockTableOptional当前只支持传入nullptr，表示不开启PagedAttention特性。
 <!-- npu="950,A3,910b" id9 -->
-- innerPrecise必须为0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>上，FLOAT16/BFLOAT16输入支持0或4，FP8/MXFP4量化仅支持4，HIF8量化（quantMode=5）仅支持0；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持配置为0或1。
+- innerPrecise必须为0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>上，FLOAT16/BFLOAT16输入支持0或4，FP8/MXFP4/MXFP8量化仅支持4，HIF8量化（quantMode=5）仅支持0；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持配置为0或1。
 <!-- end id9 -->
 - softmaxLseFlag仅支持配置0或1，分别表示不开启/开启softmaxLse输出。
 - qSeqlen和kvSeqlen不需要被blockShape整除，支持非对齐场景，实际分块数通过向上取整计算。
@@ -731,6 +737,22 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     - **CX量化公式**
 
       $$ P_{\text{Scale}} = 2^{\lceil \log_2 \left( P_{\text{max}} / dstTypeMax \right) \rceil} = 2^{\lceil \log_2 P_{\text{max}} - \log_2 dstTypeMax \rceil} $$
+
+- **quantMode=4 (MXFP8 OCP量化模式)相关约束（新增）**
+
+  - 仅Ascend 950PR&950DT系列产品支持
+  - 输入 query/key/value 为 FLOAT8_E4M3FN，scale 为 FLOAT8_E8M0
+  - blockShapeX 与 blockShapeY 均只支持 64 的倍数
+  - D仅支持64/128
+  - attentionOut数据类型仅支持FLOAT16或BFLOAT16
+  - innerPrecise 必须为 4；暂不支持 PagedAttention。softmaxLseFlag=1 可以输出 softmaxLse。
+  - 支持 attenMaskOptional 作为 blockEffRows（块内前缀有效行）；启用时 blockShape 仅支持 [128, 128]。
+  - 仅支持 V3 接口显式传入 quantMode=4，V1/V2 不会自动推断 mxfp8
+  - **量化公式**（e4m3 的 emax=8）
+    - 以P的量化为例, 其中 $P_{\text{max}}$ 为一个group（32个元素）内元素绝对值的最大值。
+    - **OCP 量化公式**
+
+      $$ P_{\text{Scale}} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor - 8} $$
 
 <!-- npu="950" id14 -->
 - **quantMode=5（HIF8 per-tensor量化模式）相关约束**：

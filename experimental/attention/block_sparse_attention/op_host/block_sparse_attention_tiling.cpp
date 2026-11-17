@@ -124,8 +124,9 @@ enum QuantMode : int64_t {
     FP8_QUANT = 1,
     MXFP4_OCP_QUANT = 2,
     MXFP4_CX_QUANT = 3,
+    MXFP8_OCP_QUANT = 4,
     HIF8_PER_TENSOR_QUANT = 5,
-    // quantMode=4 已规划给主线分支，experimental下per-head 使用较大值 20
+    // quantMode=4 为 mxfp8 OCP；experimental 下 per-head 使用较大值 20
     FP8_PERHEAD_QUANT = 20,
 };
 
@@ -133,6 +134,14 @@ enum QuantMode : int64_t {
 static bool IsMxfp4Quant(int64_t qm)
 {
     return qm == MXFP4_OCP_QUANT || qm == MXFP4_CX_QUANT;
+}
+static bool IsMxfp8Quant(int64_t qm)
+{
+    return qm == MXFP8_OCP_QUANT;
+}
+static bool IsMxFullQuant(int64_t qm)
+{
+    return IsMxfp4Quant(qm) || IsMxfp8Quant(qm);
 }
 
 static bool IsHif8Quant(int64_t qm)
@@ -788,17 +797,18 @@ ge::graphStatus BSATiling::ParseSparsePattern(gert::TilingContext* bsaContext)
     if (CheckSparsePattern(bsaContext, defaultShape) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    // V3 新增:mxfp4 要求 blockShapeX 为 64 的倍数
-    if (IsMxfp4Quant(quantMode_) && blockShapeX_ % 64 != 0) {
-        OP_LOGE(bsaContext->GetNodeName(), "mxfp4 requires blockShapeX to be multiple of 64, but got %u.",
-                blockShapeX_);
-        return ge::GRAPH_FAILED;
-    }
-    // V3 新增:mxfp4 要求 blockShapeY 为 64 的倍数
-    if (IsMxfp4Quant(quantMode_) && blockShapeY_ % 64 != 0) {
-        OP_LOGE(bsaContext->GetNodeName(), "mxfp4 requires blockShapeY to be multiple of 64, but got %u.",
-                blockShapeY_);
-        return ge::GRAPH_FAILED;
+    // mx full-quant (mxfp4/mxfp8) requires blockShapeX/Y to be multiples of 64
+    if (IsMxFullQuant(quantMode_)) {
+        if (blockShapeX_ % NUM_64 != 0) {
+            OP_LOGE(bsaContext->GetNodeName(), "mx full-quant requires blockShapeX to be multiple of 64, but got %u.",
+                    blockShapeX_);
+            return ge::GRAPH_FAILED;
+        }
+        if (blockShapeY_ % NUM_64 != 0) {
+            OP_LOGE(bsaContext->GetNodeName(), "mx full-quant requires blockShapeY to be multiple of 64, but got %u.",
+                    blockShapeY_);
+            return ge::GRAPH_FAILED;
+        }
     }
     // HIF8 keeps a fixed 128x256 internal base tile, but sparse X/Y block
     // boundaries may be smaller and are handled through the existing Q/KV
@@ -884,10 +894,19 @@ ge::graphStatus BSATiling::ParseA5AttenMask(gert::TilingContext* bsaContext, con
                     static_cast<int>(kvScalePerHead));
             return ge::GRAPH_FAILED;
         }
+    } else if (IsMxfp8Quant(quantMode_)) {
+        // 本代 mxfp8 块内 mask 仅 blockShape [128, 128]。下一代为 [256, 256]，当前未开放。
+        if (blockShapeX_ != 128 || blockShapeY_ != 128) {
+            OP_LOGE(bsaContext->GetNodeName(),
+                    "attenMask (blockEffRows) with mxfp8 requires blockShape [128, 128], but got [%ld, %ld].",
+                    blockShapeX_, blockShapeY_);
+            return ge::GRAPH_FAILED;
+        }
     } else if (!IsMxfp4Quant(quantMode_) && !IsHif8Quant(quantMode_)) {
         OP_LOGE(bsaContext->GetNodeName(),
-                "attenMask (blockEffRows) is only supported for mxfp4(quantMode=2 and 3) "
-                "FP8(quantMode=1 and 20), and HIF8(quantMode=5) on chip 950, but got quantMode=%ld.",
+                "attenMask (blockEffRows) is only supported for mxfp4(quantMode=2 and 3), "
+                "mxfp8(quantMode=4), FP8(quantMode=1 and 20), and HIF8(quantMode=5) on chip 950, "
+                "but got quantMode=%ld.",
                 quantMode_);
         return ge::GRAPH_FAILED;
     }
@@ -1066,7 +1085,7 @@ ge::graphStatus BSATiling::ValidateGenericDequantScale(gert::TilingContext* bsaC
                     NUM_1, dequantScaleBatch, dequantScaleNumHeads, dequantScaleBlockNum, dequantScaleLastDim);
             return ge::GRAPH_FAILED;
         }
-    } else if (IsMxfp4Quant(quantMode_)) {
+    } else if (IsMxFullQuant(quantMode_)) {
         return ValidateMxfp4DequantScale(bsaContext, parameterIndex);
     } else {
         if (dequantScaleTensor != nullptr) {
@@ -1087,7 +1106,7 @@ ge::graphStatus BSATiling::ValidateMxfp4DequantScale(gert::TilingContext* bsaCon
 {
     const auto* scaleShape = bsaContext->GetOptionalInputShape(parameterIndex);
     if (scaleShape == nullptr) {
-        OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3) mxfp4 dequantScale (index=%d) must not be nullptr.",
+        OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3/4) mx dequantScale (index=%d) must not be nullptr.",
                 parameterIndex);
         return ge::GRAPH_FAILED;
     }
@@ -1102,7 +1121,7 @@ ge::graphStatus BSATiling::ValidateMxfp4DequantScale(gert::TilingContext* bsaCon
         uint32_t actual = static_cast<uint32_t>(storageShape.GetDim(idx));
         if (actual != expected) {
             OP_LOGE(bsaContext->GetNodeName(),
-                    "(quantMode =2/3) mxfp4 scale dim[%d] mismatch (layout=%s, index=%d): expected %u, got %u.", idx,
+                    "(quantMode =2/3/4) mx scale dim[%d] mismatch (layout=%s, index=%d): expected %u, got %u.", idx,
                     layoutName, parameterIndex, expected, actual);
             return false;
         }
@@ -1114,7 +1133,7 @@ ge::graphStatus BSATiling::ValidateMxfp4DequantScale(gert::TilingContext* bsaCon
         //   QScale=[Tq,Nq,D//64,2]  KScale=[Tkv,Nkv,D//64,2]  VScale=[BTkv,Nkv,D,2]
         //   Tq=totalTokensT_, Tkv=totalTokensKv_, BTkv=btKvTokens_(sum_b CeilDiv(S2_b,64), ParseSeqlensInTND 累加)
         if (storageShape.GetDimNum() != DIM_NUM_4) {
-            OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3) mxfp4 TND scale must be 4D, got %zuD.",
+            OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3/4) mx TND scale must be 4D, got %zuD.",
                     storageShape.GetDimNum());
             return ge::GRAPH_FAILED;
         }
@@ -1140,7 +1159,7 @@ ge::graphStatus BSATiling::ValidateMxfp4DequantScale(gert::TilingContext* bsaCon
 
     // BNSD/BSND: 5D scale shapes (existing)
     if (storageShape.GetDimNum() != DIM_NUM_5) {
-        OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3) mxfp4 scale must be 5D, got %zuD.",
+        OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3/4) mx scale must be 5D, got %zuD.",
                 storageShape.GetDimNum());
         return ge::GRAPH_FAILED;
     }
@@ -1241,9 +1260,9 @@ ge::graphStatus BSATiling::ParseAttrs(gert::TilingContext* bsaContext)
     auto quantModePtr = attrs->GetAttrPointer<int64_t>(QUANT_MODE_INDEX);
     int64_t quantModeValue = (quantModePtr == nullptr) ? 0 : *quantModePtr;
     if (quantModeValue != NO_QUANT && quantModeValue != FP8_QUANT && quantModeValue != MXFP4_OCP_QUANT &&
-        quantModeValue != MXFP4_CX_QUANT && quantModeValue != FP8_PERHEAD_QUANT &&
+        quantModeValue != MXFP4_CX_QUANT && quantModeValue != MXFP8_OCP_QUANT && quantModeValue != FP8_PERHEAD_QUANT &&
         quantModeValue != HIF8_PER_TENSOR_QUANT) {
-        OP_LOGE(bsaContext->GetNodeName(), "Invalid quantMode %ld. Supported: 0/1/2/3/5/20.", quantModeValue);
+        OP_LOGE(bsaContext->GetNodeName(), "Invalid quantMode %ld. Supported: 0/1/2/3/4/5/20.", quantModeValue);
         return ge::GRAPH_FAILED;
     }
     quantMode_ = static_cast<uint32_t>(quantModeValue);
@@ -1423,7 +1442,9 @@ void BSATiling::CalcBaseTileTilingParams950()
     }
     qBaseTile_ = (blockShapeX_ > TILE_SIZE_128) ? TILE_SIZE_128 : static_cast<uint32_t>(blockShapeX_);
     const bool isMixedPrecision = (innerPrecise_ == BsaInnerCalcPrec::LOW_HIGH_MIXED && embeddingSize_ <= D_SIZE_128);
-    if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
+    if (quantMode_ == MXFP8_OCP_QUANT) {
+        kvBaseTile_ = TILE_SIZE_128;
+    } else if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
         // per-head kv scale 模式下 kv 序列拼接固定按 512 tile，blockShapeY 不再要求为 512
         bool enableKvBaseTile512 =
             isMixedPrecision && (perHeadKvScale_ || ((quantMode_ == FP8_QUANT) && (blockShapeY_ == 512)));
@@ -1735,6 +1756,12 @@ uint64_t BSATiling::GenerateTilingKey(gert::TilingContext* bsaContext)
             tilingKey += 41;
         } else {
             tilingKey += 40;
+        }
+    } else if (quantMode_ == MXFP8_OCP_QUANT) {
+        if (attentionOutDataType_ == ge::DT_FLOAT16) {
+            tilingKey += 51;
+        } else {
+            tilingKey += 50;
         }
     } else if (quantMode_ == FP8_QUANT || quantMode_ == FP8_PERHEAD_QUANT) {
         // quantMode=1/20 均为 fp8 全量化, 走同一 full_quant kernel 系列

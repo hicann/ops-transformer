@@ -45,6 +45,8 @@ struct TaskInfo {
     int64_t kvSeqlen = 0;           // 当前 batch 实际 KV 长度
     uint32_t yBlockNumAval = 0;     // CeilDiv(kvSeqlen, blockShapeY)，实际 Y-block 总数
     uint32_t yBlockNumRsvd = 0;     // 本 task 选中 Y-block 数（来自 gSparseCount）
+    // mask2idx 按列升序 GatherMask。count==aval 且最后下标==aval-1 时序列必为 0..aval-1。
+    bool sparseIdxIdentity = false;
     // ===== QK(Mm1) 所需（mxfp4）=====
     int64_t gmOffsetQ = 0;      // Q 数据偏移（含本 task 的 Q seq 起点，fp4 元素单位）
     int64_t gmOffsetK = 0;      // K 数据 batch+head 基址（seq 由后续稀疏 gather 处理）
@@ -53,6 +55,9 @@ struct TaskInfo {
     // O GM 偏移
     int64_t gmOffsetO = 0;
     uint32_t oShapeCol = 0;
+    // LSE GM 偏移（mxfp8 OUT_ONLY；mxfp4 不填）
+    int64_t gmOffsetLse = 0;
+    uint32_t lseShapeCol = 0;
     uint32_t qsActBaseTileAlign128 = 0;
     uint32_t qsActBaseTileAlign64 = 0;
     uint32_t qsActBaseTileAlign16 = 0;
@@ -69,6 +74,7 @@ struct BatchOffsetInfo {
     uint32_t curTotalTaskNum = 0; // 含 curBatch 在内的 task 总数（初始化为 firstBatchTaskNum）
     // TND 下各 GM 的 batch 累积偏移（BNSD/BSND 由 curBatch 直接算，不用这些字段）
     int64_t oBOffset = 0;      // O 输出
+    int64_t lseBOffset = 0;    // LSE 输出（TND 累积）
     int64_t qBOffset = 0;      // Q 数据
     int64_t qScaleBOffset = 0; // Q-scale（字节）
     int64_t vBOffset = 0;      // V(=K) 数据
@@ -95,14 +101,22 @@ struct TileInfo {
     uint32_t kvsActBaseTileAlign16 = 0;
     uint32_t kvsActBaseTileAlign32 = 0;
     uint32_t kvsActBaseTileAlign64 = 0;
-    // ===== blockEffRows(attenMask) 所需（mxfp4 softmax），blockShapeY等于128=====
+    // ===== blockEffRows(attenMask)：mxfp4 两段各128；mxfp8 仅一段128（validRowsY2 不用）=====
     uint16_t validRowsY1 = 128;
     uint16_t validRowsY2 = 128;
     // ===== PV 稀疏 gather 所需（mxfp4）=====
     uint32_t pvGatheredKvSTileIdx = 0; // 当前 tile 在 task 内的 gather 后 KV base tile 序号，供 PV
     uint16_t pscaleNum = 0;
+    uint16_t pSlot = 0; // L1 P 环 0..L1_P_BUF_CNT-1，CreateTileInfo 滚动写入，热路径不再 % 20
 };
 } // namespace MXFP4Kernel
+
+namespace MXFP8Kernel {
+static constexpr uint32_t TILE_GROUP_N = 16; // group window 16*128=2048
+using TaskInfo = MXFP4Kernel::TaskInfo;
+using TileInfo = MXFP4Kernel::TileInfo;
+using BatchOffsetInfo = MXFP4Kernel::BatchOffsetInfo;
+} // namespace MXFP8Kernel
 
 #include "../attn_infra/epilogue/block/bsa_block_epilogue.hpp"
 #include "../attn_infra/epilogue/bsa_epilogue_dispatch_policy.hpp"

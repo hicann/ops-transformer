@@ -39,9 +39,10 @@ enum QuantMode : int64_t {
     FP8_QUANT = 1,
     MXFP4_OCP_QUANT = 2,
     MXFP4_CX_QUANT = 3,
+    MXFP8_OCP_QUANT = 4,
     HIF8_PER_TENSOR_QUANT = 5,
     // fp8 全量化 + per-head kv 反量化(k/v scale 为 [B, kvHeads] 两维) + blockEffRows
-    // quantMode=4 已规划给其它分支，per-head 使用较大值 20
+    // per-head 使用较大值 20，避免与 quantMode=4 (mxfp8 OCP) 冲突
     FP8_PERHEAD_QUANT = 20,
 };
 
@@ -172,10 +173,13 @@ static bool CheckQuantModeAndDtype(int64_t quantMode, const aclTensor* query, co
         case MXFP4_CX_QUANT: // quantMode=2/3: QKV=FP4_E2M1, scales=FP8_E8M0
             return CheckQuantParams(query, key, value, qScale, kScale, vScale, DataType::DT_FLOAT4_E2M1,
                                     DataType::DT_FLOAT8_E8M0, quantMode, "FP4_E2M1", "FP8_E8M0");
+        case MXFP8_OCP_QUANT: // quantMode=4: QKV=FP8_E4M3FN, scales=FP8_E8M0 (OCP only)
+            return CheckQuantParams(query, key, value, qScale, kScale, vScale, DataType::DT_FLOAT8_E4M3FN,
+                                    DataType::DT_FLOAT8_E8M0, quantMode, "FP8_E4M3FN", "FP8_E8M0");
         case HIF8_PER_TENSOR_QUANT:
             return CheckHif8PerTensorParams(query, key, value, qScale, kScale, vScale, pScale);
         default:
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Invalid quantMode %ld, must be 0/1/2/3/5/20.", quantMode);
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Invalid quantMode %ld, must be 0/1/2/3/4/5/20.", quantMode);
             return false;
     }
 }
@@ -269,7 +273,7 @@ static aclnnStatus CheckMxfp4ScaleDim(const aclTensor* qScale, const aclTensor* 
     size_t expectedDim = (layout == "TND") ? 4 : 5;
     auto checkOne = [&](const aclTensor* scale, const char* name) -> bool {
         if (scale->GetStorageShape().GetDimNum() != expectedDim) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "mxfp4 %s must be %zuD tensor for %s layout, got %zuD.", name, expectedDim,
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "mx %s must be %zuD tensor for %s layout, got %zuD.", name, expectedDim,
                     layout.c_str(), scale->GetStorageShape().GetDimNum());
             return false;
         }
@@ -364,8 +368,8 @@ static aclnnStatus MakeContiguous(const aclTensor*& query, const aclTensor*& key
             return ACLNN_ERR_PARAM_INVALID;
         }
 
-    } else if (quantMode == MXFP4_OCP_QUANT || quantMode == MXFP4_CX_QUANT) {
-        // mxfp4(OCP/CX): scale 维度按 layout 校验, TND=4维, BNSD/BSND=5维
+    } else if (quantMode == MXFP4_OCP_QUANT || quantMode == MXFP4_CX_QUANT || quantMode == MXFP8_OCP_QUANT) {
+        // mxfp4(OCP/CX) 与 mxfp8(OCP): scale 维度按 layout 校验, TND=4维, BNSD/BSND=5维
         qDequantScaleOptional = l0op::Contiguous(qDequantScaleOptional, executor);
         CHECK_RET(qDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
         kDequantScaleOptional = l0op::Contiguous(kDequantScaleOptional, executor);
@@ -436,6 +440,19 @@ static aclnnStatus ValidateAdditionalParams(int64_t innerPrecise, int64_t quantM
 static aclnnStatus ValidateMxfp4Constraints(int64_t quantMode, int64_t softmaxLseFlag, int64_t innerPrecise,
                                             const aclTensor* attenMaskOptional, const aclTensor* blockTableOptional)
 {
+    // mxfp8 OCP：innerPrecise=4，允许 softmaxLseFlag=1 与 attenMask(blockEffRows)；暂不支持 PagedAttention
+    if (quantMode == MXFP8_OCP_QUANT) {
+        if (innerPrecise != 4) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "innerPrecise must be 4 in mxfp8 quantMode(%lld), got %lld.", quantMode,
+                    innerPrecise);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (blockTableOptional != nullptr) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "blockTableOptional must be nullptr in mxfp8 quantMode(%lld).", quantMode);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        return ACLNN_SUCCESS;
+    }
     if (quantMode != MXFP4_OCP_QUANT && quantMode != MXFP4_CX_QUANT) {
         return ACLNN_SUCCESS;
     }
