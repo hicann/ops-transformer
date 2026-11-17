@@ -1527,18 +1527,65 @@ def cpu_qfa_hif8(
             cu_seqlens_kv_list if len(cu_seqlens_kv_list) > 1 else None,
         )
 
-    cpu_out, cpu_lse = hif8_golden_mod.cpu_hif8_golden(
-        q_bnsd,
-        k_bnsd,
-        v_bnsd,
-        deq_q,
-        deq_k,
-        deq_v,
-        p_scale_t,
-        actual_seq_q,
-        actual_seq_kv,
-        softmax_scale=softmax_scale,
-    )
+    # FD 打开时 kernel 会把 KV 切成多段，每段 online max 重置，HIF8 的 P 量化
+    # 舍入随之变化，串行 golden 必然对不上（与 pytest 侧 cpu_hif8_scheduled_golden
+    # 同因）。这里复用设备侧 AICPU metadata 的 FA 分片范围复算。
+    schedule = None
+    if bool(getattr(hif8_golden_mod, "_HAS_NPU", False)):
+        try:
+            schedule = _hif8_fd_schedule(
+                cu_seqlens_q_list if len(cu_seqlens_q_list) > 1 else None,
+                cu_seqlens_kv_list if len(cu_seqlens_kv_list) > 1 else None,
+                actual_seq_q,
+                actual_seq_kv,
+                num_heads_q=int(q_bnsd.shape[1]),
+                num_heads_kv=int(v_bnsd.shape[1]),
+                head_dim=int(q_bnsd.shape[-1]),
+                head_dim_v=int(v_bnsd.shape[-1]),
+                batch_size=int(B),
+                max_seqlen_q=int(max_seqlen_q),
+                max_seqlen_kv=int(max_seqlen_kv),
+                mask_mode=int(mask_mode),
+                layout_q=str(layout_q),
+                layout_q_descale=str(q_scale_layout),
+                layout_kv=str(layout_kv),
+                layout_out=str(layout_out),
+            )
+        except Exception as exc:  # noqa: BLE001 - 拿不到调度就退回串行 golden
+            logger.warning(
+                "[GOLDEN] FD schedule unavailable (%s), use serial golden", exc
+            )
+            schedule = None
+
+    cpu_out, cpu_lse = None, None
+    if schedule is not None and int(schedule[1]) != 0 and int(mask_mode) in (0, 3):
+        cpu_out, cpu_lse = hif8_golden_mod.cpu_hif8_scheduled_golden(
+            q_bnsd,
+            k_bnsd,
+            v_bnsd,
+            deq_q,
+            deq_k,
+            deq_v,
+            p_scale_t,
+            actual_seq_q,
+            actual_seq_kv,
+            schedule,
+            softmax_scale=softmax_scale,
+            sparse_mode=int(mask_mode),
+        )
+    if cpu_out is None:
+        cpu_out, cpu_lse = hif8_golden_mod.cpu_hif8_golden(
+            q_bnsd,
+            k_bnsd,
+            v_bnsd,
+            deq_q,
+            deq_k,
+            deq_v,
+            p_scale_t,
+            actual_seq_q,
+            actual_seq_kv,
+            softmax_scale=softmax_scale,
+        )
 
     compare_layout = input_layout
     cu_q_for_convert = (
@@ -1613,6 +1660,69 @@ def cpu_qfa_hif8(
     )
 
     return result
+
+
+def _hif8_fd_schedule(
+    cu_seqlens_q,
+    cu_seqlens_kv,
+    seqused_q,
+    seqused_kv,
+    *,
+    num_heads_q,
+    num_heads_kv,
+    head_dim,
+    head_dim_v,
+    batch_size,
+    max_seqlen_q,
+    max_seqlen_kv,
+    mask_mode,
+    layout_q,
+    layout_q_descale,
+    layout_kv,
+    layout_out,
+):
+    """在设备侧重算 AICPU metadata，取出 kernel 实际使用的 FA/FD 分片。
+
+    TTK 对动态槽位只把 npu_preprocess 的结果给主算子，CPU golden 拿到的是
+    None（见 ttk aclnn testcase 的 _aclnn_dynamic_tensors 注释），所以这里
+    按主算子同一套参数再调一次 metadata 算子，拿到与 kernel 一致的调度表。
+    """
+    import torch_npu  # noqa: F401
+
+    meta_op = getattr(hif8_golden_mod, "quant_flash_attn_metadata", None)
+    if meta_op is None:
+        return None
+
+    device = torch.device("npu", torch.npu.current_device())
+
+    def _t(values):
+        if values is None:
+            return None
+        return torch.tensor([int(v) for v in values], dtype=torch.int32, device=device)
+
+    is_tnd = str(layout_q).upper() in ("TND", "NTD")
+    metadata = meta_op(
+        int(num_heads_q),
+        int(num_heads_kv),
+        int(head_dim),
+        0,
+        cu_seqlens_q=_t(cu_seqlens_q) if is_tnd else None,
+        cu_seqlens_kv=_t(cu_seqlens_kv)
+        if str(layout_kv).upper() in ("TND", "NTD")
+        else None,
+        seqused_q=_t(seqused_q),
+        seqused_kv=_t(seqused_kv),
+        batch_size=None if is_tnd else int(batch_size),
+        max_seqlen_q=int(max_seqlen_q),
+        max_seqlen_kv=int(max_seqlen_kv),
+        head_dim_v=None if head_dim_v is None else int(head_dim_v),
+        mask_mode=int(mask_mode),
+        layout_q=str(layout_q),
+        layout_q_descale=str(layout_q_descale),
+        layout_kv=str(layout_kv),
+        layout_out=str(layout_out),
+    )
+    return metadata.detach().cpu().reshape(-1).to(torch.int64)
 
 
 def _apply_hif8_golden_globals(attrs):

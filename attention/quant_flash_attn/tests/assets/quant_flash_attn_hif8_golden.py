@@ -354,6 +354,150 @@ def cpu_hif8_golden(
     return out, lse
 
 
+def cpu_hif8_scheduled_golden(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    schedule,
+    softmax_scale=None,
+    sparse_mode=0,
+):
+    """按 AICPU FA 调度分片复算 HIF8 golden（FD 感知）。
+
+    HIF8 的 P 量化是非线性的：FD 把 KV 切成多段后，每段 online max 从 -inf
+    重新起算，`hif8_cast_p(exp(S - m))` 的舍入结果随之变化，串行 golden 的
+    max 是全局单调递增的，两者必然对不上。这里直接用设备侧 metadata 的
+    FA 任务范围（section x core 的 [bn, m] x [s2_block] 区间）逐段累加，
+    再按 exp(m - m_max) 加权合并，与 kernel 的 FD 归约口径一致。
+
+    schedule 为 metadata 展平后的 int32/int64 序列，头部常量见
+    quant_flash_attn_metadata.h 的 HEAD_*_INDEX / FA_*_INDEX。
+    """
+    sched = (
+        schedule.detach().cpu().reshape(-1).to(torch.int64)
+        if torch.is_tensor(schedule)
+        else torch.as_tensor(schedule, dtype=torch.int64)
+    )
+    if sched.numel() < 16 or not int(sched[1]):
+        return None
+
+    q8 = q_fp8.detach().cpu() if torch.is_tensor(q_fp8) else torch.as_tensor(q_fp8)
+    k8 = k_fp8.detach().cpu() if torch.is_tensor(k_fp8) else torch.as_tensor(k_fp8)
+    v8 = v_fp8.detach().cpu() if torch.is_tensor(v_fp8) else torch.as_tensor(v_fp8)
+    dq = torch.as_tensor(dequant_scale_q).reshape(-1)[:1]
+    dk = torch.as_tensor(dequant_scale_k).reshape(-1)[:1]
+    dv = torch.as_tensor(v_descale).reshape(-1)[:1]
+
+    q = hif8_per_tensor_dequant(q8) * dq
+    k = hif8_per_tensor_dequant(k8) * dk
+    v = hif8_per_tensor_dequant(v8) * dv
+
+    num_heads_q, num_heads_kv = int(q.shape[1]), int(k.shape[1])
+    if num_heads_q != num_heads_kv:
+        k = broadcast_kv(num_heads_q, num_heads_kv, k)
+        v = broadcast_kv(num_heads_q, num_heads_kv, v)
+
+    d = int(q.shape[-1])
+    scale = softmax_scale if softmax_scale is not None else 1.0 / math.sqrt(d)
+    ln_ps = math.log(float(torch.as_tensor(p_scale).reshape(-1)[0]))
+
+    sn, ac, mb, kb = (int(sched[i]) for i in (0, 4, 2, 3))
+    if mb <= 0 or kb <= 0:
+        raise ValueError(f"Invalid HIF8 schedule tiles: mBase={mb}, s2Base={kb}")
+    rows = sched[16 : 16 + sn * ac * 16].reshape(-1, 16).tolist()
+
+    qlens, klens = list(actual_seq_q), list(actual_seq_kv)
+    out = torch.zeros((*q.shape[:-1], v.shape[-1]), dtype=torch.float32)
+    lse = torch.full((*q.shape[:-1], 1), float("inf"), dtype=torch.float32)
+    fmin = -torch.finfo(torch.float32).max
+
+    for b, (sq, sk) in enumerate(zip(qlens, klens)):
+        if sq <= 0 or sk <= 0:
+            continue
+        for h in range(num_heads_q):
+            bn = b * num_heads_q + h
+            for mi, lo in enumerate(range(0, sq, mb)):
+                hi = min(lo + mb, sq)
+                parts = []
+                for row in rows:
+                    if (row[0], row[1]) <= (bn, mi) <= (row[3], row[4]):
+                        st = row[2] if (bn, mi) == tuple(row[:2]) else 0
+                        en = (
+                            row[5]
+                            if (bn, mi) == tuple(row[3:5])
+                            else (sk + kb - 1) // kb
+                        )
+                        if en > st:
+                            parts.append((st, en))
+                if not parts:
+                    raise ValueError(
+                        f"Schedule does not cover batch/head/Q tile {(b, h, mi)}"
+                    )
+                expected_end = (sk + kb - 1) // kb
+                if sparse_mode == 3:
+                    expected_end = min(expected_end, (hi + sk - sq + kb - 1) // kb)
+                parts = [
+                    (st, min(en, expected_end)) for st, en in parts if st < expected_end
+                ]
+                cursor = 0
+                for st, en in sorted(parts):
+                    if st != cursor or en > expected_end:
+                        raise ValueError(
+                            f"Overlapping or missing KV schedule range: {parts}"
+                        )
+                    cursor = en
+                if cursor != expected_end:
+                    raise ValueError(
+                        f"Incomplete KV schedule: {parts}, expected end {expected_end}"
+                    )
+                nums, sums, maxes = [], [], []
+                for st, en in parts:
+                    m = torch.full((hi - lo, 1), fmin)
+                    su = torch.zeros_like(m)
+                    o = torch.zeros((hi - lo, v.shape[-1]))
+                    for j in range(st, en):
+                        ks, ke = j * kb, min((j + 1) * kb, sk)
+                        scores = q[b, h, lo:hi] @ k[b, h, ks:ke].T * scale
+                        if sparse_mode == 3:
+                            mask = (
+                                torch.arange(ks, ke)[None, :]
+                                > torch.arange(lo, hi)[:, None] + sk - sq
+                            )
+                            scores = scores.masked_fill(mask, fmin)
+                        nm = torch.maximum(
+                            m, scores.max(-1, keepdim=True).values - ln_ps
+                        )
+                        pp = torch.exp(scores - nm)
+                        factor = torch.exp(m - nm)
+                        o = o * factor + hif8_cast_p(pp) @ v[b, h, ks:ke]
+                        su = su * factor + pp.sum(-1, keepdim=True)
+                        m = nm
+                    nums.append(o)
+                    sums.append(su)
+                    maxes.append(m)
+                mm = torch.stack(maxes).max(0).values
+                weights = [torch.exp(m - mm) for m in maxes]
+                total = sum(su * w for su, w in zip(sums, weights))
+                all_masked = mm <= fmin
+                out[b, h, lo:hi] = torch.where(
+                    all_masked,
+                    torch.zeros_like(out[b, h, lo:hi]),
+                    sum(o * w for o, w in zip(nums, weights)) / (total + 1e-20),
+                )
+                lse[b, h, lo:hi] = torch.where(
+                    all_masked,
+                    torch.full_like(mm, float("inf")),
+                    mm + torch.log(total + 1e-20),
+                )
+    return out, lse
+
+
 # ==============================================================================
 # 三方比对支撑 (cross_check): fp64 bench
 # 仅 --compare cross_check 时由 impl/golden.py 调用, 两方回归路径不受影响。
