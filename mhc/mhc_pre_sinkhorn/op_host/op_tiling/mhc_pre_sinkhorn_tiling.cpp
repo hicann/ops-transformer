@@ -16,6 +16,7 @@
 #include <functional>
 #include <sstream>
 #include "mhc_pre_sinkhorn_tiling.h"
+#include "../../op_kernel/mhc_pre_sinkhorn_tiling_key.h"
 #include "op_host/tiling_util.h"
 
 using namespace ge;
@@ -83,10 +84,14 @@ constexpr int64_t PRE_POST_ROW_WORK_SCALE = 3;
 constexpr int64_t SINKHORN_ROW_WORK_SCALE = 64;
 constexpr int64_t SINKHORN_SETUP_ITER_EQUIVALENT = 4;
 constexpr int64_t SMALL_BS_THRESHOLD = 32;
-constexpr uint64_t MPMD_TILING_KEY = 0;
-constexpr uint64_t ORIGINAL_TILING_KEY = 1;
+// Tiling keys shared with the kernel entry (op_kernel/mhc_pre_sinkhorn_tiling_key.h).
+// Numeric values (0/1/2) and therefore the runtime behavior are unchanged.
+constexpr uint64_t MPMD_TILING_KEY = static_cast<uint64_t>(MhcPreSinkhorn::MhcPreSinkhornTilingKey::MPMD_KSPLIT);
+constexpr uint64_t ORIGINAL_TILING_KEY =
+    static_cast<uint64_t>(MhcPreSinkhorn::MhcPreSinkhornTilingKey::ORIGINAL_KSPLIT);
 // 切M路径：B矩阵走 MatmulImpl，不受 nd2nz srcDValue 上限约束
-constexpr uint64_t MSPLIT_TILING_KEY = 2;
+constexpr uint64_t MSPLIT_TILING_KEY =
+    static_cast<uint64_t>(MhcPreSinkhorn::MhcPreSinkhornTilingKey::MSPLIT_ND2NZ_EXCEED);
 // Nd2NzParams.srcDValue 为 uint16，取值范围 [1, 65535]；K(=hcMult*d) 超限时
 // 切K路径的 B1 搬运行距溢出，强制走切M分支
 constexpr int64_t MAX_ND2NZ_SRC_DVALUE = 65535;
@@ -794,7 +799,9 @@ ge::graphStatus MhcPreSinkhornTiling::GetWorkspaceSize()
 
 ge::graphStatus MhcPreSinkhornTiling::PostTiling()
 {
-    context_->SetTilingKey(tilingKey_);
+    const MhcPreSinkhorn::MhcPreSinkhornTilingKey tilingKey =
+        static_cast<MhcPreSinkhorn::MhcPreSinkhornTilingKey>(tilingKey_);
+    context_->SetTilingKey(static_cast<uint64_t>(tilingKey));
     context_->SetBlockDim(aicCoreNum_);
     if (tilingKey_ == MPMD_TILING_KEY) {
         auto ret = context_->SetScheduleMode(1);
