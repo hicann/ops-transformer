@@ -36,11 +36,14 @@ private:
     ge::graphStatus CheckSingleParaQuantMode(const QfmlaTilingInfo& qfmlaInfo);
     ge::graphStatus CheckSingleParaQDescale(const QfmlaTilingInfo& qfmlaInfo);
     ge::graphStatus CheckSingleParaKDescale(const QfmlaTilingInfo& qfmlaInfo);
+    ge::graphStatus CheckSingleParaRope(const QfmlaTilingInfo& qfmlaInfo); // arch22 int8
 
     // --- MultiPara: q_descale shape 与 layout_q 匹配 ---
     ge::graphStatus CheckQDescaleShape(const QfmlaTilingInfo& qfmlaInfo);
-    // --- MultiPara: k_descale shape 校验 (1,) ---
+    // --- MultiPara: k_descale shape 校验 (1,)（KV descale 统一由此承载） ---
     ge::graphStatus CheckKDescaleShape(const QfmlaTilingInfo& qfmlaInfo);
+    // --- MultiPara: rope shape 校验 (arch22 int8) ---
+    ge::graphStatus CheckRopeShape(const QfmlaTilingInfo& qfmlaInfo);
 };
 
 } // namespace quant_flash_mla

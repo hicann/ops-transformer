@@ -25,6 +25,8 @@ if (BUILD_WITH_INSTALLED_DEPENDENCY_CANN_PKG)
   endif()
 
   file(GLOB AICPU_SRC ${CMAKE_CURRENT_SOURCE_DIR}/*_aicpu*.cpp)
+  # arch22 int8全量化分核移植(IFA host tiling逻辑)不满足 *_aicpu* 命名, 显式加入编译
+  list(APPEND AICPU_SRC ${CMAKE_CURRENT_SOURCE_DIR}/qfmla_metadata_arch22_split.cpp)
   message(STATUS "[ ${OP_NAME}] Found aicpu sources: ${AICPU_SRC}, ascend dir: ${ASCEND_DIR}, ophsot name: ${OPHOST_NAME}")
 
   if(AICPU_SRC AND _AICPU_BUILTIN_PKG_ALLOWED)

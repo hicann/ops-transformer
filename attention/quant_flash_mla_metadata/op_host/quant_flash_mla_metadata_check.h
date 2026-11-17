@@ -19,6 +19,7 @@
 #include "opdev/op_log.h"
 #include "opdev/data_type_utils.h"
 #include "opdev/tensor_view_utils.h"
+#include "opdev/platform.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,7 +40,9 @@ private:
 
     // 校验基础属性: maxSeqlen / numHeads / headDim / quantMode / layout
     // 文档约束: num_heads_kv仅支持1(MLA KV_N=1); head_dim_qk仅支持576; head_dim_v仅支持512;
-    // quantMode支持1(FP8_E4M3)/0(HIFLOAT8); layout_q支持TND/BSND/BNSD(与主算子一致)
+    // quantMode支持1(FP8_E4M3)/0(HIFLOAT8)/2(INT8, arch22); layout_q支持TND/BSND/BNSD(与主算子一致)
+    // arch22(quant_mode=2)按npuarch区分校验: maxSeqlenQ<=32, numHeadsQ∈{1,2,4,8,16,32,64,128},
+    // headDimQk==512(rope分离), layout_q∈{TND,BSH}
     static inline aclnnStatus CheckBaseAttr(int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
                                             int64_t numHeadsKv, int64_t headDimQk, int64_t headDimV, int64_t quantMode,
                                             const char* layoutQ);
@@ -53,9 +56,10 @@ private:
                                              const aclTensor* cuSeqlensQOptional, const aclTensor* sequsedQOptional,
                                              const aclTensor* metadata);
 
-    // 校验一致性: batchSize取自cache_seqlens shape; cache_seqlens/cu_seqlens_q/seqused_q仅支持int32
-    static inline aclnnStatus CheckConsistency(const aclTensor* cacheSeqlens, const aclTensor* cuSeqlensQOptional,
-                                               const aclTensor* sequsedQOptional);
+    // 校验一致性: batchSize取自cache_seqlens shape; cache_seqlens/cu_seqlens_q/seqused_q
+    // fp8/hif8仅支持int32, arch22(quant_mode=2)放行int32/int64
+    static inline aclnnStatus CheckConsistency(int64_t quantMode, const aclTensor* cacheSeqlens,
+                                               const aclTensor* cuSeqlensQOptional, const aclTensor* sequsedQOptional);
 };
 
 inline aclnnStatus QuantFlashMlaMetadataCheck::ParamsCheck(
@@ -69,7 +73,7 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::ParamsCheck(
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     ret = CheckExistency(maxSeqlenQ, layoutQ, cacheSeqlens, cuSeqlensQOptional, sequsedQOptional, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    ret = CheckConsistency(cacheSeqlens, cuSeqlensQOptional, sequsedQOptional);
+    ret = CheckConsistency(quantMode, cacheSeqlens, cuSeqlensQOptional, sequsedQOptional);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     return ACLNN_SUCCESS;
 }
@@ -86,32 +90,63 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::CheckBaseAttr(int64_t maxSeqlenQ,
 {
     constexpr int64_t MLA_FP8_E4M3_FULLQUANT = 1;
     constexpr int64_t MLA_HIF8_FULLQUANT = 0;
-    static const std::unordered_set<int64_t> quantModeSet = {MLA_FP8_E4M3_FULLQUANT, MLA_HIF8_FULLQUANT};
+    constexpr int64_t MLA_INT8_FULLQUANT = 2;
+    static const std::unordered_set<int64_t> quantModeSet = {MLA_FP8_E4M3_FULLQUANT, MLA_HIF8_FULLQUANT,
+                                                             MLA_INT8_FULLQUANT};
     CHECK_COND(quantModeSet.count(quantMode) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "quantMode only supports 1 (MLA_FP8_E4M3_FULLQUANT) or 0 (MLA_HIF8_FULLQUANT), but got %ld", quantMode);
+               "quantMode only supports 1 (MLA_FP8_E4M3_FULLQUANT), 0 (MLA_HIF8_FULLQUANT) or "
+               "2 (MLA_INT8_FULLQUANT, arch22), but got %ld",
+               quantMode);
+    // A2/A5 场景按 npuArch 区分（npuArch 为唯一场景依据，与主算子 parser 交叉校验对齐）:
+    // arch22(DAV_2201) 仅支持 quant_mode=2 (MLA_INT8_FULLQUANT); A5(DAV_3510/DAV_9201) 仅支持 1 (FP8) / 0 (HIF8)
+    const bool isArch22 = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201;
+    CHECK_COND(isArch22 == (quantMode == MLA_INT8_FULLQUANT), ACLNN_ERR_RUNTIME_ERROR,
+               "quantMode=%ld does not match current NpuArch(%d): quant_mode=2 (MLA_INT8_FULLQUANT) is arch22 "
+               "(Ascend910B/910_93) only, quant_mode=0/1 is A5 only",
+               quantMode, static_cast<int32_t>(op::GetCurrentPlatformInfo().GetCurNpuArch()));
 
-    // -1表示未传; 显式传入时序列长度必须非负, 上限16对所有layout生效。
-    // 场景相关的存在性约束由 CheckExistency(特性交叉校验)负责: 非TND时与seqused_q至少传1个
-    CHECK_COND((maxSeqlenQ == -1 || (maxSeqlenQ >= 0 && maxSeqlenQ <= 16)), ACLNN_ERR_RUNTIME_ERROR,
-               "maxSeqlenQ must be -1 or in range [0, 16], but got %ld", maxSeqlenQ);
+    // -1表示未传。fp8/hif8: 显式传入时序列长度非负, 上限16 (沿用上游#7143修复);
+    // arch22(quant_mode=2) int8全量化: [1,32] (对齐IFA现状: 32 MTP最大QS), 要求大于0
+    // 场景相关的存在性约束由 CheckExistency(特性交叉校验)负责
+    if (isArch22) {
+        CHECK_COND((maxSeqlenQ == -1 || (maxSeqlenQ >= 1 && maxSeqlenQ <= 32)), ACLNN_ERR_RUNTIME_ERROR,
+                   "maxSeqlenQ must be -1 or in range [1, 32] in MLA_INT8_FULLQUANT scenario, but got %ld", maxSeqlenQ);
+    } else {
+        CHECK_COND((maxSeqlenQ == -1 || (maxSeqlenQ >= 0 && maxSeqlenQ <= 16)), ACLNN_ERR_RUNTIME_ERROR,
+                   "maxSeqlenQ must be -1 or in range [0, 16], but got %ld", maxSeqlenQ);
+    }
     CHECK_COND((maxSeqlenKv == -1 || maxSeqlenKv >= 0), ACLNN_ERR_RUNTIME_ERROR,
                "maxSeqlenKv must be -1 or greater than or equal to 0, but got %ld", maxSeqlenKv);
 
-    static const std::unordered_set<int64_t> numHeadsQSet = {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128};
-    CHECK_COND(numHeadsQSet.count(numHeadsQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "numHeadsQ must be one of {1,2,4,6,8,12,16,24,32,48,64,96,128}, but got %ld", numHeadsQ);
+    if (isArch22) {
+        // arch22: 对齐IFA现状 G∈{1,2,4,8,16,32,64,128}
+        static const std::unordered_set<int64_t> numHeadsQSetInt8 = {1, 2, 4, 8, 16, 32, 64, 128};
+        CHECK_COND(numHeadsQSetInt8.count(numHeadsQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
+                   "numHeadsQ must be one of {1,2,4,8,16,32,64,128} in MLA_INT8_FULLQUANT scenario, but got %ld",
+                   numHeadsQ);
+        // arch22: rope分离, head_dim_qk为nope维度512
+        CHECK_COND(headDimQk == 512, ACLNN_ERR_RUNTIME_ERROR,
+                   "headDimQk only supports 512 (nope, rope split) in MLA_INT8_FULLQUANT scenario, but got %ld",
+                   headDimQk);
+        CHECK_COND(layoutQ != nullptr, ACLNN_ERR_RUNTIME_ERROR, "layoutQ must not be null");
+        static const std::unordered_set<std::string> layoutQSetInt8 = {"TND", "BSH"};
+        CHECK_COND(layoutQSetInt8.count(layoutQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
+                   "layoutQ only supports TND, BSH in MLA_INT8_FULLQUANT scenario, but got %s", layoutQ);
+    } else {
+        static const std::unordered_set<int64_t> numHeadsQSet = {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128};
+        CHECK_COND(numHeadsQSet.count(numHeadsQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
+                   "numHeadsQ must be one of {1,2,4,6,8,12,16,24,32,48,64,96,128}, but got %ld", numHeadsQ);
+        // 文档约束: head_dim_qk仅支持576(512+64rope), head_dim_v仅支持512
+        CHECK_COND(headDimQk == 576, ACLNN_ERR_RUNTIME_ERROR, "headDimQk only supports 576, but got %ld", headDimQk);
+        CHECK_COND(layoutQ != nullptr, ACLNN_ERR_RUNTIME_ERROR, "layoutQ must not be null");
+        static const std::unordered_set<std::string> layoutQSet = {"TND", "BSND", "BNSD"};
+        CHECK_COND(layoutQSet.count(layoutQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
+                   "layoutQ only supports TND, BSND, BNSD, but got %s", layoutQ);
+    }
     // 文档约束: MLA场景KV共享单一latent头, num_heads_kv仅支持1
     CHECK_COND(numHeadsKv == 1, ACLNN_ERR_RUNTIME_ERROR, "numHeadsKv only supports 1 in MLA scenario, but got %ld",
                numHeadsKv);
-
-    // 文档约束: head_dim_qk仅支持576(512+64rope), head_dim_v仅支持512
-    CHECK_COND(headDimQk == 576, ACLNN_ERR_RUNTIME_ERROR, "headDimQk only supports 576, but got %ld", headDimQk);
     CHECK_COND(headDimV == 512, ACLNN_ERR_RUNTIME_ERROR, "headDimV only supports 512, but got %ld", headDimV);
-
-    CHECK_COND(layoutQ != nullptr, ACLNN_ERR_RUNTIME_ERROR, "layoutQ must not be null");
-    static const std::unordered_set<std::string> layoutQSet = {"TND", "BSND", "BNSD"};
-    CHECK_COND(layoutQSet.count(layoutQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "layoutQ only supports TND, BSND, BNSD, but got %s", layoutQ);
 
     return ACLNN_SUCCESS;
 }
@@ -161,25 +196,33 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::CheckExistency(int64_t maxSeqlenQ
     return ACLNN_SUCCESS;
 }
 
-inline aclnnStatus QuantFlashMlaMetadataCheck::CheckConsistency(const aclTensor* cacheSeqlens,
+inline aclnnStatus QuantFlashMlaMetadataCheck::CheckConsistency(int64_t quantMode, const aclTensor* cacheSeqlens,
                                                                 const aclTensor* cuSeqlensQOptional,
                                                                 const aclTensor* sequsedQOptional)
 {
-    // 文档约束: cache_seqlens/cu_seqlens_q/seqused_q仅支持int32
+    // quantMode 保留在签名中以维持调用侧稳定; 场景区分已改由 npuArch 承载(见上方 CheckBaseAttr 交叉校验)
+    (void)quantMode;
+    // 文档约束: cache_seqlens/cu_seqlens_q/seqused_q fp8/hif8仅支持int32;
+    // arch22(quant_mode=2)放行int32/int64（对齐FIA调用现状）。
+    // 场景门控按 npuArch 区分（arch22=DAV_2201，A2/A5 共用代码不以 quant_mode/dtype 区分芯片场景）
+    const bool allowInt64 = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201;
     if (cacheSeqlens != nullptr && cacheSeqlens->GetViewShape().GetDimNum() > 0) {
-        CHECK_COND(cacheSeqlens->GetDataType() == ge::DT_INT32, ACLNN_ERR_RUNTIME_ERROR,
-                   "cacheSeqlens only supports int32, but got %s",
-                   op::ToString(cacheSeqlens->GetDataType()).GetString());
+        const auto dtype = cacheSeqlens->GetDataType();
+        CHECK_COND(dtype == ge::DT_INT32 || (allowInt64 && dtype == ge::DT_INT64), ACLNN_ERR_RUNTIME_ERROR,
+                   "cacheSeqlens only supports int32 (int64 in MLA_INT8_FULLQUANT), but got %s",
+                   op::ToString(dtype).GetString());
     }
     if (cuSeqlensQOptional != nullptr && cuSeqlensQOptional->GetViewShape().GetDimNum() > 0) {
-        CHECK_COND(cuSeqlensQOptional->GetDataType() == ge::DT_INT32, ACLNN_ERR_RUNTIME_ERROR,
-                   "cuSeqlensQOptional only supports int32, but got %s",
-                   op::ToString(cuSeqlensQOptional->GetDataType()).GetString());
+        const auto dtype = cuSeqlensQOptional->GetDataType();
+        CHECK_COND(dtype == ge::DT_INT32 || (allowInt64 && dtype == ge::DT_INT64), ACLNN_ERR_RUNTIME_ERROR,
+                   "cuSeqlensQOptional only supports int32 (int64 in MLA_INT8_FULLQUANT), but got %s",
+                   op::ToString(dtype).GetString());
     }
     if (sequsedQOptional != nullptr && sequsedQOptional->GetViewShape().GetDimNum() > 0) {
-        CHECK_COND(sequsedQOptional->GetDataType() == ge::DT_INT32, ACLNN_ERR_RUNTIME_ERROR,
-                   "sequsedQOptional only supports int32, but got %s",
-                   op::ToString(sequsedQOptional->GetDataType()).GetString());
+        const auto dtype = sequsedQOptional->GetDataType();
+        CHECK_COND(dtype == ge::DT_INT32 || (allowInt64 && dtype == ge::DT_INT64), ACLNN_ERR_RUNTIME_ERROR,
+                   "sequsedQOptional only supports int32 (int64 in MLA_INT8_FULLQUANT), but got %s",
+                   op::ToString(dtype).GetString());
     }
 
     // cache_seqlens为必选输入, batchSize直接取其shape首个维度

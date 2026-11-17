@@ -58,6 +58,12 @@ ge::graphStatus SoftmaxLSEChecker::CheckSinglePara(const QfmlaTilingInfo& qfmlaI
 ge::graphStatus SoftmaxLSEChecker::CheckMultiPara(const QfmlaTilingInfo& qfmlaInfo)
 {
     const char* opName = qfmlaInfo.opName;
+    // arch22 int8全量化: 不支持 lse（IFA MLA 全量化无 lse 输出）, 芯片差异用 npuArch 区分
+    OP_CHECK_IF(qfmlaInfo.npuArch == NpuArch::DAV_2201 && qfmlaInfo.returnSoftmaxLse,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "return_softmax_lse", "true",
+                                                      "return_softmax_lse is not supported in MLA_INT8_FULLQUANT "
+                                                      "scenario"),
+                return ge::GRAPH_FAILED);
     if (qfmlaInfo.returnSoftmaxLse) {
         // return_softmax_lse=True 时, softmax_lse 必须非空
         OP_CHECK_IF(

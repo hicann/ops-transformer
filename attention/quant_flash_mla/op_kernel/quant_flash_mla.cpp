@@ -16,8 +16,13 @@
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "util.h"
+// arch35 公共头含 vector_common.h 的 using namespace AttentionCommon（全局污染），
+// 与 arch22 收编链路引入的 IFA 全局常量(FP32_BLOCK_ELEMENT_NUM/BYTE_BLOCK)二义冲突，
+// 且 arch22 分支不使用这些头，故仅 arch92/arch35 构建时引入
+#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 2201))
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "../../common/op_kernel/vector_common.h"
+#endif
 
 #if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
 
@@ -98,11 +103,14 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
                                            __gm__ uint8_t* kDescale, __gm__ uint8_t* blockTable,
                                            __gm__ uint8_t* cacheSeqLens, __gm__ uint8_t* cuSeqLensQ,
                                            __gm__ uint8_t* sequsedQ, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
-                                           __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse,
-                                           __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+                                           __gm__ uint8_t* qRope, __gm__ uint8_t* kRope, __gm__ uint8_t* attnOut,
+                                           __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                           __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(QuantFlashMlaTilingData);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+    (void)qRope; // arch22 int8专用输入, arch92不使用
+    (void)kRope;
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == QFMLA_MLA_FP8_E4M3_FULLQUANT) {
         quant_flash_mla_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(
@@ -117,6 +125,13 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
     }
 #endif
 }
+#elif (__NPU_ARCH__ == 2201) /* arch22: 910B/910_93, int8全量化(quant_mode=2) */
+
+// arch22 模板 tiling key 声明（8 个 INT8 实例: 2×layout × 2×mask × 2×kvLayout）
+#include "arch22/quant_flash_mla_template_tiling_key_arch22.h"
+// arch22 入口适配层: 映射 qfmla 17 形参 → IFA MLA int8全量化 kernel
+#include "arch22/quant_flash_mla_entry_arch22.h"
+
 #else /* arch35 及历史平台 */
 
 #include "arch35/quant_flash_mla_common_def.h"
@@ -199,11 +214,14 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
                                            __gm__ uint8_t* kDescale, __gm__ uint8_t* blockTable,
                                            __gm__ uint8_t* cacheSeqLens, __gm__ uint8_t* cuSeqLensQ,
                                            __gm__ uint8_t* sequsedQ, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
-                                           __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse,
-                                           __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+                                           __gm__ uint8_t* qRope, __gm__ uint8_t* kRope, __gm__ uint8_t* attnOut,
+                                           __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                           __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(QuantFlashMlaTilingData);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+    (void)qRope; // arch22 int8专用输入, arch35不使用
+    (void)kRope;
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == QFMLA_MLA_FP8_E4M3_FULLQUANT) {
         quant_flash_mla_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(

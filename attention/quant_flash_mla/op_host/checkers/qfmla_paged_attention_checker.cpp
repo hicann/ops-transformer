@@ -71,14 +71,14 @@ ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QfmlaTili
 ge::graphStatus PagedAttentionChecker::CheckSingleParaCacheSeqlens(const QfmlaTilingInfo& qfmlaInfo)
 {
     const char* opName = qfmlaInfo.opName;
-    // dtype: int32
-    OP_CHECK_IF(
-        qfmlaInfo.opParamInfo.cacheSeqlens.desc->GetDataType() != ge::DT_INT32,
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-            opName, CACHE_SEQLENS_NAME,
-            ge::TypeUtils::DataTypeToSerialString(qfmlaInfo.opParamInfo.cacheSeqlens.desc->GetDataType()).c_str(),
-            "The dtype of cache_seqlens must be int32"),
-        return ge::GRAPH_FAILED);
+    // dtype: int32；arch22 int8全量化放行 int64（对齐FIA调用现状）, 芯片差异用 npuArch 区分
+    const bool isArch22 = qfmlaInfo.npuArch == NpuArch::DAV_2201;
+    const auto cacheSeqDtype = qfmlaInfo.opParamInfo.cacheSeqlens.desc->GetDataType();
+    OP_CHECK_IF(cacheSeqDtype != ge::DT_INT32 && !(isArch22 && cacheSeqDtype == ge::DT_INT64),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    opName, CACHE_SEQLENS_NAME, ge::TypeUtils::DataTypeToSerialString(cacheSeqDtype).c_str(),
+                    "The dtype of cache_seqlens must be int32 (int64 is supported in MLA_INT8_FULLQUANT scenario)"),
+                return ge::GRAPH_FAILED);
     // format: ND
     if (CheckFormatSupport(qfmlaInfo.opParamInfo.cacheSeqlens.desc, CACHE_SEQLENS_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -96,6 +96,7 @@ ge::graphStatus PagedAttentionChecker::CheckBlockSize(const QfmlaTilingInfo& qfm
 {
     const char* opName = qfmlaInfo.opName;
     constexpr int64_t MLA_BLOCK_SIZE = 128;
+    // arch22 int8全量化 KV cache 固定 PA_NZ, blockSize 恒 128; arch35/arch92 同样要求 128, 统一校验
     OP_CHECK_IF(
         qfmlaInfo.blockSize != MLA_BLOCK_SIZE,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(

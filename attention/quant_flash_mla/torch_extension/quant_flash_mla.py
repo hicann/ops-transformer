@@ -21,6 +21,9 @@ METADATA_STRIDE = 16
 # MLA固定维度: head_dim_qk = nope(512) + rope(64) = 576, head_dim_v = 512
 MLA_HEAD_DIM_QK = 576
 MLA_HEAD_DIM_V = 512
+# arch22 int8全量化: rope分离, q/k_cache为nope维度(512), rope单独传入(64)
+MLA_INT8_HEAD_DIM_QK = 512
+MLA_ROPE_DIM = 64
 
 
 class QuantMode(IntEnum):
@@ -28,6 +31,9 @@ class QuantMode(IntEnum):
 
     MLA_FP8_E4M3_FULLQUANT = 1
     MLA_HIF8_FULLQUANT = 0
+    MLA_INT8_FULLQUANT = (
+        2  # arch22: Q/KV INT8（Q per-token-head、KV per-tensor），rope分离
+    )
 
 
 class MaskMode(IntEnum):
@@ -113,6 +119,7 @@ _LAYOUT_Q_EXPECTED_NDIM = {
     "TND": 3,
     "BSND": 4,
     "BNSD": 4,
+    "BSH": 3,  # arch22 int8全量化
 }
 _LAYOUT_KV_EXPECTED_NDIM = {
     "PA_NZ": 5,
@@ -121,6 +128,8 @@ _LAYOUT_KV_EXPECTED_NDIM = {
 }
 
 _SUPPORTED_NUM_HEADS_Q = (1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128)
+# arch22 int8全量化: 对齐IFA现状 G∈{1,2,4,8,16,32,64,128}
+_SUPPORTED_NUM_HEADS_Q_INT8 = (1, 2, 4, 8, 16, 32, 64, 128)
 
 
 def _check_mla_layout_pair(layout_q, layout_out) -> None:
@@ -129,10 +138,11 @@ def _check_mla_layout_pair(layout_q, layout_out) -> None:
     torch._check(
         (layout_q == "TND" and layout_out in ("TND", "NTD"))
         or (layout_q == "BSND" and layout_out == "BSND")
-        or (layout_q == "BNSD" and layout_out == "BNSD"),
+        or (layout_q == "BNSD" and layout_out == "BNSD")
+        or (layout_q == "BSH" and layout_out == "BSH"),
         lambda: (
             "layout_q and layout_out must be one of BSND->BSND, BNSD->BNSD, "
-            f"TND->TND, TND->NTD (TND_NTD), but got {layout_q}->{layout_out}"
+            f"TND->TND, TND->NTD (TND_NTD), BSH->BSH (int8), but got {layout_q}->{layout_out}"
         ),
     )
 
@@ -209,25 +219,38 @@ def _check_metadata_parameters(
 ) -> None:
     torch._check(
         quant_mode
-        in (int(QuantMode.MLA_FP8_E4M3_FULLQUANT), int(QuantMode.MLA_HIF8_FULLQUANT)),
-        lambda: f"quant_mode only supports 1 (MLA_FP8_E4M3_FULLQUANT) or "
-        f"0 (MLA_HIF8_FULLQUANT), but got {quant_mode}",
+        in (
+            int(QuantMode.MLA_FP8_E4M3_FULLQUANT),
+            int(QuantMode.MLA_HIF8_FULLQUANT),
+            int(QuantMode.MLA_INT8_FULLQUANT),
+        ),
+        lambda: f"quant_mode only supports 1 (MLA_FP8_E4M3_FULLQUANT), "
+        f"0 (MLA_HIF8_FULLQUANT) or 2 (MLA_INT8_FULLQUANT, arch22), but got {quant_mode}",
+    )
+    is_int8 = quant_mode == int(QuantMode.MLA_INT8_FULLQUANT)
+    torch._check(
+        layout_q in ("TND", "BSND", "BNSD", "BSH")
+        if is_int8
+        else layout_q in ("TND", "BSND", "BNSD"),
+        lambda: f"layout_q only supports 'TND'/'BSH' (int8) or 'TND'/'BSND'/'BNSD', but got {layout_q!r}",
+    )
+    expect_num_heads = (
+        _SUPPORTED_NUM_HEADS_Q_INT8 if is_int8 else _SUPPORTED_NUM_HEADS_Q
     )
     torch._check(
-        layout_q in ("TND", "BSND", "BNSD"),
-        lambda: f"layout_q only supports 'TND'/'BSND'/'BNSD', but got {layout_q!r}",
-    )
-    torch._check(
-        num_heads_q in _SUPPORTED_NUM_HEADS_Q,
-        lambda: f"num_heads_q must be one of {_SUPPORTED_NUM_HEADS_Q}, but got {num_heads_q}",
+        num_heads_q in expect_num_heads,
+        lambda: f"num_heads_q must be one of {expect_num_heads}, but got {num_heads_q}",
     )
     torch._check(
         num_heads_kv == 1,
         lambda: f"num_heads_kv only supports 1, but got {num_heads_kv}",
     )
+    expect_head_dim_qk = MLA_INT8_HEAD_DIM_QK if is_int8 else MLA_HEAD_DIM_QK
     torch._check(
-        head_dim_qk == MLA_HEAD_DIM_QK,
-        lambda: f"head_dim_qk only supports 576, but got {head_dim_qk}",
+        head_dim_qk == expect_head_dim_qk,
+        lambda: f"head_dim_qk only supports {expect_head_dim_qk}"
+        + (" (nope, rope split)" if is_int8 else "")
+        + f", but got {head_dim_qk}",
     )
     torch._check(
         head_dim_v == MLA_HEAD_DIM_V,
@@ -241,12 +264,21 @@ def _check_metadata_parameters(
         max_seqlen_kv == -1 or max_seqlen_kv >= 0,
         lambda: f"max_seqlen_kv must be -1 or greater than or equal to 0, but got {max_seqlen_kv}",
     )
-    # max_seqlen_q 上限 16 对所有 layout 生效 (与主算子 SeqLenChecker/metadata aclnn 校验一致)
+    # max_seqlen_q 上限: fp8/hif8 为 16, arch22 int8 为 32 (与主算子/metadata aclnn 校验一致)
+    max_seq_q_limit = 32 if is_int8 else 16
+    # 下界: arch22 int8全量化要求 >= 1; 其余场景沿用上游允许 0
+    lower_seq_q = 1 if is_int8 else 0
     torch._check(
-        max_seqlen_q == -1 or (max_seqlen_q >= 0 and max_seqlen_q <= 16),
-        lambda: f"max_seqlen_q must be -1 or in range [0, 16], but got {max_seqlen_q}",
+        max_seqlen_q == -1
+        or (max_seqlen_q >= lower_seq_q and max_seqlen_q <= max_seq_q_limit),
+        lambda: f"max_seqlen_q must be -1 or in range [{lower_seq_q}, {max_seq_q_limit}], but got {max_seqlen_q}",
     )
-    _check_int32_1d("cache_seqlens", cache_seqlens)
+    # cache_seqlens dtype: int32; arch22 int8全量化放行 int64 (对齐FIA调用现状)
+    torch._check(
+        cache_seqlens.dtype == torch.int32
+        or (is_int8 and cache_seqlens.dtype == torch.int64),
+        lambda: f"cache_seqlens must be int32 (int64 in int8 mode), but got {cache_seqlens.dtype}",
+    )
     batch_size = cache_seqlens.numel()
     if layout_q == "TND":
         _check_int32_1d("cu_seqlens_q", cu_seqlens_q)
@@ -296,6 +328,7 @@ class QuantFlashMlaOpBuilder(OpBuilder):
             "Tensor block_table, Tensor cache_seqlens, int quant_mode, *, "
             "Tensor? cu_seqlens_q=None, Tensor? seqused_q=None, "
             "Tensor? attn_mask=None, Tensor? metadata=None, "
+            "Tensor? q_rope=None, Tensor? k_rope=None, "
             "int head_dim_v=512, float? softmax_scale=None, int mask_mode=0, "
             "int max_seqlen_q=-1, int max_seqlen_kv=-1, "
             'str layout_q="TND", str layout_kv="PA_BNBD", str layout_out="TND", '
@@ -333,14 +366,16 @@ class QuantFlashMlaOpBuilder(OpBuilder):
             k_cache: torch.Tensor,
             q_descale: torch.Tensor,
             k_descale: torch.Tensor,
-            block_table: torch.Tensor,
-            cache_seqlens: torch.Tensor,
-            quant_mode: Union[QuantMode, int],
+            block_table: torch.Tensor = None,
+            cache_seqlens: torch.Tensor = None,
+            quant_mode: Union[QuantMode, int] = 1,
             *,
             cu_seqlens_q: Optional[torch.Tensor] = None,
             seqused_q: Optional[torch.Tensor] = None,
             attn_mask: Optional[torch.Tensor] = None,
             metadata: Optional[torch.Tensor] = None,
+            q_rope: Optional[torch.Tensor] = None,
+            k_rope: Optional[torch.Tensor] = None,
             head_dim_v: Optional[int] = MLA_HEAD_DIM_V,
             softmax_scale: Optional[float] = None,
             mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
@@ -388,6 +423,11 @@ class QuantFlashMlaOpBuilder(OpBuilder):
             elif layout_q_str == "BSND":
                 b_size, s_size, n_size = q.size(0), q.size(1), q.size(2)
                 t_size = 0
+            elif layout_q_str == "BSH":
+                # arch22 int8全量化: 3D (B, S, N*512)
+                b_size, s_size = q.size(0), q.size(1)
+                n_size = q.size(2) // MLA_INT8_HEAD_DIM_QK
+                t_size = 0
             else:  # BNSD
                 b_size, n_size, s_size = q.size(0), q.size(1), q.size(2)
                 t_size = 0
@@ -400,11 +440,14 @@ class QuantFlashMlaOpBuilder(OpBuilder):
                 )
             else:
                 softmax_out_size = (0,)
-            # attn_out: BSND/BNSD 出 4D, TND/NTD 出 3D
+            # attn_out: BSND/BNSD 出 4D, TND/NTD/BSH 出 3D
             if layout_out_str == "BSND":
                 attention_out_size = (b_size, s_size, n_size, head_dim_v)
             elif layout_out_str == "BNSD":
                 attention_out_size = (b_size, n_size, s_size, head_dim_v)
+            elif layout_out_str == "BSH":
+                # arch22 int8全量化: 输出跟随q layout, 3D (B, S, N*512)
+                attention_out_size = (b_size, s_size, n_size * head_dim_v)
             elif layout_out_str == "TND":
                 attention_out_size = (t_size, n_size, head_dim_v)
             else:  # NTD
@@ -442,10 +485,11 @@ def quant_flash_mla_metadata(
     Dispatcher implementation: NPU.
     'PrivateUse1' is dispatch key for custom NPU backends.
     """
-    if quant_mode not in (0, 1):
+    if quant_mode not in (0, 1, 2):
         raise ValueError(
             f"The quant_mode of quant_flash_mla_metadata only supports "
-            f"1 (MLA_FP8_E4M3_FULLQUANT) or 0 (MLA_HIF8_FULLQUANT), but got {quant_mode}"
+            f"1 (MLA_FP8_E4M3_FULLQUANT), 0 (MLA_HIF8_FULLQUANT) or "
+            f"2 (MLA_INT8_FULLQUANT, arch22), but got {quant_mode}"
         )
     if num_heads_kv != 1:
         raise ValueError(
@@ -456,8 +500,9 @@ def quant_flash_mla_metadata(
     max_seqlen_kv = -1 if max_seqlen_kv is None else max_seqlen_kv
     quant_mode = _resolve_quant_mode(quant_mode)
     mask_mode = _resolve_mask_mode(mask_mode)
-    layout_q = "TND" if layout_q is None else layout_q
-    head_dim_qk = MLA_HEAD_DIM_QK if head_dim_qk is None else head_dim_qk
+    is_int8 = quant_mode == int(QuantMode.MLA_INT8_FULLQUANT)
+    expect_head_dim_qk = MLA_INT8_HEAD_DIM_QK if is_int8 else MLA_HEAD_DIM_QK
+    head_dim_qk = expect_head_dim_qk if head_dim_qk is None else head_dim_qk
     head_dim_v = MLA_HEAD_DIM_V if head_dim_v is None else head_dim_v
     cu_seqlens_q = _normalize_optional_tensor(cu_seqlens_q)
     seqused_q = _normalize_optional_tensor(seqused_q)
@@ -538,14 +583,16 @@ def quant_flash_mla(
     k_cache: torch.Tensor,
     q_descale: torch.Tensor,
     k_descale: torch.Tensor,
-    block_table: torch.Tensor,
-    cache_seqlens: torch.Tensor,
-    quant_mode: Union[QuantMode, int],
+    block_table: torch.Tensor = None,
+    cache_seqlens: torch.Tensor = None,
+    quant_mode: Union[QuantMode, int] = 1,
     *,
     cu_seqlens_q: Optional[torch.Tensor] = None,
     seqused_q: Optional[torch.Tensor] = None,
     attn_mask: Optional[torch.Tensor] = None,
     metadata: Optional[torch.Tensor] = None,
+    q_rope: Optional[torch.Tensor] = None,
+    k_rope: Optional[torch.Tensor] = None,
     head_dim_v: Optional[int] = MLA_HEAD_DIM_V,
     softmax_scale: Optional[float] = None,
     mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
@@ -576,17 +623,49 @@ def quant_flash_mla(
         layout_kv,
         layout_out,
     )
-    if quant_mode not in (0, 1):
+    if quant_mode not in (0, 1, 2):
         raise ValueError(
             f"The quant_mode of quant_flash_mla only supports "
-            f"1 (MLA_FP8_E4M3_FULLQUANT) or 0 (MLA_HIF8_FULLQUANT), but got {quant_mode}"
+            f"1 (MLA_FP8_E4M3_FULLQUANT), 0 (MLA_HIF8_FULLQUANT) or "
+            f"2 (MLA_INT8_FULLQUANT, arch22), but got {quant_mode}"
         )
     quant_mode = _resolve_quant_mode(quant_mode)
     mask_mode = _resolve_mask_mode(mask_mode)
+    is_int8 = quant_mode == int(QuantMode.MLA_INT8_FULLQUANT)
     if head_dim_v is None:
         head_dim_v = MLA_HEAD_DIM_V
     cu_seqlens_q = _normalize_optional_tensor(cu_seqlens_q)
     seqused_q = _normalize_optional_tensor(seqused_q)
+    q_rope = _normalize_optional_tensor(q_rope)
+    k_rope = _normalize_optional_tensor(k_rope)
+
+    if is_int8:
+        # arch22 int8全量化: rope分离必传（A2必须传入）; KV descale统一由k_descale承载
+        torch._check(
+            q_rope is not None and k_rope is not None,
+            lambda: "q_rope and k_rope must be provided when quant_mode is 2 (MLA_INT8_FULLQUANT)",
+        )
+        for name, tensor in (("q_rope", q_rope), ("k_rope", k_rope)):
+            torch._check(
+                tensor.dtype == torch.bfloat16,
+                lambda name=name, tensor=tensor: (
+                    f"{name} must be bfloat16 in int8 mode, but got {tensor.dtype}"
+                ),
+            )
+        torch._check(
+            return_softmax_lse is False,
+            lambda: "return_softmax_lse is not supported in int8 mode",
+        )
+        # arch22 kernel 侧 cu_seqlens_q 按 uint64(IFA actualSeqLengthsQ)读取:
+        # int32 输入上转 int64, 避免 int32 缓冲被按 8 字节误读
+        if cu_seqlens_q is not None and cu_seqlens_q.dtype != torch.int64:
+            cu_seqlens_q = cu_seqlens_q.to(torch.int64)
+    else:
+        # fp8/hif8: rope 不支持传入（A5无需传入保持默认）
+        torch._check(
+            q_rope is None and k_rope is None,
+            lambda: "q_rope/k_rope is only supported when quant_mode is 2 (MLA_INT8_FULLQUANT)",
+        )
 
     # Prevent empty outputs from being short-circuited by the framework before
     # host tiling validation. QFA applies the same guard to output-related dims.
@@ -636,6 +715,21 @@ def quant_flash_mla(
             raise ValueError(
                 f"In HIF8 mode (quant_mode=0), k_cache must be uint8 (hif8 encoded), but got {k_cache.dtype}"
             )
+    elif quant_mode == int(QuantMode.MLA_INT8_FULLQUANT):
+        # arch22 int8全量化: q/k_cache为int8, rope分离bf16, descale fp32, 输出bf16
+        if q.dtype != torch.int8:
+            raise ValueError(
+                f"In INT8 mode (quant_mode=2), q must be int8, but got {q.dtype}"
+            )
+        if k_cache.dtype != torch.int8:
+            raise ValueError(
+                f"In INT8 mode (quant_mode=2), k_cache must be int8, but got {k_cache.dtype}"
+            )
+        if q_descale.dtype != torch.float or k_descale.dtype != torch.float:
+            raise ValueError(
+                f"In INT8 mode (quant_mode=2), q_descale/k_descale must be float32, "
+                f"but got {q_descale.dtype}/{k_descale.dtype}"
+            )
 
     # MLA 不支持 k_cache 的 stride 中含 0（仅 k_cache 支持 PA 非连续）
     for name, tensor in (("k_cache", k_cache),):
@@ -661,6 +755,8 @@ def quant_flash_mla(
         seqused_q,
         attn_mask,
         metadata,
+        q_rope,
+        k_rope,
         head_dim_v,
         softmax_scale,
         mask_mode,

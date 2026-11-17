@@ -35,6 +35,7 @@ enum class QfmlaLayout : int64_t {
     BSND = 0,
     BNSD = 1,
     TND = 2,
+    BSH = 3, // arch22 int8全量化: 3D (B,S,N*D)
 };
 
 // 输出layout（attn_out）
@@ -43,19 +44,21 @@ enum class QfmlaOutLayout : int64_t {
     BNSD = 1,
     TND = 2,
     NTD = 3,
+    BSH = 4, // arch22 int8全量化: 输出3D (B,S,N*D)，跟随q layout
 };
 
 // KV cache layout
 enum class QfmlaKvLayout : int64_t {
     PA_BBND = 0,
     PA_BNBD = 1,
-    PA_NZ = 2,
+    PA_NZ = 2, // arch22 int8全量化: 唯一支持的KV cache布局
 };
 
 // MLA量化模式
 enum class QfmlaQuantMode : int64_t {
     MLA_HIF8_FULLQUANT = 0,
     MLA_FP8_E4M3_FULLQUANT = 1,
+    MLA_INT8_FULLQUANT = 2, // arch22: Q/KV均INT8（Q per-token-head、KV per-tensor），rope分离
 };
 
 struct QfmlaTensorInfo {
@@ -69,7 +72,7 @@ struct QfmlaParaInfo {
     QfmlaTensorInfo query;
     QfmlaTensorInfo kCache;
     QfmlaTensorInfo qDescale;
-    QfmlaTensorInfo kDescale;
+    QfmlaTensorInfo kDescale; // KV descale 统一由此承载（per-tensor, shape(1,)）
     QfmlaTensorInfo blockTable;
     QfmlaTensorInfo cacheSeqlens;
     // 可选输入
@@ -77,6 +80,8 @@ struct QfmlaParaInfo {
     QfmlaTensorInfo sequsedQ;   // seq_used: 每batch实际使用的Q长度(B)
     QfmlaTensorInfo attnMask;
     QfmlaTensorInfo metadata;
+    QfmlaTensorInfo qRope; // arch22 int8全量化: rope分离输入, BF16, D=64
+    QfmlaTensorInfo kRope; // arch22 int8全量化: rope分离输入, BF16, D=64
     // 输出
     QfmlaTensorInfo attnOut;
     QfmlaTensorInfo softmaxLse;
@@ -124,6 +129,9 @@ struct QfmlaTilingInfo : public TilingInfo {
     uint32_t aicNum = 0;
     uint32_t aivNum = 0;
 
+    // 硬件架构: arch22(910B)与arch35/arch92的参数值域约束不同, checker按此区分芯片支持
+    NpuArch npuArch = NpuArch::DAV_3510;
+
     // Mask
     int64_t maskMode = 0;
     bool attnMaskFlag = false;
@@ -133,6 +141,9 @@ struct QfmlaTilingInfo : public TilingInfo {
     // Quant
     QfmlaQuantMode quantMode = QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT;
     float softmaxScale = 1.0f / 24.0f;
+
+    // arch22 int8全量化: rope分离标志（KV descale统一由k_descale承载, 无独立v_descale）
+    bool ropeFlag = false;
 
     // Layout
     QfmlaLayout layoutQ = QfmlaLayout::BSND;

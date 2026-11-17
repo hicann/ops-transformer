@@ -1,0 +1,105 @@
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+#ifndef QFMLA_METADATA_ARCH22_LAYOUT_H
+#define QFMLA_METADATA_ARCH22_LAYOUT_H
+
+#include <cstdint>
+
+namespace qfmla_arch22 {
+
+constexpr uint32_t ARCH22_HEAD_SIZE = 48U;
+
+enum Arch22HeadIndex : uint32_t {
+    ARCH22_HEAD_BALANCE_MODE = 0U,
+    ARCH22_HEAD_SPLIT_KV_FLAG = 1U,
+    ARCH22_HEAD_KV_SPLIT_PART = 2U,
+    ARCH22_HEAD_FD_MODE = 3U,
+    ARCH22_HEAD_S_INNER_SIZE = 4U,
+    ARCH22_HEAD_S_INNER_SIZE_ALIGN = 5U,
+    ARCH22_HEAD_S_INNER_LOOP_TIMES = 6U,
+    ARCH22_HEAD_S_INNER_SIZE_TAIL = 7U,
+    ARCH22_HEAD_S1_SPLIT_SIZE = 8U,
+    ARCH22_HEAD_GROUP_SPLIT_SIZE = 9U,
+    ARCH22_HEAD_G_OUTER = 10U,
+    ARCH22_HEAD_S1_OUTER = 11U,
+    ARCH22_HEAD_USED_CORE_NUM = 12U,
+    ARCH22_HEAD_PRELOAD_NUM = 13U,
+    ARCH22_HEAD_NEED_INIT_OUTPUT = 14U,
+    ARCH22_HEAD_IS_FD = 15U,
+    ARCH22_HEAD_AIC_NUM = 16U,
+    ARCH22_HEAD_AIV_NUM = 17U,
+    ARCH22_HEAD_MAX_ACTUAL_SEQ_KV = 18U,
+    ARCH22_HEAD_MASK_MODE = 19U,
+    ARCH22_HEAD_BLOCK_SIZE = 20U,
+    ARCH22_HEAD_NUM_HEADS_Q = 21U,
+    ARCH22_HEAD_NUM_HEADS_KV = 22U,
+    ARCH22_HEAD_N_NUM_OF_Q_IN_ONE_GROUP = 23U,
+    ARCH22_HEAD_Q_SEQ_SIZE = 24U,
+    ARCH22_HEAD_T_SEQ_SIZE = 25U,
+    ARCH22_HEAD_BATCH_SIZE = 26U,
+    ARCH22_HEAD_KV_SEQ_SIZE = 27U,
+    ARCH22_HEAD_MAX_BLOCK_NUM_PER_BATCH = 28U,
+    ARCH22_HEAD_ATTEN_MASK_FLAG = 29U,
+    ARCH22_HEAD_SPARSE_MODE = 30U,
+    ARCH22_HEAD_OUTPUT_LAYOUT = 31U,
+    ARCH22_HEAD_SOFTMAX_LSE_FLAG = 32U,
+    ARCH22_HEAD_ACTUAL_LEN_Q_DIMS = 33U,
+    ARCH22_HEAD_ACTUAL_LEN_DIMS = 34U,
+    ARCH22_HEAD_S_INNER_LOOP_SIZE = 35U,
+    ARCH22_HEAD_TND_FD_CORE_ARR_LEN = 36U,
+    ARCH22_HEAD_USED_VEC_NUM_FD = 37U,
+    ARCH22_HEAD_FD_RECORD_NUM = 38U,
+    ARCH22_HEAD_FA_RECORD_NUM = 39U,
+    ARCH22_HEAD_KV_LAYOUT = 40U,
+};
+
+constexpr uint32_t ARCH22_FA_RECORD_SIZE = 8U;
+
+enum Arch22FaIndex : uint32_t {
+    ARCH22_FA_S_IDX_START = 0U,
+    ARCH22_FA_S_IDX_END = 1U,
+    ARCH22_FA_B_END = 2U,
+    ARCH22_FA_S1_OUTER_END = 3U,
+    ARCH22_FA_S2_END = 4U,
+    ARCH22_FA_START_KV_SPLIT_POS = 5U,
+    ARCH22_FA_RESERVED0 = 6U,
+    ARCH22_FA_RESERVED1 = 7U,
+};
+
+constexpr uint32_t ARCH22_FD_RECORD_SIZE = 8U;
+
+enum Arch22FdIndex : uint32_t {
+    ARCH22_FD_B_IDX = 0U,
+    ARCH22_FD_S1_IDX = 1U,
+    ARCH22_FD_KV_SPLIT_NUM = 2U,
+    ARCH22_FD_S1_SPLIT_NUM = 3U,
+    ARCH22_FD_S1_LAST_PART_SIZE = 4U,
+    ARCH22_FD_S1_IDX_END = 5U,
+    ARCH22_FD_S1_IDX_END_SPLIT = 6U,
+    ARCH22_FD_WORKSPACE_IDX = 7U,
+};
+
+constexpr uint32_t ARCH22_MAX_FA_RECORDS = 64U;
+constexpr uint32_t ARCH22_MAX_FD_RECORDS = 64U;
+
+inline constexpr uint32_t GetArch22RequiredSize(uint32_t faRecords, uint32_t fdRecords)
+{
+    return ARCH22_HEAD_SIZE + faRecords * ARCH22_FA_RECORD_SIZE + fdRecords * ARCH22_FD_RECORD_SIZE;
+}
+
+inline constexpr uint32_t GetArch22RequiredSizeMax()
+{
+    return GetArch22RequiredSize(ARCH22_MAX_FA_RECORDS, ARCH22_MAX_FD_RECORDS);
+}
+
+} // namespace qfmla_arch22
+
+#endif

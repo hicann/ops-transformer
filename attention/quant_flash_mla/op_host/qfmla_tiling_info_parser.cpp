@@ -32,13 +32,12 @@ static const std::map<std::string, QfmlaLayout> QFMLA_LAYOUT_Q_MAP = {
     {"BSND", QfmlaLayout::BSND},
     {"BNSD", QfmlaLayout::BNSD},
     {"TND", QfmlaLayout::TND},
+    {"BSH", QfmlaLayout::BSH}, // arch22 int8全量化
 };
 
 static const std::map<std::string, QfmlaOutLayout> QFMLA_LAYOUT_OUT_MAP = {
-    {"BSND", QfmlaOutLayout::BSND},
-    {"BNSD", QfmlaOutLayout::BNSD},
-    {"TND", QfmlaOutLayout::TND},
-    {"NTD", QfmlaOutLayout::NTD},
+    {"BSND", QfmlaOutLayout::BSND}, {"BNSD", QfmlaOutLayout::BNSD}, {"TND", QfmlaOutLayout::TND},
+    {"NTD", QfmlaOutLayout::NTD},   {"BSH", QfmlaOutLayout::BSH}, // arch22 int8全量化: 输出3D (B,S,H)
 };
 
 static const std::map<std::string, QfmlaKvLayout> QFMLA_LAYOUT_KV_MAP = {
@@ -66,7 +65,7 @@ ge::graphStatus QfmlaInfoParser::GetNpuInfo()
     aivNum_ = ascendcPlatform.GetCoreNumAiv();
     OP_CHECK_IF(aicNum_ == 0 || aivNum_ == 0, OP_LOGE(opName_, "num of core obtained is 0."), return ge::GRAPH_FAILED);
     npuArch_ = ascendcPlatform.GetCurNpuArch();
-    if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201) {
+    if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_2201) {
         OP_LOGE(opName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
     }
@@ -151,6 +150,8 @@ ge::graphStatus QfmlaInfoParser::GetOpParaInfo()
     fillTensorInfo(opParamInfo_.sequsedQ, SEQUSED_Q_INDEX, true);
     fillTensorInfo(opParamInfo_.attnMask, ATTN_MASK_INDEX, true);
     fillTensorInfo(opParamInfo_.metadata, METADATA_INDEX, true);
+    fillTensorInfo(opParamInfo_.qRope, Q_ROPE_INDEX, true);
+    fillTensorInfo(opParamInfo_.kRope, K_ROPE_INDEX, true);
 
     // k_cache为view输入时提取stride, 用于非连续Tensor校验与kernel侧offset计算
     if (context_->InputIsView(K_CACHE_INDEX)) {
@@ -221,14 +222,31 @@ ge::graphStatus QfmlaInfoParser::GetQuantMode()
                 return ge::GRAPH_FAILED);
     int64_t quantModeVal = *opParamInfo_.quantMode;
     if (quantModeVal != static_cast<int64_t>(QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT) &&
-        quantModeVal != static_cast<int64_t>(QfmlaQuantMode::MLA_HIF8_FULLQUANT)) {
+        quantModeVal != static_cast<int64_t>(QfmlaQuantMode::MLA_HIF8_FULLQUANT) &&
+        quantModeVal != static_cast<int64_t>(QfmlaQuantMode::MLA_INT8_FULLQUANT)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
             "quant_mode must be 1 (MLA_FP8_E4M3_FULLQUANT: Q/K/V FP8_E4M3, Q per-token-head, K per-tensor) "
-            "or 0 (MLA_HIF8_FULLQUANT: Q/K/V HIFLOAT8, Q per-token-head, K per-tensor)");
+            "or 0 (MLA_HIF8_FULLQUANT: Q/K/V HIFLOAT8, Q per-token-head, K per-tensor) "
+            "or 2 (MLA_INT8_FULLQUANT: Q/K/V INT8, Q per-token-head, K per-tensor, rope split, arch22 only)");
         return ge::GRAPH_FAILED;
     }
     quantMode_ = static_cast<QfmlaQuantMode>(quantModeVal);
+    // A2/A5 场景按 npuArch 区分（npuArch 为唯一场景依据，GetNpuInfo 先于本函数执行）:
+    // arch22(DAV_2201) 仅支持 quant_mode=2 (MLA_INT8_FULLQUANT);
+    // A5(DAV_3510/DAV_9201) 仅支持 quant_mode=1 (FP8) / 0 (HIF8)
+    OP_CHECK_IF(
+        npuArch_ == NpuArch::DAV_2201 && quantModeVal != static_cast<int64_t>(QfmlaQuantMode::MLA_INT8_FULLQUANT),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
+            "On arch22 (Ascend910B/910_93), only quant_mode=2 (MLA_INT8_FULLQUANT) is supported"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        npuArch_ != NpuArch::DAV_2201 && quantModeVal == static_cast<int64_t>(QfmlaQuantMode::MLA_INT8_FULLQUANT),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
+            "quant_mode=2 (MLA_INT8_FULLQUANT) is only supported on arch22 (Ascend910B/910_93)"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -252,6 +270,24 @@ ge::graphStatus QfmlaInfoParser::GetQShapeInfo()
         // Use required cache_seqlens as B so an invalid cu_seqlens_q shape reaches its own checker.
         bSize_ = opParamInfo_.cacheSeqlens.tensor->GetShapeSize();
         s1Size_ = (opParamInfo_.maxSeqlenQ != nullptr && *opParamInfo_.maxSeqlenQ > 0) ? *opParamInfo_.maxSeqlenQ : -1;
+    } else if (layoutQ_ == QfmlaLayout::BSH) {
+        // arch22 int8全量化: 3D (B, S, N*D_nope)，nope D=512，rope分离传入
+        if (qShape.GetDimNum() != 3) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, QUERY_NAME,
+                                                     (std::to_string(qShape.GetDimNum()) + "D").c_str(),
+                                                     "The shape dim of q must be 3D when layout_q is BSH");
+            return ge::GRAPH_FAILED;
+        }
+        bSize_ = qShape.GetDim(0);
+        s1Size_ = qShape.GetDim(1);
+        headDimQk_ = 512; // nope维度，rope单独传入(64)
+        OP_CHECK_IF(qShape.GetDim(2) == 0 || qShape.GetDim(2) % headDimQk_ != 0,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, QUERY_NAME, ToString(qShape).c_str(),
+                                                          "The last dim of q must be a multiple of 512 when "
+                                                          "layout_q is BSH (H = N * 512)"),
+                    return ge::GRAPH_FAILED);
+        n1Size_ = qShape.GetDim(2) / headDimQk_;
+        qTSize_ = bSize_ * s1Size_;
     } else {
         if (qShape.GetDimNum() != 4) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, QUERY_NAME,
@@ -280,7 +316,7 @@ ge::graphStatus QfmlaInfoParser::GetKvCacheShapeInfo()
 {
     const auto& kvShape = opParamInfo_.kCache.shape->GetStorageShape();
     size_t kvDimNum = kvShape.GetDimNum();
-    // PA_BBND: (blockNum, blockSize, KV_N, D) / PA_BNBD: (blockNum, KV_N, blockSize, D)
+    // PA_BBND: (blockNum, blockSize, KV_N, D) / PA_BNBD: (blockNum, KV_N, blockSize, D) / PA_NZ: 5D
     if (layoutKv_ == QfmlaKvLayout::PA_BBND) {
         if (kvDimNum != 4) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, K_CACHE_NAME, (std::to_string(kvDimNum) + "D").c_str(),
@@ -384,6 +420,7 @@ ge::graphStatus QfmlaInfoParser::ParseFeatureInfo()
 
     cuSeqLenQFlag_ = (opParamInfo_.cuSeqlensQ.tensor != nullptr);
     seqUsedQFlag_ = (opParamInfo_.sequsedQ.tensor != nullptr);
+    ropeFlag_ = (opParamInfo_.qRope.tensor != nullptr) && (opParamInfo_.kRope.tensor != nullptr);
 
     returnSoftmaxLse_ = (opParamInfo_.returnSoftmaxLse == nullptr) ? false : *opParamInfo_.returnSoftmaxLse;
     constexpr float DEFAULT_SOFTMAX_SCALE = 1.0f / 24.0f; // 1 / sqrt(576)
@@ -398,6 +435,7 @@ void QfmlaInfoParser::GenerateInfo(QfmlaTilingInfo& qfmlaInfo)
     qfmlaInfo.opParamInfo = opParamInfo_;
     qfmlaInfo.aicNum = aicNum_;
     qfmlaInfo.aivNum = aivNum_;
+    qfmlaInfo.npuArch = npuArch_;
 
     qfmlaInfo.bSize = bSize_;
     qfmlaInfo.n1Size = n1Size_;
@@ -426,6 +464,7 @@ void QfmlaInfoParser::GenerateInfo(QfmlaTilingInfo& qfmlaInfo)
 
     qfmlaInfo.quantMode = quantMode_;
     qfmlaInfo.softmaxScale = softmaxScale_;
+    qfmlaInfo.ropeFlag = ropeFlag_;
 
     qfmlaInfo.layoutQ = layoutQ_;
     qfmlaInfo.layoutOut = layoutOut_;

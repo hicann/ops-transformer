@@ -17,6 +17,7 @@
 #include "opdev/make_op_executor.h"
 #include "opdev/op_def.h"
 #include "opdev/op_log.h"
+#include "opdev/platform.h"
 #include "opdev/tensor_view_utils.h"
 
 using namespace op;
@@ -30,10 +31,10 @@ extern aclnnStatus aclnnInnerQuantFlashMlaGetWorkspaceSize(
     const aclTensor* q, const aclTensor* kCache, const aclTensor* qDescale, const aclTensor* kDescale,
     const aclTensor* blockTable, const aclTensor* cacheSeqlens, const aclTensor* cuSeqlensQOptional,
     const aclTensor* sequsedQOptional, const aclTensor* attnMaskOptional, const aclTensor* metadataOptional,
-    int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t headDimV,
-    char* layoutQOptional, char* layoutKvOptional, char* layoutOutOptional, bool returnSoftmaxLse,
-    const aclTensor* attnOutOut, const aclTensor* softmaxLseOutOptional, uint64_t* workspaceSize,
-    aclOpExecutor** executor);
+    const aclTensor* qRopeOptional, const aclTensor* kRopeOptional, int64_t quantMode, double softmaxScale,
+    int64_t maskMode, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t headDimV, char* layoutQOptional,
+    char* layoutKvOptional, char* layoutOutOptional, bool returnSoftmaxLse, const aclTensor* attnOutOut,
+    const aclTensor* softmaxLseOutOptional, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 extern aclnnStatus aclnnInnerQuantFlashMla(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            const aclrtStream stream);
@@ -71,8 +72,9 @@ aclnnStatus aclnnQuantFlashMlaGetWorkspaceSize(
     const aclTensor* q, const aclTensor* kCache, const aclTensor* qDescale, const aclTensor* kDescale,
     const aclTensor* blockTable, const aclTensor* cacheSeqlens, const aclTensor* cuSeqlensQOptional,
     const aclTensor* sequsedQOptional, const aclTensor* attnMaskOptional, const aclTensor* metadataOptional,
-    int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t headDimV,
-    const char* layoutQ, const char* layoutKv, const char* layoutOut, bool returnSoftmaxLse, const aclTensor* attnOut,
+    const aclTensor* qRopeOptional, const aclTensor* kRopeOptional, int64_t quantMode, double softmaxScale,
+    int64_t maskMode, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t headDimV, const char* layoutQ,
+    const char* layoutKv, const char* layoutOut, bool returnSoftmaxLse, const aclTensor* attnOut,
     const aclTensor* softmaxLseOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("start aclnnQuantFlashMlaGetWorkspaceSize");
@@ -84,6 +86,19 @@ aclnnStatus aclnnQuantFlashMlaGetWorkspaceSize(
     CHECK_COND(layoutQ != nullptr, ACLNN_ERR_PARAM_INVALID, "layoutQ should be provided, but got null");
     CHECK_COND(layoutKv != nullptr, ACLNN_ERR_PARAM_INVALID, "layoutKv should be provided, but got null");
     CHECK_COND(layoutOut != nullptr, ACLNN_ERR_PARAM_INVALID, "layoutOut should be provided, but got null");
+
+    // arch22 int8全量化(quant_mode=2): rope分离必传（A2必须传入）; KV descale统一由k_descale承载
+    // fp8/hif8(quant_mode=0/1): rope 不支持传入（A5无需传入保持默认）。
+    // 场景门控按 npuArch 区分（arch22=DAV_2201，A2/A5 共用代码不以 quant_mode/dtype 区分芯片场景，
+    // 与主算子 host 侧 parser 的 quant_mode↔npuArch 交叉校验语义一致）
+    const bool isArch22 = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201;
+    if (isArch22) {
+        CHECK_COND(qRopeOptional != nullptr && kRopeOptional != nullptr, ACLNN_ERR_PARAM_INVALID,
+                   "qRope and kRope must be provided when quantMode is 2 (MLA_INT8_FULLQUANT)");
+    } else {
+        CHECK_COND(qRopeOptional == nullptr && kRopeOptional == nullptr, ACLNN_ERR_PARAM_INVALID,
+                   "qRope/kRope is only supported when quantMode is 2 (MLA_INT8_FULLQUANT)");
+    }
 
     const aclTensor* placeHolder = nullptr;
     const aclTensor* tempTensor = nullptr;
@@ -98,9 +113,9 @@ aclnnStatus aclnnQuantFlashMlaGetWorkspaceSize(
 
     ret = aclnnInnerQuantFlashMlaGetWorkspaceSize(
         q, kCache, qDescale, kDescale, blockTable, cacheSeqlens, cuSeqlensQOptional, sequsedQOptional, attnMaskOptional,
-        metadataOptional, quantMode, softmaxScale, maskMode, maxSeqlenQ, maxSeqlenKv, headDimV,
-        const_cast<char*>(layoutQ), const_cast<char*>(layoutKv), const_cast<char*>(layoutOut), returnSoftmaxLse,
-        attnOut, placeHolder, workspaceSize, executor);
+        metadataOptional, qRopeOptional, kRopeOptional, quantMode, softmaxScale, maskMode, maxSeqlenQ, maxSeqlenKv,
+        headDimV, const_cast<char*>(layoutQ), const_cast<char*>(layoutKv), const_cast<char*>(layoutOut),
+        returnSoftmaxLse, attnOut, placeHolder, workspaceSize, executor);
 
     if (!returnSoftmaxLse) {
         aclDestroyTensor(tempTensor);

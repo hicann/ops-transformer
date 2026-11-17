@@ -9,7 +9,7 @@
 - <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：支持（仅int8全量化场景，quant_mode=2）
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2推理产品</term>：不支持
@@ -35,6 +35,16 @@
   - **输出 attn_out**：数据类型为 bfloat16。
 
   其中Q的量化参数`q_descale`数据类型为FP32，shape取决于`layout_q`；K的量化参数`k_descale`为per-tensor静态量化，shape为(1,)，数据类型为FP32。
+
+  Atlas A2系列产品（arch22）支持 **int8全量化** 场景（`quant_mode=2`），量化形式与A5不同：
+
+  - **Q**：per-token-head 动态量化，数据类型为 int8（nope 维度 D=512）；
+  - **K（KV cache）/V**：per-tensor 静态量化，数据类型为 int8（nope 维度 D=512），K/V 共用 cache；
+  - **Q_rope / K_rope**：rope与nope分离输入（`q_rope`/`k_rope` 必传），数据类型为 bfloat16，D=64；
+  - **KV descale**：由 `k_descale` 承载（K/V 反量化 scale 统一），per-tensor 静态量化，shape 为 (1,)，数据类型为 FP32；
+  - **输出 attn_out**：数据类型为 bfloat16。
+
+  arch22 场景 `head_dim_qk` 属性语义为 nope 维度 512（rope 分离后不再传 576）。
 
   `quant_flash_mla_metadata`是`quant_flash_mla`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AICore/AIVCore的任务切分结果，主算子传入该metadata以优化调度。典型调用流程如下：
 
@@ -141,10 +151,12 @@ cann_ops_transformer.quant_flash_mla(
 | :--- | :---: | :--- |
 | `A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR` | 0 | A8C8 Q HIFLOAT8 per-token-head，KV HIFLOAT8 per-tensor |
 | `A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR` | 1 | A8C8 Q FP8_E4M3 per-token-head，KV FP8_E4M3 per-tensor |
+| `Q_INT8_PER_TOKEN_HEAD_KV_INT8_PER_TENSOR` | 2 | Q INT8 per-token-head，KV INT8 per-tensor，rope分离（仅Atlas A2系列产品） |
 
 > [!NOTE]
 >
 > `quant_mode=0` 时为 HIF8 场景，`quant_mode=1` 时为 FP8_E4M3 场景，对应 q/k_cache 的数据类型分别为 hifloat8 与 float8_e4m3fn。
+> `quant_mode=2` 时为 INT8 全量化场景（仅 Atlas A2 系列产品），q/k_cache 数据类型为 int8，rope 通过 `q_rope`/`k_rope` 分离传入（bfloat16），K/V 的反量化 scale 统一由 `k_descale` 传入（FP32、shape (1,)）。
 
 ### mask_mode 枚举
 
@@ -177,15 +189,15 @@ cann_ops_transformer.quant_flash_mla(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| cache_seqlens | Tensor | 必选 | 每个batch的KV序列长度 | int32 | ND | (batch_size,) | × |
+| cache_seqlens | Tensor | 必选 | 每个batch的KV序列长度 | int32（int8模式下支持int64） | ND | (batch_size,) | × |
 | num_heads_q | int | 必选 | Query head数 | int32 | - | - | - |
 | num_heads_kv | int | 必选 | Key/Value head数 | int32 | - | - | - |
 | quant_mode | int | 必选 | 量化模式，支持传入枚举或对应 int 值 | int32 | - | - | - |
-| cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (batch_size+1,) | × |
-| seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (batch_size,) | × |
+| cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32（int8模式下支持int64） | ND | (batch_size+1,) | × |
+| seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32（int8模式下支持int64） | ND | (batch_size,) | × |
 | max_seqlen_q | int | 可选 | 指定查询q序列的长度上限 | int32 | - | - | - |
 | max_seqlen_kv | int | 可选 | 指定键k和值v序列的长度上限 | int32 | - | - | - |
-| head_dim_qk | int | 可选 | q/k的每个注意力头维度，默认值为576，当前仅支持576 | int32 | - | - | - |
+| head_dim_qk | int | 可选 | q/k的每个注意力头维度，默认值为576，当前仅支持576；int8模式（quant_mode=2）下为512（nope，rope分离） | int32 | - | - | - |
 | head_dim_v | int | 可选 | v的每个注意力头维度，默认值为512，当前仅支持512 | int32 | - | - | - |
 | mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」 | int32 | - | - | - |
 | layout_q | string | 可选 | 定义输入q张量的布局格式 | string | - | - | - |
@@ -194,16 +206,18 @@ cann_ops_transformer.quant_flash_mla(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| q | Tensor | 必选 | 公式中的Q | float8_e4m3fn/hifloat8 | ND | <ul><li>(B, Q_S, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(Q_T, Q_N, D)</li></ul> | × |
-| k_cache | Tensor | 必选 | 公式中的K（KV cache）。仅PA场景支持非连续tensor，详细约束见<a href="#Paged Attention参数组">Paged Attention参数组</a>特性交叉校验 | float8_e4m3fn/hifloat8 | ND | <ul><li>(Bn, Bs, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li></ul> | √ |
+| q | Tensor | 必选 | 公式中的Q | float8_e4m3fn/hifloat8/int8 | ND | <ul><li>(B, Q_S, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(Q_T, Q_N, D)</li><li>int8模式（D=512）: (B, Q_S, Q_N*512)、(Q_T, Q_N*512)</li></ul> | × |
+| k_cache | Tensor | 必选 | 公式中的K（KV cache）。仅PA场景支持非连续tensor，详细约束见<a href="#Paged Attention参数组">Paged Attention参数组</a>特性交叉校验 | float8_e4m3fn/hifloat8/int8 | ND | <ul><li>(Bn, Bs, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li><li>int8模式（D=512）: (Bn, 1, D/32, Bs, 32)</li></ul> | √ |
 | q_descale | Tensor | 必选 | q的反量化scale，per-token-head动态量化 | float32 | ND | <ul><li>(B, Q_S, Q_N)</li><li>(B, Q_N, Q_S)</li><li>(Q_T, Q_N)</li></ul> | × |
-| k_descale | Tensor | 必选 | k的反量化scale，per-tensor静态量化 | float32 | ND | (1,) | × |
+| k_descale | Tensor | 必选 | k/v的反量化scale（K/V统一），per-tensor静态量化 | float32 | ND | (1,) | × |
 | block_table | Tensor | 必选 | 用于分块注意力计算中的块索引映射 | int32 | ND | (B, Bn) | × |
-| cache_seqlens | Tensor | 必选 | 每个batch的KV序列长度 | int32 | ND | (batch_size,) | × |
-| cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (batch_size+1,) | × |
-| seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (batch_size,) | × |
-| attn_mask | Tensor | 可选 | 掩码矩阵，仅在mask_mode为3（CAUSAL）时需要 | int8 | ND | (2048, 2048) | × |
+| cache_seqlens | Tensor | 必选 | 每个batch的KV序列长度 | int32（int8模式下支持int64） | ND | (batch_size,) | × |
+| cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32（int8模式下支持int64） | ND | (batch_size+1,) | × |
+| seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32（int8模式下支持int64） | ND | (batch_size,) | × |
+| attn_mask | Tensor | 可选 | 掩码矩阵，仅在mask_mode为3（CAUSAL）时需要；int8模式下支持bool/int8/uint8 | int8/bool/uint8 | ND | <ul><li>(2048, 2048)</li><li>int8模式: (S1, S2)</li></ul> | × |
 | metadata | Tensor | 可选 | `quant_flash_mla_metadata`生成的任务切分结果，传入后可优化调度 | int32 | ND | (2, max_schedule_size) | × |
+| q_rope | Tensor | 可选 | q的rope输入（rope/nope分离场景）；int8模式（quant_mode=2）下必传 | bfloat16 | ND | <ul><li>BSH: (B, Q_S, Q_N, 64)</li><li>TND: (Q_T, Q_N, 64)</li></ul> | × |
+| k_rope | Tensor | 可选 | k_cache的rope输入（rope/nope分离场景）；int8模式（quant_mode=2）下必传 | bfloat16 | ND | <ul><li>PA_NZ: (Bn, 1, 4, Bs, 16)</li></ul> | √ |
 | quant_mode | int | 必选 | 量化模式，支持传入枚举或对应 int 值 | int32 | - | - | - |
 | head_dim_v | int | 可选 | v的每个注意力头维度，默认值为512，当前仅支持512 | int32 | - | - | - |
 | softmax_scale | float | 可选 | 可显式设置缩放因子。不传入时默认取 1/sqrt(head_dim_qk) | float32 | - | - | - |
@@ -235,6 +249,14 @@ cann_ops_transformer.quant_flash_mla(
 - 参数cu_seqlens_q、seqused_q、block_table、cache_seqlens及attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - quant_flash_mla_metadata和quant_flash_mla的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - 该接口仅支持Paged Attention（PA）场景，不传入block_table将被拦截。
+- int8模式（quant_mode=2，仅Atlas A2系列产品）约束：
+  - q/k_cache 数据类型必须为 int8，q_rope/k_rope 必传且为 bfloat16，q_descale/k_descale 为 float32（KV descale 统一由 k_descale 承载）；
+  - layout_q 仅支持 BSH/TND，layout_kv 仅支持 PA_NZ，layout_out 仅支持 BSH/TND；
+  - q/k_cache 的 head_dim 为 512（nope），rope 维度为 64，通过 q_rope/k_rope 分离传入；
+  - Q_S 序列长度范围为 [1, 32]；
+  - block_size 由 k_cache shape 推导，固定为 128（PA_NZ）；
+  - 不支持 return_softmax_lse（必须为 False）；
+  - cache_seqlens/cu_seqlens_q/seqused_q 支持 int32/int64 双类型。
 
 ### 特性参数组
 

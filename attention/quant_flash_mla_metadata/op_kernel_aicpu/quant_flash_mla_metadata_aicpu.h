@@ -22,6 +22,7 @@
 #include "cpu_kernel.h"
 #include "cpu_tensor.h"
 #include "quant_flash_mla_metadata.h"
+#include "qfmla_metadata_arch22_split.h"
 #include "../../common/op_kernel/load_balance/section_stream_k/section_stream_k.h"
 #include "../../common/op_kernel/aicpu_common.h"
 
@@ -48,6 +49,7 @@ private:
     bool GenMetaData(SectionStreamKResult& splitRes);
     void GetMetadataRowInfo(int32_t& dimNum, int64_t& rowSize);
     bool ParamsInit();
+    bool ParamsInitArch22();
     bool CheckNeedInitOutput();
     std::vector<int64_t> GetTensorDataAsInt64(Tensor* tensor, size_t size);
 

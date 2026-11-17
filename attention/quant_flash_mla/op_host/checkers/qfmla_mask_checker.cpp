@@ -50,16 +50,40 @@ ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const QfmlaTilingInfo& qfml
     if (!qfmlaInfo.attnMaskFlag) {
         return ge::GRAPH_SUCCESS;
     }
-    // dtype: int8
-    OP_CHECK_IF(qfmlaInfo.opParamInfo.attnMask.desc->GetDataType() != ge::DT_INT8,
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                    opName, ATTN_MASK_NAME,
-                    ge::TypeUtils::DataTypeToSerialString(qfmlaInfo.opParamInfo.attnMask.desc->GetDataType()).c_str(),
-                    "The dtype of attn_mask must be int8"),
-                return ge::GRAPH_FAILED);
+    // 芯片差异用 npuArch 区分: arch22(910B) 承接 int8 全量化 MLA 收编场景
+    const bool isArch22 = qfmlaInfo.npuArch == NpuArch::DAV_2201;
+    // dtype: int8；arch22 int8全量化: bool/int8/uint8（对齐IFA现状）
+    if (isArch22) {
+        const auto maskDtype = qfmlaInfo.opParamInfo.attnMask.desc->GetDataType();
+        OP_CHECK_IF(maskDtype != ge::DT_INT8 && maskDtype != ge::DT_BOOL && maskDtype != ge::DT_UINT8,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        opName, ATTN_MASK_NAME, ge::TypeUtils::DataTypeToSerialString(maskDtype).c_str(),
+                        "The dtype of attn_mask must be int8/bool/uint8 in MLA_INT8_FULLQUANT scenario"),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(
+            qfmlaInfo.opParamInfo.attnMask.desc->GetDataType() != ge::DT_INT8,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                opName, ATTN_MASK_NAME,
+                ge::TypeUtils::DataTypeToSerialString(qfmlaInfo.opParamInfo.attnMask.desc->GetDataType()).c_str(),
+                "The dtype of attn_mask must be int8"),
+            return ge::GRAPH_FAILED);
+    }
     // format: ND
     if (CheckFormatSupport(qfmlaInfo.opParamInfo.attnMask.desc, ATTN_MASK_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
+    }
+    if (isArch22) {
+        // arch22: mask shape 2D (S1, S2)（IFA现状不限 2048，kernel按实际shape处理）
+        OP_CHECK_IF(
+            qfmlaInfo.attenMaskS1Size <= 0 || qfmlaInfo.attenMaskS2Size <= 0,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName, ATTN_MASK_NAME,
+                (std::to_string(qfmlaInfo.attenMaskS1Size) + "x" + std::to_string(qfmlaInfo.attenMaskS2Size)).c_str(),
+                "The shape of attn_mask must be 2D (S1, S2) with positive dims in MLA_INT8_FULLQUANT "
+                "scenario"),
+            return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
     }
     // shape: (2048, 2048)
     OP_CHECK_IF(

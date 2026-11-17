@@ -75,6 +75,16 @@ public:
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
+        this->Input("q_rope")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_BF16})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("k_rope")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_BF16})
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
         this->Output("attn_out")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_BF16})
@@ -110,6 +120,91 @@ public:
 
         this->AICore().AddConfig("ascend950", aicore_config_95);
         this->AICore().AddConfig("ascend960dt", aicore_config_95);
+
+        OpAICoreConfig config_910;
+        config_910.Input("q")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_INT8})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("k_cache")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_INT8})
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        config_910.Input("q_descale")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("k_descale")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("block_table")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("cache_seqlens")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32, ge::DT_INT64})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("cu_seqlens_q")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32, ge::DT_INT64})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("seqused_q")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32, ge::DT_INT64})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("attn_mask")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT8})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("metadata")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("q_rope")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_BF16})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Input("k_rope")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_BF16})
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        config_910.Output("attn_out")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_BF16})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        config_910.Output("softmax_lse")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+
+        config_910.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("coreType.value", "AiCore")
+            .ExtendCfgInfo("opFile.value", "quant_flash_mla");
+
+        this->AICore().AddConfig("ascend910b", config_910);
+        this->AICore().AddConfig("ascend910_93", config_910);
     }
 };
 

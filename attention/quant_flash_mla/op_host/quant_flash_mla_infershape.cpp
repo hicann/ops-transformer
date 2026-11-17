@@ -18,6 +18,7 @@
 #include "log/log.h"
 
 using namespace ge;
+using Ops::Base::ToString;
 
 namespace ops {
 
@@ -117,9 +118,27 @@ ge::graphStatus InferShapeQuantFlashMla(gert::InferShapeContext* context)
         seqLenQ = qShape->GetDim(0);
         numHeadsQ = qShape->GetDim(1);
         isTND = true;
+    } else if (layoutQStr == "BSH") {
+        // arch22 int8全量化: 3D (B, S, N*D_nope)，nope D=512，rope分离传入
+        if (qShape->GetDimNum() != 3) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q",
+                                                     std::to_string(qShape->GetDimNum()).c_str(),
+                                                     "The shape dim of q must be 3 when layout_q is BSH");
+            return ge::GRAPH_FAILED;
+        }
+        batchSize = qShape->GetDim(0);
+        seqLenQ = qShape->GetDim(1);
+        int64_t hiddenSize = qShape->GetDim(2);
+        if (hiddenSize <= 0 || hiddenSize % MLA_HEAD_DIM_V_DEFAULT != 0) {
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "q", ToString(*qShape).c_str(),
+                                                  "The last dim of q must be a positive multiple of 512 when "
+                                                  "layout_q is BSH (H = N * 512)");
+            return ge::GRAPH_FAILED;
+        }
+        numHeadsQ = hiddenSize / MLA_HEAD_DIM_V_DEFAULT;
     } else {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_q", layoutQStr.c_str(),
-                                              "The value of layout_q must be in BSND/BNSD/TND");
+                                              "The value of layout_q must be in BSND/BNSD/TND/BSH");
         return ge::GRAPH_FAILED;
     }
 
@@ -148,9 +167,15 @@ ge::graphStatus InferShapeQuantFlashMla(gert::InferShapeContext* context)
         attnOutShape->SetDim(0, numHeadsQ);
         attnOutShape->SetDim(1, seqLenQ);
         attnOutShape->SetDim(2, headDimV);
+    } else if (layoutOutStr == "BSH") {
+        // arch22 int8全量化: 输出跟随q layout, 3D (B, S, N*D_v)
+        attnOutShape->SetDimNum(3);
+        attnOutShape->SetDim(0, batchSize);
+        attnOutShape->SetDim(1, seqLenQ);
+        attnOutShape->SetDim(2, numHeadsQ * headDimV);
     } else {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_out", layoutOutStr.c_str(),
-                                              "The value of layout_out must be in BSND/BNSD/TND/NTD");
+                                              "The value of layout_out must be in BSND/BNSD/TND/NTD/BSH");
         return ge::GRAPH_FAILED;
     }
 

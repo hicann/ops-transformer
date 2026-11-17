@@ -52,7 +52,8 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_mla(
     const at::Tensor& q, const at::Tensor& k_cache, const at::Tensor& q_descale, const at::Tensor& k_descale,
     const at::Tensor& block_table, const at::Tensor& cache_seqlens, int64_t quant_mode,
     const c10::optional<at::Tensor>& cu_seqlens_q, const c10::optional<at::Tensor>& seqused_q,
-    const c10::optional<at::Tensor>& attn_mask, const c10::optional<at::Tensor>& metadata, int64_t head_dim_v,
+    const c10::optional<at::Tensor>& attn_mask, const c10::optional<at::Tensor>& metadata,
+    const c10::optional<at::Tensor>& q_rope, const c10::optional<at::Tensor>& k_rope, int64_t head_dim_v,
     double softmax_scale, int64_t mask_mode, int64_t max_seqlen_q, int64_t max_seqlen_kv, std::string layout_q,
     std::string layout_kv, std::string layout_out, bool return_softmax_lse)
 {
@@ -65,7 +66,8 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_mla(
     at::SmallVector<int64_t, MAX_DIM_SIZE> attentionOutSize;
     at::SmallVector<int64_t, MAX_DIM_SIZE> softmaxOutSize;
 
-    // q: TND(T,N,D) / BSND(B,S,N,D) / BNSD(B,N,S,D), D固定576(nope512+rope64)
+    // q: TND(T,N,D) / BSND(B,S,N,D) / BNSD(B,N,S,D), D固定576(nope512+rope64);
+    // BSH(arch22 int8全量化, D=512 nope, rope分离): (B,S,N*512)
     if (layout_q == "TND") {
         tSize = q.size(0);
         nSize = q.size(1);
@@ -79,7 +81,11 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_mla(
         bSize = q.size(0);
         sSize = q.size(1);
         nSize = q.size(2);
-    } else { // BNSD
+    } else if (layout_q == "BSH") {
+        bSize = q.size(0);
+        sSize = q.size(1);
+        nSize = q.size(2) / 512; // nope D=512
+    } else {                     // BNSD
         bSize = q.size(0);
         nSize = q.size(1);
         sSize = q.size(2);
@@ -100,6 +106,9 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_mla(
         attentionOutSize = {bSize, sSize, nSize, head_dim_v};
     } else if (layout_out == "BNSD") {
         attentionOutSize = {bSize, nSize, sSize, head_dim_v};
+    } else if (layout_out == "BSH") {
+        // arch22 int8全量化: 输出跟随q layout, 3D (B, S, N*512)
+        attentionOutSize = {bSize, sSize, nSize * head_dim_v};
     } else if (layout_out == "TND") {
         attentionOutSize = {tSize, nSize, head_dim_v};
     } else { // NTD
@@ -112,15 +121,15 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_mla(
         TensorWrapper q_wrapper = make_wrapper(q, HIFLOAT8);
         TensorWrapper k_cache_wrapper = make_wrapper(k_cache, HIFLOAT8);
         ACLNN_CMD(aclnnQuantFlashMla, q_wrapper, k_cache_wrapper, q_descale, k_descale, block_table, cache_seqlens,
-                  cu_seqlens_q, seqused_q, attn_mask, metadata, quant_mode, softmax_scale, mask_mode, max_seqlen_q,
-                  max_seqlen_kv, head_dim_v, layout_q, layout_kv, layout_out, return_softmax_lse, attentionOutput,
-                  softmaxLse);
+                  cu_seqlens_q, seqused_q, attn_mask, metadata, q_rope, k_rope, quant_mode, softmax_scale, mask_mode,
+                  max_seqlen_q, max_seqlen_kv, head_dim_v, layout_q, layout_kv, layout_out, return_softmax_lse,
+                  attentionOutput, softmaxLse);
         return std::tuple<at::Tensor, at::Tensor>(attentionOutput, softmaxLse);
     }
 
     ACLNN_CMD(aclnnQuantFlashMla, q, k_cache, q_descale, k_descale, block_table, cache_seqlens, cu_seqlens_q, seqused_q,
-              attn_mask, metadata, quant_mode, softmax_scale, mask_mode, max_seqlen_q, max_seqlen_kv, head_dim_v,
-              layout_q, layout_kv, layout_out, return_softmax_lse, attentionOutput, softmaxLse);
+              attn_mask, metadata, q_rope, k_rope, quant_mode, softmax_scale, mask_mode, max_seqlen_q, max_seqlen_kv,
+              head_dim_v, layout_q, layout_kv, layout_out, return_softmax_lse, attentionOutput, softmaxLse);
 
     return std::tuple<at::Tensor, at::Tensor>(attentionOutput, softmaxLse);
 }

@@ -30,6 +30,8 @@ using namespace Ops::Base;
 
 // MLA 支持的 Q_N 取值
 static const std::vector<int64_t> MLA_SUPPORT_N1 = {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128};
+// arch22 int8全量化支持的 Q_N 取值（对齐IFA现状: G∈{1,2,4,8,16,32,64,128}）
+static const std::vector<int64_t> MLA_INT8_SUPPORT_N1 = {1, 2, 4, 8, 16, 32, 64, 128};
 
 // ============================================================================
 // SinglePara — Layout
@@ -38,7 +40,28 @@ static const std::vector<int64_t> MLA_SUPPORT_N1 = {1, 2, 4, 6, 8, 12, 16, 24, 3
 ge::graphStatus CommonChecker::CheckSingleParaLayout(const QfmlaTilingInfo& qfmlaInfo)
 {
     const char* opName = qfmlaInfo.opName;
-    // layout_q: 支持TND/BSND/BNSD
+    // 芯片差异用 npuArch 区分: arch22(910B) 承接 int8 全量化 MLA 收编场景
+    const bool isArch22 = qfmlaInfo.npuArch == NpuArch::DAV_2201;
+    if (isArch22) {
+        // arch22 int8全量化: layout_q 仅 BSH/TND; layout_kv 仅 PA_NZ; layout_out 仅 BSH/TND
+        OP_CHECK_IF(qfmlaInfo.layoutQ != QfmlaLayout::TND && qfmlaInfo.layoutQ != QfmlaLayout::BSH,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "layout_q", "invalid",
+                                                          "In MLA_INT8_FULLQUANT scenario, only layout_q=BSH/TND "
+                                                          "are supported"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(qfmlaInfo.layoutKv != QfmlaKvLayout::PA_NZ,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "layout_kv", "invalid",
+                                                          "In MLA_INT8_FULLQUANT scenario, layout_kv must be "
+                                                          "PA_NZ"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(qfmlaInfo.layoutOut != QfmlaOutLayout::TND && qfmlaInfo.layoutOut != QfmlaOutLayout::BSH,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "layout_out", "invalid",
+                                                          "In MLA_INT8_FULLQUANT scenario, layout_out must be "
+                                                          "BSH/TND"),
+                    return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
+    // fp8/hif8: layout_q: 支持TND/BSND/BNSD
     OP_CHECK_IF(qfmlaInfo.layoutQ != QfmlaLayout::TND && qfmlaInfo.layoutQ != QfmlaLayout::BSND &&
                     qfmlaInfo.layoutQ != QfmlaLayout::BNSD,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "layout_q", "invalid",
@@ -69,11 +92,20 @@ ge::graphStatus CommonChecker::CheckSingleParaLayout(const QfmlaTilingInfo& qfml
 ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfmlaTilingInfo& qfmlaInfo)
 {
     const char* opName = qfmlaInfo.opName;
-    // FP8场景: q/k_cache为fp8_e4m3; HIF8场景: q/k_cache为hifloat8
-    const bool isHif8 = qfmlaInfo.quantMode == QfmlaQuantMode::MLA_HIF8_FULLQUANT;
-    const ge::DataType expectDtype = isHif8 ? ge::DT_HIFLOAT8 : ge::DT_FLOAT8_E4M3FN;
-    const char* expectDtypeName = isHif8 ? "hifloat8" : "float8_e4m3fn";
-    const char* sceneName = isHif8 ? "MLA_HIF8_FULLQUANT" : "MLA_FP8_E4M3_FULLQUANT";
+    // INT8场景(arch22): q/k_cache为int8; FP8场景: q/k_cache为fp8_e4m3; HIF8场景: q/k_cache为hifloat8
+    ge::DataType expectDtype;
+    const char* expectDtypeName;
+    const char* sceneName;
+    if (qfmlaInfo.quantMode == QfmlaQuantMode::MLA_INT8_FULLQUANT) {
+        expectDtype = ge::DT_INT8;
+        expectDtypeName = "int8";
+        sceneName = "MLA_INT8_FULLQUANT";
+    } else {
+        const bool isHif8 = qfmlaInfo.quantMode == QfmlaQuantMode::MLA_HIF8_FULLQUANT;
+        expectDtype = isHif8 ? ge::DT_HIFLOAT8 : ge::DT_FLOAT8_E4M3FN;
+        expectDtypeName = isHif8 ? "hifloat8" : "float8_e4m3fn";
+        sceneName = isHif8 ? "MLA_HIF8_FULLQUANT" : "MLA_FP8_E4M3_FULLQUANT";
+    }
     // q: dtype 与 quant_mode 匹配
     OP_CHECK_IF(qfmlaInfo.qType != expectDtype,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
@@ -109,14 +141,14 @@ ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfmlaTilingInfo& qfmla
 ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfmlaTilingInfo& qfmlaInfo)
 {
     const char* opName = qfmlaInfo.opName;
-    // q: layout_q=TND 时 shape dim 必须为 3D, BSND/BNSD 时为 4D
+    // q: layout_q=TND/BSH 时 shape dim 必须为 3D, BSND/BNSD 时为 4D
     const bool isQ4D = qfmlaInfo.layoutQ == QfmlaLayout::BSND || qfmlaInfo.layoutQ == QfmlaLayout::BNSD;
     const auto& qShape = qfmlaInfo.opParamInfo.query.shape->GetStorageShape();
     OP_CHECK_IF(
         qShape.GetDimNum() != (isQ4D ? 4 : 3),
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, QUERY_NAME, (std::to_string(qShape.GetDimNum()) + "D").c_str(),
                                                  isQ4D ? "The shape dim of q must be 4D when layout_q is BSND/BNSD" :
-                                                         "The shape dim of q must be 3D when layout_q is TND"),
+                                                         "The shape dim of q must be 3D when layout_q is TND/BSH"),
         return ge::GRAPH_FAILED);
 
     // k_cache: PA_BBND/PA_BNBD 为 4D, PA_NZ 为 5D
@@ -136,14 +168,14 @@ ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfmlaTilingInfo& qf
                     return ge::GRAPH_FAILED);
     }
 
-    // attn_out: layout_out=TND/NTD 时为 3D, BSND/BNSD 时为 4D
+    // attn_out: layout_out=TND/NTD/BSH 时为 3D, BSND/BNSD 时为 4D
     const bool isOut4D = qfmlaInfo.layoutOut == QfmlaOutLayout::BSND || qfmlaInfo.layoutOut == QfmlaOutLayout::BNSD;
     const auto& attnOutShape = qfmlaInfo.opParamInfo.attnOut.shape->GetStorageShape();
     OP_CHECK_IF(attnOutShape.GetDimNum() != (isOut4D ? 4 : 3),
                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
                     opName, ATTN_OUT_NAME, (std::to_string(attnOutShape.GetDimNum()) + "D").c_str(),
                     isOut4D ? "The shape dim of attn_out must be 4D when layout_out is BSND/BNSD" :
-                              "The shape dim of attn_out must be 3D when layout_out is TND/NTD"),
+                              "The shape dim of attn_out must be 3D when layout_out is TND/NTD/BSH"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -197,11 +229,63 @@ ge::graphStatus CommonChecker::CheckParaExistence(const QfmlaTilingInfo& qfmlaIn
 ge::graphStatus CommonChecker::CheckAxis(const QfmlaTilingInfo& qfmlaInfo)
 {
     const char* opName = qfmlaInfo.opName;
-    // head_dim_qk = 576 (nope 512 + rope 64)
-    OP_CHECK_IF(qfmlaInfo.headDimQk != QFMLA_HEAD_DIM_QK,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "q", std::to_string(qfmlaInfo.headDimQk).c_str(),
-                                                      "In MLA scenario, head_dim_qk must be 576 (nope 512 + rope 64)"),
-                return ge::GRAPH_FAILED);
+    // 芯片差异用 npuArch 区分: arch22(910B) 承接 int8 全量化 MLA 收编场景
+    const bool isArch22 = qfmlaInfo.npuArch == NpuArch::DAV_2201;
+    if (isArch22) {
+        // arch22 int8全量化: q为nope分离输入, D=512; rope单独传入(D=64)
+        OP_CHECK_IF(qfmlaInfo.headDimQk != 512,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "q", std::to_string(qfmlaInfo.headDimQk).c_str(),
+                                                          "In MLA_INT8_FULLQUANT scenario, head_dim of q must be 512 "
+                                                          "(nope), rope is provided separately"),
+                    return ge::GRAPH_FAILED);
+        // S1 约束: [1, 32] (对齐IFA现状: 32 MTP最大QS)
+        OP_CHECK_IF(qfmlaInfo.s1Size != -1 && (qfmlaInfo.s1Size < 1 || qfmlaInfo.s1Size > 32),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, "q", std::to_string(qfmlaInfo.s1Size).c_str(),
+                        "In MLA_INT8_FULLQUANT scenario, Q_S must be in range [1, 32] when max_seqlen_q is provided"),
+                    return ge::GRAPH_FAILED);
+        // k_cache D 维度校验: D=512 (nope)。PA_NZ: dim2*32==512 -> dim2==16
+        const auto& kCacheShapeInt8 = qfmlaInfo.opParamInfo.kCache.shape->GetStorageShape();
+        OP_CHECK_IF(static_cast<int64_t>(kCacheShapeInt8.GetDim(4)) != 32,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, K_CACHE_NAME, ToString(kCacheShapeInt8).c_str(),
+                                                          "When layout_kv is PA_NZ, the innermost axis must be 32"),
+                    return ge::GRAPH_FAILED);
+        const int64_t kCacheDInt8 = static_cast<int64_t>(kCacheShapeInt8.GetDim(2)) * 32;
+        OP_CHECK_IF(kCacheDInt8 != 512,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, K_CACHE_NAME, std::to_string(kCacheDInt8).c_str(),
+                                                          "In MLA_INT8_FULLQUANT scenario, head_dim of k_cache must "
+                                                          "be 512 (nope)"),
+                    return ge::GRAPH_FAILED);
+    } else {
+        // head_dim_qk = 576 (nope 512 + rope 64)
+        OP_CHECK_IF(
+            qfmlaInfo.headDimQk != QFMLA_HEAD_DIM_QK,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "q", std::to_string(qfmlaInfo.headDimQk).c_str(),
+                                                  "In MLA scenario, head_dim_qk must be 576 (nope 512 + rope 64)"),
+            return ge::GRAPH_FAILED);
+        // S1 约束: [1, 16]
+        OP_CHECK_IF(qfmlaInfo.s1Size != -1 && (qfmlaInfo.s1Size < 1 || qfmlaInfo.s1Size > 16),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, "q", std::to_string(qfmlaInfo.s1Size).c_str(),
+                        "In MLA scenario, Q_S must be in range [1, 16] when max_seqlen_q is provided"),
+                    return ge::GRAPH_FAILED);
+        // k_cache D 维度校验: head_dim_qk=576
+        const auto& kCacheShape = qfmlaInfo.opParamInfo.kCache.shape->GetStorageShape();
+        int64_t kCacheD = 0;
+        if (qfmlaInfo.layoutKv == QfmlaKvLayout::PA_BBND || qfmlaInfo.layoutKv == QfmlaKvLayout::PA_BNBD) {
+            kCacheD = static_cast<int64_t>(kCacheShape.GetDim(3));
+        } else {
+            OP_CHECK_IF(static_cast<int64_t>(kCacheShape.GetDim(4)) != 32,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, K_CACHE_NAME, ToString(kCacheShape).c_str(),
+                                                              "When layout_kv is PA_NZ, the innermost axis must be 32"),
+                        return ge::GRAPH_FAILED);
+            kCacheD = static_cast<int64_t>(kCacheShape.GetDim(2)) * 32;
+        }
+        OP_CHECK_IF(kCacheD != QFMLA_HEAD_DIM_QK,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, K_CACHE_NAME, std::to_string(kCacheD).c_str(),
+                                                          "In MLA scenario, head_dim_qk of k_cache must be 576"),
+                    return ge::GRAPH_FAILED);
+    }
     // head_dim_v = 512
     OP_CHECK_IF(qfmlaInfo.headDimV != QFMLA_HEAD_DIM_V,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "head_dim_v", std::to_string(qfmlaInfo.headDimV).c_str(),
@@ -213,15 +297,20 @@ ge::graphStatus CommonChecker::CheckAxis(const QfmlaTilingInfo& qfmlaInfo)
                                                       "In MLA scenario, KV_N of k_cache must be 1"),
                 return ge::GRAPH_FAILED);
     // Q_N 取值约束
-    if (std::find(MLA_SUPPORT_N1.begin(), MLA_SUPPORT_N1.end(), qfmlaInfo.n1Size) == MLA_SUPPORT_N1.end()) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            opName, "q", std::to_string(qfmlaInfo.n1Size).c_str(),
-            "In MLA scenario, Q_N must be one of {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128}");
+    const auto& supportN1 = isArch22 ? MLA_INT8_SUPPORT_N1 : MLA_SUPPORT_N1;
+    if (std::find(supportN1.begin(), supportN1.end(), qfmlaInfo.n1Size) == supportN1.end()) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "q", std::to_string(qfmlaInfo.n1Size).c_str(),
+                                              isArch22 ?
+                                                  "In MLA_INT8_FULLQUANT scenario, Q_N must be one of "
+                                                  "{1, 2, 4, 8, 16, 32, 64, 128}" :
+                                                  "In MLA scenario, Q_N must be one of {1, 2, 4, 6, 8, 12, 16, 24, 32, "
+                                                  "48, 64, 96, 128}");
         return ge::GRAPH_FAILED;
     }
     // BSND/BNSD s1Size comes from the physical Q shape, independently of max_seqlen_q.
     // TND max_seqlen_q is validated by SeqLenChecker; actual lengths are in cu/seq tensors.
-    OP_CHECK_IF(qfmlaInfo.layoutQ != QfmlaLayout::TND && (qfmlaInfo.s1Size < 1 || qfmlaInfo.s1Size > 16),
+    // arch22 int8 全量化 (layout_q 为 BSH/TND) 的 S1 校验由上方 arch22 专用分支负责 ([1,32], 允许未传入)
+    OP_CHECK_IF(!isArch22 && qfmlaInfo.layoutQ != QfmlaLayout::TND && (qfmlaInfo.s1Size < 1 || qfmlaInfo.s1Size > 16),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     opName, "q", std::to_string(qfmlaInfo.s1Size).c_str(),
                     "In MLA scenario, Q_S of q must be in range [1, 16] when layout_q is BSND or BNSD"),
@@ -242,22 +331,6 @@ ge::graphStatus CommonChecker::CheckAxis(const QfmlaTilingInfo& qfmlaInfo)
         qfmlaInfo.qTSize <= 0,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "q", std::to_string(qfmlaInfo.qTSize).c_str(), "Q_T must be > 0"),
         return ge::GRAPH_FAILED);
-    // k_cache D 维度校验: head_dim_qk=576
-    const auto& kCacheShape = qfmlaInfo.opParamInfo.kCache.shape->GetStorageShape();
-    int64_t kCacheD = 0;
-    if (qfmlaInfo.layoutKv == QfmlaKvLayout::PA_BBND || qfmlaInfo.layoutKv == QfmlaKvLayout::PA_BNBD) {
-        kCacheD = static_cast<int64_t>(kCacheShape.GetDim(3));
-    } else {
-        OP_CHECK_IF(static_cast<int64_t>(kCacheShape.GetDim(4)) != 32,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, K_CACHE_NAME, ToString(kCacheShape).c_str(),
-                                                          "When layout_kv is PA_NZ, the innermost axis must be 32"),
-                    return ge::GRAPH_FAILED);
-        kCacheD = static_cast<int64_t>(kCacheShape.GetDim(2)) * 32;
-    }
-    OP_CHECK_IF(kCacheD != QFMLA_HEAD_DIM_QK,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, K_CACHE_NAME, std::to_string(kCacheD).c_str(),
-                                                      "In MLA scenario, head_dim_qk of k_cache must be 576"),
-                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -287,8 +360,18 @@ ge::graphStatus CommonChecker::CheckQueryShape(const QfmlaTilingInfo& qfmlaInfo)
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, QUERY_NAME, ToString(qShape).c_str(),
                                                           "When layout_q is BNSD, q shape must be (B, Q_N, Q_S, 576)"),
                     return ge::GRAPH_FAILED);
+    } else if (qfmlaInfo.layoutQ == QfmlaLayout::BSH) {
+        // BSH(arch22): q shape 应为 (B, Q_S, Q_N*512)
+        OP_CHECK_IF(static_cast<int64_t>(qShape.GetDim(0)) != qfmlaInfo.bSize ||
+                        static_cast<int64_t>(qShape.GetDim(1)) != qfmlaInfo.s1Size ||
+                        static_cast<int64_t>(qShape.GetDim(2)) != qfmlaInfo.n1Size * 512,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, QUERY_NAME, ToString(qShape).c_str(),
+                                                          "When layout_q is BSH, q shape must be (B, Q_S, Q_N * 512)"),
+                    return ge::GRAPH_FAILED);
     } else {
-        // TND: q shape 应为 (Q_T, Q_N, head_dim_qk=576)
+        // TND: q shape 应为 (Q_T, Q_N, head_dim_qk)；arch22 int8 全量化时 head_dim_qk 为 nope 维度 512
+        const bool isArch22 = qfmlaInfo.npuArch == NpuArch::DAV_2201;
+        const int64_t expectHeadDimQk = isArch22 ? 512 : QFMLA_HEAD_DIM_QK;
         OP_CHECK_IF(static_cast<int64_t>(qShape.GetDim(0)) != qfmlaInfo.qTSize,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, QUERY_NAME, ToString(qShape).c_str(),
                                                           "The dim0 of q shape must be Q_T"),
@@ -297,9 +380,11 @@ ge::graphStatus CommonChecker::CheckQueryShape(const QfmlaTilingInfo& qfmlaInfo)
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, QUERY_NAME, ToString(qShape).c_str(),
                                                           "The dim1 of q shape must be Q_N"),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(static_cast<int64_t>(qShape.GetDim(2)) != QFMLA_HEAD_DIM_QK,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, QUERY_NAME, ToString(qShape).c_str(),
-                                                          "The dim2 of q shape must be head_dim_qk(576)"),
+        OP_CHECK_IF(static_cast<int64_t>(qShape.GetDim(2)) != expectHeadDimQk,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName, QUERY_NAME, ToString(qShape).c_str(),
+                        isArch22 ? "The dim2 of q shape must be head_dim_qk(512) in MLA_INT8_FULLQUANT scenario" :
+                                   "The dim2 of q shape must be head_dim_qk(576)"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -349,6 +434,15 @@ ge::graphStatus CommonChecker::CheckAttnOutShape(const QfmlaTilingInfo& qfmlaInf
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, ATTN_OUT_NAME, ToString(attnOutShape).c_str(),
                                                   "When layout_out is NTD, attn_out shape must be (Q_N, Q_T, 512)"),
             return ge::GRAPH_FAILED);
+    } else if (qfmlaInfo.layoutOut == QfmlaOutLayout::BSH) {
+        // BSH(arch22): attn_out shape 应为 (B, Q_S, Q_N*512)
+        OP_CHECK_IF(
+            static_cast<int64_t>(attnOutShape.GetDim(0)) != qfmlaInfo.bSize ||
+                static_cast<int64_t>(attnOutShape.GetDim(1)) != qfmlaInfo.s1Size ||
+                static_cast<int64_t>(attnOutShape.GetDim(2)) != qfmlaInfo.n1Size * QFMLA_HEAD_DIM_V,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, ATTN_OUT_NAME, ToString(attnOutShape).c_str(),
+                                                  "When layout_out is BSH, attn_out shape must be (B, Q_S, Q_N * 512)"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -382,15 +476,18 @@ ge::graphStatus CommonChecker::CheckLayoutPairConsistency(const QfmlaTilingInfo&
     const char* opName = qfmlaInfo.opName;
     // layout_q 与 layout_out 配对一致性: 仅支持 4 种组合
     // BSND->BSND / BNSD->BNSD / TND->TND / TND->NTD(即 TND_NTD, 下划线格式表示输入输出 layout)
+    // arch22 int8全量化: BSH->BSH / TND->TND
     const bool layoutPairValid =
         (qfmlaInfo.layoutQ == QfmlaLayout::TND && qfmlaInfo.layoutOut == QfmlaOutLayout::TND) ||
         (qfmlaInfo.layoutQ == QfmlaLayout::TND && qfmlaInfo.layoutOut == QfmlaOutLayout::NTD) ||
         (qfmlaInfo.layoutQ == QfmlaLayout::BSND && qfmlaInfo.layoutOut == QfmlaOutLayout::BSND) ||
-        (qfmlaInfo.layoutQ == QfmlaLayout::BNSD && qfmlaInfo.layoutOut == QfmlaOutLayout::BNSD);
+        (qfmlaInfo.layoutQ == QfmlaLayout::BNSD && qfmlaInfo.layoutOut == QfmlaOutLayout::BNSD) ||
+        (qfmlaInfo.layoutQ == QfmlaLayout::BSH && qfmlaInfo.layoutOut == QfmlaOutLayout::BSH);
     OP_CHECK_IF(!layoutPairValid,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     opName, "layout_out", "invalid",
-                    "layout_q and layout_out must be one of BSND->BSND, BNSD->BNSD, TND->TND, TND->NTD (TND_NTD)"),
+                    "layout_q and layout_out must be one of BSND->BSND, BNSD->BNSD, TND->TND, TND->NTD (TND_NTD), "
+                    "BSH->BSH (int8)"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

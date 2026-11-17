@@ -23,7 +23,7 @@
 namespace optiling {
 namespace quant_flash_mla {
 
-// 输入索引
+// 输入索引（与 quant_flash_mla_def.cpp 输入顺序一致）
 constexpr size_t QUERY_INDEX = 0;
 constexpr size_t K_CACHE_INDEX = 1;
 constexpr size_t Q_DESCALE_INDEX = 2;
@@ -34,6 +34,8 @@ constexpr size_t CU_SEQLENS_Q_INDEX = 6;
 constexpr size_t SEQUSED_Q_INDEX = 7;
 constexpr size_t ATTN_MASK_INDEX = 8;
 constexpr size_t METADATA_INDEX = 9;
+constexpr size_t Q_ROPE_INDEX = 10; // arch22 int8全量化
+constexpr size_t K_ROPE_INDEX = 11; // arch22 int8全量化
 
 // 输出索引
 constexpr size_t ATTN_OUT_INDEX = 0;
@@ -62,6 +64,8 @@ constexpr const char* CU_SEQLENS_Q_NAME = "cu_seqlens_q";
 constexpr const char* SEQUSED_Q_NAME = "seqused_q";
 constexpr const char* ATTN_MASK_NAME = "attn_mask";
 constexpr const char* METADATA_NAME = "metadata";
+constexpr const char* Q_ROPE_NAME = "q_rope";
+constexpr const char* K_ROPE_NAME = "k_rope";
 constexpr const char* ATTN_OUT_NAME = "attn_out";
 constexpr const char* SOFTMAX_LSE_NAME = "softmax_lse";
 
@@ -146,6 +150,7 @@ private:
     bool returnSoftmaxLse_ = false;
     bool metadataFlag_ = false;
     bool emptyTensorFlag_ = false;
+    bool ropeFlag_ = false;
 
     // dtype
     ge::DataType qType_ = ge::DT_FLOAT8_E4M3FN;

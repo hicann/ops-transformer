@@ -55,6 +55,9 @@ aclnnStatus aclnnQuantFlashMlaMetadataGetWorkspaceSize(const aclTensor* cacheSeq
     // 否则异常 case 会绕过 checker。仅为空 layout 按当前唯一支持布局 TND 应用默认值。
     layoutQ = (layoutQ != nullptr && strlen(layoutQ) > 0) ? layoutQ : "TND";
 
+    // block_size/layout_kv 均不再作为接口入参: arch22 int8 全量化场景 KV cache 固定 PA_NZ、
+    // blockSize 固定 128, 由 AICPU 分核侧内置常量保证 (与主算子 k_cache shape 推导结果一致)
+
     auto ret = QuantFlashMlaMetadataCheck::ParamsCheck(cacheSeqlens, cuSeqlensQOptional, sequsedQOptional, maxSeqlenQ,
                                                        maxSeqlenKv, numHeadsQ, numHeadsKv, headDimQk, headDimV,
                                                        quantMode, maskMode, layoutQ, metaData);

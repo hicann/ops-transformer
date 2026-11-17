@@ -38,12 +38,13 @@ ge::graphStatus SeqLenChecker::CheckSingleParaSequsedQ(const QfmlaTilingInfo& qf
     if (!qfmlaInfo.seqUsedQFlag) {
         return ge::GRAPH_SUCCESS; // 可选参数，存在性由 CheckFeature 负责
     }
-    // dtype: int32
-    OP_CHECK_IF(qfmlaInfo.opParamInfo.sequsedQ.desc->GetDataType() != ge::DT_INT32,
+    // dtype: int32；arch22 int8全量化放行 int64（对齐FIA调用现状）, 芯片差异用 npuArch 区分
+    const bool isArch22 = qfmlaInfo.npuArch == NpuArch::DAV_2201;
+    const auto sequsedDtype = qfmlaInfo.opParamInfo.sequsedQ.desc->GetDataType();
+    OP_CHECK_IF(sequsedDtype != ge::DT_INT32 && !(isArch22 && sequsedDtype == ge::DT_INT64),
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                    opName, SEQUSED_Q_NAME,
-                    ge::TypeUtils::DataTypeToSerialString(qfmlaInfo.opParamInfo.sequsedQ.desc->GetDataType()).c_str(),
-                    "The dtype of seqused_q must be int32"),
+                    opName, SEQUSED_Q_NAME, ge::TypeUtils::DataTypeToSerialString(sequsedDtype).c_str(),
+                    "The dtype of seqused_q must be int32 (int64 is supported in MLA_INT8_FULLQUANT scenario)"),
                 return ge::GRAPH_FAILED);
     // format: ND
     if (CheckFormatSupport(qfmlaInfo.opParamInfo.sequsedQ.desc, SEQUSED_Q_NAME) != ge::GRAPH_SUCCESS) {
@@ -64,12 +65,13 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QfmlaTilingInfo& 
     if (!qfmlaInfo.cuSeqLenQFlag) {
         return ge::GRAPH_SUCCESS;
     }
-    // dtype: int32
-    OP_CHECK_IF(qfmlaInfo.opParamInfo.cuSeqlensQ.desc->GetDataType() != ge::DT_INT32,
+    // dtype: int32；arch22 int8全量化放行 int64（对齐FIA调用现状）, 芯片差异用 npuArch 区分
+    const bool isArch22 = qfmlaInfo.npuArch == NpuArch::DAV_2201;
+    const auto cuSeqDtype = qfmlaInfo.opParamInfo.cuSeqlensQ.desc->GetDataType();
+    OP_CHECK_IF(cuSeqDtype != ge::DT_INT32 && !(isArch22 && cuSeqDtype == ge::DT_INT64),
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                    opName, CU_SEQLENS_Q_NAME,
-                    ge::TypeUtils::DataTypeToSerialString(qfmlaInfo.opParamInfo.cuSeqlensQ.desc->GetDataType()).c_str(),
-                    "The dtype of cu_seqlens_q must be int32"),
+                    opName, CU_SEQLENS_Q_NAME, ge::TypeUtils::DataTypeToSerialString(cuSeqDtype).c_str(),
+                    "The dtype of cu_seqlens_q must be int32 (int64 is supported in MLA_INT8_FULLQUANT scenario)"),
                 return ge::GRAPH_FAILED);
     // format: ND
     if (CheckFormatSupport(qfmlaInfo.opParamInfo.cuSeqlensQ.desc, CU_SEQLENS_Q_NAME) != ge::GRAPH_SUCCESS) {
@@ -86,13 +88,19 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QfmlaTilingInfo& 
 
 ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenQ(const QfmlaTilingInfo& qfmlaInfo)
 {
-    // max_seqlen_q: -1 (未传入) 或 [0, 16]。
-    // 上限 16 对所有 layout 生效 (TND 单 batch Q 长度上限; BSND/BNSD 传入时同样约束)
-    OP_CHECK_IF(qfmlaInfo.maxSeqQ < -1 || qfmlaInfo.maxSeqQ > 16,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfmlaInfo.opName, "max_seqlen_q",
-                                                      std::to_string(qfmlaInfo.maxSeqQ).c_str(),
-                                                      "max_seqlen_q must be -1 (not provided) or in range [0, 16]"),
-                return ge::GRAPH_FAILED);
+    const char* opName = qfmlaInfo.opName;
+    // max_seqlen_q: -1 (未传入) 或 [0, 16]; arch22 int8全量化为 [1, 32]（对齐IFA现状: 32 MTP最大QS）。
+    // 上限对所有 layout 生效 (TND 单 batch Q 长度上限; BSND/BNSD 传入时同样约束)。
+    // 芯片差异用 npuArch 区分
+    const bool isArch22 = qfmlaInfo.npuArch == NpuArch::DAV_2201;
+    const int64_t maxSeqLenQLimit = isArch22 ? 32 : 16;
+    // arch22 int8全量化: [1, 32]（对齐IFA现状: 32 MTP最大QS）; 其余场景沿用上游: [0, 16]
+    OP_CHECK_IF(
+        qfmlaInfo.maxSeqQ < -1 || qfmlaInfo.maxSeqQ > maxSeqLenQLimit || (isArch22 && qfmlaInfo.maxSeqQ == 0),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "max_seqlen_q", std::to_string(qfmlaInfo.maxSeqQ).c_str(),
+                                              isArch22 ? "max_seqlen_q must be -1 (not provided) or in range [1, 32]" :
+                                                         "max_seqlen_q must be -1 (not provided) or in range [0, 16]"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

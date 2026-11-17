@@ -29,6 +29,53 @@ uint32_t QuantFlashMlaMetadataCpuKernel::Compute(CpuKernelContext& ctx)
     if (!success) {
         return KERNEL_STATUS_PARAM_INVALID;
     }
+    if (quantMode_ == 2) {
+        // arch22(Ascend910B/910_93) int8 MLA 全量化: 移植IFA host tiling分核逻辑,
+        // 由AICPU在device侧读序列值做分核决策(消除host tiling的D2H同步空泡),
+        // 输出arch22专属布局metadata(qfmla_metadata_arch22_layout.h), 由quant_flash_mla arch22 kernel读侧消费
+        aicpu::arch22::Arch22ScheduleInput input;
+        if (cacheSeqlens_ != nullptr && cacheSeqlens_->GetData() != nullptr) {
+            input.cacheSeqlens = GetTensorDataAsInt64(cacheSeqlens_, cacheSeqlens_->NumElements());
+        }
+        if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
+            input.cuSeqlensQ = GetTensorDataAsInt64(cuSeqlensQ_, cuSeqlensQ_->NumElements());
+        }
+        if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
+            input.sequsedQ = GetTensorDataAsInt64(sequsedQ_, sequsedQ_->NumElements());
+        }
+        input.batchSize = batchSize_;
+        input.numHeadsQ = numHeadsQ_;
+        input.numHeadsKv = numHeadsKv_;
+        input.maxSeqlenQ = maxSeqlenQ_;
+        input.maxSeqlenKv = maxSeqlenKv_;
+        input.maskMode = maskMode_;
+        input.headDimQk = headDimQk_;
+        input.layoutQ = layoutQ_;
+        input.socVersion = socVersion_;
+        input.aicCoreNum = static_cast<uint32_t>(aicCoreNum_);
+        input.aivCoreNum = static_cast<uint32_t>(aivCoreNum_);
+
+        aicpu::arch22::Arch22ScheduleResult splitRes;
+        success = aicpu::arch22::Arch22Schedule(input, splitRes);
+        if (!success) {
+            return KERNEL_STATUS_PARAM_INVALID;
+        }
+        // needInit精确判定(读值), 作为最终裁决写入HEAD_NEED_INIT_OUTPUT
+        needInitOutput_ = CheckNeedInitOutput();
+        splitRes.needInitOutput = needInitOutput_ ? 1U : 0U;
+
+        int32_t dimNum = 0;
+        int64_t rowSize = 0;
+        GetMetadataRowInfo(dimNum, rowSize);
+        if (metaData_ == nullptr || metaData_->GetData() == nullptr) {
+            KERNEL_LOG_ERROR("metadata is empty");
+            return KERNEL_STATUS_PARAM_INVALID;
+        }
+        success =
+            aicpu::arch22::GenMetaDataArch22(splitRes, static_cast<int32_t*>(metaData_->GetData()), rowSize, dimNum);
+        return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
+    }
+    // arch35(A5)路径: SectionStreamK负载均衡分核, 零行为变化
     SectionStreamKResult splitRes;
     success = BalanceSchedule(splitRes) && GenMetaData(splitRes);
     return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
@@ -57,6 +104,8 @@ bool QuantFlashMlaMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     GetAttrValueOpt(ctx, "layout_q", layoutQ_);
     GetAttrValueOpt(ctx, "metadata_dim_num", metadataDimNum_);
     GetAttrValueOpt(ctx, "metadata_row_size", metadataRowSize_);
+    // block_size/layout_kv 不再从attr读取: arch22 int8全量化场景 KV cache 固定 PA_NZ、
+    // blockSize 固定 128, 由 Arch22ScheduleInput 内置默认值保证
     return ParamsInit();
 }
 
@@ -121,6 +170,12 @@ std::vector<int64_t> QuantFlashMlaMetadataCpuKernel::GetTensorDataAsInt64(Tensor
 
 bool QuantFlashMlaMetadataCpuKernel::ParamsInit()
 {
+    if (quantMode_ == 2) {
+        // arch22(int8 MLA全量化)走独立初始化: 不使用SectionStreamK固定切分常量
+        // (s2BaseSize_=256/mBaseSize_=32*cvRatio为arch35专用), 分核所需的sInner等
+        // 全部由Arch22IfaSplit按IFA逻辑重建计算, 避免arch35的param初始化污染arch22路径
+        return ParamsInitArch22();
+    }
     deviceInfo.aicCoreMaxNum = aicCoreNum_;
     deviceInfo.aivCoreMaxNum = aivCoreNum_;
     deviceInfo.aicCoreMinNum = 1;
@@ -262,6 +317,25 @@ bool QuantFlashMlaMetadataCpuKernel::ParamsInit()
     }
 
     needInitOutput_ = CheckNeedInitOutput();
+    return true;
+}
+
+bool QuantFlashMlaMetadataCpuKernel::ParamsInitArch22()
+{
+    // arch22(quant_mode=2)参数初始化:
+    // 1. 不填充deviceInfo/baseInfo/param中SectionStreamK专用的固定切分常量(见ParamsInit注释);
+    // 2. 仅做输入整形与batchSize派生, 值级校验(actLen>=0/QS∈[0,32]/T==cu末元素等)统一在
+    //    Arch22Schedule(IFA移植逻辑)内完成, 且Q长度上限按IFA MLA现状放开至32(本处不做16限制);
+    // 3. baseInfo.querySeqSize/kvSeqSize仅作为CheckNeedInitOutput在varlen张量缺失时的兜底容量值.
+    const bool hasCacheSeqlens = cacheSeqlens_ != nullptr && cacheSeqlens_->GetData() != nullptr;
+    if (!hasCacheSeqlens) {
+        KERNEL_LOG_ERROR("arch22: quant_mode=2 requires cache_seqlens (PA scene)");
+        return false;
+    }
+    // batch size由cacheSeqlens实际长度推导(每batch一项)
+    batchSize_ = static_cast<int32_t>(cacheSeqlens_->NumElements());
+    baseInfo.querySeqSize = (maxSeqlenQ_ > 0) ? static_cast<uint32_t>(maxSeqlenQ_) : 0U;
+    baseInfo.kvSeqSize = (maxSeqlenKv_ > 0) ? static_cast<uint32_t>(maxSeqlenKv_) : 0U;
     return true;
 }
 
