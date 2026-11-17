@@ -259,7 +259,7 @@ aclnnStatus aclnnRecurrentKda(
       <td>numAcceptedTokensOptional (aclTensor)</td>
       <td>Input</td>
       <td>Number of accepted tokens for each sequence.</td>
-      <td>Optional; if passed, ssmStateIndicesOptional must also be passed; Shape: [seq_num], each value must be in the range [1,seq_len] of the corresponding sequence.</td>
+      <td>Optional; if passed, ssmStateIndicesOptional must also be passed; Shape: [seq_num], each value must be in [1,seq_len] of the corresponding sequence and selects the initial State slot.</td>
       <td>INT32, INT64</td>
       <td>ND</td>
       <td>[seq_num]</td>
@@ -510,7 +510,7 @@ aclnnStatus aclnnRecurrentKda(
 ## Constraints
 
 - Deterministic computation: aclnnRecurrentKda defaults to a deterministic implementation.
-- This API is designed for decode / MTP short-sequence use cases. Both the dense single-sequence length and the varlen single-sequence length must be less than or equal to 8.
+- Dense and variable-length sequences are processed recurrently in fixed-size token windows.
 - The data types of query, key, and value must be the same, and only BFLOAT16 is supported; out has the same dtype as value.
 - gate and beta support FLOAT, BFLOAT16, and FLOAT16 (internally converted to FLOAT for computation).
 - initialState and finalState must be of the same data type, either BFLOAT16 or FLOAT; out has the same dtype as value. finalState must be provided, and its content is valid only when outputFinalState=true.
@@ -520,7 +520,7 @@ aclnnStatus aclnnRecurrentKda(
 - K_dim supports only 128, and V_dim supports only 128 or 256.
 - H_v must be divisible by H_k.
 - stateVFirst supports true and false (defaults to false): if true, the shapes of initialState and finalState must be `[state_capacity, H_v, V_dim, K_dim]`; if false, they must be `[state_capacity, H_v, K_dim, V_dim]`. If ssmStateIndicesOptional is not passed, state_capacity must be equal to the number of logical sequences; if it is passed, state_capacity can differ from seq_num, and valid slots are selected by indices.
-- The first element of cuSeqlensOptional must be 0, and each offset must be non-decreasing and must not exceed the input token capacity; each variable-length sequence must have a length of 8 or less. The last element can be less than the token capacity. In this case, the padding tail output is not guaranteed to be valid and the state is not updated.
+- The first element of cuSeqlensOptional must be 0, and each offset must be non-decreasing and must not exceed the input token capacity. The last element can be less than the token capacity. In this case, the padding tail output is not guaranteed to be valid and the state is not updated.
 - ssmStateIndicesOptional supports a 1D tensor whose length is greater than or equal to the token capacity, or a 2D tensor with the shape of [seq_num,max_step]; in the 2D form, max_step must cover the length of each actual sequence, and each index must be in [0,state_capacity). numAcceptedTokensOptional must be a 1D tensor with a length equal to seq_num, and each value must be in [1,seq_len] of the corresponding sequence; it depends on ssmStateIndicesOptional, but ssmStateIndicesOptional can be provided alone.
 - aLogOptional is required when useGateInKernel=true; when useGateInKernel=false, an error is reported if aLogOptional or dtBiasOptional is passed in or safeGate=true is set.
 - The shape of aLogOptional must be [H_v]; the shape of dtBiasOptional must be [H_v*K_dim] or [H_v,K_dim].

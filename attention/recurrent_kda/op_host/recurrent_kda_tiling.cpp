@@ -13,6 +13,7 @@
  * \brief
  */
 #include "recurrent_kda_tiling.h"
+#include "../op_kernel/recurrent_kda_apt_tiling_key.h"
 
 #include "err/ops_err.h"
 #include "log/log.h"
@@ -64,7 +65,7 @@ void RecurrentKdaTiling::InitCompileInfo()
     const auto& ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfo_.ubSize);
     compileInfo_.aivNum = ascendcPlatform.GetCoreNumAiv();
-    compileInfo_.isA5 = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510;
+    compileInfo_.isAscend950 = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510;
 
     if (compileInfo_.aivNum <= 0) {
         OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "aivNum <= 0");
@@ -138,7 +139,7 @@ RecurrentKdaTilingContext RecurrentKdaTiling::BuildProcessorContext() const
     CopyOptionalOriginShape(context_, ACC_TOKEN_INDEX, ctx.acceptedTokensShape);
     ctx.aivNum = compileInfo_.aivNum;
     ctx.ubSize = compileInfo_.ubSize;
-    ctx.isA5 = compileInfo_.isA5 ? 1 : 0;
+    ctx.isAscend950 = compileInfo_.isAscend950 ? 1 : 0;
     ctx.stateDtype = context_->GetInputDesc(STATE_INDEX)->GetDataType();
     ctx.gateDtype = context_->GetInputDesc(GATE_INDEX)->GetDataType();
     ctx.betaDtype = context_->GetInputDesc(BETA_INDEX)->GetDataType();
@@ -219,7 +220,17 @@ ge::graphStatus RecurrentKdaTiling::DoOpTiling()
 
 ge::graphStatus RecurrentKdaTiling::DoLibApiTiling()
 {
-    tilingKey_ = 0;
+    uint32_t kernelMode = RKDA_TPL_COMPAT;
+    if (compileInfo_.isAscend950) {
+        if (tilingData_.stateVFirst) {
+            kernelMode =
+                (tilingData_.a5VfFlags & RecurrentKda::RKDA_VF_FUSED) != 0 ? RKDA_TPL_V_FIRST_FUSED : RKDA_TPL_V_FIRST;
+        } else {
+            kernelMode =
+                (tilingData_.a5VfFlags & RecurrentKda::RKDA_VF_FUSED) != 0 ? RKDA_TPL_K_FIRST_FUSED : RKDA_TPL_K_FIRST;
+        }
+    }
+    tilingKey_ = compileInfo_.isAscend950 ? GET_TPL_TILING_KEY(kernelMode) : 0;
     return ge::GRAPH_SUCCESS;
 };
 

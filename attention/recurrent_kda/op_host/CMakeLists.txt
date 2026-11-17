@@ -32,3 +32,11 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
 else()
     add_modules_sources(OPTYPE recurrent_kda ACLNNTYPE aclnn_exclude)
 endif()
+
+if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
+    add_ops_compile_options(
+        OP_NAME RecurrentKda
+        OPTIONS --cce-auto-sync=off -Wno-deprecated-declarations
+                -mllvm -cce-aicore-jump-expand=false
+    )
+endif()

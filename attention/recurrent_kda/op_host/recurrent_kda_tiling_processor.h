@@ -29,6 +29,7 @@
 #include <string>
 
 using RecurrentKdaTilingData = RecurrentKda::RecurrentKdaTilingData;
+using RecurrentKda::RKDA_ASCEND950_WINDOW_SIZE;
 
 namespace optiling {
 
@@ -47,13 +48,16 @@ static constexpr size_t RKDA_DIM_3 = 3;
 
 static constexpr uint32_t RKDA_LAYOUT_BSND = 0;
 static constexpr uint32_t RKDA_LAYOUT_TND = 1;
-// A2/A3 input window capacity; A5 retains its sequence-length limit.
+// A2/A3 input window capacity.
 static constexpr size_t RKDA_MAX_MTP = 8;
 static constexpr int64_t RKDA_INPUT_BUFFER_NUM = 2;
 static constexpr int64_t RKDA_UB_GUARD_BYTES = 2048;
 static constexpr size_t RKDA_SYS_WORKSPACE_SIZE = 16U * 1024U * 1024U;
-// On A5, broadTmp aliases state in UB when K hits this fused-reduce size.
+// Retained for the legacy UB calculation; A5 uses PlanA5Ub instead.
 static constexpr int64_t RKDA_FUSED_REDUCE_K = 128;
+static constexpr uint32_t RKDA_A5_V_STEP = 128;
+static constexpr uint32_t RKDA_A5_STATE_OUT_BUFFER_NUM = 3;
+static constexpr uint32_t RKDA_A5_ATTN_OUT_BUFFER_NUM = 2;
 
 struct RecurrentKdaTilingContext {
     const char* nodeName = "RecurrentKda";
@@ -102,7 +106,7 @@ struct RecurrentKdaTilingContext {
     bool hasStateOutStrides = false;
     uint64_t aivNum = 0;
     uint64_t ubSize = 0;
-    uint32_t isA5 = 0;
+    uint32_t isAscend950 = 0;
 };
 
 class RecurrentKdaTilingProcessor {
@@ -136,6 +140,10 @@ public:
 
     ge::graphStatus ProcessUb(RecurrentKdaTilingData& tiling) const
     {
+        tiling.a5VfFlags = 0;
+        if (ctx_.isAscend950 != 0) {
+            return PlanA5Ub(tiling);
+        }
         struct RuleItem {
             const char* name;
             ge::graphStatus (RecurrentKdaTilingProcessor::*fn)(RecurrentKdaTilingData&, UbCalcContext&) const;
@@ -157,6 +165,33 @@ public:
     }
 
 private:
+    ge::graphStatus PlanA5Ub(RecurrentKdaTilingData& tiling) const
+    {
+        // Three state banks and two slots for tiled input/output.
+        const uint64_t capacity = ctx_.ubSize;
+        constexpr uint64_t bytes = 3 * 65536 +
+                                   2 * (4 * RKDA_ASCEND950_WINDOW_SIZE * 128 * 2 +
+                                        RKDA_ASCEND950_WINDOW_SIZE * 128 * 4 + RKDA_ASCEND950_WINDOW_SIZE * 32) +
+                                   2 * 512 + 512;
+        using namespace RecurrentKda;
+        tiling.a5VfFlags = (tiling.useQkL2norm ? RKDA_VF_NORM : 0U) | (tiling.useGateInKernel ? RKDA_VF_RAW_GATE : 0U) |
+                           (tiling.hasDtBias ? RKDA_VF_BIAS : 0U) | (tiling.useBetaSigmoid ? RKDA_VF_SIGMOID : 0U) |
+                           (tiling.allowNegEigval ? RKDA_VF_NEGATIVE : 0U) | (tiling.safeGate ? RKDA_VF_SAFE : 0U) |
+                           ((tiling.inplaceFinalState || tiling.outputFinalState) ? RKDA_VF_WRITE_STATE : 0U) |
+                           (tiling.hasSsmStateIndices ? RKDA_VF_INDEXED : 0U);
+        constexpr uint32_t fusedMask =
+            RKDA_VF_NORM | RKDA_VF_RAW_GATE | RKDA_VF_BIAS | RKDA_VF_SIGMOID | RKDA_VF_NEGATIVE | RKDA_VF_SAFE;
+        constexpr uint32_t fusedValue = RKDA_VF_NORM | RKDA_VF_RAW_GATE | RKDA_VF_BIAS | RKDA_VF_SIGMOID;
+        if ((tiling.a5VfFlags & fusedMask) == fusedValue)
+            tiling.a5VfFlags |= RKDA_VF_FUSED;
+        tiling.ubCalSize = static_cast<uint32_t>(capacity);
+        tiling.ubRestBytes = static_cast<uint32_t>(bytes);
+        tiling.vStep = RKDA_A5_V_STEP;
+        tiling.stateOutBufferNum = RKDA_A5_STATE_OUT_BUFFER_NUM;
+        tiling.attnOutBufferNum = RKDA_A5_ATTN_OUT_BUFFER_NUM;
+        return ge::GRAPH_SUCCESS;
+    }
+
     struct UbCalcContext {
         int64_t ubSize = 0;
         int64_t aNv = 0;
@@ -644,7 +679,7 @@ private:
         }
         uint64_t maxCoreNum = (ctx_.aivNum > 0) ? ctx_.aivNum : 1;
         uint64_t selectedCoreNum = (taskUnits < maxCoreNum) ? taskUnits : maxCoreNum;
-        if (ctx_.isA5 == 0) {
+        if (ctx_.isAscend950 == 0) {
             // Keep the minimum wave count while avoiding partially filled cores.
             const uint64_t tasksPerCore = (taskUnits + maxCoreNum - 1) / maxCoreNum;
             selectedCoreNum = (taskUnits + tasksPerCore - 1) / tasksPerCore;
@@ -663,23 +698,21 @@ private:
 
     ge::graphStatus RuleFillTilingShapeData(RecurrentKdaTilingData& tiling) const
     {
-        if (ctx_.isA5 == 0) {
-            // Long-sequence offsets are 64-bit, but serialized capacities remain uint32.
-            const int64_t maxCapacity = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
-            const int64_t seqLen = ctx_.queryShape.GetDim(ctx_.layout == RKDA_LAYOUT_TND ? RKDA_DIM_0 : RKDA_DIM_1);
-            const int64_t batch = ctx_.layout == RKDA_LAYOUT_TND ? 1 : ctx_.queryShape.GetDim(RKDA_DIM_0);
-            const int64_t seqNum = SeqNum(ctx_.queryShape, ctx_.cuSeqlensShape);
-            OP_CHECK_IF(seqLen > maxCapacity || batch > maxCapacity / seqLen || seqNum > maxCapacity ||
-                            ctx_.stateShape.GetDim(RKDA_DIM_0) > maxCapacity ||
-                            (ctx_.hasSsmStateIndices && ctx_.ssmStateShape.GetDimNum() == RKDA_METADATA_RANK2 &&
-                             ctx_.ssmStateShape.GetDim(RKDA_DIM_1) > maxCapacity),
-                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
-                            ctx_.nodeName, "T, B, seq_num, state_capacity",
-                            std::to_string(seqLen) + ", " + std::to_string(batch) + ", " + std::to_string(seqNum) +
-                                ", " + std::to_string(ctx_.stateShape.GetDim(RKDA_DIM_0)),
-                            "token/state capacities must fit the uint32 tiling fields"),
-                        return ge::GRAPH_FAILED);
-        }
+        // Long-sequence offsets are 64-bit, but serialized capacities remain uint32.
+        const int64_t maxCapacity = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
+        const int64_t seqLen = ctx_.queryShape.GetDim(ctx_.layout == RKDA_LAYOUT_TND ? RKDA_DIM_0 : RKDA_DIM_1);
+        const int64_t batch = ctx_.layout == RKDA_LAYOUT_TND ? 1 : ctx_.queryShape.GetDim(RKDA_DIM_0);
+        const int64_t seqNum = SeqNum(ctx_.queryShape, ctx_.cuSeqlensShape);
+        OP_CHECK_IF(seqLen > maxCapacity || batch > maxCapacity / seqLen || seqNum > maxCapacity ||
+                        ctx_.stateShape.GetDim(RKDA_DIM_0) > maxCapacity ||
+                        (ctx_.hasSsmStateIndices && ctx_.ssmStateShape.GetDimNum() == RKDA_METADATA_RANK2 &&
+                         ctx_.ssmStateShape.GetDim(RKDA_DIM_1) > maxCapacity),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(ctx_.nodeName, "T, B, seq_num, state_capacity",
+                                                           std::to_string(seqLen) + ", " + std::to_string(batch) +
+                                                               ", " + std::to_string(seqNum) + ", " +
+                                                               std::to_string(ctx_.stateShape.GetDim(RKDA_DIM_0)),
+                                                           "token/state capacities must fit the uint32 tiling fields"),
+                    return ge::GRAPH_FAILED);
         FillTilingShapeData(ctx_.queryShape, ctx_.valueShape, ctx_.stateShape, ctx_.cuSeqlensShape, tiling);
         return ge::GRAPH_SUCCESS;
     }
@@ -698,8 +731,8 @@ private:
     int64_t CalcFixedUbBytes(int64_t aNv, int64_t aDv, int64_t aDk, uint32_t nv) const
     {
         const int64_t rawBytes = RKDA_MAX_MTP * (8 * aDk + 2 * aDv);
-        const int64_t rawBufferNum = ctx_.isA5 != 0 ? 1 : 2;
-        const int64_t betaHeads = ctx_.isA5 != 0 ? aNv : static_cast<int64_t>(nv);
+        const int64_t rawBufferNum = ctx_.isAscend950 != 0 ? 1 : 2;
+        const int64_t betaHeads = ctx_.isAscend950 != 0 ? aNv : static_cast<int64_t>(nv);
         int64_t usedUbBytes = rawBufferNum * rawBytes;
         usedUbBytes += RKDA_MAX_MTP * 4 * betaHeads; // beta input queue, fp32.
         usedUbBytes += 64 + RKDA_UB_GUARD_BYTES;     // scalar buffer and guard.
@@ -708,7 +741,7 @@ private:
 
     int64_t CalcWorkingUbBytes(int64_t aNv, int64_t aDv, int64_t aDk, uint32_t nv) const
     {
-        const int64_t betaHeads = ctx_.isA5 != 0 ? aNv : static_cast<int64_t>(nv);
+        const int64_t betaHeads = ctx_.isAscend950 != 0 ? aNv : static_cast<int64_t>(nv);
         int64_t usedUbBytes = CalcFixedUbBytes(aNv, aDv, aDk, nv);
         usedUbBytes += RKDA_MAX_MTP * (4 * aDv + 12 * aDk + 4 * betaHeads);
         return usedUbBytes;
@@ -717,7 +750,7 @@ private:
     int64_t CalcComputeUbCoeff(int64_t aDk) const
     {
         int64_t coeff = 4 * aDk + 8; // state and row outputs.
-        if (ctx_.isA5 == 0 || aDk != RKDA_FUSED_REDUCE_K) {
+        if (ctx_.isAscend950 == 0 || aDk != RKDA_FUSED_REDUCE_K) {
             coeff += 4 * aDk; // broadTmp for the generic matvec path.
         }
         return coeff;
@@ -828,7 +861,7 @@ private:
         tiling.vStep = selected.vStep;
         tiling.stateOutBufferNum = selected.stateOutBufferNum;
         tiling.attnOutBufferNum = selected.attnOutBufferNum;
-        if (ctx_.isA5 == 0) {
+        if (ctx_.isAscend950 == 0) {
             const int64_t tmpBytes = ubCalcCtx.workingUbBytes - ubCalcCtx.fixedUbBytes +
                                      CalcComputeUbCoeff(aDk) * static_cast<int64_t>(selected.vStep);
             if (tmpBytes > ubRestBytes) {

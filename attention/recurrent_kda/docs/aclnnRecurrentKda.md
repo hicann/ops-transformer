@@ -257,7 +257,7 @@ aclnnStatus aclnnRecurrentKda(
       <td>numAcceptedTokensOptional（aclTensor）</td>
       <td>输入</td>
       <td>每条序列已接受的 token 数量。</td>
-      <td>可选；传入时必须同时传 ssmStateIndicesOptional；Shape: [seq_num]，每个值须位于对应序列的 [1,seq_len]。</td>
+      <td>可选；传入时必须同时传 ssmStateIndicesOptional；Shape: [seq_num]，每个值须位于对应序列的 [1,seq_len]，用于选择初始 State 槽位。</td>
       <td>INT32、INT64</td>
       <td>ND</td>
       <td>[seq_num]</td>
@@ -508,7 +508,7 @@ aclnnStatus aclnnRecurrentKda(
 ## 约束说明
 
 - 确定性计算：aclnnRecurrentKda 默认确定性实现。
-- 该接口面向 decode / MTP 短序列场景，dense 单序列长度与 varlen 单序列长度均必须小于等于 8。
+- dense 和 varlen 序列按固定大小的 token 窗口递归计算。
 - query、key、value 数据类型必须保持一致，且仅支持 BFLOAT16；out 与 value 同 dtype。
 - gate、beta 支持 FLOAT、BFLOAT16、FLOAT16（接口内部会转换为 FLOAT 参与计算）。
 - initialState 与 finalState 数据类型必须一致，支持 BFLOAT16 或 FLOAT；out 与 value 同 dtype。finalState 必须提供，仅在 outputFinalState=true 时保证内容有效。
@@ -518,7 +518,7 @@ aclnnStatus aclnnRecurrentKda(
 - K_dim 仅支持 128，V_dim 仅支持 128 或 256。
 - H_v 必须能被 H_k 整除。
 - stateVFirst 支持 true 和 false（默认 false）：为 true 时 initialState 与 finalState 的 shape 必须满足 `[state_capacity, H_v, V_dim, K_dim]`；为 false 时必须满足 `[state_capacity, H_v, K_dim, V_dim]`。未传 ssmStateIndicesOptional 时 state_capacity 必须等于逻辑序列数；传入后 state_capacity 可以与 seq_num 不同，由索引选择有效槽位。
-- cuSeqlensOptional 首元素必须为 0、各 offset 必须非递减且不得超过输入 token capacity；每段变长序列长度必须小于等于 8。末元素可以小于 token capacity，此时 padding tail 输出不保证有效且不更新 state。
+- cuSeqlensOptional 首元素必须为 0、各 offset 必须非递减且不得超过输入 token capacity。末元素可以小于 token capacity，此时 padding tail 输出不保证有效且不更新 state。
 - ssmStateIndicesOptional 支持长度大于等于 token capacity 的 1D tensor，或 shape 为 [seq_num,max_step] 的 2D tensor；二维形式的 max_step 必须覆盖每条实际序列长度，索引值必须位于 [0,state_capacity)。numAcceptedTokensOptional 必须为长度等于 seq_num 的 1D tensor，且每个值位于对应序列的 [1,seq_len]；它依赖 ssmStateIndicesOptional，但 ssmStateIndicesOptional 可以单独提供。
 - useGateInKernel=true 时 aLogOptional 必选；useGateInKernel=false 时传入了 aLogOptional、dtBiasOptional 或 safeGate=true 均会报错。
 - aLogOptional shape 必须为 [H_v]；dtBiasOptional shape 必须为 [H_v*K_dim] 或 [H_v,K_dim]。

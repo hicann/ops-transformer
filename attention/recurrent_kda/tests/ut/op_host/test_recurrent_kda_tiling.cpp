@@ -108,7 +108,7 @@ TEST(RecurrentKdaTilingProcessor, A5KeepsSingleWaveCores)
 {
     RecurrentKdaTilingData tiling = {};
     auto ctx = MakeBsndContext(3, 4, 8, 48, UT_K, UT_V);
-    ctx.isA5 = 1;
+    ctx.isAscend950 = 1;
     RecurrentKdaTilingProcessor processor(ctx);
     ASSERT_EQ(processor.ProcessShapes(tiling), ge::GRAPH_SUCCESS);
     EXPECT_EQ(tiling.vectorCoreNum, static_cast<uint32_t>(UT_AIV_NUM));
@@ -292,14 +292,89 @@ TEST(RecurrentKdaTilingProcessor, A5UbModelSelectsVStep)
 {
     RecurrentKdaTilingData tiling = {};
     auto ctx = MakeDefaultContext();
-    ctx.isA5 = 1;
+    ctx.isAscend950 = 1;
+    ctx.ubSize = 256 * 1024;
     ASSERT_EQ(RunTiling(ctx, tiling), ge::GRAPH_SUCCESS);
-
-    // One raw input buffer and the fused broadTmp reduce leave room for a wider vStep.
-    EXPECT_EQ(tiling.stateOutBufferNum, 1U);
+    EXPECT_EQ(tiling.stateOutBufferNum, 3U);
     EXPECT_EQ(tiling.attnOutBufferNum, 2U);
-    EXPECT_EQ(tiling.vStep, 64U);
-    EXPECT_EQ(tiling.ubRestBytes, 52416U);
+    EXPECT_EQ(tiling.vStep, 128U);
+    EXPECT_EQ(tiling.ubRestBytes, 210688U);
+    EXPECT_EQ(tiling.a5VfFlags, RecurrentKda::RKDA_VF_WRITE_STATE);
+}
+
+TEST(RecurrentKdaTilingProcessor, A5SelectsFusedFlagsOnlyForSupportedAttributes)
+{
+    auto ctx = MakeDefaultContext();
+    ctx.isAscend950 = 1;
+    ctx.ubSize = 256 * 1024;
+    ctx.useQkL2norm = 1;
+    ctx.useGateInKernel = 1;
+    ctx.useBetaSigmoid = 1;
+    ctx.hasALog = 1;
+    ctx.hasDtBias = 1;
+    ctx.aLogShape = gert::Shape({UT_HV});
+    ctx.dtBiasShape = gert::Shape({UT_HV, UT_K});
+    RecurrentKdaTilingData tiling = {};
+    ASSERT_EQ(RunTiling(ctx, tiling), ge::GRAPH_SUCCESS);
+    EXPECT_NE(tiling.a5VfFlags & RecurrentKda::RKDA_VF_FUSED, 0U);
+    ctx.allowNegEigval = 1;
+    ASSERT_EQ(RunTiling(ctx, tiling), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(tiling.a5VfFlags & RecurrentKda::RKDA_VF_FUSED, 0U);
+    ctx.allowNegEigval = 0;
+    ctx.safeGate = 1;
+    ASSERT_EQ(RunTiling(ctx, tiling), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(tiling.a5VfFlags & RecurrentKda::RKDA_VF_FUSED, 0U);
+}
+
+TEST(RecurrentKdaTilingProcessor, A5AcceptsLongSequences)
+{
+    auto ctx = MakeBsndContext(2, 65, UT_H, UT_HV, UT_K, UT_V);
+    ctx.isAscend950 = 1;
+    ctx.ubSize = 256 * 1024;
+    RecurrentKdaTilingData tiling = {};
+    ASSERT_EQ(RunTiling(ctx, tiling), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(tiling.seqLen, 65U);
+    EXPECT_EQ(tiling.t, 130U);
+}
+
+TEST(RecurrentKdaTilingProcessor, PlatformsPreserveLegacySafeGateBounds)
+{
+    const float bounds[] = {-5.0f,
+                            -0.1f,
+                            0.0f,
+                            -5.1f,
+                            std::numeric_limits<float>::quiet_NaN(),
+                            std::numeric_limits<float>::infinity(),
+                            -std::numeric_limits<float>::infinity()};
+    const ge::graphStatus expected[] = {ge::GRAPH_SUCCESS, ge::GRAPH_SUCCESS, ge::GRAPH_FAILED, ge::GRAPH_FAILED,
+                                        ge::GRAPH_SUCCESS, ge::GRAPH_FAILED,  ge::GRAPH_FAILED};
+    for (uint32_t platform : {0U, 1U}) {
+        for (size_t i = 0; i < sizeof(bounds) / sizeof(bounds[0]); ++i) {
+            auto ctx = MakeDefaultContext();
+            ctx.isAscend950 = platform;
+            ctx.useGateInKernel = 1;
+            ctx.hasALog = 1;
+            ctx.aLogShape = gert::Shape({UT_HV});
+            ctx.safeGate = 1;
+            ctx.lowerBound = bounds[i];
+            RecurrentKdaTilingData tiling = {};
+            EXPECT_EQ(RecurrentKdaTilingProcessor(ctx).ProcessShapes(tiling), expected[i]);
+        }
+    }
+}
+
+TEST(RecurrentKdaTilingProcessor, A5RejectsHeadMajorAndBatchGaps)
+{
+    auto ctx = MakeBsndContext(2, UT_SEQ_LEN, UT_H, UT_HV, UT_K, UT_V);
+    ctx.isAscend950 = 1;
+    ctx.hasQueryStrides = true;
+    ctx.queryStrides = {UT_SEQ_LEN * UT_H * UT_K, UT_K, UT_SEQ_LEN * UT_K, 1};
+    RecurrentKdaTilingData tiling = {};
+    RecurrentKdaTilingProcessor processor(ctx);
+    EXPECT_EQ(processor.ProcessShapes(tiling), ge::GRAPH_FAILED);
+    ctx.queryStrides = {UT_SEQ_LEN * UT_H * UT_K + UT_K, UT_H * UT_K, UT_K, 1};
+    RecurrentKdaTilingProcessor processorWithGap(ctx);
+    EXPECT_EQ(processorWithGap.ProcessShapes(tiling), ge::GRAPH_FAILED);
 }
 
 TEST(RecurrentKdaTilingProcessor, RejectsUbTooSmall)

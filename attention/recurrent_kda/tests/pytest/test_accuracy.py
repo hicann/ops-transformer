@@ -131,10 +131,14 @@ def run_case(
     inp = make_inputs(**kwargs)
     dev = _device()
     torch_npu.npu.set_device(dev)
-    device_name = torch_npu.npu.get_device_name(dev)
-    qk_l2norm_eps = 0.0 if "Ascend950" in device_name else 1e-6
+    qk_l2norm_eps = 1e-6
+    round_intermediate_state = "Ascend950" in torch_npu.npu.get_device_name(dev)
     golden = recurrent_kda_golden(
-        **inp, output_final_state=True, qk_l2norm_eps=qk_l2norm_eps, **op_kwargs
+        **inp,
+        output_final_state=True,
+        qk_l2norm_eps=qk_l2norm_eps,
+        round_intermediate_state=round_intermediate_state,
+        **op_kwargs,
     )
 
     call_kwargs = {**op_kwargs, "output_final_state": True, "layout": inp["layout"]}
@@ -522,3 +526,108 @@ def test_recurrent_kda_accuracy():
 
 if __name__ == "__main__":
     test_recurrent_kda_accuracy()
+
+
+@pytest.mark.parametrize("state_v_first", [False, True])
+@pytest.mark.parametrize("state_dtype", [torch.bfloat16, torch.float32])
+@pytest.mark.parametrize("fused", [False, True])
+def test_a5_long_sequence(state_v_first, state_dtype, fused):
+    dev = _device()
+    if "Ascend950" not in torch_npu.npu.get_device_name(dev):
+        pytest.skip("A5 implementation regression")
+    assert run_case(
+        "A5 long sequence and state view",
+        {
+            "batch": 2,
+            "seq_len": 17,
+            "vdim": 256,
+            "state_v_first": state_v_first,
+            "state_dtype": state_dtype,
+            "qk_scale": 0.08,
+            "seed": 1096,
+        },
+        {
+            "state_v_first": state_v_first,
+            "use_qk_l2norm_in_kernel": True,
+            "use_gate_in_kernel": fused,
+            "use_beta_sigmoid_in_kernel": True,
+        },
+        non_contiguous_state=True,
+    )
+
+
+@pytest.mark.parametrize("state_v_first", [False, True])
+@pytest.mark.parametrize("metadata_dtype", [torch.int32, torch.int64])
+def test_a5_speculative_initial_slot(state_v_first, metadata_dtype):
+    dev = _device()
+    if "Ascend950" not in torch_npu.npu.get_device_name(dev):
+        pytest.skip("A5 implementation regression")
+    inp = make_inputs(
+        batch=1,
+        seq_len=2,
+        state_capacity=5,
+        state_v_first=state_v_first,
+        qk_scale=0.08,
+        seed=1073,
+    )
+    indices = torch.arange(5, dtype=metadata_dtype).reshape(1, 5)
+    accepted = torch.tensor([4], dtype=metadata_dtype)
+    # max_step may exceed the current query length; accepted selects slot 3.
+    inp["ssm_state_indices"] = indices
+    golden = recurrent_kda_golden(
+        **inp,
+        num_accepted_tokens=accepted,
+        state_v_first=state_v_first,
+        use_qk_l2norm_in_kernel=True,
+    )
+    out, state = recurrent_kda(
+        *(inp[n].to(dev) for n in ("q", "k", "v", "g", "beta", "initial_state")),
+        cu_seqlens=torch.tensor(inp["cu_seqlens"], dtype=metadata_dtype, device=dev),
+        ssm_state_indices=indices.to(dev),
+        num_accepted_tokens=accepted.to(dev),
+        state_v_first=state_v_first,
+        use_qk_l2norm_in_kernel=True,
+        output_final_state=True,
+        inplace_final_state=False,
+    )
+    torch_npu.npu.synchronize()
+    torch.testing.assert_close(out.cpu(), golden[0], rtol=0.02, atol=0.01)
+    torch.testing.assert_close(state[:2].cpu(), golden[1][:2], rtol=0.02, atol=0.01)
+
+
+@pytest.mark.parametrize("state_v_first", [False, True])
+def test_a5_packed_qkv_across_batch_boundary(state_v_first):
+    dev = _device()
+    if "Ascend950" not in torch_npu.npu.get_device_name(dev):
+        pytest.skip("A5 implementation regression")
+    inp = make_inputs(
+        batch=2, seq_len=9, state_v_first=state_v_first, qk_scale=0.08, seed=1187
+    )
+    inp["cu_seqlens"] = [0, 5, 18]
+    golden = recurrent_kda_golden(
+        **inp, state_v_first=state_v_first, use_qk_l2norm_in_kernel=True
+    )
+    packed = torch.cat([inp[n].flatten(-2) for n in ("q", "k", "v")], dim=-1).to(dev)
+    views = []
+    start = 0
+    for name in ("q", "k", "v"):
+        heads, features = inp[name].shape[-2:]
+        views.append(
+            packed[..., start : start + heads * features].unflatten(
+                -1, (heads, features)
+            )
+        )
+        start += heads * features
+    out, state = recurrent_kda(
+        *views,
+        inp["g"].to(dev),
+        inp["beta"].to(dev),
+        inp["initial_state"].to(dev),
+        cu_seqlens=torch.tensor(inp["cu_seqlens"], dtype=torch.int64, device=dev),
+        state_v_first=state_v_first,
+        use_qk_l2norm_in_kernel=True,
+        output_final_state=True,
+    )
+    torch_npu.npu.synchronize()
+    torch.testing.assert_close(out.cpu(), golden[0], rtol=0.02, atol=0.01)
+    torch.testing.assert_close(state.cpu(), golden[1], rtol=0.02, atol=0.01)

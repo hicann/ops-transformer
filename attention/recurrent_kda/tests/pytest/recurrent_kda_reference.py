@@ -102,6 +102,7 @@ def recurrent_kda_reference(
     lower_bound: float = -5.0,
     state_v_first: bool = True,
     qk_l2norm_eps: float = 1e-6,
+    round_intermediate_state: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     del output_final_state, inplace_final_state
 
@@ -184,6 +185,10 @@ def recurrent_kda_reference(
                     else seq_idx
                 )
                 state[out_slot, hv_idx] = state_cur
+                if round_intermediate_state:
+                    # A5 stores the recurrent State in its declared dtype between tokens.
+                    # The current token output above uses the FP32 update before rounding.
+                    state_cur = state_cur.to(state_dtype).float()
 
     if not state_v_first:
         state = state.transpose(-1, -2).contiguous()
