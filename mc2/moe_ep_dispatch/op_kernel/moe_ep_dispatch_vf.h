@@ -36,6 +36,9 @@ constexpr static Reg::CastTrait HIST_U16_TO_U32_EVEN = {Reg::RegLayout::ZERO, Re
 constexpr static Reg::CastTrait HIST_U16_TO_U32_ODD = {Reg::RegLayout::ONE, Reg::SatMode::NO_SAT,
                                                        Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
+constexpr static Reg::CastTrait RECV_S32_TO_S64 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                   Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
+
 /** Narrow expert ids to int16 and derive the raw destination rank. */
 __simd_callee__ inline void PrepareExpertAndRank(__ubuf__ int32_t* topkIds, __ubuf__ int16_t* expertIds,
                                                  __ubuf__ int16_t* rawRank, uint32_t elementCount,
@@ -353,6 +356,103 @@ __simd_vf__ __aicore__ inline void DedupAndCalCnt(__ubuf__ int32_t* topkIds, __u
     Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     CalSendCntPerExpert(expertScratch, expertCounter, elementCount, expertCount);
     DedupAndSendDirect(dstRank, rawRankScratch, rankCounter, tokenCount, topK, rankCount);
+}
+
+/** Sum compact rank rows without materializing an int64 matrix in UB. */
+template <bool DoCpuSync>
+__simd_vf__ __aicore__ inline void CalRecvCountPerExpert(__ubuf__ int32_t* rankCounts, __ubuf__ int64_t* expertCounts,
+                                                         __ubuf__ int64_t* actualCount, uint32_t rankCount,
+                                                         uint32_t expertCount, uint32_t expertStride)
+{
+    Reg::RegTensor<int32_t> countReg;
+    Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> wideCountReg;
+    Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> partialReg;
+    Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> gatheredReg;
+    Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> totalReg;
+    Reg::RegTensor<uint32_t> indexReg;
+    Reg::RegTensor<uint32_t> gatherIndexReg;
+    // RegTraitNumTwo holds 64 int64 values in separate low/high B32 registers.
+    Reg::MaskReg allMask = Reg::CreateMask<int32_t, Reg::MaskPattern::ALL>();
+    uint32_t maxRowsPerLoad = expertStride < B32_ELEMENTS_PER_VECTOR ? B32_ELEMENTS_PER_VECTOR / expertStride : 1U;
+    uint32_t rowsPerLoad = 1U;
+    // Use power-of-two row groups; absent rows in the final load are zeroed by Cast.
+    while (rowsPerLoad < rankCount && (rowsPerLoad << 1U) <= maxRowsPerLoad) {
+        rowsPerLoad <<= 1U;
+    }
+    Reg::Arange(reinterpret_cast<Reg::RegTensor<int32_t>&>(indexReg), 0);
+    if constexpr (DoCpuSync) {
+        Reg::Duplicate(totalReg, static_cast<int64_t>(0), allMask);
+    }
+
+    for (uint32_t expertStart = 0; expertStart < expertCount; expertStart += B32_ELEMENTS_PER_VECTOR) {
+        uint32_t validExperts = expertCount - expertStart;
+        validExperts = validExperts < B32_ELEMENTS_PER_VECTOR ? validExperts : B32_ELEMENTS_PER_VECTOR;
+        uint32_t maskCount = validExperts;
+        Reg::MaskReg expertMask = Reg::UpdateMask<int32_t>(maskCount);
+        Reg::Duplicate(partialReg, static_cast<int64_t>(0), allMask);
+        for (uint32_t rankStart = 0; rankStart < rankCount; rankStart += rowsPerLoad) {
+            uint32_t validRows = rankCount - rankStart;
+            validRows = validRows < rowsPerLoad ? validRows : rowsPerLoad;
+            uint32_t loadCount = rowsPerLoad > 1U ? validRows * expertStride : validExperts;
+            Reg::MaskReg loadMask = Reg::UpdateMask<int32_t>(loadCount);
+            Reg::LoadAlign(countReg, rankCounts + rankStart * expertStride + expertStart);
+            Reg::Cast<int64_t, int32_t, RECV_S32_TO_S64>(wideCountReg, countReg, loadMask);
+            // Keep partial sums for rows absent from the last load.
+            Reg::Add(partialReg, partialReg, wideCountReg, allMask);
+        }
+
+        // Fold the upper half of the row slots into the lower half at each level.
+        for (uint32_t foldRows = rowsPerLoad >> 1U; foldRows > 0U; foldRows >>= 1U) {
+            uint32_t foldCount = foldRows > 1U ? foldRows * expertStride : validExperts;
+            Reg::MaskReg foldMask = Reg::UpdateMask<int32_t>(foldCount);
+            Reg::Adds(gatherIndexReg, indexReg, foldRows * expertStride, foldMask);
+            Reg::Gather(reinterpret_cast<Reg::RegTensor<int32_t>&>(gatheredReg.reg[0]),
+                        reinterpret_cast<Reg::RegTensor<int32_t>&>(partialReg.reg[0]), gatherIndexReg);
+            Reg::Gather(reinterpret_cast<Reg::RegTensor<int32_t>&>(gatheredReg.reg[1]),
+                        reinterpret_cast<Reg::RegTensor<int32_t>&>(partialReg.reg[1]), gatherIndexReg);
+            // The final mask excludes expert padding; ZEROING also clears unused total-count lanes.
+            Reg::Add(partialReg, partialReg, gatheredReg, foldMask);
+        }
+        Reg::StoreAlign(expertCounts + expertStart, partialReg, expertMask);
+        if constexpr (DoCpuSync) {
+            Reg::Add(totalReg, totalReg, partialReg, allMask);
+        }
+    }
+
+    if constexpr (DoCpuSync) {
+        Reg::Reduce<Reg::ReduceType::SUM>(totalReg, totalReg, allMask);
+        uint32_t count = 1U;
+        Reg::MaskReg totalMask = Reg::UpdateMask<int32_t>(count);
+        Reg::StoreAlign(actualCount, totalReg, totalMask);
+    }
+}
+
+/** Extract each rank's count, then clear the consumed notification blocks. */
+__simd_vf__ __aicore__ inline void ExtractRecvCountPerRank(__ubuf__ int32_t* states, __ubuf__ int32_t* rankCounts,
+                                                           uint32_t rankCount)
+{
+    Reg::RegTensor<uint32_t> indexReg;
+    Reg::RegTensor<int32_t> countReg;
+    Reg::RegTensor<int32_t> zeroReg;
+    Reg::MaskReg allMask = Reg::CreateMask<int32_t, Reg::MaskPattern::ALL>();
+    Reg::Arange(reinterpret_cast<Reg::RegTensor<int32_t>&>(indexReg), 0);
+    Reg::Muls(indexReg, indexReg, UB_STRIDE, allMask);
+    Reg::Adds(indexReg, indexReg, 1U, allMask);
+    Reg::Duplicate(zeroReg, static_cast<int32_t>(0), allMask);
+    uint32_t remaining = rankCount;
+    uint16_t loopCount = static_cast<uint16_t>(Ceil(rankCount, B32_ELEMENTS_PER_VECTOR));
+    for (uint16_t loop = 0; loop < loopCount; ++loop) {
+        Reg::MaskReg activeMask = Reg::UpdateMask<int32_t>(remaining);
+        Reg::Gather(countReg, states + loop * B32_ELEMENTS_PER_VECTOR * UB_STRIDE, indexReg, activeMask);
+        Reg::StoreAlign(rankCounts + loop * B32_ELEMENTS_PER_VECTOR, countReg, activeMask);
+    }
+    Reg::LocalMemBar<Reg::MemType::VEC_LOAD, Reg::MemType::VEC_STORE>();
+    remaining = rankCount * UB_STRIDE;
+    loopCount = static_cast<uint16_t>(Ceil(remaining, B32_ELEMENTS_PER_VECTOR));
+    for (uint16_t loop = 0; loop < loopCount; ++loop) {
+        Reg::MaskReg activeMask = Reg::UpdateMask<int32_t>(remaining);
+        Reg::StoreAlign(states + loop * B32_ELEMENTS_PER_VECTOR, zeroReg, activeMask);
+    }
 }
 
 #endif

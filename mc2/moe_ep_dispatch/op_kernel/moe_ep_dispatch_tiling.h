@@ -22,6 +22,7 @@
 
 constexpr uint32_t UB_ALIGN = 32U;
 constexpr uint32_t WIN_ADDR_ALIGN = 512U;
+constexpr uint32_t UB_STRIDE = 8U;                                  // UB_ALIGN/sizeof(int32_t)=8
 constexpr uint32_t MOE_EP_SEND_ENTRY_BYTES = 2U * sizeof(uint32_t); // source slot和destination slot
 constexpr uint32_t MOE_EP_META_BATCH_MAX = 32U;
 constexpr uint32_t MOE_EP_META_SCATTER_UB_BYTES = 4U * MOE_EP_META_BATCH_MAX * sizeof(int32_t);
