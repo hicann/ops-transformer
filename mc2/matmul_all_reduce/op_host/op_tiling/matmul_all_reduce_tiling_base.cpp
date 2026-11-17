@@ -714,6 +714,32 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckInput()
                                                              (std::to_string(x1DimNum) + "D").c_str(),
                                                              "The shape dim of x1 must be 2 or 3"),
                     return ge::GRAPH_FAILED);
+    // 量化场景下(dequant_scale非空)生效：x2的n维为1时不支持；非量化场景不校验
+    const gert::StorageShape* dequantScaleShape = mmrCtxInfo_.dequant_scale_shape;
+    if (dequantScaleShape != nullptr) {
+        const gert::StorageShape* x2Shape = mmrCtxInfo_.x2_shape;
+        const auto& x2StorageShape = x2Shape->GetStorageShape();
+        const bool isTransB = (mmrCtxInfo_.isTransB != nullptr) && (*mmrCtxInfo_.isTransB);
+        bool x2NIsOne = false;
+        if (x2StorageShape.GetDimNum() == DIM_NUM_TWO) {
+            x2NIsOne = isTransB ? (x2StorageShape.GetDim(0) == 1) : (x2StorageShape.GetDim(1) == 1);
+        }
+        OP_TILING_CHECK(x2NIsOne,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x2",
+                                                              Ops::Base::ToString(x2StorageShape).c_str(),
+                                                              "The n dim of x2 can't be 1"),
+                        return ge::GRAPH_FAILED);
+        // x2Scale(dequant_scale)的k分组维为1时不支持，仅校验3维mx scale(转置场景为[n, k, 2]，
+        // 非转置为[k, n, 2]，最后一维为packing维度)，1维pertensor scale (1)不校验
+        const auto& dequantStorageShape = dequantScaleShape->GetStorageShape();
+        const size_t kDimIdx = isTransB ? 1U : 0U;
+        OP_TILING_CHECK(
+            (dequantStorageShape.GetDimNum() == DIM_NUM_THREE) && (dequantStorageShape.GetDim(kDimIdx) == 1),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "dequant_scale",
+                                                  Ops::Base::ToString(dequantStorageShape).c_str(),
+                                                  "The k dim of x2Scale(dequant_scale) can't be 1"),
+            return ge::GRAPH_FAILED);
+    }
     // bias为n值
     if (CheckInputBias() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;

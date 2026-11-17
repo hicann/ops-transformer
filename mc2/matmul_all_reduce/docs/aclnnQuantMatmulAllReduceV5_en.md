@@ -101,7 +101,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
           <td>x2</td>
           <td>Input</td>
           <td>Right matrix of the MatMul computation, that is, x2 in the Formula.</td>
-          <td><ul><li>Current version supports only 2D input.</li><li>Transpose/non-transpose use cases are supported.</li><li>In ND format, non-contiguous tensors with the last two axes transposed are supported. Other non-contiguous tensors are not supported.</li></ul></td>
+          <td><ul><li>Current version supports only 2D input.</li><li>Transpose/non-transpose use cases are supported.</li><li>In ND format, non-contiguous tensors with the last two axes transposed are supported. Other non-contiguous tensors are not supported.</li><li>The n axis cannot be 1.</li></ul></td>
           <td>INT8, FLOAT8_E4M3FN, FLOAT8_E5M2, HIFLOAT8, FLOAT4_E2M1.</td>
           <td>ND</td>
           <td>2</td>
@@ -141,7 +141,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
           <td>x2ScaleOptional</td>
           <td>Input</td>
           <td>Dequantization coefficient after MatMul computation, that is, x2Scale in the formula.</td>
-          <td><ul><li>The shape is (1) in the pertensor use case and (n)/(1, n) in the perchannel use case.</li><li>If the input is int8 and the output is BFLOAT16, directly pass x2ScaleOptional of the BFLOAT16 type to this API.</li><li>If the output is FLOAT16 and the input is INT8, directly pass x2ScaleOptional of the FLOAT32 type to this API when x1ScaleOptional is not empty; if x1ScaleOptional is empty, call the aclnn API of the TransQuantParamV2 operator in advance to convert x2ScaleOptional to the INT64/UINT64 data type.</li><li>If the data type is FLOAT8_E8M0, only the transposed layout is supported, and the shape is [n, ceilDiv(k, 64), 2].</li> <li>If x2 is FLOAT4_E2M1, ensure that ceilDiv(k, 32) is an even number.</li><li>In the perblock use case, the shape of x2 is [ceilDiv(k, 128), ceilDiv(n, 128)]. If x2 is transposed, the shape of x2ScaleOptional is [ceilDiv(n, 128), ceilDiv(k, 128)].</li></ul></td>
+          <td><ul><li>The shape is (1) in the pertensor use case and (n)/(1, n) in the perchannel use case.</li><li>If the input is int8 and the output is BFLOAT16, directly pass x2ScaleOptional of the BFLOAT16 type to this API.</li><li>If the output is FLOAT16 and the input is INT8, directly pass x2ScaleOptional of the FLOAT32 type to this API when x1ScaleOptional is not empty; if x1ScaleOptional is empty, call the aclnn API of the TransQuantParamV2 operator in advance to convert x2ScaleOptional to the INT64/UINT64 data type.</li><li>If the data type is FLOAT8_E8M0, only the transposed layout is supported, and the shape is [n, ceilDiv(k, 64), 2].</li> <li>If x2 is FLOAT4_E2M1, ensure that ceilDiv(k, 32) is an even number.</li><li>In the perblock use case, the shape of x2 is [ceilDiv(k, 128), ceilDiv(n, 128)]. If x2 is transposed, the shape of x2ScaleOptional is [ceilDiv(n, 128), ceilDiv(k, 128)].</li><li>When the dtype is FLOAT8_E8M0, the ceilDiv(k, 64) axis cannot be 1.</li></ul></td>
           <td>INT64, UINT64, FLOAT32, BFLOAT16, FLOAT8_E8M0</td>
           <td>ND</td>
           <td>1-3</td>
@@ -375,6 +375,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
 
 - MC2 is disabled in incremental scenarios and enabled in full scenarios.
 - The input x1 can be 2-dimensional or 3-dimensional, with its shape being (b, s, k) or (m, k). x2 must be 2-dimensional, with its shape being (k, n). The k axis must satisfy the mm operator input requirements, meaning the k axes must be equal.
+- In quantization scenarios, the n axis of x2 cannot be 1. When the dtype of x2Scale is FLOAT8_E8M0, the ceilDiv(k, 64) axis in shape [n, ceilDiv(k, 64), 2] cannot be 1. The pertensor shape (1) is not affected by this constraint.
 - The size of m must not exceed 2147483647. The last dimension size of x1 and x2 must not exceed 65535. The last dimension of x1 refers to k, and the last dimension of x2 refers to k when transposed or n when not transposed.
 - The passed x1, x2, x2Scale, or output must not be null pointers.
 - The data types and data formats of x1, x2, dequantScale, output, bias (when not null), and x3 (when not null) must fall within the supported ranges.
