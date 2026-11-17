@@ -152,18 +152,18 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
     if (is_quant) {
         TORCH_CHECK(query.scalar_type() == at::kHalf, "int8 key requires float16 query.");
         TORCH_CHECK(scale.has_value() && scale.value().defined() && scale.value().numel() > 0,
-                    "int8 key requires dequant scale.");
-        TORCH_CHECK(scale.value().scalar_type() == at::kFloat, "scale dtype must be float32.");
+                    "int8 key requires dequant key_scale.");
+        TORCH_CHECK(scale.value().scalar_type() == at::kFloat, "key_scale dtype must be float32.");
         if (is_tnd) {
             TORCH_CHECK(scale.value().dim() == SCALE_TND_DIM || (scale.value().dim() == 1 && key.size(1) == 1),
-                        "TND scale must be [T2, N2] or [T2].");
+                        "TND key_scale must be [T2, N2] or [T2].");
         } else {
-            TORCH_CHECK(scale.value().dim() == SCALE_PA_DIM, "PA scale must be 3D [NP, N_kv, P].");
+            TORCH_CHECK(scale.value().dim() == SCALE_PA_DIM, "PA key_scale must be 3D [NP, N_kv, P].");
         }
     } else {
         TORCH_CHECK(key.scalar_type() == query.scalar_type(), "non-quant key dtype must match query.");
-        TORCH_CHECK(!scale.has_value() || !scale.value().defined(), "non-quant path must not pass scale.");
-        TORCH_CHECK(!is_fp8 || (!scale.has_value() || !scale.value().defined()), "FP8 path must not pass scale.");
+        TORCH_CHECK(!scale.has_value() || !scale.value().defined(), "non-quant path must not pass key_scale.");
+        TORCH_CHECK(!is_fp8 || (!scale.has_value() || !scale.value().defined()), "FP8 path must not pass key_scale.");
     }
     TORCH_CHECK(cu_q.scalar_type() == at::kInt, "actual_seq_qlen dtype must be int32.");
     TORCH_CHECK(kv_len.scalar_type() == at::kInt, "actual_seq_klen dtype must be int32.");
@@ -238,13 +238,14 @@ void CheckHeadDim(const at::Tensor& query, int64_t keyHeadDim)
 
 } // namespace
 
-at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key,
-                              const c10::optional<at::Tensor>& block_table, const c10::optional<at::Tensor>& scale,
+at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key, const at::Tensor& start_loc,
+                              const c10::optional<at::Tensor>& block_table,
+                              const c10::optional<at::Tensor>& query_scale, const c10::optional<at::Tensor>& key_scale,
                               const c10::optional<at::Tensor>& atten_mask,
                               const c10::optional<at::Tensor>& actual_seq_qlen,
-                              const c10::optional<at::Tensor>& actual_seq_klen, const at::Tensor& start_loc,
-                              c10::string_view layout_key, int64_t sparse_mode, int64_t init_blocks,
-                              int64_t local_blocks, c10::string_view layout_query, int64_t pool_block_size)
+                              const c10::optional<at::Tensor>& actual_seq_klen, c10::string_view layout_key,
+                              int64_t sparse_mode, int64_t init_blocks, int64_t local_blocks,
+                              c10::string_view layout_query, int64_t pool_block_size, int64_t compress_factor)
 {
     CheckMsaRequiredTensors(query, key, start_loc, actual_seq_qlen, actual_seq_klen);
     const std::string layoutKeyStr = ParseLayoutKey(layout_key);
@@ -259,7 +260,10 @@ at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key,
     const at::Tensor& cu_q = actual_seq_qlen.value();
     const at::Tensor& kv_len = actual_seq_klen.value();
     CheckMsaLayoutRanks(query, key, block_table, layoutKeyStr, layoutQueryStr, cu_q, kv_len, start_loc);
-    CheckMsaSparseAndDtypes(query, key, scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, seq_key);
+    CheckMsaSparseAndDtypes(query, key, key_scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, seq_key);
+    TORCH_CHECK(!query_scale.has_value() || !query_scale.value().defined(),
+                "query_scale is reserved and not supported.");
+    TORCH_CHECK(compress_factor == 1, "compress_factor only supports 1, got ", compress_factor);
     // pool_block_size 只允许 16 / 128；BSND/BNSD 固定 16。存储页长（key 的页维度）与打分块长解耦，
     // 但打分块不能超过存储页容量（kernel 按页表取每块前 bs 个 token）。
     const int64_t keyPage = seq_key ? 0 : (layoutKeyStr == "BBND") ? key.size(1) : key.size(DIM_2);
@@ -317,8 +321,9 @@ at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key,
     const int64_t score_stride = ((meta.maxBlocks + SCORE_STRIDE_ALIGN - 1) / SCORE_STRIDE_ALIGN) * SCORE_STRIDE_ALIGN;
     const int64_t score_heads = (poolBlockSize == BLOCK16_SIZE) ? 1 : num_q_heads;
     at::Tensor score = at::empty({score_heads, total_q, score_stride}, query.options().dtype(at::kFloat));
-    ACLNN_CMD(aclnnMsaIndexScoreV2, query, key, block_table, scale, atten_mask, actual_seq_qlen, actual_seq_klen,
-              start_loc, layoutKeyStr, sparse_mode, init_blocks, local_blocks, layoutQueryStr, poolBlockSize, score);
+    ACLNN_CMD(aclnnMsaIndexScoreV2, query, key, start_loc, block_table, query_scale, key_scale, atten_mask,
+              actual_seq_qlen, actual_seq_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, layoutQueryStr,
+              poolBlockSize, compress_factor, score);
     return score;
 }
 

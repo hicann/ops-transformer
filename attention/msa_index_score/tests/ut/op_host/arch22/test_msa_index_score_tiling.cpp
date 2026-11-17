@@ -93,6 +93,8 @@ struct MsaTilingSpec {
     int64_t sparseMode{0};
     int64_t initBlocks{0};
     int64_t localBlocks{1};
+    int64_t returnChoice{0};
+    int64_t topk{16};
 };
 
 gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocParam& soc, void* compileInfo)
@@ -100,7 +102,9 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
     std::vector<gert::TilingContextPara::TensorDescription> inputs;
     inputs.push_back(Present(spec.queryShape, spec.queryDtype));
     inputs.push_back(Present(spec.keyShape, spec.keyDtype));
+    inputs.push_back(spec.startLocShape.empty() ? Absent(ge::DT_INT32) : Present(spec.startLocShape, ge::DT_INT32));
     inputs.push_back(spec.hasBlockTable ? Present(spec.blockTableShape, ge::DT_INT32) : Absent(ge::DT_INT32));
+    inputs.push_back(Absent(ge::DT_FLOAT)); // query_scale，当前预留
     inputs.push_back(spec.hasScale ? Present(spec.scaleShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
     inputs.push_back(spec.hasMask ? Present({2048, 2048}, ge::DT_INT8) : Absent(ge::DT_INT8));
     inputs.push_back(spec.qlenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.qlenShape, ge::DT_INT32));
@@ -111,7 +115,6 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
                                                        true, const_cast<int32_t*>(spec.klenData.data()));
     }
     inputs.push_back(klenDesc);
-    inputs.push_back(spec.startLocShape.empty() ? Absent(ge::DT_INT32) : Present(spec.startLocShape, ge::DT_INT32));
 
     std::vector<gert::TilingContextPara::TensorDescription> outputs;
     outputs.push_back(Present(spec.scoreShape, ge::DT_FLOAT));
@@ -122,7 +125,9 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
         {"init_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.initBlocks)},
         {"local_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.localBlocks)},
         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>(spec.layoutQuery)},
-        {"pool_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.poolBlockSize)}};
+        {"pool_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.poolBlockSize)},
+        {"return_choice", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.returnChoice)},
+        {"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.topk)}};
 
     return gert::TilingContextPara("MsaIndexScore", inputs, outputs, attrs, compileInfo, soc.socVersion, soc.coreNum,
                                    soc.ubSize, MSA_TILING_CAP);
@@ -418,4 +423,13 @@ TEST_F(MsaIndexScoreTilingFp8Arch22, a2_a3_fp8_rejected)
     spec.queryDtype = ge::DT_HIFLOAT8;
     spec.keyDtype = ge::DT_HIFLOAT8;
     RunTiling(spec, kSoc910B, ge::GRAPH_FAILED);
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch22, a2_a3_topk_rejected)
+{
+    MsaTilingSpec spec;
+    spec.returnChoice = 1;
+    spec.topk = 16;
+    RunTiling(spec, kSoc910B, ge::GRAPH_FAILED);
+    RunTiling(spec, kSoc91093, ge::GRAPH_FAILED);
 }

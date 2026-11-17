@@ -54,18 +54,20 @@
 aclnnStatus aclnnMsaIndexScoreV2GetWorkspaceSize(
     const aclTensor *query,
     const aclTensor *key,
+    const aclTensor *startLoc,
     const aclTensor *blockTableOptional,
-    const aclTensor *scaleOptional,
+    const aclTensor *queryScaleOptional,
+    const aclTensor *keyScaleOptional,
     const aclTensor *attenMaskOptional,
     const aclTensor *actualSeqQlenOptional,
     const aclTensor *actualSeqKlenOptional,
-    const aclTensor *startLoc,
     char            *layoutKeyOptional,
     int64_t          sparseMode,
     int64_t          initBlocks,
     int64_t          localBlocks,
     char            *layoutQueryOptional,
     int64_t          poolBlockSize,
+    int64_t          compressFactor,
     const aclTensor *score,
     uint64_t        *workspaceSize,
     aclOpExecutor  **executor);
@@ -124,6 +126,16 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>仅支持首轴非连续</td>
     </tr>
     <tr>
+      <td>startLoc</td>
+      <td>输入</td>
+      <td>当前query所在逻辑block索引（非token前缀）。</td>
+      <td>与<code>initBlocks</code> / <code>localBlocks</code>一起生成$local\_mask$。</td>
+      <td>INT32</td>
+      <td>ND</td>
+      <td>1（$[B]$）</td>
+      <td>-</td>
+    </tr>
+<tr>
       <td>blockTableOptional</td>
       <td>输入</td>
       <td>表示当前传入的使用PageAttention存储的block映射表。</td>
@@ -134,16 +146,16 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>scaleOptional</td>
+      <td>queryScaleOptional</td>
       <td>输入</td>
-      <td>公式中的$scale$，反量化系数。</td>
-      <td>非量化与FP8传入<code>nullptr</code>。</td>
+      <td>query的量化系数。</td>
+      <td>数据类型、数据格式与<code>keyScaleOptional</code>相同。当前仅预留，须传<code>nullptr</code>。</td>
       <td>FLOAT</td>
       <td>ND</td>
-      <td>3（$[block\_num, N2, block\_size]$、$[block\_num, block\_size, N2]$）或2（$[T2, N2]$）</td>
+      <td>与keyScaleOptional相同</td>
       <td>-</td>
     </tr>
-    <tr>
+        <tr>
       <td>attenMaskOptional</td>
       <td>输入</td>
       <td>控制因果可见的mask掩码。</td>
@@ -173,17 +185,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>1（$[B]$或$[B+1]$）</td>
       <td>-</td>
     </tr>
-    <tr>
-      <td>startLoc</td>
-      <td>输入</td>
-      <td>当前query所在逻辑block索引（非token前缀）。</td>
-      <td>与<code>initBlocks</code> / <code>localBlocks</code>一起生成$local\_mask$。</td>
-      <td>INT32</td>
-      <td>ND</td>
-      <td>1（$[B]$）</td>
-      <td>-</td>
-    </tr>
-    <tr>
+        <tr>
       <td>layoutKeyOptional</td>
       <td>输入</td>
       <td>key的数据排布。</td>
@@ -244,6 +246,16 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>-</td>
     </tr>
     <tr>
+      <td>compressFactor</td>
+      <td>输入</td>
+      <td>key的压缩倍数。</td>
+      <td>1表示不压缩。4表示输入时已把4个token压成一行，当前仅预留，须传1。</td>
+      <td>INT64</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
       <td>score</td>
       <td>输出</td>
       <td>公式中的$score$。</td>
@@ -278,7 +290,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
 
   <!-- npu="950" id7 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-      - query、key：数据类型除BFLOAT16、FLOAT16外，还支持FLOAT8_E5M2、FLOAT8_E4M3FN。
+      - query、key：数据类型除BFLOAT16、FLOAT16外，还支持FLOAT8_E5M2、FLOAT8_E4M3FN。FLOAT4_E2M1、FLOAT16 score，以及FLOAT8_E4M3FN query配FLOAT4_E2M1 key仅预留，当前会拒绝。
       - query：BSND、BNSD布局仅支持FLOAT16/BFLOAT16。
       - key：BSND、BNSD的逻辑块长固定为16，且仅支持FLOAT16/BFLOAT16；BBND/BNBD的存储页长还支持16（FLOAT16/BFLOAT16）。
       - layoutQueryOptional：支持BSND、BNSD。
@@ -399,7 +411,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
 - `layoutKeyOptional`指定key：`"BBND"`（$[block\_num, block\_size, N2, D]$）、`"BNBD"`（$[block\_num, N2, block\_size, D]$）、`"TND"`（$[T2, N2, D]$）、`"BSND"`（$[B, S2, N2, D]$）、`"BNSD"`（$[B, N2, S2, D]$）。不传时默认`"BBND"`。key为TND时必须与query布局相同；key为BSND/BNSD且`poolBlockSize=128`时，query须为TND，`poolBlockSize=16`时，query必须与key同布局；key为BBND/BNBD时query可以是三种中的任意一种。
 - 逻辑块长为16时（query为BSND/BNSD，或`poolBlockSize=16`）：8个长度为16的逻辑块拼成一次128列GEMM。先在每个head内对16个token取max，再对每个block取head间max，即$score[0][t][i] = \max_{h'} \max_{j \in block_i} (Q[t][h'] \cdot K[j])$。head维为1。query的head数必须整除128，因此支持$N1=16$。BBND/BNBD必须传入`blockTableOptional`；BSND/BNSD不得传入。TND经`aclnnMsaIndexScoreV2`显式传`poolBlockSize=16`时也走这条路径。
 - PageAttention（`layoutKey`为`"BBND"`/`"BNBD"`）场景下，`blockTableOptional`必须传入；TND/BSND/BNSD不得传入。TND/BSND/BNSD的`actualSeqKlenOptional`统一为$[B+1]$前缀和，PA为$[B]$可见长度。BSND/BNSD每个请求的q、kv长度不能超过对应shape里的$S$。
-- 非量化时`key` dtype与`query`相同（BFLOAT16/FLOAT16），`scaleOptional`为`nullptr`。
+- 非量化时`key` dtype与`query`相同（BFLOAT16/FLOAT16），`keyScaleOptional`为`nullptr`。`queryScaleOptional`当前须为`nullptr`，`compressFactor`当前须为1。
 - `sparseMode`当前仅支持0、3：
     - 为0时，代表defaultMask模式，`attenMaskOptional`传入`nullptr`；
     - 为3时，代表rightDownCausal模式，`attenMaskOptional`必须传入，shape为$[2048, 2048]$，取值为1代表该位不参与计算，为0代表该位参与计算。
@@ -609,22 +621,24 @@ int ExecuteMsaIndexScore(TensorResources& resources, aclrtStream stream,
   int64_t poolBlockSize = 128;  // 打分池化块长；16 走两级 maxpool（仅 950 fp16/bf16）
   aclOpExecutor* executor = nullptr;
 
-  // 非量化：scaleOptional 传 nullptr
+  // 非量化：keyScaleOptional、queryScaleOptional 传 nullptr；compressFactor 传 1
   int ret = aclnnMsaIndexScoreV2GetWorkspaceSize(
       resources.queryTensor,
       resources.keyTensor,
+      resources.startLocTensor,
       resources.blockTableTensor,
-      nullptr,  // scaleOptional
+      nullptr,  // queryScaleOptional
+      nullptr,  // keyScaleOptional
       resources.attenMaskTensor,
       resources.actualSeqQlenTensor,
       resources.actualSeqKlenTensor,
-      resources.startLocTensor,
       layoutKey,
       sparseMode,
       initBlocks,
       localBlocks,
       layoutQuery,
       poolBlockSize,
+      1,  // compressFactor
       resources.scoreTensor,
       workspaceSize,
       &executor);

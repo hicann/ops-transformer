@@ -25,14 +25,28 @@
 
 ## Function
 
-- **Description**: Wraps `aclnnMsaIndexScore`. Query stays TND. The API does not include TopK.
+- **Description**: Wraps `aclnnMsaIndexScore`. Query stays TND. `return_choice=0` returns score. `return_choice=1` returns `sparse_indices`. `return_choice=2` returns indices and values. TopK is supported on Ascend 950PR&950DT products with `pool_block_size=128`. Prefix column indices come first, in ascending order; tail-segment indices follow.
 - **Formula**:
 
 $$
 score = Maxpool[(scale\cdot)Q_{idx}@K_{idx}^{T}+atten\_mask]+local\_mask
 $$
 
-- Computation: load visible $K$ by `layout_key`, compute $QK^{T}$, apply rightDownCausal when `sparse_mode=3`, Maxpool over 128-token blocks, then add `local_mask`.
+`return_choice=0` returns `score` only. When `return_choice` is 1 or 2, TopK continues on the valid columns of each $(h,t)$. For `sparse_mode=3`, $visibleEnd=\mathrm{clamp}(kv-q+t_{off}+1,0,kv)$. For `sparse_mode=0`, $visibleEnd=kv$. Under PageAttention, $BlockCap$ is the smaller of the `block_table` width and the logical-block limit; otherwise it is the logical-block limit.
+
+$$
+validBlocks=\min(\lceil visibleEnd/128\rceil,BlockCap),\quad m=\min(topk,validBlocks),\quad tailStart=\lfloor validBlocks/1024\rfloor\times 1024
+$$
+
+Select $m$ indices from $[0,validBlocks)$. A higher score wins. Equal scores keep the smaller column index. This chooses the set only. The output is not ordered by score: selected columns with index $<tailStart$ are written in ascending index order, then selected columns with index $\ge tailStart$ are written in ascending index order. Let $I_j$ be the $j$-th index in that order.
+
+$$
+sparse\_indices[h,t,j]=\begin{cases}I_j&j<m\\-1&j\ge m\end{cases},\quad sparse\_values[h,t,j]=\begin{cases}score[h,t,I_j]&j<m\\-\infty&j\ge m\end{cases}
+$$
+
+`return_choice=1` does not return `sparse_values`. When `validBlocks=0`, every slot is $-1$ and $-\infty$.
+
+- Computation: load visible $K$ by `layout_key`, compute $QK^{T}$, apply rightDownCausal when `sparse_mode=3`, Maxpool over 128-token blocks, then add `local_mask`. When `return_choice` is 1 or 2, select the TopK set above and place tail-segment indices after the prefix indices.
 - `layout_key` is `TND`, `BSND`, `BNSD`, `BBND`, or `BNBD`. BSND / BNSD omit `block_table` and pass the `[B+1]` key prefix sum.
 
 ## Function Prototype
@@ -44,7 +58,8 @@ cann_ops_transformer.msa_index_score(
     start_loc,
     *,
     block_table=None,
-    scale=None,
+    query_scale=None,
+    key_scale=None,
     atten_mask=None,
     actual_seq_qlen=None,
     actual_seq_klen=None,
@@ -52,7 +67,10 @@ cann_ops_transformer.msa_index_score(
     sparse_mode=3,
     init_blocks=0,
     local_blocks=1,
-) -> Tensor
+    return_choice=0,
+    topk=16,
+    compress_factor=1,
+)
 ```
 
 ## Parameters
@@ -103,13 +121,13 @@ cann_ops_transformer.msa_index_score(
     <td><code>[B,MB]</code></td>
   </tr>
   <tr>
-    <td>scale</td>
+    <td>query_scale</td>
     <td>Optional</td>
-    <td>Omitted for non-quantized and FP8 inputs.</td>
+    <td>Quantization scale of query. Reserved. Must be None.</td>
     <td>float32</td>
     <td>-</td>
   </tr>
-  <tr>
+    <tr>
     <td>atten_mask</td>
     <td>Required for mode=3</td>
     <td>Compressed lower triangular template.</td>
@@ -172,7 +190,9 @@ cann_ops_transformer.msa_index_score(
 
 ## Output
 
-`[N1, T1, RoundUp(MB,16)]` float32
+- `return_choice=0`: `[N1, T1, RoundUp(MB,16)]` float32 score.
+- `return_choice=1`: `[N1, T1, topk]` int32 indices. Slots past the valid count are -1.
+- `return_choice=2`: indices and float32 values of the same shape. Invalid values are $-\infty$.
 
 ## Example
 

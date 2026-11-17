@@ -119,10 +119,10 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
         # cann_ops_transformer.__init__ re-exports torch.ops once the schema exists.
         return (
             "msa_index_score_v2(Tensor query, Tensor key, Tensor start_loc, "
-            "Tensor? block_table=None, Tensor? scale=None, Tensor? atten_mask=None, "
-            'Tensor? actual_seq_qlen=None, Tensor? actual_seq_klen=None, *, str layout_key="BBND", '
-            'int sparse_mode=3, int init_blocks=0, int local_blocks=1, str layout_query="TND", '
-            "int pool_block_size=128) -> Tensor"
+            "Tensor? block_table=None, Tensor? query_scale=None, Tensor? key_scale=None, "
+            "Tensor? atten_mask=None, Tensor? actual_seq_qlen=None, Tensor? actual_seq_klen=None, "
+            '*, str layout_key="BBND", int sparse_mode=3, int init_blocks=0, int local_blocks=1, '
+            'str layout_query="TND", int pool_block_size=128, int compress_factor=1) -> Tensor'
         )
 
     def register_meta(self):
@@ -132,7 +132,8 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
             key: torch.Tensor,
             start_loc: torch.Tensor,
             block_table: Optional[torch.Tensor],
-            scale: Optional[torch.Tensor],
+            query_scale: Optional[torch.Tensor],
+            key_scale: Optional[torch.Tensor],
             atten_mask: Optional[torch.Tensor],
             actual_seq_qlen: Optional[torch.Tensor],
             actual_seq_klen: Optional[torch.Tensor],
@@ -143,6 +144,7 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
             local_blocks: int = DEFAULT_LOCAL_BLOCKS,
             layout_query: str = "TND",
             pool_block_size: int = 128,
+            compress_factor: int = 1,
         ):
             layout_query = _normalize_layout_query(layout_query)
             torch._check(
@@ -210,7 +212,8 @@ def _msa_index_score_v2(
     key: torch.Tensor,
     start_loc: torch.Tensor,
     block_table: Optional[torch.Tensor],
-    scale: Optional[torch.Tensor],
+    query_scale: Optional[torch.Tensor],
+    key_scale: Optional[torch.Tensor],
     atten_mask: Optional[torch.Tensor],
     actual_seq_qlen: Optional[torch.Tensor],
     actual_seq_klen: Optional[torch.Tensor],
@@ -221,28 +224,30 @@ def _msa_index_score_v2(
     local_blocks: int = DEFAULT_LOCAL_BLOCKS,
     layout_query: str = "TND",
     pool_block_size: int = 128,
+    compress_factor: int = 1,
 ) -> torch.Tensor:
     layout = _normalize_layout_key(layout_key)
     layout_query = _normalize_layout_query(layout_query)
     pool_block_size = _resolve_pool_block_size(layout, key, pool_block_size)
     if layout == "BBND" and key.dim() == 3 and int(key.size(1)) == 128:
         key = key.unsqueeze(2)
-    # C++ wrapper still follows aclnn order: optionals then start_loc.
     return _get_op_module().msa_index_score_v2(
         query,
         key,
+        start_loc,
         block_table,
-        scale,
+        query_scale,
+        key_scale,
         atten_mask,
         actual_seq_qlen,
         actual_seq_klen,
-        start_loc,
         layout,
         sparse_mode,
         init_blocks,
         local_blocks,
         layout_query,
         pool_block_size,
+        compress_factor,
     )
 
 
@@ -252,7 +257,8 @@ def msa_index_score_v2(
     start_loc: torch.Tensor,
     *,
     block_table: Optional[torch.Tensor] = None,
-    scale: Optional[torch.Tensor] = None,
+    query_scale: Optional[torch.Tensor] = None,
+    key_scale: Optional[torch.Tensor] = None,
     atten_mask: Optional[torch.Tensor] = None,
     actual_seq_qlen: Optional[torch.Tensor] = None,
     actual_seq_klen: Optional[torch.Tensor] = None,
@@ -262,6 +268,7 @@ def msa_index_score_v2(
     local_blocks: int = DEFAULT_LOCAL_BLOCKS,
     layout_query: str = "TND",
     pool_block_size: int = 128,
+    compress_factor: int = 1,
 ) -> torch.Tensor:
     """MSA Index Branch block score，封装 aclnnMsaIndexScoreV2。
 
@@ -280,10 +287,12 @@ def msa_index_score_v2(
 
     Args:
         query: ``[T1, N1, D]`` float16 / bfloat16；950 还可为三种 FP8
-        key: 与 ``layout_key`` 对应；非量化须与 query 同 dtype；int8 仅 fp16 query + scale
+        key: 与 ``layout_key`` 对应；非量化须与 query 同 dtype；int8 仅 fp16 query + key_scale
         start_loc: ``[B]``，当前 query 所在逻辑 block 索引（local_mask）
         block_table: ``[B, MB]``，BBND/BNBD 必选；TND / BSND / BNSD 不传
-        scale: int8 反量化。PA 为 ``[NP, N2, P]``；TND 为 ``[T2, N2]``；非量化 / FP8 为 None
+        key_scale: key 反量化。PA 为 ``[NP, N2, P]``；TND 为 ``[T2, N2]``；非量化 / FP8 为 None
+        query_scale: query 量化系数，预留，当前必须为 None
+        compress_factor: key 压缩倍数，1 表示不压缩，当前只支持 1
         atten_mask: sparse_mode=3 时 ``[2048, 2048]`` int8
         actual_seq_qlen: query 前缀和 ``[B+1]``
         actual_seq_klen: PA 为各请求 S2 ``[B]``；TND / BSND / BNSD 为 key 前缀和 ``[B+1]``
@@ -308,7 +317,8 @@ def msa_index_score_v2(
         key,
         start_loc,
         block_table,
-        scale,
+        query_scale,
+        key_scale,
         atten_mask,
         actual_seq_qlen,
         actual_seq_klen,
@@ -318,4 +328,5 @@ def msa_index_score_v2(
         local_blocks=local_blocks,
         layout_query=layout_query,
         pool_block_size=pool_block_size,
+        compress_factor=compress_factor,
     )

@@ -16,10 +16,12 @@ extern "C" {
 #endif
 
 extern aclnnStatus aclnnInnerMsaIndexScoreGetWorkspaceSize(
-    const aclTensor* query, const aclTensor* key, const aclTensor* blockTableOptional, const aclTensor* scaleOptional,
-    const aclTensor* attenMaskOptional, const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional,
-    const aclTensor* startLoc, char* layoutKeyOptional, int64_t sparseMode, int64_t initBlocks, int64_t localBlocks,
-    char* layoutQueryOptional, int64_t poolBlockSize, const aclTensor* score, uint64_t* workspaceSize,
+    const aclTensor* query, const aclTensor* key, const aclTensor* startLoc, const aclTensor* blockTableOptional,
+    const aclTensor* queryScaleOptional, const aclTensor* keyScaleOptional, const aclTensor* attenMaskOptional,
+    const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional, char* layoutKeyOptional,
+    int64_t sparseMode, int64_t initBlocks, int64_t localBlocks, char* layoutQueryOptional, int64_t poolBlockSize,
+    int64_t returnChoice, int64_t topk, int64_t compressFactor, const aclTensor* scoreOptional,
+    const aclTensor* sparseIndicesOptional, const aclTensor* sparseValuesOptional, uint64_t* workspaceSize,
     aclOpExecutor** executor);
 
 extern aclnnStatus aclnnInnerMsaIndexScore(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
@@ -30,16 +32,19 @@ extern aclnnStatus aclnnInnerMsaIndexScore(void* workspace, uint64_t workspaceSi
 #endif
 
 aclnnStatus aclnnMsaIndexScoreGetWorkspaceSize(
-    const aclTensor* query, const aclTensor* key, const aclTensor* blockTableOptional, const aclTensor* scaleOptional,
-    const aclTensor* attenMaskOptional, const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional,
-    const aclTensor* startLoc, char* layoutKeyOptional, int64_t sparseMode, int64_t initBlocks, int64_t localBlocks,
-    const aclTensor* score, uint64_t* workspaceSize, aclOpExecutor** executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* startLoc, const aclTensor* blockTableOptional,
+    const aclTensor* queryScaleOptional, const aclTensor* keyScaleOptional, const aclTensor* attenMaskOptional,
+    const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional, char* layoutKeyOptional,
+    int64_t sparseMode, int64_t initBlocks, int64_t localBlocks, int64_t returnChoice, int64_t topk,
+    int64_t compressFactor, const aclTensor* scoreOptional, const aclTensor* sparseIndicesOptional,
+    const aclTensor* sparseValuesOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // 原始参数表固定 layout_query="TND"、pool_block_size=128。
-    return aclnnInnerMsaIndexScoreGetWorkspaceSize(query, key, blockTableOptional, scaleOptional, attenMaskOptional,
-                                                   actualSeqQlenOptional, actualSeqKlenOptional, startLoc,
-                                                   layoutKeyOptional, sparseMode, initBlocks, localBlocks,
-                                                   const_cast<char*>("TND"), 128, score, workspaceSize, executor);
+    return aclnnInnerMsaIndexScoreGetWorkspaceSize(
+        query, key, startLoc, blockTableOptional, queryScaleOptional, keyScaleOptional, attenMaskOptional,
+        actualSeqQlenOptional, actualSeqKlenOptional, layoutKeyOptional, sparseMode, initBlocks, localBlocks,
+        const_cast<char*>("TND"), 128, returnChoice, topk, compressFactor, scoreOptional, sparseIndicesOptional,
+        sparseValuesOptional, workspaceSize, executor);
 }
 
 aclnnStatus aclnnMsaIndexScore(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)

@@ -36,12 +36,13 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_bbnd)
         {
             {{{32, 8, 128}, {32, 8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},         // query
             {{{2, 128, 1, 128}, {2, 128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // key BBND
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},                             // start_loc
             {{{1, 2}, {1, 2}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table
-            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                             // scale
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                             // query_scale
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                             // key_scale
             {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},                              // atten_mask
             {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},                             // actual_seq_qlen
             {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},                             // actual_seq_klen
-            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}                              // start_loc
         },
         {
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND} // score
@@ -62,11 +63,12 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_bnbd)
         "MsaIndexScore",
         {{{{48, 4, 128}, {48, 4, 128}}, ge::DT_BF16, ge::FORMAT_ND},
          {{{4, 1, 128, 128}, {4, 1, 128, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{2, 20}, {2, 20}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}, // query_scale
          {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
          {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND},
-         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND}},
         {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNBD")},
@@ -86,12 +88,13 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_tnd_prefix)
         "MsaIndexScore",
         {{{{32, 8, 128}, {32, 8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          {{{256, 1, 128}, {256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}, // query_scale
          {{{2048, 2048}, {2048, 2048}}, ge::DT_INT8, ge::FORMAT_ND},
          {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
-         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList},
-         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList}},
         {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
          {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
@@ -110,12 +113,13 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_tnd_multi_batch)
         "MsaIndexScore",
         {{{{64, 2, 128}, {64, 2, 128}}, ge::DT_BF16, ge::FORMAT_ND},
          {{{512, 1, 128}, {512, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}, // query_scale
          {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
          {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND},
-         {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList},
-         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND}},
+         {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList}},
         {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
          {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
@@ -135,12 +139,13 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_tnd_empty_kv)
         "MsaIndexScore",
         {{{{8, 1, 128}, {8, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          {{{0, 1, 128}, {0, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}, // query_scale
          {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
          {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
-         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList},
-         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList}},
         {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
          {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
@@ -157,11 +162,12 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_query_rank_invalid)
         "MsaIndexScore",
         {{{{1, 32, 8, 128}, {1, 32, 8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          {{{2, 128, 1, 128}, {2, 128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{1, 2}, {1, 2}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}, // query_scale
          {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
          {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
-         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}},
         {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BBND")},
@@ -178,11 +184,12 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_layout_invalid)
         "MsaIndexScore",
         {{{{32, 8, 128}, {32, 8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          {{{2, 128, 1, 128}, {2, 128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{1, 2}, {1, 2}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}, // query_scale
          {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
          {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
-         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}},
         {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSH")},
@@ -201,12 +208,13 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_bsnd_pool128)
         "MsaIndexScore",
         {{{{32, 8, 128}, {32, 8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}, // query_scale
          {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
          {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
-         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList},
-         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList}},
         {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
          {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
@@ -225,12 +233,13 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_bnsd_pool128)
         "MsaIndexScore",
         {{{{48, 4, 128}, {48, 4, 128}}, ge::DT_BF16, ge::FORMAT_ND},
          {{{2, 1, 320, 128}, {2, 1, 320, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}, // query_scale
          {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
          {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND},
-         {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList},
-         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND}},
+         {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList}},
         {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
          {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
@@ -248,11 +257,12 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_block_table_rank_invalid)
         "MsaIndexScore",
         {{{{32, 8, 128}, {32, 8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          {{{2, 128, 1, 128}, {2, 128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}, // query_scale
          {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
          {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
-         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
          {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}},
         {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BBND")},
@@ -277,8 +287,10 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_inferdtype)
         ge::DataType outputDtype = ge::DT_FLOAT;
         auto context_holder =
             gert::InferDataTypeContextFaker()
-                .NodeIoNum(8, 1)
+                .NodeIoNum(9, 3)
                 .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
                 .InputDataTypes(
                     {&queryDtype, &keyDtype, &i32Dtype, &f32Dtype, &maskDtype, &i32Dtype, &i32Dtype, &i32Dtype})
                 .NodeAttrs({{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BBND")},
@@ -290,5 +302,7 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_inferdtype)
         EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
         ASSERT_NE(context, nullptr);
         EXPECT_EQ(context->GetOutputDataType(0), outputDtype);
+        EXPECT_EQ(context->GetOutputDataType(1), i32Dtype);
+        EXPECT_EQ(context->GetOutputDataType(2), f32Dtype);
     }
 }

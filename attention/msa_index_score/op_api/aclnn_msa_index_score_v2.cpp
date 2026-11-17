@@ -18,10 +18,12 @@ extern "C" {
 
 // aclnn_inner 生成的内部 ABI：参数 = def 全集。V2 与 base 两个公有包装共用同一个原型。
 extern aclnnStatus aclnnInnerMsaIndexScoreGetWorkspaceSize(
-    const aclTensor* query, const aclTensor* key, const aclTensor* blockTableOptional, const aclTensor* scaleOptional,
-    const aclTensor* attenMaskOptional, const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional,
-    const aclTensor* startLoc, char* layoutKeyOptional, int64_t sparseMode, int64_t initBlocks, int64_t localBlocks,
-    char* layoutQueryOptional, int64_t poolBlockSize, const aclTensor* score, uint64_t* workspaceSize,
+    const aclTensor* query, const aclTensor* key, const aclTensor* startLoc, const aclTensor* blockTableOptional,
+    const aclTensor* queryScaleOptional, const aclTensor* keyScaleOptional, const aclTensor* attenMaskOptional,
+    const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional, char* layoutKeyOptional,
+    int64_t sparseMode, int64_t initBlocks, int64_t localBlocks, char* layoutQueryOptional, int64_t poolBlockSize,
+    int64_t returnChoice, int64_t topk, int64_t compressFactor, const aclTensor* scoreOptional,
+    const aclTensor* sparseIndicesOptional, const aclTensor* sparseValuesOptional, uint64_t* workspaceSize,
     aclOpExecutor** executor);
 
 extern aclnnStatus aclnnInnerMsaIndexScore(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
@@ -32,11 +34,11 @@ extern aclnnStatus aclnnInnerMsaIndexScore(void* workspace, uint64_t workspaceSi
 #endif
 
 ACLNN_API aclnnStatus aclnnMsaIndexScoreV2GetWorkspaceSize(
-    const aclTensor* query, const aclTensor* key, const aclTensor* blockTableOptional, const aclTensor* scaleOptional,
-    const aclTensor* attenMaskOptional, const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional,
-    const aclTensor* startLoc, char* layoutKeyOptional, int64_t sparseMode, int64_t initBlocks, int64_t localBlocks,
-    char* layoutQueryOptional, int64_t poolBlockSize, const aclTensor* score, uint64_t* workspaceSize,
-    aclOpExecutor** executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* startLoc, const aclTensor* blockTableOptional,
+    const aclTensor* queryScaleOptional, const aclTensor* keyScaleOptional, const aclTensor* attenMaskOptional,
+    const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional, char* layoutKeyOptional,
+    int64_t sparseMode, int64_t initBlocks, int64_t localBlocks, char* layoutQueryOptional, int64_t poolBlockSize,
+    int64_t compressFactor, const aclTensor* score, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // 缺省归一：空 / 空串回落 TND；poolBlockSize 非正数回落 128（host tiling 再做 16/128 白名单校验）。
     char layoutQueryDefault[] = "TND";
@@ -44,9 +46,9 @@ ACLNN_API aclnnStatus aclnnMsaIndexScoreV2GetWorkspaceSize(
         (layoutQueryOptional == nullptr || layoutQueryOptional[0] == '\0') ? layoutQueryDefault : layoutQueryOptional;
     const int64_t poolBlockSizeNorm = (poolBlockSize <= 0) ? 128 : poolBlockSize;
     const aclnnStatus ret = aclnnInnerMsaIndexScoreGetWorkspaceSize(
-        query, key, blockTableOptional, scaleOptional, attenMaskOptional, actualSeqQlenOptional, actualSeqKlenOptional,
-        startLoc, layoutKeyOptional, sparseMode, initBlocks, localBlocks, layoutQuery, poolBlockSizeNorm, score,
-        workspaceSize, executor);
+        query, key, startLoc, blockTableOptional, queryScaleOptional, keyScaleOptional, attenMaskOptional,
+        actualSeqQlenOptional, actualSeqKlenOptional, layoutKeyOptional, sparseMode, initBlocks, localBlocks,
+        layoutQuery, poolBlockSizeNorm, 0, 16, compressFactor, score, nullptr, nullptr, workspaceSize, executor);
     return ret;
 }
 

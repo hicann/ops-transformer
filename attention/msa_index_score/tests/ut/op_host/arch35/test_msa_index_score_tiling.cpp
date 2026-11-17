@@ -93,6 +93,13 @@ struct MsaTilingSpec {
     int64_t sparseMode{0};
     int64_t initBlocks{0};
     int64_t localBlocks{1};
+    int64_t returnChoice{0};
+    int64_t topk{16};
+    bool hasScore{true};
+    bool hasIndices{false};
+    bool hasValues{false};
+    std::vector<int64_t> indicesShape{};
+    std::vector<int64_t> valuesShape{};
 };
 
 gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocParam& soc, void* compileInfo)
@@ -100,7 +107,9 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
     std::vector<gert::TilingContextPara::TensorDescription> inputs;
     inputs.push_back(Present(spec.queryShape, spec.queryDtype));
     inputs.push_back(Present(spec.keyShape, spec.keyDtype));
+    inputs.push_back(spec.startLocShape.empty() ? Absent(ge::DT_INT32) : Present(spec.startLocShape, ge::DT_INT32));
     inputs.push_back(spec.hasBlockTable ? Present(spec.blockTableShape, ge::DT_INT32) : Absent(ge::DT_INT32));
+    inputs.push_back(Absent(ge::DT_FLOAT)); // query_scale，当前预留
     inputs.push_back(spec.hasScale ? Present(spec.scaleShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
     inputs.push_back(spec.hasMask ? Present({2048, 2048}, ge::DT_INT8) : Absent(ge::DT_INT8));
     inputs.push_back(spec.qlenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.qlenShape, ge::DT_INT32));
@@ -111,10 +120,11 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
                                                        true, const_cast<int32_t*>(spec.klenData.data()));
     }
     inputs.push_back(klenDesc);
-    inputs.push_back(spec.startLocShape.empty() ? Absent(ge::DT_INT32) : Present(spec.startLocShape, ge::DT_INT32));
 
     std::vector<gert::TilingContextPara::TensorDescription> outputs;
-    outputs.push_back(Present(spec.scoreShape, ge::DT_FLOAT));
+    outputs.push_back(spec.hasScore ? Present(spec.scoreShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
+    outputs.push_back(spec.hasIndices ? Present(spec.indicesShape, ge::DT_INT32) : Absent(ge::DT_INT32));
+    outputs.push_back(spec.hasValues ? Present(spec.valuesShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
 
     std::vector<gert::TilingContextPara::OpAttr> attrs = {
         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>(spec.layout)},
@@ -122,7 +132,9 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
         {"init_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.initBlocks)},
         {"local_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.localBlocks)},
         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>(spec.layoutQuery)},
-        {"pool_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.poolBlockSize)}};
+        {"pool_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.poolBlockSize)},
+        {"return_choice", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.returnChoice)},
+        {"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.topk)}};
 
     return gert::TilingContextPara("MsaIndexScore", inputs, outputs, attrs, compileInfo, soc.socVersion, soc.coreNum,
                                    soc.ubSize, MSA_TILING_CAP);
@@ -447,5 +459,61 @@ TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_hifloat8_rejected)
     MsaTilingSpec spec;
     spec.queryDtype = ge::DT_HIFLOAT8;
     spec.keyDtype = ge::DT_HIFLOAT8;
+    RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_bf16_topk_indices_and_values)
+{
+    MsaTilingSpec spec;
+    spec.queryDtype = ge::DT_BF16;
+    spec.keyDtype = ge::DT_BF16;
+    spec.sparseMode = 3;
+    spec.hasMask = true;
+    spec.returnChoice = 2;
+    spec.topk = 16;
+    spec.hasScore = false;
+    spec.hasIndices = true;
+    spec.hasValues = true;
+    spec.indicesShape = {8, 32, 16};
+    spec.valuesShape = {8, 32, 16};
+    RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, 9);
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_fp8_e4m3_topk_indices)
+{
+    MsaTilingSpec spec;
+    spec.queryDtype = ge::DT_FLOAT8_E4M3FN;
+    spec.keyDtype = ge::DT_FLOAT8_E4M3FN;
+    spec.returnChoice = 1;
+    spec.topk = 32;
+    spec.hasScore = false;
+    spec.hasIndices = true;
+    spec.indicesShape = {8, 32, 32};
+    RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, 12);
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_topk_pool16_rejected)
+{
+    MsaTilingSpec spec;
+    spec.returnChoice = 1;
+    spec.poolBlockSize = 16;
+    spec.hasScore = false;
+    spec.hasIndices = true;
+    spec.indicesShape = {1, 32, 16};
+    RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_topk_out_of_range_rejected)
+{
+    MsaTilingSpec spec;
+    spec.returnChoice = 3;
+    RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
+    spec.returnChoice = 1;
+    spec.topk = 0;
+    spec.hasScore = false;
+    spec.hasIndices = true;
+    spec.indicesShape = {8, 32, 16};
+    RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
+    spec.topk = 129;
     RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
 }

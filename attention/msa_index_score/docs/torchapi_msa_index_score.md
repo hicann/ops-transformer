@@ -30,12 +30,27 @@ $$
 score = Maxpool[(scale\cdot)Q_{idx}@K_{idx}^{T}+atten\_mask]+local\_mask
 $$
 
+`return_choice=0`时只返回上面的`score`。`return_choice`为1或2时，对每个$(h,t)$在有效列上继续取TopK。`sparse_mode=3`时$visibleEnd=\mathrm{clamp}(kv-q+t_{off}+1,0,kv)$，`sparse_mode=0`时$visibleEnd=kv$。$BlockCap$在PageAttention下取`block_table`宽度与逻辑块上限的较小值，否则为逻辑块上限。
+
+$$
+validBlocks=\min(\lceil visibleEnd/128\rceil,BlockCap),\quad m=\min(topk,validBlocks),\quad tailStart=\lfloor validBlocks/1024\rfloor\times 1024
+$$
+
+在列号$[0,validBlocks)$中取$m$个下标。分数更高者优先，分数相同则列号更小者优先。这只决定入选集合。写出时不按分数排序：列号小于$tailStart$的入选列按列号从小到大，列号不小于$tailStart$的入选列接在后面并按列号从小到大。记排好的第$j$个列号为$I_j$。
+
+$$
+sparse\_indices[h,t,j]=\begin{cases}I_j&j<m\\-1&j\ge m\end{cases},\quad sparse\_values[h,t,j]=\begin{cases}score[h,t,I_j]&j<m\\-\infty&j\ge m\end{cases}
+$$
+
+`return_choice=1`时不返回`sparse_values`。`validBlocks=0`时各槽为$-1$和$-\infty$。
+
 - **主要计算过程**：
 
   1. 将每个query token的$Q_{idx}$与KV sparse block内因果可见的$K_{idx}$做矩阵乘，得到token级相关性。
   2. 按`sparse_mode`叠加$atten\_mask$：`sparse_mode=0`不做因果截断，`sparse_mode=3`按rightDownCausal屏蔽不可见位置。
   3. 在每个长度为$block\_size$的sparse block上做Maxpool，得到逐block的重要性分数。
-  4. 用`start_loc`、`init_blocks`、`local_blocks`生成$local\_mask$，对强制保留的block写入高分，得到输出`score`。本接口不包含TopK。
+  4. 用`start_loc`、`init_blocks`、`local_blocks`生成$local\_mask$，对强制保留的block写入高分，得到输出`score`。
+  5. `return_choice`为1或2时做TopK。前缀列号从小到大写出，尾块列号接在后面。尾块是有效列数按1024取余。不足k的索引为-1，值为`-inf`。仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK后的结果。
 
 ## 函数原型
 
@@ -46,7 +61,8 @@ cann_ops_transformer.msa_index_score(
     start_loc,
     *,
     block_table=None,
-    scale=None,
+    query_scale=None,
+    key_scale=None,
     atten_mask=None,
     actual_seq_qlen=None,
     actual_seq_klen=None,
@@ -54,7 +70,10 @@ cann_ops_transformer.msa_index_score(
     sparse_mode=3,
     init_blocks=0,
     local_blocks=1,
-) -> Tensor
+    return_choice=0,
+    topk=16,
+    compress_factor=1,
+)
 ```
 
 ## 参数说明
@@ -65,7 +84,8 @@ cann_ops_transformer.msa_index_score(
 | key | 必选 | $K_{idx}$。PA允许dim0非连续 | 与query同型。 | `[NP,P,N2,D]` / `[NP,N2,P,D]` / `[T2,N2,D]` / `[B,S2,N2,D]` / `[B,N2,S2,D]` |
 | start_loc | 必选 | query所在逻辑block | int32 | `[B]` |
 | block_table | PA必选 | 逻辑block到物理page。TND / BSND / BNSD不传 | int32 | `[B,MB]` |
-| scale | 可选 | 非量化与FP8不传 | float32 | - |
+| query_scale | 可选 | query量化系数。预留，须为None | float32 | - |
+| key_scale | 可选 | key反量化系数。非量化与FP8不传 | float32 | - |
 | atten_mask | mode=3必选 | 因果模板 | int8 | `[2048,2048]` |
 | actual_seq_qlen | 必选 | query前缀和 | int32 | `[B+1]` |
 | actual_seq_klen | 必选 | PA为各请求可见长度；TND / BSND / BNSD为前缀和 | int32 | `[B]` / `[B+1]` |
@@ -73,6 +93,7 @@ cann_ops_transformer.msa_index_score(
 | sparse_mode | 可选 | 0或3，默认3 | int | - |
 | init_blocks | 可选 | `local_mask`头部强制块数，默认0 | int | - |
 | local_blocks | 可选 | `local_mask`局部窗口，默认1 | int | - |
+| compress_factor | 可选 | key压缩倍数，默认1。当前只支持1 | int | - |
 
 <!-- npu="A3,910b" id8 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
@@ -81,19 +102,22 @@ cann_ops_transformer.msa_index_score(
 <!-- npu="950" id7 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
     - query、key：数据类型除fp16/bf16外，还支持float8_e4m3fn / float8_e5m2。
+- 原型预留但当前会拒绝：A2/A3的float16 score/values、int8 query+int8 key；950的float4_e2m1（scale为float8_e8m0）、bf16/fp16的float16输出，以及float8_e4m3fn query配float4_e2m1 key。
 <!-- end id7 -->
 
 ## 返回值说明
 
 | 返回值 | dtype | shape |
 | --- | --- | --- |
-| score | float32 | `[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]` |
+| score（`return_choice=0`） | float32 | `[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]` |
+| sparse_indices（`return_choice=1`或`2`） | int32 | `[N1, T1, topk]` |
+| sparse_values（`return_choice=2`） | float32 | `[N1, T1, topk]` |
 
 ## 约束说明
 
 - query固定TND，逻辑块长128。BSND / BNSD的$S2$是定长槽，`actual_seq_klen[b+1] - actual_seq_klen[b]`不超过$S2$，且不传`block_table`。
 - `q_len` / `kv_len`允许为0。空KV的score为`-inf`。
-- 本接口不包含TopK。
+- `return_choice`默认0，返回score。为1时返回`sparse_indices`，为2时返回`(sparse_indices, sparse_values)`。`topk`默认16，范围1到128。仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK后的结果。
 
 ## 确定性计算
 

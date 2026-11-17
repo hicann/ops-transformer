@@ -102,6 +102,29 @@ inline bool IsOptionalProvided(const gert::StorageShape* shape)
     return shape != nullptr && shape->GetStorageShape().GetDimNum() > 0;
 }
 
+// 可选输出未实例化时，运行时下标会前移。按 IR 下标取实例起点。
+struct MsaIrOutput {
+    const gert::StorageShape* shape = nullptr;
+    const gert::CompileTimeTensorDesc* desc = nullptr;
+};
+
+inline MsaIrOutput IrOutputAt(gert::TilingContext* context, size_t irIndex)
+{
+    MsaIrOutput out;
+    const auto* node = context->GetComputeNodeInfo();
+    if (node == nullptr || irIndex >= node->GetIrOutputsNum()) {
+        return out;
+    }
+    const auto* inst = node->GetOutputInstanceInfo(irIndex);
+    if (inst == nullptr || inst->GetInstanceNum() == 0U) {
+        return out;
+    }
+    const size_t runtime = inst->GetInstanceStart();
+    out.shape = context->GetOutputShape(runtime);
+    out.desc = context->GetOutputDesc(runtime);
+    return out;
+}
+
 // 分页逻辑块数是页表宽度；非分页没有页表，上界是 score 末维。
 // score 末维是对齐后的输出宽度，分页时只作不超过已分配 score 的钳位。
 inline uint32_t LogicalBlockLimit(const MsaIndexScoreInfo& info)
@@ -503,6 +526,45 @@ ge::graphStatus ParseLayoutQueryAttr(gert::TilingContext* context, const char* l
     return ge::GRAPH_SUCCESS;
 }
 
+// return_choice!=0 时没有用户 score。末维与 InferShape 相同：逻辑块数 16 对齐。
+uint32_t DeriveAlignedMaxBlocks(gert::TilingContext* context, const MsaIndexScoreInfo& info)
+{
+    uint32_t raw = 0;
+    const uint32_t pool = (info.poolBlockSize == 0U) ? MSA_BLOCK_SIZE : info.poolBlockSize;
+    if (MsaIsPaKeyLayout(info.keyLayout)) {
+        raw = info.tableWidth;
+    } else {
+        const gert::Tensor* klenTensor = context->GetOptionalInputTensor(MSA_IDX_ACTUAL_SEQ_KLEN);
+        const int32_t* klenData = nullptr;
+        if (IsHostVisibleTensor(klenTensor)) {
+            klenData = klenTensor->GetData<int32_t>();
+        }
+        if (klenData != nullptr && info.batch > 0U) {
+            for (uint32_t b = 0; b < info.batch; ++b) {
+                int32_t kv = klenData[b + 1U] - klenData[b];
+                if (kv < 0) {
+                    kv = 0;
+                }
+                if (info.kMaxSeq > 0U && static_cast<uint32_t>(kv) > info.kMaxSeq) {
+                    kv = static_cast<int32_t>(info.kMaxSeq);
+                }
+                const uint32_t blocks = (kv <= 0) ? 0U : (static_cast<uint32_t>(kv) + pool - 1U) / pool;
+                if (blocks > raw) {
+                    raw = blocks;
+                }
+            }
+        } else if (info.keyLayout == MSA_KEY_LAYOUT_TND) {
+            raw = (pool == 0U) ? 0U : (info.totalK + pool - 1U) / pool;
+        } else {
+            raw = (pool == 0U) ? 0U : (info.kMaxSeq + pool - 1U) / pool;
+        }
+    }
+    if (raw == 0U) {
+        raw = 1U;
+    }
+    return RoundUpU32(raw, MSA_SCORE_STRIDE_ALIGN);
+}
+
 ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& info)
 {
     info.platformInfo = context->GetPlatformInfo();
@@ -521,7 +583,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     const gert::StorageShape* actualSeqKlenShape = context->GetOptionalInputShape(MSA_IDX_ACTUAL_SEQ_KLEN);
     OP_CHECK_IF(!IsOptionalProvided(actualSeqKlenShape), OP_LOGE(context, "actual_seq_klen is required."),
                 return ge::GRAPH_FAILED);
-    // start_loc 是 REQUIRED，但排在 block_table/scale/atten_mask 等 OPTIONAL 之后。
+    // start_loc 是必选输入，排在 query、key 之后。
     const gert::StorageShape* startLocShape = context->GetRequiredInputShape(MSA_IDX_START_LOC);
     OP_CHECK_NULL_WITH_CONTEXT(context, startLocShape);
 
@@ -559,6 +621,33 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     OP_CHECK_IF(poolBlockSizeAttr != MSA_BLOCK_SIZE && poolBlockSizeAttr != MSA_BLOCK16_SIZE,
                 OP_LOGE(context, "pool_block_size must be %u or %u, got %u.", MSA_BLOCK_SIZE, MSA_BLOCK16_SIZE,
                         poolBlockSizeAttr),
+                return ge::GRAPH_FAILED);
+    const int64_t* returnChoicePtr = attrs->GetInt(MSA_ATTR_RETURN_CHOICE);
+    const int64_t returnChoice = (returnChoicePtr == nullptr) ? 0 : *returnChoicePtr;
+    OP_CHECK_IF(returnChoice != static_cast<int64_t>(MSA_RETURN_SCORE) &&
+                    returnChoice != static_cast<int64_t>(MSA_RETURN_INDICES) &&
+                    returnChoice != static_cast<int64_t>(MSA_RETURN_INDICES_VALUES),
+                OP_LOGE(context, "return_choice must be 0, 1 or 2, got %ld.", returnChoice), return ge::GRAPH_FAILED);
+    info.returnChoice = static_cast<uint32_t>(returnChoice);
+    if (info.returnChoice == MSA_RETURN_SCORE) {
+        info.topk = 0;
+    } else {
+        OP_CHECK_IF(!info.isAscend950,
+                    OP_LOGE(context, "return_choice=%ld is only supported on Ascend 950.", returnChoice),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(poolBlockSizeAttr == MSA_BLOCK16_SIZE,
+                    OP_LOGE(context, "return_choice=%ld does not support pool_block_size=16.", returnChoice),
+                    return ge::GRAPH_FAILED);
+        const int64_t* topkPtr = attrs->GetInt(MSA_ATTR_TOPK);
+        const int64_t topkVal = (topkPtr == nullptr) ? static_cast<int64_t>(MSA_TOPK_DEFAULT) : *topkPtr;
+        OP_CHECK_IF(topkVal < 1 || topkVal > static_cast<int64_t>(MSA_TOPK_MAX),
+                    OP_LOGE(context, "topk must be in [1, 128], got %ld.", topkVal), return ge::GRAPH_FAILED);
+        info.topk = static_cast<uint32_t>(topkVal);
+    }
+    // compress_factor 只做接口预留。1 为不压缩，计算路径与原先一致。
+    const int64_t* compressFactorPtr = attrs->GetInt(MSA_ATTR_COMPRESS_FACTOR);
+    const int64_t compressFactor = (compressFactorPtr == nullptr) ? 1 : *compressFactorPtr;
+    OP_CHECK_IF(compressFactor != 1, OP_LOGE(context, "compress_factor only supports 1, got %ld.", compressFactor),
                 return ge::GRAPH_FAILED);
     const bool batchKey128 = (info.keyLayout == MSA_KEY_LAYOUT_BSND || info.keyLayout == MSA_KEY_LAYOUT_BNSD) &&
                              poolBlockSizeAttr == MSA_BLOCK_SIZE;
@@ -619,31 +708,36 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 }
             }
         }
-        // score 的 T1 决定 head 步长。调用方按 actual_seq_qlen 末值分配时，不能再用 B*S。
-        const gert::StorageShape* scoreShapeEarly = context->GetOutputShape(0);
-        OP_CHECK_NULL_WITH_CONTEXT(context, scoreShapeEarly);
-        const gert::Shape& scoreEarly = scoreShapeEarly->GetStorageShape();
-        OP_CHECK_IF(scoreEarly.GetDimNum() != MSA_QUERY_DIM_NUM, OP_LOGE(context, "score must be 3D [N1,T1,stride]."),
-                    return ge::GRAPH_FAILED);
-        // pool_block_size=16 的 head 间 max 把 score 收到 1 个 head；块长 128 仍是每个 query head 一份。
-        const uint32_t expectScoreHeads = (poolBlockSizeAttr == MSA_BLOCK16_SIZE) ? 1U : info.numQHeads;
-        OP_CHECK_IF(static_cast<uint32_t>(scoreEarly.GetDim(MSA_DIM_0)) != expectScoreHeads,
-                    OP_LOGE(context, "score head dim(%ld) must be %u.", scoreEarly.GetDim(MSA_DIM_0), expectScoreHeads),
-                    return ge::GRAPH_FAILED);
-        const int64_t scoreTokens = scoreEarly.GetDim(MSA_DIM_1);
-        OP_CHECK_IF(scoreTokens < 0, OP_LOGE(context, "score T1 must be concrete, got %ld.", scoreTokens),
-                    return ge::GRAPH_FAILED);
-        if (qPrefixApplied) {
-            OP_CHECK_IF(
-                static_cast<uint32_t>(scoreTokens) != info.totalQ,
-                OP_LOGE(context, "score T1(%ld) must equal actual_seq_qlen prefix(%u).", scoreTokens, info.totalQ),
-                return ge::GRAPH_FAILED);
+        // score 的 T1 决定 head 步长。return_choice!=0 时没有 score，totalQ 保持前缀和或 B*S。
+        if (info.returnChoice != MSA_RETURN_SCORE) {
+            // 非 TND query 的 TopK 仍用上面算好的 totalQ。
         } else {
-            const uint32_t cap = info.batch * info.qMaxSeq;
-            OP_CHECK_IF(static_cast<uint32_t>(scoreTokens) > cap,
-                        OP_LOGE(context, "score T1(%ld) exceeds batch*S(%u).", scoreTokens, cap),
+            const gert::StorageShape* scoreShapeEarly = context->GetOutputShape(0);
+            OP_CHECK_NULL_WITH_CONTEXT(context, scoreShapeEarly);
+            const gert::Shape& scoreEarly = scoreShapeEarly->GetStorageShape();
+            OP_CHECK_IF(scoreEarly.GetDimNum() != MSA_QUERY_DIM_NUM,
+                        OP_LOGE(context, "score must be 3D [N1,T1,stride]."), return ge::GRAPH_FAILED);
+            // pool_block_size=16 的 head 间 max 把 score 收到 1 个 head；块长 128 仍是每个 query head 一份。
+            const uint32_t expectScoreHeads = (poolBlockSizeAttr == MSA_BLOCK16_SIZE) ? 1U : info.numQHeads;
+            OP_CHECK_IF(
+                static_cast<uint32_t>(scoreEarly.GetDim(MSA_DIM_0)) != expectScoreHeads,
+                OP_LOGE(context, "score head dim(%ld) must be %u.", scoreEarly.GetDim(MSA_DIM_0), expectScoreHeads),
+                return ge::GRAPH_FAILED);
+            const int64_t scoreTokens = scoreEarly.GetDim(MSA_DIM_1);
+            OP_CHECK_IF(scoreTokens < 0, OP_LOGE(context, "score T1 must be concrete, got %ld.", scoreTokens),
                         return ge::GRAPH_FAILED);
-            info.totalQ = static_cast<uint32_t>(scoreTokens);
+            if (qPrefixApplied) {
+                OP_CHECK_IF(
+                    static_cast<uint32_t>(scoreTokens) != info.totalQ,
+                    OP_LOGE(context, "score T1(%ld) must equal actual_seq_qlen prefix(%u).", scoreTokens, info.totalQ),
+                    return ge::GRAPH_FAILED);
+            } else {
+                const uint32_t cap = info.batch * info.qMaxSeq;
+                OP_CHECK_IF(static_cast<uint32_t>(scoreTokens) > cap,
+                            OP_LOGE(context, "score T1(%ld) exceeds batch*S(%u).", scoreTokens, cap),
+                            return ge::GRAPH_FAILED);
+                info.totalQ = static_cast<uint32_t>(scoreTokens);
+            }
         }
     }
     // 块长 16 的 BSND/BNSD（及 query BSND/BNSD）仅 950。非 V2 的 pool=128 key BSND/BNSD 不在此列。
@@ -757,19 +851,79 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                     OP_LOGE(context, "PA actual_seq_klen must be [B] visible S2."), return ge::GRAPH_FAILED);
     }
 
-    // score 末维 = 打分块数（16 对齐），步长与核内循环界统一取自调用方分配的输出。
-    const gert::StorageShape* scoreShape = context->GetOutputShape(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, scoreShape);
-    const gert::Shape& scOut = scoreShape->GetStorageShape();
-    OP_CHECK_IF(scOut.GetDimNum() != MSA_QUERY_DIM_NUM, OP_LOGE(context, "score must be 3D [N1,T1,stride]."),
-                return ge::GRAPH_FAILED);
-    info.maxBlocksPerBatch = static_cast<uint32_t>(scOut.GetDim(MSA_DIM_2));
-    OP_CHECK_IF(info.maxBlocksPerBatch == 0, OP_LOGE(context, "score last dim must be positive."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF((info.maxBlocksPerBatch % MSA_SCORE_STRIDE_ALIGN) != 0,
-                OP_LOGE(context, "score last dim(%u) must be a multiple of %u.", info.maxBlocksPerBatch,
-                        MSA_SCORE_STRIDE_ALIGN),
-                return ge::GRAPH_FAILED);
+    // score 末维 = 打分块数（16 对齐）。return_choice=0 时取自用户 score；否则按输入推导，与 InferShape 一致。
+    const MsaIrOutput scoreOutIr = IrOutputAt(context, 0);
+    const MsaIrOutput indicesOutIr = IrOutputAt(context, 1);
+    const MsaIrOutput valuesOutIr = IrOutputAt(context, 2);
+    const gert::StorageShape* scoreShape = scoreOutIr.shape;
+    const gert::StorageShape* indicesShape = indicesOutIr.shape;
+    const gert::StorageShape* valuesShape = valuesOutIr.shape;
+    const bool hasScore = IsOptionalProvided(scoreShape);
+    const bool hasIndices = IsOptionalProvided(indicesShape);
+    const bool hasValues = IsOptionalProvided(valuesShape);
+    if (info.returnChoice == MSA_RETURN_SCORE) {
+        OP_CHECK_IF(!hasScore, OP_LOGE(context, "outputs do not match return_choice=%u.", info.returnChoice),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(hasIndices || hasValues,
+                    OP_LOGE(context, "outputs do not match return_choice=%u.", info.returnChoice),
+                    return ge::GRAPH_FAILED);
+        const gert::Shape& scOut = scoreShape->GetStorageShape();
+        OP_CHECK_IF(scOut.GetDimNum() != MSA_QUERY_DIM_NUM, OP_LOGE(context, "score must be 3D [N1,T1,stride]."),
+                    return ge::GRAPH_FAILED);
+        info.maxBlocksPerBatch = static_cast<uint32_t>(scOut.GetDim(MSA_DIM_2));
+        OP_CHECK_IF(info.maxBlocksPerBatch == 0, OP_LOGE(context, "score last dim must be positive."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF((info.maxBlocksPerBatch % MSA_SCORE_STRIDE_ALIGN) != 0,
+                    OP_LOGE(context, "score last dim(%u) must be a multiple of %u.", info.maxBlocksPerBatch,
+                            MSA_SCORE_STRIDE_ALIGN),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_NULL_WITH_CONTEXT(context, scoreOutIr.desc);
+        OP_CHECK_IF(scoreOutIr.desc->GetDataType() != ge::DT_FLOAT,
+                    OP_LOGE(context, "fp16 score is reserved and not supported."), return ge::GRAPH_FAILED);
+    } else {
+        const bool outputsOk = !hasScore && hasIndices &&
+                               ((info.returnChoice == MSA_RETURN_INDICES && !hasValues) ||
+                                (info.returnChoice == MSA_RETURN_INDICES_VALUES && hasValues));
+        if (!outputsOk) {
+            OP_LOGE(context, "outputs do not match return_choice=%u.", info.returnChoice);
+            return ge::GRAPH_FAILED;
+        }
+        const gert::Shape& idxOut = indicesShape->GetStorageShape();
+        const auto* idxDesc = indicesOutIr.desc;
+        OP_CHECK_NULL_WITH_CONTEXT(context, idxDesc);
+        const bool idxOk =
+            idxOut.GetDimNum() == MSA_QUERY_DIM_NUM && idxDesc->GetDataType() == ge::DT_INT32 &&
+            static_cast<ge::Format>(ge::GetPrimaryFormat(idxDesc->GetStorageFormat())) == ge::FORMAT_ND &&
+            static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_0)) == info.numQHeads &&
+            static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_1)) == info.totalQ &&
+            static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_2)) == info.topk;
+        if (!idxOk) {
+            const int dtype = (idxDesc == nullptr) ? -1 : static_cast<int>(idxDesc->GetDataType());
+            const int fmt =
+                (idxDesc == nullptr) ? -1 : static_cast<int>(ge::GetPrimaryFormat(idxDesc->GetStorageFormat()));
+            OP_LOGE(context,
+                    "sparse_indices must be [N1, T1, topk] int32 ND, got rank=%zu dims=[%ld,%ld,%ld] dtype=%d "
+                    "format=%d heads=%u totalQ=%u topk=%u.",
+                    idxOut.GetDimNum(), idxOut.GetDimNum() > 0 ? idxOut.GetDim(0) : -1,
+                    idxOut.GetDimNum() > 1 ? idxOut.GetDim(1) : -1, idxOut.GetDimNum() > 2 ? idxOut.GetDim(2) : -1,
+                    dtype, fmt, info.numQHeads, info.totalQ, info.topk);
+            return ge::GRAPH_FAILED;
+        }
+        if (info.returnChoice == MSA_RETURN_INDICES_VALUES) {
+            const gert::Shape& valOut = valuesShape->GetStorageShape();
+            const auto* valDesc = valuesOutIr.desc;
+            OP_CHECK_NULL_WITH_CONTEXT(context, valDesc);
+            const bool valOk = valDesc->GetDataType() == ge::DT_FLOAT && valOut.GetDimNum() == idxOut.GetDimNum() &&
+                               valOut.GetDim(MSA_DIM_0) == idxOut.GetDim(MSA_DIM_0) &&
+                               valOut.GetDim(MSA_DIM_1) == idxOut.GetDim(MSA_DIM_1) &&
+                               valOut.GetDim(MSA_DIM_2) == idxOut.GetDim(MSA_DIM_2);
+            OP_CHECK_IF(!valOk,
+                        OP_LOGE(context, "sparse_values must match sparse_indices and be float32. fp16 values are "
+                                         "reserved and not supported."),
+                        return ge::GRAPH_FAILED);
+        }
+        info.maxBlocksPerBatch = DeriveAlignedMaxBlocks(context, info);
+    }
     // 块长 16：TND 16、BSND/BNSD，以及 BBND/BNBD 页长 16，仅 Ascend 950。
     // 取值白名单与 BSND/BNSD 组合已在 attr 解析处校验，PA 页长已与 attr 交叉校验。
     const bool logicalBlock16 = info.poolBlockSize == MSA_BLOCK16_SIZE;
@@ -806,7 +960,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     info.queryDtype = queryDesc->GetDataType();
     OP_CHECK_IF(!IsNonQuantQueryDtype(info.queryDtype, info.isAscend950),
                 OP_LOGE(context, "query dtype must be bf16 or fp16 on A2/A3; Ascend 950 also allows hifloat8 / "
-                                 "float8_e5m2 / float8_e4m3fn."),
+                                 "float8_e5m2 / float8_e4m3fn. int8 query and float4 are reserved."),
                 return ge::GRAPH_FAILED);
 
     info.isQuant = (info.keyDtype == ge::DT_INT8);
@@ -839,7 +993,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                     OP_LOGE(context, "FP8 query/key is only supported on Ascend 950."), return ge::GRAPH_FAILED);
     }
 
-    const gert::StorageShape* scaleShape = context->GetOptionalInputShape(MSA_IDX_SCALE);
+    const gert::StorageShape* scaleShape = context->GetOptionalInputShape(MSA_IDX_KEY_SCALE);
     if (info.isQuant) {
         OP_CHECK_IF(!IsOptionalProvided(scaleShape), OP_LOGE(context, "int8 key requires dequant scale."),
                     return ge::GRAPH_FAILED);
@@ -866,14 +1020,17 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                                 sc.GetDim(MSA_DIM_1), sc.GetDim(MSA_DIM_2)),
                         return ge::GRAPH_FAILED);
         }
-        const auto* scaleDesc = context->GetOptionalInputDesc(MSA_IDX_SCALE);
+        const auto* scaleDesc = context->GetOptionalInputDesc(MSA_IDX_KEY_SCALE);
         OP_CHECK_NULL_WITH_CONTEXT(context, scaleDesc);
         OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT, OP_LOGE(context, "dequant scale dtype must be float32."),
                     return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(IsOptionalProvided(scaleShape), OP_LOGE(context, "non-quant path must not pass scale."),
+        OP_CHECK_IF(IsOptionalProvided(scaleShape), OP_LOGE(context, "non-quant path must not pass key_scale."),
                     return ge::GRAPH_FAILED);
     }
+    const gert::StorageShape* queryScaleShape = context->GetOptionalInputShape(MSA_IDX_QUERY_SCALE);
+    OP_CHECK_IF(IsOptionalProvided(queryScaleShape), OP_LOGE(context, "query_scale is reserved and not supported."),
+                return ge::GRAPH_FAILED);
 
     const int64_t* sparseModeAttr = attrs->GetInt(MSA_ATTR_SPARSE_MODE);
     info.sparseMode = (sparseModeAttr == nullptr) ? MSA_SPARSE_MODE_RIGHT_DOWN : static_cast<uint32_t>(*sparseModeAttr);
@@ -1023,6 +1180,24 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     tilingData.set_strideOutToken(scoreBlockStride);
     tilingData.set_kScratchOffsetElems(kScratchOffsetElems);
 
+    size_t userBytes =
+        static_cast<size_t>(sWsBytes) + static_cast<size_t>(kScratchBytes) + static_cast<size_t>(qScratchBytes);
+    if (info.isAscend950 && sWsBytes == 0U && kScratchBytes == 0U) {
+        userBytes += 64U;
+    }
+    uint32_t scoreWorkspaceElems = 0;
+    size_t scoreBytes = 0;
+    if (info.returnChoice != MSA_RETURN_SCORE) {
+        const size_t aligned = (userBytes + 255U) & ~static_cast<size_t>(255U);
+        scoreWorkspaceElems = static_cast<uint32_t>(aligned / sizeof(float));
+        scoreBytes = static_cast<size_t>(info.numQHeads) * static_cast<size_t>(info.totalQ) *
+                     static_cast<size_t>(scoreBlockStride) * sizeof(float);
+        userBytes = aligned + scoreBytes;
+    }
+    tilingData.set_returnChoice(info.returnChoice);
+    tilingData.set_topk(info.topk);
+    tilingData.set_scoreWorkspaceElems(scoreWorkspaceElems);
+
     tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
 
@@ -1043,12 +1218,7 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
 
     size_t* workspaces = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);
-    workspaces[0] = ascendcPlatform.GetLibApiWorkSpaceSize() + static_cast<size_t>(sWsBytes) +
-                    static_cast<size_t>(kScratchBytes) + static_cast<size_t>(qScratchBytes);
-    // 非量化 PA 无 S GM / K scratch 时 user workspace 为 0，GetUserWorkspace 可能返回 nullptr。
-    if (info.isAscend950 && sWsBytes == 0U && kScratchBytes == 0U) {
-        workspaces[0] += 64U;
-    }
+    workspaces[0] = ascendcPlatform.GetLibApiWorkSpaceSize() + userBytes;
 
     uint64_t tilingKey = MSA_TILING_KEY_FP16;
     if (info.poolBlockSize == MSA_BLOCK16_SIZE) {
@@ -1064,6 +1234,20 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
         tilingKey = MSA_TILING_KEY_FP8_E4M3FN;
     } else {
         tilingKey = (info.queryDtype == ge::DT_BF16) ? MSA_TILING_KEY_BF16 : MSA_TILING_KEY_FP16;
+    }
+    if (info.returnChoice != MSA_RETURN_SCORE) {
+        if (info.queryDtype == ge::DT_BF16) {
+            tilingKey = MSA_TILING_KEY_BF16_TOPK;
+        } else if (info.queryDtype == ge::DT_FLOAT16) {
+            tilingKey = MSA_TILING_KEY_FP16_TOPK;
+        } else if (info.queryDtype == ge::DT_FLOAT8_E5M2) {
+            tilingKey = MSA_TILING_KEY_FP8_E5M2_TOPK;
+        } else if (info.queryDtype == ge::DT_FLOAT8_E4M3FN) {
+            tilingKey = MSA_TILING_KEY_FP8_E4M3FN_TOPK;
+        } else {
+            OP_LOGE(context, "return_choice=%u does not support this dtype.", info.returnChoice);
+            return ge::GRAPH_FAILED;
+        }
     }
     context->SetTilingKey(tilingKey);
     OP_LOGI(context->GetNodeName(),

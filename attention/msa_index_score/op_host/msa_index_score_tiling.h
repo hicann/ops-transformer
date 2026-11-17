@@ -27,12 +27,13 @@ namespace optiling {
 // 与 op_def 入参顺序一致
 constexpr uint32_t MSA_IDX_QUERY = 0;
 constexpr uint32_t MSA_IDX_KEY = 1;
-constexpr uint32_t MSA_IDX_BLOCK_TABLE = 2;
-constexpr uint32_t MSA_IDX_SCALE = 3;
-constexpr uint32_t MSA_IDX_ATTEN_MASK = 4;
-constexpr uint32_t MSA_IDX_ACTUAL_SEQ_QLEN = 5;
-constexpr uint32_t MSA_IDX_ACTUAL_SEQ_KLEN = 6;
-constexpr uint32_t MSA_IDX_START_LOC = 7;
+constexpr uint32_t MSA_IDX_START_LOC = 2;
+constexpr uint32_t MSA_IDX_BLOCK_TABLE = 3;
+constexpr uint32_t MSA_IDX_QUERY_SCALE = 4;
+constexpr uint32_t MSA_IDX_KEY_SCALE = 5;
+constexpr uint32_t MSA_IDX_ATTEN_MASK = 6;
+constexpr uint32_t MSA_IDX_ACTUAL_SEQ_QLEN = 7;
+constexpr uint32_t MSA_IDX_ACTUAL_SEQ_KLEN = 8;
 
 constexpr uint32_t MSA_ATTR_LAYOUT_KEY = 0;
 constexpr uint32_t MSA_ATTR_SPARSE_MODE = 1;
@@ -40,6 +41,9 @@ constexpr uint32_t MSA_ATTR_INIT_BLOCKS = 2;
 constexpr uint32_t MSA_ATTR_LOCAL_BLOCKS = 3;
 constexpr uint32_t MSA_ATTR_LAYOUT_QUERY = 4;
 constexpr uint32_t MSA_ATTR_POOL_BLOCK_SIZE = 5;
+constexpr uint32_t MSA_ATTR_RETURN_CHOICE = 6;
+constexpr uint32_t MSA_ATTR_TOPK = 7;
+constexpr uint32_t MSA_ATTR_COMPRESS_FACTOR = 8;
 
 BEGIN_TILING_DATA_DEF(MsaIndexScoreTilingData)
 TILING_DATA_FIELD_DEF(uint32_t, batch)
@@ -78,6 +82,9 @@ TILING_DATA_FIELD_DEF(uint32_t, queryLayout) // TND / BSND / BNSD
 TILING_DATA_FIELD_DEF(uint32_t, qMaxSeq)     // BSND/BNSD 的 S；TND 为 0
 TILING_DATA_FIELD_DEF(uint32_t, kMaxSeq)     // 非分页 BSND/BNSD 的 S；其余为 0
 TILING_DATA_FIELD_DEF(uint32_t, qScratchElems)
+TILING_DATA_FIELD_DEF(uint32_t, returnChoice)
+TILING_DATA_FIELD_DEF(uint32_t, topk)
+TILING_DATA_FIELD_DEF(uint32_t, scoreWorkspaceElems)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(MsaIndexScore, MsaIndexScoreTilingData)
 
@@ -103,6 +110,8 @@ struct MsaIndexScoreInfo {
     uint32_t totalK = 0;
     uint32_t pageSize = 0;   // PA 存储页长（key 的页维度）；顺序布局与 poolBlockSize 相同
     uint32_t tableWidth = 0; // PA 页表宽度（存储页粒度）；顺序布局为 0
+    uint32_t returnChoice = 0;
+    uint32_t topk = 0;
     bool isQuant = false;
     bool isAscend950 = false;
     ge::DataType queryDtype = ge::DT_BF16;

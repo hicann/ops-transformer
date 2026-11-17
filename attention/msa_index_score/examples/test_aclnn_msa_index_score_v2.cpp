@@ -926,8 +926,8 @@ bool RunCase(const TestCase& tc, aclrtStream stream, bool isAscend950)
     aclOpExecutor* executor = nullptr;
     void* workspaceAddr = nullptr;
     int ret = aclnnMsaIndexScoreV2GetWorkspaceSize(
-        queryT, keyT, blockTableT, scaleT, attenMaskT, actualSeqQlenT, actualSeqKlenT, startLocT, layoutKeyBuf,
-        tc.sparseMode, kInitBlocks, kLocalBlocks, layoutQueryBuf, blockLen, scoreT, &workspaceSize, &executor);
+        queryT, keyT, startLocT, blockTableT, nullptr, scaleT, attenMaskT, actualSeqQlenT, actualSeqKlenT, layoutKeyBuf,
+        tc.sparseMode, kInitBlocks, kLocalBlocks, layoutQueryBuf, blockLen, 1, scoreT, &workspaceSize, &executor);
     if (ret != ACL_SUCCESS) {
         (void)printf("  [%s] GetWorkspaceSize failed, ERROR %d -> FAIL\n", tc.name.c_str(), ret);
         return false;

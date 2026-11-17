@@ -17,6 +17,7 @@
  */
 
 #include <string>
+#include <vector>
 #include <torch/extension.h>
 #include "aclnn_common.h"
 
@@ -130,18 +131,18 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
     if (is_quant) {
         TORCH_CHECK(query.scalar_type() == at::kHalf, "int8 key requires float16 query.");
         TORCH_CHECK(scale.has_value() && scale.value().defined() && scale.value().numel() > 0,
-                    "int8 key requires dequant scale.");
-        TORCH_CHECK(scale.value().scalar_type() == at::kFloat, "scale dtype must be float32.");
+                    "int8 key requires dequant key_scale.");
+        TORCH_CHECK(scale.value().scalar_type() == at::kFloat, "key_scale dtype must be float32.");
         if (is_tnd) {
             TORCH_CHECK(scale.value().dim() == SCALE_TND_DIM || (scale.value().dim() == 1 && key.size(1) == 1),
-                        "TND scale must be [T2, N2] or [T2].");
+                        "TND key_scale must be [T2, N2] or [T2].");
         } else {
-            TORCH_CHECK(scale.value().dim() == SCALE_PA_DIM, "PA scale must be 3D [NP, N_kv, P].");
+            TORCH_CHECK(scale.value().dim() == SCALE_PA_DIM, "PA key_scale must be 3D [NP, N_kv, P].");
         }
     } else {
         TORCH_CHECK(key.scalar_type() == query.scalar_type(), "non-quant key dtype must match query.");
-        TORCH_CHECK(!scale.has_value() || !scale.value().defined(), "non-quant path must not pass scale.");
-        TORCH_CHECK(!is_fp8 || (!scale.has_value() || !scale.value().defined()), "FP8 path must not pass scale.");
+        TORCH_CHECK(!scale.has_value() || !scale.value().defined(), "non-quant path must not pass key_scale.");
+        TORCH_CHECK(!is_fp8 || (!scale.has_value() || !scale.value().defined()), "FP8 path must not pass key_scale.");
     }
     TORCH_CHECK(cu_q.scalar_type() == at::kInt, "actual_seq_qlen dtype must be int32.");
     TORCH_CHECK(kv_len.scalar_type() == at::kInt, "actual_seq_klen dtype must be int32.");
@@ -260,11 +261,13 @@ at::Tensor AllocMsaScore(const at::Tensor& query, int64_t maxBlocks)
 }
 } // namespace
 
-at::Tensor msa_index_score(const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& block_table,
-                           const c10::optional<at::Tensor>& scale, const c10::optional<at::Tensor>& atten_mask,
-                           const c10::optional<at::Tensor>& actual_seq_qlen,
-                           const c10::optional<at::Tensor>& actual_seq_klen, const at::Tensor& start_loc,
-                           c10::string_view layout_key, int64_t sparse_mode, int64_t init_blocks, int64_t local_blocks)
+std::vector<at::Tensor> msa_index_score_impl(
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& start_loc,
+    const c10::optional<at::Tensor>& block_table, const c10::optional<at::Tensor>& query_scale,
+    const c10::optional<at::Tensor>& key_scale, const c10::optional<at::Tensor>& atten_mask,
+    const c10::optional<at::Tensor>& actual_seq_qlen, const c10::optional<at::Tensor>& actual_seq_klen,
+    c10::string_view layout_key, int64_t sparse_mode, int64_t init_blocks, int64_t local_blocks, int64_t return_choice,
+    int64_t topk, int64_t compress_factor)
 {
     CheckMsaRequiredTensors(query, key, start_loc, actual_seq_qlen, actual_seq_klen);
     const std::string layoutKeyStr = ParseLayoutKey(layout_key);
@@ -273,7 +276,10 @@ at::Tensor msa_index_score(const at::Tensor& query, const at::Tensor& key, const
     const at::Tensor& cu_q = actual_seq_qlen.value();
     const at::Tensor& kv_len = actual_seq_klen.value();
     CheckMsaLayoutRanks(query, key, block_table, layoutKeyStr, is_tnd, is_batch, cu_q, kv_len, start_loc);
-    CheckMsaSparseAndDtypes(query, key, scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, is_tnd);
+    CheckMsaSparseAndDtypes(query, key, key_scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, is_tnd);
+    TORCH_CHECK(!query_scale.has_value() || !query_scale.value().defined(),
+                "query_scale is reserved and not supported.");
+    TORCH_CHECK(compress_factor == 1, "compress_factor only supports 1, got ", compress_factor);
     MsaKeyMeta meta;
     if (is_tnd) {
         meta = ResolveTndKeyMeta(key, cu_q, kv_len, start_loc, init_blocks, local_blocks);
@@ -285,14 +291,70 @@ at::Tensor msa_index_score(const at::Tensor& query, const at::Tensor& key, const
     }
     TORCH_CHECK(meta.numKvHeads == 1, "num_kv_heads currently only supports 1.");
     CheckHeadDim(query, meta.keyHeadDim);
-    at::Tensor score = AllocMsaScore(query, meta.maxBlocks);
-    ACLNN_CMD(aclnnMsaIndexScore, query, key, block_table, scale, atten_mask, actual_seq_qlen, actual_seq_klen,
-              start_loc, layoutKeyStr, sparse_mode, init_blocks, local_blocks, score);
-    return score;
+    TORCH_CHECK(return_choice == 0 || return_choice == 1 || return_choice == 2, "return_choice must be 0, 1 or 2, got ",
+                return_choice);
+    auto local_device = c10::Device(query.device());
+    const c10::OptionalDeviceGuard device_guard(local_device);
+    if (return_choice == 0) {
+        at::Tensor score = AllocMsaScore(query, meta.maxBlocks);
+        // ACLNN_CMD binds every argument as a non-const lvalue reference.
+        c10::optional<at::Tensor> noIndices;
+        c10::optional<at::Tensor> noValues;
+        ACLNN_CMD(aclnnMsaIndexScore, query, key, start_loc, block_table, query_scale, key_scale, atten_mask,
+                  actual_seq_qlen, actual_seq_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, return_choice,
+                  topk, compress_factor, score, noIndices, noValues);
+        return {score};
+    }
+    TORCH_CHECK(topk >= 1 && topk <= 128, "topk must be in [1, 128], got ", topk);
+    const int64_t total_q = query.size(0);
+    const int64_t num_q_heads = query.size(1);
+    at::Tensor indices = at::empty({num_q_heads, total_q, topk}, query.options().dtype(at::kInt));
+    at::Tensor values = at::empty({0}, query.options().dtype(at::kFloat));
+    if (return_choice == 2) {
+        values = at::empty({num_q_heads, total_q, topk}, query.options().dtype(at::kFloat));
+    }
+    c10::optional<at::Tensor> noScore;
+    c10::optional<at::Tensor> valuesArg;
+    if (return_choice == 2) {
+        valuesArg = values;
+    }
+    ACLNN_CMD(aclnnMsaIndexScore, query, key, start_loc, block_table, query_scale, key_scale, atten_mask,
+              actual_seq_qlen, actual_seq_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, return_choice,
+              topk, compress_factor, noScore, indices, valuesArg);
+    if (return_choice == 1) {
+        return {indices};
+    }
+    return {indices, values};
+}
+
+at::Tensor msa_index_score(const at::Tensor& query, const at::Tensor& key, const at::Tensor& start_loc,
+                           const c10::optional<at::Tensor>& block_table, const c10::optional<at::Tensor>& query_scale,
+                           const c10::optional<at::Tensor>& key_scale, const c10::optional<at::Tensor>& atten_mask,
+                           const c10::optional<at::Tensor>& actual_seq_qlen,
+                           const c10::optional<at::Tensor>& actual_seq_klen, c10::string_view layout_key,
+                           int64_t sparse_mode, int64_t init_blocks, int64_t local_blocks, int64_t compress_factor)
+{
+    return msa_index_score_impl(query, key, start_loc, block_table, query_scale, key_scale, atten_mask, actual_seq_qlen,
+                                actual_seq_klen, layout_key, sparse_mode, init_blocks, local_blocks, 0, 16,
+                                compress_factor)[0];
+}
+
+std::vector<at::Tensor> msa_index_score_sparse(
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& start_loc,
+    const c10::optional<at::Tensor>& block_table, const c10::optional<at::Tensor>& query_scale,
+    const c10::optional<at::Tensor>& key_scale, const c10::optional<at::Tensor>& atten_mask,
+    const c10::optional<at::Tensor>& actual_seq_qlen, const c10::optional<at::Tensor>& actual_seq_klen,
+    c10::string_view layout_key, int64_t sparse_mode, int64_t init_blocks, int64_t local_blocks, int64_t return_choice,
+    int64_t topk, int64_t compress_factor)
+{
+    return msa_index_score_impl(query, key, start_loc, block_table, query_scale, key_scale, atten_mask, actual_seq_qlen,
+                                actual_seq_klen, layout_key, sparse_mode, init_blocks, local_blocks, return_choice,
+                                topk, compress_factor);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     m.def("msa_index_score", &msa_index_score, "msa_index_score");
+    m.def("msa_index_score_sparse", &msa_index_score_sparse, "msa_index_score_sparse");
 }
 } // namespace op_api

@@ -78,9 +78,12 @@ public:
     __aicore__ inline MsaIndexScoreKernel() {}
 
     __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR blockTable, GM_ADDR scale, GM_ADDR actualSeqQlen,
-                                GM_ADDR actualSeqKlen, GM_ADDR startLoc, GM_ADDR score, GM_ADDR workspace,
+                                GM_ADDR actualSeqKlen, GM_ADDR startLoc, GM_ADDR score, GM_ADDR sparseIndices,
+                                GM_ADDR sparseValues, GM_ADDR workspace,
                                 const MsaIndexScoreTilingData* __restrict tiling)
     {
+        (void)sparseIndices;
+        (void)sparseValues;
         tiling_ = tiling;
         gQuery_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ*>(query));
         if constexpr (IS_QUANT_V) {

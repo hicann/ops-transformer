@@ -204,3 +204,32 @@ def compare(actual, golden, atol=1e-3, rtol=1e-3, error_ratio_threshold=1e-3):
         max_diff = float(np.max(diff)) if diff.size else 0.0
         return False, f"error_ratio={ratio:.6f} max_abs_diff={max_diff}"
     return True, "ok"
+
+
+def msa_index_score_topk_from_score(score, valid_blocks_per_token, topk, trunk=1024):
+    """从已算好的 score 行选出 topk。
+
+    集合按分数从高到低，同分保留更小列号。写出时列号小于 tailStart 的在前，
+    尾块列号接在后面。不足 topk 的位置为 -1 和 NEG_INF。
+    """
+    heads, tokens, _stride = score.shape
+    indices = np.full((heads, tokens, topk), -1, dtype=np.int32)
+    values = np.full((heads, tokens, topk), NEG_INF, dtype=np.float32)
+    for t in range(tokens):
+        valid = int(valid_blocks_per_token[t])
+        if valid < 0:
+            valid = 0
+        tail_start = (valid // trunk) * trunk
+        row_scores = score[:, t, :valid]
+        for h in range(heads):
+            order = sorted(
+                range(valid), key=lambda i, h=h: (-float(row_scores[h, i]), i)
+            )
+            picked = order[: min(topk, valid)]
+            prefix = sorted(i for i in picked if i < tail_start)
+            tail = sorted(i for i in picked if i >= tail_start)
+            seq = prefix + tail
+            for j, col in enumerate(seq):
+                indices[h, t, j] = col
+                values[h, t, j] = score[h, t, col]
+    return indices, values

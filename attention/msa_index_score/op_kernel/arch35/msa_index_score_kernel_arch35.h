@@ -43,15 +43,19 @@
 #endif
 #include "../msa_index_score_task.h"
 #include "msa_seg_row_max_epilogue_arch35.h"
+#if !defined(__DAV_C310_CUBE__) && !defined(__DAV_310R6_CUBE__)
+#include "msa_index_score_topk_arch35.h"
+#endif
 
 namespace MsaIndexScoreNs {
 
 /// IS_BLOCK16：逻辑块长 MSA_BLOCK16_SIZE。BSND/BNSD、BBND/BNBD 页长 16，或 TND 显式 pool_block_size=16（两级
 /// maxpool）。 一次 128 列 GEMM 覆盖 MSA_BLOCKS_PER_STILE 个逻辑 block（= 一个「窗」）， 归约时多做一次 head 间
 /// maxpool。Cube 的 N 仍是 MSA_BLOCK_SIZE，与 128 路径共用全部流水。
-template <class ElementQ_, bool IS_QUANT, bool IS_BLOCK16 = false>
+template <class ElementQ_, bool IS_QUANT, bool IS_BLOCK16 = false, bool ENABLE_TOPK = false>
 class MsaIndexScoreKernel {
 public:
+    static_assert(!(IS_BLOCK16 && ENABLE_TOPK), "block size 16 does not implement topk");
     using ElementQ = ElementQ_;
     using ArchTag = Catlass::Arch::AtlasA5;
     /// 逻辑 block 的 token 数：决定 scheduler 的块算术，与 Cube 的 N 无关。
@@ -69,9 +73,10 @@ public:
     using SType = Catlass::Gemm::GemmType<ElementS, LayoutS>;
 
 #if defined(__DAV_C310_CUBE__) || defined(__DAV_310R6_CUBE__)
-    // int8 的 K 源是每 stile 复用的 per-core scratch，保持 2 级 L1B 流水（3 级实测竞态崩溃）；
-    // 同样出于该 scratch 的时序保守性，unit flag 只在非量化路径开启。
-    using BlockMmad = MsaBlockMmad<QType, KType, SType, IS_QUANT ? MSA_L1B_STAGES_INT8 : MSA_L1B_STAGES_FP16, false>;
+    // int8 的 K 源是每 stile 复用的 per-core scratch，保持 2 级 L1B 流水（3 级实测竞态崩溃）。
+    // unit flag 在非对齐 prefill 回归中出现 AICore timeout，保留显式 M_FIX/FIX_M 同步。
+    using BlockMmad = MsaBlockMmad<QType, KType, SType,
+                                   IS_QUANT ? MSA_L1B_STAGES_INT8 : (IS_BLOCK16 ? MSA_L1B_STAGES_FP16 : 4U), false>;
 #endif
 
     static constexpr uint32_t REVERSE_DEPTH = MSA_WORKSPACE_STAGES - 1;
@@ -95,7 +100,8 @@ public:
     __aicore__ inline MsaIndexScoreKernel() {}
 
     __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR blockTable, GM_ADDR scale, GM_ADDR actualSeqQlen,
-                                GM_ADDR actualSeqKlen, GM_ADDR startLoc, GM_ADDR score, GM_ADDR workspace,
+                                GM_ADDR actualSeqKlen, GM_ADDR startLoc, GM_ADDR score, GM_ADDR sparseIndices,
+                                GM_ADDR sparseValues, GM_ADDR workspace,
                                 const MsaIndexScoreTilingData* __restrict tiling)
     {
         tiling_ = tiling;
@@ -119,7 +125,17 @@ public:
         gActualSeqQlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(actualSeqQlen));
         gActualSeqKlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(actualSeqKlen));
         gStartLoc_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(startLoc));
-        gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(score));
+        if constexpr (ENABLE_TOPK) {
+            gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace) + tiling_->scoreWorkspaceElems);
+            gSparseIndices_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sparseIndices));
+            if (tiling_->returnChoice == MSA_RETURN_INDICES_VALUES) {
+                gSparseValues_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(sparseValues));
+            }
+        } else {
+            (void)sparseIndices;
+            (void)sparseValues;
+            gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(score));
+        }
         gWorkspace_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementS*>(workspace));
 
         scheduler_.Init(tiling_->batch, tiling_->numQHeads, tiling_->maxBlocksPerBatch, tiling_->scoreBlockStride,
@@ -151,6 +167,10 @@ private:
             ProcessCubeC2Ub(resource, blockMmad, coreIdx, coreNum, coreKScratch, totalTasks);
         } else {
             ProcessCubeGm(blockMmad, coreIdx, coreNum, coreKScratch, totalTasks);
+        }
+        if constexpr (ENABLE_TOPK) {
+            AscendC::PipeBarrier<PIPE_ALL>();
+            AscendC::SyncAll<false>();
         }
     }
 
@@ -248,10 +268,14 @@ private:
                     // 与 GM 路径一致：等 AIV MTE3 写完 scratch 再 MTE2 进 L1，否则 int8/TND 读到 0。
                     AscendC::PipeBarrier<PIPE_ALL>();
                 }
-                AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + ping);
-                AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + ping + MSA_A5_AIV_FLAG_OFFSET);
+                if constexpr (IS_QUANT_V) {
+                    AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + ping);
+                    AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + ping +
+                                                                            MSA_A5_AIV_FLAG_OFFSET);
+                }
                 auto ubS = resource.ubBuf.template GetBufferByByte<float>(ping * MSA_A5_S_PING_BYTES);
-                ComputePageToUb(blockMmad, task, blk, ubS, coreKScratch, needLoadQ);
+                ComputePageToUb(blockMmad, task, blk, ubS, coreKScratch, needLoadQ,
+                                IS_QUANT_V ? -1 : static_cast<int32_t>(ping));
                 needLoadQ = false;
                 AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + ping);
                 AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + ping + MSA_A5_AIV_FLAG_OFFSET);
@@ -362,8 +386,12 @@ private:
             return MsaSeqKeyBlockElem(tiling_->keyLayout, task.batchIdx, task.cuKStart, blk * tiling_->poolBlockSize,
                                       tiling_->numKvHeads, tiling_->headDim, tiling_->kMaxSeq);
         }
-        // 存储页表按页粒度：打分块首 token 定位页与页内偏移。页长与打分块长解耦；
-        // 页长 = 打分块长（128 路径或 M3 页 16）时退化为逐块 1:1 寻址。
+        // 页长 = 打分块长时逐块 1:1 寻址，省掉每页一次运行时除法、取模和页内偏移合成。
+        if (tiling_->poolBlockSize == tiling_->pageSize) {
+            const int32_t page = gBlockTable_.GetValue(task.batchIdx * tiling_->tableWidth + blk);
+            return static_cast<uint64_t>(page) * tiling_->strideKvBlock;
+        }
+        // 存储页表按页粒度：打分块首 token 定位页与页内偏移。页长与打分块长解耦。
         // 可见块已停在页表宽度；这里只在页号越界时钳到最后一页，避免读出页表。
         const uint32_t tok = blk * tiling_->poolBlockSize;
         uint32_t pageIdx = tok / tiling_->pageSize;
@@ -761,7 +789,7 @@ private:
 
     __aicore__ inline void ComputePageToUb(BlockMmad& blockMmad, const MsaTask& task, uint32_t blk,
                                            const AscendC::LocalTensor<float>& ubS, uint64_t kScratchBase,
-                                           bool needLoadL1)
+                                           bool needLoadL1, int32_t vcPing)
     {
         const uint32_t mActual = task.mActual;
         const uint32_t headDim = tiling_->headDim;
@@ -771,10 +799,11 @@ private:
         const Catlass::GemmCoord shape{mActual, MSA_BLOCK_SIZE, headDim};
         const auto queryGm = QueryGm(task);
         if (KeyBlockNeedsScratch(task, blk)) {
-            blockMmad.ComputeToUb(queryGm, layoutQ, gKeyScratch_[kScratchBase], layoutKScratch, ubS, shape, needLoadL1);
+            blockMmad.ComputeToUb(queryGm, layoutQ, gKeyScratch_[kScratchBase], layoutKScratch, ubS, shape, needLoadL1,
+                                  1U, vcPing);
         } else if constexpr (!IS_QUANT_V) {
             const uint64_t kOffset = KeyBlockGmOffset(task, blk);
-            blockMmad.ComputeToUb(queryGm, layoutQ, gKeyFp_[kOffset], layoutKGm, ubS, shape, needLoadL1);
+            blockMmad.ComputeToUb(queryGm, layoutQ, gKeyFp_[kOffset], layoutKGm, ubS, shape, needLoadL1, 1U, vcPing);
         }
     }
 
@@ -828,6 +857,17 @@ private:
             ProcessVectorC2Ub(resource, epilogue, subIdx, subBlockNum, coreIdx, coreNum, coreKScratch, totalTasks);
         } else {
             ProcessVectorGm(resource, epilogue, subIdx, subBlockNum, coreIdx, coreNum, coreKScratch, totalTasks);
+        }
+        if constexpr (ENABLE_TOPK) {
+            AscendC::PipeBarrier<PIPE_ALL>();
+            AscendC::SyncAll<false>();
+#if !defined(__DAV_C310_CUBE__) && !defined(__DAV_310R6_CUBE__)
+            MsaIndexScoreTopk topk;
+            // 阶段 A 已经结束，阶段 B 复用整段 UB 做 Sort32。只在 ENABLE_TOPK 实例里走到。
+            auto ubTrunk = resource.ubBuf.template GetBufferByByte<float>(0);
+            topk.Run(tiling_, gScore_, gSparseIndices_, gSparseValues_, gActualSeqQlen_, gActualSeqKlen_,
+                     tiling_->returnChoice == MSA_RETURN_INDICES_VALUES, ubTrunk);
+#endif
         }
     }
 
@@ -966,6 +1006,8 @@ private:
     AscendC::GlobalTensor<int32_t> gActualSeqKlen_;
     AscendC::GlobalTensor<int32_t> gStartLoc_;
     AscendC::GlobalTensor<float> gScore_;
+    AscendC::GlobalTensor<int32_t> gSparseIndices_;
+    AscendC::GlobalTensor<float> gSparseValues_;
     AscendC::GlobalTensor<ElementS> gWorkspace_;
 };
 

@@ -24,10 +24,12 @@ extern "C" {
  * @domain aclnn_ops_infer
  */
 ACLNN_API aclnnStatus aclnnMsaIndexScoreGetWorkspaceSize(
-    const aclTensor* query, const aclTensor* key, const aclTensor* blockTableOptional, const aclTensor* scaleOptional,
-    const aclTensor* attenMaskOptional, const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional,
-    const aclTensor* startLoc, char* layoutKeyOptional, int64_t sparseMode, int64_t initBlocks, int64_t localBlocks,
-    const aclTensor* score, uint64_t* workspaceSize, aclOpExecutor** executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* startLoc, const aclTensor* blockTableOptional,
+    const aclTensor* queryScaleOptional, const aclTensor* keyScaleOptional, const aclTensor* attenMaskOptional,
+    const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional, char* layoutKeyOptional,
+    int64_t sparseMode, int64_t initBlocks, int64_t localBlocks, int64_t returnChoice, int64_t topk,
+    int64_t compressFactor, const aclTensor* scoreOptional, const aclTensor* sparseIndicesOptional,
+    const aclTensor* sparseValuesOptional, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /* @brief aclnnMsaIndexScore的第二段接口，用于执行计算。 */
 ACLNN_API aclnnStatus aclnnMsaIndexScore(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,

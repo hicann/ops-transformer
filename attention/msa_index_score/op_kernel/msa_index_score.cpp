@@ -13,7 +13,7 @@
  * \brief MsaIndexScore kernel 入口。
  *
  * 入参顺序与 op_def / aclnn 对齐：
- *   query, key, block_table, scale, atten_mask, actual_seq_qlen, actual_seq_klen, start_loc, score
+ *   query, key, start_loc, block_table, query_scale, key_scale, atten_mask, actual_seq_qlen, actual_seq_klen, score
  * atten_mask 仅做 host 校验；device 侧按 sparse_mode 解析因果，不消费该 GM。
  */
 
@@ -31,7 +31,8 @@ using namespace MsaIndexScoreNs;
 #define MSA_INVOKE_KERNEL(ElementQ, IsQuant) \
     do { \
         MsaIndexScoreKernel<ElementQ, IsQuant> op; \
-        op.Init(query, key, blockTable, scale, actualSeqQlen, actualSeqKlen, startLoc, score, userWs, tilingData); \
+        op.Init(query, key, blockTable, scale, actualSeqQlen, actualSeqKlen, startLoc, score, sparseIndices, \
+                sparseValues, userWs, tilingData); \
         op.Process(); \
     } while (0)
 
@@ -39,17 +40,28 @@ using namespace MsaIndexScoreNs;
 #define MSA_INVOKE_KERNEL_BLK16(ElementQ) \
     do { \
         MsaIndexScoreKernel<ElementQ, false, true> op; \
-        op.Init(query, key, blockTable, scale, actualSeqQlen, actualSeqKlen, startLoc, score, userWs, tilingData); \
+        op.Init(query, key, blockTable, scale, actualSeqQlen, actualSeqKlen, startLoc, score, sparseIndices, \
+                sparseValues, userWs, tilingData); \
         op.Process(); \
     } while (0)
 
-extern "C" __global__ __aicore__ void msa_index_score(GM_ADDR query, GM_ADDR key, GM_ADDR blockTable, GM_ADDR scale,
-                                                      GM_ADDR attenMask, GM_ADDR actualSeqQlen, GM_ADDR actualSeqKlen,
-                                                      GM_ADDR startLoc, GM_ADDR score, GM_ADDR workspace,
+#define MSA_INVOKE_KERNEL_TOPK(ElementQ) \
+    do { \
+        MsaIndexScoreKernel<ElementQ, false, false, true> op; \
+        op.Init(query, key, blockTable, scale, actualSeqQlen, actualSeqKlen, startLoc, score, sparseIndices, \
+                sparseValues, userWs, tilingData); \
+        op.Process(); \
+    } while (0)
+
+extern "C" __global__ __aicore__ void msa_index_score(GM_ADDR query, GM_ADDR key, GM_ADDR startLoc, GM_ADDR blockTable,
+                                                      GM_ADDR queryScale, GM_ADDR scale, GM_ADDR attenMask,
+                                                      GM_ADDR actualSeqQlen, GM_ADDR actualSeqKlen, GM_ADDR score,
+                                                      GM_ADDR sparseIndices, GM_ADDR sparseValues, GM_ADDR workspace,
                                                       GM_ADDR tiling)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-    (void)attenMask; // host 校验；device 按 sparse_mode 解析 rightDownCausal
+    (void)queryScale; // query 量化系数仅预留，计算路径不消费
+    (void)attenMask;  // host 校验；device 按 sparse_mode 解析 rightDownCausal
     // 950 非量化 PA：S 在 UB、无 K scratch，user workspace 可能为 0。不能因此跳过整个 kernel 流程。
     GM_ADDR userWs = AscendC::GetUserWorkspace(workspace);
     if (userWs == nullptr) {
@@ -75,6 +87,14 @@ extern "C" __global__ __aicore__ void msa_index_score(GM_ADDR query, GM_ADDR key
         MSA_INVOKE_KERNEL_BLK16(bfloat16_t);
     } else if (TILING_KEY_IS(MSA_TILING_KEY_FP16_BLK16)) {
         MSA_INVOKE_KERNEL_BLK16(half);
+    } else if (TILING_KEY_IS(MSA_TILING_KEY_BF16_TOPK)) {
+        MSA_INVOKE_KERNEL_TOPK(bfloat16_t);
+    } else if (TILING_KEY_IS(MSA_TILING_KEY_FP16_TOPK)) {
+        MSA_INVOKE_KERNEL_TOPK(half);
+    } else if (TILING_KEY_IS(MSA_TILING_KEY_FP8_E5M2_TOPK)) {
+        MSA_INVOKE_KERNEL_TOPK(fp8_e5m2_t);
+    } else if (TILING_KEY_IS(MSA_TILING_KEY_FP8_E4M3FN_TOPK)) {
+        MSA_INVOKE_KERNEL_TOPK(fp8_e4m3fn_t);
 #endif
     }
 }

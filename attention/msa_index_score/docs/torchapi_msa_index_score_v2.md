@@ -48,7 +48,8 @@ cann_ops_transformer.msa_index_score_v2(
     start_loc,
     *,
     block_table=None,
-    scale=None,
+    query_scale=None,
+    key_scale=None,
     atten_mask=None,
     actual_seq_qlen=None,
     actual_seq_klen=None,
@@ -58,6 +59,7 @@ cann_ops_transformer.msa_index_score_v2(
     local_blocks=1,
     layout_query="TND",
     pool_block_size=128,
+    compress_factor=1,
 ) -> Tensor
 ```
 
@@ -109,13 +111,13 @@ cann_ops_transformer.msa_index_score_v2(
     <td><code>[B,MB]</code></td>
   </tr>
   <tr>
-    <td>scale</td>
+    <td>query_scale</td>
     <td>可选</td>
-    <td>非量化与FP8不传</td>
+    <td>query量化系数。预留，须为None</td>
     <td>float32</td>
     <td>-</td>
   </tr>
-  <tr>
+    <tr>
     <td>atten_mask</td>
     <td>mode=3必选</td>
     <td>压缩下三角模板</td>

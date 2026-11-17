@@ -68,11 +68,11 @@ public:
     using L1AAlignHelper = Catlass::Gemm::helper::L1AlignHelper<ElementA, LayoutA>;
     using L1BAlignHelper = Catlass::Gemm::helper::L1AlignHelper<ElementB, LayoutB>;
 
-    // K (B) 的 L1 流水级数。非量化 3 级：fixpipe 减半（fp16 S）后 MTE2 的逐页延迟
-    // （~390ns，L2 命中）会成为新的关键路径，加深一级让 MTE2 提前两页预取。
+    // K (B) 的 L1 流水级数。非量化 block128 4 级：fixpipe 减半（fp16 S）后 MTE2 的
+    // 逐页延迟（~390ns，L2 命中）会成为新的关键路径，加深一级让 MTE2 提前三页预取。
     // int8 保持 2 级：K 源是每 stile 复用的 per-core scratch，AIV 下一 stile 的 cast
     // 会重写该区，更深的预取与 cast 重写产生竞态（实测 STAGES=3 下 int8 崩溃）。
-    // L1 占用：A 32KB + 3×32KB B = 128KB / 512KB。
+    // block16 保持原有 3 级。block128 L1 占用：A 32KB + 4×32KB B = 160KB / 512KB。
     static constexpr uint32_t STAGES = STAGES_IN;
     // 非量化路径开 unit flag：mmad 与 fixpipe 的依赖交给硬件互锁，省掉每页
     // M_FIX/FIX_M 四次标量 set/wait。标量因此能在 cube 完成前就发出下一页的
@@ -281,15 +281,17 @@ public:
     __aicore__ inline void ComputeToUb(const AscendC::GlobalTensor<ElementA>& gmA, const LayoutA& layoutA,
                                        const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
                                        const AscendC::LocalTensor<float>& ubC, const Catlass::GemmCoord& actualShape,
-                                       bool needLoadL1, uint32_t splitGroup = 1U)
+                                       bool needLoadL1, uint32_t splitGroup = 1U, int32_t vcPing = -1)
     {
         storeToUb_ = true;
         ubC_ = ubC;
         splitGroup_ = splitGroup;
+        vcPing_ = vcPing;
         AscendC::GlobalTensor<ElementC> dummyGm;
         const LayoutC dummyLayout(actualShape.m(), actualShape.n(), actualShape.n());
         operator()(gmA, layoutA, gmB, layoutB, dummyGm, dummyLayout, actualShape, needLoadL1);
         storeToUb_ = false;
+        vcPing_ = -1;
     }
 
 private:
@@ -300,6 +302,11 @@ private:
         const uint32_t mEven = (actualShape.m() + 1U) & ~1U;
         const uint32_t nAlign = (actualShape.n() + 7U) & ~7U;
         const uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(actualShape.m());
+        // K 的 GM→L1 与 Mmad 已在等待前发射；只在真正写 UB 前等两个 AIV 释放 slot。
+        if (vcPing_ >= 0) {
+            AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + vcPing_);
+            AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + vcPing_ + MSA_A5_AIV_FLAG_OFFSET);
+        }
         if constexpr (!USE_UNIT_FLAG) {
             AscendC::SetFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
             AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
@@ -376,6 +383,7 @@ private:
     CopyL0CToGm copyL0CToGm_;
     bool storeToUb_{false};
     uint32_t splitGroup_{1U};
+    int32_t vcPing_{-1};
     AscendC::LocalTensor<float> ubC_;
 };
 

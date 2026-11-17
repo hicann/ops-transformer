@@ -35,12 +35,27 @@
 
     There is no $scale$ in the non-quantized scenario. When `sparse_mode=3`, $atten\_mask$ is right-down causal. When `sparse_mode=0`, it is not applied. $local\_mask$ is generated from `start_loc`, `init_blocks`, and `local_blocks`, and writes high scores to blocks that must be kept.
 
+    `returnChoice=0` writes `score` only. When `returnChoice` is 1 or 2, TopK continues on the valid columns of each $(h,t)$. For `sparseMode=3`, $visibleEnd=\mathrm{clamp}(kv-q+t_{off}+1,0,kv)$. For `sparseMode=0`, $visibleEnd=kv$. Under PageAttention, $BlockCap$ is the smaller of the `blockTable` width and the logical-block limit; otherwise it is the logical-block limit.
+
+    $$
+    validBlocks=\min(\lceil visibleEnd/128\rceil,BlockCap),\quad m=\min(topk,validBlocks),\quad tailStart=\lfloor validBlocks/1024\rfloor\times 1024
+    $$
+
+    Select $m$ indices from $[0,validBlocks)$. A higher score wins. Equal scores keep the smaller column index. This chooses the set only. The output is not ordered by score: selected columns with index $<tailStart$ are written in ascending index order, then selected columns with index $\ge tailStart$ are written in ascending index order. Let $I_j$ be the $j$-th index in that order.
+
+    $$
+    sparse\_indices[h,t,j]=\begin{cases}I_j&j<m\\-1&j\ge m\end{cases},\quad sparse\_values[h,t,j]=\begin{cases}score[h,t,I_j]&j<m\\-\infty&j\ge m\end{cases}
+    $$
+
+    `returnChoice=1` does not write `sparseValues`. When `validBlocks=0`, every slot is $-1$ and $-\infty$.
+
 - **Computation**:
 
     1. Multiply $Q_{idx}$ of each query token by the causally visible $K_{idx}$ in the KV sparse block to obtain token-level relevance.
     2. Apply $atten\_mask$ according to `sparse_mode`: `sparse_mode=0` does not truncate causally, and `sparse_mode=3` masks invisible positions with rightDownCausal.
     3. Maxpool over each sparse block of length $block\_size$ to obtain the per-block importance score.
-    4. Generate $local\_mask$ from `start_loc`, `init_blocks`, and `local_blocks`, write high scores to blocks that must be kept, and produce `score`. This operator does not include TopK.
+    4. Generate $local\_mask$ from `start_loc`, `init_blocks`, and `local_blocks`, write high scores to blocks that must be kept, and produce `score`.
+    5. When `returnChoice` is 1 or 2, continue with TopK. Higher scores are selected first; equal scores keep the smaller column index. Prefix column indices are written in ascending order, and indices from the tail segment follow them. The tail is the remainder of the valid column count modulo 1024. Slots past the valid count are -1. TopK is supported on Ascend 950PR&950DT products with `pool_block_size=128` only.
 
 - **Parameters**:
 
@@ -56,17 +71,23 @@ Each operator uses a [two-phase API](../../../docs/en/context/two_phase_api.md).
 aclnnStatus aclnnMsaIndexScoreGetWorkspaceSize(
     const aclTensor *query,
     const aclTensor *key,
+    const aclTensor *startLoc,
     const aclTensor *blockTableOptional,
-    const aclTensor *scaleOptional,
+    const aclTensor *queryScaleOptional,
+    const aclTensor *keyScaleOptional,
     const aclTensor *attenMaskOptional,
     const aclTensor *actualSeqQlenOptional,
     const aclTensor *actualSeqKlenOptional,
-    const aclTensor *startLoc,
     char            *layoutKeyOptional,
     int64_t          sparseMode,
     int64_t          initBlocks,
     int64_t          localBlocks,
-    const aclTensor *score,
+    int64_t          returnChoice,
+    int64_t          topk,
+    int64_t          compressFactor,
+    const aclTensor *scoreOptional,
+    const aclTensor *sparseIndicesOptional,
+    const aclTensor *sparseValuesOptional,
     uint64_t        *workspaceSize,
     aclOpExecutor  **executor);
 aclnnStatus aclnnMsaIndexScore(
@@ -120,6 +141,15 @@ aclnnStatus aclnnMsaIndexScore(
       <td>3 ($[T2, N2, D]$) or 4 ($[B, S2, N2, D]$, $[B, N2, S2, D]$, $[block\_num, N2, block\_size, D]$, $[block\_num, block\_size, N2, D]$)</td>
     </tr>
     <tr>
+      <td>startLoc</td>
+      <td>Input</td>
+      <td>Logical block index of the current query (not a token prefix).</td>
+      <td>Generates $local\_mask$ together with <code>initBlocks</code> and <code>localBlocks</code>.</td>
+      <td>INT32</td>
+      <td>ND</td>
+      <td>1 ($[B]$)</td>
+    </tr>
+<tr>
       <td>blockTableOptional</td>
       <td>Input</td>
       <td>Block mapping table for PageAttention storage.</td>
@@ -129,15 +159,15 @@ aclnnStatus aclnnMsaIndexScore(
       <td>2 ($[B, S2/block\_size]$)</td>
     </tr>
     <tr>
-      <td>scaleOptional</td>
+      <td>queryScaleOptional</td>
       <td>Input</td>
-      <td>Dequantization coefficient $scale$ in the formula.</td>
-      <td>Pass <code>nullptr</code> for non-quantized and FP8 inputs.</td>
+      <td>Quantization coefficient of query.</td>
+      <td>Same dtype and format as <code>keyScaleOptional</code>. Reserved. Pass <code>nullptr</code>.</td>
       <td>FLOAT</td>
       <td>ND</td>
-      <td>3 ($[block\_num, N2, block\_size]$, $[block\_num, block\_size, N2]$) or 2 ($[T2, N2]$)</td>
+      <td>Same as keyScaleOptional</td>
     </tr>
-    <tr>
+        <tr>
       <td>attenMaskOptional</td>
       <td>Input</td>
       <td>Mask that controls causal visibility.</td>
@@ -164,16 +194,7 @@ aclnnStatus aclnnMsaIndexScore(
       <td>ND</td>
       <td>1 ($[B]$ or $[B+1]$)</td>
     </tr>
-    <tr>
-      <td>startLoc</td>
-      <td>Input</td>
-      <td>Logical block index of the current query (not a token prefix).</td>
-      <td>Generates $local\_mask$ together with <code>initBlocks</code> and <code>localBlocks</code>.</td>
-      <td>INT32</td>
-      <td>ND</td>
-      <td>1 ($[B]$)</td>
-    </tr>
-    <tr>
+        <tr>
       <td>layoutKeyOptional</td>
       <td>Input</td>
       <td>Data layout of key.</td>
@@ -205,6 +226,15 @@ aclnnStatus aclnnMsaIndexScore(
       <td>Input</td>
       <td>Local window length forced by $local\_mask$.</td>
       <td>The window is $[max(0, startLoc+1-localBlocks), startLoc]$. It writes the high score $1\mathrm{e}29$ and overrides init at the same positions. Optional. Default $1$.</td>
+      <td>INT64</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>compressFactor</td>
+      <td>Input</td>
+      <td>Key compression factor.</td>
+      <td>1 means no compression. 4 means four tokens are already packed into one row. Reserved. Pass 1.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -365,7 +395,7 @@ aclnnStatus aclnnMsaIndexScore(
     - 3 is rightDownCausal. `attenMaskOptional` is required, with shape $[2048, 2048]$. A value of 1 means the position is excluded. A value of 0 means it is included.
 - `initBlocks` and `localBlocks` must be $\ge 0$ and must not exceed the number of logical blocks (the second dimension of `blockTableOptional` for PageAttention; the aligned last dimension of score for TND). When both are 0, $local\_mask$ is skipped.
 - `q_len` / `kv_len` may be 0. The score of an empty KV request is $-inf$.
-- This API does not include TopK.
+- `returnChoice` defaults to 0 and keeps the score-only behavior. 1 writes `sparseIndicesOptional` only. 2 also writes `sparseValuesOptional`. `topk` defaults to 16 and must be in [1, 128]. This is supported on Ascend 950PR&950DT products with `pool_block_size=128` only.
 - Deterministic computation: the same inputs produce the same output.
 
 ## Example
@@ -1112,9 +1142,10 @@ bool RunCase(const TestCase& tc, aclrtStream stream)
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     void* workspaceAddr = nullptr;
-    int ret = aclnnMsaIndexScoreGetWorkspaceSize(queryT, keyT, blockTableT, scaleT, attenMaskT, actualSeqQlenT,
-                                                 actualSeqKlenT, startLocT, layoutKeyBuf, tc.sparseMode, kInitBlocks,
-                                                 kLocalBlocks, scoreT, &workspaceSize, &executor);
+    int ret = aclnnMsaIndexScoreGetWorkspaceSize(queryT, keyT, startLocT, blockTableT, nullptr, scaleT, attenMaskT,
+                                                 actualSeqQlenT, actualSeqKlenT, layoutKeyBuf, tc.sparseMode,
+                                                 kInitBlocks, kLocalBlocks, 0, 16, 1, scoreT, nullptr, nullptr,
+                                                 &workspaceSize, &executor);
     if (ret != ACL_SUCCESS) {
         (void)printf("  [%s] GetWorkspaceSize failed, ERROR %d -> FAIL\n", tc.name.c_str(), ret);
         return false;

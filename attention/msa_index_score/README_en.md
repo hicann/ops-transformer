@@ -44,18 +44,20 @@ English | [简体中文](./README.md)
 | --- | --- | --- | --- | --- |
 | query | Input | $Q_{idx}$. Non-V2 is fixed to TND $[T1, N1, D]$. V2 also supports BSND $[B, S1, N1, D]$ and BNSD $[B, N1, S1, D]$; these two are supported only on <term>Ascend 950PR&950DT products</term>. | BFLOAT16, FLOAT16; <term>Ascend 950PR&950DT products</term> also support FLOAT8_E5M2 and FLOAT8_E4M3FN. | ND |
 | key | Input | $K_{idx}$. TND $[T2, N2, D]$; BSND $[B, S2, N2, D]$; BNSD $[B, N2, S2, D]$; BBND $[block\_num, block\_size, N2, D]$; BNBD $[block\_num, N2, block\_size, D]$. In V2, the non-paged key must use the same layout as query, and BSND/BNSD are supported only on <term>Ascend 950PR&950DT products</term> with a logical block length of 16. PA allows the first axis to be non-contiguous. | Same type as query. | ND |
+| start_loc | Input | Index of the logical block where the current query resides, with the shape $[B]$, used for $local\_mask$. | INT32 | ND |
 | block_table | Optional input | Maps the logical blocks of PA to physical pages, with the shape $[B, maxBlockNumPerSeq]$. It is not passed for TND / BSND / BNSD. | INT32 | ND |
-| scale | Optional input | It must be empty for non-quantization and FP8. | FLOAT | ND |
+| query_scale | Optional input | Quantization scale of query. Reserved. It must be empty. | FLOAT | ND |
+| key_scale | Optional input | Dequantization scale of key. It must be empty for non-quantization and FP8. | FLOAT | ND |
 | atten_mask | Optional input | It must be passed when `sparse_mode=3`, with the shape $[2048, 2048]$. The value 1 indicates not participating in the computation, and 0 indicates participating. | INT8 | ND |
 | actual_seq_qlen | Optional input | Prefix sum of query, with the shape $[B+1]$. | INT32 | ND |
 | actual_seq_klen | Optional input | For TND / BSND / BNSD, it is the key prefix sum $[B+1]$. For PA, it is the visible length of each request $[B]$. For BSND/BNSD, the length difference of each request does not exceed $S2$. | INT32 | ND |
-| start_loc | Input | Index of the logical block where the current query resides, with the shape $[B]$, used for $local\_mask$. | INT32 | ND |
 | layout_key | Attribute | `TND` / `BSND` / `BNSD` / `BBND` / `BNBD`. The default value is `BBND`. | STRING | - |
 | sparse_mode | Attribute | 0: defaultMask; 3: rightDownCausal. | INT64 | - |
 | init_blocks | Attribute | Number of head blocks with forced retention. The default value is 0. | INT64 | - |
 | local_blocks | Attribute | Length of the window with forced retention near the current query. The default value is 1. Set it to 0 to align with the raw score. | INT64 | - |
 | layout_query | Attribute | `TND` / `BSND` / `BNSD`. The default value is `TND`. (The aclnnMsaIndexScore API does not support setting it, and it is fixed to `TND`; the aclnnMsaIndexScoreV2 API supports setting it) | STRING | - |
 | pool_block_size | Attribute | Number of tokens reduced for each score. Only 16 / 128 are allowed. The default value is 128. (The aclnnMsaIndexScore API does not support setting it, and it is fixed to 128; the aclnnMsaIndexScoreV2 API supports setting it) | INT64 | - |
+| compress_factor | Attribute | Key compression factor. 1 means no compression and is the default. 4 means four tokens are already packed into one row. Reserved. | INT64 | - |
 | score | Output | Per-block importance score. For block length 128, the shape is $[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$; for block length 16, after the inter-head max is computed, the head dimension is 1, and the shape is $[1, T1, RoundUp(maxBlockNumPerSeq, 16)]$. | FLOAT | ND |
 
 `layout_query` and `pool_block_size` are fixed to `TND` and 128 by this API and are not in the parameter table of `aclnnMsaIndexScore`. The API that allows configuring these two items is [aclnnMsaIndexScoreV2](./docs/aclnnMsaIndexScoreV2.md).
@@ -65,7 +67,8 @@ English | [简体中文](./README.md)
 - Non-V2 aclnn API (`aclnnMsaIndexScore`): query is fixed to TND, and the logical block length is 128. The key can be `BBND` / `BNBD` / `TND` / `BSND` / `BNSD`, which are supported by <term>Atlas A2 products</term>, <term>Atlas A3 products</term>, and <term>Ascend 950PR&950DT products</term>. For BSND / BNSD, `block_table` is not passed, `actual_seq_klen` is the $[B+1]$ prefix sum, and the length difference of each request does not exceed the $S2$ of key.
 - V2 aclnn API (`aclnnMsaIndexScoreV2`): query can be TND / BSND / BNSD. The non-paged key must use the same layout as query. Only <term>Ascend 950PR&950DT products</term> are supported, `pool_block_size` is 16, and `actual_seq_klen` is the $[B+1]$ prefix sum.
 - PageAttention must pass `block_table`, and `actual_seq_klen` is the visible length $[B]$. TND / BSND / BNSD must not pass `block_table`, and `actual_seq_klen` is the $[B+1]$ prefix sum.
-- In the non-quantized scenario, key has the same dtype as query, and `scale` is empty. <term>Ascend 950PR&950DT products</term> support FLOAT8_E5M2 and FLOAT8_E4M3FN.
+- In the non-quantized scenario, key has the same dtype as query, and `key_scale` is empty. <term>Ascend 950PR&950DT products</term> support FLOAT8_E5M2 and FLOAT8_E4M3FN. `query_scale` must be empty. `compress_factor` only supports 1.
+- The following dtype combinations are reserved in the prototype and are rejected by the current implementation: on A2/A3, FLOAT16 `score` / `sparse_values` for the existing combinations, and INT8 query with INT8 key; on Ascend 950, FLOAT4_E2M1 pairs with FLOAT8_E8M0 scales, FLOAT16 outputs for bf16/fp16, and FLOAT8_E4M3FN query with FLOAT4_E2M1 key (`key_scale` is FLOAT8_E4M3FN). Implemented paths still use FLOAT `score` and `sparse_values`.
 - `sparse_mode` supports only 0 or 3. When it is 3, `atten_mask` must be $[2048, 2048]$.
 - `init_blocks` and `local_blocks` must be $\ge 0$ and must not exceed the number of logical blocks. When both are 0, $local\_mask$ is not written.
 - `q_len` / `kv_len` can be 0. The score with empty KV is filled with `-inf`.

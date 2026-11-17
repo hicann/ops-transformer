@@ -35,12 +35,27 @@
 
     非量化时没有$scale$。`sparse_mode=3`时$atten\_mask$为右下因果；`sparse_mode=0`时不叠加。$local\_mask$由`start_loc`、`init_blocks`、`local_blocks`生成，对强制保留的block写入高分。
 
+    `returnChoice=0`时只输出上面的`score`。`returnChoice`为1或2时，对每个$(h,t)$在有效列上继续取TopK。`sparseMode=3`时$visibleEnd=\mathrm{clamp}(kv-q+t_{off}+1,0,kv)$，`sparseMode=0`时$visibleEnd=kv$。$BlockCap$在PageAttention下取`blockTable`宽度与逻辑块上限的较小值，否则为逻辑块上限。
+
+    $$
+    validBlocks=\min(\lceil visibleEnd/128\rceil,BlockCap),\quad m=\min(topk,validBlocks),\quad tailStart=\lfloor validBlocks/1024\rfloor\times 1024
+    $$
+
+    在列号$[0,validBlocks)$中取$m$个下标。分数更高者优先，分数相同则列号更小者优先。这只决定入选集合。写出时不按分数排序：列号小于$tailStart$的入选列按列号从小到大，列号不小于$tailStart$的入选列接在后面并按列号从小到大。记排好的第$j$个列号为$I_j$。
+
+    $$
+    sparse\_indices[h,t,j]=\begin{cases}I_j&j<m\\-1&j\ge m\end{cases},\quad sparse\_values[h,t,j]=\begin{cases}score[h,t,I_j]&j<m\\-\infty&j\ge m\end{cases}
+    $$
+
+    `returnChoice=1`时不写`sparseValues`。`validBlocks=0`时各槽为$-1$和$-\infty$。
+
 - **主要计算过程**：
 
     1. 将每个query token的$Q_{idx}$与KV sparse block内因果可见的$K_{idx}$做矩阵乘，得到token级相关性；
     2. 按`sparse_mode`叠加$atten\_mask$：`sparse_mode=0`不做因果截断，`sparse_mode=3`按rightDownCausal屏蔽不可见位置。
     3. 在每个长度为$block\_size$的sparse block上做Maxpool，得到逐block的重要性分数。
-    4. 用`start_loc`、`init_blocks`、`local_blocks`生成$local\_mask$，对强制保留的block写入高分，得到输出`score`。本算子不包含TopK。
+    4. 用`start_loc`、`init_blocks`、`local_blocks`生成$local\_mask$，对强制保留的block写入高分，得到输出`score`。
+    5. `returnChoice`为1或2时继续做TopK。入选按分数从高到低，分数相同则列号更小者优先。写出时前缀列号从小到大，尾块列号放在该行有效结果的最后。尾块是有效列数按1024对齐后的余数。不足k的索引为-1。目前仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK后的结果。
 
 - **参数介绍**：
 
@@ -56,17 +71,23 @@
 aclnnStatus aclnnMsaIndexScoreGetWorkspaceSize(
     const aclTensor *query,
     const aclTensor *key,
+    const aclTensor *startLoc,
     const aclTensor *blockTableOptional,
-    const aclTensor *scaleOptional,
+    const aclTensor *queryScaleOptional,
+    const aclTensor *keyScaleOptional,
     const aclTensor *attenMaskOptional,
     const aclTensor *actualSeqQlenOptional,
     const aclTensor *actualSeqKlenOptional,
-    const aclTensor *startLoc,
     char            *layoutKeyOptional,
     int64_t          sparseMode,
     int64_t          initBlocks,
     int64_t          localBlocks,
-    const aclTensor *score,
+    int64_t          returnChoice,
+    int64_t          topk,
+    int64_t          compressFactor,
+    const aclTensor *scoreOptional,
+    const aclTensor *sparseIndicesOptional,
+    const aclTensor *sparseValuesOptional,
     uint64_t        *workspaceSize,
     aclOpExecutor  **executor);
 aclnnStatus aclnnMsaIndexScore(
@@ -120,6 +141,15 @@ aclnnStatus aclnnMsaIndexScore(
       <td>3（$[T2, N2, D]$）或4（$[B, S2, N2, D]$、$[B, N2, S2, D]$、$[block\_num, N2, block\_size, D]$、$[block\_num, block\_size, N2, D]$）</td>
     </tr>
     <tr>
+      <td>startLoc</td>
+      <td>输入</td>
+      <td>当前query所在逻辑block索引（非token前缀）。</td>
+      <td>与<code>initBlocks</code> / <code>localBlocks</code>一起生成$local\_mask$。</td>
+      <td>INT32</td>
+      <td>ND</td>
+      <td>1（$[B]$）</td>
+    </tr>
+<tr>
       <td>blockTableOptional</td>
       <td>输入</td>
       <td>表示当前传入的使用PageAttention存储的block映射表。</td>
@@ -129,15 +159,15 @@ aclnnStatus aclnnMsaIndexScore(
       <td>2（$[B, S2/block\_size]$）</td>
     </tr>
     <tr>
-      <td>scaleOptional</td>
+      <td>queryScaleOptional</td>
       <td>输入</td>
-      <td>公式中的$scale$，反量化系数。</td>
-      <td>非量化与FP8传入<code>nullptr</code>。</td>
+      <td>query的量化系数。</td>
+      <td>数据类型、数据格式与<code>keyScaleOptional</code>相同。当前仅预留，须传<code>nullptr</code>。</td>
       <td>FLOAT</td>
       <td>ND</td>
-      <td>3（$[block\_num, N2, block\_size]$、$[block\_num, block\_size, N2]$）或2（$[T2, N2]$）</td>
+      <td>与keyScaleOptional相同</td>
     </tr>
-    <tr>
+        <tr>
       <td>attenMaskOptional</td>
       <td>输入</td>
       <td>控制因果可见的 mask。</td>
@@ -164,16 +194,7 @@ aclnnStatus aclnnMsaIndexScore(
       <td>ND</td>
       <td>1（$[B]$或$[B+1]$）</td>
     </tr>
-    <tr>
-      <td>startLoc</td>
-      <td>输入</td>
-      <td>当前query所在逻辑block索引（非token前缀）。</td>
-      <td>与<code>initBlocks</code> / <code>localBlocks</code>一起生成$local\_mask$。</td>
-      <td>INT32</td>
-      <td>ND</td>
-      <td>1（$[B]$）</td>
-    </tr>
-    <tr>
+        <tr>
       <td>layoutKeyOptional</td>
       <td>输入</td>
       <td>key的数据排布。</td>
@@ -205,6 +226,15 @@ aclnnStatus aclnnMsaIndexScore(
       <td>输入</td>
       <td>$local\_mask$强制选中的局部窗口长度。</td>
       <td>窗口为$[max(0, startLoc+1-localBlocks), startLoc]$，写入高分$1\mathrm{e}29$（覆盖同位置init）。可选，默认$1$。</td>
+      <td>INT64</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>compressFactor</td>
+      <td>输入</td>
+      <td>key的压缩倍数。</td>
+      <td>1表示不压缩。4表示输入时已把4个token压成一行，当前仅预留，须传1。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -247,6 +277,7 @@ aclnnStatus aclnnMsaIndexScore(
   - <term>Ascend 950PR&950DT系列产品</term>：
       - query、key：数据类型除BFLOAT16、FLOAT16外，还支持FLOAT8_E5M2、FLOAT8_E4M3FN。
   <!-- end id7 -->
+  - 原型另预留、当前实现会拒绝的组合：A2/A3的FLOAT16 `score`/`sparseValues`、INT8 query+INT8 key；Ascend 950的FLOAT4_E2M1（scale为FLOAT8_E8M0）、bf16/fp16的FLOAT16输出，以及FLOAT8_E4M3FN query配FLOAT4_E2M1 key。已实现路径的score与sparse values仍为FLOAT。
 
 - **返回值：**
 
@@ -365,7 +396,8 @@ aclnnStatus aclnnMsaIndexScore(
     - 为3时，代表rightDownCausal模式，`attenMaskOptional`必须传入，shape为$[2048, 2048]$，取值为1代表该位不参与计算，为0代表该位参与计算。
 - `initBlocks`、`localBlocks`必须$\ge 0$且不超过逻辑block数（PA为`blockTableOptional`第二维；TND为score末维对齐宽度）。两者均为0时跳过$local\_mask$。
 - `q_len` / `kv_len`允许为0。空KV的score填$-inf$。
-- 本接口不包含TopK。
+- `returnChoice`默认0，与原先只输出score一致。为1时只写`sparseIndicesOptional`，为2时同时写`sparseValuesOptional`。`topk`默认16，范围是1到128，只在非0时生效。
+- 目前仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK后的结果。索引是逻辑block列号，从0开始。不足k为-1。尾块列号位于该行其它入选列号之后。
 - 确定性计算：相同输入下输出确定。
 
 ## 调用示例
@@ -1112,9 +1144,10 @@ bool RunCase(const TestCase& tc, aclrtStream stream)
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     void* workspaceAddr = nullptr;
-    int ret = aclnnMsaIndexScoreGetWorkspaceSize(queryT, keyT, blockTableT, scaleT, attenMaskT, actualSeqQlenT,
-                                                 actualSeqKlenT, startLocT, layoutKeyBuf, tc.sparseMode, kInitBlocks,
-                                                 kLocalBlocks, scoreT, &workspaceSize, &executor);
+    int ret = aclnnMsaIndexScoreGetWorkspaceSize(queryT, keyT, startLocT, blockTableT, nullptr, scaleT, attenMaskT,
+                                                 actualSeqQlenT, actualSeqKlenT, layoutKeyBuf, tc.sparseMode,
+                                                 kInitBlocks, kLocalBlocks, 0, 16, 1, scoreT, nullptr, nullptr,
+                                                 &workspaceSize, &executor);
     if (ret != ACL_SUCCESS) {
         (void)printf("  [%s] GetWorkspaceSize failed, ERROR %d -> FAIL\n", tc.name.c_str(), ret);
         return false;

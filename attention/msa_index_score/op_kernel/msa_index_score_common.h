@@ -210,5 +210,52 @@ MSA_FN uint64_t MsaSeqKeyBlockElem(uint32_t keyLayout, uint32_t batchIdx, uint32
 // 块长 16（BSND/BNSD，或 BBND/BNBD 页长 16）：独立 TilingKey，128 路径保持原样。
 #define MSA_TILING_KEY_BF16_BLK16 7
 #define MSA_TILING_KEY_FP16_BLK16 8
+// 950：max 之后再做 topk。A2/A3 的 13/14 只预留，本阶段 tiling 不发出。
+#define MSA_TILING_KEY_BF16_TOPK 9
+#define MSA_TILING_KEY_FP16_TOPK 10
+#define MSA_TILING_KEY_FP8_E5M2_TOPK 11
+#define MSA_TILING_KEY_FP8_E4M3FN_TOPK 12
+#define MSA_TILING_KEY_BF16_TOPK_A2 13
+#define MSA_TILING_KEY_FP16_TOPK_A2 14
+
+constexpr uint32_t MSA_RETURN_SCORE = 0;
+constexpr uint32_t MSA_RETURN_INDICES = 1;
+constexpr uint32_t MSA_RETURN_INDICES_VALUES = 2;
+constexpr uint32_t MSA_TOPK_DEFAULT = 16;
+constexpr uint32_t MSA_TOPK_MAX = 128;
+constexpr uint32_t MSA_TOPK_TRUNK = 1024;
+constexpr int32_t MSA_TOPK_INVALID_INDEX = -1;
+
+// 一块 Sort32 最多 2048 列：6 段缓冲约 48KB，落在 256KB UB 里。
+constexpr uint32_t MSA_TOPK_SORT_CHUNK = 2048;
+// Sort32 一次处理 32 个元素；(score, index) 一对占 2 个 float。
+constexpr uint32_t MSA_TOPK_SORT32_LEN = 32;
+constexpr uint32_t MSA_TOPK_SORT_PAIR = 2;
+// Gather 的 byte offset = 元素下标 << 2。sizeof(float) 与 sizeof(int32) 都是 4。
+constexpr uint32_t MSA_TOPK_GATHER_BYTE_SHIFT = 2;
+// 长度表放在 trunk 的 128KB 处，q / k 各最多 2048 个 int32。
+constexpr uint32_t MSA_TOPK_LEN_FLOAT_OFF = 32768;
+constexpr uint32_t MSA_TOPK_LEN_CAP = 2048;
+// 行元数据放在 160KB 处。q、kv、token 偏移各 4096 个 int32，依次排列。
+constexpr uint32_t MSA_TOPK_META_FLOAT_OFF = 40960;
+constexpr uint32_t MSA_TOPK_META_CAP = 4096;
+// 256 列、k=128 的稠密路径，一次最多拼 8 行。
+constexpr uint32_t MSA_TOPK_DENSE_COLS = 256;
+constexpr uint32_t MSA_TOPK_DENSE_K = MSA_TOPK_MAX;
+constexpr uint32_t MSA_TOPK_DENSE_BATCH = 8;
+constexpr uint32_t MSA_TOPK_DENSE_PROP_FLOATS = MSA_TOPK_DENSE_COLS * MSA_TOPK_SORT_PAIR;
+constexpr uint32_t MSA_TOPK_SORT32_PAIR_FLOATS = MSA_TOPK_SORT32_LEN * MSA_TOPK_SORT_PAIR;
+// MrgSort 四路源。0b1111 四路都参与，0b0011 只合并前两路。
+constexpr uint32_t MSA_TOPK_MRG_SRC_NUM = 4;
+constexpr uint32_t MSA_TOPK_MRG_MASK_ALL = 0b1111U;
+constexpr uint32_t MSA_TOPK_MRG_MASK_LO2 = 0b0011U;
+// 尾块列号加上 2^20，排在任何前缀列号之后。填充列的索引键落到最后。
+constexpr float MSA_TOPK_TAIL_KEY_BIAS = 1048576.0F;
+constexpr int32_t MSA_TOPK_PAD_INDEX = 0x7FFFFFFF;
+
+MSA_FN constexpr uint32_t MsaAlignUpPow2(uint32_t value, uint32_t align)
+{
+    return (value + align - 1U) & ~(align - 1U);
+}
 
 #endif // MSA_INDEX_SCORE_COMMON_H

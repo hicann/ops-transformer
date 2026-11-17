@@ -31,18 +31,19 @@ except ImportError:
 if _TORCHAIR_AVAILABLE:
 
     @auto_convert_to_tensor(
-        [False, False, False, False, False, False, False, False],
-        [False, False, True, True, True, True, True, False],
+        [False, False, False, False, False, False, False, False, False],
+        [False, False, False, True, True, True, True, True, True],
     )
     def MsaIndexScoreV2(
         query: Tensor,
         key: Tensor,
+        start_loc: Tensor,
         block_table: Optional[Tensor],
-        scale: Optional[Tensor],
+        query_scale: Optional[Tensor],
+        key_scale: Optional[Tensor],
         atten_mask: Optional[Tensor],
         actual_seq_qlen: Optional[Tensor],
         actual_seq_klen: Optional[Tensor],
-        start_loc: Tensor,
         *,
         layout_key: str = "BBND",
         sparse_mode: int = 3,
@@ -60,7 +61,8 @@ if _TORCHAIR_AVAILABLE:
             "query": query,
             "key": key,
             "block_table": block_table,
-            "scale": scale,
+            "query_scale": query_scale,
+            "key_scale": key_scale,
             "atten_mask": atten_mask,
             "actual_seq_qlen": actual_seq_qlen,
             "actual_seq_klen": actual_seq_klen,
@@ -73,6 +75,9 @@ if _TORCHAIR_AVAILABLE:
             "local_blocks": attr.Int(local_blocks),
             "layout_query": attr.Str(layout_query),
             "pool_block_size": attr.Int(pool_block_size),
+            "return_choice": attr.Int(0),
+            "topk": attr.Int(16),
+            "compress_factor": attr.Int(1),
         }
         outputs = ["score"]
         return ge_op(
@@ -84,25 +89,29 @@ if _TORCHAIR_AVAILABLE:
             ir=IrDef("MsaIndexScore")
             .input(
                 "query",
-                "DT_FLOAT16, DT_BF16, DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN",
+                "DT_FLOAT16, DT_BF16, DT_INT8, DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1",
             )
             .input(
                 "key",
-                "DT_FLOAT16, DT_BF16, DT_INT8, DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN",
+                "DT_FLOAT16, DT_BF16, DT_INT8, DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1",
             )
+            .input("start_loc", "DT_INT32")
             .optional_input("block_table", "DT_INT32")
-            .optional_input("scale", "DT_FLOAT")
+            .optional_input("query_scale", "DT_FLOAT, DT_FLOAT8_E8M0")
+            .optional_input("key_scale", "DT_FLOAT, DT_FLOAT8_E8M0, DT_FLOAT8_E4M3FN")
             .optional_input("atten_mask", "DT_INT8")
             .optional_input("actual_seq_qlen", "DT_INT32")
             .optional_input("actual_seq_klen", "DT_INT32")
-            .input("start_loc", "DT_INT32")
             .attr("layout_key", attr.Str("BBND"))
             .attr("sparse_mode", attr.Int(3))
             .attr("init_blocks", attr.Int(0))
             .attr("local_blocks", attr.Int(1))
             .attr("layout_query", attr.Str("TND"))
             .attr("pool_block_size", attr.Int(128))
-            .output("score", "DT_FLOAT"),
+            .attr("return_choice", attr.Int(0))
+            .attr("topk", attr.Int(16))
+            .attr("compress_factor", attr.Int(1))
+            .output("score", "DT_FLOAT, DT_FLOAT16"),
         )
 
     @register_fx_node_ge_converter(
@@ -113,7 +122,8 @@ if _TORCHAIR_AVAILABLE:
         key: Tensor,
         start_loc: Tensor,
         block_table: Optional[Tensor],
-        scale: Optional[Tensor],
+        query_scale: Optional[Tensor],
+        key_scale: Optional[Tensor],
         atten_mask: Optional[Tensor],
         actual_seq_qlen: Optional[Tensor],
         actual_seq_klen: Optional[Tensor],
@@ -130,7 +140,8 @@ if _TORCHAIR_AVAILABLE:
             query=query,
             key=key,
             block_table=block_table,
-            scale=scale,
+            query_scale=query_scale,
+            key_scale=key_scale,
             atten_mask=atten_mask,
             actual_seq_qlen=actual_seq_qlen,
             actual_seq_klen=actual_seq_klen,
