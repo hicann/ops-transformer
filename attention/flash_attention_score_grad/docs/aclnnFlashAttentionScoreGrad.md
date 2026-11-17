@@ -105,7 +105,7 @@ aclnnStatus aclnnFlashAttentionScoreGrad(
 
 ## aclnnFlashAttentionScoreGradGetWorkspaceSize
 
-- **参数说明：**
+- **参数说明**
   <table style="undefined;table-layout: fixed; width: 1529px"><colgroup>
     <col style="width: 198px">
     <col style="width: 120px">
@@ -489,25 +489,25 @@ aclnnStatus aclnnFlashAttentionScoreGrad(
 - 输入key/value的shape除D外必须一致，在query/key/value的D大小相同的情况下，query/dy的shape必须一致。
 - 支持输入query/dy的N和key/value的N不相等，但必须成比例关系，即Nq/Nkv必须是非0整数，Nq取值范围1~256。
 - 关于数据shape的约束，以inputLayout的BSND、BNSD为例（BSH、SBH下H=N\*D），其中：
-    - B：取值范围为1~2M。带prefixOptional的时候B最大支持2K。
+    - B：取值范围为1~2M。带prefixOptional的时候B最大支持2k。
     - N：取值范围为1~256。
     - S：取值范围为1~1M。
     - D：取值范围为1~768。
 - query、keyIn、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
-- pseShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可使alibi位置编码压缩，此时只需要输入原始PSE最后1024行进行内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
+- pseShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可开启alibi位置编码压缩，此时只需要输入原始PSE最后1024行进行内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
   - 参数每个batch不相同时，shape为BNHSkv(H=1024)。
   - 每个batch相同时，shape为1NHSkv(H=1024)。
   - 如不使用该参数可传入nullptr。
-- innerPrecise: 当前0、1为保留配置值，2为无效行计算，其功能是避免在计算过程中存在整行mask进而导致精度有损失，但是该配置会导致性能下降。如果算子可判断出存在无效行场景，会自动开启无效行计算，例如sparseMode为3，Sq > Skv场景。
-- sparseMode的约束如下:
-  - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量；
-  - 配置为1、2、3、5时，用户配置的preTokens、nextTokens不会生效；
+- innerPrecise：当前0、1为保留配置值，2为无效行计算，其功能是避免在计算过程中存在整行mask进而导致精度有损失，但是该配置会导致性能下降。如果算子可判断出存在无效行场景，会自动开启无效行计算，例如sparseMode为3，Sq > Skv场景。
+- sparseMode的约束如下：
+  - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量。
+  - 配置为1、2、3、5时，用户配置的preTokens、nextTokens不会生效。
   - 配置为0、4时，须保证attenMaskOptional与preTokens、nextTokens的范围一致。
   - 用户不特意指定时建议传入0。
   - sparse不同模式的详细说明请参见[sparse模式说明](../../../docs/zh/context/sparse_mode_introduction.md)。
 - 部分场景下，如果计算量过大可能会导致算子执行超时（AI Core error类型报错，errorStr为：timeout or trap error），此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 - 关于softmaxMax与softmaxSum参数的约束：输入格式固定为\[B, N, S, 8\]；TND的输入格式除外，此时为\[T, N, 8\]，注：T=B*S。
-- headNum的取值必须和传入的Query中的N值保持一致。
+- headNum的取值必须和传入的query中的N值保持一致。
 - band场景，preTokens和nextTokens之间必须要有交集。
 - pseShiftOptional中的Sq在大于1024场景下，且此时shape取值为BNHS或1NHS时，需要满足Sq和Skv等长。
 - prefixOptional稀疏计算场景，即sparseMode=5或者sparseMode=6，当Sq > Skv时，prefix的N值取值范围\[0, Skv\]，当Sq <= Skv时，prefix的N值取值范围\[Skv-Sq, Skv\]。

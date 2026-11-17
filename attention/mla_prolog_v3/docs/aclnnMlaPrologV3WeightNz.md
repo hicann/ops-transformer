@@ -23,14 +23,14 @@
 
 ## 功能说明
 
-- **功能更新**：（相对于aclnnMlaPrologV2weightNz的差异）
+- **功能更新**：（相对于aclnnMlaPrologV2WeightNz的差异）
     - 新增Query与Key的尺度矫正因子，分别对应qcQrScale（$\alpha_q$）与kcScale（$\alpha_{kv}$）。
     - 新增参数（例如actualSeqLenOptional、kNopeClipAlphaOptional、weightQuantMode、kvCacheQuantMode、queryQuantMode、ckvkrRepoMode、quantScaleRepoMode和tileSize等），新增可选输出queryNormOutOptional和dequantScaleQNormOutOptional。
     - 调整cacheIndex参数的名称与位置，对应当前的cacheIndexOptional。
-- **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路:
-    - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后，再乘以Query尺度矫正因子$\alpha_q$得到$q^N$；第二路乘以$W^{QR}$后经过旋转位置编码（ROPE）得到$q^R$。
-    - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后，乘以Key尺度矫正因子$\alpha_{kv}$传入Cache中得到$k^C$；
-    - 第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码传入另一个Cache中得到$k^R$；
+- **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路：
+    - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后，再乘以Query尺度矫正因子$\alpha_q$得到$q^N$；第二路乘以$W^{QR}$后经过旋转位置编码（RoPE）得到$q^R$。
+    - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后，乘以Key尺度矫正因子$\alpha_{kv}$传入Cache中得到$k^C$。
+    - 第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码传入另一个Cache中得到$k^R$。
     - 第五路是输出$q^N$经过DynamicQuant后得到的量化参数。
     - 第六路是queryNormOutOptional非空且非量化场景（weightQuantMode=0）下，输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后得到压缩结果$c^Q$，作为queryNormOutOptional输出。
     - 第七路是queryNormOutOptional非空且量化场景（weightQuantMode≠0）下，对$c^Q$做DynamicQuant，最终得到量化后的queryNormOutOptional和对应量化参数dequantScaleQNormOutOptional。
@@ -130,7 +130,7 @@
     queryNorm = {\mathrm{cast\_to\_fp8}(c^Q / \mathrm{dequantScaleQNorm})}
     $$
 
-    其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数位的最大值emax。
+    其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数的最大值emax。
 
 ## 函数原型
 
@@ -216,7 +216,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       <tr>
         <td>tokenX</td>
         <td>输入</td>
-        <td>公式中用于计算Query和Key的输入tensor。</td>
+        <td>公式中用于计算Query和Key的输入Tensor。</td>
         <td>支持B=0,S=0,T=0的空Tensor</td>
         <td>BFLOAT16、FLOAT8_E4M3FN、INT8、HIFLOAT8</td>
         <td>ND</td>
@@ -557,7 +557,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
         <ul>
             <li>用户未特意指定时，建议传入"PA_BSND"</li>
             <li>仅支持char*类型</li>
-            <li>可选值为："PA_BSND"、 "PA_NZ"、 "PA_BLK_BSND"、 "PA_BLK_NZ"、 "BSND"、 "TND"</li>
+            <li>可选值为："PA_BSND"、"PA_NZ"、"PA_BLK_BSND"、"PA_BLK_NZ"、"BSND"、"TND"</li>
         </ul>
         </td>
         <td>CHAR*</td>
@@ -638,7 +638,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       <tr>
         <td>qcQrScale</td>
         <td>输入</td>
-        <td>表示Query的尺度矫正系数。</td>
+        <td>表示Query的尺度矫正因子。</td>
         <td>用户不特意指定时需要传入1.0</td>
         <td>DOUBLE</td>
         <td>-</td>
@@ -648,7 +648,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       <tr>
         <td>kcScale</td>
         <td>输入</td>
-        <td>表示Key的尺度矫正系数。</td>
+        <td>表示Key的尺度矫正因子。</td>
         <td>用户不特意指定时需要传入1.0</td>
         <td>DOUBLE</td>
         <td>-</td>
@@ -979,14 +979,14 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       - int8/fp8/hif8全量化场景下，dequantScaleXOptional的shape为(B\*S, 1)；mxfp8全量化场景下，dequantScaleXOptional的shape为(B*S, He/32)
       - queryOut的shape为(B, S, N, Hckv)
       - queryRopeOut的shape为(B, S, N, Dr)
-      - int8/mxfp8/fp8/hif8全量化且kvCache pertensor量化场景下，dequantScaleQNopeOutOptional的shape为(B*S, N, 1)，其他场景下为nullptr
+      - int8/mxfp8/fp8/hif8全量化且kvCache pertensor量化场景下，dequantScaleQNopeOutOptional的shape为(B*S, N, 1)，其他场景下为nullptr。
   - B、S、T、Skv值允许一个或多个取0，即Shape与B、S、T、Skv值相关的入参允许传入空Tensor，其余入参不支持传入空Tensor。
       - 如果B、S、T取值为0，则queryOut、queryRopeOut输出空Tensor，kvCacheRef、krCacheRef不做更新。
       - 如果Skv取值为0，则queryOut、queryRopeOut、dequantScaleQNopeOutOptional正常计算，kvCacheRef、krCacheRef不做更新，即输出空Tensor。
-  - 当CacheMode为BSND时
+  - 当CacheMode为BSND时。
       - tokenX应不采用BS合轴，即维度为(B, S, He)
       - kvCache的维度为(B,S,Nkv,Dr)
-  - 当CacheMode为TND时
+  - 当CacheMode为TND时。
       - tokenX应采用BS合轴，即维度为(T, He)
       - kvCache的维度为(T,Nkv,Dr)
   - 当ckvkrRepoMode=1时
@@ -999,7 +999,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
 
   - actualSeqLenOptional传入时，actualSeqLenOptional最后一个数需与T保持一致。
   - pertoken-pergroup量化模式下，ckvkrRepoMode和quantScaleRepoMode必须同时为1；其他量化模式以及非量化场景下，ckvkrRepoMode和quantScaleRepoMode必须同时为0。
-  - pertoken-pergroup量化模式下，CacheMode只支持PA_BSND, BSND和TND。
+  - pertoken-pergroup量化模式下，CacheMode只支持PA_BSND、BSND和TND。
   - 当ckvkrRepoMode值为1时，krCache必须为空Tensor（即shape的乘积为0）。
   - kvcache pertensor量化模式下，kvCacheQuantMode和queryQuantMode必须同时为1。
 
@@ -1019,7 +1019,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
     <tr>
       <td colspan="2">非量化</td>
       <td>
-          weight_quant_mode=0,kv_cache_quant_mode=0,query_quant_mode=0<br>
+          weightQuantMode=0,kvCacheQuantMode=0,queryQuantMode=0<br>
           入参：所有入参皆为非量化数据 <br>
           出参：所有出参皆为非量化数据
       </td>
@@ -1634,7 +1634,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
 
 <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-  ```Cpp
+  ```cpp
   #include <iostream>
   #include <cstring>
   #include <vector>
@@ -2028,7 +2028,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
 
 <term>Ascend 950PR&950DT系列产品</term>示例代码如下，仅供参考。
 
-  ```Cpp
+  ```cpp
 #include <iostream>
 #include <cstring>
 #include <vector>

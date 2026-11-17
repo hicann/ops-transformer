@@ -26,7 +26,7 @@
 - 接口功能：aclnnGenericBlockSparseAttentionGradMetadata根据sparseBlockIdx、sparseBlockCount、seqlen等信息进行稀疏attention的分核与负载均衡，为aclnnGenericBlockSparseAttentionGrad的前置AI CPU算子。
 
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做`[baseM, baseN] = [128, 128]`基本块粒度的贪心负载均衡，输出metadata供主Grad算子消费。
   <!-- end id9 -->
 
@@ -39,7 +39,7 @@
 
 - Metadata size计算公式：
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>:
+  - <term>Ascend 950PR&950DT系列产品</term>：
 
     $$
     \text{metaSize} = 80 + B \times N1 \times J \times 4
@@ -49,7 +49,7 @@
   <!-- end id7 -->
 
   <!-- npu="A3,910b" id8 -->
-  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>:
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
 
     $$
     \text{metaSize} = 198
@@ -267,7 +267,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
       <tr>
         <td>layoutSparsePattern</td>
         <td>输入</td>
-        <td>代表输入的sparseBlockIdx、sparseBlockCount的数据排布格式。</td>
+        <td>表示输入的sparseBlockIdx、sparseBlockCount的数据排布格式。</td>
         <td>当前仅支持取"1"，详细参考<a href="../../generic_block_sparse_attention_grad/docs/aclnnGenericBlockSparseAttentionGrad.md#layout对应关系说明">layout对应关系说明</a>。</td>
         <td>INT64</td>
         <td>-</td>
@@ -287,7 +287,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
       <tr>
         <td>softmaxPrecision</td>
         <td>输入</td>
-        <td>Softmax计算采取的精度级别。</td>
+        <td>Softmax计算采用的精度级别。</td>
         <td>当前仅支持0。</td>
         <td>INT64</td>
         <td>-</td>
@@ -338,7 +338,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>metadata</td>
         <td>输出</td>
         <td>稀疏attention的分核信息。</td>
-        <td>不支持空Tensor。不同产品metaSize支持长度不一样，具体见表格下方说明或者约束说明。</td>
+        <td>不支持空Tensor。不同产品支持的metaSize长度不一样，具体见表格下方说明或者约束说明。</td>
         <td>INT32</td>
         <td>ND</td>
         <td>[metaSize]</td>
@@ -413,10 +413,10 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
           <td>sparseBlockIdx/sparseBlockCount/metadata为空或shape/dtype非法。</td>
         </tr>
         <tr>
-          <td>layout为TND时未提供cuSeqLengths；headDim、blockShape、layoutSparsePattern、residualBlockMode、isConsistentTopk、window参数不在支持范围。</td>
+          <td>layout为TND时未提供cuSeqLengths；headDim、blockShape、layoutSparsePattern、residualBlockMode、isConsistentTopk、winLeft/winRight参数不在支持范围。</td>
         </tr>
         <tr>
-          <td>sparseBlockIdx的J维与ceilDiv(maxKvSeqlen, blockShapeY)不一致；metadata长度不足；B×N1×J超过任务数上限（1M）。</td>
+          <td>sparseBlockIdx的J维与ceilDiv(maxKvSeqlen, blockShapeY)不一致；metadata长度不足；B×N1×J超过任务数上限（1048576）。</td>
         </tr>
       </tbody>
     </table>
@@ -468,7 +468,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
   - 本算子输出为确定性结果。
 - 须与[aclnnGenericBlockSparseAttentionGrad](../../generic_block_sparse_attention_grad/docs/aclnnGenericBlockSparseAttentionGrad.md)配合使用；主算子调用前必须先成功执行本算子。
 - HeadDim固定为128；numQHeads/numKvHeads须落在[1, 128]，且numQHeads % numKvHeads == 0。
-- blockShape：blockShapeX仅支持1, blockShapeY须≥128且为64的倍数；layoutSparsePattern当前仅支持1；maskType当前仅支持1。
+- blockShape：blockShapeX仅支持1，blockShapeY须≥128且为64的倍数；layoutSparsePattern当前仅支持1；maskType当前仅支持1。
 - layoutQ与layoutKv须相同，取值"TND"/"BNSD"/"BSND"；TND布局下cuSeqLengthsQOptional/cuSeqLengthsKvOptional必选。
 - sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自maxQSeqlen/maxKvSeqlen（须与Q/K的S维一致）。
 - winLeft和winRight不使能时必须为-1。

@@ -23,9 +23,9 @@
 
 ## 功能说明
 
-本API支持负载均衡和专家剪枝功能。经过映射后的专家表和mask可传入Moe层进行数据分发和处理。
+本API支持负载均衡和专家剪枝功能。经过映射后的专家表和Mask可传入MoE层进行数据分发和处理。
 
-* 负载均衡：为了解决负载不均衡的场景，该算子可以完成每个token的topK个专家逻辑专家号到物理卡号的映射。计算方法如下所示：
+* 负载均衡：为了解决负载不均衡的问题，该算子可以完成每个token的topK个逻辑专家号到物理卡号的映射。计算方法如下所示：
 
   负载均衡对于expert_ids中的第i个值，即第i个token：
 
@@ -332,7 +332,7 @@ aclnnStatus aclnnMoeUpdateExpert(
 
 - **接口配套与调用顺序**：
     该接口必须与`aclnnMoeDistributeDispatchV2`及`aclnnMoeDistributeCombineV2`/`aclnnMoeDistributeCombineAddRmsNorm`接口配套使用，**调用顺序固定为**：
-    `aclnnMoeUpdateExpert` → `aclnnMoeDistributeDispatchV2` → `aclnnMoeDistributeCombineV2`/`aclnnMoeDistributeCombineAddRmsNorm`；
+    `aclnnMoeUpdateExpert` → `aclnnMoeDistributeDispatchV2` → `aclnnMoeDistributeCombineV2`/`aclnnMoeDistributeCombineAddRmsNorm`。
 
     或与`aclnnMoeDistributeDispatchV3`及`aclnnMoeDistributeCombineV3`/`aclnnMoeDistributeCombineAddRmsNormV2`接口配套使用，**调用顺序固定为**：
     `aclnnMoeUpdateExpert` → `aclnnMoeDistributeDispatchV3` → `aclnnMoeDistributeCombineV3`/`aclnnMoeDistributeCombineAddRmsNormV2`；具体参考[调用示例](#调用示例)。
@@ -342,26 +342,26 @@ aclnnStatus aclnnMoeUpdateExpert(
 
 - **硬件相关定义**：
    <!-- npu="A3" id8 -->
-   <term>Atlas A3系列产品</term>  ：单卡包含双DIE（“晶粒”或“裸片”），因此参数说明中的“本卡”均指**单DIE**。
+   <term>Atlas A3系列产品</term>：单卡包含双DIE（“晶粒”或“裸片”），因此参数说明中的“本卡”均指**单DIE**。
    <!-- end id8 -->
 
 - **参数shape格式约束**：
-   - **BS**：本卡最终输出的token数量，取值范围( 0 < BS ≤ 512 )。
+   - **BS**：本卡最终输出的token数量，取值范围(0, 512]。
    - **K**：选取的topK个专家，取值范围( 0 < K ≤ 16 )，且需满足( 0 < K ≤ moeExpertNum )。
    - **moeExpertNum**：MoE专家数量，取值范围(0, 1024]。
-   - **F**：映射表`eplbTable`的列数，取值范围 [2, worldSize + 1]；第一列为逻辑专家的部署实例数（值>0），后F-1列为对应的物理卡号。
+   - **F**：映射表`eplbTable`的列数，取值范围 [2, worldSize + 1]；第一列为逻辑专家的部署实例数（值>0），后F-1列为对应的实例编号。
    - **实例总数限制**：所有卡部署的MoE专家实例总数最多1024，即( place_per_rank * world_size ≤ 1024 )（`place_per_rank`为单卡部署实例数）。
    - **单卡实例数一致性**：每张卡部署的专家实例数必须相同。
 
 ## 调用示例
 
 <!-- npu="950,A3" id7 -->
-以<term>Atlas A3系列产品</term>  以及<term>Ascend 950PR&950DT系列产品</term>为例，调用MoeUpdateExpert，MoeDistributeDispatchV2和MoeDistributeCombineAddRmsNorm算子。
+以<term>Atlas A3系列产品</term>以及<term>Ascend 950PR&950DT系列产品</term>为例，调用MoeUpdateExpert、MoeDistributeDispatchV2和MoeDistributeCombineAddRmsNorm算子。
 <!-- end id7 -->
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

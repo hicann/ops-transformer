@@ -114,7 +114,7 @@ aclnnStatus aclnnMatmulAllReduceAddRmsNorm(
           <td>x2</td>
           <td>输入</td>
           <td>MatMul计算的右矩阵，即计算公式中的x2。</td>
-          <td><ul><li>支持空Tensor。</li><li>与x1的数据类型保持一致。</li><li>当前版本仅支持二维输入，支持转置/不转置场景。</li><li>支持最后两轴转置情况下的非连续的tensor</li></ul></td>
+          <td><ul><li>支持空Tensor。</li><li>与x1的数据类型保持一致。</li><li>当前版本仅支持二维输入，支持转置/不转置场景。</li><li>支持最后两轴转置情况下的非连续的Tensor。</li></ul></td>
           <td>FLOAT16、BFLOAT16</td>
           <td>ND</td>
           <td>2</td>
@@ -164,7 +164,7 @@ aclnnStatus aclnnMatmulAllReduceAddRmsNorm(
           <td>group</td>
           <td>输入</td>
           <td>Host侧标识通信域的字符串，通信域名称。</td>
-          <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
+          <td>通过HCCL提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -174,7 +174,7 @@ aclnnStatus aclnnMatmulAllReduceAddRmsNorm(
           <td>reduceOp</td>
           <td>输入</td>
           <td>Host侧标识操作类型的字符串，reduce操作类型。</td>
-          <td>当前仅支持输入"sum"。</td>
+          <td>当前仅支持输入“sum”。</td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -323,7 +323,7 @@ aclnnStatus aclnnMatmulAllReduceAddRmsNorm(
 ## 约束说明
 
 - 确定性计算：
-  - aclnnMatmulAllReduceAddRmsNorm默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算
+  - aclnnMatmulAllReduceAddRmsNorm默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
 
 - 使用场景同融合算子aclnnMatmulAllReduce一致：增量场景不开启MC2，全量场景开启MC2。
 - 输入x1可为二维或者三维，其shape为(b, s, k)或者(m, k)。x2必须是二维，其shape为(k, n)，轴满足mm算子入参要求，k轴相等。bias若非空，bias为一维，其shape为(n)。
@@ -333,7 +333,7 @@ aclnnStatus aclnnMatmulAllReduceAddRmsNorm(
 - x1、x2、bias、residual、gamma、y、normOut计算输入的数据类型要一致。
 - 只支持x2矩阵转置/不转置，x1矩阵支持不转置场景。
 - 支持1、2、4、8卡，并且仅支持HCCS链路all mesh组网。
-- 支持(b*s)、n为0的空tensor，不支持k为0的空tensor。
+- 支持(b*s)、n为0的空Tensor，不支持k为0的空Tensor。
 
 <!-- npu="910b" id7 -->
 - <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
@@ -349,7 +349,7 @@ aclnnStatus aclnnMatmulAllReduceAddRmsNorm(
 
 <!-- end id8 -->
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include <thread>

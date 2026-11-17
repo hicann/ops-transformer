@@ -203,7 +203,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(
           <td>antiquantGroupSize</td>
           <td>输入</td>
           <td>伪量化pergroup模式下，对x2进行反量化计算的groupSize输入。</td>
-          <td><ul><li>pergroup量化场景下需传入该参数，传入值的范围为[32,min(k-1,INT_MAX)]，且为32的倍数; k取值范围与mm接口保持一致，为[1,65535]。</li><li>非pergroup量化场景下仅支持传入0。</li></ul></td>
+          <td><ul><li>pergroup量化场景下需传入该参数，传入值的范围为[32,min(k-1,INT_MAX)]，且为32的倍数；k取值范围与mm接口保持一致，为[1,65535]。</li><li>非pergroup量化场景下仅支持传入0。</li></ul></td>
           <td>INT64</td>
           <td>-</td>
           <td>-</td>
@@ -326,7 +326,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(
 - 通信引擎commMode支持度：
 
   <!-- npu="910b" id7 -->
-  - <term>Atlas A2系列产品</term>：目前不支持指定通信引擎，commMode仅允许输入为"ai_cpu"，使用AICPU通信引擎。
+  - <term>Atlas A2系列产品</term>：目前不支持指定通信引擎，commMode仅允许输入为"ai_cpu"，使用AI CPU通信引擎。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：目前通信引擎支持AICPU和CCU，commMode允许输入为"ai_cpu"或者"ccu"。CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
@@ -339,23 +339,23 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(
 - 确定性计算：
 
   <!-- npu="910b" id9 -->
-  - <term>Atlas A2系列产品</term>：`aclnnWeightQuantMatmulAllReduceV2`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算
+  - <term>Atlas A2系列产品</term>：`aclnnWeightQuantMatmulAllReduceV2`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
-  - Ascend 950PR&950DT系列产品：`aclnnWeightQuantMatmulAllReduceV2`默认确定性实现。
+  - <term>Ascend 950PR&950DT系列产品</term>：`aclnnWeightQuantMatmulAllReduceV2`默认确定性实现。
   <!-- end id10 -->
 
 - 增量场景不使能MC2，全量场景使能MC2。
 - 输入x1可为二维或者三维，其shape为(b, s, k)或者(m, k)。
-- x2必须是二维。其shape为(k, n)，k轴满足mm算子入参要求，k轴相等，m的范围为[1, 2147483647]，k、n的范围为[1, 65535]。
+- x2必须是二维，其shape为(k, n)，k轴满足mm算子入参要求，k轴相等，m的范围为[1, 2147483647]，k、n的范围为[1, 65535]。
 - 传入的x1、x2、antiquantScale或者output不为空指针。
 - 当输入x1的shape为(b, s, k)时，x3（非空场景）与输出output的shape为(b, s, n)；当输入x1的shape为(m, k)时，x3（非空场景）与输出output的shape为(m, n)。
 - bias若非空，shape大小与output最后一维大小相等。antiquantScale在pertensor场景下shape为(1)，在perchannel场景下shape为(1,n)/(n)，在pergroup场景shape为(ceil(k,antiquantGroupSize), n)。antiquantOffset若非空，其shape与antiquantScale一致。
 - x1和x2，x3（非空场景）、antiquantScale、antiquantOffset（非空场景）、output、bias（非空场景）的数据类型和数据格式需要在支持的范围之内。
-- x1，antiquantScale，antiquantOffset（非空场景），x3（非空场景）、bias（非空场景）、output的数据类型相同。antiquantGroupSize取值满足取值范围且为32倍数。
+- x1、antiquantScale、antiquantOffset（非空场景）、x3（非空场景）、bias（非空场景）、output的数据类型相同。antiquantGroupSize取值满足取值范围且为32倍数。
 - pergroup场景下，x2转置时，antiquantScale和antiquantOffset需要一起转置，保持连续性。
 - 在长序列场景，随着b/s或者m的增大，可能出现OOM或者计算超时。
-- 仅支持hccs链路all mesh组网。
+- 仅支持HCCS链路all mesh组网。
 
     <!-- npu="910b" id11 -->
     - <term>Atlas A2系列产品</term>：支持1、2、4、8卡。
@@ -497,12 +497,12 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="950,910b" id16 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：
 
-  ```Cpp
+  ```cpp
   #include <iostream>
   #include <vector>
   #include <thread>

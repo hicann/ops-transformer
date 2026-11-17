@@ -33,7 +33,7 @@
 
     `expertScales`为空Tensor时，路由专家结果直接求和；若传入`sharedExpertXOptional`，仍直接累加，不乘路由权重。
 
-> 注意：该接口必须与`aclnnMoeDistributeDispatchV3`配套使用，相当于按`aclnnMoeDistributeDispatchV3`接口收集数据的路径原路返还。
+> 注意：该接口必须与`aclnnMoeDistributeDispatchV3`配套使用，相当于按`aclnnMoeDistributeDispatchV3`接口收集数据的路径原路返回。
 
 相较于`aclnnMoeDistributeCombineV2`接口，该接口变更如下：
 
@@ -435,7 +435,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     <tr>
     <td>groupListType</td>
     <td>输入</td>
-    <td>group List格式，预留参数。</td>
+    <td>groupList格式，预留参数。</td>
     <td>当前版本不支持，传0。</td>
     <td>INT64</td>
     <td>-</td>
@@ -541,15 +541,15 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     - constExpertAlpha1Optional预留参数，当前版本不支持，传空指针即可。
     - constExpertAlpha2Optional预留参数，当前版本不支持，传空指针即可。
     - constExpertVOptional预留参数，当前版本不支持，传空指针即可。
-    - zeroExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
-    - copyExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
+    - zeroExpertNum当commAlg="fullmesh"时，取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
+    - copyExpertNum当commAlg="fullmesh"时，取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum当前版本不支持，传0即可。
     </details>
     <!-- end id7 -->
 
     <!-- npu="A3" id8 -->
     <details>
-    <summary><term>Atlas A3系列产品</term>  ：</summary>
+    <summary><term>Atlas A3系列产品</term>：</summary>
 
     - expertScales仅支持传入形状为(BS, K)的有效Tensor并进行加权聚合，不支持空Tensor。
     - commAlg当前版本不支持，传空指针即可。
@@ -572,9 +572,9 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     - constExpertAlpha1Optional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
     - constExpertAlpha2Optional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
     - constExpertVOptional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为 <code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
-    - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
-    - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
-    - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
+    - zeroExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
+    - copyExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
+    - constExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
     </details>
     <!-- end id8 -->
 
@@ -603,9 +603,9 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     - constExpertAlpha1Optional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
     - constExpertAlpha2Optional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
     - constExpertVOptional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为 <code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
-    - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
-    - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
-    - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
+    - zeroExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
+    - copyExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
+    - constExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
     </details>
     <!-- end id9 -->
 
@@ -709,7 +709,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
 - **产品特定约束**：
 
   <!-- npu="A3" id10 -->
-  - <term>Atlas A3系列产品</term>  ：单卡包含双DIE（晶粒/裸片），参数说明中的“本卡”均指单DIE。
+  - <term>Atlas A3系列产品</term>：单卡包含双DIE（晶粒/裸片），参数说明中的“本卡”均指单DIE。
 
   <!-- end id10 -->
 
@@ -759,8 +759,8 @@ aclnnStatus aclnnMoeDistributeCombineV3(
       <!-- npu="910b" id11 -->
       - <term>Atlas A2系列产品</term>：
         - commAlg配置为""或nullptr：依照HCCL_INTRA_PCIE_ENABLE和HCCL_INTRA_ROCE_ENABLE环境变量配置，选择"fullmesh"或"hierarchy"公式。
-        - commAlg配置为"fullmesh": 设置大小要求 <code>= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)</code>。
-        - commAlg配置为"hierarchy": 设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512)。
+        - commAlg配置为"fullmesh"：设置大小要求 <code>= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)</code>。
+        - commAlg配置为"hierarchy"：设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512)。
       <!-- end id11 -->
       <!-- npu="A3" id12 -->
       - <term>Atlas A3系列产品</term>：
@@ -791,7 +791,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
   - 当前不支持TP域通信。
 
   <!-- npu="A3" id15 -->
-  - <term>Atlas A3系列产品</term>  ：一个通信域内的节点需在一个超节点内，不支持跨超节点。
+  - <term>Atlas A3系列产品</term>：一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
   <!-- end id15 -->
 
@@ -1256,11 +1256,11 @@ aclnnStatus aclnnMoeDistributeCombineV3(
 
 <!-- end id18 -->
 <!-- npu="950" id19 -->
-- <term>Ascend 950DT系列产品</term> ：请参考 [aclnnMoeDistributeCombineV2](./aclnnMoeDistributeCombineV2.md) 中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V4 接口相较于 V3 接口新增的场景参数按上述参数说明传值即可。
+- <term>Ascend 950DT系列产品</term> ：请参考 [aclnnMoeDistributeCombineV2](./aclnnMoeDistributeCombineV2.md) 中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V3 接口相较于 V2 接口新增的场景参数按上述参数说明传值即可。
 
 <!-- end id19 -->
 <!-- npu="A3" id20 -->
-- <term>Atlas A3系列产品</term>  ：
+- <term>Atlas A3系列产品</term>：
 
     具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 

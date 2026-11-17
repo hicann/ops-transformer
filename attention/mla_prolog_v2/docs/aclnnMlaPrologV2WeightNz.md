@@ -25,10 +25,10 @@
 
 ## 功能说明
 
-- **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为五路；
-    - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后得到$q^N$；第二路乘以$W^{QR}$后经过旋转位置编码（ROPE）得到$q^R$。
-    - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后传入Cache中得到$k^C$；
-    - 第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码后传入另一个Cache中得到$k^R$；
+- **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为五路。
+    - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后得到$q^N$；第二路乘以$W^{QR}$后经过旋转位置编码（RoPE）得到$q^R$。
+    - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后传入Cache中得到$k^C$。
+    - 第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码后传入另一个Cache中得到$k^R$。
     - 第五路是输出$q^N$经过DynamicQuant后得到的量化参数。
     - 权重参数WeightDq、WeightUqQr和WeightDkvKr需要以NZ格式传入
 
@@ -58,7 +58,7 @@
     q^N = q^C \cdot W^{UK}
     $$
 
-    对Query进行ROPE旋转位置编码
+    对Query进行RoPE旋转位置编码
 
     $$
     q^R = ROPE(c^Q \cdot W^{QR})
@@ -74,7 +74,7 @@
     k^C = Cache(c^{KV})
     $$
 
-    对Key进行ROPE旋转位置编码，并将结果存入cache
+    对Key进行RoPE旋转位置编码，并将结果存入cache
 
     $$
     k^R = Cache(ROPE(x \cdot W^{KR}))
@@ -163,7 +163,7 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
       <tr>
         <td>tokenX</td>
         <td>输入</td>
-        <td>公式中用于计算Query和Key的输入tensor。</td>
+        <td>公式中用于计算Query和Key的输入Tensor。</td>
         <td>
           <ul>
             <li>支持B=0,S=0,T=0的空Tensor</li>
@@ -452,7 +452,7 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
       <tr>
         <td>queryOut</td>
         <td>输出</td>
-        <td>公式中Query的输出tensor（对应 <i>q<sup>N</sup></i>）。</td>
+        <td>公式中Query的输出Tensor（对应 <i>q<sup>N</sup></i>）。</td>
         <td>-</td>
         <td>BFLOAT16、INT8</td>
         <td>ND</td>
@@ -462,7 +462,7 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
       <tr>
         <td>queryRopeOut</td>
         <td>输出</td>
-        <td>公式中Query位置编码的输出tensor（对应 <i>q<sup>R</sup></i>）。</td>
+        <td>公式中Query位置编码的输出Tensor（对应 <i>q<sup>R</sup></i>）。</td>
         <td>-</td>
         <td>BFLOAT16</td>
         <td>ND</td>
@@ -699,7 +699,7 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
   <details>
   <summary><a id="shapeConstraint"></a>shape约束</summary>
 
-  - weight_dq，weight_uq_qr，weight_dkv_kr在不转置的情况下各个维度的表示：（k, n）。
+  - weightDq，weightUqQr，weightDkvKr在不转置的情况下各个维度的表示：（k, n）。
   - shape约束：
       - 若tokenX的维度采用BS合轴，即(T, He)
           - ropeSin和ropeCos的shape为(T, Dr)
@@ -762,7 +762,7 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
       <td> kv_cache量化 </td>
       <td>
           入参：tokenX传入pertoken量化数据，weightDq、weightUqQr、weightDkvKr传入perchannel量化数据，kvCacheRef传入pertensor量化数据，其余入参皆为非量化数据 <br>
-          出参：queryOut返回pertoken_head量化数据，kvCacheRef出参返回pertensor量化数据，其余出参范围非量化数据
+          出参：queryOut返回pertoken_head量化数据，kvCacheRef出参返回pertensor量化数据，其余出参返回非量化数据
       </td>
     </tr>
   </table>

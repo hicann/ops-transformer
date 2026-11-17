@@ -23,7 +23,7 @@
 - <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
-**说明：** 使用该接口时，请确保驱动固件包和CANN包都为配套的8.0.RC2版本或者配套的更高版本，否则将会引发报错，比如Bus Error等。
+**说明：** 使用该接口时，请确保驱动固件包和CANN包都为配套的8.0.RC2版本或者配套的更高版本，否则将会引发报错，比如BUS ERROR等。
 
 ## 功能说明
 
@@ -136,7 +136,7 @@ aclnnStatus aclnnQuantMatmulAllReduceAddRmsNorm(
         <tr>
           <td>dequantScale（aclTensor）</td>
           <td>输入</td>
-          <td>MatMul计算后的全量化系数，即计算公式中的dequantScale。</td>
+          <td>MatMul计算后的反量化系数，即计算公式中的dequantScale。</td>
           <td>shape在pertensor场景为(1)，perchannel场景为(n)或(1, n)。</td>
           <td>UINT64、INT64、BFLOAT16</td>
           <td>ND</td>
@@ -147,7 +147,7 @@ aclnnStatus aclnnQuantMatmulAllReduceAddRmsNorm(
           <td>residual（aclTensor）</td>
           <td>输入</td>
           <td>AddRmsNorm融合算子的残差输入，即计算公式中的residual。</td>
-          <td>inplace场景将residual作为y的输出地址。当前版本仅支持三维输入。</td>
+          <td>Inplace场景将residual作为y的输出地址。当前版本仅支持三维输入。</td>
           <td>FLOAT16、BFLOAT16</td>
           <td>ND</td>
           <td>3</td>
@@ -346,7 +346,7 @@ aclnnStatus aclnnQuantMatmulAllReduceAddRmsNorm(
 - 若输出residual类型为FLOAT16，dequantScale的类型为UINT64、INT64；若输出residual类型为BFLOAT16，dequantScale的类型为BFLOAT16。
 - x1、x2数据类型为INT8，bias数据类型为INT32、residual、gamma、y、normOut计算输入的数据类型要一致。
 - 只支持x2矩阵转置/不转置，x1矩阵支持不转置场景。
-- 支持1、2、4、8卡，并且仅支持hccs链路all mesh组网。
+- 支持1、2、4、8卡，并且仅支持HCCS链路all mesh组网。
 - 支持(b*s)、n为0的空tensor，不支持k为0的空tensor。
 
 <!-- npu="910b" id7 -->
@@ -358,7 +358,7 @@ aclnnStatus aclnnQuantMatmulAllReduceAddRmsNorm(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include <thread>

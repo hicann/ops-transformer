@@ -24,7 +24,7 @@
 ## 功能说明
 
 - 接口功能：
-    - 完成量化的路由专家 GroupedMatMul、Unpermute、AlltoAllv 融合并实现与共享专家 MatMul 并行融合，先计算后通信，支持pertensor-pertensor、mx[量化模式](../../../docs/zh/context/quant_mode_introduction.md)。
+    - 完成量化的路由专家GroupedMatMul、Unpermute、AlltoAllv融合并实现与共享专家MatMul并行融合，先计算后通信，支持pertensor-pertensor、mx[量化模式](../../../docs/zh/context/quant_mode_introduction.md)。
 
 - 计算公式：
     - 路由专家：
@@ -138,7 +138,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
                 <td>gmmWeight</td>
                 <td>输入</td>
                 <td>公式中的输入gmmWeight。</td>
-                <td>shape (e, H1, N1)。e为每卡部署的专家数，H1为hidden size，N1为路由专家FFN中间维度。</td>
+                <td>shape (e, H1, N1)。e为每卡部署的专家数，H1为hidden size，N1为路由专家FFN的中间层维度。</td>
                 <td>HIFLOAT8、FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1</td>
                 <td>ND</td>
                 <td>3</td>
@@ -171,7 +171,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
                 <td>sendCountsTensorOptional</td>
                 <td>输入</td>
                 <td>AlltoAllv使用的send count。</td>
-                <td>当前仅支持空。shape (e * ep, )。e为每卡部署的专家个数，ep为ep域大小。</td>
+                <td>当前仅支持空。shape (e * ep, )。e为每卡部署的专家个数，epWorldSize为ep域大小。</td>
                 <td>INT64</td>
                 <td>ND</td>
                 <td>1</td>
@@ -182,7 +182,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
                 <td>recvCountsTensorOptional</td>
                 <td>输入</td>
                 <td>AlltoAllv使用的recv count。</td>
-                <td>当前仅支持空。shape (e * ep, )。e为每卡部署的专家个数，ep为ep域大小。</td>
+                <td>当前仅支持空。shape (e * ep, )。e为每卡部署的专家个数，epWorldSize为ep域大小。</td>
                 <td>INT64</td>
                 <td>ND</td>
                 <td>1</td>
@@ -226,7 +226,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
                 <td>mmWeightScaleOptional</td>
                 <td>输入</td>
                 <td>mmWeight的量化系数。</td>
-                <td><li>pertensor量化：shape(1)。</li><li>mx量化: shape (N2, ceil(H2/64), 2)，weight转置时为(ceil(H2/64), N2, 2)</li></td>
+                <td><li>pertensor量化：shape (1)。</li><li>mx量化：shape (N2, ceil(H2/64), 2)，weight转置时为(ceil(H2/64), N2, 2)</li></td>
                 <td>FLOAT32、FLOAT8_E8M0</td>
                 <td>ND</td>
                 <td><li>pertensor量化：1</li><li>mx量化：3</li></td>
@@ -314,7 +314,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
                 <td>groupSize</td>
                 <td>输入</td>
                 <td>PerGroup量化分组大小。</td>
-                <td>用于Matmul计算三个方向上的量化分组大小。预留参数，仅当量化Scale输入为2维及以上数据时取值有效，其他场景需传入0。groupSize输入由3个方向的groupSizeM，groupSizeN，groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（高16位无效），计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</td>
+                <td>用于Matmul计算三个方向上的量化分组大小。预留参数，仅当量化Scale输入为2维及以上数据时取值有效，其他场景需传入0。groupSize输入由3个方向的groupSizeM、groupSizeN、groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（高16位无效），计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</td>
                 <td>INT64</td>
                 <td>-</td>
                 <td>-</td>
@@ -357,7 +357,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
             <tr>
                 <td>sendCounts</td>
                 <td>输入</td>
-                <td>AlltoAllv使用的send count。表示其他Rank向当前rank上各expert发送的token数量。</td>
+                <td>AlltoAllv使用的send count。表示其他Rank向当前rank上各专家发送的token数量。</td>
                 <td>支持的维度为e * ep。按<code>sendCounts[fromRank][expertId]</code>一维展开，例如e=3时顺序为<code>e0,e1,e2,e0,e1,e2, ...</code></td>
                 <td>aclIntArray*（元素类型INT64）</td>
                 <td>ND</td>
@@ -413,7 +413,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
                 <td>mmYOptional</td>
                 <td>输出</td>
                 <td>matmul计算输出。</td>
-                <td>shape (bs, N2)。</td>
+                <td>shape (BS, N2)。</td>
                 <td>FLOAT16、BFLOAT16</td>
                 <td>ND</td>
                 <td>2</td>
@@ -444,7 +444,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
         </tbody>
     </table>
 
-  gmmXQuantMode、gmmWeightQuantMode、mmXQuantMode、mmWeightQuantMode、commQuantMode的枚举值跟[量化模式](../../../docs/zh/context/quant_mode_introduction.md)关系如下:
+  gmmXQuantMode、gmmWeightQuantMode、mmXQuantMode、mmWeightQuantMode、commQuantMode的枚举值跟[量化模式](../../../docs/zh/context/quant_mode_introduction.md)关系如下：
   * 0: 非量化
   * 1: pertensor
   * 2: perchannel
@@ -536,16 +536,16 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
   - Ascend 950DT系列产品：支持CCU通信和AI CPU通信，CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
   <!-- end id8 -->
 
-- e * epWorldSize 乘积最大支持256，其中e（单卡专家数），最大支持32，epWorldSize支持2/4/8/16/32/64/128/256;
-- gmmX的shape(A, H1)，A为sendCounts之和，H1取值范围(0, 65536);
-- gmmWeight的shape(e, H1, N1)，N1取值范围(0, 65536);
-- y的shape为(BSK, N1)，其中K的范围[2, 8]，BSK为recvCounts之和;
-- mmX是共享专家的左矩阵，shape为(BS, H2)，H2的取值范围(0, 12288]；
-- mmWeight是共享专家的右矩阵，shape为(H2, N2)，N2的取值范围(0, 65536)；
-- sendCounts为发送到其他卡的token数，数组大小为e * epWorldSize;
-- recvCounts为从其他卡接收到的token数，数组大小为e * epWorldSize;
-- 路由专家和共享专家量化Scale、Mode等均为必选；
-- 低比特通信Mode为必选参数，DType和Scale为可选，当Mode为非0时需要提供DType和Scale；
+- e * epWorldSize乘积最大支持256，其中e（单卡专家数），最大支持32，epWorldSize支持2/4/8/16/32/64/128/256。
+- gmmX的shape(A, H1)，A为sendCounts之和，H1取值范围(0, 65536)。
+- gmmWeight的shape(e, H1, N1)，N1取值范围(0, 65536)。
+- y的shape为(BSK, N1)，其中K的范围[2, 8]，BSK为recvCounts之和。
+- mmX是共享专家的左矩阵，shape为(BS, H2)，H2的取值范围(0, 12288]。
+- mmWeight是共享专家的右矩阵，shape为(H2, N2)，N2的取值范围(0, 65536)。
+- sendCounts为发送到其他卡的token数，数组大小为e * epWorldSize。
+- recvCounts为从其他卡接收到的token数，数组大小为e * epWorldSize。
+- 路由专家和共享专家量化Scale、Mode等均为必选。
+- 低比特通信Mode为必选参数，DType和Scale为可选，当Mode为非0时需要提供DType和Scale。
 - 参数说明里shape使用的变量：
   - BSK：本卡接收的token数，是recvCounts参数累加之和，取值范围(0, 52428800)。
   - H1：表示路由专家hidden size隐藏层大小，取值范围(0, 65536)。
@@ -559,7 +559,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
   - mx量化且gmmX与gmmWeight为FLOAT4_E2M1时，H1和H2必须为偶数且不能为2，同时transGmmWeight和transMmWeight为false情况下，N1和N2必须为偶数。
   - gmmWeight和gmmWeightScale的转置状态必须保持一致：同时转置或同时不转置。mmWeight和mmWeightScale同样需要保持转置状态一致。
-  - groupSize:
+  - groupSize：
     - 仅当gmmXScale/gmmWeightScale/mmXScale/mmWeightScale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
     - groupSize值支持公式推导：传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据gmmX/gmmWeight/mmX/mmWeight/gmmXScale/gmmWeightScale/mmXScale/mmWeightScale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。设置原理：如果groupSizeM=0，表示m方向量化分组值由接口推导，推导公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与gmmX/mmX shape中的m一致，scaleM与gmmXScale/mmXScale shape中的m一致；如果groupSizeK=0，表示k方向量化分组值由接口推导，推导公式为groupSizeK = k / scaleK（需保证k能被scaleK整除），其中k与gmmX/mmX shape中的k一致，scaleK与gmmXScale/mmXScale shape中的k一致；如果groupSizeN=0，表示n方向量化分组值由接口推导，推导公式为groupSizeN = n / scaleN（需保证n能被scaleN整除），其中n与gmmWeight/mmWeight shape中的n一致，scaleN与gmmWeightScale/mmWeightScale shape中的n一致。
     $$
@@ -569,7 +569,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
 
 - 量化参数约束：
   - 当前版本支持pertensor量化、mx量化。
-- 类型约束
+- 类型约束：
   - pertensor量化
 
     | gmmX | gmmWeight | gmmXScale | gmmWeightScale | mmXScale | mmWeightScale | y |
@@ -592,7 +592,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950" id9 -->
 - <term>Ascend 950DT系列产品</term>：

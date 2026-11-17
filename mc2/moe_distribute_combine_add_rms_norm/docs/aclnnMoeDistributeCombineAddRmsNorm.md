@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：当存在TP域通信时，先进行ReduceScatterV通信，再进行AlltoAllV通信，最后将接收的数据整合（乘权重再相加）；当不存在TP域通信时，进行AlltoAllV通信，最后将接收的数据整合（乘权重再相加），之后完成Add和RmsNorm融合。
+- 接口功能：当存在TP域通信时，先进行ReduceScatterV通信，再进行AllToAllV通信，最后将接收的数据整合（乘权重再相加）；当不存在TP域通信时，进行AllToAllV通信，最后将接收的数据整合（乘权重再相加），之后完成Add和RmsNorm融合。
 
 - 计算公式：
 
@@ -248,8 +248,8 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
     <tr>
     <td>sharedExpertXOptional</td>
     <td>输入</td>
-    <td>表示共享专家计算后的Token。</td>
-    <td>可传有效数据或空指针，2D时shape为(Bs, H)，3D时shape为(Bs, 1, H)</td>
+    <td>表示共享专家计算后的token。</td>
+    <td>可传有效数据或空指针，2D时shape为(Bs, H)，3D时shape为(Bs, 1, H)。</td>
     <td>BFLOAT16</td>
     <td>ND</td>
     <td>-</td>
@@ -329,7 +329,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
     <td>expertShardType</td>
     <td>输入</td>
     <td>表示共享专家卡分布类型。</td>
-    <td>当前仅支持传0，表示共享专家卡排在MoE专家卡前面</td>
+    <td>当前仅支持传0，表示共享专家卡排在MoE专家卡前面。</td>
     <td>INT64</td>
     <td>ND</td>
     <td>-</td>
@@ -368,7 +368,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
     <tr>
     <td>outDtype</td>
     <td>输入</td>
-    <td>用于指定输出x的数据类型，预留参数</td>
+    <td>用于指定输出x的数据类型，预留参数。</td>
     <td>当前版本不支持，传0即可。</td>
     <td>INT64</td>
     <td>ND</td>
@@ -388,7 +388,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
     <tr>
     <td>groupListType</td>
     <td>输入</td>
-    <td>group List格式，预留参数。</td>
+    <td>groupList格式，预留参数。</td>
     <td>当前版本不支持，传1即可。</td>
     <td>INT64</td>
     <td>ND</td>
@@ -428,7 +428,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
     <tr>
     <td>rstdOut</td>
     <td>输出</td>
-    <td>RMSNorm计算中的逆标准差（1/RMS(x)）。</td>
+    <td>RmsNorm计算中的逆标准差（1/RMS(x)）。</td>
     <td>要求为3D Tensor，shape为(Bs, 1, 1)。</td>
     <td>FLOAT32</td>
     <td>ND</td>

@@ -133,7 +133,7 @@ aclnnStatus aclnnIncreFlashAttentionV4(
         <td>key</td>
         <td>输入</td>
         <td>公式中的输入K。</td>
-        <td>key、value中对应tensor的shape需要完全一致。</td>
+        <td>key、value中对应Tensor的shape需要完全一致。</td>
         <td>FLOAT16、BFLOAT16、INT8</td>
         <td>ND</td>
         <td><ul><li>(B, N, S, D)</li><li>(B, S, N, D)</li><li>(B, S, H)</li></ul></td>
@@ -143,7 +143,7 @@ aclnnStatus aclnnIncreFlashAttentionV4(
         <td>value</td>
         <td>输入</td>
         <td>公式中的输入V。</td>
-        <td>key、value中对应tensor的shape需要完全一致。</td>
+        <td>key、value中对应Tensor的shape需要完全一致。</td>
         <td>FLOAT16、BFLOAT16、INT8</td>
         <td>ND</td>
         <td><ul><li>(B, N, S, D)</li><li>(B, S, N, D)</li><li>(B, S, H)</li></ul></td>
@@ -163,7 +163,7 @@ aclnnStatus aclnnIncreFlashAttentionV4(
         <td>attenMask</td>
         <td>输入</td>
         <td>attention掩码矩阵。</td>
-        <td><ul><li>支持空Tensor。</li><li>当attenMask数据类型取INT8、UINT8时，其tensor中的值需要为0或1。</li></ul></td>
+        <td><ul><li>支持空Tensor。</li><li>当attenMask数据类型取INT8、UINT8时，其Tensor中的值需要为0或1。</li></ul></td>
         <td>BOOL、INT8、UINT8</td>
         <td>ND</td>
         <td><ul><li>(B, S)</li><li>(B, 1, S)</li><li>(B, 1, 1, S)</li></ul></td>
@@ -212,8 +212,8 @@ aclnnStatus aclnnIncreFlashAttentionV4(
       <tr>
         <td>quantScale2</td>
         <td>输入</td>
-        <td>输出量化的量化因子。</td>
-        <td><ul><li>支持空Tensor。</li><li>支持per-tensor，per-channel。</li></ul></td>
+        <td>反量化（伪量化）的量化偏移。</td>
+        <td><ul><li>支持空Tensor。</li><li>支持per-tensor、per-channel。</li></ul></td>
         <td>FLOAT32、BFLOAT16</td>
         <td>ND</td>
         <td><ul><li>(1)</li><li>(D * N)，N为numKeyValueHeads</li></ul></td>
@@ -223,7 +223,7 @@ aclnnStatus aclnnIncreFlashAttentionV4(
         <td>quantOffset2</td>
         <td>输入</td>
         <td>输出量化的量化偏移。</td>
-        <td><ul><li>支持空Tensor。</li><li>支持per-tensor，per-channel。</li></ul></td>
+        <td><ul><li>支持空Tensor。</li><li>支持per-tensor、per-channel。</li></ul></td>
         <td>FLOAT32、BFLOAT16</td>
         <td>ND</td>
         <td><ul><li>(1)</li><li>(D * N)，N为numKeyValueHeads</li></ul></td>
@@ -233,7 +233,7 @@ aclnnStatus aclnnIncreFlashAttentionV4(
         <td>antiquantScale</td>
         <td>输入</td>
         <td>量化因子。</td>
-        <td><ul><li>支持空Tensor。</li><li>支持per-tensor，per-channel（list），由shape决定，BNSD场景下shape为(2, N, 1, D)，BSH场景下shape为(2, H)，BSND场景下shape为(2, N, D)。</li></ul></td>
+        <td><ul><li>支持空Tensor。</li><li>支持per-tensor、per-channel（list），由shape决定，BNSD场景下shape为(2, N, 1, D)，BSH场景下shape为(2, H)，BSND场景下shape为(2, N, D)。</li></ul></td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
         <td><ul><li>(2, N, 1, D)</li><li>(2, H)</li><li>(2, N, D)</li><li>(2)</li></ul></td>
@@ -242,8 +242,8 @@ aclnnStatus aclnnIncreFlashAttentionV4(
         <tr>
         <td>antiquantOffset</td>
         <td>输入</td>
-        <td>输出量化的量化因子。</td>
-        <td><ul><li>支持空Tensor。</li><li>支持per-tensor，per-channel（list），由shape决定，BNSD场景下shape为(2, N, 1, D)，BSH场景下shape为(2, H)，BSND场景下shape为(2, N, D)。</li></ul></td>
+        <td>反量化（伪量化）的量化偏移。</td>
+        <td><ul><li>支持空Tensor。</li><li>支持per-tensor、per-channel（list），由shape决定，BNSD场景下shape为(2, N, 1, D)，BSH场景下shape为(2, H)，BSND场景下shape为(2, N, D)。</li></ul></td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
         <td><ul><li>(2, N, 1, D)</li><li>(2, H)</li><li>(2, N, D)</li><li>(2)</li></ul></td>
@@ -293,7 +293,7 @@ aclnnStatus aclnnIncreFlashAttentionV4(
         <td>inputLayout</td>
         <td>输入</td>
         <td>标识输入query、key、value的数据排布格式。</td>
-        <td>当前支持BSH、BNSD、BSND。用户不特意指定时建议传入"BSH"。</td>
+        <td>当前支持BSH、BNSD、BSND。用户不特意指定时建议传入“BSH”。</td>
         <td>STRING</td>
         <td>-</td>
         <td>-</td>
@@ -451,7 +451,7 @@ aclnnStatus aclnnIncreFlashAttentionV4(
   - 支持B轴小于等于65536，N轴小于等于256，D轴小于等于512。
   - query数据类型支持FLOAT16、BFLOAT16，attentionOut、key和value数据类型支持FLOAT16、INT8、BFLOAT16。
   - dequantScale1、dequantScale2数据类型支持UINT64、FLOAT32。
-  - quantScale1、quantScale2和quantOffset2数据类型支持FLOAT32
+  - quantScale1、quantScale2和quantOffset2数据类型支持FLOAT32。
   - numKeyValueHeads数据类型支持INT64。
 <!-- end id7 -->
 <!-- npu="310p" id8 -->
@@ -462,7 +462,7 @@ aclnnStatus aclnnIncreFlashAttentionV4(
   - dequantScale1、quantScale1、dequantScale2、quantScale2和quantOffset2仅支持nullptr。
   - numKeyValueHeads仅支持取值0。
 <!-- end id8 -->
-- 非连续场景下，参数key、value的tensorlist中tensor的个数等于query的B(由于tensorlist限制，非连续场景下B需要小于等于256)。shape除S外需要完全一致，且batch只能为1。
+- 非连续场景下，参数key、value的tensorlist中tensor的个数等于query的B(由于tensorlist限制，非连续场景下B需要小于等于256)。shape除S外需要完全一致，且Batch只能为1。
 - query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 - 参数query中的N和numHeads值相等，key、value的N和numKeyValueHeads值相等，并且numHeads是numKeyValueHeads的倍数关系。
 - query、key、value输入均为INT8的场景暂不支持。
@@ -470,15 +470,15 @@ aclnnStatus aclnnIncreFlashAttentionV4(
 - antiquantScale和antiquantOffset参数约束：
   - per-channel模式：两个参数的shape可支持(2, N, 1, D)，(2, N, D)，(2, H)，N为numKeyValueHeads。参数数据类型和query数据类型相同。
   - per-tensor模式：两个参数的shape均为(2)，数据类型和query数据类型相同。
-- 入参quantScale2和quantOffset2支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型。若传入quantOffset2 ，需保证其类型和shape信息与quantScale2一致。当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16，否则仅支持FLOAT32 。per-channel格式，当输出layout为BSH时，要求quantScale2所有维度的乘积等于H；其他layout要求乘积等于N*D。（建议输出layout为BSH时，quantScale2 shape传入[1,1,H]或[H]；输出为BNSD时，建议传入[1,N,1,D]或[N,D]；输出为BSND时，建议传入[1,1,N,D]或[N,D]）。
-- page attention场景:
+- 入参quantScale2和quantOffset2支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型。若传入quantOffset2，需保证其类型和shape信息与quantScale2一致。当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16，否则仅支持FLOAT32。per-channel格式，当输出layout为BSH时，要求quantScale2所有维度的乘积等于H；其他layout要求乘积等于N*D。（建议输出layout为BSH时，quantScale2 shape传入[1,1,H]或[H]；输出为BNSD时，建议传入[1,N,1,D]或[N,D]；输出为BSND时，建议传入[1,1,N,D]或[N,D]）。
+- page attention场景：
   - page attention的开启必要条件是blockTable存在且有效，同时key、value是按照blockTable中的索引在一片连续内存中排布，支持key、value dtype为FLOAT16/BFLOAT16/INT8，在该场景下key、value的inputLayout参数无效。
   - blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在开启page attention场景下，blockSize需要传入非0值，且blockSize最大不超过512。key、value输入类型为FLOAT16/BFLOAT16时需要16对齐，key、value输入类型为INT8时需要32对齐，推荐使用128。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
-  - page attention场景下，当query的inputLayout为BNSD时，kv cache排布支持（blocknum, blocksize, H）和（blocknum, KV_N, blocksize, D）两种格式，当query的inputLayout为BSH、BSND时，kv cache排布只支持（blocknum, blocksize, H）一种格式。blocknum不能小于根据actualSeqLengthsKv和blockSize计算的每个batch的block数量之和。且key和value的shape需保证一致。
+  - page attention场景下，当query的inputLayout为BNSD时，kv cache排布支持（blocknum, blocksize, H）和（blocknum, KV_N, blocksize, D）两种格式，当query的inputLayout为BSH、BSND时，kv cache排布只支持（blocknum, blocksize, H）一种格式。blocknum不能小于根据actualSeqLengthsKv和blockSize计算的每个Batch的block数量之和。且key和value的shape需保证一致。
   - page attention场景下，kv cache排布为（blocknum, KV_N, blocksize, D）时性能通常优于kv cache排布为（blocknum, blocksize, H）时的性能，建议优先选择（blocknum, KV_N, blocksize, D）格式。
   - page attention开启场景下，当输入kv cache排布格式为（blocknum, blocksize, H），且numKeyValueHeads * headDim超过64k时，受硬件指令约束，会被拦截报错。可通过开启GQA（减小numKeyValueHeads）或调整kv cache排布格式为（blocknum, numKeyValueHeads, blocksize, D）解决。
-  - page attention场景下，必须传入输入actualSeqLengths。
-  - page attention场景下，blockTable必须为二维，第一维长度需等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大actualSeqLengthsKv对应的block数量）。
+  - page attention场景下，必须传入actualSeqLengths。
+  - page attention场景下，blocktable必须为二维，第一维长度需等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个Batch中最大actualSeqLengthsKv对应的block数量）。
   - page attention开启场景下，以下场景输入S需要大于等于maxBlockNumPerSeq * blockSize。
   - 开启Attention mask，例如mask shape为(B, 1, 1, S)。
   - 开启pseShift，例如pseShift shape为(B, N, 1, S)。

@@ -154,7 +154,7 @@ aclnnStatus aclnnMatmulAlltoAllV2(
     <tr>
     <td>commMode</td>
     <td>输入</td>
-    <td>指定当前通信类型。</td>
+    <td>指定当前通信引擎。</td>
     <td>支持输入"aiv"、"ai_cpu"或"ccu"。</td>
     <td>-</td>
     <td>-</td>
@@ -213,7 +213,7 @@ aclnnStatus aclnnMatmulAlltoAllV2(
     </tr>
     </tbody></table>
 
-- **返回值**
+- **返回值：**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
@@ -324,7 +324,7 @@ aclnnStatus aclnnMatmulAlltoAllV2(
 * 参数说明中shape使用的变量H2必须整除NPU卡数。
 * H1范围仅支持[1, 65535]。
 * BS*rankSize和H2的值不得超过2147483647(INT32_MAX)，BS的值不得小于0，H2的值不得小于2。
-* 空tensor的支持度根据不同设备型号有不同的限制：
+* 空Tensor的支持度根据不同设备型号有不同的限制：
 
   <!-- npu="910b" id13 -->
   - <term>Atlas A2系列产品</term>：不支持任何空tensor。
@@ -336,7 +336,7 @@ aclnnStatus aclnnMatmulAlltoAllV2(
   - <term>Ascend 950PR&950DT系列产品</term>：仅支持输入x1的第一维度（BS）为0的空tensor，其它空tensor均不支持。
   <!-- end id15 -->
 
-* 非连续tensor的支持度根据不同设备型号有不同的限制：
+* 非连续Tensor的支持度根据不同设备型号有不同的限制：
 
   <!-- npu="910b" id16 -->
   - <term>Atlas A2系列产品</term>：不支持任何非连续tensor。
@@ -395,12 +395,12 @@ aclnnStatus aclnnMatmulAlltoAllV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="910b" id28 -->
 - <term>Atlas A2系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>
@@ -609,7 +609,7 @@ aclnnStatus aclnnMatmulAlltoAllV2(
 <!-- npu="950" id29 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

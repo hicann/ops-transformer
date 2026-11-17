@@ -98,7 +98,7 @@ aclnnStatus aclnnMatmulAllReduce(
           <td>x2</td>
           <td>输入</td>
           <td>MatMul计算的右矩阵，即计算公式中的x2。</td>
-          <td><ul><li>当前版本仅支持二维输入。</li><li>支持转置/不转置场景。</li><li>ND格式下支持最后两轴转置情况下的非连续的tensor，其他非连续tensor不支持</li></ul></td>
+          <td><ul><li>当前版本仅支持二维输入。</li><li>支持转置/不转置场景。</li><li>ND格式下支持最后两轴转置情况下的非连续的Tensor，其他非连续Tensor不支持。</li></ul></td>
           <td>BFLOAT16、FLOAT16</td>
           <td>ND</td>
           <td>2</td>
@@ -167,7 +167,7 @@ aclnnStatus aclnnMatmulAllReduce(
         <tr>
           <td>workspaceSize</td>
           <td>输出</td>
-          <td>返回需要在device侧申请的workspace大小。</td>
+          <td>返回需要在Device侧申请的workspace大小。</td>
           <td>-</td>
           <td>-</td>
           <td>-</td>
@@ -191,7 +191,7 @@ aclnnStatus aclnnMatmulAllReduce(
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-    第一阶段接口完成入参校验，出现以下场景报错：
+    第一阶段接口完成入参校验，出现以下场景时报错：
 
     <table style="undefined;table-layout: fixed; width: 1149px"><colgroup>
     <col style="width: 282px">
@@ -243,12 +243,12 @@ aclnnStatus aclnnMatmulAllReduce(
     <tr>
         <td>workspace</td>
         <td>输入</td>
-        <td>在device侧申请的workspace内存地址。</td>
+        <td>在Device侧申请的workspace内存地址。</td>
     </tr>
     <tr>
         <td>workspaceSize</td>
         <td>输入</td>
-        <td>在device侧申请的workspace大小，由第一段接口<code>aclnnMatmulAllReduceGetWorkspaceSize</code>获取。</td>
+        <td>在Device侧申请的workspace大小，由第一段接口<code>aclnnMatmulAllReduceGetWorkspaceSize</code>获取。</td>
     </tr>
     <tr>
         <td>executor</td>
@@ -274,15 +274,15 @@ aclnnStatus aclnnMatmulAllReduce(
   - <term>Atlas A2系列产品</term>：`aclnnMatmulAllReduce`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
-  - Ascend 950PR&950DT系列产品：`aclnnMatmulAllReduce`默认确定性实现。
+  - <term>Ascend 950PR&950DT系列产品</term>：`aclnnMatmulAllReduce`默认确定性实现。
   <!-- end id8 -->
 
 - 增量场景不开启MC2，全量场景开启MC2。
-- 输入x1可为二维或者三维，其shape为(b, s, k)或者(m, k)。x2必须是二维，其shape为(k, n)，轴满足mm算子入参要求，k轴相等。bias若非空，其shape为(n)。
+- 输入x1可为二维或者三维，其shape为(b, s, k)或者(m, k)。x2必须是二维，其shape为(k, n)，轴满足MatMul算子入参要求，k轴相等。bias若非空，其shape为(n)。
 - b*s、m、k、n的值均不得超过2147483647(INT32_MAX)。
 - 当输入x1的shape为(b, s, k)时，输出output的shape为(b, s, n)，当输入x1的shape为(m, k)时，输出output的shape为(m, n)。
 - x1、x2、bias计算输入的数据类型要和output计算输出的数据类型一致。
-- 仅支持HCCS链路all mesh组网。
+- 仅支持HCCS链路Full Mesh（全互连）组网。
 
     <!-- npu="910b" id9 -->
     - <term>Atlas A2系列产品</term>：支持1、2、4、8卡。
@@ -294,20 +294,20 @@ aclnnStatus aclnnMatmulAllReduce(
 <!-- npu="910b" id11 -->
 - <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
 <!-- end id11 -->
-- 空tensor支持度：
+- 空Tensor支持度：
   - 支持k为0的场景，输出为bias。
-  - 支持bs/m/n为0，此时传入的输出也应该是空tensor，此场景不进入kernel计算，直接返回。
+  - 支持bs/m/n为0，此时传入的输出也应该是空Tensor，此场景不进入Kernel计算，直接返回。
 
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="950,910b" id12 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <iostream>
     #include <vector>
     #include <thread>

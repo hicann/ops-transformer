@@ -119,7 +119,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceAddRmsNorm(
           <td>x2</td>
           <td>输入</td>
           <td>MatMul计算的右矩阵，即计算公式中的x2。</td>
-          <td><ul><li>支持空Tensor。</li><li>当前版本仅支持二维输入，支持转置/不转置场景。</li><li>支持转置场景下的非连续tensor。</li></ul></td>
+          <td><ul><li>支持空Tensor。</li><li>当前版本仅支持二维输入，支持转置/不转置场景。</li><li>支持转置场景下的非连续Tensor。</li></ul></td>
           <td>INT8、INT4</td>
           <td>ND</td>
           <td>2</td>
@@ -199,7 +199,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceAddRmsNorm(
           <td>reduceOp</td>
           <td>输入</td>
           <td>Host侧标识操作类型的字符串，reduce操作类型。</td>
-          <td>当前仅支持输入"sum"。</td>
+          <td>当前仅支持输入“sum”。</td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -228,7 +228,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceAddRmsNorm(
         <tr>
           <td>antiquantGroupSize</td>
           <td>输入</td>
-          <td>伪量化pergroup模式下，对x2进行反量化计算的groupSize输入。</td>
+          <td>伪量化pergroup模式下，对x2进行伪量化计算的groupSize输入。</td>
           <td>当不支持pergroup时，传入0，支持时，传入值的范围为[32, min(k-1,INT_MAX)]，且为32的倍数。k取值范围与mm接口保持一致。</td>
           <td>INT64</td>
           <td>-</td>
@@ -358,16 +358,16 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceAddRmsNorm(
 - 确定性计算：
   - aclnnWeightQuantMatmulAllReduceAddRmsNorm默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算
 
-- 使用场景同融合算子aclnnWeightQuantMatmulAllReduce一致：增量场景不开启MC2，全量场景开启MC2
+- 使用场景同融合算子aclnnWeightQuantMatmulAllReduce一致：增量场景不开启MC2，全量场景开启MC2。
 - 输入x1可为二维或者三维，其shape为(b, s, k)或者(s, k)。x2必须是二维，其shape为(k, n)，轴满足mm算子入参要求，k轴相等，b\*s、s的范围为[1, 2147483647]，k、n的范围为[1, 65535]。bias若非空，bias为一维，其shape为(n)。
 - 输入residual必须是三维，其shape为(b, s, n)，当x1为二维时，residual的(b*s)等于x1的s。输入gamma必须是一维，其shape为(n)。
-- antiquantScale满足pertensor场景shape为(1)，perchannel场景shape为(1,n)/(n)，pergroup场景shape为(ceil(k,antiquantGroupSize),n)。antiquantOffset若非空，shape与antiquantScale一致。
+- antiquantScale满足pertensor场景shape为(1)，PerChannel场景shape为(1,n)/(n)，pergroup场景shape为(ceil(k,antiquantGroupSize),n)。antiquantOffset若非空，shape与antiquantScale一致。
 - 输出y和normOut的维度和数据类型同residual。bias若非空，shape大小与normOut最后一维相等。
 - x2的数据类型需为int8或者int4，x1、bias、residual、gamma、y、normOut计算输入的数据类型要一致。
 - 只支持x2矩阵转置/不转置，x1矩阵支持不转置场景。
 - antiquantGroupSize取值满足取值范围[32, min(k-1, INT_MAX)]且为32倍数。
-- 支持1、2、4、8卡，并且仅支持hccs链路all mesh组网。
-- 支持(b*s)、n为0的空tensor，不支持k为0的空tensor。
+- 支持1、2、4、8卡，并且仅支持HCCS链路all mesh组网。
+- 支持(b*s)、n为0的空Tensor，不支持k为0的空Tensor。
 
 <!-- npu="910b" id7 -->
 - <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
@@ -378,7 +378,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceAddRmsNorm(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include <thread>

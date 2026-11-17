@@ -128,7 +128,7 @@ aclnnStatus aclnnMaskedCausalConv1dBackward(
       <tr>
         <td>weight（aclTensor*）</td>
         <td>输入</td>
-        <td>表示卷积权重，对应公式中的weight。</td>
+        <td>表示分组卷积权重，对应公式中的weight。</td>
         <td>
           <ul>
             <li>不支持空Tensor。</li>
@@ -174,7 +174,7 @@ aclnnStatus aclnnMaskedCausalConv1dBackward(
       <tr>
         <td>gradWeightOut（aclTensor*）</td>
         <td>输出</td>
-        <td>表示分组卷积输入weight的梯度，对应公式中的gradWeight。</td>
+        <td>表示分组卷积权重weight的梯度，对应公式中的gradWeight。</td>
         <td>
           <ul>
             <li>不支持空Tensor。</li>
@@ -294,7 +294,7 @@ aclnnStatus aclnnMaskedCausalConv1dBackward(
 - 输入限制：
   - 输入输出的shape数据范围约束如下：
     - B（Batch size）：取值范围为1~32。
-    - B *S（Batchsize* SeqLength）：取值范围为1~512K。
+    - B *S（Batch size \* SeqLength）：取值范围为1~512k。
     - H（hiddenSize）：取值范围384~24576，且是64的整数倍。
     - W：W当前只支持3。
 - 算子入参与中间计算结果，在对应运行数据类型（float16/bfloat16）下，数值均不会超出该类型值域范围。

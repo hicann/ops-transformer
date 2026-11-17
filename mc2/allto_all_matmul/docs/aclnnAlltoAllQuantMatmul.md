@@ -292,8 +292,8 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
     <tr>
     <td>groupSize</td>
     <td>输入</td>
-    <td>用于Matmul计算三个方向上的量化分组大小，由3个方向的groupSizeM，groupSizeN，groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（groupSize中的高16位的数值无效）。</td>
-    <td><ul><li>mx量化场景下仅支持[groupSizeM, groupSizeN, groupSizeK] = [1, 1, 32]，对应的groupSize具体取值详细参见<a href="#约束说明">约束说明</a>。其余量化场景默认配置为0，取值不生效。</li><li>支持参数自动推导，当根据计算公式分解的groupSizeM，groupSizeN，groupSizeK任一或多个参数为0时，算子自动推导这些参数值，具体规则详细参见<a href="#约束说明">约束说明</a></li></ul></td>
+    <td>用于Matmul计算三个方向上的量化分组大小，由3个方向的groupSizeM、groupSizeN、groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（groupSize中的高16位的数值无效）。</td>
+    <td><ul><li>mx量化场景下仅支持[groupSizeM, groupSizeN, groupSizeK] = [1, 1, 32]，对应的groupSize具体取值详细参见<a href="#约束说明">约束说明</a>。其余量化场景默认配置为0，取值不生效。</li><li>支持参数自动推导，当根据计算公式分解的groupSizeM、groupSizeN、groupSizeK任一或多个参数为0时，算子自动推导这些参数值，具体规则详细参见<a href="#约束说明">约束说明</a>。</li></ul></td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -361,7 +361,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
     </tr>
     </tbody></table>
 
-  x1QuantMode、x2QuantMode、commQuantMode的枚举值与[量化模式](../../../docs/zh/context/quant_mode_introduction.md)关系如下:
+  x1QuantMode、x2QuantMode、commQuantMode的枚举值与[量化模式](../../../docs/zh/context/quant_mode_introduction.md)关系如下：
   * 0: 不量化
   * 1: pertensor
   * 2: perchannel
@@ -470,7 +470,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
 * NPU卡数（rankSize），根据设备型号有不同限制：
 
   <!-- npu="910b" id9 -->
-  - <term>Atlas A2系列产品</term>：支持2、4、8卡。
+  - <term>Atlas A2系列产品</term>：支持2、4、8张卡。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
   - <term>Ascend 950PR&950DT系列产品</term>：支持2、4、8、16卡。
@@ -488,13 +488,13 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
   - <term>Ascend 950PR&950DT系列产品</term>：仅支持x2为非连续tensor，其它非连续tensor均不支持。
   <!-- end id12 -->
 
-* 传入的x1、x2、x2Scale和output不为空指针，且
+* 传入的x1、x2、x2Scale和output不为空指针，其他输入约束如下：
 
   <!-- npu="950" id13 -->
   - <term>Ascend 950PR&950DT系列产品</term>：在x1QuantMode为pertoken动态量化场景下，不支持传入x1ScaleOptional。
   <!-- end id13 -->
 
-* groupSize相关约束:
+* groupSize相关约束：
   - 仅当x1ScaleOptional和x2Scale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
   - 传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据x1/x2/x1ScaleOptional/x2Scale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。原理：假设groupSizeM=0，表示m方向量化分组值由接口推断，推断公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与x1 shape中的m一致，scaleM与x1ScaleOptional shape中的m一致，k和n方向同理。
     $$
@@ -521,7 +521,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
       * 目前支持左矩阵perToken量化和perToken动态量化，x1QuantMode=3或7；右矩阵perChannel量化，x2QuantMode=2。
     * 类型约束：
       * x1、alltoAllOutOptional的数据类型必须一致。
-      * 若x1、x2、alltoAllOut输入INT32类型，则视作8个INT4打包，会被重新解释为INT4。
+      * 若x1、x2、alltoAllOutOptional输入INT32类型，则视作8个INT4打包，会被重新解释为INT4。
       * A16W8和A16W4时，smoothQuant场景，x1ScaleOptional与x1的数据类型必须一致。
       * A16W8时，x1、x2、biasOptional和output支持的数据类型组合有：
 
@@ -553,7 +553,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
     * 维度约束：
       * A16W8时，rankSize \* H必须被16整除；rankSize \* H取值范围：[1, 35000]。
       * A16W4时，rankSize \* H必须被16整除；N必须为偶数；rankSize \* H取值范围：[1, 35000]。
-      * A4W4时，H与N必须为偶数；rankSize * H取值范围：[1, 35000]。
+      * A4W4时，H与N必须为偶数；rankSize \* H取值范围：[1, 35000]。
   <!-- end id14 -->
   <!-- npu="950" id15 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
@@ -623,7 +623,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="910b" id18 -->
 - <term>Atlas A2系列产品</term>：

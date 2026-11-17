@@ -183,7 +183,7 @@ aclnnStatus aclnnBlockAttnResUpdate(
       <tr>
         <td>pseudoQuery(const aclTensor*)</td>
         <td>输入</td>
-        <td>用于计算当前partial block logit的pseudoQuery。</td>
+        <td>用于计算当前partial block score的pseudoQuery。</td>
         <td>
           <ul>
             <li>必选。</li>
@@ -349,7 +349,7 @@ aclnnStatus aclnnBlockAttnResUpdate(
       <tr>
         <td class="merged-cell" rowspan="5">ACLNN_ERR_PARAM_INVALID</td>
         <td class="merged-cell" rowspan="5">161002</td>
-        <td>输入或输出的 dtype、原始或存储 format、dimension 或 shape 关系不满足约束。</td>
+        <td>输入或输出的 数据类型、原始或存储数据格式、维度或shape 关系不满足约束。</td>
       </tr>
       <tr>
         <td><code>T < 0</code>，或者 <code>D</code> 不在 <code>[0, 8192]</code> 范围内。</td>
@@ -358,7 +358,7 @@ aclnnStatus aclnnBlockAttnResUpdate(
         <td>非空场景下 <code>T * D</code> 超出 <code>int64_t</code> 可表示范围。</td>
       </tr>
       <tr>
-        <td>任一 Tensor 输入或输出为非连续 Tensor。</td>
+        <td>任一Tensor输入或输出为非连续Tensor。</td>
       </tr>
       <tr>
         <td><code>eps</code> 不是有限正数。</td>
@@ -417,8 +417,8 @@ aclnnStatus aclnnBlockAttnResUpdate(
 ## 约束说明
 
 - 确定性计算：
-  - aclnnBlockAttnResUpdate默认确定性实现。
-- 所有 Tensor 输入都支持空 Tensor，但必须继续满足彼此的 shape 关系，不能单独任意置空。
+  - `aclnnBlockAttnResUpdate`默认确定性实现。
+- 所有Tensor输入都支持空Tensor，但必须继续满足彼此的shape关系，不能单独任意置空。
 - 非空场景下，`T * D` 不能超出`int64_t`可表示范围。
 
 ## 调用示例

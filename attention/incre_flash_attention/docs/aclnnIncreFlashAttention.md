@@ -31,7 +31,7 @@
 
     **说明：**
 
-    KV Cache是大模型推理性能优化的一个常用技术。采样时，Transformer模型会以给定的prompt/context作为初始输入进行推理（可以并行处理），随后逐一生成额外的token来继续完善生成的序列（体现了模型的自回归性质）。在采样过程中，Transformer会执行自注意力操作，为此需要给当前序列中的每个项目（无论是prompt/context还是生成的token）提取键值（KV）向量。这些向量存储在一个矩阵中，通常被称为kv缓存（KV Cache）。
+    KV Cache是大模型推理性能优化的一个常用技术。采样时，Transformer模型会以给定的prompt/context作为初始输入进行推理（可以并行处理），随后逐一生成额外的token来继续完善生成的序列（体现了模型的自回归性质）。在采样过程中，Transformer会执行自注意力操作，为此需要给当前序列中的每个项目（无论是prompt/context还是生成的token）提取键值（KV）向量。这些向量存储在一个矩阵中，通常被称为KV缓存（KV Cache）。
 
 - 计算公式：
 
@@ -102,7 +102,7 @@ aclnnStatus aclnnIncreFlashAttention(
         <th>使用说明</th>
         <th>数据类型</th>
         <th>数据格式</th>
-        <th>维度(shape)</th>
+        <th>维度（shape）</th>
         <th>非连续Tensor</th>
       </tr></thead>
     <tbody>
@@ -190,7 +190,7 @@ aclnnStatus aclnnIncreFlashAttention(
         <td>inputLayout</td>
         <td>输入</td>
         <td>标识输入query、key、value的数据排布格式。</td>
-        <td>当前支持BSH、BNSD、BSND。用户不特意指定时建议传入"BSH"。</td>
+        <td>当前支持BSH、BNSD、BSND。用户不特意指定时建议传入“BSH”。</td>
         <td>STRING</td>
         <td>-</td>
         <td>-</td>
@@ -259,7 +259,7 @@ aclnnStatus aclnnIncreFlashAttention(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。</td>
+      <td>如果传入参数是必选输入、输出或者必选属性，且是空指针，则返回161001。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
@@ -269,7 +269,7 @@ aclnnStatus aclnnIncreFlashAttention(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内部调用npu runtime的接口异常。</td>
+      <td>API内部调用NPU Runtime的接口异常。</td>
     </tr>
   </tbody>
   </table>

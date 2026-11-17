@@ -66,7 +66,7 @@
   K=\frac{((dS)^T*Q)}{\sqrt{d}}
   $$
 
-其中增加**sink**之后计算逻辑见下，主要修改相关softmax_max和softmax_sum逻辑计算部分
+其中增加**sink**之后计算逻辑见下，主要修改相关softmax_max和softmax_sum逻辑计算部分。
 
 $$
 S = Q @ K^{T}
@@ -431,7 +431,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(
         <td>preTokens</td>
         <td>可选输入</td>
         <td>稀疏计算时滑窗左边界。</td>
-        <td>不特意指定建议2147483647。</td>
+        <td>不特意指定时建议2147483647。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -441,7 +441,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(
         <td>nextTokens</td>
         <td>可选输入</td>
         <td>稀疏计算时滑窗右边界。</td>
-        <td>不特意指定建议2147483647。</td>
+        <td>不特意指定时建议2147483647。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -471,7 +471,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(
         <td>innerPrecise</td>
         <td>可选输入</td>
         <td>内部计算精度控制。</td>
-        <td>保留参数，暂未使用。</td>
+        <td>预留参数，暂未使用。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -661,7 +661,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(
 - 确定性计算：
   - aclnnFlashAttentionUnpaddingScoreGradV5默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- 输入query、queryRope、key、keyRope、value、dy的B：batchsize必须相等。
+- 输入query、queryRope、keyIn、keyInRope、value、dy的B：batch size必须相等。
 - 输入query、key、value、dy的inputLayout必须一致。
 - 输入query、queryRope、key、keyRope、value、dy的inputLayout必须是TND。
 - 输入query、key、value、pseShiftOptional的数据类型必须一致。
@@ -670,20 +670,20 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(
 - 关于数据shape的约束，以inputLayout的TND为例，其中：
 
     - T(B*S)：取值范围为1\~1M。
-    - B：取值范围为1\~20000。带prefixOptional的时候B最大支持1K。
+    - B：取值范围为1\~20000。带prefixOptional的时候B最大支持1k。
     - N：取值范围为1\~256。
     - S：取值范围为1\~1M。
     - D：取值范围为1\~768。
-    - KeepProb: 取值范围为(0, 1]。
+    - KeepProb：取值范围为(0, 1]。
 - query、key、value数据排布格式仅支持TND，T是B和S合轴紧密排列的数据（每个batch的SeqLenQ和SeqLenKV），其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
-- TND格式下，支持尾部部分Batch不参与计算，此时actual_seq_qlen和actual_seq_kv_len尾部传入对应个数的0即可。假设真实的S长度为[2, 3, 4, 5, 6]，此时后两个Batch不参与计算，则传入的actual_seq_qlen为[2, 5, 9, 0, 0]。
+- TND格式下，支持尾部部分Batch不参与计算，此时actualSeqQLenOptional和actualSeqKvLenOptional尾部传入对应个数的0即可。假设真实的S长度为[2, 3, 4, 5, 6]，此时后两个Batch不参与计算，则传入的actual_seq_qlen为[2, 5, 9, 0, 0]。
 - pseShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可开启alibi位置编码压缩，此时只需要输入原始PSE最后1024行，实现内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
   - 参数每个batch不相同时，shape为BNHSkv(H=1024)。
   - 每个batch相同时，shape为1NHSkv(H=1024)。
   - TND场景下，每个batch段内部仍按[N, Sq_i, Skv_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq_i、真实key/value长度为Skv_i，则该段PSE元素个数为N *Sq_i* Skv_i，整段PSE总长度pseTotalLen为sum_i(N *Sq_i* Skv_i)。
-  - 如果pseType为2或3的时候，数据类型需为FLOAT32,对应shape支持范围是[B,N]或[N]。
+  - 如果pseType为2或3的时候，数据类型需为FLOAT32，对应shape支持范围是[B,N]或[N]。
   - 如果不开启该参数，pseShiftOptional需要传入nullptr，pseType需要传入1。
-- pseType各个取值含义
+- pseType各个取值含义。
 
   | pseType | 含义 | 备注 |
   | ----------- | --------------------------------- | ----------|
@@ -692,16 +692,16 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(
   | 2 | 内部生成pse先mul再add | - |
   | 3 | 内部生成pse先mul再add再sqrt | - |
 
-- sparseMode的约束如下:
-  - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量；
-  - 配置为1、2、3时，用户配置的preTokens、nextTokens不会生效；
+- sparseMode的约束如下：
+  - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量。
+  - 配置为1、2、3时，用户配置的preTokens、nextTokens不会生效。
   - sparseMode配置为0、4时，须保证attenMaskOptional与preTokens、nextTokens的范围一致。
   - 用户不特意指定时建议传入0。
   - sparse不同模式的详细说明请参见[sparse模式说明](../../../docs/zh/context/sparse_mode_introduction.md)。
   - 配置为7时，不支持可选输入pseShiftOptional。
   - 配置为8时，当每个sequence的q、kv等长时支持可选输入pseShiftOptional，针对全局做pse生成。支持q方向进行外切，需要外切前每个sequence的q、kv等长，外切后传入的actualSeqQLenOptional[0] - actualSeqKvLenOptional[0] + qStartIdxOptional - kvStartIdxOptional == 0（本功能属实验性功能）。
 - 不同数据格式详情请参见[数据格式](../../../docs/zh/context/data_format.md)。
-- 部分场景下，如果计算量过大可能会导致算子执行超时（aicore error类型报错，errorStr为：timeout or trap error），此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
+- 部分场景下，如果计算量过大可能会导致算子执行超时（AI Core error类型报错，errorStr为：timeout or trap error），此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 - prefixOptional稀疏计算仅支持压缩场景，sparseMode=6，当Sq > Skv时，prefix的N值取值范围\[0, Skv\]，当Sq <= Skv时，prefix的N值取值范围\[Skv-Sq, Skv\]。
 - actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入pseShiftOptional。
 - 关于softmaxMax与softmaxSum参数的约束：输入格式固定为\[B, N, S, 8\]，TND的输入格式除外，此时为\[T, N, 8\]，注：T=B*S。

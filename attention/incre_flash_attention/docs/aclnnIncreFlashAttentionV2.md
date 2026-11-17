@@ -29,17 +29,17 @@
 
   对于自回归（Auto-regressive）的语言模型，随着新词的生成，推理输入长度不断增大。在原来全量推理的基础上**实现增量推理**，query的S轴固定为1，key和value是经过KV Cache后，将之前推理过的state信息，叠加在一起，每个Batch对应S轴的实际长度可能不一样，输入的数据是经过padding后的固定长度数据。
 
-  相比全量场景的Flash Attention算子（[PromptFlashAttention](../../prompt_flash_attention/README.md)），增量推理的流程与正常全量推理并不完全等价，不过增量推理的精度并无明显劣化。
+  相比全量场景的FlashAttention算子（[PromptFlashAttention](../../prompt_flash_attention/README.md)），增量推理的流程与正常全量推理并不完全等价，不过增量推理的精度并无明显劣化。
 
     **说明：**
 
-    KV Cache是大模型推理性能优化的一个常用技术。采样时，Transformer模型会以给定的prompt/context作为初始输入进行推理（可以并行处理），随后逐一生成额外的token来继续完善生成的序列（体现了模型的自回归性质）。在采样过程中，Transformer会执行自注意力操作，为此需要给当前序列中的每个项目（无论是prompt/context还是生成的token）提取键值（KV）向量。这些向量存储在一个矩阵中，通常被称为kv缓存（KV Cache）。
+    KV Cache是大模型推理性能优化的一个常用技术。采样时，Transformer模型会以给定的prompt/context作为初始输入进行推理（可以并行处理），随后逐一生成额外的token来继续完善生成的序列（体现了模型的自回归性质）。在采样过程中，Transformer会执行自注意力操作，为此需要给当前序列中的每个项目（无论是prompt/context还是生成的token）提取键值（KV）向量。这些向量存储在一个矩阵中，通常被称为KV缓存（KV Cache）。
 
 - 计算公式：
 
   self-attention（自注意力）利用输入样本自身的关系构建了一种注意力模型。其原理是假设有一个长度为$n$的输入样本序列$x$，$x$的每个元素都是一个$d$维向量，可以将每个$d$维向量看作一个token embedding，将这样一条序列经过3个权重矩阵变换得到3个维度为$n*$d的矩阵。
 
-    self-attention的计算公式一般定义如下，其中$Q$、$K$、$V$为输入样本的重要属性元素，是输入样本经过空间变换得到，且可以统一到一个特征空间中。
+    self-attention的计算公式一般定义如下，其中$Q$、$K$、$V$为输入样本的重要属性元素，是输入样本经过空间变换得到的，且可以统一到一个特征空间中。
 
   $$
      Attention(Q,K,V)=Score(Q,K)V
@@ -317,7 +317,7 @@ aclnnStatus aclnnIncreFlashAttentionV2(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。</td>
+      <td>如果传入参数是必选输入、输出或者必选属性，且是空指针，则返回161001。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
@@ -327,7 +327,7 @@ aclnnStatus aclnnIncreFlashAttentionV2(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内部调用npu runtime的接口异常。</td>
+      <td>API内部调用NPU runtime的接口异常。</td>
     </tr>
   </tbody>
   </table>
@@ -385,7 +385,7 @@ aclnnStatus aclnnIncreFlashAttentionV2(
   - 支持B轴小于等于65536，N轴小于等于256，D轴小于等于512。
   - query数据类型支持FLOAT16、BFLOAT16，attentionOut、key和value数据类型支持FLOAT16、BFLOAT16。
   - dequantScale1、dequantScale2数据类型支持UINT64、FLOAT32。
-  - quantScale1、quantScale2和quantOffset2数据类型支持FLOAT32
+  - quantScale1、quantScale2和quantOffset2数据类型支持FLOAT32。
   - numKeyValueHeads数据类型支持INT64。
 <!-- end id6 -->
 - <term>Atlas推理系列产品</term>：
@@ -395,7 +395,7 @@ aclnnStatus aclnnIncreFlashAttentionV2(
   - dequantScale1、quantScale1、dequantScale2、quantScale2和quantOffset2仅支持nullptr。
   - numKeyValueHeads仅支持取值0。
 - 非连续场景下，参数key、value的tensorlist中tensor的个数等于query的B（由于tensorlist限制，非连续场景下B需要小于等于256）。shape除S外需要完全一致，且batch只能为1。
-- 参数query中的N和numHeads值相等，key、value的N和numKeyValueHeads值相等，并且numHeads是numKeyValueHeads的倍数关系。
+- 参数query中的N和numHeads值相等，key、value的N和numKeyValueHeads值相等，并且numHeads与numKeyValueHeads是倍数关系。
 - 仅支持query的S轴等于1。
 - 当attenMask数据类型取INT8、UINT8时，其tensor中的值需要为0或1。
 - query、key、value输入均为INT8的场景暂不支持。
