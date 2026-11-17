@@ -542,13 +542,11 @@ uint32_t SparseFlashMlaMetadataCpuKernel::GetOriTopkLength(uint32_t s1GIdx, cons
 uint32_t SparseFlashMlaMetadataCpuKernel::GetCmpTopkLength(uint32_t bsStride)
 {
     // 尝试使用 cmpTopkLength_
-    if (cmpTopK_ != 0 && cmpMaskMode_ == static_cast<int32_t>(SparseMode::DEFAULT_MASK) && cmpTopkLength_ != nullptr &&
-        cmpTopkLength_->GetData() != nullptr) {
+    if (cmpTopK_ != 0 && cmpTopkLength_ != nullptr && cmpTopkLength_->GetData() != nullptr) {
         const int32_t* cmpTopkPtr = static_cast<const int32_t*>(cmpTopkLength_->GetData());
         // 规划 FA/FD 任务时，将有效稀疏长度限制到索引宽度，与内核的计算范围保持一致。
         return std::min(static_cast<uint32_t>(cmpTopkPtr[bsStride]), static_cast<uint32_t>(cmpTopK_));
     }
-    // 如果不是 DEFAULT_MASK，使用 cmpTopK_
     return static_cast<uint32_t>(cmpTopK_);
 }
 
@@ -1558,14 +1556,15 @@ bool SparseFlashMlaMetadataCpuKernel::BalanceSchedule(SplitResult& splitRes)
     splitRes.maxCost = INT64_MAX;
     splitRes.usedCoreNum = 1U;
 
-    if (isBatchConsistency_) {
+    if (isBatchConsistency_ || ProcessSocVersion() == ValidSocVersion::ASCEND960) {
+        supportFd_ = true;
         CalcSplitPlan(splitRes.maxCost, splitContext, splitRes);
         if (splitRes.numOfFdHead > 0U) {
             SplitFD(splitRes);
         }
-    } else if (ProcessSocVersion() == ValidSocVersion::ASCEND910 || ProcessSocVersion() == ValidSocVersion::ASCEND960 ||
-               aicCoreNum_ <= 4U || batchSize_ > aicCoreNum_ - 4U) {
-        // A2/A3/A6或Batch超过Cube核数减4时关闭FD，直接生成一次不开FD的方案。
+    } else if (ProcessSocVersion() == ValidSocVersion::ASCEND910 || aicCoreNum_ <= 4U ||
+               batchSize_ > aicCoreNum_ - 4U) {
+        // A2/A3、核数不足或Batch超过Cube核数减4时关闭FD，直接生成一次不开FD的方案。
         supportFd_ = false;
         CalcSplitPlan(splitRes.maxCost, splitContext, splitRes);
     } else {

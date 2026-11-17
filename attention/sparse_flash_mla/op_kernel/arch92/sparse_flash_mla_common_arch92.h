@@ -18,6 +18,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "../sparse_flash_mla_common.h"
 #include "../sparse_flash_mla_kernel_metadata.h"
+#include "common/smla_common_defs_arch92.h"
 
 constexpr uint64_t BLOCK_BYTE = 32;
 constexpr uint32_t NEGATIVE_MIN_VALUE_FP32 = 0xFF7FFFFF;
@@ -35,7 +36,6 @@ constexpr uint32_t BUFFER_SIZE_256K = 262144; // 262144表示256 * 1024
 
 constexpr uint32_t CV_RATIO = 1;
 constexpr uint64_t SYNC_MODE = 2;
-constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM = 33U;
 
 namespace SMLAKernel {
 __aicore__ constexpr uint64_t Align2Func(uint64_t data)

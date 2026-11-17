@@ -1007,9 +1007,12 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec1(
                 uint32_t workspaceIdx = GetCrossCoreWorkspaceIdx(qs35VecRunInfo);
                 int64_t stagingMOffset = GetFaStagingMOffset(qs35VecRunInfo, qs35VecConstInfo);
                 LocalTensor<float> tmpUb = this->batchReduceTmpBuf.template Get<float>();
+                LocalTensor<float> tmpMaxBlockUb = tmpUb;
+                // 256 个 float 对应 1024 字节，用于分隔 max 和 sum 的暂存区。
+                LocalTensor<float> tmpSumBlockUb = tmpUb[256];
                 AttentionCommon::StageVec1Lse(stagingLayout, crossCoreCombineBase, workspaceIdx, stagingMOffset,
-                                              qs35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpUb, vToMte3Id,
-                                              stageMte3ToVId);
+                                              qs35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpMaxBlockUb, tmpSumBlockUb,
+                                              vToMte3Id, stageMte3ToVId);
             } else if (qs35VecRunInfo.isFirstS2SplitCore && qs35VecRunInfo.reduceBlockId == 0 &&
                        qs35VecRunInfo.s2LoopCount < qs35VecRunInfo.s2LoopLimit) {
                 AttentionCommon::S2SplitFdStagingLayout stagingLayout = {
@@ -1017,9 +1020,13 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec1(
                     AttentionCommon::FD_BROADCAST_ELEMS_PER_ROW, AttentionCommon::FD_REDUCE_CHUNK_ROWS};
                 int64_t stagingMOffset = GetFaStagingMOffset(qs35VecRunInfo, qs35VecConstInfo);
                 LocalTensor<float> tmpUb = this->batchReduceTmpBuf.template Get<float>();
-                AttentionCommon::StageVec1Lse(
-                    stagingLayout, intraCoreCombineBase, GetIntraCoreWorkspaceIdx(qs35VecRunInfo, qs35VecConstInfo),
-                    stagingMOffset, qs35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpUb, vToMte3Id, stageMte3ToVId);
+                LocalTensor<float> tmpMaxBlockUb = tmpUb;
+                // 256 个 float 对应 1024 字节，用于分隔 max 和 sum 的暂存区。
+                LocalTensor<float> tmpSumBlockUb = tmpUb[256];
+                AttentionCommon::StageVec1Lse(stagingLayout, intraCoreCombineBase,
+                                              GetIntraCoreWorkspaceIdx(qs35VecRunInfo, qs35VecConstInfo),
+                                              stagingMOffset, qs35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpMaxBlockUb,
+                                              tmpSumBlockUb, vToMte3Id, stageMte3ToVId);
                 // 零行 AIV 的 Vec2 会提前返回，不会等待此事件，因此不发送信号。
                 if (qs35VecRunInfo.halfMRealSize > 0) {
                     SetFlag<HardEvent::MTE3_MTE2>(intraLseMte3ToMte2Id[qs35VecRunInfo.multiCoreIdxMod2]);
@@ -1032,9 +1039,12 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec1(
                 uint32_t workspaceIdx = GetCrossCoreWorkspaceIdx(qs35VecRunInfo);
                 int64_t stagingMOffset = GetFaStagingMOffset(qs35VecRunInfo, qs35VecConstInfo);
                 LocalTensor<float> tmpUb = this->batchReduceTmpBuf.template Get<float>();
+                LocalTensor<float> tmpMaxBlockUb = tmpUb;
+                // 256 个 float 对应 1024 字节，用于分隔 max 和 sum 的暂存区。
+                LocalTensor<float> tmpSumBlockUb = tmpUb[256];
                 AttentionCommon::StageVec1Lse(stagingLayout, crossCoreCombineBase, workspaceIdx, stagingMOffset,
-                                              qs35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpUb, vToMte3Id,
-                                              stageMte3ToVId);
+                                              qs35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpMaxBlockUb, tmpSumBlockUb,
+                                              vToMte3Id, stageMte3ToVId);
             }
         }
     } else {
@@ -1046,8 +1056,12 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec1(
             uint32_t workspaceIdx = GetCrossCoreWorkspaceIdx(qs35VecRunInfo);
             int64_t stagingMOffset = GetFaStagingMOffset(qs35VecRunInfo, qs35VecConstInfo);
             LocalTensor<float> tmpUb = this->dequantScaleBuff.template Get<float>();
+            LocalTensor<float> tmpMaxBlockUb = tmpUb;
+            // 256 个 float 对应 1024 字节，用于分隔 max 和 sum 的暂存区。
+            LocalTensor<float> tmpSumBlockUb = tmpUb[256];
             AttentionCommon::StageVec1Lse(stagingLayout, fdStagingBase, workspaceIdx, stagingMOffset,
-                                          qs35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpUb, vToMte3Id, stageMte3ToVId);
+                                          qs35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpMaxBlockUb, tmpSumBlockUb,
+                                          vToMte3Id, stageMte3ToVId);
         }
     }
 

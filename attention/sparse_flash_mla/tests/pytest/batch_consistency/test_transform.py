@@ -13,11 +13,98 @@
 import pytest
 import torch
 
+from .adapter import CaseAdapter
+from .schema import SchemaError, check_invariants
 from .transform import (
     ActualInputSemanticOracle,
     BatchCaseTransformer,
     InvalidTransformError,
 )
+
+
+def make_padded_bsnd_case():
+    return {
+        "B": 3,
+        "layout_q": "BSND",
+        "layout_kv": "BSND",
+        "params": {},
+        "cpu_output": torch.zeros((3, 2, 1, 2)),
+        "metadata_input": {
+            "B": 3,
+            "N1": 1,
+            "N2": 1,
+            "D": 2,
+            "max_seqlen_q": 2,
+            "max_seqlen_ori_kv": 8,
+            "max_seqlen_cmp_kv": 2,
+            "has_ori_kv": True,
+            "has_cmp_kv": True,
+            "layout_q": "BSND",
+            "layout_kv": "BSND",
+        },
+        "input": {
+            "q": torch.arange(12).reshape(3, 2, 1, 2),
+            "ori_kv": torch.arange(48).reshape(3, 8, 1, 2),
+            "cmp_kv": torch.arange(12).reshape(3, 2, 1, 2),
+            "cu_seqlens_q": None,
+            "seqused_ori_kv": torch.tensor([4, 4, 8], dtype=torch.int32),
+            "seqused_cmp_kv": torch.tensor([0, 0, 2], dtype=torch.int32),
+            "cmp_residual_kv": torch.tensor([0, 0, 0], dtype=torch.int32),
+            "sinks": torch.zeros(1),
+            "softmax_scale": 1.0,
+            "cmp_ratio": 4,
+            "ori_mask_mode": 4,
+            "cmp_mask_mode": 3,
+            "ori_win_left": -1,
+            "ori_win_right": -1,
+            "layout_q": "BSND",
+            "layout_kv": "BSND",
+        },
+    }
+
+
+@pytest.mark.parametrize("batch_ids", [[0], [0, 1], [1, 0], [2, 0]])
+def test_bsnd_batch_selection_keeps_padded_kv_metadata(batch_ids):
+    baseline = make_padded_bsnd_case()
+    derived = BatchCaseTransformer(baseline).select_batches(batch_ids)
+    for prefix, physical_length in (("ori", 8), ("cmp", 2)):
+        assert derived["metadata_input"][f"max_seqlen_{prefix}_kv"] == physical_length
+        assert derived["input"][f"{prefix}_kv"].shape[1] == physical_length
+        assert torch.equal(
+            derived["input"][f"seqused_{prefix}_kv"],
+            baseline["input"][f"seqused_{prefix}_kv"][batch_ids],
+        )
+    assert derived["metadata_input"]["has_cmp_kv"] is True
+    mapping = [
+        (old_batch, token, new_batch, token)
+        for new_batch, old_batch in enumerate(batch_ids)
+        for token in range(2)
+    ]
+    assert ActualInputSemanticOracle.validate_mapped_tokens(baseline, derived, mapping)[
+        "pass"
+    ]
+
+
+@pytest.mark.parametrize("prefix", ["ori", "cmp"])
+@pytest.mark.parametrize("configured", [0, 1, 9])
+def test_bsnd_invariants_reject_metadata_different_from_storage(prefix, configured):
+    data = make_padded_bsnd_case()
+    data["metadata_input"][f"max_seqlen_{prefix}_kv"] = configured
+    with pytest.raises(SchemaError, match=f"BSND metadata max_seqlen_{prefix}_kv"):
+        check_invariants(data)
+
+
+def test_bsnd_logical_kv_resize_keeps_padded_metadata():
+    data = make_padded_bsnd_case()
+    transformer = BatchCaseTransformer(data)
+    transformer._set_kv_lengths(data, "ori", [0, 0, 0])
+    transformer._set_kv_lengths(data, "cmp", [0, 0, 0])
+    transformer._sync_derived_fields(CaseAdapter(data))
+    check_invariants(data)
+    assert data["metadata_input"]["max_seqlen_ori_kv"] == 8
+    assert data["metadata_input"]["max_seqlen_cmp_kv"] == 2
+    assert data["input"]["seqused_ori_kv"].tolist() == [0, 0, 0]
+    assert data["input"]["seqused_cmp_kv"].tolist() == [0, 0, 0]
 
 
 def make_kv_resize_case(layout, batch_size=1, prefix="ori"):

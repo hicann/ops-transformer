@@ -63,7 +63,7 @@ __aicore__ inline void GetSingleCoreParam(RunParamStr& runParam, const ConstInfo
 
     if constexpr (TEMPLATE_MODE != SMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
-        if constexpr (LAYOUT_T == SMLA_LAYOUT::TND) {
+        if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::TND) {
             if (hasActualSeqCmpKvlen) {
                 actualS2CmpSize = actualSeqCmpKvlenGm.GetValue(bIdx);
             } else if (hasCuSeqlensCmpKv) {
@@ -85,7 +85,7 @@ __aicore__ inline void GetSingleCoreParam(RunParamStr& runParam, const ConstInfo
         if (constInfo.cmpMaskMode == 0) {
             runParam.nextTokensPerBatchCmp = runParam.actualS2CmpSize * constInfo.cmpRatio;
         } else {
-            runParam.cmpResidual = (cmpResidualKvGm.GetPhyAddr() != nullptr) ? cmpResidualKvGm.GetValue(bIdx) : 0;
+            runParam.cmpResidual = (constInfo.cmpRatio != 1) ? cmpResidualKvGm.GetValue(bIdx) : 0;
             runParam.nextTokensPerBatchCmp =
                 (int64_t)runParam.actualS2CmpSize * constInfo.cmpRatio + runParam.cmpResidual - runParam.actualS1Size;
         }
@@ -313,12 +313,12 @@ __aicore__ inline int64_t ClipSInnerTokenCube(int64_t sInnerToken, int64_t minVa
 
 TEMPLATE_INTF
 __aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo& constInfo,
-                                         GlobalTensor<int32_t>& oriTopkLengthGm, GlobalTensor<int32_t>& cmpTopkLengthGm,
-                                         GlobalTensor<int32_t>& cuSeqlensQGm)
+                                         GlobalTensor<int32_t>& cuSeqlensQGm, GlobalTensor<int32_t>& oriTopkLengthGm,
+                                         GlobalTensor<int32_t>& cmpTopkLengthGm)
 {
     if (TEMPLATE_MODE != SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
         TEMPLATE_MODE != SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        if (runParam.actualS2OriSize == 0) {
+        if (runParam.actualS2OriSize == 0 && runParam.actualS2CmpSize == 0) {
             runParam.oriKvLoopEndIdx = 0;
             runParam.cmpKvLoopEndIdx = 0;
             runParam.s2LoopEndIdx = 0;
@@ -328,26 +328,18 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo&
     }
     uint32_t s2BaseSize = constInfo.s2BaseSize;
 
-    // 计算topk length
+    runParam.oriSparseBlockCount = constInfo.oriSparseBlockCount;
+    runParam.cmpSparseBlockCount = constInfo.cmpSparseBlockCount;
+    int64_t queryOffset = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
     if constexpr (LAYOUT_T == SMLA_LAYOUT::TND) {
-        uint64_t actualSeqQPrefixSum = cuSeqlensQGm.GetValue(runParam.boIdx);
-        runParam.oriSparseBlockCount =
-            constInfo.hasOriTopkLength ?
-                Min(oriTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.oriSparseBlockCount) :
-                constInfo.oriSparseBlockCount;
-        runParam.cmpSparseBlockCount =
-            constInfo.hasCmpTopkLength ?
-                Min(cmpTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.cmpSparseBlockCount) :
-                constInfo.cmpSparseBlockCount;
-    } else {
-        uint64_t bsndTopkIdx = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
-        runParam.oriSparseBlockCount = constInfo.hasOriTopkLength ?
-                                           Min(oriTopkLengthGm.GetValue(bsndTopkIdx), constInfo.oriSparseBlockCount) :
-                                           constInfo.oriSparseBlockCount;
-        runParam.cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
-                                           Min(cmpTopkLengthGm.GetValue(bsndTopkIdx), constInfo.cmpSparseBlockCount) :
-                                           constInfo.cmpSparseBlockCount;
+        queryOffset = cuSeqlensQGm.GetValue(runParam.boIdx) + runParam.s1oIdx;
     }
+    runParam.oriSparseBlockCount = constInfo.hasOriTopkLength ?
+                                       Min(oriTopkLengthGm.GetValue(queryOffset), constInfo.oriSparseBlockCount) :
+                                       constInfo.oriSparseBlockCount;
+    runParam.cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
+                                       Min(cmpTopkLengthGm.GetValue(queryOffset), constInfo.cmpSparseBlockCount) :
+                                       constInfo.cmpSparseBlockCount;
 
     // orikv
     runParam.s2OriLineStartIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(

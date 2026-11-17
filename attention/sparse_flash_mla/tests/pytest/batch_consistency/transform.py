@@ -237,9 +237,14 @@ class ActualInputSemanticOracle:
                 tensors.get("cmp_ratio") or adapter.metadata.get("cmp_ratio") or 1
             )
             if cmp_mode == 0:
-                end = min(cmp_length, ori_length // ratio)
+                end = cmp_length
             elif cmp_mode == 3:
-                end = min(cmp_length, (ori_length - q_length + token + 1) // ratio)
+                residuals = tensors.get("cmp_residual_kv")
+                residual = (
+                    int(residuals[batch]) if residuals is not None and ratio != 1 else 0
+                )
+                restored_length = cmp_length * ratio + residual
+                end = min(cmp_length, (restored_length - q_length + token + 1) // ratio)
             else:
                 raise InvalidTransformError(
                     f"Unsupported cmp_mask_mode={cmp_mode} in semantic oracle"
@@ -545,6 +550,13 @@ class BatchCaseTransformer:
         max_cmp = max(cmp_lengths, default=0)
         adapter.set_reporting_field("S2", max_ori)
         adapter.metadata["max_seqlen_q"] = max(q_lengths, default=1)
+        # BSND keeps its padded sequence axis when batches or logical lengths
+        # change. Metadata describes that storage, including all-zero cmp groups.
+        if adapter.get_layout_kv() == "BSND":
+            ori_kv = tensors.get("ori_kv")
+            cmp_kv = tensors.get("cmp_kv")
+            max_ori = int(ori_kv.shape[1]) if ori_kv is not None else 0
+            max_cmp = int(cmp_kv.shape[1]) if cmp_kv is not None else 0
         adapter.metadata["max_seqlen_ori_kv"] = max_ori
         adapter.metadata["max_seqlen_cmp_kv"] = max_cmp
 
@@ -909,12 +921,31 @@ class BatchCaseTransformer:
         if ori_mode not in (3, 4) and not (has_cmp and cmp_mode in (3, 4)):
             return
 
-        self._set_kv_lengths(input_data, "ori", [new_ori_length])
-        if has_cmp:
+        old_ori_length = ActualInputSemanticOracle._lengths(self.input_data, "ori")[
+            source_batch
+        ]
+        context_delta = new_ori_length - old_ori_length
+        if ori_mode in (3, 4):
+            self._set_kv_lengths(input_data, "ori", [new_ori_length])
+        if has_cmp and cmp_mode in (3, 4):
             ratio = int(
                 tensors.get("cmp_ratio") or adapter.metadata.get("cmp_ratio") or 1
             )
-            cmp_length, residual = divmod(new_ori_length, ratio)
+            old_cmp_length = ActualInputSemanticOracle._lengths(self.input_data, "cmp")[
+                source_batch
+            ]
+            old_residuals = self.tensors.get("cmp_residual_kv")
+            old_residual = (
+                int(old_residuals[source_batch])
+                if old_residuals is not None and ratio != 1
+                else 0
+            )
+            new_cmp_context = old_cmp_length * ratio + old_residual + context_delta
+            if new_cmp_context < 0:
+                raise InvalidTransformError(
+                    "CMP transform requires a negative aligned context length"
+                )
+            cmp_length, residual = divmod(new_cmp_context, ratio)
             self._set_kv_lengths(input_data, "cmp", [cmp_length])
             # The operator contract rejects cmp_residual_kv for an unmasked
             # compressed branch and when there is no compression.  Resizing an

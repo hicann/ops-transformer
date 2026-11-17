@@ -824,10 +824,13 @@ __aicore__ inline void SmlaCsaBlockVector<TEMPLATE_ARGS>::StageCrossCoreVec1Lse(
         smla35VecConstInfo.gSize, dTemplateAlign64, GetStagingSlotNum(false),
         AttentionCommon::FD_BROADCAST_ELEMS_PER_ROW, AttentionCommon::FD_REDUCE_CHUNK_ROWS};
     LocalTensor<float> tmpUb = this->batchReduceTmpUb.tensor;
+    LocalTensor<float> tmpMaxBlockUb = tmpUb;
+    // 256 个 float 对应 1024 字节，用于分隔 max 和 sum 的暂存区。
+    LocalTensor<float> tmpSumBlockUb = tmpUb[256];
     AttentionCommon::StageVec1Lse(stagingLayout, crossCoreCombineBase, GetCrossCoreWorkspaceIdx(smla35VecRunInfo),
                                   GetFaStagingMOffset(smla35VecRunInfo, smla35VecConstInfo),
-                                  smla35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpUb, INNERCORE_STAGE2,
-                                  INNERCORE_STAGE_FD_MTE3_V);
+                                  smla35VecRunInfo.halfMRealSize, maxUb, sumUb, tmpMaxBlockUb, tmpSumBlockUb,
+                                  INNERCORE_STAGE2, INNERCORE_STAGE_FD_MTE3_V);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -854,10 +857,13 @@ __aicore__ inline void SmlaCsaBlockVector<TEMPLATE_ARGS>::StageBatchConsistencyV
             smla35VecConstInfo.gSize, dTemplateAlign64, GetStagingSlotNum(true),
             AttentionCommon::FD_BROADCAST_ELEMS_PER_ROW, AttentionCommon::FD_REDUCE_CHUNK_ROWS};
         LocalTensor<float> tmpUb = this->batchReduceTmpUb.tensor;
+        LocalTensor<float> tmpMaxBlockUb = tmpUb;
+        // 256 个 float 对应 1024 字节，用于分隔 max 和 sum 的暂存区。
+        LocalTensor<float> tmpSumBlockUb = tmpUb[256];
         AttentionCommon::StageVec1Lse(
             stagingLayout, intraCoreCombineBase, GetIntraCoreWorkspaceIdx(smla35VecRunInfo, smla35VecConstInfo),
             GetFaStagingMOffset(smla35VecRunInfo, smla35VecConstInfo), smla35VecRunInfo.halfMRealSize, maxUb, sumUb,
-            tmpUb, INNERCORE_STAGE2, INNERCORE_STAGE_FD_MTE3_V);
+            tmpMaxBlockUb, tmpSumBlockUb, INNERCORE_STAGE2, INNERCORE_STAGE_FD_MTE3_V);
         // 零行 AIV 的 Vec2 会提前返回，不会等待此事件，因此不发送信号。
         if (smla35VecRunInfo.halfMRealSize > 0) {
             SetFlag<HardEvent::MTE3_MTE2>(INNERCORE_INTRALSE_MTE3_MTE2(smla35VecRunInfo.multiCoreIdxMod2));
@@ -882,10 +888,13 @@ __aicore__ inline void SmlaCsaBlockVector<TEMPLATE_ARGS>::StageLegacyVec1Lse(Loc
         smla35VecConstInfo.gSize, dTemplateAlign64, GetStagingSlotNum(), AttentionCommon::FD_BROADCAST_ELEMS_PER_ROW,
         AttentionCommon::FD_REDUCE_CHUNK_ROWS};
     LocalTensor<float> tmpUb = this->fdLseTmpUb.tensor;
+    LocalTensor<float> tmpMaxBlockUb = tmpUb;
+    // 256 个 float 对应 1024 字节，用于分隔 max 和 sum 的暂存区。
+    LocalTensor<float> tmpSumBlockUb = tmpUb[256];
     AttentionCommon::StageVec1Lse(stagingLayout, fdStagingBase, GetCrossCoreWorkspaceIdx(smla35VecRunInfo),
                                   GetFaStagingMOffset(smla35VecRunInfo, smla35VecConstInfo),
-                                  static_cast<uint32_t>(smla35VecRunInfo.halfMRealSize), maxUb, sumUb, tmpUb,
-                                  INNERCORE_STAGE2, INNERCORE_STAGE_FD_MTE3_V);
+                                  static_cast<uint32_t>(smla35VecRunInfo.halfMRealSize), maxUb, sumUb, tmpMaxBlockUb,
+                                  tmpSumBlockUb, INNERCORE_STAGE2, INNERCORE_STAGE_FD_MTE3_V);
 }
 
 TEMPLATES_DEF_NO_DEFAULT

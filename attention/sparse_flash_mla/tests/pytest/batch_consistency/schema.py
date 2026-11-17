@@ -283,6 +283,15 @@ class CaseSchema:
         cmp_kv = tensors.get("cmp_kv")
         seqused_ori_kv = tensors.get("seqused_ori_kv")
         if layout_kv == "BSND":
+            for prefix, kv in (("ori", ori_kv), ("cmp", cmp_kv)):
+                name = f"max_seqlen_{prefix}_kv"
+                configured = metadata.get(name)
+                if kv is not None and configured is not None:
+                    if int(configured) != int(kv.shape[1]):
+                        raise SchemaError(
+                            f"BSND metadata {name} {configured} != "
+                            f"{prefix}_kv dim-1 {kv.shape[1]}"
+                        )
             if ori_kv is not None and ori_kv.shape[0] != batch_size:
                 raise SchemaError(f"ori_kv dim-0 {ori_kv.shape[0]} != B={batch_size}")
             if seqused_ori_kv is not None and ori_kv is not None:

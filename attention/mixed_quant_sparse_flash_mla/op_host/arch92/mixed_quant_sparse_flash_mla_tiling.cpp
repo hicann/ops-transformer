@@ -51,18 +51,31 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
     constexpr uint32_t M_BASE_SIZE = 64;   // m轴基本块大小
     constexpr uint32_t S2_BASE_SIZE = 128; // S2轴基本块大小
     constexpr uint32_t D_SIZE = 512;
-    constexpr uint32_t VEC_RES_ELEM_SIZE = 2; // 2: fp16/bf16
-    constexpr uint32_t TOPK_MAX_SIZE = 2048;  // TopK选取个数
+    constexpr uint32_t VEC_RES_ELEM_SIZE = 2;     // 2: fp16/bf16
+    constexpr uint32_t TOPK_MAX_SIZE = 2048;      // TopK选取个数
+    constexpr uint32_t MAX_S2_SPLIT_NUM = 2;      // 每核最多S2切分次数
+    constexpr uint32_t FLOAT_ELEM_SIZE = 4;       // sizeof(float)
+    constexpr uint32_t FD_BLOCK_ELEM = 8;         // FD广播份数
+    constexpr uint32_t FD_MAX_SUM_REGION_NUM = 2; // max和sum两个区域
+    constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM = 33;
     constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128;
     constexpr uint32_t UB_SIZE = 376 * 1024;
+    constexpr uint32_t UB_BLOCK_ALIGN_SHIFT = 5; // UB 数据块按 2^5 = 32 字节对齐。
+    constexpr uint64_t UB_BLOCK_ALIGN_BYTES = 1ULL << UB_BLOCK_ALIGN_SHIFT;
     uint32_t alignedOriSparseBlockCount = (tilingInfo->oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
                                           SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
     uint32_t alignedCmpSparseBlockCount = (tilingInfo->cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
                                           SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
-    uint64_t oriUbSize = static_cast<uint64_t>(tilingInfo->oriMaxBlockNumPerBatch) * sizeof(int32_t) +
-                         static_cast<uint64_t>(alignedOriSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
-    uint64_t cmpUbSize = static_cast<uint64_t>(tilingInfo->cmpMaxBlockNumPerBatch) * sizeof(int32_t) +
-                         static_cast<uint64_t>(alignedCmpSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
+    uint64_t oriUbSize =
+        (((static_cast<uint64_t>(tilingInfo->oriMaxBlockNumPerBatch) * sizeof(int32_t) + UB_BLOCK_ALIGN_BYTES - 1) >>
+          UB_BLOCK_ALIGN_SHIFT)
+         << UB_BLOCK_ALIGN_SHIFT) +
+        static_cast<uint64_t>(alignedOriSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
+    uint64_t cmpUbSize =
+        (((static_cast<uint64_t>(tilingInfo->cmpMaxBlockNumPerBatch) * sizeof(int32_t) + UB_BLOCK_ALIGN_BYTES - 1) >>
+          UB_BLOCK_ALIGN_SHIFT)
+         << UB_BLOCK_ALIGN_SHIFT) +
+        static_cast<uint64_t>(alignedCmpSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
     bool oriBlockSizePowerOfTwo =
         tilingInfo->oriBlockSize > 0 && (tilingInfo->oriBlockSize & (tilingInfo->oriBlockSize - 1)) == 0;
     bool cmpBlockSizePowerOfTwo =
@@ -102,6 +115,24 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
             perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
             workspaceSize += totalBS1 * alignedCmpSparseBlockCount * sizeof(int64_t);
         }
+    }
+    uint32_t fdStagingMSize = tilingInfo->gSize;
+    uint32_t fdStagingSlotNum = isSplitG ? (aicNum >> 1) : aicNum;
+    if (tilingInfo->batchConsistency) {
+        size_t combineElemSize = static_cast<size_t>(fdStagingMSize) * D_SIZE +
+                                 static_cast<size_t>(FD_MAX_SUM_REGION_NUM) * fdStagingMSize * FD_BLOCK_ELEM;
+        // 核内规约：每个逻辑槽分配两份中间状态，供轮换暂存使用。
+        workspaceSize += 2ULL * fdStagingSlotNum * combineElemSize * FLOAT_ELEM_SIZE;
+        // 核间规约：每个逻辑槽预留最多 BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM 份规约块状态。
+        workspaceSize += static_cast<size_t>(fdStagingSlotNum) * BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM *
+                         combineElemSize * FLOAT_ELEM_SIZE;
+    } else {
+        // 末尾的2对应每个split分别暂存max和sum。
+        size_t s2SplitStagingPerSlot =
+            static_cast<size_t>(fdStagingMSize) * D_SIZE * FLOAT_ELEM_SIZE * MAX_S2_SPLIT_NUM +
+            static_cast<size_t>(fdStagingMSize) * FD_BLOCK_ELEM * FLOAT_ELEM_SIZE * MAX_S2_SPLIT_NUM *
+                FD_MAX_SUM_REGION_NUM;
+        workspaceSize += s2SplitStagingPerSlot * fdStagingSlotNum;
     }
     size_t* workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
@@ -147,7 +178,8 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoA6CsaTiling(MQSMLATilingInfo* 
     uint32_t tilingKey = GET_TPL_TILING_KEY(
         0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_), static_cast<uint32_t>(tilingInfo->gSize > 64),
         ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8), vectorizeFlag,
-        static_cast<uint32_t>(tilingInfo->topkValueMode), static_cast<uint32_t>(tilingInfo->quantMode));
+        static_cast<uint32_t>(tilingInfo->batchConsistency), static_cast<uint32_t>(tilingInfo->topkValueMode),
+        static_cast<uint32_t>(tilingInfo->quantMode));
     context_->SetTilingKey(tilingKey);
     context_->SetScheduleMode(1);
 

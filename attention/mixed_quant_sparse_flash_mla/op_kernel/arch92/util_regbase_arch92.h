@@ -75,6 +75,13 @@ struct RunParamStr { // 分核与切块需要使用到参数
     int64_t qSNumInOneBlock;
     int64_t oriKvLoopEndIdx;
     int64_t cmpKvLoopEndIdx;
+    int64_t s2RangeStart = 0;
+    int64_t s2RangeEnd = 0;
+    int64_t firstFdDataWorkspaceIdx = 0;
+    int64_t s2SplitIdx = 0;
+    int64_t baseBlockNumPerReductionBlock = 1;
+    bool isCrossCoreSplit = false;
+    bool isFirstS2SplitCore = true;
 };
 
 #define COMMON_RUN_INFO \
@@ -131,6 +138,13 @@ struct RunInfo {
     int64_t qSNumInOneBlock;
     int64_t oriKvLoopEndIdx;
     int64_t cmpKvLoopEndIdx;
+    int64_t firstFdDataWorkspaceIdx = 0;
+    int64_t s2SplitIdx = 0;
+    int64_t reduceBlockId = 0;
+    bool isCrossCoreSplit = false;
+    bool isFirstS2SplitCore = true;
+    bool isFirstBase = true;
+    bool isLastBase = true;
 };
 
 struct ConstInfo {

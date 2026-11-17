@@ -169,14 +169,14 @@ __aicore__ inline void StageBroadcastMaxSum(const S2SplitFdStagingLayout& layout
 }
 
 // Stage Vec1 max/sum to GM staging.
-// tmpUb must hold at least 2 * stagingM * broadcastElems floats (max + sum broadcast blocks).
+// The caller provides non-overlapping max/sum scratch tensors, each large enough
+// for the broadcast of validRows rounded up to layout.broadcastElems rows.
 __aicore__ inline void StageVec1Lse(const S2SplitFdStagingLayout& layout, __gm__ uint8_t* stagingBase,
                                     int64_t workspaceIdx, int64_t stagingMOffset, int64_t validRows,
-                                    LocalTensor<float>& maxUb, LocalTensor<float>& sumUb, LocalTensor<float>& tmpUb,
+                                    LocalTensor<float>& maxUb, LocalTensor<float>& sumUb,
+                                    LocalTensor<float>& tmpMaxBlockUb, LocalTensor<float>& tmpSumBlockUb,
                                     uint8_t vToMte3Id, uint8_t mte3ToVId)
 {
-    LocalTensor<float> tmpMaxBlockUb = tmpUb;
-    LocalTensor<float> tmpSumBlockUb = tmpUb[1024 / sizeof(float)];
     int64_t mSizeAlign8 = (validRows + layout.broadcastElems - 1) / layout.broadcastElems * layout.broadcastElems;
     int64_t brcbRepeat = mSizeAlign8 / layout.broadcastElems;
     Brcb(tmpMaxBlockUb, maxUb, brcbRepeat, {1, static_cast<uint16_t>(layout.broadcastElems)});

@@ -61,13 +61,11 @@ __aicore__ inline void GetSingleCoreParam(
 
     if constexpr (TEMPLATE_MODE != MQSMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != MQSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
-        if constexpr (LAYOUT_T == MQSMLA_LAYOUT ::TND) {
+        if constexpr (KV_LAYOUT_T == MQSMLA_LAYOUT::TND) {
             if (hasActualSeqCmpKvlen) {
                 actualS2CmpSize = actualSeqCmpKvlenGm.GetValue(bIdx);
             } else if (hasCuSeqlensCmpKv) {
                 actualS2CmpSize = cuSeqlensCmpKvGm.GetValue(bIdx + 1) - cuSeqlensCmpKvGm.GetValue(bIdx);
-            } else {
-                actualS2CmpSize = actualS2OriSize / constInfo.cmpRatio;
             }
         } else {
             actualS2CmpSize = (!hasActualSeqCmpKvlen) ? constInfo.cmpS2Size : actualSeqCmpKvlenGm.GetValue(bIdx);
@@ -76,13 +74,14 @@ __aicore__ inline void GetSingleCoreParam(
 
     runParam.actualS1Size = actualS1Size;
     runParam.actualS2OriSize = actualS2OriSize;
+    runParam.actualS2CmpSize = actualS2CmpSize;
     if constexpr (TEMPLATE_MODE != MQSMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != MQSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
         runParam.actualS2CmpSize = actualS2CmpSize;
         if (constInfo.cmpMaskMode == 0) {
             runParam.nextTokensPerBatchCmp = runParam.actualS2CmpSize * constInfo.cmpRatio;
         } else {
-            runParam.cmpResidual = (constInfo.cmpRatio != 1) ? cmpResidualKvGm.GetValue(bIdx) : 0;
+            runParam.cmpResidual = cmpResidualKvGm.GetPhyAddr() != nullptr ? cmpResidualKvGm.GetValue(bIdx) : 0;
             runParam.nextTokensPerBatchCmp =
                 (int64_t)runParam.actualS2CmpSize * constInfo.cmpRatio + runParam.cmpResidual - runParam.actualS1Size;
         }
@@ -120,7 +119,7 @@ __aicore__ inline void ComputeParamBatch(
 
 TEMPLATE_INTF
 __aicore__ inline void ComputeS1LoopInfo(RunParamStr& runParam, const ConstInfo& constInfo, bool lastBN,
-                                         int64_t nextGs1Idx, int64_t gS1StartIdx)
+                                         int64_t nextGs1Idx, int64_t gS1StartIdx, uint32_t s2EndIdx = 0)
 {
     int32_t gSize = 64;
     // 计算每个基本快可以拷贝多少行s
@@ -164,7 +163,8 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr& runParam, const ConstInfo&
     if (!lastBN) {
         runParam.gs1LoopEndIdx = gs1LoopEndIdx;
     } else { // 最后一个bn, 从数组下一个元素取值
-        runParam.gs1LoopEndIdx = nextGs1Idx == 0 ? gs1LoopEndIdx : nextGs1Idx;
+        runParam.gs1LoopEndIdx =
+            (nextGs1Idx == 0 && s2EndIdx == 0) ? gs1LoopEndIdx : nextGs1Idx + (s2EndIdx != 0 ? 1 : 0);
     }
 
     if (runParam.gs1LoopStartIdx > runParam.gs1LoopEndIdx) {
@@ -303,39 +303,24 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo&
                                          GlobalTensor<int32_t>& cuSeqlensQGm, GlobalTensor<int32_t>& oriTopkLengthGm,
                                          GlobalTensor<int32_t>& cmpTopkLengthGm)
 {
-    if constexpr (TEMPLATE_MODE != MQSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
-                  TEMPLATE_MODE != MQSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        if (runParam.actualS2OriSize == 0) {
-            runParam.oriKvLoopEndIdx = 0;
-            runParam.cmpKvLoopEndIdx = 0;
-            runParam.s2LoopEndIdx = 0;
-            return true;
-        }
+    if (runParam.actualS2OriSize == 0 && runParam.actualS2CmpSize == 0) {
+        runParam.oriKvLoopEndIdx = 0;
+        runParam.cmpKvLoopEndIdx = 0;
+        runParam.s2LoopEndIdx = 0;
+        return true;
     }
 
     uint32_t s2BaseSize = constInfo.s2BaseSize;
-
-    uint32_t oriSparseBlockCount = constInfo.oriSparseBlockCount;
-    uint32_t cmpSparseBlockCount = constInfo.cmpSparseBlockCount;
+    int64_t queryOffset = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
     if constexpr (LAYOUT_T == MQSMLA_LAYOUT::TND) {
-        uint64_t actualSeqQPrefixSum = cuSeqlensQGm.GetValue(runParam.boIdx);
-        oriSparseBlockCount =
-            constInfo.hasOriTopkLength ?
-                Min(oriTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.oriSparseBlockCount) :
-                constInfo.oriSparseBlockCount;
-        cmpSparseBlockCount =
-            constInfo.hasCmpTopkLength ?
-                Min(cmpTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.cmpSparseBlockCount) :
-                constInfo.cmpSparseBlockCount;
-    } else {
-        uint64_t bsndTopkIdx = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
-        oriSparseBlockCount = constInfo.hasOriTopkLength ?
-                                  Min(oriTopkLengthGm.GetValue(bsndTopkIdx), constInfo.oriSparseBlockCount) :
-                                  constInfo.oriSparseBlockCount;
-        cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
-                                  Min(cmpTopkLengthGm.GetValue(bsndTopkIdx), constInfo.cmpSparseBlockCount) :
-                                  constInfo.cmpSparseBlockCount;
+        queryOffset = cuSeqlensQGm.GetValue(runParam.boIdx) + runParam.s1oIdx;
     }
+    uint32_t oriSparseBlockCount = constInfo.hasOriTopkLength ?
+                                       Min(oriTopkLengthGm.GetValue(queryOffset), constInfo.oriSparseBlockCount) :
+                                       constInfo.oriSparseBlockCount;
+    uint32_t cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
+                                       Min(cmpTopkLengthGm.GetValue(queryOffset), constInfo.cmpSparseBlockCount) :
+                                       constInfo.cmpSparseBlockCount;
 
     // orikv
     runParam.s2LineStartIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(

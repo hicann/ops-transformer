@@ -20,6 +20,7 @@
 #include "sparse_flash_mla_kvcache_arch92.h"
 #include "sparse_flash_mla_csa_block_cube_arch92.h"
 #include "sparse_flash_mla_csa_block_vector_arch92.h"
+#include "smla_kernel_common_arch92.h"
 #include "kernel_operator.h"
 #include "../sparse_flash_mla_kernel_metadata.h"
 #include "../../../common/op_kernel/matmul.h"
@@ -62,6 +63,10 @@ public:
     __aicore__ inline void Process();
 
 private:
+    __aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr& smlaRunParam, const ConstInfo& constInfo,
+                                                            uint32_t s2BlockIdx);
+    __aicore__ inline bool ApplyS2MetadataRange(RunParamStr& smlaRunParam, ConstInfo& constInfo, int64_t s2StartPoint,
+                                                int64_t s2EndPoint, bool isFirstS2RangeTask, bool isLastS2RangeTask);
     __aicore__ inline void ProcessMainLoop();
     __aicore__ inline int64_t GetSeqLen(int32_t bIdx, bool hasActualSeq, bool hasCuSeqlens,
                                         GlobalTensor<int32_t>& actualSeqGm, GlobalTensor<int32_t>& cuSeqlensGm,
@@ -153,12 +158,14 @@ private:
     /* 模板库Block */
     CubeBlockType cubeBlock;
     VecBlockType vecBlock;
+    int64_t s2SplitIdxCounter = 0;
     int64_t createdTaskCount = 0;
     int64_t executedTaskCount = 0;
     int64_t multiCoreInnerIdx = 1;
     int64_t s2LoopEndIdx = 0;
     int64_t gS1LoopEndForBN = 0;
     int64_t s2Cur = 0;
+    uint32_t s2MetaEndIdx = 0;
 };
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -205,6 +212,27 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Ini
                            cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedQ, seqUsedOriKV, seqUsedCmpKV,
                            cmpResidualKV, oriTopkLength, cmpTopkLength, sinks, workspace, tiling, tPipe); // gm设置
     this->InitLocalBuffer();
+    if ASCEND_IS_AIV {
+        int64_t fdStagingOffset = 0U;
+        if constexpr (IS_SPLIT_G) {
+            constexpr uint32_t TRIPLE_BUFFER_NUM = 3U;
+            int64_t v0ResSize = constInfo.s2BaseSize * constInfo.dSize * sizeof(Q_T);
+            int64_t v0LogicalSlotCount = GetBlockNum() >> 1U;
+            fdStagingOffset = v0ResSize * TRIPLE_BUFFER_NUM * v0LogicalSlotCount;
+            fdStagingOffset += TRIPLE_BUFFER_NUM * constInfo.s2BaseSize * sizeof(int32_t) * GetBlockNum();
+        }
+        // Bind the staging regions after splitting the workspace.
+        if constexpr (IS_BATCH_CONSISTENCY) {
+            uint64_t combineElemSize = static_cast<uint64_t>(constInfo.gSize) * Align64Func(constInfo.dSizeV) +
+                                       2ULL * constInfo.gSize * AttentionCommon::FD_BROADCAST_ELEMS_PER_ROW;
+            uint64_t intraCoreSlotNum = IS_SPLIT_G ? GetBlockNum() : (GetBlockNum() << 1U);
+            uint64_t intraCoreCombineSize = intraCoreSlotNum * combineElemSize * sizeof(float);
+            vecBlock.InitS2SplitStaging(workspace + fdStagingOffset,
+                                        workspace + fdStagingOffset + intraCoreCombineSize);
+        } else {
+            vecBlock.InitS2SplitStaging(workspace + fdStagingOffset);
+        }
+    }
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -465,6 +493,89 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Pro
     }
     ProcessMainLoop();
     FreeEvent();
+    PipeBarrier<PIPE_ALL>();
+    SyncAll();
+    if ASCEND_IS_AIV {
+        AttentionCommon::FdRunInfo fdRunInfo;
+        AttentionCommon::ParseFdRunInfo(fdRunInfo, constInfo, metadataGm);
+        if (fdRunInfo.coreEnable) {
+            vecBlock.ProcessFlashDecode(fdRunInfo, constInfo);
+            vecBlock.FreeFDEvent();
+        }
+    }
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline int64_t SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::ConvertS2MetadataBlockToToken(
+    const RunParamStr& smlaRunParam, const ConstInfo& constInfo, uint32_t s2BlockIdx)
+{
+    int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
+    int64_t smlaOriLength = smlaRunParam.s2OriLineEndIdx - smlaRunParam.s2OriLineStartIdx;
+    int64_t cmpLen = smlaRunParam.s2CmpLineEndIdx - smlaRunParam.s2CmpLineStartIdx;
+    int64_t safeBaseBlockNum =
+        smlaRunParam.baseBlockNumPerReductionBlock > 0 ? smlaRunParam.baseBlockNumPerReductionBlock : 1LL;
+    int64_t reductionBlockSize = safeBaseBlockNum * s2BaseSize;
+    int64_t oriReductionBlockNum = (smlaOriLength + reductionBlockSize - 1) / reductionBlockSize;
+    if (s2BlockIdx <= oriReductionBlockNum) {
+        int64_t oriToken = static_cast<int64_t>(s2BlockIdx) * reductionBlockSize;
+        return oriToken < smlaOriLength ? oriToken : smlaOriLength;
+    }
+    int64_t cmpToken = (static_cast<int64_t>(s2BlockIdx) - oriReductionBlockNum) * reductionBlockSize;
+    return smlaOriLength + (cmpToken < cmpLen ? cmpToken : cmpLen);
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline bool SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::ApplyS2MetadataRange(
+    RunParamStr& smlaRunParam, ConstInfo& constInfo, int64_t s2StartPoint, int64_t s2EndPoint, bool isFirstS2RangeTask,
+    bool isLastS2RangeTask)
+{
+    int64_t oriStart = smlaRunParam.s2OriLineStartIdx;
+    int64_t oriEnd = smlaRunParam.s2OriLineEndIdx;
+    int64_t smlaOriLength = oriEnd - oriStart;
+    int64_t cmpStart = smlaRunParam.s2CmpLineStartIdx;
+    int64_t cmpEnd = smlaRunParam.s2CmpLineEndIdx;
+    int64_t cmpLen = cmpEnd - cmpStart;
+    int64_t totalLen = smlaOriLength + cmpLen;
+
+    int64_t effectiveS2EndPoint = (isLastS2RangeTask && s2EndPoint == 0) ? totalLen : s2EndPoint;
+    int64_t rangeStart = isFirstS2RangeTask ? s2StartPoint : 0;
+    rangeStart = rangeStart < 0 ? 0 : rangeStart;
+    rangeStart = rangeStart < totalLen ? rangeStart : totalLen;
+    int64_t rangeEnd = isLastS2RangeTask ? effectiveS2EndPoint : totalLen;
+    rangeEnd = rangeEnd < 0 ? 0 : rangeEnd;
+    rangeEnd = rangeEnd < totalLen ? rangeEnd : totalLen;
+    if (rangeEnd <= rangeStart) {
+        smlaRunParam.oriKvLoopEndIdx = 0;
+        smlaRunParam.cmpKvLoopEndIdx = 0;
+        smlaRunParam.s2LoopEndIdx = 0;
+        smlaRunParam.isCrossCoreSplit = false;
+        return true;
+    }
+
+    bool hasPrevCore = rangeStart > 0;
+    bool hasNextCore = rangeEnd < totalLen;
+    smlaRunParam.isCrossCoreSplit = hasPrevCore || hasNextCore;
+    smlaRunParam.isFirstS2SplitCore = !hasPrevCore;
+
+    int64_t oriRangeStart = rangeStart < smlaOriLength ? rangeStart : smlaOriLength;
+    int64_t oriRangeEnd = rangeEnd < smlaOriLength ? rangeEnd : smlaOriLength;
+    smlaRunParam.s2OriLineStartIdx = oriStart + oriRangeStart;
+    smlaRunParam.s2OriLineEndIdx = oriStart + oriRangeEnd;
+
+    int64_t cmpRangeStart = rangeStart > smlaOriLength ? rangeStart - smlaOriLength : 0;
+    cmpRangeStart = cmpRangeStart < cmpLen ? cmpRangeStart : cmpLen;
+    int64_t cmpRangeEnd = rangeEnd > smlaOriLength ? rangeEnd - smlaOriLength : 0;
+    cmpRangeEnd = cmpRangeEnd < cmpLen ? cmpRangeEnd : cmpLen;
+    smlaRunParam.s2CmpLineStartIdx = cmpStart + cmpRangeStart;
+    smlaRunParam.s2CmpLineEndIdx = cmpStart + cmpRangeEnd;
+
+    int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
+    int64_t oriRangeLen = smlaRunParam.s2OriLineEndIdx - smlaRunParam.s2OriLineStartIdx;
+    int64_t cmpRangeLen = smlaRunParam.s2CmpLineEndIdx - smlaRunParam.s2CmpLineStartIdx;
+    smlaRunParam.oriKvLoopEndIdx = (oriRangeLen + s2BaseSize - 1) / s2BaseSize;
+    smlaRunParam.cmpKvLoopEndIdx = (cmpRangeLen + s2BaseSize - 1) / s2BaseSize;
+    smlaRunParam.s2LoopEndIdx = smlaRunParam.oriKvLoopEndIdx + smlaRunParam.cmpKvLoopEndIdx;
+    return smlaRunParam.s2LoopEndIdx == 0;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -488,59 +599,28 @@ __aicore__ inline TaskDealMode SparseFlashMlaSwaKernel<CubeBlockType, VecBlockTy
     int32_t gs1LoopEndIdx)
 {
     bool lastBN = (bN2Cur == bN2EndIdx - 1);
-    bool isFirstTask = (s2Cur == s2StartIdx && gS1Cur == firstGs1 && bN2Cur == bN2StartIdx);
-
-    if (bN2Cur != prevBN2Cur || isFirstTask) {
+    bool isFirstTask = (s2Cur == 0 && gS1Cur == firstGs1 && bN2Cur == bN2StartIdx);
+    const bool newBatch = bN2Cur != prevBN2Cur || isFirstTask;
+    if (newBatch) {
         runParam.boIdx = bN2Cur;
         runParam.n2oIdx = 0;
         ComputeParamBatch<TEMPLATE_INTF_ARGS>(
             runParam, this->constInfo, this->cuSeqlensQGm, this->cuSeqlensOriKvGm, this->cuSeqlensCmpKvGm,
             this->actualSeqQlenGm, this->actualSeqOriKvlenGm, this->actualSeqCmpKvlenGm, this->cmpResidualKvGm,
             this->hasActualSeqQlen, this->hasActualSeqOriKvlen, this->hasActualSeqCmpKvlen, this->hasCuSeqlensCmpKv);
-        ComputeS1LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, lastBN, nextGs1Idx, gS1StartIdx);
+        ComputeS1LoopInfo<TEMPLATE_INTF_ARGS>(runParam, constInfo, lastBN, nextGs1Idx, gS1StartIdx, this->s2MetaEndIdx);
         prevBN2Cur = bN2Cur;
         prevGS1Cur = static_cast<uint32_t>(-1);
-        gS1LoopEndForBN = runParam.gs1LoopEndIdx;
-
-        runParam.s1oIdx = gS1Cur * runParam.qSNumInOneBlock;
-        if constexpr (IS_SPLIT_G) {
-            const int64_t halfG = (constInfo.gSize + 1) / 2;
-            runParam.goIdx = (aicIdx % 2 == 0) ? 0 : halfG;
-            runParam.gSplitSize = (aicIdx % 2 == 0) ? halfG : (constInfo.gSize - halfG);
-        } else {
-            runParam.goIdx = 0;
-            runParam.gSplitSize = constInfo.gSize;
-        }
-
-        // 增加 S1 无效行跳过
-        if (gS1Cur >= runParam.gs1LoopEndIdx) {
-            s2Cur = 0;
-            gS1Cur = 0;
-            gS1StartIdx = 0;
-            ++bN2Cur;
-            return TaskDealMode::SKIP;
-        }
-
-        bool s1NoNeedCalc = ComputeParamS1<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, gS1Cur, this->cuSeqlensQGm);
-        bool s2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, this->oriTopkLengthGm,
-                                                                  this->cmpTopkLengthGm, this->cuSeqlensQGm);
-        if (s1NoNeedCalc || s2NoNeedCalc) {
-            ++gS1Cur;
-            s2Cur = 0;
-            if (gS1Cur >= gS1LoopEndForBN) {
-                gS1Cur = 0;
-                gS1StartIdx = 0;
-                ++bN2Cur;
-            }
-            return TaskDealMode::SKIP;
-        }
-        s2LoopEndIdx = runParam.s2LoopEndIdx - 1;
-        prevGS1Cur = gS1Cur;
     }
-
-    if (gS1Cur != prevGS1Cur) {
+    if (newBatch || gS1Cur != prevGS1Cur) {
         gS1LoopEndForBN = runParam.gs1LoopEndIdx;
-
+        if (gS1Cur >= runParam.gs1LoopEndIdx) {
+            s2Cur = 0;
+            gS1Cur = 0;
+            gS1StartIdx = 0;
+            ++bN2Cur;
+            return TaskDealMode::SKIP;
+        }
         runParam.s1oIdx = gS1Cur * runParam.qSNumInOneBlock;
         if constexpr (IS_SPLIT_G) {
             const int64_t halfG = (constInfo.gSize + 1) / 2;
@@ -550,19 +630,28 @@ __aicore__ inline TaskDealMode SparseFlashMlaSwaKernel<CubeBlockType, VecBlockTy
             runParam.goIdx = 0;
             runParam.gSplitSize = constInfo.gSize;
         }
-
-        if (gS1Cur >= runParam.gs1LoopEndIdx) {
-            s2Cur = 0;
-            gS1Cur = 0;
-            gS1StartIdx = 0;
-            ++bN2Cur;
-            return TaskDealMode::SKIP;
+        bool s1NoNeedCalc = ComputeParamS1<TEMPLATE_INTF_ARGS>(runParam, constInfo, gS1Cur, this->cuSeqlensQGm);
+        bool s2NoNeedCalc =
+            ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(runParam, constInfo, cuSeqlensQGm, oriTopkLengthGm, cmpTopkLengthGm);
+        if (!s2NoNeedCalc) {
+            runParam.baseBlockNumPerReductionBlock = 1LL;
+            if constexpr (IS_BATCH_CONSISTENCY) {
+                int64_t s2Load = runParam.s2OriLineEndIdx - runParam.s2OriLineStartIdx + runParam.s2CmpLineEndIdx -
+                                 runParam.s2CmpLineStartIdx;
+                int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
+                int64_t s2PerReduceBlock = ((s2Load + 31LL) / 32LL + s2BaseSize - 1) / s2BaseSize * s2BaseSize;
+                int64_t baseBlockNum = s2PerReduceBlock / s2BaseSize;
+                runParam.baseBlockNumPerReductionBlock = baseBlockNum > 0 ? baseBlockNum : 1LL;
+            }
+            bool isFirstS2RangeTask = (bN2Cur == bN2StartIdx && gS1Cur == firstGs1);
+            bool isLastS2RangeTask = (lastBN && gS1Cur + 1 == runParam.gs1LoopEndIdx);
+            int64_t s2StartPoint = ConvertS2MetadataBlockToToken(runParam, constInfo, s2StartIdx);
+            int64_t s2EndPoint = (isLastS2RangeTask && s2MetaEndIdx == 0) ?
+                                     0 :
+                                     ConvertS2MetadataBlockToToken(runParam, constInfo, s2MetaEndIdx);
+            s2NoNeedCalc = ApplyS2MetadataRange(runParam, constInfo, s2StartPoint, s2EndPoint, isFirstS2RangeTask,
+                                                isLastS2RangeTask);
         }
-
-        bool s1NoNeedCalc = ComputeParamS1<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, gS1Cur, this->cuSeqlensQGm);
-        bool s2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, this->oriTopkLengthGm,
-                                                                  this->cmpTopkLengthGm, this->cuSeqlensQGm);
-
         if (s1NoNeedCalc || s2NoNeedCalc) {
             ++gS1Cur;
             s2Cur = 0;
@@ -572,6 +661,12 @@ __aicore__ inline TaskDealMode SparseFlashMlaSwaKernel<CubeBlockType, VecBlockTy
                 ++bN2Cur;
             }
             return TaskDealMode::SKIP;
+        }
+
+        if constexpr (!IS_BATCH_CONSISTENCY) {
+            if (runParam.isCrossCoreSplit) {
+                runParam.s2SplitIdx = s2SplitIdxCounter++;
+            }
         }
         s2LoopEndIdx = runParam.s2LoopEndIdx - 1;
         prevGS1Cur = gS1Cur;
@@ -670,20 +765,23 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Pro
     uint32_t bN2EndIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_BN2_END_INDEX, false));
     uint32_t nextGs1Idx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_M_END_INDEX, false));
     uint32_t s2EndIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_END_INDEX, false));
+    this->s2MetaEndIdx = s2EndIdx;
 
-    if (nextGs1Idx != 0) {
+    if (nextGs1Idx != 0 || s2EndIdx != 0) {
         bN2EndIdx++;
     }
 
     RunInfo runInfo[3];
     RunParamStr runParam;
+    runParam.firstFdDataWorkspaceIdx =
+        metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX, false));
     int64_t remainingS2Sync = maxS2LoopCnt;
     uint32_t prevBN2Cur = bN2StartIdx;
     uint32_t firstGs1 = gS1StartIdx;
     uint32_t prevGS1Cur = gS1StartIdx;
     uint32_t bN2Cur = bN2StartIdx;
     uint32_t gS1Cur = gS1StartIdx;
-    int64_t s2Cur = s2StartIdx;
+    int64_t s2Cur = 0;
     bool shouldDispatchTask = true;
     bool shouldExecuteTask = false;
     // 计算当前batch的gs1LoopEndIdx
@@ -704,7 +802,7 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Pro
         // 不需要取topk, 每次计算gSize行, 循环qs次
         gs1LoopEndIdx = (actualS1Size + qSNumInOneBlock - 1) / qSNumInOneBlock;
     }
-    gs1LoopEndIdx = nextGs1Idx == 0 ? gs1LoopEndIdx : nextGs1Idx;
+    gs1LoopEndIdx = (nextGs1Idx == 0 && s2EndIdx == 0) ? gs1LoopEndIdx : nextGs1Idx + (s2EndIdx != 0 ? 1 : 0);
     while (shouldDispatchTask || shouldExecuteTask) {
         shouldDispatchTask = ShouldDispatchTask(bN2Cur, gS1Cur, bN2EndIdx, nextGs1Idx, gs1LoopEndIdx);
         if (shouldDispatchTask) {
@@ -760,13 +858,26 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Set
     runInfo.isCrossCoreSplit = runParam.isCrossCoreSplit;
     runInfo.s2SplitIdx = runParam.s2SplitIdx;
     runInfo.isFirstS2SplitCore = runParam.isFirstS2SplitCore;
-    int64_t safeBaseBlockNum =
-        runParam.baseBlockNumPerReductionBlock > 0 ? runParam.baseBlockNumPerReductionBlock : 1LL;
-    int64_t baseBlockIdInReduceBlock = s2LoopCount % safeBaseBlockNum;
-    runInfo.reduceBlockId = s2LoopCount / safeBaseBlockNum;
-    runInfo.isFirstBase = baseBlockIdInReduceBlock == 0;
-    runInfo.isLastBase = baseBlockIdInReduceBlock == safeBaseBlockNum - 1LL || s2LoopCount == s2LoopLimit;
-    runInfo.needReduce = runInfo.reduceBlockId > 0;
+    if constexpr (IS_BATCH_CONSISTENCY) {
+        int64_t safeBaseBlockNum =
+            runParam.baseBlockNumPerReductionBlock > 0 ? runParam.baseBlockNumPerReductionBlock : 1LL;
+        int64_t reductionLoopCount = s2LoopCount;
+        // 进入 CMP 时补齐规约计数，不增加实际计算。
+        if (s2LoopCount >= runParam.oriKvLoopEndIdx) {
+            reductionLoopCount += (safeBaseBlockNum - runParam.oriKvLoopEndIdx % safeBaseBlockNum) % safeBaseBlockNum;
+        }
+        int64_t baseBlockIdInReduceBlock = reductionLoopCount % safeBaseBlockNum;
+        runInfo.reduceBlockId = reductionLoopCount / safeBaseBlockNum;
+        runInfo.isFirstBase = baseBlockIdInReduceBlock == 0;
+        runInfo.isLastBase = baseBlockIdInReduceBlock == safeBaseBlockNum - 1LL || s2LoopCount == s2LoopLimit ||
+                             s2LoopCount + 1 == runParam.oriKvLoopEndIdx;
+        runInfo.needReduce = runInfo.reduceBlockId > 0;
+        if (runParam.isCrossCoreSplit && runInfo.isFirstBase &&
+            (!runParam.isFirstS2SplitCore || runInfo.reduceBlockId == 0)) {
+            runParam.s2SplitIdx = s2SplitIdxCounter++;
+        }
+        runInfo.s2SplitIdx = runParam.s2SplitIdx;
+    }
     this->ComputeBmm1Tail(runInfo, runParam);
     InitUniqueRunInfo(runParam, runInfo);
 }
