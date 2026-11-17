@@ -22,7 +22,7 @@ namespace Catlass {
 /// the callable structure it carries like std::function<void(void)>, so it is necessary to ensure
 /// that it is used within the life cycle of the callable structure.
 struct Callback {
-    void const* func{nullptr};
+    const void* func{nullptr};
     void (*caller)(void const*){nullptr};
 
     Callback() = default;

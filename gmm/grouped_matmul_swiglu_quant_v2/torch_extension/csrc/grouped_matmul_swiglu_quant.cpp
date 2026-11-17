@@ -21,6 +21,7 @@
 namespace op_api {
 namespace {
 constexpr int64_t kCeilDivAdjustment = 1;
+constexpr int64_t kWeightRank = 3;
 constexpr int64_t kWeightScaleRank = 4;
 constexpr int64_t kSwigluSplitFactor = 2;
 constexpr int64_t kMxScalePairSize = 2;
@@ -130,7 +131,7 @@ std::tuple<at::Tensor, at::Tensor> grouped_matmul_swiglu_quant(
     const double gluBiasValue = gluBias.value_or(kDefaultGluBias);
     CheckListForIndexing(weight, "weight");
     CheckListForIndexing(weightScale, "weight_scale");
-    TORCH_CHECK(weight[0].dim() == 3, "weight[0] must be 3D, but got ", weight[0].dim(), ".");
+    TORCH_CHECK(weight[0].dim() == kWeightRank, "weight[0] must be 3D, but got ", weight[0].dim(), ".");
     TORCH_CHECK(x.defined() && x.dim() > kDim0, "x must be defined and have a dimension for output shape inference.");
     TORCH_CHECK(swigluMode.has_value(), "swiglu_mode must be specified; use torch_npu for legacy V2 calls.");
     // The Torch schema has a TensorList bias, while ACLNN takes one Tensor.
