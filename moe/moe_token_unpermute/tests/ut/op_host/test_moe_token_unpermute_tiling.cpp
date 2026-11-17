@@ -261,6 +261,59 @@ TEST_F(MoeTokenUnpermuteTiling, test_tiling_small_tokens_num_core)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 2);
 }
 
+// Output shape validation emits warnings and preserves the input-derived tiling result.
+TEST_F(MoeTokenUnpermuteTiling, test_tiling_output_not_2d_warns)
+{
+    optiling::MoeTokenUnpermuteCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara("MoeTokenUnpermute",
+                                              {{{{6144, 5120}, {6144, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                               {{{6144}, {6144}}, ge::DT_INT32, ge::FORMAT_ND}},
+                                              {{{{6144, 5120, 1}, {6144, 5120, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+                                              {{"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+                                              &compileInfo);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 2, "5120 1 6144 5120 1 0 96 0 96 1 0 4 ", {16777216});
+}
+
+TEST_F(MoeTokenUnpermuteTiling, test_tiling_output_tokens_mismatch_without_probs_warns)
+{
+    optiling::MoeTokenUnpermuteCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara("MoeTokenUnpermute",
+                                              {{{{6144, 5120}, {6144, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                               {{{6144}, {6144}}, ge::DT_INT32, ge::FORMAT_ND}},
+                                              {{{{6143, 5120}, {6143, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+                                              {{"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+                                              &compileInfo);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 2, "5120 1 6144 5120 1 0 96 0 96 1 0 4 ", {16777216});
+}
+
+TEST_F(MoeTokenUnpermuteTiling, test_tiling_output_tokens_mismatch_with_probs_warns)
+{
+    optiling::MoeTokenUnpermuteCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara("MoeTokenUnpermute",
+                                              {{{{49152, 5120}, {49152, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                               {{{49152}, {49152}}, ge::DT_INT32, ge::FORMAT_ND},
+                                               {{{6144, 8}, {6144, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+                                              {{{{49152, 5120}, {49152, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+                                              {{"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+                                              &compileInfo);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 3, "5120 8 49152 5120 1 0 96 0 96 1 0 4 ", {16777216});
+}
+
+TEST_F(MoeTokenUnpermuteTiling, test_tiling_output_hidden_mismatch_warns)
+{
+    for (int64_t outputHiddenSize : {5119, 5121}) {
+        SCOPED_TRACE(outputHiddenSize);
+        optiling::MoeTokenUnpermuteCompileInfo compileInfo = {};
+        gert::TilingContextPara tilingContextPara(
+            "MoeTokenUnpermute",
+            {{{{6144, 5120}, {6144, 5120}}, ge::DT_FLOAT, ge::FORMAT_ND},
+             {{{6144}, {6144}}, ge::DT_INT32, ge::FORMAT_ND}},
+            {{{{6144, outputHiddenSize}, {6144, outputHiddenSize}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+            {{"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}}, &compileInfo);
+        ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 4, "5120 1 6144 5120 1 0 96 0 96 1 0 4 ", {16777216});
+    }
+}
+
 TEST_F(MoeTokenUnpermuteTiling, test_tiling_prob_small_ub_token_split)
 {
     optiling::MoeTokenUnpermuteCompileInfo compileInfo = {};

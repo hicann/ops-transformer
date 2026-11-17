@@ -155,6 +155,30 @@ static inline ge::graphStatus InputParamCheck(const gert::TilingContext* context
     return ge::GRAPH_SUCCESS;
 }
 
+static inline ge::graphStatus OutputParamCheck(const gert::TilingContext* context)
+{
+    const gert::StorageShape* tokensShape = context->GetInputShape(0);
+    const gert::StorageShape* probsShape = context->GetInputShape(2);
+    const gert::StorageShape* outShape = context->GetOutputShape(0);
+
+    if (outShape == nullptr) {
+        OP_LOGW("MoeTokenUnpermute", "[MoeTokenUnpermute] outShape is nullptr.");
+    }
+    if (outShape->GetStorageShape().GetDimNum() != 2) {
+        OP_LOGW("MoeTokenUnpermute", "[MoeTokenUnpermute] outShape's shape is not 2D.");
+    }
+
+    int64_t hiddenSize = tokensShape->GetStorageShape().GetDim(1);
+    int64_t tokensNum =
+        probsShape != nullptr ? probsShape->GetStorageShape().GetDim(0) : tokensShape->GetStorageShape().GetDim(0);
+
+    if (outShape->GetStorageShape().GetDim(0) != tokensNum || outShape->GetStorageShape().GetDim(1) != hiddenSize) {
+        OP_LOGW("MoeTokenUnpermute", "[MoeTokenUnpermute] outShape's shape is not [tokensNum, hiddenSize].");
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
 static inline void Init(const gert::TilingContext* context, const int64_t topK, MoeTokenUnpermuteParam& param)
 {
     auto ascendPlaform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
@@ -360,6 +384,7 @@ ge::graphStatus TilingCompute(gert::TilingContext* context, const int64_t topK)
     if (InputParamCheck(context) == ge::GRAPH_FAILED) {
         return ge::GRAPH_FAILED;
     }
+    OutputParamCheck(context);
     Init(context, topK, param);
     SetCoreNum(param);
     TilingHiddenSize(param);
