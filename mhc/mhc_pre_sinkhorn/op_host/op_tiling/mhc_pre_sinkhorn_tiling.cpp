@@ -13,6 +13,7 @@
  * \brief MhcPreSinkhorn tiling implementation
  */
 
+#include <cstdlib>
 #include <functional>
 #include <sstream>
 #include "mhc_pre_sinkhorn_tiling.h"
@@ -92,9 +93,39 @@ constexpr uint64_t ORIGINAL_TILING_KEY =
 // 切M路径：B矩阵走 MatmulImpl，不受 nd2nz srcDValue 上限约束
 constexpr uint64_t MSPLIT_TILING_KEY =
     static_cast<uint64_t>(MhcPreSinkhorn::MhcPreSinkhornTilingKey::MSPLIT_ND2NZ_EXCEED);
+// tiny 精简路径：8 AIC + 16 AIV, 单轮 K + 单 L1 槽位 + 宽 L0 内块
+constexpr uint64_t TINY_TILING_KEY = static_cast<uint64_t>(MhcPreSinkhorn::MhcPreSinkhornTilingKey::TINY);
 // Nd2NzParams.srcDValue 为 uint16，取值范围 [1, 65535]；K(=hcMult*d) 超限时
 // 切K路径的 B1 搬运行距溢出，强制走切M分支
 constexpr int64_t MAX_ND2NZ_SRC_DVALUE = 65535;
+// tiny 固定 launch 规模与 cube 内块（与 op_kernel/mhc_pre_sinkhorn_tiny_core.h 同源）
+constexpr int64_t TINY_AIC_NUM = 8;
+constexpr int64_t TINY_AIV_NUM = 2 * TINY_AIC_NUM;
+constexpr int64_t TINY_K_L0_SIZE = 256;
+constexpr int64_t TINY_L0_BUF_BYTES = 64 * 1024;
+
+// MHC_PRE_TINYBS=auto|on|off (default auto)
+enum class TinyMode {
+    AUTO,
+    ON,
+    OFF,
+};
+
+TinyMode ReadTinyMode()
+{
+    const char* value = std::getenv("MHC_PRE_TINYBS");
+    if (value == nullptr) {
+        return TinyMode::AUTO;
+    }
+    std::string mode(value);
+    if (mode == "off" || mode == "0" || mode == "false") {
+        return TinyMode::OFF;
+    }
+    if (mode == "on" || mode == "1" || mode == "true") {
+        return TinyMode::ON;
+    }
+    return TinyMode::AUTO;
+}
 } // namespace
 
 ge::graphStatus MhcPreSinkhornTiling::GetPlatformInfo()
@@ -114,6 +145,15 @@ ge::graphStatus MhcPreSinkhornTiling::GetPlatformInfo()
         uint64_t ubSizePlatForm;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
         ubSize_ = ubSizePlatForm;
+        uint64_t memSize = 0;
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, memSize);
+        l1Size_ = memSize;
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, memSize);
+        l0aSize_ = memSize;
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, memSize);
+        l0bSize_ = memSize;
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, memSize);
+        l0cSize_ = memSize;
         socVersion_ = ascendcPlatform.GetSocVersion();
     }
     OP_CHECK_IF(aicCoreNum_ == 0, OP_LOGE(context_, "aicCoreNum is 0, cannot do tiling"), return ge::GRAPH_FAILED);
@@ -224,6 +264,149 @@ void MhcPreSinkhornTiling::CalcVectorCoreNum()
     }
 }
 
+bool MhcPreSinkhornTiling::TinyResourceGate(int64_t splitKSize, int64_t mL1Size) const
+{
+    if (splitKSize <= 0 || mL1Size <= 0) {
+        return false;
+    }
+    // A/B NZ rows match the Nd2Nz dstNzC0Stride of the tiny cube CopyIn:
+    // align16(M) for A, align16(hcMix) for B.
+    int64_t aRows = RoundUp(mL1Size, AscendC::BLOCK_CUBE);
+    int64_t bRows = RoundUp(hcMix_, AscendC::BLOCK_CUBE);
+    int64_t l1Need = (aRows + bRows) * splitKSize * sizeof(float);
+    int64_t l0aNeed = 2 * aRows * TINY_K_L0_SIZE * sizeof(float);
+    int64_t l0bNeed = 2 * bRows * TINY_K_L0_SIZE * sizeof(float);
+    if (l1Size_ == 0 || l0aSize_ == 0 || l0bSize_ == 0 || l0cSize_ == 0) {
+        // No platform memory query (e.g. UT compile-info path): do not route tiny.
+        return false;
+    }
+    return l1Need <= static_cast<int64_t>(l1Size_) && l0aNeed <= static_cast<int64_t>(l0aSize_) &&
+           l0bNeed <= static_cast<int64_t>(l0bSize_) && TINY_L0_BUF_BYTES <= static_cast<int64_t>(l0cSize_);
+}
+
+ge::graphStatus MhcPreSinkhornTiling::CalcTinyTiling(int64_t splitKSize, int64_t mL1Size)
+{
+    tilingKey_ = TINY_TILING_KEY;
+    int64_t kSize = static_cast<int64_t>(hcMult_) * d_;
+    int64_t cubeBlockDimK = CeilDiv(kSize, splitKSize);
+    hcMultAlign_ = RoundUp(hcMult_, BLOCK_SIZE / sizeof(float));
+
+    tilingData_.set_k(kSize);
+    tilingData_.set_cubeBlockDimM(1);
+    tilingData_.set_cubeBlockDimK(cubeBlockDimK);
+    tilingData_.set_multCoreSplitKSize(splitKSize);
+    tilingData_.set_multCoreSplitMSize(mL1Size);
+    tilingData_.set_mL1Size(mL1Size);
+    tilingData_.set_kL1Size(splitKSize);
+    // Single outer K round per core: the whole K slice lives in one L1 A/B slot.
+    tilingData_.set_cvLoopKSize(splitKSize);
+    tilingData_.set_cubeCoreNum(TINY_AIC_NUM);
+    int64_t lineByteSize = (sizeof(int16_t) + sizeof(int32_t)) * DOUBLE_BUFFER * splitKSize;
+    int64_t stage1MFactor = static_cast<int64_t>(ubSize_) / lineByteSize;
+    OP_CHECK_IF(
+        stage1MFactor < 1,
+        OP_LOGE(context_->GetNodeName(), "MhcPreSinkhorn tiny: splitK %ld exceeds UB stage1 budget", splitKSize),
+        return ge::GRAPH_FAILED);
+    tilingData_.set_stage1MFactor(stage1MFactor);
+
+    // Part2 distribution: 16 AIV (8 AIC * 2), one row per row-factor iteration.
+    rowOfFormerBlock_ = CeilDiv(bs_, TINY_AIV_NUM);
+    usedAivCoreNums_ = static_cast<uint64_t>(std::min<int64_t>(CeilDiv(bs_, rowOfFormerBlock_), TINY_AIV_NUM));
+    rowOfTailBlock_ = bs_ - static_cast<int64_t>(usedAivCoreNums_ - 1) * rowOfFormerBlock_;
+    rowFactor_ = 1;
+
+    // dFactor budget: key=1 original path with rowOnceLoop == 1 (bs <= 32).
+    int64_t kBlockNum = cubeBlockDimK;
+    int64_t rowOnceLoop = 1;
+    int64_t mix0OriginSize = kBlockNum * rowOnceLoop * hcMultAlign_ * sizeof(float) * DOUBLE_BUFFER;
+    int64_t mix1OriginSize = mix0OriginSize;
+    int64_t mix0Size = rowOnceLoop * hcMultAlign_ * sizeof(float);
+    int64_t mix1Size = mix0Size;
+    int64_t squareSumSize = kBlockNum * RoundUp(rowOnceLoop * 16, 16) * sizeof(float) * DOUBLE_BUFFER;
+    int64_t squareReduceSize = rowOnceLoop * SQUARE_SUM_SIZE * sizeof(float);
+    int64_t rsqrtSize = RoundUp(rowOnceLoop, BLOCK_SIZE / sizeof(float)) * sizeof(float);
+    int64_t xSize = rowOnceLoop * hcMult_ * RoundUp(d_, 16) * 2 * DOUBLE_BUFFER;
+    int64_t ySize = rowOnceLoop * RoundUp(d_, 16) * 2 * DOUBLE_BUFFER;
+    int64_t postSize = rowOnceLoop * hcMultAlign_ * sizeof(float) * DOUBLE_BUFFER;
+    int64_t base0Size = hcMultAlign_ * sizeof(float);
+    int64_t base1Size = base0Size;
+    int64_t xCastSize = rowOnceLoop * hcMult_ * RoundUp(d_, 8) * sizeof(float);
+    int64_t yCastSize = rowOnceLoop * RoundUp(d_, 8) * sizeof(float);
+    int64_t rowBrcb0Size = RoundUp(rowOnceLoop, 8) * BLOCK_SIZE;
+    int64_t hcBrcb1Size = RoundUp(rowOnceLoop * hcMultAlign_, 8) * BLOCK_SIZE;
+    int64_t maskPatternSize = (rowOnceLoop + MASK_PATTERN_DIM_SIZE - 1) * BLOCK_SIZE;
+    int64_t mix2OriginSize = kBlockNum * rowOnceLoop * hcMult_ * hcMultAlign_ * sizeof(float) * DOUBLE_BUFFER;
+    int64_t combFragSize = rowOnceLoop * hcMult_ * hcMultAlign_ * sizeof(float) * DOUBLE_BUFFER;
+    int64_t base2Size = hcMult_ * hcMultAlign_ * sizeof(float);
+    int64_t reduceBufSize = rowOnceLoop * hcMultAlign_ * sizeof(float);
+    int64_t mix2Size = rowOnceLoop * hcMult_ * hcMultAlign_ * sizeof(float);
+    int64_t originalExtraSize = mix2OriginSize + combFragSize + base2Size + reduceBufSize + mix2Size;
+
+    int64_t totalSize = mix0OriginSize + mix1OriginSize + mix0Size + mix1Size + squareSumSize + squareReduceSize +
+                        rsqrtSize + xSize + ySize + postSize + base0Size + base1Size + xCastSize + yCastSize +
+                        rowBrcb0Size + hcBrcb1Size + maskPatternSize + originalExtraSize;
+    dLoop_ = 1;
+    dFactor_ = d_;
+    tailDFactor_ = d_;
+    if (totalSize > static_cast<int64_t>(ubSize_)) {
+        int64_t usedUbSize = totalSize - xSize - ySize - xCastSize - yCastSize;
+        int64_t ubRemain = static_cast<int64_t>(ubSize_) - usedUbSize;
+        auto calcShrinkSize = [&](int64_t b) {
+            int64_t df = CeilDiv(d_, b);
+            int64_t xs = rowOnceLoop * hcMult_ * RoundUp(df, 16) * 2 * DOUBLE_BUFFER;
+            int64_t ys = rowOnceLoop * RoundUp(df, 16) * 2 * DOUBLE_BUFFER;
+            int64_t xcs = rowOnceLoop * hcMult_ * RoundUp(df, 8) * sizeof(float);
+            int64_t ycs = rowOnceLoop * RoundUp(df, 8) * sizeof(float);
+            return xs + ys + xcs + ycs;
+        };
+        int64_t lo = 2;
+        int64_t hi = d_;
+        int64_t base = d_ + 1;
+        while (lo <= hi) {
+            int64_t mid = lo + (hi - lo) / 2;
+            if (calcShrinkSize(mid) <= ubRemain) {
+                base = mid;
+                hi = mid - 1;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        OP_CHECK_IF(base > d_,
+                    OP_LOGE(context_->GetNodeName(), "MhcPreSinkhorn tiny: UB cannot hold the minimum d tile"),
+                    return ge::GRAPH_FAILED);
+        dFactor_ = CeilDiv(d_, base);
+        if (dFactor_ > 32) {
+            dFactor_ = DownAlign(dFactor_, 32);
+        }
+        dLoop_ = CeilDiv(d_, dFactor_);
+        tailDFactor_ = d_ % dFactor_ == 0 ? dFactor_ : d_ % dFactor_;
+    }
+
+    tilingData_.set_bs(bs_);
+    tilingData_.set_hcMix(hcMix_);
+    tilingData_.set_hcMult(hcMult_);
+    tilingData_.set_d(d_);
+    tilingData_.set_hcMultAlign(hcMultAlign_);
+    tilingData_.set_rowOfFormerBlock(rowOfFormerBlock_);
+    tilingData_.set_rowOfTailBlock(rowOfTailBlock_);
+    tilingData_.set_rowLoopOfFormerBlock(rowOfFormerBlock_);
+    tilingData_.set_rowLoopOfTailBlock(rowOfTailBlock_);
+    tilingData_.set_stage2RowFactor(1);
+    tilingData_.set_secondUsedCoreNum(static_cast<int64_t>(usedAivCoreNums_));
+    tilingData_.set_tailRowFactorOfFormerBlock(1);
+    tilingData_.set_tailRowFactorOfTailBlock(1);
+    tilingData_.set_dLoop(dLoop_);
+    tilingData_.set_dFactor(dFactor_);
+    tilingData_.set_tailDFactor(tailDFactor_);
+    tilingData_.set_iterTimes(iterTimes_);
+    tilingData_.set_hcEps(hcEps_);
+    tilingData_.set_normEps(normEps_);
+    tilingData_.set_needGrad(0);
+    tilingData_.set_hasPremix(context_->GetOptionalInputShape(4) != nullptr ? 1 : 0);
+    tilingData_.set_isHf32(isHf32_ ? 1 : 0);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus MhcPreSinkhornTiling::CalcMKSplitCoreMembasePart2Tiling()
 {
     // needGrad 输出(sumOut/normOut/hcBeforeNorm)依赖 original 路径的中间量,
@@ -232,6 +415,28 @@ ge::graphStatus MhcPreSinkhornTiling::CalcMKSplitCoreMembasePart2Tiling()
     // K(=hcMult*d) 超出 nd2nz srcDValue 上限(65535)时, 切K路径 CopyInB1 的搬运行距
     // 溢出 uint16, 强制走切M(KEY(2)); Stage2 沿用 original 的分核/分片字段。
     bool kExceedNd2nzLimit = static_cast<int64_t>(hcMult_) * d_ > MAX_ND2NZ_SRC_DVALUE;
+
+    // tiny route: small-batch (decode) inference with !needGrad. The shape-level
+    // condition is bs <= 32 unless MHC_PRE_TINYBS=on forces it; the resource gate
+    // (per-platform L1/L0A/L0B/L0C) decides whether the single-slot cube fits.
+    TinyMode tinyMode = ReadTinyMode();
+    if (tinyMode != TinyMode::OFF && !needGrad_ && !kExceedNd2nzLimit &&
+        (bs_ <= SMALL_BS_THRESHOLD || tinyMode == TinyMode::ON) && aicCoreNum_ >= TINY_AIC_NUM &&
+        aivCoreNum_ >= static_cast<uint64_t>(TINY_AIV_NUM)) {
+        int64_t tinySplitKSize =
+            RoundUp(CeilDiv(static_cast<int64_t>(hcMult_) * d_, TINY_AIC_NUM), K_MULIT_CORE_SPLIT_BASE_SIZE);
+        int64_t tinyML1Size = std::min<int64_t>(M_L1_MAX_SIZE, RoundUp(bs_, AscendC::BLOCK_CUBE));
+        if (TinyResourceGate(tinySplitKSize, tinyML1Size)) {
+            OP_LOGD(context_->GetNodeName(),
+                    "MhcPreSinkhorn route tiny(3): bs=%ld d=%ld splitK=%ld mL1=%ld l1=%lu l0a=%lu l0b=%lu l0c=%lu", bs_,
+                    d_, tinySplitKSize, tinyML1Size, l1Size_, l0aSize_, l0bSize_, l0cSize_);
+            return CalcTinyTiling(tinySplitKSize, tinyML1Size);
+        }
+        OP_LOGD(context_->GetNodeName(),
+                "MhcPreSinkhorn tiny gate rejected: splitK=%ld mL1=%ld l1=%lu l0a=%lu l0b=%lu l0c=%lu", tinySplitKSize,
+                tinyML1Size, l1Size_, l0aSize_, l0bSize_, l0cSize_);
+    }
+
     bool useOriginal = kExceedNd2nzLimit || bs_ <= SMALL_BS_THRESHOLD || needGrad_;
     if (useOriginal) {
         tilingKey_ = kExceedNd2nzLimit ? MSPLIT_TILING_KEY : ORIGINAL_TILING_KEY;
@@ -802,7 +1007,8 @@ ge::graphStatus MhcPreSinkhornTiling::PostTiling()
     const MhcPreSinkhorn::MhcPreSinkhornTilingKey tilingKey =
         static_cast<MhcPreSinkhorn::MhcPreSinkhornTilingKey>(tilingKey_);
     context_->SetTilingKey(static_cast<uint64_t>(tilingKey));
-    context_->SetBlockDim(aicCoreNum_);
+    // cubeCoreNum equals aicCoreNum_ on keys 0/1/2 and the tiny AIC count (8) on key=3.
+    context_->SetBlockDim(static_cast<uint64_t>(tilingData_.get_cubeCoreNum()));
     if (tilingKey_ == MPMD_TILING_KEY) {
         auto ret = context_->SetScheduleMode(1);
         OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGE(context_, "Failed to set schedule mode to 1 for MhcPreSinkhorn."),

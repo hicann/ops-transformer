@@ -34,17 +34,22 @@ enum class MhcPreSinkhornTilingKey : uint32_t {
     // m-split kernel: K (= hcMult * d) exceeds the nd2nz srcDValue limit (65535),
     // so B goes through MatmulImpl instead of the k-split copy path.
     MSPLIT_ND2NZ_EXCEED = 2,
+    // Tiny inference kernel for small-batch (decode) shapes: 8 AIC + 16 AIV,
+    // single-K-round cube path with a wider inner L0 block. Same math and
+    // workspace layout as ORIGINAL_KSPLIT; no needGrad branches.
+    TINY = 3,
 };
 } // namespace MhcPreSinkhorn
 
 // Template parameter space for opc kernel instantiation: a single UINT template
-// argument schMode whose value list [0, 1, 2] equals the enum values above. With a
+// argument schMode whose value list [0, 1, 2, 3] equals the enum values above. With a
 // value list equal to its own indices, the encoded tiling key equals the schMode
 // value, so the host keeps writing SetTilingKey(static_cast<uint64_t>(enum value))
-// with zero behavior change (keys 0/1/2 as before).
-ASCENDC_TPL_ARGS_DECL(MhcPreSinkhorn, ASCENDC_TPL_UINT_DECL(schMode, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2), );
+// with zero behavior change (keys 0/1/2 as before, 3 selects the tiny kernel).
+ASCENDC_TPL_ARGS_DECL(MhcPreSinkhorn,
+                      ASCENDC_TPL_UINT_DECL(schMode, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3), );
 
-// Instantiation list: one kernel per schMode value (0/1/2).
-ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(schMode, ASCENDC_TPL_UI_LIST, 0, 1, 2), ), );
+// Instantiation list: one kernel per schMode value (0/1/2/3).
+ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(schMode, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3), ), );
 
 #endif // MHC_PRE_SINKHORN_TILING_KEY_H

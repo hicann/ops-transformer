@@ -18,6 +18,7 @@
 #include "lib/matmul_intf.h"
 #include "mhc_pre_sinkhorn_m_k_split_core.h"
 #include "mhc_pre_sinkhorn_m_split_core.h"
+#include "mhc_pre_sinkhorn_tiny_core.h"
 #include "mhc_pre_sinkhorn_tiling_key.h"
 using namespace MhcPreSinkhorn;
 
@@ -66,6 +67,20 @@ __global__ __aicore__ void mhc_pre_sinkhorn(GM_ADDR x, GM_ADDR phi, GM_ADDR alph
 
         TPipe pipeStage2;
         MhcPreSinkhorn::MhcPreSinkhornMembaseKSplitCorePart2<DTYPE_X, true> op2;
+        op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
+                 tilingData, &pipeStage2);
+        op2.Process();
+        pipeStage2.Destroy();
+    } else if constexpr (schMode == static_cast<uint32_t>(MhcPreSinkhornTilingKey::TINY)) {
+        // -----------tiny: 8 AIC + 16 AIV, single-round single-slot cube, no needGrad------------
+        TPipe pipe;
+        MhcPreSinkhorn::MhcPreSinkhornMembaseKSplitCorePart1<DTYPE_X, MhcPreSinkhorn::MhcPreSinkhornTinyCubeCompute> op;
+        op.Init(x, phi, userWs, tilingData, &pipe);
+        op.Process();
+        pipe.Destroy();
+
+        TPipe pipeStage2;
+        MhcPreSinkhorn::MhcPreSinkhornTinyPart2<DTYPE_X> op2;
         op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
                  tilingData, &pipeStage2);
         op2.Process();

@@ -63,7 +63,10 @@ class HcCubeComputeSplitK {
 public:
     __aicore__ inline HcCubeComputeSplitK(){};
 
-    __aicore__ inline void Init(const GlobalTensor<float>& xGm, const GlobalTensor<float>& phiGm, TPipe* tpipe);
+    // tilingData is only consumed by derived tiny variants (L1/L0 slot sizing);
+    // the key=0/1 split-K cube path ignores it and keeps its fixed 2-slot layout.
+    __aicore__ inline void Init(const GlobalTensor<float>& xGm, const GlobalTensor<float>& phiGm, TPipe* tpipe,
+                                const MhcPreSinkhornTilingData* tilingData = nullptr);
     // enable_hf32 属性下发: 是否启用HF32模式, 缺省启用(true=主线合入前的mm1_/MmadAB HF32行为; false=FP32)
     __aicore__ inline void SetHf32Enable(bool enable)
     {
@@ -168,10 +171,12 @@ private:
 };
 
 MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_PARAM
-__aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Init(const GlobalTensor<float>& xGm,
-                                                                                  const GlobalTensor<float>& phiGm,
-                                                                                  TPipe* tpipe)
+__aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_SPLIT_K_TEMPLATE_CLASS::Init(
+    const GlobalTensor<float>& xGm, const GlobalTensor<float>& phiGm, TPipe* tpipe,
+    const MhcPreSinkhornTilingData* tilingData)
 {
+    (void)xGm;
+    (void)tilingData;
     phiGm_ = phiGm;
 
     TBuf<TPosition::A1> l1aBuffer;

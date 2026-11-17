@@ -22,7 +22,9 @@
 
 namespace MhcPreSinkhorn {
 using namespace AscendC;
-template <typename T>
+// TCube defaults to the key=0/1 split-K cube implementation; the tiny route
+// instantiates the same Part1 protocol with a single-slot / wide-L0 cube type.
+template <typename T, class TCube = HcCubeComputeSplitK<false>>
 class MhcPreSinkhornMembaseKSplitCorePart1 {
 public:
     __aicore__ inline MhcPreSinkhornMembaseKSplitCorePart1() {}
@@ -59,7 +61,7 @@ public:
         squareSumFp32BufSize_ = CeilAlign(tilingData->bs, BLOCK_CUBE) * BLOCK_CUBE;
 
         if ASCEND_IS_AIC {
-            cubeCompute_.Init(xCastFp32WsGm, hcFnGm, pipePtr);
+            cubeCompute_.Init(xCastFp32WsGm, hcFnGm, pipePtr, tilingData);
             // enable_hf32 属性控制: A2侧Cube Mmad(x@phi与平方和)是否启用HF32, 缺省启用(true=主线合入前mm1_的HF32行为;
             // false=premix参考实现的FP32行为)
             cubeCompute_.SetHf32Enable(tilingData->isHf32 != 0);
@@ -238,7 +240,7 @@ private:
     LocalTensor<float> yCastLocal;
     LocalTensor<float> mmOutLocal;
 
-    HcCubeComputeSplitK<false> cubeCompute_;
+    TCube cubeCompute_;
     static constexpr uint64_t SYNC_AIV_TO_AIC_FLAG = 8;
     static constexpr uint64_t SYNC_AIC_TO_AIV_FLAG = 9;
     static constexpr uint64_t SYNC_MODE2 = NUM_TWO;

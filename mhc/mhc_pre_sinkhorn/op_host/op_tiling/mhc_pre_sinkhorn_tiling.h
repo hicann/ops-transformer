@@ -228,6 +228,8 @@ public:
     ge::graphStatus GetShapeAttrsInfoInner();
     ge::graphStatus CalcOpTiling();
     ge::graphStatus CalcMKSplitCoreMembasePart2Tiling();
+    bool TinyResourceGate(int64_t splitKSize, int64_t mL1Size) const;
+    ge::graphStatus CalcTinyTiling(int64_t splitKSize, int64_t mL1Size);
     ge::graphStatus CalcStage1Tiling();
     void CalcVectorCoreNum();
     ge::graphStatus CalcSinkhornTiling();
@@ -241,6 +243,11 @@ private:
     uint64_t workspaceSize_ = 0;
     uint64_t usedAivCoreNums_ = 0;
     uint64_t ubSize_ = 0;
+    // 平台实查的片上存储容量，用于 tiny 路由的 L1/L0 预算 gate
+    uint64_t l1Size_ = 0;
+    uint64_t l0aSize_ = 0;
+    uint64_t l0bSize_ = 0;
+    uint64_t l0cSize_ = 0;
     int64_t bs_ = 0;
     int64_t hcMix_ = 0;
     int64_t hcMult_ = 0;
