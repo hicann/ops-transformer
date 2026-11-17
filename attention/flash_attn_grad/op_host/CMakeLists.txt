@@ -105,6 +105,7 @@ endif()
 file(GLOB FAG_TILING_SUBDIR_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/info/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/plan/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/plan/deterministic/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/base/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/checkers/*.cpp
 )

@@ -85,7 +85,7 @@ def copy_in_atten_mask(constInfo, runInfo, subIdx, tensor_mask, mask_ub, mask_pr
     """按 mask_mode 把压缩 attenmask 搬进 UB。TND 时用 batch 局部坐标。0930 移植。"""
     if runInfo.halfS1RealSize == 0:
         return
-    vec_off = subIdx * VECTOR_BASEM
+    vec_off = subIdx * runInfo.firstHalfS1RealSize
     halfS1 = runInfo.halfS1RealSize
     s2Real = runInfo.s2RealSize
     if layout == 1:

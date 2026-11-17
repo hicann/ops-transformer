@@ -9,157 +9,186 @@
  */
 
 #include "flash_attn_grad_tiling_swizzle.h"
+#include "deterministic/flash_attn_grad_tiling_deter.h"
+#include "deterministic/flash_attn_grad_tiling_deter_tnd.h"
 
+#include <algorithm>
+#include <limits>
 #include <set>
+#include <vector>
 
 namespace optiling {
 namespace {
+constexpr int64_t CUBE_BASE = 128;
+constexpr uint64_t INPUT_BYTES = 2;
+constexpr uint64_t FP32_BYTES = 4;
+constexpr uint64_t COMPRESSED_MASK_BYTES = 2048 * 2048;
 
-// 基本块尺寸。与 flash_attn_grad_block_outer.h 的 S1_INNER*S1CV_RATIO(64*2) 和
-// S2_INNER*S2CV_RATIO(128*1) 必须相等 —— 这里估算的 s1Outer/s2Outer 要和分核
-// 实际使用的口径一致，否则 liveHeads 估的就不是 metadata 真正的分核形态。
-constexpr int64_t CUBE_BASE_M = 128;
-constexpr int64_t CUBE_BASE_N = 128;
-constexpr int64_t FP16_BYTES = 2;
-constexpr int64_t FP32_BYTES = 4;
+int64_t CeilDivSigned(int64_t value, int64_t divisor)
+{
+    return value >= 0 ? (value + divisor - 1) / divisor : value / divisor;
+}
 
+// Same effective columns as padded_block_valid / col_prefix_body. The ASC
+// GetSparseBlockInfo partition is a contiguous interval in this packed order.
+// Keep int64_t offsets: std::set<int> in the old ASC estimate can alias large grids.
+struct ValidColumns {
+    std::vector<int64_t> begin;
+    std::vector<int64_t> prefix;
+};
+
+ValidColumns BuildValidColumns(const FagParsedInfo& info, int64_t m, int64_t n)
+{
+    ValidColumns columns;
+    columns.begin.resize(n);
+    columns.prefix.resize(n + 1, 0);
+    const int64_t p =
+        info.maskMode == MASK_MODE_CAUSAL ? m - 1 : std::min(CeilDivSigned(info.s1Token, CUBE_BASE), m - 1);
+    const int64_t q = std::min(CeilDivSigned(info.s2Token, CUBE_BASE), n - 1);
+    for (int64_t c = 0; c < n; ++c) {
+        int64_t lo = 0;
+        int64_t hi = m - 1;
+        if (info.maskMode != MASK_MODE_NO_MASK) {
+            lo = std::max(c - q, int64_t{0});
+            hi = std::min(c + p, m - 1);
+            if (c == n - 1 && info.maskMode == MASK_MODE_WINDOW) {
+                const int64_t alignedEnd = CeilDivSigned(info.s2, 64) * 64;
+                hi = std::min(CeilDivSigned(alignedEnd + info.s1Token, CUBE_BASE) - 1, m - 1);
+            }
+        }
+        columns.begin[c] = lo;
+        columns.prefix[c + 1] = columns.prefix[c] + std::max(hi - lo + 1, int64_t{0});
+    }
+    return columns;
+}
+
+bool ProductFits(int64_t lhs, int64_t rhs)
+{
+    return lhs >= 0 && rhs > 0 && lhs <= std::numeric_limits<int64_t>::max() / rhs;
+}
+
+// Port of ASC CheckExceedL2Cache: interleave one effective tile per active core,
+// accumulate distinct Q and KV addresses, and stop only after exceeding L2.
+// D and Dv are independent: y/dout use Dv, q/dq and k/dk use D.
+bool CheckExceedL2(const FagParsedInfo& info, const ValidColumns& columns, int64_t m, int64_t n,
+                   FagSchedulePlan& schedule)
+{
+    const int64_t perHead = schedule.normalValidPerHead;
+    const int64_t total = perHead * info.b * info.n2 * info.g;
+    const uint64_t qBytes = CUBE_BASE * ((info.d + 2 * info.dv) * INPUT_BYTES + info.d * FP32_BYTES);
+    const uint64_t kvBytes = CUBE_BASE * (info.d + info.dv) * (INPUT_BYTES + FP32_BYTES);
+    std::set<int64_t> qAddresses;
+    std::set<int64_t> kvAddresses;
+    uint64_t usedBytes = 0;
+    for (int64_t round = 0; round < schedule.normalMaxValidBlocks; ++round) {
+        for (int64_t core = 0; core < schedule.normalBlockOuter; ++core) {
+            const int64_t packed = core * schedule.normalMaxValidBlocks + round;
+            if (packed >= total) {
+                continue;
+            }
+            const int64_t head = packed / perHead;
+            const int64_t within = packed % perHead;
+            const auto end = std::upper_bound(columns.prefix.begin(), columns.prefix.end(), within);
+            const int64_t col = static_cast<int64_t>(end - columns.prefix.begin()) - 1;
+            const int64_t row = columns.begin[col] + within - columns.prefix[col];
+            if (qAddresses.insert(head * m + row).second) {
+                usedBytes += qBytes;
+            }
+            if (kvAddresses.insert((head / info.g) * n + col).second) {
+                usedBytes += kvBytes;
+            }
+            if (usedBytes > info.l2CacheSize) {
+                schedule.normalWorkingSetBytes = usedBytes;
+                return true;
+            }
+        }
+    }
+    if (info.maskMode != MASK_MODE_NO_MASK) {
+        usedBytes += COMPRESSED_MASK_BYTES;
+    }
+    schedule.normalWorkingSetBytes = usedBytes;
+    return usedBytes > info.l2CacheSize;
+}
 } // namespace
 
 void DecideSwizzle(const FagParsedInfo& info, const FagKernelPlan& kernel, FagSchedulePlan& schedule,
                    FagRouteTrace& trace)
 {
-    // 决定块到核的映射方式。线性切分会让同时在跑的核散落在很多 head 上：
-    // S=8192 D=128、36 核时，核 0 在 head 0 而核 35 已经在 head 31，于是 36 个核
-    // 同时为 32 个 head 拉 K/V，工作集冲过 L2（标定机型 9599 上是 128MB，实际值
-    // 取自平台，见 info.l2CacheSize）。msprof 显示 cube 与 vector
-    // 两侧 mte2_ratio 都是 0.72，而 mac 反而从 0.938 掉到 0.733 —— 说明瓶颈已经
-    // 变成 HBM 带宽而非算力。swizzle 改为按整列 s2 跨核发放，把同时在跑的核锁在
-    // 同一个 head 内。
-    //
-    // 工作集要算一个 head
-    // 碰到的所有张量（S=8192 时约 22MB/head）：q+dout+attn_out 读 fp16、dq 写 fp32、
-    // k+v 读 fp16、dk+dv 写 fp32。只算 K+V 的话在 N=32 时正好落在 128MB 上并误判
-    // 成"放得下"，而实测那里 swizzle 快 34%。
-    //
-    // swizzle 的分配粒度是一整列，列数太少就没法均衡（N=1 时 64 列分 36 核，
-    // 核 0 拿 2 列而核 35 拿 1 列，2 倍倾斜，实测反慢 14%）。
     schedule.swizzle = 0;
-
-    // Deterministic scheduling uses the AscendC-compatible non-swizzle mapping.
-    // Its cross-round conflicts are serialized by the kernel's FIX token chain
-    // while accumulating directly into the public fp32 workspace.
+    // The deterministic family planner and its key encoding remain independent.
     if (info.isDeterministic) {
-        trace.swizzleReject = "deterministic-linear";
+        if (info.isTnd) {
+            DecideTndDeterministicSchedule(info, kernel, schedule, trace);
+        } else {
+            DecideFixedDeterministicSchedule(info, kernel, schedule, trace);
+        }
         return;
     }
-
     if (kernel.tmpl != TMPL_BN2GS1S2) {
         trace.swizzleReject = "not-bn2gs1s2";
         return;
     }
-    if (info.layout == LAYOUT_TND) {
-        // TND swizzle 是另一套实现（列前缀和在 AICPU），本轮不接。
-        trace.swizzleReject = "tnd-layout";
-        return;
-    }
     if (info.hasSeqused) {
-        // Metadata uses a per-batch effective grid. The current swizzle mapping
-        // assumes the fixed physical S grid and cannot reinterpret its indices.
         trace.swizzleReject = "seqused-variable-grid";
         return;
     }
-    if (schedule.usedCube != info.aicNum) {
-        trace.swizzleReject = "partial-chip";
+    if (info.isTnd && (!info.tndAllSame || info.maxSeqlenQ <= 0 || info.maxSeqlenKv <= 0)) {
+        trace.swizzleReject = "tnd-not-uniform";
         return;
     }
-    // 判据整个建立在"工作集是否超 L2"上，L2 未知就没有判据可言。部分型号
-    // （如 KirinX90）平台上报 l2_size=0，此时保守不开：swizzle 只是性能选择，
-    // 不开一定正确，而拿 0 当分母会让阈值退化成 0、变成恒开。
+    if (info.layout != LAYOUT_NOT_TND && info.layout != LAYOUT_TND) {
+        trace.swizzleReject = "unsupported-layout";
+        return;
+    }
     if (info.l2CacheSize == 0) {
         trace.swizzleReject = "unknown-l2";
         return;
     }
-
-    const int64_t s1Outer = (info.s1 + CUBE_BASE_M - 1) / CUBE_BASE_M;
-    const int64_t s2Outer = (info.s2 + CUBE_BASE_N - 1) / CUBE_BASE_N;
-    // GQA 下块网格是 b*n2*G*s1Outer*s2Outer，融合后的 batch 维是 b*n2*G，
-    // 所以 G 在这里只是把 head 数乘上去（kernel 在 n2 内层走 g）。
-    // mask 用 valid tiles（GetTotalPerBatchNum），让 L2 门看到真实工作集。
-    const int64_t perHeadBlocks = info.totalPerBatchNum > 0 ? info.totalPerBatchNum : (s1Outer * s2Outer);
-    const int64_t fusedHeads = info.b * info.n2 * info.g;
-    const int64_t totalBlocks = fusedHeads * perHeadBlocks;
-    if (perHeadBlocks <= 0 || info.aicNum == 0) {
+    const int64_t m = (info.s1 + CUBE_BASE - 1) / CUBE_BASE;
+    const int64_t n = (info.s2 + CUBE_BASE - 1) / CUBE_BASE;
+    if (m <= 0 || n <= 0 || info.b <= 0 || info.n2 <= 0 || info.g <= 0 || info.aicNum == 0) {
         trace.swizzleReject = "degenerate-grid";
         return;
     }
-
-    // 必须用 aicNum 而不是 blockDim：blockDim 是 CalcTschBlockDim 出来的混合调度
-    // 值，而 kernel 里的 coreNum 来自 pl.get_block_num()（启动的 cube 数）。
-    const int64_t cores = static_cast<int64_t>(info.aicNum);
-    const int64_t perCore = (totalBlocks + cores - 1) / cores;
-    // 线性切分下同时活跃的 head 有几个
-    std::set<int64_t> liveHeads;
-    for (int64_t c = 0; c < cores; ++c) {
-        liveHeads.insert((c * perCore) / perHeadBlocks);
-    }
-    // 每个融合 (b,n2,g) 单元：Q 侧张量（q+dout+attn_out 读 fp16、dq 写 fp32）是本
-    // g 私有的，KV 侧（k+v 读 fp16、dk+dv 写 fp32）被同一 KV head 的 G 个 Q head
-    // 共享，故 KV 字节按 G 摊薄只记一份。
-    const int64_t perHeadBytes = 3 * info.s1 * info.d * FP16_BYTES + info.s1 * info.d * FP32_BYTES +
-                                 (2 * info.s2 * info.d * FP16_BYTES + 2 * info.s2 * info.d * FP32_BYTES) / info.g;
-    const int64_t liveBytes = static_cast<int64_t>(liveHeads.size()) * perHeadBytes;
-
-    // 判据取决于 S1 与 S2 的**方向**，不只是工作集大小。swizzle 买到的是"一个核
-    // 走完一整列 s1Outer 块"，即 K/V 只载一次、dK/dV 在 L0C 连续累加；付出的是更
-    // 粗的分配粒度（一列 = s1Outer 块）。这个权衡随列长而变。
-    //
-    // 1) S2 更长时（s2Outer > s1Outer）swizzle 从不获胜：列只有 s1Outer 块，复用
-    //    窗口短，而列数 b*n*s2Outer 已经大到让线性切分自然待在一个 head 内。
-    //    实测 0/5 胜（36 核，D=128，linear/swizzle us）：
-    //      N8  1024/8192 106MB 237.2/250.3   N16 1024/8192 212MB 491.9/492.1
-    //      N16 2048/8192 232MB 848.2/858.4   N24 1024/8192 318MB 723.1/728.0
-    //      N32  512/8192 404MB 629.3/632.1
-    //    后两个是 318/404MB 的工作集，远超任何阈值却仍是线性更快 —— 所以需要独立
-    //    的方向判据，调阈值救不回来。
-    //
-    // 2) S1 占优时（s1Outer >= 2*s2Outer）拐点来得更早，阈值降到 1.25x L2。
-    //    实测边界落在 138MB(线性) 与 172MB(swizzle) 之间：
-    //      N12 8192/512  129MB 194.9/245.9   N12 8192/1024 138MB 330.0/353.0
-    //      N24 4096/512  138MB 201.2/201.6   N16 8192/512  172MB 277.4/263.7
-    //      N16 8192/1024 184MB 509.3/474.3   N20 8192/1024 230MB 781.8/583.1
-    //      N24 8192/1024 276MB 994.6/698.5   N32 8192/512  344MB 725.9/523.4
-    //    1.1x~1.4x 是同一个平台期（误判数相同），取中点 1.25x。
-    //
-    // 3) 对称情形保持原来的 2x L2，它是在 N=8/10/12/16/24 上标定的，不能回退：
-    //      N=8 176MB 1556/1761, N=10 220MB 1904/2007, N=12 264MB 2833/2677,
-    //      N=16 352MB 4121/3550, N=24 528MB 6483/4982
-    //    N=10 在 220MB 仍偏好线性，而 S1 重的分支在 172MB 就该切换 —— 两个拐点
-    //    确实不同，一个全局阈值服务不了两者。
-    //
-    // 全部 29 个实测点上：方向无关的旧 2x 规则误判 7 个（累计代价 67.7%），
-    // 本判据误判 2 个（18.0%）。kernel 只消费 tilingkey 的 swizzle 位。
-    if (s2Outer > s1Outer) {
-        trace.swizzleReject = "s2-dominant";
+    const ValidColumns columns = BuildValidColumns(info, m, n);
+    schedule.normalValidPerHead = columns.prefix.back();
+    int64_t total = schedule.normalValidPerHead;
+    if (!ProductFits(total, info.b) || !ProductFits(total * info.b, info.n2) ||
+        !ProductFits(total * info.b * info.n2, info.g)) {
+        trace.swizzleReject = "grid-overflow";
         return;
     }
-    // 1.25x 用整数表达，避免浮点：5*L2/4。
-    // 阈值的两个倍数（1.25x / 2x）是在 128MB L2 的 Ascend950PR_9599 上标定的；
-    // L2 更小的型号（950PR_950z 16MB、950DT_950x 32MB、957d 96MB、多个 112MB）
-    // 按同样的倍数缩放，倍数本身尚未在那些型号上复标。
-    const int64_t l2Bytes = static_cast<int64_t>(info.l2CacheSize);
-    const bool s1Heavy = (s1Outer >= 2 * s2Outer);
-    const int64_t threshold = s1Heavy ? (5 * l2Bytes / 4) : (2 * l2Bytes);
-    if (liveBytes <= threshold) {
+    total *= info.b * info.n2 * info.g;
+    if (total == 0) {
+        trace.swizzleReject = "empty-effective-grid";
+        return;
+    }
+    const int64_t cores = static_cast<int64_t>(info.aicNum);
+    schedule.normalMaxValidBlocks = total / cores + (total % cores != 0);
+    schedule.normalBlockOuter = (total - 1) / schedule.normalMaxValidBlocks + 1;
+    const int64_t lengthLimit = info.s1 < 16384 ? 6 : (info.s1 / 16384) * 8;
+    schedule.normalContinuousBlocks = std::min(schedule.normalMaxValidBlocks, lengthLimit);
+    // ASC SetSparseParams also treats a full-window BAND as dense after token
+    // correction. Keep this local to normal swizzle; do not alter other routes.
+    const bool normalDense = info.sparseType == FAG_SPARSE_TYPE_DENSE ||
+                             (info.maskMode == MASK_MODE_WINDOW && info.s1Token >= info.s1 && info.s2Token >= info.s2);
+    // Equal-length TND only uses the ordinary mapping; storage/LSE stay TND.
+    if (!info.isTnd && normalDense && info.s1 >= 32768 && info.s2 >= 32768) {
+        schedule.normalSwizzleKind = 1;
+    } else if (!info.isTnd && info.sparseType == FAG_SPARSE_TYPE_CASUAL && info.s1 == info.s2 && info.s1 >= 32768) {
+        schedule.normalSwizzleKind = 2;
+    }
+    if (schedule.usedCube != info.aicNum || schedule.normalBlockOuter != cores) {
+        trace.swizzleReject = "partial-effective-chip";
+        return;
+    }
+    // ASC's large-invalid-block exception is LEFT_UP_CAUSAL only. This API
+    // exposes RIGHT_DOWN_CAUSAL and BAND; neither inherits that exception.
+    if (!CheckExceedL2(info, columns, m, n, schedule)) {
         trace.swizzleReject = "working-set-fits";
         return;
     }
-    if (fusedHeads * s2Outer < 2 * cores) {
-        trace.swizzleReject = "too-few-columns";
-        return;
-    }
-
     schedule.swizzle = 1;
     trace.swizzleReject = "accepted";
 }
-
 } // namespace optiling

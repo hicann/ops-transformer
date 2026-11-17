@@ -40,8 +40,11 @@ from fag_common import (
     chunk_off,
     chunk_valid_d,
 )
-from fag_mem import POST_ELEMS, PRE_ELEMS
-from fag_vector_api import (
+from memory.fag_mem import (
+    POST_ELEMS,
+    PRE_ELEMS,
+)
+from compute.fag_vector_api import (
     broadcast_sub_mul_cast_vf,
     cast_p_vf,
     dsink_partial_vf,
@@ -50,18 +53,24 @@ from fag_vector_api import (
     fill_zero_vf,
     muls_cast_vf,
     softmax_grad_front_row192_vf,
-    softmax_grad_front_row256_acc_vf,
     softmax_grad_front_row256_vf,
+    softmax_grad_front_row384_vf,
+    softmax_grad_front_row512_vf,
+    softmax_grad_front_row640_vf,
+    softmax_grad_front_row768_vf,
     softmax_grad_front_row_vf,
 )
-from fag_schedule import (
+from fag_common import (
     META_FAG_DKV_ROW_ENDS,
     META_FAG_DKV_ROW_STARTS,
     META_FAG_DQ_ROW_ENDS,
     META_FAG_DQ_ROW_STARTS,
 )
 from fag_tiling import Tmpl
-from attenmask import copy_in_atten_mask, muls_sel_simple_softmax_vf
+from compute.attenmask import (
+    copy_in_atten_mask,
+    muls_sel_simple_softmax_vf,
+)
 # --- end generated imports ---
 
 # 窗口循环内每窗交错穿插的清零 chunk 上限。大 N 场景（zTotal >> nIter，如
@@ -77,19 +86,15 @@ _KBATCH_CAP = 2
 # ==================================================================
 
 
-def copy_ub2l1(l1_tile, nzp_ub, row_offset):
+def copy_ub2l1(l1_tile, nzp_ub, row_offset, rows):
     """把 NZ+1 缓冲搬进 CV 共享 L1，跳过 bank 错开用的填充块。
 
-    valid_shape 固定设为 [VECTOR_BASEM, N]=[64,128]，框架据此算出源跨距
-    65-64=1，正好跳过每个分形列末尾那一个填充 block。
-
-    为什么不按尾块收窄到 halfS1RealSize：两个 vector 子核分别 insert 到
-    rowOff=0 与 64，各占 L1 的 64 行、互不重叠，故超出 s1Real 的脏行只落在
-    本子核自己那半区内，随后由 matmul 的 valid_shape 与 store 裁掉。
-
-    搬完把 valid_shape 恢复成 [65, N]，让下一轮 VF 仍按 65 行跨距写入。
+    GS 的 nzp_ub 是物理 65 行的非 compact NZ，收窄有效行数
+    不改变 VF 的 65 行分形步长。两个 AIV 写到 0 / ceil(s1Real/2)，只搬
+    各自有效行；L1 仍按完整 128 行物理步长排布，兼容同址 ZN 转置视图。
+    其它路径调用时 rows=64，保持原来的 RowPlusOne 布局。
     """
-    pl.set_validshape(nzp_ub, [VECTOR_BASEM, VECTOR_BASEN])
+    pl.set_validshape(nzp_ub, [rows, VECTOR_BASEN])
     pl.insert(l1_tile, nzp_ub, [row_offset, 0])
     pl.set_validshape(nzp_ub, [NZP_ROWS, VECTOR_BASEN])
 
@@ -119,119 +124,135 @@ def _sfmg_tile_compute(
     loadRows,
     halfRows,
     rowShift,
-    y_ub,
-    dy_ub,
+    y_group,
+    dy_group,
     sfmg_ub,
     rowStride,
+    wideRows,
 ):
-    """一个 64 行窗口的 sfmg = rowsum(dy * y)：载 y/dy 后按 dv_align 分档跑 VF。
+    """Shared pre/inline SFMG with the ASC per-lane FP32 addition tree.
 
-    process_vec1（主循环内联，非前移档）与 process_presfmg（pre 阶段前移）
-    共用同一套 load 与 VF 分档，保证两条路径数值行为一致：
-    loadRows 是物理窗口行数（TND 借行含在内），halfRows 是本子核有效行数，
-    rowShift 把 VF 的读取跳到窗口内的有效行。
+    Wide rows are loaded in full, using 32-row pre or 8-row inline slots.
+    The output remains the caller's original macro window: rowOff is local
+    to that window, so workspace indexing and pre/zero interleaving do not
+    change. Narrow loads retain their existing physical row layout.
     """
     if dv_align == 768:
-        # 768 档：y/dy 按 256 列窗口三趟载入，后两趟累加到同一 sfmg。
-        for k in pl.range(0, 3):
-            colOff = k * 256
-            rem = pl.max(constInfo.dvSize - colOff, 0)
-            winW = pl.min(256, rem)
-            if rem > 0:
-                pl.set_validshape(y_ub, [loadRows, winW])
-                pl.set_validshape(dy_ub, [loadRows, winW])
-                pl.load(
+        for rowOff in pl.range(0, halfRows, wideRows):
+            rows = pl.min(wideRows, halfRows - rowOff)
+            y_ub = y_group.next()
+            dy_ub = dy_group.next()
+            pl.set_validshape(y_ub, [rows, constInfo.dvSize])
+            pl.set_validshape(dy_ub, [rows, constInfo.dvSize])
+            pl.load(
+                y_ub,
+                tensor_y,
+                [idx0, loadBase + rowShift + rowOff, idx2, 0],
+                order=[1, 3],
+            )
+            pl.load(
+                dy_ub,
+                tensor_dy,
+                [idx0, loadBase + rowShift + rowOff, idx2, 0],
+                order=[1, 3],
+            )
+            # Select outside VF: no unsupported runtime VF branch. Each
+            # branch performs exactly one reduction per row, after the
+            # corresponding ASC tree, including explicitly zeroed tail lanes.
+            if constInfo.dvSize <= 384:
+                tail = constInfo.dvSize - 256
+                softmax_grad_front_row384_vf(
+                    sfmg_ub,
                     y_ub,
-                    tensor_y,
-                    [idx0, loadBase, idx2, colOff],
-                    order=[1, 3],
-                )
-                pl.load(
                     dy_ub,
-                    tensor_dy,
-                    [idx0, loadBase, idx2, colOff],
-                    order=[1, 3],
+                    rows,
+                    0,
+                    768,
+                    (tail + 1) // 2,
+                    tail // 2,
+                    rowOff,
                 )
-                w0 = pl.min(rem, 128)
-                w1 = pl.max(rem - 128, 0)
-                even0 = (w0 + 1) // 2
-                odd0 = w0 // 2
-                even1 = (w1 + 1) // 2
-                odd1 = w1 // 2
-                if k == 0:
-                    softmax_grad_front_row256_vf(
-                        sfmg_ub,
-                        y_ub,
-                        dy_ub,
-                        halfRows,
-                        rowShift,
-                        rowStride,
-                        even0,
-                        odd0,
-                        even1,
-                        odd1,
-                    )
-                else:
-                    softmax_grad_front_row256_acc_vf(
-                        sfmg_ub,
-                        y_ub,
-                        dy_ub,
-                        halfRows,
-                        rowShift,
-                        rowStride,
-                        even0,
-                        odd0,
-                        even1,
-                        odd1,
-                    )
-        return
-    pl.set_validshape(y_ub, [loadRows, constInfo.dvSize])
-    pl.set_validshape(dy_ub, [loadRows, constInfo.dvSize])
-    pl.load(y_ub, tensor_y, [idx0, loadBase, idx2, 0], order=[1, 3])
-    pl.load(dy_ub, tensor_dy, [idx0, loadBase, idx2, 0], order=[1, 3])
-    # 列宽跟 dv_align：256/192 各一档 VF；64 与 128（含 D=192,Dv=128）共用
-    # 一次 128-lane load，用 even/odd mask 收真实 Dv。
-    if dv_align == 256:
-        w0 = pl.min(constInfo.dvSize, 128)
-        w1 = pl.max(constInfo.dvSize - 128, 0)
-        softmax_grad_front_row256_vf(
-            sfmg_ub,
-            y_ub,
-            dy_ub,
-            halfRows,
-            rowShift,
-            rowStride,
-            (w0 + 1) // 2,
-            w0 // 2,
-            (w1 + 1) // 2,
-            w1 // 2,
-        )
-    elif dv_align == 192:
-        w0 = pl.min(constInfo.dvSize, 128)
-        w1 = pl.max(constInfo.dvSize - 128, 0)
-        softmax_grad_front_row192_vf(
-            sfmg_ub,
-            y_ub,
-            dy_ub,
-            halfRows,
-            rowShift,
-            rowStride,
-            (w0 + 1) // 2,
-            w0 // 2,
-            (w1 + 1) // 2,
-            w1 // 2,
-        )
+            elif constInfo.dvSize <= 512:
+                tail = constInfo.dvSize - 384
+                softmax_grad_front_row512_vf(
+                    sfmg_ub,
+                    y_ub,
+                    dy_ub,
+                    rows,
+                    0,
+                    768,
+                    (tail + 1) // 2,
+                    tail // 2,
+                    rowOff,
+                )
+            elif constInfo.dvSize <= 640:
+                tail = constInfo.dvSize - 512
+                softmax_grad_front_row640_vf(
+                    sfmg_ub,
+                    y_ub,
+                    dy_ub,
+                    rows,
+                    0,
+                    768,
+                    (tail + 1) // 2,
+                    tail // 2,
+                    rowOff,
+                )
+            else:
+                tail = constInfo.dvSize - 640
+                softmax_grad_front_row768_vf(
+                    sfmg_ub,
+                    y_ub,
+                    dy_ub,
+                    rows,
+                    0,
+                    768,
+                    (tail + 1) // 2,
+                    tail // 2,
+                    rowOff,
+                )
     else:
-        softmax_grad_front_row_vf(
-            sfmg_ub,
-            y_ub,
-            dy_ub,
-            halfRows,
-            rowShift,
-            rowStride,
-            constInfo.dvEvenSize,
-            constInfo.dvOddSize,
-        )
+        y_ub = y_group.next()
+        dy_ub = dy_group.next()
+        pl.set_validshape(y_ub, [loadRows, constInfo.dvSize])
+        pl.set_validshape(dy_ub, [loadRows, constInfo.dvSize])
+        pl.load(y_ub, tensor_y, [idx0, loadBase, idx2, 0], order=[1, 3])
+        pl.load(dy_ub, tensor_dy, [idx0, loadBase, idx2, 0], order=[1, 3])
+        if dv_align == 256:
+            tail = constInfo.dvSize - 128
+            softmax_grad_front_row256_vf(
+                sfmg_ub,
+                y_ub,
+                dy_ub,
+                halfRows,
+                rowShift,
+                rowStride,
+                (tail + 1) // 2,
+                tail // 2,
+            )
+        elif dv_align == 192:
+            tail = constInfo.dvSize - 128
+            softmax_grad_front_row192_vf(
+                sfmg_ub,
+                y_ub,
+                dy_ub,
+                halfRows,
+                rowShift,
+                rowStride,
+                (tail + 1) // 2,
+                tail // 2,
+            )
+        else:
+            softmax_grad_front_row_vf(
+                sfmg_ub,
+                y_ub,
+                dy_ub,
+                halfRows,
+                rowShift,
+                rowStride,
+                constInfo.dvEvenSize,
+                constInfo.dvOddSize,
+            )
 
 
 def process_vec1(
@@ -252,7 +273,7 @@ def process_vec1(
     无关，主循环每个 tile 重算会被重复 s2Outer 遍，大 D 档是 V 侧的主要
     浪费。pre 阶段(process_presfmg)已按 (head, 全局 token 行) 算好全量存
     ws，这里只搬本子核有效行：起点 loadBaseTnd+rowShift 即 rowBase 的
-    全局行；尾部不足 64 行的槽位与内联路径一样由 V3 的写满语义吞掉。
+    全局行；GS 的 V3 只读取本子核有效行，不消费尾部残留。
     dv_align=64 保持内联（一趟半宽 VF，前移的 GM 往返不划算）。
     ★门必须与写入方逐一对齐（读未初始化的 ws 是灾难）：写侧
     process_presfmg 与读侧共用 constInfo.enablePreSfmg（host 按 fasg
@@ -267,7 +288,7 @@ def process_vec1(
             # 只搬有效行（rows），并 clamp 确保不超出 ws 的 (head,batch) 段：
             # rowShift 使读取起点 = rowBase（全局行），rows 使终点 = rowBase+rows
             # 不会超出本 batch 的物理范围。剩余 sfmg_ub[rows..63] 为残留，
-            # 与内联路径的 VF 写入行为一致（V3 后续按 validshape 裁剪）。
+            # GS 的 V3 按有效行计算；与内联路径的 VF 写入范围一致。
             # validshape/order 与 lse 同一套：[64,1] DN tile 取 [rows,1]，
             # order=[1,0] 把 tile 行轴映到 ws 的扁平 token 轴。
             pl.set_validshape(sfmg_ub, [rows, 1])
@@ -277,7 +298,7 @@ def process_vec1(
                 [0, headQ * constInfo.t1Size + runInfo.loadBaseTnd + runInfo.rowShift],
                 order=[1, 0],
             )
-            # load 后恢复满形状 [64,1]：V3 的 VF 按线性地址读 64 行。
+            # 恢复物理形状 [64,1]；GS 的 V3 仍只读取 rows 行。
             pl.set_validshape(sfmg_ub, [VECTOR_BASEM, 1])
     else:
         # 未前移：主循环内联重算，数值与 pre 路径一致（同一套 VF）。
@@ -296,6 +317,7 @@ def process_vec1(
             dy_ub,
             sfmg_ub,
             rowStride,
+            8,
         )
 
 
@@ -407,8 +429,6 @@ def process_presfmg(
             # enablePreSfmg=0 时只保留清零（主循环 V1 走内联重算），
             # sp 载入/VF/store 全部跳过；标志按 launch 恒定，乒乓轮转一致。
             if constInfo.enablePreSfmg == 1:
-                y_t = y_ub.next()
-                dy_t = dy_ub.next()
                 out_t = sfmg_ub.next()
                 flat_t = sfmg_flat.next()
                 _sfmg_tile_compute(
@@ -421,10 +441,11 @@ def process_presfmg(
                     rows,
                     rows,
                     0,
-                    y_t,
-                    dy_t,
+                    y_ub,
+                    dy_ub,
                     out_t,
                     rowStride,
+                    32,
                 )
                 # 扁平视图落盘：[1,rows] 恒等映射，只落有效 rows 个元素。
                 pl.set_validshape(flat_t, [1, rows])
@@ -452,8 +473,6 @@ def process_presfmg(
             rows = pl.min(spRows, constInfo.s1Size - s)
             # 同 TND 分支：enablePreSfmg=0 时只清零，不搬 y/dO、不算 sfmg。
             if constInfo.enablePreSfmg == 1:
-                y_t = y_ub.next()
-                dy_t = dy_ub.next()
                 out_t = sfmg_ub.next()
                 flat_t = sfmg_flat.next()
                 _sfmg_tile_compute(
@@ -466,10 +485,11 @@ def process_presfmg(
                     rows,
                     rows,
                     0,
-                    y_t,
-                    dy_t,
+                    y_ub,
+                    dy_ub,
                     out_t,
                     rowStride,
+                    32,
                 )
                 # 同上：扁平视图 [1,rows] 恒等映射，落有效 rows 个元素。
                 pl.set_validshape(flat_t, [1, rows])
@@ -492,17 +512,8 @@ def process_presfmg(
 # ==================================================================
 
 
-def process_vec2(
-    constInfo,
-    runInfo,
-    subIdx,
-    tensor_lse,
-    mm2_ub,
-    lse_ub,
-    tensor_mask,
-    mask_ub,
-    mask_pre_ub,
-):
+def prefetch_vec_lse(constInfo, runInfo, tensor_lse, lse_ub):
+    """准备本任务 LSE；调用方决定在消费时或提前一任务装入 UB。"""
     headQ = runInfo.n2oIdx * constInfo.gSize + runInfo.goIdx
     loadRows = _vector_load_rows(constInfo, runInfo)
     pl.set_validshape(lse_ub, [loadRows, 1])
@@ -517,6 +528,22 @@ def process_vec2(
         pl.load(
             lse_ub, tensor_lse, [runInfo.boIdx, headQ, runInfo.loadBase], order=[2, 0]
         )
+
+
+def process_vec2(
+    constInfo,
+    runInfo,
+    subIdx,
+    tensor_lse,
+    mm2_ub,
+    lse_ub,
+    tensor_mask,
+    mask_ub,
+    mask_pre_ub,
+    lse_preloaded=False,
+):
+    if not lse_preloaded:
+        prefetch_vec_lse(constInfo, runInfo, tensor_lse, lse_ub)
     if mask_mode != 0:
         copy_in_atten_mask(
             constInfo, runInfo, subIdx, tensor_mask, mask_ub, mask_pre_ub
@@ -537,16 +564,16 @@ def process_vec2(
 
 
 def process_vec3(constInfo, runInfo, subIdx, ds_l1, mm1_ub, mm2_ub, sfmg_ub, nzp_ub):
-    rowOff = subIdx * VECTOR_BASEM
-    # nd/nz 不裁剪：列方向的脏数据由 matmul 的 valid_shape 与 store 挡掉。
-    # VF 固定写满 VECTOR_BASEM 行：NZ+1 的分形列间距由行数决定，按尾块
-    # 缩小会让间距漂移。尾块只在 insert 时用 valid_shape 裁掉。
-    broadcast_sub_mul_cast_vf(
-        nzp_ub, mm1_ub, mm2_ub, sfmg_ub, constInfo.scaleValue, VECTOR_BASEM
-    )
-    # 只写一次 L1：mm4 通过 ds_t_l1(同地址的 ZN 视图)直接读到 dS^T，
-    # 无需再做 transpose/insert
-    copy_ub2l1(ds_l1, nzp_ub, rowOff)
+    rowOff = subIdx * runInfo.firstHalfS1RealSize
+    rows = VECTOR_BASEM
+    if template == Tmpl.BN2GS1S2:
+        rows = runInfo.halfS1RealSize
+    if rows > 0:
+        broadcast_sub_mul_cast_vf(
+            nzp_ub, mm1_ub, mm2_ub, sfmg_ub, constInfo.scaleValue, rows
+        )
+        # L1 物理步长不变；mm4 仍从同址 ZN 视图读取 dS^T。
+        copy_ub2l1(ds_l1, nzp_ub, rowOff, rows)
 
 
 # ==================================================================
@@ -555,10 +582,13 @@ def process_vec3(constInfo, runInfo, subIdx, ds_l1, mm1_ub, mm2_ub, sfmg_ub, nzp
 
 
 def process_vec4(constInfo, runInfo, subIdx, p_l1, mm2_ub, nzp_ub):
-    rowOff = subIdx * VECTOR_BASEM
-    cast_p_vf(nzp_ub, mm2_ub, VECTOR_BASEM)
-    # 同 process_vec3：mm5 从 p_t_l1(同地址 ZN 视图)读 P^T
-    copy_ub2l1(p_l1, nzp_ub, rowOff)
+    rowOff = subIdx * runInfo.firstHalfS1RealSize
+    rows = VECTOR_BASEM
+    if template == Tmpl.BN2GS1S2:
+        rows = runInfo.halfS1RealSize
+    if rows > 0:
+        cast_p_vf(nzp_ub, mm2_ub, rows)
+        copy_ub2l1(p_l1, nzp_ub, rowOff, rows)
 
 
 # ==================================================================
@@ -712,6 +742,48 @@ def process_pre_from_meta(meta, fagOff, tensor_dq, tensor_dk, tensor_dv, dQ, dV,
     process_pre(tensor_dq, zt, dqRowStart * dQ, dqNElems)
     process_pre(tensor_dk, zt, dkvRowStart * dQ, dkvNElems)
     process_pre(tensor_dv, zt, dkvRowStart * dV, dvNElems)
+
+
+def zero_tnd_empty_batch(constInfo, cu_q, cu_kv, tensor_dq, tensor_dk, tensor_dv, zt):
+    """变长 TND：把「空 batch」对侧的 out 行清零。
+
+    packed 索引空间按每 batch 的有效块数拼起来，空 batch（一侧长度为 0）
+    不产生任何任务，主循环不会写它的 out；host 读不到 cu_seqlens，无法像
+    asc 那样据此退回 GS1S2，只能在这里按 batch 补零，语义等同 GS 的
+    pre 清零 + post 全量写回。
+
+    行空间是 token 主序紧凑视图：
+      dq      [T1*N1, D]   元素偏移 = token * N1 * D
+      dk/dv   [T2*N2, D/Dv] 元素偏移 = token * N2 * D
+    一个 batch 的 token 区间对全部 head 连续，直接按 [token0, token1) 整段清。
+    各 AIV 按 batch 均分；只有空 batch 才真正产生清零任务。
+    """
+    aivIdx = pl.get_block_idx()
+    aivNum = constInfo.aivCount
+    bSize = constInfo.bSize
+    start = bSize * aivIdx // aivNum
+    end = bSize * (aivIdx + 1) // aivNum
+    n1 = constInfo.n2Size * constInfo.gSize
+    n2 = constInfo.n2Size
+    dQ = constInfo.dSize
+    dV = constInfo.dvSize
+    one64 = pl.const(1, pl.DT_INT64)
+    pl.set_validshape(zt, [1, PRE_ELEMS[d_align]])
+    fill_zero_f16_vf(zt, PRE_ELEMS[d_align] // VF_LANES_F16)
+    for i in pl.range(start, end):
+        q0 = pl.getval(cu_q, i) * one64
+        q1 = pl.getval(cu_q, i + 1) * one64
+        k0 = pl.getval(cu_kv, i) * one64
+        k1 = pl.getval(cu_kv, i + 1) * one64
+        # KV 为空：dq 整段为 0（没有 key 参与 softmax）。
+        if q1 > q0:
+            if k1 == k0:
+                process_pre(tensor_dq, zt, q0 * n1 * dQ, (q1 - q0) * n1 * dQ)
+        # Q 为空：dk/dv 整段为 0（该 batch 对 KV 没有贡献）。
+        if k1 > k0:
+            if q1 == q0:
+                process_pre(tensor_dk, zt, k0 * n2 * dQ, (k1 - k0) * n2 * dQ)
+                process_pre(tensor_dv, zt, k0 * n2 * dV, (k1 - k0) * n2 * dV)
 
 
 def process_nz_pre(tensor_ws, elems, aiv_count, zt):

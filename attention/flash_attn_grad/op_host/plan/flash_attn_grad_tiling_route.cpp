@@ -31,16 +31,32 @@ constexpr int64_t BN2_MULTIBLK_BN_256 = 256;
 constexpr int64_t BN2_ALIGN128 = 128;
 
 // ===== 能力谓词 =============================================================
-// 共同前提：BN2 系列模板不接变长 TND、GQA 或 D>MAX_HEAD_DIM；且要求 D==Dv
+// 变长 TND 的 BN2 单块准入：host 读不到 cu_seqlens 的数据，但 max_seqlen 是
+// 每 batch 长度的上界——两侧都 ≤ BN2_MAX_S 时，任何 batch 都装得进一个
+// BN2 基本块（运行期 s1Outer=s2Outer=1），kernel 用 cu_seqlens 逐 batch 寻址。
+// 该档与 asc 的 "变长 TND 实际 max≤128 → BN2 单块" 对齐；MultiBlk 仍不接
+// 变长 TND（其 per-core 条带寻址依赖固定 s1Outer），见 Feasible_Bn2MultiBlk。
+// mask 4 的滑动窗口在变长下可能出现整块无效（skip_invalid 整块跳过、该
+// batch 的 out 行没有写者），本轮不放开，保持 GS1S2 兜底；mask 3 右下对齐
+// 时每个非空 batch 至少有一行有效，不会出现整块无效。
+bool TndVarlenBn2SingleFeasible(const FagParsedInfo& p)
+{
+    if (p.maskMode == MASK_MODE_WINDOW) {
+        return false;
+    }
+    return p.maxSeqlenQ > 0 && p.maxSeqlenKv > 0 && p.maxSeqlenQ <= BN2_MAX_S && p.maxSeqlenKv <= BN2_MAX_S;
+}
+
+// 共同前提：GQA、D!=Dv、D>MAX_HEAD_DIM 不接；且要求 D==Dv
 // （BN2 的 V/dO 固定按 dSize 建视图，只有 GS1S2 处理 D=192/Dv=128）。
 bool Bn2FamilyFeasible(const FagParsedInfo& p)
 {
     // 等长 TND（tndAllSame，parser 用 shape 算术判定）的 GM 排布与 BSND
     // 四维视图逐元素重合，可走 BN2（layout=1 二进制，lse 走 TND 2D 视图）；
-    // 变长 TND 由本谓词挡回 GS1S2 兜底。0930 bisect-sink 定案移植。
+    // 变长 TND 仅在 max_seqlen 可给出单块上界时放开。0930 bisect-sink 定案移植。
     // Effective lengths are runtime values. Even physically equal TND batches
     // need the variable-length GS grid when either seqused input is supplied.
-    if (p.hasSeqused || (p.isTnd && !p.tndAllSame)) {
+    if (p.hasSeqused || (p.isTnd && !p.tndAllSame && !TndVarlenBn2SingleFeasible(p))) {
         return false;
     }
     // D==Dv 与 AICPU 的 headDimV==headDim 门一一对应，两边必须同为 D 或同为 GS。
@@ -59,8 +75,11 @@ bool Feasible_Bn2MultiBlk(const FagParsedInfo& p)
     // S 落在 (128, 640]：这些都是 MultiBlk kernel 的实现前提。
     // mask 3/4 也可以走 MultiBlk；无效行/列由 bn2NeedZero 另开一份二进制。
     // D==Dv 已在 Bn2FamilyFeasible 里统一把关。
-    return Bn2FamilyFeasible(p) && (p.s1 > BN2_MAX_S || p.s2 > BN2_MAX_S) && p.s1 <= BN2_MULTIBLK_SEQ &&
-           p.s2 <= BN2_MULTIBLK_SEQ;
+    // 变长 TND 只做单块：MultiBlk 的 dQ 回写按 per-core 条带寻址
+    // （cBlockIdx*s1Outer + s1oIdx），依赖固定 s1Outer；等长 TND 的排布与
+    // BSND 一致，不受影响。
+    return !(p.isTnd && !p.tndAllSame) && Bn2FamilyFeasible(p) && (p.s1 > BN2_MAX_S || p.s2 > BN2_MAX_S) &&
+           p.s1 <= BN2_MULTIBLK_SEQ && p.s2 <= BN2_MULTIBLK_SEQ;
 }
 
 // D5：BN2S2 是保留位，本轮不实现不编译，host 永不产生 template=3。
@@ -180,6 +199,16 @@ ge::graphStatus SelectKernelPlan(gert::TilingContext* context, const FagParsedIn
 
     if (plan.isBn2MultiBlk == 1 && (info.maskMode == MASK_MODE_CAUSAL || info.maskMode == MASK_MODE_WINDOW) &&
         FagBn2HasInvalidOuter(info.s1, info.s2, info.s1Token, info.s2Token)) {
+        plan.bn2NeedZero = 1;
+    }
+
+    // 变长 TND 的 BN2 单块：host 读不到 cu_seqlens，无法像 asc 那样在存在空
+    // batch 时退回 GS1S2；kernel 的 packed 索引空间不为空 batch 产生任务，
+    // 需要 pre 阶段把「空 batch 对侧的 out 行」补零。用 bn2NeedZero（bit13）
+    // 区分出这份二进制，同时让 tiling 打开 BATCH_MODE（未满核启动时
+    // sync_all 必须靠它）。等长 TND 不可能有跨 batch 的空序列，保持
+    // need_zero=0，不为既有路径增加清零开销。
+    if (plan.tmpl == TMPL_BN2 && plan.isBn2MultiBlk == 0 && info.isTnd && !info.tndAllSame) {
         plan.bn2NeedZero = 1;
     }
 

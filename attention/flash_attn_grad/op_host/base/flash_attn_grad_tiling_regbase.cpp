@@ -21,7 +21,7 @@ namespace optiling {
 namespace {
 
 // TilingData 有两份互不相干的声明，谁都不引用谁：
-//   1. op_kernel/flash_attn_grad.py 的 FlashAttnGradTilingData dataclass 是权威，
+//   1. op_kernel/arch35/fag_tiling.py 的 FlashAttnGradTilingData dataclass 是权威，
 //      codegen 按它的声明顺序生成 FlashAttnGradTilingData_tiling.h（本文件强制包含），
 //      也就是下面真正写入的那份内存布局；
 //   2. op_host/flash_attn_grad_tiling.h（入口旁）的 FlashAttnGradTilingDataTmp 是手写的，
@@ -30,8 +30,9 @@ namespace {
 // 布局钉死：改了 py 侧字段就会在这里断编译，逼着同步改 Tmp 和这些数字。
 // 注意 scaleValue 是唯一的 4 字节字段，它后面有 4 字节填充 —— 框架的
 // CheckAlignAndGenPlaceHolder 也会插同样的填充，两边才对得上。
-static_assert(sizeof(FlashAttnGradTilingData) == 224,
+static_assert(sizeof(FlashAttnGradTilingData) == 960,
               "TilingData layout changed; update FlashAttnGradTilingDataTmp in flash_attn_grad_tiling.h too.");
+static_assert(offsetof(FlashAttnGradTilingData, deterCausalGroups) == 952, "Causal group count must be appended");
 static_assert(offsetof(FlashAttnGradTilingData, scaleValue) == 56, "scaleValue moved; re-check the 4-byte padding.");
 static_assert(offsetof(FlashAttnGradTilingData, gSize) == 64, "gSize moved; re-check the padding after scaleValue.");
 static_assert(offsetof(FlashAttnGradTilingData, coefN2) == 128,
@@ -43,8 +44,12 @@ static_assert(offsetof(FlashAttnGradTilingData, sequsedQOptional) == 200,
               "sequsedQOptional moved; earlier field offsets must stay unchanged.");
 static_assert(offsetof(FlashAttnGradTilingData, sequsedKvOptional) == 208,
               "sequsedKvOptional must follow sequsedQOptional.");
-static_assert(offsetof(FlashAttnGradTilingData, enablePreSfmg) == 216,
-              "enablePreSfmg must be appended after sequsedKvOptional.");
+static_assert(offsetof(FlashAttnGradTilingData, enablePreSfmg) == 216, "enablePreSfmg must follow sequsedKvOptional.");
+static_assert(offsetof(FlashAttnGradTilingData, deterSparseKind) == 224,
+              "deterministic payload must follow the mainline sfmg flag.");
+static_assert(offsetof(FlashAttnGradTilingData, metadataWordCount) == 936,
+              "metadata capacity must follow deterministic band phases.");
+static_assert(offsetof(FlashAttnGradTilingData, deterL2Bytes) == 944, "L2 capacity must follow metadataWordCount.");
 
 void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagTilingPlan& plan,
              const FagRouteTrace& trace)
@@ -69,8 +74,28 @@ void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagT
             info.coefB0KV, info.coefN0, info.coefN2, plan.tilingKey, plan.workspace.totalSize);
 
     // 决策追溯：上板发现别的模板更快时，先看这行就知道今天为什么选了它。
+    OP_LOGI(context->GetNodeName(), "FlashAttnGrad deter plan: family=%ld, rounds=%ld.", plan.schedule.deter.family,
+            plan.schedule.deterMaxRound);
+    if (!info.isDeterministic) {
+        OP_LOGI(context->GetNodeName(),
+                "FlashAttnGrad normal swizzle plan: kind=%ld, continuousBlocks=%ld, validPerHead=%ld, "
+                "maxValidBlocks=%ld, effectiveBlockOuter=%ld, workingSetBytes=%lu, tndUniformCandidate=%d.",
+                plan.schedule.normalSwizzleKind, plan.schedule.normalContinuousBlocks, plan.schedule.normalValidPerHead,
+                plan.schedule.normalMaxValidBlocks, plan.schedule.normalBlockOuter, plan.schedule.normalWorkingSetBytes,
+                static_cast<int>(info.tndAllSame));
+    }
+
     // l2CacheSize 一起打出来：swizzle 的阈值以它为分母，各 ascend950 变体
     // 16MB~128MB 不等，判据对不上时第一件事就是核对这个数。
+    if (plan.schedule.deter.family == DeterFamily::FIXED_GQA_CAUSAL_GROUPED ||
+        plan.schedule.deter.family == DeterFamily::FIXED_MHA_BAND_GROUPED) {
+        OP_LOGI(context->GetNodeName(),
+                "FlashAttnGrad grouped plan: causalGroups=%ld, causalRoundsPerGroup=%ld, bandGroups=%ld, "
+                "bandFullRounds=%ld, bandTailRounds=%ld.",
+                plan.schedule.deter.causalGroups, plan.schedule.deter.causalRoundsPerGroup,
+                plan.schedule.deter.band.groupsPerChunk, plan.schedule.deter.band.fullRounds,
+                plan.schedule.deter.band.tailRounds);
+    }
     OP_LOGI(context->GetNodeName(), "FlashAttnGrad route: chosen=%s, swizzle=%s, nzOut=%s, aicNum=%u, l2CacheSize=%lu.",
             trace.chosen, trace.swizzleReject, trace.nzOutReject, info.aicNum, info.l2CacheSize);
     for (size_t i = 0; i < trace.rejectedNum; ++i) {
@@ -180,6 +205,99 @@ ge::graphStatus FlashAttnGradTilingRegbase::WriteTilingData(const FagParsedInfo&
     tilingData->sequsedQOptional = info.hasSequsedQ ? 1 : 0;
     tilingData->sequsedKvOptional = info.hasSequsedKv ? 1 : 0;
     tilingData->enablePreSfmg = plan.kernel.enablePreSfmg;
+    tilingData->deterSparseKind = plan.schedule.deter.sparseKind;
+    tilingData->deterDenseRound = plan.schedule.deter.denseRound;
+    tilingData->deterCausalRoundsPerGroup = plan.schedule.deter.causalRoundsPerGroup;
+    tilingData->deterCausalGroups = plan.schedule.deter.causalGroups;
+    tilingData->deterBandMode = plan.schedule.deter.bandMode;
+    tilingData->deterM = plan.schedule.deter.m;
+    tilingData->deterN = plan.schedule.deter.n;
+    tilingData->deterP = plan.schedule.deter.p;
+    tilingData->deterQ = plan.schedule.deter.q;
+    tilingData->deterRowOffset = plan.schedule.deter.rowOffset;
+    tilingData->deterColOffset = plan.schedule.deter.colOffset;
+    tilingData->deterBandPhaseCount = plan.schedule.deter.band.phaseCount;
+    tilingData->deterBandTailPhaseCount = plan.schedule.deter.band.tailPhaseCount;
+    tilingData->deterBandK = plan.schedule.deter.band.k;
+    tilingData->deterBandB = plan.schedule.deter.band.b;
+    tilingData->deterBandG = plan.schedule.deter.band.g;
+    tilingData->deterBandGroupsPerChunk = plan.schedule.deter.band.groupsPerChunk;
+    tilingData->deterBandFullRounds = plan.schedule.deter.band.fullRounds;
+    tilingData->deterBandTailRounds = plan.schedule.deter.band.tailRounds;
+    tilingData->deterBandTotalRounds = plan.schedule.deter.band.totalRounds;
+    tilingData->deterBandPhase0Kind = plan.schedule.deter.band.phases[0].kind;
+    tilingData->deterBandPhase0M = plan.schedule.deter.band.phases[0].m;
+    tilingData->deterBandPhase0N = plan.schedule.deter.band.phases[0].n;
+    tilingData->deterBandPhase0RowOffset = plan.schedule.deter.band.phases[0].rowOffset;
+    tilingData->deterBandPhase0ColOffset = plan.schedule.deter.band.phases[0].colOffset;
+    tilingData->deterBandPhase0FullRounds = plan.schedule.deter.band.phases[0].fullRounds;
+    tilingData->deterBandPhase0TailRounds = plan.schedule.deter.band.phases[0].tailRounds;
+    tilingData->deterBandPhase1Kind = plan.schedule.deter.band.phases[1].kind;
+    tilingData->deterBandPhase1M = plan.schedule.deter.band.phases[1].m;
+    tilingData->deterBandPhase1N = plan.schedule.deter.band.phases[1].n;
+    tilingData->deterBandPhase1RowOffset = plan.schedule.deter.band.phases[1].rowOffset;
+    tilingData->deterBandPhase1ColOffset = plan.schedule.deter.band.phases[1].colOffset;
+    tilingData->deterBandPhase1FullRounds = plan.schedule.deter.band.phases[1].fullRounds;
+    tilingData->deterBandPhase1TailRounds = plan.schedule.deter.band.phases[1].tailRounds;
+    tilingData->deterBandPhase2Kind = plan.schedule.deter.band.phases[2].kind;
+    tilingData->deterBandPhase2M = plan.schedule.deter.band.phases[2].m;
+    tilingData->deterBandPhase2N = plan.schedule.deter.band.phases[2].n;
+    tilingData->deterBandPhase2RowOffset = plan.schedule.deter.band.phases[2].rowOffset;
+    tilingData->deterBandPhase2ColOffset = plan.schedule.deter.band.phases[2].colOffset;
+    tilingData->deterBandPhase2FullRounds = plan.schedule.deter.band.phases[2].fullRounds;
+    tilingData->deterBandPhase2TailRounds = plan.schedule.deter.band.phases[2].tailRounds;
+    tilingData->deterBandPhase3Kind = plan.schedule.deter.band.phases[3].kind;
+    tilingData->deterBandPhase3M = plan.schedule.deter.band.phases[3].m;
+    tilingData->deterBandPhase3N = plan.schedule.deter.band.phases[3].n;
+    tilingData->deterBandPhase3RowOffset = plan.schedule.deter.band.phases[3].rowOffset;
+    tilingData->deterBandPhase3ColOffset = plan.schedule.deter.band.phases[3].colOffset;
+    tilingData->deterBandPhase3FullRounds = plan.schedule.deter.band.phases[3].fullRounds;
+    tilingData->deterBandPhase3TailRounds = plan.schedule.deter.band.phases[3].tailRounds;
+    tilingData->deterBandPhase4Kind = plan.schedule.deter.band.phases[4].kind;
+    tilingData->deterBandPhase4M = plan.schedule.deter.band.phases[4].m;
+    tilingData->deterBandPhase4N = plan.schedule.deter.band.phases[4].n;
+    tilingData->deterBandPhase4RowOffset = plan.schedule.deter.band.phases[4].rowOffset;
+    tilingData->deterBandPhase4ColOffset = plan.schedule.deter.band.phases[4].colOffset;
+    tilingData->deterBandPhase4FullRounds = plan.schedule.deter.band.phases[4].fullRounds;
+    tilingData->deterBandPhase4TailRounds = plan.schedule.deter.band.phases[4].tailRounds;
+    tilingData->deterBandTailPhase0Kind = plan.schedule.deter.band.tailPhases[0].kind;
+    tilingData->deterBandTailPhase0M = plan.schedule.deter.band.tailPhases[0].m;
+    tilingData->deterBandTailPhase0N = plan.schedule.deter.band.tailPhases[0].n;
+    tilingData->deterBandTailPhase0RowOffset = plan.schedule.deter.band.tailPhases[0].rowOffset;
+    tilingData->deterBandTailPhase0ColOffset = plan.schedule.deter.band.tailPhases[0].colOffset;
+    tilingData->deterBandTailPhase0FullRounds = plan.schedule.deter.band.tailPhases[0].fullRounds;
+    tilingData->deterBandTailPhase0TailRounds = plan.schedule.deter.band.tailPhases[0].tailRounds;
+    tilingData->deterBandTailPhase1Kind = plan.schedule.deter.band.tailPhases[1].kind;
+    tilingData->deterBandTailPhase1M = plan.schedule.deter.band.tailPhases[1].m;
+    tilingData->deterBandTailPhase1N = plan.schedule.deter.band.tailPhases[1].n;
+    tilingData->deterBandTailPhase1RowOffset = plan.schedule.deter.band.tailPhases[1].rowOffset;
+    tilingData->deterBandTailPhase1ColOffset = plan.schedule.deter.band.tailPhases[1].colOffset;
+    tilingData->deterBandTailPhase1FullRounds = plan.schedule.deter.band.tailPhases[1].fullRounds;
+    tilingData->deterBandTailPhase1TailRounds = plan.schedule.deter.band.tailPhases[1].tailRounds;
+    tilingData->deterBandTailPhase2Kind = plan.schedule.deter.band.tailPhases[2].kind;
+    tilingData->deterBandTailPhase2M = plan.schedule.deter.band.tailPhases[2].m;
+    tilingData->deterBandTailPhase2N = plan.schedule.deter.band.tailPhases[2].n;
+    tilingData->deterBandTailPhase2RowOffset = plan.schedule.deter.band.tailPhases[2].rowOffset;
+    tilingData->deterBandTailPhase2ColOffset = plan.schedule.deter.band.tailPhases[2].colOffset;
+    tilingData->deterBandTailPhase2FullRounds = plan.schedule.deter.band.tailPhases[2].fullRounds;
+    tilingData->deterBandTailPhase2TailRounds = plan.schedule.deter.band.tailPhases[2].tailRounds;
+    tilingData->deterBandTailPhase3Kind = plan.schedule.deter.band.tailPhases[3].kind;
+    tilingData->deterBandTailPhase3M = plan.schedule.deter.band.tailPhases[3].m;
+    tilingData->deterBandTailPhase3N = plan.schedule.deter.band.tailPhases[3].n;
+    tilingData->deterBandTailPhase3RowOffset = plan.schedule.deter.band.tailPhases[3].rowOffset;
+    tilingData->deterBandTailPhase3ColOffset = plan.schedule.deter.band.tailPhases[3].colOffset;
+    tilingData->deterBandTailPhase3FullRounds = plan.schedule.deter.band.tailPhases[3].fullRounds;
+    tilingData->deterBandTailPhase3TailRounds = plan.schedule.deter.band.tailPhases[3].tailRounds;
+    tilingData->deterBandTailPhase4Kind = plan.schedule.deter.band.tailPhases[4].kind;
+    tilingData->deterBandTailPhase4M = plan.schedule.deter.band.tailPhases[4].m;
+    tilingData->deterBandTailPhase4N = plan.schedule.deter.band.tailPhases[4].n;
+    tilingData->deterBandTailPhase4RowOffset = plan.schedule.deter.band.tailPhases[4].rowOffset;
+    tilingData->deterBandTailPhase4ColOffset = plan.schedule.deter.band.tailPhases[4].colOffset;
+    tilingData->deterBandTailPhase4FullRounds = plan.schedule.deter.band.tailPhases[4].fullRounds;
+    tilingData->deterBandTailPhase4TailRounds = plan.schedule.deter.band.tailPhases[4].tailRounds;
+    const auto* metadataShape = context_->GetOptionalInputShape(METADATA_INDEX);
+    tilingData->metadataWordCount = metadataShape == nullptr ? 0 : metadataShape->GetStorageShape().GetShapeSize();
+    tilingData->deterL2Bytes = static_cast<int64_t>(info.l2CacheSize);
     return ge::GRAPH_SUCCESS;
 }
 

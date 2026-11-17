@@ -13,7 +13,7 @@
 #include "flash_attn_grad_tiling_key.h"
 #include "flash_attn_grad_tiling_nzout.h"
 #include "flash_attn_grad_tiling_route.h"
-#include "flash_attn_grad_tiling_schedule.h"
+#include "flash_attn_grad_tiling_launch.h"
 #include "flash_attn_grad_tiling_swizzle.h"
 #include "flash_attn_grad_tiling_workspace.h"
 #include "log/log.h"

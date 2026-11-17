@@ -116,6 +116,8 @@ ge::graphStatus ParseShapes(gert::TilingContext* context, FagParsedInfo& info)
     const auto qShape = context->GetInputShape(Q_INDEX);
     const auto kShape = context->GetInputShape(K_INDEX);
     const auto vShape = context->GetInputShape(V_INDEX);
+    const auto qDesc = context->GetInputDesc(Q_INDEX);
+    info.isBf16 = qDesc != nullptr && qDesc->GetDataType() == ge::DT_BF16;
 
     if (info.isTnd) {
         info.s1 = info.maxSeqlenQ > 0 ? info.maxSeqlenQ : qShape->GetStorageShape().GetDim(0);
