@@ -37,6 +37,7 @@ constexpr double DEFAULT_DDR_RATE = 31.0;
 constexpr double DEFAULT_L2_RATE = 100.0;
 constexpr double MHZ_PER_GHZ = 1000.0;
 constexpr double KB_SIZE = 1024.0;
+constexpr double BANDWIDTH_THRESHOLD = 2.0; // 走带宽方案的经验值
 
 double StrToDoubleWithDefault(const std::string& value, double defaultValue)
 {
@@ -945,7 +946,8 @@ bool GroupedWeightQuantBatchMatmulTiling::CalcMxA8W4BandwidthResplit(const gert:
                                                                      uint64_t& selectedNBlockSize) const
 {
     if (!IsMxA8W4() || groupType_ != static_cast<int64_t>(GroupType::SPLIT_M) || groupNum_ == 0 ||
-        nSize_ > coreNum_ * BASIC_BLOCK_BASE_N || (groupListType_ != 0 && groupListType_ != 1)) {
+        nSize_ > coreNum_ * BASIC_BLOCK_BASE_N || (groupListType_ != 0 && groupListType_ != 1) ||
+        !EnableBandWidthSelect(context)) {
         return false;
     }
 
@@ -1016,6 +1018,13 @@ bool GroupedWeightQuantBatchMatmulTiling::CalcMxA8W4BandwidthResplit(const gert:
     return false;
 }
 
+bool GroupedWeightQuantBatchMatmulTiling::EnableBandWidthSelect(const gert::TilingContext* context) const
+{
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
+    const double hbmBW = GetHbmBW(platformInfo);
+    return hbmBW > BANDWIDTH_THRESHOLD;
+}
+
 bool GroupedWeightQuantBatchMatmulTiling::CalcResplitTiling(const gert::TilingContext* context)
 {
     if (!EnableTailResplit()) {
@@ -1055,7 +1064,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CalcResplitTiling(const gert::TilingCo
         nSize_ <= coreNum_ * static_cast<uint64_t>(BASIC_BLOCK_BASE_N) &&
         (groupListType_ == 0 || groupListType_ == 1) &&
         nBlockCount >= GroupedMatmul::CeilDiv(static_cast<uint64_t>(coreNum_), static_cast<uint64_t>(groupNum_)) &&
-        groupDistributedLoadBalanced;
+        groupDistributedLoadBalanced && EnableBandWidthSelect(context);
     if (bandwidthModelSelected) {
         resplitParam_.mainBlockSize = BASIC_BLOCK_BASE_N;
         resplitParam_.mainBlockCount = 0UL;
@@ -1996,6 +2005,9 @@ void GroupedWeightQuantBatchMatmulTiling::CalcFullNumBlocksResplitTiling(uint64_
 
 bool GroupedWeightQuantBatchMatmulTiling::TraverseForBalanceBaseN()
 {
+    if (!IsMxA8W4()) {
+        return false;
+    }
     uint64_t loopNum = GroupedMatmul::CeilDiv(groupNum_ * GroupedMatmul::CeilDiv(nSize_, BASIC_BLOCK_BASE_N), coreNum_);
     for (uint64_t baseN = BASIC_BLOCK_BASE_N; baseN >= BASIC_BLOCK_BASE_N_MIN; baseN -= MX_A8W4_BASE_N_STEP) {
         uint64_t blockCount = GroupedMatmul::CeilDiv(nSize_, baseN);

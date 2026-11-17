@@ -401,6 +401,7 @@ protected:
     void PrintTilingResult(const gert::TilingContext* context);
     bool EnableTailResplit() const;
     bool TraverseForBalanceBaseN();
+    bool EnableBandWidthSelect(const gert::TilingContext* context) const;
 
 private:
     int32_t mList_[GroupedMatmul::MAX_TENSOR_CONT] = {0};
