@@ -106,9 +106,6 @@ static inline bool CheckShape(const aclTensor* x, const aclTensor* addNum, const
                               uint32_t topK, uint32_t activateType, bool isNorm, float scale, bool enableExpertMapping,
                               const aclTensor* y, const aclTensor* indices)
 {
-    if (x->IsEmpty()) {
-        return true;
-    }
     OP_CHECK(groupNum > 0 && groupTopk > 0 && topN > 0 && topK > 0,
              OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                      "all of groupNum: %u, groupTopk: %u, topN: %u and topK: %u must be greater than 0.", groupNum,
