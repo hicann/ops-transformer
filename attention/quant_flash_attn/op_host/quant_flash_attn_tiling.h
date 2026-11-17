@@ -22,8 +22,6 @@
 
 namespace optiling {
 
-ge::graphStatus TilingQuantFlashAttnInt8(gert::TilingContext* context,
-                                         const platform_ascendc::PlatformAscendC& platform);
 ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttn(gert::TilingContext* context);
 ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForQuantFlashAttn(gert::TilingParseContext* context);
 

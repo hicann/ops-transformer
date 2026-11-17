@@ -12,13 +12,13 @@
 
 <!-- npu="A3" id2 -->
 
-- <term>Atlas A3 products</term>: Supported
+- <term>Atlas A3 products</term>: Not supported
 
 <!-- end id2 -->
 
 <!-- npu="910b" id3 -->
 
-- <term>Atlas A2 products</term>: Supported
+- <term>Atlas A2 products</term>: Not supported
 
 <!-- end id3 -->
 
@@ -44,19 +44,10 @@
 
 - **Description**:
 
-  `quant_flash_attn` is an extension API of `cann_ops_transformer` based on `torch_npu`, used to call the `QuantFlashAttn` operator to perform full-quantization attention computation in quantization use cases, unifying training and inference.
-
-  <!-- npu="950" id7 -->
-  <term>Ascend 950PR&950DT products</term> support three quantization use cases.
-
+  `quant_flash_attn` is an extension API of `cann_ops_transformer` based on `torch_npu`, used to call the `QuantFlashAttn` operator to perform full-quantization attention computation in quantization use cases, unifying training and inference. Currently, three quantization use cases are supported:
   - HIF8 use case: Q/K/V all use HIFLOAT8 per-tensor quantization.
   - MxFP8 use case: Q/K/V all use MXFP8 quantization.
   - FP8 use case: Q/K use FP8_E4M3 per-token-head quantization, and V uses FP8_E4M3 per-head quantization.
-  <!-- end id7 -->
-
-  <!-- npu="A3,910b" id8 -->
-  <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support fully quantized INT8 MHA/GQA prefill with INT8 Q, K, and V inputs and BF16 output.
-  <!-- end id8 -->
 
   `quant_flash_attn_metadata` is the metadata generation API of `quant_flash_attn`, used to generate metadata before the main operator executes. The metadata records the AICore/AIVCore task partitioning result. The main operator can optionally pass in the metadata to optimize scheduling. The typical call flow is as follows:
 
@@ -102,9 +93,7 @@
 
 ## Function Prototype
 
-<!-- npu="950" id9 -->
 Before calling the quant_flash_attn API, call the prerequisite API quant_flash_attn_metadata to complete the load balancing computation for quant_flash_attn.
-<!-- end id9 -->
 
 ```python
 cann_ops_transformer.quant_flash_attn_metadata(
@@ -176,7 +165,6 @@ The Python API supports passing the `IntEnum` enumeration or the corresponding i
 | `A8C8_QKV_HIF8_PER_TENSOR_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32` |  0  | HIF8 use case. |
 | `A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32`           |  1  | MxFP8 use case. |
 | `A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32` |  6  | FP8 use case. |
-| `A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16` | 12 | INT8 prefill. |
 
 ### mask_mode Enumeration
 
@@ -208,8 +196,6 @@ In the document constraints, common fields are defined as follows:
 
 ## Parameters
 
-The tables list the combined support across products. Use values that satisfy the constraints for the selected product and quantization mode.
-
 ### quant_flash_attn_metadata
 
 | Name | Type | Required/Optional | Description | Data Type | Data Format | Dimension | Non-contiguous Tensor |
@@ -217,7 +203,7 @@ The tables list the combined support across products. Use values that satisfy th
 | num_heads_q      | int           | Required    | Number of Query heads.                                                                       | int32  | -    | -      | -         |
 | num_heads_kv     | int           | Required    | Number of Key/Value heads.                                                                   | int32  | -    | -      | -         |
 | head_dim          | int           | Required    | Dimension of each attention head.                                                                         | int32  | -    | -      | -         |
-| quant_mode        | int/QuantMode | Required    | Quantization mode. Pass a QuantMode member or the corresponding integer 0, 1, 6, or 12. | int32  | -    | -      | -         |
+| quant_mode        | int/QuantMode | Required    | Quantization mode. Supports passing the enumeration or the corresponding int value. For the enumeration definition, see "quant_mode Enumeration".                                        | int32  | -    | -      | -         |
 | cu_seqlens_q     | Tensor        | Optional    | Cumulative sequence length of Q, used to handle variable-length sequences. The first element must be 0.                                                       | int32  | ND   | (B+1,) | ×         |
 | cu_seqlens_kv    | Tensor        | Optional    | Cumulative sequence length of KV, used to handle variable-length sequences. The first element must be 0.                                                      | int32  | ND   | (B+1,) | ×         |
 | seqused_q         | Tensor        | Optional    | Specifies the actual sequence length used in each batch of q, to truncate redundancy.                                                          | int32  | ND   | (B,)   | ×         |
@@ -239,13 +225,13 @@ The tables list the combined support across products. Use values that satisfy th
 
 | Name             | Type | Required/Optional | Description | Data Type                | Data Format | Dimensions                                                                                                         | Non-contiguous Tensor |
 | :------------------- | :------------ | :---- | :--------------------------------------------------- | :---------------------- | :--- | :----------------------------------------------------------------------------------------------------------------- | :-------- |
-| q                    | Tensor        | Required | Q in the formula. | int8/float8_e4m3fn/hifloat8 | ND   | <ul><li>(Q_T, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(B, Q_S, Q_N, D)</li><li>(Q_N, Q_T, D)</li></ul> | ×         |
-| k                    | Tensor        | Required | K in the formula. | int8/float8_e4m3fn/hifloat8 | ND   | <ul><li>(KV_T, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(B, KV_S, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li><li>(Bn, Bs, KV_N, D)</li></ul> | √         |
-| v                    | Tensor        | Required | V in the formula. | int8/float8_e4m3fn/hifloat8 | ND   | <ul><li>(KV_T, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(B, KV_S, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li><li>(Bn, Bs, KV_N, D)</li></ul> | √         |
-| q_descale           | Tensor        | Required | Dequantization scale of q. | float8_e8m0/float32 | ND   | <ul><li>(Q_T, Q_N, ⌈D/64⌉, 2)</li><li>(KV_N, Q_T, G, ⌈D/64⌉, 2)</li><li>(B, Q_N, Q_S, ⌈D/64⌉, 2)</li><li>(B, Q_S, Q_N, ⌈D/64⌉, 2)</li><li>(B, KV_N, Q_S, G, ⌈D/64⌉, 2)</li><li>(Q_N, Q_T)</li><li>(1,)</li><li>(Q_T, Q_N)</li><li>(B, Q_N, Q_S)</li><li>(B, Q_S, Q_N)</li></ul> | ×         |
-| k_descale           | Tensor        | Required | Dequantization scale of k. | float8_e8m0/float32 | ND   | <ul><li>(KV_T, KV_N, ⌈D/64⌉, 2)</li><li>(B, KV_N, KV_S, ⌈D/64⌉, 2)</li><li>(B, KV_S, KV_N, ⌈D/64⌉, 2)</li><li>(Bn, KV_N, Bs, ⌈D/64⌉, 2)</li><li>(Bn, KV_N, Bs/16, ⌈D/64⌉, 16, 2)</li><li>(Bn, KV_N, Bs)</li><li>(1,)</li><li>(KV_T, KV_N)</li><li>(B, KV_N, KV_S)</li><li>(B, KV_S, KV_N)</li><li>(Bn, Bs, KV_N, ⌈D/64⌉, 2)</li></ul> | √         |
-| v_descale           | Tensor        | Required | Dequantization scale of v. | float8_e8m0/float32 | ND   | <ul><li>(KV_T/64, KV_N, D, 2)</li><li>(B, KV_N, KV_S/64, D, 2)</li><li>(B, KV_S/64, KV_N, D, 2)</li><li>(Bn, KV_N, Bs/64, D, 2)</li><li>(Bn, KV_N, D/16, Bs/64, 16, 2)</li><li>(KV_N,)</li><li>(1,)</li><li>(Bn, Bs/64, KV_N, D, 2)</li></ul> | √         |
-| quant_mode          | int/QuantMode | Required | Quantization mode. Pass a QuantMode member or the corresponding integer 0, 1, 6, or 12. | int32                   | -    | -                                                                                                                  | -         |
+| q                    | Tensor        | Required | Q in the formula. | float8_e4m3fn/hifloat8 | ND   | (Q_T, Q_N, D)                                                                                                    | ×         |
+| k                    | Tensor        | Required | K in the formula. | float8_e4m3fn/hifloat8 | ND   | <ul><li>(KV_T, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li></ul>                   | √         |
+| v                    | Tensor        | Required | V in the formula. | float8_e4m3fn/hifloat8 | ND   | <ul><li>(KV_T, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li></ul>                   | √         |
+| q_descale           | Tensor        | Required | Dequantization scale of q. | float8_e8m0/float32    | ND   | <ul><li>(Q_T, Q_N, ⌈D/64⌉, 2)</li><li>(KV_N, Q_T, G, ⌈D/64⌉, 2)</li><li>(Q_N, Q_T)</li></ul>                     | ×         |
+| k_descale           | Tensor        | Required | Dequantization scale of k. | float8_e8m0/float32    | ND   | <ul><li>(KV_T, KV_N, ⌈D/64⌉, 2)</li><li>(Bn, KV_N, Bs, ⌈D/64⌉, 2)</li><li>(Bn, KV_N, Bs/16, ⌈D/64⌉, 16, 2)</li><li>(Bn, KV_N, Bs)</li></ul> | √         |
+| v_descale           | Tensor        | Required | Dequantization scale of v. | float8_e8m0/float32    | ND   | <ul><li>(KV_T/64, KV_N, D, 2)</li><li>(Bn, KV_N, Bs/64, D, 2)</li><li>(Bn, KV_N, D/16, Bs/64, 16, 2)</li><li>(KV_N,)</li></ul> | √         |
+| quant_mode          | int/QuantMode | Required | Quantization mode. Supports passing the enumeration or the corresponding int value. See "quant_mode Enumeration" for the enumeration definition. | int32                   | -    | -                                                                                                                  | -         |
 | block_table         | Tensor        | Optional | Block index mapping in block-wise attention computation. | int32                   | ND   | (B, Bn)                                                                                                            | ×         |
 | cu_seqlens_q       | Tensor        | Optional | Cumulative sequence length of Q, used to handle variable-length sequences. The first element must be 0. | int32                   | ND   | (B+1,)                                                                                                             | ×         |
 | cu_seqlens_kv      | Tensor        | Optional | Cumulative sequence length of KV, used to handle variable-length sequences. The first element must be 0. | int32                   | ND   | (B+1,)                                                                                                             | ×         |
@@ -254,7 +240,7 @@ The tables list the combined support across products. Use values that satisfy th
 | p_scale             | Tensor        | Optional | Quantization parameter of P. | float32                 | ND   | (1,)                                                                                                               | ×         |
 | sinks                | Tensor        | Optional | Input tensor in the sink use case. Not supported in the current version. Pass None. | float32                 | ND   | (Q_N,)                                                                                                            | ×         |
 | attn_mask           | Tensor        | Optional | Mask matrix. | int8                    | ND   | (2048, 2048)                                                                                                       | ×         |
-| metadata             | Tensor        | Optional | Task splitting result generated by `quant_flash_attn_metadata`. Passing it optimizes scheduling. | int32                   | ND   | (metadata_size,) or (2, max_schedule_size) | ×         |
+| metadata             | Tensor        | Optional | Task splitting result generated by `quant_flash_attn_metadata`. Passing it optimizes scheduling. | int32                   | ND   | (2, max_schedule_size)                                                                                             | ×         |
 | softmax_scale       | float         | Optional | Scaling factor that can be explicitly set to override the default computation. | float32                 | -    | -                                                                                                                  | -         |
 | mask_mode           | int/MaskMode  | Optional | Mask mode. Supports passing the enumeration or the corresponding int value. See "mask_mode Enumeration" for the enumeration definition. Only 0/3 is supported in the current version. | int32                   | -    | -                                                                                                                  | -         |
 | win_left            | int           | Optional | Left boundary of the window. | int32                   | -    | -                                                                                                                  | -         |
@@ -267,36 +253,30 @@ The tables list the combined support across products. Use values that satisfy th
 | layout_out          | string        | Optional | Defines the layout format of the output tensor. | string                  | -    | -                                                                                                                  | -         |
 | return_softmax_lse | bool          | Optional | Whether to obtain the LSE result of softmax. | BOOL                    | -    | -                                                                                                                  | -         |
 
+> [!NOTE]
+>
+> k/v/k_descale/v_descale support non-contiguous tensors only in the Paged Attention use case. For the axis constraints supported in the non-contiguous case, see the feature cross validation in <a href="#paged-attention-parameter-group">Paged Attention Parameter Group</a>.<br>Note: The stride of each dimension of a non-contiguous tensor cannot be 0.
+
 ## Returns
 
 ### quant_flash_attn_metadata
 
 | Name | Type | Required/Optional | Description                        | Data type | Data format | Dim                      | Non-contiguous Tensor |
 | :------- | :----- | :---- | :------------------------ | :---- | :--- | :----------------------- | :-------- |
-| metadata | Tensor | Required    | Task split data of quant_flash_attn. | int32 | ND   | (metadata_size,) or (2, max_schedule_size) | ×         |
+| metadata | Tensor | Required    | Task split data of quant_flash_attn. | int32 | ND   | (2, max_schedule_size) | ×         |
 
 ### quant_flash_attn
 
 | Name      | Type   | Required/Optional | Description | Data Type     | Data Format | Dimension              | Non-contiguous Tensor |
 | :----------- | :----- | :---- | :--- | :------- | :--- | :--- | :-------- |
-| attn_out    | Tensor | Required    | Computation output of quant_flash_attn. | bfloat16 | ND   | <ul><li>(Q_T, Q_N, D) (TND)</li><li>(B, Q_S, Q_N, D) (BSND)</li><li>(B, Q_N, Q_S, D) (BNSD)</li></ul> | ×         |
-| softmax_lse | Tensor | Optional    | LSE result of softmax. When `return_softmax_lse` is True, a Tensor is output with a shape that depends on the layout_q; when `return_softmax_lse` is False, an empty Tensor is output. | float32  | ND   | <ul><li>(Q_N, Q_T) (TND/NTD)</li><li>(B, Q_N, Q_S) (BSND)</li><li>(B, Q_N, Q_S) (BNSD)</li></ul> | ×         |
+| attn_out    | Tensor | Required    | Computation output of quant_flash_attn. | bfloat16 | ND   | <ul><li>(Q_T, Q_N, D)</li><li>(B, Q_S, Q_N, D) (HIF8 use case)</li><li>(B, Q_N, Q_S, D) (HIF8 use case)</li></ul> | ×         |
+| softmax_lse | Tensor | Optional    | LSE result of softmax. When `return_softmax_lse` is True, a Tensor is output with a shape that depends on the layout_q; when `return_softmax_lse` is False, an empty Tensor is output. | float32  | ND   | <ul><li>(Q_N, Q_T) (TND)</li><li>(B, Q_N, Q_S) (BSND)</li><li>(B, Q_N, Q_S) (BNSD)</li></ul> | ×         |
 
 ## Constraints
-
-<!-- npu="950" id17 -->
-**<term>Ascend 950PR&950DT products</term>**
 
 - Parameters cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, block_table, and attn_mask are tensors. Since the operator cannot obtain the specific values of tensors in the Tiling phase, the tiling side does not validate the values, and users must ensure correctness. If invalid values are passed for the preceding parameters, undefined behavior occurs (such as precision issues and program crashes caused by invalid memory access).
 - The input parameters of quant_flash_attn_metadata and quant_flash_attn must be consistent during the call. Since the operator is divided into two APIs for a two-phase call, it cannot perform the check itself, and customers must ensure correctness. If the parameters passed to the APIs are inconsistent, undefined behavior occurs (such as precision issues and program crashes caused by invalid memory access).
 
-> [!NOTE]
->
-> k/v/k_descale/v_descale support non-contiguous tensors only in the Paged Attention use case. For the axis constraints supported in the non-contiguous case, see the feature cross validation in <a href="#paged-attention-parameter-group">Paged Attention Parameter Group</a>.<br>Note: The stride of each dimension of a non-contiguous tensor cannot be 0.
-
-<!-- end id17 -->
-
-<!-- npu="950" id21 -->
 ### Feature Parameter Group
 
 |       Feature Parameter Group       | Parameter Field Name |  Field Grouping  | Field Type |
@@ -1201,25 +1181,7 @@ Paged Attention is enabled when block_table is not empty.
     </tbody>
 </table>
 
-<!-- end id21 -->
-
-<!-- npu="A3,910b" id18 -->
-### Atlas A2/A3 INT8 Constraints
-
-- Supports fully quantized INT8 MHA/GQA prefill without a KV cache. Pass `12` or `QuantMode.A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16` as `quant_mode`.
-- Q, K, and V must be contiguous INT8 tensors. The output is BF16. Pass `q_descale`, `k_descale`, `v_descale`, and `p_scale` as contiguous FP32 tensors on the same NPU as Q, K, and V. Q and K use per-token, per-head scales with the same shape as the respective input with the D axis removed. V uses per-head scales of shape `(KV_N,)` shared across batches. The static quantization scale `p_scale` for the softmax weights has shape `(1,)`.
-- Q, K, and V must share the same D in the range 1 to 256. `Q_N` must be divisible by `KV_N`.
-- `layout_q`, `layout_kv`, and `layout_out` support BNSD, BSND, and TND. Set `layout_q_descale` to `layout_q`. BNSD and BSND may be mixed. Q and KV must have the same batch size. Omit `cu_seqlens_q` and `cu_seqlens_kv` for these layouts. When generating metadata, pass `batch_size` and positive values for `max_seqlen_q` and `max_seqlen_kv`.
-- With TND, use TND for Q, KV, and the output. Pass contiguous INT32 cumulative lengths `cu_seqlens_q` and `cu_seqlens_kv` of shape `(B+1,)`. Each must start at 0, be nondecreasing, and end at the corresponding total token count. Individual Q sequences may have length 0. Each nonempty Q sequence requires a nonempty KV sequence. Omit `batch_size` when generating metadata. If passed, `max_seqlen_q` and `max_seqlen_kv` must cover the corresponding actual maximum lengths.
-- `win_left` and `win_right` specify distances relative to the bottom-right-aligned position. Use `-1` for an unbounded side or a nonnegative value up to `INT32_MAX`. The visible range is the intersection of the window and the mask. Fully masked rows yield zero output and an LSE of `-inf`.
-- `metadata` is optional. If passed, use the contiguous one-dimensional INT32 tensor generated by `quant_flash_attn_metadata`. Ensure the layouts, sequence lengths, head counts, D, mask, and window parameters match the main call. Set `is_grad_enabled` to `False` and `head_dim_v` to `None` or D. If cumulative lengths change during ACLGraph replay, generate metadata using the updated lengths.
-- `softmax_scale` must be finite and positive. Pass `None` for `block_table`, `seqused_q`, `seqused_kv`, `sinks`, `attn_mask`, `v_tail`, `block_table_tail`, and `seqused_v_tail`.
-<!-- end id18 -->
-
 ## Example
-
-<!-- npu="950" id19 -->
-### Ascend 950 Examples
 
 - quant_flash_attn_metadata + quant_flash_attn joint call example (TND, non-PA use case)
 
@@ -1388,38 +1350,3 @@ Paged Attention is enabled when block_table is not empty.
   assert attn_out.dtype == out_dtype
   assert torch.isfinite(attn_out.float()).all().item()
   ```
-<!-- end id19 -->
-
-<!-- npu="A3,910b" id20 -->
-### Atlas A2/A3 INT8 Prefill Example (TND)
-
-```python
-import torch
-import torch_npu
-from cann_ops_transformer.ops import quant_flash_attn, quant_flash_attn_metadata
-
-torch.npu.set_device(0)
-q_heads, kv_heads, head_dim = 4, 2, 64
-length = 128
-cu = torch.tensor([0, length], device="npu", dtype=torch.int32)
-q = torch.randint(-127, 128, (length, q_heads, head_dim), device="npu", dtype=torch.int8)
-k = torch.randint(-127, 128, (length, kv_heads, head_dim), device="npu", dtype=torch.int8)
-v = torch.randint(-127, 128, (length, kv_heads, head_dim), device="npu", dtype=torch.int8)
-q_descale = torch.full((length, q_heads), 0.01, device="npu", dtype=torch.float32)
-k_descale = torch.full((length, kv_heads), 0.01, device="npu", dtype=torch.float32)
-v_descale = torch.full((kv_heads,), 0.01, device="npu", dtype=torch.float32)
-p_scale = torch.tensor([127.0], device="npu", dtype=torch.float32)
-options = dict(
-    quant_mode=quant_flash_attn.QuantMode.A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16,
-    mask_mode=3,
-    layout_q="TND", layout_kv="TND", layout_out="TND", layout_q_descale="TND",
-    cu_seqlens_q=cu, cu_seqlens_kv=cu,
-    max_seqlen_q=length, max_seqlen_kv=length,
-)
-metadata = quant_flash_attn_metadata(q_heads, kv_heads, head_dim, **options)
-attn_out, softmax_lse = quant_flash_attn(
-    q, k, v, q_descale, k_descale, v_descale,
-    p_scale=p_scale, metadata=metadata, softmax_scale=head_dim ** -0.5, **options,
-)
-```
-<!-- end id20 -->

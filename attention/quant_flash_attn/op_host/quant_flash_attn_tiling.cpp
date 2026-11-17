@@ -18,7 +18,6 @@
 #include "log/log.h"
 #include "op_host/tiling_templates_registry.h"
 #include "quant_flash_attn_tiling.h"
-#include "../op_kernel/arch22/quant_flash_attn_tiling_data_int8.h"
 #include "quant_flash_attn_tiling_common.h"
 #include "qfa_tiling_info_parser.h"
 #include "checkers/qfa_checker.h"
@@ -45,19 +44,6 @@ ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttn(gert::TilingContext* conte
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-    const auto* attrs = context->GetAttrs();
-    const auto* quantMode = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(ATTR_QUANT_MODE_INDEX);
-    if (quantMode == nullptr) {
-        OP_LOGE(context, "quant_compute_mode is required.");
-        return ge::GRAPH_FAILED;
-    }
-    if (*quantMode == QFA_INT8_QUANT_MODE) {
-        return TilingQuantFlashAttnInt8(context, ascendcPlatform);
-    }
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201) {
-        OP_LOGE(context, "A2/A3 supports full INT8 GQA quant_mode=12 with required Q/K/V/P scales.");
-        return ge::GRAPH_FAILED;
-    }
     if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201) {
         if (IsEmptyInput(context)) {
             return ge::GRAPH_SUCCESS;

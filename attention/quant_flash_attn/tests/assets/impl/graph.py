@@ -119,45 +119,6 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         **kwargs,
     ):
         super().__init__()
-        self.win_left, self.win_right = win_left, win_right
-        if quant_mode is not None and int(quant_mode) == 12:
-            # INT8 inputs already have their final layout. Consume metadata
-            # prepared before capture; do not invoke FP8 packing or read lengths.
-            import torch_npu
-
-            torch_npu.npu.set_device(int(kwargs.get("device_id", 0)))
-            values = locals()
-            for name in (
-                "q",
-                "k",
-                "v",
-                "q_descale",
-                "k_descale",
-                "v_descale",
-                "quant_mode",
-                "block_table",
-                "p_scale",
-                "cu_seqlens_q",
-                "cu_seqlens_kv",
-                "seqused_q",
-                "seqused_kv",
-                "attn_mask",
-                "metadata",
-                "v_tail",
-                "block_table_tail",
-                "seqused_v_tail",
-                "softmax_scale",
-                "mask_mode",
-                "layout_q",
-                "layout_q_descale",
-                "layout_kv",
-                "layout_out",
-                "max_seqlen_q",
-                "max_seqlen_kv",
-                "return_softmax_lse",
-            ):
-                setattr(self, name, values[name])
-            return
         torch_npu_mod, mxfp8_golden_mod, fp8_golden_mod, hif8_golden_mod = (
             _load_npu_modules()
         )
@@ -522,8 +483,6 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             seqused_v_tail=self.seqused_v_tail,
             softmax_scale=self.softmax_scale,
             mask_mode=self.mask_mode,
-            win_left=self.win_left,
-            win_right=self.win_right,
             layout_q=self.layout_q,
             layout_q_descale=self.layout_q_descale,
             layout_kv=self.layout_kv,

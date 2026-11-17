@@ -67,7 +67,7 @@ def _num_heads_q(q_shape, layout_q):
 
 
 def _num_heads_kv(k_shape, layout_kv):
-    if layout_kv in ("PA_BBND", "BSND"):
+    if layout_kv == "PA_BBND":
         return int(k_shape[2])
     return int(k_shape[1])
 
@@ -92,7 +92,7 @@ def _derive_batch_size(q_shape, layout_q, cu_seqlens_q, seqused_q, kwargs):
     explicit = get_attribute(kwargs, "batch_size")
     if explicit is not None:
         return int(explicit)
-    if layout_q in ("BSND", "BNSD"):
+    if layout_q == "BSND":
         return int(q_shape[0])
     return 0
 
@@ -175,7 +175,7 @@ def build_metadata_arguments(
     else:
         batch_size = _derive_batch_size(q_shape, layout_q, cu_q, seq_q, kwargs)
 
-    arguments = {
+    return {
         "num_heads_q": num_heads_q,
         "num_heads_kv": num_heads_kv,
         "head_dim": head_dim,
@@ -194,12 +194,6 @@ def build_metadata_arguments(
         "layout_kv": layout_kv,
         "layout_out": layout_out,
     }
-    if arguments["quant_mode"] == 12:
-        arguments.update(
-            win_left=int(get_attribute(kwargs, "win_left", -1)),
-            win_right=int(get_attribute(kwargs, "win_right", -1)),
-        )
-    return arguments
 
 
 def move_to_device(value, target):
@@ -237,11 +231,6 @@ def run_metadata(arguments, metadata):
         layout_q_descale=str(arguments["layout_q_descale"]),
         layout_kv=str(arguments["layout_kv"]),
         layout_out=str(arguments["layout_out"]),
-        **(
-            {key: arguments[key] for key in ("win_left", "win_right")}
-            if arguments["quant_mode"] == 12
-            else {}
-        ),
     )
 
 
@@ -291,8 +280,6 @@ def run(
     """
     if quant_mode is None:
         quant_mode = get_attribute(kwargs, "quant_mode", 1)
-    if int(quant_mode) == 12 and not bool(get_attribute(kwargs, "use_metadata", True)):
-        return {"metadata": None}
     # 位置标量参数桥接进 kwargs, 供 build_metadata_arguments 统一读取。
     hook_kwargs = dict(kwargs)
     hook_kwargs.setdefault("quant_mode", quant_mode)
@@ -303,8 +290,6 @@ def run(
     hook_kwargs.setdefault("layout_q_descale", layout_q_descale)
     hook_kwargs.setdefault("layout_kv", layout_kv)
     hook_kwargs.setdefault("layout_out", layout_out)
-    hook_kwargs.setdefault("win_left", win_left)
-    hook_kwargs.setdefault("win_right", win_right)
     testcase_name = hook_kwargs.get("testcase_name")
     logging.info(
         "[%s] build QuantFlashAttn metadata (quant_mode=%s)", testcase_name, quant_mode

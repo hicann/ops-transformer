@@ -29,7 +29,6 @@
 #include "opdev/make_op_executor.h"
 
 #include "../quant_flash_attn_metadata_check.h"
-#include "tiling/platform/platform_ascendc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,10 +68,6 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
         aivCoreNum = npuInfo.GetVectorCoreNum();
     }
     const char* socVersion = npuInfo.GetSocLongVersion().c_str();
-    platform_ascendc::PlatformAscendC schedulePlatform(npuInfo.GetPlatformInfos());
-    uint64_t scheduleL2Bytes = 0;
-    schedulePlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, scheduleL2Bytes);
-    const int64_t scheduleWorkspace = schedulePlatform.GetLibApiWorkSpaceSize();
 
     // 宿主侧读取输出 tensor 的 shape 并经 attr 下发: AICPU 侧输出 TensorShape 可能未填充,
     // FAG 偏移与容量校验依赖该值, 必须使用宿主侧可靠 shape。
@@ -95,7 +90,7 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
         cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ,
         maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, quantMode, maskMode, winLeft, winRight, layoutQ,
         layoutQDescale, layoutKv, layoutOut, isGradEnabled, socVersion, aicCoreNum, aivCoreNum, metadataDimNum,
-        metadataRowSize, scheduleL2Bytes, scheduleWorkspace, metaData, uniqueExecutor.get());
+        metadataRowSize, metaData, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();

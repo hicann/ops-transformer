@@ -19,9 +19,6 @@
 #include "opdev/op_log.h"
 #include "opdev/data_type_utils.h"
 #include "opdev/tensor_view_utils.h"
-#define QFA_WORKLOAD_INLINE inline
-#include "../../quant_flash_attn/op_kernel/arch22/quant_flash_attn_workload_int8.h"
-#undef QFA_WORKLOAD_INLINE
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,38 +69,6 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::ParamsCheck(
     int64_t winRight, const char* layoutQ, const char* layoutQDescale, const char* layoutKv, const char* layoutOut,
     bool isGradEnabled, const aclTensor* metadata)
 {
-    if (quantMode == QFA_INT8_QUANT_MODE) {
-        using namespace BaseApi::Int8GqaTnd;
-        CHECK_COND(batchSize > 0 && numHeadsQ > 0 && numHeadsKv > 0 && numHeadsQ % numHeadsKv == 0 && headDim > 0 &&
-                       headDim <= QFA_MAX_HEAD_DIM && headDimV == headDim && !isGradEnabled &&
-                       (maskMode == QFA_MASK_NONE || maskMode == QFA_MASK_CAUSAL_ATTR) &&
-                       winLeft >= QFA_UNBOUNDED_WINDOW && winLeft <= INT32_MAX && winRight >= QFA_UNBOUNDED_WINDOW &&
-                       winRight <= INT32_MAX && !IsTensorExist(sequsedQOptional) && !IsTensorExist(sequsedKvOptional),
-                   ACLNN_ERR_PARAM_INVALID, "Invalid full INT8 metadata attributes");
-        CHECK_COND(
-            layoutQ != nullptr && layoutKv != nullptr && layoutOut != nullptr &&
-                (std::string(layoutQ) == "BNSD" || std::string(layoutQ) == "BSND" || std::string(layoutQ) == "TND") &&
-                (std::string(layoutKv) == "BNSD" || std::string(layoutKv) == "BSND" ||
-                 std::string(layoutKv) == "TND") &&
-                (std::string(layoutOut) == "BNSD" || std::string(layoutOut) == "BSND" ||
-                 std::string(layoutOut) == "TND") &&
-                ((std::string(layoutQ) == "TND") == (std::string(layoutKv) == "TND")) &&
-                ((std::string(layoutQ) == "TND") == (std::string(layoutOut) == "TND")),
-            ACLNN_ERR_PARAM_INVALID, "Invalid full INT8 metadata layouts");
-        CHECK_COND(metadata != nullptr && metadata->GetDataType() == op::DataType::DT_INT32 &&
-                       metadata->GetViewShape().GetDimNum() == 1 &&
-                       BaseApi::Int8GqaTnd::QfaMetadataCapacity(metadata->GetViewShape().GetDim(0), batchSize) != 0U,
-                   ACLNN_ERR_PARAM_INVALID, "Full INT8 metadata requires an INT32 scheduling buffer");
-        auto ret = CheckExistency(maxSeqlenQ, maxSeqlenKv, layoutQ, layoutKv, cuSeqlensQOptional, cuSeqlensKvOptional,
-                                  sequsedQOptional, sequsedKvOptional, metadata);
-        CHECK_RET(ret == ACLNN_SUCCESS, ret);
-        for (const auto* lengths : {cuSeqlensQOptional, cuSeqlensKvOptional}) {
-            CHECK_COND(!IsTensorExist(lengths) || lengths->GetDataType() == op::DataType::DT_INT32,
-                       ACLNN_ERR_PARAM_INVALID, "Full INT8 cumulative lengths require INT32");
-        }
-        return CheckConsistency(batchSize, numHeadsQ, numHeadsKv, cuSeqlensQOptional, cuSeqlensKvOptional,
-                                sequsedQOptional, sequsedKvOptional);
-    }
     auto ret = CheckBaseAttr(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, quantMode,
                              layoutQ, layoutQDescale, layoutKv, layoutOut, isGradEnabled);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -178,7 +143,7 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize,
                HEAD_DIM_192, HEAD_DIM_256, headDim);
 
     // 校验 headDimV: 仅 (headDim=192, headDimV=128) 允许异值, 其余仍要求 headDimV == headDim
-    CHECK_COND((headDim == HEAD_DIM_192 && headDimV == HEAD_DIM_128) || headDimV == headDim, ACLNN_ERR_RUNTIME_ERROR,
+    CHECK_COND((headDim == HEAD_DIM_192 && headDimV == 128) || headDimV == headDim, ACLNN_ERR_RUNTIME_ERROR,
                "headDimV must be equal to headDim, or be 128 when headDim is 192; got headDimV=%ld, headDim=%ld",
                headDimV, headDim);
 
