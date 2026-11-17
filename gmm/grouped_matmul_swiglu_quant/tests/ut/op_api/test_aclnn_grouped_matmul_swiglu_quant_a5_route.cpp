@@ -7,6 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
+#include "log/log.h"
 #include <dlfcn.h>
 #include <vector>
 #include <new>
@@ -186,6 +187,11 @@ static aclTensor* StcUnexpectedViewCopy(const aclTensor*, aclTensor*, aclOpExecu
 #define OP_LOGE(...) ProbeError(__VA_ARGS__)
 #undef OP_LOGE_WITHOUT_REPORT
 #define OP_LOGE_WITHOUT_REPORT(...) ProbeError(__VA_ARGS__)
+// Structured logs bypass OP_LOGE. Capture the rendered message and the reported code.
+#undef OP_LOGE_LIBOPAPI_REPORT
+#define OP_LOGE_LIBOPAPI_REPORT(opName, ...) ProbeError(ACLNN_ERR_PARAM_INVALID, __VA_ARGS__)
+#undef REPORT_PREDEFINED_ERR_MSG
+#define REPORT_PREDEFINED_ERR_MSG(code, keys, values) (probe.error += code)
 #undef OP_LOGW
 #define OP_LOGW(...)
 #undef OP_LOGD
@@ -214,6 +220,8 @@ static aclTensor* StcUnexpectedViewCopy(const aclTensor*, aclTensor*, aclOpExecu
 #undef OP_LOGI
 #undef OP_LOGE
 #undef OP_LOGE_WITHOUT_REPORT
+#undef OP_LOGE_LIBOPAPI_REPORT
+#undef REPORT_PREDEFINED_ERR_MSG
 #undef OP_LOGW
 #undef OP_LOGD
 #undef CommonOpExecutorRun

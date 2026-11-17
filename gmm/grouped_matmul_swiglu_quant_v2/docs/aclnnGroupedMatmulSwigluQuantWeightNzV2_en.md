@@ -30,7 +30,7 @@
 - Formula:
 
   <!-- npu="A3,910b" id7 -->
-  - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
+  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
     <details>
     <summary>Quantization scenario A8W8 (A refers to the activation matrix, W refers to the weight matrix, and 8 refers to the INT8 data type):</summary>
     <a id="quantization-scenario-a8w8"></a>
@@ -550,7 +550,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
     </table>
 
     <!-- npu="A3,910b" id9 -->
-    - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
+    - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
       - <strong>weight is forcibly treated as FRACTAL_NZ format.</strong>
       - The superscript "1" in the data type column of the table above indicates data types not supported by this series.
       - weight supports transposition in the A4W4 scenario, while other inputs support only the non-transposed format. INT32 is used for adaptation in A8W4 and A4W4 scenarios, where one INT32 is interpreted as eight INT4 data values in practice. The A8W8 scenario does not support the ND data format.
@@ -660,7 +660,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
       - aclnnGroupedMatmulSwigluQuantWeightNzV2 defaults to a deterministic implementation.
 
   <!-- npu="A3,910b" id11 -->
-  - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
+  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
     - The following constraint conditions must be met in A8W8/A8W4/A4W4 quantization scenarios:
         - The data types must meet the requirements in the following table:
           <table style="undefined;table-layout: fixed; width: 1134px"><colgroup>
@@ -811,18 +811,25 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
   <!-- end id11 -->
   <!-- npu="950" id12 -->
   - <term>Ascend 950PR&950DT products</term>:
-    - The first dimension of groupList supports a maximum of 1024, i.e., a maximum of 1024 groups.
-    - The A8W8 Pertoken quantization scenario must meet the following constraints:
-        - x, weight, and output support the following data type combinations; the data types of xScale and outputScale are both FLOAT:
-          - INT8: x, weight, and output are all INT8; weightScale supports FLOAT, FLOAT16, or BFLOAT16.
-          - HIFLOAT8: x, weight, and output are all HIFLOAT8; weightScale supports FLOAT or BFLOAT16.
-          - FP8: x and weight support FLOAT8_E4M3FN; weightScale supports FLOAT or BFLOAT16; output supports FLOAT8_E4M3FN and FLOAT_E5M2.
-        - The shape of x is (M, K). weight supports non-transposed and transposed input, with the entry view shape (E, K, N) for both: non-transposed input uses a contiguous stride, with FRACTAL_NZ storage shape (E, ceil(N/32), ceil(K/16), 16, 32); transposed input uses the stride (K * N, 1, K), with FRACTAL_NZ storage shape (E, ceil(K/32), ceil(N/16), 16, 32).
-        - x supports only non-transposed input. When weight is transposed input, the internal `transposeWeight` attribute of the operator is true, and the ZN template is used to process FRACTAL_NZ data.
-        - The shape of weightScale is (E, N), the shapes of xScale and outputScale are (M,), and the shape of output is (M, N/2).
-        - Both dequantMode and quantMode must be 0; dequantDtype supports 0, 1, and 27.
-        - N must be greater than 0 and an integer multiple of 64.
-        - The tensorlist lengths of weight and weightScale must both be 1.
+    - The first dimension of groupList supports up to 1024 groups.
+    - The per-token quantization scenario has the following constraints:
+      - dequantMode and quantMode must both be 0. dequantDtype supports 0, 1, and 27.
+      - The tensor lists weight and weightScale must both have length 1.
+      - The data types must match the following table.
+
+        | Quantization Scenario | x | weight | weightScale | xScale | output | outputScale |
+        | --- | --- | --- | --- | --- | --- | --- |
+        | Per-token quantization (K-C) | INT8 | INT8 | FLOAT, FLOAT16, and BFLOAT16 | FLOAT | INT8 | FLOAT |
+        | HIFLOAT8 | HIFLOAT8 | HIFLOAT8 | FLOAT and BFLOAT16 | FLOAT | HIFLOAT8 | FLOAT |
+        | FP8 | FLOAT8_E4M3FN | FLOAT8_E4M3FN | FLOAT and BFLOAT16 | FLOAT | FLOAT8_E4M3FN and FLOAT8_E5M2 | FLOAT |
+
+      - The shapes must match the following table.
+
+        | Quantization Scenario | x | weight | weight_scale | x_scale | output | output_scale |
+        | --- | --- | --- | --- | --- | --- | --- |
+        | Per-token quantization (K-C) | (M, K) | weight supports transposed and non-transposed input. Both use the view shape (E, K, N).<br>Non-transposed input uses a contiguous stride and the FRACTAL_NZ storage shape (E, ceil(N/32), ceil(K/16), 16, 32).<br>Transposed input uses the stride (K * N, 1, K) and the FRACTAL_NZ storage shape (E, ceil(K/32), ceil(N/16), 16, 32). | Shape {(E, N)} | (M, ) | (M, N / 2) | (M, ) |
+      - N must be positive and a multiple of 64.
+
     - The following constraints must be met in the MX quantization scenario:
         - The data types must meet the requirements in the following table:
           <table style="undefined;table-layout: fixed; width: 1134px"><colgroup>
@@ -971,12 +978,12 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
 
   <!-- end id12 -->
 
-## Example
+## Examples
 
 The sample code is as follows and is for reference only. For details about compilation and execution, see [Compile and Run Samples](../../../docs/en/context/compile_and_run_sample.md).
 
   <!-- npu="A3,910b" id13 -->
-  - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
+  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
 
     ```cpp
     #include <iostream>

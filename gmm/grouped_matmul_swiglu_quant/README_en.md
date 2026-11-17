@@ -1,17 +1,19 @@
 # GroupedMatmulSwigluQuant
 
-English | [简体中文](./README.md)
-
-## Product Support
+## Applicable Products
 
 | Product | Supported |
-| :----------------------------------------------------------- | :------: |
-| <term>Atlas A3 products</term>     |    √     |
-| <term>Atlas A2 products</term> |    √     |
-| <term>Kirin X90 processor series products</term> | √ |
-| <term>Kirin 9030 processor series products</term> | √ |
+|:----------------------------|:-----------:|
+|<term>Ascend 950PR&950DT products</term>|      √     |
+|<term>Atlas A3 products</term>|      √     |
+|<term>Atlas A2 products</term>|      √     |
+|<term>Atlas 200I/500 A2 inference products</term>|      ×     |
+|<term>Atlas inference products</term>|      ×     |
+|<term>Atlas training products</term>|      ×     |
+|<term>Kirin X90 processor products</term> | √ |
+|<term>Kirin 9030 processor products</term> | √ |
 
-## Function Description
+## Description
 
 - API function: This operator fuses GroupedMatmul, dquant, swiglu, and quant. For details, see the computation formula.
 - Computation formula:
@@ -85,101 +87,48 @@ English | [简体中文](./README.md)
 
         $Q_{i} = \left \lfloor \frac{S_{i}}{ Q\_scale_{i} } + Q\_offset_{i}\right \rceil $
 
-## Parameter Description
+## Parameters
 
-<table style="table-layout: auto; width: 100%">
-<thead>
-<tr>
-<th style="white-space: nowrap">Parameter Name</th>
-<th style="white-space: nowrap">Input/Output/Attribute</th>
-<th style="white-space: nowrap">Description</th>
-<th style="white-space: nowrap">Data Type</th>
-<th style="white-space: nowrap">Data Format</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="white-space: nowrap">x</td>
-<td style="white-space: nowrap">Input</td>
-<td style="white-space: nowrap">Left matrix, which is X in the formula.</td>
-<td style="white-space: nowrap">INT8</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">weight</td>
-<td style="white-space: nowrap">Input</td>
-<td style="white-space: nowrap">Weight matrix, which is W in the formula.</td>
-<td style="white-space: nowrap">INT8</td>
-<td style="white-space: nowrap">ND / NZ</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">bias</td>
-<td style="white-space: nowrap">Input</td>
-<td style="white-space: nowrap">Auxiliary matrix for matrix multiplication (weightAssistMatrix), with the shape [E,N]. It must be passed in only in the A8W4 scenario; in the A8W8 scenario, pass in a null pointer.</td>
-<td style="white-space: nowrap">FLOAT32</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">offset</td>
-<td style="white-space: nowrap">Input</td>
-<td style="white-space: nowrap">Offset for per-channel asymmetric dequantization, which is offset in the formula.</td>
-<td style="white-space: nowrap">FLOAT32</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">weightScale</td>
-<td style="white-space: nowrap">Input</td>
-<td style="white-space: nowrap">Quantization factor of the right matrix, which is w_scale in the formula.</td>
-<td style="white-space: nowrap">FLOAT, FLOAT16, BFLOAT16</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">xScale</td>
-<td style="white-space: nowrap">Input</td>
-<td style="white-space: nowrap">Quantization factor of the left matrix, which is x_scale in the formula.</td>
-<td style="white-space: nowrap">FLOAT32</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">groupList</td>
-<td style="white-space: nowrap">Input</td>
-<td style="white-space: nowrap">Indicates the number of tokens participating in the computation in each group, which is groupList in the formula.</td>
-<td style="white-space: nowrap">INT64</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">output</td>
-<td style="white-space: nowrap">Output</td>
-<td style="white-space: nowrap">Quantized output result, which is Q in the formula.</td>
-<td style="white-space: nowrap">INT8</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">outputScale</td>
-<td style="white-space: nowrap">Output</td>
-<td style="white-space: nowrap">Quantization factor of the output, which is Q_scale in the formula.</td>
-<td style="white-space: nowrap">FLOAT</td>
-<td style="white-space: nowrap">ND </td>
-</tr>
-<tr>
-<td style="white-space: nowrap">outputOffset</td>
-<td style="white-space: nowrap">Reserved parameter</td>
-<td style="white-space: nowrap">Reserved parameter for interface compatibility. It is not supported in the current version, and you must pass in a null pointer.</td>
-<td style="white-space: nowrap">-</td>
-<td style="white-space: nowrap">-</td>
-</tr>
-</tbody>
-</table>
+| Parameter | Input/Output/Attribute | Description | Data Type | Data Format |
+|--------|:---:|------|----------|:-----------:|
+| x | Input | Left matrix $X$ in the formula. | INT8 | ND |
+| weight | Input | Grouped weight matrix $W$ in the formula. Each INT32 value packs eight INT4 elements. | INT8, INT4<sup>1</sup>, and INT32<sup>1</sup> | ND/NZ |
+| bias | Optional input | Auxiliary matrix (`weightAssistMatrix`) with shape `[E, N]`. You must provide it for A8W4. Pass nullptr for A8W8. | FLOAT | ND |
+| offset | Optional input | Reserved offset for per-channel asymmetric dequantization. Pass nullptr. | FLOAT | ND |
+| weightScale | Input | Quantization scale factor $w\_scale$ for the right matrix. | UINT64<sup>1</sup>, FLOAT, FLOAT16, and BFLOAT16<sup>2</sup> | ND |
+| xScale | Input | Quantization scale factor $x\_scale$ for the left matrix. | FLOAT | ND |
+| <abbr title="Length equals the number of experts. Elements are cumulative token counts.">groupList</abbr> | Input | Token ranges for the experts. | INT64 | ND |
+| output | Output | Quantized result $Q$. | INT8 | ND |
+| outputScale | Output | Quantization scale factor $Q\_scale$ for each token. | FLOAT | ND |
+| outputOffset | Output | Reserved output. The WeightNZ path on Ascend 950 ignores it. Pass nullptr in other scenarios. | - | - |
 
-- <term>Kirin X90 processor series products</term> and <term>Kirin 9030 processor series products</term>: BFLOAT16 is not supported.
+- <term>Ascend 950PR&950DT products</term>:
+  - Superscript <sup>1</sup> marks data types that these products do not support.
+  - weight supports only the NZ format.
+  - Both bias and offset must be nullptr.
+- <term>Kirin X90 processor products</term> and <term>Kirin 9030 processor products</term>:
+  - Superscript <sup>2</sup> marks data types that these products do not support.
+
+---
 
 ## Constraints
 
- - The length of the N axis cannot exceed 10240.
- - The length of the K axis cannot exceed 65536.
+- <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
+   - N must not exceed 10240.
+   - K must not exceed 65536.
+- <term>Ascend 950PR&950DT products</term>:
+  - These products support only A8W8 per-token/per-channel quantization.
+   - N must be positive and a multiple of 64.
+
+> For the constraints of aclnnGroupedMatmulSwigluQuant, see [aclnnGroupedMatmulSwigluQuant Constraints](docs/aclnnGroupedMatmulSwigluQuant_en.md#constraints).
+>
+> For the constraints of WeightNZ, see [aclnnGroupedMatmulSwigluQuantWeightNZ Constraints](docs/aclnnGroupedMatmulSwigluQuantWeightNZ_en.md#constraints).
+
+---
 
 ## Invocation Instructions
 
 | Invocation Method | Invocation Sample | Description |
-|--------------|-------------------------|--------------------------------------------------------------|
-| aclnn invocation | [test_aclnn_grouped_matmul_swiglu_quant](examples/test_aclnn_grouped_matmul_swiglu_quant.cpp) | Invoke the [GroupedMatmulSwigluQuant](docs/aclnnGroupedMatmulSwigluQuant_en.md) operator through the API. |
+|----------|----------|------|
+| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant](examples/test_aclnn_grouped_matmul_swiglu_quant.cpp) | Call the GroupedMatmulSwigluQuant operator using the two-stage [aclnnGroupedMatmulSwigluQuant](docs/aclnnGroupedMatmulSwigluQuant_en.md) API. |
+| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz.cpp) | Call the GroupedMatmulSwigluQuantWeightNZ operator using the two-stage [aclnnGroupedMatmulSwigluQuantWeightNZ](docs/aclnnGroupedMatmulSwigluQuantWeightNZ_en.md) API. |

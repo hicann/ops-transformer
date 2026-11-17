@@ -2,12 +2,16 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Atlas A3系列产品</term>     |    √     |
-| <term>Atlas A2系列产品</term> |    √     |
-| <term>Kirin X90处理器系列产品</term> | √ |
-| <term>Kirin 9030处理器系列产品</term> | √ |
+|产品      | 是否支持 |
+|:----------------------------|:-----------:|
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
+|<term>Kirin X90处理器系列产品</term> | √ |
+|<term>Kirin 9030处理器系列产品</term> | √ |
 
 ## 功能说明
 
@@ -85,99 +89,46 @@
 
 ## 参数说明
 
-<table style="table-layout: auto; width: 100%">
-<thead>
-<tr>
-<th style="white-space: nowrap">参数名</th>
-<th style="white-space: nowrap">输入/输出/属性</th>
-<th style="white-space: nowrap">描述</th>
-<th style="white-space: nowrap">数据类型</th>
-<th style="white-space: nowrap">数据格式</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="white-space: nowrap">x</td>
-<td style="white-space: nowrap">输入</td>
-<td style="white-space: nowrap">左矩阵，公式中的X。</td>
-<td style="white-space: nowrap">INT8</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">weight</td>
-<td style="white-space: nowrap">输入</td>
-<td style="white-space: nowrap">权重矩阵，公式中的W。</td>
-<td style="white-space: nowrap">INT8</td>
-<td style="white-space: nowrap">ND / NZ</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">bias</td>
-<td style="white-space: nowrap">输入</td>
-<td style="white-space: nowrap">矩阵乘时的辅助矩阵（weightAssistMatrix），shape为[E,N]；仅A8W4场景必须传入，A8W8场景需传空指针。</td>
-<td style="white-space: nowrap">FLOAT32</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">offset</td>
-<td style="white-space: nowrap">输入</td>
-<td style="white-space: nowrap">per-channel非对称反量化的偏移，公式中的offset。</td>
-<td style="white-space: nowrap">FLOAT32</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">weightScale</td>
-<td style="white-space: nowrap">输入</td>
-<td style="white-space: nowrap">右矩阵的量化因子，公式中的w_scale。</td>
-<td style="white-space: nowrap">FLOAT、FLOAT16、BFLOAT16</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">xScale</td>
-<td style="white-space: nowrap">输入</td>
-<td style="white-space: nowrap">左矩阵的量化因子，公式中的x_scale。</td>
-<td style="white-space: nowrap">FLOAT32</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">groupList</td>
-<td style="white-space: nowrap">输入</td>
-<td style="white-space: nowrap">指示每个分组参与计算的Token个数，公式中的groupList。</td>
-<td style="white-space: nowrap">INT64</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">output</td>
-<td style="white-space: nowrap">输出</td>
-<td style="white-space: nowrap">输出的量化结果，公式中的Q。</td>
-<td style="white-space: nowrap">INT8</td>
-<td style="white-space: nowrap">ND</td>
-</tr>
-<tr>
-<td style="white-space: nowrap">outputScale</td>
-<td style="white-space: nowrap">输出</td>
-<td style="white-space: nowrap">输出的量化因子，公式中的Q_scale。</td>
-<td style="white-space: nowrap">FLOAT</td>
-<td style="white-space: nowrap">ND </td>
-</tr>
-<tr>
-<td style="white-space: nowrap">outputOffset</td>
-<td style="white-space: nowrap">预留参数</td>
-<td style="white-space: nowrap">兼容接口预留参数；当前版本不支持，必须传空指针。</td>
-<td style="white-space: nowrap">-</td>
-<td style="white-space: nowrap">-</td>
-</tr>
-</tbody>
-</table>
+| 参数名 | 输入/输出/属性 | 描述 | 数据类型 | 数据格式 |
+|--------|:---:|------|----------|:-----------:|
+| x | 输入 | 公式中的左矩阵 $X$ | INT8 | ND |
+| weight | 输入 | 公式中的分组权重矩阵 $W$。INT32为INT4打包类型，每个INT32存放8个INT4元素 | INT8、INT4<sup>1</sup>、INT32<sup>1</sup> | ND/NZ |
+| bias | 可选输入 | A8W4场景的辅助矩阵（`weightAssistMatrix`），shape为 `[E, N]`，该场景必须传入。A8W8场景传入 nullptr | FLOAT | ND |
+| offset | 可选输入 | perchannel非对称反量化的偏移量（预留参数），传入 nullptr | FLOAT | ND |
+| weightScale | 输入 | 公式中的 $w\_scale$，代表右矩阵的量化缩放因子 | UINT64<sup>1</sup>、FLOAT、FLOAT16、BFLOAT16<sup>2</sup> | ND |
+| xScale | 输入 | 公式中的 $x\_scale$，代表左矩阵的量化缩放因子 | FLOAT | ND |
+| <abbr title="长度为专家数，元素为各组token数的累积和">groupList</abbr> | 输入 | 指定各专家对应的token范围 | INT64 | ND |
+| output | 输出 | 量化结果 $Q$ | INT8 | ND |
+| outputScale | 输出 | 每个token的量化缩放因子 $Q\_scale$ | FLOAT | ND |
+| outputOffset | 输出 | 预留输出。Ascend 950的WeightNZ路径忽略该参数，其余场景传入 nullptr | - | - |
 
-- <term>Kirin X90处理器系列产品</term>、<term>Kirin 9030处理器系列产品</term>: 不支持BFLOAT16。
+- <term>Ascend 950PR&950DT系列产品</term>：
+  - 上表数据类型列中的角标 <sup>1</sup> 代表该系列不支持的数据类型。
+  - weight仅支持NZ格式。
+  - bias和offset均须传入 nullptr。
+- <term>Kirin X90处理器系列产品</term>、<term>Kirin 9030处理器系列产品</term>：
+  - 上表数据类型列中的角标 <sup>2</sup> 代表该系列不支持的数据类型。
+
+---
 
 ## 约束说明
 
- - N轴长度不能超过10240。
- - K轴长度不能超过65536。
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+   - N轴长度不能超过10240。
+   - K轴长度不能超过65536。
+- <term>Ascend 950PR&950DT系列产品</term>：
+  - 仅支持A8W8 pertoken perchannel量化场景。
+   - N 为正数且为64的整数倍。
+
+> aclnnGroupedMatmulSwigluQuant接口详细约束请参见 [aclnnGroupedMatmulSwigluQuant约束说明](docs/aclnnGroupedMatmulSwigluQuant.md#约束说明)。
+>
+> WeightNZ接口详细约束请参见 [aclnnGroupedMatmulSwigluQuantWeightNZ约束说明](docs/aclnnGroupedMatmulSwigluQuantWeightNZ.md#约束说明)。
+
+---
 
 ## 调用说明
 
-| 调用方式      | 调用样例                 | 说明                                                         |
-|--------------|-------------------------|--------------------------------------------------------------|
-| aclnn调用 | [test_aclnn_grouped_matmul_swiglu_quant](examples/test_aclnn_grouped_matmul_swiglu_quant.cpp) | 通过接口方式调用[GroupedMatmulSwigluQuant](docs/aclnnGroupedMatmulSwigluQuant.md)算子。 |
+| 调用方式 | 调用样例 | 说明 |
+|----------|----------|------|
+| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant](examples/test_aclnn_grouped_matmul_swiglu_quant.cpp) | 通过[aclnnGroupedMatmulSwigluQuant](docs/aclnnGroupedMatmulSwigluQuant.md)两段式接口调用GroupedMatmulSwigluQuant算子。 |
+| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz.cpp) | 通过[aclnnGroupedMatmulSwigluQuantWeightNZ](docs/aclnnGroupedMatmulSwigluQuantWeightNZ.md)两段式接口调用GroupedMatmulSwigluQuantWeightNZ算子 |

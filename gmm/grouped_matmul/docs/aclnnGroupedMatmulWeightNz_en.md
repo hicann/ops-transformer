@@ -1668,7 +1668,7 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
+int aclnnGroupedMatmulTest(int32_t deviceId, aclrtStream &stream)
 {
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
@@ -1717,7 +1717,8 @@ int aclnnGourpedMatmulTest(int32_t deviceId, aclrtStream &stream)
     std::vector<int8_t> weightHostData(groupnum * k * n, 10);
     std::vector<uint16_t> yHostData(m * n, 0);
     std::vector<int64_t> groupListData = {256, 512};
-    std::vector<int8_t> scaleHostData(groupnum * n, 1);
+    constexpr uint16_t bf16One = 0x3F80; // BF16 representation of 1.0
+    std::vector<uint16_t> scaleHostData(groupnum * n, bf16One);
     std::vector<int8_t> biasHostData(groupnum * n, 1);
     std::vector<int8_t> pertokenHostData(m, 1);
 
@@ -1803,7 +1804,7 @@ int main()
     // Fill in deviceId based on the actual device.
     int32_t deviceId = 0;
     aclrtStream stream;
-    auto ret = aclnnGourpedMatmulTest(deviceId, stream);
+    auto ret = aclnnGroupedMatmulTest(deviceId, stream);
     CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnGroupedMatmulWeightNz test failed. ERROR: %d\n", ret); return ret);
 
     Finalize(deviceId, stream);

@@ -541,9 +541,10 @@ static aclnnStatus RouteToSwigluQuantWeightNzV2GetWorkspaceSize(const aclTensor*
                                                                 uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // V2 has no offset input, so validate it here and delegate all other parameter checks to V2.
-    CHECK_COND(offset == nullptr, ACLNN_ERR_PARAM_INVALID,
-               "In op [%s], A5 A8W8 pertoken/perchannel requires offset to be nullptr.",
-               "aclnnGroupedMatmulSwigluQuantWeightNZ");
+    OP_CHECK(offset == nullptr,
+             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnGroupedMatmulSwigluQuantWeightNZGetWorkspaceSize", "offset",
+                                                   "nonnull", "offset must be nullptr"),
+             return ACLNN_ERR_PARAM_INVALID);
     // Reject null elements before constructing TensorLists.
     CHECK_RET(weightScale != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     const aclTensor* weights[] = {weight};
@@ -575,7 +576,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZGetWorkspaceSize(const aclTenso
                    DFX_OUT(output, outputScale, outputOffset));
     // Route before the legacy NZ format mutation and parameter checks.
     if (ShouldRouteToSwigluQuantV2(x, weight)) {
-        OP_LOGI("A5 A8W8 routes aclnnGroupedMatmulSwigluQuantWeightNZGetWorkspaceSize to "
+        OP_LOGI("Ascend 950 A8W8 routes aclnnGroupedMatmulSwigluQuantWeightNZGetWorkspaceSize to "
                 "aclnnGroupedMatmulSwigluQuantWeightNzV2GetWorkspaceSize.");
         return RouteToSwigluQuantWeightNzV2GetWorkspaceSize(x, weight, bias, offset, weightScale, xScale, groupList,
                                                             output, outputScale, outputOffset, workspaceSize, executor);

@@ -111,11 +111,9 @@ For the detailed computation formulas (classified by scenario: non-quantization,
 
 - <term>Ascend 950PR&950DT products</term>:
   - The superscript <sup>1</sup> in the Data type column of the preceding table indicates data types not supported by this series.
-  - The input parameter x does not support the INT32 type.
-  - In the non-quantization scenario, the input parameters x and weight and the output parameter out support up to 1024 tensors; in the pseudo-quantization scenario, they support up to 128 tensors; the full quantization scenario supports multiple tensors.
+  - The inputs x and weight and the output out each support up to 1024 tensors without quantization, 128 tensors with pseudo-quantization, and 1024 tensors with full quantization.
 - <term>Atlas A2 products</term> and <term>Atlas A3 products</term>:
   - The superscript <sup>2</sup> in the Data type column of the preceding table indicates data types not supported by this series.
-  - The input parameters x and weight do not support the FLOAT8_E5M2, FLOAT8_E4M3FN, HIFLOAT8, FLOAT4_E2M1, or FLOAT4_E1M2 types.
   - The input parameter biasOptional does not support BFLOAT16.
   - The input parameter scaleOptional does not support the FLOAT8_E8M0 or INT64 types.
   - The input parameters antiquantScaleOptional and perTokenScaleOptional do not support the FLOAT8_E8M0 type.

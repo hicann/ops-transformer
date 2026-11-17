@@ -109,11 +109,9 @@ $$
 
 - <term>Ascend 950PR&950DT系列产品</term>：
   - 上表数据类型列中的角标 <sup>1</sup> 代表该系列不支持的数据类型。
-  - 输入参数 x 不支持 INT32 类型。
-  - 输入参数 x、weight，输出参数 out在非量化场景支持最多1024个Tensor，在伪量化场景支持最多128个Tensor，全量化支持多Tensor。
+  - 输入参数 x、weight，输出参数 out在非量化场景支持最多1024个Tensor，在伪量化场景支持最多128个Tensor，全量化支持最多1024个Tensor。
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
   - 上表数据类型列中的角标 <sup>2</sup> 代表该系列不支持的数据类型。
-  - 输入参数 x、weight不支持FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1、FLOAT4_E1M2类型。
   - 输入参数 biasOptional不支持BFLOAT16。
   - 输入参数 scaleOptional不支持FLOAT8_E8M0、INT64类型。
   - 输入参数 antiquantScaleOptional、perTokenScaleOptional不支持FLOAT8_E8M0类型。
