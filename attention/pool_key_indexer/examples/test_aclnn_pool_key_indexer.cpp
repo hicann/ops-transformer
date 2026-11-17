@@ -116,7 +116,7 @@ int InitializeTensors(TensorResources& resources)
 
     // FP16 tensor 的 host 数据按 half 位型(uint16_t)填充, 与 aclDataType::ACL_FLOAT16 匹配;
     // 0x3C00 = FP16 1.0。不可用 float 字节流直接填充 —— 会被按 half 解读为错位值
-    // (1.0f 的字节流 00 00 80 3F -> [0.0, 2.0] 交替)。若未来需要填充任意 float 值,
+    // (1.0f 的字节流 00 00 80 3F -> [0.0, 1.875] 交替)。若未来需要填充任意 float 值,
     // 须先做 float->half 位型转换再填入
     constexpr uint16_t kFp16One = 0x3C00;
     std::vector<uint16_t> queryHostData(queryShapeSize, kFp16One);

@@ -736,9 +736,15 @@ int InitializeTensors(TensorResources& resources) {
     int64_t sparseIndicesShapeSize = GetShapeSize(sparseIndicesShape);
     int64_t sparseValuesShapeSize = GetShapeSize(sparseValuesShape);
 
-    std::vector<float> queryHostData(queryShapeSize, 1);
-    std::vector<float> poolKeyHostData(poolKeyShapeSize, 1);
-    std::vector<float> weightsHostData(weightsShapeSize, 1);
+    // Host data of FP16 tensors is filled with the half bit pattern (uint16_t) to match
+    // aclDataType::ACL_FLOAT16; 0x3C00 is FP16 1.0. Do not fill with a raw float byte stream,
+    // which would be interpreted as misaligned half values (the bytes of 1.0f, 00 00 80 3F,
+    // become [0.0, 1.875] alternately). Arbitrary float values must be converted to the half
+    // bit pattern before filling.
+    constexpr uint16_t kFp16One = 0x3C00;
+    std::vector<uint16_t> queryHostData(queryShapeSize, kFp16One);
+    std::vector<uint16_t> poolKeyHostData(poolKeyShapeSize, kFp16One);
+    std::vector<uint16_t> weightsHostData(weightsShapeSize, kFp16One);
     std::vector<int32_t> sparseIndicesHostData(sparseIndicesShapeSize, 1);
     std::vector<float> sparseValuesHostData(sparseValuesShapeSize, 1);
 
