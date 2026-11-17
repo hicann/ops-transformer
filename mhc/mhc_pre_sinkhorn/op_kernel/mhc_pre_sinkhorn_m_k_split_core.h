@@ -716,8 +716,9 @@ private:
                    hcScale0, tilingData->hcEps, curRowFactor, tilingData->hcMult);
 
         if (tilingData->hasPremix != 0) {
-            // 槽式搬运: nBurst=curRowFactor, 每行 4 元素占一个 32B 槽(UB 行距 hcMultAlign),
-            // 保证 ProcessYHc4 的 Brcb 源地址(preRow 行首)32B 对齐(GM 行距仍为 hcMult)。
+            event_t eventIdPremixV_MTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+            SetFlag<HardEvent::V_MTE2>(eventIdPremixV_MTE2);
+            WaitFlag<HardEvent::V_MTE2>(eventIdPremixV_MTE2);
             CopyIn(premixGm[globalRowOffset * tilingData->hcMult], premixLocal, curRowFactor, tilingData->hcMult);
             event_t eventIdPremix = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
             SetFlag<HardEvent::MTE2_V>(eventIdPremix);
@@ -929,6 +930,9 @@ private:
                        hcScale0, tilingData->hcEps, curRowFactor, tilingData->hcMult);
 
             if (tilingData->hasPremix != 0) {
+                event_t eventIdPremixV_MTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+                SetFlag<HardEvent::V_MTE2>(eventIdPremixV_MTE2);
+                WaitFlag<HardEvent::V_MTE2>(eventIdPremixV_MTE2);
                 CopyIn(premixGm[globalRowOffset * tilingData->hcMult], premixLocal, 1,
                        curRowFactor * tilingData->hcMult);
                 event_t eventIdPremix = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));

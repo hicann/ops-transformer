@@ -149,10 +149,13 @@ class MhcPreSinkhornOpBuilder(OpBuilder):
         return ["csrc/mhc/mhc_pre_sinkhorn.cpp"]
 
     def schema(self) -> str:
+        # pre_mix 必须为位置参数(带默认值): torch.library.register_autograd 的
+        # has_kwarg_only_tensors 检查拒绝 kwarg-only Tensor 参数, 放在 * 之后会导致
+        # 算子无法注册 dispatcher 级自动反向。
         return (
             "mhc_pre_sinkhorn(Tensor x, Tensor phi, Tensor alpha, Tensor bias, "
-            "int hcMult, int numIters, float hcEps, float normEps, bool outFlag, *, "
-            "Tensor? pre_mix=None, bool enable_hf32=True) -> "
+            "int hcMult, int numIters, float hcEps, float normEps, bool outFlag, "
+            "Tensor? pre_mix=None, *, bool enable_hf32=True) -> "
             "(Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)"
         )
 
