@@ -157,10 +157,10 @@ cann_ops_transformer.generic_block_sparse_attention(
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | sparse_block_idx | Tensor | Required | KV block indexes selected by each Q block. | int32 | ND | (KV_N, totalQBlocks, topK) |
 | sparse_block_count | Tensor | Required | Number of KV blocks actually retained for each Q block. | int32 | ND | (KV_N, totalQBlocks) |
-| num_heads_q | int | Required | Number of Query heads. | int32 | - | - |
+| num_heads_q | int | Required | Number of Query heads. A4C4: num_heads_q/num_heads_kv is in [1,16]. | int32 | - | - |
 | num_heads_kv | int | Required | Number of Key/Value heads. | int32 | - | - |
-| head_dim | int | Required | Dimension of each attention head. | int32 | - | - |
-| block_shape | list[int] | Required | Sparse block shape `[block_x, block_y]`. | int64 | - | Length of 2 |
+| head_dim | int | Required | Dimension of each attention head. A4C4 uses logical D=192 or 256. | int32 | - | - |
+| block_shape | list[int] | Required | Sparse block shape `[block_x, block_y]`. A4C4 uses [1,Y], Y in {4,8,16,32,64,128}. | int64 | - | Length of 2 |
 | cu_seqlens_q | Tensor | Conditional | Required for TND Q. Cumulative sequence lengths, used to process variable-length sequences. The first element must be 0. | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | Conditional | Required for TND KV. Pass `None` for paged KV. Cumulative sequence lengths, used to process variable-length sequences. The first element must be 0. | int64 | ND | (B+1,) |
 | seqused_q | Tensor | Conditional | Required for BSND/BNSD. For TND Q, this is optional with non-quantized inputs, MXFP8, or `quant_mode=8` on <term>Ascend 950PR&950DT products</term>. Pass `None` for INT8 TND. | int32 | ND | (B,) |
@@ -180,19 +180,21 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 ### generic_block_sparse_attention
 
+D in the table denotes the logical head dimension. A4C4 Torch tensors use a physical final dimension D/2; see [A4C4](#a4c4quantmode4) for packed storage and scale conventions.
+
 | Name | Type | Required/Optional | Description | Data Type | Data Format | Dimension |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| q | Tensor | Required | Query in the formula | bfloat16/float16/float8_e4m3fn/int8 | ND | TND: (Q_T, Q_N, D); BSND: (B, Sq, Q_N, D); BNSD: (B, Q_N, Sq, D) |
-| k | Tensor | Required | Key in the formula. The last Torch dimension `D_kv` is logical `D/2` for `quant_mode=8` and `D` for other modes. In this mode, K and V must have the same data type. Use `float4_e2m1fn_x2` for both, or `uint8` containing packed FP4 data for both. | bfloat16/float16/float8_e4m3fn/int8/float4_e2m1fn_x2/uint8 | ND | PA_BBND: (num_blocks, block_size, KV_N, D_kv); PA_BNBD: (num_blocks, KV_N, block_size, D_kv); TND: (KV_T, KV_N, D_kv); BSND: (B, Sk, KV_N, D_kv); BNSD: (B, KV_N, Sk, D_kv) |
+| q | Tensor | Required | Query in the formula; mode 4 uses packed uint8 with physical final dimension D/2. | bfloat16/float16/float8_e4m3fn/int8/uint8 | ND | TND: (Q_T, Q_N, D); BSND: (B, Sq, Q_N, D); BNSD: (B, Q_N, Sq, D) |
+| k | Tensor | Required | Key in the formula. The last Torch dimension `D_kv` is logical `D/2` for `quant_mode=4/8` and `D` for other modes. For `quant_mode=8`, K and V must have the same data type. Use `float4_e2m1fn_x2` for both, or `uint8` containing packed FP4 data for both. | bfloat16/float16/float8_e4m3fn/int8/float4_e2m1fn_x2/uint8 | ND | PA_BBND: (num_blocks, block_size, KV_N, D_kv); PA_BNBD: (num_blocks, KV_N, block_size, D_kv); TND: (KV_T, KV_N, D_kv); BSND: (B, Sk, KV_N, D_kv); BNSD: (B, KV_N, Sk, D_kv) |
 | v | Tensor | Required | Value in the formula, with the same `D_kv` and supported data types as k. | bfloat16/float16/float8_e4m3fn/int8/float4_e2m1fn_x2/uint8 | ND | Same as k |
 | sparse_block_idx | Tensor | Required | KV block index selected by each Q block | int32 | ND | (KV_N, totalQBlocks, topK) |
 | sparse_block_count | Tensor | Required | Number of KV blocks actually retained for each Q block | int32 | ND | (KV_N, totalQBlocks) |
-| block_shape | list[int] | Required | Sparse block shape `[block_x, block_y]` | int64 | - | length of 2 |
+| block_shape | list[int] | Required | Sparse block shape `[block_x, block_y]` A4C4 uses [1,Y], Y in {4,8,16,32,64,128}. | int64 | - | length of 2 |
 | metadata | Tensor | Required | Task split result from `generic_block_sparse_attention_metadata` with matching layout, inputs, and attributes. | int32 | ND | (1024,) |
 | attn_mask | Tensor | Optional | Must be None when mask_mode=0/1; must be INT32 exactMask when mask_mode=3 (Union) | bool/int32 | ND | Union: (KV_N, G, U×block_y) |
-| q_dequant_scale | Tensor | Required for INT8; conditional for other modes |query dequantization scale factor; INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0 | ND | INT8: TND: [Q_T,Q_N]; BSND: [B,Q_S,Q_N]; BNSD: [B,Q_N,Q_S]; MXFP8: see the ACLNN quantization contract |
-| k_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8` | key dequantization scale factor; INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0/bfloat16 | ND | INT8: PA_BBND/PA_BNBD: [num_blocks,KV_N,128]; TND: [KV_N,KV_T]; BSND/BNSD: [B,KV_N,KV_S]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. |
-| v_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8` | value dequantization scale factor; INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32/float8_e8m0/bfloat16 | ND | INT8: [KV_N,D]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. |
+| q_dequant_scale | Tensor | Required for INT8; conditional for other modes; required for A4C4 | query dequantization scale factor; INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7) requires a contiguous, positive, finite float32 Tensor A4C4 (mode 4) requires E8M0 or uint8 encoding. | float32/float8_e8m0/uint8 | ND | INT8: TND: [Q_T,Q_N]; BSND: [B,Q_S,Q_N]; BNSD: [B,Q_N,Q_S]; MXFP8: see the ACLNN quantization contract <br>A4C4: [scale shapes](#a4c4quantmode4). |
+| k_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8`; required for A4C4 | key dequantization scale factor; INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7) requires a contiguous, positive, finite float32 Tensor A4C4 (mode 4) requires E8M0 or uint8 encoding. | float32/float8_e8m0/bfloat16/uint8 | ND | INT8: PA_BBND/PA_BNBD: [num_blocks,KV_N,128]; TND: [KV_N,KV_T]; BSND/BNSD: [B,KV_N,KV_S]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. <br>A4C4: [scale shapes](#a4c4quantmode4). |
+| v_dequant_scale | Tensor | Required for INT8, MXFP8, and `quant_mode=8`; required for A4C4 | value dequantization scale factor; INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7) requires a contiguous, positive, finite float32 Tensor A4C4 (mode 4) requires E8M0 or uint8 encoding. | float32/float8_e8m0/bfloat16/uint8 | ND | INT8: [KV_N,D]; MXFP8: see the ACLNN quantization contract <br>For `quant_mode=8`, use the logical K/V shape with D replaced by 8. <br>A4C4: [scale shapes](#a4c4quantmode4). |
 | p_quant_scale | Tensor | Required for INT8; conditional for other modes |P quantization scale factor; INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32 | ND | INT8: [1]; MXFP8: see the ACLNN quantization contract |
 | cu_seqlens_q | Tensor | Conditional | Required for TND Q. Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | Conditional | Required for TND KV. Pass `None` for paged KV. Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
@@ -205,7 +207,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | softmax_scale | float | Optional | Scale factor that can be explicitly set to override the default computation | float32 | - | - |
 | mask_mode | int/MaskMode | Optional | Mask mode. Supports passing an enumeration or the corresponding int value. See "mask_mode enumeration" for the enumeration definition | int32 | - | - |
 | quant_mode | int/QuantMode | Optional | Quantization mode. Supports passing an enumeration or the corresponding int value. See "quant_mode enumeration" for the enumeration definition | int32 | - | - |
-| dst_type_max | float | Optional | Quantization-related parameter | float32 | - | - |
+| dst_type_max | float | Optional | Mode 4: 0 selects CX=6; explicit values must be finite and in [6,12]. Other modes require 0. | float32 | - | - |
 | softmax_precision | int | Optional | Softmax precision mode | int32 | - | - |
 | win_left | int | Optional | Window left boundary | int32 | - | - |
 | win_right | int | Optional | Window right boundary | int32 | - | - |
@@ -243,6 +245,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 ### Product-Specific Constraints
 
+- A4C4 (quant_mode=4) on <term>Ascend 950PR&950DT products</term>: D=192/256, block_shape=[1,Y] with Y in {4,8,16,32,64,128}, GQA group size 1–16, mask_mode=0/1, residual_block_mode=0/1, and softmax_precision=0. Q/K/V use FLOAT4_E2M1 with E8M0 scales; FP16/BF16 output and optional FP32 LSE are supported. [A4C4 API constraints](#a4c4quantmode4).
 - On <term>Ascend 950PR&950DT products</term>, set `quant_mode=QuantMode.Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP` (8) in both Metadata and Attention. Call `generic_block_sparse_attention_metadata` first and explicitly pass its result as `metadata` to Attention. Use logical D=128, `block_shape=[1,128]`, GQA group size 1–32, `mask_mode=0` (non-causal) or `1` (causal), `softmax_precision=0`, and `residual_block_mode=0`. Set `attention_out_dtype` to float16 or bfloat16. LSE is optional.
   - `max_seqlen_q` and the actual Q sequence length of each batch item are at most 16. For BSND and BNSD, the Q tensor sequence axis is also limited to 16. `num_heads_kv` is at most five for PA_BBND, BSND, and TND KV layouts. This five-head limit does not apply to BNSD or PA_BNBD.
   - Q supports `TND`, `BSND`, and `BNSD`. Dense K/V must use the same layout as Q. Each Q layout can also use `PA_BBND` or `PA_BNBD` with 128-token pages. See the [layout matching relationship table](#layout-matching-relationship-table) for output shapes.
@@ -766,7 +769,7 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
             <td>quant_mode</td>
             <td>                <ul>
                     <li>data_type supports INT.</li>
-                    <li>Supported values are 0 (non-quantized), 5 (FP8), 6 (MXFP8), 7 (INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>), and 8 (FP8 Q with FP4 K/V). Modes 5, 6, and 8 apply to <term>Ascend 950PR&950DT products</term>.</li>
+                    <li>Supported values are 0 (non-quantized), 4 (A4C4), 5 (FP8), 6 (MXFP8), 7 (INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>), and 8 (FP8 Q with FP4 K/V). Modes 4, 5, 6, and 8 apply to <term>Ascend 950PR&950DT products</term>.</li>
                 </ul>
             </td>
             <td>Optional input. The default value is 0.</td>
@@ -778,7 +781,7 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
                     <li>If quant_mode=0, q/k/v_dequant_scale must be None. For quant_mode=8, the Q scale is fixed at 1.0. Pass independent BF16 K/V scales and leave q_dequant_scale and p_quant_scale as None.</li>
                     <li>If quant_mode!=0, attention_out_dtype must be passed, and the output dtype in current quantization use cases must be float16 or bfloat16.</li>
                 </ul>
-            </td>
+             A4C4 (mode 4) requires three E8M0 dequant scales and p_quant_scale=None; see <a href="#a4c4quantmode4">A4C4</a>.</td>
         </tr>
         <tr>
             <td>q_dequant_scale</td>
@@ -829,7 +832,7 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
             <td>return_softmax_lse</td>
             <td>                <ul>
                     <li>data_type only supports BOOL.</li>
-                    <li>Non-quant (quant_mode=0) and INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7), and A8C4 (quant_mode=8) support False and True; high-precision FP8 on Ascend 950PR&950DT products (quant_mode=5, softmax_precision=0, D=128) supports False/True; low-precision FP8 on Ascend 950PR&950DT products (quant_mode=5, softmax_precision=1) and MXFP8 (quant_mode=6) support only False.</li>
+                    <li>Non-quant (quant_mode=0), A4C4 (quant_mode=4), and INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7), and A8C4 (quant_mode=8) support False and True; high-precision FP8 on Ascend 950PR&950DT products (quant_mode=5, softmax_precision=0, D=128) supports False/True; low-precision FP8 on Ascend 950PR&950DT products (quant_mode=5, softmax_precision=1) and MXFP8 (quant_mode=6) support only False.</li>
                 </ul>
             </td>
             <td>Optional attribute, default value is False.</td>
@@ -931,3 +934,43 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
 ## INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>
 
 Use `quant_mode=QuantMode.INT8_FULL_QUANT` (7) for INT8 Q/K/V; pass the same value to both metadata and attention. All four external scales are required. `softmax_precision=0` is required; the output is `torch.float16` or `torch.bfloat16`. Scale shapes and layout constraints are described in the [ACLNN quantization contract](aclnnGenericBlockSparseAttention_en.md#quantization-related-description). `quant_mode=5` is for FP8 on <term>Ascend 950PR&950DT products</term> and cannot be used for INT8.
+
+<a name="a4c4quantmode4"></a>
+
+## A4C4 (MXFP4 CX, quant_mode=4)
+
+`QuantMode.FP4_E2M1_DYNAMIC_CX` (4) selects A4C4. Use mode 4 and `softmax_precision=0` in Metadata and Attention.
+Mode 6 is exclusively MXFP8; OCP mode 3 remains unsupported.
+Logical D is 192 or 256, `block_shape=[1,Y]` with Y in {4,8,16,32,64,128}, and the Q/KV head ratio is in [1,16].
+Both `mask_mode=0/1` and `residual_block_mode=0/1` are supported, with optional FP32 LSE.
+See the [ACLNN A4C4 description](./aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4) for the nine layout pairs.
+
+### Inputs and Outputs
+
+| Parameter | Torch type and convention |
+| --- | --- |
+| q, k, v | packed uint8; two E2M1 values per byte, physical final dimension D/2; even D elements use the low four bits |
+| q_dequant_scale, k_dequant_scale | E8M0 or uint8 encoding; preserve the data prefix axes and replace the final D/2 axis with [D/64,2] |
+| v_dequant_scale | E8M0 or uint8 encoding; follow the ACLNN A4C4 scale table and independent alignment of each batch |
+| p_quant_scale | None; P is dynamically quantized inside the operator |
+| dst_type_max | 0 selects CX=6; explicit values must be finite and in [6,12] |
+| attention_out_dtype | Explicit torch.float16 or torch.bfloat16 is required |
+| attention_out | Same layout as q, with logical final dimension D |
+| softmax_lse | FP32; [Tq,Nq,1] for TND or [B,Nq,Sq,1] for BNSD/BSND; empty when disabled |
+
+All three dequantization scales are required. For each effective sequence, KV head and channel, the V scale remains constant across tokens and physical pages and is repeated in the documented storage shape.
+For TND V scales, round each batch's storage length from `cu_seqlens_kv` up independently before concatenation.
+Do not align only the total length or derive batch offsets from shorter `seqused_kv` values.
+Paged K/V and their scales share physical IDs from `block_table`, including non-contiguous or shuffled IDs; the interface normalizes input storage to contiguous tensors.
+
+### Length and Numerical Conventions
+
+TND Q requires `cu_seqlens_q`; TND KV requires `cu_seqlens_kv`.
+Paged KV requires `block_table` and `seqused_kv` with `cu_seqlens_kv=None`.
+BNSD/BSND Q requires `seqused_q`; BNSD/BSND KV requires `seqused_kv`.
+Use logical D for Metadata's `head_dim` and matching inputs and attributes in both calls.
+In causal mode, actual KV length must be at least actual Q length in every batch.
+
+P uses dynamic CX quantization; the Softmax denominator and LSE use FP32 exponentials before quantization, with no additional output dequantization.
+Quantization error, block pairing and FD accumulation order can prevent bitwise equality across layouts or schedules.
+See the [ACLNN A4C4 description](./aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4) for the scale and numerical conventions.

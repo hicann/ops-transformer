@@ -38,7 +38,8 @@ const std::array<const aclTensor*, 2> GenericBlockSparseAttention(
            softmaxPrecision, winLeft, winRight, returnSoftmaxlse, residualBlockMode, isConsistentTopk);
 
     DataType outDtype =
-        (query->GetDataType() == DataType::DT_FLOAT8_E4M3FN || query->GetDataType() == DataType::DT_INT8) ?
+        (query->GetDataType() == DataType::DT_FLOAT8_E4M3FN || query->GetDataType() == DataType::DT_INT8 ||
+         query->GetDataType() == DataType::DT_FLOAT4_E2M1) ?
             attentionOut->GetDataType() :
             query->GetDataType();
     auto attentionOutTensor = executor->AllocTensor(outDtype, Format::FORMAT_ND, Format::FORMAT_ND);

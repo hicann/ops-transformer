@@ -26,9 +26,14 @@
     (TILING_KEY_VAR >= 9250002900000050ULL && TILING_KEY_VAR <= 9250002900000055ULL)
 #include "arch35/generic_block_sparse_attention_kernel_arch35_mxfp8_full_quant.h"
 #endif
-#if defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+#if defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN) && \
+    (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
 #include "arch35/generic_block_sparse_attention_kernel_arch35_a8c4.h"
 #endif
+#if defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_QUERY == DT_FLOAT4_E2M1) && \
+    (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+#include "arch35/generic_block_sparse_attention_kernel_arch35_mxfp4_full_quant.h"
+#endif // MXFP4-only headers
 #endif
 
 using namespace NpuArch;
@@ -197,6 +202,95 @@ __global__ __aicore__ void GbsaInferIntfUnionArch22(GM_ADDR q, GM_ADDR k, GM_ADD
 #if (__CCE_AICORE__ == 310)
 
 using namespace GbsaKernelArch35;
+
+#if defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_QUERY == DT_FLOAT4_E2M1) && \
+    (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+template <uint32_t D, class OutputT, Format QFormat, Format KvFormat, bool IsPaged, bool IsCausal, bool HasResidual,
+          uint32_t FixedQueryTile = 0U>
+__aicore__ __attribute__((noinline)) static void GbsaInferMxfp4Head(const GbsaKernelArch35::Mxfp4::KernelParams& params)
+{
+    GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, data, params.tiling);
+    const uint32_t Q = FixedQueryTile != 0U ? FixedQueryTile : data.baseTileInfo.qBaseTile;
+    const uint32_t KV = data.baseTileInfo.kvBaseTile;
+    static_assert(D == 64U || D == 128U || D == 192U || D == 256U, "Unsupported MXFP4 head size");
+    // Validate the host-selected tile pair before constructing any device layout.
+    const bool validTile =
+        ((Q == 16U || Q == 32U) && KV == 512U) || (Q == 64U && KV == 256U) || (Q == 128U && KV == 128U);
+    if (data.groupSize == 0U || data.groupSize > 128U || !validTile) {
+        return;
+    }
+    using ArchTag = Arch::AtlasA5;
+    using ElementQ = fp4x2_e2m1_t;
+    using ElementK = fp4x2_e2m1_t;
+    using ElementP = fp4x2_e2m1_t;
+    using ElementV = fp4x2_e2m1_t;
+    using ElementS = float;
+    using ElementOTmp = float;
+    using ElementO = OutputT;
+    using LayoutP = layout::zN;
+
+    // MXFP4 storage and compute extents use the host-selected runtime tiles.
+    // Keep the BlockMmad interface, with dynamic dimension carrier types.
+    using L1TileShapeQK = tla::Shape<uint32_t, uint32_t, uint32_t>;
+    using L0TileShapeQK = tla::Shape<uint32_t, uint32_t, uint32_t>;
+    using L1TileShapePV = tla::Shape<uint32_t, uint32_t, uint32_t>;
+    using L0TileShapePV = tla::Shape<uint32_t, uint32_t, uint32_t>;
+    using DispatchPolicyQK = Gemm::MmadAtlasA5GbsaQKMxfp4<IsPaged>;
+    using DispatchPolicyPV = Gemm::MmadAtlasA5GbsaPVMxfp4<IsPaged>;
+    using TileCopyQK = Gemm::Tile::PackedTileCopyMxfp4<IsPaged, false>;
+    using TileCopyPV = Gemm::Tile::PackedTileCopyMxfp4<IsPaged, true>;
+    using TileMmadQK = Gemm::Tile::TileMmadTla<ArchTag, ElementQ, typename TileCopyQK::LayoutTagL1A>;
+    using TileMmadPV = Gemm::Tile::TileMmadTla<ArchTag, ElementP, LayoutP>;
+    using BlockMmadQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, ElementQ, ElementK,
+                                                  ElementS, void, TileCopyQK, TileMmadQK>;
+    using BlockMmadPV = Gemm::Block::BlockMmadTla<DispatchPolicyPV, L1TileShapePV, L0TileShapePV, ElementP, ElementV,
+                                                  ElementOTmp, void, TileCopyPV, TileMmadPV>;
+    using DispatchPolicySoftmax = Epilogue::EpilogueAtlasA5Mxfp4Softmax;
+    using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicySoftmax>;
+    using DispatchPolicyPScale = Epilogue::EpilogueAtlasA5Mxfp4PScale;
+    using EpilogueComputePScale = Epilogue::Block::BlockEpilogue<DispatchPolicyPScale>;
+    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA5Mxfp4RescaleO;
+    using EpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, ElementO>;
+    using DispatchPolicyPrepareKvScale = Epilogue::EpilogueAtlasA5Mxfp4KvScale<IsPaged>;
+    using EpiloguePrepareKvScale = Epilogue::Block::BlockEpilogue<DispatchPolicyPrepareKvScale>;
+    using DispatchPolicyPrepareOffsets = Epilogue::EpilogueAtlasA5PrepareKvOffsetsMxfp4<IsPaged, HasResidual>;
+    using EpiloguePrepareOffsets = Epilogue::Block::BlockEpilogue<DispatchPolicyPrepareOffsets>;
+    using Kernel = GbsaMxfp4FullQuantKernelArch35<BlockMmadQK, BlockMmadPV, EpilogueOnlineSoftmax,
+                                                  EpilogueComputePScale, EpilogueRescaleO, EpiloguePrepareOffsets,
+                                                  EpiloguePrepareKvScale, QFormat, KvFormat, IsCausal, HasResidual>;
+    Kernel kernel(D, Q, KV);
+    // Keep the straight-through body only for the minimum query-tile family.
+    kernel(params, FixedQueryTile == 16U);
+}
+
+template <uint32_t D, class OutputT, Format QFormat, Format KvFormat, bool IsPaged, bool IsCausal, bool HasResidual>
+__aicore__ inline void GbsaInferMxfp4Dimension(
+    const Mxfp4::KernelParams& params, const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData& data)
+{
+    if (data.groupSize <= 16U) {
+        // Every minimum query tile keeps its address arithmetic constant.
+        GbsaInferMxfp4Head<D, OutputT, QFormat, KvFormat, IsPaged, IsCausal, HasResidual, 16U>(params);
+    } else {
+        GbsaInferMxfp4Head<D, OutputT, QFormat, KvFormat, IsPaged, IsCausal, HasResidual>(params);
+    }
+}
+
+template <class OutputT, Format QFormat, Format KvFormat, bool IsPaged, bool IsCausal, bool HasResidual>
+__aicore__ inline void GbsaInferInterfaceMxfp4(const Mxfp4::KernelParams& params)
+{
+    GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, data, params.tiling);
+    if (data.embeddingSize == 64U) {
+        GbsaInferMxfp4Dimension<64, OutputT, QFormat, KvFormat, IsPaged, IsCausal, HasResidual>(params, data);
+    } else if (data.embeddingSize == 128U) {
+        GbsaInferMxfp4Dimension<128, OutputT, QFormat, KvFormat, IsPaged, IsCausal, HasResidual>(params, data);
+    } else if (data.embeddingSize == 192U) {
+        GbsaInferMxfp4Dimension<192, OutputT, QFormat, KvFormat, IsPaged, IsCausal, HasResidual>(params, data);
+    } else if (data.embeddingSize == 256U) {
+        GbsaInferMxfp4Dimension<256, OutputT, QFormat, KvFormat, IsPaged, IsCausal, HasResidual>(params, data);
+    }
+}
+
+#endif // MXFP4-only entry helpers
 
 template <class InDtype, class SMDtype, class REDtype, Format qFormat, Format kvFormat, bool isPaged,
           bool isCausal = true, bool hasResidualBlock = false, Epilogue::LseMode lseMode = Epilogue::LseMode::NONE,
@@ -580,7 +674,8 @@ __global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, G
 }
 #endif // Packed MXFP8 dispatch
 
-#if defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+#if defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN) && \
+    (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
 template <class BaseCopy>
 struct A8C4PreloadedKvTileCopy : BaseCopy {
     template <class TensorB>

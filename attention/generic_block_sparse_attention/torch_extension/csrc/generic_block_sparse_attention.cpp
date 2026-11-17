@@ -28,9 +28,11 @@ enum QuantMode : int64_t {
     Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP = 8,
 };
 
-static TensorWrapper MakePackedFp4Wrapper(const at::Tensor& tensor)
+// Packed uint8 storage needs an explicit ACL interpretation; preserve all other dtypes.
+static TensorWrapper MakePackedWrapper(const at::Tensor& tensor, aclDataType packed_dtype)
 {
-    return TensorWrapper{tensor, ACL_FLOAT4_E2M1};
+    const auto dtype = ConvertToAclDataType(tensor.scalar_type());
+    return TensorWrapper{tensor, dtype == ACL_UINT8 ? packed_dtype : dtype};
 }
 
 at::Tensor GenericBlockSparseAttentionMetadata(
@@ -87,7 +89,27 @@ std::tuple<at::Tensor, at::Tensor> GenericBlockSparseAttention(
         TORCH_CHECK(false, "attention_out_dtype must be specified when quant_mode != NO_QUANT");
     }
 
-    at::Tensor attention_out = at::empty(q.sizes(), q.options().dtype(out_dtype));
+    const bool is_a4c4 = quant_mode == FP4_E2M1_DYNAMIC_CX;
+    if (is_a4c4) {
+        // These optionals are dereferenced when constructing the ACL wrappers below.
+        TORCH_CHECK(q_dequant_scale.has_value() && q_dequant_scale->defined(), "quant_mode=", quant_mode,
+                    " requires q_dequant_scale");
+        TORCH_CHECK(k_dequant_scale.has_value() && k_dequant_scale->defined(), "quant_mode=", quant_mode,
+                    " requires k_dequant_scale");
+        TORCH_CHECK(v_dequant_scale.has_value() && v_dequant_scale->defined(), "quant_mode=", quant_mode,
+                    " requires v_dequant_scale");
+    }
+
+    auto output_sizes = q.sizes().vec();
+    if (is_a4c4) {
+        TORCH_CHECK(!output_sizes.empty(), "FP4 output allocation requires Q to have at least one dimension");
+        output_sizes.back() *= 2; // Packed FP4 stores two logical elements per byte.
+    }
+    if (return_softmax_lse) {
+        const int64_t min_rank = layout_q == "TND" ? 2 : 3;
+        TORCH_CHECK(q.dim() >= min_rank, "Q rank must be at least ", min_rank, " to allocate softmax_lse");
+    }
+    at::Tensor attention_out = at::empty(output_sizes, q.options().dtype(out_dtype));
 
     at::Tensor softmax_lse;
     auto opts_f32 = q.options().dtype(at::kFloat);
@@ -105,9 +127,21 @@ std::tuple<at::Tensor, at::Tensor> GenericBlockSparseAttention(
     }
 
     const int64_t return_softmax_lse_flag = return_softmax_lse ? 1 : 0;
-    if (is_q_fp8_kv_fp4 && k.scalar_type() == torch_uint8) {
-        const auto key = MakePackedFp4Wrapper(k);
-        const auto value = MakePackedFp4Wrapper(v);
+    if (is_a4c4) {
+        const auto query = MakePackedWrapper(q, ACL_FLOAT4_E2M1);
+        const auto key = MakePackedWrapper(k, ACL_FLOAT4_E2M1);
+        const auto value = MakePackedWrapper(v, ACL_FLOAT4_E2M1);
+        const auto query_scale = MakePackedWrapper(*q_dequant_scale, ACL_FLOAT8_E8M0);
+        const auto key_scale = MakePackedWrapper(*k_dequant_scale, ACL_FLOAT8_E8M0);
+        const auto value_scale = MakePackedWrapper(*v_dequant_scale, ACL_FLOAT8_E8M0);
+        ACLNN_CMD(aclnnGenericBlockSparseAttention, query, key, value, sparse_block_idx, sparse_block_count, metadata,
+                  attn_mask, query_scale, key_scale, value_scale, p_quant_scale, cu_seqlens_q, cu_seqlens_kv, seqused_q,
+                  seqused_kv, block_table, block_shape_ref, layout_q, layout_kv, layout_sparse_pattern, softmax_scale,
+                  mask_mode, quant_mode, dst_type_max, softmax_precision, win_left, win_right, return_softmax_lse_flag,
+                  residual_block_mode, is_consistent_topk, attention_out, softmax_lse);
+    } else if (is_q_fp8_kv_fp4 && k.scalar_type() == torch_uint8) {
+        const auto key = MakePackedWrapper(k, ACL_FLOAT4_E2M1);
+        const auto value = MakePackedWrapper(v, ACL_FLOAT4_E2M1);
         ACLNN_CMD(aclnnGenericBlockSparseAttention, q, key, value, sparse_block_idx, sparse_block_count, metadata,
                   attn_mask, q_dequant_scale, k_dequant_scale, v_dequant_scale, p_quant_scale, cu_seqlens_q,
                   cu_seqlens_kv, seqused_q, seqused_kv, block_table, block_shape_ref, layout_q, layout_kv,

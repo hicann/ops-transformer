@@ -22,6 +22,7 @@
 #include "opdev/op_log.h"
 #include "opdev/platform.h"
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <unordered_map>
 
@@ -40,6 +41,7 @@ constexpr uint32_t GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND = 5U;
 
 static constexpr int64_t LSE_OUT = 1;
 static constexpr int64_t MXFP8_QUANT_TYPE = 6;
+static constexpr int64_t GBSA_QUANT_TYPE_A4C4 = 4;
 
 static bool CheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value, int64_t quantType)
 {
@@ -48,6 +50,18 @@ static bool CheckDataType(const aclTensor* query, const aclTensor* key, const ac
     const DataType vDtype = value->GetDataType();
 
     const bool a8c4 = quantType == GBSA_QUANT_TYPE_A8C4;
+    if (quantType == GBSA_QUANT_TYPE_A4C4) {
+        if (qDtype != DataType::DT_FLOAT4_E2M1 || kDtype != DataType::DT_FLOAT4_E2M1 ||
+            vDtype != DataType::DT_FLOAT4_E2M1) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A4C4 quantType=4 requires FP4 E2M1 query/key/value.");
+            return false;
+        }
+        return true;
+    }
+    if (qDtype == DataType::DT_FLOAT4_E2M1) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "FP4 E2M1 query requires A4C4 quantType=4.");
+        return false;
+    }
     if (a8c4 || kDtype == DataType::DT_FLOAT4_E2M1 || vDtype == DataType::DT_FLOAT4_E2M1) {
         if (!a8c4 || qDtype != DataType::DT_FLOAT8_E4M3FN || kDtype != DataType::DT_FLOAT4_E2M1 ||
             vDtype != DataType::DT_FLOAT4_E2M1) {
@@ -218,6 +232,37 @@ static aclnnStatus ValidateAdditionalParams(int64_t softmaxPrecision, const aclT
     return ACLNN_SUCCESS;
 }
 
+// Validate public A4C4 tensor descriptors before graph construction. In particular,
+// preserve dtype errors forwarded by Torch instead of deferring them to tiling.
+static aclnnStatus ValidateA4C4Params(const aclTensor* qScale, const aclTensor* kScale, const aclTensor* vScale,
+                                      const aclTensor* pScale, const aclTensor* attentionOut, int64_t softmaxPrecision)
+{
+    for (const auto* scale : {qScale, kScale, vScale}) {
+        OP_CHECK_NULL(scale, return ACLNN_ERR_PARAM_NULLPTR);
+        if (scale->GetDataType() != DataType::DT_FLOAT8_E8M0) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A4C4 requires E8M0 Q/K/V dequant scales.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        const auto& shape = scale->GetViewShape();
+        if (shape.GetDimNum() == 0U) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A4C4 dequant scales must not be empty or scalar.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        for (size_t axis = 0; axis < shape.GetDimNum(); ++axis) {
+            if (shape.GetDim(axis) == 0) {
+                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A4C4 dequant scales must not be empty or scalar.");
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+        }
+    }
+    if (pScale != nullptr || softmaxPrecision != 0 ||
+        (attentionOut->GetDataType() != DataType::DT_FLOAT16 && attentionOut->GetDataType() != DataType::DT_BF16)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A4C4 requires absent pQuantScale, FP32 softmax and FP16/BF16 output.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
 // layoutQ / layoutKv are string attrs; keep as string end-to-end.
 static std::string ConvertLayoutString(char* layoutStr)
 {
@@ -382,6 +427,18 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     }
 
     const bool unionFp8 = maskType == 3 && quantType == 5 && query->GetDataType() == DataType::DT_FLOAT8_E4M3FN;
+    const bool validDstTypeMax =
+        (quantType == GBSA_QUANT_TYPE_A4C4 && query->GetDataType() == DataType::DT_FLOAT4_E2M1) ?
+            std::isfinite(dstTypeMax) && (dstTypeMax == 0.0 || (dstTypeMax >= 6.0 && dstTypeMax <= 12.0)) :
+            dstTypeMax == 0.0;
+    if (!validDstTypeMax) {
+        OP_LOGE(
+            ACLNN_ERR_PARAM_INVALID,
+            "dstTypeMax requires 0 or a finite value in [6, 12] for A4C4 quantType=4; other modes require 0, got %f.",
+            dstTypeMax);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
     // Storage mode comes from blockTable presence; layout only constrains the tensor axes.
     const bool isPaged = blockTableOptional != nullptr;
     if (quantType == 5 && softmaxPrecision == 1 &&
@@ -394,7 +451,8 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
                                                   query->GetDataType() == DataType::DT_BF16)) ||
                               (((quantType == 5 && softmaxPrecision == 0) || quantType == MXFP8_QUANT_TYPE ||
                                 quantType == GBSA_QUANT_TYPE_A8C4) &&
-                               query->GetDataType() == DataType::DT_FLOAT8_E4M3FN));
+                               query->GetDataType() == DataType::DT_FLOAT8_E4M3FN) ||
+                              (quantType == GBSA_QUANT_TYPE_A4C4 && query->GetDataType() == DataType::DT_FLOAT4_E2M1));
     const bool layoutIsPa = (std::string(layoutKv) == "PA_BBND" || std::string(layoutKv) == "PA_BNBD");
     if (isPaged) {
         if (!layoutIsPa) {
@@ -449,6 +507,13 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     if (ret != ACLNN_SUCCESS) {
         return ret;
     }
+    if (quantType == GBSA_QUANT_TYPE_A4C4) {
+        ret = ValidateA4C4Params(qDequantScaleOptional, kDequantScaleOptional, vDequantScaleOptional,
+                                 pQuantScaleOptional, attentionOut, softmaxPrecision);
+        if (ret != ACLNN_SUCCESS) {
+            return ret;
+        }
+    }
     if (returnSoftmaxlse == LSE_OUT) {
         OP_CHECK_NULL(softmaxLseOptional, return ACLNN_ERR_PARAM_NULLPTR);
     }
@@ -480,11 +545,12 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     // MXFP8 shares the physical page geometry of contiguous K/V and KScale.
     // Preserve the existing dim0-hole support for the other quantization modes.
     const bool isMxfp8 = quantType == MXFP8_QUANT_TYPE;
-    const aclTensor* keyFinal =
-        isPaged && !isMxfp8 ? NormalizeDim0KvTensor(key, "key", executorImpl) : l0op::Contiguous(key, executorImpl);
+    const bool contiguousKv = isMxfp8 || quantType == GBSA_QUANT_TYPE_A4C4;
+    const aclTensor* keyFinal = isPaged && !contiguousKv ? NormalizeDim0KvTensor(key, "key", executorImpl) :
+                                                           l0op::Contiguous(key, executorImpl);
     CHECK_RET(keyFinal != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor* valueFinal = isPaged && !isMxfp8 ? NormalizeDim0KvTensor(value, "value", executorImpl) :
-                                                        l0op::Contiguous(value, executorImpl);
+    const aclTensor* valueFinal = isPaged && !contiguousKv ? NormalizeDim0KvTensor(value, "value", executorImpl) :
+                                                             l0op::Contiguous(value, executorImpl);
     CHECK_RET(valueFinal != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     auto outputs = l0op::GenericBlockSparseAttention(

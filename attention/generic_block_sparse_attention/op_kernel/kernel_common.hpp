@@ -87,6 +87,9 @@ struct GenericBlockSparseAttentionTilingData {
     // A8C4 paged BF16 scale strides in elements.
     uint64_t kScaleStride0;
     uint64_t vScaleStride0;
+    float log2Cx;
+    float log2CxCeil;
+    uint32_t returnSoftmaxLse;
 };
 
 } // namespace GenericBlockSparseAttn

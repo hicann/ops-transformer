@@ -208,7 +208,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>numQHeads</td>
       <td>输入</td>
       <td>主算子Query的head数。</td>
-      <td>必须大于0，并与主算子保持一致。Q/KV头数关系见<a href="#其他约束">其他约束</a>。</td>
+      <td>必须大于0，并与主算子保持一致。Q/KV头数关系见<a href="#其他约束">其他约束</a>。A4C4（quantType=4）的numQHeads/numKvHeads须在[1,16]范围内。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -228,7 +228,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>headDim</td>
       <td>输入</td>
       <td>主算子Query、Key和Value每个head的特征维度。</td>
-      <td>headDim取值范围见<a href="#产品差异约束">产品差异约束</a>，并须与主算子保持一致。</td>
+      <td>headDim取值范围见<a href="#产品差异约束">产品差异约束</a>，并须与主算子保持一致。A4C4（quantType=4）仅支持逻辑D=192或256。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -238,7 +238,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>blockShape</td>
       <td>输入</td>
       <td>代表稀疏块形状数组。</td>
-      <td>稀疏块形状[blockShapeX, blockShapeY]。非union为[1,Y]；union（maskType=3）为[8,Y]（当前仅支持8）。须与主算子一致。<term>Ascend 950PR&950DT系列产品</term>非量化与常规FP8（quantType=5，非union）支持1≤blockShapeY≤128的任意整数；MXFP8与主算子配套时blockShapeY仅支持4或8；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1、2、4、8、16、32、64、128。</td>
+      <td>稀疏块形状[blockShapeX, blockShapeY]。非union为[1,Y]；union（maskType=3）为[8,Y]（当前仅支持8）。须与主算子一致。<term>Ascend 950PR&950DT系列产品</term>非量化与常规FP8（quantType=5，非union）支持1≤blockShapeY≤128的任意整数；MXFP8与主算子配套时blockShapeY仅支持4或8；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1、2、4、8、16、32、64、128。A4C4（quantType=4）使用[1,Y]，Y∈{4,8,16,32,64,128}。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -291,7 +291,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>quantType</td>
       <td>输入</td>
       <td>代表采用的量化手段。</td>
-      <td>量化类型：0为非量化；5为<term>Ascend 950PR&950DT系列产品</term> 常规FP8；6为<term>Ascend 950PR&950DT系列产品</term> MXFP8；7为<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8；8为<term>Ascend 950PR&950DT系列产品</term> A8C4。1～4为预留值，当前不支持。具体规格见产品差异约束。</td>
+      <td>量化类型：0为非量化；4为<term>Ascend 950PR&950DT系列产品</term> A4C4（MXFP4 CX）；5为<term>Ascend 950PR&950DT系列产品</term> 常规FP8；6为<term>Ascend 950PR&950DT系列产品</term> MXFP8；7为<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8；8为<term>Ascend 950PR&950DT系列产品</term> A8C4。1、2、3为预留值，当前不支持。具体规格见产品差异约束。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -479,6 +479,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 
 ### 产品差异约束
 
+- <term>Ascend 950PR&950DT系列产品</term>的A4C4（quantType=4）：D=192/256，blockShape=[1,Y]，Y∈{4,8,16,32,64,128}，GQA分组大小1～16，maskType=0/1、residualBlockMode=0/1、softmaxPrecision=0。须与主算子的输入及属性一致。详见[A4C4接口约束](#a4c4metadataquanttype4)。
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景：`headDim`支持1～256的任意值；`layoutQ/layoutKv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`，不支持其他组合；`maskType`支持0（非因果）、1（causal）和3（union）；非union时`blockShape=[1,Y]`（`1≤Y≤128`），union时`blockShape=[8,Y]`；`residualBlockMode`支持0或1（union仅支持0）。
 - <term>Ascend 950PR&950DT系列产品</term> Union（`maskType=3`）仅支持 `quantType=0`（FP16/BF16 非量化）和 `quantType=5`（FP8）；`blockShape=[8,Y]`（`1≤Y≤128`），`residualBlockMode=0`；FP8 Union 另要求 `headDim=128`。FP8 Union 分页 KV 另要求 `Y` 整除页大小 128。须与主算子一致。
@@ -497,7 +498,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 <!-- end id10 -->
 
 <!-- npu="950,A3,910b" id12 -->
-- `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、5（FP8量化）、6（MXFP8）或8（A8C4）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持0（非量化）或7（INT8全量化）。
+- `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、4（A4C4）、5（FP8量化）、6（MXFP8）或8（A8C4）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持0（非量化）或7（INT8全量化）。
 <!-- end id12 -->
 <!-- npu="950,A3,910b" id13 -->
 - `softmaxPrecision`：<term>Ascend 950PR&950DT系列产品</term>非Union场景（maskType=0/1）下，非量化FLOAT16/BFLOAT16支持0或1，quantType=5的FP8量化场景支持0或1，`MXFP8`支持0或1且均使用FP32 S/Softmax，推荐0，1为兼容别名；Union场景（maskType=3）下，非量化与FP8量化均仅支持0；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非Union场景下FLOAT16支持0或1，BFLOAT16仅支持0，Union场景（maskType=3）下仅支持0。
@@ -618,3 +619,16 @@ Ascend 950PR/950DT 上要求 headDim=128、blockShape=[1,128]、GQA 分组大小
 A8C4 的 `maxQSeqLen` 不超过 16，TND 下每个 batch 的实际 Q 序列长度也不超过 16。`numQHeads` 不超过 INT32_MAX。KV 布局为 PA_BBND、BSND 或 TND 时，`numKvHeads` 不超过 5。BNSD 和 PA_BNBD 不受此 5 个 KV head 的限制。
 
 稀疏索引容量上限为 INT32_MAX，有效索引、计数和调度溢出约束保持不变。
+
+<a name="a4c4metadataquanttype4"></a>
+
+### A4C4 Metadata（quantType=4）
+
+<term>Ascend 950PR&950DT系列产品</term>的A4C4要求 `headDim=192/256`、`blockShape=[1,Y]`（Y∈{4,8,16,32,64,128}）、`numQHeads/numKvHeads∈[1,16]`、`softmaxPrecision=0`。
+支持 `maskType=0/1` 和 `residualBlockMode=0/1`。九种布局组合及scale说明见[主算子A4C4接口](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#a4c4quanttype4)。
+
+`headDim` 使用逻辑D，不传打包后的D/2。Metadata不接收Q/K/V或scale；主算子负责验证对应张量的类型、形状及存储。
+Metadata和Attention的量化类型、掩码、布局、稀疏输入、残差模式及序列长度必须一致，并使用配套版本。
+
+Metadata根据实际query/KV-head任务数及有效稀疏块工作量选择普通或Flash Decoding调度；每个query使用自己的有效稀疏计数。
+FD分片保留P量化所需的组边界，由主算子合并FP32部分结果。核数由运行平台查询，不是固定值；无需额外接口参数。

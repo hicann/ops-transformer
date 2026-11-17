@@ -89,6 +89,19 @@ struct MmadAtlasA5GbsaPVMxfp8 : public MmadAtlasA5 {
     static constexpr uint32_t L0_STAGES = 2;
 };
 
+// MXFP4 QK and PV use separate policies because their right-operand loads differ.
+template <bool PAGED_CACHE_FLAG_ = false>
+struct MmadAtlasA5GbsaQKMxfp4 : public MmadAtlasA5 {
+    static constexpr uint32_t L0_STAGES = 2;
+    static constexpr bool PAGED_CACHE_FLAG = PAGED_CACHE_FLAG_;
+};
+
+template <bool PAGED_CACHE_FLAG_ = false>
+struct MmadAtlasA5GbsaPVMxfp4 : public MmadAtlasA5 {
+    static constexpr uint32_t L0_STAGES = 2;
+    static constexpr bool PAGED_CACHE_FLAG = PAGED_CACHE_FLAG_;
+};
+
 } // namespace NpuArch::Gemm
 
 #endif // GEMM_DISPATCH_POLICY_HPP

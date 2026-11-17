@@ -81,7 +81,6 @@ bool GenericBlockSparseAttentionMetadataAicpu::Prepare(CpuKernelContext& ctx)
     }
 
     // Optional for compatibility with callers predating quantization-aware scheduling.
-    // MXFP8 uses the base task list and must not construct an unused FD schedule.
     quantType_ = 0;
     GetAttrValueOpt(ctx, "quant_type", quantType_);
     const bool attrsValid =
@@ -147,8 +146,10 @@ bool GenericBlockSparseAttentionMetadataAicpu::CheckInputs()
     }
     if ((qInputLayout_ != "TND" && maxQSeqLen_ <= 0) || numQHeads_ <= 0 || numKvHeads_ <= 0 || headDim_ <= 0 ||
         blockShapeY_ <= 0 || blockShapeY_ > 256 || (isPackedGQA_ != 0 && isPackedGQA_ != 1) || aicCoreNum_ <= 0 ||
-        aicCoreNum_ > MAX_AIC_CORE_NUM || (residualBlockMode_ != 0 && residualBlockMode_ != 1) ||
-        (isConsistentTopk_ != 0 && isConsistentTopk_ != 1)) {
+        (quantType_ == generic_block_sparse_attention_metadata::GBSA_QUANT_TYPE_A4C4 ?
+             aicCoreNum_ > INT32_MAX :
+             aicCoreNum_ > MAX_AIC_CORE_NUM) ||
+        (residualBlockMode_ != 0 && residualBlockMode_ != 1) || (isConsistentTopk_ != 0 && isConsistentTopk_ != 1)) {
         KERNEL_LOG_ERROR("Invalid scheduling attrs for GenericBlockSparseAttentionMetadata.");
         return false;
     }

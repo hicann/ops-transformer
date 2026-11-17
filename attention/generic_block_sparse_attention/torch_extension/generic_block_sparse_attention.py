@@ -169,6 +169,7 @@ class GenericBlockSparseAttentionOpBuilder(OpBuilder):
             is_consistent_topk: Optional[bool] = False,
             attention_out_dtype: Optional[torch.dtype] = None,
         ):
+            is_a4c4 = quant_mode == QuantMode.FP4_E2M1_DYNAMIC_CX
             is_q_fp8_kv_fp4 = (
                 quant_mode == QuantMode.Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP
             )
@@ -192,7 +193,27 @@ class GenericBlockSparseAttentionOpBuilder(OpBuilder):
                     "attention_out_dtype must be specified when quant_mode != NO_QUANT"
                 )
 
-            attn = q.new_empty(q.shape, dtype=out_dtype)
+            output_shape = list(q.shape)
+            if is_a4c4:
+                for name, scale in (
+                    ("q_dequant_scale", q_dequant_scale),
+                    ("k_dequant_scale", k_dequant_scale),
+                    ("v_dequant_scale", v_dequant_scale),
+                ):
+                    if scale is None:
+                        raise ValueError(f"quant_mode={quant_mode} requires {name}")
+                if not output_shape:
+                    raise ValueError(
+                        "FP4 output allocation requires Q to have at least one dimension"
+                    )
+                output_shape[-1] *= 2
+            if return_softmax_lse:
+                min_rank = 2 if layout_q == "TND" else 3
+                if q.dim() < min_rank:
+                    raise ValueError(
+                        f"Q rank must be at least {min_rank} to allocate softmax_lse"
+                    )
+            attn = q.new_empty(output_shape, dtype=out_dtype)
             if return_softmax_lse:
                 # 与 C++ GenericBlockSparseAttention LSE 分配一致
                 if layout_q == "TND":
@@ -384,6 +405,11 @@ def generic_block_sparse_attention(
     is_consistent_topk: Optional[bool] = False,
     attention_out_dtype: Optional[torch.dtype] = None,
 ):
+    """Compute GBSA; quant_mode=4 (A4C4 CX) uses dst_type_max as P's CX.
+
+    Pass 0 for the default CX=6, or a finite value in [6, 12].
+    Other quantization modes require dst_type_max=0.
+    """
     op_module = generic_block_sparse_attention_op_builder.load()
     return op_module.generic_block_sparse_attention(
         q,

@@ -24,6 +24,26 @@
 #include "tiling/platform/platform_ascendc.h"
 #include "op_host/tiling_base.h"
 
+namespace {
+namespace Mxfp4Tiling {
+// Select MXFP4 tile sizes here and pass them to the device through tiling.
+constexpr uint32_t GetQueryTile(uint32_t rows)
+{
+    return rows <= 16U ? 16U : rows <= 32U ? 32U : rows <= 64U ? 64U : 128U;
+}
+
+constexpr uint32_t GetKvTile(uint32_t /*headDim*/, uint32_t queryTile)
+{
+    return queryTile <= 32U ? 512U : queryTile <= 64U ? 256U : 128U;
+}
+
+constexpr uint32_t GetKeyTile(uint32_t headDim, uint32_t queryTile)
+{
+    return GetKvTile(headDim, queryTile);
+}
+} // namespace Mxfp4Tiling
+} // namespace
+
 namespace GbsaTilingKeyEncoding {
 constexpr auto DECIMAL_RADIX = 10U;
 constexpr auto MASK_DIVISOR = 1000U;
@@ -150,6 +170,7 @@ constexpr uint32_t GBSA_A8C4_MAX_Q_SEQ_LEN = 16U;
 // 256 tokens * 16 scale bytes * 5 KV heads fit one 20 KiB scale slot.
 constexpr uint32_t GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND = 5U;
 constexpr uint64_t GBSA_A8C4_TILING_OFFSET = 1000000000000ULL;
+constexpr uint64_t GBSA_MXFP4_TILING_OFFSET = 6000000000ULL;
 constexpr int64_t GBSA_WIN_DISABLED = -1;
 constexpr float GBSA_DST_TYPE_MAX_DISABLED = 0.0f;
 constexpr uint32_t GSA_FD_MAX_ACTIVE_CORE_NUM = 32U;        // Maximum AIC cores used by FD.
@@ -246,6 +267,10 @@ ge::graphStatus ValidateBlockShapeForMaskType(gert::TilingContext* context, int6
 
 ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext* context)
 {
+    const auto* queryDesc = context->GetInputDesc(QUERY_INDEX);
+    if (queryDesc != nullptr) {
+        dataType_ = queryDesc->GetDataType();
+    }
     auto attrs = context->GetAttrs();
     if (attrs == nullptr) {
         OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttention", "Attrs got from ge context is nullptr.");
@@ -279,10 +304,10 @@ ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext* context)
     }
     if (quantType_ != GBSA_QUANT_TYPE_NONE && quantType_ != GBSA_QUANT_TYPE_FULL &&
         quantType_ != GBSA_QUANT_TYPE_MXFP8 && quantType_ != GBSA_QUANT_TYPE_INT8 &&
-        quantType_ != GBSA_QUANT_TYPE_A8C4) {
+        quantType_ != GBSA_QUANT_TYPE_A8C4 && quantType_ != GBSA_QUANT_TYPE_A4C4) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             context->GetNodeName(), "quantType", std::to_string(quantType_).c_str(),
-            "supported modes are 0 (none), 5 (FP8), 6 (A5 MXFP8), 7 (A2/A3 INT8), and 8 (A5 A8C4)");
+            "supported modes are 0 (none), 5 (FP8), 4 (A5 A4C4 CX), 6 (A5 MXFP8), 7 (A2/A3 INT8), and 8 (A5 A8C4)");
         return ge::GRAPH_FAILED;
     }
 
@@ -301,14 +326,14 @@ ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext* context)
     if (residualModePtr != nullptr) {
         residualBlockMode_ = *residualModePtr;
     }
-    const bool residualModeSupported =
-        residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_NONE ||
-        (residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_FORCE &&
-         (quantType_ == GBSA_QUANT_TYPE_NONE || (socVer_ != SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_INT8)));
+    const bool residualModeSupported = residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_NONE ||
+                                       (residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_FORCE &&
+                                        (quantType_ == GBSA_QUANT_TYPE_NONE || IsMxfp4() ||
+                                         (socVer_ != SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_INT8)));
     if (!residualModeSupported) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "residual_block_mode",
                                               std::to_string(residualBlockMode_).c_str(),
-                                              "mode 1 supports non-quant and A2/A3 INT8 full quantization");
+                                              "mode 1 supports non-quant, A4C4 and A2/A3 INT8 full quantization");
         return ge::GRAPH_FAILED;
     }
 
@@ -339,10 +364,21 @@ ge::graphStatus GBSATiling::CheckReservedAttrs(gert::TilingContext* context)
     }
 
     const float* dstTypeMaxPtr = attrs->GetFloat(ATTR_DST_TYPE_MAX_INDEX);
-    if (dstTypeMaxPtr != nullptr && *dstTypeMaxPtr != GBSA_DST_TYPE_MAX_DISABLED) {
+    const float dstTypeMax = dstTypeMaxPtr != nullptr ? *dstTypeMaxPtr : GBSA_DST_TYPE_MAX_DISABLED;
+    if (IsMxfp4()) {
+        // Match BSA CX: 0 selects the default 6; explicit values are in [6, 12].
+        if (!std::isfinite(dstTypeMax) || !(dstTypeMax == 0.0f || (dstTypeMax >= 6.0f && dstTypeMax <= 12.0f))) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "dst_type_max",
+                                                  std::to_string(dstTypeMax).c_str(),
+                                                  "MXFP4 CX requires 0 (default 6) or a finite value in [6, 12]");
+            return ge::GRAPH_FAILED;
+        }
+        log2Cx_ = std::log2(dstTypeMax == 0.0f ? 6.0f : dstTypeMax);
+        log2CxCeil_ = std::ceil(log2Cx_);
+    } else if (dstTypeMax != GBSA_DST_TYPE_MAX_DISABLED) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "dst_type_max",
-                                              std::to_string(*dstTypeMaxPtr).c_str(),
-                                              "dst_type_max is not supported yet and must be 0");
+                                              std::to_string(dstTypeMax).c_str(),
+                                              "dst_type_max must be 0 unless quantType is 4 (A4C4 CX)");
         return ge::GRAPH_FAILED;
     }
     const int64_t* winLeftPtr = attrs->GetInt(ATTR_WIN_LEFT_INDEX);
@@ -432,7 +468,7 @@ ge::graphStatus GBSATiling::GetInputLayout(gert::TilingContext* context)
 
 ge::graphStatus GBSATiling::CheckAttentionOutDtype(gert::TilingContext* context)
 {
-    if (dataType_ == ge::DT_FLOAT8_E4M3FN || dataType_ == ge::DT_INT8) {
+    if (dataType_ == ge::DT_FLOAT8_E4M3FN || dataType_ == ge::DT_INT8 || dataType_ == ge::DT_FLOAT4_E2M1) {
         auto outDesc = context->GetOutputDesc(ATTENTION_OUT_INDEX);
         if (outDesc == nullptr) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "attentionOut", "nullptr",
@@ -444,7 +480,7 @@ ge::graphStatus GBSATiling::CheckAttentionOutDtype(gert::TilingContext* context)
             OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                 context->GetNodeName(), "attentionOut",
                 std::to_string(static_cast<int32_t>(attentionOutDtype_)).c_str(),
-                "attentionOut must be float16 or bfloat16 for float8_e4m3fn or int8 query");
+                "attentionOut must be float16 or bfloat16 for float8_e4m3fn or int8/float4_e2m1 query");
             return ge::GRAPH_FAILED;
         }
     }
@@ -562,7 +598,7 @@ ge::graphStatus GBSATiling::ParseKvCacheStride0(gert::TilingContext* context)
 
     // Packed MXFP8 shares physical offsets between K/V and KScale. ACLNN
     // makes these caches contiguous; direct GE callers must provide that layout.
-    if (quantType_ == GBSA_QUANT_TYPE_MXFP8 && (kStride0_ != pageElems || vStride0_ != pageElems)) {
+    if (IsMxfp8() && (kStride0_ != pageElems || vStride0_ != pageElems)) {
         OP_LOGE(context->GetNodeName(), "MXFP8 paged K/V require contiguous page storage.");
         return ge::GRAPH_FAILED;
     }
@@ -584,6 +620,10 @@ ge::graphStatus GBSATiling::ParseKvCacheStride0(gert::TilingContext* context)
              ", Nkv*D=" + std::to_string(rowElems))
                 .c_str(),
             "the dim0 stride of value is invalid for paged KV: it must be >= pageElems and aligned to Nkv*D");
+        return ge::GRAPH_FAILED;
+    }
+    if (IsMxfp4() && (kStride0_ != pageElems || vStride0_ != pageElems)) {
+        OP_LOGE(context->GetNodeName(), "MXFP4 requires contiguous PA pages and matching contiguous KScale.");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -913,10 +953,10 @@ ge::graphStatus GBSATiling::ParseQkvDtype(gert::TilingContext* context)
         return ge::GRAPH_FAILED;
     }
     if (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16 && dataType_ != ge::DT_FLOAT8_E4M3FN &&
-        dataType_ != ge::DT_INT8) {
+        dataType_ != ge::DT_INT8 && dataType_ != ge::DT_FLOAT4_E2M1) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
             context->GetNodeName(), "query", std::to_string(static_cast<int32_t>(dataType_)).c_str(),
-            "only float16/bfloat16/float8_e4m3fn/int8 are supported for query/key/value");
+            "only float16/bfloat16/float8_e4m3fn/int8/float4_e2m1 are supported for query/key/value");
         return ge::GRAPH_FAILED;
     }
     if (scaleValue_ == 0.0f && embeddingSize_ > 0) {
@@ -962,8 +1002,7 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
         pipelineWorkspaceSize = mm1OutSize_ + smOnlineOutSize_ + mm2OutSize_ + updateSize_;
     } else {
         // MXFP8 uses descriptor rings instead of an identity index array.
-        pipelineWorkspaceSize =
-            quantType_ == GBSA_QUANT_TYPE_MXFP8 ? 32U : static_cast<uint64_t>(topK_) * sizeof(int32_t);
+        pipelineWorkspaceSize = IsMxfp8() ? 32U : static_cast<uint64_t>(topK_) * sizeof(int32_t);
         if (IsMxfp8PackedPath()) {
             // Four AIV-produced K/V descriptor slots per AIC.
             // Each slot has a cache-line header plus at most one 16-byte record
@@ -984,17 +1023,22 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
         }
     }
 
-    // Four per-AIC slots. Each L1-N group has a 64B header and
+    // Four per-AIC slots for non-quant, twelve for delayed MXFP4 PV.
+    // Each 128-token descriptor group has a 64B header and
     // PA entries hold {K offset, V offset, K meta, V meta}; dense entries
     // pack {offset, meta} but retain the original four-word capacity.
     // Arch35 Regular/FP8 gather and Union precompute KV gather descriptors; MXFP8 uses its own rings.
-    if (socVer_ == SOC_VER_950_CODE && quantType_ != GBSA_QUANT_TYPE_MXFP8) {
-        const uint64_t sparseBlocks = (mm1L1TileN_ + 2ULL * blockShapeY_ - 2U) / blockShapeY_;
-        const uint64_t copyBlocks = isPaged_ ? std::min<uint64_t>(mm1L1TileN_, sparseBlocks * 2U) : sparseBlocks;
+    if (socVer_ == SOC_VER_950_CODE && !IsMxfp8()) {
+        const bool isMxfp4 = dataType_ == ge::DT_FLOAT4_E2M1;
+        const uint64_t historySlots = isMxfp4 ? 12U : 4U;
+        const uint64_t descriptorRows = isMxfp4 ? 128U : mm1L1TileN_;
+        const uint64_t sparseBlocks = (descriptorRows + 2ULL * blockShapeY_ - 2U) / blockShapeY_;
+        const uint64_t copyBlocks = isPaged_ ? std::min<uint64_t>(descriptorRows, sparseBlocks * 2U) : sparseBlocks;
         const uint64_t recordWords = 4U;
         const uint64_t groupBytes = AlignUp(64U + copyBlocks * recordWords * sizeof(uint64_t), 64U);
-        const uint64_t tileWords = ((kvBaseTile_ + mm1L1TileN_ - 1U) / mm1L1TileN_) * groupBytes / sizeof(uint64_t);
-        const uint64_t offsetBytes = static_cast<uint64_t>(blockDim_) * 4U * tileWords * sizeof(uint64_t);
+        const uint64_t tileWords =
+            ((kvBaseTile_ + descriptorRows - 1U) / descriptorRows) * groupBytes / sizeof(uint64_t);
+        const uint64_t offsetBytes = static_cast<uint64_t>(blockDim_) * historySlots * tileWords * sizeof(uint64_t);
         const uint64_t offset = AlignUp(pipelineWorkspaceSize, GSA_FD_WORKSPACE_ALIGNMENT);
         if (tileWords > std::numeric_limits<uint32_t>::max() ||
             offset > std::numeric_limits<uint64_t>::max() - offsetBytes) {
@@ -1044,7 +1088,7 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
         fdLseSubStride_ = ((groupSize_ + 1U) / 2U + 7U) / 8U * 8U;
         fdPartialLseOffset_ = AlignUp(pipelineWorkspaceSize, GSA_FD_WORKSPACE_ALIGNMENT);
         const uint64_t partialLseSize =
-            static_cast<uint64_t>(fdPartialCapacity_) * 2U * fdLseSubStride_ * sizeof(float);
+            static_cast<uint64_t>(fdPartialCapacity_) * 2U * fdLseSubStride_ * sizeof(float) * (IsMxfp4() ? 2U : 1U);
         fdPartialOOffset_ = AlignUp(fdPartialLseOffset_ + partialLseSize, GSA_FD_WORKSPACE_ALIGNMENT);
         const uint64_t fdPartialOStride = AlignUp(embeddingSize_, 16U);
         const uint64_t partialOSize =
@@ -1186,7 +1230,7 @@ ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext* con
                                               "atten_mask is not supported yet and must be nullptr");
         return ge::GRAPH_FAILED;
     }
-    if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
+    if (IsMxfp8()) {
         return CheckMxfp8Scales(context);
     }
     if (dataType_ == ge::DT_INT8) {
@@ -1208,6 +1252,9 @@ ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext* con
             return ge::GRAPH_FAILED;
         }
         return ge::GRAPH_SUCCESS;
+    }
+    if (dataType_ == ge::DT_FLOAT4_E2M1) {
+        return ge::GRAPH_SUCCESS; // Required scale types/shapes were checked by CheckMxfp4Config.
     }
     if (context->GetOptionalInputTensor(P_QUANT_SCALE_INDEX) != nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "p_quant_scale", "provided",
@@ -1448,8 +1495,121 @@ ge::graphStatus GBSATiling::CheckInt8Config(gert::TilingContext* context)
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus GBSATiling::CheckMxfp4Config(gert::TilingContext* context)
+{
+    if (quantType_ != GBSA_QUANT_TYPE_A4C4 || dataType_ != ge::DT_FLOAT4_E2M1 || socVer_ != SOC_VER_950_CODE ||
+        softmaxPrecision_ != 0U || (maskType_ != 0 && maskType_ != 1) || blockShapeX_ != 1U ||
+        (embeddingSize_ != 192U && embeddingSize_ != 256U) ||
+        (blockShapeY_ < 4U || blockShapeY_ > 128U || (blockShapeY_ & (blockShapeY_ - 1U)) != 0U) ||
+        (groupSize_ < 1U || groupSize_ > 16U) || (isPaged_ && blockSize_ != 128U)) {
+        OP_LOGE(
+            context->GetNodeName(),
+            "A4C4 requires quantType=4, A5 FLOAT4_E2M1 Q/K/V, supported dense/paged layouts, "
+            "FP32 softmax, maskType=0/1, blockX=1, headDim=192/256, blockY in {4,8,16,32,64,128}, groupSize in [1,16] "
+            "and pageSize=128; got headDim=%u, blockY=%u, groupSize=%u.",
+            embeddingSize_, blockShapeY_, groupSize_);
+        return ge::GRAPH_FAILED;
+    }
+    for (const int scaleIndex : {Q_DEQUANT_SCALE_INDEX, K_DEQUANT_SCALE_INDEX}) {
+        const auto* desc = context->GetOptionalInputDesc(scaleIndex);
+        const auto* scaleShape = context->GetOptionalInputShape(scaleIndex);
+        const auto& dataShape =
+            context->GetInputShape(scaleIndex == Q_DEQUANT_SCALE_INDEX ? QUERY_INDEX : KEY_INDEX)->GetStorageShape();
+        if (desc == nullptr || scaleShape == nullptr || desc->GetDataType() != ge::DT_FLOAT8_E8M0) {
+            OP_LOGE(context->GetNodeName(), "MXFP4 requires E8M0 QScale and KScale.");
+            return ge::GRAPH_FAILED;
+        }
+        const auto& shape = scaleShape->GetStorageShape();
+        const size_t rank = dataShape.GetDimNum();
+        if (shape.GetDimNum() != rank + 1U || shape.GetDim(rank - 1U) != embeddingSize_ / 64U ||
+            shape.GetDim(rank) != 2) {
+            OP_LOGE(context->GetNodeName(), "MXFP4 Q/KScale must replace Q/K's D axis by [D/64, 2].");
+            return ge::GRAPH_FAILED;
+        }
+        for (size_t axis = 0; axis + 1U < rank; ++axis) {
+            if (shape.GetDim(axis) != dataShape.GetDim(axis)) {
+                OP_LOGE(context->GetNodeName(), "MXFP4 Q/KScale prefix dimensions must match Q/K.");
+                return ge::GRAPH_FAILED;
+            }
+        }
+    }
+    const auto* vDesc = context->GetOptionalInputDesc(V_DEQUANT_SCALE_INDEX);
+    const auto* vShape = context->GetOptionalInputShape(V_DEQUANT_SCALE_INDEX);
+    const auto* pDesc = context->GetOptionalInputDesc(P_QUANT_SCALE_INDEX);
+    if (pDesc != nullptr && pDesc->GetDataType() != ge::DT_UNDEFINED) {
+        OP_LOGE(context->GetNodeName(),
+                "MXFP4 P uses internal dynamic group32 quantization; pQuantScale must be absent.");
+        return ge::GRAPH_FAILED;
+    }
+    if (vDesc == nullptr || vShape == nullptr || vDesc->GetDataType() != ge::DT_FLOAT8_E8M0) {
+        OP_LOGE(context->GetNodeName(), "MXFP4 requires E8M0 VScale in the KV storage layout.");
+        return ge::GRAPH_FAILED;
+    }
+    const auto& scale = vShape->GetStorageShape();
+    const auto& value = context->GetInputShape(VALUE_INDEX)->GetStorageShape();
+    const bool tnd = layoutKv_ == "TND";
+    const size_t rank = tnd ? 4U : 5U;
+    const size_t headAxis = layoutKv_ == "BNSD" || isPaBnbd_ ? 1U : (tnd ? 1U : 2U);
+    const size_t pairAxis = layoutKv_ == "BNSD" || isPaBnbd_ ? 2U : (tnd ? 0U : 1U);
+    bool valid = scale.GetDimNum() == rank;
+    if (valid) {
+        valid = scale.GetDim(rank - 1U) == 2 && scale.GetDim(rank - 2U) == embeddingSize_ &&
+                scale.GetDim(headAxis) == kvHeads_;
+        if (tnd) {
+            // Each batch owns ceil(storageLength/64) pairs. cu lengths are
+            // device inputs: exact prefixes follow those lengths in the kernel.
+            const int64_t minPairs = (value.GetDim(0) + 63) / 64;
+            valid = valid && scale.GetDim(0) >= minPairs && scale.GetDim(0) <= minPairs + batch_ - 1;
+        } else {
+            const uint32_t tokens = isPaged_ ? blockSize_ : kvSeqCapacity_;
+            valid = valid && scale.GetDim(0) == value.GetDim(0) && scale.GetDim(pairAxis) == (tokens + 63U) / 64U;
+        }
+    }
+    if (!valid) {
+        OP_LOGE(context->GetNodeName(),
+                "MXFP4 VScale must replace the KV S axis by ceil(S/64) and append 2; "
+                "TND concatenates independently aligned batch segments. PA uses physical cache pages.");
+        return ge::GRAPH_FAILED;
+    }
+    fdStaticEnabled_ = topK_ >= 12U;
+    if (groupSize_ <= 16U && (embeddingSize_ == 128U || embeddingSize_ == 256U) &&
+        totalQTokens_ * kvHeads_ < blockDim_ && topK_ <= 64U) {
+        fdStaticEnabled_ = false;
+        blockDim_ = static_cast<uint32_t>(std::max<uint64_t>(1U, totalQTokens_ * kvHeads_));
+    }
+    if (!fdStaticEnabled_ && (embeddingSize_ == 128U || embeddingSize_ == 256U) && groupSize_ <= 16U &&
+        totalQTokens_ * kvHeads_ <= 2U * aicNum_) {
+        blockDim_ = static_cast<uint32_t>(
+            std::max<uint64_t>(1U, std::min<uint64_t>(blockDim_, (totalQTokens_ * kvHeads_ + 1U) / 2U)));
+    }
+    // Select the launch grid before per-core workspaces are sized.
+    const uint64_t storedTasks = totalQTokens_ * kvHeads_;
+    const uint64_t kvCapacity = isPaged_ ? static_cast<uint64_t>(maxBlocksPerBatch_) * blockSize_ :
+                                           (layoutKv_ == "TND" ? totalKvTokens_ : kvSeqCapacity_);
+    const bool shortQuery = layoutQ_ == "TND" ? qBlockNum_ <= 8ULL * batch_ : qSeqCapacity_ <= 8U;
+    // The sparse-list width and dense storage separately bound selected tokens.
+    // If either fits one KV tile, the metadata scheduler cannot create FD work.
+    const uint64_t listTokens = static_cast<uint64_t>(topK_) * blockShapeY_;
+    const bool oneTileStorage =
+        !isPaged_ && kvCapacity <= 512U && ((kvCapacity + blockShapeY_ - 1U) / blockShapeY_) * blockShapeY_ <= 512U;
+    if ((!fdStaticEnabled_ || oneTileStorage || listTokens <= 512U) && shortQuery && groupSize_ <= 16U &&
+        residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_NONE && blockShapeX_ == 1U &&
+        (embeddingSize_ == 192U || embeddingSize_ == 256U) && storedTasks > 0U && storedTasks < blockDim_) {
+        blockDim_ = static_cast<uint32_t>(storedTasks);
+    }
+    if (!fdStaticEnabled_ && residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_NONE && groupSize_ <= 16U &&
+        (embeddingSize_ == 192U || embeddingSize_ == 256U) && blockShapeX_ == 1U && shortQuery && kvCapacity <= 512U &&
+        static_cast<uint64_t>(topK_) * blockShapeY_ <= 512U && storedTasks > 0U && storedTasks <= aicNum_) {
+        blockDim_ = static_cast<uint32_t>(storedTasks);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
 {
+    if (quantType_ == GBSA_QUANT_TYPE_A4C4 || dataType_ == ge::DT_FLOAT4_E2M1) {
+        return CheckMxfp4Config(context);
+    }
     if (quantType_ == GBSA_QUANT_TYPE_A8C4) {
         if (socVer_ != SOC_VER_950_CODE || dataType_ != ge::DT_FLOAT8_E4M3FN || embeddingSize_ != 128U ||
             softmaxPrecision_ != 0U || (maskType_ != 0 && maskType_ != 1) || blockShapeX_ != 1U ||
@@ -1534,7 +1694,7 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
         return CheckInt8Config(context);
     }
     // Preserve arch22 non-quant capabilities while adding arch35 MXFP8 and Union.
-    const bool isMxfp8 = quantType_ == GBSA_QUANT_TYPE_MXFP8;
+    const bool isMxfp8 = IsMxfp8();
     const bool isQuant = quantType_ != GBSA_QUANT_TYPE_NONE;
     const bool generalizedMxfp8 = socVer_ == SOC_VER_950_CODE && isMxfp8 && dataType_ == ge::DT_FLOAT8_E4M3FN;
     const bool highPrecisionFp8 = socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_FULL &&
@@ -1670,7 +1830,7 @@ bool GBSATiling::IsMxfp8PackedPath() const
     const uint64_t kScaleRowBytes = static_cast<uint64_t>(kvHeads_) * (embeddingSize_ / 32U);
     const uint32_t qTile = Mxfp8Tiling::QueryTileRows(groupSize_);
     const uint32_t tile = Mxfp8Tiling::KvTileTokens(groupSize_);
-    return socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_MXFP8 && batch_ != 0U && packedLayout &&
+    return socVer_ == SOC_VER_950_CODE && IsMxfp8() && batch_ != 0U && packedLayout &&
            (embeddingSize_ == 192U || embeddingSize_ == GBSA_TILE_SIZE_256) &&
            (blockShapeY_ == 4U || blockShapeY_ == 8U) &&
            // Both accepted precision values use FP32 scores. Value 1 remains
@@ -1710,12 +1870,16 @@ uint64_t GBSATiling::GenerateTilingKey()
         tilingKey += GBSA_A8C4_TILING_OFFSET;
     }
 
-    // dtype / attentionOut dtype additives
+    if (dataType_ == ge::DT_FLOAT4_E2M1) {
+        tilingKey += GBSA_MXFP4_TILING_OFFSET;
+    }
+
+    // dtype / quantized output dtype (same additives as BSA)
     if (dataType_ == ge::DT_FLOAT16) {
         // +0
     } else if (dataType_ == ge::DT_BF16) {
-        tilingKey += GbsaTilingKeyEncoding::BF16_DTYPE_FIELD;
-    } else if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
+        tilingKey += 22220ULL;
+    } else if (dataType_ == ge::DT_FLOAT8_E4M3FN || dataType_ == ge::DT_FLOAT4_E2M1) {
         if (attentionOutDtype_ == ge::DT_FLOAT16) {
             tilingKey += GbsaTilingKeyEncoding::FP8_OUT_FP16_FIELD;
         } else if (attentionOutDtype_ == ge::DT_BF16) {
@@ -1757,20 +1921,27 @@ uint64_t GBSATiling::GenerateTilingKey()
                  layoutQ_ == "BSND" ? GbsaTilingKeyEncoding::Q_BSND_FIELD :
                                       GbsaTilingKeyEncoding::Q_TND_FIELD;
 
-    if (returnSoftmaxlse_) {
-        tilingKey += GBSA_LSE_OUT_OFFSET;
-    }
     if (residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_FORCE) {
         tilingKey += GBSA_RESIDUAL_BLOCK_MODE_TILING_OFFSET;
     }
-    if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
+    if (IsMxfp8()) {
         tilingKey += GBSA_MXFP8_TILING_OFFSET;
+    }
+    // MXFP4 uses the same semantic key for LSE on/off across every layout,
+    // mask, residual mode and output dtype. The device reads the tiling flag.
+    if (returnSoftmaxlse_ && !IsMxfp4()) {
+        tilingKey += GBSA_LSE_OUT_OFFSET;
     }
     return tilingKey;
 }
 
 void GBSATiling::CalcBaseTileTilingParams950()
 {
+    if (IsMxfp4()) {
+        qBaseTile_ = Mxfp4Tiling::GetQueryTile(groupSize_);
+        kvBaseTile_ = Mxfp4Tiling::GetKvTile(embeddingSize_, qBaseTile_);
+        return;
+    }
     // Union mode processes blockShapeX (=unionSize) Q tokens per task, so tile
     // selection must use the effective row count instead of the bare GQA group size.
     const uint32_t tileGroupSize = maskType_ == GBSA_MASK_TYPE_UNION ? groupSize_ * blockShapeX_ : groupSize_;
@@ -1814,6 +1985,22 @@ void GBSATiling::CalcBaseTileTilingParams950()
 
 void GBSATiling::CalcMatmulPhaseL1TileInfo950()
 {
+    if (IsMxfp4()) {
+        const uint32_t dimCapacity = embeddingSize_ <= 128U ? 128U : 256U;
+        mm1L1TileM_ = qBaseTile_;
+        mm1L1TileN_ = Mxfp4Tiling::GetKeyTile(embeddingSize_, qBaseTile_);
+        mm1L1TileKLeft_ = dimCapacity;
+        mm1L1TileKRight_ = dimCapacity;
+        mm2L1TileM_ = std::max(qBaseTile_, 32U);
+        mm2L1TileN_ = dimCapacity;
+        mm2L1TileKLeft_ = kvBaseTile_;
+        mm2L1TileKRight_ = kvBaseTile_;
+        qL1BufNum_ = 1U;
+        kL1BufNum_ = 2U;
+        vL1BufNum_ = 2U;
+        pL1BufNum_ = 3U;
+        return;
+    }
     const uint32_t embeddingSizeAligned = embeddingSize_ <= GBSA_TILE_SIZE_128 ? GBSA_TILE_SIZE_128 :
                                           embeddingSize_ <= GBSA_TILE_SIZE_256 ? GBSA_TILE_SIZE_256 :
                                                                                  GBSA_TILE_SIZE_512;
@@ -1916,6 +2103,7 @@ ge::graphStatus GBSATiling::FillTilingData(gert::TilingContext* context)
     tilingData_->set_kScaleStride0(kScaleStride0_);
     tilingData_->set_vScaleStride0(vScaleStride0_);
     tilingData_->set_fdStaticEnabled(fdStaticEnabled_ ? 1U : 0U);
+    tilingData_->set_returnSoftmaxLse(returnSoftmaxlse_ ? 1U : 0U);
     tilingData_->set_fdLseSubStride(fdLseSubStride_);
     tilingData_->set_fdPartialCapacity(fdPartialCapacity_);
     tilingData_->set_fdPartialLseOffset(fdPartialLseOffset_);
@@ -1931,6 +2119,8 @@ ge::graphStatus GBSATiling::FillTilingData(gert::TilingContext* context)
     tilingData_->set_totalQTokens(totalQTokens_);
     tilingData_->set_totalKvTokens(totalKvTokens_);
     tilingData_->set_maskType(static_cast<uint32_t>(maskType_));
+    tilingData_->set_log2Cx(log2Cx_);
+    tilingData_->set_log2CxCeil(log2CxCeil_);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1949,7 +2139,7 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
     if (CheckMetadata(context) != ge::GRAPH_SUCCESS || CheckReservedOptionalInputs(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    if (quantType_ == GBSA_QUANT_TYPE_MXFP8 && !IsMxfp8PackedPath()) {
+    if (IsMxfp8() && !IsMxfp8PackedPath()) {
         OP_LOGE(context->GetNodeName(),
                 "Unsupported MXFP8 configuration: only grouped packed execution is supported; "
                 "Fragment fallback has been removed. Requires nonempty B/KV, TND/BSND/BNSD Q with matching dense KV "
@@ -1970,7 +2160,7 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
             CalcBaseTileTilingParams950();
         }
         CalcMatmulPhaseL1TileInfo950();
-    } else if (socVer_ == SOC_VER_950_CODE && quantType_ != GBSA_QUANT_TYPE_MXFP8) {
+    } else if (socVer_ == SOC_VER_950_CODE && !IsMxfp8()) {
         CalcBaseTileTilingParams950();
         CalcMatmulPhaseL1TileInfo950();
         if (quantType_ == GBSA_QUANT_TYPE_A8C4) {
@@ -2003,7 +2193,7 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
             const bool smallM = groupSize_ <= GBSA_TILE_SIZE_16 && blockShapeX_ == 1U;
             kvBaseTile_ = smallM && embeddingSize_ <= GBSA_TILE_SIZE_256 ? GBSA_TILE_SIZE_512 : GBSA_TILE_SIZE_256;
         }
-    } else if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
+    } else if (IsMxfp8()) {
         qBaseTile_ = Mxfp8Tiling::QueryTileRows(groupSize_);
         kvBaseTile_ = Mxfp8Tiling::KvTileTokens(groupSize_);
         mm1L1TileM_ = qBaseTile_;

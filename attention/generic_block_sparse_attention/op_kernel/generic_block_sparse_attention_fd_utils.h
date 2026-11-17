@@ -16,6 +16,8 @@
 
 namespace GsaFd {
 
+constexpr uint32_t GBSA_QUANT_TYPE_A4C4 = 4U;
+
 __aicore__ inline uint32_t HashConfigValue(uint32_t hash, uint32_t value)
 {
     constexpr uint32_t FNV_PRIME = 16777619U;
@@ -56,16 +58,19 @@ __aicore__ inline uint32_t CalculateConfigSignature(
     return hash;
 }
 
-template <bool isCausal = true>
+template <bool isCausal = true, uint32_t QuantType = 0U>
 __aicore__ inline bool ValidateMetadata(__gm__ const GbsaMetadata::Metadata* meta,
                                         const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData,
                                         uint32_t physicalAicNum, uint32_t* validatedFlags = nullptr)
 {
+    uint32_t signature = CalculateConfigSignature<isCausal>(tilingData);
+    if constexpr (QuantType == GBSA_QUANT_TYPE_A4C4) {
+        signature = HashConfigValue(signature, QuantType);
+    }
     if (meta == nullptr || meta->magic != GbsaMetadata::METADATA_MAGIC ||
         meta->version != GbsaMetadata::METADATA_VERSION ||
         meta->metadataUsedSize != static_cast<int32_t>(GbsaMetadata::METADATA_USED_SIZE) ||
-        meta->configSignature != static_cast<int32_t>(CalculateConfigSignature<isCausal>(tilingData)) ||
-        meta->saTotalTaskNum < 0) {
+        meta->configSignature != static_cast<int32_t>(signature) || meta->saTotalTaskNum < 0) {
         return false;
     }
 
@@ -81,6 +86,11 @@ __aicore__ inline bool ValidateMetadata(__gm__ const GbsaMetadata::Metadata* met
     }
     if ((flags & GbsaMetadata::FD_SCHEDULE_ENABLED) == 0U) {
         return meta->fdActiveCoreNum == 0 && meta->combineTaskNum == 0 && meta->fdPartialTaskNum == 0;
+    }
+    if constexpr (QuantType == GBSA_QUANT_TYPE_A4C4) {
+        if (tilingData->fdStaticEnabled == 0U) {
+            return false;
+        }
     }
     if (meta->fdActiveCoreNum <= 0 ||
         meta->fdActiveCoreNum > static_cast<int32_t>(GbsaMetadata::MAX_FD_ACTIVE_CORE_NUM) ||

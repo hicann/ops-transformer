@@ -292,4 +292,40 @@ struct TileCopyTla<Arch::AtlasA5,
 
 } // namespace NpuArch::Gemm::Tile
 
+#if (__CCE_AICORE__ == 310) && defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && \
+    (ORIG_DTYPE_QUERY == DT_FLOAT4_E2M1) && (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+namespace NpuArch::Gemm::Tile {
+
+// Transpose a V submatrix into L0B. Channel and KV offsets address the
+// original full-tile zN data and nN scale layouts independently.
+struct CopyL1ToL0VMxfp4 {
+    template <class DstTensor>
+    __aicore__ inline void operator()(const DstTensor& dst, const AscendC::LocalTensor<uint8_t>& src,
+                                      const AscendC::LocalTensor<uint8_t>& valueScale, uint32_t headDim,
+                                      uint32_t kvRows, uint32_t destinationRows = 0, uint32_t sourceKvRows = 0,
+                                      uint32_t kvStart = 0, uint32_t channelStart = 0) const
+    {
+        AscendC::LoadData2DParamsV2 data;
+        data.mStartPosition = kvStart / 16;
+        data.kStartPosition = channelStart / 64;
+        data.mStep = kvRows / 16;
+        data.kStep = headDim / 64;
+        data.srcStride = (sourceKvRows == 0 ? kvRows : sourceKvRows) / 16;
+        data.dstStride = (destinationRows == 0 ? headDim : destinationRows) / 16;
+        data.ifTranspose = true;
+        AscendC::LoadData2DMxParams mx;
+        mx.xStartPosition = channelStart / 16;
+        mx.yStartPosition = kvStart / 64;
+        mx.xStep = (destinationRows == 0 ? headDim : destinationRows) / 16;
+        mx.yStep = kvRows / 64;
+        mx.srcStride = (sourceKvRows == 0 ? kvRows : sourceKvRows) / 64;
+        mx.dstStride = kvRows / 64;
+        AscendC::LoadData(dst, src.ReinterpretCast<fp4x2_e2m1_t>(), valueScale.ReinterpretCast<AscendC::fp8_e8m0_t>(),
+                          data, mx);
+    }
+};
+
+} // namespace NpuArch::Gemm::Tile
+#endif // MXFP4 on AtlasA5
+
 #endif // GEMM_TILE_COPY_L1_TO_L0B_A5_HPP

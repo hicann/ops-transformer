@@ -575,9 +575,135 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ConfigSignatureTracksRe
     EXPECT_NE(topkResult.configSignature, baseSignature);
 }
 
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp4KeepsShortTasksRegularAndDistinctSignature)
+{
+    auto input = MakeDecodeInput();
+    ScheduleResult legacy;
+    ASSERT_EQ(BuildSchedule(input, legacy), BSAScheduleStatus::BSA_SUCCESS);
+    ASSERT_NE(legacy.fdScheduleFlags & FD_SCHEDULE_ENABLED, 0);
+    input.quantType = GBSA_QUANT_TYPE_A4C4;
+    input.blockShapeY = 4;
+    input.headDim = 256;
+    ScheduleResult mxfp4;
+    ASSERT_EQ(BuildSchedule(input, mxfp4), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_EQ(mxfp4.fdScheduleFlags & FD_SCHEDULE_ENABLED, 0);
+    EXPECT_EQ(mxfp4.fdActiveCoreNum, 0);
+    EXPECT_EQ(mxfp4.fdPartialTaskNum, 0);
+    EXPECT_EQ(mxfp4.saTotalTaskNum, legacy.saTotalTaskNum);
+    const uint32_t signature = CalculateConfigSignature(input);
+    input.quantType = 0;
+    EXPECT_NE(signature, CalculateConfigSignature(input));
+    EXPECT_EQ(signature, HashConfigValue(CalculateConfigSignature(input), 4U));
+    const uint32_t nonQuantSignature = CalculateConfigSignature(input);
+    input.quantType = 5;
+    EXPECT_EQ(nonQuantSignature, CalculateConfigSignature(input)); // Existing metadata stays compatible.
+}
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp4FdUsesPhysicalCoreCountAndAlignedRanges)
+{
+    for (const int64_t dim : {192, 256}) {
+        for (const int64_t blockY : {4, 8, 16, 32, 64, 128}) {
+            for (const int64_t cores : {1, 2, 4, 8, 16, 24, 28, 32, 36, 64}) {
+                for (const int64_t group : {1, 8, 12, 16}) {
+                    SCOPED_TRACE(testing::Message()
+                                 << "D=" << dim << " Y=" << blockY << " G=" << group << " cores=" << cores);
+                    auto input = MakeDecodeInput();
+                    input.quantType = GBSA_QUANT_TYPE_A4C4;
+                    input.aicCoreNum = cores;
+                    input.numQHeads = group;
+                    input.numKvHeads = 1;
+                    input.blockShapeY = blockY;
+                    input.headDim = dim;
+                    input.blockIndexStride = 512;
+                    input.validBlockNums = {512, 259};
+                    ScheduleResult result;
+                    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+                    if (2 * 10 >= cores * 3) {
+                        EXPECT_EQ(result.fdActiveCoreNum, 0);
+                        continue;
+                    }
+                    ASSERT_GT(result.fdActiveCoreNum, 2);
+                    EXPECT_LE(result.fdActiveCoreNum, cores);
+                    EXPECT_LE(result.fdActiveCoreNum, MAX_FD_ACTIVE_CORE_NUM);
+                    const int64_t blocksPerGroup = (dim == 256 ? 256 : 128) / blockY;
+                    std::array<int64_t, 2> next = {0, 0};
+                    for (int64_t core = 0; core < result.fdActiveCoreNum; ++core) {
+                        const auto& schedule = result.decodeSchedules[core];
+                        for (int64_t task = schedule.baseTaskStart; task < schedule.baseTaskEnd; ++task) {
+                            const int64_t begin = task == schedule.baseTaskStart ? schedule.firstBlockStart : 0;
+                            const int64_t end =
+                                task + 1 == schedule.baseTaskEnd ? schedule.lastBlockEnd : input.validBlockNums[task];
+                            EXPECT_EQ(begin, next[task]);
+                            EXPECT_EQ(begin % blocksPerGroup, 0);
+                            EXPECT_GT(end, begin);
+                            next[task] = end;
+                        }
+                    }
+                    EXPECT_EQ(next[0], 512);
+                    EXPECT_EQ(next[1], 259);
+                    const int64_t capacity = std::min<int64_t>(MAX_COMBINE_TASK_NUM, (cores * 3 - 1) / 10) +
+                                             std::min<int64_t>(cores, MAX_FD_ACTIVE_CORE_NUM) - 1;
+                    EXPECT_LE(result.fdPartialTaskNum, capacity);
+                    std::array<MetadataType, METADATA_TOTAL_SIZE> metadata{};
+                    EXPECT_EQ(EncodeMetadata(result, metadata.data(), metadata.size()), BSAScheduleStatus::BSA_SUCCESS);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp4FdKeepsEmptyAndResidualTasksOnce)
+{
+    for (const int64_t dim : {192, 256}) {
+        SCOPED_TRACE(testing::Message() << "D=" << dim);
+        auto input = MakeDecodeInput();
+        input.quantType = GBSA_QUANT_TYPE_A4C4;
+        input.headDim = dim;
+        input.blockShapeY = 8;
+        input.blockIndexStride = 512;
+        input.residualBlockMode = 1;
+        input.validBlockNums = {0, 513};
+        ScheduleResult result;
+        ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+        ASSERT_GT(result.fdActiveCoreNum, 0);
+        std::array<int64_t, 2> next = {0, 0};
+        int64_t emptyTaskVisits = 0;
+        int64_t firstNonEmptyCore = -1;
+        int64_t nonEmptyTaskPartials = 0;
+        for (int64_t core = 0; core < result.fdActiveCoreNum; ++core) {
+            const auto& schedule = result.decodeSchedules[core];
+            for (int64_t task = schedule.baseTaskStart; task < schedule.baseTaskEnd; ++task) {
+                ASSERT_GE(task, 0);
+                ASSERT_LT(task, 2);
+                const int64_t begin = task == schedule.baseTaskStart ? schedule.firstBlockStart : 0;
+                const int64_t end = task + 1 == schedule.baseTaskEnd ? schedule.lastBlockEnd :
+                                                                       std::max<int64_t>(input.validBlockNums[task], 1);
+                EXPECT_EQ(begin, next[task]);
+                EXPECT_GT(end, begin);
+                next[task] = end;
+                if (task == 0) {
+                    ++emptyTaskVisits;
+                } else {
+                    if (firstNonEmptyCore == -1) {
+                        firstNonEmptyCore = core;
+                    }
+                    ++nonEmptyTaskPartials;
+                }
+            }
+        }
+        EXPECT_EQ(emptyTaskVisits, 1);
+        EXPECT_EQ(next[0], 1);
+        EXPECT_EQ(next[1], 513); // The final range contains the single implicit residual block.
+        ASSERT_EQ(result.combineTaskNum, 1);
+        EXPECT_EQ(result.combineSchedules[0].baseTask, 1);
+        EXPECT_EQ(result.combineSchedules[0].firstCore, firstNonEmptyCore);
+        EXPECT_EQ(result.combineSchedules[0].partialCount, nonEmptyTaskPartials);
+    }
+}
+
 } // namespace
 
-TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp8FdPreservesBaseTasksAndSparseRangeSchedule)
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, MxFdPreservesBaseTasksAndSparseRangeSchedule)
 {
     for (int64_t blockY : {4, 8}) {
         for (int64_t maskType : {0, 1}) {
@@ -590,17 +716,36 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Mxfp8FdPreservesBaseTas
             ScheduleResult baseline;
             ASSERT_EQ(BuildSchedule(input, baseline), BSAScheduleStatus::BSA_SUCCESS);
             ASSERT_NE(static_cast<uint32_t>(baseline.fdScheduleFlags) & FD_SCHEDULE_ENABLED, 0U);
-            for (int64_t quantType : {5, 6}) {
+            for (int64_t quantType : {4, 5, 6}) {
                 input.quantType = quantType;
                 ScheduleResult result;
                 ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
-                EXPECT_EQ(result.configSignature, baseline.configSignature);
+                if (quantType == GBSA_QUANT_TYPE_A4C4) {
+                    // Only A4C4 tags its signature and aligns partials to
+                    // descriptor groups for group32 FP4 P.
+                    EXPECT_NE(result.configSignature, baseline.configSignature);
+                } else {
+                    EXPECT_EQ(result.configSignature, baseline.configSignature);
+                }
                 EXPECT_EQ(result.saTotalTaskNum, baseline.saTotalTaskNum);
                 EXPECT_EQ(result.saUsedCoreNum, baseline.saUsedCoreNum);
                 EXPECT_EQ(result.blockPrefix, baseline.blockPrefix);
                 EXPECT_EQ(result.fdScheduleFlags, baseline.fdScheduleFlags);
-                EXPECT_EQ(result.fdActiveCoreNum, baseline.fdActiveCoreNum);
-                EXPECT_EQ(result.fdPartialTaskNum, baseline.fdPartialTaskNum);
+                if (quantType != GBSA_QUANT_TYPE_A4C4) {
+                    EXPECT_EQ(result.fdActiveCoreNum, baseline.fdActiveCoreNum);
+                    EXPECT_EQ(result.fdPartialTaskNum, baseline.fdPartialTaskNum);
+                } else {
+                    int64_t covered = 0;
+                    for (int64_t core = 0; core < result.fdActiveCoreNum; ++core) {
+                        const auto& schedule = result.decodeSchedules[core];
+                        const int64_t begin = result.blockPrefix[schedule.baseTaskStart] + schedule.firstBlockStart;
+                        const int64_t end = result.blockPrefix[schedule.baseTaskEnd - 1] + schedule.lastBlockEnd;
+                        EXPECT_EQ(begin, covered);
+                        EXPECT_GT(end, begin);
+                        covered = end;
+                    }
+                    EXPECT_EQ(covered, result.blockPrefix.back());
+                }
                 EXPECT_LE(result.fdPartialTaskNum, GetHostFdPartialCapacity(input.aicCoreNum));
             }
         }
@@ -797,4 +942,34 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Int8SevenPreservesRegul
     EXPECT_EQ(actual, expected);
     EXPECT_NE(actual[FD_SCHEDULE_FLAGS_INDEX] & FD_SCHEDULE_ENABLED, 0);
     EXPECT_EQ(actual[PACKED_COUNT_RANGE_TAG_INDEX], 0);
+}
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, A4C4SignatureAndFdScheduleAreIsolatedFromMxfp8)
+{
+    auto input = MakeDecodeInput();
+    input.qSeqLens = {1};
+    input.qBlockStorageNum = 1;
+    input.numQHeads = 12;
+    input.headDim = 256;
+    input.blockShapeY = 4;
+    input.blockIndexStride = 512;
+    input.validBlockNums = {512};
+    input.quantType = GBSA_QUANT_TYPE_MXFP8;
+    ScheduleResult mxfp8;
+    ASSERT_EQ(BuildSchedule(input, mxfp8), BSAScheduleStatus::BSA_SUCCESS);
+    input.quantType = GBSA_QUANT_TYPE_A4C4;
+    ScheduleResult a4c4;
+    ASSERT_EQ(BuildSchedule(input, a4c4), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_NE(a4c4.configSignature, mxfp8.configSignature);
+    std::array<MetadataType, METADATA_TOTAL_SIZE> before{};
+    std::array<MetadataType, METADATA_TOTAL_SIZE> after{};
+    ASSERT_EQ(EncodeMetadata(mxfp8, before.data(), before.size()), BSAScheduleStatus::BSA_SUCCESS);
+    ASSERT_EQ(EncodeMetadata(a4c4, after.data(), after.size()), BSAScheduleStatus::BSA_SUCCESS);
+    input.quantType = 0;
+    const uint32_t legacySignature = CalculateConfigSignature(input);
+    EXPECT_EQ(before[CONFIG_SIGNATURE_INDEX], static_cast<MetadataType>(legacySignature));
+    EXPECT_EQ(after[CONFIG_SIGNATURE_INDEX], static_cast<MetadataType>(HashConfigValue(legacySignature, 4U)));
+    EXPECT_EQ(before[FD_ACTIVE_CORE_NUM_INDEX], 32); // Upstream cost-based block schedule.
+    EXPECT_EQ(after[FD_ACTIVE_CORE_NUM_INDEX], 8);   // Existing A4C4 descriptor-group schedule.
+    EXPECT_EQ(before[SA_TOTAL_TASK_NUM_INDEX], after[SA_TOTAL_TASK_NUM_INDEX]);
 }

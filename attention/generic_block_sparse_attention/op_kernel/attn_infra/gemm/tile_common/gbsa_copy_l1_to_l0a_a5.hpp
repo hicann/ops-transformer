@@ -323,4 +323,39 @@ struct TileCopyTla<Arch::AtlasA5,
 
 } // namespace NpuArch::Gemm::Tile
 
+#if (__CCE_AICORE__ == 310) && defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && \
+    (ORIG_DTYPE_QUERY == DT_FLOAT4_E2M1) && (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+namespace NpuArch::Gemm::Tile {
+
+// Q/P -> L0A and K -> L0B use the same non-transposed zN source layout.
+struct CopyL1ToL0Mxfp4 {
+    template <class DstTensor>
+    __aicore__ inline void operator()(const DstTensor& dst, const AscendC::LocalTensor<uint8_t>& src,
+                                      const AscendC::LocalTensor<uint8_t>& scale, uint32_t rows, uint32_t reduction,
+                                      uint32_t sourceRows, uint32_t rowStart = 0, uint32_t sourceReduction = 0,
+                                      uint32_t reductionStart = 0) const
+    {
+        AscendC::LoadData2DParamsV2 data;
+        data.mStartPosition = rowStart / 16;
+        data.kStartPosition = reductionStart / 64;
+        data.mStep = rows / 16;
+        data.kStep = reduction / 64;
+        data.srcStride = sourceRows / 16;
+        data.dstStride = rows / 16;
+        data.ifTranspose = false;
+        AscendC::LoadData2DMxParams mx;
+        mx.xStartPosition = rowStart / 16;
+        mx.yStartPosition = reductionStart / 64;
+        mx.xStep = rows / 16;
+        mx.yStep = reduction / 64;
+        mx.srcStride = (sourceReduction == 0 ? reduction : sourceReduction) / 64;
+        mx.dstStride = reduction / 64;
+        AscendC::LoadData(dst, src.ReinterpretCast<fp4x2_e2m1_t>(), scale.ReinterpretCast<AscendC::fp8_e8m0_t>(), data,
+                          mx);
+    }
+};
+
+} // namespace NpuArch::Gemm::Tile
+#endif // MXFP4 on AtlasA5
+
 #endif // GEMM_TILE_COPY_L1_TO_L0A_A5_HPP

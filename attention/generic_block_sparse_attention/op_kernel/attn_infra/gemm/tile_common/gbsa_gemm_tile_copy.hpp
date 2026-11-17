@@ -170,4 +170,25 @@ struct PackedTileCopyTlaToUB : public PackedTileCopyTla<ArchTag, ElementA_, Layo
 //////////////////////////////
 } // namespace NpuArch::Gemm::Tile
 
+#if (__CCE_AICORE__ == 310) && defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && \
+    (ORIG_DTYPE_QUERY == DT_FLOAT4_E2M1) && (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+namespace NpuArch::Gemm::Tile {
+
+template <bool Paged, bool IsPV>
+struct PackedTileCopyMxfp4 {
+    using ElementAccumulator = float;
+    using LayoutTagL1A = layout::zN;
+    using LayoutTagL1B = layout::zN;
+    using LayoutTagL0A = layout::zZ;
+    using LayoutTagL0B = layout::nZ;
+    using CopyGmToL1B = CopySparsePackedGmToL1Mxfp4<Paged>;
+    using CopyGmToL1Scale = CopyQueryScaleGmToL1Mxfp4;
+    using CopyL1ToL0A = CopyL1ToL0Mxfp4;
+    using CopyL1ToL0B = std::conditional_t<IsPV, CopyL1ToL0VMxfp4, CopyL1ToL0Mxfp4>;
+    using CopyL0CToUB = CopyL0CToUbMxfp4<IsPV>;
+};
+
+} // namespace NpuArch::Gemm::Tile
+#endif // MXFP4 on AtlasA5
+
 #endif // GEMM_TILE_TILE_COPY_HPP

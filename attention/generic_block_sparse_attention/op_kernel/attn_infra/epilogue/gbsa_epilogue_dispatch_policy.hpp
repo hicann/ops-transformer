@@ -95,6 +95,29 @@ struct EpilogueAtlasA5GbsaRescaleOMxfp8 {
     static constexpr LseFormat LSE_FORMAT = LSE_FORMAT_;
 };
 
+template <uint32_t HeadDim_, uint32_t QueryTile_>
+struct EpilogueAtlasA5Mxfp4Base {
+    using ArchTag = Arch::AtlasA5;
+    static constexpr uint32_t HEAD_DIM = HeadDim_;
+    static constexpr uint32_t QUERY_TILE = QueryTile_;
+    static constexpr uint32_t VEC_ROWS = ((QueryTile_ / 2 + 15) / 16) * 16;
+};
+
+struct EpilogueAtlasA5Mxfp4Softmax {
+    using ArchTag = Arch::AtlasA5;
+};
+struct EpilogueAtlasA5Mxfp4PScale {
+    using ArchTag = Arch::AtlasA5;
+};
+struct EpilogueAtlasA5Mxfp4RescaleO {
+    using ArchTag = Arch::AtlasA5;
+};
+template <bool Paged>
+struct EpilogueAtlasA5Mxfp4KvScale {
+    using ArchTag = Arch::AtlasA5;
+    static constexpr bool PAGED_CACHE_FLAG = Paged;
+};
+
 } // namespace NpuArch::Epilogue
 
 #endif // EPILOGUE_DISPATCH_POLICY_HPP

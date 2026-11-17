@@ -299,7 +299,7 @@ struct isnZ<Element, Layout, std::enable_if_t<Layout::depth == 2 && Layout::rank
          stride<0, 0>(Layout{}) == 1 && stride<1, 1>(Layout{}) == ELE_NUM_PER_FRACTAL);
 };
 
-#if defined(CATLASS_ARCH_A5_ENABLED)
+#if defined(CATLASS_ARCH_A5_ENABLED) || (__CCE_AICORE__ == 310)
 template <class Element, class Layout, class Enable1 = void, class Enable2 = void>
 struct isMxScaleANoTrans {
     static bool const value = false;

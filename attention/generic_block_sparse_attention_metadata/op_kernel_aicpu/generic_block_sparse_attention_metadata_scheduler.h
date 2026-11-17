@@ -24,6 +24,14 @@
 namespace aicpu {
 namespace generic_block_sparse_attention_metadata {
 
+constexpr int64_t GBSA_QUANT_TYPE_A4C4 = 4;
+constexpr int64_t GBSA_QUANT_TYPE_MXFP8 = 6;
+
+inline bool IsMxQuantType(int64_t quantType)
+{
+    return quantType == GBSA_QUANT_TYPE_A4C4 || quantType == GBSA_QUANT_TYPE_MXFP8;
+}
+
 enum class BSAScheduleStatus : uint32_t {
     BSA_SUCCESS = 0U,
     BSA_INVALID_PARAM = 1U,
@@ -147,6 +155,10 @@ inline uint32_t CalculateConfigSignature(const ScheduleInput& input)
     if (input.maskType == 0 || input.maskType == 3) {
         hash = HashConfigValue(hash, 0U);
     }
+    // Keep existing non-quant/FP8 signatures stable; the MXFP4 kernel requires this tag.
+    if (input.quantType == GBSA_QUANT_TYPE_A4C4) {
+        hash = HashConfigValue(hash, static_cast<uint32_t>(input.quantType));
+    }
     return hash;
 }
 
@@ -247,7 +259,9 @@ inline bool IsScheduleInputValid(const ScheduleInput& input)
            (input.residualBlockMode == 0 || input.residualBlockMode == 1) &&
            (input.maskType == 0 || input.maskType == 1 || input.maskType == 3) &&
            (input.maskType != 3 || IsUnionQuantTypeSupported(input.quantType)) && input.aicCoreNum > 0 &&
-           input.aicCoreNum <= MAX_AIC_CORE_NUM && input.qSeqLens.size() == static_cast<size_t>(input.batchSize);
+           (input.quantType == GBSA_QUANT_TYPE_A4C4 ? FitsMetadataType(input.aicCoreNum) :
+                                                      input.aicCoreNum <= MAX_AIC_CORE_NUM) &&
+           input.qSeqLens.size() == static_cast<size_t>(input.batchSize);
 }
 
 inline BSAScheduleStatus BuildSaTaskInfo(const ScheduleInput& input, ScheduleResult& result)
@@ -286,7 +300,7 @@ inline BSAScheduleStatus BuildBlockPrefix(const ScheduleInput& input, ScheduleRe
     result.blockPrefix.resize(static_cast<size_t>(result.saTotalTaskNum) + 1U, 0);
     const int64_t qHeadCount = input.isPackedGQA == 1 ? result.groupSize : 1;
     const int64_t m16 = CeilDiv(qHeadCount, 16);
-    result.hasPackedCountRange = input.quantType == 6 && input.residualBlockMode == 0;
+    result.hasPackedCountRange = IsMxQuantType(input.quantType) && input.residualBlockMode == 0;
     for (int64_t task = 0; task < result.saTotalTaskNum; ++task) {
         const int64_t validBlockNum = input.validBlockNums[static_cast<size_t>(task)];
         const int64_t maxValidBlockNum = input.blockIndexStride + (input.residualBlockMode == 1 ? 1 : 0);
@@ -324,19 +338,31 @@ inline bool ShouldBuildDecodeSchedule(const ScheduleInput& input, const Schedule
     const int64_t totalSplitTaskNum = result.blockPrefix.back();
     // Decode scheduling partitions sparse-list block ranges. The kernel resolves each range with the runtime
     // blockShapeY, so the schedule is independent of the sparse block's token width.
+    // A4C4 aligns FD partials to its descriptor groups; MXFP8 keeps the upstream block schedule.
+    const bool mxfp4ShapeSupported =
+        input.quantType != GBSA_QUANT_TYPE_A4C4 ||
+        ((input.headDim == 64 || input.headDim == 128 || input.headDim == 192 || input.headDim == 256) &&
+         input.blockShapeX == 1 && input.blockShapeY >= 2 && input.blockShapeY <= 128 &&
+         (input.blockShapeY & (input.blockShapeY - 1)) == 0);
     const bool mxfp8ShapeSupported =
-        input.quantType != 6 || ((input.headDim == 192 || input.headDim == 256) && input.blockShapeX == 1 &&
-                                 (input.blockShapeY == 4 || input.blockShapeY == 8) && input.residualBlockMode == 0);
+        input.quantType != GBSA_QUANT_TYPE_MXFP8 ||
+        ((input.headDim == 192 || input.headDim == 256) && input.blockShapeX == 1 &&
+         (input.blockShapeY == 4 || input.blockShapeY == 8) && input.residualBlockMode == 0);
+    if (input.quantType == GBSA_QUANT_TYPE_A4C4 && result.groupSize <= 16 &&
+        (input.headDim == 128 || input.headDim == 256) && input.blockIndexStride <= 64 &&
+        input.qBlockStorageNum * input.numKvHeads < input.aicCoreNum) {
+        return false;
+    }
     const bool fdShapeSupported =
-        mxfp8ShapeSupported && input.headDim > 0 && input.headDim <= 512 && input.blockIndexStride >= 12 &&
-        result.groupSize > 0 && result.groupSize <= 128 && result.saTotalTaskNum > 0 &&
+        mxfp4ShapeSupported && mxfp8ShapeSupported && input.headDim > 0 && input.headDim <= 512 &&
+        input.blockIndexStride >= 12 && result.groupSize > 0 && result.groupSize <= 128 && result.saTotalTaskNum > 0 &&
         static_cast<uint64_t>(result.saTotalTaskNum) * 10U < static_cast<uint64_t>(input.aicCoreNum) * 3U;
     if (input.maskType == 3 || !fdShapeSupported || totalSplitTaskNum <= result.saUsedCoreNum || totalCost == 0U ||
         totalValidBlockNum == 0U) {
         return false;
     }
-    if (input.quantType == 6) {
-        // Packed MXFP8 computes 512/256/128-token tiles rather than one
+    if (IsMxQuantType(input.quantType)) {
+        // Packed MX paths compute 512/256/128-token tiles rather than one
         // micro-block per tile. Do not pay the global barrier/combine cost
         // when the existing base tasks already cover this amount of work.
         // Use effective counts, never the physical sparse-index capacity.
@@ -411,6 +437,68 @@ inline BSAScheduleStatus BuildCombineSchedules(ScheduleResult& result)
     return BSAScheduleStatus::BSA_SUCCESS;
 }
 
+// MXFP4 keeps group32 quantization and PA pair ordering within descriptor
+// groups. Partition these units, but encode the same sparse-list block coordinates
+// as the other kernels. The protocol capacity is independent of physical cores.
+inline BSAScheduleStatus BuildMxfp4DecodeSchedule(const ScheduleInput& input, ScheduleResult& result)
+{
+    using namespace optiling::generic_block_sparse_attention_metadata;
+    if (input.headDim > 256 || result.saTotalTaskNum > MAX_COMBINE_TASK_NUM) {
+        return BSAScheduleStatus::BSA_SUCCESS;
+    }
+    const int64_t kvTile = result.groupSize <= 32 ? 512 : (result.groupSize <= 64 ? 256 : 128);
+    // Metadata is shared by dense and PA inputs. The conservative PA group
+    // boundary is 256 tokens for D128/256, otherwise 128; never exceed KV tile.
+    const int64_t descriptorRows = input.headDim == 128 || input.headDim == 256 ? 256 : 128;
+    const int64_t blocksPerGroup = std::max<int64_t>(std::min(kvTile, descriptorRows) / input.blockShapeY, 1);
+    std::vector<int64_t> groupPrefix(static_cast<size_t>(result.saTotalTaskNum) + 1U, 0);
+    for (int64_t task = 0; task < result.saTotalTaskNum; ++task) {
+        groupPrefix[task + 1] =
+            groupPrefix[task] + CeilDiv(std::max<int64_t>(input.validBlockNums[task], 1), blocksPerGroup);
+    }
+    const int64_t coreLimit = std::min<int64_t>(input.aicCoreNum, MAX_FD_ACTIVE_CORE_NUM);
+    const int64_t groupsPerCore = CeilDiv(groupPrefix.back(), coreLimit);
+    const int64_t activeCores = CeilDiv(groupPrefix.back(), groupsPerCore);
+    if (activeCores <= result.saUsedCoreNum) {
+        return BSAScheduleStatus::BSA_SUCCESS;
+    }
+    result.fdActiveCoreNum = activeCores;
+    for (int64_t core = 0; core < activeCores; ++core) {
+        const int64_t first = core * groupsPerCore;
+        const int64_t end = std::min(first + groupsPerCore, groupPrefix.back());
+        const int64_t firstTask =
+            std::upper_bound(groupPrefix.begin(), groupPrefix.end(), first) - groupPrefix.begin() - 1;
+        const int64_t lastTask =
+            std::upper_bound(groupPrefix.begin(), groupPrefix.end(), end - 1) - groupPrefix.begin() - 1;
+        auto& schedule = result.decodeSchedules[core];
+        schedule.baseTaskStart = firstTask;
+        schedule.baseTaskEnd = lastTask + 1;
+        schedule.firstBlockStart = (first - groupPrefix[firstTask]) * blocksPerGroup;
+        schedule.lastBlockEnd = std::min((end - groupPrefix[lastTask]) * blocksPerGroup,
+                                         std::max<int64_t>(input.validBlockNums[lastTask], 1));
+        // This header is a maximum raw-block budget; consumers use the exact
+        // per-core ranges, including variable topk and empty tasks.
+        result.decodePerCoreTaskNum =
+            std::max(result.decodePerCoreTaskNum, result.blockPrefix[lastTask] + schedule.lastBlockEnd -
+                                                      result.blockPrefix[firstTask] - schedule.firstBlockStart);
+    }
+    for (int64_t task = 0; task < result.saTotalTaskNum; ++task) {
+        const int64_t firstCore = groupPrefix[task] / groupsPerCore;
+        const int64_t lastCore = (groupPrefix[task + 1] - 1) / groupsPerCore;
+        if (firstCore == lastCore) {
+            continue;
+        }
+        auto& combine = result.combineSchedules[result.combineTaskNum++];
+        combine.baseTask = task;
+        combine.firstCore = firstCore;
+        combine.partialStart = result.fdPartialTaskNum;
+        combine.partialCount = lastCore - firstCore + 1;
+        result.fdPartialTaskNum += combine.partialCount;
+    }
+    result.fdScheduleFlags |= FD_SCHEDULE_ENABLED;
+    return BSAScheduleStatus::BSA_SUCCESS;
+}
+
 } // namespace
 
 inline BSAScheduleStatus BuildSchedule(const ScheduleInput& input, ScheduleResult& result)
@@ -436,6 +524,9 @@ inline BSAScheduleStatus BuildSchedule(const ScheduleInput& input, ScheduleResul
     result.fdTotalFlatTaskNum = totalSplitTaskNum;
     if (!ShouldBuildDecodeSchedule(input, result, totalCost, totalValidBlockNum)) {
         return BSAScheduleStatus::BSA_SUCCESS;
+    }
+    if (input.quantType == GBSA_QUANT_TYPE_A4C4) {
+        return BuildMxfp4DecodeSchedule(input, result);
     }
     const uint64_t maxCoreLimit = std::min<uint64_t>(
         std::min<uint64_t>(static_cast<uint64_t>(input.aicCoreNum), MAX_FD_ACTIVE_CORE_NUM), totalValidBlockNum);

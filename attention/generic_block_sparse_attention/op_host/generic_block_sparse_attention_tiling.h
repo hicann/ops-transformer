@@ -20,6 +20,8 @@
 
 namespace optiling {
 
+constexpr int64_t GBSA_QUANT_TYPE_A4C4 = 4;
+
 namespace Mxfp8Tiling {
 // Host-only budgets mirror the device components. Keep these inline so Host
 // validation can exercise them without exporting symbols from the tiling library.
@@ -283,6 +285,10 @@ TILING_DATA_FIELD_DEF(uint32_t, unionIoPackORowStride);
 // A8C4 paged BF16 scale strides in elements, independent of the K/V cache strides.
 TILING_DATA_FIELD_DEF(uint64_t, kScaleStride0);
 TILING_DATA_FIELD_DEF(uint64_t, vScaleStride0);
+// CX parameters are derived once on host; keep existing tiling offsets unchanged.
+TILING_DATA_FIELD_DEF(float, log2Cx);
+TILING_DATA_FIELD_DEF(float, log2CxCeil);
+TILING_DATA_FIELD_DEF(uint32_t, returnSoftmaxLse);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttention, GenericBlockSparseAttentionTilingData)
 
@@ -325,12 +331,21 @@ private:
     ge::graphStatus CheckSoftmaxPrecision(gert::TilingContext* context);
     ge::graphStatus CheckQuantConfig(gert::TilingContext* context);
     ge::graphStatus CheckInt8Config(gert::TilingContext* context);
+    ge::graphStatus CheckMxfp4Config(gert::TilingContext* context);
     ge::graphStatus CheckMetadata(gert::TilingContext* context);
     ge::graphStatus CheckReservedOptionalInputs(gert::TilingContext* context);
     ge::graphStatus CheckMxfp8Scales(gert::TilingContext* context);
     ge::graphStatus ParseKvCacheStride0(gert::TilingContext* context);
     void CalcBaseTileTilingParams950();
     void CalcMatmulPhaseL1TileInfo950();
+    bool IsMxfp4() const
+    {
+        return quantType_ == GBSA_QUANT_TYPE_A4C4 && dataType_ == ge::DT_FLOAT4_E2M1;
+    }
+    bool IsMxfp8() const
+    {
+        return quantType_ == 6 && dataType_ == ge::DT_FLOAT8_E4M3FN;
+    }
     bool IsMxfp8PackedPath() const;
     uint64_t GenerateTilingKey();
 
@@ -351,6 +366,8 @@ private:
     uint32_t maxBlocksPerBatch_ = 0;
     uint32_t groupSize_ = 0;
     float scaleValue_ = 0.0f;
+    float log2Cx_ = 0.0f;
+    float log2CxCeil_ = 0.0f;
     uint32_t softmaxPrecision_ = 0;
     int64_t residualBlockMode_ = 0;
     bool isConsistentTopk_ = false;

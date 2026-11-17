@@ -205,7 +205,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>numQHeads</td>
       <td>Input</td>
       <td>Number of Query heads of the primary operator.</td>
-      <td>Must be greater than 0 and consistent with the primary operator. For the Q/KV head count relationship, see <a href="#other-constraints">Other Constraints</a>.</td>
+      <td>Must be greater than 0 and consistent with the primary operator. For the Q/KV head count relationship, see <a href="#other-constraints">Other Constraints</a>. For A4C4 (quantType=4), numQHeads/numKvHeads must be in [1,16].</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -225,7 +225,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>headDim</td>
       <td>Input</td>
       <td>Feature dimension of each head of Query, Key, and Value of the Primary Operator.</td>
-      <td>Only 128 is supported. The value must be the same as that of the Primary Operator.</td>
+      <td>Only 128 is supported. The value must be the same as that of the Primary Operator. A4C4 (quantType=4) supports logical D=192 or 256.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -235,7 +235,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>blockShape</td>
       <td>Input</td>
       <td>Represents the array of sparse block shapes.</td>
-      <td>Sparse block shape [blockShapeX, blockShapeY]. Non-union: [1,Y]; union (maskType=3): [8,Y] (currently only 8). Must match the main operator. For product scope, see <a href="#other-constraints">Other Constraints</a>.</td>
+      <td>Sparse block shape [blockShapeX, blockShapeY]. Non-union: [1,Y]; union (maskType=3): [8,Y] (currently only 8). Must match the main operator. For product scope, see <a href="#other-constraints">Other Constraints</a>. A4C4 (quantType=4) uses [1,Y] with Y in {4,8,16,32,64,128}.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -287,7 +287,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>quantType</td>
       <td>Input</td>
       <td>Represents the quantization method used.</td>
-      <td>Quantization type: 0 for non-quantized inputs, 5 for FP8 on Ascend 950PR&950DT products, 6 for MXFP8 on Ascend 950PR&950DT products, 7 for INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and 8 for A8C4 on Ascend 950PR&950DT products. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
+      <td>Quantization type: 0 for non-quantized inputs, 4 for Ascend 950PR&950DT products A4C4 (MXFP4 CX), 5 for FP8 on Ascend 950PR&950DT products, 6 for MXFP8 on Ascend 950PR&950DT products, 7 for INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and 8 for A8C4 on Ascend 950PR&950DT products. Values 1, 2, and 3 are reserved and unsupported. See product-specific constraints.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -465,6 +465,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 
 ## Constraints
 
+- A4C4 (quantType=4) on <term>Ascend 950PR&950DT products</term>: D=192/256, blockShape=[1,Y] with Y in {4,8,16,32,64,128}, GQA group size 1–16, maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. Match the Attention inputs and attributes. [A4C4 API constraints](#a4c4metadataquanttype4).
 - INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
 
 ### Baseline Description
@@ -576,3 +577,18 @@ On Ascend 950PR and 950DT, use headDim=128, blockShape=[1,128], a GQA group size
 A8C4 limits `maxQSeqLen` to 16. For TND, the actual Q sequence length is also limited to 16 per batch item. `numQHeads` must not exceed INT32_MAX. For PA_BBND, BSND, and TND KV layouts, `numKvHeads` must be at most five. This five-head limit does not apply to BNSD or PA_BNBD.
 
 The sparse-index capacity limit is INT32_MAX. Existing index, count, and scheduling overflow constraints apply.
+
+<a name="a4c4metadataquanttype4"></a>
+
+### A4C4 Metadata (quantType=4)
+
+On <term>Ascend 950PR&950DT products</term>, A4C4 requires `headDim=192/256`, `blockShape=[1,Y]` with Y in {4,8,16,32,64,128},
+`numQHeads/numKvHeads` in [1,16], and `softmaxPrecision=0`. Both `maskType=0/1` and `residualBlockMode=0/1` are supported.
+See the [Attention A4C4 API](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4) for the nine layout pairs and scales.
+
+Pass logical D as `headDim`, not the packed dimension D/2. Metadata does not accept Q/K/V or scales; Attention validates their data types, shapes and storage.
+Use matching library versions and identical quantization modes, masks, layouts, sparse inputs, residual modes and sequence lengths in Metadata and Attention.
+
+Metadata selects regular or Flash Decoding scheduling from actual query/KV-head task counts and effective sparse-block workload, using each query's own count.
+FD preserves the grouping boundaries required by P quantization, and Attention merges FP32 partial results.
+The core count is queried from the runtime platform rather than fixed; no extra interface argument is required.

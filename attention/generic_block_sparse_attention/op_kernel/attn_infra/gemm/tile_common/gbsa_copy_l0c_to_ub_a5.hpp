@@ -303,4 +303,36 @@ struct CopyL0CToUBTla<
 
 } // namespace NpuArch::Gemm::Tile
 
+#if (__CCE_AICORE__ == 310) && defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && \
+    (ORIG_DTYPE_QUERY == DT_FLOAT4_E2M1) && (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
+namespace NpuArch::Gemm::Tile {
+
+template <bool IsPV>
+struct CopyL0CToUbMxfp4 {
+    static constexpr AscendC::FixpipeConfig CFG_ROW_MAJOR_UB = {AscendC::CO2Layout::ROW_MAJOR, true};
+    template <class TensorUB>
+    __aicore__ inline void operator()(TensorUB const& dst, const AscendC::LocalTensor<float>& src, uint32_t columns,
+                                      uint32_t queryRows) const
+    {
+        const auto offset = dst.layout()(dst.coord());
+        const uint32_t rows0 = (queryRows + 1) / 2;
+        const uint32_t rowOffset = IsPV ? (rows0 + 15) / 16 * 16 : rows0;
+        const uint32_t alignedRows = IsPV ? 2U * rowOffset : (queryRows + 15U) / 16U * 16U;
+        AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> params;
+        params.mSize = IsPV ? alignedRows : 2U * rows0;
+        params.nSize = columns;
+        params.srcStride = alignedRows;
+        params.dstStride = tla::get<0>(dst.stride());
+        params.quantPre = QuantMode_t::NoQuant;
+        params.dualDstCtl = 1;
+        params.params.ndNum = 1;
+        params.params.srcNdStride = 0;
+        params.params.dstNdStride = 0;
+        AscendC::Fixpipe<float, float, CFG_ROW_MAJOR_UB>(dst.data()[offset], src, params);
+    }
+};
+
+} // namespace NpuArch::Gemm::Tile
+#endif // MXFP4 on AtlasA5
+
 #endif // GEMM_TILE_COPY_L0C_TO_UB_A5_HPP
