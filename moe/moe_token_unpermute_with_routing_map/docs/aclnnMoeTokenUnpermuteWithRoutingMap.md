@@ -313,7 +313,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMap(
       <td>topK_num > 512。</td>
     </tr>
     <tr>
-      <td>probsOptional的shape不在支持的范围内。</td>
+      <td>probsOptional、unpermutedTokens的shape不在支持的范围内。</td>
     </tr>
   </tbody></table>
 
