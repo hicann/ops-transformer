@@ -97,6 +97,17 @@ class PytestV2TopKComparator:
             else (f"pytest QuantLightningIndexerV2 {stage} returned {status!r}"),
         }
 
+    @staticmethod
+    def sort_score_dtype(params):
+        npu = getattr(torch, "npu", None)
+        if int(params[20]) != 2 or npu is None or not npu.is_available():
+            return None
+        # TTK outputs are on CPU, so pytest cannot infer the execution device.
+        device_name = npu.get_device_name()
+        dtype = torch.bfloat16 if device_name.startswith("Ascend950") else torch.float32
+        logging.info("INT8 TopK reference: %s, sort_score_dtype=%s", device_name, dtype)
+        return dtype
+
     def compare(self, *outputs, compare_data=None):
         if compare_data is None:
             raise ValueError(
@@ -155,6 +166,7 @@ class PytestV2TopKComparator:
         golden_values_for_index = golden_values.detach().cpu().float().numpy()
         npu_values_for_index = npu_values.detach().cpu().float().numpy()
         module = self.load_module()
+        sort_score_dtype = self.sort_score_dtype(params)
         index_result = module.check_result(
             golden_indices,
             npu_indices,
@@ -163,6 +175,7 @@ class PytestV2TopKComparator:
             params,
             golden_values_for_index,
             npu_values_for_index,
+            sort_score_dtype=sort_score_dtype,
         )
         results = [self.result_dict(index_result, "index compare")]
         if return_value:
@@ -174,6 +187,7 @@ class PytestV2TopKComparator:
                 npu_indices,
                 topk_value,
                 output_idx_offset,
+                sort_score_dtype=sort_score_dtype,
             )
             results.append(self.result_dict(value_result, "sparse-value compare"))
         return results

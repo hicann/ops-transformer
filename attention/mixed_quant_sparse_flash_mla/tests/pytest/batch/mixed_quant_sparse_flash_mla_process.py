@@ -21,6 +21,7 @@ import math
 import cann_ops_transformer
 import torchair
 from torchair.configs.compiler_config import CompilerConfig
+from mqsmla_super_kernel import compile_super_kernel, super_kernel_enabled
 
 
 class Network(torch.nn.Module):
@@ -104,6 +105,7 @@ class Network(torch.nn.Module):
 
 
 def test_mqsmla_quant_process_graph(test_data, device_id=0):
+    """Return (npu_result, cpu_output, npu_lse, cpu_lse), matching eager mode."""
     params = test_data["params"]
     metadata_input = test_data["metadata_input"]
     op_input = test_data["op_input"]
@@ -113,17 +115,20 @@ def test_mqsmla_quant_process_graph(test_data, device_id=0):
 
     torch._dynamo.reset()
     npu_mode = Network().npu()
-    config = CompilerConfig()
-    config.mode = "reduce-overhead"
-    config.experimental_config.aclgraph._aclnn_static_shape_kernel = True
-    config.experimental_config.aclgraph._aclnn_static_shape_kernel_build_dir = "./"
-    config.experimental_config.frozen_parameter = True
-    config.experimental_config.tiling_schedule_optimize = True
-    config.experimental_config.topology_sorting_strategy = "StableRDFS"
-    npu_backend = torchair.get_npu_backend(compiler_config=config)
-    npu_mode = torch.compile(
-        npu_mode, fullgraph=True, backend=npu_backend, dynamic=False
-    )
+    if super_kernel_enabled():
+        npu_mode = compile_super_kernel(npu_mode)
+    else:
+        config = CompilerConfig()
+        config.mode = "reduce-overhead"
+        config.experimental_config.aclgraph._aclnn_static_shape_kernel = True
+        config.experimental_config.aclgraph._aclnn_static_shape_kernel_build_dir = "./"
+        config.experimental_config.frozen_parameter = True
+        config.experimental_config.tiling_schedule_optimize = True
+        config.experimental_config.topology_sorting_strategy = "StableRDFS"
+        npu_backend = torchair.get_npu_backend(compiler_config=config)
+        npu_mode = torch.compile(
+            npu_mode, fullgraph=True, backend=npu_backend, dynamic=False
+        )
 
     print("test_data:", params)
     print("mixed_quant_sparse_flash_mla_metadata...")
@@ -253,6 +258,9 @@ def test_mqsmla_quant_process_graph(test_data, device_id=0):
 
 
 def test_mqsmla_quant_process_ci(test_data, device_id=0):
+    """Return (npu_result, cpu_output, npu_lse, cpu_lse) in every mode."""
+    if super_kernel_enabled():
+        return test_mqsmla_quant_process_graph(test_data, device_id=device_id)
     params = test_data["params"]
     metadata_input = test_data["metadata_input"]
     op_input = test_data["op_input"]
@@ -393,4 +401,4 @@ def test_mqsmla_quant_process_ci(test_data, device_id=0):
 
     torch.npu.synchronize()
 
-    return npu_result, cpu_output, cpu_lse, npu_lse
+    return npu_result, cpu_output, npu_lse, cpu_lse

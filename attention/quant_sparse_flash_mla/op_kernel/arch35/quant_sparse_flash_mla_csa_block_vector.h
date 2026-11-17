@@ -2030,8 +2030,36 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::FreeEvent(ConstInfo& qs35VecC
     WaitFlag<HardEvent::V_MTE2>(fdVToMte2Id[1]);
     WaitFlag<HardEvent::MTE3_V>(fdMte3ToVId);
     if constexpr (IS_BATCH_CONSISTENCY) {
+        WaitFlag<HardEvent::MTE3_MTE2>(fdMte3ToMte2Id);
         WaitFlag<HardEvent::V_MTE2>(intraPartialOVToMte2Id);
         WaitFlag<HardEvent::V_MTE2>(reduceMaxSumVToMte2Id);
+    }
+
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVId);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(stageMte3ToVId);
+    GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3Id);
+    for (uint32_t eventIdx = 0; eventIdx < 2; ++eventIdx) {
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(mte2ToVV0Id[eventIdx]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(vToMte2V0Id[eventIdx]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3V0Id[eventIdx]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVV0Id[eventIdx]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(fdVToMte2Id[eventIdx]);
+    }
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(fdMte2ToVId);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(fdMte3ToVId);
+    if constexpr (IS_BATCH_CONSISTENCY) {
+        for (uint32_t eventIdx = 0; eventIdx < 2; ++eventIdx) {
+            GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(intraLseMte3ToMte2Id[eventIdx]);
+            GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(intraAttnOutMte3ToMte2Id[eventIdx]);
+        }
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(intraPartialOVToMte2Id);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(reduceMaxSumVToMte2Id);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(reduceMte2ToVId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(fdMte3ToMte2Id);
+    }
+    if (qs35VecConstInfo.isSoftmaxLseEnable) {
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVLseOutId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3LseOutId);
     }
 }
 

@@ -19,6 +19,7 @@ import result_compare_method
 import lightning_indexer_v2_golden
 import pytest
 import lightning_indexer_v2_acl_graph
+from liv2_super_kernel import super_kernel_enabled
 
 paramset = os.environ.get("LIV2_PARAMSET", "default")
 if paramset not in ("default", "stc"):
@@ -194,6 +195,8 @@ for paramset_index, (paramset_name, params) in enumerate(ENABLED_PARAMSETS):
         run_mode = os.environ.get("LIV2_RUN_MODE", "both")
         if run_mode not in ("eager", "graph", "both"):
             raise ValueError(f"unsupported run_mode: {run_mode}")
+        if super_kernel_enabled():
+            run_mode = "graph"
         if run_mode != "graph":
             cpu_result, npu_result, topk_value, cpu_topk_value, npu_topk_value = (
                 lightning_indexer_v2_golden.liv2_output_single(test_data)

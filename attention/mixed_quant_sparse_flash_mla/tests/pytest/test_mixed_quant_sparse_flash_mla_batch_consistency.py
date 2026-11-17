@@ -54,7 +54,7 @@ class MixedQuantSparseFlashMlaExecutor:
 
     def __call__(self, data):
         device_id = int(os.environ.get("MQSMLA_DEVICE_ID", "0"))
-        output, _cpu_output, _cpu_lse, softmax_lse = (
+        output, _cpu_output, softmax_lse, _cpu_lse = (
             mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(
                 data, device_id=device_id
             )

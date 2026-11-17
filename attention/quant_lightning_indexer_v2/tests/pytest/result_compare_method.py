@@ -428,6 +428,29 @@ def _reshape_topk_value(topk_value, total_rows, sparse_count, params):
     return topk_value.reshape(total_rows, sparse_count)
 
 
+def _align_int8_sort_scores(topk_value, quant_mode, result, sort_score_dtype):
+    if quant_mode != 2:
+        return topk_value
+    if sort_score_dtype is None:
+        sort_score_dtype = torch.float32
+        if result.device.type == "npu":
+            device_name = torch.npu.get_device_name(result.device)
+            if device_name.startswith("Ascend950"):
+                sort_score_dtype = torch.bfloat16
+            print_log(
+                f"INT8 TopK reference: {device_name}, sort_score_dtype={sort_score_dtype}"
+            )
+    if sort_score_dtype == torch.float32:
+        return topk_value
+    if sort_score_dtype != torch.bfloat16:
+        raise ValueError("INT8 sort scores must use float32 or bfloat16")
+
+    value = topk_value.to(torch.float32).contiguous()
+    rounded_bits = (value.view(torch.int32) + 0x8000) & -0x10000
+    rounded = rounded_bits.view(torch.float32)
+    return torch.where(torch.isfinite(value), rounded, value)
+
+
 def check_result(
     expect,
     result,
@@ -436,6 +459,8 @@ def check_result(
     params,
     cpu_topk_value,
     npu_topk_value,
+    *,
+    sort_score_dtype=None,
 ):
     (
         batch_size,
@@ -472,6 +497,10 @@ def check_result(
         return_value,
         _,
     ) = params
+
+    topk_value = _align_int8_sort_scores(
+        topk_value, quant_mode, result, sort_score_dtype
+    )
 
     # Q 侧个体长度
     if layout_query == "TND":
@@ -780,6 +809,8 @@ def check_result_return_value(
     result_indices=None,
     topk_value=None,
     output_idx_offset=None,
+    *,
+    sort_score_dtype=None,
 ):
     (
         batch_size,
@@ -816,6 +847,11 @@ def check_result_return_value(
         return_value,
         _,
     ) = params
+
+    if topk_value is not None:
+        topk_value = _align_int8_sort_scores(
+            topk_value, quant_mode, result, sort_score_dtype
+        )
 
     npu_pass = True
     max_error = 0

@@ -93,7 +93,7 @@ def mqsmla(testcase_files):
             values = mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(
                 data, device_id=device_id
             )
-            return RunResult(values[0], values[3])
+            return RunResult(values[0], values[2])
 
         report = run_configured_consistency(
             test_data,
@@ -116,7 +116,7 @@ def mqsmla(testcase_files):
         return
     npu_error_msg = None
     try:
-        npu_result, cpu_quant_result, cpu_lse, npu_lse = (
+        npu_result, cpu_quant_result, npu_lse, cpu_lse = (
             mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(
                 test_data, device_id=device_id
             )

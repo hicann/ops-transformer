@@ -9,6 +9,17 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+# Keep the switch available to pytest subprocesses and isolated batch workers.
+super_kernel_args=()
+for super_kernel_arg in "$@"; do
+    if [[ "$super_kernel_arg" == "--super-kernel" ]]; then
+        export QLIV2_SUPER_KERNEL=1
+    else
+        super_kernel_args+=("$super_kernel_arg")
+    fi
+done
+set -- "${super_kernel_args[@]}"
+
 set -o pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -29,6 +40,7 @@ show_help() {
   help         显示帮助
 
 通用选项:
+  --super-kernel            Enable ACLGraph SuperKernel with full-core debug
   -M, --run-mode MODE       eager|graph，默认 eager
   -O, --output FILE         结果 Excel 路径；single 默认 single_result.xlsx，batch 默认 result.xlsx
   -C, --cases NAMES         按给定顺序执行 case 名，逗号分隔

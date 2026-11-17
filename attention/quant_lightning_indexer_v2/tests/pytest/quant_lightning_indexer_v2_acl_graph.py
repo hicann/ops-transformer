@@ -19,6 +19,7 @@ import torch.nn as nn
 from torchair.configs.compiler_config import CompilerConfig
 import cann_ops_transformer
 import quant_lightning_indexer_v2_golden
+from qliv2_super_kernel import compile_super_kernel, super_kernel_enabled
 
 QUANT_MODE_MXFP4 = 5
 
@@ -228,13 +229,16 @@ def _qliv2_run_compiled_graph(run_args):
     """
     通过 torch.compile + torchair 后端执行算子（共用逻辑）。
     """
-    config = CompilerConfig()
-    config.mode = "reduce-overhead"
-    npu_backend = torchair.get_npu_backend(compiler_config=config)
     torch._dynamo.reset()
-    npu_mode = torch.compile(
-        QLIV2Network().npu(), fullgraph=False, backend=npu_backend, dynamic=False
-    )
+    if super_kernel_enabled():
+        npu_mode = compile_super_kernel(QLIV2Network().npu())
+    else:
+        config = CompilerConfig()
+        config.mode = "reduce-overhead"
+        npu_backend = torchair.get_npu_backend(compiler_config=config)
+        npu_mode = torch.compile(
+            QLIV2Network().npu(), fullgraph=False, backend=npu_backend, dynamic=False
+        )
     npu_result, npu_topk_value = npu_mode(**run_args)
     torch.npu.synchronize()
     if run_args["return_value"]:

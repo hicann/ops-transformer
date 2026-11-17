@@ -18,6 +18,7 @@ import pytest
 
 import result_compare_method
 from batch import quant_lightning_indexer_v2_pt_loadprocess
+from qliv2_super_kernel import super_kernel_enabled
 from qliv2_test_utils import (
     QliV2CaseSelector,
     QliV2ResultWriter,
@@ -37,6 +38,8 @@ SINGLE_CASE_PATH = os.environ.get("QLIV2_TESTCASE_PATH", "").strip()
 IS_ISOLATED_MODE = bool(SINGLE_CASE_PATH)
 # flag：运行模式 eager / graph（通过环境变量 QLIV2_RUN_MODE 或命令行参数设置，默认 eager）
 RUN_MODE = os.environ.get("QLIV2_RUN_MODE", "eager").strip().lower()
+if super_kernel_enabled():
+    RUN_MODE = "graph"
 # 支持通过环境变量 QLIV2_PT_FILE_LIST 指定用例文件列表（逗号分隔），用于从 Excel 筛选的 batch_exec 模式
 PT_FILE_LIST = os.environ.get("QLIV2_PT_FILE_LIST", "").strip()
 CASE_NAMES = os.environ.get("QLIV2_CASE_NAMES", "").strip()

@@ -151,7 +151,7 @@ def load_excel_test_cases(excel_file_path: str, sheetname: str):
             },
         )
         df = df.replace({np.nan: None, pd.NA: None})
-        df = df.applymap(parse_to_list)
+        df = df.apply(lambda column: column.map(parse_to_list))
         df = df.astype(
             {
                 "T1": "Int64",

@@ -9,6 +9,17 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+# Keep the switch available to pytest subprocesses and isolated batch workers.
+super_kernel_args=()
+for super_kernel_arg in "$@"; do
+    if [[ "$super_kernel_arg" == "--super-kernel" ]]; then
+        export MQSMLA_SUPER_KERNEL=1
+    else
+        super_kernel_args+=("$super_kernel_arg")
+    fi
+done
+set -- "${super_kernel_args[@]}"
+
 set -euo pipefail
 
 QSMLA_PT_SAVE_SCRIPT="./batch/test_mixed_quant_sparse_flash_mla_pt_save.py"
@@ -148,6 +159,7 @@ show_help() {
     echo "  help               显示本帮助信息"
     echo ""
     echo "选项（batch_save/batch_exec/batch_exec_graph/batch 命令支持）："
+    echo "  --super-kernel    Enable ACLGraph SuperKernel with full-core debug"
     echo "  --excel <路径>      指定excel文件路径（默认: ./excel/example.xlsx）"
     echo "  --sheet <名称>      指定excel sheet名（默认: decode）"
     echo "  --pt-dir <目录>     指定pt文件保存/读取目录（默认: mqsmla_testcase）"

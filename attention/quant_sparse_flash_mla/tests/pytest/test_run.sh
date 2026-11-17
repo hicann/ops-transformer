@@ -9,6 +9,17 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+# Keep the switch available to pytest subprocesses and isolated batch workers.
+super_kernel_args=()
+for super_kernel_arg in "$@"; do
+    if [[ "$super_kernel_arg" == "--super-kernel" ]]; then
+        export QSMLA_SUPER_KERNEL=1
+    else
+        super_kernel_args+=("$super_kernel_arg")
+    fi
+done
+set -- "${super_kernel_args[@]}"
+
 # 脚本路径
 QSMLA_PT_SAVE_SCRIPT="./batch/test_quant_sparse_flash_mla_pt_save.py"
 TEST_QSMLA_PT_BATCH_SCRIPT="test_quant_sparse_flash_mla_batch.py"
@@ -122,6 +133,7 @@ show_help() {
     echo "  --pt-dir <目录>   指定pt文件保存/读取目录（默认: qsmla_testcase）"
     echo "  --keep-pt         执行完成后保留pt文件（默认清理，仅batch命令）"
     echo "  --run-graph       执行aclgraph模式（默认不开启）"
+    echo "  --super-kernel    Enable ACLGraph SuperKernel with full-core debug"
     echo "  --batch-consistency <auto|on|off>  batch一致性策略（默认: auto）"
     echo ""
     echo "示例："

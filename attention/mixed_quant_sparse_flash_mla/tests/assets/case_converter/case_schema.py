@@ -788,8 +788,15 @@ def parameter_case(row):
         ("cu_seqlens_ori_kv", cuo if lk == "TND" else None),
         ("cu_seqlens_cmp_kv", cuc if lk == "TND" else None),
         ("seqused_q", qlen),
-        ("seqused_ori_kv", None if ori_sparse else olen),
-        ("seqused_cmp_kv", None if ori_sparse else clen),
+        # Paged masked sparse KV still needs active lengths for metadata.
+        (
+            "seqused_ori_kv",
+            olen if not ori_sparse or (lk == "PA_BBND" and omask != 0) else None,
+        ),
+        (
+            "seqused_cmp_kv",
+            clen if not ori_sparse or (lk == "PA_BBND" and cmask != 0) else None,
+        ),
         ("cmp_residual_kv", residual),
     )
     attributes = {

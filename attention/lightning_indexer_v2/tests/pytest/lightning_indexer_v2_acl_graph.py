@@ -23,6 +23,7 @@ import torchair
 import torch.nn as nn
 from torchair.configs.compiler_config import CompilerConfig
 import lightning_indexer_v2_golden
+from liv2_super_kernel import compile_super_kernel, super_kernel_enabled
 
 
 class LIV2Network(nn.Module):
@@ -193,13 +194,16 @@ def _liv2_run_compiled_graph(run_args):
     """
     通过 torch.compile + torchair 后端执行算子（共用逻辑）。
     """
-    config = CompilerConfig()
-    config.mode = "reduce-overhead"
-    npu_backend = torchair.get_npu_backend(compiler_config=config)
     torch._dynamo.reset()
-    npu_mode = torch.compile(
-        LIV2Network().npu(), fullgraph=False, backend=npu_backend, dynamic=False
-    )
+    if super_kernel_enabled():
+        npu_mode = compile_super_kernel(LIV2Network().npu())
+    else:
+        config = CompilerConfig()
+        config.mode = "reduce-overhead"
+        npu_backend = torchair.get_npu_backend(compiler_config=config)
+        npu_mode = torch.compile(
+            LIV2Network().npu(), fullgraph=False, backend=npu_backend, dynamic=False
+        )
     npu_result, npu_topk_value = npu_mode(**run_args)
     torch.npu.synchronize()
     npu_topk_value, _ = npu_topk_value.sort(dim=-1, descending=True)

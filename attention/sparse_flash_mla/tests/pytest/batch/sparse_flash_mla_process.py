@@ -16,6 +16,7 @@ import torch
 import torch_npu
 import torchair
 from torchair.configs.compiler_config import CompilerConfig
+from smla_super_kernel import compile_super_kernel, super_kernel_enabled
 
 # Register sparse_flash_mla and sparse_flash_mla_metadata via PTA
 TORCH_EXT_PATH = os.path.normpath(
@@ -98,6 +99,8 @@ class Network(torch.nn.Module):
 
 
 def call_npu(input_data):
+    if super_kernel_enabled():
+        return call_npu_graph(input_data, device_id=torch.npu.current_device())
     params = input_data["params"]
     metadata_input = input_data["metadata_input"]
     tensor_input = input_data["input"]
@@ -282,17 +285,20 @@ def call_npu_graph(input_data, device_id=0):
 
     torch._dynamo.reset()
     npu_mode = Network().npu()
-    config = CompilerConfig()
-    config.mode = "reduce-overhead"
-    config.experimental_config.aclgraph._aclnn_static_shape_kernel = True
-    config.experimental_config.aclgraph._aclnn_static_shape_kernel_build_dir = "./"
-    config.experimental_config.frozen_parameter = True
-    config.experimental_config.tiling_schedule_optimize = True
-    config.experimental_config.topology_sorting_strategy = "StableRDFS"
-    npu_backend = torchair.get_npu_backend(compiler_config=config)
-    npu_mode = torch.compile(
-        npu_mode, fullgraph=True, backend=npu_backend, dynamic=False
-    )
+    if super_kernel_enabled():
+        npu_mode = compile_super_kernel(npu_mode)
+    else:
+        config = CompilerConfig()
+        config.mode = "reduce-overhead"
+        config.experimental_config.aclgraph._aclnn_static_shape_kernel = True
+        config.experimental_config.aclgraph._aclnn_static_shape_kernel_build_dir = "./"
+        config.experimental_config.frozen_parameter = True
+        config.experimental_config.tiling_schedule_optimize = True
+        config.experimental_config.topology_sorting_strategy = "StableRDFS"
+        npu_backend = torchair.get_npu_backend(compiler_config=config)
+        npu_mode = torch.compile(
+            npu_mode, fullgraph=True, backend=npu_backend, dynamic=False
+        )
 
     # metadata解析
     K1 = metadata_input.get("K1")

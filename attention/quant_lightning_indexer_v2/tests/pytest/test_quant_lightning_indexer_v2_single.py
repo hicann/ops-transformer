@@ -22,6 +22,7 @@ import quant_lightning_indexer_v2_golden
 import pytest
 from batch import quant_lightning_indexer_v2_pt_loadprocess
 from qliv2_test_utils import QliV2ResultWriter, ensure_comparison_passed
+from qliv2_super_kernel import super_kernel_enabled
 
 paramset = os.environ.get("QLIV2_PARAMSET", "default")
 if paramset not in ("default", "stc"):
@@ -148,6 +149,8 @@ def test_qliv2(param_combinations):  # Init params and tensors
     run_mode = (
         os.environ.get("QLIV2_RUN_MODE", param_combinations["run_mode"]).strip().lower()
     )
+    if super_kernel_enabled():
+        run_mode = "graph"
     torch_npu.npu.set_device(0)
     test_data = (
         batch_size,

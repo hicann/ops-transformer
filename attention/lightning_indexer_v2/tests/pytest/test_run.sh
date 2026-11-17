@@ -9,6 +9,17 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+# Keep the switch available to pytest subprocesses and isolated batch workers.
+super_kernel_args=()
+for super_kernel_arg in "$@"; do
+    if [[ "$super_kernel_arg" == "--super-kernel" ]]; then
+        export LIV2_SUPER_KERNEL=1
+    else
+        super_kernel_args+=("$super_kernel_arg")
+    fi
+done
+set -- "${super_kernel_args[@]}"
+
 # ====================== 配置区======================
 # 默认读取的用例excel表格路径（须为具体文件，不支持通配符），如下：
 DEFAULT_EXCEL="./excel/test_cases.xlsx"
@@ -141,6 +152,8 @@ show_help() {
     echo "  candidate_reject                      执行 candidate host 校验拒绝用例"
     echo "  batch [options]      执行用例批量生成调试（生成pt后执行NPU测试）"
     echo "  batch_exec [options] 按Excel的Testcase_Name筛选已有pt直接执行NPU测试（跳过pt生成）"
+    echo ""
+    echo "  --super-kernel      Enable ACLGraph SuperKernel with full-core debug (single/batch/batch_exec)"
     echo ""
     echo "batch/batch_exec 选项："
     echo "  -E, --excel FILE     Excel用例表格路径（默认 $DEFAULT_EXCEL，须为具体文件）"

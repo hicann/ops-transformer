@@ -76,6 +76,17 @@ Batch tests:
 
 Execute in the pytest folder path:
 
+### SuperKernel
+
+```bash
+bash test_run.sh single --paramset stc --super-kernel
+bash test_run.sh batch -E ./excel/my.xlsx -S Sheet2 -P ./pt_path --super-kernel
+```
+
+Append `--super-kernel` to an existing batch command to enable it; otherwise, the original execution mode is unchanged.
+Metadata is still generated outside the graph. Single-operator full-core debugging remains enabled
+(`debug_per_op_max_core_num=1` does not limit execution to one core).
+
 ### Running Test Cases
 
 #### Single-Case Debugging

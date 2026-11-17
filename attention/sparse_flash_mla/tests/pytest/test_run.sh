@@ -9,6 +9,17 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+# Keep the switch available to pytest subprocesses and isolated batch workers.
+super_kernel_args=()
+for super_kernel_arg in "$@"; do
+    if [[ "$super_kernel_arg" == "--super-kernel" ]]; then
+        export SMLA_SUPER_KERNEL=1
+    else
+        super_kernel_args+=("$super_kernel_arg")
+    fi
+done
+set -- "${super_kernel_args[@]}"
+
 # 显示帮助信息
 show_help() {
     cat << EOF
@@ -46,6 +57,7 @@ show_help() {
     示例3: bash $0 load_graph -P "./data" -E "./excel/example.xlsx" -S "CSA"
 
 通用选项:
+  --super-kernel  Enable ACLGraph SuperKernel with full-core debug
   --batch-consistency <auto|on|off>
                batch一致性策略（默认auto：paramset/PT有配置时开启）
   -h, --help   显示此帮助信息

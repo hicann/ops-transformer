@@ -17,6 +17,7 @@ import numpy as np
 import cann_ops_transformer
 import torchair
 from torchair.configs.compiler_config import CompilerConfig
+from qsmla_super_kernel import compile_super_kernel, super_kernel_enabled
 import logging
 
 
@@ -114,17 +115,20 @@ def test_qsmla_quant_process_graph(test_data, device_id=0):
     # 编译
     torch._dynamo.reset()
     npu_model = Network().npu()
-    config = CompilerConfig()
-    config.mode = "reduce-overhead"
-    config.experimental_config.aclgraph._aclnn_static_shape_kernel = True
-    config.experimental_config.aclgraph._aclnn_static_shape_kernel_build_dir = "./"
-    config.experimental_config.frozen_parameter = True
-    config.experimental_config.tiling_schedule_optimize = True
-    config.experimental_config.topology_sorting_strategy = "StableRDFS"
-    npu_backend = torchair.get_npu_backend(compiler_config=config)
-    npu_model = torch.compile(
-        npu_model, backend=npu_backend, fullgraph=True, dynamic=False
-    )
+    if super_kernel_enabled():
+        npu_model = compile_super_kernel(npu_model)
+    else:
+        config = CompilerConfig()
+        config.mode = "reduce-overhead"
+        config.experimental_config.aclgraph._aclnn_static_shape_kernel = True
+        config.experimental_config.aclgraph._aclnn_static_shape_kernel_build_dir = "./"
+        config.experimental_config.frozen_parameter = True
+        config.experimental_config.tiling_schedule_optimize = True
+        config.experimental_config.topology_sorting_strategy = "StableRDFS"
+        npu_backend = torchair.get_npu_backend(compiler_config=config)
+        npu_model = torch.compile(
+            npu_model, backend=npu_backend, fullgraph=True, dynamic=False
+        )
 
     logging.info("program running in aclgraph mode.")
     logging.info(f"test_data:{params}")
@@ -264,6 +268,8 @@ def test_qsmla_quant_process_graph(test_data, device_id=0):
 
 
 def test_qsmla_quant_process_ci(test_data, device_id=0):
+    if super_kernel_enabled():
+        return test_qsmla_quant_process_graph(test_data, device_id=device_id)
     params = test_data["params"]
     metadata_input = test_data["metadata_input"]
     op_input = test_data["op_input"]

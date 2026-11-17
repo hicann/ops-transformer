@@ -50,6 +50,16 @@
 
 在pytest文件夹路径下执行：
 
+### SuperKernel
+
+```bash
+bash test_run.sh single --super-kernel
+bash test_run.sh batch_exec --pt-dir my_pt --mode 0  --super-kernel
+```
+
+批跑时在原命令末尾加 `--super-kernel`；默认沿用原执行模式。metadata 仍在图外生成，
+启用时保留单算子满核 debug（`debug_per_op_max_core_num=1`，不是限制为一个核）。
+
 ### 运行测试用例
 
 #### 单用例测试

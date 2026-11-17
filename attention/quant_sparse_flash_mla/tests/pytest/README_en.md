@@ -53,6 +53,17 @@ Batch testing:
 
 Run the commands in the pytest folder:
 
+### SuperKernel
+
+```bash
+bash test_run.sh single --super-kernel
+bash test_run.sh batch_exec --pt-dir my_pt --super-kernel
+```
+
+Append `--super-kernel` to an existing batch command to enable it; otherwise, the original execution mode is unchanged.
+Metadata is still generated outside the graph. Single-operator full-core debugging remains enabled
+(`debug_per_op_max_core_num=1` does not limit execution to one core).
+
 ### Running Test Cases
 
 #### Single-Case Testing

@@ -23,6 +23,7 @@ import math
 import os
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from liv2_super_kernel import super_kernel_enabled
 
 TEST_INPUT_PATH = "pt_path"
 # 支持通过环境变量 LIV2_TESTCASE_DIR 指定pt目录（batch模式由 test_run.sh 设置），
@@ -43,6 +44,8 @@ is_isolated_mode = bool(single_case_path)
 pt_file_list_env = os.environ.get("LIV2_PT_FILE_LIST", "").strip()
 # flag：运行模式 eager / graph（通过环境变量 LIV2_RUN_MODE 或命令行参数设置，默认 eager）
 run_mode = os.environ.get("LIV2_RUN_MODE", "eager").strip().lower()
+if super_kernel_enabled():
+    run_mode = "graph"
 # 生成所有的组合，并转换为字典列表
 locals()["testcase_files"] = []
 if single_case_path:
@@ -81,6 +84,7 @@ else:
 
 
 def liv2(testcase_files):  # 初始化参数和tensor
+    """Run one case and return any failure to the pytest process."""
     try:
         if run_mode == "graph":
             (
@@ -106,7 +110,7 @@ def liv2(testcase_files):  # 初始化参数和tensor
             ) = lightning_indexer_v2_pt_loadprocess.test_liv2_process(
                 testcase_files, device_id=device_id
             )
-        if npu_result != None:
+        if npu_result is not None:
             result, fulfill_percent = result_compare_method.check_result(
                 cpu_result,
                 npu_result,
@@ -186,7 +190,7 @@ def liv2(testcase_files):  # 初始化参数和tensor
             print(f"Excel列名: {list(df.columns)}")
             print(f"变量名: {list(row_data.keys())}")
             print("请检查变量名或Excel文件")
-            return False
+            return f"Result columns mismatch: {result_path}"
 
         # 追加新行
         new_df = pd.DataFrame([row_data])
@@ -197,8 +201,19 @@ def liv2(testcase_files):  # 初始化参数和tensor
 
     # 保存到Excel
     df.to_excel(result_path, index=False)
+    case_name = Path(testcase_files).stem
     if result == "NPU ERROR":
-        pytest.fail(f"用例执行失败:{Path(testcase_files).stem}")
+        return f"用例执行失败:{case_name}"
+    failures = []
+    if result != "Pass":
+        failures.append(f"indices={result} ({fulfill_percent:.2f}%)")
+    if result_return_value not in ("Pass", "N/A"):
+        failures.append(
+            f"values={result_return_value} ({fulfill_precent_return_value:.2f}%)"
+        )
+    if failures:
+        return f"{case_name}: " + "; ".join(failures)
+    return None
 
 
 @pytest.mark.ci
@@ -211,6 +226,8 @@ def test_liv2(testcase_files):  # 初始化参数和tensor
             for future in as_completed([futures]):
                 try:
                     result = future.result()
+                    if result is not None:
+                        pytest.fail(str(result))
                 except Exception as e:
                     pytest.fail(f"当前用例线程执行失败：{e}")
     else:
@@ -222,5 +239,7 @@ def test_liv2(testcase_files):  # 初始化参数和tensor
             for future in as_completed([future1]):
                 try:
                     result = future.result()
+                    if result is not None:
+                        pytest.fail(str(result))
                 except Exception as e:
                     pytest.fail(f"❌ 当前用例子进程执行失败：{e}")
