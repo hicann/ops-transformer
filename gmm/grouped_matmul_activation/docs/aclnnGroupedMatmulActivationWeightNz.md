@@ -91,15 +91,15 @@ aclnnStatus aclnnGroupedMatmulActivationWeightNz(
   | --- | --- | --- | --- | --- | --- | --- | --- |
   | x（const aclTensor*） | 输入 | 激活矩阵，对应公式中的X。 | 不支持空Tensor。 | FLOAT4_E2M1 | ND | `(M,K)` | √ |
   | xScale（const aclTensor*） | 输入 | 激活的缩放因子，对应公式中的S^X。 | 不支持空Tensor，每64个K元素对应2个缩放因子。 | FLOAT8_E8M0 | ND | `(M,K/64,2)` | √ |
-  | groupList（const aclTensor*） | 输入 | 专家分组信息。 | 不支持空Tensor，数据须位于Device内存，含义由groupListType指定。 | INT64 | ND | `(E)` | √ |
+  | groupList（const aclTensor*） | 输入 | 专家分组信息。 | 不支持空Tensor，含义由groupListType指定。 | INT64 | ND | `(E)` | √ |
   | weight（const aclTensorList*） | 输入 | 权重列表，对应公式中的W。 | 长度须为1，包含全部E个专家，不支持空Tensor。转置状态由stride识别，布局见约束说明。 | FLOAT4_E2M1 | FRACTAL_NZ | `(E,K,N)` | √ |
   | weightScale（const aclTensorList*） | 输入 | 权重缩放因子列表，对应公式中的S^W。 | 长度须为1，包含全部E个专家，不支持空Tensor，转置状态须与weight一致。 | FLOAT8_E8M0 | ND | `(E,K/64,N,2)` | √ |
-  | bias（const aclTensorList*） | 可选输入 | 预留的矩阵乘偏置。 | 仅支持nullptr或空列表，表示不加偏置。 | - | - | - | - |
+  | bias（const aclTensorList*） | 输入 | 预留的矩阵乘偏置。 | 仅支持nullptr或空列表。 | - | - | - | - |
   | dequantMode（int64_t） | 输入 | 反量化模式。 | 仅支持2，表示MX反量化。 | - | - | - | - |
   | dequantDtype（int64_t） | 输入 | GMM中间结果的数据类型。 | 仅支持0，表示FLOAT32。 | - | - | - | - |
   | actType（const char*） | 输入 | 激活类型。 | 仅支持字符串`"swiglu"`。 | - | - | - | - |
   | groupListType（int64_t） | 输入 | 分组列表解释方式。 | 0表示累计结束位置，1表示各组token数。 | - | - | - | - |
-  | tuningConfig（const aclIntArray*） | 可选输入 | 预留的调优配置。 | 仅支持nullptr或空数组。 | - | - | - | - |
+  | tuningConfig（const aclIntArray*） | 输入 | 预留的调优配置。 | 仅支持nullptr或空数组。 | - | - | - | - |
   | swigluMode（int64_t） | 输入 | SwiGLU计算模式。 | 仅支持2，表示前后分半、先裁剪再激活并应用alpha/bias，计算过程见功能说明。 | - | - | - | - |
   | clampLimit（double） | 输入 | 激活和线性分支的裁剪上限。 | 须为不超过FLOAT32最大有限值的正有限数，转换为FLOAT32后须大于0。 | - | - | - | - |
   | gluAlpha（double） | 输入 | sigmoid输入缩放系数。 | 须为有限数且绝对值不超过FLOAT32最大有限值。 | - | - | - | - |
@@ -144,17 +144,28 @@ aclnnStatus aclnnGroupedMatmulActivationWeightNz(
 ## 约束说明
 
 - 确定性说明：aclnnGroupedMatmulActivationWeightNz默认确定性实现。
-- 接口用于专家前向计算。M须大于0，K、N须为正数且满足128对齐，E的取值范围为`[1,1024]`。x和weight的逻辑K须一致。
-- 调用方传入的weight视图shape在两种布局下均为`(E,K,N)`，weightScale视图shape均为`(E,K/64,N,2)`，不能仅通过交换shape来声明转置。常用布局的描述符如下，stride以各Tensor的数据类型元素为单位，FLOAT4_E2M1权重每字节存储两个元素。
+- M须大于0。
+- K、N须为正数且满足128对齐。
+- 输入输出Tensor的数据类型、数据格式及shape如下。weight和weightScale传入的视图shape在转置和非转置布局下相同，转置状态由stride识别。
+
+| Tensor | 数据类型（dtype） | 数据格式 | 调用方传入的视图shape |
+| --- | --- | --- | --- |
+| x | FLOAT4_E2M1 | ND | `(M,K)` |
+| xScale（x_scale） | FLOAT8_E8M0 | ND | `(M,K/64,2)` |
+| weight | FLOAT4_E2M1 | FRACTAL_NZ | `(E,K,N)` |
+| weightScale | FLOAT8_E8M0 | ND | `(E,K/64,N,2)` |
+| groupList | INT64 | ND | `(E,)` |
+| y | BFLOAT16 | ND | `(M,N/2)` |
+
+- 常用布局的描述符如下，stride以各Tensor的数据类型元素为单位，权重每字节存储两个元素。
 
 | 布局 | weight的stride | weight的storage shape | weightScale的stride |
 | --- | --- | --- | --- |
 | 非转置 | `(K*N,N,1)` | `(E,N/64,K/16,16,64)` | `((K/64)*N*2,N*2,2,1)` |
 | 转置 | `(K*N,1,K)` | `(E,K/64,N/16,16,64)` | `((K/64)*N*2,2,(K/64)*2,1)` |
 
-- 接口根据stride识别weight和weightScale的转置状态，两者须保持一致。转置输入会由通路内部将视图归一化为`(E,N,K)`和`(E,N,K/64,2)`，调用方不应提前重复交换维度。转置weight的stride、weightScale的后三维stride须与上表一致；非转置权重须保持对应NZ数据布局。
-- weight和weightScale分别通过一个Tensor传入全部E个专家的数据，不能将各专家拆成多个TensorList元素。
-- `groupListType=0`时，groupList须非负、单调非递减，最后一个值不大于M；`groupListType=1`时，各组token数须非负且总和不超过M。允许专家的token数为0，Device侧分组数值由调用方保证合法。
+- 接口根据stride识别weight和weightScale的转置状态，两者须保持一致。转置weight的stride、weightScale的后三维stride须与上表一致。
+- E的取值范围为`[1,1024]`。`groupListType=0`时，groupList须非负、单调非递减，最后一个值不大于M；`groupListType=1`时，各组token数须非负且总和不超过M。允许专家的token数为0，分组数值由调用方保证合法。
 
 ## 调用示例
 
@@ -163,7 +174,7 @@ aclnnStatus aclnnGroupedMatmulActivationWeightNz(
 <!-- npu="950" id7 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
 
-  以下示例演示A4W4 WeightNZ输入、BF16输出的两段式接口调用，使用非转置权重，设备号为0。
+  以下示例演示A4W4 WeightNZ输入、BF16输出的两段式接口调用，使用非转置权重。
 
   ```cpp
   #include <acl/acl.h>
