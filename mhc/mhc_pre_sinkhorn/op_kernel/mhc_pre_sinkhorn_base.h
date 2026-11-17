@@ -162,7 +162,10 @@ __aicore__ inline void MulABLastDimBrcInline(const LocalTensor<T>& output, const
                 instrParams.src1BlkStride = 0;
                 instrParams.dstRepStride = dstRepStridePerLine;
                 instrParams.src0RepStride = dstRepStridePerLine;
-                instrParams.src1RepStride = 0;
+                // repeatTimes=curRowNum walks row by row with a per-row coefficient, so
+                // src1RepStride must be 1; for rf=1 repeatTimes==1, equivalent to the old
+                // value 0, behavior unchanged
+                instrParams.src1RepStride = 1;
                 Mul(output[numRepeatPerLine * elemInOneRepeat], input0[numRepeatPerLine * elemInOneRepeat], tmpBuffer,
                     numRemainPerLine, curRowNum, instrParams);
             }
@@ -186,7 +189,22 @@ __aicore__ inline void MulABLastDimBrcInline2(const LocalTensor<T>& output, cons
     uint32_t elemInOneRepeat = REPEAT_SIZE / sizeof(T);
     uint32_t curColNumAlign = RoundUp<T>(curColNum);
     if (curColNum <= elemInOneBlock) {
-        Mul(output, input0, tmpBuffer, curRowNum * curColNumAlign);
+        if (curRowNum == numN) {
+            // rf=1 legacy path: the first curRowNum blocks of tmpBuffer are exactly the
+            // per-row coefficients of x, identical to the old version
+            Mul(output, input0, tmpBuffer, curRowNum * curColNumAlign);
+        } else {
+            // rf>1: Brcb output is group-laid-out, coefficient c of group g lives in
+            // block (g*elemInOneBlock + c); blocks (g*elemInOneBlock + numN ..
+            // elemInOneBlock-1) are padding, fetch the coefficient block per row
+            for (uint32_t g = 0; g < static_cast<uint32_t>(curRowNum) / numN; g++) {
+                for (uint32_t c = 0; c < static_cast<uint32_t>(numN); c++) {
+                    uint32_t row = g * numN + c;
+                    Mul(output[row * curColNumAlign], input0[row * curColNumAlign],
+                        tmpBuffer[(g * elemInOneBlock + c) * elemInOneBlock], curColNumAlign);
+                }
+            }
+        }
     } else {
         int32_t numRepeatPerLine = curColNum / elemInOneRepeat;
         int32_t numRemainPerLine = curColNum % elemInOneRepeat;
@@ -208,16 +226,22 @@ __aicore__ inline void MulABLastDimBrcInline2(const LocalTensor<T>& output, cons
                         numRepeatPerLine, instrParams);
                 }
             } else {
-                // 在Row方向开Repeat
+                // Row-direction repeats: for rf>1 loop by group; within a group src1
+                // walks the coefficient blocks (g*elemInOneBlock + c) linearly with
+                // RepStride=1, avoiding reading inter-group padding blocks from a full
+                // linear table walk
                 instrParams.dstBlkStride = 1;
                 instrParams.src0BlkStride = 1;
                 instrParams.src1BlkStride = 0;
                 instrParams.dstRepStride = dstRepStridePerLine;
                 instrParams.src0RepStride = dstRepStridePerLine;
                 instrParams.src1RepStride = 1;
-                for (uint32_t i = 0; i < numRepeatPerLine; i++) {
-                    Mul(output[i * elemInOneRepeat], input0[i * elemInOneRepeat], tmpBuffer, elemInOneRepeat, curRowNum,
-                        instrParams);
+                for (uint32_t g = 0; g < static_cast<uint32_t>(curRowNum) / numN; g++) {
+                    for (uint32_t i = 0; i < numRepeatPerLine; i++) {
+                        Mul(output[g * numN * curColNumAlign + i * elemInOneRepeat],
+                            input0[g * numN * curColNumAlign + i * elemInOneRepeat],
+                            tmpBuffer[g * elemInOneBlock * elemInOneBlock], elemInOneRepeat, numN, instrParams);
+                    }
                 }
             }
         }
@@ -242,8 +266,13 @@ __aicore__ inline void MulABLastDimBrcInline2(const LocalTensor<T>& output, cons
                 instrParams.dstRepStride = dstRepStridePerLine;
                 instrParams.src0RepStride = dstRepStridePerLine;
                 instrParams.src1RepStride = 1;
-                Mul(output[numRepeatPerLine * elemInOneRepeat], input0[numRepeatPerLine * elemInOneRepeat], tmpBuffer,
-                    numRemainPerLine, curRowNum, instrParams);
+                // remain-row-direction: loop by group for the same reason as the
+                // row-direction path
+                for (uint32_t g = 0; g < static_cast<uint32_t>(curRowNum) / numN; g++) {
+                    Mul(output[g * numN * curColNumAlign + numRepeatPerLine * elemInOneRepeat],
+                        input0[g * numN * curColNumAlign + numRepeatPerLine * elemInOneRepeat],
+                        tmpBuffer[g * elemInOneBlock * elemInOneBlock], numRemainPerLine, numN, instrParams);
+                }
             }
         }
     }
@@ -318,7 +347,10 @@ __aicore__ inline void SubABLastDimBrcInline(const LocalTensor<T>& output, const
                 instrParams.src1BlkStride = 0;
                 instrParams.dstRepStride = dstRepStridePerLine;
                 instrParams.src0RepStride = dstRepStridePerLine;
-                instrParams.src1RepStride = 0;
+                // repeatTimes=curRowNum walks row by row with a per-row coefficient, so
+                // src1RepStride must be 1; for rf=1 repeatTimes==1, equivalent to the old
+                // value 0, behavior unchanged
+                instrParams.src1RepStride = 1;
                 Sub(output[numRepeatPerLine * elemInOneRepeat], input0[numRepeatPerLine * elemInOneRepeat], tmpBuffer,
                     numRemainPerLine, curRowNum, instrParams);
             }
@@ -395,7 +427,10 @@ __aicore__ inline void DivABLastDimBrcInline(const LocalTensor<T>& output, const
                 instrParams.src1BlkStride = 0;
                 instrParams.dstRepStride = dstRepStridePerLine;
                 instrParams.src0RepStride = dstRepStridePerLine;
-                instrParams.src1RepStride = 0;
+                // repeatTimes=curRowNum walks row by row with a per-row coefficient, so
+                // src1RepStride must be 1; for rf=1 repeatTimes==1, equivalent to the old
+                // value 0, behavior unchanged
+                instrParams.src1RepStride = 1;
                 Div(output[numRepeatPerLine * elemInOneRepeat], input0[numRepeatPerLine * elemInOneRepeat], tmpBuffer,
                     numRemainPerLine, curRowNum, instrParams);
             }
