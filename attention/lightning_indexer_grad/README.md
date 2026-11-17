@@ -73,7 +73,7 @@
     <tr>
       <td>dy</td>
       <td>输入</td>
-      <td>公式中的输入dY，表示输出梯度，不支持空tensor和非连续。layout为BSND时，shape为(B,S1,N1,D)；layout为TND时，shape为(T1,N1,D)。</td>
+      <td>公式中的输入dY，表示输出梯度，不支持空tensor和非连续。layout为BSND时，shape为(B,S1,K)；layout为TND时，shape为(T1,K)，其中K为topK（sparseCount），不含N1头维。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
     </tr>

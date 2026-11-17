@@ -134,10 +134,10 @@ aclnnStatus aclnnLightningIndexerGrad(
       <td>dy</td>
       <td>输入</td>
       <td>公式中的value。</td>
-      <td>shape支持[B, S1, N1, D]/[T1, N1, D]。</td>
+      <td>shape支持[B, S1, K]/[T1, K]，K为sparseCount（topk），不含N1头维。</td>
       <td>BFLOAT16、FLOAT16</td>
       <td>ND</td>
-      <td>3-4</td>
+      <td>2-3</td>
       <td>√</td>
     </tr>
     <tr>
@@ -571,7 +571,7 @@ int main()
 
     std::vector<int64_t> qShape = {batch, s1, n2 * g, d};
     std::vector<int64_t> kShape = {batch, s2, n2, d};
-    std::vector<int64_t> dyShape = {batch, s1, n2 * g, d};
+    std::vector<int64_t> dyShape = {batch, s1, topK};
     std::vector<int64_t> sparseIndicesShape = {batch, s1, topK};
     std::vector<int64_t> weightsShape = {batch, s1, n2 * g};
     std::vector<int64_t> dQueryShape = {batch, s1, n2 * g, d};

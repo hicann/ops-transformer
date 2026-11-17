@@ -192,7 +192,7 @@ int main()
 
     std::vector<int64_t> qShape = {batch, s1, n2 * g, d};
     std::vector<int64_t> kShape = {batch, s2, n2, d};
-    std::vector<int64_t> dyShape = {batch, s1, n2 * g, d};
+    std::vector<int64_t> dyShape = {batch, s1, topK};
     std::vector<int64_t> sparseIndicesShape = {batch, s1, topK};
     std::vector<int64_t> weightsShape = {batch, s1, n2 * g};
     std::vector<int64_t> dQueryShape = {batch, s1, n2 * g, d};

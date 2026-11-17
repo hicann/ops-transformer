@@ -75,7 +75,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>dy</td>
       <td>Input</td>
-      <td>Input dY in the formula, indicating the output gradient. Empty tensors and non-contiguous tensors are not supported. When layout is BSND, the shape is (B,S1,N1,D). When layout is TND, the shape is (T1,N1,D).</td>
+      <td>Input dY in the formula, indicating the output gradient. Empty tensors and non-contiguous tensors are not supported. When layout is BSND, the shape is (B,S1,K). When layout is TND, the shape is (T1,K), where K is topK (sparseCount); there is no N1 head dimension.</td>
       <td>FLOAT16, BFLOAT16</td>
       <td>ND</td>
     </tr>
