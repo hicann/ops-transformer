@@ -102,10 +102,12 @@ static const std::initializer_list<DataType> routing_map_dtype_list = {op::DataT
 static const std::initializer_list<DataType> indice_dtype_list = {op::DataType::DT_INT32};
 
 static inline bool CheckNotNull(const aclTensor* permuteTokens, const aclTensor* sortedIndices,
-                                const aclTensor* probsOptional, const aclIntArray* restoreShapeOptional)
+                                const aclTensor* probsOptional, const aclIntArray* restoreShapeOptional,
+                                aclTensor* unpermutedTokens)
 {
     OP_CHECK_NULL(permuteTokens, return false);
     OP_CHECK_NULL(sortedIndices, return false);
+    OP_CHECK_NULL(unpermutedTokens, return false);
     if (probsOptional == nullptr && restoreShapeOptional == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
             "MoeTokenUnpermuteWithRoutingMap", "probsOptional, restoreShapeOptional",
@@ -226,7 +228,8 @@ static aclnnStatus CheckParams(const aclTensor* permuteTokens, const aclTensor* 
                                const aclIntArray* restoreShapeOptional, aclTensor* unpermutedTokens,
                                aclTensor* outIndex, aclTensor* permuteTokenId, aclTensor* permuteProbs)
 {
-    CHECK_RET(CheckNotNull(permuteTokens, sortedIndices, probsOptional, restoreShapeOptional), ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(CheckNotNull(permuteTokens, sortedIndices, probsOptional, restoreShapeOptional, unpermutedTokens),
+              ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(permuteTokens, sortedIndices, routingMapOptional, probsOptional, unpermutedTokens,
                               outIndex, permuteTokenId, permuteProbs),
               ACLNN_ERR_PARAM_INVALID);
