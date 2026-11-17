@@ -49,15 +49,16 @@ private:
                                        LocalTensor<float>& src1Tensor, uint32_t s1Extend, uint32_t s2Extend,
                                        uint32_t s2ExtendAlign, const SoftMaxTiling& tiling);
     __aicore__ inline void SubGrapA(int64_t curIdx, const VecBlockInfoDet& blockInfo, event_t mte2WaitMte3A,
-                                    const bool skipSftMaxSumCopy);
+                                    const bool skipSftMaxSumCopy, event_t mte2WaitMte3B);
     __aicore__ inline void SubGrapB(int64_t curIdx, const VecBlockInfoDet& blockInfo, event_t mte2WaitMte3B,
                                     const bool skipSftMaxSumCopy);
     __aicore__ inline void DropOutCopy(LocalTensor<uint8_t>& dropMaskTensor, int64_t s2VBegin);
     __aicore__ inline void OrderAccum(GlobalTensor<float> dstTensor, GlobalTensor<float> srcTensor, DetGroup detGrop,
-                                      uint32_t pingpongFlag, int32_t headNum, int32_t startBlkIdx, int32_t usedVecCore);
+                                      uint32_t pingpongFlag, int32_t headNum, int32_t startBlkIdx, int32_t usedVecCore,
+                                      uint32_t dOffset);
     __aicore__ inline void OrderAccumDq(GlobalTensor<INPUT_TYPE> dstTensor, GlobalTensor<float> srcTensor,
                                         DetGroup detGrop, uint32_t pingpongFlag, uint32_t startBlkIdx,
-                                        uint32_t usedVecCore);
+                                        uint32_t usedVecCore, uint32_t dOffset);
 
 protected:
     TBuf<> unifiedBuffer;
@@ -82,6 +83,7 @@ protected:
     constexpr static uint32_t TMP_UB_SIZE = 33 * 1024;
     constexpr static uint32_t TOTAL_SIZE = 191 * 1024;
     constexpr static int32_t CUBE_BLOCK_SIZE = 512 * 512;
+    constexpr static uint32_t DET_D_BLOCK_SIZE = 128;
     uint32_t eventIdAPing = 3;
     uint32_t eventIdAPong = 4;
     uint32_t eventIdBPing = 5;
@@ -176,6 +178,9 @@ __aicore__ void VecOpDet<FAGT>::Init(GM_ADDR drop_mask, GM_ADDR softmax_max, GM_
     if (layout != TND) {
         dimS1 = tilingData->basicDetTensorTilingData.s1;
         dimS2 = tilingData->basicDetTensorTilingData.s2;
+    }
+    if (headDim > DET_D_BLOCK_SIZE) {
+        dqPostAbsorb = 1;
     }
 
     pipe->InitBuffer(unifiedBuffer, TOTAL_SIZE);
@@ -396,7 +401,7 @@ __aicore__ inline void VecOpDet<FAGT>::DropOutCopy(LocalTensor<uint8_t>& dropMas
 
 template <typename FAGT>
 __aicore__ inline void VecOpDet<FAGT>::SubGrapA(int64_t curIdx, const VecBlockInfoDet& blockInfo, event_t mte2WaitMte3A,
-                                                const bool skipSftMaxSumCopy)
+                                                const bool skipSftMaxSumCopy, event_t mte2WaitMte3B)
 {
     if (curIdx > 0) {
         WAIT_FLAG(MTE3, MTE2, mte2WaitMte3A);
@@ -404,6 +409,18 @@ __aicore__ inline void VecOpDet<FAGT>::SubGrapA(int64_t curIdx, const VecBlockIn
     DataCopyPad(mm2OutTensor, mm2WorkspaceGm[copyInOffset], copyInParam, {false, 0, 0, 0});
     SET_FLAG(MTE2, V, EVENT_ID0);
     WAIT_FLAG(MTE2, V, EVENT_ID0);
+
+    if (headDim > DET_D_BLOCK_SIZE) {
+        if (!skipSftMaxSumCopy) {
+            CopyInSoftMax(sftMaxSumTensor, s1Extend, softMaxOffset);
+        }
+        // Signal stats readiness before the independent MM1 DMA is queued.
+        SET_FLAG(MTE2, V, EVENT_ID0);
+        if (curIdx > 0) {
+            WAIT_FLAG(MTE3, MTE2, mte2WaitMte3B);
+        }
+        DataCopyPad(mm1OutTensor, mm1WorkspaceGm[copyInOffset], copyInParam, {false, 0, 0, 0});
+    }
 
     Muls(mm2OutTensor, mm2OutTensor, scaleValue, s1Extend * s2ExtendAlign);
     AscendC::PipeBarrier<PIPE_V>();
@@ -437,11 +454,12 @@ __aicore__ inline void VecOpDet<FAGT>::SubGrapA(int64_t curIdx, const VecBlockIn
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    if (!skipSftMaxSumCopy) {
-        CopyInSoftMax(sftMaxSumTensor, s1Extend, softMaxOffset);
+    if (headDim <= DET_D_BLOCK_SIZE) {
+        if (!skipSftMaxSumCopy) {
+            CopyInSoftMax(sftMaxSumTensor, s1Extend, softMaxOffset);
+        }
+        SET_FLAG(MTE2, V, EVENT_ID0);
     }
-
-    SET_FLAG(MTE2, V, EVENT_ID0);
     WAIT_FLAG(MTE2, V, EVENT_ID0);
 
     CalcSoftMax(softmaxResTensor, mm2OutTensor, sftMaxSumTensor, s1Extend, s2Extend, s2ExtendAlign,
@@ -484,10 +502,12 @@ template <typename FAGT>
 __aicore__ inline void VecOpDet<FAGT>::SubGrapB(int64_t curIdx, const VecBlockInfoDet& blockInfo, event_t mte2WaitMte3B,
                                                 const bool skipSftMaxSumCopy)
 {
-    if (curIdx > 0) {
-        WAIT_FLAG(MTE3, MTE2, mte2WaitMte3B);
+    if (headDim <= DET_D_BLOCK_SIZE) {
+        if (curIdx > 0) {
+            WAIT_FLAG(MTE3, MTE2, mte2WaitMte3B);
+        }
+        DataCopyPad(mm1OutTensor, mm1WorkspaceGm[copyInOffset], copyInParam, {false, 0, 0, 0});
     }
-    DataCopyPad(mm1OutTensor, mm1WorkspaceGm[copyInOffset], copyInParam, {false, 0, 0, 0});
 
     if constexpr (DROP_ENABLE == true) {
         SET_FLAG(MTE2, V, EVENT_ID0);
@@ -616,8 +636,18 @@ __aicore__ inline void VecOpDet<FAGT>::DetVector1(const VecAddrInfoDet& addrs)
         event_t mte2WaitMte3B = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE3_MTE2>());
         if (unlikely(blockInfo.isFullMask)) {
             CalFullMask(i, mte2WaitMte3A, mte2WaitMte3B);
+        } else if (unlikely(s1Extend == 0)) {
+            // A one-row tail leaves the second AIV empty. Keep the event chain across tiles.
+            if (i > 0) {
+                WAIT_FLAG(MTE3, MTE2, mte2WaitMte3A);
+                WAIT_FLAG(MTE3, MTE2, mte2WaitMte3B);
+            }
+            if (i + 1 < blockLen) {
+                SET_FLAG(MTE3, MTE2, mte2WaitMte3A);
+                SET_FLAG(MTE3, MTE2, mte2WaitMte3B);
+            }
         } else {
-            SubGrapA(i, blockInfo, mte2WaitMte3A, skipSftMaxSumCopy);
+            SubGrapA(i, blockInfo, mte2WaitMte3A, skipSftMaxSumCopy, mte2WaitMte3B);
             SubGrapB(i, blockInfo, mte2WaitMte3B, skipSftMaxSumCopy);
         }
         GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(mte2WaitMte3A);
@@ -637,17 +667,24 @@ __aicore__ inline void VecOpDet<FAGT>::DetVector2(const VecAddrInfoDet& addrs)
     SET_FLAG(V, MTE2, eventIdBPong);
 
     uint32_t pingpongFlag = 0;
+    const uint32_t dSlices = headDim > DET_D_BLOCK_SIZE ? (headDim + DET_D_BLOCK_SIZE - 1) / DET_D_BLOCK_SIZE : 1;
 
     if (vecCoreIdx < 16) {
         if (dqPostAbsorb) {
             for (uint32_t groupIdx = 0; groupIdx < addrs.s1GroupNum; groupIdx++) {
-                OrderAccumDq(dqGm, dqDetWorkSpaceGm, addrs.detS1GroupList[groupIdx], pingpongFlag, 0, 16);
+                for (uint32_t slice = 0; slice < dSlices; slice++) {
+                    const uint32_t dOffset = slice * DET_D_BLOCK_SIZE;
+                    OrderAccumDq(dqGm, dqDetWorkSpaceGm, addrs.detS1GroupList[groupIdx], pingpongFlag, 0, 16, dOffset);
+                }
                 pingpongFlag = 1 - pingpongFlag;
             }
         } else {
             for (uint32_t groupIdx = 0; groupIdx < addrs.s1GroupNum; groupIdx++) {
-                OrderAccum(dqWorkSpaceGm, dqDetWorkSpaceGm, addrs.detS1GroupList[groupIdx], pingpongFlag, n2 * g, 0,
-                           16);
+                for (uint32_t slice = 0; slice < dSlices; slice++) {
+                    const uint32_t dOffset = slice * DET_D_BLOCK_SIZE;
+                    OrderAccum(dqWorkSpaceGm, dqDetWorkSpaceGm, addrs.detS1GroupList[groupIdx], pingpongFlag, n2 * g, 0,
+                               16, dOffset);
+                }
                 pingpongFlag = 1 - pingpongFlag;
             }
         }
@@ -659,7 +696,11 @@ __aicore__ inline void VecOpDet<FAGT>::DetVector2(const VecAddrInfoDet& addrs)
             if (addrs.detS2GroupList[groupIdx].accumNum == 1) {
                 continue;
             }
-            OrderAccum(dkWorkSpaceGm, dkDetWorkSpaceGm, addrs.detS2GroupList[groupIdx], pingpongFlag, n2, 16, 16);
+            for (uint32_t slice = 0; slice < dSlices; slice++) {
+                const uint32_t dOffset = slice * DET_D_BLOCK_SIZE;
+                OrderAccum(dkWorkSpaceGm, dkDetWorkSpaceGm, addrs.detS2GroupList[groupIdx], pingpongFlag, n2, 16, 16,
+                           dOffset);
+            }
             pingpongFlag = 1 - pingpongFlag;
         }
     }
@@ -670,8 +711,11 @@ __aicore__ inline void VecOpDet<FAGT>::DetVector2(const VecAddrInfoDet& addrs)
             if (addrs.detS2GroupList[groupIdx].accumNum == 1) {
                 continue;
             }
-            OrderAccum(dvWorkSpaceGm, dvDetWorkSpaceGm, addrs.detS2GroupList[groupIdx], pingpongFlag, n2, dvStartCore,
-                       16);
+            for (uint32_t slice = 0; slice < dSlices; slice++) {
+                const uint32_t dOffset = slice * DET_D_BLOCK_SIZE;
+                OrderAccum(dvWorkSpaceGm, dvDetWorkSpaceGm, addrs.detS2GroupList[groupIdx], pingpongFlag, n2,
+                           dvStartCore, 16, dOffset);
+            }
             pingpongFlag = 1 - pingpongFlag;
         }
     }
@@ -685,7 +729,7 @@ __aicore__ inline void VecOpDet<FAGT>::DetVector2(const VecAddrInfoDet& addrs)
 template <typename FAGT>
 __aicore__ inline void VecOpDet<FAGT>::OrderAccumDq(GlobalTensor<INPUT_TYPE> dstTensor, GlobalTensor<float> srcTensor,
                                                     DetGroup detGrop, uint32_t pingpongFlag, uint32_t startBlkIdx,
-                                                    uint32_t usedVecCore)
+                                                    uint32_t usedVecCore, uint32_t dOffset)
 {
     LocalTensor<float> addTensor = pingpongFlag ? addPingTensor : addPongTensor;
     LocalTensor<INPUT_TYPE> addCastTensor = pingpongFlag ? addCastPingTensor : addCastPongTensor;
@@ -705,17 +749,47 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccumDq(GlobalTensor<INPUT_TYPE> dst
         copyOutGmOffset = detGrop.outAddr + (loclBlockIdx * processS1 + tailS1) * headNum * headDim;
     }
 
-    uint32_t dataSize = processS1 * headDim;
+    uint32_t processD = headDim;
+    if (headDim > DET_D_BLOCK_SIZE) {
+        processD = (headDim - dOffset > DET_D_BLOCK_SIZE) ? DET_D_BLOCK_SIZE : headDim - dOffset;
+    }
+    uint32_t dataSize = processS1 * processD;
     uint32_t resIdx = detGrop.accumList[0];
+    uint64_t workspaceOffset = copyInGmOffset;
+    if (headDim > DET_D_BLOCK_SIZE) {
+        copyOutGmOffset = detGrop.outAddr + copyInGmOffset;
+        workspaceOffset = copyOutGmOffset;
+    }
+    AscendC::DataCopyExtParams detCopyInParams;
+    detCopyInParams.blockCount = processS1;
+    detCopyInParams.blockLen = processD * sizeof(float);
+    detCopyInParams.srcStride = (headDim - processD) * sizeof(float);
+    detCopyInParams.dstStride = 0;
+    detCopyInParams.rsv = 0;
+    AscendC::DataCopyExtParams detCopyOutParams;
+    detCopyOutParams.blockCount = processS1;
+    detCopyOutParams.blockLen = processD * sizeof(float);
+    detCopyOutParams.srcStride = 0;
+    detCopyOutParams.dstStride = (headDim - processD) * sizeof(float);
+    detCopyOutParams.rsv = 0;
     AscendC::DataCopyExtParams intriParams;
     intriParams.blockCount = processS1;
-    intriParams.blockLen = headDim * sizeof(INPUT_TYPE);
+    intriParams.blockLen = processD * sizeof(INPUT_TYPE);
     intriParams.srcStride = 0;
-    intriParams.dstStride = (headNum - 1) * headDim * sizeof(INPUT_TYPE);
+    if (headDim > DET_D_BLOCK_SIZE) {
+        intriParams.dstStride = (headDim - processD) * sizeof(INPUT_TYPE);
+    } else {
+        intriParams.dstStride = (headNum - 1) * headDim * sizeof(INPUT_TYPE);
+    }
 
     // first process
     WAIT_FLAG(MTE3, MTE2, eventIdA);
-    DataCopy(addTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim], dataSize);
+    if (headDim > DET_D_BLOCK_SIZE) {
+        DataCopyPad(addTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim + dOffset], detCopyInParams,
+                    {false, 0, 0, 0});
+    } else {
+        DataCopy(addTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim], dataSize);
+    }
 
     SET_FLAG(MTE2, MTE3, EVENT_ID0);
     WAIT_FLAG(MTE2, MTE3, EVENT_ID0);
@@ -729,7 +803,12 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccumDq(GlobalTensor<INPUT_TYPE> dst
         resIdx = detGrop.accumList[i];
 
         WAIT_FLAG(V, MTE2, eventId);
-        DataCopy(copyTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim], dataSize);
+        if (headDim > DET_D_BLOCK_SIZE) {
+            DataCopyPad(copyTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim + dOffset], detCopyInParams,
+                        {false, 0, 0, 0});
+        } else {
+            DataCopy(copyTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim], dataSize);
+        }
 
         SET_FLAG(MTE2, V, EVENT_ID0);
         WAIT_FLAG(MTE2, V, EVENT_ID0);
@@ -749,7 +828,11 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccumDq(GlobalTensor<INPUT_TYPE> dst
             uint32_t eventId = (detGrop.accumNum % 2) ? eventIdBPing : eventIdBPong;
 
             WAIT_FLAG(V, MTE2, eventId);
-            DataCopy(copyTensor, dqWorkSpaceGm[copyInGmOffset], dataSize);
+            if (headDim > DET_D_BLOCK_SIZE) {
+                DataCopyPad(copyTensor, dqWorkSpaceGm[workspaceOffset + dOffset], detCopyInParams, {false, 0, 0, 0});
+            } else {
+                DataCopy(copyTensor, dqWorkSpaceGm[copyInGmOffset], dataSize);
+            }
 
             SET_FLAG(MTE2, V, EVENT_ID0);
             WAIT_FLAG(MTE2, V, EVENT_ID0);
@@ -768,13 +851,17 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccumDq(GlobalTensor<INPUT_TYPE> dst
         SET_FLAG(V, MTE3, EVENT_ID0);
         WAIT_FLAG(V, MTE3, EVENT_ID0);
 
-        DataCopyPad(dstTensor[copyOutGmOffset], addCastTensor, intriParams);
+        DataCopyPad(dstTensor[copyOutGmOffset + dOffset], addCastTensor, intriParams);
     } else if (detGrop.existFirstBlock && !detGrop.existLastBlock) {
         // 第一块，直接覆盖输出到临时GM上
         SET_FLAG(V, MTE3, EVENT_ID0);
         WAIT_FLAG(V, MTE3, EVENT_ID0);
 
-        DataCopy(dqWorkSpaceGm[copyInGmOffset], addTensor, dataSize);
+        if (headDim > DET_D_BLOCK_SIZE) {
+            DataCopyPad(dqWorkSpaceGm[workspaceOffset + dOffset], addTensor, detCopyOutParams);
+        } else {
+            DataCopy(dqWorkSpaceGm[copyInGmOffset], addTensor, dataSize);
+        }
     } else {
         // 既不是最后一块也是不是最后一块，
         // 则在临时GM上累加
@@ -782,7 +869,11 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccumDq(GlobalTensor<INPUT_TYPE> dst
         WAIT_FLAG(V, MTE3, EVENT_ID0);
 
         AscendC::SetAtomicType<float>();
-        DataCopy(dqWorkSpaceGm[copyInGmOffset], addTensor, dataSize);
+        if (headDim > DET_D_BLOCK_SIZE) {
+            DataCopyPad(dqWorkSpaceGm[workspaceOffset + dOffset], addTensor, detCopyOutParams);
+        } else {
+            DataCopy(dqWorkSpaceGm[copyInGmOffset], addTensor, dataSize);
+        }
         AscendC::SetAtomicNone();
     }
 
@@ -792,7 +883,7 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccumDq(GlobalTensor<INPUT_TYPE> dst
 template <typename FAGT>
 __aicore__ inline void VecOpDet<FAGT>::OrderAccum(GlobalTensor<float> dstTensor, GlobalTensor<float> srcTensor,
                                                   DetGroup detGrop, uint32_t pingpongFlag, int32_t headNum,
-                                                  int32_t startBlkIdx, int32_t usedVecCore)
+                                                  int32_t startBlkIdx, int32_t usedVecCore, uint32_t dOffset)
 {
     LocalTensor<float> addTensor = pingpongFlag ? addPingTensor : addPongTensor;
     uint32_t eventIdA = pingpongFlag ? eventIdAPing : eventIdAPong;
@@ -821,11 +912,26 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccum(GlobalTensor<float> dstTensor,
         }
     }
 
-    uint32_t dataSize = processS1 * headDim;
+    uint32_t processD = headDim;
+    if (headDim > DET_D_BLOCK_SIZE) {
+        processD = (headDim - dOffset > DET_D_BLOCK_SIZE) ? DET_D_BLOCK_SIZE : headDim - dOffset;
+    }
+    uint32_t dataSize = processS1 * processD;
     uint32_t resIdx = detGrop.accumList[0];
+    AscendC::DataCopyExtParams detCopyInParams;
+    detCopyInParams.blockCount = processS1;
+    detCopyInParams.blockLen = processD * sizeof(float);
+    detCopyInParams.srcStride = (headDim - processD) * sizeof(float);
+    detCopyInParams.dstStride = 0;
+    detCopyInParams.rsv = 0;
     // first process
     WAIT_FLAG(MTE3, MTE2, eventIdA);
-    DataCopy(addTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim], dataSize);
+    if (headDim > DET_D_BLOCK_SIZE) {
+        DataCopyPad(addTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim + dOffset], detCopyInParams,
+                    {false, 0, 0, 0});
+    } else {
+        DataCopy(addTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim], dataSize);
+    }
 
     SET_FLAG(MTE2, MTE3, EVENT_ID0);
     WAIT_FLAG(MTE2, MTE3, EVENT_ID0);
@@ -839,7 +945,12 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccum(GlobalTensor<float> dstTensor,
         LocalTensor<float> copyTensor = i % 2 ? copyPingTensor : copyPongTensor;
 
         WAIT_FLAG(V, MTE2, eventId);
-        DataCopy(copyTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim], dataSize);
+        if (headDim > DET_D_BLOCK_SIZE) {
+            DataCopyPad(copyTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim + dOffset], detCopyInParams,
+                        {false, 0, 0, 0});
+        } else {
+            DataCopy(copyTensor, srcTensor[copyInGmOffset + resIdx * 512 * headDim], dataSize);
+        }
 
         SET_FLAG(MTE2, V, EVENT_ID0);
         WAIT_FLAG(MTE2, V, EVENT_ID0);
@@ -855,7 +966,9 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccum(GlobalTensor<float> dstTensor,
     // end process
     AscendC::DataCopyExtParams intriParams;
     int32_t _dstStride;
-    if (layout == BNGSD) {
+    if (headDim > DET_D_BLOCK_SIZE) {
+        _dstStride = (headDim - processD) * sizeof(float);
+    } else if (layout == BNGSD) {
         _dstStride = 0;
     } else if (layout == SBNGD) {
         _dstStride = (batch * headNum - 1) * headDim * sizeof(float);
@@ -863,12 +976,12 @@ __aicore__ inline void VecOpDet<FAGT>::OrderAccum(GlobalTensor<float> dstTensor,
         _dstStride = (headNum - 1) * headDim * sizeof(float);
     }
     intriParams.blockCount = processS1;
-    intriParams.blockLen = headDim * sizeof(float);
+    intriParams.blockLen = processD * sizeof(float);
     intriParams.srcStride = 0;
     intriParams.dstStride = _dstStride;
 
     AscendC::SetAtomicType<float>();
-    DataCopyPad(dstTensor[copyOutGmOffset], addTensor, intriParams);
+    DataCopyPad(dstTensor[copyOutGmOffset + dOffset], addTensor, intriParams);
     AscendC::SetAtomicNone();
 
     SET_FLAG(MTE3, MTE2, eventIdA);

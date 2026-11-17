@@ -223,12 +223,16 @@ public:
         }
 
         SyncFunc();
-        ComputeMMDKV<DK>(shapeInfo, dsWorkSpaceAddr, queryAddr, dk_out);
-        SyncFunc();
-        ComputeMMDQ<DQ>(shapeInfo, dsWorkSpaceAddr, keyAddr, dq_out);
-        SyncFunc();
-        ComputeMMDKV<DV>(shapeInfo, pWorkSpaceAddr, dyAddr, dv_out);
-        SyncFunc();
+        if (dimD > 128) {
+            ComputeMM345Wide(shapeInfo, dq_out, dk_out, dv_out);
+        } else {
+            ComputeMMDKV<DK>(shapeInfo, dsWorkSpaceAddr, queryAddr, dk_out, dimD);
+            SyncFunc();
+            ComputeMMDQ<DQ>(shapeInfo, dsWorkSpaceAddr, keyAddr, dq_out, dimD);
+            SyncFunc();
+            ComputeMMDKV<DV>(shapeInfo, pWorkSpaceAddr, dyAddr, dv_out, dimD);
+            SyncFunc();
+        }
 
         WAIT_FLAG(MTE1, MTE2, aEventIDPing);
         WAIT_FLAG(MTE1, MTE2, aEventIDPong);
@@ -239,24 +243,60 @@ public:
     };
 
 private:
+    __aicore__ __attribute__((noinline)) void ComputeMM345Wide(const CubeAddrInfoDet& shapeInfo, __gm__ float* dq_out,
+                                                               __gm__ float* dk_out, __gm__ float* dv_out)
+    {
+        for (uint32_t dOffset = 0; dOffset < dimD; dOffset += SIZE_128) {
+            const uint64_t realN = min(dimD - dOffset, uint64_t(SIZE_128));
+            ComputeMMDKV<DK, true>(shapeInfo, dsWorkSpaceAddr, queryAddr + dOffset, dk_out + dOffset, realN);
+            SyncFunc();
+            ComputeMMDQ<DQ, true>(shapeInfo, dsWorkSpaceAddr, keyAddr + dOffset, dq_out + dOffset, realN);
+            SyncFunc();
+            ComputeMMDKV<DV, true>(shapeInfo, pWorkSpaceAddr, dyAddr + dOffset, dv_out + dOffset, realN);
+            SyncFunc();
+        }
+    }
+
     template <uint32_t CUBE_TYPE>
     __aicore__ inline __attribute__((always_inline)) void ComputeMM12(const CubeAddrInfoDet& shapeInfo,
                                                                       __gm__ INPUT_TYPE* left, __gm__ INPUT_TYPE* right,
                                                                       __gm__ float* out)
     {
-        /*
-        对于Dq，ReDuce轴为headDim方向（对应K轴），具体遍历顺序示意图如下：
-                            dimD(K)                          dimD(K)
-                    +-----------------------+         +-----------------------+
-                    |       0/4/8/12        |         |        0/1/2/3        |
-                    |-----------------------|         |-----------------------|
-                    |       1/5/9/13        |         |        4/5/6/7        |
-               S1(M)|-----------------------|    S2(N)|-----------------------|
-                    |       2/6/10/14       |         |        8/9/10/11      |
-                    |---------- ------------|         |-----------------------|
-                    |       3/7/11/15       |         |       12/13/14/15     |
-                    +-----------------------+         +-----------------------+
-        */
+        constexpr int32_t wideMaxM = SIZE_32 * SIZE_ONE_K / (SIZE_256 * sizeof(INPUT_TYPE));
+        if (dimD <= SIZE_128) {
+            ComputeMM12<CUBE_TYPE, SIZE_128, false>(shapeInfo, left, right, out);
+        } else {
+            ComputeMM12Wide<CUBE_TYPE, wideMaxM>(shapeInfo, left, right, out);
+        }
+    }
+
+    template <uint32_t CUBE_TYPE, int32_t maxM>
+    __aicore__ __attribute__((noinline)) void ComputeMM12Wide(const CubeAddrInfoDet& shapeInfo, __gm__ INPUT_TYPE* left,
+                                                              __gm__ INPUT_TYPE* right, __gm__ float* out)
+    {
+        if (shapeInfo.s1Len % SIZE_128 == 0) {
+            ComputeMM12<CUBE_TYPE, maxM, true>(shapeInfo, left, right, out);
+        } else {
+            ComputeMM12<CUBE_TYPE, maxM, false>(shapeInfo, left, right, out);
+        }
+    }
+
+    __aicore__ inline __attribute__((always_inline)) void MM12CopyIn(LocalTensor<INPUT_TYPE> dst, uint64_t srcOffset,
+                                                                     uint32_t rows, uint32_t alignedRows,
+                                                                     uint32_t srcStride)
+    {
+        commonNd2NzParams.nValue = rows;
+        commonNd2NzParams.dValue = dimD;
+        commonNd2NzParams.srcDValue = srcStride;
+        commonNd2NzParams.dstNzC0Stride = alignedRows;
+        AscendC::DataCopy(dst, tmp_type_gm_tensor[srcOffset], commonNd2NzParams);
+    }
+
+    template <uint32_t CUBE_TYPE, int32_t maxM, bool FULL_M_BLOCKS>
+    __aicore__ inline __attribute__((always_inline)) void ComputeMM12(const CubeAddrInfoDet& shapeInfo,
+                                                                      __gm__ INPUT_TYPE* left, __gm__ INPUT_TYPE* right,
+                                                                      __gm__ float* out)
+    {
         uint32_t taskIdPingPong = shapeInfo.taskId % 2;
         uint64_t globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + taskIdPingPong * BLOCK_WORKSPACE;
         int32_t cubeBlockIdx = 0; // 用于计算MM12输出结果的下标，一个cubeBlock的大小是128*128
@@ -273,86 +313,122 @@ private:
         const uint64_t right_offset = gm_b - (__gm__ INPUT_TYPE*)0;
         const uint64_t out_offset = gm_c - (__gm__ float*)0;
 
+        constexpr bool useWholeL0B = maxM < SIZE_128;
+        if constexpr (useWholeL0B) {
+            // A uses L1 [0, 256KB), B uses L1 [256KB, 512KB).
+            // Each input block copies the full D256 row in one Nd2Nz operation.
+            for (int32_t mIdx = 0; mIdx < mLoop; mIdx++) {
+                int32_t mProcess = (!FULL_M_BLOCKS && mIdx == mLoop - 1) ? mTail : SIZE_128;
+                int32_t mProcessAlign = RoundUp(mProcess, SIZE_16);
+                const uint64_t innerQueryOffset = mIdx * SIZE_128 * qSrcDvalue;
+                LocalTensor<INPUT_TYPE> l1ATile = l1_query_ping_tensor[mIdx * SIZE_128 * dimD];
+                MM12CopyIn(l1ATile, left_offset + innerQueryOffset, mProcess, mProcessAlign, qSrcDvalue);
+            }
+            for (int32_t nIdx = 0; nIdx < nLoop; nIdx++) {
+                int32_t nProcess = (nIdx == nLoop - 1) ? nTail : SIZE_128;
+                int32_t nProcessAlign = RoundUp(nProcess, SIZE_16);
+                const uint64_t innerKeyOffset = nIdx * SIZE_128 * kvSrcDvalue;
+                LocalTensor<INPUT_TYPE> l1BTile = l1_a_ping_tensor[nIdx * SIZE_128 * dimD];
+                MM12CopyIn(l1BTile, right_offset + innerKeyOffset, nProcess, nProcessAlign, kvSrcDvalue);
+            }
+            SET_FLAG(MTE2, MTE1, EVENT_ID0);
+            WAIT_FLAG(MTE2, MTE1, EVENT_ID0);
+        }
+
         for (int32_t nIdx = 0; nIdx < nLoop; nIdx++) {
             int32_t s2Idx = shapeInfo.s2Idx + nIdx * SIZE_128;
             int32_t nProcess = (nIdx == nLoop - 1) ? nTail : SIZE_128;
             int32_t nProcessAlign = RoundUp(nProcess, SIZE_16);
-            bool needCopyInAMatrix = nIdx == 0 ? true : false;
+            const bool needCopyInAMatrix = nIdx == 0;
             bool needCopyInBMatrix = true;
-            LocalTensor<INPUT_TYPE> l1_b_tensor = l1_b_ping_tensor[nIdx * SIZE_128 * dimD];
-            LocalTensor<INPUT_TYPE> l0_b_tensor = ping_pong_flag_b ? l0_b_ping_tensor : l0_b_pong_tensor;
+            LocalTensor<INPUT_TYPE> l1_b_tensor =
+                useWholeL0B ? l1_a_ping_tensor[nIdx * SIZE_128 * dimD] : l1_b_ping_tensor[nIdx * SIZE_128 * dimD];
+            LocalTensor<INPUT_TYPE> l0_b_tensor =
+                (useWholeL0B || ping_pong_flag_b) ? l0_b_ping_tensor : l0_b_pong_tensor;
             uint32_t bEventID = ping_pong_flag_b ? bEventIDPing : bEventIDPong;
-
-            for (int32_t mIdx = 0; mIdx < mLoop; mIdx++) {
-                int32_t s1Idx = shapeInfo.s1Idx + mIdx * SIZE_128;
-                int32_t mProcess = (mIdx == mLoop - 1) ? mTail : SIZE_128;
-                if (enableCausalOpt &&
-                    IsFullMaskBlock(s1Idx, s2Idx, mProcess, nProcess, sparseLeftBound, sparseRightBound, sparseMode)) {
-                    continue;
-                }
-                LocalTensor<INPUT_TYPE> l1_a_tensor;
-                LocalTensor<INPUT_TYPE> l0_a_tensor = ping_pong_flag_a ? l0_a_ping_tensor : l0_a_pong_tensor;
-                LocalTensor<float> l0_c_tensor = ping_pong_flag_a ? l0_c_ping_tensor : l0_c_pong_tensor;
-                uint32_t aEventID = ping_pong_flag_a ? aEventIDPing : aEventIDPong;
-                int32_t mProcessAlign = RoundUp(mProcess, SIZE_16);
-                uint64_t inner_query_offset, inner_key_offset;
-                if (layout == BSNGD || layout == TND) {
-                    inner_query_offset = mIdx * SIZE_128 * dimN1 * dimD;
-                    inner_key_offset = nIdx * SIZE_128 * dimN2 * dimD;
-                } else if (layout == SBNGD) {
-                    inner_query_offset = mIdx * SIZE_128 * batch * dimN1 * dimD;
-                    inner_key_offset = nIdx * SIZE_128 * batch * dimN2 * dimD;
-                } else if (layout == BNGSD) {
-                    inner_query_offset = mIdx * SIZE_128 * dimD;
-                    inner_key_offset = nIdx * SIZE_128 * dimD;
-                }
-
-                if constexpr (CUBE_TYPE == QK) {
-                    // reuse query
-                    l1_a_tensor = taskIdPingPong ? l1_query_ping_tensor[mIdx * SIZE_128 * dimD] :
-                                                   l1_query_pong_tensor[mIdx * SIZE_128 * dimD];
-                } else {
-                    l1_a_tensor = l1_a_ping_tensor[mIdx * SIZE_128 * dimD];
-                }
-
-                if (needCopyInAMatrix) {
-                    commonNd2NzParams.nValue = mProcess;
-                    commonNd2NzParams.dValue = dimD;
-                    commonNd2NzParams.srcDValue = qSrcDvalue;
-                    commonNd2NzParams.dstNzC0Stride = mProcessAlign;
-                    AscendC::DataCopy(l1_a_tensor, tmp_type_gm_tensor[left_offset + inner_query_offset],
-                                      commonNd2NzParams);
-
-                    SET_FLAG(MTE2, MTE1, EVENT_ID0);
-                    WAIT_FLAG(MTE2, MTE1, EVENT_ID0);
-                }
-
-                WAIT_FLAG(M, MTE1, aEventID);
-                commonLoadData2dParamsNoTranspose.repeatTimes = dimD / SIZE_16;
-                commonLoadData2dParamsNoTranspose.srcStride = mProcessAlign / SIZE_16;
-                for (int32_t i = 0; i < mProcessAlign / SIZE_16; i++) {
-                    AscendC::LoadData(l0_a_tensor[i * dimD * SIZE_16], l1_a_tensor[i * SIZE_256],
+            if constexpr (useWholeL0B) {
+                // K256 can span both L0B slots. Release them after all Q rows use this B tile.
+                WAIT_FLAG(M, MTE1, bEventIDPing);
+                WAIT_FLAG(M, MTE1, bEventIDPong);
+                for (uint32_t dOffset = 0; dOffset < SIZE_256; dOffset += SIZE_128) {
+                    commonLoadData2dParamsNoTranspose.repeatTimes = SIZE_128 * nProcessAlign / (SIZE_16 * SIZE_16);
+                    commonLoadData2dParamsNoTranspose.srcStride = 1;
+                    AscendC::LoadData(l0_b_ping_tensor[dOffset * nProcessAlign], l1_b_tensor[dOffset * nProcessAlign],
                                       commonLoadData2dParamsNoTranspose);
                 }
+            }
 
-                if (needCopyInBMatrix) {
-                    commonNd2NzParams.nValue = nProcess;
-                    commonNd2NzParams.dValue = dimD;
-                    commonNd2NzParams.srcDValue = kvSrcDvalue;
-                    commonNd2NzParams.dstNzC0Stride = nProcessAlign;
-                    AscendC::DataCopy(l1_b_tensor, tmp_type_gm_tensor[right_offset + inner_key_offset],
-                                      commonNd2NzParams);
-                    SET_FLAG(MTE2, MTE1, EVENT_ID0);
-                    WAIT_FLAG(MTE2, MTE1, EVENT_ID0);
-                    WAIT_FLAG(M, MTE1, bEventID);
-                    commonLoadData2dParamsNoTranspose.repeatTimes = dimD * nProcessAlign / SIZE_256;
-                    commonLoadData2dParamsNoTranspose.srcStride = 1;
-                    AscendC::LoadData(l0_b_tensor, l1_b_tensor, commonLoadData2dParamsNoTranspose);
+            constexpr int32_t chunksPerBlock = SIZE_128 / maxM;
+            const int32_t mChunks = CeilDiv(mSize, maxM);
+            for (int32_t tileM = 0; tileM < mChunks; ++tileM) {
+                const int32_t mIdx = tileM / chunksPerBlock;
+                const int32_t rowOffset = (tileM % chunksPerBlock) * maxM;
+                int32_t s1Idx = shapeInfo.s1Idx + mIdx * SIZE_128;
+                const int32_t mRows = (!FULL_M_BLOCKS && mIdx == mLoop - 1) ? mTail : SIZE_128;
+                if (enableCausalOpt &&
+                    IsFullMaskBlock(s1Idx, s2Idx, mRows, nProcess, sparseLeftBound, sparseRightBound, sparseMode)) {
+                    continue;
+                }
+                const int32_t mRowsAlign = RoundUp(mRows, SIZE_16);
+                LocalTensor<INPUT_TYPE> l1_a_tensor = l1_query_ping_tensor[mIdx * SIZE_128 * dimD];
+                if constexpr (!useWholeL0B) {
+                    const uint64_t inner_query_offset = mIdx * SIZE_128 * qSrcDvalue;
+                    if constexpr (CUBE_TYPE == QK) {
+                        // Keep Q in its task slot for DK.
+                        l1_a_tensor = taskIdPingPong ? l1_query_ping_tensor[mIdx * SIZE_128 * dimD] :
+                                                       l1_query_pong_tensor[mIdx * SIZE_128 * dimD];
+                    } else {
+                        l1_a_tensor = l1_a_ping_tensor[mIdx * SIZE_128 * dimD];
+                    }
+
+                    if (needCopyInAMatrix) {
+                        MM12CopyIn(l1_a_tensor, left_offset + inner_query_offset, mRows, mRowsAlign, qSrcDvalue);
+
+                        SET_FLAG(MTE2, MTE1, EVENT_ID0);
+                        WAIT_FLAG(MTE2, MTE1, EVENT_ID0);
+                    }
+                }
+
+                const int32_t mProcess = !useWholeL0B ? mRows : (FULL_M_BLOCKS ? maxM : min(maxM, mRows - rowOffset));
+                const int32_t mProcessAlign = RoundUp(mProcess, SIZE_16);
+                LocalTensor<INPUT_TYPE> l0_a_tensor = ping_pong_flag_a ? l0_a_ping_tensor : l0_a_pong_tensor;
+                LocalTensor<float> l0_c_tensor = ping_pong_flag_a ? l0_c_ping_tensor : l0_c_pong_tensor;
+                const uint32_t aEventID = ping_pong_flag_a ? aEventIDPing : aEventIDPong;
+
+                if constexpr (useWholeL0B) {
+                    WAIT_FLAG(FIX, M, aEventID);
+                }
+                WAIT_FLAG(M, MTE1, aEventID);
+                const uint32_t kStep = useWholeL0B ? SIZE_128 : dimD;
+                commonLoadData2dParamsNoTranspose.repeatTimes = kStep / SIZE_16;
+                commonLoadData2dParamsNoTranspose.srcStride = mRowsAlign / SIZE_16;
+                // L1 holds the whole logical Q tile. L0A holds the current M slice.
+                for (uint32_t kOffset = 0; kOffset < (useWholeL0B ? SIZE_256 : 1); kOffset += kStep) {
+                    for (int32_t i = 0; i < mProcessAlign / SIZE_16; i++) {
+                        AscendC::LoadData(l0_a_tensor[(i * dimD + kOffset) * SIZE_16],
+                                          l1_a_tensor[kOffset * mRowsAlign + (rowOffset + i * SIZE_16) * SIZE_16],
+                                          commonLoadData2dParamsNoTranspose);
+                    }
+                }
+
+                if constexpr (!useWholeL0B) {
+                    if (needCopyInBMatrix) {
+                        const uint64_t inner_key_offset = nIdx * SIZE_128 * kvSrcDvalue;
+                        MM12CopyIn(l1_b_tensor, right_offset + inner_key_offset, nProcess, nProcessAlign, kvSrcDvalue);
+                        SET_FLAG(MTE2, MTE1, EVENT_ID0);
+                        WAIT_FLAG(MTE2, MTE1, EVENT_ID0);
+                        WAIT_FLAG(M, MTE1, bEventID);
+                        commonLoadData2dParamsNoTranspose.repeatTimes = dimD * nProcessAlign / SIZE_256;
+                        commonLoadData2dParamsNoTranspose.srcStride = 1;
+                        AscendC::LoadData(l0_b_tensor, l1_b_tensor, commonLoadData2dParamsNoTranspose);
+                    }
                 }
 
                 SET_FLAG(MTE1, M, EVENT_ID0);
                 WAIT_FLAG(MTE1, M, EVENT_ID0);
-                WAIT_FLAG(FIX, M, aEventID);
+                if constexpr (!useWholeL0B) {
+                    WAIT_FLAG(FIX, M, aEventID);
+                }
 
                 MmadParams madParams;
                 madParams.m = mProcess == 1 ? 2 : mProcess;
@@ -363,9 +439,11 @@ private:
                 AscendC::Mmad(l0_c_tensor, l0_a_tensor, l0_b_tensor, madParams);
                 AscendC::PipeBarrier<PIPE_M>();
                 SET_FLAG(M, MTE1, aEventID);
-                if (needCopyInBMatrix) {
-                    SET_FLAG(M, MTE1, bEventID);
-                    needCopyInBMatrix = false;
+                if constexpr (!useWholeL0B) {
+                    if (needCopyInBMatrix) {
+                        SET_FLAG(M, MTE1, bEventID);
+                        needCopyInBMatrix = false;
+                    }
                 }
 
                 commonFixpipeParamsV220.mSize = mProcess;
@@ -373,24 +451,32 @@ private:
                 commonFixpipeParamsV220.srcStride = mProcessAlign;
                 commonFixpipeParamsV220.dstStride = SIZE_128;
                 AscendC::Fixpipe<float, float, AscendC::CFG_ROW_MAJOR>(
-                    tmp_fp32_gm_tensor[out_offset + cubeBlockIdx * BASE_BLOCK_SIZE], l0_c_tensor,
+                    tmp_fp32_gm_tensor[out_offset + cubeBlockIdx * BASE_BLOCK_SIZE + rowOffset * SIZE_128], l0_c_tensor,
                     commonFixpipeParamsV220);
                 SET_FLAG(FIX, M, aEventID);
-                cubeBlockIdx++;
                 ping_pong_flag_a = 1 - ping_pong_flag_a;
+                // The Q slices share one 128-by-128 workspace block.
+                if (!useWholeL0B || rowOffset + mProcess == mRows) {
+                    ++cubeBlockIdx;
+                }
             }
-            ping_pong_flag_b = 1 - ping_pong_flag_b;
+            if constexpr (useWholeL0B) {
+                SET_FLAG(M, MTE1, bEventIDPing);
+                SET_FLAG(M, MTE1, bEventIDPong);
+            } else {
+                ping_pong_flag_b = 1 - ping_pong_flag_b;
+            }
         }
     };
 
-    template <uint32_t CUBE_TYPE>
+    template <uint32_t CUBE_TYPE, bool WIDE_D = false>
     __aicore__ inline __attribute__((always_inline)) void ComputeMMDQ(const CubeAddrInfoDet& shapeInfo,
                                                                       __gm__ INPUT_TYPE* left, __gm__ INPUT_TYPE* right,
-                                                                      __gm__ float* out)
+                                                                      __gm__ float* out, uint64_t realN)
     {
         /*
         对于Dq，ReDuce轴为S2方向（对应N轴），具体遍历顺序示意图如下：
-                            S2(N)                           dimD(K)
+                            S2(N)                           D
                     +-----------------------+         +-----------------------+
                     |  0  |  1  |  2  |  3  |         |       0/4/8/12        |
                     |-----|-----|-----|-----|         |-----|-----|-----|-----|
@@ -405,6 +491,9 @@ private:
         uint64_t globalBlockOffset = GetBlockIdx() * BLOCK_WORKSPACE * 2 + taskIdPingPong * BLOCK_WORKSPACE;
         uint32_t mSize = shapeInfo.s1Len;
         uint32_t nSize = shapeInfo.s2Len;
+        // A partial sub-block in a multi-block tile needs the ordered L0C path.
+        const bool syncEachContribution =
+            !WIDE_D || (mSize > SIZE_128 && mSize % SIZE_128 != 0) || (nSize > SIZE_128 && nSize % SIZE_128 != 0);
         int32_t mTail = (mSize % SIZE_128) == 0 ? SIZE_128 : (mSize % SIZE_128);
         int32_t nTail = (nSize % SIZE_128) == 0 ? SIZE_128 : (nSize % SIZE_128);
         int32_t mLoop = CeilDiv(mSize, SIZE_128);
@@ -459,7 +548,7 @@ private:
                 uint32_t aEventID = ping_pong_flag_a ? aEventIDPing : aEventIDPong;
                 LocalTensor<INPUT_TYPE> l1_a_buf_tensor = ping_pong_flag_a ? l1_a_ping_tensor : l1_a_pong_tensor;
                 LocalTensor<INPUT_TYPE> l0_a_buf_tensor = ping_pong_flag_a ? l0_a_ping_tensor : l0_a_pong_tensor;
-                LocalTensor<INPUT_TYPE> l1_b_buf_tensor = l1_b_ping_tensor[nIdx * SIZE_128 * dimD];
+                LocalTensor<INPUT_TYPE> l1_b_buf_tensor = l1_b_ping_tensor[nIdx * SIZE_128 * realN];
                 LocalTensor<INPUT_TYPE> l0_b_buf_tensor = ping_pong_flag_a ? l0_b_ping_tensor : l0_b_pong_tensor;
 
                 WAIT_FLAG(MTE1, MTE2, aEventID);
@@ -469,32 +558,38 @@ private:
                                                      mProcessAlign, nProcessAlign, true);
                 SET_FLAG(MTE1, MTE2, aEventID);
                 MM345LoadB(l1_b_buf_tensor, l0_b_buf_tensor, tmp_type_gm_tensor[real_right_offset], nProcess,
-                           nProcessAlign, dimN2, needCopyInBMatrix);
+                           nProcessAlign, dimN2, realN, needCopyInBMatrix);
 
                 SET_FLAG(MTE1, M, EVENT_ID0);
                 WAIT_FLAG(MTE1, M, EVENT_ID0);
-                WAIT_FLAG(FIX, M, bEventID);
+                if (initL0C || syncEachContribution) {
+                    WAIT_FLAG(FIX, M, bEventID);
+                }
 
                 MmadParams madParams;
                 madParams.m = mProcess == 1 ? 2 : mProcess;
-                madParams.n = dimD;
+                madParams.n = realN;
                 madParams.k = nProcess;
                 madParams.cmatrixInitVal = initL0C;
                 madParams.unitFlag = needCopyOut ? 3 : 2;
                 AscendC::Mmad(l0_c_buf_tensor, l0_a_buf_tensor, l0_b_buf_tensor, madParams);
                 SET_FLAG(M, MTE1, aEventID);
-                AscendC::PipeBarrier<PIPE_M>();
+                if (syncEachContribution) {
+                    AscendC::PipeBarrier<PIPE_M>();
+                }
 
                 if (needCopyOut) {
                     if constexpr (DETERMINISTIC_ENABLE) {
                         MM345CopyOut<false>(l0_c_buf_tensor, out_offset + mIdx * SIZE_128 * dimD, mProcess, dimD,
-                                            mProcessAlign);
+                                            mProcessAlign, realN);
                     } else {
                         MM345CopyOut<true>(l0_c_buf_tensor, out_offset + inner_query_offset, mProcess, dimN1 * dimD,
-                                           mProcessAlign);
+                                           mProcessAlign, realN);
                     }
                 }
-                SET_FLAG(FIX, M, bEventID);
+                if (needCopyOut || syncEachContribution) {
+                    SET_FLAG(FIX, M, bEventID);
+                }
 
                 initL0C = false;
                 ping_pong_flag_a = 1 - ping_pong_flag_a;
@@ -503,14 +598,15 @@ private:
         }
     };
 
-    template <uint32_t CUBE_TYPE>
+    template <uint32_t CUBE_TYPE, bool WIDE_D = false>
     __aicore__ inline __attribute__((always_inline)) void ComputeMMDKV(const CubeAddrInfoDet& shapeInfo,
                                                                        __gm__ INPUT_TYPE* left,
-                                                                       __gm__ INPUT_TYPE* right, __gm__ float* out)
+                                                                       __gm__ INPUT_TYPE* right, __gm__ float* out,
+                                                                       uint64_t realN)
     {
         /*
         对于Dk，Dv，ReDuce轴为S1方向（对应M轴），具体遍历顺序示意图如下：
-                            S2(N)                           dimD(K)
+                            S2(N)                           D
                     +-----------------------+         +-----------------------+
                     |  0  |  4  |  8  |  12 |         |       0/4/8/12        |
                     |-----|-----|-----|-----|         |-----------------------|
@@ -526,6 +622,9 @@ private:
         uint32_t cubeBlockIdx = 0;
         uint32_t mSize = shapeInfo.s1Len;
         uint32_t nSize = shapeInfo.s2Len;
+        // A partial sub-block in a multi-block tile needs the ordered L0C path.
+        const bool syncEachContribution =
+            !WIDE_D || (mSize > SIZE_128 && mSize % SIZE_128 != 0) || (nSize > SIZE_128 && nSize % SIZE_128 != 0);
         int32_t mTail = (mSize % SIZE_128) == 0 ? SIZE_128 : (mSize % SIZE_128);
         int32_t nTail = (nSize % SIZE_128) == 0 ? SIZE_128 : (nSize % SIZE_128);
         int32_t mLoop = CeilDiv(mSize, SIZE_128);
@@ -573,12 +672,17 @@ private:
                 LocalTensor<INPUT_TYPE> l0_b_buf_tensor = ping_pong_flag_a ? l0_b_ping_tensor : l0_b_pong_tensor;
 
                 if constexpr (CUBE_TYPE == DK) {
-                    // reuse query
-                    l1_b_buf_tensor = taskIdPingPong ? l1_query_ping_tensor[mIdx * SIZE_128 * dimD] :
-                                                       l1_query_pong_tensor[mIdx * SIZE_128 * dimD];
-                    needCopyInBMatrix = false;
+                    if constexpr (!WIDE_D) {
+                        // D<=128时复用QK阶段常驻L1的query，D分块后重新加载当前切片
+                        l1_b_buf_tensor = taskIdPingPong ? l1_query_ping_tensor[mIdx * SIZE_128 * realN] :
+                                                           l1_query_pong_tensor[mIdx * SIZE_128 * realN];
+                        needCopyInBMatrix = false;
+                    } else {
+                        l1_b_buf_tensor = l1_b_ping_tensor[mIdx * SIZE_128 * realN];
+                        needCopyInBMatrix = nIdx == 0;
+                    }
                 } else {
-                    l1_b_buf_tensor = l1_b_ping_tensor[mIdx * SIZE_128 * dimD];
+                    l1_b_buf_tensor = l1_b_ping_tensor[mIdx * SIZE_128 * realN];
                     needCopyInBMatrix = nIdx == 0;
                 }
 
@@ -590,38 +694,44 @@ private:
                 SET_FLAG(MTE1, MTE2, aEventID);
 
                 MM345LoadB(l1_b_buf_tensor, l0_b_buf_tensor, tmp_type_gm_tensor[real_right_offset], mProcess,
-                           mProcessAlign, dimN1, needCopyInBMatrix);
+                           mProcessAlign, dimN1, realN, needCopyInBMatrix);
 
                 SET_FLAG(MTE1, M, EVENT_ID0);
                 WAIT_FLAG(MTE1, M, EVENT_ID0);
-                WAIT_FLAG(FIX, M, bEventID);
+                if (initL0C || syncEachContribution) {
+                    WAIT_FLAG(FIX, M, bEventID);
+                }
 
                 MmadParams madParams;
                 madParams.m = nProcess == 1 ? 2 : nProcess;
-                madParams.n = dimD;
+                madParams.n = realN;
                 madParams.k = mProcess;
                 madParams.cmatrixInitVal = initL0C;
                 madParams.unitFlag = mIdx == mLoop - 1 ? 3 : 2;
                 AscendC::Mmad(l0_c_buf_tensor, l0_a_buf_tensor, l0_b_buf_tensor, madParams);
                 SET_FLAG(M, MTE1, aEventID);
-                AscendC::PipeBarrier<PIPE_M>();
+                if (syncEachContribution) {
+                    AscendC::PipeBarrier<PIPE_M>();
+                }
 
                 if (mIdx == mLoop - 1) {
                     if constexpr (DETERMINISTIC_ENABLE) {
                         if (shapeInfo.atmoicAdd) {
                             MM345CopyOut<true>(l0_c_buf_tensor, out_offset + inner_key_offset, nProcess, dstStride,
-                                               nProcessAlign);
+                                               nProcessAlign, realN);
                         } else {
                             MM345CopyOut<false>(l0_c_buf_tensor, out_offset + nIdx * SIZE_128 * dimD, nProcess, dimD,
-                                                nProcessAlign);
+                                                nProcessAlign, realN);
                         }
                     } else {
                         MM345CopyOut<true>(l0_c_buf_tensor, out_offset + inner_key_offset, nProcess, dimN2 * dimD,
-                                           nProcessAlign);
+                                           nProcessAlign, realN);
                     }
                 }
 
-                SET_FLAG(FIX, M, bEventID);
+                if (mIdx == mLoop - 1 || syncEachContribution) {
+                    SET_FLAG(FIX, M, bEventID);
+                }
                 if constexpr (CUBE_TYPE == DK) {
                     // 记录cubeBlockIdx, 用于dQ的计算
                     cubeBlockIdxArry[nIdx][mIdx] = cubeBlockIdx;
@@ -674,7 +784,8 @@ private:
 
     __aicore__ inline __attribute__((always_inline)) void MM345LoadB(
         LocalTensor<INPUT_TYPE> dstL1Tensor, LocalTensor<INPUT_TYPE> dstL0Tensor, GlobalTensor<INPUT_TYPE> srcTensor,
-        const int32_t processLen, const int32_t processLenAlign, const int32_t headNum, const bool needCopyIn)
+        const int32_t processLen, const int32_t processLenAlign, const int32_t headNum, uint64_t realN,
+        const bool needCopyIn)
     {
         if (needCopyIn) {
             int32_t _srcDValue{0};
@@ -686,7 +797,7 @@ private:
                 _srcDValue = headNum * dimD;
             }
             commonNd2NzParams.nValue = processLen;
-            commonNd2NzParams.dValue = dimD;
+            commonNd2NzParams.dValue = realN;
             commonNd2NzParams.srcDValue = _srcDValue;
             commonNd2NzParams.dstNzC0Stride = processLenAlign;
             AscendC::DataCopy(dstL1Tensor, srcTensor, commonNd2NzParams);
@@ -695,10 +806,10 @@ private:
             WAIT_FLAG(MTE2, MTE1, EVENT_ID0);
         }
 
-        commonLoadData2dParamsTranspose.repeatTimes = dimD / SIZE_16;
+        commonLoadData2dParamsTranspose.repeatTimes = realN / SIZE_16;
         commonLoadData2dParamsTranspose.srcStride = processLenAlign / SIZE_16;
         for (int32_t j = 0; j < processLenAlign / SIZE_16; j++) {
-            AscendC::LoadData(dstL0Tensor[j * dimD * SIZE_16], dstL1Tensor[j * SIZE_16 * SIZE_16],
+            AscendC::LoadData(dstL0Tensor[j * realN * SIZE_16], dstL1Tensor[j * SIZE_16 * SIZE_16],
                               commonLoadData2dParamsTranspose);
         }
     };
@@ -706,14 +817,14 @@ private:
     template <bool ATMOIC_ADD>
     __aicore__ inline __attribute__((always_inline)) void MM345CopyOut(LocalTensor<float> srcTensor, uint64_t outOffset,
                                                                        uint16_t mSize, uint32_t dstStride,
-                                                                       uint16_t srcStride)
+                                                                       uint16_t srcStride, uint64_t realN)
     {
         if constexpr (ATMOIC_ADD) {
             AscendC::SetAtomicType<float>();
         }
 
         commonFixpipeParamsV220.mSize = mSize;
-        commonFixpipeParamsV220.nSize = dimD;
+        commonFixpipeParamsV220.nSize = realN;
         commonFixpipeParamsV220.srcStride = srcStride;
         commonFixpipeParamsV220.dstStride = dstStride;
         AscendC::Fixpipe<float, float, AscendC::CFG_ROW_MAJOR>(tmp_fp32_gm_tensor[outOffset], srcTensor,

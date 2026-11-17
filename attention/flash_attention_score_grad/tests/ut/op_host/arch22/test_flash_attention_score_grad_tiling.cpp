@@ -7,10 +7,12 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
+#include <cstring>
 #include <iostream>
 #include <gtest/gtest.h>
 #include "tiling/platform/platform_ascendc.h"
 #include "../../../../common/include/op_host/tiling_base.h"
+#include "../../../../op_kernel/arch22/flash_attention_score_grad_tiling.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 #include "softmax_tiling_mocker.h"
@@ -755,4 +757,116 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_tiling_4)
         "2199023255560 34359738432 274877907456 2199023255560 1 0 ";
     std::vector<size_t> expectWorkspaces = {34909184};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+namespace {
+constexpr int64_t BASIC_DET_BF16_KEY = 4398046529126;
+constexpr int64_t BASIC_DET_FP16_KEY = 4398046537318;
+constexpr uint32_t BASIC_DET_CUBE_CORES = 20;
+
+gert::TilingContextPara MakeBasicDetContext(int64_t seq, int64_t qHeads, int64_t kvHeads, int64_t sparseMode = 0,
+                                            int64_t nextTokens = 65536, ge::DataType dtype = ge::DT_BF16)
+{
+    using Ops::Transformer::AnyValue;
+    using Tensor = gert::TilingContextPara::TensorDescription;
+    constexpr int64_t headDim = 256;
+    static Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
+        40,
+        BASIC_DET_CUBE_CORES,
+        196608,
+        524288,
+        65536,
+        65536,
+        131072,
+        201326592,
+        BASIC_DET_CUBE_CORES,
+        platform_ascendc::SocVersion::ASCEND910B};
+    const std::string socInfo = R"({"hardware_info":{
+        "CORE_NUM":20,"cube_core_cnt":20,"vector_core_cnt":40,"UB_SIZE":196608,"L1_SIZE":524288,
+        "L0A_SIZE":65536,"L0B_SIZE":65536,"L0C_SIZE":131072,"L2_SIZE":201326592,"socVersion":"Ascend910B"
+    }})";
+    const Tensor query{{{1, qHeads, seq, headDim}, {1, qHeads, seq, headDim}}, dtype, ge::FORMAT_ND};
+    const Tensor kv{{{1, kvHeads, seq, headDim}, {1, kvHeads, seq, headDim}}, dtype, ge::FORMAT_ND};
+    const Tensor softmax{{{1, qHeads, seq, 8}, {1, qHeads, seq, 8}}, ge::DT_FLOAT, ge::FORMAT_ND};
+    const Tensor absent{{{}, {}}, dtype, ge::FORMAT_ND};
+    std::vector<Tensor> inputs(25, absent);
+    inputs[0] = query;
+    inputs[1] = kv;
+    inputs[2] = kv;
+    inputs[3] = query;
+    if (sparseMode != 0) {
+        const int64_t maskSize = sparseMode == 3 ? 2048 : seq;
+        inputs[7] = Tensor{{{maskSize, maskSize}, {maskSize, maskSize}}, ge::DT_UINT8, ge::FORMAT_ND};
+    }
+    inputs[8] = softmax;
+    inputs[9] = softmax;
+    inputs[11] = query;
+    return gert::TilingContextPara("FlashAttentionScoreGrad", inputs, {query, kv, kv, absent, absent, absent, absent},
+                                   {{"scale_value", AnyValue::CreateFrom<float>(0.0625f)},
+                                    {"keep_prob", AnyValue::CreateFrom<float>(1.0f)},
+                                    {"pre_tockens", AnyValue::CreateFrom<int64_t>(65536)},
+                                    {"next_tockens", AnyValue::CreateFrom<int64_t>(nextTokens)},
+                                    {"head_num", AnyValue::CreateFrom<int64_t>(qHeads)},
+                                    {"input_layout", AnyValue::CreateFrom<std::string>("BNSD")},
+                                    {"inner_precise", AnyValue::CreateFrom<int64_t>(0)},
+                                    {"sparse_mode", AnyValue::CreateFrom<int64_t>(sparseMode)},
+                                    {"pse_type", AnyValue::CreateFrom<int64_t>(1)},
+                                    {"seed", AnyValue::CreateFrom<int64_t>(0)},
+                                    {"offset", AnyValue::CreateFrom<int64_t>(0)},
+                                    {"out_dtype", AnyValue::CreateFrom<int64_t>(0)},
+                                    {"softmax_in_layout", AnyValue::CreateFrom<std::string>("")}},
+                                   &compileInfo, "Ascend910B", socInfo, 8192, 1);
+}
+
+void CheckBasicDetD256(const gert::TilingContextPara& context, int64_t key)
+{
+    TilingInfo result;
+    ASSERT_TRUE(ExecuteTiling(context, result));
+    ASSERT_EQ(result.tilingKey, key);
+    EXPECT_EQ(result.blockNum, BASIC_DET_CUBE_CORES);
+    FlashAttentionGradBasicDetTilingData data{};
+    ASSERT_EQ(result.tilingDataSize, sizeof(data));
+    std::memcpy(&data, result.tilingData.get(), sizeof(data));
+    const auto& params = data.basicDetTensorTilingData;
+    EXPECT_EQ(params.get_s1(), context.inputTensorDesc_[0].shape_.GetStorageShape().GetDim(2));
+    EXPECT_EQ(params.get_s2(), context.inputTensorDesc_[1].shape_.GetStorageShape().GetDim(2));
+    constexpr size_t partialSize = BASIC_DET_CUBE_CORES * 512 * 256 * sizeof(float);
+    EXPECT_EQ(params.get_dkDetWorkspaceOffset() - params.get_dqDetWorkspaceOffset(), partialSize);
+    EXPECT_EQ(params.get_dvDetWorkspaceOffset() - params.get_dkDetWorkspaceOffset(), partialSize);
+    ASSERT_EQ(result.workspaceSizes.size(), 1U);
+    EXPECT_GE(result.workspaceSizes[0], params.get_dvDetWorkspaceOffset() + partialSize);
+}
+
+void CheckBasicDetFallback(const gert::TilingContextPara& context)
+{
+    TilingInfo result;
+    ASSERT_TRUE(ExecuteTiling(context, result));
+    EXPECT_NE(result.tilingKey, BASIC_DET_BF16_KEY);
+    EXPECT_NE(result.tilingKey, BASIC_DET_FP16_KEY);
+}
+} // namespace
+
+TEST_F(FlashAttentionScoreGradTiling, BasicDetD256Dense)
+{
+    CheckBasicDetD256(MakeBasicDetContext(2048, 3, 3), BASIC_DET_BF16_KEY);
+    CheckBasicDetD256(MakeBasicDetContext(3073, 1, 1), BASIC_DET_BF16_KEY);
+}
+
+TEST_F(FlashAttentionScoreGradTiling, BasicDetD256RightDownCausal)
+{
+    CheckBasicDetD256(MakeBasicDetContext(32784, 1, 1, 3, 0, ge::DT_FLOAT16), BASIC_DET_FP16_KEY);
+}
+
+TEST_F(FlashAttentionScoreGradTiling, BasicDetD256RejectsUnsupportedShapes)
+{
+    CheckBasicDetFallback(MakeBasicDetContext(8192, 4, 2));
+    CheckBasicDetFallback(MakeBasicDetContext(2047, 4, 4));
+    CheckBasicDetFallback(MakeBasicDetContext(32785, 1, 1));
+    CheckBasicDetFallback(MakeBasicDetContext(3072, 1, 1));
+}
+
+TEST_F(FlashAttentionScoreGradTiling, BasicDetD256RejectsUnsupportedMasks)
+{
+    CheckBasicDetFallback(MakeBasicDetContext(2048, 3, 3, 0, 2047));
+    CheckBasicDetFallback(MakeBasicDetContext(2048, 3, 3, 1));
 }

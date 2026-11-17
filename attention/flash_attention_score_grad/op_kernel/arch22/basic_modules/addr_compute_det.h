@@ -34,6 +34,30 @@ public:
         globalCubeAddr = cubeAddrInfo;
         globalCubeAddr->blockLength = 0;
         globalCubeAddr->atmoicAdd = 0;
+        if (useDenseSchedule) {
+            const int32_t waveStart = curCubeIdx;
+            const int32_t waveEnd = min(waveStart + int32_t(cubeCoreNum), totalTiles);
+            const int32_t t = waveStart + cubeCoreIdx;
+            if (t < totalTiles) {
+                const int32_t head = t / headTiles;
+                bIdx = head / dimN1;
+                n1Idx = head % dimN1;
+                const int32_t major = (t / seqTiles % seqTiles) * 512;
+                const int32_t minor = (t % seqTiles) * 512;
+                s1Idx = useQFirst ? minor : major;
+                s2Idx = useQFirst ? major : minor;
+                curCubeIdx = t;
+                CubeRecord(min(512, seqLength - s1Idx), min(512, seqLength - s2Idx));
+                // Only a repeated KV key in this wave needs vector accumulation.
+                const bool hasPrev = useQFirst ? t > waveStart && t % seqTiles != 0 :
+                                                 t - seqTiles >= waveStart && (t - seqTiles) / headTiles == head;
+                const bool hasNext = useQFirst ? t + 1 < waveEnd && (t + 1) % seqTiles != 0 :
+                                                 t + seqTiles < waveEnd && (t + seqTiles) / headTiles == head;
+                globalCubeAddr->atmoicAdd = !hasPrev && !hasNext;
+            }
+            curCubeIdx = waveEnd;
+            return;
+        }
         s2GroupNum = 0;
         for (int32_t i = 0; i < cubeCoreNum; i++) {
             globalCubeAddr->detS2GroupList[i].accumNum = 0;
@@ -58,6 +82,72 @@ public:
         globalVecAddr->blockLength = 0;
         s1GroupNum = 0;
         s2GroupNum = 0;
+        if (useDenseSchedule) {
+            if (useQFirst) {
+                GetDenseQFirstVecAddrInfo();
+                return;
+            }
+            const int32_t waveStart = curCubeIdx;
+            const int32_t waveEnd = min(waveStart + int32_t(cubeCoreNum), totalTiles);
+            // Keep Q rows in first-appearance order, including partial final rows.
+            for (int32_t qrow = waveStart / seqTiles; qrow * seqTiles < waveEnd; qrow++) {
+                auto& group = globalVecAddr->detS1GroupList[s1GroupNum++];
+                const int32_t first = max(waveStart, qrow * seqTiles);
+                const int32_t last = min(waveEnd, (qrow + 1) * seqTiles);
+                group.outAddr = (int64_t(qrow / seqTiles) * seqLength + (qrow % seqTiles) * 512) * dimD;
+                group.recoderS = min(512, seqLength - (qrow % seqTiles) * 512);
+                group.accumNum = 0;
+                group.existFirstBlock = first == qrow * seqTiles;
+                group.existLastBlock = last == (qrow + 1) * seqTiles;
+                for (int32_t t = first; t < last; t++) {
+                    group.accumList[group.accumNum++] = t % cubeCoreNum;
+                }
+            }
+            for (int32_t j = 0; j < waveEnd - waveStart; j++) {
+                const int32_t t = waveStart + j;
+                const int32_t h = t / headTiles;
+                const int32_t k = t % seqTiles;
+                const int64_t outAddr = (int64_t(h) * seqLength + k * 512) * dimD;
+                int32_t gidx = s2GroupNum;
+                if (2 * seqTiles >= static_cast<int32_t>(cubeCoreNum)) {
+                    // At most one repeat per key. The first seqTiles slots are unique.
+                    if (j >= seqTiles && (t - seqTiles) / headTiles == h) {
+                        gidx = j - seqTiles;
+                    }
+                } else {
+                    gidx = 0;
+                    while (gidx < s2GroupNum && globalVecAddr->detS2GroupList[gidx].outAddr != outAddr) {
+                        gidx++;
+                    }
+                }
+                if (gidx == s2GroupNum) {
+                    s2GroupNum++;
+                    auto& group = globalVecAddr->detS2GroupList[gidx];
+                    group.outAddr = outAddr;
+                    group.recoderS = min(512, seqLength - k * 512);
+                    group.accumNum = 0;
+                    group.existFirstBlock = 0;
+                    group.existLastBlock = 0;
+                }
+                auto& group = globalVecAddr->detS2GroupList[gidx];
+                group.accumList[group.accumNum++] = j;
+            }
+            const int32_t t = waveStart + cubeCoreIdx;
+            if (t < totalTiles) {
+                const int32_t head = t / headTiles;
+                bIdx = head / dimN1;
+                n1Idx = head % dimN1;
+                s1Idx = (t / seqTiles % seqTiles) * 512;
+                s2Idx = (t % seqTiles) * 512;
+                curCubeIdx = t;
+                VecRecord(min(512, seqLength - s1Idx), min(512, seqLength - s2Idx));
+            }
+            curCubeIdx = waveEnd;
+            globalVecAddr->curCubeIdx = waveEnd % cubeCoreNum;
+            globalVecAddr->s1GroupNum = s1GroupNum;
+            globalVecAddr->s2GroupNum = s2GroupNum;
+            return;
+        }
         for (int32_t i = 0; i < cubeCoreNum; i++) {
             globalVecAddr->detS1GroupList[i].accumNum = 0;
             globalVecAddr->detS1GroupList[i].existFirstBlock = 0;
@@ -83,10 +173,25 @@ public:
         this->dimN1 = dimN2 * dimG;
         this->dimD = tilingData->basicDetTensorTilingData.d;
         this->sparseMode = tilingData->basicDetTensorTilingData.sparseMode;
+        useDenseSchedule = dimD > 128 && sparseMode == 0;
         this->preToken = tilingData->basicDetTensorTilingData.preTockens;
         this->nextToken = tilingData->basicDetTensorTilingData.nextTockens;
         this->dqPostAbsorb = tilingData->basicDetTensorTilingData.dqPostAbsorb;
         this->layout = tilingData->basicDetTensorTilingData.layout;
+        if (dimD > 128) {
+            dqPostAbsorb = 1;
+        }
+        if (useDenseSchedule) {
+            seqLength = tilingData->basicDetTensorTilingData.s1;
+            seqTiles = CeilDiv(seqLength, 512);
+            // Near-full tails keep the same Cube sub-block count as full tiles.
+            constexpr int32_t tileLength = 512;
+            const int32_t seqTail = seqLength % tileLength;
+            const int32_t waveSize = static_cast<int32_t>(cubeCoreNum);
+            useQFirst = seqTail > tileLength - SIZE_128 && (seqTiles % waveSize == 0 || 2 * seqTiles == waveSize);
+            headTiles = seqTiles * seqTiles;
+            totalTiles = dimB * dimN1 * headTiles;
+        }
         if (layout != TND) {
             dimS1 = tilingData->basicDetTensorTilingData.s1;
             dimS2 = tilingData->basicDetTensorTilingData.s2;
@@ -110,6 +215,68 @@ public:
     }
 
 private:
+    __aicore__ __attribute__((noinline)) void GetDenseQFirstVecAddrInfo()
+    {
+        const int32_t waveStart = curCubeIdx;
+        const int32_t waveEnd = min(waveStart + int32_t(cubeCoreNum), totalTiles);
+        for (int32_t kv = waveStart / seqTiles; kv * seqTiles < waveEnd; kv++) {
+            auto& group = globalVecAddr->detS2GroupList[s2GroupNum++];
+            const int32_t first = max(waveStart, kv * seqTiles);
+            const int32_t last = min(waveEnd, (kv + 1) * seqTiles);
+            group.outAddr = (int64_t(kv / seqTiles) * seqLength + (kv % seqTiles) * 512) * dimD;
+            group.recoderS = min(512, seqLength - (kv % seqTiles) * 512);
+            group.accumNum = 0;
+            group.existFirstBlock = 0;
+            group.existLastBlock = 0;
+            for (int32_t t = first; t < last; t++) {
+                group.accumList[group.accumNum++] = t - waveStart;
+            }
+        }
+
+        int32_t nextHeadStart = (waveStart / headTiles + 1) * headTiles;
+        int32_t headGroupStart = 0;
+        int32_t nextQGroup = 0;
+        for (int32_t t = waveStart; t < waveEnd; t++) {
+            if (t == nextHeadStart) {
+                nextHeadStart += headTiles;
+                headGroupStart = s1GroupNum;
+                nextQGroup = headGroupStart;
+            }
+            const int32_t gidx = nextQGroup++;
+            if (nextQGroup == headGroupStart + seqTiles) {
+                nextQGroup = headGroupStart;
+            }
+            auto& group = globalVecAddr->detS1GroupList[gidx];
+            if (gidx == s1GroupNum) {
+                s1GroupNum++;
+                const int32_t q = t % seqTiles;
+                group.outAddr = (int64_t(t / headTiles) * seqLength + q * 512) * dimD;
+                group.recoderS = min(512, seqLength - q * 512);
+                group.accumNum = 0;
+                group.existFirstBlock = 0;
+                group.existLastBlock = 0;
+            }
+            const int32_t k = t / seqTiles % seqTiles;
+            group.existFirstBlock |= k == 0;
+            group.existLastBlock |= k == seqTiles - 1;
+            group.accumList[group.accumNum++] = t - waveStart;
+        }
+        const int32_t t = waveStart + cubeCoreIdx;
+        if (t < totalTiles) {
+            const int32_t head = t / headTiles;
+            bIdx = head / dimN1;
+            n1Idx = head % dimN1;
+            s1Idx = (t % seqTiles) * 512;
+            s2Idx = (t / seqTiles % seqTiles) * 512;
+            curCubeIdx = t;
+            VecRecord(min(512, seqLength - s1Idx), min(512, seqLength - s2Idx));
+        }
+        curCubeIdx = waveEnd;
+        globalVecAddr->curCubeIdx = waveEnd % cubeCoreNum;
+        globalVecAddr->s1GroupNum = s1GroupNum;
+        globalVecAddr->s2GroupNum = s2GroupNum;
+    }
+
     __gm__ uint8_t* seqLenQ;
     __gm__ uint8_t* seqLenK;
     CubeAddrInfoDet* globalCubeAddr; // 用于存储Cube计算相关的地址信息
@@ -136,6 +303,9 @@ private:
     int32_t loopFinish{0}; // 用于控制Loop结束的中间变量，当所有Cube核在当前Loop都分配到任务时，一次Loop结束
     int32_t enableCausalOpt{0};
     int32_t dqPostAbsorb{0};
+    bool useDenseSchedule{false};
+    bool useQFirst{false};
+    int32_t seqTiles{0}, headTiles{0}, totalTiles{0}, seqLength{0};
     // 稀疏计算参数
     uint32_t sparseMode{0}; // 稀疏模式
     int64_t preToken{0};

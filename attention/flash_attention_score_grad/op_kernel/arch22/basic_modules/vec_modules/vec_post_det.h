@@ -90,6 +90,9 @@ __aicore__ inline void VectorPostDet<OUT_TYPE, TILING_TYPE, DETERMINISTIC_ENABLE
 
     uint32_t coreNum = tilingData->basicDetTensorTilingData.coreNum;
     dqPostAbsorb = tilingData->basicDetTensorTilingData.dqPostAbsorb;
+    if (tilingData->basicDetTensorTilingData.d > 128) {
+        dqPostAbsorb = 1;
+    }
 
     // compute tiling
     constexpr static uint32_t POST_COEX_NODE = 3;

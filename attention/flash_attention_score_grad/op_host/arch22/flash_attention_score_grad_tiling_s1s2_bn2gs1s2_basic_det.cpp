@@ -31,8 +31,14 @@ constexpr int64_t ATTEN_MASK_NUM = 2048;
 constexpr int64_t S_MAX = 32768;
 constexpr int64_t DIM_NUM_2 = 2;
 constexpr int64_t SPECIAL_HEADDIM_128 = 128;
+constexpr int64_t SPECIAL_HEADDIM_256 = 256;
 constexpr int64_t C0_SIZE = 16;
 constexpr int64_t AIV_NUM_910B2 = 48;
+
+// Performance admission for wide heads on 910B3.
+constexpr int64_t WIDE_HEAD_MIN_SEQ_LEN = 2048;
+constexpr int64_t WIDE_HEAD_MAX_SEQ_LEN = 32784;
+constexpr int64_t WIDE_HEAD_SEQ_TILE = 512;
 
 ge::graphStatus FlashAttentionScoreGraTilingBasicDet::GetMaxWorkspaceFlag()
 {
@@ -279,6 +285,8 @@ bool FlashAttentionScoreGraTilingBasicDet::IsCapable()
      * 5. PSE
      * 6. headDim <= 128
      * 7. Sink, with or without attenMask
+     *
+     * D256 supports BNSD under the additional conditions in IsShapeCapable().
      */
     auto sinkShape = context_->GetOptionalInputShape(SINK_IN);
     if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1) {
@@ -408,12 +416,40 @@ bool FlashAttentionScoreGraTilingBasicDet::IsDropMskCapable()
 
 bool FlashAttentionScoreGraTilingBasicDet::IsShapeCapable()
 {
-    if (fBaseParams.d != fBaseParams.dv || fBaseParams.d > SPECIAL_HEADDIM_128 || fBaseParams.d % C0_SIZE != 0) {
+    if (fBaseParams.d != fBaseParams.dv || fBaseParams.d % C0_SIZE != 0) {
         return false;
     }
     if (strcmp(fBaseParams.inputLayout, TND_STR) != 0 && fBaseParams.s1 != fBaseParams.s2) {
         return false;
     }
+    if (fBaseParams.d > SPECIAL_HEADDIM_128) {
+        const auto& params = fBaseParams;
+        // The wide-head schedule uses contiguous BNSD heads and the same head index for Q and KV.
+        if (params.d != SPECIAL_HEADDIM_256 || strcmp(params.inputLayout, BNSD_STR) != 0 || params.n1 != params.n2) {
+            return false;
+        }
+
+        const int64_t seq = params.s1;
+        if (seq < WIDE_HEAD_MIN_SEQ_LEN || seq > WIDE_HEAD_MAX_SEQ_LEN) {
+            return false;
+        }
+        const int64_t seqTiles = (seq + WIDE_HEAD_SEQ_TILE - 1) / WIDE_HEAD_SEQ_TILE;
+        const int64_t tilesPerHead = seqTiles * seqTiles;
+        // Require enough tiles for two full Cube waves.
+        const int64_t minTiles = 2 * static_cast<int64_t>(aicoreParams_.aicNum);
+        const int64_t minHeads = (minTiles + tilesPerHead - 1) / tilesPerHead;
+        if (params.n1 <= 0 || params.b < (minHeads - 1) / params.n1 + 1) {
+            return false;
+        }
+
+        // IsAttenMskCapable has validated mask presence and shape.
+        const bool denseAttention =
+            params.sparseMode == NO_MASK && params.preTockens >= seq && params.nextTockens >= seq;
+        if (!denseAttention && params.sparseMode != RIGHT_DOWN_CAUSAL) {
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -435,6 +471,10 @@ ge::graphStatus FlashAttentionScoreGraTilingBasicDet::DoOpTiling()
 
     uint32_t vectorCoreNum = compileInfoPtr->aivNum;
     tilingData->basicDetTensorTilingData.set_coreNum(vectorCoreNum);
+    if (fBaseParams.d > SPECIAL_HEADDIM_128) {
+        tilingData->basicDetTensorTilingData.set_s1(fBaseParams.s1);
+        tilingData->basicDetTensorTilingData.set_s2(fBaseParams.s2);
+    }
     tilingData->basicDetTensorTilingData.set_scaleValue(fBaseParams.scaleValue);
     tilingData->basicDetTensorTilingData.set_b(fBaseParams.b);
     tilingData->basicDetTensorTilingData.set_t1(fBaseParams.t1);
