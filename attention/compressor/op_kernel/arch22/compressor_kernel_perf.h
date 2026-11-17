@@ -89,6 +89,7 @@ private:
     GlobalTensor<MM1_OUT_T> vec1ScoreCacheGm;
     GlobalTensor<MM1_OUT_T> Vec1InputKvGm;
     GlobalTensor<MM1_OUT_T> Vec1InputScoreGm;
+    GlobalTensor<MM1_OUT_T> stateCacheSnapshotGm;
     // ================================Task Info====================================
     CompressorTools<COMP> tools_;
     ConstInfo constInfo{};
@@ -155,7 +156,8 @@ __aicore__ inline void CompressorKernelPerf<COMP>::Init(__gm__ uint8_t* x, __gm_
         blockVec_.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut,
                        softmaxScoreOut, kvOut);
         blockVec_.InitBuffers(pipe_);
-        blockVec_.InitVec1GlobalTensor(Vec1InputKvGm, Vec1InputScoreGm, vec1KvCacheGm, vec1ScoreCacheGm);
+        blockVec_.InitVec1GlobalTensor(Vec1InputKvGm, Vec1InputScoreGm, vec1KvCacheGm, vec1ScoreCacheGm,
+                                       stateCacheSnapshotGm);
     }
 }
 
@@ -179,6 +181,8 @@ __aicore__ inline void CompressorKernelPerf<COMP>::InitTilingData()
     constInfo.batchConsistency = tilingData_->baseParams.batchConsistency;
     constInfo.vec1TailCacheSize = tilingData_->workspaceParams.vec1TailCacheSize;
     constInfo.dbWorkspaceRatio = tilingData_->workspaceParams.dbWorkspaceRatio;
+    constInfo.stateCacheSnapshotOffset = tilingData_->workspaceParams.stateCacheSnapshotOffset;
+    constInfo.stateCacheSnapshotSize = tilingData_->workspaceParams.stateCacheSnapshotSize;
 }
 
 template <typename COMP>
@@ -429,6 +433,8 @@ __aicore__ inline void CompressorKernelPerf<COMP>::InitWorkspace(__gm__ uint8_t*
 
     vec1ScoreCacheGm.SetGlobalBuffer((__gm__ MM1_OUT_T*)(workspace + offset));
     offset += constInfo.dbWorkspaceRatio * constInfo.vec1TailCacheSize * sizeof(MM1_OUT_T);
+
+    stateCacheSnapshotGm.SetGlobalBuffer((__gm__ MM1_OUT_T*)(workspace + constInfo.stateCacheSnapshotOffset));
 }
 
 template <typename COMP>
@@ -514,6 +520,19 @@ __aicore__ inline void CompressorKernelPerf<COMP>::Process()
         return;
     }
     AllocEventID();
+
+    if ASCEND_IS_AIV {
+        if (constInfo.stateCacheSnapshotSize != 0) {
+            bool needSnapshot = blockVec_.IsPotentialStateCacheConflict();
+            blockVec_.SetStateCacheSnapshotEnabled(needSnapshot);
+            if (needSnapshot && GetBlockIdx() % 2 == 1 && constInfo.aiCoreIdx < constInfo.batchSize) {
+                blockVec_.SnapshotStateCache();
+            }
+            if (needSnapshot) {
+                SyncAll<true>();
+            }
+        }
+    }
 
     BatchInfo batchInfo{};
 

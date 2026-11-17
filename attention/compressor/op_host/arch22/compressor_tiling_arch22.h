@@ -122,7 +122,7 @@ const std::map<std::string, std::vector<uint32_t>> DIM_NUM_MAP = {
     {WGATE_NAME, {COMPRESSOR_DIM_NUM_2}},
     {STATE_CACHE_NAME, {COMPRESSOR_DIM_NUM_3}},
     {APE_NAME, {COMPRESSOR_DIM_NUM_2}},
-    {STATE_BLOCK_TABLE_NAME, {COMPRESSOR_DIM_NUM_2}},
+    {STATE_BLOCK_TABLE_NAME, {COMPRESSOR_DIM_NUM_1, COMPRESSOR_DIM_NUM_2}},
     {CU_SEQLENS_NAME, {COMPRESSOR_DIM_NUM_1}},
     {SEQUSED_NAME, {COMPRESSOR_DIM_NUM_1}},
     {START_POS_NAME, {COMPRESSOR_DIM_NUM_1}},
@@ -217,8 +217,7 @@ const std::vector<int> CMP_RATIO{4, 128};
 const std::vector<int> CMP_RATIO{2, 4, 8, 16, 32, 64, 128};
 #endif
 const std::vector<uint32_t> HEAD_DIM{128, 512};
-// A3 only supports the linear state-cache buffer mode.
-const std::vector<int> CACHE_MODE{1};
+const std::vector<int> CACHE_MODE{1, 2};
 
 enum class CACHE_MODE : uint8_t {
     LINEAR_BUFFER = 1,

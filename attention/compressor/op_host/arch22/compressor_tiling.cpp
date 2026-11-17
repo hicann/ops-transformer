@@ -45,8 +45,8 @@ ge::graphStatus CompressorTiling::ConvertRequiredParams(gert::TilingContext& con
     compressorContext.wgate.shape = context.GetRequiredInputShape(WEIGHT_WGATE_INPUT_INDEX);
     compressorContext.stateCache.desc = context.GetRequiredInputDesc(STATE_CACHE_INPUT_INDEX);
     compressorContext.stateCache.shape = context.GetRequiredInputShape(STATE_CACHE_INPUT_INDEX);
-    compressorContext.ape.desc = context.GetRequiredInputDesc(APE_INPUT_INDEX);
-    compressorContext.ape.shape = context.GetRequiredInputShape(APE_INPUT_INDEX);
+    compressorContext.ape.desc = context.GetOptionalInputDesc(APE_INPUT_INDEX);
+    compressorContext.ape.shape = context.GetOptionalInputShape(APE_INPUT_INDEX);
 
     compressorContext.cmpKv.desc = context.GetOutputDesc(CMP_KV_OUTPUT_INDEX);
     compressorContext.cmpKv.shape = context.GetOutputShape(CMP_KV_OUTPUT_INDEX);
@@ -212,10 +212,31 @@ ge::graphStatus CompressorTiling::SetWorkSpaceInfo()
     workspaceParams_->dbWorkspaceRatio = 2;
     workspaceParams_->mm1KvResSize = innerSplitParams_->mBaseSize * baseParams_->headDim * coff;
     workspaceParams_->mm1ScoreResSize = innerSplitParams_->mBaseSize * baseParams_->headDim * coff;
+    workspaceParams_->vec1TailCacheSize = 0;
     if (coff == 2) {
         workspaceParams_->vec1TailCacheSize = baseParams_->cmpRatio * baseParams_->headDim;
     }
     workspaceParams_->vec1ResSize = innerSplitParams_->mBaseSize * baseParams_->headDim * baseParams_->nSize;
+    workspaceParams_->stateCacheSnapshotOffset = 0;
+    workspaceParams_->stateCacheSnapshotSize = 0;
+
+    const bool isRingBuffer =
+        static_cast<uint8_t>(*context_->cacheMode) == static_cast<uint8_t>(CACHE_MODE::RING_BUFFER);
+    if (isRingBuffer && context_->templateId != TemplateId::FULL_LOAD) {
+        constexpr uint32_t STATE_NUM = 2;
+        constexpr uint32_t SNAPSHOT_ELEMENT_SIZE = sizeof(float);
+        uint32_t maxSeqPerBatch =
+            context_->layout == LayoutType::LAYOUT_BSH ? baseParams_->seqSize : baseParams_->tokenSize;
+        uint32_t maxWriteRows = std::min(maxSeqPerBatch, pageAttentionParams_->blockSize);
+        bool canWrapIntoReadPrefix =
+            baseParams_->cmpRatio > 1 && maxSeqPerBatch > 0 &&
+            static_cast<uint64_t>(maxWriteRows) + baseParams_->cmpRatio - 1 > pageAttentionParams_->blockSize;
+        if (canWrapIntoReadPrefix) {
+            workspaceParams_->stateCacheSnapshotSize = static_cast<uint64_t>(baseParams_->batchSize) * STATE_NUM *
+                                                       (baseParams_->cmpRatio - 1) * baseParams_->headDim *
+                                                       SNAPSHOT_ELEMENT_SIZE;
+        }
+    }
 
     return ge::GRAPH_SUCCESS;
 }
@@ -324,6 +345,8 @@ ge::graphStatus CompressorTiling::CalcWorkSpace()
         workspaceParams_->vec1TailCacheSize * MM1_RES_ELEM_SIZE * workspaceParams_->dbWorkspaceRatio * 2; // 2 kv和score
     workspaceSize_ +=
         workspaceParams_->vec1ResSize * maxGroupNum * V1_RES_ELEM_SIZE * workspaceParams_->dbWorkspaceRatio;
+    workspaceParams_->stateCacheSnapshotOffset = workspaceSize_ - libapiSize_;
+    workspaceSize_ += workspaceParams_->stateCacheSnapshotSize;
 
     if (context_->workSpaces) {
         context_->workSpaces[0] = workspaceSize_;
@@ -347,7 +370,7 @@ ge::graphStatus CompressorTiling::CheckEmptyTensor() const
             context_->wkv.shape->GetStorageShape().GetShapeSize() == 0 ||
             context_->wgate.shape->GetStorageShape().GetShapeSize() == 0 ||
             context_->stateCache.shape->GetStorageShape().GetShapeSize() == 0 ||
-            context_->ape.shape->GetStorageShape().GetShapeSize() == 0 ||
+            (context_->ape.shape != nullptr && context_->ape.shape->GetStorageShape().GetShapeSize() == 0) ||
             context_->stateBlockTable.shape->GetStorageShape().GetShapeSize() == 0) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->opName, "x", "0",
                                                   "Only input tensor x dim B or S or T supports to be 0");
@@ -685,6 +708,13 @@ ge::graphStatus CompressorTiling::CheckSingleParaStateCache() const
 
 ge::graphStatus CompressorTiling::CheckSingleParaApe() const
 {
+    OP_CHECK_IF((context_->ape.shape == nullptr) != (context_->ape.desc == nullptr),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "ape",
+                                                         "shape and desc must both be present or absent"),
+                return ge::GRAPH_FAILED);
+    if (context_->ape.shape == nullptr && context_->ape.desc == nullptr) {
+        return ge::GRAPH_SUCCESS;
+    }
     if (ge::GRAPH_SUCCESS != CheckDtypeSupport(context_->ape.desc, APE_NAME) ||
         ge::GRAPH_SUCCESS != CheckDimNumSupport(context_->ape.shape, APE_NAME)) {
         return ge::GRAPH_FAILED;
@@ -770,7 +800,7 @@ ge::graphStatus CompressorTiling::CheckSingleParaCoff() const
 
 ge::graphStatus CompressorTiling::CheckSingleParaCacheMode() const
 {
-    // A3 does not support the ring buffer mode (cache_mode=2).
+    // Validate the shared linear-buffer and ring-buffer selector.
     if (ge::GRAPH_SUCCESS != CheckAttrValueSupport(context_->cacheMode, CACHE_MODE, CACHE_MODE_NAME)) {
         return ge::GRAPH_FAILED;
     }
@@ -825,12 +855,6 @@ ge::graphStatus CompressorTiling::CheckRequiredInOutExistence() const
     OP_CHECK_IF(context_->stateCache.desc == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_cache", "desc is nullptr"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->ape.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "ape", "shape is nullptr"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->ape.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "ape", "desc is nullptr"),
-                return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->stateBlockTable.shape == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->opName, "state_block_table", "shape is nullptr"),
                 return ge::GRAPH_FAILED);
@@ -875,6 +899,32 @@ ge::graphStatus CompressorTiling::CheckRequiredAttrExistence() const
 
 ge::graphStatus CompressorTiling::CheckFeature() const
 {
+    const auto cacheMode = static_cast<uint8_t>(*context_->cacheMode);
+    const auto blockTableDimNum = context_->stateBlockTable.shape->GetStorageShape().GetDimNum();
+
+    if (cacheMode == static_cast<uint8_t>(CACHE_MODE::RING_BUFFER)) {
+        OP_CHECK_IF(coff != 1U,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context_->opName, COFF_NAME, std::to_string(static_cast<uint32_t>(coff)),
+                        "ring buffer (cache_mode=2) is currently supported only when coff=1"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(blockTableDimNum != COMPRESSOR_DIM_NUM_1,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->opName, STATE_BLOCK_TABLE_NAME,
+                                                          "dim_num=" + std::to_string(blockTableDimNum),
+                                                          "state_block_table must be [B] when cache_mode=2"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(pageAttentionParams_->blockNum < baseParams_->batchSize,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context_->opName, STATE_CACHE_NAME, "dim 0=" + std::to_string(pageAttentionParams_->blockNum),
+                        "state_cache dim 0 must be at least batchSize when cache_mode=2"),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(blockTableDimNum != COMPRESSOR_DIM_NUM_2,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context_->opName, STATE_BLOCK_TABLE_NAME, "dim_num=" + std::to_string(blockTableDimNum),
+                        "state_block_table must be [B, maxBlockNumPerBatch] when cache_mode=1"),
+                    return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 

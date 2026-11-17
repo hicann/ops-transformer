@@ -71,6 +71,8 @@ struct CompressorWorkspaceParams {
     uint32_t vec1ResSize;
     uint32_t vec1TailCacheSize;
     uint32_t dbWorkspaceRatio = 1;
+    uint64_t stateCacheSnapshotOffset = 0;
+    uint64_t stateCacheSnapshotSize = 0;
 };
 
 struct CompressorTilingData {

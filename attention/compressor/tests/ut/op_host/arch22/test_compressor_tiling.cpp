@@ -353,12 +353,76 @@ TEST_F(CompressorTilingArch22, test6)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
+// Ring buffer accepts a per-batch physical block table when coff=1.
+TEST_F(CompressorTilingArch22, test_ring_buffer_coff1_supported)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{512, 4096}, {512, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{512, 4096}, {512, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 1024}, {4, 128, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 512}, {4, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 1024}, {4, 128, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(131072)},
+        },
+        &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
+    int64_t expectTilingKey = 128;
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// A null APE descriptor is valid on A2 and uses the same tiling path as APE=0.
+TEST_F(CompressorTilingArch22, test_optional_ape_supported)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
+    int64_t expectTilingKey = 32;
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
 // ====================================================================
 // Error Cases — expected FAIL
 // ====================================================================
 
-// A3 does not support cache_mode=2 (ring buffer).
-TEST_F(CompressorTilingArch22, test_cache_mode_ring_buffer_unsupported)
+// Ring buffer is staged on coff=1; overlap data rearrangement is rejected.
+TEST_F(CompressorTilingArch22, test_ring_buffer_rejects_coff2)
 {
     optiling::CompressorCompileInfo compileInfo = {};
     gert::TilingContextPara tilingContextPara(
@@ -369,7 +433,7 @@ TEST_F(CompressorTilingArch22, test_cache_mode_ring_buffer_unsupported)
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
