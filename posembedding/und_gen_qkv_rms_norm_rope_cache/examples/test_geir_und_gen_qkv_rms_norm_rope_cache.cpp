@@ -362,13 +362,17 @@ int main(int argc, char* argv[])
 
     // 输入也落盘：需要核对数值时，直接读这些 bin 喂给 tests/assets/golden.py 复算即可，
     // 不必在校验侧重复实现这里的伪随机序列
+    bool dumpOk = true;
     int input_num = input.size();
     for (int i = 0; i < input_num; i++) {
         string input_file = "./tc_ge_irrun_test_npu_input_" + std::to_string(i) + ".bin";
         uint8_t* input_data_i = input[i].GetData();
         int64_t input_shape = input[i].GetTensorDesc().GetShape().GetShapeSize();
         uint32_t data_size = input_shape * GetDataTypeSize(input[i].GetTensorDesc().GetDataType());
-        WriteDataToFile(input_file, data_size, input_data_i);
+        if (WriteDataToFile(input_file, data_size, input_data_i) != SUCCESS) {
+            printf("write dump file failed: %s\n", input_file.c_str());
+            dumpOk = false;
+        }
     }
 
     int output_num = output.size();
@@ -379,7 +383,10 @@ int main(int argc, char* argv[])
         int64_t output_shape = output[i].GetTensorDesc().GetShape().GetShapeSize();
         std::cout << "this is " << i << "th output, output shape size =" << output_shape << std::endl;
         uint32_t data_size = output_shape * GetDataTypeSize(output[i].GetTensorDesc().GetDataType());
-        WriteDataToFile(output_file, data_size, output_data_i);
+        if (WriteDataToFile(output_file, data_size, output_data_i) != SUCCESS) {
+            printf("write dump file failed: %s\n", output_file.c_str());
+            dumpOk = false;
+        }
     }
 
     delete session;
@@ -390,5 +397,9 @@ int main(int argc, char* argv[])
         return FAILED;
     }
     printf("%s - INFO - [XIR]: Finalize ir graph session success\n", GetTime().c_str());
+    if (!dumpOk) {
+        printf("%s - ERROR - [XIR]: Save input or output data failed\n", GetTime().c_str());
+        return FAILED;
+    }
     return SUCCESS;
 }

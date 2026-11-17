@@ -81,7 +81,7 @@ English | [简体中文](./README.md)
 
 ## Calling Instructions
 
-| Calling Method | Calling Sample | Description |
+| Calling Method | Sample Code    | Description |
 | :------------- | :------------- | :---------- |
 | PyTorch API | [test_torch_und_gen_qkv_rms_norm_rope_cache.py](./examples/test_torch_und_gen_qkv_rms_norm_rope_cache.py) | Calls the UndGenQkvRmsNormRopeCache operator through the [und_gen_qkv_rms_norm_rope_cache](docs/torchapi_und_gen_qkv_rms_norm_rope_cache_en.md) API. |
 | aclnn call | [test_aclnn_und_gen_qkv_rms_norm_rope_cache.cpp](./examples/test_aclnn_und_gen_qkv_rms_norm_rope_cache.cpp) | Calls the UndGenQkvRmsNormRopeCache operator through the [aclnnUndGenQkvRmsNormRopeCache](docs/aclnnUndGenQkvRmsNormRopeCache_en.md) API. Two-phase invocation; the sample includes slot_mapping precomputation. |
