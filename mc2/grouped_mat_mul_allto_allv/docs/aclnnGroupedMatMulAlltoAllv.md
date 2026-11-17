@@ -170,7 +170,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllv(
     <td>-</td>
     </tr>
     <tr>
-    <td>epWorldSize（int64_t）</td>
+    <td>epWorldSize(int64_t)</td>
     <td>输入</td>
     <td>ep通信域size。</td>
     <td>支持2、4、8、16、32、64、128、256。</td>
@@ -361,7 +361,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllv(
   - BSK：本卡接收的token数，是recvCounts参数累加之和，取值范围(0, 52428800)。
   - H1：表示路由专家hidden size隐藏层大小，取值范围(0, 65536)。
   - H2：表示共享专家hidden size隐藏层大小，取值范围(0, 12288]。
-  - e：表示单卡上专家个数，e<=32，e * epWorldSize最大支持256。
+  - e：表示单卡上专家个数，e <= 32，e * epWorldSize最大支持256。
   - N1：表示路由专家的head_num，取值范围(0, 65536)。
   - N2：表示共享专家的head_num，取值范围(0, 65536)。
   - BS：batch sequence size。
@@ -370,7 +370,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllv(
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
 
 <!-- npu="A3" id9 -->
-- <term>Atlas A3系列产品</term>：单卡通信量在 2MB 以下可能存在性能劣化。
+- <term>Atlas A3系列产品</term>：单卡通信量在2MB以下可能存在性能劣化。
 
 <!-- end id9 -->
 

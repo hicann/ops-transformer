@@ -451,8 +451,8 @@ aclnnStatus aclnnQuantCompressor(
         - cuSeqlensOptional，参数必须为空。
         - sequsedOptional，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length长度，即要求sequsedOptional[n] <= S，且不小于0。
         - cacheMode=1时，stateBlockTable支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(startPosOptional)+S。cacheMode=2时，stateBlockTable支持输入shape[B]。
-        - cmpKv，输出shape为[B,ceil(S/cmp_ratio),D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ...  + (compressed_tokens+padN)。
-- 输出有效范围：compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio，其中，Seqlen表示不同Batch中的有效token数。BSH 布局时，每 batch 的有效结果位于输出的前 compressed_tokens[n] 行；TH 布局时，按 batch 顺序连续拼接，总有效范围为前 sum(compressed_tokens[n]) 行。输出分配容量中其余尾行算子不写入。
+        - cmpKv，输出shape为[B,ceil(S/cmp_ratio),D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ... + (compressed_tokens+padN)。
+- 输出有效范围：compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio，其中，Seqlen表示不同Batch中的有效token数。BSH布局时，每batch的有效结果位于输出的前compressed_tokens[n]行；TH布局时，按batch顺序连续拼接，总有效范围为前sum(compressed_tokens[n])行。输出分配容量中其余尾行算子不写入。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
       - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
@@ -492,15 +492,15 @@ aclnnStatus aclnnQuantCompressor(
       </table>
       </div>
 - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下stateCache不做更新，输出cmpKv为空tensor。
-- stateBlockTableOptional元素取值范围为[0, block_num)，block_num为stateCacheRef第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cacheMode=1（连续buffer）下写state_cache操作跳过该位置；cacheMode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cacheMode=1下元素值0为"未分配"哨兵值可重复出现，非0值须全局唯一；cacheMode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
+- stateBlockTableOptional元素取值范围为[0, block_num)，block_num为stateCacheRef第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cacheMode=1（连续buffer）下写state_cache操作跳过该位置；cacheMode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cacheMode=1下元素值0为“未分配”哨兵值可重复出现，非0值须全局唯一；cacheMode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
 - 输入属性限制：
   - quantMode取值为1（A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL），此时xDescale、wkvDescale、wgateDescale为必选输入。
   - 支持D为128/512。
   - 支持H为1K~10K，512对齐。
   - 支持blockSize为1~1024。
   - 支持如下三种典型组合场景：
-      - C4A: D=512, coff=2, cmp_ratio=4；
-      - C4Li: D=128, coff=2, cmp_ratio=4；
+      - C4A: D=512, coff=2, cmp_ratio=4。
+      - C4Li: D=128, coff=2, cmp_ratio=4。
       - C128A: D=512, coff=1, cmp_ratio=128。
 
 ## 调用示例

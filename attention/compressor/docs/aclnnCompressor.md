@@ -175,7 +175,7 @@ aclnnStatus aclnnCompressor(
     <tr>
       <td>stateCacheRef（aclTensor*）</td>
       <td>输入/输出</td>
-      <td>公式中的<span class="math-inline">[kv_state, score_state]</span>，表示kv_state和score_state的历史数据。计算后 kv_state 和 score_state 会原位更新到此 Tensor</td>
+      <td>公式中的<span class="math-inline">[kv_state, score_state]</span>，表示kv_state和score_state的历史数据。计算后kv_state和score_state会原位更新到此Tensor</td>
       <td>不支持空Tensor。</td>
       <td>FLOAT</td>
       <td>ND</td>
@@ -338,7 +338,7 @@ aclnnStatus aclnnCompressor(
   - D（Head Dim）表示hidden层的最小单元大小，D取值由wkv的第一维大小除以coff得到。
 
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term> ：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     - cmpRatio仅支持2/4/8/16/32/64/128。
   <!-- end id7 -->
 
@@ -383,7 +383,7 @@ aclnnStatus aclnnCompressor(
     <tr>
       <td>ACLNN_ERR_INNER_TILING_ERROR</td>
       <td>561002</td>
-      <td>tiling发生异常，入参的dtype类型或者shape错误。</td>
+      <td>Tiling发生异常，入参的dtype类型或者shape错误。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -454,8 +454,8 @@ aclnnStatus aclnnCompressor(
     - cuSeqlensOptional必须传入空指针。
     - sequsedOptional支持输入shape为[B,]，要求0 ≤ sequsedOptional[n] ≤ S。
     - cacheMode=1时，stateBlockTableOptional支持输入shape为[B, ceil(Smax/block_size)]，Smax=max(start_pos)+S；cacheMode=2时，支持输入shape为[B]。
-    - cmpKvOut输出shape为[B, ceil(S/cmp_ratio), D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ...  + (compressed_tokens+padN)。
-- 输出有效范围：compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio，其中，Seqlen表示不同Batch中的有效token数。BS非合轴时，每 batch 的有效结果位于输出的前 compressed_tokens[n] 行；BS合轴时，按 batch 顺序连续拼接，总有效范围为前 sum(compressed_tokens[n]) 行。输出分配容量中其余尾行算子不写入。
+    - cmpKvOut输出shape为[B, ceil(S/cmp_ratio), D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ... + (compressed_tokens+padN)。
+- 输出有效范围：compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio，其中，Seqlen表示不同Batch中的有效token数。BS非合轴时，每batch的有效结果位于输出的前compressed_tokens[n]行；BS合轴时，按batch顺序连续拼接，总有效范围为前sum(compressed_tokens[n])行。输出分配容量中其余尾行算子不写入。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
     - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
@@ -480,7 +480,7 @@ aclnnStatus aclnnCompressor(
       </tbody>
       </table>
   - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下stateCacheRef不做更新，输出cmpKvOut为空tensor。
-  - stateBlockTableOptional元素取值范围为[0, block_num)，block_num为stateCacheRef第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cacheMode=1（连续buffer）下写state_cache操作跳过该位置；cacheMode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cacheMode=1下元素值0为"未分配"哨兵值可重复出现，非0值须全局唯一；cacheMode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
+  - stateBlockTableOptional元素取值范围为[0, block_num)，block_num为stateCacheRef第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cacheMode=1（连续buffer）下写state_cache操作跳过该位置；cacheMode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cacheMode=1下元素值0为“未分配”哨兵值可重复出现，非0值须全局唯一；cacheMode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
 - 输入属性限制：
   - 支持D为128/512。
   - 支持H为1K~10K，512对齐。

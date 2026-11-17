@@ -694,7 +694,7 @@ aclnnStatus aclnnSparseFlashMla(
   - 除`cmpTopkLengthOptional`等预留输入可传入nullptr或空Tensor外，其余已传入Tensor不支持为空。
   - `metadataOptional`参数必须传入，由`aclnnSparseFlashMlaMetadata`算子生成，shape固定为(2048,)。
   - `cmpResidualKvOptional`为主算子和`aclnnSparseFlashMlaMetadata`的可选入参；传入后用于按`cmp_len * cmpRatio + residual`恢复cmp侧mask使用的压缩前长度。主算子仅在cmpMaskMode为3且cmpRatio不等于1时允许传入，cmpMaskMode为0或cmpRatio等于1时不允许传入。
-  - 当layoutKvOptional为PA_BBND时，oriKvOptional和cmpKvOptional支持0轴非连续，非连续Tensor的每一维的stride均不能为0。不支持其他非连续。
+  - 当layoutKvOptional为PA_BBND时，oriKvOptional和cmpKvOptional支持0轴非连续，非连续Tensor的每一维的stride均不能为0，不支持其他非连续。
 
 - 三种Attention场景输入要求
 

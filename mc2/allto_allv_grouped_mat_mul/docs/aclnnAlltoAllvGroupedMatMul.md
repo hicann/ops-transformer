@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：完成路由专家 AlltoAllv、Permute、GroupedMatMul 融合并实现与共享专家 MatMul 并行融合，**先通信后计算**。
+- 接口功能：完成路由专家AlltoAllv、Permute、GroupedMatMul融合并实现与共享专家MatMul并行融合，**先通信后计算**。
 
 - 计算公式：
     - 路由专家：
@@ -103,7 +103,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
     <tr>
         <td>gmmX(aclTensor*)</td>
         <td>输入</td>
-        <td>该输入进行 AlltoAllv 通信与 Permute 操作后结果作为 GroupedMatMul 计算的左矩阵。</td>
+        <td>该输入进行AlltoAllv通信与Permute操作后结果作为GroupedMatMul计算的左矩阵。</td>
         <td>支持2维，shape为(BSK, H1)。</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
@@ -113,7 +113,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
     <tr>
         <td>gmmWeight(aclTensor*)</td>
         <td>输入</td>
-        <td>GroupedMatMul 计算的右矩阵。</td>
+        <td>GroupedMatMul计算的右矩阵。</td>
         <td>支持3维，shape为(e, H1, N1)。</td>
         <td>与gmmX保持一致</td>
         <td>ND</td>
@@ -163,7 +163,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
     <tr>
         <td>group(char*)</td>
         <td>输入</td>
-        <td>专家并行的通信域名，字符串长度要求(0, 128)。</td>
+        <td>专家并行的通信域名称，字符串长度要求(0, 128)。</td>
         <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
         <td>STRING</td>
         <td>-</td>
@@ -171,7 +171,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
         <td>-</td>
     </tr>
     <tr>
-        <td>epWorldSize（int64_t）</td>
+        <td>epWorldSize(int64_t)</td>
         <td>输入</td>
         <td>ep通信域的大小。</td>
         <td>支持2、4、8、16、32、64、128、256。</td>
@@ -224,7 +224,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
         <td>permuteOutFlag(bool)</td>
         <td>输入</td>
         <td>permuteOutOptional是否需要输出。</td>
-        <td>true表明需要输出，false表明不需要输出。</td>
+        <td>true表示需要输出，false表示不需要输出。</td>
         <td>BOOL</td>
         <td>-</td>
         <td>-</td>
@@ -244,7 +244,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
         <td>mmYOptional(aclTensor*)</td>
         <td>输出</td>
         <td>共享专家计算的输出。</td>
-        <td>支持2维，shape为(BS, N2)，仅当传入mmXOptional与mmWeightOptional才输出。</td>
+        <td>支持2维，shape为(BS, N2)，仅当传入mmXOptional与mmWeightOptional时才输出。</td>
         <td>与mmXOptional保持一致</td>
         <td>ND</td>
         <td>2</td>
@@ -261,7 +261,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
         <td>x</td>
     </tr>
     <tr>
-        <td>workspaceSize（uint64_t*）</td>
+        <td>workspaceSize(uint64_t*)</td>
         <td>输出</td>
         <td>返回需要在Device侧申请的workspace大小。</td>
         <td>-</td>
@@ -383,7 +383,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
   - BSK：本卡发送的token数，是sendCounts参数累加之和，取值范围(0, 52428800)。
   - H1：表示路由专家hidden size隐藏层大小，取值范围(0, 65536)。
   - H2：表示共享专家hidden size隐藏层大小，取值范围(0, 12288]。
-  - e：表示单卡上专家个数，e<=48，e * epWorldSize最大支持384。
+  - e：表示单卡上专家个数，e <= 48，e * epWorldSize最大支持384。
   - N1：表示路由专家的head_num，取值范围(0, 65536)。
   - N2：表示共享专家的head_num，取值范围(0, 65536)。
   - BS：batch sequence size。
@@ -392,7 +392,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
 
 <!-- npu="A3" id9 -->
-- <term>Atlas A3系列产品</term>  : 单卡通信量在 2MB 以下可能存在性能劣化。
+- <term>Atlas A3系列产品</term>：单卡通信量在2MB以下可能存在性能劣化。
 
 <!-- end id9 -->
 
@@ -402,7 +402,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
 
 说明：
 
-- 本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy等，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+- 本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy等，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 - 本示例代码以8卡为例，请根据实际环境卡数修改`EP_WORLD_SIZE`。
 
 <!-- npu="950,A3" id10 -->

@@ -584,8 +584,8 @@ aclnnStatus aclnnMlaPreprocessV2(
       <td>输出</td>
       <td>表示Key经过ReshapeAndCache后的输出。</td>
       <td>shape和dtype随cacheMode变化：<ul>
-        <li>cacheMode为0：shape为[blockNum, blockSize, 1, 576]， dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
-        <li>cacheMode为1：shape为[blockNum, blockSize, 1, 512]， dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
+        <li>cacheMode为0：shape为[blockNum, blockSize, 1, 576]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
+        <li>cacheMode为1：shape为[blockNum, blockSize, 1, 512]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为2：shape为[blockNum, 16, blockSize, 32]，dtype为INT8，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li>
         <li>cacheMode为3：shape为[blockNum, 32, blockSize, 16]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li></ul>
       </td>

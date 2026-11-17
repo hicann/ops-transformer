@@ -130,7 +130,7 @@
 
 - 计算公式：
 
-  K 是卷积核宽度，L 是当前 batch 的序列长度，dim 是特征维度，batchId 是当前处理的变长序列索引，C 是 convStates 缓存空间长度（convStates.size(1)），B 是 APC 块大小（bSize）。对输入 x 中的每一个 batch 进行以下操作：
+  K是卷积核宽度，L是当前batch的序列长度，dim是特征维度，batchId是当前处理的变长序列索引，C是convStates缓存空间长度（convStates.size(1)），B是APC块大小（bSize）。对输入x中的每一个batch进行以下操作：
   1. 缓存读取
 
       缓存行索引：
@@ -680,7 +680,7 @@ aclnnStatus aclnnFusedCausalConv1d(
 
 - 输入值域限制：
   - queryStartLoc是累计偏移量，取值范围[0, cuSeqLen]，长度为batch+1，queryStartLoc[i]表示第i个序列的起始偏移，queryStartLoc[batch]表示最后一个序列的结束位置。
-  - blockSize 为0或者大于等于2，apc开启时不为0。
+  - blockSize为0或者大于等于2，apc开启时不为0。
   - blockIdxFirstScheduledToken、blockIdxLastScheduledToken、initialStateIdx、numComputedTokens和cacheIndices均存在时表示APC开启，且满足以下条件（i为batch的索引）：
     - cacheIndices为2维
     - initialStateIdx[i] <= blockIdxFirstScheduledToken[i]+1
@@ -691,7 +691,7 @@ aclnnStatus aclnnFusedCausalConv1d(
   - numComputedTokens中每个元素取值大于等于0。
   - cacheIndices的取值范围为[0, convStates.dim[0]-1],且值均不能相等（除非等于padSlotId）。
   - maxQueryLen = batch中的最大seqLen。
-  - Pangu V2 模式（convMode = 1）下，numComputedTokens不能为 None。
+  - Pangu V2模式（convMode = 1）下，numComputedTokens不能为None。
   - 算子入参与中间计算结果，在对应数据类型（float16/bfloat16）下，数值均不会超出该类型值域范围。
   - 算子输入不支持有±inf和Nan的情况。
 

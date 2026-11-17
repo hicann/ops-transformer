@@ -92,7 +92,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
 
 ## aclnnFusedFloydAttentionGradGetWorkspaceSize
 
-- **参数说明**
+- **参数说明：**
 
   <table style="undefined;table-layout: fixed; width: 1565px"><colgroup>
       <col style="width: 146px">
@@ -320,7 +320,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入参数是必选输入，输出或者必选属性，且是空指针。</td>
+      <td>传入参数是必选输入、输出或者必选属性，且是空指针。</td>
     </tr>
     <tr>
       <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>

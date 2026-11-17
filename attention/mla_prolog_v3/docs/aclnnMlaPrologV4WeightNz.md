@@ -26,10 +26,10 @@
 - **功能更新**：（相对于aclnnMlaPrologV3weightNz的差异）
     - 新增可选参数doRope：控制是否对queryRopeOut与krCache执行旋转位置编码；默认true；doRope=true时ropeSin/ropeCos必须传入非空有效Tensor，doRope=false时跳过RoPE并写直通结果，此时ropeSin/ropeCos必须同时为空（nullptr或空Tensor）。
     - N:Head-Num（多头数）范围调整为1-128
-- **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路:
+- **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路：
     - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后，乘以Query尺度矫正因子$\alpha_q$得到$c^Q$，再分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后得到$q^N$；第二路乘以$W^{QR}$后，在doRope=true时经过旋转位置编码得到$q^R$，doRope=false时对$c^Q \cdot W^{QR}$直通写出。
-    - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后，乘以Key尺度矫正因子$\alpha_{kv}$传入Cache中得到$k^C$；
-    - 第四路是输入$x$乘以$W^{KR}$后，在doRope=true时经过旋转位置编码再写入Cache得到$k^R$，doRope=false时对$x \cdot W^{KR}$直通写入Cache；
+    - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后，乘以Key尺度矫正因子$\alpha_{kv}$传入Cache中得到$k^C$。
+    - 第四路是输入$x$乘以$W^{KR}$后，在doRope=true时经过旋转位置编码再写入Cache得到$k^R$，doRope=false时对$x \cdot W^{KR}$直通写入Cache。
     - 第五路是输出$q^N$经过DynamicQuant后得到的量化参数。
     - 第六路是queryNormFlag=true时，输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后得到压缩结果$c^Q$，作为queryNormOutOptional输出。
     - 第七路是queryNormFlag=true且量化场景（weightQuantMode≠0）下，对$c^Q$做DynamicQuant，最终得到量化后的queryNormOutOptional和对应量化参数dequantScaleQNormOutOptional。
@@ -62,7 +62,7 @@
     $$
     其中 $\alpha_q$ 是Query的尺度矫正参数。
 
-    对Query进行ROPE旋转位置编码（doRope=true）
+    对Query进行RoPE旋转位置编码（doRope=true）
 
     $$
     q^R = \mathrm{ROPE}(c^Q \cdot W^{QR})
@@ -85,7 +85,7 @@
     $$
     其中 $\alpha_{kv}$ 是Key的尺度矫正参数。
 
-    对Key进行ROPE旋转位置编码，并将结果存入cache（doRope=true）
+    对Key进行RoPE旋转位置编码，并将结果存入cache（doRope=true）
 
     $$
     k^R = \mathrm{Cache}(\mathrm{ROPE}(x \cdot W^{KR}))
@@ -141,7 +141,7 @@
     queryNorm = {\mathrm{cast\_to\_fp8}(c^Q / \mathrm{dequantScaleQNorm})}
     $$
 
-    其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数的最大值emax。
+    其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数位的最大值emax。
 
 ## 函数原型
 
@@ -570,7 +570,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
         <ul>
             <li>用户未特意指定时，建议传入"PA_BSND"</li>
             <li>仅支持char*类型</li>
-            <li>可选值为："PA_BSND"、 "PA_NZ"、 "PA_BLK_BSND"、 "PA_BLK_NZ"、 "BSND"、 "TND"</li>
+            <li>可选值为："PA_BSND"、"PA_NZ"、"PA_BLK_BSND"、"PA_BLK_NZ"、"BSND"、"TND"</li>
         </ul>
         </td>
         <td>CHAR*</td>
@@ -739,7 +739,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
       <tr>
         <td>queryNormOutOptional</td>
         <td>输出</td>
-        <td>公式中tokenX做rmsNorm后的输出tensor（对应<i>c<sup><i>Q</i></sup></i>）。</td>
+        <td>公式中tokenX做RmsNorm后的输出tensor（对应<i>c<sup><i>Q</i></sup></i>）。</td>
         <td>queryNormFlag=true时输出</td>
         <td>BFLOAT16、INT8、FLOAT8_E4M3FN、HIFLOAT8</td>
         <td>ND</td>

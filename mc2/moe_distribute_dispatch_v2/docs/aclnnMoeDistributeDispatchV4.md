@@ -480,8 +480,8 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - expandScalesOut要求为1D Tensor，shape为(A,)。
     - quantMode支持0（非量化）、2（动态量化）。
     - elasticInfoOptional当前版本不支持，传空指针即可。
-    - zeroExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
-    - copyExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
+    - zeroExpertNum当commAlg="fullmesh"时，取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
+    - copyExpertNum当commAlg="fullmesh"时，取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum当前版本不支持，传0即可。
     - performanceInfoOptional可选择传入有效数据或空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     </details>
@@ -492,7 +492,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     <summary><term>Atlas A3系列产品</term></summary>
 
     - dynamicScalesOut仅quantMode取值为2时有输出。
-    - commAlg支持""，"fullmesh_v1"，"fullmesh_v2", "hierarchy"三种输入方式。""：默认值，不开启fullmesh_v2模板；"fullmesh_v1"：不开启fullmesh_v2模板；"fullmesh_v2"：开启fullmesh_v2模板；"hierarchy": 开启跨超模板，该模板支持各rank BS不一致，仅支持tpWorldSize为1、共享专家为0的场景，且不支持二维mask、特殊专家、performanceInfo场景。可变BS场景需为所有rank配置相同且非0的globalBs容量，并且不传xActiveMaskOptional。
+    - commAlg支持""，"fullmesh_v1"，"fullmesh_v2"，"hierarchy"三种输入方式。""：默认值，不开启fullmesh_v2模板；"fullmesh_v1"：不开启fullmesh_v2模板；"fullmesh_v2"：开启fullmesh_v2模板；"hierarchy"：开启跨超模板，该模板支持各rank BS不一致，仅支持tpWorldSize为1、共享专家为0的场景，且不支持二维mask、特殊专家、performanceInfo场景。可变BS场景需为所有rank配置相同且非0的globalBs容量，并且不传xActiveMaskOptional。
     - xActiveMaskOptional要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。
     - expertScalesOptional当commAlg="hierarchy"场景时，要求为2D Tensor，shape为(BS, K)；当commAlg=""、"fullmesh_v1"、"fullmesh_v2"场景时，`传空指针即可。
     - epWorldSize取值范围[2, 768]；当commAlg="hierarchy"场景时，取值范围为[16, 256]，且为16的整数倍。
@@ -508,10 +508,10 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - expandScalesOut当commAlg="hierarchy"场景时，要求为1D Tensor，shape为(A,)；当commAlg=""、"fullmesh_v1"、"fullmesh_v2"场景时暂不支持该输出。
     - quantMode支持0（非量化）、2（动态量化）。
     - elasticInfoOptional当前版本不支持，传空指针即可。
-    - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
-    - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>。
-    - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>。
-    - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
+    - zeroExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
+    - copyExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>。
+    - constExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>。
+    - performanceInfoOptional可选择传入有效数据或空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     - scalesOptional 2D Tensor，非量化场景传空指针；动态量化可传有效数据或空指针。
     </details>
     <!-- end id10 -->
@@ -537,10 +537,10 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - expandScalesOut当使能expertScales专家权重功能时，输出有效；不使能时，该输出无效。
     - quantMode支持0（非量化）、1（静态量化）、2（pertoken动态量化）、3（pergroup动态量化）、4（mx动态量化）。
     - elasticInfoOptional当前版本不支持，传空指针即可。
-    - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
-    - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>。
-    - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>。
-    - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
+    - zeroExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
+    - copyExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>。
+    - constExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>。
+    - performanceInfoOptional可选择传入有效数据或空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     - scalesOptional quantMode取值为0时，若`x`的数据类型为`FLOAT16`或`BFLOAT16`则传空指针，若`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`则必传有效数据；quantMode取值为1时必传有效数据；quantMode取值为2或3时可传有效数据或空指针；quantMode取值为4时传空指针。
     </details>
     <!-- end id11 -->
@@ -656,8 +656,8 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
   | A            | 表示本卡需要分发的最大token数量，取值范围如下：<ul> <li>对于共享专家，令 <code>ranksPerSharedExpert = sharedExpertRankNum / sharedExpertNum</code>、<code>maxBS = (globalBs == 0 ? BS : globalBs / epWorldSize)</code>，要满足 <code>A &gt;= maxBS * ((epWorldSize + ranksPerSharedExpert - 1) / ranksPerSharedExpert)</code>。</li><li>对于MoE专家，当globalBs为0时，要满足A >= BS \* epWorldSize \* min(localExpertNum, K)；当globalBs非0时，要满足A >= globalBs \* min(localExpertNum, K)。</li></ul>|
-  | H（hidden size） | 表示hidden size隐藏层大小。 具体产品差异见下方说明。 |
-  | BS           | 表示本卡最终输出token数。 具体产品差异见下方说明。 |
+  | H（hidden size） | 表示hidden size隐藏层大小。具体产品差异见下方说明。 |
+  | BS           | 表示本卡最终输出token数。具体产品差异见下方说明。 |
   | K | 表示选取topK个专家，取值范围为0 < K ≤ 16，且<code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>。具体产品差异见下方说明。 |
   | serverNum    | 表示服务器节点数，仅支持2、4、8。具体产品差异见下方说明。 |
   | localExpertNum |   本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li>具体产品差异见下方说明。</li></ul> |
@@ -729,9 +729,9 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
               - `scalesOptional`的shape为(`BS`, `dim1`)，其中`dim1`需满足小于等于`H`。
       - `quantMode`取值为1时，表示静态量化场景，`expandXOut`的数据类型支持`INT8`、`HIFLOAT8`。
           - `expandXOut`的数据类型为`INT8`时有如下场景：
-              - 输入的`scalesOptional`代表量化系数，shape为(1, )；
-              - 输入的`scalesOptional`表示每个专家共享的平滑权重时，shape为(`H`，)；
-              - 输入的`scalesOptional`代表融了每个专家的平滑权重的量化系数时，若有共享专家卡，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)，若无共享专家卡，其shape为(`moeExpertNum`, `H`)。
+              - 输入的`scalesOptional`代表量化系数，shape为(1, )。
+              - 输入的`scalesOptional`表示每个专家共享的平滑权重时，shape为(`H`, )。
+              - 输入的`scalesOptional`代表融合了每个专家的平滑权重的量化系数时，若有共享专家卡，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)，若无共享专家卡，其shape为(`moeExpertNum`, `H`)。
           - `expandXOut`的数据类型为`HIFLOAT8`时，`scalesOptional`的shape必须为(1, )。
       - `quantMode`取值为2时，表示pertoken动态量化场景，`expandXOut`的数据类型支持`INT8`、`FLOAT8_E4M3FN`、`FLOAT8_E5M2`。
           - 输入`scalesOptional`可传入空指针。
@@ -754,8 +754,8 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
       <!-- npu="910b" id16 -->
       - <term>Atlas A2系列产品</term>：
           - commAlg配置为""或nullptr：依照HCCL_INTRA_PCIE_ENABLE和HCCL_INTRA_ROCE_ENABLE环境变量配置，选择"fullmesh"或"hierarchy"公式。
-          - commAlg配置为"fullmesh": 当`x`的数据类型为`INT32`时，要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* (H \* sizeof(int32) + 32B) + 2MB)；其他数据类型要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)。
-          - commAlg配置为"hierarchy": 要求 >= (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
+          - commAlg配置为"fullmesh"：当`x`的数据类型为`INT32`时，要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* (H \* sizeof(int32) + 32B) + 2MB)；其他数据类型要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)。
+          - commAlg配置为"hierarchy"：要求 >= (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
       <!-- end id16 -->
       <!-- npu="A3" id17 -->
       - <term>Atlas A3系列产品</term>：
@@ -782,7 +782,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
       - <term>Atlas A3系列产品</term>、Ascend 950DT系列产品：不支持该环境变量。
       <!-- end id20 -->
 
-  - **HCCL_LOGIC_SUPERPOD_ID**
+  - **HCCL_LOGIC_SUPERPOD_ID**：
 
       <!-- npu="A3" id21 -->
       - <term>Atlas A3系列产品</term>：当commAlg配置"hierarchy"需根据不同的逻辑超节点配置该环境变量，例如两机分别设为`export HCCL_LOGIC_SUPERPOD_ID=0`和`export HCCL_LOGIC_SUPERPOD_ID=1`。
@@ -1283,7 +1283,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- end id27 -->
-- 示例代码如下，仅供参考
+- 示例代码如下，仅供参考：
 
     ```Cpp
     #include <thread>

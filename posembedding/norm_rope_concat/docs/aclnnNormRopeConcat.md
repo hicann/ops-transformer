@@ -25,7 +25,7 @@
 
 ## 功能说明
 
-- 接口功能:（多模态）transformer注意力机制中，针对query、key和Value实现归一化（Norm）、旋转位置编码（Rope）、特征拼接（Concat）：
+- 接口功能：（多模态）transformer注意力机制中，针对query、key和Value实现归一化（Norm）、旋转位置编码（Rope）、特征拼接（Concat）：
 
     - 归一化（Norm）当前支持层归一化（LayerNorm）、带仿射变换参数层归一化（AFFINE LayerNorm）、均方根归一化（RmsNorm）和带仿射变换参数均方根归一化（AFFINE RmsNorm）类型。
     - 旋转位置编码（Rope）支持Interleave和Half类型。
@@ -49,7 +49,7 @@
     1. 输入输出布局如下：输入`query`的shape为`(B, S_q, N, D)`，`encoderQuery`的shape为`(B, S_eq, N, D)`，输出`hiddenState`的shape为`(B, N, S_q + S_eq, D)`，其中
     `B`为批次大小，`S_q`和`S_eq`分别为`query`和`encoderQuery`的序列长度，`N`为注意力头数，`D`为头维度。
     2. Norm有五种模式(`normType`)：`NONE(0), LAYER_NORM(1), LAYER_NORM_AFFINE(2), RMS_NORM(3), RMS_NORM_AFFINE(4)`，其中：
-        当`normType = NONE`时:
+        当`normType = NONE`时：
         $$
         hiddenState_q = query
         $$
@@ -88,7 +88,7 @@
         $$
 
     3. Concat指在sequence维度上进行拼接，拼接有顺序区别(`concatOrder`)，当`concatOrder=0`时，$hiddenState_q$在$hiddenState_{eq}$前，当`concatOrder=1`时，$hiddenState_q$在$hiddenState_{eq}$后。
-    4. RoPE有三种模式(`ropeType`):`NONE(0), INTERLEAVE(1), HALF(2)`，其中当`ropeType=NONE`时直接输出不做变换，其余情况参考如下:
+    4. RoPE有三种模式(`ropeType`):`NONE(0), INTERLEAVE(1), HALF(2)`，其中当`ropeType=NONE`时直接输出不做变换，其余情况参考如下：
 
         ```python
           def image_rotary_emb(hidden_states, rope_sin, rope_cos, mode=1):
@@ -354,7 +354,7 @@ aclnnStatus aclnnNormRopeConcat(
       <tr>
         <td>normType</td>
         <td>属性</td>
-        <td>表示作用在q，k上的正则化类型，0: 不做正则化，1: LayerNorm, 2: LayerNormAffine, 3: RmsNorm, 4: RmsNormAffine。</td>
+        <td>表示作用在q、k上的正则化类型，0: 不做正则化，1: LayerNorm, 2: LayerNormAffine, 3: RmsNorm, 4: RmsNormAffine。</td>
         <td>无。</td>
         <td>int64</td>
         <td>标量</td>
@@ -364,7 +364,7 @@ aclnnStatus aclnnNormRopeConcat(
       <tr>
         <td>normAddedType</td>
         <td>属性</td>
-        <td>表示作用在encoderQuery，encoderKey上的正则化类型，0: 不做正则化，1: LayerNorm, 2: LayerNormAffine, 3: RmsNorm, 4: RmsNormAffine。</td>
+        <td>表示作用在encoderQuery、encoderKey上的正则化类型，0: 不做正则化，1: LayerNorm, 2: LayerNormAffine, 3: RmsNorm, 4: RmsNormAffine。</td>
         <td>无。</td>
         <td>int64</td>
         <td>标量</td>
@@ -619,7 +619,7 @@ aclnnStatus aclnnNormRopeConcat(
   - aclnnNormRopeConcat默认确定性实现。
 - query、key、value、encoderQuery、encoderKey、encoderValue数据类型需一致。
 - headDim长度在[1~1024]之间，且为偶数。
-- seqRope长度大小在[1~Min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)]之间。
+- seqRope长度在[1~Min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)]之间。
 
 ## 调用示例
 

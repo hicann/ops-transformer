@@ -379,12 +379,12 @@ aclnnStatus aclnnRainFusionAttention(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>输入query，key，value，selectIdx，selectNumIdx传入的是空指针。</td>
+      <td>输入query、key、value、selectIdx、selectNumIdx传入的是空指针。</td>
     </tr>
     <tr>
       <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="4">161002</td>
-      <td>query，key，value数据类型不在支持的范围之内。</td>
+      <td>query、key、value数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>qInputLayout或kvInputLayout不合法。</td>

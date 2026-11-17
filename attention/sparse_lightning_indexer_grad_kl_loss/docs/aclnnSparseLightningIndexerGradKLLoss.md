@@ -55,7 +55,7 @@
    利用链式法则可以进行weight，query和key矩阵的梯度计算：
 
    $$
-   dW\mathop{{}}\nolimits_{{t,:}}=dI\mathop{{}}\nolimits_{{t,:}}\text{@} \left( ReLU \left( S\mathop{{}}\nolimits_{{t,:}} \left)  \left) \mathop{{}}\nolimits^{{T}}\right. \right. \right. \right.
+   dW\mathop{{}}\nolimits_{{t,:}}=dI\mathop{{}}\nolimits_{{t,:}}\text{@} \left( ReLU \left( S\mathop{{}}\nolimits_{{t,:}} \left) \left) \mathop{{}}\nolimits^{{T}}\right. \right. \right. \right.
    $$
 
    $$
@@ -114,7 +114,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
 
 ## aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize
 
-- **参数说明:**
+- **参数说明：**
 
     <table style="undefined;table-layout: fixed; width: 1550px">
         <colgroup>
@@ -667,7 +667,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         </tbody>
     </table>
     <!-- npu="950" id8 -->
-    <term>Ascend 950PR&950DT系列产品</term>：N1仅支持32、48、64、128，Nidx1额外支持24，二者仅允许(48,24)组合，禁止其余数值配对; B、S1、S2均支持泛化。
+    <term>Ascend 950PR&950DT系列产品</term>：N1仅支持32、48、64、128，Nidx1额外支持24，二者仅允许(48,24)组合，禁止其余数值配对；B、S1、S2均支持泛化。
     <!-- end id8 -->
 
 ## 调用示例

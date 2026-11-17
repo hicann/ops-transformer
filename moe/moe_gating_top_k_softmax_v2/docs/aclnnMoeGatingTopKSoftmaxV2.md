@@ -26,7 +26,7 @@
 - 接口功能：MoE计算中，如果renorm=0，先对x的输出做Softmax计算，再取topK操作；如果renorm=1，先对x的输出做topK操作，再进行Softmax操作。yOut：当renorm=0时，对x做Softmax后取的topK值；当renorm=1时，对x先取topK再进行Softmax，得到的结果。expertIdxOut为topK的值的索引结果，即对应的专家序号；如果对应的行finished为True，则专家序号直接填num\_expert值（即x的最后一个轴大小）。
 - 计算公式：
 
-1. renorm = 0,
+1. renorm = 0
 
     $$
     softmaxResultOutOptional=softmax(x,axis=-1)
@@ -232,10 +232,10 @@ aclnnStatus aclnnMoeGatingTopKSoftmaxV2(
     <tr>
     <td rowspan="8"> ACLNN_ERR_INNER_TILING_ERROR </td>
     <td rowspan="8"> 561002 </td>
-    <td>多个输入tensor之间的shape信息不匹配。</td>
+    <td>多个输入Tensor之间的shape信息不匹配。</td>
     </tr>
     <tr>
-    <td>输入属性和输入tensor之间的shape信息不匹配。</td>
+    <td>输入属性和输入Tensor之间的shape信息不匹配。</td>
     </tr>
     <tr>
     <td>x的shape维度不为2或3。</td>
@@ -267,12 +267,12 @@ aclnnStatus aclnnMoeGatingTopKSoftmaxV2(
     <tbody>
       <tr><td>workspace</td><td>输入</td><td>在Device侧申请的workspace内存地址。</td></tr>
       <tr><td>workspaceSize</td><td>输入</td><td>在Device侧申请的workspace大小，由第一段接口aclnnMoeGatingTopKSoftmaxV2GetWorkspaceSize获取。</td></tr>
-      <tr><td>executor</td><td>输入</td><td> op执行器，包含了算子计算流程。 </td></tr>
-      <tr><td>stream</td><td>输入</td><td> 指定执行任务的Stream。 </td></tr>
+      <tr><td>executor</td><td>输入</td><td> op执行器，包含了算子计算流程。</td></tr>
+      <tr><td>stream</td><td>输入</td><td> 指定执行任务的Stream。</td></tr>
     </tbody>
   </table>
 
-- **返回值**
+- **返回值：**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 

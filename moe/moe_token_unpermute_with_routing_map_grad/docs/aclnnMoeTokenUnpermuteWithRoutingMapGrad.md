@@ -68,7 +68,7 @@
   permutedTokensGradOut = permutedProbs * permutedTokensGrad
   $$
 
-    (2) probs为None：
+  (2) probs为None：
 
   $$
   permutedTokensGradOut[outIndex[i]] = unpermutedTokensGrad[permuteTokenId[i]]

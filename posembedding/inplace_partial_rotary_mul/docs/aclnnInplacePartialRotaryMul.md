@@ -48,7 +48,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnInplacePartialRotaryMulGetWorkspaceSize"接口获取入参并根据流程计算所需workspace大小，再调用"aclnnInplacePartialRotaryMul"接口执行计算。
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnInplacePartialRotaryMulGetWorkspaceSize”接口获取入参并根据流程计算所需workspace大小，再调用“aclnnInplacePartialRotaryMul”接口执行计算。
 
 ```c++
 aclnnStatus aclnnInplacePartialRotaryMulGetWorkspaceSize(
@@ -120,7 +120,7 @@ aclnnStatus aclnnInplacePartialRotaryMul(
       <td>sin</td>
       <td>输入</td>
       <td>位置编码张量，公式中的sin。</td>
-      <td>与xRef数据类型一致，或者为FLOAT32</td>
+      <td>与xRef数据类型一致，或者为FLOAT32。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>4</td>
@@ -129,7 +129,7 @@ aclnnStatus aclnnInplacePartialRotaryMul(
     <tr>
       <td>rotary_mode</td>
       <td>输入</td>
-      <td>旋转模式</td>
+      <td>旋转模式。</td>
       <td>0为half模式，1为interleave模式，当前仅支持interleave模式。</td>
       <td>INT64</td>
       <td>-</td>
@@ -260,7 +260,7 @@ aclnnStatus aclnnInplacePartialRotaryMul(
     - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：cos/sin的shape当前只支持BS1D、B11D排布，即要求B轴保持相等。
     <!-- end id8 -->
 
-  - partialSlice约束：sliceStart ≥ 0，sliceEnd ≥ 0，sliceEnd ≤ xRef最后一维（D）大小，sliceLength = sliceEnd - sliceStart >= 0，当sliceEnd和sliceStart相同时，不做旋转位置编码，直接返回。
+  - partialSlice约束：sliceStart ≥ 0，sliceEnd ≥ 0，sliceEnd ≤ xRef最后一维（D）大小，sliceLength = sliceEnd - sliceStart ≥ 0，当sliceEnd和sliceStart相同时，不做旋转位置编码，直接返回。
 
 ## 调用示例
 

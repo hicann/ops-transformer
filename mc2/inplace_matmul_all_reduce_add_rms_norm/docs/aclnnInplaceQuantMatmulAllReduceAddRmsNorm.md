@@ -47,7 +47,7 @@
 - aclnnQuantMatmulAllReduceAddRmsNorm和aclnnInplaceQuantMatmulAllReduceAddRmsNorm实现相同的功能，使用区别如下，请根据自身实际场景选择合适的算子。
 
   - aclnnQuantMatmulAllReduceAddRmsNorm：需新建两个输出张量normOut和张量y对象存储计算结果。
-  - aclnnInplaceQuantMatmulAllReduceAddRmsNorm：需新建一个输出张量normOut，在非Inplace场景中新建的输出张量y存储的结果直接存储到输入张量residual的内存中。
+  - aclnnInplaceQuantMatmulAllReduceAddRmsNorm：需新建一个输出张量normOut，原非Inplace场景中新建的输出张量y存储的结果直接存储到输入张量residual的内存中。
 
 - 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnInplaceQuantMatmulAllReduceAddRmsNormGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnInplaceQuantMatmulAllReduceAddRmsNorm”接口执行计算。
 
@@ -116,7 +116,7 @@ aclnnStatus aclnnInplaceQuantMatmulAllReduceAddRmsNorm(
           <td>x2（aclTensor）</td>
           <td>输入</td>
           <td>MatMul计算的右矩阵，即计算公式中的x2。</td>
-          <td><ul><li>支持空Tensor。</li><li>与x1的数据类型保持一致。</li><li>当前版本仅支持二维输入，支持转置/不转置场景。</li><li>支持转置场景下的非连续的tensor</li></ul></td>
+          <td><ul><li>支持空Tensor。</li><li>与x1的数据类型保持一致。</li><li>当前版本仅支持二维输入，支持转置/不转置场景。</li><li>支持转置场景下的非连续的Tensor。</li></ul></td>
           <td>INT8</td>
           <td>ND</td>
           <td>2</td>
@@ -176,7 +176,7 @@ aclnnStatus aclnnInplaceQuantMatmulAllReduceAddRmsNorm(
           <td>group（char）</td>
           <td>输入</td>
           <td>Host侧标识通信域的字符串，通信域名称。</td>
-          <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
+          <td>通过HCCL提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -276,7 +276,7 @@ aclnnStatus aclnnInplaceQuantMatmulAllReduceAddRmsNorm(
         <td>streamMode不在合法范围内。</td>
     </tr>
     <tr>
-        <td>x1的最后一维shape大小k值为0</td>
+        <td>x1的最后一维shape大小k值为0。</td>
     </tr>
     </tbody>
     </table>
@@ -335,8 +335,8 @@ aclnnStatus aclnnInplaceQuantMatmulAllReduceAddRmsNorm(
 - 若输出residual类型为FLOAT16，dequantScale的类型为UINT64、INT64；若输出residual类型为BFLOAT16，dequantScale的类型为BFLOAT16。
 - x1、x2数据类型为INT8，bias数据类型为INT32、residual、gamma、y、normOut计算输入的数据类型要一致。
 - 只支持x2矩阵转置/不转置，x1矩阵支持不转置场景。
-- 支持1、2、4、8卡，并且仅支持hccs链路all mesh组网。
-- 支持(b*s)、n为0的空tensor，不支持k为0的空tensor。
+- 支持1、2、4、8卡，并且仅支持HCCS链路all mesh组网。
+- 支持(b*s)、n为0的空Tensor，不支持k为0的空Tensor。
 
 <!-- npu="910b" id7 -->
 - <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。

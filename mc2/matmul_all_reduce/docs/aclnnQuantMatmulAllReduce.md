@@ -140,7 +140,7 @@ aclnnStatus aclnnQuantMatmulAllReduce(
           <td>group</td>
           <td>输入</td>
           <td>通信域名称。</td>
-          <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
+          <td>通过HCCL提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -150,7 +150,7 @@ aclnnStatus aclnnQuantMatmulAllReduce(
           <td>reduceOp</td>
           <td>输入</td>
           <td>reduce操作类型。</td>
-          <td>当前版本仅支持输入"sum"。</td>
+          <td>当前版本仅支持输入“sum”。</td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -218,7 +218,7 @@ aclnnStatus aclnnQuantMatmulAllReduce(
     <!-- npu="950" id8 -->
     - <term>Ascend 950PR&950DT系列产品</term>：
 
-        - x2输入的数据格式仅支持ND（当前版本仅支持二维输入）。
+        - x2输入的数据格式仅支持ND格式（当前版本仅支持二维输入）。
 
     <!-- end id8 -->
 
@@ -226,7 +226,7 @@ aclnnStatus aclnnQuantMatmulAllReduce(
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-    第一阶段接口完成入参校验，出现以下场景报错：
+    第一段接口完成入参校验，出现以下场景报错：
 
     <table style="undefined;table-layout: fixed; width: 1149px"><colgroup>
     <col style="width: 282px">
@@ -309,7 +309,7 @@ aclnnStatus aclnnQuantMatmulAllReduce(
   - <term>Atlas A2系列产品</term>：`aclnnQuantMatmulAllReduce`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
-  - Ascend 950PR&950DT系列产品：`aclnnQuantMatmulAllReduce`默认确定性实现。
+  - <term>Ascend 950PR&950DT系列产品</term>：`aclnnQuantMatmulAllReduce`默认确定性实现。
   <!-- end id10 -->
 
 - 增量场景不开启MC2，全量场景开启MC2。
@@ -319,7 +319,7 @@ aclnnStatus aclnnQuantMatmulAllReduce(
 - 传入的x1、x2、dequantScale或者output不为空指针。
 - x1和x2、dequantScale、output、bias（非空场景）、x3（非空场景）的数据类型和数据格式需要在支持的范围之内。
 - 若输出output类型为FLOAT16，dequantScale的类型为INT64、UINT64；若输出output类型为BFLOAT16，dequantScale的类型为BFLOAT16，x3的类型为BFLOAT16。
-- 仅支持hccs链路all mesh组网。
+- 仅支持HCCS链路all mesh组网。
 
     <!-- npu="910b" id11 -->
     - <term>Atlas A2系列产品</term>：支持1、2、4、8卡。
@@ -338,7 +338,7 @@ aclnnStatus aclnnQuantMatmulAllReduce(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950,910b" id14 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：

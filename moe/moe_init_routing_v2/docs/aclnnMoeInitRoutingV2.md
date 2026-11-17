@@ -46,7 +46,7 @@
   expandedRowIdxOut[sortedRowIdx[i]]=i
   $$
 
-  3.按照sortedRowIdx将token按专家顺序排列，在dropPadMode为1时将每个专家需要处理的Token个数对齐为expertCapacity个，超过expertCapacity个的Token会被Drop，不足的会用0填充。得出expandedXOut：
+  3.按照sortedRowIdx将token按专家顺序排列，在dropPadMode为1时将每个专家需要处理的Token个数对齐为expertCapacity个，超过expertCapacity个的Token会被Drop，不足的会用0填充，得出expandedXOut：
 
   $$
   expandedXOut[expandedRowIdxOut[i]]=x[i//k]
@@ -123,8 +123,8 @@ aclnnStatus aclnnMoeInitRoutingV2(
     <tr>
       <td>x</td>
       <td>输入</td>
-      <td>MOE的输入，即token特征输入。</td>
-      <td><ul><li>支持空tensor。</li><li>要求为一个2D的Tensor，shape为[numRows, h],numRows代表Token个数，h代表每个Token的长度。</li></ul></td>
+      <td>MoE的输入，即token特征输入。</td>
+      <td><ul><li>支持空tensor。</li><li>要求为一个2D的Tensor，shape为[numRows, h]，numRows代表Token个数，h代表每个Token的长度。</li></ul></td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>2</td>
@@ -194,7 +194,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>expertTokensBeforeCapacityFlagOptional</td>
       <td>输入</td>
       <td>控制是否输出expertTokensBeforeCapacityOut。</td>
-      <td>取值为false和true<ul><li>false：表示不输出expertTokensBeforeCapacityOut。</li><li>true：表示输出expertTokensBeforeCapacityOut，值为在drop之前各个专家处理的token数量。</li></ul></td>
+      <td>取值为false和true。<ul><li>false：表示不输出expertTokensBeforeCapacityOut。</li><li>true：表示输出expertTokensBeforeCapacityOut，值为在drop之前各个专家处理的token数量。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -267,10 +267,10 @@ aclnnStatus aclnnMoeInitRoutingV2(
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：输入expertIdx数据类型支持INT32，要求是一个2D的shape [numRows, k]。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
-  - <term>Ascend 950PR&950DT系列产品</term> ：输入expertIdx数据类型支持INT32、INT64，要求是一个2D的shape [numRows, k]或者1D的shape [numRows]，当shape为1D时表示k=1。
+  - <term>Ascend 950PR&950DT系列产品</term>：输入expertIdx数据类型支持INT32、INT64，要求是一个2D的shape [numRows, k]或者1D的shape [numRows]，当shape为1D时表示k=1。
   <!-- end id8 -->
   <!-- npu="310p" id9 -->
-  - |<term>Atlas推理系列产品</term>：输入expertIdx数据类型支持INT32，要求是一个2D的shape [numRows, k]，dropPadMode仅支持0。输入x的尾轴大小要求可以整除32。
+  - <term>Atlas推理系列产品</term>：输入expertIdx数据类型支持INT32，要求是一个2D的shape [numRows, k]，dropPadMode仅支持0。输入x的尾轴大小要求可以整除32。
 
   <!-- end id9 -->
 
@@ -309,7 +309,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
         <td>expertTokensCountOrCumsumOut需要输出时，expertNum等于0。</td>
       </tr>
       <tr>
-        <td>x和expertIdx的shape维度不等于2，且第一维不相等。在|<term>Atlas推理系列产品</term>上输入x的尾轴大小不能整除32</td>
+        <td>x和expertIdx的shape维度不等于2，且第一维不相等。在<term>Atlas推理系列产品</term>上输入x的尾轴大小不能整除32</td>
       </tr>
       <tr>
         <td>activeNum、expertNum、expertCapacity的值小于0。</td>

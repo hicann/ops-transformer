@@ -514,7 +514,7 @@ aclnnStatus aclnnMlaProlog(
         <tr>
           <td>executor</td>
           <td>输出</td>
-          <td>返回op执行器，包含算子计算流程。</td>
+          <td>返回OP执行器，包含算子计算流程。</td>
           <td>
             <ul>
               <li>仅用于输出结果，无需输入配置</li>
@@ -561,12 +561,12 @@ aclnnStatus aclnnMlaProlog(
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
           <td>361001</td>
-          <td>API调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
+          <td>API内部调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>
           <td>561002</td>
-          <td>tiling发生异常，入参的dtype或者shape错误。</td>
+          <td>Tiling发生异常，入参的dtype类型或者shape错误。</td>
         </tr>
       </tbody>
     </table>
@@ -601,7 +601,7 @@ aclnnStatus aclnnMlaProlog(
         <tr>
           <td>executor</td>
           <td>aclOpExecutor*</td>
-          <td>op执行器，包含了算子计算流程。</td>
+          <td>OP执行器，包含了算子计算流程。</td>
         </tr>
         <tr>
           <td>stream</td>
@@ -711,7 +711,7 @@ aclnnStatus aclnnMlaProlog(
   <details>
   <summary><a id="specialConstraint"></a>特殊约束</summary>
 
-  - weight_dq，weight_uq_qr，weight_dkv_kr在不转置的情况下各个维度的表示：（k, n）。
+  - weight_dq、weight_uq_qr、weight_dkv_kr在不转置的情况下各个维度的表示：（k, n）。
 
   </details>
 

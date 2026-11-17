@@ -422,7 +422,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
    <tr>
       <td>softmaxSum（aclTensor）</td>
       <td>输出</td>
-      <td>Attention算法query乘key的结果减去softmaxMax,再取exp，接着求sum，得到softmaxSum。</td>
+      <td>Attention算法query乘key的结果减去softmaxMax，再取exp，接着求sum，得到softmaxSum。</td>
       <td>不支持空tensor。</td>
       <td>FLOAT</td>
       <td>ND</td>

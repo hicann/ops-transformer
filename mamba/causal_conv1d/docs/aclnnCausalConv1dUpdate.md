@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：完成因果一维卷积（Causal Conv1d）的状态更新（decode / update）计算。算子内部支持 SiLU 激活、缓存索引（cacheIndices）、投机解码（numAcceptedTokens）等特性。
+- 接口功能：完成因果一维卷积（Causal Conv1d）的状态更新（decode / update）计算。算子内部支持SiLU激活、缓存索引（cacheIndices）、投机解码（numAcceptedTokens）等特性。
 
 - 支持以下场景：
   - 场景一（decode/update场景 — 固定batch）：
@@ -66,13 +66,13 @@
 
 - 计算公式：
 
-  Causal Conv1d 是一种因果一维卷积算子，常用于序列建模中。在每个时间步 $t$，根据当前输入 $x_t$、卷积权重 $w$ 和历史状态，计算卷积输出 $y_t$。
+  Causal Conv1d是一种因果一维卷积算子，常用于序列建模中。在每个时间步 $t$，根据当前输入 $x_t$、卷积权重 $w$ 和历史状态，计算卷积输出 $y_t$。
 
   $$
   y_t = \text{Activation}\left(\sum_{j=0}^{W-1} w_j \cdot x_{t-j} + b\right)
   $$
 
-  其中，$W$ 为卷积核宽度（支持2、3、4），$w_j$ 为卷积权重，$b$ 为偏置（可选），$\text{Activation}$ 为激活函数（可选，SiLU）。当 `activation="none"` 时不使用激活函数，`activation="silu"` 时使用 SiLU 激活函数。
+  其中，$W$ 为卷积核宽度（支持2、3、4），$w_j$ 为卷积权重，$b$ 为偏置（可选），$\text{Activation}$ 为激活函数（可选，SiLU）。当 `activation="none"` 时不使用激活函数，`activation="silu"` 时使用SiLU激活函数。
 
 ## 函数原型
 
@@ -107,7 +107,7 @@ aclnnStatus aclnnCausalConv1dUpdate(
 
 ## aclnnCausalConv1dUpdateGetWorkspaceSize
 
-- **参数说明**：
+- **参数说明：**
 
   <table style="undefined;table-layout: fixed; width: 1550px"><colgroup>
   <col style="width: 230px">
@@ -145,7 +145,7 @@ aclnnStatus aclnnCausalConv1dUpdate(
     <tr>
       <td>weight（aclTensor*）</td>
       <td>输入</td>
-      <td>计算公式中的w，代表因果1维卷积核。</td>
+      <td>计算公式中的w，代表因果一维卷积核。</td>
       <td><ul><li>不支持空tensor。</li><li>shape为[K, dim]，K∈{2,3,4}。</li></ul></td>
       <td>数据类型与x一致</td>
       <td>ND</td>
@@ -284,7 +284,7 @@ aclnnStatus aclnnCausalConv1dUpdate(
     </tr>
   </tbody></table>
 
-- **返回值**
+- **返回值：**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 

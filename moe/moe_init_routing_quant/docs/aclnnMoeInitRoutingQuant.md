@@ -239,16 +239,16 @@ aclnnStatus aclnnMoeInitRoutingQuant(
         <td>x的shape维度不为2。</td>
       </tr>
       <tr>
-        <td>rowIdx的shape不为2或者rowIdx和expertIdx的shape不相等</td>
+        <td>rowIdx的shape不为2或者rowIdx和expertIdx的shape不相等。</td>
       </tr>
       <tr>
         <td>activeNum小于0。</td>
       </tr>
       <tr>
-        <td>expandedRowIdxOut和expandedExpertIdxOut的shape不相等，且不等于NUM_ROWS * k</td>
+        <td>expandedRowIdxOut和expandedExpertIdxOut的shape不相等，且不等于NUM_ROWS * k。</td>
       </tr>
       <tr>
-        <td>expandedXOut的shape不等于(min(NUM_ROWS, activeNum) * k, H)</td>
+        <td>expandedXOut的shape不等于(min(NUM_ROWS, activeNum) * k, H)。</td>
       </tr>
     </tbody>
   </table>

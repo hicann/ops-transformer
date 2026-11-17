@@ -435,7 +435,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>quantMode（int64_t）</td>
       <td>输入</td>
       <td>表示量化模式。</td>
-      <td>量化模式1表示Q、K、V 为per-tensor量化，数据类型为HIFLOAT8。</td>
+      <td>量化模式1表示Q、K、V为per-tensor量化，数据类型为HIFLOAT8。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -524,7 +524,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
     <tr>
       <td>topkValueMode（int64_t）</td>
       <td>输入</td>
-      <td>topk索引取值模式。取值1时稀疏索引表示逻辑token索引；取值2时，PA_BBND布局的稀疏索引表示物理token offset，即physical_block_id * block_size + offset_in_block,
+      <td>topk索引取值模式。取值1时稀疏索引表示逻辑token索引；取值2时，PA_BBND布局的稀疏索引表示物理token offset，即physical_block_id * block_size + offset_in_block
         ，其中physical_block_id表示实际物理块号，offset_in_block表示实际物理块内的偏移。</td>
       <td>支持1和2。</td>
       <td>-</td>
@@ -699,11 +699,11 @@ aclnnStatus aclnnQuantSparseFlashMla(
 
 - 使用约束
 
-  - 参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional、sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional、cmpResidualKvOptional、oriBlockTableOptional、cmpBlockTableOptional等输入属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+  - 参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional、sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional、cmpResidualKvOptional、oriBlockTableOptional、cmpBlockTableOptional等输入属于tensor。由于算子在tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
   - aclnnQuantSparseFlashMlaMetadata和aclnnQuantSparseFlashMla的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由用户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
   - oriTopkLengthOptional、cmpTopkLengthOptional分别表示oriSparseIndicesOptional、cmpSparseIndicesOptional实际参与计算的长度。在对应的oriMaskMode或cmpMaskMode为0的稀疏计算场景，有效q位置的长度值须非负；实际计算长度取该值与对应索引Tensor最后一维大小的较小值，超出索引宽度的部分不参与计算。
   - 调用aclnnQuantSparseFlashMlaMetadata时，若主算子传入oriSparseIndicesOptional或cmpSparseIndicesOptional，对应的oriTopk或cmpTopk须等于该索引Tensor的最后一维大小，保证分核与主算子使用相同的索引宽度。
-  - cmpResidualKvOptional配合cmpRatio使用，可恢复压缩前KV长度。且每个batch的值需要小于cmpRatio。仅当cmpMaskMode为3且cmpRatio!=1时允许传入；cmpMaskMode为0或cmpRatio等于1时不允许传入。
+  - cmpResidualKvOptional配合cmpRatio使用，可恢复压缩前KV长度，且每个batch的值需要小于cmpRatio。仅当cmpMaskMode为3且cmpRatio!=1时允许传入；cmpMaskMode为0或cmpRatio等于1时不允许传入。
   - attnOutOut：tensor类型，公式中的输出，数据类型支持BFLOAT16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致。
   - returnSoftmaxLse=False时返回shape为[1]的值为0的tensor；returnSoftmaxLse=True时返回FLOAT32的log-sum-exp结果。
   - cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
@@ -1326,7 +1326,7 @@ metadataOptional校验
 
 #### Paged Attention参数组
 
-当layoutKvOptional为PA_BBND时，开启Paged Attention
+当layoutKvOptional为PA_BBND时，开启Paged Attention：
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
         <col style="width: 147px">

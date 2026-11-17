@@ -45,7 +45,7 @@
     expandedRowIdxOut[sortedRowIdx[i]]=i
     $$
 
-    3.在dropless模式下，对sortedExpertIdx的每个专家统计直方图结果，再进行Cumsum，得出expertTokensCountOrCumsumOutOptional：
+    3.在Dropless模式下，对sortedExpertIdx的每个专家统计直方图结果，再进行Cumsum，得出expertTokensCountOrCumsumOutOptional：
 
     $$
     expertTokensCountOrCumsumOutOptional[i]=Cumsum(Histogram(sortedExpertIdx))
@@ -75,7 +75,7 @@
             quantResult = round(x / dynamicQuantScaleOutOptional)
             $$
 
-        - 若输入scale:
+        - 若输入scale：
 
             $$
             dynamicQuantScaleOutOptional = row\_max(abs(x * scaleOptional)) / 127
@@ -154,7 +154,7 @@ aclnnStatus aclnnMoeInitRoutingQuantV2(
     <tr>
       <td>x</td>
       <td>输入</td>
-      <td>MOE的输入即token特征输入。</td>
+      <td>MoE的输入即token特征输入。</td>
       <td><ul><li>支持空tensor。</li><li>要求为一个2D的Tensor，shape为[NUM_ROWS, H]，NUM_ROWS代表Token个数，H代表每个Token的长度。</li></ul></td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
@@ -265,7 +265,7 @@ aclnnStatus aclnnMoeInitRoutingQuantV2(
       <td>expandedXOut</td>
       <td>输出</td>
       <td>根据expertIdx进行扩展过的特征。</td>
-      <td><ul><li>支持空tensor。</li><li>在Dropless/Active场景下要求是一个2D的Tensor，Dropless场景shape为[NUM_ROWS * K, H]，Active场景shape为[min(activeNum, NUM_ROWS * K), H]。</li><li>在Drop/Pad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, H]。</li><li>数据类型支持INT8和INT4,当expandedXOut的数据类型为INT4时有如下限制：dropPadMode仅支持0；H必须可以被2整除；传入scaleOptional时scaleOptional的shape仅支持为[1, H]。</li></ul></td>
+      <td><ul><li>支持空tensor。</li><li>在Dropless/Active场景下要求是一个2D的Tensor，Dropless场景shape为[NUM_ROWS * K, H]，Active场景shape为[min(activeNum, NUM_ROWS * K), H]。</li><li>在Drop/Pad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, H]。</li><li>数据类型支持INT8和INT4，当expandedXOut的数据类型为INT4时有如下限制：dropPadMode仅支持0；H必须可以被2整除；传入scaleOptional时scaleOptional的shape仅支持为[1, H]。</li></ul></td>
       <td>INT8、INT4</td>
       <td>ND</td>
       <td>2或3</td>
@@ -342,7 +342,7 @@ aclnnStatus aclnnMoeInitRoutingQuantV2(
 
   `aclnnStatus`：返回状态码，具体参见 <a href="../../../docs/zh/context/aclnn_return_code.md">aclnn返回码</a>。
 
-  一段接口完成入参校验，出现以下场景时报错：
+  第一段接口完成入参校验，出现以下场景时报错：
   <table style="undefined;table-layout: fixed; width: 1180px">
     <colgroup>
       <col style="width: 250px">
@@ -370,7 +370,7 @@ aclnnStatus aclnnMoeInitRoutingQuantV2(
       <tr>
         <td rowspan="6">ACLNN_ERR_INNER_TILING_ERROR</td>
         <td rowspan="6">561002</td>
-        <td>x和expertIdx的shape维度不等于2，且第一维不相等。当expandedXOut的数据类型为INT4时dropPadMode不为0或输入scaleOptional时shape不为[1, H]</td>
+        <td>x和expertIdx的shape维度不等于2，且第一维不相等。当expandedXOut的数据类型为INT4时dropPadMode不为0或输入scaleOptional时shape不为[1, H]。</td>
       </tr>
       <tr>
         <td>activeNum、expertNum、expertCapacity的值小于0。</td>

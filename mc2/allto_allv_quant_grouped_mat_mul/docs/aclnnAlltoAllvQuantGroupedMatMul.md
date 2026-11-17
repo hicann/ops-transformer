@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **算子功能**：完成路由专家 AlltoAllv、量化 GroupedMatMul 融合并实现与共享专家量化 MatMul 并行融合，**先通信后计算**。
+- **算子功能**：完成路由专家AlltoAllv、量化GroupedMatMul融合并实现与共享专家量化MatMul并行融合，**先通信后计算**。
 
 - **计算公式**：
 假设通信域中的总卡数为 epWorldSize，每张卡上通信后路由专家个数为 e，每张卡分组矩阵乘只负责本卡专家的计算。对于每张卡的计算公式如下：
@@ -117,7 +117,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(
     <tr>
         <td>gmmX</td>
         <td>输入</td>
-        <td>该输入进行 AlltoAllv 通信与 Permute 操作后结果作为 GroupedMatMul 计算的左矩阵。</td>
+        <td>该输入进行AlltoAllv通信与Permute操作后结果作为GroupedMatMul计算的左矩阵。</td>
         <td>当前版本仅支持2维输入，shape为(BSK, H1)，且仅支持不转置场景。</td>
         <td>HIFLOAT8、FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1</td>
         <td>ND</td>
@@ -127,7 +127,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(
     <tr>
         <td>gmmWeight</td>
         <td>输入</td>
-        <td>GroupedMatMul 计算的右矩阵。</td>
+        <td>GroupedMatMul计算的右矩阵。</td>
         <td>当前版本仅支持3维输入，不转置shape为(e, H1, N1)，转置shape为(e, N1, H1)。</td>
         <td>HIFLOAT8、FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1</td>
         <td>ND</td>
@@ -271,7 +271,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(
     <tr>
         <td>group</td>
         <td>输入</td>
-        <td>专家并行的通信域名，字符串长度要求 (0, 128)。</td>
+        <td>专家并行的通信域名，字符串长度要求(0, 128)。</td>
         <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
         <td>STRING</td>
         <td>-</td>
@@ -400,7 +400,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(
     </tr>
     </tbody></table>
 
-- gmmXQuantMode、gmmWeightQuantMode、mmXQuantMode、mmWeightQuantMode的枚举值跟量化模式关系如下:
+- gmmXQuantMode、gmmWeightQuantMode、mmXQuantMode、mmWeightQuantMode的枚举值跟量化模式关系如下：
   - 0: 非量化
   - 1: pertensor
   - 2: perchannel
@@ -482,7 +482,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(
 
 ## 约束说明
 
-- 通信引擎约束：仅支持 AI CPU 通信。
+- 通信引擎约束：仅支持AI CPU通信。
 
 - 确定性计算：
   - `aclnnAlltoAllvQuantGroupedMatMul`默认确定性实现。
@@ -500,7 +500,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
   - mx量化且gmmX与gmmWeight为FLOAT4_E2M1时，H1和H2必须为偶数且不能为2，同时transGmmWeight和transMmWeight为false情况下，N1和N2必须为偶数。
   - gmmWeight和gmmWeightScale的转置状态必须保持一致：同时转置或同时不转置。mmWeight和mmWeightScale同样需要保持转置状态一致。
-  - groupSize:
+  - groupSize：
     - 仅当gmmXScale/gmmWeightScale/mmXScale/mmWeightScale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
     - groupSize值支持公式推导：传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据gmmX/gmmWeight/mmX/mmWeight/gmmXScale/gmmWeightScale/mmXScale/mmWeightScale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。设置原理：如果groupSizeM=0，表示m方向量化分组值由接口推导，推导公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与gmmX/mmX shape中的m一致，scaleM与gmmXScale/mmXScale shape中的m一致；如果groupSizeK=0，表示k方向量化分组值由接口推导，推导公式为groupSizeK = k / scaleK（需保证k能被scaleK整除），其中k与gmmX/mmX shape中的k一致，scaleK与gmmXScale/mmXScale shape中的k一致；如果groupSizeN=0，表示n方向量化分组值由接口推导，推导公式为groupSizeN = n / scaleN（需保证n能被scaleN整除），其中n与gmmWeight/mmWeight shape中的n一致，scaleN与gmmWeightScale/mmWeightScale shape中的n一致。
     $$
@@ -509,14 +509,14 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(
     - 如果满足重新设置条件，当gmmXScale/gmmWeightScale/mmXScale/mmWeightScale输入是2维及以上时，且数据类型都为FLOAT8_E8M0时，[groupSizeM，groupSizeN，groupSizeK]取值组合会推导为[1, 1, 32]，对应groupSize的值为4295032864。
 - 量化参数约束：
   - 当前版本支持pertensor量化、mx量化。
-- 类型约束
-  - pertensor量化
+- 类型约束：
+  - pertensor量化。
 
     | gmmX | gmmWeight | gmmXScale | gmmWeightScale | mmXScale | mmWeightScale | gmmY |
     | :------: | :------: | :------: | :------: | :------: | :------: | :------: |
     | HIFLOAT8 | HIFLOAT8 | FLOAT32 | FLOAT32 | FLOAT32 | FLOAT32 | FLOAT16/BFLOAT16 |
 
-  - mx量化
+  - mx量化。
 
     | gmmX | gmmWeight | gmmXScale | gmmWeightScale | mmXScale | mmWeightScale | gmmY |
     | :------: | :------: | :------: | :------: | :------: | :------: | :------: |

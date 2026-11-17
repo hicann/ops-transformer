@@ -127,7 +127,7 @@ aclnnStatus aclnnMatmulAlltoAll(
     <tr>
     <td>group</td>
     <td>输入</td>
-    <td>标识列组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
+    <td>标识列组的字符串，即通信域名称，通过HCCL接口HcclGetCommName获取commName作为该参数。</td>
     <td>字符串长度要求(0, 128)。</td>
     <td>-</td>
     <td>-</td>
@@ -294,7 +294,7 @@ aclnnStatus aclnnMatmulAlltoAll(
   - <term>Ascend 950PR&950DT系列产品</term>：支持2、4、8、16卡。
   <!-- end id9 -->
 
-* 参数说明中shape使用的变量H2必须整除NPU卡数。
+* 参数说明中shape使用的变量H2必须能被NPU卡数整除。
 * H1范围仅支持[1, 65535]。
 * H2的取值范围根据不同设备型号有不同的限制：
 
@@ -365,7 +365,7 @@ aclnnStatus aclnnMatmulAlltoAll(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="910b" id25 -->
 - <term>Atlas A2系列产品</term>：

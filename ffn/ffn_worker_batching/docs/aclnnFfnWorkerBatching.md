@@ -126,7 +126,7 @@ aclnnStatus aclnnFfnWorkerBatching(
     <tr>
       <td>expertNum</td>
       <td>输入</td>
-      <td>本卡专家总数，等于每层本卡专家数 × layerNum。用于推导groupList输出大小。</td>
+      <td>本卡专家总数，等于每层本卡专家数 × layerNum，用于推导groupList输出大小。</td>
       <td>取值范围为(0, 8192]。</td>
       <td>INT64</td>
       <td>-</td>
@@ -136,7 +136,7 @@ aclnnStatus aclnnFfnWorkerBatching(
     <tr>
       <td>maxOutShape</td>
       <td>输入</td>
-      <td>输出shape上限，格式为 {A, BS, topK+1, H}。用于推导y输出的shape上限 Y = A × BS × (topK+1)，以及H值。</td>
+      <td>输出shape上限，格式为 {A, BS, topK+1, H}，用于推导y输出的shape上限 Y = A × BS × (topK+1)，以及H值。</td>
       <td>数组长度必须为4。其中A取值范围为(0, 1024]，BS大于0，topK+1取值范围为(0, 64]，H大于0。tokenDtype=5时H须为偶数。</td>
       <td>LIST_INT64</td>
       <td>-</td>
@@ -238,7 +238,7 @@ aclnnStatus aclnnFfnWorkerBatching(
       <td>输出</td>
       <td>随token重排的scale值。tokenDtype=2时每行一个FP32 scale；tokenDtype=3、4、5时每32个逻辑元素一个FLOAT8_E8M0 scale。</td>
       <td>tokenDtype=0、1时该输出无有效数据。tokenDtype=3、4、5时尾部不足32个元素的分组仍占一个E8M0 scale。</td>
-      <td>FP32，FLOAT8_E8M0</td>
+      <td>FP32、FLOAT8_E8M0</td>
       <td>ND</td>
       <td>tokenDtype=2时shape为(Y)；tokenDtype=3、4、5时shape为(Y, ceil(H/32))</td>
       <td>×</td>

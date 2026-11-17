@@ -238,7 +238,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>blockShape</td>
       <td>输入</td>
       <td>代表稀疏块形状数组。</td>
-      <td>稀疏块形状[blockShapeX, blockShapeY]。非union为[1,Y]；union（maskType=3）为[8,Y]（当前仅支持8）。须与主算子一致。<term>Ascend 950PR&950DT系列产品</term>非量化与常规 FP8（quantType=5，非union）支持1≤blockShapeY≤128的任意整数；MXFP8与主算子配套时blockShapeY仅支持4或8；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1、2、4、8、16、32、64、128。</td>
+      <td>稀疏块形状[blockShapeX, blockShapeY]。非union为[1,Y]；union（maskType=3）为[8,Y]（当前仅支持8）。须与主算子一致。<term>Ascend 950PR&950DT系列产品</term>非量化与常规FP8（quantType=5，非union）支持1≤blockShapeY≤128的任意整数；MXFP8与主算子配套时blockShapeY仅支持4或8；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1、2、4、8、16、32、64、128。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -391,7 +391,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 - 稀疏块形状blockShape含两个元素[blockShapeX, blockShapeY]。非union时blockShapeX=1，union（maskType=3）时blockShapeX=8。<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持blockShapeY为1、2、4、8、16、32、64、128。
 <!-- end id7 -->
 <!-- npu="950" id17 -->
-- <term>Ascend 950PR&950DT系列产品</term>非量化与常规 FP8：`X=1`，`1≤Y≤128`；union（maskType=3）时`blockShapeX=8`，`blockShape=[8,Y]`（`1≤Y≤128`）。FP8 Union（quantType=5）在分页 KV（PA_BBND/PA_BNBD）下另要求 `Y` 整除页大小 128（即 `Y∈{1,2,4,8,16,32,64,128}`）。
+- <term>Ascend 950PR&950DT系列产品</term>非量化与常规FP8：`X=1`，`1≤Y≤128`；union（maskType=3）时`blockShapeX=8`，`blockShape=[8,Y]`（`1≤Y≤128`）。FP8 Union（quantType=5）在分页 KV（PA_BBND/PA_BNBD）下另要求 `Y` 整除页大小 128（即 `Y∈{1,2,4,8,16,32,64,128}`）。
 <!-- end id17 -->
 
 - **返回值**
@@ -473,7 +473,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 
 - **返回值**
 
-  返回 aclnnStatus 状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 
@@ -550,10 +550,10 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 
 ### 其他约束
 
-- 本接口必须与`aclnnGenericBlockSparseAttention`配套使用。共同Tensor和属性须与随后调用的主算子完全一致，每次调用主算子前均须重新生成`metadataOptional`。主算子的完整约束见[aclnnGenericBlockSparseAttention](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#约束说明)。
+- 本接口必须与`aclnnGenericBlockSparseAttention`配套使用。公共Tensor和属性须与随后调用的主算子完全一致，每次调用主算子前均须重新生成`metadataOptional`。主算子的完整约束见[aclnnGenericBlockSparseAttention](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#约束说明)。
 <!-- npu="950,A3,910b" id14 -->
 - 布局组合及适用范围见[产品差异约束](#产品差异约束)。`layoutSparsePattern=4`、`winLeft=winRight=-1`；非union时`blockShapeX=1`，union时`blockShapeX=8`；headDim范围见[产品差异约束](#产品差异约束)。maskType支持0/1；<term>Ascend 950PR&950DT系列产品</term>及非量化的<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>另支持3（union）；<term>Ascend 950PR&950DT系列产品</term> `MXFP8`亦支持0或1；quantType=5的FP8常规路径仅支持1。
-- `sparseBlockIdx`的shape为`[numKvHeads, totalQBlocks, maxSparseBlockCount]`，`sparseBlockCount`的shape为`[numKvHeads, totalQBlocks]`。`maxSparseBlockCount`须大于0，且须不小于`sparseBlockCount`中所有元素的最大值。容量上限：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化和INT8全量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16、MXFP8及常规 FP8（含 FP8 Union）为INT32_MAX。
+- `sparseBlockIdx`的shape为`[numKvHeads, totalQBlocks, maxSparseBlockCount]`，`sparseBlockCount`的shape为`[numKvHeads, totalQBlocks]`。`maxSparseBlockCount`须大于0，且须不小于`sparseBlockCount`中所有元素的最大值。容量上限：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化和INT8全量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16、MXFP8及常规FP8（含FP8 Union）为INT32_MAX。
 <!-- end id14 -->
 
 - 每组有效稀疏索引须非负、严格升序且不重复，位于前`sparseBlockCount`个位置；随机升序即可，不要求等步长或物理页连续。

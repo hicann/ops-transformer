@@ -539,7 +539,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     <td>rstdOut</td>
     <td>输出</td>
     <td>RmsNorm计算的标准化系数。</td>
-    <td>Device侧3D Tensor， shape为(Bs, 1, 1)。</td>
+    <td>Device侧3D Tensor，shape为(Bs, 1, 1)。</td>
     <td>FLOAT32</td>
     <td>ND</td>
     <td>3</td>
@@ -690,10 +690,10 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
 - 接口配套约束：
   - aclnnMoeDistributeDispatchV3接口与aclnnMoeDistributeCombineAddRmsNormV2接口必须配套使用，具体参考[调用示例](#调用示例)。
 
-- 参数一致性约束
-  - 调用接口过程中使用的expertIds、xActiveMaskOptional、elasticInfoOptional、groupEp、epWorldSize、moeExpertNum、expertShardType、sharedExpertNum、sharedExpertRankNum、globalBs、commAlg、zeroExpertNum、copyExpertNum、constExpertNum参数、HCCL_BUFFSIZE取值所有卡需保持一致，网络中不同层中也需保持一致，且和DispatchV3对应参数也保持一致。
+- 参数一致性约束：
+  - 调用接口过程中使用的expertIds、xActiveMaskOptional、elasticInfoOptional、groupEp、epWorldSize、moeExpertNum、expertShardType、sharedExpertNum、sharedExpertRankNum、globalBs、commAlg、zeroExpertNum、copyExpertNum、constExpertNum参数及HCCL_BUFFSIZE取值，所有卡需保持一致，网络中不同层中也需保持一致，且和DispatchV3对应参数也保持一致。
 
-- 产品特定约束
+- 产品特定约束：
 
   <!-- npu="A3" id9 -->
   - <term>Atlas A3系列产品</term>：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
@@ -702,20 +702,20 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
 
 - Shape变量约束：
     - A：表示本卡需要分发的最大token数量，取值范围如下：
-        - 当globalBs为0时，要满足A >= BS *epWorldSize* min(localExpertNum, K)；
+        - 当globalBs为0时，要满足A >= BS *epWorldSize* min(localExpertNum, K)。
         - 当globalBs非0时，要满足A >= globalBs * min(localExpertNum, K)。
 
     - H：表示hidden size隐藏层大小，取值范围为[1024, 8192]。
     - Bs：表示batch sequence size，即本卡最终输出的token数量，取值范围为0 < Bs ≤ 512。
-    - K：表示选取topK个专家，取值范围为0 < K ≤ 16同时满足0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum。
+    - K：表示选取topK个专家，取值范围为0 < K ≤ 16，同时满足0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum。
     - localExpertNum：表示本卡专家数量。
         - 对于共享专家卡，localExpertNum = 1
         - 对于MoE专家卡，localExpertNum = moeExpertNum / (epWorldSize - sharedExpertRankNum)，当前版本不支持TP域通信。
 
 - 环境变量约束：
     - HCCL_BUFFSIZE：调用本接口前需检查HCCL_BUFFSIZE环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
-        - ep通信域内：设置大小要求 >= 2且满足1024 ^ 2 *(HCCL_BUFFSIZE - 2) / 2 >= BS* 2 *(H + 128)* (epWorldSize * localExpertNum + K + 1)，localExpertNum表示MoE专家卡的本卡专家数。
-        - tp通信域内：预留参数，当前版本不支持。
+        - EP通信域内：设置大小要求 >= 2且满足1024 ^ 2 *(HCCL_BUFFSIZE - 2) / 2 >= BS* 2 *(H + 128)* (epWorldSize * localExpertNum + K + 1)，localExpertNum表示MoE专家卡的本卡专家数。
+        - TP通信域内：预留参数，当前版本不支持。
 
 - 通信域使用约束：
     - 一个模型中的aclnnMoeDistributeCombineAddRmsNormV2和aclnnMoeDistributeDispatchV3仅支持相同EP通信域，且该通信域中不允许有其他算子。
@@ -737,7 +737,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     - moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum < MAX_INT32，其中MAX_INT32值为2147483647。
 
     <!-- npu="950,A3" id12 -->
-    - <term>Atlas A3系列产品</term>  、<term>Ascend 950DT系列产品</term>：暂不支持动态缩容。
+    - <term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：暂不支持动态缩容。
 
     <!-- end id12 -->
 

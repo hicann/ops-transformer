@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **接口功能**：MoE(Mixture of Experts)计算中，最后处理合并MoE(专家混合)FFN(Feed-Forward Network，前馈网络)的输出结果。
+- **接口功能**：MoE(Mixture of Experts，专家混合)计算中，最后处理合并MoE FFN(Feed-Forward Network，前馈网络)的输出结果。
 - **计算公式**：
 
   $$
@@ -90,7 +90,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV2(
   <tr>
     <td>expandedX(aclTensor*)</td>
     <td>输入</td>
-    <td>公式中的expandedX ，MoE的FFN输出。</td>
+    <td>公式中的expandedX，MoE的FFN输出。</td>
     <td>-</td>
     <td>FLOAT16、BFLOAT16、FLOAT32</td>
     <td>ND</td>
@@ -202,7 +202,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV2(
   <!-- npu="A3,910b" id7 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
     - expandedX要求是一个2D/3D的Tensor，支持的数据类型为FLOAT16、BFLOAT16、FLOAT32，支持drop less和drop pad场景。
-    - scalesOptional：混合精度模式下，支持expandedX为BFLOAT16 时scalesOptional为FLOAT32；非混合精度模式下，数据类型要求与expandedX一致。
+    - scalesOptional：混合精度模式下，支持expandedX为BFLOAT16时scalesOptional为FLOAT32；非混合精度模式下，数据类型要求与expandedX一致。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
@@ -212,7 +212,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV2(
   <!-- npu="310p" id9 -->
   - <term>Atlas推理系列产品</term>：
     - expandedX要求是一个2D的Tensor，数据类型支持FLOAT16、FLOAT32，shape要求尾轴H为32对齐。
-    - x1Optional、x2Optional、biasOptional、expertIdxOptional仅支持传入nullptr
+    - x1Optional、x2Optional、biasOptional、expertIdxOptional仅支持传入nullptr。
     - 仅支持dropPadMode传入2。
     - scalesOptional数据类型支持FLOAT16、FLOAT32，且需要与expandedX一致。
 
@@ -250,10 +250,10 @@ aclnnStatus aclnnMoeFinalizeRoutingV2(
     <tr>
     <td rowspan="2">ACLNN_ERR_INNER_NULLPTR</td>
     <td rowspan="2">561103</td>
-    <td>多个输入tensor之间的shape信息不匹配。</td>
+    <td>多个输入Tensor之间的shape信息不匹配。</td>
     </tr>
     <tr>
-    <td>输入属性和输入tensor之间的shape信息不匹配。</td>
+    <td>输入属性和输入Tensor之间的shape信息不匹配。</td>
     </tr>
   </tbody></table>
 
@@ -296,7 +296,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV2(
   </tbody>
   </table>
 
-- **返回值**
+- **返回值：**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
@@ -305,10 +305,10 @@ aclnnStatus aclnnMoeFinalizeRoutingV2(
 1. 确定性计算：
     - aclnnMoeFinalizeRoutingV2默认确定性实现。
 
-2. NUM\_ROWS：表示行数；
-    - K：表示从总的专家E中选出K个专家；
-    - H：表示hidden size，即每个token序列长度，为列数；
-    - E：表示expert num，即专家数，E需要大于等于K；
+2. NUM\_ROWS：表示行数。
+    - K：表示从总的专家E中选出K个专家。
+    - H：表示hidden size，即每个token的序列长度，为列数。
+    - E：表示expert num，即专家数，E需要大于等于K。
     - C：表示expert capacity，即专家处理token数量的能力阈值。
 
 3. expandedRowIdx：当dropPadMode参数值为0、2时，Tensor中的值取值范围是[0,NUM_ROWS * K-1]；当dropPadMode参数值为1、3时，Tensor中的值取值范围是[-1, E \* C - 1]。

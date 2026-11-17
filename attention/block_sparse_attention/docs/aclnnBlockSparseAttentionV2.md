@@ -50,7 +50,7 @@
 <!-- npu="950" id7 -->
 - **FP8特性说明（仅<term>Ascend 950PR&950DT系列产品</term>支持）**：
 
-  本算子新增支持FP8数据类型的输入，以提供计算效率并降低显存占用。当使用FP8输入时，需要提供相应的量化缩放因子用于反量化计算。
+  本算子新增支持FP8数据类型的输入，以提高计算效率并降低显存占用。当使用FP8输入时，需要提供相应的量化缩放因子用于反量化计算。
 
 <!-- end id7 -->
 - **量化缩放因子**：
@@ -60,17 +60,17 @@
   qDequantScale（query量化缩放因子）
   - 数据类型：FLOAT32
   - shape：(Batch, HeadNum, CeilDiv(maxQSeqLength, blockShapeX), 1)
-  - 用途：在QK矩阵乘法时对query进行反量化。
+  - 用途：在QK矩阵乘法时对query进行反量化
 
   kDequantScale（key量化缩放因子）
   - 数据类型：FLOAT32
   - shape：(Batch, KVHeadNum, CeilDiv(maxKVSeqLength, blockShapeY), 1)
-  - 用途：在QK矩阵乘法时对key进行反量化。
+  - 用途：在QK矩阵乘法时对key进行反量化
 
   vDequantScale（value量化缩放因子）
   - 数据类型：FLOAT32
   - shape：(Batch, KVHeadNum, CeilDiv(maxKVSeqLength, blockShapeY), 1)
-  - 用途：在PV矩阵乘法时对value进行反量化。
+  - 用途：在PV矩阵乘法时对value进行反量化
 
 ## 函数原型
 
@@ -218,7 +218,6 @@ aclnnStatus aclnnBlockSparseAttentionV2(
       <td>×</td>
     </tr>
     <tr>
-    <tr>
       <td>blockShapeOptional（aclIntArray*）</td>
       <td>输入</td>
       <td>稀疏块形状数组。</td>
@@ -228,7 +227,7 @@ aclnnStatus aclnnBlockSparseAttentionV2(
           <li>当配置了blockSparseMaskOptional时：如配置此输入，算子会从中获取稀疏块尺寸；如不配置此输入，算子将默认稀疏块尺寸为[128,128]。</li>
           <li>当未配置blockSparseMaskOptional时：无论此项如何配置，算子均将忽略。</li>
         </ul>
-        当配置此输入时：必须包含两个元素[blockShapeX, blockShapeY]
+        当配置此输入时：必须包含两个元素[blockShapeX, blockShapeY]。
         <ul>
           <li>blockShapeX: Q方向块大小，值必须大于0。</li>
           <li>blockShapeY: KV方向块大小，值必须大于0；在<term>Ascend 950PR&950DT系列产品</term>上须为16的倍数，在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上须为128的倍数。</li>
@@ -239,6 +238,7 @@ aclnnStatus aclnnBlockSparseAttentionV2(
       <td>1</td>
       <td>-</td>
     </tr>
+    <tr>
       <td>actualSeqLengthsOptional（aclIntArray*）</td>
       <td>输入</td>
       <td>描述每个Batch对应的query序列长度。</td>
@@ -400,7 +400,7 @@ aclnnStatus aclnnBlockSparseAttentionV2(
       <td>输入</td>
       <td>Softmax计算采取的精度级别。</td>
       <td>
-        控制online softmax阶段以及rescale阶段运算使用的数据类型。当前只支持传0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>在FLOAT16/BFLOAT16非量化输入时支持配置为0或4，在FLOAT8_E4M3FN量化输入时仅支持配置为4，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持配置为0或1
+        控制online softmax阶段以及rescale阶段运算使用的数据类型。当前只支持传0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>在FLOAT16/BFLOAT16非量化输入时支持配置为0或4，在FLOAT8_E4M3FN量化输入时仅支持配置为4，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持配置为0或1。
         <ul>
           <li>0：表示online softmax和rescale全部采取fp32数据类型，适合追求计算精度的场景使用。</li>
           <li>1：仅支持输入的query、key、value均为fp16数据类型时配置，表示online softmax和rescale全部采取fp16数据类型，性能更好，但精度较低，且可能发生计算时的数值溢出，使用者需根据值域范围自行判断是否使用。</li>
@@ -498,7 +498,7 @@ aclnnStatus aclnnBlockSparseAttentionV2(
     <tr>
       <td>executor（aclOpExecutor**）</td>
       <td>输出</td>
-      <td>返回op执行器，包含算子计算流程。</td>
+      <td>返回OP执行器，包含算子计算流程。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -530,12 +530,12 @@ aclnnStatus aclnnBlockSparseAttentionV2(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>输入query，key，value传入的是空指针。</td>
+      <td>输入query、key、value传入的是空指针。</td>
     </tr>
     <tr>
       <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="4">161002</td>
-      <td>query，key，value数据类型不在支持的范围之内。</td>
+      <td>query、key、value数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>qInputLayout或kvInputLayout不合法。</td>
@@ -578,7 +578,7 @@ aclnnStatus aclnnBlockSparseAttentionV2(
     <tr>
       <td>executor</td>
       <td>输入</td>
-      <td>op执行器，包含了算子计算流程。</td>
+      <td>OP执行器，包含了算子计算流程。</td>
     </tr>
     <tr>
       <td>stream</td>
@@ -600,7 +600,7 @@ aclnnStatus aclnnBlockSparseAttentionV2(
 - qInputLayout和kvInputLayout当前仅支持相同的"TND"、"BNSD"或"BSND"布局；其中"BSND"仅<term>Ascend 950PR&950DT系列产品</term>支持。
 - 当前query、key、value的InputLayout必须保持一致。
 - 输入query、key、value的数据类型必须一致，支持FLOAT16和BFLOAT16。
-- query、key、value的D轴当前仅支持配置为64或128
+- query、key、value的D轴当前仅支持配置为64或128。
 - blockShapeOptional如果传入，则必须包含至少两个元素[blockShapeX, blockShapeY]，且值必须大于0，blockShapeY在<term>Ascend 950PR&950DT系列产品</term>上须为16的倍数，在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上须为128的倍数。
 - blockSparseMaskOptional当前必须传入，且shape为[batch, headNum, qBlockNum, kvBlockNum]。TND时，qBlockNum = ceilDiv(max(actualSeqLengths), blockShapeX)，kvBlockNum = ceilDiv(max(actualSeqLengthsKv), blockShapeY)。BNSD/BSND时，qBlockNum = ceilDiv(Q shape中的S, blockShapeX)，kvBlockNum = ceilDiv(K shape中的S, blockShapeY)；若传入actualSeqLengths和actualSeqLengthsKv，也可按实际长度计算：qBlockNum = ceilDiv(max(actualSeqLengths), blockShapeX)，kvBlockNum = ceilDiv(max(actualSeqLengthsKv), blockShapeY)。
 - attenMaskOptional当前只支持传入nullptr。

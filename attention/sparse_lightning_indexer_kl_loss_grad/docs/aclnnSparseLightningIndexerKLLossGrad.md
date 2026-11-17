@@ -119,7 +119,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
 
 ## aclnnSparseLightningIndexerKLLossGradGetWorkspaceSize
 
-- **参数说明:**
+- **参数说明：**
 
     <table style="undefined;table-layout: fixed; width: 1550px">
         <colgroup>
@@ -573,7 +573,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
         </tbody>
     </table>
 
-  - 参数B的支持情况:
+  - 参数B的支持情况：
 
     <!-- npu="A3,910b" id10 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：B支持1~256。
@@ -582,7 +582,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
     - <term>Ascend 950PR&950DT系列产品</term>：B>0。
     <!-- end id11 -->
 
-  - 参数S1、S2的支持情况:
+  - 参数S1、S2的支持情况：
 
     <!-- npu="A3,910b" id12 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：S1支持1~8k，S2支持1~512k。
@@ -591,7 +591,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
     - <term>Ascend 950PR&950DT系列产品</term>：S1>0，S2>0。
     <!-- end id13 -->
 
-  - 参数N1的支持情况:
+  - 参数N1的支持情况：
 
     <!-- npu="A3,910b" id14 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N1支持8、16、32、64。
@@ -600,7 +600,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
     - <term>Ascend 950PR&950DT系列产品</term>：N1支持1~128。
     <!-- end id15 -->
 
-  - 参数K的支持情况:
+  - 参数K的支持情况：
 
     <!-- npu="A3,910b" id16 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：K支持1~8192。

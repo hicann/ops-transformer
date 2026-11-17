@@ -35,9 +35,9 @@
 
 - 计算公式：
 
-  令 $i$ 表示 token 行，$h$ 表示 hidden 维下标，$K$ 表示路由专家数。token_data 包含 $K$ 个路由专家结果和最后一行共享专家结果。
+  令$i$表示token行，$h$表示hidden维下标，$K$表示路由专家数。token_data包含$K$个路由专家结果和最后一行共享专家结果。
 
-  - 非量化场景（tokenDtype 为 0 或 1）：
+  - 非量化场景（tokenDtype为0或1）：
 
     $$
     y[i,h] = \sum_{k=0}^{K-1} \text{expertScales}[i,k] \times \text{token\_data}[i,k,h] + \text{token\_data}[i,K,h]
@@ -49,7 +49,7 @@
     y[i,h] = \sum_{k=0}^{K} \operatorname{dequant}\!\left(\text{token\_data}[i,k,h],\ \text{expertScales}[i,k,\lfloor h/32 \rfloor]\right)
     $$
 
-    MXFP 的 scale 按每 32 个 hidden 元素分组；shape 中额外对齐的 scale 槽不对应有效 hidden 元素。
+    MXFP的scale按每32个hidden元素分组；shape中额外对齐的scale槽不对应有效hidden元素。
 
   $$
   \text{nextLayerId} = \text{layerId} + 1
@@ -111,7 +111,7 @@ aclnnStatus aclnnAttentionWorkerCombine(
       <td>scheduleContext</td>
       <td>输入</td>
       <td>Attention侧接收的调度上下文，内含CommonArea、ControlArea、AttentionArea、FfnArea。算子从AttentionArea的token_data_buf中读取token数据。</td>
-      <td>不支持空tensor。</td>
+      <td>不支持空Tensor。</td>
       <td>INT8</td>
       <td>ND</td>
       <td>1维，shape固定为(1024)</td>
@@ -170,7 +170,7 @@ aclnnStatus aclnnAttentionWorkerCombine(
     <tr>
       <td>y</td>
       <td>输出</td>
-      <td>最终的注意力合并结果。</td>
+      <td>最终的注意力融合结果。</td>
       <td>-</td>
       <td>FP16、BF16</td>
       <td>ND</td>

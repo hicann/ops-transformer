@@ -29,7 +29,7 @@
 
 - **计算公式**：
 
-    为以下3种情形：
+    分为以下3种情形：
 
     - 情形1：对量化后的入参x1、x2进行MatMul计算后，接着进行dequant计算，接着与x3进行Add操作，最后做AllReduce计算。
 
@@ -181,7 +181,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV3(
           <td>commQuantScale1Optional</td>
           <td>输入</td>
           <td>matmulAdd计算后的perchannel量化系数，即计算公式中的commQuantScale1Optional。</td>
-          <td>x2为(k, n)时， shape可为(n)或者(1,n)</td>
+          <td>x2为(k, n)时，shape可为(n)或者(1,n)</td>
           <td>BFLOAT16、FLOAT16</td>
           <td>ND</td>
           <td>1-2</td>
@@ -190,8 +190,8 @@ aclnnStatus aclnnQuantMatmulAllReduceV3(
         <tr>
           <td>commQuantScale2Optional</td>
           <td>输入</td>
-          <td>allGather计算后的perchannel量化系数，即计算公式中的commQuantScale2Optional。</td>
-          <td>x2为(k, n)时， shape可为(n)或者(1,n)</td>
+          <td>AllGather计算后的perchannel量化系数，即计算公式中的commQuantScale2Optional。</td>
+          <td>x2为(k, n)时，shape可为(n)或者(1,n)</td>
           <td>BFLOAT16、FLOAT16</td>
           <td>ND</td>
           <td>1-2</td>
@@ -201,7 +201,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV3(
           <td>group</td>
           <td>输入</td>
           <td>通信域名称。</td>
-          <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
+          <td>通过HCCL提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -383,7 +383,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV3(
 - 若输出output类型为FLOAT16，当pertokenScale为空时，dequantScale的类型为INT64、UINT64，当pertokenScale不为空时，dequantScale的类型为FLOAT32；若输出output类型为BFLOAT16，dequantScale的类型为BFLOAT16，x3的类型为BFLOAT16。
 - 传入的commQuantScale1与commQuantScale2需要同时为空指针或同时不为空指针，若传入的commQuantScale1与commQuantScale2同时不为空指针，两个量化参数shape需保持一致，类型需与算子输出类型保持一致，且每张卡输入保持一致。
 - x1的shape为(b, s, k)时，pertokenScaleOptional的shape为(b*s)；当x1的shape为(m, k)时，pertokenScaleOptional的shape为(m)。
-- 仅支持hccs链路all mesh组网。
+- 仅支持HCCS链路all mesh组网。
 
     <!-- npu="910b" id11 -->
     - <term>Atlas A2系列产品</term>：支持1、2、4、8卡。
@@ -395,7 +395,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV3(
 <!-- npu="910b" id13 -->
 - <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
 <!-- end id13 -->
-- int8低bit通信仅在通信bound的情况下存在性能收益，计算bound的情况不建议开启int8低bit通信，即不建议输入commQuantScale1和commQuantScale2。
+- int8低比特通信仅在通信bound的情况下存在性能收益，计算bound的情况不建议开启int8低比特通信，即不建议输入commQuantScale1和commQuantScale2。
 - 空tensor支持度：
   - 不支持空tensor。
 
@@ -403,7 +403,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV3(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950,910b" id14 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：
