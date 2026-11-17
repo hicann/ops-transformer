@@ -447,18 +447,22 @@ __global__ __aicore__ void GbsaInferIntfUnionFp8(GM_ADDR q, GM_ADDR k, GM_ADDR v
     gbsaKernel(params);
 }
 
-template <class InDtype, class SMDtype, class REDtype, Format qFormat,
-          Epilogue::LseMode lseMode = Epilogue::LseMode::NONE, Epilogue::LseFormat lseFormat = Epilogue::LseFormat::TN1>
+template <class InDtype, class SMDtype, class REDtype, Format qFormat, Format kvFormat, bool isPaged,
+          Epilogue::LseMode lseMode = Epilogue::LseMode::NONE, Epilogue::LseFormat lseFormat = Epilogue::LseFormat::TN1,
+          class OutDtype = SMDtype>
 __global__ __aicore__ void GbsaInferInterfaceFullQuant(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
                                                        GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
                                                        GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
                                                        GM_ADDR blockTable, GM_ADDR qDequantScale, GM_ADDR kDequantScale,
                                                        GM_ADDR vDequantScale, GM_ADDR o, GM_ADDR softmaxLse,
-                                                       GM_ADDR workspace, GM_ADDR tiling, GM_ADDR pQuantScale = nullptr)
+                                                       GM_ADDR workspace, GM_ADDR tiling)
 {
-    GbsaInferIntfRegularImpl<InDtype, SMDtype, REDtype, qFormat, Format::BSND, true, true, false, lseMode, lseFormat,
-                             SMDtype>(q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv,
-                                      sequsedQ, sequsedKv, blockTable, o, softmaxLse, workspace, tiling);
+    // Per-tensor dequantization scales are not used by this FP8 path.
+    // FP8 full-quant is causal and does not use an implicit residual block.
+    GbsaInferIntfRegularImpl<InDtype, SMDtype, REDtype, qFormat, kvFormat, isPaged, true, false, lseMode, lseFormat,
+                             OutDtype>(q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths,
+                                       cuSeqLengthsKv, sequsedQ, sequsedKv, blockTable, o, softmaxLse, workspace,
+                                       tiling);
 }
 #if !defined(TILING_KEY_VAR) || (TILING_KEY_VAR >= 9250002900000020ULL && TILING_KEY_VAR <= 9250002900000023ULL) || \
     (TILING_KEY_VAR >= 9250002900000032ULL && TILING_KEY_VAR <= 9250002900000035ULL) || \

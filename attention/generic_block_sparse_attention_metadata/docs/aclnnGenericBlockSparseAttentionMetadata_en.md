@@ -161,7 +161,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
           <li>If the actual length is not specified, nullptr can be passed in, indicating that the storage length is the same as that obtained by differencing cuSeqLengthsQOptional.</li>
           <li>When passed in, the shape is (B,), and each element must be ≥0 and ≤ the cu storage length of the corresponding batch. For the dual-length semantics when coexisting with cu, see <a href="#other-constraints">Other Constraints</a>.</li>
         </ul>
-       For Atlas A2/A3 products INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
+       For INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -276,7 +276,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>Input</td>
       <td>Specifies the mask type in the attention computation.</td>
       <td>        Value: 0-5. For details, see <a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention_en.md#mask-description">Mask Description</a>.<br>
-        Supports 0 (non-causal) and 1 (causal); Ascend 950PR&amp;950DT and non-quantized Atlas A2/A3 also support 3 (union). For product scope, see <a href="#other-constraints">Other Constraints</a>.
+        Supports 0 (non-causal) and 1 (causal); Ascend 950PR&amp;950DT and non-quantized inputs on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> also support 3 (union). For product scope, see <a href="#other-constraints">Other Constraints</a>.
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -287,7 +287,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>quantType</td>
       <td>Input</td>
       <td>Represents the quantization method used.</td>
-      <td>Quantization type: 0 for non-quantized inputs, 5 for Ascend 950PR&950DT products FP8, 6 for Ascend 950PR&950DT products MXFP8, 7 for Atlas A2/A3 products INT8, and 8 for Ascend 950PR&950DT products A8C4. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
+      <td>Quantization type: 0 for non-quantized inputs, 5 for FP8 on Ascend 950PR&950DT products, 6 for MXFP8 on Ascend 950PR&950DT products, 7 for INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and 8 for A8C4 on Ascend 950PR&950DT products. Values 1-4 are reserved and unsupported. See product-specific constraints.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -302,8 +302,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
           <li>0: fp32 is used for both online softmax and rescale. Suitable for use cases that require high computation precision.</li>
           <li>1: Mixed precision; online softmax uses fp16/bf16 (the same as attentionOut) and rescale uses fp32. Numeric overflow may occur in the online softmax stage.</li>
         </ul>
-        Chip constraints: in non-Union scenarios (maskType=0/1) of Ascend 950PR&amp;950DT, non-quant FLOAT16/BFLOAT16 supports 0 or 1 and FP8 supports only 1; in Union scenarios (maskType=3), both non-quant and FP8 support only 0; on Atlas A2/A3, FLOAT16 supports 0 or 1 and BFLOAT16 supports only 0.
-       Atlas A2/A3 products INT8 (quantType=7) requires softmaxPrecision=0.</td>
+        Chip constraints: in non-Union scenarios (maskType=0/1) of Ascend 950PR&amp;950DT, non-quant FLOAT16/BFLOAT16 supports 0 or 1 and FP8 supports 0 or 1; in Union scenarios (maskType=3), both non-quant and FP8 support only 0; on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, FLOAT16 supports 0 or 1 and BFLOAT16 supports only 0.
+       INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7) requires softmaxPrecision=0.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -465,7 +465,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 
 ## Constraints
 
-- Atlas A2/A3 products INT8 quantization (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
+- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
 
 ### Baseline Description
 
@@ -515,7 +515,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 ### Other Constraints
 
 - This API must be used together with `aclnnGenericBlockSparseAttention`. Shared tensors and attributes must be exactly the same as those of the subsequently called primary operator, and `metadataOptional` must be regenerated before each call to the primary operator. For the complete constraints of the primary operator, see [aclnnGenericBlockSparseAttention](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention_en.md#constraints).
-- Layout combinations and product scope match the main operator: `layoutSparsePattern=4`, `winLeft=winRight=-1`; non-union uses `blockShapeX=1`, union uses `blockShapeX=8`. Non-quant Ascend 950PR&amp;950DT: `maskType` supports 0/1/3; non-union uses `blockShape=[1,Y]` (`1≤Y≤128`), union uses `blockShape=[8,Y]`; `residualBlockMode` supports 0 or 1 (union supports only 0). Atlas A2/A3: `maskType` supports 0/1/3; non-union uses `blockShape=[1,Y]` (Y in {1,2,4,8,16,32,64,128}), union uses `blockShape=[8,Y]`. Regular FP8: `headDim=128`, `layoutQ/layoutKv=TND/PA_BBND`, `maskType=1`, `residualBlockMode=0`, `blockShape=[1,Y]` (`1≤Y≤128`). Union (maskType=3) supports FP16/BF16 non-quant on Atlas A2/A3 (`blockShape=[8,Y]` with power-of-two Y, `residualBlockMode=0`, INT32 exactMask) and FP16/BF16/FP8 on Ascend 950 with `blockShape=[8,Y]` (`1≤Y≤128`), `residualBlockMode=0`; FP8 Union additionally requires `headDim=128`, and for paged KV `Y` must divide the PA page size 128. Union does not support `quantType=6`.
+- Layout combinations and product scope match the main operator: `layoutSparsePattern=4`, `winLeft=winRight=-1`; non-union uses `blockShapeX=1`, union uses `blockShapeX=8`. Non-quant Ascend 950PR&amp;950DT: `maskType` supports 0/1/3; non-union uses `blockShape=[1,Y]` (`1≤Y≤128`), union uses `blockShape=[8,Y]`; `residualBlockMode` supports 0 or 1 (union supports only 0). <term>Atlas A2 products</term> and <term>Atlas A3 products</term>: `maskType` supports 0/1/3; non-union uses `blockShape=[1,Y]` (Y in {1,2,4,8,16,32,64,128}), union uses `blockShape=[8,Y]`. Regular FP8: `headDim=128`, `maskType=1`, `residualBlockMode=0`, `blockShape=[1,Y]` (`1≤Y≤128`). Union (maskType=3) supports FP16/BF16 non-quant on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (`blockShape=[8,Y]` with power-of-two Y, `residualBlockMode=0`, INT32 exactMask) and FP16/BF16/FP8 on <term>Ascend 950PR&950DT products</term> with `blockShape=[8,Y]` (`1≤Y≤128`), `residualBlockMode=0`; FP8 Union additionally requires `headDim=128`, and for paged KV `Y` must divide the PA page size 128. Union does not support `quantType=6`.
+- On <term>Ascend 950PR&950DT products</term>, regular FP8 (`quantType=5`, `maskType=1`) with `softmaxPrecision=0` requires `headDim=128` and `1≤groupSize≤16`. Supported Q/KV layouts are `TND/TND`, `BSND/BSND`, `BNSD/BNSD`, and each Q layout paired with `PA_BBND` or `PA_BNBD`. Low precision (`softmaxPrecision=1`) supports only `TND/PA_BBND` with LSE disabled.
 - The shape of `sparseBlockIdx` is `[numKvHeads, totalQBlocks, maxSparseBlockCount]`, and the shape of `sparseBlockCount` is `[numKvHeads, totalQBlocks]`. `maxSparseBlockCount` must be greater than 0 and not less than the maximum of all elements in `sparseBlockCount`. Capacity upper limit is INT32_MAX for non-quant and FP8 paths.
 - For TND, `cuSeqLengthsQOptional` must be passed in; `sequsedQOptional` can be nullptr. When sequsedQ is passed in, each element must be within the range `[0, corresponding batch storage length]`. Sparse block partitioning is still calculated based on the storage length described by the cu prefix sum.
 - When layoutKv is PA_BBND/PA_BNBD, `sequsedKvOptional` must be passed in and `cuSeqLengthsKvOptional` must not be passed in. When layoutKv is TND, `sequsedKvOptional` can be used together with `cuSeqLengthsKvOptional`, and the dual-length semantics are the same as those on the Q side.

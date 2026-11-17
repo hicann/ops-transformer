@@ -923,13 +923,6 @@ ge::graphStatus GBSATiling::ParseQkvDtype(gert::TilingContext* context)
             "only float16/bfloat16/float8_e4m3fn/int8 are supported for query/key/value");
         return ge::GRAPH_FAILED;
     }
-    // Legacy per-tensor FP8 (quantType=5) only instantiates PA_BBND; Union FP8 allows PA_BNBD.
-    if (isPaBnbd_ && quantType_ == GBSA_QUANT_TYPE_FULL && maskType_ != GBSA_MASK_TYPE_UNION) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "kv_input_layout", layoutKv_.c_str(),
-                                              "PA_BNBD does not support quantType=5; use PA_BBND");
-        return ge::GRAPH_FAILED;
-    }
-
     if (scaleValue_ == 0.0f && embeddingSize_ > 0) {
         scaleValue_ = 1.0f / std::sqrt(static_cast<float>(embeddingSize_));
     }
@@ -1360,7 +1353,7 @@ ge::graphStatus GBSATiling::CheckSoftmaxPrecision(gert::TilingContext* context)
 {
     if (socVer_ == SOC_VER_950_CODE) {
         // SoftmaxUnion always runs FP32 S; require softmaxPrecision=0 for both
-        // non-quant and FP8 union. Regular FullQuant still requires 1.
+        // non-quant and FP8 union.
         if (maskType_ == GBSA_MASK_TYPE_UNION) {
             if (softmaxPrecision_ != 0U) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -1368,11 +1361,6 @@ ge::graphStatus GBSATiling::CheckSoftmaxPrecision(gert::TilingContext* context)
                     "Union mode only supports softmaxPrecision=0 (FP32 SoftmaxUnion)");
                 return ge::GRAPH_FAILED;
             }
-        } else if (quantType_ == GBSA_QUANT_TYPE_FULL && softmaxPrecision_ != 1) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "softmaxPrecision",
-                                                  std::to_string(softmaxPrecision_).c_str(),
-                                                  "on chip 950, FP8 full-quant only supports softmaxPrecision=1");
-            return ge::GRAPH_FAILED;
         }
     } else if (dataType_ == ge::DT_BF16 && softmaxPrecision_ == 1) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -1538,13 +1526,15 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
     const bool isMxfp8 = quantType_ == GBSA_QUANT_TYPE_MXFP8;
     const bool isQuant = quantType_ != GBSA_QUANT_TYPE_NONE;
     const bool generalizedMxfp8 = socVer_ == SOC_VER_950_CODE && isMxfp8 && dataType_ == ge::DT_FLOAT8_E4M3FN;
+    const bool highPrecisionFp8 = socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_FULL &&
+                                  dataType_ == ge::DT_FLOAT8_E4M3FN && softmaxPrecision_ == 0U;
     if (maskType_ != GBSA_MASK_TYPE_UNION && (!isPaged_ || layoutQ_ != "TND") && !generalizedMxfp8 &&
-        (quantType_ != 0 || (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16))) {
+        !highPrecisionFp8 && (quantType_ != 0 || (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16))) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
             context->GetNodeName(), "quantType and query/key/value dtype",
             ("quantType=" + std::to_string(quantType_) + ", dtype=" + std::to_string(static_cast<int32_t>(dataType_)))
                 .c_str(),
-            "dense non-paged KV requires FP16/BF16 quantType=0, arch35 MXFP8, or Union");
+            "Dense or batched layouts require FP16/BF16, Ascend 950 FP8/MXFP8, or Union");
         return ge::GRAPH_FAILED;
     }
     const bool isFp8 = (dataType_ == ge::DT_FLOAT8_E4M3FN);
@@ -1596,11 +1586,17 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
                                               "FP8 full-quant / MXFP8 is only supported on chip 950");
         return ge::GRAPH_FAILED;
     }
-    if (returnSoftmaxlse_ && isQuant5 && maskType_ != GBSA_MASK_TYPE_UNION) {
-        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
-            context->GetNodeName(), "return_softmax_lse and quantType",
-            ("return_softmax_lse=1, quantType=" + std::to_string(quantType_)).c_str(),
-            "returnSoftmaxlse=1 is not supported for the FP8 full-quant path");
+    if (isQuant5 && softmaxPrecision_ == 1U &&
+        (!isPaged_ || layoutQ_ != "TND" || layoutKv_ != "PA_BBND" || returnSoftmaxlse_)) {
+        OP_LOGE(context->GetNodeName(), "Low-precision FP8 full-quant requires TND/PA_BBND and no LSE.");
+        return ge::GRAPH_FAILED;
+    }
+    if (isQuant5 && softmaxPrecision_ == 0U && embeddingSize_ != GBSA_TILE_SIZE_128) {
+        OP_LOGE(context->GetNodeName(), "High-precision FP8 full-quant requires headDim=128.");
+        return ge::GRAPH_FAILED;
+    }
+    if (isQuant5 && softmaxPrecision_ == 0U && maskType_ != GBSA_MASK_TYPE_UNION && groupSize_ > GBSA_TILE_SIZE_16) {
+        OP_LOGE(context->GetNodeName(), "Regular high-precision FP8 requires groupSize <= 16.");
         return ge::GRAPH_FAILED;
     }
     if (blockShapeY_ != 128U) {

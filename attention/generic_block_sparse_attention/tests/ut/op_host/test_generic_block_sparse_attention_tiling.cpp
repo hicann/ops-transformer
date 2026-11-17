@@ -43,6 +43,7 @@ constexpr int64_t kS1 = 4;
 constexpr int64_t kS2 = 256;
 constexpr int64_t kN1 = 4;
 constexpr int64_t kN2 = 1;
+constexpr int64_t kFp8HighPrecisionHeads = 16 * kN2;
 constexpr int64_t kD = 128;
 constexpr int64_t kTopK = 2;
 constexpr int64_t kBlockSize = 128;
@@ -1712,9 +1713,9 @@ TEST_F(generic_block_sparse_attention_tiling_ut, mxfp8_rejects_nonpacked_layout_
     }
 }
 
-std::vector<gert::TilingContextPara::TensorDescription> MakeBnbdInputs(ge::DataType qkvDtype)
+std::vector<gert::TilingContextPara::TensorDescription> MakeBnbdInputs(ge::DataType qkvDtype, int64_t numHeads = kN1)
 {
-    auto inputs = MakeInputs(qkvDtype);
+    auto inputs = MakeInputs(qkvDtype, kD, numHeads);
     // PA_BNBD KV: [numBlocks, Nkv, blockSize, D] (middle two axes swapped vs PA_BBND).
     inputs[1] = {{{kMaxBlocks, kN2, kBlockSize, kD}, {kMaxBlocks, kN2, kBlockSize, kD}}, qkvDtype, ge::FORMAT_ND};
     inputs[2] = inputs[1];
@@ -1746,6 +1747,16 @@ TEST_F(generic_block_sparse_attention_tiling_ut, tnd_paged_bnbd_fp8_rejected_950
         "GenericBlockSparseAttention", MakeBnbdInputs(ge::DT_FLOAT8_E4M3FN), MakeOutputs(ge::DT_FLOAT16, false),
         MakeAttrs(1, 5, 1, 0, 0.0f, -1, -1, 4, "TND", "PA_BNBD"), &compileInfo, "Ascend950", 56, 262144);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, tnd_paged_bnbd_fp8_high_precision_950)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "GenericBlockSparseAttention", MakeBnbdInputs(ge::DT_FLOAT8_E4M3FN, kFp8HighPrecisionHeads),
+        MakeOutputs(ge::DT_FLOAT16, false, kD, kFp8HighPrecisionHeads),
+        MakeAttrs(1, 5, 0, 0, 0.0f, -1, -1, 4, "TND", "PA_BNBD"), &compileInfo, "Ascend950", 56, 262144);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 9250000081001012ULL);
 }
 
 TEST_F(generic_block_sparse_attention_tiling_ut, tnd_paged_bnbd_fp16_mask0_950)
@@ -1987,14 +1998,61 @@ TEST_F(generic_block_sparse_attention_tiling_ut, unsupported_fp8_with_lse_950)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(generic_block_sparse_attention_tiling_ut, fp8_rejects_softmax_precision_0_950)
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_high_precision_lse_out_950)
 {
-    // FP8 full-quant only supports softmaxPrecision=1.
     GenericBlockSparseAttentionCompileInfo compileInfo;
-    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", MakeInputs(ge::DT_FLOAT8_E4M3FN),
-                                              MakeOutputs(ge::DT_FLOAT16, false), MakeAttrs(1, 5, 0, 0), &compileInfo,
-                                              "Ascend950", 56, 262144);
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention",
+                                              MakeInputs(ge::DT_FLOAT8_E4M3FN, kD, kFp8HighPrecisionHeads),
+                                              MakeOutputs(ge::DT_FLOAT16, true, kD, kFp8HighPrecisionHeads),
+                                              MakeAttrs(1, 5, 0, 1), &compileInfo, "Ascend950", 56, 262144);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 9250000171001012ULL);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_high_precision_rejects_non128_head_dim)
+{
+    for (const int64_t headDim : {64, 256}) {
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention",
+                                                  MakeInputs(ge::DT_FLOAT8_E4M3FN, headDim, kFp8HighPrecisionHeads),
+                                                  MakeOutputs(ge::DT_FLOAT16, false, headDim, kFp8HighPrecisionHeads),
+                                                  MakeAttrs(1, 5, 0, 0), &compileInfo, "Ascend950", 56, 262144);
+        ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_high_precision_rejects_unsupported_group_sizes)
+{
+    for (const int64_t group : {17, 32}) {
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention",
+                                                  MakeInputs(ge::DT_FLOAT8_E4M3FN, kD, group * kN2),
+                                                  MakeOutputs(ge::DT_FLOAT16, false, kD, group * kN2),
+                                                  MakeAttrs(1, 5, 0, 0), &compileInfo, "Ascend950", 56, 262144);
+        ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_high_precision_supports_groups_1_to_16)
+{
+    for (int64_t group = 1; group <= 16; ++group) {
+        SCOPED_TRACE(group);
+        GenericBlockSparseAttentionCompileInfo compileInfo;
+        gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention",
+                                                  MakeInputs(ge::DT_FLOAT8_E4M3FN, kD, group * kN2),
+                                                  MakeOutputs(ge::DT_FLOAT16, false, kD, group * kN2),
+                                                  MakeAttrs(1, 5, 0, 0), &compileInfo, "Ascend950", 56, 262144);
+        ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 9250000071001012ULL);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_high_precision_950)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention",
+                                              MakeInputs(ge::DT_FLOAT8_E4M3FN, kD, kFp8HighPrecisionHeads),
+                                              MakeOutputs(ge::DT_FLOAT16, false, kD, kFp8HighPrecisionHeads),
+                                              MakeAttrs(1, 5, 0, 0), &compileInfo, "Ascend950", 56, 262144);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 9250000071001012ULL);
 }
 
 TEST_F(generic_block_sparse_attention_tiling_ut, invalid_block_table_dims)

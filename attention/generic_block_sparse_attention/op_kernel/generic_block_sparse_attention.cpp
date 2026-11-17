@@ -917,6 +917,42 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
         TILING_KEY_IS(GBSA_BF16_TND_TND_BF16SM_TILING_LSE_OUT_NO_MASK);
         TILING_KEY_IS(GBSA_FP8_TND_PA_BBND_FP16SM_TILING);
         TILING_KEY_IS(GBSA_FP8_TND_PA_BBND_BF16SM_TILING);
+        TILING_KEY_IS(GBSA_FP8_TND_PA_BBND_FP32SM_FP16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_TND_PA_BBND_FP32SM_FP16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_TND_PA_BBND_FP32SM_BF16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_TND_PA_BBND_FP32SM_BF16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_TND_PA_BNBD_FP32SM_FP16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_TND_PA_BNBD_FP32SM_FP16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_TND_PA_BNBD_FP32SM_BF16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_TND_PA_BNBD_FP32SM_BF16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_TND_TND_FP32SM_FP16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_TND_TND_FP32SM_FP16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_TND_TND_FP32SM_BF16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_TND_TND_FP32SM_BF16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BSND_BSND_FP32SM_FP16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BSND_BSND_FP32SM_FP16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BSND_BSND_FP32SM_BF16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BSND_BSND_FP32SM_BF16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BNSD_BNSD_FP32SM_FP16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BNSD_BNSD_FP32SM_FP16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BNSD_BNSD_FP32SM_BF16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BNSD_BNSD_FP32SM_BF16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BBND_FP32SM_FP16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BBND_FP32SM_FP16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BBND_FP32SM_BF16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BBND_FP32SM_BF16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BBND_FP32SM_FP16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BBND_FP32SM_FP16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BBND_FP32SM_BF16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BBND_FP32SM_BF16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BNBD_FP32SM_FP16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BNBD_FP32SM_FP16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BNBD_FP32SM_BF16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BNBD_FP32SM_BF16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BNBD_FP32SM_FP16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BNBD_FP32SM_FP16O_TILING_LSE_OUT);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BNBD_FP32SM_BF16O_TILING);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BNBD_FP32SM_BF16O_TILING_LSE_OUT);
         TILING_KEY_IS(GBSA_FP8_TND_PA_BBND_FP32SM_TILING_UNION);
         TILING_KEY_IS(GBSA_FP8_TND_TND_FP32SM_TILING_UNION);
         TILING_KEY_IS(GBSA_FP8_TND_PA_BNBD_FP32SM_TILING_UNION);
@@ -2365,11 +2401,187 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
             sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
             pQuantScale);
 #elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP16SM_TILING
-        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::TND>(
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::TND,
+                                    GbsaKernelArch35::Format::BSND, true>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
 #elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_BF16SM_TILING
-        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::TND>(
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::TND,
+                                    GbsaKernelArch35::Format::BSND, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_FP16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_FP16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::TND,
+                                    GbsaKernelArch35::Format::BSND, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_FP16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, half>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_BF16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_BF16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::TND,
+                                    GbsaKernelArch35::Format::BSND, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_BF16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BNBD_FP32SM_FP16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_TND_PA_BNBD_FP32SM_FP16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::TND,
+                                    GbsaKernelArch35::Format::BNSD, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_TND_PA_BNBD_FP32SM_FP16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, half>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BNBD_FP32SM_BF16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_TND_PA_BNBD_FP32SM_BF16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::TND,
+                                    GbsaKernelArch35::Format::BNSD, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_TND_PA_BNBD_FP32SM_BF16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_FP16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_FP16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<
+            fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::TND, false,
+            (TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_FP16O_TILING_LSE_OUT) ? NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                                                               NpuArch::Epilogue::LseMode::NONE,
+            NpuArch::Epilogue::LseFormat::TN1, half>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_BF16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_BF16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<
+            fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::TND, false,
+            (TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_BF16O_TILING_LSE_OUT) ? NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                                                               NpuArch::Epilogue::LseMode::NONE,
+            NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_FP16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_FP16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<
+            fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND, false,
+            (TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_FP16O_TILING_LSE_OUT) ? NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                                                                 NpuArch::Epilogue::LseMode::NONE,
+            NpuArch::Epilogue::LseFormat::TN1, half>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_BF16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_BF16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<
+            fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND, false,
+            (TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_BF16O_TILING_LSE_OUT) ? NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                                                                 NpuArch::Epilogue::LseMode::NONE,
+            NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_FP16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_FP16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<
+            fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD, false,
+            (TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_FP16O_TILING_LSE_OUT) ? NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                                                                 NpuArch::Epilogue::LseMode::NONE,
+            NpuArch::Epilogue::LseFormat::TN1, half>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_BF16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_BF16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<
+            fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD, false,
+            (TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_BF16O_TILING_LSE_OUT) ? NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                                                                 NpuArch::Epilogue::LseMode::NONE,
+            NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_FP16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_FP16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BSND,
+                                    GbsaKernelArch35::Format::BSND, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_FP16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, half>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_BF16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_BF16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BSND,
+                                    GbsaKernelArch35::Format::BSND, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_BF16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_FP16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_FP16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BNSD,
+                                    GbsaKernelArch35::Format::BSND, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_FP16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, half>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_BF16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_BF16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BNSD,
+                                    GbsaKernelArch35::Format::BSND, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_BF16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_FP16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_FP16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BSND,
+                                    GbsaKernelArch35::Format::BNSD, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_FP16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, half>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_BF16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_BF16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BSND,
+                                    GbsaKernelArch35::Format::BNSD, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_BF16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_FP16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_FP16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BNSD,
+                                    GbsaKernelArch35::Format::BNSD, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_FP16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, half>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_BF16O_TILING || \
+    TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_BF16O_TILING_LSE_OUT
+        GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, float, float, GbsaKernelArch35::Format::BNSD,
+                                    GbsaKernelArch35::Format::BNSD, true,
+                                    (TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_BF16O_TILING_LSE_OUT) ?
+                                        NpuArch::Epilogue::LseMode::OUT_ONLY :
+                                        NpuArch::Epilogue::LseMode::NONE,
+                                    NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
 #elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_TILING_UNION

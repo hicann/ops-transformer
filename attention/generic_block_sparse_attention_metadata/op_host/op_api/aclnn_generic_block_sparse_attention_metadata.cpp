@@ -433,12 +433,6 @@ aclnnStatus CheckGbsaSoftmaxPrecision(int64_t softmaxPrecision, int64_t quantTyp
         }
         return ACLNN_SUCCESS;
     }
-    if (quantType == GBSA_QUANT_TYPE_FLOAT8 && softmaxPrecision != GBSA_SOFTMAX_PRECISION_MIXED) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "Per-tensor FP8 quantization only supports softmaxPrecision=%lld, but got %lld.",
-                GBSA_SOFTMAX_PRECISION_MIXED, softmaxPrecision);
-        return ACLNN_ERR_PARAM_INVALID;
-    }
     return ACLNN_SUCCESS;
 }
 
@@ -554,9 +548,10 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
     }
     if (maskType != 3 && (!GbsaIsLayout(kvInputLayout, "PA_BBND") || !GbsaIsLayout(qInputLayout, "TND")) &&
         quantType != GBSA_QUANT_TYPE_NONE && !int8Layout && !a8c4 &&
-        !(isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8)) {
+        !(isArch35 && (quantType == GBSA_QUANT_TYPE_MXFP8 ||
+                       (quantType == GBSA_QUANT_TYPE_FLOAT8 && softmaxPrecision == GBSA_SOFTMAX_PRECISION_HIGH)))) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "Batched Q and dense/PA_BNBD KV require quantType=0, A5 MXFP8/A8C4, or Union.");
+                "Batched Q and dense/PA_BNBD KV require quantType=0, A5 high-precision FP8/MXFP8/A8C4, or Union.");
 
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -579,6 +574,12 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         isArch35 && quantType == GBSA_QUANT_TYPE_MXFP8);
     if (status != ACLNN_SUCCESS) {
         return status;
+    }
+    constexpr int64_t regularHighPrecisionFp8Group = 16;
+    if (isArch35 && quantType == GBSA_QUANT_TYPE_FLOAT8 && softmaxPrecision == GBSA_SOFTMAX_PRECISION_HIGH &&
+        maskType != GBSA_MASK_TYPE_UNION && numQHeads / numKvHeads > regularHighPrecisionFp8Group) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Regular high-precision FP8 requires groupSize <= 16.");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     if (a8c4 && numQHeads / numKvHeads > 32) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires groupSize <= 32.");
