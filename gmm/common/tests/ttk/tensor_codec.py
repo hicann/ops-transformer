@@ -11,6 +11,49 @@ import numpy as np
 import torch
 
 
+def first_tensor(value):
+    """Read one descriptor or tensor from a TensorList."""
+    return value[0] if isinstance(value, (list, tuple)) and value else value
+
+
+def is_transposed(tensor):
+    if tensor is None or tensor.ndim < 2:
+        return False
+    strides = tensor.stride() if isinstance(tensor, torch.Tensor) else tensor.strides
+    return strides[-2] < strides[-1]
+
+
+def restore_tensor_views(view_strides, **tensors):
+    """Rebuild dense permutation views described by plugin attributes."""
+    for name, strides in view_strides.items():
+        values = tensors[name]
+        for index, value in enumerate(values):
+            if value.stride() == strides:
+                continue
+            order = sorted(range(value.ndim), key=strides.__getitem__, reverse=True)
+            inverse = tuple(order.index(axis) for axis in range(value.ndim))
+            source = value.permute(order).clone(memory_format=torch.contiguous_format)
+            values[index] = source.permute(inverse)
+            if values[index].stride() != strides:
+                raise ValueError(
+                    f"{name} stride {strides} does not describe a dense transpose"
+                )
+
+
+def nz_tile_width(dtype):
+    if dtype.startswith("float4") or dtype == "int4":
+        return 64
+    if dtype in ("float16", "bfloat16"):
+        return 16
+    return 32
+
+
+def torch_case_format(fmt):
+    # The ACL spelling leaves the host-to-device tensor dense. The operator
+    # hook casts its source matrix before restoring transposed API views.
+    return "FRACTAL_NZ" if fmt == "ACL_FORMAT_FRACTAL_NZ" else fmt
+
+
 def _nd(value, fmt, ori_shape):
     if value is None:
         return None

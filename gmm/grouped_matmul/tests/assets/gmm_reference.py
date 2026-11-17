@@ -26,19 +26,35 @@ _nd, _cast, _numpy, _decode = (
 _np, _whole, _numeric, _weights = (
     _CODEC[name] for name in ("_np", "_whole", "_numeric", "_weights")
 )
+_is_transposed = _CODEC["is_transposed"]
+_nz_tile_width = _CODEC["nz_tile_width"]
+_torch_case_format = _CODEC["torch_case_format"]
+_restore_tensor_views = _CODEC["restore_tensor_views"]
+
+
+FIXPIPE_SCALE_MASK = np.uint32(0xFFFFE000)
+FIXPIPE_INT8_OUTPUT_BIT = np.uint64(1) << np.uint64(46)
 
 
 def u64_to_deq_scale(scale):
-    return (
-        (np.asarray(scale, dtype=np.uint64) & np.uint64(0xFFFFFFFF))
-        .astype(np.uint32)
-        .view(np.float32)
-    )
+    # Fixpipe reads the upper 19 bits of the FP32 payload in the low word.
+    payload = np.asarray(scale, dtype=np.uint64).astype(np.uint32)
+    return (payload & FIXPIPE_SCALE_MASK).view(np.float32)
 
 
 def scale_generate(value):
     value = np.ascontiguousarray(value, dtype=np.float32)
-    return (value.view(np.uint32) & np.uint32(0xFFFFE000)).view(np.float32)
+    return (value.view(np.uint32) & FIXPIPE_SCALE_MASK).view(np.float32)
+
+
+def _pack_fixpipe_scale(carrier, *, int8_output):
+    """Generate FP32 scales from the fixture and pack them in the declared dtype."""
+    values = (carrier.astype(np.uint64) % 1000 + 1).astype(np.float32)
+    values *= np.float32(0.001)
+    payload = scale_generate(values).view(np.uint32).astype(np.uint64)
+    if int8_output:
+        payload |= FIXPIPE_INT8_OUTPUT_BIT
+    return payload.astype(carrier.dtype)
 
 
 def transform_tensor(value):
@@ -535,6 +551,12 @@ _OUTPUTS = {
 }
 
 
+def _output_dtype(value, default):
+    if isinstance(value, str) and value.startswith("torch."):
+        value = getattr(torch, value.removeprefix("torch."))
+    return value if isinstance(value, torch.dtype) else _OUTPUTS.get(value, default)
+
+
 def _first(values):
     if isinstance(values, (list, tuple)):
         return values[0] if values else None
@@ -783,6 +805,33 @@ def aclnn_reference_metadata(fields):
     )
 
 
+def _aclnn_tensor_metadata(weight, meta):
+    tensor = weight[0]
+    dtypes = meta["tensor_dtypes"]
+    formats = meta["tensor_formats"]
+    semantic = [_kernel_dtype(dtypes, index) for index in range(12)]
+    trans = _is_transposed(tensor)
+    nz = _kernel_dtype(formats, 1, "ND") == "FRACTAL_NZ"
+    carrier = ""
+    if semantic[1] == "int32":
+        carrier = "int4"
+    if semantic[1] == "float32" and semantic[0].startswith("float8"):
+        carrier = "float4_e2m1"
+    if carrier:
+        semantic[1] = carrier
+    c0 = 32 if carrier == "float4_e2m1" else _nz_tile_width(semantic[1])
+    k, n = _logical_weight(tensor.shape, trans, carrier)
+    return dict(
+        gmm_semantic=semantic,
+        gmm_transpose_weight=trans,
+        gmm_nz_c0=c0 if nz else 0,
+        gmm_weight_carrier=carrier,
+        gmm_k=k,
+        gmm_n=n,
+        gmm_scale_nz=_kernel_dtype(formats, 3, "ND") == "FRACTAL_NZ",
+    )
+
+
 class GroupedMatmulTestSpec:
     @staticmethod
     def golden(*args, **kwargs):
@@ -845,15 +894,11 @@ class GroupedMatmulTestSpec:
                     return None
                 if isinstance(v, (list, tuple)):
                     return type(v)(packed(t) for t in v)
-                values = (np.asarray(v, dtype=np.uint64) % 1000 + 1).astype(
-                    np.float32
-                ) * np.float32(0.001)
-                bits = (values.view(np.uint32) & np.uint32(0xFFFFE000)).astype(
-                    np.uint64
+                return _pack_fixpipe_scale(
+                    np.asarray(v),
+                    int8_output=_kernel_dtype(kwargs.get("output_dtypes", ()), 0)
+                    == "int8",
                 )
-                if _kernel_dtype(kwargs.get("output_dtypes", ()), 0) == "int8":
-                    bits |= np.uint64(1) << np.uint64(46)
-                return bits.astype(v.dtype)
 
             scale = packed(scale)
 
@@ -1070,7 +1115,12 @@ class GroupedMatmulV5TestSpec:
     ):
         reference = kwargs.get("gmm_reference")
         if reference is None:
-            reference = aclnn_reference_metadata(kwargs["testcase"].original_dict)
+            fields = kwargs["testcase"].original_dict
+            reference = (
+                aclnn_reference_metadata(fields)
+                if "weight" in fields
+                else _aclnn_tensor_metadata(weight, kwargs)
+            )
         group_values = kwargs.get("ttk_group_list", reference.get("group_list"))
         if groups is not None and group_values is not None:
             group_values = np.asarray(group_values, dtype=np.int64)
@@ -1086,16 +1136,9 @@ class GroupedMatmulV5TestSpec:
             for t in seq:
                 a = _np(t)
                 if idx == 3 and d[idx] in ("int64", "uint64"):
-                    vals = (a.astype(np.uint64) % 1000 + 1).astype(
-                        np.float32
-                    ) * np.float32(0.001)
-                    value = (vals.view(np.uint32) & np.uint32(0xFFFFE000)).astype(
-                        np.uint64
+                    value = _pack_fixpipe_scale(
+                        a, int8_output=str(out[0].dtype) in ("torch.int8", "int8")
                     )
-                    od = str(out[0].dtype)
-                    if od in ("torch.int8", "int8"):
-                        value |= np.uint64(1) << np.uint64(46)
-                    value = value.astype(a.dtype)
                 elif idx == 1 and kwargs["gmm_weight_carrier"]:
                     codes = (
                         (a.astype(np.int64)[..., None] + np.arange(8) * 3) & 15
@@ -1162,11 +1205,13 @@ class GroupedMatmulV5TestSpec:
     ):
         if act_type != 0:
             raise ValueError("Activation fusion is outside the GMM reference")
-        kwargs.update(
-            gmm_reference
-            if gmm_reference is not None
-            else aclnn_reference_metadata(csv_fields)
-        )
+        if gmm_reference is None:
+            gmm_reference = (
+                aclnn_reference_metadata(csv_fields)
+                if csv_fields and "weight" in csv_fields
+                else _aclnn_tensor_metadata(weight, kwargs)
+            )
+        kwargs.update(gmm_reference)
         return _run(
             x,
             weight,
@@ -1306,7 +1351,15 @@ def _optional_torch_tensors(reference, **tensors):
         for name in reference.get("empty_tensorlists", ()):
             if name in tensors:
                 tensors[name] = None
-    return tuple(tensors.values())
+    return tuple(
+        None if _is_empty_tensorlist(value) else value for value in tensors.values()
+    )
+
+
+def _is_empty_tensorlist(value):
+    return isinstance(value, (list, tuple)) and all(
+        item is None or item.numel() == 0 for item in value
+    )
 
 
 sys.path.insert(0, str(_SHARED))
@@ -1412,15 +1465,14 @@ class TorchNpuGroupedMatmulTestSpec:
         if scale is not None:
             for t in scale:
                 if t.dtype in (torch.int64, torch.uint64):
-                    values = (_numpy(t).astype(np.uint64) % 1000 + 1).astype(
-                        np.float32
-                    ) * np.float32(0.001)
-                    bits = (values.view(np.uint32) & np.uint32(0xFFFFE000)).astype(
-                        np.uint64
+                    packed = _pack_fixpipe_scale(
+                        _numpy(t),
+                        int8_output=_output_dtype(
+                            kwargs.get("output_dtype"), x[0].dtype
+                        )
+                        == torch.int8,
                     )
-                    if kwargs.get("output_dtype") == 1:
-                        bits |= np.uint64(1) << np.uint64(46)
-                    t.copy_(torch.from_numpy(bits.view(np.int64)).to(t.dtype))
+                    t.copy_(torch.from_numpy(packed))
 
         if (
             x[0].dtype == torch.int8
@@ -1436,15 +1488,38 @@ class TorchNpuGroupedMatmulTestSpec:
     def npu_preprocess(
         x, weight, *, csv_fields=None, gmm_graph_reference=None, **kwargs
     ):
-        if gmm_graph_reference is None:
-            weight_format = (csv_fields or {}).get("weight_format")
+        if gmm_graph_reference is None and csv_fields and "weight_format" in csv_fields:
+            weight_format = csv_fields["weight_format"]
             scale_nz = literal_eval(csv_fields["scale"]).get("format") == "nz"
+        elif gmm_graph_reference is None:
+            formats = kwargs["tensor_formats"]
+            weight_format = (
+                "nz"
+                if _torch_case_format(_kernel_dtype(formats, 1, "ND")) == "FRACTAL_NZ"
+                else "nd"
+            )
+            scale_nz = (
+                _torch_case_format(_kernel_dtype(formats, 3, "ND")) == "FRACTAL_NZ"
+            )
+            for name in (
+                "bias",
+                "scale",
+                "offset",
+                "antiquant_scale",
+                "antiquant_offset",
+                "per_token_scale",
+            ):
+                value = kwargs.get(name)
+                if value and _is_empty_tensorlist(value):
+                    value.clear()
         else:
             weight_format = gmm_graph_reference["weight_format"]
             scale_nz = gmm_graph_reference["scale_nz"]
             for name in gmm_graph_reference.get("empty_tensorlists", ()):
                 kwargs[name].clear()
             _restore_graph_views(gmm_graph_reference, x=x, weight=weight, **kwargs)
+        strides = kwargs.pop("ttk_view_strides", {})
+        _restore_tensor_views(strides, x=x, weight=weight, **kwargs)
         if weight_format not in ("nd", "nz"):
             raise ValueError(
                 f"weight_format column must be 'nd' or 'nz', got {weight_format!r}"
@@ -1539,6 +1614,14 @@ class TorchNpuGroupedMatmulTestSpec:
                 per_token_scale=per_token_scale,
             )
         )
+        _restore_tensor_views(
+            kwargs.get("ttk_view_strides", {}),
+            x=x,
+            weight=weight,
+            scale=scale,
+            antiquant_scale=antiquant_scale,
+            per_token_scale=per_token_scale,
+        )
         _restore_graph_views(
             kwargs.get("gmm_graph_reference"),
             x=x,
@@ -1561,11 +1644,7 @@ class TorchNpuGroupedMatmulTestSpec:
             if weight[0].dtype == torch.float32:
                 wd = "float4_e2m1"
         bd = _dtype(_first(bias))
-        od = (
-            _OUTPUTS.get(output_dtype, x[0].dtype)
-            if not isinstance(output_dtype, torch.dtype)
-            else output_dtype
-        )
+        od = _output_dtype(output_dtype, x[0].dtype)
         output_name = str(od).removeprefix("torch.")
         args = [
             _convert(x, xd),
@@ -1637,11 +1716,3 @@ class TorchNpuGroupedMatmulTestSpec:
             else torch.from_numpy(np.asarray(v))
             for v in outputs
         ]
-
-
-__spec__ = {
-    "grouped_matmul": "GroupedMatmulTestSpec",
-    "aclnnGroupedMatmulV5": "GroupedMatmulV5TestSpec",
-    "aclnnGroupedMatmulWeightNz": "GroupedMatmulWeightNzTestSpec",
-    "torch_npu.npu_grouped_matmul": "TorchNpuGroupedMatmulTestSpec",
-}

@@ -24,6 +24,9 @@ grouped_matmul_activation_quant_golden = _REFERENCE[
 ]
 _make_valid_group_list = run_path(str(_ASSETS / "inputs.py"))["_make_valid_group_list"]
 as_numpy = _REFERENCE["as_numpy"]
+_restore_tensor_views = run_path(
+    str(_ASSETS.parents[2] / "common" / "tests" / "ttk" / "tensor_codec.py")
+)["restore_tensor_views"]
 
 
 def _decode_scale(tensor):
@@ -58,21 +61,20 @@ class GmmaqTorchTestSpec:
         weight,
         weight_scale,
         activation_type,
-        *,
-        ttk_transpose_weight=False,
         **kwargs,
     ):
         import torch_npu
 
-        (source,) = weight
-        if ttk_transpose_weight:
-            # TTK generates dense TensorList members. Restore the API's transpose views.
-            source = source.transpose(-1, -2).contiguous()
-            weight_scale[0] = (
-                weight_scale[0].transpose(-3, -2).contiguous().transpose(-3, -2)
-            )
+        _restore_tensor_views(
+            kwargs.get("ttk_view_strides", {}), weight=weight, weight_scale=weight_scale
+        )
+        (weight_view,) = weight
+        transposed = weight_view.stride(-2) < weight_view.stride(-1)
+        source = (
+            weight_view.transpose(-1, -2).contiguous() if transposed else weight_view
+        )
         converted = torch_npu.npu_format_cast(source, 29)
-        weight[0] = converted.transpose(-1, -2) if ttk_transpose_weight else converted
+        weight[0] = converted.transpose(-1, -2) if transposed else converted
 
     @staticmethod
     def golden(

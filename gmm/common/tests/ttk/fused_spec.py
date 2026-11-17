@@ -7,6 +7,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 """Shared TTK support for GMM FinalizeRouting and SwiGLU quantization."""
 
+from ast import literal_eval
 import math
 from pathlib import Path
 from runpy import run_path
@@ -21,6 +22,48 @@ _CODEC = run_path(str(Path(__file__).with_name("tensor_codec.py")))
 _nd, _cast, _numpy, _decode, _weights = (
     _CODEC[name] for name in ("_nd", "_cast", "_numpy", "_decode", "_weights")
 )
+
+_first_tensor, _is_transposed, _nz_tile_width, _torch_case_format = (
+    _CODEC[name]
+    for name in ("first_tensor", "is_transposed", "nz_tile_width", "torch_case_format")
+)
+
+_restore_tensor_views = _CODEC["restore_tensor_views"]
+
+
+_TORCH_DTYPES = {
+    1: "int8",
+    5: "float16",
+    6: "float32",
+    15: "bfloat16",
+    290: "hifloat8",
+    291: "float8_e5m2",
+    292: "float8_e4m3fn",
+    293: "float8_e8m0",
+    296: "float4_e2m1",
+    297: "float4_e1m2",
+}
+_ACL_DTYPES = {
+    2: "float16",
+    3: "int8",
+    34: "hifloat8",
+    35: "float8_e5m2",
+    36: "float8_e4m3fn",
+    40: "float4_e2m1",
+    41: "float4_e1m2",
+}
+_DTYPE_NAMES = {
+    "float8_e8m0fnu": "float8_e8m0",
+    "float4_e2m1fn_x2": "float4_e2m1",
+    "float4_e1m2fn_x2": "float4_e1m2",
+}
+
+
+def _dtype_name(value, mapping=None):
+    if mapping is not None and value in mapping:
+        return mapping[value]
+    name = str(value).rsplit(".", 1)[-1]
+    return _DTYPE_NAMES.get(name, name)
 
 
 try:
@@ -541,8 +584,6 @@ def _hook_customize(*args, **meta):
     counts = np.array(meta["f_counts"], np.int64)
     if meta["f_gltype"] == 0:
         counts = np.cumsum(counts)
-    if meta.get("ttk_group_list") is not None:
-        counts = np.asarray(meta["ttk_group_list"], dtype=np.int64)
     _copy(args[ports["groups"]], counts)
     if family == "routing":
         _copy(
@@ -558,6 +599,8 @@ def _with_transposed_storage(tensor, dim0, dim1):
     """Give a dense CSV tensor transposed strides without changing logical values."""
     import torch
 
+    if tensor.stride(dim0) < tensor.stride(dim1):
+        return tensor
     source = tensor.transpose(dim0, dim1).clone(memory_format=torch.contiguous_format)
     return source.transpose(dim0, dim1)
 
@@ -679,9 +722,10 @@ def _hook_golden(*args, _routing_trace=None, **meta):
             bias=attr(meta, "glu_bias", "gluBias", 1.0),
         )
         if meta["f_sd"] != "float8_e8m0":
-            if meta.get("dequant_dtype") == 5:
+            dequant_dtype = _dtype_name(meta.get("dequant_dtype"), _TORCH_DTYPES)
+            if dequant_dtype == "float16":
                 activated = activated.astype(np.float16).astype(np.float32)
-            elif meta.get("dequant_dtype") == 15:
+            elif dequant_dtype == "bfloat16":
                 activated = _to_bfloat16_float32(activated)
             limits = {
                 "int8": 127,
@@ -879,9 +923,91 @@ _PORTS = {
 }
 
 
+def _case_reference(family, route, args, meta):
+    ports = _PORTS[family, route]
+    names = _NAMES[family, "e2e"]
+    pos_names = names[: 3 if family == "routing" else 5]
+    tensors = tensor_args(
+        args, dict(meta, f_route=route, f_pos_names=pos_names, f_param_names=names)
+    )
+    x = _first_tensor(tensors[ports["x"]])
+    weight = _first_tensor(tensors[ports["w"]])
+    types = meta["input_dtypes" if route == "kernel" else "tensor_dtypes"]
+    formats = meta["input_formats" if route == "kernel" else "tensor_formats"]
+    fmt = _torch_case_format(_first_tensor(formats[ports["w"]]))
+    xd, wd, sd = (
+        _dtype_name(_first_tensor(types[ports[key]])) for key in ("x", "w", "ws")
+    )
+    mode = attr(meta, "swiglu_mode", "swigluMode", 0)
+    gltype = attr(meta, "group_list_type", "groupListType", 0)
+    bs, resweight = 0, 1
+    if route == "kernel":
+        trans = attr(meta, "transpose_weight", "transpose_w", False)
+        shape = meta["input_ori_shapes"][ports["w"]]
+        if isinstance(shape[0], (tuple, list)):
+            shape = shape[0]
+        shape = (*shape[:-2], shape[-1], shape[-2]) if trans else tuple(shape)
+        out = _dtype_name(_first_tensor(meta["output_dtypes"][0]))
+    elif route == "aclnn":
+        if family == "routing":
+            # The ACLNN routing API takes source matrices and explicit transpose flags.
+            resweight, trans, gltype = args[13], args[16], args[17]
+            output = args[-1]
+            bs = output.shape[-2]
+            shape = (
+                (*weight.shape[:-2], weight.shape[-1], weight.shape[-2])
+                if trans
+                else tuple(weight.shape)
+            )
+            out = _dtype_name(_first_tensor(types[-1]))
+        else:
+            gltype = args[11]
+            trans = _is_transposed(weight)
+            shape = tuple(weight.shape)
+            out = _dtype_name(_first_tensor(types[8]))
+            if len(args) == 22:
+                mode = args[13]
+    else:
+        trans = _is_transposed(weight)
+        shape = (*weight.shape[:-2], x.shape[-1], weight.shape[-1])
+        x_hint, w_hint = (
+            "x_dtype",
+            "w_dtype" if family == "routing" else "weight_dtype",
+        )
+        sd_hint = "scale_dtype" if family == "routing" else "weight_scale_dtype"
+        xd = _dtype_name(meta.get(x_hint) or xd, _TORCH_DTYPES)
+        wd = _dtype_name(meta.get(w_hint) or wd, _TORCH_DTYPES)
+        sd = _dtype_name(meta.get(sd_hint) or sd, _TORCH_DTYPES)
+        if family == "swiglu":
+            out = _dtype_name(
+                meta["quant_dtype"], _ACL_DTYPES if mode == 2 else _TORCH_DTYPES
+            )
+        else:
+            out = _dtype_name(meta["dtype"], _TORCH_DTYPES)
+        if fmt == "FRACTAL_NZ" and xd == "float8_e4m3fn" and wd.startswith("float4"):
+            fmt = "FRACTAL_NZ_C0_32"
+    if family == "routing" and route != "aclnn":
+        bs = meta["output_bs"]
+        resweight = meta.get("shared_input_weight", 1)
+    group_values = meta["ttk_group_list"]
+    counts = np.diff(group_values, prepend=0) if gltype == 0 else tuple(group_values)
+    return dict(
+        counts=counts,
+        types=(xd, wd),
+        sd=sd,
+        out=out,
+        trans=trans,
+        format=fmt,
+        c0=_nz_tile_width(wd),
+        shape=shape,
+        gltype=gltype,
+        mode=mode,
+        bs=bs,
+        resweight=resweight,
+    )
+
+
 def _reference_metadata(family, route, data):
-    if data is None:
-        raise ValueError("missing ttk_reference in attributes1")
     names = _NAMES[family, "e2e"]
     return {
         **{f"f_{key}": value for key, value in data.items()},
@@ -893,13 +1019,55 @@ def _reference_metadata(family, route, data):
     }
 
 
+def _routing_case_reference(route, context):
+    fields = context.csv_fields
+    data = dict(context.attributes)
+    for key in (
+        "input_dtypes",
+        "output_dtypes",
+        "input_formats",
+        "input_ori_shapes",
+        "tensor_dtypes",
+        "tensor_formats",
+    ):
+        if fields.get(key):
+            data[key] = literal_eval(fields[key])
+    args = tuple(context.input_tensors)
+    if route == "aclnn":
+        # CompareContext provides tensor slots only; assemble the routing API suffix.
+        args = (
+            *args[:12],
+            data["dtype"],
+            data["sharedInputWeight"],
+            data["sharedInputOffset"],
+            data["transposeX1"],
+            data["transposeX2"],
+            data["groupListType"],
+            data.get("tuningConfigOptional"),
+            args[-1],
+        )
+    elif route == "e2e":
+        data.update(zip(_NAMES["routing", route], args))
+    return _case_reference("routing", route, args, data)
+
+
 def make_spec(family, route):
+    def reference(args, attrs, legacy, *, restore_views=False):
+        if restore_views and attrs.get("ttk_view_strides"):
+            names = _NAMES[family, route]
+            pos_count = 3 if family == "routing" else 5
+            tensors = {**attrs, **dict(zip(names[:pos_count], args))}
+            strides = tensors.pop("ttk_view_strides")
+            _restore_tensor_views(strides, **tensors)
+        data = _case_reference(family, route, args, attrs) if legacy is None else legacy
+        return _reference_metadata(family, route, data)
+
     def customize(*args, ttk_reference=None, **kwargs):
-        meta = _reference_metadata(family, route, ttk_reference)
+        meta = reference(args, kwargs, ttk_reference)
         return _hook_customize(*args, **kwargs, **meta)
 
     def golden(*args, ttk_reference=None, **kwargs):
-        meta = _reference_metadata(family, route, ttk_reference)
+        meta = reference(args, kwargs, ttk_reference, restore_views=True)
         if route == "aclnn" and family == "swiglu" and meta["f_mode"] == 2:
             names = (
                 "swigluMode",
@@ -914,14 +1082,17 @@ def make_spec(family, route):
         return _hook_golden(*args, **kwargs, **meta)
 
     def preprocess(*args, ttk_reference=None, **kwargs):
-        meta = _reference_metadata(family, route, ttk_reference)
+        meta = reference(args, kwargs, ttk_reference, restore_views=True)
         return _hook_preprocess(*args, **kwargs, **meta)
 
     def compare(output, expected, *, compare_context):
         from dataclasses import replace
 
         meta = _reference_metadata(
-            family, route, compare_context.attributes.get("ttk_reference")
+            family,
+            route,
+            compare_context.attributes.get("ttk_reference")
+            or _routing_case_reference(route, compare_context),
         )
         comparison = replace(
             compare_context, attributes={**compare_context.attributes, **meta}

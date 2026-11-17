@@ -367,6 +367,8 @@ def _ceil_power_of_two(value):
 
 
 def _ge_dtype_to_name(dtype):
+    if isinstance(dtype, (str, torch.dtype)):
+        return str(dtype).removeprefix("torch.")
     dtype_names = {
         QUANT_DTYPE_E5M2: "float8_e5m2",
         QUANT_DTYPE_E4M3FN: "float8_e4m3fn",
