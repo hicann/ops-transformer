@@ -35,7 +35,7 @@
 
   该接口支持以下三类典型计算模式：
 
-  - **SWA（Sliding Window Attention）**：仅使用`ori_kv`，对原始KV做滑动窗口注意力。
+  - **SWA（Sliding Window Attention）**：仅使用`ori_kv`，支持滑动窗口注意力，以及通过`ori_sparse_indices`选择原始KV的稀疏注意力场景（DSpark）。DSpark通过`ori_topk_length`指定每个Query实际参与计算的索引条目数。
   - **CSA（Compressed Sparse Attention）**：同时使用`ori_kv`、`cmp_kv`和`cmp_sparse_indices`，对原始KV窗口和TopK选择出的压缩KV共同做注意力。
   - **HCA（Heavily Compressed Attention）**：同时使用`ori_kv`和`cmp_kv`，对原始KV窗口和连续压缩KV段共同做注意力。
 
@@ -278,14 +278,14 @@ cann_ops_transformer.sparse_flash_mla(
 | max_seqlen_q | int32；必须大于0。 | TND场景必传。 | 必须等于`q`各Batch实际长度的最大值。 | 与`cu_seqlens_q`及q的q_t维一致。 |
 | max_seqlen_ori_kv | int32；必须大于0。 | `ori_kv`为TND布局时必传。 | 必须等于`ori_kv`各Batch实际长度的最大值。 | 与`cu_seqlens_ori_kv`及ori_kv_t一致。 |
 | max_seqlen_cmp_kv | int32；必须大于0。 | `cmp_kv`为TND布局时必传。 | 必须等于`cmp_kv`各Batch实际长度的最大值。 | 与`cu_seqlens_cmp_kv`及cmp_kv_t一致。 |
-| ori_topk | int32；当前仅支持0。 | 可选，默认None。 | 必须与`sparse_flash_mla`的`ori_sparse_indices`和`ori_topk_length`的传入状态一致。 | 当前不支持`ori_sparse_indices`非空，因此必须为0。 |
+| ori_topk | int32；0表示原始KV非稀疏场景，大于0表示原始KV稀疏索引的容量。 | DSpark场景必须传入且大于0。 | 必须等于主接口`ori_sparse_indices`的最后一维大小。 | Atlas A2/A3的DSpark场景需同时向metadata和主接口传入`ori_topk_length`，并设置`ori_mask_mode=0`。 |
 | cmp_topk | int32；SWA/HCA场景取值为0，CSA场景取值为压缩kv的TopK长度且大于0。 | CSA场景必传且非0；其他场景为0。 | 必须等于`cmp_sparse_indices`最后一维。 | <term>Atlas A3系列产品</term>：CSA取大于8192或小于等于0、或SWA/HCA取非0时拦截；<term>Ascend 950PR&950DT系列产品</term>：CSA取小于等于0、或SWA/HCA取非0时拦截。 |
 | cmp_ratio | int32；SWA场景取值为1，CSA/HCA场景取值1-128。 | 可选，默认None。 | 必须与主接口、`cmp_residual_kv`和`cmp_kv`压缩关系一致。 | <term>Atlas A3系列产品</term>：SWA无限制、CSA取非1、2、4、HCA取非128时拦截；<term>Ascend 950PR&950DT系列产品</term>：SWA取非1或CSA/HCA取非1-128时拦截。 |
-| ori_mask_mode | int32；接口定义支持0、3、4。 | 可选。 | 无。 | 当传入4时，与`ori_win_left`、`ori_win_right`组合使用。 |
+| ori_mask_mode | int32；接口定义支持0、3、4。 | 可选。 | 必须与主接口一致。 | Atlas A2/A3的DSpark场景必须为0；当传入4时，与`ori_win_left`、`ori_win_right`组合使用。 |
 | cmp_mask_mode | int32；接口定义支持0、3。 | 可选。 | 无。 | SWA为0；CSA/HCA为3。 |
-| ori_win_left | int32；接口定义为-1或非负数。 | 可选。 | 无。 | <term>Atlas A3系列产品</term>：取非127时拦截；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。仅作用于`ori_kv`侧。 |
-| ori_win_right | int32；接口定义为-1或非负数。 | 可选。 | 无。 | <term>Atlas A3系列产品</term>：取非0时拦截；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。仅作用于`ori_kv`侧。 |
-| layout_q | string；仅支持`BSND`、`TND`。 | 可选，默认None。 | 必须与q的维度、主接口和长度类Tensor一致。 | 仅支持与`layout_kv`组合为`BSND`/`BSND`、`TND`/`TND`、`BSND`/`PA_BBND`或`TND`/`PA_BBND`。 |
+| ori_win_left | int32；接口定义为-1或非负数。 | 可选。 | 必须与主接口一致。 | <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>：DSpark场景支持-1或非负数，非DSpark场景仅支持127；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。仅作用于`ori_kv`侧。 |
+| ori_win_right | int32；接口定义为-1或非负数。 | 可选。 | 必须与主接口一致。 | <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>：DSpark场景支持-1或非负数，非DSpark场景仅支持0；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。仅作用于`ori_kv`侧。 |
+| layout_q | string；仅支持`BSND`、`TND`。 | 可选，默认None。 | 必须与q的维度、主接口和长度类Tensor一致。 | 仅支持与`layout_kv`组合为`BSND`/`BSND`、`TND`/`TND`、`BSND`/`PA_BBND`或`TND`/`PA_BBND`；其中Atlas A2/A3的DSpark场景不支持`BSND`/`PA_BBND`。 |
 | layout_kv | string；仅支持`BSND`、`TND`、`PA_BBND`。 | 可选，默认None。 | 必须与`ori_kv`、`cmp_kv`的维度和主接口一致。 | 非PA场景必须与`layout_q`相同；PA场景要求Block Table和`seqused_ori_kv`。 |
 | has_ori_kv | bool。 | 必选，与主接口实际传入状态一致。 | 必须等价于`ori_kv is not None`。 | 三种已支持场景均要求为True。 |
 | has_cmp_kv | bool。 | 必选，与主接口实际传入状态一致。 | 必须等价于`cmp_kv is not None`。 | SWA为False；CSA/HCA为True。 |
@@ -308,7 +308,7 @@ cann_ops_transformer.sparse_flash_mla(
 #### 公共参数组
 
 - `q`、`ori_kv`、`cmp_kv`的数据类型必须一致，且仅支持`float16`和`bfloat16`。
-- `layout_q`和`layout_kv`仅支持`BSND`/`BSND`、`TND`/`TND`、`BSND`/`PA_BBND`、`TND`/`PA_BBND`组合。非`PA_BBND`场景下，两者必须一致。
+- `layout_q`和`layout_kv`仅支持`BSND`/`BSND`、`TND`/`TND`、`BSND`/`PA_BBND`、`TND`/`PA_BBND`组合。非`PA_BBND`场景下，两者必须一致。Atlas A2/A3的DSpark场景不支持`BSND`/`PA_BBND`。
 - `layout_q="BSND"`时`q`必须为4维；`layout_q="TND"`时`q`必须为3维，并且必须传入`cu_seqlens_q`。
 - `layout_kv="BSND"`或`layout_kv="PA_BBND"`时，kv必须为4维；`layout_kv="TND"`时，kv必须为3维。`layout_kv="TND"`时必须传入`cu_seqlens_ori_kv`；传入`cmp_kv`时，还必须传入`cu_seqlens_cmp_kv`。
 - `metadata`必须为2048个`int32`元素；`topk_value_mode`在A2A3仅支持1，A5支持1和2。
@@ -317,7 +317,7 @@ cann_ops_transformer.sparse_flash_mla(
 | 参数 | 单参数校验 | 存在性拦截 | 一致性拦截 | 特性交叉拦截 |
 | :--- | :--- | :--- | :--- | :--- |
 | q | `float16`或`bfloat16`；`BSND`为(b, q_s, q_n, d)，`TND`为(q_t, q_n, d)；任一轴为0时拦截。 | 必传。 | `q`、`attention_out`的dtype、shape需相同。 | b > 0；d必须为512，q_n/kv_n必须为正整数；布局必须符合下表。q_s > 0；0 < q_n <= 128；q_t > 0。 |
-| ori_kv | 与`q`相同的数据类型；`BSND`为(b, ori_kv_s, kv_n, d)，`TND`为(ori_kv_t, kv_n, d)，`PA_BBND`为(ori_kv_block_nums, ori_kv_block_size, kv_n, d)。 | 已支持的SWA、CSA、HCA场景均必传。 | layout_kv不为PA_BBND时，layout_q和layout_kv需保持一致；layout_kv为PA_BBND时，layout_q可为BSND或TND。 | PA场景必须有`ori_block_table`和`seqused_ori_kv`；block_size满足产品规格。ori_kv_s > 0；ori_kv_n = 1；ori_kv_t > 0；ori_kv_block_nums > 0；1 <= ori_kv_block_size <= 1024。 |
+| ori_kv | 与`q`相同的数据类型；`BSND`为(b, ori_kv_s, kv_n, d)，`TND`为(ori_kv_t, kv_n, d)，`PA_BBND`为(ori_kv_block_nums, ori_kv_block_size, kv_n, d)。 | 已支持的SWA、CSA、HCA场景均必传。 | layout_kv不为PA_BBND时，layout_q和layout_kv需保持一致；layout_kv为PA_BBND时，layout_q可为BSND或TND，Atlas A2/A3的DSpark场景仅支持TND。 | PA场景必须有`ori_block_table`和`seqused_ori_kv`；block_size满足产品规格。ori_kv_s > 0；ori_kv_n = 1；ori_kv_t > 0；ori_kv_block_nums > 0；1 <= ori_kv_block_size <= 1024。 |
 | cmp_kv | 与`q`相同的数据类型；`BSND`为(b, cmp_kv_s, kv_n, d)，`TND`为(cmp_kv_t, kv_n, d)，`PA_BBND`为(cmp_kv_block_nums, cmp_kv_block_size, kv_n, d)。 | SWA必须不传；CSA/HCA必传。 | 若cmp_kv传入，ori_kv与cmp_kv的dtype需一致。 | CSA要求`cmp_sparse_indices`；HCA禁止传该索引；PA场景要求`cmp_block_table`。cmp_kv_s > 0；cmp_kv_n = 1；cmp_kv_t > 0；cmp_kv_block_nums > 0；1 <= cmp_kv_block_size <= 1024。 |
 | metadata | `int32`、ND、shape为(2048,)。 | 必传；缺失应拦截。 | 必须是使用本次layout、序列长度、模式、窗口、压缩率和kv存在性生成的结果。 | 与前置接口不一致或复用其他输入生成的metadata应拦截。 |
 | softmax_scale | float，必须为有限值。 | 可选，默认1.0。 | 应与用户期望的缩放策略一致。 | 不参与metadata生成；常用设置为`1.0 / sqrt(d)`。 |
@@ -338,15 +338,16 @@ layout匹配关系表：
 
 | 场景 | 必选输入与属性 | 不允许或固定的输入与属性 |
 | :--- | :--- | :--- |
-| SWA | 仅传入`ori_kv`。 | 不传`cmp_kv`、`cmp_sparse_indices`和`cmp_block_table`；`cmp_topk=0`、`cmp_mask_mode=0`。 |
+| SWA（滑动窗口） | 仅传入`ori_kv`。 | 不传`cmp_kv`、`cmp_sparse_indices`和`cmp_block_table`；`cmp_topk=0`、`cmp_mask_mode=0`。 |
+| SWA（原始KV稀疏，DSpark） | 传入`ori_kv`、`ori_sparse_indices`和`ori_topk_length`。 | 不传`cmp_kv`、`cmp_sparse_indices`和`cmp_block_table`；`cmp_topk=0`、`cmp_mask_mode=0`。 |
 | CSA | 传入`ori_kv`、`cmp_kv`、`cmp_sparse_indices`；`cmp_mask_mode=3`且`cmp_topk`为非0；`cmp_ratio!=1`时还需传入`cmp_residual_kv`。 | `cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入`cmp_residual_kv`。 |
 | HCA | 传入`ori_kv`、`cmp_kv`；`cmp_mask_mode=3`；`cmp_ratio!=1`时还需传入`cmp_residual_kv`。 | 不传`cmp_sparse_indices`；`cmp_topk=0`；`cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入`cmp_residual_kv`。 |
 
 | 参数 | 单参数校验 | 存在性拦截 | 一致性拦截 | 特性交叉拦截 |
 | :--- | :--- | :--- | :--- | :--- |
-| ori_sparse_indices | `int32`、ND。 | 必须不传。 | 与`ori_topk=0`和`ori_topk_length=None`一致。 | 当mask mode !=0时，有效长度必须与参与计算的序列长度保持一致，且不支持传入topk_length。当mask mode ==0时，ori_kv_k 需要大于等于对应的topk_length。 |
+| ori_sparse_indices | `int32`、ND；BSND为(b, q_s, kv_n, ori_kv_k)，TND为(q_t, kv_n, ori_kv_k)。 | Atlas A2/A3的DSpark场景必传。 | 与`ori_topk=0`和`ori_topk_length=None`一致。 | 当mask mode !=0时，有效长度必须与参与计算的序列长度保持一致， 且不支持传入topk_length。当mask mode ==0时，ori_kv_k 需要大于等于对应的topk_length。 |
 | cmp_sparse_indices | `int32`、ND；`BSND`为(b, q_s, kv_n, cmp_kv_k)，`TND`为(q_t, kv_n, cmp_kv_k)；值必须为-1或有效的cmp token索引。 | 仅CSA必传；SWA/HCA必须不传。 | b/q_t、kv_n必须与`q`一致，cmp_kv_k必须与`cmp_topk`一致。 | <term>Atlas A3系列产品</term>：cmp_kv_k取大于8192或小于等于0时拦截；<term>Ascend 950PR&950DT系列产品</term>：cmp_kv_k取小于等于0时拦截。无效位置填-1，索引具体取值由用户保证。 |
-| ori_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | CSA场景可选，其他场景不能传。 | 与`ori_sparse_indices=None`和`ori_topk=0`一致。 | 传入时，不需要传入`seqused_ori_kv`。 |
+| ori_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | Atlas A2/A3的DSpark场景必传。 | 与`ori_sparse_indices=None`和`ori_topk=0`一致。 | 传入时，不需要传入`seqused_ori_kv`。 |
 | cmp_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | CSA场景可选，其他场景不能传。 | 与`cmp_sparse_indices`和`cmp_topk`的状态一致。 | 传入时，不需要传入`seqused_cmp_kv`。 |
 | cmp_ratio | int32；SWA场景取值为1，CSA/HCA场景取值范围1-128。 | 可选，默认1。 | 必须同时与`metadata`、`cmp_kv`长度和`cmp_residual_kv`一致。 | <term>Atlas A3系列产品</term>：SWA无限制、CSA取非1、2、4、HCA取非128时拦截；<term>Ascend 950PR&950DT系列产品</term>：SWA取非1或CSA/HCA取非1-128时拦截。 |
 | topk_value_mode | int32；A2A3仅支持1，A5支持1和2。 | 可选，默认1。 | 必须与`cmp_sparse_indices`的索引取值约定一致。 | 不参与`metadata`生成；取非1值应拦截。 |
@@ -366,11 +367,11 @@ layout匹配关系表：
 | seqused_q | `int32`、ND、shape为(b,)；每项非负整数且不超过对应q长度。 | 可选。 | b必须与`q`、`metadata`一致。 | Tensor具体值由用户保证。 |
 | seqused_ori_kv | `int32`、ND、shape为(b,)；每项非负整数且不超过对应`ori_kv`长度。 | PA场景必传；其他场景可选。 | b必须与`ori_kv`、`ori_block_table`和`metadata`一致。 | 无。 |
 | seqused_cmp_kv | `int32`、ND、shape为(b,)；每项非负整数且不超过对应`cmp_kv`长度。 | 可选。 | b必须与`cmp_kv`和`metadata`一致。 | 无。 |
-| cmp_residual_kv | `int32`、ND、shape为(b,)；每项范围[0, cmp_ratio)。 | `cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入。 | 必须与`metadata`、`cmp_ratio`和`cmp_kv`长度一致。 | 恢复长度必须满足`cmp_len * cmp_ratio + residual = ori_len_for_cmp_mask`。 |
-| ori_mask_mode | `int32`；接口定义支持0、3、4。 | 可选。 | 必须与`metadata`一致。 | 当前支持0、3、4。 |
+| cmp_residual_kv | `int32`、ND、shape为(b,)；每项范围[0, cmp_ratio)。 | `cmp_mask_mode=0`或`cmp_ratio=1`时不允许传入 | 必须与`metadata`、`cmp_ratio`和`cmp_kv`长度一致。 | 恢复长度必须满足`cmp_len * cmp_ratio + residual = ori_len_for_cmp_mask`。 |
+| ori_mask_mode | `int32`；接口定义支持0、3、4。 | 可选。 | 必须与`metadata`一致。 | Atlas A2/A3的DSpark场景必须为0。 |
 | cmp_mask_mode | `int32`；接口定义支持0、3。 | 可选。 | 必须与`metadata`一致。 | 当前支持0、3。 |
-| ori_win_left | `int32`；接口定义为-1或非负数。 | 可选。 | 必须与`metadata`一致。 | <term>Atlas A3系列产品</term>：取非127时拦截；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。 |
-| ori_win_right | `int32`；接口定义为-1或非负数。 | 可选。 | 必须与`metadata`一致。 | <term>Atlas A3系列产品</term>：取非0时拦截；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。 |
+| ori_win_left | `int32`；接口定义为-1或非负数。 | 可选。 | 必须与`metadata`一致。 | <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>：DSpark场景支持-1或非负数，非DSpark场景仅支持127；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。 |
+| ori_win_right | `int32`；接口定义为-1或非负数。 | 可选。 | 必须与`metadata`一致。 | <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>：DSpark场景支持-1或非负数，非DSpark场景仅支持0；<term>Ascend 950PR&950DT系列产品</term>：取值小于-1时拦截。 |
 
 #### PagedAttention参数组
 

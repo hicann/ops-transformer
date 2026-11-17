@@ -528,7 +528,7 @@ aclnnStatus aclnnSparseFlashMla(
   </table>
 
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N1/N2支持[1, 128]内的任意整数；SWA不传入cmpKvOptional，cmpRatio不参与计算，CSA支持传入1、2或4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏oriKvOptional场景支持oriSparseIndicesOptional及oriTopkLengthOptional，layoutQOptional和layoutKvOptional仅支持"TND"/"PA_BBND"组合，oriWinLeft和oriWinRight支持非负数，cmpSparseIndicesOptional的最后一维K2当前支持[1, 8192]内的任意整数。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N1/N2支持[1, 128]内的任意整数；SWA不传入cmpKvOptional，cmpRatio不参与计算，CSA支持传入1、2或4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏oriKvOptional场景支持oriSparseIndicesOptional及oriTopkLengthOptional，layoutQOptional和layoutKvOptional支持"BSND"/"BSND"、"TND"/"TND"、"TND"/"PA_BBND"组合，oriWinLeft和oriWinRight各自支持-1或非负数，cmpSparseIndicesOptional的最后一维K2当前支持[1, 8192]内的任意整数。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：N1支持1-128，N2只支持1。
@@ -580,7 +580,7 @@ aclnnStatus aclnnSparseFlashMla(
         <td>cmpRatio与CSA、HCA场景不匹配。</td>
       </tr>
       <tr>
-        <td>非SWA稀疏oriKvOptional场景oriWinLeft不为127，或oriWinRight不为0；SWA稀疏oriKvOptional场景oriWinLeft或oriWinRight为负数。</td>
+        <td>非SWA稀疏oriKvOptional场景oriWinLeft不为127，或oriWinRight不为0；SWA稀疏oriKvOptional场景oriWinLeft或oriWinRight小于-1。</td>
       </tr>
       <tr>
         <td>layoutQOptional、layoutKvOptional、topkValueMode、cmpSparseIndicesOptional、metadataOptional、sinksOptional、cuSeqlens或seqused相关参数规格不在支持范围内。</td>

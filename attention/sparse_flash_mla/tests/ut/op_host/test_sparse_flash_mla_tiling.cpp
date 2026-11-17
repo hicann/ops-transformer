@@ -110,11 +110,123 @@ void RunA2SwaOnlyOriKvFp16(int64_t topkValueMode, ge::graphStatus expectedStatus
         &compileInfo, "Ascend910B", 40, 196608);
     ExecuteTestCase(tilingContextPara, expectedStatus, expectedTilingKey);
 }
+void RunA2DsparkTnd(ge::DataType dtype, bool withSeqUsed, ge::graphStatus expectedStatus,
+                    uint64_t expectedTilingKey = UINT64_MAX)
+{
+    SMLACompileInfo compileInfo = {};
+    int64_t cuSeqLensQData[] = {0, 128, 256, 384, 512};
+    int64_t cuSeqLensOriKvData[] = {0, 513, 1026, 1539, 2052};
+    int64_t seqUsedOriKvData[] = {513, 513, 513, 513};
+    int64_t metadataData[kMetadataSize] = {0};
+    FillMockSmlaMetadata(metadataData);
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashMla",
+        {
+            {{{512, 64, 512}, {512, 64, 512}}, dtype, ge::FORMAT_ND},
+            {{{2052, 1, 512}, {2052, 1, 512}}, dtype, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{512, 1, 1024}, {512, 1, 1024}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{5}, {5}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqLensQData},
+            {{{5}, {5}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqLensOriKvData},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {withSeqUsed ? gert::StorageShape({4}, {4}) : gert::StorageShape(),
+             withSeqUsed ? ge::DT_INT32 : ge::DT_UNDEFINED, ge::FORMAT_ND, true, seqUsedOriKvData},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{512, 1}, {512, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+        },
+        {
+            {{{512, 64, 512}, {512, 64, 512}}, dtype, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"ori_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"cmp_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"ori_win_left", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+            {"ori_win_right", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+            {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+            {"topk_value_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        },
+        &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, expectedStatus, expectedTilingKey);
+}
+
+void RunA2DsparkBsnd(ge::DataType dtype, bool withSeqUsed, ge::graphStatus expectedStatus,
+                     uint64_t expectedTilingKey = UINT64_MAX, int64_t sparseS1 = 128, int64_t sparseN2 = 1)
+{
+    SMLACompileInfo compileInfo = {};
+    int64_t seqUsedOriKvData[] = {513, 513, 513, 513};
+    int64_t metadataData[kMetadataSize] = {0};
+    FillMockSmlaMetadata(metadataData);
+    gert::TilingContextPara tilingContextPara(
+        "SparseFlashMla",
+        {
+            {{{4, 128, 64, 512}, {4, 128, 64, 512}}, dtype, ge::FORMAT_ND},
+            {{{4, 1024, 1, 512}, {4, 1024, 1, 512}}, dtype, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{4, sparseS1, sparseN2, 2048}, {4, sparseS1, sparseN2, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {withSeqUsed ? gert::StorageShape({4}, {4}) : gert::StorageShape(),
+             withSeqUsed ? ge::DT_INT32 : ge::DT_UNDEFINED, ge::FORMAT_ND, true, seqUsedOriKvData},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{4, sparseS1, sparseN2}, {4, sparseS1, sparseN2}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+        },
+        {
+            {{{4, 128, 64, 512}, {4, 128, 64, 512}}, dtype, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"ori_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"cmp_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"ori_win_left", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+            {"ori_win_right", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+            {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+            {"topk_value_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        },
+        &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, expectedStatus, expectedTilingKey);
+}
+
 } // namespace
 
 TEST_F(SparseFlashMlaTiling, test_tiling_swa_only_ori_kv_fp16_tnd_pa_nd)
 {
     RunA2SwaOnlyOriKvFp16(1, ge::GRAPH_SUCCESS, smla_ut::kTndPaBnbdSwaTilingKey);
+}
+
+TEST_F(SparseFlashMlaTiling, test_tiling_dspark_tnd_tnd_fp16_k_gt_kv)
+{
+    RunA2DsparkTnd(ge::DT_FLOAT16, false, ge::GRAPH_SUCCESS, 2097186UL);
+}
+
+TEST_F(SparseFlashMlaTiling, test_tiling_dspark_tnd_tnd_bf16_k_gt_kv)
+{
+    RunA2DsparkTnd(ge::DT_BF16, false, ge::GRAPH_SUCCESS, 2097186UL);
 }
 
 TEST_F(SparseFlashMlaTiling, test_tiling_topk_offset_rejected_on_a2)
@@ -950,4 +1062,24 @@ TEST_F(SparseFlashMlaTiling, test_tiling_mock_950_swa_only_ori_kv_fp16_tnd_pa_bb
          {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
         &compileInfo, "Ascend950", 56, 262144);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+TEST_F(SparseFlashMlaTiling, test_tiling_dspark_bsnd_bsnd_fp16_k_gt_kv)
+{
+    RunA2DsparkBsnd(ge::DT_FLOAT16, false, ge::GRAPH_SUCCESS, 2097152UL);
+}
+
+TEST_F(SparseFlashMlaTiling, test_tiling_dspark_bsnd_bsnd_bf16_padded_kv)
+{
+    RunA2DsparkBsnd(ge::DT_BF16, true, ge::GRAPH_SUCCESS, 2097152UL);
+}
+
+TEST_F(SparseFlashMlaTiling, test_tiling_dspark_bsnd_reject_matching_tables_with_wrong_q_rows)
+{
+    RunA2DsparkBsnd(ge::DT_BF16, false, ge::GRAPH_FAILED, UINT64_MAX, 127, 1);
+}
+
+TEST_F(SparseFlashMlaTiling, test_tiling_dspark_bsnd_reject_matching_tables_with_wrong_kv_heads)
+{
+    RunA2DsparkBsnd(ge::DT_BF16, false, ge::GRAPH_FAILED, UINT64_MAX, 128, 2);
 }

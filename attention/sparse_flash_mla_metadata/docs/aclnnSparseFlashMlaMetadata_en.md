@@ -451,10 +451,10 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 
   <ul>
     <!-- npu="A3" id7 -->
-    <li><term>Atlas A3 products</term>: sequsedQOptional and cmpTopkLengthOptional are not supported; numHeadsQ/numHeadsKv support any integer in [1, 128]; the SWA sparse ori_kv use case supports oriTopkLengthOptional, oriTopk greater than 0, and oriMaskMode of 0, and oriWinLeft and oriWinRight support non-negative values; in other SWA use cases, oriTopk is 0, oriMaskMode is 4, oriWinLeft is 127, and oriWinRight is 0; cmpTopk supports [0, 8192], where 0 indicates non-sparse compressed KV, cmpMaskMode supports only 3, cmpKv is not passed in for SWA, cmpRatio does not participate in the computation, CSA supports 1, 2, or 4, and HCA supports 128.</li>
+    <li><term>Atlas A3 products</term>: sequsedQOptional and cmpTopkLengthOptional are not supported; numHeadsQ/numHeadsKv support any integer in [1, 128]; the SWA sparse ori_kv use case supports oriTopkLengthOptional, oriTopk greater than 0, and oriMaskMode of 0, and oriWinLeft and oriWinRight each support -1 or a non-negative value; in other SWA use cases, oriTopk is 0, oriMaskMode is 4, oriWinLeft is 127, and oriWinRight is 0; cmpTopk supports [0, 8192], where 0 indicates non-sparse compressed KV, cmpMaskMode supports only 3, cmpKv is not passed in for SWA, cmpRatio does not participate in the computation, CSA supports 1, 2, or 4, and HCA supports 128.</li>
     <!-- end id7 -->
     <!-- npu="910b" id8 -->
-    <li><term>Atlas A2 products</term>: sequsedQOptional and cmpTopkLengthOptional are not supported; numHeadsQ/numHeadsKv support any integer in [1, 128]; the SWA sparse ori_kv use case supports oriTopkLengthOptional, oriTopk greater than 0, and oriMaskMode of 0, and oriWinLeft and oriWinRight support non-negative values; in other SWA use cases, oriTopk is 0, oriMaskMode is 4, oriWinLeft is 127, and oriWinRight is 0; cmpTopk supports [0, 8192], where 0 indicates non-sparse compressed KV, cmpMaskMode supports only 3, cmpKv is not passed in for SWA, cmpRatio does not participate in the computation, CSA supports 1, 2, or 4, and HCA supports 128.</li>
+    <li><term>Atlas A2 products</term>: sequsedQOptional and cmpTopkLengthOptional are not supported; numHeadsQ/numHeadsKv support any integer in [1, 128]; the SWA sparse ori_kv use case supports oriTopkLengthOptional, oriTopk greater than 0, and oriMaskMode of 0, and oriWinLeft and oriWinRight each support -1 or a non-negative value; in other SWA use cases, oriTopk is 0, oriMaskMode is 4, oriWinLeft is 127, and oriWinRight is 0; cmpTopk supports [0, 8192], where 0 indicates non-sparse compressed KV, cmpMaskMode supports only 3, cmpKv is not passed in for SWA, cmpRatio does not participate in the computation, CSA supports 1, 2, or 4, and HCA supports 128.</li>
     <!-- end id8 -->
   </ul>
 
@@ -560,7 +560,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
         <td>In non-SWA sparse ori_kv use case, oriMaskMode is not 4; in SWA sparse ori_kv use case, oriMaskMode is not 0, or cmpMaskMode is not 3.</td>
       </tr>
       <tr>
-        <td>In the non-SWA sparse ori_kv use case, oriWinLeft is not 127 or oriWinRight is not 0; in the SWA sparse ori_kv use case, oriWinLeft or oriWinRight is negative.</td>
+        <td>In the non-SWA sparse ori_kv use case, oriWinLeft is not 127 or oriWinRight is not 0; in the SWA sparse ori_kv use case, oriWinLeft or oriWinRight is less than -1.</td>
       </tr>
       <tr>
         <td>cmpRatio does not match the CSA or HCA use cases.</td>
@@ -618,7 +618,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
         <td>In the non-SWA sparse ori_kv use case, oriMaskMode is not 4; in the SWA sparse ori_kv use case, oriMaskMode is not 0, or cmpMaskMode is not 3.</td>
       </tr>
       <tr>
-        <td>In the non-SWA sparse ori_kv use case, oriWinLeft is not 127 or oriWinRight is not 0; in the SWA sparse ori_kv use case, oriWinLeft or oriWinRight is negative.</td>
+        <td>In the non-SWA sparse ori_kv use case, oriWinLeft is not 127 or oriWinRight is not 0; in the SWA sparse ori_kv use case, oriWinLeft or oriWinRight is less than -1.</td>
       </tr>
       <tr>
         <td>cmpRatio does not match the CSA or HCA use case.</td>
@@ -727,7 +727,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 <!-- end id12 -->
 <!-- npu="A3" id13 -->
 - Atlas A3 products constraints:
-  - In the SWA sparse ori_kv use case, only the SWA template is supported. `hasOriKv` must be true, `hasCmpKv` must be false, `oriTopk` must be greater than 0, `oriMaskMode` must be 0, `oriWinLeft` and `oriWinRight` must be non-negative, and `oriTopkLengthOptional` must be passed in. `oriTopk` must be consistent with the last dimension K of oriSparseIndicesOptional of the paired main operator. `oriTopkLengthOptional` specifies the number of left-aligned valid index entries for each q token and KV head. The value must be within the range [0, K]. Metadata uses only `oriTopkLengthOptional` to generate task partitioning. In the PA_BBND use case, the paired main operator still requires `sequsedOriKvOptional` to be passed in.
+  - In the SWA sparse ori_kv use case, only the SWA template is supported, with layout combinations BSND/BSND, TND/TND, and TND/PA_BBND. `hasOriKv` must be true, `hasCmpKv` must be false, `oriTopk` must be greater than 0, `oriMaskMode` must be 0, `oriWinLeft` and `oriWinRight` must each be -1 or a non-negative value, and `oriTopkLengthOptional` must be passed in. `oriTopk` must be consistent with the last dimension K of oriSparseIndicesOptional of the paired main operator. `oriTopkLengthOptional` specifies the number of left-aligned valid index entries for each q token and KV head. The value must be within the range [0, K]. Metadata uses only `oriTopkLengthOptional` to generate task partitioning. In the PA_BBND use case, the paired main operator still requires `sequsedOriKvOptional` to be passed in.
   - When layoutQOptional is TND, `cuSeqlensQOptional` must be passed in.
   - When layoutKvOptional is PA_BBND, `sequsedOriKvOptional` must be passed in. In the BSND use case, `sequsedOriKvOptional` is optional and overrides the valid oriKv length of each batch; in the TND use case, `cuSeqlensOriKvOptional` is used to express the oriKv sequence boundary.
   - When layoutKvOptional is TND, `cuSeqlensOriKvOptional` must be passed in; if hasCmpKv is true, `cuSeqlensCmpKvOptional` must also be passed in.
@@ -736,7 +736,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 <!-- end id13 -->
 <!-- npu="910b" id14 -->
 - Atlas A2 products constraints:
-  - In the SWA sparse ori_kv use case, only the SWA template is supported. `hasOriKv` must be true, `hasCmpKv` must be false, `oriTopk` must be greater than 0, `oriMaskMode` must be 0, `oriWinLeft` and `oriWinRight` must be non-negative, and `oriTopkLengthOptional` must be passed in. `oriTopk` must be consistent with K, the last dimension of oriSparseIndicesOptional of the accompanying main operator. `oriTopkLengthOptional` indicates the number of left-aligned valid index entries for each q token and KV head, and its value must be within the range of [0, K]. Metadata uses only `oriTopkLengthOptional` to generate task partitioning. In the PA_BBND use case, the accompanying main operator still requires `sequsedOriKvOptional` to be passed in.
+  - In the SWA sparse ori_kv use case, only the SWA template is supported, with layout combinations BSND/BSND, TND/TND, and TND/PA_BBND. `hasOriKv` must be true, `hasCmpKv` must be false, `oriTopk` must be greater than 0, `oriMaskMode` must be 0, `oriWinLeft` and `oriWinRight` must each be -1 or a non-negative value, and `oriTopkLengthOptional` must be passed in. `oriTopk` must be consistent with K, the last dimension of oriSparseIndicesOptional of the accompanying main operator. `oriTopkLengthOptional` indicates the number of left-aligned valid index entries for each q token and KV head, and its value must be within the range of [0, K]. Metadata uses only `oriTopkLengthOptional` to generate task partitioning. In the PA_BBND use case, the accompanying main operator still requires `sequsedOriKvOptional` to be passed in.
   - When layoutQOptional is TND, `cuSeqlensQOptional` must be passed in.
   - When layoutKvOptional is PA_BBND, `sequsedOriKvOptional` must be passed in. In the BSND use case, `sequsedOriKvOptional` is optional and overrides the valid oriKv length of each batch; in the TND use case, `cuSeqlensOriKvOptional` is used to express the oriKv sequence boundary.
   - When layoutKvOptional is TND, `cuSeqlensOriKvOptional` must be passed in; if hasCmpKv is true, `cuSeqlensCmpKvOptional` must also be passed in.

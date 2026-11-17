@@ -109,6 +109,7 @@ public:
     static constexpr uint64_t MERGE_WORKSPACE_ROW_NUM = 512;
 
 private:
+    __aicore__ inline int32_t GetOriSparseKvLength(uint32_t bIdx);
     __aicore__ inline int64_t GetOriSparseKeyGmOffset(int32_t logicalIdx, const RunInfo& runInfo);
     __aicore__ inline void CopyInSingleOriSparseRow(int64_t& mte2Size, int64_t mte3Size, int64_t mergeMte3Idx,
                                                     int32_t logicalIdx, const RunInfo& runInfo);
@@ -252,9 +253,26 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::InitVec0GlobalTensor(GlobalTensor<
 {
     this->kvMergeGm_ = kvMergeGm;
     this->oriKvGm_ = oriKvGm;
-    this->oriBlockTableGm_ = oriBlockTableGm;
+    if constexpr (PAGE_ATTENTION) {
+        this->oriBlockTableGm_ = oriBlockTableGm;
+    }
     this->oriSparseIndicesGm = oriSparseIndicesGm;
     this->oriTopkLengthGm = oriTopkLengthGm;
+}
+
+template <typename SMLAT>
+__aicore__ inline int32_t SWAVectorBlock<SMLAT>::GetOriSparseKvLength(uint32_t bIdx)
+{
+    if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::TND) {
+        return actualSeqLengthsKVGm.GetValue(bIdx + 1) - actualSeqLengthsKVGm.GetValue(bIdx);
+    } else if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::BSND) {
+        if (constInfo.actualLenDimsKV == 0) {
+            return static_cast<int32_t>(constInfo.kvSeqSize);
+        }
+        return actualSeqLengthsKVGm.GetValue(bIdx);
+    } else {
+        return actualSeqLengthsKVGm.GetValue(bIdx);
+    }
 }
 
 template <typename SMLAT>
@@ -263,18 +281,24 @@ __aicore__ inline int64_t SWAVectorBlock<SMLAT>::GetOriSparseKeyGmOffset(int32_t
     if (logicalIdx < 0) {
         return -1;
     }
-    int32_t oriLenLimit = actualSeqLengthsKVGm.GetValue(runInfo.bIdx);
+    int32_t oriLenLimit = GetOriSparseKvLength(runInfo.bIdx);
     if (logicalIdx >= oriLenLimit) {
         return -1;
     }
-    uint64_t blockTableIdx = static_cast<uint64_t>(logicalIdx) / constInfo.paOriBlockSize;
-    uint64_t inBlockIdx = static_cast<uint64_t>(logicalIdx) % constInfo.paOriBlockSize;
-    uint64_t idInBlockTable =
-        oriBlockTableGm_.GetValue(runInfo.bIdx * constInfo.oriMaxBlockNumPerBatch + blockTableIdx);
-    return static_cast<int64_t>(idInBlockTable * constInfo.oriKvStride0 +
-                                static_cast<uint64_t>(runInfo.n2IdxReal) * constInfo.headDim *
-                                    constInfo.paOriBlockSize +
-                                inBlockIdx * constInfo.headDim);
+    if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::TND || KV_LAYOUT_T == SMLA_LAYOUT::BSND) {
+        // tensorBOffset contains the physical batch base and KV head offset, in elements.
+        return static_cast<int64_t>(runInfo.tensorBOffset) +
+               static_cast<int64_t>(logicalIdx) * constInfo.kvHeadNum * constInfo.headDim;
+    } else {
+        uint64_t blockTableIdx = static_cast<uint64_t>(logicalIdx) / constInfo.paOriBlockSize;
+        uint64_t inBlockIdx = static_cast<uint64_t>(logicalIdx) % constInfo.paOriBlockSize;
+        uint64_t idInBlockTable =
+            oriBlockTableGm_.GetValue(runInfo.bIdx * constInfo.oriMaxBlockNumPerBatch + blockTableIdx);
+        return static_cast<int64_t>(idInBlockTable * constInfo.oriKvStride0 +
+                                    static_cast<uint64_t>(runInfo.n2IdxReal) * constInfo.headDim *
+                                        constInfo.paOriBlockSize +
+                                    inBlockIdx * constInfo.headDim);
+    }
 }
 
 template <typename SMLAT>
@@ -571,6 +595,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::InitSoftmaxDefaultBuffer()
     CopySinksIn();
     Duplicate(softmaxMaxDefaultUb, SOFTMAX_MIN_NUM, SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T));
     Duplicate(softmaxSumDefaultUb, R0, SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T));
+    AscendC::PipeBarrier<PIPE_V>();
 }
 
 template <typename SMLAT>
@@ -589,7 +614,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo& info
     uint32_t ubOffset = 0;
     if (info.isOriOnly) {
         if constexpr (IS_DSPARK) {
-            int32_t oriLenLimit = actualSeqLengthsKVGm.GetValue(info.bIdx);
+            int32_t oriLenLimit = GetOriSparseKvLength(info.bIdx);
             uint32_t validCols = Min(info.actualSingleProcessSInnerSize, columnCount);
             uint32_t sparseColStart = info.s2Idx * constInfo.s2BaseSize;
             for (uint32_t i = s1StartIdx; i <= s1EndIdx; i++) {

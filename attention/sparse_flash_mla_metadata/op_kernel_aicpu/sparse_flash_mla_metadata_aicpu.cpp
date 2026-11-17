@@ -1563,9 +1563,9 @@ bool SparseFlashMlaMetadataCpuKernel::BalanceSchedule(SplitResult& splitRes)
         if (splitRes.numOfFdHead > 0U) {
             SplitFD(splitRes);
         }
-    } else if (ProcessSocVersion() == ValidSocVersion::ASCEND960 || aicCoreNum_ <= 4U ||
-               batchSize_ > aicCoreNum_ - 4U) {
-        // A6或Batch超过Cube核数减4时关闭FD，直接生成一次不开FD的方案。
+    } else if (ProcessSocVersion() == ValidSocVersion::ASCEND910 || ProcessSocVersion() == ValidSocVersion::ASCEND960 ||
+               aicCoreNum_ <= 4U || batchSize_ > aicCoreNum_ - 4U) {
+        // A2/A3/A6或Batch超过Cube核数减4时关闭FD，直接生成一次不开FD的方案。
         supportFd_ = false;
         CalcSplitPlan(splitRes.maxCost, splitContext, splitRes);
     } else {

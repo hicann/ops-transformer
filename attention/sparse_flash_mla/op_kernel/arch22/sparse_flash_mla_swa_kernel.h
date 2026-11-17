@@ -574,11 +574,11 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::Init(
         }
     }
 
+    if constexpr (IS_DSPARK) {
+        oriSparseIndicesGm.SetGlobalBuffer((__gm__ int32_t*)oriSparseIndices);
+    }
     if constexpr (PAGE_ATTENTION) {
         oriBlockTableGm.SetGlobalBuffer((__gm__ int32_t*)oriBlockTable);
-        if constexpr (IS_DSPARK) {
-            oriSparseIndicesGm.SetGlobalBuffer((__gm__ int32_t*)oriSparseIndices);
-        }
         if constexpr (TEMPLATE_MODE == HCA_TEMPLATE) {
             cmpBlockTableGm.SetGlobalBuffer((__gm__ int32_t*)cmpBlockTable);
         }

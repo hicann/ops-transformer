@@ -43,6 +43,13 @@ inline constexpr int64_t SMLA_CMP_RATIO_UPPER_BOUND = 128;
 inline constexpr int64_t SMLA_NUM_HEADS_Q_LOWER_BOUND = 1;
 inline constexpr int64_t SMLA_NUM_HEADS_Q_UPPER_BOUND = 128;
 
+inline bool IsA2A3Smla(const char* socVersion)
+{
+    // GetSocLongVersion includes the chip SKU, such as Ascend910B3 or Ascend910_9391.
+    return socVersion != nullptr && (strncmp(socVersion, "Ascend910B", sizeof("Ascend910B") - 1) == 0 ||
+                                     strncmp(socVersion, "Ascend910_93", sizeof("Ascend910_93") - 1) == 0);
+}
+
 inline bool IsA5Smla(const char* socVersion)
 {
     return socVersion != nullptr && (strstr(socVersion, "Ascend950") != nullptr);
@@ -242,12 +249,12 @@ aclnnStatus CheckSingleParamSmla(int64_t batchSize, int64_t maxSeqlenQ, int64_t 
                     OP_LOGE_FOR_INVALID_VALUE(SMLA_ACLNN_OP_NAME, "ori_mask_mode", std::to_string(oriMaskMode), "0");
                     return ACLNN_ERR_PARAM_INVALID;
                 }
-                if (oriWinLeft < 0 || oriWinRight < 0) {
+                if (oriWinLeft < -1 || oriWinRight < -1) {
                     OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
                         SMLA_ACLNN_OP_NAME, "ori_win_left, ori_win_right",
                         std::to_string(oriWinLeft) + ", " + std::to_string(oriWinRight),
                         "When has_ori_kv is true and ori_topk is non-zero (DSpark), "
-                        "ori_win_left and ori_win_right must be non-negative");
+                        "ori_win_left and ori_win_right must be -1 or non-negative");
                     return ACLNN_ERR_PARAM_INVALID;
                 }
             } else {
@@ -345,6 +352,17 @@ aclnnStatus CheckSingleParamSmla(int64_t batchSize, int64_t maxSeqlenQ, int64_t 
             std::string(layoutQOptional) + ", " + std::string(layoutKvOptional),
             "When layout_kv is not PA_BBND, the values of layout_q, layout_kv must be the same");
         return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (IsA2A3Smla(socVersion) && hasOriKv && !hasCmpKv && oriTopk > 0) {
+        const bool isBsndPair = strcmp(layoutQOptional, "BSND") == 0 && strcmp(layoutKvOptional, "BSND") == 0;
+        const bool isTndPair = strcmp(layoutQOptional, "TND") == 0 &&
+                               (strcmp(layoutKvOptional, "TND") == 0 || strcmp(layoutKvOptional, "PA_BBND") == 0);
+        if (!isBsndPair && !isTndPair) {
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(SMLA_ACLNN_OP_NAME, "layout_q, layout_kv",
+                                                   std::string(layoutQOptional) + ", " + std::string(layoutKvOptional),
+                                                   "DSpark only supports BSND/BSND, TND/TND or TND/PA_BBND on A2/A3");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     // 校验 layout_q 为 BSND 时，max_seqlen_q 必须大于 0
     if (strcmp(layoutQOptional, "BSND") == 0 && maxSeqlenQ <= 0) {

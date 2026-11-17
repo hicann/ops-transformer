@@ -524,7 +524,7 @@ aclnnStatus aclnnSparseFlashMla(
   </table>
 
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: N1/N2 supports any integer in [1, 128]; for SWA, cmpKv is not passed in and cmpRatio does not participate in the computation; CSA supports passing in 1, 2, or 4, and HCA supports passing in 128; block_size must be a multiple of 16, with a maximum of 1024; the SWA sparse ori_kv scenario supports ori_sparse_indices and ori_topk_length, oriWinLeft and oriWinRight support non-negative values, and the last dimension K2 of cmp_sparse_indices currently supports any integer within [1, 8192].
+  - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: N1/N2 supports any integer in [1, 128]; for SWA, cmpKvOptional is not passed in and cmpRatio does not participate in the computation; CSA supports passing in 1, 2, or 4, and HCA supports passing in 128; block_size must be a multiple of 16, with a maximum of 1024; the SWA sparse oriKvOptional scenario supports oriSparseIndicesOptional and oriTopkLengthOptional, layoutQOptional and layoutKvOptional support the combinations "BSND"/"BSND", "TND"/"TND", and "TND"/"PA_BBND", oriWinLeft and oriWinRight each support -1 or a non-negative value, and the last dimension K2 of cmpSparseIndicesOptional currently supports any integer within [1, 8192].
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT products</term>: N1 supports 1-128, and N2 only supports 1.
@@ -576,7 +576,7 @@ aclnnStatus aclnnSparseFlashMla(
         <td>cmpRatio does not match the CSA or HCA use cases.</td>
       </tr>
       <tr>
-        <td>In the non-SWA sparse ori_kv use case, oriWinLeft is not equal to 127 or oriWinRight is not equal to 0; in the SWA sparse ori_kv use case, oriWinLeft or oriWinRight is negative.</td>
+        <td>In the non-SWA sparse ori_kv use case, oriWinLeft is not equal to 127 or oriWinRight is not equal to 0; in the SWA sparse ori_kv use case, oriWinLeft or oriWinRight is less than -1.</td>
       </tr>
       <tr>
         <td>The specifications of parameters related to layoutQOptional, layoutKvOptional, topkValueMode, cmpSparseIndicesOptional, metadataOptional, sinksOptional, cuSeqlens, or seqused are not within the supported range.</td>

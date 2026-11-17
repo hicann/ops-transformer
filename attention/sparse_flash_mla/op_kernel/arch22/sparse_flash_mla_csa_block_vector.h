@@ -365,6 +365,7 @@ __aicore__ inline void SMLAVectorBlock<SMLAT>::InitSoftmaxDefaultBuffer()
     CopySinksIn();
     Duplicate(softmaxMaxDefaultUb, SOFTMAX_MIN_NUM, SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T));
     Duplicate(softmaxSumDefaultUb, R0, SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T));
+    AscendC::PipeBarrier<PIPE_V>();
 }
 
 template <typename SMLAT>
@@ -972,7 +973,7 @@ __aicore__ inline void SMLAVectorBlock<SMLAT>::DealBmm2ResBaseBlock(const RunInf
 
             uint64_t accumGmOffset =
                 ((info.loop - 1) % constInfo.preLoadNum) * constInfo.bmm2ResUbSize + inOutBaseOffset;
-            DataCopy(bmm2ResPreUb, mm2ResGm[accumGmOffset], vec2ComputeSize);
+            DataCopy(bmm2ResPreUb, vec2ResGm[accumGmOffset], vec2ComputeSize);
 
             SetFlag<AscendC::HardEvent::MTE2_V>(SYNC_INPUT_BUF1_FLAG);
             WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_INPUT_BUF1_FLAG);
@@ -1002,14 +1003,15 @@ __aicore__ inline void SMLAVectorBlock<SMLAT>::DealBmm2ResBaseBlock(const RunInf
             RowDivs(bmm2ResUb, bmm2ResUb, tmpSumUb, dealRowCount, columnCount, actualColumnCount);
             PipeBarrier<PIPE_V>();
             Bmm2ResCopyOut(info, bmm2ResUb, mStart, dealRowCount, columnCount, actualColumnCount);
-        } else if (!info.isFirstSInnerLoop) {
+        } else {
             LocalTensor<T> outUb = outputBuff1.Get<T>();
             WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
+            AscendC::PipeBarrier<PIPE_V>();
             DataCopy(outUb, bmm2ResUb, dealRowCount * columnCount);
             SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
             WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
             uint64_t accumGmOffset = (info.loop % constInfo.preLoadNum) * constInfo.bmm2ResUbSize + inOutBaseOffset;
-            DataCopy(mm2ResGm[accumGmOffset], outUb, vec2ComputeSize);
+            DataCopy(vec2ResGm[accumGmOffset], outUb, vec2ComputeSize);
             SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
             WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
             SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);

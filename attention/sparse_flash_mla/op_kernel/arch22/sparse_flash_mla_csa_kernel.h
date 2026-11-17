@@ -643,7 +643,7 @@ __aicore__ inline void SparseFlashMlaCsa<SMLAT>::CalcParams(uint32_t loop, uint3
         info.isOriOnly = false;
         info.relativeS2Idx = info.s2Idx - tempLoopInfo.oriLoopTimes;
         uint64_t s2Offset = (info.s2Idx - tempLoopInfo.oriLoopTimes) * constInfo.s2BaseSize;
-        if (s2LoopIdx + 1 == tempLoopInfo.s2LoopTimes) {
+        if (s2LoopIdx + 1 == tempLoopInfo.oriLoopTimes + tempLoopInfo.cmpLoopTimes) {
             info.actualSingleProcessSInnerSize = tempLoopInfo.actCmpS2Size - s2Offset;
         } else {
             info.actualSingleProcessSInnerSize = constInfo.s2BaseSize;

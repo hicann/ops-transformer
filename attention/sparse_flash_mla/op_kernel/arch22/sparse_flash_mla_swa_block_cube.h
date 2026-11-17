@@ -373,7 +373,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo& info, cons
             uint32_t copyFinishRowCnt = 0;
 
             if (info.isOriOnly) {
-                if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
+                // DSpark TND 和 PA 都使用gathered KV.
+                if constexpr (IS_DSPARK || KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
                     uint64_t curS2Offset = static_cast<uint64_t>(info.s2Idx) * constInfo.s2BaseSize +
                                            info.s2StartPoint + nL1 * N_SPLIT_SIZE;
                     uint32_t copyFinishRowCnt = 0;
@@ -833,7 +834,8 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo& info, cons
 
                 uint32_t copyFinishRowCnt = 0;
                 if (info.isOriOnly) {
-                    if constexpr (KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
+                    // // DSpark TND 和 PA 都使用gathered KV.
+                    if constexpr (IS_DSPARK || KV_LAYOUT_T == SMLA_LAYOUT::PA_BBND) {
                         uint64_t curS2Offset = static_cast<uint64_t>(info.s2Idx) * constInfo.s2BaseSize +
                                                info.s2StartPoint + kL1 * K_L0_SPLIT_SIZE;
                         if constexpr (IS_DSPARK) {

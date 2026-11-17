@@ -1595,6 +1595,14 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaOriSparseIndices() const
                     std::to_string(opParamInfo_.oriSparseIndices.tensor->GetStorageShape().GetDim(0)) +
                     ") should be equal to B(" + std::to_string(bSize_) + ")"),
             return ge::GRAPH_FAILED);
+        if (npuArch_ == NpuArch::DAV_2201 && smlaInfo_.perfMode == SMLATemplateMode::SWA_TEMPLATE_MODE) {
+            const auto& sparseShape = opParamInfo_.oriSparseIndices.tensor->GetStorageShape();
+            OP_CHECK_IF(
+                sparseShape.GetDim(1) != s1Size_ || sparseShape.GetDim(2) != n2Size_,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "ori_sparse_indices", ToStringRaw(sparseShape),
+                                                      "DSpark BSND ori_sparse_indices must have shape [B, S1, N2, K]."),
+                return ge::GRAPH_FAILED);
+        }
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -2205,10 +2213,10 @@ ge::graphStatus SMLATilingCheck::CheckFeatureShape() const
                                                              std::string(A2_A3_PLATFORM_LOG.c_str()) + ", but got " +
                                                              std::to_string(*opParamInfo_.oriMaskMode) + "."),
                 return ge::GRAPH_FAILED);
-            OP_CHECK_IF(oriWinLeft_ < 0 || oriWinRight_ < 0,
+            OP_CHECK_IF(oriWinLeft_ < -1 || oriWinRight_ < -1,
                         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                             opName_, "ori_win_left",
-                            "ori_win_left/right should be non-negative for ori sparse SWA on " +
+                            "ori_win_left/right should be -1 or non-negative for ori sparse SWA on " +
                                 std::string(A2_A3_PLATFORM_LOG.c_str()) + "."),
                         return ge::GRAPH_FAILED);
         } else {
@@ -2245,6 +2253,17 @@ ge::graphStatus SMLATilingCheck::CheckFeatureLayout() const
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "layout_q", layoutQuery.c_str(),
                                                       "Layout_q only supports BSND or TND"),
                 return ge::GRAPH_FAILED);
+    if (npuArch_ == NpuArch::DAV_2201 && smlaInfo_.perfMode == SMLATemplateMode::SWA_TEMPLATE_MODE &&
+        hasOriSparseIndices_) {
+        const bool isBsndPair = qLayout_ == SMLALayout::BSND && kvLayout_ == SMLALayout::BSND;
+        const bool isTndPair =
+            qLayout_ == SMLALayout::TND && (kvLayout_ == SMLALayout::TND || kvLayout_ == SMLALayout::PA_BBND);
+        OP_CHECK_IF(
+            !isBsndPair && !isTndPair,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "layout_q, layout_kv", "DSpark only supports BSND/BSND, TND/TND or TND/PA_BBND on A2/A3."),
+            return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
