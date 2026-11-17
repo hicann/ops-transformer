@@ -58,6 +58,7 @@ else()
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
     ${ARCH35_CHECKER_SRC_FILES}
     qfa_tiling_info_parser.cpp
+    arch22/quant_flash_attn_tiling_int8.cpp
     )
     add_modules_sources_with_soc(
         OP_API_INDEPENDENT ON

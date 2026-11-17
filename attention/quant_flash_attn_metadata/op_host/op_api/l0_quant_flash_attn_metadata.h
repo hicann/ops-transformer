@@ -22,7 +22,8 @@ const aclTensor* QuantFlashAttnMetadata(const aclTensor* cuSeqlensQOptional, con
                                         const char* layoutQDescale, const char* layoutKv, const char* layoutOut,
                                         bool isGradEnabled, const char* socVersion, int64_t aicCoreNum,
                                         int64_t aivCoreNum, int64_t metadataDimNum, int64_t metadataRowSize,
-                                        const aclTensor* metaData, aclOpExecutor* executor);
+                                        int64_t scheduleL2Bytes, int64_t scheduleWorkspace, const aclTensor* metaData,
+                                        aclOpExecutor* executor);
 } // namespace l0op
 
 #endif

@@ -14,3 +14,10 @@ get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
 get_filename_component(OP_NAME ${PARENT_DIR} NAME)
 
 add_modules_sources(OPTYPE ${OP_NAME} ACLNNTYPE aclnn)
+
+# Metadata and attention use the same platform workspace/L2 scheduling rules.
+foreach(opapi_target cust_opapi op_host_aclnn)
+    if(TARGET ${opapi_target})
+        target_link_libraries(${opapi_target} PRIVATE tiling_api)
+    endif()
+endforeach()

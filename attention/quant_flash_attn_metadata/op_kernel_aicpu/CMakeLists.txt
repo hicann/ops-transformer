@@ -36,4 +36,5 @@ endif()
 
 if(UT_TEST_ALL OR OP_KERNEL_AICPU_UT)
     AddAicpuOpTestCase( ${OP_NAME})
+    add_subdirectory(../tests/ut/op_kernel_aicpu ${CMAKE_CURRENT_BINARY_DIR}/ut)
 endif()

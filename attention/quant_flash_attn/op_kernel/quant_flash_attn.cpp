@@ -15,11 +15,71 @@
 
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
+
+// The compiler encodes the Atlas A2/A3 architecture as __NPU_ARCH__ == 2201.
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 2201)
+
+/* --- arch22: full INT8 GQA with required Q/K/V/P scales --- */
+#include "lib/matmul_intf.h"
+#include <type_traits>
+#include "arch22/quant_flash_attn_template_tiling_key_arch22.h"
+#include "arch22/quant_flash_attn_kernel_int8.h"
+
+using namespace AscendC;
+
+template <uint8_t inOutLayoutType, uint16_t rawConfig, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
+          bool isFd, bool hasVTail>
+__global__ __aicore__ void quant_flash_attn(
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* dequantScaleQuery,
+    __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
+    __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ, __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
+    __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
+    __gm__ uint8_t* vTail, __gm__ uint8_t* blockTableTail, __gm__ uint8_t* sequsedVTail, __gm__ uint8_t* attnOut,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+{
+    using namespace BaseApi::Int8GqaTnd;
+    constexpr uint16_t config = rawConfig & QFA_INT8_CFG_PIPELINE_MASK;
+    constexpr bool WINDOWED = (rawConfig & QFA_INT8_CFG_WINDOW_FLAG) != 0U;
+    constexpr bool RETURN_LSE = (rawConfig & QFA_INT8_CFG_LSE_FLAG) != 0U;
+    REGISTER_TILING_DEFAULT(QuantFlashAttnTilingPayloadInt8);
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+    if constexpr (inOutLayoutType >= QFA_INT8_TPL_BNSD && inOutLayoutType <= QFA_INT8_TPL_BSND_OR_MIXED &&
+                  !hasAttenMask && KvLayoutType == QFA_INT8_TPL_KV_LAYOUT && !isFd && !hasVTail) {
+        constexpr auto path = inOutLayoutType == QFA_INT8_TPL_BNSD ? BaseApi::Int8GqaPath::BNSD :
+                              inOutLayoutType == QFA_INT8_TPL_TND  ? BaseApi::Int8GqaPath::TND :
+                                                                     BaseApi::Int8GqaPath::BSND;
+        if constexpr (quantMode == QFA_INT8_QUANT_MODE) {
+            constexpr bool packedD64 = config == QFA_INT8_CFG_D64_M512 && path == BaseApi::Int8GqaPath::TND;
+            constexpr bool d64Opt = config == QFA_INT8_CFG_D64_M512_TASK_MAP;
+            constexpr uint16_t pipeline = d64Opt ? QFA_INT8_CFG_D64_M512 : config;
+            constexpr bool longTnd = path == BaseApi::Int8GqaPath::TND &&
+                                     (pipeline == QFA_INT8_CFG_RESIDENT_Q || pipeline == QFA_INT8_CFG_D128_M512);
+            constexpr uint16_t features = d64Opt ? QFA_VEC_D64_TASK_MAP_FEATURES :
+                                          packedD64 || config == QFA_INT8_CFG_D96_M512_FIXPIPE ||
+                                                  config == QFA_INT8_CFG_D96_M256_CAUSAL_MHA ||
+                                                  (longTnd && pipeline == QFA_INT8_CFG_D128_M512) ?
+                                                   QFA_VEC_PREFILL_FEATURES :
+                                                   0U;
+            BaseApi::QuantFlashAttnKernelGqaInt8<
+                RETURN_LSE, path, pipeline, packedD64 || (d64Opt && path != BaseApi::Int8GqaPath::BNSD), features,
+                features != 0U || (longTnd && pipeline == QFA_INT8_CFG_RESIDENT_Q), d64Opt, longTnd,
+                longTnd && pipeline == QFA_INT8_CFG_RESIDENT_Q, WINDOWED>::Process(query, key, value, dequantScaleQuery,
+                                                                                   dequantScaleKey, dequantScaleValue,
+                                                                                   pScale, cuSeqLensQ, cuSeqLensKv,
+                                                                                   metadata, attnOut, softmaxLse,
+                                                                                   workspace, tiling);
+        }
+    }
+}
+
+#else // Existing architectures retain the upstream implementation.
+
 #include "util.h"
 #include "../../common/op_kernel/vector_common.h"
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 
 /* ===== 平台相关部分：按 arch 整体分流，两个分支的 include 互斥（见 arch 目录分工） ===== */
+// 9201 is the compiler architecture code for the arch92 kernel below.
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
 
 /* --- arch92 --- */
@@ -54,10 +114,11 @@ __aicore__ inline void quant_flash_attn_mxfp8_dn(
     // Prefill 按 M128 分核、每次计算 64 行，S1 模板固定为 64；FD block 仍按 128 行调度。
     constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(64);
     constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(ConfigValue[config].s2);
+    // Round D and Dv up to a 64-element template width (shift by log2(64)).
     constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(
-        (static_cast<std::underlying_type_t<inferDTemplateType>>(ConfigValue[config].d) + 63) >> 6 << 6);
+        (static_cast<std::underlying_type_t<inferDTemplateType> >(ConfigValue[config].d) + 63) >> 6 << 6);
     constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(
-        (static_cast<std::underlying_type_t<inferDTemplateType>>(ConfigValue[config].dv) + 63) >> 6 << 6);
+        (static_cast<std::underlying_type_t<inferDTemplateType> >(ConfigValue[config].dv) + 63) >> 6 << 6);
     constexpr bool isDAligned = ConfigValue[config].d != inferDTemplateType::NotAligned &&
                                 static_cast<int32_t>(ConfigValue[config].d) % 64 == 0;
 
@@ -121,10 +182,11 @@ __aicore__ inline void quant_flash_attn_mxfp8_nd(
 
     constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(ConfigValue[config].s1);
     constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(ConfigValue[config].s2);
+    // Round D and Dv up to a 64-element template width (shift by log2(64)).
     constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(
-        (static_cast<std::underlying_type_t<inferDTemplateType>>(ConfigValue[config].d) + 63) >> 6 << 6);
+        (static_cast<std::underlying_type_t<inferDTemplateType> >(ConfigValue[config].d) + 63) >> 6 << 6);
     constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(
-        (static_cast<std::underlying_type_t<inferDTemplateType>>(ConfigValue[config].dv) + 63) >> 6 << 6);
+        (static_cast<std::underlying_type_t<inferDTemplateType> >(ConfigValue[config].dv) + 63) >> 6 << 6);
     constexpr bool isDAligned = ConfigValue[config].d != inferDTemplateType::NotAligned &&
                                 static_cast<int32_t>(ConfigValue[config].d) % 64 == 0;
 
@@ -309,10 +371,11 @@ __aicore__ inline void quant_flash_attn_mxfp8(
 
     constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(ConfigValue[config].s1);
     constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(ConfigValue[config].s2);
+    // Round D and Dv up to a 64-element template width (shift by log2(64)).
     constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(
-        (static_cast<std::underlying_type_t<inferDTemplateType>>(ConfigValue[config].d) + 63) >> 6 << 6);
+        (static_cast<std::underlying_type_t<inferDTemplateType> >(ConfigValue[config].d) + 63) >> 6 << 6);
     constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(
-        (static_cast<std::underlying_type_t<inferDTemplateType>>(ConfigValue[config].dv) + 63) >> 6 << 6);
+        (static_cast<std::underlying_type_t<inferDTemplateType> >(ConfigValue[config].dv) + 63) >> 6 << 6);
     constexpr bool isDAligned = ConfigValue[config].d != inferDTemplateType::NotAligned &&
                                 static_cast<int32_t>(ConfigValue[config].d) % 64 == 0;
 
@@ -526,3 +589,5 @@ __global__ __aicore__ void quant_flash_attn(
 }
 
 #endif
+
+#endif // __NPU_ARCH__ == 2201

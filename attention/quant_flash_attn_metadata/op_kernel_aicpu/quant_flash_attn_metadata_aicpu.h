@@ -72,6 +72,8 @@ public:
 
 private:
     bool Prepare(CpuKernelContext& ctx);
+    int64_t scheduleL2Bytes_ = 0, scheduleWorkspace_ = 0;
+    bool GenInt8MetaData();
     bool BalanceSchedule(SectionStreamKResult& splitRes);
     bool GenMetaData(SectionStreamKResult& splitRes);
     void SetMetadataHead(const SectionStreamKResult& splitRes, optiling::detail::FaMetaData& faMetadata);

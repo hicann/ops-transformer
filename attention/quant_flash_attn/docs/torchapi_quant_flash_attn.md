@@ -10,13 +10,13 @@
 
 <!-- npu="A3" id2 -->
 
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：支持
 
 <!-- end id2 -->
 
 <!-- npu="910b" id3 -->
 
-- <term>Atlas A2系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：支持
 
 <!-- end id3 -->
 
@@ -42,10 +42,19 @@
 
 - **接口功能**：
 
-  `quant_flash_attn`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantFlashAttn`算子完成量化场景下的全量化注意力计算，训练推理归一化。当前支持三类量化场景：
+  `quant_flash_attn`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantFlashAttn`算子完成量化场景下的全量化注意力计算，训练推理归一化。
+
+  <!-- npu="950" id7 -->
+  <term>Ascend 950PR&950DT系列产品</term>当前支持三类量化场景：
+
   - HIF8场景：Q/K/V 均采用 HIFLOAT8 per-tensor 量化。
   - MxFP8场景：Q/K/V 均采用 MXFP8 量化。支持在Paged Attention的decode/prefill场景下，将最后不足64个token的V保留为BF16高精尾块，通过三个新增尾块参数传入。
   - FP8场景：Q/K 采用 FP8_E4M3 per-token-head 量化，V 采用 FP8_E4M3 per-head 量化。
+  <!-- end id7 -->
+
+  <!-- npu="A3,910b" id8 -->
+  <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>支持 INT8 全量化 MHA/GQA Prefill，输入 Q/K/V 为 INT8，输出为 BF16。
+  <!-- end id8 -->
 
   `quant_flash_attn_metadata`是`quant_flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AI Core/AIV Core的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
 
@@ -91,7 +100,9 @@
 
 ## 函数原型
 
+<!-- npu="950" id9 -->
 调用quant_flash_attn接口之前，请先调用前置接口quant_flash_attn_metadata，完成quant_flash_attn负载均衡的计算。
+<!-- end id9 -->
 
 ```python
 
@@ -162,11 +173,12 @@ cann_ops_transformer.quant_flash_attn(
 
 ### quant_mode 枚举
 
-| 枚举名                                                           |  值  | 含义      |
-| :------------------------------------------------------------ | :-: | :------ |
+| 枚举名 | 值 | 含义 |
+| :--- | :---: | :--- |
 | `A8C8_QKV_HIF8_PER_TENSOR_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32` |  0  | HIF8场景  |
 | `A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32`           |  1  | MxFP8场景 |
 | `A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32` |  6  | FP8场景  |
+| `A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16` | 12 | INT8场景 |
 
 ### mask_mode 枚举
 
@@ -198,6 +210,8 @@ cann_ops_transformer.quant_flash_attn(
 
 ## 参数说明
 
+下表列出各产品支持范围的并集，取值须满足对应产品和量化模式的约束。
+
 ### quant_flash_attn_metadata
 
 | 参数名                | 参数类型          | 可选/必选 | 描述                                                                                | 数据类型   | 数据格式 | 维度     | 非连续Tensor |
@@ -227,13 +241,13 @@ cann_ops_transformer.quant_flash_attn(
 
 | 参数名                  | 参数类型          | 可选/必选 | 描述                                                   | 数据类型                    | 数据格式 | 维度                                                                                                                 | 非连续Tensor |
 | :------------------- | :------------ | :---- | :--------------------------------------------------- | :---------------------- | :--- | :----------------------------------------------------------------------------------------------------------------- | :-------- |
-| q                    | Tensor        | 必选    | 公式中的Q                                                | float8_e4m3fn/hifloat8 | ND   | <ul><li>(Q_T, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(B, Q_S, Q_N, D)</li></ul>                                                                 | ×         |
-| k                    | Tensor        | 必选    | 公式中的K                                                | float8_e4m3fn/hifloat8 | ND   | <ul><li>(KV_T, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(B, KV_S, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li></ul>                   | √         |
-| v                    | Tensor        | 必选    | 公式中的V                                                | float8_e4m3fn/hifloat8 | ND   | <ul><li>(KV_T, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(B, KV_S, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li></ul>                   | √         |
-| q_descale           | Tensor        | 必选    | q的反量化scale                                           | float8_e8m0/float32    | ND   | <ul><li>(Q_T, Q_N, ⌈D/64⌉, 2)</li><li>(KV_N, Q_T, G, ⌈D/64⌉, 2)</li><li>(B, Q_N, Q_S, ⌈D/64⌉, 2)</li><li>(B, Q_S, Q_N, ⌈D/64⌉, 2)</li><li>(B, KV_N, Q_S, G, ⌈D/64⌉, 2)</li><li>(Q_N, Q_T)</li></ul>                     | ×         |
-| k_descale           | Tensor        | 必选    | k的反量化scale                                           | float8_e8m0/float32    | ND   | <ul><li>(KV_T, KV_N, ⌈D/64⌉, 2)</li><li>(B, KV_N, KV_S, ⌈D/64⌉, 2)</li><li>(B, KV_S, KV_N, ⌈D/64⌉, 2)</li><li>(Bn, KV_N, Bs, ⌈D/64⌉, 2)</li><li>(Bn, KV_N, Bs/16, ⌈D/64⌉, 16, 2)</li><li>(Bn, KV_N, Bs)</li></ul> | √         |
-| v_descale           | Tensor        | 必选    | v的反量化scale                                           | float8_e8m0/float32    | ND   | <ul><li>(KV_T/64, KV_N, D, 2)</li><li>(B, KV_N, KV_S/64, D, 2)</li><li>(B, KV_S/64, KV_N, D, 2)</li><li>(Bn, KV_N, Bs/64, D, 2)</li><li>(Bn, KV_N, D/16, Bs/64, 16, 2)</li><li>(KV_N,)</li></ul> | √         |
-| quant_mode          | int/QuantMode | 必选    | 量化模式，支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」           | int32                   | -    | -                                                                                                                  | -         |
+| q                    | Tensor        | 必选    | 公式中的Q                                                | int8/float8_e4m3fn/hifloat8 | ND   | <ul><li>(Q_T, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(B, Q_S, Q_N, D)</li><li>(Q_N, Q_T, D)</li></ul> | ×         |
+| k                    | Tensor        | 必选    | 公式中的K                                                | int8/float8_e4m3fn/hifloat8 | ND   | <ul><li>(KV_T, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(B, KV_S, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li><li>(Bn, Bs, KV_N, D)</li></ul> | √         |
+| v                    | Tensor        | 必选    | 公式中的V                                                | int8/float8_e4m3fn/hifloat8 | ND   | <ul><li>(KV_T, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(B, KV_S, KV_N, D)</li><li>(Bn, KV_N, Bs, D)</li><li>(Bn, KV_N, D/32, Bs, 32)</li><li>(Bn, Bs, KV_N, D)</li></ul> | √         |
+| q_descale           | Tensor        | 必选    | q的反量化scale                                           | float8_e8m0/float32    | ND   | <ul><li>(Q_T, Q_N, ⌈D/64⌉, 2)</li><li>(KV_N, Q_T, G, ⌈D/64⌉, 2)</li><li>(B, Q_N, Q_S, ⌈D/64⌉, 2)</li><li>(B, Q_S, Q_N, ⌈D/64⌉, 2)</li><li>(B, KV_N, Q_S, G, ⌈D/64⌉, 2)</li><li>(Q_N, Q_T)</li><li>(1,)</li><li>(Q_T, Q_N)</li><li>(B, Q_N, Q_S)</li><li>(B, Q_S, Q_N)</li></ul> | ×         |
+| k_descale           | Tensor        | 必选    | k的反量化scale                                           | float8_e8m0/float32    | ND   | <ul><li>(KV_T, KV_N, ⌈D/64⌉, 2)</li><li>(B, KV_N, KV_S, ⌈D/64⌉, 2)</li><li>(B, KV_S, KV_N, ⌈D/64⌉, 2)</li><li>(Bn, KV_N, Bs, ⌈D/64⌉, 2)</li><li>(Bn, KV_N, Bs/16, ⌈D/64⌉, 16, 2)</li><li>(Bn, KV_N, Bs)</li><li>(1,)</li><li>(KV_T, KV_N)</li><li>(B, KV_N, KV_S)</li><li>(B, KV_S, KV_N)</li><li>(Bn, Bs, KV_N, ⌈D/64⌉, 2)</li></ul> | √         |
+| v_descale           | Tensor        | 必选    | v的反量化scale                                           | float8_e8m0/float32    | ND   | <ul><li>(KV_T/64, KV_N, D, 2)</li><li>(B, KV_N, KV_S/64, D, 2)</li><li>(B, KV_S/64, KV_N, D, 2)</li><li>(Bn, KV_N, Bs/64, D, 2)</li><li>(Bn, KV_N, D/16, Bs/64, 16, 2)</li><li>(KV_N,)</li><li>(1,)</li><li>(Bn, Bs/64, KV_N, D, 2)</li></ul> | √         |
+| quant_mode          | int/QuantMode | 必选    | 量化模式，取值为 0、1、6 或 12 | int32                   | -    | -                                                                                                                  | -         |
 | block_table         | Tensor        | 可选    | 用于分块注意力计算中的块索引映射                                     | int32                   | ND   | (B, Bn)                                                                                                            | ×         |
 | cu_seqlens_q       | Tensor        | 可选    | Q的累积序列长度，用于处理变长序列，第一个元素必须为0                          | int32                   | ND   | (B+1,)                                                                                                             | ×         |
 | cu_seqlens_kv      | Tensor        | 可选    | KV的累积序列长度，用于处理变长序列，第一个元素必须为0                         | int32                   | ND   | (B+1,)                                                                                                             | ×         |
@@ -242,7 +256,7 @@ cann_ops_transformer.quant_flash_attn(
 | p_scale             | Tensor        | 可选    | P的量化参数                                               | float32                 | ND   | (1,)                                                                                                               | ×         |
 | sinks                | Tensor        | 可选    | sink场景下的输入tensor。当前版本不支持，传None即可 | float32                 | ND   | (Q_N,)                                                                                                            | ×         |
 | attn_mask           | Tensor        | 可选    | 掩码矩阵                                                 | int8                    | ND   | (2048, 2048)                                                                                                       | ×         |
-| metadata             | Tensor        | 可选    | `quant_flash_attn_metadata`生成的任务切分结果，传入后可优化调度        | int32                   | ND   | (2, max_schedule_size)                                                                                             | ×         |
+| metadata             | Tensor        | 可选    | `quant_flash_attn_metadata`生成的任务切分结果，传入后可优化调度        | int32                   | ND   | (metadata_size,) 或 (2, max_schedule_size) | ×         |
 | v_tail               | Tensor        | 可选    | BF16高精V尾块；默认None，启用时与另外两个尾块参数一起传入                    | bfloat16                | ND   | 见「V高精尾块参数组」                                                                                                        | 见下文       |
 | block_table_tail     | Tensor        | 可选    | 高精尾块独立块表，索引v_tail的第0维；默认None                         | int32                   | ND   | (B, Bt)                                                                                                            | ×         |
 | seqused_v_tail       | Tensor        | 可选    | 每个batch的有效V尾块长度；默认None                               | int32                   | ND   | (B,)                                                                                                               | ×         |
@@ -258,29 +272,34 @@ cann_ops_transformer.quant_flash_attn(
 | layout_out          | string        | 可选    | 定义输出张量的布局格式                                          | string                  | -    | -                                                                                                                  | -         |
 | return_softmax_lse | bool          | 可选    | 是否需要获取softmax的LSE结果                                  | BOOL                    | -    | -                                                                                                                  | -         |
 
-> [!NOTE]
->
-> k/v/k_descale/v_descale仅在Paged Attention场景下支持非连续Tensor，非连续时支持的轴约束见<a href="#Paged Attention参数组">Paged Attention参数组</a>特性交叉校验。<br>注：非连续Tensor每一维的stride均不能为0。
-
 ## 返回值说明
 
 ### quant_flash_attn_metadata
 
 | 参数名      | 参数类型   | 可选/必选 | 描述                        | 数据类型  | 数据格式 | 维度                       | 非连续Tensor |
 | :------- | :----- | :---- | :------------------------ | :---- | :--- | :----------------------- | :-------- |
-| metadata | Tensor | 必选    | quant_flash_attn的任务切分数据 | int32 | ND   | (2, max_schedule_size) | ×         |
+| metadata | Tensor | 必选    | quant_flash_attn的任务切分数据 | int32 | ND   | (metadata_size,) 或 (2, max_schedule_size) | ×         |
 
 ### quant_flash_attn
 
 | 参数名          | 参数类型   | 可选/必选 | 描述                                                                                                           | 数据类型     | 数据格式 | 维度              | 非连续Tensor |
 | :----------- | :----- | :---- | :----------------------------------------------------------------------------------------------------------- | :------- | :--- | :-------------- | :-------- |
 | attn_out    | Tensor | 必选    | quant_flash_attn的计算输出                                                                                     | bfloat16 | ND   | <ul><li>(Q_T, Q_N, D)（TND）</li><li>(B, Q_S, Q_N, D)（BSND）</li><li>(B, Q_N, Q_S, D)（BNSD）</li></ul> | ×         |
-| softmax_lse | Tensor | 可选    | softmax的LSE结果。`return_softmax_lse`为True时，输出shape随layout_q变化的Tensor；`return_softmax_lse`为False时，则输出空Tensor | float32  | ND   | <ul><li>(Q_N, Q_T)（TND）</li><li>(B, Q_N, Q_S)（BSND）</li><li>(B, Q_N, Q_S)（BNSD）</li></ul> | ×         |
+| softmax_lse | Tensor | 可选    | softmax的LSE结果。`return_softmax_lse`为True时，输出shape随layout_q变化的Tensor；`return_softmax_lse`为False时，则输出空Tensor | float32  | ND   | <ul><li>(Q_N, Q_T)（TND/NTD）</li><li>(B, Q_N, Q_S)（BSND）</li><li>(B, Q_N, Q_S)（BNSD）</li></ul> | ×         |
 
 ## 约束说明
 
+<!-- npu="950" id17 -->
+**<term>Ascend 950PR&950DT系列产品</term>**
+
 - 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、block_table、block_table_tail、seqused_v_tail及attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - quant_flash_attn_metadata和quant_flash_attn的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+
+> [!NOTE]
+>
+> k/v/k_descale/v_descale仅在Paged Attention场景下支持非连续Tensor，非连续时支持的轴约束见<a href="#Paged Attention参数组">Paged Attention参数组</a>特性交叉校验。<br>注：非连续Tensor每一维的stride均不能为0。
+
+<!-- end id17 -->
 
 ### 版本配套要求
 
@@ -292,6 +311,7 @@ cann_ops_transformer.quant_flash_attn(
 >
 > 仅更新custom包或Torch扩展会造成底层调用参数错位，可能导致段错误。三个尾块参数均传`None`仍会占用参数位置，不能替代版本配套更新。
 
+<!-- npu="950" id21 -->
 ### 特性参数组
 
 |        特性参数组       |        参数字段名称        |       字段分组       |  字段类型  |
@@ -1417,8 +1437,25 @@ mask_mode参数解释：
         </tr>
     </tbody>
 </table>
+<!-- end id21 -->
+
+<!-- npu="A3,910b" id18 -->
+### Atlas A2/A3 INT8 约束
+
+- 仅支持无 KV cache 的 INT8 全量化 MHA/GQA Prefill。`quant_mode` 传整数 `12` 或枚举 `QuantMode.A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16`。
+- Q、K、V 为连续的 INT8 Tensor，输出为 BF16。`q_descale`、`k_descale`、`v_descale` 和 `p_scale` 必传，均为与 Q、K、V 位于同一 NPU 的连续 FP32 Tensor。Q、K 的反量化系数按 token 和 head 提供，形状为对应输入去掉 D 轴；V 的反量化系数按 head 提供，形状为 `(KV_N,)`，各 batch 共用；Softmax 权重的静态量化系数 `p_scale` 形状为 `(1,)`。
+- Q、K、V 的 D 相同，取值为 1～256，`Q_N` 必须能被 `KV_N` 整除。
+- `layout_q`、`layout_kv` 和 `layout_out` 仅支持 BNSD、BSND、TND。`layout_q_descale` 设为 `layout_q`。BNSD 和 BSND 可混用，Q 和 KV 的 batch 大小须一致，`cu_seqlens_q` 和 `cu_seqlens_kv` 均省略。生成 metadata 时须传 `batch_size` 和正数的 `max_seqlen_q`、`max_seqlen_kv`。
+- TND 要求 Q、KV 和输出均为 TND。须传形状为 `(B+1,)` 的连续 INT32 累积序列长度 `cu_seqlens_q`、`cu_seqlens_kv`，从 0 开始、非递减，末元素等于对应的总 token 数。允许部分 batch 的 Q 长度为 0。非空 Q 序列须有非空 KV 序列。生成 metadata 时省略 `batch_size`。传入的 `max_seqlen_q`、`max_seqlen_kv` 须覆盖对应的实际最大长度。
+- `win_left` 和 `win_right` 设置相对右下对齐位置的窗口距离，`-1` 表示该侧无界，非负值最大为 `INT32_MAX`。窗口和 mask 的可见范围取交集。完全被遮蔽的行输出 0，LSE 为 `-inf`。
+- `metadata` 可省略。传入时须使用 `quant_flash_attn_metadata` 生成的连续一维 INT32 Tensor，调用方须保证生成时使用的布局、序列长度、头数、D、mask 和窗口参数与主算子一致。`is_grad_enabled` 为 `False`，`head_dim_v` 为 `None` 或 D。ACLGraph 回放时若更新了累积长度，须使用更新后的长度生成 metadata。
+- `softmax_scale` 须为有限正数。`block_table`、`seqused_q`、`seqused_kv`、`sinks`、`attn_mask`、`v_tail`、`block_table_tail`、`seqused_v_tail` 均传 `None`。
+<!-- end id18 -->
 
 ## 调用示例
+
+<!-- npu="950" id19 -->
+### Ascend 950 示例
 
 - quant_flash_attn_metadata + quant_flash_attn联合调用示例（TND，非PA场景）
 
@@ -1701,3 +1738,38 @@ mask_mode参数解释：
   assert attn_out.dtype == out_dtype
   assert torch.isfinite(attn_out.float()).all().item()
   ```
+<!-- end id19 -->
+
+<!-- npu="A3,910b" id20 -->
+### Atlas A2/A3 INT8 Prefill 示例（TND）
+
+```python
+import torch
+import torch_npu
+from cann_ops_transformer.ops import quant_flash_attn, quant_flash_attn_metadata
+
+torch.npu.set_device(0)
+q_heads, kv_heads, head_dim = 4, 2, 64
+length = 128
+cu = torch.tensor([0, length], device="npu", dtype=torch.int32)
+q = torch.randint(-127, 128, (length, q_heads, head_dim), device="npu", dtype=torch.int8)
+k = torch.randint(-127, 128, (length, kv_heads, head_dim), device="npu", dtype=torch.int8)
+v = torch.randint(-127, 128, (length, kv_heads, head_dim), device="npu", dtype=torch.int8)
+q_descale = torch.full((length, q_heads), 0.01, device="npu", dtype=torch.float32)
+k_descale = torch.full((length, kv_heads), 0.01, device="npu", dtype=torch.float32)
+v_descale = torch.full((kv_heads,), 0.01, device="npu", dtype=torch.float32)
+p_scale = torch.tensor([127.0], device="npu", dtype=torch.float32)
+options = dict(
+    quant_mode=quant_flash_attn.QuantMode.A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16,
+    mask_mode=3,
+    layout_q="TND", layout_kv="TND", layout_out="TND", layout_q_descale="TND",
+    cu_seqlens_q=cu, cu_seqlens_kv=cu,
+    max_seqlen_q=length, max_seqlen_kv=length,
+)
+metadata = quant_flash_attn_metadata(q_heads, kv_heads, head_dim, **options)
+attn_out, softmax_lse = quant_flash_attn(
+    q, k, v, q_descale, k_descale, v_descale,
+    p_scale=p_scale, metadata=metadata, softmax_scale=head_dim ** -0.5, **options,
+)
+```
+<!-- end id20 -->
