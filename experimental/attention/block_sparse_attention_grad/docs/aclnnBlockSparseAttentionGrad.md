@@ -73,7 +73,7 @@
   dK=(dS^T*Q)*scale
   $$
 
-BlockSparseAttentionGrad输入dout、query、key、value, attentionOut的数据排布格式支持从多种维度排布解读，可通过qInputLayout和kvInputLayout传入。为了方便理解后续支持的具体排布格式（如 BNSD、TND 等），此处先对排布格式中各缩写字母所代表的维度含义进行统一说明：
+BlockSparseAttentionGrad输入dout、query、key、value、attentionOut的数据排布格式支持从多种维度排布解读，可通过qInputLayout和kvInputLayout传入。为了方便理解后续支持的具体排布格式（如 BNSD、TND 等），此处先对排布格式中各缩写字母所代表的维度含义进行统一说明：
 
 * B：表示输入样本批量大小（Batch）
 * T：B和S合轴紧密排列的长度（Total tokens）

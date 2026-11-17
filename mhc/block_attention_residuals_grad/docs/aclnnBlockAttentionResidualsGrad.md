@@ -250,7 +250,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
           <tr>
               <td>workspaceSize（uint64_t*）</td>
               <td>输出</td>
-              <td>返回需要在Device侧申请的workspace大小</td>
+              <td>返回需要在Device侧申请的workspace大小。</td>
               <td>-</td>
               <td>-</td>
               <td>-</td>

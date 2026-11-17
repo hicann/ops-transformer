@@ -430,16 +430,16 @@ aclnnStatus aclnnPromptFlashAttentionV2(
 
 - 入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空tensor（即S2为0），则attentionOut填充为全零。attentionOut为空Tensor时，AscendCLNN框架会处理。其余在上述参数说明中标注了“可传入nullptr”的入参为空指针时，不进行处理。
 
-- query，key，value输入，功能使用限制如下：
+- query、key、value输入，功能使用限制如下：
 
   <!-- npu="910b" id6 -->
   - <term>Atlas A2系列产品</term>：
 
-    - 支持B轴小于等于65536（64k），输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128；
+    - 支持B轴小于等于65536（64k），输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128。
 
     - 支持N轴小于等于256；
 
-    - S支持小于等于20971520（20M）。部分长序列场景下，如果计算量过大可能会导致pfa算子执行超时（aicore error类型报错，errorStr为:timeout or trap error），此场景下建议做S切分处理，注：这里计算量会受B、S、N、D等的影响，值越大计算量越大。典型的会超时的长序列（即B、S、N、D的乘积较大）场景包括但不限于：
+    - 支持S轴小于等于20971520（20M）。部分长序列场景下，如果计算量过大可能会导致pfa算子执行超时（aicore error类型报错，errorStr为:timeout or trap error），此场景下建议做S切分处理，注：这里计算量会受B、S、N、D等的影响，值越大计算量越大。典型的会超时的长序列（即B、S、N、D的乘积较大）场景包括但不限于：
         <table style="undefined;table-layout: fixed; width: 600px"><colgroup>
             <col style="width: 100px">
             <col style="width: 100px">
@@ -496,9 +496,9 @@ aclnnStatus aclnnPromptFlashAttentionV2(
 
   <!-- npu="310p" id31 -->
   - <term>Atlas推理系列产品</term>：
-      - 在inputLayout为BSH时，支持B轴小于等于300，其余情况B轴小于等于128；
-      - 支持N轴小于等于256；
-      - 支持S轴小于等于65535(64k), Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置atten_mask；
+      - 在inputLayout为BSH时，支持B轴小于等于300，其余情况B轴小于等于128。
+      - 支持N轴小于等于256。
+      - 支持S轴小于等于65535（64k），Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置atten_mask。
       - 支持D轴小于等于512。
   <!-- end id31 -->
 
@@ -537,7 +537,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     <!-- end id21 -->
   - 当attenMask数据类型取INT8、UINT8时，其tensor中的值需要为0或1。
 
-- actualSeqLengths，actualSeqLengthsKv输入，功能使用限制如下：
+- actualSeqLengths、actualSeqLengthsKv输入，功能使用限制如下：
 
   - 输入值域限制：
     - 对于actualSeqLengths，如果不指定序列长度，可以传入nullptr，这表示有效序列长度与query的shape中的S长度相同。需要注意的是，该参数中每个batch的有效序列长度不应超过query中对应batch的序列长度。
@@ -552,7 +552,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas推理系列产品</term>：数据类型支持INT64。
     <!-- end id22 -->
 
-- deqScale1，deqScale2输入，功能使用限制如下：
+- deqScale1、deqScale2输入，功能使用限制如下：
 
   - 输入数据类型限制：
 
@@ -574,7 +574,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas推理系列产品</term>：仅支持nullptr。
     <!-- end id24 -->
 
-- quantScale2，quantOffset2输入，功能使用限制如下：
+- quantScale2、quantOffset2输入，功能使用限制如下：
 
   - 输入数据类型限制：
 
@@ -651,15 +651,15 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas推理系列产品</term>：仅支持FLOAT16。
     <!-- end id30 -->
 
-- 其它约束：
+- 其他约束：
   - int8量化相关入参数量与输入、输出数据格式的综合限制：
     - 输入为INT8，输出为INT8的场景：入参deqScale1、quantScale1、deqScale2、quantScale2需要同时存在，quantOffset2可选，不传时默认为0。
     - 输入为INT8，输出为FLOAT16的场景：入参deqScale1、quantScale1、deqScale2需要同时存在，若存在入参quantOffset2或quantScale2（即不为nullptr），则报错并返回。
     - 输入为FLOAT16或BFLOAT16，输出为INT8的场景：入参quantScale2需存在，quantOffset2可选，不传时默认为0，若存在入参deqScale1或quantScale1或deqScale2（即不为nullptr），则报错并返回。
-    - 入参quantScale2和quantOffset2支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型。若传入quantOffset2 ，需保证其类型和shape信息与quantScale2一致。当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16 ，否则仅支持FLOAT32 。per-channel格式，当输出layout为BSH时，要求quantScale2所有维度的乘积等于H；其他layout要求乘积等于N*D。（建议输出layout为BSH时，quantScale2 shape传入[1,1,H]或[H]；输出为BNSD时，建议传入[1,N,1,D]或[N,D]；输出为BSND时，建议传入[1,1,N,D]或[N,D]）
+    - 入参quantScale2和quantOffset2支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型。若传入quantOffset2，需保证其类型和shape信息与quantScale2一致。当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16，否则仅支持FLOAT32。per-channel格式，当输出layout为BSH时，要求quantScale2所有维度的乘积等于H；其他layout要求乘积等于N*D。（建议输出layout为BSH时，quantScale2 shape传入[1,1,H]或[H]；输出为BNSD时，建议传入[1,N,1,D]或[N,D]；输出为BSND时，建议传入[1,1,N,D]或[N,D]）
     - 输出为int8，quantScale2和quantOffset2为per-channel时，暂不支持左padding、Ring Attention或者D非32Byte对齐的场景。
     - 输出为int8时，暂不支持sparse为band且preTokens/nextTokens为负数。
-  - 当输出为INT8，入参quantOffset2传入非空指针和非空tensor值，并且sparseMode、preTokens和nextTokens满足以下条件，矩阵会存在某几行不参与计算的情况，导致计算结果误差，该场景会拦截（解决方案：如果希望该场景不被拦截，需要在PFA接口外部做后量化操作，不在PFA接口内部开启）:
+  - 当输出为INT8，入参quantOffset2传入非空指针和非空tensor值，并且sparseMode、preTokens和nextTokens满足以下条件，矩阵会存在某几行不参与计算的情况，导致计算结果误差，该场景会拦截（解决方案：如果希望该场景不被拦截，需要在PFA接口外部做后量化操作，不在PFA接口内部开启）：
     - sparseMode = 0，attenMask如果非空指针，每个batch actualSeqLengths - actualSeqLengthsKV - preTokens > 0或nextTokens < 0时，满足拦截条件。
     - sparseMode = 1或2，不会出现满足拦截条件的情况。
     - sparseMode = 3，每个batch actualSeqLengthsKV - actualSeqLengths < 0，满足拦截条件。

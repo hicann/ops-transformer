@@ -574,7 +574,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
     <tr>
         <td>learnableSinkOptional</td>
         <td>可选输入</td>
-        <td>表示通过可学习的"Sink Token"起到吸收Attention Score的作用。</td>
+        <td>表示通过可学习的“Sink Token”起到吸收Attention Score的作用。</td>
         <td>
         <ul>
             <li>仅支持非量化场景。</li>
@@ -648,7 +648,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>表示key/value的head个数</td>
         <td>
         <ul>
-            <li>需要满足numKeyValueHeads整除numHeads，即numHeads % numKeyValueHeads == 0。GQA非量化场景和Prefill MLA场景下，numHeads与numKeyValueHeads的比值无限制; Decode MLA场景下，非量化场景numHeads与numKeyValueHeads的比值无限制，全量化场景仅支持numHeads与numKeyValueHeads的比值为1、2、4、8、16、32、64、128。</li>
+            <li>需要满足numKeyValueHeads整除numHeads，即numHeads % numKeyValueHeads == 0。GQA非量化场景和Prefill MLA场景下，numHeads与numKeyValueHeads的比值无限制；Decode MLA场景下，非量化场景numHeads与numKeyValueHeads的比值无限制，全量化场景仅支持numHeads与numKeyValueHeads的比值为1、2、4、8、16、32、64、128。</li>
             <li>在BSND、TND、BNSD、NTD、BSND_BNSD、BNSD_BSND、NTD_TND场景下，还需要与shape中的key/value的N轴shape值相同，否则执行异常。</li>
         </ul>
         </td>
@@ -700,7 +700,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>key/value伪量化的模式</td>
         <td>
         <ul>
-            <li>quantMode见<a href="#AntiQuant">伪量化参数</a>。 </li>
+            <li>quantMode见<a href="#AntiQuant">伪量化参数</a>。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
         </td>
@@ -780,7 +780,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>softmaxLse</td>
         <td>输出</td>
         <td>
-        RingAttention算法对query乘key的结果，先取max得到softmax_max。query乘key的结果减去softmax_max,再取exp，接着求sum，得到softmax_sum。最后对softmax_sum取log，再加上softmax_max得到的结果。</td>
+        RingAttention算法对query乘key的结果，先取max得到softmax_max。query乘key的结果减去softmax_max，再取exp，接着求sum，得到softmax_sum。最后对softmax_sum取log，再加上softmax_max得到的结果。</td>
         <td>
         <ul>
             <li>softmaxLseFlag为True时，数据为inf的代表无效数据。</li>
@@ -789,7 +789,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         </td>
         <td>FLOAT32</td>
         <td>ND</td>
-        <td>一般情况下，shape必须为[B,N,Q_S,1],当inputLayout为TND/NTD_TND时,shape必须为[T,N,1]。</td>
+        <td>一般情况下，shape必须为[B,N,Q_S,1]，当inputLayout为TND/NTD_TND时，shape必须为[T,N,1]。</td>
         <td>-</td>
     </tr>
     <tr>
@@ -845,7 +845,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
                 <td>361001</td>
-                <td>API内部调用npu runtime的接口异常。</td>
+                <td>API内部调用NPU runtime的接口异常。</td>
             </tr>
         </tbody>
     </table>
@@ -1007,7 +1007,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
             <td rowspan="2">PagedAttention</td>
             <td>blockSize</td>
             <td>在开启PagedAttention场景下，blockSize需要传入非0值。在非量化场景下有以下约束：<br>
-            Decode MLA/Prefill MLA场景：blockSize 16对齐，最大支持1024;<br>
+            Decode MLA/Prefill MLA场景：blockSize 16对齐，最大支持1024；<br>
             GQA场景：QueryHeadDim/KeyHeadDim/ValueHeadDim均为64或128时，blockSize 16对齐，最大支持1024；<br>
             其他情况下，若Q_S> 1，blockSize 128对齐，最大支持1024，若Q_S= 1，blockSize 16对齐，最大支持512。</td>
             <td>blockSize是用户自定义的参数，该参数的取值会影响PagedAttention的性能，通常情况下，PagedAttention可以提高吞吐量，但会带来性能上的下降。</td>
@@ -1307,7 +1307,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             </tr>
             <tr>
                 <td>quantScale2</td>
-                <td>支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型
+                <td>支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型：
                     <ul>
                     <li>当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16，否则仅支持FLOAT32。</li>
                     <li>per-channel格式：当layout为BSH、BSND、BNSD、BNSD_BSND时，要求quantScale2
@@ -1318,7 +1318,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             </tr>
             <tr>
                 <td>quantOffset2</td>
-                <td>可选参数，若传入quantOffset2 ，需保证其类型和shape信息与quantScale2一致。不传时默认为nullptr,表示为0。
+                <td>可选参数，若传入quantOffset2 ，需保证其类型和shape信息与quantScale2一致。不传时默认为nullptr，表示为0。
                 </td>
             </tr>
             <tr>
@@ -1410,7 +1410,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                         <ul>
                         <li>shape需要保持一致；</li>
                         <li>要求query的s小于等于16</li>
-                        <li>要求query的数据类型为BFLOAT16,key、value的数据类型为INT8，输出的数据类型为BFLOAT16</li>
+                        <li>要求query的数据类型为BFLOAT16，key、value的数据类型为INT8，输出的数据类型为BFLOAT16</li>
                         <li>不支持tensorlist、左padding、PagedAttention特性</li>
                     </ul>
                 </td>
@@ -1526,7 +1526,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         <td rowspan="7">当query的d等于512时</td>
         <td rowspan="3">通用场景</td>
         <td>inputLayout</td>
-        <td>支持TND、TND_NTD;</td>
+        <td>支持TND、TND_NTD；</td>
     </tr>
     <tr>
         <td>numKeyValueHeads</td>
@@ -1686,7 +1686,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         <tr>
             <td>MASK</td>
             <td>sparseMode</td>
-            <td>sparseMode支持0, 3, 4, 9</td>
+            <td>sparseMode支持0、3、4、9</td>
             <td>-</td>
         </tr>
         <tr>
@@ -1722,7 +1722,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         </tr>
         <tr>
             <td>dequantScaleQueryOptional</td>
-            <td>FLOAT32;需与keyAntiquantScaleOptional, valueAntiquantScaleOptional同时存在</td>
+            <td>FLOAT32；需与keyAntiquantScaleOptional、valueAntiquantScaleOptional同时存在</td>
             <td>无D维度，其余维度需要与入参query的shape保持一致</td>
         </tr>
         <tr>
@@ -1737,8 +1737,8 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         </tr>
         <tr>
             <td>sparseMode</td>
-            <td>全量化场景sparseMode仅支持0,3,9</td>
-            <td>qs=1时，仅支持sparseMode=0，且attenMask为nullptr; qs>1时，支持sparseMode=3（attenMask的shape为[2048,2048]）或sparseMode=9（attenMask的shape见Mask章节）</td>
+            <td>全量化场景sparseMode仅支持0、3、9</td>
+            <td>qs=1时，仅支持sparseMode=0，且attenMask为nullptr；qs>1时，支持sparseMode=3（attenMask的shape为[2048,2048]）或sparseMode=9（attenMask的shape见Mask章节）</td>
         </tr>
         <tr>
             <td>blockSize</td>
@@ -1851,7 +1851,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
     </tr>
     <tr>
         <td colspan="2">Mask</td>
-        <td colspan="3">当MTP等于0时，支持sparseMode=0且attenMask为nullptr；当MTP大于0、小于16时，支持sparseMode=3（传入优化后的attenMask矩阵，shape为2048*2048）或sparseMode=9（传入tree mask，inputLayout为BSH/BSND时shape为(B,Q_S,Q_S)，inputLayout为TND时shape为(∑Q_Si²,)）；</td>
+        <td colspan="3">当MTP等于0时，支持sparseMode=0且attenMask为nullptr；当MTP大于0、小于16时，支持sparseMode=3（传入优化后的attenMask矩阵，shape为2048*2048）或sparseMode=9（传入tree mask，inputLayout为BSH/BSND时shape为(B,Q_S,Q_S)，inputLayout为TND时shape为(∑Q_Si²,)。</td>
     </tr>
     <tr>
         <td rowspan="9">伪量化</td>
@@ -2014,7 +2014,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                 <ul>
                     <li>PagedAttention伪量化场景：支持query为FLOAT16/BFLOAT16，支持key、value为INT8。</li>
                     <li>PagedAttention全量化场景：不支持query dtype为INT8。</li>
-                <li>传入Mask时，并且sparseMode不为2，3，4时，Mask的最后一维需要大于等于maxBlockNumPerSeq * blockSize</li>
+                <li>传入Mask时，并且sparseMode不为2、3、4时，Mask的最后一维需要大于等于maxBlockNumPerSeq * blockSize</li>
                 <li>传入pseShift时，pseShift的最后一维需要大于等于maxBlockNumPerSeq * blockSize</li>
                 </ul>
                 </td>
@@ -2086,7 +2086,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                 <li>query、key、value输入类型均为INT8的场景暂不支持。</li>
                 <li>在INT4(INT32)伪量化场景下，aclnn单算子调用支持KV INT4输入或者INT4拼接成INT32输入（建议通过dynamicQuant生成INT4格式的数据，因为dynamicQuant就是一个INT32包括8个INT4）。</li>
                 <li>在INT4(INT32)伪量化场景下，若KV INT4拼接成INT32输入，那么KV的N、D或者H是实际值的八分之一（prefix同理）。</li>
-                <li>key、value在特定数据类型下存在对于D轴的限制
+                <li>key、value在特定数据类型下存在对于D轴的限制：
                     <ul>
                     <li>key、value输入类型为INT4(INT32)时，D轴需要64对齐（INT32仅支持D 8对齐）。</li>
                     </ul>
@@ -2129,7 +2129,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                 <td>blockTable</td>
                 <td>
                 <ul>
-                    <li>开启Attention Mask，当sparseMode不为2,3,4时，传入Mask的最后一维需要大于等于blockTable的第二维 * blockSize。</li>
+                    <li>开启Attention Mask，当sparseMode不为2、3、4时，传入Mask的最后一维需要大于等于blockTable的第二维 * blockSize。</li>
                     <li>开启pseShift，传入pseShift的最后一维需要大于等于blockTable的第二维 * blockSize。</li>
                     <li>开启伪量化per-token模式：输入参数antiquantScale和antiquantOffset的最后一维需要大于等于blockTable的第二维 * blockSize。</li>
                     <li>开启per-token叠加per-head模式：输入参数antiquantScale和antiquantOffset的最后一维需要大于等于blockTable的第二维 * blockSize，数据类型固定为FLOAT32。（当key、value数据类型为INT8、INT4(INT32)时支持。）</li>

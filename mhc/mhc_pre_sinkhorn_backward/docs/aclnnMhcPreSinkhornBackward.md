@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **接口功能**：MhcPreSinkhornBackward是MhcPreSinkhorn的反向算子。计算对应的梯度反向传播。
+- **接口功能**：MhcPreSinkhornBackward是MhcPreSinkhorn的反向算子，计算对应的梯度反向传播。
   - 该接口在Cube中使用的计算模式为HF32。
 
 - **计算公式**：
@@ -537,10 +537,10 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
             <tr>
                 <td rowspan="6">ACLNN_ERR_PARAM_INVALID</td>
                 <td rowspan="6">161002</td>
-                <td>输入或输出tensor的维度个数(dim)与参数说明不符。</td>
+                <td>输入或输出Tensor的维度个数(dim)与参数说明不符。</td>
             </tr>
             <tr>
-                <td>输入或输出tensor的维度(shape)与参数说明不符。</td>
+                <td>输入或输出Tensor的维度(shape)与参数说明不符。</td>
             </tr>
             <tr>
                 <td>输入变量的数据类型和数据格式不在支持的范围内。</td>
@@ -552,7 +552,7 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
                 <td>N取值不符合约束要求。</td>
             </tr>
             <tr>
-                <td>C不符合大于0 小于100000 且可以被128整除的要求。</td>
+                <td>C不符合大于0、小于100000且可以被128整除的要求。</td>
             </tr>
             <tr>
                 <td>ACLNN_ERR_INNER_NULLPTR</td>
@@ -640,7 +640,7 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
   - gradHin与x的数据类型须保持一致，支持FLOAT16、BFLOAT16。
   - gradX的shape须与x保持一致，数据类型须与gradHin保持一致。
   - gradPhi、gradAlpha、gradBias的shape须分别与phi、alpha、bias保持一致。
-  - 其余输入、输出tensor的数据类型须为FLOAT32。
+  - 其余输入、输出Tensor的数据类型须为FLOAT32。
 
 - 确定性计算
 

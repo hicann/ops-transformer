@@ -121,11 +121,11 @@ aclnnStatus aclnnSparseFlashAttention(
     <tr>
       <td>key（aclTensor）</td>
       <td>输入</td>
-      <td>attention结构的Key输入</td>
+      <td>attention结构的Key输入。</td>
       <td>
           <ul>
                 <li>不支持空tensor。</li>
-                <li>blockNum为PageAttention时block总数。</li>
+                <li>blockNum为PageAttention时的block总数。</li>
           </ul>
       </td>
       <td>FLOAT16、BFLOAT16</td>
@@ -211,7 +211,7 @@ aclnnStatus aclnnSparseFlashAttention(
                 <li>如果不指定seqlen可传入None，表示和key的shape的S长度相同。</li>
                 <li>该参数中每个Batch的有效token数不超过key/value中的维度S大小且不小于0。支持长度为B的一维tensor。</li>
                 <li>当layoutKvOptional为TND或PA_BSND时，该入参必须传入。</li>
-                <li>layoutKvOptional为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>layoutKvOptional为TND时，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -407,7 +407,7 @@ aclnnStatus aclnnSparseFlashAttention(
    <tr>
       <td>softmaxSum（aclTensor）</td>
       <td>输出</td>
-      <td>Attention算法query乘key的结果减去softmaxMax,再取exp，接着求sum，得到softmaxSum。</td>
+      <td>Attention算法对query乘key的结果减去softmaxMax，再取exp，接着求sum，得到softmaxSum。</td>
       <td>不支持空tensor。</td>
       <td>FLOAT</td>
       <td>ND</td>

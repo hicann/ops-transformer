@@ -32,7 +32,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize"获取workspace大小，再调用"aclnnQuantLightningIndexerV2Metadata"执行计算
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize"获取workspace大小，再调用"aclnnQuantLightningIndexerV2Metadata"执行计算。
 
 ``` cpp
 aclnnStatus aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize(
@@ -226,7 +226,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
       <td>layoutQOptional（char*）</td>
       <td>输入</td>
       <td>表示q的排列格式。</td>
-      <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
+      <td><ul><li>支持BSND、TND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>

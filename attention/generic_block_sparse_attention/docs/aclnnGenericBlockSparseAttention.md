@@ -403,8 +403,8 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>
         控制online softmax阶段以及rescale阶段运算使用的数据类型。取值0或1：
         <ul>
-          <li>0：online softmax和rescale全部采取fp32，适合追求计算精度的场景。</li>
-          <li>1：混合精度；online softmax采取fp16/bf16（与attentionOut相同），rescale采取fp32，online softmax阶段可能数值溢出。</li>
+          <li>0：online softmax和rescale全部采取FP32，适合追求计算精度的场景。</li>
+          <li>1：混合精度；online softmax采取FP16/BF16（与attentionOut相同），rescale采取FP32，online softmax阶段可能数值溢出。</li>
         </ul>
         MXFP8（quantType=6）例外：0和1均使用FP32 S及Softmax，推荐0，1仅作为兼容别名；P仍按p_quant_scale量化为FP8。各精度模式的适用范围见<a href="#产品差异约束">产品差异约束</a>。
        <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8（quantType=7）要求softmaxPrecision=0。</td>
@@ -473,7 +473,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>输出</td>
       <td>计算输出，shape与query一致；非量化时数据类型与query一致，量化时由调用方指定FLOAT16或BFLOAT16输出。</td>
       <td>shape与query保持一致；非量化时数据类型与query一致，量化时输出为FLOAT16或BFLOAT16。layoutQ支持TND、BSND或BNSD，适用范围见<a href="#产品差异约束">产品差异约束</a>。</td>
-      <td>FLOAT16、BFLOAT17（INT8/FP8输入时由本tensor指定）</td>
+      <td>FLOAT16、BFLOAT16（INT8/FP8输入时由本tensor指定）</td>
       <td>ND</td>
       <td>与query一致</td>
       <td>√</td>
@@ -544,17 +544,17 @@ aclnnStatus aclnnGenericBlockSparseAttention(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>query/key/value/sparseBlockIdx/sparseBlockCount/metadataOptional/attentionOut 等当前必传指针为空。</td>
+      <td>query/key/value/sparseBlockIdx/sparseBlockCount/metadataOptional/attentionOut等当前必传指针为空。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>layout、maskType、blockShape、softmaxPrecision、quantType、returnSoftmaxlse、layoutSparsePattern、residualBlockMode、isConsistentTopk 等与约束不匹配。</td>
+      <td>layout、maskType、blockShape、softmaxPrecision、quantType、returnSoftmaxlse、layoutSparsePattern、residualBlockMode、isConsistentTopk等与约束不匹配。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_INNER_NULLPTR</td>
       <td>561103</td>
-      <td>Contiguous/InferShape 失败（如 layout 不支持、缺少 blockTable 等）。</td>
+      <td>Contiguous/InferShape失败（如layout不支持、缺少blockTable等）。</td>
     </tr>
   </tbody>
   </table>
@@ -600,7 +600,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
 
 - **返回值**
 
-  返回 aclnnStatus 状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 
@@ -621,7 +621,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的INT8全量化场景：`quantType=7`，Q/K/V的数据类型为INT8；`headDim`为1～256，Q head数必须是KV head数的整数倍，分组大小为1～128；Q支持TND、BSND、BNSD，KV为与Q相同的非PA布局或PA_BBND/PA_BNBD；PA的`blockSize=128`；`blockShape=[1,Y]`，Y为1、2、4、8、16、32、64、128；`maskType=0/1`、`residualBlockMode=0/1`、`softmaxPrecision=0`。mode=1隐式追加可见范围末尾的不完整块，不占用topK及`sparseBlockCount`。
 <!-- end id12 -->
 <!-- npu="950,A3,910b" id13 -->
-- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化和INT8全量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16、MXFP8及常规 FP8（含 FP8 Union）支持1～INT32_MAX；容量均须不小于稀疏块有效计数的最大值。
+- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化和INT8全量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16、MXFP8及常规FP8（含FP8 Union）支持1～INT32_MAX；容量均须不小于稀疏块有效计数的最大值。
 <!-- end id13 -->
 <!-- npu="950,A3,910b" id14 -->
 - `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、5（FP8量化）、6（MXFP8）或8（A8C4）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持0（非量化）或7（INT8全量化）。
@@ -910,8 +910,8 @@ INT8使用FP32 Softmax（`softmaxPrecision=0`）。PV结果乘V scale并除以P 
         </ul>
         pQuantScaleOptional(可选)：
         <ul>
-          <li>输入时，仅包含单一元素，用于用户控制P的静态量化系数: [1]。</li>
-          <li>nullptr: 算子默认P的静态量化系数为448.0。</li>
+          <li>输入时，仅包含单一元素，用于用户控制P的静态量化系数：[1]。</li>
+          <li>nullptr：算子默认P的静态量化系数为448.0。</li>
         </ul>
       </td>
       <td>FLOAT32</td>
@@ -1020,13 +1020,13 @@ Q/K/V输入为FLOAT8_E4M3FN，输出为FLOAT16或BFLOAT16。Q/K沿D维每32个�
     <tr>
       <td>1</td>
       <td>causal mask</td>
-      <td>不传 attenMaskOptional（内置 causal）；规划 BOOL [2048,2048] 下三角</td>
+      <td>不传attenMaskOptional（内置causal）；规划BOOL [2048,2048] 下三角</td>
       <td>-1/-1</td>
     </tr>
     <tr>
       <td>2</td>
       <td>window mask</td>
-      <td>规划：BOOL [2048,2048] 下三角，与 winLeft/winRight 配合</td>
+      <td>规划：BOOL [2048,2048] 下三角，与winLeft/winRight配合</td>
       <td>实际window包括的向前/向后看的token数</td>
     </tr>
     <tr>
@@ -1064,7 +1064,7 @@ Q/K/V输入为FLOAT8_E4M3FN，输出为FLOAT16或BFLOAT16。Q/K沿D维每32个�
 - layoutKv为PA_BBND/PA_BNBD时须传sequsedKvOptional，不传cuSeqLengthsKvOptional。
 - seqused与对应cu前缀和同时传入时（layoutQ为TND时的Q侧，及layoutKv为TND时的KV侧）：各batch的seqused元素须≤对应cu存储长度，且须与Metadata侧完全一致。
 - quantType=8 时 Q 使用 FLOAT8_E4M3FN，K/V 使用 FLOAT4_E2M1。其他模式要求 Q/K/V 的数据类型一致。
-- `PA_BBND`/`PA_BNBD`下key/value仅dim0（物理页轴）可非连续；页内元素须连续（`PA_BBND`为blockSize×numKeyValueHeads×headDim，`PA_BNBD`为numKeyValueHeads×blockSize×headDim，两者元素数相同）；stride0 ≥ blockSize×numKeyValueHeads×headDim且按numKeyValueHeads×headDim对齐。 `MXFP8`的ACLNN入口会将K/V整理为连续页；直接GE调用`MXFP8`时要求连续页stride，不能沿用带洞页的地址。
+- `PA_BBND`/`PA_BNBD`下key/value仅dim0（物理页轴）可非连续；页内元素须连续（`PA_BBND`为blockSize×numKeyValueHeads×headDim，`PA_BNBD`为numKeyValueHeads×blockSize×headDim，两者元素数相同）；stride0 ≥ blockSize×numKeyValueHeads×headDim且按numKeyValueHeads×headDim对齐。`MXFP8`的ACLNN入口会将K/V整理为连续页；直接GE调用`MXFP8`时要求连续页stride，不能沿用带洞页的地址。
 
 ## 调用示例
 
@@ -1408,7 +1408,7 @@ int main()
 }
 ```
 
-## `MXFP8` grouped K scale 流水
+## `MXFP8` grouped K scale流水
 
 <term>Ascend 950PR&950DT系列产品</term> 的 `quant_mode=6` 仅使用512-token grouped路径，无需额外开关。Python、Torch schema和ACLNN接口不增加参数，ACLNN入口为 `aclnnGenericBlockSparseAttention`。
 

@@ -30,7 +30,7 @@
   <summary>MX量化场景：</summary>
   <a id="MX量化场景"></a>
 
-    - **定义**：
+    - **定义：**
 
       * **⋅** 表示矩阵乘法。
       * **⊙** 表示逐元素乘法。
@@ -49,7 +49,7 @@
       * $E$ 表示专家数，$M$ 表示总token数，$K$ 表示输入特征维度，$N$ 表示输出特征维度。
       * $blocksize$ 表示MX量化结果的存储block大小，当前仅支持64，对应2个MX量化group，每个group包含32个元素。
 
-    - **输入**：
+    - **输入：**
 
       * $X$：激活矩阵。
       * $groupList$：分组索引列表，按groupListType解释为cumsum或count。
@@ -63,7 +63,7 @@
       * $Y$：激活并量化后的输出矩阵，数据类型由输出Tensor y指定。
       * $YScale$：输出量化因子。
 
-    - **计算过程**
+    - **计算过程：**
 
       - 1.根据groupList[i]确定当前分组的token范围，$i \in [0, Len(groupList))$。
 
@@ -241,7 +241,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
       <td rowspan="1">输入</td>
       <td>表示分组信息，对应公式中的groupList。</td>
       <td><ul>
-      <li>必选参数。根据groupListType输入不同格式数据。当groupListType为0时，最后一个值不大于x中tensor的第一维, 当groupListType为1时，数值的总和不大于x中tensor的第一维。</li>
+      <li>必选参数。根据groupListType输入不同格式数据。当groupListType为0时，最后一个值不大于x中tensor的第一维，当groupListType为1时，数值的总和不大于x中tensor的第一维。</li>
       <li>groupListType=0时，groupList元素必须非负且单调不减，最后一个元素不大于M；groupListType=1时，元素必须非负且总和不大于M。</li>
       <li>GetWorkspaceSize的第一阶段只校验groupList的指针、dtype和shape，不读取设备侧tensor的元素值；调用方需保证上述值域约束。</li>
       <li>groupList中的值约束了输出数据的有效部分，groupList未指定的部分将不会参与更新。</li>
@@ -610,7 +610,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
        </table>
 
     - 表中xScale、weightScale、outputScale的shape最后一维为2，表示每个64元素的存储block中包含2个MX量化group，每个group覆盖32个元素。
-    - 非空场景下N必须为64整数倍，且N至少为64。
+    - 非空场景下N必须为64的整数倍，且N至少为64。
     - 非空场景下K必须大于0；MXFP4场景下x和weight必须同时为FLOAT4，二者可分别选择FLOAT4_E2M1或FLOAT4_E1M2，且K必须为偶数且不能为2。
 
 ## 调用示例

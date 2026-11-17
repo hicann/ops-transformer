@@ -207,7 +207,7 @@ aclnnStatus aclnnPoolKeyIndexer(
       <td>公式中的输入K<sub>pool</sub>。</td>
       <td>
           <ul>
-                <li>支持“0 池”空张量（纯尾块模式：BSND S2=0、TND T2=0、PA block_num=0）；此时各batch有效key全部由poolTailK表达，尾token按因果可见性写入sparseIndices。</li>
+                <li>支持“0池”空张量（纯尾块模式：BSND S2=0、TND T2=0、PA block_num=0）；此时各batch有效key全部由poolTailK表达，尾token按因果可见性写入sparseIndices。</li>
                 <li>block_num为PageAttention时block总数，block_size为一个block的pool数（块内每行为一个pool的key，行距为headDim，不做token展开）。</li>
                 <li>数据类型需与query保持一致。</li>
                 <li>数据布局需与query保持一致，PageAttention场景（layoutKeyOptional为PA_BBND）除外。</li>
@@ -492,7 +492,7 @@ aclnnStatus aclnnPoolKeyIndexer(
           <ul>
                 <li>不支持空tensor。</li>
                 <li>元素为原始KV token索引（batch内局部口径），合法域为[0, 完整pool数×pool_size+poolTailK)，其中完整pool数为poolKey的S2（BSND）/T2（TND）维大小或actualSeqLengthsKeyOptional对应元素（PA_BBND）；索引不指向poolKey内部，尾部poolTailK个token由下游从原始KV中按索引回取。</li>
-                <li>无尾token（poolTailK为0）或因因果可见性不可见的尾token位置填充-1。</li>
+                <li>无尾token（poolTailK为0）或因果可见性不可见的尾token位置填充-1。</li>
                 <li>layoutQueryOptional为BSND时，输出shape为(B, S1, topk + pool_size - 1)。</li>
                 <li>layoutQueryOptional为TND时，输出shape为(T1, topk + pool_size - 1)。</li>
           </ul>

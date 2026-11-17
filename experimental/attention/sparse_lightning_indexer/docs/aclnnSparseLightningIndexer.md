@@ -14,7 +14,7 @@
 
 ## 功能说明
 
-aclnnSparseLightningIndexer 实现 candidate consumer 语义：在
+aclnnSparseLightningIndexer实现 candidate consumer 语义：在
 LightningIndexerV2 加权 ReLU 打分框架（score = Σg W_g·ReLU(Q_g·Kᵀ)）上消费上游 source 算子
 （aclnnLightningIndexerV2 candidateTopkBlocks 开启时输出的 candidateTopkIndices）的候选块索引，
 对候选外可达位置做 NEG_HUGE 泄漏（leak）降级后走原 topk 管线。
@@ -101,9 +101,9 @@ aclnnStatus aclnnSparseLightningIndexer(void *workspace, uint64_t workspaceSize,
 ## 跨算子契约
 
 - candidateTopkIndices 直接对接 aclnnLightningIndexerV2（开启 candidateTopkBlocks 时）的 candidateTopkIndicesOut 输出，块号为同一 forward 内 batch 相对压缩块号，槽位无序（消费侧按集合消费）；
-- 候选块号不含 output_idx_offset 偏移；
-- candidateBlockSize、cmpRatio 必须与 source 侧配置一致；
-- 候选宽度 candBlocks 由输入 tensor shape 末维推导（本算子无 candidate_topk_blocks 属性）。
+- 候选块号不含 output_idx_offset偏移；
+- candidateBlockSize、cmpRatio必须与source侧配置一致；
+- 候选宽度candBlocks由输入 tensor shape 末维推导（本算子无 candidate_topk_blocks 属性）。
 
 ## 调用示例
 

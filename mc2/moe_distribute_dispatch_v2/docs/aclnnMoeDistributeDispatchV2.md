@@ -26,7 +26,7 @@
 - 接口功能：对token数据进行量化（可选），进行EP（Expert Parallelism）域的AllToAllV通信。TP（Tensor Parallelism）域通信当前版本不再支持，TP相关参数为预留参数。
 
     相较于`aclnnMoeDistributeDispatch`接口，该接口变更如下：
-    1. 输出了更详细的token信息辅助CombineV2系列算子高效地进行全卡同步，因此原接口中shape为`(BS * K,)`的`expandIdx`出参替换为shape为`(A * 128,)`的`assistInfoForCombineOut`参数；
+    1. 输出了更详细的token信息辅助CombineV2系列算子高效地进行全卡同步，因此原接口中shape为`(BS * K,)`的`expandIdx`出参替换为shape为`(A * 128,)`的`assistInfoForCombineOut`参数。
     2. 新增`commAlg`入参，代替用于控制分层算法的`HCCL_INTRA_PCIE_ENABLE`和`HCCL_INTRA_ROCE_ENABLE`环境变量。
 
     详细说明请参考以下参数说明。
@@ -617,7 +617,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
 - **产品特定约束**：
 
   <!-- npu="A3" id12 -->
-  - <term>Atlas A3系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
+  - <term>Atlas A3系列产品</term>：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
   <!-- end id12 -->
 
 - **Shape变量约束**：
@@ -625,8 +625,8 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
   | A            | 表示本卡需要分发的最大token数量，取值范围如下：<ul> <li>对于共享专家，令 <code>ranksPerSharedExpert = sharedExpertRankNum / sharedExpertNum</code>、<code>maxBS = (globalBs == 0 ? BS : globalBs / epWorldSize)</code>，要满足 <code>A &gt;= maxBS * ((epWorldSize + ranksPerSharedExpert - 1) / ranksPerSharedExpert)</code>。</li> <li>对于MoE专家，当globalBs为0时，要满足A >= BS \* epWorldSize \* min(localExpertNum, K)；当globalBs非0时，要满足A >= globalBs \* min(localExpertNum, K)。</li> </ul>|
-  | H（hidden size） | 表示hidden size隐藏层大小。 具体产品差异见下方说明。 |
-  | BS           | 表示本卡最终输出token数。 具体产品差异见下方说明。 |
+  | H（hidden size） | 表示hidden size隐藏层大小。具体产品差异见下方说明。 |
+  | BS           | 表示本卡最终输出token数。具体产品差异见下方说明。 |
   | K | 表示选取topK个专家，取值范围为0 < K ≤ 16，且<code>0 < K ≤ moeExpertNum</code>。具体产品差异见下方说明。 |
   | serverNum    | 表示服务器节点数，仅支持2、4、8。具体产品差异见下方说明。 |
   | localExpertNum |   本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum / (epWorldSize - sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li>具体产品差异见下方说明。</li></ul> |
@@ -692,9 +692,9 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
               - `scalesOptional`的shape为(`BS`, `dim1`)，其中`dim1`需满足小于等于`H`。
       - `quantMode`取值为1时，表示静态量化场景，`expandXOut`的数据类型支持`INT8`、`HIFLOAT8`。
           - `expandXOut`的数据类型为`INT8`时有如下场景：
-              - 输入的`scalesOptional`代表量化系数，shape为(1, )；
-              - 输入的`scalesOptional`表示每个专家共享的平滑权重时，shape为(`H`，)；
-              - 输入的`scalesOptional`代表融了每个专家的平滑权重的量化系数时，若有共享专家卡，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)，若无共享专家卡，其shape为(`moeExpertNum`, `H`)。
+              - 输入的`scalesOptional`代表量化系数，shape为(1, )。
+              - 输入的`scalesOptional`表示每个专家共享的平滑权重时，shape为(`H`, )。
+              - 输入的`scalesOptional`代表融合了每个专家的平滑权重的量化系数时，若有共享专家卡，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)，若无共享专家卡，其shape为(`moeExpertNum`, `H`)。
           - `expandXOut`的数据类型为`HIFLOAT8`时，`scalesOptional`的shape必须为(1, )。
       - `quantMode`取值为2时，表示pertoken动态量化场景，`expandXOut`的数据类型支持`INT8`、`FLOAT8_E4M3FN`、`FLOAT8_E5M2`。
           - 输入`scalesOptional`可传入空指针。
@@ -722,7 +722,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
           <!-- end id16 -->
           <!-- npu="A3" id17 -->
           - <term>Atlas A3系列产品</term>  ：
-              - ep通信域内：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 64) + (K +   sharedExpertNum) \* maxBS \* Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) /   512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。当前不支持TP通信域。
+              - ep通信域内：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 64) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) /   512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。当前不支持TP通信域。
           <!-- end id17 -->
           <!-- npu="950" id18 -->
           - <term>Ascend 950DT系列产品</term>：
@@ -781,7 +781,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
 
 - 机器数量设置：
 
-    两机16卡场景中，需将参数MACHINE_NUM设置为2，即
+    两机16卡场景中，需将参数MACHINE_NUM设置为2，即：
 
     ```Cpp
     const uint32_t MACHINE_NUM = 2;

@@ -37,8 +37,8 @@
 
 相较于`aclnnMoeDistributeCombine`接口，该接口变更如下：
 
-- 输入了更详细的token信息辅助`aclnnMoeDistributeCombineV2`高效地进行全卡同步，因此原接口中shape为`(BS * K,)`的`expandIdx`入参替换为shape为`(A * 128,)`的`assistInfoForCombine`参数；
-- 新增`sharedExpertXOptional`入参，支持在`sharedExpertNum`为0时，由用户输入共享专家计算后的token；
+- 输入了更详细的token信息辅助`aclnnMoeDistributeCombineV2`高效地进行全卡同步，因此原接口中shape为`(BS * K,)`的`expandIdx`入参替换为shape为`(A * 128,)`的`assistInfoForCombine`参数。
+- 新增`sharedExpertXOptional`入参，支持在`sharedExpertNum`为0时，由用户输入共享专家计算后的token。
 - 新增`commAlg`入参，代替`HCCL_INTRA_PCIE_ENABLE`和`HCCL_INTRA_ROCE_ENABLE`环境变量。
 
 详细说明请参考以下参数说明。
@@ -369,7 +369,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     <tr>
     <td>groupListType</td>
     <td>输入</td>
-    <td>group List格式，预留参数。</td>
+    <td>groupListType格式，预留参数。</td>
     <td>当前版本不支持，传0即可。</td>
     <td>INT64</td>
     <td>-</td>
@@ -580,7 +580,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 - **产品特定约束**：
 
   <!-- npu="A3" id10 -->
-  - <term>Atlas A3系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
+  - <term>Atlas A3系列产品</term>：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
 
   <!-- end id10 -->
 
@@ -588,11 +588,11 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
-  | A            | 本卡需分发的最大token数，取值范围如下: <ul><li>对于共享专家，要满足<code>A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum</code>。</li><li>对于MoE专家，当globalBs为0时，要满足<code>A >= BS \* epWorldSize \* min(localExpertNum, K)</code>；当globalBs非0时，要满足<code>A >= globalBs \* min(localExpertNum, K)</code>。</li></ul>|
-  | H            | 表示hidden size隐藏层大小: 具体产品差异见下方说明。 |
-  | BS           | 表示batch sequence size（本卡最终输出的token数量）: 具体产品差异见下方说明。 |
+  | A            | 本卡需分发的最大token数，取值范围如下： <ul><li>对于共享专家，要满足<code>A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum</code>。</li><li>对于MoE专家，当globalBs为0时，要满足<code>A >= BS \* epWorldSize \* min(localExpertNum, K)</code>；当globalBs非0时，要满足<code>A >= globalBs \* min(localExpertNum, K)</code>。</li></ul>|
+  | H            | 表示hidden size隐藏层大小： 具体产品差异见下方说明。 |
+  | BS           | 表示batch sequence size（本卡最终输出的token数量）： 具体产品差异见下方说明。 |
   | K | 表示选取topK个专家，取值范围为0 < K ≤ 16，且<code>0 < K ≤ moeExpertNum</code>。具体产品差异见下方说明。 |
-  | serverNum    | 服务器节点数:具体产品差异见下方说明。 |
+  | serverNum    | 服务器节点数：具体产品差异见下方说明。 |
   | localExpertNum |  本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，localExpertNum > 1时不支持TP通信。 </li><li>具体产品差异见下方说明。</li></ul> |
 
   <!-- npu="A3" id29 -->
@@ -662,7 +662,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
   - 当前不支持TP域通信。
 
   <!-- npu="A3" id16 -->
-  - <term>Atlas A3系列产品</term>  ：一个通信域内的节点需在一个超节点内，不支持跨超节点。
+  - <term>Atlas A3系列产品</term>：一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
   <!-- end id16 -->
 
@@ -695,7 +695,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
 - 机器数量设置：
 
-    两机16卡场景中，需将参数MACHINE_NUM设置为2，即
+    两机16卡场景中，需将参数MACHINE_NUM设置为2，即：
 
     ```Cpp
     const uint32_t MACHINE_NUM = 2;

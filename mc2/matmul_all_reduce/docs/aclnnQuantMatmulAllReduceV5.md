@@ -119,7 +119,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
           <td>x3Optional</td>
           <td>输入</td>
           <td>MatMul计算后的add计算，即计算公式中的x3Optional。</td>
-          <td><ul><li>低比特通信场景下仅支持输出为BFLOAT16场景，且仅支持非空输入，要求数据类型、维度与output的维度一致。</li></ul></td>
+          <td><ul><li>低比特通信场景下仅支持输出为BFLOAT16，且仅支持非空输入，要求数据类型、维度与output的维度一致。</li></ul></td>
           <td>FLOAT16、BFLOAT16、FLOAT32</td>
           <td>ND</td>
           <td>2-3</td>
@@ -129,7 +129,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
           <td>x1ScaleOptional</td>
           <td>输入</td>
           <td>MatMul计算后的pertoken去量化系数，即计算公式中的x1ScaleOptional。</td>
-          <td><ul><li>pertoken场景下，x1为(b, m, k)时shape为(b*m)，x1为(m, k)时shape为(m)。</li><li>perblock场景下，x1为(b, m, k)时shape为[b, ceilDiv(m, 128), ceilDiv(k, 128)]，x1为(m, k)时shape为[ceilDiv(m, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，shape为[m, ceilDiv(k, 64), 2], x1为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数。</li></ul></td>
+          <td><ul><li>pertoken场景下，x1为(b, m, k)时shape为(b*m)，x1为(m, k)时shape为(m)。</li><li>perblock场景下，x1为(b, m, k)时shape为[b, ceilDiv(m, 128), ceilDiv(k, 128)]，x1为(m, k)时shape为[ceilDiv(m, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，shape为[m, ceilDiv(k, 64), 2]，x1为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数。</li></ul></td>
           <td>FLOAT32、FLOAT8_E8M0</td>
           <td>ND</td>
           <td>1-3</td>
@@ -139,7 +139,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
           <td>x2Scale</td>
           <td>输入</td>
           <td>MatMul计算后的去量化系数，即计算公式中的x2Scale。</td>
-          <td><ul><li>shape在pertensor场景为(1)，perchannel场景为(n)/(1, n)。</li><li>输入为int8且输出为BFLOAT16时，直接将BFLOAT16类型的x2Scale传入本接口。</li><li>输出为FLOAT16且输入为INT8时，x1ScaleOptional不为空，可直接将FLOAT32类型的x2Scale传入本接口，如果x1ScaleOptional为空，则需提前调用TransQuantParamV2算子的aclnn接口来将x2Scale转成INT64/UINT64数据类型。</li><li>数据类型为FLOAT8_E8M0时，仅支持转置，shape为[n, ceilDiv(k, 64), 2]。</li> <li>x2为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数.</li><li>perblock场景下，x2的shape为[ceilDiv(k, 128), ceilDiv(n, 128)]，x2转置时，x2Scale的shape为[ceilDiv(n, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，ceilDiv(k, 64)轴不支持为1。</li></ul></td>
+          <td><ul><li>shape在pertensor场景为(1)，perchannel场景为(n)/(1, n)。</li><li>输入为int8且输出为BFLOAT16时，直接将BFLOAT16类型的x2Scale传入本接口。</li><li>输出为FLOAT16且输入为INT8时，x1ScaleOptional不为空，可直接将FLOAT32类型的x2Scale传入本接口，如果x1ScaleOptional为空，则需提前调用TransQuantParamV2算子的aclnn接口来将x2Scale转成INT64/UINT64数据类型。</li><li>数据类型为FLOAT8_E8M0时，仅支持转置，shape为[n, ceilDiv(k, 64), 2]。</li> <li>x2为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数。</li><li>perblock场景下，x2的shape为[ceilDiv(k, 128), ceilDiv(n, 128)]，x2转置时，x2Scale的shape为[ceilDiv(n, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，ceilDiv(k, 64)轴不支持为1。</li></ul></td>
           <td>INT64、UINT64、FLOAT32、BFLOAT16、FLOAT8_E8M0</td>
           <td>ND</td>
           <td>1-3</td>
@@ -219,7 +219,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
           <td>groupSize</td>
           <td>输入</td>
           <td>用于表示反量化中x1Scale/x2Scale输入的一个数在其所在的对应维度方向上可以用于该方向x1/x2输入的多少个数的反量化。</td>
-          <td><ul><li>groupSize输入由3个方向的groupSizeM，groupSizeN，groupSizeK三个值拼接组成，每个值占16位，计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</li><li>perblock场景仅支持groupSizeM，groupSizeN，groupSizeK = 128,128,128</li><li>MXFP场景仅支持groupSizeM，groupSizeN，groupSizeK = 1,1,32</li><li>支持参数自动推导，任一参数输入0时，算子自动推导该参数值，全部输入0时，自动推导全部参数值</li></ul></td>
+          <td><ul><li>groupSize输入由groupSizeM、groupSizeN、groupSizeK三个值拼接组成，每个值占16位，计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</li><li>perblock场景仅支持groupSizeM，groupSizeN，groupSizeK = 128,128,128</li><li>MXFP场景仅支持groupSizeM，groupSizeN，groupSizeK = 1,1,32</li><li>支持参数自动推导，任一参数输入0时，算子自动推导该参数值，全部输入0时，自动推导全部参数值</li></ul></td>
           <td>INT64</td>
           <td>-</td>
           <td>-</td>
@@ -378,7 +378,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
 - 传入的x1、x2、x2Scale或者output不为空指针。
 - x1和x2、x1ScaleOptional、x2Scale、output、biasOptional（非空场景）、x3Optional（非空场景）的数据类型和数据格式需要在支持的范围之内。
 - 传入的commQuantScale1与commQuantScale2需要同时为空指针或同时不为空指针，若传入的commQuantScale1与commQuantScale2同时不为空指针，两个量化参数shape需保持一致，类型需与算子输出类型保持一致，且每张卡输入保持一致。
-- 仅支持hccs链路all mesh组网。
+- 仅支持HCCS链路all mesh组网。
 
     <!-- npu="910b" id11 -->
     - <term>Atlas A2系列产品</term>：支持1、2、4、8卡。
@@ -391,14 +391,14 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
 - INT8和FP8低bit通信仅在通信bound的情况下存在性能收益，计算bound的情况不建议使能INT8或FP8低bit通信，即不建议输入commQuantScale1和commQuantScale2，且commQuantMode输入0。（注：INT8低bit通信指输入为int8且使能commQuantScale1Optional、commQuantScale2Optional；FP8低bit通信指输入为FLOAT8_E4M3FN/FLOAT8_E5M2且使能commQuantMode=1。）
 - 空tensor支持度：
   - 不支持空tensor。
-- groupSize相关约束:
+- groupSize相关约束：
   - 仅当x1Scale和x2Scale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
   - 传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据x1/x2/x1Scale/x2Scale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。原理：假设groupSizeM=0，表示m方向量化分组值由接口推断，推断公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与x1 shape中的m一致，scaleM与x1Scale shape中的m一致。
     $$
     groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32
     $$
 
-输入和输出支持以下数据类型组合
+输入和输出支持以下数据类型组合：
 
 <!-- npu="910b" id13 -->
 - <term>Atlas A2系列产品</term>：
@@ -461,7 +461,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
 <!-- npu="950" id14 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
 
-    int8输入时，支持pertoken-perchannel量化 && pertensor-perchannel量化
+    int8输入时，支持pertoken-perchannel量化 && pertensor-perchannel量化：
     <table>
     <thead>
         <tr>
@@ -667,7 +667,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="950,910b" id15 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：

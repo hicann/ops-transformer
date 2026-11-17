@@ -582,8 +582,8 @@ aclnnStatus aclnnMoeDistributeCombine(
    <!-- end id16 -->
    <!-- npu="A3" id17 -->
    - <term>Atlas A3系列产品</term>：
-        - ep通信域内：设置大小要求(≥ 2)且满足(1024^2 \* (HCCL_BUFFSIZE - 2) / 2 ≥ BS \* 2 \* (H + 128) \* (epWorldSize \* localExpertNum + K + 1))，其中`localExpertNum`需使用MoE专家卡的本卡专家数。
-        - tp通信域内：预留参数，当前版本不支持。
+        - EP通信域内：设置大小要求(≥ 2)且满足(1024^2 \* (HCCL_BUFFSIZE - 2) / 2 ≥ BS \* 2 \* (H + 128) \* (epWorldSize \* localExpertNum + K + 1))，其中`localExpertNum`需使用MoE专家卡的本卡专家数。
+        - TP通信域内：预留参数，当前版本不支持。
    <!-- end id17 -->
    <!-- npu="950" id18 -->
    - <term>Ascend 950DT系列产品</term>：设置大小要求(≥ 2)且满足(1024^2 \* (HCCL_BUFFSIZE - 2) / 2 ≥ BS \* 2 \* (H + 128) \* (epWorldSize \* localExpertNum + K + 1))，其中`localExpertNum`需使用MoE专家卡的本卡专家数。
@@ -629,15 +629,15 @@ aclnnStatus aclnnMoeDistributeCombine(
 
         2. 将项目拷贝到两台服务器中，并根据机器的device ip配置rank_table_m2.json文件内容。注意两机rank_table_m2.json文件保持一致。
 
-        3. 安装cann包，并参考下方指导编译运行。
+        3. 安装CANN包，并参考下方指导编译运行。
 
-    - 关于rankTable:
+    - 关于rankTable：
 
-        1. 开发者可以通过ranktable文件配置参与集合通信的NPU资源信息，详细配置请参考[《集合通信用户指南》](https://hiascend.com/document/redirect/CannCommunityHcclUg)中“通信功能开发>集群信息配置>ranktable文件配置资源信息”。
+        1. 开发者可以通过ranktable文件配置参与集合通信的NPU资源信息，详细配置请参考《[集合通信用户指南](https://hiascend.com/document/redirect/CannCommunityHcclUg)》中“通信功能开发>集群信息配置>ranktable文件配置资源信息”。
 
         2. 使用`cat /etc/hccn.conf`或者`for i in $(seq 0 7); do echo "===================> dev$i, NPU$((i+1))"; hccn_tool -i $i -ip -g; done`查询机器的device ip。然后参考集合通信文档填写json文件。
 
-        > 注意：两机16卡场景中，两机器的device_id都是0~7，其中一台机器的rank_id为0~7，另一台机器的rank_id为8~15。单机16卡场景中，device_id和rank_id都是0~15。
+        > 注意：两机16卡场景中，两台机器的device_id都是0~7，其中一台机器的rank_id为0~7，另一台机器的rank_id为8~15。单机16卡场景中，device_id和rank_id都是0~15。
 
     - 环境变量配置：
 
@@ -652,7 +652,7 @@ aclnnStatus aclnnMoeDistributeCombine(
         ```
 
     - 机器数量设置：
-        两机16卡场景中，需将参数MACHINE_NUM设置为2，即
+        两机16卡场景中，需将参数MACHINE_NUM设置为2，即：
 
         ```Cpp
         const uint32_t MACHINE_NUM = 2;

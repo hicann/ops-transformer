@@ -37,13 +37,13 @@
     $$
 
   2.以sortedRowIdx做位置映射得出expandedRowIdxOut：
-    - rowIdxType等于1时, 输出scatter索引
+    - rowIdxType等于1时，输出scatter索引
 
       $$
       expandedRowIdxOut[i]=sortedRowIdx[i]
       $$
 
-    - rowIdxType等于0时, 输出gather索引
+    - rowIdxType等于0时，输出gather索引
 
       $$
       expandedRowIdxOut[sortedRowIdx[i]]=i
@@ -73,7 +73,7 @@
             quantResult = round(x / dynamicQuantScaleOutOptional)
             $$
 
-        - 若输入scale:
+        - 若输入scale：
 
             $$
             dynamicQuantScaleOutOptional = row\_max(abs(x * scaleOptional)) / 127
@@ -222,7 +222,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
     <tr>
       <td>expertIdx（aclTensor）</td>
       <td>输入</td>
-      <td>每一行特征对应的K个处理专家，里面元素专家id不能超过专家数</td>
+      <td>每一行特征对应的K个处理专家，里面元素的专家id不能超过专家数</td>
       <td>shape为(NUM_ROWS, K)</td>
       <td>INT32</td>
       <td>ND</td>
@@ -235,12 +235,12 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>表示用于计算量化结果的参数</td>
       <td><ul>
         <li>如果不输入表示计算时不使用scale;</li>
-        <li>非量化场景下为可选输入，如果输入则要求为1D的Tensor，shape为(NUM_ROWS,)，类型为FLOAT32。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果输入则要求3D的Tensor，shape为(NUM_ROWS, CeilDiv(H, 64), 2), 类型为FLOAT8_E8M0;</li>
+        <li>非量化场景下为可选输入，如果输入则要求为1D的Tensor，shape为(NUM_ROWS,)，类型为FLOAT32。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果输入则要求3D的Tensor，shape为(NUM_ROWS, CeilDiv(H, 64), 2)，类型为FLOAT8_E8M0;</li>
         <li>静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]；</li>
         <li>quantMode为1的INT8动态量化场景下为可选输入，如果输入则要求为2D的Tensor，shape为(expertEnd-expertStart, H)；quantMode为13的INT4动态量化场景下为可选输入，如果输入则要求shape为(1, H)，表示按H维广播的smooth scale。</li>
         <li>MXFP8量化场景下（quantMode为2、3）不输入。</li>
         <li>HIF8直转和HIF8 PERTOKEN量化场景下（quantMode为6、8）不输入。</li>
-        <li>HIF8 PERTENSOR量化场景下（quantMode为7）必须输入,输入要求为1D的Tensor，shape为[1, ]。</li>
+        <li>HIF8 PERTENSOR量化场景下（quantMode为7）必须输入，输入要求为1D的Tensor，shape为[1, ]。</li>
         <li>MXFP4量化场景下（quantMode为9）不输入。</li>
         <li>FP8 PerGroup量化场景下（quantMode为4、5、14、15）不输入。</li>
         <li>FP8 PerBlock量化场景下（quantMode为11、12）不输入。</li>
@@ -256,7 +256,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>表示用于计算quant结果的偏移值</td>
       <td><ul>
-        <li>在非量化场景下不输入;</li><li>静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]；</li>
+        <li>在非量化场景下不输入。</li><li>静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]；</li>
         <li>动态量化（quantMode为1）、MXFP8量化（quantMode为2、3）、HIF8量化（quantMode为6、7、8）、MXFP4量化（quantMode为9）、FP8 PerGroup量化（quantMode为4、5、14、15）、FP8 PerBlock量化（quantMode为11、12）、INT4动态量化（quantMode为13）、MXFP8 RoundScale+Amax量化场景下（quantMode为16、17）不输入。</li>
       </ul></td>
       <td>FLOAT32</td>
@@ -304,7 +304,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>expertNum（int64_t）</td>
       <td>输入</td>
       <td>表示专家数</td>
-      <td>expertTokensNumType为key_value模式时，取值范围为[1, 5120]，其它模式取值范围为[1, 10240]</td>
+      <td>expertTokensNumType为key_value模式时，取值范围为[1, 5120]，其他模式取值范围为[1, 10240]</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -315,8 +315,8 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>表示是否为DropPad场景</td>
       <td>取值为0和1
-        <br>0：表示Dropless场景，该场景下不校验expertCapacity；
-        <br>1：表示DropPad场景；
+        <br>0：表示Dropless场景，该场景下不校验expertCapacity。
+        <br>1：表示DropPad场景。
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -328,9 +328,9 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>表示直方图的不同模式</td>
       <td>取值为0、1和2
-        <br>0：表示 cumsum 模式；
-        <br>1：表示 count 模式；
-        <br>2：表示 key_value 模式；
+        <br>0：表示cumsum模式。
+        <br>1：表示count模式。
+        <br>2：表示key_value模式。
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -340,7 +340,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
     <tr>
       <td>expertTokensNumFlag（bool）</td>
       <td>输入</td>
-      <td>表示是否输出 expertTokensCountOrCumsumOut </td>
+      <td>表示是否输出expertTokensCountOrCumsumOut </td>
       <td>取值为false和true</td>
       <td>BOOL</td>
       <td>-</td>
@@ -352,24 +352,24 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>表示不同量化场景</td>
       <td>取值为0、1、-1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17
-        <br>0：表示静态 quant 场景;
-        <br>1：表示动态 quant 场景，expandedXOut量化到INT8;
-        <br>-1：表示非量化场景;
-        <br>2：表示MXFP8量化场景，expandedXOut量化到FLOAT8_E5M2;
-        <br>3：表示MXFP8量化场景，expandedXOut量化到FLOAT8_E4M3FN;
-        <br>4：表示FP8 PerGroup量化场景（GroupSize=128，RoundScale），expandedXOut量化到FLOAT8_E5M2;
-        <br>5：表示FP8 PerGroup量化场景（GroupSize=128，RoundScale），expandedXOut量化到FLOAT8_E4M3FN;
-        <br>6：表示HIF8直转量化场景，expandedXOut量化到HIFLOAT8;
-        <br>7：表示HIF8 PERTENSOR量化场景，expandedXOut按照pertensor模式量化到HIFLOAT8;
-        <br>8：表示HIF8 PERTOKEN量化场景，expandedXOut按照pertoken模式量化到HIFLOAT8;
-        <br>9：表示MXFP4量化场景，expandedXOut量化到FLOAT4_E2M1;
-        <br>11：表示FP8 PerBlock量化场景（BlockSize=128），expandedXOut量化到FLOAT8_E5M2，expandedScaleOut为FLOAT32三维布局;
-        <br>12：表示FP8 PerBlock量化场景（BlockSize=128），expandedXOut量化到FLOAT8_E4M3FN，expandedScaleOut为FLOAT32三维布局;
-        <br>13：表示INT4动态量化场景，expandedXOut量化到INT4;
-        <br>14：表示FP8 PerGroup量化场景（GroupSize=128，RoundScale+Amax），expandedXOut量化到FLOAT8_E5M2;
-        <br>15：表示FP8 PerGroup量化场景（GroupSize=128，RoundScale+Amax），expandedXOut量化到FLOAT8_E4M3FN;
-        <br>16：表示MXFP8 RoundScale+Amax量化场景，expandedXOut量化到FLOAT8_E5M2;
-        <br>17：表示MXFP8 RoundScale+Amax量化场景，expandedXOut量化到FLOAT8_E4M3FN;
+        <br>0：表示静态quant场景。
+        <br>1：表示动态quant场景，expandedXOut量化到INT8。
+        <br>-1：表示非量化场景。
+        <br>2：表示MXFP8量化场景，expandedXOut量化到FLOAT8_E5M2。
+        <br>3：表示MXFP8量化场景，expandedXOut量化到FLOAT8_E4M3FN。
+        <br>4：表示FP8 PerGroup量化场景（GroupSize=128，RoundScale），expandedXOut量化到FLOAT8_E5M2。
+        <br>5：表示FP8 PerGroup量化场景（GroupSize=128，RoundScale），expandedXOut量化到FLOAT8_E4M3FN。
+        <br>6：表示HIF8直转量化场景，expandedXOut量化到HIFLOAT8。
+        <br>7：表示HIF8 PERTENSOR量化场景，expandedXOut按照pertensor模式量化到HIFLOAT8。
+        <br>8：表示HIF8 PERTOKEN量化场景，expandedXOut按照pertoken模式量化到HIFLOAT8。
+        <br>9：表示MXFP4量化场景，expandedXOut量化到FLOAT4_E2M1。
+        <br>11：表示FP8 PerBlock量化场景（BlockSize=128），expandedXOut量化到FLOAT8_E5M2，expandedScaleOut为FLOAT32三维布局。
+        <br>12：表示FP8 PerBlock量化场景（BlockSize=128），expandedXOut量化到FLOAT8_E4M3FN，expandedScaleOut为FLOAT32三维布局。
+        <br>13：表示INT4动态量化场景，expandedXOut量化到INT4。
+        <br>14：表示FP8 PerGroup量化场景（GroupSize=128，RoundScale+Amax），expandedXOut量化到FLOAT8_E5M2。
+        <br>15：表示FP8 PerGroup量化场景（GroupSize=128，RoundScale+Amax），expandedXOut量化到FLOAT8_E4M3FN。
+        <br>16：表示MXFP8 RoundScale+Amax量化场景，expandedXOut量化到FLOAT8_E5M2。
+        <br>17：表示MXFP8 RoundScale+Amax量化场景，expandedXOut量化到FLOAT8_E4M3FN。
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -380,7 +380,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>activeExpertRangeOptional（aclIntArray）</td>
       <td>输入</td>
       <td>表示活跃的expert范围</td>
-      <td>长度为2，数组内的值为[expertStart, expertEnd]，左闭右开，要求值大于等于0，并且expertEnd不大于expertNum；Drop/Pad场景下，expertStart等于0, expertEnd等于expertNum。</td>
+      <td>长度为2，数组内的值为[expertStart, expertEnd]，左闭右开，要求值大于等于0，并且expertEnd不大于expertNum；Drop/Pad场景下，expertStart等于0，expertEnd等于expertNum。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -403,8 +403,8 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>表示量化时scale算法的选择</td>
       <td>取值为0、1
-        <br>0：表示默认算法，结果与aclnnMoeInitRoutingV4一致;
-        <br>1：表示另一组scale阈值，仅在受支持的量化场景生效;
+        <br>0：表示默认算法，结果与aclnnMoeInitRoutingV4一致。
+        <br>1：表示另一组scale阈值，仅在受支持的量化场景生效。
         <br>不支持的场景必须传0，否则第一段接口返回ACLNN_ERR_PARAM_INVALID。</td>
       <td>INT64</td>
       <td>-</td>
@@ -429,7 +429,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>expandedRowIdxOut（aclTensor）</td>
       <td>输出</td>
       <td>expandedXOut和x的索引映射关系</td>
-      <td>输出shape为(NUM_ROWS*K, )， 前availableIdxNum个元素为有效数据，其余无效数据由rowIdxType决定：
+      <td>输出shape为(NUM_ROWS*K, )，前availableIdxNum个元素为有效数据，其余无效数据由rowIdxType决定：
         <ul><li>当rowIdxType为0时，无效数据由-1填充</li>
         <li>当rowIdxType为1时，无效数据未初始化</li></ul>
       </td>
@@ -459,7 +459,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输出不同量化过程中scaleOptional的中间值。</td>
       <td> 必选参数，不支持传入nullptr。各场景的输出shape要求如下。
         <ul style="list-style-type: circle;">
-        <li>非量化场景下，当scaleOptional输入时，shape为[NUM_ROWS*K]，前availableIdxNum个元素为有效数据，输出FLOAT32类型。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果scaleOptional输入，则expandedScaleOut的shape为[NUM_ROWS*K, CeilDiv(H, 64), 2]，输出FLOAT8_E8M0类型。当Drop/Pad场景输出是一个1D的Tensor，shape为[expertNum * expertCapacity]，输出FLOAT32类型。</li>
+        <li>非量化场景下，当scaleOptional输入时，shape为[NUM_ROWS*K]，前availableIdxNum个元素为有效数据，输出FLOAT32类型。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果scaleOptional输入，则expandedScaleOut的shape为[NUM_ROWS*K, CeilDiv(H, 64), 2]，输出FLOAT8_E8M0类型。当Drop/Pad场景下输出是一个1D的Tensor，shape为[expertNum * expertCapacity]，输出FLOAT32类型。</li>
         <li>动态量化场景下，输出为一维Tensor，shape为[NUM_ROWS*K]。当scaleOptional输入时，前availableIdxNum个元素为有效数据。</li>
         <li>静态量化场景下（quantMode为0）、HIF8直转量化场景下（quantMode为6）、HIF8 PERTENSOR量化场景下（quantMode为7），不产生scale数据，expandedScaleOut可传入shape为[0]、数据类型为FLOAT32、格式为ND的空Tensor。</li>
         <li>MXFP8量化场景下（quantMode为2、3、16、17），输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H,32),2)，NUM_ROWS*K的前availableIdxNum行为有效数据。</li>

@@ -145,13 +145,13 @@ aclnnStatus aclnnMhcSinkhorn(
 - 公共约束
 
   1. 输入约束：
-     - 输入Tensor `x`为空，报错`ACLNN_ERR_PARAM_NULLPTR`；
-     - 所有输入/输出Tensor的数据格式仅支持`ACL_FORMAT_ND`；
+     - 输入Tensor `x`为空，报错`ACLNN_ERR_PARAM_NULLPTR`。
+     - 所有输入/输出Tensor的数据格式仅支持`ACL_FORMAT_ND`。
      - 仅支持`FLOAT32`数据类型，不支持其他精度（如FLOAT16/DOUBLE）。
      - normOut和sumOut为可选参数，可传空指针；传空指针时不输出对应结果。不为空时，normOut的元素总数须为`2*numIters*T*n*8`，sumOut的元素总数须为`2*numIters*T*8`（其中`T`为输入合并后的batch数：3维时`T=x.shape[0]`，4维时`T=x.shape[0]*x.shape[1]`；`n`为矩阵维度，取值4/6/8；`8`为n按8对齐后的值），且格式须为`ACL_FORMAT_ND`，否则报错`ACLNN_ERR_PARAM_INVALID`。
-     - 输入-inf/inf/nan/，输出nan/nan/nan。
+     - 输入-inf/inf/nan，输出nan/nan/nan。
   2. 内存约束：
-     - Workspace内存需在Device侧申请，且大小需严格匹配第一段接口返回值；
+     - Workspace内存需在Device侧申请，且大小需严格匹配第一段接口返回值。
 
 - 规格约束
 

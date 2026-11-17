@@ -382,12 +382,12 @@ aclnnStatus aclnnNsaCompressAttention(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>输入query，key，value传入的是空指针。</td>
+      <td>输入query、key、value传入的是空指针。</td>
     </tr>
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="3">161002</td>
-      <td>query，key，value数据类型不在支持的范围之内。</td>
+      <td>query、key、value数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>inputLayout不合法。</td>

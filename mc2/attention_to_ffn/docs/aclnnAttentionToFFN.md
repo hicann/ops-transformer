@@ -369,7 +369,7 @@ aclnnStatus aclnnAttentionToFFN(
 - **产品特定约束**：
 
   <!-- npu="A3" id7 -->
-  - <term>Atlas A3系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明中的“本卡”均表示单DIE。
+  - <term>Atlas A3系列产品</term>：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明中的“本卡”均表示单DIE。
 
   <!-- end id7 -->
 
@@ -400,7 +400,7 @@ aclnnStatus aclnnAttentionToFFN(
 
 文件准备：
 
-1.新建AttentionToFFNDemo目录，按照下方指导在AttentionToFFNDemo下新建aclnnAttentionToFFNDemo.cpp，AttentionToFFN.sh文件并参考如下代码修改。
+1.新建AttentionToFFNDemo目录，按照下方指导在AttentionToFFNDemo下新建aclnnAttentionToFFNDemo.cpp、AttentionToFFN.sh文件并参考如下代码修改。
 
 2.安装cann包，并根据下方指导编译运行AttentionToFFNDemo。
 
@@ -425,7 +425,7 @@ bash AttentionToFFN.sh
 ./AttentionToFFNDemo
 ```
 
-示例代码如下，仅供参考
+示例代码如下，仅供参考：
 
 ```c++
 #include <thread>

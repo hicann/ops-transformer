@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：完成路由专家 GroupedMatMul、Unpermute、AlltoAllv 融合并实现与共享专家 MatMul 并行融合，**先计算后通信**。
+- 接口功能：完成路由专家GroupedMatMul、Unpermute、AlltoAllv融合并实现与共享专家MatMul并行融合，**先计算后通信**。
 
 - 计算公式：
 
@@ -122,7 +122,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <tr>
     <td>gmmX(aclTensor*)</td>
     <td>输入</td>
-    <td>GroupedMatMul 计算的左矩阵。</td>
+    <td>GroupedMatMul计算的左矩阵。</td>
     <td><ul><li>数据类型与gmmWeight保持一致。</li><li>支持2维，shape为(A, H1)。</li></ul></td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
@@ -132,7 +132,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <tr>
     <td>gmmWeight(aclTensor*)</td>
     <td>输入</td>
-    <td>GroupedMatMul 计算的右矩阵。</td>
+    <td>GroupedMatMul计算的右矩阵。</td>
     <td><ul><li>数据类型与gmmX保持一致。</li><li>支持3维，shape为(e, H1, N1)。</li></ul></td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
@@ -202,7 +202,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <tr>
     <td>epWorldSize（int64_t）</td>
     <td>输入</td>
-    <td>ep通信域size；传入-1时使用group通信域的实际大小，显式指定时必须与该大小一致，实际大小仍须满足产品约束。</td>
+    <td>EP通信域size；传入-1时使用group通信域的实际大小，显式指定时必须与该大小一致，实际大小仍须满足产品约束。</td>
     <td>支持2、4、8、16、32、64、128、256。</td>
     <td>INT64</td>
     <td>-</td>
@@ -376,7 +376,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
   - Atlas A2系列产品：仅支持AIV通信。
   <!-- end id11 -->
   <!-- npu="950" id12 -->
-  - Ascend 950DT系列产品：支持 CCU 通信和 AI CPU 通信，CCU 仅支持单机 UB 域内互联，AI CPU 可支持跨机 UB 域内互联。
+  - Ascend 950DT系列产品：支持CCU通信和AI CPU通信，CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
 
   <!-- end id12 -->
 
@@ -397,7 +397,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
   - BSK：本卡接收的token数，是recvCounts参数累加之和，取值范围(0, 52428800)。
   - H1：表示路由专家hidden size隐藏层大小，取值范围(0, 65536)。
   - H2：表示共享专家hidden size隐藏层大小，取值范围(0, 12288]。
-  - e：表示单卡上专家个数，AIV通信要求e > 0且e \* epWorldSize最大支持1024；其他通信引擎要求e<=32且e \* epWorldSize最大支持256。
+  - e：表示单卡上专家个数，AIV通信要求e > 0且e \* epWorldSize最大支持1024；其他通信引擎要求e <= 32且e \* epWorldSize最大支持256。
   - N1：表示路由专家的head_num，取值范围(0, 65536)。
   - N2：表示共享专家的head_num，取值范围(0, 65536)。
   - BS：batch sequence size。
@@ -423,7 +423,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分 HCCL 集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="950,A3" id15 -->
 - <term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：

@@ -254,7 +254,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
     - <term>Atlas推理系列产品</term>：0=half。
 
     <!-- end id11 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>却传入这两个值时，接口**不返回错误码**，而是打印 **warning** 日志，提示该 mode 仅 <term>Ascend 950PR&950DT系列产品</term> 支持；实际计算按 `0=half` 语义执行，输出与 quarter / interleave-half 不一致。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上传入这两个值时，接口**不返回错误码**，而是打印 **warning** 日志，提示该mode仅 <term>Ascend 950PR&950DT系列产品</term> 支持；实际计算按 `0=half` 语义执行，输出与quarter / interleave-half不一致。
 
 - **返回值：**
 
@@ -291,7 +291,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
       <td>传入的x、cos、sin、out的shape不匹配。</td>
     </tr>
     <tr>
-      <td>传入的mode参数不在支持的范围内。 </td>
+      <td>传入的mode参数不在支持的范围内。</td>
     </tr>
   </tbody>
   </table>
@@ -359,7 +359,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   输入张量x支持BNSD、BSND、SBND、TND排布。
   输入张量x、cos、sin及输出张量y的D维度大小必须相同，满足D<896，且必须为2的倍数。
   输入张量x和输出张量y的shape必须完全相同。
-  输入张量cos和sin的shape必须完全相同.
+  输入张量cos和sin的shape必须完全相同。
   - half模式：
     - B，N < 1000;
     - 当x为BNSD时，cos、sin支持11SD、B1SD、BNSD
@@ -369,7 +369,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
     - 当x为SBND时，cos、sin支持S11D、SB1D、SBND
     - 当x为TND时，cos、sin支持T1D、TND
   - interleave模式：
-    - B * N < 1000（N<1000当x为TND）
+    - B * N < 1000（当x为TND时N<1000）
     - 当x为BNSD时，cos、sin支持11SD
     - 当x为BSND时，cos、sin支持1S1D
     - 当x为SBND时，cos、sin支持S11D

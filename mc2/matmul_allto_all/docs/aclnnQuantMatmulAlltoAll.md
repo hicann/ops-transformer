@@ -214,7 +214,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
     <tr>
     <td>group</td>
     <td>输入</td>
-    <td>标识通信组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
+    <td>标识通信组的字符串，即通信域名称，通过HCCL接口HcclGetCommName获取commName作为该参数。</td>
     <td>字符串长度要求(0, 128)。</td>
     <td>-</td>
     <td>-</td>
@@ -456,7 +456,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
   - <term>Atlas A2系列产品</term>：biasOptional不支持传入空指针。
   <!-- end id13 -->
 
-* groupSize相关约束:
+* groupSize相关约束：
   - 仅当x1Scale和x2Scale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
   - 传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据x1/x2/x1Scale/x2Scale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。原理：假设groupSizeM=0，表示m方向量化分组值由接口推断，推断公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与x1 shape中的m一致，scaleM与x1Scale shape中的m一致，k和n方向同理。
     $$
@@ -543,7 +543,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
     * 维度约束：
       * H1范围仅支持[1, 65535]。
       * mx量化场景下，x2必须转置，shape为(H2, H1)，transposeX2为True。
-      * mx量化场景下，且x1和x2输入为FLOAT4_E2M1时，H1必须是偶数，且ceil(H1/32)必须是偶数。
+      * mx量化场景下，x1和x2输入为FLOAT4_E2M1时，H1必须是偶数，且ceil(H1/32)必须是偶数。
   <!-- end id15 -->
 
 * 通算融合算子不支持并发调用，不同的通算融合算子也不支持并发调用。
@@ -562,7 +562,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="910b" id18 -->
 - <term>Atlas A2系列产品</term>：

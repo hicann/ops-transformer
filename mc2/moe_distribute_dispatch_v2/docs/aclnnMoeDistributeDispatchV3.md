@@ -376,7 +376,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     <td>expandXOut</td>
     <td>输出</td>
     <td>根据<code>expertIds</code>扩展过的token特征。</td>
-    <td>2D Tensor 。</td>
+    <td>2D Tensor。</td>
     <td>FLOAT16、BFLOAT16、INT8、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1、FLOAT4_E1M2、INT32</td>
     <td>-</td>
     <td><code>(A, H)</code></td>
@@ -491,7 +491,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
 
     <!-- npu="A3" id10 -->
     <details>
-    <summary><term>Atlas A3系列产品</term>  ：</summary>
+    <summary><term>Atlas A3系列产品</term>：</summary>
 
     - dynamicScalesOut仅quantMode取值为2时有输出。
     - commAlg支持""、"fullmesh_v1"、"fullmesh_v2"三种输入方式。""：默认值，开启fullmesh_v1模板；"fullmesh_v1"：开启fullmesh_v1模板；"fullmesh_v2"：开启fullmesh_v2模板。
@@ -647,7 +647,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
 - **产品特定约束**：
 
   <!-- npu="A3" id12 -->
-  - <term>Atlas A3系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明中的“本卡”均表示单DIE。
+  - <term>Atlas A3系列产品</term>：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明中的“本卡”均表示单DIE。
 
   <!-- end id12 -->
 
@@ -656,8 +656,8 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
   | A            | 表示本卡需要分发的最大token数量，取值范围如下：<ul> <li>对于共享专家，令 <code>ranksPerSharedExpert = sharedExpertRankNum / sharedExpertNum</code>、<code>maxBS = (globalBs == 0 ? BS : globalBs / epWorldSize)</code>，要满足 <code>A &gt;= maxBS * ((epWorldSize + ranksPerSharedExpert - 1) / ranksPerSharedExpert)</code>。</li> <li>对于MoE专家，当globalBs为0时，要满足A >= BS \* epWorldSize \* min(localExpertNum, K)；当globalBs非0时，要满足A >= globalBs \* min(localExpertNum, K)。</li> </ul>|
-  | H（hidden size） | 表示hidden size隐藏层大小。 具体产品差异见下方说明。 |
-  | BS           | 表示本卡最终输出token数。 具体产品差异见下方说明。 |
+  | H（hidden size） | 表示hidden size隐藏层大小。具体产品差异见下方说明。 |
+  | BS           | 表示本卡最终输出token数。具体产品差异见下方说明。 |
   | K | 表示选取topK个专家，取值范围为0 < K ≤ 16，且<code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>。具体产品差异见下方说明。 |
   | serverNum    | 表示服务器节点数，仅支持2、4、8。具体产品差异见下方说明。 |
   | localExpertNum |   本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li>具体产品差异见下方说明。</li></ul> |
@@ -726,8 +726,8 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
               - `scalesOptional`的shape为(`BS`, `dim1`)，其中`dim1`需满足小于等于`H`。
       - `quantMode`取值为1时，表示静态量化场景，`expandX`的数据类型支持`INT8`、`HIFLOAT8`。
           - `expandX`的数据类型为`INT8`时有如下场景：
-              - 输入的`scalesOptional`代表量化系数，shape为(1, )；
-              - 输入的`scalesOptional`表示每个专家共享的平滑权重时，shape为(`H`，)；
+              - 输入的`scalesOptional`代表量化系数，shape为(1, )。
+              - 输入的`scalesOptional`表示每个专家共享的平滑权重时，shape为(`H`，)。
               - 输入的`scalesOptional`代表融了每个专家的平滑权重的量化系数时，若有共享专家卡，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)，若无共享专家卡，其shape为(`moeExpertNum`, `H`)。
           - `expandX`的数据类型为`HIFLOAT8`时，`scalesOptional`的shape必须为(1, )。
       - `quantMode`取值为2时，表示pertoken动态量化场景，`expandX`的数据类型支持`INT8`、`FLOAT8_E4M3FN`、`FLOAT8_E5M2`。
@@ -752,8 +752,8 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
       <!-- npu="910b" id16 -->
       - <term>Atlas A2系列产品</term>：
           - commAlg配置为""或nullptr：依照HCCL_INTRA_PCIE_ENABLE和HCCL_INTRA_ROCE_ENABLE环境变量配置，选择"fullmesh"或"hierarchy"公式。
-          - commAlg配置为"fullmesh": 当`x`的数据类型为`INT32`时，设置大小要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* (H \* sizeof(int32) + 32Byte) + 2MB)；其他数据类型设置大小要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)。
-          - commAlg配置为"hierarchy": 设置大小要求 >= (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1Byte + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
+          - commAlg配置为"fullmesh"：当`x`的数据类型为`INT32`时，设置大小要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* (H \* sizeof(int32) + 32Byte) + 2MB)；其他数据类型设置大小要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)。
+          - commAlg配置为"hierarchy"：设置大小要求 >= (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1Byte + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
       <!-- end id16 -->
       <!-- npu="A3" id17 -->
       - <term>Atlas A3系列产品</term>：
@@ -785,7 +785,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
   - 当前不支持TP域通信。
 
   <!-- npu="A3" id20 -->
-  - <term>Atlas A3系列产品</term>  ：一个通信域内的节点需在一个超节点内，不支持跨超节点。
+  - <term>Atlas A3系列产品</term>：一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
   <!-- end id20 -->
 
@@ -1249,7 +1249,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
 
 <!-- end id23 -->
 <!-- npu="950" id24 -->
-- <term>Ascend 950DT系列产品</term> ：请参考[aclnnMoeDistributeDispatchV2](../docs/aclnnMoeDistributeDispatchV2.md)中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V3接口相较于V2接口新增的场景参数按上述参数说明传值即可。
+- <term>Ascend 950DT系列产品</term>：请参考[aclnnMoeDistributeDispatchV2](../docs/aclnnMoeDistributeDispatchV2.md)中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V3接口相较于V2接口新增的场景参数按上述参数说明传值即可。
 
 <!-- end id24 -->
 <!-- npu="A3" id25 -->

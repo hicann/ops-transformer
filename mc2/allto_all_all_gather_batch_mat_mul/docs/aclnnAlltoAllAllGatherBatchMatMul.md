@@ -29,7 +29,7 @@
 
 - 计算公式：
 
-    计算逻辑如下，其中y1、y2、y3为输出
+    计算逻辑如下，其中y1、y2、y3为输出。
 
     $$
     x1 = AllToAll(x)
@@ -49,7 +49,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnAlltoAllAllGatherBatchMatMul"接口执行计算。
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnAlltoAllAllGatherBatchMatMul”接口执行计算。
 
 ```cpp
 aclnnStatus aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize(
@@ -127,7 +127,7 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(
     <td>biasOptional(aclTensor*)</td>
     <td>输入</td>
     <td>BatchMatMul计算的bias。</td>
-    <td><ul><li>x为FLOAT16时，biasOptional需为FLOAT16。</li><li>x为BFLOAT16时，biasOptional需为FLOAT32，支持两维或三维。支持传入空指针。</li></ul></td>
+    <td><ul><li>x为FLOAT16时，biasOptional需为FLOAT16。</li><li>x为BFLOAT16时，biasOptional需为FLOAT32，支持两维或三维，支持传入空指针。</li></ul></td>
     <td>FLOAT16、FLOAT32</td>
     <td>ND</td>
     <td>2、3</td>
@@ -249,7 +249,7 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-    第一阶段接口完成入参校验，出现以下场景报错：
+    第一阶段接口完成入参校验，出现以下场景时报错：
 
     <table style="undefined;table-layout: fixed; width: 1149px"><colgroup>
     <col style="width: 282px">
@@ -367,7 +367,7 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(
   - E/ep的取值范围为：[1, 32]。
   - ep、tp均仅支持2、4、8、16、32。
   - groupEp和groupTp名称不能相同。
-  - C必须大于0，上限为算子device内存上限，当xShardType为1时，C是tp的整数倍。
+  - C必须大于0，上限为算子Device内存上限，当xShardType为1时，C是tp的整数倍。
   - 通算融合算子不支持并发调用，不同的通算融合算子也不支持并发调用。
   - 不支持跨超节点，只支持超节点内。
 
@@ -376,7 +376,7 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="A3" id7 -->
-- <term>Atlas A3系列产品</term>  ：
+- <term>Atlas A3系列产品</term>：
 
     ```Cpp
     #include <thread>

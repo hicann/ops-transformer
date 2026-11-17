@@ -172,7 +172,7 @@
 
 ## 函数原型
 
-每个算子分为两段式接口，必须先调用"aclnnMoeGatingTopKV2GetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnMoeGatingTopKV2"接口执行计算。
+每个算子分为两段式接口，必须先调用“aclnnMoeGatingTopKV2GetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnMoeGatingTopKV2”接口执行计算。
 
 ```Cpp
 aclnnStatus aclnnMoeGatingTopKV2GetWorkspaceSize(
@@ -293,7 +293,7 @@ aclnnStatus aclnnMoeGatingTopKV2(
     <tr>
       <td>groupCount</td>
       <td>输入</td>
-      <td>分组的总个数，对应公式中的groupCount</td>
+      <td>分组的总个数，对应公式中的groupCount。</td>
       <td>无</td>
       <td>INT64</td>
       <td>-</td>
@@ -515,7 +515,7 @@ aclnnStatus aclnnMoeGatingTopKV2(
     * 要求1 <= kGroup <= groupCount，并且kGroup * x_shape[-1] / groupCount的值要大于等于k。
     * 要求groupCount > 0，x_shape[-1]能够被groupCount整除且整除后的结果大于groupSelectMode，并且整除的结果按照32个数对齐后乘groupCount的结果不大于2048。
 * 其他限制：
-    * groupSelectMode取值0和1，0表示使用最大值对group进行排序, 1表示使用topk2的sum值对group进行排序。
+    * groupSelectMode取值0和1，0表示使用最大值对group进行排序，1表示使用topk2的sum值对group进行排序。
     * normType取值范围和含义：0表示使用Softmax函数，1表示使用Sigmoid函数并做renorm，2表示使用SqrtSoftplus函数并做renorm，3表示使用Sigmoid函数，且由renorm控制是否对选中专家的得分归一化（renorm=0表示不做renorm，renorm=1表示做renorm）。
         <!-- npu="A3,910b" id7 -->
         * <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：

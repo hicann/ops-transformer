@@ -107,7 +107,7 @@ aclnnStatus aclnnAllGatherMatmul(
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
         <td>2</td>
-        <td>√（仅适用转置场景）</td>
+        <td>√（仅适用于转置场景）</td>
     </tr>
     <tr>
         <td>bias</td>
@@ -123,7 +123,7 @@ aclnnStatus aclnnAllGatherMatmul(
         <td>group</td>
         <td>输入</td>
         <td>通信域名称。</td>
-        <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
+        <td>通过HCCL提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -295,9 +295,9 @@ aclnnStatus aclnnAllGatherMatmul(
   - aclnnAllGatherMatmul默认确定性实现。
 
 - 输入x1为2维，其shape为(m, k)。x2必须是2维，其shape为(k, n)，轴满足MatMul算子入参要求，k轴相等，且k轴取值范围为[256, 65535)。
-- x1/x2支持的空tensor场景，m和n可以为空，k不可为空，且需要满足以下条件：
-    - m为空，k不为空，n不为空；
-    - m不为空，k不为空，n为空；
+- x1/x2支持的空Tensor场景，m和n可以为空，k不可为空，且需要满足以下条件：
+    - m为空，k不为空，n不为空。
+    - m不为空，k不为空，n为空。
     - m为空，k不为空，n为空。
 - 输出为2维，其shape为(m*rank_size, n)，rank_size为卡数。
 
@@ -305,14 +305,14 @@ aclnnStatus aclnnAllGatherMatmul(
 - <term>Atlas A2系列产品</term>：支持2、4、8卡，并且仅支持HCCS链路Full Mesh（全互连）组网。
 <!-- end id9 -->
 <!-- npu="A3" id10 -->
-- <term>Atlas A3系列产品</term>  ：支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
+- <term>Atlas A3系列产品</term> ：支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
 <!-- end id10 -->
 <!-- npu="950" id11 -->
 - <term>Ascend 950PR&950DT系列产品</term>:
   - 支持2、4、8、16、32、64卡，并且仅支持HCCS链路Full Mesh（全互连）组网。
 <!-- end id11 -->
 <!-- npu="910b" id12 -->
-- <term>Atlas A2系列产品</term>:一个模型中的通算融合MC2算子，仅支持相同通信域。
+- <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
 
 <!-- end id12 -->
 
@@ -320,10 +320,10 @@ aclnnStatus aclnnAllGatherMatmul(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="950,A3,910b" id13 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  、<term>Ascend 950PR&950DT系列产品</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term> 、<term>Ascend 950PR&950DT系列产品</term>：
 
     ```Cpp
     #include <thread>

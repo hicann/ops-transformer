@@ -422,7 +422,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
     <tr>
       <td>ropeHeadDim（int64_t）</td>
       <td>输入</td>
-      <td>表示rope头的维度。</td>
+      <td>表示RoPE头的维度。</td>
       <td>仅支持64。</td>
       <td>-</td>
       <td>-</td>
@@ -685,12 +685,12 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
 
 - 使用约束
 
-  - 参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional、sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional、cmpResidualKvOptional、oriBlockTableOptional、cmpBlockTableOptional等输入属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+  - 参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional、sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional、cmpResidualKvOptional、oriBlockTableOptional、cmpBlockTableOptional等输入属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，Tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
   - aclnnMixedQuantSparseFlashMlaMetadata和aclnnMixedQuantSparseFlashMla的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由用户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
   - quantMode=1/2且对应的oriMaskMode或cmpMaskMode为0的稀疏计算场景，oriTopkLengthOptional、cmpTopkLengthOptional分别表示oriSparseIndicesOptional、cmpSparseIndicesOptional实际参与计算的长度。有效q位置的长度值须非负；实际计算长度取该值与对应索引Tensor最后一维大小的较小值，超出索引宽度的部分不参与计算。quantMode=3不支持这两个长度输入。
   - 调用aclnnMixedQuantSparseFlashMlaMetadata时，若主算子传入oriSparseIndicesOptional或cmpSparseIndicesOptional，对应的oriTopk或cmpTopk须等于该索引Tensor的最后一维大小，保证分核与主算子使用相同的索引宽度。
   - quantMode=1/2时，cmpResidualKvOptional配合cmpRatio使用，可恢复压缩前KV长度。且每个batch的值需要小于cmpRatio。仅当cmpMaskMode为3且cmpRatio不等于1时允许传入；cmpMaskMode为0或cmpRatio等于1时不允许传入。
-  - attnOut：tensor类型，公式中的输出。数据类型支持FLOAT16、BFLOAT16，数据格式支持ND，shape和dtype与q一致。
+  - attnOut：Tensor类型，公式中的输出。数据类型支持FLOAT16、BFLOAT16，数据格式支持ND，shape和dtype与q一致。
   - returnSoftmaxLse=False时返回shape为[1]的值为0的tensor；returnSoftmaxLse=True时返回FLOAT32的log-sum-exp结果。
   - cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
   - 当layoutKvOptional为PA_BBND时，oriKvOptional和cmpKvOptional支持0轴非连续，非连续Tensor的每一维的stride均不能为0。不支持其他非连续。
@@ -876,7 +876,7 @@ layout匹配关系表：
 </tbody>
 </table>
 
-metadataOptional校验
+metadataOptional校验：
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
         <col style="width: 147px">
@@ -1309,7 +1309,7 @@ metadataOptional校验
 
 #### Paged Attention参数组
 
-当layoutKvOptional为PA_BBND时，开启Paged Attention
+当layoutKvOptional为PA_BBND时，开启Paged Attention。
 
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>

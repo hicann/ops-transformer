@@ -236,7 +236,7 @@
 
              $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-             其中，$xScale_{i}$代表的是对应token的量化因子
+             其中，$xScale_{i}$代表的是对应token的量化因子。
            - 3.量化输出结果
 
              $Q\_scale_{i} = \frac{max(|S_{i}|)}{max(type)}$
@@ -254,7 +254,7 @@
 
         * $X∈\mathbb{Z_8}^{M \times K}$：激活矩阵（左矩阵），M是总token数，K是特征维度。
         * $W∈\mathbb{Z_8}^{E \times K \times N}$：分组权重矩阵（右矩阵），E是专家个数，K是特征维度，N是输出维度。
-        * $w\_scale∈\mathbb{R}^{E \times ceil(K / 64) \times N \times 2}$：分组权重矩阵（右矩阵）的逐通道缩放因子，E是专家个数，K是特征维度， N是输出维度。
+        * $w\_scale∈\mathbb{R}^{E \times ceil(K / 64) \times N \times 2}$：分组权重矩阵（右矩阵）的逐通道缩放因子，E是专家个数，K是特征维度，N是输出维度。
         * $x\_scale∈\mathbb{R}^{M \times ceil(K / 64) \times 2}$：激活矩阵（左矩阵）的逐token缩放因子，M是总token数，K是特征维度。
         * $grouplist∈\mathbb{N}^{E}$：cumsum或count的分组索引列表。
       - **输出**：
@@ -474,7 +474,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
       <tr>
         <td>quantMode</td>
         <td rowspan="1">输入</td>
-        <td>表示量化计算类型，用于确定swiglu结果的量化模式。</td>
+        <td>表示量化计算类型，用于确定SwiGLU结果的量化模式。</td>
         <td><ul>
           <li>0表示per-token。</li>
           <li>2表示MX量化。</li>
@@ -498,7 +498,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
         <td>tuningConfigOptional</td>
         <td rowspan="1">可选输入</td>
         <td>用于算子预估M/E的大小，走不同的算子模板，以适配不同场景性能要求。</td>
-        <td>数组，传入的第一个数字表示各个专家处理的token数的预期值，用于优化tiling，A4W4 右矩阵NZ输入时开启，其他输入请传入空指针。</td>
+        <td>数组，传入的第一个数字表示各个专家处理的token数的预期值，用于优化Tiling，A4W4右矩阵NZ输入时开启，其他输入请传入空指针。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -616,7 +616,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
         <td>在不支持多Tensor的场景下，传入的weight、weightScale的tensor list长度不为1；或在多Tensor场景下，weight和weightScale的tensor list长度不一致。</td>
       </tr>
       <tr>
-        <td>传入的x、xScale为空tensor，传入的weight、weightScale为空tensorList。</td>
+        <td>传入的x、xScale为空Tensor，传入的weight、weightScale为空tensorList。</td>
       </tr>
       <tr>
         <td>groupList的元素个数大于weight的首轴长度。</td>
@@ -970,7 +970,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
           - N >= 128。
           - weight仅支持转置。用户需构造转置的NZ格式weight数据，调用前需transpose成非转置状态。
           - 多tensor场景下（tensorlist长度大于等于1），weight和weightScale的tensor数量需一致。
-          - 多tensor场景下，weight中每个tensor的K和N需相等。
+          - 多Tensor场景下，weight中每个Tensor的K和N需相等。
           - 多tensor场景下，weight中每个tensor的view shape为2D，weightScale中每个tensor的view shape为3D；单tensor场景下，weight中每个tensor的view shape为3D，weightScale中每个tensor的view shape为4D。
           - 多tensor场景下，所有weightScale tensor的shape需与对应weight tensor匹配。
           - 多tensor场景下，groupList的长度需等于weight/weightScale的tensor数量。

@@ -22,7 +22,7 @@
 
 ## 功能说明
 
-- 接口功能：Stem OAM (Output-Aware Metric) 大模型推理动态稀疏注意力机制的前置评分模块。从 Paged KV Cache 中提取 K/V 数据，经 K Processing (per-token K-scale × group sum + anti-diagonal flip) 和 V Processing (per-head vScale × L2 Norm → Log → Global Normalize → ReLU → Block Average) 计算，输出 kFlat 和 vBias 供 Stem OAM score computation 使用。
+- 接口功能：Stem OAM (Output-Aware Metric) 大模型推理动态稀疏注意力机制的前置评分模块。从Paged KV Cache 中提取 K/V 数据，经 K Processing (per-token K-scale × group sum + anti-diagonal flip) 和 V Processing (per-head vScale × L2 Norm → Log → Global Normalize → ReLU → Block Average) 计算，输出 kFlat 和 vBias 供 Stem OAM score computation 使用。
 
 - 计算公式：
 阶段1：De-page + Cast FP32 + kScaleCache Gather
@@ -153,7 +153,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0pky">kCache（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">Paged K cache。</td>
-      <td class="tg-0pky">不支持空Tensor。<br>两种布局, 由kvLayout指定, 当前仅支持"BNBD":<br>"BBND"为[total_blocks, kvBlockSize, H_kv, D=128], <br>"BNBD"为[total_blocks, H_kv, kvBlockSize, D=128]。<br>支持前三维非连续, 最后一维必须连续, H_kv最大值为8。</td>
+      <td class="tg-0pky">不支持空Tensor。<br>两种布局, 由kvLayout指定, 当前仅支持"BNBD":<br>"BBND"为[total_blocks, kvBlockSize, H_kv, D=128], <br>"BNBD"为[total_blocks, H_kv, kvBlockSize, D=128]。<br>支持前三维非连续，最后一维必须连续，H_kv最大值为8。</td>
       <td class="tg-0pky">FLOAT8_E4M3FN</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4</td>
@@ -212,8 +212,8 @@ aclnnStatus aclnnStemOamPrepPagedKv(
     <tr>
       <td class="tg-0pky">lambdaMag</td>
       <td class="tg-0pky">ATTR</td>
-      <td class="tg-0pky">V bias 乘数</td>
-      <td class="tg-0pky">取值范围: [0,1]。</td>
+      <td class="tg-0pky">V bias乘数</td>
+      <td class="tg-0pky">取值范围：[0,1]。</td>
       <td class="tg-0pky">double</td>
       <td class="tg-0pky">-</td>
       <td class="tg-0pky">-</td>
@@ -223,7 +223,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0pky">kvLayout</td>
       <td class="tg-0pky">ATTR</td>
       <td class="tg-0pky">KV Cache布局</td>
-      <td class="tg-0pky">取值范围: "BBND"、"BNBD"。当前仅支持"BNBD"</td>
+      <td class="tg-0pky">取值范围："BBND"、"BNBD"。当前仅支持"BNBD"</td>
       <td class="tg-0pky">char*</td>
       <td class="tg-0pky">-</td>
       <td class="tg-0pky">-</td>
@@ -233,7 +233,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0lax">stemBlockSize</td>
       <td class="tg-0lax">ATTR</td>
       <td class="tg-0lax">Stem block大小</td>
-      <td class="tg-0lax">取值范围: %32==0, ≤256, 且stemBlockSize必须是stemStride的整数倍，推荐128。</td>
+      <td class="tg-0lax">取值范围：%32==0，≤256，且stemBlockSize必须是stemStride的整数倍，推荐128。</td>
       <td class="tg-0lax">int64_t</td>
       <td class="tg-0lax">-</td>
       <td class="tg-0lax">-</td>
@@ -243,7 +243,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0lax">stemStride</td>
       <td class="tg-0lax">ATTR</td>
       <td class="tg-0lax">Stride大小</td>
-      <td class="tg-0lax">取值范围: %16==0，≤64，≤stemBlockSize，推荐16。</td>
+      <td class="tg-0lax">取值范围：%16==0，≤64，≤stemBlockSize，推荐16。</td>
       <td class="tg-0lax">int64_t</td>
       <td class="tg-0lax">-</td>
       <td class="tg-0lax">-</td>
@@ -252,7 +252,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
     <tr>
       <td class="tg-0lax">kFlat（aclTensor*）</td>
       <td class="tg-0lax">输出</td>
-      <td class="tg-0lax">K group sum + anti-diag flip 结果。</td>
+      <td class="tg-0lax">K group sum + anti-diag flip结果。</td>
       <td class="tg-0lax">不支持空Tensor。<br>shape为[batch, H_kv, max_Kb, kflat_dim]，其中kflat_dim=stemStride*D, <br>max_Kb依赖kvSeqLens输入计算获得。</td>
       <td class="tg-0lax">BFLOAT16</td>
       <td class="tg-0lax">ND</td>

@@ -272,7 +272,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     <tr>
       <td>kScaleOptional</td>
       <td>可选输入</td>
-      <td>当kCache为INT8数据类型时需要存在。对应计算公式中的kScale。</td>
+      <td>当kCache为INT8数据类型时需要存在，对应计算公式中的kScale。</td>
       <td>shape为[N<sub>k</sub>, D<sub>qkv</sub>]。</td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -282,7 +282,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     <tr>
       <td>vScaleOptional</td>
       <td>可选输入</td>
-      <td>当vCache为INT8数据类型时需要存在。对应计算公式中的vScale。</td>
+      <td>当vCache为INT8数据类型时需要存在，对应计算公式中的vScale。</td>
       <td>shape为[N<sub>v</sub>, D<sub>qkv</sub>]。</td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -312,7 +312,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     <tr>
       <td>qkvSize</td>
       <td>输入</td>
-      <td>按[B<sub>qkv</sub>, S<sub>qkv</sub>, N<sub>qkv</sub>, D<sub>qkv</sub>]顺序传入，提供输入参数qkv矩阵的B，S，N，D维度具体尺寸。</td>
+      <td>按[B<sub>qkv</sub>, S<sub>qkv</sub>, N<sub>qkv</sub>, D<sub>qkv</sub>]顺序传入，提供输入参数qkv矩阵的B、S、N、D维度具体尺寸。</td>
       <td><ul><li>要求N<sub>qkv</sub> = N<sub>q</sub> + N<sub>k</sub> + N<sub>v</sub>。</li><li>元素数量严格等于4，各元素必须为非零有效正整数。</li></ul></td>
       <td>INT64</td>
       <td>-</td>
@@ -332,7 +332,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     <tr>
       <td>epsilon</td>
       <td>输入</td>
-      <td>RmsNorm计算中防止除0。对应计算公式中的epsilon。</td>
+      <td>RmsNorm计算中防止除0，对应计算公式中的epsilon。</td>
       <td>建议值为1e-6</td>
       <td>FLOAT32</td>
       <td>-</td>
@@ -495,7 +495,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     * 使用requireMemory表示存放数据所需的空间大小，需满足：requireMemory >= (B<sub>qkv</sub> *S<sub>qkv</sub>* N<sub>qkv</sub> *D<sub>qkv</sub> + 2* D<sub>qkv</sub> + 2 *B<sub>qkv</sub>* S<sub>qkv</sub> *D<sub>qkv</sub> + B<sub>qkv</sub>* S<sub>qkv</sub> *N<sub>q</sub>* D<sub>qkv</sub> + BlockNum *BlockSize* N<sub>v</sub> *D<sub>qkv</sub> + BlockNum* BlockSize *N<sub>k</sub>* D<sub>qkv</sub>) *sizeof(FLOAT16) + B<sub>qkv</sub>* S<sub>qkv</sub> *sizeof(INT64) + (2* N<sub>k</sub> *D<sub>qkv</sub> + 2* N<sub>v</sub>) * sizeof(FLOAT)，当计算出requireMemory的大小超过当前AI处理器的GM空间总大小，不支持使用该接口。
 - 其他限制：
     * 对于index，要求index的value值范围为[-1, BlockNum * BlockSize)。value数值不可以重复，index为-1时，代表跳过更新。
-    * kScaleOptional, vScaleOptional表示对称量化的缩放因子，因此若传参，则值不能为0。
+    * kScaleOptional、vScaleOptional表示对称量化的缩放因子，因此若传参，则值不能为0。
 
 ## 调用示例
 

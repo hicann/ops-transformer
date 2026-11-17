@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：执行双路旋转位置编码[aclnnApplyRotaryPosEmb](../../apply_rotary_pos_emb/docs/aclnnApplyRotaryPosEmb.md)的反向计算。同时计算 query 和 key 的 rope 反向梯度，融合为一次 kernel 调用。
+- 接口功能：执行双路旋转位置编码[aclnnApplyRotaryPosEmb](../../apply_rotary_pos_emb/docs/aclnnApplyRotaryPosEmb.md)的反向计算。同时计算query和key的rope反向梯度，融合为一次kernel调用。
 
 - 计算公式：
 

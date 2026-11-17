@@ -87,7 +87,7 @@
   dK=(dS^T*Q)*scale
   $$
 
-BlockSparseAttentionGrad输入dout、query、key、value, attentionOut的数据排布格式支持从多种维度排布解读，可通过qInputLayout和kvInputLayout传入。为了方便理解后续支持的具体排布格式（如 BNSD、TND 等），此处先对排布格式中各缩写字母所代表的维度含义进行统一说明：
+BlockSparseAttentionGrad输入dout、query、key、value、attentionOut的数据排布格式支持从多种维度排布解读，可通过qInputLayout和kvInputLayout传入。为了方便理解后续支持的具体排布格式（如 BNSD、TND 等），此处先对排布格式中各缩写字母所代表的维度含义进行统一说明：
 
 - B：表示输入样本批量大小（Batch）
 - T：B和S合轴紧密排列的长度（Total tokens）
@@ -500,7 +500,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
 - softmaxLse的layout需要与query的layout保持一致。如果query的layout为"BSND"时，softmaxLse的layout应传入"BNS1"。
 - Ascend 950 产品要求 HeadDim 等于 128。
 - blockShapeOptional中的blockShapeX和blockShapeY分别表示Q方向和KV方向的稀疏粒度。两者均须大于 0，可以配置为不同值。Ascend 950 要求两者均为 16 的整数倍。BlockSparseMask的Q块数和KV块数应分别按照对应方向的稀疏粒度计算。
-- 根据算子支持的输入 Layout，query 张量 Shape 中对应的 head 维度大小记为 N1，key 和 value 张量 Shape 中对应的 head 维度大小记为 N2。必须满足N1 % N2 == 0。 支持MQA、MHA、GQA场景。
+- 根据算子支持的输入 Layout，query 张量 Shape 中对应的 head 维度大小记为 N1，key 和 value 张量 Shape 中对应的 head 维度大小记为 N2。必须满足N1 % N2 == 0。支持MQA、MHA、GQA场景。
 - actualSeqLengthsOptional与actualSeqLengthsKvOptional相关约束：当qInputLayout或kvInputLayout 为非"TND"时，会忽略这两个入参。
 
 ## 调用示例

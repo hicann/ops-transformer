@@ -136,7 +136,7 @@ aclnnStatus aclnnGroupedMatMulAllReduce(
       <tr>
       <td>splitItem（uint64_t）</td>
       <td>输入</td>
-      <td>可选属性，代表输入和输出是否要做tensor切分。</td>
+      <td>可选属性，代表输入和输出是否要做Tensor切分。</td>
       <td>支持0/1/2/3：0=输入输出都不切分，1=输入切分输出不切分，2=输入不切分输出切分，3=输入输出都切分。</td>
       <td>INT64</td>
       <td>ND</td>
@@ -146,7 +146,7 @@ aclnnStatus aclnnGroupedMatMulAllReduce(
       <tr>
       <td>group(char*)</td>
       <td>输入</td>
-      <td>Host侧标识组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
+      <td>Host侧标识组的字符串，即通信域名称，通过HCCL接口HcclGetCommName获取commName作为该参数。</td>
       <td>字符串长度需大于0。</td>
       <td>STRING</td>
       <td>ND</td>
@@ -156,7 +156,7 @@ aclnnStatus aclnnGroupedMatMulAllReduce(
       <tr>
       <td>reduceOp(char*)</td>
       <td>输入</td>
-      <td>reduce操作类型。</td>
+      <td>Reduce操作类型。</td>
       <td>仅支持"sum"。</td>
       <td>STRING</td>
       <td>ND</td>
@@ -321,12 +321,12 @@ aclnnStatus aclnnGroupedMatMulAllReduce(
   -“x-FLOAT16、weight-FLOAT16、bias-FLOAT16”
   -“x-BFLOAT16、weight-BFLOAT16、bias-FLOAT32”
 - 维度约束：
-  - 当splitItem为0时，x支持2-6维，y支持2-6维；
-  - 当splitItem为1/2/3时，x支持2维，y支持2维；
+  - 当splitItem为0时，x支持2-6维，y支持2-6维。
+  - 当splitItem为1/2/3时，x支持2维，y支持2维。
   - 无论splitItem取值如何，weight均支持2维。
 - 设备数量约束：支持2、4、8卡部署。
 - 张量维度大小约束：
-  - x和weight中每一组tensor的最后一维大小都应小于65536（x的最后一维：transpose_x为false时指K轴，为true时指M轴；weight的最后一维：transpose_weight为false时指N轴，为true时指K轴）。
+  - x和weight中每一组Tensor的最后一维大小都应小于65536（x的最后一维：transpose_x为false时指K轴，为true时指M轴；weight的最后一维：transpose_weight为false时指N轴，为true时指K轴）。
   - x和weight中每一组tensor的每一维大小在32字节对齐后都应小于int32最大值（2147483647）。
 
 ## 调用示例
@@ -901,7 +901,7 @@ int launchMultiThread(Args &input_args, int32_t *devices, HcclComm *comms, Resou
 
 int InitParams(int argc, char** argv) {
   if (argc < 4) {
-    LOG_PRINT("miss paramaters\n");
+    LOG_PRINT("miss parameters\n");
   }
   g_ndev = std::stoi(argv[1]);
   loop = std::stoi(argv[2]);

@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：aclnnSparseLightningIndexer 实现 candidate consumer 语义：在 LightningIndexerV2 加权 ReLU 打分框架上消费上游 source 算子（aclnnLightningIndexerV3 开启 candidateTopkBlocks 时输出的 candidateBlockIndices）的候选块索引，对每个 query 行做无 leak 候选内 TopK：可达且命中候选块的位置以真实分数参与排序，其余位置（不可达 / 可达但不在候选内）一律无效不入选；非候选块索引一律不进入 topk 输出，候选内有效数不足 topk 时剩余槽位填 -1，输出每个 query 行的 top-k 索引与（returnValue为1时的）TopK 分数。算子仅注册 ascend910b / ascend910_93 平台（arch22），需与上游 aclnnLightningIndexerV3 的 candidate source 模式配套使用。
+- 接口功能：aclnnSparseLightningIndexer实现 candidate consumer 语义：在 LightningIndexerV2 加权 ReLU 打分框架上消费上游 source 算子（aclnnLightningIndexerV3 开启 candidateTopkBlocks 时输出的 candidateBlockIndices）的候选块索引，对每个 query 行做无 leak 候选内 TopK：可达且命中候选块的位置以真实分数参与排序，其余位置（不可达 / 可达但不在候选内）一律无效不入选；非候选块索引一律不进入 topk 输出，候选内有效数不足 topk 时剩余槽位填 -1，输出每个 query 行的 top-k 索引与（returnValue为1时的）TopK 分数。算子仅注册 ascend910b / ascend910_93 平台（arch22），需与上游 aclnnLightningIndexerV3 的 candidate source 模式配套使用。
 
 - 计算公式（每 batch b、query 行 i，N2=1）：
 
@@ -50,7 +50,7 @@
 
   - $vl(b,i)$：行可达前缀长度，由因果mask、sequsedKOptional/cuSeqlensKOptional与cmpRatio（含cmpResidualKOptional余数）推算。
   - $blockSize$：属性candidateBlockSize。
-  - $candSet(b,i)$：候选块号集合（来自candidateBlockIndices，重复/越界/-1按"非候选"处理）。
+  - $candSet(b,i)$：候选块号集合（来自candidateBlockIndices，重复/越界/-1按“非候选”处理）。
   - $nvalid(b,i)$：候选内有效位置数。
   - $\mathrm{DoReduce}$：沿g（多头）方向的加权求和。
   - $W$：多头权重投影矩阵；$\odot$：逐元素乘法；@：矩阵乘法。
@@ -344,7 +344,7 @@ aclnnStatus aclnnSparseLightningIndexer(
     <tr>
     <td>sparseIndicesOut（const aclTensor*）</td>
     <td>输出</td>
-    <td>公式中的Indices输出（无 leak TopK 索引）。</td>
+    <td>公式中的Indices输出（无leak TopK索引）。</td>
     <td><ul><li>不支持空tensor。</li><li>有效槽为候选内可达位置按分数降序排列（同分次序不承诺）。</li><li>候选内有效数nvalid &lt; topk时，其后槽位全部填-1（含候选外可达位置在内的所有无效槽一律-1，不输出任何候选外索引）；全无效行输出全-1。</li><li>layout_q为BSND时，shape为(B, S1, N2, topk)。</li><li>layout_q为TND时，shape为(T, N2, topk)。</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
@@ -465,25 +465,25 @@ aclnnStatus aclnnSparseLightningIndexer(
   - layout_k非PA_BBND时，layout_q与layout_k必须一致；PA_BBND时block_table必传且dim0等于B，seqused_k必传，k仅允许0轴非连续。
   - layout_k为TND时cuSeqlensKOptional必传；layout_k为BSND时cuSeqlensKOptional传入报错。
 - candidate约束：
-  - candidateBlockIndices 必传（REQUIRED，INT32）；candBlocks（shape 末维）∈ (0, 2048] 且为 64 的倍数；本算子无 candidate_topk_blocks 属性（宽度由输入 shape 推导）。
+  - candidateBlockIndices必传（REQUIRED，INT32）；candBlocks（shape 末维）∈ (0, 2048] 且为 64 的倍数；本算子无 candidate_topk_blocks 属性（宽度由输入 shape 推导）。
   - candidateBlockSize ∈ [2, 64] 内的2的幂；与上游source算子的candidateBlockSize保持一致（调用方约束，框架层无法跨算子校验）。
-  - candidateBlockLength 预留：仅接受 nullptr/空 tensor（numel==0），非空报错
+  - candidateBlockLength预留：仅接受 nullptr/空 tensor（numel==0），非空报错
     "candidate_block_length is reserved and only empty tensor is supported yet"。
 - 属性限制：
-  - topk ∈ (0, 2048]，恒校验（>2048 报错）。
+  - topk ∈ (0, 2048]，恒校验（>2048报错）。
   - returnValue ∈ {0,1}，其它值报错拒绝（"Return_value only supports 0 or 1"）。
-  - maskMode 仅支持0或3。
-  - cmpRatio 由本算子 host 强校验 (0, 128] 且 2 的幂；上游 source 算子（aclnnLightningIndexerV3）host 仅校验 (0, 128]，两侧配置需保持一致。
-  - maxSeqlenQ 仅支持-1；seqused_q / output_idx_offset / metadata 由 arch22 host 侧校验拒绝（接口对齐保留位，传 nullptr 即可）。
-- 其余约束（layout 组合、PA block_table、N2=1、head_dim=128 等）与上游算子 aclnnLightningIndexerV3 一致。
+  - maskMode仅支持0或3。
+  - cmpRatio由本算子 host 强校验 (0, 128] 且 2 的幂；上游 source 算子（aclnnLightningIndexerV3）host 仅校验 (0, 128]，两侧配置需保持一致。
+  - maxSeqlenQ仅支持-1；seqused_q / output_idx_offset / metadata 由 arch22 host 侧校验拒绝（接口对齐保留位，传 nullptr 即可）。
+- 其余约束（layout组合、PA block_table、N2=1、head_dim=128 等）与上游算子 aclnnLightningIndexerV3 一致。
 
 ## 跨算子约束
 
-- candidateBlockIndices 直接对接 aclnnLightningIndexerV3（开启 candidateTopkBlocks 时）的 candidateBlockIndices 输出，块号为同一 forward 内 batch 相对压缩块号，槽位无序（消费侧按集合消费）；
-- 候选块号不含 output_idx_offset 偏移；
-- candidateBlockSize、cmpRatio 必须与 source 侧配置一致；
+- candidateBlockIndices直接对接 aclnnLightningIndexerV3（开启 candidateTopkBlocks 时）的 candidateBlockIndices 输出，块号为同一 forward 内 batch 相对压缩块号，槽位无序（消费侧按集合消费）；
+- 候选块号不含 output_idx_offset偏移；
+- candidateBlockSize、cmpRatio必须与source侧配置一致；
 
-- 候选宽度 candBlocks 由输入 tensor shape 末维推导。
+- 候选宽度candBlocks由输入 tensor shape 末维推导。
 
 ## 调用示例
 

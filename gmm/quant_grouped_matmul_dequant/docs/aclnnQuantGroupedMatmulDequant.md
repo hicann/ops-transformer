@@ -44,7 +44,7 @@
   $$
 
   4.分组矩阵乘+反量化
-    - 4.1 若输入的$scale_{weight}$数据类型为FLOAT32,则：
+    - 4.1 若输入的$scale_{weight}$数据类型为FLOAT32，则：
 
   $$
     \begin{aligned}
@@ -58,7 +58,7 @@
     \end{aligned}
   $$
 
-  - 4.2 若输入的$scale_{weight}$数据类型为INT64,则：
+  - 4.2 若输入的$scale_{weight}$数据类型为INT64，则：
 
     $$
     x^{*}_{quantized} = x_{quantized}[group[i-1]:group[i]] \\
@@ -67,7 +67,7 @@
     out^{*}_{quantized} = (x^{*}_{quantized}@weight_{quantized}[i] + bias) * scale_{weight}[i]
     $$
 
-    特别说明：如果是上述4.2场景，说明$scale_{weight}$输入前已经和$scale_{x}$做过了矩阵乘运算，因此算子内部计算时省略了该步骤，这要求必须是pertensor静态量化的场景。即输入前要对$scale_{weight}做如下处理得到INT64类型的数据：
+    特别说明：如果是上述4.2场景，说明$scale_{weight}$输入前已经和$scale_{x}$做过了矩阵乘运算，因此算子内部计算时省略了该步骤，这要求必须是pertensor静态量化的场景，即输入前要对$scale_{weight}做如下处理得到INT64类型的数据：
 
     $$
     scale_{weight} = scale_{weight} * scale_{x} \\
@@ -347,7 +347,7 @@ aclnnStatus aclnnQuantGroupedMatmulDequant(
 
 - **返回值**
 
-  aclnnStatus: 返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 

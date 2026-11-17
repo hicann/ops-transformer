@@ -102,7 +102,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <tr>
     <td>q（aclTensor*）</td>
     <td>输入</td>
-    <td>公式中的输入Q。支持的shape为：
+    <td>公式中的输入Q，支持的shape为：
         <ul><li>layoutQOptional为BSND时，shape为(B,S1,N1,D)。</li><li>layoutQOptional为TND时，shape为(T1,N1,D)。</li></ul></td>
     <td>不支持空tensor。</td>
     <td>BFLOAT16、FLOAT16</td>
@@ -113,7 +113,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <tr>
     <td>k（aclTensor*）</td>
     <td>输入</td>
-    <td>公式中的输入K。支持的shape为：
+    <td>公式中的输入K，支持的shape为：
         <ul><li>layoutKOptional为PA_BBND时，shape为(block_num, block_size, N2, D)。</li><li>layoutKOptional为BSND时，shape为(B, S2, N2, D)。</li><li>layoutKOptional为TND时，shape为(T2, N2, D)。</li></ul></td>
     <td><ul><li>不支持空tensor。</li><li>block_num为PageAttention时block总数，block_size为一个block的token数。</li></ul></td>
     <td>BFLOAT16、FLOAT16</td>
@@ -124,7 +124,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <tr>
     <td>w（aclTensor*）</td>
     <td>输入</td>
-    <td>公式中的输入W。支持的shape为：
+    <td>公式中的输入W，支持的shape为：
         <ul><li>layoutQOptional为BSND时，shape为(B,S1,N1)。</li><li>layoutQOptional为TND时，shape为(T1,N1)。</li></ul></td>
     <td>不支持空tensor。</td>
     <td>FLOAT</td>
@@ -195,7 +195,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <tr>
     <td>outputIdxOffsetOptional（aclTensor*）</td>
     <td>输入</td>
-    <td>表示topK结果输出索引所需要加上的偏移。支持的shape为：
+    <td>表示topK结果输出索引所需要加上的偏移，支持的shape为：
         <ul><li>layoutQ为"BSND"时shape为[B, S1, N2]。</li><li>layoutQ为"TND"时shape为[T1, N2]。</li></ul></td>
     <td><ul><li>值必须大于等于0。</li><li>加上偏移后，topK index不能超过int32最大值。</li><li>candidate模式下偏移不叠加到candidateBlockIndices。</li></ul></td>
     <td>INT32</td>
@@ -307,7 +307,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <tr>
     <td>sparseIndices（aclTensor*）</td>
     <td>输出</td>
-    <td>公式中的Indices输出。支持的shape为：
+    <td>公式中的Indices输出，支持的shape为：
         <ul><li>layoutQ为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>layoutQ为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
     <td>不支持空tensor。</td>
     <td>INT32</td>
@@ -318,7 +318,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <tr>
     <td>sparseValues（aclTensor*）</td>
     <td>输出</td>
-    <td>公式中的Indices对应的Values输出。支持的shape为：
+    <td>公式中的Indices对应的Values输出，支持的shape为：
         <ul><li>returnValue为1且layoutQ为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>returnValue为1且layoutQ为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
     <td>returnValue为1时输出对应值；为0时输出shape为(0,)的空tensor。</td>
     <td>FLOAT</td>
@@ -329,7 +329,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <tr>
     <td>candidateBlockIndices（aclTensor*）</td>
     <td>输出</td>
-    <td>两级TopK候选源模式的候选块索引输出。支持的shape为：
+    <td>两级TopK候选源模式的候选块索引输出，支持的shape为：
         <ul><li>开启且layoutQ为"BSND"时输出shape为[B, S1, N2, candidateTopkBlocks]。</li><li>开启且layoutQ为"TND"时输出shape为[T1, N2, candidateTopkBlocks]。</li><li>关闭时输出shape为(0,)。</li></ul></td>
     <td><ul><li>candidateTopkBlocks开启时必须传入实际tensor。</li><li>candidateTopkBlocks关闭时可传nullptr（接口内部以空tensor占位）。</li><li>块号为batch内相对块号（压缩K空间），无效槽位填-1，不叠加outputIdxOffset；消费侧按集合消费，不依赖槽位顺序。</li></ul></td>
     <td>INT32</td>
@@ -469,7 +469,7 @@ aclnnStatus aclnnLightningIndexerV3(
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
   - 支持本接口；candidate关闭（candidateTopkBlocks传入-1）时，接口行为与aclnnLightningIndexerV2一致。
-  - 两级TopK候选源（source）模式在本系列产品上暂不支持开启：candidateTopkBlocks传入非-1时会被host侧tiling校验拒绝并返回错误。
+  - 两级TopK候选源（source）模式在本系列产品上暂不支持开启：candidateTopkBlocks传入非-1时会被Host侧Tiling校验拒绝并返回错误。
 <!-- end id8 -->
 
 ## 调用示例

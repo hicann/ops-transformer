@@ -151,7 +151,7 @@ aclnnStatus aclnnScatterPaCache(
       <td class="tg-0pky">slotMapping(aclTensor*)</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">key的每个token在cache中的存储偏移，公式中的slotMapping。</td>
-      <td class="tg-0pky"><ul><li>支持空tensor。</li><li>当key是3维时，shape满足[batch * seq_len]，当key是4维时，shape满足[batch, num_head]。</li><li>值范围为[0, num_blocks * block_size-1]，且元素值不能重复，重复时不保证正确性。</li></ul></td>
+      <td class="tg-0pky"><ul><li>支持空tensor。</li><li>当key是3维时，shape满足[batch * seq_len]，当key是4维时，shape满足[batch, num_head]。</li><li>取值范围为[0, num_blocks * block_size-1]，且元素值不能重复，重复时不保证正确性。</li></ul></td>
       <td class="tg-0pky">INT32、INT64</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">1-2</td>
@@ -323,7 +323,7 @@ aclnnStatus aclnnScatterPaCache(
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="950" id7 -->
-- <term>Ascend 950PR&950DT系列产品</term> ：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
   ```c++
   #include <iostream>

@@ -35,7 +35,7 @@
   q_{\text{embed}} = q \cdot \text{cos} + \text{RotateHalf}(q) \cdot \sin
   $$
 
-  其中：RotateHalf(q)表示将q的D维后半部分元素移至前半部分并乘以 -1，后半部分用前半部分的值替换。
+  其中：RotateHalf(q)表示将q的D维后半部分元素移至前半部分并乘以-1，后半部分用前半部分的值替换。
 
   $$
   \text{RotateHalf}(q)_{\text{i}} =
@@ -97,7 +97,7 @@ aclnnStatus aclnnInterleaveRope(
     <tr>
       <td>x</td>
       <td>输入</td>
-      <td>device侧的aclTensor，待执行旋转位置编码的张量，对应公式中的x。</td>
+      <td>Device侧的aclTensor，待执行旋转位置编码的张量，对应公式中的x。</td>
       <td>-</td>
       <td>FLOAT32、FLOAT16、BFLOAT16</td>
       <td>ND</td>
@@ -137,7 +137,7 @@ aclnnStatus aclnnInterleaveRope(
     <tr>
       <td>workspaceSize</td>
       <td>输出</td>
-      <td>返回用户需要在npu device侧申请的workspace大小。</td>
+      <td>返回用户需要在NPU Device侧申请的workspace大小。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -228,7 +228,7 @@ aclnnStatus aclnnInterleaveRope(
     <tr>
       <td>stream</td>
       <td>输入</td>
-      <td>指定执行任务的Stream流。</td>
+      <td>指定执行任务的Stream。</td>
     </tr>
   </tbody>
   </table>
@@ -241,7 +241,7 @@ aclnnStatus aclnnInterleaveRope(
 
 - 确定性计算：
   - aclnnInterleaveRope默认确定性实现。
-- 该接口支持推理场景下使用。
+- 该接口支持在推理场景下使用。
 - x、cos、sin、out要求为4维张量，shape为（B，N，S，D）。
 - cos、sin的S维度可以为1或与x的S维度相同，N维度必须等于1。
 - 输入x、cos、sin的D维度必须等于64。

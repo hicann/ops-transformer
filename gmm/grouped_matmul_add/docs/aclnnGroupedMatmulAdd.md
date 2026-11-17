@@ -274,7 +274,7 @@ aclnnStatus aclnnGroupedMatmulAdd(
 - groupList第1维最大支持1024，即最多支持1024个group。
 
 <!-- npu="A3,910b" id10 -->
-### Atlas A3/A2 系列产品
+### Atlas A3系列产品、Atlas A2系列产品
 
 - x和weight中每一组tensor的最后一维大小都应小于65536。$x$的最后一维指当x不转置时$x$的K轴或当x转置时$x$的M轴。$weight$的最后一维指当weight不转置时$weight$的N轴或当weight转置时$weight$的K轴。
 <!-- end id10 -->

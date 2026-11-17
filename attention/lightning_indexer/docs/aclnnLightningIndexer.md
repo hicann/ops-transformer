@@ -189,7 +189,7 @@ aclnnStatus aclnnLightningIndexer(
       <td>
           <ul>
                 <li>不支持空tensor。</li>
-                <li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大S2对应的block数量，即max_S2/blockSize）</li>
+                <li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大S2对应的block数量，即max_S2/blockSize）。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -231,7 +231,7 @@ aclnnStatus aclnnLightningIndexer(
       <td>sparseCount</td>
       <td>输入</td>
       <td>topK阶段需要保留的block数量。</td>
-      <td>支持[1, 2048]，以及3072、4096、5120、6144、7168、8192</td>
+      <td>支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。</td>
       <td>INT32</td>
       <td>-</td>
       <td>-</td>
@@ -278,8 +278,8 @@ aclnnStatus aclnnLightningIndexer(
       <td>表示是否输出sparseValuesOut。</td>
       <td>
           <ul>
-                <li>True表示输出，但图模式下不支持，False表示不输出；默认值为False</li>
-                <li>仅在训练且layoutKeyOptional不为PA_BSND场景支持</li>
+                <li>True表示输出，但图模式下不支持，False表示不输出；默认值为False。</li>
+                <li>仅在训练且layoutKeyOptional不为PA_BSND场景支持。</li>
           </ul>
       </td>
       <td>BOOL</td>
@@ -309,7 +309,7 @@ aclnnStatus aclnnLightningIndexer(
       <td>不支持空tensor。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
-      <td>shape与sparseIndicesOut保持一致</td>
+      <td>shape与sparseIndicesOut保持一致。</td>
       <td>x</td>
     </tr>
     <tr>

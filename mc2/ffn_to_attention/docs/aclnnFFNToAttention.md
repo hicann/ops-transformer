@@ -124,7 +124,7 @@ aclnnStatus aclnnFFNToAttention(
     <tr>
       <td>expertOffsets</td>
       <td>输入</td>
-      <td>每个token在tokenInfoTableShape中PerTokenExpertNum的索引。</td>
+      <td>每个token在tokenInfoTableShape中ExpertNumPerToken的索引。</td>
       <td>shape为 <code>(Y, )</code>，取值区间为[0, ExpertNumPerToken-1]。</td>
       <td>INT32</td>
       <td>ND</td>
@@ -185,7 +185,7 @@ aclnnStatus aclnnFFNToAttention(
       <td>tokenDataShape</td>
       <td>输入</td>
       <td>Token数据列表大小。</td>
-      <td>包含microBatch的大小（MicroBatchNum）、BatchSize大小（Bs）、每个Token对应的Expert数量(ExpertNumPerToken)、以及token和scale长度(HS)。</td>
+      <td>包含microBatch的大小（MicroBatchNum）、BatchSize大小（Bs）、每个Token对应的Expert数量（ExpertNumPerToken）、以及token和scale长度（HS）。</td>
       <td>INT32</td>
       <td>-</td>
       <td>-</td>
@@ -301,7 +301,7 @@ aclnnStatus aclnnFFNToAttention(
 - **产品特定约束**：
 
   <!-- npu="A3" id7 -->
-  - <term>Atlas A3系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明中的“本卡”均表示单DIE。
+  - <term>Atlas A3系列产品</term> ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明中的“本卡”均表示单DIE。
 
   <!-- end id7 -->
 
@@ -327,7 +327,7 @@ aclnnStatus aclnnFFNToAttention(
 
 - 文件准备：
 
-  1. 新建FFNtoAttentionDemo目录，按照下方指导在FFNtoAttentionDemo下新建aclnnFFNtoAttentionDemo.cpp，FFNtoAttention.sh文件并参考如下代码修改。
+  1. 新建FFNtoAttentionDemo目录，按照下方指导在FFNtoAttentionDemo下新建aclnnFFNtoAttentionDemo.cpp、FFNtoAttention.sh文件并参考如下代码修改。
 
   2. 安装cann包，并根据下方指导编译运行FFNtoAttentionDemo。
 

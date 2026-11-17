@@ -34,7 +34,7 @@
   4. 单核扫描排序后的专家ID序列，查找跳变点，生成`groupList`（每个专家处理的token数）。
 
   其中 $Y = A \times BS \times (K+1)$，$A$ 为Attention worker数量，$BS$ 为micro batch size，$K+1$ 为topK加共享专家数。本接口针对接口[aclnnFfnWorkerBatching](../../ffn_worker_batching/docs/aclnnFfnWorkerBatching.md)做出如下功能变更，请根据实际情况选择合适的接口：
-  - 新增布尔类型的参数`syncFlag` ，用于开启异步接收模式，循环扫描micro batch，首次发现ready session快照后，仅处理该快照选中的session，不等待其余session；若没有数据就绪，则继续等待。 |
+  - 新增布尔类型的参数`syncFlag` ，用于开启异步接收模式，循环扫描micro batch，首次发现ready session快照后，仅处理该快照选中的session，不等待其余session；若没有数据就绪，则继续等待。
   - 异步接收模式允许同一micro batch的已就绪session来自不同层，要求`layerNum > 0`且`expertNum`能被`layerNum`整除，并按`layer_id * (expertNum / layerNum) + expert_id`生成跨层专家号进行排序、重排和`groupList`统计。同步接收与NORM使用原专家号。
 
 ## 函数原型
@@ -100,7 +100,7 @@ aclnnStatus aclnnFfnWorkerBatchingV2(
       <td>scheduleContext</td>
       <td>输入</td>
       <td>FFN侧接收的调度上下文，内含CommonArea、ControlArea、AttentionArea、FfnArea。算子从FfnArea中读取token_info_buf和token_data_buf获取待重排的token数据与描述信息。</td>
-      <td>包含的缓冲区地址必须为有效Device地址，生命周期见约束说明。</td>
+      <td>其包含的缓冲区地址必须为有效Device地址，生命周期见约束说明。</td>
       <td>INT8</td>
       <td>ND</td>
       <td>1维，长度至少1024字节</td>
@@ -119,7 +119,7 @@ aclnnStatus aclnnFfnWorkerBatchingV2(
     <tr>
       <td>maxOutShape</td>
       <td>输入</td>
-      <td>输出shape上限，格式为 {A, BS, topK+1, H}。用于推导y输出的shape上限 Y = A × BS × (topK+1)，以及H值。</td>
+      <td>输出shape上限，格式为 {A, BS, topK+1, H}。用于推导y输出的shape上限Y = A × BS × (topK+1)，以及H值。</td>
       <td>数组长度必须为4。其中A取值范围为(0, 1024]，BS大于0，topK+1取值范围为(0, 64]，H大于0。tokenDtype=5时H须为偶数。</td>
       <td>LIST_INT64</td>
       <td>-</td>
@@ -129,7 +129,7 @@ aclnnStatus aclnnFfnWorkerBatchingV2(
     <tr>
       <td>tokenDtype</td>
       <td>输入</td>
-      <td>输入token的数据类型：0为FP16；1为BF16；2为INT8动态量化，每行一个FP32 scale；3为FLOAT8_E5M2；4为FLOAT8_E4M3FN（float8_e4m3）；5为FLOAT4_E2M1。3、4、5每32个逻辑hidden state元素对应一个FLOAT8_E8M0 scale，全部scale紧跟整行token数据。</td>
+      <td>输入token的数据类型：0为FP16；1为BF16；2为INT8动态量化，每行一个FP32 scale；3为FLOAT8_E5M2；4为FLOAT8_E4M3FN（float8_e4m3fn）；5为FLOAT4_E2M1。3、4、5每32个逻辑hidden state元素对应一个FLOAT8_E8M0 scale，全部scale紧跟整行token数据。</td>
       <td>取值为0～5。y与dynamicScale的数据类型及shape须与tokenDtype对应，见下方映射表。</td>
       <td>INT64</td>
       <td>-</td>
