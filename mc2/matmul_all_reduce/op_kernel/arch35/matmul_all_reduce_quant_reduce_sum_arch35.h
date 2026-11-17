@@ -21,7 +21,11 @@ namespace Mc2Kernel {
 using namespace AscendC;
 using namespace std;
 
-constexpr int32_t TOTAL_UBSIZE_MATMUL_ALLREDUCE_INT8 = 248 * 1024;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
+constexpr int32_t TOTAL_UBSIZE_MATMUL_ALLREDUCE_INT8 = 385024;
+#else
+constexpr int32_t TOTAL_UBSIZE_MATMUL_ALLREDUCE_INT8 = 192 * 1024;
+#endif
 constexpr uint32_t BYTE512_MATMUL_ALLREDUCE_INT8 = 512;
 constexpr uint32_t DOUBLE_BUFFER_MATMUL_ALLREDUCE_INT8 = 2;
 constexpr int32_t SCALE_BUFF_CNT_MATMUL_ALLREDUCE_INT8 = 4;

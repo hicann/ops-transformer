@@ -309,8 +309,7 @@ void FpMatmulAllToAllTilingBase::PrintMatmulAlltoAllTilingData(MatmulAlltoAllTil
 
 /**
  * @brief 获取对应的tilingKey
- * 使用QUANT_MODE来区分tilingKey,此处的QUANT_MODE指的是x1,x2的QUANT模式组合，以x1为pertoken量化(K)，x2为perchannel量化(C)
- * 为例子，K-C量化就代表一种组合
+ * 使用QUANT_MODE来区分tilingKey, 此处固定为非量化NON_QUANT_MODE
  *
  * @return uint64_t tilingKey结果
  */
@@ -329,7 +328,7 @@ uint64_t FpMatmulAllToAllTilingBase::GetTilingKey() const
     }
     uint8_t commMode = (engineType == mc2tiling::A5_CCU_ENGINE) ? COMMMODE_CCU : COMMMODE_AICPU;
 
-    // Apace路径bias由mmad fixpipe加入, ADDBIASSPLITMODE恒OFF
+    // Apace路径bias由mmad经L0 bias表加入L0C初值, ADDBIASSPLITMODE恒OFF
     uint8_t addBiasSplitMode = (contextInfo.args_.isBias && !usingApaceImpl_) ? ChooseAddBiasSplitMode() : ADDBIAS_OFF;
     const uint64_t tilingKey =
         GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, usingApaceImpl_);
@@ -376,7 +375,7 @@ ge::graphStatus FpMatmulAllToAllTilingBase::PostTiling()
     // Apace: 下发hcommTilingData_; APT: 下发localTilingData_
     if (usingApaceImpl_) {
         OP_LOGI(opName_, "[APACE] PostTiling: enter Apace path.");
-        SetHcommTilingInfo(hcommTilingData_.matmulAllToAllTilingInfo);
+        SetHcommTilingInfo(hcommTilingData_);
 
         size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
         auto* outTilingData = context_->GetTilingData<hcommNonQuantMatmulAllToAllTilingData>();
@@ -447,19 +446,21 @@ void FpMatmulAllToAllTilingBase::SetTilingInfo(MatmulAlltoAllTilingInfo& tilingI
 }
 
 /**
- * @brief Apace路径的tilingInfo填充
+ * @brief Apace路径的hcomm tiling data填充
+ *
+ * 通算切分走 CommTilingData(参照 all_to_all_matmul 的 hcommAllToAllMatmulTilingData 做法);
+ * rankN/rankK 不下发——SWAT tiling 的 n/k 即单 rank 列宽/完整 K, device 侧直接取
  */
-void FpMatmulAllToAllTilingBase::SetHcommTilingInfo(MatmulAllToAllApaceTilingInfo& tilingInfo) const
+void FpMatmulAllToAllTilingBase::SetHcommTilingInfo(hcommNonQuantMatmulAllToAllTilingData& tilingData) const
 {
-    tilingInfo.tileCnt = inferredInfo.tileCnt;
-    tilingInfo.tileM = inferredInfo.tileM;
-    tilingInfo.tailCnt = inferredInfo.tailCnt;
-    tilingInfo.tailM = inferredInfo.tailM;
-    tilingInfo.rankM = contextInfo.args_.mValue;
-    tilingInfo.rankN = contextInfo.args_.nValue;
-    tilingInfo.rankK = contextInfo.args_.kValue;
-    tilingInfo.rankDim = contextInfo.args_.rankDim;
-    tilingInfo.hcclDataType =
+    auto& commTiling = tilingData.commTilingData;
+    commTiling.splitAxisTileSize = inferredInfo.tileM;
+    commTiling.splitAxisTileCnt = inferredInfo.tileCnt;
+    commTiling.splitAxisTailSize = inferredInfo.tailM;
+    commTiling.splitAxisTailCnt = inferredInfo.tailCnt;
+    tilingData.rankDim = contextInfo.args_.rankDim;
+    tilingData.rankM = static_cast<uint32_t>(contextInfo.args_.mValue);
+    tilingData.hcclDataType =
         static_cast<uint64_t>(mc2tiling::ConvertGeTypeToHcclType(opName_, contextInfo.args_.geCType));
 }
 

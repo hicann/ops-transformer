@@ -46,7 +46,7 @@ using asc::te::get;
  *    计算总量 = M*K*fullN。
  *
  * @tparam ProblemShape   问题规模类型 {M, N, K, batch}
- * @tparam BlockMmad      Blaze 非量化 mmad 块（bias 走 fixpipe）
+ * @tparam BlockMmad      Blaze 非量化 mmad 块（bias 经 L0 bias 表加入 L0C 初值）
  * @tparam BlockScheduler Blaze 非量化调度块
  */
 template <class ProblemShape, class BlockMmad, class BlockScheduler>
@@ -104,8 +104,9 @@ public:
     /**
      * @brief 初始化 mmad 块（每批一次）
      *
-     * BlockMmad::Init 只消费块形/缓冲级数等静态字段（不保存 GM 地址，地址经每次
-     * 调用的张量传入），因此逐片仅地址变化时无需重新 Init。
+     * mmOp_.Init 装填静态字段：L1/L0 块形（mL1/baseM 等）、缓冲级数（l1Stages/l0cStages）、
+     * splitKNum 与 isBias（biasGmAddr 判空推导），并计算 A/B/bias 在 L1 槽位中的 ping-pong 布局；
+     * GM 地址不在 Init 保存（经每次 operator() 的张量传入），因此逐片仅地址变化时无需重新 Init。
      */
     __aicore__ inline void InitGroup(const Params& params)
     {
@@ -118,6 +119,9 @@ public:
     __aicore__ inline void ProcessSlice(const Params& params);
 
 private:
+    // Blaze 矩阵乘执行块：一次 operator() 完成一个调度块 [curM, curN] x K 的完整计算
+    // （GM->L1->L0A/L0B 两级搬运 + mmad 在 L0C 累加 + fixpipe 把 L0C 异步搬出直写 GM），
+    // 内部自持 L1/L0/L0C 的 ping-pong 轮转状态
     BlockMmad mmOp_;
 
     static constexpr int64_t kCacheLineAlignMask = 0x7f; // 128B cache line 对齐掩码
@@ -217,9 +221,12 @@ __aicore__ inline void MatmulAllToAllMmKernel<ProblemShape, BlockMmad, BlockSche
                 gmRankC.slice(asc::te::make_coord(mPos, nPos),
                               asc::te::make_shape(get<IDX_M_TILEIDX>(singleShape), get<IDX_N_TILEIDX>(singleShape)));
 
-            // K 整段入块（mmad 内部 kL1->kL0 两级循环），bias 在 fixpipe 阶段加入，
-            // splitKIdx=0 表示单次调用完成全 K 累加并触发一次 fixpipe 搬出
-            mmOp_(gmBlockA, gmBlockB, gmBlockBias, gmBlockC, singleShape, nullptr, 0);
+            // 单块矩阵乘完整执行：内部按 kL1->kL0 两级循环搬运（GM->L1->L0A/L0B），
+            // 每拍 mmad 在 L0C 累加（有 bias 时经 L0 bias 表作 L0C 初值，仅首拍加载一次），
+            // 末拍 enable_update 后 fixpipe 将 L0C 结果异步搬出直写 GM；
+            // 尾参走默认值（gmScalePtr=nullptr、splitKIdx=0）＝无量化 scale、splitKNum=1，
+            // 即单次调用完成全 K 累加并触发唯一一次 fixpipe 搬出
+            mmOp_(gmBlockA, gmBlockB, gmBlockBias, gmBlockC, singleShape);
         }
     }
 }

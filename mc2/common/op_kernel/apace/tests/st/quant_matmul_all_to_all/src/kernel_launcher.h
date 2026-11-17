@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "apace/kernel/fusions/quant_matmul_all_to_all/mx_quant_matmul_all_to_all_urma_impl.h"
+#include "apace/kernel/fusions/matmul_all_to_all/mx_quant_matmul_all_to_all_urma_impl.h"
 
 #define DECLARE_MATMUL_A2A_MX_KERNEL(name, typeA, typeB, typeC, localDelay) \
     __global__ __aicore__ void name(__gm__ CommContext* hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM, \

@@ -27,9 +27,9 @@
 #include "matmul_allto_all_tiling_data.h"
 #include "kc_quant_matmul_allto_all_arch35.h"
 #include "mx_quant_matmul_allto_all_arch35.h"
-#include "../../../common/op_kernel/apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_tiling_data.h"
-#include "../../../common/op_kernel/apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_mx_quant_matmul_hcomm_impl.h"
-#include "../../../common/op_kernel/apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_hcomm_impl.h"
+#include "../../../common/op_kernel/apace/kernel/fusions/matmul_all_to_all/matmul_all_to_all_tiling_data.h"
+#include "../../../common/op_kernel/apace/kernel/fusions/matmul_all_to_all/matmul_all_to_all_mx_quant_matmul_hcomm_impl.h"
+#include "../../../common/op_kernel/apace/kernel/fusions/matmul_all_to_all/matmul_all_to_all_hcomm_impl.h"
 
 using AscendC::HcclServerType;
 using AscendC::TPipe;

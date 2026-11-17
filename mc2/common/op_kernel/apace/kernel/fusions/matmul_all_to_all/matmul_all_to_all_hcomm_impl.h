@@ -73,10 +73,10 @@ public:
      */
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR workspaceGM)
     {
-        x1_ = x1;
-        x2_ = x2;
-        bias_ = bias;
-        y_ = y;
+        x1Addr_ = x1;
+        x2Addr_ = x2;
+        biasAddr_ = bias;
+        yAddr_ = y;
         workspaceGM_ = workspaceGM;
         communication_.Init();
     }
@@ -90,13 +90,15 @@ public:
      */
     __aicore__ inline void Run()
     {
-        const auto& tilingInfo = tilingData_->matmulAllToAllTilingInfo;
-        if (tilingInfo.tileCnt > 0) {
-            ProcessBatch(0, tilingInfo.tileM, tilingInfo.tileCnt, tilingData_->tileMmTilingData);
+        const auto& commTiling = tilingData_->commTilingData;
+        if (commTiling.splitAxisTileCnt > 0) {
+            ProcessBatch(0, static_cast<uint32_t>(commTiling.splitAxisTileSize),
+                         static_cast<uint32_t>(commTiling.splitAxisTileCnt), tilingData_->tileMmTilingData);
         }
-        if (tilingInfo.tailCnt > 0) {
-            const uint64_t mainRows = static_cast<uint64_t>(tilingInfo.tileM) * tilingInfo.tileCnt;
-            ProcessBatch(mainRows, tilingInfo.tailM, tilingInfo.tailCnt, tilingData_->tailMmTilingData);
+        if (commTiling.splitAxisTailCnt > 0) {
+            const uint64_t mainRows = commTiling.splitAxisTileSize * commTiling.splitAxisTileCnt;
+            ProcessBatch(mainRows, static_cast<uint32_t>(commTiling.splitAxisTailSize),
+                         static_cast<uint32_t>(commTiling.splitAxisTailCnt), tilingData_->tailMmTilingData);
         }
         communication_.End();
     }
@@ -108,14 +110,14 @@ private:
     using LayoutC = AscendC::Te::NDExtLayoutPtn;
     using LayoutBias = AscendC::Te::NDExtLayoutPtn;
 
-    // Blaze 非量化组件：多块调度策略 / mmad 块（bias 走 fixpipe 加入）/ ND 调度块
+    // Blaze 非量化组件：多块调度策略 / mmad 块（bias 经 L0 bias 表加入 L0C 初值）/ ND 调度块
     using DispatchPolicy = Blaze::Gemm::MatmulMultiBlockBasic<>;
     // {M: 本rank单片行数(通算切分后的tileM/tailM, 非全量), N: 单rank列宽(=完整N/rankDim, 非全量), K: 完整K, batch: 恒1}
-    using ProblemShapeT = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
+    using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, X1Type, LayoutA, X2Type, LayoutB, YType, LayoutC,
                                                     BiasType, LayoutBias>;
-    using BlockScheduler = Blaze::Gemm::Block::BlockSchedulerMatmulBasic<ProblemShapeT>;
-    using KernelImpl = Blaze::Gemm::Kernel::MatmulAllToAllMmKernel<ProblemShapeT, BlockMmad, BlockScheduler>;
+    using BlockScheduler = Blaze::Gemm::Block::BlockSchedulerMatmulBasic<ProblemShape>;
+    using KernelImpl = Blaze::Gemm::Kernel::MatmulAllToAllMmKernel<ProblemShape, BlockMmad, BlockScheduler>;
     // 通信器：ServerType 承载 CCU/AICPU 通信引擎维度
     using CommunicationType =
         MC2KernelTemplate::HcclCommunicator<true, ServerType, MC2KernelTemplate::MC2AlltoAllContext, TilingDataType,
@@ -142,18 +144,17 @@ private:
     __aicore__ inline void SetupParams(typename KernelImpl::Params& params, uint64_t rowOffset, uint32_t taskM,
                                        uint32_t taskCnt, const MatmulTilingData& mmTile)
     {
-        const auto& tilingInfo = tilingData_->matmulAllToAllTilingInfo;
-        const uint64_t rankNPerPeer =
-            static_cast<uint64_t>(tilingInfo.rankN) / static_cast<uint64_t>(tilingInfo.rankDim); // 单 rank 列宽
+        // SWAT 的 n/k 即单 rank 列宽/完整 K(host 调 SWAT 时传入 original problem shape), 无需再除 rankDim
+        const uint64_t rankNPerPeer = static_cast<uint64_t>(mmTile.n); // 单 rank 列宽
 
-        params.problemShape = ProblemShapeT{static_cast<int64_t>(mmTile.m), static_cast<int64_t>(mmTile.n),
-                                            static_cast<int64_t>(mmTile.k), 1};
+        params.problemShape = ProblemShape{static_cast<int64_t>(mmTile.m), static_cast<int64_t>(mmTile.n),
+                                           static_cast<int64_t>(mmTile.k), 1};
 
         auto& mmParams = params.mmParams;
-        mmParams.aGmAddr = x1_ + rowOffset * tilingInfo.rankK * sizeof(X1Type);
-        mmParams.bGmAddr = x2_;
+        mmParams.aGmAddr = x1Addr_ + rowOffset * mmTile.k * sizeof(X1Type);
+        mmParams.bGmAddr = x2Addr_;
         mmParams.cGmAddr = workspaceGM_ + rowOffset * rankNPerPeer * sizeof(YType);
-        mmParams.biasGmAddr = bias_; // 可空，mmad 内部判空跳过
+        mmParams.biasGmAddr = biasAddr_; // 可空，mmad 内部判空跳过
         mmParams.mL1 = mmTile.mL1;
         mmParams.nL1 = mmTile.nL1;
         mmParams.kL1 = mmTile.kL1;
@@ -182,9 +183,9 @@ private:
         schParams.nTailMain = mmTile.nTailMain;
 
         // rank 区步长（元素数）= rankM*rankNPerPeer；片步长：x1 下一片行首 / 发送缓冲下一片行首（字节）
-        params.rankStride = static_cast<uint64_t>(tilingInfo.rankM) * rankNPerPeer;
-        params.rankDim = tilingInfo.rankDim;
-        params.sliceParams.aByteStride = static_cast<uint64_t>(taskM) * tilingInfo.rankK * sizeof(X1Type);
+        params.rankStride = static_cast<uint64_t>(tilingData_->rankM) * rankNPerPeer;
+        params.rankDim = tilingData_->rankDim;
+        params.sliceParams.aByteStride = static_cast<uint64_t>(taskM) * mmTile.k * sizeof(X1Type);
         params.sliceParams.cByteStride = static_cast<uint64_t>(taskM) * rankNPerPeer * sizeof(YType);
         params.sliceParams.sliceCount = taskCnt;
     }
@@ -201,10 +202,12 @@ private:
         typename KernelImpl::Params params;
         SetupParams(params, startRow, taskM, taskCnt, mmTile);
         kernel_.InitGroup(params);
+        // 核心逐片流水：每片"计算 -> 全核同步 -> 发通信"，非末片地址步进到下一片
         for (uint32_t sliceIdx = 0; sliceIdx < params.sliceParams.sliceCount; ++sliceIdx) {
-            kernel_.ProcessSlice(params);
-            SyncAicCores();
-            communication_.Process(sliceIdx);
+            kernel_.ProcessSlice(params);     // 计算：本片 [taskM, rankN] 逐 rank 直写发送缓冲
+            SyncAicCores();                   // 全核同步：等所有 AIC 的 fixpipe 把本片写穿到 GM
+            communication_.Process(sliceIdx); // 通信：把发送缓冲中本片的 rank-major 数据发 AllToAll
+            // 地址步进：非末片时 x1 输入行首与发送缓冲行首同步前移一片
             if (sliceIdx + 1 < params.sliceParams.sliceCount) {
                 params.mmParams.aGmAddr += params.sliceParams.aByteStride;
                 params.mmParams.cGmAddr += params.sliceParams.cByteStride;
@@ -227,17 +230,16 @@ private:
     __aicore__ inline void ProcessBatch(uint64_t startRow, uint32_t taskM, uint32_t taskCnt,
                                         const MatmulTilingData& mmTile)
     {
-        const auto& tilingInfo = tilingData_->matmulAllToAllTilingInfo;
-        const uint64_t rankNPerPeer =
-            static_cast<uint64_t>(tilingInfo.rankN) / static_cast<uint64_t>(tilingInfo.rankDim);
+        // SWAT 的 n 即单 rank 列宽, 无需再除 rankDim
+        const uint64_t rankNPerPeer = static_cast<uint64_t>(mmTile.n);
         auto* communicationContext = communication_.GetContextPtr();
         communicationContext->sendBuffer = workspaceGM_ + startRow * rankNPerPeer * sizeof(YType);
-        communicationContext->recvBuffer = y_ + startRow * rankNPerPeer * sizeof(YType);
+        communicationContext->recvBuffer = yAddr_ + startRow * rankNPerPeer * sizeof(YType);
         communicationContext->sendOffset = static_cast<uint64_t>(taskM) * rankNPerPeer * sizeof(YType);
         communicationContext->recvOffset = communicationContext->sendOffset;
         communicationContext->sendCount = static_cast<uint64_t>(taskM) * rankNPerPeer;
-        communicationContext->strideCount = static_cast<uint64_t>(tilingInfo.rankM) * rankNPerPeer;
-        communicationContext->hcclDataType = tilingInfo.hcclDataType;
+        communicationContext->strideCount = static_cast<uint64_t>(tilingData_->rankM) * rankNPerPeer;
+        communicationContext->hcclDataType = tilingData_->hcclDataType;
 
         communication_.PrepareAll(taskCnt);
         MatmulProcess(startRow, taskM, taskCnt, mmTile);
@@ -246,11 +248,11 @@ private:
     TilingDataType* tilingData_;      // host 下发的 tiling data
     KernelImpl kernel_{};             // 计算内核（无状态，参数每次传入）
     CommunicationType communication_; // HCCL 通信器
-    GM_ADDR x1_{nullptr};             // A 输入 [rankM, rankK]
-    GM_ADDR x2_{nullptr};             // 全宽 B
-    GM_ADDR bias_{nullptr};           // 全宽 bias（可空）
-    GM_ADDR y_{nullptr};              // 输出（AllToAll 接收端）
-    GM_ADDR workspaceGM_{nullptr};    // rank-major 发送缓冲
+    GM_ADDR x1Addr_{nullptr};         // A 输入 GM 地址 [rankM, rankK]
+    GM_ADDR x2Addr_{nullptr};         // 全宽 B GM 地址
+    GM_ADDR biasAddr_{nullptr};       // 全宽 bias GM 地址（可空）
+    GM_ADDR yAddr_{nullptr};          // 输出 GM 地址（AllToAll 接收端）
+    GM_ADDR workspaceGM_{nullptr};    // rank-major 发送缓冲 GM 地址
 };
 
 } // namespace Apace

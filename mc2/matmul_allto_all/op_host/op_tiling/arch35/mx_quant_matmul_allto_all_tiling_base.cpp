@@ -1063,7 +1063,7 @@ ge::graphStatus MxQuantMatmulAllToAllTilingBase::PostTiling()
     context_->SetScheduleMode(1);
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
     if (usingApaceImpl_) {
-        SetHcommTilingInfo(hcommTilingData_.matmulAllToAllTilingInfo);
+        SetHcommTilingInfo(hcommTilingData_);
         auto* outTilingData = context_->GetTilingData<hcommMatmulAllToAllTilingData>();
         OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get Apace tiling data from context"),
                         return ge::GRAPH_FAILED);
@@ -1123,23 +1123,21 @@ void MxQuantMatmulAllToAllTilingBase::SetTilingInfo(MatmulAlltoAllTilingInfo& ti
 }
 
 /**
- * @brief 获取对应的tilingKey
- * 使用QUANT_MODE来区分tilingKey,此处的QUANT_MODE指的是x1,x2的QUANT模式组合，以x1为pertoken量化(K)，x2为perchannel量化(C)
- * 为例子，K-C量化就代表一种组合
+ * @brief Apace路径的hcomm tiling data填充
  *
- * @return uint64_t tilingKey结果
+ * 通算切分走 CommTilingData(参照 all_to_all_matmul 的 hcommAllToAllMatmulTilingData 做法);
+ * rankN/rankK 不下发——SWAT tiling 的 n/k 即单 rank 列宽/完整 K, device 侧直接取
  */
-void MxQuantMatmulAllToAllTilingBase::SetHcommTilingInfo(MatmulAllToAllApaceTilingInfo& tilingInfo) const
+void MxQuantMatmulAllToAllTilingBase::SetHcommTilingInfo(hcommMatmulAllToAllTilingData& tilingData) const
 {
-    tilingInfo.tileCnt = inferredInfo.tileCnt;
-    tilingInfo.tileM = inferredInfo.tileM;
-    tilingInfo.tailCnt = inferredInfo.tailCnt;
-    tilingInfo.tailM = inferredInfo.tailM;
-    tilingInfo.rankM = contextInfo.args_.mValue;
-    tilingInfo.rankN = contextInfo.args_.nValue;
-    tilingInfo.rankK = contextInfo.args_.kValue;
-    tilingInfo.rankDim = contextInfo.args_.rankDim;
-    tilingInfo.hcclDataType =
+    auto& commTiling = tilingData.commTilingData;
+    commTiling.splitAxisTileSize = inferredInfo.tileM;
+    commTiling.splitAxisTileCnt = inferredInfo.tileCnt;
+    commTiling.splitAxisTailSize = inferredInfo.tailM;
+    commTiling.splitAxisTailCnt = inferredInfo.tailCnt;
+    tilingData.rankDim = contextInfo.args_.rankDim;
+    tilingData.rankM = static_cast<uint32_t>(contextInfo.args_.mValue);
+    tilingData.hcclDataType =
         static_cast<uint64_t>(mc2tiling::ConvertGeTypeToHcclType(opName_, contextInfo.args_.geCType));
 }
 
@@ -1225,6 +1223,12 @@ void MxQuantMatmulAllToAllTilingBase::AlignCutResForKernel(CutResult& cutRes, ui
     cutRes.shortTileAtBack = true;
 }
 
+/**
+ * @brief 获取对应的tilingKey
+ * 使用QUANT_MODE来区分tilingKey, 此处的QUANT_MODE指的是x1、x2的QUANT模式组合
+ *
+ * @return uint64_t tilingKey结果
+ */
 uint64_t MxQuantMatmulAllToAllTilingBase::GetTilingKey() const
 {
     // 按照量化组合模式，是否转置，bias数据类型进行展开

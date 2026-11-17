@@ -27,7 +27,7 @@
 #include "../../../op_kernel/arch35/matmul_allto_all_tiling_data.h"
 #include "../../../op_kernel/arch35/matmul_allto_all_tiling_key.h"
 // Apace路径的host-device tiling契约
-#include "apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_tiling_data.h"
+#include "apace/kernel/fusions/matmul_all_to_all/matmul_all_to_all_tiling_data.h"
 // 非量化SWAT tiling引擎
 #include "apace/tiling/matmul_tiling_swat.h"
 
@@ -56,8 +56,8 @@ protected:
     ge::graphStatus DoMMTiling();
     ge::graphStatus SetHcclTiling();
     void SetTilingInfo(MatmulAlltoAllTilingInfo& tilingInfo) const;
-    // Apace路径的tilingInfo填充
-    void SetHcommTilingInfo(MatmulAllToAllApaceTilingInfo& tilingInfo) const;
+    // Apace路径的hcomm tiling data填充
+    void SetHcommTilingInfo(hcommNonQuantMatmulAllToAllTilingData& tilingData) const;
     // Apace路径的mm tiling(直接调MatmulTilingSwat)
     ge::graphStatus DoHcommNonQuantMMTiling();
     // Apace路径的主块256对齐

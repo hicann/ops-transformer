@@ -27,7 +27,7 @@
 #include "quant_batch_matmul_v3/op_kernel/arch35/qbmv3_arch35_tiling_data.h"
 #include "../../../op_kernel/arch35/matmul_allto_all_tiling_data.h"
 #include "../../../op_kernel/arch35/matmul_allto_all_tiling_key.h"
-#include "apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_tiling_data.h"
+#include "apace/kernel/fusions/matmul_all_to_all/matmul_all_to_all_tiling_data.h"
 
 namespace MC2Tiling {
 using namespace optiling;
@@ -82,7 +82,7 @@ protected:
                                       TilingContextInfo& contextInfo);
     ge::graphStatus CheckMxQuantScaleDataType(const gert::TilingContext* context, const char* opName);
     void SetTilingInfo(MatmulAlltoAllTilingInfo& tilingInfo) const;
-    void SetHcommTilingInfo(MatmulAllToAllApaceTilingInfo& tilingInfo) const;
+    void SetHcommTilingInfo(hcommMatmulAllToAllTilingData& tilingData) const;
     void AlignCutResForKernel(CutResult& cutRes, uint64_t mValue) const;
     void PrintMxQuantMatmulAlltoAllTilingData(QuantMatmulAlltoAllTilingData& outTilingData);
 

@@ -74,12 +74,12 @@ public:
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR x1Scale, GM_ADDR x2Scale,
                                 GM_ADDR workspaceGM)
     {
-        x1_ = x1;
-        x2_ = x2;
-        bias_ = bias;
-        y_ = y;
-        x1Scale_ = x1Scale;
-        x2Scale_ = x2Scale;
+        x1Addr_ = x1;
+        x2Addr_ = x2;
+        biasAddr_ = bias;
+        yAddr_ = y;
+        x1ScaleAddr_ = x1Scale;
+        x2ScaleAddr_ = x2Scale;
         workspaceGM_ = workspaceGM;
 
         communication_.Init();
@@ -87,13 +87,15 @@ public:
 
     __aicore__ inline void Run()
     {
-        const auto& tilingInfo = tilingData_->matmulAllToAllTilingInfo;
-        if (tilingInfo.tileCnt > 0) {
-            ProcessBatch(0, tilingInfo.tileM, tilingInfo.tileCnt, tilingData_->tileQbmmTilingData);
+        const auto& commTiling = tilingData_->commTilingData;
+        if (commTiling.splitAxisTileCnt > 0) {
+            ProcessBatch(0, static_cast<uint32_t>(commTiling.splitAxisTileSize),
+                         static_cast<uint32_t>(commTiling.splitAxisTileCnt), tilingData_->tileQbmmTilingData);
         }
-        if (tilingInfo.tailCnt > 0) {
-            const uint64_t mainRows = static_cast<uint64_t>(tilingInfo.tileM) * tilingInfo.tileCnt;
-            ProcessBatch(mainRows, tilingInfo.tailM, tilingInfo.tailCnt, tilingData_->tailQbmmTilingData);
+        if (commTiling.splitAxisTailCnt > 0) {
+            const uint64_t mainRows = commTiling.splitAxisTileSize * commTiling.splitAxisTileCnt;
+            ProcessBatch(mainRows, static_cast<uint32_t>(commTiling.splitAxisTailSize),
+                         static_cast<uint32_t>(commTiling.splitAxisTailCnt), tilingData_->tailQbmmTilingData);
         }
         communication_.End();
     }
@@ -131,15 +133,14 @@ private:
     __aicore__ inline void SetupParams(Params& params, uint64_t rowOffset, const QuantMatmulTilingData& mmTile,
                                        uint64_t rankK, uint64_t rankNChunk, uint64_t scaleK)
     {
-        const auto& tilingInfo = tilingData_->matmulAllToAllTilingInfo;
         ProblemShape problemShape{mmTile.m, mmTile.n, mmTile.k, 1UL};
         BlockMmadParams mmParams;
-        mmParams.aGmAddr = MatmulAllToAllMxGmAddr<X1Type>(x1_, rowOffset * rankK);
-        mmParams.scaleAGmAddr = MatmulAllToAllMxGmAddr<ScaleType>(x1Scale_, rowOffset * scaleK);
-        mmParams.bGmAddr = x2_;
-        mmParams.scaleBGmAddr = x2Scale_;
+        mmParams.aGmAddr = MatmulAllToAllMxGmAddr<X1Type>(x1Addr_, rowOffset * rankK);
+        mmParams.scaleAGmAddr = MatmulAllToAllMxGmAddr<ScaleType>(x1ScaleAddr_, rowOffset * scaleK);
+        mmParams.bGmAddr = x2Addr_;
+        mmParams.scaleBGmAddr = x2ScaleAddr_;
         mmParams.cGmAddr = MatmulAllToAllMxGmAddr<YType>(workspaceGM_, rowOffset * rankNChunk);
-        mmParams.biasGmAddr = bias_;
+        mmParams.biasGmAddr = biasAddr_;
 
         L1Params l1Params{static_cast<uint64_t>(mmTile.stepK) * mmTile.baseK, mmTile.scaleKL1, mmTile.nBufferNum};
         BlockSchedulerParams schedulerParams{mmTile.baseM,
@@ -150,17 +151,17 @@ private:
                                              mmTile.nBaseTailSplitCnt,
                                              mmTile.mTailMain,
                                              mmTile.nTailMain};
-        QBMMTiling qbmmParams{tilingInfo.rankDim,
+        QBMMTiling qbmmParams{tilingData_->rankDim,
                               mmTile.baseM,
                               mmTile.baseN,
                               mmTile.baseK,
-                              bias_ != nullptr ? QBMMTiling::BIAS_ENABLED : QBMMTiling::BIAS_DISABLED,
+                              biasAddr_ != nullptr ? QBMMTiling::BIAS_ENABLED : QBMMTiling::BIAS_DISABLED,
                               mmTile.dbL0c,
                               false};
         // 模版中通过 selfBatchIdx 传入，将其对应的 batch 计算得到的数据单独放在 cGmSelfAddr 中
         // hcomm 无 self batch 直写: 全部 rank 结果写 Win 区供 Hcomm 提交
         // 因此 selfBatchIdx 传 rankDim 作哨兵，不会单独处理任何 batch
-        LocalParams localParams{static_cast<uint64_t>(tilingInfo.rankM), tilingInfo.rankDim, nullptr, false};
+        LocalParams localParams{static_cast<uint64_t>(tilingData_->rankM), tilingData_->rankDim, nullptr, false};
         params = {problemShape, mmParams, l1Params, schedulerParams, qbmmParams, localParams};
     }
 
@@ -194,18 +195,17 @@ private:
     __aicore__ inline void ProcessBatch(uint64_t startRow, uint32_t taskM, uint32_t taskCnt,
                                         const QuantMatmulTilingData& mmTile)
     {
-        const auto& tilingInfo = tilingData_->matmulAllToAllTilingInfo;
-        const uint64_t rankNChunk = static_cast<uint64_t>(tilingInfo.rankN) / tilingInfo.rankDim;
-        const uint64_t rankK = static_cast<uint64_t>(tilingInfo.rankK);
+        // SWAT 的 n/k 即单 rank 列宽/完整 K(host 调 SWAT 时传入), 无需再除 rankDim
+        const uint64_t rankNChunk = static_cast<uint64_t>(mmTile.n);
+        const uint64_t rankK = static_cast<uint64_t>(mmTile.k);
         auto* communicationContext = communication_.GetContextPtr();
         communicationContext->sendBuffer = MatmulAllToAllMxGmAddr<YType>(workspaceGM_, startRow * rankNChunk);
-        communicationContext->recvBuffer = MatmulAllToAllMxGmAddr<YType>(y_, startRow * rankNChunk);
+        communicationContext->recvBuffer = MatmulAllToAllMxGmAddr<YType>(yAddr_, startRow * rankNChunk);
         communicationContext->sendOffset = static_cast<uint64_t>(taskM) * rankNChunk * sizeof(YType);
         communicationContext->recvOffset = communicationContext->sendOffset;
         communicationContext->sendCount = static_cast<uint64_t>(taskM) * rankNChunk;
-        communicationContext->strideCount = static_cast<uint64_t>(tilingInfo.rankM) * rankNChunk;
-        communicationContext->hcclDataType = tilingInfo.hcclDataType;
-
+        communicationContext->strideCount = static_cast<uint64_t>(tilingData_->rankM) * rankNChunk;
+        communicationContext->hcclDataType = tilingData_->hcclDataType;
         communication_.PrepareAll(taskCnt);
         MatmulProcess(startRow, taskM, taskCnt, mmTile, rankK, rankNChunk);
     }
@@ -213,12 +213,12 @@ private:
     TilingDataType* tilingData_;
     KernelImpl kernel_{};
     CommunicationType communication_;
-    GM_ADDR x1_{nullptr};
-    GM_ADDR x2_{nullptr};
-    GM_ADDR bias_{nullptr};
-    GM_ADDR y_{nullptr};
-    GM_ADDR x1Scale_{nullptr};
-    GM_ADDR x2Scale_{nullptr};
+    GM_ADDR x1Addr_{nullptr};
+    GM_ADDR x2Addr_{nullptr};
+    GM_ADDR biasAddr_{nullptr};
+    GM_ADDR yAddr_{nullptr};
+    GM_ADDR x1ScaleAddr_{nullptr};
+    GM_ADDR x2ScaleAddr_{nullptr};
     GM_ADDR workspaceGM_{nullptr};
 };
 
