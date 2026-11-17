@@ -38,6 +38,8 @@ public:
 
     LocalTensor<float> floatLocalTemp_;
     LocalTensor<float> smoothScalesTensor_;
+    LocalTensor<float> absScratchTensor_; // Abs/ReduceMax 专用 scratch，与 smoothScalesTensor_ 解别名
+    bool useAbsScratch_{true};            // false 时 absScratch 复用 smoothScalesTensor_，V_MTE2 需后移
     GlobalTensor<uint8_t> dynamicScalesOutGMTensor_;
 
     TBuf<> smoothScalesBuf_;
@@ -51,9 +53,20 @@ public:
     __aicore__ inline void SetQuantInitParams(LocalTensor<float> floatLocalTemp, LocalTensor<float> smoothScalesTensor,
                                               TBuf<> smoothScalesBuf, GlobalTensor<uint8_t> dynamicScalesOutGMTensor)
     {
+        // 非 A5 fullmesh 路径无独立 scratch，复用 smooth 缓冲，V_MTE2 需等 Abs/ReduceMax 读完
+        SetQuantInitParams(floatLocalTemp, smoothScalesTensor, smoothScalesBuf, dynamicScalesOutGMTensor,
+                           smoothScalesTensor, false);
+    }
+
+    __aicore__ inline void SetQuantInitParams(LocalTensor<float> floatLocalTemp, LocalTensor<float> smoothScalesTensor,
+                                              TBuf<> smoothScalesBuf, GlobalTensor<uint8_t> dynamicScalesOutGMTensor,
+                                              LocalTensor<float> absScratchTensor, bool useAbsScratch = true)
+    {
         floatLocalTemp_ = floatLocalTemp;
         smoothScalesBuf_ = smoothScalesBuf;
         smoothScalesTensor_ = smoothScalesTensor;
+        absScratchTensor_ = absScratchTensor;
+        useAbsScratch_ = useAbsScratch;
         dynamicScalesOutGMTensor_ = dynamicScalesOutGMTensor;
 
         scalesInParams_ = {1U, static_cast<uint16_t>(axisH_ * sizeof(float)), 0U, 0U};
@@ -199,17 +212,26 @@ public:
 #endif
         Cast(floatLocalTemp_, inLocal, RoundMode::CAST_NONE, axisH_);
         PipeBarrier<PIPE_V>();
-        if constexpr (IsSmoothScaleExist) {         // 平滑系数
-            SyncFunc<AscendC::HardEvent::V_MTE2>(); // ub复用，循环同步
+        if constexpr (IsSmoothScaleExist) { // 平滑系数
             DataCopyPad(smoothScalesTensor_, scalesGMTensor_[expertIndex * axisH_], scalesInParams_, scalesPadParams_);
             SyncFunc<AscendC::HardEvent::MTE2_V>();
             Mul(floatLocalTemp_, floatLocalTemp_, smoothScalesTensor_, axisH_);
             PipeBarrier<PIPE_V>();
+            // 独立 scratch 时 smooth 缓冲不再被覆写，V_MTE2 只需等 Cast+Mul，可在 Mul 后提前释放；
+            // 复用 smooth 缓冲作 scratch 时，必须等 Abs/ReduceMax 读完后再放行下一轮 smooth 搬入。
+            if (useAbsScratch_) {
+                SyncFunc<AscendC::HardEvent::V_MTE2>(); // ub复用，循环同步
+            }
         }
-        LocalTensor<float> floatLocalAbsTemp = smoothScalesBuf_.Get<float>();
+        LocalTensor<float> floatLocalAbsTemp = absScratchTensor_;
         Abs(floatLocalAbsTemp, floatLocalTemp_, axisH_);
         PipeBarrier<PIPE_V>();
         ReduceMaxInplace(floatLocalAbsTemp, axisH_); // 获取最大值
+        if constexpr (IsSmoothScaleExist) {
+            if (!useAbsScratch_) {
+                SyncFunc<AscendC::HardEvent::V_MTE2>(); // absScratch 复用 smooth 缓冲，读完再放行
+            }
+        }
         SyncFunc<AscendC::HardEvent::V_S>();
         dynamicScale = maxVal / floatLocalAbsTemp.GetValue(0);
         Muls(floatLocalTemp_, floatLocalTemp_, dynamicScale, axisH_);

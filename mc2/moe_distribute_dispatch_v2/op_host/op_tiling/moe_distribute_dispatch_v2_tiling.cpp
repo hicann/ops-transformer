@@ -2291,6 +2291,7 @@ struct UbCheckParam {
     bool reuseValidExpertIndexForTemp = false;
     bool isScales = false;
     bool isSerialA5 = false;
+    bool isRoce = false;
 };
 
 struct A5ChunkParam {
@@ -2412,8 +2413,14 @@ static void AccountA5QuantOrMaskBufs(const UbCheckParam& p, const A5ChunkParam& 
         smoothSize = smoothSize > c.bsI32Bytes ? smoothSize : c.bsI32Bytes;
         smoothSize = smoothSize > c.bsHalfBytes ? smoothSize : c.bsHalfBytes;
 
-        ubSize = ubSize + tempBufSize + recvCastSize + smoothSize;
-        quantOrMaskBufSize = tempBufSize + recvCastSize + smoothSize;
+        // 仅 A5 fullmesh 的 smooth + PERTOKEN 路径额外申请 absScratchBuf，条件需与 kernel 侧严格一致。
+        // 2D expert mask / zero expert 场景 validExpertIndex 占用更大、UB 更紧，此时复用 smooth 缓冲。
+        const bool useAbsScratch = !p.isRoce && p.isScales && !p.hasExpertMaskOrZeroCompute &&
+                                   (p.quantMode == static_cast<uint32_t>(QuantModeA5::PERTOKEN_DYNAMIC_QUANT));
+        uint32_t absScratchSize = useAbsScratch ? smoothSize : 0;
+
+        ubSize = ubSize + tempBufSize + recvCastSize + smoothSize + absScratchSize;
+        quantOrMaskBufSize = tempBufSize + recvCastSize + smoothSize + absScratchSize;
     } else if (p.needMaskCalFlag) {
         uint32_t dstExpSize = c.chunkHostBytes;
         dstExpSize = dstExpSize > c.boolRowsBytes ? dstExpSize : c.boolRowsBytes;
@@ -2663,6 +2670,7 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
     param.reuseValidExpertIndexForTemp = reuseValidExpertIndexForTemp;
     param.isScales = isScales;
     param.isSerialA5 = isA5Arch && IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info);
+    param.isRoce = config.isRoce;
 
     uint32_t sendToMoeUsedBuffer = SendToMoeExpertUsedBuffer(context, tilingData, expertIdsBufSize, kSize, nodeName);
     uint32_t sendExtraUbSize = sendToMoeUsedBuffer;

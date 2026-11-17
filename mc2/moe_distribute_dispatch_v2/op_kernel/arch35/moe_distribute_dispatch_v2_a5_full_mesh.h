@@ -43,6 +43,7 @@ constexpr uint32_t SPLIT_BLOCK_DATA_COUNT = 120U; // 120 = SPLIT_BLOCK_DATA_SIZE
 constexpr uint32_t SIZE_ALIGN_256 = 256U;
 constexpr uint32_t CUMSUM_MAX_CORE_NUM = 8U;
 constexpr uint32_t ALL_TO_ALL_MAX_CORE_NUM = 40U;
+constexpr uint32_t PERGROUP_SMOOTH_MAX_CORE_NUM = 48U;
 // 按32核上限预留前缀和数据区（32*32*32=32KB）
 constexpr uint64_t CUMSUM_WS_FLAG_OFFSET = 32UL * 1024UL;
 constexpr uint32_t RUNPOS_CALCUMSUM = 2U;
@@ -238,6 +239,7 @@ private:
     LocalTensor<float> statusFp32Tensor_;
     LocalTensor<uint32_t> gatherMaskTensor_;
     LocalTensor<float> smoothScalesTensor_;
+    LocalTensor<float> absScratchTensor_; // Abs/ReduceMax 专用 scratch，与 smoothScalesTensor_ 解别名
     LocalTensor<float> expertScalesTensor_;
     LocalTensor<float> statusCleanFp32Tensor_;
     LocalTensor<int32_t> sendCntTensor_;
@@ -456,12 +458,16 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     aivUsedCumSum_ = (aivUsedCumSum_ >= CUMSUM_MAX_CORE_NUM) ? CUMSUM_MAX_CORE_NUM : aivUsedCumSum_;
     // 确保每个核至少处理一个状态
     aivUsedCumSum_ = (aivUsedCumSum_ >= rscvStatusNum_) ? rscvStatusNum_ : aivUsedCumSum_;
+    constexpr bool kPerGroupSend = IsSmoothScaleExist && (QuantMode == PERGROUP_DYNAMIC_QUANT);
+    constexpr bool kVectorHeavySend = IsSmoothScaleExist && (QuantMode == PERTOKEN_DYNAMIC_QUANT);
+    const uint32_t kAllToAllMaxCoreNum =
+        kPerGroupSend ? PERGROUP_SMOOTH_MAX_CORE_NUM : (kVectorHeavySend ? aivNum_ : ALL_TO_ALL_MAX_CORE_NUM);
     if (enableGroupSend_) {
         // 分组保持原来的发送核和计数核划分
         aivAllToAllDispatch_ = aivNum_ - aivUsedCumSum_;
         aivTokenCnt_ = aivUsedCumSum_;
-    } else if (aivNum_ - aivUsedCumSum_ >= ALL_TO_ALL_MAX_CORE_NUM) {
-        aivAllToAllDispatch_ = ALL_TO_ALL_MAX_CORE_NUM;
+    } else if (aivNum_ - aivUsedCumSum_ >= kAllToAllMaxCoreNum) {
+        aivAllToAllDispatch_ = kAllToAllMaxCoreNum;
         aivTokenCnt_ = aivNum_ - aivAllToAllDispatch_;
     } else {
         aivAllToAllDispatch_ = aivNum_ - aivUsedCumSum_;
@@ -1472,7 +1478,7 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
 {
     useSendGroupIndices_ = enableGroupSend_ && !isScalingDownFlag_;
     TBuf<> tempBuf, inQueueCleanBuf, calTempBuf, sendGroupIndexBuf;
-    TBuf<> smoothScalesBuf, receiveDataCastFloatBuf;
+    TBuf<> smoothScalesBuf, receiveDataCastFloatBuf, absScratchBuf;
     expertIdsBufSize_ = Ceil(expertIdsCnt_ * sizeof(int32_t), SIZE_ALIGN_256) * SIZE_ALIGN_256; // 支持compareScalar
     uint32_t tokenInBufferSize = hAlignSize_;
     // 透传时需要在搬入张量末尾填入三元组
@@ -1520,6 +1526,7 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         tpipe_->InitBuffer(gatherMaskTBuf_, gatherMaskBufSize); // 全量布局按整表、分块布局按计算块定容
     }
     constexpr uint32_t minHistoSaveBytes = (EXPERT_PER_HISTO_GROUP + 1) * sizeof(int32_t);
+    bool useAbsScratch = false;
     if constexpr ((QuantMode > UNQUANT) || (QuantMode == UNQUANT && !Std::IsSame<ExpandXOutType, XType>::value)) {
         hOutAlignUbSize_ = blockCntPerToken_ * SPLIT_BLOCK_DATA_SIZE;
         bool reuseValidExpertIndexForTemp = (isExpertMaskFlag_ || (zeroComputeExpertNum_ != 0));
@@ -1552,6 +1559,19 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
 
         floatLocalTemp_ = receiveDataCastFloatBuf.Get<float>();
         smoothScalesTensor_ = smoothScalesBuf.Get<float>();
+        // 解别名后 smooth 缓冲不再被覆写，V_MTE2 只需等 Cast+Mul 而非整条 vector 链排空。
+        // 2D expert mask / zero expert 场景 UB 更紧，复用 smooth 缓冲以省下 1 份空间。
+        if constexpr (IsSmoothScaleExist && (QuantMode == PERTOKEN_DYNAMIC_QUANT)) {
+            useAbsScratch = !(isExpertMaskFlag_ || (zeroComputeExpertNum_ != 0));
+            if (useAbsScratch) {
+                tpipe_->InitBuffer(absScratchBuf, smoothSize);
+                absScratchTensor_ = absScratchBuf.Get<float>();
+            } else {
+                absScratchTensor_ = smoothScalesBuf.Get<float>();
+            }
+        } else {
+            absScratchTensor_ = smoothScalesBuf.Get<float>();
+        }
         dstExpBuf_ = receiveDataCastFloatBuf; // 内存复用
         subExpBuf_ = smoothScalesBuf;         // 内存复用
 
@@ -1602,7 +1622,8 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         tpipe_->InitBuffer(sendGroupIndexBuf, indexBytes);
         sendGroupIndices_ = sendGroupIndexBuf.Get<int16_t>();
     }
-    quantInst_.SetQuantInitParams(floatLocalTemp_, smoothScalesTensor_, smoothScalesBuf, dynamicScalesOutGMTensor_);
+    quantInst_.SetQuantInitParams(floatLocalTemp_, smoothScalesTensor_, smoothScalesBuf, dynamicScalesOutGMTensor_,
+                                  absScratchTensor_, useAbsScratch);
     if (isExpertMaskFlag_ || (zeroComputeExpertNum_ != 0)) {
         ExpertActiveMaskInit();
     }
