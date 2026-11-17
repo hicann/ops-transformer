@@ -16,6 +16,7 @@
 #include "dense_lightning_indexer_softmax_lse_v2_tiling.h"
 #include "log/log.h"
 #include "op_host/tiling_util.h"
+#include "op_host/util/op_const_def.h"
 
 using namespace ge;
 
@@ -443,7 +444,7 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
     constexpr int64_t KV_CACHE_NUM_ARCH35 = 46832;
     constexpr int64_t KV_CACHE_NUM_ARCH92 = 30448;
     auto npuArch = ascendcPlatform.GetCurNpuArch();
-    bool isArch35 = (npuArch == NpuArch::DAV_3510);
+    bool isArch35 = (npuArch == Ops::Base::DAV_3510);
     int64_t kvCacheNum = isArch35 ? KV_CACHE_NUM_ARCH35 : KV_CACHE_NUM_ARCH92;
     int64_t kvTileElems = isArch35 ? TKV_HALF : TKV;
     int64_t s2Tiles = (s2Size + TKV - 1) / TKV;

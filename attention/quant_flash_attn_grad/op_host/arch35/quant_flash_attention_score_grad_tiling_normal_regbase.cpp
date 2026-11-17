@@ -163,7 +163,7 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::GetPlatformInfo
 bool QuantFlashAttentionScoreGradTilingNormalRegbase::IsCapable()
 {
     // 基础模板 全部支持
-    if (npuArch == NpuArch::DAV_3510) {
+    if (npuArch == Ops::Base::DAV_3510) {
         OP_LOGD(context_, "QuantFlashAttentionScoreGradTilingNormalRegbase hit");
         return true;
     }
@@ -1000,6 +1000,6 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::SaveToTilingDat
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(QuantFlashAttnGrad, QuantFlashAttentionScoreGradTilingNormalRegbase,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), 950);
+                                   static_cast<int32_t>(Ops::Base::DAV_3510), 950);
 } // namespace QuantFag
 } // namespace optiling

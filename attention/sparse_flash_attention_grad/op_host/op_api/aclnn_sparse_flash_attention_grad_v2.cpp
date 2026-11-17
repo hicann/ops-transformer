@@ -13,6 +13,7 @@
 
 #include "opdev/platform.h"
 #include "opdev/op_log.h"
+#include "op_host/util/op_const_def.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +59,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
                 "The sinks input of aclnnSparseFlashAttentionGradV2 requires a corresponding dSinks output.");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (sinks != nullptr && op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (sinks != nullptr && op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
         REPORT_PREDEFINED_ERR_MSG(
             "EZ1009", (std::vector<const char*>{"opName", "reason"}),
             (std::vector<const char*>{

@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <gtest/gtest.h>
+#include "op_host/util/op_const_def.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 #include "../../../../op_host/dense_lightning_indexer_kl_loss_grad_tiling_common.h"
@@ -53,7 +54,7 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND", ge
         info.l0cSize = 262144;
         info.l2CacheSize = 134217728;
         info.socVersion = platform_ascendc::SocVersion::ASCEND950;
-        info.npuArch = NpuArch::DAV_3510;
+        info.npuArch = Ops::Base::DAV_3510;
         return info;
     }();
     gert::TilingContextPara context(

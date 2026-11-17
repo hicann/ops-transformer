@@ -18,6 +18,7 @@
 #include "log/log.h"
 #include "op_host/data_copy_transpose_tiling.h"
 #include "op_host/tiling_templates_registry.h"
+#include "op_host/util/op_const_def.h"
 #if (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
 #include "../op_kernel/arch92/flash_attention_score_grad_template_tiling_key_david.h"
 #include "../op_kernel/arch92/flash_attention_score_grad_tiling_data_david.h"
@@ -262,7 +263,7 @@ public:
         }
         emptyTensorTilingDataRegbase->isRope = (dqRopeNum > 0 || dkRopeNum > 0);
 
-        if (npuArch == NpuArch::DAV_3510) {
+        if (npuArch == Ops::Base::DAV_3510) {
             context->SetTilingKey(
                 GET_TPL_TILING_KEY(TILING_KEY_1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, TILING_KEY_1));
         } else {
@@ -592,7 +593,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingConte
                                                             "TilingFlashAttentionGradScore: [compile_info is null]"})),
         return ge::GRAPH_FAILED);
     auto npuArch = compilePtr->npuArch;
-    if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201) {
+    if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201) {
         OP_LOGW(context, "Current npu arch is dav-3510 or dav-9201.");
         if (IsEmptyOutput(context)) {
             FlashAttentionScoreGradTiling flashAttentionScoreGradTiling;

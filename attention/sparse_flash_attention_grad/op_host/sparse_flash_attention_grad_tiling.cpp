@@ -31,7 +31,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingSparseFlashAttentionGrad(gert::TilingCont
 {
     auto platform = context->GetPlatformInfo();
     auto sfagPlatform = platform_ascendc::PlatformAscendC(platform);
-    if (sfagPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (sfagPlatform.GetCurNpuArch() == Ops::Base::DAV_3510) {
         OP_LOGW(context, "Current npu arch is dav-3510.");
     } else {
         OP_LOGW(context, "Current npu arch is not dav-3510.");

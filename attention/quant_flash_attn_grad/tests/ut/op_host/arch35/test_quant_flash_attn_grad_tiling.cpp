@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <gtest/gtest.h>
+#include "op_host/util/op_const_def.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 #include "../../../../op_host/quant_flash_attn_grad_tiling.h"
@@ -64,7 +65,7 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND")
         info.l0aSize = 65536;
         info.l0bSize = 65536;
         info.socVersion = platform_ascendc::SocVersion::ASCEND950;
-        info.npuArch = NpuArch::DAV_3510;
+        info.npuArch = Ops::Base::DAV_3510;
         return info;
     }();
     gert::TilingContextPara context("QuantFlashAttnGrad",

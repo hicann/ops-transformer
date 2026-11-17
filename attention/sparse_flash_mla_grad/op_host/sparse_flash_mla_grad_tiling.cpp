@@ -29,9 +29,10 @@ ASCENDC_EXTERN_C ge::graphStatus TilingSparseFlashMlaGrad(gert::TilingContext* c
 {
     auto platform = context->GetPlatformInfo();
     auto sasgPlatform = platform_ascendc::PlatformAscendC(platform);
-    if (sasgPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (sasgPlatform.GetCurNpuArch() == Ops::Base::DAV_3510) {
         OP_LOGD(context, "Current npu arch is dav-3510.");
-    } else if (sasgPlatform.GetCurNpuArch() == NpuArch::DAV_9201 || sasgPlatform.GetCurNpuArch() == NpuArch::DAV_9202) {
+    } else if (sasgPlatform.GetCurNpuArch() == Ops::Base::DAV_9201 ||
+               sasgPlatform.GetCurNpuArch() == Ops::Base::DAV_9202) {
         OP_LOGD(context, "Current npu arch is dav-9201 or dav-9202.");
     } else {
         OP_LOGD(context, "Current npu arch is not dav-3510.");

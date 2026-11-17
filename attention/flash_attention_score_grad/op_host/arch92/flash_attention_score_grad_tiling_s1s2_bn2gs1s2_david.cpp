@@ -654,7 +654,7 @@ bool FlashAttentionScoreGradTilingUnpaddedAttensionDavid::IsCapable()
 {
     auto actualSeqQLenTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_Q_LEN));
     OP_LOGD(context_, "coreNum is %lu", fBaseParams.coreNum);
-    if ((npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) && actualSeqQLenTensor != nullptr &&
+    if ((npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) && actualSeqQLenTensor != nullptr &&
         actualSeqQLenTensor->GetShapeSize() != 0) {
         OP_LOGD(context_, "FlashAttentionScoreGradTilingUnpaddedAttensionRegbase hit");
         return true;
@@ -665,7 +665,7 @@ bool FlashAttentionScoreGradTilingUnpaddedAttensionDavid::IsCapable()
 bool FlashAttentionScoreGradTilingUs1s2Bs2David::IsCapable()
 {
     // 基础模板 全部支持
-    if (npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) {
+    if (npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
         OP_LOGD(context_, "FlashAttentionScoreGradTilingUs1s2Bs2Regbase hit");
         return true;
     }
@@ -4517,6 +4517,7 @@ ge::graphStatus FlashAttentionScoreGradTilingUs1s2Bs2David::CheckUnpadTokensInfo
     return ge::GRAPH_SUCCESS;
 }
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingUs1s2Bs2David,
-                                   std::vector<int32_t>({(int32_t)NpuArch::DAV_9201, (int32_t)NpuArch::DAV_9202}), 800);
+                                   std::vector<int32_t>({(int32_t)Ops::Base::DAV_9201, (int32_t)Ops::Base::DAV_9202}),
+                                   800);
 } // namespace fag
 } // namespace optiling

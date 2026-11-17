@@ -10327,7 +10327,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaCausalDeter_RightDown)
 
 // P0-5: 空输出 tiling——RunEmptyTilingRegbase + CalculateTschBlockDim。
 // dq 输出 shape 含 0 维（shapeSize==0），其余输入合法；3 维输入按 SBH 声明，
-// compileInfo 带 NpuArch::DAV_3510 走 regbase 空输出分支。
+// compileInfo 带 Ops::Base::DAV_3510 走 regbase 空输出分支。
 TEST_F(FlashAttentionScoreGradTiling, Coverage_EmptyOutput_DqDimZero)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
@@ -10341,7 +10341,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_EmptyOutput_DqDimZero)
         134217728,
         32,
         platform_ascendc::SocVersion::ASCEND950,
-        NpuArch::DAV_3510};
+        Ops::Base::DAV_3510};
     gert::TilingContextPara para("FlashAttentionScoreGrad",
                                  {
                                      // q: SBH [S, B, H*D]
@@ -11369,7 +11369,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_97_empt
         134217728,
         32,
         platform_ascendc::SocVersion::ASCEND950,
-        NpuArch::DAV_3510};
+        Ops::Base::DAV_3510};
     auto para =
         MakeDispatchRoutePara(&compileInfo, {{1, 0, 1, 64}, {1, 0, 1, 64}}, {{1, 1, 100}, {1, 1, 100}},
                               {{1, 1, 100}, {1, 1, 100}}, {{1, 1, 100}, {1, 1, 100}}, {{1, 1, 100}, {1, 1, 100}});

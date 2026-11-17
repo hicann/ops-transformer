@@ -1032,5 +1032,5 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbaseArch92::GetWo
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(
     DenseLightningIndexerKLLossGrad, DenseLightningIndexerKLLossGradTilingGeneralRegbaseArch92,
-    std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_9201), static_cast<int32_t>(NpuArch::DAV_9202)}), 1);
+    std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_9201), static_cast<int32_t>(Ops::Base::DAV_9202)}), 1);
 } // namespace optiling

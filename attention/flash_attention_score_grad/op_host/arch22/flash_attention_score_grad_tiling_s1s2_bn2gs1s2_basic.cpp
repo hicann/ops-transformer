@@ -488,5 +488,5 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForMultiHeadLatentAttentionGrad(ge
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGraTilingMla,
-                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 1001);
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_2201)}), 1001);
 } // namespace optiling

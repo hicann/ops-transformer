@@ -446,7 +446,7 @@ protected:
     {
         auto actualSeqQLenTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_Q_LEN));
         OP_LOGD(context_, "coreNum is %lu", fBaseParams.coreNum);
-        if (npuArch == NpuArch::DAV_3510 && actualSeqQLenTensor != nullptr &&
+        if (npuArch == Ops::Base::DAV_3510 && actualSeqQLenTensor != nullptr &&
             actualSeqQLenTensor->GetShapeSize() != 0) {
             OP_LOGD(context_, "FlashAttentionScoreGradTilingUnpaddedAttensionRegbase hit");
             return true;
@@ -2657,6 +2657,6 @@ protected:
 };
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingVarlenRegbase,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), 900);
+                                   static_cast<int32_t>(Ops::Base::DAV_3510), 900);
 } // namespace fag
 } // namespace optiling

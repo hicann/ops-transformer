@@ -2424,8 +2424,8 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DetermineMode()
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb,
-                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 15500);
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_2201)}), 15500);
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingSameABDeterministic,
-                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 1100);
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_2201)}), 1100);
 
 } // namespace optiling

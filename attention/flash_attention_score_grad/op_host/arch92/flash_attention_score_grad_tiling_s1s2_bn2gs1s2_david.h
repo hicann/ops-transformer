@@ -18,6 +18,7 @@
 #include "flash_attention_score_grad_tiling_common_david.h"
 #include "op_host/tiling_base.h"
 #include "op_host/tiling_templates_registry.h"
+#include "op_host/util/op_const_def.h"
 #include "../../op_kernel/arch92/flash_attention_score_grad_template_tiling_key_david.h"
 #include "../../op_kernel/arch92/flash_attention_score_grad_tiling_data_david.h"
 #include "op_host/tiling_type.h"
@@ -444,7 +445,7 @@ protected:
 
     FuzzyBaseInfoParamsDavid fBaseParams{};
     platform_ascendc::SocVersion socVersion;
-    NpuArch npuArch = NpuArch::DAV_RESV;
+    NpuArch npuArch = Ops::Base::DAV_RESV;
     TndBaseInfo tndBaseInfo;
 };
 

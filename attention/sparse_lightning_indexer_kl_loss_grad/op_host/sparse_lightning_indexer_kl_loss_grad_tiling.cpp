@@ -85,10 +85,11 @@ ge::graphStatus TilingSparseLightningIndexerKLLossGrad(gert::TilingContext* cont
 
     auto platformInfoPtr = context->GetPlatformInfo();
     auto sligPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-    if (sligPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (sligPlatform.GetCurNpuArch() == Ops::Base::DAV_3510) {
         OP_LOGW(context, "Current npu arch is dav-3510.");
         return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
-    } else if (sligPlatform.GetCurNpuArch() == NpuArch::DAV_9201 || sligPlatform.GetCurNpuArch() == NpuArch::DAV_9202) {
+    } else if (sligPlatform.GetCurNpuArch() == Ops::Base::DAV_9201 ||
+               sligPlatform.GetCurNpuArch() == Ops::Base::DAV_9202) {
         OP_LOGW(context, "Current npu arch is dav-9201 or dav-9202.");
         return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
     } else {

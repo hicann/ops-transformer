@@ -65,7 +65,7 @@ protected:
                                  int64_t blockIdx = 0);
     FuzzyBaseInfoParamsRegbase fBaseParams;
     platform_ascendc::SocVersion socVersion;
-    NpuArch npuArch = NpuArch::DAV_RESV;
+    NpuArch npuArch = Ops::Base::DAV_RESV;
 };
 
 } // namespace QuantFag

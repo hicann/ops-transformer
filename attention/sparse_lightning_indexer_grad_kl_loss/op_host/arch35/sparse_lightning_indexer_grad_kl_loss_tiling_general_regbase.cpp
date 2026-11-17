@@ -1348,5 +1348,5 @@ ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseRegbase::GetWorkspaceS
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(SparseLightningIndexerGradKLLoss, SparseLightningIndexerGradKLLossTilingBaseRegbase,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), 1);
+                                   static_cast<int32_t>(Ops::Base::DAV_3510), 1);
 } // namespace optiling

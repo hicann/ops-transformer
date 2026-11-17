@@ -87,7 +87,7 @@ static Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo MakeA6Comp
             33554432, // l2CacheSize
             32,       // coreNum
             platform_ascendc::SocVersion::RESERVED_VERSION,
-            NpuArch::DAV_9201};
+            Ops::Base::DAV_9201};
 }
 
 static gert::TilingContextPara MakeMlaRopeTilingContext(
@@ -157,7 +157,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_0)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -278,7 +278,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_1)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -379,7 +379,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_2)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -500,7 +500,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_3)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -622,7 +622,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_4)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -749,7 +749,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_5)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -875,7 +875,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_6)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -998,7 +998,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_7)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -1123,7 +1123,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_8)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -1226,7 +1226,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_9)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -1330,7 +1330,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_10)
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -7958,7 +7958,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_dscal
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8053,7 +8053,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_dscal
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8148,7 +8148,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_dscal
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8243,7 +8243,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_dscal
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8338,7 +8338,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_dscal
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8433,7 +8433,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_dscal
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8528,7 +8528,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_dscal
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8623,7 +8623,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_emp
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8793,7 +8793,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_sink_
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8891,7 +8891,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_tnd_s
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -8985,7 +8985,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_fail_tnd_s
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -10983,7 +10983,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -11090,7 +11090,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -11197,7 +11197,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -11304,7 +11304,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     // Use a small mocked L2 so low-head cases exercise the column scheduling policy.
     std::string socInfo = A6SocInfo;
     const std::string originalL2 = "\"L2_SIZE\": 134217728";
@@ -11415,7 +11415,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     // Use a small mocked L2 so low-head cases exercise the column scheduling policy.
     std::string socInfo = A6SocInfo;
     const std::string originalL2 = "\"L2_SIZE\": 134217728";
@@ -11526,7 +11526,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     // Use a small mocked L2 so low-head cases exercise the column scheduling policy.
     std::string socInfo = A6SocInfo;
     const std::string originalL2 = "\"L2_SIZE\": 134217728";
@@ -11637,7 +11637,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     // Use a small mocked L2 so low-head cases exercise the column scheduling policy.
     std::string socInfo = A6SocInfo;
     const std::string originalL2 = "\"L2_SIZE\": 134217728";
@@ -11749,7 +11749,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -11856,7 +11856,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -11963,7 +11963,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -12070,7 +12070,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {
@@ -12177,7 +12177,7 @@ TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_non_tnd_co
         33554432,                                       // l2CacheSize
         32,                                             // coreNum
         platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_9201};
+        Ops::Base::DAV_9201};
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
         {

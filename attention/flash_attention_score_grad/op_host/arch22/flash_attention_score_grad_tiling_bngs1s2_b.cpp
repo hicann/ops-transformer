@@ -1130,6 +1130,6 @@ public:
 };
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradUbngs1s2BbTiling,
-                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 10000);
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_2201)}), 10000);
 
 } // namespace optiling

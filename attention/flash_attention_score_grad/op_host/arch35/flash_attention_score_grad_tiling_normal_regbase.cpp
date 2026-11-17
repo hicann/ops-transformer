@@ -1310,7 +1310,7 @@ bool FlashAttentionScoreGradTilingNormalRegbase::IsCapable()
         return false;
 
     // 基础模板 全部支持
-    if (npuArch == NpuArch::DAV_3510) {
+    if (npuArch == Ops::Base::DAV_3510) {
         OP_LOGD(context_, "FlashAttentionScoreGradTilingNormalRegbase hit");
         return true;
     }
@@ -2964,6 +2964,6 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::SaveToTilingData()
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingNormalRegbase,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), 950);
+                                   static_cast<int32_t>(Ops::Base::DAV_3510), 950);
 } // namespace fag
 } // namespace optiling

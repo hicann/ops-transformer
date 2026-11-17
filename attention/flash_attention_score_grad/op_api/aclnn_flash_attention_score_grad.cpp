@@ -31,6 +31,7 @@
 #include "runtime/context.h"
 #include "acl/acl_rt.h"
 #include "op_common/log/log.h"
+#include "op_host/util/op_const_def.h"
 
 using namespace op;
 #ifdef __cplusplus
@@ -181,7 +182,7 @@ static aclnnStatus CheckSparseModeAttenMask(const aclTensor* attenMaskOptional, 
 static bool StrideLimited()
 {
     NpuArch npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    if (npuArch == NpuArch::DAV_2201) {
+    if (npuArch == Ops::Base::DAV_2201) {
         return true;
     }
     return false;
@@ -189,7 +190,7 @@ static bool StrideLimited()
 
 static bool IsAscend950()
 {
-    return GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
+    return GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
 }
 
 static bool NeedTransposeSoftmaxTensor(const char* softmaxInLayout)

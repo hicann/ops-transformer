@@ -13,6 +13,7 @@
 #include "aclnnInner_sparse_lightning_indexer_grad_kl_loss.h"
 #include "opdev/op_log.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
 
 using namespace op;
 
@@ -60,9 +61,9 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize(
     int64_t nextTokens, bool deterministic, const aclTensor* dQueryIndex, const aclTensor* dKeyIndex,
     const aclTensor* dWeight, const aclTensor* loss, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    if (sinksOptional != nullptr && op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510 &&
-        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9201 &&
-        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9202) {
+    if (sinksOptional != nullptr && op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_9201 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_9202) {
         REPORT_PREDEFINED_ERR_MSG(
             "EZ1009", (std::vector<const char*>{"opName", "reason"}),
             (std::vector<const char*>{"aclnnSparseLightningIndexerGradKLLossV2",

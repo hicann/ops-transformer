@@ -659,6 +659,6 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetBaseShapeInfo()
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(SparseFlashAttentionGrad, SparseFlashAttentionGradBs1Regbase,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), 1);
+                                   static_cast<int32_t>(Ops::Base::DAV_3510), 1);
 } // namespace sfag
 } // namespace optiling

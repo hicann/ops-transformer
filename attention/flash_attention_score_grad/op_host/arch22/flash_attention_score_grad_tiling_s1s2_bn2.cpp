@@ -2271,8 +2271,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm4TilingData(uint32_t
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingS1s2Bn2,
-                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 15000);
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_2201)}), 15000);
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingDeterministic,
-                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 1000);
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_2201)}), 1000);
 
 } // namespace optiling
