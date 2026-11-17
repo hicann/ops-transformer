@@ -275,6 +275,10 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
 </tbody>
 </table>
 
+<!-- npu="950" id9 -->
+- num_experts: For <term>Ascend 950PR&950DT products</term>, the value range is [1, 2048].
+<!-- end id9 -->
+
 ## Return Values
 
 <table style="undefined;table-layout: fixed; width:1200px"><colgroup>
@@ -416,10 +420,19 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
   - H: indicates the hidden size. The value range is [1024, 8192].
   - BS: indicates the number of tokens to be sent. The value range is 0<BS≤512.
   - K: indicates the number of topK experts to be selected. The value range is 0<K≤16, and 0 < K ≤ num_experts + zero_expert_num + copy_expert_num + const_expert_num must also be satisfied.
+    <!-- npu="950" id13 -->
+
+    - <term>Ascend 950PR&950DT products</term>: In the non-hierarchical scenario where `comm_alg` uses the default value, the K value range is 0<K≤<b>32</b>.
+
+    <!-- end id13 -->
+
   - local_expert_num: indicates the number of experts on this card.
     - For shared expert cards, local_expert_num=1.
     - For MoE expert devices, local_expert_num=num_experts/(ep_world_size-shared_expert_rank_num).
     - Ensure that 0 < local_expert_num \* ep_world_size ≤ 2048.
+    <!-- npu="950" id10 -->
+    - For <term>Ascend 950PR&950DT products</term>, 0 < local_expert_num \* ep_world_size ≤ 4096 must be satisfied.
+    <!-- end id10 -->
 
 - `low_latency_dispatch` and `low_latency_combine` must be used together.
 - The element values in the Tensor outputs `assist_info_for_combine`, `ep_recv_counts`, and `expand_scales` of `low_latency_dispatch` may differ across different product models, communication algorithms, or versions. Directly pass the above Tensors to the corresponding parameters of `low_latency_combine` when using them. Other model service logic should not depend on these values.
@@ -439,8 +452,12 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
 
     Before calling this API, check whether the configured HCCL communicator buffer size is appropriate. The unit is MB.
   - When the HCCL\_BUFFSIZE environment variable is used, the buffer size is managed at the communicator granularity and defaults to 200 MB. Each communicator exclusively occupies a memory region of size "2*HCCL\_BUFFSIZE".
-  - In the EP communicator: the configured size must be >= 2 and satisfy >= 2 \* (local_expert_num \* max_bs \* ep_world_size \* Align512(Align32(2 \* h) + 64) + (k + shared_expert_num) \* max_bs\* Align512(2 \* h)).
+  - In the EP communicator: the configured size must be >= 2 and satisfy >= 2 \* (local_expert_num \* max_bs \* ep_world_size \* Align512(Align32(2 \* h) + 44) + (k + shared_expert_num) \* max_bs\* Align512(2 \* h)).
   - where 480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32.
+  <!-- npu="950" id11 -->
+  - For <term>Ascend 950PR&950DT products</term>, when `quant_mode` on the dispatch side is 0 and `x_smooth_scale` is not empty, the dispatch token length is `max(Align32(2 \* h) + 44, Align32(Align32(2 \* h) + 4 \* h) + 16)`, and then alignment is performed according to the preceding rules.
+  - For <term>Ascend 950PR&950DT products</term>, the combine term in the preceding formula is calculated using `480Align512(2 * h)`.
+  <!-- end id11 -->
   - The size allocated in the communicator can be calculated by calling the MoeDistributeBuffer.get_low_latency_ccl_buffer_size API.
   <!-- npu="950" id12 -->
   - For <term>Ascend 950PR&950DT products</term>, you can specify the size of the internally allocated communicator buffer using `ccl_buffer_size` when initializing `MoeDistributeBuffer`. This parameter is in MB and can use the value returned by `MoeDistributeBuffer.get_low_latency_ccl_buffer_size`.

@@ -409,7 +409,6 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
         <td>Optional</td>
         <td>            <ul>
                 <li>Logical data type of the `expand_x` output. The default value is None, which is deduced from `quant_mode` and the input type.</li>
-                <li>In Ascend 950PR&950DT products use cases, this parameter specifies a low-precision output type.</li>
                 <li>`quant_mode=1` supports int8 and hifloat8.</li>
                 <li>`quant_mode=2` supports int8, float8_e4m3fn, and float8_e5m2.</li>
                 <li>`quant_mode=3` supports float8_e4m3fn and float8_e5m2.</li>
@@ -438,6 +437,13 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
     </tr>
 </tbody>
 </table>
+
+<!-- npu="950" id15 -->
+- num_experts: For <term>Ascend 950PR&950DT products</term>, the value range is [1, 2048].
+<!-- end id15 -->
+<!-- npu="950" id17 -->
+- y_dtype: For <term>Ascend 950PR&950DT products</term>, this parameter can be used to specify a non-quantization output data type.
+<!-- end id17 -->
 
 ## Return Values
 
@@ -580,12 +586,34 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
   - H: hidden size. The value is \[1024, 8192\].
 
   - BS: batch sequence size, indicating the number of tokens finally output by the local device. Value range: 0<BS≤512.
+    - When `comm_alg` is set to "fullmesh_v2":
+        <!-- npu="A3" id12 -->
+        - <term>Atlas A3 products</term>: BS value range is 0<BS≤256.
+        <!-- end id12 -->
+        <!-- npu="950" id13 -->
+        - <term>Ascend 950PR&950DT products</term>: BS value range is 0<BS≤512.
+        <!-- end id13 -->
 
   - K: number of experts selected by topK. Value range: 0<K≤16. In addition, 0 < K ≤ num\_experts + zero_expert_num + copy_expert_num + const_expert_num must be satisfied.
+    - When `comm_alg` is set to "fullmesh_v2":
+        <!-- npu="A3" id11 -->
+
+        - <term>Atlas A3 products</term>: K value range is 0<K≤12.
+
+        <!-- end id11 -->
+
+        <!-- npu="950" id14 -->
+
+        - <term>Ascend 950PR&950DT products</term>: K value range is 0<K≤<b>32</b>.
+
+        <!-- end id14 -->
 
   - local\_expert\_num: number of experts on the local device.
     - For shared expert devices, local\_expert\_num is 1.
     - For MoE expert devices, local\_expert\_num=num\_experts/\(ep\_world\_size-shared\_expert\_rank\_num), and 0 < local_expert_num * ep_world_size ≤ 2048 must be satisfied.
+    <!-- npu="950" id16 -->
+    - For <term>Ascend 950PR&950DT products</term>, 0 < local_expert_num * ep_world_size ≤ 4096 must be satisfied.
+    <!-- end id16 -->
 
 - In different product models, with different communication algorithms, or in different versions, the element values in the Tensor outputs `assist_info_for_combine`, `ep_recv_counts`, and `expand_scales` of `low_latency_dispatch` may differ. Pass these tensors directly to the corresponding parameters of `low_latency_combine`. Other model logic must not depend on these values.
 - During the API call, the values of `num_experts`, `expert_shard_type`, `shared_expert_num`, `shared_expert_rank_num`, and `num_max_dispatch_tokens_per_rank` must be consistent across all devices. `expert_shard_type` and `num_max_dispatch_tokens_per_rank` must also be consistent across different layers in the network and consistent with the corresponding parameters of [low_latency_combine](torchapi_low_latency_combine_en.md).
