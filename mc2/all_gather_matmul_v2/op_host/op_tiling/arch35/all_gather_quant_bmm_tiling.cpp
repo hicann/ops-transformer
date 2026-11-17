@@ -622,9 +622,10 @@ ge::graphStatus AllGatherQuantBmmTiling::SetMc2Hcomm()
     }
     OP_LOGD(opName_, "Tiling SetMc2Hcom commMode_: %s", commMode_);
     OP_LOGD(opName_, "Tiling SetMc2Hcom commEngine: %d", commEngine);
-    // 单轮通信量 = 每轮切分的 tileM × K × dtypeSize（对齐 alltoall 口径；mxfp4场景使用int8类型通信，通信量减半）
-    uint64_t commKValue = isFp4_ ? (args_.kValue / EVEN_ALIGN) : args_.kValue;
-    uint64_t commDtypeSize = isFp4_ ? 1 : args_.inputDtypeSize;
+    // 单轮通信量 = 每轮切分的 tileM × K × dtypeSize（对齐 alltoall 口径；fp4/hif4 均为 2 元素打包 1 字节，通信量减半，
+    // 与 GetTilingResult 的 CCU 通信量核算口径一致）
+    uint64_t commKValue = (isFp4_ || isHiF4_) ? (args_.kValue / EVEN_ALIGN) : args_.kValue;
+    uint64_t commDtypeSize = (isFp4_ || isHiF4_) ? 1 : args_.inputDtypeSize;
     std::string algConfig =
         Mc2Tiling::SelectAllGatherAlgoNameByArch(opName_, group_, commEngine, tileMValue_, commKValue, commDtypeSize,
                                                  args_.rankDim, static_cast<uint32_t>(npuArch_));
@@ -1066,11 +1067,6 @@ ge::graphStatus AllGatherQuantBmmTiling::PostTiling()
 
 CutResult AllGatherQuantBmmTiling::GetTilingResult()
 {
-    AllGatherMMFitBalanceTiling tileFormulate(args_, KernelType::ALL_GATHER, TopoType::STANDARD_CARD);
-    CutResult result = tileFormulate.GetTiling();
-
-    bool isCcuMode = (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0);
-
     auto kValue = args_.kValue;
     auto inputDtypeSize = args_.inputDtypeSize;
     if (isFp4_ || isHiF4_) {
@@ -1079,14 +1075,8 @@ CutResult AllGatherQuantBmmTiling::GetTilingResult()
         inputDtypeSize = 1;
     }
 
-    if (isCcuMode) {
-        CommSizeInfo commSize{kValue, inputDtypeSize, args_.rankDim};
-        AdjustCutResultForCCU(result, args_.mValue, commSize, opName_);
-    } else {
-        AdjustCutResultForAICPU(result, args_.mValue, tileFormulate.matmulPerf_.GetBaseM(), opName_);
-    }
-
-    return result;
+    return AllGatherFitBalanceTilingByArch(args_, npuArch_, (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0),
+                                           CommSizeInfo{kValue, inputDtypeSize, args_.rankDim}, opName_);
 }
 
 Mc2Tiling::RCSTiling& AllGatherQuantBmmTiling::MutableRCSTilingDataA5()

@@ -19,6 +19,106 @@ constexpr static uint64_t AICPU_M_TILE_CAP = 4; // AICPU通路通信切分膨胀
 constexpr static uint64_t RANK_SIZE_16P = 16U;  // 16P跨机场景
 constexpr static uint64_t EVEN_SPLIT2_M_PER_RANK = 1024U; // 单rank M轴长度上限
 
+constexpr uint64_t APACE_RS_PER_RANK_BASE_M = 256;
+
+void MMPlusReduceScatter::FitApaceTileLengthDiscrete(bool smallDimAlignUp, bool goodLinearityShape)
+{
+    // MMPlus 的 APACE 分片策略在本类独立维护。
+    // APACE 仅调整初始缓存上限与最终余片处理，避免改动其他通路的公共切分规则。
+    // 短片已对齐；缓存上限向下对齐，避免公共初分片被非对齐上限截断。
+    FormPartition candidate(tilingM_);
+    const uint64_t alignLen = tilingM_.GetAlignLength();
+    candidate.tileArgs.maxTileLen = std::max(alignLen, candidate.tileArgs.maxTileLen / alignLen * alignLen);
+    candidate.GenerateInitialPartition(smallDimAlignUp);
+    tilingM_.cutRes = candidate.cutRes;
+
+    auto& cutRes = tilingM_.cutRes;
+    auto& tileArgs = tilingM_.tileArgs;
+    const uint64_t totalLen = tilingM_.totalLen;
+    const uint64_t tiledLen = cutRes.numLongTile * cutRes.longTileLen + cutRes.numShortTile * cutRes.shortTileLen;
+    // 初分片向上对齐后可能超出总长，此时没有额外余量参与配平。
+    const uint64_t resLen = totalLen > tiledLen ? totalLen - tiledLen : 0U;
+    bool largeBackTile =
+        (resLen >= cutRes.shortTileLen) && ((SMALL_TILECNT_PAR * cutRes.shortTileLen) >= cutRes.longTileLen);
+    goodLinearityShape =
+        (goodLinearityShape && (cutRes.shortTileLen >= tileArgs.mAlignLen)) || (!cutRes.shortTileAtBack);
+    bool smallCut = cutRes.numLongTile <= SMALL_TILECNT_PAR;
+    bool balanceCut = largeBackTile && goodLinearityShape && smallCut;
+    if (balanceCut) {
+        cutRes.longTileLen = cutRes.shortTileLen;
+        cutRes.numLongTile = (totalLen - cutRes.shortTileLen) / cutRes.longTileLen;
+        cutRes.numLongTile = std::max(cutRes.numLongTile, static_cast<uint64_t>(1));
+        cutRes.totalTileCnt = cutRes.numShortTile + cutRes.numLongTile;
+        largeBackTile = false;
+    }
+    if (cutRes.totalTileCnt == TWO) {
+        tilingM_.RedistributeTile();
+        largeBackTile = false;
+    }
+    bool moreFrontTile = largeBackTile && (cutRes.longTileLen <= cutRes.shortTileLen + resLen);
+    if (moreFrontTile) {
+        cutRes.numLongTile++;
+        tilingM_.CalcBackTile();
+    }
+
+    tileArgs.maxTileCnt = std::max(tileArgs.maxTileCnt, ONE);
+    if (cutRes.totalTileCnt > tileArgs.maxTileCnt) {
+        uint64_t tileLen = totalLen / tileArgs.maxTileCnt;
+        bool isDivisible = (tileLen * tileArgs.maxTileCnt == totalLen) && (tileLen % tileArgs.mAlignLen == 0U);
+        if (isDivisible) {
+            cutRes.numLongTile = tileArgs.maxTileCnt;
+            cutRes.longTileLen = tileLen;
+            cutRes.numShortTile = 0U;
+            cutRes.shortTileLen = 0U;
+            cutRes.totalTileCnt = tileArgs.maxTileCnt;
+        }
+    }
+    tilingM_.MaxTileCntUniform();
+    // 主片保持对齐，剩余行数留给短首片或短尾片，不再均摊。
+    tilingM_.CalcShortTile();
+    cutRes.totalTileCnt = cutRes.numLongTile + cutRes.numShortTile;
+}
+
+void MMPlusReduceScatter::SetComputesPerCycle(double computesPerCycle)
+{
+    matmulPerf_.mmShapeInfo_.computesPerCycle = computesPerCycle;
+    clusterInfo_.computesPerCycle = computesPerCycle;
+}
+
+void MMPlusReduceScatter::ConfigureApaceFormulaModel(bool useLegacyFp4Model)
+{
+    if (useLegacyFp4Model) {
+        matmulPerf_.mmShapeInfo_.inMatrixADtypeSize = 1;
+        matmulPerf_.mmShapeInfo_.inMatrixBDtypeSize = 1;
+        matmulPerf_.calcType_ = MatmulCalcType::QUANT;
+        clusterInfo_.inMatrixADtypeSize = matmulPerf_.mmShapeInfo_.inMatrixADtypeSize;
+        clusterInfo_.inMatrixBDtypeSize = matmulPerf_.mmShapeInfo_.inMatrixBDtypeSize;
+        SetComputesPerCycle(MatmulPerformance::COMPUTES_PER_CYCLE);
+    }
+    const uint64_t perRankBaseM = APACE_RS_PER_RANK_BASE_M;
+    matmulPerf_.mmShapeInfo_.baseM = perRankBaseM;
+    clusterInfo_.baseM = perRankBaseM;
+    tilingM_.SetAlignLength(perRankBaseM);
+
+    // 基本块更新后，按原顺序重算通信和计算的最小片长。
+    rankTileNum_ = commPerf_.GetRankTileNum();
+    tilingM_.SetMinLenByMin(perRankBaseM);
+    tilingM_.SetMinLenByMax(commPerf_.GetLinearThresholdLen());
+    tilingM_.SetMinLenByMax(matmulPerf_.GetLinearThresholdLen(rankTileNum_));
+}
+
+void MMPlusReduceScatter::SetTileAlignment(bool apaceEnabled, bool alignMinTileLen)
+{
+    keepTileAligned_ = apaceEnabled;
+    alignMinTileLen_ = alignMinTileLen;
+    if (apaceEnabled) {
+        constexpr uint64_t APACE_PER_RANK_M_ALIGN = 256;
+        tilingM_.SetAlignLength(APACE_PER_RANK_M_ALIGN);
+        tilingM_.SetMinLenByMax(APACE_PER_RANK_M_ALIGN);
+        tilingM_.tileArgs.minTileLen = mc2tiling::AlignUp(tilingM_.GetMinLen(), tilingM_.GetAlignLength());
+    }
+}
+
 void MMPlusReduceScatter::SetCommTimeFactorForA5()
 {
     commPerf_.ChangeCommTimeFactorByDivision(REDUCESCATTER_COMMTIME_FACTOR);
@@ -57,7 +157,10 @@ void MMPlusReduceScatter::SetCommTimeFactor()
 
 void MMPlusReduceScatter::EstimateKernelTime()
 {
-    SetCommTimeFactor();
+    // 960 AICPU 的通信因子已在构造及 MMRS 模型配置阶段确定。
+    if (npuArch_ != Ops::Base::DAV_9201 || !isAicpuComm_) {
+        SetCommTimeFactor();
+    }
     // 预测耗时
     double totalMatmulTime = EstimateTotalMatmulTime();
     double totalTpTime = EstimateTotalCommTime();
@@ -90,6 +193,9 @@ void MMPlusReduceScatter::EstimateKernelTime()
     if (increaseMinLen) { // 通过增加初始值的方式鼓励少切
         tilingM_.SetMinLenByMax(FOUR_MBYTE / clusterInfo_.nValue / rankTileNum_);
     }
+    if (keepTileAligned_) {
+        SetTileAlignment(true, alignMinTileLen_);
+    }
     OP_LOGD("MatmulReduceScatter",
             "Input shape {M, N, K} = {%lu, %lu, %lu}, cubeUtil_ %f, "
             "totalMatmulTime %f, totalTP %f, minTileSize %lu, mAlignLen %lu, commTimeFactor_ %f",
@@ -101,6 +207,10 @@ void MMPlusReduceScatter::SelectTilingMethod()
 {
     if (isAicpuComm_ && rankDim_ > 8) { // AICPU大于8P场景通信切分膨胀较大，限制最大切分轮数
         tilingM_.SetMaxTileCnt(AICPU_M_TILE_CAP);
+    }
+    if (alignMinTileLen_) {
+        // 最小片长完成耗时调整后，按 PerBlock 的 M 分组对齐，再生成分片。
+        tilingM_.tileArgs.minTileLen = mc2tiling::AlignUp(tilingM_.GetMinLen(), tilingM_.GetAlignLength());
     }
     if (tilingM_.SetShortTileLen()) { // 如果shape太小就不切
         return;
@@ -135,7 +245,11 @@ void MMPlusReduceScatter::SelectTilingMethod()
                            (clusterInfo_.nValue < SMALL_SHAPE_BAR ||
                             clusterInfo_.kValue < SMALL_SHAPE_BAR); // 2p，计算Bound，且N轴或者K轴很小
     bool goodLinearityShape = (clusterInfo_.kValue * clusterInfo_.nValue >= LARGE_NK_BAR_BASE * ONE_MBYTE);
-    tilingM_.FitTileLengthDiscrete(smallDimAlignUp, goodLinearityShape);
+    if (keepTileAligned_) {
+        FitApaceTileLengthDiscrete(smallDimAlignUp, goodLinearityShape);
+    } else {
+        tilingM_.FitTileLengthDiscrete(smallDimAlignUp, goodLinearityShape);
+    }
     OP_LOGD("MatmulReduceScatter",
             "Final cut: shortTileAtBack %d, longTileLen %lu, "
             "numLongTile %lu, shortTileLen %lu, numShortTile %lu",

@@ -47,16 +47,25 @@ public:
         rankTileNum_ = commPerf_.GetRankTileNum();
         tilingM_.SetMinLenByMax(commPerf_.GetLinearThresholdLen());
         tilingM_.SetMinLenByMax(matmulPerf_.GetLinearThresholdLen(rankTileNum_));
+        if (npuArch_ == Ops::Base::DAV_9201 && isAicpuComm_) {
+            SetCommTimeFactor();
+        }
     }
 
     void EstimateKernelTime() override;
     void SelectTilingMethod() override;
+    void SetComputesPerCycle(double computesPerCycle);
+    void ConfigureApaceFormulaModel(bool useLegacyFp4Model = false);
+    void SetTileAlignment(bool apaceEnabled, bool alignMinTileLen = false);
 
 private:
     void SetCommTimeFactorForA5();
     void SetCommTimeFactorForOther();
     void SetCommTimeFactor();
+    void FitApaceTileLengthDiscrete(bool smallDimAlignUp, bool goodLinearityShape);
     bool isAicpuComm_ = false;
+    bool keepTileAligned_ = false;
+    bool alignMinTileLen_ = false;
 };
 
 #endif //__REDUCE_SCATTER_FORMULAIC_TILING_H__

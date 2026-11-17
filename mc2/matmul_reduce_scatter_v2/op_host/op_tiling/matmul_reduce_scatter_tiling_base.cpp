@@ -22,9 +22,10 @@
 #include <unistd.h>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include "mc2_hcom_topo_info.h"
 #include "op_host/op_tiling/matmul_formulaic_tiling.h"
-#include "reduce_scatter_formulaic_tiling.h"
+#include "op_host/op_tiling/hccl_performance_arch35.h"
 #include "graph/utils/type_utils.h"
 #include "ops_utils.h"
 #include "register/op_def_registry.h"
@@ -51,6 +52,10 @@ constexpr uint32_t IS_TRANS_B = 3;
 constexpr uint32_t COMM_TURN = 4;
 constexpr int64_t AICPU_STRLEN = 6;
 constexpr uint64_t APACE_IMPL_MAX_RANK_DIM = 64;
+constexpr uint64_t FIT_BALANCE_RANK_SIZE_8 = 8;
+// MMRS 2P/4P MX 场景的模型算力修正值，不作为其他场景的芯片峰值。
+constexpr double MXFP4_COMPUTES_PER_CYCLE_960DT = 16384;
+constexpr double MXFP8_COMPUTES_PER_CYCLE_960DT = 8192;
 const std::set<int> SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64};
 const std::set<std::string> SUPPORT_COMM_MODE_A5{"ai_cpu", "ccu", "ccu_peer_only"};
 
@@ -71,6 +76,63 @@ uint32_t MatmulReduceScatterTilingBase::ReduceScatterSpliteM(mc2tiling::TilingAr
         tileLen = mc2tiling::AlignUp<uint64_t>(tileLen, 32); // 32 is used to align to 128
     }
     return args.mValue > tileLen ? tileLen : args.mValue;
+}
+
+bool MatmulReduceScatterTilingBase::Configure960FormulaTiling(MMPlusReduceScatter& scatterTiling,
+                                                              mc2tiling::Mc2QuantMode quantMode) const
+{
+    if (npuArch_ != Ops::Base::DAV_9201 || commMode_ != TPL_AICPU_COMM_MODE) {
+        return false;
+    }
+    const bool isHiF4 = args_.geAType == Ops::Transformer::DT_HIFLOAT4;
+    const bool isMxfp4 = args_.geAType == ge::DT_FLOAT4_E2M1;
+    if (args_.geAType == args_.geBType && (isMxfp4 || isHiF4)) {
+        // FP4 缓存按整字节估算，算力保持原配置，不使用 FP8 表项。
+        scatterTiling.SetComputesPerCycle(MatmulPerformance::COMPUTES_PER_CYCLE);
+    }
+    auto& commPerf = scatterTiling.commPerf_;
+    commPerf.commTypeInfo_.topoType =
+        args_.rankDim == FIT_BALANCE_RANK_SIZE_8 ? TopoType::EIGHT_P : TopoType::STANDARD_CARD;
+    const bool directReduceScatter =
+        !isA2APath_ && !isPeerOnly_ && commPerf.commTypeInfo_.kernelType == KernelType::REDUCE_SCATTER;
+    auto* platformInfo = context_->GetPlatformInfo();
+    std::string freq;
+    if (platformInfo != nullptr && platformInfo->GetPlatformRes("AICoreSpec", "cube_freq", freq)) {
+        char* end = nullptr;
+        const double mhz = std::strtod(freq.c_str(), &end);
+        if (end == freq.c_str() + freq.size() && std::isfinite(mhz) && mhz > 0.0) {
+            scatterTiling.matmulPerf_.mmShapeInfo_.cyclePerMicroSec = mhz;
+        }
+    }
+    const bool halfOutput = args_.geCType == ge::DT_FLOAT16 || args_.geCType == ge::DT_BF16;
+    if (directReduceScatter && !scatterTiling.deterministicSoc910B_ && halfOutput &&
+        commAlgoName_ == "ReduceScatter=level0:fullmesh") {
+        // 命中标定后因子为 1；未命中时保留构造阶段的回退配置。
+        HCCLPerformance960dt calibratedComm(commPerf);
+        calibratedComm.GetComm960dtParameters();
+        commPerf = calibratedComm;
+    }
+    OP_LOGI("MatmulReduceScatter", "960dt AICPU comm estimate: lookup_key=%s, rank=%lu, algo=%s",
+            commPerf.keyToFittingMap_.c_str(), scatterTiling.rankDim_, commAlgoName_.c_str());
+
+    // 在 2P/4P 分流前统一设置算力，4P 复制模型时保留配置。
+    if (args_.rankDim == TWO || args_.rankDim == FOUR) {
+        if (usingApaceImpl_ && quantMode == mc2tiling::Mc2QuantMode::MXFP_MODE && !isHiF4) {
+            if (isMxfp4) {
+                scatterTiling.SetComputesPerCycle(MXFP4_COMPUTES_PER_CYCLE_960DT);
+            } else if (args_.geCType == ge::DT_FLOAT) {
+                scatterTiling.SetComputesPerCycle(MXFP8_COMPUTES_PER_CYCLE_960DT);
+            }
+        } else if (quantMode == mc2tiling::Mc2QuantMode::PERBLOCK_MODE && halfOutput) {
+            scatterTiling.SetComputesPerCycle(MatmulPerformance::COMPUTES_PER_CYCLE);
+        }
+    }
+    if (usingApaceImpl_ && quantMode == mc2tiling::Mc2QuantMode::MXFP_MODE) {
+        scatterTiling.ConfigureApaceFormulaModel();
+    }
+    // 4P/8P 继续使用 FitBalance；未命中标定时保留回退曲线。
+    return directReduceScatter && !scatterTiling.deterministicSoc910B_ &&
+           (args_.rankDim == FOUR || args_.rankDim == FIT_BALANCE_RANK_SIZE_8);
 }
 
 CutResult MatmulReduceScatterTilingBase::GetTilingResult()
@@ -165,7 +227,10 @@ ge::graphStatus MatmulReduceScatterTilingBase::CheckHCCLSize()
 ge::graphStatus MatmulReduceScatterTilingBase::AdjustHCCLLimit(Mc2Tiling::RCSTiling& rcsCfg,
                                                                mc2tiling::Mc2QuantMode quantMmMode)
 {
-    if (tileMValue_ * args_.nValue * ge::GetSizeByDataType(args_.geCType) <= mc2tiling::ALL_GATHER_HCCL_MEM_LIMIT) {
+    const bool useAicpuCapacityCorrection = npuArch_ == Ops::Base::DAV_9201 && commMode_ == TPL_AICPU_COMM_MODE;
+    const uint64_t maxSliceM =
+        useAicpuCapacityCorrection && rcsCfg.tailCnt > 0 ? std::max(tileMValue_, tailMValue_) : tileMValue_;
+    if (maxSliceM * args_.nValue * ge::GetSizeByDataType(args_.geCType) <= mc2tiling::ALL_GATHER_HCCL_MEM_LIMIT) {
         return ge::GRAPH_SUCCESS;
     }
     OPS_LOG_I(opName_,
@@ -183,6 +248,13 @@ ge::graphStatus MatmulReduceScatterTilingBase::AdjustHCCLLimit(Mc2Tiling::RCSTil
     uint64_t minSplitPart = Ops::Base::CeilDiv(args_.mValue * args_.nValue * ge::GetSizeByDataType(args_.geCType),
                                                mc2tiling::ALL_GATHER_HCCL_MEM_LIMIT);
     tileMValue_ = Ops::Base::CeilDiv(args_.mValue, minSplitPart);
+    if (useAicpuCapacityCorrection) {
+        const uint64_t maxTileM =
+            mc2tiling::ALL_GATHER_HCCL_MEM_LIMIT / (args_.nValue * ge::GetSizeByDataType(args_.geCType));
+        OP_TILING_CHECK(maxTileM == 0, OP_LOGE(opName_, "communication row exceeds 256 MiB"), return ge::GRAPH_FAILED);
+        // 均分后的行数向上取整，仍可能超过单片容量。
+        tileMValue_ = std::min(tileMValue_, maxTileM);
+    }
     rcsCfg.tileCnt = Ops::Base::FloorDiv(args_.mValue, tileMValue_);
     rcsCfg.tailM = args_.mValue - rcsCfg.tileCnt * tileMValue_;
     tailMValue_ = rcsCfg.tailM;
@@ -513,6 +585,7 @@ void MatmulReduceScatterTilingBase::Reset()
     mmResultLen_ = 0UL; // mc2 matmul计算后结果的大小
     isPeerOnly_ = false;
     usingApaceImpl_ = false;
+    commAlgoName_.clear();
 }
 
 void MatmulReduceScatterTilingBase::SetReduceScatterTilingArgsDataType()

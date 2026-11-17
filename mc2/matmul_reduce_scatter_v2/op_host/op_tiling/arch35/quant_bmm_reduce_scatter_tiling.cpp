@@ -43,8 +43,6 @@ constexpr uint32_t DTYPE_ENUM_BF16 = 27;
 constexpr uint64_t PERBLOCK_SIZE = 128;
 constexpr uint64_t HIF4_GROUP_SIZE = 64;
 constexpr uint64_t HIF4_SCALE_LAST_DIM = 1;
-constexpr double APACE_RS_FP4_COMPUTE_PER_CYCLE_RATIO = 1.0;
-constexpr uint64_t APACE_RS_PER_RANK_BASE_M = 256;
 constexpr uint64_t MXFP8_SIZE = 32;
 constexpr uint64_t MXFP8_SIZE_K = 32;
 constexpr uint64_t MXFP8_SIZE_M = 1;
@@ -86,34 +84,6 @@ constexpr std::initializer_list<ge::DataType> HIF8FP8FP4DTYPE_SUPPORT_LIST = {
     ge::DataType::DT_FLOAT8_E4M3FN, ge::DataType::DT_FLOAT8_E5M2,  ge::DataType::DT_HIFLOAT8,
     ge::DataType::DT_FLOAT4_E2M1,   Ops::Transformer::DT_HIFLOAT4,
 };
-void ConfigureApaceFormulaModel(MMPlusReduceScatter& formulaTiling, bool isMxfp4)
-{
-    // Keep all APACE calibration in the APACE caller.  The shared
-    // MMPlusReduceScatter class and every legacy constructor remain unchanged.
-    if (isMxfp4) {
-        formulaTiling.matmulPerf_.mmShapeInfo_.inMatrixADtypeSize = 1;
-        formulaTiling.matmulPerf_.mmShapeInfo_.inMatrixBDtypeSize = 1;
-        formulaTiling.matmulPerf_.calcType_ = MatmulCalcType::QUANT;
-        formulaTiling.matmulPerf_.mmShapeInfo_.computesPerCycle =
-            APACE_RS_FP4_COMPUTE_PER_CYCLE_RATIO * MatmulPerformance::COMPUTES_PER_CYCLE;
-        formulaTiling.clusterInfo_.inMatrixADtypeSize = formulaTiling.matmulPerf_.mmShapeInfo_.inMatrixADtypeSize;
-        formulaTiling.clusterInfo_.inMatrixBDtypeSize = formulaTiling.matmulPerf_.mmShapeInfo_.inMatrixBDtypeSize;
-        formulaTiling.clusterInfo_.computesPerCycle = formulaTiling.matmulPerf_.mmShapeInfo_.computesPerCycle;
-    }
-
-    const uint64_t perRankBaseM = APACE_RS_PER_RANK_BASE_M;
-    formulaTiling.matmulPerf_.mmShapeInfo_.baseM = perRankBaseM;
-    formulaTiling.clusterInfo_.baseM = perRankBaseM;
-    formulaTiling.tilingM_.SetAlignLength(perRankBaseM);
-
-    // The base constructor calculated minTileLen for the legacy model. Reset
-    // that value to the APACE base and rebuild the two thresholds after the
-    // APACE-only model fields have been calibrated.
-    formulaTiling.rankTileNum_ = formulaTiling.commPerf_.GetRankTileNum();
-    formulaTiling.tilingM_.SetMinLenByMin(perRankBaseM);
-    formulaTiling.tilingM_.SetMinLenByMax(formulaTiling.commPerf_.GetLinearThresholdLen());
-    formulaTiling.tilingM_.SetMinLenByMax(formulaTiling.matmulPerf_.GetLinearThresholdLen(formulaTiling.rankTileNum_));
-}
 } // namespace
 
 bool QuantBmmReduceScatterTiling::IsCapable()
@@ -650,6 +620,9 @@ ge::graphStatus QuantBmmReduceScatterTiling::SetMc2Hcomm()
             algoName.empty(),
             OP_LOGE_WITHOUT_REPORT(opName_, "SelectReduceScatterAlgoName failed, empty algo name returned."),
             return ge::GRAPH_FAILED);
+        if (npuArch_ == Ops::Base::DAV_9201 && commMode_ == TPL_AICPU_COMM_MODE) {
+            commAlgoName_ = algoName;
+        }
         OP_LOGI(opName_, "[SetMc2Hcomm] selected algoName=%s, group=%s", algoName.c_str(), group);
         mc2CcTilingConfig.SetAlgConfig(algoName);
     }
@@ -700,6 +673,9 @@ void QuantBmmReduceScatterTiling::SetScene()
         // MXFP4场景识别：当x1和x2均为FP4_E2M1时，设置isMxfp4_=true
         if (args_.geAType == ge::DataType::DT_FLOAT4_E2M1 && args_.geBType == ge::DataType::DT_FLOAT4_E2M1) {
             isMxfp4_ = true;
+            if (npuArch_ == Ops::Base::DAV_9201 && commMode_ == TPL_AICPU_COMM_MODE) {
+                args_.inputDtypeSize = 1; // MMPlus 用整字节估算缓存占用，FP4 算力在 MMRS 内设置。
+            }
             OP_LOGI(opName_, "MXFP4 quant scene detected: x1/x2 dtype is DT_FLOAT4_E2M1");
         }
     } else if ((x1ScaleShape->GetStorageShape().GetDimNum() == PERBLOCK_SCALE_DIM) &&
@@ -1335,30 +1311,39 @@ QuantBmmReduceScatterHelper::QuantBmmReduceScatterHelper(QuantBmmReduceScatterTi
 
 CutResult QuantBmmReduceScatterTiling::GetTilingResult()
 {
-    if (usingApaceImpl_) {
-        MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, npuArch_, false,
-                                          (commMode_ == TPL_AICPU_COMM_MODE));
-        ConfigureApaceFormulaModel(scatterTiling, isMxfp4_ || isHiF4_);
-        scatterTiling.GetTiling();
-        CutResult cutRes = scatterTiling.tilingM_.cutRes;
+    if (!usingApaceImpl_ && mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
+        MMReduceScatterFitBalanceTiling<> quantBmmScatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
+                                                                TopoType::STANDARD_CARD,
+                                                                (commMode_ == TPL_AICPU_COMM_MODE));
+        return quantBmmScatterTiling.GetTiling();
+    } else if (!usingApaceImpl_ && mc2tiling::Is8P(args_.rankDim, npuArch_)) {
+        MMReduceScatterFitBalanceTiling<> quantBmmScatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
+                                                                TopoType::EIGHT_P, (commMode_ == TPL_AICPU_COMM_MODE));
+        return quantBmmScatterTiling.GetTiling();
+    }
+
+    MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, npuArch_, false,
+                                      (commMode_ == TPL_AICPU_COMM_MODE));
+    const bool useAicpuFormulaTiling = npuArch_ == Ops::Base::DAV_9201 && commMode_ == TPL_AICPU_COMM_MODE;
+    const bool keepTileAligned = usingApaceImpl_ && useAicpuFormulaTiling;
+    const bool useLegacyApaceTiling = usingApaceImpl_ && !useAicpuFormulaTiling;
+    if (useLegacyApaceTiling) {
+        scatterTiling.ConfigureApaceFormulaModel(isMxfp4_ || isHiF4_);
+    }
+    if (Configure960FormulaTiling(scatterTiling, quantMode_)) {
+        MMReduceScatterFitBalanceTiling960 fitTiling(args_, MatmulPerformance960dt(scatterTiling.matmulPerf_),
+                                                     HCCLPerformance960dt(scatterTiling.commPerf_), true);
+        fitTiling.SetApaceTileAlignment(keepTileAligned);
+        return fitTiling.GetTiling();
+    }
+    scatterTiling.SetTileAlignment(keepTileAligned,
+                                   useAicpuFormulaTiling && quantMode_ == mc2tiling::Mc2QuantMode::PERBLOCK_MODE);
+    scatterTiling.GetTiling();
+    CutResult cutRes = scatterTiling.tilingM_.cutRes;
+    if (useLegacyApaceTiling) {
         AlignCutResForApace(cutRes, args_.mValue);
-        return cutRes;
     }
-    if (mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
-        MMReduceScatterFitBalanceTiling quantBmmScatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
-                                                              TopoType::STANDARD_CARD,
-                                                              (commMode_ == TPL_AICPU_COMM_MODE));
-        return quantBmmScatterTiling.GetTiling();
-    } else if (mc2tiling::Is8P(args_.rankDim, npuArch_)) {
-        MMReduceScatterFitBalanceTiling quantBmmScatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
-                                                              TopoType::EIGHT_P, (commMode_ == TPL_AICPU_COMM_MODE));
-        return quantBmmScatterTiling.GetTiling();
-    } else {
-        MMPlusReduceScatter quantBmmScatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, npuArch_, false,
-                                                  (commMode_ == TPL_AICPU_COMM_MODE));
-        quantBmmScatterTiling.GetTiling();
-        return quantBmmScatterTiling.tilingM_.cutRes;
-    }
+    return cutRes;
 }
 
 // 注册Tiling类

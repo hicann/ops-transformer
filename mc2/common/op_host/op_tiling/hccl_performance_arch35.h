@@ -39,4 +39,23 @@ public:
     uint64_t InverseCommTime(double targetTime) const override;
 };
 
+// A6(960DT)薄标签模型: 序列号5内聚于本类, 标定表按需加载(缺项保留原配置)
+class HCCLPerformance960dt : public HCCLPerformanceModel {
+public:
+    explicit HCCLPerformance960dt(uint32_t inputRankDim, KernelType inputKernelType,
+                                  TopoType topoType = TopoType::STANDARD_CARD)
+        : HCCLPerformanceModel(inputRankDim, inputKernelType, Ops::Base::DAV_9201)
+    {
+        commTypeInfo_.topoType = topoType;
+    }
+
+    explicit HCCLPerformance960dt(const HCCLPerformanceModel& model)
+        : HCCLPerformanceModel(model)
+    {}
+
+    std::string GetCommInfoString() const;
+    // 调用方确认引擎、通信类型和算法满足标定条件后加载；缺少表项时保留原配置。
+    bool GetComm960dtParameters();
+};
+
 #endif // __HCCL_PERFORMANCE_ARCH35_H__

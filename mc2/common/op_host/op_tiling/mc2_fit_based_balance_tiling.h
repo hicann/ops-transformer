@@ -23,10 +23,11 @@
 
 constexpr static double CALC_COMM_RATIO = 2.0;
 
-class Mc2FitBasedBalanceTiling {
+template <typename MatmulPerf, typename CommPerf>
+class Mc2FitBasedBalanceTilingBase {
 public:
-    MatmulPerformanceArch35 matmulPerf_;
-    HCCLPerformanceArch35 commPerf_;
+    MatmulPerf matmulPerf_;
+    CommPerf commPerf_;
     FormPartition tilingM_;
     MatmulParameters mmInfo_;
     uint64_t rankDim_ = 2;
@@ -34,11 +35,23 @@ public:
     uint64_t coreNum_ = 32;
     double ratioCalcComm_ = 1.0;
 
-    // A5专用fit balance基类:成员均为Arch35专用模型,A5内蕴于类本身,不再接收档位key
-    explicit Mc2FitBasedBalanceTiling(const mc2tiling::TilingArgs& args, KernelType kernelType,
-                                      TopoType topoType = TopoType::STANDARD_CARD)
+    explicit Mc2FitBasedBalanceTilingBase(const mc2tiling::TilingArgs& args, KernelType kernelType,
+                                          TopoType topoType = TopoType::STANDARD_CARD)
         : matmulPerf_(args),
           commPerf_(args.rankDim, kernelType, topoType),
+          tilingM_(args)
+    {
+        rankDim_ = args.rankDim;
+        mmInfo_ = matmulPerf_.mmShapeInfo_;
+        tilingM_.SetMaxTileCnt(MAX_TILE_CNT); // Due to the limited FFTS queue size, a maximum of 16 rounds can be cut.
+        rankTileNum_ = commPerf_.GetRankTileNum();
+        coreNum_ = args.aicCoreNum;
+    };
+
+    explicit Mc2FitBasedBalanceTilingBase(const mc2tiling::TilingArgs& args, const MatmulPerf& matmulPerf,
+                                          const CommPerf& commPerf)
+        : matmulPerf_(matmulPerf),
+          commPerf_(commPerf),
           tilingM_(args)
     {
         rankDim_ = args.rankDim;
@@ -54,7 +67,9 @@ public:
     virtual void SetLongTileLen() {};
     virtual void AdjustLongShortTileLen() {};
 
-    virtual ~Mc2FitBasedBalanceTiling() {}
+    virtual ~Mc2FitBasedBalanceTilingBase() {}
 };
+
+using Mc2FitBasedBalanceTiling = Mc2FitBasedBalanceTilingBase<MatmulPerformanceArch35, HCCLPerformanceArch35>;
 
 #endif // __MC2_FIT_BALANCE_TILING_H__

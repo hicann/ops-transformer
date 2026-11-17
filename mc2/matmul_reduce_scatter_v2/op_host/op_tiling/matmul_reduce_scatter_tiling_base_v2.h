@@ -15,11 +15,13 @@
 #ifndef __MATMUL_REDUCE_SCATTER_TILING_BASE_V2_H__
 #define __MATMUL_REDUCE_SCATTER_TILING_BASE_V2_H__
 
+#include <string>
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "op_host/tiling_base.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "op_host/op_tiling/matmul_formulaic_tiling.h"
+#include "reduce_scatter_formulaic_tiling.h"
 #include "../../op_kernel/matmul_reduce_scatter_v2_c_tiling.h"
 
 namespace optiling {
@@ -77,6 +79,9 @@ protected:
     ge::graphStatus DoSplitMTiling(Mc2Tiling::RCSTiling& rcsCfg);
     virtual CutResult GetTilingResult();
     void AlignCutResForApace(CutResult& cutRes, uint64_t mValue) const;
+    // 配置 960 AICPU 模型，返回是否采用 FitBalance 切分。
+    bool Configure960FormulaTiling(MMPlusReduceScatter& scatterTiling,
+                                   mc2tiling::Mc2QuantMode quantMode = mc2tiling::Mc2QuantMode::DEFAULT) const;
     uint32_t GetRankSize(const char* group) const;
     void Reset();
     bool ReduceScatterCheckShapeInfo();
@@ -114,6 +119,7 @@ protected:
     uint8_t commMode_{0};
     bool isPeerOnly_{false};
     bool usingApaceImpl_{false};
+    std::string commAlgoName_;
     uint64_t tileMValue_{0};  // mc2 切块后主块M的大小；
     uint64_t tailMValue_{0};  // mc2 切块后尾块M的大小；
     uint64_t longTileLen_{0}; // mc2 切块后长块的大小；

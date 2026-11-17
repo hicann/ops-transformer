@@ -49,4 +49,22 @@ public:
     }
 };
 
+// A6(960DT)薄标签模型: 构造与拷贝构造均不改变平台参数, 场景参数由算子层注入
+class MatmulPerformance960dt : public MatmulPerformanceModel {
+public:
+    explicit MatmulPerformance960dt(const mc2tiling::TilingArgs& args)
+        : MatmulPerformanceModel(args, Ops::Base::DAV_9201)
+    {}
+
+    // 保留调用方已设置的平台频率、量化算力和 APACE 基本块
+    explicit MatmulPerformance960dt(const MatmulPerformanceModel& model)
+        : MatmulPerformanceModel(model)
+    {}
+
+    void FindCubeUtil(uint64_t rankTileNum)
+    {
+        MatmulPerformanceModel::FindCubeUtil(mmShapeInfo_.mValue, rankTileNum, false);
+    }
+};
+
 #endif // __MATMUL_PERFORMANCE_ARCH35_H__

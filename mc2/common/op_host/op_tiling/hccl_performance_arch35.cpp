@@ -85,3 +85,43 @@ uint64_t HCCLPerformanceArch35::InverseCommTime(double targetTime) const
     return static_cast<uint64_t>(tmpSize * ONE_MBYTE /
                                  (commTypeInfo_.commMatrixLen * lookUpTileNum_ * GetRealDtypeSizes()));
 }
+namespace {
+constexpr uint64_t NPUARCH_9201_FITTING_CODE = 5;
+// 键为平台_通信原语_拓扑_卡数，表项用于 AICPU FullMesh、非确定性 ReduceScatter。
+// 参数由 FP16 实测拟合；BF16 按相同的 2 字节通信量复用；其余 rankDim 走 GetComm960dtParameters 的缺项保留原配置。
+// X 为各 rank 接收量之和（MiB），T 为单次通信耗时（μs）。
+const std::map<std::string, HCCLFittingParameters> HCCL_960DT_FITTING_PARAMETER_MAP = {
+    {"5_1_0_2", HCCLFittingParameters{0.0078125, 32, 5.49045011445352, 11.4003457546524, 0.00050722240215114,
+                                      5.55673747054181, 8.75975462002455, 8.80316666247156, 187.094749417165,
+                                      1971.52175408456, 15210.0728450306, -5477.614402455}},
+    {"5_1_0_4", HCCLFittingParameters{0.0625, 32, 1.5471712160617, 28.2841478772818, 0.0057304930492253,
+                                      1.92633328083789, 10.2829369220371, 10.4033551368279, 77.7936267912563,
+                                      174.505054174211, 151.603652808899, -168.077446765101}},
+    {"5_2_0_2", HCCLFittingParameters{0.00390625, 32, 5.48806912105473, 12.2764507360356, 0.00355437046224819,
+                                      5.4284198946809, 10.5455506266561, 10.5667554461051, 187.894662609787,
+                                      281.343773987894, 2062.09592456222, -763.626069980244}},
+    {"5_2_0_4", HCCLFittingParameters{0.00048828125, 64, 1.45473124307579, 23.0171326875506, 0.00319889827026339,
+                                      1.38838392604621, 14.1606736624445, 14.161351585046, 116.119932244401,
+                                      312.607627849842, 136.485717942312, -217.009702833079}},
+};
+} // namespace
+
+std::string HCCLPerformance960dt::GetCommInfoString() const
+{
+    return std::to_string(NPUARCH_9201_FITTING_CODE) + "_" +
+           std::to_string(static_cast<int>(commTypeInfo_.kernelType)) + "_" +
+           std::to_string(static_cast<int>(commTypeInfo_.topoType)) + "_" + std::to_string(commTypeInfo_.rankDim);
+}
+
+bool HCCLPerformance960dt::GetComm960dtParameters()
+{
+    const auto key = GetCommInfoString();
+    const auto row = HCCL_960DT_FITTING_PARAMETER_MAP.find(key);
+    if (row == HCCL_960DT_FITTING_PARAMETER_MAP.end()) {
+        return false;
+    }
+    keyToFittingMap_ = key;
+    commEstimatePar_ = row->second;
+    SetCommTimeFactor(1.0);
+    return true;
+}

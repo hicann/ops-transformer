@@ -321,18 +321,8 @@ ge::graphStatus AllGatherMatmulTilingV2::PostTiling()
 
 CutResult AllGatherMatmulTilingV2::GetTilingResult()
 {
-    AllGatherMMFitBalanceTiling tileFormulate(args_, KernelType::ALL_GATHER, TopoType::STANDARD_CARD);
-    CutResult result = tileFormulate.GetTiling();
-
-    bool isCcuMode = (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0);
-    if (isCcuMode) {
-        CommSizeInfo commSize{args_.kValue, args_.inputDtypeSize, args_.rankDim};
-        AdjustCutResultForCCU(result, args_.mValue, commSize, opName_);
-    } else {
-        AdjustCutResultForAICPU(result, args_.mValue, tileFormulate.matmulPerf_.GetBaseM(), opName_);
-    }
-
-    return result;
+    return AllGatherFitBalanceTilingByArch(args_, npuArch_, (std::strncmp(commMode_, "ccu", CMP_MAX_LEN) == 0),
+                                           CommSizeInfo{args_.kValue, args_.inputDtypeSize, args_.rankDim}, opName_);
 }
 
 ge::graphStatus AllGatherMatmulTilingV2::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg& tilingCfg,

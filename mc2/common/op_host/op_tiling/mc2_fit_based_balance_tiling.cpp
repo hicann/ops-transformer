@@ -15,7 +15,8 @@
 #include "mc2_log.h"
 #include "mc2_fit_based_balance_tiling.h"
 
-CutResult Mc2FitBasedBalanceTiling::GetTiling()
+template <typename MatmulPerf, typename CommPerf>
+CutResult Mc2FitBasedBalanceTilingBase<MatmulPerf, CommPerf>::GetTiling()
 {
     EstimateMMCommTime();
     SetShortTileLen();
@@ -34,3 +35,6 @@ CutResult Mc2FitBasedBalanceTiling::GetTiling()
 
     return tilingM_.cutRes;
 }
+
+template class Mc2FitBasedBalanceTilingBase<MatmulPerformanceArch35, HCCLPerformanceArch35>;
+template class Mc2FitBasedBalanceTilingBase<MatmulPerformance960dt, HCCLPerformance960dt>;

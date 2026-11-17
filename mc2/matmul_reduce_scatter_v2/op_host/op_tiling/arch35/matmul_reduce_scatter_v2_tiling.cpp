@@ -151,6 +151,9 @@ ge::graphStatus MatmulReduceScatterV2Tiling::SetMc2Hcomm()
             algoName.empty(),
             OP_LOGE_WITHOUT_REPORT(opName_, "SelectReduceScatterAlgoName failed, empty algo name returned."),
             return ge::GRAPH_FAILED);
+        if (npuArch_ == Ops::Base::DAV_9201 && commMode_ == TPL_AICPU_COMM_MODE) {
+            commAlgoName_ = algoName;
+        }
         OP_LOGI(opName_, "[SetMc2Hcomm] selected algoName=%s, group=%s", algoName.c_str(), group);
         mc2CcTilingConfig.SetAlgConfig(algoName);
     }
@@ -330,19 +333,28 @@ ge::graphStatus MatmulReduceScatterV2Tiling::PostTiling()
 CutResult MatmulReduceScatterV2Tiling::GetTilingResult()
 {
     if (!usingApaceImpl_ && mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
-        MMReduceScatterFitBalanceTiling scatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
-                                                      TopoType::STANDARD_CARD, (commMode_ == TPL_AICPU_COMM_MODE));
+        MMReduceScatterFitBalanceTiling<> scatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
+                                                        TopoType::STANDARD_CARD, (commMode_ == TPL_AICPU_COMM_MODE));
         return scatterTiling.GetTiling();
     } else if (!usingApaceImpl_ && mc2tiling::Is8P(args_.rankDim, npuArch_)) {
-        MMReduceScatterFitBalanceTiling scatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
-                                                      TopoType::EIGHT_P, (commMode_ == TPL_AICPU_COMM_MODE));
+        MMReduceScatterFitBalanceTiling<> scatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
+                                                        TopoType::EIGHT_P, (commMode_ == TPL_AICPU_COMM_MODE));
         return scatterTiling.GetTiling();
     } else {
         MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, npuArch_, false,
                                           (commMode_ == TPL_AICPU_COMM_MODE));
+        const bool keepTileAligned =
+            usingApaceImpl_ && npuArch_ == Ops::Base::DAV_9201 && commMode_ == TPL_AICPU_COMM_MODE;
+        if (Configure960FormulaTiling(scatterTiling)) {
+            MMReduceScatterFitBalanceTiling960 fitTiling(args_, MatmulPerformance960dt(scatterTiling.matmulPerf_),
+                                                         HCCLPerformance960dt(scatterTiling.commPerf_), true);
+            fitTiling.SetApaceTileAlignment(keepTileAligned);
+            return fitTiling.GetTiling();
+        }
+        scatterTiling.SetTileAlignment(keepTileAligned);
         scatterTiling.GetTiling();
         CutResult cutRes = scatterTiling.tilingM_.cutRes;
-        if (usingApaceImpl_) {
+        if (usingApaceImpl_ && !keepTileAligned) {
             AlignCutResForApace(cutRes, args_.mValue);
         }
         return cutRes;
