@@ -266,6 +266,10 @@ __aicore__ inline void ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::
         // step1: update KvCache
         count_ = 0;
         offsetIndex = compressSeqOffsetLocal.GetValue(i);
+        wins = compressLensLocal.GetValue(i);
+        if (offsetIndex < 0 || offsetIndex >= tilingData_->seqLen || wins < 0 || wins > tilingData_->seqLen) {
+            continue;
+        }
         CopyInKey(i, offsetIndex, 0, curBlockFactor);
         CopyOutKey(i, offsetIndex, 0, curBlockFactor);
         if constexpr (InOutMode == DUAL_IN_OUT) {
@@ -273,14 +277,13 @@ __aicore__ inline void ScatterPaKvCacheOmniFullyLoad<T, IndexDtype, InOutMode>::
             CopyOutValue(i, offsetIndex, 0, curBlockFactor);
         }
         count_ += offsetIndex;
-        wins = compressLensLocal.GetValue(i);
 
         // step2: update KvCache
         int64_t srcStartIdx = compressSeqOffsetLocal.GetValue(i) + wins;
         int64_t seqLenB = seqLensGm_.GetValue((kvBlockOffset_ + i) / tilingData_->numHead);
         seqLenB = seqLenB < tilingData_->seqLen ? seqLenB : tilingData_->seqLen;
         offsetIndex = seqLenB - srcStartIdx;
-        if (offsetIndex > 0) {
+        if (srcStartIdx >= 0 && offsetIndex > 0) {
             CopyInKey(i, seqLenB, srcStartIdx, curBlockFactor);
             CopyOutKey(i, offsetIndex, count_, curBlockFactor);
             if constexpr (InOutMode == DUAL_IN_OUT) {

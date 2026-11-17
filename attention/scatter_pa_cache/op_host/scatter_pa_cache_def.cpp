@@ -17,10 +17,12 @@
 
 namespace ops {
 static const std::vector<ge::DataType> DataType = {
-    ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16,     ge::DT_INT8,        ge::DT_UINT8,         ge::DT_INT16,       ge::DT_UINT16,
-    ge::DT_INT32, ge::DT_UINT32,  ge::DT_HIFLOAT8, ge::DT_FLOAT8_E5M2, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E1M2,
-    ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16,     ge::DT_INT8,        ge::DT_UINT8,         ge::DT_INT16,       ge::DT_UINT16,
-    ge::DT_INT32, ge::DT_UINT32,  ge::DT_HIFLOAT8, ge::DT_FLOAT8_E5M2, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E1M2,
+    ge::DT_FLOAT,         ge::DT_FLOAT16,       ge::DT_BF16,        ge::DT_INT8,        ge::DT_UINT8,
+    ge::DT_INT16,         ge::DT_UINT16,        ge::DT_INT32,       ge::DT_UINT32,      ge::DT_HIFLOAT8,
+    ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E1M2, ge::DT_FLOAT,
+    ge::DT_FLOAT16,       ge::DT_BF16,          ge::DT_INT8,        ge::DT_UINT8,       ge::DT_INT16,
+    ge::DT_UINT16,        ge::DT_INT32,         ge::DT_UINT32,      ge::DT_HIFLOAT8,    ge::DT_FLOAT8_E5M2,
+    ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E1M2,
 };
 
 static const std::vector<ge::DataType> indexDataType = {
@@ -37,10 +39,10 @@ static const std::vector<ge::Format> DataFormat = {
     ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
 };
 
-class ScatterPaCache : public OpDef
-{
+class ScatterPaCache : public OpDef {
 public:
-    explicit ScatterPaCache(const char* name) : OpDef(name)
+    explicit ScatterPaCache(const char* name)
+        : OpDef(name)
     {
         this->Input("key")
             .ParamType(REQUIRED)
@@ -95,6 +97,8 @@ public:
         this->Attr("cache_mode").AttrType(OPTIONAL).String("Norm");
         this->AICore().AddConfig("ascend950", config_950);
         this->AICore().AddConfig("ascend350", config_950);
+        this->AICore().AddConfig("ascend960dt", config_950);
+        this->AICore().AddConfig("ascend960pr", config_950);
     }
 };
 OP_ADD(ScatterPaCache);

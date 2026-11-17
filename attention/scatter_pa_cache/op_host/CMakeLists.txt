@@ -26,6 +26,18 @@ if (BUILD_OPEN_PROJECT)
             COMPUTE_UNIT Ascend350_355e
             OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
         )
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960dt")
+        add_ops_compile_options(
+            OP_NAME ScatterPaCache
+            COMPUTE_UNIT ascend960dt_968B7
+            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
+        )
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960pr")
+        add_ops_compile_options(
+            OP_NAME ScatterPaCache
+            COMPUTE_UNIT Ascend960PR_969A1
+            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
+        )
     else()
         add_ops_compile_options(
             OP_NAME ScatterPaCache

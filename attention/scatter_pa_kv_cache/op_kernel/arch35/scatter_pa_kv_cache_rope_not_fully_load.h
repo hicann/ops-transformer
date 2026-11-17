@@ -387,7 +387,7 @@ __aicore__ inline void ScatterPaKvCacheRopeNotFullyLoad<T, IndexDtype, InOutMode
                                                                                                 int64_t endIdx,
                                                                                                 int64_t curBlockFactor)
 {
-    if (endIdx - startIdx <= 0) {
+    if (startIdx < 0 || endIdx - startIdx <= 0) {
         return;
     }
     int64_t keyOffset = (kvBlockOffset_ + iter) / numHead_ * tilingData_->keyStride0 +
@@ -558,6 +558,10 @@ __aicore__ inline void ScatterPaKvCacheRopeNotFullyLoad<T, IndexDtype, InOutMode
         // step1: update KvCache
         count_ = 0;
         offsetIndex = compressSeqOffsetGm_.GetValue(i);
+        wins = compressLensGm_.GetValue(i);
+        if (offsetIndex < 0 || offsetIndex >= seqLen_ || wins < 0 || wins > seqLen_) {
+            continue;
+        }
 
         HandleKeyCache(i, offsetIndex, 0);
         if constexpr (InOutMode == DUAL_IN_OUT) {
@@ -566,7 +570,6 @@ __aicore__ inline void ScatterPaKvCacheRopeNotFullyLoad<T, IndexDtype, InOutMode
         count_ += offsetIndex;
 
         // step2: reduce mean
-        wins = compressLensGm_.GetValue(i);
         int64_t endIdx = wins + offsetIndex >= seqLen_ ? seqLen_ : wins + offsetIndex;
         KVReduceMean(i, offsetIndex, endIdx, curBlockFactor);
 
@@ -574,7 +577,7 @@ __aicore__ inline void ScatterPaKvCacheRopeNotFullyLoad<T, IndexDtype, InOutMode
         count_++;
         int64_t srcStartIdx = compressSeqOffsetGm_.GetValue(i) + wins;
         offsetIndex = seqLensGm_.GetValue((kvBlockOffset_ + i) / numHead_) - srcStartIdx;
-        if (offsetIndex > 0) {
+        if (srcStartIdx >= 0 && offsetIndex > 0) {
             HandleKeyCache(i, offsetIndex, srcStartIdx);
             if constexpr (InOutMode == DUAL_IN_OUT) {
                 HandleValueCache(i, offsetIndex, srcStartIdx);
