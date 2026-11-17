@@ -61,6 +61,9 @@ constexpr int64_t GBSA_QUANT_TYPE_FLOAT8 = 5;
 constexpr int64_t GBSA_QUANT_TYPE_MXFP8 = 6;
 constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
 constexpr int64_t GBSA_QUANT_TYPE_A8C4 = 8;
+constexpr uint32_t GBSA_A8C4_MAX_Q_SEQ_LEN = 16U;
+// 256 tokens * 16 scale bytes * 5 KV heads fit one 20 KiB scale slot.
+constexpr uint32_t GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND = 5U;
 constexpr int64_t GBSA_SOFTMAX_PRECISION_HIGH = 0;
 constexpr int64_t GBSA_SOFTMAX_PRECISION_MIXED = 1;
 constexpr int64_t GBSA_CURRENT_MASK_TYPE = 1;
@@ -581,9 +584,22 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Regular high-precision FP8 requires groupSize <= 16.");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (a8c4 && numQHeads / numKvHeads > 32) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires groupSize <= 32.");
-        return ACLNN_ERR_PARAM_INVALID;
+    if (a8c4) {
+        if (maxQSeqLen > GBSA_A8C4_MAX_Q_SEQ_LEN) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires maxQSeqLen <= %u.", GBSA_A8C4_MAX_Q_SEQ_LEN);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (numQHeads > std::numeric_limits<int32_t>::max() || numQHeads / numKvHeads > 32) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires numQHeads within INT32 and groupSize <= 32.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if ((GbsaIsLayout(kvInputLayout, "PA_BBND") || GbsaIsLayout(kvInputLayout, "BSND") ||
+             GbsaIsLayout(kvInputLayout, "TND")) &&
+            numKvHeads > GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 supports at most %u KV heads for KV layout %s.",
+                    GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND, kvInputLayout);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     if (!isArch35 && quantType == GBSA_QUANT_TYPE_INT8 &&
         (headDim < 1 || headDim > 256 || numQHeads / numKvHeads > 128 || blockShapeX != 1 || blockShapeY < 1 ||

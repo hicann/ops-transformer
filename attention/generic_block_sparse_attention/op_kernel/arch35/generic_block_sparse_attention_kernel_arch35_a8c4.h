@@ -46,7 +46,6 @@ public:
     using LayoutLse = layout::RowMajor;
 
     static constexpr uint32_t PRE_LAUNCH = 2;
-    static constexpr uint32_t PV_CONSUME_DELAY = 1U;
     static constexpr uint32_t MAX_CROSS_CORE_BUF_STAGES = PRE_LAUNCH + 1;
     static constexpr uint32_t UB_S_OTMP_BUF_STAGES = 2;
     static constexpr uint32_t PENDING_STAGES = PRE_LAUNCH + 2U;
@@ -59,18 +58,18 @@ public:
 
     __aicore__ inline GbsaA8C4KernelArch35() {}
 
-    __aicore__ inline void operator()(GbsaFullQuantKernelParamsArch35 const& params)
+    __aicore__ inline void operator()(const GbsaFullQuantKernelParamsArch35& params,
+                                      const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
     {
-        GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, tilingDataLocal,
-                                    params.tiling);
-        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData = &tilingDataLocal;
         FetchBaseShapeInfo(tilingData, params.metaData);
         CalcOnChipBufTileInfo(tilingData);
         CalcUBufTileInfo();
         // Host and device use identical tile sizes; reject an invalid layout before
         // publishing any mailbox tokens (including the two AIV halves).
+        constexpr uint32_t maxStorageHeads = Epilogue::Block::A8C4KvDequant::MAX_STORAGE_HEADS;
+        const uint32_t storageHeads = GbsaLayoutHelper<kvFormat>::TokenStride(kvHeads_, 1U);
         if (embed_ != 128U || kvBaseTile_ != 512U || kL1BufNum_ < 2U || vL1BufNum_ < 2U ||
-            dequantOffset_ + 2U * dequantBytes_ > UB_LIMIT_BYTES ||
+            storageHeads > maxStorageHeads || dequantOffset_ + dequantBytes_ > UB_LIMIT_BYTES ||
             mm2L1AddrStart_ + mm2L1TileM_ * mm2L1TileKLeft_ * pL1BufNum_ + mm2L1TileN_ * mm2L1TileKRight_ * vL1BufNum_ >
                 L1_LIMIT_BYTES) {
             return;
@@ -153,7 +152,7 @@ public:
 #ifdef __DAV_VEC__
         coreIdx = AscendC::GetBlockIdx() / AscendC::GetSubBlockNum();
         EpilogueOnlineSoftmax epilogueOnlineSoftmax(resource, scaleValue_, uBufTileHelper_);
-        EpilogueRescaleO epilogueRescaleOPadding(resource, uBufTileHelper_);
+        EpilogueRescaleO epilogueRescaleO(resource, uBufTileHelper_);
 #endif
 
         uint32_t groupSize = groupSize_;
@@ -182,8 +181,7 @@ public:
                         auto gmOTensor = tla::MakeTensor(gO[gmOffsetO], gmOLayout, Arch::PositionGM{});
                         auto gmLseLayout = tla::MakeLayout<ElementLse, LayoutLse>(qBaseTile_, strideLseHead);
                         auto gmLseTensor = tla::MakeTensor(gLse[gmOffsetLse], gmLseLayout, Arch::PositionGM{});
-                        epilogueRescaleOPadding.WriteEmptyOutput(gmOTensor, gmLseTensor,
-                                                                 GemmCoord{groupSize, embed_, 0});
+                        epilogueRescaleO.WriteEmptyOutput(gmOTensor, gmLseTensor, GemmCoord{groupSize, embed_, 0});
                     }
                 }
             }
@@ -209,18 +207,10 @@ public:
         }
 
         {
-            const uint32_t storageHeads = GbsaLayoutHelper<kvFormat>::TokenStride(kvHeads_, embed_) / embed_;
             using KvDequant = Epilogue::Block::A8C4KvDequant;
-            const bool preloadKv = isPaged && !fdEnabled;
-            // With one scheduled task, the final max/sum are still live when its
-            // last PV is consumed. Only cross-task lookahead needs a snapshot.
-            const bool needsStatsSnapshot = !preloadKv && taskLoopEnd - taskLoopStart > taskLoopStep;
 #ifdef __DAV_VEC__
-            const bool singleFdTask = isCausal && fdEnabled && taskLoopEnd - taskLoopStart == 1U;
-            constexpr uint32_t fdValueSlot = 1U;
             KvDequant dequantK(resource, dequantOffset_, storageHeads);
-            // K and V use the same two slots in issue order. Each AIV owns its slots.
-            uint32_t dequantSequence = 0U;
+            // Input and output ownership are managed inside the dequantizer.
 #endif
             // One descriptor of lookahead is retained across task boundaries. Slot rotation
             // uses the global sequence; sparse addressing always uses tile.tileId.
@@ -239,24 +229,16 @@ public:
             auto produceKey = [&](const PipelineTile& tile, uint32_t seq) __aicore__ {
 #ifdef __DAV_VEC__
                 if (tile.tokens != 0U) {
-                    const uint32_t slot = dequantSequence++ % 2U;
                     ProduceKvTile<true>(dequantK, gPackedK, gKScale, tile.sparse, tile.pages, tile.kvSeq, tile.head,
-                                        tile.tileId, tile.tokens, kStride0_, seq, slot, preloadKv);
-                    if (singleFdTask && tile.partial && tile.tileCount == 1U && tile.tokens == kvBaseTile_) {
-                        auto desc = resource.ubBuf.template GetBufferByByte<uint64_t>(descriptorOffset_);
-                        const uint32_t base = (seq % PENDING_STAGES) * DESCRIPTOR_WORDS_PER_TILE;
-                        dequantK.template LoadTile<DESCRIPTOR_RECORD_BYTES / sizeof(uint64_t), 1U, isPaged ? 3U : 2U>(
-                            gPackedV, gVScale, desc[base], tile.tokens, fdValueSlot);
-                    }
+                                        tile.tileId, tile.tokens, kStride0_, seq, true);
                 }
 #endif
             };
             auto produceValue = [&](const PipelineTile& tile, uint32_t seq) __aicore__ {
 #ifdef __DAV_VEC__
                 if (tile.tokens != 0U) {
-                    const uint32_t slot = dequantSequence++ % 2U;
                     ProduceKvTile<false>(dequantK, gPackedV, gVScale, tile.sparse, tile.pages, tile.kvSeq, tile.head,
-                                         tile.tileId, tile.tokens, vStride0_, seq, slot);
+                                         tile.tileId, tile.tokens, vStride0_, seq);
                 }
 #endif
             };
@@ -284,31 +266,25 @@ public:
                 }
 #endif
 #ifdef __DAV_VEC__
-                auto rescaleOLayout = uBufTileHelper_;
-                // The preload path consumes i before Softmax(i+1) can overwrite max/sum.
-                if (needsStatsSnapshot) {
-                    rescaleOLayout.gmStartOffset = statsSnapshotOffset_ + pSlot * 2U * STATS_BYTES;
-                    rescaleOLayout.glStartOffset = rescaleOLayout.gmStartOffset + STATS_BYTES;
-                }
-                EpilogueRescaleO epilogueRescaleO(resource, rescaleOLayout);
+                EpilogueRescaleO consumer(resource, uBufTileHelper_);
                 auto oLayout = tla::MakeLayout<ElementO, LayoutO>(qBaseTile_, strideQHead);
                 auto out = tla::MakeTensor(gO[tile.oOffset], oLayout, Arch::PositionGM{});
                 auto lseLayout = tla::MakeLayout<ElementLse, LayoutLse>(qBaseTile_, strideLseHead);
                 auto lse = tla::MakeTensor(gLse[tile.lseOffset], lseLayout, Arch::PositionGM{});
                 if (tile.tokens == 0U) {
                     if (tile.partial) {
-                        epilogueRescaleO.WriteNeutralPartial(gPartialO, gPartialLse, tile.partialId, groupSize, embed_,
-                                                             tilingData->fdLseSubStride);
+                        consumer.WriteNeutralPartial(gPartialO, gPartialLse, tile.partialId, groupSize, embed_,
+                                                     tilingData->fdLseSubStride);
                     } else {
-                        epilogueRescaleO.WriteEmptyOutput(out, lse, GemmCoord{groupSize, embed_, 0});
+                        consumer.WriteEmptyOutput(out, lse, GemmCoord{groupSize, embed_, 0});
                     }
                 } else if (tile.partial) {
-                    epilogueRescaleO.ProcessPartial(out, lse, GemmCoord{groupSize, embed_, tile.tokens}, pSlot, seq,
-                                                    tile.tileId == 0U, tile.tileId + 1U == tile.tileCount, oFlag,
-                                                    gPartialO, gPartialLse, tile.partialId, tilingData->fdLseSubStride);
+                    consumer.ProcessPartial(out, lse, GemmCoord{groupSize, embed_, tile.tokens}, pSlot, seq,
+                                            tile.tileId == 0U, tile.tileId + 1U == tile.tileCount, oFlag, gPartialO,
+                                            gPartialLse, tile.partialId, tilingData->fdLseSubStride);
                 } else {
-                    epilogueRescaleO(out, lse, GemmCoord{groupSize, embed_, tile.tokens}, pSlot, seq, tile.tileId == 0U,
-                                     tile.tileId + 1U == tile.tileCount, oFlag);
+                    consumer(out, lse, GemmCoord{groupSize, embed_, tile.tokens}, pSlot, seq, tile.tileId == 0U,
+                             tile.tileId + 1U == tile.tileCount, oFlag);
                 }
 #endif
             };
@@ -346,63 +322,23 @@ public:
 #ifdef __DAV_VEC__
                     auto pLayout = tla::MakeLayout<ElementP, NpuArch::layout::zN>(groupSize, tile.tokens);
                     auto probability = tla::MakeTensor(l1PTensor[pSlot], pLayout, Arch::PositionL1{});
-                    const bool issueValueWithSoftmax =
-                        singleFdTask && tile.partial && tile.tileCount == 1U && tile.tokens == kvBaseTile_;
-                    if (issueValueWithSoftmax) {
-                        const auto prepared = dequantK.PrepareTile(tile.tokens, fdValueSlot);
-                        const uint32_t buffer = seq % vL1BufNum_;
-                        const uint32_t valueFlag = 11U + buffer;
-                        const uint32_t valueOffset = mm2L1AddrStart_ + mm2L1TileM_ * mm2L1TileKLeft_ * pL1BufNum_ +
-                                                     buffer * mm2L1TileN_ * mm2L1TileKRight_;
-                        const uint32_t l1Tokens = RoundUp(tile.tokens, 16U);
-                        auto dst = resource.l1Buf.template GetBufferByByte<fp8_e4m3fn_t>(valueOffset);
-                        // Queue the V VF after Softmax and keep the P copy ahead of V on MTE3.
-                        epilogueOnlineSoftmax(probability, shape, true, sSlot, pSlot, sFlag, pFlag,
-                                              [&]() __aicore__ { dequantK.RunTileVf(prepared); });
-                        AscendC::CrossCoreWaitFlag<4, PIPE_MTE3>(valueFlag);
-                        dequantK.StoreTile(dst, l1Tokens, fdValueSlot, prepared);
-                        AscendC::CrossCoreSetFlag<4, PIPE_MTE3>(valueFlag);
-                    } else {
-                        epilogueOnlineSoftmax(probability, shape, tile.tileId == 0U, sSlot, pSlot, sFlag, pFlag);
-                    }
-                    if (needsStatsSnapshot && tile.tileId + 1U == tile.tileCount) {
-                        const uint32_t statsOffset = statsSnapshotOffset_ + pSlot * 2U * STATS_BYTES;
-                        auto savedMax = resource.ubBuf.template GetBufferByByte<float>(statsOffset);
-                        auto savedSum = resource.ubBuf.template GetBufferByByte<float>(statsOffset + STATS_BYTES);
-                        auto max = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper_.gmStartOffset);
-                        auto sum = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper_.glStartOffset);
-                        AscendC::DataCopy(savedMax, max, 64U);
-                        AscendC::DataCopy(savedSum, sum, 64U);
-                        AscendC::PipeBarrier<PIPE_V>();
-                    }
-                    if (!preloadKv && !issueValueWithSoftmax) {
-                        produceValue(tile, seq);
-                    }
+                    epilogueOnlineSoftmax(probability, shape, tile.tileId == 0U, sSlot, pSlot, sFlag, pFlag);
 #endif
-                }
-                if (!preloadKv && seq >= PV_CONSUME_DELAY) {
-                    consume(seq - PV_CONSUME_DELAY);
                 }
             };
             auto enqueue = [&](const PipelineTile& tile) __aicore__ {
                 pending[sequence % PENDING_STAGES] = tile;
-                if (preloadKv) {
-                    // AIV: Softmax(i) -> prepare K/V(i+1) -> RescaleO(i).
-                    // AIC: QK(i) -> PV(i), using the already prepared V(i).
-                    if (sequence != 0U) {
-                        step(sequence - 1U);
-                    }
-                    produceKey(tile, sequence);
-                    produceValue(tile, sequence);
-                    if (sequence != 0U) {
-                        consume(sequence - 1U);
-                    }
-                } else {
-                    produceKey(tile, sequence);
-                    if (sequence != 0U) {
-                        step(sequence - 1U);
-                    }
+                // AIV: Softmax(i) -> prepare K/V(i+1) -> RescaleO(i).
+                // AIC: QK(i) -> PV(i), using the already prepared V(i).
+                if (sequence != 0U) {
+                    step(sequence - 1U);
                 }
+                produceKey(tile, sequence);
+                produceValue(tile, sequence);
+                if (sequence != 0U) {
+                    consume(sequence - 1U);
+                }
+
                 ++sequence;
             };
             for (uint32_t taskIdx = taskLoopStart; taskIdx < taskLoopEnd; taskIdx += taskLoopStep) {
@@ -552,12 +488,10 @@ public:
                     enqueue(task);
                 }
             }
-            // Only the end of the core's entire task stream drains the pipeline.
+            // Enqueue already consumed every predecessor; drain the final tile once.
             if (sequence != 0U) {
                 step(sequence - 1U);
-            }
-            for (uint32_t seq = sequence > PV_CONSUME_DELAY ? sequence - PV_CONSUME_DELAY : 0U; seq < sequence; ++seq) {
-                consume(seq);
+                consume(sequence - 1U);
             }
         }
         ReleaseSyncFlags<4, 4, 4>();
@@ -593,8 +527,7 @@ private:
                                          AscendC::GlobalTensor<uint8_t> scales, AscendC::GlobalTensor<int32_t> sparse,
                                          AscendC::GlobalTensor<int32_t> pages, const BatchSeqInfo& sequence,
                                          uint32_t head, uint32_t tile, uint32_t rows, uint64_t pageStride,
-                                         uint32_t globalSequence, uint32_t tileDequantSlot,
-                                         bool localDescriptor = false)
+                                         uint32_t globalSequence, bool localDescriptor = false)
     {
         const uint32_t buffer = globalSequence % (IS_K ? kL1BufNum_ : vL1BufNum_);
         const uint32_t freeFlag = (IS_K ? 8U : 11U) + buffer;
@@ -661,8 +594,8 @@ private:
                 }
             }
         }
-        dequant.ProduceTile<RECORD_WORDS, DATA_WORD, SCALE_WORD>(l1Kv, data, scales, desc[descriptorBase], rows, l1Rows,
-                                                                 tileDequantSlot);
+        dequant.ProduceTile<RECORD_WORDS, DATA_WORD, SCALE_WORD>(l1Kv, data, scales, desc[descriptorBase], rows,
+                                                                 l1Rows);
         // Both AIV halves publish even when one half has no effective rows.
         AscendC::CrossCoreSetFlag<4, PIPE_MTE3>(readyFlag);
     }
@@ -762,11 +695,9 @@ private:
         statsSnapshotOffset_ = maskStartOffset;
         descriptorOffset_ = statsSnapshotOffset_ + MAX_CROSS_CORE_BUF_STAGES * 2U * STATS_BYTES;
         dequantOffset_ = descriptorOffset_ + PENDING_STAGES * MAX_SEGMENTS * DESCRIPTOR_RECORD_BYTES;
-        const uint32_t storageHeads = GbsaLayoutHelper<kvFormat>::TokenStride(kvHeads_, embed_) / embed_;
         using Dequant = Epilogue::Block::A8C4KvDequant;
-        // K and V share two whole-tile slots. Each AIV holds at most 256
-        // tokens of the current KV head, regardless of the head count.
-        dequantBytes_ = Dequant::HalfTileScratchBytes(storageHeads);
+        // Fixed-capacity streaming scratch is independent of the number of KV heads.
+        dequantBytes_ = Dequant::ScratchBytes();
     }
 
     __aicore__ inline void InitCrossCoreDstBuf(AscendC::LocalTensor<ElementP> (&l1PTensor)[MAX_CROSS_CORE_BUF_STAGES],

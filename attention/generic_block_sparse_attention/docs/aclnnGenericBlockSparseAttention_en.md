@@ -1371,7 +1371,7 @@ int main()
 
 ## A8C4 on Ascend 950PR and 950DT (quantType=8)
 
-A8C4 requires a GQA group size of 1 to 32.
+A8C4 requires a GQA group size of 1 to 32. The actual Q sequence length is at most 16 per batch item. For BSND and BNSD Q layouts, the Q tensor sequence axis is also limited to 16. PA_BBND, BSND, and TND KV layouts support up to five KV heads. This five-head limit does not apply to BNSD or PA_BNBD.
 
 Q uses per-tensor FP8 E4M3FN (FLOAT8_E4M3FN) with a fixed scale of 1. K/V use packed FP4 E2M1 (FLOAT4_E2M1) with logical D=128, or 64 bytes per row.
 K and V scales are mandatory, independent BFLOAT16 tensors: one scale per token, KV head and 16 D elements.

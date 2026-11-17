@@ -34,6 +34,9 @@ extern "C" {
 namespace {
 constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
 constexpr int64_t GBSA_QUANT_TYPE_A8C4 = 8;
+constexpr uint32_t GBSA_A8C4_MAX_Q_SEQ_LEN = 16U;
+// 256 tokens * 16 scale bytes * 5 KV heads fit one 20 KiB scale slot.
+constexpr uint32_t GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND = 5U;
 
 static constexpr int64_t LSE_OUT = 1;
 static constexpr int64_t MXFP8_QUANT_TYPE = 6;
@@ -155,7 +158,8 @@ static aclnnStatus ValidateParams(const aclTensor* query, const aclTensor* key, 
 }
 
 static aclnnStatus ValidateA8C4Shape(const aclTensor* query, const aclTensor* key, const aclTensor* value,
-                                     const aclIntArray* blockShape, const std::string& layoutKv, bool isPaged)
+                                     const aclIntArray* blockShape, const std::string& layoutQ,
+                                     const std::string& layoutKv, bool isPaged)
 {
     constexpr int64_t headDim = 128;
     constexpr int64_t blockSize = 128;
@@ -170,6 +174,21 @@ static aclnnStatus ValidateA8C4Shape(const aclTensor* query, const aclTensor* ke
         const auto rank = tensorShape.GetDimNum();
         if (rank == 0U || tensorShape.GetDim(rank - 1U) != headDim) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires headDim=128.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    const auto& qShape = query->GetViewShape();
+    if (layoutQ != "TND" && qShape.GetDimNum() == 4U &&
+        qShape.GetDim(layoutQ == "BNSD" ? 2U : 1U) > GBSA_A8C4_MAX_Q_SEQ_LEN) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 requires Q sequence length <= %u.", GBSA_A8C4_MAX_Q_SEQ_LEN);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (layoutKv == "PA_BBND" || layoutKv == "BSND" || layoutKv == "TND") {
+        const auto& kvShape = key->GetViewShape();
+        const size_t rank = layoutKv == "TND" ? 3U : 4U;
+        if (kvShape.GetDimNum() == rank && kvShape.GetDim(rank - 2U) > GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4 supports at most %u KV heads for KV layout %s.",
+                    GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND, layoutKv.c_str());
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
@@ -421,7 +440,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
         }
     }
     if (quantType == GBSA_QUANT_TYPE_A8C4) {
-        ret = ValidateA8C4Shape(query, key, value, blockShape, layoutKv, isPaged);
+        ret = ValidateA8C4Shape(query, key, value, blockShape, layoutQ, layoutKv, isPaged);
         if (ret != ACLNN_SUCCESS) {
             return ret;
         }

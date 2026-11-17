@@ -265,6 +265,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 ### 产品差异约束
 
 - <term>Ascend 950PR&950DT系列产品</term>上，Metadata 与主算子均设 `quant_mode=QuantMode.Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP`（8）。先调用 `generic_block_sparse_attention_metadata`，再将返回张量显式传给主算子的 `metadata` 参数。逻辑 D=128，`block_shape=[1,128]`，GQA 分组大小 1～32，`mask_mode=0`（非因果）或 `1`（因果），`softmax_precision=0`，`residual_block_mode=0`。显式指定 `attention_out_dtype` 为 float16 或 bfloat16，可选 LSE。
+  - `max_seqlen_q` 和每个 batch 的实际 Q 序列长度均不超过 16。BSND 和 BNSD 的 Q 张量序列轴长度也不超过 16。KV 布局为 PA_BBND、BSND 或 TND 时，`num_heads_kv` 不超过 5。BNSD 和 PA_BNBD 不受此 5 个 KV head 的限制。
   - Q 支持 `TND`、`BSND`、`BNSD`。非分页 K/V 与 Q 使用同名布局；这三种 Q 布局也都可搭配 `PA_BBND` 或 `PA_BNBD`，页大小为 128。输出形状见 [layout 匹配关系表](#layout匹配关系表)。
   - Q 使用 `torch.float8_e4m3fn`，算子固定使用 Q scale `1.0`，`q_dequant_scale` 传 `None`。K/V 均使用 `torch.float4_e2m1fn_x2`，或均使用承载已打包 FP4 数据的 `torch.uint8`。两种表示的 Torch 张量末轴均为逻辑 `D/2`（D=128 时为 64 字节，每字节低 4 位和高 4 位分别存储偶数和奇数 D 索引的 FP4 E2M1 值）。对于每个 token 和每个 KV head，K 和 V 沿 D 轴每 16 个元素各用一份 BF16 scale，对应的 scale 张量末轴为逻辑 `D/16`。非分页 scale 使用连续 ND 张量。`p_quant_scale` 传 `None`。
   - 分页 K、V、K scale、V scale 的首轴 stride 可独立取值，各张量页内连续。打包 K/V 的 Torch 首轴 stride 以字节计，至少为 `block_size × KV_N × 64`，且是 `KV_N × 64` 的整数倍。两份 scale 的首轴 stride 以 BF16 元素计，至少为 `block_size × KV_N × 8`，且是 `KV_N × 8` 的整数倍。详见 [ACLNN 约束](./aclnnGenericBlockSparseAttention.md)。

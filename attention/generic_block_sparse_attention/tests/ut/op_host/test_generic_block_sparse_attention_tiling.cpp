@@ -155,7 +155,102 @@ std::vector<gert::TilingContextPara::OpAttr> MakeAttrs(
         {"is_consistent_topk", Ops::Transformer::AnyValue::CreateFrom<bool>(isConsistentTopk)},
     };
 }
+
+gert::TilingContextPara::TensorDescription MakeTensorDescription(const gert::Shape& shape, ge::DataType dtype)
+{
+    gert::StorageShape storageShape;
+    storageShape.MutableOriginShape() = shape;
+    storageShape.MutableStorageShape() = shape;
+    return {storageShape, dtype, ge::FORMAT_ND};
+}
+
+void CheckA8C4Tiling(const std::string& layoutQ, const std::string& layoutKv, int64_t qSeq, int64_t kvHeads,
+                     ge::graphStatus expectedStatus, uint64_t expectedKey = 0)
+{
+    SCOPED_TRACE(testing::Message() << "Q layout: " << layoutQ << ", KV layout: " << layoutKv << ", Qs: " << qSeq
+                                    << ", KV heads: " << kvHeads);
+    const int64_t qHeads = kvHeads * kN1;
+    const bool paged = layoutKv == "PA_BBND" || layoutKv == "PA_BNBD";
+    const bool tnd = layoutQ == "TND";
+    const bool bnsd = layoutQ == "BNSD";
+    const auto qShape = tnd  ? gert::Shape({qSeq, qHeads, kD}) :
+                        bnsd ? gert::Shape({kBatch, qHeads, qSeq, kD}) :
+                               gert::Shape({kBatch, qSeq, qHeads, kD});
+    gert::Shape kvShape;
+    if (paged) {
+        kvShape = layoutKv == "PA_BNBD" ? gert::Shape({kMaxBlocks, kvHeads, kBlockSize, kD}) :
+                                          gert::Shape({kMaxBlocks, kBlockSize, kvHeads, kD});
+    } else if (tnd) {
+        kvShape = gert::Shape({kS2, kvHeads, kD});
+    } else {
+        kvShape = bnsd ? gert::Shape({kBatch, kvHeads, kS2, kD}) : gert::Shape({kBatch, kS2, kvHeads, kD});
+    }
+    auto scaleShape = kvShape;
+    scaleShape.SetDim(scaleShape.GetDimNum() - 1U, kD / 16);
+    auto inputs = MakeInputs(ge::DT_FLOAT8_E4M3FN, kD, qHeads, kvHeads);
+    inputs[0] = MakeTensorDescription(qShape, ge::DT_FLOAT8_E4M3FN);
+    inputs[1] = MakeTensorDescription(kvShape, ge::DT_FLOAT4_E2M1);
+    inputs[2] = inputs[1];
+    const int64_t qBlocks = kBatch * qSeq;
+    inputs[3] = {{{kvHeads, qBlocks, kTopK}, {kvHeads, qBlocks, kTopK}}, ge::DT_INT32, ge::FORMAT_ND};
+    inputs[4] = {{{kvHeads, qBlocks}, {kvHeads, qBlocks}}, ge::DT_INT32, ge::FORMAT_ND};
+    inputs[8] = MakeTensorDescription(scaleShape, ge::DT_BF16);
+    inputs[9] = inputs[8];
+    if (!tnd) {
+        inputs[11] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+        inputs[13] = {{{kBatch}, {kBatch}}, ge::DT_INT32, ge::FORMAT_ND};
+    } else if (!paged) {
+        inputs[12] = inputs[11];
+    }
+    if (!paged) {
+        inputs[15] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
+    }
+    auto outputs = MakeOutputs(ge::DT_BF16, false, kD, qHeads);
+    outputs[0] = MakeTensorDescription(qShape, ge::DT_BF16);
+
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, outputs,
+                                MakeAttrs(0, 8, 0, 0, 0.0f, -1, -1, 4, layoutQ, layoutKv), &compileInfo, "Ascend950",
+                                32, 262144);
+    if (expectedStatus == ge::GRAPH_SUCCESS) {
+        ExecuteTestCase(ctx, expectedStatus, expectedKey);
+    } else {
+        ExecuteTestCase(ctx, expectedStatus);
+    }
+}
 } // namespace
+
+TEST_F(generic_block_sparse_attention_tiling_ut, a8c4_batched_q_sequence_boundary)
+{
+    CheckA8C4Tiling("BSND", "BSND", 16, 1, ge::GRAPH_SUCCESS, 9251000020000024ULL);
+    CheckA8C4Tiling("BSND", "BSND", 17, 1, ge::GRAPH_FAILED);
+    CheckA8C4Tiling("BNSD", "BNSD", 16, 1, ge::GRAPH_SUCCESS, 9251000010000023ULL);
+    CheckA8C4Tiling("BNSD", "BNSD", 17, 1, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, a8c4_interleaved_kv_head_boundary)
+{
+    struct LayoutCase {
+        const char* q;
+        const char* kv;
+        uint64_t key;
+    };
+    for (const auto& layout :
+         {LayoutCase{"TND", "TND", 9251000030000022ULL}, LayoutCase{"BSND", "BSND", 9251000020000024ULL},
+          LayoutCase{"TND", "PA_BBND", 9251000071000022ULL}}) {
+        CheckA8C4Tiling(layout.q, layout.kv, 16, 1, ge::GRAPH_SUCCESS, layout.key);
+        CheckA8C4Tiling(layout.q, layout.kv, 16, 5, ge::GRAPH_SUCCESS, layout.key);
+        CheckA8C4Tiling(layout.q, layout.kv, 16, 6, ge::GRAPH_FAILED);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, a8c4_contiguous_kv_allows_six_heads)
+{
+    CheckA8C4Tiling("BNSD", "BNSD", 16, 1, ge::GRAPH_SUCCESS, 9251000010000023ULL);
+    CheckA8C4Tiling("BNSD", "BNSD", 16, 6, ge::GRAPH_SUCCESS, 9251000010000023ULL);
+    CheckA8C4Tiling("TND", "PA_BNBD", 16, 1, ge::GRAPH_SUCCESS, 9251000081000022ULL);
+    CheckA8C4Tiling("TND", "PA_BNBD", 16, 6, ge::GRAPH_SUCCESS, 9251000081000022ULL);
+}
 
 TEST_F(generic_block_sparse_attention_tiling_ut, fp8_gather_reserves_descriptor_workspace)
 {

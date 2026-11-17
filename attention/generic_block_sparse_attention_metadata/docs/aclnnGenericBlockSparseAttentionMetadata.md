@@ -615,4 +615,6 @@ aclnnStatus RunMetadata(const aclTensor *sparseBlockIdx, const aclTensor *sparse
 
 Ascend 950PR/950DT 上要求 headDim=128、blockShape=[1,128]、GQA 分组大小为 1～32、softmaxPrecision=0、residualBlockMode=0。支持 maskType=0（非因果）和 1（causal）。Metadata 和主算子的量化类型、掩码、布局、稀疏输入及序列长度须一致。九种布局组合见[主算子接口](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md)。
 
+A8C4 的 `maxQSeqLen` 不超过 16，TND 下每个 batch 的实际 Q 序列长度也不超过 16。`numQHeads` 不超过 INT32_MAX。KV 布局为 PA_BBND、BSND 或 TND 时，`numKvHeads` 不超过 5。BNSD 和 PA_BNBD 不受此 5 个 KV head 的限制。
+
 稀疏索引容量上限为 INT32_MAX，有效索引、计数和调度溢出约束保持不变。

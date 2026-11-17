@@ -1434,7 +1434,7 @@ TND任务编号按实际Q长度累计，但Q/QScale/O和稀疏索引行按cuQ的
 
 ## A8C4（<term>Ascend 950PR&950DT系列产品</term>，quantType=8）
 
-A8C4 的 GQA 分组大小为 1～32。
+A8C4 的 GQA 分组大小为 1～32。每个 batch 的实际 Q 序列长度不超过 16。Q 布局为 BSND 或 BNSD 时，Q 张量的序列轴长度也不超过 16。KV 布局为 PA_BBND、BSND 或 TND 时，KV head 数不超过 5。BNSD 和 PA_BNBD 不受此 5 个 KV head 的限制。
 
 A8C4 的 Q 采用静态 per-tensor FP8 E4M3FN（FLOAT8_E4M3FN），scale 固定为 1。K/V 使用打包的 FP4 E2M1（FLOAT4_E2M1），headDim 固定为 128。
 key/value 的 ACL tensor 逻辑 D 为 128，每行实际存储 64 字节，两个 FP4 E2M1 值打包在一个字节中，偶数 D 元素位于低 4 bit，奇数 D 元素位于高 4 bit。

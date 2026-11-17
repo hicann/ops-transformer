@@ -573,4 +573,6 @@ aclnnStatus RunMetadata(const aclTensor *sparseBlockIdx, const aclTensor *sparse
 
 On Ascend 950PR and 950DT, use headDim=128, blockShape=[1,128], a GQA group size of 1 to 32, softmaxPrecision=0, and residualBlockMode=0. Both maskType=0 (non-causal) and maskType=1 (causal) are supported. Use the same quantType, mask, layouts, sparse inputs, and sequence lengths in Metadata and Attention. See the [Attention API](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention_en.md) for the nine layout pairs.
 
+A8C4 limits `maxQSeqLen` to 16. For TND, the actual Q sequence length is also limited to 16 per batch item. `numQHeads` must not exceed INT32_MAX. For PA_BBND, BSND, and TND KV layouts, `numKvHeads` must be at most five. This five-head limit does not apply to BNSD or PA_BNBD.
+
 The sparse-index capacity limit is INT32_MAX. Existing index, count, and scheduling overflow constraints apply.

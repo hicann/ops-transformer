@@ -615,13 +615,14 @@ __global__ __aicore__ void GbsaInferInterfaceA8C4(GM_ADDR q, GM_ADDR k, GM_ADDR 
     // FP4 storage tag disables the legacy A8C8 P*448 output compensation.
     using Rescale = Epilogue::Block::BlockEpilogue<Epilogue::EpilogueAtlasA5BsaRescaleO<lseMode, lseFormat>, OutDtype,
                                                    float, float, fp4x2_e2m1_t, RescaleCopy, Arch::PositionL0C>;
-    using Kernel = GbsaA8C4KernelArch35<QK, Epilogue::Block::A8C4OnlineSoftmax, PV, Rescale, qFormat, kvFormat, isPaged,
-                                        false, isCausal>;
     GbsaFullQuantKernelParamsArch35 params{q,      k,      v,     sparseIdx, sparseCount, metadata,
                                            cuQ,    cuKv,   usedQ, usedKv,    pages,       nullptr,
                                            kScale, vScale, out,   lse,       workspace,   tiling};
+    GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, tilingData, tiling);
+    using Kernel = GbsaA8C4KernelArch35<QK, Epilogue::Block::A8C4OnlineSoftmax, PV, Rescale, qFormat, kvFormat, isPaged,
+                                        false, isCausal>;
     Kernel kernel;
-    kernel(params);
+    kernel(params, &tilingData);
 }
 #endif
 #endif // Ascend 950

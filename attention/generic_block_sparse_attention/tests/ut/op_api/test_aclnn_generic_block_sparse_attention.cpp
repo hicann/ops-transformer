@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <string>
 #include <vector>
 #include "acl/acl.h"
 #include "opdev/platform.h"
@@ -50,6 +51,66 @@ constexpr int64_t kMaxBlocks = (kS2 + kBlockSize - 1) / kBlockSize;
 constexpr int64_t kTotalQBlocks = kT;
 constexpr double kScale = 1.0 / sqrt(static_cast<double>(kD));
 constexpr int64_t kLayoutSparse = 4; // KVN_TotalQB_KB
+
+constexpr int64_t kA8C4QuantType = 8;
+
+vector<int64_t> MakeDenseShape(const string& layout, int64_t seqLen, int64_t headNum)
+{
+    if (layout == "TND") {
+        return {kBatch * seqLen, headNum, kD};
+    }
+    if (layout == "BNSD") {
+        return {kBatch, headNum, seqLen, kD};
+    }
+    return {kBatch, seqLen, headNum, kD};
+}
+
+aclnnStatus QueryA8C4Workspace(string layoutQ, string layoutKv, int64_t qSeqLen, int64_t kvHeads)
+{
+    const int64_t qHeads = kN1 * kvHeads;
+    const bool tndQ = layoutQ == "TND";
+    const bool tndKv = layoutKv == "TND";
+    const bool paged = layoutKv == "PA_BBND" || layoutKv == "PA_BNBD";
+    const auto qShape = MakeDenseShape(layoutQ, qSeqLen, qHeads);
+    auto kvShape = MakeDenseShape(layoutKv, kS2, kvHeads);
+    if (layoutKv == "PA_BBND") {
+        kvShape = {kMaxBlocks, kBlockSize, kvHeads, kD};
+    } else if (layoutKv == "PA_BNBD") {
+        kvShape = {kMaxBlocks, kvHeads, kBlockSize, kD};
+    }
+    auto scaleShape = kvShape;
+    scaleShape.back() /= 16;
+
+    auto query = TensorDesc(qShape, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ToAclType();
+    auto key = TensorDesc(kvShape, ACL_FLOAT4_E2M1, ACL_FORMAT_ND).ToAclType();
+    auto kvScale = TensorDesc(scaleShape, ACL_BF16, ACL_FORMAT_ND).ToAclType();
+    auto indices = TensorDesc({kvHeads, kBatch * qSeqLen, kTopK}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto counts = TensorDesc({kvHeads, kBatch * qSeqLen}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto metadata = TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto cuQ = TensorDesc({kBatch + 1}, ACL_INT64, ACL_FORMAT_ND).ToAclType();
+    auto cuKv = TensorDesc({kBatch + 1}, ACL_INT64, ACL_FORMAT_ND).ToAclType();
+    auto usedQ = TensorDesc({kBatch}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto usedKv = TensorDesc({kBatch}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto blockTable = TensorDesc({kBatch, kMaxBlocks}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto blockShape = IntArrayDesc(vector<int64_t>{kBlockShapeX, kBlockSize}).ToAclType();
+    auto output = TensorDesc(qShape, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+
+    const auto previousSoc = op::GetCurrentPlatformInfo().GetSocVersion();
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    const auto status = aclnnGenericBlockSparseAttentionGetWorkspaceSize(
+        query.get(), key.get(), key.get(), indices.get(), counts.get(), metadata.get(), nullptr, nullptr, kvScale.get(),
+        kvScale.get(), nullptr, tndQ ? cuQ.get() : nullptr, tndKv ? cuKv.get() : nullptr, tndQ ? nullptr : usedQ.get(),
+        tndKv ? nullptr : usedKv.get(), paged ? blockTable.get() : nullptr, blockShape.get(), layoutQ.data(),
+        layoutKv.data(), kLayoutSparse, kScale, 0, kA8C4QuantType, 0.0, 0, -1, -1, 0, 0, false, output.get(), nullptr,
+        &workspaceSize, &executor);
+    if (executor != nullptr) {
+        aclDestroyAclOpExecutor(executor);
+    }
+    op::SetPlatformSocVersion(previousSoc);
+    return status;
+}
 
 } // namespace
 
@@ -142,6 +203,27 @@ TEST_F(aclnn_generic_block_sparse_attention_ut, int8_dense_tnd_workspace)
             }
         }
     }
+}
+
+TEST_F(aclnn_generic_block_sparse_attention_ut, a8c4_query_sequence_limit)
+{
+    for (const char* layout : {"BSND", "BNSD"}) {
+        SCOPED_TRACE(layout);
+        EXPECT_EQ(QueryA8C4Workspace(layout, layout, 16, 1), ACLNN_SUCCESS);
+        EXPECT_EQ(QueryA8C4Workspace(layout, layout, 17, 1), ACLNN_ERR_PARAM_INVALID);
+    }
+}
+
+TEST_F(aclnn_generic_block_sparse_attention_ut, a8c4_kv_head_limit)
+{
+    for (const char* layoutKv : {"PA_BBND", "BSND", "TND"}) {
+        SCOPED_TRACE(layoutKv);
+        const char* layoutQ = strcmp(layoutKv, "PA_BBND") == 0 ? "BSND" : layoutKv;
+        EXPECT_EQ(QueryA8C4Workspace(layoutQ, layoutKv, kS1, 5), ACLNN_SUCCESS);
+        EXPECT_EQ(QueryA8C4Workspace(layoutQ, layoutKv, kS1, 6), ACLNN_ERR_PARAM_INVALID);
+    }
+    EXPECT_EQ(QueryA8C4Workspace("BNSD", "BNSD", kS1, 6), ACLNN_SUCCESS);
+    EXPECT_EQ(QueryA8C4Workspace("BSND", "PA_BNBD", kS1, 6), ACLNN_SUCCESS);
 }
 
 // ============================================================================

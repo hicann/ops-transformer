@@ -24,6 +24,8 @@ constexpr int32_t TND_BLOCK_CAPACITY_DIM_INDEX = 2;
 // Union size is read from block_shape_x; only 8 is supported today.
 constexpr int64_t GBSA_SUPPORTED_UNION_SIZE = 8;
 constexpr int64_t GBSA_UNION_MAX_ROWS = 128;
+constexpr int64_t GBSA_QUANT_TYPE_A8C4 = 8;
+constexpr uint32_t GBSA_A8C4_MAX_Q_SEQ_LEN = 16U;
 
 bool HasTensorShape(const Tensor* tensor)
 {
@@ -161,6 +163,10 @@ bool GenericBlockSparseAttentionMetadataAicpu::CheckInputs()
         }
     }
 
+    if (quantType_ == GBSA_QUANT_TYPE_A8C4 && maxQSeqLen_ > GBSA_A8C4_MAX_Q_SEQ_LEN) {
+        KERNEL_LOG_ERROR("A8C4 requires max_q_seq_len <= %u.", GBSA_A8C4_MAX_Q_SEQ_LEN);
+        return false;
+    }
     sparseHeadNum_ = isPackedGQA_ == 1 ? numKvHeads_ : numQHeads_;
     const auto idxShape = sparseBlockIdx_->GetTensorShape();
     const auto countShape = sparseBlockCount_->GetTensorShape();
@@ -284,6 +290,11 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
             const int64_t actualQSeqLen = qUsed == nullptr ? storageQSeqLen : qUsed[batchIdx];
             if (qPrefix[batchIdx] < 0 || storageQSeqLen < 0 || actualQSeqLen < 0 || actualQSeqLen > storageQSeqLen) {
                 KERNEL_LOG_ERROR("Invalid TND Q sequence length at batch %lld.", batchIdx);
+                return false;
+            }
+            if (quantType_ == GBSA_QUANT_TYPE_A8C4 && actualQSeqLen > GBSA_A8C4_MAX_Q_SEQ_LEN) {
+                KERNEL_LOG_ERROR("A8C4 requires Q sequence length <= %u at batch %lld.", GBSA_A8C4_MAX_Q_SEQ_LEN,
+                                 batchIdx);
                 return false;
             }
             qSeqLens[static_cast<size_t>(batchIdx)] = actualQSeqLen;

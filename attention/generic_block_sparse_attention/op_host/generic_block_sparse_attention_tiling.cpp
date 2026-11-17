@@ -146,6 +146,9 @@ constexpr uint32_t GBSA_MXFP8_COALESCED_PREFILL_MAX_TOKENS = 8192U;
 
 constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
 constexpr int64_t GBSA_QUANT_TYPE_A8C4 = 8;
+constexpr uint32_t GBSA_A8C4_MAX_Q_SEQ_LEN = 16U;
+// 256 tokens * 16 scale bytes * 5 KV heads fit one 20 KiB scale slot.
+constexpr uint32_t GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND = 5U;
 constexpr uint64_t GBSA_A8C4_TILING_OFFSET = 1000000000000ULL;
 constexpr int64_t GBSA_WIN_DISABLED = -1;
 constexpr float GBSA_DST_TYPE_MAX_DISABLED = 0.0f;
@@ -1458,8 +1461,18 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
                     "maskType=0/1 and residualBlockMode=0.");
             return ge::GRAPH_FAILED;
         }
+        if (layoutQ_ != "TND" && qSeqCapacity_ > GBSA_A8C4_MAX_Q_SEQ_LEN) {
+            OP_LOGE(context->GetNodeName(), "A8C4 requires Q sequence length <= %u.", GBSA_A8C4_MAX_Q_SEQ_LEN);
+            return ge::GRAPH_FAILED;
+        }
         if (groupSize_ > GBSA_TILE_SIZE_32) {
             OP_LOGE(context->GetNodeName(), "A8C4 requires groupSize <= 32.");
+            return ge::GRAPH_FAILED;
+        }
+        if ((layoutKv_ == "PA_BBND" || layoutKv_ == "BSND" || layoutKv_ == "TND") &&
+            kvHeads_ > GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND) {
+            OP_LOGE(context->GetNodeName(), "A8C4 supports at most %u KV heads for KV layout %s.",
+                    GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND, layoutKv_.c_str());
             return ge::GRAPH_FAILED;
         }
         if (context->GetOptionalInputShape(Q_DEQUANT_SCALE_INDEX) != nullptr ||
