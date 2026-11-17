@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-融合分组矩阵乘（Grouped Matrix Multiplication，GMM）和Swish门控线性单元（Swish-Gated Linear Unit，SwiGLU）激活，用于混合专家网络的专家前向计算，直接输出BF16结果。
+融合分组矩阵乘（Grouped Matrix Multiplication, GMM）和Swish门控线性单元（Swish-Gated Linear Unit, SwiGLU）激活，用于混合专家网络的专家前向计算，直接输出BF16结果。
 
 对`group_list`指定的每个专家执行矩阵乘，`x_scale`和`weight_scale`的每个E8M0缩放因子作用于K轴上连续的32个元素。矩阵乘结果`C`的逻辑shape为`(M,N)`。
 

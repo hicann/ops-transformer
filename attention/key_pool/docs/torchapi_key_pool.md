@@ -134,7 +134,7 @@ torch.ops.cann_ops_transformer.key_pool(
 | sin | Tensor | 可选 | RoPE 正弦参数。当前版本保留接口，必须为空。 | bfloat16 | 当前版本不适用 |
 | cu_seqlens | Tensor | 可选 | TH 场景中各 Batch 在 `hidden_states` 首轴上的累计 token 边界。数据格式为 ND，不支持非连续 Tensor；BSH 场景必须为空。 | int32 | TH：`[B+1]` |
 | seqused | Tensor | 可选 | 预留的有效序列长度参数，当前版本必须为空。 | int32 | 预留 |
-| cmp_ratio | int | 可选 | 压缩率，即每个压缩组包含的 token 数。默认值为 `4`。。默认值为 `4`。 | - | - |
+| cmp_ratio | int | 可选 | 压缩率，即每个压缩组包含的 token 数。默认值为 `4`。 | - | - |
 | norm_eps | float | 可选 | LayerNorm 的 epsilon，默认值为 `1e-6`，必须大于 0。 | - | - |
 | rotary_mode | int | 可选 | RoPE 模式入口，默认值为 `1`。仅支持 `0/1`，当前版本不执行 RoPE。 | - | - |
 
@@ -155,18 +155,13 @@ torch.ops.cann_ops_transformer.key_pool(
 - `Sr = ceil(S / cmp_ratio)`，表示 BSH 每个 Batch 的输出容量；
 - `Tr = min(T, T // cmp_ratio + B)`，表示 TH 的总输出容量。
 
-每个 Batch 的有效输出数量为 `valid_count`，
-`valid_count = (start_pos + seq_len) // cmp_ratio - start_pos // cmp_ratio`。
+每个 Batch 的有效输出数量为 `valid_count`，`valid_count = (start_pos + seq_len) // cmp_ratio - start_pos // cmp_ratio`。
 BSH 的 `seq_len` 为 `S`，TH 的 `seq_len` 为相邻 `cu_seqlens` 的差值。
-BSH 的有效输出位于 `pooled_key[b, :valid_count[b]]`；TH 按 Batch 顺序连续
-拼接有效输出，第 b 个 Batch 的起点为前面各 Batch 的有效数量之和，全部有效
-结果占据输出前 `sum(valid_count)` 行。其余输出行未初始化，数值未定义，调用者只能使用有效范围；精度验证时可在
-用于比较的副本中将无效行清零，不能将该清零计入算子性能。
+BSH 的有效输出位于 `pooled_key[b, :valid_count[b]]`；TH 按 Batch 顺序连续拼接有效输出，第 b 个 Batch 的起点为前面各 Batch 的有效数量之和，全部有效结果占据输出前 `sum(valid_count)` 行。
+其余输出行未初始化，数值未定义，调用者只能使用有效范围；精度验证时可在用于比较的副本中将无效行清零，不能将该清零计入算子性能。
 
-`BSH` 表示 Batch-Sequence-Hidden 布局，`hidden_states` 的 shape 为
-`[B,S,H]`。`TH` 表示 Token-Hidden 布局，`hidden_states` 的 shape 为
-`[T,H]`，并通过 shape 为 `[B+1]` 的 `cu_seqlens` 描述各 Batch 的 token
-边界。
+`BSH` 表示 Batch-Sequence-Hidden 布局，`hidden_states` 的 shape 为`[B,S,H]`。
+`TH` 表示 Token-Hidden 布局，`hidden_states` 的 shape 为`[T,H]`，并通过 shape 为 `[B+1]` 的 `cu_seqlens` 描述各 Batch 的 token边界。
 
 ## 约束说明
 

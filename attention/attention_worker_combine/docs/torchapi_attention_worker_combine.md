@@ -38,7 +38,7 @@ cann_ops_transformer.attention_worker_combine(schedule_context, expert_scales, l
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | --- | --- | --- | --- | --- | --- |
 | schedule_context | Tensor | 必选 | 调度上下文，保存有效的ScheduleContext结构体。 | int8 | (1024,) |
-| expert_scales | Tensor | 必选 | 非量化场景为专家权重；MXFP反量化场景为E8M0缩放因子，每32个H方向的元素共享一个缩放因子。uint8用于承载E8M0原始编码。 | 非量化：float32；MXFP反量化：uint8、float8_e8m0fnu | 非量化：(R, K)；MXFP反量化：(R, K+1, S)，K+1包含共享专家 |
+| expert_scales | Tensor | 必选 | 非量化场景为专家权重；MXFP反量化场景为E8M0缩放因子，每32个H方向的元素共享一个缩放因子。uint8用于承载E8M0原始编码。 | 非量化：float32；MXFP反量化：uint8、float8_e8m0fnu | 非量化：(R, K)；MXFP反量化：(R, K+1, S)，其中K+1包含共享专家 |
 | layer_id | Tensor | 必选 | 当前层ID。 | int32 | (1,) |
 | hidden_size | int | 必选 | 每行token的元素数H，必须大于0。 | int | - |
 | token_dtype | int | 可选 | 默认值为0。0表示FP16，1表示BF16，2表示MXFP8_E5M2，3表示MXFP8_E4M3FN，4表示MXFP4_E2M1。 | int | - |

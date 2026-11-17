@@ -44,15 +44,15 @@ cann_ops_transformer.ops.moe_finalize_routing(
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 | --- | --- | --- | --- | --- | --- |
-| `expanded_x` | Tensor | 必选 | MoE FFN的输出，即公式中的expandedX。drop less场景shape为`(NUM_ROWS * K, H)`，drop pad场景shape为`(E, C, H)`。 | FLOAT16、BFLOAT16、FLOAT32 | `(NUM_ROWS * K, H)`或`(E, C, H)` |
-| `expanded_row_idx` | Tensor | 必选 | token索引映射，即公式中的expandedRowIdx。drop_pad_mode为0或2时，值域为`[0, NUM_ROWS * K - 1]`；为1或3时，值域为`[-1, E * C - 1]`，其中-1表示该token被丢弃。 | INT32 | `(NUM_ROWS * K,)` |
-| `x1` | Tensor | 可选 | 第一个共享专家输出，即公式中的x1。shape与输出一致。 | 与expanded_x一致 | `(NUM_ROWS, H)` |
-| `x2` | Tensor | 可选 | 第二个共享专家输出，即公式中的x2。shape与输出一致。x1未传入时，x2也不能传入。 | 与expanded_x一致 | `(NUM_ROWS, H)` |
+| `expanded_x` | Tensor | 必选 | MoE FFN的输出，即公式中的expandedX，drop less场景shape为`(NUM_ROWS * K, H)`，drop pad场景shape为`(E, C, H)`。 | FLOAT16、BFLOAT16、FLOAT32 | `(NUM_ROWS * K, H)`或`(E, C, H)` |
+| `expanded_row_idx` | Tensor | 必选 | token索引映射，即公式中的expandedRowIdx，drop_pad_mode为0或2时，值域为`[0, NUM_ROWS * K - 1]`；为1或3时，值域为`[-1, E * C - 1]`，其中-1表示该token被丢弃。 | INT32 | `(NUM_ROWS * K,)` |
+| `x1` | Tensor | 可选 | 第一个共享专家输出，即公式中的x1，shape与输出一致。 | 与expanded_x一致 | `(NUM_ROWS, H)` |
+| `x2` | Tensor | 可选 | 第二个共享专家输出，即公式中的x2，shape与输出一致。x1未传入时，x2也不能传入。 | 与expanded_x一致 | `(NUM_ROWS, H)` |
 | `bias` | Tensor | 可选 | 偏置量。bias存在时，expert_idx必须同时存在。 | 与expanded_x一致 | `(E, H)` |
 | `scales` | Tensor | 可选 | 路由权重系数。 | FLOAT16、BFLOAT16、FLOAT32 | `(NUM_ROWS, K)` |
-| `expert_idx` | Tensor | 可选 | 专家索引，即公式中的expertIdx。bias存在时必须同时传入。值域为`[0, E-1]`。 | INT32 | `(NUM_ROWS, K)` |
+| `expert_idx` | Tensor | 可选 | 专家索引，即公式中的expertIdx，bias存在时必须同时传入。值域为`[0, E-1]`。 | INT32 | `(NUM_ROWS, K)` |
 | `x` | Tensor | 可选 | copy expert和constant expert场景的输入。 | 与expanded_x一致 | `(NUM_ROWS, H)` |
 | `alpha1` | Tensor | 可选 | constant expert的第一缩放系数。 | 与expanded_x一致 | `(constant_expert_range_num, H)` |
 | `alpha2` | Tensor | 可选 | constant expert的第二缩放系数。 | 与expanded_x一致 | `(constant_expert_range_num, H)` |

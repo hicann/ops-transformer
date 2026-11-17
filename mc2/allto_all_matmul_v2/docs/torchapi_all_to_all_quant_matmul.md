@@ -82,7 +82,7 @@ cann_ops_transformer.all_to_all_quant_matmul(
 
 | 参数名             | 参数类型     | 可选/必选 | 描述                                                                                                                           | 数据类型                                       | 数据格式       | 维度(shape)                       |
 | ------------------ | ------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | -------------- | --------------------------------- |
-| `x1`             | Tensor       | 必选      | 左矩阵，对应各卡本地的A_local。MXFP4场景以uint8打包存储（2个fp4占1字节），实际传入的K轴大小为`H/2`，需配合`x1_dtype=296`（`float4_e2m1`）。 | `float8_e4m3fn`、`float8_e5m2`、`float4_e2m1` | ND             | `(BS, H)`                       |
+| `x1`             | Tensor       | 必选      | 左矩阵，对应各卡本地的A_local，MXFP4场景以uint8打包存储（2个fp4占1字节），实际传入的K轴大小为`H/2`，需配合`x1_dtype=296`（`float4_e2m1`）。 | `float8_e4m3fn`、`float8_e5m2`、`float4_e2m1` | ND             | `(BS, H)`                       |
 | `x2`             | Tensor       | 必选      | 右矩阵，对应公式中X2，需以转置视图（非连续tensor）传入，即先构造`(N, H*rankSize)`再`.t()`。MXFP4场景以uint8打包存储，实际传入的K轴大小为`H*rankSize/2`，需配合`x2_dtype=296`（`float4_e2m1`）。                  | `float8_e4m3fn`、`float8_e5m2`、`float4_e2m1` | ND             | `(H*rankSize, N)`（转置视图）               |
 | `group`          | ProcessGroup | 必选      | torch.distributed通信域，用于All-to-All通信。                                                                                  | -                                              | -              | -                                 |
 | `bias`           | Tensor       | 可选      | 偏置项，矩阵乘后累加，默认值为`None`。                                                                                       | `float32`                              | ND             | `(N,)`                          |
@@ -97,7 +97,7 @@ cann_ops_transformer.all_to_all_quant_matmul(
 | `x2_scale_dtype` | int          | 可选      | `x2_scale`的dtype，默认值为`None`（使用tensor的dtype）；MX场景传293（float8_e8m0）。                                                           | int                                            | -              | -                                 |
 | `y_dtype`        | int          | 可选      | 输出`y`的数据类型，默认值为`15`（BF16，ACL dtype 枚举）。                                           | int                                            | -              | -                                 |
 | `comm_mode`      | str          | 可选      | 通信模式，默认值为`"aiv_urma"`，当前仅支持`"aiv_urma"`。             | str                                         | -              | -                                 |
-| `precision_mode` | int          | 可选      | 精度模式，默认值为0。0/1/2性能由低到高，精度由高到低。                                                                         | int                                            | -              | -                                 |
+| `precision_mode` | int          | 可选      | 精度模式，默认值为0，0/1/2性能由低到高，精度由高到低。                                                                         | int                                            | -              | -                                 |
 
 ## 返回值说明
 
@@ -116,8 +116,8 @@ cann_ops_transformer.all_to_all_quant_matmul(
 - `x1`、`x2`需为2D Tensor。
 - `x1`与`x2`需同为FP8或同为FP4。
 - 通信buffer大小约束：本算子使用HCCL内置通信buffer完成All-to-All通信，该buffer大小由环境变量`HCCL_BUFFSIZE`（单位MB，不配置时默认200MB，传入到框架层时会分配两倍，为400MB）控制。每个rank的commBuffer需容纳所有rank写入的数据，要求满足：`HCCL_BUFFSIZE * 2` >= `BS * (H * sizeof(x1_dtype) + ceil(H / 64) * 2) + 2兆字节，其中`sizeof(x1_dtype)`在FP8场景为1字节、FP4场景为半字节（0.5字节），`ceil(H / 64) * 2`为x1_scale的通信量（每64个元素1字节scale、末维2字节）。若不满足，算子执行时会在Tiling阶段报错，此时可通过`export HCCL_BUFFSIZE=<建议值>`调大buffer后重试。
-- 接口的返回值为输出张量y和一个占位None，详见调用说明
-- 当前仅支持MX量化场景，`x1_quant_mode` 和 `x2_quant_mode` 都必须为 6 。
+- 接口的返回值为输出张量y和一个占位None，详见调用说明。
+- 当前仅支持MX量化场景，`x1_quant_mode` 和 `x2_quant_mode` 都必须为 6。
 
 ## 确定性计算
 

@@ -183,7 +183,7 @@ cann_ops_transformer.fused_causal_conv1d_(
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |--------|----------|-----------|------|----------|-------------|
 | x | Tensor | 必选 | 输入序列，卷积结果将原地更新至x。 | float16、bfloat16 | [batch, seq_len, dim]（固定batch）或 [cu_seq_len, dim]（变长） |
 | weight | Tensor | 必选 | 卷积权重。 | 同x | [kW, dim]，kW∈{2, 3, 4} |
@@ -259,7 +259,7 @@ cann_ops_transformer.fused_causal_conv1d_(
     - block_idx_last_scheduled_token[i] < max_num_blocks
   - num_accepted_tokens分为None和非None，非None情况下长度为batch，prefill对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seq_len-1。
   - num_computed_tokens中每个元素取值大于等于0。
-  - cache_indices的取值范围为[0, conv_states.dim[0]-1],且值均不能相等（除非等于pad_slot_id）。
+  - cache_indices的取值范围为[0, conv_states.dim[0]-1]，且值均不能相等（除非等于pad_slot_id）。
   - max_query_len = batch中的最大seq_len。
   - max_draft_tokens的取值范围为[0, 16]，默认值为7。
   - Pangu V2 模式（conv_mode = 1）下，num_computed_tokens不能为 None。

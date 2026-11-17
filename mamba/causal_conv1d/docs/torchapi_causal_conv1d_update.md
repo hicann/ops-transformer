@@ -59,9 +59,9 @@ cann_ops_transformer.causal_conv1d_update(
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |--------|----------|-----------|------|----------|-------------|
-| x | Tensor | 必选 | 输入序列。 | float16、bfloat16 | [batch, 1, dim]（固定batch，3D）。2D [cu_seq_len, dim]仅在提供num_accepted_tokens（投机解码）时支持 |
+| x | Tensor | 必选 | 输入序列。 | float16、bfloat16 | [batch, 1, dim]（固定batch，3D）。2D [cu_seq_len, dim]仅在提供num_accepted_tokens（投机解码）时支持。 |
 | conv_state | Tensor | 必选 | 卷积状态缓存，计算后原地更新。 | 同x | [num_cache_lines, state_len, dim]，state_len ≥ kW-1 |
 | weight | Tensor | 必选 | 卷积权重。 | 同x | [kW, dim]，kW∈{2, 3, 4} |
 | bias | Tensor | 可选 | 卷积偏置。默认None表示不使用。 | 同x | [dim] |

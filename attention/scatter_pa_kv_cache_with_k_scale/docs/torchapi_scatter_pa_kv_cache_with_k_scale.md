@@ -121,7 +121,7 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
 
 ## 调用示例
 
-- 单算子模式调用
+- 单算子模式调用：
 
     ```python
     import torch

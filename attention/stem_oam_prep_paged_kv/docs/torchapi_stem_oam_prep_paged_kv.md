@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  `stem_oam_prep_paged_kv`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`StemOamPrepPagedKv`算子完成Stem OAM (Output-Aware Metric) 动态稀疏注意力机制的前置评分计算。从Paged KV Cache中提取K/V数据，经K Processing（per-token K-scale × group sum + anti-diagonal flip）和V Processing（per-head vScale × L2 Norm → Log → Global Normalize → ReLU → Block Average）计算，输出k_flat和v_bias供Stem OAM score computation使用。
+  `stem_oam_prep_paged_kv`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`StemOamPrepPagedKv`算子完成Stem OAM（Output-Aware Metric）动态稀疏注意力机制的前置评分计算。从Paged KV Cache中提取K/V数据，经K Processing（per-token K-scale × group sum + anti-diagonal flip）和V Processing（per-head vScale × L2 Norm → Log → Global Normalize → ReLU → Block Average）计算，输出k_flat和v_bias供Stem OAM score computation使用。
 
 - **输入输出支持以下数据场景**：
 
@@ -69,7 +69,7 @@ cann_ops_transformer.stem_oam_prep_paged_kv(
 | v_cache | Tensor | 必选 | Paged V cache。不支持空Tensor。shape与k_cache一致。 | 与k_cache保持一致 | 4 |
 | kv_indices | Tensor | 必选 | 每batch KV Block index数组。不支持空Tensor。shape[1]=max_kv_blocks，batch最大值为16，max_kv_blocks最大值2048。 | int32 | 2 |
 | kv_seq_lens | list[int] | 必选 | 每batch KV序列长度。不支持空列表。kv序列长度最大值262144。该值用于派生kv_indices第二维max_kv_blocks及输出shape中max_Kb。 | int32 | 1 |
-| k_scale_cache | Tensor | 可选 | Per-token per-head K scale。k_cache数据类型为FP8时必填，其他类型可省略。随kv_layout变化：kv_layout="BBND": [total_blocks, kv_block_size, H_kv, 1]，kv_layout="BNBD": [total_blocks, H_kv, kv_block_size, 1]。支持前三维非连续（stride>shape），最后一维必须连续。 | float32 | 4 |
+| k_scale_cache | Tensor | 可选 | Per-token per-head K scale。k_cache数据类型为FP8时必填，其他类型可省略。随kv_layout变化：kv_layout="BBND"：[total_blocks, kv_block_size, H_kv, 1]，kv_layout="BNBD"：[total_blocks, H_kv, kv_block_size, 1]。支持前三维非连续（stride>shape），最后一维必须连续。 | float32 | 4 |
 | v_scale | Tensor | 可选 | Per-head V scale。k_cache数据类型为FP8时必填，其他类型可省略。 | float32 | 1（[H_kv]） |
 | lambda_mag | float | 可选 | V bias乘数，取值范围[0,1]，默认0.3。 | float | - |
 | kv_layout | str | 可选 | KV Cache布局，"BBND"表示[total_blocks, kv_block_size, H_kv, 128]，"BNBD"表示[total_blocks, H_kv, kv_block_size, 128]。当前仅支持"BNBD"，默认"BNBD"。 | str | - |
@@ -80,8 +80,8 @@ cann_ops_transformer.stem_oam_prep_paged_kv(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| k_flat | Tensor | 必选 | K group sum + anti-diag flip结果。不支持空Tensor。shape为[batch, H_kv, max_Kb, kflat_dim]，其中kflat_dim=stem_stride×D, max_Kb依赖kv_seq_lens输入计算获得。 | bfloat16 | 4 |
-| v_bias | Tensor | 必选 | V block bias结果。不支持空Tensor。shape为[batch, H_kv, max_Kb], max_Kb依赖kv_seq_lens输入计算获得。 | float32 | 3 |
+| k_flat | Tensor | 必选 | K group sum + anti-diag flip结果。不支持空Tensor。shape为[batch, H_kv, max_Kb, kflat_dim]，其中kflat_dim=stem_stride×D，max_Kb依赖kv_seq_lens输入计算获得。 | bfloat16 | 4 |
+| v_bias | Tensor | 必选 | V block bias结果。不支持空Tensor。shape为[batch, H_kv, max_Kb]，max_Kb依赖kv_seq_lens输入计算获得。 | float32 | 3 |
 
 ## 约束说明
 

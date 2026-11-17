@@ -177,7 +177,7 @@ cann_ops_transformer.fused_causal_conv1d(
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |--------|----------|-----------|------|----------|-------------|
 | x | Tensor | 必选 | 输入序列。 | float16、bfloat16 | [batch, seq_len, dim]（固定batch）或 [cu_seq_len, dim]（变长） |
 | weight | Tensor | 必选 | 卷积权重。 | 同x | [kW, dim]，kW∈{2, 3, 4} |
@@ -212,7 +212,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - conv_states必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, max_num_blocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
+    - cu_seq_len范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G]，batch范围[1, 256]。
     - max_num_blocks >= ceil(max_query_len, block_size)。
     - max_query_len > max_draft_tokens + 1。
   - prefill和decode混合场景：
@@ -221,7 +221,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, max_num_blocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
+    - cu_seq_len范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G]，batch范围[1, 256]。
     - max_num_blocks >= ceil(max_query_len, block_size)。
     - max_query_len > max_draft_tokens + 1。
   - decode场景（变长序列）：
@@ -253,7 +253,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - block_idx_last_scheduled_token[i] < max_num_blocks
   - num_accepted_tokens分为None和非None，非None情况下长度为batch，prefill对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seq_len-1。
   - num_computed_tokens中每个元素取值大于等于0。
-  - cache_indices的取值范围为[0, conv_states.dim[0]-1],且值均不能相等（除非等于pad_slot_id）。
+  - cache_indices的取值范围为[0, conv_states.dim[0]-1]，且值均不能相等（除非等于pad_slot_id）。
   - max_query_len = batch中的最大seq_len。
   - max_draft_tokens的取值范围为[0, 16]，默认值为7。
   - Pangu V2 模式（conv_mode = 1）下，num_computed_tokens不能为 None。

@@ -88,9 +88,9 @@ cann_ops_transformer.grouped_matmul_activation_quant(
 
 以下表格列出不同量化场景下的参数类型和 shape 约束，公共参数描述见上表。
 
-MXFP8量化场景： 输入x为`torch.float8_e4m3fn`、`torch.float8_e5m2`，weight仅支持`torch.float8_e4m3fn`的MX量化场景；
+MXFP8量化场景：输入x为`torch.float8_e4m3fn`、`torch.float8_e5m2`，weight仅支持`torch.float8_e4m3fn`的MX量化场景；
 
-MXFP4量化场景： 输入x和weight均为`torch_npu.float4_e2m1fn_x2`、`torch_npu.float4_e1m2fn_x2`的MX量化场景
+MXFP4量化场景：输入x和weight均为`torch_npu.float4_e2m1fn_x2`、`torch_npu.float4_e1m2fn_x2`的MX量化场景。
 
 ### MXFP8量化场景
 

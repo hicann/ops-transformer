@@ -59,7 +59,7 @@ cann_ops_transformer.causal_conv1d_fn(
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |--------|----------|-----------|------|----------|-------------|
 | x | Tensor | 必选 | 输入序列。 | float16、bfloat16 | [batch, seq_len, dim]（固定batch）或 [cu_seq_len, dim]（变长） |
 | weight | Tensor | 必选 | 卷积权重。 | 同x | [kW, dim]，kW∈{2, 3, 4} |
@@ -68,7 +68,7 @@ cann_ops_transformer.causal_conv1d_fn(
 | query_start_loc | Tensor | 必选 | 变长序列起始位置索引。变长场景必须提供，固定batch场景可传空Tensor。 | int32 | [batch+1] |
 | cache_indices | Tensor | 可选 | 缓存索引，指定每个序列对应的缓存状态在conv_states中的索引。默认None使用恒等映射。 | int32 | [batch] |
 | has_initial_state | Tensor | 可选 | 初始状态标志。1=使用缓存历史，0=零初始化（冷启动）。默认None全部零初始化。 | int32 | [batch] |
-| activation | str | 可选 | 激活函数类型，"silu"或"none"。默认值为"silu"。 | - | - |
+| activation | str | 可选 | 激活函数类型，“silu”或“none”。默认值为“silu”。 | - | - |
 | pad_slot_id | int | 可选 | 填充槽位ID，标识无需参与卷积计算的padding位置，命中该槽位的序列按padding处理。默认值为-1。 | - | - |
 | null_block_id | int | 可选 | 无效缓存槽位标记ID，cache_indices[i]==null_block_id时跳过该序列并输出填零。默认值为0。 | - | - |
 | block_idx_first_scheduled_token | Tensor | 可选 | 首个调度token块索引。 | int32 | [batch] |

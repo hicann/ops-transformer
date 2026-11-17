@@ -108,7 +108,7 @@ cann_ops_transformer.grouped_matmul_swiglu_quant(
 | `dequant_dtype` | torch.dtype/int | 可选 | GroupedMatmul中间结果类型，默认值为`6`（表示`torch.float32`）。 | - | - |
 | `quant_mode` | int | 可选 | 输出量化模式，默认值为2，当前仅支持2，表示MX量化。 | - | - |
 | `quant_dtype` | torch.dtype/int | 可选 | 输出`y`的数据类型，默认值为`torch.float8_e4m3fn`，显式传入`None`时使用该默认类型。当前仅支持`torch.float8_e4m3fn`，不支持`torch.int8`、`torch.float8_e5m2`及其对应的数值枚举。 | - | - |
-| `group_list_type` | int | 可选 | `group_list`的解释方式，默认值为0。0表示cumsum，1表示count。 | - | - |
+| `group_list_type` | int | 可选 | `group_list`的解释方式，默认值为0，0表示cumsum，1表示count。 | - | - |
 | `tuning_config` | List[int] | 可选 | 调优参数，默认值为`None`。当前场景不支持，仅支持`None`或空List。 | - | - |
 | `x_dtype` | torch.dtype/int | 可选 | `x`的逻辑数据类型，默认值为`None`。MXFP8场景无需传入；显式传入时仅支持`torch.float8_e4m3fn`。 | - | - |
 | `weight_dtype` | torch.dtype/int | 可选 | `weight`的逻辑数据类型，默认值为`None`。MXFP8场景无需传入；显式传入时仅支持`torch.float8_e4m3fn`。 | - | - |
@@ -119,10 +119,10 @@ cann_ops_transformer.grouped_matmul_swiglu_quant(
 | `glu_alpha` | float | 可选 | Sigmoid输入的缩放系数，默认值为`None`，此时按1.702处理。必须为有限且可由`torch.float32`表示的值。 | - | - |
 | `glu_bias` | float | 可选 | 线性分支的偏置，默认值为`None`，此时按1.0处理。必须为有限且可由`torch.float32`表示的值。 | - | - |
 | `round_mode` | str | 可选 | MX量化舍入模式，默认值为`"rint"`，当前仅支持`"rint"`。 | - | - |
-| `scale_alg` | int | 可选 | MX量化scale算法，默认值为0。0表示OCP实现，1表示cuBLAS实现；当前MXFP8输出仅支持0或1。 | - | - |
+| `scale_alg` | int | 可选 | MX量化scale算法，默认值为0，0表示OCP实现，1表示cuBLAS实现；当前MXFP8输出仅支持0或1。 | - | - |
 | `dst_type_max` | float | 可选 | 表示目标数据类型的最大值，默认值为0.0。当前MXFP8输出仅支持0.0。 | - | - |
 
-张量的shape和布局要求如下。
+张量的shape和布局要求如下：
 
 | 参数名 | shape |
 | --- | --- |

@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  `block_sparse_attention_grad`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`BlockSparseAttentionGrad`算子完成块级稀疏注意力反向计算。通过`block_sparse_mask`指定每个Q块需要参与计算的KV块，实现高效的稀疏注意力反向计算，并一次性返回`dq`、`dk`、`dv`。
+  `block_sparse_attention_grad`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`BlockSparseAttentionGrad`算子完成块级稀疏注意力反向计算，通过`block_sparse_mask`指定每个Q块需要参与计算的KV块，实现高效的稀疏注意力反向计算，并一次性返回`dq`、`dk`、`dv`。
 
   该接口为正向接口`block_sparse_attention`的反向传播：正向的输出`attentionOut`与`softmax_lse`作为反向输入参与计算。
 
@@ -57,7 +57,7 @@
   Out = PV
   $$
 
-  其中$scale$为缩放系数，一般取$scale = D^{-0.5}$，$key_{sparse}$、$value_{sparse}$为`block_sparse_mask`选取的KV块。则反向计算公式为：
+  其中$scale$为缩放系数，一般取$scale = D^{-0.5}$，$key_{sparse}$、$value_{sparse}$为`block_sparse_mask`选取的KV块，则反向计算公式为：
 
   $$
   softmax\_grad = softmaxGrad(dOut, attentionOut)
@@ -119,21 +119,21 @@ cann_ops_transformer.block_sparse_attention_grad(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| d_out | Tensor | 必选 | 公式中的dOut，即最终输出对正向attentionOut的梯度。<br>支持的shape: <ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
-| query | Tensor | 必选 | 公式中的query。<br>支持的shape: <ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
-| key | Tensor | 必选 | 公式中的key。<br>支持的shape: <ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
-| value | Tensor | 必选 | 公式中的value。<br>支持的shape: <ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
-| attention_out | Tensor | 必选 | 正向BlockSparseAttention的输出，即公式中的attentionOut。<br>支持的shape: <ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
-| softmax_lse | Tensor | 必选 | Softmax计算的log-sum-exp中间结果，用于反向计算时对数和指数的逆推。<br>支持的shape: <ul><li>TND: [Tq, Nq, 1]</li><li>BNSD: [B, Nq, Sq, 1]</li></ul> | float32 | ND | 3~4 | × |
-| block_sparse_mask | Tensor | 必选 | 块级稀疏mask，1表示保留该块参与计算，0表示跳过该块。决定哪些block实际参与注意力计算。<br>支持的shape:[B, Nq, ceil(Sq/block_x), ceil(Skv/block_y)] | uint8/bool | ND | 4 | × |
+| d_out | Tensor | 必选 | 公式中的dOut，即最终输出对正向attentionOut的梯度。<br>支持的shape：<ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
+| query | Tensor | 必选 | 公式中的query。<br>支持的shape：<ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
+| key | Tensor | 必选 | 公式中的key。<br>支持的shape：<ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
+| value | Tensor | 必选 | 公式中的value。<br>支持的shape：<ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
+| attention_out | Tensor | 必选 | 正向BlockSparseAttention的输出，即公式中的attentionOut。<br>支持的shape：<ul><li>TND: [Tq, Nq, D]</li><li>BNSD: [B, Nq, Sq, D]</li></ul> | float16/bfloat16 | ND | 3~4 | × |
+| softmax_lse | Tensor | 必选 | Softmax计算的log-sum-exp中间结果，用于反向计算时对数和指数的逆推。<br>支持的shape：<ul><li>TND: [Tq, Nq, 1]</li><li>BNSD: [B, Nq, Sq, 1]</li></ul> | float32 | ND | 3~4 | × |
+| block_sparse_mask | Tensor | 必选 | 块级稀疏mask，1表示保留该块参与计算，0表示跳过该块，决定哪些block实际参与注意力计算。<br>支持的shape：[B, Nq, ceil(Sq/block_x), ceil(Skv/block_y)] | uint8/bool | ND | 4 | × |
 | block_shape | list[int] | 可选 | 稀疏块形状，必须包含两个元素[block_x, block_y]，分别表示Q方向和KV方向的稀疏粒度；不传入时按[128, 128]处理 | int64 | - | 长度为2 | - |
 | q_input_layout | string | 可选 | 输入query张量的数据排布格式，默认"BNSD" | string | - | - | - |
 | kv_input_layout | string | 可选 | 输入key/value张量的数据排布格式，默认"BNSD" | string | - | - | - |
-| num_key_value_heads | int | 可选 | key/value的head个数，默认1。用于支持GQA（分组查询注意力）机制下的头数比例映射 | int64 | - | - | - |
+| num_key_value_heads | int | 可选 | key/value的head个数，默认1，用于支持GQA（分组查询注意力）机制下的头数比例映射 | int64 | - | - | - |
 | scale_value | float | 可选 | 公式中的scale，默认1.0，一般设置为D^-0.5 | double | - | - | - |
 | actual_seq_lengths | list[int] | TND时必选/其余可选 | 每个batch对应的query实际序列长度 | int64 | - | 长度为B | - |
 | actual_seq_lengths_kv | list[int] | TND时必选/其余可选 | 每个batch对应的key/value实际序列长度 | int64 | - | 长度为B | - |
-| atten_mask | Tensor | 可选 | 公式中的atten_mask。<ul><li>`mask_type=1`时必选，为块级变长掩码（INT32 counts）<br>支持的shape:[B, Nq, maxBlockNum, 2]，其中 $maxBlockNum=\max(\lceil Sq/block\_x\rceil, \lceil Skv/block\_y\rceil)$；</li><li>`mask_type=0`时必须为None。</li></ul> | int32 | ND | 4 | × |
+| atten_mask | Tensor | 可选 | 公式中的atten_mask。<ul><li>`mask_type=1`时必选，为块级变长掩码（INT32 counts）<br>支持的shape：[B, Nq, maxBlockNum, 2]，其中 $maxBlockNum=\max(\lceil Sq/block\_x\rceil, \lceil Skv/block\_y\rceil)$；</li><li>`mask_type=0`时必须为None。</li></ul> | int32 | ND | 4 | × |
 | mask_type | int | 可选 | 注意力计算中的掩码类型，默认0。<ul><li>当mask_type=0，即为不加mask场景（默认值），忽略`atten_mask`，按`block_sparse_mask`给定的块级稀疏模式计算；</li><li>当mask_type=1，即为块级变长掩码场景，按块级变长掩码计算，需配置`atten_mask`（INT32 counts）</li></ul> | int64 | - | - | - |
 
 ## 返回值说明

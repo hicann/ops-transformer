@@ -98,7 +98,7 @@ cann_ops_transformer.apply_rotary_pos_emb_grad(
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |--------|----------|-----------|------|----------|-------------|
 | grad_query_embed | Tensor | 必选 | 正向输出`query_out`的梯度。 | bfloat16、float16、float32 | `layout=4`时为(T, Nq, D)，其他支持的`layout`下为4维Tensor |
 | grad_key_embed | Tensor | 必选 | 正向输出`key_out`的梯度。除N维度外，shape需与`grad_query_embed`一致。 | 同grad_query_embed | `layout=4`时为(T, Nk, D)，其他支持的`layout`下为4维Tensor |
@@ -107,7 +107,7 @@ cann_ops_transformer.apply_rotary_pos_emb_grad(
 | query | Tensor | 可选 | 正向计算输入`query`。传入时计算`grad_cos`和`grad_sin`；必须与`key`同时传入或同时不传入。默认值为`None`。 | 同grad_query_embed | 与grad_query_embed一致 |
 | key | Tensor | 可选 | 正向计算输入`key`。传入时计算`grad_cos`和`grad_sin`；必须与`query`同时传入或同时不传入。默认值为`None`。 | 同grad_query_embed | 与grad_key_embed一致 |
 | rotary_mode | str | 可选 | 旋转位置编码模式，仅支持`"half"`，默认值为`"half"`。 | - | - |
-| layout | int | 可选 | 输入张量布局格式，1表示BSND，2表示SBND，4表示TND，默认值为1。 | - | - |
+| layout | int | 可选 | 输入张量布局格式，1表示BSND、2表示SBND、4表示TND，默认值为1。 | - | - |
 
 ## 返回值说明
 

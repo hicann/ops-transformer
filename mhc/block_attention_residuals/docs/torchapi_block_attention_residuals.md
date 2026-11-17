@@ -79,7 +79,7 @@
     - $block\_res \in \mathbb{R}^{T \times N \times H}$ 表示输入 `block_res`，作为拼接后的前 $N$ 行 value。
     - $proj\_weight$ 表示输入 `proj_weight`，shape 为 $[1, H]$；$proj\_weight_{0,h}$ 表示其第 $h$ 个元素。
     - $norm\_weight \in \mathbb{R}^{H}$ 表示输入 `norm_weight`。
-    - $valid\_block\_num$ 表示输入 `valid_block_num`。为可选预留属性，默认值为 `-1`，当前仅支持传入 `-1`（表示使用 `N`）或 `N`（`block_res.shape[1]`），不参与计算。
+    - $valid\_block\_num$ 表示输入 `valid_block_num`，为可选预留属性，默认值为 `-1`，当前仅支持传入 `-1`（表示使用 `N`）或 `N`（`block_res.shape[1]`），不参与计算。
     - $norm\_eps$ 表示输入 `norm_eps`，是计算 RMS 归一化因子时使用的数值稳定项。
     - $t \in [0, T)$、$i \in [0, N]$、$h \in [0, H)$ 分别表示 token、逻辑行和 hidden dimension 的索引。
     - $v_{t,i,h}$ 表示拼接后的 value；$inv\_rms_{t,i}$ 表示逐行 RMS 归一化系数；$score\_weight_{h}$ 表示 `norm_weight` 与 `proj_weight` 逐元素相乘结果。

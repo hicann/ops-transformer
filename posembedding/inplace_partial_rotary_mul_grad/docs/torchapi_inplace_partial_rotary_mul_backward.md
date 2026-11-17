@@ -51,7 +51,7 @@
 
     $dx'$的结果inplace写回`grad_output`的`[start, end)`区间。
 
-- **说明**:
+- **说明**：
 
   - 该算子当前仅实现了`rotary_mode="interleave"`模式。half（0）、quarter（2）、interleave-half（3）模式暂未支持。
   - 输入`grad_output`采用BSND维度格式，其中B（Batch）表示批量大小，S（Seq-Length）表示序列长度，N（Head-Num）表示多头数，D（Head-Dim）表示每个头的隐藏维度大小。
@@ -98,7 +98,7 @@ cann_ops_transformer.inplace_partial_rotary_mul_backward(grad_output, r1, r2, *,
 
 该算子为[inplace_partial_rotary_mul](../../inplace_partial_rotary_mul/docs/torchapi_inplace_partial_rotary_mul.md)的反向算子，两者参数`r1`、`r2`、`rotary_mode`、`partial_slice`需保持一致。
 
-> **说明**：当正向 `inplace_partial_rotary_mul` 中 `x.requires_grad` 为True时，`loss.backward()` 会自动触发本算子，无需手动调用。仅在需要显式控制梯度的场景下保留手动调用路径。
+> **说明**：当正向 `inplace_partial_rotary_mul` 中 `x.requires_grad` 为True时，`loss.backward()` 会自动触发本算子，无需手动调用，仅在需要显式控制梯度的场景下保留手动调用路径。
 
 ## 调用说明
 

@@ -163,8 +163,8 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 | max_seqlen_q | int | 可选 | 单个batch中最大的query序列长度，默认值为0。 | int32 | - |
 | max_seqlen_k | int | 可选 | 单个batch中最大的压缩后key序列长度，默认值为0。 | int32 | - |
 | topk | int | 可选 | top-k大小，即 `sparse_indices` 最后一维 `K`，当前支持[1, 2048]和4096、8192。 | int32 | - |
-| layout_q | str | 可选 | `q` 侧layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | string | - |
-| layout_k | str | 可选 | `k` 侧layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | string | - |
+| layout_q | str | 可选 | `q` 侧layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"`。 | string | - |
+| layout_k | str | 可选 | `k` 侧layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"`。 | string | - |
 | mask_mode | int | 可选 | sparse mask模式。0表示No mask，3表示rightDownCausal模式，默认值为0。 | int32 | - |
 | cmp_ratio | int | 可选 | key压缩比例，当前支持[1, 128]，默认值为1。 | int32 | - |
 
@@ -239,7 +239,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 
 ## 确定性计算
 
-默认支持确定性计算
+默认支持确定性计算。
 
 ## 调用示例
 

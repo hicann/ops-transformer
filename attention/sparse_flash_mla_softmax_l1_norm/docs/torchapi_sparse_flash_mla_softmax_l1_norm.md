@@ -24,8 +24,8 @@
 ## 功能说明
 
 - 接口功能：计算`SparseFlashMla`注意力的Softmax L1Norm结果，支持Compressed Attention以及Sparse Compressed Attention场景。该接口为`dense_lightning_indexer_kl_loss_grad`反向算子的配套接口，输出可用于反向梯度计算。调用过程中，需先调用`sparse_flash_mla_softmax_l1_norm_metadata`接口完成负载均衡计算，再调用`sparse_flash_mla_softmax_l1_norm`接口完成算子计算过程。
-    - `sparse_flash_mla_softmax_l1_norm_metadata`接口：根据主算子的shape、layout、mask等信息，采用strided方式将任务均衡切分到可用AIC核上，输出metadata供主算子使用。
-    - `sparse_flash_mla_softmax_l1_norm`接口：根据metadata中的分核信息，对Q和K计算Softmax L1Norm。
+  - `sparse_flash_mla_softmax_l1_norm_metadata`接口：根据主算子的shape、layout、mask等信息，采用strided方式将任务均衡切分到可用AIC核上，输出metadata供主算子使用。
+  - `sparse_flash_mla_softmax_l1_norm`接口：根据metadata中的分核信息，对Q和K计算Softmax L1Norm。
 
 - 计算公式：
 
@@ -114,9 +114,9 @@ cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
 | q | Tensor | 必选 | attention结构的输入Q，对应公式中的$Q$。`layout_q`="BSND"时shape为(B,S1,N1,D)；`layout_q`="TND"时shape为(T1,N1,D)。 | float16、bfloat16 | (B,S1,N1,D)、(T1,N1,D) |
-| k | Tensor | 必选 | attention结构的输入K，对应公式中的$K$。与q的B保持一致，S2支持泛化，N2=1。 | float16、bfloat16 | (B,S2,N2,D)、(T2,N2,D) |
-| softmax_lse | Tensor | 必选 | 注意力正向计算的输出softmax_lse。与q的B保持一致，N2=1，S1与q的S1保持一致，G=N1/N2。 | float32 | (B,N2,S1,G)、(N2,T1,G) |
-| sparse_indices | Tensor | 可选 | 稀疏场景下选择的k中权重较高的注意力索引。与q的B/S1保持一致，N2=1，K支持泛化。 | int32 | (B,S1,N2,K)、(T1,N2,K) |
+| k | Tensor | 必选 | attention结构的输入K，对应公式中的$K$，与q的B保持一致，S2支持泛化，N2=1。 | float16、bfloat16 | (B,S2,N2,D)、(T2,N2,D) |
+| softmax_lse | Tensor | 必选 | 注意力正向计算的输出softmax_lse，与q的B保持一致，N2=1，S1与q的S1保持一致，G=N1/N2。 | float32 | (B,N2,S1,G)、(N2,T1,G) |
+| sparse_indices | Tensor | 可选 | 稀疏场景下选择的k中权重较高的注意力索引，与q的B/S1保持一致，N2=1，K支持泛化。 | int32 | (B,S1,N2,K)、(T1,N2,K) |
 | cu_seqlens_q | Tensor | 可选 | 每个Batch中q的有效token数的累加和形式。`layout_q`为TND时该参数必传，长度与B+1保持一致，累加和与T1保持一致。 | int32 | (B+1,) |
 | cu_seqlens_k | Tensor | 可选 | 每个Batch中k的有效token数的累加和形式。`layout_k`为TND时该参数必传，长度与B+1保持一致，累加和与T2保持一致。 | int32 | (B+1,) |
 | seqused_q | Tensor | 可选 | 表示不同batch中q实际参与运算的token数。 | int32 | (B,) |
@@ -128,8 +128,8 @@ cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
 | max_seqlen_k | int | 可选 | 表示k的最大序列长度，TND dense场景用于输出shape推导，默认值为0。 | int | - |
 | cmp_ratio | int | 可选 | 表示对k的压缩率，取值范围1~128，默认值为1。 | int | - |
 | mask_mode | int | 可选 | 表示q和k计算的mask模式。0：No mask；3：rightDownCausal模式。默认值为0。 | int | - |
-| layout_q | str | 可选 | 表示输入q的数据排布格式，支持"BSND"、"TND"，默认值为"BSND"。需与layout_k保持一致。 | string | - |
-| layout_k | str | 可选 | 表示输入k的数据排布格式，支持"BSND"、"TND"，默认值为"BSND"。需与layout_q保持一致。 | string | - |
+| layout_q | str | 可选 | 表示输入q的数据排布格式，支持"BSND"、"TND"，默认值为"BSND"，需与layout_k保持一致。 | string | - |
+| layout_k | str | 可选 | 表示输入k的数据排布格式，支持"BSND"、"TND"，默认值为"BSND"，需与layout_q保持一致。 | string | - |
 
 ### sparse_flash_mla_softmax_l1_norm_metadata
 
@@ -145,8 +145,8 @@ cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
 | cmp_residual_k | Tensor | 可选 | 预留接口参数，表示不同batch中k的sequence length与cmpRatio相关的残差，当前kernel路径暂不使用。 | int32 | (B,) |
 | topk_length | Tensor | 可选 | 表示每行q对应的k实际可选的topk长度。 | int32 | (B,S1,N2)、(T1,N2) |
 | batch_size | int | 可选 | 表示输入样本批量大小（即B），默认值为None（BSND场景需传正数，TND场景可为None自动推导）。 | int | - |
-| max_seqlen_q | int | 可选 | 表示q的最大序列长度，默认值为None。BSND场景必须为正数。 | int | - |
-| max_seqlen_k | int | 可选 | 表示k的最大序列长度，默认值为None。BSND场景必须为正数。 | int | - |
+| max_seqlen_q | int | 可选 | 表示q的最大序列长度，默认值为None，BSND场景必须为正数。 | int | - |
+| max_seqlen_k | int | 可选 | 表示k的最大序列长度，默认值为None，BSND场景必须为正数。 | int | - |
 | topk | int | 可选 | 表示从k中筛选出的关键token个数，0表示无稀疏，默认值为None。 | int | - |
 | layout_q | str | 可选 | 表示q的数据排布格式，支持"BSND"、"TND"，默认值为None（内部转为"BSND"）。 | string | - |
 | layout_k | str | 可选 | 表示k的数据排布格式，支持"BSND"、"TND"，默认值为None（内部转为"BSND"）。 | string | - |

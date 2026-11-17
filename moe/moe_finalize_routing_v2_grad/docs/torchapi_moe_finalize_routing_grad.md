@@ -79,7 +79,7 @@ cann_ops_transformer.moe_finalize_routing_grad(
 
 ## 参数说明
 
-|  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
+|  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度（shape）   |
 |---------|----------|----------|---------------|---------------|------------|
 |  grad_y  |  Tensor |  必选  |  正向输出`y`的梯度。  |  float16、bfloat16、float32   | `(R, H)` |
 |  expanded_row_idx  |  Tensor |  必选  |  行索引映射，采用`(R, K)`布局。注意与正向的`(K, R)`布局不同。Dropless场景下值域为`[0, R * K - 1]`且不重复；DropPad场景下值域为`[-1, E * C - 1]`，除-1外不重复（-1表示丢弃）。当`scales`未传入时K必须为1。  |  int32   | `(R * K,)` |
@@ -93,8 +93,8 @@ cann_ops_transformer.moe_finalize_routing_grad(
 |  expert_capacity  |  int |  可选  |  每个专家能够处理的tokens数，`drop_pad_mode=1`时必须传入且大于0。默认值为0。  |  -   | - |
 
 ## 返回值说明
-git
-|  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
+
+|  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度（shape）   |
 |---------|----------|----------|---------------|---------------|------------|
 |  grad_expanded_x  |  Tensor |  必选  |  `expanded_x`的梯度。Dropless场景下shape为`(dim0, H)`，其中`dim0`为`expanded_row_idx.numel()`（当`active_num=0`时）或`min(active_num, expanded_row_idx.numel())`（当`active_num > 0`时）；DropPad场景下shape为`(expert_num, expert_capacity, H)`。数据类型与`grad_y`一致。  |  与grad_y一致   | `(dim0, H)`或`(E, C, H)` |
 |  grad_scales  |  Tensor |  必选  |  `scales`的梯度。shape为`(R, K)`，其中`K`为`scales`的第二维（当`scales`传入时）或1（当`scales`未传入时）。数据类型：当`scales`传入时与`scales`一致，否则与`grad_y`一致。  |  float16、bfloat16、float32   | `(R, K)` |

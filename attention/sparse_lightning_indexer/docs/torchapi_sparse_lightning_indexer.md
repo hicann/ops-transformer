@@ -53,7 +53,7 @@
   $$
 
   其中 `vl(b,i)` 为行可达前缀长度（由 causal mask、seqused_k/cu_seqlens_k 与 cmp_ratio 推导），
-  `blockSize` = `candidate_block_size`，`candSet` 为候选块号集合（重复/越界/-1 按"非候选"处理）。
+  `blockSize` = `candidate_block_size`，`candSet` 为候选块号集合（重复/越界/-1 按“非候选”处理）。
 
 - **调用流程**：先调用 `lightning_indexer`（source，candidate_topk_blocks 非 -1）生成候选块索引，
   再将第 3 个输出 `candidate_block_indices` 作为本接口输入完成 consumer 计算，两侧需在同一 forward 内配对使用。
@@ -91,7 +91,7 @@ cann_ops_transformer.sparse_lightning_indexer(
 
 - `sparse_indices`：INT32，BSND `[B,S1,N2,topk]` / TND `[T,N2,topk]`（无 leak TopK 索引，所有无效槽一律 -1）；
 - `sparse_values`：`return_value=0`（或缺省）时恒空 tensor `(0,)`；`return_value=1` 时与
-  `sparse_indices` 同 shape，FLOAT32，有效槽为入选位置真实 TopK 分数、-1 槽对应位填 0。
+  `sparse_indices` 同 shape，FLOAT32，有效槽为入选位置真实 TopK 分数，-1 槽对应位填 0。
 
 ## 参数说明
 
@@ -136,7 +136,7 @@ cann_ops_transformer.sparse_lightning_indexer(
 - 该接口支持推理场景下使用。
 - 该接口支持单算子模式调用。
 - `candidate_block_indices` 必传且 INT32；candBlocks（shape 末维）∈ (0, 2048] 且为 64 的倍数
-  （由输入 shape 推导，无属性）；值域 [0,numBlocks) 或 -1、槽位无序、允许重复/越界/-1 脏数据为跨算子约束
+  （由输入 shape 推导，无属性）；值域 [0,numBlocks) 或 -1，槽位无序，允许重复/越界/-1 脏数据为跨算子约束
   （host/device 不校验，越界候选自然按非候选降级）。
 - `candidate_block_size` ∈ {2,4,8,16,32,64}，默认 8；与 source 侧必须一致。
 - `topk` ∈ (0, 2048]；`return_value` ∈ {0,1}（缺省 0），其它值报错拒绝

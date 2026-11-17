@@ -58,9 +58,9 @@ cann_ops_transformer.inplace_partial_rotary_mul(x, r1, r2, *, rotary_mode="inter
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |--------|----------|-----------|------|----------|-------------|
-| x | Tensor | 必选 | 待执行旋转位置编码的张量，对应公式中的x。Inplace模式下，计算结果直接写回该Tensor。 | bfloat16、float16、float32 | (B, S, N, D) |
+| x | Tensor | 必选 | 待执行旋转位置编码的张量，对应公式中的x，Inplace模式下，计算结果直接写回该Tensor。 | bfloat16、float16、float32 | (B, S, N, D) |
 | r1 | Tensor | 必选 | 位置编码张量，对应公式中的cos分量。 | bfloat16、float16、float32 | 4维，需与x满足广播关系 |
 | r2 | Tensor | 必选 | 位置编码张量，对应公式中的sin分量，`r2`和`r1`的数据类型必须一致。 | bfloat16、float16、float32 | 4维，需与x满足广播关系 |
 | rotary_mode | str | 可选 | 旋转模式。当前仅支持"interleave"，默认值为"interleave"。 | - | - |

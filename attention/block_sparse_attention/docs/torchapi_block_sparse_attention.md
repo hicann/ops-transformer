@@ -40,7 +40,7 @@
 
   - **非量化场景**（`quant_mode=NO_QUANT`，0，默认）：Q/K/V 均为 float16 或 bfloat16；
   - **FP8场景**（`quant_mode=FP8_QUANT`，1）：Q/K/V 均为 float8_e4m3fn，携带 FP32 反量化缩放因子，输出反量化为 float16 或 bfloat16；
-  - **MXFP4场景**（`quant_mode=MXFP4_OCP_QUANT`/`MXFP4_CX_QUANT`，2/3）：Q/K/V 为 float4_e2m1fn_x2（以 uint8 传入），携带 float8_e8m0fnu descale 张量，输出反量化为 float16 或 bfloat16。
+  - **MXFP4场景**（`quant_mode=MXFP4_OCP_QUANT`/`MXFP4_CX_QUANT`，2/3）：Q/K/V 为 float4_e2m1fn_x2（以 uint8 传入），携带 float8_e8m0fnu descale 张量，输出反量化为 float16 或 bfloat16；
   - **MXFP8场景**（`quant_mode=MXFP8_OCP_QUANT`，4）：Q/K/V 为 float8_e4m3fn，携带 float8_e8m0fnu descale 张量，输出反量化为 float16 或 bfloat16；
   - **HIF8场景**（`quant_mode=HIF8_QKVP_PERTENSOR_QUANT`，5）：Q/K/V 以 uint8 传入并按 HIFLOAT8 解释，分别提供 FP32 per-tensor 反量化缩放因子；softmax 结果 P 的量化缩放因子可选，输出为 float16 或 bfloat16。
 
@@ -58,7 +58,7 @@
 
 > [!NOTE]
 >
-> query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim，且满足D=H/N、T表示B和S合轴紧密排列的长度（Total tokens）。Q_S表示输入query tensor的序列长度，Q_N表示输入query tensor的头数，KV_S表示输入key/value tensor的序列长度，KV_N表示输入key/value tensor的头数。
+> query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size，S（Seq-Length）表示输入样本序列长度，H（Hidden-Size）表示隐藏层的大小，N（Head-Num）表示多头数，D（Head-Dim）表示隐藏层最小的单元尺寸headdim，且满足D=H/N，T表示B和S合轴紧密排列的长度（Total tokens）。Q_S表示输入query tensor的序列长度，Q_N表示输入query tensor的头数，KV_S表示输入key/value tensor的序列长度，KV_N表示输入key/value tensor的头数。
 
 ## 函数原型
 
@@ -257,7 +257,7 @@ cann_ops_transformer.block_sparse_attention(
 
 ## 调用示例
 
-- 基础示例（TND布局，float16非量化）
+- 基础示例（TND布局，float16非量化）：
 
     ```python
     import torch
@@ -299,7 +299,7 @@ cann_ops_transformer.block_sparse_attention(
     assert softmax_lse.shape == (Tq, Nq, 1)
     ```
 
-- MXFP4量化示例（TND布局，quant_mode=MXFP4_OCP_QUANT）
+- MXFP4量化示例（TND布局，quant_mode=MXFP4_OCP_QUANT）：
 
     ```python
     import torch

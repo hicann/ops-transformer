@@ -333,7 +333,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 
 |   命名   |                          含义                          |
 | :-------: | :-----------------------------------------------------: |
-|     B     |               Batch,表示输入样本批量大小               |
+|     B     |               Batch，表示输入样本批量大小               |
 | N1 / Q_N |                   输入q tensor的头数                   |
 | N2 / KV_N |                 输入key/v tensor的头数                 |
 | S1 / Q_S |                      输入q序列长度                      |
@@ -352,7 +352,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 
   - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
   - 触发空Tensor的用例将全部拦截报错。
-- q、k、v、dout、attn_out、dq、dk、dv校验:
+- q、k、v、dout、attn_out、dq、dk、dv校验：
 
   <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 147px">
@@ -424,7 +424,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
     </tr>
     </tbody>
     </table>
-- lse校验:
+- lse校验：
 
   <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 147px">
@@ -457,7 +457,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
     </tr>
     </tbody>
     </table>
-- sparse_block_idx、sparse_block_count、block_shape校验:
+- sparse_block_idx、sparse_block_count、block_shape校验：
 
   <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 147px">
@@ -521,7 +521,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
     </tr>
     </tbody>
     </table>
-- metadata校验:
+- metadata校验：
 
   <table style="undefined;table-layout: fixed; width:1625px">
         <colgroup>
@@ -570,7 +570,7 @@ mask_mode参数解释：
 
 - `MaskMode.CAUSAL`（1）：两种模式均支持，默认值。
 - `MaskMode.NO_MASK`（0）：仅`layout_sparse_pattern=0`时支持。
-- win_left / win_right：不使能时必须为-1；attn_mask当前应传`None`
+- win_left / win_right：不使能时必须为-1；attn_mask当前应传`None`。
 
 #### SeqLens参数组
 

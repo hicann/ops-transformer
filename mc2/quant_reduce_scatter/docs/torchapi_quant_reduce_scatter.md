@@ -69,7 +69,7 @@ cann_ops_transformer.ops.quant_reduce_scatter(
 
 - x（Tensor）：必选参数，代表需要进行通信的数据，数据类型支持float8_e4m3fn、float8_e5m2、int8和hifloat8，数据格式支持ND，输入shape支持2维和3维，形如(bs, h)和(b, s, h)，且h满足128对齐。该参数不支持空tensor。
 
-- scales（Tensor）：必选参数，代表通信数据的量化系数，数据类型支持float32、float8_e8m0，数据格式支持ND，当数据类型为float32，量化模式为pertoken-pergroup量化（KG量化），若x为2维(bs, h)，则scales为2维(bs, h/128)，若x为3维(b, s, h)，则scales为3维(b, s, h/128)。当数据类型为float8_e8m0，且x数据类型为float8_e4m3fn，float8_e5m2时，量化模式为MX量化，若x为2维，scales的shape则为3维(bs, h/64, 2)，若x为3维，scales的shape则为4维(b, s, h/64, 2)。h的范围在[1024, 8192]内，且h满足128对齐。该参数不支持空tensor。
+- scales（Tensor）：必选参数，代表通信数据的量化系数，数据类型支持float32、float8_e8m0，数据格式支持ND，当数据类型为float32，量化模式为pertoken-pergroup量化（KG量化），若x为2维(bs, h)，则scales为2维(bs, h/128)，若x为3维(b, s, h)，则scales为3维(b, s, h/128)。当数据类型为float8_e8m0，且x数据类型为float8_e4m3fn、float8_e5m2时，量化模式为MX量化，若x为2维，scales的shape则为3维(bs, h/64, 2)，若x为3维，scales的shape则为4维(b, s, h/64, 2)。h的范围在[1024, 8192]内，且h满足128对齐。该参数不支持空tensor。
 
 - hcom（str）：必选参数，表示通信域handle名。通过get_hccl_comm_name接口获取。
 
@@ -102,7 +102,7 @@ cann_ops_transformer.ops.quant_reduce_scatter(
 
 - 通信域使用约束：
   - 同一通信域内仅允许连续执行`aclnnQuantAllReduce`和`aclnnQuantReduceScatter`算子，且该通信域中不允许有其他通信算子。
-  - `HCCL_BUFFSIZE`：调用本算子前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求满足`HCCL_BUFFSIZE`>= 2 * (`xDataSize` + `scalesDataSize + 1`)。其中`xDataSize`为输入`x`的数据大小，计算公式为：`xDataSize = BS * H * 1 (Byte)`，`scalesDataSize`为`scales`的数据大小，当量化方式为pertoken-pergroup量化时，计算公式为：`scalesDataSize = BS * H / 128 * 4 (Byte)`，当量化方式为MX量化时，计算公式为：`scalesDataSize = BS * H / 32 * 1 (Byte)`。
+  - `HCCL_BUFFSIZE`：调用本算子前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求满足`HCCL_BUFFSIZE` >= 2 * (`xDataSize` + `scalesDataSize + 1`)。其中`xDataSize`为输入`x`的数据大小，计算公式为：`xDataSize = BS * H * 1 (Byte)`，`scalesDataSize`为`scales`的数据大小，当量化方式为pertoken-pergroup量化时，计算公式为：`scalesDataSize = BS * H / 128 * 4 (Byte)`，当量化方式为MX量化时，计算公式为：`scalesDataSize = BS * H / 32 * 1 (Byte)`。
 
 - 数据类型约束：
 

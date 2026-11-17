@@ -86,7 +86,7 @@ cann_ops_transformer.mhc_post(x, h_res, h_out, h_post) -> Tensor
     <th>可选/必选</th>
     <th>描述</th>
     <th>数据类型</th>
-    <th>维度(shape)</th>
+    <th>维度（shape）</th>
 </tr>
 </thead>
 <tbody>
@@ -162,7 +162,7 @@ cann_ops_transformer.mhc_post(x, h_res, h_out, h_post) -> Tensor
     <th>可选/必选</th>
     <th>描述</th>
     <th>数据类型</th>
-    <th>维度(shape)</th>
+    <th>维度（shape）</th>
 </tr>
 </thead>
 <tbody>

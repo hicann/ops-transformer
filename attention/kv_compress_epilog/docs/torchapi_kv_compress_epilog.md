@@ -88,7 +88,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>quant_group_size</td>
         <td>int</td>
         <td>可选</td>
-        <td>量化分组大小，默认值64。quant_mode=0/1时内核固定按64处理；quant_mode=2时仅支持16/32/64，且要求(d-64) % quant_group_size == 0。</td>
+        <td>量化分组大小，默认值64，quant_mode=0/1时内核固定按64处理；quant_mode=2时仅支持16/32/64，且要求(d-64) % quant_group_size == 0。</td>
         <td>int</td>
         <td>-</td>
     </tr>
@@ -96,11 +96,11 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>quant_mode</td>
         <td>str</td>
         <td>可选</td>
-        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧int）。默认值<code>"fp8_e8m0"</code>。三种模式中 <code>"fp8_bf16"</code> 与 <code>"fp8_e8m0"</code> 为同一种per-group FP8 量化方法（nope/rope整体逐组动态量化为FP8(e4m3) 并打包进uint8），仅scale表示不同。可选值与含义：
+        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧int）。默认值<code>"fp8_e8m0"</code>。三种模式中 <code>"fp8_bf16"</code> 与 <code>"fp8_e8m0"</code> 为同一种per-group FP8 量化方法（nope/rope整体逐组动态量化为FP8（e4m3） 并打包进uint8），仅scale表示不同。可选值与含义：
             <ul>
-                <li><code>"fp8_bf16"</code>(内部0)：per-group FP8 量化，组大小由quant_group_size决定（内核固定按64），每组一个 <b>bf16</b> scale。</li>
-                <li><code>"fp8_e8m0"</code>(内部1)：per-group FP8 量化，每组一个 <b>e8m0</b>(2 的幂指数) scale，即MX-FP8 微缩放。</li>
-                <li><code>"hifloat8_fp4"</code>(内部2)：rope段（尾轴后64 列）HiFloat8 <b>静态</b>量化（乘x_scale后取HiFloat8）；nope段（前d-64 列）per-group <b>float4_E2M1 动态</b>量化（scale=组内amax/6，以bf16 写出）。</li>
+                <li><code>"fp8_bf16"</code>（内部0）：per-group FP8 量化，组大小由quant_group_size决定（内核固定按64），每组一个 <b>bf16</b> scale。</li>
+                <li><code>"fp8_e8m0"</code>（内部1）：per-group FP8 量化，每组一个 <b>e8m0</b>（2 的幂指数） scale，即MX-FP8 微缩放。</li>
+                <li><code>"hifloat8_fp4"</code>（内部2）：rope段（尾轴后64 列）HiFloat8 <b>静态</b>量化（乘x_scale后取HiFloat8）；nope段（前d-64 列）per-group <b>float4_E2M1 动态</b>量化（scale=组内amax/6，以bf16 写出）。</li>
             </ul>
             下文约束说明中出现的quant_mode=0/1/2 指上表对应的内部int取值。</td>
         <td>str</td>
@@ -110,7 +110,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>round_scale</td>
         <td>bool</td>
         <td>可选</td>
-        <td>group模式下是否对每组scale向上取到2的幂。默认值True。quant_mode=2下不生效。</td>
+        <td>group模式下是否对每组scale向上取到2的幂。默认值True，quant_mode=2下不生效。</td>
         <td>bool</td>
         <td>-</td>
     </tr>

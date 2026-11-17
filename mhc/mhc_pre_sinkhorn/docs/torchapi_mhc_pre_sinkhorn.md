@@ -118,7 +118,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>phi</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>MHC的参数矩阵。对应公式中<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>pre</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>post</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>res</sup>。使用时对N轴进行拆分，分别是(N, N*C), (N, N*C), (N*N, N*C)。</td>
+        <td>MHC的参数矩阵。对应公式中<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>pre</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>post</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>res</sup>。使用时对N轴进行拆分，分别是(N, N*C)、(N, N*C)、(N*N, N*C)。</td>
         <td>float32</td>
         <td>(N*N+2*N, N*C)</td>
     </tr>
@@ -126,7 +126,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>alpha</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>MHC的缩放参数，包含3个元素分别对应H<sup>pre</sup>、H<sup>post</sup>、H<sup>res</sup>的缩放系数。对应公式中α<sup>pre</sup>、α<sup>post</sup>、α<sup>res</sup>。</td>
+        <td>MHC的缩放参数，包含3个元素，分别对应H<sup>pre</sup>、H<sup>post</sup>、H<sup>res</sup>的缩放系数。对应公式中α<sup>pre</sup>、α<sup>post</sup>、α<sup>res</sup>。</td>
         <td>float32</td>
         <td>(3)</td>
     </tr>
@@ -134,7 +134,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>bias</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>MHC的bias参数，包含2N+N²个元素。对应公式中β<sup>pre</sup>、β<sup>post</sup>、β<sup>res</sup>，分别对应N, N, N*N。</td>
+        <td>MHC的bias参数，包含2N+N²个元素。对应公式中β<sup>pre</sup>、β<sup>post</sup>、β<sup>res</sup>，分别对应N、N、N*N。</td>
         <td>float32</td>
         <td>(2N+N²)</td>
     </tr>
@@ -142,7 +142,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>hcMult</td>
         <td>int</td>
         <td>必选</td>
-        <td>残差流数量，HC维度大小。</td>
+        <td>残差流数量、HC维度大小。</td>
         <td>-</td>
         <td>-</td>
     </tr>
@@ -158,7 +158,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>hcEps</td>
         <td>float</td>
         <td>可选</td>
-        <td>H<sup>pre</sup>经sigmoid后的eps参数。对应公式中ε<sub>hc</sub>。默认值1e-6。</td>
+        <td>H<sup>pre</sup>经sigmoid后的eps参数。对应公式中ε<sub>hc</sub>。默认值：1e-6。</td>
         <td>-</td>
         <td>-</td>
     </tr>
@@ -166,7 +166,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>normEps</td>
         <td>float</td>
         <td>可选</td>
-        <td>RmsNorm的防除零参数。对应公式中ε<sub>norm</sub>。默认值1e-6。</td>
+        <td>RmsNorm的防除零参数。对应公式中ε<sub>norm</sub>。默认值：1e-6。</td>
         <td>-</td>
         <td>-</td>
     </tr>
@@ -264,15 +264,15 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
 ## 确定性/Batch一致性
 
 - 确定性计算：
-    - 默认支持确定性计算。
+  - 默认支持确定性计算。
 
 - Batch一致性：
     <!-- npu="A3,910b" id9 -->
-    - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
         - 默认不支持Batch一致性。
     <!-- end id9 -->
     <!-- npu="950" id10 -->
-    - <term>Ascend 950PR&950DT系列产品</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
         - 默认不支持Batch一致性，可通过PyTorch开关（[《TorchNPU自定义API》](https://www.hiascend.com/document/detail/zh/Pytorch/latest/apiref/customapi/docs/zh/custom_APIs/overview.md)中torch_npu.npu.set_deterministic_level）支持。开启Batch一致性后性能可能会有一定程度的劣化。
     <!-- end id10 -->
 

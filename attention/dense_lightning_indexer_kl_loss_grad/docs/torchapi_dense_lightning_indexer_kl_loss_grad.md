@@ -25,8 +25,8 @@
 
 - API功能：
 
-    * `dense_lightning_indexer_kl_loss_grad`：计算 Lightning Indexer KL Loss 训练场景下的反向输出。该接口接收 Lightning Indexer 分支的 `q`、`k`、`w`，以及由主 Attention 分支预先计算得到的目标分布 `attn_softmax_l1_norm`和`softmax_lse`，输出 `dq`、`dk`、`dw` 和 Lightning Indexer 分支的 `softmax_out`。
-    * `dense_lightning_indexer_kl_loss_grad_metadata`：用于在主算子前生成分核 metadata，输出结果需要作为 `dense_lightning_indexer_kl_loss_grad` 的 `metadata` 输入传入。
+  - `dense_lightning_indexer_kl_loss_grad`：计算 Lightning Indexer KL Loss 训练场景下的反向输出。该接口接收 Lightning Indexer 分支的 `q`、`k`、`w`，以及由主 Attention 分支预先计算得到的目标分布 `attn_softmax_l1_norm`和`softmax_lse`，输出 `dq`、`dk`、`dw` 和 Lightning Indexer 分支的 `softmax_out`。
+  - `dense_lightning_indexer_kl_loss_grad_metadata`：用于在主算子前生成分核 metadata，输出结果需要作为 `dense_lightning_indexer_kl_loss_grad` 的 `metadata` 输入传入。
 
 - 计算公式：
 
@@ -155,7 +155,7 @@ dense_lightning_indexer_kl_loss_grad(
 
 ### dense_lightning_indexer_kl_loss_grad_metadata
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |--------|----------|-----------|------|----------|-------------|
 | num_heads_q | int | 必选 | `q` 的 head 数，即主接口 `q` 的 `N1`，当前支持[1, 128]。 | int32 | - |
 | num_heads_k | int | 必选 | `k` 的 head 数，即主接口 `k` 的 `N2`。当前仅支持 1。 | int32 | - |
@@ -168,8 +168,8 @@ dense_lightning_indexer_kl_loss_grad(
 | batch_size | int | 可选 | batch 大小。BSND 场景建议显式传入，TND 场景也可由 `cu_seqlens_q` 推导，默认值为0。 | int32 | - |
 | max_seqlen_q | int | 可选 | 单个 batch 中最大的 query 序列长度，默认值为0。 | int32 | - |
 | max_seqlen_k | int | 可选 | 单个 batch 中最大的压缩后 key 序列长度，默认值为0。 | int32 | - |
-| layout_q | str | 可选 | `q` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | string | - |
-| layout_k | str | 可选 | `k` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | string | - |
+| layout_q | str | 可选 | `q` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"`。 | string | - |
+| layout_k | str | 可选 | `k` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"`。 | string | - |
 | mask_mode | int | 可选 | mask 模式。0表示No mask，3表示rightDownCausal模式，默认值为0。 | int32 | - |
 | cmp_ratio | int | 可选 | key 压缩比例，当前支持[1, 128]，默认值为 1。 | int32 | - |
 
@@ -177,7 +177,7 @@ dense_lightning_indexer_kl_loss_grad(
 
 ### dense_lightning_indexer_kl_loss_grad
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |--------|----------|-----------|------|----------|-------------|
 | dq | Tensor | 必选 | `q` 的梯度。 | 与 `q` 一致 | 与 `q` 一致 |
 | dk | Tensor | 必选 | `k` 的梯度。 | 与 `k` 一致 | 与 `k` 一致 |
@@ -186,7 +186,7 @@ dense_lightning_indexer_kl_loss_grad(
 
 ### dense_lightning_indexer_kl_loss_grad_metadata
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |--------|----------|-----------|------|----------|-------------|
 | metadata | Tensor | 必选 | 每个AI Core的Attention计算任务的Batch、Head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。 | int32 | shape为(64, )  |
 

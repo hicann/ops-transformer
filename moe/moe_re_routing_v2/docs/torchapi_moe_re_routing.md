@@ -81,7 +81,7 @@ cann_ops_transformer.moe_re_routing(
 
 |  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
 |---------|----------|----------|---------------|---------------|------------|
-|  permute_tokens  |  Tensor |  必选  |  表示重新排布后的token。shape为[A, H]，数据类型同`tokens`。  |  与tokens一致  | 2  |
+|  permute_tokens  |  Tensor |  必选  |  表示重新排布后的token，shape为[A, H]，数据类型同`tokens`。  |  与tokens一致  | 2  |
 |  permute_per_token_scales  |  Tensor |  必选  |  表示重新排布后的`per_token_scales`。`per_token_scales`输入时，shape和数据类型与`per_token_scales`一致；`per_token_scales`未输入时，shape为[A]，数据类型为`float32`，该输出无意义。  |  float32、float8_e8m0  | 1-3  |
 |  permute_token_idx  |  Tensor |  必选  |  表示每个token在原排布方式下的索引。shape为[A]。  |  int32   | 1  |
 |  expert_token_num  |  Tensor |  必选  |  表示每个专家处理的token数。shape为[E]，数据类型同`expert_token_num_per_rank`。  |  int32、int64   | 1  |

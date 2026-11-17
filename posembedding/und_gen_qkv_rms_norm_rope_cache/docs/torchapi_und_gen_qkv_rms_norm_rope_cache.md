@@ -60,7 +60,7 @@ cann_ops_transformer.und_gen_qkv_rms_norm_rope_cache(
 
 记`T = und_len + gen_len`为输出token总数，`N = Hq + Hk + Hv`，`D`为头维度（固定为128），`Bn`/`Bs`为KV Cache的页数与页内行数。
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 |---|---|---|---|---|---|
 | und_qkv | Tensor | 必选 | 理解阶段的Q/K/V融合输入，头维度上按`[Hq,Hk,Hv]`依次排布。 | torch.bfloat16 | `[und_len,N,D]` |
 | und_weights_q | Tensor | 必选 | 理解阶段Q分支的RMSNorm权重。 | torch.bfloat16 | `[D]` |
@@ -70,7 +70,7 @@ cann_ops_transformer.und_gen_qkv_rms_norm_rope_cache(
 | v_cache | Tensor | 必选 | V Cache，原地更新。必须内存连续。 | torch.bfloat16 | `[Bn,Bs,Hv,D]` |
 | slot_mapping | Tensor | 必选 | 每个输出token写入cache的slot索引，`slot = block_idx * Bs + row_idx`。 | torch.int64 | `[T]` |
 | positions | Tensor | 必选 | MRoPE的T/H/W三轴位置索引，逐行对应一个轴。 | torch.int64 | `[3,T]` |
-| gen_qkv | Optional[Tensor] | 可选 | 生成阶段的Q/K/V融合输入，N和D维必须与`und_qkv`一致。当前版本必须传入且`gen_len`为正数，传入`None`（纯prefill）暂不支持。 | torch.bfloat16 | `[gen_len,N,D]` |
+| gen_qkv | Optional[Tensor] | 可选 | 生成阶段的Q/K/V融合输入，N和D维必须与`und_qkv`一致。当前版本必须传入，且`gen_len`为正数，传入`None`（纯prefill）暂不支持。 | torch.bfloat16 | `[gen_len,N,D]` |
 | gen_weights_q | Optional[Tensor] | 可选 | 生成阶段Q分支的RMSNorm权重。当前版本必须传入，且需与`gen_weights_k`成对传入。 | torch.bfloat16 | `[D]` |
 | gen_weights_k | Optional[Tensor] | 可选 | 生成阶段K分支的RMSNorm权重。当前版本必须传入，且需与`gen_weights_q`成对传入。 | torch.bfloat16 | `[D]` |
 | cat_indices | Optional[Tensor] | 可选 | 输出token到源token的映射`out_t -> src_t`，取值小于`und_len`时取理解段，否则取生成段。当前版本必须传入，传入`None`（单序列恒等映射）暂不支持。 | torch.int64 | `[T]` |

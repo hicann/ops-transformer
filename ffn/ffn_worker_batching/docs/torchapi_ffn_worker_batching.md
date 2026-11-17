@@ -8,7 +8,7 @@
 
 根据调度上下文中的专家号排序，重排 token、scale 和来源索引，并统计各专家的 token 数。算子只搬运数据，不执行 FFN 矩阵计算或量化计算。
 
-异步接收（`need_schedule=1、sync_flag=True`）允许同一 micro batch 中已就绪的不同 session 属于不同层，使用跨层专家号：
+异步接收（`need_schedule=1, sync_flag=True`）允许同一 micro batch 中已就绪的不同 session 属于不同层，使用跨层专家号：
 
 ```text
 experts_per_layer = expert_num / layer_num
@@ -77,7 +77,7 @@ cann_ops_transformer.ffn_worker_batching(
 
 按[Torch扩展构建说明](../../../torch_extension/README.md)安装whl，并加载配套的自定义OPP环境后，从仓库根目录运行：
 
-示例设置`expert_num=8、layer_num=2`，每层4个专家。session 0属于layer 1，session 1属于layer 0，两者使用相同的层内专家号`[[1,0],[3,1]]`。micro batch 0未就绪，micro batch 1仅这两个session就绪，session 2不应被消费。
+示例设置`expert_num=8, layer_num=2`，每层4个专家。session 0属于layer 1，session 1属于layer 0，两者使用相同的层内专家号`[[1,0],[3,1]]`。micro batch 0未就绪，micro batch 1仅这两个session就绪，session 2不应被消费。
 
 核心调用为：
 

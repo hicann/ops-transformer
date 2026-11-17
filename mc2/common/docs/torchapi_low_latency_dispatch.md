@@ -583,7 +583,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
     </table>
 
 - 参数里Shape使用的变量如下：
-  - A：表示本卡接收的最大token数量，取值范围如下
+  - A：表示本卡接收的最大token数量，取值范围如下：
     - 对于共享专家，要满足A=BS\*shared\_expert\_num/shared\_expert\_rank\_num。
     - 对于MoE专家，当`num_max_dispatch_tokens_per_rank`为0时，要满足A \>= BS \* ep\_world\_size \* min\(local\_expert\_num, K\)；当`num_max_dispatch_tokens_per_rank`不为0时，要满足A \>= num_max\_dispatch\_tokens\_per\_rank \* ep\_world\_size \* min\(local\_expert\_num, K\)。
 
@@ -617,7 +617,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
 - 在不同产品型号、不同通信算法或不同版本中，`low_latency_dispatch`的Tensor输出`assist_info_for_combine`、`ep_recv_counts`、`expand_scales`中的元素值可能不同，使用时直接将上述Tensor传给`low_latency_combine`对应参数即可，模型其他业务逻辑不应对其存在依赖。
 - 调用接口过程中使用的`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_combine](torchapi_low_latency_combine.md)对应参数也保持一致。
 - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
-- `num_experts` + `zero_expert_num` + `copy_expert_num` + `const_expert_num` < `MAX_int32`。。
+- `num_experts` + `zero_expert_num` + `copy_expert_num` + `const_expert_num` < `MAX_int32`。
 - 相关约束：
   <!-- npu="910b" id7 -->
   - <term>Atlas A2系列产品</term>：

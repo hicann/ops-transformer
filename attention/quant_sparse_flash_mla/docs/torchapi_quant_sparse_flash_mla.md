@@ -240,7 +240,7 @@ cann_ops_transformer.quant_sparse_flash_mla(
   - quant_sparse_flash_mla_metadata和quant_sparse_flash_mla的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由用户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
   - ori_topk_length、cmp_topk_length分别表示ori_sparse_indices、cmp_sparse_indices实际参与计算的长度。在对应的ori_mask_mode或cmp_mask_mode为0的稀疏计算场景，有效q位置的长度值须非负；实际计算长度取该值与对应索引Tensor最后一维大小的较小值，超出索引宽度的部分不参与计算。
   - 调用quant_sparse_flash_mla_metadata时，若主算子传入ori_sparse_indices或cmp_sparse_indices，对应的ori_topk或cmp_topk须等于该索引Tensor的最后一维大小，保证分核与主算子使用相同的索引宽度。
-  - cmp_residual_kv配合cmp_ratio使用，可恢复压缩前KV长度。且每个batch的值需要小于cmp_ratio。仅当cmp_mask_mode=3且cmp_ratio!=1时允许传入；当cmp_mask_mode=0或cmp_ratio=1时不允许传入。
+  - cmp_residual_kv配合cmp_ratio使用，可恢复压缩前KV长度，且每个batch的值需要小于cmp_ratio。仅当cmp_mask_mode=3且cmp_ratio!=1时允许传入；当cmp_mask_mode=0或cmp_ratio=1时不允许传入。
   - attention_out：tensor类型，公式中的输出，数据类型支持bfloat16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
   - return_softmax_lse=False时返回shape为[1]的值为0的tensor；return_softmax_lse=True时返回float32的log-sum-exp结果。
   - cu_seqlens_q、cu_seqlens_ori_kv、cu_seqlens_cmp_kv须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
@@ -281,7 +281,7 @@ cann_ops_transformer.quant_sparse_flash_mla(
   - 空tensor指必选输入、某调用场景下必传输入和输出的shape size为0，即有任意轴为0。
   - 触发空tensor的用例将全部拦截报错。
 
-- q、ori_kv、cmp_kv、attention_out校验
+- q、ori_kv、cmp_kv、attention_out校验：
 
 <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
 <col style="width: 147px">
@@ -455,7 +455,7 @@ layout匹配关系表：
 </tbody>
 </table>
 
-metadata校验
+metadata校验：
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
         <col style="width: 147px">
@@ -492,9 +492,9 @@ metadata校验
 #### Mask参数组
 
 <ul>
-    <li>ori_mask_mode/cmp_mask_mode=0，全计算模式（默认值）</li>
-    <li>ori_mask_mode/cmp_mask_mode=3，rightDownCausal模式</li>
-    <li>ori_mask_mode=4，SlidingWindow模式</li>
+    <li>ori_mask_mode/cmp_mask_mode=0：全计算模式（默认值）</li>
+    <li>ori_mask_mode/cmp_mask_mode=3：rightDownCausal模式</li>
+    <li>ori_mask_mode=4：SlidingWindow模式</li>
 </ul>
 
 <table style="undefined;table-layout: fixed; width:1625px">
@@ -755,7 +755,7 @@ metadata校验
             <td>无</td>
             <td>
                 <ul>
-                    <li>在SWA典型场景，仅支持默认值1。</li>
+                    <li>在SWA典型场景，仅支持默认值1</li>
                 </ul>
             </td>
         </tr>
@@ -894,7 +894,7 @@ metadata校验
 
 #### Paged Attention参数组
 
-当layout_kv为PA_BBND时，开启PagedAttention
+当layout_kv为PA_BBND时，开启PagedAttention。
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
         <col style="width: 147px">
@@ -1044,7 +1044,7 @@ metadata校验
 
 ## 调用示例
 
-### SWA，BSND输入
+### SWA、BSND输入
 
 ```python
 import torch
@@ -1127,7 +1127,7 @@ npu_result, _ = torch.ops.cann_ops_transformer.quant_sparse_flash_mla(
 torch.npu.synchronize()
 ```
 
-### HCA，LayoutQ BSND，LayoutKv PA_BBND输入
+### HCA、LayoutQ BSND、LayoutKv PA_BBND输入
 
 ```python
 import torch
@@ -1255,7 +1255,7 @@ npu_result, _ = torch.ops.cann_ops_transformer.quant_sparse_flash_mla(
 torch.npu.synchronize()
 ```
 
-### CSA，TND输入
+### CSA、TND输入
 
 ```python
 import torch

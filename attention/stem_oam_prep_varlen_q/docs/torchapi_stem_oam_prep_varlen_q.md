@@ -29,19 +29,19 @@
 
 - **计算公式**：
 
-  阶段1 Scale Fusion:
+  阶段1 Scale Fusion：
   $$q\_scale[b, h, pos] = qscale[b, h, pos]$$
 
-  阶段2 De-page Varlen:
+  阶段2 De-page Varlen：
   $$Q\_dense[b] = Cast(q[cu\_seqlens\_q[b]:cu\_seqlens\_q[b]+q\_len[b], :, :], \text{FP32})$$
 
-  阶段3 Weighted Group Sum (自然顺序，NO flip):
+  阶段3 Weighted Group Sum (自然顺序，NO flip)：
   $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times q\_scale[b,h,position(qb,r,g)]$$
 
-  阶段4 Flatten:
+  阶段4 Flatten：
   $$qflat[b, h, qb, g \times D : (g+1) \times D] = Q\_group\_sum[b, h, qb, g, :]$$
 
-  阶段5 Cast输出:
+  阶段5 Cast输出：
   $$qflat\_out = qflat.to(\text{BF16})$$
 
 - **关键特性**：Q侧stride维度为自然顺序（不翻转），与K侧的翻转处理不同。
@@ -161,7 +161,7 @@ cann_ops_transformer.stem_oam_prep_varlen_q(q, q_seq_lens, cu_seq_lens_q, *, q_s
 - 该接口支持训练、推理场景下使用。
 - 该接口支持单算子模式和TorchAir图模式调用。
 - q的最后一维D必须等于128。
-- stem_block_size仅支持128，stem_stride仅支持16。派生值：R = stem_block_size / stem_stride = 8, kflat_dim = stem_stride × D = 2048。
+- stem_block_size仅支持128，stem_stride仅支持16。派生值：R = stem_block_size / stem_stride = 8，kflat_dim = stem_stride × D = 2048。
 - q仅支持float8_e4m3fn数据类型，q_scale必填且数据类型为float32，q_flat输出固定为bfloat16。
 - q_seq_lens长度取值范围为(0, 1024]。
 - 当q_seq_lens中某batch值为0时，该batch对应的q_flat输出填充为零。
@@ -197,7 +197,7 @@ cann_ops_transformer.stem_oam_prep_varlen_q(q, q_seq_lens, cu_seq_lens_q, *, q_s
   )
   ```
 
-- 图模式调用
+- 图模式调用：
 
   ```python
   import torch

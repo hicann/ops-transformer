@@ -74,7 +74,7 @@
     dS = P \times (dP\text{ } -\text{ } SoftmaxGrad(dO, O))
     $$
 
-    阶段三：计算dQ, dKV, dSinks
+    阶段三：计算dQ、dKV、dSinks
 
     $$
     dQ = dS \text{ } @ \text{ } selectedKv \text{ }  \cdot \text{ } scale
@@ -306,56 +306,56 @@ cann_ops_transformer.sparse_flash_mla_grad(
     | layout_q/kv | BSND / TND，必须一致 | - |
     | cmp_ratio | 1~128 | - |
 
-  - `ori_kv`/`cmp_kv`传None的支持情况:
+  - `ori_kv`/`cmp_kv`传None的支持情况：
     <!-- npu="A3,910b" id7 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：ori_kv 不能为 None。cmp_kv 在 SWA 与 ori sparse 时必须为 None，在 CFA、SCFA 时不能为 None。
     <!-- end id7 -->
     <!-- npu="950" id10 -->
     - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id10 -->
-  - `ori_sparse_indices`的支持情况:
+  - `ori_sparse_indices`的支持情况：
     <!-- npu="A3,910b" id11 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：ori_mask_mode=0 时支持。SWA、CFA、SCFA场景不使用该参数，需传 None。
     <!-- end id11 -->
     <!-- npu="950" id12 -->
     - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id12 -->
-  - `seqused_q`的支持情况:
+  - `seqused_q`的支持情况：
     <!-- npu="A3,910b" id13 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持（需传None）。
     <!-- end id13 -->
     <!-- npu="950" id14 -->
     - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id14 -->
-  - `ori_topk_length`/`cmp_topk_length`的支持情况:
+  - `ori_topk_length`/`cmp_topk_length`的支持情况：
     <!-- npu="A3,910b" id15 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持（需传None）。
     <!-- end id15 -->
     <!-- npu="950" id16 -->
     - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id16 -->
-  - `sinks` 传None的支持情况:
+  - `sinks` 传None的支持情况：
     <!-- npu="A3,910b" id17 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持。
     <!-- end id17 -->
     <!-- npu="950" id18 -->
     - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id18 -->
-  - `metadata`的支持情况:
+  - `metadata`的支持情况：
     <!-- npu="A3,910b" id19 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：仅支持传None。
     <!-- end id19 -->
     <!-- npu="950" id20 -->
     - <term>Ascend 950PR&950DT系列产品</term>：必须传。
     <!-- end id20 -->
-  - `ori_mask_mode`的支持情况:
+  - `ori_mask_mode`的支持情况：
     <!-- npu="A3,910b" id21 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：SWA、CFA、SCFA 仅支持模式 4；ori sparse 仅支持模式 0。
     <!-- end id21 -->
     <!-- npu="950" id22 -->
     - <term>Ascend 950PR&950DT系列产品</term>：支持模式0、3、4。
     <!-- end id22 -->
-  - `cmp_mask_mode`的支持情况:
+  - `cmp_mask_mode`的支持情况：
     <!-- npu="A3,910b" id23 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：仅支持模式3。
     <!-- end id23 -->
@@ -365,7 +365,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 ## 确定性计算
 
-默认支持确定性计算
+默认支持确定性计算。
 
 ## 调用示例
 

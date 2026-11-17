@@ -107,7 +107,7 @@ cann_ops_transformer.block_attn_res_prepare(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | --- | --- | --- | --- | --- | --- |
 | block_res | Tensor | 必选 | 历史残差块，对应公式中的 $V$。数据格式为 ND；$T$ 为 token 数，$N$ 为可容纳的历史残差块数，$D$ 为隐藏特征维度。 | float32 | [T, N, D] |
-| valid_blocks | Tensor | 必选 | 当前有效历史残差块数 $N_v$。数据格式为 ND。值为0时，`numerator` 返回全0 Tensor、`logit_max` 返回所有元素均为float32最小有限值的Tensor、`exp_sum` 返回全0 Tensor；值大于 $N$ 时按 $N$ 处理。 | uint64 | [1] |
+| valid_blocks | Tensor | 必选 | 当前有效历史残差块数 $N_v$。数据格式为 ND。值为0时，`numerator` 返回全0 Tensor，`logit_max` 返回所有元素均为float32最小有限值的Tensor，`exp_sum` 返回全0 Tensor；值大于 $N$ 时按 $N$ 处理。 | uint64 | [1] |
 | pseudo_query | Tensor | 必选 | 伪 Query，对应公式中的 $Q$；每个目标 slot 对应一个 Query 向量，最后一维必须与 `block_res` 的最后一维相同。数据格式为 ND。 | float32 | [S, D] |
 | eps | float |可选| RMS归一化的数值稳定项，校验后的eps以FLOAT32属性参与计算，必须为有限值且位于`[FLT_MIN, FLT_MAX]`（约`[1.1754943508222875e-38, 3.4028234663852886e+38]`），不支持次正规数；默认值为`1.0e-6`。 | float | - |
 
@@ -129,7 +129,7 @@ cann_ops_transformer.block_attn_res_prepare(
 - `T == 0`或`S == 0`时，在参数校验和形状推导通过后返回对应shape的空输出，不发起AICore计算；上述非空计算的上限，不作为该路径的检查条件，`eps`有效范围及其他接口校验仍适用。
 - `block_res.shape[2]` 必须等于 `pseudo_query.shape[1]`。
 - 所有输入和输出 Tensor 均必须为连续 Tensor，不支持非连续 Tensor。
-- `valid_blocks[0] == 0` 时，`numerator` 返回全 0 Tensor、`logit_max` 返回所有元素均为 float32 最小有限值的 Tensor、`exp_sum` 返回全 0 Tensor；`valid_blocks[0] > N` 时按 `N` 处理。
+- `valid_blocks[0] == 0` 时，`numerator` 返回全 0 Tensor，`logit_max` 返回所有元素均为 float32 最小有限值的 Tensor，`exp_sum` 返回全 0 Tensor；`valid_blocks[0] > N` 时按 `N` 处理。
 - `block_res` 或 `pseudo_query` 含 `NaN`、`Inf`，或 FP32 平方、乘法及累加发生溢出时，结果可能包含 `NaN` 或 `Inf`。
 
 ## 确定性/Batch一致性

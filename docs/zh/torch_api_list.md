@@ -40,7 +40,7 @@
 |[apply_rotary_pos_emb](../../posembedding/apply_rotary_pos_emb/docs/torchapi_apply_rotary_pos_emb.md)|融合query和key两路旋转位置编码计算，返回旋转位置编码后的query和key输出张量。|默认支持确定性计算|默认支持确定性计算|
 |[apply_rotary_pos_emb_grad](../../posembedding/apply_rotary_pos_emb_grad/docs/torchapi_apply_rotary_pos_emb_grad.md)|执行双路旋转位置编码的反向计算，将query和key两路梯度计算融合为一次kernel调用。|-|默认支持确定性计算|
 |[attention_to_ffn](../../mc2/attention_to_ffn_v2/docs/torchapi_attention_to_ffn.md)|将Attention节点上数据发往FFN节点。|-|默认支持确定性计算|
-|[attention_worker_combine](../../attention/attention_worker_combine/docs/torchapi_attention_worker_combine.md)|融合FFN侧返回的专家token，Ascend 950支持MXFP反量化。|默认支持确定性计算|默认支持确定性计算|
+|[attention_worker_combine](../../attention/attention_worker_combine/docs/torchapi_attention_worker_combine.md)|融合FFN侧返回的专家token；Ascend 950支持MXFP反量化。|默认支持确定性计算|默认支持确定性计算|
 |[all_gather_quant_matmul](../../mc2/all_gather_matmul_v3/docs/torchapi_all_gather_quant_matmul.md)|完成AllGather通信与MX量化矩阵乘法的融合计算。|-|默认支持确定性计算|
 |[all_to_all_quant_matmul](../../mc2/allto_all_matmul_v2/docs/torchapi_all_to_all_quant_matmul.md)|完成All-to-All通信与MX量化矩阵乘法的融合计算。|-|默认支持确定性计算|
 |[causal_conv1d_fn](../../mamba/causal_conv1d/docs/torchapi_causal_conv1d_fn.md)| 因果一维卷积前向计算（prefill/chunk-prefill），封装aclnnCausalConv1dFn。| - | 默认支持确定性计算 |
@@ -111,4 +111,4 @@
 |[dense_lightning_indexer_kl_loss_grad](../../attention/dense_lightning_indexer_kl_loss_grad/docs/torchapi_dense_lightning_indexer_kl_loss_grad.md)| Lightning Indexer KL Loss训练Dense场景下的反向输出。需与`dense_lightning_indexer_kl_loss_grad_metadata`配套使用。| - |默认支持确定性计算|
 |[sparse_flash_mla_softmax_l1_norm](../../attention/sparse_flash_mla_softmax_l1_norm/docs/torchapi_sparse_flash_mla_softmax_l1_norm.md)|`dense_lightning_indexer_kl_loss_grad`的前置接口，生成attn_softmax_l1_norm。需与`sparse_flash_mla_softmax_l1_norm_metadata`配套使用。 |-|默认支持确定性计算|
 |[stem_oam_prep_paged_kv](../../attention/stem_oam_prep_paged_kv/docs/torchapi_stem_oam_prep_paged_kv.md)| 大模型推理动态稀疏注意力机制的前置评分模块，为block-sparse-attention提供前置评分。| - |默认支持确定性计算|
-|[und_gen_qkv_rms_norm_rope_cache](../../posembedding/und_gen_qkv_rms_norm_rope_cache/docs/torchapi_und_gen_qkv_rms_norm_rope_cache.md)|融合und/gen两段QKV的间接寻址拼接、Q/K RMSNorm、MRoPE和分页KV Cache更新，返回Q，k_cache/v_cache原地更新。|-|默认支持确定性计算|
+|[und_gen_qkv_rms_norm_rope_cache](../../posembedding/und_gen_qkv_rms_norm_rope_cache/docs/torchapi_und_gen_qkv_rms_norm_rope_cache.md)|融合und/gen两段QKV的间接寻址拼接、Q/K RMSNorm、MRoPE和分页KV Cache更新，返回Q、k_cache/v_cache原地更新。|-|默认支持确定性计算|

@@ -25,7 +25,7 @@
 
 - API功能：
 
-    * `dense_lightning_indexer_softmax_lse`：计算 Dense 打分的 Lightning Indexer 对应的 Softmax Log-Sum-Exp（LSE）值。主要计算过程为：
+  - `dense_lightning_indexer_softmax_lse`：计算 Dense 打分的 Lightning Indexer 对应的 Softmax Log-Sum-Exp（LSE）值。主要计算过程为：
 
         1. 将输入的 Query 张量`q`与 Key 张量`k`进行矩阵乘法，得到每个 Query Token 与所有 Key Token 之间的相关性分数矩阵。
         2. 通过 ReLU 激活函数过滤负相关信号后，将结果与加权系数`w`逐元素相乘。
@@ -34,7 +34,7 @@
 
         该算子常与 `lightning_indexer` / `quant_lightning_indexer` 的 Dense 打分模式配合使用，用于后续的 Softmax 归一化计算。
 
-    * `dense_lightning_indexer_softmax_lse_metadata`：用于在主算子前生成分核 metadata 信息，输出结果需要作为 `dense_lightning_indexer_softmax_lse` 的 `metadata` 输入传入。
+  - `dense_lightning_indexer_softmax_lse_metadata`：用于在主算子前生成分核 metadata 信息，输出结果需要作为 `dense_lightning_indexer_softmax_lse` 的 `metadata` 输入传入。
 
 - 计算公式：
 
@@ -153,9 +153,9 @@ dense_lightning_indexer_softmax_lse(
 | batch_size | int | 可选 | batch 大小。BSND 场景建议显式传入，TND 场景也可由 `cu_seqlens_q` 推导，默认值为0。 | int32 | - |
 | max_seqlen_q | int | 可选 | 单个 batch 中最大的 query 序列长度，默认值为0。 | int32 | - |
 | max_seqlen_k | int | 可选 | 单个 batch 中最大的压缩后 key 序列长度，默认值为0。 | int32 | - |
-| layout_q | str | 可选 | `q` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | str | - |
-| layout_k | str | 可选 | `k` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | str | - |
-| mask_mode | int | 可选 | sparse mask 模式。0表示No mask，3表示rightDownCausal模式，默认值为0。 | int32 | - |
+| layout_q | str | 可选 | `q` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"`。 | str | - |
+| layout_k | str | 可选 | `k` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"`。 | str | - |
+| mask_mode | int | 可选 | sparse mask 模式，0表示No mask，3表示rightDownCausal模式，默认值为0。 | int32 | - |
 | cmp_ratio | int | 可选 | key 压缩比例，当前支持[1, 128]，默认值为 1。 | int32 | - |
 
 ## 返回值说明

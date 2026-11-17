@@ -39,11 +39,11 @@
 
   - 根据`comm_alg`计算dispatch阶段每个token所需大小：
 
-        若`comm_alg`为"fullmesh_v2"：
+        若`comm_alg`为“fullmesh_v2”：
 
         $$token\_need\_size\_dispatch = Align480(token\_actual\_len) / full\_mesh\_data\_align * win\_addr\_align$$
 
-        若`comm_alg`为"fullmesh_v1"或""：
+        若`comm_alg`为“fullmesh_v1”或“”：
 
         $$token\_need\_size\_dispatch = Align512(token\_actual\_len)$$
 
@@ -88,7 +88,7 @@ MoeDistributeBuffer.get_low_latency_ccl_buffer_size(world_size, num_max_dispatch
     <th>可选/必选</th>
     <th>描述</th>
     <th>数据类型</th>
-    <th>维度(shape)</th>
+    <th>维度（shape）</th>
 </tr>
 </thead>
 <tbody>
@@ -152,7 +152,7 @@ MoeDistributeBuffer.get_low_latency_ccl_buffer_size(world_size, num_max_dispatch
         <td>comm_alg</td>
         <td>str</td>
         <td>可选</td>
-        <td>表示通信算法。支持取值："fullmesh_v1"、"fullmesh_v2"或""（默认）。</td>
+        <td>表示通信算法。支持取值：“fullmesh_v1”、“fullmesh_v2”或“”（默认）。</td>
         <td>str</td>
         <td>-</td>
     </tr>
@@ -176,7 +176,7 @@ MoeDistributeBuffer.get_low_latency_ccl_buffer_size(world_size, num_max_dispatch
     <th>可选/必选</th>
     <th>描述</th>
     <th>数据类型</th>
-    <th>维度(shape)</th>
+    <th>维度（shape）</th>
 </tr>
 </thead>
 <tbody>
@@ -201,7 +201,7 @@ MoeDistributeBuffer.get_low_latency_ccl_buffer_size(world_size, num_max_dispatch
 
 变量说明：
 
-- BS：表示batch sequence size，即本卡最终输出的token数量。取值范围为0<BS≤512，当comm_alg为"fullmesh_v2"时，需满足0<BS≤256。
+- BS：表示batch sequence size，即本卡最终输出的token数量。取值范围为 0 < BS ≤ 512，当 comm_alg 为 “fullmesh_v2” 时，需满足 0 < BS ≤ 256。
 
 list[Tensor]长度 / 是否转置 / 是否支持非连续Tensor：
 

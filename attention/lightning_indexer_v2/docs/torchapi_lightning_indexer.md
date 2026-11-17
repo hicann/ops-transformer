@@ -109,11 +109,11 @@ cann_ops_transformer.lightning_indexer(
 | num_heads_k | int | 必选 | 表示k的head个数，当前仅支持1。 | int64 | - |
 | head_dim | int | 必选 | 表示注意力头的维度，当前仅支持128。 | int64 | - |
 | topk | int | 必选 | 表示为每个q token保留的Key token索引个数，当前支持[1, 8192]。 | int64 | - |
-| cu_seqlens_q | Tensor | 可选 | 表示不同batch中q的有效Sequence Length的累加前缀和，仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 shape为(b+1, )。 | int32 | 1 |
-| cu_seqlens_k | Tensor | 可选 | 表示不同batch中k的有效Sequence Length的累加前缀和，仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 shape为(b+1, )。 | int32 | 1 |
-| seqused_q | Tensor | 可选 | 表示不同batch中q实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 shape为(b, )。 | int32 | 1 |
-| seqused_k | Tensor | 可选 | 表示不同batch中k实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 shape为(b, )。 | int32 | 1 |
-| cmp_residual_k | Tensor | 可选 | 表示不同batch中k压缩前Sequence Length除以cmp_ratio的余数，配合cmp_ratio实现k部分的mask和负载计算。cmp_ratio不为1且mask_mode为3场景下必传。数据格式为ND，支持非连续的Tensor。 shape为(b, )。 | int32 | 1 |
+| cu_seqlens_q | Tensor | 可选 | 表示不同batch中q的有效Sequence Length的累加前缀和，仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。shape为(b+1, )。 | int32 | 1 |
+| cu_seqlens_k | Tensor | 可选 | 表示不同batch中k的有效Sequence Length的累加前缀和，仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。shape为(b+1, )。 | int32 | 1 |
+| seqused_q | Tensor | 可选 | 表示不同batch中q实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。shape为(b, )。 | int32 | 1 |
+| seqused_k | Tensor | 可选 | 表示不同batch中k实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。shape为(b, )。 | int32 | 1 |
+| cmp_residual_k | Tensor | 可选 | 表示不同batch中k压缩前Sequence Length除以cmp_ratio的余数，配合cmp_ratio实现k部分的mask和负载计算。cmp_ratio不为1且mask_mode为3场景下必传。数据格式为ND，支持非连续的Tensor。shape为(b, )。 | int32 | 1 |
 | batch_size | int | 可选 | 表示batch数量，默认值为None。 | int64 | - |
 | max_seqlen_q | int | 可选 | 表示q的最长Sequence Length。layout_q为BSND时必须为正数且等于S1，不可传-1；layout_q为TND时建议传-1，表示任意可能长度，此时序列长度由cu_seqlens_q推导，该值不参与计算。默认值为None。 | int64 | - |
 | max_seqlen_k | int | 可选 | 表示k的最长Sequence Length。layout_k为BSND时必须为正数且等于S2，不可传-1；layout_k为TND时建议传-1，此时序列长度由cu_seqlens_k推导，该值不参与计算；layout_k为PA_BBND时可传-1，此时序列长度由seqused_k的元素值给出。默认值为None。 | int64 | - |
@@ -126,18 +126,18 @@ cann_ops_transformer.lightning_indexer(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| q | Tensor | 必选 | 公式中的输入Q。不支持空tensor。数据格式为ND。 支持的shape为：layout_q为BSND时shape为(b,q_s,q_n,d)；layout_q为TND时shape为(q_t,q_n,d)。 | bfloat16、float16 | 3-4 |
-| k | Tensor | 必选 | 公式中的输入K。不支持空tensor。数据格式为ND，支持非连续的Tensor（仅PA_BBND场景下0轴支持非连续）。 支持的shape为：layout_k为BSND时shape为(b,k_s,k_n,d)；layout_k为TND时shape为(k_t,k_n,d)；layout_k为PA_BBND时shape为(block_num,block_size,k_n,d)。 | bfloat16、float16 | 3-4 |
-| w | Tensor | 必选 | 公式中的输入W。不支持空tensor。数据格式为ND。 支持的shape为：layout_q为BSND时shape为(b,q_s,q_n)；layout_q为TND时shape为(q_t,q_n)。 | float | 2-3 |
+| q | Tensor | 必选 | 公式中的输入Q。不支持空tensor。数据格式为ND。支持的shape为：layout_q为BSND时shape为(b,q_s,q_n,d)；layout_q为TND时shape为(q_t,q_n,d)。 | bfloat16、float16 | 3-4 |
+| k | Tensor | 必选 | 公式中的输入K。不支持空tensor。数据格式为ND，支持非连续的Tensor（仅PA_BBND场景下0轴支持非连续）。支持的shape为：layout_k为BSND时shape为(b,k_s,k_n,d)；layout_k为TND时shape为(k_t,k_n,d)；layout_k为PA_BBND时shape为(block_num,block_size,k_n,d)。 | bfloat16、float16 | 3-4 |
+| w | Tensor | 必选 | 公式中的输入W。不支持空tensor。数据格式为ND。支持的shape为：layout_q为BSND时shape为(b,q_s,q_n)；layout_q为TND时shape为(q_t,q_n)。 | float | 2-3 |
 | topk | int | 必选 | topK阶段需要保留的Key token索引数量，当前支持[1, 8192]。 | int64 | - |
-| cu_seqlens_q | Tensor | 可选 | layout_q为TND时为各batch有效token数的累加和（首元素为0，非递减）；layout_q为BSND时为[0, 各样本有效Q长度]，长度各自不超过q_s。仅TND场景下必传。数据格式为ND。 shape为(b+1,)。 | int32 | 1 |
-| cu_seqlens_k | Tensor | 可选 | layout_k为TND时为各batch有效token数的累加和（首元素为0，非递减）；layout_k为BSND时不支持传入。仅TND场景下必传。数据格式为ND。 shape为(b+1,)。 | int32 | 1 |
-| seqused_q | Tensor | 可选 | 不同batch中q的真实使用长度。数据格式为ND。 shape为(b,)。 | int32 | 1 |
-| seqused_k | Tensor | 可选 | 不同batch中k的真实使用长度。数据格式为ND。 shape为(b,)。 | int32 | 1 |
-| cmp_residual_k | Tensor | 可选 | 表示k压缩前token数量除以cmp_ratio的余数。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。 shape为(b,)。 | int32 | 1 |
-| block_table | Tensor | 可选 | 表示PagedAttention中KV存储使用的block映射表。不支持空tensor。数据格式为ND。 shape为(b, k_s_max/block_size)。 | int32 | 2 |
-| output_idx_offset | Tensor | 可选 | 表示topK结果输出索引所需要加上的偏移。值必须大于等于0，加上偏移后topK index不能超过int32最大值。数据格式为ND。 支持的shape为：layout_q为BSND时shape为(b,q_s,k_n)；layout_q为TND时shape为(q_t,k_n)。 | int32 | 2-3 |
-| metadata | Tensor | 可选 | 由lightning_indexer_metadata得到的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。不支持空tensor。数据格式为ND。 shape为(2048,)。 | int32 | 1 |
+| cu_seqlens_q | Tensor | 可选 | layout_q为TND时为各batch有效token数的累加和（首元素为0，非递减）；layout_q为BSND时为[0, 各样本有效Q长度]，长度各自不超过q_s。仅TND场景下必传。数据格式为ND。shape为(b+1,)。 | int32 | 1 |
+| cu_seqlens_k | Tensor | 可选 | layout_k为TND时为各batch有效token数的累加和（首元素为0，非递减）；layout_k为BSND时不支持传入。仅TND场景下必传。数据格式为ND。shape为(b+1,)。 | int32 | 1 |
+| seqused_q | Tensor | 可选 | 不同batch中q的真实使用长度。数据格式为ND。shape为(b,)。 | int32 | 1 |
+| seqused_k | Tensor | 可选 | 不同batch中k的真实使用长度。数据格式为ND。shape为(b,)。 | int32 | 1 |
+| cmp_residual_k | Tensor | 可选 | 表示k压缩前token数量除以cmp_ratio的余数。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。shape为(b,)。 | int32 | 1 |
+| block_table | Tensor | 可选 | 表示PagedAttention中KV存储使用的block映射表。不支持空tensor。数据格式为ND。shape为(b, k_s_max/block_size)。 | int32 | 2 |
+| output_idx_offset | Tensor | 可选 | 表示topK结果输出索引所需要加上的偏移。值必须大于等于0，加上偏移后topK index不能超过int32最大值。数据格式为ND。支持的shape为：layout_q为BSND时shape为(b,q_s,k_n)；layout_q为TND时shape为(q_t,k_n)。 | int32 | 2-3 |
+| metadata | Tensor | 可选 | 由lightning_indexer_metadata得到的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。不支持空tensor。数据格式为ND。shape为(2048,)。 | int32 | 1 |
 | max_seqlen_q | int | 可选 | q的最大序列长度。-1表示任意可能长度，默认值为-1。 | int64 | - |
 | layout_q | str | 可选 | 用于标识输入q的数据排布格式，支持BSND、TND，默认值为BSND。 | string | - |
 | layout_k | str | 可选 | 用于标识输入k的数据排布格式，支持BSND、TND、PA_BBND，默认值为BSND。 | string | - |
@@ -153,7 +153,7 @@ cann_ops_transformer.lightning_indexer(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| metadata | Tensor | 必选 | 每个AIcore的Attention计算任务的batch、head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。 支持的shape为(2048,)。 | int32 | 1 |
+| metadata | Tensor | 必选 | 每个AIcore的Attention计算任务的batch、head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。支持的shape为(2048,)。 | int32 | 1 |
 
 ### lightning_indexer
 
@@ -161,16 +161,16 @@ cann_ops_transformer.lightning_indexer(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| sparse_indices | Tensor | 必选 | 公式中的Indices输出。不支持空tensor。无效部分填-1。数据格式为ND。 支持的shape为：layout_q为BSND时shape为(b,q_s,k_n,topk)；layout_q为TND时shape为(q_t,k_n,topk)。 | int32 | 3/4 |
-| sparse_values | Tensor | 条件输出 | 公式中的Indices对应的Values输出。return_value为1时输出位置级topk真实分数（与sparse_indices按槽位一一配对）；return_value为0时输出shape为(0,)的空tensor。无效部分填-inf。数据格式为ND。 支持的shape为：layout_q为BSND且return_value为1时shape为(b,q_s,k_n,topk)；layout_q为TND且return_value为1时shape为(q_t,k_n,topk)；return_value为0时shape为(0,)。 | float | 3-4 |
+| sparse_indices | Tensor | 必选 | 公式中的Indices输出。不支持空tensor。无效部分填-1。数据格式为ND。支持的shape为：layout_q为BSND时shape为(b,q_s,k_n,topk)；layout_q为TND时shape为(q_t,k_n,topk)。 | int32 | 3/4 |
+| sparse_values | Tensor | 条件输出 | 公式中的Indices对应的Values输出。return_value为1时输出位置级topk真实分数（与sparse_indices按槽位一一配对）；return_value为0时输出shape为(0,)的空tensor。无效部分填-inf。数据格式为ND。支持的shape为：layout_q为BSND且return_value为1时shape为(b,q_s,k_n,topk)；layout_q为TND且return_value为1时shape为(q_t,k_n,topk)；return_value为0时shape为(0,)。 | float | 3-4 |
 
 传入`candidate_topk_blocks`（含显式-1关闭）时返回4元组`(sparse_indices, sparse_values, candidate_block_indices, candidate_block_length)`：
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
 | sparse_indices | Tensor | 必选 | 同2元组返回，candidate模式不影响其结果。 | int32 | 3-4 |
-| sparse_values | Tensor | 条件输出 | return_value已放开（值域{0,1}）：rv=1时输出位置级topk真实分数（与sparse_indices按槽位一一配对，FLOAT32）；rv=0时恒为shape(0,)的空tensor。无效部分填-inf。 支持的shape为：rv=1且layout_q为BSND时shape为(b,q_s,k_n,topk)；rv=1且layout_q为TND时shape为(q_t,k_n,topk)；rv=0时shape为(0,)。 | float | 3-4 |
-| candidate_block_indices | Tensor | 条件输出 | candidate_topk_blocks开启时输出候选块索引：batch内压缩K位置空间的相对块号（块j覆盖[j×candidate_block_size,(j+1)×candidate_block_size)），无效槽填-1，不叠加output_idx_offset，槽位顺序不作为消费约束；该输出不受return_value影响。 支持的shape为：开启且layout_q为BSND时shape为(b,q_s,k_n,candidate_topk_blocks)；开启且layout_q为TND时shape为(q_t,k_n,candidate_topk_blocks)；关闭时shape为(0,)。 | int32 | 3-4 |
+| sparse_values | Tensor | 条件输出 | return_value已放开（值域{0,1}）：rv=1时输出位置级topk真实分数（与sparse_indices按槽位一一配对，FLOAT32）；rv=0时恒为shape(0,)的空tensor。无效部分填-inf。支持的shape为：rv=1且layout_q为BSND时shape为(b,q_s,k_n,topk)；rv=1且layout_q为TND时shape为(q_t,k_n,topk)；rv=0时shape为(0,)。 | float | 3-4 |
+| candidate_block_indices | Tensor | 条件输出 | candidate_topk_blocks开启时输出候选块索引：batch内压缩K位置空间的相对块号（块j覆盖[j×candidate_block_size,(j+1)×candidate_block_size)），无效槽填-1，不叠加output_idx_offset，槽位顺序不作为消费约束；该输出不受return_value影响。支持的shape为：开启且layout_q为BSND时shape为(b,q_s,k_n,candidate_topk_blocks)；开启且layout_q为TND时shape为(q_t,k_n,candidate_topk_blocks)；关闭时shape为(0,)。 | int32 | 3-4 |
 | candidate_block_length | Tensor | 必选 | 预留接口，恒为空tensor，kernel不消费。 | int32 | 1 |
 
 ## 约束说明
@@ -195,7 +195,7 @@ cann_ops_transformer.lightning_indexer(
 - 当传入的cmp_ratio > 1且mask_mode = 3时，必须传入cmp_residual_k，其余情况不传入。
 - sparse_indices无效部分填-1；sparse_values无效部分填-inf；candidate_block_indices无效槽位填-1。
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>:
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
   - 当前lightning_indexer接口不支持seqused_q、output_idx_offset、max_seqlen_q功能，不建议传入这些参数。
   - 支持num_heads_q = 1~64、q_n = 1~64。
@@ -210,7 +210,7 @@ cann_ops_transformer.lightning_indexer(
   - 两级TopK候选源（source）模式仅在本系列产品上支持开启：`lightning_indexer`传入`candidate_topk_blocks`非-1即开启（返回4元组）；开启时topk仅支持[1, 2048]；return_value已放开（值域{0,1}，rv=1时sparse_values输出位置级topk真实分数）；未传入`candidate_topk_blocks`时行为与既有版本完全一致（返回2元组）。
 <!-- end id7 -->
 <!-- npu="950" id8 -->
-- <term>Ascend 950PR&950DT系列产品</term>:
+- <term>Ascend 950PR&950DT系列产品</term>：
   - topk取值范围当前仅支持[1, 8192]。
   - 支持num_heads_q = 1~64、q_n = 1~64。
   - cmp_ratio支持[1, 128]。
@@ -237,8 +237,8 @@ cann_ops_transformer.lightning_indexer(
 
 - 入参为空的场景处理：
 
-    - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
-    - 触发空tensor的用例将全部拦截报错。
+  - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
+  - 触发空tensor的用例将全部拦截报错。
 
 - q、k、sparse_indices、sparse_values校验
 

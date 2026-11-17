@@ -115,7 +115,7 @@
 
      传入的`shifted_prev_mix`不再经过上述Pre分支的Sigmoid和`hc_pre_eps`处理；它仅替换加权合并所用的`pre_mix`，不改变Post、Res分支系数的生成。合并结果`h_in`仍在第5阶段执行`rms_norm_1`。本次`pre_mix`与外部`shifted_prev_mix`使用独立UB区域；外部系数可提前载入，本次系数写回后，其UB区域方可再次生成新值。
 
-     MhcPre算子的Res分支Sinkhorn归一化阶段（预留功能）
+      MhcPre算子的Res分支Sinkhorn归一化阶段（预留功能）。
 
      令$L=num\_sinkhorn\_iters$。当前版本仅支持$L=0$，直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或Sinkhorn归一化：
 
@@ -189,7 +189,7 @@ cann_ops_transformer.mega_mhc(
 
 $N=hc\_mult$，当前为4；$Q=N(N+2)=24$，$K=N\cdot D$。
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 | --- | --- | --- | --- | --- | --- |
 | x | Tensor | 必选 | Attention/MLP输出，对应公式中的x。 | float16、bfloat16 | `[B,S,D]`或`[T,D]` |
 | residual | Tensor | 必选 | MhcPost算子的残差映射阶段的输入，对应公式中的residual。 | float16、bfloat16 | `[B,S,N,D]`或`[T,N,D]` |
@@ -205,19 +205,19 @@ $N=hc\_mult$，当前为4；$Q=N(N+2)=24$，$K=N\cdot D$。
 | rms_norm_eps | float | 可选 | 默认1e-6，对应公式中的rms_norm_eps，用于RmsNorm算子的rms_norm_0、rms_norm_mid和rms_norm_1阶段。转为float32后须有限且大于0。 | - | - |
 | hc_norm_eps | float | 可选 | 默认1e-6，用于计算`x_2`完整N*D行的均方根并缩放投影结果，对应公式中的hc_norm_eps。转为float32后须有限且大于0。 | - | - |
 | hc_pre_eps | float | 可选 | 默认1e-6，对应公式中MhcPre算子的Pre分支Sigmoid阶段的输出附加项hc_pre_eps。转为float32后须有限且大于0。 | - | - |
-| inner_precise | int | 可选 | 指定MhcPre算子的矩阵乘阶段的计算模式，作用于公式中的x_2_rs与proj_w相乘。默认值为0。0：使用float32计算；1：使用HF32计算。2（3BF16）为预留取值，本版不支持。 | - | - |
+| inner_precise | int | 可选 | 指定MhcPre算子的矩阵乘阶段的计算模式，作用于公式中的x_2_rs与proj_w相乘。默认值为0，0：使用float32计算；1：使用HF32计算；2（3BF16）为预留取值，本版不支持。 | - | - |
 | hc_mult | int | 可选 | 默认值为4，对应公式中的N，须与residual的head维一致；本版仅支持4，其他取值为预留取值。 | - | - |
 | hc_post_scale | float | 可选 | MhcPre算子的Post分支Sigmoid阶段的输出倍率，对应公式中的hc_post_scale；默认值为2.0，转换为float32后须有限。 | - | - |
 | sinkhorn_eps | float | 可选 | 预留参数，默认值为1e-6，本版仅支持1e-6，不参与计算。 | - | - |
 | num_sinkhorn_iters | int | 可选 | 预留参数，默认值为0，本版仅支持0。 | - | - |
 | rms_norm_scale | float | 可选 | 预留参数，默认值为1.0，本版仅支持1.0。 | - | - |
-| output_mode | int | 可选 | 指定输出模式，默认值为0。0：输出非量化结果；1：输出MX Quant量化结果；2：同时输出量化和非量化结果。不支持其他取值；1、2为预留取值，本版仅支持0。 | - | - |
+| output_mode | int | 可选 | 指定输出模式，默认值为0，0：输出非量化结果；1：输出MX Quant量化结果；2：同时输出量化和非量化结果。不支持其他取值；1、2为预留取值，本版仅支持0。 | - | - |
 
 ## 返回值说明
 
 返回`(new_residual, new_post_mix, new_comb_res_mix, new_prev_mix, y, y_quant, y_scale)`。
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 | --- | --- | --- | --- | --- | --- |
 | new_residual | Tensor | 必选 | MhcPost算子的输出融合阶段的残差状态；rms_norm_mid_weight非空时为RmsNorm算子的rms_norm_mid阶段的输出，对应公式中的new_residual，即x_2。 | 与x相同 | `[B,S,N,D]`或`[T,N,D]` |
 | new_post_mix | Tensor | 必选 | MhcPre算子的Post分支系数生成阶段的新系数，对应公式中的new_post_mix。 | float32 | `[B,S,N,1]`或`[T,N,1]` |

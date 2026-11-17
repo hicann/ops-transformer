@@ -46,7 +46,7 @@ cann_ops_transformer.ops.moe_token_permute(
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 | --- | --- | --- | --- | --- | --- |
 | `tokens` | Tensor | 必选 | 输入token特征，记shape为`[N, H]`。量化模式仅支持float16和bfloat16。 | 非量化：float16、bfloat16、float32；Ascend 950非量化额外支持int8；量化：float16、bfloat16 | `[N, H]` |
 | `indices` | Tensor | 必选 | token对应的专家索引。可以是一维索引，也可以表示每个token对应K个专家。元素个数记为`F`。 | int32、int64 | `[N]`或`[N, K]` |
@@ -84,10 +84,10 @@ num_out_tokens < 0:                              M = max(F + num_out_tokens, 0)
 
 | `quant_mode` | `permuted_tokens` | `sorted_indices` | `expanded_scale` |
 | --- | --- | --- | --- |
-| `-1` | shape为`[M, H]`，dtype与`tokens`相同 | shape为`[F]`，dtype为int32 | shape为`[0]`的空Tensor，dtype为float32 |
-| `2` | shape为`[M, H]`，dtype为float8_e5m2 | shape为`[F]`，dtype为int32 | shape为`[M, AlignUp(CeilDiv(H, 32), 2)]`，dtype为float8_e8m0 |
-| `3` | shape为`[M, H]`，dtype为float8_e4m3fn | shape为`[F]`，dtype为int32 | shape为`[M, AlignUp(CeilDiv(H, 32), 2)]`，dtype为float8_e8m0 |
-| `9` | PyTorch物理shape为`[M, H / 2]`，dtype为uint8 | shape为`[F]`，dtype为int32 | PyTorch物理shape为`[M, CeilDiv(H, 64), 2]`，dtype为uint8 |
+| `-1` | shape为`[M, H]`，dtype与`tokens`相同。 | shape为`[F]`，dtype为int32。 | shape为`[0]`的空Tensor，dtype为float32。 |
+| `2` | shape为`[M, H]`，dtype为float8_e5m2。 | shape为`[F]`，dtype为int32。 | shape为`[M, AlignUp(CeilDiv(H, 32), 2)]`，dtype为float8_e8m0。 |
+| `3` | shape为`[M, H]`，dtype为float8_e4m3fn。 | shape为`[F]`，dtype为int32。 | shape为`[M, AlignUp(CeilDiv(H, 32), 2)]`，dtype为float8_e8m0。 |
+| `9` | PyTorch物理shape为`[M, H / 2]`，dtype为uint8。 | shape为`[F]`，dtype为int32。 | PyTorch物理shape为`[M, CeilDiv(H, 64), 2]`，dtype为uint8。 |
 
 其中：
 

@@ -63,7 +63,7 @@
   Attention(Q,K,V)=Score(Q,\ K) V
   $$
 
-  本算子中Score函数采用Softmax函数，self-attention计算公式为:
+  本算子中Score函数采用Softmax函数，self-attention计算公式为：
 
   $$
   Attention(Q,K,V)=Softmax(\frac{QK^T}{\sqrt{d}})V
@@ -87,7 +87,7 @@
 
 > [!NOTE]
 >
-> Q、K、V数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim，且满足D=H/N、Q_T表示所有query Batch输入样本序列长度的累加和，KV_T表示所有K、V Batch输入样本序列长度的累加和。Q_S表示输入q tensor的序列长度，Q_N表示输入q tensor的头数，KV_S表示输入k/v tensor的序列长度，KV_N表示输入k/v tensor的头数。
+> Q、K、V数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim，且满足D=H/N，Q_T表示所有query Batch输入样本序列长度的累加和，KV_T表示所有K、V Batch输入样本序列长度的累加和。Q_S表示输入q tensor的序列长度，Q_N表示输入q tensor的头数，KV_S表示输入k/v tensor的序列长度，KV_N表示输入k/v tensor的头数。
 
 ## 函数原型
 
@@ -185,7 +185,7 @@ cann_ops_transformer.quant_flash_attn(
 
 |   命名  |                                                                             含义                                                                             |
 | :---: | :--------------------------------------------------------------------------------------------------------------------------------------------------------: |
-|   B   |                                                                      Batch,表示输入样本批量大小                                                                      |
+|   B   |                                                                      Batch，表示输入样本批量大小                                                                      |
 |  Q_N |                                                                 输入q tensor的头数，对应q shape中的N                                                                 |
 | KV_N |                                                               输入k/v tensor的头数，对应k/v shape中的N                                                               |
 |  Q_S |                                                                输入q tensor的序列长度，对应q shape中的S                                                                |
@@ -1299,7 +1299,7 @@ mask_mode参数解释：
 
 设第b个batch的总KV长度为`L = seqused_kv[b]`，尾块长度必须为`T = seqused_v_tail[b] = L % 64`，满足`0 <= T < 64`。主`block_table`、`v`、`v_descale`仍按覆盖全长`L`的主KV cache准备（K需要使用尾段的token）；其中前`L - T`个token的V走主cache的量化路径并按`v_descale`反量化，最后`T`个token的V改由`v_tail`以BF16提供、不使用`v_descale`，主cache尾段的V不参与计算。例如`L=1555`时，`L - T`为1536，尾块为19；`L`为64的倍数时尾块长度为0。当前不支持任意长度或任意位置的高精窗口。
 
-`v_tail`的块大小`Bs`、KV头数`KV_N`、head dimension `D`与主V cache一致。设尾块池物理块数为`Bn_tail`，其shape如下；BF16的NZ内维为16，不能直接使用量化V的D/32、32布局。
+`v_tail`的块大小`Bs`、KV头数`KV_N`、head dimension `D`与主V cache一致。设尾块池物理块数为`Bn_tail`，其shape如下：BF16的NZ内维为16，不能直接使用量化V的D/32、32布局。
 
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
