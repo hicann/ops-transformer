@@ -24,6 +24,12 @@
 using namespace ge;
 using namespace AscendC;
 namespace optiling {
+
+REGISTER_TILING_DATA_CLASS(IncreFlashAttention_1002312000040001012, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(IncreFlashAttention_1002312000100001012, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(IncreFlashAttention_1003113000100001012, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(IncreFlashAttention_1001311000100001012, FlashAttentionScoreSimplifiedTilingData)
+
 namespace arch38 {
 
 const int64_t tokenDefault = 2147483647; // for token default value
@@ -276,7 +282,42 @@ bool IFATilingArch38::CheckArch38ScenarioSupported(const IncreFlashAttentionCont
     OP_CHECK_IF((!IsArch38SupportedHeadSize(dQ) || !IsArch38SupportedHeadSize(dV)),
                 OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "query, value",
                                                        (std::to_string(dQ) + ", " + std::to_string(dV)).c_str(),
-                                                       "head size only supports 64/80/128."),
+                                                       "head size only supports 64/80/128/256."),
+
+                return false);
+
+    // MLA is identified by the rope inputs, keep the same rule as enableIFAMLA in the PFA tiling.
+    const bool enableIFAMLA = (ifaContext.queryRope.tensor != nullptr) && (ifaContext.keyRope.tensor != nullptr);
+    // The registered templates on this platform always have query d equal to value d (non-MLA scenarios).
+    OP_CHECK_IF((!enableIFAMLA && (dQ != dV)),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "query.d, value.d",
+                                                       (std::to_string(dQ) + ", " + std::to_string(dV)).c_str(),
+                                                       "query d and value d must be equal on this platform."),
+                return false);
+
+    // Only allow dtype combinations that have registered tiling keys.
+    OP_CHECK_IF(((ifaContext.query.desc == nullptr) || (ifaContext.key.desc == nullptr) ||
+                 (ifaContext.attenOut.desc == nullptr)),
+                OP_LOGE_WITHOUT_REPORT(opName, "query/key/attentionOut desc is null."), return false);
+    OP_CHECK_IF(!IsArch38SupportedDataType(ifaContext.query.desc->GetDataType(), ifaContext.key.desc->GetDataType(),
+                                           ifaContext.attenOut.desc->GetDataType(), dQ),
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                    opName, "query, key, attentionOut",
+                    (std::string(GetPfaDataTypeStr(ifaContext.query.desc->GetDataType())) + ", " +
+                     std::string(GetPfaDataTypeStr(ifaContext.key.desc->GetDataType())) + ", " +
+                     std::string(GetPfaDataTypeStr(ifaContext.attenOut.desc->GetDataType())))
+                        .c_str(),
+                    "only fp16/int8 query/key/value with fp16/int8 output is supported on this platform, "
+                    "and head size 256 only supports fp16 query/key/value with fp16 output."),
+                return false);
+
+    // Head size 256 only has tiling keys for the with-mask case.
+    const bool isHeadSize256 = (dQ == ARCH38_SUPPORTED_D_256) || (dV == ARCH38_SUPPORTED_D_256);
+    const bool hasAttenMask = (ifaContext.attenMask.tensor != nullptr) &&
+                              (ifaContext.attenMask.tensor->GetStorageShape().GetShapeSize() != 0);
+    OP_CHECK_IF((isHeadSize256 && (!hasAttenMask)),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "atten_mask", "absent",
+                                                      "head size 256 requires atten_mask on this platform."),
                 return false);
 
     return true;

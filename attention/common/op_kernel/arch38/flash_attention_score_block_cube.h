@@ -22,6 +22,7 @@
 
 #include "infer_flash_attention_comm_arch38.h"
 #include "flash_attention_score_common_regbase_arch38.h"
+#include "fa_arch38_policy.h"
 #include "kernel_operator_list_tensor_intf.h"
 using namespace AscendC;
 using namespace AscendC::Impl::Detail;
@@ -99,10 +100,12 @@ struct L0CBuffSel {
 };
 
 /* ============确定bmm2ResBuffer的类型============= */
-template <bool useDn, bool isFp8>
+// useSingle：bmm2 结果用单缓冲(CROSS_CORE_SYNC 串行 BMM2↔Vec2)，省一块 UB；
+// 否则用双缓冲(DB)，保留 BMM2↔Vec2 overlap。
+template <bool useSingle>
 struct Bmm2ResBuffSel {
     using Type =
-        std::conditional_t<(useDn && isFp8), BuffersPolicySingleBuffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>,
+        std::conditional_t<useSingle, BuffersPolicySingleBuffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>,
                            BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>>;
 };
 
@@ -120,11 +123,18 @@ public:
     static constexpr bool splitD = (uint16_t)dVTemplateType > (uint16_t)DTemplateType::Aligned256;
     static constexpr bool useDn =
         IsDn(true, isInt8, pseMode, hasAtten, hasDrop, s1BaseSize == 128, dTemplateType, hasRope);
-    static constexpr TPosition bmm2OutPos = GetC2Position(
-        dVTemplateType,
-        UbOutCondition<INPUT_T>(IsSameType<INPUT_T, float>::value, pseMode, hasAtten, hasDrop, s1BaseSize == 64),
-        (s2BaseSize == 256 && s1BaseSize == 64));
+
+    static constexpr bool forceBmm2UB =
+        ArchInfo::IsForceBmm2UB(hasAtten, static_cast<uint32_t>(dVTemplateType), s1BaseSize);
+    static constexpr TPosition bmm2OutPos =
+        forceBmm2UB ? TPosition::VECCALC :
+                      GetC2Position(dVTemplateType,
+                                    UbOutCondition<INPUT_T>(IsSameType<INPUT_T, float>::value, pseMode, hasAtten,
+                                                            hasDrop, s1BaseSize == 64),
+                                    (s2BaseSize == 256 && s1BaseSize == 64));
     static constexpr bool bmm2Write2Ub = bmm2OutPos == TPosition::VECCALC;
+    // bmm2 单缓冲时 BMM2↔Vec2 需用同一同步槽串行（统一取自 IsSingleBmm2Res，避免三处公式漂移）
+    static constexpr bool useSingleBmm2Res = IsSingleBmm2Res<INPUT_T, OUTPUT_T>(useDn, isFp8, hasAtten, dVTemplateType);
     static constexpr uint8_t FIXP_FIXED_SHIFT_VAL = isInt8 ? 0 : 16;
     static constexpr FixpipeConfig BMM1_FIXPIPE_CONFIG = {CO2Layout::ROW_MAJOR, true, !isInt8};
     static constexpr FixpipeConfig BMM2_FIXPIPE_CONFIG = {CO2Layout::ROW_MAJOR, bmm2Write2Ub, !isInt8};
@@ -656,14 +666,15 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm2(
         };
         mm2B.Wait<HardEvent::MTE2_MTE1>(); // 等待
         using L0C_TYPE = int32_t;
-        MatmulBase<INPUT_T, INPUT_T, L0C_TYPE, 128, (uint32_t)dVTemplateType, 128, ABLayout::MK, ABLayout::KN>(
+        constexpr uint32_t bmm2BaseN = ((uint32_t)dVTemplateType > 128U) ? 128 : (uint32_t)dVTemplateType;
+        MatmulBase<INPUT_T, INPUT_T, L0C_TYPE, 128, bmm2BaseN, 128, ABLayout::MK, ABLayout::KN>(
             mm2A.GetTensor<INPUT_T>(), mm2BTensor, mmL0ABuffers, mmL0BBuffers, mm2ResL0C.GetTensor<L0C_TYPE>(), param);
         mm2B.Set<HardEvent::MTE1_MTE2>(); // 释放L1B
 
         mm2ResL0C.Set<HardEvent::M_FIX>();  // 通知
         mm2ResL0C.Wait<HardEvent::M_FIX>(); // 等待
 
-        WaitFlag<HardEvent::V_FIX>(cvSyncPtr->syncC2V2VFix[runInfo.taskIdMod2]);
+        WaitFlag<HardEvent::V_FIX>(cvSyncPtr->syncC2V2VFix[useSingleBmm2Res ? 0 : runInfo.taskIdMod2]);
 
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C→UB;FixpipeParamsM300:L0C→UB
         fixpipeParams.nSize = constInfo.dSizeV;                // L0C上的bmm1结果矩阵N方向的size大小
@@ -688,7 +699,7 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm2(
                                                  fixpipeParams); // 将matmul结果从L0C搬运到UB
         mm2ResL0C.Set<HardEvent::FIX_M>();                       // 释放
     }
-    SetFlag<HardEvent::FIX_V>(cvSyncPtr->syncC2V2FixV[runInfo.taskIdMod2]);
+    SetFlag<HardEvent::FIX_V>(cvSyncPtr->syncC2V2FixV[useSingleBmm2Res ? 0 : runInfo.taskIdMod2]);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -1066,7 +1077,8 @@ __aicore__ inline void FABlockCube<TEMPLATE_ARGS>::IterateBmm1Nd(
         1                             // isRightTranspose
     };
     using L0C_TYPE = int32_t;
-    MatmulBase<INPUT_T, INPUT_T, L0C_TYPE, 128, 128, dBaseSize, ABLayout::MK, ABLayout::KN>(
+    constexpr uint32_t bmm1BaseK = (dBaseSize > 128) ? 128U : dBaseSize;
+    MatmulBase<INPUT_T, INPUT_T, L0C_TYPE, 128, 128, bmm1BaseK, ABLayout::MK, ABLayout::KN>(
         mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers, mmL0BBuffers,
         mm1ResL0C.GetTensor<L0C_TYPE>(), param);
     if (unlikely(runInfo.s2LoopCount == runInfo.s2LoopLimit)) {

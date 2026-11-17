@@ -424,6 +424,7 @@ attention:
       - attention/fused_infer_attention_score/op_kernel
       - attention/fused_infer_attention_score/tests
       - attention/fused_infer_attention_score/op_host/arch22
+      - attention/fused_infer_attention_score/op_host/arch38 # arch38 tiling 目前UT框架不支持（会被高级api拦截走不进去tiling，后续打通后开放）
     test:
       ut: True
       examples: False
@@ -441,6 +442,8 @@ attention:
       - attention/incre_flash_attention/README.md
     ut_cov_exclude:
       - attention/incre_flash_attention/op_kernel
+      - attention/incre_flash_attention/op_host/incre_flash_attention_tiling_arch38.cpp  # arch38 tiling 目前UT框架不支持（会被高级api拦截走不进去tiling，后续打通后开放）
+      - attention/incre_flash_attention/op_host/incre_flash_attention_tiling_arch38.h    # arch38 tiling 目前UT框架不支持（会被高级api拦截走不进去tiling，后续打通后开放）
     test:
       examples: True
       ut: True

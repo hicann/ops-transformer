@@ -20,11 +20,18 @@
 #include "op_host/data_copy_transpose_tiling.h"
 #include "log/log.h"
 #include "err/ops_err.h"
+#include "../../common/op_kernel/arch38/fa_arch38_policy.h"
 
 using namespace ge;
 using namespace AscendC;
 using namespace matmul_tiling;
 namespace optiling {
+
+REGISTER_TILING_DATA_CLASS(PromptFlashAttention_1002312000040001012, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(PromptFlashAttention_1002312000100001012, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(PromptFlashAttention_1003113000100001012, FlashAttentionScoreSimplifiedTilingData)
+REGISTER_TILING_DATA_CLASS(PromptFlashAttention_1001311000100001012, FlashAttentionScoreSimplifiedTilingData)
+
 namespace arch38 {
 constexpr uint32_t NUM_0 = 0;
 
@@ -2630,30 +2637,24 @@ void PromptFlashAttentionTilingArch38::GetEnableDN(PromptFlashAttentionTilingDat
                                                    std::vector<int64_t>& actualSeqLengths,
                                                    std::vector<int64_t>& actualSeqLengthsKV)
 {
-    // 使能DN条件：1.sOuter >= 128; 2.d等长且不大于128; 3.输入类型为fp16/bf16; 4.不带mask、pse、MLA等高阶特性; 5.FP8
-    // perblock全量化
-    bool isQKVActualSeqLengthsRight = true;
+    // 使能 DN：镜像 kernel 模板条件 !hasAtten && s1BaseSize == 128 && dTemplate == Aligned128，
+    // 即 !enableMask && AlignUp(d, 64) == 128 && sOuter == 128。
+    (void)valueShapeInfo;
+    (void)actualSeqLengths;
+    (void)actualSeqLengthsKV;
     constexpr uint32_t dLimitDN = 128;
-    constexpr uint32_t vecCoreNum = 2;
+    constexpr uint32_t sOuterBaseSizeDN = 128;
     constexpr uint32_t sOuterLimitDN = 64;
-    enableDN = (AlignUp(queryShapeInfo.d, sOuterLimitDN) == 128) && !enableIFA && !enableMask; // pfa d=128 使能dn
-    for (uint32_t i = LOOP_BEGIN_NUM; i < queryShapeInfo.b; i++) {
-        if ((actualSeqLengths[i] % 32 > 0) ||
-            (actualSeqLengthsKV[i] <= 128)) { // 32: 只针对对齐场景修改基本快大小; 128: 扩大sInner的KV_S限制
-            isQKVActualSeqLengthsRight = false;
-            break;
-        }
-    }
+    // kernel 侧由模板参数推导 useDn：!hasAtten && s1BaseSize == 128 && dTemplate == Aligned128。
+    // 此处镜像同一规则，保证 DN 的 tilingKey 位始终与 kernel 路径一致
+    // （sOuter == 128 <=> s1BaseSize == 128；不在此判断 IFA，kernel 侧看不到该信息）。
+    const uint32_t sOuter = tilingData.promptAttentionSingleCoreParams.get_singleProcessSOuterSize();
+    enableDN = (AlignUp(queryShapeInfo.d, sOuterLimitDN) == dLimitDN) && !enableMask && (sOuter == sOuterBaseSizeDN);
 
-    if (enableDN && isQKVActualSeqLengthsRight && (queryShapeInfo.d == valueShapeInfo.d) &&
-        (queryShapeInfo.d == 64)) { // 64：扩大sInner的dsize限制
-        tilingData.promptAttentionSingleCoreParams.set_singleProcessSInnerSize(256U);
-    }
-
-    if (enableDN && (queryShapeInfo.d == valueShapeInfo.d) && (queryShapeInfo.d <= 128) &&
-        enablePerblockQuant) { // 128： perblock全量化 扩大sInner切块大小 d<=128
-        tilingData.promptAttentionSingleCoreParams.set_singleProcessSInnerSize(256U);
-    }
+    // arch35 同步遗留的两段 sInner=256 扩展（d==64 / perblock fp8）在 arch38 不可达，已删除：
+    // - d==64 不满足 enableDN 的 AlignUp(d, 64) == 128，D64 不会走 DN；
+    // - perblock(fp8/hif8) 已被 CheckArch38ScenarioSupported 的 dtype 门禁拒绝。
+    // 若未来放开 D64-DN 或 fp8 perblock，需要同时恢复 sInner=256 与对应的 tilingKey/模板。
 }
 
 void PromptFlashAttentionTilingArch38::SetTilingData(ContextParamsForPFATiling& contextKeyParams,
@@ -2960,14 +2961,20 @@ bool PromptFlashAttentionTilingArch38::AdjustCVTilingCVDiff(const ContextParamsF
         bool checkSparseMode = ((sparseMode == SPARSE_MODE_ALL_MASK) || (sparseMode == SPARSE_MODE_RIGHT_DOWN) ||
                                 (((sparseMode == SPARSE_MODE_NO_MASK) || (sparseMode == SPARSE_MODE_BAND)) &&
                                  (preTokens + nextTokens > static_cast<int32_t>(SINNER_FACTOR_DEFAULT))));
-        if (checkDtype && checkQueryAndValueS && checkSparseMode && !enablePFARope && !enablePerblockQuant) {
+        // 小 s（64/256）仅有 int8 输出的模板；fp16->fp16 固定走大 s（128/128）。
+        if (checkDtype && checkQueryAndValueS && checkSparseMode && !enablePFARope && !enablePerblockQuant &&
+            (contextKeyParams.outputDataType == ge::DT_INT8)) {
             minFactor = SOUTER_FACTOR_SUB;
             rectangleFactor = SINNER_FACTOR_DOUBLE;
             softmaxSOuterFactor = SOUTER_FACTOR_SUB;
         }
-    } else if (tilingData.promptAttentionBaseParams.get_vHeadSize() > 128 && !enableIFAMLA &&
-               !enableIFA) { // 128 : D size
-        if (!faRunFlag_) {
+    } else if (tilingData.promptAttentionBaseParams.get_vHeadSize() > 128 && !enableIFAMLA && !enableIFA) {
+        // D>128 with atten_mask: enforce s_outer/s_inner = 64/128
+        // (UB cannot accommodate 128/128 tiling + D256 features + mask data)
+        if (enableMask && faRunFlag_) {
+            minFactor = SOUTER_FACTOR_SUB;
+            rectangleFactor = SINNER_FACTOR_DEFAULT;
+        } else if (!faRunFlag_) {
             minFactor = SOUTER_FACTOR_SUB;
             rectangleFactor = SINNER_FACTOR_SUB;
         } else {
@@ -2977,7 +2984,7 @@ bool PromptFlashAttentionTilingArch38::AdjustCVTilingCVDiff(const ContextParamsF
         softmaxSOuterFactor = SOUTER_FACTOR_SUB;
     } else if (enableIFAMLA ||
                (enableIFA && tilingData.promptAttentionBaseParams.get_vHeadSize() > 128)) { // IFA VD > 128
-        if (!faRunFlag_ || enableIFAMLA) {
+        if (!faRunFlag_ || enableIFAMLA || enableMask) {
             minFactor = SOUTER_FACTOR_SUB;
         } else {
             minFactor = SOUTER_FACTOR_DEFAULT;
@@ -3662,9 +3669,12 @@ size_t PromptFlashAttentionTilingArch38::GetPFAWorkSpaceSize(PromptFlashAttentio
             bmm2ResBlockSize = 512L; // 512: headsize is 512
         }
         uint32_t s1BasicBlock = tilingData.promptAttentionSingleCoreParams.get_singleProcessSOuterSize() * 2;
+        uint32_t sOuter = tilingData.promptAttentionSingleCoreParams.get_singleProcessSOuterSize();
         uint32_t calcTypeSize = softmaxDataTypeSize;
-        if ((!enableDN && dSize > 128) || // 128: headsize is 128
-            (enableDN && dSize > 192)) {  // 192: headsize is 192
+        // 与 kernel 共用同一判定（dV 模板桶 + S1 基本块 + mask），避免 host/kernel 条件漂移。
+        bool forceBmm2UB = ArchInfo::IsForceBmm2UB(enableMask, dVBasicBlock, sOuter);
+        if (!forceBmm2UB && ((!enableDN && dSize > 128) || // 128: headsize is 128
+                             (enableDN && dSize > 192))) { // 192: headsize is 192
             bmm2Bytes = s1BasicBlock * bmm2ResBlockSize * calcTypeSize;
             if (dVBasicBlock > 256) { // 256: headsize is 256
                 vec2Bytes = s1BasicBlock * dVBasicBlock * calcTypeSize;
@@ -4038,19 +4048,87 @@ bool PromptFlashAttentionTilingArch38::CheckAlibiPseCrossover(ContextParamsForPF
     return true;
 }
 
+bool PromptFlashAttentionTilingArch38::CheckArch38PlatformSupported(const ContextParamsForPFATiling& contextKeyParams,
+                                                                    const PFAShapeInfo& queryShapeInfo,
+                                                                    const PFAShapeInfo& valueShapeInfo) const
+{
+    // 以下约束只与平台已注册的模板/tilingKey 有关，不依赖 IFA/合轴改写后的 n/s，
+    // 因此 IFA / MLA / 合轴路径也必须满足，不能放在 early-return 之后。
+    OP_CHECK_IF((inputLayout != InputLayout::BNSD),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "only BNSD layout is supported on this platform."),
+                return false);
+
+    OP_CHECK_IF((!IsArch38SupportedHeadSize(static_cast<int64_t>(queryShapeInfo.d)) ||
+                 !IsArch38SupportedHeadSize(static_cast<int64_t>(valueShapeInfo.d))),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                                            "head size only supports 64/80/128/256, but query d = %u, value d = %u.",
+                                            queryShapeInfo.d, valueShapeInfo.d),
+                return false);
+
+    // 本平台注册的模板中 query d 恒等于 value d。
+    OP_CHECK_IF((queryShapeInfo.d != valueShapeInfo.d),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    contextKeyParams.opName, "query.d, value.d",
+                    (std::to_string(queryShapeInfo.d) + ", " + std::to_string(valueShapeInfo.d)).c_str(),
+                    "query d and value d must be equal on this platform."),
+                return false);
+
+    // 仅放行已注册 tiling key 的 dtype 组合，避免分发到不存在的 kernel。
+    OP_CHECK_IF(
+        !IsArch38SupportedDataType(contextKeyParams.inputDataType, contextKeyParams.kDataType,
+                                   contextKeyParams.outputDataType, static_cast<int64_t>(queryShapeInfo.d)),
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            contextKeyParams.opName, "query, key, attentionOut",
+            (GetPfaDataTypeStr(contextKeyParams.inputDataType) + ", " + GetPfaDataTypeStr(contextKeyParams.kDataType) +
+             ", " + GetPfaDataTypeStr(contextKeyParams.outputDataType))
+                .c_str(),
+            "only fp16/int8 query/key/value with fp16/int8 output is supported on this platform, "
+            "and head size 256 only supports fp16 query/key/value with fp16 output."),
+        return false);
+
+    // head size 256 仅有带 mask 场景的 tiling key。
+    OP_CHECK_IF(((static_cast<int64_t>(queryShapeInfo.d) == ARCH38_SUPPORTED_D_256) && (!enableMask)),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "atten_mask", "absent",
+                                                      "head size 256 requires atten_mask on this platform."),
+                return false);
+
+    return true;
+}
+
 bool PromptFlashAttentionTilingArch38::CheckArch38ScenarioSupported(const ContextParamsForPFATiling& contextKeyParams,
                                                                     const PFAShapeInfo& queryShapeInfo,
                                                                     const PFAShapeInfo& valueShapeInfo) const
 {
-    // IFA / MLA / 合轴路径各有自己的门禁，且 queryShapeInfo.n 与 .s 在调用点之前已按 gSize 改写，
-    // 与下面 qs == kvs、qs > 1 等 PFA 约束天然不兼容，此处直接放行
-    if (enableIFA || enableIFAMLA || enablePFAMerge || enablePFAMLA) {
-        return true;
+    // 本平台没有 queryRope/keyRope 对应的模板：所有 tiling key 都以 hasRope == false 实例化，
+    // 若放行 PFARope 场景会静默忽略 rope 输入。
+    OP_CHECK_IF(enablePFARope,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "queryRope/keyRope", "not empty",
+                                                      "queryRope/keyRope is not supported on this platform."),
+                return false);
+
+    // 本平台同样没有 MLA 对应的模板：entry 中不存在 +3e7（MLA）key，也没有 d=192/576 的组合，
+    // 放行只会生成未注册的 key 并分发失败，此处显式拒绝。
+    OP_CHECK_IF((enableIFAMLA || enablePFAMLA),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "queryRope/keyRope or query.d, value.d",
+                                                      "MLA", "MLA is not supported on this platform."),
+                return false);
+
+    // 平台级约束（layout / head size / dQ == dV / dtype / D256 mask）对所有路径生效。
+    if (!CheckArch38PlatformSupported(contextKeyParams, queryShapeInfo, valueShapeInfo)) {
+        return false;
     }
 
-    OP_CHECK_IF((inputLayout != InputLayout::BNSD),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "only BNSD layout is supported on this platform."),
+    // 带 mask 的 band（sparseMode=4）会生成 +2e8 的 tilingKey，本平台没有注册；
+    // 不带 mask 的 band 仍走普通的 no-mask key，IFA / 合轴可继续使用。
+    OP_CHECK_IF((enableMask && (sparseModeVal == SPARSE_MODE_BAND)),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "band mask is not supported on this platform."),
                 return false);
+
+    // IFA / 合轴在调用点前已按 gSize 改写 queryShapeInfo.n/.s，下面 qs == kvs、qs > 1 等
+    // PFA 原始形状约束不适用，因此这里只跳过形状相关检查（平台级约束已在上方执行）。
+    if (enableIFA || enablePFAMerge) {
+        return true;
+    }
 
     OP_CHECK_IF((queryShapeInfo.b != 1U && queryShapeInfo.b != 9U),
                 OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "batch size must be 1 or 9, but b = %u.",
@@ -4072,13 +4150,6 @@ bool PromptFlashAttentionTilingArch38::CheckArch38ScenarioSupported(const Contex
     OP_CHECK_IF((queryShapeInfo.s > static_cast<uint64_t>(ARCH38_SUPPORTED_MAX_SEQ)),
                 OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "seq length must be <= %ld, but seq = %lu.",
                                             ARCH38_SUPPORTED_MAX_SEQ, queryShapeInfo.s),
-                return false);
-
-    OP_CHECK_IF((!IsArch38SupportedHeadSize(static_cast<int64_t>(queryShapeInfo.d)) ||
-                 !IsArch38SupportedHeadSize(static_cast<int64_t>(valueShapeInfo.d))),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "head size only supports 64/80/128, but query d = %u, value d = %u.",
-                                            queryShapeInfo.d, valueShapeInfo.d),
                 return false);
 
     const int64_t nQ = *contextKeyParams.headsNumber;
@@ -4173,6 +4244,32 @@ ge::graphStatus PromptFlashAttentionTilingArch38::AdjustTilingData(ContextParams
                                     queryShapeInfo);
     OP_CHECK_IF(!ret, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "adjust tiling cv diff fail"),
                 return ge::GRAPH_FAILED);
+
+    // fp16 输入的部分形状没有注册 tiling key，在此 fail fast。
+    // 该判断需与 prompt_flash_attention_entry_regbase.h 的 key 列表保持一致。
+    const bool isFp16Input = (inputType == ge::DT_FLOAT16);
+    const bool isSmallSOuter = (sOuterFactor == 64U);
+    const bool isHeadSize64 = (static_cast<int64_t>(queryShapeInfo.d) == ARCH38_SUPPORTED_D_64);
+    // fp16 -> fp16：d = 64 且无 mask 的组合没有注册 key（小 s 已固定走大 s）。
+    OP_CHECK_IF((isFp16Input && (outputType == ge::DT_FLOAT16) && isHeadSize64 && (!enableMask)),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    contextKeyParams.opName, "input_dtype, output_dtype, head_size, atten_mask",
+                    (std::string(GetPfaDataTypeStr(contextKeyParams.inputDataType)) + ", " +
+                     GetPfaDataTypeStr(outputType) + ", " + std::to_string(queryShapeInfo.d) + ", absent")
+                        .c_str(),
+                    "fp16->fp16 with head size 64 without atten_mask has no registered tiling key on this platform."),
+                return ge::GRAPH_FAILED);
+    // fp16 -> int8：只注册了小 s（64/256）模板，且 d = 64 带 mask 的组合没有注册 key。
+    OP_CHECK_IF((isFp16Input && (outputType == ge::DT_INT8) && ((!isSmallSOuter) || (isHeadSize64 && enableMask))),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    contextKeyParams.opName, "output_dtype, sOuter, head_size, atten_mask",
+                    (std::string(GetPfaDataTypeStr(outputType)) + ", " + std::to_string(sOuterFactor) + ", " +
+                     std::to_string(queryShapeInfo.d) + ", " + (enableMask ? "true" : "false"))
+                        .c_str(),
+                    "fp16->int8 only supports sOuter = 64, and head size 64 combined with atten_mask "
+                    "has no registered tiling key on this platform."),
+                return ge::GRAPH_FAILED);
+
     softmaxSInnerFactor = sInnerFactor;
 
     tilingData.promptAttentionBaseParams.set_softmaxOuterSize(softmaxSOuterFactor);

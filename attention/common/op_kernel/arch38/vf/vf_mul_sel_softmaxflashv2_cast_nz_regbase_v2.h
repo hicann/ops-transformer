@@ -17,15 +17,11 @@
 
 #include "kernel_tensor.h"
 #include "../pse_arch38.h"
+#include "vf_store_exp.h"
 
 using namespace regbaseutil;
 
 namespace FaVectorApi {
-/* **************************************************************************************************
- * only 128*128 support
- * only high performance support (expSum expMax use
- * fp32)************************************************************************************************* */
-// originN = 128, No update
 constexpr uint32_t floatRepSize = 64;
 constexpr uint32_t halfRepSize = 128;
 constexpr uint32_t blockBytesU8 = 32;
@@ -53,82 +49,81 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl128(
     uint32_t maskLen = originN;
     __VEC_SCOPE__
     {
-        Reg::RegTensor<T> vreg_input_x;
-        Reg::RegTensor<T> vreg_input_max;
-        Reg::RegTensor<T> vreg_max_brc;
-        Reg::RegTensor<T> vreg_min;
-        Reg::RegTensor<float> vreg_exp_sum;
-        Reg::RegTensor<float> vreg_exp_even;
-        Reg::RegTensor<float> vreg_exp_odd;
+        Reg::RegTensor<T> vregInputX;
+        Reg::RegTensor<T> vregInputMax;
+        Reg::RegTensor<T> vregMaxBrc;
+        Reg::RegTensor<T> vregMin;
+        Reg::RegTensor<float> vregExpSum;
+        Reg::RegTensor<float> vregExpEven;
+        Reg::RegTensor<float> vregExpOdd;
 
-        Reg::UnalignReg ureg_max;
-        Reg::UnalignReg ureg_exp_sum;
+        Reg::UnalignReg uregMax;
+        Reg::UnalignReg uregExpSum;
 
-        Reg::MaskReg preg_all_b32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_all_b16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_all_b8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_s8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
-        Reg::MaskReg preg_mask;
-        Reg::RegTensor<uint16_t> vreg_atten_mask;
+        Reg::MaskReg pregAllB32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregAllB16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregAllB8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregS8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
+        Reg::MaskReg pregMask;
+        Reg::RegTensor<uint16_t> vregAttenMask;
 
-        Reg::RegTensor<half> vreg_exp_res;
-        Reg::RegTensor<half> vreg_muls_res;
-        Reg::RegTensor<int8_t> vreg_res;
+        Reg::RegTensor<half> vregExpRes;
+        Reg::RegTensor<half> vregMulsRes;
+        Reg::RegTensor<int8_t> vregRes;
 
-        Reg::Duplicate(vreg_min, minValue);
-        Reg::MaskReg preg_ori_tail_n = Reg::UpdateMask<T>(maskLen);
+        Reg::Duplicate(vregMin, minValue);
+        Reg::MaskReg pregOriTailN = Reg::UpdateMask<T>(maskLen);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
-            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x, vreg_input_x, scale, preg_all_b16);
-            Reg::Select(vreg_input_x, vreg_input_x, vreg_min, preg_ori_tail_n);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX, srcUb + i * sInner);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vregInputX, vregInputX, scale, pregAllB16);
+            Reg::Select(vregInputX, vregInputX, vregMin, pregOriTailN);
             if constexpr (hasAtten) {
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vregAttenMask,
                                                                       maskUb + i * sInner);
-                Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask, vreg_atten_mask, static_cast<uint16_t>(0),
-                                                          preg_all_b16);
-                Reg::Select(vreg_input_x, vreg_min, vreg_input_x, preg_mask);
+                Reg::CompareScalar<uint16_t, CMPMODE::NE>(pregMask, vregAttenMask, static_cast<uint16_t>(0),
+                                                          pregAllB16);
+                Reg::Select(vregInputX, vregMin, vregInputX, pregMask);
             }
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x, preg_ori_tail_n);
-            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_x, preg_all_b16);
-            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, vreg_input_max, ureg_max, 1);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vregInputX, pregOriTailN);
+            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vregInputMax, vregInputX, pregAllB16);
+            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, vregInputMax, uregMax, 1);
         }
-        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, ureg_max, 0);
+        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, uregMax, 0);
 
         mem_bar(VST_VLD);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max_brc, maxUbStart + i);
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
-            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_input_x,
-                                                                                     vreg_max_brc, preg_ori_tail_n);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vregMaxBrc, maxUbStart + i);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX, srcUb + i * sInner);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vregExpRes, vregInputX, vregMaxBrc,
+                                                                                     pregOriTailN);
 
-            static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+            static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
             static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
                                                           Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
             static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
                                                           Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
             if constexpr (IsSameType<T2, int8_t>::value) {
-                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vreg_muls_res, vreg_exp_res, (half)quantScaleP,
-                                                                   preg_all_b16);
-                Reg::Cast<int8_t, half, castTrait>(vreg_res, vreg_muls_res, preg_all_b16);
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res,
-                                                                       (Reg::RegTensor<uint16_t>&)vreg_res);
+                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vregMulsRes, vregExpRes, (half)quantScaleP,
+                                                                   pregAllB16);
+                Reg::Cast<int8_t, half, castTrait>(vregRes, vregMulsRes, pregAllB16);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vregRes,
+                                                                       (Reg::RegTensor<uint16_t>&)vregRes);
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t*&)expUb, vreg_res, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb, vregRes, blockStride, repeatStride, pregS8);
             } else {
-                Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2*&)expUb, vreg_exp_res, blockStride, repeatStride, preg_all_b16);
+                StoreExp(expUb, vregExpRes, blockStride, repeatStride, pregAllB16, quantScaleP);
             }
 
-            Reg::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
-            Reg::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
-            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd, preg_all_b32);
-            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum, preg_all_b32);
-            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, vreg_exp_sum, ureg_exp_sum, 1);
+            Reg::Cast<float, half, castTrait0>(vregExpEven, vregExpRes, pregAllB16);
+            Reg::Cast<float, half, castTrait1>(vregExpOdd, vregExpRes, pregAllB16);
+            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vregExpSum, vregExpEven, vregExpOdd, pregAllB32);
+            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vregExpSum, vregExpSum, pregAllB32);
+            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, vregExpSum, uregExpSum, 1);
         }
-        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, ureg_exp_sum, 0);
+        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, uregExpSum, 0);
     }
 }
 
@@ -158,81 +153,81 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
 
     __VEC_SCOPE__
     {
-        Reg::RegTensor<T> vreg_input_x_1;
-        Reg::RegTensor<T> vreg_input_x_2;
-        Reg::RegTensor<T> vreg_input_max_tmp;
-        Reg::RegTensor<T> vreg_input_max;
-        Reg::RegTensor<T> vreg_max_brc;
-        Reg::RegTensor<T> vreg_min;
-        Reg::RegTensor<float> vreg_exp_sum;
-        Reg::RegTensor<float> vreg_exp_even;
-        Reg::RegTensor<float> vreg_exp_odd;
+        Reg::RegTensor<T> vregInputX1;
+        Reg::RegTensor<T> vregInputX2;
+        Reg::RegTensor<T> vregInputMaxTmp;
+        Reg::RegTensor<T> vregInputMax;
+        Reg::RegTensor<T> vregMaxBrc;
+        Reg::RegTensor<T> vregMin;
+        Reg::RegTensor<float> vregExpSum;
+        Reg::RegTensor<float> vregExpEven;
+        Reg::RegTensor<float> vregExpOdd;
 
-        Reg::UnalignReg ureg_max;
-        Reg::UnalignReg ureg_exp_sum;
+        Reg::UnalignReg uregMax;
+        Reg::UnalignReg uregExpSum;
 
-        Reg::MaskReg preg_all_b32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_all_b16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_all_b8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_s8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
-        Reg::MaskReg preg_mask_1;
-        Reg::MaskReg preg_mask_2;
-        Reg::RegTensor<uint16_t> vreg_atten_mask_1;
-        Reg::RegTensor<uint16_t> vreg_atten_mask_2;
+        Reg::MaskReg pregAllB32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregAllB16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregAllB8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregS8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
+        Reg::MaskReg pregMask1;
+        Reg::MaskReg pregMask2;
+        Reg::RegTensor<uint16_t> vregAttenMask1;
+        Reg::RegTensor<uint16_t> vregAttenMask2;
 
-        Reg::RegTensor<T> vreg_exp_res;
-        Reg::RegTensor<T> vreg_exp_res_1;
-        Reg::RegTensor<T> vreg_exp_res_2;
-        Reg::RegTensor<T> vreg_muls_res_1;
-        Reg::RegTensor<T> vreg_muls_res_2;
-        Reg::RegTensor<int8_t> vreg_res_1;
-        Reg::RegTensor<int8_t> vreg_res_2;
-        Reg::MaskReg preg_ori_tail_n_1 = Reg::UpdateMask<T>(maskLen1);
-        Reg::MaskReg preg_ori_tail_n_2 = Reg::UpdateMask<T>(maskLen2);
+        Reg::RegTensor<T> vregExpRes;
+        Reg::RegTensor<T> vregExpRes1;
+        Reg::RegTensor<T> vregExpRes2;
+        Reg::RegTensor<T> vregMulsRes1;
+        Reg::RegTensor<T> vregMulsRes2;
+        Reg::RegTensor<int8_t> vregRes1;
+        Reg::RegTensor<int8_t> vregRes2;
+        Reg::MaskReg pregOriTailN1 = Reg::UpdateMask<T>(maskLen1);
+        Reg::MaskReg pregOriTailN2 = Reg::UpdateMask<T>(maskLen2);
 
-        Reg::Duplicate(vreg_min, minValue);
+        Reg::Duplicate(vregMin, minValue);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
-            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_1, vreg_input_x_1, scale, preg_all_b16);
-            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_2, vreg_input_x_2, scale, preg_all_b16);
-            Reg::Select(vreg_input_x_1, vreg_input_x_1, vreg_min, preg_ori_tail_n_1);
-            Reg::Select(vreg_input_x_2, vreg_input_x_2, vreg_min, preg_ori_tail_n_2);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX1, srcUb + i * sInner);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX2, srcUb + i * sInner + halfRepSize);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vregInputX1, vregInputX1, scale, pregAllB16);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vregInputX2, vregInputX2, scale, pregAllB16);
+            Reg::Select(vregInputX1, vregInputX1, vregMin, pregOriTailN1);
+            Reg::Select(vregInputX2, vregInputX2, vregMin, pregOriTailN2);
             if constexpr (hasAtten) {
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask_1,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vregAttenMask1,
                                                                       maskUb + i * sInner);
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask_2,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vregAttenMask2,
                                                                       maskUb + i * sInner + halfRepSize);
 
-                Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask_1, vreg_atten_mask_1, static_cast<uint16_t>(0),
-                                                          preg_all_b16);
-                Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask_2, vreg_atten_mask_2, static_cast<uint16_t>(0),
-                                                          preg_all_b16);
+                Reg::CompareScalar<uint16_t, CMPMODE::NE>(pregMask1, vregAttenMask1, static_cast<uint16_t>(0),
+                                                          pregAllB16);
+                Reg::CompareScalar<uint16_t, CMPMODE::NE>(pregMask2, vregAttenMask2, static_cast<uint16_t>(0),
+                                                          pregAllB16);
 
-                Reg::Select(vreg_input_x_1, vreg_min, vreg_input_x_1, preg_mask_1);
-                Reg::Select(vreg_input_x_2, vreg_min, vreg_input_x_2, preg_mask_2);
+                Reg::Select(vregInputX1, vregMin, vregInputX1, pregMask1);
+                Reg::Select(vregInputX2, vregMin, vregInputX2, pregMask2);
             }
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_ori_tail_n_1);
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vreg_input_x_2,
-                                                            preg_ori_tail_n_2);
-            Reg::Max(vreg_input_max_tmp, vreg_input_x_1, vreg_input_x_2, preg_all_b16);
-            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_max_tmp, preg_all_b16);
-            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, vreg_input_max, ureg_max, 1);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vregInputX1, pregOriTailN1);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vregInputX2,
+                                                            pregOriTailN2);
+            Reg::Max(vregInputMaxTmp, vregInputX1, vregInputX2, pregAllB16);
+            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vregInputMax, vregInputMaxTmp, pregAllB16);
+            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, vregInputMax, uregMax, 1);
         }
-        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, ureg_max, 0);
+        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, uregMax, 0);
 
         mem_bar(VST_VLD);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max_brc, maxUbStart + i);
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
-            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_1, vreg_input_x_1,
-                                                                                     vreg_max_brc, preg_ori_tail_n_1);
-            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_2, vreg_input_x_2,
-                                                                                     vreg_max_brc, preg_ori_tail_n_2);
-            static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vregMaxBrc, maxUbStart + i);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX1, srcUb + i * sInner);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX2, srcUb + i * sInner + halfRepSize);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vregExpRes1, vregInputX1,
+                                                                                     vregMaxBrc, pregOriTailN1);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vregExpRes2, vregInputX2,
+                                                                                     vregMaxBrc, pregOriTailN2);
+            static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
             static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
                                                           Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
@@ -240,38 +235,36 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
                                                           Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
             if constexpr (IsSameType<T2, int8_t>::value) {
-                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vreg_muls_res_1, vreg_exp_res_1, (half)quantScaleP,
-                                                                   preg_all_b16);
-                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vreg_muls_res_2, vreg_exp_res_2, (half)quantScaleP,
-                                                                   preg_all_b16);
+                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vregMulsRes1, vregExpRes1, (half)quantScaleP,
+                                                                   pregAllB16);
+                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vregMulsRes2, vregExpRes2, (half)quantScaleP,
+                                                                   pregAllB16);
 
-                Reg::Cast<int8_t, half, castTrait>(vreg_res_1, vreg_muls_res_1, preg_all_b16);
-                Reg::Cast<int8_t, half, castTrait>(vreg_res_2, vreg_muls_res_2, preg_all_b16);
+                Reg::Cast<int8_t, half, castTrait>(vregRes1, vregMulsRes1, pregAllB16);
+                Reg::Cast<int8_t, half, castTrait>(vregRes2, vregMulsRes2, pregAllB16);
 
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res_1,
-                                                                       (Reg::RegTensor<uint16_t>&)vreg_res_1);
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res_2,
-                                                                       (Reg::RegTensor<uint16_t>&)vreg_res_2);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vregRes1,
+                                                                       (Reg::RegTensor<uint16_t>&)vregRes1);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vregRes2,
+                                                                       (Reg::RegTensor<uint16_t>&)vregRes2);
 
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t*&)expUb1, vreg_res_1, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb1, vregRes1, blockStride, repeatStride, pregS8);
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t*&)expUb2, vreg_res_2, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb2, vregRes2, blockStride, repeatStride, pregS8);
             } else {
-                Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2*&)expUb1, vreg_exp_res_1, blockStride, repeatStride, preg_all_b16);
-                Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2*&)expUb2, vreg_exp_res_2, blockStride, repeatStride, preg_all_b16);
+                StoreExp(expUb1, vregExpRes1, blockStride, repeatStride, pregAllB16, quantScaleP);
+                StoreExp(expUb2, vregExpRes2, blockStride, repeatStride, pregAllB16, quantScaleP);
             }
 
-            Reg::Add<half, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_exp_res_1, vreg_exp_res_2, preg_all_b16);
-            Reg::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
-            Reg::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
-            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd, preg_all_b32);
-            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum, preg_all_b32);
-            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, vreg_exp_sum, ureg_exp_sum, 1);
+            Reg::Add<half, Reg::MaskMergeMode::ZEROING>(vregExpRes, vregExpRes1, vregExpRes2, pregAllB16);
+            Reg::Cast<float, half, castTrait0>(vregExpEven, vregExpRes, pregAllB16);
+            Reg::Cast<float, half, castTrait1>(vregExpOdd, vregExpRes, pregAllB16);
+            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vregExpSum, vregExpEven, vregExpOdd, pregAllB32);
+            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vregExpSum, vregExpSum, pregAllB32);
+            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, vregExpSum, uregExpSum, 1);
         }
-        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, ureg_exp_sum, 0);
+        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(expSumUb, uregExpSum, 0);
     }
 }
 
@@ -327,128 +320,124 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl128(
 
     __VEC_SCOPE__
     {
-        Reg::RegTensor<T> vreg_input_x;
-        Reg::RegTensor<T> vreg_input_max;
-        Reg::RegTensor<T> vreg_min;
-        Reg::RegTensor<float> vreg_exp_sum;
-        Reg::RegTensor<float> vreg_exp_sum_brc_even;
-        Reg::RegTensor<float> vreg_exp_sum_brc_odd;
-        Reg::RegTensor<T> vreg_in_max;
-        Reg::RegTensor<T> vreg_max;
-        Reg::RegTensor<T> vreg_exp_max;
-        Reg::RegTensor<float> vreg_exp_max_even;
-        Reg::RegTensor<float> vreg_exp_max_odd;
-        Reg::RegTensor<float> vreg_in_exp_sum_even;
-        Reg::RegTensor<float> vreg_in_exp_sum_odd;
-        Reg::RegTensor<float> vreg_exp_sum_update_even;
-        Reg::RegTensor<float> vreg_exp_sum_update_odd;
-        Reg::RegTensor<T> vreg_exp_res;
-        Reg::RegTensor<float> vreg_exp_even;
-        Reg::RegTensor<float> vreg_exp_odd;
+        Reg::RegTensor<T> vregInputX;
+        Reg::RegTensor<T> vregInputMax;
+        Reg::RegTensor<T> vregMin;
+        Reg::RegTensor<float> vregExpSum;
+        Reg::RegTensor<float> vregExpSumBrcEven;
+        Reg::RegTensor<float> vregExpSumBrcOdd;
+        Reg::RegTensor<T> vregInMax;
+        Reg::RegTensor<T> vregMax;
+        Reg::RegTensor<T> vregExpMax;
+        Reg::RegTensor<float> vregExpMaxEven;
+        Reg::RegTensor<float> vregExpMaxOdd;
+        Reg::RegTensor<float> vregInExpSumEven;
+        Reg::RegTensor<float> vregInExpSumOdd;
+        Reg::RegTensor<float> vregExpSumUpdateEven;
+        Reg::RegTensor<float> vregExpSumUpdateOdd;
+        Reg::RegTensor<T> vregExpRes;
+        Reg::RegTensor<float> vregExpEven;
+        Reg::RegTensor<float> vregExpOdd;
 
-        Reg::UnalignReg ureg_max;
-        Reg::UnalignReg ureg_exp_sum;
+        Reg::UnalignReg uregMax;
+        Reg::UnalignReg uregExpSum;
 
-        Reg::MaskReg preg_all_b32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_all_b16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_all_b8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_s8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
-        Reg::MaskReg preg_mask;
-        Reg::RegTensor<uint16_t> vreg_atten_mask;
+        Reg::MaskReg pregAllB32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregAllB16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregAllB8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregS8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
+        Reg::MaskReg pregMask;
+        Reg::RegTensor<uint16_t> vregAttenMask;
 
-        Reg::RegTensor<half> vreg_muls_res;
-        Reg::RegTensor<int8_t> vreg_res;
+        Reg::RegTensor<half> vregMulsRes;
+        Reg::RegTensor<int8_t> vregRes;
 
-        static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+        static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
                                                      Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
         static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
         static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-        Reg::MaskReg preg_ori_tail_n = Reg::UpdateMask<T>(maskLen);
-        Reg::Duplicate(vreg_min, minValue);
+        Reg::MaskReg pregOriTailN = Reg::UpdateMask<T>(maskLen);
+        Reg::Duplicate(vregMin, minValue);
         for (uint16_t i = 0; i < rows; ++i) {
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
-            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x, vreg_input_x, scale, preg_all_b16);
-            Reg::Select(vreg_input_x, vreg_input_x, vreg_min, preg_ori_tail_n);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX, srcUb + i * sInner);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vregInputX, vregInputX, scale, pregAllB16);
+            Reg::Select(vregInputX, vregInputX, vregMin, pregOriTailN);
             if constexpr (hasAtten) {
-                Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask,
+                Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vregAttenMask,
                                                                        maskUb + i * sInner);
-                Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask, vreg_atten_mask, static_cast<uint16_t>(0),
-                                                          preg_all_b16);
-                Reg::Select(vreg_input_x, vreg_min, vreg_input_x, preg_mask);
+                Reg::CompareScalar<uint16_t, CMPMODE::NE>(pregMask, vregAttenMask, static_cast<uint16_t>(0),
+                                                          pregAllB16);
+                Reg::Select(vregInputX, vregMin, vregInputX, pregMask);
             }
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x, preg_ori_tail_n);
-            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_x, preg_all_b16);
-            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vreg_input_max, ureg_max, 1);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vregInputX, pregOriTailN);
+            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vregInputMax, vregInputX, pregAllB16);
+            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vregInputMax, uregMax, 1);
         }
-        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, ureg_max, 0);
+        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, uregMax, 0);
         mem_bar(VST_VLD);
 
-        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_in_max, inMaxUb);
-        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_max, tmpMaxUbStart);
-        Reg::Max<T, Reg::MaskMergeMode::ZEROING>(vreg_max, vreg_input_max, vreg_in_max, preg_all_b16);
-        Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_max, vreg_in_max, vreg_max,
-                                                                                 preg_all_b16);
-        Reg::Cast<float, half, castTrait0>(vreg_exp_max_even, vreg_exp_max, preg_all_b16);
-        Reg::Cast<float, half, castTrait1>(vreg_exp_max_odd, vreg_exp_max, preg_all_b16);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInMax, inMaxUb);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputMax, tmpMaxUbStart);
+        Reg::Max<T, Reg::MaskMergeMode::ZEROING>(vregMax, vregInputMax, vregInMax, pregAllB16);
+        Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vregExpMax, vregInMax, vregMax,
+                                                                                 pregAllB16);
+        Reg::Cast<float, half, castTrait0>(vregExpMaxEven, vregExpMax, pregAllB16);
+        Reg::Cast<float, half, castTrait1>(vregExpMaxOdd, vregExpMax, pregAllB16);
 
-        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expMaxUb, vreg_exp_max_even, vreg_exp_max_odd,
-                                                             preg_all_b32);
-        Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(maxUb, vreg_max, preg_all_b16);
+        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expMaxUb, vregExpMaxEven, vregExpMaxOdd, pregAllB32);
+        Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(maxUb, vregMax, pregAllB16);
 
         mem_bar(VST_VLD);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max, maxUb + i);
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
-            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_input_x,
-                                                                                     vreg_max, preg_ori_tail_n);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vregMax, maxUb + i);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX, srcUb + i * sInner);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vregExpRes, vregInputX, vregMax,
+                                                                                     pregOriTailN);
 
-            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+            static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
                                                           Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::NO_SAT,
+            static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::SAT,
                                                           Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 
             if constexpr (IsSameType<T2, int8_t>::value) {
-                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vreg_muls_res, vreg_exp_res, (half)quantScaleP,
-                                                                   preg_all_b16);
+                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vregMulsRes, vregExpRes, (half)quantScaleP,
+                                                                   pregAllB16);
 
-                Reg::Cast<int8_t, half, castTrait0>(vreg_res, vreg_muls_res, preg_all_b16);
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res,
-                                                                       (Reg::RegTensor<uint16_t>&)vreg_res);
+                Reg::Cast<int8_t, half, castTrait0>(vregRes, vregMulsRes, pregAllB16);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vregRes,
+                                                                       (Reg::RegTensor<uint16_t>&)vregRes);
 
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ int8_t*&)expUb), vreg_res, blockStride, repeatStride, preg_s8);
+                    ((__ubuf__ int8_t*&)expUb), vregRes, blockStride, repeatStride, pregS8);
             } else {
-                Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2*&)expUb, vreg_exp_res, blockStride, repeatStride, preg_all_b16);
+                StoreExp(expUb, vregExpRes, blockStride, repeatStride, pregAllB16, quantScaleP);
             }
 
             // x_sum = sum(x_exp, axis=-1, keepdims=True)
-            Reg::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
-            Reg::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
-            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd, preg_all_b32);
-            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum, preg_all_b32);
-            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, vreg_exp_sum, ureg_exp_sum, 1);
+            Reg::Cast<float, half, castTrait0>(vregExpEven, vregExpRes, pregAllB16);
+            Reg::Cast<float, half, castTrait1>(vregExpOdd, vregExpRes, pregAllB16);
+            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vregExpSum, vregExpEven, vregExpOdd, pregAllB32);
+            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vregExpSum, vregExpSum, pregAllB32);
+            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, vregExpSum, uregExpSum, 1);
         }
-        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, ureg_exp_sum, 0);
+        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, uregExpSum, 0);
         mem_bar(VST_VLD);
 
         // x_sum = sum(exp_max * in_sum + x_sum)
-        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg_in_exp_sum_even, vreg_in_exp_sum_odd, inExpSumUb);
-        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg_exp_sum_brc_even, vreg_exp_sum_brc_odd,
-                                                             tmpExpSumUbStart);
-        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_max_even, vreg_in_exp_sum_even,
-                                                     preg_all_b32);
-        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_max_odd, vreg_in_exp_sum_odd,
-                                                     preg_all_b32);
-        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_sum_update_even,
-                                                     vreg_exp_sum_brc_even, preg_all_b32);
-        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_sum_update_odd,
-                                                     vreg_exp_sum_brc_odd, preg_all_b32);
-        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expSumUb, vreg_exp_sum_update_even,
-                                                             vreg_exp_sum_update_odd, preg_all_b32);
+        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vregInExpSumEven, vregInExpSumOdd, inExpSumUb);
+        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vregExpSumBrcEven, vregExpSumBrcOdd, tmpExpSumUbStart);
+        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vregExpSumUpdateEven, vregExpMaxEven, vregInExpSumEven,
+                                                     pregAllB32);
+        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vregExpSumUpdateOdd, vregExpMaxOdd, vregInExpSumOdd, pregAllB32);
+        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vregExpSumUpdateEven, vregExpSumUpdateEven, vregExpSumBrcEven,
+                                                     pregAllB32);
+        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vregExpSumUpdateOdd, vregExpSumUpdateOdd, vregExpSumBrcOdd,
+                                                     pregAllB32);
+        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expSumUb, vregExpSumUpdateEven, vregExpSumUpdateOdd,
+                                                             pregAllB32);
     }
 }
 
@@ -485,161 +474,156 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl256(
 
     __VEC_SCOPE__
     {
-        Reg::RegTensor<T> vreg_input_x_1;
-        Reg::RegTensor<T> vreg_input_x_2;
-        Reg::RegTensor<T> vreg_input_max;
-        Reg::RegTensor<T> vreg_input_max_tmp;
-        Reg::RegTensor<T> vreg_min;
-        Reg::RegTensor<float> vreg_exp_sum;
-        Reg::RegTensor<float> vreg_exp_sum_brc_even;
-        Reg::RegTensor<float> vreg_exp_sum_brc_odd;
-        Reg::RegTensor<T> vreg_in_max;
-        Reg::RegTensor<T> vreg_max;
-        Reg::RegTensor<T> vreg_exp_max;
-        Reg::RegTensor<float> vreg_exp_max_even;
-        Reg::RegTensor<float> vreg_exp_max_odd;
-        Reg::RegTensor<float> vreg_in_exp_sum_even;
-        Reg::RegTensor<float> vreg_in_exp_sum_odd;
-        Reg::RegTensor<float> vreg_exp_sum_update_even;
-        Reg::RegTensor<float> vreg_exp_sum_update_odd;
-        Reg::RegTensor<T> vreg_exp_res;
-        Reg::RegTensor<T> vreg_exp_res_1;
-        Reg::RegTensor<T> vreg_exp_res_2;
-        Reg::RegTensor<float> vreg_exp_even;
-        Reg::RegTensor<float> vreg_exp_odd;
+        Reg::RegTensor<T> vregInputX1;
+        Reg::RegTensor<T> vregInputX2;
+        Reg::RegTensor<T> vregInputMax;
+        Reg::RegTensor<T> vregInputMaxTmp;
+        Reg::RegTensor<T> vregMin;
+        Reg::RegTensor<float> vregExpSum;
+        Reg::RegTensor<float> vregExpSumBrcEven;
+        Reg::RegTensor<float> vregExpSumBrcOdd;
+        Reg::RegTensor<T> vregInMax;
+        Reg::RegTensor<T> vregMax;
+        Reg::RegTensor<T> vregExpMax;
+        Reg::RegTensor<float> vregExpMaxEven;
+        Reg::RegTensor<float> vregExpMaxOdd;
+        Reg::RegTensor<float> vregInExpSumEven;
+        Reg::RegTensor<float> vregInExpSumOdd;
+        Reg::RegTensor<float> vregExpSumUpdateEven;
+        Reg::RegTensor<float> vregExpSumUpdateOdd;
+        Reg::RegTensor<T> vregExpRes;
+        Reg::RegTensor<T> vregExpRes1;
+        Reg::RegTensor<T> vregExpRes2;
+        Reg::RegTensor<float> vregExpEven;
+        Reg::RegTensor<float> vregExpOdd;
 
-        Reg::UnalignReg ureg_max;
-        Reg::UnalignReg ureg_exp_sum;
+        Reg::UnalignReg uregMax;
+        Reg::UnalignReg uregExpSum;
 
-        Reg::MaskReg preg_all_b32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_all_b16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_all_b8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
-        Reg::MaskReg preg_s8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
-        Reg::MaskReg preg_mask_1;
-        Reg::MaskReg preg_mask_2;
-        Reg::RegTensor<uint16_t> vreg_atten_mask_1;
-        Reg::RegTensor<uint16_t> vreg_atten_mask_2;
+        Reg::MaskReg pregAllB32 = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregAllB16 = Reg::CreateMask<half, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregAllB8 = Reg::CreateMask<int8_t, Reg::MaskPattern::ALL>();
+        Reg::MaskReg pregS8 = Reg::CreateMask<int8_t, Reg::MaskPattern::VL128>();
+        Reg::MaskReg pregMask1;
+        Reg::MaskReg pregMask2;
+        Reg::RegTensor<uint16_t> vregAttenMask1;
+        Reg::RegTensor<uint16_t> vregAttenMask2;
 
-        Reg::RegTensor<T> vreg_muls_res_1;
-        Reg::RegTensor<T> vreg_muls_res_2;
-        Reg::RegTensor<int8_t> vreg_res_1;
-        Reg::RegTensor<int8_t> vreg_res_2;
+        Reg::RegTensor<T> vregMulsRes1;
+        Reg::RegTensor<T> vregMulsRes2;
+        Reg::RegTensor<int8_t> vregRes1;
+        Reg::RegTensor<int8_t> vregRes2;
 
-        static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+        static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
                                                      Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
         static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
         static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
-        Reg::MaskReg preg_ori_tail_n_1 = Reg::UpdateMask<T>(maskLen1);
-        Reg::MaskReg preg_ori_tail_n_2 = Reg::UpdateMask<T>(maskLen2);
+        Reg::MaskReg pregOriTailN1 = Reg::UpdateMask<T>(maskLen1);
+        Reg::MaskReg pregOriTailN2 = Reg::UpdateMask<T>(maskLen2);
 
-        Reg::Duplicate(vreg_min, minValue);
+        Reg::Duplicate(vregMin, minValue);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
-            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_1, vreg_input_x_1, scale, preg_all_b16);
-            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_2, vreg_input_x_2, scale, preg_all_b16);
-            Reg::Select(vreg_input_x_1, vreg_input_x_1, vreg_min, preg_ori_tail_n_1);
-            Reg::Select(vreg_input_x_2, vreg_input_x_2, vreg_min, preg_ori_tail_n_2);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX1, srcUb + i * sInner);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX2, srcUb + i * sInner + halfRepSize);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vregInputX1, vregInputX1, scale, pregAllB16);
+            Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vregInputX2, vregInputX2, scale, pregAllB16);
+            Reg::Select(vregInputX1, vregInputX1, vregMin, pregOriTailN1);
+            Reg::Select(vregInputX2, vregInputX2, vregMin, pregOriTailN2);
             if constexpr (hasAtten) {
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask_1,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vregAttenMask1,
                                                                       maskUb + i * sInner);
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask_2,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vregAttenMask2,
                                                                       maskUb + i * sInner + halfRepSize);
 
-                Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask_1, vreg_atten_mask_1, static_cast<uint16_t>(0),
-                                                          preg_all_b16);
-                Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask_2, vreg_atten_mask_2, static_cast<uint16_t>(0),
-                                                          preg_all_b16);
+                Reg::CompareScalar<uint16_t, CMPMODE::NE>(pregMask1, vregAttenMask1, static_cast<uint16_t>(0),
+                                                          pregAllB16);
+                Reg::CompareScalar<uint16_t, CMPMODE::NE>(pregMask2, vregAttenMask2, static_cast<uint16_t>(0),
+                                                          pregAllB16);
 
-                Reg::Select(vreg_input_x_1, vreg_min, vreg_input_x_1, preg_mask_1);
-                Reg::Select(vreg_input_x_2, vreg_min, vreg_input_x_2, preg_mask_2);
+                Reg::Select(vregInputX1, vregMin, vregInputX1, pregMask1);
+                Reg::Select(vregInputX2, vregMin, vregInputX2, pregMask2);
             }
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_ori_tail_n_1);
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vreg_input_x_2,
-                                                            preg_ori_tail_n_2);
-            Reg::Max(vreg_input_max_tmp, vreg_input_x_1, vreg_input_x_2, preg_all_b16);
-            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_max_tmp, preg_all_b16);
-            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vreg_input_max, ureg_max, 1);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vregInputX1, pregOriTailN1);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vregInputX2,
+                                                            pregOriTailN2);
+            Reg::Max(vregInputMaxTmp, vregInputX1, vregInputX2, pregAllB16);
+            Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vregInputMax, vregInputMaxTmp, pregAllB16);
+            Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vregInputMax, uregMax, 1);
         }
-        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, ureg_max, 0);
+        Reg::DataCopyUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, uregMax, 0);
         mem_bar(VST_VLD);
 
-        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_in_max, inMaxUb);
-        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_max, tmpMaxUbStart);
-        Reg::Max<T, Reg::MaskMergeMode::ZEROING>(vreg_max, vreg_input_max, vreg_in_max, preg_all_b16);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInMax, inMaxUb);
+        Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputMax, tmpMaxUbStart);
+        Reg::Max<T, Reg::MaskMergeMode::ZEROING>(vregMax, vregInputMax, vregInMax, pregAllB16);
 
-        Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_max, vreg_in_max, vreg_max,
-                                                                                 preg_all_b16);
-        Reg::Cast<float, half, castTrait0>(vreg_exp_max_even, vreg_exp_max, preg_all_b16);
-        Reg::Cast<float, half, castTrait1>(vreg_exp_max_odd, vreg_exp_max, preg_all_b16);
+        Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vregExpMax, vregInMax, vregMax,
+                                                                                 pregAllB16);
+        Reg::Cast<float, half, castTrait0>(vregExpMaxEven, vregExpMax, pregAllB16);
+        Reg::Cast<float, half, castTrait1>(vregExpMaxOdd, vregExpMax, pregAllB16);
 
-        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expMaxUb, vreg_exp_max_even, vreg_exp_max_odd,
-                                                             preg_all_b32);
-        Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(maxUb, vreg_max, preg_all_b16);
+        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expMaxUb, vregExpMaxEven, vregExpMaxOdd, pregAllB32);
+        Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(maxUb, vregMax, pregAllB16);
 
         mem_bar(VST_VLD);
 
         for (uint16_t i = 0; i < rows; ++i) {
-            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max, maxUb + i);
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
-            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
-            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_1, vreg_input_x_1,
-                                                                                     vreg_max, preg_ori_tail_n_1);
-            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_2, vreg_input_x_2,
-                                                                                     vreg_max, preg_ori_tail_n_2);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vregMax, maxUb + i);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX1, srcUb + i * sInner);
+            Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vregInputX2, srcUb + i * sInner + halfRepSize);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vregExpRes1, vregInputX1, vregMax,
+                                                                                     pregOriTailN1);
+            Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vregExpRes2, vregInputX2, vregMax,
+                                                                                     pregOriTailN2);
 
             if constexpr (IsSameType<T2, int8_t>::value) {
-                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vreg_muls_res_1, vreg_exp_res_1, (half)quantScaleP,
-                                                                   preg_all_b16);
-                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vreg_muls_res_2, vreg_exp_res_2, (half)quantScaleP,
-                                                                   preg_all_b16);
+                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vregMulsRes1, vregExpRes1, (half)quantScaleP,
+                                                                   pregAllB16);
+                Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vregMulsRes2, vregExpRes2, (half)quantScaleP,
+                                                                   pregAllB16);
 
-                Reg::Cast<int8_t, half, castTrait>(vreg_res_1, vreg_muls_res_1, preg_all_b16);
-                Reg::Cast<int8_t, half, castTrait>(vreg_res_2, vreg_muls_res_2, preg_all_b16);
+                Reg::Cast<int8_t, half, castTrait>(vregRes1, vregMulsRes1, pregAllB16);
+                Reg::Cast<int8_t, half, castTrait>(vregRes2, vregMulsRes2, pregAllB16);
 
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res_1,
-                                                                       (Reg::RegTensor<uint16_t>&)vreg_res_1);
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res_2,
-                                                                       (Reg::RegTensor<uint16_t>&)vreg_res_2);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vregRes1,
+                                                                       (Reg::RegTensor<uint16_t>&)vregRes1);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vregRes2,
+                                                                       (Reg::RegTensor<uint16_t>&)vregRes2);
 
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t*&)expUb1, vreg_res_1, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb1, vregRes1, blockStride, repeatStride, pregS8);
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t*&)expUb2, vreg_res_2, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb2, vregRes2, blockStride, repeatStride, pregS8);
             } else {
-                Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2*&)expUb1, vreg_exp_res_1, blockStride, repeatStride, preg_all_b16);
-                Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2*&)expUb2, vreg_exp_res_2, blockStride, repeatStride, preg_all_b16);
+                StoreExp(expUb1, vregExpRes1, blockStride, repeatStride, pregAllB16, quantScaleP);
+                StoreExp(expUb2, vregExpRes2, blockStride, repeatStride, pregAllB16, quantScaleP);
             }
 
-            Reg::Add<half, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_exp_res_1, vreg_exp_res_2, preg_all_b16);
-            Reg::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
-            Reg::Cast<float, half, castTrait1>(vreg_exp_odd, vreg_exp_res, preg_all_b16);
-            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_even, vreg_exp_odd, preg_all_b32);
-            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum, vreg_exp_sum, preg_all_b32);
-            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, vreg_exp_sum, ureg_exp_sum, 1);
+            Reg::Add<half, Reg::MaskMergeMode::ZEROING>(vregExpRes, vregExpRes1, vregExpRes2, pregAllB16);
+            Reg::Cast<float, half, castTrait0>(vregExpEven, vregExpRes, pregAllB16);
+            Reg::Cast<float, half, castTrait1>(vregExpOdd, vregExpRes, pregAllB16);
+            Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vregExpSum, vregExpEven, vregExpOdd, pregAllB32);
+            Reg::ReduceSum<float, float, Reg::MaskMergeMode::ZEROING>(vregExpSum, vregExpSum, pregAllB32);
+            Reg::DataCopyUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, vregExpSum, uregExpSum, 1);
         }
-        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, ureg_exp_sum, 0);
+        Reg::DataCopyUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(tmpExpSumUb, uregExpSum, 0);
         mem_bar(VST_VLD);
 
-        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg_in_exp_sum_even, vreg_in_exp_sum_odd, inExpSumUb);
-        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vreg_exp_sum_brc_even, vreg_exp_sum_brc_odd,
-                                                             tmpExpSumUbStart);
-        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_max_even, vreg_in_exp_sum_even,
-                                                     preg_all_b32);
-        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_max_odd, vreg_in_exp_sum_odd,
-                                                     preg_all_b32);
-        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_even, vreg_exp_sum_update_even,
-                                                     vreg_exp_sum_brc_even, preg_all_b32);
-        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vreg_exp_sum_update_odd, vreg_exp_sum_update_odd,
-                                                     vreg_exp_sum_brc_odd, preg_all_b32);
-        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expSumUb, vreg_exp_sum_update_even,
-                                                             vreg_exp_sum_update_odd, preg_all_b32);
+        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vregInExpSumEven, vregInExpSumOdd, inExpSumUb);
+        Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(vregExpSumBrcEven, vregExpSumBrcOdd, tmpExpSumUbStart);
+        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vregExpSumUpdateEven, vregExpMaxEven, vregInExpSumEven,
+                                                     pregAllB32);
+        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(vregExpSumUpdateOdd, vregExpMaxOdd, vregInExpSumOdd, pregAllB32);
+        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vregExpSumUpdateEven, vregExpSumUpdateEven, vregExpSumBrcEven,
+                                                     pregAllB32);
+        Reg::Add<float, Reg::MaskMergeMode::ZEROING>(vregExpSumUpdateOdd, vregExpSumUpdateOdd, vregExpSumBrcOdd,
+                                                     pregAllB32);
+        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(expSumUb, vregExpSumUpdateEven, vregExpSumUpdateOdd,
+                                                             pregAllB32);
     }
 }
 
@@ -670,43 +654,36 @@ __aicore__ inline void SoftmaxFlashV510Update8(
  * @param [out] expSumTensor, out sum(exp(x-max)) of last axis
  * @param [out] maxTensor, out max value of last axis
  * @param [out] expMaxTensor, output expmax LocalTensor
- * @param [in] srcTensor, input LocalTensor
+ * @param [in] inSrcTensor, input LocalTensor
  * @param [in] inExpSumTensor, in sum(exp(x-max)) of last softmax result
  * @param [in] inMaxTensor, in max value of last softmax result
- * @param [in] maskTensor, atten mask LocalTensor, each line padding to 32, padding value is 1
- * @param [in] pseTensor, reserved
+ * @param [in] inMaskTensor, atten mask LocalTensor, each line padding to 32, padding value is 1
+ * @param [in] inPseTensor, reserved
  * @param [in] sharedTmpBuffer, input local temporary Tensor
  * @param [in] m, input rows
- * @param [in] originN, input origin colums, support range for sInner is: 0 < sInner <= 128
+ * @param [in] originN, input origin columns, support range for sInner is: 0 < sInner <= 128
  * @param [in] scale, scale value
  * @param [in] minValue, minimum value
- * @param [in] isBmm2Concat, reserved
+ * @param [in] quantScaleP, quant scale for softmax output
  * @param [in] isUpdate, enable flash mode
  * @param [in] mode
  *  mode 0: 64 < originN <= 128, and originN is not 8 aligned
  *  mode 1: 64 < originN <= 128, and originN is 8 aligned
  *  mode 2: 0 < originN <= 64
  * @param [in] hasAtten, indicates whether there is atten_mask
- * @param [in] hasPse, indicates whether there is pse_shift
  */
 template <typename T, typename T2, bool isUpdate = false, uint8_t mode = 0, uint32_t sOuter = 0, uint32_t sInner = 0,
           bool hasAtten = false>
-__aicore__ inline void SoftmaxFlashV510_VF(const LocalTensor<T2>& dstTensor, const LocalTensor<float>& expSumTensor,
-                                           const LocalTensor<T>& maxTensor, const LocalTensor<float>& expMaxTensor,
-                                           const LocalTensor<T>& inSrcTensor, const LocalTensor<float>& inExpSumTensor,
-                                           const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& inMaskTensor,
-                                           const LocalTensor<T>& inPseTensor,
-                                           const LocalTensor<uint8_t>& sharedTmpBuffer, const uint32_t m,
-                                           const uint32_t originN, const T scale, const T minValue, float quantScaleP)
+__aicore__ inline void SoftmaxFlashV510Vf(const LocalTensor<T2>& dstTensor, const LocalTensor<float>& expSumTensor,
+                                          const LocalTensor<T>& maxTensor, const LocalTensor<float>& expMaxTensor,
+                                          const LocalTensor<T>& inSrcTensor, const LocalTensor<float>& inExpSumTensor,
+                                          const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& inMaskTensor,
+                                          const LocalTensor<T>& inPseTensor,
+                                          const LocalTensor<uint8_t>& sharedTmpBuffer, const uint32_t m,
+                                          const uint32_t originN, const T scale, const T minValue, float quantScaleP)
 {
-    constexpr uint32_t blockU8 = 32;
-    uint32_t blockN = 0;
-    if constexpr (IsSameType<T2, int8_t>::value) {
-        blockN = 32;
-    } else {
-        blockN = 16;
-    }
-    // NZ分形间距，单位为16元素的block数，即S1方向的行距；1个cube对应1个vector，vec1算完整的S1基本块，|1错开bank
+    // NZ fractal stride, in units of 16-element blocks (the S1-direction row stride); 1 cube maps to
+    // 1 vector, vec1 computes the whole S1 base block, and the |1 avoids bank conflicts.
     uint16_t blockStride = sOuter | 0x1;
 
     if constexpr (!isUpdate) {

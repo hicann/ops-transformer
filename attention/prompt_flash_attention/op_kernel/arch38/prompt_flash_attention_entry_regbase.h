@@ -81,6 +81,12 @@ inline __aicore__ void prompt_flash_attention_FIAS_regbase(
     TILING_KEY_IS(1001311000100001212);
     TILING_KEY_IS(1001311000100021212);
     TILING_KEY_IS(1002122000100021012);
+
+    TILING_KEY_IS(1002312000040001012);
+    TILING_KEY_IS(1002312000100001012);
+    TILING_KEY_IS(1003113000100001012);
+    TILING_KEY_IS(1001311000100001012);
+
     TILING_KEY_IS(1000000000000000090);
 
 #if TILING_KEY_VAR == 1002312000040001212
@@ -149,6 +155,30 @@ inline __aicore__ void prompt_flash_attention_FIAS_regbase(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, int8_t, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned64, S2TemplateType::Aligned256, DTemplateType::Aligned128,
         DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
+#elif TILING_KEY_VAR == 1002312000040001012
+    // BNSD layout HighPerformance, no mask, no pse, D128, FP16 noquant, FP16 out, S1=128/S2=128
+    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+        BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
+        LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned128,
+        DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, false, false, false, true, false, false);
+#elif TILING_KEY_VAR == 1002312000100001012
+    // BNSD layout HighPerformance, with mask, no pse, D128, FP16 noquant, FP16 out, S1=128/S2=128
+    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+        BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
+        LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned128,
+        DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
+#elif TILING_KEY_VAR == 1003113000100001012
+    // BNSD layout HighPerformance, with mask, no pse, D256, FP16 noquant, FP16 out, S1=64/S2=128
+    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+        BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
+        LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned64, S2TemplateType::Aligned128, DTemplateType::Aligned256,
+        DTemplateType::Aligned256, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
+#elif TILING_KEY_VAR == 1001311000100001012
+    // BNSD layout HighPerformance, with mask, no pse, D64, FP16 noquant, FP16 out, S1=128/S2=128
+    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+        BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
+        LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned64,
+        DTemplateType::Aligned64, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1000000000000000090
     INVOKE_PFA_DUMMY();
 #endif

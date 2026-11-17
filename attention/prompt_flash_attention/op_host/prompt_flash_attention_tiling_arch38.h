@@ -28,10 +28,24 @@ std::string GetPfaDataTypeStr(ge::DataType type);
 constexpr int64_t ARCH38_SUPPORTED_D_64 = 64;
 constexpr int64_t ARCH38_SUPPORTED_D_80 = 80;
 constexpr int64_t ARCH38_SUPPORTED_D_128 = 128;
+constexpr int64_t ARCH38_SUPPORTED_D_256 = 256;
 
 inline bool IsArch38SupportedHeadSize(int64_t d)
 {
-    return (d == ARCH38_SUPPORTED_D_64) || (d == ARCH38_SUPPORTED_D_80) || (d == ARCH38_SUPPORTED_D_128);
+    return (d == ARCH38_SUPPORTED_D_64) || (d == ARCH38_SUPPORTED_D_80) || (d == ARCH38_SUPPORTED_D_128) ||
+           (d == ARCH38_SUPPORTED_D_256);
+}
+
+// arch38 已注册模板覆盖的 dtype 组合，PFA 与 IFA 两条场景门禁共用：
+// Q/K/V 需同为 fp16 或同为 int8，输出为 fp16 或 int8；d = 256 仅有 fp16 Q/K/V -> fp16 输出的模板。
+inline bool IsArch38SupportedDataType(ge::DataType queryDtype, ge::DataType kvDtype, ge::DataType outputDtype,
+                                      int64_t d)
+{
+    if ((queryDtype != kvDtype) || ((queryDtype != ge::DT_FLOAT16) && (queryDtype != ge::DT_INT8)) ||
+        ((outputDtype != ge::DT_FLOAT16) && (outputDtype != ge::DT_INT8))) {
+        return false;
+    }
+    return (d != ARCH38_SUPPORTED_D_256) || ((queryDtype == ge::DT_FLOAT16) && (outputDtype == ge::DT_FLOAT16));
 }
 
 class PromptFlashAttentionTilingArch38 : public FiaTilingBase {
@@ -239,6 +253,8 @@ protected:
     ge::graphStatus SetQKVStartIdx(ContextParamsForPFATiling& contextKeyParams);
     bool CheckAlibiPseCrossover(ContextParamsForPFATiling& contextKeyParams);
 
+    bool CheckArch38PlatformSupported(const ContextParamsForPFATiling& contextKeyParams,
+                                      const PFAShapeInfo& queryShapeInfo, const PFAShapeInfo& valueShapeInfo) const;
     bool CheckArch38ScenarioSupported(const ContextParamsForPFATiling& contextKeyParams,
                                       const PFAShapeInfo& queryShapeInfo, const PFAShapeInfo& valueShapeInfo) const;
 

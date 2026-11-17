@@ -25,6 +25,15 @@ using matmul::MatmulType;
 using namespace AscendC;
 
 constexpr uint64_t BLOCK_BYTE = 32;
+constexpr uint64_t VECTOR_LENGTH_BYTES = 256;
+// FlashUpdate 尾块按整 VL 载入：当行宽不是 VL 的整数倍时，最后一行会多读最多一个 VL。
+// buffer 按最大使用行数分配后，需要在末尾预留一个 VL，避免最后一行读到分配区之后。
+// 返回需要预留的字节数（0 表示无需预留）。
+template <typename T, uint32_t dSize>
+__aicore__ inline constexpr uint32_t VfTailReadPadBytes()
+{
+    return ((dSize * sizeof(T)) % VECTOR_LENGTH_BYTES != 0U) ? static_cast<uint32_t>(VECTOR_LENGTH_BYTES) : 0U;
+}
 constexpr int32_t SOFTMAX_M_ALIGNED_SIZE = 8;
 constexpr int32_t SOFTMAX_K_ALIGNED_SIZE = 64;
 constexpr uint64_t DATACOPYPAD_PADDING_VALUE_ZERO = 0;
@@ -148,6 +157,17 @@ __aicore__ constexpr bool IsDn(bool isFp32, bool isValidFp8, regbaseutil::PseTyp
         return true;
     }
     return false;
+}
+
+// BMM2 结果是否单缓冲。单缓冲省一块 UB，但代价是 BMM2↔Vec2 串行，且同步槽必须退化为单槽
+// （见 syncC2V2 槽位索引）。KernelBase/FABlockCube/FABlockVecBase 三处统一从此函数取值，
+// 避免公式漂移导致 buffer 块数与同步槽数错配（会引入 BMM2↔Vec2 读写竞争）。
+template <typename INPUT_T, typename OUTPUT_T>
+__aicore__ constexpr bool IsSingleBmm2Res(bool useDn, bool isFp8, bool hasAtten,
+                                          regbaseutil::DTemplateType dVTemplateType)
+{
+    return (useDn && isFp8) || (IsSameType<INPUT_T, half>::value && IsSameType<OUTPUT_T, half>::value && hasAtten &&
+                                ((uint16_t)dVTemplateType == (uint16_t)regbaseutil::DTemplateType::Aligned128));
 }
 
 template <typename INPUT_T>

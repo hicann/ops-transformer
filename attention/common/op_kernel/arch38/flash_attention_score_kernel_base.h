@@ -89,6 +89,10 @@ public:
     static constexpr bool isFp8 = CubeBlockType::isFp8;
     /* 是否使能dn的信息; 没有可选输入并且S2切分的时候使用dn，s2比较小的时候nd效果更好 */
     static constexpr bool useDn = CubeBlockType::useDn;
+    // bmm2 结果是否用单缓冲：useDn&&isFp8 原本就用单缓冲；此外 fp16→fp16 的 D128+mask 模板
+    // (s1=128/s2=128/d=128/hasAtten) 是 UB 最紧的组合(超限 1280 B，开 LSE 超 5376 B)，
+    // 仅对它降单缓冲省一块 UB。其余 fp16→fp16 场景(D128无mask/D256/D64)UB 充裕，保持双缓冲避免串行损失性能。
+    static constexpr bool useSingleBmm2Res = IsSingleBmm2Res<INPUT_T, OUTPUT_T>(useDn, isFp8, hasAtten, dVTemplateType);
     static constexpr TPosition bmm2OutPos = CubeBlockType::bmm2OutPos;
     static constexpr bool bmm2Write2Ub = CubeBlockType::bmm2Write2Ub;
     static constexpr bool splitD = CubeBlockType::splitD;
@@ -100,7 +104,7 @@ public:
 
     BufferManager<BufferType::UB> ubBufferManager;
     BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm1Buffers;
-    using bmm2ResBufferType = typename Bmm2ResBuffSel<useDn, isFp8>::Type;
+    using bmm2ResBufferType = typename Bmm2ResBuffSel<useSingleBmm2Res>::Type;
     bmm2ResBufferType bmm2Buffers;
 
     // mm2左矩阵P
@@ -241,15 +245,18 @@ template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreKernelBase<ChildClass, CubeBlockType, VecBlockType>::InitMMResBuf()
 {
     constexpr uint32_t mm1ResultSize = s1BaseSize / CV_RATIO * s2BaseSize * sizeof(T);
-    constexpr uint32_t mm2ResultSize = s1BaseSize / CV_RATIO * dTemplateAlign64 *
-                                       sizeof(T); // CV数量之比暂时定义为宏，后续应根据硬件版本定义为相应常量
+    // CV数量之比暂时定义为宏，后续应根据硬件版本定义为相应常量
+    // FlashUpdate 尾块按整 VL 载入，最后一行可能多读一个 VL；mm2 结果缓冲按 s1BaseSize 行分配，
+    // 与 stage2OutBuf 共用同一 pad 规则（VfTailReadPadBytes）。
+    constexpr uint32_t mm2TailPad = VfTailReadPadBytes<T, dTemplateAlign64>();
+    constexpr uint32_t mm2ResultSize = s1BaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T) + mm2TailPad;
     constexpr uint32_t mm2LeftSize = s1BaseSize * s2BaseSize * sizeof(INPUT_T);
     l1BufferManager.Init(pipe, 524288); // 512 * 1024
     // 保存p结果的L1内存必须放在第一个L1 policy上，保证和vec申请的地址相同
     l1PBuffers.Init(l1BufferManager, mm2LeftSize);
 
     if constexpr (bmm2Write2Ub) {
-        if constexpr (!(useDn && isFp8)) {
+        if constexpr (!useSingleBmm2Res) {
             ubBufferManager.Init(pipe, mm1ResultSize * 2 + mm2ResultSize * 2);
             bmm2Buffers.Init(ubBufferManager, mm2ResultSize);
         } else {
@@ -530,7 +537,7 @@ __aicore__ inline void FlashAttentionScoreKernelBase<ChildClass, CubeBlockType, 
     runInfo.halfS1RealSize = runParam.halfS1RealSize;
     runInfo.firstHalfS1RealSize = runParam.firstHalfS1RealSize;
 
-    runInfo.vec2S1BaseSize = runInfo.halfS1RealSize; // D>128 这里需要适配
+    runInfo.vec2S1BaseSize = runInfo.s1RealSize;
 
     // ------------------------S2 Base Related----------------------------
     runInfo.s2RealSize = s2BaseSize;
