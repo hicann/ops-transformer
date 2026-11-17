@@ -109,7 +109,7 @@ cann_ops_transformer.stem_oam_prep_varlen_q(q, q_seq_lens, cu_seq_lens_q, *, q_s
         <td>stem_block_size</td>
         <td>int</td>
         <td>可选</td>
-        <td>表示stem block大小，对应公式中B。控制每个stem block的token数量，决定Q Processing的分组粒度。默认值128。</td>
+        <td>表示stem block大小，对应公式中B。控制每个stem block的token数量，决定Q侧预处理的分组粒度。默认值128。</td>
         <td>-</td>
         <td>-</td>
     </tr>

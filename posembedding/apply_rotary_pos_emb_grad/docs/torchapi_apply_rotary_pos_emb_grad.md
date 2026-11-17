@@ -106,7 +106,7 @@ cann_ops_transformer.apply_rotary_pos_emb_grad(
 | sin | Tensor | 必选 | 正向计算输入的正弦值张量，shape需与`cos`一致。 | 同grad_query_embed | 同cos |
 | query | Tensor | 可选 | 正向计算输入`query`。传入时计算`grad_cos`和`grad_sin`；必须与`key`同时传入或同时不传入。默认值为`None`。 | 同grad_query_embed | 与grad_query_embed一致 |
 | key | Tensor | 可选 | 正向计算输入`key`。传入时计算`grad_cos`和`grad_sin`；必须与`query`同时传入或同时不传入。默认值为`None`。 | 同grad_query_embed | 与grad_key_embed一致 |
-| rotary_mode | str | 可选 | 旋转编码模式，仅支持`"half"`，默认值为`"half"`。 | - | - |
+| rotary_mode | str | 可选 | 旋转位置编码模式，仅支持`"half"`，默认值为`"half"`。 | - | - |
 | layout | int | 可选 | 输入张量布局格式，1表示BSND，2表示SBND，4表示TND，默认值为1。 | - | - |
 
 ## 返回值说明
