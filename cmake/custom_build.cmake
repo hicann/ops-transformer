@@ -399,6 +399,19 @@ get_target_property(base_aclnn_srcs op_host_aclnn SOURCES)
 get_target_property(base_aclnn_inner_srcs op_host_aclnnInner SOURCES)
 get_target_property(base_aclnn_exclude_srcs op_host_aclnnExc SOURCES)
 
+# Add the helper after capturing operator sources so it cannot turn an empty
+# registration library into a nonempty operator category.
+include(${CMAKE_CURRENT_LIST_DIR}/op_arch_helper.cmake)
+if(base_aclnn_srcs)
+    add_registration_arch_helper(op_host_aclnn)
+endif()
+if(base_aclnn_inner_srcs)
+    add_registration_arch_helper(op_host_aclnnInner)
+endif()
+if(base_aclnn_exclude_srcs)
+    add_registration_arch_helper(op_host_aclnnExc)
+endif()
+
 if (BUILD_OPEN_PROJECT)
     set(base_aclnn_binary_dir ${ASCEND_AUTOGEN_DIR})
 else()

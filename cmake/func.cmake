@@ -497,12 +497,31 @@ function(add_ops_info_target)
     endif()
 endfunction()
 
+include(${CMAKE_CURRENT_LIST_DIR}/npu_arch.cmake)
+
+# COMPUTE_UNIT additionally accepts NPU architecture names. Architecture
+# entries are expanded before either options backend sees them; existing SoC
+# entries retain their prior backend-specific interpretation.
 function(add_ops_compile_options)
     cmake_parse_arguments(OP_COMPILE "" "OP_NAME" "COMPUTE_UNIT;OPTIONS" ${ARGN})
 
     if(NOT OP_COMPILE_OPTIONS)
         return()
     endif()
+
+    set(_compile_units "")
+    set(_compile_unit_keys "")
+    foreach(_unit IN LISTS OP_COMPILE_COMPUTE_UNIT)
+        expand_compile_compute_unit("${_unit}" _expanded_units)
+        foreach(_expanded_unit IN LISTS _expanded_units)
+            string(TOLOWER "${_expanded_unit}" _unit_key)
+            if(NOT _unit_key IN_LIST _compile_unit_keys)
+                list(APPEND _compile_units "${_expanded_unit}")
+                list(APPEND _compile_unit_keys "${_unit_key}")
+            endif()
+        endforeach()
+    endforeach()
+    set(OP_COMPILE_COMPUTE_UNIT "${_compile_units}")
 
     if(ADD_OPS_COMPILE_OPTION_V2)
         execute_process(COMMAND ${HI_PYTHON} ${ASCENDC_CMAKE_UTIL_DIR}/ascendc_gen_options.py

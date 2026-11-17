@@ -13,6 +13,52 @@
 # ACLNNEXTRAVERSION 算子版本(ex., v2, v3, v5, etc.)
 # OPTYPE 和 ACLNNTYPE 需一一对应
 
+include(${CMAKE_CURRENT_LIST_DIR}/npu_arch.cmake)
+
+# COMPUTE_UNIT and TILING_DIR are positional pairs. SoC entries are mapped to
+# their NPU arch; the first matching pair wins for each selected build SoC.
+# Explicit pairs replace the default tiling directories, including any
+# per-operator additions. Callers must list every directory they require.
+function(select_tiling_directories out units directories build_units)
+  list(LENGTH units _unit_count)
+  list(LENGTH directories _dir_count)
+  if(NOT _unit_count EQUAL _dir_count OR _unit_count EQUAL 0)
+    message(FATAL_ERROR "COMPUTE_UNIT and TILING_DIR must be non-empty lists of equal length")
+  endif()
+  set(_keys "")
+  foreach(_unit IN LISTS units)
+    get_npu_arch_by_soc_version("${_unit}" _arch)
+    if(NOT _arch)
+      string(TOLOWER "${_unit}" _arch)
+    endif()
+    list(APPEND _keys "${_arch}")
+  endforeach()
+  set(_selected "")
+  foreach(_soc IN LISTS build_units)
+    get_npu_arch_by_soc_version("${_soc}" _arch)
+    if(NOT _arch)
+      # Retain exact SoC matching for platforms without a known NPU arch.
+      string(TOLOWER "${_soc}" _arch)
+    endif()
+    list(FIND _keys "${_arch}" _index)
+    if(NOT _index EQUAL -1)
+      list(GET directories ${_index} _directory)
+      list(APPEND _selected "${_directory}")
+    else()
+      if(DEFINED OPS_NAME AND NOT "${OPS_NAME}" STREQUAL "")
+        set(_tiling_owner "${OPS_NAME}")
+      else()
+        set(_tiling_owner "${CMAKE_CURRENT_SOURCE_DIR}")
+      endif()
+      message(WARNING "[${_tiling_owner}] No TILING_DIR match for SoC '${_soc}' "
+        "(architecture '${_arch}'; configured COMPUTE_UNIT: ${units}). "
+        "Explicit tiling configuration replaces the default directories.")
+    endif()
+  endforeach()
+  list(REMOVE_DUPLICATES _selected)
+  set(${out} "${_selected}" PARENT_SCOPE)
+endfunction()
+
 function(extract_ops_name SOURCE_DIR OUTPUT_VAR)
   get_filename_component(PARENT_DIR ${SOURCE_DIR} DIRECTORY)
   get_filename_component(OPS_NAME ${PARENT_DIR} NAME)
@@ -196,7 +242,8 @@ endmacro()
 
 macro(add_modules_sources_with_soc)
   set(oneValueArgs OP_API_INDEPENDENT OP_API_DIR OP_MC2_ENABLE HOSTCPU)
-  set(multiValueArgs OPTYPE ACLNNTYPE)
+  # Optional per-operator tiling directories, paired with SoC or NPU arch.
+  set(multiValueArgs OPTYPE ACLNNTYPE COMPUTE_UNIT TILING_DIR)
 
   cmake_parse_arguments(MODULE "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
   set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -297,7 +344,12 @@ macro(add_modules_sources_with_soc)
     endif()
   endif()
 
-  foreach(ARCH ${OP_ARCH_DIRECTORY})
+  set(OPTILING_ARCH_DIRECTORY ${OP_ARCH_DIRECTORY})
+  if(MODULE_COMPUTE_UNIT OR MODULE_TILING_DIR)
+    select_tiling_directories(OPTILING_ARCH_DIRECTORY "${MODULE_COMPUTE_UNIT}"
+        "${MODULE_TILING_DIR}" "${ASCEND_COMPUTE_UNIT}")
+  endif()
+  foreach(ARCH ${OPTILING_ARCH_DIRECTORY})
   if (MODULE_OP_MC2_ENABLE)
     file(GLOB_RECURSE files ${SOURCE_DIR}/op_tiling/${ARCH}/*.cpp)
   else()
