@@ -175,7 +175,7 @@ TEST_F(aclnn_generic_block_sparse_attention_ut, normal)
 TEST_F(aclnn_generic_block_sparse_attention_ut, int8_dense_tnd_workspace)
 {
     op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
-    for (int64_t headDim : {1, 17, 128, 129, 250, 255, 256}) {
+    for (int64_t headDim : {128, 256}) {
         auto query = TensorDesc({4, 8, headDim}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-8, 8);
         auto key = TensorDesc({257, 2, headDim}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-8, 8);
         auto sparseBlockIdx = TensorDesc({2, 4, 3}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0});
@@ -188,7 +188,7 @@ TEST_F(aclnn_generic_block_sparse_attention_ut, int8_dense_tnd_workspace)
         auto cuSeqLengthsQ = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 4});
         auto cuSeqLengthsKv = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 257});
         for (int64_t residualBlockMode : {0, 1}) {
-            for (int64_t blockShapeY : {1, 2, 4, 8, 16, 32, 64, 128}) {
+            for (int64_t blockShapeY : {4, 8, 16, 32, 64, 128}) {
                 auto blockShape = IntArrayDesc(vector<int64_t>{1, blockShapeY});
                 auto output = TensorDesc({4, 8, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
                 char layout[] = "TND";

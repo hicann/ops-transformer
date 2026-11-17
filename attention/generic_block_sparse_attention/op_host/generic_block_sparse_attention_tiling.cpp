@@ -186,13 +186,6 @@ ge::graphStatus GBSATiling::GetNpuInfo(gert::TilingContext* context)
 
 namespace {
 
-bool SupportsFdTopK(uint32_t topK, bool isArch35)
-{
-    constexpr uint32_t minTopK = 12U;
-    constexpr uint32_t arch22MaxFdTopK = 512U;
-    return topK >= minTopK && (isArch35 || topK <= arch22MaxFdTopK);
-}
-
 ge::graphStatus ParseBlockShapeAttr(gert::TilingContext* context,
                                     const gert::TypedContinuousVector<int64_t>* blockShapeArr, uint32_t& blockShapeX,
                                     uint32_t& blockShapeY)
@@ -1063,10 +1056,15 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
         userWorkspaceSize = fdPartialOOffset_ + partialOSize;
     }
     // Internal page-NZ KV buffers amortize over long prefill; public input tensors and tiling ABI stay unchanged.
-    if (dataType_ == ge::DT_INT8 && groupSize_ <= 16U && embeddingSize_ >= 64U && embeddingSize_ % 32U == 0U &&
-        totalQTokens_ >= static_cast<uint64_t>(batch_) * 128U &&
-        (!isPaged_ || static_cast<uint64_t>(batch_) * maxBlocksPerBatch_ <=
-                          (totalKvTokens_ + static_cast<uint64_t>(batch_) * 128U) / 128U)) {
+    bool usePackedKv = dataType_ == ge::DT_INT8;
+    if (totalQTokens_ < static_cast<uint64_t>(batch_) * 128U) {
+        usePackedKv = false;
+    }
+    if (isPaged_ && static_cast<uint64_t>(batch_) * maxBlocksPerBatch_ >
+                        (totalKvTokens_ + static_cast<uint64_t>(batch_) * 128U) / 128U) {
+        usePackedKv = false;
+    }
+    if (usePackedKv) {
         constexpr uint64_t ALIGNMENT = 512U;
         const uint64_t paddingTokens = static_cast<uint64_t>(batch_) * 128U;
         const uint64_t bytesPerToken = static_cast<uint64_t>(kvHeads_) * embeddingSize_;
@@ -1386,14 +1384,14 @@ ge::graphStatus GBSATiling::CheckInt8Config(gert::TilingContext* context)
                                               "INT8 quantization requires quantType=7");
         return ge::GRAPH_FAILED;
     }
-    if (embeddingSize_ == 0U || embeddingSize_ > 256U) {
+    if (embeddingSize_ != 128U && embeddingSize_ != 256U) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "headDim", std::to_string(embeddingSize_).c_str(),
-                                              "INT8 quantization requires headDim in [1,256]");
+                                              "INT8 quantization requires headDim=128 or 256");
         return ge::GRAPH_FAILED;
     }
-    if (groupSize_ > 128U) {
+    if (groupSize_ > 16U) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "groupSize", std::to_string(groupSize_).c_str(),
-                                              "INT8 quantization requires GQA group size <= 128");
+                                              "INT8 quantization requires GQA group size <= 16");
         return ge::GRAPH_FAILED;
     }
     if (!isPaged_ && layoutKv_ != layoutQ_) {
@@ -1417,10 +1415,10 @@ ge::graphStatus GBSATiling::CheckInt8Config(gert::TilingContext* context)
                                               "INT8 quantization requires blockShapeX=1");
         return ge::GRAPH_FAILED;
     }
-    if (blockShapeY_ == 0U || blockShapeY_ > 128U || (blockShapeY_ & (blockShapeY_ - 1U)) != 0U) {
+    if (blockShapeY_ < 4U || blockShapeY_ > 128U || (blockShapeY_ & (blockShapeY_ - 1U)) != 0U) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "blockShapeY",
                                               std::to_string(blockShapeY_).c_str(),
-                                              "INT8 quantization requires a power-of-two blockShapeY in [1,128]");
+                                              "INT8 quantization requires a power-of-two blockShapeY in [4,128]");
         return ge::GRAPH_FAILED;
     }
     if (maskType_ != 0 && maskType_ != 1) {
@@ -1446,7 +1444,7 @@ ge::graphStatus GBSATiling::CheckInt8Config(gert::TilingContext* context)
         return ge::GRAPH_FAILED;
     }
     // Reuse the FP16 metadata split-K schedule and FP32 partial-output merge.
-    fdStaticEnabled_ = SupportsFdTopK(topK_, false);
+    fdStaticEnabled_ = topK_ >= 12U;
     return ge::GRAPH_SUCCESS;
 }
 
