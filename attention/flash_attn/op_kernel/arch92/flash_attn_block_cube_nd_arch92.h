@@ -103,8 +103,6 @@ public:
     static constexpr uint32_t L1_Q_BUF_BYTES = mBaseSize * dBaseSize * sizeof(Q_T);
     static constexpr uint32_t L1_KV_BUFCNT = FA_T::L1_KV_BUFCNT;
     static constexpr uint32_t L1_KV_BUF_BYTES = s2BaseSize * dBaseSize * sizeof(KV_T);
-    // D=256，当前S2切256，L0B如果要开DB，需要切N切K，当前matmul.h不支持，后续确定切块后修复
-    static constexpr bool L0B_DB = !(s2BaseSize == 256U && dBaseSize > 128U);
     // buffer位置+用途+Buffers, 例如l1PBuffers; 使用时命名: 用途+buffer位置+Tensor, 例如pL1Tensor
     LocalTensor<uint8_t> l1PBuffers_;
     LocalTensor<uint8_t> l1QBuffers_;
@@ -121,10 +119,9 @@ public:
     fa_base_matmul::BufferManager<fa_base_matmul::BufferType::L0B> l0bBufferManager_;
     using L0APolicyType =
         BuffersPolicyDB<BufferType::L0A, SyncType::INNER_CORE_SYNC, SyncMode::LOCK_UNLOCK, IdSource::EXTERNAL>;
-    using L0BPolicyType = std::conditional_t<
-        L0B_DB, BuffersPolicyDB<BufferType::L0B, SyncType::INNER_CORE_SYNC, SyncMode::LOCK_UNLOCK, IdSource::EXTERNAL>,
-        BuffersPolicySingleBuffer<BufferType::L0B, SyncType::INNER_CORE_SYNC, SyncMode::LOCK_UNLOCK,
-                                  IdSource::EXTERNAL>>;
+    // D>128 的满块把 K、N 都切到 128，其余 D<=128 的 L0B 块也不超过 32 KiB，L0B 恒用双缓冲。
+    using L0BPolicyType =
+        BuffersPolicyDB<BufferType::L0B, SyncType::INNER_CORE_SYNC, SyncMode::LOCK_UNLOCK, IdSource::EXTERNAL>;
     L0APolicyType mmL0APolicy_;
     L0BPolicyType mmL0BPolicy_;
 
@@ -217,20 +214,18 @@ public:
 
     __aicore__ inline void UnInitCrossCoreSync()
     {
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1_0);
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1_1);
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM2_0);
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM2_1);
+        for (uint32_t i = 0; i < UB_MM1_RES_BUFCNT; ++i) {
+            CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1_0 + i);
+        }
+        for (uint32_t i = 0; i < UB_MM2_RES_BUFCNT; ++i) {
+            CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM2_0 + i);
+        }
     }
 
     __aicore__ inline void AllocEventID()
     {
         mmL0APolicy_.Init(l0aBufferManager_, BUFFER_SIZE_BYTE_32K, L0A_BUFFER_ID0, L0A_BUFFER_ID1);
-        if constexpr (L0B_DB) {
-            mmL0BPolicy_.Init(l0bBufferManager_, BUFFER_SIZE_BYTE_32K, L0B_BUFFER_ID0, L0B_BUFFER_ID1);
-        } else {
-            mmL0BPolicy_.Init(l0bBufferManager_, BUFFER_SIZE_BYTE_32K, L0B_BUFFER_ID0);
-        }
+        mmL0BPolicy_.Init(l0bBufferManager_, BUFFER_SIZE_BYTE_32K, L0B_BUFFER_ID0, L0B_BUFFER_ID1);
     }
 
     __aicore__ inline void FreeEventID()
@@ -329,23 +324,16 @@ public:
         CopyKeySlice(kL1Tensor, 0, constInfo_.dSize, runInfo);
         Mutex::Unlock<PIPE_MTE2>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         Mutex::Lock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
-        {
+        if constexpr (dBaseSize > 128) {
+            MMParam param = MakeMMParam(runInfo.actMSize, runInfo.actSingleLoopS2Size, constInfo_.dSize, false, true);
+            IterateBmmKnSplit(mm1ResUbTensor, qL1Tensor, kL1Tensor, param, 0, runInfo);
+        } else {
             Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
             MMParam param = MakeMMParam((uint32_t)runInfo.actMSize, (uint32_t)runInfo.actSingleLoopS2Size,
                                         (uint32_t)(constInfo_.dSize), false, true);
-            if constexpr (dBaseSize > 128) {
-                if constexpr (s2BaseSize == 256) {
-                    MatmulN<Q_T, KV_T, MM_T, 64, 128, 256, ABLayout::MK, ABLayout::KN>(
-                        qL1Tensor, kL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
-                } else {
-                    MatmulK<Q_T, KV_T, MM_T, 128, 128, 128, ABLayout::MK, ABLayout::KN>(
-                        qL1Tensor, kL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
-                }
-            } else {
-                MatmulBase<Q_T, KV_T, MM_T, 128, 128, dBaseSize, ABLayout::MK, ABLayout::KN>(
-                    qL1Tensor, kL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
-            }
+            MatmulBase<Q_T, KV_T, MM_T, 128, 128, dBaseSize, ABLayout::MK, ABLayout::KN>(
+                qL1Tensor, kL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
 
             Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
@@ -361,6 +349,71 @@ public:
         if (unlikely(runInfo.isLastS2Loop)) {
             Mutex::Unlock<PIPE_MTE1>(Q_L1_BUFFER_ID0 + qL1BufId_);
             qL1BufId_ = (qL1BufId_ + 1) % L1_Q_BUFCNT;
+        }
+    }
+
+    // Full tile: two K slices x two N slices. Each N slice retains its own L0C
+    // accumulator until both K slices complete; VEC receives one whole-tile notification.
+    __aicore__ inline void IterateBmmKnSplit(LocalTensor<MM_T>& dstUb, const LocalTensor<Q_T>& aL1,
+                                             const LocalTensor<KV_T>& bL1, const MMParam& param, uint32_t firstL0C,
+                                             RunInfo& runInfo)
+    {
+        // TODO，unit_flag待开启
+        // K、N 各切 128：每块 L0B 为 128x128，占 32 KiB，可乒乓复用。
+        constexpr uint32_t baseK = 128;
+        constexpr uint32_t baseN = 128;
+        const uint32_t kLoops = (param.singleK + baseK - 1) / baseK;
+        const uint32_t nLoops = (param.singleN + baseN - 1) / baseN;
+        const uint32_t aRowStride = AlignUp(param.singleM, 16U);
+        const uint32_t bRowStride = AlignUp(param.isRightTranspose ? param.singleN : param.singleK, 16U);
+        for (uint32_t n = 0; n < nLoops; ++n) {
+            Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + firstL0C + n);
+        }
+        for (uint32_t k = 0; k < kLoops; ++k) {
+            const uint32_t kStart = k * baseK;
+            const uint32_t tileK = AttentionCommon::Min(baseK, param.singleK - kStart);
+            auto aBuffer = mmL0APolicy_.Get();
+            aBuffer.template Wait<HardEvent::M_MTE1>();
+            auto aL0 = aBuffer.template GetTensor<Q_T>();
+            LoadDataToL0A(aL0, aL1, param, kStart * aRowStride, tileK, param.singleM);
+
+            for (uint32_t n = 0; n < nLoops; ++n) {
+                const uint32_t nStart = n * baseN;
+                const uint32_t tileN = AttentionCommon::Min(baseN, param.singleN - nStart);
+                const uint32_t bOffset =
+                    param.isRightTranspose ? kStart * bRowStride + nStart * 16U : nStart * bRowStride + kStart * 16U;
+                auto bBuffer = mmL0BPolicy_.Get();
+                bBuffer.template Wait<HardEvent::M_MTE1>();
+                auto bL0 = bBuffer.template GetTensor<KV_T>();
+                LoadDataToL0B(bL0, bL1, param, bOffset, tileK, tileN);
+                bBuffer.template Set<HardEvent::MTE1_M>();
+                bBuffer.template Wait<HardEvent::MTE1_M>();
+
+                auto cL0 = l0CBuffers_[(firstL0C + n) * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
+                MmadParams mm;
+                mm.m = param.realM == 0 ? param.singleM : param.realM;
+                if (mm.m == 1) {
+                    mm.m = 16;
+                }
+                mm.n = tileN;
+                mm.k = tileK;
+                mm.cmatrixInitVal = k == 0;
+                mm.cmatrixSource = false;
+                mm.unitFlag = 0;
+                Mmad(cL0, aL0, bL0, mm);
+                bBuffer.template Set<HardEvent::M_MTE1>();
+            }
+            // A is shared by both N slices. Release it only after the last MMAD.
+            aBuffer.template Set<HardEvent::M_MTE1>();
+        }
+        for (uint32_t n = 0; n < nLoops; ++n) {
+            const uint32_t cId = L0C_BUFFER_ID0 + firstL0C + n;
+            auto cL0 = l0CBuffers_[(firstL0C + n) * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
+            Mutex::Unlock<PIPE_M>(cId);
+            Mutex::Lock<PIPE_FIX>(cId);
+            // Both BMMs have a 256-element destination row stride on this path.
+            FixpipeMm2PartialN(dstUb[n * baseN], cL0, AttentionCommon::Min(baseN, param.singleN - n * baseN), runInfo);
+            Mutex::Unlock<PIPE_FIX>(cId);
         }
     }
 
@@ -406,7 +459,12 @@ public:
         CopyValueSlice(vL1Tensor, 0, constInfo_.dSizeV, runInfo);
         Mutex::Unlock<PIPE_MTE2>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         Mutex::Lock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
-        {
+        if constexpr (dVBaseSize > 128) {
+            // P is stored with a fixed mBaseSize NZ row stride, including the last M tile.
+            MMParam param = MakeMMParam(mBaseSize, constInfo_.dSizeV, runInfo.actSingleLoopS2Size, false, false, true,
+                                        true, 0, runInfo.actMSize);
+            IterateBmmKnSplit(mm2ResUbTensor, pL1Tensor, vL1Tensor, param, 2, runInfo);
+        } else {
             Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
             MMParam param = {
@@ -418,17 +476,12 @@ public:
             };
             param.realM = (uint32_t)runInfo.actMSize;
 
-            if constexpr (dVBaseSize > 128) {
-                MatmulN<Q_T, KV_T, MM_T, mBaseSize, 128, s2BaseSize, ABLayout::MK, ABLayout::KN>(
+            if constexpr (s2BaseSize == 128) {
+                MatmulFull<Q_T, KV_T, MM_T, 128, dVBaseSize, 128, ABLayout::MK, ABLayout::KN>(
                     pL1Tensor, vL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
             } else {
-                if constexpr (s2BaseSize == 128) {
-                    MatmulFull<Q_T, KV_T, MM_T, 128, dVBaseSize, 128, ABLayout::MK, ABLayout::KN>(
-                        pL1Tensor, vL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
-                } else {
-                    MatmulBase<Q_T, KV_T, MM_T, 128, dVBaseSize, 128, ABLayout::MK, ABLayout::KN>(
-                        pL1Tensor, vL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
-                }
+                MatmulBase<Q_T, KV_T, MM_T, 128, dVBaseSize, 128, ABLayout::MK, ABLayout::KN>(
+                    pL1Tensor, vL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
             }
             Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);

@@ -248,12 +248,15 @@ __simd_vf__ void ProcessVec1UpdateGeneralImpl256VF(
         StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)tmpMaxUb), vreg_input_max, ureg_max, 1);
     }
     StoreUnAlignPost<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)tmpMaxUb), ureg_max, 0);
-    LoadAlign(vreg_in_max, inMaxUb);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
-    LoadAlign(vreg_input_max, tmpMaxUb2); // 获取新的max[s1, 1]
-
-    Max(vreg_max_new, vreg_input_max, vreg_in_max, preg_all); // 计算新、旧max的最大值
-    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)tmpMaxUb2, vreg_max_new, preg_all);
+    // 与 aligned128/unaligned64 的合并逻辑保持一致：按 64 lane 分组覆盖全部 m 行。
+    uint16_t cnt = CeilDivision(m, 64);
+    for (int i = 0; i < cnt; i++) {
+        LoadAlign(vreg_in_max, inMaxUb + i * 64);
+        LoadAlign(vreg_input_max, tmpMaxUb2 + i * 64);            // 获取新的max[s1, 1]
+        Max(vreg_max_new, vreg_input_max, vreg_in_max, preg_all); // 计算新、旧max的最大值
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)tmpMaxUb2 + i * 64, vreg_max_new, preg_all);
+    }
     if constexpr (hasDrop == 1) {
         Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_zero, 0.0f, preg_all);
     }
@@ -364,8 +367,14 @@ __aicore__ inline void ProcessVec1UpdateGeneralImpl256(
     __ubuf__ T* expMaxUb = (__ubuf__ T*)expMaxTensor.GetPhyAddr();
     __ubuf__ T* inMaxUb = (__ubuf__ T*)inMaxTensor.GetPhyAddr();
     __ubuf__ T* tmpExpSumUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr();
-    __ubuf__ T* tmpMaxUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + 64;
-    __ubuf__ T* tmpMaxUb2 = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + 64;
+#if (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+    // 与 UpdateExpSumAndExpMax<T, s1BaseSize> 的 repSize=ceil64(s1BaseSize) 保持一致。
+    const uint32_t tmpMaxOffset = (s1BaseSize + 63U) >> 6 << 6;
+#else
+    const uint32_t tmpMaxOffset = 64U;
+#endif
+    __ubuf__ T* tmpMaxUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + tmpMaxOffset;
+    __ubuf__ T* tmpMaxUb2 = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + tmpMaxOffset;
     __ubuf__ uint32_t* maskUb1 = (__ubuf__ uint32_t*)maskTensor.GetPhyAddr();
     __ubuf__ uint32_t* maskUb2 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize);
     __ubuf__ uint32_t* maskUb3 = (__ubuf__ uint32_t*)(maskTensor.GetPhyAddr() + floatRepSize * 2);

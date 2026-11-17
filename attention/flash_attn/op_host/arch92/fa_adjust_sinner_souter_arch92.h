@@ -19,10 +19,13 @@ namespace optiling {
 namespace flash_attn {
 namespace fa_tiling_util {
 
-inline void SetMBaseSize(uint32_t vHeadDim, uint32_t& mBaseSize)
+inline void SetMBaseSize(uint32_t vHeadDim, uint32_t maskMode, uint32_t& mBaseSize)
 {
     if (vHeadDim == 128) {
         mBaseSize = 128;
+    } else if (vHeadDim == 256) {
+        // mask_mode=4(BAND) 继续使用基线 64 行切块，其余 D=256 走 M=96 新方案
+        mBaseSize = (maskMode == 4U) ? 64U : 96U;
     } else {
         mBaseSize = 64;
     }
@@ -78,7 +81,7 @@ inline void SetS2BaseSize(uint32_t templateId, uint32_t vHeadDim, uint32_t& s2Ba
 inline void GetConfigInfo(uint32_t vHeadDim, int32_t maskMode, int32_t maxSeqQ, uint32_t& templateId,
                           uint32_t& mBaseSize, uint32_t& s2BaseSize)
 {
-    SetMBaseSize(vHeadDim, mBaseSize);
+    SetMBaseSize(vHeadDim, static_cast<uint32_t>(maskMode), mBaseSize);
     SetKernelTemplateId(vHeadDim, maxSeqQ, mBaseSize, maskMode, templateId);
     SetS2BaseSize(templateId, vHeadDim, s2BaseSize);
 }

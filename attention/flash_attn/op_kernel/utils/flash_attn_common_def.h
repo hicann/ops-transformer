@@ -87,6 +87,7 @@ enum class inferS1TemplateType {
     Aligned16 = 16,
     Aligned32 = 32,
     Aligned64 = 64,
+    Aligned96 = 96,
     Aligned128 = 128,
     Aligned256 = 256,
     NotAligned,
@@ -229,23 +230,24 @@ static constexpr ConfigParams ConfigValueArch92[] = {
     // 下标 1: (S1=64, S2=256, D=64, DV=64, originalDV=64)，ND 使用
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned64,
      inferDTemplateType::Aligned64, inferDTemplateType::Aligned64,
-     /*ubMm1*/ 2, /*ubMm2*/ 2, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
+     /*ubMm1*/ 2, /*ubMm2*/ 2, /*ubVec1*/ 2, /*ubMask*/ 2, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
     // 下标 2: (S1=128, S2=128, D=128, DV=128, originalDV=128)，ND 使用
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned128,
      inferDTemplateType::Aligned128, inferDTemplateType::Aligned128,
-     /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
+     /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 2, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
     // 下标 3: (S1=128, S2=256, D=128, DV=128, originalDV=128)，不合轴 DN 使用
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned128,
      inferDTemplateType::Aligned128, inferDTemplateType::Aligned128,
      /*ubMm1*/ 1, /*ubMm2*/ 1, /*ubVec1*/ 1, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
-    // 下标 4: (S1=64, S2=256, D=256, DV=256, originalDV=256)，ND 使用
+    // 下标 4: (M=96, S2=256, D=256, DV=256, originalDV=256)，仅 ND(D=256) 使用
+    {inferS1TemplateType::Aligned96, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned256,
+     inferDTemplateType::Aligned256, inferDTemplateType::Aligned256,
+     /*ubMm1*/ 1, /*ubMm2*/ 1, /*ubVec1*/ 1, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 2},
+    // 下标 5: (M=64, S2=256, D=256, DV=256, originalDV=256)，mask_mode=4(BAND) 基线档
+    // 下标 6/7 对齐下标 2/3; arch92 host 不会下发
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned256,
      inferDTemplateType::Aligned256, inferDTemplateType::Aligned256,
-     /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 2},
-    // 下标 5-7: 占位，arch92 host 不会下发；originalDV 分别为 256/128/128
-    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned256,
-     inferDTemplateType::Aligned256, inferDTemplateType::Aligned256,
-     /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 2},
+     /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 2, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 2},
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned128,
      inferDTemplateType::Aligned128, inferDTemplateType::Aligned128,
      /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},

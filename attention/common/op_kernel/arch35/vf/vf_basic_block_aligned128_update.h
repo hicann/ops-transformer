@@ -383,7 +383,8 @@ __aicore__ inline void ProcessVec1UpdateImpl128(
     __ubuf__ T* inMaxUb = (__ubuf__ T*)inMaxTensor.GetPhyAddr();
     __ubuf__ T* tmpExpSumUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr();
 #if (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-    const uint32_t tempMaxOffset = s1BaseSize < 64U ? 64U : s1BaseSize;
+    // 与 UpdateExpSumAndExpMax<T, s1BaseSize> 的 repSize=ceil64(s1BaseSize) 保持一致。
+    const uint32_t tempMaxOffset = (s1BaseSize + 63U) >> 6 << 6;
     __ubuf__ T* tmpMaxUb = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + (tempMaxOffset / ArchInfo::CV_RATIO);
     __ubuf__ T* tmpMaxUb2 = (__ubuf__ T*)sharedTmpBuffer.GetPhyAddr() + (tempMaxOffset / ArchInfo::CV_RATIO);
 #else

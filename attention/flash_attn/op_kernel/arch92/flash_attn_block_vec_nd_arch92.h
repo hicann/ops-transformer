@@ -54,12 +54,11 @@ public:
     static constexpr bool PAGE_ATTENTION = FA_T::pageAttention;
     static constexpr bool HAS_MASK = FA_T::hasMask;
 
+    // Softmax 统计按实际处理行数 mBaseSize/CV_RATIO 计算，并按向量寄存器位宽（64 个 float 元素）
+    // 向上对齐，供共享 VF 以 64 行一组读写；M=64/96/128 对齐后分别为 64/128/128。
+    static constexpr uint32_t STAT_ROWS_REG_ALIGNED = ((mBaseSize / CV_RATIO + 63U) / 64U * 64U);
     using T = float;
     static constexpr uint32_t dTemplateAlign64 = BaseApi::Align64Func((uint16_t)FA_T::dVBaseSize);
-
-    static constexpr uint32_t DB = 2;
-    // 索引使用 loop & (DB - 1) 代替 loop % DB，要求 DB 必须是2的幂，否则位掩码结果错误
-    static_assert(DB > 0 && (DB & (DB - 1)) == 0, "DB must be a power of two for bitmask indexing");
 
     // 核间同步ID
     static constexpr uint64_t CROSS_CORE_SYNC_MODE = 4;
@@ -102,7 +101,7 @@ public:
         return UB_MM2_RES_BUFCNT * UB_MM2_RES_BUF_BYTES + UB_MM1_RES_BUFCNT * UB_MM1_RES_BUF_BYTES;
     }
 
-    static constexpr uint32_t UB_MASK_BUFCNT = 2U;
+    static constexpr uint32_t UB_MASK_BUFCNT = FA_T::UB_MASK_BUFCNT;
     static constexpr uint32_t UB_MASK_BUF_BYTES = mBaseSize * s2BaseSize;
 
     LocalTensor<uint8_t> ubMaskBuffers_;
@@ -110,22 +109,24 @@ public:
     LocalTensor<T> ubVec2Res_; // 存放vec2阶段VEC的中间处理结果, 并且作为attn_out的输出buffer, 需配对的MTE3和V的同步ID
 
     static constexpr uint32_t UB_VEC1_RES_BUFCNT = FA_T::UB_VEC1_RES_BUFCNT;
-    static constexpr uint32_t UB_VEC1_RES_BUF_BYTES = 33280; // 32k + 256 * sizeof(inputT)
+    static constexpr uint32_t UB_VEC1_RES_BUF_BYTES = (mBaseSize / CV_RATIO + 1U) * s2BaseSize * sizeof(INPUT_T);
+    static constexpr uint32_t UB_VEC2_RES_BUF_BYTES = mBaseSize / CV_RATIO * dVBaseSize * sizeof(T);
+    static constexpr uint32_t UB_SOFTMAX_TMP_BYTES = 2U * STAT_ROWS_REG_ALIGNED * sizeof(T);
     LocalTensor<uint8_t> ubVec1ResBuffers_;
     uint32_t vec1ResUbBufId_ = 0;
 
     static constexpr uint32_t UB_SOFTMAX_MAX_BUFCNT = 3U;
-    static constexpr uint32_t UB_SOFTMAX_MAX_BUF_BYTES = mBaseSize / CV_RATIO * sizeof(T);
+    static constexpr uint32_t UB_SOFTMAX_MAX_BUF_BYTES = STAT_ROWS_REG_ALIGNED * sizeof(T);
     LocalTensor<T> softmaxSumBuf_;
     static constexpr uint32_t UB_SOFTMAX_SUM_BUFCNT = 3U;
-    static constexpr uint32_t UB_SOFTMAX_SUM_BUF_BYTES = mBaseSize / CV_RATIO * sizeof(T);
+    static constexpr uint32_t UB_SOFTMAX_SUM_BUF_BYTES = STAT_ROWS_REG_ALIGNED * sizeof(T);
     LocalTensor<T> softmaxMaxBuf_;
     static constexpr uint32_t UB_SOFTMAX_EXP_BUFCNT = 3U;
-    static constexpr uint32_t UB_SOFTMAX_EXP_BUF_BYTES = mBaseSize / CV_RATIO * sizeof(T);
+    static constexpr uint32_t UB_SOFTMAX_EXP_BUF_BYTES = STAT_ROWS_REG_ALIGNED * sizeof(T);
     LocalTensor<T> softmaxExpBuf_;
 
     static constexpr uint32_t UB_LSE_OUT_BUFCNT = 2U;
-    static constexpr uint32_t UB_LSE_OUT_BUF_BYTES = mBaseSize / CV_RATIO * sizeof(float) * 8;
+    static constexpr uint32_t UB_LSE_OUT_BUF_BYTES = STAT_ROWS_REG_ALIGNED * sizeof(float) * 8;
     LocalTensor<uint8_t> ubLseOutBuffers_;
     uint32_t lseOutUbBufId_ = 0;
 
@@ -202,18 +203,18 @@ public:
 
         /*--------------------------------------------UB--------------------------------------------*/
         struct UbLayout {
-            uint8_t mm2ResBuffers[UB_MM2_RES_BUFCNT][UB_MM2_RES_BUF_BYTES];    // 1 * 64K = 64K, CV通信BUF
-            uint8_t mm1ResBuffers[UB_MM1_RES_BUFCNT][UB_MM1_RES_BUF_BYTES];    // 2 * 64K = 128K, CV通信BUF
-            uint8_t maskBuffers[UB_MASK_BUFCNT][UB_MASK_BUF_BYTES];            // 2 * 16K = 32K, 输入BUF: MASK拷入
-            uint8_t vec2Res[65536U];                                           // 64K, 输出BUF: attn_out拷出
-            uint8_t vec1ResBuffers[UB_VEC1_RES_BUFCNT][UB_VEC1_RES_BUF_BYTES]; // 2 * 32.25K, softmax结果拷至L1
+            uint8_t mm2ResBuffers[UB_MM2_RES_BUFCNT][UB_MM2_RES_BUF_BYTES]; // BMM2->VEC communication
+            uint8_t mm1ResBuffers[UB_MM1_RES_BUFCNT][UB_MM1_RES_BUF_BYTES]; // BMM1->VEC communication
+            uint8_t maskBuffers[UB_MASK_BUFCNT][UB_MASK_BUF_BYTES];         // D256: one 96x256 INT8 mask, 24 KiB
+            uint8_t vec2Res[UB_VEC2_RES_BUF_BYTES];                         // FP32 accumulator, reused for output Cast
+            uint8_t vec1ResBuffers[UB_VEC1_RES_BUFCNT][UB_VEC1_RES_BUF_BYTES];       // Softmax P staging, copied to L1
             uint8_t softmaxSumBuf_[UB_SOFTMAX_SUM_BUFCNT][UB_SOFTMAX_SUM_BUF_BYTES]; // 3 * 0.5K = 1.5K, sum常驻BUF
             uint8_t softmaxMaxBuf_[UB_SOFTMAX_MAX_BUFCNT][UB_SOFTMAX_MAX_BUF_BYTES]; // 3 * 0.5K = 1.5K, max常驻BUF
             uint8_t softmaxExpBuf_[UB_SOFTMAX_EXP_BUFCNT][UB_SOFTMAX_EXP_BUF_BYTES]; // 3 * 0.5K = 1.5K, exp常驻BUF
             uint8_t lseOutBuffers[UB_LSE_OUT_BUFCNT]
                                  [UB_LSE_OUT_BUF_BYTES]; // 2 * 4K = 8K, 输出BUF:
                                                          // FD中间结果SUM和MAX拷出至GM，或者LSE结果拷出
-            uint8_t softmaxTmpBuf[512U];                 // 0.5K, 常驻BUF, 用于softmax计算的中间结果缓存
+            uint8_t softmaxTmpBuf[UB_SOFTMAX_TMP_BYTES]; // Shared VF row statistics
         };
         static_assert(sizeof(UbLayout) <= (CV_RATIO == 1 ? 376 * 1024 : 248 * 1024), "UB buffer too large");
         ubMm2ResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, mm2ResBuffers),
@@ -227,7 +228,7 @@ public:
                          .template ReinterpretCast<T>();
         ubVec1ResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, vec1ResBuffers),
                                                  SIZE_OF_MEMBER(UbLayout, vec1ResBuffers));
-        // softmaxSum×3 + softmaxMax×3 + softmaxExp×3，各 256 bytes
+        // M=96 pads every max/sum/exp slot to 128 FP32 elements for vector loads.
         softmaxSumBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, softmaxSumBuf_),
                                               SIZE_OF_MEMBER(UbLayout, softmaxSumBuf_))
                              .template ReinterpretCast<T>();
@@ -301,10 +302,12 @@ public:
 
     __aicore__ inline void InitCrossCoreSync()
     {
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM2_0);
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM2_1);
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM1_0);
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM1_1);
+        for (uint32_t i = 0; i < UB_MM2_RES_BUFCNT; ++i) {
+            CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM2_0 + i);
+        }
+        for (uint32_t i = 0; i < UB_MM1_RES_BUFCNT; ++i) {
+            CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM1_0 + i);
+        }
     }
 
     __aicore__ inline void UnInitCrossCoreSync() {}
@@ -455,7 +458,8 @@ public:
         LocalTensor<T> expUb =
             softmaxExpBuf_[(runInfo.loop % UB_SOFTMAX_EXP_BUFCNT) * (UB_SOFTMAX_EXP_BUF_BYTES / sizeof(T))];
 
-        const uint32_t maskBufId = runInfo.loop & (DB - 1);
+        // mask buffer 数量由 config 提供：D256 M=96 为 1 块，其余档位为 2 块（BAND 需 main/pre 乒乓）。
+        const uint32_t maskBufId = runInfo.loop & (UB_MASK_BUFCNT - 1U);
         if constexpr (HAS_MASK) {
             attenMaskUb = ubMaskBuffers_[maskBufId * UB_MASK_BUF_BYTES];
             AttenMaskCopyIn(attenMaskUb, 0, runInfo.actVecMSize, runInfo);
@@ -735,7 +739,7 @@ public:
     __aicore__ inline void AttenMaskCopyIn(LocalTensor<uint8_t> attenMaskUb, uint32_t vecMIdx, uint32_t mDealSize,
                                            RunInfo& runInfo)
     {
-        const uint32_t bufIdx = runInfo.loop & (DB - 1);
+        const uint32_t bufIdx = runInfo.loop & (UB_MASK_BUFCNT - 1U);
         MaskInfoMerged maskInfo;
         maskInfo.gs1StartIdx = runInfo.gS1Idx + runInfo.vecMbaseIdx + vecMIdx;
         maskInfo.gs1dealNum = mDealSize;

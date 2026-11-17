@@ -58,7 +58,8 @@ void FlashAttnTilingImplArch92::UpdateTilingKeyConfig()
         } else if (faInfo_->qkHeadDim == 128) {
             tilingKeyInfo_.config = 2; // (M=128, S2=128, D=128)
         } else if (faInfo_->qkHeadDim == 256) {
-            tilingKeyInfo_.config = 4; // (M=64, S2=256, D=256)
+            // mask_mode=4(BAND) 使用基线 M=64 档(config=5)，其余走 M=96 新方案(config=4)
+            tilingKeyInfo_.config = (faInfo_->maskMode == static_cast<int64_t>(MaskMode::BAND)) ? 5 : 4;
         } else {
             OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(faInfo_->opName, "qkHeadDim(Head num of Q/K)",
                                                    std::to_string(faInfo_->qkHeadDim).c_str(),
