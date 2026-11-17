@@ -660,9 +660,16 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
   | A            | Maximum number of tokens to be dispatched by the current device. The value range is as follows: <ul> <li>For shared experts, ensure A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum.</li> <li>For MoE experts, if globalBS is 0, ensure A >= BS \* epWorldSize \* min(localExpertNum, K); if globalBS is not 0, ensure A >= globalBS \* min(localExpertNum, K).</li> </ul>|
   | H (hidden size) | Indicates the hidden size. <ul><li><term>Atlas A2 products</term>: If the data type of `x` is INT32, the value range is (0, 5120] and the value must be a multiple of 32. For other data types, the value range is (0, 10240] and the value must be a multiple of 32.</li> <li><term>Atlas A3 products</term>, Ascend 950PR&950DT products: The value range is [1024, 8192].</li> </ul> |
   | BS           | Number of final output tokens of the current device. <ul><li><term>Atlas A2 products</term>: Depending on the value of commAlg, the value range is (0 < BS ≤ 256) when commAlg is "fullmesh"; the value range is (0 < BS ≤ 512) when commAlg is "hierarchy" and the driver version is ≥25.0.RC1.1;</li><li><term>Atlas A3 products</term>: Depending on the value of commAlg, the value range is (0 < BS ≤ 256) when commAlg is "fullmesh_v2", and (0 < BS ≤ 512) when commAlg is "fullmesh_v1" or "".</li><li><term>Ascend 950PR&950DT products</term>: 0 < BS ≤ 512.</li></ul> |
-  | K    | Number of experts selected by topK. The value range is 0 < K ≤ 16 and <code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>.<br> <term>Atlas A3 products</term>, Ascend 950PR&950DT products: If commAlg is "fullmesh_v2", the value range is 0 < K ≤ 12.|
+  | K | Number of selected topK experts. The value range is 0 < K ≤ 16, and <code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>. See the product-specific constraints below. |
   | serverNum    | Number of server nodes. Only 2, 4, and 8 are supported.<br>Atlas A2 products: This variable is used only by the shape in this use case.                                                  |
   | localExpertNum |  Number of experts on the current device: <ul><li>For shared expert cards, localExpertNum = 1;</li><li>For MoE expert cards, localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>. TP domain communication is not supported in the current version. </li><li><term>Atlas A3 products</term>, Ascend 950PR&950DT products: Ensure 0 < <code>localExpertNum * epWorldSize</code> ≤ 2048.</li></ul>|
+
+  <!-- npu="A3" id26 -->
+  - K: <term>Atlas A3 products</term>: When `commAlg` is "fullmesh_v2", the value range is 0 < K ≤ 12.
+  <!-- end id26 -->
+  <!-- npu="950" id27 -->
+  - K: <term>Ascend 950PR&950DT products</term>: The ordinary fullmesh_v2 path (`commAlg` is "fullmesh_v2", non-hierarchical and non-RoCE) supports 0 < K ≤ 32; other paths retain 0 < K ≤ 16. For K > 16, the paired Combine operator must not use AddRmsNorm fusion.
+  <!-- end id27 -->
 
 - **quantMode-related constraints**:
 

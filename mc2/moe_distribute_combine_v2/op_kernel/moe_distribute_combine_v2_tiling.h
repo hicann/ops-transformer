@@ -51,6 +51,8 @@ struct MoeDistributeCombineV2Info {
     float armAvgFactor;
     float epsilon;
     uint32_t bufferNum;
+    uint32_t moeQueueBytes;  // 普通A5 MTE每个接收队列槽的字节数；0保留既有布局
+    uint32_t clearFlagBytes; // 普通A5 MTE共享清flag零源字节数；0保留完整零源
     uint64_t roceCombineOffset;
     uint64_t rswBufferSize; // 0=旧协议(480/512 flag)；非0=rsw_buffer挡位(16KB~2MB，每slot一个)
 };

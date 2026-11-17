@@ -81,7 +81,7 @@ constexpr int64_t MOE_EXPERT_MAX_NUM_LAYERED = 512;
 constexpr int64_t LOCAL_EXPERT_MAX_SIZE = 2048;
 constexpr int64_t LOCAL_EXPERT_MAX_SIZE_A5 = 4096;
 constexpr int64_t K_MAX = 16;
-constexpr int64_t FULLMESH_K_MAX_A5 = K_MAX;
+constexpr int64_t FULLMESH_K_MAX_A5 = 32;
 constexpr int64_t FULLMESH_K_MAX_A3 = 12;
 constexpr size_t SYSTEM_NEED_WORKSPACE = 16UL * 1024UL * 1024UL;
 constexpr uint32_t WORKSPACE_ELEMENT_OFFSET = 512;
@@ -108,6 +108,15 @@ constexpr uint64_t STATIC_SCALE_DIM_0 = 1;
 constexpr uint64_t ONE_DIM_SCALE_COL_NUM = 1;
 constexpr uint64_t MX_BLOCK_SIZE = 32U;
 constexpr uint64_t PERGROUP_BLOCK_SIZE = 128U;
+constexpr uint32_t FULLMESH_K_RED_LINE = 12U;
+constexpr uint32_t FULLMESH_CHUNK_BYTES = 16U * 1024U;
+constexpr uint32_t FULLMESH_CHUNK_ELEMS = FULLMESH_CHUNK_BYTES / 4U;
+constexpr uint32_t FULLMESH_REDUCE_WS_DIV = 16U;
+constexpr uint32_t SIZE_OF_BOOL = 1U;
+constexpr uint32_t FULLMESH_BS_SLICE_TARGET_BYTES = 32U * 1024U;
+constexpr uint32_t FULLMESH_BS_SLICE_MAX = 4U;
+constexpr uint64_t FULLMESH_BS_SLICE_WS_BYTES = 20U * 1024UL;
+
 constexpr uint64_t HIF4_GROUP_SIZE = 64U;
 } // namespace
 
@@ -892,6 +901,11 @@ static bool CheckCommAlgAttrs(const gert::TilingContext* context, const char* no
     const int64_t expertIdsDim1 = expertIdStorageShape->GetStorageShape().GetDim(1);
     uint32_t k = static_cast<uint32_t>(expertIdsDim1);
 
+    const bool isA5FullMeshV2 =
+        mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 && isSetFullMeshV2 && !isLayered && !config.isRoce;
+    OP_TILING_CHECK(k > K_MAX && !isA5FullMeshV2,
+                    OP_LOGE(nodeName, "topK above %ld requires A5 fullmesh_v2, but got %u.", K_MAX, k), return false);
+
     int64_t fullMeshBsUpperBound = FULLMESH_BS_UPPER_BOUND_A3;
     if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
         fullMeshBsUpperBound = FULLMESH_BS_UPPER_BOUND_A5;
@@ -1112,13 +1126,14 @@ static ge::graphStatus CheckXAndExpertIdsTensorShape(const gert::TilingContext* 
                             "xShape's dim0 is %ld, expertIdShape's dim0 is %ld.",
                             xDim0, expertIdsDim0),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((expertIdsDim1 <= 0) || (expertIdsDim1 > K_MAX) ||
+    int64_t kUpperBound = mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 ? FULLMESH_K_MAX_A5 : K_MAX;
+    OP_TILING_CHECK((expertIdsDim1 <= 0) || (expertIdsDim1 > kUpperBound) ||
                         (expertIdsDim1 > moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum),
                     OP_LOGE(nodeName,
                             "expertIdShape's dim1(k) should be in (0, min(%ld, "
                             "moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum = %ld)], "
                             "but got expertIdShape's dim1=%ld.",
-                            K_MAX, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum, expertIdsDim1),
+                            kUpperBound, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum, expertIdsDim1),
                     return ge::GRAPH_FAILED);
     if (isLayered &&
         CheckLayeredExpertScalesShape(context, nodeName, expertIdsDim0, expertIdsDim1) != ge::GRAPH_SUCCESS) {
@@ -1668,7 +1683,7 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
     return SetRecvSlotAndRSWBufferIdx(context, tilingData.moeDistributeDispatchV2Info, nodeName, winSizeData);
 }
 
-static uint32_t Ceil(uint32_t dividend, uint32_t divisor, const char* nodeName)
+static uint32_t CeilAlign(uint32_t dividend, uint32_t divisor, const char* nodeName)
 {
     if (divisor != 0) {
         return ((dividend + divisor - 1) / divisor) * divisor;
@@ -1713,21 +1728,22 @@ static uint32_t SendToMoeExpertUsedBuffer(const gert::TilingContext* context,
         }
     }
     uint32_t moeUsedAivNum = aivUsedAllToAll - sharedUsedAivNum;
-    uint32_t maskSizePerExpert = Ceil((expertIdsBufSize / sizeof(int32_t)) / 8, UB_ALIGN, nodeName); // 8 is 1byte->8bit
-    uint32_t expertMaskBufSize = maskSizePerExpert * Ceil(moeExpertNum, moeUsedAivNum, nodeName) / moeUsedAivNum;
+    uint32_t maskSizePerExpert =
+        CeilAlign((expertIdsBufSize / sizeof(int32_t)) / 8, UB_ALIGN, nodeName); // 8 is 1byte->8bit
+    uint32_t expertMaskBufSize = maskSizePerExpert * CeilAlign(moeExpertNum, moeUsedAivNum, nodeName) / moeUsedAivNum;
     if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201) {
-        UbForMoe = UbForMoe + expertMaskBufSize;                                        // expertMaskBuf
-        UbForMoe = UbForMoe + Ceil(moeExpertNum * sizeof(int32_t), UB_ALIGN, nodeName); // tokenNumToExpertBuf
+        UbForMoe = UbForMoe + expertMaskBufSize;                                             // expertMaskBuf
+        UbForMoe = UbForMoe + CeilAlign(moeExpertNum * sizeof(int32_t), UB_ALIGN, nodeName); // tokenNumToExpertBuf
     }
     if (IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info) &&
         mc2tiling::GetNpuArch(context) != Ops::Base::DAV_2201) {
-        uint32_t countNumPerCore = Ceil(totalExpertNum, aivNum, nodeName) / aivNum;
+        uint32_t countNumPerCore = CeilAlign(totalExpertNum, aivNum, nodeName) / aivNum;
         if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_3510) {
-            uint32_t rankNumPerCore = Ceil(epWorldSize, aivNum, nodeName) / aivNum;
+            uint32_t rankNumPerCore = CeilAlign(epWorldSize, aivNum, nodeName) / aivNum;
             uint32_t expertNumPerRank = std::max(moeExpertNumPerRank, 1U);
             countNumPerCore = std::max(countNumPerCore, rankNumPerCore * expertNumPerRank);
         }
-        uint32_t statusCntAlign = Ceil(countNumPerCore, UB_ALIGN_INT32_NUM, nodeName);
+        uint32_t statusCntAlign = CeilAlign(countNumPerCore, UB_ALIGN_INT32_NUM, nodeName);
         UbForMoe = UbForMoe + statusCntAlign * UB_ALIGN_VAL;
         if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
             uint32_t histoGroupNum =
@@ -1747,7 +1763,7 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
     uint32_t epWorldSize = tilingData.moeDistributeDispatchV2Info.epWorldSize;
     if (tilingData.moeDistributeDispatchV2Info.hasElasticInfo) {
         uint32_t elasticInfoSize = (ELASTIC_INFO_OFFSET + RANK_LIST_NUM * epWorldSize) * sizeof(int32_t);
-        uint32_t elasticInfoSizeAlign = Ceil(elasticInfoSize, UB_ALIGN, nodeName);
+        uint32_t elasticInfoSizeAlign = CeilAlign(elasticInfoSize, UB_ALIGN, nodeName);
         UbForBasic = UbForBasic + elasticInfoSizeAlign; // elasticInfoBuf_
     }
 
@@ -1766,15 +1782,15 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
     if (isB4) {
         // 4bit 输入按 2 元素/字节打包
         const uint32_t hInBytes = static_cast<uint32_t>((hSize + EVEN_ALIGN - 1) / EVEN_ALIGN);
-        hAlignSize = Ceil(hInBytes, UB_ALIGN, nodeName);
+        hAlignSize = CeilAlign(hInBytes, UB_ALIGN, nodeName);
     } else {
         const uint32_t inputTypeSize = ge::GetSizeByDataType(inputType);
-        hAlignSize = (isMxQuant || isPerGroupQuant) ? Ceil(hSize, PERGROUP_BLOCK_SIZE, nodeName) * inputTypeSize :
-                                                      Ceil(hSize * inputTypeSize, UB_ALIGN, nodeName);
+        hAlignSize = (isMxQuant || isPerGroupQuant) ? CeilAlign(hSize, PERGROUP_BLOCK_SIZE, nodeName) * inputTypeSize :
+                                                      CeilAlign(hSize * inputTypeSize, UB_ALIGN, nodeName);
     }
     if (!isArch22 && !isArch35 && quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
         const auto& info = tilingData.moeDistributeDispatchV2Info;
-        hAlignSize = Ceil(hAlignSize + info.scalesCol * info.scalesTypeSize, UB_ALIGN, nodeName);
+        hAlignSize = CeilAlign(hAlignSize + info.scalesCol * info.scalesTypeSize, UB_ALIGN, nodeName);
     }
     // xDesc与expandXDesc在之前的函数中已校验非空，此处不做校验
     if (xDesc->GetDataType() == expandXDesc->GetDataType()) {
@@ -1795,7 +1811,7 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
         const uint32_t outputTypeSize = ge::GetSizeByDataType(outputType);
         hOutSize = hSize * outputTypeSize;
     }
-    hOutSizeAlign = Ceil(hOutSize, UB_ALIGN, nodeName);
+    hOutSizeAlign = CeilAlign(hOutSize, UB_ALIGN, nodeName);
     if ((quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) && isScales) {
         uint32_t scaleInBytes =
             tilingData.moeDistributeDispatchV2Info.scalesCol * tilingData.moeDistributeDispatchV2Info.scalesTypeSize;
@@ -1805,25 +1821,25 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
     } else if (isMxQuant) {
         bool isFp4 = outputType == ge::DT_FLOAT4_E2M1 || outputType == ge::DT_FLOAT4_E1M2;
         uint32_t outputBytes = isFp4 ? (hSize + 1U) / 2U : hSize;
-        uint32_t scaleCount = Ceil(hSize, MX_BLOCK_SIZE, nodeName) / MX_BLOCK_SIZE;
-        hOutSizeAlign = Ceil(outputBytes, SIZE_ALIGN_256, nodeName) + Ceil(scaleCount, EVEN_ALIGN, nodeName);
+        uint32_t scaleCount = CeilAlign(hSize, MX_BLOCK_SIZE, nodeName) / MX_BLOCK_SIZE;
+        hOutSizeAlign = CeilAlign(outputBytes, SIZE_ALIGN_256, nodeName) + CeilAlign(scaleCount, EVEN_ALIGN, nodeName);
     } else if (isPerGroupQuant) {
-        uint32_t paddedH = Ceil(hSize, PERGROUP_BLOCK_SIZE, nodeName);
+        uint32_t paddedH = CeilAlign(hSize, PERGROUP_BLOCK_SIZE, nodeName);
         hOutSizeAlign = paddedH + paddedH / PERGROUP_BLOCK_SIZE * sizeof(float);
     } else if (isHif4Quant) {
-        uint32_t scaleCount = Ceil(hSize, HIF4_GROUP_SIZE, nodeName) / HIF4_GROUP_SIZE;
+        uint32_t scaleCount = CeilAlign(hSize, HIF4_GROUP_SIZE, nodeName) / HIF4_GROUP_SIZE;
         hOutSizeAlign +=
             scaleCount *
             sizeof(uint32_t); // hifloat4_scale为b32，此处使用uint32_t确保不含hifloat4_scale的低版本包可以正常编译
     }
-    uint32_t hScaleSizeAlign = Ceil(hOutSizeAlign, UB_ALIGN, nodeName);
+    uint32_t hScaleSizeAlign = CeilAlign(hOutSizeAlign, UB_ALIGN, nodeName);
     uint32_t tokenQuantAlign = hScaleSizeAlign / sizeof(int32_t);
     hOutSizeAlign = tokenQuantAlign * sizeof(int32_t) + UB_ALIGN;
-    uint32_t blockCntPerToken = Ceil(hOutSizeAlign, SPLIT_BLOCK_DATA_SIZE, nodeName) / SPLIT_BLOCK_DATA_SIZE;
+    uint32_t blockCntPerToken = CeilAlign(hOutSizeAlign, SPLIT_BLOCK_DATA_SIZE, nodeName) / SPLIT_BLOCK_DATA_SIZE;
     uint32_t hCommuSize = blockCntPerToken * SPLIT_BLOCK_SIZE;
     UbForBasic = UbForBasic + hCommuSize * BUFFER_NUM; // outBuf
 
-    expertIdsBufSize = Ceil(expertIdsCnt * sizeof(int32_t), SIZE_ALIGN_256, nodeName);
+    expertIdsBufSize = CeilAlign(expertIdsCnt * sizeof(int32_t), SIZE_ALIGN_256, nodeName);
     UbForBasic = UbForBasic + expertIdsBufSize; // expertIdsBuf_
     return UbForBasic;
 }
@@ -1837,7 +1853,7 @@ static uint32_t A3FullMeshUsedBuffer(const gert::TilingContext* context,
     uint32_t usedSize = UB_ALIGN * 3U;
     if (info.hasElasticInfo) {
         usedSize +=
-            Ceil((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
+            CeilAlign((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
     }
     // SendCumSum retains both counting scratch buffers, the mask workspace and routing IDs.
     usedSize += BUFFER_NUM * info.maxSizeForUbBuffer + BUFFER_NUM * expertIdsBufSize;
@@ -1845,24 +1861,24 @@ static uint32_t A3FullMeshUsedBuffer(const gert::TilingContext* context,
         usedSize += expertIdsBufSize;
     }
     uint32_t countBufferSize =
-        Ceil(info.moeExpertNum + info.sharedExpertRankNum, UB_ALIGN / sizeof(int32_t), nodeName) * UB_ALIGN;
+        CeilAlign(info.moeExpertNum + info.sharedExpertRankNum, UB_ALIGN / sizeof(int32_t), nodeName) * UB_ALIGN;
     usedSize += countBufferSize;
     if (info.isExpertMask || info.zeroComputeExpertNum != 0) {
-        usedSize += Ceil(info.bs * sizeof(int32_t), UB_ALIGN, nodeName);
-        uint32_t maskSize = info.bs * Ceil(info.k * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
-        usedSize += std::max(Ceil(info.bs * info.k * sizeof(int32_t), UB_ALIGN, nodeName), maskSize);
+        usedSize += CeilAlign(info.bs * sizeof(int32_t), UB_ALIGN, nodeName);
+        uint32_t maskSize = info.bs * CeilAlign(info.k * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
+        usedSize += std::max(CeilAlign(info.bs * info.k * sizeof(int32_t), UB_ALIGN, nodeName), maskSize);
     }
-    uint32_t packedDataSize = Ceil(hOutSizeAlign, SPLIT_BLOCK_DATA_SIZE, nodeName);
+    uint32_t packedDataSize = CeilAlign(hOutSizeAlign, SPLIT_BLOCK_DATA_SIZE, nodeName);
     bool isSameType = context->GetInputDesc(config.xIndex)->GetDataType() ==
                       context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX)->GetDataType();
-    uint32_t inputSize = Ceil(info.h * SIZE_OF_HALF, UB_ALIGN, nodeName);
+    uint32_t inputSize = CeilAlign(info.h * SIZE_OF_HALF, UB_ALIGN, nodeName);
     if (info.quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
         inputSize += info.scalesCol * info.scalesTypeSize;
         if (isSameType) {
             inputSize = packedDataSize;
         }
     }
-    usedSize += BUFFER_NUM * Ceil(inputSize, UB_ALIGN, nodeName);
+    usedSize += BUFFER_NUM * CeilAlign(inputSize, UB_ALIGN, nodeName);
     if (info.quantMode != static_cast<uint32_t>(QuantModeA5::NON_QUANT) || !isSameType) {
         usedSize += packedDataSize; // quantization result, including the complete final 480B block
     }
@@ -1882,13 +1898,13 @@ static uint32_t SetMaxSizeForUbBuffer(MoeDistributeDispatchV2TilingData& tilingD
                                       uint32_t kSize, uint32_t expertIdsCnt, bool isScales, const char* nodeName)
 {
     uint32_t quantMode = tilingData.moeDistributeDispatchV2Info.quantMode;
-    uint32_t hFp32Size = Ceil(hSize * sizeof(float), UB_ALIGN, nodeName);
+    uint32_t hFp32Size = CeilAlign(hSize * sizeof(float), UB_ALIGN, nodeName);
     if ((quantMode == static_cast<uint32_t>(QuantModeA5::PERGROUP_DYNAMIC_QUANT)) && isScales) {
-        hFp32Size = Ceil(hSize, PERGROUP_BLOCK_SIZE, nodeName) * sizeof(float);
+        hFp32Size = CeilAlign(hSize, PERGROUP_BLOCK_SIZE, nodeName) * sizeof(float);
     }
-    uint32_t bsKAlign256 = Ceil(expertIdsCnt * SIZE_OF_HALF, SIZE_ALIGN_256, nodeName);
-    uint32_t expertIdsSize = Ceil(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
-    uint32_t xActivateMaskSize = bsSize * Ceil(kSize * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
+    uint32_t bsKAlign256 = CeilAlign(expertIdsCnt * SIZE_OF_HALF, SIZE_ALIGN_256, nodeName);
+    uint32_t expertIdsSize = CeilAlign(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
+    uint32_t xActivateMaskSize = bsSize * CeilAlign(kSize * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
     uint32_t maxSize = hFp32Size > expertIdsSize ? hFp32Size : expertIdsSize;
     maxSize = maxSize > xActivateMaskSize ? maxSize : xActivateMaskSize;
     maxSize = maxSize > bsKAlign256 ? maxSize : bsKAlign256;
@@ -1938,11 +1954,11 @@ static uint32_t CalcA5TokenInAlignSize(const gert::TilingContext* context, const
     if (isB4) {
         // 同 AllToAllBasicUsedBuffer：4bit 输入按打包字节数记账，与 quant.h 的 hAlignSize_ 对齐
         const uint32_t hInBytes = static_cast<uint32_t>((info.h + EVEN_ALIGN - 1) / EVEN_ALIGN);
-        hAlignSize = Ceil(hInBytes, UB_ALIGN, nodeName);
+        hAlignSize = CeilAlign(hInBytes, UB_ALIGN, nodeName);
     } else {
         const uint32_t inputTypeSize = ge::GetSizeByDataType(inputType);
-        hAlignSize = (isMxQuant || isPerGroupQuant) ? Ceil(info.h, PERGROUP_BLOCK_SIZE, nodeName) * inputTypeSize :
-                                                      Ceil(info.h * inputTypeSize, UB_ALIGN, nodeName);
+        hAlignSize = (isMxQuant || isPerGroupQuant) ? CeilAlign(info.h, PERGROUP_BLOCK_SIZE, nodeName) * inputTypeSize :
+                                                      CeilAlign(info.h * inputTypeSize, UB_ALIGN, nodeName);
     }
 
     if (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
@@ -1964,23 +1980,23 @@ static uint32_t CalcA5TokenOutAlignSize(const gert::TilingContext* context, cons
     uint32_t outputTypeSize = isOutputFp4 ? 1U : ge::GetSizeByDataType(outputType);
     uint32_t scaleInBytes = info.scalesCol * info.scalesTypeSize;
     uint32_t outputBytes = isOutputFp4 ? (info.h + 1U) / 2U : info.h * outputTypeSize;
-    uint32_t hOutSize = Ceil(outputBytes, UB_ALIGN, nodeName);
+    uint32_t hOutSize = CeilAlign(outputBytes, UB_ALIGN, nodeName);
     if (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
         hOutSize += scaleInBytes;
     } else if (quantMode == static_cast<uint32_t>(QuantModeA5::PERTOKEN_DYNAMIC_QUANT)) {
         hOutSize += sizeof(float);
     } else if (isMxQuant) {
-        uint32_t scaleCount = Ceil(info.h, MX_BLOCK_SIZE, nodeName) / MX_BLOCK_SIZE;
-        hOutSize = Ceil(outputBytes, SIZE_ALIGN_256, nodeName) + Ceil(scaleCount, EVEN_ALIGN, nodeName);
+        uint32_t scaleCount = CeilAlign(info.h, MX_BLOCK_SIZE, nodeName) / MX_BLOCK_SIZE;
+        hOutSize = CeilAlign(outputBytes, SIZE_ALIGN_256, nodeName) + CeilAlign(scaleCount, EVEN_ALIGN, nodeName);
     } else if (isPerGroupQuant) {
-        uint32_t paddedH = Ceil(info.h, PERGROUP_BLOCK_SIZE, nodeName);
+        uint32_t paddedH = CeilAlign(info.h, PERGROUP_BLOCK_SIZE, nodeName);
         hOutSize = paddedH * outputTypeSize + paddedH / PERGROUP_BLOCK_SIZE * sizeof(float);
     } else if (quantMode == static_cast<uint32_t>(QuantModeA5::HIF4_QUANT)) {
-        hOutSize += Ceil(info.h, HIF4_GROUP_SIZE, nodeName) / HIF4_GROUP_SIZE * sizeof(uint32_t);
+        hOutSize += CeilAlign(info.h, HIF4_GROUP_SIZE, nodeName) / HIF4_GROUP_SIZE * sizeof(uint32_t);
     }
-    return Ceil(
-        Ceil(hOutSize, UB_ALIGN, nodeName) + TRIPLE * sizeof(int32_t) + (info.hasExpertScales ? sizeof(float) : 0U),
-        UB_ALIGN, nodeName);
+    return CeilAlign(CeilAlign(hOutSize, UB_ALIGN, nodeName) + TRIPLE * sizeof(int32_t) +
+                         (info.hasExpertScales ? sizeof(float) : 0U),
+                     UB_ALIGN, nodeName);
 }
 
 static bool NeedA5CastBuf(const gert::TilingContext* context, const MoeDistributeDispatchV2Info& info,
@@ -2023,29 +2039,30 @@ static ge::graphStatus CheckSerialReceiveUbSizeA5(const gert::TilingContext* con
                     OP_LOGE(nodeName, "Calc cumsum UB budget failed."), return ge::GRAPH_FAILED);
     uint32_t moeExpertNumPerRank = info.moeExpertNum / (info.epWorldSize - info.sharedExpertRankNum);
     uint32_t recvStatusNum = info.epWorldSize * moeExpertNumPerRank;
-    uint32_t recvStatusPerCore = Ceil(recvStatusNum, aivNum, nodeName) / aivNum;
+    uint32_t recvStatusPerCore = CeilAlign(recvStatusNum, aivNum, nodeName) / aivNum;
 
     uint64_t fixedUbSize = 2U * UB_ALIGN;
-    fixedUbSize += Ceil(recvStatusPerCore * UB_ALIGN, SIZE_ALIGN_256, nodeName);
-    uint32_t gatherSize = std::max(Ceil(recvStatusPerCore * sizeof(float), UB_ALIGN, nodeName),
-                                   Ceil(info.epWorldSize * moeExpertNumPerRank * sizeof(float), UB_ALIGN, nodeName));
-    fixedUbSize += std::max(gatherSize, Ceil(recvStatusNum * Mc2Kernel::STATE_OFFSET, UB_ALIGN, nodeName));
+    fixedUbSize += CeilAlign(recvStatusPerCore * UB_ALIGN, SIZE_ALIGN_256, nodeName);
+    uint32_t gatherSize =
+        std::max(CeilAlign(recvStatusPerCore * sizeof(float), UB_ALIGN, nodeName),
+                 CeilAlign(info.epWorldSize * moeExpertNumPerRank * sizeof(float), UB_ALIGN, nodeName));
+    fixedUbSize += std::max(gatherSize, CeilAlign(recvStatusNum * Mc2Kernel::STATE_OFFSET, UB_ALIGN, nodeName));
     fixedUbSize += 2U * aivNum * UB_ALIGN;
-    uint32_t expertPrefixNum = Ceil(recvStatusPerCore, info.epWorldSize, nodeName) / info.epWorldSize;
-    fixedUbSize += std::max(Ceil(aivNum * sizeof(float), UB_ALIGN, nodeName),
-                            Ceil(expertPrefixNum * sizeof(int32_t), UB_ALIGN, nodeName));
+    uint32_t expertPrefixNum = CeilAlign(recvStatusPerCore, info.epWorldSize, nodeName) / info.epWorldSize;
+    fixedUbSize += std::max(CeilAlign(aivNum * sizeof(float), UB_ALIGN, nodeName),
+                            CeilAlign(expertPrefixNum * sizeof(int32_t), UB_ALIGN, nodeName));
     fixedUbSize += 3U * UB_ALIGN;
     if (info.isPerformance) {
-        fixedUbSize += Ceil(info.epWorldSize * sizeof(int64_t), UB_ALIGN, nodeName);
-        fixedUbSize += Ceil(recvStatusPerCore * sizeof(int32_t), UB_ALIGN, nodeName);
+        fixedUbSize += CeilAlign(info.epWorldSize * sizeof(int64_t), UB_ALIGN, nodeName);
+        fixedUbSize += CeilAlign(recvStatusPerCore * sizeof(int32_t), UB_ALIGN, nodeName);
     }
-    fixedUbSize += Ceil(moeExpertNumPerRank * sizeof(int64_t), UB_ALIGN, nodeName);
-    fixedUbSize += 4U * Ceil(recvStatusPerCore * sizeof(int32_t), UB_ALIGN, nodeName);
+    fixedUbSize += CeilAlign(moeExpertNumPerRank * sizeof(int64_t), UB_ALIGN, nodeName);
+    fixedUbSize += 4U * CeilAlign(recvStatusPerCore * sizeof(int32_t), UB_ALIGN, nodeName);
 
     uint32_t tokenAlign = CalcA5TokenOutAlignSize(context, info, nodeName);
-    uint32_t blockCnt = Ceil(tokenAlign, SPLIT_BLOCK_DATA_SIZE, nodeName) / SPLIT_BLOCK_DATA_SIZE;
+    uint32_t blockCnt = CeilAlign(tokenAlign, SPLIT_BLOCK_DATA_SIZE, nodeName) / SPLIT_BLOCK_DATA_SIZE;
     uint64_t minCopyUbSize = BUFFER_NUM * static_cast<uint64_t>(blockCnt) * SPLIT_BLOCK_DATA_SIZE;
-    minCopyUbSize += Ceil(blockCnt * sizeof(float), SIZE_ALIGN_256, nodeName) + blockCnt * UB_ALIGN;
+    minCopyUbSize += CeilAlign(blockCnt * sizeof(float), SIZE_ALIGN_256, nodeName) + blockCnt * UB_ALIGN;
     uint64_t requiredUbSize = fixedUbSize + minCopyUbSize + 2U * UB_ALIGN;
     OP_TILING_CHECK(
         requiredUbSize > cumsumUbBudget,
@@ -2073,11 +2090,11 @@ static uint32_t CalcCumSumStatusCntAlign(const MoeDistributeDispatchV2Info& info
     uint32_t totalExpertNum = info.sharedExpertRankNum + info.moeExpertNum;
     uint32_t coreNum = CalcCumSumCoreNum(totalExpertNum, totalExpertNum, aivNum);
     uint32_t expertNumPerCore = (totalExpertNum + coreNum - 1U) / coreNum;
-    uint32_t statusCntAlign = Ceil(expertNumPerCore, UB_ALIGN / sizeof(int32_t), nodeName);
+    uint32_t statusCntAlign = CeilAlign(expertNumPerCore, UB_ALIGN / sizeof(int32_t), nodeName);
     if (info.sharedExpertRankNum != 0U) {
         uint32_t coreNumShare = CalcCumSumCoreNum(totalExpertNum, info.epWorldSize, aivNum);
         uint32_t expertNumPerCoreShare = (totalExpertNum + coreNumShare - 1U) / coreNumShare;
-        uint32_t statusCntAlignShare = Ceil(expertNumPerCoreShare, UB_ALIGN / sizeof(int32_t), nodeName);
+        uint32_t statusCntAlignShare = CeilAlign(expertNumPerCoreShare, UB_ALIGN / sizeof(int32_t), nodeName);
         statusCntAlign = std::max(statusCntAlign, statusCntAlignShare);
     }
     return statusCntAlign;
@@ -2093,6 +2110,9 @@ static uint32_t CalcCumSumRecStatusNumPerCore(const MoeDistributeDispatchV2Info&
     return (rscvStatusNum + coreNum - 1U) / coreNum;
 }
 
+static uint32_t CalcCumSumScratchSize(const gert::TilingContext* context, const MoeDistributeDispatchV2Info& info,
+                                      uint32_t expertIdsBufSize, uint32_t maxSizeForUbBuffer, const char* nodeName);
+
 static uint32_t CalcCumSumUsedUbSize(const gert::TilingContext* context, const MoeDistributeDispatchV2Info& info,
                                      uint32_t recStatusNumPerCore, uint32_t statusCntAlign, uint32_t expertIdsBufSize,
                                      uint32_t maxSizeForUbBuffer, uint32_t aivNum, const char* nodeName)
@@ -2101,20 +2121,13 @@ static uint32_t CalcCumSumUsedUbSize(const gert::TilingContext* context, const M
     uint32_t cumSumUbSize = 2U * UB_ALIGN;
     if (info.hasElasticInfo) {
         cumSumUbSize +=
-            Ceil((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
+            CeilAlign((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
     }
-    cumSumUbSize += 2U * maxSizeForUbBuffer;
-    cumSumUbSize += 2U * expertIdsBufSize;
+    cumSumUbSize += CalcCumSumScratchSize(context, info, expertIdsBufSize, maxSizeForUbBuffer, nodeName);
     cumSumUbSize += statusCntAlign * UB_ALIGN;
-    if (info.isExpertMask || (info.zeroComputeExpertNum != 0)) {
-        uint32_t expertIdsSize = Ceil(info.bs * info.k * sizeof(int32_t), UB_ALIGN, nodeName);
-        uint32_t xActivateMaskSize = info.bs * Ceil(info.k * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
-        cumSumUbSize += Ceil(info.bs * sizeof(int32_t), UB_ALIGN, nodeName);
-        cumSumUbSize += std::max(expertIdsSize, xActivateMaskSize);
-    }
-    cumSumUbSize += Ceil(recStatusNumPerCore * UB_ALIGN, SIZE_ALIGN_256, nodeName);
-    uint32_t recStatusSpace = Ceil(recStatusNumPerCore * sizeof(float), UB_ALIGN, nodeName);
-    uint32_t recvWinSpace = Ceil(info.epWorldSize * moeExpertNumPerRank * sizeof(float), UB_ALIGN, nodeName);
+    cumSumUbSize += CeilAlign(recStatusNumPerCore * UB_ALIGN, SIZE_ALIGN_256, nodeName);
+    uint32_t recStatusSpace = CeilAlign(recStatusNumPerCore * sizeof(float), UB_ALIGN, nodeName);
+    uint32_t recvWinSpace = CeilAlign(info.epWorldSize * moeExpertNumPerRank * sizeof(float), UB_ALIGN, nodeName);
     cumSumUbSize += std::max(recStatusSpace, recvWinSpace);
     uint32_t histoExpertNum =
         mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 ? statusCntAlign : info.moeExpertNum;
@@ -2123,17 +2136,19 @@ static uint32_t CalcCumSumUsedUbSize(const gert::TilingContext* context, const M
     histoGroupNum = (histoGroupNum == 0U) ? 1U : histoGroupNum;
     cumSumUbSize += histoGroupNum * Mc2Kernel::EXPERT_HISTO_BIN_NUM * sizeof(uint16_t);
     cumSumUbSize += 2U * aivNum * UB_ALIGN;
-    cumSumUbSize += Ceil(aivNum * sizeof(float), UB_ALIGN, nodeName);
+    uint32_t expertPrefixNum = (recStatusNumPerCore + info.epWorldSize - 1U) / info.epWorldSize;
+    cumSumUbSize += std::max(CeilAlign(aivNum * sizeof(float), UB_ALIGN, nodeName),
+                             CeilAlign(expertPrefixNum * sizeof(int32_t), UB_ALIGN, nodeName));
     cumSumUbSize += 3U * UB_ALIGN;
     if (info.isPerformance) {
-        cumSumUbSize += Ceil(info.epWorldSize * sizeof(int64_t), UB_ALIGN, nodeName);
-        cumSumUbSize += Ceil(recStatusNumPerCore * sizeof(int32_t), UB_ALIGN, nodeName);
+        cumSumUbSize += CeilAlign(info.epWorldSize * sizeof(int64_t), UB_ALIGN, nodeName);
+        cumSumUbSize += CeilAlign(recStatusNumPerCore * sizeof(int32_t), UB_ALIGN, nodeName);
         if (info.hasElasticInfo) {
-            cumSumUbSize +=
-                Ceil((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
+            cumSumUbSize += CeilAlign((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t),
+                                      UB_ALIGN, nodeName);
         }
     }
-    cumSumUbSize += Ceil(moeExpertNumPerRank * sizeof(int64_t), UB_ALIGN, nodeName);
+    cumSumUbSize += CeilAlign(moeExpertNumPerRank * sizeof(int64_t), UB_ALIGN, nodeName);
     return cumSumUbSize;
 }
 
@@ -2177,38 +2192,40 @@ static uint64_t CalcMteSendUbSize(const gert::TilingContext* context, const MoeD
                                   const char* nodeName)
 {
     uint32_t expertIdsCnt = info.bs * info.k;
-    uint32_t expertIdsSize = Ceil(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
+    uint32_t expertIdsSize = CeilAlign(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
     uint32_t expertIdsBufSize = std::max(expertIdsCnt * static_cast<uint32_t>(sizeof(int32_t)),
-                                         Ceil(info.bs * SIZE_OF_HALF, SIZE_ALIGN_256, nodeName));
-    uint32_t maskSize = info.bs * Ceil(info.k * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
+                                         CeilAlign(info.bs * SIZE_OF_HALF, SIZE_ALIGN_256, nodeName));
+    uint32_t maskSize = info.bs * CeilAlign(info.k * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
     uint32_t hFp32Size = info.h * sizeof(float);
     if (info.quantMode == static_cast<uint32_t>(QuantModeA5::PERGROUP_DYNAMIC_QUANT) &&
         context->GetOptionalInputShape(config.scalesIndex) != nullptr) {
-        hFp32Size = Ceil(info.h, PERGROUP_BLOCK_SIZE, nodeName) * sizeof(float);
+        hFp32Size = CeilAlign(info.h, PERGROUP_BLOCK_SIZE, nodeName) * sizeof(float);
     }
     uint32_t maxSize = std::max(std::max(hFp32Size, expertIdsSize),
-                                std::max(maskSize, Ceil(expertIdsCnt * SIZE_OF_HALF, SIZE_ALIGN_256, nodeName)));
-    uint32_t statusCount = Ceil(info.moeExpertNum + info.sharedExpertRankNum, aivNum, nodeName) / aivNum;
-    uint32_t statusSize = Ceil(statusCount, UB_ALIGN / sizeof(int32_t), nodeName) * UB_ALIGN;
-    uint64_t sendUb =
-        UB_ALIGN + statusSize + Ceil(expertIdsBufSize, UB_ALIGN, nodeName) + Ceil(maxSize, UB_ALIGN, nodeName);
+                                std::max(maskSize, CeilAlign(expertIdsCnt * SIZE_OF_HALF, SIZE_ALIGN_256, nodeName)));
+    uint32_t statusCount = CeilAlign(info.moeExpertNum + info.sharedExpertRankNum, aivNum, nodeName) / aivNum;
+    uint32_t statusSize = CeilAlign(statusCount, UB_ALIGN / sizeof(int32_t), nodeName) * UB_ALIGN;
+    uint64_t sendUb = UB_ALIGN + statusSize + CeilAlign(expertIdsBufSize, UB_ALIGN, nodeName) +
+                      CeilAlign(maxSize, UB_ALIGN, nodeName);
     if (info.hasElasticInfo) {
-        sendUb += Ceil((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
+        sendUb +=
+            CeilAlign((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
     }
     if (info.isExpertMask || info.zeroComputeExpertNum != 0) {
-        sendUb += Ceil(info.bs * sizeof(int32_t), UB_ALIGN, nodeName) + std::max(expertIdsSize, maskSize);
+        sendUb += CeilAlign(info.bs * sizeof(int32_t), UB_ALIGN, nodeName) + std::max(expertIdsSize, maskSize);
     }
     if (info.hasExpertScales) {
-        sendUb += Ceil(expertIdsBufSize, UB_ALIGN, nodeName);
+        sendUb += CeilAlign(expertIdsBufSize, UB_ALIGN, nodeName);
     }
-    sendUb += BUFFER_NUM * Ceil(maxSize, UB_ALIGN, nodeName);
+    sendUb += BUFFER_NUM * CeilAlign(maxSize, UB_ALIGN, nodeName);
     bool needCastBuf = NeedA5CastBuf(context, info, config);
     if (needCastBuf && info.quantMode == static_cast<uint32_t>(QuantModeA5::PERTOKEN_DYNAMIC_QUANT)) {
         sendUb += UB_ALIGN;
     }
     uint32_t hAlignSize = CalcA5TokenInAlignSize(context, info, config, nodeName);
     uint32_t hOutAlignUbSize = CalcA5TokenOutAlignSize(context, info, nodeName);
-    uint32_t alignedQueueSize = needCastBuf ? Ceil(hAlignSize, UB_ALIGN, nodeName) + hOutAlignUbSize : hOutAlignUbSize;
+    uint32_t alignedQueueSize =
+        needCastBuf ? CeilAlign(hAlignSize, UB_ALIGN, nodeName) + hOutAlignUbSize : hOutAlignUbSize;
     uint32_t queueDepth = sendUb + BUFFER_NUM * alignedQueueSize > ubSize ? 1U : BUFFER_NUM;
     return sendUb + queueDepth * alignedQueueSize;
 }
@@ -2218,21 +2235,22 @@ static uint64_t CalcMteWaitUbSize(const gert::TilingContext* context, const MoeD
 {
     uint32_t moeExpertNumPerRank = info.moeExpertNum / (info.epWorldSize - info.sharedExpertRankNum);
     uint32_t recvWinBlockNum = info.epWorldSize * moeExpertNumPerRank;
-    uint32_t recStatusNumPerCore = Ceil(recvWinBlockNum, aivNum, nodeName) / aivNum;
+    uint32_t recStatusNumPerCore = CeilAlign(recvWinBlockNum, aivNum, nodeName) / aivNum;
     uint32_t hOutAlignUbSize = CalcA5TokenOutAlignSize(context, info, nodeName);
     uint64_t waitUb = std::max<uint32_t>(recStatusNumPerCore * UB_ALIGN, SIZE_ALIGN_256);
-    waitUb += 2U * Ceil(recvWinBlockNum * sizeof(float), UB_ALIGN, nodeName);
+    waitUb += 2U * CeilAlign(recvWinBlockNum * sizeof(float), UB_ALIGN, nodeName);
     waitUb += 2U * aivNum * UB_ALIGN + 3U * UB_ALIGN;
     waitUb += BUFFER_NUM * hOutAlignUbSize;
-    waitUb += Ceil(moeExpertNumPerRank * sizeof(int64_t), UB_ALIGN, nodeName);
+    waitUb += CeilAlign(moeExpertNumPerRank * sizeof(int64_t), UB_ALIGN, nodeName);
     waitUb += recvWinBlockNum * UB_ALIGN;
     waitUb += UB_ALIGN + BUFFER_NUM * hOutAlignUbSize;
     if (info.hasElasticInfo) {
-        waitUb += Ceil((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
+        waitUb +=
+            CeilAlign((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
     }
     if (info.isPerformance) {
-        waitUb += Ceil(info.epWorldSize * sizeof(int64_t), UB_ALIGN, nodeName);
-        waitUb += Ceil(recStatusNumPerCore * sizeof(int32_t), UB_ALIGN, nodeName);
+        waitUb += CeilAlign(info.epWorldSize * sizeof(int64_t), UB_ALIGN, nodeName);
+        waitUb += CeilAlign(recStatusNumPerCore * sizeof(int32_t), UB_ALIGN, nodeName);
     }
     return waitUb;
 }
@@ -2256,11 +2274,333 @@ static ge::graphStatus CheckMteUbSizeA5(const gert::TilingContext* context, cons
     return ge::GRAPH_SUCCESS;
 }
 
+struct UbCheckParam {
+    uint32_t quantMode = 0;
+    uint32_t hSize = 0;
+    uint32_t bsSize = 0;
+    uint32_t kSize = 0;
+    uint32_t expertIdsCnt = 0;
+    uint32_t expertIdsBufSize = 0;
+    uint32_t hOutSizeAlign = 0;
+    uint32_t expertIdsSize = 0;
+    uint32_t xActivateMaskSize = 0;
+    uint32_t calTokenIdxBuffSize = 0;
+    uint32_t maxSizeForUbBuffer = 0;
+    bool needMaskCalFlag = false;
+    bool hasExpertMaskOrZeroCompute = false;
+    bool reuseValidExpertIndexForTemp = false;
+    bool isScales = false;
+    bool isSerialA5 = false;
+};
+
+struct A5ChunkParam {
+    bool useL0 = false;
+    uint32_t chunkElems = 0;
+    uint32_t chunkHostBytes = 0;
+    uint32_t maskRowStride = 0;
+    uint32_t maskRows = 0;
+    uint32_t boolRowsBytes = 0;
+    uint32_t halfRowsBytes = 0;
+    uint32_t reduceWsBytes = 0;
+    uint32_t bsBoolBytes = 0;
+    uint32_t bsHalfBytes = 0;
+    uint32_t bsI32Bytes = 0;
+};
+
+static A5ChunkParam ComputeA5ChunkParam(const UbCheckParam& p, const char* nodeName, bool forceL1 = false)
+{
+    A5ChunkParam c;
+    c.useL0 = (p.kSize <= FULLMESH_K_RED_LINE) && !forceL1;
+    c.chunkElems =
+        c.useL0 ? p.expertIdsCnt : (p.expertIdsCnt < FULLMESH_CHUNK_ELEMS ? p.expertIdsCnt : FULLMESH_CHUNK_ELEMS);
+    c.chunkHostBytes = CeilAlign(c.chunkElems * sizeof(int32_t), SIZE_ALIGN_256, nodeName);
+
+    c.maskRowStride = CeilAlign(p.kSize * SIZE_OF_BOOL, UB_ALIGN, nodeName);
+    uint32_t rowsByChunk = FULLMESH_CHUNK_BYTES / (c.maskRowStride * SIZE_OF_HALF);
+    rowsByChunk = (rowsByChunk / 16U) * 16U;
+    if (rowsByChunk == 0U) {
+        rowsByChunk = 16U;
+    }
+    c.maskRows = c.useL0 ? p.bsSize : (p.bsSize < rowsByChunk ? p.bsSize : rowsByChunk);
+    c.boolRowsBytes = c.maskRows * c.maskRowStride;
+    c.halfRowsBytes = c.maskRows * c.maskRowStride * SIZE_OF_HALF;
+
+    c.reduceWsBytes = CeilAlign(c.chunkElems * sizeof(float) / FULLMESH_REDUCE_WS_DIV, UB_ALIGN, nodeName);
+    c.reduceWsBytes = c.reduceWsBytes < UB_ALIGN ? UB_ALIGN : c.reduceWsBytes;
+
+    c.bsBoolBytes = CeilAlign(p.bsSize * SIZE_OF_BOOL, UB_ALIGN, nodeName);
+    c.bsHalfBytes = CeilAlign(p.bsSize * SIZE_OF_HALF, UB_ALIGN, nodeName);
+    c.bsI32Bytes = CeilAlign(p.bsSize * sizeof(int32_t), UB_ALIGN, nodeName);
+    return c;
+}
+
+static uint32_t CalcCumSumScratchSize(const gert::TilingContext* context, const MoeDistributeDispatchV2Info& info,
+                                      uint32_t expertIdsBufSize, uint32_t maxSizeForUbBuffer, const char* nodeName)
+{
+    uint32_t scratchSize = BUFFER_NUM * maxSizeForUbBuffer + BUFFER_NUM * expertIdsBufSize;
+    uint32_t expertIdsSize = CeilAlign(info.bs * info.k * sizeof(int32_t), UB_ALIGN, nodeName);
+    uint32_t maskSize = info.bs * CeilAlign(info.k * SIZE_OF_BOOL, UB_ALIGN, nodeName) * SIZE_OF_HALF;
+    uint32_t validBufferSize = std::max(expertIdsSize, maskSize);
+    // Preserve the existing admission limits for K <= 16 and unchanged architectures.
+    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 && info.k > K_MAX) {
+        UbCheckParam p;
+        p.bsSize = info.bs;
+        p.kSize = info.k;
+        p.expertIdsCnt = info.bs * info.k;
+        const A5ChunkParam c = ComputeA5ChunkParam(p, nodeName);
+        const uint32_t minHistoSaveBytes =
+            CeilAlign((Mc2Kernel::EXPERT_PER_HISTO_GROUP + 1U) * sizeof(int32_t), UB_ALIGN, nodeName);
+        uint32_t dstExpSize =
+            std::max(std::max(c.chunkHostBytes, c.boolRowsBytes), std::max(c.bsBoolBytes, minHistoSaveBytes));
+        uint32_t subExpSize = std::max(c.chunkHostBytes, std::max(c.bsHalfBytes, c.bsI32Bytes));
+        scratchSize = dstExpSize + subExpSize + expertIdsBufSize + std::min(expertIdsBufSize, FULLMESH_CHUNK_BYTES);
+        validBufferSize = std::max(c.chunkHostBytes, c.halfRowsBytes);
+    }
+    if (info.isExpertMask || info.zeroComputeExpertNum != 0) {
+        scratchSize += CeilAlign(info.bs * sizeof(int32_t), UB_ALIGN, nodeName) + validBufferSize;
+    }
+    return scratchSize;
+}
+
+static void AccountA5MaskAndWorkBufs(const UbCheckParam& p, const A5ChunkParam& c, uint32_t& ubSize,
+                                     std::string& ubDetail)
+{
+    uint32_t gatherMaskBufSizeA5 =
+        p.needMaskCalFlag ?
+            (c.useL0 ? p.expertIdsBufSize :
+                       (p.expertIdsBufSize < FULLMESH_CHUNK_BYTES ? p.expertIdsBufSize : FULLMESH_CHUNK_BYTES)) :
+            0;
+    uint32_t calTempBufSizeA5 = p.needMaskCalFlag ? 0 : c.reduceWsBytes;
+    uint32_t maskAndWorkBufSize = gatherMaskBufSizeA5 + calTempBufSizeA5;
+    ubSize = ubSize + maskAndWorkBufSize; // gatherMaskTBuf_ / calTempBuf
+    ubDetail += "; gatherMask+calTemp(layout=" + std::string(c.useL0 ? "full" : "chunked") +
+                "):" + std::to_string(maskAndWorkBufSize);
+}
+
+static void AccountA5QuantOrMaskBufs(const UbCheckParam& p, const A5ChunkParam& c, bool isDirectCastA5,
+                                     uint32_t& hOutAlignUbSize, uint32_t& ubSize, std::string& ubDetail,
+                                     const char* nodeName)
+{
+    const uint32_t minHistoSaveBytes =
+        CeilAlign((Mc2Kernel::EXPERT_PER_HISTO_GROUP + 1U) * sizeof(int32_t), UB_ALIGN, nodeName);
+    uint32_t quantOrMaskBufSize = 0;
+    if ((p.quantMode > static_cast<uint32_t>(QuantModeA5::NON_QUANT)) || isDirectCastA5) {
+        hOutAlignUbSize = CeilAlign(p.hOutSizeAlign, SPLIT_BLOCK_DATA_SIZE, nodeName);
+
+        uint32_t tempBufSize = p.reuseValidExpertIndexForTemp ? 0 : hOutAlignUbSize;
+        uint32_t hFp32QuantBytes = CeilAlign(p.hSize * sizeof(float), UB_ALIGN, nodeName);
+        uint32_t smoothQuantBytes = hFp32QuantBytes;
+
+        if ((p.quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT)) ||
+            (p.quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT_CLIP))) {
+            smoothQuantBytes = 0;
+        } else if (p.quantMode == static_cast<uint32_t>(QuantModeA5::PERGROUP_DYNAMIC_QUANT)) {
+            hFp32QuantBytes = CeilAlign(p.hSize, static_cast<uint32_t>(PERGROUP_BLOCK_SIZE), nodeName) /
+                              static_cast<uint32_t>(PERGROUP_BLOCK_SIZE) * sizeof(float);
+            if (p.isScales) {
+                smoothQuantBytes =
+                    CeilAlign(p.hSize, static_cast<uint32_t>(PERGROUP_BLOCK_SIZE), nodeName) * sizeof(float);
+            }
+        }
+        uint32_t recvCastSize = hFp32QuantBytes > c.chunkHostBytes ? hFp32QuantBytes : c.chunkHostBytes;
+        recvCastSize = recvCastSize > c.boolRowsBytes ? recvCastSize : c.boolRowsBytes;
+        if (p.isSerialA5) {
+            recvCastSize = recvCastSize > minHistoSaveBytes ? recvCastSize : minHistoSaveBytes;
+        }
+
+        uint32_t smoothSize = smoothQuantBytes > c.chunkHostBytes ? smoothQuantBytes : c.chunkHostBytes;
+        smoothSize = smoothSize > c.bsI32Bytes ? smoothSize : c.bsI32Bytes;
+        smoothSize = smoothSize > c.bsHalfBytes ? smoothSize : c.bsHalfBytes;
+
+        ubSize = ubSize + tempBufSize + recvCastSize + smoothSize;
+        quantOrMaskBufSize = tempBufSize + recvCastSize + smoothSize;
+    } else if (p.needMaskCalFlag) {
+        uint32_t dstExpSize = c.chunkHostBytes;
+        dstExpSize = dstExpSize > c.boolRowsBytes ? dstExpSize : c.boolRowsBytes;
+        dstExpSize = dstExpSize > c.bsBoolBytes ? dstExpSize : c.bsBoolBytes;
+        if (p.isSerialA5) {
+            dstExpSize = dstExpSize > minHistoSaveBytes ? dstExpSize : minHistoSaveBytes;
+        }
+
+        uint32_t subExpSize = c.chunkHostBytes;
+        subExpSize = subExpSize > c.bsHalfBytes ? subExpSize : c.bsHalfBytes;
+        subExpSize = subExpSize > c.bsI32Bytes ? subExpSize : c.bsI32Bytes;
+
+        ubSize = ubSize + dstExpSize + subExpSize;
+        quantOrMaskBufSize = dstExpSize + subExpSize;
+    } else {
+        uint32_t recomputeSize =
+            c.useL0 ? p.calTokenIdxBuffSize :
+                      (p.calTokenIdxBuffSize < c.chunkHostBytes ? p.calTokenIdxBuffSize : c.chunkHostBytes);
+        if (p.isSerialA5) {
+            recomputeSize = recomputeSize > minHistoSaveBytes ? recomputeSize : minHistoSaveBytes;
+        }
+        ubSize = ubSize + BUFFER_NUM * recomputeSize;
+        quantOrMaskBufSize = BUFFER_NUM * recomputeSize;
+    }
+    ubDetail += "; quantOrMaskBufs:" + std::to_string(quantOrMaskBufSize);
+}
+
+static void AccountA5ValidIdxBufs(const UbCheckParam& p, const A5ChunkParam& c, uint32_t hOutAlignUbSize,
+                                  uint32_t& ubSize, std::string& ubDetail, const char* nodeName)
+{
+    uint32_t validIdxBufSize = 0;
+    if (p.hasExpertMaskOrZeroCompute) {
+        uint32_t axisBSAlign = CeilAlign(p.bsSize * sizeof(int32_t), UB_ALIGN, nodeName);
+        ubSize = ubSize + axisBSAlign; // validBsIndexTBuf_
+        uint32_t validBufferSize = c.useL0 ?
+                                       (p.expertIdsSize > p.xActivateMaskSize ? p.expertIdsSize : p.xActivateMaskSize) :
+                                       (c.chunkHostBytes > c.halfRowsBytes ? c.chunkHostBytes : c.halfRowsBytes);
+        if (p.reuseValidExpertIndexForTemp && (hOutAlignUbSize > validBufferSize)) {
+            validBufferSize = hOutAlignUbSize;
+        }
+        ubSize = ubSize + validBufferSize; // validExpertIndexBuf_
+        validIdxBufSize = axisBSAlign + validBufferSize;
+    }
+    ubDetail += "; validBsIndex+validExpertIndex:" + std::to_string(validIdxBufSize);
+}
+
+static void AccountA5BsSlice(const gert::TilingContext* context, const MoeDistributeDispatchV2TilingData& tilingData,
+                             const UbCheckParam& p, const A5ChunkParam& c, uint32_t& ubSize, std::string& ubDetail,
+                             const char* nodeName)
+{
+    if (!c.useL0 && p.expertIdsBufSize > FULLMESH_BS_SLICE_TARGET_BYTES) {
+        uint32_t blockCntPerToken = CeilAlign(p.hOutSizeAlign, SPLIT_BLOCK_DATA_SIZE, nodeName) / SPLIT_BLOCK_DATA_SIZE;
+        uint32_t hCommuSize = blockCntPerToken * SPLIT_BLOCK_SIZE;
+        uint64_t ubRealSize = 0;
+        auto ascendcPlatformUb = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+        ascendcPlatformUb.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubRealSize);
+
+        uint64_t outBufModel = static_cast<uint64_t>(BUFFER_NUM) * hCommuSize;
+        uint64_t fixedNoOut = (ubSize > outBufModel) ? (ubSize - outBufModel) : ubSize;
+        uint64_t pipe1 = (ubRealSize > fixedNoOut) ? ((ubRealSize - fixedNoOut) / hCommuSize) : 0;
+
+        if (pipe1 < 8U) {
+            uint32_t sliceNum =
+                (p.expertIdsBufSize + FULLMESH_BS_SLICE_TARGET_BYTES - 1) / FULLMESH_BS_SLICE_TARGET_BYTES;
+            sliceNum = sliceNum > FULLMESH_BS_SLICE_MAX ? FULLMESH_BS_SLICE_MAX : sliceNum;
+            uint32_t rowsPerSlice = CeilAlign(p.bsSize, sliceNum, nodeName) / sliceNum;
+
+            uint32_t sliceIdsSize = CeilAlign(rowsPerSlice * p.kSize * sizeof(int32_t), SIZE_ALIGN_256, nodeName);
+            uint32_t moeExpertNumUb = tilingData.moeDistributeDispatchV2Info.moeExpertNum;
+            uint32_t histoGroups = CeilAlign(moeExpertNumUb, Mc2Kernel::EXPERT_PER_HISTO_GROUP, nodeName) /
+                                   Mc2Kernel::EXPERT_PER_HISTO_GROUP;
+            uint32_t histoBufSize = (histoGroups + 1U) * Mc2Kernel::EXPERT_HISTO_BIN_NUM * sizeof(uint16_t);
+            uint32_t sliceExtra = sliceIdsSize + histoBufSize;
+            ubSize = ubSize - p.expertIdsBufSize + sliceExtra;
+            ubDetail += "; bsSlice(count=" + std::to_string(sliceNum) + ",ids:" + std::to_string(sliceIdsSize) +
+                        ",localHisto:" + std::to_string(histoBufSize) + ",pipe1:" + std::to_string(pipe1) + ")";
+        }
+    }
+}
+
+static void CheckUBSizeA5(const gert::TilingContext* context, MoeDistributeDispatchV2TilingData& tilingData,
+                          const UbCheckParam& p, bool isDirectCast, uint32_t sendExtraUbSize, uint32_t& ubSize,
+                          std::string& ubDetail, const char* nodeName)
+{
+    if (p.kSize <= FULLMESH_K_RED_LINE) {
+        A5ChunkParam cL0;
+        cL0.useL0 = true;
+        cL0.chunkElems = p.expertIdsCnt;
+        cL0.chunkHostBytes = CeilAlign(cL0.chunkElems * sizeof(int32_t), SIZE_ALIGN_256, nodeName);
+        cL0.maskRowStride = CeilAlign(p.kSize * SIZE_OF_BOOL, UB_ALIGN, nodeName);
+        uint32_t rowsByChunkL0 = FULLMESH_CHUNK_BYTES / (cL0.maskRowStride * SIZE_OF_HALF);
+        rowsByChunkL0 = (rowsByChunkL0 / 16U) * 16U;
+        if (rowsByChunkL0 == 0U) {
+            rowsByChunkL0 = 16U;
+        }
+        cL0.maskRows = p.bsSize;
+        cL0.boolRowsBytes = cL0.maskRows * cL0.maskRowStride;
+        cL0.halfRowsBytes = cL0.maskRows * cL0.maskRowStride * SIZE_OF_HALF;
+        cL0.reduceWsBytes = CeilAlign(cL0.chunkElems * sizeof(float) / FULLMESH_REDUCE_WS_DIV, UB_ALIGN, nodeName);
+        cL0.reduceWsBytes = cL0.reduceWsBytes < UB_ALIGN ? UB_ALIGN : cL0.reduceWsBytes;
+        cL0.bsBoolBytes = CeilAlign(p.bsSize * SIZE_OF_BOOL, UB_ALIGN, nodeName);
+        cL0.bsHalfBytes = CeilAlign(p.bsSize * SIZE_OF_HALF, UB_ALIGN, nodeName);
+        cL0.bsI32Bytes = CeilAlign(p.bsSize * sizeof(int32_t), UB_ALIGN, nodeName);
+
+        uint32_t l0UbSize = ubSize + sendExtraUbSize;
+        std::string l0Detail = ubDetail;
+        AccountA5MaskAndWorkBufs(p, cL0, l0UbSize, l0Detail);
+        uint32_t hOutAlignL0 = 0;
+        AccountA5QuantOrMaskBufs(p, cL0, isDirectCast, hOutAlignL0, l0UbSize, l0Detail, nodeName);
+        AccountA5ValidIdxBufs(p, cL0, hOutAlignL0, l0UbSize, l0Detail, nodeName);
+
+        uint64_t ubRealSizeL0 = 0;
+        auto platformL0 = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+        platformL0.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubRealSizeL0);
+
+        if (l0UbSize > ubRealSizeL0) {
+            tilingData.moeDistributeDispatchV2Info.useL0Layout = 0U;
+            OP_LOGI(nodeName,
+                    "Full-size layout UB=%uB exceeds real UB=%luB, "
+                    "falling back to L1 chunked layout (k=%u, bs=%u, moeExpertNum=%u)",
+                    l0UbSize, ubRealSizeL0, p.kSize, p.bsSize, tilingData.moeDistributeDispatchV2Info.moeExpertNum);
+        } else {
+            tilingData.moeDistributeDispatchV2Info.useL0Layout = 1U;
+        }
+    } else {
+        tilingData.moeDistributeDispatchV2Info.useL0Layout = 0U;
+    }
+
+    bool forceL1 = (tilingData.moeDistributeDispatchV2Info.useL0Layout == 0U);
+    const A5ChunkParam c = ComputeA5ChunkParam(p, nodeName, forceL1);
+    AccountA5MaskAndWorkBufs(p, c, ubSize, ubDetail);
+    uint32_t hOutAlignUbSize = 0;
+    AccountA5QuantOrMaskBufs(p, c, isDirectCast, hOutAlignUbSize, ubSize, ubDetail, nodeName);
+    AccountA5ValidIdxBufs(p, c, hOutAlignUbSize, ubSize, ubDetail, nodeName);
+    AccountA5BsSlice(context, tilingData, p, c, ubSize, ubDetail, nodeName);
+}
+
+static void AccountLegacySendBuffers(const UbCheckParam& p, bool isDirectCast, bool isArch22, uint32_t& ubSize,
+                                     std::string& ubDetail, const char* nodeName)
+{
+    uint32_t gatherMaskBufSize = p.needMaskCalFlag ? p.expertIdsBufSize : 0;
+    uint32_t calTempBufSize =
+        p.expertIdsCnt <= 256U ?
+            UB_ALIGN :
+            CeilAlign(CeilAlign(p.expertIdsCnt, 64U, nodeName) / 64U * sizeof(float), SIZE_ALIGN_256, nodeName);
+    uint32_t maskAndWorkBufSize = isArch22 ? (gatherMaskBufSize + p.calTokenIdxBuffSize) :
+                                             (p.needMaskCalFlag ? p.expertIdsBufSize : calTempBufSize);
+    ubSize = ubSize + maskAndWorkBufSize; // gatherMaskTBuf_ / calTempBuf
+    ubDetail += "; gatherMask+calTemp:" + std::to_string(maskAndWorkBufSize);
+
+    uint32_t quantOrMaskBufSizeA3 = 0;
+    if ((p.quantMode > static_cast<uint32_t>(QuantModeA5::NON_QUANT)) || isDirectCast) {
+        uint32_t hOutAlignUbSize = CeilAlign(p.hOutSizeAlign, isArch22 ? UB_ALIGN : SPLIT_BLOCK_DATA_SIZE, nodeName);
+        uint32_t tempBufSize = p.reuseValidExpertIndexForTemp ? 0U : hOutAlignUbSize;
+        ubSize = ubSize + tempBufSize;
+        ubSize = ubSize + BUFFER_NUM * p.maxSizeForUbBuffer;
+        quantOrMaskBufSizeA3 = tempBufSize + BUFFER_NUM * p.maxSizeForUbBuffer;
+    } else if (p.needMaskCalFlag) {
+        ubSize = ubSize + BUFFER_NUM * p.maxSizeForUbBuffer;
+        quantOrMaskBufSizeA3 = BUFFER_NUM * p.maxSizeForUbBuffer;
+    } else {
+        ubSize = ubSize + BUFFER_NUM * p.calTokenIdxBuffSize;
+        quantOrMaskBufSizeA3 = BUFFER_NUM * p.calTokenIdxBuffSize;
+    }
+    ubDetail += "; quantOrMaskBufs:" + std::to_string(quantOrMaskBufSizeA3);
+
+    uint32_t validIdxBufSizeA3 = 0;
+    if (p.hasExpertMaskOrZeroCompute) {
+        uint32_t axisBSAlign = CeilAlign(p.bsSize * sizeof(int32_t), UB_ALIGN, nodeName);
+        ubSize = ubSize + axisBSAlign; // validBsIndexTBuf_
+        uint32_t validBufferSize = p.expertIdsSize > p.xActivateMaskSize ? p.expertIdsSize : p.xActivateMaskSize;
+        if (p.reuseValidExpertIndexForTemp &&
+            ((p.quantMode > static_cast<uint32_t>(QuantModeA5::NON_QUANT)) || isDirectCast)) {
+            validBufferSize = std::max(validBufferSize, CeilAlign(p.hOutSizeAlign, SPLIT_BLOCK_DATA_SIZE, nodeName));
+        }
+        ubSize = ubSize + validBufferSize; // validExpertIndexBuf_
+        validIdxBufSizeA3 = axisBSAlign + validBufferSize;
+    }
+    ubDetail += "; validBsIndex+validExpertIndex:" + std::to_string(validIdxBufSizeA3);
+}
+
 static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistributeDispatchV2TilingData& tilingData,
                                    const char* nodeName, const DispatchV2Config& config)
 {
     uint32_t ubSize = UB_ALIGN; // dataStateBuf
     std::string ubDetail = "dataStateBuf:" + std::to_string(UB_ALIGN);
+    const bool isA5Arch = (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510);
     const bool isArch22 = (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201);
 
     uint32_t quantMode = tilingData.moeDistributeDispatchV2Info.quantMode;
@@ -2279,96 +2619,88 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
     const gert::StorageShape* scalesStorageShape = context->GetOptionalInputShape(config.scalesIndex);
     bool isActiveMask = (xActiveMaskStorageShape != nullptr);
     bool isScales = (scalesStorageShape != nullptr);
+
     bool needMaskCalFlag = (isActiveMask || tilingData.moeDistributeDispatchV2Info.zeroComputeExpertNum != 0);
     bool hasExpertMaskOrZeroCompute = (tilingData.moeDistributeDispatchV2Info.isExpertMask ||
                                        (tilingData.moeDistributeDispatchV2Info.zeroComputeExpertNum != 0));
     bool reuseValidExpertIndexForTemp = !isArch22 && hasExpertMaskOrZeroCompute;
 
-    uint32_t expertIdsSize = Ceil(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
-    uint32_t xActivateMaskSize = bsSize * Ceil(kSize * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
+    uint32_t expertIdsSize = CeilAlign(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
+    uint32_t xActivateMaskSize = bsSize * CeilAlign(kSize * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
     uint32_t maxSizeForUbBuffer =
         SetMaxSizeForUbBuffer(tilingData, hSize, bsSize, kSize, expertIdsCnt, isScales, nodeName);
-
-    uint32_t calTokenIdxBuffSize = Ceil(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
-    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
-        IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info)) {
-        calTokenIdxBuffSize = std::max(calTokenIdxBuffSize, SIZE_ALIGN_256);
-    }
-    uint32_t calTempBufSize = calTokenIdxBuffSize; // A3 维持原公式
-    if (!isArch22) {
-        // 规约只需保存每64个float的中间结果（与 kernel 侧 reduceBytes 公式对齐）
-        calTempBufSize = expertIdsCnt <= 256U ?
-                             UB_ALIGN :
-                             Ceil(Ceil(expertIdsCnt, 64U, nodeName) / 64U * sizeof(float), SIZE_ALIGN_256, nodeName);
-    }
-    uint32_t gatherMaskBufSize = needMaskCalFlag ? expertIdsBufSize : 0;
-    uint32_t maskAndWorkBufSize =
-        isArch22 ? (gatherMaskBufSize + calTokenIdxBuffSize) : (needMaskCalFlag ? expertIdsBufSize : calTempBufSize);
-    ubSize = ubSize + maskAndWorkBufSize; // gatherMaskTBuf_ / calTempBuf
-    ubDetail += "; gatherMask+calTemp:" + std::to_string(maskAndWorkBufSize);
 
     uint32_t expertScalesBufSize =
         (tilingData.moeDistributeDispatchV2Info.hasExpertScales && isArch22) ? expertIdsBufSize : 0;
     ubSize = ubSize + expertScalesBufSize; // expertScalesBuf_
     ubDetail += "; expertScalesBuf:" + std::to_string(expertScalesBufSize);
 
-    uint32_t quantOrMaskBufSize = 0;
-    uint32_t hOutAlignUbSize = 0;
+    uint32_t calTokenIdxBuffSize = CeilAlign(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
+    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
+        IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info)) {
+        calTokenIdxBuffSize = std::max(calTokenIdxBuffSize, SIZE_ALIGN_256);
+    }
+
     const auto* xDesc = context->GetInputDesc(config.xIndex);
     const auto* expandXDesc = context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX);
     bool isDirectCast = (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) && (xDesc != nullptr) &&
                         (expandXDesc != nullptr) && (xDesc->GetDataType() != expandXDesc->GetDataType());
-    if (quantMode > static_cast<uint32_t>(QuantModeA5::NON_QUANT) || isDirectCast) {
-        hOutAlignUbSize = Ceil(hOutSizeAlign, isArch22 ? UB_ALIGN : SPLIT_BLOCK_DATA_SIZE, nodeName);
-        uint32_t tempBufSize = reuseValidExpertIndexForTemp ? 0 : hOutAlignUbSize;
-        ubSize = ubSize + tempBufSize;
-        ubSize = ubSize + BUFFER_NUM * maxSizeForUbBuffer; // receiveDataCastFloatBuf smoothScalesBuf
-        quantOrMaskBufSize = tempBufSize + BUFFER_NUM * maxSizeForUbBuffer;
-    } else if (needMaskCalFlag) {
-        ubSize = ubSize + BUFFER_NUM * maxSizeForUbBuffer;
-        quantOrMaskBufSize = BUFFER_NUM * maxSizeForUbBuffer;
-    } else {
-        ubSize = ubSize + BUFFER_NUM * calTokenIdxBuffSize; // dstExpBuf_ / subExpBuf_
-        quantOrMaskBufSize = BUFFER_NUM * calTokenIdxBuffSize;
-    }
-    ubDetail += "; quantOrMaskBufs:" + std::to_string(quantOrMaskBufSize);
 
-    uint32_t validIdxBufSize = 0;
-    if (hasExpertMaskOrZeroCompute) {
-        uint32_t axisBSAlign = Ceil(bsSize * sizeof(int32_t), UB_ALIGN, nodeName);
-        ubSize = ubSize + axisBSAlign; // validBsIndexTBuf_
-        uint32_t validBufferSize = expertIdsSize > xActivateMaskSize ? expertIdsSize : xActivateMaskSize;
-        if (reuseValidExpertIndexForTemp && (hOutAlignUbSize > validBufferSize)) {
-            validBufferSize = hOutAlignUbSize;
-        }
-        ubSize = ubSize + validBufferSize; // validExpertIndexBuf_
-        validIdxBufSize = axisBSAlign + validBufferSize;
-    }
-    ubDetail += "; validBsIndex+validExpertIndex:" + std::to_string(validIdxBufSize);
+    UbCheckParam param;
+    param.quantMode = quantMode;
+    param.hSize = hSize;
+    param.bsSize = bsSize;
+    param.kSize = kSize;
+    param.expertIdsCnt = expertIdsCnt;
+    param.expertIdsBufSize = expertIdsBufSize;
+    param.hOutSizeAlign = hOutSizeAlign;
+    param.expertIdsSize = expertIdsSize;
+    param.xActivateMaskSize = xActivateMaskSize;
+    param.calTokenIdxBuffSize = calTokenIdxBuffSize;
+    param.maxSizeForUbBuffer = maxSizeForUbBuffer;
+    param.needMaskCalFlag = needMaskCalFlag;
+    param.hasExpertMaskOrZeroCompute = hasExpertMaskOrZeroCompute;
+    param.reuseValidExpertIndexForTemp = reuseValidExpertIndexForTemp;
+    param.isScales = isScales;
+    param.isSerialA5 = isA5Arch && IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info);
 
     uint32_t sendToMoeUsedBuffer = SendToMoeExpertUsedBuffer(context, tilingData, expertIdsBufSize, kSize, nodeName);
-    ubSize = ubSize + sendToMoeUsedBuffer;
-    ubDetail += "; sendToMoeExpertBufs:" + std::to_string(sendToMoeUsedBuffer);
-
+    uint32_t sendExtraUbSize = sendToMoeUsedBuffer;
     if (!isArch22) {
-        ubSize += 2U * UB_ALIGN; // 首尾计量buffer（calBeginBuf_/calEndBuf_）
+        sendExtraUbSize += 2U * UB_ALIGN; // 首尾计量buffer（calBeginBuf_/calEndBuf_）
         uint32_t groupIndexSize = 0;
         if (config.isMc2Context) {
             // V3分组开关在device context中，预留组内索引空间
-            groupIndexSize = Ceil(expertIdsCnt * sizeof(int16_t), UB_ALIGN, nodeName);
-            ubSize += groupIndexSize;
+            groupIndexSize = CeilAlign(expertIdsCnt * sizeof(int16_t), UB_ALIGN, nodeName);
+            sendExtraUbSize += groupIndexSize;
         }
         ubDetail += "; metering+groupIndex:" + std::to_string(2U * UB_ALIGN + groupIndexSize);
     }
+    uint32_t legacyUbSize = ubSize;
+    if (isA5Arch) {
+        CheckUBSizeA5(context, tilingData, param, isDirectCast, sendExtraUbSize, ubSize, ubDetail, nodeName);
+        if (kSize <= K_MAX) {
+            // Keep existing K <= 16 admission boundaries while checking the new layout independently.
+            std::string legacyDetail;
+            AccountLegacySendBuffers(param, isDirectCast, false, legacyUbSize, legacyDetail, nodeName);
+            ubSize = std::max(ubSize, legacyUbSize);
+            ubDetail += "; legacySendLowerBound:" + std::to_string(legacyUbSize);
+        }
+    } else {
+        AccountLegacySendBuffers(param, isDirectCast, isArch22, ubSize, ubDetail, nodeName);
+    }
+    ubSize += sendExtraUbSize;
+    ubDetail += "; sendToMoeExpertBufs:" + std::to_string(sendToMoeUsedBuffer);
     if (mc2tiling::GetSocVersion(context) == "Ascend910_93") {
         ubSize = A3FullMeshUsedBuffer(context, tilingData, expertIdsBufSize, hOutSizeAlign, config, nodeName);
     }
-    ubDetail += "; total:" + std::to_string(ubSize);
-    if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_2201) {
+    if (!isArch22) {
         OP_TILING_CHECK(CheckCumSumUbSizeA5(context, nodeName, tilingData, expertIdsBufSize, maxSizeForUbBuffer,
                                             config) != ge::GRAPH_SUCCESS,
                         OP_LOGE(nodeName, "Check cumsum core UB size failed."), return ge::GRAPH_FAILED);
     }
+    ubDetail += "; total:" + std::to_string(ubSize);
+
     return CheckUsedUbSize(context, tilingData, nodeName, ubSize, bsSize, hSize, kSize, ubDetail);
 }
 
@@ -2384,6 +2716,9 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext* context, const char* no
         // A5为前缀和同步标记预留空间
         workSpaces[0] +=
             A5_CUMSUM_WS_FLAG_OFFSET + static_cast<uint64_t>(aivNum) * A5_CUMSUM_WORKSPACE_MAX_CORE_NUM * UB_ALIGN_VAL;
+        if (npuArch == Ops::Base::DAV_3510) {
+            workSpaces[0] += FULLMESH_BS_SLICE_WS_BYTES;
+        }
     }
     return ge::GRAPH_SUCCESS;
 }

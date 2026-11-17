@@ -658,9 +658,10 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
   | A            | 表示本卡需要分发的最大token数量，取值范围如下：<ul> <li>对于共享专家，令 <code>ranksPerSharedExpert = sharedExpertRankNum / sharedExpertNum</code>、<code>maxBS = (globalBs == 0 ? BS : globalBs / epWorldSize)</code>，要满足 <code>A &gt;= maxBS * ((epWorldSize + ranksPerSharedExpert - 1) / ranksPerSharedExpert)</code>。</li><li>对于MoE专家，当globalBs为0时，要满足A >= BS \* epWorldSize \* min(localExpertNum, K)；当globalBs非0时，要满足A >= globalBs \* min(localExpertNum, K)。</li></ul>|
   | H（hidden size） | 表示hidden size隐藏层大小。 具体产品差异见下方说明。 |
   | BS           | 表示本卡最终输出token数。 具体产品差异见下方说明。 |
-  | K    | 表示选取topK个专家，取值范围为0 < K ≤16，且<code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>。具体产品差异见下方说明。 |
+  | K | 表示选取topK个专家，取值范围为0 < K ≤ 16，且<code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>。具体产品差异见下方说明。 |
   | serverNum    | 表示服务器节点数，仅支持2、4、8。具体产品差异见下方说明。 |
   | localExpertNum |   本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li>具体产品差异见下方说明。</li></ul> |
+
 
   <!-- npu="910b" id28 -->
   - H（hidden size）：<term>Atlas A2系列产品</term>：当`x`的数据类型为INT32时，取值范围为(0, 5120]且为32的整数倍；其他数据类型的取值范围为(0, 10240]且为32的整数倍。
@@ -683,6 +684,9 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
   <!-- npu="A3" id34 -->
   - K：<term>Atlas A3系列产品</term>：当commAlg为"fullmesh_v2"时，取值范围为0 < K ≤ 12。
   <!-- end id34 -->
+  <!-- npu="950" id38 -->
+  - K：<term>Ascend 950DT系列产品</term>：普通fullmesh_v2路径（commAlg为"fullmesh_v2"，非分层且非RoCE）支持0 < K ≤ 32；其他路径仍为0 < K ≤ 16。K > 16时，不支持与AddRmsNorm融合Combine配套。
+  <!-- end id38 -->
   <!-- npu="910b" id35 -->
   - serverNum：<term>Atlas A2系列产品</term>：仅该场景的shape使用了该变量。
   <!-- end id35 -->

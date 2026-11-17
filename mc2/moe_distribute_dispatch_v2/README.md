@@ -352,7 +352,9 @@ $$
     - `A`：表示本卡可能接收的最大token数量，取值范围如下：
         - 对于共享专家，令`ranksPerSharedExpert = sharedExpertRankNum / sharedExpertNum`、`maxBS = (globalBs == 0 ? BS : globalBs / epWorldSize)`，要满足`A >= maxBS * ((epWorldSize + ranksPerSharedExpert - 1) / ranksPerSharedExpert)`。
         - 对于MoE专家，当`globalBs`为0时，要满足`A` >= `BS` *`epWorldSize`* min(`localExpertNum`, `K`)；当`globalBs`非0时，要满足`A` >= `globalBs` * min(`localExpertNum`, `K`)。
-    - `K`：表示选取topK个专家，取值范围为0 < `K` ≤ 16同时满足0 < `K` ≤ `moeExpertNum` + `zeroExpertNum` + `copyExpertNum` + `constExpertNum`。
+    - `K`：表示选取topK个专家，取值范围为0 < `K` ≤ 16，且0 < `K` ≤ `moeExpertNum` + `zeroExpertNum` + `copyExpertNum` + `constExpertNum`。具体产品差异见下方说明。
+        - K：<term>Atlas A3系列产品</term>：当commAlg为"fullmesh_v2"时，取值范围为0 < K ≤ 12。
+        - K：<term>Ascend 950DT系列产品</term>：普通fullmesh_v2路径（commAlg为"fullmesh_v2"，非分层且非RoCE）支持0 < K ≤ 32；其他路径仍为0 < K ≤ 16。K > 16时，不支持与AddRmsNorm融合Combine配套。
     - `localExpertNum`：表示本卡专家数量。
         - 对于共享专家卡，`localExpertNum` = 1
         - 对于MoE专家卡，`localExpertNum` = `moeExpertNum` / (`epWorldSize` - `sharedExpertRankNum`)，当前版本不支持TP域通信。

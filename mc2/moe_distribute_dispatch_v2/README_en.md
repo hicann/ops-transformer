@@ -354,7 +354,9 @@ For details, see the following parameter description.
     - `A`: Maximum number of tokens that the current device may receive. The value ranges are as follows:
         - For shared experts, let `ranksPerSharedExpert = sharedExpertRankNum / sharedExpertNum` and `maxBS = (globalBs == 0 ? BS : globalBs / epWorldSize)`. Then `A >= maxBS * ((epWorldSize + ranksPerSharedExpert - 1) / ranksPerSharedExpert)` must be satisfied.
         - For MoE experts, if `globalBs` is 0, `A` >= `BS` *`epWorldSize`* min(`localExpertNum`, `K`) must be satisfied; if `globalBs` is not 0, `A` >= `globalBs` * min(`localExpertNum`, `K`) must be satisfied.
-    - `K`: Number of selected topK experts. The value range is 0 < `K` ≤ 16, and 0 < `K` ≤ `moeExpertNum` + `zeroExpertNum` + `copyExpertNum` + `constExpertNum` must also be satisfied.
+    - `K`: Number of selected topK experts. The value range is 0 < `K` ≤ 16, and 0 < `K` ≤ `moeExpertNum` + `zeroExpertNum` + `copyExpertNum` + `constExpertNum`. See the product-specific constraints below.
+        - K: <term>Atlas A3 products</term>: When `commAlg` is "fullmesh_v2", the value range is 0 < K ≤ 12.
+        - K: <term>Ascend 950PR&950DT products</term>: The ordinary fullmesh_v2 path (`commAlg` is "fullmesh_v2", non-hierarchical and non-RoCE) supports 0 < K ≤ 32; other paths retain 0 < K ≤ 16. For K > 16, the paired Combine operator must not use AddRmsNorm fusion.
     - `localExpertNum`: Number of experts on the current device.
         - For a shared expert device, `localExpertNum` = 1
         - For a MoE expert device, `localExpertNum` = `moeExpertNum` / (`epWorldSize` - `sharedExpertRankNum`); TP domain communication is not supported in the current version.

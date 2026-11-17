@@ -348,7 +348,9 @@ English | [简体中文](./README.md)
     - `A`: Indicates the maximum number of tokens that the current device may receive. The value range is as follows:
         - For shared experts, `A` = `BS` *`epWorldSize`* `sharedExpertNum` / `sharedExpertRankNum` must be satisfied.
         - For MoE experts, when `globalBs` is 0, `A` >= `BS` *`epWorldSize`* min(`localExpertNum`, `K`) must be satisfied. When `globalBs` is not 0, `A` >= `globalBs` * min(`localExpertNum`, `K`) must be satisfied.
-    - `K`: Indicates that topK experts are selected. The value range is 0 < `K` ≤ 16, and 0 < `K` ≤ `moeExpertNum` + `zeroExpertNum` + `copyExpertNum` + `constExpertNum` must also be satisfied.
+    - `K`: Number of selected topK experts. The value range is 0 < `K` ≤ 16, and 0 < `K` ≤ `moeExpertNum` + `zeroExpertNum` + `copyExpertNum` + `constExpertNum`. See the product-specific constraints below.
+        - K: <term>Atlas A3 products</term>: When `commAlg` is "fullmesh_v2", the value range is 0 < K ≤ 16.
+        - K: <term>Ascend 950PR&950DT products</term>: The ordinary MTE path (`commAlg` is nullptr or "", non-hierarchical and without AddRmsNorm fusion) supports 0 < K ≤ 32; other paths retain 0 < K ≤ 16.
     - `localExpertNum`: Indicates the number of experts on the current device.
         - For shared expert devices, `localExpertNum` = 1
         - For MoE expert devices, `localExpertNum` = `moeExpertNum` / (`epWorldSize` - `sharedExpertRankNum`). TP domain communication is not supported in the current version.

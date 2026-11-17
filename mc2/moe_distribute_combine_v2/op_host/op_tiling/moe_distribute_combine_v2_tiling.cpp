@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <string>
 #include <type_traits>
+#include <limits>
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "mc2_log.h"
@@ -104,6 +105,9 @@ constexpr int64_t MOE_EXPERT_MAX_NUM_LAYERED = 512;
 constexpr int64_t LOCAL_EXPERT_MAX_SIZE = 2048;
 constexpr int64_t LOCAL_EXPERT_MAX_SIZE_A5 = 4096;
 constexpr int64_t K_MAX = 16;
+constexpr int64_t K_MAX_A5_MTE = 32;
+constexpr uint64_t A5_MTE_UB_SIZE = 248ULL * 1024ULL;
+constexpr uint32_t CLEAR_FLAG_BASE_BYTES = 8192U;
 constexpr int64_t H_MIN = 1024;
 constexpr int64_t H_MAX = 8192;
 constexpr int64_t H_MAX_LAYERED = 7168;
@@ -127,6 +131,19 @@ using CommQuantModeType = std::underlying_type_t<CommQuantMode>;
 } // namespace
 
 namespace optiling {
+static bool IsA5MteCombine(const gert::TilingContext* context, const CombineV2Config& config, bool isLayered)
+{
+    if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_3510 || isLayered) {
+        return false;
+    }
+    const auto* attrs = context->GetAttrs();
+    if (attrs == nullptr) {
+        return false;
+    }
+    const auto* commAlg = attrs->GetAttrPointer<char>(static_cast<int>(config.attrCommAlgIndex));
+    return commAlg == nullptr || commAlg[0] == '\0';
+}
+
 static bool IsPresentTensorShape(const gert::StorageShape* storageShape)
 {
     if (storageShape == nullptr) {
@@ -1324,18 +1341,19 @@ static bool CheckSharedExpertInputShape(const gert::TilingContext* context, cons
 }
 
 static bool CheckExpertsTensorShape(const gert::TilingContext* context, MoeDistributeCombineV2TilingData& tilingData,
-                                    const char* nodeName, const CombineV2Config& config, const uint32_t expertIdsDim0,
-                                    const uint32_t expertIdsDim1, const bool hasExpertScales)
+                                    const char* nodeName, const CombineV2Config& config, const int64_t expertIdsDim0,
+                                    const int64_t expertIdsDim1, const bool hasExpertScales, const bool isLayered)
 {
     int64_t moeExpertNum = static_cast<int64_t>(tilingData.moeDistributeCombineV2Info.moeExpertNum);
     int64_t zeroExpertNum = static_cast<int64_t>(tilingData.moeDistributeCombineV2Info.zeroExpertNum);
     int64_t copyExpertNum = static_cast<int64_t>(tilingData.moeDistributeCombineV2Info.copyExpertNum);
     int64_t constExpertNum = static_cast<int64_t>(tilingData.moeDistributeCombineV2Info.constExpertNum);
+    const int64_t maxK = IsA5MteCombine(context, config, isLayered) && !config.hasAddRmsNorm ? K_MAX_A5_MTE : K_MAX;
     OP_TILING_CHECK(
         (expertIdsDim1 <= 0) ||
-            (expertIdsDim1 > K_MAX || (expertIdsDim1 > moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)),
+            (expertIdsDim1 > maxK || (expertIdsDim1 > moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)),
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "expertIds(k)", std::to_string(expertIdsDim1).c_str(),
-                                  ("should be in (0, min(K_MAX=" + std::to_string(K_MAX) + ", totalExpertNum=" +
+                                  ("should be in (0, min(K_MAX=" + std::to_string(maxK) + ", totalExpertNum=" +
                                    std::to_string(moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum) + ")]")
                                       .c_str()),
         return false);
@@ -1437,32 +1455,38 @@ static bool CheckFromDispatchTensorShape(const gert::TilingContext* context,
     return true;
 }
 
-static uint32_t CalA(MoeDistributeCombineV2TilingData& tilingData, const bool isShared,
-                     const uint32_t localMoeExpertNum, const bool hasElasticInfo, const int64_t expertIdsDim1)
+static bool CalA(MoeDistributeCombineV2TilingData& tilingData, const bool isShared, const uint32_t localMoeExpertNum,
+                 const bool hasElasticInfo, const int64_t expertIdsDim1, uint32_t& A)
 {
-    uint32_t A = 0U;
-    uint32_t rankNumPerSharedExpert = 0U;
-    uint32_t maxSharedGroupNum = 0U;
-    uint32_t globalBs = tilingData.moeDistributeCombineV2Info.globalBs;
-    uint32_t sharedExpertNum = tilingData.moeDistributeCombineV2Info.sharedExpertNum;
-    uint32_t sharedExpertRankNum = tilingData.moeDistributeCombineV2Info.sharedExpertRankNum;
-    uint32_t epWorldSizeU32 = tilingData.moeDistributeCombineV2Info.epWorldSize;
-    uint32_t maxBs = globalBs / epWorldSizeU32;
+    uint64_t maxSharedGroupNum = 0U;
+    const uint64_t globalBs = tilingData.moeDistributeCombineV2Info.globalBs;
+    const uint64_t sharedExpertNum = tilingData.moeDistributeCombineV2Info.sharedExpertNum;
+    const uint64_t sharedExpertRankNum = tilingData.moeDistributeCombineV2Info.sharedExpertRankNum;
+    const uint64_t epWorldSize = tilingData.moeDistributeCombineV2Info.epWorldSize;
+    if (epWorldSize == 0U || expertIdsDim1 <= 0) {
+        return false;
+    }
+    const uint64_t maxBs = globalBs / epWorldSize;
     if ((sharedExpertNum != 0U) && (sharedExpertRankNum != 0U)) { // 除零保护
-        rankNumPerSharedExpert = sharedExpertRankNum / sharedExpertNum;
-        maxSharedGroupNum = (epWorldSizeU32 + rankNumPerSharedExpert - 1U) / rankNumPerSharedExpert;
+        const uint64_t rankNumPerSharedExpert = sharedExpertRankNum / sharedExpertNum;
+        if (rankNumPerSharedExpert == 0U) {
+            return false;
+        }
+        maxSharedGroupNum = (epWorldSize + rankNumPerSharedExpert - 1U) / rankNumPerSharedExpert;
     }
-    if (isShared) { // 本卡为共享专家
-        A = maxBs * maxSharedGroupNum;
-    } else { // 本卡为moe专家
-        A = globalBs * std::min(static_cast<int64_t>(localMoeExpertNum), expertIdsDim1);
-    }
+    const uint64_t sharedCapacity = maxBs * maxSharedGroupNum;
+    const uint64_t moeCapacity =
+        globalBs * static_cast<uint64_t>(std::min(static_cast<int64_t>(localMoeExpertNum), expertIdsDim1));
+    uint64_t capacity = isShared ? sharedCapacity : moeCapacity;
     if (hasElasticInfo) {
-        A = std::max(static_cast<int64_t>(maxBs * maxSharedGroupNum),
-                     globalBs * std::min(static_cast<int64_t>(localMoeExpertNum), expertIdsDim1));
+        capacity = std::max(sharedCapacity, moeCapacity);
     }
+    if (capacity > std::numeric_limits<uint32_t>::max()) {
+        return false;
+    }
+    A = static_cast<uint32_t>(capacity);
     tilingData.moeDistributeCombineV2Info.a = A;
-    return A;
+    return true;
 }
 
 static bool CheckSendCountTensorShape(const gert::TilingContext* context, MoeDistributeCombineV2TilingData& tilingData,
@@ -1567,7 +1591,10 @@ static bool CheckTensorShape(const gert::TilingContext* context, MoeDistributeCo
     if (!CheckOptionalInfoTensorShape(context, tilingData, nodeName, hasElasticInfo, isPerformance, config)) {
         return false;
     }
-    uint32_t A = CalA(tilingData, isShared, localMoeExpertNum, hasElasticInfo, expertIdsDim1);
+    uint32_t A = 0U;
+    OP_TILING_CHECK(!CalA(tilingData, isShared, localMoeExpertNum, hasElasticInfo, expertIdsDim1, A),
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "expandX row capacity is invalid or exceeds uint32 tiling range"),
+                    return false);
 
     if (!CheckActiveMaskTensorShape(context, nodeName, config, isActiveMask, expertIdsDim0, expertIdsDim1)) {
         return false;
@@ -1576,9 +1603,9 @@ static bool CheckTensorShape(const gert::TilingContext* context, MoeDistributeCo
     OP_TILING_CHECK(!CheckZeroComputeExpertsTensorShape(context, tilingData, nodeName, config, expertIdsDim0),
                     OP_LOGE_WITHOUT_REPORT(nodeName, "Zero_compute_experts' param dim check failed."), return false);
 
-    OP_TILING_CHECK(
-        !CheckExpertsTensorShape(context, tilingData, nodeName, config, expertIdsDim0, expertIdsDim1, hasExpertScales),
-        OP_LOGE_WITHOUT_REPORT(nodeName, "Experts' param dim check failed."), return false);
+    OP_TILING_CHECK(!CheckExpertsTensorShape(context, tilingData, nodeName, config, expertIdsDim0, expertIdsDim1,
+                                             hasExpertScales, isLayered),
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Experts' param dim check failed."), return false);
 
     OP_TILING_CHECK(!CheckFromDispatchTensorShape(context, tilingData, nodeName, config, A, isLayered),
                     OP_LOGE_WITHOUT_REPORT(nodeName, "From dispatch's param dim check failed."), return false);
@@ -1722,24 +1749,29 @@ static bool CheckAndSetGlobalBs(const gert::TilingContext* context, MoeDistribut
     OP_LOGD(nodeName, "MoeDistributeCombineV2 *globalBsPtr = %ld, bs = %ld, epWorldSize = %u\n", *globalBsPtr,
             expertIdsDim0, epWorldSize);
 
-    OP_TILING_CHECK((*globalBsPtr != 0) && ((*globalBsPtr < static_cast<int64_t>(epWorldSize) * expertIdsDim0) ||
-                                            ((*globalBsPtr) % (static_cast<int64_t>(epWorldSize)) != 0)),
+    OP_TILING_CHECK(epWorldSize == 0U || expertIdsDim0 <= 0 ||
+                        static_cast<uint64_t>(expertIdsDim0) > std::numeric_limits<uint32_t>::max() / epWorldSize,
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "default globalBS exceeds uint32 tiling range"), return false);
+    const uint64_t defaultGlobalBs = static_cast<uint64_t>(expertIdsDim0) * epWorldSize;
+    OP_TILING_CHECK(*globalBsPtr < 0 || static_cast<uint64_t>(*globalBsPtr) > std::numeric_limits<uint32_t>::max(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "globalBS", std::to_string(*globalBsPtr).c_str(),
+                                              "must fit uint32 tiling range"),
+                    return false);
+    const uint64_t globalBs = *globalBsPtr == 0 ? defaultGlobalBs : static_cast<uint64_t>(*globalBsPtr);
+    OP_TILING_CHECK(globalBs < defaultGlobalBs || globalBs % epWorldSize != 0U,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "globalBS", std::to_string(*globalBsPtr).c_str(),
                                               "should be 0 or configured maxBs per rank * epWorldSize"),
                     return false);
 
     OP_TILING_CHECK(
         mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
-            *globalBsPtr > static_cast<int64_t>(epWorldSize) * BS_UPPER_BOUND,
+            globalBs > static_cast<uint64_t>(epWorldSize) * BS_UPPER_BOUND,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            nodeName, "globalBs", std::to_string(*globalBsPtr).c_str(),
+            nodeName, "globalBs", std::to_string(globalBs).c_str(),
             (std::string("The configured maxBs per rank must not exceed ") + std::to_string(BS_UPPER_BOUND) + " on A5")
                 .c_str()),
         return false);
-    tilingData.moeDistributeCombineV2Info.globalBs = static_cast<uint32_t>(*globalBsPtr);
-    if (*globalBsPtr == 0) {
-        tilingData.moeDistributeCombineV2Info.globalBs = static_cast<uint32_t>(expertIdsDim0) * epWorldSize;
-    }
+    tilingData.moeDistributeCombineV2Info.globalBs = static_cast<uint32_t>(globalBs);
     return true;
 }
 
@@ -1764,7 +1796,7 @@ static bool CheckAttrs(const gert::TilingContext* context, MoeDistributeCombineV
     int64_t localExpertMaxSize =
         (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) ? LOCAL_EXPERT_MAX_SIZE_A5 : LOCAL_EXPERT_MAX_SIZE;
     OP_TILING_CHECK(
-        (localMoeExpertNum <= 0) || (localMoeExpertNum * epWorldSize > localExpertMaxSize),
+        (localMoeExpertNum <= 0) || (static_cast<int64_t>(localMoeExpertNum) * epWorldSize > localExpertMaxSize),
         OP_LOGE_FOR_INVALID_VALUE(
             nodeName, "localMoeExpertNum", std::to_string(localMoeExpertNum).c_str(),
             ("must be > 0 and localMoeExpertNum * epWorldSize <= " + std::to_string(localExpertMaxSize)).c_str()),
@@ -2195,8 +2227,11 @@ static uint64_t GetComputeBufferSize(const gert::TilingContext* context,
     uint32_t hExpandXAlign32Size = (hExpandXTypeSize + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
     uint32_t hFloatAlign32Size = GetFloatAlignSize(hFloatSize, UB_ALIGN, isA5OrA6FusedQuant);
     uint32_t hFloatAlign256Size = GetFloatAlignSize(hFloatSize, ALIGNED_LEN, isA5OrA6FusedQuant);
-    uint32_t bsKFloatAlign = (axisBS * axisK * sizeof(float) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
-    uint32_t mulBufSize = hFloatAlign256Size > bsKFloatAlign ? hFloatAlign256Size : bsKFloatAlign;
+    uint32_t mulBufSize = hFloatAlign256Size;
+    if (!IsA5MteCombine(context, config, false) || config.hasAddRmsNorm) {
+        uint32_t bsKFloatAlign = (axisBS * axisK * sizeof(float) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
+        mulBufSize = std::max(hFloatAlign256Size, bsKFloatAlign);
+    }
     uint32_t maxSizeRowTmpFloatBuf = hFloatAlign32Size;
 
     if (isInputExpertMaskFlag) {
@@ -2353,14 +2388,15 @@ static void GetCommQuantScratchAndDataSize(const gert::TilingContext* context, c
         uint32_t scaleNum = (axisH + UB_ALIGN - 1U) / UB_ALIGN;
         scaleNum = (scaleNum + 1U) / 2U * 2U;
         commDataBytes = (axisH + ALIGNED_LEN - 1U) / ALIGNED_LEN * ALIGNED_LEN + scaleNum * sizeof(uint8_t);
-        // A5 MXFP8接收端不再分配独立的scaleDiv临时区，预算与kernel保持一致
+        // MXFP8接收端复用计算缓冲，无独立scaleDiv临时区。
         scaleNumAlignSize = 0U;
     }
 }
 
 static uint64_t GetCommBufferSize(const gert::TilingContext* context,
                                   const MoeDistributeCombineV2TilingData* tilingData, const CombineV2Config& config,
-                                  uint32_t& moeQueueBytes, uint64_t& dispatchBufferSize)
+                                  uint32_t& moeQueueBytes, uint64_t& dispatchBufferSize, uint32_t& fullFlagQueueBytes,
+                                  uint64_t& fullClearFlagBytes)
 {
     uint32_t axisH = tilingData->moeDistributeCombineV2Info.h;
     uint32_t flagRcvCount =
@@ -2387,22 +2423,30 @@ static uint64_t GetCommBufferSize(const gert::TilingContext* context,
     }
 
     // 清零buffer独立保留，轮询标志复用接收队列
-    uint32_t clearFlagCount = flagRcvCount * blockCntPerToken * SPLIT_BLOCK_FLAG_COUNT;
+    fullClearFlagBytes =
+        static_cast<uint64_t>(flagRcvCount) * blockCntPerToken * SPLIT_BLOCK_FLAG_COUNT * sizeof(float);
     if (tilingData->moeDistributeCombineV2Info.rswBufferSize != 0UL) {
-        // rsw协议: 清整个128B尾区
-        clearFlagCount = flagRcvCount * (RSW_TRAILER_SIZE / sizeof(float));
+        // rsw协议保留完整128B尾区零源；A5动态零源仅用于旧协议。
+        fullClearFlagBytes = static_cast<uint64_t>(flagRcvCount) * RSW_TRAILER_SIZE;
     }
-    uint32_t clearFlagBufSize = (clearFlagCount * sizeof(float) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
+    const bool useAdaptiveLayout = IsA5MteCombine(context, config, false) && !config.hasAddRmsNorm;
+    uint64_t clearFlagBufSize =
+        useAdaptiveLayout ? std::min<uint64_t>(fullClearFlagBytes, CLEAR_FLAG_BASE_BYTES) : fullClearFlagBytes;
     uint64_t commBufferSize = static_cast<uint64_t>(scaleNumAlignSize) + clearFlagBufSize;
     dispatchBufferSize =
         GetDispatchBufferSize(tilingData, moeQueueBytes, quantResultDataBytes, packedDataBytes, quantBufferSize);
+    // 只扩接收队列，不改变发送侧预算；rsw计数检查使用独立临时区。
+    fullFlagQueueBytes = moeQueueBytes;
     // 只扩接收队列，不改变发送侧预算; rsw协议标志检查走CheckSlotArriveByCount, 不占接收队列
     if (tilingData->moeDistributeCombineV2Info.rswBufferSize == 0UL) {
         uint32_t maxSlotCount =
             std::max(tilingData->moeDistributeCombineV2Info.k, tilingData->moeDistributeCombineV2Info.sharedExpertNum);
         uint32_t flagBytes = maxSlotCount * blockCntPerToken * SPLIT_BLOCK_FLAG_COUNT * sizeof(float);
         flagBytes = (flagBytes + ALIGNED_LEN - 1U) / ALIGNED_LEN * ALIGNED_LEN;
-        moeQueueBytes = std::max(moeQueueBytes, flagBytes);
+        fullFlagQueueBytes = std::max(moeQueueBytes, flagBytes);
+        if (!useAdaptiveLayout) {
+            moeQueueBytes = fullFlagQueueBytes;
+        }
     }
     return commBufferSize;
 }
@@ -2442,19 +2486,61 @@ static void SetA3BufferNum(const uint64_t ubSize, const gert::TilingContext* con
     tilingData->moeDistributeCombineV2Info.bufferNum = totalBufferSize > ubSize ? BUFFER_SINGLE : BUFFER_NUM;
 }
 
+static bool GetA5MteSumTmpReserve(const gert::TilingContext* context,
+                                  const MoeDistributeCombineV2TilingData* tilingData, const CombineV2Config& config,
+                                  uint64_t& reserve)
+{
+    reserve = 0U;
+    if (!IsA5MteCombine(context, config, false) || config.hasAddRmsNorm) {
+        return true;
+    }
+    const auto& info = tilingData->moeDistributeCombineV2Info;
+    auto reserveFor = [&](uint32_t n, uint32_t typeSize) {
+        uint32_t maximum = 0U;
+        uint32_t minimum = 0U;
+        AscendC::GetSumMaxMinTmpSize(n, typeSize, false, maximum, minimum);
+        if (maximum == 0U || maximum < minimum) {
+            OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Invalid Sum temporary space query: n=%u, typeSize=%u", n,
+                                   typeSize);
+            return false;
+        }
+        const uint64_t aligned = (static_cast<uint64_t>(maximum) + UB_ALIGN - 1U) / UB_ALIGN * UB_ALIGN;
+        reserve = std::max(reserve, aligned);
+        return true;
+    };
+    if (info.isTokenMask && !reserveFor(info.bs, DTYPE_SIZE_HALF)) {
+        return false;
+    }
+    if (info.isExpertMask && (!reserveFor(info.k, DTYPE_SIZE_HALF) || !reserveFor(info.bs, DTYPE_SIZE_HALF))) {
+        return false;
+    }
+    if (info.constExpertNum > 0U && !reserveFor(info.h, sizeof(float))) {
+        return false;
+    }
+    return true;
+}
+
 static bool UbUsedCal(const uint64_t ubSize, const gert::TilingContext* context,
                       MoeDistributeCombineV2TilingData* tilingData, const CombineV2Config& config)
 {
-    // A3 retains its raw-data/separate-flag protocol after EP16 regression checks.
-    // Its prefetch queues use the original A3 UB budget; A5 keeps the packed budget.
+    tilingData->moeDistributeCombineV2Info.moeQueueBytes = 0U;
+    tilingData->moeDistributeCombineV2Info.clearFlagBytes = 0U;
+    // A3 uses raw data and separate flags, so its prefetch queues retain the A3 budget.
     NpuArch npuArch = mc2tiling::GetNpuArch(context);
     if (npuArch != Ops::Base::DAV_3510 && npuArch != Ops::Base::DAV_9201 && npuArch != Ops::Base::DAV_9202) {
         SetA3BufferNum(ubSize, context, tilingData, config);
         return true;
     }
     uint32_t moeQueueBytes = 0U;
+    uint32_t fullFlagQueueBytes = 0U;
+    uint64_t fullClearFlagBytes = 0U;
     uint64_t dispatchBufferSize = 0U;
-    uint64_t commBufferSize = GetCommBufferSize(context, tilingData, config, moeQueueBytes, dispatchBufferSize);
+    uint64_t commBufferSize = GetCommBufferSize(context, tilingData, config, moeQueueBytes, dispatchBufferSize,
+                                                fullFlagQueueBytes, fullClearFlagBytes);
+    uint64_t sumTmpReserve = 0U;
+    if (!GetA5MteSumTmpReserve(context, tilingData, config, sumTmpReserve)) {
+        return false;
+    }
     if (dispatchBufferSize > ubSize) {
         OP_LOGE_WITHOUT_REPORT(context->GetNodeName(),
                                "MoeDistributeCombineV2 dispatch-buffer UB usage exceeds available UB size");
@@ -2462,16 +2548,46 @@ static bool UbUsedCal(const uint64_t ubSize, const gert::TilingContext* context,
     }
     // 单buf路径必须先通过UB检查，不能依赖运行时分配器兜底
     uint64_t singleBufferSize = GetComputeBufferSize(context, tilingData, config, BUFFER_SINGLE) + commBufferSize +
-                                GetReceiveBufferSize(tilingData) + moeQueueBytes;
+                                GetReceiveBufferSize(tilingData) + moeQueueBytes + sumTmpReserve;
     if (singleBufferSize > ubSize) {
         OP_LOGE_WITHOUT_REPORT(context->GetNodeName(),
                                "MoeDistributeCombineV2 single-buffer UB usage exceeds available UB size");
         return false;
     }
-    uint64_t totalBufferSize = GetComputeBufferSize(context, tilingData, config, BUFFER_NUM) + commBufferSize +
-                               GetReceiveBufferSize(tilingData);
-    tilingData->moeDistributeCombineV2Info.bufferNum =
-        totalBufferSize + moeQueueBytes * BUFFER_NUM > ubSize ? BUFFER_SINGLE : BUFFER_NUM;
+    uint64_t doubleBufferSize = GetComputeBufferSize(context, tilingData, config, BUFFER_NUM) + commBufferSize +
+                                GetReceiveBufferSize(tilingData) + sumTmpReserve +
+                                static_cast<uint64_t>(moeQueueBytes) * BUFFER_NUM;
+    auto& info = tilingData->moeDistributeCombineV2Info;
+    info.bufferNum = doubleBufferSize > ubSize ? BUFFER_SINGLE : BUFFER_NUM;
+    if (IsA5MteCombine(context, config, false) && !config.hasAddRmsNorm) {
+        // 先以基础队列及小零源保住流水份数，再固定份数选择队列和零源。
+        uint64_t selectedBudget = info.bufferNum == BUFFER_NUM ? doubleBufferSize : singleBufferSize;
+        uint64_t extraQueueBytes = static_cast<uint64_t>(fullFlagQueueBytes - moeQueueBytes) * info.bufferNum;
+        info.moeQueueBytes = selectedBudget + extraQueueBytes <= ubSize ? fullFlagQueueBytes : moeQueueBytes;
+        selectedBudget += static_cast<uint64_t>(info.moeQueueBytes - moeQueueBytes) * info.bufferNum;
+        const uint64_t clearBase = std::min<uint64_t>(fullClearFlagBytes, CLEAR_FLAG_BASE_BYTES);
+        if (clearBase == 0U || selectedBudget < clearBase || selectedBudget > ubSize) {
+            OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Invalid Combine clear-flag UB budget");
+            return false;
+        }
+        const uint64_t budgetWithoutClear = selectedBudget - clearBase;
+        const uint64_t clearCapacity = (ubSize - budgetWithoutClear) / UB_ALIGN * UB_ALIGN;
+        const uint64_t clearLimit = std::min(fullClearFlagBytes, clearCapacity);
+        const uint64_t totalBlocks = fullClearFlagBytes / UB_ALIGN;
+        const uint64_t maxBlocks = clearLimit / UB_ALIGN;
+        if (clearCapacity < clearBase || totalBlocks == 0U || maxBlocks == 0U) {
+            OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Insufficient Combine clear-flag source capacity");
+            return false;
+        }
+        const uint64_t batchCount = (totalBlocks + maxBlocks - 1U) / maxBlocks;
+        const uint64_t blocksPerBatch = (totalBlocks + batchCount - 1U) / batchCount;
+        const uint64_t clearBytes = blocksPerBatch * UB_ALIGN;
+        if (clearBytes > clearLimit || clearBytes > std::numeric_limits<uint32_t>::max()) {
+            OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Invalid Combine clear-flag source size");
+            return false;
+        }
+        info.clearFlagBytes = static_cast<uint32_t>(clearBytes);
+    }
     return true;
 }
 
@@ -2650,6 +2766,9 @@ ge::graphStatus CheckAndSetPlatformInfo(gert::TilingContext* context, MoeDistrib
                     return ge::GRAPH_FAILED);
     uint64_t ubSize = 0UL;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
+    if (IsA5MteCombine(context, config, isLayered) && !config.hasAddRmsNorm) {
+        ubSize = std::min(ubSize, A5_MTE_UB_SIZE);
+    }
     numBlocks = ascendcPlatform.CalcTschBlockDim(aivNum, 0, aivNum);
     context->SetBlockDim(numBlocks);
     tilingData->moeDistributeCombineV2Info.aivNum = aivNum;

@@ -53,6 +53,7 @@ struct MoeDistributeDispatchV2Info {
     uint64_t roceDispatchOffset;
     uint64_t roceExpertOffset;
     uint64_t roceTokenMapOffset;
+    uint32_t useL0Layout; // Full-size layout selected by Host UB accounting.
     // combine接收区rsw_buffer挡位(0=旧协议480/512槽位), 与combine侧同口径决策, 决定dispatch区起始偏移
     uint64_t rswBufferSize;
     uint32_t rswBufferIdx;

@@ -727,9 +727,16 @@ aclnnStatus aclnnMoeDistributeCombineV4(
   | A            | Maximum number of tokens to be dispatched by this device. The value range is as follows: <ul><li>For shared experts, <code>A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum</code> must be satisfied.</li><li>For MoE experts, when globalBS is 0, <code>A >= BS \* epWorldSize \* min(localExpertNum, K)</code> must be satisfied; when globalBS is non-0, <code>A >= globalBS \* min(localExpertNum, K)</code> must be satisfied.</li></ul>|
   | H            | Indicates the hidden size:<ul><li><term>Atlas A2 products</term>: (0, 10240] and a multiple of 32.</li><li><term>Atlas A3 products</term>: Depends on the value of commAlg. When commAlg is "hierarchy", the value range of H is [1024, 7168] and H must be a multiple of 32. In other use cases, the value range is [1024, 8192].</li><li><term>Ascend 950PR&950DT products</term>: The value range is [1024, 8192].</li></ul> |
   | BS           | Final number of output tokens of this device:<ul><li><term>Atlas A2 products</term>: Depends on the value of commAlg. "fullmesh" supports (0, 256]; "hierarchy" supports (0, 512] when the driver version is ≥ 25.0.RC1.1.</li><li><term>Atlas A3 products</term>: Depends on the value of commAlg. The value range is (0 < BS ≤ 256) for "fullmesh_v2" and "hierarchy", and (0 < BS ≤ 512) for "fullmesh_v1" and "".</li><li><term>Ascend 950PR&950DT products</term>: 0 < BS ≤ 512.</li></ul>|
-  | K            | Indicates the number of topK experts to be selected:<br> 0 < K ≤ 16 and 0 < K ≤ <code>moeExpertNum+zeroExpertNum+copyExpertNum+constExpertNum</code>. |
+  | K | Number of selected topK experts. The value range is 0 < K ≤ 16, and <code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>. See the product-specific constraints below. |
   | serverNum    | Number of server nodes:<br>Atlas A2 products: This variable is used only in the shape of this use case. Only 2, 4, and 8 are supported.
   | localExpertNum | Number of experts on this device:<ul><li>For a shared expert device, localExpertNum = 1.</li><li>For an MoE expert device, localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>. TP communication is not supported when localExpertNum > 1.</li><li><term>Atlas A3 products</term>: 0 < localExpertNum \* epWorldSize ≤ 2048 must be satisfied. When commAlg is "hierarchy", localExpertNum ≤ 24 and localExpertNum \* epWorldSize ≤ 512 must be satisfied.</li><li><term>Ascend 950PR&950DT products</term>: 0 < localExpertNum \* epWorldSize ≤ 2048 must be satisfied.</li></ul>|
+
+  <!-- npu="A3" id23 -->
+  - K: <term>Atlas A3 products</term>: When `commAlg` is "fullmesh_v2", the value range is 0 < K ≤ 16.
+  <!-- end id23 -->
+  <!-- npu="950" id24 -->
+  - K: <term>Ascend 950PR&950DT products</term>: The ordinary MTE path (`commAlg` is nullptr or "", non-hierarchical and without AddRmsNorm fusion) supports 0 < K ≤ 32; other paths retain 0 < K ≤ 16.
+  <!-- end id24 -->
 
 - **Environment Variable Constraints**:
   - **HCCL_BUFFSIZE**: Before calling this API, check whether the value of the HCCL_BUFFSIZE environment variable is reasonable. This environment variable indicates the memory size occupied by a single communication domain, in MB. The default value is 200 MB when not configured.
