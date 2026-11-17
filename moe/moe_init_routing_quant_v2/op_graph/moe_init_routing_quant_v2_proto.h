@@ -31,7 +31,7 @@ namespace ge {
  *            to be a 1D shape (1,) for the static quant scenario. The dynamic quant scene if not input, indicates
  *            that scale is not used in the calculation process; if a 2D Tensor is input, the shape is required to be
  *            (expertNum, H) or (1, H). Type is:Float32. Format support ND.
- * @li offset: An Optional Tensor. Indicates the offset value used to compute the result, it`s only used in the static
+ * @li offset: An Optional Tensor. Indicates the offset value used to compute the result, it's only used in the static
  *             quant scenario, which is required to be a 1D shape (1,). Type is:Float32. Format support ND.
  * @par Outputs:
  * @li expanded_x: A 2D or 3D Tensor. Type is:Int8. Format support ND.
