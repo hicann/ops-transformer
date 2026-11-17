@@ -1524,12 +1524,6 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::ClearP
     GlobalTensor<float> dstFlagGlobal;
     dstFlagGlobal.SetGlobalBuffer((__gm__ float*)(wAddr + SPLIT_BLOCK_DATA_SIZE));
     DataCopyPad(dstFlagGlobal, flagTensor, clearFlagParams);
-    if constexpr (SupportRsw) {
-        const uint32_t minPage = static_cast<uint32_t>(RswBufferTier::SIZE_16K);
-        ClearWindowRecords(flagTensor.template ReinterpretCast<uint8_t>(), clearBlockCount, wAddr,
-                           static_cast<uint64_t>(flagRcvCount_) * hAlignWinSize_,
-                           GetRswCounterOffset(wAddr, minPage, SLOT_TRAILER_SIZE), sizeof(uint64_t), minPage);
-    }
 }
 
 template <A5MteCombineTypeClass>
@@ -1544,18 +1538,6 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::ClearS
     GlobalTensor<float> dstGlobal;
     dstGlobal.SetGlobalBuffer((__gm__ float*)wAddr);
     DataCopyPad(dstGlobal, zeroTensor, clearParams);
-    // 下一层的 Dispatch 窗口可能与本次已消费的数据重叠，清除其中的同步标记。
-    LocalTensor<uint8_t> zeros = zeroTensor.template ReinterpretCast<uint8_t>();
-    const uint32_t capacity = flagRcvCount_ * SLOT_TRAILER_SIZE / UB_ALIGN;
-    wAddr -= slotCountOffset_;
-    const uint32_t minPage = static_cast<uint32_t>(RswBufferTier::SIZE_16K);
-    const uint32_t counter = GetRswCounterOffset(wAddr, minPage, SLOT_TRAILER_SIZE);
-    for (uint32_t slot = 0; slot < flagRcvCount_; ++slot) {
-        ClearWindowRecords(zeros, capacity, wAddr, commDataBytes_, SPLIT_BLOCK_DATA_SIZE, SPLIT_BLOCK_FLAG_SIZE,
-                           SPLIT_BLOCK_SIZE);
-        ClearWindowRecords(zeros, capacity, wAddr, commDataBytes_, counter, sizeof(uint64_t), minPage);
-        wAddr += hAlignWinSize_;
-    }
 }
 
 template <A5MteCombineTypeClass>
