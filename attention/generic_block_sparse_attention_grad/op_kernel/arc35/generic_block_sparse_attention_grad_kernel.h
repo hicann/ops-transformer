@@ -417,7 +417,6 @@ public:
         (void)dout;
         (void)attention_out;
         (void)sparseBlockCount;
-        (void)metadata;
         (void)cuSeqLengthsKv;
         (void)sequsedQ;
         (void)sequsedKv;
@@ -425,7 +424,7 @@ public:
         (void)dk;
         (void)dv;
         (void)tPipe;
-        vecOp.SendVecPre(dq_workspace_, dk_workspace_, dv_workspace_, tilingData, ub_buffer_);
+        vecOp.SendVecPre(dq_workspace_, dk_workspace_, dv_workspace_, tilingData, ub_buffer_, metadata);
         SET_FLAG(MTE3, MTE2, EVENT_ID0);
         WAIT_FLAG(MTE3, MTE2, EVENT_ID0);
         vecOp.SendVecSftgFront(dout_gm_, attention_out_gm_, sftg_workspace_, tilingData, ub_buffer_);
@@ -463,6 +462,11 @@ public:
 
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE_2, PIPE_FIX>(FLAG_CUBE_POST);
         SyncAll();
+        if constexpr (DETERMINISTIC_ENABLE) {
+            // Reduce private detDq -> dq out (scale+cast). Skip float dq_workspace and the extra SyncAll:
+            // each AIV owns the same dq partition for reduce and dk/dv post.
+            vecOp.VecDeterReducePostDq(metadata, dq_gm_, ub_buffer_);
+        }
         vecOp.SendVecPost(dq_gm_, dk_gm_, dv_gm_, dq_workspace_, dk_workspace_, dv_workspace_, tilingData, ub_buffer_);
     }
 };

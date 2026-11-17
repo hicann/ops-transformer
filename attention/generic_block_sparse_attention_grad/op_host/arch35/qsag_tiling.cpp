@@ -45,8 +45,6 @@ protected:
         const auto* layout = attrs->GetAttrPointer<int64_t>(3);
         if (!layout || *layout != 0)
             return ge::GRAPH_PARAM_INVALID;
-        if (context_->GetDeterministic() != 0)
-            return Fail("QSAG does not support deterministic execution", "deterministic");
         std::array<qsag::TensorInfo, 17> tensors;
         constexpr const char* optionalInputNames[] = {"metadata",          "atten_mask", "cu_seq_lengths_q",
                                                       "cu_seq_lengths_kv", "seqused_q",  "seqused_kv"};
@@ -159,7 +157,11 @@ protected:
         data_.set_cubeCoreNum(cores);
         const uint64_t queryTokens = s_.layout == 0 ? s_.sq : s_.sq * s_.batch;
         const uint64_t queryRows = queryTokens * s_.nk;
-        const uint32_t queryParts = queryRows != 0 && queryRows < cores ? cores / queryRows : 1;
+        // Deterministic writers are indexed by core id into detKv[core]. Splitting one
+        // query row across cores (queryParts>1) would need more writer slots than
+        // min(cores, queryRows); keep one core per query/head row under deter.
+        const uint32_t queryParts =
+            context_->GetDeterministic() == 0 && queryRows != 0 && queryRows < cores ? cores / queryRows : 1;
         const uint32_t queryGroups = cores / queryParts;
         data_.set_queryParts(queryParts);
         data_.set_queryGroups(queryGroups);
@@ -228,6 +230,65 @@ protected:
         if (!reserve({s_.batch, s_.nk, s_.qcap, sizeof(int32_t)}))
             return Fail("filtered counts workspace overflow");
         data_.set_filteredCountsOffset(start);
+        data_.set_detPlanOffset(0);
+        if (context_->GetDeterministic() != 0) {
+            // This is a semantic proof, not a performance threshold: a visible
+            // residual tail contributes even when all sparse counts are zero.
+            bool guaranteedTail = false;
+            if (s_.layout != 0 && !data_.get_hasUsedQ() && !data_.get_hasUsedKv() && s_.bs > 1) {
+                const uint64_t validQ = std::min(s_.sq, s_.qcap);
+                if (validQ != 0) {
+                    if (data_.get_maskType() == 0) {
+                        guaranteedTail = s_.sk % s_.bs != 0;
+                    } else {
+                        const uint64_t hidden = s_.sq - validQ;
+                        const uint64_t lastVisible = s_.sk > hidden ? s_.sk - hidden : 0;
+                        guaranteedTail = lastVisible % s_.bs != 0 || (validQ >= 2 && lastVisible >= 2);
+                    }
+                }
+            }
+            if (!guaranteedTail) {
+                // One cache-line record per AIV, for local flags and decisions.
+                if (!reserve({cores, 2, 2, 8, sizeof(int32_t)}))
+                    return Fail("deterministic empty-plan flags overflow");
+                data_.set_detPlanOffset(start);
+            }
+        }
+        sparseKv_ = false;
+        data_.set_detBlockMaskOffset(0);
+        data_.set_detKvWorkspaceOffset(0);
+        data_.set_detKvWorkspaceSize(0);
+        if (context_->GetDeterministic() != 0) {
+            // One private plane per core that owns at least one (token, kv-head) row.
+            // Using qt alone under-counts when nk>1 (e.g. qt=14,nk=2,cores=28): cores
+            // 14..27 own batch1 rows but had no plane, so their dk/dv never reduced.
+            const uint64_t active = std::min(cores, qt * s_.nk);
+            if (!reserve({active, 2, kt, s_.nk, s_.dp, sizeof(float)}))
+                return Fail("deterministic private storage overflow");
+            data_.set_detKvWorkspaceOffset(start);
+            data_.set_detKvWorkspaceSize(offset - start);
+            // Conservative traffic gate. Coarse blocks are global-token aligned,
+            // so a sparse interval may touch ceil(Bs/128)+1 coarse blocks.
+            uint64_t bound = 0;
+            const uint64_t queriesPerWriter = active == 0 ? 0 : (qt * s_.nk + active - 1) / active;
+            const bool alignedSingleBatch = s_.batch == 1 && s_.bs <= 128 && 128 % s_.bs == 0;
+            const uint64_t chunksPerInterval = alignedSingleBatch ? 1 : (s_.bs + 127) / 128 + 1;
+            const uint64_t chunks = (kt + 127) / 128;
+            uint64_t maskElements = 0;
+            const bool bounded = qsag::Product(s_.topk + 1, chunksPerInterval, bound) &&
+                                 qsag::Product(bound, 128, bound) && qsag::Product(bound, queriesPerWriter, bound);
+            const bool maskFits = qsag::Product(s_.nk, chunks, maskElements) &&
+                                  qsag::Product(maskElements, 8, maskElements) && maskElements <= 2048;
+            const uint64_t privateBytes = data_.get_detKvWorkspaceSize();
+            const bool sparseTraffic = (bound <= kt / 4 && privateBytes >= 256ULL * 1024 * 1024) ||
+                                       (bound <= kt / 3 * 2 && privateBytes >= 128ULL * 1024 * 1024);
+            if (bounded && maskFits && sparseTraffic) {
+                if (!reserve({active, maskElements, sizeof(int32_t)}))
+                    return Fail("deterministic block-mask overflow");
+                data_.set_detBlockMaskOffset(start);
+                sparseKv_ = true;
+            }
+        }
         platform_ascendc::PlatformAscendC platform(context_->GetPlatformInfo());
         uint64_t sys = platform.GetLibApiWorkSpaceSize();
         if (sys > static_cast<uint64_t>(INT64_MAX) - offset)
@@ -251,10 +312,13 @@ protected:
 
     uint64_t GetTilingKey() const override
     {
-        return dtype_ == ge::DT_BF16 ? 2000 : 2001;
+        // 2000/2001 non-deterministic; 2010/2011 fixed-order private reduction.
+        const uint64_t base = dtype_ == ge::DT_BF16 ? 2000 : 2001;
+        return context_->GetDeterministic() != 0 ? base + (sparseKv_ ? 20 : 10) : base;
     }
 
 private:
+    bool sparseKv_{false};
     ge::graphStatus Fail(const char* message, const char* parameters = nullptr)
     {
         if (parameters != nullptr) {

@@ -508,13 +508,6 @@ aclnnStatus Validate(const aclTensor* query, const aclTensor* key, const aclTens
                 op::ToString(metadataOptional->GetDataType()).GetString());
         return ACLNN_ERR_PARAM_INVALID;
     }
-    int64_t deterministicLevel = 0;
-    if (aclrtGetSysParamOpt(ACL_OPT_DETERMINISTIC, &deterministicLevel) == ACL_SUCCESS && deterministicLevel != 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "GenericBlockSparseAttentionGrad: deterministic computation is not supported, got level %ld.",
-                deterministicLevel);
-        return ACLNN_ERR_PARAM_INVALID;
-    }
     return ACLNN_SUCCESS;
 }
 

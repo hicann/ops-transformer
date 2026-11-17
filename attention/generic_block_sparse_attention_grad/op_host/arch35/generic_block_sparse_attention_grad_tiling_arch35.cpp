@@ -44,16 +44,6 @@ public:
 protected:
     bool IsCapable() override
     {
-        if (context_->GetDeterministic() == 1) {
-            const char* nodeName = context_->GetNodeName();
-            const std::string reason =
-                "arch35 AiCore template does not implement deterministic=1; supported mode is deterministic=0";
-            const std::vector<const char*> msgKey = {"optype", "opskernel", "reason"};
-            const std::vector<const char*> msgValue = {"GenericBlockSparseAttentionGrad", "AiCore", reason.c_str()};
-            OP_LOGE_WITHOUT_REPORT(nodeName, "%s", reason.c_str());
-            REPORT_PREDEFINED_ERR_MSG("EZ3002", msgKey, msgValue);
-            return false;
-        }
         if (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16) {
             OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "query, key, value",
                                                    std::to_string(static_cast<int64_t>(dataType_)),
@@ -369,6 +359,7 @@ protected:
         uint64_t dqSize = 0;
         uint64_t dkSize = 0;
         uint64_t sftgSize = 0;
+        const bool deterministic = (context_->GetDeterministic() == 1);
 
         if (strcmp(qLayout_, TND_STR) == 0) {
             dqSize = static_cast<uint64_t>(qSeqLen_) * qHeadNum_ * headDim_;
@@ -385,13 +376,42 @@ protected:
         tilingData_.set_sftgWorkspaceOffset(usrOffset);
         usrOffset += sftgSize * sizeof(float);
         tilingData_.set_dqWorkspaceOffset(usrOffset);
-        usrOffset += dqSize * sizeof(float);
+        // Deterministic reduction writes dq directly; no intermediate FP32 dq is needed.
+        if (!deterministic) {
+            usrOffset += dqSize * sizeof(float);
+        }
         tilingData_.set_dkWorkspaceOffset(usrOffset);
         usrOffset += dkSize * sizeof(float);
         tilingData_.set_dvWorkspaceOffset(usrOffset);
         usrOffset += dkSize * sizeof(float);
         tilingData_.set_dqSelWorkspaceOffset(usrOffset);
         usrOffset += tilingData_.get_cubeCoreNum() * 2 * tilingData_.get_baseM() * headDim_ * sizeof(float);
+
+        if (deterministic) {
+            uint64_t detCoreNum = tilingData_.get_cubeCoreNum();
+            const uint64_t groupUpper = static_cast<uint64_t>(batchNum_ > 0 ? batchNum_ : 1) *
+                                        static_cast<uint64_t>(kvHeadNum_ > 0 ? kvHeadNum_ : 1) *
+                                        static_cast<uint64_t>(numJ_ > 0 ? numJ_ : 1);
+            if (groupUpper < detCoreNum) {
+                detCoreNum = groupUpper;
+            }
+            if (detCoreNum == 0) {
+                detCoreNum = 1;
+            }
+            const uint64_t maxGroupElems = static_cast<uint64_t>(qSeqLen_) * (qHeadNum_ / kvHeadNum_) * headDim_;
+            const bool compactDq = static_cast<uint64_t>(batchNum_) * kvHeadNum_ > 1 &&
+                                   (strcmp(qLayout_, TND_STR) != 0 || dqSize >= 2 * 1024 * 1024);
+            const uint64_t detElems = compactDq ? dqSize + (detCoreNum - 1) * maxGroupElems : detCoreNum * dqSize;
+            const uint64_t detDqSize = detElems * sizeof(float);
+            tilingData_.set_detCoreNum(detCoreNum);
+            tilingData_.set_detDqWorkspaceOffset(usrOffset);
+            tilingData_.set_detDqWorkspaceSize(detDqSize);
+            usrOffset += detDqSize;
+        } else {
+            tilingData_.set_detCoreNum(0);
+            tilingData_.set_detDqWorkspaceOffset(0);
+            tilingData_.set_detDqWorkspaceSize(0);
+        }
 
         context_->GetWorkspaceSizes(1)[0] = sysWorkspaceSize + usrOffset;
         return ge::GRAPH_SUCCESS;
@@ -406,6 +426,7 @@ protected:
 
     uint64_t GetTilingKey() const override
     {
+        // 1000-1005: non-deter; 1010-1015: deter (+10)
         uint64_t key = 1000;
         key = (dataType_ == ge::DT_BF16) ? key : key + 0b001;
         if (strcmp(qLayout_, BSND_STR) == 0) {
@@ -414,6 +435,9 @@ protected:
             key += 0b010;
         } else if (strcmp(qLayout_, TND_STR) == 0) {
             key += 0b100;
+        }
+        if (context_->GetDeterministic() == 1) {
+            key += 10;
         }
         return key;
     }

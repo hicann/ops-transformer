@@ -543,7 +543,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 ## Constraints
 
 - Deterministic computation:
-  - aclnnGenericBlockSparseAttentionGrad defaults to a non-deterministic implementation. A deterministic implementation is not currently supported, and the deterministic computation configuration does not take effect.
+  - aclnnGenericBlockSparseAttentionGrad defaults to a non-deterministic implementation. On Ascend 950 (A5 / arch35), deterministic mode can be enabled via the deterministic switch; when layoutSparsePattern=1, Q indices within one KV block must be unique. arch22 is not supported yet.
 - Call [aclnnGenericBlockSparseAttentionGradMetadata](../../generic_block_sparse_attention_grad_metadata/docs/aclnnGenericBlockSparseAttentionGradMetadata_en.md) to generate `metadataOptional` before calling this API.
 - The data types of query, key, value, dout, out, dQuery, dKey, and dValue should be kept consistent; FLOAT16 and BFLOAT16 are supported.
 - The data type of lse should be FLOAT32.

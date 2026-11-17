@@ -55,14 +55,11 @@ const std::array<const aclTensor*, 3> GenericBlockSparseAttentionGrad(
         (cuSeqLengthsKvOptional != nullptr || isQsag) ?
             cuSeqLengthsKvOptional :
             executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
-    const aclTensor* sequsedQTensor =
-        (sequsedQOptional != nullptr || isQsag) ?
-            sequsedQOptional :
-            executor->AllocTensor(DataType::DT_INT32, Format::FORMAT_ND, Format::FORMAT_ND);
-    const aclTensor* sequsedKvTensor =
-        (sequsedKvOptional != nullptr || isQsag) ?
-            sequsedKvOptional :
-            executor->AllocTensor(DataType::DT_INT32, Format::FORMAT_ND, Format::FORMAT_ND);
+    // Both kernels distinguish absent used lengths by a null GM address.
+    // An allocated empty placeholder can have a non-null address, causing
+    // GBSAG to read uninitialized lengths instead of falling back to cuSeq.
+    const aclTensor* sequsedQTensor = sequsedQOptional;
+    const aclTensor* sequsedKvTensor = sequsedKvOptional;
 
     const int64_t defaultBlockShape[] = {1, 128};
     const aclIntArray* blockShapeAttr =

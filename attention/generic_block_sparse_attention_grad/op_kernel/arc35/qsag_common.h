@@ -38,6 +38,8 @@ constexpr uint16_t KV_FREE = RESULT_FREE + SLOT_COUNT;
 constexpr uint16_t SCORE_READY = KV_FREE + SLOT_COUNT;
 constexpr uint16_t RESULT_READY = SCORE_READY + SLOT_COUNT;
 constexpr uint16_t FILTER_READY = RESULT_READY + SLOT_COUNT;
+// Mode 1 synchronizes the two AIVs belonging to one AIC only.
+constexpr uint16_t DET_SCATTER_SYNC = 15;
 
 struct UbShape {
     uint32_t halfCapacity, vectorRows, columns, headDim, blockSize, transferElements;

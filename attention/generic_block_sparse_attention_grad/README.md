@@ -262,7 +262,7 @@ $$
 - `layoutSparsePattern=1`时，residualBlockMode仅支持0，maskType仅支持1。
 - softmaxPrecision当前仅支持0；
 - winLeft/winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
-- 使用非确定性计算路径；暂不支持确定性计算。
+- 默认非确定性。Ascend 950（A5 / arch35）上：可通过确定性开关开启，layoutSparsePattern=1时要求单 KV 块内 Q index 唯一。arch22 暂不支持。
 
 ## 调用说明
 

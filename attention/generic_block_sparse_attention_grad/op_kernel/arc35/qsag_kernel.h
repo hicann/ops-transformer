@@ -14,7 +14,7 @@
 
 namespace QSAG {
 
-template <typename T, typename Tiling>
+template <typename T, typename Tiling, bool DETERMINISTIC = false, bool SPARSE_KV = false>
 class Kernel {
     struct QueryCache {
         uint64_t batch = 0;
@@ -27,8 +27,8 @@ class Kernel {
     } queryCache_;
     ConstInfo<Tiling> info_;
     SharedBuffers<T> shared_;
-    VectorOp<T, Tiling> vector_;
-    CubeOp<T, Tiling> cube_;
+    VectorOp<T, Tiling, DETERMINISTIC, SPARSE_KV> vector_;
+    CubeOp<T, Tiling, DETERMINISTIC> cube_;
     GlobalTensor<int32_t> counts_, filteredCounts_, usedQ_, usedK_;
     GlobalTensor<int64_t> cuQ_, cuK_;
     uint32_t querySlot_ = 0;
@@ -99,8 +99,9 @@ class Kernel {
         return causal <= 0 ? 0 : Min(klen, static_cast<uint64_t>(causal));
     }
 
-    __aicore__ inline void FilterPatterns()
+    __aicore__ inline bool FilterPatterns()
     {
+        bool anyContribution = false;
         queryCache_ = {};
         const uint64_t rows = info_.tq * info_.tiling->kvHeadNum;
         for (uint64_t work = info_.vcore; work < rows; work += info_.tiling->cubeCoreNum * AIV_PER_CUBE) {
@@ -111,9 +112,41 @@ class Kernel {
                 continue;
             }
             uint64_t row = (batch * info_.tiling->kvHeadNum + head) * info_.tiling->qCapacity + qlocal;
-            vector_.FilterQuery(row, VisibleLength(qlocal, qlen, klen), counts_.GetValue(row));
+            const uint64_t visible = VisibleLength(qlocal, qlen, klen);
+            const uint32_t quota = vector_.FilterQuery(row, visible, counts_.GetValue(row));
+            if constexpr (DETERMINISTIC) {
+                if (info_.tiling->detPlanOffset != 0) {
+                    anyContribution = anyContribution || quota != 0 || visible % info_.blockSize != 0;
+                }
+            }
         }
         queryCache_ = {};
+        return anyContribution;
+    }
+
+    __aicore__ inline void BuildDetBlockMask()
+    {
+        const uint64_t queryRows = info_.tq * info_.tiling->kvHeadNum;
+        const uint32_t queryParts = info_.tiling->queryParts;
+        const uint32_t queryGroups = info_.tiling->queryGroups;
+        const uint64_t firstQuery = info_.core < queryGroups * queryParts ? info_.core / queryParts : queryRows;
+        if (info_.sub == 0 && firstQuery < queryRows) {
+            vector_.InitDetBlockMask();
+            queryCache_ = {};
+            for (uint64_t work = firstQuery; work < queryRows; work += queryGroups) {
+                const uint64_t token = work / info_.tiling->kvHeadNum;
+                const uint64_t head = work % info_.tiling->kvHeadNum;
+                uint64_t batch, qlocal, kbase, qlen, klen;
+                if (!QueryInfo(token, batch, qlocal, kbase, qlen, klen))
+                    continue;
+                const uint64_t row = (batch * info_.tiling->kvHeadNum + head) * info_.tiling->qCapacity + qlocal;
+                vector_.MarkDetBlockMask(row, head, kbase, VisibleLength(qlocal, qlen, klen), counts_.GetValue(row));
+            }
+            vector_.PublishDetBlockMask();
+        }
+        queryCache_ = {};
+        PipeBarrier<PIPE_ALL>();
+        SyncAll();
     }
 
     __aicore__ inline void ProcessGather(const TileTask& task)
@@ -288,14 +321,25 @@ public:
             }
         }
         info_.nzRows = (info_.directResult ? info_.halfCapacity : info_.vectorRows) + 1;
-        info_.pairedKV = info_.directResult && info_.d == info_.dp;
+        // Sparse queries gather original K/V directly instead of packing the full KV.
+        info_.pairedKV = !SPARSE_KV && info_.directResult && info_.d == info_.dp;
         info_.cacheQueryIndices =
             info_.directResult && info_.template PlanUb<T>(true, info_.resultSlots, true).topkBytes >
                                       AlignBytes(info_.n / info_.blockSize * sizeof(int32_t));
         vector_.Init(key, value, dout, out, lse, indices, dq, dk, dv, workspace, info_, shared_, pipe);
         cube_.Init(query, dout, workspace, info_, shared_, pipe);
         if ASCEND_IS_AIV {
-            FilterPatterns();
+            const bool localContribution = FilterPatterns();
+            if constexpr (DETERMINISTIC) {
+                if (info_.tiling->detPlanOffset != 0 && vector_.IsEmptyDetPlan(localContribution)) {
+                    vector_.ZeroFinalOutputs();
+                    // No nzReady, KV_FREE, or RESULT_FREE token was initialized.
+                    CrossCoreSetFlag<4, PIPE_MTE3>(FILTER_READY + info_.sub * AIV_FLAG_OFFSET);
+                    return;
+                }
+            }
+            if constexpr (SPARSE_KV)
+                BuildDetBlockMask();
             vector_.Begin(pipe);
             CrossCoreSetFlag<4, PIPE_MTE3>(FILTER_READY + info_.sub * AIV_FLAG_OFFSET);
         }
@@ -303,6 +347,17 @@ public:
             // Counts are read on Scalar, after every AIV has finished the preprocessing barrier.
             CrossCoreWaitFlag<4, PIPE_S>(FILTER_READY);
             CrossCoreWaitFlag<4, PIPE_S>(FILTER_READY + AIV_FLAG_OFFSET);
+            if constexpr (DETERMINISTIC) {
+                if (info_.tiling->detPlanOffset != 0) {
+                    GlobalTensor<int32_t> decisions;
+                    decisions.SetGlobalBuffer((__gm__ int32_t*)(workspace + info_.tiling->detPlanOffset));
+                    const uint64_t vectors = info_.tiling->cubeCoreNum * AIV_PER_CUBE;
+                    if (decisions.GetValue((vectors + info_.core * AIV_PER_CUBE) * 8) == 0) {
+                        cube_.Destroy(pipe);
+                        return;
+                    }
+                }
+            }
         }
 
         for (uint32_t slot = 0; slot < SLOT_COUNT; ++slot) {

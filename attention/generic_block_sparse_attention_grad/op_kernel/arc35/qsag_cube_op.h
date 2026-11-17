@@ -12,7 +12,7 @@
 
 namespace QSAG {
 
-template <typename T, typename Tiling>
+template <typename T, typename Tiling, bool DETERMINISTIC = false>
 class CubeOp {
     static constexpr uint32_t L0_OPERAND_BYTES = 64 * 1024;
     static constexpr uint32_t L0_RESULT_BYTES = 128 * 1024;
@@ -160,14 +160,14 @@ public:
             Product(shared_->dsl[slot], ql_[dStart * info_->groupCapacity], info_->groupCapacity, info_->n,
                     info_->groupCapacity, width, true, true, info_->n, width, info_->groupCapacity);
             if (info_->directResult) {
-                ToResultUB(shared_->resultK[info_->ResultSlot(slot)][dStart], width);
+                ToResultUB(shared_->resultK[info_->ResultSlot(slot)][dStart], width, task.selected);
             } else {
                 ToGM(shared_->mm4[slot][dStart], info_->n, width, info_->n, info_->dp, false);
             }
             Product(shared_->pl[slot], dol_[dStart * info_->groupCapacity], info_->groupCapacity, info_->n,
                     info_->groupCapacity, width, true, true, info_->n, width, info_->groupCapacity);
             if (info_->directResult) {
-                ToResultUB(shared_->resultV[info_->ResultSlot(slot)][dStart], width);
+                ToResultUB(shared_->resultV[info_->ResultSlot(slot)][dStart], width, task.selected);
             } else {
                 ToGM(shared_->mm5[slot][dStart], info_->n, width, info_->n, info_->dp, false);
             }
@@ -307,11 +307,15 @@ private:
         SetFlag<HardEvent::FIX_M>(static_cast<event_t>(resultReuseEvent_[resultSlot_]));
     }
 
-    __aicore__ inline void ToResultUB(LocalTensor<float> dst, uint32_t width)
+    __aicore__ inline void ToResultUB(LocalTensor<float> dst, uint32_t width, uint32_t selected)
     {
         Fence<HardEvent::M_FIX>();
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> cp;
         cp.mSize = info_->n;
+        if constexpr (DETERMINISTIC) {
+            // Dual destination divides these rows equally; each half is 16-row aligned.
+            cp.mSize = (selected + 2 * NZ_WIDTH - 1) / (2 * NZ_WIDTH) * (2 * NZ_WIDTH);
+        }
         cp.nSize = width;
         cp.srcStride = info_->n;
         cp.dstStride = 2 * info_->dp; // direct UB 行布局固定为 [dK, dV]。

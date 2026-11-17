@@ -572,7 +572,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 ## 约束说明
 
 - 确定性计算：
-  - aclnnGenericBlockSparseAttentionGrad默认为非确定性实现，不支持通过aclrtSetSysParamOpt开启确定性。
+  - aclnnGenericBlockSparseAttentionGrad默认为非确定性实现。Ascend 950（A5 / arch35）上：可通过确定性开关开启，layoutSparsePattern=1时要求单 KV 块内 Q index 唯一。arch22 暂不支持。
 - 参数query、key、value、dout、out、dQuery、dKey、dValue的数据类型应保持一致，支持FLOAT16和BFLOAT16；lse为FLOAT32，sparseBlockIdx、sparseBlockCount为INT32，cuSeqLengthsQOptional/cuSeqLengthsKvOptional为INT64，sequsedQOptional/sequsedKvOptional为INT32。
 - layoutQ和layoutKv须相同，支持TND、BNSD、BSND。TND布局须传入对应的INT64 `(B+1,)` cuSeqLengths；BNSD/BSND布局下seqused须传nullptr。
 - softmaxPrecision仅支持0；winLeft和winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。

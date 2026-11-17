@@ -293,12 +293,13 @@ private:
         madParams.n = head_dim_;
         madParams.k = mProcess;
         madParams.cmatrixInitVal = runTimeInfo.need_init_l0c;
-        madParams.unitFlag = runTimeInfo.is_singlekv_last ? 3 : 2;
+        const bool copyResult = runTimeInfo.is_singlekv_last;
+        madParams.unitFlag = copyResult ? 3 : 2;
         AscendC::Mmad(l0_c_tensor, l0_a_tensor, l0_b_tensor, madParams);
         AscendC::PipeBarrier<PIPE_M>();
         SET_FLAG(M, MTE1, evnet_id);
 
-        if (runTimeInfo.is_singlekv_last) {
+        if (copyResult) {
             AscendC::FixpipeParamsV220 fixpipeParamsV220;
             fixpipeParamsV220.mSize = nProcess;
             fixpipeParamsV220.nSize = head_dim_;

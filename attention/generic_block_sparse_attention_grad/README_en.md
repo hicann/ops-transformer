@@ -265,7 +265,7 @@ $$
 - When `layoutSparsePattern=1`, residualBlockMode supports only 0 and maskType supports only 1.
 - softmaxPrecision currently supports only 0;
 - winLeft/winRight must be -1 when the sliding window is not enabled; nullptr should currently be passed for attenMaskOptional.
-- The non-deterministic computation path is used; deterministic computation is not yet supported.
+- Defaults to non-deterministic. On Ascend 950 (A5 / arch35), deterministic mode can be enabled via the deterministic switch; when layoutSparsePattern=1, Q indices within one KV block must be unique. arch22 is not supported yet.
 
 ## Invocation Description
 

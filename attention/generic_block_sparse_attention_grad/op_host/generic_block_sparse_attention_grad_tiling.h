@@ -48,15 +48,23 @@ TILING_DATA_FIELD_DEF(uint64_t, mm4Offset);
 TILING_DATA_FIELD_DEF(uint64_t, mm5Offset);
 TILING_DATA_FIELD_DEF(uint64_t, filteredIndicesOffset);
 TILING_DATA_FIELD_DEF(uint64_t, filteredCountsOffset);
+TILING_DATA_FIELD_DEF(uint64_t, detPlanOffset);
+TILING_DATA_FIELD_DEF(uint64_t, detKvWorkspaceOffset);
+TILING_DATA_FIELD_DEF(uint64_t, detKvWorkspaceSize);
 TILING_DATA_FIELD_DEF(float, softmaxScale);
 TILING_DATA_FIELD_DEF(uint32_t, hasUsedQ);
 TILING_DATA_FIELD_DEF(uint32_t, hasUsedKv);
 TILING_DATA_FIELD_DEF(uint64_t, ubSize);
+TILING_DATA_FIELD_DEF(uint64_t, detBlockMaskOffset);
 TILING_DATA_FIELD_DEF(uint32_t, queryParts);
 TILING_DATA_FIELD_DEF(uint32_t, queryGroups);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttentionGrad_2000, QsagTilingDataArch35)
 REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttentionGrad_2001, QsagTilingDataArch35)
+REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttentionGrad_2010, QsagTilingDataArch35)
+REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttentionGrad_2011, QsagTilingDataArch35)
+REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttentionGrad_2020, QsagTilingDataArch35)
+REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttentionGrad_2021, QsagTilingDataArch35)
 
 BEGIN_TILING_DATA_DEF(QsagTilingDataArch22)
 TILING_DATA_FIELD_DEF(uint64_t, cubeCoreNum);
@@ -120,6 +128,9 @@ TILING_DATA_FIELD_DEF(uint64_t, dkWorkspaceOffset);
 TILING_DATA_FIELD_DEF(uint64_t, dvWorkspaceOffset);
 TILING_DATA_FIELD_DEF(uint64_t, sftgWorkspaceOffset);
 TILING_DATA_FIELD_DEF(uint64_t, dqSelWorkspaceOffset);
+TILING_DATA_FIELD_DEF(uint64_t, detDqWorkspaceOffset);
+TILING_DATA_FIELD_DEF(uint64_t, detDqWorkspaceSize);
+TILING_DATA_FIELD_DEF(uint64_t, detCoreNum);
 TILING_DATA_FIELD_DEF(float, softmaxScale);
 TILING_DATA_FIELD_DEF(uint32_t, sftgTmpSpaceSize);
 TILING_DATA_FIELD_DEF(uint32_t, BlockX);

@@ -195,7 +195,25 @@ __simd_vf__ inline void ScalePairedK(__ubuf__ float* pairs, float scale, uint32_
     }
 }
 
-template <typename T, typename Tiling>
+// Fixed producer order in registers; one batched DMA replaces the per-core
+// load/Add/barrier loop. Each output lane follows exactly the same order.
+__simd_vf__ inline void ReducePrivateWriters(__ubuf__ float* values, uint32_t count, uint32_t stride, uint32_t writers)
+{
+    using namespace AscendC::Reg;
+    for (uint16_t col = 0; col < count; col += FLOATS_PER_VECTOR) {
+        uint32_t remaining = count - col;
+        MaskReg valid = UpdateMask<float>(remaining);
+        RegTensor<float> sum, value;
+        LoadAlign(sum, values + col);
+        for (uint16_t writer = 1; writer < writers; ++writer) {
+            LoadAlign(value, values + writer * stride + col);
+            Add(sum, sum, value, valid);
+        }
+        StoreAlign(values + col, sum, valid);
+    }
+}
+
+template <typename T, typename Tiling, bool DETERMINISTIC = false, bool SPARSE_KV = false>
 class VectorOp {
     struct SparseCursor {
         uint32_t block, offset;
@@ -204,8 +222,12 @@ class VectorOp {
     SharedBuffers<T>* shared_;
     TBuf<TPosition::VECCALC> ub_;
     GlobalTensor<T> k_, v_, dout_, out_, dq_, dk_, dv_;
-    GlobalTensor<float> lse_, di_, wq_, wk_, wv_;
-    GlobalTensor<int32_t> indices_, rawIndices_, filteredCounts_;
+    bool scatterQueryValid_ = false;
+    uint64_t scatterQueryToken_ = 0, scatterQueryHead_ = 0, scatterQueryKbase_ = 0;
+    GlobalTensor<float> lse_, di_, wq_, wk_, wv_, detKv_;
+    uint64_t dkvElems_{0};
+    GlobalTensor<int32_t> indices_, rawIndices_, filteredCounts_, detPlan_, blockMask_;
+    uint64_t maskChunks_ = 0, maskPlane_ = 0;
     LocalTensor<float> lseCache_[SLOT_COUNT];
     LocalTensor<float> transfer0_, transfer1_;
     LocalTensor<int32_t> topkCache_, topkSlots_[PIPELINE_STAGES];
@@ -226,6 +248,15 @@ public:
     {
         info_ = &info;
         shared_ = &shared;
+        if constexpr (DETERMINISTIC) {
+            if (info.tiling->detPlanOffset != 0)
+                detPlan_.SetGlobalBuffer((__gm__ int32_t*)(workspace + info.tiling->detPlanOffset));
+        }
+        if constexpr (SPARSE_KV) {
+            maskChunks_ = (info.tk + 127) / 128;
+            maskPlane_ = info.tiling->kvHeadNum * maskChunks_;
+            blockMask_.SetGlobalBuffer((__gm__ int32_t*)(workspace + info.tiling->detBlockMaskOffset));
+        }
         // Wide-D direct results retain the original VF schedule after performance regression.
         fuseNz_ = info_->directResult && info_->dp <= 128;
         pairSegmentElements_ = info_->tk * info_->tiling->kvHeadNum * info_->d;
@@ -248,6 +279,12 @@ public:
         wq_.SetGlobalBuffer((__gm__ float*)(workspace + info_->tiling->dqOffset));
         wk_.SetGlobalBuffer((__gm__ float*)(workspace + info_->tiling->dkOffset));
         wv_.SetGlobalBuffer((__gm__ float*)(workspace + info_->tiling->dvOffset));
+        if constexpr (DETERMINISTIC) {
+            if (info.tiling->detKvWorkspaceSize > 0) {
+                dkvElems_ = info.tk * info.tiling->kvHeadNum * info.dp;
+                detKv_.SetGlobalBuffer((__gm__ float*)(workspace + info.tiling->detKvWorkspaceOffset));
+            }
+        }
 
         // The same capacity calculation selects the path and sizes its allocation.
         const auto plan = info_->template PlanUb<T>(info_->directResult, info_->resultSlots, info_->cacheQueryIndices);
@@ -281,7 +318,7 @@ public:
     }
 
     // One AIV owns each row. Preserve order and multiplicity while removing masked blocks.
-    __aicore__ inline void FilterQuery(uint64_t row, uint64_t visible, int32_t rawCount)
+    __aicore__ inline uint32_t FilterQuery(uint64_t row, uint64_t visible, int32_t rawCount)
     {
         const uint64_t complete = visible / info_->blockSize;
         const uint32_t count = rawCount <= 0 ? 0 : Min(static_cast<uint64_t>(rawCount), info_->tiling->topK);
@@ -332,6 +369,101 @@ public:
         DataCopyPad(filteredCounts_[row], output, store);
         Fence<HardEvent::MTE3_S>();
         Fence<HardEvent::MTE3_MTE2>();
+        return kept;
+    }
+
+    // All local records are written on every invocation, including idle AIVs.
+    // The second table publishes the common decision for the paired AIC, without
+    // overwriting local flags that another AIV may still be reading.
+    __aicore__ inline bool IsEmptyDetPlan(bool localContribution)
+    {
+        const uint32_t vectors = info_->tiling->cubeCoreNum * AIV_PER_CUBE;
+        auto local = transfer0_.template ReinterpretCast<int32_t>();
+        for (uint32_t i = 0; i < 8; ++i)
+            local.SetValue(i, 0);
+        local.SetValue(0, localContribution ? 1 : 0);
+        Fence<HardEvent::S_MTE3>();
+        DataCopy(detPlan_[info_->vcore * 8], local, 8);
+        PipeBarrier<PIPE_ALL>();
+        SyncAll();
+        auto flags = ub_.template GetWithOffset<int32_t>(vectors * 8, 0);
+        DataCopy(flags, detPlan_, vectors * 8);
+        Fence<HardEvent::MTE2_S>();
+        bool any = false;
+        for (uint32_t i = 0; i < vectors; ++i)
+            any = any || flags.GetValue(i * 8) != 0;
+        local.SetValue(0, any ? 1 : 0);
+        Fence<HardEvent::S_MTE3>();
+        DataCopy(detPlan_[(vectors + info_->vcore) * 8], local, 8);
+        Fence<HardEvent::MTE3_S>();
+        return !any;
+    }
+
+    __aicore__ inline void ZeroFinalTensor(GlobalTensor<T> output, uint64_t count)
+    {
+        const uint64_t launched = info_->tiling->cubeCoreNum * AIV_PER_CUBE;
+        const uint32_t alignment = BLOCK_BYTES / sizeof(T);
+        const uint64_t perCore = ((count + launched - 1) / launched + alignment - 1) / alignment * alignment;
+        const uint64_t start = info_->vcore * perCore;
+        if (start >= count)
+            return;
+        const uint64_t end = Min(start + perCore, count);
+        const uint32_t chunk = info_->transferElements * sizeof(float) / sizeof(T);
+        auto zero = transfer0_.template ReinterpretCast<T>();
+        Duplicate(zero, static_cast<T>(0), chunk);
+        Fence<HardEvent::V_MTE3>();
+        for (uint64_t first = start; first < end; first += chunk) {
+            const uint32_t elements = Min(chunk, end - first);
+            DataCopyExtParams store{1, static_cast<uint32_t>(elements * sizeof(T)), 0, 0, 0};
+            DataCopyPad(output[first], zero, store);
+        }
+        Fence<HardEvent::MTE3_V>();
+        Fence<HardEvent::MTE3_MTE2>();
+    }
+
+    __aicore__ inline void ZeroFinalOutputs()
+    {
+        ZeroFinalTensor(dq_, info_->tq * info_->tiling->qHeadNum * info_->d);
+        ZeroFinalTensor(dk_, info_->tk * info_->tiling->kvHeadNum * info_->d);
+        ZeroFinalTensor(dv_, info_->tk * info_->tiling->kvHeadNum * info_->d);
+        PipeBarrier<PIPE_ALL>();
+    }
+
+    __aicore__ inline void InitDetBlockMask()
+    {
+        auto mask = transfer0_.template ReinterpretCast<int32_t>();
+        Duplicate(mask, 0, maskPlane_ * 8);
+        Fence<HardEvent::V_S>();
+    }
+
+    __aicore__ inline void MarkDetBlockMask(uint64_t row, uint64_t head, uint64_t kbase, uint64_t visible,
+                                            int32_t rawCount)
+    {
+        auto mask = transfer0_.template ReinterpretCast<int32_t>();
+        const uint64_t complete = visible / info_->blockSize;
+        const uint32_t count = rawCount <= 0 ? 0 : Min(static_cast<uint64_t>(rawCount), info_->tiling->topK);
+        for (uint32_t i = 0; i < count; ++i) {
+            const int32_t block = rawIndices_.GetValue(row * info_->tiling->topK + i);
+            if (block < 0 || static_cast<uint64_t>(block) >= complete)
+                continue;
+            const uint64_t first = kbase + block * info_->blockSize;
+            const uint64_t last = first + info_->blockSize - 1;
+            for (uint64_t chunk = first / 128; chunk <= last / 128; ++chunk)
+                mask.SetValue((head * maskChunks_ + chunk) * 8, 1);
+        }
+        const uint64_t tail = visible % info_->blockSize;
+        if (tail != 0) {
+            for (uint64_t chunk = (kbase + visible - tail) / 128; chunk <= (kbase + visible - 1) / 128; ++chunk)
+                mask.SetValue((head * maskChunks_ + chunk) * 8, 1);
+        }
+    }
+
+    __aicore__ inline void PublishDetBlockMask()
+    {
+        auto mask = transfer0_.template ReinterpretCast<int32_t>();
+        Fence<HardEvent::S_MTE3>();
+        DataCopy(blockMask_[info_->core * maskPlane_ * 8], mask, maskPlane_ * 8);
+        Fence<HardEvent::MTE3_S>();
     }
 
     __aicore__ inline void Begin(TPipe* pipe)
@@ -354,18 +486,19 @@ public:
         }
         PipeBarrier<PIPE_ALL>();
         SyncAll();
-        PostTensor(dq_, wq_, info_->tq * info_->tiling->qHeadNum, info_->tiling->softmaxScale);
-        if (info_->pairedKV) {
+        if constexpr (DETERMINISTIC) {
+            VecDeterReduceKv();
+        } else if (info_->pairedKV) {
             PostPairedKV(dk_, wk_);
             PostPairedKV(dv_, wk_[info_->dp]);
         } else if (info_->directResult) {
             PostPairedPhysical(dk_, wk_);
             PostPairedPhysical(dv_, wk_[info_->dp]);
-
         } else {
             PostTensor(dk_, wk_, info_->tk * info_->tiling->kvHeadNum, 1.0f);
             PostTensor(dv_, wv_, info_->tk * info_->tiling->kvHeadNum, 1.0f);
         }
+        PostTensor(dq_, wq_, info_->tq * info_->tiling->qHeadNum, info_->tiling->softmaxScale);
     }
 
     __aicore__ inline void CacheQueryStatsVector(uint64_t token, uint64_t head, uint32_t rows)
@@ -431,6 +564,23 @@ public:
             if (info_->cacheQueryIndices && !task.tail) {
                 topkCache_ = topkCache_[task.first];
             }
+        }
+        if constexpr (DETERMINISTIC) {
+            // A selected position may switch AIV ownership in the next Q.
+            // Complete both streams between Qs sharing one batch/head plane.
+            // Different batches/heads are disjoint. Within one Q, repeated KV occurrences
+            // have identical contributions, so their relative order is immaterial.
+            if (scatterQueryValid_ && scatterQueryHead_ == task.head && scatterQueryKbase_ == task.kbase &&
+                scatterQueryToken_ != task.token) {
+                CrossCoreSetFlag<1, PIPE_MTE3>(DET_SCATTER_SYNC);
+                CrossCoreWaitFlag<1, PIPE_MTE3>(DET_SCATTER_SYNC);
+            }
+            scatterQueryValid_ = true;
+            scatterQueryToken_ = task.token;
+            scatterQueryHead_ = task.head;
+            scatterQueryKbase_ = task.kbase;
+            ScatterDetData(task);
+            return;
         }
         ScatterRows(task.sparseBase, task.first, task.selected, task.tail, task.tailStart, task.kbase, task.kvHead,
                     task.id % SLOT_COUNT);
@@ -645,11 +795,20 @@ private:
     {
         ZeroWorkspace(wq_, info_->tq * info_->tiling->qHeadNum * info_->dp);
         const uint64_t kvElements = info_->tk * info_->tiling->kvHeadNum * info_->dp;
-        if (info_->directResult) {
-            ZeroWorkspace(wk_, 2 * kvElements);
+        if constexpr (DETERMINISTIC) {
+            if (info_->tiling->detKvWorkspaceSize > 0) {
+                if constexpr (SPARSE_KV)
+                    ZeroDetKvBlocks();
+                else
+                    ZeroWorkspace(detKv_, static_cast<uint64_t>(DetWriterCount()) * 2 * dkvElems_);
+            }
         } else {
-            ZeroWorkspace(wk_, kvElements);
-            ZeroWorkspace(wv_, kvElements);
+            if (info_->directResult)
+                ZeroWorkspace(wk_, 2 * kvElements);
+            else {
+                ZeroWorkspace(wk_, kvElements);
+                ZeroWorkspace(wv_, kvElements);
+            }
         }
         const uint64_t totalRows = info_->tq * info_->tiling->qHeadNum;
         const auto plan = info_->template PlanUb<T>(info_->directResult, info_->resultSlots);
@@ -683,6 +842,332 @@ private:
         }
         PipeBarrier<PIPE_ALL>();
         SyncAll();
+    }
+
+    template <typename U>
+    __aicore__ inline U CeilDiv(U dividend, U divisor)
+    {
+        return (dividend + divisor - 1) / divisor;
+    }
+
+    template <typename U>
+    __aicore__ inline U RoundUp(U val, U align)
+    {
+        return (val + align - 1) / align * align;
+    }
+
+    __aicore__ inline void StoreDetOutput(GlobalTensor<T> output, LocalTensor<T> values, uint64_t row, uint32_t rows)
+    {
+        for (uint32_t copied = 0; copied < rows;) {
+            uint64_t offset;
+            uint32_t stride;
+            const uint32_t run = PhysicalKvRun(row + copied, rows - copied, offset, stride);
+            DataCopyExtParams store{static_cast<uint16_t>(run), static_cast<uint32_t>(info_->d * sizeof(T)), 0, stride,
+                                    0};
+            DataCopyPad(output[offset], values[copied * info_->dp], store);
+            copied += run;
+        }
+    }
+
+    __aicore__ inline uint32_t DetWriterCount() const
+    {
+        // Matches tiling active writers: one plane per owned (token, kv-head) row.
+        return Min(info_->tq * info_->tiling->kvHeadNum, info_->tiling->cubeCoreNum);
+    }
+
+    __aicore__ inline void LoadDetWriters(LocalTensor<float> values, uint32_t capacity, uint64_t source, uint32_t count)
+    {
+        const uint32_t writers = DetWriterCount();
+        const uint64_t stride = 2 * dkvElems_;
+        if (stride * sizeof(float) <= MAX_FIXPIPE_STRIDE) {
+            DataCopyExtParams load{static_cast<uint16_t>(writers), static_cast<uint32_t>(count * sizeof(float)),
+                                   static_cast<uint32_t>((stride - count) * sizeof(float)),
+                                   static_cast<uint32_t>((capacity - count) * sizeof(float) / BLOCK_BYTES), 0};
+            DataCopyPad(values, detKv_[source], load, DataCopyPadExtParams<float>{});
+        } else {
+            // DMA strides are uint32; individual addresses remain uint64.
+            for (uint32_t writer = 0; writer < writers; ++writer) {
+                DataCopyExtParams load{1, static_cast<uint32_t>(count * sizeof(float)), 0, 0, 0};
+                DataCopyPad(values[writer * capacity], detKv_[source + writer * stride], load,
+                            DataCopyPadExtParams<float>{});
+            }
+        }
+    }
+
+    __aicore__ inline void ZeroDetKvBlocks()
+    {
+        const uint64_t writers = DetWriterCount();
+        const auto plan = info_->template PlanUb<T>(info_->directResult, info_->resultSlots, info_->cacheQueryIndices);
+        const uint32_t zeroElements =
+            Min(128 * info_->dp, plan.totalBytes / sizeof(float) / FLOATS_PER_VECTOR * FLOATS_PER_VECTOR);
+        auto zeros = ub_.template GetWithOffset<float>(zeroElements, 0);
+        Duplicate(zeros, 0.0f, zeroElements);
+        Fence<HardEvent::V_MTE3>();
+        for (uint64_t task = info_->vcore; task < writers * maskPlane_;
+             task += info_->tiling->cubeCoreNum * AIV_PER_CUBE) {
+            if (blockMask_.GetValue(task * 8) == 0)
+                continue;
+            const uint64_t writer = task / maskPlane_;
+            const uint64_t head = (task % maskPlane_) / maskChunks_;
+            const uint64_t token = (task % maskChunks_) * 128;
+            const uint32_t elements = Min(static_cast<uint64_t>(128), info_->tk - token) * info_->dp;
+            for (uint32_t component = 0; component < 2; ++component) {
+                const uint64_t base = (2 * writer + component) * dkvElems_ + (head * info_->tk + token) * info_->dp;
+                for (uint32_t first = 0; first < elements; first += zeroElements) {
+                    const uint32_t count = Min(zeroElements, elements - first);
+                    DataCopyExtParams store{1, static_cast<uint32_t>(count * sizeof(float)), 0, 0, 0};
+                    DataCopyPad(detKv_[base + first], zeros, store);
+                }
+            }
+        }
+        Fence<HardEvent::MTE3_V>();
+        Fence<HardEvent::MTE3_MTE2>();
+    }
+
+    __aicore__ inline void ReduceDetSparseKv()
+    {
+        const uint32_t writers = DetWriterCount();
+        const auto plan = info_->template PlanUb<T>(info_->directResult, info_->resultSlots, info_->cacheQueryIndices);
+        const uint32_t idsOffset = AlignBytes(writers * 32);
+        const uint32_t headerBytes = idsOffset + AlignBytes(writers * sizeof(int32_t));
+        uint32_t rowAlign = 1;
+        while (rowAlign * info_->dp % FLOATS_PER_VECTOR != 0)
+            ++rowAlign;
+        const uint32_t quantum = rowAlign * info_->dp;
+        if (plan.totalBytes < headerBytes + quantum * (writers * sizeof(float) + sizeof(T))) {
+            ReduceDetSparseKvStreaming();
+            return;
+        }
+        auto flags = ub_.template GetWithOffset<int32_t>(writers * 8, 0);
+        auto ids = ub_.template GetWithOffset<int32_t>(writers, idsOffset);
+        const uint32_t taskRows = Min(static_cast<uint32_t>(128), info_->transferElements / info_->dp);
+        const uint32_t pieces = (128 + taskRows - 1) / taskRows;
+        for (uint64_t task = info_->vcore; task < maskPlane_ * pieces;
+             task += info_->tiling->cubeCoreNum * AIV_PER_CUBE) {
+            const uint64_t parent = task / pieces;
+            const uint32_t pieceOffset = task % pieces * taskRows;
+            const uint64_t token = parent % maskChunks_ * 128 + pieceOffset;
+            if (token >= info_->tk)
+                continue;
+            DataCopyExtParams loadFlags{static_cast<uint16_t>(writers), 32,
+                                        static_cast<uint32_t>((maskPlane_ - 1) * 32), 0, 0};
+            DataCopyPad(flags, blockMask_[parent * 8], loadFlags, DataCopyPadExtParams<int32_t>{});
+            Fence<HardEvent::MTE2_S>();
+            uint32_t active = 0;
+            for (uint32_t writer = 0; writer < writers; ++writer)
+                if (flags.GetValue(writer * 8) != 0)
+                    ids.SetValue(active++, writer);
+            const uint64_t row = (parent / maskChunks_) * info_->tk + token;
+            const uint32_t rows = Min(static_cast<uint64_t>(Min(taskRows, 128 - pieceOffset)), info_->tk - token);
+            const uint32_t slots = active == 0 ? 1 : active;
+            const uint32_t capacity =
+                Min(rows * info_->dp,
+                    (plan.totalBytes - headerBytes) / (slots * sizeof(float) + sizeof(T)) / quantum * quantum);
+            const uint32_t tileRows = capacity / info_->dp;
+            auto values = ub_.template GetWithOffset<float>(slots * capacity, headerBytes);
+            auto converted = ub_.template GetWithOffset<T>(capacity, headerBytes + slots * capacity * sizeof(float));
+            for (uint32_t component = 0; component < 2; ++component) {
+                auto output = component == 0 ? dk_ : dv_;
+                for (uint32_t first = 0; first < rows; first += tileRows) {
+                    const uint32_t countRows = Min(tileRows, rows - first);
+                    const uint32_t count = countRows * info_->dp;
+                    if (active == 0) {
+                        Duplicate(values, 0.0f, count);
+                    } else {
+                        for (uint32_t start = 0; start < active;) {
+                            const uint32_t firstWriter = ids.GetValue(start);
+                            uint32_t end = start + 1;
+                            while (end < active && ids.GetValue(end) == firstWriter + end - start)
+                                ++end;
+                            DataCopyExtParams load{
+                                static_cast<uint16_t>(end - start), static_cast<uint32_t>(count * sizeof(float)),
+                                static_cast<uint32_t>((2 * dkvElems_ - count) * sizeof(float)),
+                                static_cast<uint32_t>((capacity - count) * sizeof(float) / BLOCK_BYTES), 0};
+                            DataCopyPad(values[start * capacity],
+                                        detKv_[(2 * firstWriter + component) * dkvElems_ + (row + first) * info_->dp],
+                                        load, DataCopyPadExtParams<float>{});
+                            start = end;
+                        }
+                        Fence<HardEvent::MTE2_V>();
+                        asc_vf_call<ReducePrivateWriters>((__ubuf__ float*)values.GetPhyAddr(), count, capacity,
+                                                          active);
+                    }
+                    PipeBarrier<PIPE_V>();
+                    Cast(converted, values, RoundMode::CAST_RINT, count);
+                    Fence<HardEvent::V_MTE3>();
+                    StoreDetOutput(output, converted, row + first, countRows);
+                    Fence<HardEvent::MTE3_V>();
+                    Fence<HardEvent::MTE3_MTE2>();
+                }
+            }
+        }
+    }
+
+    __aicore__ inline void ReduceDetSparseKvStreaming()
+    {
+        const uint32_t writers = DetWriterCount();
+        auto flags = ub_.template GetWithOffset<int32_t>(writers * 8, 0);
+        auto converted = transfer1_.template ReinterpretCast<T>();
+        const uint32_t tileRows = info_->transferElements / info_->dp;
+        const uint32_t taskRows = Min(static_cast<uint32_t>(128), info_->transferElements / info_->dp);
+        const uint32_t pieces = (128 + taskRows - 1) / taskRows;
+        for (uint64_t task = info_->vcore; task < maskPlane_ * pieces;
+             task += info_->tiling->cubeCoreNum * AIV_PER_CUBE) {
+            const uint64_t parent = task / pieces;
+            const uint32_t pieceOffset = task % pieces * taskRows;
+            const uint64_t token = parent % maskChunks_ * 128 + pieceOffset;
+            if (token >= info_->tk)
+                continue;
+            DataCopyExtParams loadFlags{static_cast<uint16_t>(writers), 32,
+                                        static_cast<uint32_t>((maskPlane_ - 1) * 32), 0, 0};
+            DataCopyPad(flags, blockMask_[parent * 8], loadFlags, DataCopyPadExtParams<int32_t>{});
+            Fence<HardEvent::MTE2_S>();
+            const uint64_t row = (parent / maskChunks_) * info_->tk + token;
+            const uint32_t rows = Min(static_cast<uint64_t>(Min(taskRows, 128 - pieceOffset)), info_->tk - token);
+            for (uint32_t component = 0; component < 2; ++component) {
+                auto output = component == 0 ? dk_ : dv_;
+                for (uint32_t first = 0; first < rows; first += tileRows) {
+                    const uint32_t countRows = Min(tileRows, rows - first);
+                    const uint32_t count = countRows * info_->dp;
+                    if (flags.GetValue(0) != 0) {
+                        DataCopy(transfer0_, detKv_[component * dkvElems_ + (row + first) * info_->dp], count);
+                        Fence<HardEvent::MTE2_V>();
+                    } else {
+                        Duplicate(transfer0_, 0.0f, count);
+                    }
+                    for (uint32_t writer = 1; writer < writers; ++writer) {
+                        if (flags.GetValue(writer * 8) == 0)
+                            continue;
+                        DataCopy(transfer1_, detKv_[(2 * writer + component) * dkvElems_ + (row + first) * info_->dp],
+                                 count);
+                        Fence<HardEvent::MTE2_V>();
+                        Add(transfer0_, transfer0_, transfer1_, count);
+                        Fence<HardEvent::V_MTE2>();
+                    }
+                    PipeBarrier<PIPE_V>();
+                    Cast(converted, transfer0_, RoundMode::CAST_RINT, count);
+                    Fence<HardEvent::V_MTE3>();
+                    StoreDetOutput(output, converted, row + first, countRows);
+                    Fence<HardEvent::MTE3_V>();
+                    Fence<HardEvent::MTE3_MTE2>();
+                }
+            }
+        }
+    }
+
+    __aicore__ inline void ReduceDetDataStreaming()
+    {
+        const uint64_t totalRows = info_->tk * info_->tiling->kvHeadNum;
+        const uint32_t tileRows = info_->transferElements / info_->dp;
+        const uint32_t writers = DetWriterCount();
+        auto temp = ub_.template GetWithOffset<float>(info_->transferElements, 0);
+        auto converted = temp.template ReinterpretCast<T>();
+        for (uint64_t row = info_->vcore * tileRows; row < totalRows;
+             row += info_->tiling->cubeCoreNum * AIV_PER_CUBE * tileRows) {
+            const uint32_t rows = Min(static_cast<uint64_t>(tileRows), totalRows - row);
+            const uint32_t count = rows * info_->dp;
+            DataCopy(transfer0_, detKv_[row * info_->dp], count);
+            DataCopy(transfer1_, detKv_[dkvElems_ + row * info_->dp], count);
+            Fence<HardEvent::MTE2_V>();
+            for (uint32_t writer = 1; writer < writers; ++writer) {
+                for (uint32_t component = 0; component < 2; ++component) {
+                    DataCopy(temp, detKv_[(2 * writer + component) * dkvElems_ + row * info_->dp], count);
+                    Fence<HardEvent::MTE2_V>();
+                    auto sum = component == 0 ? transfer0_ : transfer1_;
+                    Add(sum, sum, temp, count);
+                    Fence<HardEvent::V_MTE2>();
+                }
+            }
+            Cast(converted, transfer0_, RoundMode::CAST_RINT, count);
+            Cast(converted[count], transfer1_, RoundMode::CAST_RINT, count);
+            Fence<HardEvent::V_MTE3>();
+            StoreDetOutput(dk_, converted, row, rows);
+            StoreDetOutput(dv_, converted[count], row, rows);
+            Fence<HardEvent::MTE3_V>();
+            Fence<HardEvent::MTE3_MTE2>();
+        }
+    }
+
+    __aicore__ inline void VecDeterReduceKv()
+    {
+        if constexpr (DETERMINISTIC) {
+            if constexpr (SPARSE_KV) {
+                ReduceDetSparseKv();
+                return;
+            }
+            const uint32_t writers = DetWriterCount();
+            const auto plan =
+                info_->template PlanUb<T>(info_->directResult, info_->resultSlots, info_->cacheQueryIndices);
+            uint32_t rowAlign = 1;
+            while ((rowAlign * info_->dp) % FLOATS_PER_VECTOR != 0)
+                ++rowAlign;
+            const uint32_t quantum = rowAlign * info_->dp;
+            const uint64_t totalRows = info_->tk * info_->tiling->kvHeadNum;
+            const uint64_t balancedRows =
+                RoundUp(CeilDiv(totalRows, static_cast<uint64_t>(info_->tiling->cubeCoreNum * AIV_PER_CUBE)),
+                        static_cast<uint64_t>(rowAlign));
+            const uint32_t capacity =
+                Min(balancedRows * info_->dp,
+                    Min(32768, plan.totalBytes / (2 * (writers * sizeof(float) + sizeof(T)))) / quantum * quantum);
+            if (capacity == 0) {
+                ReduceDetDataStreaming();
+                return;
+            }
+            const uint32_t tileRows = capacity / info_->dp;
+            LocalTensor<float> values[2];
+            LocalTensor<T> converted[2];
+            const uint32_t stageBytes = capacity * writers * sizeof(float);
+            for (uint32_t slot = 0; slot < 2; ++slot) {
+                values[slot] = ub_.template GetWithOffset<float>(capacity * writers, slot * stageBytes);
+                converted[slot] = ub_.template GetWithOffset<T>(capacity, 2 * stageBytes + slot * capacity * sizeof(T));
+            }
+            const uint64_t launched = info_->tiling->cubeCoreNum * AIV_PER_CUBE;
+            const uint64_t firstRow = info_->vcore * tileRows;
+            if (firstRow >= totalRows)
+                return;
+            for (uint32_t component = 0; component < 2; ++component) {
+                auto output = component == 0 ? dk_ : dv_;
+                // Finish() has released producer events and drained the pipelines.
+                // V_MTE2 protects staging reuse; MTE3_V protects cast-buffer reuse.
+                for (uint32_t slot = 0; slot < 2; ++slot) {
+                    SetFlag<HardEvent::V_MTE2>(static_cast<event_t>(slot));
+                    SetFlag<HardEvent::MTE3_V>(static_cast<event_t>(slot));
+                }
+                WaitFlag<HardEvent::V_MTE2>(EVENT_ID0);
+                LoadDetWriters(values[0], capacity, component * dkvElems_ + firstRow * info_->dp,
+                               Min(tileRows, totalRows - firstRow) * info_->dp);
+                SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
+                uint32_t slot = 0;
+                for (uint64_t row = firstRow; row < totalRows; row += launched * tileRows) {
+                    const uint32_t rows = Min(tileRows, totalRows - row);
+                    const uint32_t count = rows * info_->dp;
+                    WaitFlag<HardEvent::MTE2_V>(static_cast<event_t>(slot));
+                    const uint64_t nextRow = row + launched * tileRows;
+                    const uint32_t nextSlot = 1 - slot;
+                    if (nextRow < totalRows) {
+                        WaitFlag<HardEvent::V_MTE2>(static_cast<event_t>(nextSlot));
+                        LoadDetWriters(values[nextSlot], capacity, component * dkvElems_ + nextRow * info_->dp,
+                                       Min(tileRows, totalRows - nextRow) * info_->dp);
+                        SetFlag<HardEvent::MTE2_V>(static_cast<event_t>(nextSlot));
+                    }
+                    WaitFlag<HardEvent::MTE3_V>(static_cast<event_t>(slot));
+                    asc_vf_call<ReducePrivateWriters>((__ubuf__ float*)values[slot].GetPhyAddr(), count, capacity,
+                                                      writers);
+                    PipeBarrier<PIPE_V>();
+                    Cast(converted[slot], values[slot], RoundMode::CAST_RINT, count);
+                    SetFlag<HardEvent::V_MTE2>(static_cast<event_t>(slot));
+                    SetFlag<HardEvent::V_MTE3>(static_cast<event_t>(slot));
+                    WaitFlag<HardEvent::V_MTE3>(static_cast<event_t>(slot));
+                    StoreDetOutput(output, converted[slot], row, rows);
+                    SetFlag<HardEvent::MTE3_V>(static_cast<event_t>(slot));
+                    slot = nextSlot;
+                }
+                for (uint32_t slot = 0; slot < 2; ++slot) {
+                    WaitFlag<HardEvent::V_MTE2>(static_cast<event_t>(slot));
+                    WaitFlag<HardEvent::MTE3_V>(static_cast<event_t>(slot));
+                }
+            }
+        }
     }
 
     __aicore__ inline void PostTensor(GlobalTensor<T> output, GlobalTensor<float> src, uint64_t rows, float scale)
@@ -889,14 +1374,71 @@ private:
         DataCopy(dst[info_->sub * info_->halfRows * NZ_WIDTH], src, cp);
     }
 
+    // Each AIV owns a range of selected rows and submits both K and V.
+    __aicore__ inline void ScatterDetData(const TileTask& task)
+    {
+        if (!task.tail && !info_->directResult)
+            LoadIndices(task.sparseBase + task.first, task.selected / info_->blockSize);
+        const uint32_t half = info_->directResult ? (task.selected + 2 * NZ_WIDTH - 1) / (2 * NZ_WIDTH) * NZ_WIDTH :
+                                                    (task.selected + AIV_PER_CUBE - 1) / AIV_PER_CUBE;
+        const uint32_t begin = info_->sub * half;
+        const uint32_t end = Min(task.selected, begin + half);
+        const uint32_t slot = task.id % SLOT_COUNT;
+        const uint64_t writerBase = info_->core * 2 * dkvElems_;
+        const uint64_t headBase = (task.kvHead * info_->tk + task.kbase) * info_->dp;
+        SparseCursor cursor{begin / info_->blockSize, begin % info_->blockSize};
+        for (uint32_t first = begin; first < end;) {
+            const uint32_t rows =
+                info_->directResult ? end - first : Min(info_->transferElements / info_->dp, end - first);
+            auto key = info_->directResult ? shared_->resultK[info_->ResultSlot(slot)] : transfer0_;
+            auto value = info_->directResult ? key[info_->dp] : transfer1_;
+            if (info_->directResult) {
+                const uint32_t vfRows = rows - (info_->dp == NZ_WIDTH ? 1 : 0);
+                if (vfRows != 0)
+                    asc_vf_call<ScalePairedK>((__ubuf__ float*)key.GetPhyAddr(), info_->tiling->softmaxScale, vfRows,
+                                              info_->dp);
+                if (info_->dp == NZ_WIDTH) {
+                    PipeBarrier<PIPE_V>();
+                    Muls(key[vfRows * 2 * info_->dp], key[vfRows * 2 * info_->dp], info_->tiling->softmaxScale,
+                         info_->dp);
+                }
+            } else {
+                DataCopy(key, shared_->mm4[slot][first * info_->dp], rows * info_->dp);
+                DataCopy(value, shared_->mm5[slot][first * info_->dp], rows * info_->dp);
+                Fence<HardEvent::MTE2_V>();
+                Muls(key, key, info_->tiling->softmaxScale, rows * info_->dp);
+            }
+            Fence<HardEvent::V_MTE3>();
+            SetAtomicAdd<float>();
+            for (uint32_t copied = 0; copied < rows;) {
+                uint64_t token;
+                const uint32_t run =
+                    NextSparseRun(cursor, rows - copied, first + copied, task.tail, task.tailStart, token);
+                const uint32_t localStride = info_->directResult ? 2 * info_->dp : info_->dp;
+                const uint64_t target = writerBase + headBase + token * info_->dp;
+                DataCopyExtParams store{static_cast<uint16_t>(run), static_cast<uint32_t>(info_->dp * sizeof(float)),
+                                        static_cast<uint32_t>((localStride - info_->dp) * sizeof(float) / BLOCK_BYTES),
+                                        0, 0};
+                DataCopyPad(detKv_[target], key[copied * localStride], store);
+                DataCopyPad(detKv_[target + dkvElems_], value[copied * localStride], store);
+                copied += run;
+            }
+            SetAtomicNone();
+            Fence<HardEvent::MTE3_V>();
+            Fence<HardEvent::MTE3_MTE2>();
+            first += rows;
+        }
+    }
+
     __aicore__ inline void ScatterRows(uint64_t sparseBase, uint64_t first, uint32_t count, bool tail,
                                        uint64_t tailStart, uint64_t kbase, uint64_t head, uint32_t slot)
     {
         if (!tail && !info_->directResult) {
             LoadIndices(sparseBase + first, count / info_->blockSize);
         }
-        uint32_t begin = info_->sub * (info_->n / AIV_PER_CUBE);
-        uint32_t end = Min(count, begin + info_->n / AIV_PER_CUBE);
+        const uint32_t halfRows = info_->n / AIV_PER_CUBE;
+        uint32_t begin = info_->sub * halfRows;
+        uint32_t end = Min(count, begin + halfRows);
         const uint64_t rowStride = info_->KvGradRowStride() * info_->dp;
         const uint64_t base = info_->KvGradRow(kbase, head) * info_->dp;
         const uint64_t stride = (rowStride - info_->dp) * sizeof(float);

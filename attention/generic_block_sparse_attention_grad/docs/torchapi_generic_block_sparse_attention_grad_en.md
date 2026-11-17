@@ -253,7 +253,7 @@ Where:
 
 ## Constraints
 
-- Deterministic computation: `generic_block_sparse_attention_grad` defaults to a non-deterministic implementation. Deterministic implementation is currently not supported. The deterministic computation configuration does not take effect.
+- Deterministic computation: defaults to non-deterministic. On Ascend 950 (A5 / arch35), deterministic mode can be enabled via the deterministic switch; when layoutSparsePattern=1, Q indices within one KV block must be unique. arch22 is not supported yet.
 - Parameters `cu_seqlens_q`, `cu_seqlens_kv`, `seqused_q`, `seqused_kv`, `sparse_block_idx`, and `sparse_block_count` are tensors. Because the operator cannot obtain the specific tensor values in the Tiling phase, tiling does not validate the values. You must ensure their correctness. If invalid values are passed for the preceding parameters, undefined behavior occurs (such as precision issues or program crashes caused by invalid memory access).
 - The input parameters of `generic_block_sparse_attention_grad_metadata` and `generic_block_sparse_attention_grad` must be consistent during the call. Because the operator is divided into two APIs for phased calls, the operator cannot validate the parameters itself. You must ensure their correctness. If the parameters passed to the APIs are inconsistent, undefined behavior occurs (such as precision issues or program crashes caused by invalid memory access).
 - Successfully call `generic_block_sparse_attention_grad_metadata` to generate `metadata`, and then pass it to the main operator;

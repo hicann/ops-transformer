@@ -720,6 +720,11 @@ ge::graphStatus GBSAGTiling::GetGBSAGTiling(gert::TilingContext* context,
                                             GenericBlockSparseAttentionGradTilingData& tilingData)
 {
     const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
+    if (context->GetDeterministic() != 0) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "deterministic",
+                                                 "GBSAG arch22 does not support deterministic execution");
+        return ge::GRAPH_FAILED;
+    }
     tilingData_ = &tilingData;
     ge::graphStatus ret = GetNpuInfo(context);
     if (ret != ge::GRAPH_SUCCESS) {

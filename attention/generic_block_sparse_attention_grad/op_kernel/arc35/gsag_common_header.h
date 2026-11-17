@@ -48,6 +48,7 @@ static constexpr uint32_t AIV0_AIV1_FLAG_OFFSET = 16;
 // Keep in sync with generic_block_sparse_attention_grad_metadata.h (standalone kernel compile).
 static constexpr uint32_t AIC_CORE_MAX_NUM = 36;
 static constexpr uint32_t GRAD_METADATA_SIZE = 8;
+static constexpr uint32_t USED_CORE_NUM = 5; // metadata header index
 static constexpr uint32_t TASK_ENTRY_SIZE = 4;
 static constexpr uint32_t TASK_LIST_OFFSET = GRAD_METADATA_SIZE + 2 * AIC_CORE_MAX_NUM;
 static constexpr uint32_t CORE_TASK_START_OFFSET = GRAD_METADATA_SIZE;

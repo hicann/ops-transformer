@@ -268,7 +268,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 
 ## 约束说明
 
-- 确定性计算：`generic_block_sparse_attention_grad`默认不支持确定性计算。
+- 确定性计算：默认为非确定性。Ascend 950（A5 / arch35）上可通过确定性开关开启，layoutSparsePattern=1时要求单 KV 块内 Q index 唯一；arch22 暂不支持。
 
 **`layout_sparse_pattern=1`：**
 

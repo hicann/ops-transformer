@@ -45,6 +45,8 @@ protected:
 
     ge::graphStatus GetShapeAttrsInfo() override
     {
+        if (context_->GetDeterministic() != 0)
+            return Fail("QSAG arch22 does not support deterministic execution", "deterministic");
         const auto* attrs = context_->GetAttrs();
         if (!attrs)
             return Fail("QSAG attributes are missing");
