@@ -288,8 +288,8 @@ aclnnStatus aclnnNsaCompressWithCache(
       <td>input、weight、outputCache为空tensor。</td>
     </tr>
     <tr>
-      <td rowspan="7">ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td rowspan="7">561002</td>
+      <td rowspan="6">ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td rowspan="6">561002</td>
       <td>input和weight不满足broadcast关系，即input的第三维大小与weight的第二维大小不相等。</td>
     </tr>
     <tr>
@@ -303,9 +303,6 @@ aclnnStatus aclnnNsaCompressWithCache(
     </tr>
     <tr>
       <td>seq_lens_type!=1或者layout取值不是BSH、SBH、BSND、BNSD、TND中的一个。</td>
-    </tr>
-    <tr>
-      <td>page_block_size取值不是64或者128。</td>
     </tr>
     <tr>
       <td>headDim未对齐16。</td>

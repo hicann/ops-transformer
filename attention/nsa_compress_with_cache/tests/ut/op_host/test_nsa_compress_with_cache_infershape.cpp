@@ -85,3 +85,30 @@ TEST_F(NsaCompressWithCacheProto, NsaCompressWithCache_infershape_A2_bf16)
     std::vector<std::vector<int64_t>> expectShapes = {{256, 32, 128}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectShapes);
 }
+
+TEST_F(NsaCompressWithCacheProto, NsaCompressWithCache_infershape_A3_bf16_page_block_size_64)
+{
+    gert::InfershapeContextPara para("NsaCompressWithCache",
+                                     {
+                                         {{{16, 128, 32, 128}, {16, 128, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{32, 32}, {32, 32}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND},
+                                         {{{256, 32, 128}, {256, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                     },
+                                     {
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                     },
+                                     {
+                                         {"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+                                         {"compress_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(32)},
+                                         {"compress_stride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                         {"act_seq_len_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                         {"page_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
+                                     },
+                                     kInputIrInstance, kOutputIrInstance);
+
+    std::vector<std::vector<int64_t>> expectShapes = {{256, 32, 128}};
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectShapes);
+}
