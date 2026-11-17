@@ -197,7 +197,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <td>maxSeqlenQ (int64_t)</td>
       <td>Input</td>
       <td>Indicates the maximum Sequence Length of q.</td>
-      <td><ul><li>Value Range: ≥-1. A value of -1 indicates any possible length.</li><li>The recommended value is -1.</li></ul></td>
+      <td><ul><li>Value Range: ≥-1.</li><li>When layoutQOptional is BSND: the value must be positive and equal to S1 (the size of the S axis in the q shape); -1 is not allowed.</li><li>When layoutQOptional is TND: the recommended value is -1, which indicates any possible length; the sequence length is then derived from the difference between adjacent elements of cuSeqlensQOptional and this value is not used.</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -207,7 +207,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <td>maxSeqlenK (int64_t)</td>
       <td>Input</td>
       <td>Indicates the maximum Sequence Length of k.</td>
-      <td><ul><li>Value Range ≥ -1. -1 indicates any possible length.</li><li>The recommended value is -1.</li></ul></td>
+      <td><ul><li>Value Range: ≥-1.</li><li>When layoutKOptional is BSND: the value must be positive and equal to S2 (the size of the S axis in the k shape); -1 is not allowed.</li><li>When layoutKOptional is TND: the recommended value is -1, which indicates any possible length; the sequence length is then derived from the difference between adjacent elements of cuSeqlensKOptional and this value is not used.</li><li>When layoutKOptional is PA_BBND: sequsedKOptional must be provided; maxSeqlenK can be -1, in which case the sequence length is given by the elements of sequsedKOptional.</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -374,6 +374,8 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
   - The values of sequsedQOptional and sequsedKOptional must indicate the number of valid tokens in each batch.
   - In non-PA scenarios, layoutQOptional and layoutKOptional must be the same.
   - cmpResidualKOptional must satisfy cmpResidualKOptional[i] < cmpRatio.
+  - maxSeqlenQ: when layoutQOptional is BSND, S1 must be passed; when layoutQOptional is TND, -1 can be passed and the sequence length is derived from cuSeqlensQOptional.
+  - maxSeqlenK: when layoutKOptional is BSND, S2 must be passed; when layoutKOptional is TND, -1 can be passed and the sequence length is derived from cuSeqlensKOptional; when layoutKOptional is PA_BBND, sequsedKOptional must be provided, maxSeqlenK can be -1, and the sequence length is given by sequsedKOptional.
   - layoutQOptional=BSND scenario
     - maxSeqlenQ must be set to the value of S1.
   - layoutKOptional=BSND scenario
@@ -393,6 +395,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
   - k Seqlen Value Rules
     - If layoutKOptional is BSND, obtain seqlen preferentially from the elements in sequsedKOptional. If sequsedKOptional is not passed in, obtain seqlen from maxSeqlenK.
     - If layoutKOptional is TND, obtain seqlen preferentially from the elements in sequsedKOptional. If sequsedKOptional is not passed in, obtain seqlen from the elements in cuSeqlensKOptional.
+    - If layoutKOptional is PA_BBND, sequsedKOptional must be passed in and the seqlen is obtained from the elements in sequsedKOptional.
 
 ## Example
 

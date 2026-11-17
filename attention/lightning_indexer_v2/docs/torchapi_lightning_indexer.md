@@ -115,8 +115,8 @@ cann_ops_transformer.lightning_indexer(
 | seqused_k | Tensor | 可选 | 表示不同batch中k实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 shape为(b, )。 | int32 | 1 |
 | cmp_residual_k | Tensor | 可选 | 表示不同batch中k压缩前Sequence Length除以cmp_ratio的余数，配合cmp_ratio实现k部分的mask和负载计算。cmp_ratio不为1且mask_mode为3场景下必传。数据格式为ND，支持非连续的Tensor。 shape为(b, )。 | int32 | 1 |
 | batch_size | int | 可选 | 表示batch数量，默认值为None。 | int64 | - |
-| max_seqlen_q | int | 可选 | 表示q的最长Sequence Length，-1表示任意可能长度，默认值为None。 | int64 | - |
-| max_seqlen_k | int | 可选 | 表示k的最长Sequence Length，-1表示任意可能长度，默认值为None。 | int64 | - |
+| max_seqlen_q | int | 可选 | 表示q的最长Sequence Length。layout_q为BSND时必须为正数且等于S1，不可传-1；layout_q为TND时建议传-1，表示任意可能长度，此时序列长度由cu_seqlens_q推导，该值不参与计算。默认值为None。 | int64 | - |
+| max_seqlen_k | int | 可选 | 表示k的最长Sequence Length。layout_k为BSND时必须为正数且等于S2，不可传-1；layout_k为TND时建议传-1，此时序列长度由cu_seqlens_k推导，该值不参与计算；layout_k为PA_BBND时可传-1，此时序列长度由seqused_k的元素值给出。默认值为None。 | int64 | - |
 | layout_q | str | 可选 | 表示q的排列格式，支持BSND、TND，默认值为None。 | string | - |
 | layout_k | str | 可选 | 表示k的排列格式，支持BSND、TND、PA_BBND，默认值为None。 | string | - |
 | mask_mode | int | 可选 | 表示mask的模式，0表示defaultMask模式，3表示rightDownCausal模式，默认值为None。 | int64 | - |

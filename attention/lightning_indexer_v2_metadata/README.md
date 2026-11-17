@@ -107,14 +107,14 @@
     <tr>
       <td>max_seqlen_q</td>
       <td>可选属性</td>
-      <td>表示q的最长Sequence Length，-1表示任意可能长度。</td>
+      <td>表示q的最长Sequence Length。layout_q=BSND时必须为正数且等于S1，不可传-1；layout_q=TND时建议传-1，表示任意可能长度，此时序列长度由cu_seqlens_q推导，该值不参与计算。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_k</td>
       <td>可选属性</td>
-      <td>表示k的最长Sequence Length，-1表示任意可能长度。</td>
+      <td>表示k的最长Sequence Length。layout_k=BSND时必须为正数且等于S2，不可传-1；layout_k=TND时建议传-1，此时序列长度由cu_seqlens_k推导，该值不参与计算；layout_k=PA_BBND时可传-1，此时序列长度由seqused_k的元素值给出。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
@@ -174,7 +174,7 @@
 - layout_k=TND场景
   - cu_seqlens_k必须传入。
 - layout_k=PA_BBND场景
-  - seqused_k必须传入。
+  - seqused_k必须传入；max_seqlen_k可传-1，此时seqlen由seqused_k中的元素给出。
 - Batch取值规则
   - layout_q为BSND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过batch_size获取batch数。
   - layout_q为TND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过cu_seqlens_q的shape推导batch。
@@ -184,6 +184,7 @@
 - k Seqlen取值规则
   - layout_k为BSND时，优先通过seqused_k中的元素获取seqlen，seqused_k未传入则通过max_seqlen_k获取seqlen。
   - layout_k为TND时，优先通过seqused_k中的元素获取seqlen，seqused_k未传入则通过cu_seqlens_k中的元素获取seqlen。
+  - layout_k为PA_BBND时，seqused_k必须传入，seqlen通过seqused_k中的元素获取。
 
 ## 调用说明
 

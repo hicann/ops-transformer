@@ -109,14 +109,14 @@ English | [简体中文](./README.md)
     <tr>
       <td>max_seqlen_q</td>
       <td>Optional Attribute</td>
-      <td>Maximum Sequence Length of q. -1 indicates any possible length.</td>
+      <td>Maximum Sequence Length of q. When layout_q is BSND, the value must be positive and equal to S1, and -1 is not allowed; when layout_q is TND, -1 is recommended to indicate any possible length, in which case the sequence length is derived from cu_seqlens_q and this value is not used.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_k</td>
       <td>Optional Attribute</td>
-      <td>Maximum Sequence Length of k. -1 indicates any possible length.</td>
+      <td>Maximum Sequence Length of k. When layout_k is BSND, the value must be positive and equal to S2, and -1 is not allowed; when layout_k is TND, -1 is recommended and the sequence length is derived from cu_seqlens_k; when layout_k is PA_BBND, -1 can be passed and the sequence length is given by the elements of seqused_k.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
@@ -176,7 +176,7 @@ English | [简体中文](./README.md)
 - layout_k=TND scenario
   - cu_seqlens_k must be passed.
 - layout_k=PA_BBND scenario
-  - seqused_k must be passed.
+  - seqused_k must be passed. max_seqlen_k can be -1, in which case the seqlen is given by the elements of seqused_k.
 - Batch value rules
   - When layout_q is BSND, the batch is preferentially derived from the shape of seqused_q; if seqused_q is not passed, the number of batches is obtained from batch_size.
   - When layout_q is TND, the batch is preferentially derived from the shape of seqused_q; if seqused_q is not passed, the batch is derived from the shape of cu_seqlens_q.
@@ -186,6 +186,7 @@ English | [简体中文](./README.md)
 - k Seqlen value rules
   - When layout_k is BSND, the seqlen is preferentially obtained from the elements in seqused_k; if seqused_k is not passed, the seqlen is obtained from max_seqlen_k.
   - When layout_k is TND, the seqlen is preferentially obtained from the elements in seqused_k; if seqused_k is not passed, the seqlen is obtained from the elements in cu_seqlens_k.
+  - When layout_k is PA_BBND, seqused_k must be passed and the seqlen is obtained from the elements in seqused_k.
 
 ## Invocation Description
 

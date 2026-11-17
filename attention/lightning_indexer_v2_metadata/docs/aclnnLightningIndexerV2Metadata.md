@@ -195,7 +195,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <td>maxSeqlenQ（int64_t）</td>
       <td>输入</td>
       <td>表示q的最长Sequence Length。</td>
-      <td><ul><li>取值范围≥-1，-1表示任意可能长度。</li><li>建议值为-1。</li></ul></td>
+      <td><ul><li>取值范围≥-1。</li><li>layoutQOptional=BSND时：必须为正数且等于S1（q shape中的S轴大小），不可传-1。</li><li>layoutQOptional=TND时：建议值为-1，-1表示任意可能长度，此时序列长度由cuSeqlensQOptional相邻元素的差值推导，该值不参与计算。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -205,7 +205,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <td>maxSeqlenK（int64_t）</td>
       <td>输入</td>
       <td>表示k的最长Sequence Length。</td>
-      <td><ul><li>取值范围≥-1，-1表示任意可能长度。</li><li>建议值为-1。</li></ul></td>
+      <td><ul><li>取值范围≥-1。</li><li>layoutKOptional=BSND时：必须为正数且等于S2（k shape中的S轴大小），不可传-1。</li><li>layoutKOptional=TND时：建议值为-1，-1表示任意可能长度，此时序列长度由cuSeqlensKOptional相邻元素的差值推导，该值不参与计算。</li><li>layoutKOptional=PA_BBND时：必须传入sequsedKOptional，maxSeqlenK可取-1，此时序列长度由sequsedKOptional的元素值给出。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -372,6 +372,8 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
   - 参数sequsedQOptional、sequsedKOptional要求其值表示每个Batch中的有效token数。
   - 非PA场景layoutQOptional、layoutKOptional须相同。
   - 参数cmpResidualKOptional需满足cmpResidualKOptional[i] < cmpRatio。
+  - maxSeqlenQ：layoutQOptional=BSND时必须传入S1；layoutQOptional=TND时可传-1，序列长度由cuSeqlensQOptional推导。
+  - maxSeqlenK：layoutKOptional=BSND时必须传入S2；layoutKOptional=TND时可传-1，序列长度由cuSeqlensKOptional推导；layoutKOptional=PA_BBND时必须传入sequsedKOptional，maxSeqlenK可传-1，序列长度由sequsedKOptional给出。
   - layoutQOptional=BSND场景
     - maxSeqlenQ必须传入S1的值。
   - layoutKOptional=BSND场景
@@ -391,6 +393,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
   - k Seqlen取值规则
     - layoutKOptional为BSND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过maxSeqlenK获取seqlen。
     - layoutKOptional为TND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过cuSeqlensKOptional中相邻元素的差值获取seqlen。
+    - layoutKOptional为PA_BBND时，sequsedKOptional必须传入，seqlen由sequsedKOptional中的元素获取。
 
 ## 调用示例
 

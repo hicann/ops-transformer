@@ -111,8 +111,8 @@ cann_ops_transformer.lightning_indexer(
 | seqused_k | Tensor | Optional | Actual Sequence Lengths of k that participate in the computation in different batches. Data format: ND. Non-contiguous tensors are supported. | int32 | (b, ) |
 | cmp_residual_k | Tensor | Optional | Remainder of the pre-compression Sequence Length of cmp_kv divided by cmp_ratio in each batch. Used together with cmp_ratio to compute the mask and load of the cmp_kv part. Required when cmp_ratio is not 1 and mask_mode is 3. Data format: ND. Non-contiguous tensors are supported. | int32 | (b, ) |
 | batch_size | int | Optional | Number of batches. The default value is 0. | int64 | - |
-| max_seqlen_q | int | Optional | Maximum Sequence Length of q. -1 indicates any possible length. The default value is -1. | int64 | - |
-| max_seqlen_k | int | Optional | Maximum Sequence Length of k. -1 indicates any possible length. The default value is -1. | int64 | - |
+| max_seqlen_q | int | Optional | Maximum Sequence Length of q. When layout_q is BSND, the value must be positive and equal to S1, and -1 is not allowed; when layout_q is TND, -1 is recommended to indicate any possible length, in which case the sequence length is derived from cu_seqlens_q and this value is not used. The default value is -1. | int64 | - |
+| max_seqlen_k | int | Optional | Maximum Sequence Length of k. When layout_k is BSND, the value must be positive and equal to S2, and -1 is not allowed; when layout_k is TND, -1 is recommended and the sequence length is derived from cu_seqlens_k; when layout_k is PA_BBND, -1 can be passed and the sequence length is given by the elements of seqused_k. The default value is -1. | int64 | - |
 | layout_q | str | Optional | Layout format of q. Supported values: BSND and TND. The default value is BSND. | string | - |
 | layout_k | str | Optional | Layout format of k. Supported values: BSND, TND, and PA_BBND. The default value is BSND. | string | - |
 | mask_mode | int | Optional | Sparse mode. 0 indicates No mask, and 3 indicates the rightDownCausal mode. The default value is 0. | int64 | - |
