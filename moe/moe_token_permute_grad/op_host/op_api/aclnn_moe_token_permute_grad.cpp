@@ -55,6 +55,23 @@ static inline bool CheckDtypeValid(const aclTensor* permutedOutputGrad, const ac
     return true;
 }
 
+static void checkShape(const aclTensor* permutedOutputGrad, const aclTensor* out)
+{
+    if (permutedOutputGrad == nullptr || out == nullptr) {
+        return;
+    }
+    const auto& gradShape = permutedOutputGrad->GetViewShape();
+    const auto& outShape = out->GetViewShape();
+    if (gradShape.GetDimNum() < 2 || outShape.GetDimNum() < 2) {
+        return;
+    }
+    if (outShape.GetDim(1) != gradShape.GetDim(1)) {
+        OP_LOGW("Output hidden dimension mismatch: expected %ld, got %ld. Execution may write beyond the declared "
+                "output shape.",
+                gradShape.GetDim(1), outShape.GetDim(1));
+    }
+}
+
 static aclnnStatus CheckParams(const aclTensor* permutedOutputGrad, const aclTensor* sortedIndices,
                                const aclTensor* out)
 {
@@ -80,6 +97,8 @@ aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(const aclTensor* permutedOu
     if (numTopk == 0 || numTopk < -1) {
         OP_LOGW("Invalid numTopk [%ld]: 0 and values less than -1 are not supported.", numTopk);
     }
+
+    MoeTokenPermuteGradCheck::checkShape(permutedOutputGrad, out);
 
     bool useMoeInitRoutingV2Grad = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!useMoeInitRoutingV2Grad) {

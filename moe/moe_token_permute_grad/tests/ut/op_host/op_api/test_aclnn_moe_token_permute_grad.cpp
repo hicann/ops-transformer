@@ -230,3 +230,32 @@ TEST_F(l2_moe_token_permute_grad_test, Ascend950_moe_token_permute_grad_execute)
     EXPECT_THAT(execRet, testing::AnyOf(testing::Eq(ACLNN_SUCCESS), testing::Eq(ACLNN_ERR_PARAM_NULLPTR),
                                         testing::Eq(ACLNN_ERR_PARAM_INVALID)));
 }
+
+// The hidden-dimension warning must not override the existing paddedMode error.
+TEST_F(l2_moe_token_permute_grad_test, HiddenShapeWarningPreservesPaddedModeValidation)
+{
+    struct ShapeCase {
+        const char* name;
+        vector<int64_t> gradShape;
+        vector<int64_t> outShape;
+    };
+    const vector<ShapeCase> cases = {
+        {"gradient rank guard", {30}, {2, 5}}, {"output rank guard", {6, 5}, {10}},
+        {"hidden too small", {6, 5}, {2, 4}},  {"hidden too large", {6, 5}, {2, 6}},
+        {"matching hidden", {6, 5}, {2, 5}},
+    };
+    for (const auto& shapeCase : cases) {
+        SCOPED_TRACE(shapeCase.name);
+        auto permutedOutputGrad = TensorDesc(shapeCase.gradShape, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
+        auto sortedIndices = TensorDesc({6}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2);
+        auto out = TensorDesc(shapeCase.outShape, ACL_FLOAT16, ACL_FORMAT_ND);
+        int64_t numTopk = 3;
+        bool paddedMode = true;
+        auto ut = OP_API_UT(aclnnMoeTokenPermuteGrad, INPUT(permutedOutputGrad, sortedIndices, numTopk, paddedMode),
+                            OUTPUT(out));
+        uint64_t workspaceSize = 12345;
+        aclOpExecutor* executor = nullptr;
+        EXPECT_EQ(ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor), ACLNN_ERR_PARAM_INVALID);
+        EXPECT_EQ(workspaceSize, 12345U);
+    }
+}
