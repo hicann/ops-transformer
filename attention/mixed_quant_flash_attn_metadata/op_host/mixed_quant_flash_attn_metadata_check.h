@@ -194,11 +194,11 @@ int64_t GetKvBatchSizeMqfa(const aclTensor* sequsedKvOptional, int64_t batchSize
     return batchSize;
 }
 
-aclnnStatus CheckSingleParamMqfa(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
-                                 int64_t numHeadsKv, int64_t headDim, int64_t quantComputeMode, int64_t maskMode,
-                                 int64_t winLeft, int64_t winRight, const char* layoutQOptional,
-                                 const char* layoutKvOptional, const char* layoutAttnOutOptional, uint32_t aicCoreNum,
-                                 uint32_t aivCoreNum)
+aclnnStatus CheckSingleParamMqfa(const aclTensor* sequsedQOptional, int64_t batchSize, int64_t maxSeqlenQ,
+                                 int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim,
+                                 int64_t quantComputeMode, int64_t maskMode, int64_t winLeft, int64_t winRight,
+                                 const char* layoutQOptional, const char* layoutKvOptional,
+                                 const char* layoutAttnOutOptional, uint32_t aicCoreNum, uint32_t aivCoreNum)
 {
     // batch_size >= 0
     if (batchSize < 0) {
@@ -312,11 +312,11 @@ aclnnStatus CheckSingleParamMqfa(int64_t batchSize, int64_t maxSeqlenQ, int64_t 
         OP_LOGE_FOR_INVALID_VALUE(MQFA_ACLNN_OP_NAME, "layout_kv", layoutKvOptional, "PA_BNBD, PA_BBND or PA_NZ");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    // 校验 layout_q 为 BSND 或 BNSD 时，max_seqlen_q 必须大于 -1
-    if (strcmp(layoutQOptional, "TND") != 0 && maxSeqlenQ < 0) {
+    // 校验 layout_q 为 BSND 或 BNSD 且 seqused_q 未传入时，max_seqlen_q 必须大于 -1
+    if (strcmp(layoutQOptional, "TND") != 0 && !IsTensorExistMqfa(sequsedQOptional) && maxSeqlenQ < 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(MQFA_ACLNN_OP_NAME, "max_seqlen_q", std::to_string(maxSeqlenQ),
-                                              "When layout_q is BSND or BNSD, the value of max_seqlen_q "
-                                              "must be greater than -1");
+                                              "When layout_q is BSND or BNSD and seqused_q is not passed, "
+                                              "the value of max_seqlen_q must be greater than -1");
         return ACLNN_ERR_PARAM_INVALID;
     }
     // num_heads_q 必须能被 num_heads_kv 整除
@@ -535,9 +535,9 @@ aclnnStatus ParamsCheck(const aclTensor* cuSeqlensQOptional, const aclTensor* se
                         int64_t maskMode, int64_t winLeft, int64_t winRight, const char* layoutQ, const char* layoutKv,
                         const char* layoutAttnOut, uint32_t aicCoreNum, uint32_t aivCoreNum, const aclTensor* metaData)
 {
-    if (CheckSingleParamMqfa(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, quantComputeMode,
-                             maskMode, winLeft, winRight, layoutQ, layoutKv, layoutAttnOut, aicCoreNum,
-                             aivCoreNum) == ACLNN_SUCCESS &&
+    if (CheckSingleParamMqfa(sequsedQOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim,
+                             quantComputeMode, maskMode, winLeft, winRight, layoutQ, layoutKv, layoutAttnOut,
+                             aicCoreNum, aivCoreNum) == ACLNN_SUCCESS &&
         CheckExistenceMqfa(cuSeqlensQOptional, sequsedKvOptional, layoutQ, layoutKv, metaData) == ACLNN_SUCCESS &&
         CheckConsistencyMqfa(cuSeqlensQOptional, sequsedQOptional, sequsedKvOptional, layoutQ, batchSize, numHeadsKv,
                              aicCoreNum, aivCoreNum, metaData) == ACLNN_SUCCESS) {

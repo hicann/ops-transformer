@@ -204,11 +204,12 @@ ge::graphStatus ActualSeqLenChecker::CheckMultiPara(const FaTilingInfo& faInfo)
                         "max_seqlen_kv must be provided"),
                     return ge::GRAPH_FAILED);
 
-        // 非TND场景下，max_seqlen_q必须等于q的S轴大小
-        OP_CHECK_IF(faInfo.maxSeqQ != static_cast<int64_t>(faInfo.s1Size),
+        // 非TND场景下，seqused_q未传入时，max_seqlen_q必须等于q的S轴大小
+        OP_CHECK_IF(sequsedQTensor == nullptr && faInfo.maxSeqQ != static_cast<int64_t>(faInfo.s1Size),
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                         faInfo.opName, "max_seqlen_q", std::to_string(faInfo.maxSeqQ).c_str(),
-                        ("When layout_q is BSND or BNSD, the value of max_seqlen_q must be equal to the size (" +
+                        ("When layout_q is BSND or BNSD and seqused_q is not passed, the value of max_seqlen_q "
+                         "must be equal to the size (" +
                          std::to_string(faInfo.s1Size) + ") of the axis S of q")
                             .c_str()),
                     return ge::GRAPH_FAILED);

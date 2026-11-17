@@ -27,7 +27,11 @@ keyword args.  Must NOT declare a ``context`` parameter.  Returns
 filled in place).
 """
 
+import os
+
 import torch
+
+RUN_METHOD = "npu"
 
 
 def get_attribute(kwargs, name, default=None):
@@ -143,8 +147,47 @@ def _move_to_device(value, anchor):
     return torch.as_tensor(_to_int_list(value), dtype=torch.int32, device=anchor.device)
 
 
+def run_metadata_on_host(arguments, anchor):
+    """ESL 路径：host 侧计算 metadata 再搬上设备。
+
+    原生 ``mixed_quant_flash_attn_metadata`` 算子内核在 ESL 仿真器上不可用，
+    因此对齐 pytest ``core.npu.run_npu`` 的 RUN_METHOD == "esl" 路径：用
+    ``core.meta_cpu`` 的辅助二进制在 host 侧算出 metadata，再上设备。
+    """
+    from core.meta_cpu.mixed_quant_flash_attn_metadata_op import (
+        MixedQuantFlashAttnMetadataOp,
+    )
+
+    metadata = MixedQuantFlashAttnMetadataOp().npu_mixed_quant_flash_attn_metadata(
+        num_heads_q=int(arguments["num_heads_q"]),
+        num_heads_kv=int(arguments["num_heads_kv"]),
+        head_dim=int(arguments["head_dim"]),
+        quant_compute_mode=int(arguments["quant_mode"]),
+        cu_seqlens_q=_to_int_list(arguments["cu_seqlens_q"]),
+        seqused_q=_to_int_list(arguments["seqused_q"]),
+        seqused_kv=_to_int_list(arguments["seqused_kv"]),
+        batch_size=int(arguments["batch_size"]),
+        max_seqlen_q=int(arguments["max_seqlen_q"]),
+        max_seqlen_kv=int(arguments["max_seqlen_kv"]),
+        mask_mode=int(arguments["mask_mode"]),
+        win_left=int(arguments["win_left"]),
+        win_right=int(arguments["win_right"]),
+        layout_q=str(arguments["layout_q"]),
+        layout_kv=str(arguments["layout_kv"]),
+        layout_out=str(arguments["layout_attn_out"]),
+    )
+    return torch.tensor(metadata, dtype=torch.int32).to(device=anchor.device)
+
+
 def run_metadata(arguments, anchor):
-    """Invoke the companion metadata op on device, anchored on ``anchor``."""
+    """Invoke the companion metadata op on device, anchored on ``anchor``.
+
+    ESL 仿真环境走 host 侧计算（见 ``run_metadata_on_host``）；真机仍走原生
+    ``mixed_quant_flash_attn_metadata`` 算子。
+    """
+    if RUN_METHOD == "esl":
+        return run_metadata_on_host(arguments, anchor)
+
     import cann_ops_transformer  # noqa: F401  (ensure op registration)
 
     return torch.ops.cann_ops_transformer.mixed_quant_flash_attn_metadata(
