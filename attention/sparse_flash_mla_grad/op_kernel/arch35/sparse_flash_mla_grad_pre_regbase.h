@@ -163,7 +163,15 @@ __aicore__ inline void SparseFlashMlaGradPreRegbase<T1, T2, IS_TND, isOriKVExist
     // process
     if (g_coreType == AIV) {
         // clear dq dk dv workspace
-        InitOutput<float>(dqWorkSpaceGm[dqOffset], initdqSize, 0);
+        // Match FAGBlockCube::overwriteFirstDq. Empty/masked/variable-length
+        // queries keep zero initialization because no first tile may be computed.
+        bool overwriteFirstDq = !IsDETER && !IS_TND && isOriKVExist && !IsOriKVSparse &&
+                                TilingData->baseParams.n2 == 1 && !TilingData->baseParams.hasUsedSeqQ &&
+                                !TilingData->baseParams.hasUsedSeqOriKV && !TilingData->baseParams.hasOriTopK &&
+                                TilingData->baseParams.s1 > 0 && TilingData->baseParams.s2 >= TilingData->baseParams.s1;
+        if (!overwriteFirstDq) {
+            InitOutput<float>(dqWorkSpaceGm[dqOffset], initdqSize, 0);
+        }
         if constexpr (isOriKVExist) {
             InitOutput<float>(dorikvWorkSpaceGm[dorikvOffset], initdorikvSize, 0);
             if constexpr (!IsOriKVSparse && !IsDETER) {

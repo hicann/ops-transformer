@@ -24,6 +24,8 @@ constexpr int32_t PROCESS_KV_SIZE = 4096;
 constexpr int32_t PROCESS_KV_SIZE_NO_DETER = 128;
 constexpr uint8_t SYNC_C3_TO_V0_FLAG[2] = {7, 9};
 constexpr uint8_t SYNC_V0_TO_C1_FLAG[2] = {0, 1};
+// KV lookahead: independent V->C permission to overwrite the C1/C2 UB slots.
+constexpr uint8_t SYNC_V_UB_TO_C12_FLAG[2] = {2, 3};
 constexpr uint8_t SYNC_C1_TO_V2_FLAG[2] = {0, 1};
 constexpr uint8_t SYNC_C2_TO_V2_FLAG[2] = {2, 3};
 constexpr uint8_t SYNC_V3_TO_C3_FLAG = 4;
@@ -36,6 +38,7 @@ constexpr uint8_t SCATTER_CUBE_SYNC_FLAG = 11;
 constexpr uint8_t SCATTER_VEC_SYNC_FLAG = 12;
 constexpr uint8_t SCATTER_SYNC_FLAG = 13;
 constexpr uint8_t SCATTER_TO_FIX_SYNC_FLAG = 14;
+constexpr uint8_t SOFTMAX_L1_SYNC_FLAG = 15;
 
 // MM_IDX
 constexpr uint8_t DQ_IDX = 0;
@@ -68,7 +71,8 @@ struct DqkvResPos {
     X(IsCmpKVExist, bool, false) \
     X(IsOriKVSparse, bool, false) \
     X(IsCmpKVSparse, bool, false) \
-    X(IsDETER, bool, false)
+    X(IsDETER, bool, false) \
+    X(SplitG, bool, false)
 
 /* 1. 生成带默认值的模版Template */
 #define GEN_TYPE_PARAM(name) typename name,

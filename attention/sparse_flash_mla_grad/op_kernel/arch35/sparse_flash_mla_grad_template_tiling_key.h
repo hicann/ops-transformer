@@ -40,10 +40,10 @@ ASCENDC_TPL_ARGS_DECL(SparseFlashMlaGrad, // 算子唯一标识，可以opType�
                       //      0: DISABLE
                       //      1: ENABLE
                       ASCENDC_TPL_BOOL_DECL(IsTnd, 0, 1),
-                      // bit: 11-4 GTemplateType
-                      ASCENDC_TPL_UINT_DECL(GTemplateNum, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_LIST, 128),
+                      // bit: 11-4 GTemplateType; 64 selects two G64 slices for physical G128.
+                      ASCENDC_TPL_UINT_DECL(GTemplateNum, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_LIST, 64, 128),
                       // bit: 19-12 S2TemplateType
-                      ASCENDC_TPL_UINT_DECL(S2TemplateNum, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_LIST, 128),
+                      ASCENDC_TPL_UINT_DECL(S2TemplateNum, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_LIST, 64, 128),
                       // bit: 31-20 DTemplateType
                       ASCENDC_TPL_UINT_DECL(DTemplateNum, ASCENDC_TPL_12_BW, ASCENDC_TPL_UI_LIST, 512),
                       // bit: 32
@@ -157,6 +157,27 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(IsOriKVSparse, 1), ASCENDC_TPL_BOOL_SEL(IsCmpKVSparse, 0),
                          ASCENDC_TPL_BOOL_SEL(Deterministic, 0, 1),
                          ASCENDC_TPL_TILING_STRUCT_SEL(sfmgTilingWithTemplate)),
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InputDType, ASCENDC_TPL_UI_LIST, 1), ASCENDC_TPL_BOOL_SEL(IsTnd, 0, 1),
+                         ASCENDC_TPL_UINT_SEL(GTemplateNum, ASCENDC_TPL_UI_LIST, 64, 128),
+                         ASCENDC_TPL_UINT_SEL(S2TemplateNum, ASCENDC_TPL_UI_LIST, 64),
+                         ASCENDC_TPL_UINT_SEL(DTemplateNum, ASCENDC_TPL_UI_LIST, 512),
+                         ASCENDC_TPL_BOOL_SEL(IsOriKVExist, 1), ASCENDC_TPL_BOOL_SEL(IsCmpKVExist, 0),
+                         ASCENDC_TPL_BOOL_SEL(IsOriKVSparse, 1), ASCENDC_TPL_BOOL_SEL(IsCmpKVSparse, 0),
+                         ASCENDC_TPL_BOOL_SEL(Deterministic, 0), ASCENDC_TPL_TILING_STRUCT_SEL(sfmgTilingWithTemplate)),
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InputDType, ASCENDC_TPL_UI_LIST, 1), ASCENDC_TPL_BOOL_SEL(IsTnd, 0),
+                         ASCENDC_TPL_UINT_SEL(GTemplateNum, ASCENDC_TPL_UI_LIST, 64, 128),
+                         ASCENDC_TPL_UINT_SEL(S2TemplateNum, ASCENDC_TPL_UI_LIST, 64),
+                         ASCENDC_TPL_UINT_SEL(DTemplateNum, ASCENDC_TPL_UI_LIST, 512),
+                         ASCENDC_TPL_BOOL_SEL(IsOriKVExist, 1), ASCENDC_TPL_BOOL_SEL(IsCmpKVExist, 0),
+                         ASCENDC_TPL_BOOL_SEL(IsOriKVSparse, 0), ASCENDC_TPL_BOOL_SEL(IsCmpKVSparse, 0),
+                         ASCENDC_TPL_BOOL_SEL(Deterministic, 0), ASCENDC_TPL_TILING_STRUCT_SEL(sfmgTilingWithTemplate)),
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InputDType, ASCENDC_TPL_UI_LIST, 1), ASCENDC_TPL_BOOL_SEL(IsTnd, 0),
+                         ASCENDC_TPL_UINT_SEL(GTemplateNum, ASCENDC_TPL_UI_LIST, 64, 128),
+                         ASCENDC_TPL_UINT_SEL(S2TemplateNum, ASCENDC_TPL_UI_LIST, 64),
+                         ASCENDC_TPL_UINT_SEL(DTemplateNum, ASCENDC_TPL_UI_LIST, 512),
+                         ASCENDC_TPL_BOOL_SEL(IsOriKVExist, 1), ASCENDC_TPL_BOOL_SEL(IsCmpKVExist, 1),
+                         ASCENDC_TPL_BOOL_SEL(IsOriKVSparse, 0), ASCENDC_TPL_BOOL_SEL(IsCmpKVSparse, 0, 1),
+                         ASCENDC_TPL_BOOL_SEL(Deterministic, 0), ASCENDC_TPL_TILING_STRUCT_SEL(sfmgTilingWithTemplate)),
 #endif
 );
 #endif

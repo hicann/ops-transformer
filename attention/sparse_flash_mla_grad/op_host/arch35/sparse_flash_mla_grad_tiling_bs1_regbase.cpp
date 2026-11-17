@@ -241,6 +241,31 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::DoOpTiling()
     // Init
     tmpData.singleM = 128; // G方向上的固定切分大小
     tmpData.singleN = 128; // s2方向上的固定切分大小
+    bool qDyDoubleBufferShape = tmpData.queryType == ge::DT_BF16 && (tmpData.g == 64 || tmpData.g == 128) &&
+                                tmpData.n2 == 1 && tmpData.b == 1 && tmpData.d == 512 && tmpData.d1 == 512 &&
+                                tmpData.layout == static_cast<uint32_t>(InputLayout::BSND) && tmpData.oriKV &&
+                                !tmpData.oriKVSparse && !tmpData.usedSeqQ && !tmpData.usedSeqOriKV &&
+                                !tmpData.oriTopK && tmpData.s1 > 0 && tmpData.s2 >= tmpData.s1;
+    bool oriSparseShape = tmpData.queryType == ge::DT_BF16 && (tmpData.g == 64 || tmpData.g == 128) &&
+                          tmpData.n2 == 1 && tmpData.b == 1 && tmpData.d == 512 && tmpData.d1 == 512 &&
+                          (tmpData.layout == static_cast<uint32_t>(InputLayout::BSND) ||
+                           tmpData.layout == static_cast<uint32_t>(InputLayout::TND)) &&
+                          tmpData.oriKV && tmpData.oriKVSparse && !tmpData.cmpKV && tmpData.s1 > 0 && tmpData.s2 > 0 &&
+                          (baseParams_->get_oriSparseMode() == 0 || baseParams_->get_oriSparseMode() == 3 ||
+                           baseParams_->get_oriSparseMode() == 4);
+    bool optimized = !tmpData.deterministic && (qDyDoubleBufferShape || oriSparseShape);
+    if (optimized) {
+        tmpData.singleN = oriSparseShape && tmpData.g == 64 ? 128 : 64;
+        if (tmpData.g == 128) {
+            tmpData.singleM = 64;
+        }
+    }
+    OP_LOGI(context_,
+            "SMLAG optimized: enabled[%d], singleN[%u], physicalG[%ld], deterministic[%d], oriSparseMode[%ld], "
+            "oriWinLeft[%ld], oriWinRight[%ld], cmpSparse[%d]",
+            static_cast<int>(optimized), tmpData.singleN, tmpData.g, static_cast<int>(tmpData.deterministic),
+            baseParams_->get_oriSparseMode(), baseParams_->get_oriWinLeft(), baseParams_->get_oriWinRight(),
+            static_cast<int>(tmpData.cmpKVSparse));
 
     auto status = DoBlockTiling();
     if (status != ge::GRAPH_SUCCESS) {

@@ -21,7 +21,7 @@ using namespace AscendC;
 
 template <typename T1, typename T2, typename OUTDTYPE = T1, const bool IS_TND = 0, const bool isOriKVExist = 0,
           const bool isCmpKVExist = 0, const bool IsOriKVSparse = 0, const bool IsCmpKVSparse = 0,
-          const bool IsDETER = 0>
+          const bool IsDETER = 0, const bool SplitG = false>
 class SparseFlashMlaGradPostRegbase {
 public:
     __aicore__ inline SparseFlashMlaGradPostRegbase(){};
@@ -56,12 +56,13 @@ public:
 };
 
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
-          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
+          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER,
+          const bool SplitG>
 __aicore__ inline void SparseFlashMlaGradPostRegbase<
-    T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist, IsOriKVSparse, IsCmpKVSparse,
-    IsDETER>::Init(__gm__ uint8_t* dq, __gm__ uint8_t* dori_kv, __gm__ uint8_t* dcmp_kv, __gm__ uint8_t* dsinks,
-                   __gm__ uint8_t* workspace,
-                   const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* __restrict ordTilingData, TPipe* pipe_in)
+    T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist, IsOriKVSparse, IsCmpKVSparse, IsDETER,
+    SplitG>::Init(__gm__ uint8_t* dq, __gm__ uint8_t* dori_kv, __gm__ uint8_t* dcmp_kv, __gm__ uint8_t* dsinks,
+                  __gm__ uint8_t* workspace,
+                  const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* __restrict ordTilingData, TPipe* pipe_in)
 {
     vBlockIdx = GetBlockIdx();
     tilingData = ordTilingData;
@@ -107,9 +108,10 @@ __aicore__ inline void SparseFlashMlaGradPostRegbase<
 }
 
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
-          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
+          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER,
+          const bool SplitG>
 __aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist,
-                                                     IsOriKVSparse, IsCmpKVSparse, IsDETER>::ProcessSink()
+                                                     IsOriKVSparse, IsCmpKVSparse, IsDETER, SplitG>::ProcessSink()
 {
     if (vBlockIdx != 0) {
         return;
@@ -152,11 +154,17 @@ __aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, i
     GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(eventIDMte3ToMte2);
 }
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
-          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
+          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER,
+          const bool SplitG>
 __aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist,
-                                                     IsOriKVSparse, IsCmpKVSparse, IsDETER>::ProcessDqkv()
+                                                     IsOriKVSparse, IsCmpKVSparse, IsDETER, SplitG>::ProcessDqkv()
 {
+    bool directDqOutput =
+        commondef::EnableDirectDq<T1, IsDETER, IS_TND, isOriKVExist, IsOriKVSparse, SplitG>(tilingData->baseParams);
     for (int qkvIdx = 0; qkvIdx < 3; qkvIdx++) {
+        if (qkvIdx == 0 && directDqOutput) {
+            continue;
+        }
         if constexpr (!isOriKVExist) {
             if (qkvIdx == 1) {
                 continue;
@@ -260,9 +268,10 @@ __aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, i
     }
 }
 template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const bool isOriKVExist,
-          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
+          const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER,
+          const bool SplitG>
 __aicore__ inline void SparseFlashMlaGradPostRegbase<T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist,
-                                                     IsOriKVSparse, IsCmpKVSparse, IsDETER>::Process()
+                                                     IsOriKVSparse, IsCmpKVSparse, IsDETER, SplitG>::Process()
 {
     if (g_coreType != AIV) {
         return;

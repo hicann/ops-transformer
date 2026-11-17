@@ -49,6 +49,8 @@ public:
     __aicore__ inline void InitCubeVecSharedParams(FagRunInfo& runInfo, int32_t s2RealSize);
     __aicore__ inline int32_t GatherKV(const GlobalTensor<INPUT_TYPE>& selectedKWorkSpaceGm, FagConstInfo& constInfo,
                                        FagRunInfo& runInfo);
+    __aicore__ inline int32_t GatherKVUnDeter(const GlobalTensor<INPUT_TYPE>& selectedKWorkSpaceGm,
+                                              FagConstInfo& constInfo, FagRunInfo& runInfo);
     __aicore__ inline void ProcessVec1(FagConstInfo& constInfo, FagRunInfo& runInfo);
     __aicore__ inline void ProcessVec2(LocalTensor<CALC_TYPE>& mm2ResTensor, FagConstInfo& constInfo,
                                        FagRunInfo& runInfo);
@@ -87,7 +89,7 @@ public:
     constexpr static uint32_t CUBE_BASEN = (uint32_t)s2TemplateType;
     constexpr static uint32_t HEAD_DIM_ALIGN = (uint32_t)dTemplateType;
     constexpr static uint32_t VECTOR_BASEM = CUBE_BASEM / CV_CORE_RATIO;
-    constexpr static uint32_t VECTOR_BASEN = CUBE_BASEN;
+    constexpr static uint32_t VECTOR_BASEN = 128; // Preserve the Vector row pitch.
     constexpr static uint32_t INPUT_BLOCK_NUM = 32 / sizeof(INPUT_TYPE);
     constexpr static uint32_t FRACTAL_NZ_C0_SIZE = 32 / sizeof(INPUT_TYPE);
     constexpr static uint32_t DETER_EXCEED_USE_SIZE = 2 * 1024;
@@ -133,6 +135,10 @@ public:
     TQue<QuePosition::VECOUT, 1> dSinkQue;
     TBuf<> softmaxSinkResBuf[2];
     TBuf<> softmaxGradResBuf;
+    TBuf<> sparseIndicesBuf;
+    int64_t softmaxGradT1Index = -1;
+    int64_t softmaxGradN2Index = -1;
+    int64_t softmaxGradGOffset = -1;
     TBuf<> dropMaskBuf;
     TBuf<> dropmaskIndexVecBuf;
     TQueBind<TPosition::VECIN, TPosition::VECOUT, 1> deterInOutQue;
@@ -248,11 +254,16 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::InitUbBuffer(FagConstInfo& co
     pipe->InitBuffer(pseOrDyInQue, 1, VECTOR_BASEM * VECTOR_BASEN * sizeof(OUTDTYPE));
 
     pipe->InitBuffer(softmaxGradResBuf, VECTOR_BASEM * sizeof(CALC_TYPE));
+    if constexpr (!IsDETER && (IsOriKVSparse || IsCmpKVSparse)) {
+        pipe->InitBuffer(sparseIndicesBuf, 4 * CUBE_BASEN * sizeof(int32_t));
+    }
     pipe->InitBuffer(softmaxSinkResBuf[0], 64 * sizeof(float));
     pipe->InitBuffer(softmaxSinkResBuf[1], 64 * sizeof(float));
     pipe->InitBuffer(LseQue[0], 1, 64 * sizeof(float));
     pipe->InitBuffer(LseQue[1], 1, 64 * sizeof(float));
-    pipe->InitBuffer(sinkQue, 1, 64 * sizeof(float));
+    // The sink VF loads a full 64-float register even for a 32-head group.
+    // Pad the full-head cache so the last group starting at head 96 stays in bounds.
+    pipe->InitBuffer(sinkQue, 1, (SplitG ? 192 : 64) * sizeof(float));
     pipe->InitBuffer(dSinkQue, 1, 64 * sizeof(float));
 
     pipe->InitBuffer(dSOutQue, 1, VECTOR_BASEM * VREG_SIZE + VREG_SIZE + DETER_EXCEED_USE_SIZE);
@@ -573,6 +584,16 @@ __aicore__ inline bool FAGBlockVec<TEMPLATE_ARGS>::GetBS1Index(
 
     actualOriSelectedBlockCount = Min(Min(oriTopkLength, curS2), usedS2);
     actualCmpSelectedBlockCount = Min(Min(cmpTopkLength, curS3), usedS3);
+    if constexpr (CUBE_BASEN == 64 && IsOriKVSparse) {
+        actualOriSelectedBlockCount = commondef::GetValidSparseCount(
+            oritopkIndicesGm, bS1Index * constInfo.n2Size * constInfo.oriSelectedBlockCount,
+            actualOriSelectedBlockCount);
+    }
+    if constexpr (CUBE_BASEN == 64 && IsCmpKVSparse) {
+        actualCmpSelectedBlockCount = commondef::GetValidSparseCount(
+            cmptopkIndicesGm, bS1Index * constInfo.n2Size * constInfo.cmpSelectedBlockCount,
+            actualCmpSelectedBlockCount);
+    }
 
     bIdx = bIndex;
     s1Idx = s1Index;
@@ -615,6 +636,9 @@ TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline int32_t FAGBlockVec<TEMPLATE_ARGS>::GatherKV(const GlobalTensor<INPUT_TYPE>& selectedKWorkSpaceGm,
                                                                FagConstInfo& constInfo, FagRunInfo& runInfo)
 {
+    if constexpr (!IsDETER) {
+        return GatherKVUnDeter(selectedKWorkSpaceGm, constInfo, runInfo);
+    }
     if (!runInfo.isSparse) {
         return 0;
     }
@@ -740,6 +764,88 @@ __aicore__ inline int32_t FAGBlockVec<TEMPLATE_ARGS>::GatherKV(const GlobalTenso
 }
 
 TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline int32_t FAGBlockVec<TEMPLATE_ARGS>::GatherKVUnDeter(
+    const GlobalTensor<INPUT_TYPE>& selectedKWorkSpaceGm, FagConstInfo& constInfo, FagRunInfo& runInfo)
+{
+    if (!runInfo.isSparse || runInfo.actualSelCntOffset == 0) {
+        return 0;
+    }
+
+    // Both existing queues hold at least 16 KiB. Batch 16 rows of D=512
+    // FP16/BF16 data, retaining ping-pong ownership across MTE2 and MTE3.
+    constexpr uint32_t GATHER_ROWS = 16;
+    static_assert(GATHER_ROWS * HEAD_DIM_ALIGN * sizeof(INPUT_TYPE) <= VECTOR_BASEM * VREG_SIZE + VREG_SIZE);
+    uint32_t firstVecEnd = CeilDiv(runInfo.actualSelCntOffset, 2);
+    uint32_t begin = vSubBlockIdx == 0 ? 0 : firstVecEnd;
+    uint32_t gatherEnd = vSubBlockIdx == 0 ? firstVecEnd : runInfo.actualSelCntOffset;
+    uint32_t rowSize = constInfo.selectedBlockSize * constInfo.commonConstInfo.dSize;
+    uint64_t outOffset = begin * constInfo.selectedBlockSize * constInfo.dTotalSize;
+    int32_t s2RealSize = 0;
+    uint32_t pingPong = 0;
+
+    auto mte2WaitPing = GetTPipePtr()->AllocEventID<HardEvent::MTE3_MTE2>();
+    auto mte2WaitPong = GetTPipePtr()->AllocEventID<HardEvent::MTE3_MTE2>();
+    auto mte3WaitPing = GetTPipePtr()->AllocEventID<HardEvent::MTE2_MTE3>();
+    auto mte3WaitPong = GetTPipePtr()->AllocEventID<HardEvent::MTE2_MTE3>();
+    SetFlag<HardEvent::MTE3_MTE2>(mte2WaitPing);
+    SetFlag<HardEvent::MTE3_MTE2>(mte2WaitPong);
+
+    LocalTensor<INPUT_TYPE> gatherPing = dSOutQue.AllocTensor<INPUT_TYPE>();
+    LocalTensor<INPUT_TYPE> gatherPong = pOutQue.AllocTensor<INPUT_TYPE>();
+    GlobalTensor<int32_t> indicesGm = runInfo.isOriKV ? oritopkIndicesGm : cmptopkIndicesGm;
+    LocalTensor<int32_t> indicesTensor =
+        sparseIndicesBuf.Get<int32_t>()[(runInfo.commonRunInfo.taskId & 3) * CUBE_BASEN];
+    DataCopyPad(indicesTensor, indicesGm[runInfo.sparseIndicesOffset],
+                {1, static_cast<uint32_t>(runInfo.actualSelCntOffset * sizeof(int32_t)), 0, 0, 0}, {false, 0, 0, 0});
+    auto indicesReady = GetTPipePtr()->FetchEventID(HardEvent::MTE2_S);
+    SetFlag<HardEvent::MTE2_S>(indicesReady);
+    WaitFlag<HardEvent::MTE2_S>(indicesReady);
+    GlobalTensor<INPUT_TYPE> keyGm = runInfo.isOriKV ? oriKVGm : cmpKVGm;
+    DataCopyExtParams copyIn{1, static_cast<uint32_t>(rowSize * sizeof(INPUT_TYPE)), 0, 0, 0};
+    DataCopyExtParams copyOut{1, 0, 0, 0, 0};
+
+    for (uint32_t first = begin; first < gatherEnd; first += GATHER_ROWS) {
+        uint32_t rows = gatherEnd - first < GATHER_ROWS ? gatherEnd - first : GATHER_ROWS;
+        auto mte2Wait = pingPong == 0 ? mte2WaitPing : mte2WaitPong;
+        auto mte3Wait = pingPong == 0 ? mte3WaitPing : mte3WaitPong;
+        LocalTensor<INPUT_TYPE>& gather = pingPong == 0 ? gatherPing : gatherPong;
+        WaitFlag<HardEvent::MTE3_MTE2>(mte2Wait);
+        uint32_t validRows = 0;
+        for (; validRows < rows; validRows++) {
+            int32_t index = indicesTensor.GetValue(first + validRows);
+            if (unlikely(index < 0)) {
+                break;
+            }
+            uint64_t keyOffset = static_cast<uint64_t>(index) * rowSize * constInfo.n2Size;
+            DataCopyPad(gather[validRows * rowSize], keyGm[runInfo.commonRunInfo.keyOffset + keyOffset], copyIn,
+                        padParams);
+        }
+        if (validRows != 0) {
+            SetFlag<HardEvent::MTE2_MTE3>(mte3Wait);
+            WaitFlag<HardEvent::MTE2_MTE3>(mte3Wait);
+            copyOut.blockLen = validRows * rowSize * sizeof(INPUT_TYPE);
+            DataCopyPad(selectedKWorkSpaceGm[runInfo.kSelectedWsAddr + outOffset], gather, copyOut);
+            outOffset += validRows * constInfo.dTotalSize;
+            s2RealSize += validRows;
+        }
+        SetFlag<HardEvent::MTE3_MTE2>(mte2Wait);
+        pingPong = 1 - pingPong;
+        if (validRows < rows) {
+            break;
+        }
+    }
+    WaitFlag<HardEvent::MTE3_MTE2>(mte2WaitPing);
+    WaitFlag<HardEvent::MTE3_MTE2>(mte2WaitPong);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(mte2WaitPing);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(mte2WaitPong);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_MTE3>(mte3WaitPing);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_MTE3>(mte3WaitPong);
+    dSOutQue.FreeTensor(gatherPing);
+    pOutQue.FreeTensor(gatherPong);
+    return s2RealSize;
+}
+
+TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec1(FagConstInfo& constInfo, FagRunInfo& runInfo)
 {
     ///////////////////////////////////////////////////////////////
@@ -747,6 +853,17 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec1(FagConstInfo& con
     ///////////////////////////////////////////////////////////////
     if (runInfo.halfGRealSize == 0 || runInfo.commonRunInfo.s2RealSize == 0) {
         return;
+    }
+    if constexpr (!IsDETER) {
+        // O and dO do not change between KV tiles of the same query.
+        // This dedicated buffer remains live until ProcessVec3 consumes it.
+        if (softmaxGradT1Index == runInfo.t1Index && softmaxGradN2Index == runInfo.n2Index &&
+            softmaxGradGOffset == runInfo.gOffset) {
+            return;
+        }
+        softmaxGradT1Index = runInfo.t1Index;
+        softmaxGradN2Index = runInfo.n2Index;
+        softmaxGradGOffset = runInfo.gOffset;
     }
     LocalTensor<CALC_TYPE> softmaxGradResTensor = softmaxGradResBuf.Get<CALC_TYPE>();
     uint32_t loopNum = Ceil<uint32_t>(runInfo.halfGRealSize, constInfo.sfmgMaxLoopSize);
@@ -757,7 +874,7 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec1(FagConstInfo& con
         if (loopIdx == loopNum - 1) {
             curLoopSize = tailLoopSize;
         }
-        CopyInSoftmaxGrad<INPUT_TYPE, CALC_TYPE, OUTDTYPE, VECTOR_BASEM, 512, IS_D_NO_EQUAL>(
+        CopyInSoftmaxGrad<INPUT_TYPE, CALC_TYPE, OUTDTYPE, VECTOR_BASEM, 512, IS_D_NO_EQUAL, SplitG>(
             constInfo, runInfo, loopIdx, curLoopSize, loopSize, attenMaskOrYInQue, pseOrDyInQue, dyGm, yGm);
         CalculateCastSoftmaxGrad<INPUT_TYPE, CALC_TYPE, OUTDTYPE, VECTOR_BASEM, 512>(
             constInfo, curLoopSize, attenMaskOrYInQue, pseOrDyInQue, softmaxGradResTensor[loopSize * loopIdx],
@@ -782,7 +899,20 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::CopySink(FagConstInfo& constI
     if (constInfo.halfGRealSize == 0) {
         return;
     }
-    CopyInSink<float, VECTOR_BASEM>(constInfo, sinkQue, sinkGm);
+    if constexpr (SplitG) {
+        // Both G64 groups share this immutable, full-head sink cache.
+        LocalTensor<float> sinkTensor = sinkQue.AllocTensor<float>();
+        Duplicate(sinkTensor, 0.0f, 192);
+        event_t eventIDVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+        SetFlag<HardEvent::V_MTE2>(eventIDVToMTE2);
+        WaitFlag<HardEvent::V_MTE2>(eventIDVToMTE2);
+        DataCopyPad(sinkTensor, sinkGm, {1, static_cast<uint16_t>(128 * sizeof(float)), 0, 0}, {false, 0, 0, 0});
+        sinkQue.EnQue(sinkTensor);
+        sinkQue.DeQue<float>();
+        sinkQue.FreeTensor(sinkTensor);
+    } else {
+        CopyInSink<float, VECTOR_BASEM>(constInfo, sinkQue, sinkGm);
+    }
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -796,7 +926,7 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::CopyUB2L1(FagConstInfo& const
     }
     uint32_t scmOffset = vSubBlockIdx == 0 ? 0 : runInfo.firstHalfGRealSize * FRACTAL_NZ_C0_SIZE;
     DataCopyParams dataCopyParams;
-    dataCopyParams.blockCount = VECTOR_BASEN / FRACTAL_NZ_C0_SIZE;
+    dataCopyParams.blockCount = CUBE_BASEN / FRACTAL_NZ_C0_SIZE;
     dataCopyParams.blockLen = (uint16_t)(runInfo.halfGRealSize * FRACTAL_NZ_C0_SIZE / INPUT_BLOCK_NUM);
     dataCopyParams.srcStride =
         (uint16_t)((VECTOR_BASEM + 1 - runInfo.halfGRealSize) * FRACTAL_NZ_C0_SIZE / INPUT_BLOCK_NUM);
@@ -816,7 +946,8 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec2(LocalTensor<CALC_
     // VF2: pse + attenMask + muls + simpleSoftmax copyIn+calculate
     ///////////////////////////////////////////////////////////////
     LocalTensor<CALC_TYPE> softmaxL1ResTensor = softmaxL1OutQue.AllocTensor<CALC_TYPE>();
-    float pScalar = 1.0f / static_cast<float>(static_cast<int64_t>(constInfo.commonConstInfo.gSize));
+    // The two G64 contributions are summed into the original G128 head mean.
+    float pScalar = 1.0f / static_cast<float>(constInfo.physicalGSize);
     if (runInfo.isSparse) {
         CalculatePseMulsSelSimpleSoftMax<OUTDTYPE, CALC_TYPE, false, false, false, VECTOR_BASEM, VECTOR_BASEN, true>(
             constInfo, runInfo, *pseInfoPtr, *attenMaskInfoPtr, LseQue[runInfo.sTaskIdMod2], attenMaskOrYInQue,
@@ -836,6 +967,11 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec2(LocalTensor<CALC_
         dataCopyGmParams.blockLen = runInfo.commonRunInfo.s2RealSize * sizeof(CALC_TYPE);
         dataCopyGmParams.srcStride = 0;
         dataCopyGmParams.dstStride = 0;
+        if constexpr (IsDETER && CUBE_BASEN == 64) {
+            if (runInfo.isSparse && vSubBlockIdx == 1) {
+                CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(SOFTMAX_L1_SYNC_FLAG);
+            }
+        }
         SetAtomicAdd<CALC_TYPE>();
         if (runInfo.isOriKV && runInfo.isSparse) {
             DataCopyPad(oriSoftmaxL1Gm[runInfo.t1Index * runInfo.selectedBlockCount + runInfo.blkCntOffset],
@@ -845,6 +981,11 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec2(LocalTensor<CALC_
                         softmaxL1ResTensor, dataCopyGmParams);
         }
         SetAtomicNone();
+        if constexpr (IsDETER && CUBE_BASEN == 64) {
+            if (runInfo.isSparse && vSubBlockIdx == 0) {
+                CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SOFTMAX_L1_SYNC_FLAG);
+            }
+        }
     }
     softmaxL1OutQue.FreeTensor(softmaxL1ResTensor);
 }
@@ -929,7 +1070,11 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessSoftmaxSink(FagConstIn
     LseQue[runInfo.sTaskIdMod2].DeQue<CALC_TYPE>();
     sinkQue.EnQue(sinkTensor);
     sinkQue.DeQue<CALC_TYPE>();
-    CalculateSoftMaxSink<CALC_TYPE>(softmaxSinkTensor, lseTensor, sinkTensor, runInfo.halfGRealSize);
+    LocalTensor<CALC_TYPE> currentSinkTensor = sinkTensor;
+    if constexpr (SplitG) {
+        currentSinkTensor = sinkTensor[runInfo.gOffset + vSubBlockIdx * runInfo.firstHalfGRealSize];
+    }
+    CalculateSoftMaxSink<CALC_TYPE>(softmaxSinkTensor, lseTensor, currentSinkTensor, runInfo.halfGRealSize);
     LseQue[runInfo.sTaskIdMod2].FreeTensor(lseTensor);
     sinkQue.FreeTensor(sinkTensor);
 }
@@ -955,7 +1100,7 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVecSink(LocalTensor<CA
     dSinkQue.DeQue<CALC_TYPE>();
     SetAtomicAdd<CALC_TYPE>();
     uint64_t dsinkWorkSpaceOffset =
-        cBlockIdx * constInfo.commonConstInfo.gSize + vSubBlockIdx * runInfo.firstHalfGRealSize;
+        cBlockIdx * constInfo.physicalGSize + runInfo.gOffset + vSubBlockIdx * runInfo.firstHalfGRealSize;
     DataCopyPad(dsinkWorkSpaceGm[dsinkWorkSpaceOffset], dsinkOutTensor,
                 {1, static_cast<uint32_t>(runInfo.halfGRealSize * sizeof(CALC_TYPE)), 0, 0, 0});
     SetAtomicNone();
@@ -977,95 +1122,74 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ScatterAdd(const GlobalTensor
     if constexpr (!IS_SPARSE) {
         return;
     }
-    int64_t UB_ROW_SIZE = 8;
-    int64_t s2RealSize = runInfo.commonRunInfo.s2RealSize;
-    int64_t firstCoreKSize = s2RealSize / 2;
-    int64_t currentCoreKSize = (vSubBlockIdx == 0) ? firstCoreKSize : (s2RealSize - firstCoreKSize);
-    if (currentCoreKSize == 0) {
+    constexpr uint32_t ROWS = 8;
+    static_assert(2 * ROWS * HEAD_DIM_ALIGN <= VECTOR_BASEM * VECTOR_BASEN);
+    const uint32_t firstRows = runInfo.commonRunInfo.s2RealSize / 2;
+    const uint32_t count = vSubBlockIdx == 0 ? firstRows : runInfo.commonRunInfo.s2RealSize - firstRows;
+    if (count == 0) {
         return;
     }
-
+    const uint32_t batches = (count + ROWS - 1) / ROWS;
+    const uint64_t rowStart = vSubBlockIdx * firstRows;
+    const uint64_t dkStart = runInfo.mm4ResWsAddr + rowStart * constInfo.selectedBlockSize * HEAD_DIM_ALIGN;
+    const uint64_t dvStart = runInfo.mm5ResWsAddr + rowStart * constInfo.selectedBlockSize * HEAD_DIM_ALIGN;
+    LocalTensor<int32_t> indices = sparseIndicesBuf.Get<int32_t>()[(runInfo.commonRunInfo.taskId & 3) * CUBE_BASEN];
+    GlobalTensor<CALC_TYPE> output = dkWorkSpaceGm[runInfo.commonRunInfo.keyOffset];
+    auto free0 = GetTPipePtr()->AllocEventID<HardEvent::MTE3_MTE2>();
+    auto free1 = GetTPipePtr()->AllocEventID<HardEvent::MTE3_MTE2>();
+    auto ready0 = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
+    auto ready1 = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
+    auto computed = GetTPipePtr()->FetchEventID(HardEvent::V_MTE3);
+    // mm1/mm2 UB is shared with earlier pipeline tasks. Preserve the original
+    // entry fence before either slot can overwrite data still read by MTE3.
+    SetFlag<HardEvent::MTE3_MTE2>(free0);
+    WaitFlag<HardEvent::MTE3_MTE2>(free0);
+    SetFlag<HardEvent::MTE3_MTE2>(free1);
+    const uint32_t initial = count < ROWS ? count : ROWS;
+    DataCopy(dkInTensor, mm4ResWorkSpaceGm[dkStart], initial * HEAD_DIM_ALIGN);
+    DataCopy(dvInTensor, mm5ResWorkSpaceGm[dvStart], initial * HEAD_DIM_ALIGN);
+    SetFlag<HardEvent::MTE2_V>(ready0);
     SetAtomicAdd<CALC_TYPE>();
-    int64_t maxLoops = CeilDiv(currentCoreKSize, UB_ROW_SIZE);
-    int64_t tailRows = currentCoreKSize - (maxLoops - 1) * UB_ROW_SIZE;
-
-    event_t eventIDMTE3ToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
-    event_t eventIDMTE2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
-    event_t eventIDVToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
-
-    int64_t kvOffset = IS_SPARSE ? runInfo.commonRunInfo.keyOffset :
-                                   runInfo.kSelectedWsAddr + vSubBlockIdx * firstCoreKSize * HEAD_DIM_ALIGN;
-    GlobalTensor<float> dkOutGm = dkWorkSpaceGm[kvOffset];
-    int64_t currentMm4SrcOffset =
-        runInfo.mm4ResWsAddr + vSubBlockIdx * firstCoreKSize * constInfo.selectedBlockSize * HEAD_DIM_ALIGN;
-    int64_t currentMm5SrcOffset =
-        runInfo.mm5ResWsAddr + vSubBlockIdx * firstCoreKSize * constInfo.selectedBlockSize * HEAD_DIM_ALIGN;
-    // 1 - main loop
-    SetFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
-    uint64_t gmOffset = runInfo.sparseIndicesOffset + vSubBlockIdx * firstCoreKSize;
-    GlobalTensor<int32_t> topkIndicesGm = runInfo.isOriKV ? oritopkIndicesGm : cmptopkIndicesGm;
-    for (int64_t loop = 0; loop < maxLoops - 1; loop++) {
-        WaitFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
-        DataCopy(dkInTensor, mm4ResWorkSpaceGm[currentMm4SrcOffset + loop * UB_ROW_SIZE * HEAD_DIM_ALIGN],
-                 UB_ROW_SIZE * HEAD_DIM_ALIGN);
-        SetFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-        WaitFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-        Muls(dkInTensor, dkInTensor, (float)constInfo.scaleValue, UB_ROW_SIZE * HEAD_DIM_ALIGN);
-        DataCopy(dvInTensor, mm5ResWorkSpaceGm[currentMm5SrcOffset + loop * UB_ROW_SIZE * HEAD_DIM_ALIGN],
-                 UB_ROW_SIZE * HEAD_DIM_ALIGN);
-        SetFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-        WaitFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-        if constexpr (IS_SPARSE) {
-            for (int64_t row = 0; row < UB_ROW_SIZE; row++) {
-                int32_t s2Idx = topkIndicesGm[gmOffset + loop * UB_ROW_SIZE].GetValue(row);
-                if (s2Idx >= 0) {
-                    Add(dkInTensor[row * HEAD_DIM_ALIGN], dkInTensor[row * HEAD_DIM_ALIGN],
-                        dvInTensor[row * HEAD_DIM_ALIGN], HEAD_DIM_ALIGN);
-                    SetFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-                    WaitFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-                    DataCopy(dkOutGm[s2Idx * HEAD_DIM_ALIGN], dkInTensor[row * HEAD_DIM_ALIGN], HEAD_DIM_ALIGN);
-                }
-            }
-        } else {
-            Add(dkInTensor, dkInTensor, dvInTensor, UB_ROW_SIZE * HEAD_DIM_ALIGN);
-            SetFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-            WaitFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-            DataCopy(dkOutGm[loop * UB_ROW_SIZE * HEAD_DIM_ALIGN], dkInTensor, UB_ROW_SIZE * HEAD_DIM_ALIGN);
+    for (uint32_t batch = 0; batch < batches; ++batch) {
+        const uint32_t slot = batch & 1;
+        const uint32_t offset = slot * ROWS * HEAD_DIM_ALIGN;
+        auto ready = slot == 0 ? ready0 : ready1;
+        auto free = slot == 0 ? free0 : free1;
+        WaitFlag<HardEvent::MTE2_V>(ready);
+        if (batch + 1 < batches) {
+            const uint32_t nextSlot = 1 - slot;
+            const uint32_t nextRow = (batch + 1) * ROWS;
+            const uint32_t nextRows = count - nextRow < ROWS ? count - nextRow : ROWS;
+            auto nextFree = nextSlot == 0 ? free0 : free1;
+            auto nextReady = nextSlot == 0 ? ready0 : ready1;
+            WaitFlag<HardEvent::MTE3_MTE2>(nextFree);
+            DataCopy(dkInTensor[nextSlot * ROWS * HEAD_DIM_ALIGN],
+                     mm4ResWorkSpaceGm[dkStart + nextRow * HEAD_DIM_ALIGN], nextRows * HEAD_DIM_ALIGN);
+            DataCopy(dvInTensor[nextSlot * ROWS * HEAD_DIM_ALIGN],
+                     mm5ResWorkSpaceGm[dvStart + nextRow * HEAD_DIM_ALIGN], nextRows * HEAD_DIM_ALIGN);
+            SetFlag<HardEvent::MTE2_V>(nextReady);
         }
-        SetFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
-    }
-
-    WaitFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
-    // 2 - tail loop
-    DataCopy(dkInTensor, mm4ResWorkSpaceGm[currentMm4SrcOffset + (maxLoops - 1) * UB_ROW_SIZE * HEAD_DIM_ALIGN],
-             tailRows * HEAD_DIM_ALIGN);
-    SetFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-    WaitFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-    Muls(dkInTensor, dkInTensor, (float)constInfo.scaleValue, tailRows * HEAD_DIM_ALIGN);
-    DataCopy(dvInTensor, mm5ResWorkSpaceGm[currentMm5SrcOffset + (maxLoops - 1) * UB_ROW_SIZE * HEAD_DIM_ALIGN],
-             tailRows * HEAD_DIM_ALIGN);
-    SetFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-    WaitFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-    if constexpr (IS_SPARSE) {
-        for (int64_t row = 0; row < tailRows; row++) {
-            int32_t s2Idx = topkIndicesGm[gmOffset + (maxLoops - 1) * UB_ROW_SIZE].GetValue(row);
-            if (s2Idx >= 0) {
-                Add(dkInTensor[row * HEAD_DIM_ALIGN], dkInTensor[row * HEAD_DIM_ALIGN],
-                    dvInTensor[row * HEAD_DIM_ALIGN], HEAD_DIM_ALIGN);
-                SetFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-                WaitFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-                DataCopy(dkOutGm[s2Idx * HEAD_DIM_ALIGN], dkInTensor[row * HEAD_DIM_ALIGN], HEAD_DIM_ALIGN);
+        const uint32_t rows = count - batch * ROWS < ROWS ? count - batch * ROWS : ROWS;
+        Muls(dkInTensor[offset], dkInTensor[offset], (float)constInfo.scaleValue, rows * HEAD_DIM_ALIGN);
+        Add(dkInTensor[offset], dkInTensor[offset], dvInTensor[offset], rows * HEAD_DIM_ALIGN);
+        SetFlag<HardEvent::V_MTE3>(computed);
+        WaitFlag<HardEvent::V_MTE3>(computed);
+        for (uint32_t row = 0; row < rows; ++row) {
+            int32_t index = indices.GetValue(rowStart + batch * ROWS + row);
+            if (index >= 0) {
+                DataCopy(output[static_cast<uint64_t>(index) * HEAD_DIM_ALIGN],
+                         dkInTensor[offset + row * HEAD_DIM_ALIGN], HEAD_DIM_ALIGN);
             }
         }
-    } else {
-        Add(dkInTensor, dkInTensor, dvInTensor, tailRows * HEAD_DIM_ALIGN);
-        SetFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-        WaitFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-        DataCopy(dkOutGm[(maxLoops - 1) * UB_ROW_SIZE * HEAD_DIM_ALIGN], dkInTensor, tailRows * HEAD_DIM_ALIGN);
+        SetFlag<HardEvent::MTE3_MTE2>(free);
     }
-    SetFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
     SetAtomicNone();
-    WaitFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
+    WaitFlag<HardEvent::MTE3_MTE2>(free0);
+    WaitFlag<HardEvent::MTE3_MTE2>(free1);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(free0);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(free1);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(ready0);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(ready1);
 }
 
 TEMPLATES_DEF

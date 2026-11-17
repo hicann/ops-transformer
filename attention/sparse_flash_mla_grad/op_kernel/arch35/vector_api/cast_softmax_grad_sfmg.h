@@ -19,7 +19,7 @@
 using namespace commondef;
 
 template <typename T1, typename T2, typename OUTDTYPE, const uint32_t VECTOR_BASEM = 64,
-          const uint32_t HEAD_DIM_ALIGN = 128, const bool IS_D_NO_EQUAL = false>
+          const uint32_t HEAD_DIM_ALIGN = 128, const bool IS_D_NO_EQUAL = false, const bool IS_SPLIT_G = false>
 __aicore__ inline void CopyInSoftmaxGrad(FagConstInfo& constInfo, FagRunInfo& runInfo, int32_t loopIdx,
                                          int32_t curLoopSize, int32_t loopSize, TQue<QuePosition::VECIN, 1>& yInQue,
                                          TQue<QuePosition::VECIN, 1>& dxInQue, GlobalTensor<T1>& dxGm,
@@ -29,17 +29,20 @@ __aicore__ inline void CopyInSoftmaxGrad(FagConstInfo& constInfo, FagRunInfo& ru
     int64_t srcGmOffset = 0;
     int64_t transpose_stride = 0;
     int64_t transpose_stride_for_out = 0;
-    srcGmOffset = runInfo.t1Index * constInfo.commonConstInfo.n2GDv +
-                  runInfo.firstHalfGRealSize * GetSubBlockIdx() * constInfo.commonConstInfo.dSizeV +
+    const int64_t queryOffset = IS_SPLIT_G ? runInfo.dyOffset : runInfo.t1Index * constInfo.commonConstInfo.n2GDv;
+    srcGmOffset = queryOffset + runInfo.firstHalfGRealSize * GetSubBlockIdx() * constInfo.commonConstInfo.dSizeV +
                   loopIdx * loopSize * constInfo.commonConstInfo.dSizeV;
 
     LocalTensor<OUTDTYPE> yTensor = yInQue.AllocTensor<OUTDTYPE>();
     LocalTensor<T1> dxTensor = dxInQue.AllocTensor<T1>();
 
-    Duplicate<OUTDTYPE>(yTensor, 0, curLoopSize * HEAD_DIM_ALIGN);
-    Duplicate<T1>(dxTensor, 0, curLoopSize * HEAD_DIM_ALIGN);
-    SetFlag<HardEvent::V_MTE2>(static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2)));
-    WaitFlag<HardEvent::V_MTE2>(static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2)));
+    // Full-width copies overwrite every element; only padded rows need zeroing.
+    if (constInfo.commonConstInfo.dSizeV < HEAD_DIM_ALIGN) {
+        Duplicate<OUTDTYPE>(yTensor, 0, curLoopSize * HEAD_DIM_ALIGN);
+        Duplicate<T1>(dxTensor, 0, curLoopSize * HEAD_DIM_ALIGN);
+        SetFlag<HardEvent::V_MTE2>(static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2)));
+        WaitFlag<HardEvent::V_MTE2>(static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2)));
+    }
 
     uint32_t dstBlockStride = (HEAD_DIM_ALIGN - constInfo.dAlignToBlock) * sizeof(T1) / 32;
     uint32_t dstBlockStrideForOut = (HEAD_DIM_ALIGN - constInfo.dAlignToBlockForFp8) * sizeof(OUTDTYPE) / 32;

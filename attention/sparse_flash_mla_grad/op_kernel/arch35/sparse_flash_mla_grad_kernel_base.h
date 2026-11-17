@@ -76,7 +76,7 @@ public:
     constexpr static uint32_t CUBE_BASEK = 128;
     constexpr static uint32_t HEAD_DIM_ALIGN = (uint32_t)dTemplateType;
     constexpr static uint32_t VECTOR_BASEM = CUBE_BASEM / CV_CORE_RATIO;
-    constexpr static uint32_t VECTOR_BASEN = CUBE_BASEN;
+    constexpr static uint32_t VECTOR_BASEN = 128; // Preserve the Vector row pitch.
     constexpr static uint32_t INPUT_BLOCK_NUM = 32 / sizeof(INPUT_TYPE);
     constexpr static uint32_t INPUT_BLOCK_NUM_FOR_FP8 = 32 / sizeof(OUTDTYPE);
     constexpr static uint32_t BASE_DQ_SIZE = CUBE_BASEM * HEAD_DIM_ALIGN;
@@ -105,6 +105,11 @@ protected:
     GlobalTensor<float> dqWorkSpaceGm, dOriKVWorkSpaceGm, dCmpKVWorkSpaceGm, dOriVWorkSpaceGm, dCmpVWorkSpaceGm;
     GlobalTensor<float> mm4ResWorkSpaceGm, mm5ResWorkSpaceGm;
     GlobalTensor<INPUT_TYPE> selectedKWorkSpaceGm;
+    GlobalTensor<INPUT_TYPE> dqDirectGm;
+    GlobalTensor<int32_t> oriIndicesGm;
+    GlobalTensor<int32_t> cmpIndicesGm;
+    bool directDqOutput = false;
+    bool sparseKv128 = false;
     // CV核间共享Buffer
     TBuf<> mm1ResBuf[2];
     TBuf<> mm2ResBuf[2];
@@ -176,6 +181,8 @@ protected:
     int64_t t3Index = 0;
     int64_t n2Index = 0;
     int64_t lastT1Index = -1;
+    int64_t currentGOffset = 0;
+    int64_t lastGOffset = -1;
     int64_t usedCoreNum = 0;
     int64_t processBS1ByCore = 0;
     int64_t oriWinStart = 0;
@@ -261,6 +268,13 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     cmpTopkLengthAddr = cmp_topk_length;
     cmpResidualKVAddr = cmp_residual_kv;
 
+    dqDirectGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)dq);
+    oriIndicesGm.SetGlobalBuffer((__gm__ int32_t*)ori_sparse_indices);
+    cmpIndicesGm.SetGlobalBuffer((__gm__ int32_t*)cmp_sparse_indices);
+    sparseKv128 = commondef::EnableSparseKv128<INPUT_TYPE, IsDETER, IsOriKVExist, IsCmpKVExist, IsOriKVSparse>(
+        tilingData->baseParams);
+    directDqOutput = commondef::EnableDirectDq<INPUT_TYPE, IsDETER, IS_TND, IsOriKVExist, IsOriKVSparse, SplitG>(
+        tilingData->baseParams);
     InitCVCommonGlobalBuffer(workspace);
     InitCVCommonBuffer();
 
@@ -353,7 +367,8 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     constInfo.oriSelectedBlockCount = tilingData->baseParams.oriselectedBlockCount;
     constInfo.cmpSelectedBlockCount = tilingData->baseParams.cmpselectedBlockCount;
     constInfo.selectedBlockCount = constInfo.oriSelectedBlockCount + constInfo.cmpSelectedBlockCount;
-    constInfo.commonConstInfo.gSize = tilingData->baseParams.g;
+    constInfo.physicalGSize = tilingData->baseParams.g;
+    constInfo.commonConstInfo.gSize = constInfo.physicalGSize;
     constInfo.halfGRealSize = (constInfo.commonConstInfo.gSize + 1) >> 1;
     constInfo.firstHalfGRealSize = constInfo.halfGRealSize;
     if (vSubBlockIdx == 1) {
@@ -447,7 +462,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
         curS2 = constInfo.commonConstInfo.s2Size;
         curS3 = constInfo.s3Size;
     }
-    constInfo.selectedCountOffset = CUBE_BASEM;
+    constInfo.selectedCountOffset = CUBE_BASEN;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
@@ -471,6 +486,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     FagRunInfo& runInfo, FagRunInfo& preRunInfo, int64_t taskId, int64_t sTaskId, int64_t deterTaskId, int64_t kvOffset)
 {
     runInfo.t1Index = t1Index;
+    runInfo.gOffset = currentGOffset;
     runInfo.t2Index = t2Index;
     runInfo.t3Index = t3Index;
     runInfo.n2Index = n2Index;
@@ -503,7 +519,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     }
 
     // 当前S1内执行了一次task后，isS1IdxNoChange置为true
-    runInfo.isS1IdxNoChange = t1Index == lastT1Index;
+    runInfo.isS1IdxNoChange = t1Index == lastT1Index && currentGOffset == lastGOffset;
     if constexpr (IS_ORI_KV) {
         runInfo.isNextS1IdxNoChange =
             actualCmpSelectedBlockCount > 0 ||
@@ -514,6 +530,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     }
     preRunInfo.isSecondLast = !runInfo.isNextS1IdxNoChange;
     lastT1Index = t1Index;
+    lastGOffset = currentGOffset;
 
     GetDerived()->SetUniqueRunInfo(runInfo);
 
@@ -570,7 +587,8 @@ template <bool IS_MM1_MM2>
 __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryOffset(
     FagRunInfo& runInfo)
 {
-    return runInfo.t1Index * constInfo.n2Size * constInfo.commonConstInfo.gSize * constInfo.commonConstInfo.dSize;
+    return (runInfo.t1Index * constInfo.n2Size * constInfo.physicalGSize + runInfo.gOffset) *
+           constInfo.commonConstInfo.dSize;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
@@ -584,7 +602,8 @@ template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetDxOffset(
     FagRunInfo& runInfo)
 {
-    return runInfo.t1Index * constInfo.n2Size * constInfo.commonConstInfo.gSize * constInfo.commonConstInfo.dSizeV;
+    return (runInfo.t1Index * constInfo.n2Size * constInfo.physicalGSize + runInfo.gOffset) *
+           constInfo.commonConstInfo.dSizeV;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
@@ -633,6 +652,18 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     }
     actualOriSelectedBlockCount = Min(Min(oriTopkLength, curS2), usedS2);
     actualCmpSelectedBlockCount = Min(Min(cmpTopkLength, curS3), usedS3);
+    if constexpr (IsOriKVSparse) {
+        if (CUBE_BASEN == 64 || sparseKv128) {
+            actualOriSelectedBlockCount = commondef::GetValidSparseCount(
+                oriIndicesGm, (t1Index * constInfo.n2Size + n2Idx) * constInfo.oriSelectedBlockCount,
+                actualOriSelectedBlockCount);
+        }
+    }
+    if constexpr (CUBE_BASEN == 64 && IsCmpKVSparse) {
+        actualCmpSelectedBlockCount = commondef::GetValidSparseCount(
+            cmpIndicesGm, (t1Index * constInfo.n2Size + n2Idx) * constInfo.cmpSelectedBlockCount,
+            actualCmpSelectedBlockCount);
+    }
     actualSelectedBlockCount = actualOriSelectedBlockCount + actualCmpSelectedBlockCount;
 }
 

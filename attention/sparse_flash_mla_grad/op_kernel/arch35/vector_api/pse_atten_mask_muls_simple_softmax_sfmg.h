@@ -43,7 +43,8 @@ __aicore__ inline void CopyInLse(FagConstInfo& constInfo, FagRunInfo& runInfo, T
         return;
     }
     int64_t lseGmOffset = 0;
-    lseGmOffset = runInfo.t1Index * constInfo.commonConstInfo.gSize + runInfo.firstHalfGRealSize * GetSubBlockIdx();
+    lseGmOffset =
+        runInfo.t1Index * constInfo.physicalGSize + runInfo.gOffset + runInfo.firstHalfGRealSize * GetSubBlockIdx();
     LocalTensor<T2> lseTensor = lseInQue.AllocTensor<T2>();
     DataCopyPad(lseTensor, lseGm[lseGmOffset], {1, static_cast<uint16_t>(runInfo.halfGRealSize * sizeof(T2)), 0, 0},
                 {false, 0, 0, 0});

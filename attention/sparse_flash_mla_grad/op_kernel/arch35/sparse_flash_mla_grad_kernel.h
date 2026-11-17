@@ -36,10 +36,14 @@ public:
     __aicore__ inline void Process();
     __aicore__ inline void ProcessDeter();
     __aicore__ inline void ProcessUnDeter();
+    __aicore__ inline void ProcessUnDeterKvPrefetch();
 
 private:
     __aicore__ inline void ProcessPreload(FagRunInfo& runInfo, int64_t taskId, bool& isFirstBlock);
     __aicore__ inline void ProcessNotFirst(FagRunInfo& runInfo);
+    __aicore__ inline void ProcessKVPrefetch(FagRunInfo& runInfo);
+    __aicore__ inline void ProcessCube12(FagRunInfo& runInfo);
+    __aicore__ inline void AdvanceKvPrefetch(FagRunInfo* runInfos, int64_t taskId);
     __aicore__ inline void ScatterAddUnDeter(FagRunInfo& runInfo);
     __aicore__ inline void CopyLse(FagRunInfo& runInfo);
 };
@@ -51,7 +55,15 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Se
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::SetUniqueConstInfo(
     FagConstInfo& constInfo)
-{}
+{
+    if constexpr (SplitG) {
+        // Physical strides were computed with G=128 in SetConstInfo. Only the
+        // matrix/Vector work size becomes 64; each AIV owns 32 of these heads.
+        constInfo.commonConstInfo.gSize = 64;
+        constInfo.halfGRealSize = 32;
+        constInfo.firstHalfGRealSize = 32;
+    }
+}
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::ProcessPreload(FagRunInfo& runInfo,
@@ -97,6 +109,90 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
 }
 
 template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::ProcessKVPrefetch(FagRunInfo& runInfo)
+{
+    runInfo.kvL1Slot = runInfo.commonRunInfo.taskId % 3;
+    if ASCEND_IS_AIV {
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+    }
+    int32_t s2RealSize = this->vecBlock.GatherKV(this->selectedKWorkSpaceGm, this->constInfo, runInfo);
+    if ASCEND_IS_AIV {
+        this->vecBlock.InitCubeVecSharedParams(runInfo, s2RealSize);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SYNC_V0_TO_C1_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+    } else {
+        this->cubeBlock.GetCubeVecSharedParams(runInfo);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(SYNC_V0_TO_C1_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(16 + SYNC_V0_TO_C1_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+        this->cubeBlock.PrefetchKV(this->selectedKWorkSpaceGm, this->constInfo, runInfo);
+        // The GM gather slot is reusable after MTE2 has copied it to L1.
+        // L1 has separate three-slot ownership and stays live through dQ.
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(16 + SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+    }
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::ProcessCube12(FagRunInfo& runInfo)
+{
+    // Prefetch-ready only protects GM input. C1/C2 writes share UB with an
+    // older scatter task, so preserve a distinct destination-free handshake.
+    if ASCEND_IS_AIV {
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SYNC_V_UB_TO_C12_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+    } else {
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SYNC_V_UB_TO_C12_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + SYNC_V_UB_TO_C12_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+    }
+    bool isFirstBlock = !runInfo.isS1IdxNoChange;
+    LocalTensor<CALC_TYPE> mm1ResTensor = this->mm1ResBuf[runInfo.commonRunInfo.taskIdMod2].template Get<CALC_TYPE>();
+    this->cubeBlock.IterateMmDyV(mm1ResTensor, this->selectedKWorkSpaceGm, this->constInfo, runInfo);
+    if ASCEND_IS_AIC {
+        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SYNC_C1_TO_V2_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SYNC_C1_TO_V2_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+    }
+
+    LocalTensor<CALC_TYPE> mm2ResTensor = this->mm2ResBuf[runInfo.commonRunInfo.taskIdMod2].template Get<CALC_TYPE>();
+    this->cubeBlock.IterateMmQK(mm2ResTensor, this->selectedKWorkSpaceGm, this->constInfo, runInfo);
+    if ASCEND_IS_AIC {
+        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SYNC_C2_TO_V2_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SYNC_C2_TO_V2_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+    }
+    if (isFirstBlock) {
+        this->vecBlock.CopyLse(this->constInfo, runInfo); // copy in lse double buffer
+        if (this->constInfo.isSink) {
+            this->vecBlock.ProcessSoftmaxSink(this->constInfo, runInfo);
+        }
+        isFirstBlock = false;
+    }
+    runInfo.taskStep = TASK_C1C2;
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::AdvanceKvPrefetch(FagRunInfo* runInfos,
+                                                                                                int64_t taskId)
+{
+    ProcessKVPrefetch(runInfos[taskId & 3]);
+    if (taskId > 0) {
+        ProcessCube12(runInfos[(taskId + 3) & 3]);
+    }
+    if (taskId > 1) {
+        ProcessNotFirst(runInfos[(taskId + 2) & 3]);
+    }
+    if (taskId > 2) {
+        ScatterAddUnDeter(runInfos[(taskId + 1) & 3]);
+    }
+    if ASCEND_IS_AIC {
+        if (!runInfos[taskId & 3].isS1IdxNoChange) {
+            // With one-task lookahead, the query two slots behind may still
+            // own Q/dY at entry. Its final dK/dV above must be queued first.
+            // The prefetch API addresses contiguous G64 rows. For SplitG this
+            // logical row is physical_query * 2 + head_half, not a KV index.
+            this->cubeBlock.PrefetchQueryDy(runInfos[taskId & 3].commonRunInfo.queryOffset / (64 * 512),
+                                            runInfos[taskId & 3].sTaskIdMod2);
+        }
+    }
+}
+
+template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::ProcessNotFirst(FagRunInfo& runInfo)
 {
     if (runInfo.taskStep != TASK_C1C2) {
@@ -114,6 +210,14 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
     LocalTensor<CALC_TYPE> mm2ResTensor = this->mm2ResBuf[runInfo.commonRunInfo.taskIdMod2].template Get<CALC_TYPE>();
 
     this->vecBlock.ProcessVec2(mm2ResTensor, this->constInfo, runInfo); // v2: pse + attenMask + simpleSoftmax
+    if constexpr (IsDETER && BaseClass::CUBE_BASEN == 64) {
+        if ASCEND_IS_AIC {
+            if (runInfo.isSparse && runInfo.commonRunInfo.s2RealSize > 0) {
+                CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SOFTMAX_L1_SYNC_FLAG);
+                CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SOFTMAX_L1_SYNC_FLAG);
+            }
+        }
+    }
     if (this->constInfo.isSink) {
         this->vecBlock.ProcessVecSink(mm1ResTensor, mm2ResTensor, this->constInfo, runInfo);
     }
@@ -140,18 +244,20 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
         CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(SYNC_V3_TO_C3_FLAG);
         CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(16 + SYNC_V3_TO_C3_FLAG);
     }
-    // compute dq
-    this->cubeBlock.template IterateMmDsK<CALC_TYPE, BaseClass::IS_DQ_WRITE_UB>(
-        this->dqWorkSpaceGm, this->selectedKWorkSpaceGm, this->dSL1Buf, this->constInfo, runInfo); // c3
+    if constexpr (IsDETER) {
+        this->cubeBlock.template IterateMmDsK<CALC_TYPE, BaseClass::IS_DQ_WRITE_UB>(
+            this->dqWorkSpaceGm, this->selectedKWorkSpaceGm, this->dSL1Buf, this->constInfo, runInfo);
+        if ASCEND_IS_AIC {
+            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(16 + SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+        }
+    }
     if ASCEND_IS_AIC {
-        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
-        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(16 + SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
         if constexpr (!IsDETER) {
             CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SYNC_V5_TO_C4_FLAG[runInfo.commonRunInfo.taskIdMod2]);
             CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + SYNC_V5_TO_C4_FLAG[runInfo.commonRunInfo.taskIdMod2]);
         }
     }
-
     // compute dk
     GlobalTensor<CALC_TYPE> dkOutTensor = this->mm4ResWorkSpaceGm;
     if constexpr (!IsDETER) {
@@ -161,6 +267,22 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
     }
     this->cubeBlock.template IterateMmDsQ<CALC_TYPE, BaseClass::IS_DK_WRITE_UB>(dkOutTensor, this->dSL1Buf,
                                                                                 this->constInfo, runInfo); // c4
+    if constexpr (!IsDETER) {
+        // compute dq
+        if (this->directDqOutput) {
+            this->cubeBlock.template IterateMmDsK<INPUT_TYPE, false>(this->dqDirectGm, this->selectedKWorkSpaceGm,
+                                                                     this->dSL1Buf, this->constInfo, runInfo); // c3
+        } else {
+            this->cubeBlock.template IterateMmDsK<CALC_TYPE, BaseClass::IS_DQ_WRITE_UB>(
+                this->dqWorkSpaceGm, this->selectedKWorkSpaceGm, this->dSL1Buf, this->constInfo, runInfo); // c3
+        }
+        if constexpr (BaseClass::CUBE_BASEN != 64) {
+            if ASCEND_IS_AIC {
+                CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+                CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(16 + SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+            }
+        }
+    }
     if ASCEND_IS_AIC {
         CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(SYNC_C4_TO_V3_FLAG);
         CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + SYNC_C4_TO_V3_FLAG);
@@ -448,7 +570,7 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::ProcessUnDeter()
+__aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::ProcessUnDeterKvPrefetch()
 {
     this->AllocEventID();
     if (this->constInfo.isSink) {
@@ -456,7 +578,95 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
     }
     int64_t taskId = 0;
     int64_t sTaskId = 0;
-    FagRunInfo runInfos[3]; // for cv ping pong
+    FagRunInfo runInfos[4];
+    for (int32_t i = 0; i < this->processBS1ByCore; ++i) {
+        this->usedT1Index = this->cBlockIdx + this->usedCoreNum * i;
+        this->GetTndSeqLen(this->usedT1Index, this->bIndex);
+        for (this->n2Index = 0; this->n2Index < this->tilingData->baseParams.n2; ++this->n2Index) {
+            this->GetActualSelCount(this->usedT1Index, this->n2Index, this->actualSelectedBlockCount);
+            // Complete all KV tiles for one G64 group before changing groups:
+            // only one dQ accumulator is resident in L0C. Q/dY ping-pong slots
+            // keep the next half live while the preceding half drains.
+            constexpr uint32_t headGroups = SplitG ? 2 : 1;
+            for (uint32_t headGroup = 0; headGroup < headGroups; ++headGroup) {
+                this->currentGOffset = headGroup * 64;
+                if constexpr (IsOriKVExist) {
+                    for (this->blkCntOffset = 0; this->blkCntOffset < this->actualOriSelectedBlockCount;
+                         this->blkCntOffset += this->constInfo.selectedCountOffset) {
+                        this->template SetRunInfo<true>(runInfos[taskId & 3], runInfos[(taskId + 3) & 3], taskId,
+                                                        sTaskId, 0, 0);
+                        AdvanceKvPrefetch(runInfos, taskId);
+                        int64_t realSize = runInfos[taskId & 3].commonRunInfo.s2RealSize;
+                        ++taskId;
+                        if (realSize < this->constInfo.selectedCountOffset) {
+                            break;
+                        }
+                    }
+                }
+                if constexpr (IsCmpKVExist) {
+                    for (this->blkCntOffset = this->actualOriSelectedBlockCount;
+                         this->blkCntOffset < this->actualSelectedBlockCount;
+                         this->blkCntOffset += this->constInfo.selectedCountOffset) {
+                        this->template SetRunInfo<false>(runInfos[taskId & 3], runInfos[(taskId + 3) & 3], taskId,
+                                                         sTaskId, 0, 0);
+                        AdvanceKvPrefetch(runInfos, taskId);
+                        int64_t realSize = runInfos[taskId & 3].commonRunInfo.s2RealSize;
+                        ++taskId;
+                        if (realSize < this->constInfo.selectedCountOffset) {
+                            break;
+                        }
+                    }
+                }
+                if (this->actualSelectedBlockCount > 0) {
+                    ++sTaskId;
+                }
+            }
+        }
+    }
+    // Drain exactly the outstanding stages, including cores with only one task.
+    if (taskId > 0) {
+        ProcessCube12(runInfos[(taskId - 1) & 3]);
+    }
+    if (taskId > 1) {
+        ProcessNotFirst(runInfos[(taskId - 2) & 3]);
+    }
+    if (taskId > 2) {
+        ScatterAddUnDeter(runInfos[(taskId - 3) & 3]);
+    }
+    if (taskId > 0) {
+        ProcessNotFirst(runInfos[(taskId - 1) & 3]);
+    }
+    if (taskId > 1) {
+        ScatterAddUnDeter(runInfos[(taskId - 2) & 3]);
+    }
+    if (taskId > 0) {
+        ScatterAddUnDeter(runInfos[(taskId - 1) & 3]);
+    }
+    this->FreeEventID();
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::ProcessUnDeter()
+{
+    if constexpr (BaseClass::CUBE_BASEN == 64) {
+        ProcessUnDeterKvPrefetch();
+        return;
+    }
+    this->AllocEventID();
+    if (this->constInfo.isSink) {
+        this->vecBlock.CopySink(this->constInfo);
+    }
+    int64_t taskId = 0;
+    int64_t sTaskId = 0;
+    FagRunInfo runInfos[3]{}; // for cv ping pong
+    if constexpr (BaseClass::CUBE_BASEN == 64) {
+        if ASCEND_IS_AIC {
+            if (this->processBS1ByCore > 0) {
+                this->cubeBlock.PrefetchQueryDy(this->cBlockIdx, 0);
+            }
+        }
+    }
+
     for (int32_t i = 0; i < this->processBS1ByCore; i++) {
         bool isFirstBlock = true;
         this->usedT1Index = this->cBlockIdx + this->usedCoreNum * i;
@@ -472,7 +682,6 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
                         ProcessPreload(runInfos[taskId % 3], taskId, isFirstBlock);
                     }
                     int64_t curTaskS2RealSize = runInfos[taskId % 3].commonRunInfo.s2RealSize;
-                    int64_t lastTaskS2RealSize = runInfos[(taskId + 1) % 3].commonRunInfo.s2RealSize;
                     if (taskId > 0) {
                         ProcessNotFirst(runInfos[(taskId + 2) % 3]);
                     }
@@ -497,7 +706,6 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
                         ProcessPreload(runInfos[taskId % 3], taskId, isFirstBlock);
                     }
                     int64_t curTaskS2RealSize = runInfos[taskId % 3].commonRunInfo.s2RealSize;
-                    int64_t lastTaskS2RealSize = runInfos[(taskId + 1) % 3].commonRunInfo.s2RealSize;
                     if (taskId > 0) {
                         ProcessNotFirst(runInfos[(taskId + 2) % 3]);
                     }
@@ -514,15 +722,24 @@ __aicore__ inline void SparseFlashMlaGradKernel<CubeBlockType, VecBlockType>::Pr
         if (this->actualSelectedBlockCount > 0) {
             sTaskId++;
         }
+        if constexpr (BaseClass::CUBE_BASEN == 64) {
+            if ASCEND_IS_AIC {
+                if (i + 1 < this->processBS1ByCore) {
+                    // Current KV loads are already queued. Overlap next Q/dY
+                    // with outstanding gradient work and next-query metadata.
+                    this->cubeBlock.PrefetchQueryDy(this->usedT1Index + this->usedCoreNum, sTaskId & 1);
+                }
+            }
+        }
     }
 
-    if (runInfos[(taskId + 2) % 3].taskStep == TASK_C1C2) {
+    if (taskId > 0 && runInfos[(taskId + 2) % 3].taskStep == TASK_C1C2) {
         ProcessNotFirst(runInfos[(taskId + 2) % 3]);
     }
-    if (runInfos[(taskId + 1) % 3].taskStep == TASK_C3C4C5) {
+    if (taskId > 1 && runInfos[(taskId + 1) % 3].taskStep == TASK_C3C4C5) {
         ScatterAddUnDeter(runInfos[(taskId + 1) % 3]);
     }
-    if (runInfos[(taskId + 2) % 3].taskStep == TASK_C3C4C5) {
+    if (taskId > 0 && runInfos[(taskId + 2) % 3].taskStep == TASK_C3C4C5) {
         ScatterAddUnDeter(runInfos[(taskId + 2) % 3]);
     }
     this->FreeEventID();

@@ -24,6 +24,41 @@ using AscendC::Cast;
 using AscendC::RoundMode;
 
 namespace commondef {
+__aicore__ inline int64_t GetValidSparseCount(const AscendC::GlobalTensor<int32_t>& indices, int64_t offset,
+                                              int64_t count)
+{
+    if (count == 0 || indices.GetValue(offset + count - 1) >= 0) {
+        return count;
+    }
+    int64_t begin = 0;
+    while (begin < count) {
+        int64_t mid = begin + (count - begin) / 2;
+        if (indices.GetValue(offset + mid) >= 0) {
+            begin = mid + 1;
+        } else {
+            count = mid;
+        }
+    }
+    return begin;
+}
+
+template <typename T, bool deterministic, bool oriExists, bool cmpExists, bool oriSparse, typename Params>
+__aicore__ inline bool EnableSparseKv128(const Params& p)
+{
+    return AscendC::IsSameType<T, bfloat16_t>::value && !deterministic && oriExists && !cmpExists && oriSparse &&
+           p.b == 1 && p.n2 == 1 && p.g == 64 && p.d == 512 && p.d1 == 512 && p.s1 > 0 && p.s2 > 0 &&
+           (p.oriSparseMode == 0 || p.oriSparseMode == 3 || p.oriSparseMode == 4);
+}
+
+template <typename T, bool deterministic, bool isTnd, bool oriExists, bool oriSparse, bool completeSplitG = false,
+          typename Params>
+__aicore__ inline bool EnableDirectDq(const Params& p)
+{
+    return AscendC::IsSameType<T, bfloat16_t>::value && !deterministic &&
+           (p.g == 64 || (completeSplitG && p.g == 128)) && p.d == 512 && p.d1 == 512 && !isTnd && oriExists &&
+           !oriSparse && p.b == 1 && p.n2 == 1 && !p.hasUsedSeqQ && !p.hasUsedSeqOriKV && !p.hasOriTopK && p.s1 > 0 &&
+           p.s2 >= p.s1;
+}
 // L0C自主管理相关
 constexpr uint32_t MIN_L0C_BUF_NUM = 4;
 constexpr int32_t DK_DV_L0C_BUF_NUM = 2;
@@ -131,6 +166,7 @@ struct DeterConstInfo {
 
 struct FagConstInfo {
     ConstInfo<false, false> commonConstInfo{0};
+    int64_t physicalGSize = 0; // GM tensor strides and head-wise reductions retain the full G.
     DeterConstInfo deterConstInfo{0};
     int64_t bSize;
     int64_t n2Size;
@@ -200,6 +236,8 @@ struct QuantScaleInfo {
 };
 
 struct FagRunInfo {
+    int64_t gOffset = 0;   // First physical head of this logical G64 query.
+    uint32_t kvL1Slot = 0; // KV64 L1 ownership is independent of two-slot UB/workspace ownership.
     RunInfo<false> commonRunInfo{0};
     QuantScaleInfo quantScaleInfo;
     int64_t sTaskId;

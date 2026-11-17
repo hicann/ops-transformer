@@ -28,7 +28,7 @@
 
 #define INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL(INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND, s2TemplateType, \
                                                       dTemplateType, isOriKVExist, isCmpKVExist, isOriKVSparse, \
-                                                      isCmpKVSparse, isDeter) \
+                                                      isCmpKVSparse, isDeter, splitG) \
     do { \
         SparseFlashMlaGradPreRegbase<INPUT_TYPE, float, IS_TND, isOriKVExist, isCmpKVExist, isOriKVSparse, \
                                      isCmpKVSparse, isDeter> \
@@ -41,15 +41,17 @@
         using CubeBlockType = typename std::conditional< \
             g_coreType == AscendC::AIC, \
             SfagBaseApi::FAGBlockCube<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND, s2TemplateType, dTemplateType, \
-                                      isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, isDeter>, \
+                                      isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, isDeter, splitG>, \
             SfagBaseApi::FAGBlockCubeDummy<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND, s2TemplateType, dTemplateType, \
-                                           isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, isDeter>>::type; \
+                                           isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, isDeter, \
+                                           splitG>>::type; \
         using VecBlockType = typename std::conditional< \
             g_coreType == AscendC::AIC, \
             SfagBaseApi::FAGBlockVecDummy<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND, s2TemplateType, dTemplateType, \
-                                          isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, isDeter>, \
+                                          isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, isDeter, splitG>, \
             SfagBaseApi::FAGBlockVec<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND, s2TemplateType, dTemplateType, \
-                                     isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, isDeter>>::type; \
+                                     isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, isDeter, \
+                                     splitG>>::type; \
 \
         SfagBaseApi::SparseFlashMlaGradKernel<CubeBlockType, VecBlockType> op; \
         op.Init(query, ori_kv, cmp_kv, d_out, out, ori_sparse_indices, cmp_sparse_indices, cu_seqlens_q, \
@@ -62,7 +64,7 @@
             pipeBase.Destroy(); \
             TPipe pipePost; \
             SparseFlashMlaGradPostRegbase<INPUT_TYPE, float, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist, \
-                                          isOriKVSparse, isCmpKVSparse, isDeter> \
+                                          isOriKVSparse, isCmpKVSparse, isDeter, splitG> \
                 opPost; \
             opPost.Init(dq, dori_kv, dcmp_kv, dsinks, user, tilingData, &pipePost); \
             opPost.Process(); \
@@ -101,16 +103,16 @@ inline __aicore__ void RegbaseSFAG(
     GET_TILING_DATA_WITH_STRUCT(fagTiling, tiling_data_in, tiling_data);
     const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* __restrict tilingData = &tiling_data_in;
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16)
-    INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL_FP16(half, float, half, isTnd, S2TemplateType(s2TemplateType),
-                                                       DTemplateType(dTemplateType), isOriKVExist, isCmpKVExist,
-                                                       isOriKVSparse, isCmpKVSparse, deterministic);
+    INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL_FP16(
+        half, float, half, isTnd, S2TemplateType(s2TemplateType), DTemplateType(dTemplateType), isOriKVExist,
+        isCmpKVExist, isOriKVSparse, isCmpKVSparse, deterministic, (gTemplateType == 64));
     return;
 #endif
 
 #if (ORIG_DTYPE_QUERY == DT_BF16)
     INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL_BF16(
         bfloat16_t, float, bfloat16_t, isTnd, S2TemplateType(s2TemplateType), DTemplateType(dTemplateType),
-        isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, deterministic);
+        isOriKVExist, isCmpKVExist, isOriKVSparse, isCmpKVSparse, deterministic, (gTemplateType == 64));
     return;
 #endif
 }
