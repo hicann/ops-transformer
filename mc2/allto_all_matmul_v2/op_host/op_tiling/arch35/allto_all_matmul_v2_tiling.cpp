@@ -255,7 +255,8 @@ bool AlltoAllMatmulV2TilingClass::CheckOtherAttrs(const char* opName)
         return false;
     }
     auto* pmPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_PRECISION_MODE);
-    if (pmPtr != nullptr && (*pmPtr < 0 || *pmPtr > 2)) {
+    constexpr int64_t PRECISION_MODE_MAX = 2;
+    if (pmPtr != nullptr && (*pmPtr < 0 || *pmPtr > PRECISION_MODE_MAX)) {
         OP_LOGE_FOR_INVALID_VALUE(opName, "precision_mode", std::to_string(*pmPtr).c_str(), "0/1/2");
         return false;
     }
@@ -330,13 +331,14 @@ bool AlltoAllMatmulV2TilingClass::CheckMatmulDimsAndBounds(const char* opName)
     uint64_t x1DimNum = x1Shape->GetStorageShape().GetDimNum();
     uint64_t x2DimNum = x2Shape->GetStorageShape().GetDimNum();
     uint64_t yDimNum = yShape->GetStorageShape().GetDimNum();
-    if (x1DimNum != 2 || x2DimNum != 2) {
+    constexpr uint64_t MATMUL_DIM_NUM = 2UL;
+    if (x1DimNum != MATMUL_DIM_NUM || x2DimNum != MATMUL_DIM_NUM) {
         OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
             opName, "x1, x2", (std::to_string(x1DimNum) + "D," + std::to_string(x2DimNum) + "D").c_str(),
             "x1 and x2 must be 2D");
         return false;
     }
-    if (yDimNum != 2) {
+    if (yDimNum != MATMUL_DIM_NUM) {
         OP_LOGE_FOR_INVALID_SHAPEDIM(opName, "y", std::to_string(yDimNum).c_str(), "2D");
         return false;
     }
@@ -345,7 +347,6 @@ bool AlltoAllMatmulV2TilingClass::CheckMatmulDimsAndBounds(const char* opName)
     uint64_t x1K = x1Shape->GetStorageShape().GetDim(1U);
     uint64_t x2N = x2Shape->GetStorageShape().GetDim(0U);
     uint64_t x2K = x2Shape->GetStorageShape().GetDim(1U);
-
     if (x1M == 0 || x1K == 0 || x2N == 0 || x2K == 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "x1, x2",
                                               ("x1=[" + std::to_string(x1M) + "," + std::to_string(x1K) + "], x2=[" +
@@ -383,7 +384,6 @@ bool AlltoAllMatmulV2TilingClass::CheckMatmulDivisibility(const char* opName)
     uint64_t x2K = x2Shape->GetStorageShape().GetDim(1U);
     uint64_t yM = yShape->GetStorageShape().GetDim(0U);
     uint64_t yN = yShape->GetStorageShape().GetDim(1U);
-
     if (x1M % worldSize != 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "x1 dim0", ("M=" + std::to_string(x1M)).c_str(),
                                               "The dim0 of x1 must be divisible by world_size");
@@ -589,7 +589,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
     }
     memset_s(rt->GetData(), cap, 0, cap);
 
-    auto* td = reinterpret_cast<allToAllQuantMatmulTilingData*>(rt->GetData());
+    auto* td = static_cast<allToAllQuantMatmulTilingData*>(rt->GetData());
 
     auto* x1DescTiling = context_->GetInputDesc(IDX_INPUT_X1);
     if (x1DescTiling == nullptr) {
@@ -648,7 +648,8 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
     // MXFP4 打包存储(2 个 fp4 占 1 字节)，数据通信的 K 轴字节数需减半；
     // scale 仍是 e8m0(每 32 元素 1 字节)，不受 fp4 影响。
     if (x1Dtype == ge::DT_FLOAT4_E2M1) {
-        td->commTilingData.nonSplitAxisSize = ka / 2;
+        constexpr uint64_t FP4_PACKED_PER_BYTE = 2UL;
+        td->commTilingData.nonSplitAxisSize = ka / FP4_PACKED_PER_BYTE;
     }
 
     // win 区 buffer 复用深度决策：budget 取自 context 的 hccl_buffer_size，
@@ -705,20 +706,23 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
     libApiWorkSpaceSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
 
     td->dumpInfo.workspaceLayout.totalSize = libApiWorkSpaceSize_;
-    td->dumpInfo.workspaceLayout.segCount = 1;
     td->dumpInfo.workspaceLayout.segments[0] = {
         0UL, libApiWorkSpaceSize_, static_cast<uint8_t>(Utils::WS_SEG_LIB_API), {}};
     td->dumpInfo.workspaceLayout.totalSize += Utils::STATE_DUMP_TOTAL_SIZE;
-    td->dumpInfo.workspaceLayout.segCount = 2;
+    constexpr uint8_t WORKSPACE_SEG_CNT = 2; // libapi + state_dump
+    td->dumpInfo.workspaceLayout.segCount = WORKSPACE_SEG_CNT;
     td->dumpInfo.workspaceLayout.segments[1] = {
         libApiWorkSpaceSize_, Utils::STATE_DUMP_TOTAL_SIZE, static_cast<uint8_t>(Utils::WS_SEG_STATE_DUMP), {}};
-    double typeSize = (x1Dtype == ge::DT_FLOAT4_E2M1) ? 0.5 : 1.0;
-    uint64_t scaleKDim = (k_ + 63UL) / 64UL;
-    uint64_t dataRegionBytes = worldSize_ * m_ * static_cast<uint64_t>(static_cast<double>(k_) * typeSize);
-    uint64_t scaleRegionBytes = worldSize_ * m_ * scaleKDim * 2UL;
+    // 对齐 comm tiling 的整数口径: fp4 打包 2 元素/字节, 数据区字节数 = k/2; scale 区 = ceil(K/64)*2
+    const bool isFp4 = (x1Dtype == ge::DT_FLOAT4_E2M1);
+    uint64_t scaleKDim = (k_ + MX_SCALE_ALIGN - 1UL) / MX_SCALE_ALIGN;
+    uint64_t dataBytesPerRow = isFp4 ? (k_ / 2UL) : k_;
+    uint64_t dataRegionBytes = worldSize_ * m_ * dataBytesPerRow;
+    uint64_t scaleRegionBytes = worldSize_ * m_ * scaleKDim * SCALE_LAST_DIM;
     td->dumpInfo.peermemDataSize = dataRegionBytes + scaleRegionBytes;
     td->dumpInfo.peermemLayout.totalSize = td->dumpInfo.peermemDataSize;
-    td->dumpInfo.peermemLayout.segCount = 2;
+    constexpr uint8_t PEERMEM_SEG_CNT = 2; // data + scale
+    td->dumpInfo.peermemLayout.segCount = PEERMEM_SEG_CNT;
     td->dumpInfo.peermemLayout.segments[0] = {0UL, dataRegionBytes, static_cast<uint8_t>(Utils::PEERMEM_SEG_DATA), {}};
     td->dumpInfo.peermemLayout.segments[1] = {
         dataRegionBytes, scaleRegionBytes, static_cast<uint8_t>(Utils::PEERMEM_SEG_SCALE), {}};

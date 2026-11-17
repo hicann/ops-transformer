@@ -723,7 +723,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext* context, const ShapeIn
 
     memset_s(rawTilingData->GetData(), rawTilingData->GetCapacity(), 0,
              rawTilingData->GetCapacity()); // 校验非空并tilingdata 缓冲区清零
-    auto* tilingData = reinterpret_cast<AllGatherMxMatmulUrmaTilingData*>(rawTilingData->GetData());
+    auto* tilingData = static_cast<AllGatherMxMatmulUrmaTilingData*>(rawTilingData->GetData());
 
     uint64_t m = static_cast<uint64_t>(shapeInfo.mPerRank);
     uint64_t k = static_cast<uint64_t>(shapeInfo.k);

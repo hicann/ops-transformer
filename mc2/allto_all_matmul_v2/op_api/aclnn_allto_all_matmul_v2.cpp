@@ -40,7 +40,10 @@ extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, 
 
 static bool IsTransposeLastTwoDims(const aclTensor* tensor)
 {
-    if (tensor->GetViewShape().GetDimNum() < 2 || tensor->GetViewShape().GetDimNum() > 6) {
+    constexpr int64_t MIN_TRANSPOSE_DIM = 2;
+    constexpr int64_t MAX_TRANSPOSE_DIM = 6;
+    if (tensor->GetViewShape().GetDimNum() < MIN_TRANSPOSE_DIM ||
+        tensor->GetViewShape().GetDimNum() > MAX_TRANSPOSE_DIM) {
         return false;
     }
     int64_t dim1 = tensor->GetViewShape().GetDimNum() - 1;
@@ -54,9 +57,9 @@ static bool IsTransposeLastTwoDims(const aclTensor* tensor)
     return false;
 }
 
-const std::initializer_list<op::DataType> X_DTYPE_SUPPORT_LIST = {
+static const std::initializer_list<op::DataType> X_DTYPE_SUPPORT_LIST = {
     op::DataType::DT_FLOAT8_E4M3FN, op::DataType::DT_FLOAT8_E5M2, op::DataType::DT_FLOAT4_E2M1};
-const std::initializer_list<op::DataType> SCALE_DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT8_E8M0};
+static const std::initializer_list<op::DataType> SCALE_DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT8_E8M0};
 
 // CheckDtype: dtype 校验（bitcast 场景校验声明的 dtype，与 op_def 白名单一致）
 static aclnnStatus CheckDtype(const aclTensor* x1, const aclTensor* x2, const aclTensor* x1Scale,
@@ -182,7 +185,6 @@ extern "C" aclnnStatus AlltoAllMatmulV2GetWorkspaceSize(
         hcclBufferSize, yDtype, x1QuantMode, x2QuantMode, kDefaultX1QuantDtype, kDefaultTransposeX1, transposeX2,
         groupSize, const_cast<char*>(effectiveCommMode), precisionMode, output, alltoAllOutOptional, workspaceSize,
         executor);
-
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_INNER, "aclnnInnerAlltoAllMatmulV2GetWorkspaceSize failed, ret=%d", ret);
     }

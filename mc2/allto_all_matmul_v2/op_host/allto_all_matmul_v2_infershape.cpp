@@ -37,6 +37,9 @@ constexpr size_t INDEX_ATTR_TRANSPOSE_X2 = 8;
 
 constexpr int64_t MX_SCALE_BLOCK_SIZE = 64;
 constexpr int64_t MX_SCALE_LAST_DIM = 2;
+constexpr size_t SCALE_DIM_NUM = 3;      // scale 形状 [dim0, ceil(K/64), 2], 恒 3 维(与 tiling 一致)
+constexpr size_t MATMUL_MIN_DIM_NUM = 2; // x1/x2 输入至少 2D [M,K]/[N,K]
+constexpr size_t OUT_DIM_NUM = 2;        // 输出 y 形状 [M/world_size, N]
 constexpr int64_t DIM_MINUS_ONE = -1;
 
 bool ValidateInferDtypes(const gert::InferShapeContext* context, const char* nodeName)
@@ -64,6 +67,13 @@ bool ValidateInferDtypes(const gert::InferShapeContext* context, const char* nod
 
 bool ValidateInferKCrossCheck(const char* nodeName, int64_t ka, int64_t kTotal, int64_t worldSize)
 {
+    if (ka == DIM_MINUS_ONE || kTotal == DIM_MINUS_ONE) {
+        return true;
+    }
+    if (worldSize <= 0) {
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "world_size", std::to_string(worldSize).c_str(), "positive");
+        return false;
+    }
     if (kTotal != ka * worldSize) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             nodeName, "x2 K_total", std::to_string(kTotal).c_str(),
@@ -85,12 +95,12 @@ bool ValidateInferScaleShapes(const gert::InferShapeContext* context, const char
     if (x1ScaleShape == nullptr || x2ScaleShape == nullptr) {
         return true;
     }
-    if (x1ScaleShape->GetDimNum() < 3 || x2ScaleShape->GetDimNum() < 3) {
+    if (x1ScaleShape->GetDimNum() != SCALE_DIM_NUM || x2ScaleShape->GetDimNum() != SCALE_DIM_NUM) {
         OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
             nodeName, "x1_scale, x2_scale",
             (std::to_string(x1ScaleShape->GetDimNum()) + "D," + std::to_string(x2ScaleShape->GetDimNum()) + "D")
                 .c_str(),
-            "x1_scale and x2_scale must be at least 3D");
+            "x1_scale and x2_scale must be 3D");
         return false;
     }
     int64_t expectedScaleK1 = CeilDiv(ka, MX_SCALE_BLOCK_SIZE);
@@ -154,7 +164,7 @@ ge::graphStatus AlltoAllMatmulV2InferShape(gert::InferShapeContext* context)
     const auto x2Shape = context->GetInputShape(INDEX_IN_X2);
     OPS_CHECK_NULL_WITH_CONTEXT(context, x1Shape);
     OPS_CHECK_NULL_WITH_CONTEXT(context, x2Shape);
-    if (x1Shape->GetDimNum() < 2 || x2Shape->GetDimNum() < 2) {
+    if (x1Shape->GetDimNum() < MATMUL_MIN_DIM_NUM || x2Shape->GetDimNum() < MATMUL_MIN_DIM_NUM) {
         OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
             nodeName, "x1, x2",
             (std::to_string(x1Shape->GetDimNum()) + "D," + std::to_string(x2Shape->GetDimNum()) + "D").c_str(),
@@ -200,7 +210,7 @@ ge::graphStatus AlltoAllMatmulV2InferShape(gert::InferShapeContext* context)
     auto outShape = context->GetOutputShape(INDEX_OUT_Y);
     OPS_CHECK_NULL_WITH_CONTEXT(context, outShape);
 
-    outShape->SetDimNum(2);
+    outShape->SetDimNum(OUT_DIM_NUM);
     if (m != DIM_MINUS_ONE && n != DIM_MINUS_ONE) {
         outShape->SetDim(0U, m / worldSize); // per-rank output M
         outShape->SetDim(1U, n);
