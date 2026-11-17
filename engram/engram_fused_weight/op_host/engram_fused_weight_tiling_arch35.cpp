@@ -14,7 +14,7 @@
  *
  * 输入范围约束:
  *   1. weight_hidden / weight_embed 均为 2D [hcMult, hiddenSize] 且 shape 相同;
- *   2. dtype 支持 BF16 / FLOAT16 (两个输入 dtype 一致), 输出固定 FP32;
+ *   2. dtype 支持 BFLOAT16 / FLOAT16 (两个输入 dtype 一致), 输出固定 FP32;
  *   3. 总元素数满足 numElements % 256 == 0 (numElements == 0 允许, 直接返回空结果);
  *   4. 无规模上限: blockSize 随总量自适应。
  */
@@ -53,30 +53,39 @@ ge::graphStatus EngramFusedWeightTilingArch35::ValidateShapes(const gert::Shape&
 {
     const char* nodeName = context_->GetNodeName();
 
-    OP_CHECK_IF(
-        whStorage.GetDimNum() != INPUT_DIM_NUM,
-        OP_LOGE(nodeName, "weight_hidden must be 2D [hcMult, hiddenSize], got dimNum=%zu", whStorage.GetDimNum()),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        weStorage.GetDimNum() != INPUT_DIM_NUM,
-        OP_LOGE(nodeName, "weight_embed must be 2D [hcMult, hiddenSize], got dimNum=%zu", weStorage.GetDimNum()),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        weStorage.GetDim(0) != whStorage.GetDim(0) || weStorage.GetDim(1) != whStorage.GetDim(1),
-        OP_LOGE(nodeName, "weight_hidden and weight_embed must have the same shape, got [%ld, %ld] and [%ld, %ld]",
-                whStorage.GetDim(0), whStorage.GetDim(1), weStorage.GetDim(0), weStorage.GetDim(1)),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(whStorage.GetDimNum() != INPUT_DIM_NUM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "weight_hidden",
+                                                         std::to_string(whStorage.GetDimNum()).c_str(),
+                                                         "The shape dim of input weight_hidden must be 2"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(weStorage.GetDimNum() != INPUT_DIM_NUM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "weight_embed",
+                                                         std::to_string(weStorage.GetDimNum()).c_str(),
+                                                         "The shape dim of input weight_embed must be 2"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(weStorage.GetDim(0) != whStorage.GetDim(0) || weStorage.GetDim(1) != whStorage.GetDim(1),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    nodeName, "weight_hidden and weight_embed",
+                    (Ops::Base::ToString(whStorage) + " and " + Ops::Base::ToString(weStorage)).c_str(),
+                    "The shapes of input weight_hidden and weight_embed must be "
+                    "the same"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(outStorage.GetDimNum() != INPUT_DIM_NUM || outStorage.GetDim(0) != whStorage.GetDim(0) ||
                     outStorage.GetDim(1) != whStorage.GetDim(1),
-                OP_LOGE(nodeName, "weight_fused must have the same shape as weight_hidden [%ld, %ld]",
-                        whStorage.GetDim(0), whStorage.GetDim(1)),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    nodeName, "weight_fused and weight_hidden",
+                    (Ops::Base::ToString(outStorage) + " and " + Ops::Base::ToString(whStorage)).c_str(),
+                    "The shape of output weight_fused must be the same as input "
+                    "weight_hidden"),
                 return ge::GRAPH_FAILED);
 
     totalElements_ = whStorage.GetShapeSize();
     // 总元素数须被 256 整除; 0 元素 (空输入) 允许, kernel 侧直接返回。
     OP_CHECK_IF(
         totalElements_ != 0 && totalElements_ % TOTAL_ELEM_ALIGN != 0,
-        OP_LOGE(nodeName, "the total number of input elements must be divisible by 256, got %ld", totalElements_),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(nodeName, "weight_hidden", std::to_string(totalElements_).c_str(),
+                                                  "The total number of elements of input weight_hidden must "
+                                                  "be divisible by 256, or be 0 for empty input"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -88,27 +97,33 @@ ge::graphStatus EngramFusedWeightTilingArch35::ValidateDtypes()
     auto whDesc = context_->GetInputDesc(WEIGHT_HIDDEN_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, whDesc);
     OP_CHECK_IF(whDesc->GetDataType() != ge::DT_BF16 && whDesc->GetDataType() != ge::DT_FLOAT16,
-                OP_LOGE(nodeName, "weight_hidden dtype only support BFLOAT16 or FLOAT16, got %d",
-                        static_cast<int>(whDesc->GetDataType())),
+                OP_LOGE_FOR_INVALID_DTYPE(nodeName, "weight_hidden", Ops::Base::ToString(whDesc->GetDataType()).c_str(),
+                                          "BFLOAT16 or FLOAT16"),
                 return ge::GRAPH_FAILED);
 
     auto weDesc = context_->GetInputDesc(WEIGHT_EMBED_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, weDesc);
     OP_CHECK_IF(weDesc->GetDataType() != ge::DT_BF16 && weDesc->GetDataType() != ge::DT_FLOAT16,
-                OP_LOGE(nodeName, "weight_embed dtype only support BFLOAT16 or FLOAT16, got %d",
-                        static_cast<int>(weDesc->GetDataType())),
+                OP_LOGE_FOR_INVALID_DTYPE(nodeName, "weight_embed", Ops::Base::ToString(weDesc->GetDataType()).c_str(),
+                                          "BFLOAT16 or FLOAT16"),
                 return ge::GRAPH_FAILED);
 
     // kernel 侧两个输入共用同一模板类型 T0, dtype 必须一致。
-    OP_CHECK_IF(whDesc->GetDataType() != weDesc->GetDataType(),
-                OP_LOGE(nodeName, "weight_hidden and weight_embed must have the same dtype"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        whDesc->GetDataType() != weDesc->GetDataType(),
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            nodeName, "weight_hidden and weight_embed",
+            (Ops::Base::ToString(whDesc->GetDataType()) + " and " + Ops::Base::ToString(weDesc->GetDataType())).c_str(),
+            "The dtypes of input weight_hidden and weight_embed must be "
+            "the same"),
+        return ge::GRAPH_FAILED);
 
     auto outDesc = context_->GetOutputDesc(WEIGHT_FUSED_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, outDesc);
-    OP_CHECK_IF(
-        outDesc->GetDataType() != ge::DT_FLOAT,
-        OP_LOGE(nodeName, "weight_fused dtype only support FLOAT, got %d", static_cast<int>(outDesc->GetDataType())),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(outDesc->GetDataType() != ge::DT_FLOAT,
+                OP_LOGE_FOR_INVALID_DTYPE(nodeName, "weight_fused", Ops::Base::ToString(outDesc->GetDataType()).c_str(),
+                                          "FLOAT"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -123,9 +138,9 @@ ge::graphStatus EngramFusedWeightTilingArch35::GetShapeAndDtypeInfo()
 
     OP_CHECK_IF(ValidateShapes(whShape->GetStorageShape(), weShape->GetStorageShape(), outShape->GetStorageShape()) !=
                     ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "ValidateShapes failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(ValidateDtypes() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "ValidateDtypes failed"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ValidateShapes failed"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ValidateDtypes() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ValidateDtypes failed"), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -220,13 +235,14 @@ ge::graphStatus EngramFusedWeightTilingArch35::RunTiling()
     OP_CHECK_IF(context_ == nullptr, OP_LOGE("engram_fused_weight_tiling", "failed to get tiling context."),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetPlatformInfo() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "GetPlatformInfo failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetPlatformInfo() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetPlatformInfo failed"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(GetShapeAndDtypeInfo() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "GetShapeAndDtypeInfo failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(DoOpTiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "DoOpTiling failed"),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetShapeAndDtypeInfo failed"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(PostTiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "PostTiling failed"),
+    OP_CHECK_IF(DoOpTiling() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "DoOpTiling failed"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(PostTiling() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "PostTiling failed"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

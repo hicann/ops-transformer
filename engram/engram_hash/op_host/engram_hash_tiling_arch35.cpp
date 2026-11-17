@@ -68,55 +68,95 @@ ge::graphStatus EngramHashTilingArch35::ValidateShapes(const gert::Shape& idsSto
 
     // ids 须为 [num_tokens, max_ngram_size] 且 N >= 2。
     OP_CHECK_IF(idsStorage.GetDimNum() != IDS_DIM_NUM,
-                OP_LOGE(nodeName, "ngram_token_ids must be 2D [num_tokens, max_ngram_size], got dimNum=%zu",
-                        idsStorage.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "ngram_token_ids",
+                                                         std::to_string(idsStorage.GetDimNum()).c_str(),
+                                                         "The shape dim of input ngram_token_ids must be 2"),
                 return ge::GRAPH_FAILED);
     numTokens_ = idsStorage.GetDim(0);
     maxNgramSize_ = idsStorage.GetDim(1);
-    OP_CHECK_IF(maxNgramSize_ < MIN_NGRAM_SIZE,
-                OP_LOGE(nodeName, "max_ngram_size must be at least 2, got %ld", maxNgramSize_),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        maxNgramSize_ < MIN_NGRAM_SIZE,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "ngram_token_ids", Ops::Base::ToString(idsStorage).c_str(),
+                                              "The 1st dim (max_ngram_size) of input ngram_token_ids must be "
+                                              "at least 2"),
+        return ge::GRAPH_FAILED);
 
     // vocab 须为 [L, N - 1, tables] 且 L >= 1, tables >= 1。
     OP_CHECK_IF(vocabStorage.GetDimNum() != VOCAB_DIM_NUM,
-                OP_LOGE(nodeName,
-                        "vocab_sizes must be 3D [num_ngram_layers, max_ngram_size - 1, num_embed_table_per_ngram], "
-                        "got dimNum=%zu",
-                        vocabStorage.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "vocab_sizes",
+                                                         std::to_string(vocabStorage.GetDimNum()).c_str(),
+                                                         "The shape dim of input vocab_sizes must be 3"),
                 return ge::GRAPH_FAILED);
     numNgramLayers_ = vocabStorage.GetDim(0);
-    OP_CHECK_IF(numNgramLayers_ <= 0, OP_LOGE(nodeName, "num_ngram_layers must be positive, got %ld", numNgramLayers_),
-                return ge::GRAPH_FAILED);
     OP_CHECK_IF(
-        vocabStorage.GetDim(1) != maxNgramSize_ - 1,
-        OP_LOGE(nodeName, "vocab_sizes dimension 1 must be %ld, got %ld", maxNgramSize_ - 1, vocabStorage.GetDim(1)),
+        numNgramLayers_ <= 0,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "vocab_sizes", Ops::Base::ToString(vocabStorage).c_str(),
+                                              "The 0th dim (num_ngram_layers) of input vocab_sizes must be "
+                                              "a positive number"),
         return ge::GRAPH_FAILED);
-    numTables_ = vocabStorage.GetDim(2);
-    OP_CHECK_IF(numTables_ <= 0, OP_LOGE(nodeName, "num_embed_table_per_ngram must be positive, got %ld", numTables_),
+    OP_CHECK_IF(vocabStorage.GetDim(1) != maxNgramSize_ - 1,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    nodeName, "vocab_sizes and ngram_token_ids",
+                    (Ops::Base::ToString(vocabStorage) + " and " + Ops::Base::ToString(idsStorage)).c_str(),
+                    "The 1st dim of input vocab_sizes must be equal to the 1st dim "
+                    "of input ngram_token_ids minus 1"),
                 return ge::GRAPH_FAILED);
+    numTables_ = vocabStorage.GetDim(2);
+    OP_CHECK_IF(
+        numTables_ <= 0,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "vocab_sizes", Ops::Base::ToString(vocabStorage).c_str(),
+                                              "The 2nd dim (num_embed_table_per_ngram) of input vocab_sizes "
+                                              "must be a positive number"),
+        return ge::GRAPH_FAILED);
 
     numOutCols_ = (maxNgramSize_ - 1) * numTables_;
 
     // mult 须为 [L, N]。
-    OP_CHECK_IF(multStorage.GetDimNum() != MULTIPLIERS_DIM_NUM || multStorage.GetDim(0) != numNgramLayers_ ||
-                    multStorage.GetDim(1) != maxNgramSize_,
-                OP_LOGE(nodeName, "multipliers must have shape [%ld, %ld], got dimNum=%zu", numNgramLayers_,
-                        maxNgramSize_, multStorage.GetDimNum()),
+    OP_CHECK_IF(multStorage.GetDimNum() != MULTIPLIERS_DIM_NUM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "multipliers",
+                                                         std::to_string(multStorage.GetDimNum()).c_str(),
+                                                         "The shape dim of input multipliers must be 2"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(multStorage.GetDim(0) != numNgramLayers_ || multStorage.GetDim(1) != maxNgramSize_,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    nodeName, "multipliers", Ops::Base::ToString(multStorage).c_str(),
+                    ("The shape of input multipliers must be "
+                     "[num_ngram_layers, max_ngram_size] = [" +
+                     std::to_string(numNgramLayers_) + ", " + std::to_string(maxNgramSize_) + "]")
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
     // offsets 须为 [L, C]。
-    OP_CHECK_IF(offsStorage.GetDimNum() != OFFSETS_DIM_NUM || offsStorage.GetDim(0) != numNgramLayers_ ||
-                    offsStorage.GetDim(1) != numOutCols_,
-                OP_LOGE(nodeName, "offsets must have shape [%ld, %ld], got dimNum=%zu", numNgramLayers_, numOutCols_,
-                        offsStorage.GetDimNum()),
+    OP_CHECK_IF(
+        offsStorage.GetDimNum() != OFFSETS_DIM_NUM,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "offsets", std::to_string(offsStorage.GetDimNum()).c_str(),
+                                                 "The shape dim of input offsets must be 2"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(offsStorage.GetDim(0) != numNgramLayers_ || offsStorage.GetDim(1) != numOutCols_,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    nodeName, "offsets", Ops::Base::ToString(offsStorage).c_str(),
+                    ("The shape of input offsets must be [num_ngram_layers, "
+                     "(max_ngram_size - 1) * num_embed_table_per_ngram] = [" +
+                     std::to_string(numNgramLayers_) + ", " + std::to_string(numOutCols_) + "]")
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
     // 输出须为 [L, T, C]。
-    OP_CHECK_IF(outStorage.GetDimNum() != 3 || outStorage.GetDim(0) != numNgramLayers_ ||
-                    outStorage.GetDim(1) != numTokens_ || outStorage.GetDim(2) != numOutCols_,
-                OP_LOGE(nodeName, "hash_indices must have shape [%ld, %ld, %ld], got dimNum=%zu", numNgramLayers_,
-                        numTokens_, numOutCols_, outStorage.GetDimNum()),
+    OP_CHECK_IF(outStorage.GetDimNum() != VOCAB_DIM_NUM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "hash_indices",
+                                                         std::to_string(outStorage.GetDimNum()).c_str(),
+                                                         "The shape dim of output hash_indices must be 3"),
                 return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        outStorage.GetDim(0) != numNgramLayers_ || outStorage.GetDim(1) != numTokens_ ||
+            outStorage.GetDim(2) != numOutCols_,
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(nodeName, "hash_indices", Ops::Base::ToString(outStorage).c_str(),
+                                               ("The shape of output hash_indices must be [num_ngram_layers, "
+                                                "num_tokens, (max_ngram_size - 1) * num_embed_table_per_ngram] = [" +
+                                                std::to_string(numNgramLayers_) + ", " + std::to_string(numTokens_) +
+                                                ", " + std::to_string(numOutCols_) + "]")
+                                                   .c_str()),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -126,38 +166,38 @@ ge::graphStatus EngramHashTilingArch35::ValidateDtypes()
 
     auto idsDesc = context_->GetInputDesc(NGRAM_TOKEN_IDS_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, idsDesc);
-    OP_CHECK_IF(
-        idsDesc->GetDataType() != ge::DT_INT32,
-        OP_LOGE(nodeName, "ngram_token_ids dtype only support INT32, got %d", static_cast<int>(idsDesc->GetDataType())),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(idsDesc->GetDataType() != ge::DT_INT32,
+                OP_LOGE_FOR_INVALID_DTYPE(nodeName, "ngram_token_ids",
+                                          Ops::Base::ToString(idsDesc->GetDataType()).c_str(), "DT_INT32"),
+                return ge::GRAPH_FAILED);
 
     auto multDesc = context_->GetInputDesc(MULTIPLIERS_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, multDesc);
-    OP_CHECK_IF(
-        multDesc->GetDataType() != ge::DT_INT64,
-        OP_LOGE(nodeName, "multipliers dtype only support INT64, got %d", static_cast<int>(multDesc->GetDataType())),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(multDesc->GetDataType() != ge::DT_INT64,
+                OP_LOGE_FOR_INVALID_DTYPE(nodeName, "multipliers", Ops::Base::ToString(multDesc->GetDataType()).c_str(),
+                                          "DT_INT64"),
+                return ge::GRAPH_FAILED);
 
     auto vocabDesc = context_->GetInputDesc(VOCAB_SIZES_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, vocabDesc);
-    OP_CHECK_IF(
-        vocabDesc->GetDataType() != ge::DT_INT32,
-        OP_LOGE(nodeName, "vocab_sizes dtype only support INT32, got %d", static_cast<int>(vocabDesc->GetDataType())),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(vocabDesc->GetDataType() != ge::DT_INT32,
+                OP_LOGE_FOR_INVALID_DTYPE(nodeName, "vocab_sizes",
+                                          Ops::Base::ToString(vocabDesc->GetDataType()).c_str(), "DT_INT32"),
+                return ge::GRAPH_FAILED);
 
     auto offsDesc = context_->GetInputDesc(OFFSETS_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, offsDesc);
-    OP_CHECK_IF(
-        offsDesc->GetDataType() != ge::DT_INT32,
-        OP_LOGE(nodeName, "offsets dtype only support INT32, got %d", static_cast<int>(offsDesc->GetDataType())),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(offsDesc->GetDataType() != ge::DT_INT32,
+                OP_LOGE_FOR_INVALID_DTYPE(nodeName, "offsets", Ops::Base::ToString(offsDesc->GetDataType()).c_str(),
+                                          "DT_INT32"),
+                return ge::GRAPH_FAILED);
 
     auto outDesc = context_->GetOutputDesc(HASH_INDICES_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, outDesc);
-    OP_CHECK_IF(
-        outDesc->GetDataType() != ge::DT_INT32,
-        OP_LOGE(nodeName, "hash_indices dtype only support INT32, got %d", static_cast<int>(outDesc->GetDataType())),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(outDesc->GetDataType() != ge::DT_INT32,
+                OP_LOGE_FOR_INVALID_DTYPE(nodeName, "hash_indices", Ops::Base::ToString(outDesc->GetDataType()).c_str(),
+                                          "DT_INT32"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -177,9 +217,9 @@ ge::graphStatus EngramHashTilingArch35::GetShapeAndDtypeInfo()
 
     OP_CHECK_IF(ValidateShapes(idsShape->GetStorageShape(), multShape->GetStorageShape(), vocabShape->GetStorageShape(),
                                offsShape->GetStorageShape(), outShape->GetStorageShape()) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "ValidateShapes failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(ValidateDtypes() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "ValidateDtypes failed"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ValidateShapes failed"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ValidateDtypes() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ValidateDtypes failed"), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -329,13 +369,14 @@ ge::graphStatus EngramHashTilingArch35::RunTiling()
     OP_CHECK_IF(context_ == nullptr, OP_LOGE("engram_hash_tiling", "failed to get tiling context."),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetPlatformInfo() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "GetPlatformInfo failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetPlatformInfo() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetPlatformInfo failed"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(GetShapeAndDtypeInfo() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "GetShapeAndDtypeInfo failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(DoOpTiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "DoOpTiling failed"),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetShapeAndDtypeInfo failed"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(PostTiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "PostTiling failed"),
+    OP_CHECK_IF(DoOpTiling() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "DoOpTiling failed"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(PostTiling() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "PostTiling failed"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

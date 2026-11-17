@@ -115,8 +115,8 @@ aclnnStatus aclnnEngramHash(
       <td>输入或输出的数据类型不在支持的范围内。</td>
     </tr>
     <tr>
-      <td rowspan="1">ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td rowspan="1">561002</td>
+      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td>561002</td>
       <td>输入或输出的shape不在支持的范围内。</td>
     </tr>
   </tbody>
