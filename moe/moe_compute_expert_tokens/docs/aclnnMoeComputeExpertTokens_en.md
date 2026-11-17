@@ -107,7 +107,7 @@ aclnnStatus aclnnMoeComputeExpertTokens(
       <td>out</td>
       <td>Output</td>
       <td>Output in the formula.</td>
-      <td>The shape size is equal to the number of experts.</td>
+      <td>The number of elements must be equal to the number of experts. A mismatch triggers a warning log. If the output is smaller, continuing execution may cause out-of-bounds writes.</td>
       <td>Consistent with sortedExperts.</td>
       <td>ND</td>
       <td>1</td>

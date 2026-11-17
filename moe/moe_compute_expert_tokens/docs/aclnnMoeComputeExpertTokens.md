@@ -105,7 +105,7 @@ aclnnStatus aclnnMoeComputeExpertTokens(
       <td>out</td>
       <td>输出</td>
       <td>公式中的输出。</td>
-      <td>Shape大小等于专家数。</td>
+      <td>Shape大小必须等于专家数。若不一致，会打印告警日志；若小于专家数，继续执行可能发生越界写。</td>
       <td>与sortedExperts保持一致。</td>
       <td>ND</td>
       <td>1</td>

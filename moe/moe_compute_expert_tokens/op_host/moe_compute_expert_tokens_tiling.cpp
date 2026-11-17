@@ -143,6 +143,13 @@ static bool CheckParamsShape(const gert::TilingContext* context)
                                                       "must be greater than 0 and not greater than 2048"),
                 return false);
 
+    if (outShape.GetDim(0) != numOfExpert) {
+        OP_LOGW(context->GetNodeName(),
+                "The length of out (%ld) must be equal to num_experts (%ld). "
+                "Continuing with a smaller out may cause out-of-bounds writes.",
+                outShape.GetDim(0), numOfExpert);
+    }
+
     return true;
 }
 
