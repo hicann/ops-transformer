@@ -82,7 +82,7 @@ private:
     uint32_t aivCoreNum_ = 48U;
     int32_t batchSize_ = 0;
     int32_t maxSeqlenQ_ = 0;
-    int32_t maxSeqlenK_ = 0;
+    int64_t maxSeqlenK_ = 0;
     int32_t numHeadsQ_ = 0;
     int32_t numHeadsK_ = 0;
     int32_t headDim_ = 0;
@@ -235,11 +235,31 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
     // 校验 seqused_k 元素非负
     if (sequsedK_ != nullptr && sequsedK_->GetData() != nullptr) {
         const int32_t* sequsedKPtr = static_cast<const int32_t*>(sequsedK_->GetData());
+        const int32_t* cuSeqlensKPtr =
+            (layoutK_ == "TND" && cuSeqlensK_ != nullptr && cuSeqlensK_->GetData() != nullptr) ?
+                static_cast<const int32_t*>(cuSeqlensK_->GetData()) :
+                nullptr;
         for (int i = 0; i < batchSize; i++) {
             if (sequsedKPtr[i] < 0) {
                 KERNEL_LOG_ERROR("The elements in seqused_k should be >= 0, but got seqused_k[%d] = %d", i,
                                  sequsedKPtr[i]);
                 return false;
+            }
+            // 校验 seqused_k 元素不大于 max_seqlen_k (BSND) 或 cu_seqlens_k 序列长度 (TND)
+            if (layoutK_ == "BSND" && sequsedKPtr[i] > maxSeqlenK_) {
+                KERNEL_LOG_ERROR("The elements in seqused_k should not be greater than max_seqlen_k %lld, "
+                                 "but got seqused_k[%d] = %d",
+                                 static_cast<long long>(maxSeqlenK_), i, sequsedKPtr[i]);
+                return false;
+            }
+            if (cuSeqlensKPtr != nullptr) {
+                int32_t seqLen = cuSeqlensKPtr[i + 1] - cuSeqlensKPtr[i];
+                if (sequsedKPtr[i] > seqLen) {
+                    KERNEL_LOG_ERROR("The elements in seqused_k should not be greater than the sequence length "
+                                     "from cu_seqlens_k %d, but got seqused_k[%d] = %d",
+                                     seqLen, i, sequsedKPtr[i]);
+                    return false;
+                }
             }
         }
     }
