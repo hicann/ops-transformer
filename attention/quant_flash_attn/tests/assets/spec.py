@@ -65,8 +65,12 @@ def _resolve_quant_mode(args, kwargs):
 
 
 def _golden_dispatch(*args, **kwargs):
-    golden_module = load_impl_module("golden")
     qm = _resolve_quant_mode(args, kwargs)
+    if qm == 12:
+        return load_impl_module("int8").cpu_golden(*args, **kwargs)
+    if "int8" in _impl_cache:
+        _impl_cache["int8"].clear_reference()
+    golden_module = load_impl_module("golden")
     if qm == 6:
         return golden_module.cpu_qfa_gqa_fp8(*args, **kwargs)
     if qm == 0:
@@ -77,8 +81,10 @@ def _golden_dispatch(*args, **kwargs):
 
 
 def _inputs_dispatch(*args, **kwargs):
-    inputs_module = load_impl_module("inputs")
     qm = _resolve_quant_mode(args, kwargs)
+    if qm == 12:
+        return load_impl_module("int8").customize_inputs(*args, **kwargs)
+    inputs_module = load_impl_module("inputs")
     if qm == 6:
         return inputs_module.generate_qfa_gqa_fp8_inputs(*args, **kwargs)
     if qm == 0:
@@ -89,13 +95,14 @@ def _inputs_dispatch(*args, **kwargs):
 
 
 class QuantFlashAttnSpec:
-    """quant_flash_attn 测试规范 (MXFP8 + GQA FP8 + HIF8, 按 quant_mode 派发)。
+    """quant_flash_attn 测试规范，按 quant_mode 派发。
 
     quant_mode=1: MXFP8 (Q/K per-token-group, V per-channel-group, descale=e8m0)
     quant_mode=6: GQA FP8 全量化 (Q/K per-token-head, V per-head, descale=FP32)
     quant_mode=0: HIF8 per-tensor 量化
+    quant_mode=12: A2/A3 INT8 全量化，支持 BNSD/BSND/TND、SWA、LSE，metadata 为 None
 
-    metadata 由 npu_preprocess 在主算子调用前生成并回填 metadata slot,
+    A5 模式的 metadata 由 npu_preprocess 在主算子调用前生成并回填,
     主算子直接由 ttk 调用 torch.ops.cann_ops_transformer.quant_flash_attn。
 
     golden/customize_inputs/compare/npu_preprocess 均懒加载 impl 模块,
@@ -107,9 +114,12 @@ class QuantFlashAttnSpec:
 
     @staticmethod
     def compare(*outputs, compare_context=None, **kwargs):
+        testcase_name = getattr(compare_context, "testcase_name", None)
+        int8_impl = _impl_cache.get("int8")
+        if int8_impl is not None and int8_impl.has_reference(testcase_name):
+            return int8_impl.compare(*outputs, testcase_name=testcase_name)
         impl = load_impl_module("compare")
         if impl.cross_check_enabled():
-            testcase_name = getattr(compare_context, "testcase_name", None)
             golden_impl = load_impl_module("golden")
             return impl.compare(
                 *outputs,

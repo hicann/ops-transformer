@@ -280,6 +280,8 @@ def run(
     """
     if quant_mode is None:
         quant_mode = get_attribute(kwargs, "quant_mode", 1)
+    if int(quant_mode) == 12:
+        return {"metadata": None}
     # 位置标量参数桥接进 kwargs, 供 build_metadata_arguments 统一读取。
     hook_kwargs = dict(kwargs)
     hook_kwargs.setdefault("quant_mode", quant_mode)

@@ -11,7 +11,7 @@
 /*!
  * \file quant_flash_attn_def.cpp
  * \brief QuantFlashAttn算子定义（量化注意力推理）
- *        输入数据类型支持FP8_E4M3等（详见 quant_mode 枚举），输出固定BF16。
+ *        输入数据类型由 quant_mode 和硬件配置决定，输出固定BF16。
  *        支持BSND/BNSD/TND三种layout，支持分页KV缓存（PA_ND/PA_Nz）。
  */
 
@@ -156,8 +156,10 @@ public:
         this->Attr("quant_compute_mode").AttrType(REQUIRED).Int();
         this->Attr("softmax_scale").AttrType(OPTIONAL).Float(0.0f);
         this->Attr("mask_mode").AttrType(OPTIONAL).Int(0);
+        // A window distance of -1 leaves that side unbounded.
         this->Attr("win_left").AttrType(OPTIONAL).Int(-1);
         this->Attr("win_right").AttrType(OPTIONAL).Int(-1);
+        // A max sequence length of -1 means the caller omitted the bound.
         this->Attr("max_seqlen_q").AttrType(OPTIONAL).Int(-1);
         this->Attr("max_seqlen_kv").AttrType(OPTIONAL).Int(-1);
         this->Attr("layout_q").AttrType(OPTIONAL).String("BSND");
@@ -165,6 +167,54 @@ public:
         this->Attr("layout_kv").AttrType(OPTIONAL).String("BSND");
         this->Attr("layout_out").AttrType(OPTIONAL).String("BSND");
         this->Attr("return_softmax_lse").AttrType(OPTIONAL).Bool(false);
+
+        OpAICoreConfig aicore_config_22;
+        aicore_config_22.Input("q")
+            .ParamType(REQUIRED)
+            .DataType({Ops::Transformer::DT_INT8})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_22.Input("k")
+            .ParamType(REQUIRED)
+            .DataType({Ops::Transformer::DT_INT8})
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_22.Input("v")
+            .ParamType(REQUIRED)
+            .DataType({Ops::Transformer::DT_INT8})
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_22.Input("q_descale")
+            .ParamType(REQUIRED)
+            .DataType({Ops::Transformer::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_22.Input("k_descale")
+            .ParamType(REQUIRED)
+            .DataType({Ops::Transformer::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_22.Input("v_descale")
+            .ParamType(REQUIRED)
+            .DataType({Ops::Transformer::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_22.Output("attn_out")
+            .ParamType(REQUIRED)
+            .DataType({Ops::Transformer::DT_BF16})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_22.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("coreType.value", "AiCore")
+            .ExtendCfgInfo("opFile.value", "quant_flash_attn");
+        this->AICore().AddConfig("ascend910b", aicore_config_22);
+        this->AICore().AddConfig("ascend910_93", aicore_config_22);
 
         OpAICoreConfig aicore_config_95;
         aicore_config_95.DynamicCompileStaticFlag(true)
