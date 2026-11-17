@@ -53,12 +53,11 @@ static aclnnStatus CheckNsaCompressWithCacheParam(const aclTensor* input, const 
                                                   const uint64_t* workspaceSize, aclOpExecutor* const* executor)
 {
     // 必须的参数指针判空
-    CHECK_RET(input != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(weight != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(slotMapping != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(outputCacheRef != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(workspaceSize != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(executor != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(input, return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(weight, return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(slotMapping, return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(outputCacheRef, return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_COMM_INPUT(workspaceSize, executor);
     return ACLNN_SUCCESS;
 }
 
@@ -88,12 +87,12 @@ static aclnnStatus InputDtypeCheck(const aclTensor* input, const aclTensor* weig
     OP_CHECK_DTYPE_NOT_SUPPORT(weight, DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
     OP_CHECK_DTYPE_NOT_SUPPORT(outputCache, DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
 
-    CHECK_COND(slotMapping->GetDataType() == DataType::DT_INT32, false,
+    CHECK_COND(slotMapping->GetDataType() == DataType::DT_INT32, ACLNN_ERR_PARAM_INVALID,
                "slotMapping only support dtype int32, but got %s.",
                op::ToString(slotMapping->GetDataType()).GetString());
 
     if (blockTableOptional != nullptr) {
-        CHECK_COND(blockTableOptional->GetDataType() == DataType::DT_INT32, false,
+        CHECK_COND(blockTableOptional->GetDataType() == DataType::DT_INT32, ACLNN_ERR_PARAM_INVALID,
                    "blockTableOptional only support dtype int32, but got %s.",
                    op::ToString(blockTableOptional->GetDataType()).GetString());
     }
@@ -158,9 +157,10 @@ aclnnStatus aclnnNsaCompressWithCacheGetWorkspaceSize(
                           compressBlockSize, compressStride, actSeqLenType, pageBlockSize, outputCache),
                    DFX_OUT(outputCache));
     // 检查入参
-    CHECK_RET(CheckNsaCompressWithCacheParam(input, weight, slotMapping, outputCache, workspaceSize, executor) ==
-                  ACLNN_SUCCESS,
-              ACLNN_ERR_PARAM_NULLPTR);
+    if (CheckNsaCompressWithCacheParam(input, weight, slotMapping, outputCache, workspaceSize, executor) !=
+        ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
     // 检查空tensor
     if (CheckIsEmptyTensor(input, weight, outputCache)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "[NSACompressWithCache] do not support empty input/weight/outputCache.");
@@ -176,7 +176,6 @@ aclnnStatus aclnnNsaCompressWithCacheGetWorkspaceSize(
               ACLNN_ERR_PARAM_INVALID);
     // 获取executor
     auto uniqueExecutor = CREATE_EXECUTOR();
-    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     aclOpExecutor* l0Executor = uniqueExecutor.get();
     CHECK_RET(Contiguous(input, weight, blockTableOptional, outputCache, l0Executor) == ACLNN_SUCCESS,
@@ -204,8 +203,11 @@ aclnnStatus aclnnNsaCompressWithCache(void* workspace, uint64_t workspaceSize, a
 {
     // 固定写法
     L2_DFX_PHASE_2(aclnnNsaCompressWithCache);
-    CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "This is an error in NsaCompressWithCache launch aicore");
+    const auto ret = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
+    if (ret != ACLNN_SUCCESS) {
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER, "This is an error in NsaCompressWithCache launch aicore");
+        return ACLNN_ERR_INNER;
+    }
     return ACLNN_SUCCESS;
 }
 } // namespace

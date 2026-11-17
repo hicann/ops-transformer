@@ -16,7 +16,7 @@
 #include "log/log.h"
 #include "nsa_compress_with_cache_tiling.h"
 #include "nsa_compress_with_cache_tiling_common.h"
-#include "err/ops_err.h"
+#include <vector>
 
 using namespace Ops::Transformer::OpTiling;
 
@@ -58,6 +58,15 @@ static const size_t SAL_BIT_16 = 16UL;
 
 static const size_t NUM_2 = 2UL;
 
+static void ReportTilingFailure(const std::string& reason)
+{
+    constexpr const char* opName = "NsaCompressWithCache";
+    OP_LOGE_WITHOUT_REPORT(opName, "%s", reason.c_str());
+    const std::vector<const char*> keys = {"opName", "reason"};
+    const std::vector<const char*> values = {opName, reason.c_str()};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", keys, values);
+}
+
 class NsaCompressWithCacheTiling : public TilingBaseClass {
 public:
     explicit NsaCompressWithCacheTiling(gert::TilingContext* context)
@@ -68,7 +77,8 @@ protected:
     ge::graphStatus CheckContext()
     {
         auto attrs = context_->GetAttrs();
-        OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
+        OP_CHECK_IF(attrs == nullptr, ReportTilingFailure("Tiling context attributes are null."),
+                    return ge::GRAPH_FAILED);
         // 除了第一个属性都是必选属性
         size_t idx = 1;
         auto compressBlockSizePtr = attrs->GetAttrPointer<int64_t>(idx++);
@@ -77,26 +87,33 @@ protected:
         auto pageBlockSizePtr = attrs->GetAttrPointer<int64_t>(idx++);
         size_t* workspaces = context_->GetWorkspaceSizes(1);
 
-        OP_CHECK_NULL_WITH_CONTEXT(context_, compressBlockSizePtr);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, compressStridePtr);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, actSeqLenTypePtr);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, pageBlockSizePtr);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
+        OP_CHECK_IF(compressBlockSizePtr == nullptr, ReportTilingFailure("compress_block_size attribute is null."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compressStridePtr == nullptr, ReportTilingFailure("compress_stride attribute is null."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(actSeqLenTypePtr == nullptr, ReportTilingFailure("act_seq_len_type attribute is null."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(pageBlockSizePtr == nullptr, ReportTilingFailure("page_block_size attribute is null."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(workspaces == nullptr, ReportTilingFailure("Workspace sizes are null."), return ge::GRAPH_FAILED);
 
         // 检查input、weight和outputCache
         auto inputShape = context_->GetInputShape(INPUT_INDEX_INPUT);
         auto weightShape = context_->GetInputShape(INPUT_INDEX_WEIGHT);
         auto outputCacheShape = context_->GetInputShape(INPUT_INDEX_OUTPUT_CACHE);
 
-        OP_CHECK_NULL_WITH_CONTEXT(context_, inputShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, weightShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, outputCacheShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetRawTilingData());
-        OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetRawTilingData()->GetData());
+        OP_CHECK_IF(inputShape == nullptr, ReportTilingFailure("Input shape is null."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(weightShape == nullptr, ReportTilingFailure("Weight shape is null."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(outputCacheShape == nullptr, ReportTilingFailure("Output cache shape is null."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(context_->GetRawTilingData() == nullptr, ReportTilingFailure("Raw tiling data is null."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(context_->GetRawTilingData()->GetData() == nullptr,
+                    ReportTilingFailure("Raw tiling data buffer is null."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(context_->GetRawTilingData()->GetCapacity() < tilingData.GetDataSize(),
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache",
-                                                "context tiling data capacity %zu < actual tiling data size %zu.",
-                                                context_->GetRawTilingData()->GetCapacity(), tilingData.GetDataSize()),
+                    ReportTilingFailure(
+                        "Raw tiling data capacity " + std::to_string(context_->GetRawTilingData()->GetCapacity()) +
+                        " is smaller than the required size " + std::to_string(tilingData.GetDataSize()) + "."),
                     return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
@@ -113,8 +130,8 @@ protected:
         auto pageBlockSizePtr = attrs->GetAttrPointer<int64_t>(idx++);
 
         OP_CHECK_IF(*compressStridePtr <= 0,
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache",
-                                                "compressStride should be a positive integer multiple of 16."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "compress_stride", std::to_string(*compressStridePtr),
+                                                          "Must be a positive integer multiple of 16."),
                     return false);
 
         compressBlockSize = *compressBlockSizePtr;
@@ -123,18 +140,22 @@ protected:
         pageBlockSize = *pageBlockSizePtr;
 
         OP_CHECK_IF(compressBlockSize % COMPRESS_ALIGN != 0,
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "compressBlockSize should be divisible by 16."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, "compress_block_size", std::to_string(compressBlockSize), "Must be a multiple of 16."),
                     return false);
         OP_CHECK_IF(compressStride % COMPRESS_ALIGN != 0,
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "compressStride should be divisible by 16."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "compress_stride", std::to_string(compressStride),
+                                                          "Must be a multiple of 16."),
                     return false);
         OP_CHECK_IF(compressBlockSize < compressStride,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        "NsaCompressWithCache",
-                        "got compressBlockSize < compressStride, expect compressBlockSize >= compressStride."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, "compress_block_size, compress_stride",
+                        std::to_string(compressBlockSize) + ", " + std::to_string(compressStride),
+                        "compress_block_size must be greater than or equal to compress_stride."),
                     return false);
         OP_CHECK_IF(actSeqLenType != ACT_SEQ_TYPE_COUNT,
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "attrs: actSeqLenType only support 1 now"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "act_seq_len_type", std::to_string(actSeqLenType),
+                                                          "Only 1 is supported."),
                     return false);
 
         OP_LOGD(context_, "attrs: compressBlockSize[%u] compressStride[%u] actSeqLenType[%u] pageBlockSize[%u].",
@@ -148,7 +169,9 @@ protected:
         inputDtype = context_->GetInputDesc(INPUT_INDEX_INPUT)->GetDataType();
         ge::DataType weightDtype = context_->GetInputDesc(INPUT_INDEX_WEIGHT)->GetDataType();
         OP_CHECK_IF(inputDtype != weightDtype,
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "Dtype of input must equal to weight"),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        opName, "weight", ge::TypeUtils::DataTypeToSerialString(weightDtype),
+                        "Must match input dtype " + ge::TypeUtils::DataTypeToSerialString(inputDtype) + "."),
                     return false);
         mInputDtypeBytes = ge::GetSizeByDataType(inputDtype);
         switch (inputDtype) {
@@ -159,8 +182,9 @@ protected:
                 mCalcTypeBytes = ge::GetSizeByDataType(ge::DT_FLOAT);
                 break;
             default:
-                OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "not support input dtype: %s for now",
-                                            ge::TypeUtils::DataTypeToSerialString(inputDtype).c_str());
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "input",
+                                                      ge::TypeUtils::DataTypeToSerialString(inputDtype),
+                                                      "Only float16 and bfloat16 are supported.");
                 return false;
         }
         return true;
@@ -175,50 +199,50 @@ protected:
         headDim = inputShape->GetStorageShape().GetDim(DIM_NUM_3);
         outTokenNum = outputCacheShape->GetStorageShape().GetDim(DIM_NUM_0);
         OP_CHECK_IF(headNum != weightShape->GetStorageShape().GetDim(DIM_NUM_1),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        "NsaCompressWithCache",
-                        "2nd dim of weight should equal to headNum, but got weight.shape[1]=%ld and headNum=%u",
-                        weightShape->GetStorageShape().GetDim(DIM_NUM_1), headNum),
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        opName, "weight.shape[1]", std::to_string(weightShape->GetStorageShape().GetDim(DIM_NUM_1)),
+                        "Must match input head count " + std::to_string(headNum) + "."),
                     return false);
 
         OP_CHECK_IF(compressBlockSize != weightShape->GetStorageShape().GetDim(DIM_NUM_0),
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache",
-                                                "1st dim of weight should equal to compressBlockSize, but got "
-                                                "weight.shape[0]=%ld and compressBlockSize=%u",
-                                                weightShape->GetStorageShape().GetDim(DIM_NUM_0), compressBlockSize),
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        opName, "weight.shape[0]", std::to_string(weightShape->GetStorageShape().GetDim(DIM_NUM_0)),
+                        "Must match compress_block_size " + std::to_string(compressBlockSize) + "."),
                     return false);
 
         OP_CHECK_IF(
             headNum != outputCacheShape->GetStorageShape().GetDim(DIM_NUM_1),
-            OPS_REPORT_VECTOR_INNER_ERR(
-                "NsaCompressWithCache",
-                "2nd dim of outputCache should equal to headNum, but got outputCache.shape[1]=%ld and headNum=%u",
-                outputCacheShape->GetStorageShape().GetDim(DIM_NUM_1), headNum),
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName, "output_cache.shape[1]", std::to_string(outputCacheShape->GetStorageShape().GetDim(DIM_NUM_1)),
+                "Must match input head count " + std::to_string(headNum) + "."),
             return false);
         OP_CHECK_IF(
             headDim != outputCacheShape->GetStorageShape().GetDim(DIM_NUM_2),
-            OPS_REPORT_VECTOR_INNER_ERR(
-                "NsaCompressWithCache",
-                "3rd dim of outputCache should equal to headDim, but got outputCache.shape[2]=%ld and headDim=%u",
-                outputCacheShape->GetStorageShape().GetDim(DIM_NUM_1), headDim),
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName, "output_cache.shape[2]", std::to_string(outputCacheShape->GetStorageShape().GetDim(DIM_NUM_2)),
+                "Must match input head dimension " + std::to_string(headDim) + "."),
             return false);
 
         OP_CHECK_IF(headDim % DIM_ALIGN != 0,
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache",
-                                                "headDim should be divisible by 16 , but got headDim=%u", headDim),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "input.shape[3]", std::to_string(headDim),
+                                                          "Head dimension must be a multiple of 16."),
                     return false);
 
-        OP_CHECK_IF(
-            compressBlockSize > MAX_COMPRESS_BLOCK_SIZE,
-            OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "do not support compressBlockSize larger than 64."),
-            return false);
-        OP_CHECK_IF(headNum == 0, OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "headNum can not be 0!"),
+        OP_CHECK_IF(compressBlockSize > MAX_COMPRESS_BLOCK_SIZE,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "compress_block_size",
+                                                          std::to_string(compressBlockSize), "Must not exceed 64."),
+                    return false);
+        OP_CHECK_IF(headNum == 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "input.shape[2]", std::to_string(headNum),
+                                                          "Head count must be greater than 0."),
                     return false);
         OP_CHECK_IF(headNum > MAX_COMPRESS_BLOCK_SIZE,
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "do not support headNum larger than 64."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "input.shape[2]", std::to_string(headNum),
+                                                          "Head count must not exceed 64."),
                     return false);
         OP_CHECK_IF(headNum > MAX_ODD_HEAD_SIZE && headNum % 2 == 1,
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "do not support odd headNum larger than 50."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "input.shape[2]", std::to_string(headNum),
+                                                          "An odd head count must not exceed 50."),
                     return false);
 
         return true;
@@ -289,16 +313,16 @@ protected:
         if (actSeqLenShape != nullptr && actSeqLenShape->GetStorageShape().GetDimNum() != 0) {
             actSeqLenExistFlag = 1;
             auto actSeqLenDtype = actSeqLenInput->GetDataType();
-            OP_CHECK_IF(
-                actSeqLenDtype != ge::DT_INT64,
-                OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "invalid actSeqLen dtype[%s], only support int64.",
-                                            ge::TypeUtils::DataTypeToSerialString(actSeqLenDtype).c_str()),
-                return false);
+            OP_CHECK_IF(actSeqLenDtype != ge::DT_INT64,
+                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "act_seq_len",
+                                                              ge::TypeUtils::DataTypeToSerialString(actSeqLenDtype),
+                                                              "Only int64 is supported."),
+                        return false);
             batchSize = actSeqLenShape->GetStorageShape().GetDim(0);
-            OP_CHECK_IF(
-                batchSize > MAX_BATCH_SIZE,
-                OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "do not support batchSize larger than 2048."),
-                return false);
+            OP_CHECK_IF(batchSize > MAX_BATCH_SIZE,
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "act_seq_len.shape[0]", std::to_string(batchSize),
+                                                              "Batch size must not exceed 2048."),
+                        return false);
             AnalyzeActSeqLenData();
         }
         blockTableExistFlag = 0;
@@ -307,11 +331,11 @@ protected:
         if (blockTableShape != nullptr && blockTableShape->GetStorageShape().GetDimNum() != 0) {
             blockTableExistFlag = 1;
             auto blockTableDtype = blockTableInput->GetDataType();
-            OP_CHECK_IF(
-                blockTableDtype != ge::DT_INT32,
-                OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "invalid blockTable dtype[%s], only support int32.",
-                                            ge::TypeUtils::DataTypeToSerialString(blockTableDtype).c_str()),
-                return false);
+            OP_CHECK_IF(blockTableDtype != ge::DT_INT32,
+                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "block_table",
+                                                              ge::TypeUtils::DataTypeToSerialString(blockTableDtype),
+                                                              "Only int32 is supported."),
+                        return false);
             pageNumPerBatch = blockTableShape->GetStorageShape().GetDim(1);
         }
         inputLayoutExitFlag = 0;
@@ -323,10 +347,9 @@ protected:
             }
             OP_CHECK_IF(inputLayoutStr != "BSH" && inputLayoutStr != "SBH" && inputLayoutStr != "BSND" &&
                             inputLayoutStr != "BNSD" && inputLayoutStr != "TND",
-                        OPS_REPORT_VECTOR_INNER_ERR(
-                            "NsaCompressWithCache",
-                            "The inputLayout should be BSH/SBH/BSND/BNSD/TND(case-insensitive), but got %s.",
-                            inputLayoutStr.c_str()),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName, "layout", inputLayout,
+                            "Only BSH, SBH, BSND, BNSD and TND are supported (case-insensitive)."),
                         return false);
         }
         OP_LOGD(context_, "actSeqLenExistFlag: %d, blockTableExistFlag: %d.", actSeqLenExistFlag, blockTableExistFlag);
@@ -380,7 +403,8 @@ protected:
             } else {
                 headsNumPerCore = 0;
             }
-            OP_CHECK_IF(headsNumPerCore == 0, OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "input too large."),
+            OP_CHECK_IF(headsNumPerCore == 0,
+                        ReportTilingFailure("No head fits into the available UB for the input shape."),
                         return ge::GRAPH_FAILED);
         }
         return ge::GRAPH_SUCCESS;
@@ -423,8 +447,7 @@ protected:
         auto platformInfoPtr = context_->GetPlatformInfo();
         if (platformInfoPtr == nullptr) {
             auto compileInfoPtr = reinterpret_cast<const NsaCompressWithCacheCompileInfo*>(context_->GetCompileInfo());
-            OP_CHECK_IF(compileInfoPtr == nullptr,
-                        OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "compileInfoPtr is null."),
+            OP_CHECK_IF(compileInfoPtr == nullptr, ReportTilingFailure("Both platform info and compile info are null."),
                         return ge::GRAPH_FAILED);
             aivNum = compileInfoPtr->aivNum;
             ubSize = compileInfoPtr->ubSize;
@@ -441,11 +464,10 @@ protected:
     {
         opName = context_->GetNodeName();
         OP_LOGD(opName, "TilingContext: %s.", GetTilingContextDebugStr().c_str());
-        OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS,
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "invalid context."), return ge::GRAPH_FAILED);
-        OP_CHECK_IF(!AnalyzeAttrs() || !AnalyzeInputShape() || !AnalyzeDtype() || !AnalyzeOptionalInput(),
-                    OPS_REPORT_VECTOR_INNER_ERR("NsaCompressWithCache", "fail to analyze context info."),
+        OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(opName, "invalid context."),
                     return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!AnalyzeAttrs() || !AnalyzeInputShape() || !AnalyzeDtype() || !AnalyzeOptionalInput(),
+                    OP_LOGE_WITHOUT_REPORT(opName, "fail to analyze context info."), return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     };
     // 3、计算数据切分TilingData

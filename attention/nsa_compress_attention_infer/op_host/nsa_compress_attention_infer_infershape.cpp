@@ -14,6 +14,7 @@
  */
 
 #include <register/op_impl_registry.h>
+#include <vector>
 #include "log/log.h"
 #include "platform/platform_info.h"
 
@@ -32,6 +33,12 @@ static const uint64_t DIM_NUM_1 = 1;
 static const uint64_t DIM_NUM_2 = 2;
 static const uint64_t DIM_NUM_3 = 3;
 
+static void ReportInferShapeFailure(const char* reason)
+{
+    REPORT_PREDEFINED_ERR_MSG("EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                              (std::vector<const char*>{"NsaCompressAttentionInfer", reason}));
+}
+
 static ge::graphStatus InferShapeNsaCompressAttentionInfer(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
@@ -42,17 +49,20 @@ static ge::graphStatus InferShapeNsaCompressAttentionInfer(gert::InferShapeConte
     const gert::Shape* valueShape = context->GetInputShape(VALUE_INPUT_INDEX);
 
     auto attrs = context->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(attrs == nullptr, ReportInferShapeFailure("InferShape context attributes are null."),
+                return GRAPH_FAILED);
     const int64_t* kvHeadNumsPtr = attrs->GetAttrPointer<int64_t>(KV_NUM_HEADS_ATTR_INDEX);
     const int64_t* selectBlockCountPtr = attrs->GetAttrPointer<int64_t>(SELECT_BLOCK_ATTR_INDEX);
     const char* layOutPtr = attrs->GetAttrPointer<char>(LAYOUT_ATTR_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, layOutPtr);
+    OP_CHECK_IF(layOutPtr == nullptr, ReportInferShapeFailure("InferShape context layoutOptional is null."),
+                return GRAPH_FAILED);
 
     auto kvHeadNums = *kvHeadNumsPtr;
     auto selectBlockCount = *selectBlockCountPtr;
     std::string layOutStr = std::string(layOutPtr);
     if (layOutStr != "TND" && layOutStr != "BSND") {
-        OP_LOGE(context, "The layout should be TND and BSND, but got %s.", layOutStr.c_str());
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("NsaCompressAttentionInfer", "layoutOptional", layOutStr,
+                                              "Only TND and BSND are supported.");
         return GRAPH_FAILED;
     }
 
@@ -60,7 +70,8 @@ static ge::graphStatus InferShapeNsaCompressAttentionInfer(gert::InferShapeConte
     *outShape = *queryShape;
 
     gert::Shape* topkIndicesOutShape = context->GetOutputShape(TOPK_OUTPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, topkIndicesOutShape);
+    OP_CHECK_IF(topkIndicesOutShape == nullptr, ReportInferShapeFailure("topkIndicesOut shape is null."),
+                return GRAPH_FAILED);
     *topkIndicesOutShape = *queryShape;
 
     if (layOutStr == "TND") {

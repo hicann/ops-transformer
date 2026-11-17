@@ -51,7 +51,6 @@ const aclTensor* NsaCompressWithCache(const aclTensor* input, const aclTensor* w
                            OP_OUTPUT(outputCacheRef),
                            OP_ATTR(layoutOptional, compressBlockSize, compressStride, actSeqLenType, pageBlockSize));
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "InferShape failed.");
         return nullptr;
     }
 
@@ -61,7 +60,6 @@ const aclTensor* NsaCompressWithCache(const aclTensor* input, const aclTensor* w
         OP_OUTPUT(outputCacheRef),
         OP_ATTR(layoutOptional, compressBlockSize, compressStride, actSeqLenType, pageBlockSize));
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "ADD_TO_LAUNCHER_LIST_AICORE failed.");
         return nullptr;
     }
     return outputCacheRef;

@@ -75,7 +75,6 @@ const std::array<const aclTensor*, 2> NsaCompressAttentionInfer(
         OP_ATTR(numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount, compressBlockSize, compressBlockStride,
                 static_cast<float>(scaleValue), layoutOptional, pageBlockSize, sparseMode));
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "NsaCompressAttentionInfer InferShape failed.");
         return {nullptr, nullptr};
     }
 

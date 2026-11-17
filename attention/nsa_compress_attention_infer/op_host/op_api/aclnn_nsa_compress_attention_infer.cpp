@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include "nsa_compress_attention_infer.h"
 #include "aclnn_nsa_compress_attention_infer.h"
+#include "aclnn_kernels/common/op_error_check.h"
 #include "aclnn_kernels/contiguous.h"
 #include "aclnn_kernels/pad.h"
 #include "aclnn_kernels/reshape.h"
@@ -129,15 +130,15 @@ aclnnStatus nsaCompressAttentionInferCheckTensorNull(const aclTensor* query, con
                                                      const aclTensor* topKOutput, const uint64_t* workspaceSize)
 {
     // 必须的参数指针判空
-    CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(key != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(value != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(blockTableOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(actualCmpKvSeqLenOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(layoutOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(output != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(topKOutput != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(workspaceSize != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(query, return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(key, return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(value, return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(blockTableOptional, return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(actualCmpKvSeqLenOptional, return ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_COND(layoutOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR, "layoutOptional is nullptr.");
+    OP_CHECK_NULL(output, return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK_NULL(topKOutput, return ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_COND(workspaceSize != nullptr, ACLNN_ERR_PARAM_NULLPTR, "workspaceSize is nullptr.");
     return ACLNN_SUCCESS;
 }
 
@@ -151,7 +152,7 @@ aclnnStatus FakeArray_cai(const aclIntArray* inArray, aclIntArray*& outArray)
         std::vector<int64_t> fake_array(size, -1);
         outArray = aclCreateIntArray(fake_array.data(), size);
         if (outArray == nullptr) {
-            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Try alloc array failed");
+            OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR, "Try alloc array failed");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -171,7 +172,7 @@ aclnnStatus aclnnNsaCompressAttentionInferGetMaxWorkspaceSize(
     aclIntArray* fakeActualCmpKvSeqLenOptional{nullptr};
     // nullptr不处理， nullptr是空指针，这样不会影响原来就不传入actual seq length为空的逻辑
     aclnnStatus ret = FakeArray_cai(actualCmpKvSeqLenOptional, fakeActualCmpKvSeqLenOptional);
-    CHECK_RET_CODE(ret, "Try alloc fake actualSeqLengthsKvOptional failed");
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     ret = aclnnNsaCompressAttentionInferGetWorkspaceSize(
         query, key, value, attentionMaskOptional, blockTableOptional, actualQSeqLenOptional,
         fakeActualCmpKvSeqLenOptional, actualSelKvSeqLenOptional, topKMaskOptional, numHeads, numKeyValueHeads,
@@ -190,10 +191,10 @@ aclnnStatus aclnnNsaCompressAttentionInferGetWorkspaceSize(
     char* layoutOptional, int64_t pageBlockSize, int64_t sparseMode, const aclTensor* output,
     const aclTensor* topKOutput, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    CHECK_RET(
-        nsaCompressAttentionInferCheckTensorNull(query, key, value, blockTableOptional, actualCmpKvSeqLenOptional,
-                                                 layoutOptional, output, topKOutput, workspaceSize) == ACLNN_SUCCESS,
-        ACLNN_ERR_PARAM_NULLPTR);
+    if (nsaCompressAttentionInferCheckTensorNull(query, key, value, blockTableOptional, actualCmpKvSeqLenOptional,
+                                                 layoutOptional, output, topKOutput, workspaceSize) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
     CHECK_RET(nsaCompressAttentionInferValidateParam(query, key, value, blockTableOptional, output, topKOutput) ==
                   ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);
@@ -205,7 +206,6 @@ aclnnStatus aclnnNsaCompressAttentionInferGetWorkspaceSize(
                    DFX_OUT(output, topKOutput));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
-    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     if (output->IsEmpty() && topKOutput->IsEmpty()) {
         *workspaceSize = 0;
         uniqueExecutor.ReleaseTo(executor);
@@ -236,7 +236,7 @@ aclnnStatus aclnnNsaCompressAttentionInferGetWorkspaceSize(
     auto l0topKOutput = l0NsaCompressAttentionInferOuts[1];
 
     if (l0output == nullptr || l0topKOutput == nullptr) {
-        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "l0output or l0topKOutput is null");
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR, "l0output or l0topKOutput is null");
         *workspaceSize = 0;
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_ERR_INNER_NULLPTR;
