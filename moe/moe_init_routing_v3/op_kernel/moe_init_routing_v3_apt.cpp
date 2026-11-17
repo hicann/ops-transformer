@@ -40,9 +40,11 @@
 #include "arch35/moe_v3_topk_weight_out.h"
 
 /*
- * 非量化
+ * 量化模式
  */
+#define MOE_INIT_ROUTING_V3_QUANT_MODE_UNQUANT -1
 #define MOE_INIT_ROUTING_V3_QUANT_MODE_DYNAMIC 1
+#define MOE_INIT_ROUTING_V3_QUANT_MODE_HIF8_PERTOKEN 8
 #define MOE_INIT_ROUTING_V3_QUANT_MODE_INT4_DYNAMIC 13
 
 #define MOE_INIT_ROUTING_V3_SORTONECORE_GATHER 10000000        // 单核排序、非量化、GATHER索引
@@ -209,6 +211,28 @@ extern "C" __global__ __aicore__ void moe_init_routing_v3(GM_ADDR x, GM_ADDR exp
     if (TILING_KEY_IS(EMPTY_TENSOR)) {
         if (GetBlockIdx() != 0) {
             return;
+        }
+        // n/k==0 时无 token 可路由。DropPad 下 expandedX 为 [expertNum*expertCapacity, cols] 全零、
+        // 有输入 scale 时 expandedScale 为 [expertNum*expertCapacity] 全零（与正常路径
+        // ZeroOutAllOutput 语义一致）。空 tensor 场景 tiling 仅启动 1 核，由 block 0 统一清零。
+        if (t->dropPadMode == DROP_PAD_MODE) {
+            const int64_t outputRows = t->expertNum * t->expertCapacity;
+            if (outputRows > 0 && t->cols > 0) {
+                // 统一按字节清零：全零字节是所有输出 dtype（fp16/bf16/fp32/int8/fp8/hif8 等）的 +0，
+                // 避免 GlobalTensor<奇异类型> 的模板展开加深编译负担（fp8透传实例的编译器前端栈紧张）。
+                const int64_t xBytes = (IsSameType<DTYPE_EXPANDED_X, int4b_t>::value ||
+                                        IsSameType<DTYPE_EXPANDED_X, fp4x2_e2m1_t>::value) ?
+                                           outputRows * ((t->cols + 1) / 2) : // 4bit 打包：两个值 1 字节
+                                           outputRows * t->cols * static_cast<int64_t>(sizeof(DTYPE_EXPANDED_X));
+                GlobalTensor<uint8_t> zeroGm;
+                zeroGm.SetGlobalBuffer((__gm__ uint8_t*)expandedX, xBytes);
+                InitGlobalMemory(zeroGm, xBytes, static_cast<uint8_t>(0));
+            }
+            if (t->isInputScale == 1 && outputRows > 0) {
+                GlobalTensor<float> scaleZeroGm;
+                scaleZeroGm.SetGlobalBuffer((__gm__ float*)expandedScale, outputRows);
+                InitGlobalMemory(scaleZeroGm, outputRows, static_cast<float>(0));
+            }
         }
         if (t->expertTokensNumFlag) {
             GlobalTensor<int64_t> expertTokensCountGm;
@@ -477,6 +501,30 @@ extern "C" __global__ __aicore__ void moe_init_routing_v3(GM_ADDR x, GM_ADDR exp
     }
 
     if (t->cols == 0) {
+        // cols==0 时量化阶段不执行；quantMode=-1/1/8/13 的 expandedScale 为 1D float [n*k]
+        // （droppad 时为 [expertNum*expertCapacity]，HIF8_PERTOKEN 除外）仍有输出元素，
+        // block 0 清零后返回。其余模式的 scale 含 CeilDiv(0, blockSize)=0 的维度或不输出。
+        if (GetBlockIdx() == 0) {
+            constexpr bool isMXFPXNoQuant = IsSameType<DTYPE_X, fp8_e4m3fn_t>::value ||
+                                            IsSameType<DTYPE_X, fp8_e5m2_t>::value ||
+                                            IsSameType<DTYPE_X, fp4x2_e2m1_t>::value;
+            const int64_t quantMode = t->quantMode;
+            const bool needScaleInit = !isMXFPXNoQuant && (quantMode == MOE_INIT_ROUTING_V3_QUANT_MODE_UNQUANT ||
+                                                           quantMode == MOE_INIT_ROUTING_V3_QUANT_MODE_DYNAMIC ||
+                                                           quantMode == MOE_INIT_ROUTING_V3_QUANT_MODE_HIF8_PERTOKEN ||
+                                                           quantMode == MOE_INIT_ROUTING_V3_QUANT_MODE_INT4_DYNAMIC);
+            if (needScaleInit) {
+                const int64_t scaleElements =
+                    (t->dropPadMode == DROP_PAD_MODE && quantMode != MOE_INIT_ROUTING_V3_QUANT_MODE_HIF8_PERTOKEN) ?
+                        t->expertNum * t->expertCapacity :
+                        t->n * t->k;
+                if (scaleElements > 0) {
+                    GlobalTensor<float> expandedScaleGm;
+                    expandedScaleGm.SetGlobalBuffer((__gm__ float*)expandedScale, scaleElements);
+                    InitGlobalMemory(expandedScaleGm, scaleElements, 0.0f);
+                }
+            }
+        }
 #if ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
         SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(oriOverflowMode);
 #endif

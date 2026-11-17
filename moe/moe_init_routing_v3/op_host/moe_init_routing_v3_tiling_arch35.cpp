@@ -2059,6 +2059,11 @@ bool MoeInitRoutingV3TilingArch35::IsFullLoad()
     if (dropPadMode_ == DROP_PAD_MODE_DROPPAD) {
         return false;
     }
+    // Zero-width inputs keep using the normal routing templates, which still produce row
+    // indices and expert counts; the cols==0 exit in the kernel zero-fills expandedScale.
+    if (cols_ == 0) {
+        return false;
+    }
     int64_t perCoreTokens = 1;
     if (expertStart_ == 0 && expertEnd_ == expertNum_) {
         ep_ = 0;

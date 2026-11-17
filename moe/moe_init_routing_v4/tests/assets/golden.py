@@ -92,6 +92,14 @@ def _bf16_bits_to_float32(x):
     return (bits.astype(numpy.uint32) << 16).view(numpy.float32)
 
 
+def _row_amax(x_abs):
+    """逐行绝对值最大。cols==0 时 kernel 提前返回不写 scale 输出（保持零初始化），
+    golden 需返回 0 而不是对空 axis 归约报错。"""
+    if x_abs.shape[-1] == 0:
+        return numpy.zeros(x_abs.shape[:-1] + (1,), dtype=x_abs.dtype)
+    return numpy.max(x_abs, axis=-1, keepdims=True)
+
+
 def _mxfp8_roundscale_quant_numpy(x, dst_type_str, clamp_amax=False, block_size=32):
     x_array = numpy.asarray(x)
     x_f32 = x_array.astype(numpy.float32)
@@ -472,7 +480,7 @@ def _moe_init_routing_v4_numpy(
         if scale is None:
             expanded_x = expanded_x[:actual_expert_total_num, :]
             x_abs = numpy.abs(expanded_x)
-            x_max = numpy.max(x_abs, axis=-1, keepdims=True)
+            x_max = _row_amax(x_abs)
             expanded_scale = x_max / 127
             expanded_x = expanded_x / expanded_scale
             expanded_x = numpy.round(expanded_x).astype(numpy.int8)
@@ -483,7 +491,7 @@ def _moe_init_routing_v4_numpy(
             expanded_x = expanded_x[:actual_expert_total_num, :]
             expanded_x = expanded_x * expended_scale
             x_abs = numpy.abs(expanded_x)
-            x_max = numpy.max(x_abs, axis=-1, keepdims=True)
+            x_max = _row_amax(x_abs)
             expanded_scale = x_max / 127
             expanded_x = expanded_x / expanded_scale
             expanded_x = numpy.round(expanded_x).astype(numpy.int8)
@@ -534,7 +542,7 @@ def _moe_init_routing_v4_numpy(
         expanded_x = expanded_x[:actual_expert_total_num, :]
 
         x_abs = numpy.abs(expanded_x)
-        x_max_per_token = numpy.max(x_abs, axis=-1, keepdims=True)
+        x_max_per_token = _row_amax(x_abs)
         expanded_scale = x_max_per_token / 32768.0
 
         expanded_scale_safe = numpy.where(expanded_scale == 0, 1.0, expanded_scale)
@@ -758,7 +766,7 @@ def _moe_init_routing_v4_numpy(
             expanded_x = expanded_x[:actual_expert_total_num, :] * smooth_scale
 
         x_abs = numpy.abs(expanded_x)
-        x_max = numpy.max(x_abs, axis=-1, keepdims=True)
+        x_max = _row_amax(x_abs)
         expanded_scale = numpy.where(
             x_max == 0,
             numpy.float32(0.0),

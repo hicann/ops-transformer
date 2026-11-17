@@ -350,19 +350,14 @@ void ExpectArch35MxFP8NoQuantUseGatherCopy(int64_t n, int64_t h, int64_t k, int6
     EXPECT_EQ(tilingData->useGatherCopy, expectedUseGatherCopy);
 }
 
-void ExpectArch35ZeroWidthFullLoadCoreSplit(gert::TilingContextPara& tilingContextPara, uint64_t expectedTilingKey)
+// 零宽（cols==0）场景被 IsFullLoad 排除后路由到分阶段排序模板，仅校验 tiling key 与
+// tiling 数据完整性；FullLoad 的 count/gather 核切分耦合断言随全载路径一并不再适用。
+void ExpectArch35ZeroWidthStagedTilingKey(gert::TilingContextPara& tilingContextPara, uint64_t expectedTilingKey)
 {
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, expectedTilingKey);
-    ASSERT_GE(tilingInfo.tilingDataSize, sizeof(MoeInitRoutingV3Arch35TilingData));
-    const auto* tilingData = reinterpret_cast<const MoeInitRoutingV3Arch35TilingData*>(tilingInfo.tilingData.get());
-    const auto& tokensCountTiling = tilingData->expertTokensCountTilingDataOp;
-    const auto& gatherOutTiling = tilingData->gatherOutComputeParamsOp;
-    EXPECT_GT(gatherOutTiling.needCoreNum, 0);
-    EXPECT_EQ(gatherOutTiling.needCoreNum, tokensCountTiling.needCoreNum);
-    EXPECT_EQ(gatherOutTiling.perCoreIndicesElements, tokensCountTiling.perCoreElements);
-    EXPECT_EQ(gatherOutTiling.lastCoreIndicesElements, tokensCountTiling.lastCoreElements);
+    EXPECT_GE(tilingInfo.tilingDataSize, sizeof(MoeInitRoutingV3Arch35TilingData));
 }
 } // namespace
 
@@ -930,23 +925,24 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_empty_tensor_k
                               kExpandedXDtypeAuto, ge::GRAPH_SUCCESS);
 }
 
-// dropless 零宽场景：cols_==0 但 n*k 非 0，仍应选择排序 tiling，而不是 EMPTY_TENSOR。
+// dropless 零宽场景：cols_==0 但 n*k 非 0，不选 EMPTY_TENSOR，也不进 FullLoad（IsFullLoad
+// 已排除 cols==0，避免全载量化阶段带 0 列硬跑），应路由到分阶段排序模板。
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cols_zero_not_empty_routing)
 {
-    constexpr uint64_t FULL_LOAD_UNQUANT_TILING_KEY = 200000ULL;
+    constexpr uint64_t SORT_ONE_CORE_UNQUANT_GATHER_TILING_KEY = 10000000ULL;
     RunArch35ExtendedTestcase(17, 0, 115, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_UNQUANT, ge::DT_INT8,
                               {0, EXPERT_NUM}, ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT,
-                              kExpandedXDtypeAuto, ge::GRAPH_SUCCESS, FULL_LOAD_UNQUANT_TILING_KEY);
+                              kExpandedXDtypeAuto, ge::GRAPH_SUCCESS, SORT_ONE_CORE_UNQUANT_GATHER_TILING_KEY);
 }
 
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cols_zero_accepts_zero_active_num)
 {
-    constexpr uint64_t FULL_LOAD_UNQUANT_TILING_KEY = 200000ULL;
+    constexpr uint64_t SORT_ONE_CORE_UNQUANT_GATHER_TILING_KEY = 10000000ULL;
     optiling::MoeInitRoutingV3CompileInfo compileInfo = {40, 262144, Ops::Base::DAV_3510};
     auto tilingContextPara = MakeArch35ExtendedTilingContextPara(
         17, 0, 115, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_UNQUANT, ge::DT_INT8, {0, EXPERT_NUM},
         ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto, &compileInfo, 0);
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, FULL_LOAD_UNQUANT_TILING_KEY, "", {});
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SORT_ONE_CORE_UNQUANT_GATHER_TILING_KEY, "", {});
 }
 
 // dropless 零宽场景应覆盖 Ascend 950 支持的全部 quantMode，并保留非全载 Gather/Scatter tiling key。
@@ -1010,9 +1006,11 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cols_zero_all_
     }
 }
 
-TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cols_zero_full_load_quant_modes)
+// dropless 零宽场景覆盖 950 支持的量化模式：cols==0 排除出 FullLoad 后，应落到对应的
+// 单核分阶段排序量化模板（kernel 侧由 cols==0 提前返回分支补 scale 清零）。
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cols_zero_staged_quant_modes)
 {
-    struct FullLoadCase {
+    struct StagedCase {
         int64_t quantMode;
         ge::DataType xDtype;
         std::vector<int64_t> scaleShape;
@@ -1020,11 +1018,11 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cols_zero_full
         ge::DataType expandedXDtype;
         uint64_t tilingKey;
     };
-    const std::vector<FullLoadCase> cases = {
-        {QUANT_MODE_UNQUANT, ge::DT_FLOAT16, {}, {}, ge::DT_FLOAT16, 200000ULL},
-        {QUANT_MODE_STATIC, ge::DT_FLOAT16, {1}, {1}, ge::DT_INT8, 210000ULL},
-        {QUANT_MODE_DYNAMIC, ge::DT_FLOAT16, {}, {}, ge::DT_INT8, 220000ULL},
-        {QUANT_MODE_INT4_DYNAMIC, ge::DT_BF16, {}, {}, ge::DT_INT4, 220000ULL},
+    const std::vector<StagedCase> cases = {
+        {QUANT_MODE_UNQUANT, ge::DT_FLOAT16, {}, {}, ge::DT_FLOAT16, 10000000ULL},
+        {QUANT_MODE_STATIC, ge::DT_FLOAT16, {1}, {1}, ge::DT_INT8, 10010000ULL},
+        {QUANT_MODE_DYNAMIC, ge::DT_FLOAT16, {}, {}, ge::DT_INT8, 10020000ULL},
+        {QUANT_MODE_INT4_DYNAMIC, ge::DT_BF16, {}, {}, ge::DT_INT4, 10140000ULL},
     };
     for (const auto& testcase : cases) {
         SCOPED_TRACE(testcase.quantMode);
@@ -1033,12 +1031,12 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_cols_zero_full
             3, 0, 8, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, testcase.quantMode, testcase.xDtype, {0, EXPERT_NUM},
             ROW_IDX_TYPE_GATHER, testcase.scaleShape, ge::DT_FLOAT, testcase.offsetShape, ge::DT_FLOAT,
             testcase.expandedXDtype, &compileInfo);
-        ExpectArch35ZeroWidthFullLoadCoreSplit(tilingContextPara, testcase.tilingKey);
+        ExpectArch35ZeroWidthStagedTilingKey(tilingContextPara, testcase.tilingKey);
         auto falsePara = MakeArch35ExtendedTilingContextPara(
             3, 0, 8, 0, 0, EXPERT_TOKENS_TYPE_COUNT, false, testcase.quantMode, testcase.xDtype, {0, EXPERT_NUM},
             ROW_IDX_TYPE_GATHER, testcase.scaleShape, ge::DT_FLOAT, testcase.offsetShape, ge::DT_FLOAT,
             testcase.expandedXDtype, &compileInfo);
-        ExpectArch35ZeroWidthFullLoadCoreSplit(falsePara, testcase.tilingKey);
+        ExpectArch35ZeroWidthStagedTilingKey(falsePara, testcase.tilingKey);
     }
 }
 
