@@ -75,8 +75,8 @@ def _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q):
 def _fag_deter_elems(
     batch_size, num_heads_q, num_heads_kv, max_seqlen_q, max_seqlen_kv
 ):
-    """Versioned bounded TND schedule tail (int32 words), independent of rounds."""
-    return 518 + 32 * batch_size
+    """确定性分核在核上闭式计算，metadata 不再为轮次表预留。"""
+    return 0
 
 
 def _calculate_metadata_size(

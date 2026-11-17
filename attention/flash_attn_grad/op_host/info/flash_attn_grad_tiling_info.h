@@ -23,7 +23,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include "../plan/deterministic/plan_types.h"
 #include <string>
 
 namespace optiling {
@@ -106,7 +105,6 @@ struct FagParsedInfo {
     // 由 ParseShapes 用 shape 算术判定（T1==b*s1 且 cu_seqlens 差分全等）。
     bool tndAllSame = false;
     bool isBnsd = false;
-    bool isBf16 = false; // C4 TND admission depends on the actual Q dtype.
 
     // 轴
     int64_t b = 0;
@@ -144,7 +142,7 @@ struct FagParsedInfo {
     // 编译期常量决定是否算 dsink，非 sink 变体里相关代码被折叠掉。命中时按
     // head 在本 AIV 的 UB 累加器里精确累加，循环末尾写成槽位区本 AIV 行，
     // post 阶段由 AIV0 固定次序归约后整行写 dsink
-    // （见 op_kernel/compute/fag_block_vec.py 的 process_sink_partial/reduce）。
+    // （见 op_kernel/fag_block_vec.py 的 process_sink_partial/reduce）。
     bool hasSinks = false;
     // context->GetDeterministic()==1。BN2 单块仍走现网（tilingkey deter=0）。
     bool isDeterministic = false;
@@ -175,7 +173,7 @@ struct FagKernelPlan {
     // 运行时字段（不占 tilingkey）：kernel 的写侧（process_presfmg）与读侧
     // （process_vec1）用同一标志，避免多编一份二进制。判据见 DecidePreSfmg。
     int64_t enablePreSfmg = 0;
-    // bit21: dq/dk/dv use a padded, per-S128-tile FP32 NZ workspace.
+    // bit16: dq/dk/dv use a padded, per-S128-tile FP32 NZ workspace.
     int64_t nzOut = 0;
 };
 
@@ -186,16 +184,7 @@ struct FagSchedulePlan {
     uint32_t blockDim = 0;
     bool useActualCores = false;
     int64_t swizzle = 0;
-    // Non-deterministic GS diagnostics. Kernel derives these from existing
-    // dimensions/tokens; no fields are added to the 960-byte tiling ABI.
-    int64_t normalSwizzleKind = 0;
-    int64_t normalContinuousBlocks = 0;
-    int64_t normalValidPerHead = 0;
-    int64_t normalMaxValidBlocks = 0;
-    int64_t normalBlockOuter = 0;
-    uint64_t normalWorkingSetBytes = 0;
     int64_t deterMaxRound = 0;
-    FagDeterPlan deter;
 };
 
 // workspace 具名分区。offset 是相对 kernel 拿到的 workspace 指针的字节偏移，

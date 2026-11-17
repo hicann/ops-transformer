@@ -10,11 +10,11 @@
 
 /*!
  * \file flash_attn_grad_tiling_swizzle.h
- * \brief L4 策略层：ASC 有效块分核、L2 地址去重估算及 swizzle 分支。
+ * \brief L4 策略层：分核方式（线性均分 vs 按 s2 列跨核发放）。
  *
  * 这是一个纯偏好判据 —— 两种分核都算得对，只是快慢不同。判据必须保持
  * 纯整数、无浮点、无平台调用。kernel 只消费 tilingkey 里的 swizzle 位，
- * kernel 从现有几何推导分支和连续块数；不改变公共 tiling ABI。
+ * 不再维护 Python 镜像。
  */
 
 #ifndef FLASH_ATTN_GRAD_TILING_SWIZZLE_H_
@@ -25,7 +25,7 @@
 namespace optiling {
 
 // 前置条件：kernel.tmpl 与 schedule.usedCube 必须已经定下来 —— swizzle 只在
-// BN2GS1S2、实际有效分核满片且工作集超 L2 才开。调用顺序不可与 BuildSchedulePlan 对调。
+// BN2GS1S2 且满片启动时才可能开。调用顺序不可与 BuildSchedulePlan 对调。
 void DecideSwizzle(const FagParsedInfo& info, const FagKernelPlan& kernel, FagSchedulePlan& schedule,
                    FagRouteTrace& trace);
 

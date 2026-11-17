@@ -14,15 +14,32 @@ coordinate, not an offset into packed GM. The caller decodes it and applies the
 physical cu_seqlens offsets. No per-batch array or private workspace is needed.
 """
 
-from schedule.deterministic.fag_deter_state import (
-    pl,
-    make_tnd_deter_schedule,
-    reset_tnd_batch_cursor,
-)
+try:
+    import pypto_pro.language as pl
+except ImportError:  # CPU coordinate parity tests, without a device runtime.
+    from types import SimpleNamespace
 
-from schedule.deterministic.fag_deter_formulas import (
-    _gcd,
-)
+    class _Pl:
+        DT_INT64 = 0
+        min = staticmethod(min)
+        max = staticmethod(max)
+        range = staticmethod(range)
+
+        @staticmethod
+        def astype(value, _dtype):
+            return int(value)
+
+        @staticmethod
+        def getval(tensor, index):
+            return tensor[index]
+
+        @staticmethod
+        def struct(_name, **values):
+            return SimpleNamespace(**values)
+
+    pl = _Pl()
+
+from fag_deter import _gcd
 
 
 def tnd_deter_lengths(ci, batch, cuq, cuk, usedq, usedk):
@@ -73,6 +90,52 @@ def tnd_permute_delta(delta1, m, n, g, phase_round):
             delta = pl.astype(delta - period, pl.DT_INT64)
     xg = (delta - 1) % mg
     return head, xg // mm, xg % mm + 1, (delta - 1) // mg + 1
+
+
+def make_tnd_deter_schedule(max_round, r0, r1, r2, core_divide, is_causal, r_whole):
+    """Kernel-private plan and batch cursor; no tiling/workspace ABI fields.
+
+    The cursor range is (begin, end] in the current phase's *unpermuted*
+    one-based ID space. A phase change invalidates it, because causal/band
+    phases do not have the same per-batch counts.
+    """
+    return pl.struct(
+        "FagTndDeterSchedule",
+        maxRound=pl.astype(max_round, pl.DT_INT64),
+        r0=pl.astype(r0, pl.DT_INT64),
+        r1=pl.astype(r1, pl.DT_INT64),
+        r2=pl.astype(r2, pl.DT_INT64),
+        coreDivide=pl.astype(core_divide, pl.DT_INT64),
+        lineDeter=pl.astype(0, pl.DT_INT64),
+        isCausal=pl.astype(is_causal, pl.DT_INT64),
+        rWhole=pl.astype(r_whole, pl.DT_INT64),
+        cursorPhase=pl.astype(-1, pl.DT_INT64),
+        cursorBatch=pl.astype(0, pl.DT_INT64),
+        cursorBegin=pl.astype(0, pl.DT_INT64),
+        cursorEnd=pl.astype(0, pl.DT_INT64),
+        cursorReady=pl.astype(0, pl.DT_INT64),
+        cursorSq=pl.astype(0, pl.DT_INT64),
+        cursorSk=pl.astype(0, pl.DT_INT64),
+        cursorM=pl.astype(0, pl.DT_INT64),
+        cursorN=pl.astype(0, pl.DT_INT64),
+        cursorP=pl.astype(0, pl.DT_INT64),
+        cursorQ=pl.astype(0, pl.DT_INT64),
+        cursorMo=pl.astype(0, pl.DT_INT64),
+        cursorNo=pl.astype(0, pl.DT_INT64),
+        cursorVm=pl.astype(0, pl.DT_INT64),
+        cursorVn=pl.astype(0, pl.DT_INT64),
+        cursorArea=pl.astype(0, pl.DT_INT64),
+    )
+
+
+def reset_tnd_batch_cursor(plan, phase):
+    """Reset once per phase, not once per physical task or empty round."""
+    if plan.cursorPhase != phase:
+        plan.cursorPhase = pl.astype(phase, pl.DT_INT64)
+        plan.cursorBatch = pl.astype(0, pl.DT_INT64)
+        plan.cursorBegin = pl.astype(0, pl.DT_INT64)
+        plan.cursorEnd = pl.astype(0, pl.DT_INT64)
+        plan.cursorReady = pl.astype(0, pl.DT_INT64)
 
 
 def load_tnd_dense_batch(ci, plan, cuq, cuk, usedq, usedk):

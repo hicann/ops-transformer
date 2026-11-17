@@ -44,29 +44,23 @@ import inspect
 
 import pypto_pro.language as pl
 
-from compute import fag_block_cube
-from compute import fag_block_vec
-from memory import fag_buffers
+import fag_block_cube
+import fag_block_vec
+import fag_buffers
 import fag_common
+import fag_deter
+import fag_deter_tnd_dense
+import fag_deter_tnd_sparse
+import fag_schedule
 import fag_nzout
-from schedule.deterministic import fag_deter_formulas, fag_deter_legacy, fag_deter_state
-from schedule.deterministic import fag_deter_fixed
-from schedule.deterministic import fag_deter_baseline
-from schedule.deterministic import fag_deter_band_owner
-from schedule.deterministic import fag_deter_band_plan
-from schedule.deterministic.tnd import fag_deter_tnd_dense
-from schedule.deterministic.tnd import fag_deter_tnd_sparse
-from schedule.deterministic.tnd import fag_deter_tnd_plan
-from schedule.deterministic.tnd import fag_deter_tnd_normalized
-from schedule import fag_schedule
 from fag_tiling import FlashAttnGradTilingData, Tmpl
-from pipeline.fag_kernel_deter import (
+from fag_kernel_deter import (
     _run_preload2_cube_gs_deter,
     _run_preload2_vector_gs_deter,
     _run_preload3_cube_deter,
     _run_preload3_vector_deter,
 )
-from pipeline.fag_kernel_norm import (
+from fag_kernel_norm import (
     _run_preload2_cube_bn2,
     _run_preload2_cube_gs_normal,
     _run_preload2_vector_bn2,
@@ -95,17 +89,9 @@ def _bind_helpers():
         fag_block_vec,
         fag_buffers,
         fag_common,
-        fag_deter_formulas,
-        fag_deter_legacy,
-        fag_deter_state,
-        fag_deter_fixed,
-        fag_deter_baseline,
-        fag_deter_band_owner,
-        fag_deter_band_plan,
+        fag_deter,
         fag_deter_tnd_dense,
         fag_deter_tnd_sparse,
-        fag_deter_tnd_plan,
-        fag_deter_tnd_normalized,
         fag_schedule,
         fag_nzout,
     ):
@@ -169,8 +155,7 @@ def flash_attn_grad_preload3(
 
     # ---- workspace 分区 ----
     # host(GetWorkspaceSizes) 给的是单块连续内存，这里按 fp32 元素切成
-    # dq/dk/dv 三段累加区。ND 三段大小与 host 的 CalcWorkSpace 逐一对齐；
-    # NZ 内核按运行期 ceil16(D) 紧凑分段，host 按 128 列档预留容量上界。
+    # dq/dk/dv 三段累加区。三段大小必须与 host 的 CalcWorkSpace 逐一对齐。
     # dq 段按 n1(=n2*G) 个 head，dk/dv 段按 n2 —— 与 host 的 dqElems/dkvElems
     # 一致。GQA 下若这里误用 n2，dk/dv 的起始偏移就会算错。
     # TND 按物理 packed token 分段，非 TND 的 T 仍为 B*S；seqused 不改变跨度。
@@ -195,13 +180,12 @@ def flash_attn_grad_preload3(
     ws_ptr = pl.make_ptr(workspace, dtype=pl.DT_FP32)
     dq_workspace = ws_ptr
     # 段宽按各自的 head dim：dq/dk 是 D，dv 是 Dv(可以短于 D)。
-    # ND 与 host 的 dqElems/dkElems/dvElems 对齐；NZ 的所有内核消费者
-    # 统一使用上述紧凑分段，host 的容量上界不作为内核分段偏移。
+    # 必须与 host 的 dqElems/dkElems/dvElems 逐一对齐。
     dk_workspace = pl.addptr(dq_workspace, dqWsElems)
     dv_workspace = pl.addptr(dk_workspace, dkWsElems)
-    # 128 行保护垫之后是 dsink 槽位 [aivCount x N1]；NZ 也按紧凑段尾计算。
+    # 128 行对齐垫之后是 dsink 槽位 [aivCount x N1]，与 host BuildWorkspacePlan 对齐。
     dsink_workspace = pl.addptr(dv_workspace, dvWsElems + 128 * wsPadCols)
-    # dsink 槽位之后是 sfmg 前移缓存 [N1*T1] fp32；host 为全段预留足够容量。
+    # dsink 槽位之后是 sfmg 前移缓存 [N1*T1] fp32，与 host 的 plan.sfmg 对齐。
     # dv_align>=128 时 pre 阶段全量写入、主循环 V1 只读现成值。
     sfmg_workspace = pl.addptr(dsink_workspace, constInfo.aivCount * constInfo.n1Size)
 
@@ -413,9 +397,7 @@ def flash_attn_grad_preload3(
     coreNum = constInfo.coreNum
 
     # 分核区间取自 metadata。swizzle 支仍走公式，原因见 block_range_of。
-    meta = pl.make_tensor(
-        metadata, [pl.max(constInfo.metadataWordCount, 1)], [1], dtype=pl.DT_INT32
-    )
+    meta = pl.make_tensor(metadata, [META_VIEW_LEN], [1], dtype=pl.DT_INT32)
     one64 = pl.const(1, pl.DT_INT64)
     fagOff = pl.getval(meta, META_HEAD_FAG_START_INDEX) * one64
     blockStart = (
@@ -638,8 +620,7 @@ def flash_attn_grad_preload3(
         subIdx = pl.get_subblock_idx()
         y_ub = make_y_ub(v1w)
         dy_ub = make_dy_ub(v1w)
-        ds_out_ub = make_ds_out_ub(v1w)
-        p_out_ub = make_p_out_ub(v1w)
+        nzp_ub = make_nzp_ub(v1w)
         sfmg_ub = make_sfmg_ub(v1w)
         lse_ub = make_lse_ub(v1w)
         sink_part_ub = make_sink_part_ub(v1w)
@@ -676,8 +657,7 @@ def flash_attn_grad_preload3(
             mm2_res=mm2_res,
             y_ub=y_ub,
             dy_ub=dy_ub,
-            ds_out_ub=ds_out_ub,
-            p_out_ub=p_out_ub,
+            nzp_ub=nzp_ub,
             sfmg_ub=sfmg_ub,
             lse_ub=lse_ub,
             sink_part_ub=sink_part_ub,
@@ -1089,9 +1069,7 @@ def flash_attn_grad_preload2(
     # cube/vector 的 numBlocks 不一致，set/wait 配不上。
     cBlockIdx = pl.get_block_idx() // pl.get_subblock_num()
     coreNum = constInfo.coreNum
-    meta = pl.make_tensor(
-        metadata, [pl.max(constInfo.metadataWordCount, 1)], [1], dtype=pl.DT_INT32
-    )
+    meta = pl.make_tensor(metadata, [META_VIEW_LEN], [1], dtype=pl.DT_INT32)
     one64 = pl.const(1, pl.DT_INT64)
     fagOff = pl.getval(meta, META_HEAD_FAG_START_INDEX) * one64
     blockStart = (
@@ -1127,28 +1105,16 @@ def flash_attn_grad_preload2(
                     dv, [1, dvElems], [dvElems, 1], dtype=input_dtype
                 )
                 zero_ub = make_pre_zero_buffer_f16()
-                if layout == 1:
-                    # 变长 TND：只清“空 batch 对侧”的行，运行期按 cu_seqlens 定位。
-                    zero_tnd_empty_batch(
-                        constInfo,
-                        cu_q_tensor,
-                        cu_kv_tensor,
-                        tensor_dq_flat,
-                        tensor_dk_flat,
-                        tensor_dv_flat,
-                        zero_ub.current(),
-                    )
-                else:
-                    process_pre_from_meta(
-                        meta,
-                        fagOff,
-                        tensor_dq_flat,
-                        tensor_dk_flat,
-                        tensor_dv_flat,
-                        constInfo.dSize,
-                        constInfo.dvSize,
-                        zero_ub.current(),
-                    )
+                process_pre_from_meta(
+                    meta,
+                    fagOff,
+                    tensor_dq_flat,
+                    tensor_dk_flat,
+                    tensor_dv_flat,
+                    constInfo.dSize,
+                    constInfo.dvSize,
+                    zero_ub.current(),
+                )
                 if sink == 1:
                     sink_zero_ub = make_pre_zero_buffer_f32()
                     process_sink_zero(
@@ -1348,11 +1314,8 @@ def flash_attn_grad_preload2(
         elif deter == 1:
             q_l1_dk = make_q_lag_view()
             do_l1_dv = make_do_lag_view()
-            dv_acc0 = make_dv_l0c_chunk0()
-            dv_acc1 = make_dv_l0c_chunk1()
             runInfos = make_run_infos_2()
             sched = pl.make_tuple(
-                meta=meta,
                 cBlockIdx=cBlockIdx,
                 coreNum=coreNum,
                 cuQ=cu_q_tensor,
@@ -1380,8 +1343,6 @@ def flash_attn_grad_preload2(
                 do_l1=do_l1,
                 q_l1_dk=q_l1_dk,
                 do_l1_dv=do_l1_dv,
-                dv_acc0=dv_acc0,
-                dv_acc1=dv_acc1,
                 left=left,
                 right=right,
                 acc=acc,
@@ -1391,8 +1352,6 @@ def flash_attn_grad_preload2(
             )
             _run_preload2_cube_gs_deter(constInfo, sched, gm, buf, runInfos)
         else:
-            dv_acc0 = make_dv_l0c_chunk0()
-            dv_acc1 = make_dv_l0c_chunk1()
             runInfos = make_run_infos_2()
             sched = pl.make_tuple(
                 meta=meta,
@@ -1425,8 +1384,6 @@ def flash_attn_grad_preload2(
                 k_l1_n=k_l1_n,
                 v_l1=v_l1,
                 do_l1=do_l1,
-                dv_acc0=dv_acc0,
-                dv_acc1=dv_acc1,
                 left=left,
                 right=right,
                 acc=acc,
@@ -1571,8 +1528,7 @@ def flash_attn_grad_preload2(
         elif deter == 1:
             y_ub = make_y_ub(v1w)
             dy_ub = make_dy_ub(v1w)
-            ds_out_ub = make_ds_out_ub(v1w)
-            p_out_ub = make_p_out_ub(v1w)
+            nzp_ub = make_nzp_ub(v1w)
             sfmg_ub = make_sfmg_ub(v1w)
             lse_ub = make_lse_ub(v1w)
             sink_part_ub = make_sink_part_ub(v1w)
@@ -1580,7 +1536,6 @@ def flash_attn_grad_preload2(
             mask_pre_ub = make_mask_pre_view(v1w)
             runInfos = make_run_infos_2()
             sched = pl.make_tuple(
-                meta=meta,
                 cBlockIdx=cBlockIdx,
                 coreNum=coreNum,
                 cuQ=cu_q_tensor,
@@ -1604,8 +1559,7 @@ def flash_attn_grad_preload2(
                 mm2_res=mm2_res,
                 y_ub=y_ub,
                 dy_ub=dy_ub,
-                ds_out_ub=ds_out_ub,
-                p_out_ub=p_out_ub,
+                nzp_ub=nzp_ub,
                 sfmg_ub=sfmg_ub,
                 lse_ub=lse_ub,
                 sink_part_ub=sink_part_ub,
@@ -1618,8 +1572,7 @@ def flash_attn_grad_preload2(
         else:
             y_ub = make_y_ub(v1w)
             dy_ub = make_dy_ub(v1w)
-            ds_out_ub = make_ds_out_ub(v1w)
-            p_out_ub = make_p_out_ub(v1w)
+            nzp_ub = make_nzp_ub(v1w)
             sfmg_ub = make_sfmg_ub(v1w)
             lse_ub = make_lse_ub(v1w)
             sink_part_ub = make_sink_part_ub(v1w)
@@ -1655,8 +1608,7 @@ def flash_attn_grad_preload2(
                 mm2_res=mm2_res,
                 y_ub=y_ub,
                 dy_ub=dy_ub,
-                ds_out_ub=ds_out_ub,
-                p_out_ub=p_out_ub,
+                nzp_ub=nzp_ub,
                 sfmg_ub=sfmg_ub,
                 lse_ub=lse_ub,
                 sink_part_ub=sink_part_ub,

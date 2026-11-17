@@ -11,8 +11,8 @@
 职责是把「本核该干哪些块」翻译成逐 task 的 :class:`FagRunInfo`：
 
 1. **块级有效性**：``is_block_valid_i`` / ``skip_invalid``；
-2. **分核映射**：普通计算保留 metadata/列分核；确定性计算按编译期 family
-   选择固定布局 Host 计划、TND metadata 计划或兼容闭式，每轮返回一个物理坐标；
+2. **分核映射**：线性支读 AICPU metadata；swizzle 支按列/按 packed 有效块
+   跨核发放；deter+swizzle0 核上闭式算 fusedIdx 并跳过空槽；
 3. **逐 task 展开**：``set_run_info`` 把全局块下标拆成 (b, n2, g, s2o, s1o)
    与各张量的 GM 偏移，并算好 K/V 复用与 dK/dV flush 的开关。
 
@@ -24,55 +24,19 @@ task 数一致的前提，也是 set/wait 能配对的前提。任何只改一�
 import pypto_pro.language as pl
 
 # --- generated imports (fag_fiximports.py) ---
-from fag_colsplit import (
-    causal_core_count,
-    causal_swizzle_idx,
-    col_core_count,
-    col_local_to_global,
-    col_packed_to_dense,
-)
-from fag_common import (
-    CUBE_BASEM,
-    CUBE_BASEN,
-    VECTOR_BASEM,
-    META_HEAD_FAG_START_INDEX,
-    META_FAG_BLOCK_STARTS_OFFSET,
-    META_FAG_BLOCK_ENDS_OFFSET,
-    META_FAG_PRE_AIV_NUM,
-    META_FAG_DQ_ROWS,
-    META_FAG_DKV_ROWS,
-    META_FAG_DQ_ROW_STARTS,
-    META_FAG_DQ_ROW_ENDS,
-    META_FAG_DKV_ROW_STARTS,
-    META_FAG_DKV_ROW_ENDS,
-    META_FAG_AIV_LIST_NUM,
-)
-from schedule.deterministic.fag_deter_legacy import (
+from fag_colsplit import col_core_count, col_local_to_global, col_packed_to_dense
+from fag_common import CUBE_BASEM, CUBE_BASEN, VECTOR_BASEM
+from fag_deter import (
     deter_lin_gidx,
     deter_lin_max_round,
     deter_lin_round_bounds,
 )
-from schedule.deterministic.fag_deter_state import (
-    init_gqa_dense_plan,
-)
-from schedule.deterministic.fag_deter_fixed import (
-    deter_fixed_gidx,
-)
-from schedule.deterministic.tnd.fag_deter_tnd_plan import (
-    init_tnd_metadata_schedule,
-    tnd_metadata_gidx,
-)
-from schedule.deterministic.tnd.fag_deter_tnd_dense import (
+from fag_deter_tnd_dense import (
     init_tnd_dense_schedule,
+    make_tnd_deter_schedule,
     tnd_dense_gidx,
 )
-from schedule.deterministic.fag_deter_state import (
-    make_tnd_deter_schedule,
-)
-from schedule.deterministic.tnd.fag_deter_tnd_sparse import (
-    init_tnd_sparse_schedule,
-    tnd_sparse_gidx,
-)
+from fag_deter_tnd_sparse import init_tnd_sparse_schedule, tnd_sparse_gidx
 from fag_tiling import Tmpl
 # --- end generated imports ---
 
@@ -207,24 +171,12 @@ def init_deter_schedule(
     cu_kv_tensor,
     used_q_tensor,
     used_kv_tensor,
-    metadata_tensor=None,
 ):
-    """Initialize one compiled schedule family on both cube and vector cores.
+    """Compute TND phase lengths once, identically on cube and vector cores.
 
-    TND locality families validate the metadata plan; legacy TND computes its
-    original closed form. Fixed families cache Host-selected parameters, while
-    legacy GQA selects its immutable dense schedule once per invocation.
+    This is scalar kernel state, not an ABI extension or a private workspace.
+    Fixed-layout kernels fold away the TND plan and retain their own schedule.
     """
-    if deter_family >= 12 and deter_family <= 20:
-        return init_tnd_metadata_schedule(
-            constInfo,
-            coreNum,
-            metadata_tensor,
-            cu_q_tensor,
-            cu_kv_tensor,
-            used_q_tensor,
-            used_kv_tensor,
-        )
     if layout == 1:
         if mask_mode == 0:
             return init_tnd_dense_schedule(
@@ -243,96 +195,38 @@ def init_deter_schedule(
             used_q_tensor,
             used_kv_tensor,
         )
-    plan = make_tnd_deter_schedule(0, 0, 0, 0, 0, 0, 0)
-    if deter_family == 4:
-        plan = init_gqa_dense_plan(
-            plan,
-            coreNum,
-            constInfo.deterM,
-            constInfo.deterN,
-            constInfo.bSize * constInfo.n2Size,
-            constInfo.gSize,
-            constInfo.deterDenseRound,
-        )
-    elif deter_family == 0 and swizzle == 0:
-        dense_grid = constInfo.sequsedQOptional + constInfo.sequsedKvOptional
-        if mask_mode == 0:
-            dense_grid = 1
-        if dense_grid > 0 and constInfo.gSize > 1:
-            plan = init_gqa_dense_plan(
-                plan,
-                coreNum,
-                constInfo.s1Outer,
-                constInfo.s2Outer,
-                constInfo.bSize * constInfo.n2Size,
-                constInfo.gSize,
-                0,
-            )
-    return plan
+    return make_tnd_deter_schedule(0, 0, 0, 0, 0, 0, 0)
 
 
-def init_deter_sync_policy(plan):
-    """Writer ownership changes tokens only for verified TND metadata plans."""
-    sync_dq = pl.astype(1, pl.DT_INT64)
-    sync_kv = pl.astype(1, pl.DT_INT64)
-    dq_group = pl.astype(1, pl.DT_INT64)
-    if deter_family == 14:
-        if plan.strategy == 3:
-            sync_dq = pl.astype(0, pl.DT_INT64)
-            sync_kv = pl.astype(0, pl.DT_INT64)
-    elif deter_family == 15 or deter_family == 17:
-        if plan.strategy == 4:
-            sync_kv = pl.astype(0, pl.DT_INT64)
-    elif deter_family == 16 or deter_family == 18:
-        if plan.strategy == 5:
-            sync_kv = pl.astype(0, pl.DT_INT64)
-            dq_group = pl.astype(4, pl.DT_INT64)
-    if plan.normalized == 1:
-        sync_dq = pl.astype(1, pl.DT_INT64)
-        sync_kv = pl.astype(1, pl.DT_INT64)
-        dq_group = pl.astype(1, pl.DT_INT64)
-    return sync_dq, sync_kv, dq_group
-
-
-def deter_dq_token_edges(physical_round, first_round, max_round, lag, group, sync_dq):
-    """Use source rounds, including empty slots, for grouped dQ ordering.
-
-    The compute pipeline is lag rounds behind the decoder. Flush a partial
-    final group before the common drain so every initialized token is consumed.
-    """
-    wait = pl.astype(sync_dq, pl.DT_INT64)
-    signal = pl.astype(sync_dq, pl.DT_INT64)
-    if group > 1:
-        logical = physical_round - lag
-        wait = pl.astype(0, pl.DT_INT64)
-        signal = pl.astype(0, pl.DT_INT64)
-        if logical >= first_round and logical < max_round:
-            if (logical - first_round) % group == 0:
-                wait = pl.astype(sync_dq, pl.DT_INT64)
-            if (logical - first_round + 1) % group == 0 or logical + 1 == max_round:
-                signal = pl.astype(sync_dq, pl.DT_INT64)
-    return wait, signal
-
-
-def ci_fixed_rounds(constInfo):
-    return pl.astype(constInfo.deterMaxRound, pl.DT_INT64)
-
-
-def deter_round_bounds(constInfo, coreNum, tnd_plan):
-    """All cores share a physical-round interval selected by the active family."""
-    if (deter_family >= 1 and deter_family <= 11) or (
-        deter_family >= 21 and deter_family <= 26
-    ):
-        return pl.astype(0, pl.DT_INT64), ci_fixed_rounds(constInfo)
+def deter_round_bounds(constInfo, coreNum, tnd_plan=None):
+    """All cores share one physical-round interval; swizzle stays unchanged."""
     if layout == 1:
         return pl.astype(0, pl.DT_INT64), tnd_plan.maxRound
-    if tnd_plan.gqaDenseRound > 0:
-        return pl.astype(0, pl.DT_INT64), pl.astype(
-            tnd_plan.gqaDenseRound * constInfo.s1Outer, pl.DT_INT64
-        )
     if swizzle == 0:
         return deter_lin_round_bounds(constInfo, coreNum)
     return pl.astype(0, pl.DT_INT64), deter_max_round(constInfo, coreNum)
+
+
+def deter_swz_gidx(constInfo, cBlockIdx, coreNum, roundId):
+    """deter+swizzle：与 ``block_idx_of`` 同映射，越界空槽 -1。"""
+    if mask_mode == 0:
+        n_col = constInfo.bSize * constInfo.n2Size * constInfo.gSize * constInfo.s2Outer
+        t = cBlockIdx + (roundId // constInfo.s1Outer) * coreNum
+        if t >= n_col:
+            return pl.astype(-1, pl.DT_INT64)
+        return pl.astype(
+            swizzle_idx(constInfo, cBlockIdx, coreNum, roundId), pl.DT_INT64
+        )
+    packed = cBlockIdx + roundId * coreNum
+    limit = (
+        constInfo.bSize
+        * constInfo.n2Size
+        * constInfo.gSize
+        * constInfo.totalPerBatchNum
+    )
+    if packed >= limit:
+        return pl.astype(-1, pl.DT_INT64)
+    return pl.astype(packed_to_dense_idx(constInfo, packed), pl.DT_INT64)
 
 
 def skip_empty_deter(
@@ -346,41 +240,14 @@ def skip_empty_deter(
     cu_q_tensor=None,
     cu_kv_tensor=None,
     tnd_plan=None,
-    metadata_tensor=None,
 ):
-    """Decode exactly one physical round; empty slots do not start a tile.
+    """deter+swizzle0：只算当前物理轮，空槽不启动新 tile。
 
     已到期的跨轮流水仍需消费，且必须透传对应 FIX token，不能整轮 continue。
     当前轮解码与有效任务前瞻分开，不能用前瞻游标推进流水物理轮次。
     """
     dead = pl.min(pl.max(roundId + 1 - maxRound, 0), 1)
-    if (deter_family >= 1 and deter_family <= 11) or (
-        deter_family >= 21 and deter_family <= 26
-    ):
-        gIdx = deter_fixed_gidx(
-            constInfo,
-            cBlockIdx,
-            coreNum,
-            roundId,
-            tnd_plan.gqaDenseK,
-            tnd_plan.gqaDenseRound,
-            tnd_plan.gqaDenseT1,
-            tnd_plan.gqaDenseT2,
-        )
-    elif deter_family >= 12 and deter_family <= 20:
-        gIdx = tnd_metadata_gidx(
-            constInfo,
-            cBlockIdx,
-            coreNum,
-            roundId,
-            tnd_plan,
-            metadata_tensor,
-            cu_q_tensor,
-            cu_kv_tensor,
-            used_q_tensor,
-            used_kv_tensor,
-        )
-    elif layout == 1:
+    if layout == 1:
         if mask_mode == 0:
             gIdx = tnd_dense_gidx(
                 constInfo,
@@ -415,16 +282,7 @@ def skip_empty_deter(
         )
         gIdx = gIdx * valid + pl.astype(-1, pl.DT_INT64) * (1 - valid)
     else:
-        gIdx = deter_lin_gidx(
-            constInfo,
-            cBlockIdx,
-            coreNum,
-            roundId,
-            tnd_plan.gqaDenseK,
-            tnd_plan.gqaDenseRound,
-            tnd_plan.gqaDenseT1,
-            tnd_plan.gqaDenseT2,
-        )
+        gIdx = deter_lin_gidx(constInfo, cBlockIdx, coreNum, roundId)
         if constInfo.sequsedQOptional + constInfo.sequsedKvOptional > 0:
             valid = seqused_block_valid(constInfo, gIdx, used_q_tensor, used_kv_tensor)
             gIdx = gIdx * valid + pl.astype(-1, pl.DT_INT64) * (1 - valid)
@@ -443,7 +301,6 @@ def find_next_valid_deter(
     cu_q_tensor=None,
     cu_kv_tensor=None,
     tnd_plan=None,
-    metadata_tensor=None,
 ):
     """返回下一个有效任务及其原始物理轮次；无任务时返回 (-1, maxRound)。
 
@@ -451,28 +308,6 @@ def find_next_valid_deter(
     此游标不控制 readyRound/FIX；空轮仍由主循环逐轮透传同步。
     """
     searchRound = pl.astype(startRound, pl.DT_INT64)
-    # Dense MHA starts at round zero. Prove a core permanently idle only on
-    # that initial lookup; active cores need no repeated geometry checks.
-    if startRound == 0 and deter_family == 0 and layout != 1 and swizzle == 0:
-        dense_grid = constInfo.sequsedQOptional + constInfo.sequsedKvOptional
-        if mask_mode == 0:
-            dense_grid = 1
-        if (
-            dense_grid > 0
-            and constInfo.gSize == 1
-            and coreNum > 0
-            and constInfo.bSize > 0
-            and constInfo.n2Size > 0
-            and constInfo.s1Outer > 0
-            and constInfo.s2Outer > 0
-        ):
-            active_cores = pl.min(
-                coreNum, constInfo.bSize * constInfo.n2Size * constInfo.s1Outer
-            )
-            if cBlockIdx >= active_cores:
-                # Only stop task lookahead. The caller still advances every
-                # physical round and propagates the original FIX tokens.
-                searchRound = pl.astype(maxRound, pl.DT_INT64)
     nextGIdx = pl.const(-1, pl.DT_INT64)
     nextRound = pl.astype(maxRound, pl.DT_INT64)
     while searchRound < maxRound:
@@ -487,7 +322,6 @@ def find_next_valid_deter(
             cu_q_tensor,
             cu_kv_tensor,
             tnd_plan,
-            metadata_tensor,
         )
         if candidateGIdx >= 0:
             nextGIdx = candidateGIdx
@@ -495,6 +329,22 @@ def find_next_valid_deter(
             break
         searchRound = followingRound
     return nextGIdx, nextRound
+
+
+def skip_deter_empty_pipe(gIdx, isLastLoop):
+    """deter+swizzle0 空槽且未收尾：跳过 mm/doFix，避免 CV 事件二次 wait。
+
+    空槽仍推进 denseCursor；taskId/L0C 只跟有效块。swizzle1 lockstep 不跳。
+    """
+    if deter == 0:
+        return 0
+    if swizzle == 1:
+        return 0
+    if gIdx >= 0:
+        return 0
+    if isLastLoop == 1:
+        return 0
+    return 1
 
 
 def next_work_gidx(
@@ -513,7 +363,7 @@ def next_work_gidx(
     batch_cursor=None,
 ):
     """下一块全局下标；本核没有活块时 -1。TND 时 cu 张量透传给 skip_invalid。0930 移植。"""
-    if swizzle == 0 or constInfo.normalSwizzleEnabled == 0:
+    if swizzle == 0:
         return skip_invalid(
             constInfo,
             denseCursor,
@@ -547,11 +397,25 @@ def fetch_work_gidx(
     used_kv_tensor=None,
     batch_cursor=None,
 ):
-    """Non-deterministic runner fetch; deterministic runners use physical rounds.
+    """主循环唯一取块入口，返回 (gIdx, nextCursor)。
 
-    Keep the two protocols separate: a valid-task cursor cannot drive the
-    deterministic pipeline's empty-slot relay and delayed reduction drain.
+    deter+swizzle0：核上闭式跳空槽，nextCursor 是下一轮下标。
+    deter+swizzle1：按轮 lockstep，空槽保持 -1，cursor 原样。
+    非 deter：next_work_gidx；线性支 nextCursor = gIdx+1。
     """
+    if deter == 1:
+        if swizzle == 1:
+            return (
+                deter_swz_gidx(constInfo, cBlockIdx, coreNum, roundId),
+                pl.astype(denseCursor, pl.DT_INT64),
+            )
+        return skip_empty_deter(
+            constInfo,
+            cBlockIdx,
+            coreNum,
+            denseCursor,
+            deter_max_round(constInfo, coreNum),
+        )
     gIdx = next_work_gidx(
         constInfo,
         cBlockIdx,
@@ -567,7 +431,7 @@ def fetch_work_gidx(
         used_kv_tensor,
         batch_cursor,
     )
-    if swizzle == 0 or constInfo.normalSwizzleEnabled == 0:
+    if swizzle == 0:
         if gIdx >= 0:
             return pl.astype(gIdx, pl.DT_INT64), pl.astype(gIdx + 1, pl.DT_INT64)
         return pl.astype(gIdx, pl.DT_INT64), pl.astype(blockEnd, pl.DT_INT64)
@@ -575,21 +439,24 @@ def fetch_work_gidx(
 
 
 # ==================================================================
-#  Swizzle 分核 —— ASC 连续有效块、大 dense 旋转、大 causal 双 head 折叠
+#  Swizzle 分核 —— 让同时在跑的核落在同一 head 内，命中 L2
 #  判据在 host（op_host/plan/flash_attn_grad_tiling_swizzle.cpp），
 #  这里只负责「已经决定开 swizzle」之后的下标映射。
 # ==================================================================
 
 
 def swizzle_idx(constInfo, cBlockIdx, coreNum, localIdx):
-    """ASC large-dense columns with a diagonal S1 rotation inside each column."""
+    """把本核的局部块序号映射成全局块下标。
+
+    局部序号 localIdx 先拆成「第几列 k」与「列内第几个 s1 块」，
+    列号再按跨步还原成全局列 t = cBlockIdx + k * coreNum，
+    最后由 t 解出 (head, s2Idx) 拼回全局下标。
+    """
     k = localIdx // constInfo.s1Outer
     s1Idx = localIdx % constInfo.s1Outer
     t = cBlockIdx + k * coreNum
     head = t // constInfo.s2Outer
     s2Idx = t % constInfo.s2Outer
-    if deter == 0:
-        s1Idx = (s2Idx + s1Idx) % constInfo.s1Outer
     return head * constInfo.s1oS2o + s2Idx * constInfo.s1Outer + s1Idx
 
 
@@ -597,17 +464,31 @@ def swizzle_idx(constInfo, cBlockIdx, coreNum, localIdx):
 #  AICPU metadata 布局 —— 与 flash_attn_grad_metadata_split.h 对齐
 # ==================================================================
 
-# Reader offsets live in fag_common; this layer only consumes metadata.
-# The tensor view uses Host metadataWordCount, including the optional TND tail.
+META_HEAD_FAG_START_INDEX = 7
+META_FAG_BLOCK_STARTS_OFFSET = 8
+META_FAG_BLOCK_ENDS_OFFSET = 44
+META_FAG_PRE_AIV_NUM = 121
+META_FAG_DQ_ROWS = 122
+META_FAG_DKV_ROWS = 123
+META_FAG_DQ_ROW_STARTS = 124
+META_FAG_DQ_ROW_ENDS = 196
+META_FAG_DKV_ROW_STARTS = 268
+META_FAG_DKV_ROW_ENDS = 340
+META_FAG_AIV_LIST_NUM = 72
+# fagOff 随 FA 段（aic * stride * B * N2）变大，与 shape 表无关。
+META_VIEW_LEN = 1048576
 
 
 def block_range_of(constInfo, cBlockIdx, coreNum, blockStart, blockEnd):
-    """Exact useful-task count; linear and unproved TND use metadata intervals."""
-    if swizzle == 0 or constInfo.normalSwizzleEnabled == 0:
+    """本核负责的块数。线性支读 metadata；swizzle 仍走列跨核公式。
+
+    mask+swizzle 按 packed 有效块跨核发，不再用整矩形列跨核。
+    分核开关用 tilingkey 裸名 ``swizzle``，与 ``next_work_gidx`` 一样先判
+    ``swizzle == 0``，死支公式不进线性核。
+    """
+    if swizzle == 0:
         return pl.astype(pl.max(blockEnd - blockStart, 0), pl.DT_INT64)
-    if constInfo.normalSwizzleKind == 2:
-        return pl.astype(causal_core_count(constInfo, cBlockIdx, coreNum), pl.DT_INT64)
-    if constInfo.normalSwizzleKind == 1 or deter == 1:
+    if mask_mode == 0:
         numColTasks = (
             constInfo.bSize * constInfo.n2Size * constInfo.gSize * constInfo.s2Outer
         )
@@ -620,19 +501,13 @@ def block_range_of(constInfo, cBlockIdx, coreNum, blockStart, blockEnd):
 
 def block_idx_of(constInfo, cBlockIdx, coreNum, blockStart, localIdx):
     """局部块序号 -> 全局块下标。线性支起点取自 metadata。"""
-    if swizzle == 0 or constInfo.normalSwizzleEnabled == 0:
+    if swizzle == 0:
         return pl.astype(blockStart + localIdx, pl.DT_INT64)
-    if constInfo.normalSwizzleKind == 2:
-        return pl.astype(
-            causal_swizzle_idx(constInfo, cBlockIdx, coreNum, localIdx), pl.DT_INT64
-        )
-    if constInfo.normalSwizzleKind == 1 or deter == 1:
+    if mask_mode == 0:
         return pl.astype(
             swizzle_idx(constInfo, cBlockIdx, coreNum, localIdx), pl.DT_INT64
         )
     gidx = col_local_to_global(constInfo, cBlockIdx, coreNum, localIdx)
-    if mask_mode == 0:
-        return pl.astype(gidx, pl.DT_INT64)
     return pl.astype(col_packed_to_dense(constInfo, gidx), pl.DT_INT64)
 
 
@@ -664,8 +539,7 @@ def need_load_kv(constInfo, gIdx, localIdx):
         gCur = s2_group_of(constInfo, gIdx)
         gPrev = s2_group_of(constInfo, pl.max(gIdx - 1, 0))
         return pl.max(isFirst, pl.min(gCur - gPrev, 1))
-    # Safe defaults until apply_l0c_s2 sees the actual adjacent decoded task.
-    return 1
+    return 1 - pl.min(localIdx % constInfo.s1Outer, 1)
 
 
 def next_s2_same(constInfo, gIdx, localIdx):
@@ -674,7 +548,7 @@ def next_s2_same(constInfo, gIdx, localIdx):
         return 1 - pl.min(
             s2_group_of(constInfo, gIdx + 1) - s2_group_of(constInfo, gIdx), 1
         )
-    return 0
+    return pl.min((localIdx + 1) % constInfo.s1Outer, 1)
 
 
 # ==================================================================
@@ -763,17 +637,16 @@ def set_run_info(
     # vec1 的 GM 行偏移也是它。两个子核各自算自己的 runInfo。
     runInfo.firstHalfS2RealSize = (s2Real + 1) // 2
 
-    # GS 的 C1/C2 使用实际 M，DualModeSplitM 将 M 补偶数后均分。
-    # 奇数尾块的第二个 AIV 不计算最后一行 padding；BN2 保持固定 64 行分界。
-    runInfo.firstHalfS1RealSize = VECTOR_BASEM
-    if template == Tmpl.BN2GS1S2:
-        runInfo.firstHalfS1RealSize = (s1Real + 1) // 2
+    # vector 侧两个子核各承担半个 S1：
+    # subIdx=0 取 firstHalf，subIdx=1 取剩余部分
+    # 两个 vector 子核的分界固定为 VECTOR_BASEM(64)，不能按 s1Real 折半：
+    # mm1/mm2 结果由 fixpipe 以 DualModeSplitM 写出，硬件在第 64 行处切分，
+    # 子核 0 恒拿块内 0..63 行、子核 1 恒拿 64..127 行。若分界跟着尾块变小，
+    # UB 里的数据与 VF 的行号就错位(实测尾块场景 dQ/dK/dV 全错)。
+    # 固定 64 同时天然满足 dS^T/P^T 的 NZ 分形 16 对齐要求。
+    # 本子核真实行数：尾块可能不足，甚至为 0(s1Real <= 64 时子核 1 无事可做)
     runInfo.halfS1RealSize = pl.max(
-        pl.min(
-            s1Real - subIdx * runInfo.firstHalfS1RealSize,
-            runInfo.firstHalfS1RealSize,
-        ),
-        0,
+        pl.min(s1Real - subIdx * VECTOR_BASEM, VECTOR_BASEM), 0
     )
 
     # BSND 布局的 GM 偏移
@@ -797,7 +670,7 @@ def set_run_info(
         runInfo.nzKvTile = (
             runInfo.boIdx * constInfo.n2Size + runInfo.n2oIdx
         ) * constInfo.s2Outer + runInfo.s2oIdx
-    rowBase = runInfo.queryOffset + subIdx * runInfo.firstHalfS1RealSize
+    rowBase = runInfo.queryOffset + subIdx * VECTOR_BASEM
     runInfo.loadBase = pl.max(pl.min(rowBase, constInfo.s1Size - VECTOR_BASEM), 0)
     runInfo.rowShift = rowBase - runInfo.loadBase
     # TND：lse 行地址 = boIdx * S1 + loadBase（全局 token 行，lse 是 2D
@@ -1160,15 +1033,8 @@ def _set_run_info_tnd_varlen(
     runInfo.s1RealSize = s1Real
     runInfo.s2RealSize = s2Real
     runInfo.firstHalfS2RealSize = (s2Real + 1) // 2
-    runInfo.firstHalfS1RealSize = VECTOR_BASEM
-    if template == Tmpl.BN2GS1S2:
-        runInfo.firstHalfS1RealSize = (s1Real + 1) // 2
     runInfo.halfS1RealSize = pl.max(
-        pl.min(
-            s1Real - subIdx * runInfo.firstHalfS1RealSize,
-            runInfo.firstHalfS1RealSize,
-        ),
-        0,
+        pl.min(s1Real - subIdx * VECTOR_BASEM, VECTOR_BASEM), 0
     )
     runInfo.queryOffset = tokenBaseQ + runInfo.s1oIdx * CUBE_BASEM
     runInfo.keyOffset = tokenBaseKV + runInfo.s2oIdx * CUBE_BASEN
@@ -1196,7 +1062,7 @@ def _set_run_info_tnd_varlen(
         )
     runInfo.batchS1Len = batchS1Len
     runInfo.batchS2Len = batchS2Len
-    rowBase = runInfo.queryOffset + subIdx * runInfo.firstHalfS1RealSize
+    rowBase = runInfo.queryOffset + subIdx * VECTOR_BASEM
     batchEndQ = tokenBaseQ + batchS1Len
     batchLoadBase = pl.max(pl.min(rowBase, batchEndQ - VECTOR_BASEM), tokenBaseQ)
     # Keep the vector y/dy/lse window inside the physical packed tensor.
@@ -1282,18 +1148,7 @@ def set_bn2_s2_range(constInfo, runInfo):
 
 
 def apply_l0c_s2(constInfo, runInfos, curInfo, taskId, ring):
-    """GS 按相邻有效任务的 (b,n2,s2o) 复用 K/V 并驻留 dK/dV。
-
-    G 不属于输出块身份：dense 的 S2Outer=1 跨 G 时也继续累加。
-    普通 swizzle 的组首、跨 head、causal 折叠都不能由 localIdx%M 推测。
-    当前任务默认 flush；实际的下一任务解码后才允许取消上一任务的 flush。
-    """
-    if template == Tmpl.BN2GS1S2 and swizzle == 0:
-        apply_s2_idx_no_change(runInfos, curInfo, taskId, ring)
-        return
-    if template == Tmpl.BN2GS1S2 and deter == 0:
-        apply_s2_idx_no_change(runInfos, curInfo, taskId, ring)
-        return
+    """TND、mask 或 deter+非 swizzle：按上一有效块的 (s2,b,n2) 开 L0C 累加。"""
     if layout == 1:
         apply_s2_idx_no_change(runInfos, curInfo, taskId, ring)
         return

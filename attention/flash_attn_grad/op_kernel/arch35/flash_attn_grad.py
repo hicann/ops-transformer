@@ -7,20 +7,36 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""FlashAttnGrad PyPTO Pro JIT entry.
+"""FlashAttnGrad kernel 入口 (PyPTO Pro)。
 
-Layout:
-  pipeline/ -- setup, preload loops and synchronization
-  compute/ -- Cube and Vector block computations
-  memory/ -- on-chip addresses and tile declarations
-  schedule/ -- task selection and RunInfo construction
-  schedule/deterministic/ -- state, shared formulas and family decoders
-  schedule/deterministic/tnd/ -- device-side TND metadata consumers
+只做**编译期分发**：``Tmpl.BN2GS1S2`` 且 ``d_align<=192`` 走
+``flash_attn_grad_preload3``（``runInfos[3]``），其余走
+``flash_attn_grad_preload2``（``runInfos[2]``）。
+实现按职责拆在同目录的 ``fag_*`` 模块：
 
-Keep exactly one @pl.jit kernel visible to pypto_codegen.py.
-FlashAttnGradTilingData/Key and the ping-pong arrays remain exported here.
-The entry selects preload3 for BN2GS1S2 with d_align <= 192, else preload2.
-TND planning remains in the metadata operator; these modules only consume it.
+===================  ============================================
+模块                  职责
+===================  ============================================
+``fag_common``       基本块尺寸、同步 flag、ConstInfo/RunInfo
+``fag_mem``          L1/L0/UB 地址与 mutex id
+``fag_tiling``       host 契约（TilingData / TilingKey）
+``fag_schedule``     块有效性、swizzle、RunInfo
+``fag_deter`` 确定性非 swizzle 闭式分核
+``fag_buffers``      片上 tile 声明
+``fag_block_cube``   C1..C5 五个 matmul
+``fag_block_vec``    V1..V6 与 pre/post 编排
+``fag_vector_api``   寄存器级 VF 微内核
+``attenmask``        mask 搬入与 softmax VF
+``fag_kernel``       两个模板入口 + 编译期分发
+``fag_kernel_norm``  非确定性 / BN2 主循环
+``fag_kernel_deter`` 确定性主循环
+===================  ============================================
+
+本文件必须保持「有且仅有一个 ``@pl.jit``」：codegen
+(``cmake/scripts/pypto_codegen.py``) 靠这一点在模块里找到 kernel。
+:class:`FlashAttnGradTilingData` / :class:`FlashAttnGradTilingKey` 在这里
+re-export，供 JIT 脚本按老路径 import。模板 / 对齐 / swizzle 判据只在
+host（``op_host/plan/*``）里实现，不再提供 Python 镜像。
 """
 
 import os
@@ -32,10 +48,7 @@ _KERNEL_DIR = os.path.dirname(os.path.abspath(__file__))
 if _KERNEL_DIR not in sys.path:
     sys.path.insert(0, _KERNEL_DIR)
 
-from pipeline.fag_kernel import (
-    flash_attn_grad_preload2,
-    flash_attn_grad_preload3,
-)
+from fag_kernel import flash_attn_grad_preload2, flash_attn_grad_preload3
 from fag_tiling import FlashAttnGradTilingData, FlashAttnGradTilingKey, Tmpl
 
 # 这四个 flag 是**按 taskId 奇偶下标取**的，故必须在运行期真的存在一个数组。

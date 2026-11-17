@@ -19,12 +19,10 @@ The returned synthetic max-shape index is NOT the normal TND packed index;
 physical GM offsets still come exclusively from cu_seqlens.
 """
 
-from schedule.deterministic.tnd.fag_deter_tnd_dense import (
+from fag_deter_tnd_dense import (
     pl,
     tnd_deter_lengths,
     tnd_permute_delta,
-)
-from schedule.deterministic.fag_deter_state import (
     make_tnd_deter_schedule,
     reset_tnd_batch_cursor,
 )

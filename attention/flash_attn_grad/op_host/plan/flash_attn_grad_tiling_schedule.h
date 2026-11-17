@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file flash_attn_grad_tiling_launch.h
+ * \file flash_attn_grad_tiling_schedule.h
  * \brief L4 策略层：决定启动多少 cube 核（blockDim）。
  *
  * 分核区间本身不在 host —— 它由 AICPU metadata 产出，kernel 运行期读取。
@@ -17,8 +17,8 @@
  * "允许多发、禁止少发" 的单向安全（多发的核 start==end 自然 no-op）。
  */
 
-#ifndef FLASH_ATTN_GRAD_TILING_LAUNCH_H_
-#define FLASH_ATTN_GRAD_TILING_LAUNCH_H_
+#ifndef FLASH_ATTN_GRAD_TILING_SCHEDULE_H_
+#define FLASH_ATTN_GRAD_TILING_SCHEDULE_H_
 
 #include "exe_graph/runtime/tiling_context.h"
 #include "../info/flash_attn_grad_tiling_info.h"
@@ -32,4 +32,4 @@ ge::graphStatus BuildSchedulePlan(gert::TilingContext* context, const FagParsedI
 
 } // namespace optiling
 
-#endif // FLASH_ATTN_GRAD_TILING_LAUNCH_H_
+#endif // FLASH_ATTN_GRAD_TILING_SCHEDULE_H_

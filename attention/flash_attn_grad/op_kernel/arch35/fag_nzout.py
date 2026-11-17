@@ -8,21 +8,16 @@
 # -----------------------------------------------------------------------------------------------------------
 """Per-S-tile FP32 NZ workspace and fused NZ-to-ND output conversion.
 
-Each tile owns 128 physical rows and runtime dAlign=ceil16(D) columns. The
-kernel packs all workspace segments with this width; the host reserves the
-compile-time 128-column tier as a capacity upper bound. GM FP32 NZ uses C0=8.
-TND batch gaps bound storage by N * (ceil(T / 128) + B - 1) tiles;
+Each tile owns 128 physical rows and dAlign columns (the kernel writes whole
+[128, dAlign] tiles; the route pins dAlign=128, and the host reserves the same
+width). GM FP32 NZ uses
+C0=8. TND batch gaps bound storage by N * (ceil(T / 128) + B - 1) tiles;
 effective sequence lengths never change these physical addresses.
 """
 
 import pypto_pro.language as pl
 
-from memory.fag_mem import (
-    POST_F16_ADDRS,
-    POST_F32_ADDRS,
-    MTX_UB_POST_F16,
-    MTX_UB_POST_F32,
-)
+from fag_mem import POST_F16_ADDRS, POST_F32_ADDRS, MTX_UB_POST_F16, MTX_UB_POST_F32
 
 
 def nz_workspace_tiles(total_tokens, batch, max_seq):

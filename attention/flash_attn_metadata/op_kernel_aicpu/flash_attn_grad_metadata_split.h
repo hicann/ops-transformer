@@ -28,7 +28,6 @@
 #define FLASH_ATTN_GRAD_METADATA_SPLIT_H
 
 #include "flash_attn_metadata_aicpu.h"
-#include "flash_attn_grad_tnd_plan.h"
 #include <algorithm>
 #include <cmath>
 #include <climits>
@@ -251,10 +250,6 @@ void FlashAttnMetadataCpuKernel::SupportTransBSND()
         }
     }
     if (fagIsAllSame_ && isTND) {
-        // FAG_LAYOUT_TYPE_INDEX publishes this actual-cu proof for diagnostics.
-        // It normalizes scheduling only: the FAG kernel still uses physical TND
-        // token offsets/LSE, and independently verifies both cu arrays before
-        // admitting its non-deterministic uniform swizzle mapping.
         fagLayoutType_ = FAG_INPUT_FORMAT_BS2N2GD;
         fagUseTndSplit_ = false;
         if (fagSparseMode_ == FAG_SPARSE_RIGHT_DOWN_CAUSAL || fagSparseMode_ == FAG_SPARSE_BAND) {
@@ -285,21 +280,10 @@ void FlashAttnMetadataCpuKernel::SetFagSplitAxis()
 
     // Match pypto host: single-block BN2 (S<=128) or MultiBlk (S in (128, 640]
     // and BN gate). Mask 3/4 is allowed on BN2 (kernel skip_invalid / packed).
-    // GQA / D>MAX_HEAD_DIM / D!=Dv stay on GS1S2.
-    //
-    // 变长 TND：host 用 max_seqlen 作每 batch 上界，两侧 ≤128 时每 batch 都
-    // 只有一个基本块，可走 BN2 单块（与 host TndVarlenBn2SingleFeasible 一
-    // 一对应）。seqused 诱导的 TND 分核（非 TND 布局）仍保持 GS1S2；零长
-    // batch 由 kernel 的 BN2 pre 按 batch 补零，故这里不再用
-    // fagIsSeqExistZero_ 把该档踢回 GS（host 看不到这个条件，必须同步）。
+    // GQA / D>MAX_HEAD_DIM / D!=Dv / variable-length TND stay on GS1S2.
     constexpr int64_t BN2_MAX_D = 768;
-    const bool tndVarlen = (fagLayoutType_ == FAG_INPUT_FORMAT_TND) && fagUseTndSplit_ && !fagHasSeqused_;
-    // maskMode_ 已在 InitFagLayoutAndSparse 把 win(-1,-1) 归一成 0；剩下的 4
-    // 是真实窗口，变长下单块可能整块无效，与 host 一致地保持 GS1S2。
-    const bool tndSingleBounded =
-        tndVarlen && maskMode_ != 4 && maxSeqlenQ_ > 0 && maxSeqlenKv_ > 0 && maxSeqlenQ_ <= 128 && maxSeqlenKv_ <= 128;
-    fagIsBn2_ = (s1 <= 128 && s2 <= 128) && (n1 == n2) && (d <= BN2_MAX_D) && (d == d1) &&
-                (!fagUseTndSplit_ || tndSingleBounded);
+    fagIsBn2_ = (s1 <= 128 && s2 <= 128) && (n1 == n2) && (d <= BN2_MAX_D) && (d == d1) && !fagUseTndSplit_ &&
+                !fagIsSeqExistZero_;
     constexpr int64_t BN2_MULTIBLK_SEQ = 640;
     constexpr int64_t BN2_MULTIBLK_BN_128 = 128;
     constexpr int64_t BN2_MULTIBLK_BN_256 = 256;
@@ -312,8 +296,9 @@ void FlashAttnMetadataCpuKernel::SetFagSplitAxis()
     if (fagIsBn2MultiBlk_) {
         fagIsBn2_ = true;
     }
-    // asc 的 "TND 且 d>128 → 放弃 BN2" 是单块的历史限制；PyPTO BN2 已支持
-    // D≤768（含 192/256/768 的 workspace 档），变长 TND 不再套用这条。
+    if (fagIsBn2_ && fagUseTndSplit_ && d > 128) {
+        fagIsBn2_ = false;
+    }
     if (fagIsBn2_) {
         fagSplitAxis_ = FAG_SPLIT_AXIS_BN2;
     } else {
@@ -1198,18 +1183,6 @@ void FlashAttnMetadataCpuKernel::GenFagMetadata(uint32_t sectionNum)
     fag[FAG_DKV_ROWS_INDEX] = static_cast<FA_METADATA_T>(dkvRows);
     FagSplitRows(dqRows, nAiv, fag + FAG_DQ_ROW_STARTS_OFFSET, fag + FAG_DQ_ROW_ENDS_OFFSET);
     FagSplitRows(dkvRows, nAiv, fag + FAG_DKV_ROW_STARTS_OFFSET, fag + FAG_DKV_ROW_ENDS_OFFSET);
-    if (layoutQ_ == "TND" && layoutKv_ == "TND") {
-        const auto shape = metadata_->GetTensorShape();
-        const int64_t words = shape != nullptr && shape->GetDims() == 1 ? shape->GetDimSize(0) : 0;
-        const int64_t tailOffset = static_cast<int64_t>(fagOffset) + FAG_METADATA_SIZE;
-        const int64_t required = fag_pto_tnd::WordCount(batchSize_);
-        if (words >= tailOffset && words - tailOffset >= required) {
-            const auto plan =
-                fag_pto_tnd::Build(actualSeqlenQ_, actualSeqlenKv_, numHeadsKv_, fagG_, headDim_, headDimV_,
-                                   aicCoreNum_, maskMode_, winLeft_, winRight_, fagBlockOuter_);
-            (void)fag_pto_tnd::Serialize(plan, aicCoreNum_, basePtr + tailOffset, words - tailOffset);
-        }
-    }
 }
 
 // ===== FAG metadata end =====

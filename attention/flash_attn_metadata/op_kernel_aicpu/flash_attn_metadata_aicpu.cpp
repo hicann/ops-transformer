@@ -467,14 +467,6 @@ bool FlashAttnMetadataCpuKernel::BalanceSchedule(load_balance::SectionStreamKRes
 
 bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult& splitRes)
 {
-    const auto shape = metadata_->GetTensorShape();
-    const int64_t words = shape != nullptr && shape->GetDims() == 1 ? shape->GetDimSize(0) : 0;
-    const int64_t required = METADATA_STRIDE +
-                             static_cast<int64_t>(splitRes.sectionNum) *
-                                 (static_cast<int64_t>(aicCoreNum_) + static_cast<int64_t>(aivCoreNum_)) *
-                                 METADATA_STRIDE +
-                             (fagIsGradEnabled_ ? FAG_METADATA_SIZE : 0);
-    KERNEL_CHECK_FALSE(words >= required, false, "metadata storage is too short for the generated sections");
     detail::FaMetadata faMetadata(aicCoreNum_, aivCoreNum_, splitRes.sectionNum, metadata_->GetData());
     faMetadata.Clear(); // set to all 0
 
