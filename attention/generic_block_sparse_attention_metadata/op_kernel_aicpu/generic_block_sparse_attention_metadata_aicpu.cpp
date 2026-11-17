@@ -23,6 +23,7 @@ constexpr int32_t TND_SPARSE_BLOCK_COUNT_DIM_NUM = 2;
 constexpr int32_t TND_BLOCK_CAPACITY_DIM_INDEX = 2;
 // Union size is read from block_shape_x; only 8 is supported today.
 constexpr int64_t GBSA_SUPPORTED_UNION_SIZE = 8;
+constexpr int64_t GBSA_UNION_MAX_ROWS = 128;
 
 bool HasTensorShape(const Tensor* tensor)
 {
@@ -126,8 +127,8 @@ bool GenericBlockSparseAttentionMetadataAicpu::CheckInputs()
         KERNEL_LOG_ERROR("Union mode requires packed GQA, kvHeads>=1, residual_block_mode=0 and is_consistent_topk=0.");
         return false;
     }
-    if (maskType_ == 3 && quantType_ == 6) {
-        KERNEL_LOG_ERROR("Union mode only supports quantType=0 or 5.");
+    if (maskType_ == 3 && !generic_block_sparse_attention_metadata::IsUnionQuantTypeSupported(quantType_)) {
+        KERNEL_LOG_ERROR("Union mode only supports quantType=0 or 5, got %lld.", quantType_);
         return false;
     }
     // Regular: blockShapeX=1. Union: blockShapeX is unionSize (only 8 supported).
@@ -148,6 +149,16 @@ bool GenericBlockSparseAttentionMetadataAicpu::CheckInputs()
         (isConsistentTopk_ != 0 && isConsistentTopk_ != 1)) {
         KERNEL_LOG_ERROR("Invalid scheduling attrs for GenericBlockSparseAttentionMetadata.");
         return false;
+    }
+
+    if (maskType_ == 3) {
+        const int64_t groupSize = numQHeads_ / numKvHeads_;
+        if (groupSize > GBSA_UNION_MAX_ROWS / blockShapeX_) {
+            KERNEL_LOG_ERROR(
+                "Union requires block_shape_x * groupSize <= %lld, got block_shape_x=%lld, groupSize=%lld.",
+                GBSA_UNION_MAX_ROWS, blockShapeX_, groupSize);
+            return false;
+        }
     }
 
     sparseHeadNum_ = isPackedGQA_ == 1 ? numKvHeads_ : numQHeads_;

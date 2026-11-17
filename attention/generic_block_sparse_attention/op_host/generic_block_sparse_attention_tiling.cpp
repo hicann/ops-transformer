@@ -1169,14 +1169,14 @@ ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext* con
         }
         const auto* maskShape = context->GetOptionalInputShape(ATTEN_MASK_INDEX);
         const auto* maskDesc = context->GetOptionalInputDesc(ATTEN_MASK_INDEX);
+        const int64_t maskColumns = static_cast<int64_t>(topK_) * blockShapeY_;
         if (maskShape == nullptr || maskDesc == nullptr || maskDesc->GetDataType() != ge::DT_INT32 ||
             maskShape->GetStorageShape().GetDimNum() != 3U ||
             maskShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(kvHeads_) ||
             maskShape->GetStorageShape().GetDim(1) != static_cast<int64_t>(qBlockNum_) ||
-            maskShape->GetStorageShape().GetDim(2) !=
-                static_cast<int64_t>(topK_) * static_cast<int64_t>(blockShapeY_)) {
-            OP_LOGE(context->GetNodeName(), "Union exactMask must be INT32 [kvHeads=%u, G=%u, U*blockShapeY=%u].",
-                    kvHeads_, qBlockNum_, topK_ * blockShapeY_);
+            maskShape->GetStorageShape().GetDim(2) != maskColumns) {
+            OP_LOGE(context->GetNodeName(), "Union exactMask must be INT32 [kvHeads=%u, G=%u, U*blockShapeY=%lld].",
+                    kvHeads_, qBlockNum_, static_cast<long long>(maskColumns));
             return ge::GRAPH_FAILED;
         }
     } else if (context->GetOptionalInputTensor(ATTEN_MASK_INDEX) != nullptr) {
@@ -1712,18 +1712,16 @@ uint64_t GBSATiling::GenerateTilingKey()
         }
     }
 
-    // Arch22 shares its existing dense/paged dispatch across layouts. Layout strides
-    // are carried in tiling data, including when static compilation folds the data.
-    // Arch35 retains layout-specific template dispatch. Union dense KV uses the TND field
-    // (layout comes from tiling data); paged Union keeps PA_BBND/PA_BNBD keys.
-    tilingKey += socVer_ != SOC_VER_950_CODE ?
+    // Regular Arch22 shares dense/paged entries. Union uses the same layout
+    // fields on both architectures so the kernel can specialize its addressing.
+    const bool layoutInKey = isArch35 || maskType_ == GBSA_MASK_TYPE_UNION;
+    tilingKey += !layoutInKey ?
                      (isPaged_ ? GbsaTilingKeyEncoding::KV_PA_BBND_FIELD : GbsaTilingKeyEncoding::KV_TND_FIELD) :
-                 layoutKv_ == "PA_BBND"            ? GbsaTilingKeyEncoding::KV_PA_BBND_FIELD :
-                 layoutKv_ == "PA_BNBD"            ? GbsaTilingKeyEncoding::KV_PA_BNBD_FIELD :
-                 maskType_ == GBSA_MASK_TYPE_UNION ? GbsaTilingKeyEncoding::KV_TND_FIELD :
-                 layoutKv_ == "BNSD"               ? GbsaTilingKeyEncoding::KV_BNSD_FIELD :
-                 layoutKv_ == "BSND"               ? GbsaTilingKeyEncoding::KV_BSND_FIELD :
-                                                     GbsaTilingKeyEncoding::KV_TND_FIELD;
+                 layoutKv_ == "PA_BBND" ? GbsaTilingKeyEncoding::KV_PA_BBND_FIELD :
+                 layoutKv_ == "PA_BNBD" ? GbsaTilingKeyEncoding::KV_PA_BNBD_FIELD :
+                 layoutKv_ == "BNSD"    ? GbsaTilingKeyEncoding::KV_BNSD_FIELD :
+                 layoutKv_ == "BSND"    ? GbsaTilingKeyEncoding::KV_BSND_FIELD :
+                                          GbsaTilingKeyEncoding::KV_TND_FIELD;
 
     if (isPaged_) {
         tilingKey += GbsaTilingKeyEncoding::PAGED_FIELD;
@@ -1742,9 +1740,8 @@ uint64_t GBSATiling::GenerateTilingKey()
         tilingKey += static_cast<uint64_t>(maskType_) * GbsaTilingKeyEncoding::MASK_FIELD;
     }
 
-    // Q layout: TND = 2, BNSD = 3, BSND = 4. Union folds Q layout into tiling data.
-    tilingKey += (socVer_ != SOC_VER_950_CODE || maskType_ == GBSA_MASK_TYPE_UNION) ?
-                     GbsaTilingKeyEncoding::Q_TND_FIELD :
+    // Q layout: TND = 2, BNSD = 3, BSND = 4.
+    tilingKey += !layoutInKey       ? GbsaTilingKeyEncoding::Q_TND_FIELD :
                  layoutQ_ == "BNSD" ? GbsaTilingKeyEncoding::Q_BNSD_FIELD :
                  layoutQ_ == "BSND" ? GbsaTilingKeyEncoding::Q_BSND_FIELD :
                                       GbsaTilingKeyEncoding::Q_TND_FIELD;

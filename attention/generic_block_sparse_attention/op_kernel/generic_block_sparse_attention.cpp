@@ -658,6 +658,34 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
         TILING_KEY_IS(GBSA_BF16_TND_PA_BBND_TILING_LSE_OUT_UNION);
         TILING_KEY_IS(GBSA_FP16_TND_TND_TILING_LSE_OUT_UNION);
         TILING_KEY_IS(GBSA_BF16_TND_TND_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_TND_PA_BNBD_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_BNSD_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_PA_BBND_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_PA_BNBD_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_BSND_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_PA_BBND_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_PA_BNBD_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_TND_PA_BNBD_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_BNSD_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_PA_BBND_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_PA_BNBD_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_BSND_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_PA_BBND_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_PA_BNBD_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_TND_PA_BNBD_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_BNSD_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_PA_BBND_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_PA_BNBD_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_BSND_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_PA_BBND_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_PA_BNBD_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_TND_PA_BNBD_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_BNSD_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_PA_BBND_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_PA_BNBD_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_BSND_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_PA_BBND_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_PA_BNBD_TILING_LSE_OUT_UNION);
 
         TILING_KEY_IS(GBSA_FP16_TND_TND_TILING_LSE_OUT);
         TILING_KEY_IS(GBSA_FP16_TND_TND_HALFSM_TILING_LSE_OUT);
@@ -801,36 +829,150 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
         GbsaInferIntfRegularArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling);
-#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BBND_TILING_UNION
-        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BBND_TILING_UNION
-        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+// Union layouts: qLayout 0 = TND, 1 = BSND, 2 = BNSD; kvLayout 0 = TND, 1 = BSND (PA_BBND pages use BSND
+// strides), 2 = BNSD, 3 = BNSD paged (PA_BNBD pages use BNSD strides); isPaged = true marks the PA layouts.
 #elif TILING_KEY_VAR == GBSA_FP16_TND_TND_TILING_UNION
-        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, false>(
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, false, 0U, 0U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BBND_TILING_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, true, 0U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BNBD_TILING_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, true, 0U, 3U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_BNSD_TILING_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, false, 2U, 2U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_PA_BBND_TILING_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, true, 2U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_PA_BNBD_TILING_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, true, 2U, 3U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_BSND_TILING_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, false, 1U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_PA_BBND_TILING_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, true, 1U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_PA_BNBD_TILING_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::NONE, true, 1U, 3U>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_BF16_TND_TND_TILING_UNION
-        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, false>(
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, false, 0U, 0U>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BBND_TILING_LSE_OUT_UNION
-        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true>(
+#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BBND_TILING_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, true, 0U, 1U>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BBND_TILING_LSE_OUT_UNION
-        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true>(
+#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BNBD_TILING_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, true, 0U, 3U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_BNSD_TILING_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, false, 2U, 2U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_PA_BBND_TILING_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, true, 2U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_PA_BNBD_TILING_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, true, 2U, 3U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_BSND_TILING_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, false, 1U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_PA_BBND_TILING_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, true, 1U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_PA_BNBD_TILING_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::NONE, true, 1U, 3U>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_FP16_TND_TND_TILING_LSE_OUT_UNION
-        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, false>(
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, false, 0U, 0U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BBND_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 0U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BNBD_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 0U, 3U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_BNSD_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, false, 2U, 2U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_PA_BBND_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 2U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_PA_BNBD_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 2U, 3U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_BSND_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, false, 1U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_PA_BBND_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 1U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_PA_BNBD_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<half, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 1U, 3U>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_BF16_TND_TND_TILING_LSE_OUT_UNION
-        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, false>(
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, false, 0U, 0U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BBND_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 0U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BNBD_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 0U, 3U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_BNSD_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, false, 2U, 2U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_PA_BBND_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 2U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_PA_BNBD_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 2U, 3U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_BSND_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, false, 1U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_PA_BBND_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 1U, 1U>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_PA_BNBD_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionArch22<bfloat16_t, float, float, NpuArch::Epilogue::LseMode::OUT_ONLY, true, 1U, 3U>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #endif
@@ -965,6 +1107,54 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
         TILING_KEY_IS(GBSA_FP8_TND_PA_BBND_FP32SM_BF16_TILING_LSE_OUT_UNION);
         TILING_KEY_IS(GBSA_FP8_TND_TND_FP32SM_BF16_TILING_LSE_OUT_UNION);
         TILING_KEY_IS(GBSA_FP8_TND_PA_BNBD_FP32SM_BF16_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_BNSD_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_PA_BBND_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_PA_BNBD_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_BSND_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_PA_BBND_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_PA_BNBD_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_BNSD_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_PA_BBND_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_PA_BNBD_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_BSND_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_PA_BBND_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_PA_BNBD_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_BNSD_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_PA_BBND_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BNSD_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_BSND_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP16_BSND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_BNSD_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_PA_BBND_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BNSD_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_BSND_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_BF16_BSND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_BNSD_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BBND_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BNBD_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_BSND_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BBND_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BNBD_FP32SM_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_BNSD_FP32SM_BF16_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BBND_FP32SM_BF16_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BNBD_FP32SM_BF16_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_BSND_FP32SM_BF16_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BBND_FP32SM_BF16_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BNBD_FP32SM_BF16_TILING_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_BNSD_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BBND_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_BSND_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_BNSD_FP32SM_BF16_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BBND_FP32SM_BF16_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BNSD_PA_BNBD_FP32SM_BF16_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_BSND_FP32SM_BF16_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BBND_FP32SM_BF16_TILING_LSE_OUT_UNION);
+        TILING_KEY_IS(GBSA_FP8_BSND_PA_BNBD_FP32SM_BF16_TILING_LSE_OUT_UNION);
         TILING_KEY_IS(GBSA_FP16_TND_PA_BBND_FP32SM_TILING_UNION);
         TILING_KEY_IS(GBSA_BF16_TND_PA_BBND_FP32SM_TILING_UNION);
         TILING_KEY_IS(GBSA_FP16_TND_PA_BNBD_FP32SM_TILING_UNION);
@@ -2584,14 +2774,15 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                                     NpuArch::Epilogue::LseFormat::TN1, bfloat16_t>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling);
-#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_TILING_UNION
-        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND,
-                              true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+// Union PA layouts: PA_BBND pages use BSND strides and PA_BNBD pages use BNSD strides.
 #elif TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_TILING_UNION
         GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::TND,
                               false, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND,
+                              true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BNBD_FP32SM_TILING_UNION
@@ -2599,15 +2790,45 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                               true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_BF16_TILING_UNION
-        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::TND,
-                              GbsaKernelArch35::Format::BSND, true, NpuArch::Epilogue::LseMode::NONE,
-                              NpuArch::Epilogue::LseFormat::TN1>(
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD,
+                              false, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BSND,
+                              true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD,
+                              true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND,
+                              false, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND,
+                              true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BNSD,
+                              true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_BF16_TILING_UNION
         GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::TND,
                               GbsaKernelArch35::Format::TND, false, NpuArch::Epilogue::LseMode::NONE,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_BF16_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::TND,
+                              GbsaKernelArch35::Format::BSND, true, NpuArch::Epilogue::LseMode::NONE,
                               NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
@@ -2617,9 +2838,40 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                               NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
-        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND,
-                              true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_BF16_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BNSD,
+                              GbsaKernelArch35::Format::BNSD, false, NpuArch::Epilogue::LseMode::NONE,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_BF16_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BNSD,
+                              GbsaKernelArch35::Format::BSND, true, NpuArch::Epilogue::LseMode::NONE,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_BF16_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BNSD,
+                              GbsaKernelArch35::Format::BNSD, true, NpuArch::Epilogue::LseMode::NONE,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_BF16_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BSND,
+                              GbsaKernelArch35::Format::BSND, false, NpuArch::Epilogue::LseMode::NONE,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_BF16_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BSND,
+                              GbsaKernelArch35::Format::BSND, true, NpuArch::Epilogue::LseMode::NONE,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_BF16_TILING_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BSND,
+                              GbsaKernelArch35::Format::BNSD, true, NpuArch::Epilogue::LseMode::NONE,
+                              NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_TILING_LSE_OUT_UNION
@@ -2627,20 +2879,55 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                               false, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND,
+                              true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
         GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BNSD,
                               true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_BF16_TILING_LSE_OUT_UNION
-        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::TND,
-                              GbsaKernelArch35::Format::BSND, true, NpuArch::Epilogue::LseMode::OUT_ONLY,
-                              NpuArch::Epilogue::LseFormat::TN1>(
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD,
+                              false, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BSND,
+                              true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD,
+                              true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND,
+                              false, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND,
+                              true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BNSD,
+                              true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_FP8_TND_TND_FP32SM_BF16_TILING_LSE_OUT_UNION
         GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::TND,
                               GbsaKernelArch35::Format::TND, false, NpuArch::Epilogue::LseMode::OUT_ONLY,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP32SM_BF16_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::TND,
+                              GbsaKernelArch35::Format::BSND, true, NpuArch::Epilogue::LseMode::OUT_ONLY,
                               NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
@@ -2650,15 +2937,50 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                               NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BBND_FP32SM_TILING_UNION
-        // maskType=3 → isolated Union kernel / Union* templates
-        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND, true,
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_BNSD_FP32SM_BF16_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BNSD,
+                              GbsaKernelArch35::Format::BNSD, false, NpuArch::Epilogue::LseMode::OUT_ONLY,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BBND_FP32SM_BF16_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BNSD,
+                              GbsaKernelArch35::Format::BSND, true, NpuArch::Epilogue::LseMode::OUT_ONLY,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BNSD_PA_BNBD_FP32SM_BF16_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BNSD,
+                              GbsaKernelArch35::Format::BNSD, true, NpuArch::Epilogue::LseMode::OUT_ONLY,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_BSND_FP32SM_BF16_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BSND,
+                              GbsaKernelArch35::Format::BSND, false, NpuArch::Epilogue::LseMode::OUT_ONLY,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BBND_FP32SM_BF16_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BSND,
+                              GbsaKernelArch35::Format::BSND, true, NpuArch::Epilogue::LseMode::OUT_ONLY,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP8_BSND_PA_BNBD_FP32SM_BF16_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnionFp8<fp8_e4m3fn_t, bfloat16_t, float, GbsaKernelArch35::Format::BSND,
+                              GbsaKernelArch35::Format::BNSD, true, NpuArch::Epilogue::LseMode::OUT_ONLY,
+                              NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_TND_TND_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::TND, false,
                            NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BBND_FP32SM_TILING_UNION
-        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND,
-                           true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BBND_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND, true,
+                           NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BNBD_FP32SM_TILING_UNION
@@ -2666,13 +2988,33 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                            NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BNBD_FP32SM_TILING_UNION
-        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BNSD,
-                           true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_BNSD_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD, false,
+                           NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_FP16_TND_TND_FP32SM_TILING_UNION
-        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::TND, false,
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_PA_BBND_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BSND, true,
+                           NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_PA_BNBD_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD, true,
+                           NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_BSND_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND, false,
+                           NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_PA_BBND_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND, true,
+                           NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_PA_BNBD_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BNSD, true,
                            NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
@@ -2681,24 +3023,44 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                            false, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
-        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND, true,
-                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BBND_FP32SM_TILING_UNION
         GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND,
-                           true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+                           true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
-        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BNSD, true,
-                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
-#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
+#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BNBD_FP32SM_TILING_UNION
         GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BNSD,
-                           true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+                           true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_BNSD_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD,
+                           false, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_PA_BBND_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BSND,
+                           true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_PA_BNBD_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD,
+                           true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_BSND_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND,
+                           false, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_PA_BBND_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND,
+                           true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_PA_BNBD_FP32SM_TILING_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BNSD,
+                           true, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_FP16_TND_TND_FP32SM_TILING_LSE_OUT_UNION
@@ -2706,9 +3068,89 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                            NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND, true,
+                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BNSD, true,
+                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_BNSD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD, false,
+                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BSND, true,
+                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BNSD_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD, true,
+                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_BSND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND, false,
+                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND, true,
+                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_FP16_BSND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<half, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BNSD, true,
+                           NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_BF16_TND_TND_FP32SM_TILING_LSE_OUT_UNION
         GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::TND,
                            false, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BSND,
+                           true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_TND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::TND, GbsaKernelArch35::Format::BNSD,
+                           true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_BNSD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD,
+                           false, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BSND,
+                           true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BNSD_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BNSD, GbsaKernelArch35::Format::BNSD,
+                           true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_BSND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND,
+                           false, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_PA_BBND_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND,
+                           true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
+#elif TILING_KEY_VAR == GBSA_BF16_BSND_PA_BNBD_FP32SM_TILING_LSE_OUT_UNION
+        GbsaInferIntfUnion<bfloat16_t, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BNSD,
+                           true, NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling, attenMask);
 #elif TILING_KEY_VAR == GBSA_FP16_TND_PA_BBND_FP32SM_TILING || \

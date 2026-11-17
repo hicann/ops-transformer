@@ -10,7 +10,7 @@
 
 #include "../arch35/kernel_utils.hpp"
 #include "../kernel_common.hpp"
-#include "../generic_block_sparse_attention_metadata_kernel.h"
+#include "../generic_block_sparse_attention_fd_utils.h"
 
 using namespace NpuArch;
 using namespace tla;
@@ -21,7 +21,7 @@ namespace GbsaKernelArch35 {
 // generic_block_sparse_attention_kernel_arch35.h (GbsaRegularKernelArch35).
 // isFp8 selects FP8 QKV/P physical-row / UB budget paths; O always comes from Rescale.
 template <class EpiloguePrepareKvOffsets, class BlockMmadQK, class EpilogueOnlineSoftmax, class BlockMmadPV,
-          class EpilogueRescaleO, Format kvFormat, bool isPaged, bool isFp8>
+          class EpilogueRescaleO, Format qFormat, Format kvFormat, bool isPaged, bool isFp8>
 class GbsaUnionKernelArch35 {
 public:
     using ArchTag = typename BlockMmadPV::ArchTag;
@@ -60,16 +60,16 @@ public:
         GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, tilingDataLocal,
                                     params.tiling);
         const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData = &tilingDataLocal;
-        FetchBaseShapeInfo(tilingData, params.metaData);
-        CalcOnChipBufTileInfo(tilingData);
-        CalcUBufTileInfo();
-        __gm__ const GbsaMetadata::Metadata* meta =
-            reinterpret_cast<__gm__ const GbsaMetadata::Metadata*>(params.metaData);
-        uint32_t coreIdx = AscendC::GetBlockIdx();
-        const uint32_t coreNum = AscendC::GetBlockNum();
+        __gm__ const auto* meta = reinterpret_cast<__gm__ const GbsaMetadata::Metadata*>(params.metaData);
         if (!ValidateMetadata(meta, tilingData)) {
             return;
         }
+        totalTaskNum_ = static_cast<uint32_t>(meta->saTotalTaskNum);
+        FetchBaseShapeInfo(tilingData);
+        CalcOnChipBufTileInfo(tilingData);
+        CalcUBufTileInfo();
+        uint32_t coreIdx = AscendC::GetBlockIdx();
+        const uint32_t coreNum = AscendC::GetBlockNum();
 
         AscendC::GlobalTensor<ElementQ> gQ;
         gQ.SetGlobalBuffer((__gm__ ElementQ*)params.q);
@@ -85,7 +85,7 @@ public:
         }
         AscendC::GlobalTensor<int64_t> gCuSeqLengthsKv;
         if constexpr (!isPaged) {
-            if (qFormat_ == Format::TND) {
+            if constexpr (qFormat == Format::TND) {
                 gCuSeqLengthsKv.SetGlobalBuffer((__gm__ int64_t*)params.cuSeqLengthsKv);
             }
         }
@@ -95,7 +95,7 @@ public:
 
         gExactMask.SetGlobalBuffer((__gm__ int32_t*)params.attenMask);
         AscendC::GlobalTensor<int64_t> gCuSeqLengths;
-        if (qFormat_ == Format::TND) {
+        if constexpr (qFormat == Format::TND) {
             gCuSeqLengths.SetGlobalBuffer((__gm__ int64_t*)params.cuSeqLengths);
         }
         AscendC::GlobalTensor<int32_t> gSequsedQ;
@@ -132,7 +132,7 @@ public:
         const uint32_t kvOffsetGroupWords = CalcKvOffsetGroupWords<isPaged>(mm1L1TileN_, blockShapeY_);
         const uint64_t strideKVRow = isPaged ?
                                          GbsaLayoutHelper<kvFormat>::TokenStride(kvHeads_, embed_) :
-                                         (qFormat_ == Format::BNSD ? embed_ : static_cast<uint64_t>(kvHeads_) * embed_);
+                                         (qFormat == Format::BNSD ? embed_ : static_cast<uint64_t>(kvHeads_) * embed_);
 
         InitSyncFlags<4, 4, 4>();
 
@@ -159,7 +159,7 @@ public:
 
         uint32_t groupSize = groupSize_;
         const uint64_t strideQHead =
-            qFormat_ == Format::BNSD ? GbsaLayoutHelper<Format::BNSD>::HeadStride(qSeqCapacity_, embed_) : embed_;
+            qFormat == Format::BNSD ? GbsaLayoutHelper<Format::BNSD>::HeadStride(qSeqCapacity_, embed_) : embed_;
         uint32_t embedRound = RoundUp(embed_, 16);
 
 #ifdef __DAV_VEC__
@@ -217,7 +217,7 @@ public:
             const uint32_t qTokenInBatch = unitInBatch * UNION_SIZE;
             const uint32_t rowsInUnit = min(UNION_SIZE, qSeqlen - qTokenInBatch);
             const uint32_t taskRows = rowsInUnit * groupSize;
-            const bool contiguousIo = qFormat_ == Format::TND && (kvHeads_ == 1U || rowsInUnit <= 1U);
+            const bool contiguousIo = qFormat == Format::TND && (kvHeads_ == 1U || rowsInUnit <= 1U);
             uint64_t gmOffsetQ = UnionTensorOffset(qSeq, qTokenInBatch, qHeadStart, qHeads_, embed_);
             uint64_t gmOffsetO = gmOffsetQ;
             uint64_t gmOffsetLse = UnionLseOffset(qSeq, qTokenInBatch, qHeadStart, qHeads_);
@@ -289,6 +289,19 @@ public:
                 gBatchBlockTable = gBlockTable[static_cast<uint64_t>(batchIdx) * maxBlocksPerBatch_];
             }
             const uint32_t kvSLoopNum = CeilDiv(validKvTokens, kvBaseTile_);
+#ifdef __DAV_CUBE__
+            uint32_t vTailPadding = 0U;
+            if constexpr (isFp8 && isPaged) {
+                const uint32_t tailRows = kvSeqlen % blockShapeY_;
+                // The valid sparse list is sorted, so only its last entry can
+                // reference the incomplete logical block.
+                if (tailRows != 0U && explicitBlockCount != 0U &&
+                    gTaskSparseBlockIdx.GetValue(explicitBlockCount - 1U) ==
+                        static_cast<int32_t>(kvSeqlen / blockShapeY_)) {
+                    vTailPadding = blockShapeY_ - tailRows;
+                }
+            }
+#endif
             uint32_t rowNum = taskRows;
             uint32_t rowNumRound = RoundUp(rowNum, 16);
             // FP8 nZ C0 groups are 32 rows; keep AIV half-ranges physically disjoint.
@@ -410,7 +423,7 @@ public:
                     // exactMask layout [kvHeads, G, U * blockShapeY_]; this
                     // tile covers columns [kvBlockIdx * kvBaseTile, ...).
                     exactMaskTileOffset = (static_cast<uint64_t>(kvHeadIdx) * qBlockNum_ + globalQBlock) *
-                                              static_cast<uint64_t>(topK_ * blockShapeY_) +
+                                              (static_cast<uint64_t>(topK_) * blockShapeY_) +
                                           static_cast<uint64_t>(kvBlockIdx) * kvBaseTile_;
                     uint64_t exactMaskNextTileOffset = 0;
                     uint32_t exactMaskNextCols = 0;
@@ -459,12 +472,22 @@ public:
                         kvBlockIdxDe, mm1L0BTotalStages_, lastMm1L0BStages, mm2L0BTotalStages_, kvSLoopNum, false);
                     // The same local tile index controls sparse addressing and P/L0 rotation.
 
-                    blockMmadPV(
-                        gmVTensorTla, ubOTmpTensorTla, gTaskSparseBlockIdx, pvShape, kvBlockIdxDe, kvBaseTile_,
-                        blockShapeY_, prefixSumL0AStages, prefixSumL0BStages, smToMm2Flag, mm2ToReFlag, strideKVRow,
-                        gBatchBlockTable, blockSize_, vStride0_, localExplicitBlockCount, 0U,
-                        gKvOffsetInfo[static_cast<uint64_t>(kvBlockIdxDe % KV_OFFSET_STAGES) * kvOffsetTileWords],
-                        kvOffsetGroupWords, mm1L1TileN_);
+                    const auto kvOffsets =
+                        gKvOffsetInfo[static_cast<uint64_t>(kvBlockIdxDe % KV_OFFSET_STAGES) * kvOffsetTileWords];
+                    const bool useVTailZero = isFp8 && isPaged && vTailPadding != 0U && kvBlockIdxDe + 1U == kvSLoopNum;
+                    if (useVTailZero) {
+                        if constexpr (isFp8 && isPaged) {
+                            blockMmadPV.RunWithVTailZero(gmVTensorTla, ubOTmpTensorTla, pvShape, kvBlockIdxDe,
+                                                         prefixSumL0AStages, prefixSumL0BStages, smToMm2Flag,
+                                                         mm2ToReFlag, kvOffsets, kvOffsetGroupWords, mm1L1TileN_,
+                                                         vTailPadding);
+                        }
+                    } else {
+                        blockMmadPV(gmVTensorTla, ubOTmpTensorTla, gTaskSparseBlockIdx, pvShape, kvBlockIdxDe,
+                                    kvBaseTile_, blockShapeY_, prefixSumL0AStages, prefixSumL0BStages, smToMm2Flag,
+                                    mm2ToReFlag, strideKVRow, gBatchBlockTable, blockSize_, vStride0_,
+                                    localExplicitBlockCount, 0U, kvOffsets, kvOffsetGroupWords, mm1L1TileN_);
+                    }
 
 #endif
 #ifdef __DAV_VEC__
@@ -600,7 +623,7 @@ private:
     __aicore__ inline void ReadUnionBatch(CuTensor& cu, UsedTensor& used, bool hasUsed, uint32_t batch,
                                           uint32_t capacity, BatchSeqInfo& seq) const
     {
-        if (qFormat_ == Format::TND) {
+        if constexpr (qFormat == Format::TND) {
             ReadBatchSeqInfo<Format::TND>(cu, used, hasUsed, batch, seq);
         } else {
             // Dense Q and KV share the layout, and both batched lengths are required.
@@ -611,18 +634,18 @@ private:
     __aicore__ inline uint64_t UnionTensorOffset(const BatchSeqInfo& seq, uint32_t token, uint32_t head, uint32_t heads,
                                                  uint32_t dim) const
     {
-        return qFormat_ == Format::BNSD ? GetTensorOffset<Format::BNSD>(seq, token, head, heads, dim) :
-                                          GetTensorOffset<Format::TND>(seq, token, head, heads, dim);
+        return qFormat == Format::BNSD ? GetTensorOffset<Format::BNSD>(seq, token, head, heads, dim) :
+                                         GetTensorOffset<Format::TND>(seq, token, head, heads, dim);
     }
 
     __aicore__ inline uint64_t UnionLseOffset(const BatchSeqInfo& seq, uint32_t token, uint32_t head,
                                               uint32_t heads) const
     {
-        return qFormat_ == Format::TND ? GetLseOffset<Format::TND>(seq, token, head, heads) :
-                                         GetLseOffset<Format::BNSD>(seq, token, head, heads);
+        return qFormat == Format::TND ? GetLseOffset<Format::TND>(seq, token, head, heads) :
+                                        GetLseOffset<Format::BNSD>(seq, token, head, heads);
     }
 
-    // One unsplit task per Q group/KV head; reject FD schedules.
+    // Union uses an unsplit Metadata schedule.
     __aicore__ inline bool ValidateMetadata(
         __gm__ const GbsaMetadata::Metadata* meta,
         const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tiling) const
@@ -641,24 +664,20 @@ private:
                                    0U};
         uint32_t signature = 2166136261U;
         for (uint32_t value : config) {
-            for (uint32_t shift = 0; shift < 32U; shift += 8U) {
-                signature = (signature ^ ((value >> shift) & 0xFFU)) * 16777619U;
-            }
+            signature = GsaFd::HashConfigValue(signature, value);
         }
         return meta != nullptr && meta->magic == GbsaMetadata::METADATA_MAGIC &&
                meta->version == GbsaMetadata::METADATA_VERSION &&
                meta->metadataUsedSize == static_cast<int32_t>(GbsaMetadata::METADATA_USED_SIZE) &&
                meta->configSignature == static_cast<int32_t>(signature) && meta->saTotalTaskNum >= 0 &&
-               tiling->maskType == 3U && tiling->residualBlockMode == 0U && tiling->isConsistentTopk == 0U &&
-               tiling->fdStaticEnabled == 0U && meta->fdScheduleFlags == GbsaMetadata::FD_ACTUAL_BLOCK_PREFIX &&
-               meta->fdActiveCoreNum == 0 && meta->combineTaskNum == 0 && meta->fdPartialTaskNum == 0;
+               meta->fdScheduleFlags == GbsaMetadata::FD_ACTUAL_BLOCK_PREFIX && meta->fdActiveCoreNum == 0 &&
+               meta->combineTaskNum == 0 && meta->fdPartialTaskNum == 0;
     }
 
     __aicore__ inline void FetchBaseShapeInfo(
-        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData, GM_ADDR metaData)
+        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
     {
         batch_ = tilingData->batch;
-        qFormat_ = tilingData->qLayout == 2U ? Format::BNSD : tilingData->qLayout == 1U ? Format::BSND : Format::TND;
         qSeqCapacity_ = tilingData->qSeqCapacity;
         kvSeqCapacity_ = tilingData->kvSeqCapacity;
         qHeads_ = tilingData->numHeads;
@@ -670,9 +689,6 @@ private:
         qBlockNum_ = tilingData->qBlockNum;
         topK_ = tilingData->topK;
         maxBlocksPerBatch_ = tilingData->maxBlocksPerBatch;
-        // Full AICPU metadata protocol overlay (no tiling fallback for task schedule).
-        __gm__ GbsaMetadata::Metadata* meta = reinterpret_cast<__gm__ GbsaMetadata::Metadata*>(metaData);
-        totalTaskNum_ = static_cast<uint32_t>(meta->saTotalTaskNum);
         scaleValue_ = tilingData->scaleValue;
         groupSize_ = tilingData->groupSize;
         qBaseTile_ = tilingData->baseTileInfo.qBaseTile;
@@ -882,7 +898,6 @@ private:
 private:
     Arch::Resource<ArchTag> resource;
     // basic shape info
-    Format qFormat_;
     uint32_t qSeqCapacity_;
     uint32_t kvSeqCapacity_;
     uint32_t batch_;

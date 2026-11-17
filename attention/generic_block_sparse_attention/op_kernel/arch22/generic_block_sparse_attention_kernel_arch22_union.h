@@ -24,8 +24,8 @@ namespace GbsaKernelArch22 {
 
 // maskType=3 (union exactMask): ND GM-workspace pipeline (Approach B).
 // One task = one union group of ≤8 Q tokens × groupSize heads.
-template <class BlockMmadQK, class EpilogueOnlineSoftmax, class BlockMmadPV, class EpilogueRescaleO,
-          bool isPaged = true, bool hasResidualBlock = false>
+template <class BlockMmadQK, class EpilogueOnlineSoftmax, class BlockMmadPV, class EpilogueRescaleO, bool isPaged,
+          uint32_t qLayout, uint32_t kvLayout>
 class GbsaUnionKernelArch22 {
 public:
     using ArchTag = typename BlockMmadPV::ArchTag;
@@ -63,18 +63,15 @@ public:
         GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, tilingDataLocal,
                                     params.tiling);
         const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData = &tilingDataLocal;
-        FetchTilingData(tilingData, params.metaData);
-        const uint32_t qLayout = tilingData->qLayout, kvLayout = tilingData->kvLayout;
+        __gm__ const auto* meta = reinterpret_cast<__gm__ const GbsaMetadata::Metadata*>(params.metaData);
+        if (!GsaFd::ValidateMetadata(meta, tilingData, AscendC::GetBlockNum())) {
+            return;
+        }
+        totalTaskNum_ = static_cast<uint32_t>(meta->saTotalTaskNum);
+        FetchTilingData(tilingData);
         const uint32_t qCapacity = tilingData->qSeqCapacity, kvCapacity = tilingData->kvSeqCapacity;
         const uint64_t qHeadStride = qLayout == 2U ? static_cast<uint64_t>(qCapacity) * embed_ : embed_;
         const uint64_t qTokenStride = qLayout == 2U ? embed_ : static_cast<uint64_t>(qHeads_) * embed_;
-        __gm__ const GbsaMetadata::Metadata* meta =
-            reinterpret_cast<__gm__ const GbsaMetadata::Metadata*>(params.metaData);
-        const uint32_t physicalAicNum = AscendC::GetBlockNum();
-        if (!GsaFd::ValidateMetadata(meta, tilingData, physicalAicNum) || tilingData->maskType != 3U ||
-            tilingData->residualBlockMode != 0U || tilingData->isConsistentTopk != 0U) {
-            return;
-        }
         AscendC::GlobalTensor<ElementQ> gQ;
         gQ.SetGlobalBuffer((__gm__ ElementQ*)params.q);
         AscendC::GlobalTensor<ElementK> gK;
@@ -399,7 +396,7 @@ public:
                     // columns [kvBlockIdx * kvBaseTile, ...).
                     const uint64_t exactMaskTileOffset =
                         (static_cast<uint64_t>(kvHeadIdx) * qBlockNum_ + globalQBlock) *
-                            static_cast<uint64_t>(topK_ * blockShapeY_) +
+                            (static_cast<uint64_t>(topK_) * blockShapeY_) +
                         static_cast<uint64_t>(kvBlockIdx) * kvBaseTile_;
 
                     NpuArch::Arch::CrossCoreWaitFlag(qkReady_);
@@ -500,7 +497,7 @@ public:
 
 private:
     __aicore__ inline void FetchTilingData(
-        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData, GM_ADDR metaData)
+        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
     {
         batch_ = tilingData->batch;
         qHeads_ = tilingData->numHeads;
@@ -512,8 +509,6 @@ private:
         qBlockNum_ = tilingData->qBlockNum;
         topK_ = tilingData->topK;
         maxBlocksPerBatch_ = tilingData->maxBlocksPerBatch;
-        __gm__ GbsaMetadata::Metadata* meta = reinterpret_cast<__gm__ GbsaMetadata::Metadata*>(metaData);
-        totalTaskNum_ = static_cast<uint32_t>(meta->saTotalTaskNum);
         scaleValue_ = tilingData->scaleValue;
         groupSize_ = tilingData->groupSize;
         qBaseTile_ = tilingData->baseTileInfo.qBaseTile;

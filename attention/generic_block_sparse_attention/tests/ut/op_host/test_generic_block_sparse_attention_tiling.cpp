@@ -49,6 +49,7 @@ constexpr int64_t kTopK = 2;
 constexpr int64_t kBlockSize = 128;
 constexpr int64_t kBlockShapeX = 1;
 constexpr int64_t kUnionBlockShapeX = 8; // unionSize == blockShapeX; only 8 supported
+constexpr uint64_t kUnionLseKeyOffset = 100000000ULL;
 constexpr int64_t kT = kBatch * kS1;
 constexpr int64_t kMaxBlocks = (kS2 + kBlockSize - 1) / kBlockSize;
 constexpr int64_t kTotalQBlocks = kT;
@@ -3203,7 +3204,7 @@ TEST_F(generic_block_sparse_attention_tiling_ut, union_mode_rejects_mxfp8)
 TEST_F(generic_block_sparse_attention_tiling_ut, union_batched_layout_dispatch)
 {
     for (const std::string layout : {"BSND", "BNSD"}) {
-        for (auto dtype : {ge::DT_FLOAT16, ge::DT_FLOAT8_E4M3FN}) {
+        for (auto dtype : {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN}) {
             const bool fp8 = dtype == ge::DT_FLOAT8_E4M3FN;
             for (const std::string& kvLayout : {layout, std::string("PA_BBND"), std::string("PA_BNBD")}) {
                 const bool paged = kvLayout != layout;
@@ -3227,42 +3228,65 @@ TEST_F(generic_block_sparse_attention_tiling_ut, union_batched_layout_dispatch)
                 if (paged) {
                     inputs[15] = {{{2, 2}, {2, 2}}, ge::DT_INT32, ge::FORMAT_ND};
                 }
-                auto outputs = MakeOutputs(ge::DT_FLOAT16, true);
-                if (layout == "BSND") {
-                    outputs[0] = {{{2, 17, 4, 128}, {2, 17, 4, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND};
-                } else {
-                    outputs[0] = {{{2, 4, 17, 128}, {2, 4, 17, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND};
+                const auto outDtype = fp8 ? ge::DT_FLOAT16 : dtype;
+                const bool bnsd = layout == "BNSD";
+                const uint64_t kvField = kvLayout == "PA_BNBD" ? 81000000ULL :
+                                         paged                 ? 71000000ULL :
+                                         bnsd                  ? 10000000ULL :
+                                                                 20000000ULL;
+                const uint64_t dtypeField = fp8 ? 10ULL : dtype == ge::DT_BF16 ? 22220ULL : 0ULL;
+                for (bool arch35 : {false, true}) {
+                    if (!arch35 && fp8) {
+                        continue;
+                    }
+                    const uint64_t base = arch35 ? 9250002000000000ULL : 9200002000000000ULL;
+                    const uint64_t baseKey = base + kvField + dtypeField + (bnsd ? 3ULL : 4ULL);
+                    for (bool returnLse : {false, true}) {
+                        auto outputs = MakeOutputs(outDtype, returnLse);
+                        if (bnsd) {
+                            outputs[0] = {{{2, 4, 17, 128}, {2, 4, 17, 128}}, outDtype, ge::FORMAT_ND};
+                        } else {
+                            outputs[0] = {{{2, 17, 4, 128}, {2, 17, 4, 128}}, outDtype, ge::FORMAT_ND};
+                        }
+                        if (returnLse) {
+                            outputs[1] = {{{2, 4, 17, 1}, {2, 4, 17, 1}}, ge::DT_FLOAT, ge::FORMAT_ND};
+                        }
+                        const uint64_t key = baseKey + (returnLse ? kUnionLseKeyOffset : 0ULL);
+                        GenericBlockSparseAttentionCompileInfo compileInfo;
+                        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, outputs,
+                                                    MakeAttrs(3, fp8 ? 5 : 0, 0, returnLse, 0.0f, -1, -1, 4, layout,
+                                                              kvLayout, 0, false, kUnionBlockShape),
+                                                    &compileInfo, arch35 ? "Ascend950" : "Ascend910B", arch35 ? 56 : 40,
+                                                    arch35 ? 262144 : 196608);
+                        ExecuteTestCase(ctx, ge::GRAPH_SUCCESS, key);
+                    }
                 }
-                outputs[1] = {{{2, 4, 17, 1}, {2, 4, 17, 1}}, ge::DT_FLOAT, ge::FORMAT_ND};
-                const uint64_t key = 9250002100000002ULL +
-                                     (kvLayout == "PA_BNBD" ? 81000000ULL :
-                                      paged                 ? 71000000ULL :
-                                                              30000000ULL) +
-                                     (fp8 ? 10ULL : 0ULL);
-                GenericBlockSparseAttentionCompileInfo compileInfo;
-                gert::TilingContextPara ctx(
-                    "GenericBlockSparseAttention", inputs, outputs,
-                    MakeAttrs(3, fp8 ? 5 : 0, 0, 1, 0.0f, -1, -1, 4, layout, kvLayout, 0, false, kUnionBlockShape),
-                    &compileInfo, "Ascend950", 56, 262144);
-                ExecuteTestCase(ctx, ge::GRAPH_SUCCESS, key);
             }
         }
     }
 }
 
-TEST_F(generic_block_sparse_attention_tiling_ut, union_mode_pa_bnbd_950)
+TEST_F(generic_block_sparse_attention_tiling_ut, union_mode_tnd_pa_bnbd)
 {
-    // Non-quant union now accepts PA_BNBD KV (Q remains TND).
-    GenericBlockSparseAttentionCompileInfo compileInfo;
-    auto inputs = MakeUnionInputs(ge::DT_FLOAT16, 128, 4, 128);
-    // PA_BNBD: [numBlocks, Nkv, blockSize, D]
-    inputs[1] = {{{kMaxBlocks, 1, kBlockSize, 128}, {kMaxBlocks, 1, kBlockSize, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND};
-    inputs[2] = inputs[1];
-    constexpr uint64_t kFp16UnionPaBnbdTiling950 = 9250002081000002ULL;
-    gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false, 128, 4),
-                                MakeAttrs(3, 0, 0, 0, 0.0f, -1, -1, 4, "TND", "PA_BNBD", 0, false, kUnionBlockShape),
-                                &compileInfo, "Ascend950", 56, 262144);
-    ExecuteTestCase(ctx, ge::GRAPH_SUCCESS, kFp16UnionPaBnbdTiling950);
+    for (auto dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+        auto inputs = MakeUnionInputs(dtype, 128, 4, 128);
+        // PA_BNBD: [numBlocks, Nkv, blockSize, D]
+        inputs[1] = {{{kMaxBlocks, 1, kBlockSize, 128}, {kMaxBlocks, 1, kBlockSize, 128}}, dtype, ge::FORMAT_ND};
+        inputs[2] = inputs[1];
+        for (bool arch35 : {false, true}) {
+            const uint64_t base = arch35 ? 9250002081000002ULL : 9200002081000002ULL;
+            const uint64_t baseKey = base + (dtype == ge::DT_BF16 ? 22220ULL : 0ULL);
+            for (bool returnLse : {false, true}) {
+                const uint64_t key = baseKey + (returnLse ? kUnionLseKeyOffset : 0ULL);
+                GenericBlockSparseAttentionCompileInfo compileInfo;
+                gert::TilingContextPara ctx(
+                    "GenericBlockSparseAttention", inputs, MakeOutputs(dtype, returnLse, 128, 4),
+                    MakeAttrs(3, 0, 0, returnLse, 0.0f, -1, -1, 4, "TND", "PA_BNBD", 0, false, kUnionBlockShape),
+                    &compileInfo, arch35 ? "Ascend950" : "Ascend910B", arch35 ? 56 : 40, arch35 ? 262144 : 196608);
+                ExecuteTestCase(ctx, ge::GRAPH_SUCCESS, key);
+            }
+        }
+    }
 }
 
 TEST_F(generic_block_sparse_attention_tiling_ut, union_mode_accepts_multi_kv_heads)

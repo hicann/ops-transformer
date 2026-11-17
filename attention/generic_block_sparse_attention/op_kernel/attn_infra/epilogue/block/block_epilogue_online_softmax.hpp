@@ -53,6 +53,7 @@ public:
     static constexpr uint32_t ROW_OPS_SPEC_MASK_4 = 4;
     static constexpr uint32_t MAX_ROW_NUM_SUB_CORE = 256;
     static constexpr int64_t UB_FLOAT_LINE_SIZE = 64;
+    static constexpr int32_t EXACT_MASK_SIGN_BIT_INDEX = 31;
     // Reserve three separate 512-column buffers for packed bits, expanded mask, and sentinel.
     static constexpr uint32_t EXACT_MASK_TILE_COLUMNS = 512;
     static constexpr float MIN_VALUE = -3.402823466e+38F;
@@ -468,9 +469,10 @@ public:
             const uint32_t slot = globalRow / exactMaskGroupSize_;
             const uint32_t rows = Min(rowNumCurLoop - row, exactMaskGroupSize_ - globalRow % exactMaskGroupSize_);
             // Sign-extend the masked bit, then retain the FP32 sentinel bits only for masked columns.
-            AscendC::ShiftLeft(bits, exactMaskUbTensor, static_cast<int32_t>(31U - slot), columnNum);
+            AscendC::ShiftLeft(bits, exactMaskUbTensor, EXACT_MASK_SIGN_BIT_INDEX - static_cast<int32_t>(slot),
+                               columnNum);
             AscendC::PipeBarrier<PIPE_V>();
-            AscendC::ShiftRight(bits, bits, int32_t{31}, columnNum);
+            AscendC::ShiftRight(bits, bits, EXACT_MASK_SIGN_BIT_INDEX, columnNum);
             AscendC::PipeBarrier<PIPE_V>();
             AscendC::And(maskBits, maskBits, sentinelBits, columnNum * 2);
             AscendC::PipeBarrier<PIPE_V>();

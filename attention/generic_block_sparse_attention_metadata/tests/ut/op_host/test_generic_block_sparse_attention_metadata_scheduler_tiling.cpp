@@ -761,19 +761,25 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionRuntimeBlockShapeX
     EXPECT_EQ(BuildSchedule(input, rejected), BSAScheduleStatus::BSA_INVALID_PARAM);
 }
 
-TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionMxfp8IsRejected)
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionQuantTypeWhitelist)
 {
-    // SoftmaxUnion (maskType=3) only supports quantType=0 or 5; MXFP8 must be rejected
-    // so metadata does not emit a Union schedule for an unsupported combination.
     constexpr int64_t kUnionSize = 8;
     ScheduleInput input = MakeDecodeInput();
     input.maskType = 3;
     input.blockShapeX = kUnionSize;
-    input.quantType = 6;
-    input.headDim = 256;
-    input.blockShapeY = 4;
-    ScheduleResult result;
-    EXPECT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_INVALID_PARAM);
+    input.headDim = 128;
+    input.blockShapeY = 128;
+
+    for (int64_t quantType : {0, 5}) {
+        input.quantType = quantType;
+        ScheduleResult result;
+        EXPECT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS) << "quantType=" << quantType;
+    }
+    for (int64_t quantType : {-1, 6, 7, 8, 9}) {
+        input.quantType = quantType;
+        ScheduleResult result;
+        EXPECT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_INVALID_PARAM) << "quantType=" << quantType;
+    }
 }
 
 TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, Int8SevenPreservesRegularFdSchedule)

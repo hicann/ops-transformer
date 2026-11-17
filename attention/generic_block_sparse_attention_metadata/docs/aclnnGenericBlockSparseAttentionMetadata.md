@@ -481,17 +481,17 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景：`headDim`支持1～256的任意值；`layoutQ/layoutKv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`，不支持其他组合；`maskType`支持0（非因果）、1（causal）和3（union）；非union时`blockShape=[1,Y]`（`1≤Y≤128`），union时`blockShape=[8,Y]`；`residualBlockMode`支持0或1（union仅支持0）。
+- <term>Ascend 950PR&950DT系列产品</term> Union（`maskType=3`）仅支持 `quantType=0`（FP16/BF16 非量化）和 `quantType=5`（FP8）；`blockShape=[8,Y]`（`1≤Y≤128`），`residualBlockMode=0`；FP8 Union 另要求 `headDim=128`。FP8 Union 分页 KV 另要求 `Y` 整除页大小 128。须与主算子一致。
+- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（`quantType=5`）要求 `headDim=128`、`maskType=1`、`residualBlockMode=0`、`blockShape=[1,Y]`（`1≤Y≤128`）。
+- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（`quantType=5`、`maskType=1`）高精模式（`softmaxPrecision=0`）仅支持 `headDim=128` 和 `1≤groupSize≤16`。Q/KV 支持 `TND/TND`、`BSND/BSND`、`BNSD/BNSD`，以及上述三种 Q 布局分别搭配 `PA_BBND` 或 `PA_BNBD`。低精模式（`softmaxPrecision=1`）仅支持 `TND/PA_BBND`，且关闭 LSE。
 <!-- end id8 -->
 <!-- npu="A3,910b" id9 -->
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化FLOAT16/BFLOAT16场景：`headDim`支持1～256的任意值；`layoutQ/layoutKv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`；`blockShape=[1,Y]`，Y支持1、2、4、8、16、32、64、128；`maskType`支持0（非因果）、1（causal）和3（union，见下方Union约束）；`residualBlockMode`支持0或1。TND KV须传入`cuSeqLengthsKvOptional`；causal模式下各batch须满足实际KV长度不小于实际Q长度。
+- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> Union（`maskType=3`）仅支持 `quantType=0`（FP16/BF16 非量化）、`blockShape=[8,Y]`、`residualBlockMode=0`。Y 支持 1、2、4、8、16、32、64、128，分页 KV 的页大小为 128。稀疏索引按各 batch 有效 Q 长度分组，须与主算子的 Union 参数一致。
 <!-- end id9 -->
 <!-- npu="950,A3,910b" id10 -->
-- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> Union（`maskType=3`）支持 FP16/BF16 非量化、`blockShape=[8,Y]`、`residualBlockMode=0`。Y 支持 1、2、4、8、16、32、64、128，分页 KV 的页大小为 128。稀疏索引按各 batch 有效 Q 长度分组，须与主算子的 Union 参数一致。
-- <term>Ascend 950PR&950DT系列产品</term> Union（`maskType=3`）支持 FP16/BF16 和 FP8；`blockShape=[8,Y]`（`1≤Y≤128`），`residualBlockMode=0`；FP8 Union 另要求 `headDim=128`。FP8 Union 分页 KV 另要求 `Y` 整除页大小 128。Union 不支持 `quantType=6`。须与主算子一致。
 - <term>Ascend 950PR&950DT系列产品</term> MXFP8（`quantType=6`）仅支持`headDim=192/256`、`blockShape=[1,4]`或`[1,8]`、`numQHeads/numKvHeads=1～128`。Metadata接口直接拒绝其他`headDim`或稀疏块大小，返回`ACLNN_ERR_PARAM_INVALID`。Q支持`TND/BSND/BNSD`，KV支持同布局非分页输入或`PA_BBND/PA_BNBD`；主算子要求分页KV的页大小为128。支持`maskType=0/1`、`softmaxPrecision=0/1`，两种精度值均使用FP32 score；`residualBlockMode=0`，主算子不支持输出LSE。Metadata不接收Q/K/V及scale，参数校验通过不替代主算子的scale、地址及缓冲容量检查。
 - `quantType=6`的Q/K使用group-32、V使用per-channel、P使用per-tensor缩放；scale的shape和dtype由主算子校验，metadata不读取scale。满足形状、任务数及工作量条件时，Metadata可生成Flash Decoding分裂调度；工作量根据实际有效稀疏块计数与`blockShapeY`估算，工作量不足时保留常规调度。
-- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（quantType=5，maskType≠3）：`headDim`仅支持128，`maskType=1`、`residualBlockMode=0`、`blockShape=[1,Y]`（`1≤Y≤128`）。FP8 Union 见上条 Union 约束；Union 不支持 `quantType=6`。
-- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（`quantType=5`、`maskType=1`）高精模式（`softmaxPrecision=0`）仅支持 `headDim=128` 和 `1≤groupSize≤16`。Q/KV 支持 `TND/TND`、`BSND/BSND`、`BNSD/BNSD`，以及上述三种 Q 布局分别搭配 `PA_BBND` 或 `PA_BNBD`。 低精模式（`softmaxPrecision=1`）仅支持 `TND/PA_BBND`，且关闭 LSE。
 - 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化和INT8全量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16、MXFP8及常规 FP8（含 FP8 Union）支持1～INT32_MAX；容量均须不小于稀疏块有效计数的最大值。
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的INT8全量化场景：`quantType=7`，Q/K/V的数据类型为INT8；`headDim`为1～256，Q head数必须是KV head数的整数倍，分组大小为1～128；Q支持TND、BSND、BNSD，KV为与Q相同的非PA布局或PA_BBND/PA_BNBD；PA的`blockSize=128`；`blockShape=[1,Y]`，Y为1、2、4、8、16、32、64、128；`maskType=0/1`、`residualBlockMode=0/1`、`softmaxPrecision=0`。mode=1隐式追加可见范围末尾的不完整块，不占用topK及`sparseBlockCount`。
 <!-- end id10 -->
@@ -539,7 +539,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
   </tr>
   <tr>
     <td>totalQBlocks</td>
-    <td>按存储长度分块后的Q块总数，即$\sum_i \mathrm{ceilDiv}(qStorageLen_i, blockShapeX)$</td>
+    <td>非 Union 的 TND 路径按 Q 存储长度分块，$\sum_i \mathrm{ceilDiv}(qStorageLen_i, blockShapeX)$。Union（`maskType=3`）按有效 Q 长度分组，$G=\sum_i \mathrm{ceilDiv}(qEffectiveLen_i, 8)$。</td>
   </tr>
   <tr>
     <td>maxSparseBlockCount</td>
@@ -560,7 +560,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 <!-- npu="A3,910b" id16 -->
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>在maskType=1时，第q个有效Q token的KV可见长度为`kvLen-qLen+q+1`，q从0开始；maskType=0时可见长度为`kvLen`。residualBlockMode=1时显式列表只包含可见范围内的完整KV块，尾部不完整块由主算子隐式加入，不计入sparseBlockCount及maxSparseBlockCount容量。Metadata与主算子的maskType、residualBlockMode、序列长度和有效计数须一致。
 <!-- end id16 -->
-- TND布局下，`cuSeqLengthsQOptional`必须传入；`sequsedQOptional`可传入`nullptr`。传入sequsedQ时，每个元素须位于`[0, 对应Batch存储长度]`范围内。分核按实际长度累加，稀疏块分块仍按cu前缀和描述的存储长度计算。
+- TND布局下，`cuSeqLengthsQOptional`必须传入；`sequsedQOptional`可传入`nullptr`。传入sequsedQ时，每个元素须位于`[0, 对应Batch存储长度]`范围内。分核按有效长度累加。非 Union（`maskType=0/1`）的稀疏槽位按 Q 存储长度计算，Q 的 padding 仍占用稀疏槽位。
+- Union（`maskType=3`）按 batch 顺序拼接各 batch 的组。TND 优先用 `sequsedQOptional` 作为有效 Q 长度，未传时取 `cuSeqLengthsQOptional` 的相邻差值。`cuSeqLengthsQOptional` 仍用于确定各 batch 的 Q 存储起点。有效 Q 长度为 0 的 batch 不产生组。有有效 Q 但未选中任何 KV 块的组仍保留，`sparseBlockCount=0`。要求总组数 `G > 0`，即至少一个 batch 有有效 Q。
 - layoutKv为PA_BBND/PA_BNBD时须传`sequsedKvOptional`，不传`cuSeqLengthsKvOptional`。layoutKv为TND时，`sequsedKvOptional`可与`cuSeqLengthsKvOptional`并存，双长度语义同Q侧。
 - `numQHeads >= numKvHeads`且`numQHeads % numKvHeads == 0`，`groupSize = numQHeads / numKvHeads`不超过128。
 - 输出`metadataOptional`固定为INT32、shape为`(1024,)`，不得解析、修改或跨不同输入和属性复用。

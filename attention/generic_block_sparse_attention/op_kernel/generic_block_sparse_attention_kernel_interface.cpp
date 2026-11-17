@@ -131,8 +131,9 @@ __global__ __aicore__ void GbsaInferIntfRegularArch22(GM_ADDR q, GM_ADDR k, GM_A
 }
 
 // maskType=3 only — Union ND / exactMask on Arch22 (FP32 softmax).
-template <class InDtype, class SMDtype, class REDtype, Epilogue::LseMode lseMode, bool isPaged, bool wideSmallM>
-__aicore__ inline void GbsaInferIntfUnionArch22Impl(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
+template <class InDtype, class SMDtype, class REDtype, Epilogue::LseMode lseMode, bool isPaged, uint32_t qLayout,
+          uint32_t kvLayout>
+__global__ __aicore__ void GbsaInferIntfUnionArch22(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
                                                     GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
                                                     GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
                                                     GM_ADDR blockTable, GM_ADDR o, GM_ADDR softmaxLse,
@@ -155,8 +156,8 @@ __aicore__ inline void GbsaInferIntfUnionArch22Impl(GM_ADDR q, GM_ADDR k, GM_ADD
     using LayoutO = layout::RowMajor;
     using LayoutOTmp = layout::RowMajor;
 
-    using L1TileShapeQK = std::conditional_t<wideSmallM, GemmShape<16, 256, 128>, GemmShape<128, 128, 128>>;
-    using L0TileShapeQK = std::conditional_t<wideSmallM, GemmShape<16, 256, 64>, GemmShape<128, 128, 128>>;
+    using L1TileShapeQK = GemmShape<128, 128, 128>;
+    using L0TileShapeQK = GemmShape<128, 128, 128>;
     using DispatchPolicyQK = Gemm::MmadAtlasA2SFAIQK<isPaged, false, false, true>;
     using QType = Gemm::GemmType<ElementQ, LayoutQ>;
     using KType = Gemm::GemmType<ElementK, LayoutK>;
@@ -168,8 +169,8 @@ __aicore__ inline void GbsaInferIntfUnionArch22Impl(GM_ADDR q, GM_ADDR k, GM_ADD
     using MaskType = Gemm::GemmType<int8_t, layout::RowMajor>;
     using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType, MaskType>;
 
-    using L1TileShapePV = std::conditional_t<wideSmallM, GemmShape<16, 128, 256>, GemmShape<128, 128, 256>>;
-    using L0TileShapePV = std::conditional_t<wideSmallM, GemmShape<16, 256, 64>, GemmShape<128, 128, 128>>;
+    using L1TileShapePV = GemmShape<128, 128, 256>;
+    using L0TileShapePV = GemmShape<128, 128, 128>;
     using DispatchPolicyPV = Gemm::MmadAtlasA2SFAIPV<isPaged, false, false, true>;
     using VType = Gemm::GemmType<ElementV, LayoutV>;
     using OTmpType = Gemm::GemmType<ElementOTmp, LayoutOTmp>;
@@ -182,39 +183,14 @@ __aicore__ inline void GbsaInferIntfUnionArch22Impl(GM_ADDR q, GM_ADDR k, GM_ADD
     using EpilogueRescaleO =
         Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, OType, OTmpType, OTmpUpdateType, LseType>;
 
-    using GbsaKernel =
-        GbsaUnionKernelArch22<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO, isPaged, false>;
+    using GbsaKernel = GbsaUnionKernelArch22<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO, isPaged,
+                                             qLayout, kvLayout>;
 
     GbsaKernelParamsArch22 params{
         q,         k,          v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
         sequsedKv, blockTable, o, softmaxLse,     workspace,        tiling,   attenMask};
     GbsaKernel gbsaKernel;
     gbsaKernel(params);
-}
-
-template <class InDtype, class SMDtype, class REDtype = SMDtype, Epilogue::LseMode lseMode = Epilogue::LseMode::NONE,
-          bool isPaged = true>
-__global__ __aicore__ void GbsaInferIntfUnionArch22(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
-                                                    GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
-                                                    GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
-                                                    GM_ADDR blockTable, GM_ADDR o, GM_ADDR softmaxLse,
-                                                    GM_ADDR workspace, GM_ADDR tiling, GM_ADDR attenMask)
-{
-    GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, tilingDataLocal, tiling);
-    const auto* data = &tilingDataLocal;
-    // Effective union rows = groupSize * UNION_SIZE(8); keep wide-small-M when ≤16.
-    const bool wideSmallM = data->embeddingSize > 0U && data->embeddingSize <= 256U && data->groupSize > 0U &&
-                            data->groupSize * 8U <= 16U && data->blockShapeX == 1U &&
-                            data->baseTileInfo.kvBaseTile == 256U;
-    if (wideSmallM) {
-        GbsaInferIntfUnionArch22Impl<InDtype, SMDtype, REDtype, lseMode, isPaged, true>(
-            q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ, sequsedKv,
-            blockTable, o, softmaxLse, workspace, tiling, attenMask);
-    } else {
-        GbsaInferIntfUnionArch22Impl<InDtype, SMDtype, REDtype, lseMode, isPaged, false>(
-            q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ, sequsedKv,
-            blockTable, o, softmaxLse, workspace, tiling, attenMask);
-    }
 }
 
 #endif
@@ -370,7 +346,7 @@ __global__ __aicore__ void GbsaInferIntfUnion(GM_ADDR q, GM_ADDR k, GM_ADDR v, G
                                                             ElementK, TileCopyRescaleO, Arch::PositionL0C>;
 
     using GbsaKernel = GbsaUnionKernelArch35<EpiloguePrepareKvOffsets, BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV,
-                                             EpilogueRescaleO, kvFormat, isPaged, false>;
+                                             EpilogueRescaleO, qFormat, kvFormat, isPaged, false>;
 
     GbsaKernelParamsArch35 params{
         q,         k,          v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
@@ -438,7 +414,7 @@ __global__ __aicore__ void GbsaInferIntfUnionFp8(GM_ADDR q, GM_ADDR k, GM_ADDR v
                                                             ElementK, TileCopyRescaleO, Arch::PositionL0C>;
 
     using GbsaKernel = GbsaUnionKernelArch35<EpiloguePrepareKvOffsets, BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV,
-                                             EpilogueRescaleO, kvFormat, isPaged, true>;
+                                             EpilogueRescaleO, qFormat, kvFormat, isPaged, true>;
 
     GbsaKernelParamsArch35 params{
         q,         k,          v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,

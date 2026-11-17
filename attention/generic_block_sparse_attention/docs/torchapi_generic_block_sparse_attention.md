@@ -271,17 +271,16 @@ cann_ops_transformer.generic_block_sparse_attention(
 
 <!-- npu="950" id7 -->
 - <term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景：`head_dim`支持1～256的任意值；`layout_q/layout_kv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`，不支持其他组合；`mask_mode`支持0（非因果）、1（causal）和3（union）；非union时`block_shape=[1,Y]`（`1≤Y≤128`），union（`mask_mode=3`）时`block_shape=[unionSize,Y]`，`unionSize`从`block_shape[0]`读取且**当前仅支持8**；`residual_block_mode`支持0或1（union仅支持0）。
+- <term>Ascend 950PR&950DT系列产品</term> Union（`mask_mode=3`）仅支持 `quant_mode=0`（FP16/BF16 非量化）和 `quant_mode=5`（FP8）。须传 INT32 exactMask，`block_shape=[8,Y]`（`1≤Y≤128`），`residual_block_mode=0`；FP8 Union 另要求 `head_dim=128`，分页 KV 下要求 Y 整除页大小 128。
+- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（`quant_mode=5`）要求 `head_dim=128`、`mask_mode=1`、`residual_block_mode=0`、`block_shape=[1,Y]`（`1≤Y≤128`）。
+- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（`quant_mode=5`、`mask_mode=1`）高精模式（`softmax_precision=0`）仅支持 `head_dim=128` 和 `1≤group_size≤16`。Q/KV 支持 `TND/TND`、`BSND/BSND`、`BNSD/BNSD`，以及上述三种 Q 布局分别搭配 `PA_BBND` 或 `PA_BNBD`。`return_softmax_lse` 支持 0 或 1。低精模式（`softmax_precision=1`）仅支持 `TND/PA_BBND`，且关闭 LSE。
 <!-- end id7 -->
 <!-- npu="A3,910b" id8 -->
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化FLOAT16/BFLOAT16场景：`head_dim`支持1～256的任意值；`layout_q/layout_kv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`；`block_shape=[1,Y]`，Y支持1、2、4、8、16、32、64、128；`mask_mode`支持0（非因果）、1（causal）和3（union，见下方Union约束）；`residual_block_mode`支持0或1。TND KV须传入`cu_seqlens_kv`，dense Q/K/V按对应布局连续存储；causal模式下各batch须满足实际KV长度不小于实际Q长度。
-- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> Union（`mask_mode=3`）支持 FP16/BF16 非量化、`block_shape=[8,Y]`、`residual_block_mode=0`。Y 支持 1、2、4、8、16、32、64、128，分页 KV 的页大小为 128。支持 TND、BSND、BNSD 的同布局 dense KV 以及 PA_BBND、PA_BNBD 分页 KV。须传 INT32 exactMask，GQA 分组大小与 blockShapeX 的乘积须不大于 128。
+- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> Union（`mask_mode=3`）仅支持 `quant_mode=0`（FP16/BF16 非量化）、`block_shape=[8,Y]`、`residual_block_mode=0`。Y 支持 1、2、4、8、16、32、64、128，分页 KV 的页大小为 128。支持 TND、BSND、BNSD 的同布局 dense KV 以及 PA_BBND、PA_BNBD 分页 KV。须传 INT32 exactMask，GQA 分组大小与 blockShapeX 的乘积须不大于 128。
 <!-- end id8 -->
 <!-- npu="950,A3,910b" id9 -->
-- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8 量化：`head_dim`仅支持128，`mask_mode=1`、`residual_block_mode=0`、`block_shape=[1,Y]`（`1≤Y≤128`）。
-- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（`quant_mode=5`、`mask_mode=1`）高精模式（`softmax_precision=0`）仅支持 `head_dim=128` 和 `1≤groupSize≤16`。Q/KV 支持 `TND/TND`、`BSND/BSND`、`BNSD/BNSD`，以及上述三种 Q 布局分别搭配 `PA_BBND` 或 `PA_BNBD`。 `return_softmax_lse` 支持 0 或 1。 低精模式（`softmax_precision=1`）仅支持 `TND/PA_BBND`，且关闭 LSE。
-- <term>Ascend 950PR&950DT系列产品</term> Union（`mask_mode=3`）：须传 INT32 exactMask，`block_shape=[8,Y]`（`1≤Y≤128`），`residual_block_mode=0`；FP8 Union 另要求 `head_dim=128`。Union 不支持 `quantType=6`。
 - <term>Ascend 950PR&950DT系列产品</term> `MXFP8`（`quant_mode=6`）仅保留grouped路径：Q为TND/`BSND`/BNSD，KV为同布局dense或`PA_BBND`/`PA_BNBD`（页大小128），D=192/256且block_shape=[1,4/8]；D192/256均支持group_size=1～128，softmax_precision=0/1（均使用FP32 S），不输出LSE；D128不支持。完整条件见`MXFP8`量化契约，`residual_block_mode=0`，不满足grouped条件直接报不支持。
-- <term>Ascend 950PR&950DT系列产品</term> 常规低精 FP8（quantType=5，softmax_precision=1）：`head_dim`仅支持128，`layout_q/layout_kv`仅支持`TND/PA_BBND`，`mask_mode=1`、`residual_block_mode=0`、`block_shape=[1,Y]`（`1≤Y≤128`）。FP8 Union 见上条 Union 约束；Union 不支持 `quantType=6`。
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8路径支持`residual_block_mode=0/1`；mode=1的尾块不写入`sparse_block_idx`，不计入`sparse_block_count`，metadata和计算接口必须使用同一模式。
 <!-- end id9 -->
 <!-- npu="950,A3,910b" id10 -->
@@ -291,8 +290,8 @@ cann_ops_transformer.generic_block_sparse_attention(
 - `quant_mode`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）、5（FP8量化）、6（MXFP8）或8（FP8 Q 和 FP4 K/V）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持0（非量化）或7（INT8全量化）。
 <!-- end id11 -->
 <!-- npu="950,A3,910b" id12 -->
-- `softmax_precision`：<term>Ascend 950PR&950DT系列产品</term>非Union场景（mask_mode=0/1）下，非量化FLOAT16/BFLOAT16支持0或1，quantType=5的FP8量化场景支持0或1，`MXFP8`支持0或1且均使用FP32 S/Softmax，推荐0，1为兼容别名；Union场景（mask_mode=3）下，非量化与FP8量化均仅支持0；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非Union场景下FLOAT16支持0或1，BFLOAT16仅支持0，Union场景（`mask_mode=3`）下仅支持0。
-- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化场景支持在上述布局组合及`residual_block_mode=0`或1时输出LSE。常规低精 FP8（quantType=5、softmax_precision=1）与`MXFP8`不支持输出LSE；FP8 Union（D=128）支持输出LSE。
+- `softmax_precision`：<term>Ascend 950PR&950DT系列产品</term>非Union场景（mask_mode=0/1）下，非量化FLOAT16/BFLOAT16支持0或1，quant_mode=5的FP8量化场景支持0或1，`MXFP8`支持0或1且均使用FP32 S/Softmax，推荐0，1为兼容别名；Union场景（mask_mode=3）下，非量化与FP8量化均仅支持0；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非Union场景下FLOAT16支持0或1，BFLOAT16仅支持0，Union场景（`mask_mode=3`）下仅支持0。
+- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化场景支持在上述布局组合及`residual_block_mode=0`或1时输出LSE。常规低精 FP8（quant_mode=5、softmax_precision=1）与`MXFP8`不支持输出LSE；常规高精 FP8（`quant_mode=5`、`softmax_precision=0`）和 FP8 Union（D=128）均支持输出 LSE。
 <!-- end id12 -->
 - 每组有效稀疏索引须非负、严格升序且不重复，位于前`sparse_block_count`个位置；随机升序即可，不要求等步长或物理页连续。
 <!-- npu="A3,910b" id14 -->
@@ -547,7 +546,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 - block_shape=[1,Y]：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的Y支持1、2、4、8、16、32、64、128。
 <!-- end id15 -->
 <!-- npu="950" id16 -->
-- <term>Ascend 950PR&950DT系列产品</term>非量化与常规 FP8：`X=1`，`1≤Y≤128`；Union：`[8,Y]`（`1≤Y≤128`）；union（mask_mode=3）时X为unionSize，当前仅支持8。非union量化场景为`[1,128]`。
+- <term>Ascend 950PR&950DT系列产品</term>非量化与常规 FP8：`X=1`，`1≤Y≤128`；Union：`[8,Y]`（`1≤Y≤128`）；union（mask_mode=3）时X为unionSize，当前仅支持8。
 <!-- end id16 -->
 
 - metadata校验：

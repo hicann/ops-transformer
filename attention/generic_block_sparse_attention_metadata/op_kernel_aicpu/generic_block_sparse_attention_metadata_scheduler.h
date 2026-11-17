@@ -227,6 +227,11 @@ inline BSAScheduleStatus AccumulateFdCost(int64_t m16, int64_t validBlockNum, ui
     return BSAScheduleStatus::BSA_SUCCESS;
 }
 
+inline bool IsUnionQuantTypeSupported(int64_t quantType)
+{
+    return quantType == 0 || quantType == 5;
+}
+
 inline bool IsScheduleInputValid(const ScheduleInput& input)
 {
     using namespace optiling::generic_block_sparse_attention_metadata;
@@ -241,7 +246,7 @@ inline bool IsScheduleInputValid(const ScheduleInput& input)
            (input.isPackedGQA == 0 || input.isPackedGQA == 1) &&
            (input.residualBlockMode == 0 || input.residualBlockMode == 1) &&
            (input.maskType == 0 || input.maskType == 1 || input.maskType == 3) &&
-           !(input.maskType == 3 && input.quantType == 6) && input.aicCoreNum > 0 &&
+           (input.maskType != 3 || IsUnionQuantTypeSupported(input.quantType)) && input.aicCoreNum > 0 &&
            input.aicCoreNum <= MAX_AIC_CORE_NUM && input.qSeqLens.size() == static_cast<size_t>(input.batchSize);
 }
 

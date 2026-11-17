@@ -473,6 +473,61 @@ public:
         }
     }
 
+    // FP8 paged Union calls this entry only for a tile with unused V rows.
+    template <class TensorB, class TensorC>
+    __aicore__ inline void RunWithVTailZero(TensorB& gBTensor, TensorC& ubCTensor, GemmCoord actualOriShape,
+                                            uint32_t gatheredKvSTileIdx, uint64_t prefixSumL0AStages,
+                                            uint64_t prefixSumL0BStages, Arch::CrossCoreFlag smToMm2Flag,
+                                            Arch::CrossCoreFlag mm2ToReFlag,
+                                            AscendC::GlobalTensor<uint64_t> kvOffsetInfo, uint32_t kvOffsetGroupWords,
+                                            uint32_t kvOffsetGroupN, uint32_t vTailPadding)
+    {
+        static_assert(PRECOMPUTE_SPARSE && PAGED_CACHE_FLAG && sizeof(ElementB) == 1U && !TileCopy::IS_MXFP8,
+                      "V tail zeroing requires precomputed paged FP8 PV");
+        const uint32_t rowNum = actualOriShape[0];
+        const uint32_t embed = actualOriShape[1];
+        const uint32_t tileRows = actualOriShape[2];
+        const uint32_t l1BBufId = gatheredKvSTileIdx & (l1BBufNum - 1U);
+        const uint32_t l1BEventId = l1BBufId + 3U;
+        const uint32_t l1ABufId = gatheredKvSTileIdx % l1ABufNum;
+        auto l1BLayoutTla = tla::MakeLayout<ElementB, LayoutTagL1B>(tileRows, embed);
+        auto l1BTensorTla = tla::MakeTensor(l1BTensor[l1BBufId], l1BLayoutTla, Arch::PositionL1{});
+        auto l1ALayoutTla = tla::MakeLayout<ElementA, LayoutTagL1A>(rowNum, tileRows);
+        auto l1ATensorTla = tla::MakeTensor(l1ATensor[l1ABufId], l1ALayoutTla, Arch::PositionL1{});
+
+        AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventId);
+        const uint32_t vGroupNum = CeilDiv(tileRows, kvOffsetGroupN);
+        const uint32_t vReadyBase = EVENT_ID3 + l1BBufId * CeilDiv(l1BTileK, kvOffsetGroupN);
+        for (uint32_t groupIdx = 0; groupIdx < vGroupNum; ++groupIdx) {
+            SparseVGroupL1Load(gBTensor, l1BTensorTla, kvOffsetInfo[groupIdx * kvOffsetGroupWords],
+                               groupIdx * kvOffsetGroupN, embed);
+            if (groupIdx + 1U == vGroupNum) {
+                // Cube consumes the whole tile. Zero P cannot suppress NaN V.
+                const uint32_t stripeBlocks = tla::get<1, 1>(l1BTensorTla.stride()) / BYTE_PER_C0;
+                const uint32_t firstPad = tileRows - vTailPadding;
+                AscendC::InitConstValueParams<uint16_t> zero(embed / BYTE_PER_C0, vTailPadding,
+                                                             stripeBlocks - vTailPadding, 0);
+                AscendC::PipeBarrier<PIPE_MTE2>();
+                AscendC::Fill(
+                    l1BTensor[l1BBufId].template ReinterpretCast<uint16_t>()[firstPad * BYTE_PER_C0 / sizeof(uint16_t)],
+                    zero);
+            }
+            AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(vReadyBase + groupIdx);
+        }
+        const uint32_t freeFlag =
+            GbsaKernelArch35::KV_OFFSET_FLAG_BASE + gatheredKvSTileIdx % GbsaKernelArch35::KV_OFFSET_STAGES;
+        AscendC::CrossCoreSetFlag<4, PIPE_S>(freeFlag);
+        AscendC::CrossCoreSetFlag<4, PIPE_S>(freeFlag + V0_V1_FLAG_ID_OFFSET);
+        WaitCrossCoreSync<4, PIPE_MTE1>(smToMm2Flag);
+        if (embed <= L0_TILE_N) {
+            ComputePV<1U>(l1ATensorTla, l1BTensorTla, ubCTensor, actualOriShape, gatheredKvSTileIdx, prefixSumL0AStages,
+                          prefixSumL0BStages, smToMm2Flag, mm2ToReFlag, l1BEventId, vReadyBase, kvOffsetGroupN);
+        } else {
+            ComputePV<2U>(l1ATensorTla, l1BTensorTla, ubCTensor, actualOriShape, gatheredKvSTileIdx, prefixSumL0AStages,
+                          prefixSumL0BStages, smToMm2Flag, mm2ToReFlag, l1BEventId, vReadyBase, kvOffsetGroupN);
+        }
+    }
+
     template <uint32_t N_SPLITS, class TensorL1A, class TensorL1B, class TensorC>
     __aicore__ inline void ComputePV(TensorL1A& l1ATensorTla, TensorL1B& l1BTensorTla, TensorC& ubCTensor,
                                      GemmCoord actualOriShape, uint32_t gatheredKvSTileIdx, uint64_t prefixSumL0AStages,
