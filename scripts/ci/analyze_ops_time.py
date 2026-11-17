@@ -39,7 +39,7 @@ def parse_txt_content(content):
     pattern = (
         r"Build \[([^\]]+)\] op_name \[([^\]]+)\] index \[([^\]]+)\] "
         r"bin_file \[([^\]]+)\] duration \[([^\]]+)\] size \[([^\]]+)\] "
-        r"start_time \[([^\]]+)\] end_time \[([^\]]+)\]"
+        r"start_time \[([^\]]+)\] end_time \[([^\]]+)\](?: backend \[([^\]]+)\])?"
     )
     match = re.search(pattern, content)
 
@@ -55,6 +55,7 @@ def parse_txt_content(content):
         "size": match.group(6),
         "start_time": match.group(7),
         "end_time": match.group(8),
+        "backend": match.group(9) or "asc",
     }
 
 
@@ -81,6 +82,8 @@ def find_txt_files():
     # Iterate through all soc directories
     for soc_dir in os.listdir(base_dir):
         gen_dir = os.path.join(base_dir, soc_dir, "gen")
+        if not os.path.isdir(gen_dir):
+            continue
         # Find all txt files in gen directory
         for file in os.listdir(gen_dir):
             match_txt = re.match(r"([^-]+)-(\d+)\.txt", file)
@@ -114,7 +117,7 @@ def process_txt_file(txt_files):
                 logger.warning(f"File content format mismatch: {txt_file}")
                 continue
             # Build data row
-            key = (parsed_data["soc"], parsed_data["op_name"])
+            key = (parsed_data["soc"], parsed_data["op_name"], parsed_data["backend"])
             duration = float(parsed_data["duration"])
             merge_dict[key]["duration"] += duration
             merge_dict[key]["max_duration"] = max(
@@ -199,14 +202,27 @@ def main():
 
     data_list = []
     # Append merged rows
-    for (soc, op_name), values in merge_dict.items():
-        real_op_name = remove_apt_suffix(op_name)
-        real_op_name = group_trans_op_name.get(real_op_name, real_op_name)
+    for (soc, op_name, backend), values in merge_dict.items():
+        if backend == "dsl":
+            # A whole OpKit build is timed once, independently of ASC shards.
+            real_op_name = f"{op_name}_cannbotdsl"
+        else:
+            real_op_name = remove_apt_suffix(op_name)
+            real_op_name = group_trans_op_name.get(real_op_name, real_op_name)
+        durations = (
+            union_duration(values["intervals"]),
+            values["duration"],
+            values["max_duration"],
+        )
+        duration, total, maximum = (
+            round(seconds, 3) if backend == "dsl" else int(seconds)
+            for seconds in durations
+        )
         merged_row = {
             "op_name": f"{real_op_name}",
-            "duration": int(union_duration(values["intervals"])),
-            "sum_duration": int(values["duration"]),
-            "max_duration": int(values["max_duration"]),
+            "duration": duration,
+            "sum_duration": total,
+            "max_duration": maximum,
             "size": int(values["size"]),
             "soc": soc,
         }

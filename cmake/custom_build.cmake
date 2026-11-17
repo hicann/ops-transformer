@@ -154,57 +154,55 @@ if (BUILD_OPEN_PROJECT)
         )
     endif()
 
-    # op tiling
-    add_library(cust_opmaster SHARED
-        $<$<TARGET_EXISTS:opbase_util_objs>:$<TARGET_OBJECTS:opbase_util_objs>>
-        $<$<TARGET_EXISTS:opbase_tiling_objs>:$<TARGET_OBJECTS:opbase_tiling_objs>>
-    )
-    target_include_directories(cust_opmaster PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/mc2/common/utils
-            ${CMAKE_CURRENT_SOURCE_DIR}/mc2/common/op_host/op_tiling
-            ${CMAKE_CURRENT_SOURCE_DIR}/mc2/common/op_kernel
-            $<$<BOOL:${BUILD_OPEN_PROJECT}>:$<BUILD_INTERFACE:${ASCEND_CANN_PACKAGE_PATH}/include/experiment>>
-    )
-    target_compile_options(cust_opmaster PRIVATE
-            $<$<COMPILE_LANGUAGE:CXX>:-std=c++11>
-            -fvisibility=hidden
-    )
-    target_compile_definitions(cust_opmaster PRIVATE
-            LOG_CPP
-            PROCESS_LOG
-    )
-    target_link_libraries(cust_opmaster PRIVATE
-            $<BUILD_INTERFACE:intf_pub>
-            $<BUILD_INTERFACE:ops_transformer_utils_tiling_headers>
-            $<$<BOOL:${alog_FOUND}>:$<BUILD_INTERFACE:alog_headers>>
-            $<$<BOOL:${dlog_FOUND}>:$<BUILD_INTERFACE:dlog_headers>>
-            -Wl,--whole-archive
-            rt2_registry
-            -Wl,--no-whole-archive
-            -Wl,--no-as-needed
-            graph
-            graph_base
-            exe_graph
-            platform
-            register
-            error_manager
-            ascendalog
-            unified_dlog
-            -Wl,--as-needed
-            -Wl,--whole-archive
-            tiling_api
-            -Wl,--no-whole-archive
-            acl_rt
-            c_sec
-    )
-    set_target_properties(cust_opmaster PROPERTIES OUTPUT_NAME
-            cust_opmaster_rt2.0
-    )
-    add_custom_command(TARGET cust_opmaster
-            POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${TILING_CUSTOM_DIR}
-            COMMAND ln -sf $<TARGET_FILE:cust_opmaster> ${TILING_CUSTOM_FILE}
-    )
+    # Both runtime and compile-time tiling use the same ASC implementation.
+    function(add_transformer_tiling_library target)
+        add_library(${target} SHARED
+            $<$<TARGET_EXISTS:opbase_util_objs>:$<TARGET_OBJECTS:opbase_util_objs>>
+            $<$<TARGET_EXISTS:opbase_tiling_objs>:$<TARGET_OBJECTS:opbase_tiling_objs>>
+        )
+        target_include_directories(${target} PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/mc2/common/utils
+                ${CMAKE_CURRENT_SOURCE_DIR}/mc2/common/op_host/op_tiling
+                ${CMAKE_CURRENT_SOURCE_DIR}/mc2/common/op_kernel
+                $<$<BOOL:${BUILD_OPEN_PROJECT}>:$<BUILD_INTERFACE:${ASCEND_CANN_PACKAGE_PATH}/include/experiment>>
+        )
+        target_compile_options(${target} PRIVATE
+                $<$<COMPILE_LANGUAGE:CXX>:-std=c++11>
+                -fvisibility=hidden
+        )
+        target_compile_definitions(${target} PRIVATE
+                LOG_CPP
+                PROCESS_LOG
+        )
+        target_link_libraries(${target} PRIVATE
+                $<BUILD_INTERFACE:intf_pub>
+                $<BUILD_INTERFACE:ops_transformer_utils_tiling_headers>
+                $<$<BOOL:${alog_FOUND}>:$<BUILD_INTERFACE:alog_headers>>
+                $<$<BOOL:${dlog_FOUND}>:$<BUILD_INTERFACE:dlog_headers>>
+                -Wl,--whole-archive
+                rt2_registry
+                -Wl,--no-whole-archive
+                -Wl,--no-as-needed
+                graph
+                graph_base
+                exe_graph
+                platform
+                register
+                error_manager
+                ascendalog
+                unified_dlog
+                -Wl,--as-needed
+                -Wl,--whole-archive
+                tiling_api
+                -Wl,--no-whole-archive
+                acl_rt
+                c_sec
+        )
+    endfunction()
+
+    add_transformer_tiling_library(cust_opmaster)
+    set(_cust_opmaster_output_name cust_opmaster_rt2.0)
+    set_target_properties(cust_opmaster PROPERTIES OUTPUT_NAME "${_cust_opmaster_output_name}")
     if (NOT ENABLE_BUILT_IN)
         install(TARGETS cust_opmaster
                 LIBRARY DESTINATION packages/vendors/${VENDOR_NAME}_transformer/op_impl/ai_core/tbe/op_tiling/lib/linux/${CMAKE_SYSTEM_PROCESSOR}
@@ -215,13 +213,16 @@ if (BUILD_OPEN_PROJECT)
     set(compat_optiling_dir  ${CMAKE_CURRENT_BINARY_DIR}/compat)
     set(compat_optiling_file ${compat_optiling_dir}/liboptiling.so)
     add_custom_target(optiling_compat ALL
-            DEPENDS ${compat_optiling_file}
+            DEPENDS "${TILING_CUSTOM_FILE}" ${compat_optiling_file}
     )
 
     add_custom_command(
             OUTPUT ${compat_optiling_file}
             COMMAND ${CMAKE_COMMAND} -E make_directory ${compat_optiling_dir}
-            COMMAND ln -sf lib/linux/${CMAKE_SYSTEM_PROCESSOR}/$<TARGET_FILE_NAME:cust_opmaster> ${compat_optiling_file}
+            COMMAND ln -sf
+                "lib/linux/${CMAKE_SYSTEM_PROCESSOR}/${CMAKE_SHARED_LIBRARY_PREFIX}${_cust_opmaster_output_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
+                "${compat_optiling_file}"
+            VERBATIM
     )
 
     if (NOT ENABLE_BUILT_IN)
@@ -753,7 +754,17 @@ else()
     )
 endif ()
 cannbotdsl_clean_resources()
+set(_tiling_libraries cust_opmaster)
+set(_compile_tiling_library cust_opmaster)
 if(NOT ENABLE_BUILT_IN)
+    get_property(_dsl_host_archives GLOBAL PROPERTY CANNBOTDSL_NATIVE_ARCHIVES)
+    if(ENABLE_OPS_KERNEL AND _dsl_host_archives)
+        # asc_opc only needs ASC tiling registration. Keep the DSL runtime out
+        # of its process, which may use a different libascendcl from the host.
+        set(_compile_tiling_library cust_opmaster_compile)
+        add_transformer_tiling_library(${_compile_tiling_library})
+        list(APPEND _tiling_libraries ${_compile_tiling_library})
+    endif()
     cannbotdsl_link_host(cust_opmaster)
     target_sources(cust_opapi PRIVATE
         $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>>)
@@ -766,22 +777,33 @@ target_link_libraries(
     PRIVATE $<$<BOOL:${BUILD_WITH_INSTALLED_DEPENDENCY_CANN_PKG}>:$<BUILD_INTERFACE:opapi_math>>
 )
 
-if (NOT ENABLE_AICPU_KERNEL)
-    target_link_libraries(cust_opmaster PUBLIC $<TARGET_NAME_IF_EXISTS:${OPHOST_NAME}_tiling_obj>)
-    target_link_libraries(
-        cust_opmaster
-        PUBLIC $<$<TARGET_EXISTS:${COMMON_NAME}_obj>:${COMMON_NAME}_obj>
-        PUBLIC $<$<TARGET_EXISTS:${COMMON_NAME}_fallback_obj>:${COMMON_NAME}_fallback_obj>
-        PUBLIC $<$<TARGET_EXISTS:${OPGRAPH_NAME}_fallback_obj>:${OPGRAPH_NAME}_fallback_obj>
-        PRIVATE $<$<BOOL:${BUILD_WITH_INSTALLED_DEPENDENCY_CANN_PKG}>:$<BUILD_INTERFACE:optiling>>
-    )
-else()
-    target_link_libraries(
-        cust_opmaster
-        PUBLIC $<$<TARGET_EXISTS:${COMMON_NAME}_obj>:${COMMON_NAME}_obj>
-        PRIVATE $<$<BOOL:${BUILD_WITH_INSTALLED_DEPENDENCY_CANN_PKG}>:$<BUILD_INTERFACE:optiling>>
-    )
-endif()
+foreach (_tiling_library IN LISTS _tiling_libraries)
+    if (NOT ENABLE_AICPU_KERNEL)
+        target_link_libraries(${_tiling_library} PUBLIC $<TARGET_NAME_IF_EXISTS:${OPHOST_NAME}_tiling_obj>)
+        target_link_libraries(
+            ${_tiling_library}
+            PUBLIC $<$<TARGET_EXISTS:${COMMON_NAME}_obj>:${COMMON_NAME}_obj>
+            PUBLIC $<$<TARGET_EXISTS:${COMMON_NAME}_fallback_obj>:${COMMON_NAME}_fallback_obj>
+            PUBLIC $<$<TARGET_EXISTS:${OPGRAPH_NAME}_fallback_obj>:${OPGRAPH_NAME}_fallback_obj>
+            PRIVATE $<$<BOOL:${BUILD_WITH_INSTALLED_DEPENDENCY_CANN_PKG}>:$<BUILD_INTERFACE:optiling>>
+        )
+    else()
+        target_link_libraries(
+            ${_tiling_library}
+            PUBLIC $<$<TARGET_EXISTS:${COMMON_NAME}_obj>:${COMMON_NAME}_obj>
+            PRIVATE $<$<BOOL:${BUILD_WITH_INSTALLED_DEPENDENCY_CANN_PKG}>:$<BUILD_INTERFACE:optiling>>
+        )
+    endif()
+endforeach()
+
+# AscendC loads this link via ASCEND_CUSTOM_OPP_PATH during kernel compilation.
+add_custom_command(
+    OUTPUT "${TILING_CUSTOM_FILE}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${TILING_CUSTOM_DIR}"
+    COMMAND ln -sf "$<TARGET_FILE:${_compile_tiling_library}>" "${TILING_CUSTOM_FILE}"
+    DEPENDS ${_compile_tiling_library}
+    VERBATIM
+)
 
 target_link_libraries(
     cust_proto

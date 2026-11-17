@@ -1060,6 +1060,14 @@ function(add_bin_compile_target)
         set(${_op_name}_a6_dir ${_op_info})
     endforeach()
 
+    # Open-project kernel groups need the local tiling registry even when
+    # they build a custom kernel subpackage for a separate host package.
+    set(_use_host_tiling OFF)
+    if (ENABLE_OPS_HOST OR ENABLE_HOST_TILING OR
+        (BUILD_OPEN_PROJECT AND TARGET cust_opmaster AND TARGET optiling_compat))
+        set(_use_host_tiling ON)
+    endif ()
+
     set(_ops_target_list)
     set(compile_scripts)
     file(GLOB scripts_list ${GEN_OUT_DIR}/*.sh)
@@ -1227,7 +1235,7 @@ function(add_bin_compile_target)
         if (_compile_flag)
             set(_BUILD_COMMAND)
             set(_BUILD_FLAG ${GEN_OUT_DIR}/${OP_TARGET_NAME}_${op_index}.done)
-            if (ENABLE_OPS_HOST OR ENABLE_HOST_TILING)
+            if (_use_host_tiling)
                 list(APPEND _BUILD_COMMAND export ASCEND_CUSTOM_OPP_PATH=${CUSTOM_DIR} &&)
             endif ()
             list(APPEND _BUILD_COMMAND export HI_PYTHON="python3" &&)
@@ -1248,7 +1256,7 @@ function(add_bin_compile_target)
                 DEPENDS ${_BUILD_FLAG}
             )
 
-            if (ENABLE_OPS_HOST OR ENABLE_HOST_TILING)
+            if (_use_host_tiling)
                 add_dependencies(${OP_TARGET_NAME}_${op_index} optiling_compat generate_ops_info)
             endif ()
             add_dependencies(${OP_TARGET_NAME}_${op_index} ${OP_TARGET_NAME}_src_copy ${OP_TARGET_NAME}_py_copy ${OP_TARGET_NAME}_mkdir)

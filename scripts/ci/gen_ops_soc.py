@@ -11,6 +11,7 @@
 import os
 import re
 import logging
+from pathlib import Path
 
 black_list = [
     "moe_gather_v2",
@@ -173,12 +174,11 @@ def grouped(gen_path, soc, group_size):
     return result
 
 
-def grouped_back(gen_path, soc, group_size):
+def grouped_back(gen_path, soc, group_size, dsl_ops=()):
     result: list[list[str]] = [[] for _ in range(group_size)]
-    if not os.path.isdir(gen_path):
-        return result
-    sh_files = get_sh_files(gen_path)
+    sh_files = get_sh_files(gen_path) if os.path.isdir(gen_path) else []
     op_counts = count_opnames(sh_files)
+    remaining_dsl_ops = set(dsl_ops)
 
     added_op_levels = set()
     special_task_parts = []
@@ -191,6 +191,7 @@ def grouped_back(gen_path, soc, group_size):
         if op_name.endswith(("_a2", "_a3", "_apt")):
             op_name_real = op_name.rsplit("_", 1)[0]
 
+        remaining_dsl_ops.discard(op_name_real)
         if op_name_real in black_list:
             continue
         if op_name_real in op_level_list:
@@ -206,7 +207,7 @@ def grouped_back(gen_path, soc, group_size):
         if op_name_real in op_level_list_barrier:
             if op_name_real not in added_op_levels:
                 added_op_levels.add(op_name_real)
-                op_level_list_barrier.append(str(op_name_real))
+                special_task_parts_barrier.append(str(op_name_real))
             continue
         if count >= group_size:
             for i in range(group_size):
@@ -230,6 +231,11 @@ def grouped_back(gen_path, soc, group_size):
     if special_task_parts_barrier:
         special_task_barrier = ",".join(special_task_parts_barrier)
         result[current_group_index].append(special_task_barrier)
+
+    # OpKit schedules its own variants. Keep each DSL-only task in one group.
+    for op_name in sorted(remaining_dsl_ops.difference(black_list)):
+        result[current_group_index].append(op_name)
+        current_group_index = (current_group_index + 1) % group_size
 
     return result
 
@@ -423,6 +429,61 @@ def extract_ai_core_configs(file_path):
         return []
 
 
+def get_dsl_ops(repository_path, soc):
+    repository = Path(repository_path)
+    cmake_file = repository / "CMakeLists.txt"
+    if not cmake_file.is_file():
+        logger.warning(
+            "Root CMakeLists.txt not found at %s; skipping DSL ops",
+            cmake_file,
+        )
+        return set()
+
+    # Match the repository's DSL default even when the declaration spans lines.
+    cmake = re.sub(r"(?m)#.*$", "", cmake_file.read_text(encoding="utf-8"))
+    default_soc = re.search(
+        r'^\s*set\s*\(\s*CANNBOTDSL_COMPUTE_UNIT\s+(?:"([^"]+)"|([^\s()"]+))\s+CACHE\b',
+        cmake,
+        re.MULTILINE,
+    )
+    if not default_soc:
+        logger.warning(
+            "CANNBOTDSL_COMPUTE_UNIT default not found in %s; skipping DSL ops",
+            cmake_file,
+        )
+        return set()
+    dsl_soc = default_soc[1] or default_soc[2]
+    if soc != dsl_soc:
+        logger.info("Skipping DSL ops for %s; repository DSL SoC is %s", soc, dsl_soc)
+        return set()
+
+    ops = set()
+    for root, dirs, _ in os.walk(repository):
+        dirs[:] = [
+            name
+            for name in dirs
+            if not name.startswith(".") and not should_skip_directory(name)
+        ]
+        if "op_dsl" not in dirs:
+            continue
+        dirs.remove("op_dsl")
+        op_dir = Path(root)
+        # Either build path can own an op for this SoC. The grouping code
+        # filters out DSL ops already covered by ASC entries.
+        entry = op_dir / "op_dsl" / "CMakeLists.txt"
+        name = re.escape(op_dir.name)
+        registration = rf'^\s*enable_cannbotdsl_kernel\s*\(\s*(?:{name}|"{name}")\s'
+        if entry.is_file() and re.search(
+            registration, entry.read_text(encoding="utf-8"), re.MULTILINE
+        ):
+            ops.add(op_dir.name)
+        else:
+            logger.warning(
+                "DSL registration for %s not found in %s", op_dir.name, entry
+            )
+    return ops
+
+
 def grouped_def(repository_path, soc, group_size):
     result: list[list[str]] = [[] for _ in range(group_size)]
     init_oplist = []
@@ -442,6 +503,7 @@ def grouped_def(repository_path, soc, group_size):
 
                 if soc in ai_core_configs:
                     init_oplist.append(op_name)
+    init_oplist.extend(get_dsl_ops(repository_path, soc).difference(init_oplist))
     init_oplist.sort()
     special_task = ""
     special_task_moe_distribute = ""
@@ -495,7 +557,8 @@ def main(repository_path, soc, group_size=1):
         os.path.join(project_path, "build", "binary", soc, "gen")
     )
     if group_size > 1:
-        op_data = grouped_back(gen_path, soc, group_size)
+        dsl_ops = get_dsl_ops(project_path, soc)
+        op_data = grouped_back(gen_path, soc, group_size, dsl_ops)
     else:
         op_data = grouped_def(project_path, soc, group_size)
     return op_data

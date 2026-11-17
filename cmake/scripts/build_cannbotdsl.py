@@ -18,6 +18,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from contextlib import contextmanager
 from importlib import import_module
 from importlib.metadata import PackageNotFoundError, distribution
@@ -164,12 +165,23 @@ def package_files(root):
     }
 
 
-def sync_kernels(output, destination, soc):
+def kernel_timing_path(output, soc_dir):
+    return soc_dir / "gen" / f"{output.parent.name}_cannbotdsl-0.txt"
+
+
+def sync_kernels(output, destination, soc, timing):
     """Own individual scan files; never delete another producer's directory."""
     destination = Path(destination)
     state = destination.parent / ".cannbotdsl-files.json"
     with file_lock(state.with_suffix(".lock")):
         _sync_kernels(output, destination, soc, state)
+        if timing:
+            path = kernel_timing_path(output, destination.parent)
+            if not path.is_file() or path.read_text(encoding="utf-8") != timing:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = path.with_suffix(".tmp")
+                temporary.write_text(timing, encoding="utf-8")
+                temporary.replace(path)
 
 
 def remove_scan_files(root, paths):
@@ -262,6 +274,7 @@ def clean(root, binary_root, packages, host_enabled):
             continue
         for owner in removed:
             remove_scan_files(state.parent / "bin", owners.pop(owner))
+            kernel_timing_path(Path(owner), state.parent).unlink(missing_ok=True)
             (Path(owner).parent / "kernel.built").unlink(missing_ok=True)
         for name in ("binary_info_config.json", "relocatable_kernel_info_config.json"):
             (state.parent / "bin" / name).unlink(missing_ok=True)
@@ -403,6 +416,7 @@ def build(
         record["layout"] = plan
     state = output / ".transformer-build.json"
     cached = json.loads(state.read_text()) if state.is_file() else {}
+    timing = cached.get("kernel_timing")
     if cached.get("record") != record or cached.get("files") != package_files(output):
         with publication(output) as stage:
             options = (
@@ -414,6 +428,9 @@ def build(
                     l2=aclnn_type == "aclnn",
                 )
             )
+            if mode == "kernel":
+                start_time = time.time()
+                start_clock = time.monotonic()
             opkit.build(
                 collectors=source.parent,
                 # Only ACLNN Host publication collects the L2 declaration.
@@ -425,6 +442,19 @@ def build(
                 jobs=jobs,
                 **options,
             )
+            if mode == "kernel":
+                duration = time.monotonic() - start_clock
+                size = sum(
+                    path.stat().st_size
+                    for path in (stage / "kernel" / soc).rglob("*.o")
+                    if path.is_file()
+                )
+                timing = (
+                    f"Build [{soc}] op_name [{source.stem}] index [0] bin_file [-] "
+                    f"duration [{duration:.6f}] size [{size}] "
+                    f"start_time [{start_time:.6f}] end_time [{start_time + duration:.6f}] "
+                    "backend [dsl]\n"
+                )
             if mode == "host":
                 if aclnn_type is None:
                     index = json.loads((stage / _NATIVE_ARCHIVE_INDEX).read_text())
@@ -445,13 +475,13 @@ def build(
                     raise ValueError(
                         "Host package is missing files declared in the configured layout"
                     )
-            write_json(
-                stage / ".transformer-build.json",
-                dict(record=record, files=package_files(stage)),
-            )
+            build_state = dict(record=record, files=package_files(stage))
+            if timing:
+                build_state["kernel_timing"] = timing
+            write_json(stage / ".transformer-build.json", build_state)
     if mode == "kernel":
         # Feed the same ASC index generator; retain logical SoC paths in JSON.
-        sync_kernels(output, kernel_output, soc)
+        sync_kernels(output, kernel_output, soc, timing)
 
 
 def main():
