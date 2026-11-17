@@ -20,6 +20,7 @@
 #include "../../basic_modules/sparse_flash_attention_grad_vec_op.h"
 #include "../../basic_modules/sparse_flash_attention_grad_common_header.h"
 #include "sparse_flash_attention_grad_post.h"
+#include "sparse_flash_attention_grad_ksplit_det.h"
 
 namespace SFAG_BASIC {
 
@@ -228,6 +229,15 @@ __aicore__ inline void SelectedAttentionGradBasic<SFAGT>::Process(
     GM_ADDR key_rope, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dq_rope, GM_ADDR dk_rope, GM_ADDR workspace,
     const TILING_CLASS* __restrict tilingData)
 {
+    if constexpr (IS_DETERMINISTIC) {
+        if (tilingData->opInfo.ksplitDet != 0) {
+            SelectedAttentionGradKsplitDet<SFAGT> ksplitOp;
+            ksplitOp.Process(query, key, value, attention_out, attention_out_grad, softmax_max, softmax_sum,
+                             topk_indices, actual_seq_qlen, actual_seq_kvlen, query_rope, key_rope, dq, dk, dv, dq_rope,
+                             dk_rope, workspace, tilingData);
+            return;
+        }
+    }
     Init(tilingData);
     topkIndicesGm.SetGlobalBuffer((__gm__ int32_t*)topk_indices);
     if constexpr (IS_BSND == false) {

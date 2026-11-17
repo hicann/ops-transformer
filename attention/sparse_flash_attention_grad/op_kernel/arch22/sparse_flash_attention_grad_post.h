@@ -27,6 +27,8 @@ public:
                                 __gm__ uint8_t* dq_rope, __gm__ uint8_t* dk_rope, __gm__ uint8_t* workspace,
                                 const TILING_TYPE* __restrict ordTilingData, TPipe* pipe_in);
     __aicore__ inline void Process();
+    // K-split writes dq itself. Post then only casts dk/dv.
+    bool skipDq{false};
     __aicore__ inline void InitIndex(uint64_t startIdx, int64_t curG, int64_t& curS, int64_t headDim,
                                      int64_t headDimAlign, GM_ADDR seqS);
     __aicore__ inline void NZ2ND(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor, uint64_t sLen,
@@ -450,14 +452,16 @@ SparseFlashAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMA
         qEnd = qPostBlockTotal;
     }
 
-    InitIndex(qBegin, g, s1, d, dAlign, actual_seq_qlen_addr);
+    if (!skipDq) {
+        InitIndex(qBegin, g, s1, d, dAlign, actual_seq_qlen_addr);
 
-    for (uint64_t i = qBegin; i < qEnd; i = i + 2 * qPostBaseNum) {
-        uint64_t dataSize = i + qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
-        NZVecClc(dqWorkSpaceGm, dqGm, dataSize, actual_seq_qlen_addr, g, s1, d, dAlign, true, 0);
-        uint64_t dataSize1 = i + 2 * qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
-        dataSize1 = i + qPostBaseNum >= qPostBlockTotal ? 0 : dataSize1;
-        NZVecClc(dqWorkSpaceGm, dqGm, dataSize1, actual_seq_qlen_addr, g, s1, d, dAlign, true, 1);
+        for (uint64_t i = qBegin; i < qEnd; i = i + 2 * qPostBaseNum) {
+            uint64_t dataSize = i + qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
+            NZVecClc(dqWorkSpaceGm, dqGm, dataSize, actual_seq_qlen_addr, g, s1, d, dAlign, true, 0);
+            uint64_t dataSize1 = i + 2 * qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
+            dataSize1 = i + qPostBaseNum >= qPostBlockTotal ? 0 : dataSize1;
+            NZVecClc(dqWorkSpaceGm, dqGm, dataSize1, actual_seq_qlen_addr, g, s1, d, dAlign, true, 1);
+        }
     }
 
     // init k
@@ -514,52 +518,54 @@ SparseFlashAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMA
     uint64_t dqOutGmOffset = cBlockIdx * qPostBlockFactor * (qPostBaseNum / totalD) * dimDqk;
     uint64_t dqRopeOutGmOffset = cBlockIdx * qPostBlockFactor * (qPostBaseNum / totalD) * dimRope;
 
-    SetFlag<HardEvent::V_MTE2>(0);
-    for (uint64_t i = qBegin; i < qEnd; i = i + qPostBaseNum) {
-        AscendC::LocalTensor<float> vecIn = inQueue.template AllocTensor<float>();
-        AscendC::LocalTensor<OUT_TYPE> vecOut = outQueue.template AllocTensor<OUT_TYPE>();
-        uint64_t dataSize = i + qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
-        WaitFlag<HardEvent::V_MTE2>(0);
-        DataCopy(vecIn, dqWorkSpaceGm[i], (dataSize + 7) / 8 * 8); // dataSize(fp32) align 32B
-        inQueue.EnQue(vecIn);
-        inQueue.template DeQue<float>();
-
-        if constexpr (AscendC::IsSameType<OUT_TYPE, float>::value) {
-            Muls(vecOut, vecIn, (float)tilingData->postTilingData.scaleValue, dataSize);
-            outQueue.EnQue(vecOut);
-            outQueue.template DeQue<OUT_TYPE>();
-
-            DataCopy(dqGm[i], vecOut, (dataSize + 7) / 8 * 8); // dataSize(fp16) align 32B
-        } else {
-            Muls(vecIn, vecIn, (float)tilingData->postTilingData.scaleValue, dataSize);
-            PIPE_BARRIER(PIPE_V);
-
-            Cast(vecOut, vecIn, AscendC::RoundMode::CAST_ROUND, dataSize);
-            outQueue.EnQue(vecOut);
-            outQueue.template DeQue<OUT_TYPE>();
-
-            DataCopyParams repeatParams;
-            repeatParams.blockCount = dataSize / totalD;
-            repeatParams.blockLen = dimDqk * sizeof(OUT_TYPE) / 32;
-            repeatParams.srcStride = dimRope * sizeof(OUT_TYPE) / 32;
-            repeatParams.dstStride = 0;
-
-            DataCopy(dqGm[dqOutGmOffset], vecOut, repeatParams);
-            dqOutGmOffset += repeatParams.blockCount * dimDqk;
-
-            if constexpr (HAS_ROPE) {
-                // if ROPE_ENABLED: scatter --> dq & dq_rope
-                repeatParams.blockLen = dimRope * sizeof(OUT_TYPE) / 32;
-                repeatParams.srcStride = dimDqk * sizeof(OUT_TYPE) / 32;
-                DataCopy(dqRopeGm[dqRopeOutGmOffset], vecOut[dimDqk], repeatParams);
-                dqRopeOutGmOffset += repeatParams.blockCount * dimRope;
-            }
-        }
-        inQueue.FreeTensor(vecIn);
-        outQueue.FreeTensor(vecOut);
+    if (!skipDq) {
         SetFlag<HardEvent::V_MTE2>(0);
+        for (uint64_t i = qBegin; i < qEnd; i = i + qPostBaseNum) {
+            AscendC::LocalTensor<float> vecIn = inQueue.template AllocTensor<float>();
+            AscendC::LocalTensor<OUT_TYPE> vecOut = outQueue.template AllocTensor<OUT_TYPE>();
+            uint64_t dataSize = i + qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
+            WaitFlag<HardEvent::V_MTE2>(0);
+            DataCopy(vecIn, dqWorkSpaceGm[i], (dataSize + 7) / 8 * 8); // dataSize(fp32) align 32B
+            inQueue.EnQue(vecIn);
+            inQueue.template DeQue<float>();
+
+            if constexpr (AscendC::IsSameType<OUT_TYPE, float>::value) {
+                Muls(vecOut, vecIn, (float)tilingData->postTilingData.scaleValue, dataSize);
+                outQueue.EnQue(vecOut);
+                outQueue.template DeQue<OUT_TYPE>();
+
+                DataCopy(dqGm[i], vecOut, (dataSize + 7) / 8 * 8); // dataSize(fp16) align 32B
+            } else {
+                Muls(vecIn, vecIn, (float)tilingData->postTilingData.scaleValue, dataSize);
+                PIPE_BARRIER(PIPE_V);
+
+                Cast(vecOut, vecIn, AscendC::RoundMode::CAST_ROUND, dataSize);
+                outQueue.EnQue(vecOut);
+                outQueue.template DeQue<OUT_TYPE>();
+
+                DataCopyParams repeatParams;
+                repeatParams.blockCount = dataSize / totalD;
+                repeatParams.blockLen = dimDqk * sizeof(OUT_TYPE) / 32;
+                repeatParams.srcStride = dimRope * sizeof(OUT_TYPE) / 32;
+                repeatParams.dstStride = 0;
+
+                DataCopy(dqGm[dqOutGmOffset], vecOut, repeatParams);
+                dqOutGmOffset += repeatParams.blockCount * dimDqk;
+
+                if constexpr (HAS_ROPE) {
+                    // if ROPE_ENABLED: scatter --> dq & dq_rope
+                    repeatParams.blockLen = dimRope * sizeof(OUT_TYPE) / 32;
+                    repeatParams.srcStride = dimDqk * sizeof(OUT_TYPE) / 32;
+                    DataCopy(dqRopeGm[dqRopeOutGmOffset], vecOut[dimDqk], repeatParams);
+                    dqRopeOutGmOffset += repeatParams.blockCount * dimRope;
+                }
+            }
+            inQueue.FreeTensor(vecIn);
+            outQueue.FreeTensor(vecOut);
+            SetFlag<HardEvent::V_MTE2>(0);
+        }
+        WaitFlag<HardEvent::V_MTE2>(0);
     }
-    WaitFlag<HardEvent::V_MTE2>(0);
     PIPE_BARRIER(PIPE_ALL);
     // init k
     uint64_t kBegin = cBlockIdx * kPostBlockFactor * kPostBaseNum;

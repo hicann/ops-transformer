@@ -46,6 +46,10 @@ public:
                                                                          const int32_t blkCntOffset,
                                                                          const int32_t mmPingPongIdx);
 
+    __aicore__ inline __attribute__((always_inline)) void cube345ProcessKsplit(
+        const RunInfo& runInfo, const int32_t blkCntOffset, const int32_t mmPingPongIdx,
+        const AscendC::GlobalTensor<float>& dqPartialGm);
+
 private:
     __aicore__ inline __attribute__((always_inline)) void cube1Process(
         const int64_t queryGmOffset, const int64_t queryRopeGmOffset, const int64_t keyGmOffset,
@@ -89,6 +93,10 @@ private:
                                                                             const int64_t lastBlockSize,
                                                                             const bool isLastBasicBlock,
                                                                             const RunInfo& runInfo);
+
+    __aicore__ inline __attribute__((always_inline)) void cube3ProcessKsplitSparse(
+        const int64_t dsGmOffset, const int64_t keyGmOffset, const int32_t blkCntOffset, const int64_t lastBlockSize,
+        const bool isLastBasicBlock, const AscendC::GlobalTensor<float>& dqPartialGm);
 
     __aicore__ inline __attribute__((always_inline)) void cube4Process(
         const int64_t dsGmOffset, const int64_t queryGmOffset, const int64_t queryRopeGmOffset,
@@ -206,6 +214,7 @@ private:
     int64_t scatterTokenCapacity;
     int64_t selectedS2;
     bool enableOptimizedScatter{false};
+    bool ksplitDet{false};
     int32_t selectedCntOffset;
     int32_t processBS1ByCore;
     uint32_t usedCoreNum;
@@ -230,6 +239,7 @@ __aicore__ inline void CubeOp<SFAGT>::Init(GM_ADDR query, GM_ADDR key, GM_ADDR v
     selectedBlockCount = tilingData->opInfo.selectedBlockCount;
     selectedBlockSize = tilingData->opInfo.selectedBlockSize;
     enableOptimizedScatter = tilingData->opInfo.enableOptimizedScatter;
+    ksplitDet = tilingData->opInfo.ksplitDet != 0;
     selectedS2 = selectedBlockCount * selectedBlockSize;
     dimGAlign = AlignTo<int64_t>(dimG, SIZE_16);
     mm12WorkspaceLen = tilingData->opInfo.mm12WorkspaceLen;
@@ -335,7 +345,7 @@ __aicore__ inline void CubeOp<SFAGT>::InitGMBuffer(GM_ADDR query, GM_ADDR key, G
     usedWorkspaceLen += dqWorkspaceLen + dkWorkspaceLen + dvWorkspaceLen;
 
     // scatter add
-    uint64_t scatterBufferNum = enableOptimizedScatter ? SCATTER_BUFFER_NUM : PING_PONG_BUFFER;
+    uint64_t scatterBufferNum = (enableOptimizedScatter || ksplitDet) ? SCATTER_BUFFER_NUM : PING_PONG_BUFFER;
     int64_t mm4ResAddr = usedWorkspaceLen / sizeof(float);
     int64_t mm5ResAddr = mm4ResAddr + MAX_CORE_NUM * scatterTokenCapacity * dimDTotal * scatterBufferNum;
     usedWorkspaceLen += MAX_CORE_NUM * scatterTokenCapacity * (dimDTotal + dimDv) * scatterBufferNum * sizeof(float);
@@ -399,4 +409,5 @@ __aicore__ inline void CubeOp<SFAGT>::InitLocalTensor()
 #include "./cube_modules/cube3_sfag.h"
 #include "./cube_modules/cube4_sfag.h"
 #include "./cube_modules/cube5_sfag.h"
+#include "./cube_modules/cube3_ksplit_sfag.h"
 } // namespace SFAG_BASIC

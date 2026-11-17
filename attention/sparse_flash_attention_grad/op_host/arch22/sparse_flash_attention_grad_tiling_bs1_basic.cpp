@@ -240,9 +240,17 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::DoOpTiling()
         return status;
     }
 
+    // Override usedCoreNum / castUsedCoreNum before post factors are computed.
+    DoKsplitTiling();
+
     status = DoCastTiling();
     if (status != ge::GRAPH_SUCCESS) {
         return status;
+    }
+
+    if (tilingData.opInfo.get_ksplitDet() != 0) {
+        // dq is reduced, scaled and cast on the leftover AIVs. Post only casts dk/dv.
+        tilingData.opInfo.set_dqWorkspaceLen(0);
     }
 
     return ge::GRAPH_SUCCESS;
@@ -282,6 +290,10 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetWorkspaceSize()
                                     .c_str()})),
                 return ge::GRAPH_FAILED);
     context_->SetBlockDim(blockdim);
+    if (tilingData.opInfo.get_ksplitDet() != 0) {
+        // MIX AIC:AIV = 1:2. blockDim is the AIC launch count (20 or 24).
+        context_->SetBlockDim(static_cast<uint32_t>(currentUseCoreNum));
+    }
 
     // 系统预留
     int64_t sysLen = WORKSPACE_BASE_CAL;
@@ -306,11 +318,34 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetWorkspaceSize()
 
     int64_t dAlign = (tilingData.opInfo.get_D() + tilingData.opInfo.get_ropeD() + 15) / 16 * 16;
     int64_t d2Align = (tilingData.opInfo.get_D2() + 15) / 16 * 16;
-    uint32_t scatterBufferNum = tmpData.enableOptimizedScatter ? SCATTER_BUFFER_NUM : PING_PONG_BUFFER;
+    const bool ksplitDet = tilingData.opInfo.get_ksplitDet() != 0;
+    uint32_t scatterBufferNum = (tmpData.enableOptimizedScatter || ksplitDet) ? SCATTER_BUFFER_NUM : PING_PONG_BUFFER;
     int64_t scatterTokenCapacity = tmpData.enableOptimizedScatter ?
                                        static_cast<int64_t>(tmpData.singleN) :
                                        static_cast<int64_t>(tmpData.selected_block_count) * tmpData.selected_block_size;
     workspaces[0] += 24 * scatterBufferNum * scatterTokenCapacity * (dAlign + d2Align) * B32;
+    if (ksplitDet) {
+        int64_t userBytes = static_cast<int64_t>(workspaces[0]) - sysLen;
+        int64_t partialOffset = AlignData(userBytes, GM_ALIGN);
+        int64_t dimDTotal = tilingData.opInfo.get_D() + tilingData.opInfo.get_ropeD();
+        int64_t partialLen = static_cast<int64_t>(tilingData.opInfo.get_kSplitComputeCoreNum()) * 5 *
+                             tilingData.opInfo.get_G() * dimDTotal * B32;
+        partialLen = AlignData(partialLen, GM_ALIGN);
+        tilingData.opInfo.set_dqPartialWorkspaceOffset(static_cast<uint64_t>(partialOffset));
+        tilingData.opInfo.set_dqPartialWorkspaceLen(static_cast<uint64_t>(partialLen));
+        // One [row, 8] fp32 record per (token, head). K-split used to recompute
+        // this on every compute core; the pre-pass writes it once.
+        int64_t rowCount = tmpData.layout == static_cast<uint32_t>(InputLayout::TND) ?
+                               tmpData.t1 * tilingData.opInfo.get_G() :
+                               tmpData.b * tmpData.s1 * tilingData.opInfo.get_G();
+        int64_t rowSumOffset = AlignData(partialOffset + partialLen, GM_ALIGN);
+        int64_t rowSumLen = AlignData(rowCount * static_cast<int64_t>(BLOCK), GM_ALIGN);
+        tilingData.opInfo.set_rowSumWorkspaceOffset(static_cast<uint64_t>(rowSumOffset));
+        tilingData.opInfo.set_rowSumWorkspaceLen(static_cast<uint64_t>(rowSumLen));
+        tilingData.opInfo.set_rowSumRows(static_cast<uint64_t>(rowCount));
+        workspaces[0] = static_cast<size_t>(sysLen + rowSumOffset + rowSumLen);
+        OP_LOGI(context_, "SFAG rowSum precompute: rows=%ld bytes=%ld offset=%ld.", rowCount, rowSumLen, rowSumOffset);
+    }
 
     tilingData.opInfo.set_mm12WorkspaceLen(mm12WorkspaceLen);
     tilingData.opInfo.set_selectedKWorkspaceLen(selectedKWorkspaceLen);
@@ -496,6 +531,41 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::DoSftTiling()
             sftBaseM -= sftBaseM > blockFp32 ? blockFp32 : 1;
         }
     }
+    // VecOp::Process gives each AIV half the tiles (tail stays on AIV1).
+    // The largest baseM that fits UB can leave one AIV idle or holding the
+    // tail, e.g. G=64 and baseM=24 is 24 vs 24+16. A smaller aligned tile
+    // with an even count, 16+16 vs 16+16, shortens the slower AIV. Keep the
+    // larger tile when the critical path does not improve. Stay on multiples
+    // of eight while G and the candidate are at least one Brcb repeat.
+    if (tmpData.deterministic && sftBaseM > 0) {
+        const uint32_t g = tmpData.singleM;
+        const uint32_t step = (sftBaseM >= blockFp32 && g >= blockFp32) ? blockFp32 : 1;
+        auto aivCriticalRows = [](uint32_t rows, uint32_t baseM) -> uint32_t {
+            const uint32_t tileCount = (rows + baseM - 1) / baseM;
+            const uint32_t aiv0Tiles = tileCount / 2;
+            const uint32_t aiv1Tiles = tileCount - aiv0Tiles;
+            const uint32_t tail = rows % baseM;
+            const uint32_t lastTile = tail == 0 ? baseM : tail;
+            const uint32_t aiv0Rows = aiv0Tiles * baseM;
+            const uint32_t aiv1Rows = aiv1Tiles == 0 ? 0 : (aiv1Tiles - 1) * baseM + lastTile;
+            return std::max(aiv0Rows, aiv1Rows);
+        };
+        uint32_t bestBaseM = sftBaseM;
+        uint32_t bestCrit = aivCriticalRows(g, sftBaseM);
+        for (uint32_t cand = sftBaseM; cand >= step; cand -= step) {
+            if (calcUbUsed(cand, optimizedMaxGatherSize) <= availableUbSize) {
+                const uint32_t crit = aivCriticalRows(g, cand);
+                if (crit < bestCrit) {
+                    bestCrit = crit;
+                    bestBaseM = cand;
+                }
+            }
+            if (cand == step) {
+                break;
+            }
+        }
+        sftBaseM = bestBaseM;
+    }
     OP_CHECK_IF(
         sftBaseM == 0,
         REPORT_PREDEFINED_ERR_MSG(
@@ -509,9 +579,12 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::DoSftTiling()
                             .c_str()})),
         return ge::GRAPH_FAILED);
 
+    const uint32_t loopEnd = (tmpData.singleM + sftBaseM - 1) / sftBaseM;
     OP_LOGI(context_->GetNodeName(),
-            "SFAG sftBaseM=%u, gatherRows=%u, estimated vector UB=%lu/%lu bytes, optimized=%d.", sftBaseM,
-            optimizedMaxGatherSize, calcUbUsed(sftBaseM, optimizedMaxGatherSize), availableUbSize,
+            "SFAG sftBaseM=%u, softmax tiles=%u (AIV0=%u, AIV1=%u), gatherRows=%u, "
+            "estimated vector UB=%lu/%lu bytes, optimized=%d.",
+            sftBaseM, loopEnd, loopEnd / 2, loopEnd - loopEnd / 2, optimizedMaxGatherSize,
+            calcUbUsed(sftBaseM, optimizedMaxGatherSize), availableUbSize,
             static_cast<int32_t>(tmpData.enableOptimizedScatter));
 
     tilingData.splitCoreParams.set_sftBaseM(sftBaseM);
@@ -868,6 +941,69 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetBaseShapeInfo()
     }
 
     return ge::GRAPH_SUCCESS;
+}
+
+void SparseFlashAttentionGradBasicTiling::DoKsplitTiling()
+{
+    tilingData.opInfo.set_ksplitDet(0);
+    tilingData.opInfo.set_kSplitComputeCoreNum(0);
+    tilingData.opInfo.set_kSplitChunkPerCore(0);
+    tilingData.opInfo.set_kSplitLastChunk(0);
+    tilingData.opInfo.set_kSplitReduceAivNum(0);
+    tilingData.opInfo.set_dqPartialWorkspaceOffset(0);
+    tilingData.opInfo.set_dqPartialWorkspaceLen(0);
+    tilingData.opInfo.set_rowSumWorkspaceOffset(0);
+    tilingData.opInfo.set_rowSumWorkspaceLen(0);
+    tilingData.opInfo.set_rowSumRows(0);
+
+    constexpr uint32_t ksplitTopk = 2048;
+    constexpr uint32_t ksplitBlockSize = 1;
+    if (!tmpData.deterministic || tmpData.selected_block_count != ksplitTopk ||
+        tmpData.selected_block_size != ksplitBlockSize) {
+        return;
+    }
+
+    // 24 AIC: 21 * 96 + 32 on 22 cores, 4 AIVs reduce. 20 AIC: 16 * 128 on 16 cores, 8 AIVs reduce.
+    uint32_t launchAic = 0;
+    uint32_t computeCores = 0;
+    uint32_t chunk = 0;
+    uint32_t lastChunk = 0;
+    uint32_t reduceAiv = 0;
+    const uint32_t aicNum = aicoreParams_.aicNum;
+    const uint32_t aivNum = aicoreParams_.numBlocks;
+    if (aicNum >= 24 && aivNum >= 48) {
+        launchAic = 24;
+        computeCores = 22;
+        chunk = 96;
+        lastChunk = 32;
+        reduceAiv = 4;
+    } else if (aicNum == 20 && aivNum >= 40) {
+        launchAic = 20;
+        computeCores = 16;
+        chunk = 128;
+        lastChunk = 128;
+        reduceAiv = 8;
+    } else {
+        return;
+    }
+
+    const int64_t g = tilingData.opInfo.get_G();
+    if (g <= 0 || (g % static_cast<int64_t>(reduceAiv)) != 0) {
+        return;
+    }
+    if (static_cast<int64_t>(computeCores - 1) * chunk + lastChunk != ksplitTopk) {
+        return;
+    }
+
+    tilingData.opInfo.set_ksplitDet(1);
+    tilingData.opInfo.set_kSplitComputeCoreNum(computeCores);
+    tilingData.opInfo.set_kSplitChunkPerCore(chunk);
+    tilingData.opInfo.set_kSplitLastChunk(lastChunk);
+    tilingData.opInfo.set_kSplitReduceAivNum(reduceAiv);
+    tilingData.opInfo.set_usedCoreNum(launchAic);
+    tilingData.opInfo.set_castUsedCoreNum(launchAic * 2);
+    OP_LOGI(context_, "SFAG ksplit det: launchAic=%u compute=%u chunk=%u last=%u reduceAiv=%u G=%ld topk=%u.",
+            launchAic, computeCores, chunk, lastChunk, reduceAiv, g, tmpData.selected_block_count);
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(SparseFlashAttentionGrad, SparseFlashAttentionGradBasicTiling,

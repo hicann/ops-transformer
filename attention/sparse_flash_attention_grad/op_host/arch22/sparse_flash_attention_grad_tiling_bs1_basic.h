@@ -72,6 +72,7 @@ private:
     ge::graphStatus DoSftTiling();
     ge::graphStatus DoBlockTiling();
     ge::graphStatus DoCastTiling();
+    void DoKsplitTiling();
     TempParams tmpData;
 
     const char* opName;

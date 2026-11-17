@@ -130,7 +130,18 @@ TILING_DATA_FIELD_DEF(uint32_t, selectedBlockCount);
 TILING_DATA_FIELD_DEF(uint32_t, selectedBlockSize);
 TILING_DATA_FIELD_DEF(bool, deterministic);
 TILING_DATA_FIELD_DEF(bool, enableOptimizedScatter);
-TILING_DATA_FIELD_DEF_ARR(bool, 6, rsv);
+// K-split deterministic. 0 keeps the BS1 deterministic path.
+TILING_DATA_FIELD_DEF(uint32_t, ksplitDet);
+TILING_DATA_FIELD_DEF(uint32_t, kSplitComputeCoreNum);
+TILING_DATA_FIELD_DEF(uint32_t, kSplitChunkPerCore);
+TILING_DATA_FIELD_DEF(uint32_t, kSplitLastChunk);
+TILING_DATA_FIELD_DEF(uint32_t, kSplitReduceAivNum);
+TILING_DATA_FIELD_DEF(uint64_t, dqPartialWorkspaceOffset);
+TILING_DATA_FIELD_DEF(uint64_t, dqPartialWorkspaceLen);
+// Precomputed rowsum(out * dOut). 0 rows keeps the in-loop SoftmaxGradFront.
+TILING_DATA_FIELD_DEF(uint64_t, rowSumWorkspaceOffset);
+TILING_DATA_FIELD_DEF(uint64_t, rowSumWorkspaceLen);
+TILING_DATA_FIELD_DEF(uint64_t, rowSumRows);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(SparseFlashAttentionGradBaseBasicParamsOp, SparseFlashAttentionGradBaseBasicParams)
 

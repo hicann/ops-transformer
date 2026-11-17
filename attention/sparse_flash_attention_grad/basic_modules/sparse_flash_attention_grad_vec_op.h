@@ -47,6 +47,7 @@ public:
                                 GM_ADDR key_rope, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace,
                                 const TILING_CLASS* __restrict ordTilingData, TPipe* pipe);
     __aicore__ inline void Process(const RunInfo& runInfo);
+    __aicore__ inline void PrecomputeRowSum();
     __aicore__ inline void GatherKV(const int64_t n2Index, uint64_t currentS1Offset, const RunInfo& runInfo);
     __aicore__ inline void ScatterAddUnDeter(const RunInfo& runInfo);
     __aicore__ inline void ScatterAddDeter(const RunInfo& runInfo);
@@ -108,6 +109,8 @@ protected:
     GlobalTensor<float> dvWorkspaceGm;
     GlobalTensor<float> mm4ResWorkspaceGm; // 24 * SCATTER_BUFFER_NUM * K * Dk
     GlobalTensor<float> mm5ResWorkspaceGm; // 24 * SCATTER_BUFFER_NUM * K * Dv
+    GlobalTensor<float> rowSumWorkspaceGm;
+    bool rowSumReady{false};
 
     TBuf<> vecQue;
     LocalTensor<uint8_t> helpTensor;
@@ -350,7 +353,9 @@ __aicore__ inline void VecOp<SFAGT>::InitGMBuffer(GM_ADDR key, GM_ADDR value, GM
     usedWorkspaceLen += dqWorkspaceLen + dkWorkspaceLen + dvWorkspaceLen;
 
     // scatter add
-    uint64_t scatterBufferNum = tilingData->opInfo.enableOptimizedScatter ? SCATTER_BUFFER_NUM : PING_PONG_BUFFER;
+    uint64_t scatterBufferNum = (tilingData->opInfo.enableOptimizedScatter || tilingData->opInfo.ksplitDet != 0) ?
+                                    SCATTER_BUFFER_NUM :
+                                    PING_PONG_BUFFER;
     int64_t mm4ResAddr = usedWorkspaceLen / sizeof(float);
     int64_t mm5ResAddr = mm4ResAddr + MAX_CORE_NUM * scatterTokenCapacity * dimDAlign * scatterBufferNum;
     usedWorkspaceLen +=
@@ -367,6 +372,10 @@ __aicore__ inline void VecOp<SFAGT>::InitGMBuffer(GM_ADDR key, GM_ADDR value, GM
 
     mm4ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm4ResAddr);
     mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm5ResAddr);
+    if (tilingData->opInfo.rowSumRows > 0) {
+        rowSumWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace +
+                                          tilingData->opInfo.rowSumWorkspaceOffset / sizeof(float));
+    }
 }
 
 template <typename SFAGT>
@@ -655,20 +664,27 @@ __aicore__ inline void VecOp<SFAGT>::CalRowsumAndSftCopyIn(const int32_t headOff
             curRowSumTensor.SetShapeInfo(ShapeInfo(2, curSoftmaxGradShape, DataFormat::ND));
             curRowSumTensor.SetSize(alignedProcessM * BLOCK_FP32);
 
-            DataCopyPad(attentionGradT1Tensor, attentionGradGm[dyGmOffset + rowBase * dimDv], copyParams, padParams);
-            DataCopyPad(attentionT1Tensor, attentionGm[dyGmOffset + rowBase * dimDv], copyParams, padParams);
-            SET_FLAG(MTE2, V, vWaitMte2);
-            WAIT_FLAG(MTE2, V, vWaitMte2);
+            if (rowSumReady) {
+                DataCopy(curRowSumTensor, rowSumWorkspaceGm[(sumGmOffset + rowBase) * BLOCK_FP32], curM * BLOCK_FP32);
+                SET_FLAG(MTE2, V, vWaitMte2);
+                WAIT_FLAG(MTE2, V, vWaitMte2);
+            } else {
+                DataCopyPad(attentionGradT1Tensor, attentionGradGm[dyGmOffset + rowBase * dimDv], copyParams,
+                            padParams);
+                DataCopyPad(attentionT1Tensor, attentionGm[dyGmOffset + rowBase * dimDv], copyParams, padParams);
+                SET_FLAG(MTE2, V, vWaitMte2);
+                WAIT_FLAG(MTE2, V, vWaitMte2);
 
-            Cast(attentionGradFP32Tensor, attentionGradT1Tensor, RoundMode::CAST_NONE, dataSize);
-            Cast(attentionFP32Tensor, attentionT1Tensor, RoundMode::CAST_NONE, dataSize);
-            PIPE_BARRIER(PIPE_V);
-            // SoftmaxGradFront derives its reduction extent from the input shape, including tail tiles.
-            uint32_t curAttentionShape[2] = {curM, static_cast<uint32_t>(dimDv)};
-            attentionGradFP32Tensor.SetShapeInfo(ShapeInfo(2, curAttentionShape, DataFormat::ND));
-            attentionFP32Tensor.SetShapeInfo(ShapeInfo(2, curAttentionShape, DataFormat::ND));
-            SoftmaxGradFront<float, false>(curRowSumTensor, attentionGradFP32Tensor, attentionFP32Tensor, helpTensor,
-                                           tilingData->softmaxGradTilingData);
+                Cast(attentionGradFP32Tensor, attentionGradT1Tensor, RoundMode::CAST_NONE, dataSize);
+                Cast(attentionFP32Tensor, attentionT1Tensor, RoundMode::CAST_NONE, dataSize);
+                PIPE_BARRIER(PIPE_V);
+                // SoftmaxGradFront derives its reduction extent from the input shape, including tail tiles.
+                uint32_t curAttentionShape[2] = {curM, static_cast<uint32_t>(dimDv)};
+                attentionGradFP32Tensor.SetShapeInfo(ShapeInfo(2, curAttentionShape, DataFormat::ND));
+                attentionFP32Tensor.SetShapeInfo(ShapeInfo(2, curAttentionShape, DataFormat::ND));
+                SoftmaxGradFront<float, false>(curRowSumTensor, attentionGradFP32Tensor, attentionFP32Tensor,
+                                               helpTensor, tilingData->softmaxGradTilingData);
+            }
 
             // [N2, T1, G] or [B, N2, S1, G] --> current [sftBaseM, 1].
             // The optimized path stores all tiles; the non-optimized path reuses tile 0.
@@ -689,6 +705,68 @@ __aicore__ inline void VecOp<SFAGT>::CalRowsumAndSftCopyIn(const int32_t headOff
             }
         }
     }
+}
+
+template <typename SFAGT>
+__aicore__ inline void VecOp<SFAGT>::PrecomputeRowSum()
+{
+    // Each (token, head) rowsum(out * dOut) does not depend on the K slice.
+    // All AIVs write [row, 8] fp32 once; later K-split cores only load it.
+    const int64_t totalRows = static_cast<int64_t>(tilingData->opInfo.rowSumRows);
+    const uint32_t aivNum = tilingData->opInfo.castUsedCoreNum;
+    if (totalRows <= 0 || aivNum == 0 || params.sftBaseM == 0) {
+        return;
+    }
+    const int64_t rowsPerCore = (totalRows + static_cast<int64_t>(aivNum) - 1) / static_cast<int64_t>(aivNum);
+    const int64_t begin = static_cast<int64_t>(vecBlockIdx) * rowsPerCore;
+    int64_t end = begin + rowsPerCore;
+    if (end > totalRows) {
+        end = totalRows;
+    }
+    if (begin < end) {
+        PIPE_BARRIER(PIPE_ALL);
+        bool waitStore = false;
+        for (int64_t row = begin; row < end; row += params.sftBaseM) {
+            if (waitStore) {
+                WAIT_FLAG(MTE3, MTE2, mte2WaitMte3Proc);
+                waitStore = false;
+            }
+            int32_t processM = static_cast<int32_t>(params.sftBaseM);
+            if (row + processM > end) {
+                processM = static_cast<int32_t>(end - row);
+            }
+            uint32_t dataSize = static_cast<uint32_t>(processM) * static_cast<uint32_t>(dimDv);
+            DataCopyExtParams copyParams{1, static_cast<uint32_t>(dataSize * sizeof(T1)), 0, 0, 0};
+            DataCopyPadExtParams<T1> inPad{false, 0, 0, 0};
+            DataCopyPad(attentionGradT1Tensor, attentionGradGm[row * dimDv], copyParams, inPad);
+            DataCopyPad(attentionT1Tensor, attentionGm[row * dimDv], copyParams, inPad);
+            SET_FLAG(MTE2, V, vWaitMte2);
+            WAIT_FLAG(MTE2, V, vWaitMte2);
+            Cast(attentionGradFP32Tensor, attentionGradT1Tensor, RoundMode::CAST_NONE, dataSize);
+            Cast(attentionFP32Tensor, attentionT1Tensor, RoundMode::CAST_NONE, dataSize);
+            PIPE_BARRIER(PIPE_V);
+            // Keep the reusable member tensor's capacity intact across precompute tail tiles.
+            LocalTensor<float> curRowSumTensor = rowSumOutTensor;
+            uint32_t curSoftmaxGradShape[2] = {static_cast<uint32_t>(processM), static_cast<uint32_t>(BLOCK_FP32)};
+            curRowSumTensor.SetShapeInfo(ShapeInfo(2, curSoftmaxGradShape, DataFormat::ND));
+            curRowSumTensor.SetSize(static_cast<uint32_t>(processM) * BLOCK_FP32);
+            uint32_t curAttentionShape[2] = {static_cast<uint32_t>(processM), static_cast<uint32_t>(dimDv)};
+            attentionGradFP32Tensor.SetShapeInfo(ShapeInfo(2, curAttentionShape, DataFormat::ND));
+            attentionFP32Tensor.SetShapeInfo(ShapeInfo(2, curAttentionShape, DataFormat::ND));
+            SoftmaxGradFront<float, false>(curRowSumTensor, attentionGradFP32Tensor, attentionFP32Tensor, helpTensor,
+                                           tilingData->softmaxGradTilingData);
+            SET_FLAG(V, MTE3, mte3WaitV);
+            WAIT_FLAG(V, MTE3, mte3WaitV);
+            DataCopy(rowSumWorkspaceGm[row * BLOCK_FP32], curRowSumTensor,
+                     static_cast<uint32_t>(processM) * BLOCK_FP32);
+            SET_FLAG(MTE3, MTE2, mte2WaitMte3Proc);
+            waitStore = true;
+        }
+        if (waitStore) {
+            WAIT_FLAG(MTE3, MTE2, mte2WaitMte3Proc);
+        }
+    }
+    rowSumReady = true;
 }
 
 template <typename SFAGT>
@@ -1652,30 +1730,34 @@ __aicore__ inline void VecOp<SFAGT>::ScatterAddDeter(const RunInfo& runInfo)
 
     int64_t totalVec = (runInfo.s1End - runInfo.s1Begin) * 2;
 
-    int64_t firstCoreKSize = s2RealSize / totalVec;
-    int64_t currentCoreKSize =
-        (vecBlockIdx == totalVec - 1) ? (s2RealSize % totalVec + firstCoreKSize) : firstCoreKSize;
+    if (vecBlockIdx >= totalVec) {
+        return;
+    }
+    const int64_t averageBlocks = s2RealSize / totalVec;
+    const int64_t remainderBlocks = s2RealSize % totalVec;
+    const int64_t currentCoreKSize = averageBlocks + (vecBlockIdx < remainderBlocks ? 1 : 0);
+    const int64_t firstBlock = vecBlockIdx * averageBlocks + Min<int64_t>(vecBlockIdx, remainderBlocks);
 
     if (currentCoreKSize == 0) {
         return;
     }
     SetAtomicAdd<float>();
     int64_t cubeBlockIdxCalculate = runInfo.s1Index - runInfo.s1Begin;
-    int64_t actTotalRows = (vecBlockIdx == totalVec - 1) ?
-                               (currentCoreKSize - 1) * selectedBlockSize + runInfo.lastBlockSize :
-                               currentCoreKSize * selectedBlockSize;
+    const bool ownsLastBlock = firstBlock + currentCoreKSize == s2RealSize;
+    int64_t actTotalRows = ownsLastBlock ? (currentCoreKSize - 1) * selectedBlockSize + runInfo.lastBlockSize :
+                                           currentCoreKSize * selectedBlockSize;
     int64_t maxLoops = CeilDiv(actTotalRows, UB_ROW_SIZE);
     int64_t tailRows = actTotalRows - (maxLoops - 1) * UB_ROW_SIZE;
 
     int64_t currentDkSrcOffset =
         runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * selectedBlockSizeDimDAlign +
         cubeBlockIdxCalculate * selectedBlockCount * selectedBlockSizeDimDAlign +
-        vecBlockIdx * firstCoreKSize * selectedBlockSizeDimDAlign;
+        firstBlock * selectedBlockSizeDimDAlign;
     int64_t currentDvSrcOffset =
         runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * selectedBlockSizeDimD2Align +
         cubeBlockIdxCalculate * selectedBlockCount * selectedBlockSizeDimD2Align +
-        vecBlockIdx * firstCoreKSize * selectedBlockSizeDimD2Align;
-    int64_t currentIndicesOffset = runInfo.indicesGmOffset + vecBlockIdx * firstCoreKSize;
+        firstBlock * selectedBlockSizeDimD2Align;
+    int64_t currentIndicesOffset = runInfo.indicesGmOffset + firstBlock;
     GlobalTensor<float> dkSrcGm = mm4ResWorkspaceGm[currentDkSrcOffset];
     GlobalTensor<float> dvSrcGm = mm5ResWorkspaceGm[currentDvSrcOffset];
     GlobalTensor<int32_t> indicesGm = topkIndicesGm[currentIndicesOffset];
@@ -1714,7 +1796,7 @@ __aicore__ inline void VecOp<SFAGT>::ScatterAddDeter(const RunInfo& runInfo)
         WaitFlag<AscendC::HardEvent::V_MTE3>(mte3WaitV);
 
         if (runInfo.isSmallS2) {
-            int64_t baseRow = loop * UB_ROW_SIZE + vecBlockIdx * firstCoreKSize * selectedBlockSize;
+            int64_t baseRow = loop * UB_ROW_SIZE + firstBlock * selectedBlockSize;
             DataCopy(dkOutGm[baseRow * dimDAlign], dkInUb, ubRowSizeDAlign);
             if constexpr (!KV_MERGE) {
                 DataCopy(dvOutGm[baseRow * dimD2Align], dvInUb, ubRowSizeD2Align);
@@ -1766,7 +1848,7 @@ __aicore__ inline void VecOp<SFAGT>::ScatterAddDeter(const RunInfo& runInfo)
     int64_t totalRound = CeilDiv(tailRows, curProcessRow);
     int64_t row = 0;
     if (runInfo.isSmallS2) {
-        int64_t baseRow = (maxLoops - 1) * UB_ROW_SIZE + vecBlockIdx * firstCoreKSize * selectedBlockSize;
+        int64_t baseRow = (maxLoops - 1) * UB_ROW_SIZE + firstBlock * selectedBlockSize;
         DataCopy(dkOutGm[baseRow * dimDAlign], dkInUb, tailRows * dimDAlign);
         if constexpr (!KV_MERGE) {
             DataCopy(dvOutGm[baseRow * dimD2Align], dvInUb, tailRows * dimD2Align);
@@ -1778,7 +1860,7 @@ __aicore__ inline void VecOp<SFAGT>::ScatterAddDeter(const RunInfo& runInfo)
                 s2Idx = indicesGm.GetValue(curSelBlk);
             }
             if (s2Idx >= 0) {
-                if (vecBlockIdx == totalVec - 1 && loop == totalRound - 1) {
+                if (ownsLastBlock && loop == totalRound - 1) {
                     curProcessRow =
                         (runInfo.lastBlockSize % curProcessRow) ? runInfo.lastBlockSize % curProcessRow : curProcessRow;
                 }
