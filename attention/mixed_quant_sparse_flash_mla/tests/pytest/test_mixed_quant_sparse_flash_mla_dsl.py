@@ -174,6 +174,15 @@ def gen_data(params):
         indices = torch.randint(
             p[f"s_{side}"], (rows, width), generator=generator, dtype=torch.int32
         )
+        if p.get("unique_indices", False):
+            if width > p[f"s_{side}"]:
+                raise ValueError("unique TopK width cannot exceed logical KV length")
+            indices = torch.stack(
+                [
+                    torch.randperm(p[f"s_{side}"], generator=generator)[:width]
+                    for _ in range(rows)
+                ]
+            ).int()
         if p.get("mixed_pair_gaps", False):
             # One duplicate pair among seven distinct pairs in every full
             # subtile exercises local fallback without disabling its neighbors.
@@ -186,10 +195,16 @@ def gen_data(params):
                 ([0, 1, min(127, width), width] * ((rows + 3) // 4))[:rows],
                 dtype=torch.int32,
             )
-        if (side == "cmp" and not has_cmp) or (
-            side == "ori" and p.get("zero_ori", False)
+        if (
+            p.get("all_empty", False)
+            or (side == "cmp" and not has_cmp)
+            or (side == "ori" and p.get("zero_ori", False))
         ):
             lengths.zero_()
+        if "active_rows" in p:
+            inactive = torch.ones(rows, dtype=torch.bool)
+            inactive[p["active_rows"]] = False
+            lengths[inactive] = 0
         if p.get(f"omit_{side}_topk_length", False):
             lengths.fill_(width)
         # Invalid unused indices catch reads beyond each valid prefix.
@@ -424,6 +439,7 @@ def run_prepared(
         "quant_mode": quant_mode,
         "softmax_scale": case["scale"],
         "rope_head_dim": 64,
+        "cmp_ratio": p.get("cmp_ratio", 1),
         "layout_q": "TND",
         "layout_kv": "PA_BBND",
         "return_softmax_lse": p.get("return_softmax_lse", False),
@@ -584,8 +600,10 @@ def test_existing_modes_keep_asc_route(quant_mode):
     assert main_args[0][1] == quant_mode and metadata_args[0][3] == quant_mode
 
 
-@pytest.mark.parametrize("layout_q", ("TND", "BSND"))
-@pytest.mark.parametrize("layout_kv", ("PA_BBND", "TND", "BSND"))
+LAYOUTS = (("BSND", "BSND"), ("TND", "TND"), ("BSND", "PA_BBND"), ("TND", "PA_BBND"))
+
+
+@pytest.mark.parametrize("layout_q,layout_kv", LAYOUTS)
 @pytest.mark.parametrize("has_cmp", (False, True))
 def test_dsl_layouts(layout_q, layout_kv, has_cmp):
     _check_layout(layout_q, layout_kv, has_cmp=has_cmp)
@@ -596,27 +614,203 @@ def test_dsl_heads_and_tnd_padding(heads):
     _check_layout("TND", "PA_BBND", heads=heads, padding=True, has_sinks=False)
 
 
+@pytest.mark.parametrize("heads", range(1, 65))
+def test_dsl_every_head_count(heads):
+    _check_layout("TND", "PA_BBND", heads=heads)
+
+
+@pytest.mark.parametrize("heads", (2, 33, 64))
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_fd_prefix_precision(heads, has_sinks):
+    # Small valid prefixes expose BF16 P's dependence on the running max.
+    # Require actual library FD splits, including all three head buckets.
+    _check_layout(
+        "TND",
+        "PA_BBND",
+        heads=heads,
+        has_sinks=has_sinks,
+        spans=[2, 1, 2],
+        require_fd=True,
+        address_mode="pre",
+        data_params=dict(
+            seed=323, s_cmp=521, k_cmp=512, vary_lengths=True, unique_indices=True
+        ),
+    )
+
+
+@pytest.mark.parametrize("layout_q,layout_kv", LAYOUTS)
+@pytest.mark.parametrize("has_cmp", (False, True))
+def test_dsl_no_sink(layout_q, layout_kv, has_cmp):
+    _check_layout(layout_q, layout_kv, heads=17, has_cmp=has_cmp, has_sinks=False)
+
+
+@pytest.mark.parametrize("layout_kv", ("TND", "PA_BBND"))
+@pytest.mark.parametrize("heads", (1, 17, 32, 33, 63, 64))
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_physical_tnd_padding(layout_kv, heads, has_sinks):
+    _check_layout(
+        "TND",
+        layout_kv,
+        heads=heads,
+        has_sinks=has_sinks,
+        spans=[4, 0, 3, 5],
+        used=[2, 0, 0, 3],
+    )
+
+
+@pytest.mark.parametrize("layout_q,layout_kv", LAYOUTS)
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_all_empty_rows(layout_q, layout_kv, has_sinks):
+    _check_layout(layout_q, layout_kv, heads=17, has_sinks=has_sinks, all_empty=True)
+
+
+@pytest.mark.parametrize("layout_kv", ("TND", "PA_BBND"))
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_all_tnd_padding(layout_kv, has_sinks):
+    _check_layout(
+        "TND",
+        layout_kv,
+        heads=17,
+        has_sinks=has_sinks,
+        spans=[0, 4, 0, 3],
+        used=[0, 0, 0, 0],
+    )
+
+
+@pytest.mark.parametrize("layout_kv", ("TND", "PA_BBND"))
+@pytest.mark.parametrize("has_cmp", (False, True))
+def test_dsl_padding_without_topk_lengths(layout_kv, has_cmp):
+    _check_layout(
+        "TND",
+        layout_kv,
+        heads=17,
+        has_cmp=has_cmp,
+        has_sinks=False,
+        spans=[4, 0, 3, 5],
+        used=[2, 0, 0, 3],
+        omit_lengths=True,
+    )
+
+
+@pytest.mark.parametrize("layout_q", ("BSND", "TND"))
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_pa_axis0_stride(layout_q, has_sinks):
+    _check_layout(
+        layout_q, "PA_BBND", heads=33, has_sinks=has_sinks, axis0_noncontiguous=True
+    )
+
+
 def test_dsl_bsnd_padding():
     _check_layout("BSND", "BSND", padding=True)
 
 
+@pytest.mark.parametrize("layout_q", ("BSND", "TND"))
+@pytest.mark.parametrize(
+    "scenario",
+    ("mixed", "ori_only", "empty", "omit_lengths", "no_sinks", "empty_no_sinks"),
+)
+def test_dsl_batched_pa(layout_q, scenario):
+    omit_lengths = scenario == "omit_lengths"
+    _check_layout(
+        layout_q,
+        "PA_BBND",
+        has_cmp=scenario != "ori_only",
+        has_sinks=scenario not in ("no_sinks", "empty_no_sinks"),
+        all_empty=scenario in ("empty", "empty_no_sinks"),
+        spans=[65, 65] if layout_q == "BSND" else [65, 0, 64],
+        omit_lengths=omit_lengths,
+        address_mode="pipe",
+        data_params=dict(
+            s_cmp=521,
+            k_cmp=512,
+            vary_lengths=not omit_lengths,
+            omit_ori_topk_length=omit_lengths,
+            omit_cmp_topk_length=omit_lengths,
+        ),
+    )
+
+
+@pytest.mark.parametrize("boundary", ("padding", "heads", "axis0"))
+def test_dsl_batched_pa_fallback(boundary):
+    _check_layout(
+        "TND",
+        "PA_BBND",
+        heads=33 if boundary == "heads" else 64,
+        padding=boundary == "padding",
+        axis0_noncontiguous=boundary == "axis0",
+        address_mode="pre",
+        data_params=dict(s_cmp=521, k_cmp=512, vary_lengths=True),
+    )
+
+
+def test_dsl_batched_pa_prefill():
+    _check_layout(
+        "TND",
+        "PA_BBND",
+        spans=[129],
+        has_sinks=False,
+        address_mode="pipe",
+        data_params=dict(s_cmp=521, k_cmp=512, vary_lengths=True),
+    )
+
+
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_batched_pa_fd_prefix(has_sinks):
+    _check_layout(
+        "TND",
+        "PA_BBND",
+        spans=[129],
+        has_sinks=has_sinks,
+        require_fd=True,
+        address_mode="pipe",
+        data_params=dict(
+            seed=323,
+            s_cmp=521,
+            k_cmp=512,
+            unique_indices=True,
+            active_rows=[128],
+        ),
+    )
+
+
 def _check_layout(
-    layout_q, layout_kv, *, has_cmp=True, heads=64, padding=False, has_sinks=True
+    layout_q,
+    layout_kv,
+    *,
+    has_cmp=True,
+    heads=64,
+    padding=False,
+    has_sinks=True,
+    sink_form="none",
+    spans=None,
+    used=None,
+    all_empty=False,
+    axis0_noncontiguous=False,
+    omit_lengths=False,
+    omit_length_sides=(),
+    require_fd=False,
+    address_mode=None,
+    data_params=None,
 ):
     pytest.importorskip("torch_npu")
     if not torch.npu.is_available():
         pytest.skip("NPU unavailable")
     torch.npu.set_device(int(os.environ.get("MQSMLA_DEVICE", "0")))
-    p, case, expected, expected_lse = gen_data(
-        dict(
-            _BASE,
-            q_lengths=[2, 2],
-            has_cmp=has_cmp,
-            heads=heads,
-            omit_sinks=not has_sinks,
-        )
+    params = dict(
+        _BASE,
+        q_lengths=spans if spans is not None else [2, 2],
+        has_cmp=has_cmp,
+        heads=heads,
+        omit_sinks=not has_sinks,
+        all_empty=all_empty,
     )
+    params.update(data_params or {})
+    for side in ("ori", "cmp") if has_cmp else ("ori",):
+        if omit_lengths or side in omit_length_sides:
+            params[f"omit_{side}_topk_length"] = True
+    p, case, expected, expected_lse = gen_data(params)
     q = case["q"]
+    batch, rows = case["b"], case["t1"]
     expected = expected.view(case["t1"], heads, D)
     kwargs = dict(
         q=q.npu(),
@@ -636,26 +830,57 @@ def _check_layout(
         )
         kwargs[f"{side}_topk_length"] = case[f"len_{side}"].view(case["t1"], 1).npu()
         if layout_kv == "PA_BBND":
-            kwargs[f"{side}_kv"] = _pa_tensor(pa, row_bytes)
+            kwargs[f"{side}_kv"] = _pa_tensor(
+                pa, row_bytes, axis0_noncontiguous=axis0_noncontiguous
+            )
             kwargs[f"{side}_block_table"] = pa["block_table"].npu()
         else:
             blocks = pa["phys"]["row"][pa["block_table"].long().flatten()]
             dense = blocks.reshape(case["b"], -1, 1, row_bytes)
             if layout_kv == "TND":
-                span = dense.shape[1]
-                dense = dense.flatten(0, 1)
-                kwargs[f"cu_seqlens_{side}_kv"] = (
-                    torch.arange(case["b"] + 1, dtype=torch.int32).mul_(span).npu()
+                # Independent physical spans with poisoned KV padding ensure
+                # addressing uses cu_seqlens rather than a uniform batch pitch.
+                chunks, ends = [], [0]
+                for b in range(batch):
+                    chunks.append(
+                        torch.cat(
+                            (
+                                dense[b, : p[f"s_{side}"]],
+                                torch.full(
+                                    (7 * b, 1, row_bytes), 0xA5, dtype=torch.uint8
+                                ),
+                            )
+                        )
+                    )
+                    ends.append(ends[-1] + chunks[-1].shape[0])
+                dense = torch.cat(chunks)
+                kwargs[f"cu_seqlens_{side}_kv"] = torch.tensor(
+                    ends, dtype=torch.int32
+                ).npu()
+                kwargs[f"seqused_{side}_kv"] = torch.full(
+                    (batch,), p[f"s_{side}"], dtype=torch.int32, device="npu"
                 )
             kwargs[f"{side}_kv"] = dense.npu()
-    if padding:
-        kwargs["seqused_q"] = torch.tensor([1, 0], dtype=torch.int32, device="npu")
-        expected[[1, 2, 3]] = 0
+    if padding or used is not None:
+        used = used if used is not None else [1, 0]
+        kwargs["seqused_q"] = torch.tensor(used, dtype=torch.int32, device="npu")
+        padded = torch.zeros(rows, dtype=torch.bool)
+        for b, actual in enumerate(used):
+            padded[
+                int(case["cu_seqlens_q"][b]) + actual : int(case["cu_seqlens_q"][b + 1])
+            ] = True
+        expected[padded] = 0
         # PR 323 preserves the existing BSND empty-row LSE contract;
         # only physical TND padding clears LSE to zero.
-        expected_lse[:, [1, 2, 3]] = 0 if layout_q == "TND" else case["sinks"][:heads]
+        expected_lse[:, padded] = 0 if layout_q == "TND" else case["sinks"][:heads]
+        # No query or sparse-index load is allowed for physical padding.
+        poison_rows = padded.npu()
+        kwargs["q"][poison_rows] = float("nan")
+        for side in ("ori", "cmp") if has_cmp else ("ori",):
+            kwargs[f"{side}_sparse_indices"][poison_rows] = 0x7FFFFFFF
     if layout_q == "BSND":
-        kwargs["q"] = kwargs["q"].view(2, 2, heads, D)
+        seq = p["q_lengths"][0]
+        kwargs["q"] = kwargs["q"].view(batch, seq, heads, D)
         for name in (
             "ori_sparse_indices",
             "cmp_sparse_indices",
@@ -663,8 +888,20 @@ def _check_layout(
             "cmp_topk_length",
         ):
             if name in kwargs:
-                kwargs[name] = kwargs[name].view(2, 2, *kwargs[name].shape[1:])
+                kwargs[name] = kwargs[name].view(batch, seq, *kwargs[name].shape[1:])
+    for side in ("ori", "cmp") if has_cmp else ("ori",):
+        if omit_lengths or side in omit_length_sides:
+            kwargs.pop(f"{side}_topk_length", None)
+    if not has_sinks and sink_form == "omitted":
+        kwargs.pop("sinks")
     kwargs["metadata"] = _library_metadata(kwargs)
+    if require_fd:
+        metadata = kwargs["metadata"].cpu()
+        vector_cores = int(torch.npu.get_device_properties().vector_core_num)
+        fd = metadata[80 * 9 : 80 * 9 + vector_cores * 8].view(-1, 8)
+        assert bool(((fd[:, 0] != 0) & (fd[:, 4] > 1)).any()), (
+            "precision regression must exercise cross-core FD reduction"
+        )
     frontend = import_module(
         f"{OPS.__name__}.ops.attention.mixed_quant_sparse_flash_mla.mixed_quant_sparse_flash_mla"
     )
@@ -673,9 +910,32 @@ def _check_layout(
         "load",
         side_effect=AssertionError("Mode 4 must bypass the ASC builder"),
     ):
-        actual, lse = OPS.mixed_quant_sparse_flash_mla(**kwargs)
+        # Poison the caller-owned outputs so unassigned metadata rows cannot
+        # pass accidentally through freshly allocated zero-filled pages.
+        dsl = import_module(
+            f"{frontend.__package__}.op_dsl.mixed_quant_sparse_flash_mla"
+        )
+        if address_mode is not None:
+            assert (
+                dsl._select_addr_mode(
+                    kwargs["ori_kv"],
+                    kwargs.get("ori_block_table"),
+                    kwargs["ori_sparse_indices"].view(rows, 1, -1),
+                    kwargs.get("cmp_kv"),
+                    kwargs.get("cmp_block_table"),
+                    kwargs["cmp_sparse_indices"].view(rows, 1, -1) if has_cmp else None,
+                    layout_kv,
+                    heads,
+                )
+                == address_mode
+            )
+        out = torch.full_like(kwargs["q"], float("nan"))
+        lse_shape = (1, rows, heads) if layout_q == "TND" else (batch, 1, seq, heads)
+        lse = torch.full(lse_shape, float("nan"), dtype=torch.float32, device="npu")
+        dsl._mixed_quant_sparse_flash_mla_out(**kwargs, out=out, lse=lse)
+        actual = out
     assert actual.shape == kwargs["q"].shape
-    assert lse.shape == ((1, 4, heads) if layout_q == "TND" else (2, 1, 2, heads))
+    assert lse.shape == lse_shape
     actual = actual.cpu().reshape_as(expected)
     torch.testing.assert_close(
         lse.cpu().reshape_as(expected_lse), expected_lse, rtol=1e-5, atol=1e-5
@@ -696,6 +956,22 @@ def test_dsl_bsnd_meta_output_shapes():
         assert lse.dtype == torch.float32
 
 
+@pytest.mark.parametrize("layout_q,layout_kv", (("BSND", "TND"), ("TND", "BSND")))
+def test_dsl_rejects_mismatched_dense_layouts(layout_q, layout_kv):
+    # The tensor-only validator must reject this before compilation/device work.
+    dsl = import_module(
+        f"{OPS.__name__}.ops.attention.mixed_quant_sparse_flash_mla.op_dsl.mixed_quant_sparse_flash_mla"
+    )
+    with pytest.raises(ValueError, match="non-PA KV requires"):
+        dsl._validate_inputs(
+            torch.empty((1, 1, D), dtype=torch.bfloat16),
+            ori_kv=torch.empty(1, dtype=torch.uint8),
+            quant_mode=4,
+            layout_q=layout_q,
+            layout_kv=layout_kv,
+        )
+
+
 def test_dsl_metadata_fake_tensor():
     from torch._subclasses.fake_tensor import FakeTensorMode
 
@@ -711,7 +987,6 @@ def test_dsl_metadata_fake_tensor():
 @pytest.mark.parametrize(
     "extra",
     (
-        {"cmp_ratio": 4},
         {"ori_mask_mode": 3},
         {"topk_value_mode": 0},
         {"key_dtype": 1},
@@ -733,6 +1008,16 @@ def test_dsl_rejects_unsupported_modes(extra):
             OPS.mixed_quant_sparse_flash_mla(
                 torch.empty((1, 64, D), dtype=torch.bfloat16, device="npu"), 4, **extra
             )
+
+
+@pytest.mark.parametrize("cmp_ratio", (0, -7, 2, 21, 48, 1 << 40))
+def test_dsl_ignores_cmp_ratio_for_explicit_indices(cmp_ratio):
+    pytest.importorskip("torch_npu")
+    if not torch.npu.is_available():
+        pytest.skip("NPU unavailable")
+    torch.npu.set_device(int(os.environ.get("MQSMLA_DEVICE", "0")))
+    params = dict(_BASE, heads=17, q_lengths=[2, 1], cmp_ratio=cmp_ratio)
+    run_prepared(*gen_data(params), api=OPS)
 
 
 def test_dsl_bsnd_library_metadata():
@@ -792,3 +1077,167 @@ def test_dsl_meta_layout_aliases(layout_q, layout_kv):
         q, 4, ori_kv=kv, layout_q=layout_q, layout_kv=layout_kv, return_softmax_lse=True
     )
     assert out.shape == q.shape and lse.shape == (1, 3, 17)
+
+
+@pytest.mark.parametrize("layout_kv", ("TND", "PA_BBND"))
+@pytest.mark.parametrize("has_cmp", (False, True))
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_tnd_padding_reuses_variant(layout_kv, has_cmp, has_sinks):
+    """Changing effective Q lengths must not select another AOT/tiling key."""
+    dsl = import_module(
+        f"{OPS.__name__}.ops.attention.mixed_quant_sparse_flash_mla.op_dsl.mixed_quant_sparse_flash_mla"
+    )
+    variant = dsl._get_compiled_variant
+    keys = []
+
+    def record(*args, **kwargs):
+        keys.append((args, tuple(sorted(kwargs.items()))))
+        return variant(*args, **kwargs)
+
+    with patch.object(dsl, "_get_compiled_variant", side_effect=record):
+        for used in (None, [33, 0, 20], [0, 0, 0]):
+            _check_layout(
+                "TND",
+                layout_kv,
+                heads=64,
+                spans=[65, 0, 68],
+                used=used,
+                has_cmp=has_cmp,
+                has_sinks=has_sinks,
+                data_params=dict(k_cmp=512, vary_lengths=True),
+                address_mode="pipe" if layout_kv == "PA_BBND" else "off",
+            )
+    assert len(keys) == 3 and keys[0] == keys[1] == keys[2]
+
+
+@pytest.mark.parametrize("heads", (33, 64))
+@pytest.mark.parametrize("has_cmp", (False, True))
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_padded_strided_pa_prefill(heads, has_cmp, has_sinks):
+    _check_layout(
+        "TND",
+        "PA_BBND",
+        heads=heads,
+        spans=[67, 0, 69],
+        used=[31, 0, 40],
+        axis0_noncontiguous=True,
+        has_cmp=has_cmp,
+        has_sinks=has_sinks,
+        data_params=dict(s_cmp=521, k_cmp=512, vary_lengths=True),
+        address_mode="pipe" if heads == 64 else "pre",
+    )
+
+
+@pytest.mark.parametrize("has_cmp", (False, True))
+def test_dsl_pa_prefill_sparse_order(has_cmp):
+    dsl = import_module(
+        f"{OPS.__name__}.ops.attention.mixed_quant_sparse_flash_mla.op_dsl.mixed_quant_sparse_flash_mla"
+    )
+    # Level 3 retains the caller's sparse order instead of pair-sorted DMA.
+    with patch.object(dsl, "_batch_consistency_enabled", return_value=True):
+        _check_layout(
+            "TND",
+            "PA_BBND",
+            spans=[129],
+            has_cmp=has_cmp,
+            data_params=dict(s_cmp=521, k_cmp=512, vary_lengths=True),
+            address_mode="pipe",
+        )
+
+
+@pytest.mark.parametrize("used", (31, 0))
+def test_dsl_long_padded_pa_query_count(used):
+    # Exercise AIC query counting overlapped with the strided address prepass,
+    # including a launch with no active query and no sink contribution.
+    _check_layout(
+        "TND",
+        "PA_BBND",
+        spans=[129],
+        used=[used],
+        axis0_noncontiguous=True,
+        has_sinks=False,
+        data_params=dict(s_cmp=521, k_cmp=512, vary_lengths=True),
+        address_mode="pipe",
+    )
+
+
+def _check_length_variant_reuse(layout_q, layout_kv, has_cmp, has_sinks, pipe=False):
+    dsl = import_module(
+        f"{OPS.__name__}.ops.attention.mixed_quant_sparse_flash_mla.op_dsl.mixed_quant_sparse_flash_mla"
+    )
+    variant = dsl._get_compiled_variant
+    keys = []
+
+    def record(*args, **kwargs):
+        keys.append((args, tuple(sorted(kwargs.items()))))
+        return variant(*args, **kwargs)
+
+    omissions = ((), ("ori",), ("cmp",), ("ori", "cmp")) if has_cmp else ((), ("ori",))
+    with patch.object(dsl, "_get_compiled_variant", side_effect=record):
+        for sides in omissions:
+            _check_layout(
+                layout_q,
+                layout_kv,
+                heads=64 if pipe else 17,
+                has_cmp=has_cmp,
+                has_sinks=has_sinks,
+                spans=[129] if pipe else [2, 2],
+                omit_length_sides=sides,
+                data_params=dict(k_cmp=512 if pipe else 129, vary_lengths=True),
+                address_mode="pipe" if pipe else None,
+            )
+    assert len(keys) == len(omissions) and all(key == keys[0] for key in keys)
+
+
+@pytest.mark.parametrize("layout_q,layout_kv", LAYOUTS)
+@pytest.mark.parametrize("has_cmp", (False, True))
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_length_inputs_reuse_variant(layout_q, layout_kv, has_cmp, has_sinks):
+    _check_length_variant_reuse(layout_q, layout_kv, has_cmp, has_sinks)
+
+
+@pytest.mark.parametrize("has_cmp", (False, True))
+@pytest.mark.parametrize("has_sinks", (False, True))
+def test_dsl_pipe_length_inputs_reuse_variant(has_cmp, has_sinks):
+    _check_length_variant_reuse("TND", "PA_BBND", has_cmp, has_sinks, pipe=True)
+
+
+def _check_sink_variant_reuse(layout_q, layout_kv, has_cmp, omit_lengths, pipe=False):
+    dsl = import_module(
+        f"{OPS.__name__}.ops.attention.mixed_quant_sparse_flash_mla.op_dsl.mixed_quant_sparse_flash_mla"
+    )
+    variant = dsl._get_compiled_variant
+    keys = []
+
+    def record(*args, **kwargs):
+        keys.append((args, tuple(sorted(kwargs.items()))))
+        return variant(*args, **kwargs)
+
+    with patch.object(dsl, "_get_compiled_variant", side_effect=record):
+        for has_sinks, form in ((True, "none"), (False, "none"), (False, "omitted")):
+            _check_layout(
+                layout_q,
+                layout_kv,
+                heads=64 if pipe else 17,
+                has_cmp=has_cmp,
+                has_sinks=has_sinks,
+                sink_form=form,
+                spans=[129] if pipe else [2, 2],
+                omit_lengths=omit_lengths,
+                data_params=dict(k_cmp=512 if pipe else 129, vary_lengths=True),
+                address_mode="pipe" if pipe else None,
+            )
+    assert len(keys) == 3 and keys[0] == keys[1] == keys[2]
+
+
+@pytest.mark.parametrize("layout_q,layout_kv", LAYOUTS)
+@pytest.mark.parametrize("has_cmp", (False, True))
+@pytest.mark.parametrize("omit_lengths", (False, True))
+def test_dsl_sink_inputs_reuse_variant(layout_q, layout_kv, has_cmp, omit_lengths):
+    _check_sink_variant_reuse(layout_q, layout_kv, has_cmp, omit_lengths)
+
+
+@pytest.mark.parametrize("has_cmp", (False, True))
+@pytest.mark.parametrize("omit_lengths", (False, True))
+def test_dsl_pipe_sink_inputs_reuse_variant(has_cmp, omit_lengths):
+    _check_sink_variant_reuse("TND", "PA_BBND", has_cmp, omit_lengths, pipe=True)

@@ -75,6 +75,39 @@ FD_M_NUM_INDEX = 6
 
 _SPAN_CACHE = {}
 _SPAN_CACHE_LOCK = threading.Lock()
+_CONSTANT_INPUT_CACHE = {}
+_CONSTANT_INPUT_CACHE_LOCK = threading.Lock()
+
+
+def _constant_input(shape, value, dtype, device):
+    """Retain immutable default inputs across streams and warmed graph captures.
+
+    Eager first use completes the host-to-device copy before publishing a cache
+    entry. Constants remain alive because captured graphs can retain raw input
+    addresses. A cold capture instead owns its graph-local construction.
+    """
+    device = torch.device(device)
+    if device.type == "npu" and device.index is None:
+        device = torch.device("npu", torch.npu.current_device())
+    shape = tuple(shape)
+    key = (device, shape, dtype, value)
+    with _CONSTANT_INPUT_CACHE_LOCK:
+        cached = _CONSTANT_INPUT_CACHE.get(key)
+        if cached is not None:
+            return cached
+        if device.type == "npu" and torch.npu.is_current_stream_capturing():
+            return torch.full(shape, value, dtype=dtype, device=device)
+        cached = torch.full(shape, value, dtype=dtype, device="cpu").to(
+            device, non_blocking=False
+        )
+        _CONSTANT_INPUT_CACHE[key] = cached
+        return cached
+
+
+def _default_topk_length(indices):
+    return _constant_input(
+        indices.shape[:-1], indices.shape[-1], torch.int32, indices.device
+    )
 
 
 def _get_cube_core_num(device=None):
@@ -131,7 +164,6 @@ def _flatten_bsnd_lengths(lengths, seqused_q):
 def _validate_api_modes(
     quant_mode,
     rope_head_dim,
-    cmp_ratio,
     ori_mask_mode,
     cmp_mask_mode,
     ori_win_left,
@@ -144,8 +176,7 @@ def _validate_api_modes(
     if rope_head_dim not in (None, 64):
         raise NotImplementedError("This DSL supports rope_head_dim=64 only")
     if (
-        cmp_ratio not in (None, 1)
-        or ori_mask_mode not in (None, 0)
+        ori_mask_mode not in (None, 0)
         or cmp_mask_mode not in (None, 0)
         or ori_win_left not in (None, -1)
         or ori_win_right not in (None, -1)
@@ -170,11 +201,22 @@ _NZ_CHUNK = _NZ_PAD_ROWS * _NZ_ROW
 # Main-loop and FD reduction buffers reuse UB at separate phases.
 # Conservative address-prepass arena capacity. On this dav-3510 platform,
 # SIMD has 248 KiB usable UB; SIMT reserves another 32 KiB for DCache.
-# Keep the prepass arena at 216 KiB while the SIMD main phase uses up to 248 KiB.
+# The scalar-row arena uses 216 KiB; the batched pipeline and main phase
+# each use up to 248 KiB at separate phases, separated by publication and rewind.
 _ADDR_UB_BYTES = 216 * 1024
 # Separate small-pool owners retain MTE2/MTE3 overlap between prepass rows.
 _ADDR_COMPACT_BT = 2048
 _ADDR_COMPACT_K = 1024
+
+_ADDR_BATCH_ROWS = 16
+_ADDR_BATCH_MAX_DECODE_ROWS = 128
+_ADDR_PIPE_ORI_K = 128
+_ADDR_PIPE_CMP_K = 512
+# 两个 86016 B 输入槽按实际页表宽度紧凑布局；两个 40960 B 输出槽保持完整行。
+# 总量 253952 B；小页表保持 16 行，最大双侧页表/最大 K 自动缩至 7 行。
+_ADDR_PIPE_INPUT_ELEMS = 21504
+_ADDR_BATCH_DEPTH = 2
+
 
 # Compile-time shape contract.
 D = 512  # Logical head dimension: nope[448] followed by rope[64].
@@ -270,7 +312,7 @@ def _pa_fast_mode():
 def _pa_fast_eligible(ori, bt, idx, cmp, btc, idxc, layout_kv):
     """Specialize common PA shapes without inspecting device tensor values.
 
-    Larger pools, padded pages, other widths and other layouts keep the generic
+    Larger pools, other widths and other layouts keep the generic
     path. The page bounds also form part of the compiled TensorSpec contract.
     """
     if layout_kv != "PA_BBND" or not _addr_vec_eligible(ori, bt, idx, cmp, btc, idxc):
@@ -306,8 +348,9 @@ def _addr_vec_eligible(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx):
         return (
             block_size >= 16
             and block_size & (block_size - 1) == 0
-            and kv.stride(0) == block_size * row_bytes
-            and kv.shape[0] * block_size <= 1 << 31
+            # Address tables hold positive INT32 byte offsets. Page gaps are
+            # part of the physical span, as in arch35's ori/cmpKvStride.
+            and (kv.shape[0] - 1) * kv.stride(0) + block_size * row_bytes <= 1 << 31
             and _addr_ub_bytes(table_width, index_width) <= _ADDR_UB_BYTES
         )
 
@@ -322,6 +365,18 @@ def _addr_vec_eligible(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx):
 def _addr_ub_bytes(table_width, index_width):
     """Include DMA alignment and the output's padded 16-column consumer tail."""
     return 4 * (_addr_tab_w(table_width) + 2 * _addr_tab_w(index_width))
+
+
+def _addr_pipe_view(slot, begin, count):
+    root = from_tensor(slot, layout=make_layout((1, _ADDR_PIPE_INPUT_ELEMS)))
+    return root[0:1, begin : begin + count]
+
+
+def _copy_addr_elements_from_gm(ch, gm, elem_off, count):
+    mem_copy(
+        from_tensor(ch, layout=make_layout((1, count))),
+        gm.view(gm.shape[0] * gm.shape[1])[elem_off : elem_off + count,].view(1, count),
+    )
 
 
 def _addr_tab_w(k):
@@ -933,6 +988,21 @@ class Vector:
             rr.vmem_bar("vst_vld")
 
     @jit
+    def reset_partial_sum(self, job):
+        # Prefix replay contributes only the running maximum. The assigned
+        # FD part must not count any earlier keys or the earlier sink again.
+        sm_sum = self.sm_sum_tb[job % 2]
+        with vf(mode="simd"):
+            mask, _ = rr.update_mask(2 * self.tile_vec_m, elem_bits=32)
+            rr.vstore(
+                sm_sum,
+                0,
+                rr.vdups(0.0, dtypes.float32),
+                mask,
+            )
+            rr.vmem_bar("vst_vld")
+
+    @jit
     def update_o(
         self, half, first, last, exp_idx: int, sum_idx: int, pack_output=False
     ):
@@ -1462,6 +1532,7 @@ class MqsmlaKernel:
         cu_ori_kv: Tensor = None,
         cu_cmp_kv: Tensor = None,
         seqused_q: Tensor = None,
+        has_seqused_q: dtypes.int32 = 0,
     ):
         # Workspace capacity determines the launch grid and FD slot count.
         self._b_rt = cu_seqlens_q.shape[1] - 1
@@ -1486,6 +1557,7 @@ class MqsmlaKernel:
         self._cmp_topk_length = cmp_topk_length
 
         self._seqused_q = seqused_q
+        self._has_seqused_q = has_seqused_q
         self._cu_q = cu_seqlens_q
         self._cu_ori_kv, self._cu_cmp_kv = cu_ori_kv, cu_cmp_kv
 
@@ -1510,6 +1582,45 @@ class MqsmlaKernel:
                     MemLoc.UB,
                     dtypes.int32,
                     make_layout((1, _ADDR_UB_BYTES // 4)),
+                )
+            elif const_expr(_avec == "pipe"):
+                # DMA 分区按 32 B 对齐；48 个元素覆盖两侧索引 padding 与两组长度。
+                self._addr_pipe_bt1 = max(64, ((self._pa_bt.shape[1] + 7) // 8) * 8)
+                self._addr_pipe_bt2 = 0
+                pipe_k2 = 0
+                if const_expr(self.has_cmp):
+                    self._addr_pipe_bt2 = max(
+                        64, ((self._pa_bt_cmp.shape[1] + 7) // 8) * 8
+                    )
+                    pipe_k2 = self._avec_k2
+                self._addr_pipe_ori_index = self._addr_pipe_bt1 + self._addr_pipe_bt2
+                self._addr_pipe_rows = min(
+                    _ADDR_BATCH_ROWS,
+                    (_ADDR_PIPE_INPUT_ELEMS - self._addr_pipe_ori_index - 48)
+                    // (_ADDR_PIPE_ORI_K + _ADDR_PIPE_CMP_K),
+                )
+                self._addr_pipe_cmp_index = (
+                    self._addr_pipe_ori_index
+                    + ((self._addr_pipe_rows * self._avec_k1 + 7) // 8) * 8
+                )
+                self._addr_pipe_ori_length = (
+                    self._addr_pipe_cmp_index
+                    + ((self._addr_pipe_rows * pipe_k2 + 7) // 8) * 8
+                )
+                self._addr_pipe_cmp_length = self._addr_pipe_ori_length + 16
+                self._addr_input_ring = RingBuffer(
+                    MemLoc.UB,
+                    dtypes.int32,
+                    make_layout((1, _ADDR_PIPE_INPUT_ELEMS)),
+                    depth=_ADDR_BATCH_DEPTH,
+                )
+                self._addr_out_ring = RingBuffer(
+                    MemLoc.UB,
+                    dtypes.int32,
+                    make_layout(
+                        (1, _ADDR_BATCH_ROWS * (_ADDR_PIPE_ORI_K + _ADDR_PIPE_CMP_K))
+                    ),
+                    depth=2,
                 )
             else:
                 # Distinct owners allow the next index load to overlap the
@@ -1562,7 +1673,26 @@ class MqsmlaKernel:
         # directly; the global FD gate is read only after the main loop.
         if const_expr(_addr_vec_mode() != "off"):
             # Publish the address table before the main loop consumes it.
-            self._addr_precompute(row_count)
+            self._addr_start_batch = bn2_start
+            self._addr_end_batch = bn2_end
+            if const_expr(_addr_vec_mode() == "pipe"):
+                active_queries = dtypes.int64(-1)
+                if (
+                    is_aic()
+                    and self._ori_idx.shape[0]
+                    >= _KV_L2_PREFILL_MIN_QUERIES * self._b_rt
+                ):
+                    active_queries = dtypes.int64(0)
+                    for row in range(row_count):
+                        row_begin, row_end = self.query_tile_range(
+                            row, row_count, s2_end
+                        )
+                        active_queries += 1 if row_end > row_begin else 0
+                else:
+                    self._addr_precompute_batched(row_count)
+                self._pipe_active_queries = active_queries
+            else:
+                self._addr_precompute(row_count)
             # AIC waits for both AIV writes before releasing the block.
             # Use MTE1 so the wait does not block Q prefetch on MTE2.
             cube_sync_intra_wait(PIPE.MTE1, self._addr_bar_sid)
@@ -1583,10 +1713,16 @@ class MqsmlaKernel:
         else:
             self.pipeline_vector(row_count, s2_end)
 
-        # Empty queries never enter the delay line. Write their outputs after
-        # draining so the shared output buffer cannot disturb pending PVs.
-        for m_seq in range(0, row_count):
-            m_idx = self._m_idx(m_seq)
+        # Library metadata schedules useful work only. In particular, an
+        # all-padding/all-empty batch can have no enabled FA cores at all.
+        # Partition empty physical rows independently of FA/FD ownership so
+        # every O/LSE row is initialized, including unscheduled padding tails.
+        # Drain the pipeline first: finalize_empty reuses its output buffers.
+        blocks = self._ws.shape[0] // WS_BYTES_PER_CORE
+        for m_idx in range(
+            self._ori_idx.shape[0] * self.block_idx // blocks,
+            self._ori_idx.shape[0] * (self.block_idx + 1) // blocks,
+        ):
             if self._n_end_rt(m_idx) == 0:
                 o_tile = self.output_view(m_idx)
                 lse_base = (
@@ -1598,7 +1734,7 @@ class MqsmlaKernel:
                     lse_base = m_idx * self.num_heads() + self.subblock_idx * (
                         (self.num_heads() + 1) // 2
                     )
-                if const_expr(self._seqused_q is not None):
+                if self._has_seqused_q != 0:
                     if self._query_valid(m_idx):
                         self.vector.finalize_empty(
                             o_tile, self._sinks, self._lse, lse_base
@@ -1781,14 +1917,15 @@ class MqsmlaKernel:
             tiles = tiles + self._cmp_tiles_rt(m_idx)
         return tiles if self._query_valid(m_idx) else dtypes.int64(0)
 
+    @jit
     def _n_end_rt(self, m_idx: int):
-        if const_expr(self._seqused_q is not None):
-            return self._padding_n_end_rt(m_idx)
         # Runtime query tile count: ORI tiles plus CMP tiles.
-        ori_tiles = self._ori_tiles_rt(m_idx)
-        if const_expr(not self.has_cmp):
-            return ori_tiles
-        return ori_tiles + self._cmp_tiles_rt(m_idx)
+        tiles = self._ori_tiles_rt(m_idx)
+        if const_expr(self.has_cmp):
+            tiles = tiles + self._cmp_tiles_rt(m_idx)
+        if self._has_seqused_q != 0:
+            tiles = tiles if self._query_valid(m_idx) else dtypes.int64(0)
+        return tiles
 
     @jit
     def _actual_n(self, m_idx: int, n):
@@ -2027,13 +2164,9 @@ class MqsmlaKernel:
                     second_index_col = first_index_col + 1
                     first_row_index = _i64(tab, idx_row, first_index_col)
                     second_row_index = _i64(tab, idx_row, second_index_col)
-                    if const_expr(_pa_fast_mode()):
-                        # The bounded PA fast path publishes byte offsets once
-                        # in VF, eliminating per-token scalar address multiplies.
-                        addr0, addr1 = first_row_index, second_row_index
-                    else:
-                        addr0 = first_row_index * row_bytes
-                        addr1 = second_row_index * row_bytes
+                    # Both bounded and generic PA prepasses publish byte
+                    # offsets using the actual physical page stride.
+                    addr0, addr1 = first_row_index, second_row_index
                     first = min(addr0, addr1)
                     gap = max(addr0, addr1) - first
                     addresses.append(addr0)
@@ -2150,7 +2283,7 @@ class MqsmlaKernel:
                 mem_copy(dst, src)
 
     @jit
-    def _addr_vector_chunk(self, chunk, ktab, w, bs, inv_bs, row_bytes):
+    def _addr_vector_chunk(self, chunk, ktab, w, bs, inv_bs, row_bytes, page_stride):
         lanes = min(_ADDR_HALF, ktab - chunk * _ADDR_HALF)
         mk, _ = rr.update_mask(lanes, elem_bits=32)
         lane = rr.varange(0, dtypes.int32)
@@ -2172,10 +2305,244 @@ class MqsmlaKernel:
             )
         off = rr.vsub(idx, rr.vmuls(blk, bs, mask=mk), mask=mk)
         p = rr.vgather(self._ch_addr_bt, rr.vreinterpret(blk, dtypes.uint32), mask=mk)
-        row = rr.vadd(rr.vmuls(p, bs, mask=mk), off, mask=mk)
-        if const_expr(_pa_fast_mode()):
-            row = rr.vmuls(row, row_bytes, mask=mk)
+        # arch35: physical_page * kvStride + in_page * row_bytes.
+        # Keep page pitch independent of block size, including axis-0 gaps.
+        row = rr.vadd(
+            rr.vmuls(p, dtypes.int32(page_stride), mask=mk),
+            rr.vmuls(off, row_bytes, mask=mk),
+            mask=mk,
+        )
         rr.vstore(self._ch_addr_out, chunk * _ADDR_HALF, row, mk)
+
+    @jit
+    def _addr_load_group(self, batch, first, nr):
+        # 同一槽中的页表、索引和长度按本次调用的容量布局，组不跨 batch。
+        slot = self._addr_input_ring.next_write()
+        bt = _addr_pipe_view(slot, 0, self._addr_pipe_bt1)
+        _copy_addr_elements_from_gm(
+            bt, self._pa_bt, batch * self._pa_bt.shape[1], self._pa_bt.shape[1]
+        )
+        sp = _addr_pipe_view(
+            slot, self._addr_pipe_ori_index, self._addr_pipe_rows * self._avec_k1
+        )
+        _copy_addr_elements_from_gm(
+            sp, self._ori_idx, first * self._avec_k1, nr * self._avec_k1
+        )
+        if const_expr(self._ori_topk_length is not None):
+            lens = _addr_pipe_view(slot, self._addr_pipe_ori_length, 16)
+            mem_copy(
+                from_tensor(lens, layout=make_layout((1, nr))),
+                self._ori_topk_length[first : first + nr,].view(1, nr),
+            )
+        if const_expr(self.has_cmp):
+            bt = _addr_pipe_view(slot, self._addr_pipe_bt1, self._addr_pipe_bt2)
+            _copy_addr_elements_from_gm(
+                bt,
+                self._pa_bt_cmp,
+                batch * self._pa_bt_cmp.shape[1],
+                self._pa_bt_cmp.shape[1],
+            )
+            sp = _addr_pipe_view(
+                slot, self._addr_pipe_cmp_index, self._addr_pipe_rows * self._avec_k2
+            )
+            _copy_addr_elements_from_gm(
+                sp, self._cmp_idx, first * self._avec_k2, nr * self._avec_k2
+            )
+            if const_expr(self._cmp_topk_length is not None):
+                lens = _addr_pipe_view(slot, self._addr_pipe_cmp_length, 16)
+                mem_copy(
+                    from_tensor(lens, layout=make_layout((1, nr))),
+                    self._cmp_topk_length[first : first + nr,].view(1, nr),
+                )
+
+    @jit
+    def _addr_compute_group_side(
+        self,
+        sp,
+        lens,
+        bt,
+        out,
+        nr,
+        kwidth,
+        chunks,
+        bs,
+        page_scale,
+        tab_cols,
+        col0,
+        row_bytes,
+        valid_rows,
+        page_stride,
+    ):
+        # int32 索引 -> 页号 -> 物理行号，空行的 gather 掩码全关。
+        mask = rr.full_mask(elem_bits=32)
+        # 页大小限定 64/128/256，页号为 (idx * (256 / bs)) >> 8。
+        page_size = rr.vdups(bs, dtypes.int32)
+        row_mask = rr.vadds(page_size, -1, mask=mask)
+        lane = rr.varange(0, dtypes.int32)
+        for row in cannbotdsl.range(
+            dtypes.int32(0), dtypes.int32(nr), dtypes.int32(1), unroll=1
+        ):
+            active = rr.vgts(
+                rr.vdups(dtypes.int32(valid_rows) - row, dtypes.int32), 0, mask=mask
+            )
+            last = rr.vdups(dtypes.int32(kwidth - 1), dtypes.int32)
+            if const_expr(lens is not None):
+                width = rr.vload_broadcast(lens, row)
+                width = rr.vmins(width, kwidth, mask=mask)
+                active = rr.vgts(width, 0, mask=active)
+                last = rr.vadds(rr.vmaxs(width, 1, mask=mask), -1, mask=mask)
+            for chunk in cannbotdsl.range(
+                dtypes.int32(0), chunks, dtypes.int32(1), unroll=1
+            ):
+                mk = mask
+                active_chunk = active
+                col = rr.vmin(rr.vadds(lane, chunk * 64, mask=mk), last, mask=mk)
+                source_col = rr.vadds(col, row * kwidth, mask=mk)
+                idx = rr.vgather(
+                    sp, rr.vreinterpret(source_col, dtypes.uint32), mask=active_chunk
+                )
+                page = rr.vshr(
+                    rr.vmuls(idx, page_scale, mask=active_chunk), 8, mask=active_chunk
+                )
+                page_index = rr.vreinterpret(page, dtypes.uint32)
+                # 同一路径直接查 UB 页表，避免每组寄存器前缀和双路选择的额外指令。
+                physical_page = rr.vgather(bt, page_index, mask=active_chunk)
+                # 与 arch35 一致：真实页距独立于页内 token 大小。
+                in_page = rr.vbitwise_and(idx, row_mask, mask=active_chunk)
+                physical_base = rr.vmuls(
+                    physical_page, dtypes.int32(page_stride), mask=active_chunk
+                )
+                physical_row = rr.vadd(
+                    physical_base,
+                    rr.vmuls(in_page, row_bytes, mask=active_chunk),
+                    mask=active_chunk,
+                )
+                rr.vstore(out, row * tab_cols + col0 + chunk * 64, physical_row, mk)
+
+    @jit
+    def _addr_compute_group(self, slot, out, nr, first, batch):
+        valid_rows = nr
+        if self._has_seqused_q != 0:
+            valid_end = _i64(self._cu_q, 0, batch) + _i64(self._seqused_q, batch)
+            valid_rows = max(0, min(nr, valid_end - first))
+        bt1 = _addr_pipe_view(slot, 0, self._addr_pipe_bt1)
+        sp1 = _addr_pipe_view(
+            slot, self._addr_pipe_ori_index, self._addr_pipe_rows * self._avec_k1
+        )
+        len1 = None
+        if const_expr(self._ori_topk_length is not None):
+            len1 = _addr_pipe_view(slot, self._addr_pipe_ori_length, 16)
+        cols = self._avec_k1_tab + (self._avec_k2_tab if self.has_cmp else 0)
+        if const_expr(self.has_cmp):
+            bt2 = _addr_pipe_view(slot, self._addr_pipe_bt1, self._addr_pipe_bt2)
+            sp2 = _addr_pipe_view(
+                slot, self._addr_pipe_cmp_index, self._addr_pipe_rows * self._avec_k2
+            )
+            len2 = None
+            if const_expr(self._cmp_topk_length is not None):
+                len2 = _addr_pipe_view(slot, self._addr_pipe_cmp_length, 16)
+        nr = dtypes.int32(nr)
+        cols = dtypes.int32(cols)
+        kw1, kt1 = dtypes.int32(self._avec_k1), dtypes.int32(self._avec_k1_tab)
+        if const_expr(self.has_cmp):
+            kw2, _kt2 = dtypes.int32(self._avec_k2), dtypes.int32(self._avec_k2_tab)
+        ori_bs = dtypes.int32(self._avec_bs_ori)
+        ori_chunks = dtypes.int32(self._avec_k1_tab // 64)
+        ori_page_scale = 4 if ori_bs == 64 else (2 if ori_bs == 128 else 1)
+        if const_expr(self.has_cmp):
+            cmp_bs = dtypes.int32(self._avec_bs_cmp)
+            cmp_chunks = dtypes.int32(self._avec_k2_tab // 64)
+            cmp_page_scale = 4 if cmp_bs == 64 else (2 if cmp_bs == 128 else 1)
+        with vf(mode="simd"):
+            self._addr_compute_group_side(
+                sp1,
+                len1,
+                bt1,
+                out,
+                nr,
+                kw1,
+                ori_chunks,
+                ori_bs,
+                ori_page_scale,
+                cols,
+                dtypes.int32(0),
+                KV_ROW_BYTES_ORI,
+                valid_rows,
+                self._ori_page_stride,
+            )
+            if const_expr(self.has_cmp):
+                self._addr_compute_group_side(
+                    sp2,
+                    len2,
+                    bt2,
+                    out,
+                    nr,
+                    kw2,
+                    cmp_chunks,
+                    cmp_bs,
+                    cmp_page_scale,
+                    cols,
+                    kt1,
+                    KV_ROW_BYTES_CMP,
+                    valid_rows,
+                    self._cmp_page_stride,
+                )
+
+    @jit
+    def _addr_precompute_batched(self, m_count):
+        cols = self._avec_k1_tab + (self._avec_k2_tab if self.has_cmp else 0)
+        core = dtypes.int64(self.subblock_idx)
+        per, tail = m_count // 2, m_count % 2
+        start = per * core + min(core, tail)
+        stop = start + per + (dtypes.int64(1) if core < tail else dtypes.int64(0))
+        current = start
+        # metadata 将本核 query 限定在已知 batch 区间；同 batch 时无需读 cu_q 搜索。
+        batch, upper = self._addr_start_batch, self._addr_end_batch
+        target = self._m_idx(start)
+        while batch < upper:
+            mid = (batch + upper) // 2
+            take = _i64(self._cu_q, 0, mid + 1) <= target
+            batch = mid + 1 if take else batch
+            upper = upper if take else mid
+        bound = self._bound_after(batch, dtypes.int64(self._b_rt))
+        # 输入预取推进 batch 前，保存消费游标的初始位置。
+        read_batch, read_bound = batch, bound
+        # 先填满输入环，再边计算最早的一组边补入后续组；组不跨 batch。
+        for prefetch in range(_ADDR_BATCH_DEPTH - 1):
+            if current < stop:
+                first = self._m_idx(current)
+                while first >= bound:
+                    batch = batch + 1
+                    bound = self._bound_after(batch, dtypes.int64(self._b_rt))
+                nr = min(self._addr_pipe_rows, min(stop - current, bound - first))
+                self._addr_load_group(batch, first, nr)
+                current = current + nr
+        consumed = start
+        while consumed < stop:
+            if current < stop:
+                first = self._m_idx(current)
+                while first >= bound:
+                    batch = batch + 1
+                    bound = self._bound_after(batch, dtypes.int64(self._b_rt))
+                nr = min(self._addr_pipe_rows, min(stop - current, bound - first))
+                self._addr_load_group(batch, first, nr)
+                current = current + nr
+            first = self._m_idx(consumed)
+            while first >= read_bound:
+                read_batch = read_batch + 1
+                read_bound = self._bound_after(read_batch, dtypes.int64(self._b_rt))
+            nr = min(self._addr_pipe_rows, min(stop - consumed, read_bound - first))
+            slot = self._addr_input_ring.next_read()
+            out = self._addr_out_ring.next_write()
+            self._addr_compute_group(slot, out, nr, first, read_batch)
+            ready = self._addr_out_ring.next_read()
+            mem_copy(
+                self._addr_tab[first : first + nr, 0:cols],
+                from_tensor(ready, layout=make_layout((nr, cols))),
+            )
+            consumed = consumed + nr
+        vec_sync_intra_arrive(PIPE.MTE3, self._addr_bar_sid)
+        vec_sync_block_wait(PIPE.S, self._addr_bar_flag, mode=2)
 
     @jit
     def _addr_precompute(self, m_count):
@@ -2191,6 +2558,7 @@ class MqsmlaKernel:
                 bs, kwidth, col0 = self._avec_bs_ori, self._avec_k1, 0
                 ktab = self._avec_k1_tab
                 row_bytes = KV_ROW_BYTES_ORI
+                page_stride = self._ori_page_stride
 
                 def w_fn(mi):
                     return self._ori_valid_w(mi)
@@ -2199,6 +2567,7 @@ class MqsmlaKernel:
                 bs, kwidth, col0 = (self._avec_bs_cmp, self._avec_k2, self._avec_k1_tab)
                 ktab = self._avec_k2_tab
                 row_bytes = KV_ROW_BYTES_CMP
+                page_stride = self._cmp_page_stride
 
                 def w_fn(mi):
                     return self._cmp_topk_len(mi)
@@ -2246,7 +2615,7 @@ class MqsmlaKernel:
                     bound = self._bound_after(batch, b_last)
                 w = w_fn(m_idx)
                 active = w > dtypes.int64(0)
-                if const_expr(self._seqused_q is not None):
+                if self._has_seqused_q != 0:
                     valid_end = _i64(self._cu_q, 0, batch) + _i64(
                         self._seqused_q, batch
                     )
@@ -2261,7 +2630,7 @@ class MqsmlaKernel:
                     with vf(mode="simd"):
                         for chunk in range(chunks):
                             self._addr_vector_chunk(
-                                chunk, ktab, w, bs, inv_bs, row_bytes
+                                chunk, ktab, w, bs, inv_bs, row_bytes, page_stride
                             )
                     dst = m_idx * tab_cols + col0
                     # Write the padded ktab columns, clamped by w-1. Multiples of 16 columns
@@ -2353,13 +2722,18 @@ class MqsmlaKernel:
         tick: int,
         m_seq: int,
         n,
-        is_first: int,
         job: int,
         is_last: int,
         score,
         p_l1_write,
         actual_n,
     ):
+        # A continuation replays preceding tiles to recover the same running
+        # max used by the unsplit online softmax before rounding P to BF16.
+        # Keep that max, but discard the prefix's normalization contribution.
+        if m_seq == 0 and self._s2_start > 0 and n == self._s2_start:
+            self.vector.reset_partial_sum(job)
+        is_first = 1 if n == 0 else 0
         if const_expr(self._sinks is None):
             if actual_n == self.tile_n:
                 if is_first == 1:
@@ -2412,33 +2786,19 @@ class MqsmlaKernel:
                         False,
                     )
         else:
-            continuation = (self._s2_start > 0) if m_seq == 0 else False
             if actual_n == self.tile_n:
                 if is_first == 1:
-                    if continuation:
-                        self.vector.softmax_rest_full(
-                            job,
-                            tick,
-                            self._scale,
-                            True,
-                            True,
-                            score,
-                            self.p_out,
-                            actual_n,
-                            False,
-                        )
-                    else:
-                        self.vector.softmax_rest_full(
-                            job,
-                            tick,
-                            self._scale,
-                            True,
-                            True,
-                            score,
-                            self.p_out,
-                            actual_n,
-                            True,
-                        )
+                    self.vector.softmax_rest_full(
+                        job,
+                        tick,
+                        self._scale,
+                        True,
+                        True,
+                        score,
+                        self.p_out,
+                        actual_n,
+                        True,
+                    )
                 else:
                     self.vector.softmax_rest_full(
                         job,
@@ -2453,30 +2813,17 @@ class MqsmlaKernel:
                     )
             else:
                 if is_first == 1:
-                    if continuation:
-                        self.vector.softmax_rest_full(
-                            job,
-                            tick,
-                            self._scale,
-                            True,
-                            False,
-                            score,
-                            self.p_out,
-                            actual_n,
-                            False,
-                        )
-                    else:
-                        self.vector.softmax_rest_full(
-                            job,
-                            tick,
-                            self._scale,
-                            True,
-                            False,
-                            score,
-                            self.p_out,
-                            actual_n,
-                            True,
-                        )
+                    self.vector.softmax_rest_full(
+                        job,
+                        tick,
+                        self._scale,
+                        True,
+                        False,
+                        score,
+                        self.p_out,
+                        actual_n,
+                        True,
+                    )
                 else:
                     self.vector.softmax_rest_full(
                         job,
@@ -2543,6 +2890,10 @@ class MqsmlaKernel:
 
     @jit
     def cube_pv(self, kv_lower_rows_l1, kv_upper_rows_l1, m_seq: int, n, is_first: int):
+        # Prefix values must not enter this part's O accumulator. Both Cube
+        # and Vector restart PV at the original metadata boundary.
+        if m_seq == 0 and self._s2_start > 0 and n == self._s2_start:
+            is_first = 1
         self.matmul.compute_pv_fanout(
             self.p_l1.next_read(),
             self.next_result(True),
@@ -2554,7 +2905,8 @@ class MqsmlaKernel:
     @jit
     def query_tile_range(self, m_seq, row_count, s2_end):
         tiles = self._n_end_rt(self._m_idx(m_seq))
-        begin = self._s2_start if m_seq == 0 else dtypes.int64(0)
+        # Recover the serial running max before the assigned FD interval.
+        begin = dtypes.int64(0)
         end = (s2_end if s2_end > 0 else tiles) if m_seq == row_count - 1 else tiles
         return begin, end
 
@@ -2598,9 +2950,19 @@ class MqsmlaKernel:
             kv_lower_rows_l1, kv_upper_rows_l1 = self.next_kv(False)
             self.matmul_qk(job, kv_lower_rows_l1, kv_upper_rows_l1)
             active_rows = dtypes.int64(0)
-            for row in range(row_count):
-                row_begin, row_end = self.query_tile_range(row, row_count, s2_end)
-                active_rows += 1 if row_end > row_begin else 0
+            if const_expr(_addr_vec_mode() == "pipe"):
+                active_rows = self._pipe_active_queries
+                if active_rows < 0:
+                    active_rows = dtypes.int64(0)
+                    for row in range(row_count):
+                        row_begin, row_end = self.query_tile_range(
+                            row, row_count, s2_end
+                        )
+                        active_rows += 1 if row_end > row_begin else 0
+            else:
+                for row in range(row_count):
+                    row_begin, row_end = self.query_tile_range(row, row_count, s2_end)
+                    active_rows += 1 if row_end > row_begin else 0
             for _ in range(active_rows):
                 next_m = self.next_query(m_seq + 1, row_count, s2_end)
                 if next_m < row_count:
@@ -2662,7 +3024,6 @@ class MqsmlaKernel:
                 softmax.t,
                 softmax.m,
                 softmax.n,
-                softmax.first,
                 softmax.sum_slot,
                 softmax.last,
                 score,
@@ -2717,7 +3078,9 @@ class MqsmlaKernel:
                     n=n,
                     t=tick,
                     last=1 if n == end - 1 else 0,
-                    first=1 if n == begin else 0,
+                    first=1
+                    if n == begin or (m_seq == 0 and n == self._s2_start)
+                    else 0,
                     sum_slot=job % 2,
                     valid=valid,
                     ori_tiles=ori_tiles,
@@ -2862,6 +3225,8 @@ def _validate_inputs(
             "Invalid input: layout_q must be TND or BSND; "
             "layout_kv must be PA_BBND, TND or BSND"
         )
+    if layout_kv != "PA_BBND" and layout_q != layout_kv:
+        raise ValueError("Invalid input: non-PA KV requires layout_q == layout_kv")
     if int(quant_mode) != 4:
         raise ValueError(
             "Invalid input: mixed_quant_sparse_flash_mla supports only quant_mode=4"
@@ -3219,6 +3584,7 @@ def _run_mqsmla(
     cu_ori_kv: Tensor = None,
     cu_cmp_kv: Tensor = None,
     seqused_q: Tensor = None,
+    has_seqused_q: dtypes.int32 = 0,
     layout_kv: Constexpr[str] = "PA_BBND",
     head_bucket: Constexpr[int] = 64,
 ):
@@ -3289,10 +3655,20 @@ def _run_mqsmla(
         cu_ori_kv,
         cu_cmp_kv,
         seqused_q,
+        has_seqused_q,
     )
 
 
-def _select_addr_mode(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx):
+def _select_addr_mode(
+    ori_kv,
+    ori_bt,
+    ori_idx,
+    cmp_kv,
+    cmp_bt,
+    cmp_idx,
+    layout_kv="PA_BBND",
+    num_heads=64,
+):
     """Select staging and address units; K/page widths remain dynamic in AOT."""
     if not _addr_vec_eligible(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx):
         return "off"
@@ -3307,23 +3683,31 @@ def _select_addr_mode(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx):
             )
         )
     )
-    return "pre" if compact else "arena"
+    if not compact:
+        return "arena"
+    # The batched prepass uses fixed 128/512-column slots and byte offsets.
+    # Query validity is a runtime property shared by padded and compact TND.
+    if (
+        num_heads == 64
+        and ori_idx.shape[0] > _ADDR_BATCH_MAX_DECODE_ROWS
+        and _pa_fast_eligible(
+            ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx, layout_kv
+        )
+    ):
+        return "pipe"
+    return "pre"
 
 
 def _get_compiled_kernel(
     ori_kv,
     ori_sparse_indices,
     ori_block_table,
-    ori_topk_length,
     cmp_kv=None,
     cmp_sparse_indices=None,
     cmp_block_table=None,
-    cmp_topk_length=None,
     lse=None,
     layout_kv="PA_BBND",
     num_heads=64,
-    has_sinks=True,
-    tnd_padding=False,
 ):
     """Cache dynamic executables by optional inputs and address representation."""
     addr_mode = _select_addr_mode(
@@ -3333,11 +3717,11 @@ def _get_compiled_kernel(
         cmp_kv,
         cmp_block_table,
         cmp_sparse_indices,
+        layout_kv,
+        num_heads,
     )
     return _get_compiled_variant(
         cmp_kv is not None,
-        ori_topk_length is not None,
-        cmp_topk_length is not None,
         lse is not None,
         addr_mode,
         layout_kv,
@@ -3351,8 +3735,6 @@ def _get_compiled_kernel(
             layout_kv,
         ),
         _head_bucket(num_heads),
-        has_sinks,
-        tnd_padding,
     )
 
 
@@ -3365,34 +3747,28 @@ def _head_bucket(num_heads):
 @aot.compile_cache
 def _get_compiled_variant(
     has_cmp,
-    has_ori_length,
-    has_cmp_length,
     has_lse,
     addr_mode,
     layout_kv="PA_BBND",
     pa_fast=False,
     head_bucket=64,
-    has_sinks=True,
-    tnd_padding=False,
 ):
     """Share compilation, caching and address-mode lifetime with AOT export."""
-    if addr_mode not in ("pre", "off", "arena"):
+    if addr_mode not in ("pre", "off", "arena", "pipe"):
         raise ValueError(f"Unsupported address mode: {addr_mode}")
     if pa_fast and layout_kv != "PA_BBND":
         raise ValueError("PA specialization cannot be used for a dense KV layout")
+    if addr_mode == "pipe" and (not pa_fast or head_bucket != 64):
+        raise ValueError("Batched PA addressing requires full heads and compact PA")
     if head_bucket not in (32, 63, 64):
         raise ValueError(f"Unsupported head bucket: {head_bucket}")
     key = (
         has_cmp,
-        has_ori_length,
-        has_cmp_length,
         has_lse,
         addr_mode,
         layout_kv,
         pa_fast,
         head_bucket,
-        has_sinks,
-        tnd_padding,
     )
     with _COMPILE_LOCK:
         global _ADDR_VEC_OVERRIDE, _PA_FAST_OVERRIDE
@@ -3406,15 +3782,11 @@ def _get_compiled_variant(
 
 def _compile_mqsmla(
     has_cmp,
-    has_ori_length,
-    has_cmp_length,
     has_lse,
     addr_mode,
     layout_kv="PA_BBND",
     pa_fast=False,
     head_bucket=64,
-    has_sinks=True,
-    tnd_padding=False,
 ):
     """Declare the dynamic signature; the caller holds the compilation lock."""
     rows = Dim("T1", min=1)
@@ -3424,11 +3796,9 @@ def _compile_mqsmla(
         else Dim("N1", min=1 if head_bucket == 32 else 33, max=head_bucket)
     )
     batch = Dim("B", min=1)
-    # TND KV has no tensor carrying B directly; bind its prefix-sum length
-    # instead of leaving B present only through the derived expression B+1.
-    query_boundaries = (
-        Dim("B1", min=2) if layout_kv == "TND" and not tnd_padding else batch + 1
-    )
+    # The runtime seqused slot binds B even when its public argument is absent.
+    # cu_seqlens always describes physical storage; no padding-specific variant.
+    query_boundaries = batch + 1
     if layout_kv == "TND":
         ori_block_size = cmp_block_size = 1
     elif layout_kv == "PA_BBND":
@@ -3471,9 +3841,9 @@ def _compile_mqsmla(
         ),
         TensorSpec((rows, N2, ori_slots), i32),
         TensorSpec((batch, ori_table_width), i32) if layout_kv == "PA_BBND" else None,
-        TensorSpec((rows, N2), i32) if has_ori_length else None,
+        TensorSpec((rows, N2), i32),
         TensorSpec((rows, heads, D), dtypes.bfloat16),
-        TensorSpec((heads,), dtypes.float32) if has_sinks else None,
+        TensorSpec((heads,), dtypes.float32),
         TensorSpec((query_boundaries,), i32),
         TensorSpec((MQSMLA_METADATA_TOTAL_SIZE,), i32),
         TensorSpec((workspace_bytes,), dtypes.uint8),
@@ -3497,7 +3867,7 @@ def _compile_mqsmla(
         TensorSpec((batch, cmp_table_width), i32)
         if has_cmp and layout_kv == "PA_BBND"
         else None,
-        TensorSpec((rows, N2), i32) if has_cmp_length else None,
+        TensorSpec((rows, N2), i32) if has_cmp else None,
         TensorSpec((N2, rows, heads), dtypes.float32) if has_lse else None,
         dtypes.float32,
         i32,
@@ -3509,7 +3879,8 @@ def _compile_mqsmla(
         TensorSpec((query_boundaries,), i32)
         if layout_kv == "TND" and has_cmp
         else None,
-        TensorSpec((batch,), i32) if tnd_padding else None,
+        TensorSpec((batch,), i32),
+        i32,
         layout_kv,
         head_bucket,
     )
@@ -3607,19 +3978,9 @@ def _mixed_quant_sparse_flash_mla_out(
         for_cmp = cmp_kv is not None
         if seqused_q is not None:
             if ori_topk_length is None:
-                ori_topk_length = torch.full(
-                    (batch, seq, N2),
-                    ori_sparse_indices.shape[-1],
-                    dtype=torch.int32,
-                    device=q.device,
-                )
+                ori_topk_length = _default_topk_length(ori_sparse_indices)
             if for_cmp and cmp_topk_length is None:
-                cmp_topk_length = torch.full(
-                    (batch, seq, N2),
-                    cmp_sparse_indices.shape[-1],
-                    dtype=torch.int32,
-                    device=q.device,
-                )
+                cmp_topk_length = _default_topk_length(cmp_sparse_indices)
         ori_topk_length = _flatten_bsnd_lengths(ori_topk_length, seqused_q)
         cmp_topk_length = _flatten_bsnd_lengths(cmp_topk_length, seqused_q)
         q, out = q.view(batch * seq, n1, D), out.view(batch * seq, n1, D)
@@ -3641,8 +4002,17 @@ def _mixed_quant_sparse_flash_mla_out(
         ori_kv = ori_kv.view(ori_kv.shape[0], 1, N2, KV_ROW_BYTES_ORI)
         if cmp_kv is not None:
             cmp_kv = cmp_kv.view(cmp_kv.shape[0], 1, N2, KV_ROW_BYTES_CMP)
-    # An absent length tensor activates all sparse-index columns; the kernel
-    # reads K from the index shape without allocating a replacement tensor.
+    # Missing lengths mean all K columns are active. Reuse immutable default
+    # inputs so present/missing lengths share a signature and the hot device
+    # path does not gain a per-query presence branch or a repeated fill op.
+    if ori_topk_length is None:
+        ori_topk_length = _default_topk_length(ori_sparse_indices)
+    if cmp_kv is not None and cmp_topk_length is None:
+        cmp_topk_length = _default_topk_length(cmp_sparse_indices)
+    # A -inf sink contributes zero softmax mass. Supplying the immutable
+    # sentinel lets provided/absent sinks use the same compiled signature.
+    if sinks is None:
+        sinks = _constant_input((N1,), -math.inf, torch.float32, q.device)[:n1]
     addr_ws = None
     addr_bytes = 0
     addr_mode = _select_addr_mode(
@@ -3652,6 +4022,8 @@ def _mixed_quant_sparse_flash_mla_out(
         cmp_kv,
         cmp_block_table,
         cmp_sparse_indices,
+        kernel_layout_kv,
+        n1,
     )
     if addr_mode != "off":
         columns = _addr_tab_w(ori_sparse_indices.shape[2])
@@ -3686,16 +4058,12 @@ def _mixed_quant_sparse_flash_mla_out(
         ori_kv,
         ori_sparse_indices,
         ori_block_table,
-        ori_topk_length,
         cmp_kv,
         cmp_sparse_indices,
         cmp_block_table,
-        cmp_topk_length,
         lse if return_softmax_lse else None,
         kernel_layout_kv,
         n1,
-        sinks is not None,
-        layout_q == "TND" and seqused_q is not None,
     )
     # AOT fixes absent Tensor parameters at compile time and removes them from
     # the runtime signature. Remaining Tensor arguments keep their order.
@@ -3715,7 +4083,11 @@ def _mixed_quant_sparse_flash_mla_out(
             if kernel_layout_kv == "TND"
             else []
         ),
-        *([seqused_q] if layout_q == "TND" and seqused_q is not None else []),
+        # AOT fixes optional Tensor presence at compile time. Keep one Tensor
+        # slot and mirror arch35's runtime hasActualSeqQlen flag instead.
+        # The absent-input view is never read and allocates no device storage.
+        seqused_q if layout_q == "TND" and seqused_q is not None else cu_seqlens_q[:-1],
+        1 if layout_q == "TND" and seqused_q is not None else 0,
     )
 
 
@@ -3757,11 +4129,11 @@ def mixed_quant_sparse_flash_mla(
 
     KV encoding is mixed FP8/FP4; metadata comes from the existing library operator.
     Non-default masks and non-sparse modes are rejected, not silently ignored.
+    Explicit sparse indices determine KV selection, so cmp_ratio is ignored.
     """
     _validate_api_modes(
         quant_mode,
         rope_head_dim,
-        cmp_ratio,
         ori_mask_mode,
         cmp_mask_mode,
         ori_win_left,
@@ -3822,19 +4194,12 @@ def mixed_quant_sparse_flash_mla(
 
 
 def _variant_calls():
-    """Enumerate pickleable configurations for AOT variant workers."""
-    for tnd_padding, has_sinks, head_bucket, has_cmp in product(
-        (False, True), (True, False), (64, 32, 63), (True, False)
-    ):
-        cmp_lengths = (True, False) if has_cmp else (False,)
-        for has_ori_length, has_cmp_length, has_lse in product(
-            (True, False), cmp_lengths, (True, False)
-        ):
-            args = (has_cmp, has_ori_length, has_cmp_length, has_lse)
+    """Enumerate the compile configurations for AOT export."""
+    for head_bucket, has_cmp in product((64, 32, 63), (True, False)):
+        for has_lse in (True, False):
+            args = (has_cmp, has_lse)
             options = dict(
                 head_bucket=head_bucket,
-                has_sinks=has_sinks,
-                tnd_padding=tnd_padding,
             )
             for addr_mode in ("pre", "off", "arena"):
                 yield (*args, addr_mode), dict(layout_kv="PA_BBND", **options)
@@ -3843,17 +4208,17 @@ def _variant_calls():
                         (*args, addr_mode),
                         dict(layout_kv="PA_BBND", pa_fast=True, **options),
                     )
+            if head_bucket == 64:
+                yield (
+                    (*args, "pipe"),
+                    dict(layout_kv="PA_BBND", pa_fast=True, **options),
+                )
             for layout_kv in ("TND", "BSND"):
                 yield (*args, "off"), dict(layout_kv=layout_kv, **options)
 
 
 @aot.export("mixed_quant_sparse_flash_mla_dsl")
 def export_mqsmla():
-    """Register the operator for OpKit AOT variant workers."""
-    raise RuntimeError(
-        "MQSMLA AOT export requires OpKit variant workers; "
-        "build with opkit.build(jobs=N), N >= 2, and available jobserver slots"
-    )
-
-
-export_mqsmla.__cannbot_aot_variants__ = ("_get_compiled_variant", _variant_calls)
+    """Compile all supported configurations for AOT publication."""
+    for args, kwargs in _variant_calls():
+        _get_compiled_variant(*args, **kwargs)
