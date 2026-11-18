@@ -402,6 +402,68 @@ def extract_traditional_aicore_configs(content):
     return configs
 
 
+class ArchitectureConfigurationError(ValueError):
+    """An architecture registration cannot be translated to a known SoC."""
+
+
+# Keep this table aligned with the g_archToSocNames map in the opbase revision
+# selected by cmake/third_party/opbase.cmake.
+ARCH_TO_SOC = {
+    "DAV_1001": ["ascend910"],
+    "DAV_2002": ["ascend310p"],
+    "DAV_2201": ["ascend910b", "ascend910_93"],
+    "DAV_3002": ["ascend310b"],
+    "DAV_3003": ["kirinx90"],
+    "DAV_3004": ["ascend031"],
+    "DAV_3102": ["ascend610lite"],
+    "DAV_3113": ["kirin9030"],
+    "DAV_3505": ["ascend035"],
+    "DAV_3510": ["ascend950", "ascend350"],
+    "DAV_5102": ["mc62", "ascend630"],
+    "DAV_5162": ["ascend5162"],
+    "DAV_9201": ["ascend960dt"],
+    "DAV_9202": ["ascend960pr"],
+}
+
+
+def extract_arch_aicore_configs(content):
+    """Extract direct AddConfigByArch calls, including multiline calls."""
+    # Mask comments and literals so examples/log messages are not registrations.
+    pattern = r"""("(?:\\.|[^"\\])*"|(?<![A-Za-z0-9_])(?:u8|[LuU])?'(?:\\.|[^'\\\r\n])*'|//[^\n]*|/\*[\s\S]*?\*/)"""
+    source = re.sub(pattern, lambda m: re.sub(r"[^\n]", " ", m.group(0)), content)
+    configs = []
+    for match in re.finditer(r"\bAddConfigByArch\s*\(", source):
+        depth = 1
+        commas = []
+        end = None
+        for index in range(match.end(), len(source)):
+            char = source[index]
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    end = index
+                    break
+            elif char == "," and depth == 1:
+                commas.append(index)
+            elif char == ";" and depth == 1:
+                break
+        if end is None or not commas:
+            raise ArchitectureConfigurationError(
+                "Malformed AddConfigByArch registration"
+            )
+        arch_end = commas[1] if len(commas) > 1 else end
+        arch_expr = source[commas[0] + 1 : arch_end].strip()
+        arch = re.fullmatch(r"(?:[A-Za-z_]\w*::)*(DAV_[A-Za-z0-9_]+)", arch_expr)
+        if not arch or arch.group(1) not in ARCH_TO_SOC:
+            raise ArchitectureConfigurationError(
+                "Unsupported or ambiguous AddConfigByArch architecture: " + arch_expr
+            )
+        configs.extend(ARCH_TO_SOC[arch.group(1)])
+    return configs
+
+
 def extract_ai_core_configs(file_path):
     """
     从 _def.cpp 文件中提取 AICore 配置名称
@@ -415,6 +477,8 @@ def extract_ai_core_configs(file_path):
         traditional_configs = extract_traditional_aicore_configs(content)
         if traditional_configs:
             configs.extend(traditional_configs)
+
+        configs.extend(extract_arch_aicore_configs(content))
 
         # 方法2：匹配 FOREACH_OPDEF 相关格式
         foreach_configs = extract_foreach_opdef_configs(content)
@@ -432,6 +496,8 @@ def extract_ai_core_configs(file_path):
         # 去重并返回
         return list(set(configs))
 
+    except ArchitectureConfigurationError as e:
+        raise ArchitectureConfigurationError(f"{file_path}: {e}") from e
     except Exception as e:
         logger.error(f"读取文件 {file_path} 时出错: {e}")
         return []
