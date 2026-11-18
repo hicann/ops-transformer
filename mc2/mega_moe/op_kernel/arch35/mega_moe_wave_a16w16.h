@@ -10,7 +10,7 @@
 
 /*!
  * \file mega_moe_wave_a16w16.h
- * \brief MegaMoe A16W16 输入通信与专家计算
+ * \brief MegaMoe A16W16 类型与派生流程框架
  */
 
 #ifndef MEGA_MOE_WAVE_A16W16_H
@@ -36,7 +36,7 @@ struct InputScratchSelector<bfloat16_t> {
 
 template <uint32_t TileM, uint32_t TileN, bool Prefetch>
 struct ActivationEpilogueSelector<bfloat16_t, bfloat16_t, TileM, TileN, Prefetch> {
-    using Type = Bf16ActivationEpilogue<Prefetch>;
+    using Type = Bf16ActivationEpilogue<TileM, TileN, Prefetch>;
 };
 
 template <>
@@ -65,6 +65,18 @@ private:
     friend WaveBase;
     friend RuntimeBase;
     Bf16GmmBlockContext moeBlockContext_{};
+
+    static_assert(Std::IsSame<XType, bfloat16_t>::value && Std::IsSame<OutputType, bfloat16_t>::value &&
+                      Std::IsSame<MoeWeightType, bfloat16_t>::value &&
+                      Std::IsSame<SharedWeightType, bfloat16_t>::value,
+                  "MegaMoe A16W16 requires BF16 input, output and weights.");
+    static_assert(MoeQuantMode == BF16_PASSTHROUGH && SharedQuantMode == BF16_PASSTHROUGH,
+                  "MegaMoe A16W16 requires BF16 expert input types.");
+    static_assert(CombineQuantMode == COMBINE_NO_QUANT, "MegaMoe A16W16 requires unquantized Combine.");
+
+public:
+    // 输入通信、计算及同步钩子已实现，由入口偏特化选择本路径。
+    static constexpr bool kImplementationReady = true;
 
 protected:
     __aicore__ inline void InitPathConfigs(const MegaMoeTilingData* tilingData)

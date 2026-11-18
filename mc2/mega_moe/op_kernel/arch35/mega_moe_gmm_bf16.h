@@ -19,6 +19,7 @@
 
 namespace MegaMoeImpl {
 
+// 普通 BF16 MMAD 无持久化 Prologue 状态，仅初始化真实计算资源配置。
 struct Bf16GmmBlockContext {
     template <typename Block>
     __aicore__ inline void Init(Block& block) const

@@ -31,7 +31,8 @@ constexpr uint32_t GMM2_LAG_MIN_TOKEN_NUM = 4096U;
         MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format
 
 /*
- * 双 Wave lookahead 交错执行 GMM1/GMM2；输入准备、共享专家和 Unpermute 使用 MegaMoe 的公共编排。
+ * 公共初始化、输入准备、共享专家和 Unpermute 由 MegaMoe 基类统一实现；本类保留 A8W8 特有的
+ * 双 Wave lookahead、GMM1/GMM2 交错调度及量化 Combine 编排。
  */
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived = void>
 class MegaMoeA8W8Wave : public MegaMoe<TemplateMegaMoeA8W8WaveTypeFunc> {
@@ -40,6 +41,8 @@ private:
     friend MegaMoeBase;
 
 public:
+    static constexpr bool kImplementationReady = true;
+
     __aicore__ inline void Init(
         GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
         GM_ADDR weight2, GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales,
@@ -84,6 +87,7 @@ protected:
     using MegaMoeBase::waveCombineScratch_;
     using MegaMoeBase::waveCombineDedupScratch_;
 
+    // 流水保留在本类，派生类只替换数据路径相关叶子操作。
     __aicore__ inline void DispatchTokenRangeForWave(const ExpertTokenRange& dispatchRange);
     __aicore__ inline void RunGmm1ActivationSlice(
         const ExpertTokenPosition& gmm1Position, ExpertLoopState& gmm1ExpertState, GMMAddrInfo& gmm1AddrInfo,
@@ -863,7 +867,11 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>
 __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDerived>::Process()
 {
-    this->ProcessWave(GetImpl());
+    // 就绪状态取自最终实现类型，未完成实现的派生类型不能进入公共流水。
+    static_assert(ImplType::kImplementationReady, "MegaMoe derived kernel implementation is not ready.");
+    if constexpr (ImplType::kImplementationReady) {
+        this->ProcessWave(GetImpl());
+    }
 }
 
 #undef TemplateMegaMoeA8W8WaveTypeClass

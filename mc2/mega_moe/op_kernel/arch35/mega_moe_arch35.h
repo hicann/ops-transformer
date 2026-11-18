@@ -40,6 +40,7 @@
 namespace MegaMoeImpl {
 using namespace AscendC;
 
+// 局部类型选择由原有模板参数推导，默认映射保持现有 MX 类型。
 template <typename StorageType>
 struct InputConfigSelector {
     using Type = QuantProcessConfig;
@@ -92,6 +93,7 @@ private:
     using SendMaskBufferConfig = MegaMoeSendMaskBufferConfig;
     using UnpermuteBufferConfig = MegaMoeUnpermuteBufferConfig;
 
+    // 公共初始化细节仅由本类组织，派生类通过路径配置接口提供差异。
     __aicore__ inline GM_ADDR InitRuntimeContext(GM_ADDR context, const MegaMoeTilingData* tilingData);
     __aicore__ inline void BindTensorAddresses(
         GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1, GM_ADDR weight2, GM_ADDR weightScales1,
@@ -107,6 +109,7 @@ private:
 protected:
     using A8W4BlockContext = typename GmmBlockContextSelector<MoeWeightType, MoeQuantMode>::Type;
 
+    // 路径配置及派生类可复用的初始化操作。
     __aicore__ inline GM_ADDR InitBaseState(
         GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
         GM_ADDR weight2, GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales,
@@ -123,6 +126,7 @@ protected:
     __aicore__ inline void InitQuantTokenBufferConfig();
     __aicore__ inline void InitTokenUnpermuteConfig();
 
+    // 输入准备：保留公共编排，允许派生类替换临时空间和 token 处理。
     __aicore__ inline uint32_t InitInputScratchTensors(uint32_t mxTempTensorAddr);
     __aicore__ inline void PrepareInputTokenRange(const WorkRange& tokenRange);
     __aicore__ inline void QuantizeInputTokens(const WorkRange& tokenRange);
@@ -135,6 +139,7 @@ protected:
         Derived& derived, SharedGmmStartCondition sharedGmmStartCondition);
     __aicore__ inline void WaitForInputPreparation(SharedGmmStartCondition sharedGmmStartCondition);
 
+    // Dispatch 与专家计数。
     __aicore__ inline void InitMoeRingReuseBuffers(GMMAddrInfo& gmmAddrInfo) const;
     __aicore__ inline void DispatchBuffInit();
     template <bool ReserveCumsum = false>
@@ -147,6 +152,7 @@ protected:
     __aicore__ inline void EnterSteadyDispatch();
     __aicore__ inline void ExportAndResetExpertCounts();
 
+    // 共享专家：配置、地址绑定、计算及同步收尾。
     __aicore__ inline void InitSharedGmm1Epilogue();
     __aicore__ inline void ConfigureSharedGmm1Input(GMMAddrInfo& gmmAddrInfo, GmmExecutionConfig& gmmConfig,
                                                 Gmm1ActivationSync& sharedGmm1ActivationSync) const;
@@ -169,6 +175,7 @@ protected:
     __aicore__ inline void ProcessSharedExpertGmm2(Derived& derived);
     __aicore__ inline void SyncBeforeSharedExpertGmm1();
 
+    // MoE 计算、输出聚合与顶层 Wave 编排。
     __aicore__ inline void RunGmm2CombineForExpert(ExpertLoopState& state, GMMAddrInfo& gmmAddrInfo,
                                                uint32_t& startBlockIdx, uint32_t tokenStartIndexInExpert,
                                                uint32_t sliceTokenCount,
@@ -184,10 +191,12 @@ protected:
     template <typename Derived>
     __aicore__ inline void ProcessWave(Derived& derived);
 
+    // 启动条件与激活同步角色查询集中声明。
     __aicore__ inline SharedGmmStartCondition GetSharedGmmStartCondition() const;
     __aicore__ inline uint16_t GetMoeActivationSubBlockIdx() const;
     __aicore__ inline uint16_t GetSharedActivationSubBlockIdx() const;
 
+    // 成员保持原有顺序，避免改变对象布局。
     typename GmmBlockContextSelector<SharedWeightType, SharedQuantMode>::Type sharedBlockContext_{};
     __gm__ Mc2MoeContext* mc2Context_{nullptr};
     Params params_{};

@@ -141,7 +141,7 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(bool topkWeightsPrefetch, c
     TEventID eventId = static_cast<TEventID>(bufferIdx);
     PipeWait<PIPE_MTE2, PIPE_MTE3>(eventId);
     __ubuf__ ActivationType* tokenScaleBuffer = GetDispatchCopyBuffer(context, scratch, bufferIdx);
-    // void 表示报文没有 scale 段，仅搬运 token 和可选路由权重。
+    // void 仅表示 Dispatch 没有 scale 段，不要求计算配置提供 scale 类型或缓冲区。
     __ubuf__ QuantScaleType* scaleBuffer = nullptr;
     if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
         scaleBuffer = reinterpret_cast<__ubuf__ QuantScaleType*>(

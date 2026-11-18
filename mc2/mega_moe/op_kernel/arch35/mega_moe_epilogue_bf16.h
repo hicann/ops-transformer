@@ -18,7 +18,7 @@
 
 namespace MegaMoeImpl {
 
-template <bool TopkWeightsPrefetch>
+template <uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch>
 class Bf16ActivationEpilogue {
 public:
     struct Params {
@@ -44,9 +44,10 @@ public:
     __aicore__ inline void RunTile(GM_ADDR input, GM_ADDR metadata, uint32_t fullWidth,
                                     uint32_t row, uint32_t column, uint32_t rows, uint32_t columns)
     {
-        constexpr uint32_t tileN = MegaMoeBf16GmmConfig::TILE_N;
+        static_assert(TileN == MegaMoeBf16GmmConfig::TILE_N);
         constexpr uint32_t chunkRows = MegaMoeBf16GmmConfig::ACTIVATION_TILE_ROWS;
-        constexpr uint32_t slabBytes = chunkRows * tileN * sizeof(bfloat16_t);
+        static_assert(TileM >= chunkRows);
+        constexpr uint32_t slabBytes = chunkRows * TileN * sizeof(bfloat16_t);
         auto* gate = reinterpret_cast<__ubuf__ bfloat16_t*>(0U);
         auto* up = reinterpret_cast<__ubuf__ bfloat16_t*>(slabBytes);
         auto* output = reinterpret_cast<__ubuf__ bfloat16_t*>(2U * slabBytes);
@@ -58,7 +59,7 @@ public:
             const uint64_t sourceOffset =
                 (static_cast<uint64_t>(row + offset) * fullWidth + column) * sizeof(bfloat16_t);
             const CopyRows copyIn{static_cast<uint16_t>(count), columns * static_cast<uint32_t>(sizeof(bfloat16_t)),
-                                  static_cast<uint64_t>(fullWidth) * sizeof(bfloat16_t), tileN * sizeof(bfloat16_t)};
+                                  static_cast<uint64_t>(fullWidth) * sizeof(bfloat16_t), TileN * sizeof(bfloat16_t)};
             PipeFence<PIPE_MTE3, PIPE_MTE2, SYNC_EVENT_ID0>();
             CopyGmToUb(gate, input + sourceOffset, copyIn);
             if (divisor == ACTIVATION_N_HALF) {
@@ -71,7 +72,7 @@ public:
             PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID0>();
             if (divisor == 1U) {
                 Activation::GeluActivationTileContext<bfloat16_t> context{
-                    gate, output, weights, tileN, static_cast<uint16_t>(count), static_cast<uint16_t>(columns)};
+                    gate, output, weights, TileN, static_cast<uint16_t>(count), static_cast<uint16_t>(columns)};
                 Activation::RunGeluActivation<bfloat16_t, TopkWeightsPrefetch>(context);
             } else {
                 Activation::GatedActivationTileContext<bfloat16_t> context{};
@@ -79,8 +80,8 @@ public:
                 context.up = up;
                 context.output = output;
                 context.topkWeights = TopkWeightsPrefetch ? weights : nullptr;
-                context.inputRowStrideElements = tileN;
-                context.outputRowStrideElements = tileN;
+                context.inputRowStrideElements = TileN;
+                context.outputRowStrideElements = TileN;
                 context.rowLoopCount = static_cast<uint16_t>(count);
                 Activation::ConfigureGatedActivationTail(context, static_cast<uint16_t>(columns));
                 Activation::RunGatedActivation<bfloat16_t, TopkWeightsPrefetch>(context, params_.actMode,
@@ -91,7 +92,7 @@ public:
                 ((outputRowOffset_ + row + offset) * outputWidth + column) * sizeof(bfloat16_t);
             CopyUbToGm(params_.yGmAddr + destinationOffset, output,
                 CopyRows{static_cast<uint16_t>(count), columns * static_cast<uint32_t>(sizeof(bfloat16_t)),
-                         static_cast<uint64_t>(outputWidth) * sizeof(bfloat16_t), tileN * sizeof(bfloat16_t)});
+                         static_cast<uint64_t>(outputWidth) * sizeof(bfloat16_t), TileN * sizeof(bfloat16_t)});
         }
     }
 
