@@ -275,8 +275,13 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBufferToGm(const GmmExecutionCon
         int64_t scaleN =
             Ops::Base::CeilDiv(static_cast<int64_t>(activationOutputWidth), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
             MXFP_MULTI_BASE_SIZE;
-        AscendC::Coord<int64_t, int64_t> vecBaseOffset{
-            globalTokenStartIndex * activationOutputWidth / outputElementsPerByte, globalTokenStartIndex * scaleN};
+        AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{
+            globalTokenStartIndex * activationOutputWidth / outputElementsPerByte,
+            globalTokenStartIndex * scaleN,
+            expertOffset * syncLayout.activationFlagSlotCountPerExpert / INT_CACHELINE + expertMGroupOffset,
+            0L,
+            0L,
+            0L};
         epilogueOp.UpdateGlobalAddr(vecBaseOffset);
     }
     if constexpr (g_coreType == AIC) {

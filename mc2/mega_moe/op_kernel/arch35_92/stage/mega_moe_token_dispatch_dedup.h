@@ -149,9 +149,9 @@ __aicore__ inline void StoreDedupEntry(bool topkWeightsPrefetch, const TokenDisp
     __ubuf__ int32_t* weightBitsTensor = nullptr;
     if (recordHasWeights) {
         PipeWait<PIPE_MTE2, PIPE_S>(eventId);
-        const uint32_t weightOffsetInElements =
-            (context.quantTokenAlignBytes + context.quantScaleAlignBytes) / sizeof(ActivationType);
-        weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(tokenScaleBuffer + weightOffsetInElements);
+        uint32_t weightOffsetInUb = context.quantTokenAlignBytes + context.quantScaleAlignBytes;
+        weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) +
+                                                               weightOffsetInUb);
     } else {
         // Fetch 在无权重段布局下为 ring meta 置了 S_MTE3；本路径不消费 ring meta，在此配平。
         PipeWait<PIPE_S, PIPE_MTE3>(eventId);

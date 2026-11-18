@@ -25,24 +25,20 @@
 namespace MegaMoeImpl {
 
 #define TemplateMegaMoeA16W16WaveTypeClass \
-    typename TopkWeightsType, int32_t MoeWeight1Format, int32_t MoeWeight2Format, int32_t SharedWeight1Format, \
-        int32_t SharedWeight2Format
+    typename XType, typename OutputType, typename TopkWeightsType, typename MoeWeightType, int32_t MoeQuantMode, \
+        typename SharedWeightType, int32_t SharedQuantMode, int32_t MoeWeight1Format, int32_t MoeWeight2Format, \
+        int32_t SharedWeight1Format, int32_t SharedWeight2Format
 #define TemplateMegaMoeA16W16WaveTypeFunc \
-    TopkWeightsType, MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format
+    XType, OutputType, TopkWeightsType, MoeWeightType, MoeQuantMode, SharedWeightType, SharedQuantMode, \
+        MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format
 
 template <TemplateMegaMoeA16W16WaveTypeClass>
 class MegaMoeA16W16Wave
-    : public MegaMoeA8W8Wave<bfloat16_t, bfloat16_t, TopkWeightsType, bfloat16_t, BF16_PASSTHROUGH, bfloat16_t,
-                             BF16_PASSTHROUGH, MoeWeight1Format, MoeWeight2Format, SharedWeight1Format,
-                             SharedWeight2Format, MegaMoeA16W16Wave<TemplateMegaMoeA16W16WaveTypeFunc>> {
+    : public MegaMoeA8W8Wave<TemplateMegaMoeA16W16WaveTypeFunc, MegaMoeA16W16Wave<TemplateMegaMoeA16W16WaveTypeFunc>> {
 private:
     using Self = MegaMoeA16W16Wave<TemplateMegaMoeA16W16WaveTypeFunc>;
-    using WaveBase = MegaMoeA8W8Wave<bfloat16_t, bfloat16_t, TopkWeightsType, bfloat16_t, BF16_PASSTHROUGH, bfloat16_t,
-                                     BF16_PASSTHROUGH, MoeWeight1Format, MoeWeight2Format, SharedWeight1Format,
-                                     SharedWeight2Format, Self>;
-    using RuntimeBase =
-        MegaMoe<bfloat16_t, bfloat16_t, TopkWeightsType, bfloat16_t, BF16_PASSTHROUGH, bfloat16_t, BF16_PASSTHROUGH,
-                MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format>;
+    using WaveBase = MegaMoeA8W8Wave<TemplateMegaMoeA16W16WaveTypeFunc, Self>;
+    using RuntimeBase = MegaMoe<TemplateMegaMoeA16W16WaveTypeFunc>;
     friend WaveBase;
     friend RuntimeBase;
     Bf16GmmBlockContext moeBlockContext_{};
@@ -104,7 +100,7 @@ protected:
             gmm1Position.tokenIndexInExpert);
         Bf16Gmm::RunGmm1<MoeWeight1Format != FORMAT_ND, false>(
             moeBlockContext_, this->epilogueOp_, gmm1WaveProblemShape, gmm1AddrInfo, this->gmmExecutionConfig_.blockJob,
-            runtimeState, this->commonConfig_.activationOutputDivisor, this->params_.tilingData->isTopkWeightsPrefetch);
+            runtimeState, this->commonConfig_.activationOutputDivisor);
         (void)waveEndTokenIndexInExpert;
         (void)expertRowCount;
     }
@@ -140,7 +136,7 @@ protected:
             this->sharedWeightTensorListAddrs_, this->sharedEpilogueOp_, gmmAddrInfo, sharedExpertIdx);
         Bf16Gmm::RunGmm1<SharedWeight1Format != FORMAT_ND, true>(
             this->sharedBlockContext_, this->sharedEpilogueOp_, problemShape, gmmAddrInfo, sharedGmmConfig.blockJob,
-            runtimeState, this->commonConfig_.activationOutputDivisor, false);
+            runtimeState, this->commonConfig_.activationOutputDivisor);
     }
 
     __aicore__ inline void RunSharedExpertGmm2(GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape,

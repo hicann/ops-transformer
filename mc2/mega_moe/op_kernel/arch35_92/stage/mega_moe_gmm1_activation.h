@@ -37,9 +37,9 @@ __aicore__ inline void WaitForGmm1InputReady(const GMMAddrInfo& gmmAddrInfo, con
     if constexpr (IsShared) {
         return;
     }
-    uint32_t mGroupIdx = mLoc / config.tileM;
+    uint32_t waveIdx = mLoc / config.tileM;
     uint32_t targetValue = (mLoc + config.tileM > config.m) ? (config.m - mLoc) : config.tileM;
-    uint64_t flagOffset = static_cast<uint64_t>(mGroupIdx) * INT_CACHELINE;
+    uint64_t flagOffset = static_cast<uint64_t>(waveIdx) * INT_CACHELINE;
     __gm__ int32_t* flagValueAddr = gmmAddrInfo.dispatchToGmm1Flag + flagOffset;
     WaitUntilGmFlagEquals(flagValueAddr, static_cast<int32_t>(targetValue));
 }
@@ -223,7 +223,7 @@ __aicore__ inline void Gmm1AicMmadToGmGeneric(WorkSet& workSet, const Params& pa
     blockMmadContext->template Init<GmmStage::GMM1>(config);
     auto& blockMmad = blockMmadContext->blockMmad;
 
-    uint32_t lastWaitedMGroupIdx = static_cast<uint32_t>(-1);
+    uint32_t lastWaveWaited = static_cast<uint32_t>(-1);
     for (uint32_t loopIdx = startLoopIdx; loopIdx < tileNum; loopIdx += config.blockNum) {
         auto blockCoord = workSet.scheduler.GetBlockCoord(loopIdx);
         auto actualShape = workSet.scheduler.GetBlockShape(blockCoord);
@@ -238,10 +238,10 @@ __aicore__ inline void Gmm1AicMmadToGmGeneric(WorkSet& workSet, const Params& pa
          */
         auto gmBlockScaleA = workSet.gmScaleA.slice(asc::te::make_coord(mLoc, 0),
                                                     asc::te::make_shape(Get<M_VALUE>(actualShape), config.scaleK));
-        uint32_t mGroupIdx = mLoc / config.tileM;
-        if (mGroupIdx != lastWaitedMGroupIdx) {
+        uint32_t waveIdx = mLoc / config.tileM;
+        if (waveIdx != lastWaveWaited) {
             WaitForGmm1InputReady<IsShared>(gmmAddrInfo, config, mLoc);
-            lastWaitedMGroupIdx = mGroupIdx;
+            lastWaveWaited = waveIdx;
         }
         sync.WaitForActivation();
 #ifndef MEGA_MOE_ARCH92_DEVICE
@@ -276,7 +276,7 @@ __aicore__ inline void Gmm1AicMmadGeneric(WorkSet& workSet, const GMMAddrInfo& g
     auto l0cOutUbSecond =
         asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, ElementC>(ubOffsetSecond), ubLayout);
 
-    uint32_t lastWaitedMGroupIdx = static_cast<uint32_t>(-1);
+    uint32_t lastWaveWaited = static_cast<uint32_t>(-1);
     for (uint32_t loopIdx = startLoopIdx; loopIdx < tileNum; loopIdx += config.blockNum) {
         auto blockCoord = workSet.scheduler.GetBlockCoord(loopIdx);
         auto actualShape = workSet.scheduler.GetBlockShape(blockCoord);
@@ -287,10 +287,10 @@ __aicore__ inline void Gmm1AicMmadGeneric(WorkSet& workSet, const GMMAddrInfo& g
                                           asc::te::make_shape(Get<M_VALUE>(actualShape), Get<K_VALUE>(actualShape)));
         auto gmBlockScaleA = workSet.gmScaleA.slice(asc::te::make_coord(mLoc, 0),
                                                     asc::te::make_shape(Get<M_VALUE>(actualShape), config.scaleK));
-        uint32_t mGroupIdx = mLoc / config.tileM;
-        if (mGroupIdx != lastWaitedMGroupIdx) {
+        uint32_t waveIdx = mLoc / config.tileM;
+        if (waveIdx != lastWaveWaited) {
             WaitForGmm1InputReady<IsShared>(gmmAddrInfo, config, mLoc);
-            lastWaitedMGroupIdx = mGroupIdx;
+            lastWaveWaited = waveIdx;
         }
         sync.WaitForActivation();
 
@@ -315,16 +315,16 @@ __aicore__ inline void Gmm1AicMmadA8W4(BlockMmad& blockMmad, WorkSet& workSet, c
     const bool interleave = config.activationOutputDivisor != 1U;
     blockMmad.template Init<false>(matmulShape, l0TileShape, interleave);
 
-    uint32_t lastWaitedMGroupIdx = static_cast<uint32_t>(-1);
+    uint32_t lastWaveWaited = static_cast<uint32_t>(-1);
     for (uint32_t loopIdx = startLoopIdx; loopIdx < tileNum; loopIdx += config.blockNum) {
         auto blockCoord = workSet.scheduler.GetBlockCoord(loopIdx);
         auto actualShape = workSet.scheduler.GetBlockShape(blockCoord);
         uint32_t mLoc = Get<M_VALUE>(blockCoord);
         uint32_t nLoc = Get<N_VALUE>(blockCoord);
-        uint32_t mGroupIdx = mLoc / config.tileM;
-        if (mGroupIdx != lastWaitedMGroupIdx) {
+        uint32_t waveIdx = mLoc / config.tileM;
+        if (waveIdx != lastWaveWaited) {
             WaitForGmm1InputReady<IsShared>(gmmAddrInfo, config, mLoc);
-            lastWaitedMGroupIdx = mGroupIdx;
+            lastWaveWaited = waveIdx;
         }
 
         sync.WaitForActivation();
@@ -377,10 +377,14 @@ __aicore__ inline void Gmm1Aiv0PrefetchEpilogueTileGeneric(const Config& config,
         uint32_t epilogueN = Get<N_VALUE>(actualShape) / config.activationOutputDivisor;
         uint32_t epilogueNLoc = nLoc / config.activationOutputDivisor;
         Std::tuple<int64_t, int64_t, int64_t, int64_t> epilogueShape{subM, epilogueN, 0, 0};
-        Std::tuple<int64_t, int64_t> epilogueOffset{
+        Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> epilogueOffset{
             subMLoc * config.outputN + epilogueNLoc,
             subMLoc * CeilDiv(config.outputN, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE +
-                CeilDiv(epilogueNLoc, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE};
+                CeilDiv(epilogueNLoc, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE,
+            static_cast<int64_t>(subMLoc / L1_TILE_M_256),
+            0,
+            static_cast<int64_t>(metaInfoRow),
+            0};
         MegaMoeImpl::SetSaturationStrategy(SaturationStrategy::USE_API);
         activationQuantOp(true, epilogueShape, epilogueOffset, 0U);
         NotifyGmm2InputReady<IsWaveFlagGrained>(gmmAddrInfo.activationToGmm2Flag, subMLoc / L1_TILE_M_256);
@@ -404,9 +408,14 @@ __aicore__ inline void Gmm1Aiv0EpilogueTileGeneric(const Config& config, Activat
     uint32_t epilogueN = Get<N_VALUE>(actualShape) / config.activationOutputDivisor;
     uint32_t epilogueNLoc = nLoc / config.activationOutputDivisor;
     Std::tuple<int64_t, int64_t, int64_t, int64_t> epilogueShape{Get<M_VALUE>(actualShape), epilogueN, 0, 0};
-    Std::tuple<int64_t, int64_t> epilogueOffset{
-        mLoc * config.outputN + epilogueNLoc, mLoc * CeilDiv(config.outputN, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE +
-                                                  CeilDiv(epilogueNLoc, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE};
+    Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> epilogueOffset{
+        mLoc * config.outputN + epilogueNLoc,
+        mLoc * CeilDiv(config.outputN, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE +
+            CeilDiv(epilogueNLoc, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE,
+        static_cast<int64_t>(mLoc / L1_TILE_M_256),
+        0,
+        0,
+        0};
 #ifndef MEGA_MOE_ARCH92_DEVICE
     using KernelConfig = typename Config::KernelConfig;
     if constexpr (!KernelConfig::IS_SHARED) {
@@ -611,9 +620,13 @@ __aicore__ inline void UpdateSharedExpertGmm1GlobalBuffer(const MoeStageCommonCo
             uint64_t activationN = n / commonConfig.activationOutputDivisor;
             uint64_t scaleN =
                 Ops::Base::CeilDiv(activationN, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-            AscendC::Coord<int64_t, int64_t> vecBaseOffset{
+            AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{
                 static_cast<int64_t>(expertIdx * m * activationN / outputElemsPerByte),
-                static_cast<int64_t>(expertIdx * m * scaleN)};
+                static_cast<int64_t>(expertIdx * m * scaleN),
+                0L,
+                0L,
+                0L,
+                0L};
             epilogueOp.UpdateGlobalAddr(vecBaseOffset);
         }
     }

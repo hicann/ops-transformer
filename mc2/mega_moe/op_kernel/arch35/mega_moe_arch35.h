@@ -961,7 +961,9 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessSharedExpertGmm1
     } else {
         ProcessSharedExpertGmm1Loop(derived, gmmAddrInfo, problemShape, sharedGmmConfig, runtimeState);
     }
-    Gmm1UbActivationSync::EndSync(runtimeState.vecSetSyncCom, runtimeState.pingpongIdx);
+    constexpr uint32_t bufferCount =
+        SharedQuantConfig::AXW_MODE == AxWMode::A16W16 ? MegaMoeBf16GmmConfig::GMM1_UB_BUFFER_COUNT : DOUBLE_BUFFER;
+    Gmm1UbActivationSyncBase<bufferCount>::EndSync(runtimeState.vecSetSyncCom, runtimeState.pingpongIdx);
     gmm1PingPongIdx_ = 0U;
 }
 

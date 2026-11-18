@@ -80,8 +80,9 @@ template <typename TopkWeightsType, int32_t MoeWeight1Format, int32_t MoeWeight2
 class MegaMoeMteWave<bfloat16_t, bfloat16_t, TopkWeightsType, bfloat16_t, MoeWeight1Format, MoeWeight2Format,
                      bfloat16_t, SharedWeight1Format, SharedWeight2Format, EXPERT_QUANT_OUT_DTYPE_BF16,
                      EXPERT_QUANT_OUT_DTYPE_BF16>
-    : public MegaMoeA16W16Wave<TopkWeightsType, MoeWeight1Format, MoeWeight2Format, SharedWeight1Format,
-                               SharedWeight2Format> {};
+    : public MegaMoeA16W16Wave<bfloat16_t, bfloat16_t, TopkWeightsType, bfloat16_t, EXPERT_QUANT_OUT_DTYPE_BF16,
+                               bfloat16_t, EXPERT_QUANT_OUT_DTYPE_BF16, MoeWeight1Format, MoeWeight2Format,
+                               SharedWeight1Format, SharedWeight2Format> {};
 #endif
 
 } // namespace MegaMoeImpl

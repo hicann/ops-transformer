@@ -31,8 +31,7 @@ constexpr uint32_t GMM2_LAG_MIN_TOKEN_NUM = 4096U;
         MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format
 
 /*
- * 按 Wave 分批处理 MoE token，提前搬运下一批数据，并安排 GMM1、激活、GMM2 和专家结果回传。
- * 输入准备、共享专家和 Unpermute 使用 MegaMoe 的公共编排。
+ * 双 Wave lookahead 交错执行 GMM1/GMM2；输入准备、共享专家和 Unpermute 使用 MegaMoe 的公共编排。
  */
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived = void>
 class MegaMoeA8W8Wave : public MegaMoe<TemplateMegaMoeA8W8WaveTypeFunc> {
@@ -194,10 +193,12 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
 {
     using QuantScaleOutType = typename MegaMoeBase::MoeQuantConfig::QuantScaleType;
 
+    const auto& workspace = params_.workspace.layout;
+    const auto& buffer = params_.workspace.base;
     UpdateMoeExpertGmm1GlobalBuffer<ActivationType, MoeWeightType, ActivationType, QuantScaleOutType,
                                     PackedElementTraits<QuantOutType>::ELEMENTS_PER_BYTE, false>(
-        params_.tilingData->isTopkWeightsPrefetch, gmmExecutionConfig_, syncWorkspaceLayout_, params_.workspace.layout,
-        params_.workspace.base, moeWeightTensorListAddrs_, epilogueOp_, gmm1AddrInfo, gmm1ExpertState,
+        params_.tilingData->isTopkWeightsPrefetch, gmmExecutionConfig_, syncWorkspaceLayout_, workspace, buffer,
+        moeWeightTensorListAddrs_, epilogueOp_, gmm1AddrInfo, gmm1ExpertState,
         commonConfig_.gmm1OutputDim / commonConfig_.activationOutputDivisor, gmm1Position.tokenIndexInExpert);
     /*
      * 只有该 problem 从第 0 行覆盖到专家尾，后续 Wave 才不会再次读取同一份 GMM1 权重。
@@ -733,8 +734,10 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
     Gmm2WaveState gmm2State{};
     InitMoeRingReuseBuffers(gmm1AddrInfo);
     InitMoeRingReuseBuffers(gmm2State.addrInfo);
-    if (params_.tilingData->isTopkWeightsPrefetch) {
-        gmm1AddrInfo.gmm1ActivationSync = &gmm1ActivationSync;
+    if constexpr (MegaMoeBase::MoeQuantConfig::AXW_MODE != AxWMode::A16W16) {
+        if (params_.tilingData->isTopkWeightsPrefetch) {
+            gmm1AddrInfo.gmm1ActivationSync = &gmm1ActivationSync;
+        }
     }
     if (params_.tilingData->combineQuantMode == COMBINE_NO_QUANT) {
         // 握手对象恒挂；Combine 去重在上面的模板分支中关闭逐 tile 握手。
@@ -809,7 +812,9 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
         ProcessGmm2AndCombineWave(gmm2PendingWaveEnd, gmm2State, combineBufferConfig);
     }
 
-    if (!params_.tilingData->isTopkWeightsPrefetch) {
+    if constexpr (MegaMoeBase::MoeQuantConfig::AXW_MODE == AxWMode::A16W16) {
+        Gmm1UbActivationSyncBase<MegaMoeBf16GmmConfig::GMM1_UB_BUFFER_COUNT>::EndSync(vecSetSyncCom, gmm1PingPongIdx_);
+    } else if (!params_.tilingData->isTopkWeightsPrefetch) {
         Gmm1UbActivationSync::EndSync(vecSetSyncCom, gmm1PingPongIdx_);
     }
     gmm1PingPongIdx_ = 0U;

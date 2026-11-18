@@ -33,7 +33,12 @@ public:
     __aicore__ inline void Init(const Params& params)
     {
         params_ = params;
-        weights_ = reinterpret_cast<__ubuf__ float*>(MegaMoeBf16GmmConfig::GMM1_UB_SLOT_BYTES);
+        constexpr uint32_t inputBytes =
+            MegaMoeBf16GmmConfig::TILE_M * MegaMoeBf16GmmConfig::TILE_N * sizeof(bfloat16_t);
+        const bool isGelu = params.actMode == static_cast<uint8_t>(MegaMoeActMode::GELU);
+        input_ = reinterpret_cast<__ubuf__ bfloat16_t*>(0U);
+        output_ = isGelu ? input_ : reinterpret_cast<__ubuf__ bfloat16_t*>(inputBytes);
+        weights_ = reinterpret_cast<__ubuf__ float*>(isGelu ? inputBytes : inputBytes + inputBytes / ACTIVATION_N_HALF);
     }
 
     __aicore__ inline void SetOutputRowOffset(uint64_t rowOffset)
@@ -41,23 +46,12 @@ public:
         outputRowOffset_ = rowOffset;
     }
 
-    __aicore__ inline void RunTile(GM_ADDR gmm1Output, GM_ADDR metadata, uint16_t pingpongIdx, uint32_t outputWidth,
-                                   uint32_t row, uint32_t column, uint32_t rows, uint32_t columns)
+    __aicore__ inline void RunTile(GM_ADDR metadata, uint32_t outputWidth, uint32_t row, uint32_t column, uint32_t rows,
+                                   uint32_t columns)
     {
         const uint32_t divisor = GetActivationOutputDivisor(params_.actMode);
         const uint32_t outputStride = MegaMoeBf16GmmConfig::TILE_N / divisor;
-        const uint32_t slotOffsetBytes =
-            params_.topkWeightsPrefetch ? 0U : pingpongIdx * MegaMoeBf16GmmConfig::GMM1_UB_SLOT_BYTES;
-        input_ = reinterpret_cast<__ubuf__ bfloat16_t*>(slotOffsetBytes);
-        output_ = input_;
         if (params_.topkWeightsPrefetch) {
-            const uint64_t sourceOffset =
-                (static_cast<uint64_t>(row) * outputWidth + column) * divisor * sizeof(bfloat16_t);
-            CopyGmToUb(
-                input_, gmm1Output + sourceOffset,
-                CopyRows{static_cast<uint16_t>(rows), columns * divisor * static_cast<uint32_t>(sizeof(bfloat16_t)),
-                         static_cast<uint64_t>(outputWidth) * divisor * sizeof(bfloat16_t),
-                         MegaMoeBf16GmmConfig::TILE_N * static_cast<uint32_t>(sizeof(bfloat16_t))});
             CopyGmToUb(weights_, metadata + static_cast<uint64_t>(row) * META_INFO_SIZE * sizeof(int32_t),
                        rows * META_INFO_SIZE * static_cast<uint32_t>(sizeof(int32_t)));
             PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID0>();
@@ -71,7 +65,7 @@ public:
                    CopyRows{static_cast<uint16_t>(rows), columns * static_cast<uint32_t>(sizeof(bfloat16_t)),
                             static_cast<uint64_t>(outputWidth) * sizeof(bfloat16_t),
                             outputStride * static_cast<uint32_t>(sizeof(bfloat16_t))});
-        // 等待结果搬出后再归还当前 UB 槽或 GM tile 的消费额度。
+        // ACK 由 Vector 发出，等待搬出完成后再允许 AIC 复用输入槽。
         PipeFence<PIPE_MTE3, PIPE_V, SYNC_EVENT_ID0>();
         PipeFence<PIPE_MTE3, PIPE_S, SYNC_EVENT_ID0>();
     }

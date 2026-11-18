@@ -54,7 +54,7 @@ template <typename DataTypeOut, typename DataTypeIn, uint32_t TileN = 256>
 class BlockEpilogueActivationMxQuant {
 public:
     using BlockShape = Shape<int64_t, int64_t, int64_t, int64_t>;
-    using BlockCoord = Coord<int64_t, int64_t>;
+    using BlockCoord = Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>;
     using ProblemShape = Shape<int64_t, int64_t, int64_t, int64_t>;
 
     struct Arguments {

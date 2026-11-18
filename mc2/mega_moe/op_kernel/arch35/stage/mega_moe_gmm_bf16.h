@@ -20,14 +20,14 @@ namespace MegaMoeImpl {
 
 struct Bf16GmmBlockContext {
     template <typename Block>
-    __aicore__ inline void Init(Block& block, uint32_t tileM = MegaMoeBf16GmmConfig::L0_TILE_M) const
+    __aicore__ inline void Init(Block& block, uint32_t tileN = MegaMoeBf16GmmConfig::TILE_N) const
     {
         typename Block::Params params{};
         params.mL1 = MegaMoeBf16GmmConfig::TILE_M;
-        params.nL1 = MegaMoeBf16GmmConfig::TILE_N;
+        params.nL1 = tileN;
         params.kL1 = MegaMoeBf16GmmConfig::L1_TILE_K;
-        params.mL0 = tileM;
-        params.nL0 = MegaMoeBf16GmmConfig::TILE_N;
+        params.mL0 = MegaMoeBf16GmmConfig::L0_TILE_M;
+        params.nL0 = tileN;
         params.kL0 = MegaMoeBf16GmmConfig::L0_TILE_K;
         params.l1Stages = MegaMoeBf16GmmConfig::BUFFER_COUNT;
         params.l0cStages = 1U;
@@ -38,13 +38,11 @@ struct Bf16GmmBlockContext {
 namespace Bf16Gmm {
 using MakeLayout = asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn, AscendC::Std::Int<16>>;
 
-template <bool WeightNZ, bool ConcatB = false>
+template <bool WeightNZ>
 struct Kernel {
     using LayoutB = typename AscendC::Std::conditional_t<WeightNZ, asc::te::zn_layout_ptn, asc::te::dn_ext_layout_ptn>;
     using MakeLayoutB = asc::te::frame_layout_format<LayoutB, AscendC::Std::Int<16>>;
-    using Policy = Blaze::Gemm::MatmulMultiBlockBasic<
-        0, 0, Blaze::Gemm::KernelMmadMultiBlockBasic,
-        ConcatB ? static_cast<uint64_t>(Blaze::Gemm::NoContiguousType::NON_CONTIGUOUS_TYPE_BATCHED_B) : 0U>;
+    using Policy = Blaze::Gemm::MatmulMultiBlockBasic<0, 0, Blaze::Gemm::KernelMmadMultiBlockBasic, 0>;
     using Block =
         Blaze::Gemm::Block::BlockMmad<Policy, bfloat16_t, asc::te::nd_ext_layout_ptn, bfloat16_t, LayoutB, bfloat16_t,
                                       asc::te::nd_ext_layout_ptn, float, asc::te::nd_ext_layout_ptn>;
@@ -80,76 +78,77 @@ __aicore__ inline void ComputeGmm2Tile(Block& block, TensorA& a, TensorB& b, Ten
     }
 }
 
-// 两个权重切片在 L1 沿 N 拼接，一次计算完整 gate/up；GELU 使用单个权重切片。
+// UB 每行按 gate/up 交织；权重使用全局列号，输出使用当前槽的局部行列号。
 template <typename Block, typename TensorA, typename TensorB, typename TensorC, typename Coord, typename Extent>
-__aicore__ inline void ComputeGmm1Tile(Block& block, TensorA& a, TensorB& b, TensorC& c, const Coord& coord,
+__aicore__ inline void ComputeGmm1Tile(Block& block, TensorA& a, TensorB& b, TensorC& ub, const Coord& coord,
                                        const Extent& extent, const ProblemConfig& config)
 {
     const uint32_t branchColumnOffset = Get<N_VALUE>(coord) / config.activationOutputDivisor;
     const uint32_t branchColumnCount = Get<N_VALUE>(extent) / config.activationOutputDivisor;
     const uint32_t branchWidth = config.n / config.activationOutputDivisor;
-    auto tileA =
-        a.slice(asc::te::make_coord(Get<M_VALUE>(coord), 0U), asc::te::make_shape(Get<M_VALUE>(extent), config.k));
-    auto branchB =
-        b.slice(asc::te::make_coord(0U, branchColumnOffset), asc::te::make_shape(config.k, branchColumnCount));
-    using LayoutB = asc::te::get_layout_pattern<typename TensorB::layout_type>;
-    auto batchedLayoutB = asc::te::make_pattern_layout<LayoutB, asc::te::layout_trait_default<bfloat16_t>>(
-        asc::te::make_shape(config.activationOutputDivisor, branchB.layout().shape()),
-        asc::te::make_stride(b.layout()(asc::te::make_coord(0U, branchWidth)), branchB.layout().stride()));
-    auto tileB = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ bfloat16_t*>(branchB.data().get())),
-        batchedLayoutB);
+    const uint32_t ubBranchWidth = MegaMoeBf16GmmConfig::TILE_N / config.activationOutputDivisor;
     auto bias = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(static_cast<__gm__ float*>(nullptr)),
-                                     MakeLayout{}(1U, Get<N_VALUE>(extent)));
-    Gmm1OutputView<TensorC> output{c};
-    typename Block::TupleShape shape{Get<M_VALUE>(extent), Get<N_VALUE>(extent), config.k, 0U};
-    block(tileA, tileB, bias, output, shape);
+                                     MakeLayout{}(1U, branchColumnCount));
+    for (uint32_t offset = 0U; offset < Get<M_VALUE>(extent); offset += MegaMoeBf16GmmConfig::L0_TILE_M) {
+        const uint32_t remaining = Get<M_VALUE>(extent) - offset;
+        const uint32_t rows = remaining < MegaMoeBf16GmmConfig::L0_TILE_M ? remaining : MegaMoeBf16GmmConfig::L0_TILE_M;
+        auto tileA =
+            a.slice(asc::te::make_coord(Get<M_VALUE>(coord) + offset, 0U), asc::te::make_shape(rows, config.k));
+        for (uint32_t branch = 0U; branch < config.activationOutputDivisor; ++branch) {
+            auto tileB = b.slice(asc::te::make_coord(0U, branchColumnOffset + branch * branchWidth),
+                                 asc::te::make_shape(config.k, branchColumnCount));
+            auto tileC = ub.slice(asc::te::make_coord(offset, branch * ubBranchWidth),
+                                  asc::te::make_shape(rows, branchColumnCount));
+            Gmm1OutputView<decltype(tileC)> output{tileC};
+            typename Block::TupleShape shape{rows, branchColumnCount, config.k, 0U};
+            block(tileA, tileB, bias, output, shape);
+        }
+    }
 }
 
-template <bool WeightNZ, bool IsShared, typename TensorC, typename Sync>
+template <bool WeightNZ, bool IsShared>
 __aicore__ inline void RunGmm1Aic(const Bf16GmmBlockContext& context, GmmKernel::BlockScheduler& scheduler,
                                   const GMMAddrInfo& addresses, const ProblemConfig& config, uint32_t first,
-                                  uint32_t tiles, TensorC& c, Sync& sync, const uint16_t& pingpongIdx)
+                                  uint32_t tiles, GmmRuntimeState& runtimeState)
 {
-    typename Kernel<WeightNZ, true>::Block block;
-    context.Init(block, MegaMoeBf16GmmConfig::TILE_M);
+    typename Kernel<WeightNZ>::Block block;
+    context.Init(block, MegaMoeBf16GmmConfig::TILE_N / config.activationOutputDivisor);
     auto a = asc::te::make_tensor(
         asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ bfloat16_t*>(addresses.aGlobal)),
         MakeLayout{}(config.m, config.k));
     auto b = asc::te::make_tensor(
         asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ bfloat16_t*>(addresses.bGlobal)),
         typename Kernel<WeightNZ>::MakeLayoutB{}(config.k, config.n));
-    constexpr bool outputToGm = Std::is_same_v<asc::te::get_mem_location<TensorC>, asc::te::location::gm>;
-    uint32_t lastWaitedMGroupIdx = static_cast<uint32_t>(-1);
+    auto ub = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, bfloat16_t>(0U),
+                                   MakeLayout{}(MegaMoeBf16GmmConfig::TILE_M, MegaMoeBf16GmmConfig::TILE_N));
+    Gmm1UbActivationSyncBase<MegaMoeBf16GmmConfig::GMM1_UB_BUFFER_COUNT> sync(runtimeState.vecSetSyncCom,
+                                                                              runtimeState.pingpongIdx);
+    uint32_t lastWaveWaited = static_cast<uint32_t>(-1);
     for (uint32_t tile = first; tile < tiles; tile += config.blockNum) {
         const auto coord = scheduler.GetBlockCoord(tile);
         const auto extent = scheduler.GetBlockShape(coord);
-        const uint32_t mGroupIdx = Get<M_VALUE>(coord) / config.tileM;
-        if (mGroupIdx != lastWaitedMGroupIdx) {
+        const uint32_t wave = Get<M_VALUE>(coord) / config.tileM;
+        if (wave != lastWaveWaited) {
             WaitForGmm1InputReady<IsShared>(addresses, config, Get<M_VALUE>(coord));
-            lastWaitedMGroupIdx = mGroupIdx;
+            lastWaveWaited = wave;
         }
         sync.WaitForActivation();
-        const uint32_t outputRow = outputToGm ? Get<M_VALUE>(coord) : pingpongIdx * MegaMoeBf16GmmConfig::TILE_M;
-        const uint32_t outputColumn = outputToGm ? Get<N_VALUE>(coord) : 0U;
-        auto tileC = c.slice(asc::te::make_coord(outputRow, outputColumn),
-                             asc::te::make_shape(Get<M_VALUE>(extent), Get<N_VALUE>(extent)));
-        ComputeGmm1Tile(block, a, b, tileC, coord, extent, config);
+        ComputeGmm1Tile(block, a, b, ub, coord, extent, config);
         sync.NotifyActivation();
     }
 }
 
-template <typename Epilogue, typename Sync>
-__aicore__ inline void RunGmm1Aiv0Epilogue(GmmKernel::BlockScheduler& scheduler, Epilogue& epilogue,
-                                           const GMMAddrInfo& addresses, const ProblemConfig& config, uint32_t first,
-                                           uint32_t tiles, GmmRuntimeState& runtimeState, Sync& sync)
+template <typename Epilogue>
+__aicore__ inline void RunGmm1Aiv(GmmKernel::BlockScheduler& scheduler, Epilogue& epilogue,
+                                  const GMMAddrInfo& addresses, const ProblemConfig& config, uint32_t first,
+                                  uint32_t tiles, GmmRuntimeState& runtimeState)
 {
+    Gmm1UbActivationSyncBase<MegaMoeBf16GmmConfig::GMM1_UB_BUFFER_COUNT> sync(runtimeState.pingpongIdx);
     for (uint32_t tile = first; tile < tiles; tile += config.blockNum) {
         const auto coord = scheduler.GetBlockCoord(tile);
         const auto extent = scheduler.GetBlockShape(coord);
         sync.WaitForGmm1();
-        epilogue.RunTile(addresses.gmm1OutGlobal, addresses.metaInfoGlobal, runtimeState.pingpongIdx,
-                         config.n / config.activationOutputDivisor, Get<M_VALUE>(coord),
+        epilogue.RunTile(addresses.metaInfoGlobal, config.n / config.activationOutputDivisor, Get<M_VALUE>(coord),
                          Get<N_VALUE>(coord) / config.activationOutputDivisor, Get<M_VALUE>(extent),
                          Get<N_VALUE>(extent) / config.activationOutputDivisor);
         GmmKernel::NotifyGmm2InputReady<true>(addresses.activationToGmm2Flag, Get<M_VALUE>(coord) / config.tileM);
@@ -160,7 +159,7 @@ __aicore__ inline void RunGmm1Aiv0Epilogue(GmmKernel::BlockScheduler& scheduler,
 template <bool WeightNZ, bool IsShared, typename Epilogue>
 __aicore__ inline void RunGmm1(const Bf16GmmBlockContext& context, Epilogue& epilogue, const ProblemShape& shape,
                                const GMMAddrInfo& addresses, const BlockJobContext& job, GmmRuntimeState& runtimeState,
-                               uint32_t divisor, bool topkWeightsPrefetch)
+                               uint32_t divisor)
 {
     const uint32_t m = static_cast<uint32_t>(Get<M_VALUE>(shape));
     const uint32_t n = static_cast<uint32_t>(Get<N_VALUE>(shape));
@@ -171,29 +170,10 @@ __aicore__ inline void RunGmm1(const Bf16GmmBlockContext& context, Epilogue& epi
                                                                          int64_t{MegaMoeBf16GmmConfig::TILE_N})});
     const uint32_t tiles = static_cast<uint32_t>(scheduler.GetTileNum());
     const uint32_t first = (job.jobIndex + job.totalJobs - runtimeState.startBlockIdx) % job.totalJobs;
-    if (topkWeightsPrefetch) {
-        if constexpr (g_coreType == AIC) {
-            auto c = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
-                                              reinterpret_cast<__gm__ bfloat16_t*>(addresses.gmm1OutGlobal)),
-                                          MakeLayout{}(m, n));
-            RunGmm1Aic<WeightNZ, IsShared>(context, scheduler, addresses, config, first, tiles, c,
-                                           *addresses.gmm1ActivationSync, runtimeState.pingpongIdx);
-        } else if (MegaMoeHardwarePolicy::GetSubBlockIdx() == 0U) {
-            RunGmm1Aiv0Epilogue(scheduler, epilogue, addresses, config, first, tiles, runtimeState,
-                                *addresses.gmm1ActivationSync);
-        }
-    } else {
-        Gmm1UbActivationSync sync(runtimeState.vecSetSyncCom, runtimeState.pingpongIdx);
-        if constexpr (g_coreType == AIC) {
-            auto c = asc::te::make_tensor(
-                asc::te::make_mem_ptr<asc::te::location::ub, bfloat16_t>(0U),
-                MakeLayout{}(MegaMoeBf16GmmConfig::TILE_M * MegaMoeBf16GmmConfig::GMM1_UB_BUFFER_COUNT,
-                             MegaMoeBf16GmmConfig::TILE_N));
-            RunGmm1Aic<WeightNZ, IsShared>(context, scheduler, addresses, config, first, tiles, c, sync,
-                                           runtimeState.pingpongIdx);
-        } else if (MegaMoeHardwarePolicy::GetSubBlockIdx() == 0U) {
-            RunGmm1Aiv0Epilogue(scheduler, epilogue, addresses, config, first, tiles, runtimeState, sync);
-        }
+    if constexpr (g_coreType == AIC) {
+        RunGmm1Aic<WeightNZ, IsShared>(context, scheduler, addresses, config, first, tiles, runtimeState);
+    } else if (MegaMoeHardwarePolicy::GetSubBlockIdx() == 0U) {
+        RunGmm1Aiv(scheduler, epilogue, addresses, config, first, tiles, runtimeState);
     }
     runtimeState.startBlockIdx = (runtimeState.startBlockIdx + tiles) % job.totalJobs;
 }

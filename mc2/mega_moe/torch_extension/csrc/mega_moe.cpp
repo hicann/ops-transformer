@@ -857,7 +857,7 @@ MemoryBudgetParams BuildMemoryBudgetParams(int64_t epWorldSize, int64_t moeExper
         params.sharedActivationStorage = {MegaMoeImpl::MemoryLayoutDetail::BF16_BITS};
 
         // 与 A16W16 tiling 的中间结果及输入复用策略保持一致。
-        params.reserveGmm1Output = params.topkWeightsPrefetch;
+        params.reserveGmm1Output = false;
         params.reserveCumsum = false;
         params.sharedInputIndependent = false;
     }

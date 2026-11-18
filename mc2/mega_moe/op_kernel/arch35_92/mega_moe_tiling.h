@@ -189,7 +189,7 @@ struct MegaMoeL1Layout {
     uint64_t scaleBOffsets[2];
 };
 
-// BF16 GMM1 使用完整 256×256 计算块，GMM2 保持 128 行分条，不申请 MX scale。
+// BF16 使用 256 行逻辑任务，普通 MMAD 在 L0 按 128 行分条，不申请 MX scale。
 struct MegaMoeBf16GmmConfig {
     static constexpr uint32_t TILE_M = 256U;
     static constexpr uint32_t TILE_N = 256U;
@@ -197,12 +197,10 @@ struct MegaMoeBf16GmmConfig {
     static constexpr uint32_t L0_TILE_M = 128U;
     static constexpr uint32_t L0_TILE_K = 64U;
     static constexpr uint32_t BUFFER_COUNT = 2U;
-    static constexpr uint32_t GMM1_UB_BUFFER_COUNT = 2U;
-    static constexpr uint32_t GMM1_UB_SLOT_BYTES = TILE_M * TILE_N * sizeof(uint16_t);
-    // 非 prefetch 在两个输入槽内原位激活；prefetch 只使用一个输入槽和逐行路由元数据。
-    static constexpr uint32_t ACTIVATION_UB_BYTES = GMM1_UB_BUFFER_COUNT * GMM1_UB_SLOT_BYTES;
-    static constexpr uint32_t PREFETCH_ACTIVATION_UB_BYTES =
-        GMM1_UB_SLOT_BYTES + TILE_M * MegaMoeImpl::MemoryLayoutDetail::ALIGN_32;
+    static constexpr uint32_t GMM1_UB_BUFFER_COUNT = 1U;
+    // 固定输入槽、门控激活输出和逐行路由元数据的最大占用。
+    static constexpr uint32_t ACTIVATION_UB_BYTES =
+        TILE_M * (TILE_N * sizeof(uint16_t) * 3U / 2U + MegaMoeImpl::MemoryLayoutDetail::ALIGN_32);
 };
 
 struct MegaMoeTilingData {

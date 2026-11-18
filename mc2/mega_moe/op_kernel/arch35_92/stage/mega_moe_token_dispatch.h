@@ -149,9 +149,9 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(bool topkWeightsPrefetch, c
     }
     if (topkWeightsPrefetch || IsCombineDedupOn(params.tilingData->compute.dedupMode)) {
         PipeWait<PIPE_MTE2, PIPE_S>(eventId);
-        const uint32_t weightOffsetInElements =
-            (context.quantTokenAlignBytes + context.quantScaleAlignBytes) / sizeof(ActivationType);
-        auto* weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(tokenScaleBuffer + weightOffsetInElements);
+        uint32_t weightOffsetInUb = context.quantTokenAlignBytes + context.quantScaleAlignBytes;
+        auto* weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(
+            reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) + weightOffsetInUb);
         int32_t topkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor.Read(copyStartIdx + copyIdx));
         int32_t weightBits =
             weightBitsTensor[static_cast<uint32_t>(topkIndex % static_cast<int32_t>(params.tilingData->compute.topK))];
