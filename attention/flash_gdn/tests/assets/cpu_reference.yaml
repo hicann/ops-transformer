@@ -1,0 +1,9 @@
+# Native TTK CPU peer collection for FlashGDN cross_check/L2.
+# Start a real CPU xpu-server on this loopback port before running a case.
+remote:
+  endpoints:
+    - host: 127.0.0.1
+      port: 19090
+      providers: [torch]
+      hardware: cpu
+  dispatch_deadline_s: 600
