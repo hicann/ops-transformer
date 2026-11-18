@@ -587,8 +587,9 @@ __aicore__ inline void UpdateSharedExpertGmm1GlobalBuffer(const MoeStageCommonCo
     uint64_t m = commonConfig.tokenNum;
     uint64_t n = commonConfig.gmm1OutputDim;
     uint64_t k = commonConfig.tokenHiddenDim;
+    uint64_t scaleK = Ops::Base::CeilDiv(k, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
     uint64_t activationN = n / commonConfig.activationOutputDivisor;
-    uint64_t scaleN = 0U;
+    uint64_t scaleN = Ops::Base::CeilDiv(activationN, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
     uint64_t expertIdx = sharedExpertIdx;
 
     if constexpr (UseGmOutput) {
@@ -597,14 +598,8 @@ __aicore__ inline void UpdateSharedExpertGmm1GlobalBuffer(const MoeStageCommonCo
     }
     gmmAddrInfo.bGlobal = GetExpertWeightAddr<WeightType>(weights.weight1, gmmConfig.isPerExpertWeightTensor,
                                                           sharedExpertIdx, expertIdx * n * k / weightElemsPerByte);
-    if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
-        uint64_t scaleK = Ops::Base::CeilDiv(k, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-        scaleN = Ops::Base::CeilDiv(activationN, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-        gmmAddrInfo.bScaleGlobal = GetExpertWeightAddr<QuantScaleType>(
-            weights.weightScales1, gmmConfig.isPerExpertWeightTensor, sharedExpertIdx, expertIdx * n * scaleK);
-    } else {
-        gmmAddrInfo.bScaleGlobal = nullptr;
-    }
+    gmmAddrInfo.bScaleGlobal = GetExpertWeightAddr<QuantScaleType>(
+        weights.weightScales1, gmmConfig.isPerExpertWeightTensor, sharedExpertIdx, expertIdx * n * scaleK);
     gmmAddrInfo.activationToGmm2Flag = nullptr;
     if (workspace.mte.sync.sharedActivationReady.get_ptr(workspaceBase) != nullptr) {
         uint64_t sharedActivationFlagElementCount =

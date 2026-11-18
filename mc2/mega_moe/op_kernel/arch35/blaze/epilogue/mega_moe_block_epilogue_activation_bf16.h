@@ -20,8 +20,6 @@ namespace MegaMoeImpl {
 
 class Bf16ActivationEpilogue {
 public:
-    using BlockCoord = AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>;
-
     struct Params {
         GM_ADDR yGmAddr = nullptr;
         float clampLimit = 0.0f;
@@ -43,11 +41,9 @@ public:
         weights_ = reinterpret_cast<__ubuf__ float*>(isGelu ? inputBytes : inputBytes + inputBytes / ACTIVATION_N_HALF);
     }
 
-    __aicore__ inline void UpdateGlobalAddr(const BlockCoord& baseOffset)
+    __aicore__ inline void SetOutputRowOffset(uint64_t rowOffset)
     {
-        // 第一项为输出存储元素偏移，BF16 指针运算按每元素两字节寻址。
-        activationOutputGlobal_ =
-            reinterpret_cast<__gm__ bfloat16_t*>(params_.yGmAddr) + AscendC::Std::get<0>(baseOffset);
+        outputRowOffset_ = rowOffset;
     }
 
     __aicore__ inline void RunTile(GM_ADDR metadata, uint32_t outputWidth, uint32_t row, uint32_t column, uint32_t rows,
@@ -64,8 +60,8 @@ public:
             RunActivation<false>(rows, columns, outputStride);
         }
         PipeFence<PIPE_V, PIPE_MTE3, SYNC_EVENT_ID0>();
-        const uint64_t destinationOffset = static_cast<uint64_t>(row) * outputWidth + column;
-        CopyUbToGm(activationOutputGlobal_ + destinationOffset, output_,
+        const uint64_t destinationOffset = ((outputRowOffset_ + row) * outputWidth + column) * sizeof(bfloat16_t);
+        CopyUbToGm(params_.yGmAddr + destinationOffset, output_,
                    CopyRows{static_cast<uint16_t>(rows), columns * static_cast<uint32_t>(sizeof(bfloat16_t)),
                             static_cast<uint64_t>(outputWidth) * sizeof(bfloat16_t),
                             outputStride * static_cast<uint32_t>(sizeof(bfloat16_t))});
@@ -104,7 +100,7 @@ private:
     }
 
     Params params_{};
-    __gm__ bfloat16_t* activationOutputGlobal_ = nullptr;
+    uint64_t outputRowOffset_ = 0U;
     __ubuf__ bfloat16_t* input_ = nullptr;
     __ubuf__ bfloat16_t* output_ = nullptr;
     __ubuf__ float* weights_ = nullptr;
