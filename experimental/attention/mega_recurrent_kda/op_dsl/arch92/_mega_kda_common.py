@@ -163,7 +163,10 @@ class VariableLengthKDAKernel:
     ):
         gemm = SequenceProjectionStage()
         conv_kernel = SequenceConvStage()
-        # Host supplies compensated raw/Fa/Fb/Beta with their original ABI.
+        gemm.kernel[cores](raw, x, wqkv)
+        gemm.kernel[cores](fa, x, wa)
+        gemm.kernel[cores](decay, fa, wb)
+        gemm.kernel[cores](beta, x, wbeta)
         gemm.kernel[cores](z, x, wz)
         conv_kernel.kernel[self.aiv_per_aic * cores](
             convolved, raw, conv, indices, accepted, cu, wc, conv_stride0
@@ -379,18 +382,6 @@ def execute_sequence(a, prefix, cores, heads):
     z = work(p)
     convolved = work(3 * p)
     gated = work(p)
-    qkv_keep = _frontend._twofold_qkv_projection(
-        x, a["qkv_projection_weight"], raw, cores
-    )
-    fa, decay, auxiliary_keep = _frontend._accurate_auxiliary_projection(
-        padded,
-        a["decay_projection_a_weight"],
-        a["decay_projection_b_weight"],
-        cores,
-    )
-    beta, beta_keep = _frontend._auxiliary_twofold_projection(
-        padded, beta_weight, cores
-    )
     compiled_sequence(heads)(
         out,
         padded,
@@ -443,9 +434,6 @@ def execute_sequence(a, prefix, cores, heads):
         convolved,
         gated,
         out,
-        qkv_keep,
-        auxiliary_keep,
-        beta_keep,
     )
     globals()["_WORKSPACE_KEEP"] = keep
     return out[:total].view(x.shape)

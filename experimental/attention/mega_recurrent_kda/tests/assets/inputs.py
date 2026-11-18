@@ -13,6 +13,7 @@ import csv
 import functools
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 
@@ -23,7 +24,14 @@ _CASE_SUITES = ("interception", "redline", "generalization", "stc", "performance
 
 
 def _row_configuration(row):
-    return json.loads(ast.literal_eval(row["attributes"])["case_config"])
+    config = json.loads(ast.literal_eval(row["attributes"])["case_config"])
+    ranges = ast.literal_eval(row["input_data_ranges"])
+    if "input_specs" in config and len(ranges) == len(NAMES) + 1:
+        for name, limits in zip((*NAMES, "cu_seqlens"), ranges, strict=True):
+            spec = config["input_specs"][name]
+            if spec is not None:
+                spec["low"], spec["high"] = limits
+    return config
 
 
 def selected_architecture():
@@ -114,7 +122,13 @@ def write_csv(path, rows, *, for_ttk=False):
             "PASS_CAPTURE": "kda_ttk_ops.capture",
         }
         for row in records:
-            row["api_name"] = entrypoints[_row_configuration(row)["expected"]]
+            config = _row_configuration(row)
+            row["api_name"] = entrypoints[config["expected"]]
+            attributes = ast.literal_eval(row["attributes"])
+            attributes["case_config"] = json.dumps(
+                config, ensure_ascii=False, separators=(",", ":")
+            )
+            row["attributes"] = repr(attributes)
     with Path(path).open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()
@@ -123,11 +137,19 @@ def write_csv(path, rows, *, for_ttk=False):
 
 @functools.lru_cache(None)
 def load_operator():
-    if __package__ == "assets":
-        from _mega_kda_paths import load_sample
-    else:
-        from .._mega_kda_paths import load_sample
-    return load_sample("mega_recurrent_kda/mega_recurrent_kda.py")
+    """Use the installed extension dispatcher; never silently load checkout DSL."""
+    import importlib
+    from types import SimpleNamespace
+
+    package = os.environ.get("MKDA_TORCH_PACKAGE", "cann_ops_transformer")
+    adapter = importlib.import_module(
+        package + ".ops.attention.mega_recurrent_kda.mega_recurrent_kda"
+    )
+    return SimpleNamespace(
+        mega_recurrent_kda=torch.ops.cann_ops_transformer.mega_recurrent_kda.default,
+        InputValidation=adapter.InputValidation,
+        _implementation_for_device=adapter._implementation_for_device,
+    )
 
 
 # Deterministic tensor construction shared by pytest and TTK.
@@ -175,27 +197,37 @@ def _make(config=None, *, device="cpu", poison=False):
     width = c.get("H", 7168)
     g = torch.Generator().manual_seed(c["seed"])
 
-    def rand(shape, dt=torch.bfloat16, scale=0.02):
+    def rand(name, shape, dt=torch.bfloat16, scale=0.02):
         if device == "meta":
             return torch.empty(shape, dtype=dt, device="meta")
-        return (torch.randn(shape, generator=g) * scale).to(dt)
+        spec = c.get("input_specs", {}).get(name)
+        std = float(spec["std"]) if spec else scale
+        value = torch.randn(shape, generator=g) * std
+        if spec:
+            if spec["mean"]:
+                value.add_(float(spec["mean"]))
+            value.clamp_(float(spec["low"]), float(spec["high"]))
+        return value.to(dt)
 
     xshape = (sum(lengths), width) if c["layout"] == "TH" else (b, s, width)
     tensors = [
-        rand(xshape),
-        rand((3 * p, width)),
-        rand((128, width)),
-        rand((p, 128)),
-        rand((n, width)),
-        rand((p, width)),
-        rand((128,), torch.float32, 0.2),
-        rand((width, p)),
-        rand((4, 3 * p)),
+        rand("hidden_states", xshape),
+        rand("qkv_projection_weight", (3 * p, width)),
+        rand("decay_projection_a_weight", (128, width)),
+        rand("decay_projection_b_weight", (p, 128)),
+        rand("beta_projection_weight", (n, width)),
+        rand("output_gate_projection_weight", (p, width)),
+        rand("output_norm_weight", (128,), torch.float32, 0.2),
+        rand("output_projection_weight", (width, p)),
+        rand("conv1d_weight", (4, 3 * p)),
     ]
-    conv_backing = rand((blocks * c["conv_step"], length, 3 * p))
+    conv_backing = rand("conv_state", (blocks * c["conv_step"], length, 3 * p))
     conv = conv_backing[:: c["conv_step"]]
     cp_backing = rand(
-        (blocks * c["checkpoint_step"], n, 128, 128), torch.float32, 0.002
+        "checkpoint_state",
+        (blocks * c["checkpoint_step"], n, 128, 128),
+        torch.float32,
+        0.002,
     )
     cp = cp_backing[:: c["checkpoint_step"]]
     # 按 PA 块数分配记录池。常规精度用例将未写入区域初始化为零。
@@ -204,7 +236,9 @@ def _make(config=None, *, device="cpu", poison=False):
         _replay_pool(
             torch.full(
                 (blocks * c.get(name + "_step", 1), n, capacity, 128),
-                fill,
+                fill
+                if poison
+                else c.get("input_specs", {}).get(name, {}).get("value", fill),
                 dtype=dt,
                 device=device,
             ),
@@ -227,8 +261,8 @@ def _make(config=None, *, device="cpu", poison=False):
         *records,
         indices,
         counts,
-        rand((n,), torch.float32, 0.1),
-        rand((n, 128), torch.float32, 0.1),
+        rand("A_log", (n,), torch.float32, 0.1),
+        rand("dt_bias", (n, 128), torch.float32, 0.1),
     ]
     if device == "meta":
         cu = (
@@ -261,6 +295,14 @@ def _make(config=None, *, device="cpu", poison=False):
         args["conv1d_weight"] = (
             grouped if form == "per_head" else grouped[:, 0]
         ).contiguous()
+    if device != "meta" and not poison:
+        for name, spec in c.get("input_specs", {}).items():
+            value = args[name]
+            if spec is None or value is None or not value.numel():
+                continue
+            low, high = torch.aminmax(value)
+            if not (float(low) >= spec["low"] and float(high) <= spec["high"]):
+                raise ValueError(f"{name} violates its CSV input_data_ranges")
     return args, dict(conv=conv_backing, checkpoint=cp_backing), c
 
 
@@ -274,12 +316,12 @@ def to_npu(args):
             continue
         if name in PA_POOLS:
             # Preserve genuine PA gaps; this is allocation/copy, not arithmetic.
-            actual = torch.empty_strided(
-                value.shape, value.stride(), dtype=value.dtype, device="npu"
+            elements = value.untyped_storage().nbytes() // value.element_size()
+            backing = torch.empty(elements, dtype=value.dtype, device="npu")
+            backing.fill_(43.0)
+            actual = backing.as_strided(
+                value.shape, value.stride(), value.storage_offset()
             )
-            if value.numel() > 0:
-                span = (value.shape[0] - 1) * value.stride(0) + value[0].numel()
-                actual.as_strided((span,), (1,)).fill_(43.0)
             actual.copy_(value)
         else:
             actual = value.npu()
@@ -325,6 +367,16 @@ def manifest(args):
             import torch_npu
 
             entry["npu_format"] = int(torch_npu.get_npu_format(t))
+        if name in PA_POOLS:
+            elements = t.untyped_storage().nbytes() // t.element_size()
+            payload = math.prod(t.shape[1:])
+            entry["storage_elements"] = elements
+            entry["storage_bytes"] = elements * t.element_size()
+            entry["storage_shape"] = (
+                [elements // payload, *t.shape[1:]]
+                if payload and elements % payload == 0
+                else [elements]
+            )
         result[name] = entry
     return result
 

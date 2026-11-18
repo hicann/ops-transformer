@@ -58,6 +58,7 @@ Dimension numbers in prose are one-based. Code expressions such as `shape[2]` an
 ### Dimension symbols
 
 - `B` Number of logical requests. For BSH, use the first input dimension. For TH, use `cu_seqlens.numel() - 1`.
+- `b` Model batch used in the specialized-path condition, where `B = b * TP`.
 - `seq_len` Number of tokens per request in BSH.
 - `total_tokens` Total tokens across all requests in TH.
 - `H` Hidden dimension, fixed at 7168.
@@ -70,35 +71,35 @@ Dimension numbers in prose are one-based. Code expressions such as `shape[2]` an
 
 ### Parameter table
 
-| Parameter | Input/output | Dtype/format | Shape or value | Description |
-| --- | --- | --- | --- | --- |
-| `hidden_states` | Input | BF16 / ND | `[B, seq_len, H]` or `[total_tokens, H]` | Hidden states in BSH or TH layout. |
-| `qkv_projection_weight` | Input | BF16 / NZ | `[3*P,H]` | Joint query, key, and value projection weights. |
-| `decay_projection_a_weight` | Input | BF16 / NZ | `[D,H]` | First decay projection, from hidden width to head width. |
-| `decay_projection_b_weight` | Input | BF16 / NZ | `[P,D]` | Second decay projection, from head width to all head channels. |
-| `beta_projection_weight` | Input | BF16 / NZ | `[N,H]` | Projects one beta logit per head. |
-| `output_gate_projection_weight` | Input | BF16 / NZ | `[P,H]` | Projects the output gate logits. |
-| `output_norm_weight` | Input | FP32 / ND | `[D]` | Per-channel RMSNorm weight shared by all heads. |
-| `output_projection_weight` | Input | BF16 / NZ | `[H,P]` | Projects concatenated head outputs to hidden width. |
-| `conv1d_weight` | Input | BF16 / ND | `[4,3*P]`, `[3,N,4,D]` or `[3,4,D]` | Four-tap causal convolution weights. |
-| `conv_state` | Input/output | BF16 / ND | `[block_num,L,3*P]`, writable | Convolution history pool. |
-| `checkpoint_state` | Input | FP32 / ND | `[block_num,N,D,D]`, read-only | Read-only initial recurrent state. |
-| `replay_u` | Input/output | FP32 / ND | `[block_num,N,S,D]`, writable update vectors | Replay update vectors. |
-| `replay_k` | Input/output | FP16 / ND | `[block_num,N,S,D]`, writable normalized keys | Replay normalized keys. |
-| `replay_decay` | Input/output | FP32 / ND | `[block_num,N,S,D]`, writable exponentiated decay factors | Replay exponentiated decay factors. |
-| `state_indices` | Input | int32 / ND | `[B]`, unique block indices | Shared physical block index for each request. |
-| `conv_num_accepted_tokens` | Input | int32 / ND | `[B]`, Conv history counts in `[0,L-2]` | Selects the convolution history window for each request. |
-| `A_log` | Input | FP32 / ND | `[N]`, log decay parameter | Log decay parameter per head. |
-| `dt_bias` | Input | FP32 / ND | `[N,D]`, decay bias | Decay bias per head and channel. |
-| `scale` | Input | FP32 scalar | Query scale, typically `D**-0.5` | Scales normalized queries. |
-| `lower_bound` | Input | FP32 scalar | Decay bound in `[-5,0]` | Lower bound of the log decay gate. |
-| `rms_norm_eps` | Input | FP32 scalar | Positive normal value, default `1e-5` | Epsilon for output RMSNorm. |
-| `cu_seqlens` | Input | int32/int64 / ND | `[B+1]` prefix sums for TH, `None` for BSH | Cumulative token counts for TH. Use None for BSH. |
-| `out` | Output | BF16 / ND | `[B,seq_len,H]` / `[total_tokens,H]` | Main output, with the same shape as the input. |
+| Parameter | Input/output/attribute | Required/optional | Dtype/format | Shape or value | Description |
+| --- | --- | --- | --- | --- | --- |
+| `hidden_states` | Input | Required | BF16 / ND | `[B, seq_len, H]` or `[total_tokens, H]` | Hidden states in BSH or TH layout. |
+| `qkv_projection_weight` | Input | Required | BF16 / NZ | `[3*P,H]` | Joint query, key, and value projection weights. |
+| `decay_projection_a_weight` | Input | Required | BF16 / NZ | `[D,H]` | First decay projection, from hidden width to head width. |
+| `decay_projection_b_weight` | Input | Required | BF16 / NZ | `[P,D]` | Second decay projection, from head width to all head channels. |
+| `beta_projection_weight` | Input | Required | BF16 / NZ | `[N,H]` | Projects one beta logit per head. |
+| `output_gate_projection_weight` | Input | Required | BF16 / NZ | `[P,H]` | Projects the output gate logits. |
+| `output_norm_weight` | Input | Required | FP32 / ND | `[D]` | Per-channel RMSNorm weight shared by all heads. |
+| `output_projection_weight` | Input | Required | BF16 / NZ | `[H,P]` | Projects concatenated head outputs to hidden width. |
+| `conv1d_weight` | Input | Required | BF16 / ND | `[4,3*P]`, `[3,N,4,D]` or `[3,4,D]` | Four-tap causal convolution weights. |
+| `conv_state` | Input/output | Required | BF16 / ND | `[block_num,L,3*P]`, writable | Convolution history pool. |
+| `checkpoint_state` | Input | Required | FP32 / ND | `[block_num,N,D,D]`, read-only | Read-only initial recurrent state. |
+| `replay_u` | Input/output | Required | FP32 / ND | `[block_num,N,S,D]`, writable update vectors | Replay update vectors. |
+| `replay_k` | Input/output | Required | FP16 / ND | `[block_num,N,S,D]`, writable normalized keys | Replay normalized keys. |
+| `replay_decay` | Input/output | Required | FP32 / ND | `[block_num,N,S,D]`, writable exponentiated decay factors | Replay exponentiated decay factors. |
+| `state_indices` | Input | Required | int32 / ND | `[B]`, unique block indices | Shared physical block index for each request. |
+| `conv_num_accepted_tokens` | Input | Required | int32 / ND | `[B]`, Conv history counts in `[0,L-2]` | Selects the convolution history window for each request. |
+| `A_log` | Input | Required | FP32 / ND | `[N]`, log decay parameter | Log decay parameter per head. |
+| `dt_bias` | Input | Required | FP32 / ND | `[N,D]`, decay bias | Decay bias per head and channel. |
+| `scale` | Attribute | Required | FP32 scalar | Query scale, typically `D**-0.5` | Scales normalized queries. |
+| `lower_bound` | Attribute | Required | FP32 scalar | Decay bound in `[-5,0]` | Lower bound of the log decay gate. |
+| `rms_norm_eps` | Attribute | Optional (default `1e-5`) | FP32 scalar | Positive normal value | Epsilon for output RMSNorm. |
+| `cu_seqlens` | Input | Optional (required for TH) | int32/int64 / ND | `[B+1]` prefix sums for TH, `None` for BSH | Cumulative token counts for TH. Use None for BSH. |
+| `out` | Output | — | BF16 / ND | `[B,seq_len,H]` / `[total_tokens,H]` | Main output, with the same shape as the input. |
 
 ## Returns
 
-The result is `(out, conv_state, replay_u, replay_k, replay_decay)`. `out` is BF16 with the shape of `hidden_states`. The other four entries alias their corresponding input pools.
+The result is `(out, conv_state, replay_u, replay_k, replay_decay)`. `out` is BF16 with the shape of `hidden_states`. The other four entries alias their corresponding input pools. Their storage layouts are preserved. `checkpoint_state` is read-only.
 
 ## Constraints
 
@@ -149,49 +150,58 @@ Groups follow the computation stages and field roles. Supply all required inputs
 
 ### Constraints by parameter group
 
+Each constraint is annotated with its interception behavior:
+
+- [Enforced] Checked synchronously at call time. Violations raise `ValueError` or `TypeError`, and no state pool is modified (atomic rejection). The checks cover shapes, dtypes, formats, layouts, scalar ranges, and storage aliasing. They do not validate tensor contents (such as weight, `A_log`, `dt_bias`, or checkpoint values); content correctness is the caller's responsibility.
+- [Enforced on host] Value checks that must copy device tensors to the host. These value checks are skipped during graph capture; the caller must write valid values before replay (see [Graph capture](#graph-capture)).
+- [Not enforced] Cases where the operator performs no check or none is needed, including content and semantic contracts owned by the caller, and results guaranteed by the operator's own execution behavior.
+- Within a single constraint, mixed statements are annotated individually.
+
 #### Common
 
-- **Single-parameter constraints** `hidden_states` is BF16/ND with hidden width 7168. BSH requires positive batch and sequence lengths. TH requires a positive token count. The total token count is below `2**31` in both layouts.
+- **Single-parameter constraints** [Enforced] `hidden_states` is BF16/ND with hidden width 7168. BSH requires positive batch and sequence lengths. TH requires a positive token count. The batch satisfies `1 <= B <= block_num`. The total token count is below `2**31` in both layouts (host-side value check, skipped during graph capture).
 
-- **Presence constraints** The interface is for inference. Supply every input except `rms_norm_eps` and `cu_seqlens`, which are optional. Use ordinary tensors and call `.detach()` on Parameter objects first.
+- **Presence constraints** [Enforced] The interface is for inference. Supply every input except `rms_norm_eps` and `cu_seqlens`; missing arguments are rejected by the interface schema. Use ordinary tensors and call `.detach()` on Parameter objects first; undetached Parameter inputs are rejected.
 
-- **Consistency constraints** All tensors reside on the same NPU. The main output matches the input shape, layout, and dtype.
+- **Consistency constraints** [Enforced] All tensors reside on the same NPU; device consistency is checked per tensor, and NPU devices are required. The main output matches the input shape, layout, and dtype (not enforced: the operator allocates the output from the input shape and layout, so this holds by construction).
 
-- **Cross-feature constraints** Convert the six projection weights to NZ before calling. Other tensors use ND. Input tensors outside the five state pools must be contiguous.
+- **Cross-feature constraints** [Enforced] Convert the six projection weights to NZ before calling. Other tensors use ND. NZ/ND formats are checked per tensor. Input tensors outside the five state pools must be contiguous.
 
 #### QKV projection
 
-- **Single-parameter constraints** `qkv_projection_weight` is BF16/NZ with shape `[3*P,H]`, in Q, K, V order.
+- **Single-parameter constraints** [Enforced] `qkv_projection_weight` is BF16/NZ with shape `[3*P,H]`, in Q, K, V order. The Q, K, V channel ordering is a content contract (not enforced: the operator splits channels in a fixed order and does not inspect the weight contents).
 
-- **Cross-feature constraints** Its input width matches `H` in `hidden_states`. Its `3*P` output channels match the Conv weights and history pool.
+- **Cross-feature constraints** [Enforced] Its input width matches `H` in `hidden_states`. Its `3*P` output channels match the Conv weights and history pool (the Conv weight shape enumeration and the third dimension of `conv_state` are both checked against the same `3*P`).
 
 #### Causal Conv1D
 
-- **Single-parameter constraints** `conv1d_weight` accepts `[4,3*P]`, `[3,N,4,D]`, or `[3,4,D]` with four taps. `conv_state` is BF16/ND with shape `[block_num,L,3*P]` and `L >= 3`.
+- **Single-parameter constraints** [Enforced] `conv1d_weight` accepts `[4,3*P]`, `[3,N,4,D]`, or `[3,4,D]` with four taps. `conv_state` is BF16/ND with shape `[block_num,L,3*P]`, `L >= 3`, and a positive `block_num`.
 
-- **Consistency constraints** `conv_num_accepted_tokens` is an int32 tensor of shape `[B]` with values in `[0,L-2]`. Read three history rows starting at `max(count-1,0)`. Copy the last two rows to the start of the block and append the current raw QKV projections.
+- **Consistency constraints** [Enforced on host] `conv_num_accepted_tokens` is an int32 tensor of shape `[B]` with values in `[0,L-2]`. Reading three history rows starting at `max(count-1,0)`, copying the last two rows to the start of the block, and appending the current raw QKV projections are execution behavior (not enforced); whether the count is semantically consistent with the true history length is the caller's responsibility (not enforced).
 
-- **Cross-feature constraints** Select history blocks with `state_indices`. For a longest request of `max_seq_len` tokens, require `L >= max_seq_len + 2`.
+- **Cross-feature constraints** [Enforced] Select history blocks with `state_indices`. For a longest request of `max_seq_len` tokens, require `L >= max_seq_len + 2` (checked at the entry point for BSH; for TH it depends on host-side sequence lengths and is skipped during graph capture).
 
 #### Decay projection and gating
 
-- **Single-parameter constraints** Both projection weights are BF16/NZ with shapes `[D,H]` and `[P,D]`, respectively. `A_log` and `dt_bias` are FP32/ND. `lower_bound` is finite FP32 in `[-5,0]`.
+- **Single-parameter constraints** [Enforced] Both projection weights are BF16/NZ with shapes `[D,H]` and `[P,D]`, respectively. `A_log` and `dt_bias` are FP32/ND. `lower_bound` is finite FP32 in `[-5,0]`.
 
-- **Consistency constraints** The first projection output width matches the second projection input width `D`. The second output is grouped as `[N,D]`, aligned by head with `A_log[N]` and `dt_bias[N,D]`.
+- **Consistency constraints** [Enforced] The first projection output width matches the second projection input width `D`. The second output is grouped as `[N,D]`, aligned by head with `A_log[N]` and `dt_bias[N,D]`.
 
 #### Beta projection and query scaling
 
-- **Single-parameter constraints** `beta_projection_weight` is BF16/NZ with shape `[N,H]`. `scale` must be representable as finite FP32, commonly `D**-0.5`. Q/K normalization uses a fixed `1e-6`.
+- **Single-parameter constraints** [Enforced] `beta_projection_weight` is BF16/NZ with shape `[N,H]`. `scale` must be representable as finite FP32; its actual value is unrestricted (not enforced: the common value is `D**-0.5`, and the numerical effect is the caller's responsibility). Q/K normalization uses a fixed `1e-6` (a compile-time constant, no check needed).
 
-- **Cross-feature constraints** `N` is 24, 12, or 6 for TP4, TP8, or TP16. All weights and state pools use the same `N` and `D=128`.
+- **Cross-feature constraints** [Enforced] `N` is 24, 12, or 6 for TP4, TP8, or TP16. All weights and state pools use the same `N` and `D=128`.
 
 #### Paged recurrence and replay
 
-- **Single-parameter constraints** `state_indices` is an int32 tensor of shape `[B]`. Its indices are distinct within a call and in `[0,block_num)`. Block 0 is valid. `checkpoint_state` is read-only.
+- **Single-parameter constraints** [Enforced on host] `state_indices` is an int32 tensor of shape `[B]`. Its indices are distinct within a call and in `[0,block_num)` (including block 0, which is an ordinary valid block). Index range and uniqueness checks read values to the host and are skipped during graph capture. `checkpoint_state` being read-only is a behavioral promise (not enforced: the operator never writes to this pool, so no check is needed).
 
-- **Consistency constraints** The replay pools share shape `[block_num,N,S,D]`. They store FP32 update vectors, FP16 normalized keys, and FP32 exponentiated decay factors. Writes cover only valid token prefixes in the selected blocks, preserving other blocks, record tails, and inter-block gaps.
+- **Consistency constraints** [Enforced] The replay pools share shape `[block_num,N,S,D]`. They store FP32 update vectors, FP16 normalized keys, and FP32 exponentiated decay factors, with a positive `S`. Writing only valid token prefixes in the selected blocks while preserving other blocks, record tails, and inter-block gaps is execution behavior (not enforced).
 
-- **Cross-feature constraints** Conv, checkpoint, and the three replay pools share `block_num` and the physical block selected for each request. Each pool can have its own `stride(0)` of at least one block in elements. The remaining axes must be contiguous. The four writable pools require `requires_grad=False` and storage regions disjoint from other inputs. Replay capacity must satisfy `S >= max_seq_len`.
+- **Cross-feature constraints** [Enforced] Conv, checkpoint, and the three replay pools share `block_num` and the physical block selected for each request. Each pool can have its own `stride(0)` of at least one block in elements. The remaining axes must be contiguous. The four writable pools require `requires_grad=False` and storage regions disjoint from other inputs (aliasing is checked pairwise). Replay capacity must satisfy `S >= max_seq_len` (checked at the entry point for BSH; for TH it depends on host-side sequence lengths and is skipped during graph capture).
+
+For `state_indices=[5,0]` and sequence lengths of one and three, the call writes the first replay record in block 5 and the first three records in block 0. Other records retain their values. A Conv count of 2 for the second request starts the history read at row 1 in block 0.
 
 Compute the replay offset in elements of the corresponding pool's dtype.
 
@@ -201,25 +211,31 @@ slot * replay.stride(0) + (head * S + token) * D + channel
 
 #### Output normalization, gating, and projection
 
-- **Single-parameter constraints** `output_norm_weight` is an FP32/ND tensor of shape `[D]`. Gate and output projection weights are BF16/NZ with shapes `[P,H]` and `[H,P]`. `rms_norm_eps` must be a positive normal FP32 value.
+- **Single-parameter constraints** [Enforced] `output_norm_weight` is an FP32/ND tensor of shape `[D]`. Gate and output projection weights are BF16/NZ with shapes `[P,H]` and `[H,P]`. `rms_norm_eps` must be a positive normal FP32 value.
 
-- **Presence constraints** The default `rms_norm_eps` is `1e-5`.
+- **Presence constraints** [Enforced] The default `rms_norm_eps` is `1e-5` (guaranteed by the interface default value).
 
-- **Cross-feature constraints** All heads share the RMSNorm weight. The gate projection aligns with the `P` concatenated channels, and the final projection restores width `H`.
+- **Cross-feature constraints** [Enforced] All heads share the RMSNorm weight. The gate projection aligns with the `P` concatenated channels, and the final projection restores width `H`.
 
 #### Variable-length input
 
-- **Single-parameter constraints** `cu_seqlens` is a contiguous int32 or int64 ND tensor of shape `[B+1]`.
+- **Single-parameter constraints** [Enforced] `cu_seqlens` is a contiguous int32 or int64 ND tensor of shape `[B+1]`.
 
-- **Presence constraints** TH requires `cu_seqlens`. BSH uses `None`.
+- **Presence constraints** [Enforced] TH requires `cu_seqlens`. BSH uses `None`.
 
-- **Consistency constraints** Prefix sums start at zero, increase strictly, and end at `total_tokens`. Each consecutive difference gives the corresponding request length.
+- **Consistency constraints** [Enforced on host] Prefix sums start at zero, increase strictly, and end at `total_tokens`. Each consecutive difference gives the corresponding request length. The value check reads data to the host and is skipped during graph capture.
 
-- **Cross-feature constraints** The largest consecutive difference determines `max_seq_len` for Conv and replay capacity checks. TH reads prefix sums on the host and cannot be captured.
+- **Cross-feature constraints** [Enforced on host] The largest consecutive difference determines `max_seq_len` for Conv and replay capacity checks. TH reads prefix sums on the host and cannot be captured (an execution restriction rather than a check; it cannot be intercepted inside the operator, so callers must avoid capturing TH inputs).
 
 ### Graph capture
 
-Warm up compilation and workspace allocation before capturing BSH inputs. During capture the wrapper retains static checks and skips device-value checks and wrapper event waits and recording. Use valid block indices and Conv counts before replay. Manage the graph and shared workspace lifetimes and serialize their use. TH reads its prefix sums on the host and cannot be captured.
+Graph capture here means ACL Graph stream capture through `torch_npu.npu.NPUGraph` / `torch_npu.npu.graph`.
+BSH supports graph capture. Warm up operator compilation and workspace allocation before capture. Static parameter checks remain enabled; device-value checks and wrapper event waits and recording are skipped during capture.
+Repeated zero block indices may be used as placeholders during capture. Before replay, supply valid, distinct block indices and valid Conv counts. Ordinary calls, including warm-up before capture, still perform value checks.
+The shared call lock and completion event protect workspace and pool reuse. The caller manages graph and shared workspace lifetimes and serializes their use.
+The general BSH path generates equally spaced sequence prefixes on the device. TH reads `cu_seqlens` on the host to select its execution path and cannot be captured.
+
+The Torch extension registers Meta and PrivateUse1 implementations for `torch.ops.cann_ops_transformer.mega_recurrent_kda`. The operator can be called directly when building graphs with TorchDynamo.
 
 ### Execution path and core quotas
 
@@ -234,7 +250,7 @@ Set `KDA_ARCH=arch92` to select the arch92 cases when running pytest or exportin
 
 ## Usage example
 
-This BSH example uses `hidden_states` of shape `[2,4,7168]`. Prepare the weights and remaining inputs as specified in the parameter tables.
+This BSH example uses BF16/ND `hidden_states` of shape `[2,4,7168]`. Prepare the six NZ projection weights, `conv1d_weight`, `output_norm_weight`, `A_log`, and `dt_bias` as specified in the parameter table. Install the operator package and PyTorch extension built from this repository and import the extension to register the interface. The example uses the default extension package name `cann_ops_transformer`; the name depends on the build configuration.
 
 ```python
 import torch
@@ -251,6 +267,7 @@ replay_u = torch.zeros(2*block_num, N, S, D, dtype=torch.float32, device=device)
 replay_k = torch.zeros(3*block_num, N, S, D, dtype=torch.float16, device=device)[::3]
 replay_decay = torch.zeros(4*block_num, N, S, D, dtype=torch.float32, device=device)[::4]
 state_indices = torch.tensor([5, 0], dtype=torch.int32, device=device)
+conv_num_accepted_tokens = torch.zeros(2, dtype=torch.int32, device=device)
 
 out, conv_state, replay_u, replay_k, replay_decay = torch.ops.cann_ops_transformer.mega_recurrent_kda(
     hidden_states=hidden_states,

@@ -111,11 +111,8 @@ if __package__:
         S4ProjectionScheduleFrontendOperations,
         S4ProjectionStage,
         SequenceConvStage,
-        _accurate_auxiliary_projection,
-        _auxiliary_twofold_projection,
-        _twofold_qkv_projection,
-        prepare_optimized_precision,
         SequenceProjectionStage,
+        FullKFaProjectionStage,
         TP16GridScheduleFrontendOperations,
         TP16S4AuxiliarySchedule,
         TP4AuxiliaryScheduleFrontendOperations,
@@ -195,11 +192,8 @@ else:
         S4ProjectionScheduleFrontendOperations,
         S4ProjectionStage,
         SequenceConvStage,
-        _accurate_auxiliary_projection,
-        _auxiliary_twofold_projection,
-        _twofold_qkv_projection,
-        prepare_optimized_precision,
         SequenceProjectionStage,
+        FullKFaProjectionStage,
         TP16GridScheduleFrontendOperations,
         TP16S4AuxiliarySchedule,
         TP4AuxiliaryScheduleFrontendOperations,
@@ -1248,7 +1242,7 @@ class TP4DelayedProjectionSchedule:
             q,
             k,
             v,
-            initial.accurate_decay,
+            decay,
             beta,
             initial,
             replay_u,
@@ -1419,7 +1413,7 @@ class S4DelayedGateSchedule:
             q,
             k,
             v,
-            initial.accurate_decay,
+            decay,
             beta,
             initial,
             replay_u,
@@ -1807,7 +1801,6 @@ class TP4S8Dispatch(TP4S8DefaultStage):
             conv.stride0,
             conv.length,
             3 * self.heads * TILE,
-            conv.accurate_raw,
         )
         wc = wc.view((3, self.heads, CONV_KERNEL, TILE))
         if (
@@ -1972,15 +1965,9 @@ class TP4TPOptimizedKernel:
         width,
         policy,
         selector,
-        accurate_raw,
-        accurate_decay,
     ):
-        initial = _CheckpointPool(
-            checkpoint, indices, checkpoint_stride0, accurate_decay
-        )
-        conv = _ConvPool(
-            conv, conv_stride0, conv_length, 3 * TP4_HEADS * TILE, accurate_raw
-        )
+        initial = _CheckpointPool(checkpoint, indices, checkpoint_stride0)
+        conv = _ConvPool(conv, conv_stride0, conv_length, 3 * TP4_HEADS * TILE)
         u = ReplayPool(replay_u, indices, u_stride0, TP4_HEADS, record_s)
         rk = ReplayPool(replay_k, indices, k_stride0, TP4_HEADS, record_s)
         rd = ReplayPool(replay_decay, indices, decay_stride0, TP4_HEADS, record_s)
@@ -2143,8 +2130,6 @@ class TP4TPOptimizedKernel:
         policy,
         selector,
         cores,
-        accurate_raw,
-        accurate_decay,
     ):
         self.device[cores](
             out,
@@ -2188,9 +2173,39 @@ class TP4TPOptimizedKernel:
             width,
             policy,
             selector,
-            accurate_raw,
-            accurate_decay,
         )
+
+
+class FullKFaProjectionKernel:
+    """Accumulate the complete Fa K dimension in one Cube accumulator."""
+
+    @kernel
+    def device(self, out, x, weight):
+        onchip_rewind(reset_sync_id=True)
+        stage = FullKFaProjectionStage()
+        stage.project(out, x, weight)
+
+    @host
+    def run(self, out, x, weight, cores):
+        self.device[cores](out, x, weight)
+
+
+@functools.lru_cache(None)
+def _fullk_fa_handle(device):
+    rows = cannbotdsl.Dim("fa_rows", min=TILE, multiple_of=TILE)
+    return cannbotdsl.compile(
+        FullKFaProjectionKernel().run,
+        TensorSpec((rows, D), dtypes.float32),
+        TensorSpec((rows, HIDDEN_SIZE), dtypes.bfloat16),
+        TensorSpec((D, HIDDEN_SIZE), dtypes.bfloat16, storage_format="nz"),
+        dtypes.int64,
+    )
+
+
+def _project_fullk_fa(x, weight, cores):
+    fp32 = torch.empty((x.shape[0], D), dtype=torch.float32, device=x.device)
+    _fullk_fa_handle(x.device)(fp32, x, weight, cores)
+    return fp32.to(torch.bfloat16), fp32
 
 
 class TP4VariableLengthKDAKernel:
@@ -2301,6 +2316,10 @@ class TP4VariableLengthKDAKernel:
         eps,
         cores,
     ):
+        self.project[cores](raw, x, wqkv)
+        # Fa is computed by the shared full-K Cube projection before launch.
+        self.project[cores](decay, fa, wb)
+        self.project[cores](beta, x, wbeta)
         self.project[cores](z, x, wz)
         self.convolve[2 * cores](
             convolved, raw, conv, indices, accepted, cu, wc, conv_stride0
@@ -3022,7 +3041,7 @@ class TP8DelayedProjectionSchedule:
             q,
             k,
             v,
-            initial.accurate_decay,
+            decay,
             beta,
             initial,
             replay_u,
@@ -3209,7 +3228,7 @@ class _HeadStreamSchedule(TP8DelayedProjectionSchedule):
             q,
             k,
             v,
-            initial.accurate_decay,
+            decay,
             beta,
             initial,
             replay_u,
@@ -3395,7 +3414,6 @@ def _execute_stream_prefix_tail(
             conv.stride0,
             conv.length,
             conv.width,
-            conv.accurate_raw[prefix_rows:total_rows, None],
         ),
         state_indices[prefix_batch:total_batch,],
         conv_accepted[prefix_batch:total_batch,],
@@ -3757,7 +3775,6 @@ class TP8S8Dispatch(TP8S8DefaultStage):
             conv.stride0,
             conv.length,
             3 * self.heads * TILE,
-            conv.accurate_raw,
         )
         wc = wc.view((3, self.heads, CONV_KERNEL, TILE))
         if (
@@ -3979,15 +3996,9 @@ class TP8TPOptimizedKernel:
         width,
         policy,
         selector,
-        accurate_raw,
-        accurate_decay,
     ):
-        initial = _CheckpointPool(
-            checkpoint, indices, checkpoint_stride0, accurate_decay
-        )
-        conv = _ConvPool(
-            conv, conv_stride0, conv_length, 3 * TP8_HEADS * TILE, accurate_raw
-        )
+        initial = _CheckpointPool(checkpoint, indices, checkpoint_stride0)
+        conv = _ConvPool(conv, conv_stride0, conv_length, 3 * TP8_HEADS * TILE)
         u = ReplayPool(replay_u, indices, u_stride0, TP8_HEADS, record_s)
         rk = ReplayPool(replay_k, indices, k_stride0, TP8_HEADS, record_s)
         rd = ReplayPool(replay_decay, indices, decay_stride0, TP8_HEADS, record_s)
@@ -4187,8 +4198,6 @@ class TP8TPOptimizedKernel:
         policy,
         selector,
         cores,
-        accurate_raw,
-        accurate_decay,
     ):
         self.device[cores](
             out,
@@ -4232,8 +4241,6 @@ class TP8TPOptimizedKernel:
             width,
             policy,
             selector,
-            accurate_raw,
-            accurate_decay,
         )
 
 
@@ -4345,6 +4352,10 @@ class TP8VariableLengthKDAKernel:
         eps,
         cores,
     ):
+        self.project[cores](raw, x, wqkv)
+        # Fa is computed by the shared full-K Cube projection before launch.
+        self.project[cores](decay, fa, wb)
+        self.project[cores](beta, x, wbeta)
         self.project[cores](z, x, wz)
         self.convolve[2 * cores](
             convolved, raw, conv, indices, accepted, cu, wc, conv_stride0
@@ -4554,7 +4565,7 @@ class TP16GridSchedule(
                     q_workspace_gm,
                     k_workspace_gm,
                     v_workspace_gm,
-                    initial_state_gm.accurate_decay,
+                    decay_workspace_gm,
                     output_gate_workspace_gm,
                     beta_workspace_gm,
                     initial_state_gm,
@@ -5108,7 +5119,7 @@ class _ResidentDelayedZSchedule(TP16GridSchedule):
             q,
             k,
             v,
-            initial.accurate_decay,
+            decay,
             beta,
             initial,
             replay_u,
@@ -5333,7 +5344,6 @@ class TP16S8Dispatch(TP16S8DefaultStage):
             conv.stride0,
             conv.length,
             3 * self.heads * TILE,
-            conv.accurate_raw,
         )
         wc = wc.view((3, self.heads, CONV_KERNEL, TILE))
         if (
@@ -5494,15 +5504,9 @@ class TP16TPOptimizedKernel:
         width,
         policy,
         selector,
-        accurate_raw,
-        accurate_decay,
     ):
-        initial = _CheckpointPool(
-            checkpoint, indices, checkpoint_stride0, accurate_decay
-        )
-        conv = _ConvPool(
-            conv, conv_stride0, conv_length, 3 * TP16_HEADS * TILE, accurate_raw
-        )
+        initial = _CheckpointPool(checkpoint, indices, checkpoint_stride0)
+        conv = _ConvPool(conv, conv_stride0, conv_length, 3 * TP16_HEADS * TILE)
         u = ReplayPool(replay_u, indices, u_stride0, TP16_HEADS, record_s)
         rk = ReplayPool(replay_k, indices, k_stride0, TP16_HEADS, record_s)
         rd = ReplayPool(replay_decay, indices, decay_stride0, TP16_HEADS, record_s)
@@ -5627,8 +5631,6 @@ class TP16TPOptimizedKernel:
         policy,
         selector,
         cores,
-        accurate_raw,
-        accurate_decay,
     ):
         self.device[cores](
             out,
@@ -5672,8 +5674,6 @@ class TP16TPOptimizedKernel:
             width,
             policy,
             selector,
-            accurate_raw,
-            accurate_decay,
         )
 
 
@@ -5785,6 +5785,10 @@ class TP16VariableLengthKDAKernel:
         eps,
         cores,
     ):
+        self.project[cores](raw, x, wqkv)
+        # Fa is computed by the shared full-K Cube projection before launch.
+        self.project[cores](decay, fa, wb)
+        self.project[cores](beta, x, wbeta)
         self.project[cores](z, x, wz)
         self.convolve[2 * cores](
             convolved, raw, conv, indices, accepted, cu, wc, conv_stride0
@@ -5876,8 +5880,6 @@ def _optimized_specification(sequence, heads, tp):
         dtypes.int64,
         dtypes.int64,
         dtypes.int64,
-        nd((rows, 3 * p), fp),
-        nd((rows, p)),
     )
 
 
@@ -5989,9 +5991,6 @@ class _TPImplementation:
             self._workspaces[key] = (views, norm)
         views, norm = self._workspaces[key]
 
-        accurate_raw, accurate_decay, precision_keep = prepare_optimized_precision(
-            x, a, self.heads, cores
-        )
         model_batch = batch // self.tp
         if sequence == S8_SEQUENCE_LENGTH:
             selected = self.plan(model_batch, self.tp, cores)
@@ -6046,16 +6045,11 @@ class _TPImplementation:
             a["rms_norm_eps"],
             *geometry,
             cores,
-            accurate_raw,
-            accurate_decay,
         )
         return out.view(a["hidden_states"].shape), (
             views,
             norm,
             out,
-            accurate_raw,
-            accurate_decay,
-            precision_keep,
         )
 
     def execute_variable(self, a, prefix, cores):
@@ -6100,14 +6094,9 @@ class _TPImplementation:
 
         out = work(HIDDEN_SIZE)
         raw = work(3 * p, torch.float32)
-        qkv_keep = _twofold_qkv_projection(x, a["qkv_projection_weight"], raw, cores)
-        fa, decay, decay_keep = _accurate_auxiliary_projection(
-            padded,
-            a["decay_projection_a_weight"],
-            a["decay_projection_b_weight"],
-            cores,
-        )
-        beta, beta_keep = _auxiliary_twofold_projection(padded, beta_weight, cores)
+        fa, fa_fp32 = _project_fullk_fa(padded, a["decay_projection_a_weight"], cores)
+        decay = work(p)
+        beta = work(TILE)
         z = work(p)
         convolved = work(3 * p)
         gated = work(p)
@@ -6163,9 +6152,7 @@ class _TPImplementation:
             convolved,
             gated,
             out,
-            qkv_keep,
-            decay_keep,
-            beta_keep,
+            fa_fp32,
         )
         return out[:total].view(x.shape), keep
 
@@ -6299,21 +6286,7 @@ def mega_recurrent_kda(
 
 @export("mega_recurrent_kda")
 def export_mega_recurrent_kda():
-    """统一导出补偿投影及三个 TP 的 S8、S4 和变长内核。"""
-    if __package__:
-        from .mega_recurrent_kda_frontend import (
-            _get_auxiliary_compiled,
-            _get_twofold_compiled,
-        )
-    else:
-        from mega_recurrent_kda_frontend import (
-            _get_auxiliary_compiled,
-            _get_twofold_compiled,
-        )
-
-    for width in sorted({D, TILE}):  # Fa 和变长路径的 Beta
-        _get_auxiliary_compiled(HIDDEN_SIZE, width)
+    """Export S4, S8 and variable-length Native kernels for every TP."""
+    _fullk_fa_handle("export").close()
     for heads in SUPPORTED_HEAD_COUNTS:
-        _get_twofold_compiled(3 * heads * D)
-        _get_auxiliary_compiled(D, heads * D)  # Fb
         implementation(heads).export_kernels()

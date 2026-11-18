@@ -10,10 +10,8 @@
 
 if __package__:
     from . import _mega_kda_common as _common
-    from .mega_recurrent_kda_frontend import export_precision_kernels
 else:
     import _mega_kda_common as _common
-    from mega_recurrent_kda_frontend import export_precision_kernels
 
 
 class _HeadImplementation:

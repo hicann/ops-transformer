@@ -75,7 +75,6 @@ class _CheckpointPool(NamedTuple):
     data: Tensor
     indices: Tensor
     stride0: int
-    accurate_decay: Tensor
 
 
 class _ConvPool(NamedTuple):
@@ -83,7 +82,6 @@ class _ConvPool(NamedTuple):
     stride0: int
     length: int
     width: int
-    accurate_raw: Tensor
 
 
 @jit
@@ -109,15 +107,8 @@ def _checkpoint_head(pool, batch, head):
 
 @jit
 def _checkpoint_batches(pool, begin, end):
-    """切分逻辑 batch，同时保留原有 PA 状态池的完整物理存储。"""
-    return _CheckpointPool(
-        pool.data,
-        pool.indices[begin:end,],
-        pool.stride0,
-        pool.accurate_decay[
-            begin * S8_SEQUENCE_LENGTH : end * S8_SEQUENCE_LENGTH, None
-        ],
-    )
+    """Slice logical batches while retaining the physical checkpoint pool."""
+    return _CheckpointPool(pool.data, pool.indices[begin:end,], pool.stride0)
 
 
 @jit

@@ -10,19 +10,14 @@
 
 from __future__ import annotations
 
-import cannbotdsl
-import torch
 from cannbotdsl import (
     MemLoc,
     PIPE,
     Tensor,
-    TensorSpec,
     dtypes,
     from_tensor,
     make_layout,
 )
-from cannbotdsl.lang.host import host
-from cannbotdsl.lang.kernel import kernel
 from cannbotdsl.buffer import Buffer
 from cannbotdsl.lang.constexpr import const_expr
 from cannbotdsl.lang.jit import jit
@@ -34,27 +29,20 @@ from cannbotdsl.ops.reg import (
     PackMode,
     UnpackMode,
     update_mask,
-    vabs,
     vadd,
     vadds,
     vcast,
     vdiv,
     vdups,
-    veq,
     vexp,
-    vle,
     vload,
-    vload_broadcast,
     vload_unpack,
     vmadd,
     vmem_bar,
     vmul,
-    vmuls,
     vneg,
-    vselect,
     vstore,
     vstore_pack,
-    vsub,
 )
 from cannbotdsl.ops.sync import (
     cube_sync_all,
@@ -419,9 +407,6 @@ class ConvSiluStage:
     def __init__(self, seq_len: int, row_block: int, row_capacity: int = 64):
         self.seq_len = seq_len
         self.row_block = row_block
-        self.accurate_raw = Buffer(
-            MemLoc.UB, dtypes.float32, make_layout((seq_len, TILE))
-        )
         self.window = Buffer(
             MemLoc.UB, dtypes.bfloat16, make_layout((CONV_KERNEL, TILE))
         )
@@ -448,13 +433,6 @@ class ConvSiluStage:
         mem_copy(self.weight_ch, weight_gm)
         mem_copy(tile_slice(self.weight, (CONV_KERNEL, TILE), (0, 0)), self.weight_ch)
         vec_sync_all()
-
-    @jit
-    def load_accurate_sequence(self, pool, batch, head):
-        mem_copy(
-            self.accurate_raw,
-            tile_slice(pool.accurate_raw, (self.seq_len, TILE), (batch, head)),
-        )
 
     @jit
     def convolve_sequence(self, local_batch: int, raw_projection, weight_ub):
@@ -494,9 +472,7 @@ class ConvSiluStage:
                     local_row = local_batch * self.seq_len + token
                     raw_offset = local_row * TILE
                     x3 = vload(raw_projection, raw_offset + off)
-                    accurate = vload(self.accurate_raw, token * TILE + off)
-                    matches = veq(x3, accurate, mask=full)
-                    x3 = vselect(x3, accurate, cond_mask=matches)
+
                     x3_bf16 = vcast(x3, dtypes.bfloat16, mask=full)
                     product1 = vmul(x1, w1, mask=full)
                     product01 = vmadd(x0, w0, product1, mask=full)
@@ -506,104 +482,7 @@ class ConvSiluStage:
                     negative_acc = vneg(acc, mask=full)
                     exp_value = vexp(negative_acc, mask=full)
                     denominator = vadds(exp_value, 1.0, mask=full)
-                    activated = vdiv(acc, denominator, mask=full)
-                    # 小参数采用补偿计算，其余范围保留原 SiLU 结果。
-                    regular_activated = activated
-                    hi = vdups(0.0, dtypes.float32)
-                    lo = vdups(0.0, dtypes.float32)
-                    product = vmul(x0, w0, mask=full)
-                    negative_product = vneg(product, mask=full)
-                    product_error = vmadd(x0, w0, negative_product, mask=full)
-                    total = vadd(hi, product, mask=full)
-                    recovered = vsub(total, hi, mask=full)
-                    prior = vsub(total, recovered, mask=full)
-                    prior_error = vsub(hi, prior, mask=full)
-                    new_error = vsub(product, recovered, mask=full)
-                    sum_error = vadd(prior_error, new_error, mask=full)
-                    term_error = vadd(sum_error, product_error, mask=full)
-                    lo = vadd(lo, term_error, mask=full)
-                    hi = total
-                    product = vmul(x1, w1, mask=full)
-                    negative_product = vneg(product, mask=full)
-                    product_error = vmadd(x1, w1, negative_product, mask=full)
-                    total = vadd(hi, product, mask=full)
-                    recovered = vsub(total, hi, mask=full)
-                    prior = vsub(total, recovered, mask=full)
-                    prior_error = vsub(hi, prior, mask=full)
-                    new_error = vsub(product, recovered, mask=full)
-                    sum_error = vadd(prior_error, new_error, mask=full)
-                    term_error = vadd(sum_error, product_error, mask=full)
-                    lo = vadd(lo, term_error, mask=full)
-                    hi = total
-                    product = vmul(x2, w2, mask=full)
-                    negative_product = vneg(product, mask=full)
-                    product_error = vmadd(x2, w2, negative_product, mask=full)
-                    total = vadd(hi, product, mask=full)
-                    recovered = vsub(total, hi, mask=full)
-                    prior = vsub(total, recovered, mask=full)
-                    prior_error = vsub(hi, prior, mask=full)
-                    new_error = vsub(product, recovered, mask=full)
-                    sum_error = vadd(prior_error, new_error, mask=full)
-                    term_error = vadd(sum_error, product_error, mask=full)
-                    lo = vadd(lo, term_error, mask=full)
-                    hi = total
-                    product = vmul(x3, w3, mask=full)
-                    negative_product = vneg(product, mask=full)
-                    product_error = vmadd(x3, w3, negative_product, mask=full)
-                    total = vadd(hi, product, mask=full)
-                    recovered = vsub(total, hi, mask=full)
-                    prior = vsub(total, recovered, mask=full)
-                    prior_error = vsub(hi, prior, mask=full)
-                    new_error = vsub(product, recovered, mask=full)
-                    sum_error = vadd(prior_error, new_error, mask=full)
-                    term_error = vadd(sum_error, product_error, mask=full)
-                    lo = vadd(lo, term_error, mask=full)
-                    hi = total
-                    total = vadd(hi, lo, mask=full)
-                    recovered = vsub(total, hi, mask=full)
-                    prior = vsub(total, recovered, mask=full)
-                    prior_error = vsub(hi, prior, mask=full)
-                    new_error = vsub(lo, recovered, mask=full)
-                    lo = vadd(prior_error, new_error, mask=full)
-                    hi = total
-                    absolute_hi = vabs(hi, mask=full)
-                    small_limit = vdups(0.0078125, dtypes.float32)
-                    small = vle(absolute_hi, small_limit, mask=full)
-                    zero = vdups(0.0, dtypes.float32)
-                    hi = vselect(hi, zero, cond_mask=small)
-                    lo = vselect(lo, zero, cond_mask=small)
-                    # SiLU = x/2 + x^2/4 - x^4/48 + x^6/480 + O(x^8).
-                    # 保留保护位至 FP32 舍入，再转换为 BF16。
-                    square = vmul(hi, hi, mask=full)
-                    negative_square = vneg(square, mask=full)
-                    square_error = vmadd(hi, hi, negative_square, mask=full)
-                    half = vmuls(hi, 0.5, mask=full)
-                    quarter_square = vmuls(square, 0.25, mask=full)
-                    major = vadd(half, quarter_square, mask=full)
-                    recovered = vsub(major, half, mask=full)
-                    prior = vsub(major, recovered, mask=full)
-                    prior_error = vsub(half, prior, mask=full)
-                    new_error = vsub(quarter_square, recovered, mask=full)
-                    major_error = vadd(prior_error, new_error, mask=full)
-                    quartic = vmul(square, square, mask=full)
-                    sixth = vmul(quartic, square, mask=full)
-                    fourth_term = vmuls(quartic, -0.020833333333333332, mask=full)
-                    sixth_term = vmuls(sixth, 0.0020833333333333333, mask=full)
-                    tail = vadd(fourth_term, sixth_term, mask=full)
-                    half_hi = vmuls(hi, 0.5, mask=full)
-                    derivative_main = vadds(half_hi, 0.5, mask=full)
-                    cubic = vmul(hi, square, mask=full)
-                    derivative_tail = vmuls(cubic, 0.08333333333333333, mask=full)
-                    derivative = vsub(derivative_main, derivative_tail, mask=full)
-                    square_correction = vmuls(square_error, 0.25, mask=full)
-                    low_correction = vmul(derivative, lo, mask=full)
-                    correction = vadd(square_correction, low_correction, mask=full)
-                    correction = vadd(correction, tail, mask=full)
-                    correction = vadd(major_error, correction, mask=full)
-                    accurate_activated = vadd(major, correction, mask=full)
-                    activated = vselect(
-                        accurate_activated, regular_activated, cond_mask=small
-                    )
+                    activated = vdiv(acc, denominator, mask=full, precision_mode=True)
                     activated_bf16 = vcast(activated, dtypes.bfloat16, mask=full)
                     output_offset = raw_offset + off
                     vstore_pack(
@@ -1596,152 +1475,68 @@ class SequenceProjectionStage:
             mem_copy(tile_slice(out, (128, 128), (row, column)), c)
 
 
-class TwofoldQKVDotStage:
-    """使用 TwoSum 残差进行补偿投影累加。"""
+class FullKFaProjectionStage:
+    """Complete Fa K reduction in a single FP32 Cube accumulator."""
 
-    @kernel
-    def kernel(self, out, x, weight):
-        onchip_rewind(reset_sync_id=True)
-        wx = Buffer(MemLoc.UB, dtypes.float32, make_layout((32, 128)))
-        xx = Buffer(MemLoc.UB, dtypes.float32, make_layout((32,)))
-        carry = Buffer(MemLoc.UB, dtypes.float32, make_layout((2, 128)))
-        result = Buffer(MemLoc.UB, dtypes.float32, make_layout((1, 128)))
-        columns = out.shape[1] // 128
-        for task in range(get_block_idx(), x.shape[0] * columns, get_block_num()):
-            row = task // columns
-            column = task % columns
-            with vf(mode="simd"):
-                mask1, _ = update_mask(64, elem_bits=32)
-                zero = vdups(0.0, dtypes.float32)
-                for segment in range(2):
-                    vstore(carry, segment * 64, zero, mask1)
-                    vstore(carry, 128 + segment * 64, zero, mask1)
-            for chunk in range(x.shape[1] // 32):
-                mem_copy(xx, x[row, chunk * 32 : (chunk + 1) * 32].view(32))
-                mem_copy(wx, tile_slice(weight, (32, 128), (chunk, column)))
-                with vf(mode="simd"):
-                    mask2, _ = update_mask(64, elem_bits=32)
-                    for segment in range(2):
-                        off = segment * 64
-                        hi = vload(carry, off)
-                        lo = vload(carry, 128 + off)
-                        for k in range(32):
-                            a = vload_broadcast(xx, k)
-                            b = vload(wx, k * 128 + off)
-                            product = vmul(a, b, mask=mask2)
-                            summed = vadd(hi, product, mask=mask2)
-                            bp = vsub(summed, hi, mask=mask2)
-                            residual = vadd(
-                                vsub(hi, vsub(summed, bp, mask=mask2), mask=mask2),
-                                vsub(product, bp, mask=mask2),
-                                mask=mask2,
-                            )
-                            lo = vadd(lo, residual, mask=mask2)
-                            hi = summed
-                        vstore(carry, off, hi, mask2)
-                        vstore(carry, 128 + off, lo, mask2)
-            with vf(mode="simd"):
-                mask3, _ = update_mask(64, elem_bits=32)
-                for segment in range(2):
-                    off = segment * 64
-                    total = vadd(vload(carry, off), vload(carry, 128 + off), mask=mask3)
-                    vstore(result, off, total, mask3)
-            mem_copy(tile_slice(out, (1, 128), (row, column)), result)
-
-
-class TwofoldQKVKernel:
-    @host
-    def run(self, out, x, weight, cores):
-        stage = TwofoldQKVDotStage()
-        stage.kernel[2 * cores](out, x, weight)
-
-
-_TWOFOLD_COMPILED = {}
-
-
-def _get_twofold_compiled(width):
-    if width not in _TWOFOLD_COMPILED:
-        rows = cannbotdsl.Dim("twofold_rows", min=1)
-        outrows = cannbotdsl.Dim("twofold_padded_rows", min=128, multiple_of=128)
-        _TWOFOLD_COMPILED[width] = cannbotdsl.compile(
-            TwofoldQKVKernel().run,
-            TensorSpec((outrows, width), dtypes.float32),
-            TensorSpec((rows, HIDDEN_SIZE), dtypes.float32),
-            TensorSpec((HIDDEN_SIZE, width), dtypes.float32),
-            dtypes.int64,
+    def __init__(self):
+        tile = 128
+        self.tile = tile
+        self.reduction_k = 7168
+        depth = 2
+        self.a_l1 = RingBuffer(
+            MemLoc.L1,
+            dtypes.bfloat16,
+            make_layout((128 * tile,)),
+            depth=depth,
+            data_format="nd",
         )
-    return _TWOFOLD_COMPILED[width]
-
-
-def _twofold_qkv_projection(hidden, weight, raw, cores):
-    import torch_npu
-
-    inputs = hidden.reshape(-1, HIDDEN_SIZE).float()
-    weights = torch_npu.npu_format_cast(weight, 2).transpose(0, 1).contiguous().float()
-    width = weight.shape[0]
-    _get_twofold_compiled(width)
-    _TWOFOLD_COMPILED[width](raw, inputs, weights, cores)
-    return (inputs, weights, raw)
-
-
-_AUXILIARY_COMPILED = {}
-
-
-def _get_auxiliary_compiled(reduction, width):
-    key = (reduction, width)
-    if key not in _AUXILIARY_COMPILED:
-        rows = cannbotdsl.Dim("auxiliary_rows", min=1)
-        _AUXILIARY_COMPILED[key] = cannbotdsl.compile(
-            TwofoldQKVKernel().run,
-            TensorSpec((rows, width), dtypes.float32),
-            TensorSpec((rows, reduction), dtypes.float32),
-            TensorSpec((reduction, width), dtypes.float32),
-            dtypes.int64,
+        self.b_l1 = RingBuffer(
+            MemLoc.L1, dtypes.bfloat16, make_layout((128, tile)), depth=depth
         )
-    return _AUXILIARY_COMPILED[key]
+        self.l0a = RingBuffer(
+            MemLoc.L0A,
+            dtypes.bfloat16,
+            make_layout((128 * tile,)),
+            depth=depth,
+            data_format="nd",
+        )
+        self.l0b = RingBuffer(
+            MemLoc.L0B, dtypes.bfloat16, make_layout((128, tile)), depth=depth
+        )
+        self.l0c = RingBuffer(
+            MemLoc.L0C,
+            dtypes.float32,
+            make_layout((128 * 128,)),
+            depth=1,
+            data_format="nd",
+        )
 
-
-def _auxiliary_twofold_projection(x, weight, cores):
-    import torch_npu
-
-    reduction = int(weight.shape[1])
-    width = int(weight.shape[0])
-    operands = x.reshape(-1, reduction).float()
-    weights = torch_npu.npu_format_cast(weight, 2).transpose(0, 1).contiguous().float()
-    projected = torch.empty(
-        (operands.shape[0], width), dtype=torch.float32, device=x.device
-    )
-    key = (reduction, width)
-    _get_auxiliary_compiled(reduction, width)
-    _AUXILIARY_COMPILED[key](projected, operands, weights, cores)
-    # Fa 和 Fb 分别保留原始 BF16 舍入边界。
-    rounded = projected.to(torch.bfloat16)
-    return rounded, (operands, weights, projected, rounded)
-
-
-def _accurate_auxiliary_projection(hidden, weight_a, weight_b, cores):
-    fa, keep_a = _auxiliary_twofold_projection(hidden, weight_a, cores)
-    fb, keep_b = _auxiliary_twofold_projection(fa, weight_b, cores)
-    return fa, fb, (keep_a, keep_b)
-
-
-def prepare_optimized_precision(hidden, arguments, heads, cores):
-    """为 S4/S8 计算补偿投影，保持 Fa、Fb 各自的 BF16 边界。"""
-    rows = hidden.shape[0]
-    padded_rows = (rows + TILE - 1) // TILE * TILE
-    raw = torch.empty(
-        (padded_rows, 3 * heads * TILE), dtype=torch.float32, device=hidden.device
-    )
-    qkv_keep = _twofold_qkv_projection(
-        hidden, arguments["qkv_projection_weight"], raw, cores
-    )
-    _, decay, decay_keep = _accurate_auxiliary_projection(
-        hidden,
-        arguments["decay_projection_a_weight"],
-        arguments["decay_projection_b_weight"],
-        cores,
-    )
-    return raw[:rows], decay, (qkv_keep, decay_keep)
+    @jit
+    def project(self, out, x, weight):
+        for row in range(get_block_idx(), x.shape[0] // 128, get_block_num()):
+            c = from_tensor(
+                self.l0c.next_write(), layout=make_layout((128, 128)), data_format="nz"
+            )
+            for ki in range(self.reduction_k // self.tile):
+                k = ki
+                a1 = from_tensor(
+                    self.a_l1.next_write(),
+                    layout=make_layout((128, self.tile)),
+                    data_format="nz",
+                )
+                b1 = self.b_l1.next_write()
+                mem_copy(a1, tile_slice(x, (128, self.tile), (row, k)))
+                mem_copy(b1, tile_slice(weight, (128, self.tile), (0, k)))
+                a0 = from_tensor(
+                    self.l0a.next_write(),
+                    layout=make_layout((128, self.tile)),
+                    data_format="nz",
+                )
+                b0 = self.l0b.next_write()
+                mem_copy(a0, a1)
+                mem_copy(b0, b1)
+                matmul(c, a0, b0, init=ki == 0)
+            mem_copy(tile_slice(out, (128, 128), (row, 0)), c)
 
 
 class SequenceConvStage:
@@ -1858,103 +1653,7 @@ class SequenceConvStage:
                                 vexp(vneg(acc, mask=mask), mask=mask), 1.0, mask=mask
                             ),
                             mask=mask,
-                        )
-                        # 小参数采用补偿计算，其余范围保留原 SiLU 结果。
-                        regular_activated = silu
-                        hi = vdups(0.0, dtypes.float32)
-                        lo = vdups(0.0, dtypes.float32)
-                        product = vmul(h0, w0, mask=mask)
-                        negative_product = vneg(product, mask=mask)
-                        product_error = vmadd(h0, w0, negative_product, mask=mask)
-                        total = vadd(hi, product, mask=mask)
-                        recovered = vsub(total, hi, mask=mask)
-                        prior = vsub(total, recovered, mask=mask)
-                        prior_error = vsub(hi, prior, mask=mask)
-                        new_error = vsub(product, recovered, mask=mask)
-                        sum_error = vadd(prior_error, new_error, mask=mask)
-                        term_error = vadd(sum_error, product_error, mask=mask)
-                        lo = vadd(lo, term_error, mask=mask)
-                        hi = total
-                        product = vmul(h1, w1, mask=mask)
-                        negative_product = vneg(product, mask=mask)
-                        product_error = vmadd(h1, w1, negative_product, mask=mask)
-                        total = vadd(hi, product, mask=mask)
-                        recovered = vsub(total, hi, mask=mask)
-                        prior = vsub(total, recovered, mask=mask)
-                        prior_error = vsub(hi, prior, mask=mask)
-                        new_error = vsub(product, recovered, mask=mask)
-                        sum_error = vadd(prior_error, new_error, mask=mask)
-                        term_error = vadd(sum_error, product_error, mask=mask)
-                        lo = vadd(lo, term_error, mask=mask)
-                        hi = total
-                        product = vmul(h2, w2, mask=mask)
-                        negative_product = vneg(product, mask=mask)
-                        product_error = vmadd(h2, w2, negative_product, mask=mask)
-                        total = vadd(hi, product, mask=mask)
-                        recovered = vsub(total, hi, mask=mask)
-                        prior = vsub(total, recovered, mask=mask)
-                        prior_error = vsub(hi, prior, mask=mask)
-                        new_error = vsub(product, recovered, mask=mask)
-                        sum_error = vadd(prior_error, new_error, mask=mask)
-                        term_error = vadd(sum_error, product_error, mask=mask)
-                        lo = vadd(lo, term_error, mask=mask)
-                        hi = total
-                        product = vmul(x, w3, mask=mask)
-                        negative_product = vneg(product, mask=mask)
-                        product_error = vmadd(x, w3, negative_product, mask=mask)
-                        total = vadd(hi, product, mask=mask)
-                        recovered = vsub(total, hi, mask=mask)
-                        prior = vsub(total, recovered, mask=mask)
-                        prior_error = vsub(hi, prior, mask=mask)
-                        new_error = vsub(product, recovered, mask=mask)
-                        sum_error = vadd(prior_error, new_error, mask=mask)
-                        term_error = vadd(sum_error, product_error, mask=mask)
-                        lo = vadd(lo, term_error, mask=mask)
-                        hi = total
-                        total = vadd(hi, lo, mask=mask)
-                        recovered = vsub(total, hi, mask=mask)
-                        prior = vsub(total, recovered, mask=mask)
-                        prior_error = vsub(hi, prior, mask=mask)
-                        new_error = vsub(lo, recovered, mask=mask)
-                        lo = vadd(prior_error, new_error, mask=mask)
-                        hi = total
-                        absolute_hi = vabs(hi, mask=mask)
-                        small_limit = vdups(0.0078125, dtypes.float32)
-                        small = vle(absolute_hi, small_limit, mask=mask)
-                        zero = vdups(0.0, dtypes.float32)
-                        hi = vselect(hi, zero, cond_mask=small)
-                        lo = vselect(lo, zero, cond_mask=small)
-                        # SiLU = x/2 + x^2/4 - x^4/48 + x^6/480 + O(x^8).
-                        # 保留保护位到 FP32 舍入，再按原边界转换到 BF16。
-                        square = vmul(hi, hi, mask=mask)
-                        negative_square = vneg(square, mask=mask)
-                        square_error = vmadd(hi, hi, negative_square, mask=mask)
-                        half = vmuls(hi, 0.5, mask=mask)
-                        quarter_square = vmuls(square, 0.25, mask=mask)
-                        major = vadd(half, quarter_square, mask=mask)
-                        recovered = vsub(major, half, mask=mask)
-                        prior = vsub(major, recovered, mask=mask)
-                        prior_error = vsub(half, prior, mask=mask)
-                        new_error = vsub(quarter_square, recovered, mask=mask)
-                        major_error = vadd(prior_error, new_error, mask=mask)
-                        quartic = vmul(square, square, mask=mask)
-                        sixth = vmul(quartic, square, mask=mask)
-                        fourth_term = vmuls(quartic, -0.020833333333333332, mask=mask)
-                        sixth_term = vmuls(sixth, 0.0020833333333333333, mask=mask)
-                        tail = vadd(fourth_term, sixth_term, mask=mask)
-                        half_hi = vmuls(hi, 0.5, mask=mask)
-                        derivative_main = vadds(half_hi, 0.5, mask=mask)
-                        cubic = vmul(hi, square, mask=mask)
-                        derivative_tail = vmuls(cubic, 0.08333333333333333, mask=mask)
-                        derivative = vsub(derivative_main, derivative_tail, mask=mask)
-                        square_correction = vmuls(square_error, 0.25, mask=mask)
-                        low_correction = vmul(derivative, lo, mask=mask)
-                        correction = vadd(square_correction, low_correction, mask=mask)
-                        correction = vadd(correction, tail, mask=mask)
-                        correction = vadd(major_error, correction, mask=mask)
-                        accurate_activated = vadd(major, correction, mask=mask)
-                        silu = vselect(
-                            accurate_activated, regular_activated, cond_mask=small
+                            precision_mode=True,
                         )
                         xb = vcast(x, dtypes.bfloat16, mask=mask)
                         vstore_pack(
@@ -2101,9 +1800,6 @@ class TP4GridScheduleFrontendOperations:
                                         history_view, (1, TILE), (cache_row + 1, 0)
                                     ),
                                 )
-                            conv_stage.load_accurate_sequence(
-                                conv_state_gm, batch_index, candidate_head
-                            )
                             conv_stage.convolve_sequence(
                                 local_batch,
                                 projection_stage.projection_fp32,
@@ -2266,9 +1962,6 @@ class TP4GridScheduleFrontendOperations:
                     mem_copy(
                         tile_slice(state_view[0:2, None], (2, TILE), (0, logical_n)),
                         tile_slice(history_view[1:3, None], (2, TILE), (0, 0)),
-                    )
-                    conv_stage.load_accurate_sequence(
-                        conv_state_gm, batch_index, logical_n
                     )
                     conv_stage.convolve_sequence(
                         local_batch, projection_stage.projection_fp32, weight_ub
@@ -2494,9 +2187,6 @@ class TPScheduleFrontendOperations:
                                 state_view[0:2, None], (2, TILE), (0, logical_n)
                             ),
                             tile_slice(history_view[1:3, None], (2, TILE), (0, 0)),
-                        )
-                        conv_stage.load_accurate_sequence(
-                            conv_state_gm, batch_index, logical_n
                         )
                         conv_stage.convolve_sequence(
                             local_batch, projection_stage.projection_fp32, weight_ub
@@ -3269,9 +2959,6 @@ class ProjectionScheduleOperationsFrontendOperations:
                                 state_view[0:2, None], (2, TILE), (0, logical_n)
                             ),
                             tile_slice(history_view[1:3, None], (2, TILE), (0, 0)),
-                        )
-                        conv_stage.load_accurate_sequence(
-                            conv_state_gm, batch_index, logical_n
                         )
                         conv_stage.convolve_sequence(
                             local_batch, projection_stage.projection_fp32, weight_ub
@@ -4105,9 +3792,6 @@ class S4ProjectionScheduleFrontendOperations:
                                         history_view, (1, TILE), (cache_row + 1, 0)
                                     ),
                                 )
-                            conv_stage.load_accurate_sequence(
-                                conv_state_gm, batch_index, candidate_head
-                            )
                             conv_stage.convolve_sequence(
                                 local_batch,
                                 projection_stage.projection_fp32,
@@ -5247,9 +4931,6 @@ class TP16GridScheduleFrontendOperations:
                                         history_view, (1, TILE), (cache_row + 1, 0)
                                     ),
                                 )
-                            conv_stage.load_accurate_sequence(
-                                conv_state_gm, batch_index, candidate_head
-                            )
                             conv_stage.convolve_sequence(
                                 local_batch,
                                 projection_stage.projection_fp32,
@@ -5475,9 +5156,6 @@ class TP16GridScheduleFrontendOperations:
                     mem_copy(
                         tile_slice(state_view[0:2, None], (2, TILE), (0, logical_n)),
                         tile_slice(history_view[1:3, None], (2, TILE), (0, 0)),
-                    )
-                    conv_stage.load_accurate_sequence(
-                        conv_state_gm, batch_index, logical_n
                     )
                     conv_stage.convolve_sequence(
                         local_batch, projection_stage.projection_fp32, weight_ub
@@ -6570,9 +6248,6 @@ class TP16GridScheduleFrontendOperations:
                                             history_view, (1, TILE), (cache_row + 1, 0)
                                         ),
                                     )
-                                conv_stage.load_accurate_sequence(
-                                    conv_state_gm, batch_index, projection_head
-                                )
                                 conv_stage.convolve_sequence(
                                     local_batch,
                                     projection_stage.projection_fp32,

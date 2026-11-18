@@ -24,7 +24,6 @@ else:
     import _kda_platform as _platform
     import mega_recurrent_kda_arch92 as _variant
 
-import cannbotdsl
 from cannbotdsl.aot import export
 
 if __package__:
@@ -605,4 +604,3 @@ def export_mega_recurrent_kda():
     """按架构导出三个 TP 的全部可达主程序。"""
     for heads in SUPPORTED_HEAD_COUNTS:
         implementation(heads).export_kernels()
-    _variant.export_precision_kernels(SUPPORTED_HEAD_COUNTS)

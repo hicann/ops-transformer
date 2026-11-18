@@ -71,11 +71,10 @@ def _available_core_quotas():
 
 
 def _call_with_quota(sample, tensors, scalars, cores: int, *, guard_case=False):
-    """Invoke the sample inside a stream whose AIC/AIV quota matches the pytest semantics.
+    """Invoke the sample inside a stream whose AIC/AIV quota matches the designed stream quota.
 
-    ``cores == 0`` means "max available" (pytest ``max``/``auto``); every invocation
-    sets the stream quota explicitly, exactly like
-    ``test_precision._check_precision`` does.
+    ``cores == 0`` means "max available" (``max``/``auto``); every invocation
+    sets the stream quota explicitly, for each call.
     """
     _, ratio, _ = _QUOTA_POLICY[fixtures.selected_architecture()]
     available = _available_core_quotas()
@@ -114,16 +113,16 @@ def _call_with_quota(sample, tensors, scalars, cores: int, *, guard_case=False):
 
 The scalar marker only selects TTK's device. Actual inputs are generated from
 the same frozen case on NPU/golden/peer; references never consume captured NPU
-values. Direct inplace/alias contracts are additionally covered by pytest.
+values. The adapter also checks inplace/alias contracts.
 """
 if __package__:
     from .assets import inputs as cases
     from .assets import inputs as fixtures
-    from .assets import golden
+    from .assets import golden, npu_peer
 else:
     from assets import inputs as cases
     from assets import inputs as fixtures
-    from assets import golden
+    from assets import golden, npu_peer
 
 
 def _case_configuration(case_id, case_config):
@@ -154,12 +153,8 @@ def save(kind, case_id, value):
 
 
 def _span(t):
-    if t.ndim and t.shape[0] and t.numel():
-        length = 1 + sum(
-            (extent - 1) * stride for extent, stride in zip(t.shape, t.stride())
-        )
-        return t.as_strided((length,), (1,))
-    return t.flatten()
+    elements = t.untyped_storage().nbytes() // t.element_size()
+    return t.as_strided((elements,), (1,), storage_offset=0)
 
 
 def _pool_storage(t):
@@ -201,6 +196,8 @@ def _pool_untouched(t, before, changed):
                 after[start + payload : start + stride],
                 before[start + payload : start + stride],
             )
+    end = (t.shape[0] - 1) * stride + payload
+    _unchanged(after[end:], before[end:])
 
 
 def _check_mega(a, c, before, result, module):
@@ -239,6 +236,8 @@ def _check_mega(a, c, before, result, module):
                     after[slot * stride + payload : (slot + 1) * stride],
                     before[key][slot * stride + payload : (slot + 1) * stride],
                 )
+        end = (tensor.shape[0] - 1) * stride + payload
+        _unchanged(after[end:], before[key][end:])
     assert torch.isfinite(result[0]).all(), "out produced NaN/Inf"
     tp = 96 // c["N"]
     sequence = lengths[0]
@@ -249,7 +248,8 @@ def _check_mega(a, c, before, result, module):
         and c["B"] % tp == 0
         and 1 <= c["B"] // tp <= 32
     )
-    assert module._last_backend == (
+    implementation = module._implementation_for_device(a["hidden_states"])
+    assert implementation._last_backend == (
         f"optimized_s{sequence}" if optimized else "variable_length"
     ), "Unexpected execution branch"
 
@@ -302,34 +302,34 @@ def verify(marker: torch.Tensor, *, case_id: str):
 
 
 def verify_hp(marker: torch.Tensor, *, case_id: str):
-    assert marker.device.type == "cpu", "FP64 golden requires a CPU marker"
+    assert marker.device.type == "cpu", "CPU FP32 golden requires a CPU marker"
     arguments, _ = prepare(case_id)
-    return golden.run_fp64(**arguments)
+    return golden.run_fp32(**arguments)
 
 
 def verify_peer(marker: torch.Tensor, *, case_id: str):
-    assert marker.device.type == "cpu", (
-        "Original third-party golden must execute on CPU"
-    )
-    a, c = prepare(case_id)
-    before = fixtures.manifest(a)
-    result = golden.run_original(**a)
-    assert all(t.device.type == "cpu" for t in result)
-    after = fixtures.manifest(a)
-    assert after == before, "Original golden adapter modified caller inputs"
+    arguments, config = prepare(case_id)
+    before = fixtures.manifest(arguments)
+    if fixtures.selected_architecture() == "arch35":
+        outputs = _call_with_quota(
+            lambda: npu_peer.run(**arguments), (), (), config["cores"]
+        )
+    else:
+        outputs = npu_peer.run(**arguments)
+    assert all(t.device.type in ("npu", "privateuseone") for t in outputs)
+    assert fixtures.manifest(arguments) == before
     save(
         "peer_manifests",
         case_id,
         dict(
             case_id=case_id,
-            configuration=c,
-            reference="specified_original_cpu_golden",
+            configuration=config,
+            reference="torch_npu_small_ops",
             inputs=before,
-            actual_inputs=after,
-            output_devices=[str(t.device) for t in result],
+            output_devices=[str(t.device) for t in outputs],
         ),
     )
-    return result
+    return outputs
 
 
 def expected(marker: torch.Tensor, *, case_id: str = None, case_config: str = None):
@@ -467,7 +467,7 @@ def capture(marker: torch.Tensor, *, case_id: str = None, case_config: str = Non
     return expected(marker, case_id=case_id).to(marker.device)
 
 
-def run_pytest_case(case_id, reference_verify):
+def run_pytest_case(case_id):
     c = cases.get(case_id)
     marker = torch.empty(1, device="npu")
     if c["expected"] == "REJECT_ATOMIC":
@@ -475,7 +475,7 @@ def run_pytest_case(case_id, reference_verify):
     if c["expected"] == "PASS_CAPTURE":
         return capture(marker, case_id=case_id)
     a, _ = prepare(case_id)
-    wanted = reference_verify(**a)
+    wanted = golden.run_fp32(**a)
     actual = verify(marker, case_id=case_id)
     for i, (value, reference) in enumerate(zip(actual, wanted, strict=True)):
         atol = (
@@ -801,6 +801,12 @@ def _customize_csv_inputs(*tensors, case_config, **_):
             or target.shape != source.shape
             or target.dtype != source.dtype
             or target.stride() != source.stride()
+            or target.storage_offset() != source.storage_offset()
+            or (
+                name in fixtures.PA_POOLS
+                and target.untyped_storage().nbytes()
+                != source.untyped_storage().nbytes()
+            )
         ):
             raise ValueError(
                 f"{name}: CSV tensor declaration disagrees with case {config['case_id']}"
@@ -881,16 +887,31 @@ def verify_csv(
 
 def verify_csv_hp(*tensors, case_config, **_):
     config = _case_configuration(None, case_config)
-    return golden.run_fp64(**_csv_arguments(tensors, config))
+    return golden.run_fp32(**_csv_arguments(tensors, config))
 
 
 def verify_csv_peer(*tensors, case_config):
     config = _case_configuration(None, case_config)
     args = _csv_arguments(tensors, config)
     before = fixtures.manifest(args)
-    outputs = golden.run_original(**args)
-    assert all(t.device.type == "cpu" for t in outputs)
+    if fixtures.selected_architecture() == "arch35":
+        outputs = _call_with_quota(
+            lambda: npu_peer.run(**args), (), (), config["cores"]
+        )
+    else:
+        outputs = npu_peer.run(**args)
+    assert all(t.device.type in ("npu", "privateuseone") for t in outputs)
     assert fixtures.manifest(args) == before
+    save(
+        "peer_manifests",
+        config["case_id"],
+        dict(
+            case_id=config["case_id"],
+            reference="torch_npu_small_ops",
+            inputs=before,
+            output_devices=[str(t.device) for t in outputs],
+        ),
+    )
     return outputs
 
 
