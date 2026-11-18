@@ -185,6 +185,7 @@ int main()
     aclDestroyTensor(sortedIndices);
     aclDestroyTensor(probsOptional);
     aclDestroyTensor(out);
+    aclDestroyIntArray(range);
 
     // 7. 释放device资源
     aclrtFree(permutedTokensAddr);

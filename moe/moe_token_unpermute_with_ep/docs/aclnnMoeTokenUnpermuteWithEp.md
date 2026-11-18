@@ -27,32 +27,24 @@
 
 - **计算公式：**
 
-  $$
-  sortedIndices = sortedIndices[rangeOptional[0]<=i<rangeOptional[1]]
-  $$
+  记 sortedIndices 的第 k 个元素为 `sortedIndices[k]`，`num_tokens = len(sortedIndices) / numTopk`，`rangeOptional = [start, end)`（`start = rangeOptional[0]`，`end = rangeOptional[1]`，公式中的 `topK_num` 即参数 `numTopk`）。仅当 `start <= sortedIndices[k] < end` 时该槽位取数，取数行为 `permutedTokens[sortedIndices[k] - start]`；否则该槽位贡献 0。`rangeOptional` 为空时等价于默认值 `{0, 0}`，所有槽位均不满足条件，输出全 0。
 
-  （1）probs非None计算公式如下，其中$i \in {0, 1, 2, ..., num\_tokens - 1}$，$j \in {0, 1, 2, ..., topK\_num - 1}$，$k \in {0, 1, 2, ..., num\_tokens * topK\_num}$：
+  （1）probs非None计算公式如下，其中$i \in {0, 1, 2, ..., num\_tokens - 1}$，$j \in {0, 1, 2, ..., topK\_num - 1}$，槽位下标$k = i * topK\_num + j$：
 
     $$
-    permutedTokens = permutedTokens.indexSelect(0, sortedIndices)
+    out_{i} = \sum_{j=0}^{topK\_num - 1} \begin{cases}
+    permutedTokens[sortedIndices[k] - start] * probs_{i,j}, & start \le sortedIndices[k] < end \\
+    0, & \text{otherwise}
+    \end{cases}
     $$
 
-    $$
-    permutedTokens_{k} = permutedTokens_{k} * probs_{i,j}
-    $$
+  （2）probs为None计算公式如下，其中$i \in {0, 1, 2, ..., num\_tokens - 1}$，$j \in {0, 1, 2, ..., topK\_num - 1}$，槽位下标$k = i * topK\_num + j$：
 
     $$
-    out_{i} = \sum_{k=i*topK\_num}^{(i+1)*topK\_num - 1 } permutedTokens_{k}
-    $$
-
-  （2）probs为None计算公式如下，其中$i \in {0, 1, 2, ..., num\_tokens - 1}$，$j \in {0, 1, 2, ..., topK\_num - 1}$：
-
-    $$
-    permutedTokens = permutedTokens.indexSelect(0, sortedIndices)
-    $$
-
-    $$
-    out_{i} = \sum_{k=i*topK\_num}^{(i+1)*topK\_num - 1 } permutedTokens_{k}
+    out_{i} = \sum_{j=0}^{topK\_num - 1} \begin{cases}
+    permutedTokens[sortedIndices[k] - start], & start \le sortedIndices[k] < end \\
+    0, & \text{otherwise}
+    \end{cases}
     $$
 
 ## 函数原型
@@ -143,7 +135,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
       <td>numTopk</td>
       <td>输入</td>
       <td>被选中的专家个数。</td>
-      <td>取值必须大于等于1；probsOptional非空时，取值必须小于等于512。</td>
+      <td>取值必须在[1, 512]范围内。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -152,9 +144,9 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
     <tr>
       <td>rangeOptional</td>
       <td>可选输入</td>
-      <td>ep切分的有效范围，size为2。</td>
-      <td>允许传入空指针；传入空指针时使用默认值{0,0}，输出为全0。</td>
-      <td>-</td>
+      <td>ep切分的有效范围[start, end)，size为2，元素类型为INT64。</td>
+      <td>允许传入空指针；传入空指针时使用默认值{0,0}，输出为全0。非空时必须满足0 &lt;= start &lt;= end &lt;= start + permutedTokens的第0维长度。</td>
+      <td>INT64</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -174,7 +166,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
       <td>可选输入</td>
       <td>-</td>
       <td>预留参数，当前仅支持传入空指针。</td>
-      <td>-</td>
+      <td>INT64</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -291,7 +283,8 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
 - 确定性计算：
   - aclnnMoeTokenUnpermuteWithEp默认确定性实现。
 
-- numTopk必须大于等于1；probsOptional非空时，numTopk必须小于等于512。
+- numTopk必须在[1, 512]范围内。
+- sortedIndices必须为1D，长度为num_tokens*numTopk，且num_tokens大于等于1，不支持空Tensor。
 - 不支持Broadcast。
 - aclTensor的shape不支持使用-1表示动态维度或使用-2表示动态Rank。
 - 不支持paddedMode为`True`。

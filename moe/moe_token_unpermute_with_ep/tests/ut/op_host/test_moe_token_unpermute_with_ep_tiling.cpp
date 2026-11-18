@@ -217,12 +217,12 @@ TEST_F(MoeTokenUnpermuteWithEpTiling, test_tiling_prob_none_fp32)
             {{{768, 20480}, {768, 20480}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {{"num_topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-         {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({1, 49151})},
+         {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({1, 6144})},
          {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
          {"restore_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({})}},
         &compileInfo);
     uint64_t expectTilingKey = 0;
-    string expectTilingData = "20480 1 8 1 49151 6143 20480 1 0 12 0 12 1 0 2 ";
+    string expectTilingData = "20480 1 8 1 6144 6143 20480 1 0 12 0 12 1 0 2 ";
     std::vector<size_t> expectWorkspaces = {0};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -261,7 +261,7 @@ TEST_F(MoeTokenUnpermuteWithEpTiling, test_tiling_small_tokens_num_core)
             {{{8}, {8}}, ge::DT_INT32, ge::FORMAT_ND},
         },
         {
-            {{{8, 128}, {8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{1, 128}, {1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
         },
         {{"num_topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
          {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
@@ -328,7 +328,7 @@ TEST_F(MoeTokenUnpermuteWithEpTiling, test_tiling_probs_invalid_dtype)
          {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
          {"restore_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({})}},
         &compileInfo);
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 0);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
 TEST_F(MoeTokenUnpermuteWithEpTiling, test_tiling_input_topk_invalid)
@@ -368,7 +368,7 @@ TEST_F(MoeTokenUnpermuteWithEpTiling, test_tiling_tokens_unknown_dtype)
          {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
          {"restore_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({})}},
         &compileInfo);
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 0);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
 TEST_F(MoeTokenUnpermuteWithEpTiling, test_tiling_indices_int64_dtype)
@@ -388,7 +388,7 @@ TEST_F(MoeTokenUnpermuteWithEpTiling, test_tiling_indices_int64_dtype)
          {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
          {"restore_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({})}},
         &compileInfo);
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 0);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
 TEST_F(MoeTokenUnpermuteWithEpTiling, test_tiling_tokens_not_2d)

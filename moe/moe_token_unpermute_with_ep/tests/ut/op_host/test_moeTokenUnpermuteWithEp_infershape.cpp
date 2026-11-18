@@ -243,29 +243,28 @@ TEST_F(MoeTokenUnpermuteWithEp, test_infertype_bf16)
                               ->GetOpImpl("MoeTokenUnpermuteWithEp")
                               ->infer_datatype;
 
-    if (data_type_func != nullptr) {
-        ge::DataType input_ref = ge::DT_BF16;
-        ge::DataType input_indices_ref = ge::DT_INT32;
-        ge::DataType output_ref = ge::DT_BF16;
-        auto context_holder = gert::InferDataTypeContextFaker()
-                                  .IrInputNum(3)
-                                  .NodeIoNum(3, 1)
-                                  .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(1, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(2, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .InputDataTypes({&input_ref, &input_indices_ref, &input_ref})
-                                  .OutputDataTypes({&output_ref})
-                                  .Build();
-        auto context = context_holder.GetContext<gert::InferDataTypeContext>();
-        EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
-        ASSERT_NE(context, nullptr);
+    ASSERT_NE(data_type_func, nullptr);
+    ge::DataType input_ref = ge::DT_BF16;
+    ge::DataType input_indices_ref = ge::DT_INT32;
+    ge::DataType output_ref = ge::DT_BF16;
+    auto context_holder = gert::InferDataTypeContextFaker()
+                              .IrInputNum(3)
+                              .NodeIoNum(3, 1)
+                              .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(1, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(2, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .InputDataTypes({&input_ref, &input_indices_ref, &input_ref})
+                              .OutputDataTypes({&output_ref})
+                              .Build();
+    auto context = context_holder.GetContext<gert::InferDataTypeContext>();
+    EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
+    ASSERT_NE(context, nullptr);
 
-        EXPECT_EQ(context->GetInputDataType(0), input_ref);
-        EXPECT_EQ(context->GetInputDataType(1), input_indices_ref);
-        EXPECT_EQ(context->GetInputDataType(2), input_ref);
-        EXPECT_EQ(context->GetOutputDataType(0), output_ref);
-    }
+    EXPECT_EQ(context->GetInputDataType(0), input_ref);
+    EXPECT_EQ(context->GetInputDataType(1), input_indices_ref);
+    EXPECT_EQ(context->GetInputDataType(2), input_ref);
+    EXPECT_EQ(context->GetOutputDataType(0), output_ref);
 }
 
 TEST_F(MoeTokenUnpermuteWithEp, test_infertype_fp16)
@@ -278,29 +277,28 @@ TEST_F(MoeTokenUnpermuteWithEp, test_infertype_fp16)
                               ->GetOpImpl("MoeTokenUnpermuteWithEp")
                               ->infer_datatype;
 
-    if (data_type_func != nullptr) {
-        ge::DataType input_ref = ge::DT_FLOAT16;
-        ge::DataType input_indices_ref = ge::DT_INT32;
-        ge::DataType output_ref = ge::DT_FLOAT16;
-        auto context_holder = gert::InferDataTypeContextFaker()
-                                  .IrInputNum(3)
-                                  .NodeIoNum(3, 1)
-                                  .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(1, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .InputDataTypes({&input_ref, &input_indices_ref, &input_ref})
-                                  .OutputDataTypes({&output_ref})
-                                  .Build();
-        auto context = context_holder.GetContext<gert::InferDataTypeContext>();
-        EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
-        ASSERT_NE(context, nullptr);
+    ASSERT_NE(data_type_func, nullptr);
+    ge::DataType input_ref = ge::DT_FLOAT16;
+    ge::DataType input_indices_ref = ge::DT_INT32;
+    ge::DataType output_ref = ge::DT_FLOAT16;
+    auto context_holder = gert::InferDataTypeContextFaker()
+                              .IrInputNum(3)
+                              .NodeIoNum(3, 1)
+                              .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(1, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .InputDataTypes({&input_ref, &input_indices_ref, &input_ref})
+                              .OutputDataTypes({&output_ref})
+                              .Build();
+    auto context = context_holder.GetContext<gert::InferDataTypeContext>();
+    EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
+    ASSERT_NE(context, nullptr);
 
-        EXPECT_EQ(context->GetInputDataType(0), input_ref);
-        EXPECT_EQ(context->GetInputDataType(1), input_indices_ref);
-        EXPECT_EQ(context->GetInputDataType(2), input_ref);
-        EXPECT_EQ(context->GetOutputDataType(0), output_ref);
-    }
+    EXPECT_EQ(context->GetInputDataType(0), input_ref);
+    EXPECT_EQ(context->GetInputDataType(1), input_indices_ref);
+    EXPECT_EQ(context->GetInputDataType(2), input_ref);
+    EXPECT_EQ(context->GetOutputDataType(0), output_ref);
 }
 
 TEST_F(MoeTokenUnpermuteWithEp, test_infertype_fp32)
@@ -313,29 +311,28 @@ TEST_F(MoeTokenUnpermuteWithEp, test_infertype_fp32)
                               ->GetOpImpl("MoeTokenUnpermuteWithEp")
                               ->infer_datatype;
 
-    if (data_type_func != nullptr) {
-        ge::DataType input_ref = ge::DT_FLOAT;
-        ge::DataType input_indices_ref = ge::DT_INT32;
-        ge::DataType output_ref = ge::DT_FLOAT;
-        auto context_holder = gert::InferDataTypeContextFaker()
-                                  .IrInputNum(3)
-                                  .NodeIoNum(3, 1)
-                                  .NodeInputTd(0, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(1, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(2, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .InputDataTypes({&input_ref, &input_indices_ref, &input_ref})
-                                  .OutputDataTypes({&output_ref})
-                                  .Build();
-        auto context = context_holder.GetContext<gert::InferDataTypeContext>();
-        EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
-        ASSERT_NE(context, nullptr);
+    ASSERT_NE(data_type_func, nullptr);
+    ge::DataType input_ref = ge::DT_FLOAT;
+    ge::DataType input_indices_ref = ge::DT_INT32;
+    ge::DataType output_ref = ge::DT_FLOAT;
+    auto context_holder = gert::InferDataTypeContextFaker()
+                              .IrInputNum(3)
+                              .NodeIoNum(3, 1)
+                              .NodeInputTd(0, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(1, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(2, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .InputDataTypes({&input_ref, &input_indices_ref, &input_ref})
+                              .OutputDataTypes({&output_ref})
+                              .Build();
+    auto context = context_holder.GetContext<gert::InferDataTypeContext>();
+    EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
+    ASSERT_NE(context, nullptr);
 
-        EXPECT_EQ(context->GetInputDataType(0), input_ref);
-        EXPECT_EQ(context->GetInputDataType(1), input_indices_ref);
-        EXPECT_EQ(context->GetInputDataType(2), input_ref);
-        EXPECT_EQ(context->GetOutputDataType(0), output_ref);
-    }
+    EXPECT_EQ(context->GetInputDataType(0), input_ref);
+    EXPECT_EQ(context->GetInputDataType(1), input_indices_ref);
+    EXPECT_EQ(context->GetInputDataType(2), input_ref);
+    EXPECT_EQ(context->GetOutputDataType(0), output_ref);
 }
 
 TEST_F(MoeTokenUnpermuteWithEp, test_infershape_prob_none_empty_range)
@@ -359,7 +356,7 @@ TEST_F(MoeTokenUnpermuteWithEp, test_infershape_prob_none_empty_range)
             {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"restore_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(restore_shape)},
         });
-    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, {{8, 2}});
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, {{1, 2}});
 }
 
 TEST_F(MoeTokenUnpermuteWithEp, test_infershape_prob_none_empty_range_topk_one)
