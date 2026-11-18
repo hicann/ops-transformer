@@ -302,7 +302,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(
         <td>epWorldSize</td>
         <td>输入</td>
         <td>ep通信域大小。</td>
-        <td><term>Ascend 950DT系列产品</term>支持2、4、8、16、32、64、128、256。</td>
+        <td>具体产品差异见下方说明。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -420,7 +420,14 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(
     </tr>
     </tbody></table>
 
-- gmmXQuantMode、gmmWeightQuantMode、mmXQuantMode、mmWeightQuantMode的枚举值跟量化模式关系如下：
+    各产品差异说明如下：
+
+    <!-- npu="950" id9 -->
+    - <term>Ascend 950DT系列产品</term>：
+      - epWorldSize：支持2、4、8、16、32、64、128、256。
+    <!-- end id9 -->
+
+- gmmXQuantMode、gmmWeightQuantMode、mmXQuantMode、mmWeightQuantMode的枚举值跟量化模式关系如下:
   - 0: 非量化
   - 1: pertensor
   - 2: perchannel
@@ -552,7 +559,9 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
+<!-- npu="950" id8 -->
 注意：由于量化接口仅支持<term>Ascend 950DT系列产品</term>，以下示例基于该系列实现。本示例代码以2卡为例，请根据实际环境卡数修改 `EP_WORLD_SIZE`。
+<!-- end id8 -->
 
 ```cpp
 #include <thread>

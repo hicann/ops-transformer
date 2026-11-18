@@ -190,7 +190,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
         <td>commMode(char*)</td>
         <td>输入</td>
         <td>指定当前通信类型。</td>
-        <td><term>Atlas A2系列产品</term>支持输入"aiv"；<br><term>Atlas A3系列产品</term>支持输入"aiv"和"ai_cpu"；<br><term>Ascend 950DT系列产品</term>支持输入"ai_cpu"和"ccu"。</td>
+        <td>具体产品差异见下方说明。</td>
         <td>STRING</td>
         <td>-</td>
         <td>-</td>
@@ -307,6 +307,19 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
         <td>-</td>
     </tr>
     </tbody></table>
+
+    <!-- npu="910b" id19 -->
+    - <term>Atlas A2系列产品</term>：
+      - commMode：支持输入"aiv"。
+    <!-- end id19 -->
+    <!-- npu="A3" id20 -->
+    - <term>Atlas A3系列产品</term>：
+      - commMode：支持输入"aiv"和"ai_cpu"。
+    <!-- end id20 -->
+    <!-- npu="950" id21 -->
+    - <term>Ascend 950DT系列产品</term>：
+      - commMode：支持输入"ai_cpu"和"ccu"。
+    <!-- end id21 -->
 
 - **返回值**
 
@@ -429,7 +442,9 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
   - ep通信域内的总接收token数（各rank的A之和）须等于总发送token数（各rank的BSK之和）。同时，各rank的`sendCounts`与对端`recvCounts`须在源、目的rank维度上互为转置，expert维度保持不变。
 
 - commMode为`"aiv"`时的附加约束与内存布局：
+  <!-- npu="A3,910b" id18 -->
   - Atlas A2的epWorldSize支持2、4、8；Atlas A3支持2、4、8、16、32、64、128。gmmX、gmmWeight、gmmY必须为相同的FLOAT16或BFLOAT16类型、ND格式，shape分别为2维、3维、2维。
+  <!-- end id18 -->
   - AIV模式下BSK/A取值范围为[1, 5000000]，H1/N1取值范围为[1, 65535]；本卡专家数e不超过512，`epWorldSize * e`不超过1024。
   - sendCounts和recvCounts接口属性为INT64直接计数数组，布局为`[rank][localExpert]`。第一阶段的主机侧tiling（根据输入和平台生成计算及通信配置的阶段）校验数组长度为`e * epWorldSize`且不超过1024，每项非负且不超过对应本卡输入/输出M，并校验sendCounts之和等于BSK、recvCounts之和等于A；这些检查在tiling阶段失败时，`aclnnAlltoAllvGroupedMatMulV2GetWorkspaceSize`返回`ACLNN_ERR_INNER_TILING_ERROR`（561002）。
   - `sendCounts`或`recvCounts`为`nullptr`、空数组时，由接口入口检查并返回`ACLNN_ERR_PARAM_INVALID`（161002）。
