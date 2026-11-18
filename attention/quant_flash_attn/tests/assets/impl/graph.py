@@ -244,11 +244,11 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         # q, k, v 是 torch.float8_e4m3fn, final layout (TND / PA paged)
         # dequant_scale_q/k/v 是 torch.float8_e8m0fnu, final layout (TND / PA paged)
         # p_scale 是 torch.float32, block_table 是 torch.int32
-        p_scale_val = (
-            float(p_scale.item())
-            if isinstance(p_scale, torch.Tensor)
-            else float(p_scale)
-        )
+        # p_scale 是可选参数 (op schema: Tensor? p_scale=None; kernel/tiling 缺省按 1.0)。
+        # 统一契约: None / 空 Tensor = absent, 原样向 prepare 与算子透传;
+        # 各层按 Optional 自行处理, 不构造 1.0 占位。算子收到 None 时内部默认 1.0。
+        if isinstance(p_scale, torch.Tensor) and p_scale.numel() == 0:
+            p_scale = None
 
         # cu_seqlens/seqused 真实值由 inputs.py 写入 _t tensor slot (8-11)；
         # 这里从 tensor 读回 list（从 tensor slot 读回）。
@@ -299,7 +299,6 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
                 "SPARSE_MODE": mask_mode,
                 "ATTN_MASK_SHAPE": attn_mask_shape or (2048, 2048),
                 "Q_SCALE_LAYOUT": q_scale_layout,
-                "P_SCALE": p_scale_val,
                 "ENABLE_LSE": enable_lse,
                 "FP8_DTYPE": torch.float8_e4m3fn,
                 "QUANT_MODE": quant_mode,
@@ -469,6 +468,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         self.v_descale = inputs["dequant_scale_v"]
         self.quant_mode = int(quant_mode)
         self.block_table = inputs["block_table"]
+        # p_scale 由 prepare 按 Optional 返回: None 或 NPU tensor, 直接透传给算子。
         self.p_scale = inputs["p_scale"]
         self.cu_seqlens_q = cu_seqlens_q_t if is_varlen_q else None
         self.cu_seqlens_kv = cu_seqlens_kv_t if is_tnd_kv else None

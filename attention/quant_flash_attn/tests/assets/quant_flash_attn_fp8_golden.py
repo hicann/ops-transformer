@@ -649,7 +649,8 @@ def prepare_npu_inputs_gqa_fp8(
 
     q_npu = q_fp8.contiguous().view(FP8_DTYPE).npu()
     deq_q_npu = dequant_scale_q.npu()
-    p_scale_npu = p_scale.npu()
+    # p_scale 可选: None 保持 None (算子缺省 1.0), 不构造 1.0 占位
+    p_scale_npu = None if p_scale is None else p_scale.npu()
     mask_arg = _build_mask()
 
     if not ENABLE_PA:

@@ -2038,10 +2038,10 @@ def prepare_npu_inputs(
 
     Q_DTYPE = q_fp8.dtype
     DQ_DTYPE = dequant_scale_q.dtype
-    P_SCALE_DTYPE = p_scale.dtype
     q_npu = q_fp8.contiguous().view(Q_DTYPE).npu()
     deq_q_npu = dequant_scale_q.view(DQ_DTYPE).npu()
-    p_scale_npu = p_scale.view(P_SCALE_DTYPE).npu()
+    # p_scale 可选: None 保持 None (算子缺省 1.0), 不构造 1.0 占位
+    p_scale_npu = None if p_scale is None else p_scale.view(p_scale.dtype).npu()
 
     out_dtype = torch.float16
     mask_arg = _build_causal_mask()

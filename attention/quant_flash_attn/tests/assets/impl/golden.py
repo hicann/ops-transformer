@@ -635,6 +635,18 @@ def _cache_cross_check(
     logger.info("[%s] sectioned ref: result=%s", name, tuple(ref_res.shape))
 
 
+def _resolve_p_scale_value(p_scale):
+    """把可选 p_scale tensor 槽归一成 CPU golden 使用的标量。
+    p_scale 是算子入参的 tensor 槽 (None 表示未传)。
+    None/空 → 1.0, 与算子 kernel 对 nullptr 的缺省一致。
+    """
+    if isinstance(p_scale, torch.Tensor):
+        return float(p_scale.item()) if p_scale.numel() > 0 else 1.0
+    if p_scale is None:
+        return 1.0
+    return float(p_scale)
+
+
 def cpu_qfa_mxfp8(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -744,12 +756,9 @@ def cpu_qfa_mxfp8(
     if not actual_seq_kv:
         actual_seq_kv = [max_seqlen_kv] * B if max_seqlen_kv > 0 else []
 
-    # p_scale_value 从 CSV attributes 经 kwargs 传入
-    p_scale_value = kwargs.get("p_scale_value", 1.0)
-    if isinstance(p_scale_value, torch.Tensor):
-        p_scale_value = float(p_scale_value.item())
-    else:
-        p_scale_value = float(p_scale_value)
+    # golden 参考尺度 (不是 CSV attributes 的 p_scale_value):
+    # 从 p_scale tensor 槽取标量, None/空 → 1.0 (与算子 nullptr 缺省一致)。
+    p_scale_value = _resolve_p_scale_value(p_scale)
 
     _apply_golden_globals(
         {
@@ -1197,11 +1206,8 @@ def cpu_qfa_gqa_fp8(
         else 1
     )
 
-    p_scale_value = kwargs.get("p_scale_value", 1.0)
-    if isinstance(p_scale_value, torch.Tensor):
-        p_scale_value = float(p_scale_value.item())
-    else:
-        p_scale_value = float(p_scale_value)
+    # golden 参考尺度: 从 p_scale tensor 槽取 (None/空 → 1.0)
+    p_scale_value = _resolve_p_scale_value(p_scale)
 
     # 注入 golden 全局变量 (cpu_fp8_fullquant_golden 读 N_q/N_kv/SPARSE_MODE 等)
     _apply_golden_globals(
@@ -1413,9 +1419,8 @@ def cpu_qfa_hif8(
     if B is None or B <= 0:
         B = len(actual_seq_q)
 
-    p_scale_value = (
-        float(p_scale.item()) if isinstance(p_scale, torch.Tensor) else float(p_scale)
-    )
+    # golden 参考尺度: 从 p_scale tensor 槽取 (None/空 → 1.0)
+    p_scale_value = _resolve_p_scale_value(p_scale)
 
     _apply_hif8_golden_globals(
         {
@@ -1458,8 +1463,8 @@ def cpu_qfa_hif8(
     )
     p_scale_t = (
         p_scale
-        if isinstance(p_scale, torch.Tensor)
-        else torch.tensor([float(p_scale)], dtype=torch.float32)
+        if isinstance(p_scale, torch.Tensor) and p_scale.numel() > 0
+        else torch.tensor([p_scale_value], dtype=torch.float32)
     )
 
     q_cpu = q.detach().cpu() if isinstance(q, torch.Tensor) else torch.as_tensor(q)
@@ -1919,11 +1924,8 @@ def cpu_qfa_hifp4(
         else:
             B = 1
 
-    p_scale_value = kwargs.get("p_scale_value", 1.0)
-    if isinstance(p_scale_value, torch.Tensor):
-        p_scale_value = float(p_scale_value.item())
-    else:
-        p_scale_value = float(p_scale_value)
+    # golden 参考尺度: 从 p_scale tensor 槽取 (None/空 → 1.0)
+    p_scale_value = _resolve_p_scale_value(p_scale)
 
     _apply_hifp4_golden_globals(
         {

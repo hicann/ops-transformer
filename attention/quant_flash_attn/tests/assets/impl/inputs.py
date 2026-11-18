@@ -112,6 +112,19 @@ def _write_int32_list(slot, values, slot_name):
         slot[...] = arr
 
 
+def _write_optional_p_scale(p_scale, value):
+    """往可选的 p_scale tensor 槽写标量; 槽是 None 时保持 absent。
+
+    p_scale: tensor_view_shapes 里的 p_scale 槽 (None 表示算子不传该输入)
+    value:   要写入的标量 (来自 CSV attributes 的 p_scale_value, 缺失时 1.0)
+    """
+    if p_scale is None:
+        return
+    if isinstance(value, torch.Tensor):
+        value = float(value.item())
+    p_scale[...] = float(value)
+
+
 def _inplace_write_bf16(slot, src_bf16, slot_name):
     """bf16 slot 覆写 (v_tail 专用)。
 
@@ -788,12 +801,8 @@ def generate_qfa_mxfp8_inputs(
     _write_slot(dequant_scale_k, k_scale_e8m0, "dequant_scale_k (slot 4)")
     _write_slot(dequant_scale_v, v_scale_e8m0, "dequant_scale_v (slot 5)")
 
-    # ----- p_scale: in-place 写 fp32 -----
-    p_scale_value = kwargs.get("p_scale_value", 1.0)
-    if isinstance(p_scale_value, torch.Tensor):
-        p_scale_value = float(p_scale_value.item())
-    if p_scale is not None:
-        p_scale[...] = p_scale_value
+    # ----- p_scale: 可选输入, 槽是 None 时保持 absent -----
+    _write_optional_p_scale(p_scale, kwargs.get("p_scale_value", 1.0))
 
     if enable_pa:
         # 空 K cache 时没有 block 映射可填, block_table 保持 slot 原值透传,
@@ -1103,11 +1112,8 @@ def generate_qfa_gqa_fp8_inputs(
     _inplace_write(dequant_scale_k, deq_k_slot, "descale_k (slot 4, BNSD FP32)")
     _inplace_write(dequant_scale_v, deq_v_final, "descale_v (slot 5, [N_kv] FP32)")
 
-    # p_scale: in-place 写 fp32
-    p_scale_value = kwargs.get("p_scale_value", 1.0)
-    if isinstance(p_scale_value, torch.Tensor):
-        p_scale_value = float(p_scale_value.item())
-    p_scale.copy_(torch.tensor([float(p_scale_value)], dtype=torch.float32))
+    # p_scale: 可选输入, 槽是 None 时保持 absent
+    _write_optional_p_scale(p_scale, kwargs.get("p_scale_value", 1.0))
 
     # block_table: int32
     block_table.copy_(bt_real.to(torch.int32))
@@ -1378,10 +1384,7 @@ def generate_qfa_hif8_inputs(
     _inplace_write(dequant_scale_k, quant_scale_k, "descale_k (slot 4)")
     _inplace_write(dequant_scale_v, quant_scale_v, "descale_v (slot 5)")
 
-    p_scale_value = kwargs.get("p_scale_value", 1.0)
-    if isinstance(p_scale_value, torch.Tensor):
-        p_scale_value = float(p_scale_value.item())
-    p_scale.copy_(torch.tensor([float(p_scale_value)], dtype=torch.float32))
+    _write_optional_p_scale(p_scale, kwargs.get("p_scale_value", 1.0))
     if block_table is not None:
         block_table.copy_(torch.zeros_like(block_table))
 
@@ -1777,11 +1780,8 @@ def generate_qfa_hifp4_inputs(
     _hifp4_inplace_write(dequant_scale_k, k_antiquant_scale_np, "descale_k (slot 4)")
     _hifp4_inplace_write(dequant_scale_v, v_antiquant_scale_np, "descale_v (slot 5)")
 
-    # p_scale
-    p_scale_value = kwargs.get("p_scale_value", 1.0)
-    if isinstance(p_scale_value, torch.Tensor):
-        p_scale_value = float(p_scale_value.item())
-    p_scale[...] = float(p_scale_value)
+    # p_scale: 可选输入, 槽是 None 时保持 absent
+    _write_optional_p_scale(p_scale, kwargs.get("p_scale_value", 1.0))
 
     # block_table
     if block_table is not None:
