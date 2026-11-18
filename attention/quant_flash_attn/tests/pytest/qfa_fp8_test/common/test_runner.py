@@ -68,6 +68,19 @@ def execute_test(params, mode, cdir=None):
     返回 (atten_result, lse_result)；当 mode 只含 gen/cpu/npu 之一时返回 (None, None)
     """
     apply_params(params)
+    # attention sink (可选): params["sinks"] 为 [N_q] 的 list/tensor/None。
+    # CPU golden 走后置恒等缩放(golden.SINKS); NPU 作为可选输入透传。
+    sinks = params.get("sinks")
+    golden.SINKS = sinks
+    sinks_dev = (
+        sinks.npu()
+        if torch.is_tensor(sinks)
+        else (
+            torch.tensor(sinks, dtype=torch.float32).npu()
+            if sinks is not None
+            else None
+        )
+    )
     case_name = params["name"]
 
     block_table_torch = None
@@ -89,6 +102,7 @@ def execute_test(params, mode, cdir=None):
                 block_table_torch,
                 golden.NUM_BLOCKS,
                 golden.KV_CACHE_LAYOUT,
+                sinks=sinks,
             ),
             cache_dir=cdir,
         )
@@ -104,9 +118,13 @@ def execute_test(params, mode, cdir=None):
             block_table_torch,
             num_blocks_loaded,
             kv_layout_loaded,
+            sinks_cached,
         ) = golden_cache.load_input(case_name, cache_dir=cdir)
         golden.NUM_BLOCKS = num_blocks_loaded
         golden.KV_CACHE_LAYOUT = kv_layout_loaded
+        if sinks is None and sinks_cached is not None:
+            # 跨进程复用旧缓存时, 以缓存中的 sink 为准, 保持 golden 与输入配套
+            golden.SINKS = sinks_cached
 
     if "gen" in mode and not (mode & {"cpu", "npu", "compare"}):
         return None, None
@@ -154,6 +172,7 @@ def execute_test(params, mode, cdir=None):
                 golden.MAX_SEQLEN_Q,
                 golden.MAX_SEQLEN_KV,
                 block_table_torch,
+                sinks=sinks_dev,
             )
         npu_out, lse_out = output
         golden_cache.save_npu_output(case_name, npu_out, lse_out, cache_dir=cdir)

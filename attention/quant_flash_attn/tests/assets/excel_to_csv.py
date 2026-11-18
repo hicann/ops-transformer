@@ -184,7 +184,7 @@ _TENSOR_SPECS = [
         "learnable_sink_dtype",
         "learnable_sink_datarange",
         "float32",
-        False,
+        True,
     ),
     ("attn_mask_shape", "attn_mask_dtype", "attn_mask_datarange", "int8", False),
     ("metadata_shape", "metadata_dtype", "metadata_datarange", "int32", False),
@@ -245,12 +245,9 @@ class _Columns:
         if name is None:
             return None
         key = _norm_name(name)
-        idx = self._by_name.get(key)
-        if idx is not None:
-            return idx
         if key in _HEADER_ALIASES_NORM:
-            return self._by_name.get(_HEADER_ALIASES_NORM[key])
-        return None
+            key = _HEADER_ALIASES_NORM[key]
+        return self._by_name.get(key)
 
     def raw_get(self, name):
         """不做别名映射，按表头名归一化直接查列（用于别名目标本身也存在的场景）。"""
@@ -406,7 +403,13 @@ def _build_tensor_lists(row, cols, quant_mode):
     dtypes = []
     data_ranges = []
 
-    descale_default = "float32" if quant_mode in (6, 0) else "float8_e8m0"
+    # redline 单 sheet 可能混排多个 quant_mode (MXFP8/FP8/HIF8): 一律按行级
+    # quant_mode 分支, 不能用首行判定的 sheet 级 quant_mode 参数。
+    _row_qm = _str_to_int(row.get(cols.get("quant_mode")))
+    if _row_qm is None:
+        _row_qm = quant_mode
+
+    descale_default = "float32" if _row_qm in (6, 0) else "float8_e8m0"
 
     is_hifp4 = _is_hifp4_row(row, cols)
     if is_hifp4:
@@ -460,12 +463,12 @@ def _build_tensor_lists(row, cols, quant_mode):
         if (
             shape_col in ("q_descale_shape", "k_descale_shape", "v_descale_shape")
             and shape == (0,)
-            and quant_mode == 0
+            and _row_qm == 0
         ):
             shape = (1,)
 
         # GQA FP8 / HIF8 / HiFP4: p_scale 空 shape → 标量 (1,) float32（与原脚本分支一致）
-        if shape_col == "p_scale_shape" and shape == (0,) and quant_mode in (6, 0, 10):
+        if shape_col == "p_scale_shape" and shape == (0,) and _row_qm in (6, 0, 10):
             shape = (1,)
             dtype = "float32"
 
@@ -517,6 +520,28 @@ def _build_tensor_lists(row, cols, quant_mode):
     shapes.extend(vt_shapes)
     dtypes.extend(vt_dtypes)
     data_ranges.extend(vt_dranges)
+
+    # GQA FP8 (quant_mode=6) + PA cache: K/V 每个 block 在数据行之后追加
+    # K_SCALE_ROWS(4) 行占位 (K 存 FP32 scale, V 为占位), 属算子物理布局;
+    # Excel 的 k_shape/v_shape 只填数据行数, 转换时按 cache 布局补齐,
+    # 否则 inputs.py 逆布局会报 shape mismatch。已按物理行数填写的保持不变。
+    if _row_qm == 6:
+        _lk = _strip_or_none(row.get(cols.get("layout_kv"))) or ""
+        if _lk.startswith("PA_"):
+            if _lk == "PA_BBND":
+                _bs_idx = 1
+            elif _lk == "PA_NZ":
+                _bs_idx = 3
+            else:
+                _bs_idx = 2
+            _bs_col = _str_to_int(row.get(cols.get("block_size")))
+            for _slot in (1, 2):
+                _sh = shapes[_slot]
+                if _sh is not None and len(_sh) > _bs_idx and _sh[_bs_idx] > 0:
+                    _dims = list(_sh)
+                    if _bs_col is None or _dims[_bs_idx] == _bs_col:
+                        _dims[_bs_idx] += 4
+                        shapes[_slot] = tuple(_dims)
 
     return shapes, dtypes, data_ranges
 
@@ -625,7 +650,14 @@ def _build_attributes(row, cols):
     _bs_raw = row.get(cols.get("batch_size"))
     if _strip_or_none(_bs_raw) is None:
         _bs_raw = row.get(cols.raw_get("B"))
-    _set_force("batch_size", _str_to_int(_bs_raw))
+    # TND/NTD 为 varlen 布局: batch 由 cu_seqlens 推导, batch_size 必须为 None
+    # (torch_extension 校验 "When the layout of query is TND, the attribute
+    #  batch_size ... must be None")。
+    _layout_q_v = _strip_or_none(row.get(cols.get("layout_q"))) or ""
+    _set_force(
+        "batch_size",
+        None if _layout_q_v in ("TND", "NTD") else _str_to_int(_bs_raw),
+    )
     # enable_pa: 从 layout_kv 前缀推导（接口适配，不是 op 参数推导）
     _set_force("enable_pa", isinstance(layout_kv, str) and layout_kv.startswith("PA_"))
     # kv_cache_layout: Excel layout_kv → wrapper 参数名

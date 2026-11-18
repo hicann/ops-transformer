@@ -154,8 +154,9 @@ public:
         InitKvCuSeqLensParser(cuSeqLensKv, sequsedKv);
 
         if ASCEND_IS_AIV {
-            vecFaBlock_.InitVecBlock(cuSeqLensQ, cuSeqLensKv, pScale, blockTable, dequantScaleQuery, dequantScaleKey,
-                                     dequantScaleValue, softmaxLse, attentionOut, workspace, qCuSeqLensParser_);
+            vecFaBlock_.InitVecBlock(cuSeqLensQ, cuSeqLensKv, pScale, sinks, blockTable, dequantScaleQuery,
+                                     dequantScaleKey, dequantScaleValue, softmaxLse, attentionOut, workspace,
+                                     qCuSeqLensParser_);
             vecFaBlock_.ClearOutput();
         }
 

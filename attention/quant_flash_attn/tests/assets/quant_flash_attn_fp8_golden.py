@@ -57,6 +57,9 @@ logger = logging.getLogger(__name__)
 # FP8 量化 (per-token-head Q/K, per-head V, descale=FP32)
 # ==============================================================================
 FP8_DTYPE = torch.float8_e4m3fn
+# attention sink (可学习): [N_q] float/None; None=不启用(原路径)
+# 语义与 pytest 侧已验收实现一致: 前置注入 max0 = sink - ln(pScale), sum0 = pScale
+SINKS = None
 K_SCALE_ROWS = 4
 EPSILON = 1e-20
 Q_BLOCK_SIZE = 128
@@ -77,6 +80,9 @@ def get_fp8_per_token_head_quant_scale(tensor):
     tensor = tensor.contiguous()
     B, N, S, _ = tensor.shape
     fp8_e4m3_max = 448.0
+    if tensor.numel() == 0:
+        # 空 Q/KV（S=0 的边界用例）无元素可量化，返回 1.0 占位
+        return torch.ones((B, N, S, 1), dtype=torch.float32)
     row_max = torch.abs(tensor).max(dim=3, keepdim=True).values
     row_max = torch.max(row_max, torch.tensor(1e-8, device=tensor.device))
     scale = fp8_e4m3_max / row_max
@@ -87,6 +93,9 @@ def get_fp8_per_head_quant_scale(tensor):
     """per-head quant scale: shape (1, N, 1, 1) FP32."""
     tensor = tensor.contiguous()
     fp8_e4m3_max = 448.0
+    if tensor.numel() == 0:
+        n = tensor.shape[1] if tensor.ndim >= 2 else 1
+        return torch.ones((1, n, 1, 1), dtype=torch.float32)
     head_max = torch.abs(tensor).amax(dim=(0, 2, 3), keepdim=True)
     head_max = torch.max(head_max, torch.tensor(1e-8, device=tensor.device))
     scale = fp8_e4m3_max / head_max
@@ -493,6 +502,16 @@ def cpu_fp8_fullquant_golden(
         ..., None
     ].contiguous()
 
+    # attention sink 前置注入(与 kernel prologue 同域):
+    #   max0 = sink - ln(pScale), sum0 = pScale
+    # 与 kernel 首块 Update 消费的初值完全一致, P 的量化域也一致。
+    if SINKS is not None:
+        sink_t = torch.as_tensor(SINKS, dtype=torch.float32).reshape(1, -1, 1, 1)
+        _ps = float(p_scale.item()) if torch.is_tensor(p_scale) else float(p_scale)
+        ln_ps = torch.tensor([math.log(_ps)], dtype=torch.float32)
+        o_max = (sink_t - ln_ps).expand_as(o_max).clone().contiguous()
+        o_sum = torch.full_like(o_sum, _ps)
+
     q_lens_t = torch.tensor(actual_seq_q, dtype=torch.int32).contiguous()
     k_lens_t = torch.tensor(actual_seq_kv, dtype=torch.int32).contiguous()
     q_lens_acl = q_lens_t.view(batch, 1, 1, 1).contiguous()
@@ -576,13 +595,16 @@ def cpu_fp8_fullquant_golden(
     out_sum = torch.cat(s_blocks, dim=2).contiguous()
     out_max = torch.cat(m_blocks, dim=2).contiguous()
 
-    all_masked = out_max <= minValue.item()
+    # 无有效 key 的行(全 mask / 有效 KV 长度为 0)保持 inf 哨兵, 与 kernel 的
+    # MarkInvalidRowMaxForSink 语义一致; 其余行按 online-softmax 记账输出 LSE。
+    # 前置注入 sink 后 out_max 不再等于 minValue, 必须用 mask 直接判定无效行。
+    valid_rows = (~mask_global).any(dim=-1, keepdim=True)
     lse = torch.where(
-        all_masked,
-        torch.full_like(out_max, float("inf")),
+        valid_rows,
         out_max + torch.log(out_sum + EPSILON),
+        torch.full_like(out_max, float("inf")),
     ).contiguous()
-    result = torch.where(all_masked, torch.zeros_like(result), result)
+    result = torch.where(valid_rows, result, torch.zeros_like(result))
     return result, lse
 
 

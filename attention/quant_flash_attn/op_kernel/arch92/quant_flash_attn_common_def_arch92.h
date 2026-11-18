@@ -341,11 +341,9 @@ struct LseConstInfo {
     bool isSoftmaxLseEnable;
 };
 
-struct SinkConstInfo {
-    bool learnableSinkFlag = false;
-};
-
-struct ConstInfo_t : CommonConstInfo, PAConstInfo, LseConstInfo, SinkConstInfo {};
+// arch92 不支持 attention sink: sinks 输入仅为保持 op 形参一致而透传,
+// kernel 不消费它; 传入非 None sinks 会由 host 侧 SinksChecker 拦截。
+struct ConstInfo_t : CommonConstInfo, PAConstInfo, LseConstInfo {};
 
 struct ConstInfoVTail_t : ConstInfo_t {
     uint32_t seqUsedKvTailSize = 0;

@@ -70,9 +70,15 @@ HIF8_MAX = 32768.0
 ENABLE_ROPE = False
 FP8_DTYPE = torch.float8_e4m3fn
 HIF8_DTYPE = torch.uint8
+# attention sink (可学习): [N_q] float/None; None=不启用(原路径)
+# 语义与 pytest 侧已验收实现一致: 前置注入 max0 = sink - ln(pScale), sum0 = pScale
+SINKS = None
 
 
 def get_hif8_per_tensor_quant_scale(tensor, hif8_max=HIF8_MAX):
+    # 空 KV（KVS=0 的边界用例）没有元素，max() 会报错；返回 1.0 占位
+    if tensor.numel() == 0:
+        return torch.tensor([1.0], dtype=torch.float32)
     max_abs = tensor.abs().max().item()
     if max_abs == 0:
         return torch.tensor([1.0], dtype=torch.float32)
@@ -276,6 +282,14 @@ def cpu_hif8_golden(
         ..., None
     ]
 
+    # attention sink 前置注入(与 kernel prologue 同域):
+    #   max0 = sink - ln(pScale), sum0 = pScale
+    if SINKS is not None:
+        sink_t = torch.as_tensor(SINKS, dtype=torch.float32).reshape(1, -1, 1, 1)
+        ln_ps = torch.tensor([math.log(float(p_scale))], dtype=torch.float32)
+        o_max = (sink_t - ln_ps).expand_as(o_max).clone()
+        o_sum = torch.full_like(o_sum, float(p_scale))
+
     TILES_Q = (Sq + Q_BLOCK_SIZE - 1) // Q_BLOCK_SIZE
     TILES_KV = (Skv + K_BLOCK_SIZE - 1) // K_BLOCK_SIZE
 
@@ -343,13 +357,15 @@ def cpu_hif8_golden(
     out = out / (out_sum + EPSILON)
 
     o_max = torch.cat(m_BLOCKS, dim=2)
-    all_masked = o_max <= minValue.item()
+    # 无有效 key 的行保持 inf 哨兵, 与 kernel 的 MarkInvalidRowMaxForSink 语义一致;
+    # 前置注入 sink 后 o_max 不再等于 minValue, 必须用 mask 直接判定无效行。
+    valid_rows = (~mask_global).any(dim=-1, keepdim=True)
     lse = torch.where(
-        all_masked,
-        torch.full_like(o_max, float("inf")),
+        valid_rows,
         o_max + torch.log(out_sum + EPSILON),
+        torch.full_like(o_max, float("inf")),
     )
-    out = torch.where(all_masked, torch.zeros_like(out), out)
+    out = torch.where(valid_rows, out, torch.zeros_like(out))
     logger.info("[CPU Golden] output=%s", out.shape)
     return out, lse
 
@@ -405,7 +421,13 @@ def cpu_hif8_scheduled_golden(
 
     d = int(q.shape[-1])
     scale = softmax_scale if softmax_scale is not None else 1.0 / math.sqrt(d)
-    ln_ps = math.log(float(torch.as_tensor(p_scale).reshape(-1)[0]))
+    ps_val = float(torch.as_tensor(p_scale).reshape(-1)[0])
+    ln_ps = math.log(ps_val)
+    sinks = (
+        None
+        if SINKS is None
+        else torch.as_tensor(SINKS, dtype=torch.float32).reshape(-1)
+    )
 
     sn, ac, mb, kb = (int(sched[i]) for i in (0, 4, 2, 3))
     if mb <= 0 or kb <= 0:
@@ -421,6 +443,9 @@ def cpu_hif8_scheduled_golden(
         if sq <= 0 or sk <= 0:
             continue
         for h in range(num_heads_q):
+            # attention sink: 每个 head 独立注入 max0 = sink - ln(pScale),
+            # sum0 = pScale(仅首段); GQA 下 sink 按 Q head 索引取值。
+            sink_h = None if sinks is None else float(sinks[h])
             bn = b * num_heads_q + h
             for mi, lo in enumerate(range(0, sq, mb)):
                 hi = min(lo + mb, sq)
@@ -458,8 +483,16 @@ def cpu_hif8_scheduled_golden(
                     )
                 nums, sums, maxes = [], [], []
                 for st, en in parts:
-                    m = torch.full((hi - lo, 1), fmin)
-                    su = torch.zeros_like(m)
+                    if sink_h is None:
+                        m = torch.full((hi - lo, 1), fmin)
+                        su = torch.zeros_like(m)
+                    else:
+                        m = torch.full((hi - lo, 1), sink_h - ln_ps)
+                        su = torch.full(
+                            (hi - lo, 1),
+                            ps_val if st == 0 else 0.0,
+                            dtype=torch.float32,
+                        )
                     o = torch.zeros((hi - lo, v.shape[-1]))
                     for j in range(st, en):
                         ks, ke = j * kb, min((j + 1) * kb, sk)
@@ -586,6 +619,14 @@ def cpu_hif8_bench(
     TILES_KV = (Skv + K_BLOCK_SIZE - 1) // K_BLOCK_SIZE
     ln_p_scale = math.log(p_scale_value)
 
+    # attention sink 前置注入(与主 golden / kernel prologue 同域):
+    #   max0 = sink - ln(pScale), sum0 = pScale
+    # 三方 bench 必须与 target 同 sink 语义, 否则比值判据失真。
+    if SINKS is not None:
+        sink_t = torch.as_tensor(SINKS, dtype=acc_dtype).reshape(1, -1, 1, 1)
+        o_max = (sink_t - ln_p_scale).expand_as(o_max).clone()
+        o_sum = torch.full_like(o_sum, p_scale_value)
+
     logger.info(
         "[CPU Bench FP64] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
         TILES_Q,
@@ -650,13 +691,15 @@ def cpu_hif8_bench(
                 o_max[:, :, Sq_start:Sq_end, :] = m_block_j
 
     result = out / (o_sum + EPSILON)
-    all_masked = o_max <= float("-inf")
+    # 无有效 key 的行保持 inf 哨兵(与主 golden / kernel 一致); 有 sink 时
+    # o_max 不再是 -inf, 必须用 mask 判定无效行。
+    valid_rows = (~mask_global).any(dim=-1, keepdim=True)
     lse = torch.where(
-        all_masked,
-        torch.full_like(o_max, float("inf")),
+        valid_rows,
         o_max + torch.log(o_sum + EPSILON),
+        torch.full_like(o_max, float("inf")),
     )
-    result = torch.where(all_masked, torch.zeros_like(result), result)
+    result = torch.where(valid_rows, result, torch.zeros_like(result))
     logger.info("[CPU Bench FP64] output=%s", result.shape)
     return result.float().contiguous(), lse.float().contiguous()
 

@@ -172,11 +172,11 @@ public:
         if ASCEND_IS_AIV {
             if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
                 vecFaBlock_.InitVecBlock(cuSeqLensQ, cuSeqLensKv, dequantScaleQuery, dequantScaleKey, dequantScaleValue,
-                                         pScale, attnMask, softmaxLse, attnOut, workspace);
+                                         pScale, sinks, attnMask, softmaxLse, attnOut, workspace);
                 vecFaBlock_.SetCuSeqLensParser(qCuSeqLensParser_);
             } else {
                 vecFaBlock_.InitVecBlock(sequsedQ, sequsedKv, dequantScaleQuery, dequantScaleKey, dequantScaleValue,
-                                         pScale, attnMask, softmaxLse, attnOut, workspace);
+                                         pScale, sinks, attnMask, softmaxLse, attnOut, workspace);
                 vecFaBlock_.SetCuSeqLensParser(qSeqUsedParser_);
             }
             vecFaBlock_.ClearOutput();
@@ -660,6 +660,10 @@ public:
                 info.faTmpOutWsPos = headS2Split_ ? (info.faTmpOutWsPos + 1) : info.faTmpOutWsPos;
             }
         }
+        // sink owner: 只有承接本 task 起始 S2 的分片(或非拆分 task)唯一计入 sink 分母项。
+        // headS2Split_ 表示本核 section 的首个 S2 不是该 task 的起点(起点在别的核),
+        // 此时该分片 sum0=0, 由起点分片计入一次, FD 合并按 max 归一后 sink 项恰好出现一次。
+        info.isSinkOwner = !(headS2Split_ && (bN2Cur == bN2Start_) && (gS1Cur == gS1OStart_));
     }
 
     __aicore__ inline void UpdateAxisInfo(TASK_DEAL_MODE taskDealMode, uint32_t& bN2Cur, uint32_t& gS1Cur,

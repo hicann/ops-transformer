@@ -48,6 +48,7 @@ PARAM_NAMES = [
     "seed_k",
     "seed_v",
     "seed_block_table",
+    "sinks",
 ]
 
 TEST_PARAMS_DEFAULTS = {
@@ -76,6 +77,7 @@ TEST_PARAMS_DEFAULTS = {
     "seed_k": [3],
     "seed_v": [20],
     "seed_block_table": [1234],
+    "sinks": [None],
 }
 
 

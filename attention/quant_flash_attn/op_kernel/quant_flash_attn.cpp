@@ -360,7 +360,7 @@ using namespace AscendC;
 using namespace optiling;
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
-          bool isFd, bool hasVTail>
+          bool isFd, bool hasVTail, bool hasSink>
 __aicore__ inline void quant_flash_attn_mxfp8(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* dequantScaleQuery,
     __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
@@ -399,7 +399,9 @@ __aicore__ inline void quant_flash_attn_mxfp8(
     using VecFaBlock =
         BaseApi::QuantFlashAttnBlockVecMxfp8<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
                                              s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType,
-                                             isFd, useDn, isDAligned, hasVTail>;
+                                             isFd, useDn, isDAligned, hasVTail, hasSink>;
+    // FD 合并阶段不再单独注入 sink: 分片侧已按 owner(isSinkOwner) 计入且共享同一网格 max,
+    // FD 合并(max 归一)天然只保留一份 sink 分母。FD block 保持无 sink 原路径, 零额外开销。
     using VecFdBlock =
         BaseApi::QuantFlashAttnBlockVecFlashDecode<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
                                                    s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
@@ -435,7 +437,7 @@ __aicore__ inline void quant_flash_attn_mxfp8(
 // quant_flash_attn_kernel_run_gqa: GQA FP8 Fullquant
 // ─────────────────────────────────────────────────────────
 template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask,
-          uint8_t config>
+          uint8_t config, bool hasSink>
 inline __aicore__ void quant_flash_attn_gqa_fp8(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* qDescale,
     __gm__ uint8_t* kDescale, __gm__ uint8_t* vDescale, __gm__ uint8_t* blockTable, __gm__ uint8_t* pScale,
@@ -463,7 +465,7 @@ inline __aicore__ void quant_flash_attn_gqa_fp8(
     using Fp8VecFaBlock =
         BaseApi::QuantFlashAttnBlockVecGqaFp8<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
                                               s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType,
-                                              false, useDn>;
+                                              false, useDn, hasSink>;
     using VecFdBlock =
         BaseApi::QuantFlashAttnBlockVecFlashDecode<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
                                                    s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
@@ -496,7 +498,7 @@ inline __aicore__ void quant_flash_attn_gqa_fp8(
 }
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
-          bool isFd>
+          bool isFd, bool hasSink>
 __aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
                                              __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
                                              __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
@@ -528,9 +530,10 @@ __aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t* query, __gm__ uint8
         BaseApi::QuantFlashAttnBlockCubeHif8<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
                                              dTemplateType, dVTemplateType, KvLayoutType, useDn>;
     // 透传 tiling key 的 isFd，使 HIF8 vector block 编译出局部结果写 workspace 的 FD 路径。
-    using VecFaBlock = BaseApi::QuantFlashAttnBlockVecHif8<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
-                                                           s1TemplateType, s2TemplateType, dTemplateType,
-                                                           dVTemplateType, hasAttenMask, KvLayoutType, isFd, useDn>;
+    using VecFaBlock =
+        BaseApi::QuantFlashAttnBlockVecHif8<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
+                                            s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType,
+                                            isFd, useDn, hasSink>;
     using VecFdBlock =
         BaseApi::QuantFlashAttnBlockVecFlashDecode<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
                                                    s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
@@ -563,7 +566,7 @@ __aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t* query, __gm__ uint8
 }
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
-          bool isFd, bool hasVTail>
+          bool isFd, bool hasVTail, bool hasSink>
 __global__ __aicore__ void quant_flash_attn(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* dequantScaleQuery,
     __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
@@ -579,19 +582,20 @@ __global__ __aicore__ void quant_flash_attn(
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == QFA_MXFP8_FP32_PREFILL || quantMode == QFA_MXFP8_FP32_DECODE) {
-        quant_flash_attn_mxfp8<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd, hasVTail>(
+        quant_flash_attn_mxfp8<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd, hasVTail, hasSink>(
             query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, vTail, blockTableTail, sequsedVTail, attnOut,
             softmaxLse, workspace, tilingData);
     }
     if constexpr (quantMode == QFA_GQA_FP8_FULLQUANT) {
-        quant_flash_attn_gqa_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config>(
-            query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
-            cuSeqLensKv, sequsedQ, sequsedKv, sinks, metadata, attnOut, softmaxLse, user, tilingData);
+        quant_flash_attn_gqa_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config,
+                                 hasSink>(query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue,
+                                          blockTable, pScale, cuSeqLensQ, cuSeqLensKv, sequsedQ, sequsedKv, sinks,
+                                          metadata, attnOut, softmaxLse, user, tilingData);
     }
 #elif (ORIG_DTYPE_Q == DT_HIFLOAT8)
     if constexpr (quantMode == QFA_HIF8_FP32) {
-        quant_flash_attn_hif8<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd>(
+        quant_flash_attn_hif8<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd, hasSink>(
             query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, attnOut, softmaxLse, workspace, tilingData);
     }

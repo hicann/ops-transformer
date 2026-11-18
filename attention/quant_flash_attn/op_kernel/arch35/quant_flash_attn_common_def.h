@@ -200,6 +200,10 @@ struct RunInfoX {
     uint32_t actSingleLoopS2Size = 0;
     uint32_t actSingleLoopS2SizeAlign;
     bool isS2SplitCore = false;
+    // sink 分母项的唯一归属分片(默认: 非拆分 task 恒为 owner)。
+    // 不能用 s2Idx==0 判定: sparse/BAND/sliding 及 section split 下, 本 task 的
+    // 首个有效 S2 块索引可能 >0, 那时所有分片 s2Idx 都非 0, sink 会被静默丢弃。
+    bool isSinkOwner = true;
     uint32_t faTmpOutWsPos = 0;
 
     int64_t preTokensLeftUp = 0;

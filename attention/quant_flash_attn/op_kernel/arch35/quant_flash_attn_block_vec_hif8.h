@@ -30,6 +30,7 @@
 #include "../../../common/op_kernel/vector_common.h"
 #include "../../../common/op_kernel/arch35/util_regbase.h"
 #include "../../../common/op_kernel/init_output.h"
+#include "../../../common/op_kernel/attn_sink_gs1.h"
 
 using namespace AscendC;
 using namespace FaVectorApi;
@@ -44,7 +45,7 @@ template <typename INPUT_T, typename T, typename OUTPUT_T, LayOutTypeEnum layout
           S2TemplateType s2TemplateType = S2TemplateType::Aligned128,
           DTemplateType dTemplateType = DTemplateType::Aligned128,
           DTemplateType dVTemplateType = DTemplateType::Aligned128, bool hasAtten = false, uint8_t KvLayoutType = 0,
-          bool isFd = false, bool useDn = false>
+          bool isFd = false, bool useDn = false, bool hasSinkFlag = false>
 class QuantFlashAttnBlockVecHif8 {
 public:
     /* =================编译期常量的基本块信息================= */
@@ -67,6 +68,18 @@ public:
     static constexpr uint32_t MXFP_GROUP_SIZE = 32U;
     static constexpr bool HAS_MASK = hasAtten;
     static constexpr bool FLASH_DECODE = isFd;
+    static constexpr bool HAS_SINK = hasSinkFlag;
+    // sink 与 FD 兼容: 只有 owner 分片(sum0=pScale)计入 sink 分母项, 其余分片 sum0=0,
+    // FD 合并按 max 归一后 sink 项恰好出现一次。
+
+    // sink 标量暂存: 每 M 块只需 1 个 float(BRC 只读首元素), 按 mloop 分槽隔离
+    // (前一 M 块的 prologue VF 可能仍在读); 槽距 8 float(32B) 满足 BRC 基址对齐,
+    // 总大小随 PRELOAD_N 自适应, 避免槽数与缓冲区大小隐式耦合。
+    static constexpr uint32_t UB_SINK_STAGE_SLOT_BYTES = 32U;
+    static constexpr uint32_t UB_SINK_STAGE_SLOT_ELEMS = UB_SINK_STAGE_SLOT_BYTES / sizeof(float);
+    // 末尾额外 1 槽缓存 ln(pScale), task 内只计算一次
+    static constexpr uint32_t UB_SINK_LN_SLOT_INDEX = PRELOAD_N + 1U;
+    static constexpr uint32_t UB_SINK_STAGE_BYTES = (PRELOAD_N + 2U) * UB_SINK_STAGE_SLOT_BYTES;
 
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
 
@@ -119,6 +132,7 @@ public:
     // gm
     GlobalTensor<OUTPUT_T> attentionOutGm_;
     GlobalTensor<float> softmaxLseGm_;
+    GlobalTensor<float> sinkGm_;
 
     GlobalTensor<int32_t> actualSeqLengthsGmQ_;
     using QSeqParserType =
@@ -142,6 +156,9 @@ public:
     LocalTensor<uint8_t> l1PBuffers_;
     uint32_t bmm1ResBufId_ = 0U;
     uint32_t l1PBufId_ = 0U;
+    // sink 标量暂存(静态 UB 布局): mloop 分槽 + 1 个 ln(pScale) 槽, 每槽 32B
+    LocalTensor<float> sinkStageBuf_;
+    bool sinkLnReady_{false};
 
     // ub (静态Tensor: 显式UB地址, 不再使用TBuf/TQue)
     LocalTensor<INPUT_T> stage1OutBuf_[UB_STAGE1_OUT_BUFCNT];
@@ -200,7 +217,7 @@ public:
     __aicore__ inline void InitVecBlock(__gm__ uint8_t* actualSeqQlenAddr, __gm__ uint8_t* actualSeqKvlenAddr,
                                         __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
                                         __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* pScale,
-                                        __gm__ uint8_t* attenMask, __gm__ uint8_t* softmaxLse,
+                                        __gm__ uint8_t* sinks, __gm__ uint8_t* attenMask, __gm__ uint8_t* softmaxLse,
                                         __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace)
     {
         uint32_t tmp1 = NEGATIVE_MIN_VALUE_FP32;
@@ -222,12 +239,14 @@ public:
         SetVScale(vScale);
         UpdateMinCheckValue();
 
-        InitVecInput(actualSeqQlenAddr, actualSeqKvlenAddr, pScale, attenMask, softmaxLse, attentionOut, workspace);
+        InitVecInput(actualSeqQlenAddr, actualSeqKvlenAddr, pScale, sinks, attenMask, softmaxLse, attentionOut,
+                     workspace);
     }
 
     __aicore__ inline void InitVecInput(__gm__ uint8_t* actualSeqQlenAddr, __gm__ uint8_t* actualSeqKvlenAddr,
-                                        __gm__ uint8_t* pScale, __gm__ uint8_t* attenMask, __gm__ uint8_t* softmaxLse,
-                                        __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace)
+                                        __gm__ uint8_t* pScale, __gm__ uint8_t* sinks, __gm__ uint8_t* attenMask,
+                                        __gm__ uint8_t* softmaxLse, __gm__ uint8_t* attentionOut,
+                                        __gm__ uint8_t* workspace)
     {
         this->attentionOutGm_.SetGlobalBuffer((__gm__ OUTPUT_T*)attentionOut);
         if (constInfo_.isSoftmaxLseEnable) {
@@ -243,6 +262,9 @@ public:
                 pScaleGm_.SetGlobalBuffer((__gm__ float*)pScale);
                 pScaleValue_ = this->pScaleGm_.GetValue(0);
             }
+        }
+        if constexpr (HAS_SINK) {
+            sinkGm_.SetGlobalBuffer((__gm__ float*)sinks);
         }
 
         if constexpr (FLASH_DECODE) {
@@ -348,9 +370,91 @@ public:
 
     // =================================Private Functions=================================
 
+    // 前置(prologue)注入: HIF8 无 e8m0 网格约束(pScale 恒为 1), 直接把 sink 作为
+    // online-softmax 初值: max0 = sink - ln(pScale), sum0 = exp(sink - max0) = pScale。
+    // 仿非量化 flash_attn arch35: 首块恒走 Update 消费该初值。
+    // prologue 复用公共 sink 原语; 原语按 DIST_BRC_B32 只读 staging 首元素广播, 故只需写 1 个元素。
+    __aicore__ inline void ResetSoftmaxBuffer(const RunInfoX& runInfo)
+    {
+        LocalTensor<float> sumUb = this->softmaxSumBuf_[runInfo.mloop % (PRELOAD_N + 1)];
+        LocalTensor<float> maxUb = this->softmaxMaxBuf_[runInfo.mloop % (PRELOAD_N + 1)];
+        // DN: 同一 M 块属单一 head, sink 为标量; FD 拆片时仅 owner 分片计入 sink 分母项
+        // staging 使用静态 sinkStageBuf_(每槽 1 float, 见 UB_SINK_STAGE_*), 槽位按 mloop 分隔;
+        // 前一 M 块的 prologue VF 可能仍在读, 复用同一格会被本块标量写覆盖。
+        LocalTensor<float> sinkTmpUb =
+            this->sinkStageBuf_[static_cast<int32_t>(runInfo.mloop % (PRELOAD_N + 1)) * UB_SINK_STAGE_SLOT_ELEMS];
+        LocalTensor<float> sinkLnUb =
+            this->sinkStageBuf_[static_cast<int32_t>(UB_SINK_LN_SLOT_INDEX) * UB_SINK_STAGE_SLOT_ELEMS];
+        // sink 标量用 V 流水指令(Duplicate)写入: 与紧随其后的 prologue VF 同属 V 流水,
+        // 天然保序, 无需 S->V 事件(与 FP8 方案一致); 只写首元素即可,
+        // SinkPrologueVF 用 DIST_BRC_B32 只读该元素并广播到全部 lane。
+        Duplicate(sinkTmpUb, static_cast<float>(sinkGm_.GetValue(runInfo.realN2Idx)), 1U);
+        // ln(pScale) 在 task 内只算一次; 后续 M 块直接 BRC 广播, 省掉每块一次全 lane Ln。
+        if (!sinkLnReady_) {
+            AttentionCommon::SinkLnScaleVF<float>((__ubuf__ float*)sinkLnUb.GetPhyAddr(), pScaleValue_);
+            sinkLnReady_ = true;
+            PipeBarrier<PIPE_V>();
+        }
+        AttentionCommon::SinkPrologueVF<float, float>(
+            (__ubuf__ float*)sumUb.GetPhyAddr(), (__ubuf__ float*)maxUb.GetPhyAddr(),
+            (__ubuf__ float*)sinkTmpUb.GetPhyAddr(), pScaleValue_, (__ubuf__ float*)sinkLnUb.GetPhyAddr(),
+            GetSinkM(runInfo), runInfo.isSinkOwner);
+        PipeBarrier<PIPE_V>();
+    }
+
+    // 与首块 softmax VF 的 m 实参保持一致(DN 下为 64)
+    __aicore__ inline uint32_t GetSinkM(const RunInfoX& runInfo) const
+    {
+        return ((runInfo.actMSizeAlign32 >> 1) + 63) >> 6 << 6;
+    }
+
+    // sink 场景下, 无有效 key 的行会拿到 sink 初值, 直接算 LSE 会得到有限值,
+    // 而 golden 该行为 inf 哨兵。判据与 RowInvalid 完全一致: 把这些行的 max 槽位置为
+    // minValue_(HIF8 的 LSE/RowInvalid 都按该值判据), Vec2 的 RowInvalidUpdateVF
+    // 会把 O 清 0。
+    __aicore__ inline void MarkInvalidRowMaxForSink(LocalTensor<float>& maxUb, const RunInfoX& runInfo, uint32_t rows)
+    {
+        if constexpr (HAS_SINK && HAS_MASK) {
+            if (rows == 0 || runInfo.actS1Size == 0) {
+                return;
+            }
+            int64_t s1FirstValidToken =
+                AttentionCommon::Min(AttentionCommon::Max(-runInfo.nextTokensLeftUp, 0), runInfo.actS1Size);
+            int64_t s1LastValidToken = AttentionCommon::Min(
+                AttentionCommon::Max(runInfo.preTokensLeftUp + runInfo.actS2Size, 0), runInfo.actS1Size);
+            s1LastValidToken = AttentionCommon::Max(s1LastValidToken - 1, 0);
+            if (s1FirstValidToken <= 0 && s1LastValidToken >= static_cast<int64_t>(runInfo.actS1Size) - 1) {
+                return; // 全有效: 热路径不付出代价
+            }
+            // DN 下 realGSize == 1, 行号即 s1 坐标; s1 随 r 单调, 只需比较区间两端点
+            // 即可判定本块是否含无效行(O(1), 与 MXFP8 的端点预判同构), 不必逐行扫描。
+            const uint32_t s1Start = runInfo.gS1Idx + runInfo.vecMbaseIdx;
+            const int64_t s1StartI64 = static_cast<int64_t>(s1Start);
+            const int64_t s1EndI64 = s1StartI64 + static_cast<int64_t>(rows) - 1;
+            if (s1StartI64 >= s1FirstValidToken && s1EndI64 <= s1LastValidToken) {
+                return; // 整块有效
+            }
+            // 向量标记: 标量先算好行区间阈值, 向量侧只做 Arange/Compares/Select,
+            // 不含 Div/Mod; DN 下 realGSize==1, 行号即 s1 坐标。
+            // 与 softmax VF 的 store / 后续 LSE VF 的 load 构成 V 流水 RAW 依赖,
+            // 用 V 屏障保证可见性(与 MXFP8 路径一致, 避免全流水屏障)。
+            const int32_t loThrI32 = AttentionCommon::SinkClampToI32(s1FirstValidToken - s1StartI64);
+            const int32_t hiThrI32 = AttentionCommon::SinkClampToI32((s1LastValidToken + 1) - s1StartI64);
+            PipeBarrier<PIPE_V>();
+            AttentionCommon::MarkInvalidRowMaxS1GVF<float, mBaseSize / CV_RATIO>(
+                (__ubuf__ float*)maxUb.GetPhyAddr(), rows, loThrI32, hiThrI32, *((float*)&minValue_));
+            PipeBarrier<PIPE_V>();
+        }
+    }
+
     __aicore__ inline void ProcessVec1Dn(LocalTensor<INPUT_T>& mm2AL1Tensor, LocalTensor<T>& mmRes, RunInfoX runInfo,
                                          uint32_t mmFreeSyncIdx)
     {
+        if constexpr (HAS_SINK) {
+            if (unlikely(runInfo.isFirstS2Loop)) {
+                ResetSoftmaxBuffer(runInfo);
+            }
+        }
         int64_t maskLine = 0;
         if constexpr (HAS_MASK) {
             maskLine = ComputeMaskLineDN(runInfo);
@@ -369,14 +473,15 @@ public:
         uint32_t s2CalcSize = runInfo.actSingleLoopS2Size;
 
         if (unlikely(runInfo.isFirstS2Loop)) {
+            // sink 场景首块恒走 Update 变体, 消费 ResetSoftmaxBuffer 前置的 (max0, sum0)
             if (unlikely(!isSkipMask_)) {
-                FaVectorApi::ProcessVec1VfDnHif8<T, INPUT_T, false, hasAtten, s2BaseSize>(
+                FaVectorApi::ProcessVec1VfDnHif8<T, INPUT_T, HAS_SINK, hasAtten, s2BaseSize>(
                     stage1CastTensor, sumUb, maxUb, mmRes, expUb, vselrIndexesTensor_,
                     ((runInfo.actMSizeAlign32 >> 1) + 63) >> 6 << 6, runInfo.actSingleLoopS2SizeAlign, s2CalcSize,
                     static_cast<T>(constInfo_.scaleValue), descaleQKValue_, pScaleValue_, negativeFloatScalar_, 0.0F,
                     maskLine);
             } else {
-                FaVectorApi::ProcessVec1VfDnHif8<T, INPUT_T, false, false, s2BaseSize>(
+                FaVectorApi::ProcessVec1VfDnHif8<T, INPUT_T, HAS_SINK, false, s2BaseSize>(
                     stage1CastTensor, sumUb, maxUb, mmRes, expUb, vselrIndexesTensor_,
                     ((runInfo.actMSizeAlign32 >> 1) + 63) >> 6 << 6, runInfo.actSingleLoopS2SizeAlign, s2CalcSize,
                     static_cast<T>(constInfo_.scaleValue), descaleQKValue_, pScaleValue_, negativeFloatScalar_, 0.0F,
@@ -456,6 +561,7 @@ public:
         uint32_t vecMIdx = runInfo.gS1Idx + runInfo.vecMbaseIdx;
         LocalTensor<float> lseUb = this->softmaxLseBuf_;
         WaitFlag<HardEvent::MTE3_V>(MTE3_V_EVENT1);
+        MarkInvalidRowMaxForSink(softmaxMaxTmp, runInfo, vecMSize);
         ComputeLseOutputVF(lseUb, softmaxSumTmp, softmaxMaxTmp, vecMSize, minValue_);
         SetFlag<HardEvent::V_MTE3>(V_MTE3_EVENT1);
         WaitFlag<HardEvent::V_MTE3>(V_MTE3_EVENT1);
@@ -501,6 +607,15 @@ public:
                     vec2ResUb, mmRes, vec2ResUb, expUb, pScaleUb, vecMSize, dTemplateAlign64, vScaleValue_, 1.0f);
             } else {
                 LocalTensor<float> sumUb = this->softmaxSumBuf_[runInfo.mloop % (PRELOAD_N + 1)];
+                // FD 非 owner 分片(sum0=0)在大 sink 下 P 全下溢时, running sum 精确为 0,
+                // 与单块分支同样的 0/0 保护: 用 FLT_MIN 兜底, 分子同为 0 时输出 0。
+                if constexpr (HAS_SINK) {
+                    if (unlikely(runInfo.isS2SplitCore && !runInfo.isSinkOwner)) {
+                        constexpr float SUM_FLOOR = 1.17549435e-38f; // FLT_MIN
+                        Maxs(sumUb, sumUb, SUM_FLOOR, static_cast<int32_t>(vecMSize));
+                        PipeBarrier<PIPE_V>();
+                    }
+                }
                 FlashUpdateLastNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false, false>(
                     vec2ResUb, mmRes, vec2ResUb, expUb, pScaleUb, sumUb, vecMSize, dTemplateAlign64, vScaleValue_,
                     1.0f);
@@ -686,6 +801,9 @@ public:
         }
         int64_t calculateSize = runInfo.actVecMSize * fp32BaseSize;
         int64_t gmOffset = runInfo.faTmpOutWsPos * mBaseSize * fp32BaseSize + runInfo.vecMbaseIdx * fp32BaseSize;
+        // FD 拆片同样要打无效行哨兵: 合并侧只在合并 max == minValue_ 时把 LSE 置 inf;
+        // 标记后该分片 partial max 恰为哨兵, 合并时 exp(max_i-M)=0, 分子分母贡献均为 0。
+        MarkInvalidRowMaxForSink(maxUb, runInfo, runInfo.actVecMSize);
         BroadCastAndCopyOut(runInfo, sumUb, maxUb, gmOffset, calculateSize);
     }
 
@@ -725,6 +843,15 @@ public:
         if (runInfo.isLastS2Loop) {
             if (unlikely(runInfo.isFirstS2Loop)) {
                 LocalTensor<float> sumUb = this->softmaxSumBuf_[runInfo.mloop % (PRELOAD_N + 1)];
+                // 只有 FD 非 owner 分片(sum0=0)在大 sink 下 P 全下溢时, 分母才会精确为 0;
+                // 用 FLT_MIN 兜底避免 0/0=NaN(分子同为 0 时输出 0)。
+                if constexpr (HAS_SINK) {
+                    if (unlikely(runInfo.isS2SplitCore && !runInfo.isSinkOwner)) {
+                        constexpr float SUM_FLOOR = 1.17549435e-38f; // FLT_MIN
+                        Maxs(sumUb, sumUb, SUM_FLOOR, static_cast<int32_t>(runInfo.actVecMSize));
+                        PipeBarrier<PIPE_V>();
+                    }
+                }
                 LastDivNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false>(
                     stage2OutBuf_, stage2OutBuf_, sumUb, runInfo.actVecMSize, (uint16_t)dTemplateAlign64, 1.0f);
             }
@@ -744,13 +871,15 @@ public:
 
     // FA保留区字节数(紧跟kernel侧ubBufferManager_的跨核bmm区之后):
     // softmax状态(9*256) + brdcst(FLASH_DECODE时2*2048) + softmaxLseBuf(2048, 常开) + vselr索引表(256)
+    // + sink标量暂存(HAS_SINK时 4*32B)
     static __aicore__ inline constexpr uint32_t GetPersistUbSize()
     {
         constexpr uint32_t softmaxSize = 9U * 256U;
         constexpr uint32_t brdcstSize = FLASH_DECODE ? (2U * 2048U) : 0U;
         constexpr uint32_t lseSize = (mBaseSize >> 1U) * sizeof(float) * 8U;
         constexpr uint32_t vselrSize = isFp8 ? 256U : 0U;
-        return softmaxSize + brdcstSize + lseSize + vselrSize;
+        constexpr uint32_t sinkStageSize = HAS_SINK ? UB_SINK_STAGE_BYTES : 0U;
+        return softmaxSize + brdcstSize + lseSize + vselrSize + sinkStageSize;
     }
 
     // FA瞬态区字节数: stage2Out + stage1Out*2, FD静态Tensor业务区(见FD block GetFdTotalUbSize)
@@ -814,6 +943,12 @@ public:
             }
             // 与 GetPersistUbSize 的 vselrSize(isFp8 ? 256U : 0U) 口径一致
             addr += 256U;
+        }
+
+        if constexpr (HAS_SINK) {
+            // 与 GetPersistUbSize 的 sinkStageSize 口径一致
+            sinkStageBuf_ = LocalTensor<float>(TPosition::VECCALC, addr, UB_SINK_STAGE_BYTES / sizeof(float));
+            addr += UB_SINK_STAGE_BYTES;
         }
 
         // ===== 瞬态区: FD静态Tensor覆盖区, 分配顺序与GetTransientUbSize保持一致 =====

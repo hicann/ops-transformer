@@ -175,6 +175,7 @@ void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyInfo()
     tilingKeyInfo_.hasAttenMask = (qfaInfo_->maskMode != static_cast<int64_t>(MaskMode::NO_MASK));
     UpdateTilingKeyKvLayout();
     tilingKeyInfo_.isFd = flashDecodeFlag_;
+    tilingKeyInfo_.hasSink = qfaInfo_->sinksFlag;
 }
 
 void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyQuantMode()
@@ -185,9 +186,9 @@ void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyQuantMode()
 void QuantFlashAttnTilingHif8Impl::GenTilingKey()
 {
     UpdateTilingKeyInfo();
-    tilingKey_ =
-        GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.quantMode,
-                           tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd, false);
+    tilingKey_ = GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.quantMode,
+                                    tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd,
+                                    false, tilingKeyInfo_.hasSink);
 
     OP_LOGI(qfaInfo_->opName, "HIF8 The tilingkey is %llu.", tilingKey_);
     OP_LOGI(qfaInfo_->opName,

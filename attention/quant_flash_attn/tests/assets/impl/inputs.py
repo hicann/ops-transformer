@@ -43,6 +43,33 @@ def _empty_like_slot(slot, dtype):
     return torch.zeros(tuple(slot.shape), dtype=dtype)
 
 
+def _pad_seq_dim_to_slot(src, slot, layout):
+    """序列维小于 CSV slot 时在尾部补零（seqused 之后的行不参与计算）。
+
+    CSV 允许 k/v 的 S 大于 seqused 最大值（decode padding）。布局转换函数按
+    max(seqused) 截断，这里补回 slot 长度；仅序列维不同、其余维一致时生效。
+    """
+    dim = {"TND": 0, "BSND": 1, "BSH": 1, "BNSD": 2}.get((layout or "").upper())
+    if dim is None or slot is None or src is None:
+        return src
+    if len(src.shape) != len(slot.shape):
+        return src
+    if tuple(src.shape) == tuple(slot.shape):
+        return src
+    if any(
+        int(src.shape[i]) != int(slot.shape[i])
+        for i in range(len(src.shape))
+        if i != dim
+    ):
+        return src
+    if int(src.shape[dim]) >= int(slot.shape[dim]):
+        return src
+    pad_shape = list(src.shape)
+    pad_shape[dim] = int(slot.shape[dim]) - int(src.shape[dim])
+    zeros = torch.zeros(pad_shape, dtype=src.dtype)
+    return torch.cat([src, zeros], dim=dim)
+
+
 def _write_int32_list(slot, values, slot_name):
     """把 attributes 里的 int 值列表写进 CSV tensor slot（覆盖 ttk 随机生成）。
 
@@ -777,9 +804,10 @@ def generate_qfa_mxfp8_inputs(
         block_table[...] = 0
 
     # ----- 新增 slot 8-14: 用 attributes 真实值覆盖 ttk 随机生成的 cu_seqlens/seqused。
-    # sinks/metadata (slot 12,14) 无 value，保持 None 语义（CSV shape (0,) → 空 tensor，
-    # sink/golden 不消费）；attn_mask (slot 13) 不传值覆盖——mask 由 golden
-    # _build_causal_mask() 按 attributes 里 attn_mask_shape 重建。 -----
+    # sinks (slot 12) 不做覆盖: ttk 按 CSV 的 learnable_sink_datarange 生成真实随机值,
+    # golden 侧读同一 tensor slot 计算 sink 分母; metadata (slot 14) 由 npu_preprocess
+    # 回填; attn_mask (slot 13) 不传值覆盖——mask 由 golden _build_causal_mask()
+    # 按 attributes 里 attn_mask_shape 重建。 -----
     _write_int32_list(cu_seqlens_q_t, cu_seqlens_q, "cu_seqlens_q (slot 8)")
     _write_int32_list(cu_seqlens_kv_t, cu_seqlens_kv, "cu_seqlens_kv (slot 9)")
     _write_int32_list(seqused_q_t, seqused_q, "seqused_q (slot 10)")
@@ -880,14 +908,17 @@ def generate_qfa_gqa_fp8_inputs(
     if not enable_pa:
         raise NotImplementedError("GQA FP8 (quant_mode=6) 仅支持 PA 模式")
 
-    # cu_seqlens -> actual_seq (差分还原)
+    # cu_seqlens -> actual_seq (差分还原; 无 cu 时回退 seqused)
     cu_seqlens_q = list(cu_seqlens_q) if cu_seqlens_q is not None else [0]
     cu_seqlens_kv = list(cu_seqlens_kv) if cu_seqlens_kv is not None else [0]
-    actual_seq_q = (
-        [cu_seqlens_q[i + 1] - cu_seqlens_q[i] for i in range(len(cu_seqlens_q) - 1)]
-        if len(cu_seqlens_q) > 1
-        else [0]
-    )
+    if len(cu_seqlens_q) > 1:
+        actual_seq_q = [
+            cu_seqlens_q[i + 1] - cu_seqlens_q[i] for i in range(len(cu_seqlens_q) - 1)
+        ]
+    elif seqused_q is not None and len(seqused_q) > 0:
+        actual_seq_q = list(seqused_q)
+    else:
+        actual_seq_q = [0]
     if len(cu_seqlens_kv) > 1:
         actual_seq_kv = [
             cu_seqlens_kv[i + 1] - cu_seqlens_kv[i]
@@ -899,8 +930,8 @@ def generate_qfa_gqa_fp8_inputs(
         actual_seq_kv = [0]
 
     # batch_size: CSV 原始值 (可为 -1), 透传给 metadata;
-    # B: 从 cu_seqlens_q 推导的正整数, 供 BNSD 张量生成。
-    B = max(1, len(cu_seqlens_q) - 1) if cu_seqlens_q and len(cu_seqlens_q) >= 2 else 1
+    # B: 由 cu_seqlens_q / seqused_q 推导的正整数, 供 BNSD 张量生成。
+    B = max(1, len(actual_seq_q))
 
     max_sq = max(actual_seq_q) if actual_seq_q else D
     max_skv = max(actual_seq_kv) if actual_seq_kv else D
@@ -1082,8 +1113,9 @@ def generate_qfa_gqa_fp8_inputs(
     block_table.copy_(bt_real.to(torch.int32))
 
     # ----- 新增 slot 8-14: 用 attributes 真实值覆盖 ttk 随机生成的 cu_seqlens/seqused。
-    # sinks/metadata (slot 12,14) 无 value，保持 None 语义（空 tensor）；attn_mask (slot 13)
-    # 不传值覆盖，mask 由 golden 按 attn_mask_shape 重建。 -----
+    # sinks (slot 12) 不覆盖: ttk 按 CSV 的 learnable_sink_datarange 生成真实随机值,
+    # golden 侧读同一 slot 计算 sink 分母; attn_mask (slot 13) 不传值覆盖，
+    # mask 由 golden 按 attn_mask_shape 重建。 -----
     _write_int32_list(cu_seqlens_q_t, cu_seqlens_q, "cu_seqlens_q (slot 8)")
     _write_int32_list(cu_seqlens_kv_t, cu_seqlens_kv, "cu_seqlens_kv (slot 9)")
     _write_int32_list(seqused_q_t, seqused_q, "seqused_q (slot 10)")
@@ -1325,6 +1357,11 @@ def generate_qfa_hif8_inputs(
         .contiguous()
         .view(torch.float8_e4m3fn)
     )
+
+    # CSV 的 S/T 维可能大于 seqused 推导值（decode padding），补零到 slot 长度
+    q_final = _pad_seq_dim_to_slot(q_final, q, input_layout)
+    k_final = _pad_seq_dim_to_slot(k_final, k, layout_kv or input_layout)
+    v_final = _pad_seq_dim_to_slot(v_final, v, layout_kv or input_layout)
 
     def _inplace_write(dst, src_torch, slot_name):
         if tuple(dst.shape) != tuple(src_torch.shape):

@@ -57,6 +57,16 @@ def apply_params(params):
 
 def execute_test(params, mode, cdir=None):
     apply_params(params)
+    # attention sink (可选): params["sinks"] 为 [N_q] 的 list/tensor/None
+    sinks = params.get("sinks")
+    golden.SINKS = sinks
+    sinks_dev = None
+    if sinks is not None:
+        sinks_dev = (
+            sinks
+            if torch.is_tensor(sinks)
+            else torch.tensor(sinks, dtype=torch.float32)
+        ).to(torch.float32)
     case_name = params["name"]
     perf_only = "perf" in mode
 
@@ -200,6 +210,7 @@ def execute_test(params, mode, cdir=None):
                 block_table_torch,
                 qr_bf16,
                 kr_bf16,
+                sinks=sinks_dev,
             )
         if perf_only:
             # Surface asynchronous device failures without copying outputs to CPU.

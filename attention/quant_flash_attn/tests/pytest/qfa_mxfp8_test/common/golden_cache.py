@@ -81,6 +81,26 @@ def has_cpu_output(case_name, cache_dir=None):
     return os.path.exists(_path(case_name, "cpu_output", cache_dir))
 
 
+def save_cpu_output_fp32(case_name, cpu_out, cpu_lse, cache_dir=None):
+    """三方(CV)分支专用: 缓存 FP32 benchmark 输出, 与 FP64 golden 分开存放。"""
+    path = _path(case_name, "cpu_output_fp32", cache_dir)
+    torch.save({"cpu_out": cpu_out, "cpu_lse": cpu_lse}, path)
+    logger.info("[CACHE] save CPU(fp32) output → %s", path)
+
+
+def load_cpu_output_fp32(case_name, cache_dir=None):
+    path = _path(case_name, "cpu_output_fp32", cache_dir)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"No cached CPU(fp32) output: {path}")
+    data = torch.load(path, weights_only=False)
+    logger.info("[CACHE] load CPU(fp32) output ← %s", path)
+    return data["cpu_out"], data["cpu_lse"]
+
+
+def has_cpu_output_fp32(case_name, cache_dir=None):
+    return os.path.exists(_path(case_name, "cpu_output_fp32", cache_dir))
+
+
 def save_npu_output(case_name, atten_out, lse_out, cache_dir=None):
     path = _path(case_name, "npu_output", cache_dir)
     torch.save({"atten_out": atten_out, "lse_out": lse_out}, path)

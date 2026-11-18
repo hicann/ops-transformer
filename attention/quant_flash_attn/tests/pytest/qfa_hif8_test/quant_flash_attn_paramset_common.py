@@ -37,6 +37,7 @@ PARAM_NAMES = [
     "quant_mode",
     "device_id",
     "is_contiguous",
+    "sinks",
 ]
 
 TEST_PARAMS_DEFAULTS = {
@@ -54,6 +55,7 @@ TEST_PARAMS_DEFAULTS = {
     "kv_cache_layout": ["TND"],
     "block_size": [0],
     "input_layout": ["TND"],
+    "sinks": [None],
 }
 
 

@@ -54,6 +54,20 @@ E8M0_MIN_POSITIVE = 2 ** (-127)
 FP8_DTYPE = torch.float8_e4m3fn
 QUANT_GROUP_SIZE = 32
 
+# attention sink (可学习): [N_q] float/None; None=不启用(原路径)
+# 语义与 pytest 侧已验收实现一致: 前置注入到 online softmax 初值,
+# MXFP8 用 LN2 网格上的 m0 保证 P 的 e8m0 量化域与 kernel prologue 一致。
+SINKS = None
+
+
+def _sink_values_for(head_idx):
+    """按 query head 索引取 sink 值; head_idx 可为 tensor (每行一个 query head)。"""
+    sink_t = (
+        SINKS if torch.is_tensor(SINKS) else torch.tensor(SINKS, dtype=torch.float32)
+    )
+    return sink_t.to(torch.float32)[head_idx].to(torch.float32)
+
+
 # ==============================================================================
 # 量化 scale 计算
 # MXFP8 量化算法:
@@ -1264,11 +1278,24 @@ def _cpu_mxfp8_golden_sectioned(
 
                 m_valid_g = torch.full((r1 - r0,), float("-inf"), dtype=torch.float32)
                 segment_stats = []
-                for blk_a, blk_b in segs:
+                for seg_idx, (blk_a, blk_b) in enumerate(segs):
                     # 每个分段独立 online softmax (对应 kernel 的一个 core chunk)
                     o = torch.zeros_like(o_g)
                     st = torch.zeros_like(s_g)
                     mx = torch.full_like(m_g, minValue)
+                    if SINKS is not None:
+                        # 所有 S2 分段共享 sink 网格 max m0(与 kernel 一致: 各分段状态/P
+                        # 量化域相同); sink 的分母项 exp(sink-m0) 仅由 owner 分段(全局
+                        # 首个)计入, FD 合并不会重复累加。
+                        sink_rows = _sink_values_for(head_idx)
+                        ln_ps = math.log(p_scale)
+                        # sink 不限制取值范围; |s| 大到网格乘法溢出时退化为 m0 = s - ln_ps
+                        sink_c = sink_rows
+                        m0 = torch.ceil(sink_c * INV_LN2) * LN2 - ln_ps
+                        m0 = torch.where(sink_c.abs() > 2.0e38, sink_c - ln_ps, m0)
+                        mx = m0.reshape(-1, 1).to(torch.float32)
+                        if seg_idx == 0:
+                            st = torch.exp(sink_c - m0).reshape(-1, 1).to(torch.float32)
                     ranges = []
                     tail_start = tail_starts[bi]
                     has_tail = tail_start < kv_len
@@ -1333,6 +1360,11 @@ def _cpu_mxfp8_golden_sectioned(
                             mx <= minValue, torch.zeros_like(upd_old), upd_old
                         )
                         upd_cur = torch.exp(m_own - m_run_new)
+                        # 空段(m_own == m_run_new == -inf)时 exp(-inf-(-inf)) 是 NaN,
+                        # 会把段内 running 状态污染成 NaN(0 * NaN 仍 NaN)。空段无贡献, 置 0。
+                        upd_cur = torch.where(
+                            m_own <= minValue, torch.zeros_like(upd_cur), upd_cur
+                        )
                         p_run = torch.exp(sij_masked - m_own_safe) * upd_cur
                         p_drop = p_run.to(FP8_DTYPE).to(torch.float32)
                         if has_tail and lo >= tail_start:
@@ -1363,17 +1395,29 @@ def _cpu_mxfp8_golden_sectioned(
                     m_g = mg_new
 
                 max_all = torch.stack([item[2] for item in segment_stats]).amax(0)
-                weights = [st * torch.exp(mx - max_all) for _, st, mx in segment_stats]
-                total = torch.stack(weights).sum(0)
-                if len(segment_stats) == 1:
-                    res_rows = segment_stats[0][0] / segment_stats[0][1]
-                else:
-                    res_rows = torch.stack(
-                        [
-                            (o / st) * (weight / total)
-                            for (o, st, _), weight in zip(segment_stats, weights)
-                        ]
-                    ).sum(0)
+                # FD 合并用未归一化的分子/分母:
+                #   res = Σ_i o_i·e^(m_i-M) / Σ_i st_i·e^(m_i-M)
+                # 逐段先算 o/st 再乘 FD 权重的写法在 st==0 的空段(大正 sink 下非
+                # owner 分段 upd_cur 下溢为 0, 整段 P 全为 0)上会产生 0/0=NaN,
+                # 而该段 FD 权重恰为 0, NaN*0 仍是 NaN, 会把整行结果污染成 NaN
+                # (kernel 对空段不做贡献, 输出为有限值)。
+                ratio = [
+                    torch.where(
+                        mx <= minValue,
+                        torch.zeros_like(mx),
+                        torch.exp(mx - max_all),
+                    )
+                    for _, _, mx in segment_stats
+                ]
+                numer = torch.stack(
+                    [o * r for (o, _, _), r in zip(segment_stats, ratio)]
+                ).sum(0)
+                denom = torch.stack(
+                    [st * r for (_, st, _), r in zip(segment_stats, ratio)]
+                ).sum(0)
+                # denom==0 只出现在整行既无有效 key 也无 sink 的场景, kernel 由
+                # InvalidRows 写 0, 这里同样给 0 而不是 0/0=NaN。
+                res_rows = numer / denom.clamp_min(torch.finfo(torch.float32).tiny)
                 # Match kernel InvalidRows for RIGHT_DOWN_CAUSAL. Rows
                 # before q_len - kv_len have no valid keys, including those
                 # inside a scheduled tile. Do not clear valid overflow rows.
@@ -1503,6 +1547,31 @@ def cpu_mxfp8_golden(
 
     ln_p_scale = torch.tensor([math.log(p_scale)], dtype=torch.float32)
 
+    # attention sink 前置注入 (与 pytest 侧已验收语义一致):
+    #   m0 = ceil(s * INV_LN2) * LN2 - ln(pScale), sum0 = exp(s - m0)
+    # 网格化 m0 使各 K 块与 kernel prologue 的 P 量化域一致 (2 的幂重标定);
+    # |s| 大到网格乘法溢出 (fp32) 时退化为 m0 = s - ln_ps。
+    sink_init_m = None
+    sink_init_s = None
+    if SINKS is not None:
+        _sink_ln2 = 0.6931471824645996
+        _sink_inv_ln2 = 1.4426950408889634
+        sink_t = (
+            SINKS
+            if torch.is_tensor(SINKS)
+            else torch.tensor(SINKS, dtype=torch.float32)
+        )
+        sink_c = sink_t.view(1, -1, 1, 1).to(torch.float32)
+        sink_init_m = torch.ceil(sink_c * _sink_inv_ln2) * _sink_ln2 - ln_p_scale.view(
+            1, 1, 1, 1
+        )
+        sink_init_m = torch.where(
+            sink_c.abs() > 2.0e38,
+            sink_c - ln_p_scale.view(1, 1, 1, 1),
+            sink_init_m,
+        )
+        sink_init_s = torch.exp(sink_c - sink_init_m)
+
     # dequant_scale 按 group_size 扩展，用于逐元素反量化
     dequant_scale_q_expanded = dequant_scale_q.repeat_interleave(
         QUANT_GROUP_SIZE, dim=-1
@@ -1563,6 +1632,11 @@ def cpu_mxfp8_golden(
         for j in range(0, TILES_KV, 2):
             # C1V1C1V1C2V2: 每次迭代处理 2 个 K block + 1 个 V block
             oi, si, mi = o_BLOCKS[i], s_BLOCKS[i], m_BLOCKS[i]
+            if sink_init_m is not None and j == 0:
+                # sink 作为 online softmax 的初始 (max, sum), 与首块一起更新;
+                # 仅首轮替换, 后续块沿用累积状态
+                si = sink_init_s.expand_as(si).clone()
+                mi = sink_init_m.expand_as(mi).clone()
 
             Kj = K_BLOCKS[j]
             Sk_start = j * K_BLOCK_SIZE

@@ -55,7 +55,10 @@ ASCENDC_TPL_ARGS_DECL(QuantFlashAttn,
                       ASCENDC_TPL_BOOL_DECL(IsFd, false, true),
                       //    HasVTail (V尾块高精窗口)
                       //    false / true, 仅MXFP8场景支持true
-                      ASCENDC_TPL_BOOL_DECL(HasVTail, false, true));
+                      ASCENDC_TPL_BOOL_DECL(HasVTail, false, true),
+                      //    HasSink (attention sink 可选输入)
+                      //    false / true, MXFP8 / GQA FP8 / HIF8 均支持 true
+                      ASCENDC_TPL_BOOL_DECL(HasSink, false, true));
 
 ASCENDC_TPL_SEL(
     // MXFP8 PREFILL: 方案A — 尾task全程DN范式(不切ND): VF用ProcessVec1VfDnMxfp8
@@ -71,8 +74,23 @@ ASCENDC_TPL_SEL(
         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_BBND,
                              KvLayoutType_PA_BNBD, KvLayoutType_PA_NZ),
-        ASCENDC_TPL_BOOL_SEL(IsFd, false, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false, true),
-        ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+        ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+        ASCENDC_TPL_BOOL_SEL(HasSink, false, true), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+    // MXFP8 + v_tail(非 D=72 config): v_tail 仅 PA 场景(checker 限定), 故不含 KvLayoutType_NO_PA
+    ASCENDC_TPL_ARGS_SEL(
+        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND_BSND, InOutLayoutType_BNSD_BNSD,
+                             InOutLayoutType_TND_TND),
+        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64,
+                             Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128,
+                             Config_S1Aligned128_S2Aligned256_DAligned256_DVAligned256,
+                             Config_S1Aligned128_S2Aligned512_DAligned192_DVAligned128),
+        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_PREFILL, QFA_MXFP8_FP32_DECODE),
+        ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+        ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD,
+                             KvLayoutType_PA_NZ),
+        ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
+        ASCENDC_TPL_BOOL_SEL(HasSink, false, true), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+    // MXFP8 D=72 config: v_tail 不支持 PA_NZ(要求 D%16==0, 72%16!=0), 故 PA 布局只保留 BBND/BNBD
     ASCENDC_TPL_ARGS_SEL(
         ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND_BSND, InOutLayoutType_BNSD_BNSD,
                              InOutLayoutType_TND_TND),
@@ -81,8 +99,18 @@ ASCENDC_TPL_SEL(
         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_BBND,
                              KvLayoutType_PA_BNBD),
-        ASCENDC_TPL_BOOL_SEL(IsFd, false, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false, true),
-        ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+        ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+        ASCENDC_TPL_BOOL_SEL(HasSink, false, true), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+    // MXFP8 D=72 config + v_tail: 仅 PA_BBND / PA_BNBD(NZ 被 D%16 限制拦截)
+    ASCENDC_TPL_ARGS_SEL(
+        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND_BSND, InOutLayoutType_BNSD_BNSD,
+                             InOutLayoutType_TND_TND),
+        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned128_S2Aligned512_DAligned72_DVAligned72),
+        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_PREFILL, QFA_MXFP8_FP32_DECODE),
+        ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+        ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD),
+        ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
+        ASCENDC_TPL_BOOL_SEL(HasSink, false, true), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
     // FP8
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_NTD_TND),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
@@ -91,8 +119,10 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BNBD),
                          ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+                         ASCENDC_TPL_BOOL_SEL(HasSink, false, true),
                          ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // HIF8 同时注册普通 FA 和 FD 模板，具体实例由 host tiling key 选择。
+    // HIF8 恒含 FD 能力: host 侧 flashDecodeFlag_ 恒为 true, 仅注册 IsFd=true;
+    // 是否实际执行 FD 由运行期 metadata 的 enableFlashDecode 决定。
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND_BSND,
                                               InOutLayoutType_BNSD_BNSD, InOutLayoutType_TND_TND),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
@@ -100,7 +130,8 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_HIF8_FP32),
                          ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA),
-                         ASCENDC_TPL_BOOL_SEL(IsFd, false, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+                         ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+                         ASCENDC_TPL_BOOL_SEL(HasSink, false, true),
                          ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)));
 
 #endif // TEMPLATE_TILING_KEY_QUANT_FLASH_ATTN_H_

@@ -381,6 +381,30 @@ def _pa_v_scale_to_bnsd_grouped(
     return unpacked[:, :, :sg_max, :].contiguous()
 
 
+def _sinks_to_fp32(sinks_t):
+    """sinks slot → 一维 float32 CPU tensor; None / 空 tensor → None。
+
+    ttk 按 CSV tensor_view_shapes 生成 sinks 随机值; SinkNone 用例 shape 为空时
+    ttk 传空 tensor, golden 必须显式回落 None — worker 进程会复用, 不显式清空
+    会残留上一个用例的 SINKS。
+    """
+    if not torch.is_tensor(sinks_t) or sinks_t.numel() == 0:
+        return None
+    return sinks_t.detach().to(torch.float32).reshape(-1).cpu()
+
+
+def _pad_seq_dim_to(t, target, dim, fill):
+    """把序列维补齐到 CSV slot 长度（padding 行按无效行填充：out=0 / lse=inf）。"""
+    if t is None or dim >= t.ndim:
+        return t
+    target = int(target)
+    if int(t.shape[dim]) >= target:
+        return t
+    pad_shape = list(t.shape)
+    pad_shape[dim] = target - int(t.shape[dim])
+    return torch.cat([t, torch.full(pad_shape, fill, dtype=t.dtype)], dim=dim)
+
+
 def _apply_golden_globals(attrs, quant_mode=1):
     """把 case 属性注入 golden 模块全局变量 (按 quant_mode 选择目标模块).
 
@@ -422,6 +446,9 @@ def _apply_golden_globals(attrs, quant_mode=1):
     for attr_key, golden_key in mapping.items():
         if attr_key in attrs:
             setattr(target, golden_key, attrs[attr_key])
+    # head_dim_v 缺省时必须显式回落 None: worker 进程会复用 golden 模块全局,
+    # 不重置会把上一个用例的 HEAD_DIM_V 带到当前用例(如 V_D 列为空的老用例)。
+    setattr(target, "HEAD_DIM_V", attrs.get("head_dim_v"))
     setattr(target, "FP8_DTYPE", torch.float8_e4m3fn)
     setattr(target, "QUANT_GROUP_SIZE", 32)
     p_scale = attrs.get("p_scale_value", 1.0)
@@ -752,6 +779,8 @@ def cpu_qfa_mxfp8(
         },
         quant_mode=1,
     )
+    # attention sink: 前置注入底层 golden 的模块全局 (每次调用显式赋值, 含 None)
+    mxfp8_golden_mod.SINKS = _sinks_to_fp32(sinks_t)
 
     group_size = 32
 
@@ -1207,6 +1236,8 @@ def cpu_qfa_gqa_fp8(
         },
         quant_mode=6,
     )
+    # attention sink: 前置注入底层 golden 的模块全局 (每次调用显式赋值, 含 None)
+    fp8_golden_mod.SINKS = _sinks_to_fp32(sinks_t)
 
     # Q: NTD [N,T,D] -> BNSD [B,N,max_sq,D]
     q_fp8_bnsd = fp8_golden_mod.ntd_to_bnsd_q_gqa(_to_torch_fp8(q), actual_seq_q)
@@ -1407,6 +1438,8 @@ def cpu_qfa_hif8(
             "SOFTMAX_SCALE": softmax_scale,
         }
     )
+    # attention sink: 前置注入底层 golden 的模块全局 (每次调用显式赋值, 含 None)
+    hif8_golden_mod.SINKS = _sinks_to_fp32(sinks_t)
 
     deq_q = (
         dequant_scale_q
@@ -1599,6 +1632,13 @@ def cpu_qfa_hif8(
         compare_layout,
         cu_seqlens=cu_q_for_convert,
     )
+    # CSV slot 可能包含 seqused 之后的 padding 行（kernel 对无效 Q 行输出 0/inf）
+    _lay = str(compare_layout).upper()
+    if _lay in ("TND", "BSND", "BNSD"):
+        _dim = {"TND": 0, "BSND": 1, "BNSD": 2}[_lay]
+        cpu_out_aligned = _pad_seq_dim_to(
+            cpu_out_aligned, int(q.shape[_dim]), _dim, 0.0
+        )
 
     if enable_lse:
         lse_compare_layout = "TND" if str(compare_layout).upper() == "TND" else "BNSD"
@@ -1629,6 +1669,16 @@ def cpu_qfa_hif8(
             # S=1 时保留 (B,N,1) 与 NPU infershape 输出一致
             if cpu_lse_aligned.ndim > 1 and cpu_lse_aligned.shape[-1] == 1:
                 cpu_lse_aligned = cpu_lse_aligned.squeeze(-1).contiguous()
+        # padding 行 LSE 补 inf（NPU 无效 Q 行输出 inf）
+        if _lay == "TND" and cpu_lse_aligned.ndim == 2:
+            cpu_lse_aligned = _pad_seq_dim_to(
+                cpu_lse_aligned, int(q.shape[0]), 1, float("inf")
+            )
+        elif _lay in ("BSND", "BNSD") and cpu_lse_aligned.ndim == 3:
+            _lse_target = int(q.shape[1]) if _lay == "BSND" else int(q.shape[2])
+            cpu_lse_aligned = _pad_seq_dim_to(
+                cpu_lse_aligned, _lse_target, 2, float("inf")
+            )
         result = [cpu_out_aligned, cpu_lse_aligned]
     else:
         # 未开 lse 时省略该输出(不返回 None), 保证 TTK 插件 compare 钩子可被调用

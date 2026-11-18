@@ -120,11 +120,18 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
     ):
         super().__init__()
         self.win_left, self.win_right = win_left, win_right
+        # TTK 已在 graph_runner 里 set_device(实际执行卡); 这里必须以输入 q 的设备为准,
+        # 不能用缺省 0 覆盖, 否则 1 卡 worker 的 .npu() 会变成跨卡拷贝并报 507001。
+        device_index = (
+            int(q.device.index)
+            if isinstance(q, torch.Tensor) and q.device.index is not None
+            else 0
+        )
         if quant_mode is not None and int(quant_mode) == 12:
             # INT8 inputs already have their final layout for graph capture.
             import torch_npu
 
-            torch_npu.npu.set_device(int(kwargs.get("device_id", 0)))
+            torch_npu.npu.set_device(device_index)
             values = locals()
             for name in (
                 "q",
@@ -160,7 +167,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         torch_npu_mod, mxfp8_golden_mod, fp8_golden_mod, hif8_golden_mod = (
             _load_npu_modules()
         )
-        torch_npu_mod.npu.set_device(int(kwargs.get("device_id", 0)))
+        torch_npu_mod.npu.set_device(device_index)
 
         # ---- 0. 从 op-schema 入参推导配置 (graph 路径拿不到额外 attr) ----
         dequant_scale_q = q_descale
@@ -216,7 +223,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         input_layout = kwargs.get("input_layout") or layout_q
         is_contiguous = bool(kwargs.get("is_contiguous", True))
         graph_path = kwargs.get("graph_path", 0)
-        device_id = kwargs.get("device_id", 0)
+        device_id = device_index
         enable_lse = return_softmax_lse
         batch_size = kwargs.get("batch_size")
         quant_mode = int(quant_mode) if quant_mode is not None else 1
@@ -419,7 +426,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
                 return t if t.numel() > 0 else None
             if lst is None:
                 return None
-            return torch.tensor(list(lst), dtype=torch.int32).npu()
+            return torch.tensor(list(lst), dtype=torch.int32, device=q.device)
 
         cu_seqlens_q_t = _as_npu(cu_seqlens_q_t, cu_seqlens_q_list)
         cu_seqlens_kv_t = _as_npu(cu_seqlens_kv_t, cu_seqlens_kv_list)
@@ -467,6 +474,10 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         self.cu_seqlens_kv = cu_seqlens_kv_t if is_tnd_kv else None
         self.seqused_q = seqused_q_t
         self.seqused_kv = seqused_kv_t
+        # sink 是可选输入, 空 slot (SinkNone) 归一化为 None
+        self.sinks = (
+            sinks if isinstance(sinks, torch.Tensor) and sinks.numel() > 0 else None
+        )
         self.attn_mask = inputs["mask"]
         self.softmax_scale = inputs["softmax_scale"]
         self.mask_mode = int(inputs["sparse_mode"])
@@ -497,7 +508,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         与 SparseFlashMlaAclGraph.forward() 模式一致.
         传参方式严格对齐 golden_mod._call_npu_fa_op 的 main_kwargs (line 1241-1265):
           - q_descale/k_descale/v_descale (不是 dequant_scale_*)
-          - 不传 sinks/win_left/win_right (用 schema 默认, 与 golden 一致)
+          - sinks 按 __init__ 保存的可选输入透传 (SinkNone 时为 None)
           - return_softmax_lse 由 _get_npu_fa_kwargs 机制对应 (此处直接传 enable_lse)
         """
         atten_out, lse_out = torch.ops.cann_ops_transformer.quant_flash_attn(
@@ -514,6 +525,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             cu_seqlens_kv=self.cu_seqlens_kv,
             seqused_q=self.seqused_q,
             seqused_kv=self.seqused_kv,
+            sinks=self.sinks,
             attn_mask=self.attn_mask,
             metadata=self.metadata,
             v_tail=self.v_tail,

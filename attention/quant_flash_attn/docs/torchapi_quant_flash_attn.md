@@ -253,7 +253,7 @@ cann_ops_transformer.quant_flash_attn(
 | seqused_q           | Tensor        | 可选    | 指定每batch中实际使用的序列长度，截断冗余运算                            | int32                   | ND   | (B,)                                                                                                               | ×         |
 | seqused_kv          | Tensor        | 可选    | 指定每batch中实际使用的序列长度，截断冗余运算                            | int32                   | ND   | (B,)                                                                                                               | ×         |
 | p_scale             | Tensor        | 可选    | P的量化参数                                               | float32                 | ND   | (1,)                                                                                                               | ×         |
-| sinks                | Tensor        | 可选    | sink场景下的输入tensor。当前版本不支持，传None即可 | float32                 | ND   | (Q_N,)                                                                                                            | ×         |
+| sinks                | Tensor        | 可选    | sink场景下的可学习输入tensor。仅DAV_3510且quant_mode为MXFP8/GQA FP8/HIF8时支持，arch92不支持；传None表示不启用sink | float32                 | ND   | (Q_N,)                                                                                                            | ×         |
 | attn_mask           | Tensor        | 可选    | 掩码矩阵                                                 | int8                    | ND   | (2048, 2048)                                                                                                       | ×         |
 | metadata             | Tensor        | 可选    | `quant_flash_attn_metadata`生成的任务切分结果，传入后可优化调度        | int32                   | ND   | (2, max_schedule_size)                                                                                             | ×         |
 | v_tail               | Tensor        | 可选    | BF16高精V尾块；默认None，启用时与另外两个尾块参数一起传入                    | bfloat16                | ND   | 见「V高精尾块参数组」                                                                                                        | 见下文       |
@@ -1377,12 +1377,18 @@ mask_mode参数解释：
             <td>sinks</td>
             <td>
                 <ul>
-                    <li>暂不支持</li>
+                    <li>dtype仅支持float32</li>
+                    <li>格式仅支持ND</li>
+                    <li>shape仅支持1D，且长度须等于Q_N</li>
                 </ul>
             </td>
             <td>可选参数</td>
             <td>无</td>
-            <td>暂不支持</td>
+            <td>
+                <ul>
+                    <li>仅DAV_3510且quant_mode为MXFP8/GQA FP8/HIF8时支持；其他架构（含arch92）或其他量化模式传入会拦截</li>
+                </ul>
+            </td>
         </tr>
     </tbody>
 </table>

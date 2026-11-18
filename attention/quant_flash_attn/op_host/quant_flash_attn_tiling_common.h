@@ -39,6 +39,7 @@ struct QfaTilingKeyInfo {
     uint64_t kvLayoutType = 0;
     bool isFd = false;
     bool hasVTail = false;
+    bool hasSink = false;
 };
 
 struct QfaPlatFormInfo {

@@ -140,6 +140,9 @@ INPUT_LAYOUT = "TND"
 Q_SCALE_LAYOUT = "BSND"
 P_SCALE = 1.0
 
+# attention sink (可学习): [N_q] float/None; None=不启用(原路径)
+SINKS = None
+
 SOFTMAX_SCALE = None
 
 IS_CONTIGUOUS = True
@@ -437,6 +440,43 @@ def _online_softmax_update(S_ij, mask_j, mi, si, oi, ln_p_scale):
     return m_block_j, s_block_j, P_ij_drop
 
 
+def _apply_sink_to_bnsd(out, lse, sinks=None):
+    """把 attention sink 以后置恒等缩放注入 BNSD 的 (out, lse) 结果。
+
+    以 m_ref = max(lse, sink) 为公共基准:
+        denom = exp(lse-m_ref) + exp(sink-m_ref)
+        O     = O * exp(lse-m_ref) / denom
+        LSE   = m_ref + log(denom)
+    与 kernel 首块把 sink 折叠进 running max 在精确算术下等价。
+    lse 非有限的行（全 mask 等）保持原值；sinks 为 None/空时原样返回。
+    """
+    sink_src = SINKS if sinks is None else sinks
+    if sink_src is None:
+        return out, lse
+    sink = torch.as_tensor(sink_src, dtype=torch.float32).detach().cpu().reshape(-1)
+    if sink.numel() == 0:
+        return out, lse
+    n_head = int(out.shape[1])
+    if sink.numel() != n_head:
+        raise ValueError(
+            f"[GOLDEN] sinks 长度 {sink.numel()} 需等于 query head 数 {n_head}"
+        )
+    sink4 = sink.view(1, n_head, 1, 1)
+    lse4 = lse.to(torch.float32)
+    if lse4.dim() == 3:
+        lse4 = lse4.unsqueeze(-1)
+    valid = torch.isfinite(lse4)
+    m_ref = torch.maximum(lse4, sink4.expand_as(lse4)).masked_fill(~valid, 0.0)
+    p_self = torch.exp(lse4 - m_ref)
+    denom = p_self + torch.exp(sink4.expand_as(lse4) - m_ref)
+    rescale = torch.where(valid, p_self / denom, torch.ones_like(denom))
+    lse_new = torch.where(valid, m_ref + torch.log(denom), lse4)
+    out_new = (out.to(torch.float32) * rescale).to(out.dtype)
+    if lse.dim() == 3:
+        lse_new = lse_new.squeeze(-1)
+    return out_new, lse_new
+
+
 def cpu_hif8_golden(
     q_fp8,
     k_fp8,
@@ -488,6 +528,14 @@ def cpu_hif8_golden(
     o_max = torch.full(q_tensor.shape[:-1], minValue.item(), dtype=torch.float32)[
         ..., None
     ]
+
+    # attention sink 前置注入(与 kernel prologue 同域):
+    #   max0 = sink - ln(pScale), sum0 = pScale
+    if SINKS is not None:
+        sink_t = torch.as_tensor(SINKS, dtype=torch.float32).reshape(1, -1, 1, 1)
+        ln_ps = torch.tensor([math.log(float(p_scale))], dtype=torch.float32)
+        o_max = (sink_t - ln_ps).expand_as(o_max).clone()
+        o_sum = torch.full_like(o_sum, float(p_scale))
 
     TILES_Q = (Sq + Q_BLOCK_SIZE - 1) // Q_BLOCK_SIZE
     TILES_KV = (Skv + K_BLOCK_SIZE - 1) // K_BLOCK_SIZE
@@ -556,13 +604,14 @@ def cpu_hif8_golden(
     out = out / (out_sum + EPSILON)
 
     o_max = torch.cat(m_BLOCKS, dim=2)
-    all_masked = o_max <= minValue.item()
+    # 无有效 key 的行保持 inf 哨兵, 与 kernel 的 MarkInvalidRowMaxForSink 语义一致
+    valid_rows = (~mask_global).any(dim=-1, keepdim=True)
     lse = torch.where(
-        all_masked,
-        torch.full_like(o_max, float("inf")),
+        valid_rows,
         o_max + torch.log(out_sum + EPSILON),
+        torch.full_like(o_max, float("inf")),
     )
-    out = torch.where(all_masked, torch.zeros_like(out), out)
+    out = torch.where(valid_rows, out, torch.zeros_like(out))
     logger.info("[CPU Golden] output=%s", out.shape)
     return out, lse
 
@@ -642,10 +691,18 @@ def cpu_hif8_scheduled_golden(data, schedule):
     lse = torch.full((*q.shape[:-1], 1), float("inf"), dtype=torch.float32)
     scale = SOFTMAX_SCALE if SOFTMAX_SCALE is not None else 1 / math.sqrt(D)
     ln_ps = math.log(float(ps.item()))
+    # FD 分片同样要消费 sink 初值: 所有分片 max0 = sink - ln(pScale), 仅起始分片(st==0)
+    # 的 sum0 = pScale, 其余分片 sum0 = 0; 合并按 max 归一后 sink 项恰好出现一次。
+    sinks = (
+        None
+        if SINKS is None
+        else torch.as_tensor(SINKS, dtype=torch.float32).reshape(-1)
+    )
     for b, (sq, sk) in enumerate(zip(qlens, klens)):
         if sk == 0:
             continue
         for h in range(N_q):
+            sink_h = None if sinks is None else float(sinks[h])
             bn = b * N_q + h
             for mi, lo in enumerate(range(0, sq, mb)):
                 hi = min(lo + mb, sq)
@@ -683,8 +740,16 @@ def cpu_hif8_scheduled_golden(data, schedule):
                     )
                 nums, sums, maxes = [], [], []
                 for st, en in parts:
-                    m = torch.full((hi - lo, 1), -torch.finfo(torch.float32).max)
-                    su = torch.zeros_like(m)
+                    if sink_h is None:
+                        m = torch.full((hi - lo, 1), -torch.finfo(torch.float32).max)
+                        su = torch.zeros_like(m)
+                    else:
+                        m = torch.full((hi - lo, 1), sink_h - ln_ps)
+                        su = torch.full(
+                            (hi - lo, 1),
+                            float(ps.item()) if st == 0 else 0.0,
+                            dtype=torch.float32,
+                        )
                     o = torch.zeros((hi - lo, v.shape[-1]))
                     for j in range(st, en):
                         ks, ke = j * kb, min((j + 1) * kb, sk)
@@ -957,6 +1022,7 @@ def _call_npu_fa_op(
     block_size,
     sparse_mode,
     out_dtype,
+    sinks=None,
 ):
     """调用 NPU 双算子 (QFA: quant_flash_attn_metadata + quant_flash_attn)
     HIF8: quant_mode=0, descale 为 FP32 标量 (1,)
@@ -1033,6 +1099,7 @@ def _call_npu_fa_op(
         "layout_out": layout_out,
         "max_seqlen_q": max_seqlen_q,
         "max_seqlen_kv": max_seqlen_kv,
+        "sinks": sinks,
     }
     main_kwargs.update(_get_npu_fa_kwargs())
     atten_out, lse_out = quant_flash_attn(**main_kwargs)
@@ -1172,6 +1239,7 @@ def prepare_npu_inputs(
     block_table_torch=None,
     qr_bf16=None,
     kr_bf16=None,
+    sinks=None,
 ):
     """准备 NPU 侧入参 (按 INPUT_LAYOUT 转换 / descale 直接用 FP32)
     HIF8: descale 是 per-tensor FP32 标量 shape (1,), 无需 E8M0 转换
@@ -1257,6 +1325,7 @@ def prepare_npu_inputs(
         "dequant_scale_k": deq_k_npu,
         "v_descale": deq_v_npu,
         "p_scale": p_scale_npu,
+        "sinks": None if sinks is None else sinks.to(torch.float32).npu(),
         "block_table": None,
         "q_n": N_q,
         "kv_n": N_kv,
@@ -1288,6 +1357,7 @@ def npu_hif8_fa(
     block_table_torch=None,
     qr_bf16=None,
     kr_bf16=None,
+    sinks=None,
 ):
     """调用 NPU 算子 (HIF8 quant_mode=0, layout 由 INPUT_LAYOUT 决定)"""
     inputs = prepare_npu_inputs(
@@ -1307,6 +1377,7 @@ def npu_hif8_fa(
         block_table_torch=block_table_torch,
         qr_bf16=qr_bf16,
         kr_bf16=kr_bf16,
+        sinks=sinks,
     )
 
     logger.info(
@@ -1353,8 +1424,11 @@ def hif8_fa_torch_npu(
     block_size,
     sparse_mode,
     out_dtype,
+    sinks=None,
 ):
     """NPU 调用入口, 支持 GRAPH_PATH=0 (单算子) 和 GRAPH_PATH=7 (aclgraph)"""
+    if sinks is not None and GRAPH_PATH != 0:
+        raise NotImplementedError("sinks 仅支持 GRAPH_PATH == 0 (单算子模式)")
     if GRAPH_PATH == 0:
         logger.info("[NPU] 调用 QFA 单算子模式...")
         return _call_npu_fa_op(
@@ -1385,6 +1459,7 @@ def hif8_fa_torch_npu(
             block_size,
             sparse_mode,
             out_dtype,
+            sinks,
         )
 
     cu_seqlens_q_t = (

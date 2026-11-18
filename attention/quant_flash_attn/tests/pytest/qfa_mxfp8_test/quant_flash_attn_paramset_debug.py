@@ -175,3 +175,13 @@ TEST_PARAMS = {
 }
 
 CASES = expand_paramset_to_cases(TEST_PARAMS)
+
+# D=192 / D_v=128 + attention sink 回归: 复用 BNSD 单 head 小用例,
+# 覆盖 D 与 D_v 不等长时 sink 前置注入的组合(sink 为 per-N_q 标量, 与 D 无关)。
+for _case in CASES:
+    if _case["name"] == "BNSD_B1_QS32_KVS128_Nq1_Nkv1_D192_SP0":
+        _sink_case = dict(_case)
+        _sink_case["name"] = "BNSD_B1_QS32_KVS128_Nq1_Nkv1_D192_SP0_SINK"
+        _sink_case["sinks"] = [0.5]
+        CASES.append(_sink_case)
+        break
