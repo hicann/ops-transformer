@@ -123,10 +123,23 @@ class _MutexPool:
                 f"need {self._next + count} ids, LIMIT={self.LIMIT}"
             )
         ids = list(range(self._next, self._next + count))
+        if any(i in self.owners for i in ids):
+            raise AssertionError(
+                f"{self._side}({self._tag}) mutex reservation collision: {ids}"
+            )
         self._next += count
         for i in ids:
             self.owners[i] = label
         return ids
+
+    def reserve(self, label, ids):
+        """Reserve fixed CV ids without changing other tiers' sequential ids."""
+        for i in ids:
+            if i < 0 or i >= self.LIMIT or i in self.owners:
+                raise AssertionError(
+                    f"{self._side}({self._tag}) invalid mutex reservation: {i}"
+                )
+            self.owners[i] = label
 
     def report(self):
         free = sorted(set(range(self.LIMIT)) - set(self.owners))
@@ -242,7 +255,7 @@ def _build_l1(width, pool):
     ar = _Arena(f"L1 d_align={width}", _L1_BYTES, pool)
     blk = (
         CUBE_BASEM * D_PHYS_W[width] * 2
-    )  # 64/128 档 32KB，192 档 48KB，256/768 档 64KB
+    )  # 64 档 16KB，128 档 32KB，192 档 48KB，256/768 档 64KB
     dsp = CUBE_BASEM * CUBE_BASEN * 2  # dS/P 是 [M,N]，与 D 无关，恒 32KB
     # 64/128 档 4 槽；192 档 3 槽；256/768 档 1-ahead 只要 2 槽（物理宽 256）。
     if width <= HEAD_DIM_ALIGN:
@@ -255,13 +268,22 @@ def _build_l1(width, pool):
     q = ar.buf("q", blk, slots=nq)  # q_lag_view 复用这份记录，同址同号
     do = ar.buf("do", blk, slots=nq)  # do_lag_view 同理
     k = ar.buf("k", blk)
-    # MM3(dQ = dS@K) 的右矩阵要非转置的 K[S2,D]，必须独占一块 L1：同一地址上
-    # 叠加 ZN 的 [D,S2] 与 ND 的 [S2,D] 两种视图能编过，但结果静默错误。
+    # BN2/wide-D load C2/C3 separately. GS through D256 treats these two
+    # allocations as a shared two-slot K buffer (see exports).
+    # C2 uses ZN[D,S2], C3 uses the byte-equivalent NZ[S2,D] view.
     k_nd = ar.buf("k_nd", blk)
     v = ar.buf("v", blk)
     # dS^T / P^T 不单独占地址，是 ds / p 上的 ZN 视图（见 make_ds_t_l1）。
     ds = ar.buf("ds", dsp, cv="ds")
     p = ar.buf("p", dsp, cv="p")
+    # Narrow GS normal kernels can pipeline two V->C tasks. Keep slot 0
+    # addresses unchanged for BN2/deterministic/swizzle kernels. The added
+    # slots take L1 from 416KB to 480KB, below its 512KB capacity.
+    ds_db1 = ds
+    p_db1 = p
+    if width <= HEAD_DIM_ALIGN:
+        ds_db1 = ar.buf("ds_db1", dsp, ids=[28])
+        p_db1 = ar.buf("p_db1", dsp, ids=[29])
 
     return {
         "q": q,
@@ -271,6 +293,8 @@ def _build_l1(width, pool):
         "v": v,
         "ds": ds,
         "p": p,
+        "ds_db1": ds_db1,
+        "p_db1": p_db1,
         "_arenas": [ar],
     }
 
@@ -312,10 +336,10 @@ def _build_l0c(width, pool, bn2_d192=False):
     768 单 scratch）。
 
     acc 单缓冲时 fixpipe 写出期间下一个 matmul 只能干等（实测 fixpipe 0.458
-    而 mac 仅 0.783），故**除 BN2 192 外所有档位都开两槽**。预算：64/128 =
-    acc 2×64 + dk 64 + dv 64 = 256KB；GS 192 = acc 2×64 + dv 2×48 = 224KB；
-    BN2 192 = acc 1×64 + dk 2×48 + dv 2×48 = 256KB；256 = acc 2×64 + dv 2×64
-    = 256KB；768 = acc 2×64 + dk 64 + dv 64 = 256KB。
+    而 mac 仅 0.783），故**除 BN2 192 外所有档位至少两槽**。预算：
+    D 64 = acc 3×64 + dk 32+ dv 32 = 256KB；128 = acc 2×64 + dk 64 + dv 64 = 256KB；
+    GS 192 = acc 2×64 +dv 2×48 = 224KB；BN2 192 = acc 1×64 + dk 2×48 + dv 2×48 = 256KB；
+    256 = acc 2×64 + dv 2×64 = 256KB；768 = acc 2×64 + dk 64 + dv 64 = 256KB。
     """
     ar = _Arena(f"L0C d_align={width}", _L0C_BYTES, pool)
     accBlk = CUBE_BASEM * ACC_COLS[width] * 4  # acc 要装 MM2/MM1 的 [M,s2]
@@ -336,7 +360,12 @@ def _build_l0c(width, pool, bn2_d192=False):
         dk = ar.buf("dk", dkvBlk, slots=nChunk)
         dv = ar.buf("dv", dkvBlk, slots=nChunk)
         return {"acc": acc, "dk": dk, "dv": dv, "_arenas": [ar]}
-    acc = ar.buf("acc", accBlk, slots=2)
+
+    if width == 64:
+        # D=64：dK/dV 按真实 64 列声明（各 32KB），让出的 64KB 给 acc 第 3 槽。
+        acc = ar.buf("acc", accBlk, slots=3)
+    else:
+        acc = ar.buf("acc", accBlk, slots=2)
     if width == 192 or width == 256:
         # dV 两个 D 分块常驻 L0C（192→2×48KB，256→2×64KB）：BN2 在 flush 时
         # fixpipe 直出 16-bit，GS1S2 累加回 fp32 ws 交给全局 post。
@@ -346,6 +375,23 @@ def _build_l0c(width, pool, bn2_d192=False):
         # 64/128 单分块常驻、768 单 scratch；dV 同样只有一个分块。
         dk = ar.buf("dk", dkvBlk, slots=1)
         dv = ar.buf("dv", dkvBlk, slots=1)
+    return {"acc": acc, "dk": dk, "dv": dv, "_arenas": [ar]}
+
+
+def _build_l0c_d192dv128(pool, gs, bn2):
+    """GS without swizzle: N128+64 dQ/dK and one Dv128 resident tile.
+
+    This layout and the normal GS layout are mutually exclusive tiling keys.
+    Each 96KiB acc/dK allocation has two compact subviews at offsets 0/64KiB,
+    sharing one mutex. Full-M results can be flushed through one full-N view;
+    tail-M results retain two compact regions and use two FIX stores.
+    dK remains resident across tasks for the same owner. The active budget is
+    acc96 + dK96 + dV64 = 256KiB; L0A/L0B retain their two 32KiB slots.
+    """
+    ar = _Arena("L0C GS d_align=192 dv_align=128", _L0C_BYTES, pool)
+    acc = ar.buf("acc_dv128", CUBE_BASEM * 192 * 4, ids=gs["acc"]["mutex"][:1])
+    dk = ar.buf("dk192", CUBE_BASEN * 192 * 4, ids=bn2["dk"]["mutex"][:1])
+    dv = ar.buf("dv128", CUBE_BASEN * 128 * 4, ids=gs["dv"]["mutex"][:1])
     return {"acc": acc, "dk": dk, "dv": dv, "_arenas": [ar]}
 
 
@@ -386,7 +432,7 @@ def _build_ub(width, pool):
 
     三张图共用这 256KB，靠执行阶段错开：
 
-    * 主图（y/dy/nzp/sfmg/lse/cast）—— 主循环用，从 0x21000 起；
+    * 主图（y/dy/dS/P/sfmg/lse，BN2 用 nzp/cast）—— 从 0x21000 起；
     * mm1/mm2 结果区 —— CV 共享，cube fixpipe 写、vector 读，从头部起；
     * pre/post —— 与主循环被 sync_all 完全隔开，整块借用头部。
 
@@ -397,8 +443,9 @@ def _build_ub(width, pool):
     时至少 8KB，装得下。
     复用的是**同一条记录**，所以「同址必须同号」是结构保证，不靠人守。
 
-    cast 只有 BN2 的 v5/v6 用，但三档都留：它排在最后，不占别人的地方，
-    留着可以让 BN2 直接复用这张图（narrow 传 HEAD_DIM_ALIGN 取档）。
+    BN2 的 cast/l0c_load 与 GS 的 P 输出是编译期互斥的两种视图。
+    GS 的 dS 保留 nzp，P 借用 cast 起始的 16640B；BN2 仍用原布局
+    （narrow 传 HEAD_DIM_ALIGN 取档）。两种 GS 输出各有独立地址和 mutex。
     """
     main = _Arena(f"UB v1w={width}", _UB_BYTES, pool, base=UB_HEAD_RESERVE + 0x20000)
     v1Alloc = 256 if width == 768 else width
@@ -415,6 +462,25 @@ def _build_ub(width, pool):
     # 其它档不用它，只占 [64,64]=16KB，避免撑爆 768 档预算。
     _load_w = VECTOR_BASEN if width == 192 else VECTOR_BASEN // 2
     l0c_load_ub = main.buf("l0c_load_ub", VECTOR_BASEM * _load_w * 4)
+    # GS 不创建 BN2 的 cast/l0c_load tile，可将这段空间作为独立 P 输出：
+    # 65*128*2B 比 cast 的 64*128*2B 多 256B，借用相邻 l0c_load 的头部。
+    # mutex 复用 cast 的记录，既不增加 id，也不改 BN2 的地址/号序。
+    # 这不是可与 BN2 scratch 同时使用的别名；仅 GS factory 引用 p_out。
+    # pre/SFMG/post 与主循环仍由原 sync_all 隔开，保持原来的分时复用。
+    gs_out_bytes = NZP_ROWS * VECTOR_BASEN * 2
+    bn2_scratch_end = l0c_load_ub["addrs"][0] + VECTOR_BASEM * _load_w * 4
+    assert bn2_scratch_end <= _UB_BYTES
+    gs_out = _Arena(
+        f"UB GS P output v1w={width} (aliases BN2 scratch)",
+        bn2_scratch_end,
+        pool,
+        base=cast["addrs"][0],
+    )
+    p_out = gs_out.buf("p_out_gs", gs_out_bytes, ids=cast["mutex"])
+    # All other live GS main buffers end before the BN2-only scratch interval.
+    assert sink_part["addrs"][0] + _UB_ROW_SLOT <= p_out["addrs"][0]
+    assert nzp["addrs"][0] + gs_out_bytes <= p_out["addrs"][0]
+    assert set(nzp["mutex"]).isdisjoint(p_out["mutex"])
     # BN2 wide（d_align>128）的载入/出口 tile 不再单独占 UB：载入 tile
     # [64, chunk] fp32 alias 到 y（V2 之后 y 已死），16-bit 出口 alias 到 cast
     # （BN2 wide 二进制里 GS 的 cast 不用）。整块 cast（chunk=96/128 列）是为了
@@ -487,10 +553,41 @@ def _build_ub(width, pool):
         )
         sfmg_pre = {"y": sp_y, "dy": sp_dy, "out": sp_out, "_arenas": [sp]}
 
+    # Wide inline SFMG keeps the original y/dy 32KB address ranges.
+    # Each 8x768 half-precision slot uses 12KB within a 16KB reservation.
+    # Allocate only the second-slot ids here, after the common cross-tier
+    # prefix: no existing mutex id or UB address changes. The first slots
+    # retain the mask aliases' ids; a full-width BN2 y alias owns both ids.
+    sfmg_wide = {}
+    if width == 768:
+        wide_y = _Arena(
+            "UB sfmg wide y", y["addrs"][0] + 0x8000, pool, base=y["addrs"][0]
+        )
+        wide_dy = _Arena(
+            "UB sfmg wide dy", dy["addrs"][0] + 0x8000, pool, base=dy["addrs"][0]
+        )
+        wide_y_buf = wide_y.buf(
+            "sfmg_wide_y",
+            0x4000,
+            slots=2,
+            ids=y["mutex"] + pool.take("sfmg_wide_y_slot1", 1),
+        )
+        wide_dy_buf = wide_dy.buf(
+            "sfmg_wide_dy",
+            0x4000,
+            slots=2,
+            ids=dy["mutex"] + pool.take("sfmg_wide_dy_slot1", 1),
+        )
+        assert 8 * 768 * 2 <= 0x4000
+        assert 32 * 768 * 2 <= SP_ROWS[width] * SP_WORK_W[width] * 2
+        sfmg_wide = {"y": wide_y_buf, "dy": wide_dy_buf, "_arenas": [wide_y, wide_dy]}
+
     return {
         "y": y,
         "dy": dy,
+        "sfmg_wide": sfmg_wide,
         "nzp": nzp,
+        "p_out": p_out,
         "sfmg": sfmg,
         "lse": lse,
         "sink_part": sink_part,
@@ -504,7 +601,9 @@ def _build_ub(width, pool):
         "f16": f16,
         "sink_row_post": sink_row_post,
         "sink_red_post": sink_red_post,
-        "_arenas": [main, shared, pre, post] + sfmg_pre.get("_arenas", []),
+        "_arenas": [main, gs_out, shared, pre, post]
+        + sfmg_pre.get("_arenas", [])
+        + sfmg_wide.get("_arenas", []),
     }
 
 
@@ -514,6 +613,15 @@ def _build_ub(width, pool):
 _CUBE_POOL = {w: _MutexPool("cube", f"d_align={w}") for w in _TIERS}
 _VEC_POOL = {w: _MutexPool("vector", f"d_align={w}") for w in _TIERS}
 
+# The common CV prefix remains eight ids: increasing it would overflow the
+# D192 cube pool. Only narrow tiers reserve the four otherwise unused ids.
+for _w in (64, 128):
+    for _pool in (_CUBE_POOL[_w], _VEC_POOL[_w]):
+        _pool.reserve("ds_db1(CV)", [28])
+        _pool.reserve("p_db1(CV)", [29])
+        _pool.reserve("ds_t_db1(CV)", [30])
+        _pool.reserve("p_t_db1(CV)", [31])
+
 _L1 = {w: _build_l1(w, _CUBE_POOL[w]) for w in _TIERS}
 _L0AB = {w: _build_l0ab(w, _CUBE_POOL[w]) for w in _TIERS}
 _L0C = {}
@@ -522,6 +630,9 @@ for _w in _TIERS:
         # 192 档要两套：GS1S2 用 acc 双槽（224KB），BN2 用 dK/dV 常驻（256KB）
         _L0C[(_w, "gs")] = _build_l0c(_w, _CUBE_POOL[_w], False)
         _L0C[(_w, "bn2")] = _build_l0c(_w, _CUBE_POOL[_w], True)
+        _L0C[(_w, "gs_dv128")] = _build_l0c_d192dv128(
+            _CUBE_POOL[_w], _L0C[(_w, "gs")], _L0C[(_w, "bn2")]
+        )
     else:
         _lay = _build_l0c(_w, _CUBE_POOL[_w], False)
         _L0C[(_w, "gs")] = _lay
@@ -539,6 +650,12 @@ L1_K_ADDR = _addr(_L1, "k")
 MTX_L1_K = _mutex(_L1, "k")
 L1_KND_ADDR = _addr(_L1, "k_nd")
 MTX_L1_K_ND = _mutex(_L1, "k_nd")
+# GS one-ahead pipelines keep at most current C2 and previous-task C3 live.
+# Swizzle preload3 consumes C3(N-2) before C2(N), retaining its two-round delay
+# without a third K slot. Empty deterministic rounds do not advance K cursors.
+# Reuse the existing K/KND allocations and ids; no extra L1 bytes or mutex ids.
+L1_K_REUSE_ADDRS = {w: _L1[w]["k"]["addrs"] + _L1[w]["k_nd"]["addrs"] for w in _TIERS}
+L1_K_REUSE_MUTEX = {w: _L1[w]["k"]["mutex"] + _L1[w]["k_nd"]["mutex"] for w in _TIERS}
 L1_V_ADDR = _addr(_L1, "v")
 MTX_L1_V = _mutex(_L1, "v")
 L1_DS_ADDR = _addr(_L1, "ds")
@@ -548,6 +665,12 @@ MTX_L1_DS = list(_CV_MTX["ds"])
 MTX_L1_P = list(_CV_MTX["p"])
 MTX_L1_DS_T = list(_CV_MTX["ds_t"])  # 与 ds 同址、另发一号，见 _CV_SLOTS
 MTX_L1_P_T = list(_CV_MTX["p_t"])
+L1_DS_DB_ADDRS = {w: [L1_DS_ADDR[w], _L1[w]["ds_db1"]["addrs"][0]] for w in (64, 128)}
+L1_P_DB_ADDRS = {w: [L1_P_ADDR[w], _L1[w]["p_db1"]["addrs"][0]] for w in (64, 128)}
+MTX_L1_DS_DB = [MTX_L1_DS[0], 28]
+MTX_L1_P_DB = [MTX_L1_P[0], 29]
+MTX_L1_DS_T_DB = [MTX_L1_DS_T[0], 30]
+MTX_L1_P_T_DB = [MTX_L1_P_T[0], 31]
 
 # ---- L0A / L0B ----
 L0AB_ADDRS = _addrs(_L0AB, "l0a")
@@ -611,6 +734,14 @@ MTX_L0C_DK1_B2 = {w: MTX_L0C_DK1_B2[w][-1] for w in _TIERS}
 MTX_L0C_DV1, MTX_L0C_DV1_B2 = _l0c_tabs("dv", "mutex")
 MTX_L0C_DV1 = {w: MTX_L0C_DV1[w][-1] for w in _TIERS}
 MTX_L0C_DV1_B2 = {w: MTX_L0C_DV1_B2[w][-1] for w in _TIERS}
+L0C_ACC_D192DV128_ADDRS = _L0C[(192, "gs_dv128")]["acc"]["addrs"]
+L0C_ACC_D192DV128_MUTEX = _L0C[(192, "gs_dv128")]["acc"]["mutex"]
+L0C_ACC_D192DV128_N64_ADDR = L0C_ACC_D192DV128_ADDRS[0] + CUBE_BASEM * 128 * 4
+L0C_DK_D192DV128_ADDRS = _L0C[(192, "gs_dv128")]["dk"]["addrs"]
+L0C_DK_D192DV128_MUTEX = _L0C[(192, "gs_dv128")]["dk"]["mutex"]
+L0C_DK_D192DV128_N64_ADDR = L0C_DK_D192DV128_ADDRS[0] + CUBE_BASEN * 128 * 4
+L0C_DV128_ADDR = _L0C[(192, "gs_dv128")]["dv"]["addrs"][0]
+MTX_L0C_DV128 = _L0C[(192, "gs_dv128")]["dv"]["mutex"][0]
 
 # ---- UB ----
 # vector 侧的 buffer 名单与档无关，三档发出的号必然一致，故导出扁平列表。
@@ -622,6 +753,7 @@ MTX_MM2_RES = list(_CV_MTX["mm2_res"])
 UB_Y_A = _addr(_UB, "y")
 UB_DY_A = _addr(_UB, "dy")
 UB_NZP_A = _addr(_UB, "nzp")
+UB_P_OUT_A = _addr(_UB, "p_out")  # GS only: BN2 scratch is inactive
 UB_SFMG_A = _addr(_UB, "sfmg")
 UB_LSE0_A = {w: _UB[w]["lse"]["addrs"][0] for w in _TIERS}
 UB_LSE1_A = {w: _UB[w]["lse"]["addrs"][1] for w in _TIERS}
@@ -631,12 +763,20 @@ UB_MASK_PRE_A = UB_DY_A
 MTX_UB_Y = _flat(_UB, "y")  # attenmask 复用
 MTX_UB_DY = _flat(_UB, "dy")  # attenmask(pre) 复用
 MTX_UB_NZP = _flat(_UB, "nzp")
+MTX_UB_P_OUT = _flat(_UB, "p_out")
 MTX_UB_SFMG = _flat(_UB, "sfmg")
 MTX_UB_LSE = _flat(_UB, "lse")
 MTX_UB_CAST = _flat(_UB, "cast")  # 仅 BN2
 MTX_UB_L0C_LOAD = _flat(_UB, "l0c_load_ub")  # 仅 BN2 192
 # 仅 wide：载入 tile 复用 y、出口复用 cast（同址必须同号）。
 MTX_UB_WSF32 = _flat(_UB, "y")
+UB_SFMG_WIDE_Y_A = _UB[768]["sfmg_wide"]["y"]["addrs"]
+UB_SFMG_WIDE_DY_A = _UB[768]["sfmg_wide"]["dy"]["addrs"]
+MTX_UB_SFMG_WIDE_Y = _UB[768]["sfmg_wide"]["y"]["mutex"]
+MTX_UB_SFMG_WIDE_DY = _UB[768]["sfmg_wide"]["dy"]["mutex"]
+# One full-range alias tile must wait for both independently rotating slots.
+MTX_UB_WSF32_WIDE = [MTX_UB_SFMG_WIDE_Y]
+
 MTX_UB_WSF16 = _flat(_UB, "cast")
 UB_SINK_PART_A = _addr(_UB, "sink_part")
 MTX_UB_SINK_PART = _flat(_UB, "sink_part")
@@ -686,13 +826,14 @@ UB_WSF16 = _addr(_UB, "cast")  # wide 的 16-bit 出口 alias 到 cast
 # ==================================================================
 #  自查
 # ==================================================================
-def describe_layout(tier=HEAD_DIM_ALIGN):
+def describe_layout(tier=HEAD_DIM_ALIGN, dv_tier=None):
     """打印一档的完整片上内存图：地址 + 大小 + 持有的 buffer-id。"""
     arenas = []
     for group in (_L1, _L0AB, _UB):
         arenas.extend(group[tier]["_arenas"])
     # L0C 表按 (档, 类) 取，默认看 GS1S2 那套；BN2 192 的另一套用 _L0C[(192,"bn2")]
-    arenas.extend(_L0C[(tier, "gs")]["_arenas"])
+    variant = "gs_dv128" if tier == 192 and dv_tier == 128 else "gs"
+    arenas.extend(_L0C[(tier, variant)]["_arenas"])
     return "\n\n".join(a.describe() for a in arenas)
 
 

@@ -35,6 +35,38 @@ class Tmpl:
     RESERVED_BN2S2 = 3
 
 
+class DeterFamily:
+    """Compile-time decoder families. Values match Host; 27..31 are reserved."""
+
+    LEGACY = 0
+    FIXED_MHA_DENSE = 1
+    FIXED_MHA_CAUSAL = 2
+    FIXED_MHA_BAND = 3
+    FIXED_GQA_DENSE = 4
+    FIXED_GQA_CAUSAL = 5
+    FIXED_GQA_BAND_PIECEWISE = 6
+    FIXED_GQA_BAND_COLUMN = 7
+    FIXED_GQA_BAND_BALANCED = 8
+    FIXED_GQA_BAND_TRANSLATED = 9
+    FIXED_GQA_BAND_FOLDED = 10
+    FIXED_GQA_BAND_OVERLAP = 11
+    TND_MHA_DENSE = 12
+    TND_MHA_SPARSE = 13
+    TND_GQA_DENSE = 14
+    TND_GQA_MIRROR = 15
+    TND_GQA_COLUMN_C4 = 16
+    TND_GQA_MIRROR_OR_BAND = 17
+    TND_GQA_COLUMN_C4_OR_BAND = 18
+    TND_GQA_CAUSAL_COMPAT = 19
+    TND_GQA_CAUSAL_OR_BAND_COMPAT = 20
+    FIXED_MHA_DENSE_BASELINE = 21
+    FIXED_MHA_CAUSAL_BASELINE = 22
+    FIXED_MHA_BAND_BASELINE = 23
+    FIXED_GQA_BAND_BASELINE = 24
+    FIXED_GQA_CAUSAL_GROUPED = 25
+    FIXED_MHA_BAND_GROUPED = 26
+
+
 @dataclass
 class FlashAttnGradTilingData:
     """对齐 op_host/flash_attn_grad_tiling.h 的 TILING_DATA_FIELD_DEF 顺序。
@@ -81,7 +113,7 @@ class FlashAttnGradTilingData:
     s1Token: int
     s2Token: int
     totalPerBatchNum: int
-    # 保留字段；核上闭式算轮次，当前不读该字段。
+    # 固定布局 family 读取 Host 计划轮次；TND 从 metadata 取得实际轮次。
     deterMaxRound: int
     # Optional effective lengths; cu_seqlens continues to describe physical storage.
     sequsedQOptional: int
@@ -91,6 +123,99 @@ class FlashAttnGradTilingData:
     # fasg DoPreTiling 的 enablePreSfmg。kernel 的写侧(process_presfmg)与
     # 读侧(process_vec1)共用该标志：1=pre 算一次写 ws，0=主循环内联重算。
     enablePreSfmg: int
+    # Deterministic schedule payload; family is a separate compile-time key.
+    deterSparseKind: int
+    deterDenseRound: int
+    deterCausalRoundsPerGroup: int
+    deterBandMode: int
+    deterM: int
+    deterN: int
+    deterP: int
+    deterQ: int
+    deterRowOffset: int
+    deterColOffset: int
+    deterBandPhaseCount: int
+    deterBandTailPhaseCount: int
+    deterBandK: int
+    deterBandB: int
+    deterBandG: int
+    deterBandGroupsPerChunk: int
+    deterBandFullRounds: int
+    deterBandTailRounds: int
+    deterBandTotalRounds: int
+    deterBandPhase0Kind: int
+    deterBandPhase0M: int
+    deterBandPhase0N: int
+    deterBandPhase0RowOffset: int
+    deterBandPhase0ColOffset: int
+    deterBandPhase0FullRounds: int
+    deterBandPhase0TailRounds: int
+    deterBandPhase1Kind: int
+    deterBandPhase1M: int
+    deterBandPhase1N: int
+    deterBandPhase1RowOffset: int
+    deterBandPhase1ColOffset: int
+    deterBandPhase1FullRounds: int
+    deterBandPhase1TailRounds: int
+    deterBandPhase2Kind: int
+    deterBandPhase2M: int
+    deterBandPhase2N: int
+    deterBandPhase2RowOffset: int
+    deterBandPhase2ColOffset: int
+    deterBandPhase2FullRounds: int
+    deterBandPhase2TailRounds: int
+    deterBandPhase3Kind: int
+    deterBandPhase3M: int
+    deterBandPhase3N: int
+    deterBandPhase3RowOffset: int
+    deterBandPhase3ColOffset: int
+    deterBandPhase3FullRounds: int
+    deterBandPhase3TailRounds: int
+    deterBandPhase4Kind: int
+    deterBandPhase4M: int
+    deterBandPhase4N: int
+    deterBandPhase4RowOffset: int
+    deterBandPhase4ColOffset: int
+    deterBandPhase4FullRounds: int
+    deterBandPhase4TailRounds: int
+    deterBandTailPhase0Kind: int
+    deterBandTailPhase0M: int
+    deterBandTailPhase0N: int
+    deterBandTailPhase0RowOffset: int
+    deterBandTailPhase0ColOffset: int
+    deterBandTailPhase0FullRounds: int
+    deterBandTailPhase0TailRounds: int
+    deterBandTailPhase1Kind: int
+    deterBandTailPhase1M: int
+    deterBandTailPhase1N: int
+    deterBandTailPhase1RowOffset: int
+    deterBandTailPhase1ColOffset: int
+    deterBandTailPhase1FullRounds: int
+    deterBandTailPhase1TailRounds: int
+    deterBandTailPhase2Kind: int
+    deterBandTailPhase2M: int
+    deterBandTailPhase2N: int
+    deterBandTailPhase2RowOffset: int
+    deterBandTailPhase2ColOffset: int
+    deterBandTailPhase2FullRounds: int
+    deterBandTailPhase2TailRounds: int
+    deterBandTailPhase3Kind: int
+    deterBandTailPhase3M: int
+    deterBandTailPhase3N: int
+    deterBandTailPhase3RowOffset: int
+    deterBandTailPhase3ColOffset: int
+    deterBandTailPhase3FullRounds: int
+    deterBandTailPhase3TailRounds: int
+    deterBandTailPhase4Kind: int
+    deterBandTailPhase4M: int
+    deterBandTailPhase4N: int
+    deterBandTailPhase4RowOffset: int
+    deterBandTailPhase4ColOffset: int
+    deterBandTailPhase4FullRounds: int
+    deterBandTailPhase4TailRounds: int
+    metadataWordCount: int
+    deterL2Bytes: int
+    deterCausalGroups: int
 
 
 # 与 op_kernel/arch35/flash_attn_grad.py 的 FlashAttnGradTilingKey 一致
@@ -126,12 +251,14 @@ class FlashAttnGradTilingKey:
     # BN2 MultiBlk 且存在整行或整列无效 tile：pre 把 dq/dk/dv out 清零。
     # 一行/一列共用这一位，kernel 不区分。
     bn2_need_zero = TilingKeyField(bits=1, values=[0, 1])
-    # bit14：确定性分核（核上闭式）。非 swizzle 走跨轮流水+L0C；swizzle 仍轮间 barrier。
+    # bit14：确定性请求；具体调度由 deter_family 在编译期选择，共用跨轮流水。
     deter = TilingKeyField(bits=1, values=[0, 1])
     # bit15：1 = 本次带 sinks 输入，kernel 额外算 dsink。编译期常量：非 sink 变体
     # 里 sink 代码被折叠掉，不再走运行期标量分支。两种 template 都放开。
     sink = TilingKeyField(bits=1, values=[0, 1])
-    # bit16: per-S-tile FP32 NZ workspace for the non-aligned D<=128 GS path.
+    # Append-only ABI: bits16..20. Existing low 16 bits stay unchanged.
+    deter_family = TilingKeyField(bits=5, values=list(range(27)))
+    # bit21: append NZ after the deterministic family; ND keys stay unchanged.
     nz_out = TilingKeyField(bits=1, values=[0, 1])
 
     def is_valid(self, key):
@@ -147,6 +274,7 @@ class FlashAttnGradTilingKey:
             bn2_need_zero,
             deter,
             sink,
+            deter_family,
             nz_out,
         ) = key
         if nz_out == 1:
@@ -158,10 +286,49 @@ class FlashAttnGradTilingKey:
         if deter == 1:
             if template != Tmpl.BN2GS1S2:
                 return False
-            if swizzle != 0:
+            if deter_family == DeterFamily.LEGACY and swizzle != 0:
                 return False
             if is_bn2_multiblk == 1 or bn2_need_zero == 1:
                 return False
+        # Families are capability contracts, not a Cartesian product of flags.
+        if deter_family != DeterFamily.LEGACY:
+            if deter != 1 or template != Tmpl.BN2GS1S2:
+                return False
+            if 1 <= deter_family <= 11 or 21 <= deter_family <= 26:
+                if layout != 0:
+                    return False
+                expected_swizzle = 0 if deter_family in (4, 5, 21, 22, 23, 24) else 1
+                if swizzle != expected_swizzle:
+                    return False
+                if deter_family in (1, 4, 21):
+                    # A full-window BAND input uses the Dense schedule in AscendC.
+                    # The mask code still comes from the unchanged input contract.
+                    if mask_mode not in (0, 4):
+                        return False
+                elif deter_family in (2, 5, 22, 25) and mask_mode != 3:
+                    return False
+                elif deter_family == 26 and mask_mode != 4:
+                    return False
+                elif mask_mode not in (3, 4):
+                    return False
+            else:
+                if layout != 1:
+                    return False
+                if swizzle != (1 if deter_family == 12 else 0):
+                    return False
+                if deter_family == 12 and mask_mode != 0:
+                    return False
+                # Actual TND lengths can make a BAND input dense at runtime.
+                if deter_family == 14 and mask_mode not in (0, 4):
+                    return False
+                if deter_family == 13 and mask_mode not in (3, 4):
+                    return False
+                if deter_family in (15, 16, 17, 18, 19, 20) and mask_mode != 3:
+                    return False
+                if deter_family in (16, 18) and (
+                    d_align not in (128, 256) or dv_align != d_align
+                ):
+                    return False
         if template == Tmpl.BN2:
             # BN2 + TND（layout=1）：host 仅对等长 TND 选 BN2（Bn2FamilyFeasible
             # 的 tndAllSame 门，由 parser 用 shape 算术判定）——等长 TND 的
@@ -178,7 +345,13 @@ class FlashAttnGradTilingKey:
             if d_align != dv_align:
                 return False
             if bn2_need_zero == 1:
-                return is_bn2_multiblk == 1 and mask_mode != 0
+                if is_bn2_multiblk == 1:
+                    # 稀疏 MultiBlk 的整行/整列无效 tile：固定布局，按 metadata
+                    # 的 pre 行区间整段清 16-bit out。
+                    return layout == 0 and mask_mode != 0
+                # 变长 TND 的 BN2 单块：只清“空 batch 对侧”的行（kernel 运行
+                # 期按 cu_seqlens 定位）。等长 TND 不产生这份二进制。
+                return layout == 1
             return True
         if is_bn2_multiblk == 1 or bn2_need_zero == 1:
             return False
@@ -186,8 +359,8 @@ class FlashAttnGradTilingKey:
         if d_align != dv_align and not (d_align == 192 and dv_align == 128):
             return False
         # 大 D 的 GS1S2 同时支持固定布局和原生 packed TND。
-        # TND 使用线性变长调度；host 不会选择 TND swizzle。
-        # 非 TND 保留 swizzle；deterministic TND 同样只编非 swizzle。
+        # 非确定性 TND swizzle 在 host 做候选筛选，kernel 验证双侧 cu 等长；
+        # 确定性仍仅 TND MHA Dense family 可编 swizzle。
         if d_align == 192 or d_align == 256 or d_align == 768:
-            return layout == 0 or swizzle == 0
+            return layout == 0 or swizzle == 0 or deter == 0 or deter_family == 12
         return True

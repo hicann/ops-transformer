@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "flash_attn_grad_tiling_schedule.h"
+#include "flash_attn_grad_tiling_launch.h"
 
 #include "flash_attn_grad_block_outer.h"
 #include "log/log.h"
@@ -34,8 +34,14 @@ ge::graphStatus BuildSchedulePlan(gert::TilingContext* context, const FagParsedI
     // 单块 4-head（mask/sink）用例会起 36 个 cube —— msprof 显示 AIC 各 pipe
     // 合计仅 4.2us / 28.9us；且 sink 的 pre-zero/reduce 成本 ∝ 启动的 AIV 数。
     const bool bn2SelfScheduled = (kernel.tmpl == TMPL_BN2);
+    // 变长 TND 的 BN2 例外：metadata 的 packed 任务数会按空 batch 剔减，而 host
+    // 拿不到 cu_seqlens、只能按 dense head 数（b*n2*g）估。一旦有效任务数 >
+    // 这张 dense 口径算出的启动核数，metadata 分给"未启动核"的任务就永远不会
+    // 执行，对应 head 的 out 保持未初始化（实测 dq/dk/dv 出 inf）。因此变长
+    // TND 一律满片启动，空 batch 的行由 kernel pre 按 cu_seqlens 补零。
+    const bool bn2VarlenTnd = bn2SelfScheduled && info.isTnd && !info.tndAllSame;
     schedule.useActualCores =
-        !info.hasSeqused && (bn2SelfScheduled || (!info.isTnd && info.maskMode == MASK_MODE_NO_MASK));
+        !info.hasSeqused && !bn2VarlenTnd && (bn2SelfScheduled || (!info.isTnd && info.maskMode == MASK_MODE_NO_MASK));
     schedule.usedCube = info.aicNum;
     if (info.isDeterministic && kernel.tmpl == TMPL_BN2GS1S2) {
         // 确定性按满片 aicNum 启动，核上闭式用 get_block_num() 当 k。

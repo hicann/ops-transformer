@@ -6,10 +6,10 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
-"""确定性非 swizzle 分核：核上闭式，不读 metadata。
+"""Shared deterministic coordinate formulas for fixed and TND decoders.
 
-(j, r) 1-based。mask_mode 是 tilingkey，只编当前 mask。gSize 运行期，
-MHA/GQA 两路都编。host 单测可给本模块赋 ``mask_mode``。
+Core and round coordinates are one-based unless a function states otherwise.
+This module does not own a schedule or choose the legacy dispatch path.
 """
 
 try:
@@ -149,11 +149,25 @@ def cal_dense(k, m, n, b, j, r):
     return w, x * ok, y * ok
 
 
-def cal_gqa_dense(k, m, n, b, core_id, round_id, g, dense_round=0):
+def gqa_dense_parameters(k, m, n, b, g, dense_round):
+    """Derive the original decoder parameters outside the cached hot path."""
     k = pl.min(pl.min(k, b * g * m), b * n)
     rmax_def = pl.max(pl.max(_ceil(b * n * g, k), _ceil(n, m)), g)
     use_dr = pl.min(pl.max(dense_round, 0), 1)
     rmax = dense_round * use_dr + rmax_def * (1 - use_dr)
+    nbg = pl.max(b * g, 1)
+    common = pl.max(_gcd(nbg, rmax), 1)
+    return k, rmax, rmax // common, nbg // common
+
+
+def cal_gqa_dense(k, m, n, b, core_id, round_id, g, dense_round=0):
+    k, rmax, t1, t2 = gqa_dense_parameters(k, m, n, b, g, dense_round)
+    return cal_gqa_dense_precomputed(k, m, n, b, core_id, round_id, g, rmax, t1, t2)
+
+
+def cal_gqa_dense_precomputed(k, m, n, b, core_id, round_id, g, dense_round, t1, t2):
+    """Decode one coordinate using the selected round and cached GCD periods."""
+    rmax = dense_round
     ok = _in_range(core_id, 1, k) * _in_range(round_id, 1, rmax * m)
     idx = (core_id - 1) * rmax + _ceil(round_id, m)
     local_id = _nz(round_id % pl.max(m, 1), pl.max(m, 1))
@@ -163,9 +177,6 @@ def cal_gqa_dense(k, m, n, b, core_id, round_id, g, dense_round=0):
     b_id = _ceil(_nz(idx % nbg, nbg), gg)
     y = _ceil(idx, nbg)
     w = _nz(idx % gg, gg)
-    gcd = pl.max(_gcd(nbg, rmax), 1)
-    t1 = rmax // gcd
-    t2 = nbg // gcd
     t1_new = t1 * m
     t1s = pl.max(t1, 1)
     t1n = pl.max(t1_new, 1)
@@ -262,7 +273,13 @@ def _causal_rec(k, m, n, j, r):
     return -(1 - valid), x * valid, y * valid
 
 
-def _causal_single(k, m, n, j, r):
+# CANN overloads sqrt(int64_t) as integer SQRT_s64. Both the original PTO
+# closed form and the ordinary source path therefore use floor(sqrt(disc)).
+CAUSAL_BOUNDARY_DEVICE_INTEGER_SQRT = 0
+CAUSAL_BOUNDARY_EXACT_INTEGER = 1
+
+
+def _causal_single(k, m, n, j, r, boundary_mode=0):
     invalid = _pack_wxy(-1, 0, 0, m, n)
     out = invalid
     if k >= (n // 2) + 1:
@@ -274,8 +291,20 @@ def _causal_single(k, m, n, j, r):
         t3 = (n // k) % 2
         bound1 = (2 * m + 1) * t1 - 2 * k * t1 * t1
         if r <= bound1:
-            disc = (2 * m + 1) * (2 * m + 1) - 8 * k * r
-            i = _ceil((2 * m + 1) - _isqrt(disc), 4 * k)
+            if boundary_mode == CAUSAL_BOUNDARY_EXACT_INTEGER:
+                low = pl.astype(1, pl.DT_INT64)
+                high = pl.astype(t1, pl.DT_INT64)
+                while low < high:
+                    mid = low + (high - low) // 2
+                    end_round = (2 * m + 1) * mid - 2 * k * mid * mid
+                    if r <= end_round:
+                        high = mid
+                    else:
+                        low = mid + 1
+                i = low
+            else:
+                disc = (2 * m + 1) * (2 * m + 1) - 8 * k * r
+                i = _ceil((2 * m + 1) - _isqrt(disc), 4 * k)
             rm = (2 * m + 1) * (i - 1) - 2 * k * (i - 1) * (i - 1)
             offset = 2 * k * (i - 1)
             w, x, y = _causal_g2k(k, j, r - rm, m - 2 * k * (i - 1), offset)
@@ -389,7 +418,7 @@ def _causal_tail_packed(k, m, n, b1, b2, j, a4, t, ell, delta):
     return out
 
 
-def cal_causal(k, m, n, b, j, r):
+def cal_causal(k, m, n, b, j, r, boundary_mode=0):
     invalid = _pack_wxy(-1, 0, 0, m, n)
     out = invalid
     b1 = b // k
@@ -454,7 +483,7 @@ def cal_causal(k, m, n, b, j, r):
                     else:
                         rm3 = rm3 + pl.max(m1, 2 * m1 - 2 * k + 1)
                     if a3 >= 1 and a3 <= rm3:
-                        single = _causal_single(k, m, n, j, a3)
+                        single = _causal_single(k, m, n, j, a3, boundary_mode)
                         w, x, y = _unpack_wxy(single, m, n)
                         if w != -1:
                             out = _pack_wxy(b, x, y, m, n)
@@ -467,7 +496,7 @@ def cal_causal(k, m, n, b, j, r):
                 else:
                     rm3 = (2 * m - t * k + 1) * t // 2
                     if a3 >= 1 and a3 <= rm3:
-                        single = _causal_single(k, m, t * k, j, a3)
+                        single = _causal_single(k, m, t * k, j, a3, boundary_mode)
                         w, x, y = _unpack_wxy(single, m, t * k)
                         if w != -1:
                             out = _pack_wxy(b, x, y, m, n)
@@ -556,7 +585,7 @@ def _gqa_causal_tail_packed(k, m, n, b1, b2, j, a4, t, ell, delta, g):
     return out
 
 
-def cal_gqa_causal(k, m, n, b, j, r, g):
+def cal_gqa_causal(k, m, n, b, j, r, g, boundary_mode=0):
     invalid = _pack_wxy(-1, 0, 0, m, n)
     out = invalid
     b1 = b // k
@@ -630,7 +659,7 @@ def cal_gqa_causal(k, m, n, b, j, r, g):
                     if a3 >= 1 and a3 <= rm3 * g:
                         n1_id = _ceil(a3, rm3)
                         a3r = _nz(a3 % rm3, rm3)
-                        single = _causal_single(k, m, n, j, a3r)
+                        single = _causal_single(k, m, n, j, a3r, boundary_mode)
                         w, x, y = _unpack_wxy(single, m, n)
                         if w != -1:
                             out = _pack_wxy((b - 1) * g + n1_id, x, y, m, n)
@@ -645,7 +674,7 @@ def cal_gqa_causal(k, m, n, b, j, r, g):
                     if a3 >= 1 and a3 <= rm3 * g:
                         n1_id = _ceil(a3, rm3)
                         a3r = _nz(a3 % rm3, rm3)
-                        single = _causal_single(k, m, t * k, j, a3r)
+                        single = _causal_single(k, m, t * k, j, a3r, boundary_mode)
                         w, x, y = _unpack_wxy(single, m, t * k)
                         if w != -1:
                             out = _pack_wxy((b - 1) * g + n1_id, x, y, m, n)
@@ -658,6 +687,11 @@ def cal_gqa_causal(k, m, n, b, j, r, g):
             else:
                 out = _gqa_causal_tail_packed(k, m, n, b1, b2, j, a3, t, ell, delta, g)
     return out
+
+
+def cal_gqa_causal_source(k, m, n, b, j, r, g):
+    """Ordinary AscendC GQA causal boundary, isolated from legacy PTO callers."""
+    return cal_gqa_causal(k, m, n, b, j, r, g, CAUSAL_BOUNDARY_DEVICE_INTEGER_SQRT)
 
 
 def band_pq(s1_outer, s2_outer, s1_token, s2_token):
@@ -1181,165 +1215,7 @@ def cal_gqa_band(k, m, n, p, q, b, g, j, r):
     return out
 
 
-def _causal_max_round(m, n, k, b, g):
-    """Exclusive upper bound from the mapper's actual segment lengths.
-
-    cal_causal/cal_gqa_causal concatenate full batches, paired batches,
-    an optional single batch, then a column-pair tail. The last tail wave
-    splits its two columns across cores when at most half the cores are used;
-    it then takes only the longest column, not the full reflected pair length.
-    """
-    out = 0
-    if k > 0 and m > 0 and n > 0 and b > 0 and g > 0:
-        n = pl.min(n, m)
-        b_tail = b % k
-        rounds = (b // k) * (n * m - n * (n - 1) // 2)
-        t = n // k
-        ell = n % k
-        t1 = n // (2 * k)
-        rounds = rounds + (2 * m - t * k + 1) * t * (b_tail // 2)
-        if b_tail % 2 == 1:
-            if t % 2 == 1:
-                m1 = m - t1 * 2 * k
-                rm3 = (m + m1 + 1) * t1
-                if ell == 0:
-                    rounds = rounds + rm3 + m1
-                else:
-                    rounds = rounds + rm3 + pl.max(m1, 2 * m1 - 2 * k + 1)
-                b_tail = b_tail - 1
-            else:
-                rounds = rounds + (2 * m - t * k + 1) * t // 2
-        pairs = ((ell + 1) // 2) * b_tail
-        pair_len = 2 * (m - n) + ell + 1 - ell % 2
-        rounds = rounds + (pairs // k) * pair_len
-        remaining = pairs % k
-        if remaining > 0:
-            if remaining <= k // 2:
-                rounds = (
-                    rounds + m - n + ell // 2 + 1 + (remaining - 1) // pl.max(b_tail, 1)
-                )
-            else:
-                rounds = rounds + pair_len
-        out = pl.max(rounds * g, 0)
-    return out
-
-
-def _dense_lin_max_round(k, m, n, bb, g):
-    """核上 dense/GQA 闭式的矩形轮次。"""
-    g = pl.max(g, 1)
-    out = 0
-    if k > 0 and m > 0 and n > 0 and bb > 0:
-        mha_round = _ceil(n * bb, pl.min(k, m * bb)) * m
-        gqa_round = select_gqa_dense_round(k, m, n, bb, g) * m
-        is_mha = _in_range(g, 1, 1)
-        out = mha_round * is_mha + gqa_round * (1 - is_mha)
-    return out
-
-
-def _band_lin_max_round(k, m, n, bb, g, s1_token, s2_token):
-    """mask4 / 矩形 causal(S1<S2) 的 band 轮次。p/q==0 是合法边界，不拒绝。"""
-    actual_m, actual_n, p, q, _mo, _no = band_pq(m, n, s1_token, s2_token)
-    out = m * n
-    if actual_m <= 0 or actual_n <= 0:
-        out = m * n
-    elif g <= 1:
-        (
-            _k,
-            _m,
-            _n,
-            _p,
-            _q,
-            _b,
-            _b1,
-            _b2,
-            _l1,
-            _l2,
-            _l3,
-            _ns,
-            _r1,
-            _r2,
-            _r3,
-            _rm,
-            rmb,
-            rm2,
-        ) = _gen_band(k, actual_m, actual_n, p, q, bb)
-        out = pl.max(rmb, 0) + pl.max(rm2, 0) + m
-    else:
-        _k, _m, _n, _p, _q, _b, _g, _b1, _b2, _l1, _l2, _l3, _rm, rmb, _r1, _r2, rm2 = (
-            _gen_gqa_band(k, actual_m, actual_n, p, q, bb, g)
-        )
-        out = pl.max(rmb, 0) + pl.max(rm2, 0) + m
-    return out
-
-
-def deter_lin_max_round(constInfo, coreNum):
-    """非 swizzle 轮次上界，与对应的 AscendC 闭式分核配套。"""
-    k = coreNum
-    b = constInfo.bSize
-    n2 = constInfo.n2Size
-    g = constInfo.gSize
-    g = pl.max(g, 1)
-    m = constInfo.s1Outer
-    n = constInfo.s2Outer
-    bb = b * n2
-    out = 0
-    dense_grid = constInfo.sequsedQOptional + constInfo.sequsedKvOptional
-    if mask_mode == 0:
-        dense_grid = 1
-    if k > 0 and m > 0 and n > 0 and bb > 0:
-        dense_r = _dense_lin_max_round(k, m, n, bb, g)
-        if dense_grid > 0:
-            out = dense_r
-        else:
-            band_r = _band_lin_max_round(
-                k, m, n, bb, g, constInfo.s1Token, constInfo.s2Token
-            )
-            if mask_mode == 3:
-                causal_r = _causal_max_round(m, n, k, bb, g)
-                use_band = _lt(constInfo.s1Size, constInfo.s2Size)
-                out = causal_r * (1 - use_band) + band_r * use_band
-            else:
-                out = band_r
-    return pl.astype(out, pl.DT_INT64)
-
-
-def deter_lin_round_bounds(constInfo, coreNum):
-    """Common [first, end) physical rounds; never compact per-core holes.
-
-    A small rectangular causal schedule (B*N2 < k, S2Outer < k) consists
-    solely of the causal column-pair tail. On its rising half x-y=a-1,
-    and on its reflected half x-y=pair_len-a (coordinates are 1-based).
-    Right-down masking requires x-y >= floor((S1-S2)/128). This gives a
-    provably empty global prefix, and a suffix on a reflected final wave.
-    Interior empty rounds and the original absolute round numbers remain.
-    """
-    first = pl.astype(0, pl.DT_INT64)
-    end = deter_lin_max_round(constInfo, coreNum)
-    if mask_mode == 3:
-        m = constInfo.s1Outer
-        n = constInfo.s2Outer
-        bb = constInfo.bSize * constInfo.n2Size
-        g = pl.max(constInfo.gSize, 1)
-        if (
-            coreNum > 0
-            and bb > 0
-            and bb < coreNum
-            and n > 0
-            and n < coreNum
-            and constInfo.s1Size >= constInfo.s2Size
-            and constInfo.s2Token == constInfo.s2Size - constInfo.s1Size
-            and constInfo.sequsedQOptional + constInfo.sequsedKvOptional == 0
-        ):
-            offset = (constInfo.s1Size - constInfo.s2Size) // CUBE_BASEM
-            first = pl.astype(offset * g, pl.DT_INT64)
-            pairs = ((n + 1) // 2) * bb
-            remaining = pairs % coreNum
-            if remaining == 0 or remaining > coreNum // 2:
-                end = pl.astype(end - offset * g, pl.DT_INT64)
-    return first, end
-
-
-def _fused_valid(constInfo, s1o, s2o):
+def fused_valid_for_mask(constInfo, s1o, s2o, mask_mode):
     out = 1
     if mask_mode == 0:
         out = 1
@@ -1386,137 +1262,3 @@ def pack_fused(w, x, y, b, n2, g, s1_outer, s2_outer, moff, noff):
         + s1_idx
     )
     return fused * ok + (-1) * (1 - ok)
-
-
-def _deter_lin_gidx_host(constInfo, cBlockIdx, coreNum, roundId):
-    """host 对拍：可用运行期 if/return。"""
-    k = coreNum
-    j = cBlockIdx + 1
-    r = roundId + 1
-    b = constInfo.bSize
-    n2 = constInfo.n2Size
-    g = constInfo.gSize
-    if g < 1:
-        g = 1
-    s1o = constInfo.s1Outer
-    s2o = constInfo.s2Outer
-    bb = b * n2
-    moff = 0
-    noff = 0
-    if k <= 0 or j < 1 or j > k or r < 1 or s1o <= 0 or s2o <= 0 or b <= 0 or n2 <= 0:
-        return -1
-    if mask_mode == 0 or constInfo.sequsedQOptional + constInfo.sequsedKvOptional > 0:
-        if g <= 1:
-            w, x, y = cal_dense(k, s1o, s2o, bb, j, r)
-        else:
-            dense_round = select_gqa_dense_round(k, s1o, s2o, bb, g)
-            w, x, y = cal_gqa_dense(k, s1o, s2o, bb, j, r, g, dense_round)
-    elif mask_mode == 3 and constInfo.s1Size >= constInfo.s2Size:
-        m = s1o
-        n = s2o if s2o <= s1o else s1o
-        if g <= 1:
-            packed = cal_causal(k, m, n, bb, j, r)
-        else:
-            packed = cal_gqa_causal(k, m, n, bb, j, r, g)
-        w, x, y = _unpack_wxy(packed, m, n)
-    else:
-        # mask4，以及 mask3 且 S1<S2：矩形 right-down causal 走 band。
-        actual_m, actual_n, p, q, moff, noff = band_pq(
-            s1o, s2o, constInfo.s1Token, constInfo.s2Token
-        )
-        if actual_m <= 0 or actual_n <= 0:
-            return -1
-        if g <= 1:
-            packed = cal_band(k, actual_m, actual_n, p, q, bb, j, r)
-            w, x, y = _unpack_wxy(packed, actual_m, actual_n)
-        else:
-            packed = cal_gqa_band(k, actual_m, actual_n, p, q, bb, g, j, r)
-            w, x, y = _unpack_wxy(packed, actual_m, actual_n)
-    fused = pack_fused(w, x, y, b, n2, g, s1o, s2o, moff, noff)
-    if fused < 0:
-        return -1
-    s1_idx = fused % s1o
-    s2_idx = (fused % (s1o * s2o)) // s1o
-    if constInfo.sequsedQOptional + constInfo.sequsedKvOptional == 0:
-        if _fused_valid(constInfo, s1_idx, s2_idx) == 0:
-            return -1
-    return fused
-
-
-def deter_lin_gidx(constInfo, cBlockIdx, coreNum, roundId):
-    """(cBlockIdx, roundId) 0-based → fusedIdx，空槽 -1。
-
-    无 seqused 时保留对应的 AscendC dense/causal/band 闭式。
-    seqused 的 batch 几何在核上读取；先枚举完整物理 dense 网格，再由
-    skip_empty_deter 按有效长度和 mask 过滤，避免静态稀疏几何提前漏块。
-    """
-    k = coreNum
-    j = cBlockIdx + 1
-    r = roundId + 1
-    b = constInfo.bSize
-    n2 = constInfo.n2Size
-    g = pl.max(constInfo.gSize, 1)
-    s1o = constInfo.s1Outer
-    s2o = constInfo.s2Outer
-    bb = b * n2
-    moff = 0
-    noff = 0
-    dense_grid = constInfo.sequsedQOptional + constInfo.sequsedKvOptional
-    if mask_mode == 0:
-        dense_grid = 1
-    if dense_grid > 0:
-        w, x, y = cal_dense(k, s1o, s2o, bb, j, r)
-        dense_round = select_gqa_dense_round(k, s1o, s2o, bb, g)
-        wg, xg, yg = cal_gqa_dense(k, s1o, s2o, bb, j, r, g, dense_round)
-    elif mask_mode == 3:
-        # S1>=S2 走三角 causal；S1<S2 的矩形 right-down 与 ASC 一样切 band。
-        causal_n = pl.min(s2o, s1o)
-        packed = cal_causal(k, s1o, causal_n, bb, j, r)
-        packed_g = cal_gqa_causal(k, s1o, causal_n, bb, j, r, g)
-        wc, xc, yc = _unpack_wxy(packed, s1o, causal_n)
-        wcg, xcg, ycg = _unpack_wxy(packed_g, s1o, causal_n)
-        actual_m, actual_n, p, q, moff_b, noff_b = band_pq(
-            s1o, s2o, constInfo.s1Token, constInfo.s2Token
-        )
-        packed_b = cal_band(k, actual_m, actual_n, p, q, bb, j, r)
-        packed_bg = cal_gqa_band(k, actual_m, actual_n, p, q, bb, g, j, r)
-        wb, xb, yb = _unpack_wxy(packed_b, actual_m, actual_n)
-        wbg, xbg, ybg = _unpack_wxy(packed_bg, actual_m, actual_n)
-        use_band = _lt(constInfo.s1Size, constInfo.s2Size)
-        use_causal = 1 - use_band
-        w = wc * use_causal + wb * use_band
-        x = xc * use_causal + xb * use_band
-        y = yc * use_causal + yb * use_band
-        wg = wcg * use_causal + wbg * use_band
-        xg = xcg * use_causal + xbg * use_band
-        yg = ycg * use_causal + ybg * use_band
-        moff = moff_b * use_band
-        noff = noff_b * use_band
-    else:
-        actual_m, actual_n, p, q, moff, noff = band_pq(
-            s1o, s2o, constInfo.s1Token, constInfo.s2Token
-        )
-        packed = cal_band(k, actual_m, actual_n, p, q, bb, j, r)
-        w, x, y = _unpack_wxy(packed, actual_m, actual_n)
-        packed_g = cal_gqa_band(k, actual_m, actual_n, p, q, bb, g, j, r)
-        wg, xg, yg = _unpack_wxy(packed_g, actual_m, actual_n)
-    is_mha = _in_range(g, 1, 1)
-    w = w * is_mha + wg * (1 - is_mha)
-    x = x * is_mha + xg * (1 - is_mha)
-    y = y * is_mha + yg * (1 - is_mha)
-    fused = pack_fused(w, x, y, b, n2, g, s1o, s2o, moff, noff)
-    s1s = pl.max(s1o, 1)
-    s2s = pl.max(s2o, 1)
-    s1_idx = fused % s1s
-    s2_idx = (fused % (s1s * s2s)) // s1s
-    hit = pl.min(pl.max(fused + 1, 0), 1)
-    if constInfo.sequsedQOptional + constInfo.sequsedKvOptional == 0:
-        hit = hit * _fused_valid(constInfo, s1_idx, s2_idx)
-    return pl.astype(fused, pl.DT_INT64) * hit + pl.astype(-1, pl.DT_INT64) * (1 - hit)
-
-
-_deter_lin_gidx_device = deter_lin_gidx
-
-
-if type(pl).__name__ == "_Pl":
-    deter_lin_gidx = _deter_lin_gidx_host

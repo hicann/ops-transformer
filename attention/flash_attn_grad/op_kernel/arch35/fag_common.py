@@ -12,13 +12,28 @@
 策略表、NZ 分形常量、CV 跨核同步 flag，以及两个贯穿全流程的结构体
 ``FagConstInfo`` / ``FagRunInfo``。
 
-不要往这里放地址(见 :mod:`fag_mem`)或任何带 ``pl.load`` / ``pl.matmul`` 的
-计算(见 :mod:`fag_block_cube` / :mod:`fag_block_vec`)。
+不要往这里放地址(见 :mod:`memory.fag_mem`)或任何带 ``pl.load`` / ``pl.matmul`` 的
+计算(见 :mod:`compute.fag_block_cube` / :mod:`compute.fag_block_vec`)。
 """
 
 import pypto_pro.language as pl
 
 from fag_colsplit import ceil_div_signed, col_prefix_body
+
+# Metadata reader offsets shared by scheduling and Vector writeback.
+# Keep values aligned with flash_attn_grad_metadata_split.h; the optional
+# TND tail is sized by Host metadataWordCount.
+META_HEAD_FAG_START_INDEX = 7
+META_FAG_BLOCK_STARTS_OFFSET = 8
+META_FAG_BLOCK_ENDS_OFFSET = 44
+META_FAG_PRE_AIV_NUM = 121
+META_FAG_DQ_ROWS = 122
+META_FAG_DKV_ROWS = 123
+META_FAG_DQ_ROW_STARTS = 124
+META_FAG_DQ_ROW_ENDS = 196
+META_FAG_DKV_ROW_STARTS = 268
+META_FAG_DKV_ROW_ENDS = 340
+META_FAG_AIV_LIST_NUM = 72
 
 # ---- 基本块尺寸 ----
 CUBE_BASEM = 128  # s1 对齐 128
@@ -37,8 +52,9 @@ BLOCK_ELEMS_F16 = 16
 # 四个槽（sp_y×2 + sp_dy×2）全双，sp_out 另占 2×rows×4B，行数按下式取 8 的
 # 倍数（sp_out DN tile 的 32B 对齐）：
 #   rows ≤ (220KB - 2*rows*4B) / (4 * SP_WORK_W * 2B)
-#   128 → 216 行、192 → 144 行、256/768 → 104 行（768 列向本就按 256 列三趟
-# 装载，tile 无需 768 宽；窗口行数与读侧 64 行窗口解耦——ws 是扁平缓存）。
+#   128 → 216 行、192 → 144 行、256/768 → 104 行。
+# SP_ROWS/SP_WORK_W 保留外层窗口与原内存预算；Dv>256 的实际规约微块
+# 在 pre 使用最多 32×768、inline 使用 8×768，输出仍写同一扁平窗口。
 # sp 的 mutex 号复用主图 tile 的号（见 fag_mem），让“pre 最后一次 store →
 # 主循环首次 load”有显式依赖；主图 tile 在 pre 阶段全部不活跃，故地址可复用。
 SP_ROWS = {128: 216, 192: 144, 256: 104, 768: 104}
@@ -63,20 +79,21 @@ SP_WORK_W = {128: 128, 192: 192, 256: 256, 768: 256}
 D_NCHUNKS = {64: 1, 128: 1, 192: 2, 256: 2, 768: 6}  # 768=6×128，空块 dW=0
 D_CHUNK_OFF0 = {64: 0, 128: 0, 192: 0, 256: 0, 768: 0}  # 第 0 块的列偏移
 D_CHUNK_W0 = {
-    64: 128,
+    64: 64,
     128: 128,
     192: 96,
     256: 128,
     768: 128,
-}  # D<=128 一块 128；192=96+96；256=128+128；768 走 6 块循环
+}  # D=64 一块 64；128 一块 128；192=96+96；256=128+128；768 走 6 块循环
 D_CHUNK_OFF1 = {64: 0, 128: 0, 192: 96, 256: 128, 768: 128}  # 第 1 块
 D_CHUNK_W1 = {64: 0, 128: 0, 192: 96, 256: 128, 768: 128}
 # L0A/L0B/L0C 按最宽的一块声明，足以装下任一块
-D_CHUNK_MAXW = {64: 128, 128: 128, 192: 96, 256: 128, 768: 128}
+D_CHUNK_MAXW = {64: 64, 128: 128, 192: 96, 256: 128, 768: 128}
 
 # Cube L1/L0 物理宽钉在 128（d_align=64 只是 tilingkey 分档，Acc/L1 仍按
 # 128 开）。pre/post 已改成 1D 元素切，不再用列宽表。V1 列宽见 v1w。
 # 768 档物理宽仍 256：整头 768 进 L1 会超 512KB，按窗重载（docs/D256设计.md）。
+# 64 档仍是 128 ，受 pypto 前端约束
 D_PHYS_W = {64: 128, 128: 128, 192: 192, 256: 256, 768: 256}
 
 # ---- D 轴分块几何 ----
@@ -192,9 +209,20 @@ SYNC_DQ_DETER_FIX_FLAG = 6
 SYNC_DK_DETER_FIX_FLAG = 7
 SYNC_DV_DETER_FIX_FLAG = 14
 
-# cube 领先 vector 的 task 数。PRELOAD_TIMES=3：首轮连发两组
-# mm2+mm1(共四次 matmul)填满两个 UB 槽位，之后第 N 组的 cube 计算与
-# 第 N-2 组的 vector 计算重叠。runInfos 需要 3 份(N / N-1 / N-2)。
+# Narrow GS normal P/dS L1 slot 1. Slot 0 retains flags 4/5/8/9.
+# A5 INTRA_BLOCK expands the logical ID to id/id+16 for the two AIVs, so
+# logical IDs must stay in 0..15. Reuse 6/7/14 from the compile-time-exclusive
+# BN2/deterministic paths; 15 is otherwise unused in the normal main loop.
+# pre/post sync_all is outside the main loop; its intra-block tokens and the
+# main-loop tokens must be fully consumed before the next phase starts.
+SYNC_V3_TO_C3_DB1_FLAG = 6
+SYNC_V4_TO_C5_DB1_FLAG = 7
+SYNC_C4_TO_V3_DB1_FLAG = 14
+SYNC_C5_TO_V4_DB1_FLAG = 15
+
+# preload3 保留三份 RunInfo。非 swizzle GS 使用上一任务/物理轮的后半计算，
+# 同时预取下一有效任务的 Q/dO；swizzle 路径仍保留原有两轮延迟。
+# 具体延迟由各流水决定，不能直接把槽位数当成计算延迟。
 PRELOAD_TIMES = 3
 
 
@@ -254,6 +282,43 @@ def set_const_info(tiling, coreNum, cu_q_tensor, cu_kv_tensor):
         packedPerHead = col_prefix_body(s1Outer, colP, colQ, s2Outer - 1) + pl.max(
             colLastHi - lastLo + 1, 0
         )
+    # Normal GS uses the same maxValidBBLen as ASC's balanced valid-block split.
+    # These are derived scalar fields, not additions to the public tiling ABI.
+    normalMaxValidBlocks = (
+        pl.astype(packedPerHead, pl.DT_INT64) * tiling.b * tiling.n2 * tiling.gSize
+        + coreNum
+        - 1
+    ) // coreNum
+    normalLengthLimit = 6
+    if tiling.s1 >= 16384:
+        normalLengthLimit = (tiling.s1 // 16384) * 8
+    normalContinuousBlocks = pl.max(pl.min(normalMaxValidBlocks, normalLengthLimit), 1)
+    normalSwizzleKind = 0  # 0: contiguous valid blocks; 1: dense; 2: paired causal
+    if layout == 0 and deter == 0:
+        if tiling.sparseType == 0 and tiling.s1 >= 32768 and tiling.s2 >= 32768:
+            normalSwizzleKind = 1
+        if mask_mode == 4:
+            if (
+                tiling.s1Token >= tiling.s1
+                and tiling.s2Token >= tiling.s2
+                and tiling.s1 >= 32768
+                and tiling.s2 >= 32768
+            ):
+                normalSwizzleKind = 1
+        if tiling.sparseType == 1 and tiling.s1 == tiling.s2 and tiling.s1 >= 32768:
+            normalSwizzleKind = 2
+    normalSwizzleEnabled = 1
+    if layout == 1 and swizzle == 1 and deter == 0:
+        # Shape equality is only the host candidate test. Prove BOTH physical
+        # cu arrays here; incorrect max-length declarations fall back to the
+        # metadata linear schedule, retaining physical TND and its LSE view.
+        for batch in pl.range(0, tiling.b + 1):
+            qBase = pl.astype(pl.getval(cu_q_tensor, batch), pl.DT_INT64)
+            kvBase = pl.astype(pl.getval(cu_kv_tensor, batch), pl.DT_INT64)
+            if qBase != batch * tiling.s1 or kvBase != batch * tiling.s2:
+                normalSwizzleEnabled = 0
+        if tiling.sequsedQOptional + tiling.sequsedKvOptional > 0:
+            normalSwizzleEnabled = 0
     return pl.struct(
         "FagConstInfo",
         bSize=tiling.b,
@@ -308,9 +373,106 @@ def set_const_info(tiling, coreNum, cu_q_tensor, cu_kv_tensor):
         s1Token=tiling.s1Token,
         s2Token=tiling.s2Token,
         totalPerBatchNum=tiling.totalPerBatchNum,
+        deterMaxRound=tiling.deterMaxRound,
+        metadataWordCount=tiling.metadataWordCount,
+        deterL2Bytes=tiling.deterL2Bytes,
+        deterSparseKind=tiling.deterSparseKind,
+        deterDenseRound=tiling.deterDenseRound,
+        deterCausalRoundsPerGroup=tiling.deterCausalRoundsPerGroup,
+        deterCausalGroups=tiling.deterCausalGroups,
+        deterBandMode=tiling.deterBandMode,
+        deterM=tiling.deterM,
+        deterN=tiling.deterN,
+        deterP=tiling.deterP,
+        deterQ=tiling.deterQ,
+        deterRowOffset=tiling.deterRowOffset,
+        deterColOffset=tiling.deterColOffset,
+        deterBandPhaseCount=tiling.deterBandPhaseCount,
+        deterBandTailPhaseCount=tiling.deterBandTailPhaseCount,
+        deterBandK=tiling.deterBandK,
+        deterBandB=tiling.deterBandB,
+        deterBandG=tiling.deterBandG,
+        deterBandGroupsPerChunk=tiling.deterBandGroupsPerChunk,
+        deterBandFullRounds=tiling.deterBandFullRounds,
+        deterBandTailRounds=tiling.deterBandTailRounds,
+        deterBandTotalRounds=tiling.deterBandTotalRounds,
+        deterBandPhase0Kind=tiling.deterBandPhase0Kind,
+        deterBandPhase0M=tiling.deterBandPhase0M,
+        deterBandPhase0N=tiling.deterBandPhase0N,
+        deterBandPhase0RowOffset=tiling.deterBandPhase0RowOffset,
+        deterBandPhase0ColOffset=tiling.deterBandPhase0ColOffset,
+        deterBandPhase0FullRounds=tiling.deterBandPhase0FullRounds,
+        deterBandPhase0TailRounds=tiling.deterBandPhase0TailRounds,
+        deterBandPhase1Kind=tiling.deterBandPhase1Kind,
+        deterBandPhase1M=tiling.deterBandPhase1M,
+        deterBandPhase1N=tiling.deterBandPhase1N,
+        deterBandPhase1RowOffset=tiling.deterBandPhase1RowOffset,
+        deterBandPhase1ColOffset=tiling.deterBandPhase1ColOffset,
+        deterBandPhase1FullRounds=tiling.deterBandPhase1FullRounds,
+        deterBandPhase1TailRounds=tiling.deterBandPhase1TailRounds,
+        deterBandPhase2Kind=tiling.deterBandPhase2Kind,
+        deterBandPhase2M=tiling.deterBandPhase2M,
+        deterBandPhase2N=tiling.deterBandPhase2N,
+        deterBandPhase2RowOffset=tiling.deterBandPhase2RowOffset,
+        deterBandPhase2ColOffset=tiling.deterBandPhase2ColOffset,
+        deterBandPhase2FullRounds=tiling.deterBandPhase2FullRounds,
+        deterBandPhase2TailRounds=tiling.deterBandPhase2TailRounds,
+        deterBandPhase3Kind=tiling.deterBandPhase3Kind,
+        deterBandPhase3M=tiling.deterBandPhase3M,
+        deterBandPhase3N=tiling.deterBandPhase3N,
+        deterBandPhase3RowOffset=tiling.deterBandPhase3RowOffset,
+        deterBandPhase3ColOffset=tiling.deterBandPhase3ColOffset,
+        deterBandPhase3FullRounds=tiling.deterBandPhase3FullRounds,
+        deterBandPhase3TailRounds=tiling.deterBandPhase3TailRounds,
+        deterBandPhase4Kind=tiling.deterBandPhase4Kind,
+        deterBandPhase4M=tiling.deterBandPhase4M,
+        deterBandPhase4N=tiling.deterBandPhase4N,
+        deterBandPhase4RowOffset=tiling.deterBandPhase4RowOffset,
+        deterBandPhase4ColOffset=tiling.deterBandPhase4ColOffset,
+        deterBandPhase4FullRounds=tiling.deterBandPhase4FullRounds,
+        deterBandPhase4TailRounds=tiling.deterBandPhase4TailRounds,
+        deterBandTailPhase0Kind=tiling.deterBandTailPhase0Kind,
+        deterBandTailPhase0M=tiling.deterBandTailPhase0M,
+        deterBandTailPhase0N=tiling.deterBandTailPhase0N,
+        deterBandTailPhase0RowOffset=tiling.deterBandTailPhase0RowOffset,
+        deterBandTailPhase0ColOffset=tiling.deterBandTailPhase0ColOffset,
+        deterBandTailPhase0FullRounds=tiling.deterBandTailPhase0FullRounds,
+        deterBandTailPhase0TailRounds=tiling.deterBandTailPhase0TailRounds,
+        deterBandTailPhase1Kind=tiling.deterBandTailPhase1Kind,
+        deterBandTailPhase1M=tiling.deterBandTailPhase1M,
+        deterBandTailPhase1N=tiling.deterBandTailPhase1N,
+        deterBandTailPhase1RowOffset=tiling.deterBandTailPhase1RowOffset,
+        deterBandTailPhase1ColOffset=tiling.deterBandTailPhase1ColOffset,
+        deterBandTailPhase1FullRounds=tiling.deterBandTailPhase1FullRounds,
+        deterBandTailPhase1TailRounds=tiling.deterBandTailPhase1TailRounds,
+        deterBandTailPhase2Kind=tiling.deterBandTailPhase2Kind,
+        deterBandTailPhase2M=tiling.deterBandTailPhase2M,
+        deterBandTailPhase2N=tiling.deterBandTailPhase2N,
+        deterBandTailPhase2RowOffset=tiling.deterBandTailPhase2RowOffset,
+        deterBandTailPhase2ColOffset=tiling.deterBandTailPhase2ColOffset,
+        deterBandTailPhase2FullRounds=tiling.deterBandTailPhase2FullRounds,
+        deterBandTailPhase2TailRounds=tiling.deterBandTailPhase2TailRounds,
+        deterBandTailPhase3Kind=tiling.deterBandTailPhase3Kind,
+        deterBandTailPhase3M=tiling.deterBandTailPhase3M,
+        deterBandTailPhase3N=tiling.deterBandTailPhase3N,
+        deterBandTailPhase3RowOffset=tiling.deterBandTailPhase3RowOffset,
+        deterBandTailPhase3ColOffset=tiling.deterBandTailPhase3ColOffset,
+        deterBandTailPhase3FullRounds=tiling.deterBandTailPhase3FullRounds,
+        deterBandTailPhase3TailRounds=tiling.deterBandTailPhase3TailRounds,
+        deterBandTailPhase4Kind=tiling.deterBandTailPhase4Kind,
+        deterBandTailPhase4M=tiling.deterBandTailPhase4M,
+        deterBandTailPhase4N=tiling.deterBandTailPhase4N,
+        deterBandTailPhase4RowOffset=tiling.deterBandTailPhase4RowOffset,
+        deterBandTailPhase4ColOffset=tiling.deterBandTailPhase4ColOffset,
+        deterBandTailPhase4FullRounds=tiling.deterBandTailPhase4FullRounds,
+        deterBandTailPhase4TailRounds=tiling.deterBandTailPhase4TailRounds,
         colP=colP,
         colQ=colQ,
         packedPerHead=packedPerHead,
+        normalSwizzleKind=normalSwizzleKind,
+        normalContinuousBlocks=normalContinuousBlocks,
+        normalMaxValidBlocks=normalMaxValidBlocks,
+        normalSwizzleEnabled=normalSwizzleEnabled,
         bandP=(pl.max(tiling.s1Token, 0) + CUBE_BASEM - 1) // CUBE_BASEM,
         bandQ=(pl.max(tiling.s2Token, 0) + CUBE_BASEN - 1) // CUBE_BASEN,
         n1Size=tiling.n2 * tiling.gSize,
@@ -343,6 +505,7 @@ def make_run_infos():
         s1RealSize=0,
         s2RealSize=0,
         halfS1RealSize=0,
+        firstHalfS1RealSize=0,
         firstHalfS2RealSize=0,
         queryOffset=0,
         keyOffset=0,
@@ -382,6 +545,7 @@ def make_run_infos_2():
         s1RealSize=0,
         s2RealSize=0,
         halfS1RealSize=0,
+        firstHalfS1RealSize=0,
         firstHalfS2RealSize=0,
         queryOffset=0,
         keyOffset=0,

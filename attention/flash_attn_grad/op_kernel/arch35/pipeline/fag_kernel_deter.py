@@ -16,14 +16,20 @@ import inspect
 
 import pypto_pro.language as pl
 
-import fag_block_cube
-import fag_block_vec
-import fag_buffers
+from compute import fag_block_cube
+from compute import fag_block_vec
+from memory import fag_buffers
 import fag_common
-import fag_deter
-import fag_deter_tnd_dense
-import fag_deter_tnd_sparse
-import fag_schedule
+from schedule.deterministic import fag_deter_formulas, fag_deter_legacy, fag_deter_state
+from schedule.deterministic import fag_deter_fixed
+from schedule.deterministic import fag_deter_baseline
+from schedule.deterministic import fag_deter_band_owner
+from schedule.deterministic import fag_deter_band_plan
+from schedule.deterministic.tnd import fag_deter_tnd_dense
+from schedule.deterministic.tnd import fag_deter_tnd_sparse
+from schedule.deterministic.tnd import fag_deter_tnd_plan
+from schedule.deterministic.tnd import fag_deter_tnd_normalized
+from schedule import fag_schedule
 
 # codegen 内联时读的是本模块 globals() 里的裸名，不是 from-import 清单。
 # module.func() 会被当成 IR op，所以这里把 helper / 常量绑成裸名。
@@ -45,9 +51,17 @@ def _bind_helpers():
         fag_block_vec,
         fag_buffers,
         fag_common,
-        fag_deter,
+        fag_deter_formulas,
+        fag_deter_legacy,
+        fag_deter_state,
+        fag_deter_fixed,
+        fag_deter_baseline,
+        fag_deter_band_owner,
+        fag_deter_band_plan,
         fag_deter_tnd_dense,
         fag_deter_tnd_sparse,
+        fag_deter_tnd_plan,
+        fag_deter_tnd_normalized,
         fag_schedule,
     ):
         for name, val in vars(mod).items():
@@ -68,7 +82,14 @@ def _run_preload3_cube_deter(
     buf,
     runInfos,
 ):
+    """Non-swizzle GS prefetches the next valid Q/dO task with one-round CV lag.
+
+    Physical rounds and the DQ/DK/DV ordering tokens remain unchanged. A next
+    valid task can lie beyond empty rounds; only its Q/dO are loaded early.
+    Three live Q/dO tasks (next/current/previous) fit the D192 L1 allocation.
+    """
     cBlockIdx = sched.cBlockIdx
+    metadata_tensor = sched.meta
     coreNum = sched.coreNum
     cu_q_tensor = sched.cuQ
     cu_kv_tensor = sched.cuKv
@@ -94,6 +115,17 @@ def _run_preload3_cube_deter(
     left = buf.left
     right = buf.right
     acc = buf.acc
+    acc_n64 = acc
+    if (
+        template == Tmpl.BN2GS1S2
+        and d_align == 192
+        and dv_align == 128
+        and (
+            swizzle == 0
+            or (swizzle == 1 and deter == 1 and layout == 1 and deter_family == 12)
+        )
+    ):
+        acc_n64 = make_l0c_acc_n64()
     dk_acc0 = buf.dk_acc0
     dv_acc0 = buf.dv_acc0
     dk_acc1 = buf.dk_acc1
@@ -101,6 +133,12 @@ def _run_preload3_cube_deter(
     ds_l1 = buf.ds_l1
     ds_t_l1 = buf.ds_t_l1
     p_t_l1 = buf.p_t_l1
+    pipelineDelay = 2
+    if swizzle == 0:
+        # Current-task cursors share the prefetch/late-reader storage.
+        q_for_mm = make_q_l1()
+        do_for_mm = make_do_l1()
+        pipelineDelay = 1
     taskId = 0
     fixTaskId = 0
     localIdx = 0
@@ -117,7 +155,9 @@ def _run_preload3_cube_deter(
         cu_kv_tensor,
         used_q_tensor,
         used_kv_tensor,
+        metadata_tensor,
     )
+    syncDq, syncKv, dqGroup = init_deter_sync_policy(tndPlan)
     firstRound, maxRound = deter_round_bounds(constInfo, coreNum, tndPlan)
     denseCursor = firstRound
     nextValidGIdx, nextValidRound = find_next_valid_deter(
@@ -131,26 +171,53 @@ def _run_preload3_cube_deter(
         cu_q_tensor,
         cu_kv_tensor,
         tndPlan,
+        metadata_tensor,
     )
-    pl.system.set_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DQ_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
-    pl.system.set_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DK_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
-    pl.system.set_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DV_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
+    if swizzle == 0:
+        if nextValidGIdx >= 0:
+            firstInfo = runInfos[0]
+            set_run_info(
+                constInfo,
+                firstInfo,
+                0,
+                nextValidGIdx,
+                0,
+                0,
+                cu_q_tensor,
+                cu_kv_tensor,
+                used_q_tensor,
+                used_kv_tensor,
+            )
+            q_first = q_l1.next()
+            do_first = do_l1.next()
+            prefetch_qdo_l1(
+                constInfo, firstInfo, tensor_q, tensor_dy, q_first, do_first
+            )
+    if syncDq == 1:
+        pl.system.set_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DQ_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
+    if syncKv == 1:
+        pl.system.set_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DK_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
+    if syncKv == 1:
+        pl.system.set_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DV_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
     while True:
         gIdx = pl.const(-1, pl.DT_INT64)
         physicalRound = denseCursor
         denseCursor = physicalRound + 1
+        dqWait, dqSet = deter_dq_token_edges(
+            physicalRound, firstRound, maxRound, pipelineDelay, dqGroup, syncDq
+        )
         if physicalRound == nextValidRound:
             gIdx = nextValidGIdx
             nextValidGIdx, nextValidRound = find_next_valid_deter(
@@ -164,6 +231,7 @@ def _run_preload3_cube_deter(
                 cu_q_tensor,
                 cu_kv_tensor,
                 tndPlan,
+                metadata_tensor,
             )
         if physicalRound >= maxRound:
             isLastLoop = 1
@@ -171,71 +239,174 @@ def _run_preload3_cube_deter(
         if gIdx >= 0:
             mm2_cur = mm2_res.next()
             mm1_cur = mm1_res.next()
-            q_cur = q_l1.next()
-            do_cur = do_l1.next()
             curInfo = runInfos[taskId % PRELOAD_TIMES]
-            set_run_info(
-                constInfo,
-                curInfo,
-                taskId,
-                gIdx,
-                0,
-                localIdx,
-                cu_q_tensor,
-                cu_kv_tensor,
-                used_q_tensor,
-                used_kv_tensor,
-            )
+            if swizzle == 0:
+                # The lookup above advances only when this valid task is
+                # consumed. Reserve/decode its successor once. Family13
+                # D192/Dv128 issues its loads inside C1/C2 after current V/K.
+                nextInfo = runInfos[(taskId + 1) % PRELOAD_TIMES]
+                if nextValidGIdx >= 0:
+                    set_run_info(
+                        constInfo,
+                        nextInfo,
+                        taskId + 1,
+                        nextValidGIdx,
+                        0,
+                        localIdx + 1,
+                        cu_q_tensor,
+                        cu_kv_tensor,
+                        used_q_tensor,
+                        used_kv_tensor,
+                    )
+                    q_next = q_l1.next()
+                    do_next = do_l1.next()
+                    if not (
+                        template == Tmpl.BN2GS1S2
+                        and d_align == 192
+                        and dv_align == 128
+                        and swizzle == 0
+                        and deter == 1
+                        and layout == 1
+                        and deter_family == 13
+                    ):
+                        prefetch_qdo_l1(
+                            constInfo, nextInfo, tensor_q, tensor_dy, q_next, do_next
+                        )
+                q_cur = q_for_mm.next()
+                do_cur = do_for_mm.next()
+            else:
+                q_cur = q_l1.next()
+                do_cur = do_l1.next()
+                set_run_info(
+                    constInfo,
+                    curInfo,
+                    taskId,
+                    gIdx,
+                    0,
+                    localIdx,
+                    cu_q_tensor,
+                    cu_kv_tensor,
+                    used_q_tensor,
+                    used_kv_tensor,
+                )
             nFetched = nFetched + 1
-            curInfo.readyRound = physicalRound + 2
+            curInfo.readyRound = physicalRound + pipelineDelay
             set_deter_l0c_neighbors(
                 constInfo, curInfo, prevValidGIdx, gIdx, nextValidGIdx
             )
             prevValidGIdx = gIdx
-            if taskId > 1:
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_V2_TO_C2_FLAG[taskId % 2],
-                )
-            iterate_mm_qk(
-                constInfo,
-                curInfo,
-                tensor_q,
-                tensor_k,
-                q_cur,
-                k_l1,
-                left,
-                right,
-                acc,
-                mm2_cur,
-                curInfo.loadKV,
-            )
-            pl.system.set_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_C2_TO_V2_FLAG[taskId % 2],
-            )
-            if taskId > 1:
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_V2_TO_C1_FLAG[taskId % 2],
-                )
-            iterate_mm_dyv(
-                constInfo,
-                curInfo,
-                tensor_dy,
-                tensor_v,
-                do_cur,
-                v_l1,
-                left,
-                right,
-                acc,
-                mm1_cur,
-                curInfo.loadKV,
-            )
-            pl.system.set_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_C1_TO_V2_FLAG[taskId % 2],
-            )
+            if swizzle == 0:
+                if (
+                    template == Tmpl.BN2GS1S2
+                    and d_align == 192
+                    and dv_align == 128
+                    and swizzle == 0
+                    and deter == 1
+                    and layout == 1
+                    and deter_family == 13
+                ):
+                    # Match the deterministic AscendC front: C1 then C2.
+                    # Writer current() is a typed next-task slot even when
+                    # copyNext is false; no extra cursor advance occurs here.
+                    if taskId > 1:
+                        pl.system.wait_cross_core(
+                            pipe=pl.PipeType.FIX,
+                            event_id=SYNC_V2_TO_C1_FLAG[taskId % 2],
+                        )
+                    iterate_mm_dyv(
+                        constInfo,
+                        curInfo,
+                        tensor_dy,
+                        tensor_v,
+                        do_cur,
+                        v_l1,
+                        left,
+                        right,
+                        acc,
+                        mm1_cur,
+                        curInfo.loadKV,
+                        0,
+                        nextValidGIdx >= 0,
+                        nextInfo,
+                        do_l1.current(),
+                    )
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_C1_TO_V2_FLAG[taskId % 2],
+                    )
+                    if taskId > 1:
+                        pl.system.wait_cross_core(
+                            pipe=pl.PipeType.FIX,
+                            event_id=SYNC_V2_TO_C2_FLAG[taskId % 2],
+                        )
+                    iterate_mm_qk(
+                        constInfo,
+                        curInfo,
+                        tensor_q,
+                        tensor_k,
+                        q_cur,
+                        k_l1,
+                        left,
+                        right,
+                        acc,
+                        mm2_cur,
+                        curInfo.loadKV,
+                        0,
+                        nextValidGIdx >= 0,
+                        nextInfo,
+                        q_l1.current(),
+                    )
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_C2_TO_V2_FLAG[taskId % 2],
+                    )
+                else:
+                    if taskId > 1:
+                        pl.system.wait_cross_core(
+                            pipe=pl.PipeType.FIX,
+                            event_id=SYNC_V2_TO_C2_FLAG[taskId % 2],
+                        )
+                    iterate_mm_qk(
+                        constInfo,
+                        curInfo,
+                        tensor_q,
+                        tensor_k,
+                        q_cur,
+                        k_l1,
+                        left,
+                        right,
+                        acc,
+                        mm2_cur,
+                        curInfo.loadKV,
+                        0,  # Non-swizzle Q is already prefetched.
+                    )
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_C2_TO_V2_FLAG[taskId % 2],
+                    )
+                    if taskId > 1:
+                        pl.system.wait_cross_core(
+                            pipe=pl.PipeType.FIX,
+                            event_id=SYNC_V2_TO_C1_FLAG[taskId % 2],
+                        )
+                    iterate_mm_dyv(
+                        constInfo,
+                        curInfo,
+                        tensor_dy,
+                        tensor_v,
+                        do_cur,
+                        v_l1,
+                        left,
+                        right,
+                        acc,
+                        mm1_cur,
+                        curInfo.loadKV,
+                        0,  # Non-swizzle dO is already prefetched.
+                    )
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_C1_TO_V2_FLAG[taskId % 2],
+                    )
             taskId = taskId + 1
             localIdx = localIdx + 1
 
@@ -253,11 +424,12 @@ def _run_preload3_cube_deter(
             pl.system.wait_cross_core(
                 pipe=pl.PipeType.MTE1, event_id=SYNC_V3_TO_C3_FLAG
             )
-            pl.system.wait_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DQ_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
+            if dqWait == 1:
+                pl.system.wait_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DQ_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
             iterate_mm_dsk(
                 constInfo,
                 fixInfo,
@@ -271,20 +443,35 @@ def _run_preload3_cube_deter(
                 acc,
                 mm1_cur,
                 cBlockIdx,
+                acc_n64,
             )
-            pl.system.set_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DQ_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
-            pl.system.wait_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DK_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
-            if d_align <= 128:
-                # 窄档（64/128）：dK 常驻 L0C（单 D 分块一个槽），跨 s1 累加，
-                # 到 flush 时由 flush_dk 写回 fp32 workspace（dV 在下面统一 flush）
+            if dqSet == 1:
+                pl.system.set_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DQ_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
+            if syncKv == 1:
+                pl.system.wait_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DK_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
+            if d_align <= 128 or (
+                template == Tmpl.BN2GS1S2
+                and d_align == 192
+                and dv_align == 128
+                and (
+                    swizzle == 0
+                    or (
+                        swizzle == 1
+                        and deter == 1
+                        and layout == 1
+                        and deter_family == 12
+                    )
+                )
+            ):
+                # Narrow dK and GS D192/Dv128 keep an owner-local resident sum.
                 iterate_mm_dsq(
                     constInfo,
                     fixInfo,
@@ -297,7 +484,6 @@ def _run_preload3_cube_deter(
                     fixInfo.dkvAcc,
                 )
             else:
-                # 192 档 dK 不驻留、复用 acc 的两个槽作 mm4 scratch
                 iterate_mm_dsq(
                     constInfo,
                     fixInfo,
@@ -312,8 +498,20 @@ def _run_preload3_cube_deter(
                     tensor_q,
                 )
             needFlush = fixInfo.flushDkv
-            if d_align <= 128:
-                # 窄档：dK 常驻 L0C，需要从 L0C flush 回 ws。
+            if d_align <= 128 or (
+                template == Tmpl.BN2GS1S2
+                and d_align == 192
+                and dv_align == 128
+                and (
+                    swizzle == 0
+                    or (
+                        swizzle == 1
+                        and deter == 1
+                        and layout == 1
+                        and deter_family == 12
+                    )
+                )
+            ):
                 if needFlush == 1:
                     flush_dk(
                         constInfo,
@@ -322,20 +520,22 @@ def _run_preload3_cube_deter(
                         dk_acc0,
                         dk_acc1,
                     )
-            pl.system.set_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DK_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
+            if syncKv == 1:
+                pl.system.set_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DK_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
             pl.system.set_cross_core(pipe=pl.PipeType.MTE1, event_id=SYNC_C4_TO_V3_FLAG)
             pl.system.wait_cross_core(
                 pipe=pl.PipeType.MTE1, event_id=SYNC_V4_TO_C5_FLAG
             )
-            pl.system.wait_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DV_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
+            if syncKv == 1:
+                pl.system.wait_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DV_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
             iterate_mm_pdy(
                 constInfo,
                 fixInfo,
@@ -355,48 +555,115 @@ def _run_preload3_cube_deter(
                     dv_acc0,
                     dv_acc1,
                 )
-            pl.system.set_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DV_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
+            if syncKv == 1:
+                pl.system.set_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DV_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
             pl.system.set_cross_core(pipe=pl.PipeType.MTE1, event_id=SYNC_C5_TO_V4_FLAG)
             fixTaskId = fixTaskId + 1
         if doFix == 0:
-            if physicalRound > firstRound:
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DQ_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+            # AscendC relays tokens only for a back-half logical round.
+            # The logical consumer round follows the selected pipeline lag;
+            # startup rounds have no dQ/dK/dV token to relay.
+            if physicalRound >= firstRound + pipelineDelay:
+                if dqWait == 1:
+                    pl.system.wait_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DQ_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if dqSet == 1:
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DQ_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if syncKv == 1:
+                    pl.system.wait_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DK_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if syncKv == 1:
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DK_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if syncKv == 1:
+                    pl.system.wait_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DV_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if syncKv == 1:
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DV_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+        if swizzle != 0:
+            if gIdx >= 0:
+                # Preserve readyRound/lag2 and all token edges, while consuming
+                # the old C3 before the current C2 reuses a shared K slot.
+                # Late Q/dO views have independent cursors from these writers.
+                producerTaskId = taskId - 1
+                curInfo = runInfos[producerTaskId % PRELOAD_TIMES]
+                q_cur = q_l1.current()
+                do_cur = do_l1.current()
+                mm2_cur = mm2_res.current()
+                mm1_cur = mm1_res.current()
+                if producerTaskId > 1:
+                    pl.system.wait_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_V2_TO_C2_FLAG[producerTaskId % 2],
+                    )
+                iterate_mm_qk(
+                    constInfo,
+                    curInfo,
+                    tensor_q,
+                    tensor_k,
+                    q_cur,
+                    k_l1,
+                    left,
+                    right,
+                    acc,
+                    mm2_cur,
+                    curInfo.loadKV,
+                    1,  # Swizzle keeps current-task Q loading.
                 )
                 pl.system.set_cross_core(
                     pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DQ_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    event_id=SYNC_C2_TO_V2_FLAG[producerTaskId % 2],
                 )
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DK_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                if producerTaskId > 1:
+                    pl.system.wait_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_V2_TO_C1_FLAG[producerTaskId % 2],
+                    )
+                iterate_mm_dyv(
+                    constInfo,
+                    curInfo,
+                    tensor_dy,
+                    tensor_v,
+                    do_cur,
+                    v_l1,
+                    left,
+                    right,
+                    acc,
+                    mm1_cur,
+                    curInfo.loadKV,
+                    1,  # Swizzle keeps current-task dO loading.
                 )
                 pl.system.set_cross_core(
                     pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DK_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-                )
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DV_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-                )
-                pl.system.set_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DV_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    event_id=SYNC_C1_TO_V2_FLAG[producerTaskId % 2],
                 )
         if isLastLoop == 1:
             drainDone = drainDone + 1
-            if drainDone >= 2:
+            if drainDone >= pipelineDelay:
                 break
     if nFetched > 0:
         lastV2 = (nFetched - 1) % 2
@@ -414,21 +681,24 @@ def _run_preload3_cube_deter(
         pl.system.wait_cross_core(
             pipe=pl.PipeType.FIX, event_id=SYNC_V2_TO_C2_FLAG[penultV2]
         )
-    pl.system.wait_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DQ_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
-    pl.system.wait_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DK_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
-    pl.system.wait_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DV_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
+    if syncDq == 1:
+        pl.system.wait_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DQ_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
+    if syncKv == 1:
+        pl.system.wait_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DK_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
+    if syncKv == 1:
+        pl.system.wait_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DV_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
 
 
 def _run_preload3_vector_deter(
@@ -440,6 +710,7 @@ def _run_preload3_vector_deter(
     sink,
 ):
     cBlockIdx = sched.cBlockIdx
+    metadata_tensor = sched.meta
     coreNum = sched.coreNum
     cu_q_tensor = sched.cuQ
     cu_kv_tensor = sched.cuKv
@@ -456,7 +727,8 @@ def _run_preload3_vector_deter(
     mm2_res = buf.mm2_res
     y_ub = buf.y_ub
     dy_ub = buf.dy_ub
-    nzp_ub = buf.nzp_ub
+    ds_out_ub = buf.ds_out_ub
+    p_out_ub = buf.p_out_ub
     sfmg_ub = buf.sfmg_ub
     lse_ub = buf.lse_ub
     mask_ub = buf.mask_ub
@@ -467,6 +739,9 @@ def _run_preload3_vector_deter(
     aivIdx = pl.get_block_idx()
     ds_l1 = buf.ds_l1
     p_l1 = buf.p_l1
+    pipelineDelay = 2
+    if swizzle == 0:
+        pipelineDelay = 1
     taskId = 0
     vecTaskId = 0
     localIdx = 0
@@ -483,6 +758,7 @@ def _run_preload3_vector_deter(
         cu_kv_tensor,
         used_q_tensor,
         used_kv_tensor,
+        metadata_tensor,
     )
     firstRound, maxRound = deter_round_bounds(constInfo, coreNum, tndPlan)
     denseCursor = firstRound
@@ -497,6 +773,7 @@ def _run_preload3_vector_deter(
         cu_q_tensor,
         cu_kv_tensor,
         tndPlan,
+        metadata_tensor,
     )
     while True:
         gIdx = pl.const(-1, pl.DT_INT64)
@@ -515,6 +792,7 @@ def _run_preload3_vector_deter(
                 cu_q_tensor,
                 cu_kv_tensor,
                 tndPlan,
+                metadata_tensor,
             )
         if physicalRound >= maxRound:
             isLastLoop = 1
@@ -535,7 +813,7 @@ def _run_preload3_vector_deter(
                     used_kv_tensor,
                 )
                 nFetched = nFetched + 1
-                curInfo.readyRound = physicalRound + 2
+                curInfo.readyRound = physicalRound + pipelineDelay
                 set_deter_l0c_neighbors(
                     constInfo, curInfo, prevValidGIdx, gIdx, nextValidGIdx
                 )
@@ -566,8 +844,8 @@ def _run_preload3_vector_deter(
                     tensor_y,
                     tensor_dy,
                     tensor_sfmg_ws,
-                    y_ub.current(),
-                    dy_ub.current(),
+                    y_ub,
+                    dy_ub,
                     sfmg_ub.current(),
                     v1w,
                 )
@@ -613,7 +891,7 @@ def _run_preload3_vector_deter(
                     subIdx,
                     p_l1.current(),
                     mm2_t,
-                    nzp_ub.current(),
+                    p_out_ub.current(),
                 )
                 pl.system.set_cross_core(
                     pipe=pl.PipeType.MTE3, event_id=SYNC_V4_TO_C5_FLAG
@@ -630,7 +908,7 @@ def _run_preload3_vector_deter(
                     mm1_t,
                     mm2_t,
                     sfmg_ub.current(),
-                    nzp_ub.current(),
+                    ds_out_ub.current(),
                 )
                 # GS1S2 C3/C4 read L1 and write GM/L0C, not mm1/mm2 UB.
                 # dsink is computed here before the set_cross_core, consistent with BN2.
@@ -663,7 +941,7 @@ def _run_preload3_vector_deter(
                 vecTaskId = vecTaskId + 1
         if isLastLoop == 1:
             drainDone = drainDone + 1
-            if drainDone >= 2:
+            if drainDone >= pipelineDelay:
                 if nFetched > 0:
                     pl.system.wait_cross_core(
                         pipe=pl.PipeType.MTE3, event_id=SYNC_C5_TO_V4_FLAG
@@ -682,6 +960,7 @@ def _run_preload2_cube_gs_deter(
     runInfos,
 ):
     cBlockIdx = sched.cBlockIdx
+    metadata_tensor = sched.meta
     coreNum = sched.coreNum
     cu_q_tensor = sched.cuQ
     cu_kv_tensor = sched.cuKv
@@ -707,6 +986,8 @@ def _run_preload2_cube_gs_deter(
     left = buf.left
     right = buf.right
     acc = buf.acc
+    dv_acc0 = buf.dv_acc0
+    dv_acc1 = buf.dv_acc1
     ds_l1 = buf.ds_l1
     ds_t_l1 = buf.ds_t_l1
     p_t_l1 = buf.p_t_l1
@@ -725,7 +1006,9 @@ def _run_preload2_cube_gs_deter(
         cu_kv_tensor,
         used_q_tensor,
         used_kv_tensor,
+        metadata_tensor,
     )
+    syncDq, syncKv, dqGroup = init_deter_sync_policy(tndPlan)
     firstRound, maxRound = deter_round_bounds(constInfo, coreNum, tndPlan)
     denseCursor = firstRound
     nextValidGIdx, nextValidRound = find_next_valid_deter(
@@ -739,26 +1022,33 @@ def _run_preload2_cube_gs_deter(
         cu_q_tensor,
         cu_kv_tensor,
         tndPlan,
+        metadata_tensor,
     )
-    pl.system.set_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DQ_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
-    pl.system.set_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DK_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
-    pl.system.set_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DV_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
+    if syncDq == 1:
+        pl.system.set_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DQ_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
+    if syncKv == 1:
+        pl.system.set_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DK_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
+    if syncKv == 1:
+        pl.system.set_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DV_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
     while True:
         gIdx = pl.const(-1, pl.DT_INT64)
         physicalRound = denseCursor
         denseCursor = physicalRound + 1
+        dqWait, dqSet = deter_dq_token_edges(
+            physicalRound, firstRound, maxRound, 1, dqGroup, syncDq
+        )
         if physicalRound == nextValidRound:
             gIdx = nextValidGIdx
             nextValidGIdx, nextValidRound = find_next_valid_deter(
@@ -772,6 +1062,7 @@ def _run_preload2_cube_gs_deter(
                 cu_q_tensor,
                 cu_kv_tensor,
                 tndPlan,
+                metadata_tensor,
             )
         if physicalRound >= maxRound:
             isLastLoop = 1
@@ -851,11 +1142,12 @@ def _run_preload2_cube_gs_deter(
             pl.system.wait_cross_core(
                 pipe=pl.PipeType.MTE1, event_id=SYNC_V3_TO_C3_FLAG
             )
-            pl.system.wait_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DQ_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
+            if dqWait == 1:
+                pl.system.wait_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DQ_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
             iterate_mm_dsk(
                 constInfo,
                 fixInfo,
@@ -870,16 +1162,18 @@ def _run_preload2_cube_gs_deter(
                 mm1_cur,
                 cBlockIdx,
             )
-            pl.system.set_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DQ_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
-            pl.system.wait_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DK_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
+            if dqSet == 1:
+                pl.system.set_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DQ_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
+            if syncKv == 1:
+                pl.system.wait_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DK_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
             iterate_mm_dsq(
                 constInfo,
                 fixInfo,
@@ -893,91 +1187,123 @@ def _run_preload2_cube_gs_deter(
                 tensor_dk_ws,
                 tensor_q,
             )
-            pl.system.set_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DK_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
+            if syncKv == 1:
+                pl.system.set_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DK_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
             pl.system.set_cross_core(pipe=pl.PipeType.MTE1, event_id=SYNC_C4_TO_V3_FLAG)
             pl.system.wait_cross_core(
                 pipe=pl.PipeType.MTE1, event_id=SYNC_V4_TO_C5_FLAG
             )
-            pl.system.wait_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DV_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
-            iterate_mm_pdy(
-                constInfo,
-                fixInfo,
-                p_t_l1.current(),
-                do_fix,
-                left,
-                right,
-                acc,
-                acc,
-                0,
-                tensor_dv_ws,
-                tensor_dy,
-            )
-            pl.system.set_cross_core(
-                pipe=pl.PipeType.FIX,
-                event_id=SYNC_DV_DETER_FIX_FLAG,
-                sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-            )
+            if syncKv == 1:
+                pl.system.wait_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DV_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
+            if d_align == 256 and swizzle == 0:
+                iterate_mm_pdy_gs_dv256(
+                    constInfo,
+                    fixInfo,
+                    p_t_l1.current(),
+                    do_fix,
+                    left,
+                    right,
+                    acc,
+                    dv_acc0,
+                    dv_acc1,
+                    tensor_dv_ws,
+                    tensor_dy,
+                )
+                if constInfo.s1Size > 64 and constInfo.s2Size > 64:
+                    # Flush remains inside the optional owner-order FIX token.
+                    # Empty physical rounds preserve the resident dV sum.
+                    if fixInfo.flushDkv == 1:
+                        flush_dv(constInfo, fixInfo, tensor_dv_ws, dv_acc0, dv_acc1)
+            else:
+                iterate_mm_pdy(
+                    constInfo,
+                    fixInfo,
+                    p_t_l1.current(),
+                    do_fix,
+                    left,
+                    right,
+                    acc,
+                    acc,
+                    0,
+                    tensor_dv_ws,
+                    tensor_dy,
+                )
+            if syncKv == 1:
+                pl.system.set_cross_core(
+                    pipe=pl.PipeType.FIX,
+                    event_id=SYNC_DV_DETER_FIX_FLAG,
+                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                )
             pl.system.set_cross_core(pipe=pl.PipeType.MTE1, event_id=SYNC_C5_TO_V4_FLAG)
             fixTaskId = fixTaskId + 1
         if doFix == 0:
             if physicalRound > firstRound:
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DQ_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-                )
-                pl.system.set_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DQ_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-                )
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DK_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-                )
-                pl.system.set_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DK_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-                )
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DV_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-                )
-                pl.system.set_cross_core(
-                    pipe=pl.PipeType.FIX,
-                    event_id=SYNC_DV_DETER_FIX_FLAG,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-                )
+                if dqWait == 1:
+                    pl.system.wait_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DQ_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if dqSet == 1:
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DQ_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if syncKv == 1:
+                    pl.system.wait_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DK_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if syncKv == 1:
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DK_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if syncKv == 1:
+                    pl.system.wait_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DV_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
+                if syncKv == 1:
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX,
+                        event_id=SYNC_DV_DETER_FIX_FLAG,
+                        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+                    )
         if isLastLoop == 1:
             drainDone = drainDone + 1
             if drainDone >= 1:
                 break
-    pl.system.wait_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DQ_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
-    pl.system.wait_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DK_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
-    pl.system.wait_cross_core(
-        pipe=pl.PipeType.FIX,
-        event_id=SYNC_DV_DETER_FIX_FLAG,
-        sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
-    )
+    if syncDq == 1:
+        pl.system.wait_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DQ_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
+    if syncKv == 1:
+        pl.system.wait_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DK_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
+    if syncKv == 1:
+        pl.system.wait_cross_core(
+            pipe=pl.PipeType.FIX,
+            event_id=SYNC_DV_DETER_FIX_FLAG,
+            sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
+        )
 
 
 def _run_preload2_vector_gs_deter(
@@ -989,6 +1315,7 @@ def _run_preload2_vector_gs_deter(
     sink,
 ):
     cBlockIdx = sched.cBlockIdx
+    metadata_tensor = sched.meta
     coreNum = sched.coreNum
     cu_q_tensor = sched.cuQ
     cu_kv_tensor = sched.cuKv
@@ -1005,7 +1332,8 @@ def _run_preload2_vector_gs_deter(
     mm2_res = buf.mm2_res
     y_ub = buf.y_ub
     dy_ub = buf.dy_ub
-    nzp_ub = buf.nzp_ub
+    ds_out_ub = buf.ds_out_ub
+    p_out_ub = buf.p_out_ub
     sfmg_ub = buf.sfmg_ub
     lse_ub = buf.lse_ub
     mask_ub = buf.mask_ub
@@ -1032,6 +1360,7 @@ def _run_preload2_vector_gs_deter(
         cu_kv_tensor,
         used_q_tensor,
         used_kv_tensor,
+        metadata_tensor,
     )
     firstRound, maxRound = deter_round_bounds(constInfo, coreNum, tndPlan)
     denseCursor = firstRound
@@ -1046,6 +1375,7 @@ def _run_preload2_vector_gs_deter(
         cu_q_tensor,
         cu_kv_tensor,
         tndPlan,
+        metadata_tensor,
     )
     while True:
         gIdx = pl.const(-1, pl.DT_INT64)
@@ -1064,6 +1394,7 @@ def _run_preload2_vector_gs_deter(
                 cu_q_tensor,
                 cu_kv_tensor,
                 tndPlan,
+                metadata_tensor,
             )
         if physicalRound >= maxRound:
             isLastLoop = 1
@@ -1114,8 +1445,8 @@ def _run_preload2_vector_gs_deter(
                 tensor_y,
                 tensor_dy,
                 tensor_sfmg_ws,
-                y_ub.current(),
-                dy_ub.current(),
+                y_ub,
+                dy_ub,
                 sfmg_ub.current(),
                 v1w,
             )
@@ -1159,7 +1490,7 @@ def _run_preload2_vector_gs_deter(
                 subIdx,
                 p_l1.current(),
                 mm2_t,
-                nzp_ub.current(),
+                p_out_ub.current(),
             )
             pl.system.set_cross_core(pipe=pl.PipeType.MTE3, event_id=SYNC_V4_TO_C5_FLAG)
             if needSyncDkMM == 1:
@@ -1174,7 +1505,7 @@ def _run_preload2_vector_gs_deter(
                 mm1_t,
                 mm2_t,
                 sfmg_ub.current(),
-                nzp_ub.current(),
+                ds_out_ub.current(),
             )
             # GS1S2 C3/C4 read L1 and write GM/L0C, not mm1/mm2 UB.
             # dsink is computed here before the set_cross_core, consistent with BN2.

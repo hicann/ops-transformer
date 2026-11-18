@@ -29,6 +29,17 @@ ge::graphStatus FagInputExistenceChecker::Check(FagCheckCtx& ctx)
                     context->GetInputShape(SOFTMAX_LSE_INDEX) == nullptr,
                 OP_LOGE(ctx.opName, "required input (q/k/v/dout/attn_out/softmax_lse) shape is nullptr."),
                 return ge::GRAPH_PARAM_INVALID);
+    const auto metadataShape = context->GetOptionalInputShape(METADATA_INDEX);
+    const auto metadataDesc = context->GetOptionalInputDesc(METADATA_INDEX);
+    // Every runner consumes the original 16-word header and 412-word FAG body.
+    // Only the versioned deterministic tail is optional.
+    OP_CHECK_IF(metadataShape == nullptr || metadataDesc == nullptr, OP_LOGE(ctx.opName, "metadata is required."),
+                return ge::GRAPH_PARAM_INVALID);
+    OP_CHECK_IF(metadataShape->GetStorageShape().GetDimNum() != 1 ||
+                    metadataShape->GetStorageShape().GetShapeSize() < 428 ||
+                    metadataDesc->GetDataType() != ge::DT_INT32,
+                OP_LOGE(ctx.opName, "metadata must be a one-dimensional int32 tensor with at least 428 words."),
+                return ge::GRAPH_PARAM_INVALID);
     return ge::GRAPH_SUCCESS;
 }
 
