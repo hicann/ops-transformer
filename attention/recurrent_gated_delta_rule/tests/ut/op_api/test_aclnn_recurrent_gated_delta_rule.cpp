@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2025-2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -52,6 +52,7 @@ public:
     TensorDesc value;
     TensorDesc beta;
     TensorDesc gama;
+    TensorDesc gamaK;
     TensorDesc actSeqLen;
     TensorDesc ssmStaId;
     TensorDesc numAccTok;
@@ -64,6 +65,7 @@ public:
         value = TensorDesc({t, nv, dv}, ACL_BF16, ACL_FORMAT_ND).ValueRange(0, 1);
         beta = TensorDesc({t, nv}, ACL_BF16, ACL_FORMAT_ND).ValueRange(0, 1);
         gama = TensorDesc({t, nv}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 1);
+        gamaK = TensorDesc({t, nv, dk}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 1);
         actSeqLen = TensorDesc({b}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 1);
         ssmStaId = TensorDesc({t}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 1);
         numAccTok = TensorDesc({b}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 1);
@@ -89,11 +91,33 @@ public:
             numAccTok = TensorDesc({b}, ACL_INT8, ACL_FORMAT_ND).ValueRange(0, 1);
         } else if (validIdx == 10) {
             out = TensorDesc({t, nv, dv}, ACL_INT8, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 11) {
+            query = TensorDesc({1, t, nk, dk}, ACL_BF16, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 12) {
+            key = TensorDesc({t + 1, nk, dk}, ACL_BF16, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 13) {
+            value = TensorDesc({t, nv, dv + 1}, ACL_BF16, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 14) {
+            beta = TensorDesc({t, nv, 1}, ACL_BF16, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 15) {
+            state = TensorDesc({t - 1, nv, dv, dk}, ACL_BF16, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 16) {
+            actSeqLen = TensorDesc({b + 1}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 17) {
+            ssmStaId = TensorDesc({t + 1}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 18) {
+            out = TensorDesc({t, nv, dv + 1}, ACL_BF16, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 19) {
+            gama = TensorDesc({t + 1, nv}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 1);
+        } else if (validIdx == 20) {
+            numAccTok = TensorDesc({b + 1}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 1);
         }
         aclnnStatus aclRet = utTest(nullIdx);
         bool pass = false;
-        if ((nullIdx == 0 || nullIdx == 10 || nullIdx == 8 || nullIdx == 9) && validIdx == 0) {
+        if ((nullIdx == 0 || nullIdx == 8 || nullIdx == 9 || nullIdx == 10) && validIdx == 0) {
             pass = (ACLNN_SUCCESS == aclRet);
+        } else if ((nullIdx >= 1 && nullIdx <= 7) || nullIdx == 11) {
+            pass = (ACLNN_ERR_PARAM_NULLPTR == aclRet);
         } else {
             pass = (ACLNN_ERR_PARAM_INVALID == aclRet);
         }
@@ -157,7 +181,7 @@ public:
             aclRet = ut.TestGetWorkspaceSize(&workspace_size);
         } else if (nullIdx == 9) {
             auto ut = OP_API_UT(aclnnRecurrentGatedDeltaRule,
-                                INPUT(query, key, value, beta, state, actSeqLen, ssmStaId, gama, gama, numAccTok, 1.0),
+                                INPUT(query, key, value, beta, state, actSeqLen, ssmStaId, gama, gamaK, numAccTok, 1.0),
                                 OUTPUT(out));
             aclRet = ut.TestGetWorkspaceSize(&workspace_size);
         } else if (nullIdx == 10) {
@@ -263,4 +287,44 @@ TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case20)
 TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case21)
 {
     rgdr_test.RGDRTestCase(0, 11);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case22)
+{
+    rgdr_test.RGDRTestCase(11, 0);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case23)
+{
+    rgdr_test.RGDRTestCase(12, 0);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case24)
+{
+    rgdr_test.RGDRTestCase(13, 0);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case25)
+{
+    rgdr_test.RGDRTestCase(14, 0);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case26)
+{
+    rgdr_test.RGDRTestCase(15, 0);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case27)
+{
+    rgdr_test.RGDRTestCase(16, 0);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case28)
+{
+    rgdr_test.RGDRTestCase(17, 0);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case29)
+{
+    rgdr_test.RGDRTestCase(18, 0);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case30)
+{
+    rgdr_test.RGDRTestCase(19, 0);
+}
+TEST_F(aclnnRecurrentGatedDeltaRule_test, ascend910B2_test_opapi_case31)
+{
+    rgdr_test.RGDRTestCase(20, 0);
 }

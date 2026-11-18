@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2025-2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
  * \brief
  */
 #include <dlfcn.h>
+#include <initializer_list>
+#include <limits>
 #include "aclnn_recurrent_gated_delta_rule.h"
 #include "recurrent_gated_delta_rule.h"
 
@@ -42,6 +44,13 @@ constexpr size_t KEY_DIM_NUM = 3;
 constexpr size_t VALUE_DIM_NUM = 3;
 constexpr size_t BETA_DIM_NUM = 2;
 constexpr size_t STATE_DIM_NUM = 4;
+constexpr size_t ACTUAL_SEQ_LENGTHS_DIM_NUM = 1;
+constexpr size_t SSM_STATE_INDICES_DIM_NUM = 1;
+constexpr size_t G_DIM_NUM = 2;
+constexpr size_t GK_DIM_NUM = 3;
+constexpr size_t NUM_ACCEPTED_TOKENS_DIM_NUM = 1;
+constexpr int64_t MAX_HEAD_NUM = 256;
+constexpr int64_t MAX_HEAD_DIM = 512;
 
 struct RecurrentGatedDeltaRuleParams {
     // madatory
@@ -114,10 +123,120 @@ static inline bool CheckDtypeVaild(const RecurrentGatedDeltaRuleParams& params)
     return true;
 }
 
+static bool CheckTensorDimNum(const aclTensor* tensor, const size_t expectedDimNum, const char* tensorName)
+{
+    const auto dimNum = tensor->GetViewShape().GetDimNum();
+    if (dimNum != expectedDimNum) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dim num of %s should be %zu, but got %zu.", tensorName, expectedDimNum,
+                dimNum);
+        return false;
+    }
+    return true;
+}
+
+static bool CheckDimRange(const char* dimName, const int64_t dimValue, const int64_t upperBound)
+{
+    if (dimValue <= 0 || dimValue > upperBound) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s should be in range (0, %ld], but got %ld.", dimName, upperBound, dimValue);
+        return false;
+    }
+    return true;
+}
+
+static bool CheckTensorShape(const aclTensor* tensor, const char* tensorName,
+                             const std::initializer_list<int64_t>& expectedShape)
+{
+    const auto shape = tensor->GetViewShape();
+    size_t dimIndex = 0;
+    for (const auto expectedDim : expectedShape) {
+        const auto actualDim = shape.GetDim(dimIndex);
+        if (actualDim != expectedDim) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The %zuth dimension of %s should be %ld, but got %ld.", dimIndex,
+                    tensorName, expectedDim, actualDim);
+            return false;
+        }
+        ++dimIndex;
+    }
+    return true;
+}
+
+static bool CheckShapeValid(const RecurrentGatedDeltaRuleParams& params)
+{
+    if (!CheckTensorDimNum(params.query, QUERY_DIM_NUM, "query") ||
+        !CheckTensorDimNum(params.key, KEY_DIM_NUM, "key") ||
+        !CheckTensorDimNum(params.value, VALUE_DIM_NUM, "value") ||
+        !CheckTensorDimNum(params.beta, BETA_DIM_NUM, "beta") ||
+        !CheckTensorDimNum(params.state, STATE_DIM_NUM, "state") ||
+        !CheckTensorDimNum(params.actual_seq_lengths, ACTUAL_SEQ_LENGTHS_DIM_NUM, "actual_seq_lengths") ||
+        !CheckTensorDimNum(params.ssm_state_indices, SSM_STATE_INDICES_DIM_NUM, "ssm_state_indices") ||
+        !CheckTensorDimNum(params.out, VALUE_DIM_NUM, "out")) {
+        return false;
+    }
+
+    const auto& queryShape = params.query->GetViewShape();
+    const auto& valueShape = params.value->GetViewShape();
+    const auto& stateShape = params.state->GetViewShape();
+    const auto& actualSeqLengthsShape = params.actual_seq_lengths->GetViewShape();
+    const int64_t tokenNum = queryShape.GetDim(0);
+    const int64_t keyHeadNum = queryShape.GetDim(1);
+    const int64_t keyHeadDim = queryShape.GetDim(2);
+    const int64_t valueHeadNum = valueShape.GetDim(1);
+    const int64_t valueHeadDim = valueShape.GetDim(2);
+    const int64_t stateBlockNum = stateShape.GetDim(0);
+    const int64_t batchSize = actualSeqLengthsShape.GetDim(0);
+
+    if (!CheckDimRange("T", tokenNum, std::numeric_limits<int64_t>::max()) ||
+        !CheckDimRange("B", batchSize, std::numeric_limits<int64_t>::max()) ||
+        !CheckDimRange("Nk", keyHeadNum, MAX_HEAD_NUM) || !CheckDimRange("Nv", valueHeadNum, MAX_HEAD_NUM) ||
+        !CheckDimRange("Dk", keyHeadDim, MAX_HEAD_DIM) || !CheckDimRange("Dv", valueHeadDim, MAX_HEAD_DIM)) {
+        return false;
+    }
+
+    if (valueHeadNum % keyHeadNum != 0) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Nv should be an integer multiple of Nk, but got Nv=%ld, Nk=%ld.",
+                valueHeadNum, keyHeadNum);
+        return false;
+    }
+    if (stateBlockNum < tokenNum) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "BlockNum should be greater than or equal to T, but got BlockNum=%ld, T=%ld.",
+                stateBlockNum, tokenNum);
+        return false;
+    }
+
+    if (!CheckTensorShape(params.query, "query", {tokenNum, keyHeadNum, keyHeadDim}) ||
+        !CheckTensorShape(params.key, "key", {tokenNum, keyHeadNum, keyHeadDim}) ||
+        !CheckTensorShape(params.value, "value", {tokenNum, valueHeadNum, valueHeadDim}) ||
+        !CheckTensorShape(params.beta, "beta", {tokenNum, valueHeadNum}) ||
+        !CheckTensorShape(params.state, "state", {stateBlockNum, valueHeadNum, valueHeadDim, keyHeadDim}) ||
+        !CheckTensorShape(params.actual_seq_lengths, "actual_seq_lengths", {batchSize}) ||
+        !CheckTensorShape(params.ssm_state_indices, "ssm_state_indices", {tokenNum}) ||
+        !CheckTensorShape(params.out, "out", {tokenNum, valueHeadNum, valueHeadDim})) {
+        return false;
+    }
+
+    if (params.g != nullptr &&
+        (!CheckTensorDimNum(params.g, G_DIM_NUM, "g") || !CheckTensorShape(params.g, "g", {tokenNum, valueHeadNum}))) {
+        return false;
+    }
+    if (params.gk != nullptr && (!CheckTensorDimNum(params.gk, GK_DIM_NUM, "gk") ||
+                                 !CheckTensorShape(params.gk, "gk", {tokenNum, valueHeadNum, keyHeadDim}))) {
+        return false;
+    }
+    if (params.num_accepted_tokens != nullptr &&
+        (!CheckTensorDimNum(params.num_accepted_tokens, NUM_ACCEPTED_TOKENS_DIM_NUM, "num_accepted_tokens") ||
+         !CheckTensorShape(params.num_accepted_tokens, "num_accepted_tokens", {batchSize}))) {
+        return false;
+    }
+
+    return true;
+}
+
 static aclnnStatus CheckParams(RecurrentGatedDeltaRuleParams& params)
 {
     // 检查输入参数是否在支持的数据类型范围内
     CHECK_RET(CheckDtypeVaild(params), ACLNN_ERR_PARAM_INVALID);
+    // 在进入tiling前校验shape，非法shape统一返回参数错误，避免暴露内部错误码。
+    CHECK_RET(CheckShapeValid(params), ACLNN_ERR_PARAM_INVALID);
 
     OP_LOGD("RecurrentGatedDeltaRule check params success.");
 
@@ -158,7 +277,7 @@ aclnnStatus aclnnRecurrentGatedDeltaRuleGetWorkspaceSize(const aclTensor* query,
         query,      key, value, beta, stateRef, actualSeqLengths, ssmStateIndices, g, gk, numAcceptedTokens,
         scaleValue, out};
 
-    CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckParams(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     auto ret = PreProcess(params);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
