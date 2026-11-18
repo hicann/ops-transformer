@@ -168,7 +168,7 @@ aclnnStatus aclnnPromptFlashAttention(
     <td>numHeads</td>
     <td>输入</td>
     <td>query的head个数。</td>
-    <td>限制：在BNSD/NSD场景下，需要与shape中的query的N轴shape值相同。</td>
+    <td>限制：在BNSD/BSND场景下，需要与shape中的query的N轴shape值相同。</td>
     <td>INT64</td>
     <td>ND</td>
     <td>1</td>
@@ -178,8 +178,8 @@ aclnnStatus aclnnPromptFlashAttention(
     <td>scaleValue</td>
     <td>输入</td>
     <td>公式中d开根号的倒数。</td>
-    <td><ul><li>数据类型与query的数据类型需满足数据类型推导规则。 </li></ul>
-        <ul><li>用户不特意指定时建议传入1.0。 </li></ul></td>
+    <td><ul><li>数据类型与query的数据类型需满足数据类型推导规则。</li></ul>
+        <ul><li>用户不特意指定时建议传入1.0。</li></ul></td>
     <td>DOUBLE</td>
     <td>-</td>
     <td>1</td>
@@ -293,7 +293,7 @@ aclnnStatus aclnnPromptFlashAttention(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内部调用npu runtime的接口异常。</td>
+      <td>API内部调用NPU runtime的接口异常。</td>
     </tr>
   </tbody>
   </table>
@@ -346,21 +346,21 @@ aclnnStatus aclnnPromptFlashAttention(
 - 确定性计算：
   - aclnnPromptFlashAttention默认确定性实现。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- 入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空tensor(即S2为0)，则attentionOut填充为全零。attentionOut为空Tensor时，AscendCLNN框架会处理。其余在上述参数说明中标注了“可传入nullptr”的入参为空指针时，不进行处理。
+- 入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空tensor（即S2为0），则attentionOut填充为全零。attentionOut为空Tensor时，AscendCLNN框架会处理。其余在上述参数说明中标注了“可传入nullptr”的入参为空指针时，不进行处理。
 - query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 
-- query，key，value输入，功能使用限制如下：
+- query、key、value输入，功能使用限制如下：
 
   - 输入shape限制：
 
     <!-- npu="910b" id6 -->
     - <term>Atlas A2系列产品</term>：
 
-      - 支持B轴小于等于65536(64k)，输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128。
+      - 支持B轴小于等于65536（64k），输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128。
 
       - 支持N轴小于等于256。
 
-      - S支持小于等于20971520（20M）。部分长序列场景下，如果计算量过大可能会导致pfa算子执行超时（aicore error类型报错，errorStr为:timeout or trap error），此场景下建议做S切分处理，注：这里计算量会受B、S、N、D等的影响，值越大计算量越大。典型的会超时的长序列（即B、S、N、D的乘积较大）场景包括但不限于：
+      - S支持小于等于20971520（20M）。部分长序列场景下，如果计算量过大可能会导致pfa算子执行超时（AI Core error类型报错，errorStr为：timeout or trap error），此场景下建议做S切分处理，注：这里计算量会受B、S、N、D等的影响，值越大计算量越大。典型的会超时的长序列（即B、S、N、D的乘积较大）场景包括但不限于：
         <table style="undefined;table-layout: fixed; width: 600px"><colgroup>
         <col style="width: 100px">
         <col style="width: 100px">
@@ -416,18 +416,18 @@ aclnnStatus aclnnPromptFlashAttention(
       - 支持D轴小于等于512。inputLayout为BSH或者BSND时，要求N*D小于65535。
     <!-- end id6 -->
     <!-- npu="910b" id7 -->
-    - <term>Atlas A2系列产品</term>： TND场景下query，key，value输入的综合限制：
-        - T小于等于65536;
-        - N等于8/16/32/64/128，且Q_N、K_N、V_N相等;
-        - Q_D、K_D等于192，V_D等于128/192;
-        - 数据类型仅支持BFLOAT16;
-        - sparse模式仅支持sparse=0且不传mask，或sparse=3且传入mask；
+    - <term>Atlas A2系列产品</term>：TND场景下query、key、value输入的综合限制：
+        - T小于等于65536。
+        - N等于8/16/32/64/128，且Q_N、K_N、V_N相等。
+        - Q_D、K_D等于192，V_D等于128/192。
+        - 数据类型仅支持BFLOAT16。
+        - sparse模式仅支持sparse=0且不传mask，或sparse=3且传入mask。
         - 当sparse=3时，要求每个batch单独的actualSeqLengths < actualSeqLengthsKv。
     <!-- end id7 -->
     - <term>Atlas推理系列产品</term>：
-        - 在inputLayout为BSH时，支持B轴小于等于300，其余情况B轴小于等于128；
-        - 支持N轴小于等于256；
-        - 支持S轴小于等于65535(64k), Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置atten_mask；
+        - 在inputLayout为BSH时，支持B轴小于等于300，其余情况B轴小于等于128。
+        - 支持N轴小于等于256。
+        - 支持S轴小于等于65535（64k），Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置attenMask。
         - 支持D轴小于等于512。
   - 输入数据类型限制：
 

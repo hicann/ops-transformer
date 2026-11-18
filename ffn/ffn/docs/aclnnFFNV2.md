@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：该FFN算子提供MoeFFN和FFN的计算功能。在没有专家分组（expertTokens为空）时是FFN，有专家分组时是MoeFFN，统称为FFN，属于Moe结构。MoE（Mixture-of-Experts，混合专家系统）是一种用于训练万亿参数量级模型的技术。MoE将预测建模任务分解为若干子任务，在每个子任务上训练一个专家模型（Expert Model），开发一个门控模型（Gating Model），该模型会根据输入数据分配一个或多个专家，最终综合多个专家计算结果作为预测结果。Mixture-of-Experts结构的模型是将输入数据分配给最相关的一个或者多个专家，综合涉及的所有专家的计算结果来确定最终结果。
+- 接口功能：该FFN算子提供MoEFFN和FFN的计算功能。在没有专家分组（expertTokens为空）时是FFN，有专家分组时是MoeFFN，统称为FFN，属于MoE结构。MoE（Mixture-of-Experts，混合专家系统）是一种用于训练万亿参数量级模型的技术。MoE将预测建模任务分解为若干子任务，在每个子任务上训练一个专家模型（Expert Model），开发一个门控模型（Gating Model），该模型会根据输入数据分配一个或多个专家，最终综合多个专家计算结果作为预测结果。Mixture-of-Experts结构的模型是将输入数据分配给最相关的一个或者多个专家，综合涉及的所有专家的计算结果来确定最终结果。
 
   相较于[FFN](aclnnFFN.md)接口，**此接口新增支持expertTokens索引输入，用tokensIndexFlag区分。**
 - 计算公式：
@@ -45,7 +45,7 @@
     $$
 
   **说明：**
-  FFN在无专家或单个专家场景是否有性能收益需要根据实际测试情况判断，当整网中FFN结构对应的小算子vector耗时超过30us，且在FFN结构中占比10%以上时，可以尝试使用该融合算子，若实际测试性能劣化则不使用。
+  FFN在无专家或单个专家场景是否有性能收益需要根据实际测试情况判断，当整网中FFN结构对应的小算子vector耗时超过30μs，且在FFN结构中占比10%以上时，可以尝试使用该融合算子，若实际测试性能劣化则不使用。
 
 ## 函数原型
 
@@ -86,8 +86,7 @@ aclnnStatus aclnnFFNV2(
 ## aclnnFFNV2GetWorkspaceSize
 
 参数说明中涉及到的公共变量说明：
-M表示token个数，对应transformer中的BS（B：Batch，表示输入样本批量大小。
-S：Seq-Length，表示输入样本序列长度）。
+M表示token个数，对应transformer中的BS（B：Batch，表示输入样本批量大小；S：Seq-Length，表示输入样本序列长度）。
 K1表示第一个matmul的输入通道数，对应transformer中的H（Head-Size，表示隐藏层的大小）。
 N1表示第一个matmul的输出通道数。
 K2表示第二个matmul的输入通道数。
@@ -97,7 +96,7 @@ N2表示第二个matmul的输出通道数，对应transformer中的H。
 - **参数说明**
 
   <table style="undefined;table-layout: fixed; width: 1640px">
-  <colgroup> <!--工具调整列宽时，所列宽总和最大不要超过1550-->
+  <colgroup> <!--工具调整列宽时，所列列宽总和最大不要超过1550-->
   <col style="width: 180px"> <!-- 参数名：自行调整列宽，原则：不能换行展示-->
   <col style="width: 120px"> <!-- 输入/输出：固定列宽-->
   <col style="width: 280px"> <!-- 描述列宽：自行调整列宽-->
@@ -105,7 +104,7 @@ N2表示第二个matmul的输出通道数，对应transformer中的H。
   <col style="width: 290px"> <!-- 数据类型列宽：自行调整列宽-->
   <col style="width: 120px"> <!--数据格式：自行调整列宽-->
   <col style="width: 320px"> <!-- 维度(shape)：自行调整列宽，内容较少时可以适当缩小列宽-->
-  <col style="width: 140px"> <!--非连续Tensor：自行调整列宽，必须不要修改这个数值-->
+  <col style="width: 140px"> <!--非连续Tensor：自行调整列宽，请勿修改这个数值-->
   </colgroup>
   <thead>
   <tr>
@@ -338,7 +337,7 @@ N2表示第二个matmul的输出通道数，对应transformer中的H。
     - x支持FLOAT16、BFLOAT16、INT8，支持输入的维度最少是2维[M, K1]、最多是8维。
     - weight1支持FLOAT16、BFLOAT16、INT8、INT4，有专家时维度为[E, K1, N1]，无专家时维度为[K1, N1]。
     - weight2支持FLOAT16、BFLOAT16、INT8、INT4，有专家时维度为[E, K2, N2]，无专家时维度为[K2, N2]。
-    - expertTokens支持INT64，若不为空时可支持的最大长度为256个。
+    - expertTokens支持INT64，若不为空时可支持的最大长度为256。
     - bias1支持FLOAT16、FLOAT32、INT32，有专家时维度为[E, N1]，无专家时维度为[N1]。
     - bias2支持FLOAT16、FLOAT32、INT32，有专家时维度为[E, N2]，无专家时维度为[N2]。
     - scale支持FLOAT32：per-tensor下输入在有/无专家时均为一维向量，输入元素个数在有/无专家时分别为[E]/[1]；per-channel下输入在有/无专家时为二维向量/一维向量，输入元素个数在有/无专家时分别为[E, N1]/[N1]。
@@ -454,12 +453,12 @@ N2表示第二个matmul的输出通道数，对应transformer中的H。
   - 激活层为gelu/fastgelu/relu/silu时，支持有专家或无专家分组的FLOAT16高精度及高性能场景、BFLOAT16场景、量化场景及伪量化场景，且N1=K2。
   - 非量化场景不能输入量化参数和伪量化参数，量化场景不能输入伪量化参数，伪量化场景不能输入量化参数。
   - 量化场景参数类型：x为INT8、weight为INT8、bias为INT32、scale为FLOAT32、offset为FLOAT32，其余参数类型根据y不同分两种情况：
-    - y为FLOAT16，deqScale支持数据类型：UINT64、INT64、FLOAT32；
-    - y为BFLOAT16，deqScale支持数据类型：BFLOAT16；
+    - y为FLOAT16，deqScale支持数据类型：UINT64、INT64、FLOAT32。
+    - y为BFLOAT16，deqScale支持数据类型：BFLOAT16。
     - 要求deqScale1与deqScale2的数据类型保持一致。
   - 量化场景支持scale的per-channel模式参数类型：x为INT8、weight为INT8、bias为INT32、scale为FLOAT32、offset为FLOAT32，其余参数类型根据y不同分两种情况：
-    - y为FLOAT16，deqScale支持数据类型：UINT64、INT64；
-    - y为BFLOAT16，deqScale支持数据类型：BFLOAT16；
+    - y为FLOAT16，deqScale支持数据类型：UINT64、INT64。
+    - y为BFLOAT16，deqScale支持数据类型：BFLOAT16。
     - 要求deqScale1与deqScale2的数据类型保持一致。
   - 伪量化场景支持两种不同参数类型：
     - y为FLOAT16、x为FLOAT16、bias为FLOAT16，antiquantScale为FLOAT16、antiquantOffset为FLOAT16，weight支持数据类型INT8和INT4。

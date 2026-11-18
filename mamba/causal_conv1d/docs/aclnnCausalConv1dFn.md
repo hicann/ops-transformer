@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：完成因果一维卷积（Causal Conv1d）的前向计算（prefill / chunk-prefill）。算子内部支持 SiLU 激活、缓存索引（cacheIndices）、初始状态模式（initialStateMode）等特性。
+- 接口功能：完成因果一维卷积（Causal Conv1d）的前向计算（prefill / chunk-prefill）。算子内部支持SiLU激活、缓存索引（cacheIndices）、初始状态模式（initialStateMode）等特性。
 
 - 支持以下场景：
   - 场景一（prefill场景 — 固定batch）：
@@ -70,15 +70,15 @@
 
 - 计算公式：
 
-  Causal Conv1d 是一种因果一维卷积算子，常用于序列建模中。在每个时间步 $t$，根据当前输入 $x_t$、卷积权重 $w$ 和历史状态，计算卷积输出 $y_t$。
+  Causal Conv1d是一种因果一维卷积算子，常用于序列建模中。在每个时间步 $t$，根据当前输入 $x_t$、卷积权重 $w$ 和历史状态，计算卷积输出 $y_t$。
 
   $$
   y_t = \text{Activation}\left(\sum_{j=0}^{W-1} w_j \cdot x_{t-j} + b\right)
   $$
 
-  其中，$W$ 为卷积核宽度（支持2、3、4），$w_j$ 为卷积权重，$b$ 为偏置（可选），$\text{Activation}$ 为激活函数（可选，SiLU）。当 `activation="none"` 时不使用激活函数，`activation="silu"` 时使用 SiLU 激活函数。
+  其中，$W$ 为卷积核宽度（支持2、3、4），$w_j$ 为卷积权重，$b$ 为偏置（可选），$\text{Activation}$ 为激活函数（可选，SiLU）。当 `activation="none"` 时不使用激活函数，`activation="silu"` 时使用SiLU激活函数。
 
-   对于 $t < W-1$ 且无历史状态时，输出为零（因果约束）。
+   当 $t < W-1$ 且无历史状态时，输出为零（因果约束）。
 
 ## 函数原型
 
@@ -153,7 +153,7 @@ aclnnStatus aclnnCausalConv1dFn(
     <tr>
       <td>weight（aclTensor*）</td>
       <td>输入</td>
-      <td>计算公式中的w，代表因果1维卷积核。</td>
+      <td>计算公式中的w，代表因果一维卷积核。</td>
       <td><ul><li>不支持空tensor。</li><li>shape为[K, dim]，K∈{2,3,4}。</li></ul></td>
       <td>数据类型与x一致</td>
       <td>ND</td>
@@ -203,7 +203,7 @@ aclnnStatus aclnnCausalConv1dFn(
     <tr>
       <td>initialStateModeOptional（aclTensor*）</td>
       <td>可选输入</td>
-      <td>初始状态标志，表示各序列是否使用缓存的初始状态。不传时全部从零初始化。</td>
+      <td>初始状态模式，表示各序列是否使用缓存的初始状态。不传时全部从零初始化。</td>
       <td>shape为[batch]。值：0=零初始化，1=使用缓存状态。开启时需额外workspace用于快照。</td>
       <td>INT32</td>
       <td>ND</td>

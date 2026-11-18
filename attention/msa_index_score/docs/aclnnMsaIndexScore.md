@@ -33,7 +33,7 @@
     score = Maxpool[(scale \cdot) Q_{idx}@K_{idx}^{T} + atten\_mask] + local\_mask
     $$
 
-    非量化时没有$scale$。`sparse_mode=3`时$atten\_mask$为右下因果；`sparse_mode=0`时不叠加。$local\_mask$由`start_loc`、`init_blocks`、`local_blocks`生成，对强制保留的block写入高分。
+    非量化时没有$scale$。`sparseMode=3`时$atten\_mask$为右下因果；`sparseMode=0`时不叠加。$local\_mask$由`startLoc`、`initBlocks`、`localBlocks`生成，对强制保留的block写入高分。
 
     `returnChoice=0`时只输出上面的`score`。`returnChoice`为1或2时，对每个$(h,t)$在有效列上继续取TopK。`sparseMode=3`时$visibleEnd=\mathrm{clamp}(kv-q+t_{off}+1,0,kv)$，`sparseMode=0`时$visibleEnd=kv$。$BlockCap$在PageAttention下取`blockTable`宽度与逻辑块上限的较小值，否则为逻辑块上限。
 
@@ -51,7 +51,7 @@
 
 - **主要计算过程**：
 
-    1. 将每个query token的$Q_{idx}$与KV sparse block内因果可见的$K_{idx}$做矩阵乘，得到token级相关性；
+    1. 将每个query token的$Q_{idx}$与KV sparse block内因果可见的$K_{idx}$做矩阵乘，得到token级相关性。
     2. 按`sparse_mode`叠加$atten\_mask$：`sparse_mode=0`不做因果截断，`sparse_mode=3`按rightDownCausal屏蔽不可见位置。
     3. 在每个长度为$block\_size$的sparse block上做Maxpool，得到逐block的重要性分数。
     4. 用`start_loc`、`init_blocks`、`local_blocks`生成$local\_mask$，对强制保留的block写入高分，得到输出`score`。
@@ -179,7 +179,7 @@ aclnnStatus aclnnMsaIndexScore(
         <tr>
       <td>attenMaskOptional</td>
       <td>输入</td>
-      <td>控制因果可见的 mask。</td>
+      <td>控制因果可见的mask。</td>
       <td>仅在sparseMode=3时使用，作为base mask控制causal可见；取值为1代表该位不参与计算，为0代表该位参与计算。</td>
       <td>INT8</td>
       <td>ND</td>
@@ -405,7 +405,7 @@ aclnnStatus aclnnMsaIndexScore(
 - `layoutKeyOptional`为`"BBND"`、`"BNBD"`、`"TND"`、`"BSND"`（$[B, S2, N2, D]$）或`"BNSD"`（$[B, N2, S2, D]$）。不传时默认`"BBND"`。
 - PageAttention必须传入`blockTableOptional`。TND / BSND / BNSD不传`blockTableOptional`，`actualSeqKlenOptional`统一为$[B+1]$前缀和。
 - `sparseMode`当前仅支持0、3：
-    - 为0时，代表defaultMask模式，`attenMaskOptional`传入`nullptr`；
+    - 为0时，代表defaultMask模式，`attenMaskOptional`传入`nullptr`。
     - 为3时，代表rightDownCausal模式，`attenMaskOptional`必须传入，shape为$[2048, 2048]$，取值为1代表该位不参与计算，为0代表该位参与计算。
 - `initBlocks`、`localBlocks`必须$\ge 0$且不超过逻辑block数（PA为`blockTableOptional`第二维；TND为score末维对齐宽度）。两者均为0时跳过$local\_mask$。
 - `q_len` / `kv_len`允许为0。空KV的score填$-inf$。
@@ -417,7 +417,7 @@ aclnnStatus aclnnMsaIndexScore(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <algorithm>
 #include <cmath>
 #include <cfenv>

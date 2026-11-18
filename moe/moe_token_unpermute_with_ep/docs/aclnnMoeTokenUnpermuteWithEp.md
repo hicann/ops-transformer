@@ -144,7 +144,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
     <tr>
       <td>rangeOptional</td>
       <td>可选输入</td>
-      <td>ep切分的有效范围[start, end)，size为2，元素类型为INT64。</td>
+      <td>EP切分的有效范围[start, end)，size为2，元素类型为INT64。</td>
       <td>允许传入空指针；传入空指针时使用默认值{0,0}，输出为全0。非空时必须满足0 &lt;= start &lt;= end &lt;= start + permutedTokens的第0维长度。</td>
       <td>INT64</td>
       <td>-</td>
@@ -287,7 +287,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
 - sortedIndices必须为1D，长度为num_tokens*numTopk，且num_tokens大于等于1，不支持空Tensor。
 - 不支持Broadcast。
 - aclTensor的shape不支持使用-1表示动态维度或使用-2表示动态Rank。
-- 不支持paddedMode为`True`。
+- 不支持paddedMode为`true`。
 - 当rangeOptional为空时，使用默认值{0,0}，输出为全0，不会回退调用其他算子。
 
 ## 调用示例

@@ -23,13 +23,13 @@
 
 ## 功能说明
 
-- 接口功能：MhcSinkhornBackward是MhcSinkhorn的反向算子。mHC（Manifold-Constrained Hyper-Connections）架构中的MhcSinkhorn算子对输入矩阵做sinkhorn变换得到双随机矩阵$\mathbf{H}_{\text{res}}$，输出的双随机矩阵的所有元素≥0、每一行之和为1且每一列之和为1 (具有范数保持、组合封闭性和凸组合几何解释三大特性)。对mHC架构中双随机矩阵$\mathbf{H}_{\text{res}}$的梯度进行sinkhorn变换的反向计算得到输入$\mathbf{H}'_{\text{res}}$的梯度。
+- 接口功能：MhcSinkhornBackward是MhcSinkhorn的反向算子。mHC（Manifold-Constrained Hyper-Connections）架构中的MhcSinkhorn算子对输入矩阵做Sinkhorn变换得到双随机矩阵$\mathbf{H}_{\text{res}}$，输出的双随机矩阵的所有元素≥0、每一行之和为1且每一列之和为1（具有范数保持、组合封闭性和凸组合几何解释三大特性）。对mHC架构中双随机矩阵$\mathbf{H}_{\text{res}}$的梯度进行Sinkhorn变换的反向计算得到输入$\mathbf{H}'_{\text{res}}$的梯度。
 
 - 计算公式
 
   - Sinkhorn-Knopp算法在正向计算中通过 $\mathbf{num\_iters}$ 次迭代归一化实现双随机投影，在反向传播的迭代计算中：
 
-  - 前 $\mathbf{num\_iters}-1$ 次迭代:
+  - 前 $\mathbf{num\_iters}-1$ 次迭代：
 
   $$
   \begin{aligned}
@@ -92,7 +92,7 @@ aclnnStatus aclnnMhcSinkhornBackward(
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-  第一阶段接口完成入参校验，出现以下场景时报错。
+  第一段接口完成入参校验，出现以下场景时报错。
 
   <table>
     <thead>

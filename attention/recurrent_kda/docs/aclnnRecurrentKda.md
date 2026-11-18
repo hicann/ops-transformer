@@ -267,7 +267,7 @@ aclnnStatus aclnnRecurrentKda(
       <td>layout（char）</td>
       <td>输入</td>
       <td>query、key、value 的数据 Layout 格式。</td>
-      <td>枚举值: BSND | TND。</td>
+      <td>枚举值：BSND | TND。</td>
       <td>STRING</td>
       <td>-</td>
       <td>-</td>
@@ -519,7 +519,7 @@ aclnnStatus aclnnRecurrentKda(
 - H_v 必须能被 H_k 整除。
 - stateVFirst 支持 true 和 false（默认 false）：为 true 时 initialState 与 finalState 的 shape 必须满足 `[state_capacity, H_v, V_dim, K_dim]`；为 false 时必须满足 `[state_capacity, H_v, K_dim, V_dim]`。未传 ssmStateIndicesOptional 时 state_capacity 必须等于逻辑序列数；传入后 state_capacity 可以与 seq_num 不同，由索引选择有效槽位。
 - cuSeqlensOptional 首元素必须为 0、各 offset 必须非递减且不得超过输入 token capacity。末元素可以小于 token capacity，此时 padding tail 输出不保证有效且不更新 state。
-- ssmStateIndicesOptional 支持长度大于等于 token capacity 的 1D tensor，或 shape 为 [seq_num,max_step] 的 2D tensor；二维形式的 max_step 必须覆盖每条实际序列长度，索引值必须位于 [0,state_capacity)。numAcceptedTokensOptional 必须为长度等于 seq_num 的 1D tensor，且每个值位于对应序列的 [1,seq_len]；它依赖 ssmStateIndicesOptional，但 ssmStateIndicesOptional 可以单独提供。
+- ssmStateIndicesOptional 支持长度大于等于 token capacity 的一维 Tensor，或 shape 为 [seq_num,max_step] 的二维 Tensor；二维形式的 max_step 必须覆盖每条实际序列长度，索引值必须位于 [0,state_capacity)。numAcceptedTokensOptional 必须为长度等于 seq_num 的 1D tensor，且每个值位于对应序列的 [1,seq_len]；它依赖 ssmStateIndicesOptional，但 ssmStateIndicesOptional 可以单独提供。
 - useGateInKernel=true 时 aLogOptional 必选；useGateInKernel=false 时传入了 aLogOptional、dtBiasOptional 或 safeGate=true 均会报错。
 - aLogOptional shape 必须为 [H_v]；dtBiasOptional shape 必须为 [H_v*K_dim] 或 [H_v,K_dim]。
 - safeGate=true 时 lowerBound 必须落在 [-5, 0) 区间内。

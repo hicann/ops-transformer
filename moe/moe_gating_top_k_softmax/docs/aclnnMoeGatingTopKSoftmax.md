@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：MoE计算中，对x的输出做Softmax计算，取topK操作。其中yOut为softmax的topK结果；expertIdxOut为topK的值的索引结果，即对应的专家序号；rowIdxOut为与expertIdxOut相同shape的列取值结果，指示每个位置对应的原始行位置。如果expertIdxOut中对应的行的finished为True，则直接填num\_expert值（即x的最后一个轴大小）。
+- 接口功能：MoE计算中，对x的输出做Softmax计算，取topK操作。其中yOut为softmax的topK结果；expertIdxOut为topK的值的索引结果，即对应的专家序号；rowIdxOut为与expertIdxOut相同shape的列取值结果，指示每个位置对应的原始行位置。如果expertIdxOut中对应的行的finished为True，则直接填专家数，即x最后一维的大小。
 - 计算公式：
 
   $$
@@ -127,7 +127,7 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
     <td>yOut</td>
     <td>输出</td>
     <td>对x做softmax后取的topK值。</td>
-    <td>其shape的非-1轴要求与x的对应轴大小一致，其-1轴要求其大小同k值</td>
+    <td>其shape的非-1轴要求与x的对应轴大小一致，其-1轴要求其大小同k值。</td>
     <td>要求与输入x一致。</td>
     <td>ND</td>
     <td>2-3</td>
@@ -137,7 +137,7 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
     <td>expertIdxOut</td>
     <td>输出</td>
     <td>对x做softmax后取topK值的索引，即专家的序号。</td>
-    <td>shape要求与yOut一致</td>
+    <td>shape要求与yOut一致。</td>
     <td>INT32</td>
     <td>ND</td>
     <td>2-3</td>
@@ -207,13 +207,13 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
     <tr>
     <td rowspan="4"> ACLNN_ERR_INNER_TILING_ERROR </td>
     <td rowspan="4"> 561002 </td>
-    <td>多个输入tensor之间的shape信息不匹配。</td>
+    <td>多个输入Tensor之间的shape信息不匹配。</td>
     </tr>
     <tr>
-    <td>输入属性和输入tensor之间的shape信息不匹配。</td>
+    <td>输入属性和输入Tensor之间的shape信息不匹配。</td>
     </tr>
     <tr>
-    <td>k的值小于或等于0或大于x-1的轴的大小。</td>
+    <td>k的值小于或等于0或大于x的-1轴大小。</td>
     </tr>
     <tr>
     <td>k的值大于1024。</td>
@@ -274,8 +274,8 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
 
 <!-- end id7 -->
 <!-- npu="310p" id8 -->
-- <term>Atlas推理系列产品</term>:
-  - 输入x shape为[token_num, expert_num], expert_num必须满足16对齐，即expert_num是16整数倍，且不能超过256。
+- <term>Atlas推理系列产品</term>：
+  - 输入x shape为[token_num, expert_num]，expert_num必须满足16对齐，即expert_num是16的整数倍，且不能超过256。
   - 输入x仅支持FLOAT16。
   - 输入不支持finishedOptional，只能输入None。
   - 输出不支持rowIdxOut，rowIdxOut输出全0。
@@ -286,7 +286,7 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include "acl/acl.h"
 #include "aclnnop/aclnn_moe_gating_top_k_softmax.h"
 #include <iostream>

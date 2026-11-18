@@ -300,7 +300,7 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
   </tbody>
   </table>
 
-- **返回值**
+- **返回值：**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
@@ -308,13 +308,13 @@ aclnnStatus aclnnScatterPaKvCacheWithKScale(
 
 - 确定性计算：
   - aclnnScatterPaKvCacheWithKScale默认确定性实现。
-- key、value、keyCacheRef、valueCacheRef的数据类型必须一致；
-- slotMapping的取值范围[0, num_blocks*block_size-1]，且slotMapping内的元素值保证不重复，重复时不保证正确性；
-- key和value的前两维shape必须相同；
-- keyScale是两维tensor，shape为[batch * seq_len, num_head]，尾轴可以不连续；
+- key、value、keyCacheRef、valueCacheRef的数据类型必须一致。
+- slotMapping的取值范围[0, num_blocks*block_size-1]，且slotMapping内的元素值保证不重复，重复时不保证正确性。
+- key和value的前两维shape必须相同。
+- keyScale是两维Tensor，shape为[batch * seq_len, num_head]，尾轴可以不连续。
 - keyScaleCacheRef是四维tensor，shape为[num_blocks, num_head, block_size, 1]，最后一维必须为1，尾轴必须连续。
 - 空Tensor支持说明：在所有必选参数指针均非空、executor创建成功的前提下，aclnnScatterPaKvCacheWithKScaleGetWorkspaceSize存在以下空输入提前成功返回分支，此时workspaceSize为0，不进入后续shape/dtype校验与算子计算，第二段接口同样返回成功且不更新缓存内容：
-  - slotMapping为空Tensor；
+  - slotMapping为空Tensor。
   - key与keyCacheRef、value与valueCacheRef、keyScale与keyScaleCacheRef三组中，每组输入或对应缓存至少一个为空Tensor。
   其余空Tensor组合不属于该成功分支，将被视为不支持空Tensor。
 

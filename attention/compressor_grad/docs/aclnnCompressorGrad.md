@@ -24,9 +24,9 @@
 ## 功能说明
 
 - 接口功能：CompressorGrad是Compressor算子的反向算子，用于计算输入$X$、权重$W^{KV}$/$W^{Gate}$与位置编码$Ape$的梯度。前向在gradEnabled为true时导出softmax\_score（分组softmax结果）与kv（softmax结果与kv\_state的Hadamard乘积）中间结果，作为本算子的输入。主要计算过程为：
-    1. 逐块计算Hadamard积反向：将上游梯度$dC$与softmax\_score、kv逐元素相乘，得到$dK$与$dS^\prime$；
-    2. softmax反向：对$dS^\prime$沿压缩轴做softmax反向，得到$dZ$；
-    3. APE梯度计算：按token位置累加$dZ$，得到$dApe$；
+    1. 逐块计算Hadamard乘积反向：将上游梯度$dC$与softmax\_score、kv逐元素相乘，得到$dK$与$dS^\prime$。
+    2. softmax反向：对$dS^\prime$沿压缩轴做softmax反向，得到$dZ$。
+    3. APE梯度计算：按token位置累加$dZ$，得到$dApe$。
     4. matmul反向：将$dK$、$dZ$与权重做矩阵乘法反向，得到$dX$、$dW^{KV}$、$dW^{Gate}$。
 
 - 计算公式：
@@ -89,7 +89,7 @@ aclnnStatus aclnnCompressorGradGetWorkspaceSize(
     aclOpExecutor   **executor)
 ```
 
-``` cpp
+```cpp
 aclnnStatus aclnnCompressorGrad(
   void          *workspace,
   uint64_t       workspaceSize,
@@ -220,7 +220,7 @@ aclnnStatus aclnnCompressorGrad(
     - wkv支持输入shape[coff* D,H]
     - wgate支持输入shape[coff* D,H]
     - softmaxScore支持输入shape：BS合轴时为[min(T,T//cmp_ratio+B), coff*cmp_ratio, D]；BS非合轴时为[B,ceil(S/cmp_ratio),coff*cmp_ratio,D]
-    - kv支持输入shape：同softmaxScore
+    - kv支持输入shape：同softmaxScore。
     - dCmpKv支持输入shape：BS合轴时为[min(T,T//cmp_ratio+B),D]；BS非合轴时为[B,ceil(S/cmp_ratio),D]
     - dX支持输出shape：与x相同，BS合轴时为[T,H]、BS非合轴时为[B,S,H]
     - dWkv、dWgate支持输出shape[coff* D,H]
@@ -238,7 +238,7 @@ aclnnStatus aclnnCompressorGrad(
         - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。
 - 输入属性限制：
     - 支持D为128/512。
-    - 支持H为1K~10K，512对齐。
+    - 支持H为1k~10k，512对齐。
     - 支持coff为1/2。
     - 支持cmp\_ratio为2~128。
 - enableApe说明：
@@ -248,7 +248,7 @@ aclnnStatus aclnnCompressorGrad(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 /**
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of

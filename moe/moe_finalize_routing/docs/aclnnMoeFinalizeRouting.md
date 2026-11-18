@@ -88,7 +88,7 @@ aclnnStatus aclnnMoeFinalizeRouting(
     <tr>
       <td>expandedX</td>
       <td>输入</td>
-      <td>公式中的expandedX ，MoE的FFN输出。</td>
+      <td>公式中的expandedX，MoE的FFN输出。</td>
       <td>要求是一个2D的Tensor。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
@@ -128,7 +128,7 @@ aclnnStatus aclnnMoeFinalizeRouting(
     <tr>
       <td>scales</td>
       <td>输入</td>
-      <td>公式中的scales.</td>
+      <td>公式中的scales。</td>
       <td>要求是一个2D的Tensor。</td>
       <td>与expandedX一致</td>
       <td>ND</td>
@@ -138,7 +138,7 @@ aclnnStatus aclnnMoeFinalizeRouting(
     <tr>
       <td>expandedRowIdx</td>
       <td>输入</td>
-      <td>公式中的expandedRowIdx.</td>
+      <td>公式中的expandedRowIdx。</td>
       <td>要求是一个1D的Tensor。<br>Tensor中的值取值范围是[0,NUM_ROWS * K-1]。</td>
       <td>INT32</td>
       <td>ND</td>

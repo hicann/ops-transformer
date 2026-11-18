@@ -476,8 +476,8 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV3(
 
 - 确定性计算：
   - aclnnFlashAttentionVarLenScoreV3默认确定性实现。
-- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配
-- 输入query、queryRope、key、keyRope、value的B：batch size必须相等。
+- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
+- 输入query、queryRope、key、keyRope、value的B：Batch size必须相等。
 - 输入query、key、value的D：Head-Dim必须满足(qD == kD && kD >= vD)，D必须是8的整数倍。
 - 输入queryRope、keyRope的D：Head-Dim必须满足(qRopeD == kRopeD)，D必须是8的整数倍，且必须小于等于query、key和value的D。
 - 输入query、key、value的inputLayout必须为TND。
@@ -486,12 +486,12 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV3(
     - N：取值范围为1\~256。
     - D：取值范围为1\~768。
     - 数据shape必须为TND。
-    - KeepProb必须为1。
+    - keepProb必须为1。
 - query、key、value数据排布格式仅支持TND，T是B和S合轴紧密排列的数据（每个batch的SeqLenQ和SeqLenKV），其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 - innerPrecise：当前0、1为保留配置值，2为开启无效行计算，其功能是避免在计算过程中存在整行mask进而导致精度有损失，但是该配置会导致性能下降。如果算子可判断出存在无效行场景，会自动开启无效行计算，例如sparseMode为3，Sq > Skv场景。
-- sparseMode的约束如下:
-  - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量；
-  - 配置为1、2、3时，用户配置的preTokens、nextTokens不会生效；
+- sparseMode的约束如下：
+  - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量。
+  - 配置为1、2、3时，用户配置的preTokens、nextTokens不会生效。
   - 配置为0、4时，须保证attenMaskOptional与preTokens、nextTokens的范围一致。
   - 用户不特意指定时建议传入0。
   - sparse不同模式的详细说明请参见[sparse模式说明](../../../docs/zh/context/sparse_mode_introduction.md)。
@@ -500,7 +500,7 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV3(
   - 配置为8时，当每个sequence的q、kv等长时支持可选输入realShiftOptional，针对全局做pse生成。支持q方向进行外切，需要外切前每个sequence的q、kv等长，外切后传入的actualSeqQLenOptional[0] - actualSeqKvLenOptional[0] + qStartIdxOptional - kvStartIdxOptional == 0（本功能属实验性功能）。
 - 部分场景下，如果计算量过大可能会导致算子执行超时（AI Core error类型报错，errorStr为：timeout or trap error），此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 - band场景，preTokens和nextTokens之间必须要有交集。
-- actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入realShiftOptional。actualSeqQLenOptional的长度取值范围为1\~2K。当存在prefixOptional输入的时候，其长度最大支持1K。
+- actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入realShiftOptional。actualSeqQLenOptional的长度取值范围为1\~2k。当存在prefixOptional输入的时候，其长度最大支持1k。
 - attenMaskOptional输入不支持补pad，即attenMaskOptional中不能存在某一行全1的场景。
 - 支持actualSeqQLenOptional中某个Batch上的S长度为0；如果存在S为0的情况，不支持pse输入，
   假设真实的S长度为\[2,2,0,2,2\]，则传入的actualSeqQLenOptional为\[2,4,4,6,8\]。

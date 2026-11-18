@@ -25,7 +25,7 @@
 
 - **接口功能**：MoE的routing计算，根据[aclnnMoeGatingTopKSoftmax](../../moe_gating_top_k_softmax/docs/aclnnMoeGatingTopKSoftmax.md)的计算结果做routing处理。
 - **计算公式**：
-  将输入shape为[NUM_ROWS, K]的expertIdx展平为一行做排序，其中NUM_ROWS为输入token个数，K为token选择的专家个数。sortedRowIdx为rowIdx经过排序后的结果
+  将输入shape为[NUM_ROWS, K]的expertIdx展平为一行做排序，其中NUM_ROWS为输入token个数，K为token选择的专家个数。sortedRowIdx为rowIdx经过排序后的结果。
 
   $$
   expandedExpertIdxOut,sortedRowIdx=keyValueSort(expertIdx,rowIdx)
@@ -93,7 +93,7 @@ aclnnStatus aclnnMoeInitRouting(
     <tr>
       <td>x</td>
       <td>输入</td>
-      <td>MOE的输入即token特征输入。</td>
+      <td>MoE的输入即token特征输入。</td>
       <td>-</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
@@ -187,7 +187,7 @@ aclnnStatus aclnnMoeInitRouting(
 
   `aclnnStatus`：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-  一段接口完成入参校验，出现以下场景时报错：
+  第一段接口完成入参校验，出现以下场景时报错：
 
   <table style="undefined;table-layout: fixed; width: 1180px">
     <colgroup>
@@ -269,14 +269,14 @@ aclnnStatus aclnnMoeInitRouting(
       <tr>
         <td>stream</td>
         <td>输入</td>
-        <td>指定执行任务的Stream流。</td>
+        <td>指定执行任务的Stream。</td>
       </tr>
     </tbody>
   </table>
 
 - **返回值：**
 
-  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  `aclnnStatus`：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 

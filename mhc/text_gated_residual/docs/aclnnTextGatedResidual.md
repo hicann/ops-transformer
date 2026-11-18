@@ -70,7 +70,7 @@ needBackward=true 时必须提供 invRmsOptional、downPreActOptional 和 upPreA
 
 ### 注入路径
 
-当 `wGateOptional` 非空 时，注入路径为：
+当`wGateOptional`非空时，注入路径为：
 
 $$
 inject_{b,s,c}=2\cdot\operatorname{sigmoid}\left(\frac{1}{C}\sum_{d=0}^{C\times H-1}xNorm_{b,s,d}\,wGate_{c,d}\right)
@@ -80,11 +80,11 @@ $$
 
 其中 $B,S$ 为 batch 和序列长度，$C$ 为通道数，$H$ 为每通道隐藏维度，$R$ 为瓶颈维度；`gamma` 为 shape $(C\times H)$ 的可选原始权重，缩放因子为 $1+\gamma_{cH+h}$。
 
-`needBackward=true` 时，前向另输出 `invRmsOptional`、`downPreActOptional` 和 `upPreActOptional` 供反向计算；`wGateOptional` 非空 时输出 `injectOptional`，反向由 `injectOptional / 2` 还原注入门控值。
+`needBackward=true` 时，前向另输出 `invRmsOptional`、`downPreActOptional` 和 `upPreActOptional` 供反向计算；`wGateOptional` 非空时输出 `injectOptional`，反向由 `injectOptional / 2` 还原注入门控值。
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnTextGatedResidualGetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnTextGatedResidual"接口执行计算。
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnTextGatedResidualGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnTextGatedResidual”接口执行计算。
 
 ```cpp
 aclnnStatus aclnnTextGatedResidualGetWorkspaceSize(
@@ -174,7 +174,7 @@ aclnnStatus aclnnTextGatedResidual(
 <tr>
   <td>wGateOptional（aclTensor*）</td>
   <td>可选输入</td>
-  <td>Injection 路径投影权重。</td>
+  <td>注入路径投影权重。</td>
   <td>传入时计算 inject，且 injectOptional 必须提供；省略时跳过；shape 为 [C,C×H]。</td>
   <td>FLOAT16、BFLOAT16</td>
   <td>ND</td>
@@ -184,7 +184,7 @@ aclnnStatus aclnnTextGatedResidual(
 <tr>
   <td>gammaOptional（aclTensor*）</td>
   <td>可选输入</td>
-  <td>Grouped RMS 权重。</td>
+  <td>分组 RMS 归一化权重。</td>
   <td>使用逐元素 gamma[C×H] 原始权重，缩放因子为 1+gamma，沿 batch 和 sequence 维广播。</td>
   <td>FLOAT32</td>
   <td>ND</td>
@@ -224,7 +224,7 @@ aclnnStatus aclnnTextGatedResidual(
 <tr>
   <td>mixed（aclTensor*）</td>
   <td>输出</td>
-  <td>channel 维度加权平均后的混合结果。</td>
+  <td>通道维度加权平均后的混合结果。</td>
   <td>shape 为 [B,S,H]；B 或 S 为 0 时支持空输出，dtype 与 x 相同。</td>
   <td>FLOAT16、BFLOAT16</td>
   <td>ND</td>
@@ -234,8 +234,8 @@ aclnnStatus aclnnTextGatedResidual(
 <tr>
   <td>injectOptional（aclTensor*）</td>
   <td>可选输出</td>
-  <td>由 injection gate 生成的注入权重。</td>
-  <td>wGateOptional 非空时 shape 为 [B,S,C]；wGateOptional 为空时可为空指针。</td>
+  <td>由注入门控生成的注入权重。</td>
+  <td>wGateOptional非空时 shape 为 [B,S,C]；wGateOptional 为空时可为空指针。</td>
   <td>FLOAT16、BFLOAT16</td>
   <td>ND</td>
   <td>(B,S,C)</td>
@@ -244,7 +244,7 @@ aclnnStatus aclnnTextGatedResidual(
 <tr>
   <td>invRmsOptional（aclTensor*）</td>
   <td>可选输出</td>
-  <td>RMS 反向需要的逐组 inverse RMS。</td>
+  <td>RMS 反向需要的逐组逆 RMS。</td>
   <td>needBackward=true 时保存；shape 为 [B,S,C]。</td>
   <td>FLOAT32</td>
   <td>ND</td>
@@ -254,7 +254,7 @@ aclnnStatus aclnnTextGatedResidual(
 <tr>
   <td>downPreActOptional（aclTensor*）</td>
   <td>可选输出</td>
-  <td>down projection 的 SiLU 输入，用于重建 SiLU 导数。</td>
+  <td>下投影的 SiLU 输入，用于重建 SiLU 导数。</td>
   <td>needBackward=true 时保存；shape 为 [B,S,R]。</td>
   <td>FLOAT16、BFLOAT16</td>
   <td>ND</td>
@@ -264,7 +264,7 @@ aclnnStatus aclnnTextGatedResidual(
 <tr>
   <td>upPreActOptional（aclTensor*）</td>
   <td>可选输出</td>
-  <td>mix 分支 up matmul 的输出，即 sigmoid 输入，用于反向重建 mix gate。</td>
+  <td>混合分支上投影的输出，即 sigmoid 输入，用于反向重建混合门控。</td>
   <td>needBackward=true 时必须提供；shape 为 [B,S,C×H]，dtype 与 x 相同，支持 FLOAT16、BFLOAT16；false 时可为空指针。</td>
   <td>FLOAT16、BFLOAT16</td>
   <td>ND</td>
@@ -317,7 +317,7 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
 <tr>
   <td>ACLNN_ERR_PARAM_NULLPTR</td>
   <td>161001</td>
-  <td>x、wDown、wUp 或 mixed 为空指针；wGateOptional 非空时 injectOptional 为空指针；needBackward=true 时 invRmsOptional、downPreActOptional 或 upPreActOptional 为空指针。</td>
+  <td>x、wDown、wUp或mixed为空指针；wGateOptional非空时，injectOptional为空指针；needBackward=true时，invRmsOptional、downPreActOptional或upPreActOptional 为空指针。</td>
 </tr>
 <tr>
   <td>ACLNN_ERR_PARAM_INVALID</td>
@@ -327,7 +327,7 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
 <tr>
   <td>ACLNN_ERR_PARAM_INVALID</td>
   <td>161002</td>
-  <td>eps 非有限、小于 0 或超出 FLOAT 可表示范围，或 channels 与 x/wDown/wUp/wGate shape 不匹配。</td>
+  <td>eps非有限、小于0或超出FLOAT可表示范围，或channels与 x/wDown/wUp/wGate shape不匹配。</td>
 </tr>
 <tr>
   <td>ACLNN_ERR_INNER_CREATE_EXECUTOR</td>
@@ -406,7 +406,7 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
 
 - 输入限制：通道数 C 为整数，满足 2≤C≤10；每通道隐藏维度 H 满足 256≤H≤4096 且 H%256=0；低秩维度 R 满足 64≤R≤896 且 R%64=0。
 - 输入 x 的 shape 为 [B,S,D]，D=C×H，H=D/C；wDown、wUp 的 shape 分别为 [R,D]、[D,R]，可选 wGateOptional 的 shape 为 [C,D]，可选 gammaOptional 的 shape 为 [D]。
-- 输入和输出计算张量支持FLOAT16、BFLOAT16；gamma和invRms为FLOAT32；upPreAct与x相同。
+- 输入和输出计算张量支持 FLOAT16、BFLOAT16；gamma 和 invRms 为 FLOAT32；upPreAct 与 x 相同。
 - `needBackward`为false时反向缓存输出可为空指针；为true时必须提供`invRmsOptional`、`downPreActOptional`和`upPreActOptional`。
 
 ## 调用示例

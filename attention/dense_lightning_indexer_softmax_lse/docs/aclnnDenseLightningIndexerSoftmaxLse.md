@@ -40,7 +40,7 @@
   \text{sumIndex}=\text{ReduceSum}\left(\text{exp}\left(res-maxIndex\right)\right)
   $$
 
-  maxIndex，sumIndex作为输出传递给算子DenseLightningIndexerGradKlLoss作为输入计算Softmax使用。
+  maxIndex、sumIndex作为输出传递给算子DenseLightningIndexerGradKlLoss作为输入计算Softmax使用。
 
 ## 函数原型
 
@@ -102,7 +102,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLse(
       <td>queryIndex（aclTensor*）</td>
       <td>输入</td>
       <td>lightningIndexer结构的输入queryIndex。</td>
-      <td><ul><li>B：支持泛化且与query的B保持一致。</li><li>Nidx1：64、32、16、8。</li><li>D：128。</li><li>T1：多个Batch的S1累加。</li></ul></td>
+      <td><ul><li>B：支持泛化且与queryIndex的B保持一致。</li><li>Nidx1：64、32、16、8。</li><li>D：128。</li><li>T1：多个Batch的S1累加。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>(B,S1,Nidx1,D);(T1,Nidx1,D)</td>
@@ -202,7 +202,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLse(
       <td>softmaxSumOut（aclTensor*）</td>
       <td>输出</td>
       <td>softmax计算使用的sum值</td>
-      <td><ul><li>B：支持泛化与query的B保持一致。</li><li>Nidx2：与keyIndex的Nidx2保持一致。</li><li>S1：支持泛化，且与queryIndex的S1保持一致。</li><li>T1：多个Batch的S1累加。</li></ul></td>
+      <td><ul><li>B：支持泛化与queryIndex的B保持一致。</li><li>Nidx2：与keyIndex的Nidx2保持一致。</li><li>S1：支持泛化，且与queryIndex的S1保持一致。</li><li>T1：多个Batch的S1累加。</li></ul></td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>(B,Nidx2,S1);(Nidx2,T1)</td>
@@ -261,7 +261,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLse(
      <tr>
       <td>ACLNN_ERR_INNER_TILING_ERROR</td>
       <td>561002</td>
-      <td>多个输入tensor之间的shape信息不匹配（详见参数说明）。</td>
+      <td>多个输入Tensor之间的shape信息不匹配（详见参数说明）。</td>
      </tr>
      </tbody>
     </table>
@@ -311,9 +311,9 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLse(
 
 ## 约束说明
 
-  - 参数queryIndex、keyIndex的数据类型应保持一致。
+  - 参数queryIndex、keyIndex的数据类型应保持一致
 
-  - 参数weight不为float32时，参数queryIndex、keyIndex、weight的数据类型应保持一致。
+  - 参数weight不为FLOAT32时，参数queryIndex、keyIndex、weight的数据类型应保持一致
 
   - 确定性计算：
     aclnnDenseLightningIndexerSoftmaxLse默认确定性实现。
@@ -449,7 +449,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLse(
     <tbody>
     <tr>
       <td>queryIndex</td>
-      <td>N1 = 64/32;  D = 128 ; S1 = 64k/128k</td>
+      <td>Nidx1 = 64/32; D = 128; S1 = 64k/128k</td>
     </tr>
     <tr>
       <td>keyIndex</td>

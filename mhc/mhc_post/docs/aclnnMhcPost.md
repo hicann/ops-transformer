@@ -27,13 +27,13 @@
 
 - 计算公式：
 
-  当 hRes 提供时：
+  当hRes提供时：
 
   $$
   x_{l+1} = (H_{l}^{res})^{T} \times x_l + h_{l}^{out} \otimes H_{t}^{post}
   $$
 
-  当 hRes 缺省时（仅 Ascend 950 支持）：
+  当hRes默认时（仅Ascend 950支持）：
 
   $$
   x_{l+1} = x_l + h_{l}^{out} \otimes H_{t}^{post}
@@ -41,7 +41,7 @@
 
 ## 函数原型
 
-算子执行接口为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnMhcPostGetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnMhcPost"接口执行计算。
+算子执行接口为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnMhcPostGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnMhcPost”接口执行计算。
 
 ```c++
 aclnnStatus aclnnMhcPostGetWorkspaceSize(
@@ -101,7 +101,7 @@ aclnnStatus aclnnMhcPost(
     <tr>
       <td>hRes</td>
       <td>输入（可选）</td>
-      <td>mHC的hRes变换矩阵，是做完sinkhorn变换后的双随机矩阵。传nullptr时退化为直接残差连接（仅 Ascend 950 支持）。</td>
+      <td>mHC的hRes变换矩阵，是做完sinkhorn变换后的双随机矩阵。传nullptr时退化为直接残差连接（仅Ascend 950支持）。</td>
       <td>-</td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -196,7 +196,7 @@ aclnnStatus aclnnMhcPost(
             <tr>
               <td>ACLNN_ERR_INNER_NULLPTR</td>
               <td>561103</td>
-              <td>n不等于4; d不在[1, 100000]范围内；d不能被128整除。</td>
+              <td>n不等于4；d不在[1, 100000]范围内；d不能被128整除。</td>
           </tr>
       </tbody>
   </table>
@@ -249,10 +249,10 @@ aclnnStatus aclnnMhcPost(
 - aclnnMhcPost默认确定性实现。
 
 <!-- npu="950" id7 -->
-- <term>Ascend 950PR&950DT系列产品</term>：hRes 支持传入 nullptr，此时退化为直接残差连接。
+- <term>Ascend 950PR&950DT系列产品</term>：hRes支持传入nullptr，此时退化为直接残差连接。
 <!-- end id7 -->
 <!-- npu="A3,910b" id8 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：hRes 为必传参数，不支持传入 nullptr。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：hRes为必传参数，不支持传入nullptr。
 
   | 规格项   | 规格               | 规格说明                                |
   | :------- | :----------------- | :------------------------------------- |

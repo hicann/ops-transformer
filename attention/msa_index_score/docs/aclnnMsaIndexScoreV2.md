@@ -43,7 +43,7 @@
     > - S（Sequence Length）表示序列长度，$S1$为query侧、$S2$为key侧
     > - T表示所有Batch序列长度累加和，$T1$为query侧、$T2$为key侧
     > - N（Head Num）表示头数，$N1$为query侧、$N2$为key侧
-    > - D（Head Dim）表示单个注意力头维度；
+    > - D（Head Dim）表示单个注意力头维度
     > - PageAttention场景下$block\_num$为物理页总数，$block\_size$为每个存储页的token数。$pool\_block\_size$为每个score归约的token数。打分块总数$M_b=\lceil S2/pool\_block\_size\rceil$；页表宽度按$block\_size$计
 
 ## 函数原型
@@ -101,7 +101,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <th>数据类型</th>
       <th>数据格式</th>
       <th>维度(shape)</th>
-      <th>非连续tensor</th>
+      <th>非连续Tensor</th>
     </tr>
   </thead>
   <tbody>
@@ -135,7 +135,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>1（$[B]$）</td>
       <td>-</td>
     </tr>
-<tr>
+    <tr>
       <td>blockTableOptional</td>
       <td>输入</td>
       <td>表示当前传入的使用PageAttention存储的block映射表。</td>
@@ -427,9 +427,9 @@ aclnnStatus aclnnMsaIndexScoreV2(
 - PageAttention（`layoutKey`为`"BBND"`/`"BNBD"`）场景下，`blockTableOptional`必须传入；TND/BSND/BNSD不得传入。TND/BSND/BNSD的`actualSeqKlenOptional`统一为$[B+1]$前缀和，PA为$[B]$可见长度。BSND/BNSD每个请求的q、kv长度不能超过对应shape里的$S$。
 - 原生浮点时`key` dtype与`query`相同（BFLOAT16/FLOAT16，Ascend950另支持两种FP8），Q/K scale均传空；MXFP4的两份E8M0系数均必填。
 - `sparseMode`当前仅支持0、3：
-    - 为0时，代表defaultMask模式，`attenMaskOptional`传入`nullptr`；
+    - 为0时，代表defaultMask模式，`attenMaskOptional`传入`nullptr`。
     - 为3时，代表rightDownCausal模式，`attenMaskOptional`必须传入，shape为$[2048, 2048]$，取值为1代表该位不参与计算，为0代表该位参与计算。
-- `initBlocks`、`localBlocks`必须$\ge 0$且不超过逻辑block数（PA为页表宽×物理页长÷pool块长；非分页为score末维对齐宽度）。两者均为0时跳过$local\_mask$。
+- `initBlocks`、`localBlocks`必须$\ge 0$且不超过逻辑块数（PA为页表宽×物理页长÷pool块长；非分页为score末维对齐宽度）。两者均为0时跳过$local\_mask$。
 - `q_len`/`kv_len`允许为0（含整batch）。对应请求跳过QK；空KV的score填$-inf$；整batch $T1=0$时`SetBlockDim(1)`（对齐FIA PR 9246）。
 - PageAttention`key`（BBND/BNBD）允许首轴非连续（`key | gap | key | ...`），tiling通过`GetInputStride`读取dim0元素stride写入`strideKvBlock`。非首轴（size>1的dim1至末维）必须等于紧凑stride，否则返回不支持/非法输入；TND / BSND / BNSD `key`不允许非连续。`scale`仍按逻辑page紧凑布局。
 - PageAttention`blockTable`第二维可以大于实际KV物理页数；score末维为$\mathrm{RoundUp}(width \times pageSize / poolBlockSize, 16)$。
@@ -452,8 +452,8 @@ aclnnStatus aclnnMsaIndexScoreV2(
 
 ## 调用示例
 
-示例代码如下（query为TND，key为BBND PageAttention，经`aclnnMsaIndexScoreV2`调用；TND key：`layoutKeyOptional="TND"`，`key`为$[T2, N2, D]$，`blockTableOptional`传`nullptr`，`actualSeqKlenOptional`为$[B+1]$前缀和。BNBD：`layoutKeyOptional="BNBD"`，`key`为$[block\_num, N2, block\_size, D]$。query改成BSND / BNSD时把`layoutQueryOptional`设成对应名字；非分页key必须用同一个名字。含TND/BNBD的精度自验证见[test_aclnn_msa_index_score_v2.cpp](../examples/test_aclnn_msa_index_score_v2.cpp)。
-```Cpp
+示例代码如下：query为TND，key为BBND PageAttention，经`aclnnMsaIndexScoreV2`调用；TND key：`layoutKeyOptional="TND"`，`key`为$[T2, N2, D]$，`blockTableOptional`传`nullptr`，`actualSeqKlenOptional`为$[B+1]$前缀和。BNBD：`layoutKeyOptional="BNBD"`，`key`为$[block\_num, N2, block\_size, D]$。query改成BSND / BNSD时把`layoutQueryOptional`设成对应名字；非分页key必须用同一个名字。含TND/BNBD的精度自验证见[test_aclnn_msa_index_score_v2.cpp](../examples/test_aclnn_msa_index_score_v2.cpp)。
+```cpp
 #include <iostream>
 #include <vector>
 #include <cstdint>
@@ -802,8 +802,8 @@ int main() {
 }
 ```
 
-TND/BNBD与上面BBND示例的差异如下
-```Cpp
+TND/BNBD与上面BBND示例的差异如下：
+```cpp
 // BNBD PageAttention：layoutKey="BNBD"，key 为 [block_num, N2, page_size, D]
 char layoutKeyBnbd[] = "BNBD";
 std::vector<int64_t> keyShapeBnbd = {blockNum, N2, blockSize, D};

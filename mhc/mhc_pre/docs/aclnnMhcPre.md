@@ -57,7 +57,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnMhcPreGetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnMhcPre"接口执行计算。
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnMhcPreGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnMhcPre”接口执行计算。
 
 ```Cpp
 aclnnStatus aclnnMhcPreGetWorkspaceSize(
@@ -175,7 +175,7 @@ aclnnStatus aclnnMhcPre(
   <tr>
       <td>hcEps（double）</td>
       <td>可选输入</td>
-      <td>h_pre的sigmoid后的eps参数，以及当alpha.shape=[2]时h_post的sigmoid后的eps参数，对应公式中的hcEps。</td>
+      <td>h_pre的sigmoid后的eps参数，以及当alpha.shape=(2)时h_post的sigmoid后的eps参数，对应公式中的hcEps。</td>
       <td>建议值：1e-6。</td>
       <td>DOUBLE</td>
       <td>-</td>
@@ -307,7 +307,7 @@ aclnnStatus aclnnMhcPre(
     <tr>
     <td> ACLNN_ERR_RUNTIME_ERROR </td>
     <td> 361001 </td>
-    <td>API内部调用npu runtime的接口异常。</td>
+    <td>API内部调用NPU Runtime的接口异常。</td>
     </tr>
   </tbody></table>
 
@@ -368,7 +368,7 @@ aclnnStatus aclnnMhcPre(
   - <term>Ascend 950PR&950DT系列产品</term>：
     - n目前支持4、6、8。
     - D支持1~16384范围以内，需满足D为16对齐。
-    - 当alpha=(3)时，支持hRes输出，必须满足以下条件：输入phi=(n<sup>2</sup>+2n, n×D)，bias=(n<sup>2</sup>+2n)；输出hMixOptional=(B, S, n<sup>2</sup>+2n)或(T, n<sup>2</sup>+2n)；当alpha=(2)时，hRes输出为0，必须满足以下条件：输入phi=(2n, n×D),bias=(2n)，输出hMixOptional=(B, S, 2n) 或 (T, 2n)。
+    - 当alpha=(3)时，支持hRes输出，必须满足以下条件：输入phi=(n<sup>2</sup>+2n, n×D)，bias=(n<sup>2</sup>+2n)；输出hMixOptional=(B, S, n<sup>2</sup>+2n)或(T, n<sup>2</sup>+2n)；当alpha=(2)时，hRes输出为0，必须满足以下条件：输入phi=(2n, n×D)，bias=(2n)，输出hMixOptional=(B, S, 2n) 或 (T, 2n)。
   <!-- end id7 -->
   <!-- npu="A3,910b" id8 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
@@ -377,9 +377,9 @@ aclnnStatus aclnnMhcPre(
     - 当alpha=(3)时，支持hRes输出，必须满足以下条件：
       - 输入phi=(n<sup>2</sup>+2n, n×D)，bias=(n<sup>2</sup>+2n)；输出hMixOptional=(B, S, n<sup>2</sup>+2n)或(T, n<sup>2</sup>+2n)。
       - 输入phi=(n!+2n, n×D)，bias=(n!+2n)；输出hMixOptional=(B, S, n!+2n)或(T, n!+2n)。
-    - 当alpha=(2)时，hRes输出为0，必须满足以下条件：输入phi=(2n, n×D),bias=(2n)，输出hMixOptional=(B, S, 2n)或(T, 2n)。
+    - 当alpha=(2)时，hRes输出为0，必须满足以下条件：输入phi=(2n, n×D)，bias=(2n)，输出hMixOptional=(B, S, 2n)或(T, 2n)。
   <!-- end id8 -->
-  - 可选输出 invRmsOptional、hMixOptional、hPreOptional 为互存关系，需同时输出或全部不输出，不支持仅返回其中部分，输出条件：invRmsOptional!=nullptr && hMixOptional!=nullptr && hPreOptional!=nullptr。
+  - 可选输出invRmsOptional、hMixOptional、hPreOptional为互存关系，需同时输出或全部不输出，不支持仅返回其中部分，输出条件：invRmsOptional!=nullptr && hMixOptional!=nullptr && hPreOptional!=nullptr。
 
 ## 调用示例
 

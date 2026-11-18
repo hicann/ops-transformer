@@ -123,7 +123,7 @@
     scatter_mode:"NHSD"
     ```
 
-- 上述场景根据构造的参数来区别，符合第一种入参构造走场景一，符合第二种构造走场景二，符合第三种构造走场景三，符合第四种构造走场景四，符合第五种构造走场景五，符合第六种构造走场景六。场景一、场景二、场景六没有compressLensOptional、seqLensOptional、compressSeqOffsetOptional这三个可选参数。场景四没有compressSeqOffsetOptional可选参数。
+- 上述场景根据构造的参数来区别，符合第一种入参构造走场景一，符合第二种构造走场景二，符合第三种构造走场景三，符合第四种构造走场景四，符合第五种构造走场景五，符合第六种构造走场景六，符合第七种构造走场景七。场景一、场景二、场景六没有compressLensOptional、seqLensOptional、compressSeqOffsetOptional这三个可选参数。场景四没有compressSeqOffsetOptional可选参数。
 
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：仅支持场景一、二、四、五、六、七。
@@ -283,7 +283,7 @@ aclnnStatus aclnnScatterPaKvCache(
       <td class="tg-0lax">scatterModeOptional（char*）</td>
       <td class="tg-0lax">输入</td>
       <td class="tg-0lax">表示更新的key和value的状态。</td>
-      <td class="tg-0lax">当传空指针或"None"时，表示更新的key和value是非压缩状态且连续。<br>当传"Alibi"时，表示更新key和value是基于Alibi结构的压缩状态。<br>当传"Rope"时，表示更新key和value是基于Rope结构的压缩状态。<br>当传"Omni"时，表示更新key和value是基于Omni结构的压缩状态。<br>当传"Nct"时，表示更新的key和value是非压缩状态但非连续。<br>当传"NHSD"时，表示keyCacheRef和valueCacheRef的格式为[num_blocks, num_head, block_size, head_size]。</td>
+      <td class="tg-0lax">当传空指针或"None"时，表示更新的key和value是非压缩状态且连续。<br>当传"Alibi"时，表示更新key和value是基于Alibi结构的压缩状态。<br>当传"RoPE"时，表示更新key和value是基于RoPE结构的压缩状态。<br>当传"Omni"时，表示更新key和value是基于Omni结构的压缩状态。<br>当传"Nct"时，表示更新的key和value是非压缩状态但非连续。<br>当传"NHSD"时，表示keyCacheRef和valueCacheRef的格式为[num_blocks, num_head, block_size, head_size]。</td>
       <td class="tg-0lax">-</td>
       <td class="tg-0lax">-</td>
       <td class="tg-0lax">-</td>
@@ -429,16 +429,16 @@ aclnnStatus aclnnScatterPaKvCache(
 
 - 确定性计算：
   - aclnnScatterPaKvCache默认确定性实现。
-- key、value、keyCacheRef、valueCacheRef的数据类型必须一致；
-- 当cacheModeOptional为“PA_NZ”时key、keyCacheRef和value、valueCacheRef的数据类型可以不一致；
-- slotMapping、compressLensOptional、compressSeqOffsetOptional、seqLensOptional的数据类型必须一致（对应场景一）；
-- slotMapping的取值范围[0,num_blocks*block_size-1]，且slotMapping内的元素值保证不重复，重复时不保证正确性；
-- 当key和value都是3维，则key和value的前两维shape必须相同；
-- 当key和value都是4维，则key和value的前三维shape必须相同，且keyCacheRef和valueCacheRef的第三维必须是1；
-- 当key和value是4维时，compressLensOptional、seqLensOptional为必选参数；当key和value是3维时，compressLensOptional、compressSeqOffsetOptional、seqLensOptional为可选参数；
-- 当key和value都是4维时，slotMapping是二维，且slotMapping的第一维值等于key的第一维为batch，slotMapping的第二维值等于key的第三维为num_head（对应场景三）；
-- 当key和value都是4维时，seqLensOptional是一维，seqLensOptional的shape[0]等于key的第一维为batch，每个元素表示对应batch的实际序列长度（对应场景三）；
-- 当key和value是3维且存在seqLensOptional时，seqLensOptional中所有值的和等于key的第一维为num_blocks（对应场景四、五）；
+- key、value、keyCacheRef、valueCacheRef的数据类型必须一致。
+- 当cacheModeOptional为“PA_NZ”时key、keyCacheRef和value、valueCacheRef的数据类型可以不一致。
+- slotMapping、compressLensOptional、compressSeqOffsetOptional、seqLensOptional的数据类型必须一致（对应场景一）。
+- slotMapping的取值范围[0,num_blocks*block_size-1]，且slotMapping内的元素值保证不重复，重复时不保证正确性。
+- 当key和value都是3维，则key和value的前两维shape必须相同。
+- 当key和value都是4维，则key和value的前三维shape必须相同，且keyCacheRef和valueCacheRef的第三维必须是1。
+- 当key和value是4维时，compressLensOptional、seqLensOptional为必选参数；当key和value是3维时，compressLensOptional、compressSeqOffsetOptional、seqLensOptional为可选参数。
+- 当key和value都是4维时，slotMapping是二维，且slotMapping的第一维值等于key的第一维为batch，slotMapping的第二维值等于key的第三维为num_head（对应场景三）。
+- 当key和value都是4维时，seqLensOptional是一维，seqLensOptional的shape[0]等于key的第一维为batch，每个元素表示对应batch的实际序列长度（对应场景三）。
+- 当key和value是3维且存在seqLensOptional时，seqLensOptional中所有值的和等于key的第一维为num_blocks（对应场景四、五）。
 - 压缩场景的缓存容量按模式分别计算，公式中的求和覆盖所有batch和head对应的元素；且每个写入区间需满足slotMapping >= 0、slotMapping + 写入长度 <= num_blocks * block_size：
   - 场景三、场景五（scatterModeOptional为"Rope"时）：每个batch/head的写入长度为seqLensOptional[i] - compressLensOptional[i] + 1（含1个均值token），元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i] + 1) <= num_blocks * block_size。
   - 场景四（scatterModeOptional为"Alibi"时）：每个batch/head的写入长度为compressLensOptional[i]，元素值必须满足公式：reduceSum(compressLensOptional[i]) <= num_blocks * block_size。
@@ -450,9 +450,9 @@ aclnnStatus aclnnScatterPaKvCache(
   - 场景四、五：<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>必须满足上述32字节对齐约束。
   <!-- end id12 -->
 - num_head必须小于4095（对应场景七）。
-- block_size *k_head_size和block_size* v_head_size必须小于UINT32_MAX（对应场景七）。
+- block_size \* k_head_size和block_size * v_head_size必须小于UINT32_MAX（对应场景七）。
 - 空Tensor支持说明：在所有必选参数指针均非空、executor创建成功的前提下，aclnnScatterPaKvCacheGetWorkspaceSize存在以下空输入提前成功返回分支，此时workspaceSize为0，不进入后续shape/dtype校验与算子计算，第二段接口同样返回成功且不更新缓存内容：key与keyCacheRef至少一个为空Tensor，且value为空Tensor（或valueCacheRef为空Tensor）。其余空Tensor组合不属于该成功分支，将被视为不支持空Tensor。
-- （num_head *k_head_size + num_head* v_head_size） * sizeof(dtype_key)必须小于196608（对应场景七）。
+- （num_head \* k_head_size + num_head \* v_head_size）* sizeof(dtypeKey)必须小于196608（对应场景七）。
 
 ## 调用示例
 
