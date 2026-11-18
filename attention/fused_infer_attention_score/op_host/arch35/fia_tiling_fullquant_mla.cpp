@@ -300,8 +300,8 @@ void FiaTilingFullQuantMlaArch35::CreateSplitInput(split_core_v2::BaseInfo& base
         }
     }
 
-    // MLA 全量化基本块: mBaseSize = sOuter * CV_RATIO = 64, s2BaseSize = 128
-    splitParam.mBaseSize = sOuterFactor_ * CV_RATIO;
+    // MLA 全量化基本块: mBaseSize = sOuter * cvRatio = 64(1:2) / 32(1:1), s2BaseSize = 128
+    splitParam.mBaseSize = sOuterFactor_ * platformInfo_.cvRatio;
     splitParam.s2BaseSize = sInnerFactor_;
     splitParam.gS1BaseSizeOfFd = 8;
     splitParam.streamK = true;
@@ -439,7 +439,7 @@ void FiaTilingFullQuantMlaArch35::GetSafeActToken(split_core_v2::SparseMode mode
     }
 }
 
-void FiaTilingFullQuantMlaArch35::UpdateTilingKeyConfig()
+__attribute__((noinline)) void FiaTilingFullQuantMlaArch35::UpdateTilingKeyConfig()
 {
     auto sOuter = sOuterFactor_ * platformInfo_.cvRatio;
     auto sInner = sInnerFactor_;
@@ -469,8 +469,12 @@ void FiaTilingFullQuantMlaArch35::UpdateTilingKeyConfig()
         dVsize = DSIZE_512;
     }
 
-    // MLA 全量化固定 config: S1Aligned64_S2Aligned128_DAligned576_DVAligned512
-    tilingKeyInfo_.config = Config_S1Aligned64_S2Aligned128_DAligned576_DVAligned512;
+    // MLA 全量化 config: CV 1:2(3510) → S1Aligned64；CV 1:1(920x) → S1Aligned32
+    if (platformInfo_.cvRatio == 1) {
+        tilingKeyInfo_.config = Config_S1Aligned32_S2Aligned128_DAligned576_DVAligned512;
+    } else {
+        tilingKeyInfo_.config = Config_S1Aligned64_S2Aligned128_DAligned576_DVAligned512;
+    }
 }
 
 void FiaTilingFullQuantMlaArch35::UpdateTilingKeyLayout()
@@ -754,5 +758,8 @@ void FiaTilingFullQuantMlaArch35::PrintAllTilingData()
 // 3. 个位代表特化模板到泛化模板的优先级排序
 // MLA 全量化: 2xx-全量化, x0x-mla, 优先级 200
 REGISTER_TILING_TEMPLATE_FIA(FusedInferAttentionScore, FiaTilingFullQuantMlaArch35,
-                             std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_3510)}), 200);
+                             std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_3510),
+                                                   static_cast<int32_t>(Ops::Base::DAV_9201),
+                                                   static_cast<int32_t>(Ops::Base::DAV_9202)}),
+                             200);
 } // namespace optiling

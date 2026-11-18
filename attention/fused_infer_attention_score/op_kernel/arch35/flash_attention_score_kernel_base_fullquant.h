@@ -175,7 +175,7 @@ __aicore__ inline void FlashAttentionScoreKernelBaseFullquant<ChildClass, CubeBl
         this->aicIdx = GetBlockIdx();
     } else {
         constInfo.aivIdx = GetBlockIdx();
-        this->aicIdx = constInfo.aivIdx >> 1;
+        this->aicIdx = constInfo.aivIdx / CV_RATIO;
         this->tilingData = tiling;
     }
     this->pipe = tPipe;
@@ -600,7 +600,7 @@ __aicore__ inline void FlashAttentionScoreKernelBaseFullquant<ChildClass, CubeBl
         runParam.s1RealSizeAlign32 = (runParam.s1RealSize + 31) >> 5 << 5;
         runParam.halfS1RealSize = runParam.s1RealSize <= 16 ? runParam.s1RealSize : (runParam.s1RealSizeAlign32 >> 1);
     } else {
-        runParam.halfS1RealSize = (runParam.s1RealSize + 1) >> 1;
+        runParam.halfS1RealSize = (runParam.s1RealSize + CV_RATIO - 1) / CV_RATIO;
     }
     runParam.firstHalfS1RealSize = runParam.halfS1RealSize;
     if (constInfo.subBlockIdx == 1) {

@@ -582,19 +582,8 @@ __aicore__ inline void CalcAIVMlaAttentionOutOffset(RunParamStr<isInfer>& runPar
                constInfo.transposeLayout == static_cast<uint32_t>(TransposeLayoutEnum::BSH_NBSD) ||
                constInfo.transposeLayout == static_cast<uint32_t>(TransposeLayoutEnum::TND_NTD)) {
         attentionOutSeqOffset = seqOffset * constInfo.dSizeV;
-        int64_t curGIdx = runParam.goIdx;
-        int64_t curS1Idx = runParam.cubeSOuterOffset / (uint32_t)s1TemplateType;
-        if (constInfo.gSize == 128) {
-            curGIdx = (curS1Idx % 2 == 0) ? curGIdx : (uint32_t)s1TemplateType;
-            curS1Idx /= 2;
-        } else {
-            // fix: 按 gSize 分解 gs 折叠轴(MLA decode 将 51 头折为 S1 轴长 51),
-            // 与写回端 MlaTransposeDataCopyOut(sOuterOffset %/ / gSize) 保持一致。
-            // 原仅特判 gSize==128 与 <=32, 漏 32<gSize<128(如 MLA 51/72)导致
-            // head>32 输出清零。此处统一 32<gSize<128 与 gSize<=32 均按 gSize 分解。
-            curGIdx = runParam.cubeSOuterOffset % constInfo.gSize;
-            curS1Idx = runParam.cubeSOuterOffset / constInfo.gSize;
-        }
+        int64_t curGIdx = runParam.goIdx + runParam.cubeSOuterOffset % constInfo.gSize;
+        int64_t curS1Idx = runParam.cubeSOuterOffset / (uint32_t)constInfo.gSize;
         if (constInfo.subBlockIdx == 1) {
             int64_t firstCurGIdx = curGIdx;
             curGIdx = (firstCurGIdx + runParam.firstHalfS1RealSize) % constInfo.gSize;

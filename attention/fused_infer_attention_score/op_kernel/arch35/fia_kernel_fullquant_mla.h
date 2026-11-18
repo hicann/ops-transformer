@@ -590,8 +590,13 @@ public:
         info.faTmpOutWsPos = constInfo.coreFirstTmpOutWsPos;
         info.isLastS2Loop = (s2Cur + 1 == curS2End);
 
-        info.actMSizeAlign = (info.actMSize + 31) >> 5 << 5;
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        info.actMSizeAlign = (info.actMSize + 15) >> 4 << 4; // CV 1:1 对齐16
+        info.actVecMSize = info.actMSize;                    // 1:1 不拆分,处理完整 M
+#else
+        info.actMSizeAlign = (info.actMSize + 31) >> 5 << 5; // CV 1:2 对齐32
         info.actVecMSize = (info.actMSize + 1) >> 1;
+#endif
         info.vecMbaseIdx = 0;
         if (constInfo.subBlockIdx == 1) {
             info.vecMbaseIdx = info.actVecMSize;

@@ -46,7 +46,7 @@ public:
     static constexpr uint32_t mBaseSize = (uint32_t)s1TemplateType;
     static constexpr uint32_t s2BaseSize = (uint32_t)s2TemplateType;
     static constexpr uint32_t vec1HalfS1BaseSize = mBaseSize >> 1;
-    static constexpr uint32_t vec1Srcstride = (mBaseSize >> 1) + 1;
+    static constexpr uint32_t vec1Srcstride = (mBaseSize / CV_RATIO) + 1;
     static constexpr uint32_t dTemplateAlign64 = Align64Func((uint16_t)dVTemplateType);
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
@@ -267,7 +267,8 @@ public:
             tSize = qActSeqLensParser.GetTSize();
         }
         int64_t totalOutputSize = tSize * constInfo.realN2Size * constInfo.realGSize * constInfo.dSizeV;
-        int64_t singleCoreSize = (totalOutputSize + (2 * constInfo.coreNum) - 1) / (2 * constInfo.coreNum);
+        int64_t singleCoreSize =
+            (totalOutputSize + (CV_RATIO * constInfo.coreNum) - 1) / (CV_RATIO * constInfo.coreNum);
         int64_t tailSize = totalOutputSize - constInfo.aivIdx * singleCoreSize;
         int64_t singleInitOutputSize = tailSize < singleCoreSize ? tailSize : singleCoreSize;
 
@@ -286,7 +287,8 @@ public:
             tSize = qActSeqLensParser.GetTSize();
         }
         int64_t totalOutputSize = tSize * constInfo.realN2Size * constInfo.realGSize;
-        int64_t singleCoreSize = (totalOutputSize + (2 * constInfo.coreNum) - 1) / (2 * constInfo.coreNum);
+        int64_t singleCoreSize =
+            (totalOutputSize + (CV_RATIO * constInfo.coreNum) - 1) / (CV_RATIO * constInfo.coreNum);
         int64_t tailSize = totalOutputSize - constInfo.aivIdx * singleCoreSize;
         int64_t singleInitOutputSize = tailSize < singleCoreSize ? tailSize : singleCoreSize;
 
@@ -344,7 +346,7 @@ public:
 
         if (constInfo.isSoftmaxLseEnable) {
             // 8: 适配TND，每行的结果存为8个重复lse元素（32B对齐）
-            this->tPipe->InitBuffer(softmaxLseQueue, 1, (mBaseSize >> 1U) * sizeof(float) * 8);
+            this->tPipe->InitBuffer(softmaxLseQueue, 1, (mBaseSize / CV_RATIO) * sizeof(float) * 8);
         }
         // ND
         tPipe->InitBuffer(vselrIndexesBuf[static_cast<int>(VselrIndexEnum::GT_64_AND_LTE_128_INDEX)],

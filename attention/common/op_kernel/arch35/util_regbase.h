@@ -51,6 +51,7 @@ enum class DTemplateType {
 
 enum class S1TemplateType {
     Aligned16 = 16,
+    Aligned32 = 32,
     Aligned64 = 64,
     Aligned128 = 128,
     Aligned256 = 256,

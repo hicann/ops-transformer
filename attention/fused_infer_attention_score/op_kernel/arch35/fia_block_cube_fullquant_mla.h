@@ -491,7 +491,11 @@ public:
         fixpipeParams.mSize = (runInfo.actMSize + 1) >> 1 << 1;
         fixpipeParams.srcStride = ((runInfo.actMSize + 15) / 16) * 16;
         fixpipeParams.dstStride = s2BaseSize;
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        fixpipeParams.dualDstCtl = 0; // CV 1:1：整块写入唯一 AIV
+#else
         fixpipeParams.dualDstCtl = 1;
+#endif
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -545,7 +549,11 @@ public:
         } else {
             fixpipeParams.dstStride = (uint32_t)constInfo.dSizeV;
         }
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        fixpipeParams.dualDstCtl = 0; // CV 1:1：整块写入唯一 AIV
+#else
         fixpipeParams.dualDstCtl = 1;
+#endif
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;

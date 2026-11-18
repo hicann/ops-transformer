@@ -364,7 +364,7 @@ __aicore__ inline void FABlockVecInferMlaFullquant<TEMPLATE_ARGS>::InitUniqueLoc
 {
     if (constInfo.isSoftmaxLseEnable) {
         // 8: 适配TND，每行的结果存为8个重复lse元素（32B对齐）
-        this->tPipe->InitBuffer(softmaxLseQueue, 1, (BaseClass::s1BaseSize >> 1U) * sizeof(float) * 8);
+        this->tPipe->InitBuffer(softmaxLseQueue, 1, (BaseClass::s1BaseSize / CV_RATIO) * sizeof(float) * 8);
     }
     if (constInfo.learnableSinkFlag) {
         this->tPipe->InitBuffer(sinkQue, 1, 256); // buffer size = 256 bytes
@@ -402,7 +402,7 @@ __aicore__ inline void FABlockVecInferMlaFullquant<TEMPLATE_ARGS>::InitFDBuffers
     }
     if (constInfo.isSoftmaxLseEnable) {
         // 8: 适配TND, 每行结果存为8个重复lse元素(32B对齐)
-        this->tPipe->InitBuffer(softmaxLseQueue, 1, (BaseClass::s1BaseSize >> 1U) * sizeof(float) * 8);
+        this->tPipe->InitBuffer(softmaxLseQueue, 1, (BaseClass::s1BaseSize / CV_RATIO) * sizeof(float) * 8);
     }
 }
 

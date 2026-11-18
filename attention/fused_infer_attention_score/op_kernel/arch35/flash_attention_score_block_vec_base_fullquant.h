@@ -40,14 +40,14 @@ public:
     static constexpr uint32_t s1BaseSize = (uint32_t)s1TemplateType;
     static constexpr uint32_t s2BaseSize = (uint32_t)s2TemplateType;
     static constexpr uint32_t vec1S2CopyLenDn = s2BaseSize >> 1;
-    static constexpr uint32_t vec1HalfS1BaseSize = s1BaseSize >> 1;
+    static constexpr uint32_t vec1HalfS1BaseSize = s1BaseSize / CV_RATIO;
     static constexpr uint32_t vec1S2CopyCountDn = s1BaseSize >> 5;
     static constexpr uint32_t vec1S2strideDn = s2BaseSize * 8;
     static constexpr uint32_t vec1ScmBlock = s1BaseSize * 8;
     static constexpr uint32_t vec1ScmBlockFp32 = s1BaseSize * 4;
     static constexpr uint32_t vec1ScmBlockFp8 = s1BaseSize * 16;
     static constexpr uint32_t vec1ResOffsetDn = s2BaseSize * 32 + 64;
-    static constexpr uint32_t vec1Srcstride = (s1BaseSize >> 1) + 1;
+    static constexpr uint32_t vec1Srcstride = (s1BaseSize / CV_RATIO) + 1;
     static constexpr uint32_t dTemplateAlign64 = Align64Func((uint16_t)dVTemplateType);
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
@@ -1607,12 +1607,10 @@ __aicore__ inline void FABlockVecBaseFullquant<TEMPLATE_BASE_ARGS>::MlaTranspose
     int64_t headUbOffset = 0, headGmOffset = 0;
     int64_t curGIdx = runInfo.goIdx, curS1Idx = runInfo.s1oIdx;
 
-    if (constInfo.gSize == 128) {                     // G为128时，基本块位于同一S1行
-        curGIdx = (curS1Idx % 2 == 0) ? curGIdx : 64; // 64 s1Base基本块
-        curS1Idx /= 2;
-    } else if (constInfo.gSize <= 32) {     // G<=32时，每64/G行为一个基本块
-        curS1Idx *= (64 / constInfo.gSize); // 64 s1Base基本块
-    }
+    // 合并轴R=t*G+n的反映射：每个s1oIdx对应s1BaseSize行(3510为64行，9201为32行)，不能按64行写死
+    int64_t mergeRowStart = curS1Idx * s1BaseSize;
+    curGIdx += mergeRowStart % constInfo.gSize;
+    curS1Idx = mergeRowStart / constInfo.gSize;
 
     if (constInfo.subBlockIdx == 1) {
         int64_t firstCurGIdx = curGIdx;
@@ -1902,7 +1900,7 @@ __aicore__ inline void FABlockVecBaseFullquant<TEMPLATE_BASE_ARGS>::InitLocalBuf
                 tPipe->InitBuffer(commonTBuf, 512); // 实际只需512Bytes
             }
             if constexpr (bmm2Write2Ub) {
-                tPipe->InitBuffer(stage2OutBuf, 64 / CV_RATIO * dTemplateAlign64 * sizeof(T)); // 64: s1RealSize
+                tPipe->InitBuffer(stage2OutBuf, s1BaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T));
             } else {
                 tPipe->InitBuffer(stage2OutBuf, 32768);
             }

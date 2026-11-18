@@ -342,7 +342,13 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitLocalBuffer()
         l0biasBufferManager.Init(tPipe, BT_PP_SIZE * KB_TO_BYTES);
         mmL0ABuffers.Init(l0aBufferManager, (MLA_L0A_SIZE / NUM_2) * KB_TO_BYTES);
         mmL0BBuffers.Init(l0bBufferManager, (MLA_L0B_SIZE / NUM_2) * KB_TO_BYTES);
-        mmL0CBuffers.Init(l0cBufferManager, (L0C_SIZE / NUM_2) * KB_TO_BYTES);
+        if constexpr (s1BaseSize * s2BaseSize * FLOAT_BYTES <= (L0C_SIZE * KB_TO_BYTES) / NUM_4 &&
+                      s1BaseSize * dVBaseSize * FLOAT_BYTES <= (L0C_SIZE * KB_TO_BYTES) / NUM_4) {
+            mmL0CBuffers.Init(l0cBufferManager, (L0C_SIZE / NUM_4) * KB_TO_BYTES);
+        } else {
+            mmL0CBuffers.Init(l0cBufferManager, (L0C_SIZE / NUM_2) * KB_TO_BYTES);
+        }
+
         if constexpr (isInt8 && isMlaFullQuant) {
             // 新增初始化bias的buffer
             biasBufL1.Init((*l1BufferManagerPtr), biasSize + avalSize + bvalSize);
@@ -651,7 +657,11 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm1MLAFul
                                   4 << 4; // 15, 4: L0C上matmul结果相邻连续数据片断间隔, 单位为16 *sizeof(T) ，对齐到16
     fixpipec310Params.dstStride = s2BaseSize; // mmResUb上两行之间的间隔，单位：element。 //
                                               // 128：根据比对dump文件得到，ND方案(S1 * S2)时脏数据用mask剔除
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    fixpipec310Params.dualDstCtl = 0; // CV 1:1：整块写入唯一 AIV
+#else
     fixpipec310Params.dualDstCtl = 1; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+#endif
     fixpipec310Params.params.ndNum = 1;
     fixpipec310Params.params.srcNdStride = 0;
     fixpipec310Params.params.dstNdStride = 0;
@@ -709,7 +719,11 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm2MLAFul
     } else {
         fixpipeParams.dstStride = (uint32_t)constInfo.dSizeV; // dstGm 两行之间的间隔
     }
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    fixpipeParams.dualDstCtl = 0; // CV 1:1：整块写入唯一 AIV
+#else
     fixpipeParams.dualDstCtl = 1;
+#endif
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
     fixpipeParams.params.dstNdStride = 0;
@@ -945,7 +959,11 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm1MLAFul
                     // *sizeof(T) ，对齐到16
         fixpipeParams.dstStride = s2BaseSize; // mmResUb上两行之间的间隔，单位：element。 //
                                               // 128：根据比对dump文件得到，ND方案(S1 * S2)时脏数据用mask剔除
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        fixpipeParams.dualDstCtl = 0; // CV 1:1：整块写入唯一 AIV
+#else
         fixpipeParams.dualDstCtl = 1; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+#endif
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
