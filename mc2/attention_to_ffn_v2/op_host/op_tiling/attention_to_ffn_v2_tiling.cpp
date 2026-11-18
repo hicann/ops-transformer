@@ -367,8 +367,8 @@ static void ExtendWorkspaceForRankTables(gert::TilingContext* context, Attention
     const size_t countRowStride = CeilAlignSize(rankCountRowBytes, WORKSPACE_ELEMENT_OFFSET);
     const size_t countMatrixBytes =
         CeilAlignSize(static_cast<size_t>(info.aivNum) * countRowStride, WORKSPACE_ELEMENT_OFFSET);
-    const size_t bucketTableBytes = CeilAlignSize(maxTotalSendNum * sizeof(int32_t), WORKSPACE_ELEMENT_OFFSET);
-    workSpaces[0] += regionsOffset + countMatrixBytes + bucketTableBytes;
+    const size_t tokenRankTableBytes = CeilAlignSize(maxTotalSendNum * sizeof(int32_t), WORKSPACE_ELEMENT_OFFSET);
+    workSpaces[0] += regionsOffset + countMatrixBytes + tokenRankTableBytes;
 }
 
 ge::graphStatus TilingNewQuantMode(gert::TilingContext* context, uint32_t quantMode)

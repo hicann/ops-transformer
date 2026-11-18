@@ -200,7 +200,7 @@ def _validate_buffer_types(
 
 
 _PAYLOAD_ALIGN = 512  # payload slot stride alignment (matches kernel WIN_ALIGN)
-_STAGING_ENTRY_ALIGN = 32  # staging/flag entry alignment (matches kernel UB_ALIGN)
+_ENTRY_ALIGN = 32  # packed-row/flag entry alignment (matches kernel UB_ALIGN)
 _LAYER_FLAG_BYTES = (
     8  # layer flag block (kernel TOKEN_INFO_TABLE_COPY_BLOCK_CNT * int32)
 )
@@ -218,13 +218,19 @@ def _align_up(value: int, align: int) -> int:
     return (value + align - 1) // align * align
 
 
-def _calc_payload_slot_stride(ffn_token_data_shape: List[int], quant_mode: int) -> int:
-    """Per-slot bytes of the persistent payload region: [staging region | local flags | layer flag].
+def _calc_payload_slot_stride(
+    ffn_token_data_shape: List[int], quant_mode: int, world_size: int
+) -> int:
+    """Per-slot bytes of the persistent payload region: [packed rows | per-rank flag spans | layer flag].
 
-    Mirrors the kernel's slot layout in op_kernel/attention_to_ffn_urma.h but bounds the
-    per-token payload by HS * bytesPerElem (tiling enforces HS * elemSize >= the kernel's
-    commuBytes) and the send-pair count by BS * (K + shared); the kernel asserts the context
-    payloadSlotStride covers its needs and fails loudly otherwise.
+    Mirrors the kernel's slot layout in op_kernel/attention_to_ffn_urma.h (run-coalesced relay):
+    token rows are packed in tokenOffset order at exactly one remote-slot stride each (HS *
+    bytesPerElem; tiling enforces HS * elemSize >= the kernel's commuBytes and the slot stride
+    must stay 32B aligned for the packed MTE3 writes), the send-pair count is bounded by
+    BS * (K + shared), and the flag area holds ONE full-span copy PER DESTINATION RANK (each
+    span carries localExpId at its own tokenOffsets and a sentinel elsewhere, mirrored remotely
+    by a single contiguous WQE). The kernel asserts the context payloadSlotStride covers its
+    needs and fails loudly otherwise.
     """
     micro_batch_num, bs, k_plus_shared, hs = ffn_token_data_shape[1:]
     torch._check(
@@ -237,11 +243,20 @@ def _calc_payload_slot_stride(ffn_token_data_shape: List[int], quant_mode: int) 
     bytes_per_elem = (
         _BYTES_PER_FP16 if quant_mode == _NO_QUANT_MODE else _BYTES_PER_QUANT_ELEM
     )
-    staging_stride = _align_up(hs * bytes_per_elem, _STAGING_ENTRY_ALIGN)
+    slot_bytes = hs * bytes_per_elem
+    torch._check(
+        slot_bytes % _ENTRY_ALIGN == 0,
+        lambda: (
+            f"ffn_token_data_shape HS * bytesPerElem = {slot_bytes} must be 32-byte aligned for the packed "
+            f"single-source relay, but got hs={hs}, bytes_per_elem={bytes_per_elem}, {ops_error(ErrCode.VALUE)}."
+        ),
+    )
     max_send_pairs = bs * k_plus_shared
-    staging_region = _align_up(max_send_pairs * staging_stride, _PAYLOAD_ALIGN)
-    flag_region = _align_up(max_send_pairs * _BYTES_PER_INT32, _STAGING_ENTRY_ALIGN)
-    return _align_up(staging_region + flag_region + _LAYER_FLAG_BYTES, _PAYLOAD_ALIGN)
+    packed_region = _align_up(max_send_pairs * slot_bytes, _PAYLOAD_ALIGN)
+    flag_region = world_size * _align_up(
+        max_send_pairs * _BYTES_PER_INT32, _ENTRY_ALIGN
+    )
+    return _align_up(packed_region + flag_region + _LAYER_FLAG_BYTES, _PAYLOAD_ALIGN)
 
 
 class AttentionToFfnBuffer:
@@ -262,9 +277,10 @@ class AttentionToFfnBuffer:
 
     The buffer also owns a persistent payload region (``payload_slot_stride`` bytes per
     slot, ``payload_slot_num`` slots, manager-allocated and slotted by microBatchId): the
-    kernel's relay WQEs read the staged token rows and flags asynchronously after the
-    kernel returns, so these regions must live in buffer-owned memory instead of the
-    per-call workspace. Different microbatches use different slots, so consecutive
+    kernel packs the token rows in tokenOffset order into this region and the relay WQEs read
+    the packed rows and flags asynchronously after the kernel returns, so these regions must
+    live in buffer-owned memory instead of the per-call workspace. Different microbatches use
+    different slots, so consecutive
     launches overlap without any drain; a slot is reused only a full pipeline round
     later, after the remote side consumed the old round. Call ``destroy()`` (or drop the
     last reference) to synchronize the device and release everything.
@@ -346,7 +362,7 @@ class AttentionToFfnBuffer:
         # only a full pipeline round later, after the remote side consumed the old round.
         self.payload_slot_num = ffn_token_data_shape[1]
         self.payload_slot_stride = _calc_payload_slot_stride(
-            ffn_token_data_shape, quant_mode
+            ffn_token_data_shape, quant_mode, self.ep_world_size
         )
         torch._check(
             self.payload_slot_stride <= _INT64_MAX // self.payload_slot_num,
@@ -516,9 +532,10 @@ def attention_to_ffn(
 
     Note:
         The send is asynchronous: the kernel may return while the communication engine is
-        still reading ``x`` (non-quant direct send reads the x GM rows through the relay
-        WQEs). The caller is responsible for keeping the input tensors alive until the
-        sends complete, e.g. by holding the references or synchronizing the device.
+        still reading the buffer's persistent payload region (the packed token rows and
+        flags). The input ``x`` itself is fully consumed by the in-kernel pack pass, so the
+        usual stream-ordering rules apply: keep the input tensors alive until the kernel
+        completes, and keep the buffer alive (see ``destroy()``) until the sends complete.
     """
     torch._check(
         buffer.context is not None,
