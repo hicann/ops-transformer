@@ -21,6 +21,7 @@ namespace GmmConstants = optiling::GMMWeightQuantConstants;
 using GmmTilingTool::AntiQuantMode;
 using GmmTilingTool::GetShapeWithDataType;
 using GmmTilingTool::IsA16MxFp4;
+using GmmTilingTool::IsA16W8;
 using GmmTilingTool::IsA16MxHiF4;
 using GmmTilingTool::IsMxA8HiF4;
 using GmmTilingTool::IsMxA8W4;
@@ -136,6 +137,19 @@ void GroupedWeightQuantMatmulAswTiling::DoLibApiTiling()
 
 void GroupedWeightQuantMatmulAswTiling::CalBasicBlock()
 {
+    // K_L0=64 keeps two 32 KiB slots in each L0A/L0B at M=N=256.
+    // K_L1=64*4 fills 512 KiB L1; M=240 reserves space for both bias slots.
+    if (IsA16W8(inputParams_)) {
+        basicTiling_.baseM =
+            inputParams_.hasBias ? GmmConstants::BASIC_BLOCK_SIZE_240 : GmmConstants::BASIC_BLOCK_SIZE_256;
+        basicTiling_.baseN =
+            CeilAlign(std::max(uint64_t{1}, std::min(inputParams_.nSize, GmmConstants::BASIC_BLOCK_SIZE_256)),
+                      GmmConstants::CUBE_BLOCK);
+        basicTiling_.baseK =
+            CeilAlign(std::max(uint64_t{1}, std::min(inputParams_.kSize, GmmConstants::BASIC_BLOCK_SIZE_64)),
+                      GmmConstants::CUBE_BLOCK);
+        return;
+    }
     basicTiling_.baseM = GmmConstants::BASIC_BLOCK_SIZE_256;
     if (IsMxA8W4(inputParams_) && inputParams_.hasBias) {
         basicTiling_.baseM = GmmConstants::BASIC_BLOCK_SIZE_240;
@@ -186,7 +200,7 @@ bool GroupedWeightQuantMatmulAswTiling::PostTiling()
 
 bool GroupedWeightQuantMatmulAswTiling::SetTilingKey()
 {
-    tilingKeyConfig_.algorithmCategory = 1;
+    tilingKeyConfig_.algorithmCategory = IsA16W8(inputParams_) ? WQGMM_VECTOR_ANTIQUANT : WQGMM_CUBE_ANTIQUANT;
     tilingKeyConfig_.algorithmSubCategory = 1;
     tilingKeyConfig_.templateCustom = 0;
     tilingKeyConfig_.transA = static_cast<uint8_t>(inputParams_.transX);

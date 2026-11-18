@@ -19,6 +19,7 @@
 namespace GmmConstants = optiling::GMMWeightQuantConstants;
 namespace GmmTilingTool = optiling::GMMWeightQuantTilingTool;
 using GmmTilingTool::IsA16MxFp4;
+using GmmTilingTool::IsA16W8;
 using GmmTilingTool::IsA16MxHiF4;
 using GmmTilingTool::IsMxA8HiF4;
 using GmmTilingTool::IsMxA8W4;
@@ -47,6 +48,35 @@ bool GMMWeightQuantTilingChecker::CheckGroupedMatmulWeightQuant()
 
 bool GMMWeightQuantTilingChecker::CheckUnsupportedDataFlow() const
 {
+    if (IsA16W8(inputParams_)) {
+        OP_CHECK_IF(inputParams_.weightFormat != ge::FORMAT_ND && inputParams_.weightFormat != ge::FORMAT_NCL,
+                    OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                        inputParams_.opName, "weight", ge::TypeUtils::FormatToSerialString(inputParams_.weightFormat),
+                        "weight must use ND or NCL storage for A16W8"),
+                    return false);
+        OP_CHECK_IF(inputParams_.hasAntiquantOffset && inputParams_.weightDtype != ge::DT_INT8,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        inputParams_.opName, "weight", ge::TypeUtils::DataTypeToSerialString(inputParams_.weightDtype),
+                        "weight must be INT8 when antiquant_offset is present"),
+                    return false);
+        for (const size_t index : {GmmConstants::SCALE_INDEX, GmmConstants::OFFSET_INDEX}) {
+            const auto* shape = context_->GetDynamicInputShape(index, 0);
+            OP_CHECK_IF(shape != nullptr && shape->GetStorageShape().GetShapeSize() != 0,
+                        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                            inputParams_.opName, index == GmmConstants::SCALE_INDEX ? "scale" : "offset",
+                            std::to_string(shape->GetStorageShape().GetShapeSize()),
+                            "quant scale and offset must be absent or empty for A16W8"),
+                        return false);
+        }
+        const auto* perToken = context_->GetOptionalInputShape(GmmConstants::PER_TOKEN_SCALE_INDEX);
+        OP_CHECK_IF(
+            perToken != nullptr && perToken->GetStorageShape().GetShapeSize() != 0,
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(inputParams_.opName, "per_token_scale",
+                                                      std::to_string(perToken->GetStorageShape().GetShapeSize()),
+                                                      "per_token_scale must be absent or empty for A16W8"),
+            return false);
+        return true;
+    }
     if (IsMxA8W4(inputParams_) || IsMxA8HiF4(inputParams_) || IsA16MxFp4(inputParams_) || IsA16MxHiF4(inputParams_)) {
         OP_CHECK_IF(!(inputParams_.isWeightNz && inputParams_.transWeight),
                     OP_LOGE(inputParams_.opName, "%s, only transposed weight with NZ format is supported.",
@@ -68,6 +98,27 @@ bool GMMWeightQuantTilingChecker::CheckUnsupportedDataFlow() const
 
 bool GMMWeightQuantTilingChecker::CheckGroupScenario() const
 {
+    if (IsA16W8(inputParams_)) {
+        OP_CHECK_IF(inputParams_.groupType != GmmConstants::SPLIT_M || !inputParams_.isSingleX ||
+                        !inputParams_.isSingleW || !inputParams_.isSingleY,
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        inputParams_.opName, "group_type, single_x, single_weight, single_y",
+                        std::to_string(inputParams_.groupType) + ", " + std::to_string(inputParams_.isSingleX) + ", " +
+                            std::to_string(inputParams_.isSingleW) + ", " + std::to_string(inputParams_.isSingleY),
+                        "A16W8 must use group_type 0 and a single x, weight and y tensor"),
+                    return false);
+        const auto* groupDesc = context_->GetOptionalInputDesc(GmmConstants::GROUPLIST_INDEX);
+        OP_CHECK_IF(groupDesc == nullptr || groupDesc->GetDataType() != ge::DT_INT64 || inputParams_.groupNum == 0,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(inputParams_.opName, "group_list",
+                                                             "group_list must be a nonempty INT64 tensor for A16W8"),
+                    return false);
+        const auto* attrs = context_->GetAttrs();
+        const auto* act = attrs->GetAttrPointer<int64_t>(GmmConstants::ATTR_INDEX_ACT_TYPE);
+        OP_CHECK_IF(act != nullptr && *act != 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "act_type", std::to_string(*act),
+                                                          "act_type must be 0 for A16W8"),
+                    return false);
+    }
     if (IsMxA8W4(inputParams_) || IsMxA8HiF4(inputParams_) || IsA16MxFp4(inputParams_) || IsA16MxHiF4(inputParams_)) {
         OP_CHECK_IF(inputParams_.groupType != GmmConstants::SPLIT_M,
                     OP_LOGE(inputParams_.opName, "%s, groupType only supports 0, but the actual value is [%ld].",
@@ -178,6 +229,10 @@ bool GMMWeightQuantTilingChecker::CheckEmptyTensor() const
                     return false);
         int64_t n = inputParams_.transWeight ? wShape.GetDim(wDimNum - GmmConstants::LAST_SECOND_DIM_INDEX) :
                                                wShape.GetDim(wDimNum - GmmConstants::LAST_FIRST_DIM_INDEX);
+        OP_CHECK_IF(IsA16W8(inputParams_) && n <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "weight N", std::to_string(n),
+                                                          "N must be greater than 0 for A16W8"),
+                    return false);
         zeroN = zeroN && (n == 0);
     }
 
@@ -189,6 +244,30 @@ bool GMMWeightQuantTilingChecker::CheckEmptyTensor() const
 
 bool GMMWeightQuantTilingChecker::CheckInputDtype() const
 {
+    if (IsA16W8(inputParams_)) {
+        OP_CHECK_IF(inputParams_.yDtype != inputParams_.xDtype ||
+                        inputParams_.antiquantScaleDtype != inputParams_.xDtype ||
+                        (inputParams_.hasAntiquantOffset && inputParams_.antiquantOffsetDtype != inputParams_.xDtype),
+                    OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                        inputParams_.opName, "x, y, antiquant_scale, antiquant_offset",
+                        ge::TypeUtils::DataTypeToSerialString(inputParams_.xDtype) + ", " +
+                            ge::TypeUtils::DataTypeToSerialString(inputParams_.yDtype) + ", " +
+                            ge::TypeUtils::DataTypeToSerialString(inputParams_.antiquantScaleDtype) + ", " +
+                            (inputParams_.hasAntiquantOffset ?
+                                 ge::TypeUtils::DataTypeToSerialString(inputParams_.antiquantOffsetDtype) :
+                                 "absent"),
+                        "y, antiquant_scale and present antiquant_offset must have the same dtype as x"),
+                    return false);
+        const bool validBias = inputParams_.biasDtype == inputParams_.xDtype ||
+                               (inputParams_.xDtype == ge::DT_BF16 && inputParams_.biasDtype == ge::DT_FLOAT);
+        OP_CHECK_IF(
+            inputParams_.hasBias && !validBias,
+            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(inputParams_.opName, "x, bias",
+                                                   ge::TypeUtils::DataTypeToSerialString(inputParams_.xDtype) + ", " +
+                                                       ge::TypeUtils::DataTypeToSerialString(inputParams_.biasDtype),
+                                                   "bias must have the same dtype as x, or be FLOAT when x is BF16"),
+            return false);
+    }
     if (IsMxA8W4(inputParams_) || IsMxA8HiF4(inputParams_)) {
         OP_CHECK_IF(inputParams_.perTokenScaleDtype != ge::DT_FLOAT8_E8M0,
                     OP_LOGE(inputParams_.opName, "perTokenScale dtype [%s] does not match expected dtype [%s].",
@@ -280,6 +359,13 @@ bool GMMWeightQuantTilingChecker::CheckTensorDtype(size_t inputIdx, size_t tenso
 {
     auto tmpDesc = context_->GetDynamicInputDesc(inputIdx, tensorIdx);
     auto tmpDtype = tmpDesc->GetDataType();
+    const auto format = tmpDesc->GetStorageFormat();
+    const bool isWeight = inputIdx == GmmConstants::WEIGHT_INDEX;
+    OP_CHECK_IF(IsA16W8(inputParams_) && format != ge::FORMAT_ND && !(isWeight && format == ge::FORMAT_NCL),
+                OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                    inputParams_.opName, tensorType, ge::TypeUtils::FormatToSerialString(format),
+                    isWeight ? "weight must use ND or NCL storage for A16W8" : "tensor must use ND storage for A16W8"),
+                return false);
     OP_CHECK_IF(tmpDtype != expectedDtype,
                 OP_LOGE(inputParams_.opName,
                         "The dtype of each tensor in %s tensor list must be consistent.%s[%zu]'s dtype [%s]"
@@ -300,6 +386,32 @@ bool GMMWeightQuantTilingChecker::CheckEveryTensorShape(size_t tensorIdx)
 
     OP_CHECK_IF(!CheckXAndWeightShape(tensorIdx), OP_LOGE(inputParams_.opName, "CheckXAndWeightShape failed."),
                 return false);
+
+    if (IsA16W8(inputParams_)) {
+        const auto* yDesc = context_->GetOutputDesc(GmmConstants::Y_INDEX);
+        const auto* yShape = context_->GetOutputShape(GmmConstants::Y_INDEX);
+        OP_CHECK_IF(yDesc->GetStorageFormat() != ge::FORMAT_ND,
+                    OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                        inputParams_.opName, "y", ge::TypeUtils::FormatToSerialString(yDesc->GetStorageFormat()),
+                        "y must use ND storage for A16W8"),
+                    return false);
+        OP_CHECK_IF(yShape == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(inputParams_.opName, "y", "y shape can not be null"),
+                    return false);
+        OP_CHECK_IF(yShape->GetStorageShape().GetDimNum() != GmmConstants::DIM_NUM_2,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        inputParams_.opName, "y", std::to_string(yShape->GetStorageShape().GetDimNum()) + "D",
+                        "y must be two-dimensional for A16W8"),
+                    return false);
+        OP_CHECK_IF(yShape->GetStorageShape().GetDim(0) != dimInfo_.mDim ||
+                        yShape->GetStorageShape().GetDim(1) != dimInfo_.nDim,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        inputParams_.opName, "y",
+                        "[" + std::to_string(yShape->GetStorageShape().GetDim(0)) + "," +
+                            std::to_string(yShape->GetStorageShape().GetDim(1)) + "]",
+                        "y shape must be [M,N], where M is the x row count and N is the weight output channel count"),
+                    return false);
+    }
 
     OP_CHECK_IF(!CheckTensorShape(GmmConstants::ANTIQUANT_SCALE_INDEX, tensorIdx, GmmConstants::ANTIQUANT_SCALE),
                 OP_LOGE(inputParams_.opName, "Check antiquantScale tensor shape failed."), return false);
@@ -337,6 +449,19 @@ bool GMMWeightQuantTilingChecker::CheckTensorDimSingleXSingleWeightSingleY(size_
     OP_CHECK_IF(!CheckTensorDim(GmmConstants::WEIGHT_INDEX, tensorIdx, targetWeightDim, GmmConstants::WEIGHT),
                 OP_LOGE(inputParams_.opName, "Invalid weight dimension."), return false);
 
+    if (IsA16W8(inputParams_)) {
+        OP_CHECK_IF(!CheckTensorDim(GmmConstants::ANTIQUANT_SCALE_INDEX, tensorIdx, GmmConstants::DIM_NUM_2,
+                                    GmmConstants::ANTIQUANT_SCALE),
+                    OP_LOGE(inputParams_.opName, "A16W8 scale must have shape [E,N]."), return false);
+        OP_CHECK_IF(
+            inputParams_.hasAntiquantOffset && !CheckTensorDim(GmmConstants::ANTIQUANT_OFFSET_INDEX, tensorIdx,
+                                                               GmmConstants::DIM_NUM_2, GmmConstants::ANTIQUANT_OFFSET),
+            OP_LOGE(inputParams_.opName, "A16W8 offset must have shape [E,N]."), return false);
+        OP_CHECK_IF(inputParams_.hasBias && !CheckTensorDim(GmmConstants::BIAS_INDEX, tensorIdx,
+                                                            GmmConstants::DIM_NUM_2, GmmConstants::BIAS),
+                    OP_LOGE(inputParams_.opName, "A16W8 bias must have shape [E,N]."), return false);
+        return true;
+    }
     size_t targetAntiquantParamsDim = GmmConstants::DIM_NUM_4;
     if (IsA16MxFp4(inputParams_) || IsA16MxHiF4(inputParams_)) {
         targetAntiquantParamsDim = GmmConstants::DIM_NUM_3;
@@ -435,7 +560,7 @@ bool GMMWeightQuantTilingChecker::CheckXAndWeightShape(size_t tensorIdx) const
                         Ops::Transformer::Gmm::FormatString("%ld, %ld", dimInfo_.weightKDim, dimInfo_.nDim),
                         "the value of K must be even, and N can not be 1 when K is 2 for 960DT MxA8W4 WeightNZ"),
                     return false);
-    } else {
+    } else if (!IsA16W8(inputParams_)) {
         OP_CHECK_IF(
             dimInfo_.nDim % GmmConstants::N_K_ALIGN_VALUE_4BIT != 0 ||
                 dimInfo_.weightKDim % GmmConstants::N_K_ALIGN_VALUE_4BIT != 0,

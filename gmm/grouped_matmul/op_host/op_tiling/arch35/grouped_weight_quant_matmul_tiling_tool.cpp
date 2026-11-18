@@ -45,8 +45,17 @@ bool AnalyzeInputs(const gert::TilingContext* context, GMMWeightQuantInputInfo& 
     OP_CHECK_IF(!AnalyzeQuantInputParams(context, inputParams),
                 OP_LOGE(inputParams.opName, "Failed to AnalyzeQuantInputParams."), return false);
 
+    inputParams.weightQuantMode = AntiQuantMode::DEFAULT;
     if (IsMxA8W4(inputParams) || IsMxA8HiF4(inputParams) || IsA16MxFp4(inputParams) || IsA16MxHiF4(inputParams)) {
         inputParams.weightQuantMode = AntiQuantMode::MX_PERGROUP_MODE;
+    } else if (inputNum.numWeight == 1 && inputNum.numAntiquantScale == 1) {
+        const auto* scaleShape = context->GetDynamicInputShape(GmmConstants::ANTIQUANT_SCALE_INDEX, 0);
+        const auto* weightShape = context->GetDynamicInputShape(GmmConstants::WEIGHT_INDEX, 0);
+        if (scaleShape != nullptr && weightShape != nullptr &&
+            IsPerChannelAntiquantScale(scaleShape->GetStorageShape(), weightShape->GetOriginShape(),
+                                       inputParams.groupNum, inputParams.transWeight)) {
+            inputParams.weightQuantMode = AntiQuantMode::PERCHANNEL_MODE;
+        }
     }
     return true;
 }
@@ -194,6 +203,13 @@ bool IsMxA8HiF4(const GMMWeightQuantInputInfo& inputParams)
 {
     return inputParams.xDtype == ge::DT_FLOAT8_E4M3FN && inputParams.weightDtype == Ops::Transformer::DT_HIFLOAT4 &&
            inputParams.antiquantScaleDtype == Ops::Transformer::DT_HIFLOAT4_SCALE;
+}
+
+bool IsA16W8(const GMMWeightQuantInputInfo& inputParams)
+{
+    return (inputParams.xDtype == ge::DT_FLOAT16 || inputParams.xDtype == ge::DT_BF16) &&
+           (inputParams.weightDtype == ge::DT_INT8 || inputParams.weightDtype == ge::DT_FLOAT8_E4M3FN ||
+            inputParams.weightDtype == ge::DT_FLOAT8_E5M2 || inputParams.weightDtype == ge::DT_HIFLOAT8);
 }
 
 bool IsA16MxFp4(const GMMWeightQuantInputInfo& inputParams)

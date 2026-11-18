@@ -59,6 +59,7 @@ using GMMS8S4BasicApiTilingData = GroupedMatmulTilingData::GMMS8S4BasicApiTiling
 #elif defined(V9201_GMM_ANTI_QUANT_CUBE)
 #include "arch35/weight_quant_asw/weight_quant_grouped_matmul_asw_cube.h"
 #include "arch35/weight_quant_asw/weight_quant_asw_tiling_key.h"
+#include "arch35/weight_quant_asw/grouped_matmul_weight_antiquant_tensor_api.h"
 #elif defined(V310_GMM_ANTI_QUANT)
 #include "arch35/weight_quant_basic_block/basic_block_config.h"
 #include "arch35/weight_quant_basic_block/grouped_matmul_weight_quant_basic_controller.h"
@@ -502,11 +503,33 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
 #endif
 #elif defined(V9201_GMM_ANTI_QUANT_CUBE)
     REGISTER_TILING_DEFAULT(GMMWeightQuantAswTilingData);
-    if constexpr (W_TYPE == WQGMM_FRACTAL_NZ && OFFSET_OR_BIAS_EXIT == WQGMM_ANTIQUANT_OFFSET_NOT_EXIST &&
-                  C_QUANT_TYPE == WQGMM_NONE && W_QUANT_TYPE == WQGMM_MX && WQ_B_TRANS == WQGMM_TRANS &&
-                  WQ_A_TRANS == WQGMM_NO_TRANS && TEMPLATE_CUSTOM_SC == WQGMM_NONE &&
-                  ALGORITHM_SUB_CATEGORY == WQGMM_ASW && ALGORITHM_CATEGORY == WQGMM_CUBE_ANTIQUANT) {
-        INVOKE_GMM_WEIGHT_QUANT_MXA8W4_ASW_OP_IMPL(WeightQuantASWMxKernel, CubeFormat::NZ, false, true);
+    if constexpr (W_TYPE == WQGMM_ND && W_QUANT_TYPE == WQGMM_PER_CHANNEL && C_QUANT_TYPE == WQGMM_NONE &&
+                  WQ_A_TRANS == WQGMM_NO_TRANS && !IS_SINGLE_MULTI_SINGLE && TEMPLATE_CUSTOM_SC == WQGMM_NONE &&
+                  ALGORITHM_SUB_CATEGORY == WQGMM_ASW && ALGORITHM_CATEGORY == WQGMM_VECTOR_ANTIQUANT) {
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+        // Dtype guards keep the existing MX-only generated translation units independent.
+        if constexpr ((AscendC::IsSameType<DTYPE_X, half>::value || AscendC::IsSameType<DTYPE_X, bfloat16_t>::value) &&
+                      (AscendC::IsSameType<DTYPE_WEIGHT, int8_t>::value ||
+                       AscendC::IsSameType<DTYPE_WEIGHT, float8_e4m3_t>::value ||
+                       AscendC::IsSameType<DTYPE_WEIGHT, float8_e5m2_t>::value ||
+                       AscendC::IsSameType<DTYPE_WEIGHT, hifloat8_t>::value) &&
+                      (OFFSET_OR_BIAS_EXIT == WQGMM_ANTIQUANT_OFFSET_NOT_EXIST ||
+                       AscendC::IsSameType<DTYPE_WEIGHT, int8_t>::value)) {
+            GROUPED_MATMUL::GroupedMatmulWeightAntiquantTensorApi<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS,
+                                                                  WQ_B_TRANS == WQGMM_TRANS,
+                                                                  OFFSET_OR_BIAS_EXIT == WQGMM_ANTIQUANT_OFFSET_EXIST>(
+                x, weight, bias, antiquantScale, antiquantOffset, groupList, y, tiling);
+        }
+    } else if constexpr (W_TYPE == WQGMM_FRACTAL_NZ && OFFSET_OR_BIAS_EXIT == WQGMM_ANTIQUANT_OFFSET_NOT_EXIST &&
+                         C_QUANT_TYPE == WQGMM_NONE && W_QUANT_TYPE == WQGMM_MX && WQ_B_TRANS == WQGMM_TRANS &&
+                         WQ_A_TRANS == WQGMM_NO_TRANS && TEMPLATE_CUSTOM_SC == WQGMM_NONE &&
+                         ALGORITHM_SUB_CATEGORY == WQGMM_ASW && ALGORITHM_CATEGORY == WQGMM_CUBE_ANTIQUANT) {
+        if constexpr (WeightQuantTools::IsMxA8W4<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE>() ||
+                      WeightQuantTools::IsMxA8HiF4<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE>() ||
+                      WeightQuantTools::IsA16MxFp4<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE>() ||
+                      WeightQuantTools::IsA16MxHiF4<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE>()) {
+            INVOKE_GMM_WEIGHT_QUANT_MXA8W4_ASW_OP_IMPL(WeightQuantASWMxKernel, CubeFormat::NZ, false, true);
+        }
     }
 #elif defined(V310_GMM_ANTI_QUANT)
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);

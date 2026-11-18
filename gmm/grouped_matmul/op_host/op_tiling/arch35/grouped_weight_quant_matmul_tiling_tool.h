@@ -52,6 +52,7 @@ constexpr int64_t SPLIT_M = 0L;
 constexpr uint64_t BASIC_BLOCK_SIZE_256 = 256UL;
 constexpr uint64_t BASIC_BLOCK_SIZE_240 = 240UL;
 constexpr uint64_t BASIC_BLOCK_SIZE_128 = 128UL;
+constexpr uint64_t BASIC_BLOCK_SIZE_64 = 64UL;
 constexpr uint64_t BASIC_BLOCK_SIZE_112 = 112UL;
 constexpr uint64_t STEP_K_4 = 4UL;
 
@@ -165,8 +166,25 @@ bool AnalyzeInputParams(const gert::TilingContext* context, GMMWeightQuantInputI
 bool AnalyzeGroupList(const gert::TilingContext* context, GMMWeightQuantInputInfo& inputParams);
 bool AnalyzeQuantInputParams(const gert::TilingContext* context, GMMWeightQuantInputInfo& inputParams);
 
+inline bool IsPerChannelAntiquantScale(const gert::Shape& scaleShape, const gert::Shape& weightShape, uint64_t groupNum,
+                                       bool transWeight)
+{
+    namespace GmmConstants = GMMWeightQuantConstants;
+    if (scaleShape.GetDimNum() != GmmConstants::DIM_NUM_2 || weightShape.GetDimNum() != GmmConstants::DIM_NUM_3 ||
+        groupNum == 0) {
+        return false;
+    }
+    const size_t nIndex = weightShape.GetDimNum() -
+                          (transWeight ? GmmConstants::LAST_SECOND_DIM_INDEX : GmmConstants::LAST_FIRST_DIM_INDEX);
+    return scaleShape.GetDim(0) == static_cast<int64_t>(groupNum) &&
+           weightShape.GetDim(0) == static_cast<int64_t>(groupNum) && weightShape.GetDim(nIndex) > 0 &&
+           scaleShape.GetDim(1) == weightShape.GetDim(nIndex);
+}
+
 bool IsMxA8W4(const GMMWeightQuantInputInfo& inputParams);
 bool IsMxA8HiF4(const GMMWeightQuantInputInfo& inputParams);
+bool IsA16W8(const GMMWeightQuantInputInfo& inputParams);
+
 bool IsA16MxFp4(const GMMWeightQuantInputInfo& inputParams);
 bool IsA16MxHiF4(const GMMWeightQuantInputInfo& inputParams);
 
