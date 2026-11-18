@@ -126,5 +126,21 @@ TEST(QuantFlashAttnArch35VTailTiling, VtailTripletEnabledAndDisabledSerializeTai
         EXPECT_EQ(empty.tailMaxBlockNum, 0U);
     }
 }
+
+TEST(QuantFlashAttnArch35VTailTiling, NonNdVTailFormatIsRejected)
+{
+    Arch35VTailCase params(false);
+    params.inputs[15].format_ = ge::FORMAT_FRACTAL_NZ;
+    ::TilingInfo result;
+    EXPECT_FALSE(ExecuteTiling(params.Context(), result));
+}
+
+TEST(QuantFlashAttnArch35VTailTiling, NonNdSequsedVTailFormatIsRejected)
+{
+    Arch35VTailCase params(false);
+    params.inputs[17].format_ = ge::FORMAT_FRACTAL_NZ;
+    ::TilingInfo result;
+    EXPECT_FALSE(ExecuteTiling(params.Context(), result));
+}
 } // namespace
 } // namespace QuantFlashAttnUT

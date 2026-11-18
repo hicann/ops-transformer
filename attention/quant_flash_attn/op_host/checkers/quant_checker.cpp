@@ -1379,6 +1379,9 @@ ge::graphStatus QuantChecker::CheckVTailShape(const QfaTilingInfo& qfaInfo) cons
                                                       DataTypeToSerialString(vTailDesc->GetDataType()).c_str(),
                                                       "The dtype of v_tail must be BF16 when v_tail is provided"),
                 return ge::GRAPH_FAILED);
+    if (CheckFormatSupport(vTailDesc, V_TAIL_NAME) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
 
     const gert::Tensor* sequsedVTail = qfaInfo.opParamInfo.sequsedVTail.tensor;
     const gert::CompileTimeTensorDesc* sequsedVTailDesc = qfaInfo.opParamInfo.sequsedVTail.desc;
@@ -1387,6 +1390,9 @@ ge::graphStatus QuantChecker::CheckVTailShape(const QfaTilingInfo& qfaInfo) cons
                                                       DataTypeToSerialString(sequsedVTailDesc->GetDataType()).c_str(),
                                                       "The dtype of seqused_v_tail must be INT32"),
                 return ge::GRAPH_FAILED);
+    if (CheckFormatSupport(sequsedVTailDesc, SEQUSED_V_TAIL_NAME) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     uint32_t tailDimNum = sequsedVTail->GetStorageShape().GetDimNum();
     OP_CHECK_IF(tailDimNum != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(qfaInfo.opName, SEQUSED_V_TAIL_NAME.c_str(),
