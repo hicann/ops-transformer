@@ -376,6 +376,8 @@ aclnnStatus aclnnMoeGatingTopK(
     </tr>
   </tbody></table>
 
+  > 说明：当输出yOut为空tensor（例如k=0时yOut的shape为[T, 0]）时，算子不执行计算，也不会校验k等参数是否满足约束，该场景直接返回成功（ACLNN_SUCCESS）。因此调用方需自行保证1 <= k <= x_shape[-1] / groupCount * kGroup，避免空结果流入后续算子。
+
 ## aclnnMoeGatingTopK
 
 - **参数说明：**
@@ -427,7 +429,7 @@ aclnnStatus aclnnMoeGatingTopK(
 * 输入shape限制：
     * x最后一维（即专家数）要求不大于2048。
 * 输入值域限制：
-    * 要求1 <= k <= x_shape[-1] / groupCount * kGroup。
+    * 要求1 <= k <= x_shape[-1] / groupCount * kGroup。当k=0（即出参yOut为空tensor）时不校验k的取值，算子直接返回成功，输出空tensor。
     * 要求1 <= kGroup <= groupCount，并且kGroup * x_shape[-1] / groupCount的值要大于等于k。
     * 要求groupCount > 0，x_shape[-1]能够被groupCount整除且整除后的结果大于groupSelectMode，并且整除的结果按照32个数对齐后乘groupCount的结果不大于2048。
 * 其他限制：

@@ -377,6 +377,8 @@ aclnnStatus aclnnMoeGatingTopK(
     </tr>
   </tbody></table>
 
+  > Note: When the output yOut is an empty tensor (for example, when k=0 and the shape of yOut is [T, 0]), the operator performs no computation and does not validate whether k and other parameters meet the constraints. In this case, the operator directly returns success (ACLNN_SUCCESS). The caller must therefore ensure that 1 <= k <= x_shape[-1] / groupCount * kGroup to prevent empty results from flowing into subsequent operators.
+
 ## aclnnMoeGatingTopK
 
 - **Parameters:**
@@ -428,7 +430,7 @@ aclnnStatus aclnnMoeGatingTopK(
 - Input shape constraints:
     - The last dimension of x (i.e., the number of experts) must not exceed 2048.
 - Input value range restrictions:
-    - Requires 1 &lt;= k &lt;= x_shape[-1] / groupCount * kGroup.
+    - Requires 1 &lt;= k &lt;= x_shape[-1] / groupCount * kGroup. When k=0 (that is, the output yOut is an empty tensor), the value of k is not validated, and the operator directly returns success with an empty tensor.
     - Requires 1 &lt;= kGroup &lt;= groupCount, and the value of kGroup * x_shape[-1] / groupCount must be greater than or equal to k.
     - Requires groupCount &gt; 0, x_shape[-1] must be divisible by groupCount and the quotient must be greater than groupSelectMode, and the result of the quotient aligned to 32 elements multiplied by groupCount must not exceed 2048.
 - Other constraints:
