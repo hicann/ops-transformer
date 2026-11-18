@@ -83,14 +83,18 @@ public:
         MsaBlockMmad<QType, KType, SType,
                      IS_MXFP4 ? (IS_BLOCK16 ? MSA_L1B_STAGES_INT8 : MSA_L1B_STAGES_FP16) :
                                 (IS_QUANT ? MSA_L1B_STAGES_INT8 : (IS_BLOCK16 ? MSA_L1B_STAGES_FP16 : 4U)),
-                     false, IS_MXFP4, IS_MXFP4 && MXFP4_N512,
-                     IS_MXFP4 && !IS_BLOCK16 && USE_C2UB_IN && !MX_LATENCY_TND>;
+                     false, IS_MXFP4, IS_MXFP4 && MXFP4_N512, IS_MXFP4 && !IS_BLOCK16 && USE_C2UB_IN && !MX_LATENCY_TND,
+                     !IS_QUANT && !IS_MXFP4 && !IS_BLOCK16 && !ENABLE_TOPK && (sizeof(ElementQ) == 1)>;
 #endif
 
     static constexpr uint32_t REVERSE_DEPTH = MSA_WORKSPACE_STAGES - 1;
     static constexpr uint32_t STILE_WIDTH = MSA_BLOCKS_PER_STILE * MSA_BLOCK_SIZE;
     static constexpr bool IS_QUANT_V = IS_QUANT;
     static constexpr bool USE_C2UB = USE_C2UB_IN;
+    // 950 非 topk、非量化、8bit block128：L1 N=256，PA 上把连续两个逻辑页收成一次 MMAD。
+    // bf16/fp16、int8、block16、MX、融合 topk 仍是 N=128 逐页。
+    static constexpr bool FP8_SCORE_PIPE =
+        !IS_QUANT_V && !IS_MXFP4 && !IS_BLOCK16 && !ENABLE_TOPK && (sizeof(ElementQ) == 1);
     using Epilogue = MsaSegRowMaxEpilogue<IS_QUANT_V, IS_BLOCK16, IS_MXFP4, MX_FUSED_STAGE>;
     static constexpr uint32_t K_SCRATCH_SLOTS = (USE_C2UB && IS_BLOCK16 && !IS_MXFP4) ? MSA_A5_S_STAGES : 1U;
     static constexpr uint32_t K_SCRATCH_ELEMS =
@@ -423,6 +427,48 @@ private:
                         }
                     }
                 }
+            } else if constexpr (FP8_SCORE_PIPE) {
+                // 两页合成一次 MMAD：标量 / Fixpipe / 跨核握手按组付一次。页在 GM 上不连续，
+                // 仍按页搬进同一块 L1 的相邻 N。顺序布局尾块继续逐页（可能要 K scratch）。
+                if (!MsaIsSeqKeyLayout(tiling_->keyLayout) && task.sBlkBegin < task.sBlkEnd) {
+                    for (uint32_t blk = task.sBlkBegin; blk < task.sBlkEnd;) {
+                        const uint32_t nPages = Fp8PageGroup(task, blk);
+                        const uint32_t headDim = tiling_->headDim;
+                        const LayoutK layoutPage(headDim, MSA_BLOCK_SIZE, tiling_->strideKvToken);
+                        for (uint32_t i = 0; i < nPages; ++i) {
+                            const uint64_t kOffset = KeyBlockGmOffset(task, blk + i);
+                            blockMmad.AppendBPage(gKeyFp_[kOffset], layoutPage, i * MSA_BLOCK_SIZE, i == 0U,
+                                                  i + 1U == nPages);
+                        }
+                        const uint32_t ping = pageSeq % MSA_A5_S_STAGES;
+                        MmadGroupedToL0C(blockMmad, task, needLoadQ, nPages);
+                        needLoadQ = false;
+                        auto ubS = resource.ubBuf.template GetBufferByByte<float>(ping * MSA_A5_S_PING_BYTES);
+                        blockMmad.FlushStoreToUb(ubS, ping, false);
+                        AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + ping);
+                        AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + ping +
+                                                                               MSA_A5_AIV_FLAG_OFFSET);
+                        ++pageSeq;
+                        blk += nPages;
+                    }
+                } else {
+                    for (uint32_t blk = task.sBlkBegin; blk < task.sBlkEnd; ++blk) {
+                        const uint32_t ping = pageSeq % MSA_A5_S_STAGES;
+                        if (KeyBlockNeedsScratch(task, blk)) {
+                            AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_K);
+                            AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_K +
+                                                                                    MSA_A5_AIV_FLAG_OFFSET);
+                            AscendC::PipeBarrier<PIPE_ALL>();
+                        }
+                        auto ubS = resource.ubBuf.template GetBufferByByte<float>(ping * MSA_A5_S_PING_BYTES);
+                        ComputePageToUb(blockMmad, task, blk, ubS, coreKScratch, needLoadQ, static_cast<int32_t>(ping));
+                        needLoadQ = false;
+                        AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + ping);
+                        AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + ping +
+                                                                               MSA_A5_AIV_FLAG_OFFSET);
+                        ++pageSeq;
+                    }
+                }
             } else {
                 for (uint32_t blk = task.sBlkBegin; blk < task.sBlkEnd; ++blk) {
                     const uint32_t ping = pageSeq % MSA_A5_S_STAGES;
@@ -456,6 +502,28 @@ private:
         AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + 1 + MSA_A5_AIV_FLAG_OFFSET);
     }
 #endif
+
+    // 950 fp8 PA：同一 stile 内、UB ping 放得下时一次做两页。AIC/AIV 用同一函数。
+    __aicore__ inline uint32_t Fp8PageGroup(const MsaTask& task, uint32_t blk) const
+    {
+        if constexpr (!FP8_SCORE_PIPE) {
+            return 1U;
+        }
+        if (MsaIsSeqKeyLayout(tiling_->keyLayout) || blk >= task.sBlkEnd) {
+            return 1U;
+        }
+        const uint32_t room = MSA_BLOCKS_PER_STILE - (blk % MSA_BLOCKS_PER_STILE);
+        const uint32_t remain = task.sBlkEnd - blk;
+        if (room < 2U || remain < 2U) {
+            return 1U;
+        }
+        uint32_t m0 = 0U;
+        uint32_t m1 = 0U;
+        MsaC2UbGroupSplit(task.mActual, 1U, m0, m1);
+        const uint32_t rows = m0 > m1 ? m0 : m1;
+        const uint64_t bytes = static_cast<uint64_t>(rows) * 2U * MSA_BLOCK_SIZE * sizeof(half);
+        return bytes <= MSA_A5_S_PING_BYTES ? 2U : 1U;
+    }
 
     __aicore__ inline bool KeyBlockNeedsScratch(const MsaTask& task, uint32_t blk) const
     {
@@ -875,6 +943,17 @@ private:
     }
 
 #if defined(__DAV_C310_CUBE__) || defined(__DAV_310R6_CUBE__)
+    __aicore__ inline void MmadGroupedToL0C(BlockMmad& blockMmad, const MsaTask& task, bool needLoadL1, uint32_t nPages)
+    {
+        const uint32_t mActual = task.mActual;
+        const uint32_t headDim = tiling_->headDim;
+        const uint32_t nCols = nPages * MSA_BLOCK_SIZE;
+        const LayoutQ layoutQ(mActual, headDim, tiling_->strideQn);
+        const LayoutK layoutKGm(headDim, nCols, tiling_->strideKvToken);
+        const Catlass::GemmCoord shape{mActual, nCols, headDim};
+        blockMmad.MmadToL0C(QueryGm(task), layoutQ, gKeyFp_, layoutKGm, shape, needLoadL1, 1U, nCols, true);
+    }
+
     __aicore__ inline void ComputePageToUb(BlockMmad& blockMmad, const MsaTask& task, uint32_t blk,
                                            const AscendC::LocalTensor<float>& ubS, uint64_t kScratchBase,
                                            bool needLoadL1, int32_t vcPing)
@@ -1633,6 +1712,37 @@ private:
                     AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_V>(MSA_A5_FLAG_VC + ping);
                     ++pageSeq;
                     blk += nPages;
+                }
+            } else if constexpr (FP8_SCORE_PIPE) {
+                if (!MsaIsSeqKeyLayout(tiling_->keyLayout)) {
+                    for (uint32_t blk = task.sBlkBegin; blk < task.sBlkEnd;) {
+                        const uint32_t nPages = Fp8PageGroup(task, blk);
+                        const uint32_t ping = pageSeq % MSA_A5_S_STAGES;
+                        AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_V>(MSA_A5_FLAG_CV + ping);
+                        if (nPages > 1U) {
+                            epilogue.ProcessPageGroupUb(ping, task, blk, nPages);
+                        } else {
+                            epilogue.ProcessPageUb(ping, task, blk);
+                        }
+                        AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_V>(MSA_A5_FLAG_VC + ping);
+                        ++pageSeq;
+                        blk += nPages;
+                    }
+                } else {
+                    for (uint32_t blk = task.sBlkBegin; blk < task.sBlkEnd; ++blk) {
+                        const uint32_t ping = pageSeq % MSA_A5_S_STAGES;
+                        if (KeyBlockNeedsScratch(task, blk)) {
+                            if (subIdx == 0) {
+                                GatherKeyPageToScratch(resource, task, blk, coreKScratch);
+                            }
+                            Catlass::Arch::CrossCoreBarrier<0x1, PIPE_MTE3>();
+                            AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_MTE3>(MSA_A5_FLAG_K);
+                        }
+                        AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_V>(MSA_A5_FLAG_CV + ping);
+                        epilogue.ProcessPageUb(ping, task, blk);
+                        AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_V>(MSA_A5_FLAG_VC + ping);
+                        ++pageSeq;
+                    }
                 }
             } else {
                 for (uint32_t blk = task.sBlkBegin; blk < task.sBlkEnd; ++blk) {

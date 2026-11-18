@@ -40,13 +40,15 @@
 namespace MsaIndexScoreNs {
 
 template <class AType_, class BType_, class CType_, uint32_t STAGES_IN = MSA_L1B_STAGES_FP16,
-          bool USE_UNIT_FLAG_ = false, bool IS_MXFP4_ = false, bool MXFP4_N512_ = false, bool MX_FIXED_TILE_ = false>
+          bool USE_UNIT_FLAG_ = false, bool IS_MXFP4_ = false, bool MXFP4_N512_ = false, bool MX_FIXED_TILE_ = false,
+          bool GROUP_N256_ = false>
 class MsaBlockMmad {
 public:
     static constexpr bool IS_MXFP4 = IS_MXFP4_;
     // Core only enables this for MXFP4 block128 C2UB: packed K<=64,
     // Mround<=128 and grouped Nround<=the selected L1_N (256 or512).
     static constexpr bool MX_FIXED_TILE = MX_FIXED_TILE_;
+    static constexpr bool GROUP_N256 = GROUP_N256_;
     static_assert(!MX_FIXED_TILE || IS_MXFP4, "fixed-tile specialization requires MXFP4");
     // 只有四页 fp16 行放得进每个 AIV 的 32KB ping 时才用 N=512，并把 L0 第二级让出去。
     static constexpr bool MXFP4_WIDE = IS_MXFP4 && MXFP4_N512_;
@@ -88,7 +90,7 @@ public:
     // L0B 仍单级：N=512 的 B tile 占满 64KB。窄路径继续 128 行、N=256、双 L0C。
     static constexpr uint32_t L1_M = MSA_ROW_TILE_M;
     static constexpr uint32_t L1_N =
-        MXFP4_WIDE ? (MSA_BLOCK_SIZE * 4U) : (IS_MXFP4 ? (MSA_BLOCK_SIZE * 2U) : MSA_BLOCK_SIZE);
+        MXFP4_WIDE ? (MSA_BLOCK_SIZE * 4U) : (IS_MXFP4 || GROUP_N256 ? (MSA_BLOCK_SIZE * 2U) : MSA_BLOCK_SIZE);
     static constexpr uint32_t L0C_M = L1_M;
     static constexpr uint32_t L0C_STAGES = MXFP4_WIDE ? 1U : 2U;
     static constexpr uint32_t L1_K = MSA_K_TILE;
@@ -468,6 +470,23 @@ public:
         gmScaleA_ = gmScaleA;
         gmScaleB_ = gmScaleB;
         MmadToL0C(gmA, layoutA, gmB, layoutB, actualShape, needLoadL1, splitGroup, loadN, bLoaded);
+    }
+
+    // 把一页 K 追加到当前 L1B 槽的 nOffset 列。first 申请槽，last 才发布 MTE2_MTE1。
+    // 随后 bLoaded 的 MMAD 一次消费这一组，槽号由 MMAD 推进。
+    __aicore__ inline void AppendBPage(const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutPage,
+                                       uint32_t nOffset, bool first, bool last)
+    {
+        if (first) {
+            AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[l1ListId_]);
+        }
+        auto layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(L1_K, L1_N);
+        const Catlass::MatrixCoord coord{0U, nOffset};
+        auto dstB = l1BTensorList_[l1ListId_][layoutBInL1.GetOffset(coord)];
+        copyGmToL1B_(dstB, gmB, layoutBInL1, layoutPage);
+        if (last) {
+            AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[l1ListId_]);
+        }
     }
 
     // 只把当前槽的 K（和 scale）从 GM 搬进 L1，不占 UB、不启动 MMAD。
