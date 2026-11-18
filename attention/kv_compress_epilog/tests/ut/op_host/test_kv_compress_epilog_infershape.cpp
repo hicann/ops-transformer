@@ -73,6 +73,28 @@ TEST_F(KvCompressEpilogProto, kv_compress_epilog_infershape_hif8_fp4_mode2)
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS);
 }
 
+TEST_F(KvCompressEpilogProto, kv_compress_epilog_infershape_int8)
+{
+    // INT8(rope bf16 位型直通 + nope per-group int8): 输出 cache 与输入 cache 同 shape/dtype, 与 quant_mode 无关。
+    gert::InfershapeContextPara infershapeContextPara(
+        "KvCompressEpilog",
+        {
+            {{{128, 16, 1, 608}, {128, 16, 1, 608}}, ge::DT_UINT8, ge::FORMAT_ND}, // cache 4D (headDim=608)
+            {{{1024, 512}, {1024, 512}}, ge::DT_BF16, ge::FORMAT_ND},              // x (d=512)
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},                       // slotMapping
+        },
+        {
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND}, // cacheOut (in-place)
+        },
+        {
+            {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+            {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+            {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        });
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS);
+}
+
 TEST_F(KvCompressEpilogProto, kv_compress_epilog_infershape_dynamic)
 {
     gert::InfershapeContextPara infershapeContextPara(

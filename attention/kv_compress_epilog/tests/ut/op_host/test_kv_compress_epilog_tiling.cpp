@@ -13,7 +13,9 @@
 #include <limits>
 #include "tiling/platform/platform_ascendc.h"
 #include "tiling_case_executor.h"
-#include "../../../op_host/kv_compress_epilog_tiling_arch35.h"
+#include "../../../op_host/kv_compress_epilog_tiling.h"
+#include "../../../op_host/arch22/kv_compress_epilog_tiling_arch22.h"
+#include "../../../op_host/arch35/kv_compress_epilog_tiling_arch35.h"
 
 static optiling::KvCompressEpilogCompileInfo compileInfo{48, 196608};
 
@@ -225,5 +227,123 @@ TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_cache_dim2_not_one_reje
             {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
         },
         &compileInfo, "Ascend950", compileInfo.coreNum, compileInfo.ubSize);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// ---------------------------------------------------------------------------
+// arch22 (DAV_2201, SoC Ascend910B) quant_mode=1: rope bf16 位型直通 + nope per-group int8 动态量化。
+//   x 必须 2D [bs, 512] (前 448 列 nope, 后 64 列 rope); quant_group_size 恒 64;
+//   行格式 128B(rope) + 448B(nope int8) + 14B(scale bf16 x7) + 18B(pad) = kvCacheCol 608, headDim >= 608。
+// ---------------------------------------------------------------------------
+static gert::TilingContextPara MakeInt8Para(int64_t bs, int64_t d, int64_t headDim, int64_t groupSize,
+                                            int64_t quantMode, ge::DataType slotDtype, const char* soc,
+                                            int64_t blockNum = 128, int64_t blockSize = 16, int64_t dim2 = 1)
+{
+    return gert::TilingContextPara(
+        "KvCompressEpilog",
+        {
+            {{{blockNum, blockSize, dim2, headDim}, {blockNum, blockSize, dim2, headDim}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{bs, d}, {bs, d}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{bs}, {bs}}, slotDtype, ge::FORMAT_ND},
+        },
+        {
+            {{{blockNum, blockSize, dim2, headDim}, {blockNum, blockSize, dim2, headDim}}, ge::DT_UINT8, ge::FORMAT_ND},
+        },
+        {
+            {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupSize)},
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(quantMode)},
+            {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+            {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, soc, compileInfo.coreNum, compileInfo.ubSize);
+}
+
+// (h) 正常路径: INT8 + slot int32, headDim=608 (=kvCacheCol), bs=1024 -> 成功, tilingKey=0。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_int8_int32)
+{
+    auto para = MakeInt8Para(1024, 512, 608, 64, 1, ge::DT_INT32, "Ascend910B");
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 0UL);
+}
+
+// (i) 正常路径: INT8 + slot int64 -> 成功, tilingKey=0 (dtype 差异由 kernel 模板承载)。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_int8_int64)
+{
+    auto para = MakeInt8Para(1024, 512, 608, 64, 1, ge::DT_INT64, "Ascend910B");
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 0UL);
+}
+
+// (j) 正常路径: bs=1 单核边界 -> 成功。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_int8_bs1)
+{
+    auto para = MakeInt8Para(1, 512, 608, 64, 1, ge::DT_INT32, "Ascend910B");
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 0UL);
+}
+
+// (k) 正常路径: headDim=640 > kvCacheCol(608), 尾部保留 -> 成功。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_int8_headdim640)
+{
+    auto para = MakeInt8Para(1024, 512, 640, 64, 1, ge::DT_INT32, "Ascend910B");
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 0UL);
+}
+
+// (l) 正常路径: blockNum 维非连续分页 cache (blockStride=10240 > blockSize*headDim=16*640) -> 成功。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_int8_noncontiguous_block)
+{
+    auto para = MakeInt8Para(1024, 512, 608, 64, 1, ge::DT_INT32, "Ascend910B", 5, 16, 1);
+    // view shape [5,16,1,608], storage 行宽 640: strides = {16*640, 640, 640, 1}
+    para.inputTensorDesc_[0].hasStride_ = true;
+    para.inputTensorDesc_[0].stride_.SetDimNum(4);
+    para.inputTensorDesc_[0].stride_.SetStride(0, 16 * 640);
+    para.inputTensorDesc_[0].stride_.SetStride(1, 640);
+    para.inputTensorDesc_[0].stride_.SetStride(2, 640);
+    para.inputTensorDesc_[0].stride_.SetStride(3, 1);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 0UL);
+}
+
+// (m) 错误: d != 512 (d=448) -> GRAPH_FAILED。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_int8_d_not_512)
+{
+    auto para = MakeInt8Para(1024, 448, 608, 64, 1, ge::DT_INT32, "Ascend910B");
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (n) 错误: quant_group_size != 64 (group=32) -> GRAPH_FAILED。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_int8_group_not_64)
+{
+    auto para = MakeInt8Para(1024, 512, 608, 32, 1, ge::DT_INT32, "Ascend910B");
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (o) 错误: headDim(576) < kvCacheCol(608) -> GRAPH_FAILED。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_int8_headdim_lt_608)
+{
+    auto para = MakeInt8Para(1024, 512, 576, 64, 1, ge::DT_INT32, "Ascend910B");
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (p) 错误: cache dim2 != 1 -> GRAPH_FAILED。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_int8_dim2_not_one)
+{
+    auto para = MakeInt8Para(1024, 512, 608, 64, 1, ge::DT_INT32, "Ascend910B", 128, 16, 2);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (q) 错误: arch22 上 quant_mode 0/2 显式报错 -> GRAPH_FAILED。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_mode0_rejected)
+{
+    auto para = MakeInt8Para(1024, 512, 608, 64, 0, ge::DT_INT32, "Ascend910B");
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_mode2_rejected)
+{
+    auto para = MakeInt8Para(1024, 512, 608, 64, 2, ge::DT_INT32, "Ascend910B");
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (r) 错误: arch35 (Ascend950) 上未定义的 quant_mode 取值显式报错 -> GRAPH_FAILED。
+TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch35_mode7_rejected)
+{
+    auto para = MakeInt8Para(1024, 512, 608, 64, 7, ge::DT_INT32, "Ascend950");
     ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
 }

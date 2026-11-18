@@ -42,12 +42,17 @@ namespace ge {
  *   For quant_mode 2 only 16/32/64 are supported and (d-64) must be divisible by it.
  * @li quant_mode: An optional int attribute. Quantization mode.
  *   - 0: nope per-group(64) FP8(E4M3) dynamic quant, scale stored as bfloat16, rope kept as bf16
- *   - 1: same as 0 but scale stored as float8_e8m0 (default)
+ *   - 1: same as 0 but scale stored as float8_e8m0 (default).
+ *        On Ascend 910B (A2) / 910_93 (A3), quant_mode=1 instead carries INT8:
+ *        nope per-group(64) INT8 symmetric dynamic quant (scale = group amax / 127,
+ *        stored as bfloat16), rope kept as original bf16 bits. Requires d == 512,
+ *        quant_group_size == 64 and headDim >= 608. Row layout (608B):
+ *        [rope bf16 128B][nope int8 448B][scale bf16 14B][pad 18B]
  *   - 2: rope static hifloat8 quant (scaled by x_scale), nope per-group FLOAT4_E2M1 dynamic quant
  *        (scale = group amax / 6, stored as bfloat16). Row layout (bytes):
  *        [rope hifloat8 64B][nope fp4 (d-64)/2 B][nope bf16 scale nGroup*2 B][pad to 128]
  * @li round_scale: An optional bool attribute. Whether to round the group scale value for
- *   quant_mode 0/1. Defaults to true. Ignored when quant_mode==2.
+ *   quant_mode 0/1. Defaults to true. Ignored when quant_mode==2; also ignored for the arch22 INT8 mode.
  * @li x_scale: An optional float attribute. For quant_mode 2 it is the rope hifloat8 static
  *   quant scale; reserved/unused for quant_mode 0/1. Defaults to 1.0.
 
@@ -60,7 +65,10 @@ namespace ge {
  *  - slot_mapping dimensions should equal x dimensions minus 1.
  *  - The last dimension (d) of x must be 64-aligned (d % 64 == 0) and greater than 64.
  *  - For quant_mode==2, quant_group_size must be 16/32/64 and (d-64) divisible by it.
- *  - Ascend 950PR&950DT products.
+ *  - On Ascend 910B (A2) / 910_93 (A3), quant_mode==1 carries INT8: d must be 512,
+ *    quant_group_size must be 64 and headDim must be >= 608; other quant_mode values
+ *    are rejected there.
+ *  - Ascend 950PR&950DT products support quant_mode 0/1/2 only.
  * @endcode
  */
 REG_OP(KvCompressEpilog)

@@ -9,12 +9,14 @@
  */
 
 /*!
- * \file kv_compress_epilog_tiling_arch35.cpp
- * \brief Architecture-specific tiling implementation for KvCompressEpilog (arch35)
+ * \file kv_compress_epilog_tiling_arch22.cpp
+ * \brief Architecture-specific tiling implementation for KvCompressEpilog quant_mode=1 (arch22, DAV_2201)。
+ *        算子 tiling 注册与按 arch 分派入口见 ../kv_compress_epilog_tiling.cpp。
  */
 
+#include <algorithm>
 #include <sstream>
-#include "kv_compress_epilog_tiling_arch35.h"
+#include "kv_compress_epilog_tiling_arch22.h"
 #include "log/log.h"
 
 using namespace ge;
@@ -22,17 +24,17 @@ using namespace ge;
 namespace optiling {
 
 template <typename T>
-static inline T CeilDiv(T num, T rnd)
+static inline T CeilDivArch22(T num, T rnd)
 {
     return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd)));
 }
 
-int64_t RoundUp(int64_t x, int64_t y)
+static inline int64_t RoundUpArch22(int64_t x, int64_t y)
 {
-    return CeilDiv(x, y) * y;
+    return CeilDivArch22(x, y) * y;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::GetPlatformInfo()
+ge::graphStatus KvCompressEpilogTilingArch22::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
@@ -51,7 +53,7 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::GetInputShapes()
+ge::graphStatus KvCompressEpilogTilingArch22::GetInputShapes()
 {
     auto shapeX = context_->GetInputShape(X_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapeX);
@@ -61,13 +63,17 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetInputShapes()
     auto slotMappingShape = shapeSlotMapping->GetStorageShape();
     uint32_t xDims = xStorageShape.GetDimNum();
     uint32_t slotMappingDims = slotMappingShape.GetDimNum();
+    // INT8: x 恰为 2D [bs, 512] (前 448 列 nope, 后 64 列 rope)
+    OP_CHECK_IF(xDims != 2,
+                OP_LOGE(context_->GetNodeName(), "x must be 2D [bs, d] when quant_mode==1, got dimNum=%u", xDims),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(xDims - 1 != slotMappingDims,
                 OP_LOGE(context_->GetNodeName(), "slotMappingDims should equal xDims - 1"), return ge::GRAPH_FAILED);
     int64_t bs = 1;
     for (uint32_t i = 0; i < slotMappingDims; i++) {
         int64_t temp = xStorageShape.GetDim(i);
         OP_CHECK_IF(temp != slotMappingShape.GetDim(i),
-                    OP_LOGE(context_->GetNodeName(), "slotMappingShape should equal xStorageShape in dim %d", i),
+                    OP_LOGE(context_->GetNodeName(), "slotMappingShape should equal xStorageShape in dim %u", i),
                     return ge::GRAPH_FAILED);
         bs *= temp;
     }
@@ -77,7 +83,7 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetInputShapes()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::GetAttributes()
+ge::graphStatus KvCompressEpilogTilingArch22::GetAttributes()
 {
     auto* attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "get attrs nullptr"), return ge::GRAPH_FAILED);
@@ -93,16 +99,18 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetAttributes()
     if (attrQuantMode != nullptr) {
         quantMode_ = *attrQuantMode;
     }
-    OP_CHECK_IF(quantMode_ != QUANT_MODE_GROUP_QUANT_BF16 && quantMode_ != QUANT_MODE_GROUP_QUANT_E8M0 &&
-                    quantMode_ != QUANT_MODE_HIF8_FP4,
-                OP_LOGE(context_->GetNodeName(), "quantMode should be 0, 1 or 2"), return ge::GRAPH_FAILED);
+    // arch22 (A2/A3) 仅支持 quant_mode=1 (int8 量化); 其余取值显式报错拦截
+    OP_CHECK_IF(
+        quantMode_ != QUANT_MODE_INT8,
+        OP_LOGE(context_->GetNodeName(),
+                "quant_mode %ld is not supported on arch22 (A2/A3); only quant_mode=1 (INT8) is supported", quantMode_),
+        return ge::GRAPH_FAILED);
 
-    // mode2(rope hifloat8 + nope FLOAT4_E2M1) 仅支持 16/32/64 的 per-group 量化粒度
-    OP_CHECK_IF(quantMode_ == QUANT_MODE_HIF8_FP4 && quantGroupSize_ != FP4_GROUP_SIZE_16 &&
-                    quantGroupSize_ != FP4_GROUP_SIZE_32 && quantGroupSize_ != FP4_GROUP_SIZE_64,
-                OP_LOGE(context_->GetNodeName(), "quant_group_size should be 16/32/64 when quant_mode==2, got %ld",
-                        quantGroupSize_),
-                return ge::GRAPH_FAILED);
+    // INT8: 量化分组大小必须等于 64
+    OP_CHECK_IF(
+        quantGroupSize_ != DEFAULT_QUANT_GROUP_SIZE,
+        OP_LOGE(context_->GetNodeName(), "quant_group_size must be 64 when quant_mode==1, got %ld", quantGroupSize_),
+        return ge::GRAPH_FAILED);
 
     const bool* attrRoundScale = attrs->GetAttrPointer<bool>(ROUND_SCALE_ATTR_INDEX);
     if (attrRoundScale != nullptr) {
@@ -118,14 +126,14 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetAttributes()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::GetDtypeInfo()
+ge::graphStatus KvCompressEpilogTilingArch22::GetDtypeInfo()
 {
     auto xDesc = context_->GetInputDesc(X_INPUT_INDEX);
     OP_CHECK_IF(xDesc == nullptr, OP_LOGE(context_->GetNodeName(), "get x desc nullptr"), return ge::GRAPH_FAILED);
     xDtype_ = xDesc->GetDataType();
 
     OP_CHECK_IF(xDtype_ != ge::DT_BF16,
-                OP_LOGE(context_->GetNodeName(), "x dtype only support BF16, got %d", static_cast<int>(xDtype_)),
+                OP_LOGE(context_->GetNodeName(), "x dtype must be bfloat16, got %d", static_cast<int>(xDtype_)),
                 return ge::GRAPH_FAILED);
 
     auto slotMappingDesc = context_->GetInputDesc(SLOT_MAPPING_INDEX);
@@ -134,53 +142,41 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetDtypeInfo()
     slotMappingDtype_ = slotMappingDesc->GetDataType();
 
     OP_CHECK_IF((slotMappingDtype_ != ge::DT_INT32 && slotMappingDtype_ != ge::DT_INT64),
-                OP_LOGE(context_->GetNodeName(), "slot_mapping dtype only support INT32/INT64, got %d",
+                OP_LOGE(context_->GetNodeName(), "slot_mapping dtype only supports int32/int64, got %d",
                         static_cast<int>(slotMappingDtype_)),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::ValidateShapes()
+ge::graphStatus KvCompressEpilogTilingArch22::ValidateShapes()
 {
     OP_CHECK_IF(bs_ <= 0, OP_LOGE(context_->GetNodeName(), "input x first dimension must be positive, got %ld", bs_),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(d_ <= SLICE_SIZE,
-                OP_LOGE(context_->GetNodeName(), "input x tail dimension must be greater than 64, got %ld", d_),
+    // INT8: x 尾轴 d 恒为 512 (前 448 列 nope per-group int8 量化, 后 64 列 rope bf16 位型直通)
+    OP_CHECK_IF(d_ != D_LENGTH_MODE3,
+                OP_LOGE(context_->GetNodeName(), "d must be 512 when quant_mode==1 (448 nope + 64 rope), got %ld", d_),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(d_ > D_LENGTH_FULL_LOAD,
-                OP_LOGE(context_->GetNodeName(), "input x tail dimension must be less than 8192, got %ld", d_),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(d_ % SLICE_SIZE != 0, OP_LOGE(context_->GetNodeName(), "d_ %% 64 should be 0 , got %ld", d_),
-                return ge::GRAPH_FAILED);
-
-    // mode2: nope 段长度(d-64)必须能被 per-group 量化粒度整除
-    OP_CHECK_IF(
-        quantMode_ == QUANT_MODE_HIF8_FP4 && (d_ - SLICE_SIZE) % quantGroupSize_ != 0,
-        OP_LOGE(context_->GetNodeName(),
-                "(d-64) %% quant_group_size should be 0 when quant_mode==2, got d=%ld group=%ld", d_, quantGroupSize_),
-        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::ValidateDtypes()
+ge::graphStatus KvCompressEpilogTilingArch22::ValidateDtypes()
 {
     auto kvCacheOutputDesc = context_->GetOutputDesc(KV_COMPRESS_CACHE_OUTPUT_INDEX);
     OP_CHECK_IF(kvCacheOutputDesc == nullptr, OP_LOGE(context_->GetNodeName(), "get output desc nullptr"),
                 return ge::GRAPH_FAILED);
 
     ge::DataType outputDtype = kvCacheOutputDesc->GetDataType();
-    OP_CHECK_IF(
-        (outputDtype != ge::DT_UINT8),
-        OP_LOGE(context_->GetNodeName(), "cache dtype only support UINT8, got %d", static_cast<int>(outputDtype)),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((outputDtype != ge::DT_UINT8),
+                OP_LOGE(context_->GetNodeName(), "cache dtype must be uint8, got %d", static_cast<int>(outputDtype)),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-bool KvCompressEpilogTilingArch35::GetCacheViewLayout(size_t inputIdx, int64_t& blockSize, int64_t& rowStride,
+bool KvCompressEpilogTilingArch22::GetCacheViewLayout(size_t inputIdx, int64_t& blockSize, int64_t& rowStride,
                                                       int64_t& blockStride)
 {
     if (!context_->InputIsView(inputIdx)) {
@@ -212,7 +208,7 @@ bool KvCompressEpilogTilingArch35::GetCacheViewLayout(size_t inputIdx, int64_t& 
     return true;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::GetKvCacheLayout()
+ge::graphStatus KvCompressEpilogTilingArch22::GetKvCacheLayout()
 {
     auto cacheShapePtr = context_->GetInputShape(KV_COMPRESS_CACHE_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, cacheShapePtr);
@@ -254,33 +250,17 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetKvCacheLayout()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::DoOpTiling()
+ge::graphStatus KvCompressEpilogTilingArch22::DoOpTiling()
 {
-    rowOfFormerBlock_ = CeilDiv(bs_, static_cast<int64_t>(coreNum_));
-    usedCoreNums_ = std::min(CeilDiv(bs_, rowOfFormerBlock_), static_cast<int64_t>(coreNum_));
+    rowOfFormerBlock_ = CeilDivArch22(bs_, static_cast<int64_t>(coreNum_));
+    usedCoreNums_ = std::min(CeilDivArch22(bs_, rowOfFormerBlock_), static_cast<int64_t>(coreNum_));
     rowOfTailBlock_ = bs_ - (usedCoreNums_ - 1) * rowOfFormerBlock_;
 
-    int64_t concatCol;
-    int64_t padCol;
-    if (quantMode_ == QUANT_MODE_HIF8_FP4) {
-        // mode2 行布局: [rope hifloat8 64B][nope FLOAT4_E2M1 (d-64)/2 B][nope bf16 scale nGroup*2 B][pad]
-        scaleCol_ = (d_ - SLICE_SIZE) / quantGroupSize_; // nGroup, (d-64)%G==0 已在 ValidateShapes 校验
-        concatCol = ROPE_HIF8_BYTES + (d_ - SLICE_SIZE) / 2 + scaleCol_ * FP4_SCALE_BYTES;
-    } else {
-        // mode0/1 行布局: [rope bf16 128B][nope fp8 (d-64)B][scale]
-        scaleCol_ = CeilDiv(d_ - 64, static_cast<int64_t>(64));
-        int64_t scaleBytes = 1;
-        if (quantMode_ == QUANT_MODE_GROUP_QUANT_BF16) {
-            scaleBytes = 2;
-        }
-        concatCol = d_ - SLICE_SIZE + SLICE_SIZE * 2 + scaleCol_ * scaleBytes;
-    }
-    if (quantMode_ == QUANT_MODE_GROUP_QUANT_E8M0) {
-        kvCacheCol_ = concatCol;
-    } else {
-        kvCacheCol_ = RoundUp(concatCol, BLOCK_SIZE);
-    }
-    padCol = kvCacheCol_ - concatCol;
+    // INT8 行布局: [rope bf16 128B][nope int8 (d-64)B][scale bf16 nGroup*2B][pad 32B 对齐]
+    scaleCol_ = (d_ - SLICE_SIZE) / quantGroupSize_; // nGroup = (512-64)/64 = 7, d==512 与 group==64 已校验
+    int64_t concatCol = ROPE_BF16_BYTES + (d_ - SLICE_SIZE) + scaleCol_ * SCALE_BF16_BYTES; // 128+448+14=590
+    kvCacheCol_ = RoundUpArch22(concatCol, BLOCK_SIZE);                                     // 608
+    int64_t padCol = kvCacheCol_ - concatCol;                                               // 18
 
     if (GetKvCacheLayout() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -293,23 +273,22 @@ ge::graphStatus KvCompressEpilogTilingArch35::DoOpTiling()
 
     int64_t rowOnceLoop = std::min(rowOfFormerBlock_, MIN_ROW_PER_CORE);
 
-    int64_t scratchRowBytes = 0;
-    if (quantMode_ == QUANT_MODE_HIF8_FP4) {
-        int64_t numChunks = (d_ - SLICE_SIZE) / SLICE_SIZE; // (d-64)/64
-        scratchRowBytes = numChunks * FP4_SCRATCH_SLOTS_PER_CHUNK * FP4_SCALE_BYTES;
-    }
-
+    // d 全载, 通过二分查找尝试搬入更多的 bs; INT8 每行 UB 预算 (与 kernel_arch22.h 实际布局一致):
+    //   x 搬入(双缓冲) 512x2Bx2 = 2048B | f32 工作区 1408x4B = 5632B | q 值 int16 中间 448x2B(32B 对齐) = 896B
+    //   amax 槽位 128x8x4B = 4096B | 行组装输出(双缓冲) 608Bx2 = 1216B | ReduceMax tmpBuffer 固定 256B
+    // 每行合计 13888B (+256B 固定), rowFactor 上限 7 (7x13888+256 = 97472B <= 192KB UB)
+    int64_t rowFactorUpper = std::min(rowOfFormerBlock_, static_cast<int64_t>(7));
     rowFactor_ = rowOnceLoop;
-    // d全载,通过二分查找尝试搬入更多的bs
     int64_t lo = rowOnceLoop;
-    int64_t hi = rowOfFormerBlock_;
+    int64_t hi = rowFactorUpper;
     while (lo <= hi) {
         int64_t mid = lo + (hi - lo) / 2;
-        int64_t xSize = mid * RoundUp(d_, X_BUFFER_ALIGN) * X_ELEMENT_BYTES * DOUBLE_BUFFER;
-        int64_t ySize = mid * RoundUp(kvCacheCol_, BLOCK_SIZE) * DOUBLE_BUFFER;
-        int64_t tmpBufferSize = RoundUp(mid, TMP_BUFFER_ALIGN) * TMP_BUFFER_ELEMENT_BYTES;
-        int64_t scratchSize = mid * scratchRowBytes;
-        int64_t totalSize = xSize + ySize + tmpBufferSize + scratchSize;
+        int64_t xSize = mid * RoundUpArch22(d_, X_BUFFER_ALIGN) * X_ELEMENT_BYTES * DOUBLE_BUFFER;
+        int64_t f32WorkSize = mid * 1408 * TMP_BUFFER_ELEMENT_BYTES;
+        int64_t qInt16Size = mid * RoundUpArch22((d_ - SLICE_SIZE) * X_ELEMENT_BYTES, BLOCK_SIZE);
+        int64_t scaleSize = mid * 128 * 8 * TMP_BUFFER_ELEMENT_BYTES;
+        int64_t ySize = mid * RoundUpArch22(kvCacheCol_, BLOCK_SIZE) * DOUBLE_BUFFER;
+        int64_t totalSize = xSize + f32WorkSize + qInt16Size + scaleSize + ySize + REDUCE_TMP_BUFFER_BYTES;
         if (totalSize <= static_cast<int64_t>(ubSize_)) {
             rowFactor_ = mid;
             lo = mid + 1;
@@ -318,8 +297,8 @@ ge::graphStatus KvCompressEpilogTilingArch35::DoOpTiling()
         }
     }
 
-    rowLoopOfFormerBlock_ = CeilDiv(rowOfFormerBlock_, rowFactor_);
-    rowLoopOfTailBlock_ = CeilDiv(rowOfTailBlock_, rowFactor_);
+    rowLoopOfFormerBlock_ = CeilDivArch22(rowOfFormerBlock_, rowFactor_);
+    rowLoopOfTailBlock_ = CeilDivArch22(rowOfTailBlock_, rowFactor_);
     tailRowFactorOfFormerBlock_ = rowOfFormerBlock_ % rowFactor_ == 0 ? rowFactor_ : rowOfFormerBlock_ % rowFactor_;
     tailRowFactorOfTailBlock_ = rowOfTailBlock_ % rowFactor_ == 0 ? rowFactor_ : rowOfTailBlock_ % rowFactor_;
 
@@ -329,6 +308,7 @@ ge::graphStatus KvCompressEpilogTilingArch35::DoOpTiling()
     tilingData_.set_kvCacheRowStride(kvCacheRowStride_);
     tilingData_.set_kvCacheBlockSize(kvCacheBlockSize_);
     tilingData_.set_kvCacheBlockStride(kvCacheBlockStride_);
+    tilingData_.set_xRowStride(d_); // x 为 2D 连续 [bs, 512], 行 stride 恒为 d
     tilingData_.set_scaleCol(scaleCol_);
     tilingData_.set_concatCol(concatCol);
     tilingData_.set_quantMode(quantMode_);
@@ -347,7 +327,7 @@ ge::graphStatus KvCompressEpilogTilingArch35::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::PostTiling()
+ge::graphStatus KvCompressEpilogTilingArch22::PostTiling()
 {
     // Set block dimension (number of AI cores to use)
     context_->SetBlockDim(usedCoreNums_);
@@ -373,7 +353,7 @@ ge::graphStatus KvCompressEpilogTilingArch35::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-void KvCompressEpilogTilingArch35::DumpTilingInfo()
+void KvCompressEpilogTilingArch22::DumpTilingInfo()
 {
     std::ostringstream info;
     info << "bs: " << tilingData_.get_bs();
@@ -382,6 +362,7 @@ void KvCompressEpilogTilingArch35::DumpTilingInfo()
     info << ", kvCacheRowStride: " << tilingData_.get_kvCacheRowStride();
     info << ", kvCacheBlockSize: " << tilingData_.get_kvCacheBlockSize();
     info << ", kvCacheBlockStride: " << tilingData_.get_kvCacheBlockStride();
+    info << ", xRowStride: " << tilingData_.get_xRowStride();
     info << ", scaleCol: " << tilingData_.get_scaleCol();
     info << ", concatCol: " << tilingData_.get_concatCol();
     info << ", quantMode: " << tilingData_.get_quantMode();
@@ -398,13 +379,13 @@ void KvCompressEpilogTilingArch35::DumpTilingInfo()
     OP_LOGI(context_->GetNodeName(), "%s", info.str().c_str());
 }
 
-uint64_t KvCompressEpilogTilingArch35::GetTilingKey() const
+uint64_t KvCompressEpilogTilingArch22::GetTilingKey() const
 {
-    // 单一 tiling key; mode0/1/2 在 kernel 内按 tilingData->quantMode 运行时分支量化路径
+    // 单一 tiling key 0 (单模板); slot_mapping int32/int64 差异由 kernel 模板类型参数承载
     return 0UL;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::GetShapeAttrsInfo()
+ge::graphStatus KvCompressEpilogTilingArch22::GetShapeAttrsInfo()
 {
     OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context can not be nullptr"),
                 return ge::GRAPH_FAILED);
@@ -427,7 +408,7 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KvCompressEpilogTilingArch35::RunTiling()
+ge::graphStatus KvCompressEpilogTilingArch22::RunTiling()
 {
     OP_CHECK_IF(GetPlatformInfo() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "GetPlatformInfo failed"),
                 return ge::GRAPH_FAILED);
@@ -443,24 +424,5 @@ ge::graphStatus KvCompressEpilogTilingArch35::RunTiling()
 
     return ge::GRAPH_SUCCESS;
 }
-
-ge::graphStatus TilingForKvCompressEpilog(gert::TilingContext* context)
-{
-    OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("KvCompressEpilog", "Tiling context is null"),
-                return ge::GRAPH_FAILED);
-
-    KvCompressEpilogTilingArch35 tiling(context);
-    return tiling.RunTiling();
-}
-
-ge::graphStatus TilingPrepareForKvCompressEpilog(gert::TilingParseContext* context)
-{
-    (void)context;
-    return ge::GRAPH_SUCCESS;
-}
-
-IMPL_OP_OPTILING(KvCompressEpilog)
-    .Tiling(TilingForKvCompressEpilog)
-    .TilingParse<KvCompressEpilogCompileInfo>(TilingPrepareForKvCompressEpilog);
 
 } // namespace optiling

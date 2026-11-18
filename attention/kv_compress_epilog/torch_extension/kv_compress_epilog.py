@@ -22,6 +22,7 @@ class KvCompressQuantMode(IntEnum):
     HIFLOAT8_FP4 = (
         2  # "hifloat8_fp4" rope hifloat8 静态 + nope per-group FLOAT4_E2M1 动态
     )
+    INT8_BF16 = 1  # "int8_bf16"     arch22(A2/A3)承载：与FP8_E8M0同值1按平台分流；nope per-group(64) int8 对称动态量化，bf16 scale，rope 保留 bf16
 
 
 DEFAULT_QUANT_MODE = "fp8_e8m0"
@@ -33,7 +34,7 @@ def _resolve_quant_mode(quant_mode: Union[str, int]) -> int:
         try:
             return int(KvCompressQuantMode[quant_mode.strip().upper()])
         except KeyError as exc:
-            valid = ", ".join(m.name.lower() for m in KvCompressQuantMode)
+            valid = ", ".join(n.lower() for n in KvCompressQuantMode.__members__)
             raise ValueError(
                 f"quant_mode should be one of [{valid}], but got {quant_mode!r}"
             ) from exc

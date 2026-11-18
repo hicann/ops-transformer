@@ -23,7 +23,8 @@ namespace {
 constexpr int64_t MIN_TAIL_DIM = 64;
 constexpr int64_t TAIL_DIM_ALIGN = 64;
 constexpr int64_t QUANT_MODE_MIN = 0;
-constexpr int64_t QUANT_MODE_MAX = 2; // 0:group(bf16) 1:group(e8m0) 2:rope hifloat8 + nope FLOAT4_E2M1
+constexpr int64_t QUANT_MODE_MAX =
+    3; // 0:group(bf16) 1:group(e8m0; arch22 A2/A3承载nope int8) 2:rope hifloat8 + nope FLOAT4_E2M1
 } // namespace
 
 void KvCompressEpilog(at::Tensor& cache, const at::Tensor& x, const at::Tensor& slotMapping, int64_t quantGroupSize,
@@ -33,8 +34,8 @@ void KvCompressEpilog(at::Tensor& cache, const at::Tensor& x, const at::Tensor& 
     TORCH_CHECK(x.dim() >= 2, "x should be at least 2-dim, but got ", x.dim());
     TORCH_CHECK(slotMapping.dim() == x.dim() - 1, "slot_mapping dim should equal x dim - 1, but got slot_mapping dim ",
                 slotMapping.dim(), " and x dim ", x.dim());
-    TORCH_CHECK(quantMode >= QUANT_MODE_MIN && quantMode <= QUANT_MODE_MAX, "quant_mode should be 0, 1 or 2, but got ",
-                quantMode);
+    TORCH_CHECK(quantMode >= QUANT_MODE_MIN && quantMode <= QUANT_MODE_MAX,
+                "quant_mode should be 0, 1, 2 or 3, but got ", quantMode);
     int64_t tailDim = x.size(x.dim() - 1);
     TORCH_CHECK(tailDim > MIN_TAIL_DIM && tailDim % TAIL_DIM_ALIGN == 0,
                 "The last dim (d) of x should be greater than 64 and 64-aligned, but got ", tailDim);

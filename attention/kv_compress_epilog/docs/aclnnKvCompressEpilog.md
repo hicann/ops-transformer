@@ -6,10 +6,10 @@
 - <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2推理产品</term>：不支持
@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：在KV Cache的Epilog阶段，对KV Cache进行原地压缩更新。将`bfloat16`激活值量化压缩后，按`slotMapping`散写到cache，值为 -1的token跳过不处理。`x`尾轴`d`的后64列为rope段、前`d-64`列为nope段。支持三种量化模式：group(bf16 scale)、group(e8m0 scale)、rope hifloat8静态 + nope FLOAT4_E2M1动态。
+- 接口功能：在KV Cache的Epilog阶段，对KV Cache进行原地压缩更新。将`bfloat16`激活值量化压缩后，按`slotMapping`散写到cache，值为 -1的token跳过不处理。`x`尾轴`d`的后64列为rope段、前`d-64`列为nope段。支持四种量化模式：group(bf16 scale)、group(e8m0 scale)、rope hifloat8静态 + nope FLOAT4_E2M1动态、nope INT8对称动态量化（rope保留bf16）。
 
 - 计算公式：
 
@@ -44,6 +44,14 @@
     scale_g = \frac{\max(|x_g|)}{FP4\_MAX}, \quad nope_i = \mathrm{FLOAT4\_E2M1}\left(\frac{x_i}{scale_g}\right)
     $$
 
+  - 场景4（quantMode=1，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上承载INT8）：`d`固定为512，前448列为nope段（每64元素一组共7组）做INT8**对称动态**量化，后64列为rope段按`bfloat16`原始位型写出；`scale`以`bfloat16`写出，`roundScale`、`xScale`不生效。每token行定长608B：rope 128B | nope 448B | scale 14B | pad 18B(写0)。取整为数学真值的 RNE（四舍六入五取偶）：
+
+    $$
+    amax_g = \max(|x_g|), \quad
+    scale_g = \begin{cases} 1.0, & amax_g = 0 \\ \frac{amax_g}{127}, & amax_g \neq 0 \end{cases}, \quad
+    q_i = \mathrm{clip}\left(\mathrm{RNE}\left(\frac{x_i}{scale_g}\right), -128, 127\right)
+    $$
+
 - 示例：
 
   ```python
@@ -55,6 +63,14 @@
   roundScale = true
   xScale = 1.0
   cache out shape:    [128, 16, 1, 384]   (原地更新)
+
+  # 场景4（quantMode=1，A2/A3 承载 INT8）
+  cache shape:        [128, 16, 1, 608]   # headDim≥608
+  x shape:            [1024, 512]
+  slot_mapping shape: [1024]
+  quantGroupSize = 64
+  quantMode = 1
+  cache out shape:    [128, 16, 1, 608]   (原地更新，被引用行的前608B被覆写)
   ```
 
 ## 函数原型
@@ -122,7 +138,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>x（const aclTensor*）</td>
       <td>输入</td>
       <td>待量化的激活输入，对应计算公式中x。</td>
-      <td><li>不支持空Tensor。</li><li>最后一维d需满足d % 64 == 0且64 < d ≤ 8192。</li></td>
+      <td><li>不支持空Tensor。</li><li>最后一维d需满足d % 64 == 0且64 < d ≤ 8192。</li><li><term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上quantMode=1时d必须等于512。</li></td>
       <td>BFLOAT16</td>
       <td>ND</td>
       <td>[bs, d]</td>
@@ -142,7 +158,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>quantGroupSize（int64_t）</td>
       <td>输入</td>
       <td>量化分组大小。</td>
-      <td>默认值为64。quantMode=2时仅支持16/32/64，且要求(d-64) % quantGroupSize == 0。</td>
+      <td>默认值为64。quantMode=2时仅支持16/32/64，且要求(d-64) % quantGroupSize == 0；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上quantMode=1时必须为64。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -152,7 +168,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>quantMode（int64_t）</td>
       <td>输入</td>
       <td>量化模式。</td>
-      <td>枚举值支持0、1、2，其中0表示group量化（scale存储为bfloat16），1表示group量化（scale存储为float8_e8m0），2表示rope段hifloat8静态量化 + nope段FLOAT4_E2M1动态量化（scale存储为bfloat16）。默认值为1。</td>
+      <td>枚举值支持0、1、2，其中0表示group量化（scale存储为bfloat16），1表示group量化（scale存储为float8_e8m0），2表示rope段hifloat8静态量化 + nope段FLOAT4_E2M1动态量化（scale存储为bfloat16），1在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上表示nope段INT8对称动态量化 + rope段保留bfloat16（scale存储为bfloat16，要求d=512；其余平台为group量化，scale存储为float8_e8m0）。默认值为1。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -162,7 +178,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>roundScale（bool）</td>
       <td>输入</td>
       <td>group模式下是否对每组scale向上取到2的幂。</td>
-      <td>默认值为true。quantMode=2下不生效。</td>
+      <td>默认值为true。quantMode=2及<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>的quantMode=1下不生效。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -171,7 +187,7 @@ aclnnStatus aclnnKvCompressEpilog(
     <tr>
       <td>xScale（float）</td>
       <td>输入</td>
-      <td>quantMode=2时为rope段hifloat8静态量化的缩放系数；quantMode=0/1下预留未使用。</td>
+      <td>quantMode=2时为rope段hifloat8静态量化的缩放系数；quantMode=0/1下预留未使用（<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>的quantMode=1亦不生效）。</td>
       <td>默认值为1.0。</td>
       <td>-</td>
       <td>-</td>
@@ -266,10 +282,16 @@ aclnnStatus aclnnKvCompressEpilog(
 
 - 确定性计算：aclnnKvCompressEpilog默认确定性实现。
 - **cache仅支持四维shape** `[blockNum, blockSize, 1, headDim]`（num_slots = blockNum × blockSize），倒数第二维固定为1，不支持其他维数；仅在blockNum维支持非连续。
-- **headDim约束**：cache末维headDim须 ≥ 每行写出字节数kvCacheCol = 对齐(concatCol)。concatCol：quantMode=0/1为(d-64)+128+⌈(d-64)/64⌉×scaleBytes（mode0=2、mode1=1）；quantMode=2为64+(d-64)/2+((d-64)/quantGroupSize)×2。对齐：quantMode=1不补齐，quantMode=0/2按32B对齐。示例：d=256、quantMode=1 → kvCacheCol=323 → headDim ≥ 323。
+- **headDim约束**：cache末维headDim须 ≥ 每行写出字节数kvCacheCol = 对齐(concatCol)。concatCol：quantMode=0/1为(d-64)+128+⌈(d-64)/64⌉×scaleBytes（mode0=2、mode1=1）；quantMode=2为64+(d-64)/2+((d-64)/quantGroupSize)×2；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上quantMode=1恒为608。对齐：quantMode=1不补齐，quantMode=0/2按32B对齐。示例：d=256、quantMode=1 → kvCacheCol=323 → headDim ≥ 323；quantMode=1（A2/A3）→ kvCacheCol=608 → headDim ≥ 608。
 - slotMapping的维度应等于x的维度减1，即slotMapping为x除最后一维外的所有维度展平。
 - x的最后一维（d轴）需满足d % 64 == 0且64 < d ≤ 8192，按每64个元素一组进行逐组量化。
 - quantMode=2时，quantGroupSize仅支持16/32/64，且nope段长度(d-64)需能被quantGroupSize整除；x需为bfloat16。
+<!-- npu="950" id7 -->
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上quantMode=1承载INT8量化（d=512、608B行），本平台quantMode=1为group(e8m0)量化。
+<!-- end id7 -->
+<!-- npu="A3,910b" id8 -->
+- quantMode=1时（INT8量化），d必须等于512（448列nope + 64列rope）、quantGroupSize必须为64、headDim须 ≥ 608；roundScale/xScale不生效。仅支持quantMode=1，其他取值报错。
+<!-- end id8 -->
 - slotMapping中值为 -1的token会被跳过不处理；其余有效元素取值范围为[0, num_slots - 1]，且元素值应保证不重复，重复时不保证结果正确性。
 
 ## 调用示例

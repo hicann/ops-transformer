@@ -17,12 +17,19 @@
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
+#include "opdev/platform.h"
 #include "opdev/shape_utils.h"
 #include "opdev/tensor_view_utils.h"
 
 using namespace op;
 
+// arch22 quant_mode=1 (int8) 场景常量, 与 op_host tiling 层校验保持一致
 namespace {
+constexpr int64_t QUANT_MODE_INT8_ACLNN = 1;
+constexpr int64_t DEFAULT_QUANT_GROUP_SIZE_ACLNN = 64;
+constexpr int64_t D_LENGTH_MODE3_ACLNN = 512;
+constexpr int64_t KVCACHE_COL_MODE3_ACLNN = 608;
+
 constexpr size_t CACHE_VIEW_DIM_NUM = 4;
 constexpr size_t CACHE_BLOCKNUM_DIM = 0;
 constexpr size_t CACHE_BLOCKSIZE_DIM = 1;
@@ -91,9 +98,98 @@ aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(aclTensor* cacheRef, const acl
     OP_CHECK_NULL(x, return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK_NULL(slotMapping, return ACLNN_ERR_PARAM_NULLPTR);
 
-    if (cacheRef->IsEmpty() || x->IsEmpty() || slotMapping->IsEmpty()) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "aclnnKvCompressEpilog does not support empty tensor!");
-        return ACLNN_ERR_PARAM_INVALID;
+    // 平台分流: arch22 (A2/A3) 执行 quant_mode=1 (int8) 专属参数校验;
+    const bool isArch22 = (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201);
+    if (isArch22) {
+        if (quantMode != QUANT_MODE_INT8_ACLNN) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "quant_mode %lld is not supported on arch22 (A2/A3); only quant_mode=1 (INT8) is supported",
+                    static_cast<long long>(quantMode));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (quantGroupSize != DEFAULT_QUANT_GROUP_SIZE_ACLNN) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quant_group_size must be 64 when quant_mode==1, got %lld",
+                    static_cast<long long>(quantGroupSize));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+
+        auto xShape = x->GetViewShape();
+        auto cacheShape = cacheRef->GetViewShape();
+        auto slotShape = slotMapping->GetViewShape();
+
+        // x: 2D [bs, 512], bf16, 非空
+        if (x->IsEmpty()) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "empty tensor is not supported (x)!");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (xShape.GetDimNum() != 2) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "x must be 2D [bs, d] when quant_mode==1, got dimNum=%u",
+                    static_cast<unsigned>(xShape.GetDimNum()));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (xShape.GetDim(1) != D_LENGTH_MODE3_ACLNN) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "d must be 512 when quant_mode==1, got %ld",
+                    static_cast<long>(xShape.GetDim(1)));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (x->GetDataType() != DataType::DT_BF16) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "x dtype must be bfloat16, got %d", static_cast<int>(x->GetDataType()));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+
+        // cache: 4D [blockNum, blockSize, 1, headDim], uint8, blockNum>0, headDim>=608,
+        //        blockStride >= blockSize*headDim (分页视图)
+        if (cacheShape.GetDimNum() != 4 || cacheShape.GetDim(2) != 1) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache must be 4D with dim2 == 1 when quant_mode==1");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (cacheRef->GetDataType() != DataType::DT_UINT8) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache dtype must be uint8, got %d",
+                    static_cast<int>(cacheRef->GetDataType()));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (cacheShape.GetDim(0) <= 0) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache blockNum must be > 0, got %ld",
+                    static_cast<long>(cacheShape.GetDim(0)));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (cacheRef->IsEmpty()) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "empty tensor is not supported (cache)!");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        const int64_t headDim = cacheShape.GetDim(3);
+        if (headDim < KVCACHE_COL_MODE3_ACLNN) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache headDim must be >= 608 when quant_mode==1, got %ld",
+                    static_cast<long>(headDim));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        {
+            auto cacheStrides = cacheRef->GetViewStrides();
+            const int64_t blockSize = cacheShape.GetDim(1);
+            const int64_t blockStride = cacheStrides[0];
+            if (blockStride < blockSize * headDim) {
+                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache blockStride must be >= blockSize * headDim, got %ld < %ld",
+                        static_cast<long>(blockStride), static_cast<long>(blockSize * headDim));
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+        }
+
+        // slot_mapping: int32/int64, 1D [bs] 与 x bs 一致, 非空
+        if (slotMapping->IsEmpty()) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "empty tensor is not supported (slot_mapping)!");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (slotMapping->GetDataType() != DataType::DT_INT32 && slotMapping->GetDataType() != DataType::DT_INT64) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "slot_mapping dtype only supports int32/int64, got %d",
+                    static_cast<int>(slotMapping->GetDataType()));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (slotShape.GetDimNum() != 1 || slotShape.GetDim(0) != xShape.GetDim(0)) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "slot_mapping length must equal x bs, got dimNum=%u len=%ld, x bs=%ld",
+                    static_cast<unsigned>(slotShape.GetDimNum()), static_cast<long>(slotShape.GetDim(0)),
+                    static_cast<long>(xShape.GetDim(0)));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
 
     // cacheRef 布局契约校验: 连续或仅 blockNum 维非连续(分页), 其余布局直接报错。

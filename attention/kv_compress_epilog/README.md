@@ -5,17 +5,18 @@
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
 | <term>Ascend 950PR&950DT系列产品</term>                       |    √     |
-| <term>Atlas A3系列产品</term>     |    ×     |
-| <term>Atlas A2系列产品</term>     |    ×     |
+| <term>Atlas A3系列产品</term>     |    √     |
+| <term>Atlas A2系列产品</term>     |    √     |
 | <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
 | <term>Atlas推理系列产品</term>                              |    ×     |
 | <term>Atlas训练系列产品</term>                              |    ×     |
 
 ## 功能说明
 
-- 算子功能：在KV Cache的Epilog阶段对缓存进行原地压缩更新。算子将`bfloat16`激活值`x`量化压缩后，按`slot_mapping`将结果散写（scatter）到`cache`，`slot_mapping`中值为 -1的token跳过不处理。`x`尾轴`d`的后64列为rope段、前`d-64`列为nope段。支持三种量化模式：
+- 算子功能：在KV Cache的Epilog阶段对缓存进行原地压缩更新。算子将`bfloat16`激活值`x`量化压缩后，按`slot_mapping`将结果散写（scatter）到`cache`，`slot_mapping`中值为 -1的token跳过不处理。`x`尾轴`d`的后64列为rope段、前`d-64`列为nope段。支持四种量化模式：
   - `quant_mode=0/1`：对`x`逐组动态量化（Group-wise Dynamic Quantization）压缩为FP8（以`uint8`打包），rope段保留为`bfloat16`；
-  - `quant_mode=2`：rope段做hifloat8**静态**量化（乘`x_scale`后取hifloat8），nope段做per-group **FLOAT4_E2M1 动态**量化（`scale=组内amax/6`以`bfloat16`写出）。
+  - `quant_mode=2`：rope段做hifloat8**静态**量化（乘`x_scale`后取hifloat8），nope段做per-group **FLOAT4_E2M1 动态**量化（`scale=组内amax/6`以`bfloat16`写出）；
+  - `quant_mode=1`（<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上承载INT8）：nope段（前448列，每64元素一组共7组）做INT8**对称动态**量化（`scale=组内amax/127`以`bfloat16`写出），rope段保留`bfloat16`原始位型，按`slot_mapping`散写；每token定长608B（rope 128B | nope 448B | scale 14B | pad 18B）。
 
 - 计算公式：
 
@@ -38,6 +39,14 @@
 
     `scale`以`bfloat16`写出；该模式下`round_scale`不生效。
 
+  - `<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上`quant_mode=1`承载 INT8 对称动态量化（量化值域 [-128, 127]）：
+
+    $$
+    scale_g = \frac{\max(|x_g|)}{127}, \quad q_i = \mathrm{RNE}\left(\frac{x_i}{scale_g}\right)
+    $$
+
+    `d` 固定为 512；`amax_g=0` 时 `scale_g=1.0`；`scale`以`bfloat16`写出（单次 RNE 舍入）；rope段64列按`bfloat16`原始位型写出；行内pad 18B写0。
+
 ## 参数说明
 
 | 参数名           | 输入/输出/属性 | 描述                                                             | 数据类型      | 数据格式 |
@@ -46,8 +55,8 @@
 | x                | 输入           | 待量化的激活输入，即公式中`x`。shape为[bs, d]。                                | BFLOAT16      | ND       |
 | slot_mapping     | 输入           | token到cache slot的索引映射，值为 -1表示跳过该token。shape为[bs]。              | INT32、INT64  | ND       |
 | cache            | 输出           | 原地更新后的KV Cache，与输入`cache`为同一tensor。                            | UINT8         | ND       |
-| quant_group_size | 可选属性       | 量化分组大小。建议值为64。`quant_mode=2`时仅支持16/32/64，且要求`(d-64) % quant_group_size == 0`。 | INT           | -        |
-| quant_mode       | 可选属性       | 量化模式：0=group(bf16 scale)，1=group(e8m0 scale)，2=rope hifloat8静态 + nope FLOAT4_E2M1动态。建议值为1。 | INT           | -        |
+| quant_group_size | 可选属性       | 量化分组大小。建议值为64。`quant_mode=2`时仅支持16/32/64，且要求`(d-64) % quant_group_size == 0`；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上`quant_mode=1`时必须为64。 | INT           | -        |
+| quant_mode       | 可选属性       | 量化模式：0=group(bf16 scale)，1=group(e8m0 scale)，2=rope hifloat8静态 + nope FLOAT4_E2M1动态；1在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上承载nope INT8对称动态量化 + rope bf16。建议值为1。 | INT           | -        |
 | round_scale      | 可选属性       | group模式下是否对每组scale向上取到2的幂。建议值为true。`quant_mode=2`下不生效。                  | BOOL          | -        |
 | x_scale          | 可选属性       | `quant_mode=2`时为rope段hifloat8静态量化的缩放系数；`quant_mode=0/1`下预留未使用。建议值为1.0。     | FLOAT         | -        |
 
@@ -57,6 +66,7 @@
 - `slot_mapping`的维度应等于`x`的维度减1，即`slot_mapping`为`x`除最后一维外的所有维度展平。
 - `x`的最后一维（d轴）需满足`d % 64 == 0`且`64 < d ≤ 8192`，按每64个元素一组进行逐组量化。
 - `quant_mode=2`时，`quant_group_size`仅支持16/32/64，且nope段长度`(d-64)`需能被`quant_group_size`整除；`x`需为`bfloat16`。
+- `quant_mode=1`在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上承载INT8量化：`d`必须等于512、`quant_group_size`必须为64、`headDim`须 ≥ 608（kvCacheCol=608）；`round_scale`/`x_scale`不生效；<term>Ascend 950PR&950DT系列产品</term>上`quant_mode=1`为FP8(e8m0)量化，其他`quant_mode`取值报错。
 - `slot_mapping`中值为 -1的token会被跳过不处理；其余有效元素取值范围为[0, num_slots - 1]，且元素值应保证不重复，重复时不保证结果正确性。
 
 ## 调用说明
