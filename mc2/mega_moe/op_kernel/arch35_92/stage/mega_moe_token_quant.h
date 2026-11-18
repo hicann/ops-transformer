@@ -440,6 +440,9 @@ __aicore__ inline void PackBf16LocalTokens(const WorkRange& tokenRange, const Mo
                                            const Params& params, const Bf16InputConfig& config,
                                            Bf16InputScratch& scratch)
 {
+    if (tokenRange.count == 0U) {
+        return;
+    }
     const uint32_t weightOffsetBytes = config.dataBytes;
     const bool hasWeights = config.tokenScaleBytes > config.dataBytes;
     auto* input = reinterpret_cast<__gm__ uint8_t*>(params.aGmAddr);
