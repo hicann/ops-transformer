@@ -474,7 +474,7 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV4(
 - band场景，preTokens和nextTokens之间必须要有交集。
 - attenMaskOptional输入不支持补pad，即attenMaskOptional中不能存在某一行全1的场景。
 - actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入realShiftOptional，假设真实的S长度为\[2,2,0,2,2\]，则传入的actualSeqQLenOptional为\[2,4,4,6,8\]。
-- softmaxOutLayout支持传入：空字符串、"same_as_input"。
+- softmaxOutLayout支持传入：空字符串、"same_as_input"。其他取值按空字符串处理（NTD 排布），并输出告警日志。
 
 ## 调用示例
 

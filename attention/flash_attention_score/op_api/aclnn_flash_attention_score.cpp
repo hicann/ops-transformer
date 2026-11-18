@@ -1130,6 +1130,22 @@ static aclnnStatus CheckFaParam(const aclTensor* query, const aclTensor* key, co
     return ACLNN_SUCCESS;
 }
 
+// The documented values are "" and "same_as_input"; any other string has always fallen through to the
+// tiling layer's default layout, so rejecting it here would break callers that pass a misspelt or
+// upper-case value and still get a working kernel. Keep the behaviour and make the fallback visible.
+static void WarnUnsupportedSoftmaxOutLayout(const char* softmaxOutLayout, const char* defaultLayout)
+{
+    if (softmaxOutLayout == nullptr || strcmp(softmaxOutLayout, "") == 0 ||
+        strcmp(softmaxOutLayout, "same_as_input") == 0) {
+        return;
+    }
+    // The default differs per interface: the fixed-length entries fall back to BNS8, the variable-length
+    // ones to NTD, so the layout name is passed in rather than assumed here.
+    OP_LOGW("In op [FlashAttentionScore], the softmaxOutLayout [%s] is not documented; the default %s "
+            "layout is used. Supported values are \"same_as_input\" and \"\"",
+            softmaxOutLayout, defaultLayout);
+}
+
 static aclnnStatus isSupportMultiInput(const aclTensor* query, const aclTensor* queryRope, const aclTensor* key,
                                        const aclTensor* keyRope, const aclTensor* value,
                                        const aclTensor* attenMaskOptional, const aclTensor* pseShiftOptional,
@@ -1695,6 +1711,7 @@ aclnnStatus aclnnFlashAttentionScoreV4GetWorkspaceSize(
     CHECK_RET(CheckFaParam(query, key, value, inputLayout, softmaxMaxOut, softmaxSumOut, attentionOutOut, workspaceSize,
                            executor) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_NULLPTR);
+    WarnUnsupportedSoftmaxOutLayout(softmaxOutLayout, "BNS8");
     L2_DFX_PHASE_1(aclnnFlashAttentionScoreV4,
                    DFX_IN(query, key, value, realShiftOptional, dropMaskOptional, paddingMaskOptional,
                           attenMaskOptional, queryRopeOptional, keyRopeOptional, dScaleQOptional, dScaleKOptional,
@@ -2054,6 +2071,7 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV4GetWorkspaceSize(
     CHECK_RET(CheckFaParam(query, key, value, inputLayout, softmaxMaxOut, softmaxSumOut, attentionOutOut, workspaceSize,
                            executor) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_NULLPTR);
+    WarnUnsupportedSoftmaxOutLayout(softmaxOutLayout, "NTD");
     L2_DFX_PHASE_1(
         aclnnFlashAttentionVarLenScoreV4,
         DFX_IN(query, key, value, realShiftOptional, dropMaskOptional, paddingMaskOptional, attenMaskOptional,
@@ -2171,6 +2189,7 @@ aclnnStatus ExecFlashAttentionVarLenScoreV5GetWorkspaceSize(
     const aclTensor* softmaxOutOut, const aclTensor* attentionOutOut, uint64_t* workspaceSize, aclOpExecutor** executor,
     bool isMaxWorkspace = false)
 {
+    WarnUnsupportedSoftmaxOutLayout(softmaxOutLayout, "NTD");
     auto uniqueExecutor = CREATE_EXECUTOR();
     // b, n1, s1 为0时，不进行任何处理
     // n2, s2, d 为0时，直接调用l0接口处理
