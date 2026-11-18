@@ -199,6 +199,10 @@ struct MegaMoeBf16GmmConfig {
     static constexpr uint32_t BUFFER_COUNT = 2U;
     static constexpr uint32_t GMM1_UB_BUFFER_COUNT = 2U;
     static constexpr uint32_t GMM1_UB_SLOT_BYTES = TILE_M * TILE_N * sizeof(uint16_t);
+    // 非 prefetch 在两个输入槽内原位激活；prefetch 只使用一个输入槽和逐行路由元数据。
+    static constexpr uint32_t ACTIVATION_UB_BYTES = GMM1_UB_BUFFER_COUNT * GMM1_UB_SLOT_BYTES;
+    static constexpr uint32_t PREFETCH_ACTIVATION_UB_BYTES =
+        GMM1_UB_SLOT_BYTES + TILE_M * MegaMoeImpl::MemoryLayoutDetail::ALIGN_32;
 };
 
 struct MegaMoeTilingData {

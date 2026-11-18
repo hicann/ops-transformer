@@ -193,7 +193,8 @@ static ge::graphStatus CheckAndSetExpertExecutionParams(const gert::TilingContex
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA16W16Compatibility(const MegaMoeTilingData* tilingData, const char* nodeName)
+static ge::graphStatus CheckA16W16Compatibility(const MegaMoeTilingData* tilingData, uint64_t ubSize,
+                                                const char* nodeName)
 {
     const bool moeBf16 = IsA16W16GmmMode(tilingData->moeGmmMode);
     const bool sharedBf16 = tilingData->compute.sharedExpertNum > 0 && IsA16W16GmmMode(tilingData->sharedGmmMode);
@@ -203,6 +204,13 @@ static ge::graphStatus CheckA16W16Compatibility(const MegaMoeTilingData* tilingD
     OP_TILING_CHECK(!moeBf16 || (tilingData->compute.sharedExpertNum > 0 && !sharedBf16),
                     OP_LOGE(nodeName, "A16W16 requires BF16 MoE and shared experts when shared weights are present."),
                     return ge::GRAPH_FAILED);
+    const uint32_t activationUbBytes = tilingData->isTopkWeightsPrefetch && !sharedBf16 ?
+                                           MegaMoeBf16GmmConfig::PREFETCH_ACTIVATION_UB_BYTES :
+                                           MegaMoeBf16GmmConfig::ACTIVATION_UB_BYTES;
+    OP_TILING_CHECK(
+        activationUbBytes > ubSize,
+        OP_LOGE(nodeName, "A16W16 activation requires %u bytes of UB, available %lu bytes.", activationUbBytes, ubSize),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -625,7 +633,7 @@ ge::graphStatus MegaMoeTilingFuncImplArch35(gert::TilingContext* context, MegaMo
                     OP_LOGE(nodeName, "platform parameters are invalid."), return ge::GRAPH_FAILED);
     if (IsA16W16GmmMode(tilingData->moeGmmMode) ||
         (tilingData->compute.sharedExpertNum > 0 && IsA16W16GmmMode(tilingData->sharedGmmMode))) {
-        OP_TILING_CHECK(CheckA16W16Compatibility(tilingData, nodeName) != ge::GRAPH_SUCCESS,
+        OP_TILING_CHECK(CheckA16W16Compatibility(tilingData, ubSize, nodeName) != ge::GRAPH_SUCCESS,
                         OP_LOGE(nodeName, "A16W16 compatibility check failed."), return ge::GRAPH_FAILED);
     }
 
