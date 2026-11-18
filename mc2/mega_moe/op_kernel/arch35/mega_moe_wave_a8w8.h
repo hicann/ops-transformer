@@ -867,7 +867,7 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>
 __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDerived>::Process()
 {
-    // 就绪状态取自最终实现类型，未完成实现的派生类型不能进入公共流水。
+    // 就绪状态取自最终实现类型，未通过完整验证的派生实现不能进入公共流水。
     static_assert(ImplType::kImplementationReady, "MegaMoe derived kernel implementation is not ready.");
     if constexpr (ImplType::kImplementationReady) {
         this->ProcessWave(GetImpl());

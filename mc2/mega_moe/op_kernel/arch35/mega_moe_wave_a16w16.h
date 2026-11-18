@@ -75,8 +75,8 @@ private:
     static_assert(CombineQuantMode == COMBINE_NO_QUANT, "MegaMoe A16W16 requires unquantized Combine.");
 
 public:
-    // 输入通信、计算及同步钩子已实现，由入口偏特化选择本路径。
-    static constexpr bool kImplementationReady = true;
+    // 完成设备编译、同步验证和入口集成后再开放生产执行。
+    static constexpr bool kImplementationReady = false;
 
 protected:
     __aicore__ inline void InitPathConfigs(const MegaMoeTilingData* tilingData)

@@ -24,7 +24,6 @@
 #include "mega_moe_wave_a8w8.h"
 #include "mega_moe_wave_a4w4.h"
 #include "mega_moe_wave_a8w4.h"
-#include "mega_moe_wave_a16w16.h"
 #endif
 
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
@@ -73,18 +72,6 @@ class MegaMoeMteWave<XType, OutputType, TopkWeightsType, fp4x2_e2m1_t, MoeWeight
                              SharedWeightType, SharedQuantMode, MoeWeight1Format, MoeWeight2Format, SharedWeight1Format,
                              SharedWeight2Format> {};
 
-#ifdef MEGA_MOE_ARCH35_DEVICE
-// BF16 直通固定为两级 BF16 计算和非量化 Combine，其余参数沿用原入口。
-template <typename TopkWeightsType, int32_t MoeWeight1Format, int32_t MoeWeight2Format,
-          int32_t SharedWeight1Format, int32_t SharedWeight2Format>
-class MegaMoeMteWave<bfloat16_t, bfloat16_t, TopkWeightsType, bfloat16_t, MoeWeight1Format, MoeWeight2Format,
-                     bfloat16_t, SharedWeight1Format, SharedWeight2Format, EXPERT_QUANT_OUT_DTYPE_BF16,
-                     EXPERT_QUANT_OUT_DTYPE_BF16>
-    : public MegaMoeA16W16Wave<bfloat16_t, bfloat16_t, TopkWeightsType, bfloat16_t, EXPERT_QUANT_OUT_DTYPE_BF16,
-                               bfloat16_t, EXPERT_QUANT_OUT_DTYPE_BF16, MoeWeight1Format, MoeWeight2Format,
-                               SharedWeight1Format, SharedWeight2Format> {};
-#endif
-
 } // namespace MegaMoeImpl
 #endif
 
@@ -104,11 +91,9 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
 #if defined(ENABLE_TENSOR_API) && defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_Y) && (ORIG_DTYPE_Y == DT_BF16) && \
     defined(ORIG_DTYPE_WEIGHT1) && \
     ((ORIG_DTYPE_WEIGHT1 == DT_FLOAT8_E5M2) || (ORIG_DTYPE_WEIGHT1 == DT_FLOAT8_E4M3FN) || \
-     (ORIG_DTYPE_WEIGHT1 == DT_FLOAT4_E2M1) || (ORIG_DTYPE_WEIGHT1 == DT_BF16)) && \
+     (ORIG_DTYPE_WEIGHT1 == DT_FLOAT4_E2M1)) && \
     defined(ORIG_DTYPE_WEIGHT2) && (ORIG_DTYPE_WEIGHT2 == ORIG_DTYPE_WEIGHT1)
-    // def 的 x 类型列表共用；BF16 权重组合仅实例化 BF16 x 对应的执行入口。
-    if constexpr (CommModeType == TILINGKEY_TPL_MTE &&
-                  (!std::is_same<MoeWeightType, bfloat16_t>::value || std::is_same<DTYPE_X, bfloat16_t>::value)) {
+    if constexpr (CommModeType == TILINGKEY_TPL_MTE) {
         MegaMoeImpl::MegaMoeMteWave<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, MoeWeightType, FORMAT_WEIGHT1, FORMAT_WEIGHT2,
                                     SharedWeightType, FORMAT_SHARED_WEIGHT1, FORMAT_SHARED_WEIGHT2,
                                     DispatchQuantOutType, SharedQuantOutType>
