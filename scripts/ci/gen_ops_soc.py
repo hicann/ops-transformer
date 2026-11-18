@@ -58,9 +58,13 @@ group_op_dict = {
         "matmul_all_reduce": 40,
         "allto_all_matmul": 20,
         "matmul_reduce_scatter_v2": 20,
+        "flash_attn_grad": 2,
+        "scatter_pa_kv_cache": 20,
     },
     "ascend350": {
         "flash_attention_score_grad": 5,
+        "flash_attn_grad": 2,
+        "scatter_pa_kv_cache": 20,
     },
     "ascend960dt": {
         "fused_infer_attention_score": 20,
@@ -70,10 +74,14 @@ group_op_dict = {
         "matmul_all_reduce": 40,
         "allto_all_matmul": 20,
         "matmul_reduce_scatter_v2": 20,
+        "flash_attn_grad": 2,
+        "scatter_pa_kv_cache": 20,
     },
     "ascend960pr": {
         "fused_infer_attention_score": 20,
         "flash_attention_score_grad": 5,
+        "flash_attn_grad": 2,
+        "scatter_pa_kv_cache": 20,
     },
 }
 
