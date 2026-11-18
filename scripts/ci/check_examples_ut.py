@@ -248,8 +248,15 @@ def parse_ops_from_filelist(
             parts = file_path.split("/")
             if len(parts) < 2:
                 continue
+            # 文档变更不改变算子实现，也不触发依赖展开。
+            # docs 目录之外的 CMakeLists.txt 等构建输入仍触发检查。
+            if parts[-1].lower().endswith((".md", ".rst", ".adoc")):
+                continue
             category, second = parts[0], parts[1]
             if category == "experimental":
+                continue
+            # 算子 docs 目录内的图片等文档资源也不触发检查。
+            if category in categories and len(parts) >= 4 and parts[2] == "docs":
                 continue
             prefix = ""
             if category in categories:
