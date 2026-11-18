@@ -1151,6 +1151,16 @@ if (NOT ENABLE_AICPU_KERNEL)
     install(DIRECTORY ${OPS_ADV_DIR}/mc2/common/op_kernel/
             DESTINATION ${IMPL_INSTALL_DIR}/ascendc/common/op_kernel
     )
+    foreach(_split_dir matmul moe apace)
+        if(IS_DIRECTORY "${OPS_ADV_DIR}/mc2/common/${_split_dir}")
+            message(STATUS "Install mc2/common domain headers: ${_split_dir}")
+            install(DIRECTORY ${OPS_ADV_DIR}/mc2/common/${_split_dir}/
+                    DESTINATION ${IMPL_INSTALL_DIR}/ascendc/common/${_split_dir}
+            )
+        else()
+            message(STATUS "Skip mc2/common domain headers, not present: ${_split_dir}")
+        endif()
+    endforeach()
 
     file(GLOB _3rd_op_dirs "${OPS_ADV_DIR}/mc2/3rd/*")
 foreach(_3rd_op_dir ${_3rd_op_dirs})
