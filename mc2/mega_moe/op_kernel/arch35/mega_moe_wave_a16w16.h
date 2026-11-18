@@ -16,9 +16,7 @@
 #ifndef MEGA_MOE_WAVE_A16W16_H
 #define MEGA_MOE_WAVE_A16W16_H
 
-#include "../arch35_92/common/mega_moe_arch_policy.h"
-
-#ifdef MEGA_MOE_ARCH35_DEVICE
+#ifndef MEGA_MOE_ARCH92_DEVICE
 #include "mega_moe_wave_a8w8.h"
 
 namespace MegaMoeImpl {

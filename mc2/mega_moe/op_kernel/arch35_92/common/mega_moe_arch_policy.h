@@ -107,10 +107,6 @@ struct MegaMoeArch92HardwarePolicy {
     }
 };
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-#define MEGA_MOE_ARCH35_DEVICE 1
-#endif
-
 #if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
 #define MEGA_MOE_ARCH92_DEVICE 1
 using MegaMoeHardwarePolicy = MegaMoeArch92HardwarePolicy;
