@@ -223,16 +223,16 @@ __simd_callee__ inline void ComputeRowScale(vector_bfloat16_t& firstHalf, vector
     asc_max(maximumExponent, maximumExponent, outputMax, all);
     asc_sub(sharedExponent, maximumExponent, outputMax, all);
     asc_shiftright_scalar(scaleValue, sharedExponent, static_cast<int16_t>(Quant::SHR_NUM_FOR_BF16), all);
-    asc_duplicate_scalar_merge(scaleValue, static_cast<uint16_t>(Quant::MAX_EXP_FOR_FP8), nanMask);
-    asc_duplicate_scalar_merge(scaleValue, static_cast<uint16_t>(0), zeroMask);
+    vdup(scaleValue, static_cast<uint16_t>(Quant::MAX_EXP_FOR_FP8), nanMask, MODE_MERGING);
+    vdup(scaleValue, static_cast<uint16_t>(0), zeroMask, MODE_MERGING);
     asc_pack_to_low(scaleBytes, scaleValue);
 
     asc_eq_scalar(specialMask, sharedExponent, static_cast<uint16_t>(Quant::BF16_EXP_BIAS), all);
     asc_sub(inverseScale, bias, sharedExponent, all);
     // Keep NaN, zero, then special-exponent repair in the same order as the Reg path.
-    asc_duplicate_scalar_merge(inverseScale, static_cast<uint16_t>(Quant::BF16_NAN_CUSTOM), nanMask);
-    asc_duplicate_scalar_merge(inverseScale, static_cast<uint16_t>(0), zeroMask);
-    asc_duplicate_scalar_merge(inverseScale, static_cast<uint16_t>(Quant::BF16_SPECIAL_EXP_THRESHOLD), specialMask);
+    vdup(inverseScale, static_cast<uint16_t>(Quant::BF16_NAN_CUSTOM), nanMask, MODE_MERGING);
+    vdup(inverseScale, static_cast<uint16_t>(0), zeroMask, MODE_MERGING);
+    vdup(inverseScale, static_cast<uint16_t>(Quant::BF16_SPECIAL_EXP_THRESHOLD), specialMask, MODE_MERGING);
 }
 
 template <typename OutputType, bool SecondHalf>

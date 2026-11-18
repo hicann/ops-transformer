@@ -123,7 +123,7 @@ __aicore__ inline void copy(const copy_atom<Atom>& copy, const Dst& dst, const M
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
                          false, static_cast<asc_load_l2_cache_mode>(src.engine().get_cache_mode()),
 #else
-                         static_cast<asc_load_l2_cache_mode>(src.engine().get_cache_mode()),
+                         src.engine().get_cache_mode(),
 #endif
                          (copy.params.n / 2U) * columnBytes, static_cast<uint32_t>(singleN * columnBytes));
 }
