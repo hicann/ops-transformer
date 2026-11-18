@@ -281,7 +281,7 @@ TEST_F(MoeInitRoutingQuantV2Tiling, moe_init_routing_quant_v2_tiling_09)
     uint64_t expectTilingKey = 11110;
     string expectTilingData = "64 320 30000 56 200 32 1 0 1 2 0 0 4 4480 1 4480 4480 4480 1 4480 4480 8160 0 2040 64 0 "
                               "280 280 280 280 280 280 0 0 0 0 0 64 0 280 280 280 280 280 280 1 1 17156 12844 2 64 "
-                              "17920 280 280 280 280 280 280 1 1 12224 5552 3 ";
+                              "17920 280 280 280 280 280 280 1 1 12352 5296 3 ";
     std::vector<size_t> expectWorkspaces = {25031296};
 
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);

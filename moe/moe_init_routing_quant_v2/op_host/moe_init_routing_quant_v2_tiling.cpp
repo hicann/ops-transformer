@@ -463,7 +463,8 @@ void MoeInitRoutingQuantV2TilingBase::Tiling4GatherQuant()
         int64_t ubSize = static_cast<int64_t>(aicoreParams_.ubSize);
         int64_t basePerLoopMaxRows = AlignOneBlockByteCeil((ubSize - baseMaxColsSize) / NUM_TWO / SIZE_INT32);
         if (cols < MAX_COLS_ONE_LOOP) {
-            basePerLoopMaxRows = AlignOneBlockByteCeil((ubSize - colSize) / NUM_TWO / SIZE_INT32);
+            basePerLoopMaxRows =
+                AlignOneBlockByteCeil((ubSize - colSize - ONE_BLOCK_BYTE * NUM_FOUR) / (NUM_TWO * SIZE_INT32));
         } else if (perCoreRows < basePerLoopMaxRows) {
             baseMaxCols = AlignOneBlockByteCeil((ubSize - rowSize) / sizeOfCol);
         }
@@ -481,12 +482,12 @@ void MoeInitRoutingQuantV2TilingBase::Tiling4GatherDynamicQuant()
     int64_t lastCoreRows = totalLength - perCoreRows * (tilingData->get_needCoreNum() - 1);
     tilingData->set_lastCoreRows(lastCoreRows);
 
-    int64_t rowSize = AlignOneBlockByte(perCoreRows * SIZE_INT32) * NUM_FOUR;
+    int64_t rowSize = AlignOneBlockByte(perCoreRows * SIZE_INT32) * NUM_TWO;
     int64_t colSize = AlignOneBlockByte(cols * SIZE_INT8) * DYNAMIC_QUANT_COLS_BUFFER;
     int64_t scaleSize = DYNAMIC_QUANT_SCALE_SIZE_64;
     int64_t onceRowSize =
         (static_cast<int64_t>(aicoreParams_.ubSize) - colSize - scaleSize - ONE_BLOCK_BYTE * NUM_FOUR * NUM_THREE) /
-        (SIZE_INT32 * NUM_FOUR);
+        (SIZE_INT32 * NUM_TWO);
     int64_t oneBlockNumInt = static_cast<int64_t>(ONE_BLOCK_BYTE) / static_cast<int64_t>(SIZE_INT32);
     onceRowSize = onceRowSize / oneBlockNumInt * oneBlockNumInt;
     bool ifOneLoopInt4 =
@@ -516,9 +517,15 @@ void MoeInitRoutingQuantV2TilingBase::Tiling4GatherDynamicQuant()
         int64_t baseMaxCols = MAX_COLS_DYNAMIC_QUANT;
         int64_t totalColSize = AlignOneBlockByte(baseMaxCols * SIZE_INT8) * DYNAMIC_QUANT_COLS_BUFFER;
         int64_t ubSize = static_cast<int64_t>(aicoreParams_.ubSize);
-        int64_t basePerLoopMaxRows = AlignOneBlockByteCeil((ubSize - totalColSize - scaleSize) / SIZE_INT32) / NUM_FOUR;
+        int64_t basePerLoopMaxRows =
+            AlignOneBlockByteCeil((ubSize - totalColSize - scaleSize - ONE_BLOCK_BYTE * NUM_FOUR * NUM_FOUR) /
+                                  SIZE_INT32) /
+            NUM_TWO;
         if (cols < MAX_COLS_DYNAMIC_QUANT) {
-            basePerLoopMaxRows = AlignOneBlockByteCeil((ubSize - colSize - scaleSize) / SIZE_INT32) / NUM_FOUR;
+            basePerLoopMaxRows =
+                AlignOneBlockByteCeil((ubSize - colSize - scaleSize - ONE_BLOCK_BYTE * NUM_FOUR * NUM_FOUR) /
+                                      SIZE_INT32) /
+                NUM_TWO;
         } else if (perCoreRows < basePerLoopMaxRows) {
             baseMaxCols =
                 AlignOneBlockByteCeil((ubSize - rowSize - scaleSize) / DYNAMIC_QUANT_COLS_BUFFER); // aligin ub

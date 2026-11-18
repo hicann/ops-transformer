@@ -45,8 +45,7 @@ private:
                                        int64_t j);
     __aicore__ inline void ComputeScale(LocalTensor<float>& inLocal, LocalTensor<float>& tempLocal, float scaleTemp,
                                         int64_t dstIndex, int64_t j);
-    __aicore__ inline void CopyInZeroIndices(int64_t progress);
-    __aicore__ inline void CopyOutZero(int64_t progress);
+    __aicore__ inline void PreClearOutput();
 
 private:
     TPipe* pipe_;
@@ -56,7 +55,6 @@ private:
     TQue<QuePosition::VECOUT, 1> calcQueue_;
     TQue<QuePosition::VECOUT, 1> inputXOutQueue_;
     TQue<QuePosition::VECOUT, 1> scaleOutQueue_;
-    TQue<QuePosition::VECIN, BUFFER_NUM> expandedRowIdxIndexCopyInQueue_;
 
     GlobalTensor<T> inputXGm_;
     GlobalTensor<int8_t> expandedXGm_;
@@ -66,7 +64,6 @@ private:
     GlobalTensor<float> quantSrcGm_;
     GlobalTensor<int32_t> expandedExpertIdxGm_;
     GlobalTensor<int32_t> sortedRowIdxGm_;
-    GlobalTensor<int32_t> expandedRowIdxIndexGm_;
     GlobalTensor<int32_t> oriExpertIdGm_;
 
     MoeV2Arch35GatherOutComputeTilingData gatherOutTilingData_;
@@ -116,51 +113,6 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::CopyInExpandedExpertId
     DataCopyPad(indicesLocal, expandedRowIdxGm_[indicesOffset_], dataCopyParams, dataCopyPadParams); // 第一轮sort的结果
     DataCopyPad(indicesLocal[currentLoopRowsAlign_], oriExpertIdGm_[indicesOffset_], dataCopyParams, dataCopyPadParams);
     expandRowIdxInQueue_.EnQue<int32_t>(indicesLocal);
-}
-
-template <typename T>
-__aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::CopyInZeroIndices(int64_t progress)
-{
-    indicesOffset_ = progress * perLoopRows_;
-    LocalTensor<int32_t> expandedRowIdxIndexLocal = expandedRowIdxIndexCopyInQueue_.AllocTensor<int32_t>();
-    DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>((currentLoopRows_ + 1) * sizeof(int32_t)), 0, 0, 0};
-    DataCopyPadExtParams<int32_t> dataCopyPadParams{false, 0, 0, 0};
-    DataCopyPad(expandedRowIdxIndexLocal, expandedRowIdxIndexGm_[indicesOffset_], dataCopyParams, dataCopyPadParams);
-    expandedRowIdxIndexCopyInQueue_.EnQue<int32_t>(expandedRowIdxIndexLocal);
-}
-
-template <typename T>
-__aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::CopyOutZero(int64_t progress)
-{
-    LocalTensor<int32_t> indicesLocal = expandedRowIdxIndexCopyInQueue_.DeQue<int32_t>();
-    if (blockIdx_ == 0) {
-        int32_t curIndex = 0;
-        int32_t nextIndex = indicesLocal.GetValue(0);
-        int32_t count = nextIndex - curIndex;
-        if (count > 0) {
-            InitOutput(expandedXGm_[curIndex * cols_], count * cols_, static_cast<int8_t>(0));
-            InitOutput(dynamicQuantScaleGm_[curIndex], count, static_cast<float>(0));
-        }
-    }
-    for (int i = 0; i < currentLoopRows_; i++) {
-        int32_t curIndex = indicesLocal.GetValue(i) + 1;
-        if (activateRows_ <= curIndex) {
-            break;
-        }
-        int32_t nextIndex = 0;
-        if (blockIdx_ == gatherOutTilingData_.needCoreNum - 1 && progress == rowLoops_ - 1 &&
-            i == currentLoopRows_ - 1) {
-            nextIndex = activateRows_;
-        } else {
-            nextIndex = indicesLocal.GetValue(i + 1);
-        }
-        int32_t count = nextIndex - curIndex;
-        if (count > 0) {
-            InitOutput(expandedXGm_[curIndex * cols_], count * cols_, static_cast<int8_t>(0));
-            InitOutput(dynamicQuantScaleGm_[curIndex], count, static_cast<float>(0));
-        }
-    }
-    expandedRowIdxIndexCopyInQueue_.FreeTensor(indicesLocal);
 }
 
 template <typename T>
@@ -545,10 +497,6 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::Init(GM_ADDR inputX, G
                                        blockIdx_ * gatherOutTilingData_.perCoreRows,
                                    cols_ * sizeof(float));
 
-    expandedRowIdxIndexGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(totalLength_, sizeof(int32_t)) * 2 +
-                                               expertNum_ + blockIdx_ * gatherOutTilingData_.perCoreRows,
-                                           0);
-
     currentLoopRowsAlign_ = MoeInitRoutingQuantV2::Align(perLoopRows_, sizeof(int32_t));
 
     int64_t perLoopColsAlignBytes = MoeInitRoutingQuantV2::AlignBytes(perLoopCols_, sizeof(T));
@@ -561,13 +509,53 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::Init(GM_ADDR inputX, G
     pipe_->InitBuffer(calcQueue_, 1, MoeInitRoutingQuantV2::AlignBytes(perLoopCols_, sizeof(float)));
     pipe_->InitBuffer(inputXOutQueue_, 1, MoeInitRoutingQuantV2::AlignBytes(perLoopCols_, sizeof(int8_t)));
     pipe_->InitBuffer(scaleOutQueue_, 1, BLOCK_BYTES + BLOCK_BYTES);
-    pipe_->InitBuffer(expandedRowIdxIndexCopyInQueue_, 1,
-                      MoeInitRoutingQuantV2::AlignBytes(perLoopRows_ + 1, sizeof(int32_t)));
+}
+
+template <typename T>
+__aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::PreClearOutput()
+{
+    // expendedX: activateRows_ * cols_ (int8) 分片清零
+    int64_t totalX = activateRows_ * cols_;
+    int64_t chunkX = (totalX + needCoreNum_ - 1) / needCoreNum_;
+    int64_t begX = blockIdx_ * chunkX;
+    int64_t lenX = totalX - begX;
+    if (lenX > chunkX) {
+        lenX = chunkX;
+    }
+    if (lenX > 0) {
+        GlobalTensor<uint8_t> xGm;
+        xGm.SetGlobalBuffer((__gm__ uint8_t*)expandedXGm_.GetPhyAddr() + begX, static_cast<uint64_t>(lenX));
+        SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
+        InitGlobalMemory(xGm, static_cast<uint64_t>(lenX), static_cast<uint8_t>(0));
+        SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
+    }
+    // dynamicQuantScale: activateRows_个 float分片清零
+    int64_t totalS = activateRows_;
+    int64_t chunkS = (totalS + needCoreNum_ - 1) / needCoreNum_;
+    int64_t begS = blockIdx_ * chunkS;
+    int64_t lenS = totalS - begS;
+    if (lenS > chunkS) {
+        lenS = chunkS;
+    }
+    if (lenS > 0) {
+        GlobalTensor<float> sGm;
+        sGm.SetGlobalBuffer((__gm__ float*)dynamicQuantScaleGm_.GetPhyAddr() + begS, static_cast<uint64_t>(lenS));
+        SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
+        InitGlobalMemory(sGm, static_cast<uint64_t>(lenS), 0.0f);
+        SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
+    }
 }
 
 template <typename T>
 __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::Process()
 {
+    // 1) 先按核分片一次性清零 expandedX 与dynamicQuantScale(pad/空槽必须为 0)
+    if (blockIdx_ < needCoreNum_) {
+        PreClearOutput();
+    }
+    // 2) 全核屏障：所有核清零完成后再写有效槽，避免跨loop/跨核覆盖有效值
+    SyncAll();
+    // 3) 逐 loop 只写有效槽
     if (blockIdx_ < needCoreNum_) {
         currentLoopRows_ = perLoopRows_;
         if (colLoops_ > 1) { // 一行无法全载，需要workspace
@@ -576,8 +564,6 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::Process()
                     if (loop == rowLoops_ - 1) {
                         currentLoopRows_ = lastLoopRows_;
                     }
-                    CopyInZeroIndices(loop);
-                    CopyOutZero(loop);
                     CopyInExpandedExpertIdx(loop);
                     CopyOutPartialXQuantEH(loop);
                 }
@@ -586,8 +572,6 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::Process()
                     if (loop == rowLoops_ - 1) {
                         currentLoopRows_ = lastLoopRows_;
                     }
-                    CopyInZeroIndices(loop);
-                    CopyOutZero(loop);
                     CopyInExpandedRowIdx(loop);
                     CopyOutPartialXQuant1H(loop);
                 }
@@ -598,9 +582,6 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::Process()
                     if (loop == rowLoops_ - 1) {
                         currentLoopRows_ = lastLoopRows_;
                     }
-                    CopyInZeroIndices(loop);
-                    CopyOutZero(loop);
-
                     CopyInExpandedExpertIdx(loop);
                     CopyOutXQuantEH(loop);
                 }
@@ -609,8 +590,6 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::Process()
                     if (loop == rowLoops_ - 1) {
                         currentLoopRows_ = lastLoopRows_;
                     }
-                    CopyInZeroIndices(loop);
-                    CopyOutZero(loop);
                     CopyInExpandedRowIdx(loop);
                     CopyOutXQuant1H(loop);
                 }
