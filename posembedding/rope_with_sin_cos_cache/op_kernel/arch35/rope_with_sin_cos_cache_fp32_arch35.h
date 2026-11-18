@@ -231,18 +231,17 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::GetCosSinCache(LocalTensor<T> 
                         {1, static_cast<uint16_t>(this->rotary_dim / 2 * sizeof(T)), 0, 0}, {false, 0, 0, 0});
             float pos1Value = 0;
             float pos2Value = 0;
-            uint32_t i = 0;
-            for (i = 0; i < this->rotary_dim / 2; i++) {
+            uint32_t halfDim = this->rotary_dim / 2;
+            for (uint32_t i = 0; i < (halfDim + 1) / 3; ++i) {
+                uint32_t pos1Index = i * 3 + 1;
+                uint32_t pos2Index = i * 3 + 2;
                 if (i < this->mrope_section1) {
-                    pos1Value = cos_sin_cache_GM.GetValue(pos1 * this->rotary_dim + cosSinOffset + i * 3 + 1);
-                    inCosSin.SetValue(i * 3 + 1, pos1Value);
+                    pos1Value = cos_sin_cache_GM.GetValue(pos1 * this->rotary_dim + cosSinOffset + pos1Index);
+                    inCosSin.SetValue(pos1Index, pos1Value);
                 }
-                if (i < this->mrope_section2) {
-                    pos2Value = cos_sin_cache_GM.GetValue(pos2 * this->rotary_dim + cosSinOffset + i * 3 + 2);
-                    inCosSin.SetValue(i * 3 + 2, pos2Value);
-                }
-                if (i > this->mrope_section1 && i > this->mrope_section2) {
-                    break;
+                if (i < this->mrope_section2 && pos2Index < halfDim) {
+                    pos2Value = cos_sin_cache_GM.GetValue(pos2 * this->rotary_dim + cosSinOffset + pos2Index);
+                    inCosSin.SetValue(pos2Index, pos2Value);
                 }
             }
         }
