@@ -307,6 +307,7 @@ private:
     TQue<QuePosition::VECIN, 1> moeMainSumQueue_;
     TBuf<> expertScalesBuf_;
     TBuf<> rowTmpFloatBuf_;
+    TBuf<> countBuf_; // rsw: count 到达检测专用 buffer
     TBuf<> sumFloatBuf_;
     TBuf<> mulBuf_;
     TBuf<> indexCountsBuf_;
@@ -894,6 +895,12 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::AlltoA
     // InitBuffer需要在tiling中计算ub总量
     tpipe_->InitBuffer(tokenBuf_, maxSizeTokenBuf);             // 16K 用于搬入输入token
     tpipe_->InitBuffer(rowTmpFloatBuf_, maxSizeRowTmpFloatBuf); // 32K 用于存储cast之后的fp32 token数据
+    if constexpr (SupportRsw) {
+        if (isRSW_) {
+            // rsw: count 到达检测专用 buffer
+            tpipe_->InitBuffer(countBuf_, flagRcvCount_ * SLOT_COUNT_BLK_SIZE);
+        }
+    }
     tpipe_->InitBuffer(mulBuf_, mulBufSize); // 32K buffer复用， 最大用于存储Brcb之后的token，需要256对齐
     tpipe_->InitBuffer(sumFloatBuf_, hFloatAlign32Size_ * bufferNum_); // 单buf按序处理，双buf交错处理
 
@@ -1490,13 +1497,13 @@ __aicore__ inline uint32_t MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Ch
         return 0U;
     }
     // rsw协议: 跨步gather各slot尾部的count块(stride=挡位-32), 硬件维护int64字节计数, 标量比较, 早退返回连续到达slot数
-    LocalTensor<uint64_t> cntTensor = rowTmpFloatBuf_.Get<uint64_t>();
+    LocalTensor<uint64_t> cntTensor = countBuf_.Get<uint64_t>();
     const DataCopyExtParams cntParams{static_cast<uint16_t>(slotCount), SLOT_COUNT_BLK_SIZE,
                                       static_cast<uint32_t>(rswBufferSize_ - SLOT_COUNT_BLK_SIZE), 0U, 0U};
     const DataCopyPadExtParams<uint64_t> padParams{false, 0U, 0U, 0U};
     GlobalTensor<uint64_t> cntGlobal;
     cntGlobal.SetGlobalBuffer((__gm__ uint64_t*)(slotBaseAddr + slotCountOffset_));
-    SyncFunc<AscendC::HardEvent::V_MTE2>();
+    SyncFunc<AscendC::HardEvent::S_MTE2>();
     DataCopyPad(cntTensor, cntGlobal, cntParams, padParams);
     SyncFunc<AscendC::HardEvent::MTE2_S>();
     uint64_t expected = static_cast<uint64_t>(expectedSlotBytes_);

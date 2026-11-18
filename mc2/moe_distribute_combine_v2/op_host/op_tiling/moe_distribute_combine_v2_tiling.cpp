@@ -2243,6 +2243,11 @@ static uint64_t GetComputeBufferSize(const gert::TilingContext* context,
 
     uint64_t totalBufferSize = static_cast<uint64_t>(maxSizeTokenBuf) + maxSizeRowTmpFloatBuf + mulBufSize +
                                hFloatAlign32Size * bufferNum + UB_ALIGN;
+    if (tilingData->moeDistributeCombineV2Info.rswBufferSize != 0UL) {
+        uint32_t flagRcvCount = axisK + tilingData->moeDistributeCombineV2Info.sharedExpertNum;
+        // rsw: count 到达检测专用 buffer，与 kernel 侧一致
+        totalBufferSize += static_cast<uint64_t>(flagRcvCount) * RSW_COUNT_BLK_SIZE;
+    }
     if (config.hasAddRmsNorm) {
         totalBufferSize += hExpandXAlign32Size + NUM_PER_REP_FP32 * sizeof(float) * BUFFER_NUM;
     }
