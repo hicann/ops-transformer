@@ -358,7 +358,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
     }
 
     const MegaMoeDispatchBufferConfig& bufferConfig = context.bufferConfig;
-    scratch.revTokenElemCnt = commonConfig_.tokenHiddenDim / A_ELEMS_PER_BYTE;
+    scratch.recvTokenDataBytes = commonConfig_.tokenHiddenDim / A_ELEMS_PER_BYTE * sizeof(ActivationType);
     scratch.revScaleElemCnt = Ops::Base::CeilDiv(static_cast<int64_t>(commonConfig_.tokenHiddenDim),
                                                  static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
                               MXFP_MULTI_BASE_SIZE;

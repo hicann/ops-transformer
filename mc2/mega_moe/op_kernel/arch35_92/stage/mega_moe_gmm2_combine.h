@@ -659,10 +659,6 @@ __aicore__ inline void UpdateMoeExpertGmm2GlobalBuffer(const GmmExecutionConfig&
 #ifndef MEGA_MOE_ARCH92_DEVICE
     gmmAddrInfo.gmm2LogicalPaddedRow = state.paddedTokenStartIndex + rowOffsetInExpert;
 #endif
-    uint64_t activationScaleWidth =
-        Ops::Base::CeilDiv(static_cast<uint64_t>(activationOutputWidth), static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
-        MXFP_MULTI_BASE_SIZE;
-
     // 激活输入按自身循环容量读取；Combine 去重时结果按紧凑逻辑行全量保存。
     const uint64_t outputTokenStartIndex = gmmConfig.ring.gmm2 ? physicalTokenStartIndex : globalTokenStartIndex;
     gmmAddrInfo.gmm2OutGlobal = workspace.routed.gmm2Output.get_ptr(workspaceBase) +
@@ -672,14 +668,22 @@ __aicore__ inline void UpdateMoeExpertGmm2GlobalBuffer(const GmmExecutionConfig&
     gmmAddrInfo.aGlobal =
         workspace.routed.gmm2Input.data.get_ptr(workspaceBase) +
         physicalTokenStartIndex * activationOutputWidth / activationOutputElementsPerByte * sizeof(ActivationOutType);
-    gmmAddrInfo.aScaleGlobal = workspace.routed.gmm2Input.scale.get_ptr(workspaceBase) +
-                               physicalTokenStartIndex * activationScaleWidth * sizeof(QuantScaleType);
     gmmAddrInfo.bGlobal = GetExpertWeightAddr<WeightType>(
         weights.weight2, gmmConfig.isPerExpertWeightTensor, state.expertIdx,
         static_cast<uint64_t>(state.expertIdx) * tokenHiddenDim * activationOutputWidth / weightElementsPerByte);
-    gmmAddrInfo.bScaleGlobal = GetExpertWeightAddr<QuantScaleType>(
-        weights.weightScales2, gmmConfig.isPerExpertWeightTensor, state.expertIdx,
-        static_cast<uint64_t>(state.expertIdx) * tokenHiddenDim * activationScaleWidth);
+    if constexpr (Std::IsSame<QuantScaleType, void>::value) {
+        gmmAddrInfo.aScaleGlobal = nullptr;
+        gmmAddrInfo.bScaleGlobal = nullptr;
+    } else {
+        uint64_t activationScaleWidth =
+            Ops::Base::CeilDiv(static_cast<uint64_t>(activationOutputWidth), static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
+            MXFP_MULTI_BASE_SIZE;
+        gmmAddrInfo.aScaleGlobal = workspace.routed.gmm2Input.scale.get_ptr(workspaceBase) +
+                                   physicalTokenStartIndex * activationScaleWidth * sizeof(QuantScaleType);
+        gmmAddrInfo.bScaleGlobal = GetExpertWeightAddr<QuantScaleType>(
+            weights.weightScales2, gmmConfig.isPerExpertWeightTensor, state.expertIdx,
+            static_cast<uint64_t>(state.expertIdx) * tokenHiddenDim * activationScaleWidth);
+    }
     gmmAddrInfo.activationToGmm2Flag =
         reinterpret_cast<__gm__ int32_t*>(workspace.sync.activationReady.get_ptr(workspaceBase)) +
         static_cast<uint64_t>(state.expertIdx) * syncLayout.activationFlagSlotCountPerExpert +
@@ -712,8 +716,6 @@ __aicore__ inline void UpdateSharedExpertGmm2GlobalBuffer(const MoeStageCommonCo
     uint64_t tokenNum = commonConfig.tokenNum;
     uint64_t tokenHiddenDim = commonConfig.tokenHiddenDim;
     uint64_t activationOutputWidth = commonConfig.gmm1OutputDim / commonConfig.activationOutputDivisor;
-    uint64_t activationScaleWidth =
-        Ops::Base::CeilDiv(activationOutputWidth, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
     uint64_t sharedExpertTokenStartIndex = static_cast<uint64_t>(sharedExpertIdx) * tokenNum;
 
     gmmAddrInfo.gmm2OutGlobal = workspace.shared.gmm2Output.get_ptr(workspaceBase) +
@@ -721,14 +723,21 @@ __aicore__ inline void UpdateSharedExpertGmm2GlobalBuffer(const MoeStageCommonCo
     gmmAddrInfo.aGlobal =
         workspace.shared.gmm2Input.data.get_ptr(workspaceBase) +
         sharedExpertTokenStartIndex * activationOutputWidth / activationElementsPerByte * sizeof(ActivationType);
-    gmmAddrInfo.aScaleGlobal = workspace.shared.gmm2Input.scale.get_ptr(workspaceBase) +
-                               sharedExpertTokenStartIndex * activationScaleWidth * sizeof(QuantScaleType);
     gmmAddrInfo.bGlobal = GetExpertWeightAddr<WeightType>(
         weights.weight2, gmmConfig.isPerExpertWeightTensor, sharedExpertIdx,
         static_cast<uint64_t>(sharedExpertIdx) * tokenHiddenDim * activationOutputWidth / weightElementsPerByte);
-    gmmAddrInfo.bScaleGlobal = GetExpertWeightAddr<QuantScaleType>(
-        weights.weightScales2, gmmConfig.isPerExpertWeightTensor, sharedExpertIdx,
-        static_cast<uint64_t>(sharedExpertIdx) * tokenHiddenDim * activationScaleWidth);
+    if constexpr (Std::IsSame<QuantScaleType, void>::value) {
+        gmmAddrInfo.aScaleGlobal = nullptr;
+        gmmAddrInfo.bScaleGlobal = nullptr;
+    } else {
+        uint64_t activationScaleWidth =
+            Ops::Base::CeilDiv(activationOutputWidth, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+        gmmAddrInfo.aScaleGlobal = workspace.shared.gmm2Input.scale.get_ptr(workspaceBase) +
+                                   sharedExpertTokenStartIndex * activationScaleWidth * sizeof(QuantScaleType);
+        gmmAddrInfo.bScaleGlobal = GetExpertWeightAddr<QuantScaleType>(
+            weights.weightScales2, gmmConfig.isPerExpertWeightTensor, sharedExpertIdx,
+            static_cast<uint64_t>(sharedExpertIdx) * tokenHiddenDim * activationScaleWidth);
+    }
     gmmAddrInfo.activationToGmm2Flag = nullptr;
     if (workspace.mte.sync.sharedActivationReady.get_ptr(workspaceBase) != nullptr) {
         uint64_t sharedActivationFlagElementCount =

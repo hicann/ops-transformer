@@ -421,6 +421,66 @@ __aicore__ inline void PackPreQuantizedLocalTokens(bool topkWeightsPrefetch, con
                                                 scratch);
 }
 
+#ifdef MEGA_MOE_ARCH35_DEVICE
+struct Bf16InputConfig {
+    uint32_t dataValidBytes = 0U;  // token 有效数据长度
+    uint32_t dataBytes = 0U;       // token 段对齐后的长度
+    uint32_t tokenScaleBytes = 0U; // 完整通信记录长度
+    uint32_t stageBytes = 0U;      // 单个 UB 打包槽占用
+};
+
+struct Bf16InputScratch {
+    __ubuf__ uint8_t* stage0 = nullptr;
+    __ubuf__ uint8_t* stage1 = nullptr;
+};
+
+// BF16 token 按位搬运；只有 BF16 路由权重需要转换为通信协议使用的 FP32。
+template <typename TopkWeightsType>
+__aicore__ inline void PackBf16LocalTokens(const WorkRange& tokenRange, const MoeStageCommonConfig& common,
+                                           const Params& params, const Bf16InputConfig& config,
+                                           Bf16InputScratch& scratch)
+{
+    const uint32_t weightOffsetBytes = config.dataBytes;
+    const bool hasWeights = config.tokenScaleBytes > config.dataBytes;
+    auto* input = reinterpret_cast<__gm__ uint8_t*>(params.aGmAddr);
+    auto* weights = reinterpret_cast<__gm__ uint8_t*>(params.probsGmAddr);
+    auto* output = params.communication.layout.quantTokenScale.template get_ptr<uint8_t>(params.communication.base);
+    PipeNotify<PIPE_MTE3, PIPE_MTE2>(EVENT_ID0);
+    PipeNotify<PIPE_MTE3, PIPE_MTE2>(EVENT_ID1);
+    for (uint32_t offset = 0U; offset < tokenRange.count; ++offset) {
+        const uint64_t tokenIndex = static_cast<uint64_t>(tokenRange.start) + offset;
+        const uint32_t slot = offset % DOUBLE_BUFFER;
+        const TEventID event = static_cast<TEventID>(slot);
+        auto* stage = slot == 0U ? scratch.stage0 : scratch.stage1;
+        PipeWait<PIPE_MTE3, PIPE_MTE2>(event);
+        CopyGmToUb(stage, input + tokenIndex * config.dataValidBytes, config.dataValidBytes);
+        if (hasWeights) {
+            auto* weightGm = weights + tokenIndex * common.topK * sizeof(TopkWeightsType);
+            if constexpr (Std::IsSame<TopkWeightsType, bfloat16_t>::value) {
+                auto* weightBf16 = reinterpret_cast<__ubuf__ bfloat16_t*>(stage + config.tokenScaleBytes);
+                CopyGmToUb(weightBf16, weightGm, common.topK * static_cast<uint32_t>(sizeof(TopkWeightsType)));
+                PipeNotify<PIPE_MTE2, PIPE_V>(event);
+                PipeWait<PIPE_MTE2, PIPE_V>(event);
+                CastBf16ToFp32VF(reinterpret_cast<__ubuf__ float*>(stage + weightOffsetBytes), weightBf16, common.topK);
+                PipeNotify<PIPE_V, PIPE_MTE3>(event);
+                PipeWait<PIPE_V, PIPE_MTE3>(event);
+            } else {
+                CopyGmToUb(stage + weightOffsetBytes, weightGm, common.topK * static_cast<uint32_t>(sizeof(float)));
+                PipeNotify<PIPE_MTE2, PIPE_MTE3>(event);
+                PipeWait<PIPE_MTE2, PIPE_MTE3>(event);
+            }
+        } else {
+            PipeNotify<PIPE_MTE2, PIPE_MTE3>(event);
+            PipeWait<PIPE_MTE2, PIPE_MTE3>(event);
+        }
+        CopyUbToGm(output + tokenIndex * config.tokenScaleBytes, stage, config.tokenScaleBytes);
+        PipeNotify<PIPE_MTE3, PIPE_MTE2>(event);
+    }
+    PipeWait<PIPE_MTE3, PIPE_MTE2>(EVENT_ID0);
+    PipeWait<PIPE_MTE3, PIPE_MTE2>(EVENT_ID1);
+}
+#endif
+
 } // namespace MegaMoeImpl
 
 #endif // MEGA_MOE_TOKEN_QUANT_H

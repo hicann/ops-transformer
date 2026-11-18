@@ -42,7 +42,7 @@ public:
 private:
     using MoeQuantConfig = typename MegaMoeBase::MoeQuantConfig;
     using ActivationType = typename MegaMoeBase::ActivationType;
-    using QuantScaleOutType = typename MegaMoeBase::QuantScaleOutType;
+    using QuantScaleOutType = typename MoeQuantConfig::QuantScaleType;
 
     static constexpr uint32_t GMM1_TILE_M = MegaMoeBase::GMM1_TILE_M;
 

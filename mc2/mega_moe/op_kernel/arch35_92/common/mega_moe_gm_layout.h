@@ -782,6 +782,7 @@ private:
     HOST_DEVICE constexpr void InitializeDispatchBuffers(const CclComputeLayoutParams& params)
     {
         const int64_t dataRows = params.ring.dispatch ? static_cast<int64_t>(params.ring.rows) : params.maxOutputSize;
+        // dispatchRevData 按 GMM1 激活的实际物理字节数分配：FP8 每字节 1 个元素，FP4 每字节 2 个元素。
         // 接收矩阵使用有效数据行宽，BF16 不包含通信 TokenScale 记录的填充及权重段。
         const int64_t dispatchDataBytesPerToken = CalcStorageDataBytes(params.h, params.dispatchInputStorage);
         Allocate(routed.gmm1Input.data,
@@ -886,8 +887,7 @@ private:
             Allocate(mte.sync.aiv1TopkReady,
                      static_cast<int64_t>(params.aicNum) * MemoryLayoutDetail::INT_CACHELINE * SIZE_INT_32);
         }
-        // Arch35 的三类 MX Wave 激活均为 FP8，BF16 不使用该回收区。
-        if (params.ring.activation && params.activationOutputStorage.elementBits == MemoryLayoutDetail::FP8_BITS) {
+        if (params.ring.activation) {
             const int64_t rowTiles =
                 MemoryLayoutDetail::CeilDiv(static_cast<int64_t>(params.ring.rows), MemoryLayoutDetail::L1_TILE_M_256);
             const int64_t rowCounterBytes = MemoryLayoutDetail::CeilAlign(
@@ -1014,6 +1014,7 @@ private:
         Allocate(shared.gmm2Output,
                  MemoryLayoutDetail::CeilAlign(SIZE_BF_16 * params.bs * params.sharedExpertNum * params.h,
                                                MemoryLayoutDetail::ALIGN_512));
+        // sharedExpertGmm1Out：共享专家 GMM1 输出 [sharedExpertNum × bs × hiddenDim]。
         // BF16 的共享 GMM1 直接写 UB，其余路径保留 GM 中间结果区。
         if (params.sharedActivationStorage.elementBits != SIZE_BF_16 * MemoryLayoutDetail::BITS_PER_BYTE) {
             Allocate(shared.gmm1Output,
@@ -1053,7 +1054,8 @@ private:
                                                 CalcStorageDataBytes(params.hiddenDim / params.activationOutputDivisor,
                                                                      params.sharedActivationStorage),
                                             MemoryLayoutDetail::ALIGN_512));
-        // 每个 MXFP scale group 保存两个分量；BF16 激活输出不分配 scale。
+        // sharedExpertActivationScale：每个 MXFP scale group 保存两个 multi-base 分量。
+        // BF16 激活输出不分配 scale。
         if (params.sharedActivationStorage.HasMxScale()) {
             Allocate(shared.gmm2Input.scale,
                      MemoryLayoutDetail::CeilAlign(

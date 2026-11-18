@@ -406,7 +406,6 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     if (IsA16W16GmmMode(tilingData->moeGmmMode)) {
         compute.dispatchInputStorage = {MemoryLayoutDetail::BF16_BITS};
         compute.activationOutputStorage = {MemoryLayoutDetail::BF16_BITS};
-        compute.reserveGmm1Output = false;
     }
     if (IsA16W16GmmMode(tilingData->sharedGmmMode)) {
         compute.sharedInputStorage = {MemoryLayoutDetail::BF16_BITS};

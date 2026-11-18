@@ -28,10 +28,7 @@
 #include "../../common/mega_moe_constants.h"
 #include "../../common/mega_moe_utils.h"
 #include "activation/activation_common.h"
-#include "activation/gelu_activation.h"
-#include "activation/situglu_activation.h"
-#include "activation/swiglu_activation.h"
-#include "activation/swigluoai_activation.h"
+#include "activation/activation_assign.h"
 #include "block_epilogue_ub_layout.h"
 #include "rowwise_mx_quant.h"
 
@@ -57,7 +54,7 @@ template <typename DataTypeOut, typename DataTypeIn, uint32_t TileN = 256>
 class BlockEpilogueActivationMxQuant {
 public:
     using BlockShape = Shape<int64_t, int64_t, int64_t, int64_t>;
-    using BlockCoord = Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>;
+    using BlockCoord = Coord<int64_t, int64_t>;
     using ProblemShape = Shape<int64_t, int64_t, int64_t, int64_t>;
 
     struct Arguments {
@@ -104,9 +101,6 @@ private:
     __aicore__ inline TileExecutionContext PrepareTileExecutionContext(const BlockShape& blockShape,
                                                                        const BlockCoord& blockCoord,
                                                                        uint16_t pingpongIdx);
-
-    __aicore__ static inline void ConfigureGatedActivationTail(
-        Activation::GatedActivationTileContext<DataTypeIn>& context, uint16_t validColumnCount);
 
     template <bool IsTopkWeightsPrefetch>
     __aicore__ inline Activation::GatedActivationTileContext<DataTypeIn> BuildGatedActivationContext(
@@ -250,46 +244,6 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::PrepareTileExecutionContext(c
     return tileContext;
 }
 
-// 保留主循环、尾 Vector 计算和两段补零能力，兼容后续放宽列方向对齐约束。
-BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
-__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::ConfigureGatedActivationTail(
-    Activation::GatedActivationTileContext<DataTypeIn>& context, uint16_t validColumnCount)
-{
-    const uint32_t vectorLength = Activation::VECTOR_LENGTH_FP32;
-    context.fullVectorLoopCount = validColumnCount / vectorLength;
-    context.needTailVectorCompute = 0U;
-    context.needAdditionalPaddingStore = 0U;
-    context.tailComputeMaskElementCount = 0U;
-    context.tailStoreMaskElementCount = 0U;
-    context.additionalPaddingStoreMaskElementCount = 0U;
-    context.gateTail = context.gate;
-    context.upTail = context.up;
-    context.outputTail = context.output;
-    context.additionalPaddingOutput = context.output;
-
-    const uint32_t tailElementCount = validColumnCount % vectorLength;
-    if (tailElementCount == 0U) {
-        return;
-    }
-
-    context.tailComputeMaskElementCount = tailElementCount;
-    context.needTailVectorCompute = 1U;
-    const uint32_t tailAndPaddingElementCount =
-        context.outputRowStrideElements - context.fullVectorLoopCount * vectorLength;
-    if (tailAndPaddingElementCount <= vectorLength) {
-        context.tailStoreMaskElementCount = tailAndPaddingElementCount;
-    } else {
-        context.needAdditionalPaddingStore = 1U;
-        context.tailStoreMaskElementCount = vectorLength;
-        context.additionalPaddingStoreMaskElementCount = tailAndPaddingElementCount - vectorLength;
-    }
-    const uint32_t tailColumnOffsetElements = context.fullVectorLoopCount * vectorLength;
-    context.gateTail = context.gate + tailColumnOffsetElements;
-    context.upTail = context.up + tailColumnOffsetElements;
-    context.outputTail = context.output + tailColumnOffsetElements;
-    context.additionalPaddingOutput = context.outputTail + context.needTailVectorCompute * vectorLength;
-}
-
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 template <bool IsTopkWeightsPrefetch>
 __aicore__ inline Activation::GatedActivationTileContext<DataTypeIn>
@@ -306,7 +260,7 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::BuildGatedActivationContext(c
     gatedActivationContext.inputRowStrideElements = static_cast<uint32_t>(validColumnCount) * ACTIVATION_N_HALF;
     gatedActivationContext.outputRowStrideElements = tileContext.geometry.outputRowStrideElements;
     gatedActivationContext.rowLoopCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
-    ConfigureGatedActivationTail(gatedActivationContext, validColumnCount);
+    Activation::ConfigureGatedActivationTail(gatedActivationContext, validColumnCount);
     if constexpr (IsTopkWeightsPrefetch) {
         gatedActivationContext.topkWeights = weightUb_;
     } else {
@@ -320,30 +274,9 @@ template <bool IsTopkWeightsPrefetch>
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGatedActivationTile(
     const TileExecutionContext& tileContext)
 {
-    Activation::GatedActivationTileContext<DataTypeIn> gatedActivationContext =
-        BuildGatedActivationContext<IsTopkWeightsPrefetch>(tileContext);
-
-    const ActMode actMode = static_cast<ActMode>(actMode_);
-    const ActSubMode actSubMode = static_cast<ActSubMode>(actSubMode_);
-    if (actMode == ActMode::SITU) {
-        const float invBeta = activationBeta_ != 0.0f ? 1.0f / activationBeta_ : 1.0f;
-        if (actSubMode == ActSubMode::LINEAR) {
-            const float invAlpha = activationAlpha_ != 0.0f ? 1.0f / activationAlpha_ : 1.0f;
-            const Activation::SituGluParams situGluParams{clampLimit_, activationBeta_, invBeta, activationAlpha_,
-                                                          invAlpha};
-            Activation::RunSiTUGLU<DataTypeIn, IsTopkWeightsPrefetch, true>(gatedActivationContext, situGluParams);
-        } else {
-            const Activation::SituGluParams situGluParams{clampLimit_, activationBeta_, invBeta, 1.0f, 1.0f};
-            Activation::RunSiTUGLU<DataTypeIn, IsTopkWeightsPrefetch, false>(gatedActivationContext, situGluParams);
-        }
-    } else if (actMode == ActMode::SWIGLU_STEP) {
-        Activation::RunSwiGLU<DataTypeIn, IsTopkWeightsPrefetch, true>(gatedActivationContext, clampLimit_);
-    } else if (actMode == ActMode::SWIGLU_OAI) {
-        const Activation::SwiGluOaiParams swiGluOaiParams{clampLimit_, activationAlpha_, activationBeta_};
-        Activation::RunSwiGLUOAI<DataTypeIn, IsTopkWeightsPrefetch>(gatedActivationContext, swiGluOaiParams);
-    } else {
-        Activation::RunSwiGLU<DataTypeIn, IsTopkWeightsPrefetch, false>(gatedActivationContext, clampLimit_);
-    }
+    auto context = BuildGatedActivationContext<IsTopkWeightsPrefetch>(tileContext);
+    Activation::RunGatedActivation<DataTypeIn, IsTopkWeightsPrefetch>(context, actMode_, actSubMode_, clampLimit_,
+                                                                      activationAlpha_, activationBeta_);
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS

@@ -686,13 +686,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::UpdateGmm
         GetExpertWeightAddr<QuantScaleOutType>(params_.bScaleGmAddr, params_.tilingData->isPerExpertWeightTensor,
                                                expertIdx, static_cast<uint64_t>(expertIdx) * (n * scaleK));
     if constexpr (g_coreType == AIV) {
-        AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{
-            static_cast<int64_t>(rows * activationCols / C_ELEMS_PER_BYTE),
-            static_cast<int64_t>(rows * scaleN),
-            static_cast<int64_t>(expertIdx) * maxWavesPerExpert_ + rowOffsetInExpert / GMM1_TILE_M,
-            0L,
-            0L,
-            0L};
+        AscendC::Coord<int64_t, int64_t> vecBaseOffset{static_cast<int64_t>(rows * activationCols / C_ELEMS_PER_BYTE),
+                                                       static_cast<int64_t>(rows * scaleN)};
         epilogueOp_.UpdateGlobalAddr(vecBaseOffset);
     }
     gmmAddrInfo.activationToGmm2Flag = (__gm__ int32_t*)workspace.sync.activationReady.get_ptr(buffer) +
@@ -924,14 +919,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::RunGmm1Wi
         const uint64_t activationCols = n / activationOutputDivisor_;
         const uint64_t scaleN =
             Ops::Base::CeilDiv(activationCols, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-        AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{
-            static_cast<int64_t>(rows * activationCols / C_ELEMS_PER_BYTE),
-            static_cast<int64_t>(rows * scaleN),
-            IsShared ? static_cast<int64_t>(state.expertIdx) :
-                       static_cast<int64_t>(state.expertIdx) * maxWavesPerExpert_ + rowOffsetInExpert / GMM1_TILE_M,
-            0L,
-            0L,
-            0L};
+        AscendC::Coord<int64_t, int64_t> vecBaseOffset{static_cast<int64_t>(rows * activationCols / C_ELEMS_PER_BYTE),
+                                                       static_cast<int64_t>(rows * scaleN)};
         epilogue.UpdateGlobalAddr(vecBaseOffset);
     }
     const BlockJobContext blockJob{MegaMoeHardwarePolicy::GetAicBlockIdx(), blockNum_};

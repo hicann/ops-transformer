@@ -857,7 +857,7 @@ MemoryBudgetParams BuildMemoryBudgetParams(int64_t epWorldSize, int64_t moeExper
         params.sharedActivationStorage = {MegaMoeImpl::MemoryLayoutDetail::BF16_BITS};
 
         // 与 A16W16 tiling 的中间结果及输入复用策略保持一致。
-        params.reserveGmm1Output = false;
+        params.reserveGmm1Output = params.topkWeightsPrefetch;
         params.reserveCumsum = false;
         params.sharedInputIndependent = false;
     }
@@ -900,8 +900,7 @@ int64_t CalcCclBufferSizeA5(int64_t epWorldSize, int64_t moeExpertNum, int64_t n
             params.ring = MegaMoeImpl::CalcCclStageRingConfig(params);
             dataBytes = std::max(dataBytes, MegaMoeImpl::WorkspaceLayout(params).workspaceSize);
             // 较小 wave 仍可能启用 ring，不能遗漏其回收标记超过全行预算的边界。
-            if (!params.ring.activation &&
-                params.activationOutputStorage.elementBits == MegaMoeImpl::MemoryLayoutDetail::FP8_BITS) {
+            if (!params.ring.activation) {
                 params.mGroupsPerWave = (params.maxOutputSize - 1) / MegaMoeImpl::CalcMemoryRingRows(1);
                 params.ring = MegaMoeImpl::CalcCclStageRingConfig(params);
                 if (params.ring.activation) {

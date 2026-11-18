@@ -198,7 +198,7 @@ __simd_callee__ inline void ConvertMxScaleToBf16(__ubuf__ fp8_e8m0_t* srcPtr, __
         // UNPACK_B8 already zero-extends each scale byte to a uint16_t lane.
         asc_shiftleft_scalar(bf16Bits, reinterpret_cast<vector_uint16_t&>(scaleReg), int16_t{7}, mask);
         asc_eq_scalar(nanMask, bf16Bits, uint16_t{0x7f80}, mask);
-        vdup(bf16Bits, uint16_t{0x7fc0}, nanMask, MODE_MERGING);
+        asc_duplicate_scalar_merge(bf16Bits, uint16_t{0x7fc0}, nanMask);
         asc_storealign_intlv(dstPtr, bf16Bits, bf16Bits);
         dstPtr += bf16RepeatSize * 2U;
     }
@@ -305,7 +305,7 @@ __simd_vf__ inline void AccumulateMxFp8VF(__ubuf__ T* tokenPtr, __ubuf__ fp8_e8m
             asc_loadalign_unpack4(rawScaleReg, reinterpret_cast<__ubuf__ uint8_t*>(scalePtr) + scaleBase);
             asc_shiftleft_scalar(scaleBits, reinterpret_cast<vector_uint32_t&>(rawScaleReg), int16_t{23}, scaleMask);
             asc_eq_scalar(nanMask, scaleBits, uint32_t{0x7f800000}, scaleMask);
-            vdup(scaleBits, uint32_t{0x7fc00000}, nanMask, MODE_MERGING);
+            asc_duplicate_scalar_merge(scaleBits, uint32_t{0x7fc00000}, nanMask);
         }
         uint32_t validDataCount = validScaleCount * SCALE_GROUP_SIZE;
         uint16_t repeatTimes = (validDataCount + fp32RepeatSize - 1U) / fp32RepeatSize;

@@ -712,7 +712,12 @@ def mega_moe(
         activation=activation,
         activation_clamp=activation_clamp,
         activation_params=activation_params,
-        dispatch_quant_out_dtype=sym_buffer.dispatch_quant_out_dtype,
+        # BF16 直通从 x 推导类型；通信容量查询仍保留 BF16 类型信息。
+        dispatch_quant_out_dtype=(
+            None
+            if sym_buffer.dispatch_quant_mode == 0 and x.dtype == torch.bfloat16
+            else sym_buffer.dispatch_quant_out_dtype
+        ),
         shared_expert_quant_out_dtype=shared_quant_dtype_int,
         weight1_type=weight1_type,
         weight2_type=weight2_type,

@@ -112,20 +112,40 @@ template <typename Atom, typename Dst, typename Src>
 __aicore__ inline void copy(const copy_atom<Atom>& copy, const Dst& dst, const MegaMoeImpl::Gmm1NzWeightView<Src>& src)
 {
     using Element = get_attribute_element_type<typename Src::element_type*>;
-    const uint64_t c0 = AscendC::Std::get<0>(AscendC::Std::get<0>(src.layout().shape()));
+    const uint64_t c0 = get_layout_trait<typename Src::layout_type>::c0_element;
     const uint64_t columnBytes = (Blaze::Gemm::IsFp4<Element>() ? c0 / 2U : c0) * sizeof(Element);
-    const uint64_t singleN = get_total_column_shape(src.layout());
-    const uint64_t curK = get_total_row_shape(src.layout());
+    uint64_t singleN;
+    uint64_t curK;
+    uint64_t matrixCount;
+    uint64_t srcStride;
+    uint64_t dstStride;
+    if constexpr (Src::layout_type::depth == five_dim_data) {
+        const auto& matrixShape = AscendC::Std::get<1>(src.layout().shape());
+        curK = AscendC::Std::get<0>(AscendC::Std::get<0>(matrixShape)) *
+               AscendC::Std::get<1>(AscendC::Std::get<0>(matrixShape));
+        singleN = AscendC::Std::get<0>(AscendC::Std::get<1>(matrixShape)) *
+                  AscendC::Std::get<1>(AscendC::Std::get<1>(matrixShape));
+        matrixCount = AscendC::Std::get<0>(src.layout().shape());
+        // 沿 gate/up 的 batch 间距交替搬运，再进入下一个 K 分形块。
+        srcStride = AscendC::Std::get<0>(src.layout().stride()) / c0 * columnBytes;
+        dstStride = AscendC::Std::get<0>(dst.layout().stride()) / c0 * columnBytes;
+    } else {
+        singleN = get_total_column_shape(src.layout());
+        curK = get_total_row_shape(src.layout());
+        matrixCount = 2U;
+        srcStride = (copy.params.n / 2U) * columnBytes;
+        dstStride = singleN * columnBytes;
+    }
     // 9201 新增预加载控制参数；传入 false 以保持原有同步行为。
-    asc_copy_gm2l1_align(reinterpret_cast<__cbuf__ uint8_t*>(dst.data().get()),
-                         reinterpret_cast<__gm__ uint8_t*>(src.data().get()), static_cast<uint32_t>(2U * curK / c0),
-                         static_cast<uint32_t>(singleN * columnBytes), 0, 0, true,
+    asc_copy_gm2l1_align(
+        reinterpret_cast<__cbuf__ uint8_t*>(dst.data().get()), reinterpret_cast<__gm__ uint8_t*>(src.data().get()),
+        static_cast<uint32_t>(matrixCount * curK / c0), static_cast<uint32_t>(singleN * columnBytes), 0, 0, true,
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
-                         false, static_cast<asc_load_l2_cache_mode>(src.engine().get_cache_mode()),
+        false, static_cast<asc_load_l2_cache_mode>(src.engine().get_cache_mode()),
 #else
-                         src.engine().get_cache_mode(),
+        static_cast<asc_load_l2_cache_mode>(src.engine().get_cache_mode()),
 #endif
-                         (copy.params.n / 2U) * columnBytes, static_cast<uint32_t>(singleN * columnBytes));
+        srcStride, dstStride);
 }
 
 template <typename Atom, typename Dst, typename Src>

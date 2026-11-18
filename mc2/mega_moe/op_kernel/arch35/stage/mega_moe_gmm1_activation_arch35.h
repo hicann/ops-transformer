@@ -283,7 +283,6 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(bool topkWeightsPrefetch,
     }
 
     constexpr uint32_t weightElementsPerByte = PackedElementTraits<WeightType>::ELEMENTS_PER_BYTE;
-    constexpr uint32_t outputElementsPerByte = PackedElementTraits<ActivationOutType>::ELEMENTS_PER_BYTE;
     int64_t n = Get<N_VALUE>(state.problemShape);
     int64_t k = Get<K_VALUE>(state.problemShape);
     int64_t expertOffset = state.expertIdx;
@@ -297,12 +296,6 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(bool topkWeightsPrefetch,
         gmmConfig.ring.dispatch ? physicalTokenStartIndex : static_cast<uint64_t>(globalTokenStartIndex);
     uint32_t expertMGroupOffset = rowOffsetInExpert / L1_TILE_M_256;
     gmmAddrInfo.gmm1LogicalPaddedRow = state.paddedTokenStartIndex + rowOffsetInExpert;
-    int64_t scaleK = Ops::Base::CeilDiv(k, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-
-    if (UseA8W4Gmm1 || topkWeightsPrefetch) {
-        gmmAddrInfo.gmm1OutGlobal =
-            workspace.routed.gmm1Output.get_ptr(workspaceBase) + physicalTokenStartIndex * n * sizeof(bfloat16_t);
-    }
     gmmAddrInfo.metaInfoGlobal = workspace.routing.receivedTokenMetadata.get_ptr(workspaceBase);
     gmmAddrInfo.activationToGmm2Flag =
         reinterpret_cast<__gm__ int32_t*>(workspace.sync.activationReady.get_ptr(workspaceBase)) +
@@ -310,31 +303,43 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(bool topkWeightsPrefetch,
         static_cast<uint64_t>(expertMGroupOffset) * INT_CACHELINE;
     gmmAddrInfo.aGlobal = workspace.routed.gmm1Input.data.get_ptr(workspaceBase) +
                           dispatchTokenStartIndex * k / ActivationElementsPerByte * sizeof(ActivationType);
-    gmmAddrInfo.aScaleGlobal = workspace.routed.gmm1Input.scale.get_ptr(workspaceBase) +
-                               dispatchTokenStartIndex * scaleK * sizeof(QuantScaleType);
     gmmAddrInfo.bGlobal =
         GetExpertWeightAddr<WeightType>(weights.weight1, gmmConfig.isPerExpertWeightTensor, state.expertIdx,
                                         static_cast<uint64_t>(state.expertIdx) * n * k / weightElementsPerByte);
-    gmmAddrInfo.bScaleGlobal =
-        GetExpertWeightAddr<QuantScaleType>(weights.weightScales1, gmmConfig.isPerExpertWeightTensor, state.expertIdx,
-                                            static_cast<uint64_t>(state.expertIdx) * n * scaleK);
+    if constexpr (Std::IsSame<QuantScaleType, void>::value) {
+        gmmAddrInfo.aScaleGlobal = nullptr;
+        gmmAddrInfo.bScaleGlobal = nullptr;
+        gmmAddrInfo.metaInfoGlobal += static_cast<uint64_t>(globalTokenStartIndex) * META_INFO_SIZE * sizeof(int32_t);
+    } else {
+        int64_t scaleK = Ops::Base::CeilDiv(k, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+        gmmAddrInfo.aScaleGlobal = workspace.routed.gmm1Input.scale.get_ptr(workspaceBase) +
+                                   dispatchTokenStartIndex * scaleK * sizeof(QuantScaleType);
+        gmmAddrInfo.bScaleGlobal =
+            GetExpertWeightAddr<QuantScaleType>(weights.weightScales1, gmmConfig.isPerExpertWeightTensor,
+                                                state.expertIdx, static_cast<uint64_t>(state.expertIdx) * n * scaleK);
+    }
+    if (UseA8W4Gmm1 || topkWeightsPrefetch) {
+        gmmAddrInfo.gmm1OutGlobal =
+            workspace.routed.gmm1Output.get_ptr(workspaceBase) + physicalTokenStartIndex * n * sizeof(bfloat16_t);
+    }
     if constexpr (g_coreType == AIV) {
         bool runsActivation = true;
         if constexpr (UseA8W4Gmm1) {
             runsActivation = MegaMoeHardwarePolicy::GetSubBlockIdx() == 1U;
         }
         if (runsActivation) {
-            int64_t scaleN = Ops::Base::CeilDiv(static_cast<int64_t>(activationOutputWidth),
-                                                static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
-                             MXFP_MULTI_BASE_SIZE;
-            AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{
-                static_cast<int64_t>(physicalTokenStartIndex) * activationOutputWidth / outputElementsPerByte,
-                static_cast<int64_t>(physicalTokenStartIndex) * scaleN,
-                expertOffset * syncLayout.activationFlagSlotCountPerExpert / INT_CACHELINE + expertMGroupOffset,
-                0L,
-                0L,
-                0L};
-            epilogueOp.UpdateGlobalAddr(vecBaseOffset);
+            if constexpr (Std::IsSame<QuantScaleType, void>::value) {
+                epilogueOp.SetOutputRowOffset(physicalTokenStartIndex);
+            } else {
+                constexpr uint32_t outputElementsPerByte = PackedElementTraits<ActivationOutType>::ELEMENTS_PER_BYTE;
+                int64_t scaleN = Ops::Base::CeilDiv(static_cast<int64_t>(activationOutputWidth),
+                                                    static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
+                                 MXFP_MULTI_BASE_SIZE;
+                AscendC::Coord<int64_t, int64_t> vecBaseOffset{
+                    static_cast<int64_t>(physicalTokenStartIndex) * activationOutputWidth / outputElementsPerByte,
+                    static_cast<int64_t>(physicalTokenStartIndex) * scaleN};
+                epilogueOp.UpdateGlobalAddr(vecBaseOffset);
+            }
         }
     }
     if constexpr (g_coreType == AIC) {

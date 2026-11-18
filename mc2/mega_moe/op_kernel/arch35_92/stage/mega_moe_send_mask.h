@@ -105,7 +105,7 @@ __simd_vf__ inline void SelectExpertIndicesVF(__ubuf__ int32_t* idsUb, __ubuf__ 
     IndexVector indicesReg;
     IndexVector packedReg;
     vector_store_unalign storeState;
-    asc_clear_ar_spr();
+    asc_squeeze_and_storeunalign_init();
     for (uint16_t i = 0U; i < repeatCount; ++i) {
         uint32_t offset = static_cast<uint32_t>(i) * INDICES_PER_VECTOR;
         vector_bool active = asc_update_mask_b32(validLen);
@@ -122,11 +122,10 @@ __simd_vf__ inline void SelectExpertIndicesVF(__ubuf__ int32_t* idsUb, __ubuf__ 
             asc_deintlv_b16(selectedMask, discardedMask, selectedMask, upperMask);
         }
         asc_loadalign(indicesReg, indicesUb + offset);
-        asc_squeeze_with_status(packedReg, indicesReg, selectedMask);
-        asc_storeunalign_postupdate(selectedUb, storeState, packedReg);
+        asc_squeeze_and_storeunalign(selectedUb, packedReg, storeState, indicesReg, selectedMask);
     }
     // 输出偏移由 AR 管理，所有迭代及收尾均使用同一基址和同一个非对齐存储状态。
-    asc_storeunalign_post(selectedUb, storeState);
+    asc_squeeze_and_storeunalign_finalize(selectedUb, storeState);
 }
 #endif
 

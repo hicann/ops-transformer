@@ -54,7 +54,9 @@ __aicore__ inline DedupDispatchViews<ActivationType, QuantScaleType> CreateDedup
     views.remoteRecordsGm =
         reinterpret_cast<__gm__ ActivationType*>(winRankAddr[remoteRankIdx] + context.quantWinOffset);
     views.recvDataGm = workspace.routed.gmm1Input.data.get_ptr<ActivationType>(buffer);
-    views.recvScaleGm = workspace.routed.gmm1Input.scale.get_ptr<QuantScaleType>(buffer);
+    if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
+        views.recvScaleGm = workspace.routed.gmm1Input.scale.get_ptr<QuantScaleType>(buffer);
+    }
     views.metadataGm = workspace.routing.receivedTokenMetadata.get_ptr<int32_t>(buffer);
     views.rowDescGm = reinterpret_cast<__gm__ int32_t*>(context.dedup.rowDescPtr);
     return views;
@@ -71,6 +73,7 @@ __aicore__ inline void FanoutDedupDataAndMeta(DedupDispatchViews<ActivationType,
                                               int32_t memberCount, uint32_t fanMetaSlotBase)
 {
     const int32_t tokenIndex = selfTopkIndex / topK;
+    auto* recvDataBytes = reinterpret_cast<__gm__ uint8_t*>(views.recvDataGm);
     for (int32_t m = 0; m < memberCount; ++m) {
         int32_t row = selfRow;
         int32_t topkIndex = selfTopkIndex;
@@ -80,10 +83,12 @@ __aicore__ inline void FanoutDedupDataAndMeta(DedupDispatchViews<ActivationType,
             row = views.descBatchTensor[tripleBase];
             topkIndex = views.descBatchTensor[tripleBase + 1U];
         }
-        CopyUbToGm((views.recvDataGm + (static_cast<uint64_t>(row) * scratch.revTokenElemCnt)), tokenScaleBuffer,
-                   static_cast<uint16_t>(scratch.revTokenElemCnt * sizeof(ActivationType)));
-        CopyUbToGm((views.recvScaleGm + (static_cast<uint64_t>(row) * scratch.revScaleElemCnt)), scaleBuffer,
-                   static_cast<uint16_t>(scratch.revScaleElemCnt * sizeof(QuantScaleType)));
+        CopyUbToGm(recvDataBytes + static_cast<uint64_t>(row) * scratch.recvTokenDataBytes, tokenScaleBuffer,
+                   static_cast<uint16_t>(scratch.recvTokenDataBytes));
+        if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
+            CopyUbToGm((views.recvScaleGm + (static_cast<uint64_t>(row) * scratch.revScaleElemCnt)), scaleBuffer,
+                       static_cast<uint16_t>(scratch.revScaleElemCnt * sizeof(QuantScaleType)));
+        }
         uint32_t metaBase = fanMetaSlotBase + static_cast<uint32_t>(m) * static_cast<uint32_t>(INT32_PER_256B);
         views.fanMetaTensor[metaBase + RANK_ID] = static_cast<int32_t>(remoteRankIdx);
         views.fanMetaTensor[metaBase + TOKEN_ID] = tokenIndex;
@@ -134,15 +139,19 @@ __aicore__ inline void StoreDedupEntry(bool topkWeightsPrefetch, const TokenDisp
     const int32_t topK = static_cast<int32_t>(params.tilingData->compute.topK);
     PipeWait<PIPE_MTE2, PIPE_MTE3>(eventId);
     __ubuf__ ActivationType* tokenScaleBuffer = GetDispatchCopyBuffer(context, scratch, bufferIdx);
-    __ubuf__ QuantScaleType* scaleBuffer =
-        reinterpret_cast<__ubuf__ QuantScaleType*>(tokenScaleBuffer + context.quantTokenAlignBytes);
+    __ubuf__ QuantScaleType* scaleBuffer = nullptr;
+    if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
+        scaleBuffer = reinterpret_cast<__ubuf__ QuantScaleType*>(reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) +
+                                                                 context.quantTokenAlignBytes);
+    }
     // 与 Fetch 侧事件分叉同条件：记录带权重段（topk 提前乘权或 tkw=0 combine 去重）走 MTE2_S。
     const bool recordHasWeights = (topkWeightsPrefetch || IsCombineDedupOn(params.tilingData->compute.dedupMode));
     __ubuf__ int32_t* weightBitsTensor = nullptr;
     if (recordHasWeights) {
         PipeWait<PIPE_MTE2, PIPE_S>(eventId);
-        uint32_t weightOffsetInUb = context.quantTokenAlignBytes + context.quantScaleAlignBytes;
-        weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(tokenScaleBuffer + weightOffsetInUb);
+        const uint32_t weightOffsetInElements =
+            (context.quantTokenAlignBytes + context.quantScaleAlignBytes) / sizeof(ActivationType);
+        weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(tokenScaleBuffer + weightOffsetInElements);
     } else {
         // Fetch 在无权重段布局下为 ring meta 置了 S_MTE3；本路径不消费 ring meta，在此配平。
         PipeWait<PIPE_S, PIPE_MTE3>(eventId);
