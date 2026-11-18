@@ -880,10 +880,20 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
     k = torch.randn(num_blocks, block_size, KV_N, D, dtype=torch.float16, device="npu")
     v = torch.randn(num_blocks, block_size, KV_N, D, dtype=torch.float16, device="npu")
 
-    sparse_block_idx = torch.randint(
-        0, num_blocks, (KV_N, total_q_blocks, top_k), dtype=torch.int32, device="npu"
+    # top_k is the index capacity; the valid count is bounded by the number of logical KV blocks.
+    num_sparse_kv_blocks = math.ceil(KV_S / block_y)
+    valid_count = min(top_k, num_sparse_kv_blocks)
+    sparse_block_idx = torch.full(
+        (KV_N, total_q_blocks, top_k), -1, dtype=torch.int32, device="npu"
     )
-    sparse_block_count = torch.full((KV_N, total_q_blocks), top_k, dtype=torch.int32, device="npu")
+    sparse_block_idx[..., :valid_count] = torch.arange(valid_count, dtype=torch.int32, device="npu")
+    sparse_block_count = torch.full((KV_N, total_q_blocks), valid_count, dtype=torch.int32, device="npu")
+
+    # Only the valid prefix is used. Its indices must be nonnegative, strictly ascending, and unique.
+    valid_idx = sparse_block_idx[..., :valid_count].cpu()
+    assert torch.all(sparse_block_count.cpu() == valid_count).item()
+    assert torch.all((valid_idx >= 0) & (valid_idx < num_sparse_kv_blocks)).item()
+    assert torch.all(valid_idx[..., 1:] > valid_idx[..., :-1]).item()
     cu_seqlens_q = torch.tensor([0, Q_S], dtype=torch.int64, device="npu")
     seqused_kv = torch.tensor([KV_S], dtype=torch.int32, device="npu")
     block_table = torch.arange(num_blocks, dtype=torch.int32, device="npu").view(1, -1)
@@ -929,6 +939,21 @@ For details about the quant_mode parameter, see the quant_mode enumeration.
     torch_npu.npu.synchronize()
     assert attention_out.shape == q.shape
     assert attention_out.dtype == q.dtype
+
+    # The identity page table maps the first valid_count logical KV blocks.
+    # Apply the right-aligned causal mask used by mask_mode=1.
+    selected_kv = min(valid_count * block_y, KV_S)
+    q_ref = q.cpu().float()
+    k_ref = k.cpu().float().reshape(-1, KV_N, D)[:selected_kv]
+    v_ref = v.cpu().float().reshape(-1, KV_N, D)[:selected_kv]
+    k_ref = k_ref.repeat_interleave(Q_N // KV_N, dim=1)
+    v_ref = v_ref.repeat_interleave(Q_N // KV_N, dim=1)
+    scores = torch.einsum("qhd,khd->hqk", q_ref, k_ref) / math.sqrt(D)
+    visible_kv = KV_S - Q_S + torch.arange(Q_S) + 1
+    visible_mask = torch.arange(selected_kv)[None, :] < visible_kv[:, None]
+    scores.masked_fill_(~visible_mask[None, :, :], float("-inf"))
+    reference = torch.einsum("hqk,khd->qhd", scores.softmax(dim=-1), v_ref)
+    torch.testing.assert_close(attention_out.cpu().float(), reference, atol=1e-2, rtol=1e-2)
     ```
 
 ## INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>
