@@ -25,6 +25,7 @@
 #include "../mhc_post_tiling.h"
 #include "../../../op_kernel/arch22/mhc_post_tiling_data.h"
 #include "../../../op_kernel/arch22/mhc_post_tiling_key.h"
+#include "../../../op_kernel/arch22/mhc_post_four_constants.h"
 #include "tiling/platform/platform_ascendc.h"
 
 namespace optiling {
@@ -564,6 +565,11 @@ void MhcPostTilingBaseArch22::ComputeTiling()
         dInner_ = d_ / dOuter_;
     }
     dInner_ = Ops::Base::CeilAlign(dInner_, static_cast<int64_t>(BF16_FP16_ALIGN_SIZE));
+    // Four-head broadcast path: 160 KB data buffers plus coefficients and padding.
+    if (n_ == MhcPost::FOUR_HEAD_COUNT && d_ >= MhcPost::FOUR_HEAD_TILE_SIZE && d_ % MhcPost::FOUR_HEAD_D_ALIGN == 0 &&
+        UB_SIZE >= MhcPost::FOUR_HEAD_MIN_UB_BYTES) {
+        dInner_ = MhcPost::FOUR_HEAD_TILE_SIZE;
+    }
     dOuter_ = Ops::Base::CeilDiv(d_, dInner_);
     dTail_ = d_ - (dOuter_ - 1) * dInner_;
     dTailAlign_ = Ops::Base::CeilAlign(dTail_, static_cast<int64_t>(BF16_FP16_ALIGN_SIZE));

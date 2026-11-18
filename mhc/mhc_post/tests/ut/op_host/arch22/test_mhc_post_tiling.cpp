@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include <iostream>
 #include <gtest/gtest.h>
 #include "../../../../op_host/op_tiling/mhc_post_tiling.h"
 #include "tiling_context_faker.h"
@@ -19,29 +18,7 @@ using namespace optiling;
 
 constexpr char kSocVersion910B[] = "Ascend910B";
 
-class MhcPostTilingArch22 : public testing::Test {
-protected:
-    static void SetUpTestCase()
-    {
-        std::cout << "MhcPostTilingArch22 SetUp" << std::endl;
-    }
-
-    static void TearDownTestCase()
-    {
-        std::cout << "MhcPostTilingArch22 TearDown" << std::endl;
-    }
-};
-
-static string TilingData2Str(const gert::TilingData* tiling_data)
-{
-    auto data = tiling_data->GetData();
-    string result;
-    for (size_t i = 0; i < tiling_data->GetDataSize(); i += sizeof(int64_t)) {
-        result += std::to_string((reinterpret_cast<const int64_t*>(tiling_data->GetData())[i / sizeof(int64_t)]));
-        result += " ";
-    }
-    return result;
-}
+class MhcPostTilingArch22 : public testing::Test {};
 
 TEST_F(MhcPostTilingArch22, test_mhc_post_3d_fp16_success)
 {
@@ -63,7 +40,7 @@ TEST_F(MhcPostTilingArch22, test_mhc_post_3d_fp16_success)
                                               },
                                               &compileInfo, kSocVersion910B);
     uint64_t expectTilingKey = 1;
-    string expectTilingDataStr = "4 5120 64 16 16 1 1024 1 5120 1 5120 5120 ";
+    string expectTilingDataStr = "4 5120 64 48 48 1 1024 1 2048 3 1024 1024 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingDataStr, expectWorkspaces);
 }
@@ -89,7 +66,7 @@ TEST_F(MhcPostTilingArch22, test_mhc_post_4d_fp16_success)
         },
         &compileInfo, kSocVersion910B);
     uint64_t expectTilingKey = 1;
-    string expectTilingDataStr = "4 5120 64 16 16 1 1024 1 5120 1 5120 5120 ";
+    string expectTilingDataStr = "4 5120 64 48 48 1 1024 1 2048 3 1024 1024 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingDataStr, expectWorkspaces);
 }

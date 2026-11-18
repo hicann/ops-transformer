@@ -17,6 +17,8 @@
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
 #include "arch22/mhc_post_arch22.h"
+#include "arch22/mhc_post_four.h"
+#include "arch22/mhc_post_four_constants.h"
 
 using namespace AscendC;
 using namespace MhcPost;
@@ -30,7 +32,24 @@ __global__ __aicore__ void mhc_post(GM_ADDR x, GM_ADDR hRes, GM_ADDR hOut, GM_AD
     GET_TILING_DATA_WITH_STRUCT(MhcPostTilingData, tilingData, tiling);
     TPipe tPipe;
 
-    MhcPostKernel<DTYPE_X, usePermanentX> op(&tPipe, &tilingData);
+    if (tilingData.n == FOUR_HEAD_COUNT && tilingData.d >= FOUR_HEAD_TILE_SIZE &&
+        tilingData.d % FOUR_HEAD_D_ALIGN == 0 && tilingData.dInner == FOUR_HEAD_TILE_SIZE) {
+        MhcPostFour<DTYPE_X> op;
+        op.Init(&tPipe, &tilingData, x, hRes, hOut, hPost, output);
+        op.Process();
+        return;
+    }
+
+    if constexpr (usePermanentX == 1) {
+        if (tilingData.n == 4 && tilingData.d < 2048) {
+            MhcPostKernel<DTYPE_X, usePermanentX, true> op(&tPipe, &tilingData);
+            op.Init(x, hRes, hOut, hPost, output, workspace);
+            op.Process();
+            return;
+        }
+    }
+
+    MhcPostKernel<DTYPE_X, usePermanentX, false> op(&tPipe, &tilingData);
     op.Init(x, hRes, hOut, hPost, output, workspace);
     op.Process();
 }

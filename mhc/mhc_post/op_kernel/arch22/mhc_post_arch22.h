@@ -28,18 +28,18 @@
 namespace MhcPost {
 using namespace AscendC;
 
-// Double Buffer configuration - Double Buffer提升Memory Bound算子性能
-constexpr uint32_t DOUBLE_BUFFER_DEPTH = 2; // Double Buffer depth for data tiles
+constexpr uint32_t DOUBLE_BUFFER_DEPTH = 2;
 
-#define TEMPLATE_DECLARE template <typename T, uint16_t USE_PERMANENT_X>
-#define TEMPLATE_ARGS T, USE_PERMANENT_X
+#define TEMPLATE_DECLARE template <typename T, uint16_t USE_PERMANENT_X, bool PACK_OUTPUT>
+#define TEMPLATE_ARGS T, USE_PERMANENT_X, PACK_OUTPUT
 
 TEMPLATE_DECLARE
 class MhcPostKernel {
 public:
     __aicore__ inline MhcPostKernel(TPipe* tPipe, const MhcPostTilingData* __restrict tilingData)
         : pipe_(tPipe),
-          tilingData_(tilingData){};
+          tilingData_(tilingData)
+    {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hRes, GM_ADDR hOut, GM_ADDR hPost, GM_ADDR output,
                                 GM_ADDR workspace);
     __aicore__ inline void Process();
@@ -48,6 +48,7 @@ private:
     __aicore__ inline void CopyInHOut(int64_t bsIdx, int64_t dIdx, int64_t dNum);
     __aicore__ inline void ComputeCopyOut(int64_t bsIdx, int64_t dIdx, int64_t dNum);
     __aicore__ inline void ComputeCopyOutAllX(int64_t bsIdx, int64_t dIdx, int64_t dNum);
+    __aicore__ inline void ComputeCopyOutPacked(int64_t bsIdx, int64_t dIdx, int64_t dNum);
     __aicore__ inline void CopyOutTile(int64_t bsIdx, int64_t dIdx, int64_t nI, int64_t dNum);
     __aicore__ inline void CopyInX(int64_t bsIdx, int64_t dIdx, int64_t nJ, int64_t dNum);
 
@@ -55,11 +56,9 @@ private:
     TPipe* pipe_;
     const MhcPostTilingData* tilingData_;
 
-    // Input queues - Double Buffer enabled (queue depth = DOUBLE_BUFFER_DEPTH)
     TQue<QuePosition::VECIN, DOUBLE_BUFFER_DEPTH> hOutTileQueue_;
     TQue<QuePosition::VECIN, DOUBLE_BUFFER_DEPTH> xTileQueue_;
 
-    // Output queues - Double Buffer enabled (queue depth = DOUBLE_BUFFER_DEPTH)
     TQue<QuePosition::VECOUT, DOUBLE_BUFFER_DEPTH> outputTileQueue_;
 
     // Intermediate buffers for float computation
@@ -117,17 +116,16 @@ __aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::Init(GM_ADDR x, GM_ADDR hRe
     hResGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
     hPostGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-    // Initialize input queues - Double Buffer with depth=DOUBLE_BUFFER_DEPTH for data tiles
     pipe_->InitBuffer(hOutTileQueue_, DOUBLE_BUFFER_DEPTH, tilingData_->dInner * sizeof(T));
     pipe_->InitBuffer(xTileQueue_, DOUBLE_BUFFER_DEPTH, xFactor_ * tilingData_->dInner * sizeof(T));
 
-    // Initialize output queues - Double Buffer with depth=DOUBLE_BUFFER_DEPTH
-    pipe_->InitBuffer(outputTileQueue_, DOUBLE_BUFFER_DEPTH, tilingData_->dInner * sizeof(T));
+    constexpr int64_t outputFactor = PACK_OUTPUT ? 4 : 1;
+    pipe_->InitBuffer(outputTileQueue_, DOUBLE_BUFFER_DEPTH, outputFactor * tilingData_->dInner * sizeof(T));
 
     // Initialize intermediate buffers
     pipe_->InitBuffer(hOutF32Buf_, tilingData_->dInner * sizeof(float));
     pipe_->InitBuffer(xF32Buf_, xFactor_ * tilingData_->dInner * sizeof(float));
-    pipe_->InitBuffer(outF32Buf_, tilingData_->dInner * sizeof(float));
+    pipe_->InitBuffer(outF32Buf_, outputFactor * tilingData_->dInner * sizeof(float));
 }
 
 TEMPLATE_DECLARE
@@ -146,7 +144,11 @@ __aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::Process()
         CopyInHOut(bsIdx, dIdx, dNum);
         if constexpr (USE_PERMANENT_X == 1) {
             CopyInX(bsIdx, dIdx, 0, dNum);
-            ComputeCopyOutAllX(bsIdx, dIdx, dNum);
+            if constexpr (PACK_OUTPUT) {
+                ComputeCopyOutPacked(bsIdx, dIdx, dNum);
+            } else {
+                ComputeCopyOutAllX(bsIdx, dIdx, dNum);
+            }
         } else {
             ComputeCopyOut(bsIdx, dIdx, dNum);
         }
@@ -235,6 +237,44 @@ __aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::ComputeCopyOutAllX(int64_t 
 }
 
 TEMPLATE_DECLARE
+__aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::ComputeCopyOutPacked(int64_t bsIdx, int64_t dIdx, int64_t dNum)
+{
+    constexpr int64_t heads = 4;
+    int64_t hPostBase = bsIdx * heads;
+    int64_t hResBase = bsIdx * heads * heads;
+    int64_t dNumAlign = (dIdx < tilingData_->dOuter - 1) ? dNum : tilingData_->dTailAlign;
+    auto hOutTile = hOutTileQueue_.DeQue<T>();
+    auto xTile = xTileQueue_.DeQue<T>();
+    auto hOutF32 = hOutF32Buf_.Get<float>();
+    auto xF32 = xF32Buf_.Get<float>();
+    auto packedF32 = outF32Buf_.Get<float>();
+    Cast(hOutF32, hOutTile, RoundMode::CAST_NONE, dNum);
+    Cast(xF32, xTile, RoundMode::CAST_NONE, heads * dNumAlign);
+#pragma unroll
+    for (int64_t i = 0; i < heads; ++i) {
+        auto outF32 = packedF32[i * dNum];
+        Muls(outF32, hOutF32, hPostGm_.GetValue(hPostBase + i), dNum);
+#pragma unroll
+        for (int64_t j = 0; j < heads; ++j) {
+            PipeBarrier<PIPE_V>();
+            Axpy(outF32, xF32[j * dNumAlign], hResGm_.GetValue(hResBase + j * heads + i), dNum);
+            PipeBarrier<PIPE_V>();
+        }
+    }
+    auto outputTile = outputTileQueue_.AllocTensor<T>();
+    Cast(outputTile, packedF32, RoundMode::CAST_RINT, heads * dNum);
+    outputTileQueue_.EnQue(outputTile);
+    outputTile = outputTileQueue_.DeQue<T>();
+    int64_t outputOffset = bsIdx * heads * tilingData_->d + dIdx * tilingData_->dInner;
+    DataCopyExtParams copyParams = {static_cast<uint16_t>(heads), static_cast<uint32_t>(dNum * sizeof(T)), 0,
+                                    static_cast<uint32_t>((tilingData_->d - dNum) * sizeof(T)), 0};
+    DataCopyPad(outputGm_[outputOffset], outputTile, copyParams);
+    outputTileQueue_.FreeTensor(outputTile);
+    hOutTileQueue_.FreeTensor(hOutTile);
+    xTileQueue_.FreeTensor(xTile);
+}
+
+TEMPLATE_DECLARE
 __aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::CopyInX(int64_t bsIdx, int64_t dIdx, int64_t nJ, int64_t dNum)
 {
     int64_t dStart = dIdx * tilingData_->dInner;
@@ -270,4 +310,4 @@ __aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::CopyOutTile(int64_t bsIdx, 
 
 } // namespace MhcPost
 
-#endif // ASCENDC_MHC_POST_H
+#endif // ASCENDC_MHC_POST_ARCH22_H
