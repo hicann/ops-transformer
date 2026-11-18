@@ -38,7 +38,7 @@ def recipe(row):
 
 
 def read_cases(suite="public", names=None, *, dut=None, arch=None):
-    dut = dut or os.environ.get("KDA_DUT", "installed")
+    dut = dut or os.environ.get("KDA_DUT", "package")
     arch = arch or architecture()
     with CSV.open(encoding="utf-8", newline="") as stream:
         rows = list(csv.DictReader(stream))

@@ -250,6 +250,7 @@ def main():
     if len(set(args.templates)) != len(args.templates):
         parser.error("templates must be distinct")
     os.environ["FLASH_KDA_ARCH"] = args.arch
+    os.environ.setdefault("KDA_DUT", "installed")
     folder = Path(__file__).resolve().parent
     os.environ["KDA_SOURCE_ROOT"] = str(root)
     output.mkdir(parents=True)

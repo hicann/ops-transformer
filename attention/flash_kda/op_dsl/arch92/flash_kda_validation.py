@@ -16,6 +16,24 @@ from typing import NamedTuple
 
 import torch
 
+# Host layout discovery supplies declaration-only Torch symbols without graph APIs.
+# Real Torch provides torch.library and keeps its original runtime registration.
+if not hasattr(torch, "library"):
+
+    class _HostLayoutNode:
+        def __getattr__(self, name):
+            return _HostLayoutNode()
+
+        def __call__(self, *args, **kwargs):
+            if len(args) == 1 and callable(args[0]) and not kwargs:
+                return args[0]
+            return _HostLayoutNode()
+
+    def _host_layout_torch_getattr(name):
+        return _HostLayoutNode()
+
+    torch.__getattr__ = _host_layout_torch_getattr
+
 CHUNK_SIZE = 64
 SUPPORTED_HEAD_DIM = 128
 MAX_VALUE_HEADS = 96

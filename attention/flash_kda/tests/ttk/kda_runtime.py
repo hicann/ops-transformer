@@ -6,7 +6,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 
-"""Explicit source/installed DUT selection and native-artifact evidence."""
+"""CANN package/source/installed DUT selection and native-artifact evidence."""
 
 import argparse
 from functools import lru_cache
@@ -19,6 +19,7 @@ import logging
 import time
 import os
 from pathlib import Path
+import pkgutil
 import sys
 
 from kda_cases import architecture
@@ -29,9 +30,9 @@ _identity = None
 
 
 def selection():
-    kind = os.environ.get("KDA_DUT", "installed")
-    if kind not in ("installed", "source"):
-        raise ValueError("KDA_DUT must be installed or source")
+    kind = os.environ.get("KDA_DUT", "package")
+    if kind not in ("package", "installed", "source"):
+        raise ValueError("KDA_DUT must be package, installed, or source")
     return (
         kind,
         architecture(),
@@ -40,6 +41,37 @@ def selection():
                 os.environ.get("KDA_SOURCE_ROOT", Path(__file__).resolve().parents[4])
             ).resolve()
         ),
+    )
+
+
+def load_cann_package():
+    """Locate FlashKDA in the built-in or vendor CANN wheel."""
+    candidates = [
+        "cann_ops_transformer",
+        "cann_ops_transformer_custom",
+        "cann_ops_transformer_flash_kda",
+    ]
+    candidates.extend(
+        sorted(
+            module.name
+            for module in pkgutil.iter_modules()
+            if module.ispkg
+            and module.name.startswith("cann_ops_transformer_")
+            and module.name not in candidates
+        )
+    )
+    for name in candidates:
+        package = f"{name}.ops.attention.flash_kda"
+        try:
+            return importlib.import_module(package), package
+        except ModuleNotFoundError as error:
+            # Only skip absent packages, not missing dependencies inside a wheel.
+            if error.name != package and not package.startswith(f"{error.name}."):
+                raise
+    raise ModuleNotFoundError(
+        "FlashKDA was not found in the CANN Python packages; "
+        "install the FlashKDA wheel and source the CANN environment, "
+        "or set KDA_DUT=source to test the checkout explicitly"
     )
 
 
@@ -53,7 +85,20 @@ def load():
             )
         return _loaded
     kind, arch, root = identity
-    if kind == "installed":
+    if kind == "package":
+        if any(n.startswith("attention.flash_kda.op_dsl.") for n in sys.modules):
+            raise RuntimeError(
+                "source DUT already imported; run package tests in a fresh process"
+            )
+        # JIT the Python shipped in CANN, unless the caller selected a native mode.
+        os.environ.setdefault("CANNBOTDSL_NATIVE_BINARY_MODE", "off")
+        public, package = load_cann_package()
+        location = Path(public.__file__).resolve()
+        if Path(root) in location.parents:
+            raise RuntimeError(
+                f"package DUT resolves inside source checkout: {location}"
+            )
+    elif kind == "installed":
         mode = os.environ.setdefault("CANNBOTDSL_NATIVE_BINARY_MODE", "require")
         if mode != "require":
             raise RuntimeError(
