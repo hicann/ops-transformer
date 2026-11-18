@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：执行双路旋转位置编码[aclnnApplyRotaryPosEmb](../../apply_rotary_pos_emb/docs/aclnnApplyRotaryPosEmb.md)的反向计算。同时计算query和key的rope反向梯度，融合为一次kernel调用。
+- 接口功能：执行双路旋转位置编码[aclnnApplyRotaryPosEmb](../../apply_rotary_pos_emb/docs/aclnnApplyRotaryPosEmb.md)的反向计算。同时计算query和key的RoPE反向梯度，融合为一次Kernel调用。
 
 - 计算公式：
 
@@ -296,7 +296,7 @@ aclnnStatus aclnnApplyRotaryPosEmbGrad(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>传入的输入输出数据类型和格式不在支持的范围内、shape不满足校验条件、维度不在支持的范围、queryOptional与keyOptional未同时传入或同时不传、或rotaryMode/layout不符合支持的值。</td>
+      <td>传入的输入输出数据类型和格式不在支持的范围内、shape不满足校验条件、维度不在支持的范围内、queryOptional与keyOptional未同时传入或同时不传、或rotaryMode/layout不符合支持的值。</td>
     </tr>
   </tbody>
   </table>

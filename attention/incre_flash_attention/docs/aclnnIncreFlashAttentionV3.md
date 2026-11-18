@@ -33,7 +33,7 @@
 
     **说明：**
 
-    KV Cache是大模型推理性能优化的一个常用技术。采样时，Transformer模型会以给定的prompt/context作为初始输入进行推理（可以并行处理），随后逐一生成额外的token来继续完善生成的序列（体现了模型的自回归性质）。在采样过程中，Transformer会执行自注意力操作，为此需要给当前序列中的每个项目（无论是prompt/context还是生成的token）提取键值（KV）向量。这些向量存储在一个矩阵中，通常被称为kv缓存（KV Cache）。
+    KV Cache是大模型推理性能优化的一个常用技术。采样时，Transformer模型会以给定的prompt/context作为初始输入进行推理（可以并行处理），随后逐一生成额外的token来继续完善生成的序列（体现了模型的自回归性质）。在采样过程中，Transformer会执行自注意力操作，为此需要给当前序列中的每个项目（无论是prompt/context还是生成的token）提取键值（KV）向量。这些向量存储在一个矩阵中，通常被称为KV缓存（KV Cache）。
 
 - 计算公式：
 
@@ -213,7 +213,7 @@ aclnnStatus aclnnIncreFlashAttentionV3(
         <td>quantScale2</td>
         <td>输入</td>
         <td>输出量化的量化因子。</td>
-        <td><ul><li>支持空Tensor。</li><li>支持per-tensor，per-channel。</li></ul></td>
+        <td><ul><li>支持空Tensor。</li><li>支持per-tensor、per-channel。</li></ul></td>
         <td>FLOAT32、BFLOAT16</td>
         <td>ND</td>
         <td><ul><li>(1)</li><li>(D * N)，N为numKeyValueHeads</li></ul></td>
@@ -223,7 +223,7 @@ aclnnStatus aclnnIncreFlashAttentionV3(
         <td>quantOffset2</td>
         <td>输入</td>
         <td>输出量化的量化偏移。</td>
-        <td><ul><li>支持空Tensor。</li><li>支持per-tensor，per-channel。</li></ul></td>
+        <td><ul><li>支持空Tensor。</li><li>支持per-tensor、per-channel。</li></ul></td>
         <td>FLOAT32、BFLOAT16</td>
         <td>ND</td>
         <td><ul><li>(1)</li><li>(D * N)，N为numKeyValueHeads</li></ul></td>

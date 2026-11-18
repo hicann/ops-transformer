@@ -82,7 +82,7 @@ aclnnStatus aclnnMhcPostBackward(
 
 - **参数说明：**
 
-  <table style="undefined;table-layout: fixed; width:  1400px"><colgroup>
+  <table style="undefined;table-layout: fixed; width: 1400px"><colgroup>
   <col style="width: 145px">
   <col style="width: 90px">
   <col style="width: 441px">

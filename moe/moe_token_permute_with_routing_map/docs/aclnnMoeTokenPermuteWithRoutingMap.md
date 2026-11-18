@@ -26,7 +26,7 @@
 - **接口功能**：MoE的permute计算，将token和expert的标签作为routingMap传入，根据routingMap将tokens和可选probsOptional广播后排序
 - **计算公式**：
 
-  tokens\_num为routingMap的第0维大小，expert\_num为routingMap的第1维大小
+  tokens\_num为routingMap的第0维大小，expert\_num为routingMap的第1维大小。
   dropAndPad为`false`时
 
   $$
@@ -257,7 +257,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(
 
   `aclnnStatus`：返回状态码，具体参见 <a href="../../../docs/zh/context/aclnn_return_code.md">aclnn返回码</a>。
 
-  一段接口完成入参校验，出现以下场景时报错：
+  第一段接口完成入参校验，出现以下场景时报错：
   <table style="undefined;table-layout: fixed; width: 1180px">
     <colgroup>
       <col style="width: 250px">
@@ -286,7 +286,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(
         <td>输入输出的shape不符合要求（permuteTokensOut第1维、sortedIndicesOut的维数和长度不符合要求的情况除外）。</td>
       </tr>
       <tr>
-        <td>numOutTokens < 0 或numOutTokens > tokens_num * experts_num</td>
+        <td>numOutTokens < 0或numOutTokens > tokens_num * experts_num</td>
       </tr>
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>

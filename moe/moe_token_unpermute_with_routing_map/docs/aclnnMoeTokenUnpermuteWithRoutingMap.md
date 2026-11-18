@@ -372,13 +372,13 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMap(
   - paddedMode为true，且topK_num > experts_num。
   - paddedMode为true，且capacity > tokens_num。
   - routingMap的数据类型或shape不符合要求。
-  - 输入tensor的数据格式不为ND。
+  - 输入Tensor的数据格式不为ND。
 
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include "acl/acl.h"
 #include "aclnnop/aclnn_moe_token_unpermute_with_routing_map.h"
 #include <iostream>

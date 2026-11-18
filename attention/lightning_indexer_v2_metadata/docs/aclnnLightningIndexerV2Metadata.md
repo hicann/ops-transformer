@@ -215,7 +215,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <td>layoutQOptional（char*）</td>
       <td>输入</td>
       <td>表示q的排列格式。</td>
-      <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
+      <td><ul><li>支持BSND、TND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -225,7 +225,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <td>layoutKOptional（char*）</td>
       <td>输入</td>
       <td>表示k的排列格式。</td>
-      <td><ul><li>支持 BSND、TND、PA_BBND。</li><li>建议值为BSND。</li></ul></td>
+      <td><ul><li>支持BSND、TND、PA_BBND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>

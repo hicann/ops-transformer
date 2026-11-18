@@ -114,7 +114,7 @@ aclnnStatus aclnnSwinAttentionScoreQuant(
     <tr>
         <td>value</td>
         <td>输入</td>
-        <td>计算注意力后的每个位置值张量，公式中的V</td>
+        <td>计算注意力后的每个位置的值张量，公式中的V</td>
         <td>输入维度需要与query、key保持一致</td>
         <td>INT8</td>
         <td>ND</td>

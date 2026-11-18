@@ -116,7 +116,7 @@
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用`aclnnMixedQuantSparseFlashMlaGetWorkspaceSize`接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用`aclnnMixedQuantSparseFlashMla`执行实际计算。
 
-```Cpp
+```cpp
 aclnnStatus aclnnMixedQuantSparseFlashMlaGetWorkspaceSize(
     const aclTensor *q,
     const aclTensor *oriKvOptional,
@@ -154,7 +154,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaGetWorkspaceSize(
     aclOpExecutor  **executor)
 ```
 
-```Cpp
+```cpp
 aclnnStatus aclnnMixedQuantSparseFlashMla(
     void             *workspace,
     uint64_t          workspaceSize,

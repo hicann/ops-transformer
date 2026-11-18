@@ -83,7 +83,7 @@ aclnnStatus aclnnMoeInitRoutingV2Grad(
     <tr>
       <td>gradExpandedX</td>
       <td>输入</td>
-      <td>表示Routing过后的目标张量。</td>
+      <td>表示Routing后的目标张量。</td>
       <td>要求为一个2D/3D的Tensor，2D shape为Dropless场景的[B*S*K, H]或者Active场景下的[A, H]，3D shape为Drop/Pad场景下的[E, C, H]。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>

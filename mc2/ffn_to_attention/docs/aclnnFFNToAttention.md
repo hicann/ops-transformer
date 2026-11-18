@@ -329,7 +329,7 @@ aclnnStatus aclnnFFNToAttention(
 
   1. 新建FFNtoAttentionDemo目录，按照下方指导在FFNtoAttentionDemo下新建aclnnFFNtoAttentionDemo.cpp、FFNtoAttention.sh文件并参考如下代码修改。
 
-  2. 安装cann包，并根据下方指导编译运行FFNtoAttentionDemo。
+  2. 安装CANN包，并根据下方指导编译运行FFNtoAttentionDemo。
 
 - FFNtoAttention.sh编译脚本
 
@@ -354,7 +354,7 @@ aclnnStatus aclnnFFNToAttention(
 
 - 示例代码如下，仅供参考
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

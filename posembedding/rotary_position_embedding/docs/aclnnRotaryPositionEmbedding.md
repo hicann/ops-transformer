@@ -361,7 +361,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   输入张量x和输出张量y的shape必须完全相同。
   输入张量cos和sin的shape必须完全相同。
   - half模式：
-    - B，N < 1000;
+    - B、N < 1000;
     - 当x为BNSD时，cos、sin支持11SD、B1SD、BNSD
       - 当（D/2）% (32/inputDtypeSize) == 0时，需满足B *N <= S* 8
       - 当（D/2）% (32/inputDtypeSize) != 0时，需满足B *N* 2 <= (S + coreNum -1) / coreNum或者D >= 80
@@ -384,7 +384,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   输入张量x和输出张量y的shape必须完全相同。
   输入张量cos和sin的shape必须完全相同。
   - 仅支持half模式：
-    - B，N < 1000
+    - B、N < 1000
     - 当x为BNSD时，cos、sin支持11SD、B1SD、BNSD
       - B *N <= S* 8
     - 当x为BSND时，cos、sin支持1S1D、BS1D、BSND
@@ -399,7 +399,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include "acl/acl.h"
 #include "aclnnop/aclnn_rotary_position_embedding.h"
 #include <iostream>

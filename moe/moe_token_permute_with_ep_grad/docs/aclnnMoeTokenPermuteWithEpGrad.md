@@ -126,7 +126,7 @@ aclnnStatus aclnnMoeTokenPermuteWithEpGrad(
       <td>permutedTokensOutputGrad</td>
       <td>输入</td>
       <td>表示正向输出permutedTokens的梯度。</td>
-      <td>shape支持2D维度，不支持空tensor，第j行对应全局permuted位置rangeOptional[0]+j。</td>
+      <td>shape支持2D维度，不支持空Tensor，第j行对应全局permuted位置rangeOptional[0]+j。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>((rangeOptional[1] - rangeOptional[0]), hidden_size)</td>
@@ -167,7 +167,7 @@ aclnnStatus aclnnMoeTokenPermuteWithEpGrad(
     <tr>
       <td>rangeOptional</td>
       <td>输入</td>
-      <td>ep切分的有效范围，size为2。</td>
+      <td>EP切分的有效范围，size为2。</td>
       <td>为空时，忽略permutedProbsOutputGradOptional和probsGradOut，执行逻辑回退到<a href="../../moe_token_permute_grad/docs/aclnnMoeTokenPermuteGrad.md">aclnnMoeTokenPermuteGrad</a>。</td>
       <td>-</td>
       <td>-</td>
@@ -178,7 +178,7 @@ aclnnStatus aclnnMoeTokenPermuteWithEpGrad(
       <td>paddedMode</td>
       <td>输入</td>
       <td>-</td>
-      <td>true表示开启paddedMode，false表示关闭paddedMode,默认为false，当前不生效。</td>
+      <td>true表示开启paddedMode，false表示关闭paddedMode，默认为false，当前不生效。</td>
       <td>bool</td>
       <td>-</td>
       <td>-</td>
@@ -314,7 +314,7 @@ aclnnStatus aclnnMoeTokenPermuteWithEpGrad(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 
 #include "acl/acl.h"
 #include "aclnnop/aclnn_moe_token_permute_with_ep_grad.h"

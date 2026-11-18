@@ -106,7 +106,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
         <th>数据类型</th>
         <th>数据格式</th>
         <th>维度(shape)</th>
-        <th>非连续tensor</th>
+        <th>非连续Tensor</th>
     </tr></thead>
     <tbody>
     <tr>
@@ -153,7 +153,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
         <td>attenMask</td>
         <td>输入</td>
         <td>mask矩阵</td>
-        <td><ul><li>不使用该功能可传入nullptr。</li></ul>
+        <td><ul><li>不使用该功能时可传入nullptr。</li></ul>
             <ul><li>综合约束请见<a href="#约束说明">约束说明</a>。</li></ul></td>
         <td>FLOAT16、BOOL、INT8、UINT8</td>
         <td>ND</td>
@@ -197,7 +197,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
         <td>quantScale1</td>
         <td>输入</td>
         <td>BMM2前面的量化因子。</td>
-        <td><ul><li>支持per-tensor。 </li></ul>
+        <td><ul><li>支持per-tensor。</li></ul>
             <ul><li>不使用该功能时可传入nullptr。</li></ul></td>
         <td>FLOAT32、nullptr</td>
         <td>ND</td>
@@ -208,7 +208,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
         <td>deqScale2</td>
         <td>输入</td>
         <td>BMM2后面的反量化因子。</td>
-        <td><ul><li>支持per-tensor。 </li></ul>
+        <td><ul><li>支持per-tensor。</li></ul>
             <ul><li>不使用该功能时可传入nullptr。</li></ul></td>
         <td>UINT64、FLOAT32、nullptr</td>
         <td>ND</td>
@@ -219,7 +219,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
         <td>quantScale2</td>
         <td>输入</td>
         <td>输出的量化因子。</td>
-        <td><ul><li>支持per-tensor，per-channel。 </li></ul>
+        <td><ul><li>支持per-tensor、per-channel。</li></ul>
             <ul><li>不使用该功能时可传入nullptr。</li></ul></td>
         <td>FLOAT32、BFLOAT16、nullptr</td>
         <td>ND</td>
@@ -230,7 +230,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
         <td>quantOffset2</td>
         <td>输入</td>
         <td>输出的量化偏移。</td>
-        <td><ul><li>支持per-tensor，per-channel。 </li></ul>
+        <td><ul><li>支持per-tensor、per-channel。</li></ul>
             <ul><li>不使用该功能时可传入nullptr。</li></ul></td>
         <td>FLOAT32、BFLOAT16、nullptr</td>
         <td>ND</td>
@@ -251,8 +251,8 @@ aclnnStatus aclnnPromptFlashAttentionV2(
         <td>scaleValue</td>
         <td>输入</td>
         <td>公式中d开根号的倒数。</td>
-        <td><ul><li>数据类型与query的数据类型需满足数据类型推导规则。 </li></ul>
-            <ul><li>用户不特意指定时建议传入1.0。 </li></ul></td>
+        <td><ul><li>数据类型与query的数据类型需满足数据类型推导规则。</li></ul>
+            <ul><li>用户不特意指定时建议传入1.0。</li></ul></td>
         <td>DOUBLE</td>
         <td>-</td>
         <td>1</td>
@@ -374,7 +374,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内部调用npu runtime的接口异常。</td>
+      <td>API内部调用NPU runtime的接口异常。</td>
     </tr>
   </tbody>
   </table>
@@ -428,7 +428,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
   - aclnnPromptFlashAttentionV2默认确定性实现。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 
-- 入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空tensor（即S2为0），则attentionOut填充为全零。attentionOut为空Tensor时，AscendCLNN框架会处理。其余在上述参数说明中标注了“可传入nullptr”的入参为空指针时，不进行处理。
+- 入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空Tensor（即S2为0），则attentionOut填充为全零。attentionOut为空Tensor时，AscendCLNN框架会处理。其余在上述参数说明中标注了“可传入nullptr”的入参为空指针时，不进行处理。
 
 - query、key、value输入，功能使用限制如下：
 
@@ -437,7 +437,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
 
     - 支持B轴小于等于65536（64k），输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128。
 
-    - 支持N轴小于等于256；
+    - 支持N轴小于等于256。
 
     - 支持S轴小于等于20971520（20M）。部分长序列场景下，如果计算量过大可能会导致pfa算子执行超时（aicore error类型报错，errorStr为:timeout or trap error），此场景下建议做S切分处理，注：这里计算量会受B、S、N、D等的影响，值越大计算量越大。典型的会超时的长序列（即B、S、N、D的乘积较大）场景包括但不限于：
         <table style="undefined;table-layout: fixed; width: 600px"><colgroup>
@@ -525,7 +525,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
 
 - attenMask功能使用限制如下：
 
-  - 输入shape限制：如果不使用该功能可传入nullptr。通常建议shape输入Q_S,KV_S;B,Q_S,KV_S;1,Q_S,KV_S;B,1,Q_S,KV_S;1,1,Q_S,KV_S，其中Q_S为query的shape中的S，KV_S为key和value的shape中的S，对于attenMask的KV_S为非32对齐的场景，建议padding到32对齐来提高性能，多余部分填充成1。
+  - 输入shape限制：如果不使用该功能时可传入nullptr。通常建议shape输入Q_S,KV_S;B,Q_S,KV_S;1,Q_S,KV_S;B,1,Q_S,KV_S;1,1,Q_S,KV_S，其中Q_S为query的shape中的S，KV_S为key和value的shape中的S，对于attenMask的KV_S为非32对齐的场景，建议padding到32对齐来提高性能，多余部分填充成1。
   - 输入数据类型限制：
 
     <!-- npu="910b" id9 -->
@@ -535,7 +535,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     <!-- npu="310p" id21 -->
     - <term>Atlas推理系列产品</term>：仅支持BOOL。
     <!-- end id21 -->
-  - 当attenMask数据类型取INT8、UINT8时，其tensor中的值需要为0或1。
+  - 当attenMask数据类型取INT8、UINT8时，其Tensor中的值需要为0或1。
 
 - actualSeqLengths、actualSeqLengthsKv输入，功能使用限制如下：
 
@@ -659,7 +659,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - 入参quantScale2和quantOffset2支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型。若传入quantOffset2，需保证其类型和shape信息与quantScale2一致。当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16，否则仅支持FLOAT32。per-channel格式，当输出layout为BSH时，要求quantScale2所有维度的乘积等于H；其他layout要求乘积等于N*D。（建议输出layout为BSH时，quantScale2 shape传入[1,1,H]或[H]；输出为BNSD时，建议传入[1,N,1,D]或[N,D]；输出为BSND时，建议传入[1,1,N,D]或[N,D]）
     - 输出为int8，quantScale2和quantOffset2为per-channel时，暂不支持左padding、Ring Attention或者D非32Byte对齐的场景。
     - 输出为int8时，暂不支持sparse为band且preTokens/nextTokens为负数。
-  - 当输出为INT8，入参quantOffset2传入非空指针和非空tensor值，并且sparseMode、preTokens和nextTokens满足以下条件，矩阵会存在某几行不参与计算的情况，导致计算结果误差，该场景会拦截（解决方案：如果希望该场景不被拦截，需要在PFA接口外部做后量化操作，不在PFA接口内部开启）：
+  - 当输出为INT8，入参quantOffset2传入非空指针和非空Tensor值，并且sparseMode、preTokens和nextTokens满足以下条件，矩阵会存在某几行不参与计算的情况，导致计算结果误差，该场景会拦截（解决方案：如果希望该场景不被拦截，需要在PFA接口外部做后量化操作，不在PFA接口内部开启）：
     - sparseMode = 0，attenMask如果非空指针，每个batch actualSeqLengths - actualSeqLengthsKV - preTokens > 0或nextTokens < 0时，满足拦截条件。
     - sparseMode = 1或2，不会出现满足拦截条件的情况。
     - sparseMode = 3，每个batch actualSeqLengthsKV - actualSeqLengths < 0，满足拦截条件。

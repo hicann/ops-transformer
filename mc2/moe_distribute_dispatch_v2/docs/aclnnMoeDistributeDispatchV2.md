@@ -475,7 +475,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
 
     <!-- end id9 -->
     <!-- npu="A3" id10 -->
-    - <term>Atlas A3系列产品</term>  ：
+    - <term>Atlas A3系列产品</term>：
         - `dynamicScalesOut`仅quantMode取值为2时有输出。
         - `commAlg`当前版本不支持，传空指针即可。
         - `xActiveMaskOptional`要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。
@@ -673,7 +673,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
           - 输出`dynamicScalesOut`shape为`(A, )`
   <!-- end id13 -->
   <!-- npu="A3" id14 -->
-  - <term>Atlas A3系列产品</term>  ：
+  - <term>Atlas A3系列产品</term>：
       - `quantMode`取值为0时，表示非量化场景，输入`scalesOptional`传空指针，`expandXOut`的数据类型支持`FLOAT16`、`BFLOAT16`。
       - `quantMode`取值为2时，表示pertoken动态量化场景，`expandXOut`的数据类型支持`INT8`。
           - 输入`scalesOptional`可传入空指针。
@@ -721,7 +721,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
               - commAlg为"hierarchy"：设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8  (`K`))) \* 1Byte + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512)。
           <!-- end id16 -->
           <!-- npu="A3" id17 -->
-          - <term>Atlas A3系列产品</term>  ：
+          - <term>Atlas A3系列产品</term>：
               - ep通信域内：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 64) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) /   512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。当前不支持TP通信域。
           <!-- end id17 -->
           <!-- npu="950" id18 -->
@@ -783,7 +783,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
 
     两机16卡场景中，需将参数MACHINE_NUM设置为2，即：
 
-    ```Cpp
+    ```cpp
     const uint32_t MACHINE_NUM = 2;
     ```
 
@@ -822,7 +822,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
 <!-- npu="950,A3,910b" id26 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

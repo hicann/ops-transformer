@@ -54,13 +54,13 @@
 
       - **计算过程**
 
-        - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$。
+        - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList)]$。
 
           >例子：假设groupList=[3,4,4,6]、groupListType=cumsum或groupList=[3,1,0,2]、groupListType=count。
           >
           >注：以上两种不同的分组方式，实际为相同的分组结果。
           >
-          >第0个右矩阵`W[0,:,:]`，对应索引位置[0,3)的token`x[0:3]`（共3-0=3个token），对应`x_scale[0:3]`、`w_scale[0]`、`bias[0]`、`offset[0]`、`Q[0:3]`、`Q_scale[0:3]`、`Q_offset[0:3]`；
+          >第0个右矩阵`W[0,:,:]`，对应索引位置[0,3)的token`x[0:3]`（共3-0=3个token），对应`x_scale[0:3]`、`w_scale[0]`、`bias[0]`、`offset[0]`、`Q[0:3]`、`Q_scale[0:3]`、`Q_offset[0:3]`。
           >
           >第1个右矩阵`W[1,:,:]`，对应索引位置[3,4)的token`x[3:4]`（共4-3=1个token），对应`x_scale[3:4]`、`w_scale[1]`、`bias[1]`、`offset[1]`、`Q[3:4]`、`Q_scale[3:4]`、`Q_offset[3:4]`；
           >
@@ -185,7 +185,7 @@
 
       - **计算过程**
 
-        - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$。
+        - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList)]$。
           - 分组逻辑与A8W8相同。
 
         - 2.根据分组确定的入参进行如下计算：
@@ -226,7 +226,7 @@
         * $Q∈\mathbb{Z_8}^{M \times N / 2}$：量化后的输出矩阵。
         * $Q\_scale∈\mathbb{R}^{M}$：量化缩放因子。
       - **计算过程**
-        - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$
+        - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList)]$
 
            - 2.根据分组确定的入参进行如下计算：
 
@@ -262,7 +262,7 @@
         * $Q∈\mathbb{F}_{8E4M3FN}^{M \times N / 2}$或$Q∈\mathbb{F}_{4E1M2}^{M \times N / 2}$或$Q∈\mathbb{F}_{4E2M1}^{M \times N / 2}$：量化后的输出矩阵，数据类型支持FLOAT8_E4M3FN、FLOAT4_E1M2、FLOAT4_E2M1。
         * $Q\_scale∈\mathbb{R}^{M \times ceil((N / 2) / 64) \times 2}$：量化缩放因子。
       - **计算过程**
-        - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$
+        - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList)]$
 
         - 2.根据分组确定的入参进行如下计算：
 

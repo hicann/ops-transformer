@@ -440,7 +440,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
     <!-- end id7 -->
     <!-- npu="A3" id8 -->
-    - <term>Atlas A3系列产品</term>  ：
+    - <term>Atlas A3系列产品</term>：
         - `expertScales`仅支持传入形状为(BS, K)的有效Tensor并进行加权聚合，不支持空Tensor。
         - `commAlg`当前版本不支持，传空指针即可。
         - `epSendCounts`的shape为(epWorldSize \* max(tpWorldSize, 1) \* localExpertNum, )。
@@ -634,7 +634,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
       - commAlg为"hierarchy"：设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
     <!-- end id11 -->
     <!-- npu="A3" id12 -->
-    - <term>Atlas A3系列产品</term>  ：
+    - <term>Atlas A3系列产品</term>：
       - ep通信域内：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 44) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) / 512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。
       - tp通信域内：设置大小要求\>=A \* (H \* 2 + 128) \* 2。
     <!-- end id12 -->
@@ -697,7 +697,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
     两机16卡场景中，需将参数MACHINE_NUM设置为2，即：
 
-    ```Cpp
+    ```cpp
     const uint32_t MACHINE_NUM = 2;
     ```
 
@@ -725,7 +725,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
 <!-- end id19 -->
 <!-- npu="950,A3" id20 -->
-- <term>Atlas A3系列产品</term>  、<term>Ascend 950DT系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：
 
     无需配置ranktable文件以及环境变量RANK_TABLE_FILE、FIRST_RANK_ID。
 
@@ -734,9 +734,9 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="950,A3,910b" id21 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  、<term>Ascend 950DT系列产品</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

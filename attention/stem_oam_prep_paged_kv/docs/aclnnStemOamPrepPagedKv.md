@@ -153,7 +153,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0pky">kCache（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">Paged K cache。</td>
-      <td class="tg-0pky">不支持空Tensor。<br>两种布局, 由kvLayout指定, 当前仅支持"BNBD":<br>"BBND"为[total_blocks, kvBlockSize, H_kv, D=128], <br>"BNBD"为[total_blocks, H_kv, kvBlockSize, D=128]。<br>支持前三维非连续，最后一维必须连续，H_kv最大值为8。</td>
+      <td class="tg-0pky">不支持空Tensor。<br>两种布局，由kvLayout指定，当前仅支持"BNBD"：<br>"BBND"为[total_blocks, kvBlockSize, H_kv, D=128], <br>"BNBD"为[total_blocks, H_kv, kvBlockSize, D=128]。<br>支持前三维非连续，最后一维必须连续，H_kv最大值为8。</td>
       <td class="tg-0pky">FLOAT8_E4M3FN</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4</td>
@@ -193,7 +193,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0pky">kScaleCacheOptional（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">Per-token per-head K scale。</td>
-      <td class="tg-0pky">kCache数据类型为FP8时必填，其他类型可省略（传nullptr）。<br>两种布局, 由kvLayout指定, 当前仅支持"BNBD":<br>"BBND"为[total_blocks, kvBlockSize, H_kv, 1],<br>"BNBD"为[total_blocks, H_kv, kvBlockSize, 1]。<br>支持前三维非连续，最后一维必须连续。</td>
+      <td class="tg-0pky">kCache数据类型为FP8时必填，其他类型可省略（传nullptr）。<br>两种布局，由kvLayout指定，当前仅支持"BNBD"：<br>"BBND"为[total_blocks, kvBlockSize, H_kv, 1],<br>"BNBD"为[total_blocks, H_kv, kvBlockSize, 1]。<br>支持前三维非连续，最后一维必须连续。</td>
       <td class="tg-0pky">FLOAT</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4</td>

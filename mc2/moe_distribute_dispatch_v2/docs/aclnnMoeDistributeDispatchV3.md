@@ -476,15 +476,15 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     - expertScalesOptional要求为2D Tensor，shape为(BS, K)。
     - epWorldSize依commAlg取值，"fullmesh"支持2、3、4、5、6、7、8、16、32、64、128、192、256、384；"hierarchy"支持16、32、64。
     - moeExpertNum依commAlg取值，"fullmesh"支持(0, 1024]，"hierarchy"支持(0, 512]。
-    - groupTp当前版本不支持，传空字符即可。
+    - groupTp当前版本不支持，传空字符串即可。
     - tpWorldSize、tpRankId、expertShardType、sharedExpertNum、sharedExpertRankNum当前版本不支持，传0即可。
     - epRecvCountsOut的shape为(moeExpertNum + 2 \* globalBs \* K \* serverNum,)（前moeExpertNum个为接收token数，剩余为通信前reduce相关信息）。
     - 当前不支持TP域通信。
     - expandScalesOut要求为1D Tensor，shape为(A,)。
     - quantMode支持0（非量化）、2（动态量化）。
     - elasticInfoOptional当前版本不支持，传空指针即可。
-    - zeroExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
-    - copyExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
+    - zeroExpertNum当commAlg="fullmesh"时，取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
+    - copyExpertNum当commAlg="fullmesh"时，取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum当前版本不支持，传0即可。
     </details>
     <!-- end id9 -->
@@ -499,7 +499,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     - expertScalesOptional当前版本不支持，传空指针即可。
     - epWorldSize取值范围[2, 768]。
     - moeExpertNum取值范围(0, 1024]。
-    - groupTp当前版本不支持，传空字符即可。
+    - groupTp当前版本不支持，传空字符串即可。
     - tpWorldSize（预留参数，当前版本不支持，仅支持传0或1）。
     - tpRankId（预留参数，当前版本不支持，仅支持传0）。
     - expertShardType当前仅支持传0，表示共享专家卡排在MoE专家卡前面。
@@ -510,9 +510,9 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     - expandScalesOut当前版本不支持该输出。
     - quantMode支持0（非量化）、2（动态量化）。
     - elasticInfoOptional当前版本不支持，传空指针即可。
-    - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
-    - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>。
-    - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>。
+    - zeroExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
+    - copyExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>。
+    - constExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>。
     - scalesOptional 2D Tensor，非量化场景传空指针；动态量化可传有效数据或空指针。
     </details>
     <!-- end id10 -->
@@ -527,7 +527,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     - expertScalesOptional可传有效Tensor或空指针。传有效Tensor时使能expertScales专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)；传空指针时不使能expertScales专家权重功能。不支持空Tensor。
     - epWorldSize取值范围[2, 1024]。
     - moeExpertNum取值范围(0, 2048]。
-    - groupTp当前版本不支持，传空字符即可。
+    - groupTp当前版本不支持，传空字符串即可。
     - tpWorldSize当前版本不支持，传0即可。
     - tpRankId当前版本不支持，传0即可。
     - expertShardType当前仅支持传0，表示共享专家卡排在MoE专家卡前面。
@@ -538,9 +538,9 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     - expandScalesOut当使能expertScales专家权重功能时，输出有效；不使能时，该输出无效。
     - quantMode支持0（非量化）、1（静态量化）、2（pertoken动态量化）、3（pergroup动态量化）、4（mx动态量化）。
     - elasticInfoOptional当前版本不支持，传空指针即可。
-    - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
-    - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>。
-    - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>。
+    - zeroExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
+    - copyExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>。
+    - constExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>。
     - scalesOptional quantMode取值为0时，若`x`的数据类型为`FLOAT16`或`BFLOAT16`则传空指针，若`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`则必传有效数据；quantMode取值为1时必传有效数据；quantMode取值为2或3时可传有效数据或空指针；quantMode取值为4时传空指针。
     </details>
     <!-- end id11 -->
@@ -707,7 +707,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
           - 输出`dynamicScalesOut`shape为`(A, )`
   <!-- end id13 -->
   <!-- npu="A3" id14 -->
-  - <term>Atlas A3系列产品</term>  ：
+  - <term>Atlas A3系列产品</term>：
       - `quantMode`取值为0时，表示非量化场景，输入`scalesOptional`传空指针，`expandX`的数据类型支持`FLOAT16`、`BFLOAT16`。
       - `quantMode`取值为2时，表示pertoken动态量化场景，`expandX`的数据类型支持`INT8`。
           - 输入`scalesOptional`可传入空指针。
@@ -830,7 +830,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
 
     - A2示例代码：
 
-        ```Cpp
+        ```cpp
         #include <thread>
         #include <iostream>
         #include <string>
@@ -1253,14 +1253,14 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
 
 <!-- end id24 -->
 <!-- npu="A3" id25 -->
-- <term>Atlas A3系列产品</term>  ：
+- <term>Atlas A3系列产品</term>：
 
     具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- end id25 -->
 - 示例代码如下，仅供参考
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

@@ -124,14 +124,14 @@ aclnnStatus aclnnScatterPaCache(
       <th class="tg-0pky">数据类型</th>
       <th class="tg-0pky">数据格式</th>
       <th class="tg-0pky">维度(shape)</th>
-      <th class="tg-0pky">非连续tensor</th>
+      <th class="tg-0pky">非连续Tensor</th>
     </tr></thead>
   <tbody>
     <tr>
       <td class="tg-0pky">key(aclTensor*)</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">待更新的key值，公式中的key。</td>
-      <td class="tg-0pky"><ul><li>支持空tensor。</li><li>HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1、FLOAT4_E1M2仅支持key是3维的场景。</li><li>shape满足[batch * seq_len, num_head, k_head_size]或[batch, seq_len, num_head, k_head_size]，FLOAT4_E2M1、FLOAT4_E1M2情况下，k_head_size必须是偶数。</li></ul></td>
+      <td class="tg-0pky"><ul><li>支持空Tensor。</li><li>HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1、FLOAT4_E1M2仅支持key是3维的场景。</li><li>shape满足[batch * seq_len, num_head, k_head_size]或[batch, seq_len, num_head, k_head_size]，FLOAT4_E2M1、FLOAT4_E1M2情况下，k_head_size必须是偶数。</li></ul></td>
       <td class="tg-0pky">FLOAT16、FLOAT、BFLOAT16、INT8、UINT8、INT16、UINT16、INT32、UINT32、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1、FLOAT4_E1M2</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">3-4</td>
@@ -181,7 +181,7 @@ aclnnStatus aclnnScatterPaCache(
       <td class="tg-0pky">seqLensOptional(aclTensor*)</td>
       <td class="tg-0pky">可选输入</td>
       <td class="tg-0pky">每个batch的实际seqLens，公式中的seqLens。</td>
-      <td class="tg-0pky"><ul><li>支持空tensor。</li><li>shape满足[batch]。</li><li>场景一传空指针。</li></ul></td>
+      <td class="tg-0pky"><ul><li>支持空Tensor。</li><li>shape满足[batch]。</li><li>场景一传空指针。</li></ul></td>
       <td class="tg-0pky">与slotMapping一致。</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">1</td>

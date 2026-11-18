@@ -290,7 +290,7 @@ aclnnStatus aclnnNsaCompressAttention(
       <tr>
         <td>selectBlockCount</td>
         <td>输入</td>
-        <td>对应公式中topK选择个数。</td>
+        <td>对应公式中topk选择个数。</td>
         <td>选择块个数。</td>
         <td>INT64</td>
         <td>-</td>

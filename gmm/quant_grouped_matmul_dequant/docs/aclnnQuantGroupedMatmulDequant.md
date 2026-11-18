@@ -162,7 +162,7 @@ aclnnStatus aclnnQuantGroupedMatmulDequant(
       <tr>
       <td>groupList</td>
       <td>输入</td>
-      <td>公式中的group。表示moe场景下输入张量x分组的前缀和结果，shape是1维[g]。</td>
+      <td>公式中的group。表示MoE场景下输入张量x分组的前缀和结果，shape是1维[g]。</td>
       <td>-</td>
       <td>INT64</td>
       <td>ND</td>

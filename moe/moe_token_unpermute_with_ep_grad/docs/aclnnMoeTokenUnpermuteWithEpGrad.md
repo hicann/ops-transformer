@@ -184,7 +184,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEpGrad(
     <tr>
       <td>rangeOptional（aclIntArray）</td>
       <td>输入</td>
-      <td>公式中的rangeOptional，ep切分的有效范围。</td>
+      <td>公式中的rangeOptional，EP切分的有效范围。</td>
       <td>支持nullptr或长度为2的aclIntArray。为nullptr或取值为{-1, -1}时不生效；生效时要求归一化后的起始位置不大于结束位置。</td>
       <td>-</td>
       <td>-</td>
@@ -352,7 +352,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEpGrad(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"

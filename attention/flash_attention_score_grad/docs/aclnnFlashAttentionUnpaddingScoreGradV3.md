@@ -276,7 +276,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3(
       <tr>
         <td>softmaxMaxOptional</td>
         <td>可选输入</td>
-        <td>正向softmax中间输出。</td>
+        <td>正向softmax的中间输出。</td>
         <td>-</td>
         <td>FLOAT</td>
         <td>ND</td>
@@ -286,7 +286,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3(
       <tr>
         <td>softmaxSumOptional</td>
         <td>可选输入</td>
-        <td>正向softmax中间输出。</td>
+        <td>正向softmax的中间输出。</td>
         <td>-</td>
         <td>FLOAT</td>
         <td>ND</td>
@@ -631,7 +631,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3(
 
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```C++
+```c++
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"

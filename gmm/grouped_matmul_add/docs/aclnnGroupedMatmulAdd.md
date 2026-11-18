@@ -481,6 +481,7 @@ aclnnStatus aclnnGroupedMatmulAdd(
       return 0;
     }
     ```
+
 <!-- end id8 -->
 
 <!-- npu="950" id9 -->

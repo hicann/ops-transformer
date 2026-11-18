@@ -40,7 +40,7 @@
         \text{GELU}_{\text{tanh}}(x) \approx 0.5x \left( 1 + \tanh\left( \sqrt{\frac{2}{\pi}} \left( x + 0.044715 x^3 \right) \right) \right)
         $$
 
-      * 当前kernel底层实现使用gelu_sigmoid函数对gelu_tanh进行近似计算，定义为：
+      * 当前Kernel底层实现使用gelu_sigmoid函数对gelu_tanh进行近似计算，定义为：
 
         $$
         \operatorname{GeluTanh}(x) =

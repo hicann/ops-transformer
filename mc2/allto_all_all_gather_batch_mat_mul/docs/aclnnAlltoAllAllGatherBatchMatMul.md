@@ -378,7 +378,7 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(
 <!-- npu="A3" id7 -->
 - <term>Atlas A3系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

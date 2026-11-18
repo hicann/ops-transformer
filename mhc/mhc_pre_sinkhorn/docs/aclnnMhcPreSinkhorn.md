@@ -197,7 +197,7 @@ aclnnStatus aclnnMhcPreSinkhorn(
       <tr>
         <td>numIters（int64_t）</td>
         <td>输入</td>
-        <td>表示sinkhorn算法迭代次数。</td>
+        <td>表示Sinkhorn算法迭代次数。</td>
         <td>当前仅支持20。</td>
         <td>-</td>
         <td>-</td>
@@ -237,7 +237,7 @@ aclnnStatus aclnnMhcPreSinkhorn(
       <tr>
         <td>hin（aclTensor*）</td>
         <td>输出</td>
-        <td>输出的h_in作为Atten/MLP层的输入。</td>
+        <td>输出的h_in作为Attention/MLP层的输入。</td>
         <td>数据类型与x相同。</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>

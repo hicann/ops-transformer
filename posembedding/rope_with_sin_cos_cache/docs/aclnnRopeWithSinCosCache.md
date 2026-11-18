@@ -26,7 +26,7 @@
 * 接口功能：推理网络为了提升性能，将sin和cos输入通过cache传入，执行旋转位置编码计算。
 * 计算公式：
 
-    1、**mrope模式**：positions的shape输入是[m, numTokens], m为mropeSection的元素数，支持3或4：
+    1、**mrope模式**：positions的shape输入是[m, numTokens]，m为mropeSection的元素数，支持3或4：
 
     $$
     cosSin[i] = cosSinCache[positions[i]]
@@ -455,7 +455,7 @@ aclnnStatus aclnnRopeWithSinCosCache(
 - queryIn和keyIn的1维大小必须是headSize的整数倍。
 - queryIn、keyIn、cosSinCache输入的数据类型需要保持一致。
 - headSize：数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数。
-- rotaryDim：始终小于等于headSize；数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数;mrope模式下应满足mropeSection所有元素累加为rotaryDim值的一半。
+- rotaryDim：始终小于等于headSize；数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数；mrope模式下应满足mropeSection所有元素累加和为rotaryDim值的一半。
 - 输入tensor positions的取值应小于cosSinCache的0维maxSeqLen。
 - mrope模式下，mropeSection：取值当前仅支持[16, 24, 24]、[24, 20, 20]、[8, 12, 12]和[16, 16, 16, 16]。
 

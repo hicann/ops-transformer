@@ -90,7 +90,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
 
 ## aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize
 
-- **参数说明:**
+- **参数说明：**
   <table style="undefined;table-layout: fixed; width: 1550px"><colgroup>
   <col style="width: 187px">
   <col style="width: 121px">
@@ -130,9 +130,9 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
       <td>可选输入</td>
       <td>正向输出permutedProbs的梯度。</td>
       <td>
-      •  不传则表示不需要计算probsGradOutOptional；<br>
+      • 不传则表示不需要计算probsGradOutOptional；<br>
       • shape为一个1D维度，topK_num表示每个token最多被选中的专家数量上限，capacity表示每个专家选中的token数量。<br>
-      • 数据类型与permutedTokenOutputGrad一致或者当permutedTokenOutputGrad是BFLOAT16时支持FLOAT。</td>
+      • 数据类型与permutedTokenOutputGrad一致或者当permutedTokenOutputGrad是BFLOAT16时支持FLOAT32。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>

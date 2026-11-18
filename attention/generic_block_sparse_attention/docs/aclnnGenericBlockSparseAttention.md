@@ -120,7 +120,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>layoutQ支持TND、BSND或BNSD，适用范围见<a href="#产品差异约束">产品差异约束</a>。其他layout的shape见<a href="#layout对应关系说明">layout对应关系说明</a>。</td>
       <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、INT8、FLOAT4_E2M1</td>
       <td>ND</td>
-      <td>TND: [totalQTokens,headNum,headDim]；BSND: [B,Sq,headNum,headDim]；BNSD: [B,headNum,Sq,headDim]</td>
+      <td>TND: [totalQTokens,headNum,headDim]；BSND: [B,Sq,headNum,headDim]；BNSD: [B,headNum,Sq,headDim]。</td>
       <td>×</td>
     </tr>
     <tr>
@@ -130,7 +130,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>可作为原始Key或Paged KV Cache。layoutKv支持"PA_BBND"、"PA_BNBD"、"TND"、"BSND"或"BNSD"，适用范围见<a href="#产品差异约束">产品差异约束</a>。其余layout及原始KV的shape见<a href="#layout对应关系说明">layout对应关系说明</a>、<a href="#paged-attention相关说明">Paged Attention相关说明</a>；dim0非连续见<a href="#其他约束">其他约束</a>。</td>
       <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、INT8、FLOAT4_E2M1</td>
       <td>ND</td>
-      <td>PA_BBND: [numBlocks,blockSize,numKeyValueHeads,headDim]；PA_BNBD: [numBlocks,numKeyValueHeads,blockSize,headDim]；TND: [Tkv,numKeyValueHeads,headDim]；BSND: [B,Sk,numKeyValueHeads,headDim]；BNSD: [B,numKeyValueHeads,Sk,headDim]</td>
+      <td>PA_BBND: [numBlocks,blockSize,numKeyValueHeads,headDim]；PA_BNBD: [numBlocks,numKeyValueHeads,blockSize,headDim]；TND: [Tkv,numKeyValueHeads,headDim]；BSND: [B,Sk,numKeyValueHeads,headDim]；BNSD: [B,numKeyValueHeads,Sk,headDim]。</td>
       <td>√</td>
     </tr>
     <tr>
@@ -509,7 +509,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
 - 稀疏块形状blockShape含两个元素[blockShapeX, blockShapeY]。非union时blockShapeX=1，union（maskType=3）时blockShapeX=8。<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持blockShapeY为1、2、4、8、16、32、64、128。
 <!-- end id7 -->
 <!-- npu="950" id8 -->
-- <term>Ascend 950PR&950DT系列产品</term>非量化与常规 FP8：`X=1`，`1≤Y≤128`；Union（maskType=3）为 `blockShape=[8,Y]`（`1≤Y≤128`）。
+- <term>Ascend 950PR&950DT系列产品</term>非量化与常规FP8：`X=1`，`1≤Y≤128`；Union（maskType=3）为 `blockShape=[8,Y]`（`1≤Y≤128`）。
 <!-- end id8 -->
 <!-- npu="950,A3,910b" id9 -->
 - returnSoftmaxlse：非量化（quantType=0）、A4C4（quantType=4）、<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8（quantType=7）和 <term>Ascend 950PR&950DT系列产品</term> A8C4（quantType=8）支持0或1；<term>Ascend 950PR&950DT系列产品</term> 高精 FP8（含常规和 Union，quantType=5、softmaxPrecision=0、D=128）支持0或1；<term>Ascend 950PR&950DT系列产品</term> 常规低精 FP8（quantType=5、softmaxPrecision=1）仅支持0。A8C8（quantType=6）支持可选FP32 LSE输出。
@@ -603,8 +603,8 @@ aclnnStatus aclnnGenericBlockSparseAttention(
 <!-- npu="950" id10 -->
 - <term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16场景：`headDim`支持1～256的任意值；`layoutQ/layoutKv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`，不支持其他组合；`maskType`支持0（非因果）、1（causal）和3（union）；非union时`blockShape=[1,Y]`（`1≤Y≤128`），union时`blockShape=[8,Y]`（`unionSize`取自`blockShape[0]`，当前仅支持8）；`residualBlockMode`支持0或1（union仅支持0）。
 - <term>Ascend 950PR&950DT系列产品</term> Union（`maskType=3`）仅支持 `quantType=0`（FP16/BF16 非量化）和 `quantType=5`（FP8）。Q 支持 `TND`、`BSND`、`BNSD`，分页 K/V 支持 `PA_BBND` 和 `PA_BNBD`，非分页 K/V 使用与 Q 相同的布局；`blockShape=[8,Y]`（`1≤Y≤128`），`residualBlockMode=0`，`isConsistentTopk=false`；须传入 INT32 exactMask。FP8 Union 另要求 `headDim=128`；分页 KV 下另要求 `Y` 整除页大小 128（`Y∈{1,2,4,8,16,32,64,128}`）。稀疏张量的 group 轴按 batch 顺序拼接，每个 batch 按实际 Q 长度每 8 个 token 分一组。
-- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（`quantType=5`）要求 `headDim=128`、`maskType=1`、`residualBlockMode=0`、`blockShape=[1,Y]`（`1≤Y≤128`）。
-- <term>Ascend 950PR&950DT系列产品</term> 常规 FP8（`quantType=5`、`maskType=1`）高精模式（`softmaxPrecision=0`）仅支持 `headDim=128` 和 `1≤groupSize≤16`。Q/KV 支持 `TND/TND`、`BSND/BSND`、`BNSD/BNSD`，以及上述三种 Q 布局分别搭配 `PA_BBND` 或 `PA_BNBD`。`returnSoftmaxlse` 支持 0 或 1。低精模式（`softmaxPrecision=1`）仅支持 `TND/PA_BBND`，且关闭 LSE。
+- <term>Ascend 950PR&950DT系列产品</term> 常规FP8（`quantType=5`）要求 `headDim=128`、`maskType=1`、`residualBlockMode=0`、`blockShape=[1,Y]`（`1≤Y≤128`）。
+- <term>Ascend 950PR&950DT系列产品</term> 常规FP8（`quantType=5`、`maskType=1`）高精模式（`softmaxPrecision=0`）仅支持 `headDim=128` 和 `1≤groupSize≤16`。Q/KV 支持 `TND/TND`、`BSND/BSND`、`BNSD/BNSD`，以及上述三种 Q 布局分别搭配 `PA_BBND` 或 `PA_BNBD`。`returnSoftmaxlse` 支持 0 或 1。低精模式（`softmaxPrecision=1`）仅支持 `TND/PA_BBND`，且关闭 LSE。
 <!-- end id10 -->
 <!-- npu="A3,910b" id11 -->
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化FLOAT16/BFLOAT16场景：`headDim`支持1～256的任意值；`layoutQ/layoutKv`支持`TND/PA_BBND`、`TND/PA_BNBD`、`TND/TND`、`BSND/BSND`、`BNSD/BNSD`、`BSND/PA_BBND`、`BNSD/PA_BBND`、`BSND/PA_BNBD`和`BNSD/PA_BNBD`；`blockShape=[1,Y]`，Y支持1、2、4、8、16、32、64、128；`maskType`支持0（非因果）、1（causal）和3（union，见下方Union约束）；`residualBlockMode`支持0或1。TND KV须传入`cuSeqLengthsKvOptional`，dense Q/K/V按对应布局连续存储；causal模式下各batch须满足实际KV长度不小于实际Q长度。

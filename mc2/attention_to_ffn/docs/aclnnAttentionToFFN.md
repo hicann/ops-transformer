@@ -139,7 +139,7 @@ aclnnStatus aclnnAttentionToFFN(
       <tr>
         <td>expertRankTable</td>
         <td>输入</td>
-        <td>每个micro batch组中专家Id到FFN卡专家部署的映射表（外部需保证值正确）。</td>
+        <td>每个micro batch组中专家Id到FFN卡专家部署的映射表（外部需保证取值正确）。</td>
         <td>shape为(L, moeExpertNum + sharedExpertNum, M)。</td>
         <td>INT32</td>
         <td>ND</td>
@@ -402,7 +402,7 @@ aclnnStatus aclnnAttentionToFFN(
 
 1.新建AttentionToFFNDemo目录，按照下方指导在AttentionToFFNDemo下新建aclnnAttentionToFFNDemo.cpp、AttentionToFFN.sh文件并参考如下代码修改。
 
-2.安装cann包，并根据下方指导编译运行AttentionToFFNDemo。
+2.安装CANN包，并根据下方指导编译运行AttentionToFFNDemo。
 
 AttentionToFFN.sh编译脚本
 

@@ -744,7 +744,7 @@ aclnnStatus aclnnFusedInferAttentionScore(
 
 - **当Q_S大于1时**：
 
-  - query，key，value输入，功能使用限制如下：
+  - query、key、value输入，功能使用限制如下：
 
     - 支持B轴小于等于65536。如果输入类型为INT8且D轴不是32字节对齐，则B轴的最大支持值为128。若输入类型为FLOAT16或BFLOAT16且D轴不是16字节对齐，B轴同样仅支持到128。
 
@@ -820,7 +820,7 @@ aclnnStatus aclnnFusedInferAttentionScore(
 
     - page attention的开启必要条件是blockTable存在且有效，同时key、value是按照blockTable中的索引在一片连续内存中排布，在该场景下key、value的inputLayout参数无效。blockTable中填充的是blockid，当前不会对blockid的合法性进行校验，需用户自行保证。
     - blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在开启page attention场景下，blockSize最小为128，最大为512，且要求是128的倍数。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
-    - page attention场景下，当输入kv cache排布格式为BnBsH（blocknum, blocksize, H），且KV_N * D超过65535时，受硬件指令约束，会被拦截报错。可通过开启GQA（减小KV_N）或调整kv cache排布格式为BnNBsD（blocknum, KV_N, blocksize, D）解决。当query的inputLayout为BNSD时，kv cache排布支持BnBsH和BnNBsD两种格式，当query的inputLayout为BSH、BSND时，kv cache排布只支持BnBsH一种格式。blocknum不能小于根据actualSeqLengthsKv和blockSize计算的每个batch的block数量之和。且key和value的shape需保证一致
+    - page attention场景下，当输入kv cache排布格式为BnBsH（blocknum, blocksize, H），且KV_N * D超过65535时，受硬件指令约束，会被拦截报错。可通过开启GQA（减小KV_N）或调整kv cache排布格式为BnNBsD（blocknum, KV_N, blocksize, D）解决。当query的inputLayout为BNSD时，kv cache排布支持BnBsH和BnNBsD两种格式，当query的inputLayout为BSH、BSND时，kv cache排布只支持BnBsH一种格式。blocknum不能小于根据actualSeqLengthsKv和blockSize计算的每个batch的block数量之和，且key和value的shape需保证一致
     - page attention不支持伪量化场景，不支持tensorlist场景，不支持左padding场景。
     - page attention场景下，必须传入actualSeqLengthsKv。
     - page attention场景下，blockTable必须为二维，第一维长度需等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为不同batch中最大actualSeqLengthsKv对应的block数量）。
@@ -843,9 +843,9 @@ aclnnStatus aclnnFusedInferAttentionScore(
     - 需要与actualSeqLengthsKv参数一起开启，否则默认为kv右padding场景。
     - 不支持PageAttention，不能与blockTable参数一起开启。
 
-  - 输出为int8时，quantScale2和quantOffset2为per-channel时，暂不支持左padding、Ring Attention或者D非32Byte对齐的场景。
+  - 输出为INT8时，quantScale2和quantOffset2为per-channel时，暂不支持左padding、Ring Attention或者D非32Byte对齐的场景。
 
-  - 输出为int8时，暂不支持sparse为band且preTokens/nextTokens为负数。
+  - 输出为INT8时，暂不支持sparse为band且preTokens/nextTokens为负数。
 
   - pseShift功能使用限制如下：
 
@@ -862,7 +862,7 @@ aclnnStatus aclnnFusedInferAttentionScore(
 
 - **当Q_S等于1时**：
 
-  - query，key，value输入，功能使用限制如下：
+  - query、key、value输入，功能使用限制如下：
     - 支持B轴小于等于65536，支持N轴小于等于256，支持D轴小于等于512。
     - query、key、value输入类型均为INT8的场景暂不支持。
   - page attention场景：

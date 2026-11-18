@@ -517,7 +517,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 <!-- npu="A3,910b" id15 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <iostream>
     #include <memory>
     #include <vector>
@@ -836,7 +836,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 
   - Pertoken量化数据流示例：
 
-  ```Cpp
+  ```cpp
   #include <iostream>
   #include <memory>
   #include <vector>

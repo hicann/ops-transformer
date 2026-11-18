@@ -299,7 +299,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
               <tr>
                   <td>ACLNN_ERR_RUNTIME_ERROR</td>
                   <td>361001</td>
-                  <td>API内部调用npu runtime的接口异常。</td>
+                  <td>API内部调用NPU runtime的接口异常。</td>
               </tr>
           </tbody>
       </table>
@@ -355,7 +355,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
 - 输入张量支持非连续Tensor，接口内部统一转为Contiguous后计算。
 - probs应为前向softmax输出，invNorm应为前向逐行归一化系数，且invNorm和probs仅支持FLOAT32。当前实现完全以保存的probs和invNorm为准。
 - validBlockNum为预留属性，不参与实际计算；仅支持传入-1。
-- T<64、H<2048或H>500000时，第一阶段接口返回ACLNN_ERR_PARAM_INVALID，不执行kernel。
+- T<64、H<2048或H>500000时，第一阶段接口返回ACLNN_ERR_PARAM_INVALID，不执行Kernel。
 - 仅N=0且T、H非零时不提前返回，仍计算partialBlock及权重梯度。
 
 ## 调用示例

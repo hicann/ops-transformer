@@ -168,11 +168,11 @@ aclnnStatus aclnnMoeComputeExpertTokens(
     <tr>
     <td> ACLNN_ERR_INNER_TILING_ERROR </td>
     <td> 561002 </td>
-    <td>sortedExperts和out的shape不等于1D的tensor。</td>
+    <td>sortedExperts和out的shape不等于1D的Tensor。</td>
     </tr>
   </tbody></table>
 
-  > 说明：当输出out为空tensor时，不校验numExperts的取值范围（需要大于0且不能超过2048），该场景直接返回成功。
+  > 说明：当输出out为空Tensor时，不校验numExperts的取值范围（需要大于0且不能超过2048），该场景直接返回成功。
 
 ## aclnnMoeComputeExpertTokens
 
@@ -223,13 +223,13 @@ aclnnStatus aclnnMoeComputeExpertTokens(
 - 确定性计算：
   - aclnnMoeComputeExpertTokens默认确定性实现。
 
-- 输入shape大小不要超过device可分配的内存上限，否则会导致异常终止。
+- 输入shape大小不要超过Device可分配的内存上限，否则会导致异常终止。
 
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"

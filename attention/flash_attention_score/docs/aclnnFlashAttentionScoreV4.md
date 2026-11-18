@@ -397,7 +397,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
         <td>outDtype</td>
         <td>输入</td>
         <td>Host侧的int64_t。</td>
-        <td>只在量化场景下生效，0表示attentionOut输出是fp16格式，1表示输出是bf16格式。</td>
+        <td>只在量化场景下生效，0表示attentionOut输出是FP16格式，1表示输出是bf16格式。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -585,8 +585,8 @@ aclnnStatus aclnnFlashAttentionScoreV4(
 
 - 确定性计算：
   - aclnnFlashAttentionScoreV4默认确定性实现。
-- 输入query、key、value的
-  - B：batchsize必须相等。
+- 输入query、key、value的约束如下：
+  - B：Batch size必须相等。
   - D：Head-Dim必须满足(qD == kD && kD >= vD)。
   - inputLayout必须一致。
 - 输入queryRopeOptional与query的输入shape仅在D维度不同，其他shape参数应该相同
@@ -614,7 +614,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
     | 3           | 算子自动生成pse先mul再add再sqrt         | - |
 
 - pseType为2或3的时候，当前只支持Sq和Skv等长。
-- sinkOptional不为None时，query与key等输入tensor仅支持float16和bfloat16两种类型。
+- sinkOptional不为None时，query与key等输入Tensor仅支持float16和bfloat16两种类型。
 - sparseMode约束如下：
   - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量。
   - 配置为1、2、3、5时，用户配置的preTokens、nextTokens不会生效。
@@ -648,7 +648,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
 
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```C++
+```c++
 #include <iostream>
 #include <vector>
 #include <cmath>

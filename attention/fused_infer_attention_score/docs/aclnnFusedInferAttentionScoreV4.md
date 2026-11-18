@@ -400,12 +400,12 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <ul>
             <li>不支持空Tensor。</li>
             <li>keyAntiquantScaleOptional和valueAntiquantScaleOptional要么都为空，要么都不为空。</li>
-            <li>其余约束见<a href="#AntiQuant">伪量化参数约束</a>和见<a href="#MLA">MLA场景全量化参数约束</a>。</li>
+            <li>其余约束见<a href="#AntiQuant">伪量化参数约束</a>和<a href="#MLA">MLA场景全量化参数约束</a>。</li>
         </ul>
         </td>
         <td>FLOAT16、BFLOAT16、FLOAT32</td>
         <td>ND</td>
-        <td>见<a href="#AntiQuant">伪量化参数</a>和见<a href="#MLA">MLA场景全量化参数</a></td>
+        <td>见<a href="#AntiQuant">伪量化参数</a>和<a href="#MLA">MLA场景全量化参数</a></td>
         <td>×</td>
     </tr>
     <tr>
@@ -432,12 +432,12 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <ul>
             <li>不支持空Tensor。</li>
             <li>keyAntiquantScaleOptional和valueAntiquantScaleOptional要么都为空，要么都不为空。</li>
-            <li>其余约束见<a href="#AntiQuant">伪量化参数约束</a>和见<a href="#MLA">MLA场景全量化参数约束</a>。</li>
+            <li>其余约束见<a href="#AntiQuant">伪量化参数约束</a>和<a href="#MLA">MLA场景全量化参数约束</a>。</li>
         </ul>
         </td>
         <td>FLOAT16、BFLOAT16、FLOAT32</td>
         <td>ND</td>
-        <td>见<a href="#AntiQuant">伪量化参数</a>和见<a href="#MLA">MLA场景全量化参数</a></td>
+        <td>见<a href="#AntiQuant">伪量化参数</a>和<a href="#MLA">MLA场景全量化参数</a></td>
         <td>×</td>
     </tr>
     <tr>
@@ -665,7 +665,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <ul>
             <li>input_layout=BSH、BSND、BNSD并且Q_S=1、QK_D=V_D、query_rope和key_rope不传的场景，该参数无效。</li>
             <li>参数描述见<a href="#Mask">Mask</a>。</li>
-            <li>inputLayout为TND、TND_NTD、NTD_TND时，综合约束请见 <a href="#TND">TND、TND_NTD、NTD_TND场景下query，key，value输入的综合限制</a>。</li>
+            <li>inputLayout为TND、TND_NTD、NTD_TND时，综合约束请见 <a href="#TND">TND、TND_NTD、NTD_TND场景下query、key、value输入的综合限制</a>。</li>
         </ul>
         </td>
         <td>INT64</td>
@@ -905,9 +905,9 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         - attentionOut和lse都为空时，属于空Tensor。
         - 属于空Tensor时，跳过校验流程；否则，走正常校验流程。
 - alibi fullmask场景约束
-  - innerPrecise为0；
-  - pseShiftOptional不为空，shape为[B, N, maxQ, maxKV];
-  - attenMaskOptional为空；
+  - innerPrecise为0。
+  - pseShiftOptional不为空，shape为[B, N, maxQ, maxKV]。
+  - attenMaskOptional为空。
   - sparseMode为0。
 
 <details>
@@ -1237,7 +1237,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             </tr>
             <tr>
                 <td>quantOffset2</td>
-                <td>可选参数，若传入quantOffset2 ，需保证其类型和shape信息与quantScale2一致。不传时默认为nullptr，表示为0。
+                <td>可选参数，若传入quantOffset2，需保证其类型和shape信息与quantScale2一致。不传时默认为nullptr，表示为0。
                 </td>
             </tr>
             <tr>
@@ -1318,7 +1318,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             </tr>
             <tr>
                 <td>quantOffset2</td>
-                <td>可选参数，若传入quantOffset2 ，需保证其类型和shape信息与quantScale2一致。不传时默认为nullptr，表示为0。
+                <td>可选参数，若传入quantOffset2，需保证其类型和shape信息与quantScale2一致。不传时默认为nullptr，表示为0。
                 </td>
             </tr>
             <tr>
@@ -1501,7 +1501,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
 
 <details>
 
-<summary><a id="TND"></a>TND、TND_NTD、NTD_TND场景下query，key，value输入的综合限制：</summary>
+<summary><a id="TND"></a>TND、TND_NTD、NTD_TND场景下query、key、value输入的综合限制：</summary>
 
 - actualSeqLengths和actualSeqLengthsKv必须传入
 
@@ -1534,7 +1534,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
     </tr>
     <tr>
         <td>sparseMode</td>
-        <td>支持0, 3, 4, 9</td>
+        <td>支持0、3、4、9</td>
     </tr>
     <tr>
         <td rowspan="2">PagedAttention</td>
@@ -1938,7 +1938,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         <tbody>
             <tr>
                 <td rowspan="4">通用场景</td>
-                <td>query，key，value</td>
+                <td>query、key、value</td>
                 <td>
                     <ul>
                     <li>B：支持B轴小于等于65536。
@@ -1967,11 +1967,11 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             </tr>
             <tr>
                 <td>actualSeqLengths</td>
-                <td>当query的inputLayout为TND/NTD_TND时，约束请见<a href="#TND">TND、TND_NTD、NTD_TND场景下query，key，value输入的综合限制</a>。</td>
+                <td>当query的inputLayout为TND/NTD_TND时，约束请见<a href="#TND">TND、TND_NTD、NTD_TND场景下query、key、value输入的综合限制</a>。</td>
             </tr>
             <tr>
                 <td>actualSeqLengthsKv</td>
-                <td>当key/value的inputLayout为TND/NTD_TND时，约束请见<a href="#TND">TND、TND_NTD、NTD_TND场景下query，key，value输入的综合限制</a>。</td>
+                <td>当key/value的inputLayout为TND/NTD_TND时，约束请见<a href="#TND">TND、TND_NTD、NTD_TND场景下query、key、value输入的综合限制</a>。</td>
             </tr>
             <tr>
                 <td>innerPrecise</td>
@@ -2079,7 +2079,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         <tbody>
             <tr>
                 <td rowspan="3">基础参数</td>
-                <td>query，key，value</td>
+                <td>query、key、value</td>
                 <td>
                 <ul>
                 <li>支持B轴小于等于65536，支持N轴小于等于256，支持D轴小于等于512。</li>
@@ -2099,7 +2099,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                 <td>
                 <ul>
                     <li>
-                    当query的inputLayout不为TND时，该参数无效。当query的inputLayout为TND/TND_NTD时，综合约束请见<a href="#TND">TND、TND_NTD、NTD_TND场景下query，key，value输入的综合限制</a>。</li>
+                    当query的inputLayout不为TND时，该参数无效。当query的inputLayout为TND/TND_NTD时，综合约束请见<a href="#TND">TND、TND_NTD、NTD_TND场景下query、key、value输入的综合限制</a>。</li>
                 </ul>
                 </td>
             </tr>
@@ -2107,7 +2107,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                 <td>actualSeqLengthsKv</td>
                 <td>
                 <ul>
-                    <li>当key/value的inputLayout为TND/TND_NTD时，综合约束请见<a href="#TND">TND、TND_NTD、NTD_TND场景下query，key，value输入的综合限制</a>。
+                    <li>当key/value的inputLayout为TND/TND_NTD时，综合约束请见<a href="#TND">TND、TND_NTD、NTD_TND场景下query、key、value输入的综合限制</a>。
                     </li>
                 </ul>
                 </td>

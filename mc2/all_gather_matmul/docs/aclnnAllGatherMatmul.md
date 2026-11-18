@@ -202,7 +202,7 @@ aclnnStatus aclnnAllGatherMatmul(
     </tbody></table>
 
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  ：
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term> ：
         - bias：暂不支持输入为非0的场景。
     <!-- end id7 -->
     <!-- npu="950" id8 -->
@@ -308,7 +308,7 @@ aclnnStatus aclnnAllGatherMatmul(
 - <term>Atlas A3系列产品</term> ：支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
 <!-- end id10 -->
 <!-- npu="950" id11 -->
-- <term>Ascend 950PR&950DT系列产品</term>:
+- <term>Ascend 950PR&950DT系列产品</term>：
   - 支持2、4、8、16、32、64卡，并且仅支持HCCS链路Full Mesh（全互连）组网。
 <!-- end id11 -->
 <!-- npu="910b" id12 -->
@@ -325,7 +325,7 @@ aclnnStatus aclnnAllGatherMatmul(
 <!-- npu="950,A3,910b" id13 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term> 、<term>Ascend 950PR&950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <vector>

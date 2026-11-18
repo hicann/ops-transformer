@@ -274,7 +274,7 @@
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用`aclnnInplaceFusedCausalConv1dGetWorkspaceSize`接口获取入参并计算所需workspace大小以及包含了算子计算流程的执行器，再调用`aclnnInplaceFusedCausalConv1d`接口执行计算。
 
-```Cpp
+```cpp
 aclnnStatus aclnnInplaceFusedCausalConv1dGetWorkspaceSize(
   aclTensor       *x,
   const aclTensor *weight,
@@ -299,7 +299,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dGetWorkspaceSize(
   aclOpExecutor  **executor)
 ```
 
-```Cpp
+```cpp
 aclnnStatus aclnnInplaceFusedCausalConv1d(
   void          *workspace,
   uint64_t       workspaceSize,
@@ -358,7 +358,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
     <tr>
       <td>convStates（aclTensor*）</td>
       <td>输入/输出</td>
-      <td>计算公式中的cacheState，代表缓存状态张量，存储各序列的历史token数据，各序列计算完成后原地更新。</td>
+      <td>计算公式中的cachedState，代表缓存状态张量，存储各序列的历史token数据，各序列计算完成后原地更新。</td>
       <td><ul><li>不支持空tensor。</li><li>shape为[..., stateLen, dim]，第0维的大小不固定。</li><li>stateLen == K-1+m，prefill场景下m=0，decode、PD混部场景下m=[0,7]。</li><li>m表示投机个数，映射numAcceptedTokens参数的值。</li><li>支持dim0和dim1非连续且stride大于等于1</li></ul></td>
       <td>数据类型与x一致</td>
       <td>ND</td>
@@ -640,7 +640,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
     - convStates必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 \* 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 \* batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 \* 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 \* batch, 4G]，batch范围[1, 256]。
     - maxNumBlocks >= ceil(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - prefill和decode混合场景：
@@ -649,7 +649,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
     - convStates必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 \* 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 \* batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 \* 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 \* batch, 4G]，batch范围[1, 256]。
     - maxNumBlocks >= ceil(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - decode场景（变长序列）：
@@ -672,26 +672,26 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
 
 - 输入值域限制：
   - queryStartLoc是累计偏移量，取值范围[0, cuSeqLen]，长度为batch+1，queryStartLoc[i]表示第i个序列的起始偏移，queryStartLoc[batch]表示最后一个序列的结束位置。
-  - blockSize为0或者大于等于2，apc开启时不为0。
+  - blockSize为0或者大于等于2，APC开启时不为0。
   - blockIdxFirstScheduledToken、blockIdxLastScheduledToken、initialStateIdx、numComputedTokens和cacheIndices均存在时表示APC开启，且满足以下条件（i为batch的索引）：
     - cacheIndices为2维
     - initialStateIdx[i] <= blockIdxFirstScheduledToken[i]+1
     - initialStateIdx[i] <= blockIdxLastScheduledToken[i]
     - blockIdxFirstScheduledToken[i] <= blockIdxLastScheduledToken[i]
     - blockIdxLastScheduledToken[i] < maxNumBlocks
-  - numAcceptedTokens分为None和非None，非None情况下长度为batch，prefile对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seqLen-1。
+  - numAcceptedTokens分为None和非None，非None情况下长度为batch，prefill对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seqLen-1。
   - numComputedTokens中每个元素取值大于等于0。
   - cacheIndices的取值范围为[0, convStates.dim[0]-1]，且值均不能相等（除非等于padSlotId）。
   - maxQueryLen = batch中的最大seqLen。
   - Pangu V2模式（convMode = 1）下，numComputedTokens不能为None。
   - 算子入参与中间计算结果，在对应数据类型（float16/bfloat16）下，数值均不会超出该类型值域范围。
-  - 算子输入不支持有±inf和Nan的情况。
+  - 算子输入不支持有±inf和NaN的情况。
 
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include <cmath>

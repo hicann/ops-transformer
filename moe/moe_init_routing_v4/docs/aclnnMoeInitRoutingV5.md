@@ -24,9 +24,9 @@
 ## 功能说明
 
 - 接口功能：MoE的routing计算，根据[aclnnMoeGatingTopKSoftmaxV2](../../moe_gating_top_k_softmax_v2/docs/aclnnMoeGatingTopKSoftmaxV2.md)的计算结果做routing处理，支持非量化、静态量化和动态量化模式。本接口针对V4接口[aclnnMoeInitRoutingV4](./aclnnMoeInitRoutingV4.md)做出如下功能变更，其余入参语义、输出含义与约束均与V4一致，请根据实际情况选择合适的接口：<br>
-  <ol><li>新增入参scaleAlg，用于选择量化时的scale算法：取值0表示默认算法，计算结果与aclnnMoeInitRoutingV4一致；取值1表示另一组scale阈值，仅在受支持的量化场景生效，其他场景必须传0。</li></ol>
+  <ol><li>新增入参scaleAlg，用于选择量化时的scale算法：取值0表示默认算法，计算结果与aclnnMoeInitRoutingV4一致。取值1表示另一组scale阈值，仅在受支持的量化场景生效，其他场景必须传0。</li></ol>
 
-  说明：本接口与V4共用同一个GEIR算子MoeInitRoutingV4，V5仅在其属性上追加scale_alg，两者可在同一张图中按需选用；scaleAlg为0时与V4行为完全一致。
+  说明：本接口与V4共用同一个GEIR算子MoeInitRoutingV4，V5仅在其属性上追加scale_alg，两者可在同一张图中按需选用，scaleAlg为0时与V4行为完全一致。
 
 - 计算公式：
 
@@ -207,7 +207,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
     <tr>
       <td>x（aclTensor）</td>
       <td>输入</td>
-      <td>MOE的输入，即token特征输入</td>
+      <td>MoE的输入，即token特征输入</td>
       <td>shape为(NUM_ROWS, H)</td>
       <td><ul>
         <li>quantMode=-1：支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2;</li>
@@ -234,9 +234,9 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>表示用于计算量化结果的参数</td>
       <td><ul>
-        <li>如果不输入表示计算时不使用scale;</li>
-        <li>非量化场景下为可选输入，如果输入则要求为1D的Tensor，shape为(NUM_ROWS,)，类型为FLOAT32。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果输入则要求3D的Tensor，shape为(NUM_ROWS, CeilDiv(H, 64), 2)，类型为FLOAT8_E8M0;</li>
-        <li>静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]；</li>
+        <li>如果不输入表示计算时不使用scale。</li>
+        <li>非量化场景下为可选输入，如果输入则要求为1D的Tensor，shape为(NUM_ROWS,)，类型为FLOAT32。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果输入则要求3D的Tensor，shape为(NUM_ROWS, CeilDiv(H, 64), 2)，类型为FLOAT8_E8M0。</li>
+        <li>静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]。</li>
         <li>quantMode为1的INT8动态量化场景下为可选输入，如果输入则要求为2D的Tensor，shape为(expertEnd-expertStart, H)；quantMode为13的INT4动态量化场景下为可选输入，如果输入则要求shape为(1, H)，表示按H维广播的smooth scale。</li>
         <li>MXFP8量化场景下（quantMode为2、3）不输入。</li>
         <li>HIF8直转和HIF8 PERTOKEN量化场景下（quantMode为6、8）不输入。</li>
@@ -256,7 +256,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>表示用于计算quant结果的偏移值</td>
       <td><ul>
-        <li>在非量化场景下不输入。</li><li>静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]；</li>
+        <li>在非量化场景下不输入。</li><li>静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]。</li>
         <li>动态量化（quantMode为1）、MXFP8量化（quantMode为2、3）、HIF8量化（quantMode为6、7、8）、MXFP4量化（quantMode为9）、FP8 PerGroup量化（quantMode为4、5、14、15）、FP8 PerBlock量化（quantMode为11、12）、INT4动态量化（quantMode为13）、MXFP8 RoundScale+Amax量化场景下（quantMode为16、17）不输入。</li>
       </ul></td>
       <td>FLOAT32</td>
@@ -269,7 +269,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>表示总的最大处理row数，当前固定为NUM_ROWS*K；实际有效行数由专家范围过滤等路由规则决定。</td>
       <td><ul>
-        <li>可选输入，不输入时activeNum默认为NUM_ROWS*K；</li>
+        <li>可选输入，不输入时activeNum默认为NUM_ROWS*K。</li>
         <li>输入时为标量Tensor（shape为()或(1,)），数据类型为INT64，数值仅支持NUM_ROWS*K。当前不支持通过该参数限制实际处理的路由数量。</li>
       </ul></td>
       <td>INT64</td>
@@ -282,7 +282,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>topk专家的路由权重，用于按排序索引重排以与expandedXOut一一对应</td>
       <td><ul>
-        <li>可选输入，不输入表示不输出expandedTopkWeightOut；</li>
+        <li>可选输入，不输入表示不输出expandedTopkWeightOut。</li>
         <li>输入shape为(NUM_ROWS, K)，数据类型仅支持FLOAT32。</li>
       </ul></td>
       <td>FLOAT32</td>
@@ -443,7 +443,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输出</td>
       <td>输出每个专家处理的token数量的统计结果或累加值</td>
       <td><ul>
-        <li>当expertTokensNumFlag为false时，输出为空tensor。</li>
+        <li>当expertTokensNumFlag为false时，输出为空Tensor。</li>
         <li>在expertTokensNumType为0时，表示activeExpertRangeOptional范围内expert在排序后处理token总数的前缀和，输出shape为[expertEnd-expertStart]。</li>
         <li>在expertTokensNumType为1时，表示activeExpertRangeOptional范围内expert对应的处理token的总数，输出shape为[expertEnd-expertStart]。</li>
         <li>在expertTokensNumType为2时，表示activeExpertRangeOptional范围内token总数为非0的expert，以及对应expert处理token的总数，输出shape为[expertNum, 2]。</li>
@@ -478,9 +478,9 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输出</td>
       <td>按排序索引重排后的路由权重，与expandedXOut一一对应</td>
       <td><ul>
-        <li>可选输出，topkWeight输入时必须同时输出；</li>
-        <li>Dropless场景下shape为[NUM_ROWS*K, 1]，前effectiveNum个元素为有效数据，其余未初始化，effectiveNum=availableIdxNum；</li>
-        <li>DropPad场景下shape为[expertNum*expertCapacity, 1]，已分配容量的位置为有效数据，未分配容量的位置填充为0；</li>
+        <li>可选输出，topkWeight输入时必须同时输出。</li>
+        <li>Dropless场景下shape为[NUM_ROWS*K, 1]，前effectiveNum个元素为有效数据，其余未初始化，effectiveNum=availableIdxNum。</li>
+        <li>DropPad场景下shape为[expertNum*expertCapacity, 1]，已分配容量的位置为有效数据，未分配容量的位置填充为0。</li>
         <li>数据类型仅支持FLOAT32。</li>
       </ul></td>
       <td>FLOAT32</td>

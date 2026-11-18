@@ -140,7 +140,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             <td>输入</td>
             <td>attention结构的输入K(V)。</td>
             <td>
-            当前暂不支持空tensor。
+            当前暂不支持空Tensor。
             </td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
@@ -169,7 +169,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             <td>稀疏场景下选择的k中权重较高的注意力索引。</td>
             <td>
             <ul>
-                <li>支持空tensor</li>
+                <li>支持空Tensor</li>
             </ul>
             </td>
             <td>INT32</td>

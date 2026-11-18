@@ -275,7 +275,7 @@ aclnnStatus aclnnSparseLightningIndexer(
     <td>maxSeqlenQ（int64_t）</td>
     <td>输入</td>
     <td>q的最大序列长度（接口对齐保留位）。</td>
-    <td>仅接受-1，非-1即被host侧校验拒绝（arch22 kernel不消费）。</td>
+    <td>仅接受-1，非-1即被host侧校验拒绝（arch22 Kernel不消费）。</td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>
@@ -325,7 +325,7 @@ aclnnStatus aclnnSparseLightningIndexer(
     <td>returnValue（int64_t）</td>
     <td>输入</td>
     <td>是否输出TopK分数。</td>
-    <td><ul><li>取值∈{0,1}，其它值报错拒绝。</li><li>0：sparseValuesOut恒空(0,)，kernel不写入。</li><li>1：sparseValuesOut输出入选位置真实TopK分数（与sparseIndicesOut同shape，dtype FLOAT32，无效槽value=0）。</li></ul></td>
+    <td><ul><li>取值∈{0,1}，其它值报错拒绝。</li><li>0：sparseValuesOut恒空(0,)，Kernel不写入。</li><li>1：sparseValuesOut输出入选位置真实TopK分数（与sparseIndicesOut同shape，dtype FLOAT32，无效槽value=0）。</li></ul></td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>
@@ -355,7 +355,7 @@ aclnnStatus aclnnSparseLightningIndexer(
     <td>sparseValuesOut（const aclTensor*）</td>
     <td>输出</td>
     <td>Values输出（TopK分数，双分支）。</td>
-    <td><ul><li>aclnn层仍做非空校验，须传入非空tensor。</li><li>returnValue为0：实际输出shape为(0,)，kernel不写入。</li><li>returnValue为1：shape与sparseIndicesOut完全相同，有效槽为入选位置真实TopK分数（fp32打分域直出），-1槽对应位value=0。</li><li>layout_q为BSND时shape为(B, S1, N2, topk)，layout_q为TND时shape为(T, N2, topk)。</li></ul></td>
+    <td><ul><li>aclnn层仍做非空校验，须传入非空tensor。</li><li>returnValue为0：实际输出shape为(0,)，Kernel不写入。</li><li>returnValue为1：shape与sparseIndicesOut完全相同，有效槽为入选位置真实TopK分数（fp32打分域直出），-1槽对应位value=0。</li><li>layout_q为BSND时shape为(B, S1, N2, topk)，layout_q为TND时shape为(T, N2, topk)。</li></ul></td>
     <td>FLOAT</td>
     <td>ND</td>
     <td>1、3-4</td>
@@ -489,7 +489,7 @@ aclnnStatus aclnnSparseLightningIndexer(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include <cmath>
