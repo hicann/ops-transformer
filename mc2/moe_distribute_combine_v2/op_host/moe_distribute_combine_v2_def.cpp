@@ -75,11 +75,24 @@ public:
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
             .ExtendCfgInfo("opFile.value", "moe_distribute_combine_v2_apt");
 
+        OpAICoreConfig aicore_config_a6;
+        aicore_config_a6.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("jitCompile.flag", "static_true")
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
+            .ExtendCfgInfo("opFile.value", "moe_distribute_combine_v2_a6");
+
         this->AICore().AddConfig("ascend910b", aicore_config_a2);
         this->AICore().AddConfig("ascend910_93", aicore_config_a3);
         this->AICore().AddConfig("ascend950", aicore_config_apt);
-        this->AICore().AddConfig("ascend960dt", aicore_config_apt);
-        this->AICore().AddConfig("ascend960pr", aicore_config_apt);
+        this->AICore().AddConfig("ascend960dt", aicore_config_a6);
+        this->AICore().AddConfig("ascend960pr", aicore_config_a6);
         this->MC2().HcclGroup({"group_ep", "group_tp"});
     }
 

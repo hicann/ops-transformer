@@ -44,8 +44,9 @@ __global__ __aicore__ void moe_distribute_combine_v3(GM_ADDR mc2Context, GM_ADDR
     GET_TILING_DATA_MEMBER(MoeDistributeCombineV2TilingData, moeDistributeCombineV2Info, combineV2Info, tilingGM);
 
     TPipe pipe;
+    int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
 #if (ORIG_DTYPE_EXPAND_X == DT_BF16 || ORIG_DTYPE_EXPAND_X == DT_FLOAT16)
-    if constexpr ((ArchTag == TILINGKEY_TPL_A5) || (ArchTag == TILINGKEY_TPL_A6)) {
+    if constexpr (ArchTag == TILINGKEY_TPL_A5) {
         if constexpr (CommMode == TILINGKEY_TPL_ROCE) {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
             MoeDistributeCombineV2RoceImpl::MoeDistributeCombineV2Roce<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode,
@@ -57,9 +58,7 @@ __global__ __aicore__ void moe_distribute_combine_v3(GM_ADDR mc2Context, GM_ADDR
             op.Process();
 #endif
         } else {
-            MoeDistributeCombineV2A5Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode, false,
-                                        (ArchTag == TILINGKEY_TPL_A6)>
-                op;
+            MoeDistributeCombineV2A5Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode, false, false> op;
             op.Init(mc2Context, expandX, expertIds, assistInfoForCombine, epSendCount, nullptr, nullptr, scales,
                     xActiveMask, sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV,
                     performanceInfo, nullptr, nullptr, XOut, workspaceGM, &pipe, &combineV2Info);
@@ -67,4 +66,5 @@ __global__ __aicore__ void moe_distribute_combine_v3(GM_ADDR mc2Context, GM_ADDR
         }
     }
 #endif
+    AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);
 }

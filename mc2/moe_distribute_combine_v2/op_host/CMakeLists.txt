@@ -23,6 +23,7 @@ if (BUILD_OPEN_PROJECT)  # custom
     set(moe_distribute_combine_v2_apt_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 mc2/moe_distribute_dispatch_v3 PARENT_SCOPE)
     set(moe_distribute_combine_v2_a3_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 mc2/moe_distribute_dispatch_v3 PARENT_SCOPE)
     set(moe_distribute_combine_v2_a2_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 mc2/moe_distribute_dispatch_v3 PARENT_SCOPE)
+    set(moe_distribute_combine_v2_a6_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 mc2/moe_distribute_dispatch_v3 PARENT_SCOPE)
 
     # --cce-auto-sync=off：指定CCE编译器是否自动执行线程间或模块间的同步操作
     add_ops_compile_options(
