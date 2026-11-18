@@ -10,7 +10,7 @@
 
 import math
 import struct
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import torch
 from torch.library import impl
@@ -34,6 +34,36 @@ WEIGHT_SCALE_N_DIM = 2
 WEIGHT_COLUMN_DIM = 2
 SCALE_PAIR_DIM = 3
 SWIGLU_SPLIT_FACTOR = 2
+GE_DTYPE_FLOAT4_E2M1 = 40
+GE_DTYPE_FLOAT8_E8M0 = 37
+ACL_DTYPE_OFFSET = 256
+
+
+def _normalize_input_dtype(dtype, expected, name):
+    if dtype is None:
+        return None
+    if isinstance(dtype, torch.dtype):
+        native_name = (
+            "float4_e2m1fn_x2" if expected == GE_DTYPE_FLOAT4_E2M1 else "float8_e8m0fnu"
+        )
+        if dtype != getattr(torch, native_name, None):
+            raise ValueError(f"{name} must specify {native_name}.")
+        return expected + ACL_DTYPE_OFFSET
+    if not isinstance(dtype, int) or isinstance(dtype, bool):
+        raise TypeError(f"{name} must be a dtype or an integer dtype enum.")
+    logical_dtype = dtype - ACL_DTYPE_OFFSET if dtype >= ACL_DTYPE_OFFSET else dtype
+    if logical_dtype != expected:
+        raise ValueError(f"{name} specifies an unsupported logical dtype.")
+    return logical_dtype + ACL_DTYPE_OFFSET
+
+
+def _check_input_storage(tensor, dtype, expected, name):
+    _normalize_input_dtype(dtype, expected, f"{name}_dtype")
+    native_name = (
+        "float4_e2m1fn_x2" if expected == GE_DTYPE_FLOAT4_E2M1 else "float8_e8m0fnu"
+    )
+    if tensor.dtype not in (torch.int8, torch.uint8, getattr(torch, native_name, None)):
+        raise ValueError(f"{name} must use byte storage or {native_name} storage.")
 
 
 def _require_tensor_list(value, name):
@@ -57,7 +87,9 @@ class GroupedMatmulActivationOpBuilder(OpBuilder):
             "Tensor x, Tensor x_scale, Tensor group_list, Tensor[] weight, Tensor[] weight_scale, "
             "*, Tensor[]? bias=None, str activation_type='swiglu', "
             "int group_list_type=0, int[]? tuning_config=None, "
-            "int swiglu_mode=2, float clamp_limit=7.0, float glu_alpha=1.702, float glu_bias=1.0) -> Tensor"
+            "int swiglu_mode=2, float clamp_limit=7.0, float glu_alpha=1.702, float glu_bias=1.0, "
+            "int? x_dtype=None, int? weight_dtype=None, int? x_scale_dtype=None, "
+            "int? weight_scale_dtype=None) -> Tensor"
         )
 
     def register_meta(self):
@@ -76,6 +108,10 @@ class GroupedMatmulActivationOpBuilder(OpBuilder):
             clamp_limit=DEFAULT_CLAMP_LIMIT,
             glu_alpha=DEFAULT_GLU_ALPHA,
             glu_bias=DEFAULT_GLU_BIAS,
+            x_dtype=None,
+            weight_dtype=None,
+            x_scale_dtype=None,
+            weight_scale_dtype=None,
         ):
             if len(weight) != 1 or len(weight_scale) != 1:
                 raise ValueError(
@@ -119,16 +155,18 @@ class GroupedMatmulActivationOpBuilder(OpBuilder):
                 raise ValueError(
                     "x must be 2D, weight[0] must be 3D and weight_scale[0] must be 4D."
                 )
-            for name, tensor in (
-                ("x", x),
-                ("x_scale", x_scale),
-                ("weight[0]", weight[0]),
-                ("weight_scale[0]", weight_scale[0]),
+            for name, tensor, dtype, expected in (
+                ("x", x, x_dtype, GE_DTYPE_FLOAT4_E2M1),
+                ("x_scale", x_scale, x_scale_dtype, GE_DTYPE_FLOAT8_E8M0),
+                ("weight[0]", weight[0], weight_dtype, GE_DTYPE_FLOAT4_E2M1),
+                (
+                    "weight_scale[0]",
+                    weight_scale[0],
+                    weight_scale_dtype,
+                    GE_DTYPE_FLOAT8_E8M0,
+                ),
             ):
-                if tensor.dtype not in (torch.int8, torch.uint8):
-                    raise ValueError(
-                        f"{name} must use torch.int8 or torch.uint8 storage."
-                    )
+                _check_input_storage(tensor, dtype, expected, name)
             if group_list.dtype != torch.int64 or group_list.dim() != 1:
                 raise ValueError("group_list must be a 1D torch.int64 tensor.")
             logical_k = x.shape[1] * PACKED_FP4_FACTOR
@@ -202,6 +240,10 @@ def _grouped_matmul_activation(
     clamp_limit=DEFAULT_CLAMP_LIMIT,
     glu_alpha=DEFAULT_GLU_ALPHA,
     glu_bias=DEFAULT_GLU_BIAS,
+    x_dtype=None,
+    weight_dtype=None,
+    x_scale_dtype=None,
+    weight_scale_dtype=None,
 ):
     return _op_builder.load().grouped_matmul_activation(
         x,
@@ -217,6 +259,10 @@ def _grouped_matmul_activation(
         clamp_limit,
         glu_alpha,
         glu_bias,
+        x_dtype,
+        weight_dtype,
+        x_scale_dtype,
+        weight_scale_dtype,
     )
 
 
@@ -235,9 +281,23 @@ def grouped_matmul_activation(
     clamp_limit: float = DEFAULT_CLAMP_LIMIT,
     glu_alpha: float = DEFAULT_GLU_ALPHA,
     glu_bias: float = DEFAULT_GLU_BIAS,
+    x_dtype: Optional[Union[torch.dtype, int]] = None,
+    weight_dtype: Optional[Union[torch.dtype, int]] = None,
+    x_scale_dtype: Optional[Union[torch.dtype, int]] = None,
+    weight_scale_dtype: Optional[Union[torch.dtype, int]] = None,
 ) -> torch.Tensor:
     """A4W4 WeightNZ grouped matmul followed by SwiGLU, with direct BF16 output."""
     bias_value = None if bias is None else _require_tensor_list(bias, "bias")
+    x_dtype = _normalize_input_dtype(x_dtype, GE_DTYPE_FLOAT4_E2M1, "x_dtype")
+    weight_dtype = _normalize_input_dtype(
+        weight_dtype, GE_DTYPE_FLOAT4_E2M1, "weight_dtype"
+    )
+    x_scale_dtype = _normalize_input_dtype(
+        x_scale_dtype, GE_DTYPE_FLOAT8_E8M0, "x_scale_dtype"
+    )
+    weight_scale_dtype = _normalize_input_dtype(
+        weight_scale_dtype, GE_DTYPE_FLOAT8_E8M0, "weight_scale_dtype"
+    )
     return torch.ops.cann_ops_transformer.grouped_matmul_activation(
         x,
         x_scale,
@@ -252,4 +312,8 @@ def grouped_matmul_activation(
         clamp_limit=clamp_limit,
         glu_alpha=glu_alpha,
         glu_bias=glu_bias,
+        x_dtype=x_dtype,
+        weight_dtype=weight_dtype,
+        x_scale_dtype=x_scale_dtype,
+        weight_scale_dtype=weight_scale_dtype,
     )

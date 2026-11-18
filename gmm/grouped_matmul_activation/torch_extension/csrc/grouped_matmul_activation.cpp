@@ -31,11 +31,17 @@ constexpr int64_t kMxDequantMode = 2L;
 constexpr int64_t kFloatDequantDtype = 0L;
 constexpr char kSwigluActType[] = "swiglu";
 
-void CheckByteStorage(const at::Tensor& tensor, const char* name)
+aclDataType ResolveInputDtype(const at::Tensor& tensor, const c10::optional<int64_t>& dtype, aclDataType expected,
+                              const char* name)
 {
     TORCH_CHECK(tensor.defined(), name, " must be defined.");
-    TORCH_CHECK(tensor.scalar_type() == at::ScalarType::Char || tensor.scalar_type() == at::ScalarType::Byte, name,
-                " must use torch.int8 or torch.uint8 storage.");
+    const aclDataType resolved = dtype.has_value() ? GetAclDataType(dtype.value()) : expected;
+    TORCH_CHECK(resolved == expected, name, " specifies an unsupported logical dtype.");
+    const bool isByteStorage =
+        tensor.scalar_type() == at::ScalarType::Char || tensor.scalar_type() == at::ScalarType::Byte;
+    TORCH_CHECK(isByteStorage || ConvertToAclDataType(tensor.scalar_type()) == expected, name,
+                " must use byte storage or the matching native dtype.");
+    return resolved;
 }
 
 void CheckSingleTensorList(const std::vector<at::Tensor>& tensors, const char* name)
@@ -49,14 +55,18 @@ at::Tensor grouped_matmul_activation(const at::Tensor& x, const at::Tensor& xSca
                                      const c10::optional<std::vector<at::Tensor>>& bias,
                                      const std::string& activationType, int64_t groupListType,
                                      const c10::optional<std::vector<int64_t>>& tuningConfig, int64_t swigluMode,
-                                     double clampLimit, double gluAlpha, double gluBias)
+                                     double clampLimit, double gluAlpha, double gluBias,
+                                     const c10::optional<int64_t>& xDtype, const c10::optional<int64_t>& weightDtype,
+                                     const c10::optional<int64_t>& xScaleDtype,
+                                     const c10::optional<int64_t>& weightScaleDtype)
 {
-    CheckByteStorage(x, "x");
-    CheckByteStorage(xScale, "x_scale");
     CheckSingleTensorList(weight, "weight");
     CheckSingleTensorList(weightScale, "weight_scale");
-    CheckByteStorage(weight[0], "weight[0]");
-    CheckByteStorage(weightScale[0], "weight_scale[0]");
+    const aclDataType xAclDtype = ResolveInputDtype(x, xDtype, ACL_FLOAT4_E2M1, "x");
+    const aclDataType weightAclDtype = ResolveInputDtype(weight[0], weightDtype, ACL_FLOAT4_E2M1, "weight[0]");
+    const aclDataType xScaleAclDtype = ResolveInputDtype(xScale, xScaleDtype, ACL_FLOAT8_E8M0, "x_scale");
+    const aclDataType weightScaleAclDtype =
+        ResolveInputDtype(weightScale[0], weightScaleDtype, ACL_FLOAT8_E8M0, "weight_scale[0]");
     TORCH_CHECK(groupList.scalar_type() == at::ScalarType::Long, "group_list must have torch.int64 dtype.");
     TORCH_CHECK(!bias.has_value() || bias->empty(),
                 "bias must be None or an empty TensorList for the current A4W4 path.");
@@ -111,10 +121,10 @@ at::Tensor grouped_matmul_activation(const at::Tensor& x, const at::Tensor& xSca
     if (tuningConfig.has_value()) {
         tuningConfigRef = at::IntArrayRef(tuningConfig.value());
     }
-    TensorWrapper xWrapper = {x, ACL_FLOAT4_E2M1};
-    TensorWrapper xScaleWrapper = {xScale, ACL_FLOAT8_E8M0};
-    TensorListWrapper weightWrapper = {weightRef, ACL_FLOAT4_E2M1};
-    TensorListWrapper weightScaleWrapper = {weightScaleRef, ACL_FLOAT8_E8M0};
+    TensorWrapper xWrapper = {x, xAclDtype};
+    TensorWrapper xScaleWrapper = {xScale, xScaleAclDtype};
+    TensorListWrapper weightWrapper = {weightRef, weightAclDtype};
+    TensorListWrapper weightScaleWrapper = {weightScaleRef, weightScaleAclDtype};
     TensorListWrapper biasWrapper = {biasRef, ACL_BF16};
     TensorWrapper yWrapper = {y, ACL_BF16};
 

@@ -107,6 +107,10 @@ class ActivationMeta(unittest.TestCase):
             "clamp_limit",
             "glu_alpha",
             "glu_bias",
+            "x_dtype",
+            "weight_dtype",
+            "x_scale_dtype",
+            "weight_scale_dtype",
         ]
         self.assertEqual([argument.name for argument in schema.arguments], expected)
         for function in (
@@ -152,6 +156,83 @@ class ActivationMeta(unittest.TestCase):
             5.0,
             1.5,
             0.5,
+            None,
+            None,
+            None,
+            None,
+        )
+
+    def test_dtype_overrides(self):
+        for transposed in (False, True):
+            for offset in (0, self.module.ACL_DTYPE_OFFSET):
+                with self.subTest(transposed=transposed, offset=offset):
+                    result = self.meta(
+                        *self.inputs(transposed),
+                        x_dtype=40 + offset,
+                        weight_dtype=40 + offset,
+                        x_scale_dtype=37 + offset,
+                        weight_scale_dtype=37 + offset,
+                    )
+                    self.assertEqual(result.shape, (3, 64))
+        for name in ("x_dtype", "weight_dtype", "x_scale_dtype", "weight_scale_dtype"):
+            for value in (41, 297, torch.float32, True, "fp4"):
+                with self.subTest(name=name, value=value):
+                    with self.assertRaises((TypeError, ValueError)):
+                        self.meta(*self.inputs(), **{name: value})
+
+    def test_native_dtype_storage(self):
+        for transposed in (False, True):
+            args = self.inputs(transposed)
+            fp4 = getattr(torch, "float4_e2m1fn_x2", None)
+            e8m0 = getattr(torch, "float8_e8m0fnu", None)
+            if fp4 is None or e8m0 is None:
+                self.skipTest("native FP4/E8M0 dtypes are unavailable")
+            args[0] = args[0].view(fp4)
+            args[1] = args[1].view(e8m0)
+            args[3] = [args[3][0].view(fp4)]
+            args[4] = [args[4][0].view(e8m0)]
+            result = self.meta(
+                *args,
+                x_dtype=fp4,
+                weight_dtype=fp4,
+                x_scale_dtype=e8m0,
+                weight_scale_dtype=e8m0,
+            )
+            self.assertEqual(result.shape, (3, 64))
+
+    def test_dtype_forwarding(self):
+        args = self.inputs()
+        with patch.object(
+            torch.ops.cann_ops_transformer, "grouped_matmul_activation", create=True
+        ) as operation:
+            self.module.grouped_matmul_activation(
+                *args,
+                x_dtype=40,
+                weight_dtype=296,
+                x_scale_dtype=37,
+                weight_scale_dtype=293,
+            )
+        for name, value in (
+            ("x_dtype", 296),
+            ("weight_dtype", 296),
+            ("x_scale_dtype", 293),
+            ("weight_scale_dtype", 293),
+        ):
+            self.assertEqual(operation.call_args.kwargs[name], value)
+        extension = types.SimpleNamespace(grouped_matmul_activation=Mock())
+        with patch.object(
+            self.module._op_builder, "load", return_value=extension, create=True
+        ):
+            self.execute(
+                *args,
+                x_dtype=296,
+                weight_dtype=296,
+                x_scale_dtype=293,
+                weight_scale_dtype=293,
+            )
+        self.assertEqual(
+            extension.grouped_matmul_activation.call_args.args[-4:],
+            (296, 296, 293, 293),
         )
 
     def test_public_keyword_forwarding(self):
