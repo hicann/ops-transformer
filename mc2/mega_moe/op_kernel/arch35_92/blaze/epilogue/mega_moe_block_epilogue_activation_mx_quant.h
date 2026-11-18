@@ -28,7 +28,7 @@
 #include "../../common/mega_moe_constants.h"
 #include "../../common/mega_moe_utils.h"
 #include "activation/activation_common.h"
-#include "activation/activation_assign.h"
+#include "activation/activation_dispatch.h"
 #include "block_epilogue_ub_layout.h"
 #include "rowwise_mx_quant.h"
 
@@ -275,8 +275,8 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGat
     const TileExecutionContext& tileContext)
 {
     auto context = BuildGatedActivationContext<IsTopkWeightsPrefetch>(tileContext);
-    Activation::RunGatedActivation<DataTypeIn, IsTopkWeightsPrefetch>(context, actMode_, actSubMode_, clampLimit_,
-                                                                      activationAlpha_, activationBeta_);
+    Activation::RunGatedActivation<DataTypeIn, IsTopkWeightsPrefetch>(
+        context, actMode_, actSubMode_, clampLimit_, activationAlpha_, activationBeta_);
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS

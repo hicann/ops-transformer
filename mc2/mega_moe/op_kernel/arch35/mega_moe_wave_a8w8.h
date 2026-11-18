@@ -725,7 +725,7 @@ template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>
 __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDerived>::SyncBeforeMoeExpertStages()
 {
     if (params_.tilingData->isTopkWeightsPrefetch) {
-        // topk 权重在激活量化阶段同步计算时，从 GM 搬入 GMM1 结果，MTE2 写 UB 前等待前序搬出完成。
+        // 提前乘权路径在激活前通过 MTE2 搬入数据，等待前序搬出读完 UB。
         PipeFence<PIPE_MTE3, PIPE_MTE2, SYNC_EVENT_ID3>();
     } else {
         // 直接 UB 激活由 Vector 写入中间值，需等待前序搬出完成。
@@ -789,11 +789,12 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
 
     ExpertTokenPosition waveBeginPosition{};
     ExpertTokenPosition gmm1Position{};
-    // GMM2 的滞后消费目标（见循环内注释）；首轮为零位置，GMM2 空转一轮。
-    // 形状门控：滞后收益来自消除 AIC 等激活（随 wave 数放大），代价是流水尾部固定多一个
-    // GMM2 wave 深度——小 bs 下 wave 少、尾深占比大，故仅在每卡 token 数达到阈值时启用。
+    /*
+     * 小 token 数时保持较短的流水尾部；达到阈值后将 GMM2/Combine 滞后一个 Wave，
+     * 用下一 Wave 的 GMM1 计算覆盖激活等待。
+     */
     const bool gmm2LagActive = commonConfig_.tokenNum >= GMM2_LAG_MIN_TOKEN_NUM;
-    // 三角色整体滞后一拍的缓存：上一 wave 的边界（见循环内注释）。
+    // 保存尚未执行 GMM2/Combine 的 Wave 终点。
     ExpertTokenPosition gmm2PendingWaveEnd{};
     bool hasPendingGmm2Wave = false;
 
@@ -810,11 +811,8 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
         const uint32_t gmm1EndBlockIndex = startBlockIdx_;
 
         /*
-         * GMM2/Combine 三角色整体滞后一拍（大 bs 门控）：wave w 的 GMM2/Combine 延至 GMM1(w+1)
-         * 之后执行，用下一 wave 的 GMM1 覆盖 AIC 等激活发布的自旋（AIV0 epilogue 在末批 MMAD
-         * 后仍需一段向量时间才发布 activationToGmm2Flag，紧跟消费同一 wave 会让 AIC 反复自旋）。
-         * 三角色（AIC/AIV0/AIV1）以相同调用序同拍延后：ProcessGmm2Wave 内部的 pairwise tile
-         * 序号、分核游标与 combine 状态在三侧保持一致推进，无需任何游标配平。
+         * 启用滞后时，当前 Wave 的 GMM2/Combine 在下一 Wave 的 GMM1 之后执行。
+         * AIC、AIV0、AIV1 按相同 Wave 边界推进，保持 tile 序号与分核游标一致。
          */
         if (gmm2LagActive) {
             if (hasPendingGmm2Wave) {

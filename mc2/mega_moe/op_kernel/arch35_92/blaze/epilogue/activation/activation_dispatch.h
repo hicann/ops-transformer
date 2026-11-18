@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef MEGA_MOE_ACTIVATION_ASSIGN_H
-#define MEGA_MOE_ACTIVATION_ASSIGN_H
+#ifndef MEGA_MOE_ACTIVATION_DISPATCH_H
+#define MEGA_MOE_ACTIVATION_DISPATCH_H
 
 #include "gelu_activation.h"
 #include "situglu_activation.h"
@@ -64,8 +64,8 @@ __aicore__ inline void ConfigureGatedActivationTail(GatedActivationTileContext<I
 
 // 只分派激活数学计算，输出转换和通信量化由调用方分别处理。
 template <typename InputType, bool Prefetch>
-__aicore__ inline void RunGatedActivation(GatedActivationTileContext<InputType>& context, uint8_t mode, uint8_t subMode,
-                                          float clampLimit, float alpha, float beta)
+__aicore__ inline void RunGatedActivation(GatedActivationTileContext<InputType>& context,
+                                          uint8_t mode, uint8_t subMode, float clampLimit, float alpha, float beta)
 {
     const ActMode actMode = static_cast<ActMode>(mode);
     const ActSubMode actSubMode = static_cast<ActSubMode>(subMode);
@@ -73,7 +73,8 @@ __aicore__ inline void RunGatedActivation(GatedActivationTileContext<InputType>&
         const float invBeta = beta != 0.0f ? 1.0f / beta : 1.0f;
         if (actSubMode == ActSubMode::LINEAR) {
             const float invAlpha = alpha != 0.0f ? 1.0f / alpha : 1.0f;
-            const Activation::SituGluParams situGluParams{clampLimit, beta, invBeta, alpha, invAlpha};
+            const Activation::SituGluParams situGluParams{clampLimit, beta, invBeta, alpha,
+                                                          invAlpha};
             Activation::RunSiTUGLU<InputType, Prefetch, true>(context, situGluParams);
         } else {
             const Activation::SituGluParams situGluParams{clampLimit, beta, invBeta, 1.0f, 1.0f};

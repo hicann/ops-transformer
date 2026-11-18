@@ -428,7 +428,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::EnterSteadyDispatch()
     }
 }
 
-// 普通模板 Token Dispatch 使用的 UB/GM 视图。
+// 初始化 Dispatch 的计数、路由和数据搬运 UB/GM 视图。
 template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
 {
@@ -462,35 +462,21 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
             reinterpret_cast<__gm__ int32_t*>(workspace.routing.recvPrefixBackup.get_ptr(buffer) +
                                               static_cast<uint64_t>(cumsumInfoTensorSize) * countWorkspace_.blockIdx);
     }
-    // 按既定顺序落地址。Tensor 保存所有 [expert][source rank] count 的前缀和。
-    // Tensor 大小：worldSize_ * moeExpertPerRank_ * sizeof(int32_t)，向上对齐至 32 字节；
+    // UB 依次放置前缀表、路由下标、搬运 ring、专家计数和 metainfo。
     uint32_t cumsumInfoTensorAddr = 0U;
     scratch.cumsumInfoTensor = reinterpret_cast<__ubuf__ int32_t*>(cumsumInfoTensorAddr);
-    // topK 有效下标 route 已消除 mask 扫描，只保留一份接收 index batch。
-    // Tensor 用途：接收 topkIndex 的当前 batch。
     uint32_t validTopkIndexTensorAddr = cumsumInfoTensorAddr + cumsumInfoTensorSize;
     uint32_t validTopkIndexTensorSize =
         Ops::Base::CeilAlign(static_cast<int64_t>(bufferConfig.routeItemsPerBatch) * static_cast<int64_t>(indexBytes),
                              static_cast<int64_t>(ALIGN_32));
     scratch.validTopkIndexTensor = {reinterpret_cast<__ubuf__ uint8_t*>(validTopkIndexTensorAddr), indexBytes};
-    /*
-     * 路由批次 Tensor 后放置 copyTmp 环形缓冲区，专家计数 Tensor 后放置 32B metaInfo 环形缓冲区。
-     * Tensor 用途：CopyTokensAndMetaForDispatch 中的动态 dispatch 环形缓冲区，配合
-     * EVENT_ID0..EVENT_ID(bufferCount-1) 形成软流水；
-     * 只记基址：槽视图在热路径由 GetDispatchCopyBuffer 现场构造，
-     * Tensor 大小：bufferConfig.bufferCount 块（启动轮按 Host 自适应分配 2~6 槽；稳态仅使用前 2 槽，不重新布局），
-     * 每块 tokenDispatchConfig_.quantTokenScaleAlignBytes；
-     * 量化路径为 Align256(token) + Align32(scale) + optional Align32(weight)，BF16 路径不含 scale 段。
-     * 该值与 host 预算中的每槽 copyBufferBytes 保持一致，故连续 ring 中每个槽位均保持 32B 对齐。
-     */
+    // 按启动槽数预留空间；稳态只使用前两槽，槽位保持 32B 对齐。
     scratch.copyTmpBaseAddr = validTopkIndexTensorAddr + validTopkIndexTensorSize;
     uint32_t copyTmpTotalSize = static_cast<uint32_t>(bufferConfig.bufferCount) * context.quantTokenScaleAlignBytes;
     uint32_t expertTokenNumsOutTensorAddr = scratch.copyTmpBaseAddr + copyTmpTotalSize;
     uint32_t expertTokenNumsOutTensorSize = Ops::Base::CeilAlign(
         static_cast<int64_t>(commonConfig_.moeExpertPerRank * sizeof(int32_t)), static_cast<int64_t>(ALIGN_32));
     scratch.expertTokenNumsOutTensor = reinterpret_cast<__ubuf__ int32_t*>(expertTokenNumsOutTensorAddr);
-    // Tensor 用途：CopyTokensAndMetaForDispatch 中的 metaInfo 环形缓冲区，逐 token 即时写入 GM；
-    // Tensor 大小：bufferCount * 32B，与 copyTmp 槽位和事件编号一一对应。
     uint32_t metaInfoTensorAddr = expertTokenNumsOutTensorAddr + expertTokenNumsOutTensorSize;
     uint32_t metaInfoTensorSize = static_cast<uint32_t>(bufferConfig.bufferCount) * INT32_PER_256B * sizeof(int32_t);
     scratch.metaInfoTensor = reinterpret_cast<__ubuf__ int32_t*>(metaInfoTensorAddr);
@@ -1328,7 +1314,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessWave(Derived& de
         derived.WaitForInputPreparation(sharedGmmStartCondition);
     }
 
-    // 共享专家使用独立事件对，避免剩余 ACK 阻塞 MoE GMM 启动；激活消费子核按路径配置。
+    // 共享专家使用独立事件对，激活消费子核按路径配置。
     Gmm1ActivationSync sharedGmm1ActivationSync(Derived::SHARED_ACTIVATION_SUB_BLOCK_IDX, GmmEventPair::SHARED_GMM1);
     if (sharedExpertNum_ > 0U) {
         // 阶段 2：可选的共享专家 GMM1 及 Activation。

@@ -14,7 +14,7 @@
 #ifdef MEGA_MOE_ARCH35_DEVICE
 #include "../../../arch35_92/common/mega_moe_copy.h"
 #include "../../../arch35_92/common/mega_moe_types.h"
-#include "../../../arch35_92/blaze/epilogue/activation/activation_assign.h"
+#include "../../../arch35_92/blaze/epilogue/activation/activation_dispatch.h"
 
 namespace MegaMoeImpl {
 
