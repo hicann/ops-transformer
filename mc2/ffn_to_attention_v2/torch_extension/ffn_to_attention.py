@@ -175,10 +175,10 @@ def _align_payload_size(value: int) -> int:
 
 
 def _calc_payload_slot_stride(
-    max_token_num: int, hidden_size: int, world_size: int
+    max_token_num: int, slot_width: int, world_size: int
 ) -> int:
-    """Reserve token rows, per-rank address tables, count rows, and flag sources."""
-    token_row_bytes = (hidden_size * 2 + 31) // 32 * 32
+    """Reserve HS-wide token rows, per-rank address tables, count rows, and flag sources."""
+    token_row_bytes = (slot_width * 2 + 31) // 32 * 32
     token_bytes = _align_payload_size(max_token_num * token_row_bytes)
     rank_table_bytes = world_size * _align_payload_size(max_token_num * 16)
     count_row_bytes = (_PAYLOAD_AIV_CAPACITY + 1) * _align_payload_size(world_size * 4)
@@ -209,10 +209,9 @@ class FFNToAttentionBuffer:
     when custom memory is used, or the internally computed conservative
     capacity otherwise (it only hosts the attention_to_ffn dispatch receiving
     area for the maximum possible attention worker count). A separate context
-    payload region reserves all three supported micro-batch rounds up front,
-    using ``token_data_shape`` for the per-round shape, and grows from
-    ``x.shape[0]`` before a send only when that fixed capacity is exceeded. It
-    holds token copies, address tables, count rows, and flag sources. This
+    payload region starts with the capacity derived from ``token_data_shape``
+    and grows from ``x.shape[0]`` before a send when needed. It holds token
+    copies, address tables, count rows, and flag sources. This
     class intentionally shares its
     registration tag with attention_to_ffn so peer ranks can discover this
     rank's window; create only one buffer per group in this process (attn
@@ -250,8 +249,7 @@ class FFNToAttentionBuffer:
             lambda: "token_data_shape must have 4 elements and token_info_table_shape must have 3 elements",
         )
         micro_batch_num, bs, expert_num_per_token, hs = self.token_data_shape
-        # The context can be reused by launches with one, two, or three active
-        # micro batches, so reserve the maximum supported round count up front.
+        # 按支持的最大 microbatch 数预留 payload；窗口 shape 仍在创建时固定。
         max_token_num = _PAYLOAD_ROUND_NUM * bs * expert_num_per_token
         self.max_token_num = max_token_num
         self.payload_slot_num = _PAYLOAD_ROUND_NUM
@@ -342,8 +340,12 @@ class FFNToAttentionBuffer:
         )
         if token_num <= self.max_token_num:
             return
+        new_capacity = min(
+            (1 << 31) - 1,  # 不超过 int32 上限
+            max(token_num, self.max_token_num * 2),
+        )
         new_slot_stride = _calc_payload_slot_stride(
-            token_num, self.token_data_shape[3], self.ep_world_size
+            new_capacity, self.token_data_shape[3], self.ep_world_size
         )
         torch._check(
             new_slot_stride <= _INT64_MAX // self.payload_slot_num,
@@ -356,7 +358,7 @@ class FFNToAttentionBuffer:
         self._retired_contexts.append(old_context)
         self.context = new_context
         self.payload_slot_stride = new_slot_stride
-        self.max_token_num = token_num
+        self.max_token_num = new_capacity
 
     def destroy(self):
         """Release the buffer and every retained resource."""

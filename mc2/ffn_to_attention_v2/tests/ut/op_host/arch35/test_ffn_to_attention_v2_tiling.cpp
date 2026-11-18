@@ -37,6 +37,7 @@ constexpr uint64_t REMOTE_ADDRESS_ENTRY_SIZE = 16U;
 constexpr uint64_t LIB_API_WORKSPACE_SIZE = 16U * 1024U * 1024U;
 constexpr uint64_t RESERVED_WORKSPACE_SIZE = 64U * 1024U * 1024U;
 constexpr uint64_t TOKEN_DTYPE_BYTES = 2U;
+constexpr uint64_t TOKEN_ROW_ALIGN = 32U;
 constexpr int64_t DEFAULT_CCL_BUFFER_SIZE = 4LL * MB_SIZE;
 constexpr int64_t MIN_CCL_BUFFER_SIZE = 2LL * MB_SIZE;
 constexpr int64_t RANK_TABLE_CCL_BUFFER_SIZE = 32LL * MB_SIZE;
@@ -209,7 +210,7 @@ TEST_F(FFNToAttentionV2Arch35TilingTest, WorkspaceScratchDoesNotOverlapLibApiWor
     TilingInfo tilingInfo;
     ASSERT_TRUE(
         RunTilingCase(BuildInputs(false), BuildAttrsWithHs(WINDOW_BOUNDARY_HS, MIN_CCL_BUFFER_SIZE), tilingInfo));
-    ASSERT_GE(tilingInfo.tilingDataSize, sizeof(FFNToAttentionV2TilingData));
+    ASSERT_EQ(tilingInfo.tilingDataSize, sizeof(FFNToAttentionV2TilingData));
     ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1U);
 
     FFNToAttentionV2TilingData tilingData{};
@@ -226,7 +227,7 @@ TEST_F(FFNToAttentionV2Arch35TilingTest, WorkspaceScratchDoesNotOverlapLibApiWor
     EXPECT_EQ(info.cclBufferSize, static_cast<uint64_t>(MIN_CCL_BUFFER_SIZE));
 
     // The payload layout fits the conservative capacity allocated by the Python buffer wrapper.
-    const uint64_t tokenRowStride = AlignUp(info.H * TOKEN_DTYPE_BYTES, 32U);
+    const uint64_t tokenRowStride = AlignUp(info.HS * TOKEN_DTYPE_BYTES, TOKEN_ROW_ALIGN);
     const uint64_t tokenRegionBytes = AlignUp(info.maxTokenNum * tokenRowStride, WORKSPACE_ALIGN);
     const uint64_t addressTableEnd = tokenRegionBytes + rankTableStride * info.worldSize;
     const uint64_t countRowsEnd = addressTableEnd + (static_cast<uint64_t>(info.aivNum) + 1U) * countRowStride;
@@ -300,6 +301,21 @@ TEST_F(FFNToAttentionV2Arch35TilingTest, RejectsMoreThanThreeMicroBatches)
 TEST_F(FFNToAttentionV2Arch35TilingTest, RejectsHsSmallerThanH)
 {
     ExecuteTilingCase(BuildInputs(true), BuildAttrsWithHs(7167), ge::GRAPH_FAILED);
+}
+
+TEST_F(FFNToAttentionV2Arch35TilingTest, PayloadRowsUseHsStrideForMultiSge)
+{
+    constexpr int64_t TEST_HS = 7296;
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(RunTilingCase(BuildInputs(false), BuildAttrsWithHs(TEST_HS), tilingInfo));
+    ASSERT_EQ(tilingInfo.tilingDataSize, sizeof(FFNToAttentionV2TilingData));
+
+    FFNToAttentionV2TilingData tilingData{};
+    std::memcpy(&tilingData, tilingInfo.tilingData.get(), sizeof(tilingData));
+    const auto& info = tilingData.ffnToAttentionV2Info;
+    EXPECT_LT(info.H, info.HS);
+    EXPECT_EQ(info.payloadTokenRowStride, AlignUp(static_cast<uint64_t>(TEST_HS) * TOKEN_DTYPE_BYTES, TOKEN_ROW_ALIGN));
+    EXPECT_EQ(info.payloadAddressTableOffset, AlignUp(info.maxTokenNum * info.payloadTokenRowStride, WORKSPACE_ALIGN));
 }
 
 TEST_F(FFNToAttentionV2Arch35TilingTest, RejectsBufferWithoutTokenInfoAlignmentSpace)

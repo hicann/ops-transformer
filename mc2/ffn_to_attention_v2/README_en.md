@@ -137,7 +137,7 @@ English | [简体中文](./README.md)
 - The communication memory must be destroyed only after the receiving operator finishes execution. Otherwise, the source and destination addresses of the URMA write become invalid, causing data loss, write exceptions, or service hangs. This operator asynchronously writes token data and flags into the window on the Attention side through a one-way URMA write. The return of the operator on the sending side does not indicate that the peer has finished consuming the data.
 - The shape values must satisfy the following constraints:
     - `Y` indicates the maximum number of tokens that the current rank needs to dispatch.
-    - `tokenInfoTableShape` is `[1, BS, expertNumPerToken]`, and `tokenDataShape` is `[1, BS, expertNumPerToken, HS]`. The first three dimensions of the two shapes must be identical.
+    - `tokenInfoTableShape` is `[microBatchNum, BS, expertNumPerToken]`, and `tokenDataShape` is `[microBatchNum, BS, expertNumPerToken, HS]`. The first three dimensions of the two shapes must be identical.
     - The value range of `BS` is `[1, 512]`.
     - `H` indicates the hidden size, with the value range `[1024, 8192]`.
     - `HS` indicates the length of each token slot in the communication window, which must satisfy `H <= HS <= 8320`.
@@ -155,7 +155,7 @@ where:
   - `flagSize = microBatchNum × BS × expertNumPerToken × 4B` (the per-token flag area written by this operator into the attention-side window)
   - `returnDataSize = microBatchNum × BS × expertNumPerToken × HS × 2B` (the single-session compact FP16/BF16 write-back data area written by this operator into the attention-side window; the write offsets are independent of the number of attention workers)
 
-The flag source area and the address table and count row areas of this operator at the end of the original window are now requested from the operator workspace, and their sizes are automatically computed by tiling, so you do not need to be aware of them.
+The token copies, flag sources, address tables, and count rows reside in a separate persistent payload region allocated by the context. They do not occupy the communication window or the operator workspace. The payload region reserves three microbatch slots with an initial token capacity of `3 × BS × expertNumPerToken`. In each slot, the token row stride is `HS × 2 bytes` rounded up to a multiple of 32 bytes. The Python wrapper grows the payload region as needed before sending, while tiling computes the slot layout required for the current invocation. Communication from a previous invocation may still be reading a payload slot, so the caller must coordinate slot reuse.
 
 The receive areas of the N sessions dispatched by `attention_to_ffn` are laid out in the FFN-side window, and their size depends on the peer `quant_mode` (1B for quantization and 2B for non-quantization dispatch), which is validated by the tiling of `attention_to_ffn_v2` based on the actual element width; this operator does not conservatively mirror at the non-quantized width.
 

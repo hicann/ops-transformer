@@ -31,7 +31,8 @@ struct FFNToAttentionV2Info {
     uint8_t windowType;
     uint64_t maxTokenNum;
     uint64_t cclBufferSize;
-    // Per-slot layout in AttentionFFNContext::payloadBufferAddr; token region starts at offset 0.
+    // Per-slot layout in AttentionFFNContext::payloadBufferAddr. Token rows start at offset 0 and
+    // use an aligned HS-wide stride. Each data SGE sends only the H valid elements of its row.
     uint64_t payloadTokenRowStride;
     uint64_t payloadAddressTableOffset;
     uint64_t payloadCountRowsOffset;

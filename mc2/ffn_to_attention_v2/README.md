@@ -112,7 +112,7 @@
     <tr>
     <td>tokenDataShape</td>
     <td>属性</td>
-    <td>Token数据列表大小，包含microBatch的大小（MicroBatchNum）、BatchSize大小（Bs）、每个Token对应的Expert数量(ExpertNumPerToken)、以及token和scale长度(HS)。</td>
+    <td>Token数据列表大小，包含microBatch的大小（MicroBatchNum）、BatchSize大小（Bs）、每个Token对应的Expert数量（ExpertNumPerToken）、以及token和scale长度（HS）。</td>
     <td>INT32</td>
     <td>-</td>
     </tr>
@@ -135,7 +135,7 @@
 - 通信内存的销毁必须晚于接收算子执行完成，否则URMA写的源地址与目标地址失效，将导致数据丢失、写入异常或业务挂死。本算子通过URMA单向写将token数据与flag异步写入Attention侧窗口，发送侧算子返回不代表对侧已完成数据消费。
 - shape取值需满足以下约束：
     - `Y`表示本rank需要分发的最大token数量。
-    - `tokenInfoTableShape`为`[1, BS, expertNumPerToken]`，`tokenDataShape`为`[1, BS, expertNumPerToken, HS]`，两个shape的前三维必须相同。
+    - `tokenInfoTableShape`为`[microBatchNum, BS, expertNumPerToken]`，`tokenDataShape`为`[microBatchNum, BS, expertNumPerToken, HS]`，两个shape的前三维必须相同。
     - `BS`取值范围为`[1, 512]`。
     - `H`表示hidden size，取值范围为`[1024, 8192]`。
     - `HS`表示通信window中每个token槽位的长度，需满足`H <= HS <= 8320`。
@@ -153,7 +153,7 @@ $$cclBufferSize \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSize},
   - `flagSize = microBatchNum × BS × expertNumPerToken × 4B`（本算子写入attention侧窗口的per-token flag区）
   - `returnDataSize = microBatchNum × BS × expertNumPerToken × HS × 2B`（本算子写入attention侧窗口的单会话紧凑FP16/BF16回写数据区，写入偏移与attention worker数量无关）
 
-原窗口尾部的本算子 flag source 区与地址表和 count 行区已改为从算子 workspace 申请，大小由 tiling 自动计算，用户无需感知。
+本算子的token副本、flag发送源、地址表和count行位于context申请的独立持久payload区，不占用通信window，也不从算子workspace申请。payload区固定预留3个microbatch槽位，初始token容量为`3 × BS × expertNumPerToken`；各槽位的token行按`HS × 2B`向上对齐到32B。Python封装在发送前按需扩容payload区，tiling计算本次调用所需的槽位布局。上一轮通信可能仍在读取payload槽位，复用前须由调用方协调。
 
 `attention_to_ffn`下发的N会话接收区布局在FFN侧窗口，其大小依赖对侧`quant_mode`（量化按1B、非量化按2B下发），由`attention_to_ffn_v2`的tiling按实际元素宽度校验，本算子不按非量化宽度保守镜像。
 

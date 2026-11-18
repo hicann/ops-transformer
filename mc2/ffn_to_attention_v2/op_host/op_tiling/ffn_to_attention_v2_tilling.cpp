@@ -118,6 +118,13 @@ ge::graphStatus FFNToAttentionV2TilingFunc(gert::TilingContext* context)
     OP_TILING_CHECK(context->SetScheduleMode(BATCH_MODE_SCHEDULE) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context->GetNodeName(), "failed to enable batch schedule mode"), return ge::GRAPH_FAILED);
 
+    auto* rawTilingData = context->GetRawTilingData();
+    OP_TILING_CHECK(rawTilingData == nullptr || rawTilingData->GetData() == nullptr,
+                    OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "rawTilingData"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(rawTilingData->GetCapacity() < sizeof(FFNToAttentionV2TilingData),
+                    OP_LOGE(context->GetNodeName(), "rawTilingData capacity %zu < %zu", rawTilingData->GetCapacity(),
+                            sizeof(FFNToAttentionV2TilingData)),
+                    return ge::GRAPH_FAILED);
     FFNToAttentionV2TilingData* tilingData = context->GetTilingData<FFNToAttentionV2TilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "tilingData"),
                     return ge::GRAPH_FAILED);
@@ -156,17 +163,19 @@ ge::graphStatus FFNToAttentionV2TilingFunc(gert::TilingContext* context)
                     return ge::GRAPH_FAILED);
     const size_t flagWorkspaceSize = aivNum * URMA_FLAG_SLOT_SIZE;
     const auto& info = tilingData->ffnToAttentionV2Info;
-    const uint64_t alignedPayloadBytes =
+    const uint64_t alignedXBytes =
         (static_cast<uint64_t>(info.H) * TOKEN_DTYPE_BYTES + URMA_UB_ALIGN - 1U) / URMA_UB_ALIGN * URMA_UB_ALIGN;
+    const uint64_t payloadTokenRowStride =
+        (static_cast<uint64_t>(info.HS) * TOKEN_DTYPE_BYTES + URMA_UB_ALIGN - 1U) / URMA_UB_ALIGN * URMA_UB_ALIGN;
     const uint64_t ubCountRowBytes =
         (static_cast<uint64_t>(worldSize) * sizeof(int32_t) + URMA_UB_ALIGN - 1U) / URMA_UB_ALIGN * URMA_UB_ALIGN;
     const uint64_t rankTableUbBytes =
         info.isInputRankTable ?
             (static_cast<uint64_t>(info.A) * sizeof(int32_t) + URMA_UB_ALIGN - 1U) / URMA_UB_ALIGN * URMA_UB_ALIGN :
             0U;
-    const uint64_t requiredUbBytes =
-        URMA_BUFFER_NUM * alignedPayloadBytes + URMA_UB_ALIGN + METADATA_CHUNK_BUFFER_SIZE + ADDRESS_TABLE_BUFFER_SIZE +
-        RANK_INFO_SEGMENT_NUM * ubCountRowBytes + URMA_HCOMM_INIT_SIZE + URMA_BATCH_BUFFER_SIZE + rankTableUbBytes;
+    const uint64_t requiredUbBytes = URMA_BUFFER_NUM * alignedXBytes + URMA_UB_ALIGN + METADATA_CHUNK_BUFFER_SIZE +
+                                     ADDRESS_TABLE_BUFFER_SIZE + RANK_INFO_SEGMENT_NUM * ubCountRowBytes +
+                                     URMA_HCOMM_INIT_SIZE + URMA_BATCH_BUFFER_SIZE + rankTableUbBytes;
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint64_t availableUbBytes = 0U;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, availableUbBytes);
@@ -185,10 +194,11 @@ ge::graphStatus FFNToAttentionV2TilingFunc(gert::TilingContext* context)
 
     // Plan one context payload slot; the Python buffer allocates the three supported slots up front.
     const uint64_t payloadSizeMax = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
-    OP_TILING_CHECK(alignedPayloadBytes == 0U || static_cast<uint64_t>(maxTokenNum) >
-                                                     (payloadSizeMax - ADDRESS_TABLE_ALIGN + 1U) / alignedPayloadBytes,
-                    OP_LOGE(context->GetNodeName(), "payload token region overflows int64"), return ge::GRAPH_FAILED);
-    const uint64_t payloadTokenBytes = static_cast<uint64_t>(maxTokenNum) * alignedPayloadBytes;
+    OP_TILING_CHECK(
+        payloadTokenRowStride == 0U ||
+            static_cast<uint64_t>(maxTokenNum) > (payloadSizeMax - ADDRESS_TABLE_ALIGN + 1U) / payloadTokenRowStride,
+        OP_LOGE(context->GetNodeName(), "payload token region overflows int64"), return ge::GRAPH_FAILED);
+    const uint64_t payloadTokenBytes = static_cast<uint64_t>(maxTokenNum) * payloadTokenRowStride;
     const uint64_t payloadTokenRegionBytes =
         (payloadTokenBytes + ADDRESS_TABLE_ALIGN - 1U) / ADDRESS_TABLE_ALIGN * ADDRESS_TABLE_ALIGN;
     OP_TILING_CHECK(rankTableStride > payloadSizeMax / worldSize,
@@ -205,7 +215,7 @@ ge::graphStatus FFNToAttentionV2TilingFunc(gert::TilingContext* context)
     OP_TILING_CHECK(payloadFlagBytes >
                         maxAlignedSlotBytes - payloadTokenRegionBytes - payloadRankTableBytes - payloadCountRowsBytes,
                     OP_LOGE(context->GetNodeName(), "payload slot size overflows int64"), return ge::GRAPH_FAILED);
-    tilingData->ffnToAttentionV2Info.payloadTokenRowStride = alignedPayloadBytes;
+    tilingData->ffnToAttentionV2Info.payloadTokenRowStride = payloadTokenRowStride;
     tilingData->ffnToAttentionV2Info.payloadAddressTableOffset = payloadTokenRegionBytes;
     tilingData->ffnToAttentionV2Info.payloadCountRowsOffset = payloadTokenRegionBytes + payloadRankTableBytes;
     tilingData->ffnToAttentionV2Info.payloadCountRowStride = countRowStride;
@@ -260,6 +270,8 @@ ge::graphStatus FFNToAttentionV2TilingFunc(gert::TilingContext* context)
     const uint64_t tilingKey = GET_TPL_TILING_KEY(rankTableMode, TILINGKEY_TPL_A5);
     context->SetTilingKey(tilingKey);
     OP_LOGD(context->GetNodeName(), "FFNToAttentionV2 cur case tilingKey is %lu", tilingKey);
+
+    rawTilingData->SetDataSize(sizeof(FFNToAttentionV2TilingData));
 
     return ge::GRAPH_SUCCESS;
 }

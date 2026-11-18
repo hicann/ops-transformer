@@ -32,12 +32,12 @@
 - **计算公式**：
 
   - 输入：
-    - $\mathbf{X} \in \mathbb{R}^{\text{Y} \times \text{H}}$：FFN节点上的token数据矩阵，对应入参 `x`。$\text{Y}$ 是本卡需要分发的最大token数量，$\text{H}$ 是隐藏层大小。
-    - $\mathbf{S} \in \mathbb{Z}^{\text{Y}}$：每个token所属的Attention Worker索引，对应入参 `session_ids`。取值范围为$[0, \text{attnRankNum}-1]$。
-    - $\mathbf{MB} \in \mathbb{Z}^{\text{Y}}$：每个token的microBatch索引，对应入参 `micro_batch_ids`。取值范围为$[0, \text{microBatchNum}-1]$。
-    - $\mathbf{T} \in \mathbb{Z}^{\text{Y}}$：每个token在microBatch中的token索引，对应入参 `token_ids`。取值范围为$[0, \text{BS}-1]$。
-    - $\mathbf{EO} \in \mathbb{Z}^{\text{Y}}$：每个token在专家维度的偏移，对应入参 `expert_offsets`。取值范围为$[0, \text{expertNumPerToken}-1]$。
-    - $\text{N}$：本卡发送的实际token总数，对应入参 `actual_token_num`。取值范围为$[0, \text{Y}]$。
+    - $\mathbf{X} \in \mathbb{R}^{\text{Y} \times \text{H}}$：FFN节点上的token数据矩阵，对应入参`x`。$\text{Y}$是本卡需要分发的最大token数量，$\text{H}$是隐藏层大小。
+    - $\mathbf{S} \in \mathbb{Z}^{\text{Y}}$：每个token所属的Attention Worker索引，对应入参`session_ids`。取值范围为$[0, \text{attnRankNum}-1]$。
+    - $\mathbf{MB} \in \mathbb{Z}^{\text{Y}}$：每个token的microBatch索引，对应入参`micro_batch_ids`。取值范围为$[0, \text{microBatchNum}-1]$。
+    - $\mathbf{T} \in \mathbb{Z}^{\text{Y}}$：每个token在microBatch中的token索引，对应入参`token_ids`。取值范围为$[0, \text{BS}-1]$。
+    - $\mathbf{EO} \in \mathbb{Z}^{\text{Y}}$：每个token在专家维度的偏移，对应入参`expert_offsets`。取值范围为$[0, \text{expertNumPerToken}-1]$。
+    - $\text{N}$：本卡发送的实际token总数，对应入参`actual_token_num`。取值范围为$[0, \text{Y}]$。
   - 输出：
     - 无Host可见输出。数据通过HCCL窗口发送至目标Attention卡，Attention卡从该HCCL窗口中读取token数据。
   - 约定：
@@ -133,7 +133,7 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
 </tbody>
 </table>
 
-初始`max_token_num`由`token_data_shape`的前三维相乘得到；调用`ffn_to_attention`时，若本卡`x.shape[0]`超过当前容量，buffer会在发送前扩容context的payload区。payload槽位数由`microBatchNum`决定。每个槽位预留按32B对齐的token行，以及地址表、count行和flag发送源的容量。每个token根据输入`micro_batch_ids[i]`写入对应槽位；一次调用可以包含多个microbatch。若直接调用底层`torch.ops.cann_ops_transformer.npu_ffn_to_attention`（例如图模式），需在捕获或发送前调用`buffer.ensure_payload_capacity(x.shape[0])`。
+初始`max_token_num`为`3 × BS × expertNumPerToken`，其中`BS`和`expertNumPerToken`来自`token_data_shape`。payload固定预留3个microbatch槽位，不随创建时`microBatchNum`的取值变化；`microBatchNum`仍须为1、2或3，且两个shape的前三维必须一致。每个槽位按当前token容量预留token行，以及地址表、count行和flag发送源的容量，token行跨度为`HS × 2B`向上对齐到32B。调用`ffn_to_attention`时，若本卡`x.shape[0]`超过当前容量，buffer会在发送前扩容context的payload区。每个token根据输入`micro_batch_ids[i]`写入对应槽位；一次调用可以包含多个microbatch。固定预留3个槽位不改变创建时的窗口shape，槽位复用前仍须由调用方确认上一轮通信不再读取该槽位。若直接调用底层`torch.ops.cann_ops_transformer.npu_ffn_to_attention`（例如图模式），需在捕获或发送前调用`buffer.ensure_payload_capacity(x.shape[0])`。
 
 该接口返回<code>FFNToAttentionBuffer</code>对象，内部自动计算FFN侧CCL通信缓冲区大小（覆盖<code>attention_to_ffn</code>的下发接收区，作为算子<code>ccl_buffer_size</code>属性，等于实际注册的窗口大小；本算子的token副本、flag发送源、地址表和count行位于context申请的独立payload区，不占用窗口），并创建通信上下文，供<code>ffn_to_attention</code>使用；传入<code>window_addr</code>和<code>window_size</code>时，本卡通信窗口以该地址和大小注册。本接口与<code>attention_to_ffn</code>共用注册tag以便对端rank查询本卡窗口。
 
