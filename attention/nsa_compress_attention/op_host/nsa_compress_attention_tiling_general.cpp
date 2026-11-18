@@ -518,7 +518,8 @@ bool NsaCompressAttentionTilingBase::AnalyzeLayout()
     OP_CHECK_IF(gSize == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "gSize is zero."), return false);
     OP_CHECK_IF(n2Size == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "n2Size is zero."), return false);
     OP_CHECK_IF(dSize > HEAD_DIM_MAX_VALUE || dSize <= 0L,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "dSize is not in range:(0, 512]."), return false);
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "dSize is not in range:(0, %ld].", HEAD_DIM_MAX_VALUE),
+                return false);
     OP_CHECK_IF(
         n1Size % n2Size != 0,
         OPS_REPORT_VECTOR_INNER_ERR(opName, "n1Size [%ld] should be a multiple of n2Size [%ld].", n1Size, n2Size),

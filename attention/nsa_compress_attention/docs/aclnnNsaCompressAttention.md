@@ -458,6 +458,7 @@ aclnnStatus aclnnNsaCompressAttention(
 - 输入query、key、value的数据类型必须一致。
 - 输入query、key、value的batchSize必须相等。
 - 输入query、key、value的headDim必须满足：qD == kD && kD >= vD
+- 输入query、key、value的headDim取值范围为(0, 768]。aclnnNsaCompressAttentionVarLenScore遵循同一约束。
 - 输入query、key、value的inputLayout必须一致。
 - 输入query的headNum为N1，输入key和value的headNum为N2，则N1 >= N2 && N1 % N2 == 0
 - 设G = N1 / N2，G需要满足以下约束：G < 128 && 128 % G == 0

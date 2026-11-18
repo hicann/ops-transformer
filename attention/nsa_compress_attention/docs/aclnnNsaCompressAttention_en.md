@@ -458,6 +458,7 @@ aclnnStatus aclnnNsaCompressAttention(
 - The data types of the input query, key, and value must be consistent.
 - The batchSize of the input query, key, and value must be equal.
 - The headDim of input query, key, and value must satisfy: qD == kD && kD >= vD
+- The headDim of input query, key, and value must be in the range (0, 768]. aclnnNsaCompressAttentionVarLenScore follows the same constraint.
 - The inputLayout of the input query, key, and value must be consistent.
 - Let the headNum of input query be N1, and the headNum of input key and value be N2, then N1 >= N2 && N1 % N2 == 0
 - Let G = N1 / N2. G must satisfy the following constraints: G < 128 && 128 % G == 0

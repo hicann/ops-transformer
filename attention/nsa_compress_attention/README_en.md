@@ -81,6 +81,7 @@ The data layout formats of the query, key, and value inputs of NsaCompressAttent
 - The data types of query, key, and value inputs must be the same.
 - The batchSizes of query, key, and value inputs must be equal.
 - The headDims of query, key, and value inputs must satisfy: `qD == kD && kD >= vD`.
+- The headDims of query, key, and value inputs must be in the range `(0, 768]`. aclnnNsaCompressAttentionVarLenScore follows the same constraint.
 - The inputLayouts of query, key, and value inputs must be the same.
 - If the headNum of the query input is N1 and the headNum of the key and value inputs is N2, `N1 >= N2 && N1 % N2 == 0`.
 - Let `G = N1 / N2`. G must satisfy the following constraints: `G < 128 && 128 % G == 0`.
