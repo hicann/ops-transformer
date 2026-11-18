@@ -887,7 +887,8 @@ private:
             Allocate(mte.sync.aiv1TopkReady,
                      static_cast<int64_t>(params.aicNum) * MemoryLayoutDetail::INT_CACHELINE * SIZE_INT_32);
         }
-        if (params.ring.activation) {
+        // Arch35 的三类 MX Wave 激活均为 FP8，BF16 不使用该回收区。
+        if (params.ring.activation && params.activationOutputStorage.elementBits == MemoryLayoutDetail::FP8_BITS) {
             const int64_t rowTiles =
                 MemoryLayoutDetail::CeilDiv(static_cast<int64_t>(params.ring.rows), MemoryLayoutDetail::L1_TILE_M_256);
             const int64_t rowCounterBytes = MemoryLayoutDetail::CeilAlign(

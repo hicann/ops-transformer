@@ -131,9 +131,6 @@ __aicore__ inline void RunGmm1Aic(const Bf16GmmBlockContext& context, GmmKernel:
             lastWaitedMGroupIdx = mGroupIdx;
         }
         sync.WaitForActivation();
-        if constexpr (outputToGm) {
-            WaitForGmm1RingTileReuse(addresses, Get<M_VALUE>(coord), Get<N_VALUE>(coord), config.n);
-        }
         const uint32_t outputRow = outputToGm ? Get<M_VALUE>(coord) : pingpongIdx * MegaMoeBf16GmmConfig::TILE_M;
         const uint32_t outputColumn = outputToGm ? Get<N_VALUE>(coord) : 0U;
         auto tileC = c.slice(asc::te::make_coord(outputRow, outputColumn),
@@ -152,12 +149,10 @@ __aicore__ inline void RunGmm1Aiv0Epilogue(GmmKernel::BlockScheduler& scheduler,
         const auto coord = scheduler.GetBlockCoord(tile);
         const auto extent = scheduler.GetBlockShape(coord);
         sync.WaitForGmm1();
-        WaitForActivationRingRowReuse(addresses, Get<M_VALUE>(coord), config.k);
         epilogue.RunTile(addresses.gmm1OutGlobal, addresses.metaInfoGlobal, runtimeState.pingpongIdx,
                          config.n / config.activationOutputDivisor, Get<M_VALUE>(coord),
                          Get<N_VALUE>(coord) / config.activationOutputDivisor, Get<M_VALUE>(extent),
                          Get<N_VALUE>(extent) / config.activationOutputDivisor);
-        PublishGmm1RingTileConsumed(addresses, Get<M_VALUE>(coord), Get<N_VALUE>(coord), config.n);
         GmmKernel::NotifyGmm2InputReady<true>(addresses.activationToGmm2Flag, Get<M_VALUE>(coord) / config.tileM);
         sync.NotifyGmm1();
     }
@@ -239,9 +234,6 @@ __aicore__ inline void RunGmm2(const Bf16GmmBlockContext& context, const Problem
                 addresses.gmm2CombineSync->WaitForCombine();
             }
             ComputeGmm2Tile(block, a, b, c, row, Get<N_VALUE>(coord), Get<M_VALUE>(extent), Get<N_VALUE>(extent), k);
-            if constexpr (!NotifyCombine && !IsShared) {
-                GmmKernel::PublishGmm2InputReadComplete(addresses, row);
-            }
             if constexpr (NotifyCombine) {
                 addresses.gmm2CombineSync->NotifyCombine();
             } else if constexpr (IsShared) {
