@@ -108,10 +108,15 @@ bool QGMMInplaceAddBasicApiTiling::AnalyzeInputs()
     const gert::Shape& x1ScaleShape = x1ScaleStorageShape->GetOriginShape();
 
     OP_CHECK_IF(!SetGroupNum(GROUPLIST_INDEX), OP_LOGE(inputParams_.opName, "SetGroupNum failed."), return false);
+    OP_CHECK_IF(!CheckShapeNotNegative(xShape, wShape, inputParams_),
+                OP_LOGE(inputParams_.opName, "CheckShapeNotNegative failed."), return false);
+    OP_CHECK_IF(!CheckXAndWeightKDim(xShape, wShape, inputParams_),
+                OP_LOGE(inputParams_.opName, "CheckXAndWeightKDim failed."), return false);
     OP_CHECK_IF(!SetMKN(xShape, wShape), OP_LOGE(inputParams_.opName, "SetMKN failed."), return false);
 
-    // HIFLOAT8 T-T 分支：IsCapable 已保证 wScale 为 (g,) 或 (g,1)，复用合并后的 T-T/T-C 校验
-    OP_CHECK_IF(!IsMicroScaling() && !CheckShapeForHif8Quant(x1ScaleShape, wScaleShape, inputParams_),
+    // 本模板只接 HIFLOAT8 T-T/T-C，其余组合由 IsCapable 在 tiling 后排除；
+    // 这里跳过 HIF8 形状校验，避免以 GRAPH_FAILED 中止导致后续模板轮不到。
+    OP_CHECK_IF(!IsMxFp8Fp4() && !IsMicroScaling() && !CheckShapeForHif8Quant(x1ScaleShape, wScaleShape, inputParams_),
                 OP_LOGE(inputParams_.opName, "CheckShapeForHif8Quant failed."), return false);
 
     OP_CHECK_IF(!SetQuantModeForQGmmInplaceAdd(), OP_LOGE(inputParams_.opName, "SetQuantModeForQGmmInplaceAdd failed."),

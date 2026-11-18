@@ -46,7 +46,13 @@ struct QGmmInplaceAddOpApiCase {
         if (!enable) {
             GTEST_SKIP() << "Skip disabled case: " << caseName;
         }
-        ops::ut::SetPlatformSocVersion(socVersion);
+        if (socVersion == "Ascend960DT") {
+            // The shared CSV helper does not map Ascend960DT; select the A6 stub explicitly.
+            op::SetPlatformSocVersion(op::SocVersion::ASCEND960DT);
+            ASSERT_EQ(op::GetCurrentPlatformInfo().GetCurNpuArch(), NpuArch::DAV_9201);
+        } else {
+            ops::ut::SetPlatformSocVersion(socVersion);
+        }
 
         TensorDesc x1Desc(ParseDims(x1Shape), ops::ut::ParseAclDtype(x1Dtype), ACL_FORMAT_ND, ParseDims(x1Stride));
         TensorDesc x2Desc(ParseDims(x2Shape), ops::ut::ParseAclDtype(x2Dtype), ACL_FORMAT_ND, ParseDims(x2Stride));

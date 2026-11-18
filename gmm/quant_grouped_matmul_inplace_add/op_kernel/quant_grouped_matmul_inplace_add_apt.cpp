@@ -15,7 +15,9 @@
 #include "arch35/qgmm_inplace_add_utils.h"
 #include "arch35/quant_grouped_matmul_inplace_add_tiling_data.h"
 #include "arch35/qgmm_inplace_add_tiling_key.h"
-#if defined(V310_QGMM_QUANT_MX_HIF4)
+#if defined(QGMM_INPLACE_ADD_USE_BLAZE_MX)
+#include "arch35/qgmm_inplace_add_mx_tensor_api.h"
+#elif defined(V310_QGMM_QUANT_MX_HIF4)
 #include "arch35/qgmm_inplace_add_mx_basic_api.h"
 #elif defined(V310_QGMM_QUANT_MX)
 #include "arch35/qgmm_inplace_add_cube_on_the_fly.h"
@@ -35,7 +37,7 @@ __global__ __aicore__ void quant_grouped_matmul_inplace_add(GM_ADDR x1, GM_ADDR 
                                                             GM_ADDR yIn, GM_ADDR scale1, GM_ADDR y, GM_ADDR workspace,
                                                             GM_ADDR tiling)
 {
-#if defined(V310_QGMM_QUANT_MX_HIF4)
+#if defined(QGMM_INPLACE_ADD_USE_BLAZE_MX) || defined(V310_QGMM_QUANT_MX_HIF4)
     REGISTER_TILING_DEFAULT(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams);
 #else
     REGISTER_NONE_TILING;
@@ -46,11 +48,25 @@ __global__ __aicore__ void quant_grouped_matmul_inplace_add(GM_ADDR x1, GM_ADDR 
     AscendC::InitSocState();
 #endif
     AscendCUtils::SetOverflow(1);
+#if defined(QGMM_INPLACE_ADD_USE_BLAZE_MX)
+    if constexpr (KERNEL_TYPE == QGMM_INPLACE_ADD_MX_UB_ADD) {
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+    } else {
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIC_ONLY);
+    }
+#else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIC_ONLY);
+#endif
     GM_ADDR user1 = GetUserWorkspace(workspace);
 
 #ifndef __CCE_KT_TEST__
-#if defined(V310_QGMM_QUANT_MX_HIF4)
+#if defined(QGMM_INPLACE_ADD_USE_BLAZE_MX)
+    if constexpr (QUANT_B_TRANS == QGMM_INPLACE_ADD_NO_TRANS && QUANT_A_TRANS == QGMM_INPLACE_ADD_TRANS &&
+                  (KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_FIXP || KERNEL_TYPE == QGMM_INPLACE_ADD_MX_UB_ADD)) {
+        QGmmInplaceAddMxTensorApi<KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_FIXP>(x1, x2, scale2, groupList, scale1, y,
+                                                                                tiling);
+    }
+#elif defined(V310_QGMM_QUANT_MX_HIF4)
     if constexpr (QUANT_B_TRANS == QGMM_INPLACE_ADD_NO_TRANS && QUANT_A_TRANS == QGMM_INPLACE_ADD_TRANS &&
                   KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_FIXP) {
         QGmmInplaceAddAswtMxBasicApi<Cgmct::Gemm::layout::ColumnMajor, Cgmct::Gemm::layout::RowMajor>(

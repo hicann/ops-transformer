@@ -287,6 +287,7 @@ protected:
     virtual void PrintQuantParams();
     bool IsMicroScaling() const;
     bool IsHif4Scale() const;
+    bool IsMxFp8Fp4() const;
     bool CheckQuantParamsForHif4TypeM(const gert::Shape& xScaleShape, const gert::Shape& wScaleShape) const;
     bool CheckQuantParamsForHif4TypeK(const gert::Shape& xScaleShape, const gert::Shape& wScaleShape) const;
     bool CheckQuantParamsForHif4QuantMode(const gert::StorageShape* xScaleStorageShape,

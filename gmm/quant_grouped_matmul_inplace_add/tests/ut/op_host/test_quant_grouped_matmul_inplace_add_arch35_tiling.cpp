@@ -64,6 +64,8 @@ struct QGmmInplaceAddArch35Param {
     vector<int64_t> scale2Shape;
     vector<int64_t> scale1Shape;
     uint64_t tilingDataSize = 0;
+    vector<int64_t> xShapeOverride;
+    vector<int64_t> weightShapeOverride;
 
     void Test() const
     {
@@ -97,8 +99,9 @@ struct QGmmInplaceAddArch35Param {
             archStr = "3510";
         }
 
-        gert::StorageShape xShape = MakeShape({k, m});
-        gert::StorageShape weightShape = MakeShape({k, n});
+        gert::StorageShape xShape = MakeShape(xShapeOverride.empty() ? vector<int64_t>{k, m} : xShapeOverride);
+        gert::StorageShape weightShape =
+            MakeShape(weightShapeOverride.empty() ? vector<int64_t>{k, n} : weightShapeOverride);
         gert::StorageShape groupListShape = MakeShape({groupNum});
         gert::StorageShape yShape = MakeShape({groupNum, m, n});
 
@@ -133,6 +136,11 @@ struct QGmmInplaceAddArch35Param {
         if (checkTilingKey) {
             ASSERT_EQ(tilingInfo.tilingKey, expectTilingKey) << "case=" << caseName;
         }
+        // Additional tiling invariants apply only to the new mixed-input cases.
+        if (xDtype == ge::DT_FLOAT8_E4M3FN &&
+            (wDtype == ge::DT_FLOAT4_E2M1 || wDtype == Ops::Transformer::DT_HIFLOAT4)) {
+            CheckPerGroupTiling(tilingInfo, compileInfo.l1Size);
+        }
         if (k == 0 && xDtype == ge::DT_HIFLOAT8 &&
             (scale2Shape.size() == 1U || (scale2Shape.size() == 2U && scale2Shape[1] == 1))) {
             // The empty T-T reduction must still serialize the BasicApi layout;
@@ -154,6 +162,56 @@ struct QGmmInplaceAddArch35Param {
             EXPECT_EQ(data->mmTilingData.kAL1, 0U);
             EXPECT_EQ(data->mmTilingData.kBL1, 0U);
         }
+    }
+
+    void CheckPerGroupTiling(const TilingInfo& tilingInfo, uint64_t l1Size) const
+    {
+        SCOPED_TRACE(caseName);
+        // TN: atomic uses kernelType=0 (key 4), adaptive UB uses kernelType=3 (key 52).
+        EXPECT_EQ(tilingInfo.tilingKey, checkTilingKey ? expectTilingKey : 4U);
+        ASSERT_EQ(tilingInfo.tilingDataSize, sizeof(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams));
+        ASSERT_NE(tilingInfo.tilingData.get(), nullptr);
+        const auto* data = reinterpret_cast<const QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams*>(
+            tilingInfo.tilingData.get());
+        EXPECT_EQ(data->quantGmmInplaceAddParams.groupNum, groupNum);
+        EXPECT_EQ(data->quantGmmInplaceAddParams.groupListType, groupListType);
+        const auto& mm = data->mmTilingData;
+        EXPECT_EQ(mm.M, m);
+        EXPECT_EQ(mm.N, n);
+        EXPECT_EQ(mm.Ka, k);
+        EXPECT_EQ(mm.Kb, k);
+        if (k == 0) {
+            return;
+        }
+        ASSERT_GT(mm.baseM, 0);
+        ASSERT_GT(mm.baseN, 0);
+        ASSERT_GT(mm.baseK, 0);
+        const bool isFp4A = xDtype == ge::DT_FLOAT4_E2M1 || xDtype == Ops::Transformer::DT_HIFLOAT4;
+        const bool isFp4B = wDtype == ge::DT_FLOAT4_E2M1 || wDtype == Ops::Transformer::DT_HIFLOAT4;
+        if (isFp4B) {
+            EXPECT_EQ(mm.baseN % 64, 0);
+        }
+        EXPECT_EQ(mm.baseK % 64, 0);
+        ASSERT_GT(mm.stepKa, 0);
+        ASSERT_GT(mm.stepKb, 0);
+        const uint64_t scaleFactorA = mm.mxTypePara & 0xffU;
+        const uint64_t scaleFactorB = (mm.mxTypePara >> 8U) & 0xffU;
+        ASSERT_GE(scaleFactorA, 1U);
+        ASSERT_LE(scaleFactorA, 127U);
+        ASSERT_GE(scaleFactorB, 1U);
+        ASSERT_LE(scaleFactorB, 127U);
+        const uint64_t kAL1 = static_cast<uint64_t>(mm.stepKa) * mm.baseK;
+        const uint64_t kBL1 = static_cast<uint64_t>(mm.stepKb) * mm.baseK;
+        // Check the reserved windows, before the adapter possibly shortens the shared scale window.
+        // E8M0 stores two one-byte scales per 64 K; HIF4 stores one four-byte scale.
+        const uint64_t scaleABytes = ((scaleFactorA * kAL1 + 63U) / 64U) * mm.baseM *
+                                     (scale1Dtype == Ops::Transformer::DT_HIFLOAT4_SCALE ? 4U : 2U);
+        const uint64_t scaleBBytes = ((scaleFactorB * kBL1 + 63U) / 64U) * mm.baseN *
+                                     (scale2Dtype == Ops::Transformer::DT_HIFLOAT4_SCALE ? 4U : 2U);
+        const uint64_t dataABytes = mm.baseM * kAL1 / (isFp4A ? 2U : 1U);
+        const uint64_t dataBBytes = mm.baseN * kBL1 / (isFp4B ? 2U : 1U);
+        const uint64_t oneBufferBytes = dataABytes + dataBBytes + scaleABytes + scaleBBytes;
+        EXPECT_LE(oneBufferBytes * 2U, l1Size);
     }
 };
 
@@ -212,6 +270,12 @@ vector<QGmmInplaceAddArch35Param> GetParams(const string& socVersion)
             p.scale2Shape = ops::ut::ParseDims(items[idx++]);
             p.scale1Shape = ops::ut::ParseDims(items[idx++]);
             p.tilingDataSize = static_cast<uint64_t>(stoull(Trim(items[idx++])));
+            if (idx < items.size()) {
+                p.xShapeOverride = ops::ut::ParseDims(items[idx++]);
+            }
+            if (idx < items.size()) {
+                p.weightShapeOverride = ops::ut::ParseDims(items[idx++]);
+            }
             params.push_back(p);
         } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);

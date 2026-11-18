@@ -119,6 +119,12 @@ bool GroupedQmmTiling::IsMxfp4() const
            (inputParams_.bDtype == ge::DT_FLOAT4_E2M1 || inputParams_.bDtype == ge::DT_FLOAT4_E1M2);
 }
 
+bool GroupedQmmTiling::IsMxFp8Fp4() const
+{
+    return inputParams_.aDtype == ge::DT_FLOAT8_E4M3FN &&
+           (inputParams_.bDtype == ge::DT_FLOAT4_E2M1 || inputParams_.bDtype == Ops::Transformer::DT_HIFLOAT4);
+}
+
 bool GroupedQmmTiling::IsMultiTensorWeight() const
 {
     auto weightShape = context_->GetDynamicInputShape(WEIGHT_INDEX, 0);
@@ -1703,9 +1709,9 @@ void GroupedQmmTiling::CalBasicBlock()
         basicTiling_.baseK = CeilAlign(basicTiling_.baseK, MXFP_BASEK_FACTOR); // mx_mmad requires basek align to 64
         bool isFp4Input = inputParams_.aDtype == ge::DT_FLOAT4_E2M1 || inputParams_.aDtype == ge::DT_FLOAT4_E1M2 ||
                           inputParams_.aDtype == Ops::Transformer::DT_HIFLOAT4;
-        if (isFp4Input && !inputParams_.transB) {
-            // 64: mx_mmad requires the inner axis to align to 64
-            basicTiling_.baseN = CeilAlign(basicTiling_.baseN, static_cast<uint64_t>(64));
+        if ((isFp4Input || IsMxFp8Fp4()) && !inputParams_.transB) {
+            // Align the packed inner axis to the MX instruction granularity.
+            basicTiling_.baseN = CeilAlign(basicTiling_.baseN, static_cast<uint64_t>(MXFP_BASEK_FACTOR));
         }
     }
 }
@@ -1792,14 +1798,18 @@ ge::graphStatus GroupedQmmTiling::CalL1Depth(uint64_t leftL1Size)
         if (inputParams_.groupType == SPLIT_M) {
             CalcAlignedMxBaseScaleSize(baseScaleASize, baseScaleBSize);
         } else {
-            baseScaleASize = GetSizeWithDataType(
-                (basicTiling_.baseK / (MX_GROUP_SIZE * MXFP_MULTI_BASE_SIZE) + inputParams_.groupNum) *
-                    MXFP_MULTI_BASE_SIZE * basicTiling_.baseM, // 2 is dim value of last scale dim
-                inputParams_.perTokenScaleDtype);
-            baseScaleBSize = GetSizeWithDataType(
-                (basicTiling_.baseK / (MX_GROUP_SIZE * MXFP_MULTI_BASE_SIZE) + inputParams_.groupNum) *
-                    MXFP_MULTI_BASE_SIZE * basicTiling_.baseN, // 2 is dim value of last pertokenScale dim
-                inputParams_.scaleDtype);
+            const bool isHif4ScaleA = inputParams_.aQuantMode == optiling::QuantMode::HIF4_PERGROUP_MODE;
+            const bool isHif4ScaleB = inputParams_.bQuantMode == optiling::QuantMode::HIF4_PERGROUP_MODE;
+            const uint64_t aGroupSize = isHif4ScaleA ? HIF4_BASEK_FACTOR : MX_GROUP_SIZE;
+            const uint64_t bGroupSize = isHif4ScaleB ? HIF4_BASEK_FACTOR : MX_GROUP_SIZE;
+            const uint64_t aMultiBase = isHif4ScaleA ? HIF4_MULTI_BASE_SIZE : MXFP_MULTI_BASE_SIZE;
+            const uint64_t bMultiBase = isHif4ScaleB ? HIF4_MULTI_BASE_SIZE : MXFP_MULTI_BASE_SIZE;
+            baseScaleASize =
+                GetSizeWithDataType(CeilAlign(CeilDiv(basicTiling_.baseK, aGroupSize), aMultiBase) * basicTiling_.baseM,
+                                    inputParams_.perTokenScaleDtype);
+            baseScaleBSize =
+                GetSizeWithDataType(CeilAlign(CeilDiv(basicTiling_.baseK, bGroupSize), bMultiBase) * basicTiling_.baseN,
+                                    inputParams_.scaleDtype);
         }
     }
     uint64_t baseL1Size = baseASize + baseBSize + baseScaleASize + baseScaleBSize;
@@ -1887,12 +1897,13 @@ void GroupedQmmTiling::CalScaleFactors()
 {
     uint64_t baseASize = GetSizeWithDataType(basicTiling_.baseM * basicTiling_.baseK, inputParams_.aDtype);
     uint64_t baseBSize = GetSizeWithDataType(basicTiling_.baseN * basicTiling_.baseK, inputParams_.bDtype);
-    uint64_t scaleGroupSize =
+    uint64_t scaleGroupSizeB =
         inputParams_.bQuantMode == optiling::QuantMode::HIF4_PERGROUP_MODE ? HIF4_BASEK_FACTOR : MX_GROUP_SIZE;
-    uint64_t baseScaleASize = GetSizeWithDataType(CeilDiv(basicTiling_.baseK, scaleGroupSize) * basicTiling_.baseM,
+    uint64_t scaleGroupSizeA = IsMxFp8Fp4() ? MX_GROUP_SIZE : scaleGroupSizeB;
+    uint64_t baseScaleASize = GetSizeWithDataType(CeilDiv(basicTiling_.baseK, scaleGroupSizeA) * basicTiling_.baseM,
                                                   inputParams_.perTokenScaleDtype);
     uint64_t baseScaleBSize =
-        GetSizeWithDataType(CeilDiv(basicTiling_.baseK, scaleGroupSize) * basicTiling_.baseN, inputParams_.scaleDtype);
+        GetSizeWithDataType(CeilDiv(basicTiling_.baseK, scaleGroupSizeB) * basicTiling_.baseN, inputParams_.scaleDtype);
     uint64_t biasDtypeSize = ge::GetSizeByDataType(inputParams_.biasDtype);
     uint64_t baseBiasSize = inputParams_.hasBias ? basicTiling_.baseN * biasDtypeSize : 0;
     uint64_t leftL1Size =

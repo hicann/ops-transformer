@@ -56,11 +56,13 @@ bool AnalyzeDtypeForInplaceAdd(const gert::TilingContext* context, GQmmInputInfo
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams.opType, "x1", "nullptr", "xDesc cannot be nullptr"),
                 return false);
     inputParams.aDtype = xDesc->GetDataType();
+    inputParams.aFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(xDesc->GetStorageFormat()));
     auto wDesc = context->GetInputDesc(WEIGHT_INDEX);
     OP_CHECK_IF(wDesc == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams.opType, "x2", "nullptr", "wDesc cannot be nullptr"),
                 return false);
     inputParams.bDtype = wDesc->GetDataType();
+    inputParams.bFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(wDesc->GetStorageFormat()));
     auto scaleDesc = context->GetInputDesc(SCALE_INDEX);
     OP_CHECK_IF(
         scaleDesc == nullptr,
@@ -78,6 +80,66 @@ bool AnalyzeDtypeForInplaceAdd(const gert::TilingContext* context, GQmmInputInfo
     return true;
 }
 
+bool IsHif4WeightForInplaceAdd(const GQmmInputInfo& inputParams)
+{
+    return inputParams.bDtype == Ops::Transformer::DT_HIFLOAT4;
+}
+
+bool CheckFormatForInplaceAdd(const GQmmInputInfo& inputParams)
+{
+    OP_CHECK_IF(inputParams.aFormat != ge::FORMAT_ND,
+                OP_LOGE_FOR_INVALID_FORMAT(inputParams.opType, "x1",
+                                           ge::TypeUtils::FormatToSerialString(inputParams.aFormat), "FORMAT_ND"),
+                return false);
+    OP_CHECK_IF(inputParams.bFormat != ge::FORMAT_ND,
+                OP_LOGE_FOR_INVALID_FORMAT(inputParams.opType, "x2",
+                                           ge::TypeUtils::FormatToSerialString(inputParams.bFormat), "FORMAT_ND"),
+                return false);
+    return true;
+}
+
+bool CheckShapeNotNegative(const gert::Shape& xShape, const gert::Shape& wShape, const GQmmInputInfo& inputParams)
+{
+    for (size_t i = 0; i < xShape.GetDimNum(); ++i) {
+        OP_CHECK_IF(xShape.GetDim(i) < 0,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        inputParams.opType, "x1, x2", "x1=" + ShapeToString(xShape) + ", x2=" + ShapeToString(wShape),
+                        BuildErrorMsgStr("dim[", i, "] of x1 must be non-negative, but the actual value is ",
+                                         xShape.GetDim(i))),
+                    return false);
+    }
+    for (size_t i = 0; i < wShape.GetDimNum(); ++i) {
+        OP_CHECK_IF(wShape.GetDim(i) < 0,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        inputParams.opType, "x1, x2", "x1=" + ShapeToString(xShape) + ", x2=" + ShapeToString(wShape),
+                        BuildErrorMsgStr("dim[", i, "] of x2 must be non-negative, but the actual value is ",
+                                         wShape.GetDim(i))),
+                    return false);
+    }
+    return true;
+}
+
+bool CheckXAndWeightKDim(const gert::Shape& xShape, const gert::Shape& wShape, const GQmmInputInfo& inputParams)
+{
+    const size_t xDimNum = xShape.GetDimNum();
+    const size_t wDimNum = wShape.GetDimNum();
+    OP_CHECK_IF(xDimNum < DIM_NUM_2D || wDimNum < DIM_NUM_2D,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    inputParams.opType, "x1, x2", "x1=" + ShapeToString(xShape) + ", x2=" + ShapeToString(wShape),
+                    "x1 and x2 must be at least 2D so that the K axis can be located"),
+                return false);
+    const int64_t xK = inputParams.transA ? xShape.GetDim(xDimNum - LAST_SECOND_DIM_INDEX) :
+                                            xShape.GetDim(xDimNum - LAST_FIRST_DIM_INDEX);
+    const int64_t wK = inputParams.transB ? wShape.GetDim(wDimNum - LAST_FIRST_DIM_INDEX) :
+                                            wShape.GetDim(wDimNum - LAST_SECOND_DIM_INDEX);
+    OP_CHECK_IF(xK != wK,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    inputParams.opType, "x1, x2", "x1=" + ShapeToString(xShape) + ", x2=" + ShapeToString(wShape),
+                    BuildErrorMsgStr("axis K of x1[", xK, "] must equal axis K of x2[", wK, "]")),
+                return false);
+    return true;
+}
+
 bool CheckDtypeForInplaceAdd(const GQmmInputInfo& inputParams)
 {
     OP_CHECK_IF(inputParams.cDtype != ge::DT_FLOAT,
@@ -90,8 +152,26 @@ bool CheckDtypeForInplaceAdd(const GQmmInputInfo& inputParams)
                  (inputParams.bDtype == ge::DT_FLOAT8_E4M3FN || inputParams.bDtype == ge::DT_FLOAT8_E5M2);
     bool isHif4 =
         inputParams.aDtype == Ops::Transformer::DT_HIFLOAT4 && inputParams.bDtype == Ops::Transformer::DT_HIFLOAT4;
+    bool isMxFp8Fp4 = inputParams.aDtype == ge::DT_FLOAT8_E4M3FN &&
+                      (inputParams.bDtype == ge::DT_FLOAT4_E2M1 || inputParams.bDtype == Ops::Transformer::DT_HIFLOAT4);
 
-    // MXFP4: both data operands FLOAT4_E2M1 with dual FLOAT8_E8M0 block scales (same scale contract as MXFP8).
+    if (isMxFp8Fp4) {
+        OP_CHECK_IF(inputParams.perTokenScaleDtype != ge::DT_FLOAT8_E8M0,
+                    OP_LOGE_FOR_INVALID_DTYPE(inputParams.opType, "scale1",
+                                              ge::TypeUtils::DataTypeToSerialString(inputParams.perTokenScaleDtype),
+                                              "DT_FLOAT8_E8M0"),
+                    return false);
+        const bool isHif4Weight = IsHif4WeightForInplaceAdd(inputParams);
+        const ge::DataType expectedScaleDtype = isHif4Weight ? Ops::Transformer::DT_HIFLOAT4_SCALE : ge::DT_FLOAT8_E8M0;
+        OP_CHECK_IF(inputParams.scaleDtype != expectedScaleDtype,
+                    OP_LOGE_FOR_INVALID_DTYPE(inputParams.opType, "scale2",
+                                              ge::TypeUtils::DataTypeToSerialString(inputParams.scaleDtype),
+                                              ge::TypeUtils::DataTypeToSerialString(expectedScaleDtype)),
+                    return false);
+        return true;
+    }
+
+    // MXFP4：两路输入均为 FLOAT4_E2M1，块缩放均为 FLOAT8_E8M0，scale 约束与 MXFP8 一致。
     bool isMx4 = inputParams.aDtype == ge::DT_FLOAT4_E2M1 && inputParams.bDtype == ge::DT_FLOAT4_E2M1;
 
     if (isHif4) {
@@ -141,16 +221,16 @@ bool CheckDtypeForInplaceAdd(const GQmmInputInfo& inputParams)
         ListToString(ge::TypeUtils::DataTypeToSerialString(inputParams.aDtype),
                      ge::TypeUtils::DataTypeToSerialString(inputParams.bDtype)),
         "in quant case, the dtypes of x1 and x2 must be both DT_HIFLOAT4, both DT_HIFLOAT8, both "
-        "DT_FLOAT8_E4M3FN/DT_FLOAT8_E5M2 or both DT_FLOAT4_E2M1");
+        "DT_FLOAT8_E4M3FN/DT_FLOAT8_E5M2, both DT_FLOAT4_E2M1, or DT_FLOAT8_E4M3FN with DT_FLOAT4_E2M1/DT_HIFLOAT4");
     return false;
 }
 
 bool CheckMx4PackedShapeForInplaceAdd(const gert::Shape& xShape, const gert::Shape& wShape,
                                       const GQmmInputInfo& inputParams)
 {
-    // FP4 TN (left transposed / right non-transposed): the original tensors are x1 = [k, m] and x2 = [k, n].
-    // FLOAT4_E2M1 packs two elements per byte, so the packed axes m and n must both be even.
-    // mSize / nSize have already been extracted by SetMKN (m from x1, n from x2).
+    // FP4 TN（左转置、右不转置）：原始张量为 x1 = [k, m]、x2 = [k, n]。
+    // FLOAT4_E2M1 每字节打包两个元素，因此打包轴 m、n 必须为偶数。
+    // mSize、nSize 已由 SetMKN 分别从 x1、x2 中提取。
     OP_CHECK_IF(xShape.GetDimNum() < DIM_NUM_2D || wShape.GetDimNum() < DIM_NUM_2D,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(
                     inputParams.opType, "x1/x2",
@@ -159,7 +239,7 @@ bool CheckMx4PackedShapeForInplaceAdd(const gert::Shape& xShape, const gert::Sha
     auto mSize = inputParams.mSize;
     auto nSize = inputParams.nSize;
     auto kSize = inputParams.kSize;
-    // 2: FLOAT4_E2M1 packs two elements per byte along the inner (packed) axis.
+    // 2：FLOAT4_E2M1 沿内轴每字节打包两个元素。
     OP_CHECK_IF(
         mSize % 2 != 0 || nSize % 2 != 0,
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
@@ -303,6 +383,61 @@ bool CheckShapeForHif4Quant(const gert::Shape& x1ScaleShape, const gert::Shape& 
     OP_CHECK_IF(wScaleKDim != expectedKDim || wScaleNDim != inputParams.nSize || wScaleLastDim != HIF4_MULTI_BASE_SIZE,
                 OP_LOGE_FOR_INVALID_SHAPE(inputParams.opType, "scale2", ShapeToString(x2ScaleShape),
                                           ShapeDimsToString(expectedKDim, inputParams.nSize, HIF4_MULTI_BASE_SIZE)),
+                return false);
+    return true;
+}
+
+bool CheckShapeForMxFp8Fp4Quant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
+                                const GQmmInputInfo& inputParams)
+{
+    OP_CHECK_IF(inputParams.groupNum > GMM_MAX_GROUP_LIST_SIZE,
+                OP_LOGE_FOR_INVALID_VALUE(inputParams.opType, "groupNum", std::to_string(inputParams.groupNum),
+                                          "no greater than " + std::to_string(GMM_MAX_GROUP_LIST_SIZE)),
+                return false);
+    auto x1ScaleDimNum = x1ScaleShape.GetDimNum();
+    auto x2ScaleDimNum = x2ScaleShape.GetDimNum();
+    OP_CHECK_IF(x1ScaleDimNum != MXFP_PER_TOKEN_SCALE_DIM_NUM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams.opType, "scale1", std::to_string(x1ScaleDimNum), "3"),
+                return false);
+    OP_CHECK_IF(x2ScaleDimNum != MXFP_TYPE_K_SCALE_DIM_NUM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams.opType, "scale2", std::to_string(x2ScaleDimNum), "3"),
+                return false);
+    auto xScaleKDim = static_cast<uint64_t>(x1ScaleShape.GetDim(0));
+    auto xScaleMDim = static_cast<uint64_t>(x1ScaleShape.GetDim(1));
+    auto xScaleLastDim = static_cast<uint64_t>(x1ScaleShape.GetDim(2));
+    auto wScaleKDim = static_cast<uint64_t>(x2ScaleShape.GetDim(0));
+    auto wScaleNDim = static_cast<uint64_t>(x2ScaleShape.GetDim(1));
+    auto wScaleLastDim = static_cast<uint64_t>(x2ScaleShape.GetDim(2));
+    auto expectedKDim = inputParams.kSize / MXFP_BASEK_FACTOR + inputParams.groupNum;
+
+    uint64_t expectedWScaleLastDim =
+        IsHif4WeightForInplaceAdd(inputParams) ? HIF4_MULTI_BASE_SIZE : MXFP_MULTI_BASE_SIZE;
+    OP_CHECK_IF(xScaleKDim != expectedKDim || xScaleMDim != inputParams.mSize || xScaleLastDim != MXFP_MULTI_BASE_SIZE,
+                OP_LOGE_FOR_INVALID_SHAPE(inputParams.opType, "scale1", ShapeToString(x1ScaleShape),
+                                          ShapeDimsToString(expectedKDim, inputParams.mSize, MXFP_MULTI_BASE_SIZE)),
+                return false);
+    OP_CHECK_IF(wScaleKDim != expectedKDim || wScaleNDim != inputParams.nSize || wScaleLastDim != expectedWScaleLastDim,
+                OP_LOGE_FOR_INVALID_SHAPE(inputParams.opType, "scale2", ShapeToString(x2ScaleShape),
+                                          ShapeDimsToString(expectedKDim, inputParams.nSize, expectedWScaleLastDim)),
+                return false);
+    return true;
+}
+
+bool CheckMxFp8Fp4InputDim(const gert::Shape& xShape, const gert::Shape& wShape, const GQmmInputInfo& inputParams)
+{
+    OP_CHECK_IF(xShape.GetDimNum() != X_DIMS || wShape.GetDimNum() != X_DIMS,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    inputParams.opType, "x1, x2", "x1=" + ShapeToString(xShape) + ", x2=" + ShapeToString(wShape),
+                    "in mxfp8+fp4 quantization mode, x1 and x2 must both be 2D because the scale capacity is "
+                    "derived from the total K"),
+                return false);
+    const uint64_t nDim = static_cast<uint64_t>(wShape.GetDim(1));
+    // N 为 fp4 内轴，mx_mmad 要求 64 对齐。
+    OP_CHECK_IF(nDim % MXFP_BASEK_FACTOR != 0,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(inputParams.opType, "x1, x2",
+                                                       "x1=" + ShapeToString(xShape) + ", x2=" + ShapeToString(wShape),
+                                                       BuildErrorMsgStr("in mxfp8+fp4 quantization mode, N[", nDim,
+                                                                        "] must be a multiple of ", MXFP_BASEK_FACTOR)),
                 return false);
     return true;
 }

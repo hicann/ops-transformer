@@ -43,7 +43,8 @@ bool QuantGroupedInplaceAddTiling::AnalyzeAttrs()
 
 bool QuantGroupedInplaceAddTiling::AnalyzeDtype()
 {
-    return AnalyzeDtypeForInplaceAdd(context_, inputParams_) && CheckDtypeForInplaceAdd(inputParams_);
+    return AnalyzeDtypeForInplaceAdd(context_, inputParams_) && CheckDtypeForInplaceAdd(inputParams_) &&
+           CheckFormatForInplaceAdd(inputParams_);
 }
 
 bool QuantGroupedInplaceAddTiling::IsHif4Scale() const
@@ -53,6 +54,12 @@ bool QuantGroupedInplaceAddTiling::IsHif4Scale() const
 
 bool QuantGroupedInplaceAddTiling::SetQuantModeForQGmmInplaceAdd()
 {
+    if (IsMxFp8Fp4()) {
+        inputParams_.aQuantMode = optiling::QuantMode::MX_PERGROUP_MODE;
+        inputParams_.bQuantMode = IsHif4WeightForInplaceAdd(inputParams_) ? optiling::QuantMode::HIF4_PERGROUP_MODE :
+                                                                            optiling::QuantMode::MX_PERGROUP_MODE;
+        return true;
+    }
     if (IsMicroScaling()) {
         inputParams_.bQuantMode = optiling::QuantMode::MX_PERGROUP_MODE;
         inputParams_.aQuantMode = optiling::QuantMode::MX_PERGROUP_MODE;
@@ -102,6 +109,10 @@ bool QuantGroupedInplaceAddTiling::AnalyzeInputs()
                 return false);
     const gert::Shape& x1ScaleShape = x1ScaleStorageShape->GetOriginShape();
     OP_CHECK_IF(!SetGroupNum(GROUPLIST_INDEX), OP_LOGE(inputParams_.opName, "SetGroupNum failed."), return false);
+    OP_CHECK_IF(!CheckShapeNotNegative(xShape, wShape, inputParams_),
+                OP_LOGE_WITHOUT_REPORT(inputParams_.opName, "CheckShapeNotNegative returned false."), return false);
+    OP_CHECK_IF(!CheckXAndWeightKDim(xShape, wShape, inputParams_),
+                OP_LOGE_WITHOUT_REPORT(inputParams_.opName, "CheckXAndWeightKDim returned false."), return false);
     OP_CHECK_IF(!SetMKN(xShape, wShape), OP_LOGE(inputParams_.opName, "SetMKN failed."), return false);
     OP_CHECK_IF(!SetQuantModeForQGmmInplaceAdd(), OP_LOGE(inputParams_.opName, "SetQuantModeForQGmmInplaceAdd failed."),
                 return false);
@@ -110,7 +121,12 @@ bool QuantGroupedInplaceAddTiling::AnalyzeInputs()
         OP_CHECK_IF(!CheckMx4PackedShapeForInplaceAdd(xShape, wShape, inputParams_),
                     OP_LOGE(inputParams_.opName, "CheckMx4PackedShapeForInplaceAdd failed."), return false);
     }
-    if (inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE) {
+    if (IsMxFp8Fp4()) {
+        OP_CHECK_IF(!CheckMxFp8Fp4InputDim(xShape, wShape, inputParams_),
+                    OP_LOGE(inputParams_.opName, "CheckMxFp8Fp4InputDim failed."), return false);
+        OP_CHECK_IF(!CheckShapeForMxFp8Fp4Quant(x1ScaleShape, wScaleShape, inputParams_),
+                    OP_LOGE(inputParams_.opName, "CheckShapeForMxFp8Fp4Quant failed."), return false);
+    } else if (inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE) {
         OP_CHECK_IF(!CheckShapeForMxQuant(x1ScaleShape, wScaleShape, inputParams_),
                     OP_LOGE(inputParams_.opName, "CheckShapeForMxQuant failed."), return false);
     } else if (inputParams_.bQuantMode == optiling::QuantMode::HIF4_PERGROUP_MODE) {
@@ -160,6 +176,34 @@ ge::graphStatus QuantGroupedInplaceAddTiling::DoLibApiTiling()
     }
     OP_CHECK_IF(CalL1Tiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"),
                 return ge::GRAPH_FAILED);
+    // Select aligned shapes for the 256 x 256 UB accumulation path.
+    constexpr uint64_t minUbGroupK = 2048;
+    constexpr uint64_t maxUbGroupK = 16384;
+    constexpr uint64_t ubTileSize = 256;
+    // Heuristically selected candidate ranges for UB accumulation.
+    constexpr uint64_t ubSmallMLower = 1792;
+    constexpr uint64_t ubSmallMUpper = 2048;
+    constexpr uint64_t ubLargeDimLower = 4864;
+    constexpr uint64_t ubLargeDimUpper = 5120;
+    constexpr uint64_t ubMediumNLower = 3584;
+    constexpr uint64_t ubMediumNUpper = 3840;
+    constexpr uint64_t ubBufferCount = 4;   // Two result slots and two old-C chunks.
+    constexpr uint64_t ubRowAlignment = 64; // FP32 UB row pitch, in elements.
+    const bool inUbShapeRange = (inputParams_.mSize >= ubSmallMLower && inputParams_.mSize <= ubSmallMUpper &&
+                                 inputParams_.nSize >= ubLargeDimLower && inputParams_.nSize <= ubLargeDimUpper) ||
+                                (inputParams_.mSize >= ubLargeDimLower && inputParams_.mSize <= ubLargeDimUpper &&
+                                 inputParams_.nSize >= ubMediumNLower && inputParams_.nSize <= ubMediumNUpper);
+    // A6 uses two result slots and two old-C chunks. Automatic panel sizing needs at least four padded rows.
+    const uint64_t minUbBytes =
+        ubBufferCount * GroupedMatmul::CeilAlign(basicTiling_.baseN, ubRowAlignment) * sizeof(float);
+    if ((npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) && IsMxFp8Fp4() && inUbShapeRange &&
+        basicTiling_.baseM == ubTileSize && basicTiling_.baseN == ubTileSize && inputParams_.mSize % ubTileSize == 0 &&
+        inputParams_.nSize % ubTileSize == 0 && inputParams_.groupNum > 0 && aicoreParams_.aicNum > 0 &&
+        inputParams_.kSize >= minUbGroupK &&
+        GroupedMatmul::CeilDiv(inputParams_.kSize, maxUbGroupK) <= inputParams_.groupNum &&
+        minUbBytes <= aicoreParams_.ubSize) {
+        inputParams_.kernelType = QGMM_INPLACE_ADD_MX_UB_ADD;
+    }
     tilingData_.mmTilingData.M = inputParams_.mSize;
     tilingData_.mmTilingData.N = inputParams_.nSize;
     tilingData_.mmTilingData.Ka = inputParams_.kSize;

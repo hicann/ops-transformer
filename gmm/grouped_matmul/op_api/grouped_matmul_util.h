@@ -76,6 +76,10 @@ constexpr size_t MX_SPLIT_K_SINGLE_X_DIM = 2UL;
 constexpr size_t MX_SPLIT_K_SINGLE_WEIGHT_DIM = 2UL;
 constexpr size_t MX_SPLIT_K_SCALE_DIM = 3UL;
 constexpr size_t MX_SPLIT_K_PER_TOKEN_SCALE_DIM = 3UL;
+// per-token scale view [M, S, 2]
+constexpr size_t MX_PER_TOKEN_SCALE_M_AXIS = 0UL;
+constexpr size_t MX_PER_TOKEN_SCALE_S_AXIS = 1UL;
+constexpr size_t MX_PER_TOKEN_SCALE_LAST_AXIS = 2UL;
 constexpr size_t MX_MULTI_ANTIQUANT_SCALE_DIM = 3UL;
 constexpr size_t MX_SINGLE_ANTIQUANT_SCALE_DIM = 4UL;
 constexpr size_t MX_MULTI_BIAS_DIM = 1UL;
@@ -92,6 +96,7 @@ constexpr size_t MX_TUPLE_WEIGHT_DIM_INDEX = 1UL;
 constexpr size_t MX_TUPLE_SCALE_DIM_INDEX = 2UL;
 constexpr size_t MX_TUPLE_PERTOKENSCALE_DIM_INDEX = 3UL;
 constexpr size_t MX_TUPLE_GROUP_NUMBER_DIM_INDEX = 4UL;
+constexpr int64_t MAX_GROUP_LIST_SIZE_TENSOR = 1024L;
 
 constexpr int64_t CUBE_BLOCK_SIZE_16 = 16L;
 constexpr int64_t CUBE_BLOCK_SIZE_32 = 32L;
@@ -106,6 +111,7 @@ constexpr int64_t LAST_TWO_DIM_INDEX = 2L;
 constexpr size_t HIF4_SPLIT_M_SCALE_DIM = 3U;
 constexpr size_t HIF4_SPLIT_M_PER_TOKEN_SCALE_DIM = 2U;
 constexpr int64_t HIF4_DIVISOR_SIZE = 64L;
+constexpr int64_t HIF4_SCALE_LAST_DIM_SIZE = 1L;
 
 constexpr int64_t N_K_MAX_VALUE_WEIGHT_QUANT = 65535L;
 constexpr int64_t N_K_ALIGN_VALUE_WEIGHT_QUANT_4BIT = 64L;

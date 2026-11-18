@@ -33,13 +33,28 @@ bool AnalyzeAttrsForInplaceAdd(const gert::TilingContext* context, optiling::GQm
 // 只读取 GQmmInputInfo 的 dtype 字段，合法性校验由 CheckDtypeForInplaceAdd 负责
 bool AnalyzeDtypeForInplaceAdd(const gert::TilingContext* context, optiling::GQmmInputInfo& inputParams);
 
-// 校验 HIFLOAT8+HIFLOAT8 (T-T/T-C) 或 FP8_E4M3FN/E5M2+FP8_E4M3FN/E5M2 (MX) 或 FLOAT4_E2M1+FLOAT4_E2M1 (MXFP4) 组合
+// 校验 HIFLOAT8+HIFLOAT8 (T-T/T-C)、FP8_E4M3FN/E5M2+FP8_E4M3FN/E5M2 (MX)、FLOAT4_E2M1+FLOAT4_E2M1 (MXFP4)
+// 或 FP8_E4M3FN+FLOAT4_E2M1/HIFLOAT4 混合组合
 bool CheckDtypeForInplaceAdd(const optiling::GQmmInputInfo& inputParams);
 
 // MXFP4 (双 FLOAT4_E2M1 + 双 FLOAT8_E8M0) k 轴分组 TN：原始 x1=[k,m]、x2=[k,n] 的打包轴 m、n 需为偶数，且 k 为 1 时
 // m、n 不能为 2 （FLOAT4_E2M1 每字节打包 2 元素）。须在 SetMKN 之后调用（依赖 inputParams.mSize/nSize）。
 bool CheckMx4PackedShapeForInplaceAdd(const gert::Shape& xShape, const gert::Shape& wShape,
                                       const optiling::GQmmInputInfo& inputParams);
+
+// 混合组合中 x2 为 HIFLOAT4（末轴 1、scale2 为 HIFLOAT4_SCALE）而非 FLOAT4_E2M1（末轴 2、E8M0）。
+bool IsHif4WeightForInplaceAdd(const optiling::GQmmInputInfo& inputParams);
+
+// x1/x2 只支持 ND；读 desc 时填入 aFormat/bFormat，与此处校验分离，与 GMM 的入口拦截位置对应。
+bool CheckFormatForInplaceAdd(const optiling::GQmmInputInfo& inputParams);
+
+// 形状各轴不得为负：mSize/kSize/nSize 为 uint64_t，负值赋值会溢出，须在 SetMKN 之前拦截。
+bool CheckShapeNotNegative(const gert::Shape& xShape, const gert::Shape& wShape,
+                           const optiling::GQmmInputInfo& inputParams);
+
+// 两路 K 轴相等：SetMKN 只从 x 取 kSize，K 不等不会在其他校验中暴露。
+bool CheckXAndWeightKDim(const gert::Shape& xShape, const gert::Shape& wShape,
+                         const optiling::GQmmInputInfo& inputParams);
 
 bool CheckCoreNumForInplaceAdd(const gert::TilingContext* context, const optiling::GQmmInputInfo& inputParams);
 
@@ -55,6 +70,16 @@ bool CheckShapeForMxQuant(const gert::Shape& x1ScaleShape, const gert::Shape& x2
                           const optiling::GQmmInputInfo& inputParams);
 bool CheckShapeForHif4Quant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
                             const optiling::GQmmInputInfo& inputParams);
+
+// MX+FP4 混合量化：scale1 恒为 E8M0 的 3D [S, M, 2]
+// scale2 为 E8M0 的 [S, N, 2]（E2M1）或 HIFLOAT4_SCALE 的 [S, N, 1]（HIF4），S = K/64 + G。
+bool CheckShapeForMxFp8Fp4Quant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
+                                const optiling::GQmmInputInfo& inputParams);
+
+// 混合组合的输入维度约束：x1/x2 二维、两路总 K 相等、总 N 为 64 的倍数；总 K 不要求对齐。
+// N 的约束源自 ACLNN 入口，这里补齐是为了让独立进入 tiling 的调用也不能绕过。
+bool CheckMxFp8Fp4InputDim(const gert::Shape& xShape, const gert::Shape& wShape,
+                           const optiling::GQmmInputInfo& inputParams);
 
 // 由 (transB, transA, kernelType) 三元组生成 tiling key，BasicApi 与 普通路径共用
 uint64_t GetTilingKeyForInplaceAdd(const optiling::GQmmInputInfo& inputParams);

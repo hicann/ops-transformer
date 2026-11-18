@@ -18,6 +18,13 @@
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)) && defined(ORIG_DTYPE_X1) && \
+    defined(DT_FLOAT8_E4M3FN) && ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN && defined(ORIG_DTYPE_X2) && \
+    ((defined(DT_FLOAT4_E2M1) && ORIG_DTYPE_X2 == DT_FLOAT4_E2M1) || \
+     (defined(DT_HIFLOAT4) && ORIG_DTYPE_X2 == DT_HIFLOAT4))
+#define QGMM_INPLACE_ADD_USE_BLAZE_MX
+#endif
+
 #if defined(ORIG_DTYPE_SCALE2) && defined(DT_FLOAT8_E8M0) && ORIG_DTYPE_SCALE2 == DT_FLOAT8_E8M0
 #define V310_QGMM_QUANT_MX
 #elif defined(ORIG_DTYPE_SCALE2) && defined(DT_HIFLOAT4_SCALE) && ORIG_DTYPE_SCALE2 == DT_HIFLOAT4_SCALE
@@ -32,20 +39,32 @@
 #define QGMM_INPLACE_ADD_DEQUANT_FIXP 0
 #define QGMM_INPLACE_ADD_DEQUANT_VECTOR 1
 #define QGMM_INPLACE_ADD_PERGROUP_PERBLOCK 2
+#define QGMM_INPLACE_ADD_MX_UB_ADD 3
 
-// 模板参数
-ASCENDC_TPL_ARGS_DECL(QuantGroupedMatmulInplaceAdd, // 算子OpType
+// Template parameters
+ASCENDC_TPL_ARGS_DECL(QuantGroupedMatmulInplaceAdd, // Operator type
                       ASCENDC_TPL_UINT_DECL(QUANT_B_TRANS, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,
                                             QGMM_INPLACE_ADD_NO_TRANS, QGMM_INPLACE_ADD_TRANS),
                       ASCENDC_TPL_UINT_DECL(QUANT_A_TRANS, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,
                                             QGMM_INPLACE_ADD_NO_TRANS, QGMM_INPLACE_ADD_TRANS),
                       ASCENDC_TPL_UINT_DECL(KERNEL_TYPE, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST,
                                             QGMM_INPLACE_ADD_DEQUANT_FIXP, QGMM_INPLACE_ADD_DEQUANT_VECTOR,
-                                            QGMM_INPLACE_ADD_PERGROUP_PERBLOCK));
+                                            QGMM_INPLACE_ADD_PERGROUP_PERBLOCK, QGMM_INPLACE_ADD_MX_UB_ADD));
 
-// 模板参数组合
-// 用于调用GET_TPL_TILING_KEY获取TilingKey时，接口内部校验TilingKey是否合法
-#if defined(V310_QGMM_QUANT_MX) || defined(V310_QGMM_QUANT_MX_HIF4)
+// Template parameter combinations
+// Validate the tiling key inside GET_TPL_TILING_KEY.
+#if defined(QGMM_INPLACE_ADD_USE_BLAZE_MX)
+// Atomic output uses AIC only; UB accumulation uses the paired AIV.
+ASCENDC_TPL_SEL(
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_AIC_ONLY),
+                         ASCENDC_TPL_UINT_SEL(QUANT_B_TRANS, ASCENDC_TPL_UI_LIST, QGMM_INPLACE_ADD_NO_TRANS),
+                         ASCENDC_TPL_UINT_SEL(QUANT_A_TRANS, ASCENDC_TPL_UI_LIST, QGMM_INPLACE_ADD_TRANS),
+                         ASCENDC_TPL_UINT_SEL(KERNEL_TYPE, ASCENDC_TPL_UI_LIST, QGMM_INPLACE_ADD_DEQUANT_FIXP)),
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_1),
+                         ASCENDC_TPL_UINT_SEL(QUANT_B_TRANS, ASCENDC_TPL_UI_LIST, QGMM_INPLACE_ADD_NO_TRANS),
+                         ASCENDC_TPL_UINT_SEL(QUANT_A_TRANS, ASCENDC_TPL_UI_LIST, QGMM_INPLACE_ADD_TRANS),
+                         ASCENDC_TPL_UINT_SEL(KERNEL_TYPE, ASCENDC_TPL_UI_LIST, QGMM_INPLACE_ADD_MX_UB_ADD)));
+#elif defined(V310_QGMM_QUANT_MX) || defined(V310_QGMM_QUANT_MX_HIF4)
 ASCENDC_TPL_SEL(
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_AIC_ONLY),
                          ASCENDC_TPL_UINT_SEL(QUANT_B_TRANS, ASCENDC_TPL_UI_LIST, QGMM_INPLACE_ADD_NO_TRANS),
