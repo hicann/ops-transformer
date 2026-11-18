@@ -19,7 +19,6 @@ import torchair
 from cann_ops_transformer.ops import compressor, compressor_v2
 import numpy as np
 import torch.nn as nn
-from torch_npu.testing.testcase import TestCase, run_tests
 import logging
 import datetime
 import os
