@@ -25,7 +25,11 @@
 
 - **接口功能**：
 
-  基于一系列计算得到MHC架构中hidden层的$\mathbf{H}'_{\text{res}}$和$\mathbf{H}_{\text{post}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{h}_{\text{in}}$。对$\mathbf{H}'_{\text{res}}$矩阵执行Sinkhorn迭代归一化变换，最终得到双随机矩阵$\mathbf{H}_{\text{res}}$；支持输出中间计算结果，用于反向梯度计算。其中，该接口在Cube中使用的计算模式为HF32。
+  基于一系列计算得到MHC架构中hidden层的$\mathbf{{H}'_{\text{res}}}$和$\mathbf{{H}_{\text{post}}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{{h}_{\text{in}}}$。对$\mathbf{{H}'_{\text{res}}}$矩阵执行Sinkhorn迭代归一化变换，最终得到双随机矩阵$\mathbf{{H}_{\text{res}}}$；支持输出中间计算结果，用于反向梯度计算。其中，该接口在Cube中默认使用HF32计算模式（与premix能力合入前一致）。
+
+  <!-- npu="A3,910b" id13 -->
+  <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：HF32模式由全局开关`torch_npu.npu.aclnn.allow_hf32`控制（缺省true），python封装不单独暴露该参数，每次调用自动读取并随调用下发，传入false语义时切换为FP32计算模式。
+  <!-- end id13 -->
 
 - **计算公式**：
 
@@ -41,43 +45,43 @@
   \end{aligned}
   $$
 
-  将$\mathbf{H^{res}_l}$作为输入，Sinkhorn变换共执行$\mathbf{numIters}$次迭代，迭代过程中生成中间归一化结果$\mathbf{normOut}[k]$和求和结果$\mathbf{sumOut}[k]$，最终输出最后一次迭代的$\mathbf{normOut}$作为变换结果。
+  将$\mathbf{H^{res}_l}$作为输入，Sinkhorn变换共执行$numIters$次迭代，迭代过程中生成中间归一化结果${normOut}[k]$和求和结果${sumOut}[k]$，最终输出最后一次迭代的${normOut}$作为变换结果。
 
   第一次迭代（初始化）：
 
   $$
   \begin{aligned}
-      \mathbf{normOut}[0] &= \text{softmax}(\mathbf{H^{res}_l},  \dim=-1) + \epsilon_{hc}, \\
-      \mathbf{sumOut}[1] &= \sum_{\dim=-2,\text{keepdim}=\text{True}} \mathbf{normOut}[0] + \epsilon_{hc}, \\
-      \mathbf{normOut}[1] &= \frac{\mathbf{normOut}[0]}{\mathbf{sum\_out}[1]}, \\
+      {normOut}[0] &= \text{softmax}({H^{res}_l},  \dim=-1) + \epsilon_{hc}, \\
+      {sumOut}[1] &= \sum_{\dim=-2,\text{keepdim}=\text{True}} {normOut}[0] + \epsilon_{hc}, \\
+      {normOut}[1] &= \frac{{normOut}[0]}{{sum\_out}[1]}, \\
   \end{aligned}
   $$
 
-  第$i$次迭代（$i = 1, 2, \dots, \mathbf{num\_iters}-1$）：
+  第$i$次迭代（$i = 1, 2, \dots, {num\_iters}-1$）：
 
   $$
   \begin{aligned}
-      \mathbf{sumOut}[2i] &= \sum_{\dim=-1,\text{keepdim}=\text{True}} \mathbf{normOut}[2i-1] + \epsilon_{hc}, \\
-      \mathbf{normOut}[2i] &= \frac{\mathbf{normOut}[2i-1]}{\mathbf{sum\_out}[2i]}, \\
-      \mathbf{sumOut}[2i+1] &= \sum_{\dim=-2,\text{keepdim}=\text{True}} \mathbf{normOut}[2i] + \epsilon_{hc}, \\
-      \mathbf{normOut}[2i+1] &= \frac{\mathbf{normOut}[2i]}{\mathbf{sum\_out}[2i+1]}, \\
+      {sumOut}[2i] &= \sum_{\dim=-1,\text{keepdim}=\text{True}} {normOut}[2i-1] + \epsilon_{hc}, \\
+      {normOut}[2i] &= \frac{{normOut}[2i-1]}{{sum\_out}[2i]}, \\
+      {sumOut}[2i+1] &= \sum_{\dim=-2,\text{keepdim}=\text{True}} {normOut}[2i] + \epsilon_{hc}, \\
+      {normOut}[2i+1] &= \frac{{normOut}[2i]}{{sum\_out}[2i+1]}, \\
   \end{aligned}
   $$
 
   最终输出：
 
   $$
-  \mathbf{normOut}[2 \times \mathbf{num\_iters} - 1]
+  {normOut}[2 \times {num\_iters} - 1]
   $$
 
   $$
-  \mathbf{sumOut}[2 \times \mathbf{num\_iters} - 1]
+  {sumOut}[2 \times {num\_iters} - 1]
   $$
 
 ## 函数原型
 
 ```python
-cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, outFlag) -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)
+cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, outFlag, *, preMix?: Tensor) -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)
 ```
 
 ## 参数说明
@@ -105,38 +109,33 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>x</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>MHC层的输入数据。对应公式中x。</td>
+        <td><ul><li>MHC层的输入数据。对应公式中x。</li><li>shape支持(B, S, N, C)、(T, N, C)。</li></ul></td>
         <td>float16、bfloat16</td>
-        <td>
-            <ul>
-                <li>(B, S, N, C)</li>
-                <li>(T, N, C)</li>
-            </ul>
-        </td>
+        <td>3-4</td>
     </tr>
     <tr>
         <td>phi</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>MHC的参数矩阵。对应公式中<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>pre</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>post</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>res</sup>。使用时对N轴进行拆分，分别是(N, N*C)、(N, N*C)、(N*N, N*C)。</td>
+        <td><ul><li>MHC的参数矩阵。对应公式中<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>pre</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>post</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>res</sup>。使用时对N轴进行拆分，分别是(N, N*C), (N, N*C), (N*N, N*C)。</li><li>shape支持(N*N+2*N, N*C)。</li></ul></td>
         <td>float32</td>
-        <td>(N*N+2*N, N*C)</td>
+        <td>2</td>
     </tr>
     <tr>
         <td>alpha</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>MHC的缩放参数，包含3个元素，分别对应H<sup>pre</sup>、H<sup>post</sup>、H<sup>res</sup>的缩放系数。对应公式中α<sup>pre</sup>、α<sup>post</sup>、α<sup>res</sup>。</td>
+        <td><ul><li>MHC的缩放参数，包含3个元素分别对应H<sup>pre</sup>、H<sup>post</sup>、H<sup>res</sup>的缩放系数。对应公式中α<sup>pre</sup>、α<sup>post</sup>、α<sup>res</sup></li><li>shape支持(3)。</li></ul></td>
         <td>float32</td>
-        <td>(3)</td>
+        <td>1</td>
     </tr>
     <tr>
         <td>bias</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>MHC的bias参数，包含2N+N²个元素。对应公式中β<sup>pre</sup>、β<sup>post</sup>、β<sup>res</sup>，分别对应N、N、N*N。</td>
+        <td><ul><li>MHC的bias参数，包含2N+N²个元素。对应公式中β<sup>pre</sup>、β<sup>post</sup>、β<sup>res</sup>，分别对应N, N, N*N</li><li>shape支持(2N+N²)。</li></ul></td>
         <td>float32</td>
-        <td>(2N+N²)</td>
+        <td>1</td>
     </tr>
     <tr>
         <td>hcMult</td>
@@ -158,7 +157,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>hcEps</td>
         <td>float</td>
         <td>可选</td>
-        <td>H<sup>pre</sup>经sigmoid后的eps参数。对应公式中ε<sub>hc</sub>。默认值：1e-6。</td>
+        <td>H<sup>pre</sup>的sigmoid后的eps参数。对应公式中ε<sub>hc</sub>。默认值：1e-6。</td>
         <td>-</td>
         <td>-</td>
     </tr>
@@ -170,8 +169,26 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>-</td>
         <td>-</td>
     </tr>
-    </tbody>
-    </table>
+    <tr>
+        <td>preMix</td>
+        <td>Tensor</td>
+        <td>可选</td>
+        <td><ul><li>premix加权系数（通常填上一个折叠点输出的hPre）。传入时hin的y折叠加权使用preMix而非内部计算的hPre；不传时行为与原接口完全一致</li><li>shape与x的前置维度一致，即(T, N)或(B, S, N)。</li></ul></td>
+        <td>float32</td>
+        <td>2-3</td>
+    </tr>
+</tbody>
+</table>
+
+  <!-- npu="A3,910b" id11 -->
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+  - 可选输入preMix，传入时shape须为(T, N)或(B, S, N)（与x的前置维度一致），dtype为float32；不传时行为与原接口完全一致。
+  <!-- end id11 -->
+
+  <!-- npu="950" id12 -->
+- <term>Ascend 950PR&950DT系列产品</term>：
+  - 可选输入preMix在当前产品使用场景下不可用，传入即报错。
+  <!-- end id12 -->
 
 ## 输出说明
 
@@ -236,7 +253,9 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
 </tbody>
 </table>
 
-> 说明：4维输入为BSND格式，3维输入为TND格式。其中B表示Batch大小，S表示单Batch序列长度，T表示所有Batch序列长度的累加和，N表示残差流数量，C表示尾轴隐藏维度大小。
+> 说明：
+>
+> 4维输入为BSND格式，3维输入为TND格式。其中B表示Batch大小，S表示单Batch序列长度，T表示所有Batch序列长度的累加和，N表示残差流数量，C表示尾轴隐藏维度大小。
 
 ## 约束说明
 
@@ -248,11 +267,12 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
 - 规格约束：
   - numIters：表示迭代次数，目前仅支持20。
   - N：目前仅支持4。
+
   <!-- npu="A3,910b" id7 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-    - 输入x仅支持4维BSND格式，shape为(B, S, N, C)。
+    - 输入x仅支持4维BSND格式，shape为(B, S, N, C)；传入可选输入preMix时还支持3维TND格式，shape为(T, N, C)。
     - 尾轴C要求128对齐，取值范围为[1, 100000]。
-  <!-- end id7 -->
+   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
     - 输入x支持4维BSND格式和3维TND格式，shape分别为(B, S, N, C)和(T, N, C)。
@@ -267,14 +287,14 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
   - 默认支持确定性计算。
 
 - Batch一致性：
-    <!-- npu="A3,910b" id9 -->
+  <!-- npu="A3,910b" id9 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-        - 默认不支持Batch一致性。
-    <!-- end id9 -->
-    <!-- npu="950" id10 -->
+    - 默认不支持Batch一致性。
+  <!-- end id9 -->
+  <!-- npu="950" id10 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-        - 默认不支持Batch一致性，可通过PyTorch开关（[《TorchNPU自定义API》](https://www.hiascend.com/document/detail/zh/Pytorch/latest/apiref/customapi/docs/zh/custom_APIs/overview.md)中torch_npu.npu.set_deterministic_level）支持。开启Batch一致性后性能可能会有一定程度的劣化。
-    <!-- end id10 -->
+    - 默认不支持Batch一致性，可通过PyTorch开关（[《TorchNPU自定义API》](https://www.hiascend.com/document/detail/zh/Pytorch/latest/apiref/customapi/docs/zh/custom_APIs/overview.md)中torch_npu.npu.set_deterministic_level）支持。开启Batch一致性后性能可能会有一定程度的劣化。
+  <!-- end id10 -->
 
 ## 调用说明
 

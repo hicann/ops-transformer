@@ -217,5 +217,6 @@ English | [简体中文](./README.md)
 
 | Calling Method      | Calling Sample                 | Description                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
-| aclnn invocation | [test_aclnn_mhc_pre_sinkhorn](examples/test_aclnn_mhc_pre_sinkhorn.cpp) | Calls the MhcPreSinkhorn operator through the [aclnnMhcPreSinkhorn](docs/aclnnMhcPreSinkhorn_en.md) API. |
+| aclnn API | [test_aclnn_mhc_pre_sinkhorn](examples/test_aclnn_mhc_pre_sinkhorn.cpp) | Calls the MhcPreSinkhorn operator through the [aclnnMhcPreSinkhorn](docs/aclnnMhcPreSinkhorn_en.md) API. |
+| aclnn API | [test_aclnn_mhc_pre_sinkhorn_v2](examples/test_aclnn_mhc_pre_sinkhorn_v2.cpp) | Calls the MhcPreSinkhorn operator through the aclnnMhcPreSinkhornV2 API. |
 | PyTorch API | - | Calls the MhcPreSinkhorn operator through the [cann_ops_transformer.mhc_pre_sinkhorn](docs/torchapi_mhc_pre_sinkhorn_en.md) API. |

@@ -215,5 +215,6 @@
 
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
-| aclnn调用 | [test_aclnn_mhc_pre_sinkhorn](examples/test_aclnn_mhc_pre_sinkhorn.cpp) | 通过[aclnnMhcPreSinkhorn](docs/aclnnMhcPreSinkhorn.md)接口方式调用MhcPreSinkhorn算子。 |
+| aclnn API | [test_aclnn_mhc_pre_sinkhorn](examples/test_aclnn_mhc_pre_sinkhorn.cpp) | 通过[aclnnMhcPreSinkhorn](docs/aclnnMhcPreSinkhorn.md)接口方式调用MhcPreSinkhorn算子。 |
+| aclnn API | [test_aclnn_mhc_pre_sinkhorn_v2](examples/test_aclnn_mhc_pre_sinkhorn_v2.cpp)| 通过[aclnnMhcPreSinkhornV2](docs/aclnnMhcPreSinkhornV2.md)接口方式调用MhcPreSinkhorn算子。 |
 | PyTorch API | - | 通过[cann_ops_transformer.mhc_pre_sinkhorn](../../mhc/mhc_pre_sinkhorn/docs/torchapi_mhc_pre_sinkhorn.md)接口方式调用MhcPreSinkhorn算子。 |

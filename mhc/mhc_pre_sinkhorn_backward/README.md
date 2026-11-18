@@ -207,4 +207,5 @@
 
 | 调用方式 | 调用样例 | 说明 |
 | :--- | :--- | :--- |
-| aclnn调用 | [test_aclnn_mhc_pre.cpp](examples/test_aclnn_mhc_pre_sinkhorn_backward.cpp) | 通过[aclnnMhcPreSinkhornBackward](docs/aclnnMhcPreSinkhornBackward.md)接口方式调用MhcPreSinkhornBackward算子。 |
+| aclnn API | [test_aclnn_mhc_pre_sinkhorn_backward](examples/test_aclnn_mhc_pre_sinkhorn_backward.cpp) | 通过[aclnnMhcPreSinkhornBackward](docs/aclnnMhcPreSinkhornBackward.md)接口方式调用MhcPreSinkhornBackward算子。 |
+| aclnn API | [test_aclnn_mhc_pre_sinkhorn_backward_v2](examples/test_aclnn_mhc_pre_sinkhorn_backward_v2.cpp) | 通过[aclnnMhcPreSinkhornBackwardV2](docs/aclnnMhcPreSinkhornBackwardV2.md)接口方式调用MhcPreSinkhornBackward算子。 |

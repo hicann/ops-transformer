@@ -209,4 +209,5 @@ English | [简体中文](./README.md)
 
 | Calling Method | Calling Sample | Description |
 | :--- | :--- | :--- |
-| aclnn invocation | [test_aclnn_mhc_pre.cpp](examples/test_aclnn_mhc_pre_sinkhorn_backward.cpp) | Calls the MhcPreSinkhornBackward operator through the [aclnnMhcPreSinkhornBackward](docs/aclnnMhcPreSinkhornBackward_en.md) API. |
+| aclnn API | [test_aclnn_mhc_pre_sinkhorn_backward](examples/test_aclnn_mhc_pre_sinkhorn_backward.cpp) | Calls the MhcPreSinkhornBackward operator through the [aclnnMhcPreSinkhornBackward](docs/aclnnMhcPreSinkhornBackward_en.md) API. |
+| aclnn API | [test_aclnn_mhc_pre_sinkhorn_backward_v2](examples/test_aclnn_mhc_pre_sinkhorn_backward_v2.cpp) | Calls the MhcPreSinkhornBackward operator through the aclnnMhcPreSinkhornBackwardV2 API. |
