@@ -3,7 +3,7 @@
 ## Product Support
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT products</term>: Not supported
+- <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3 products</term>: Supported
@@ -37,7 +37,7 @@
   <thead>
     <tr>
       <th>Parameter</th>
-      <th>Input/Output/Attr</th>
+      <th>Input/Output/Attribute</th>
       <th>Description</th>
       <th>Data Type</th>
       <th>Format</th>
@@ -82,98 +82,98 @@
     <tr>
       <td>candidate_block_length</td>
       <td>Optional input</td>
-      <td>Reserved interface for the candidate block length; only an empty tensor is accepted.</td>
+      <td>Actual valid candidate count for each Query row, in [0,2048]. Passing requirements are described in Constraints.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>num_heads_q</td>
-      <td>Attr</td>
-      <td>Number of heads of q; currently supports [1, 64]; 64 or 32 when used as the preceding operator of the second-stage consumer.</td>
+      <td>Attribute</td>
+      <td>Number of Query heads; supports [1,32] and 64.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>num_heads_k</td>
-      <td>Attr</td>
+      <td>Attribute</td>
       <td>Number of heads of k; currently only 1 is supported.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>head_dim</td>
-      <td>Attr</td>
+      <td>Attribute</td>
       <td>Dimension of the attention head; currently only 128 is supported.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>topk</td>
-      <td>Attr</td>
+      <td>Attribute</td>
       <td>Number of key sparse tokens selected from q; currently supports [1, 8192].</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>quant_mode</td>
-      <td>Attr</td>
-      <td>Quantization mode; currently supports 1/2/3/4/5. 1 means qk: fp8(e4m3) per-token-head, scale: fp32; 2 means qk: int8 per-token-head, scale: fp16, w: fp16; 3 means qk: mxfp8(e4m3), scale: fp8(e8m0); 4 means qk: hif8 per-tensor, scale: fp32; 5 means qk: mxfp4(e2m1), scale: fp8(e8m0).</td>
+      <td>Attribute</td>
+      <td>Indicates the quantization mode of the input.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>batch_size</td>
-      <td>Optional attr</td>
+      <td>Optional attribute</td>
       <td>Batch size; default 0.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_q</td>
-      <td>Optional attr</td>
+      <td>Optional attribute</td>
       <td>Maximum sequence length of q; -1 means any possible length; default -1.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_k</td>
-      <td>Optional attr</td>
+      <td>Optional attribute</td>
       <td>Maximum sequence length of k; -1 means any possible length; default -1.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>layout_q</td>
-      <td>Optional attr</td>
+      <td>Optional attribute</td>
       <td>Layout of q; BSND and TND are supported; default BSND.</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
     <tr>
       <td>layout_k</td>
-      <td>Optional attr</td>
+      <td>Optional attribute</td>
       <td>Layout of k; BSND, TND and PA_BBND are supported; default BSND.</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
     <tr>
       <td>mask_mode</td>
-      <td>Optional attr</td>
+      <td>Optional attribute</td>
       <td>Sparse mode; 0 means No mask and 3 means rightDownCausal; default 0.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>cmp_ratio</td>
-      <td>Optional attr</td>
+      <td>Optional attribute</td>
       <td>Compression ratio of k, in the range [1, 128]; default 1, meaning no compression.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>candidate_block_size</td>
-      <td>Optional attr</td>
-      <td>Candidate block size (number of positions per block); consistent with candidate_block_size of QuantSparseLightningIndexer.</td>
+      <td>Optional attribute</td>
+      <td>Number of Key positions in each candidate block; default 8. Only 8 is supported and it must match QuantSparseLightningIndexer.</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
@@ -187,11 +187,6 @@
   </tbody>
   </table>
 
-  <ul>
-    <li><term>Atlas A3 products</term> : num_heads_q supports 64 or 32 (gSize of the second-stage consumer supports 64/32); quant_mode = 1/3/4/5 is not supported; topk supports only [1, 2048]; layout_k = BSND/TND is not supported; cmp_ratio does not accept arbitrary values in [1, 128], only cmp_ratio = 1/2/4/8/16/32/64/128.</li>
-    <li><term>Atlas A2 products</term> : num_heads_q supports 64 or 32 (gSize of the second-stage consumer supports 64/32); quant_mode = 1/3/4/5 is not supported; topk supports only [1, 2048]; layout_k = BSND/TND is not supported; cmp_ratio does not accept arbitrary values in [1, 128], only cmp_ratio = 1/2/4/8/16/32/64/128.</li>
-  </ul>
-
 ## Constraints
 
 - `QuantSparseLightningIndexerMetadata` must be used together with the `QuantSparseLightningIndexer` operator.
@@ -199,33 +194,43 @@
 - `cu_seqlens_q` and `cu_seqlens_k` must contain cumulative values of the valid token counts of the current batch and all preceding batches; the first element is fixed to 0 and each following element must be greater than or equal to the previous one.
 - `seqused_q` and `seqused_k` must represent the number of valid tokens in each batch.
 - `cmp_residual_k` must satisfy cmp_residual_k[i] < cmp_ratio.
-- `candidate_block_length` is a reserved interface and only accepts an empty tensor (shapeSize 0); a non-empty tensor is rejected.
-- `candidate_block_size` currently supports only 8, consistent with `candidate_block_size` of `QuantSparseLightningIndexer`.
 - For details about the mask modes represented by mask_mode, see [sparse_mode parameter description](../../docs/zh/context/sparse_mode_introduction.md).
-- In non-PA scenarios, layout_q and layout_k must be the same.
-- layout_q = BSND scenario
-  - max_seqlen_q must be set to the value of S1.
-- layout_k = BSND scenario
-  - max_seqlen_k must be set to the value of S2.
-- layout_q = TND scenario
-  - cu_seqlens_q must be passed.
-- layout_k = TND scenario
-  - cu_seqlens_k must be passed.
-- layout_k = PA_BBND scenario
-  - seqused_k must be passed.
-- Batch derivation rules
-  - When layout_q is BSND, batch is preferably derived from the shape of seqused_q; if seqused_q is not passed, batch is taken from batch_size.
-  - When layout_q is TND, batch is preferably derived from the shape of seqused_q; if seqused_q is not passed, batch is derived from the shape of cu_seqlens_q.
-- q seqlen derivation rules
-  - When layout_q is BSND, seqlen is preferably taken from the elements of seqused_q; if seqused_q is not passed, seqlen is taken from max_seqlen_q.
-  - When layout_q is TND, seqlen is preferably taken from the elements of seqused_q; if seqused_q is not passed, seqlen is taken from the elements of cu_seqlens_q.
-- k seqlen derivation rules
-  - When layout_k is BSND, seqlen is preferably taken from the elements of seqused_k; if seqused_k is not passed, seqlen is taken from max_seqlen_k.
-  - When layout_k is TND, seqlen is preferably taken from the elements of seqused_k; if seqused_k is not passed, seqlen is taken from the elements of cu_seqlens_k.
+
+<!-- npu="950" id7 -->
+- <term>Ascend 950PR&950DT products</term>:
+  - `quant_mode` supports only 5 (MXFP4).
+  - `num_heads_q` is in [1,32], `num_heads_k` must be 1, and `head_dim` must be 128.
+  - `topk` is in [1,8192]. `candidate_block_size` supports only 8.
+  - `candidate_block_length` is required and must have INT32 dtype. Each element is the actual valid candidate count for the corresponding query, in [0,2048].
+  - The output `metadata` is a contiguous INT32 tensor with shape `(1024,)`, on the same NPU device as the input.
+  - Sequence information, layouts, masking and compression parameters must match the computation. Regenerate metadata when these parameters or candidate counts change.
+  - The generated metadata is used only by QuantSparseLightningIndexer and must not be substituted with QuantLightningIndexerV2 metadata.
+  - layout_q supports BSND and TND; layout_k supports BSND, TND and PA_BBND. Non-paged layouts must match.
+  - TND Query or Key requires the corresponding cu_seqlens_q or cu_seqlens_k. BSND layouts do not accept prefix sums.
+  - For BSND Key, max_seqlen_k must equal the physical Key sequence length. For PA_BBND, at least one of seqused_k and max_seqlen_k is required; if seqused_k is omitted, max_seqlen_k must match the logical Key capacity used by the compute interface.
+<!-- end id7 -->
+
+<!-- npu="A3,910b" id8 -->
+- <term>Atlas A3 products</term>, <term>Atlas A2 products</term>:
+  - num_heads_q supports only 32 and 64; quant_mode supports only 2; topk supports only [1,2048]; layout_k supports only PA_BBND; cmp_ratio supports only 1, 2, 4, 8, 16, 32, 64 and 128.
+  - candidate_block_length is reserved; omit it or pass an empty tensor. A non-empty tensor is not supported.
+  - layout_q = BSND scenario
+    - max_seqlen_q must be set to the value of S1.
+  - layout_q = TND scenario
+    - cu_seqlens_q must be passed.
+  - layout_k = PA_BBND scenario
+    - seqused_k must be passed.
+  - Batch derivation rules
+    - When layout_q is BSND, batch is preferably derived from the shape of seqused_q; if seqused_q is not passed, batch is taken from batch_size.
+    - When layout_q is TND, batch is preferably derived from the shape of seqused_q; if seqused_q is not passed, batch is derived from the shape of cu_seqlens_q.
+  - q seqlen derivation rules
+    - When layout_q is BSND, seqlen is preferably taken from the elements of seqused_q; if seqused_q is not passed, seqlen is taken from max_seqlen_q.
+    - When layout_q is TND, seqlen is preferably taken from the elements of seqused_q; if seqused_q is not passed, seqlen is taken from the elements of cu_seqlens_q.
+<!-- end id8 -->
 
 ## Usage
 
 | Calling method | Sample code | Description |
 | -------------- | ----------- | ----------- |
 | aclnn API | [test_aclnn_quant_sparse_lightning_indexer_metadata](./examples/test_aclnn_quant_sparse_lightning_indexer_metadata.cpp) | Call the QuantSparseLightningIndexerMetadata operator through the [aclnnQuantSparseLightningIndexerMetadata](./docs/aclnnQuantSparseLightningIndexerMetadata.md) interface |
-| PyTorch API | [test_torch_quant_sparse_lightning_indexer_metadata](./examples/test_torch_quant_sparse_lightning_indexer_metadata.py) | Call the QuantSparseLightningIndexerMetadata operator through the [quant_sparse_lightning_indexer_metadata](../quant_sparse_lightning_indexer/torch_extension/quant_sparse_lightning_indexer.py) interface |
+| PyTorch API | [test_torch_quant_sparse_lightning_indexer_metadata](./examples/test_torch_quant_sparse_lightning_indexer_metadata.py) | Call the QuantSparseLightningIndexerMetadata operator through the [quant_sparse_lightning_indexer_metadata](docs/torchapi_quant_sparse_lightning_indexer_metadata.md) interface |

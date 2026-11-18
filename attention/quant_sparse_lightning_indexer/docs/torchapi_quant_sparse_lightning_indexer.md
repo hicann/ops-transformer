@@ -3,7 +3,7 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT系列产品</term>：不支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3系列产品</term>：支持
@@ -23,15 +23,9 @@
 
 ## 功能说明
 
-- **接口功能**：
-
-  `quant_sparse_lightning_indexer` 是两级 TopK（two-level TopK，先按块粗筛再在块内精筛）方案的
-  **第二级**（consumer，候选消费级）接口。它在 `quant_lightning_indexer`（第一级，source）
-  的量化加权 ReLU 打分框架上，消费第一级输出的块级候选索引 `candidate_block_indices`，
-  只在候选块覆盖的位置上做 token 级 TopK：非候选块位置的分数被置为负无穷（不参与选择），
-  有效位置不足 `topk` 时剩余槽位输出 `-1`。
-
-- **计算公式**（每 batch b、query 行 i）：
+- 接口功能：本接口用于两级TopK（先按块筛选，再在块内筛选）方案的第二级，在第一级给出的候选块内计算量化Query与Key的加权相关性，选出token级索引供稀疏attention使用。
+- 调用流程：取得候选块索引及其有效长度后，调用[quant_sparse_lightning_indexer_metadata](../../quant_sparse_lightning_indexer_metadata/docs/torchapi_quant_sparse_lightning_indexer_metadata.md)生成本级分核信息，再将候选输入和metadata传入本接口。
+- 计算公式（每 batch b、query 行 i）：
 
   $$
   \begin{aligned}
@@ -50,12 +44,9 @@
   \end{aligned}
   $$
 
-  其中 `candidateBlockSize` = 属性 `candidate_block_size`，`candSet` 为候选块号集合
-  （重复/越界/-1 按"非候选"处理）。
+  其中 `candidateBlockSize` = 属性 `candidate_block_size`，`candSet` 为候选块号集合。
 
-- **调用流程**：`quant_sparse_lightning_indexer_metadata`（本算子的前置接口，生成分核信息 `metadata`）→
-  `quant_lightning_indexer`（`candidate_topk_blocks=2048` 开启 source，输出块级候选索引）→
-  本接口（输入 `candidate_block_indices`）→ 稀疏 attention。
+  `DoReduce`表示沿Query的head维度求和，`topK`返回Key位置索引；不满足有效序列长度和掩码约束的位置不参与选择。候选输入规则及输出顺序见[约束说明](#约束说明)。
 
 ## 函数原型
 
@@ -69,7 +60,7 @@ cann_ops_transformer.quant_sparse_lightning_indexer(
     topk,
     quant_mode,
     *,
-    candidate_block_indices,
+    candidate_block_indices=None,
     candidate_block_length=None,
     cu_seqlens_q=None,
     cu_seqlens_k=None,
@@ -84,74 +75,88 @@ cann_ops_transformer.quant_sparse_lightning_indexer(
     layout_k="BSND",
     mask_mode=0,
     cmp_ratio=1,
-    candidate_block_size=8
-) -> (Tensor, Tensor)
+    candidate_block_size=8,
+    return_value=0
+) -> Tuple[Tensor, Tensor]
 ```
-
-返回 `(sparse_indices, sparse_values)`：
-
-- `sparse_indices`：INT32，BSND `[B,S1,N2,topk]` / TND `[T,N2,topk]`（候选内 TopK 索引，无效槽一律 -1）；
-- `sparse_values`：arch22（Atlas A2/A3）上 `return_value` 固定为 0，恒为空 tensor `(0,)`，BFLOAT16。
 
 ## 参数说明
 
->**说明：**<br>
->
->- query、key、weights、query_dequant_scale、key_dequant_scale 的参数维度含义与 `quant_lightning_indexer` 一致：
->  b（batch size）、q_s/q_t（q 的序列长度/累加和）、k_s/k_t（k 的序列长度/累加和）、q_n/k_n（q/k 的多头数）、
->  d（head dim，当前仅支持 128）。
->- PageAttention 场景下 key 的 shape 为 (block_num, block_size, k_n, d)，block_num 为 block 总数，
->  block_size 为一个 block 的 token 数（为 16 的整数倍）。
+b表示batch数量，q_s、k_s分别表示Query和Key的序列长度，q_t、k_t表示TND布局下的token总数，q_n、k_n表示head数。d表示注意力头的逻辑维度，当前仅支持128；d_q、d_k表示存储后的物理末维大小，block_num表示物理页总数，block_size表示每页的token数。
 
-|  参数名   | 参数类型|  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
-|---------|------------|----------|---------------|---------------|------------|
-|  query  |  Tensor |  必选  |  公式中的 $Q_{index}^{Quant}$，不支持非连续。layout_q 为 BSND 时 shape 为 (b,q_s,q_n,d)；layout_q 为 TND 时 shape 为 (q_t,q_n,d)。  |  int8   |  3-4  |
-|  key  |  Tensor |  必选  |  公式中的 $K_{index}^{Quant}$，`key`/`key_dequant_scale` 支持 0 轴 padding 型非连续（仅 PA_BBND 布局，其余轴必须连续）。layout_k 为 PA_BBND 时 shape 为 (block_num,block_size,k_n,d)。  |  int8   |  3-4  |
-|  weights  |  Tensor |  必选  |  公式中的 $W$，不支持非连续。layout_q 为 BSND 时 shape 为 (b,q_s,q_n)；layout_q 为 TND 时 shape 为 (q_t,q_n)。  |  float16   |  2-3  |
-|  query_dequant_scale  |  Tensor |  必选  |  公式中的 $Scale_Q$，不支持非连续，shape 与 `weights` 一致。  |  float16   |  2-3  |
-|  key_dequant_scale  |  Tensor |  必选  |  公式中的 $Scale_K$，支持 0 轴非连续，shape 为移除 `key` 的 D 轴。  |  float16   |  2-3  |
-|  topk  |  int  |  必选  |  Top-k 的 k 值，取值 [1, 2048]。  |  int64   |  -  |
-|  quant_mode  |  int  |  必选  |  量化模式，本接口**仅支持 2**（INT8 量化），其它取值被 host 侧校验拒绝。  |  int64   |  -  |
-|  candidate_block_indices  |  Tensor  |  必选  |  第一级算子 `quant_lightning_indexer` 开启 source（`candidate_topk_blocks=2048`）时输出的块级候选索引。**末维即候选块个数（当前仅支持 2048）**；元素个数必须等于 BSND：B\*S1\*N2\*末维，TND：T\*N2\*末维。值域 [0,numBlocks) 或 -1（无效槽）。  |  int32   |  3-4  |
-|  candidate_block_length  |  Tensor  |  可选  |  预留接口（本期不消费）。约束见下文“约束说明”。  |  int32   |  -  |
-|  cu_seqlens_q  |  Tensor  |  可选  |  q 有效长度前缀和，第一个元素固定为 0。layout_q 为 TND 时必传；BSND 时不能传入。shape 为 (b+1,)。  |  int32   |  1  |
-|  cu_seqlens_k  |  Tensor  |  可选  |  k 有效长度前缀和。layout_k 为 PA_BBND 时不能传入。  |  int32   |  1  |
-|  seqused_q  |  Tensor  |  可选  |  q 每 batch 的有效 token 数，layout_q 为 BSND 时可选传入。shape 为 (b,)。  |  int32   |  1  |
-|  seqused_k  |  Tensor  |  可选  |  k 每 batch 的有效长度；layout_k 为 PA_BBND 时**必传**。shape 为 (b,)。  |  int32   |  1  |
-|  cmp_residual_k  |  Tensor  |  可选  |  压缩场景下 key 的残余长度，需满足 0 <= cmp_residual_k[i] < cmp_ratio。shape 为 (b,)。  |  int32   |  1  |
-|  block_table  |  Tensor  |  可选  |  PageAttention 中 KV 存储使用的 block 映射表；layout_k 为 PA_BBND 时**必传**。shape 为 (b, max_block_num_per_seq)。  |  int32   |  2  |
-|  output_idx_offset  |  Tensor  |  可选  |  输出索引的偏移量，仅加到 `sparse_indices` 的有效槽上（-1 填充槽保持 -1）；维数比 `sparse_indices` 少 1：BSND 为 (b,q_s,k_n)，TND 为 (q_t,k_n)。  |  int32   |  2-3  |
-|  metadata  |  Tensor  |  必选  |  `quant_sparse_lightning_indexer_metadata` 生成的分核信息，**不能为空**。shape 固定为 (1024,)。  |  int32   |  1  |
-|  max_seqlen_q  |  int  |  可选  |  query 的最大序列长度，默认 -1 表示任意可能长度。  |  int64   |  -  |
-|  layout_q  |  str  |  可选  |  query 的数据排布格式，支持 "BSND"、"TND"，默认 "BSND"。  |  string   |  -  |
-|  layout_k  |  str  |  可选  |  key 的数据排布格式，默认 "BSND"；arch22 上**仅支持 "PA_BBND"**（按 block_table 分页寻址）。  |  string   |  -  |
-|  mask_mode  |  int  |  可选  |  mask 模式，0 表示无 mask，3 表示 rightDownCausal（因果）mask，默认 0。  |  int64   |  -  |
-|  cmp_ratio  |  int  |  可选  |  key 的压缩倍数，取值 (0, 128] 且必须为 2 的幂，默认 1。  |  int64   |  -  |
-|  candidate_block_size  |  int  |  可选  |  候选块粒度（每个块包含的位置数），须 > 0，当前仅支持 8（BlockReduceMax 以 32B 块即 8 个 float32 为归约粒度）。与第一级算子必须一致。  |  int64   |  -  |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+|--------|----------|-----------|------|----------|-------------|
+| query | Tensor | 必选 | 公式中的量化输入$Q_{index}^{Quant}$。不支持空tensor。数据格式为ND。 | int8、float4_e2m1 | layout_q为BSND时shape为(b,q_s,q_n,d_q)；layout_q为TND时shape为(q_t,q_n,d_q) |
+| key | Tensor | 必选 | 公式中的量化输入$K_{index}^{Quant}$。不支持空tensor。数据格式为ND，非连续及分页存储规格见约束说明。 | int8、float4_e2m1 | layout_k为BSND时shape为(b,k_s,k_n,d_k)；layout_k为TND时shape为(k_t,k_n,d_k)；PA_BBND布局的存储shape见约束说明 |
+| weights | Tensor | 必选 | 公式中的权重系数$W$。不支持空tensor。数据格式为ND。 | float16、float32 | layout_q为BSND时shape为(b,q_s,q_n)；layout_q为TND时shape为(q_t,q_n) |
+| query_dequant_scale | Tensor | 必选 | 公式中的$Scale_Q$，表示Index query的反量化系数。不支持空tensor。数据格式为ND。 | float16、float8_e8m0 | quant_mode为5时，layout_q为BSND时shape为(b,q_s,q_n,d/64,2)，layout_q为TND时shape为(q_t,q_n,d/64,2)；quant_mode为2时shape与weights保持一致 |
+| key_dequant_scale | Tensor | 必选 | 公式中的$Scale_K$，表示Index key的反量化系数。quant_mode为5且layout_k为PA_BBND时传入空Tensor，其他场景不支持空tensor。数据格式为ND，非连续规格见约束说明。 | float16、float8_e8m0 | quant_mode为5时，layout_k为BSND时shape为(b,k_s,k_n,d/64,2)，layout_k为TND时shape为(k_t,k_n,d/64,2)，layout_k为PA_BBND时为(0,)；quant_mode为2时shape为(block_num,block_size,k_n) |
+| topk | int | 必选 | 表示topK阶段需要保留的key token索引数量，当前支持[1, 8192]。 | int64 | - |
+| quant_mode | int | 必选 | 表示量化模式，当前支持2/5。2表示qk: int8 per-token-head, scale: fp16, weights: fp16；5表示qk: mxfp4(e2m1), scale: fp8(e8m0)。 | int64 | - |
+| candidate_block_indices | Tensor | 可选 | 第一级算子输出的候选逻辑块索引。默认值为None，实际调用时必须传入，须与candidate_block_size对应。数据格式为ND，有效性要求见约束说明。 | int32 | BSND为(b,q_s,k_n,2048)，TND为(q_t,k_n,2048) |
+| candidate_block_length | Tensor | 可选 | 每行实际有效候选块数，取值范围为[0,2048]。默认值为None。数据格式为ND，传入规则见约束说明。 | int32 | BSND为(b,q_s,k_n)，TND为(q_t,k_n)，或空Tensor |
+| cu_seqlens_q | Tensor | 可选 | 当前batch及前序batch中query的有效token数的累加和，后一个元素的值必须大于等于前一个元素的值。仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND。layout_q为BSND时不传入。 | int32 | (b+1,) |
+| cu_seqlens_k | Tensor | 可选 | 当前batch及前序batch中key的有效token数的累加和，后一个元素的值必须大于等于前一个元素的值。仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND。其余布局不传入。 | int32 | (b+1,) |
+| seqused_q | Tensor | 可选 | 不同batch中query的真实使用长度，每个batch的有效token数不超过query中的维度S大小且不小于0。数据格式为ND。 | int32 | (b,) |
+| seqused_k | Tensor | 可选 | 不同batch中key的真实使用长度，每个batch的有效token数不超过key中的维度S大小且不小于0。数据格式为ND，layout_k为PA_BBND时的传入规则见约束说明。 | int32 | (b,) |
+| cmp_residual_k | Tensor | 可选 | 表示key压缩前token数量除以cmp_ratio的余数，需满足0 \<= cmp_residual_k\[i\] \< cmp_ratio。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。 | int32 | (b,) |
+| block_table | Tensor | 可选 | 表示PageAttention中KV存储使用的block映射表。默认值为None。数据格式为ND，传入规则见约束说明。 | int32 | (b,max_block_num_per_seq) |
+| output_idx_offset | Tensor | 可选 | 表示topK结果输出索引所需要加上的偏移，仅叠加到有效索引，无效索引保持-1。默认值为None，表示不叠加偏移。数据格式为ND。 | int32 | BSND为(b,q_s,k_n)，TND为(q_t,k_n) |
+| metadata | Tensor | 可选 | 配套quant_sparse_lightning_indexer_metadata生成的分核信息，包含使用核数、分块大小以及每个核的任务起止位置。不支持空tensor。数据格式为ND。 | int32 | (1024,) |
+| max_seqlen_q | int | 可选 | query的最大序列长度。-1表示任意可能长度，默认值为-1。 | int64 | - |
+| layout_q | str | 可选 | 用于标识输入query的数据排布格式，支持BSND、TND，默认值为BSND。 | string | - |
+| layout_k | str | 可选 | 用于标识输入key的数据排布格式，支持BSND、TND、PA_BBND，默认值为BSND。非分页场景须与layout_q相同。 | string | - |
+| mask_mode | int | 可选 | 表示mask的模式，0代表defaultMask模式，3代表rightDownCausal模式，默认值为0。 | int64 | - |
+| cmp_ratio | int | 可选 | 用于稀疏计算，表示key的压缩倍数。默认值为1，表示无压缩。取值范围为[1, 128]。 | int64 | - |
+| candidate_block_size | int | 可选 | 每个候选块包含的逻辑Key位置数，必须与第一级算子使用相同配置。默认值为8，当前仅支持8。 | int64 | - |
+| return_value | int | 可选 | 代表是否需要返回sparse_indices对应的sparse_values值。0代表不返回，1代表返回值，默认值为0。 | int64 | - |
 
 ## 返回值说明
 
-|  参数名   | 参数类型|  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
-|---------|------------|----------|---------------|---------------|------------|
-|  sparse_indices  |  Tensor  |  必选  |  候选块内的 Token 级 TopK 索引。有效槽为候选内可达位置按分数降序排列，不足 topk 的槽位与无效位置一律填 -1。layout_q 为 BSND 时 shape 为 (b,q_s,k_n,topk)；layout_q 为 TND 时 shape 为 (q_t,k_n,topk)。  |  int32   |  3-4  |
-|  sparse_values  |  Tensor  |  必选  |  arch22 上 `return_value` 固定为 0，恒为空 tensor (0,)。  |  bfloat16   |  1  |
+返回(sparse_indices, sparse_values)。
+
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+|--------|----------|-----------|------|----------|-------------|
+| sparse_indices | Tensor | 必选 | 候选范围内的token索引输出，无效部分填-1。数据格式为ND。 | int32 | layout_q为BSND时为(b,q_s,k_n,topk)；layout_q为TND时为(q_t,k_n,topk) |
+| sparse_values | Tensor | 可选 | sparse_indices对应的分数。return_value为1时输出对应分数，无效部分填-inf；为0时返回空Tensor。数据格式为ND。 | bfloat16 | return_value为1时与sparse_indices相同；为0时为(0,) |
 
 ## 约束说明
 
-- 该接口支持推理场景下使用。
-- 该接口支持单算子模式调用，图模式暂不支持。
-- `quant_mode` 仅支持 2；`query`、`key` 支持 INT8，不支持 FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1。
-- `query_dequant_scale`、`key_dequant_scale` 支持 FLOAT16；`weights` 支持 FLOAT16。
-- `topk` 支持 [1, 2048]；不支持 `return_value=1`（`sparse_values` 恒为 shape (0,)）。
-- `key` 的 N 仅支持 1；`query` 的 N 与 `key` 的 N 之比仅支持 64 或 32。
-- `layout_k` 仅支持 `PA_BBND`，因此 `block_table` 与 `seqused_k` 必传、`cu_seqlens_k` 不能传入；
-  `layout_q` 支持 `BSND`/`TND`，为 `TND` 时必须传入 `cu_seqlens_q` 且 `layout_k` 必须为 `PA_BBND`。
-- `candidate_block_indices` 必传且 INT32；末维（候选块个数）当前仅支持 2048；元素个数必须等于
-  BSND：`B*S1*N2*末维`，TND：`T*N2*末维`，否则 tiling 报错。
-- `candidate_block_size` 当前仅支持 8；`candidate_block_length` 为预留接口（本期不消费），仅接受空 tensor，传入非空 tensor 会在 tiling 报错。
-- `metadata` 必传且不能为空；`output_idx_offset` 的维数必须比 `sparse_indices` 少 1。
-- 其余约束（head_dim=128、block_size 为 16 的整数倍等）同第一级算子，详见
-  aclnn 文档 [aclnnQuantSparseLightningIndexer.md](aclnnQuantSparseLightningIndexer.md)。
+- 该接口支持推理场景下的单算子模式调用。
+- 所有输入Tensor必须位于同一NPU设备。
+- `query`、`weights`、`query_dequant_scale`和`candidate_block_indices`必须连续。
+- `candidate_block_indices`必须传入，`metadata`必须由[quant_sparse_lightning_indexer_metadata](../../quant_sparse_lightning_indexer_metadata/docs/torchapi_quant_sparse_lightning_indexer_metadata.md)生成，不能与第一级算子的metadata混用。
+- `key`的head数为1，Query和Key的逻辑head维度均为128。
+- `mask_mode`为3且`cmp_ratio`不为1时，必须传入`cmp_residual_k`。
+
+<!-- npu="950" id7 -->
+- <term>Ascend 950PR&950DT系列产品</term>：
+  - `quant_mode`仅支持5；`query`和非分页`key`支持float4_e2m1，物理末维大小为64。
+  - `weights`仅支持float32；`query_dequant_scale`和非分页`key_dequant_scale`支持float8_e8m0。
+  - Query的head数仅支持[1,32]。
+  - `layout_k`为PA_BBND时，`key`使用uint8存储，shape为(block_num,block_size/8,544)。`block_size`为[16,1024]内16的倍数；每8个token的512字节Key数据和32字节反量化系数合并存储，`key_dequant_scale`必须传入空uint8 Tensor。
+  - `layout_k`为PA_BBND且batch数大于1时，必须传入`block_table`；batch数为1时可不传入，按物理页顺序寻址。未传入`seqused_k`时，生成metadata所用的`max_seqlen_k`必须与计算接口的逻辑Key容量一致。
+  - 非分页布局不支持传入`block_table`。
+  - TND布局的`key`、`key_dequant_scale`及PA_BBND布局的`key`支持第0轴非连续，其余轴必须连续，第0轴stride不得小于单行或单页容量；BSND布局的`key`和`key_dequant_scale`必须连续。
+  - `candidate_block_length`必须传入且连续，每个元素表示对应行的实际有效候选数。对应行前`candidate_block_length`个候选块索引必须合法且互不重复，不能以候选容量代替实际有效候选数。
+  - `return_value`支持0、1；输出索引不保证按分数排序，返回分数与索引逐项对应。
+  - 仅在`mask_mode`为3且`cmp_ratio`不为1时传入`cmp_residual_k`，其余情况不传入。
+  - 取得第一级的候选索引和实际有效候选数后，需生成本级metadata，再调用计算接口。候选有效长度或序列信息变化后，必须重新生成metadata。
+  - 支持aclgraph图模式调用。
+<!-- end id7 -->
+
+<!-- npu="A3,910b" id8 -->
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+  - `quant_mode`仅支持2；`query`、`key`仅支持int8，物理末维大小为128；`weights`、`query_dequant_scale`和`key_dequant_scale`仅支持float16。
+  - Query的head数仅支持32、64；`topk`仅支持[1,2048]。
+  - `layout_k`仅支持PA_BBND，`key`的shape为(block_num,block_size,1,128)，`block_size`为16的整数倍。`block_table`和`seqused_k`必须传入。
+  - `key`和`key_dequant_scale`支持第0轴带padding的非连续Tensor，其余轴必须连续。
+  - `candidate_block_length`为预留参数，应保持默认值None或传入空Tensor，不支持非空Tensor。
+  - `cmp_ratio`仅支持1、2、4、8、16、32、64、128。
+  - 候选块索引使用-1标识无效项，无效或越界候选不参与计算。
+  - `return_value`仅支持0；输出的有效索引按对应分数降序排列。
+  - 图模式暂不支持。
+<!-- end id8 -->
 
 ## 确定性计算
 
@@ -159,45 +164,42 @@ cann_ops_transformer.quant_sparse_lightning_indexer(
 
 ## 调用示例
 
-- 单算子模式调用（第一级 source + 第二级 consumer 配对，仅 Atlas A2/A3 系列产品支持开启候选）：
-
   ```python
   import torch
   import torch_npu
   import cann_ops_transformer
 
   b, s1, n1, d = 2, 8, 64, 128
-  block_num, block_size, n2 = 4, 64, 1
-  cand_blocks = 2048
+  pages_per_batch, block_size, n2 = 4, 64, 1
+  block_num = b * pages_per_batch
+  key_length = pages_per_batch * block_size
+  topk = 2048
 
   q = torch.randint(-128, 127, (b, s1, n1, d), dtype=torch.int8).npu()
   k = torch.randint(-128, 127, (block_num, block_size, n2, d), dtype=torch.int8).npu()
   w = torch.rand(b, s1, n1, dtype=torch.float16).npu()
   q_scale = torch.rand(b, s1, n1, dtype=torch.float16).npu()
   k_scale = torch.rand(block_num, block_size, n2, dtype=torch.float16).npu()
-  seqused_k = torch.full((b,), block_num * block_size, dtype=torch.int32).npu()
-  block_table = torch.arange(b * block_num, dtype=torch.int32).npu().reshape(b, block_num)
+  seqused_k = torch.full((b,), key_length, dtype=torch.int32).npu()
+  block_table = torch.arange(block_num, dtype=torch.int32).npu().reshape(b, pages_per_batch)
 
-  # 第一级：source（候选块索引），其分核信息由第一级 metadata 接口生成
-  meta_v2 = torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata(
-      q, k, seqused_k, block_table, 2048, 2)
-  _, _, cand = torch.ops.cann_ops_transformer.quant_lightning_indexer(
-      q, k, w, q_scale, k_scale, 2048, 2,
-      seqused_k=seqused_k, block_table=block_table, metadata=meta_v2,
-      layout_q="BSND", layout_k="PA_BBND", candidate_topk_blocks=2048,
-      candidate_block_size=8)
+  # 构造覆盖全部有效Key位置的候选块；实际业务中使用第一级的候选输出。
+  candidate_count = key_length // 8
+  cand = torch.full((b, s1, n2, 2048), -1, dtype=torch.int32).npu()
+  cand[..., :candidate_count] = torch.arange(candidate_count, dtype=torch.int32).npu()
 
-  # 第二级：分核信息由本算子的前置接口生成（输出固定 1024），再消费候选做 token 级 TopK
-  metadata = torch.ops.cann_ops_transformer.quant_sparse_lightning_indexer_metadata(
-      num_heads_q=n1, num_heads_k=1, head_dim=d, topk=2048, quant_mode=2,
+  # 先生成第二级分核信息，再在候选范围内执行TopK计算。
+  metadata = cann_ops_transformer.quant_sparse_lightning_indexer_metadata(
+      num_heads_q=n1, num_heads_k=n2, head_dim=d, topk=topk, quant_mode=2,
       seqused_k=seqused_k, batch_size=b, max_seqlen_q=s1,
-      max_seqlen_k=block_num * block_size,
-      layout_q="BSND", layout_k="PA_BBND", mask_mode=0, cmp_ratio=1)
+      max_seqlen_k=key_length, layout_q="BSND", layout_k="PA_BBND",
+      mask_mode=0, cmp_ratio=1, candidate_block_size=8)
   out_idx, out_val = cann_ops_transformer.quant_sparse_lightning_indexer(
-      q, k, w, q_scale, k_scale, 2048, 2,
+      q, k, w, q_scale, k_scale, topk, 2,
       candidate_block_indices=cand,
       seqused_k=seqused_k, block_table=block_table, metadata=metadata,
       layout_q="BSND", layout_k="PA_BBND", candidate_block_size=8)
-
-  # out_idx: [b, s1, n2, topk]，无效槽为 -1；out_val: 空 tensor (0,)
+  torch.npu.synchronize()
+  print(out_idx.shape)  # torch.Size([2, 8, 1, 2048])
+  print(out_val.shape)  # torch.Size([0])
   ```
