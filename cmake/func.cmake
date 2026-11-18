@@ -986,6 +986,8 @@ function(enable_cannbotdsl_kernel op_name source_dir)
         set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_KERNEL_TARGETS ${op_name}_cannbotdsl)
         set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_KERNEL_STAMPS "${_stamp}")
         set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_KERNEL_PACKAGES "${_root}/device")
+        set_property(GLOBAL APPEND PROPERTY "CANNBOTDSL_KERNEL_PACKAGES_${CANNBOTDSL_COMPUTE_UNIT}"
+            "${_root}/device")
         if(ENABLE_BUILT_IN)
             set(_install "opp/built-in/op_impl/ai_core/tbe/kernel/${CANNBOTDSL_COMPUTE_UNIT}/ops_transformer")
         else()
@@ -1307,9 +1309,20 @@ function(add_bin_compile_target)
         set(BINARY_INFO_CONFIG_FILE ${BIN_OUT_DIR}/binary_info_config.json)
         set(RELOCATABLE_KERNEL_INFO_CONFIG_FILE ${BIN_OUT_DIR}/relocatable_kernel_info_config.json)
 
+        # ASC indexing rewrites scan JSON paths. Publish original DSL descriptions
+        # before any consumer copies this directory; leave ASC resources unchanged.
+        get_property(_dsl_packages GLOBAL PROPERTY "CANNBOTDSL_KERNEL_PACKAGES_${BINARY_COMPUTE_UNIT}")
+        set(_dsl_restore_commands)
+        foreach(_package IN LISTS _dsl_packages)
+            list(APPEND _dsl_restore_commands
+                COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                    "${_package}/kernel/${BINARY_COMPUTE_UNIT}" "${BIN_OUT_DIR}")
+        endforeach()
         add_custom_command(OUTPUT ${BINARY_INFO_CONFIG_FILE}
                 COMMAND ${HI_PYTHON} ${ASCENDC_CMAKE_UTIL_DIR}/ascendc_ops_config.py -p ${BIN_OUT_DIR} -s ${BINARY_COMPUTE_UNIT}
-                DEPENDS ${_ops_target_list} ${_dsl_stamps}
+                ${_dsl_restore_commands}
+                DEPENDS ${_ops_target_list} ${_dsl_stamps} "${CMAKE_CURRENT_FUNCTION_LIST_FILE}"
+                VERBATIM
         )
 
         add_custom_target(${OPS_CONFIG_TARGET}
