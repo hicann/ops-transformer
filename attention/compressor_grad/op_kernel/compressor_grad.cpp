@@ -11,7 +11,8 @@
 /*!
  * \file compressor_grad.cpp
  * \brief CompressorGrad arch22 单入口 MIX kernel（KERNEL_TYPE_MIX_AIC_1_2，blockDim=aicNum）：
- *        Phase0 cast(AIV) -> Phase1 scatter(AIV) -> Phase2 gemm(AIC)
+ *        Phase0 cast(AIV) -> Phase1 scatter(AIV) -> Phase1.5 dApe reduce(AIV，与 gemm 并行)
+ *        -> Phase2 gemm(AIC)
  *        相位屏障用 AscendC::SyncAll<false>()：AIC+AIV 全核、同序调用
  *        tiling 侧须 SetScheduleMode(BATCH_MODE_SCHEDULE)
  */
@@ -50,11 +51,18 @@ __global__ __aicore__ void compressor_grad(__gm__ uint8_t* x, __gm__ uint8_t* wk
         {
             TPipe pipe;
             CompressorGradScatterKernel<ioT> scatterKernel;
-            scatterKernel.Init(dCmpKv, softmaxScore, kv, dApe, cuSeqlens, seqUsed, startPos, userWs, tilingData, &pipe);
+            scatterKernel.Init(dCmpKv, softmaxScore, kv, cuSeqlens, seqUsed, startPos, userWs, tilingData, &pipe);
             scatterKernel.Process();
         }
-        // 相位屏障 2：dn/d_ape 全部写完后 AIC 才能开始 gemm
+        // 相位屏障 2：dn/d_ape partial 全部写完后 AIC 才能开始 gemm
         AscendC::SyncAll<false>();
+        // d_ape 确定性归约：AIV 归并与 AIC gemm 并行（d_ape 不参与 gemm）
+        {
+            TPipe pipe;
+            CompressorGradApeReduceKernel reduceKernel;
+            reduceKernel.Init(dApe, userWs, tilingData, &pipe);
+            reduceKernel.Process();
+        }
     }
     if ASCEND_IS_AIC {
         // 与 AIV 侧等次数的屏障调用，保证 ffts flag 计数对齐

@@ -49,6 +49,8 @@ struct CompressorGradTilingDataA3 {
     int64_t wgateF16WsOff = 0; // wgate cast to fp16, blocked-NZ, C * H elements
     int64_t dnKvWsOff = 0;     // dn_kv fp16, dnPlanes * tPad * C elements
     int64_t dnScWsOff = 0;     // dn_sc fp16, dnPlanes * tPad * C elements
+    int64_t apePartWsOff = 0;  // d_ape per-core partials f32, apePartElems elements
+    int64_t apePartElems = 0;  // scatterCoreNum * cmpRatio * totalHeadDim
     int64_t layout = 0;        // 0: BSH (x [B,S,H]), 1: TH (x [T,H] + cu_seqlens)
 };
 } // namespace optiling

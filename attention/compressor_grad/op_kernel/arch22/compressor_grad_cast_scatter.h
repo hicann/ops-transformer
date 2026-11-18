@@ -11,8 +11,10 @@
 /*!
  * \file compressor_grad_cast_scatter.h
  * \brief CompressorGrad arch22 AIV kernels:
- *        Phase0 CastKernel: x/wkv/wgate -> fp16 blocked-NZ workspace；dn_kv/dn_sc/d_ape 清零
- *        Phase1 ScatterKernel: 逐块 softmax 反向 + 梯度路由 + d_ape 累加
+ *        Phase0 CastKernel: x/wkv/wgate -> fp16 blocked-NZ workspace；dn_kv/dn_sc/d_ape 与
+ *          d_ape partial 槽清零
+ *        Phase1 ScatterKernel: 逐块 softmax 反向 + 梯度路由 + d_ape 本核 partial 槽写入
+ *        Phase1.5 ApeReduceKernel: 每核定长区间按固定核序 Kahan 归并 d_ape
  *        BSH: nblk=S/cr；TH: 逐 batch 块数由 cu_seqlens/seqused/start_pos GM 值确定
  *
  * dn workspace（blocked-NZ）：tile (t/128, c/128) 位于 C-strip 主序
@@ -34,7 +36,7 @@ using namespace AscendC;
 //   x(T,H) -> f16 blocked-NZ：tile (kb,nb) 于 GM 索引 nb*tTiles+kb，
 //     128*128 元素连续，tile 内 (c/16)*2048 + r*16 + c%16（Nd2Nz L1 镜像）
 //   wkv/wgate(C,H) -> f16 blocked-NZ：tile (kb,nb) 于 nb*(C/128)+kb
-//   dn_kv/dn_sc(T_pad,C) f16 清零；d_ape(cr,C) f32 清零
+//   dn_kv/dn_sc(T_pad,C) f16 清零；d_ape(cr,C) f32 清零；d_ape partial f32 线性清零
 // ========================================================================
 constexpr uint32_t CG_CAST_VEC = 2048; // elements per vector chunk
 constexpr uint32_t CG_X_TILE = 128;    // blocked-NZ tile edge (rows and cols)
@@ -234,7 +236,7 @@ private:
 // =========================================================================
 // Phase 1 (AIV): scatter
 //   每 (块, D 段)：dK=dC*sm；dSp=dC*kv；col=sum sm*dSp；dZ=sm*(dSp-col)；
-//   路由 cur/prev 槽到 dn_kv/dn_sc；dZ 按行累加 per-core d_ape，段末原子加。
+//   路由 cur/prev 槽到 dn_kv/dn_sc；dZ 按行累加 per-core d_ape，段末写本核 partial 槽。
 //   sm/kv 每段整块装入；colsum 用 4 路 MulAddDst；行 staging 到 (cr,seg)
 //   fp16 slot tile，每 tile 一次 2D DataCopyPad 写出。
 // ========================================================================
@@ -243,8 +245,8 @@ class CompressorGradScatterKernel {
 public:
     __aicore__ inline CompressorGradScatterKernel() {}
 
-    __aicore__ inline void Init(GM_ADDR dCmpKv, GM_ADDR smScore, GM_ADDR kvIn, GM_ADDR dApe, GM_ADDR cuSeqlens,
-                                GM_ADDR seqUsed, GM_ADDR startPos, GM_ADDR userWs,
+    __aicore__ inline void Init(GM_ADDR dCmpKv, GM_ADDR smScore, GM_ADDR kvIn, GM_ADDR cuSeqlens, GM_ADDR seqUsed,
+                                GM_ADDR startPos, GM_ADDR userWs,
                                 const optiling::CompressorGradTilingDataA3* tilingData, TPipe* pipe)
     {
         dCkGM_.SetGlobalBuffer(reinterpret_cast<__gm__ ioT*>(dCmpKv));
@@ -252,7 +254,7 @@ public:
         kvGM_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(kvIn));
         dnKvGM_.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(userWs + tilingData->dnKvWsOff));
         dnScGM_.SetGlobalBuffer(reinterpret_cast<__gm__ half*>(userWs + tilingData->dnScWsOff));
-        dApeGM_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(dApe));
+        apePartGM_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(userWs + tilingData->apePartWsOff));
         bSize_ = static_cast<uint32_t>(tilingData->batchSize);
         sSize_ = static_cast<uint32_t>(tilingData->seqSize);
         tLen_ = static_cast<uint32_t>(tilingData->tLen);
@@ -385,18 +387,18 @@ public:
                                         tokOff, fc, pfc, j >= 1U);
                 }
             }
-            // atomic accumulate this segment's d_ape partials into GM
+            // store this segment's d_ape partials into the core's private slot
+            // (layout [cid][cr][C], no atomic: the cross-core reduce is fixed-order)
             uint32_t curCol = (coff_ - 1) * dSize_ + d0;
-            SetAtomicAdd<float>();
+            const uint64_t slot = static_cast<uint64_t>(cid) * crSize_ * cSize_;
             SetWaitFlag<HardEvent::V_MTE3>();
             DataCopyExtParams cpApe{static_cast<uint16_t>(crSize_), static_cast<uint32_t>(segLen_ * sizeof(float)), 0,
                                     static_cast<uint32_t>((cSize_ - segLen_) * sizeof(float)), 0};
-            DataCopyPad(dApeGM_[curCol], apeCur_, cpApe);
+            DataCopyPad(apePartGM_[slot + curCol], apeCur_, cpApe);
             if (coff_ == 2) {
-                DataCopyPad(dApeGM_[d0], apePrev_, cpApe);
+                DataCopyPad(apePartGM_[slot + d0], apePrev_, cpApe);
             }
             SetWaitFlag<HardEvent::MTE3_V>();
-            DisableDmaAtomic();
             SetWaitFlag<HardEvent::V_MTE2>();
         }
     }
@@ -703,7 +705,7 @@ private:
     }
 
     GlobalTensor<ioT> dCkGM_;
-    GlobalTensor<float> smGM_, kvGM_, dApeGM_;
+    GlobalTensor<float> smGM_, kvGM_, apePartGM_;
     GlobalTensor<int32_t> cuGm_, sqGm_, spGm_;
     GlobalTensor<half> dnKvGM_, dnScGM_;
     uint32_t bSize_, sSize_, tLen_, dSize_, crSize_, coff_, nblk_, nblkIn_, nRows_, cSize_, segLen_;
@@ -717,6 +719,88 @@ private:
     LocalTensor<ioT> dCIn_;
     LocalTensor<half> stageHiCur_, stageHiPrev_, stageLoCur_, stageLoPrev_;
     LocalTensor<int32_t> cuMeta_, sqMeta_, spMeta_;
+};
+
+// =========================================================================
+// Phase 1.5 (AIV): d_ape 跨核归约
+//   partial 槽布局 [cid][cr][C]；每核处理 cr*C 的连续区间 [e0,e1)，按固定核序
+//   k=0..N-1 做 Kahan 补偿累加，结果普通写覆盖 d_ape（Phase0 已清零）。
+//   acc/comp/x 三个 fp32 缓冲合计 48KB：块长 L 按 UB 预算取
+//   48KB/(4*(N+2)) 并向下取 8 的倍数，使全部 N 个槽一次 2D 装入。
+// ========================================================================
+constexpr uint32_t CG_APE_REDUCE_VEC = 4096;       // element cap per UB chunk
+constexpr uint32_t CG_APE_REDUCE_UB = 48U * 1024U; // acc + comp + x buffers
+
+class CompressorGradApeReduceKernel {
+public:
+    __aicore__ inline CompressorGradApeReduceKernel() {}
+
+    __aicore__ inline void Init(GM_ADDR dApe, GM_ADDR userWs, const optiling::CompressorGradTilingDataA3* tilingData,
+                                TPipe* pipe)
+    {
+        partGM_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(userWs + tilingData->apePartWsOff));
+        dApeGM_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(dApe));
+        crSize_ = static_cast<uint32_t>(tilingData->cmpRatio);
+        cSize_ = static_cast<uint32_t>(tilingData->totalHeadDim);
+        coreNum_ = static_cast<uint32_t>(tilingData->scatterCoreNum);
+        // 区间按 8 元素（32B）切分：cr*C 必须为 8 的倍数（headDim 为 128/512 恒成立，
+        // 显式断言防参数域放开后尾部元素漏归约）
+        assert((static_cast<uint64_t>(crSize_) * cSize_) % 8U == 0U, "d_ape total elements must be 8-aligned");
+        // 48KB budget over acc/comp (L each) + x (N slots x L), 8-element rows
+        chunkLen_ = static_cast<uint32_t>(CG_APE_REDUCE_UB / (sizeof(float) * (coreNum_ + 2U))) & ~7U;
+        chunkLen_ = MinU32(chunkLen_, CG_APE_REDUCE_VEC);
+        pipe->InitBuffer(buf_, static_cast<uint32_t>((2U * chunkLen_ + coreNum_ * chunkLen_) * sizeof(float)));
+        acc_ = buf_.Get<float>();
+        comp_ = buf_.Get<float>()[chunkLen_];
+        xbuf_ = buf_.Get<float>()[2 * chunkLen_];
+    }
+
+    __aicore__ inline void Process()
+    {
+        const uint32_t cid = GetBlockIdx();
+        if (cid >= coreNum_) {
+            return;
+        }
+        const uint64_t total = static_cast<uint64_t>(crSize_) * cSize_;
+        // contiguous [e0, e1) per core, remainder to the leading cores; the
+        // split is done in 8-element units so every range stays 32B-aligned
+        const uint64_t totalU = total / 8U;
+        const uint64_t perU = totalU / coreNum_;
+        const uint64_t remU = totalU % coreNum_;
+        const uint64_t e0 = (static_cast<uint64_t>(cid) * perU + MinU64(cid, remU)) * 8U;
+        const uint64_t e1 = e0 + (perU + (cid < remU ? 1U : 0U)) * 8U;
+        for (uint64_t e = e0; e < e1; e += chunkLen_) {
+            const uint32_t n = static_cast<uint32_t>(MinU64(chunkLen_, e1 - e));
+            Duplicate(acc_, 0.0f, n);
+            Duplicate(comp_, 0.0f, n);
+            // one 2D load: all N slots x n elements, rows packed in UB
+            SetWaitFlag<HardEvent::V_MTE2>();
+            DataCopyExtParams cp{static_cast<uint16_t>(coreNum_), static_cast<uint32_t>(n * sizeof(float)),
+                                 static_cast<uint32_t>((total - n) * sizeof(float)), 0, 0};
+            DataCopyPadExtParams<float> pp{false, 0, 0, 0.0f};
+            DataCopyPad(xbuf_, partGM_[e], cp, pp);
+            SetWaitFlag<HardEvent::MTE2_V>();
+            // fixed-order Kahan: y = x - c; t = s + y; c = (t - s) - y; s = t
+            for (uint32_t k = 0; k < coreNum_; k++) {
+                LocalTensor<float> x = xbuf_[k * n];
+                Sub(x, x, comp_, n);        // y = x - c
+                Add(comp_, acc_, x, n);     // t = s + y
+                Sub(comp_, comp_, acc_, n); // t - s
+                Sub(comp_, comp_, x, n);    // c = (t - s) - y
+                Add(acc_, acc_, x, n);      // s = t
+            }
+            SetWaitFlag<HardEvent::V_MTE3>();
+            DataCopyExtParams outCp{1, static_cast<uint32_t>(n * sizeof(float)), 0, 0, 0};
+            DataCopyPad(dApeGM_[e], acc_, outCp);
+            SetWaitFlag<HardEvent::MTE3_V>();
+        }
+    }
+
+private:
+    GlobalTensor<float> partGM_, dApeGM_;
+    uint32_t crSize_ = 0, cSize_ = 0, coreNum_ = 0, chunkLen_ = 0;
+    TBuf<TPosition::VECCALC> buf_;
+    LocalTensor<float> acc_, comp_, xbuf_;
 };
 
 #endif // COMPRESSOR_GRAD_CAST_SCATTER_H

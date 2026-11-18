@@ -127,6 +127,8 @@ private:
     int64_t wgateF16WsOff_ = 0;
     int64_t dnKvWsOff_ = 0;
     int64_t dnScWsOff_ = 0;
+    int64_t apePartWsOff_ = 0;
+    int64_t apePartElems_ = 0;
 
     CompressorGradBaseParams baseParams_;
     CompressorGradContext* context_ = nullptr;

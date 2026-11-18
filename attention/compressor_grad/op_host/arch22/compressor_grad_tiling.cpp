@@ -506,15 +506,20 @@ ge::graphStatus CompressorGradTilingA3::CalcWorkSpace()
     wgateF16WsOff_ = wkvF16WsOff_ + wBytes;
     dnKvWsOff_ = wgateF16WsOff_ + wBytes;
     dnScWsOff_ = dnKvWsOff_ + dnBytes;
-    const int64_t userWsBytes = dnScWsOff_ + dnBytes;
+    // d_ape per-core partials (fp32): one [cid][cr][C] slot per scatter core,
+    // offset rounded up to the 512B alignment kept by the blocks above.
+    apePartElems_ = scatterCoreNum_ * baseParams_.cmpRatio * cSize;
+    constexpr int64_t wsAlign = 512;
+    apePartWsOff_ = (dnScWsOff_ + dnBytes + wsAlign - 1) / wsAlign * wsAlign;
+    const int64_t userWsBytes = apePartWsOff_ + apePartElems_ * static_cast<int64_t>(sizeof(float));
 
     workspaceSize_ = libapiSize_ + static_cast<size_t>(userWsBytes);
     if (context_->workSpaces) {
         context_->workSpaces[0] = workspaceSize_;
     }
 
-    OP_LOGI(context_->opName, "[TILING][arch22] workspaceSize = %zu (x=%ld w=2x%ld dn=2x%ld planes=%ld)",
-            workspaceSize_, xBytes, wBytes, dnBytes, dnPlanes_);
+    OP_LOGI(context_->opName, "[TILING][arch22] workspaceSize = %zu (x=%ld w=2x%ld dn=2x%ld planes=%ld apePart=%ld)",
+            workspaceSize_, xBytes, wBytes, dnBytes, dnPlanes_, apePartElems_ * static_cast<int64_t>(sizeof(float)));
     return ge::GRAPH_SUCCESS;
 }
 
@@ -546,6 +551,8 @@ ge::graphStatus CompressorGradTilingA3::SetTilingData()
     tilingData_->wgateF16WsOff = wgateF16WsOff_;
     tilingData_->dnKvWsOff = dnKvWsOff_;
     tilingData_->dnScWsOff = dnScWsOff_;
+    tilingData_->apePartWsOff = apePartWsOff_;
+    tilingData_->apePartElems = apePartElems_;
     return ge::GRAPH_SUCCESS;
 }
 
