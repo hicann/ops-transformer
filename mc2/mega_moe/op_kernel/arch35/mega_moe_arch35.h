@@ -37,7 +37,6 @@
 #include "../../../common/op_kernel/quantize_functions.h"
 #include "stage/mega_moe_gmm1_activation_arch35.h"
 #include "stage/mega_moe_gmm2_combine_arch35.h"
-#include "stage/mega_moe_gmm_bf16.h"
 
 namespace MegaMoeImpl {
 using namespace AscendC;
@@ -46,12 +45,6 @@ template <typename StorageType>
 struct InputPrepareSelector {
     using Config = QuantProcessConfig;
     using Scratch = QuantProcessScratch<StorageType>;
-};
-
-template <>
-struct InputPrepareSelector<bfloat16_t> {
-    using Config = Bf16InputConfig;
-    using Scratch = Bf16InputScratch;
 };
 
 template <typename OutType, typename InType>
@@ -70,11 +63,6 @@ struct GmmBlockContextSelector {
     using Config = GmmKernel::Config<true, typename Quant::ActivationQuantOutType, WeightType, bfloat16_t,
                                      typename Quant::QuantScaleType, typename Quant::QuantScaleType>;
     using Type = typename Config::BlockContext;
-};
-
-template <>
-struct GmmBlockContextSelector<bfloat16_t, BF16_PASSTHROUGH> {
-    using Type = Bf16GmmBlockContext;
 };
 
 #define TemplateMegaMoeTypeClass \
@@ -114,20 +102,18 @@ protected:
     using A8W4BlockContext = typename GmmBlockContextSelector<MoeWeightType, MoeQuantMode>::Type;
 
     __aicore__ inline void InitBaseState(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights,
-                                         GM_ADDR weight1, GM_ADDR weight2, GM_ADDR weightScales1, GM_ADDR weightScales2,
-                                         GM_ADDR scales, GM_ADDR sharedWeight1, GM_ADDR sharedWeight2,
-                                         GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
-                                         GM_ADDR expertTokenNumsOut, const MegaMoeTilingData* tilingData,
-                                         GM_ADDR tilingGM);
-    // A16W16 经 Wave Init 的 GetImpl() 调用 MegaMoeA16W16Wave 同名实现，初始化 BF16 各阶段配置。
-    __aicore__ inline void InitStageConfigs(const MegaMoeTilingData* tilingData);
+                                         GM_ADDR weight1, GM_ADDR weight2, GM_ADDR xActiveMask, GM_ADDR weightScales1,
+                                         GM_ADDR weightScales2, GM_ADDR scales, GM_ADDR sharedWeight1,
+                                         GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1,
+                                         GM_ADDR sharedWeightScales2, GM_ADDR yOut, GM_ADDR expertTokenNumsOut,
+                                         GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData, GM_ADDR tilingGM);
+    __aicore__ inline void InitPathConfigs(const MegaMoeTilingData* tilingData);
     __aicore__ inline void InitSyncWorkspaceConfigs(int32_t dispatchFlagSlotsPerExpert,
                                                     int32_t activationFlagSlotsPerExpert);
     __aicore__ inline void InitGmmConfigs();
     __aicore__ inline void InitQuantTokenBufferConfig();
     __aicore__ inline void InitTokenUnpermuteConfig();
 
-    // A16W16 经 derived 调用派生类同名实现，初始化 BF16 双缓冲打包槽。
     __aicore__ inline uint32_t InitInputScratchTensors(uint32_t mxTempTensorAddr);
     __aicore__ inline void QuantizeInputTokens(const WorkRange& tokenRange);
     template <typename Derived>
@@ -149,14 +135,11 @@ protected:
     __aicore__ inline void EnterSteadyDispatch();
     __aicore__ inline void ExportAndResetExpertCounts();
 
-    // A16W16 经 derived 调用派生类同名实现，直接使用原始 BF16 输入，scale 地址置空。
     __aicore__ inline void ConfigureSharedGmm1Input(GMMAddrInfo& gmmAddrInfo, GmmExecutionConfig& gmmConfig,
                                                     Gmm1ActivationSync& sharedGmm1ActivationSync) const;
-    // A16W16 经 derived 调用派生类同名实现，执行 BF16 共享 GMM1 与激活，激活输出不量化。
     __aicore__ inline void RunSharedExpertGmm1Activation(GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape,
                                                          const GmmExecutionConfig& gmmConfig,
                                                          GmmRuntimeState& runtimeState, uint32_t sharedExpertIdx);
-    // A16W16 经 derived 调用派生类同名实现，使用 BF16 激活和权重执行共享 GMM2。
     __aicore__ inline void RunSharedExpertGmm2(GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape,
                                                uint32_t sharedExpertIdx);
     template <typename Derived>
@@ -187,7 +170,6 @@ protected:
     template <typename Derived>
     __aicore__ inline void ProcessWave(Derived& derived);
 
-    // A16W16 经 derived 调用派生类同名实现，共享专家使用直接输入启动条件。
     __aicore__ inline SharedGmmStartCondition GetSharedGmmStartCondition() const;
 
     typename GmmBlockContextSelector<SharedWeightType, SharedQuantMode>::Type sharedBlockContext_{};
@@ -228,6 +210,8 @@ protected:
 
     static constexpr bool SHARED_INPUT_REUSES_MOE_QUANT =
         Std::IsSame<typename MoeQuantConfig::QuantOutType, typename SharedQuantConfig::QuantOutType>::value;
+    static constexpr uint16_t MOE_ACTIVATION_SUB_BLOCK_IDX = MoeQuantConfig::AXW_MODE == AxWMode::A8W4 ? 1U : 0U;
+    static constexpr uint16_t SHARED_ACTIVATION_SUB_BLOCK_IDX = 1U;
     static constexpr uint32_t GMM1_TILE_M = L1_TILE_M_256;
     typename InputPrepareSelector<ActivationType>::Scratch quantScratch_;
     typename InputPrepareSelector<SharedActivationType>::Scratch sharedQuantScratch_;
@@ -318,14 +302,9 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitTokenUnpermuteConfi
                              .tailTokenChunkConfig = params_.tilingData->unpermuteConfigForTailTokenChunk};
 }
 
-/*
- * 初始化量化路径的激活 Epilogue、输入准备、Dispatch、GMM、通信缓冲和 Unpermute 配置，
- * 并确定 Dispatch/GMM1、Activation/GMM2 的同步标志槽数。
- * A16W16 在 MegaMoeA16W16Wave 中提供同名实现，由 Wave 的 Init 通过
- * GetImpl().InitStageConfigs 调用其对应版本。
- */
+// 初始化各阶段配置及同步标志槽数。
 template <TemplateMegaMoeTypeClass>
-__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitStageConfigs(const MegaMoeTilingData* tilingData)
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitPathConfigs(const MegaMoeTilingData* tilingData)
 {
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
@@ -381,9 +360,9 @@ __aicore__ inline GM_ADDR MegaMoe<TemplateMegaMoeTypeFunc>::InitRuntimeContext(G
 template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitBaseState(
     GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1, GM_ADDR weight2,
-    GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales, GM_ADDR sharedWeight1, GM_ADDR sharedWeight2,
-    GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut, GM_ADDR expertTokenNumsOut,
-    const MegaMoeTilingData* tilingData, GM_ADDR tilingGM)
+    GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales, GM_ADDR sharedWeight1,
+    GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
+    GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData, GM_ADDR tilingGM)
 {
     GM_ADDR dumpBase = InitRuntimeContext(context, tilingData);
     params_.aGmAddr = x;
@@ -400,6 +379,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitBaseState(
     params_.y2GmAddr = yOut;
     params_.expertTokenNumsOutGmAddr = expertTokenNumsOut;
     params_.probsGmAddr = topkWeights;
+    (void)xActiveMask;
+    (void)workspaceGM;
 
     params_.communication.base = g_winRankAddr_[rankId_];
     params_.workspace.layout = WorkspaceLayout(tilingData->compute);
@@ -439,10 +420,10 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
     GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData, GM_ADDR tilingGM)
 {
-    InitBaseState(context, x, topkIds, topkWeights, weight1, weight2, weightScales1, weightScales2, scales,
+    InitBaseState(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2, scales,
                   sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut, expertTokenNumsOut,
-                  tilingData, tilingGM);
-    InitStageConfigs(tilingData);
+                  workspaceGM, tilingData, tilingGM);
+    InitPathConfigs(tilingData);
 }
 
 template <TemplateMegaMoeTypeClass>
@@ -471,11 +452,10 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
     }
     const MegaMoeDispatchBufferConfig& bufferConfig = context.bufferConfig;
     if constexpr (MoeQuantConfig::AXW_MODE == AxWMode::A16W16) {
-        scratch.recvTokenDataBytes = commonConfig_.tokenHiddenDim * sizeof(ActivationType);
+        scratch.revTokenElemCnt = commonConfig_.tokenHiddenDim;
         scratch.revScaleElemCnt = 0U;
     } else {
-        scratch.recvTokenDataBytes =
-            commonConfig_.tokenHiddenDim / MoeQuantConfig::A_ELEMS_PER_BYTE * sizeof(ActivationType);
+        scratch.revTokenElemCnt = commonConfig_.tokenHiddenDim / MoeQuantConfig::A_ELEMS_PER_BYTE;
         scratch.revScaleElemCnt =
             Ops::Base::CeilDiv(commonConfig_.tokenHiddenDim, static_cast<uint32_t>(MXFP_DIVISOR_SIZE)) *
             MXFP_MULTI_BASE_SIZE;
@@ -1354,8 +1334,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessWave(Derived& de
         derived.WaitForInputPreparation(sharedGmmStartCondition);
     }
 
-    // 共享 A8W4 写 GM，由 AIV1 消费；独立事件使剩余 ACK 不阻塞 MoE GMM 启动。
-    Gmm1ActivationSync sharedGmm1ActivationSync(1U, GmmEventPair::SHARED_GMM1);
+    // 共享专家使用独立事件对，避免剩余 ACK 阻塞 MoE GMM 启动；激活消费子核按路径配置。
+    Gmm1ActivationSync sharedGmm1ActivationSync(Derived::SHARED_ACTIVATION_SUB_BLOCK_IDX, GmmEventPair::SHARED_GMM1);
     if (sharedExpertNum_ > 0U) {
         // 阶段 2：可选的共享专家 GMM1 及 Activation。
         exceptionDump_.UpdateStage(MegaMoeImpl::Stage::SHARED_EXPERT_GMM1);
@@ -1364,7 +1344,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessWave(Derived& de
     }
 
     // 阶段 3：由派生类编排 MoE 专家的 Dispatch、GMM1/Activation 和 GMM2/Combine。
-    Gmm1ActivationSync gmm1ActivationSync(MoeQuantConfig::AXW_MODE == AxWMode::A8W4 ? 1U : 0U);
+    Gmm1ActivationSync gmm1ActivationSync(Derived::MOE_ACTIVATION_SUB_BLOCK_IDX);
     Gmm2CombineSync gmm2CombineSync;
     SyncBeforeMoeExpertStages(derived, sharedGmmStartCondition);
     derived.ProcessMoeExpertStages(gmm1ActivationSync, gmm2CombineSync);

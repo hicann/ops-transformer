@@ -24,6 +24,17 @@
 
 namespace MegaMoeImpl {
 
+template <>
+struct InputPrepareSelector<bfloat16_t> {
+    using Config = Bf16InputConfig;
+    using Scratch = Bf16InputScratch;
+};
+
+template <>
+struct GmmBlockContextSelector<bfloat16_t, BF16_PASSTHROUGH> {
+    using Type = Bf16GmmBlockContext;
+};
+
 #define TemplateMegaMoeA16W16WaveTypeClass \
     typename XType, typename OutputType, typename TopkWeightsType, typename MoeWeightType, int32_t MoeQuantMode, \
         typename SharedWeightType, int32_t SharedQuantMode, int32_t MoeWeight1Format, int32_t MoeWeight2Format, \
@@ -44,17 +55,16 @@ private:
     Bf16GmmBlockContext moeBlockContext_{};
 
 protected:
-    __aicore__ inline void InitStageConfigs(const MegaMoeTilingData* tilingData)
+    static constexpr uint16_t SHARED_ACTIVATION_SUB_BLOCK_IDX = 0U;
+
+    __aicore__ inline void InitPathConfigs(const MegaMoeTilingData* tilingData)
     {
         const auto& compute = tilingData->compute;
         auto& inputConfig = this->quantProcessConfig_;
-        const auto layout = CalcTokenScaleLayout(compute.h, compute.dispatchInputStorage, compute.topK,
-                                                 tilingData->comm.topkWeightsPrefetch);
-        inputConfig = {.dataValidBytes = static_cast<uint32_t>(layout.dataValidBytes),
-                       .dataBytes = static_cast<uint32_t>(layout.dataBytes),
-                       .tokenScaleBytes = static_cast<uint32_t>(layout.tokenScaleBytes),
-                       .stageBytes = static_cast<uint32_t>(CalcBf16InputStageBytes(
-                           layout, compute.topK, Std::IsSame<TopkWeightsType, bfloat16_t>::value))};
+        inputConfig.layout = CalcTokenScaleLayout(compute.h, compute.dispatchInputStorage, compute.topK,
+                                                  tilingData->comm.topkWeightsPrefetch);
+        inputConfig.stageBytes = static_cast<uint32_t>(
+            CalcBf16InputStageBytes(inputConfig.layout, compute.topK, Std::IsSame<TopkWeightsType, bfloat16_t>::value));
         const uint32_t sendCoreIdx = this->sharedExpertNum_ > 0U ? this->blockIdx_ : this->aivCoreIdx_;
         this->sendMaskConfig_ = CreateSendMaskConfig(this->params_, sendCoreIdx);
         this->tokenDispatchConfig_ = {
@@ -62,9 +72,9 @@ protected:
             .bufferConfig = tilingData->dispatchBufferConfig,
             .routeIndexAlignSize = static_cast<uint64_t>(CalcDispatchRouteIndexAlignSize(compute)),
             .quantWinOffset = static_cast<uint64_t>(this->params_.communication.layout.quantTokenScale.offsetBytes),
-            .quantTokenAlignBytes = inputConfig.dataBytes,
+            .quantTokenAlignBytes = static_cast<uint32_t>(inputConfig.layout.dataBytes),
             .quantScaleAlignBytes = 0U,
-            .quantTokenScaleAlignBytes = inputConfig.tokenScaleBytes,
+            .quantTokenScaleAlignBytes = static_cast<uint32_t>(inputConfig.layout.tokenScaleBytes),
             .dedup = CreateDedupConfig(this->params_)};
         const int32_t flagSlots =
             static_cast<int32_t>(Ops::Base::CeilDiv(static_cast<int64_t>(compute.maxOutputSize),
@@ -87,8 +97,9 @@ protected:
     __aicore__ inline uint32_t InitInputScratchTensors(uint32_t scratchAddr)
     {
         const uint32_t stageBytes = this->quantProcessConfig_.stageBytes;
-        this->quantScratch_.stage0 = reinterpret_cast<__ubuf__ uint8_t*>(scratchAddr);
-        this->quantScratch_.stage1 = reinterpret_cast<__ubuf__ uint8_t*>(scratchAddr + stageBytes);
+        for (uint32_t slot = 0U; slot < DOUBLE_BUFFER; ++slot) {
+            this->quantScratch_.stages[slot] = reinterpret_cast<__ubuf__ uint8_t*>(scratchAddr + slot * stageBytes);
+        }
         // 有效 token 和权重每次覆盖；记录中的对齐填充在本次 launch 保持为零。
         FillUbVF<int16_t>(reinterpret_cast<__ubuf__ int16_t*>(scratchAddr), int16_t{0},
                           DOUBLE_BUFFER * stageBytes / sizeof(int16_t));

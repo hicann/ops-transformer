@@ -73,7 +73,6 @@ __aicore__ inline void FanoutDedupDataAndMeta(DedupDispatchViews<ActivationType,
                                               int32_t memberCount, uint32_t fanMetaSlotBase)
 {
     const int32_t tokenIndex = selfTopkIndex / topK;
-    auto* recvDataBytes = reinterpret_cast<__gm__ uint8_t*>(views.recvDataGm);
     for (int32_t m = 0; m < memberCount; ++m) {
         int32_t row = selfRow;
         int32_t topkIndex = selfTopkIndex;
@@ -83,8 +82,8 @@ __aicore__ inline void FanoutDedupDataAndMeta(DedupDispatchViews<ActivationType,
             row = views.descBatchTensor[tripleBase];
             topkIndex = views.descBatchTensor[tripleBase + 1U];
         }
-        CopyUbToGm(recvDataBytes + static_cast<uint64_t>(row) * scratch.recvTokenDataBytes, tokenScaleBuffer,
-                   static_cast<uint16_t>(scratch.recvTokenDataBytes));
+        CopyUbToGm((views.recvDataGm + (static_cast<uint64_t>(row) * scratch.revTokenElemCnt)), tokenScaleBuffer,
+                   static_cast<uint16_t>(scratch.revTokenElemCnt * sizeof(ActivationType)));
         if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
             CopyUbToGm((views.recvScaleGm + (static_cast<uint64_t>(row) * scratch.revScaleElemCnt)), scaleBuffer,
                        static_cast<uint16_t>(scratch.revScaleElemCnt * sizeof(QuantScaleType)));

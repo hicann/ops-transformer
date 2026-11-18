@@ -184,10 +184,10 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
     GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
     GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData, GM_ADDR tilingGM)
 {
-    this->InitBaseState(context, x, topkIds, topkWeights, weight1, weight2, weightScales1, weightScales2, scales,
-                        sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
-                        expertTokenNumsOut, tilingData, tilingGM);
-    GetImpl().InitStageConfigs(tilingData);
+    this->InitBaseState(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
+                        scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
+                        expertTokenNumsOut, workspaceGM, tilingData, tilingGM);
+    GetImpl().InitPathConfigs(tilingData);
 }
 
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>

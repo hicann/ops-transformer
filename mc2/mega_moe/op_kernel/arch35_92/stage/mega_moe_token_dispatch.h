@@ -44,7 +44,7 @@ struct TokenDispatchScratch {
     uint32_t copyTmpBaseAddr;
     __ubuf__ int32_t* metaInfoTensor = nullptr;
     __ubuf__ int32_t* expertTokenNumsOutTensor = nullptr;
-    int64_t recvTokenDataBytes; // 单个 token 有效数据的字节数，不含 scale、路由权重及填充。
+    int64_t revTokenElemCnt;
     int64_t revScaleElemCnt;
     // 去重暂存区动态基址：紧跟 dispatch 固定 UB 区尾（host 已按 DEDUP_DISPATCH_UB_RESERVE_BYTES 预留）。
     uint32_t dedupUbBaseAddr = 0U;
@@ -170,9 +170,8 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(bool topkWeightsPrefetch, c
             }
         }
     }
-    auto* recvDataBytes = reinterpret_cast<__gm__ uint8_t*>(recvDataGm);
-    CopyUbToGm(recvDataBytes + copyIdx * scratch.recvTokenDataBytes, tokenScaleBuffer,
-               static_cast<uint16_t>(scratch.recvTokenDataBytes));
+    CopyUbToGm((recvDataGm + (copyIdx * scratch.revTokenElemCnt)), tokenScaleBuffer,
+               static_cast<uint16_t>(scratch.revTokenElemCnt * sizeof(ActivationType)));
     if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
         CopyUbToGm((recvScaleGm + (copyIdx * scratch.revScaleElemCnt)), scaleBuffer,
                    static_cast<uint16_t>(scratch.revScaleElemCnt * sizeof(QuantScaleType)));
@@ -193,8 +192,9 @@ __aicore__ inline DispatchCopyTargets<ActivationType, QuantScaleType> CreateDisp
     const auto& workspace = params.workspace.layout;
     const auto& buffer = params.workspace.base;
     DispatchCopyTargets<ActivationType, QuantScaleType> targets;
-    targets.tokenRev = reinterpret_cast<__gm__ ActivationType*>(workspace.routed.gmm1Input.data.get_ptr(buffer) +
-                                                                physicalRowOffset * scratch.recvTokenDataBytes);
+    targets.tokenRev =
+        reinterpret_cast<__gm__ ActivationType*>(workspace.routed.gmm1Input.data.get_ptr(buffer) +
+                                                 physicalRowOffset * scratch.revTokenElemCnt * sizeof(ActivationType));
     if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
         targets.scaleRev = reinterpret_cast<__gm__ QuantScaleType*>(workspace.routed.gmm1Input.scale.get_ptr(buffer) +
                                                                     physicalRowOffset * scratch.revScaleElemCnt *
