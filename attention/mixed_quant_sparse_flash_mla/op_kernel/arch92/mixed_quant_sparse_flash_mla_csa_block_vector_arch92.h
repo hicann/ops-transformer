@@ -24,6 +24,7 @@
 #include "kernel_operator_list_tensor_intf.h"
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
+#include "c_api/vector_datamove/vector_datamove.h"
 
 #include "../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_sfa.h"
 #include "../../common/op_kernel/arch92/vf/vf_flashupdate_new_sfa.h"
@@ -59,6 +60,8 @@ struct Mq92PhyAddrValidInfo {
 TEMPLATES_DEF
 class MqsmlaCsaBlockVector {
 public:
+    static constexpr bool constPadingCtrl = true;
+    static constexpr uint8_t offsetType = 1;
     // BUFFER的字节数
     static constexpr uint32_t BUFFER_SIZE_BYTE_32B = 32;
     /* =================编译期常量的基本块信息================= */
@@ -70,13 +73,14 @@ public:
     static constexpr uint32_t dVTemplateTypeInput = 608; // 608: rope(64 * 2) + nope(448) + scale(7 * 2) + pad(18)
     static constexpr uint32_t dCombineBytes = 576;       // rope(64 * 2) + nope(448)
     static constexpr uint32_t scaleBytes = 8;
-    static constexpr float R0 = 1.0f;
-    static constexpr uint64_t SYNC_SINKS_BUF_FLAG = 6;
     static constexpr uint32_t dstGap = 384;
     static constexpr uint32_t NUM_6 = 6;
+    static constexpr uint32_t V0_IN_BUF_NUM = 3; // gather 3 buffer
     static constexpr uint32_t NUM_128 = 128;
     static constexpr uint32_t NUM_256 = 256;
     static constexpr uint32_t NUM_384 = 384;
+    static constexpr float R0 = 1.0f;
+    static constexpr uint64_t SYNC_SINKS_BUF_FLAG = 6;
 
     // ==================== Functions ======================
     __aicore__ inline MqsmlaCsaBlockVector(){};
@@ -272,9 +276,6 @@ private:
     GlobalTensor<KV_T> oriKVGm;
     GlobalTensor<KV_T> cmpKVGm;
     GlobalTensor<KV_T> keyGm;
-    GlobalTensor<uint8_t> oriKVGmBytes;
-    GlobalTensor<uint8_t> cmpKVGmBytes;
-    GlobalTensor<uint8_t> keyGmBytes;
     GlobalTensor<int32_t> oriSparseIndicesGm;
     GlobalTensor<int32_t> cmpSparseIndicesGm;
     GlobalTensor<int32_t> sparseIndicesGm;
@@ -315,9 +316,11 @@ private:
     TEventID intraLseMte3Mte2Id[2];
     TEventID intraAttnMte3Mte2Id[2];
     TEventID mte2ToVV0Id[2];
+    TEventID mte2ToVV0Id3[V0_IN_BUF_NUM]; // gather 3 buffer
     TEventID vToMte3V0Id[2];
     TEventID mte3ToVV0Id[2];
     TEventID vToMte2V0Id[2];
+    TEventID vToMte2V0Id3[V0_IN_BUF_NUM]; // gather 3 buffer
     TBuf<> softmaxMaxBuf[2];
     TBuf<> softmaxSumBuf[2];
     TBuf<TPosition::VECCALC> softmaxFinalMaxBufs[2];
@@ -325,18 +328,11 @@ private:
     TBuf<> softmaxExpBuf[2];
     TBuf<TPosition::VECCALC> batchReduceTmpUb;
     TBuf<> stage0InBuf[2];
+    TBuf<> stage0InBuf3[V0_IN_BUF_NUM]; // gather 3 buffer
     TBuf<> stage0OutBuf[2];
     TBuf<> vselrIndexesBuf[2];
-    TBuf<> sparseIndiceBuf;
-    TBuf<> paBlockIdxOffsetBuf;
-    TBuf<> tailBlockOffsetBuf;
-    TBuf<> paBlockIdBuf;
     TBuf<> totalOffsetBuf;
 
-    LocalTensor<int32_t> sparseIndiceTensor;
-    LocalTensor<int32_t> paBlockIdxOffsetTensor;
-    LocalTensor<uint32_t> tailBlockOffsetTensor;
-    LocalTensor<int32_t> paBlockIdTensor;
     LocalTensor<int64_t> totalOffsetTensor;
     uint32_t pingPongV0 = 0;
     uint32_t v0BaseSize = 32;
@@ -492,6 +488,7 @@ __simd_vf__ void AntiquantVFImplFp8D448(__ubuf__ Q_T* kRopeNzUb, __ubuf__ int8_t
     MicroAPI::RegTensor<KV_T> vreg_kv_1;
     MicroAPI::RegTensor<Q_T> vreg_scale0_bf16;
     MicroAPI::RegTensor<Q_T> vreg_scale1_bf16;
+    MicroAPI::RegTensor<Q_T> vreg_scale_merge;
     MicroAPI::RegTensor<float> vreg_cast_fp_res_0;
     MicroAPI::RegTensor<float> vreg_cast_fp_res_1;
     MicroAPI::RegTensor<Q_T> vreg_mul_res_0;
@@ -531,11 +528,10 @@ __simd_vf__ void AntiquantVFImplFp8D448(__ubuf__ Q_T* kRopeNzUb, __ubuf__ int8_t
             MicroAPI::Cast<float, KV_T, castTraitFp8_1>(vreg_cast_fp_res_1, vreg_kv_1, fp32MaskAll);
             MicroAPI::Cast<Q_T, float, castTraitFp8_3>(vreg_cast_res_0, vreg_cast_fp_res_0, fp16MaskAll);
             MicroAPI::Cast<Q_T, float, castTraitFp8_3>(vreg_cast_res_1, vreg_cast_fp_res_1, fp16MaskAll);
-            MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vreg_mul_res_0, vreg_cast_res_0, vreg_scale0_bf16,
-                                                                 fp16MaskAll);
-            MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vreg_mul_res_1, vreg_cast_res_1, vreg_scale1_bf16,
-                                                                 fp16MaskAll);
-            MicroAPI::DeInterleave(vreg_cast_res_pack_0, vreg_cast_res_pack_1, vreg_mul_res_0, vreg_mul_res_1);
+            MicroAPI::DeInterleave(vreg_cast_res_pack_0, vreg_cast_res_pack_1, vreg_cast_res_0, vreg_cast_res_1);
+            MicroAPI::Select(vreg_scale_merge, vreg_scale0_bf16, vreg_scale1_bf16, kvRopeTypeMaskHalf);
+            MicroAPI::Mul<Q_T, MicroAPI::MaskMergeMode::ZEROING>(vreg_cast_res_pack_0, vreg_cast_res_pack_0,
+                                                                 vreg_scale_merge, fp16MaskAll);
             MicroAPI::StoreAlign<Q_T, MicroAPI::DataCopyMode::DATA_BLOCK_COPY, MicroAPI::PostLiteral::POST_MODE_UPDATE>(
                 dstUbTmp, vreg_cast_res_pack_0, blockStride, repeatStride, kvRopeTypeMaskAll);
         }
@@ -754,14 +750,11 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::CopyOutKvUb2L1(outpu
                                                                            const RunInfo& runInfo, ConstInfo& constInfo)
 {
     uint64_t blockElementNum = 16;
-    DataCopyParams dataCopyParams;
-    dataCopyParams.blockCount = (constInfo.dSizeNope + constInfo.dSizeRope) / blockElementNum;
-    dataCopyParams.blockLen = dealRow;
-    dataCopyParams.srcGap = v0BaseSize + 1 - dealRow;
-    dataCopyParams.dstGap = Align16Func(runInfo.s2RealSize) - dealRow;
-
     LocalTensor<Q_T> dst = outputL1.GetTensor<Q_T>();
-    DataCopy(dst[s2StartIdx * blockElementNum], antiKvTensorAsB16, dataCopyParams);
+    asc_copy_ub2l1((__cbuf__ void*)dst[s2StartIdx * blockElementNum].GetPhyAddr(),
+                   (__ubuf__ void*)antiKvTensorAsB16.GetPhyAddr(),
+                   (constInfo.dSizeNope + constInfo.dSizeRope) / blockElementNum, dealRow, v0BaseSize + 1 - dealRow,
+                   Align16Func(runInfo.s2RealSize) - dealRow);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -789,40 +782,82 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessNotSparseKv(o
         return;
     }
     int64_t s2ProcessBaseSize = v0BaseSize;
-    int64_t s2ProcessSize = s2ProcessBaseSize;
     int64_t s2V0LoopTimes = (procSize + s2ProcessBaseSize - 1) / s2ProcessBaseSize;
     int64_t s2Tail = procSize - (s2V0LoopTimes - 1) * s2ProcessBaseSize;
-    for (uint32_t i = 0; i < s2V0LoopTimes; i++) {
-        int64_t s2StartIdx = procS2Start + i * s2ProcessBaseSize;
-        if (i == s2V0LoopTimes - 1) {
-            s2ProcessSize = s2Tail;
+    if constexpr (QUANT_MODE == SCALE_CONTIGUOUS_MODE::NONCONTIGUOUS) {
+        int64_t s2ProcessSize = s2ProcessBaseSize;
+        for (uint32_t i = 0; i < s2V0LoopTimes; i++) {
+            int64_t s2StartIdx = procS2Start + i * s2ProcessBaseSize;
+            if (i == s2V0LoopTimes - 1) {
+                s2ProcessSize = s2Tail;
+            }
+            int64_t dealRows = s2ProcessSize;
+
+            if (dealRows == 0) {
+                continue;
+            }
+            WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
+            LocalTensor<KV_T> kvInUb = stage0InBuf[pingPongV0].Get<KV_T>();
+            CopyInKvNotSparse(kvInUb, dealRows, s2StartIdx, runInfo, constInfo);
+            SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
+            WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
+            WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[pingPongV0]);
+            LocalTensor<Q_T> kvDequantOutUb = stage0OutBuf[pingPongV0].Get<Q_T>();
+            DequantKv(kvDequantOutUb, kvInUb, dealRows, s2ProcessBaseSize, constInfo);
+
+            SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
+
+            SetFlag<HardEvent::V_MTE3>(vToMte3V0Id[pingPongV0]);
+            WaitFlag<HardEvent::V_MTE3>(vToMte3V0Id[pingPongV0]);
+
+            if constexpr (IS_SPLIT_G) {
+                CopyOutKvUb2Gm(v0ResGm, kvDequantOutUb, dealRows, s2StartIdx, runInfo, constInfo);
+            } else {
+                CopyOutKvUb2L1(outputL1, kvDequantOutUb, dealRows, s2StartIdx, runInfo, constInfo);
+            }
+            SetFlag<HardEvent::MTE3_V>(mte3ToVV0Id[pingPongV0]);
+            pingPongV0 ^= 1;
         }
-        int64_t dealRows = s2ProcessSize;
-
-        if (dealRows == 0) {
-            continue;
+    } else {
+        for (uint32_t p = 0; p < 2U && static_cast<int64_t>(p) < s2V0LoopTimes; ++p) {
+            int64_t pRows = (static_cast<int64_t>(p) == s2V0LoopTimes - 1) ? s2Tail : s2ProcessBaseSize;
+            WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id3[p]);
+            CopyInKvNotSparse(stage0InBuf3[p].Get<KV_T>(), pRows,
+                              procS2Start + static_cast<int64_t>(p) * s2ProcessBaseSize, runInfo, constInfo);
+            SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id3[p]);
         }
-        WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
-        LocalTensor<KV_T> kvInUb = stage0InBuf[pingPongV0].Get<KV_T>();
-        CopyInKvNotSparse(kvInUb, dealRows, s2StartIdx, runInfo, constInfo);
-        SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
-        WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
-        WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[pingPongV0]);
-        LocalTensor<Q_T> kvDequantOutUb = stage0OutBuf[pingPongV0].Get<Q_T>();
-        DequantKv(kvDequantOutUb, kvInUb, dealRows, s2ProcessBaseSize, constInfo);
-
-        SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
-
-        SetFlag<HardEvent::V_MTE3>(vToMte3V0Id[pingPongV0]);
-        WaitFlag<HardEvent::V_MTE3>(vToMte3V0Id[pingPongV0]);
-
-        if constexpr (IS_SPLIT_G) {
-            CopyOutKvUb2Gm(v0ResGm, kvDequantOutUb, dealRows, s2StartIdx, runInfo, constInfo);
-        } else {
-            CopyOutKvUb2L1(outputL1, kvDequantOutUb, dealRows, s2StartIdx, runInfo, constInfo);
+        for (uint32_t i = 0; i < s2V0LoopTimes; i++) {
+            const uint32_t inBuf = i % V0_IN_BUF_NUM;
+            const uint32_t outBuf = i % NUM_2;
+            int64_t s2StartIdx = procS2Start + i * s2ProcessBaseSize;
+            int64_t dealRows = (static_cast<int64_t>(i) == s2V0LoopTimes - 1) ? s2Tail : s2ProcessBaseSize;
+            if (dealRows == 0) {
+                continue;
+            }
+            if (static_cast<int64_t>(i) + NUM_2 < s2V0LoopTimes) {
+                const uint32_t nextIdx = i + 2U;
+                const uint32_t nextBuf = nextIdx % V0_IN_BUF_NUM;
+                int64_t nRows = (static_cast<int64_t>(nextIdx) == s2V0LoopTimes - 1) ? s2Tail : s2ProcessBaseSize;
+                WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id3[nextBuf]);
+                CopyInKvNotSparse(stage0InBuf3[nextBuf].Get<KV_T>(), nRows,
+                                  procS2Start + static_cast<int64_t>(nextIdx) * s2ProcessBaseSize, runInfo, constInfo);
+                SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id3[nextBuf]);
+            }
+            WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id3[inBuf]);
+            LocalTensor<KV_T> kvInUb = stage0InBuf3[inBuf].Get<KV_T>();
+            LocalTensor<Q_T> kvDequantOutUb = stage0OutBuf[outBuf].Get<Q_T>();
+            WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[outBuf]);
+            DequantKv(kvDequantOutUb, kvInUb, dealRows, s2ProcessBaseSize, constInfo);
+            SetFlag<HardEvent::V_MTE2>(vToMte2V0Id3[inBuf]);
+            SetFlag<HardEvent::V_MTE3>(vToMte3V0Id[outBuf]);
+            WaitFlag<HardEvent::V_MTE3>(vToMte3V0Id[outBuf]);
+            if constexpr (IS_SPLIT_G) {
+                CopyOutKvUb2Gm(v0ResGm, kvDequantOutUb, dealRows, s2StartIdx, runInfo, constInfo);
+            } else {
+                CopyOutKvUb2L1(outputL1, kvDequantOutUb, dealRows, s2StartIdx, runInfo, constInfo);
+            }
+            SetFlag<HardEvent::MTE3_V>(mte3ToVV0Id[outBuf]);
         }
-        SetFlag<HardEvent::MTE3_V>(mte3ToVV0Id[pingPongV0]);
-        pingPongV0 ^= 1;
     }
 }
 
@@ -844,8 +879,8 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::CopyInKvNotSparse(Lo
     uint32_t combineDim = combineBytes / sizeof(KV_T);
     uint32_t combineDimAlign = CeilAlign(combineBytes, BUFFER_SIZE_BYTE_32B) / sizeof(KV_T);
     DataCopyExtParams intriParams;
-    intriParams.blockCount = dealRow;
-    intriParams.blockLen = combineBytes;
+    intriParams.blockCount = 1;
+    intriParams.blockLen = static_cast<uint32_t>(dealRow) * combineBytes;
     intriParams.dstStride = 0;
     intriParams.srcStride = 0;
     DataCopyPadExtParams<KV_T> padParams;
@@ -869,7 +904,7 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::CopyInKvNotSparse(Lo
             }
             uint64_t srcOffset = idInBlockTable * paBlockStride + remainElmenCnt * constInfo.n2Size * combineBytes +
                                  (uint64_t)(runInfo.n2oIdx * combineBytes); // BlockNum, BlockSize, N, D
-            intriParams.blockCount = copyElmenCnt;                          // base s2 size
+            intriParams.blockLen = copyElmenCnt * combineBytes;
             DataCopyPad(kvMergUb[dstOffset * combineDimAlign], keyGm[srcOffset], intriParams, padParams);
             dstOffset += copyElmenCnt;
             copyFinishElmenCnt += copyElmenCnt;
@@ -925,7 +960,6 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessVec0(outputl1
     bool isCmp = runInfo.s2LoopCount >= runInfo.oriKvLoopEndIdx;
     if (isCmp) {
         keyGm = cmpKVGm;
-        keyGmBytes = cmpKVGmBytes;
         kvPhyAddrGm = cmpKvPhyAddrGm;
         if constexpr (isPa) {
             blockTableGm = cmpBlockTableGm;
@@ -934,7 +968,6 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessVec0(outputl1
         }
     } else {
         keyGm = oriKVGm;
-        keyGmBytes = oriKVGmBytes;
         kvPhyAddrGm = oriKvPhyAddrGm;
         if constexpr (isPa) {
             blockTableGm = oriBlockTableGm;
@@ -1044,51 +1077,114 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessSparseKv(outp
     }
     int64_t s2ProcessBaseLoop = CeilDiv(s2RealSize, s2ProcessBaseSize);
     int64_t s2Start = procS2Start;
-    for (uint16_t i = 0; i < s2ProcessBaseLoop; ++i) {
-        int64_t remain = s2RealSize - i * s2ProcessBaseSize;
-        int64_t dealRows;
-        if (s2RealSize < s2ProcessBaseSize) {
-            dealRows = s2RealSize;
-        } else {
-            dealRows = (s2ProcessBaseSize < remain) ? s2ProcessBaseSize : remain;
-        }
-        // 1、gather kv in gm->ub
-        WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
-        LocalTensor<KV_T> kvInUb = stage0InBuf[pingPongV0].Get<KV_T>();
-        LocalTensor<uint8_t> kvInUbBytes = stage0InBuf[pingPongV0].Get<uint8_t>();
-        LocalTensor<Q_T> kvDequantOutUb = stage0OutBuf[pingPongV0].Get<Q_T>();
-        if constexpr (QUANT_MODE == SCALE_CONTIGUOUS_MODE::NONCONTIGUOUS) {
+    if constexpr (QUANT_MODE == SCALE_CONTIGUOUS_MODE::NONCONTIGUOUS) {
+        for (uint16_t i = 0; i < s2ProcessBaseLoop; ++i) {
+            int64_t remain = s2RealSize - i * s2ProcessBaseSize;
+            int64_t dealRows;
+            if (s2RealSize < s2ProcessBaseSize) {
+                dealRows = s2RealSize;
+            } else {
+                dealRows = (s2ProcessBaseSize < remain) ? s2ProcessBaseSize : remain;
+            }
+            // 1、gather kv in gm->ub
+            WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
+            LocalTensor<KV_T> kvInUb = stage0InBuf[pingPongV0].Get<KV_T>();
+            LocalTensor<uint8_t> kvInUbBytes = stage0InBuf[pingPongV0].Get<uint8_t>();
+            LocalTensor<Q_T> kvDequantOutUb = stage0OutBuf[pingPongV0].Get<Q_T>();
             const int64_t sparseBase = topkBS1Idx + runInfo.s2StartIdx + topkKIdx + s2ProcessBaseSize * i;
             CopyInMode2Rows(kvInUb, dealRows, sparseBase, true, runInfo, constInfo);
-        } else {
-            GatherParams gatherParams2{
-                static_cast<uint16_t>(dealRows),
+
+            SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
+            WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
+            // 2、 dequant by vf
+            WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[pingPongV0]);
+            DequantKv(kvDequantOutUb, kvInUb, dealRows, s2ProcessBaseSize, constInfo);
+            SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
+            // 3、 copy kv out, ub->l1
+            SetFlag<HardEvent::V_MTE3>(vToMte3V0Id[pingPongV0]);
+            WaitFlag<HardEvent::V_MTE3>(vToMte3V0Id[pingPongV0]);
+            if constexpr (IS_SPLIT_G) {
+                CopyOutKvUb2Gm(v0ResGm, kvDequantOutUb, dealRows, s2Start, runInfo, constInfo);
+            } else {
+                CopyOutKvUb2L1(outputL1, kvDequantOutUb, dealRows, s2Start, runInfo, constInfo);
+            }
+            SetFlag<HardEvent::MTE3_V>(mte3ToVV0Id[pingPongV0]);
+            s2Start += dealRows;
+            pingPongV0 ^= 1;
+        }
+    } else {
+        for (uint32_t p = 0; p < 2U && static_cast<int64_t>(p) < s2ProcessBaseLoop; ++p) {
+            int64_t pRemain = s2RealSize - static_cast<int64_t>(p) * s2ProcessBaseSize;
+            int64_t pRows = (s2RealSize < s2ProcessBaseSize) ?
+                                s2RealSize :
+                                ((s2ProcessBaseSize < pRemain) ? s2ProcessBaseSize : pRemain);
+            WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id3[p]);
+            LocalTensor<KV_T> kvInUbP = stage0InBuf3[p].Get<KV_T>();
+
+            GatherParams gatherParamsP{
+                static_cast<uint16_t>(pRows),
                 static_cast<uint32_t>(constInfo.dSizeVInput),
                 static_cast<uint32_t>(constInfo.dSizeVInput),
             };
-            GatherPadParams<uint8_t> gatherPadparams2{GatherPaddingMode::CONSTANT_PADDING_MODE,
-                                                      static_cast<uint8_t>(2)};
-            GatherDataCopy(kvInUbBytes, keyGmBytes, totalOffset64Tensor[s2ProcessBaseSize * i], gatherParams2,
-                           gatherPadparams2);
+            const uint8_t cacheMode = ExtractCacheMode(keyGm);
+            gather_gm_to_ubuf((__ubuf__ uint8_t*)kvInUbP.GetPhyAddr(), (__gm__ uint8_t*)(keyGm.GetPhyAddr()), 0,
+                              offsetType, constPadingCtrl,
+                              (__ubuf__ int64_t*)totalOffset64Tensor[s2ProcessBaseSize * p].GetPhyAddr(), cacheMode,
+                              gatherParamsP.burstLen, gatherParamsP.dstStride, gatherParamsP.offsetNum);
+            SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id3[p]);
         }
+        for (uint16_t i = 0; i < s2ProcessBaseLoop; ++i) {
+            const uint32_t inBuf = static_cast<uint32_t>(i) % V0_IN_BUF_NUM;
+            const uint32_t outBuf = static_cast<uint32_t>(i) % NUM_2;
+            int64_t remain = s2RealSize - i * s2ProcessBaseSize;
+            int64_t dealRows;
+            if (s2RealSize < s2ProcessBaseSize) {
+                dealRows = s2RealSize;
+            } else {
+                dealRows = (s2ProcessBaseSize < remain) ? s2ProcessBaseSize : remain;
+            }
+            // 0、预取第 i+2 个 tile（该 in-buffer 上一次 dequant 已完成）
+            if (static_cast<int64_t>(i) + NUM_2 < s2ProcessBaseLoop) {
+                const uint32_t nextIdx = static_cast<uint32_t>(i) + 2U;
+                const uint32_t nextBuf = nextIdx % V0_IN_BUF_NUM;
+                int64_t nRemain = s2RealSize - static_cast<int64_t>(nextIdx) * s2ProcessBaseSize;
+                int64_t nRows = (s2RealSize < s2ProcessBaseSize) ?
+                                    s2RealSize :
+                                    ((s2ProcessBaseSize < nRemain) ? s2ProcessBaseSize : nRemain);
+                WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id3[nextBuf]);
+                LocalTensor<KV_T> kvInUbN = stage0InBuf3[nextBuf].Get<KV_T>();
 
-        SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
-        WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id[pingPongV0]);
-        // 2、 dequant by vf
-        WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[pingPongV0]);
-        DequantKv(kvDequantOutUb, kvInUb, dealRows, s2ProcessBaseSize, constInfo);
-        SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[pingPongV0]);
-        // 3、 copy kv out, ub->l1
-        SetFlag<HardEvent::V_MTE3>(vToMte3V0Id[pingPongV0]);
-        WaitFlag<HardEvent::V_MTE3>(vToMte3V0Id[pingPongV0]);
-        if constexpr (IS_SPLIT_G) {
-            CopyOutKvUb2Gm(v0ResGm, kvDequantOutUb, dealRows, s2Start, runInfo, constInfo);
-        } else {
-            CopyOutKvUb2L1(outputL1, kvDequantOutUb, dealRows, s2Start, runInfo, constInfo);
+                GatherParams gatherParamsN{
+                    static_cast<uint16_t>(nRows),
+                    static_cast<uint32_t>(constInfo.dSizeVInput),
+                    static_cast<uint32_t>(constInfo.dSizeVInput),
+                };
+                const uint8_t cacheMode = ExtractCacheMode(keyGm);
+                gather_gm_to_ubuf((__ubuf__ uint8_t*)kvInUbN.GetPhyAddr(), (__gm__ uint8_t*)(keyGm.GetPhyAddr()), 0,
+                                  offsetType, constPadingCtrl,
+                                  (__ubuf__ int64_t*)totalOffset64Tensor[s2ProcessBaseSize * nextIdx].GetPhyAddr(),
+                                  cacheMode, gatherParamsN.burstLen, gatherParamsN.dstStride, gatherParamsN.offsetNum);
+
+                SetFlag<HardEvent::MTE2_V>(mte2ToVV0Id3[nextBuf]);
+            }
+            // 1、等当前 tile 的 gather，做 dequant
+            WaitFlag<HardEvent::MTE2_V>(mte2ToVV0Id3[inBuf]);
+            LocalTensor<KV_T> kvInUb = stage0InBuf3[inBuf].Get<KV_T>();
+            LocalTensor<Q_T> kvDequantOutUb = stage0OutBuf[outBuf].Get<Q_T>();
+            WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[outBuf]);
+            DequantKv(kvDequantOutUb, kvInUb, dealRows, s2ProcessBaseSize, constInfo);
+            SetFlag<HardEvent::V_MTE2>(vToMte2V0Id3[inBuf]);
+            // 2、 copy kv out, ub->l1
+            SetFlag<HardEvent::V_MTE3>(vToMte3V0Id[outBuf]);
+            WaitFlag<HardEvent::V_MTE3>(vToMte3V0Id[outBuf]);
+            if constexpr (IS_SPLIT_G) {
+                CopyOutKvUb2Gm(v0ResGm, kvDequantOutUb, dealRows, s2Start, runInfo, constInfo);
+            } else {
+                CopyOutKvUb2L1(outputL1, kvDequantOutUb, dealRows, s2Start, runInfo, constInfo);
+            }
+            SetFlag<HardEvent::MTE3_V>(mte3ToVV0Id[outBuf]);
+            s2Start += dealRows;
         }
-        SetFlag<HardEvent::MTE3_V>(mte3ToVV0Id[pingPongV0]);
-        s2Start += dealRows;
-        pingPongV0 ^= 1;
     }
 }
 
@@ -1497,23 +1593,25 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessVec2(mmResPos
         mqsmlaIsFirstVec2Base = runInfo.isFirstBase;
     }
     if (unlikely(mqsmlaIsFirstVec2Base)) {
-        DataCopyParams intriParams;
-        intriParams.blockCount = runInfo.vec2MRealSize; // 连续数据块个数为1
-        intriParams.blockLen = constInfo.dSizeV / NUM_4 * sizeof(float) /
-                               BUFFER_SIZE_BYTE_32B; // 连续数据块长度，单位为DataBlock，此处长度为512个half元素
-        intriParams.srcGap = 0;                      // 源操作数做连续搬运
-        intriParams.dstGap = dstGap * sizeof(float) / BUFFER_SIZE_BYTE_32B; // 目的操作数连续排布
         bmm2ResBuf.WaitCrossCore();
-        DataCopy(vec2ResUb[0], mmRes, intriParams); // todo
+        asc_copy_ub2ub((__ubuf__ void*)vec2ResUb[0].GetPhyAddr(), (__ubuf__ void*)mmRes.GetPhyAddr(),
+                       runInfo.vec2MRealSize, constInfo.dSizeV / NUM_4 * sizeof(float) / BUFFER_SIZE_BYTE_32B, 0,
+                       dstGap * sizeof(float) / BUFFER_SIZE_BYTE_32B);
         bmm2ResBuf.SetCrossCore();
         bmm2ResBuf1.WaitCrossCore();
-        DataCopy(vec2ResUb[NUM_128], mmRes1, intriParams); // todo
+        asc_copy_ub2ub((__ubuf__ void*)vec2ResUb[NUM_128].GetPhyAddr(), (__ubuf__ void*)mmRes1.GetPhyAddr(),
+                       runInfo.vec2MRealSize, constInfo.dSizeV / NUM_4 * sizeof(float) / BUFFER_SIZE_BYTE_32B, 0,
+                       dstGap * sizeof(float) / BUFFER_SIZE_BYTE_32B);
         bmm2ResBuf1.SetCrossCore();
         bmm2ResBuf.WaitCrossCore();
-        DataCopy(vec2ResUb[NUM_256], mmRes, intriParams); // todo
+        asc_copy_ub2ub((__ubuf__ void*)vec2ResUb[NUM_256].GetPhyAddr(), (__ubuf__ void*)mmRes.GetPhyAddr(),
+                       runInfo.vec2MRealSize, constInfo.dSizeV / NUM_4 * sizeof(float) / BUFFER_SIZE_BYTE_32B, 0,
+                       dstGap * sizeof(float) / BUFFER_SIZE_BYTE_32B);
         bmm2ResBuf.SetCrossCore();
         bmm2ResBuf1.WaitCrossCore();
-        DataCopy(vec2ResUb[NUM_384], mmRes1, intriParams); // todo
+        asc_copy_ub2ub((__ubuf__ void*)vec2ResUb[NUM_384].GetPhyAddr(), (__ubuf__ void*)mmRes1.GetPhyAddr(),
+                       runInfo.vec2MRealSize, constInfo.dSizeV / NUM_4 * sizeof(float) / BUFFER_SIZE_BYTE_32B, 0,
+                       dstGap * sizeof(float) / BUFFER_SIZE_BYTE_32B);
         if (!IS_BATCH_CONSISTENCY || !runInfo.isLastBase) {
             bmm2ResBuf1.SetCrossCore();
         }
@@ -2347,7 +2445,6 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitGlobalBuffer(
 {
     if (oriKV != nullptr) {
         oriKVGm.SetGlobalBuffer((__gm__ KV_T*)(oriKV));
-        oriKVGmBytes.SetGlobalBuffer((__gm__ uint8_t*)(oriKV));
     }
 
     if constexpr (isPa) {
@@ -2357,7 +2454,6 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitGlobalBuffer(
     if constexpr (TEMPLATE_MODE != MQSMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != MQSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
         cmpKVGm.SetGlobalBuffer((__gm__ KV_T*)cmpKV);
-        cmpKVGmBytes.SetGlobalBuffer((__gm__ uint8_t*)cmpKV);
         if constexpr (isPa) {
             cmpBlockTableGm.SetGlobalBuffer((__gm__ int32_t*)cmpBlockTable);
         }
@@ -2422,30 +2518,41 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitLocalBuffer(TPip
     if constexpr (QUANT_MODE == SCALE_CONTIGUOUS_MODE::NONCONTIGUOUS) {
         const uint32_t scaleNumPerRow = 64;
         tPipe->InitBuffer(dequantScaleMode2Buf_, v0BaseSize * scaleNumPerRow * sizeof(float));
+        tPipe->InitBuffer(stage0InBuf[0], dVTemplateTypeInput * v0BaseSize * sizeof(KV_T));
+        tPipe->InitBuffer(stage0InBuf[1], dVTemplateTypeInput * v0BaseSize * sizeof(KV_T));
+        mte2ToVV0Id[0] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
+        mte2ToVV0Id[1] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
+        vToMte2V0Id[0] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
+        vToMte2V0Id[1] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
+        SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[0]);
+        SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[1]);
+    } else {
+        tPipe->InitBuffer(stage0InBuf3[0], dVTemplateTypeInput * v0BaseSize * sizeof(KV_T));
+        tPipe->InitBuffer(stage0InBuf3[1], dVTemplateTypeInput * v0BaseSize * sizeof(KV_T));
+        tPipe->InitBuffer(stage0InBuf3[NUM_2], dVTemplateTypeInput * v0BaseSize * sizeof(KV_T));
+        mte2ToVV0Id3[0] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
+        mte2ToVV0Id3[1] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
+        mte2ToVV0Id3[NUM_2] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
+        vToMte2V0Id3[0] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
+        vToMte2V0Id3[1] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
+        vToMte2V0Id3[NUM_2] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
+        SetFlag<HardEvent::V_MTE2>(vToMte2V0Id3[0]);
+        SetFlag<HardEvent::V_MTE2>(vToMte2V0Id3[1]);
+        SetFlag<HardEvent::V_MTE2>(vToMte2V0Id3[NUM_2]);
     }
 
     tPipe->InitBuffer(commonTBuf, 512); // commonTBuf内存申请512B
     tPipe->InitBuffer(sinksBuf, 512);   // sinksBuf内存申请512B
 
-    tPipe->InitBuffer(stage0InBuf[0], dVTemplateTypeInput * v0BaseSize * sizeof(KV_T));
-    tPipe->InitBuffer(stage0InBuf[1], dVTemplateTypeInput * v0BaseSize * sizeof(KV_T));
-    tPipe->InitBuffer(stage0OutBuf[0], dVTemplateTypeInput * (v0BaseSize + 1) * sizeof(Q_T));
-    tPipe->InitBuffer(stage0OutBuf[1], dVTemplateTypeInput * (v0BaseSize + 1) * sizeof(Q_T));
+    tPipe->InitBuffer(stage0OutBuf[0], dVTemplateType * (v0BaseSize + 1) * sizeof(Q_T));
+    tPipe->InitBuffer(stage0OutBuf[1], dVTemplateType * (v0BaseSize + 1) * sizeof(Q_T));
 
     tPipe->InitBuffer(stage1OutQue, 1, vec1Srcstride * s2BaseSize * sizeof(Q_T));
 
     tPipe->InitBuffer(stage2OutBuf, (s1BaseSize / CV_RATIO) * dTemplateAlign64 * sizeof(T));
 
-    tPipe->InitBuffer(sparseIndiceBuf, s2BaseSize * sizeof(int32_t));
-    tPipe->InitBuffer(paBlockIdxOffsetBuf, s2BaseSize * sizeof(int32_t));
-    tPipe->InitBuffer(tailBlockOffsetBuf, s2BaseSize * sizeof(uint32_t));
-    tPipe->InitBuffer(paBlockIdBuf, s2BaseSize * sizeof(int32_t));
     tPipe->InitBuffer(totalOffsetBuf, s2BaseSize * sizeof(int64_t));
 
-    sparseIndiceTensor = sparseIndiceBuf.Get<int32_t>();
-    paBlockIdxOffsetTensor = paBlockIdxOffsetBuf.Get<int32_t>();
-    tailBlockOffsetTensor = tailBlockOffsetBuf.Get<uint32_t>();
-    paBlockIdTensor = paBlockIdBuf.Get<int32_t>();
     totalOffsetTensor = totalOffsetBuf.Get<int64_t>();
 
     mte3ToVId = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
@@ -2456,12 +2563,6 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitLocalBuffer(TPip
         vToMte3LseOutId_ = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
         SetFlag<HardEvent::MTE3_V>(mte3ToVLseOutId_);
     }
-    mte2ToVV0Id[0] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
-    mte2ToVV0Id[1] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
-    vToMte2V0Id[0] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
-    vToMte2V0Id[1] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
-    SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[0]);
-    SetFlag<HardEvent::V_MTE2>(vToMte2V0Id[1]);
 
     vToMte3V0Id[0] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
     vToMte3V0Id[1] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
@@ -2512,9 +2613,15 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::FreeEvent()
         WaitFlag<HardEvent::V_MTE2>(reducePartialOEventId);
         WaitFlag<HardEvent::V_MTE2>(reduceMaxSumEventId);
     }
+    if constexpr (QUANT_MODE == SCALE_CONTIGUOUS_MODE::NONCONTIGUOUS) {
+        WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[0]);
+        WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[1]);
+    } else {
+        WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id3[0]);
+        WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id3[1]);
+        WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id3[NUM_2]);
+    }
     WaitFlag<HardEvent::MTE3_V>(mte3ToVId);
-    WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[0]);
-    WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[1]);
     WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[0]);
     WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[1]);
 }
