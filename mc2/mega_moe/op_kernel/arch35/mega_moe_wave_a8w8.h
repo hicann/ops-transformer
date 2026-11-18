@@ -31,7 +31,7 @@ constexpr uint32_t GMM2_LAG_MIN_TOKEN_NUM = 4096U;
         MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format
 
 /*
- * 公共初始化、输入准备、共享专家和 Unpermute 由 MegaMoe 基类统一实现；本类保留 A8W8 特有的
+ * Init、输入准备、共享专家和 Unpermute 由 MegaMoe 基类统一实现；本类保留 A8W8 特有的
  * 双 Wave lookahead、GMM1/GMM2 交错调度及量化 Combine 编排。
  */
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived = void>
@@ -41,11 +41,12 @@ private:
     friend MegaMoeBase;
 
 public:
-    __aicore__ inline void Init(
-        GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
-        GM_ADDR weight2, GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales,
-        GM_ADDR sharedWeight1, GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
-        GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData, GM_ADDR tilingGM);
+    __aicore__ inline void Init(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
+                                GM_ADDR weight2, GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2,
+                                GM_ADDR scales, GM_ADDR sharedWeight1, GM_ADDR sharedWeight2,
+                                GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
+                                GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData,
+                                GM_ADDR tilingGM);
     __aicore__ inline void Process();
 
 protected:
@@ -179,16 +180,14 @@ private:
 
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>
 __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDerived>::Init(
-    GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
-    GM_ADDR weight2, GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales,
-    GM_ADDR sharedWeight1, GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
+    GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1, GM_ADDR weight2,
+    GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales, GM_ADDR sharedWeight1,
+    GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
     GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData, GM_ADDR tilingGM)
 {
-    const GM_ADDR dumpBase = this->InitBaseState(
-        context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2, scales,
-        sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut, expertTokenNumsOut,
-        workspaceGM, tilingData, tilingGM);
-    this->InitWithImpl(GetImpl(), dumpBase, tilingGM);
+    this->InitWithImpl(GetImpl(), context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1,
+                 weightScales2, scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2,
+                 yOut, expertTokenNumsOut, workspaceGM, tilingData, tilingGM);
 }
 
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>
