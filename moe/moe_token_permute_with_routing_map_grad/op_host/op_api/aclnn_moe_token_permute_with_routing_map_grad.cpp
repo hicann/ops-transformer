@@ -466,6 +466,10 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize(
 
     // 如果是空tensor，直接返回
     if (permutedTokenOutputGrad->IsEmpty() || tokensGradOut->IsEmpty()) {
+        if (probsGradOutOptional != nullptr && !probsGradOutOptional->IsEmpty()) {
+            OP_LOGW("Token gradient input or output is empty. Skipping computation; non-empty "
+                    "probsGradOutOptional will not be written.");
+        }
         *workspaceSize = 0;
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
