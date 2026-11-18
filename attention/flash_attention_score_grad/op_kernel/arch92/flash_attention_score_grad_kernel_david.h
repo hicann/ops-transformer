@@ -53,9 +53,7 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
     if constexpr (IS_BN2_MULTIBLK) {
         ProcessBn2MultiBlk();
     } else {
-        // Column ownership is independent of the host's legacy small-task partition.
-        if (this->tilingData->s1s2BNGS1S2BlockNumList.blockEnds[this->cBlockIdx] == 0 &&
-            !(this->enableDenseSwizzle || this->enableCasualSwizzle)) {
+        if (this->tilingData->s1s2BNGS1S2BlockNumList.blockEnds[this->cBlockIdx] == 0) {
             return;
         }
         int64_t taskId = 0, preRunId = -1, runId = 0, nextRunId = 1;

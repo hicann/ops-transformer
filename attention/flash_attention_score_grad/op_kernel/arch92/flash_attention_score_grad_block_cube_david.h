@@ -50,8 +50,7 @@ public:
         IS_FP32_INPUT ? 2 :
                         (IS_FP8_INPUT ? (HEAD_DIM_ALIGN <= 256 ? 4 : 2) :
                                         (HEAD_DIM_ALIGN <= 128 ? 4 : 2)); // D小于128 Q DX共用4块buff，Dk Dv做L1复用 4
-    constexpr static bool IS_V_L1_DOUBLE_BUFFER =
-        IS_FP16_INPUT && HEAD_DIM_ALIGN == 192 && CUBE_BASEM == 256 && CUBE_BASEN == 128 && SPLIT_AXIS == BN2GS1S2;
+    constexpr static bool IS_V_L1_DOUBLE_BUFFER = IS_FP16_INPUT && HEAD_DIM_ALIGN == 192 && SPLIT_AXIS == BN2GS1S2;
     constexpr static uint32_t KV_L1_BUF_NUM =
         IS_V_L1_DOUBLE_BUFFER ? 4 :
         IS_FP32_INPUT         ? 2 :

@@ -2926,8 +2926,7 @@ void FlashAttentionScoreGradTilingUs1s2Bs2David::SaveNonTndColumnSwizzleParam()
     tndSwizzleParam_->set_totalValidS2TaskNum(0);
     tndSwizzleParam_->set_activeCoreNum(0);
     tndSwizzleParam_->set_columnScheduleMode(TND_VALID_S2_COLUMN_SIMPLE_CYCLIC);
-    if (!fBaseParams.isSwizzle || fBaseParams.s1CvInner != 256 || fBaseParams.cvS2Inner != 128 ||
-        fBaseParams.s1 < 32768 || fBaseParams.s2 < 32768) {
+    if (!fBaseParams.isSwizzle || fBaseParams.s1 < 32768 || fBaseParams.s2 < 32768) {
         return;
     }
     const bool isCausal = fBaseParams.sparseType == static_cast<uint8_t>(SparseType::CASUAL);

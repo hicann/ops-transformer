@@ -240,6 +240,7 @@ __aicore__ inline void CopyInMaxSumWithTbuf(FagConstInfo& constInfo, FagRunInfo&
         sfmgGmOffset = maxSumGmOffset;
     }
     LocalTensor<T2> maxSumTensor = maxSumBuf.Get<T2>();
+    uint32_t validRows = runInfo.commonRunInfo.halfS1RealSize;
     if (constInfo.tndMaxSumLayout == MAX_SUM_TND) {
         srcStride = constInfo.commonConstInfo.n2G * MAX_SUM_REDUCE_AXIS_SIZE - MAX_SUM_REDUCE_AXIS_SIZE;
         DataCopyPad(maxSumTensor[maxSumTensorOffset], sumGm[maxSumGmOffset],
@@ -252,14 +253,14 @@ __aicore__ inline void CopyInMaxSumWithTbuf(FagConstInfo& constInfo, FagRunInfo&
                     {false, 0, 0, 0}, /*pre_alloc*/ true);
     } else {
         DataCopyPad(maxSumTensor[maxSumTensorOffset], sumGm[maxSumGmOffset],
-                    {1, static_cast<uint16_t>(VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE), srcStride, 0}, {false, 0, 0, 0},
+                    {1, static_cast<uint16_t>(validRows * MAX_SUM_REDUCE_AXIS_SIZE), srcStride, 0}, {false, 0, 0, 0},
                     /*pre_alloc*/ true);
         DataCopyPad(maxSumTensor[maxSumTensorOffset + maxOffset], maxGm[maxSumGmOffset],
-                    {1, static_cast<uint16_t>(VECTOR_BASEM * MAX_SUM_REDUCE_AXIS_SIZE), srcStride, 0}, {false, 0, 0, 0},
+                    {1, static_cast<uint16_t>(validRows * MAX_SUM_REDUCE_AXIS_SIZE), srcStride, 0}, {false, 0, 0, 0},
                     /*pre_alloc*/ true);
     }
     DataCopyPad(maxSumTensor[maxSumTensorOffset + sfmgOffset], sfmgWorkspaceGm[sfmgGmOffset / 8],
-                {1, static_cast<uint16_t>(VECTOR_BASEM * sizeof(T2)), 0, 0}, {false, 0, 0, 0}, /*pre_alloc*/ true);
+                {1, static_cast<uint16_t>(validRows * sizeof(T2)), 0, 0}, {false, 0, 0, 0}, /*pre_alloc*/ true);
 }
 
 template <typename T2, const uint32_t VECTOR_BASEN = 64>
