@@ -148,7 +148,6 @@ struct RunInfo {
 };
 
 struct ConstInfo {
-    bool isSoftmaxLseEnable;
     bool isActualLenDimsKVNull;
     uint32_t sparseBlockCount;
     SMLA_CONST_INFO_COMMON_FIELDS;

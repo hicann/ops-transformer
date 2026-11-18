@@ -1019,7 +1019,7 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessSparseKv(outp
     LocalTensor<int64_t> totalOffset64Tensor = totalOffsetTensor.ReinterpretCast<int64_t>();
     if constexpr (QUANT_MODE == SCALE_CONTIGUOUS_MODE::CONTIGUOUS) {
         GlobalTensor<int64_t> kvPhyAddrGm64 = kvPhyAddrGm.template ReinterpretCast<int64_t>();
-        if constexpr (TOPK_VALUE_MODE == TopkValueMode::TOPK_OFFSET_MODE || (!IS_VEC_S2PHYADDR)) {
+        if constexpr (!IS_VEC_S2PHYADDR) {
             SetFlag<HardEvent::MTE2_S>(mte2ToSOffsetsId);
             WaitFlag<HardEvent::MTE2_S>(mte2ToSOffsetsId);
             const int64_t sparseBase = topkBS1Idx + runInfo.s2StartIdx + topkKIdx;
@@ -1158,22 +1158,24 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessVec1(outputl1
     if (!isFirstSoftmaxBase || isSinks) {
         SFAUpdateExpSumAndExpMax<T>(sumUb, maxUb, expUb, sumUb, maxUb, apiTmpBuffer, runInfo.halfMRealSize);
     }
-    const bool copyOutLse = (!IS_BATCH_CONSISTENCY || runInfo.reduceBlockId == 0) && !runInfo.isCrossCoreSplit &&
-                            constInfo.isSoftmaxLseEnable && this->isSoftmaxLseGmValid_ && runInfo.halfMRealSize > 0 &&
-                            runInfo.s2LoopCount == runInfo.s2LoopLimit;
-    if (copyOutLse) {
-        LocalTensor<float> outLse = outLseBuf_[runInfo.multiCoreIdxMod2].template Get<float>();
-        DataCopyExtParams lseParams;
-        lseParams.blockCount = 1;
-        lseParams.blockLen = static_cast<uint32_t>(runInfo.halfMRealSize * sizeof(float));
-        lseParams.srcStride = 0;
-        lseParams.dstStride = 0;
-        WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId_);
-        ComputeLse<float>(outLse, sumUb, maxUb, static_cast<uint32_t>(runInfo.halfMRealSize));
-        SetFlag<HardEvent::V_MTE3>(vToMte3LseOutId_);
-        WaitFlag<HardEvent::V_MTE3>(vToMte3LseOutId_);
-        DataCopyPad(this->softmaxLseGm_[runInfo.softmaxLseOffset], outLse, lseParams);
-        SetFlag<HardEvent::MTE3_V>(mte3ToVLseOutId_);
+    if constexpr (!HIGH_PERF) {
+        const bool copyOutLse = (!IS_BATCH_CONSISTENCY || runInfo.reduceBlockId == 0) && !runInfo.isCrossCoreSplit &&
+                                this->isSoftmaxLseGmValid_ && runInfo.halfMRealSize > 0 &&
+                                runInfo.s2LoopCount == runInfo.s2LoopLimit;
+        if (copyOutLse) {
+            LocalTensor<float> outLse = outLseBuf_[runInfo.multiCoreIdxMod2].template Get<float>();
+            DataCopyExtParams lseParams;
+            lseParams.blockCount = 1;
+            lseParams.blockLen = static_cast<uint32_t>(runInfo.halfMRealSize * sizeof(float));
+            lseParams.srcStride = 0;
+            lseParams.dstStride = 0;
+            WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId_);
+            ComputeLse<float>(outLse, sumUb, maxUb, static_cast<uint32_t>(runInfo.halfMRealSize));
+            SetFlag<HardEvent::V_MTE3>(vToMte3LseOutId_);
+            WaitFlag<HardEvent::V_MTE3>(vToMte3LseOutId_);
+            DataCopyPad(this->softmaxLseGm_[runInfo.softmaxLseOffset], outLse, lseParams);
+            SetFlag<HardEvent::MTE3_V>(mte3ToVLseOutId_);
+        }
     }
     if constexpr (IS_BATCH_CONSISTENCY) {
         if (runInfo.isLastBase) {
@@ -1733,9 +1735,11 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::CleanOutput(__gm__ u
 {
     if ASCEND_IS_AIV {
         this->attentionOutGm.SetGlobalBuffer((__gm__ OUTPUT_T*)attentionOut);
-        isSoftmaxLseGmValid_ = constInfo.isSoftmaxLseEnable && softmaxLse != nullptr;
-        if (isSoftmaxLseGmValid_) {
-            softmaxLseGm_.SetGlobalBuffer((__gm__ float*)softmaxLse);
+        if constexpr (!HIGH_PERF) {
+            isSoftmaxLseGmValid_ = softmaxLse != nullptr;
+            if (isSoftmaxLseGmValid_) {
+                softmaxLseGm_.SetGlobalBuffer((__gm__ float*)softmaxLse);
+            }
         }
     }
 }
@@ -1762,9 +1766,11 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitOutput(ConstInfo
         }
         const int64_t attentionOutSeqOffset = (seqOffset + gS1Cur) * constInfo.n2GDv + outputGStart * constInfo.dSizeV;
         matmul::InitOutput<OUTPUT_T>(this->attentionOutGm[attentionOutSeqOffset], outputGSize * constInfo.dSizeV, 0);
-        if (constInfo.isSoftmaxLseEnable && isSoftmaxLseGmValid_) {
-            const int64_t lseOffset = (seqOffset + gS1Cur) * constInfo.gSize + outputGStart;
-            matmul::InitOutput<float>(softmaxLseGm_[lseOffset], outputGSize, 0);
+        if constexpr (!HIGH_PERF) {
+            if (isSoftmaxLseGmValid_) {
+                const int64_t lseOffset = (seqOffset + gS1Cur) * constInfo.gSize + outputGStart;
+                matmul::InitOutput<float>(softmaxLseGm_[lseOffset], outputGSize, 0);
+            }
         }
     }
 }
@@ -2402,9 +2408,14 @@ TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitLocalBuffer(TPipe* pipe, ConstInfo& constInfo)
 {
     SoftmaxInitBuffer();
-    mte2ToSOffsetsId = GetTPipePtr()->AllocEventID<HardEvent::MTE2_S>();
-    sToMte2OffsetsId = GetTPipePtr()->AllocEventID<HardEvent::S_MTE2>();
-    if (constInfo.isSoftmaxLseEnable) {
+    if constexpr ((TEMPLATE_MODE == MQSMLATemplateMode::CSA_TEMPLATE_MODE ||
+                   TEMPLATE_MODE == MQSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                   TEMPLATE_MODE == MQSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+                  QUANT_MODE == SCALE_CONTIGUOUS_MODE::CONTIGUOUS && !IS_VEC_S2PHYADDR) {
+        mte2ToSOffsetsId = GetTPipePtr()->AllocEventID<HardEvent::MTE2_S>();
+        sToMte2OffsetsId = GetTPipePtr()->AllocEventID<HardEvent::S_MTE2>();
+    }
+    if constexpr (!HIGH_PERF) {
         tPipe->InitBuffer(outLseBuf_[0], 256U);
         tPipe->InitBuffer(outLseBuf_[1], 256U);
     }
@@ -2440,9 +2451,11 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitLocalBuffer(TPip
     mte3ToVId = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
     vToMte3Id = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
     SetFlag<HardEvent::MTE3_V>(mte3ToVId);
-    mte3ToVLseOutId_ = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
-    vToMte3LseOutId_ = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
-    SetFlag<HardEvent::MTE3_V>(mte3ToVLseOutId_);
+    if constexpr (!HIGH_PERF) {
+        mte3ToVLseOutId_ = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
+        vToMte3LseOutId_ = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
+        SetFlag<HardEvent::MTE3_V>(mte3ToVLseOutId_);
+    }
     mte2ToVV0Id[0] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
     mte2ToVV0Id[1] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
     vToMte2V0Id[0] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
@@ -2483,11 +2496,18 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitLocalBuffer(TPip
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::FreeEvent()
 {
-    GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_S>(mte2ToSOffsetsId);
-    GetTPipePtr()->ReleaseEventID<HardEvent::S_MTE2>(sToMte2OffsetsId);
-    WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId_);
-    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVLseOutId_);
-    GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3LseOutId_);
+    if constexpr ((TEMPLATE_MODE == MQSMLATemplateMode::CSA_TEMPLATE_MODE ||
+                   TEMPLATE_MODE == MQSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                   TEMPLATE_MODE == MQSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+                  QUANT_MODE == SCALE_CONTIGUOUS_MODE::CONTIGUOUS && !IS_VEC_S2PHYADDR) {
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_S>(mte2ToSOffsetsId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::S_MTE2>(sToMte2OffsetsId);
+    }
+    if constexpr (!HIGH_PERF) {
+        WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId_);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVLseOutId_);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3LseOutId_);
+    }
     if constexpr (IS_BATCH_CONSISTENCY) {
         WaitFlag<HardEvent::V_MTE2>(reducePartialOEventId);
         WaitFlag<HardEvent::V_MTE2>(reduceMaxSumEventId);

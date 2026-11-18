@@ -86,11 +86,11 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
     template <typename Q_T, typename KV_T, typename T, typename OUTPUT_T, bool isFd, bool isPa, \
               MQSMLA_LAYOUT LAYOUT_T, MQSMLA_LAYOUT KV_LAYOUT_T, MQSMLATemplateMode TEMPLATE_MODE, bool IS_SPLIT_G, \
               bool IS_VEC_S2PHYADDR, bool IS_BATCH_CONSISTENCY, TopkValueMode TOPK_VALUE_MODE, \
-              SCALE_CONTIGUOUS_MODE QUANT_MODE>
+              SCALE_CONTIGUOUS_MODE QUANT_MODE, bool HIGH_PERF>
 
 #define TEMPLATE_INTF_ARGS \
     Q_T, KV_T, T, OUTPUT_T, isFd, isPa, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G, IS_VEC_S2PHYADDR, \
-        IS_BATCH_CONSISTENCY, TOPK_VALUE_MODE, QUANT_MODE
+        IS_BATCH_CONSISTENCY, TOPK_VALUE_MODE, QUANT_MODE, HIGH_PERF
 
 #define CUBE_BLOCK_TRAITS_TYPE_FIELDS(X) \
     X(Q_T) \
@@ -108,7 +108,8 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
     X(IS_VEC_S2PHYADDR, bool, false) \
     X(IS_BATCH_CONSISTENCY, bool, false) \
     X(TOPK_VALUE_MODE, TopkValueMode, TopkValueMode::TOPK_INDEX_MODE) \
-    X(QUANT_MODE, SCALE_CONTIGUOUS_MODE, SCALE_CONTIGUOUS_MODE::CONTIGUOUS)
+    X(QUANT_MODE, SCALE_CONTIGUOUS_MODE, SCALE_CONTIGUOUS_MODE::CONTIGUOUS) \
+    X(HIGH_PERF, bool, false)
 
 /* 1. 生成带默认值的模版Template */
 #define GEN_TYPE_PARAM(name) typename name,

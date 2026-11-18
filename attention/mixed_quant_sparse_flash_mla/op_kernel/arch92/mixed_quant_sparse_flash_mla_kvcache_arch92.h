@@ -228,7 +228,7 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr& runParam, const ConstIn
         if (constInfo.subBlockIdx == 1) {
             runParam.attentionOutOffset += runParam.halfMRealSize * constInfo.dSizeV;
         }
-        if (constInfo.isSoftmaxLseEnable) {
+        if constexpr (!HIGH_PERF) {
             if constexpr (LAYOUT_T == MQSMLA_LAYOUT::TND) {
                 runParam.softmaxLseOffset = runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
                                             (seqOffset + runParam.sOuterOffset) * constInfo.gSize + runParam.goIdx;
@@ -377,7 +377,9 @@ __aicore__ inline void InitTaskParamByRun(const RunParamStr& runParam, RunInfo& 
         runInfo.cmpResidual = runParam.cmpResidual;
         runInfo.cmpKvLoopEndIdx = runParam.cmpKvLoopEndIdx;
     }
-    runInfo.softmaxLseOffset = runParam.softmaxLseOffset;
+    if constexpr (!HIGH_PERF) {
+        runInfo.softmaxLseOffset = runParam.softmaxLseOffset;
+    }
     runInfo.qSNumInOneBlock = runParam.qSNumInOneBlock;
     runInfo.oriKvLoopEndIdx = runParam.oriKvLoopEndIdx;
     runInfo.isCmp = runInfo.s2LoopCount >= runInfo.oriKvLoopEndIdx;
