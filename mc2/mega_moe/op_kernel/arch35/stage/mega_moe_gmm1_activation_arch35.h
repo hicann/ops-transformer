@@ -294,42 +294,63 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(bool topkWeightsPrefetch,
             static_cast<uint64_t>(globalTokenStartIndex);
     // Dispatch 输入按自身循环开关选择行号；GMM1 输出和激活仍按各自的循环物理行寻址。
     const uint64_t dispatchTokenStartIndex =
-        gmmConfig.ring.dispatch ? physicalTokenStartIndex : static_cast<uint64_t>(globalTokenStartIndex);
+        gmmConfig.ring.dispatch ?
+            CalcMteRingPhysicalRow(state.paddedTokenStartIndex + rowOffsetInExpert, gmmConfig.ring.rows) :
+            static_cast<uint64_t>(globalTokenStartIndex);
+    const uint64_t activationTokenStartIndex =
+        gmmConfig.ring.activation ?
+            CalcMteRingPhysicalRow(state.paddedTokenStartIndex + rowOffsetInExpert, gmmConfig.ring.rows) :
+            static_cast<uint64_t>(globalTokenStartIndex);
     uint32_t expertMGroupOffset = rowOffsetInExpert / L1_TILE_M_256;
     gmmAddrInfo.gmm1LogicalPaddedRow = state.paddedTokenStartIndex + rowOffsetInExpert;
-    int64_t scaleK = Ops::Base::CeilDiv(k, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
 
-    if (UseA8W4Gmm1 || topkWeightsPrefetch) {
-        gmmAddrInfo.gmm1OutGlobal =
-            workspace.routed.gmm1Output.get_ptr(workspaceBase) + physicalTokenStartIndex * n * sizeof(bfloat16_t);
+    if constexpr (Std::IsSame<ActivationType, bfloat16_t>::value) {
+        // BF16 提前乘权也直接消费 UB 结果；元信息按本次分段的逻辑起始行定位。
+        gmmAddrInfo.gmm1OutGlobal = nullptr;
+        gmmAddrInfo.metaInfoGlobal = workspace.routing.receivedTokenMetadata.get_ptr(workspaceBase) +
+                                     globalTokenStartIndex * META_INFO_SIZE * sizeof(int32_t);
+    } else {
+        if (UseA8W4Gmm1 || topkWeightsPrefetch) {
+            gmmAddrInfo.gmm1OutGlobal =
+                workspace.routed.gmm1Output.get_ptr(workspaceBase) + physicalTokenStartIndex * n * sizeof(bfloat16_t);
+        }
+        gmmAddrInfo.metaInfoGlobal = workspace.routing.receivedTokenMetadata.get_ptr(workspaceBase);
     }
-    gmmAddrInfo.metaInfoGlobal = workspace.routing.receivedTokenMetadata.get_ptr(workspaceBase);
     gmmAddrInfo.activationToGmm2Flag =
         reinterpret_cast<__gm__ int32_t*>(workspace.sync.activationReady.get_ptr(workspaceBase)) +
         expertOffset * syncLayout.activationFlagSlotCountPerExpert +
         static_cast<uint64_t>(expertMGroupOffset) * INT_CACHELINE;
     gmmAddrInfo.aGlobal = workspace.routed.gmm1Input.data.get_ptr(workspaceBase) +
                           dispatchTokenStartIndex * k / ActivationElementsPerByte * sizeof(ActivationType);
-    gmmAddrInfo.aScaleGlobal = workspace.routed.gmm1Input.scale.get_ptr(workspaceBase) +
-                               dispatchTokenStartIndex * scaleK * sizeof(QuantScaleType);
     gmmAddrInfo.bGlobal =
         GetExpertWeightAddr<WeightType>(weights.weight1, gmmConfig.isPerExpertWeightTensor, state.expertIdx,
                                         static_cast<uint64_t>(state.expertIdx) * n * k / weightElementsPerByte);
-    gmmAddrInfo.bScaleGlobal =
-        GetExpertWeightAddr<QuantScaleType>(weights.weightScales1, gmmConfig.isPerExpertWeightTensor, state.expertIdx,
-                                            static_cast<uint64_t>(state.expertIdx) * n * scaleK);
+    if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
+        int64_t scaleK = Ops::Base::CeilDiv(k, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+        gmmAddrInfo.aScaleGlobal = workspace.routed.gmm1Input.scale.get_ptr(workspaceBase) +
+                                   dispatchTokenStartIndex * scaleK * sizeof(QuantScaleType);
+        gmmAddrInfo.bScaleGlobal =
+            GetExpertWeightAddr<QuantScaleType>(weights.weightScales1, gmmConfig.isPerExpertWeightTensor,
+                                                state.expertIdx, static_cast<uint64_t>(state.expertIdx) * n * scaleK);
+    } else {
+        gmmAddrInfo.aScaleGlobal = nullptr;
+        gmmAddrInfo.bScaleGlobal = nullptr;
+    }
     if constexpr (g_coreType == AIV) {
         bool runsActivation = true;
         if constexpr (UseA8W4Gmm1) {
             runsActivation = MegaMoeHardwarePolicy::GetSubBlockIdx() == 1U;
         }
         if (runsActivation) {
-            int64_t scaleN = Ops::Base::CeilDiv(static_cast<int64_t>(activationOutputWidth),
-                                                static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
-                             MXFP_MULTI_BASE_SIZE;
+            int64_t scaleN = 0;
+            if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
+                scaleN = Ops::Base::CeilDiv(static_cast<int64_t>(activationOutputWidth),
+                                            static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
+                         MXFP_MULTI_BASE_SIZE;
+            }
             AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{
-                static_cast<int64_t>(physicalTokenStartIndex) * activationOutputWidth / outputElementsPerByte,
-                static_cast<int64_t>(physicalTokenStartIndex) * scaleN,
+                static_cast<int64_t>(activationTokenStartIndex) * activationOutputWidth / outputElementsPerByte,
+                static_cast<int64_t>(activationTokenStartIndex) * scaleN,
                 expertOffset * syncLayout.activationFlagSlotCountPerExpert / INT_CACHELINE + expertMGroupOffset,
                 0L,
                 0L,

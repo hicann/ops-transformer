@@ -104,31 +104,11 @@ protected:
     {
         const auto& workspace = this->params_.workspace.layout;
         const auto base = this->params_.workspace.base;
-        const auto& ring = this->gmmExecutionConfig_.ring;
-        const uint64_t logicalRow =
-            static_cast<uint64_t>(gmm1ExpertState.globalTokenStartIndex) + gmm1Position.tokenIndexInExpert;
-        const uint64_t paddedRow = gmm1ExpertState.paddedTokenStartIndex + gmm1Position.tokenIndexInExpert;
-        const uint64_t dispatchRow = ring.dispatch ? CalcMteRingPhysicalRow(paddedRow, ring.rows) : logicalRow;
-        const uint64_t activationRow = ring.activation ? CalcMteRingPhysicalRow(paddedRow, ring.rows) : logicalRow;
-        const uint64_t n = this->commonConfig_.gmm1OutputDim, k = this->commonConfig_.tokenHiddenDim;
-        const uint64_t group = gmm1Position.tokenIndexInExpert / MegaMoeBf16GmmConfig::TILE_M;
-        gmm1AddrInfo.aGlobal = workspace.routed.gmm1Input.data.get_ptr(base) + dispatchRow * k * sizeof(bfloat16_t);
-        gmm1AddrInfo.bGlobal = GetExpertWeightAddr<bfloat16_t>(
-            this->moeWeightTensorListAddrs_.weight1, this->gmmExecutionConfig_.isPerExpertWeightTensor,
-            gmm1Position.expertIdx, static_cast<uint64_t>(gmm1Position.expertIdx) * n * k);
-        gmm1AddrInfo.aScaleGlobal = nullptr;
-        gmm1AddrInfo.bScaleGlobal = nullptr;
-        gmm1AddrInfo.metaInfoGlobal =
-            workspace.routing.receivedTokenMetadata.get_ptr(base) + logicalRow * META_INFO_SIZE * sizeof(int32_t);
-        gmm1AddrInfo.dispatchToGmm1Flag =
-            workspace.sync.dispatchReady.template get_ptr<int32_t>(base) +
-            static_cast<uint64_t>(gmm1Position.expertIdx) * this->syncWorkspaceLayout_.dispatchFlagSlotCountPerExpert +
-            group * INT_CACHELINE;
-        gmm1AddrInfo.activationToGmm2Flag = workspace.sync.activationReady.template get_ptr<int32_t>(base) +
-                                            static_cast<uint64_t>(gmm1Position.expertIdx) *
-                                                this->syncWorkspaceLayout_.activationFlagSlotCountPerExpert +
-                                            group * INT_CACHELINE;
-        this->epilogueOp_.SetOutputRowOffset(activationRow);
+        UpdateMoeExpertGmm1GlobalBuffer<bfloat16_t, bfloat16_t, bfloat16_t, void, 1U, false>(
+            this->params_.tilingData->isTopkWeightsPrefetch, this->gmmExecutionConfig_, this->syncWorkspaceLayout_,
+            workspace, base, this->moeWeightTensorListAddrs_, this->epilogueOp_, gmm1AddrInfo, gmm1ExpertState,
+            this->commonConfig_.gmm1OutputDim / this->commonConfig_.activationOutputDivisor,
+            gmm1Position.tokenIndexInExpert);
         Bf16Gmm::RunGmm1<MoeWeight1Format != FORMAT_ND, false>(
             moeBlockContext_, this->epilogueOp_, gmm1WaveProblemShape, gmm1AddrInfo, this->gmmExecutionConfig_.blockJob,
             runtimeState, this->commonConfig_.activationOutputDivisor);
@@ -190,18 +170,9 @@ protected:
     {
         const auto& workspace = this->params_.workspace.layout;
         const auto base = this->params_.workspace.base;
-        const uint64_t rows = this->commonConfig_.tokenNum, n = this->commonConfig_.gmm1OutputDim;
-        const uint64_t k = this->commonConfig_.tokenHiddenDim;
-        gmmAddrInfo.bGlobal = GetExpertWeightAddr<bfloat16_t>(this->sharedWeightTensorListAddrs_.weight1,
-                                                              sharedGmmConfig.isPerExpertWeightTensor, sharedExpertIdx,
-                                                              sharedExpertIdx * n * k);
-        gmmAddrInfo.bScaleGlobal = nullptr;
-        gmmAddrInfo.dispatchToGmm1Flag = nullptr;
-        gmmAddrInfo.metaInfoGlobal = nullptr;
-        gmmAddrInfo.activationToGmm2Flag =
-            workspace.mte.sync.sharedActivationReady.template get_ptr<int32_t>(base) +
-            static_cast<uint64_t>(sharedExpertIdx) * CalcSharedActivationFlagElementsPerExpert(rows);
-        this->sharedEpilogueOp_.SetOutputRowOffset(sharedExpertIdx * rows);
+        UpdateSharedExpertGmm1GlobalBuffer<bfloat16_t, bfloat16_t, void, false>(
+            this->commonConfig_, sharedGmmConfig, workspace, base, this->sharedWeightTensorListAddrs_,
+            this->sharedEpilogueOp_, gmmAddrInfo, sharedExpertIdx);
         Bf16Gmm::RunGmm1<SharedWeight1Format != FORMAT_ND, true>(
             this->sharedBlockContext_, this->sharedEpilogueOp_, problemShape, gmmAddrInfo, sharedGmmConfig.blockJob,
             runtimeState, this->commonConfig_.activationOutputDivisor);
