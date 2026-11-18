@@ -108,8 +108,8 @@ __aicore__ inline void FetchDispatchTokenAndMetaInfo(bool topkWeightsPrefetch, c
     if constexpr (IsBufferReuse) {
         PipeWait<PIPE_MTE3, PIPE_MTE2>(eventId);
     }
-    CopyGmToUb(copyTmpTensor, reinterpret_cast<__gm__ uint8_t*>(remoteRecordsGm) + remoteCopyOffset,
-               context.quantTokenScaleAlignBytes);
+    CopyGmToUb(copyTmpTensor, remoteRecordsGm + remoteCopyOffset,
+               (context.quantTokenScaleAlignBytes) * sizeof(ActivationType));
     PipeNotify<PIPE_MTE2, PIPE_MTE3>(eventId);
 
     if constexpr (IsBufferReuse) {
@@ -141,17 +141,12 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(bool topkWeightsPrefetch, c
     TEventID eventId = static_cast<TEventID>(bufferIdx);
     PipeWait<PIPE_MTE2, PIPE_MTE3>(eventId);
     __ubuf__ ActivationType* tokenScaleBuffer = GetDispatchCopyBuffer(context, scratch, bufferIdx);
-    // void 仅表示 Dispatch 没有 scale 段，不要求计算配置提供 scale 类型或缓冲区。
-    __ubuf__ QuantScaleType* scaleBuffer = nullptr;
-    if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
-        scaleBuffer = reinterpret_cast<__ubuf__ QuantScaleType*>(
-            reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) + context.quantTokenAlignBytes);
-    }
+    __ubuf__ QuantScaleType* scaleBuffer =
+        reinterpret_cast<__ubuf__ QuantScaleType*>(tokenScaleBuffer + (context.quantTokenAlignBytes));
     if (topkWeightsPrefetch || IsCombineDedupOn(params.tilingData->compute.dedupMode)) {
         PipeWait<PIPE_MTE2, PIPE_S>(eventId);
         uint32_t weightOffsetInUb = context.quantTokenAlignBytes + context.quantScaleAlignBytes;
-        auto* weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(
-            reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) + weightOffsetInUb);
+        auto* weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(tokenScaleBuffer + weightOffsetInUb);
         int32_t topkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor.Read(copyStartIdx + copyIdx));
         int32_t weightBits =
             weightBitsTensor[static_cast<uint32_t>(topkIndex % static_cast<int32_t>(params.tilingData->compute.topK))];
@@ -172,10 +167,8 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(bool topkWeightsPrefetch, c
     }
     CopyUbToGm((recvDataGm + (copyIdx * scratch.revTokenElemCnt)), tokenScaleBuffer,
                static_cast<uint16_t>(scratch.revTokenElemCnt * sizeof(ActivationType)));
-    if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
-        CopyUbToGm((recvScaleGm + (copyIdx * scratch.revScaleElemCnt)), scaleBuffer,
-                   static_cast<uint16_t>(scratch.revScaleElemCnt * sizeof(QuantScaleType)));
-    }
+    CopyUbToGm((recvScaleGm + (copyIdx * scratch.revScaleElemCnt)), scaleBuffer,
+               static_cast<uint16_t>(scratch.revScaleElemCnt * sizeof(QuantScaleType)));
     PipeWait<PIPE_S, PIPE_MTE3>(eventId);
     CopyUbToGm((metadataGm + (copyIdx * INT32_PER_256B)), (scratch.metaInfoTensor + (bufferIdx * INT32_PER_256B)),
                (INT32_PER_256B) * sizeof(int32_t));
@@ -193,11 +186,9 @@ __aicore__ inline DispatchCopyTargets<ActivationType, QuantScaleType> CreateDisp
     const auto& buffer = params.workspace.base;
     DispatchCopyTargets<ActivationType, QuantScaleType> targets;
     targets.tokenRev = reinterpret_cast<__gm__ ActivationType*>(workspace.routed.gmm1Input.data.get_ptr(buffer) +
-        physicalRowOffset * scratch.revTokenElemCnt * sizeof(ActivationType));
-    if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
-        targets.scaleRev = reinterpret_cast<__gm__ QuantScaleType*>(workspace.routed.gmm1Input.scale.get_ptr(buffer) +
-            physicalRowOffset * scratch.revScaleElemCnt * sizeof(QuantScaleType));
-    }
+                                                                physicalRowOffset * scratch.revTokenElemCnt);
+    targets.scaleRev = reinterpret_cast<__gm__ QuantScaleType*>(workspace.routed.gmm1Input.scale.get_ptr(buffer) +
+                                                                physicalRowOffset * scratch.revScaleElemCnt);
     targets.remoteRank = reinterpret_cast<__gm__ ActivationType*>(winRankAddr[remoteRankIdx] + context.quantWinOffset);
     targets.metaInfo = reinterpret_cast<__gm__ int32_t*>(workspace.routing.receivedTokenMetadata.get_ptr(buffer) +
                                                          rowDstOffset * INT32_PER_256B * sizeof(int32_t));

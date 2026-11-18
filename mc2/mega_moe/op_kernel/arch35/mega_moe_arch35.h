@@ -142,8 +142,6 @@ protected:
     // Dispatch 与专家计数。
     __aicore__ inline void InitMoeRingReuseBuffers(GMMAddrInfo& gmmAddrInfo) const;
     __aicore__ inline void DispatchBuffInit();
-    template <bool ReserveCumsum = false>
-    __aicore__ inline void InitDispatchScratchTensors(uint32_t tokenElementsPerRow, uint32_t scaleElementsPerRow);
     template <bool NeedCumsumReload = false>
     __aicore__ inline void PrepareMoeExpertTokenCountTable();
     __aicore__ inline void BuildMoeDedupRowDescTable();
@@ -554,19 +552,6 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::EnterSteadyDispatch()
 template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
 {
-    const uint32_t tokenElementsPerRow = commonConfig_.tokenHiddenDim / MoeQuantConfig::A_ELEMS_PER_BYTE;
-    const uint32_t scaleElementsPerRow = Ops::Base::CeilDiv(commonConfig_.tokenHiddenDim,
-        static_cast<uint32_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-    InitDispatchScratchTensors<MoeQuantConfig::AXW_MODE == AxWMode::A8W4 ||
-                              MoeQuantConfig::AXW_MODE == AxWMode::A4W4>(tokenElementsPerRow, scaleElementsPerRow);
-}
-
-// 共用 Dispatch 的 UB 落位；行宽由各路径提供，BF16 的 scale 行宽为零。
-template <TemplateMegaMoeTypeClass>
-template <bool ReserveCumsum>
-__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitDispatchScratchTensors(
-    uint32_t tokenElementsPerRow, uint32_t scaleElementsPerRow)
-{
     const uint32_t indexBytes = params_.tilingData->topkIndexTypeBytes;
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
@@ -581,12 +566,14 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitDispatchScratchTens
     }
 
     const MegaMoeDispatchBufferConfig& bufferConfig = context.bufferConfig;
-    scratch.revTokenElemCnt = tokenElementsPerRow;
-    scratch.revScaleElemCnt = scaleElementsPerRow;
+    scratch.revTokenElemCnt = commonConfig_.tokenHiddenDim / MoeQuantConfig::A_ELEMS_PER_BYTE;
+    scratch.revScaleElemCnt = Ops::Base::CeilDiv(static_cast<int64_t>(commonConfig_.tokenHiddenDim),
+                                                 static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
+                              MXFP_MULTI_BASE_SIZE;
     uint32_t cumsumInfoTensorSize = Ops::Base::CeilAlign(
         static_cast<int64_t>(commonConfig_.worldSize * commonConfig_.moeExpertPerRank * sizeof(int32_t)),
         static_cast<int64_t>(ALIGN_32));
-    if constexpr (ReserveCumsum) {
+    if constexpr (MoeQuantConfig::AXW_MODE == AxWMode::A8W4 || MoeQuantConfig::AXW_MODE == AxWMode::A4W4) {
         scratch.cumsumGm =
             reinterpret_cast<__gm__ int32_t*>(workspace.routing.recvPrefixBackup.get_ptr(buffer) +
                                               static_cast<uint64_t>(cumsumInfoTensorSize) * countWorkspace_.blockIdx);

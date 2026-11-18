@@ -20,9 +20,32 @@
 
 #ifdef MEGA_MOE_ARCH35_DEVICE
 #include "mega_moe_wave_a8w8.h"
-#include "mega_moe_gmm_bf16.h"
 
 namespace MegaMoeImpl {
+
+// TODO 只允许参与类型和接口检查；任何实际调用都必须先补齐实现。
+template <typename Impl>
+__aicore__ inline void A16W16ImplementationTodo()
+{
+    static_assert(!Std::IsSame<Impl, Impl>::value, "MegaMoe A16W16 TODO implementation is not ready.");
+}
+
+struct Bf16InputConfig {
+    // TODO-F1：描述 BF16 token 与可选 FP32 topK 路由权重的 TokenScale 字节布局。
+};
+
+struct Bf16InputScratch {
+    // TODO-F2：补齐 BF16 双缓冲及路由权重转换视图，不分配 MX 量化临时区。
+};
+
+struct Bf16GmmBlockContext {
+    // TODO-F3：补齐无 scale 的 BF16 GMM 上下文，实际分块与 Host 预算对齐。
+};
+
+template <uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch>
+struct Bf16ActivationEpilogue {
+    // TODO-F4：补齐激活计算、BF16 GM 输出及可选路由权重处理接口。
+};
 
 template <>
 struct InputConfigSelector<bfloat16_t> {
@@ -64,7 +87,6 @@ private:
     using RuntimeBase = MegaMoe<TemplateMegaMoeA16W16WaveTypeFunc>;
     friend WaveBase;
     friend RuntimeBase;
-    Bf16GmmBlockContext moeBlockContext_{};
 
     static_assert(Std::IsSame<XType, bfloat16_t>::value && Std::IsSame<OutputType, bfloat16_t>::value &&
                       Std::IsSame<MoeWeightType, bfloat16_t>::value &&
@@ -75,97 +97,53 @@ private:
     static_assert(CombineQuantMode == COMBINE_NO_QUANT, "MegaMoe A16W16 requires unquantized Combine.");
 
 public:
-    // 完成设备编译、同步验证和入口集成后再开放生产执行。
+    // TODO 和同步契约完成前，继承的 Process 入口保持编译期禁用。
     static constexpr bool kImplementationReady = false;
 
 protected:
     __aicore__ inline void InitPathConfigs(const MegaMoeTilingData* tilingData)
     {
-        const auto& compute = tilingData->compute;
-        auto& inputConfig = this->quantProcessConfig_;
-        inputConfig.layout = CalcBf16TokenScaleLayout(compute.h, compute.topK, tilingData->comm.topkWeightsPrefetch);
-        inputConfig.stageBytes = static_cast<uint32_t>(CalcBf16InputStageBytes(
-            inputConfig.layout, compute.topK, Std::IsSame<TopkWeightsType, bfloat16_t>::value));
-        // 共享专家直接读取原输入，不额外申请共享输入打包区。
-        this->sharedQuantProcessConfig_ = {CalcBf16TokenScaleLayout(compute.h, compute.topK, false), 0U};
-        const uint32_t sendCoreIdx = this->sharedExpertNum_ > 0U ? this->blockIdx_ : this->aivCoreIdx_;
-        this->sendMaskConfig_ = CreateSendMaskConfig<TopkIndexType>(this->params_, sendCoreIdx);
-        this->tokenDispatchConfig_ = {
-            .maxOutputSize = static_cast<uint64_t>(compute.maxOutputSize),
-            .bufferConfig = tilingData->dispatchBufferConfig,
-            .routeIndexAlignSize = static_cast<uint64_t>(CalcDispatchRouteIndexAlignSize(compute)),
-            .quantWinOffset = static_cast<uint64_t>(this->params_.communication.layout.quantTokenScale.offsetBytes),
-            .quantTokenAlignBytes = static_cast<uint32_t>(inputConfig.layout.dataBytes),
-            .quantScaleAlignBytes = 0U,
-            .quantTokenScaleAlignBytes = static_cast<uint32_t>(inputConfig.layout.tokenScaleBytes),
-            .dedup = CreateDedupConfig(this->params_)};
-        const int32_t flagSlots = static_cast<int32_t>(Ops::Base::CeilDiv(
-            static_cast<int64_t>(compute.maxOutputSize),
-            static_cast<int64_t>(RuntimeBase::GMM1_TILE_M))) * INT_CACHELINE;
-        this->InitSyncWorkspaceConfigs(flagSlots, flagSlots);
-        this->InitGmmConfigs();
-        this->InitQuantTokenBufferConfig();
-        this->InitTokenUnpermuteConfig();
-        this->epilogueOp_.Init({
-            .yGmAddr = this->params_.workspace.layout.routed.gmm2Input.data.get_ptr(this->params_.workspace.base),
-            .clampLimit = tilingData->clampLimit,
-            .actMode = tilingData->actMode,
-            .actSubMode = tilingData->actSubMode,
-            .activationAlpha = tilingData->activationAlpha,
-            .activationBeta = tilingData->activationBeta});
+        // TODO-F5：配置 BF16 TokenScale、Dispatch、GM 临时区及公共阶段描述。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline uint32_t InitInputScratchTensors(uint32_t scratchAddr)
     {
-        const uint32_t stageBytes = this->quantProcessConfig_.stageBytes;
-        for (uint32_t slot = 0U; slot < DOUBLE_BUFFER; ++slot) {
-            this->quantScratch_.stages[slot] = reinterpret_cast<__ubuf__ uint8_t*>(scratchAddr + slot * stageBytes);
-        }
-        // 有效 token 和权重每次覆盖；记录中的对齐填充在本次 launch 保持为零。
-        FillUbVF<int16_t>(reinterpret_cast<__ubuf__ int16_t*>(scratchAddr), int16_t{0},
-                          DOUBLE_BUFFER * stageBytes / sizeof(int16_t));
-        PipeFence<PIPE_V, PIPE_MTE2, SYNC_EVENT_ID2>();
-        return scratchAddr + DOUBLE_BUFFER * stageBytes;
+        // TODO-F6：按字节预算布置 BF16 暂存区，返回后续公共暂存区的起始地址。
+        A16W16ImplementationTodo<Self>();
+        return 0U;
     }
 
     __aicore__ inline void PrepareInputTokenRange(const WorkRange& tokenRange)
     {
-        PackBf16LocalTokens<TopkWeightsType>(tokenRange, this->commonConfig_, this->params_,
-                                            this->quantProcessConfig_, this->quantScratch_);
+        // TODO-F7：直接打包 BF16 token 和可选 FP32 路由权重，不生成 scale。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void DispatchBuffInit()
     {
-        this->template InitDispatchScratchTensors<>(this->commonConfig_.tokenHiddenDim, 0U);
+        // TODO-F8：建立 BF16 Dispatch 的字节地址视图和接收记录描述。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void DispatchTokenRangeForWave(const ExpertTokenRange& dispatchRange)
     {
-        if constexpr (g_coreType == AIV) {
-            if (MegaMoeHardwarePolicy::GetSubBlockIdx() == 1U) {
-                DispatchTokenRange<TopkIndexType, bfloat16_t, void, RuntimeBase::GMM1_TILE_M, TopkWeightsPrefetch>(
-                    this->tokenDispatchConfig_, this->commonConfig_, this->gmmExecutionConfig_.blockJob,
-                    this->syncWorkspaceLayout_, this->params_, g_winRankAddr_, this->tokenDispatchScratch_,
-                    dispatchRange);
-            }
-        }
+        // TODO-F8：复用 Wave 范围规划，填充普通和去重 BF16 搬运与 ready 发布。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void InitMoeGmmTileCounts()
     {
-        const uint32_t activationWidth =
-            this->commonConfig_.gmm1OutputDim / this->commonConfig_.activationOutputDivisor;
-        this->gmm1TilesPerMGroup_ = Ops::Base::CeilDiv(activationWidth, MegaMoeBf16GmmConfig::TILE_N);
-        this->gmm2TilesPerMGroup_ =
-            Ops::Base::CeilDiv(this->commonConfig_.tokenHiddenDim, MegaMoeBf16GmmConfig::TILE_N);
+        // TODO-F9：按实际 BF16 GMM 分块初始化任务数，保持 Wave 规划口径一致。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void InitMoeGmmSync(
         GMMAddrInfo& gmm1AddrInfo, GMMAddrInfo& gmm2AddrInfo, Gmm1ActivationSync& gmm1ActivationSync,
         Gmm2CombineSync& gmm2CombineSync)
     {
-        gmm1AddrInfo.gmm1ActivationSync = &gmm1ActivationSync;
-        gmm2AddrInfo.gmm2CombineSync = &gmm2CombineSync;
+        // TODO-F9/F10：关联 BF16 GM 激活交接及 GMM2/Combine 的同步对象。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void RunGmm1ActivationSlice(
@@ -173,203 +151,95 @@ protected:
         const ProblemShape& gmm1WaveProblemShape, GmmRuntimeState& runtimeState,
         uint32_t waveEndTokenIndexInExpert, uint64_t expertRowCount)
     {
-        const auto& workspace = this->params_.workspace.layout;
-        const auto base = this->params_.workspace.base;
-        const auto& ring = this->gmmExecutionConfig_.ring;
-        const uint64_t logicalRow = static_cast<uint64_t>(gmm1ExpertState.globalTokenStartIndex) +
-            gmm1Position.tokenIndexInExpert;
-        const uint64_t paddedRow = gmm1ExpertState.paddedTokenStartIndex + gmm1Position.tokenIndexInExpert;
-        const uint64_t dispatchRow = ring.dispatch ? CalcMteRingPhysicalRow(paddedRow, ring.rows) : logicalRow;
-        const uint64_t resultRow = ring.gmm1 ? CalcMteRingPhysicalRow(paddedRow, ring.rows) : logicalRow;
-        const uint64_t activationRow = ring.activation ? CalcMteRingPhysicalRow(paddedRow, ring.rows) : logicalRow;
-        const uint64_t n = this->commonConfig_.gmm1OutputDim, k = this->commonConfig_.tokenHiddenDim;
-        const uint64_t group = gmm1Position.tokenIndexInExpert / MegaMoeBf16GmmConfig::TILE_M;
-        gmm1AddrInfo.aGlobal = workspace.routed.gmm1Input.data.get_ptr(base) + dispatchRow * k * sizeof(bfloat16_t);
-        gmm1AddrInfo.bGlobal = GetExpertWeightAddr<bfloat16_t>(this->moeWeightTensorListAddrs_.weight1,
-            this->gmmExecutionConfig_.isPerExpertWeightTensor, gmm1Position.expertIdx,
-            static_cast<uint64_t>(gmm1Position.expertIdx) * n * k);
-        gmm1AddrInfo.aScaleGlobal = nullptr;
-        gmm1AddrInfo.bScaleGlobal = nullptr;
-        gmm1AddrInfo.gmm1OutGlobal = workspace.routed.gmm1Output.get_ptr(base) + resultRow * n * sizeof(bfloat16_t);
-        gmm1AddrInfo.metaInfoGlobal = workspace.routing.receivedTokenMetadata.get_ptr(base) +
-            logicalRow * META_INFO_SIZE * sizeof(int32_t);
-        gmm1AddrInfo.dispatchToGmm1Flag = workspace.sync.dispatchReady.template get_ptr<int32_t>(base) +
-            static_cast<uint64_t>(gmm1Position.expertIdx) *
-                this->syncWorkspaceLayout_.dispatchFlagSlotCountPerExpert + group * INT_CACHELINE;
-        gmm1AddrInfo.activationToGmm2Flag = workspace.sync.activationReady.template get_ptr<int32_t>(base) +
-            static_cast<uint64_t>(gmm1Position.expertIdx) *
-                this->syncWorkspaceLayout_.activationFlagSlotCountPerExpert + group * INT_CACHELINE;
-        this->epilogueOp_.SetOutputRowOffset(activationRow);
-        Bf16Gmm::RunGmm1<MoeWeight1Format != FORMAT_ND, false>(moeBlockContext_, this->epilogueOp_,
-            gmm1WaveProblemShape, gmm1AddrInfo, this->gmmExecutionConfig_.blockJob, runtimeState.startBlockIdx,
-            this->commonConfig_.activationOutputDivisor);
-        (void)waveEndTokenIndexInExpert;
-        (void)expertRowCount;
+        // TODO-F9：绑定无 scale 地址，执行 BF16 GMM1、GM 落地和无量化激活。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void RunGmm2Slice(
         const ExpertTokenPosition& gmm2Position, uint32_t waveEndTokenIndexInExpert,
         const ExpertLoopState& gmm2ExpertState, GMMAddrInfo& gmm2AddrInfo, uint32_t& startBlockIdx)
     {
-        const auto& workspace = this->params_.workspace.layout;
-        const auto base = this->params_.workspace.base;
-        const auto& ring = this->gmmExecutionConfig_.ring;
-        const uint64_t logicalRow =
-            static_cast<uint64_t>(gmm2ExpertState.globalTokenStartIndex) + gmm2Position.tokenIndexInExpert;
-        const uint64_t paddedRow = gmm2ExpertState.paddedTokenStartIndex + gmm2Position.tokenIndexInExpert;
-        const uint64_t activationRow = ring.activation ? CalcMteRingPhysicalRow(paddedRow, ring.rows) : logicalRow;
-        const uint64_t resultRow = ring.gmm2 ? CalcMteRingPhysicalRow(paddedRow, ring.rows) : logicalRow;
-        const uint64_t n = this->commonConfig_.tokenHiddenDim;
-        const uint64_t k = this->commonConfig_.gmm1OutputDim / this->commonConfig_.activationOutputDivisor;
-        const uint64_t group = gmm2Position.tokenIndexInExpert / MegaMoeBf16GmmConfig::TILE_M;
-        gmm2AddrInfo.aGlobal = workspace.routed.gmm2Input.data.get_ptr(base) + activationRow * k * sizeof(bfloat16_t);
-        gmm2AddrInfo.bGlobal = GetExpertWeightAddr<bfloat16_t>(this->moeWeightTensorListAddrs_.weight2,
-            this->gmmExecutionConfig_.isPerExpertWeightTensor, gmm2Position.expertIdx,
-            static_cast<uint64_t>(gmm2Position.expertIdx) * n * k);
-        gmm2AddrInfo.aScaleGlobal = nullptr;
-        gmm2AddrInfo.bScaleGlobal = nullptr;
-        gmm2AddrInfo.gmm2OutGlobal = workspace.routed.gmm2Output.get_ptr(base) + resultRow * n * sizeof(bfloat16_t);
-        gmm2AddrInfo.metaInfoGlobal = workspace.routing.receivedTokenMetadata.get_ptr(base) +
-            logicalRow * META_INFO_SIZE * sizeof(int32_t);
-        gmm2AddrInfo.activationToGmm2Flag = workspace.sync.activationReady.template get_ptr<int32_t>(base) +
-            static_cast<uint64_t>(gmm2Position.expertIdx) *
-                this->syncWorkspaceLayout_.activationFlagSlotCountPerExpert + group * INT_CACHELINE;
-        ProblemShape waveShape = gmm2ExpertState.problemShape;
-        Get<M_VALUE>(waveShape) = waveEndTokenIndexInExpert - gmm2Position.tokenIndexInExpert;
-        if (IsCombineDedupOn(this->params_.tilingData->compute.dedupMode)) {
-            Bf16Gmm::RunGmm2<MoeWeight2Format != FORMAT_ND, false, false>(moeBlockContext_, waveShape,
-                gmm2AddrInfo, this->params_, this->gmmExecutionConfig_.blockJob, startBlockIdx,
-                this->commonConfig_.activationOutputDivisor);
-        } else {
-            Bf16Gmm::RunGmm2<MoeWeight2Format != FORMAT_ND, false, true>(moeBlockContext_, waveShape,
-                gmm2AddrInfo, this->params_, this->gmmExecutionConfig_.blockJob, startBlockIdx,
-                this->commonConfig_.activationOutputDivisor);
-        }
+        // TODO-F10：绑定 BF16 激活和权重，执行 GMM2 并发布结果。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void InitSharedGmm1Epilogue()
     {
-        const auto* data = this->params_.tilingData;
-        this->sharedEpilogueOp_.Init({
-            .yGmAddr = this->params_.workspace.layout.shared.gmm2Input.data.get_ptr(this->params_.workspace.base),
-            .clampLimit = data->clampLimit,
-            .actMode = data->actMode,
-            .actSubMode = data->actSubMode,
-            .activationAlpha = data->activationAlpha,
-            .activationBeta = data->activationBeta});
+        // TODO-F11/F12：建立共享专家无 scale 的激活配置。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void ConfigureSharedGmm1Input(
         GMMAddrInfo& gmmAddrInfo, GmmExecutionConfig& gmmConfig,
         Gmm1ActivationSync& sharedGmm1ActivationSync) const
     {
-        gmmAddrInfo.aGlobal = this->params_.aGmAddr;
-        gmmAddrInfo.aScaleGlobal = nullptr;
-        gmmAddrInfo.gmm1ActivationSync = &sharedGmm1ActivationSync;
-        gmmConfig.useStridedInput = true;
-        gmmConfig.inputLayout = {this->commonConfig_.tokenHiddenDim, 0U};
+        // TODO-F11：确定共享 BF16 输入来源、行跨度和数据就绪依赖。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void RunSharedExpertGmm1Activation(
         GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, const GmmExecutionConfig& sharedGmmConfig,
         GmmRuntimeState& runtimeState, uint32_t sharedExpertIdx)
     {
-        const auto& workspace = this->params_.workspace.layout;
-        const auto base = this->params_.workspace.base;
-        const uint64_t rows = this->commonConfig_.tokenNum, n = this->commonConfig_.gmm1OutputDim;
-        const uint64_t k = this->commonConfig_.tokenHiddenDim;
-        gmmAddrInfo.bGlobal = GetExpertWeightAddr<bfloat16_t>(this->sharedWeightTensorListAddrs_.weight1,
-            sharedGmmConfig.isPerExpertWeightTensor, sharedExpertIdx, sharedExpertIdx * n * k);
-        gmmAddrInfo.bScaleGlobal = nullptr;
-        gmmAddrInfo.gmm1OutGlobal = workspace.shared.gmm1Output.get_ptr(base) +
-            sharedExpertIdx * rows * n * sizeof(bfloat16_t);
-        gmmAddrInfo.dispatchToGmm1Flag = nullptr;
-        gmmAddrInfo.metaInfoGlobal = nullptr;
-        gmmAddrInfo.activationToGmm2Flag = workspace.mte.sync.sharedActivationReady.template get_ptr<int32_t>(base) +
-            static_cast<uint64_t>(sharedExpertIdx) * CalcSharedActivationFlagElementsPerExpert(rows);
-        this->sharedEpilogueOp_.SetOutputRowOffset(sharedExpertIdx * rows);
-        Bf16Gmm::RunGmm1<SharedWeight1Format != FORMAT_ND, true>(this->sharedBlockContext_, this->sharedEpilogueOp_,
-            problemShape, gmmAddrInfo, sharedGmmConfig.blockJob, runtimeState.startBlockIdx,
-            this->commonConfig_.activationOutputDivisor);
+        // TODO-F12：绑定当前共享专家地址，执行 BF16 GMM1 和无量化激活。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void RunSharedExpertGmm2(
         GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, uint32_t sharedExpertIdx)
     {
-        const auto& workspace = this->params_.workspace.layout;
-        const auto base = this->params_.workspace.base;
-        const uint64_t rows = this->commonConfig_.tokenNum, n = this->commonConfig_.tokenHiddenDim;
-        const uint64_t k = this->commonConfig_.gmm1OutputDim / this->commonConfig_.activationOutputDivisor;
-        const uint64_t firstRow = sharedExpertIdx * rows;
-        gmmAddrInfo.aGlobal = workspace.shared.gmm2Input.data.get_ptr(base) + firstRow * k * sizeof(bfloat16_t);
-        gmmAddrInfo.bGlobal = GetExpertWeightAddr<bfloat16_t>(this->sharedWeightTensorListAddrs_.weight2,
-            this->gmmExecutionConfig_.isPerExpertWeightTensor, sharedExpertIdx, sharedExpertIdx * n * k);
-        gmmAddrInfo.aScaleGlobal = nullptr;
-        gmmAddrInfo.bScaleGlobal = nullptr;
-        gmmAddrInfo.gmm2OutGlobal = workspace.shared.gmm2Output.get_ptr(base) + firstRow * n * sizeof(bfloat16_t);
-        gmmAddrInfo.activationToGmm2Flag = workspace.mte.sync.sharedActivationReady.template get_ptr<int32_t>(base) +
-            static_cast<uint64_t>(sharedExpertIdx) * CalcSharedActivationFlagElementsPerExpert(rows);
-        gmmAddrInfo.sharedExpertGmm2TileCounter = workspace.mte.sync.sharedGmm2Tiles.template get_ptr<int32_t>(base) +
-            static_cast<uint64_t>(sharedExpertIdx) *
-                Ops::Base::CeilDiv(rows, uint64_t{MegaMoeBf16GmmConfig::TILE_M}) * INT_CACHELINE;
-        Bf16Gmm::RunGmm2<SharedWeight2Format != FORMAT_ND, true, false>(this->sharedBlockContext_, problemShape,
-            gmmAddrInfo, this->params_, this->gmmExecutionConfig_.blockJob, this->startBlockIdx_,
-            this->commonConfig_.activationOutputDivisor);
+        // TODO-F13：绑定当前共享专家地址，执行 BF16 GMM2。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void FinishMoeActivationSync(int32_t vecSetSyncCom)
     {
-        // GM 交接额度在公共 ProcessWave 尾部由 Gmm1ActivationSync 排空，不走 MX 的 UB 握手。
-        this->gmm1PingPongIdx_ = 0U;
-        (void)vecSetSyncCom;
+        // TODO-F14：按 BF16 GM 交接协议排空 MoE 激活同步。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void FinishSharedActivationSync(GmmRuntimeState& runtimeState)
     {
-        // 共享 GM 交接使用独立事件对，公共尾部统一回收。
-        runtimeState.pingpongIdx = 0U;
-        runtimeState.vecSetSyncCom = 0;
+        // TODO-F15：按 BF16 GM 交接协议排空共享激活同步。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline SharedGmmStartCondition GetSharedGmmStartCondition() const
     {
-        return this->sharedExpertNum_ == 0U ? SharedGmmStartCondition::NoSharedExpert :
-                                             SharedGmmStartCondition::InputDirectly;
+        // TODO-F5/F11：根据共享 BF16 输入来源选择启动条件。
+        A16W16ImplementationTodo<Self>();
+        return SharedGmmStartCondition::NoSharedExpert;
     }
 
     __aicore__ inline void WaitForInputPreparation(SharedGmmStartCondition sharedGmmStartCondition)
     {
-        if (sharedGmmStartCondition != SharedGmmStartCondition::InputDirectly) {
-            SyncIntraWait<PIPE_MTE2>(INPUT_PREPARE_DONE_FLAG);
-        }
-        if (sharedGmmStartCondition == SharedGmmStartCondition::NoSharedExpert) {
-            PipeFence<PIPE_MTE2, PIPE_S, SYNC_EVENT_ID3>();
-        }
-        // 消费公共输入阶段的 UB 释放通知，BF16 的后继输入搬运由 MTE2 承接。
-        SyncIntraWait<PIPE_MTE2>(INPUT_UB_FREE_FLAG);
+        // TODO-F5/F11：按 BF16 输入就绪和 GM 输出需求等待，不沿用 MX UB 输出假设。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void SyncBeforeSharedExpertGmm1()
     {
-        if constexpr (g_coreType == AIV) {
-            PipeFence<PIPE_MTE3, PIPE_MTE2, SYNC_EVENT_ID3>();
-        }
+        // TODO-F11/F12：完成共享 GMM1 所需的输入和暂存区交接。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline void SyncBeforeMoeExpertStages()
     {
-        if constexpr (g_coreType == AIV) {
-            PipeFence<PIPE_MTE3, PIPE_MTE2, SYNC_EVENT_ID3>();
-        }
+        // TODO-F9：完成共享计算到 MoE 计算之间的 BF16 暂存区交接。
+        A16W16ImplementationTodo<Self>();
     }
 
     __aicore__ inline uint16_t GetMoeActivationSubBlockIdx() const
     {
+        // TODO-F9/F14：按 BF16 GM 激活实现确定同步角色。
+        A16W16ImplementationTodo<Self>();
         return 0U;
     }
 
     __aicore__ inline uint16_t GetSharedActivationSubBlockIdx() const
     {
+        // TODO-F12/F15：按共享 BF16 GM 激活实现确定同步角色。
+        A16W16ImplementationTodo<Self>();
         return 0U;
     }
 };
