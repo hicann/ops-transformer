@@ -181,7 +181,7 @@ cann_ops_transformer.quant_flash_mla(
 |     Q_S     |      输入q tensor的序列长度，对应q shape中的S      |
 |     D     |          隐藏层最小的单元尺寸headdim。q/k的head_dim_qk为576，v的head_dim_v为512         |
 |     Bs     |          Paged Attention场景下的KV cache的块大小block_size          |
-|     Bn     |          Paged Attention场景下KV cache的块数，即num_blocks          |
+|     Bn     |          Paged Attention场景下KV cache的块数，即num_blocks。在k_cache的shape中，Bn为KV cache物理存储的总块数，Bn = Σ ⌈各batch KV序列长度 / Bs⌉；在block_table的shape中，Bn为单个batch的最大块数，Bn = max ⌈各batch KV序列长度 / Bs⌉           |
 
 ## 参数说明
 
