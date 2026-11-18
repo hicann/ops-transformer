@@ -43,7 +43,7 @@ esac
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 KDA_ROOT=$(cd "${KDA_ROOT:-$HERE/../..}" && pwd)
-KDA_ASSETS=$(cd "${KDA_ASSETS:-$KDA_ROOT/tests/ttk}" && pwd)
+KDA_ASSETS=$(cd "${KDA_ASSETS:-$KDA_ROOT/tests/assets}" && pwd)
 KDA_PY=$(command -v "${KDA_PY:-${TTK_PY:-python3}}") || {
     echo 'ERROR: select an available Python with KDA_PY.' >&2
     exit 2
@@ -83,7 +83,7 @@ if [[ -n "${TTK_REPO:-}" ]]; then
     }
 fi
 export KDA_ROOT KDA_ASSETS KDA_PY
-export PYTHONPATH="$KDA_ASSETS${TTK_REPO:+:$TTK_REPO}${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$KDA_ASSETS/impl${TTK_REPO:+:$TTK_REPO}${PYTHONPATH:+:$PYTHONPATH}"
 [[ -z "${TTK_REPO:-}" ]] || cd "$TTK_REPO"
 
 peer_ready() {
@@ -122,7 +122,7 @@ peer_config() {
     printf 'remote:\n  endpoints:\n    - host: 127.0.0.1\n      port: %s\n' \
         "$KDA_XPU_PORT" > "$CONFIG_DIR/peer.yaml"
 }
-SPEC="$KDA_ASSETS/flash_kda_grad_ttk/spec.py"
+SPEC="$KDA_ASSETS/impl/flash_kda_grad_ttk/spec.py"
 TTK_ARGS=(
     -i "$KDA_CASES" --plugin "$SPEC" --device-whitelist "$KDA_DEVICES"
     --seed "$KDA_SEED" --pc "$KDA_PC" --proc-no-reuse --proc-timeout 3000

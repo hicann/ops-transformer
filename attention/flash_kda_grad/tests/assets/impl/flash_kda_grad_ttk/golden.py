@@ -45,23 +45,16 @@ import math
 import os
 import time
 from dataclasses import dataclass
+from threading import local
 from typing import Optional, Tuple
 
 import torch
 
 # --- causal pair loop ------------------------------------------------------
-# The causal pair accumulation in ``staged_backward`` is the BF16 peer's hot
-# spot: a Python double loop of up to CHUNK_SIZE*(CHUNK_SIZE+1)/2 iterations per
-# chunk and head.  The loop body below is the original one, moved verbatim into
-# a function and compiled with TorchScript, which removes the per-pair Python
-# dispatch while keeping the operation order, the K=16 accumulation and the
-# BF16 rounding points identical.
-#
-# JIT fusions are switched off first: with fusion enabled the graph can merge
-# elementwise chains (for example the multiply feeding the in-place add of
-# ``dq_chunk``) and the last bits change.  With fusion off the scripted graph
-# runs exactly the same elementwise ops as the Python loop, so the gradients
-# stay byte-identical.
+# The CPU peer batches independent causal-pair products by row and scripts
+# the remaining ordered updates to reduce Python dispatch. Keep exp and sum
+# at their original shapes and preserve the update order at each destination.
+# Disable JIT fusion to retain the original multiply/add rounding points.
 torch._C._jit_set_profiling_executor(False)
 torch._C._jit_set_profiling_mode(False)
 torch._C._jit_override_can_fuse_on_cpu(False)
@@ -82,31 +75,50 @@ def _pair_loop_impl(
     length: int,
     gate_ratio: str,
 ):
+    # Batch independent products within a row. Keep exp and sum on the
+    # original per-pair vectors and preserve the addition order at each
+    # destination (including row == col aliasing).
     for row in range(length):
-        for col in range(row + 1):
-            if gate_ratio == "factorized":
-                gate_decay_ratio = g_cumsum[row].exp() / g_cumsum[col].exp()
-            elif gate_ratio == "clamped":
-                gate_decay_ratio = (
-                    (g_cumsum[row] - g_cumsum[col]).clamp(min=-20.0).exp()
-                )
-            else:
-                gate_decay_ratio = (g_cumsum[row] - g_cumsum[col]).exp()
-            dAqk_coeff = dAqk_scaled[row, col]
-            dlower_beta_coeff = dlower_beta[row, col]
-            dq_chunk[row] += dAqk_coeff * k_chunk[col] * gate_decay_ratio
-            dk_chunk[row] += dlower_beta_coeff * k_chunk[col] * gate_decay_ratio
-            dk_col_pair = (
-                dlower_beta_coeff * k_chunk[row] + dAqk_coeff * q_chunk[row]
-            ) * gate_decay_ratio
-            dk_chunk[col] += dk_col_pair
-            dbeta_chunk[row] += (
-                dlower_operand[row, col]
-                * (k_chunk[row] * k_chunk[col] * gate_decay_ratio).sum()
-            )
-            dg_cumsum_pair = dk_col_pair * k_chunk[col]
-            dg_cumsum[row] += dg_cumsum_pair
-            dg_cumsum[col] -= dg_cumsum_pair
+        end = row + 1
+        gamma_row = g_cumsum[row]
+        ratios = torch.jit.annotate(list[torch.Tensor], [])
+        if gate_ratio == "factorized":
+            gamma_exp = gamma_row.exp()
+            for col in range(end):
+                ratios.append(gamma_exp / g_cumsum[col].exp())
+        elif gate_ratio == "clamped":
+            for col in range(end):
+                ratios.append((gamma_row - g_cumsum[col]).clamp(min=-20.0).exp())
+        else:
+            for col in range(end):
+                ratios.append((gamma_row - g_cumsum[col]).exp())
+        decay = torch.stack(ratios)
+        k_cols = k_chunk[:end]
+        k_row = k_chunk[row]
+        da = dAqk_scaled[row, :end].unsqueeze(-1)
+        dl_beta = dlower_beta[row, :end].unsqueeze(-1)
+        dq_terms = da * k_cols * decay
+        dk_row_terms = dl_beta * k_cols * decay
+        dk_col_terms = (dl_beta * k_row + da * q_chunk[row]) * decay
+        beta_products = k_row * k_cols * decay
+        dg_terms = dk_col_terms * k_cols
+        dq_row = dq_chunk[row]
+        dk_row = dk_chunk[row]
+        dbeta_row = dbeta_chunk[row]
+        dg_row = dg_cumsum[row]
+        dl_row = dlower_operand[row]
+        for col in range(end):
+            dq_row.add_(dq_terms[col])
+            dk_row.add_(dk_row_terms[col])
+            dbeta_row.add_(dl_row[col] * beta_products[col].sum())
+            dg_row.add_(dg_terms[col])
+        # Off-diagonal columns update distinct rows. Apply the diagonal
+        # last: its destination aliases the row updated in the loop.
+        if row > 0:
+            dk_chunk[:row].add_(dk_col_terms[:row])
+            dg_cumsum[:row].sub_(dg_terms[:row])
+        dk_row.add_(dk_col_terms[row])
+        dg_row.sub_(dg_terms[row])
     return dq_chunk, dk_chunk, dbeta_chunk, dg_cumsum
 
 
@@ -114,6 +126,122 @@ try:
     _pair_loop = torch.jit.script(_pair_loop_impl)
 except Exception:  # pragma: no cover - keep the inline loop if scripting fails
     _pair_loop = None
+
+
+# Numba is optional. The ordered TorchScript path also works without it.
+try:
+    import numpy as np
+    from numba import njit
+except ImportError:
+    njit = None
+
+
+def _pair_differences(gamma, diff, first, end, clamped):
+    i = 0
+    for r in range(first, end):
+        for c in range(r + 1):
+            for j in range(gamma.shape[1]):
+                x = gamma[r, j] - gamma[c, j]
+                diff[i, j] = np.float32(-20) if clamped and x < -20 else x
+            i += 1
+    return i
+
+
+def _pair_update(da, db, dq, dk, q, k, dg, decay, products, first, end):
+    i = 0
+    for r in range(first, end):
+        qr, kr = q[r], k[r]
+        dqr, dkr, dgr = dq[r], dk[r], dg[r]
+        for c in range(r):
+            kc, dkc, dgc = k[c], dk[c], dg[c]
+            ratios, prod = decay[i], products[i]
+            a, b = da[r, c], db[r, c]
+            for j in range(k.shape[1]):
+                ratio = ratios[j]
+                kval = kc[j]
+                dqr[j] += (a * kval) * ratio
+                dkr[j] += (b * kval) * ratio
+                p = (b * kr[j] + a * qr[j]) * ratio
+                dkc[j] += p
+                prod[j] = (kr[j] * kval) * ratio
+                g = p * kval
+                dgr[j] += g
+                dgc[j] -= g
+            i += 1
+
+        a, b = da[r, r], db[r, r]
+        ratios, prod = decay[i], products[i]
+        for j in range(k.shape[1]):
+            ratio, kval = ratios[j], kr[j]
+            dqr[j] += (a * kval) * ratio
+            p = (b * kval + a * qr[j]) * ratio
+            dkr[j] = (dkr[j] + (b * kval) * ratio) + p
+            prod[j] = (kval * kval) * ratio
+            g = p * kval
+            dgr[j] = (dgr[j] + g) - g
+        i += 1
+
+
+def _pair_update_beta(beta, dl, sums, first, end):
+    i = 0
+    for r in range(first, end):
+        for c in range(r + 1):
+            beta[r] += dl[r, c] * sums[i]
+            i += 1
+
+
+_pair_scratch = local()
+
+
+@torch.inference_mode(False)
+def _pair_workspace(capacity, width):
+    if getattr(_pair_scratch, "shape", None) != (capacity, width):
+        df = np.empty((capacity, width), dtype=np.float32)
+        dr, pr = np.empty_like(df), np.empty_like(df)
+        sm = np.empty(capacity, dtype=np.float32)
+        arrays = (df, dr, pr, sm)
+        _pair_scratch.buffers = (*arrays, *map(torch.from_numpy, arrays))
+        _pair_scratch.shape = capacity, width
+    return _pair_scratch.buffers
+
+
+def _numba_pair(gamma, da, db, dq, dk, q, k, beta, dl, dg, length, mode):
+    # Reuse a workspace for the largest chunk (64 tokens) across heads.
+    capacity = 16 * max(length, 64)
+    df, dr, pr, sm, diff, decay, products, sums = _pair_workspace(capacity, k.size(1))
+    g, a, b, dq_a, dk_a, q_a, k_a, beta_a, dl_a, dg_a = (
+        t.numpy() for t in (gamma, da, db, dq, dk, q, k, beta, dl, dg)
+    )
+    for first in range(0, length, 16):
+        end = min(first + 16, length)
+        n = _pair_differences(g, df, first, end, mode == "clamped")
+        torch.exp(diff[:n], out=decay[:n])
+        _pair_update(a, b, dq_a, dk_a, q_a, k_a, dg_a, dr, pr, first, end)
+        torch.sum(products[:n], dim=1, out=sums[:n])
+        _pair_update_beta(beta_a, dl_a, sm, first, end)
+    return dq, dk, beta, dg
+
+
+if njit is not None:
+    _pair_differences = njit(fastmath=False)(_pair_differences)
+    _pair_update = njit(fastmath=False)(_pair_update)
+    _pair_update_beta = njit(fastmath=False)(_pair_update_beta)
+
+
+def _run_cpu_pair(*args):
+    if (
+        njit is not None
+        and args[-1] != "factorized"
+        and all(
+            t.device.type == "cpu" and t.dtype == torch.float32
+            and t.layout == torch.strided and not t.requires_grad
+            for t in args[:10]
+        )
+    ):
+        return _numba_pair(*args)
+    return _pair_loop(*args)
+
+
 import torch.utils.checkpoint
 import torch.nn.functional as F
 
@@ -183,6 +311,22 @@ def resolve_initial_state(q, v, initial_state, layout, cu_seqlens=None):
         raise ValueError(f"unsupported layout: {layout}")
     dtype = torch.float64 if q.dtype == torch.float64 else torch.float32
     return torch.zeros(batch, heads, v.shape[-1], q.shape[-1], dtype=dtype, device=q.device)
+
+
+def normalize_backward_optionals(q, v, initial_state, dt_bias, dht, layout, cu_seqlens):
+    """Prepare optional terminal gradients and channelwise bias for reference math."""
+    if dht is None:
+        state = resolve_initial_state(q, v, initial_state, layout, cu_seqlens)
+        dht = torch.zeros_like(state)
+    if dt_bias is not None and dt_bias.ndim == 1:
+        dt_bias = dt_bias.reshape(v.shape[2 if layout == "BSND" else 1], q.shape[-1])
+    return dt_bias, dht
+
+
+def restore_bias_gradient(grads, dt_bias):
+    if dt_bias is not None and dt_bias.ndim == 1 and grads[-1] is not None:
+        return (*grads[:-1], grads[-1].reshape_as(dt_bias))
+    return grads
 
 
 def sequence_bounds(q, state, layout, cu_seqlens=None, seqused=None):
@@ -321,6 +465,16 @@ def _bf16_store(x: torch.Tensor) -> torch.Tensor:
     return x.to(torch.bfloat16).to(torch.float32)
 
 
+@torch.jit.script
+def _ordered_mm(left: torch.Tensor, right: torch.Tensor, result: torch.Tensor, tile: int):
+    product = torch.empty_like(result)
+    for start in range(0, left.size(1), tile):
+        end = min(start + tile, left.size(1))
+        torch.mm(left[:, start:end], right[start:end, :], out=product)
+        result.add_(product)
+    return result
+
+
 def _cube_matmul(left, right, *, quantize: bool, initial=None, k_tile: int = 16):
     """Emulate Cube BF16 operands and FP32 L0C accumulation by K tiles."""
     if not quantize:
@@ -334,6 +488,14 @@ def _cube_matmul(left, right, *, quantize: bool, initial=None, k_tile: int = 16)
         )
     else:
         result = initial.clone()
+    reuse = (
+        left.device.type == "cpu"
+        and not left.requires_grad
+        and not right.requires_grad
+        and not result.requires_grad
+    )
+    if reuse:
+        return _ordered_mm(left, right, result, k_tile)
     for k_start in range(0, left.shape[1], k_tile):
         k_end = min(k_start + k_tile, left.shape[1])
         result = result + left[:, k_start:k_end] @ right[k_start:k_end, :]
@@ -351,11 +513,28 @@ def _storage_dtype(storage_dtype: Optional[torch.dtype]) -> torch.dtype:
     return torch.bfloat16 if storage_dtype is None else storage_dtype
 
 
-def _normalized_qk(q_tokens, k_tokens, *, use_l2norm, high_dtype, low_dtype):
+def _adjacent_square_sum(values):
+    """Match the staged Vector reduction tree before BF16 normalization."""
+    partials = values.square()
+    while partials.shape[-1] > 1:
+        partials = partials.reshape(*partials.shape[:-1], -1, 2).sum(-1)
+    return partials[..., 0]
+
+
+def _normalized_qk(
+    q_tokens, k_tokens, *, use_l2norm, high_dtype, low_dtype,
+    emulate_npu_forward=False,
+):
     if not use_l2norm:
         return q_tokens, k_tokens, None, None, None, None
-    q_rstd = torch.rsqrt(q_tokens.square().sum(-1) + NORM_EPS)
-    k_rstd = torch.rsqrt(k_tokens.square().sum(-1) + NORM_EPS)
+    if emulate_npu_forward and q_tokens.shape[-1] == 128:
+        q_square_sum = _adjacent_square_sum(q_tokens)
+        k_square_sum = _adjacent_square_sum(k_tokens)
+    else:
+        q_square_sum = q_tokens.square().sum(-1)
+        k_square_sum = k_tokens.square().sum(-1)
+    q_rstd = torch.rsqrt(q_square_sum + NORM_EPS)
+    k_rstd = torch.rsqrt(k_square_sum + NORM_EPS)
     q_norm = (q_tokens * q_rstd[..., None]).to(low_dtype)
     k_norm = (k_tokens * k_rstd[..., None]).to(low_dtype)
     return q_norm.to(high_dtype), k_norm.to(high_dtype), q_norm, k_norm, q_rstd, k_rstd
@@ -396,6 +575,10 @@ def _chunk_step(
     allow_neg_eigval,
     use_gate_in_kernel,
     use_beta_sigmoid_in_kernel,
+    emulate_npu_forward=False,
+    persistent_forward=False,
+    emit_output=True,
+    advance_state=True,
 ):
     """Chunkwise KDA step; every ABI-stored tensor is rounded to ``low_dtype``.
 
@@ -415,44 +598,142 @@ def _chunk_step(
         use_gate_in_kernel=use_gate_in_kernel,
         use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
     )
-    gate = step_gate.cumsum(0)
+    if emulate_npu_forward:
+        # Vector updates the prefix one token at a time in FP32.
+        prefix = torch.zeros_like(step_gate[0])
+        rows = []
+        for row in step_gate:
+            prefix = prefix + row
+            rows.append(prefix)
+        gate = torch.stack(rows)
+    else:
+        gate = step_gate.cumsum(0)
     length = Q.shape[0]
 
-    # Only the causal (i >= j) entries survive the tril below, and there
-    # G_i - G_j <= 0 by construction. The anti-causal half is clamped to 0
-    # instead of letting exp(+huge) -> inf: masked values stay finite, so the
-    # autograd pass does not hit 0 * inf (the kernel applies the same rule).
-    delta = (gate[:, None, :] - gate[None, :, :]).clamp(max=0.0)
-    ratio = delta.exp()
-    qk_pairs = (Q[:, None, :] * K[None, :, :] * ratio).sum(-1)
-    kk_pairs = (K[:, None, :] * K[None, :, :] * ratio).sum(-1)
-    m = torch.tril(float(scale) * qk_pairs).to(low_dtype)
+    if emulate_npu_forward and use_gate_in_kernel and gate_mode != "softplus":
+        # Bounded-gate Cube scores cast each decay-weighted operand before MMAD.
+        shared = not persistent_forward and not allow_neg_eigval and abs(scale) <= 0.125
+        scores, kk_pairs = _forward_cube_scores(Q, K, gate, scale, shared)
+    elif emulate_npu_forward and not use_gate_in_kernel:
+        scores, kk_pairs = _forward_safe_cube_scores(Q, K, gate, scale)
+    else:
+        delta = (gate[:, None, :] - gate[None, :, :]).clamp(max=0.0)
+        ratio = delta.exp()
+        scores = (Q[:, None, :] * K[None, :, :] * ratio).sum(-1) * float(scale)
+        kk_pairs = (K[:, None, :] * K[None, :, :] * ratio).sum(-1)
+    m = scores.tril().to(low_dtype)
     lower = torch.tril(b_eff[:, None] * kk_pairs, diagonal=-1)
+    if emulate_npu_forward and not use_gate_in_kernel:
+        # The forward kernel stores beta-weighted KKT in FP16 before inversion.
+        lower = lower.to(torch.float16).to(high_dtype)
 
     identity = torch.eye(length, dtype=high_dtype, device=Q.device)
     if length == 1:
         inverse = identity.to(low_dtype)
+    elif emulate_npu_forward and not use_gate_in_kernel and not persistent_forward:
+        inverse = _forward_staged_inverse(lower).to(low_dtype)
     else:
         inverse = torch.linalg.solve_triangular(
             identity + lower, identity, upper=False, unitriangular=True
         ).to(low_dtype)
     p = inverse.to(high_dtype)
 
-    k_tilde = gate.exp() * K
-    w = (p @ (b_eff[:, None] * k_tilde)).to(low_dtype)
-    u = (p @ (b_eff[:, None] * V)).to(low_dtype)
-    qg = (gate.exp() * Q).to(low_dtype)
+    gate_exp = gate.exp()
+    k_tilde = gate_exp * K
+    weighted_k = b_eff[:, None] * k_tilde
+    weighted_v = b_eff[:, None] * V
+    if emulate_npu_forward:
+        weighted_k = _bf16_operand(weighted_k)
+        weighted_v = _bf16_operand(weighted_v)
+    w = (p @ weighted_k).to(low_dtype)
+    u_fp32 = p @ weighted_v
+    u = u_fp32.to(low_dtype)
+    qg = (gate_exp * Q).to(low_dtype)
     kg = ((gate[-1:] - gate).exp() * K).to(low_dtype)
 
-    corrected = (u.to(high_dtype) - w.to(high_dtype) @ state).to(low_dtype)
-    out = (
-        float(scale) * qg.to(high_dtype) @ state
-        + m.to(high_dtype) @ corrected.to(high_dtype)
-    ).to(low_dtype)
-    state = gate[-1].exp()[:, None] * state + kg.to(high_dtype).T @ corrected.to(
-        high_dtype
+    state_operand = _bf16_operand(state) if emulate_npu_forward else state
+    # The staged forward reloads U from GM. Persistent keeps the C3 result
+    # in L0C while accumulating (-W) @ H into the same tile.
+    u_operand = (
+        u_fp32 if emulate_npu_forward and persistent_forward else u.to(high_dtype)
     )
+    corrected = (u_operand - w.to(high_dtype) @ state_operand).to(low_dtype)
+    out = (
+        float(scale) * qg.to(high_dtype) @ state_operand
+        + m.to(high_dtype) @ corrected.to(high_dtype)
+    ).to(low_dtype) if emit_output else None
+    if advance_state:
+        state = gate[-1].exp()[:, None] * state + kg.to(high_dtype).T @ corrected.to(high_dtype)
     return _Step(out, state, m, inverse, w, u, qg, kg, corrected, gate, b_eff)
+
+
+def _forward_cube_scores(q, k, gate, scale, shared):
+    length = q.shape[0]
+    scores = q.new_zeros((length, length))
+    kk = torch.zeros_like(scores)
+    for start in range(0, length, 16):
+        rows = slice(start, min(start + 16, length))
+        # The staged shared path uses a midpoint for each 32-row panel.
+        reference = min(start // 32 * 32 + 16, length - 1) if shared else start
+        left_decay = (gate[rows] - gate[reference]).exp()
+        columns = slice(0, rows.stop)
+        right_decay = (gate[reference] - gate[columns]).exp()
+        right = _bf16_operand(k[columns] * right_decay).T
+        scores[rows, columns] = _bf16_operand(q[rows] * left_decay * scale) @ right
+        kk[rows, columns] = _bf16_operand(k[rows] * left_decay) @ right
+    return scores, kk
+
+
+def _forward_safe_cube_scores(q, k, gate, scale):
+    """Model the BF16 Cube operands for externally prepared gate values."""
+    length = q.shape[0]
+    scores = q.new_zeros((length, length))
+    kk = torch.zeros_like(scores)
+    for start in range(0, length, 16):
+        stop = min(start + 16, length)
+        rows = slice(start, stop)
+        if start:
+            left_decay = (gate[rows] - gate[start]).double().exp().to(q.dtype)
+            right = _bf16_operand(k[:start] * (gate[start] - gate[:start]).double().exp().to(q.dtype)).T
+            scores[rows, :start] = _bf16_operand(q[rows] * left_decay * scale) @ right
+            kk[rows, :start] = _bf16_operand(k[rows] * left_decay) @ right
+        # The diagonal tile uses each active row's own gate as the reference.
+        for row in range(start, stop):
+            columns = slice(start, row + 1)
+            right = _bf16_operand(k[columns] * (gate[row] - gate[columns]).double().exp().to(q.dtype)).T
+            scores[row, columns] = _bf16_operand(q[row] * scale) @ right
+            kk[row, columns] = k[row] @ right
+    return scores, kk
+
+
+def _forward_staged_inverse(lower):
+    """Match the staged forward's FP16 handoffs in its 16/32/64 inverse."""
+    length = lower.shape[0]
+    negative = lower.new_zeros((CHUNK_SIZE, CHUNK_SIZE))
+    negative[:length, :length] = -lower
+    inverse = torch.zeros_like(negative)
+
+    def fp16(value):
+        return value.to(torch.float16).to(lower.dtype)
+
+    for start in range(0, CHUNK_SIZE, 16):
+        block = slice(start, start + 16)
+        value = fp16(negative[block, block])
+        diagonal = torch.eye(16, dtype=lower.dtype, device=lower.device) + value
+        power2 = value @ value
+        diagonal = diagonal + fp16(diagonal) @ fp16(power2)
+        power4 = fp16(power2) @ fp16(power2)
+        diagonal = diagonal + fp16(diagonal) @ fp16(power4)
+        power8 = fp16(power4) @ fp16(power4)
+        inverse[block, block] = diagonal + fp16(diagonal) @ fp16(power8)
+
+    for size in (16, 32):
+        for start in range(0, CHUNK_SIZE, 2 * size):
+            left = slice(start, start + size)
+            right = slice(start + size, start + 2 * size)
+            partial = fp16(negative[right, left]) @ fp16(inverse[left, left])
+            inverse[right, left] = fp16(inverse[right, right]) @ fp16(partial)
+    return inverse[:length, :length]
 
 
 def _forward_pieces(
@@ -476,6 +757,7 @@ def _forward_pieces(
     storage_dtype,
     chunk_size,
     high_dtype,
+    emulate_npu_forward=False,
 ):
     """Shared prologue: token-major views, normalized Q/K, iteration metadata."""
     q_tokens = token_major(q, layout).to(high_dtype)
@@ -489,6 +771,7 @@ def _forward_pieces(
         use_l2norm=use_qk_l2norm_in_kernel,
         high_dtype=high_dtype,
         low_dtype=_storage_dtype(storage_dtype),
+        emulate_npu_forward=emulate_npu_forward,
     )
     token_count, value_heads, value_dim = v_tokens.shape
     key_heads, key_dim = q_tokens.shape[1], q_tokens.shape[-1]
@@ -536,16 +819,21 @@ def build_cache(
     chunk_size: int = CHUNK_SIZE,
     emulate_bf16: bool = True,
     storage_dtype: Optional[torch.dtype] = None,
+    _peer_only: bool = False,
+    emulate_npu_forward: bool = False,
 ) -> Cache:
     """Chunkwise forward producing the backward cache.
 
-    Math runs in FP32 (FP64 for FP64 inputs); every tensor the operator ABI
-    stores in BF16 is rounded at the same points as the device kernel, so the
-    returned cache can be fed bit-identically to the kernel and to
-    :func:`staged_backward`.
+    Math runs in FP32 (FP64 for FP64 inputs). The reference-cache route rounds
+    the ABI buffers, which can then be shared by the device and CPU backward.
+    The forward integration peer also rounds the operands consumed by Cube.
     """
     initial_state = resolve_initial_state(q, v, initial_state, layout, cu_seqlens)
-    high_dtype = torch.float64 if q.dtype == torch.float64 else torch.float32
+    high_dtype = (
+        torch.float64
+        if q.dtype == torch.float64 and not emulate_npu_forward
+        else torch.float32
+    )
     low_dtype = high_dtype if not emulate_bf16 else _storage_dtype(storage_dtype)
 
     ctx = _forward_pieces(
@@ -568,6 +856,7 @@ def build_cache(
         storage_dtype=low_dtype,
         chunk_size=chunk_size,
         high_dtype=high_dtype,
+        emulate_npu_forward=emulate_npu_forward,
     )
     q_eff = ctx["q_eff"]
     k_eff = ctx["k_eff"]
@@ -582,6 +871,14 @@ def build_cache(
     batch = ctx["batch"]
 
     bounds = sequence_bounds(q, initial_state, layout, cu_seqlens, seqused)
+    # The NPU forward scheduler explicitly selects persistent for short
+    # multi-sequence TND training. The peer uses the staged model otherwise.
+    persistent_forward = (
+        emulate_npu_forward
+        and layout == "TND"
+        and len(bounds) > 1
+        and max(end - start for start, end in bounds) <= 2 * chunk_size
+    )
     chunk_count = sum(
         (end - start + chunk_size - 1) // chunk_size
         for start, end in bounds
@@ -596,7 +893,7 @@ def build_cache(
     v_new = torch.zeros(u.shape, dtype=low_dtype, device=u.device)
     g_cumsum = torch.zeros(*shape_tokens, key_dim, dtype=high_dtype, device=q.device)
     chunk_states = torch.zeros(
-        chunk_count, value_heads, value_dim, key_dim, dtype=high_dtype, device=q.device
+        chunk_count, value_heads, value_dim, key_dim, dtype=low_dtype, device=q.device
     )
     output = torch.zeros(token_count, value_heads, value_dim, dtype=low_dtype, device=v.device)
     final_state = torch.empty_like(initial_state)
@@ -621,6 +918,9 @@ def build_cache(
             length = end - start
             chunk = chunk_base + local_chunk
             B = beta_tokens[start:end, head]
+            # Public saved states are BF16; peer must consume the same rounded
+            # cache as backward. Keep the live recurrence state in high_dtype.
+            # Exact-math reference mode retains high_dtype via low_dtype above.
             chunk_states[chunk, head] = state.T
             step = _chunk_step(
                 q_eff[start:end, qk_head],
@@ -631,6 +931,10 @@ def build_cache(
                 A_log[head] if A_log is not None else None,
                 dt_bias[head] if dt_bias is not None else None,
                 state,
+                emulate_npu_forward=emulate_npu_forward,
+                persistent_forward=persistent_forward,
+                emit_output=not _peer_only,
+                advance_state=not _peer_only or local_chunk + 1 < len(chunks),
                 **common,
             )
             state = step.state
@@ -648,7 +952,8 @@ def build_cache(
                 if use_beta_sigmoid_in_kernel
                 else B
             )
-            output[start:end, head] = step.out
+            if not _peer_only:
+                output[start:end, head] = step.out
         final_state[seq_index, head] = state.T
 
     return Cache(
@@ -1115,48 +1420,52 @@ def staged_backward(
                     Akk = cache.Akk[chunk, head, :length, :length].to(dtype)
                 do_chunk = do_tokens[start:end, head].to(dtype)
 
+                do_operand = round_operand(do_chunk)
+                state_operand = round_operand(chunk_state)
+                v_operand = round_operand(v_new)
                 # Stage 2: consumers of corrected values and of the prior state.
                 # ``d_v_new`` is the staged pipeline product (``kg @ dH`` plus
                 # ``Aqk.T @ do``); it reads ``dH`` as a single BF16 operand.
                 dv_new = _cube_matmul(
-                    round_operand(Aqk).T, round_operand(do_chunk), quantize=quantize
+                    round_operand(Aqk).T, do_operand, quantize=quantize
                 ) + _cube_matmul(
                     round_operand(kg), round_operand(dstate_out), quantize=quantize
                 )
+                dv_operand = round_operand(dv_new)
                 dAqk = torch.tril(
                     _cube_matmul(
-                        round_operand(do_chunk), round_operand(v_new).T, quantize=quantize
+                        do_operand, v_operand.T, quantize=quantize
                     )
                 )
                 dqg = float(scale) * _cube_matmul(
-                    round_operand(do_chunk), round_operand(chunk_state).T, quantize=quantize
+                    do_operand, state_operand.T, quantize=quantize
                 )
                 # ``compute_token_state_split`` is the one product that feeds
                 # dH as BF16 high + BF16 residual (two MMADs).
                 if quantize:
                     dstate_high = round_operand(dstate_out)
                     dstate_residual = round_operand(dstate_out - dstate_high)
-                    v_new_operand = round_operand(v_new)
+                    v_new_operand = v_operand
                     dkg = _cube_matmul(v_new_operand, dstate_high.T, quantize=True)
                     dkg = _cube_matmul(
                         v_new_operand, dstate_residual.T, quantize=True, initial=dkg
                     )
                 else:
                     dkg = _cube_matmul(
-                        round_operand(v_new), split_operand(dstate_out).T, quantize=False
+                        v_operand, split_operand(dstate_out).T, quantize=False
                     )
                 dstate_decay = (dstate_out * chunk_state).sum(-1)
                 dchunk_state = (
                     float(scale) * _cube_matmul(
-                        round_operand(qg).T, round_operand(do_chunk), quantize=quantize
+                        round_operand(qg).T, do_operand, quantize=quantize
                     )
                     + g_cumsum[-1].exp()[:, None] * dstate_out
                     - _cube_matmul(
-                        round_operand(w).T, round_operand(dv_new), quantize=quantize
+                        round_operand(w).T, dv_operand, quantize=quantize
                     )
                 )
                 dw = -_cube_matmul(
-                    round_operand(dv_new), round_operand(chunk_state).T, quantize=quantize
+                    dv_operand, state_operand.T, quantize=quantize
                 )
                 du = dv_new
 
@@ -1240,8 +1549,8 @@ def staged_backward(
                     dg_cumsum = dg_cumsum + pair_g
                     dbeta_chunk = dbeta_chunk + pair_b
                 else:
-                    if _pair_loop is not None:
-                        dq_chunk, dk_chunk, dbeta_chunk, dg_cumsum = _pair_loop(
+                    if _pair_loop is not None and g_cumsum.device.type == "cpu":
+                        dq_chunk, dk_chunk, dbeta_chunk, dg_cumsum = _run_cpu_pair(
                             g_cumsum,
                             dAqk_scaled,
                             dlower_beta,
@@ -1409,11 +1718,10 @@ class _GoldenProgress:
         self.next_percent = min(100.0, (math.floor(percent / 5.0) + 1) * 5.0)
 
 
-# Chunkwise FP32 reference for the KDA recurrence (ported from cannbot-dsl PR395).
+# Chunkwise reference for the KDA recurrence (ported from cannbot-dsl PR395).
 # The maths is the same token-level recurrence as before; evaluating it chunk-major
 # keeps the Python interpreter out of the inner loop, which is what made the 8K
-# cases take close to an hour. Everything stays float32 on purpose: this is the
-# device-independent truth the suite compares against, not the quantised peer.
+# cases take close to an hour. Retain the selected reference dtype throughout.
 _CHUNK_SIZE = 64
 _REFERENCE_BLOCK_SIZE = 16
 
@@ -1425,8 +1733,7 @@ def _chunk_major(x):
 
 def _chunk_lower_matmul(left, right, cumulative_decay, *, diagonal):
     """Causal QK / KKT tiles; the diagonal block uses the exact per-row decay."""
-    result = torch.zeros(*left.shape[:-1], right.shape[-2], dtype=torch.float32,
-                         device=left.device)
+    result = left.new_zeros((*left.shape[:-1], right.shape[-2]))
     for row_start in range(0, _CHUNK_SIZE, _REFERENCE_BLOCK_SIZE):
         row_end = row_start + _REFERENCE_BLOCK_SIZE
         reference = cumulative_decay[..., row_start:row_start + 1, :]
@@ -1447,7 +1754,7 @@ def _chunk_lower_matmul(left, right, cumulative_decay, *, diagonal):
             result[..., row_start:row_end, col_start:col_end] = (
                 left_rows @ right_cols.transpose(-1, -2))
     return result * torch.tril(
-        torch.ones(_CHUNK_SIZE, _CHUNK_SIZE, dtype=torch.float32, device=left.device),
+        left.new_ones((_CHUNK_SIZE, _CHUNK_SIZE)),
         diagonal=diagonal)
 
 
@@ -1461,7 +1768,7 @@ def _chunk_stage1(K, V, Q, beta, g, *, scale):
     K_decayed_beta = beta * K_decayed
     Q_decayed = gamma * Q_i * scale
     T = _chunk_lower_matmul(beta * K_i, K_i, cumdec, diagonal=-1)
-    eye = torch.eye(_CHUNK_SIZE, dtype=torch.float32, device=K.device)
+    eye = torch.eye(_CHUNK_SIZE, dtype=K.dtype, device=K.device)
     inverse = torch.linalg.solve_triangular(
         eye + T, eye.expand_as(T), upper=False, unitriangular=True)
     M = inverse * beta.transpose(-1, -2)
@@ -1498,13 +1805,12 @@ def _chunk_stage3(s1, s2):
 
 
 def _chunkwise_forward(q, k, v, step_gate, beta_eff, h0, bounds, scale, heads_per_key=1):
-    """Token-major inputs -> (outputs, final_state), chunkwise, pure fp32."""
+    """Evaluate the chunkwise recurrence in the input arithmetic dtype."""
     if heads_per_key != 1:
         q = q.repeat_interleave(heads_per_key, dim=1)
         k = k.repeat_interleave(heads_per_key, dim=1)
     token_count, value_heads, value_dim = v.shape
-    outputs = torch.zeros(token_count, value_heads, value_dim,
-                          dtype=torch.float32, device=v.device)
+    outputs = v.new_zeros((token_count, value_heads, value_dim))
     final = torch.zeros_like(h0)
     for seq_index, (start, end) in enumerate(bounds):
         length = end - start
@@ -1683,7 +1989,7 @@ def token_golden_backward(
     use_beta_sigmoid_in_kernel: bool = True,
     dtype: torch.dtype = torch.float32,
 ):
-    """TTK golden: token-level recurrence, **no BF16 storage**.
+    """TTK golden: the token recurrence evaluated by chunk algebra.
 
     Mirrors ``test_flash_kda_grad_ut._token_golden`` exactly — inputs are cast to
     ``dtype`` (FP32), L2 norm / gate / beta activation are computed in that
@@ -1694,11 +2000,14 @@ def token_golden_backward(
         S_t = S_{t-1} + k_t delta_t^T
         o_t = scale * q_t^T S_t
 
-    runs token by token; gradients come from ``torch.autograd`` over that
-    recurrence. Nothing is rounded to BF16, so this is the device-independent
-    truth the test suite compares against, not the device's own quantisation.
+    is evaluated chunkwise in ``dtype``. Gradients come from ``torch.autograd``
+    over that recurrence without casting intermediates to BF16.
     """
-    return autograd_backward(
+    raw_bias = dt_bias
+    dt_bias, dht = normalize_backward_optionals(
+        q, v, initial_state, dt_bias, dht, layout, cu_seqlens
+    )
+    grads = autograd_backward(
         q,
         k,
         v,
@@ -1721,6 +2030,7 @@ def token_golden_backward(
         use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
         dtype=dtype,
     )
+    return restore_bias_gradient(grads, raw_bias)
 
 
 # ---------------------------------------------------------------------------
@@ -1759,6 +2069,7 @@ def bf16_peer(
     v_path_bf16: bool = False,
     disable_recompute: bool = False,
     cache: Optional["Cache"] = None,
+    cache_source: str = "ref",
     **_ignored,
 ):
     """Third-party reference with the operator's BF16 quantization budget.
@@ -1787,12 +2098,31 @@ def bf16_peer(
     # 确定性的，同一份输入必然得到同一份缓存），所以这里只把契约对齐：
     # - 未传 ``cache`` 时按 ``disable_recompute=False`` 自己构建；
     # - 传了 ``cache`` 时按 ``disable_recompute=True`` 只消费、不重建。
+    raw_bias = dt_bias
+    dt_bias, dht = normalize_backward_optionals(
+        q, v, initial_state, dt_bias, dht, layout, cu_seqlens
+    )
     if cache is None:
+        emulate_npu_forward = str(cache_source).lower() == "fwd"
+        # Forward consumes BF16 g even when the public tensor is FP32.
+        # Keep the original gate for its backward chain rule below.
+        forward_g = g.to(torch.bfloat16) if emulate_npu_forward else g
         cache = build_cache(
-            q, k, v, g, beta, initial_state, A_log, dt_bias,
-            emulate_bf16=True, storage_dtype=torch.bfloat16, **kwargs
+            q,
+            k,
+            v,
+            forward_g,
+            beta,
+            initial_state,
+            A_log,
+            dt_bias,
+            emulate_bf16=True,
+            storage_dtype=torch.bfloat16,
+            _peer_only=True,
+            emulate_npu_forward=emulate_npu_forward,
+            **kwargs,
         )
-    return staged_backward(
+    grads = staged_backward(
         q, k, v, g, beta, do, dht, cache,
         A_log=A_log, dt_bias=dt_bias,
         device_quant=device_quant,
@@ -1804,3 +2134,4 @@ def bf16_peer(
         v_path_bf16=bool(v_path_bf16),
         **kwargs
     )
+    return restore_bias_gradient(grads, raw_bias)

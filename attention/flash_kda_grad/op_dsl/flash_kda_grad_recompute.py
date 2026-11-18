@@ -994,17 +994,11 @@ def recompute_tracks(
                     # from the forward implementation, including kg and v_new.
                     prep.prepare_recurrent_operands(1.0, state.gamma_ub, chunk)
                     prep.acquire_recurrent_operands()
-                    if padded:
-                        inverse_rows = inverse[
-                            batch, head, chunk * C : chunk * C + rows, None
-                        ]
-                        cube.load_inverse(
-                            tile_slice(inverse_rows, (C, C), (0, 0)), rows
-                        )
-                    else:
-                        cube.load_inverse(
-                            inverse[state_base + chunk, head, None, None], rows
-                        )
+                    row_start = origin + chunk * C
+                    inverse_rows = inverse[
+                        batch, head, row_start : row_start + rows, None
+                    ]
+                    cube.load_inverse(tile_slice(inverse_rows, (C, C), (0, 0)), rows)
                     cube.chunk_idx = chunk
                     cube.valid_rows = rows
                     cube.compute_u_pre_and_w(prep, state)
@@ -1484,7 +1478,7 @@ def recompute_staged_tracks(
             length = metadata[record + grad.TASK_LENGTH]
             chunks = metadata[record + grad.TASK_CHUNKS]
             origin = metadata[record + grad.TASK_COMPACT_TOKEN_START]
-            batch, state_base = 0, origin // C + sequence
+            batch = 0
             if padded:
                 batch, origin = sequence, 0
             stop = origin + length
@@ -1526,14 +1520,10 @@ def recompute_staged_tracks(
                 )
                 prep.prepare_recurrent_operands(1.0, decay, chunk)
                 prep.acquire_recurrent_operands()
-                if padded:
-                    cube.load_inverse(
-                        inverse[batch, head, chunk * C : chunk * C + rows, None], rows
-                    )
-                else:
-                    cube.load_inverse(
-                        inverse[state_base + chunk, head, None, None], rows
-                    )
+                row_start = origin + chunk * C
+                cube.load_inverse(
+                    inverse[batch, head, row_start : row_start + rows, None], rows
+                )
                 cube.chunk_idx, cube.valid_rows = chunk, rows
                 cube.compute_u_pre_and_w(prep, None)
         if padded:

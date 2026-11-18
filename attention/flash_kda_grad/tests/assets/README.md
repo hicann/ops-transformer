@@ -31,18 +31,19 @@ python attention/flash_kda_grad/tests/ut/test_flash_kda_grad_ut.py --profile --h
 python attention/flash_kda_grad/tests/ut/test_flash_kda_grad_ut.py --compare-bin --help
 ```
 
-TTK 的 `api.py`、`spec.py` 仍使用本目录 `flash_kda_grad_ttk/golden.py`，
+TTK 的 `api.py`、`spec.py` 仍使用本目录 `impl/flash_kda_grad_ttk/golden.py`，
 不导入 UT 模块。测试日志、profile 结果和 bin 对比报告应写到代码仓库之外。
 
 ## 1. 文件与入口
 
 ```text
-attention/flash_kda_grad/tests/ttk/
-├── flash_kda_grad_ttk/
-│   ├── api.py                      # npu(...)：NPU 算子 / CPU 参考分派
-│   ├── golden.py                   # 前向缓存、逐 token golden、分阶段反向 peer
-│   ├── spec.py                     # golden / peer 与 TTK 默认 cross_check L2
-│   └── __init__.py                 # 导出 npu
+attention/flash_kda_grad/tests/assets/
+├── impl/
+│   └── flash_kda_grad_ttk/
+│       ├── api.py                      # npu(...)：NPU 算子 / CPU 参考分派
+│       ├── golden.py                   # 前向缓存、逐 token golden、分阶段反向 peer
+│       ├── spec.py                     # golden / peer 与 TTK 默认 cross_check L2
+│       └── __init__.py                 # 导出 npu
 ├── cases/
 │   ├── flash_kda_grad_stc.csv      # 130 条 STC，含 30 条新增重算专项
 │   └── flash_kda_grad_exception.csv # 异常用例，单独维护
@@ -55,7 +56,7 @@ CPU 分支调用参考实现。
 
 ## 2. 输入、输出与缓存
 
-[`api.py`](flash_kda_grad_ttk/api.py) 的输入顺序如下，BSND 布局交换 S/N 轴，TND 使用 `[T,N,D]`：
+[`api.py`](impl/flash_kda_grad_ttk/api.py) 的输入顺序如下，BSND 布局交换 S/N 轴，TND 使用 `[T,N,D]`：
 
 | 顺序 | 张量 | shape（BNSD） | dtype |
 |---|---|---|---|
@@ -132,7 +133,7 @@ bash "$KDA_ASSETS/run_one.sh" -t kdag_stc_109
 
 `flash_kda_grad_exception.csv` 单独维护 60 条异常目录，原 001–050 不变；
 051–060 新增重算模式的初始状态类型、末维、序列数、头数、device 错误，以及
-缺失 Aqk、Akk、q_rtsd、beta 激活缓存和错误 k_rstd dtype。全部显式设置
+缺失 Aqk、Akk、q_rstd、beta 激活缓存和错误 k_rstd dtype。全部显式设置
 `disable_recompute=False`，预期在重算缓存分配和主计算前抛出 `ValueError`。
 `initial_state=None` 是合法零初态；可重算的七项缓存可省略，均不作为异常。
 
@@ -152,7 +153,7 @@ Tensor 的 Host 拦截；测试设有分配/计算哨兵，非法输入进入重
 
 ## 3. Golden、peer 与判据
 
-当前 [`spec.py`](flash_kda_grad_ttk/spec.py) 使用以下实现：
+当前 [`spec.py`](impl/flash_kda_grad_ttk/spec.py) 使用以下实现：
 
 | 角色 | 实现 | 计算方式 |
 |---|---|---|
@@ -187,7 +188,7 @@ CANNBotDSL 及 TTK 依赖。脚本不切换 Conda、不 source 固定的 CANN �
 
 ```bash
 export KDA_ROOT=/path/to/ops-transformer/attention/flash_kda_grad
-export KDA_ASSETS="$KDA_ROOT/tests/ttk"
+export KDA_ASSETS="$KDA_ROOT/tests/assets"
 # 使用 TTK 源码时设置；当前 Python 已安装 ttk 时可以省略。
 export TTK_REPO=/path/to/ops-test-kit
 export KDA_DEVICES=0
@@ -245,8 +246,9 @@ bash "$KDA_ASSETS/run_one.sh" replay 2>&1 | tee /path/to/your/batch.log
 远端 peer 可通过 TTK 原生命令和自建配置使用，例如已有 `peer.yaml` 时：
 
 ```bash
+PYTHONPATH="$KDA_ASSETS/impl${PYTHONPATH:+:$PYTHONPATH}" \
 python3 -m ttk e2e -i "$KDA_ASSETS/cases/flash_kda_grad_stc.csv" \
-  --plugin "$KDA_ASSETS/flash_kda_grad_ttk/spec.py" --config /path/to/peer.yaml \
+  --plugin "$KDA_ASSETS/impl/flash_kda_grad_ttk/spec.py" --config /path/to/peer.yaml \
   --device-whitelist "$KDA_DEVICES" --seed 20261027 --pc 1 \
   --proc-no-reuse --proc-timeout 3000 --warmup=false --run 1 \
   --task-prof false -o "$KDA_OUT"
@@ -257,7 +259,7 @@ python3 -m ttk e2e -i "$KDA_ASSETS/cases/flash_kda_grad_stc.csv" \
 结果 CSV 使用 `-o` 或 `KDA_OUT` 指定。终端和精度明细中的八个输出位置依次为
 `dq, dk, dv, dh0, dg, dbeta, dA, dBias`。常用字段：
 
-[`spec.py`](flash_kda_grad_ttk/spec.py) 的 `pre_compare` 钩子会在终端和 `ttk.log`
+[`spec.py`](impl/flash_kda_grad_ttk/spec.py) 的 `pre_compare` 钩子会在终端和 `ttk.log`
 打印八个梯度的数值表：首尾各 10 个元素、绝对差异最大的 10 个元素，以及最大有限
 绝对误差和非有限值数量。`Index` 是展平后的元素下标，
 `AbsDiff = abs(NpuOut - GoldenOut)`，`RateDiff = AbsDiff / abs(GoldenOut)`；golden
@@ -282,3 +284,17 @@ TTK adapter、golden 和 CPU peer 接受相同的可选 Tensor 参数，位于 `
 
 NPU 入口保持请求的实际 layout；参考缓存按有效长度生成，并映射到当前算子的 padded chunk 轴或 TND 预留 chunk 槽位。`cache_source="fwd"` 也将长度传给前向 metadata。
 用 CSV 运行变长用例时，长度 Tensor 需要通过 TTK 自定义输入或已有输入文件提供精确值，不能将随机 int32 数据当作合法的前缀和。
+
+### 并行构建 Native AOT 包
+
+先加载 CANN 环境，再运行以下命令。编译进程按可用 CPU 和内存限额启动，重变体优先分配。构建工具校验所有分片后发布一个 Native 包。使用同一个 `--work-dir` 可复用磁盘编译缓存，`--output` 指向新的发布目录。
+
+```bash
+python3 "$KDA_ASSETS/build_native.py" --jobs 4 \
+  --work-dir /path/to/aot-work --output /path/to/native
+KDA_NATIVE_PACKAGE=/path/to/native CANNBOTDSL_NATIVE_BINARY_MODE=require \
+  KDA_CASES="$KDA_ASSETS/cases/flash_kda_grad_whitebox.csv" \
+  bash "$KDA_ASSETS/run_one.sh"
+```
+
+原版 whitebox 使用 `cases/flash_kda_grad_whitebox.csv`。要运行含一维 `dt_bias` 和省略 `dht` 用例的新版套件，将 `KDA_CASES` 指向 `cases/flash_kda_grad_whitebox2.csv`。

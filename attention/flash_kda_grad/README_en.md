@@ -205,7 +205,7 @@
       <td>ND</td>
     </tr>
     <tr>
-      <td>q_rtsd</td>
+      <td>q_rstd</td>
       <td>input</td>
       <td>Inverse norm of the forward Q L2Norm. Mandatory with Q/K normalization on; never recomputed.</td>
       <td>FLOAT32</td>
@@ -214,7 +214,7 @@
     <tr>
       <td>k_rstd</td>
       <td>input</td>
-      <td>Inverse norm of the forward K L2Norm, same requirements as q_rtsd.</td>
+      <td>Inverse norm of the forward K L2Norm, same requirements as q_rstd.</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
@@ -385,7 +385,7 @@
   must receive a shape- and type-matching zero Tensor.
 - `Aqk`, `Akk` and `metadata` are mandatory in both modes; `disable_recompute=True` additionally requires
   `chunk_states`, `w`, `u`, `v_new`, `qg`, `kg` and `g_cumsum`.
-- Fusion switches require their caches: `use_qk_l2norm_in_kernel=True` needs `q_rtsd`/`k_rstd`;
+- Fusion switches require their caches: `use_qk_l2norm_in_kernel=True` needs `q_rstd`/`k_rstd`;
   `use_beta_sigmoid_in_kernel=True` needs `beta_sigmoid`; `use_gate_in_kernel=True` needs `A_log` (`dt_bias` is optional).
 - `allow_neg_eigval=True` requires `use_beta_sigmoid_in_kernel=True`.
 - `lower_bound` may only be None or a value in `[-5, 0)`; the backward entry rejects 0.
@@ -409,10 +409,10 @@
 | Torch interface | [torchapi_flash_kda_grad.md](./docs/torchapi_flash_kda_grad.md) | Call through `cann_ops_transformer.flash_kda_grad` and `cann_ops_transformer.flash_kda_grad_metadata`; the document contains the full prototypes, parameters, returns and examples. |
 | Direct DSL call | [op_dsl/flash_kda_grad.py](./op_dsl/flash_kda_grad.py) | Call the DSL implementation through `flash_kda_grad_npu` (main entry) and `flash_kda_grad_from_forward` (forward-cache adapter). |
 | Unit tests | [tests/ut](./tests/ut) | Operator UT, exception contracts, and the performance/precision comparison entries. |
-| TTK precision and performance | [tests/ttk/README.md](./tests/ttk/README.md) | STC case execution, dump/replay modes and the `cross_check L2` criteria. |
+| TTK precision and performance | [tests/assets/README.md](./tests/assets/README.md) | STC case execution, dump/replay modes and the `cross_check L2` criteria. |
 
 ## References
 
 - [Torch interface document (Chinese)](./docs/torchapi_flash_kda_grad.md)
 - [Torch API document (English)](./docs/torchapi_flash_kda_grad_en.md)
-- [TTK precision and performance guide](./tests/ttk/README.md)
+- [TTK precision and performance guide](./tests/assets/README.md)

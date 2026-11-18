@@ -203,7 +203,7 @@
       <td>ND</td>
     </tr>
     <tr>
-      <td>q_rtsd</td>
+      <td>q_rstd</td>
       <td>输入</td>
       <td>前向 Q L2Norm 的逆范数。开启 Q/K 归一化时必传，不参与重算。</td>
       <td>FLOAT32</td>
@@ -212,7 +212,7 @@
     <tr>
       <td>k_rstd</td>
       <td>输入</td>
-      <td>前向 K L2Norm 的逆范数，使用要求同 q_rtsd。</td>
+      <td>前向 K L2Norm 的逆范数，使用要求同 q_rstd。</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
@@ -382,7 +382,7 @@
 - 必须提供 `do` 与 `dht`；即使只对输出或最终状态中的一路求导，也须为另一路提供形状、类型匹配的零 Tensor。
 - `Aqk`、`Akk`、`metadata` 在两种模式下都必须传入；`disable_recompute=True` 时还必须传入
   `chunk_states`、`w`、`u`、`v_new`、`qg`、`kg`、`g_cumsum` 七项缓存。
-- 融合开关打开时必须提供对应缓存：`use_qk_l2norm_in_kernel=True` 需 `q_rtsd`/`k_rstd`；
+- 融合开关打开时必须提供对应缓存：`use_qk_l2norm_in_kernel=True` 需 `q_rstd`/`k_rstd`；
   `use_beta_sigmoid_in_kernel=True` 需 `beta_sigmoid`；`use_gate_in_kernel=True` 需 `A_log`（`dt_bias` 可省略）。
 - `allow_neg_eigval=True` 要求 `use_beta_sigmoid_in_kernel=True`。
 - `lower_bound` 只能为 None 或 `[-5, 0)` 内的值，0 不被反向入口接受。
@@ -404,10 +404,10 @@
 | Torch 接口调用 | [torchapi_flash_kda_grad.md](./docs/torchapi_flash_kda_grad.md) | 通过 `cann_ops_transformer.flash_kda_grad` 与 `cann_ops_transformer.flash_kda_grad_metadata` 调用，含完整接口原型、参数、返回值与调用示例。 |
 | DSL 直接调用 | [op_dsl/flash_kda_grad.py](./op_dsl/flash_kda_grad.py) | 通过 `flash_kda_grad_npu`（主入口）与 `flash_kda_grad_from_forward`（前向缓存适配入口）直接调用 DSL 实现。 |
 | 单元测试 | [tests/ut](./tests/ut) | 算子 UT、异常契约、性能与精度比较入口。 |
-| TTK 精度与性能 | [tests/ttk/README.md](./tests/ttk/README.md) | STC 用例执行、dump/replay 模式与 `cross_check L2` 判据说明。 |
+| TTK 精度与性能 | [tests/assets/README.md](./tests/assets/README.md) | STC 用例执行、dump/replay 模式与 `cross_check L2` 判据说明。 |
 
 ## 参考资源
 
 - [Torch 接口文档（中文）](./docs/torchapi_flash_kda_grad.md)
 - [Torch API document (English)](./docs/torchapi_flash_kda_grad_en.md)
-- [TTK 精度与性能说明](./tests/ttk/README.md)
+- [TTK 精度与性能说明](./tests/assets/README.md)

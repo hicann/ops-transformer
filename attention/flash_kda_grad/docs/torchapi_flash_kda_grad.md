@@ -110,12 +110,13 @@ cann_ops_transformer.flash_kda_grad(
     qg: Optional[Tensor] = None,
     kg: Optional[Tensor] = None,
     g_cumsum: Optional[Tensor] = None,
-    q_rtsd: Optional[Tensor] = None,
+    q_rstd: Optional[Tensor] = None,
     k_rstd: Optional[Tensor] = None,
     beta_sigmoid: Optional[Tensor] = None,
     A_log: Optional[Tensor] = None,
     dt_bias: Optional[Tensor] = None,
     cu_seqlens: Optional[Tensor] = None,
+    cu_seqlens_cpu: Optional[list[int]] = None,
     seqused: Optional[Tensor] = None,
     scale: Optional[float] = None,
     use_qk_l2norm_in_kernel: bool = True,
@@ -153,7 +154,7 @@ flash_kda_grad_npu(
     qg: Optional[torch.Tensor] = None,
     kg: Optional[torch.Tensor] = None,
     g_cumsum: Optional[torch.Tensor] = None,
-    q_rtsd: Optional[torch.Tensor] = None,
+    q_rstd: Optional[torch.Tensor] = None,
     k_rstd: Optional[torch.Tensor] = None,
     beta_sigmoid: Optional[torch.Tensor] = None,
     A_log: Optional[torch.Tensor] = None,
@@ -171,7 +172,7 @@ flash_kda_grad_npu(
 )
 ```
 
-`q_rtsd` 是当前接口的实际参数名，与 `k_rstd` 的拼写不同。主入口不接收独立的 `q_norm/k_norm` 参数；
+`q_rstd` 与 `k_rstd` 命名对称（此前 `q_rtsd` 的拼写已统一修正）。主入口不接收独立的 `q_norm/k_norm` 参数；
 启用归一化时，将前向保存的归一化结果按输入布局传入 `q/k`。
 
 ### Metadata 接口原型
@@ -250,9 +251,10 @@ flash_kda_grad_from_forward(
 | 参数 | TND | BNSD | BSND |
 | :--- | :--- | :--- | :--- |
 | `q`、`k` | `[T,Nqk,Dk]` | `[B,Nqk,S,Dk]` | `[B,S,Nqk,Dk]` |
-| `v`、`do` | `[T,Nv,Dv]` | `[B,Nv,S,Dv]` | `[B,S,Nv,Dv]` |
-| `g` | `[T,Nv,Dk]` | `[B,Nv,S,Dk]` | `[B,S,Nv,Dk]` |
-| `beta` | `[T,Nv]` | `[B,Nv,S]` | `[B,S,Nv]` |
+| `v` | `[T,Nv,Dv]` | `[B,Nv,S,Dv]` | `[B,S,Nv,Dv]` |
+| `do` | `[T,Nv,Dv]` | `[B,S,Nv,Dv]` | `[B,S,Nv,Dv]` |
+| `g` | `[T,Nv,Dk]` | `[B,S,Nv,Dk]` | `[B,S,Nv,Dk]` |
+| `beta` | `[T,Nv]` | `[B,S,Nv]` | `[B,S,Nv]` |
 | `initial_state`、`dht` | `[B,Nv,Dv,Dk]` | `[B,Nv,Dv,Dk]` | `[B,Nv,Dv,Dk]` |
 
 ### 主接口参数
@@ -265,65 +267,64 @@ flash_kda_grad_from_forward(
 | `v` | 输入 | Value。 | 必传；与前向输入一致。 | BFLOAT16 | ND | 见输入布局 |
 | `g` | 输入 | Gate 输入。 | 必传；融合时为原始 gate 输入，未融合时为单步 log gate。 | BFLOAT16 / FLOAT32 | ND | 见输入布局 |
 | `beta` | 输入 | 每 token、每 value head 的更新系数输入。 | 必传；融合时为 sigmoid 前的输入，未融合时为已激活的系数。 | BFLOAT16 / FLOAT32 | ND | 见输入布局 |
-| `do` | 输入 | 前向输出梯度。 | 必传；没有该路梯度时传零 Tensor，不能传 `None`。 | BFLOAT16 | ND | 与 `v` 相同 |
+| `do` | 输入 | 前向输出梯度。 | 必传；没有该路梯度时传零 Tensor，不能传 `None`。 | BFLOAT16 | ND | BSND / TND |
 | `dht` | 输入 | 最终状态梯度。 | 必传；没有该路梯度时传零 Tensor，不能传 `None`。 | FLOAT32 | ND | `[B,Nv,Dv,Dk]` |
 | `Aqk` | 输入 | 前向因果 QK 矩阵，已包含 `scale`。 | 两种重算模式均必传，不重算。 | BFLOAT16 | ND | 缓存布局 |
 | `Akk` | 输入 | 前向 WY 变换的单位下三角矩阵逆。 | 两种重算模式均必传，不重算。 | BFLOAT16 | ND | 缓存布局 |
 | `metadata` | 输入 | 反向任务调度信息。 | 必传；由 `flash_kda_grad_metadata` 生成，不能使用前向 metadata 替代。 | INT32 | ND | `[8+7*B*Nv]` |
 | `initial_state` | 输入 | 前向初始状态。 | 重算时使用，`None` 表示零状态；保存缓存模式不使用。 | FLOAT32 | ND | `[B,Nv,Dv,Dk]` |
-| `chunk_states` | 输入 | 各 chunk 入口状态。 | 保存缓存模式必传；重算模式忽略并重新生成。 | FLOAT32 | ND | 缓存布局 |
+| `chunk_states` | 输入 | 各 chunk 入口状态。 | 保存缓存模式必传；重算模式忽略并重新生成。 | BFLOAT16 | ND | 缓存布局 |
 | `w` | 输入 | WY 变换后的 Key 缓存。 | 保存缓存模式必传；重算模式重新生成。 | BFLOAT16 | ND | 缓存布局 |
 | `u` | 输入 | WY 变换后的 Value 缓存。 | 保存缓存模式仍须提供；当前反向数值计算不读取其保存值。 | BFLOAT16 | ND | 缓存布局 |
 | `v_new` | 输入 | 结合 chunk 入口状态修正后的 Value。 | 保存缓存模式必传；重算模式重新生成。 | BFLOAT16 | ND | 缓存布局 |
 | `qg`、`kg` | 输入 | 结合累计 gate 的 Q/K 缓存。 | 保存缓存模式必传；`qg` 不包含 `scale`。 | BFLOAT16 | ND | 缓存布局 |
 | `g_cumsum` | 输入 | chunk 内累计 log gate。 | 保存缓存模式必传；不能用逐 token 的原始 `g` 替代。 | FLOAT32 | ND | 缓存布局 |
-| `q_rtsd`、`k_rstd` | 输入 | 前向 Q/K L2Norm 的逆范数。 | 开启 Q/K 归一化时必传，不参与重算。 | FLOAT32 | ND | 缓存布局 |
+| `q_rstd`、`k_rstd` | 输入 | 前向 Q/K L2Norm 的逆范数。 | 开启 Q/K 归一化时必传，不参与重算。 | FLOAT32 | ND | 缓存布局 |
 | `beta_sigmoid` | 输入 | 前向激活后的 beta。 | 开启 beta sigmoid 融合时必传；启用负特征值时已包含系数 2。 | FLOAT32 | ND | 缓存布局 |
 | `A_log` | 输入 | 每个 value head 的 gate 参数。 | `use_gate_in_kernel=True` 时必传。 | FLOAT32 | ND | `[Nv]` |
-| `dt_bias` | 输入 | 每个 value head、每个 Key 通道的 gate 偏置。 | 可选；融合 gate 时 `None` 表示零偏置。 | FLOAT32 | ND | `[Nv,Dk]` |
+| `dt_bias` | 输入 | 每个 value head、每个 Key 通道的 gate 偏置。 | 可选；融合 gate 时 `None` 表示零偏置。 | FLOAT32 | ND | `[Nv,Dk]` / `[Nv*Dk]` |
 | `cu_seqlens` | 输入 | TND 的 token 前缀和。 | 主反向可省略；显式传入时须与 metadata 一致。 | INT32 | ND | `[B+1]` |
+| `cu_seqlens_cpu` | 输入 | Host 侧序列边界预留参数。 | 仅允许省略或传 `None`。 | INT32 数组 | — | — |
 | `seqused` | 输入 | BSND/BNSD 的有效序列长度。 | 主反向可省略；显式传入时须与 metadata 一致。 | INT32 | ND | `[B]` |
 | `scale` | 输入属性 | 输出/Query 缩放系数。 | 默认 `None`，使用 `1/sqrt(Dk)`；显式值必须为有限数值，且须与前向一致。 | float / None | - | - |
 | `use_qk_l2norm_in_kernel` | 输入属性 | 是否计算 Q/K 归一化反向。 | 默认 `True`。 | bool | - | - |
 | `use_gate_in_kernel` | 输入属性 | 是否计算 gate 激活反向。 | 默认 `True`。 | bool | - | - |
 | `use_beta_sigmoid_in_kernel` | 输入属性 | 是否计算 beta sigmoid 反向。 | 默认 `True`。 | bool | - | - |
 | `allow_neg_eigval` | 输入属性 | 是否使用 `2*sigmoid(beta)`。 | 默认 `False`；为 `True` 时必须开启 beta sigmoid 融合。 | bool | - | - |
-| `disable_recompute` | 输入属性 | 是否使用保存的七项缓存。 | DSL 入口默认 `True`，要求完整缓存；为 `False` 时启用重算。Torch 入口默认 `False`。 | bool | - | - |
+| `disable_recompute` | 输入属性 | 是否使用保存的七项缓存。 | 默认 `False` 时启用重算；设为 `True` 时要求完整缓存。 | bool | - | - |
 | `lower_bound` | 输入属性 | 融合 gate 的下界及公式选择。 | 默认 `None`，使用 softplus；非空时须在 `[-5,0)`，使用有界 sigmoid。 | float / None | - | - |
 | `layout` | 输入属性 | 输入和对应梯度的布局。 | 默认 `"TND"`；支持 `"TND"`、`"BNSD"`、`"BSND"`。 | str | - | - |
 | `dq`、`dk`、`dv` | 输出 | Q/K/V 梯度。 | GQA 的 Q/K 梯度已沿对应 value heads 求和。 | BFLOAT16 | ND | 分别与 `q/k/v` 相同 |
 | `dh0` | 输出 | 初始状态梯度。 | 始终返回 FP32 的 V-first 状态。 | FLOAT32 | ND | `[B,Nv,Dv,Dk]` |
 | `dg`、`dbeta` | 输出 | Gate/beta 输入梯度。 | 分别保持 `g/beta` 的 dtype 和形状。 | BFLOAT16 / FLOAT32 | ND | 分别与 `g/beta` 相同 |
 | `dA` | 输出 | `A_log` 梯度。 | 关闭 gate 融合时为 `None`。 | FLOAT32 | ND | `[Nv]` |
-| `dBias` | 输出 | `dt_bias` 梯度。 | 关闭 gate 融合或未传 `dt_bias` 时为 `None`。 | FLOAT32 | ND | `[Nv,Dk]` |
+| `dBias` | 输出 | `dt_bias` 梯度。 | 关闭 gate 融合或未传 `dt_bias` 时为 `None`。 | FLOAT32 | ND | `[Nv,Dk]` / `[Nv*Dk]` |
 
 ### 前向缓存布局
 
-BNSD 和 BSND 输入均使用 head 在前的前向缓存布局。缓存不能随 BSND 输入一起转换为 `[B,S,N,...]`；
-由主入口内部创建计算所需的视图。
+BNSD 和 BSND 共用同一缓存布局。状态按 chunk 在前排列，矩阵和逐 token 缓存按 head 在前排列。关闭 gate 或 beta 融合时，对应的 `g` 或 `beta` 必须为 FP32。
 
 | 缓存 | TND | BNSD / BSND | 数据类型 |
 | :--- | :--- | :--- | :--- |
-| `q_norm`、`k_norm`（仅适配入口从 tuple 读取） | `[T,Nqk,Dk]` | `[B,Nqk,S,Dk]` | BFLOAT16 |
-| `q_rtsd`、`k_rstd` | `[T,Nqk]` | `[B,Nqk,S]` | FLOAT32 |
-| `beta_sigmoid` | `[T,Nv]` | `[B,Nv,S]` | FLOAT32 |
-| `Aqk`、`Akk` | `[Nc,Nv,C,C]` | `[B,Nv,Cmax,C,C]` | BFLOAT16 |
-| `w`、`qg`、`kg` | `[T,Nv,Dk]` | `[B,Nv,S,Dk]` | BFLOAT16 |
-| `u`、`v_new` | `[T,Nv,Dv]` | `[B,Nv,S,Dv]` | BFLOAT16 |
-| `g_cumsum` | `[T,Nv,Dk]` | `[B,Nv,S,Dk]` | FLOAT32 |
-| `chunk_states` | `[Nc,Nv,Dv,Dk]` | `[B,Nv,Cmax,Dv,Dk]` | FLOAT32 |
+| `q_norm`、`k_norm`（仅适配入口从 tuple 读取） | `[T,Nqk,Dk]` | BSND / BNSD | BFLOAT16 |
+| `q_rstd`、`k_rstd` | `[Nqk,T]` | `[B,Nqk,S]` | FLOAT32 |
+| `beta_sigmoid` | `[Nv,T]` | `[B,Nv,S]` | FLOAT32 |
+| `Aqk`、`Akk` | `[Nv,T,C]` | `[B,Nv,S,C]` | BFLOAT16 |
+| `w`、`qg`、`kg` | `[Nv,T,Dk]` | `[B,Nv,S,Dk]` | BFLOAT16 |
+| `u`、`v_new` | `[Nv,T,Dv]` | `[B,Nv,S,Dv]` | BFLOAT16 |
+| `g_cumsum` | `[Nv,T,Dk]` | `[B,Nv,S,Dk]` | FLOAT32 |
+| `chunk_states` | `[Nc,Nv,Dv,Dk]` | `[B,Cmax,Nv,Dv,Dk]` | BFLOAT16 |
 
 TND 中，第 `s` 条序列的第 `j` 个 chunk（均从 0 开始）使用槽位 `floor(cu_seqlens[s]/64) + s + j`。
-`Nc` 不是各序列有效 chunk 数之和；预留槽位不参与计算。矩阵和状态缓存必须保留 chunk 轴，
-入口不接受旧的紧凑缓存或展平后的矩阵缓存。
+`Nc` 不是各序列有效 chunk 数之和；预留槽位不参与计算。状态缓存保留 chunk 轴。矩阵缓存按 token 行寻址，末尾 64 列为块内列；反向对尾块的计算工作区补零。
+
+矩阵按 token 偏移寻址，TND 尾块只读有效行并在设备工作区补零。保存的状态缓存为 BF16，重算使用独立的 FP32 状态缓冲。
 
 `forward_outputs` 必须保持训练前向的 16 项返回顺序：
 
 ```python
-(
-    out, final_state, q_norm, k_norm, q_rtsd, k_rstd, beta_sigmoid,
-    Aqk, Akk, w, u, qg, kg, v_new, g_cumsum, saved_chunk_states,
-)
+(out, final_state, chunk_states, Aqk, Akk, w, u, qg, kg, v_new,
+ g_cumsum, q_norm, q_rstd, k_norm, k_rstd, beta_activated)
 ```
 
 适配入口不读取前两项的数值，`do/dht` 仍需显式提供。`chunk_states_fp32` 可在保存缓存模式覆盖
@@ -378,7 +379,7 @@ BSND/BNSD 的无效 token 行在 `dq/dk/dv/dg/dbeta` 中写零。输出不保证
 | 公共参数组 | `dq/dk/dv/dh0` | OUTPUT | Tensor |
 | 前向缓存与重算参数组 | `Aqk/Akk/chunk_states/w/u/v_new/qg/kg/g_cumsum/initial_state` | INPUT | Tensor / None |
 | 前向缓存与重算参数组 | `disable_recompute` | ATTR | bool |
-| Q/K 归一化参数组 | `q_rtsd/k_rstd` | INPUT | Tensor / None |
+| Q/K 归一化参数组 | `q_rstd/k_rstd` | INPUT | Tensor / None |
 | Q/K 归一化参数组 | `use_qk_l2norm_in_kernel` | ATTR | bool |
 | Gate 参数组 | `g/A_log/dt_bias` | INPUT | Tensor / None |
 | Gate 参数组 | `use_gate_in_kernel/lower_bound` | ATTR | bool / float / None |
@@ -419,7 +420,7 @@ BSND/BNSD 的无效 token 行在 `dq/dk/dv/dg/dbeta` 中写零。输出不保证
 | `w/u/v_new/qg/kg/g_cumsum/chunk_states` | 可省略或传 `None`；即使传入也会忽略并重新生成。 | 七项全部必传，满足前向缓存布局。 |
 | `initial_state` | `None` 表示零状态；非零前向初始状态必须显式传入。 | 不使用。 |
 | `Aqk/Akk` | 必传，不重算。 | 必传。 |
-| `q_rtsd/k_rstd/beta_sigmoid` | 对应融合开启时必传，不重算。 | 对应融合开启时必传。 |
+| `q_rstd/k_rstd/beta_sigmoid` | 对应融合开启时必传，不重算。 | 对应融合开启时必传。 |
 
 - **单参数约束**：`chunk_states` 为 FP32 的 chunk 入口状态。重算时的 `initial_state` 为
   FP32 `[B,Nv,Dv,Dk]`，最后一维 stride 必须为 1。
@@ -432,7 +433,7 @@ BSND/BNSD 的无效 token 行在 `dq/dk/dv/dg/dbeta` 中写零。输出不保证
 #### Q/K 归一化参数组
 
 - **存在性约束**：`use_qk_l2norm_in_kernel=True` 时，主入口的 `q/k` 必须为前向保存的 BF16 归一化结果，
-  并提供 FP32 `q_rtsd/k_rstd`。关闭时直接传原始 Q/K，不使用逆范数缓存。
+  并提供 FP32 `q_rstd/k_rstd`。关闭时直接传原始 Q/K，不使用逆范数缓存。
 - **一致性约束**：逆范数按 Nqk 个 head 保存。BSND 输入下，主入口 `q/k` 为 `[B,S,Nqk,Dk]`，
   逆范数仍为 `[B,Nqk,S]`。
 - **特性交叉约束**：归一化开关控制归一化反向，不会在主入口重新归一化原始 Q/K。使用适配入口时可传原始 Q/K，
@@ -538,7 +539,7 @@ dq, dk, dv, dh0, dg, dbeta, dA, dBias = ops.flash_kda_grad(
     chunk_states=fwd_outputs[15],
     w=fwd_outputs[9], u=fwd_outputs[10], v_new=fwd_outputs[13],
     qg=fwd_outputs[11], kg=fwd_outputs[12], g_cumsum=fwd_outputs[14],
-    q_rtsd=fwd_outputs[4], k_rstd=fwd_outputs[5],
+    q_rstd=fwd_outputs[4], k_rstd=fwd_outputs[5],
     beta_sigmoid=fwd_outputs[6],
     A_log=A_log, dt_bias=dt_bias,
     scale=scale,
@@ -556,7 +557,7 @@ dq, dk, dv, dh0, dg, dbeta, dA, dBias = ops.flash_kda_grad(
     q, k, v, g, beta, do, dht,
     fwd_outputs[7], fwd_outputs[8], bwd_metadata,
     initial_state=initial_state,
-    q_rtsd=fwd_outputs[4], k_rstd=fwd_outputs[5], beta_sigmoid=fwd_outputs[6],
+    q_rstd=fwd_outputs[4], k_rstd=fwd_outputs[5], beta_sigmoid=fwd_outputs[6],
     A_log=A_log, dt_bias=dt_bias,
     scale=scale,
     disable_recompute=False,
@@ -572,4 +573,16 @@ dq, dk, dv, dh0, dg, dbeta, dA, dBias = ops.flash_kda_grad(
 转为 `[B,S,Nqk,Dk]`；其余缓存保持前向返回布局。
 
 单元测试与参考公式位于 [tests/ut](../tests/ut)，TTK 精度与性能验收见
-[tests/ttk/README.md](../tests/ttk/README.md)。
+[tests/assets/README.md](../tests/assets/README.md)。
+
+## 与正向 autograd 对接
+
+正向使用 `attention/flash_kda` 的 Torch Extension，并按设备选择
+`op_dsl/arch35` 或 `op_dsl/arch92`；本反向算子的训练验证覆盖 arch35。
+加载 FlashKDA Grad 扩展后，使用 `enable_grad=True` 生成包含正向及反向调度的
+metadata。正向 `flash_kda` 返回的输出可通过 `torch.autograd.grad` 或
+`backward` 调用本反向算子，缓存按照正向公开接口转换布局。
+
+关闭内核 Q/K L2Norm 时，适配层使用正向实际消费的 Q/K，归一化导数由调用方
+已有的归一化计算图负责。反向梯度恢复到原始输入 dtype。
+此接口不依赖 `experimental/attention/flash_kda`。

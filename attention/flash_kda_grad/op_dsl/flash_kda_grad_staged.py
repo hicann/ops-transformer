@@ -290,9 +290,6 @@ class StagedReverseState:
                 )
                 matrix_batch = dtypes.int64(storage_batch)
                 matrix_row = source_row_start
-                if not padded_layout:
-                    matrix_batch = _tnd_chunk_index(compact_token_start, seq_idx, chunk)
-                    matrix_row = 0
                 matrix_source = gm_Aqk[matrix_batch, value_head, None, None]
                 output_source = gm_output_gradient[
                     storage_batch, value_head, None, None

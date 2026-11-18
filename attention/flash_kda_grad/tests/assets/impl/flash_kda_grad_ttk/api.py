@@ -51,7 +51,7 @@ from . import golden
 __all__ = ["npu"]
 
 
-_OPERATOR_ROOT = Path(__file__).resolve().parents[3]
+_OPERATOR_ROOT = Path(__file__).resolve().parents[4]
 _OPERATOR_CACHE: dict[str, object] = {}
 
 
@@ -72,6 +72,10 @@ def _source_loader():
 def _load_operator():
     """Return the backward entry and metadata from the adjacent op_dsl directory."""
     if "pair" not in _OPERATOR_CACHE:
+        if package := os.environ.get("KDA_NATIVE_PACKAGE"):
+            from cannbotdsl.aot import register_directory  # noqa: PLC0415
+
+            register_directory(package)
         load_sample = _source_loader()
         integration = load_sample("flash_kda_grad/flash_kda_grad.py")
         metadata = load_sample("flash_kda_grad/flash_kda_grad_metadata.py")
@@ -180,10 +184,16 @@ def _load_forward():
 
     Kept lazy so the default path never imports the forward operator.
     """
-    load_sample = _source_loader()
+    from attention.flash_kda.torch_extension.flash_kda import _dsl_module
 
-    fwd = load_sample("flash_kda_fwd/flash_kda_fwd.py")
-    fwd_meta = load_sample("flash_kda_fwd/flash_kda_fwd_metadata.py")
+    def flash_kda_fwd(q, *args, **kwargs):
+        return _dsl_module("flash_kda", q).flash_kda_fwd(q, *args, **kwargs)
+
+    def flash_kda_fwd_metadata(cu_seqlens, seqused, **kwargs):
+        reference = cu_seqlens if cu_seqlens is not None else seqused
+        return _dsl_module("flash_kda_metadata", reference).flash_kda_fwd_metadata(
+            cu_seqlens, seqused, **kwargs
+        )
 
     def run(
         q,
@@ -207,43 +217,54 @@ def _load_forward():
         cu_seqlens=None,
         seqused=None,
     ):
-        forward_lengths = cu_seqlens
-        if seqused is not None:
-            forward_lengths = torch.cat(
-                (seqused.new_zeros(1), seqused.cumsum(0, dtype=torch.int32))
-            )
-        metadata = fwd_meta.flash_kda_fwd_metadata(
-            q, v, initial_state, layout, forward_lengths
+        batch, heads, width = (
+            (cu_seqlens.numel() - 1, q.shape[1], q.shape[-1])
+            if layout == "TND"
+            else (q.shape[0], q.shape[1 if layout == "BNSD" else 2], q.shape[-1])
         )
-        outputs = fwd.flash_kda_fwd(
+        length = (
+            q.shape[0] if layout == "TND" else q.shape[2 if layout == "BNSD" else 1]
+        )
+        value_heads = v.shape[2 if layout == "BSND" else 1]
+        metadata = flash_kda_fwd_metadata(
+            cu_seqlens,
+            seqused,
+            batch_size=batch,
+            nheads_qk=heads,
+            nheads_v=value_heads,
+            seqlens=length,
+            headdim_qk=width,
+            enable_grad=True,
+            layout=layout,
+        )
+        if layout == "BNSD":
+            g, beta = g.transpose(1, 2).contiguous(), beta.transpose(1, 2).contiguous()
+        outputs = flash_kda_fwd(
             q,
             k,
             v,
             g,
             beta,
-            float(scale),
+            metadata,
             initial_state,
             A_log,
             dt_bias,
-            _resolve_lower_bound(gate_mode, lower_bound),
-            layout,
-            metadata,
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            scale=float(scale),
+            lower_bound=_resolve_lower_bound(gate_mode, lower_bound),
+            layout=layout,
             use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
             use_gate_in_kernel=use_gate_in_kernel,
             use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
             disable_recompute=True,
-            return_intermediate_state=True,
             allow_neg_eigval=allow_neg_eigval,
             output_final_state=True,
         )
         (
             out,
             final_state,
-            q_norm,
-            k_norm,
-            q_rstd,
-            k_rstd,
-            beta_sigmoid,
+            chunk_states,
             Aqk,
             Akk,
             w,
@@ -252,7 +273,11 @@ def _load_forward():
             kg,
             v_new,
             g_cumsum,
-            chunk_states,
+            q_norm,
+            q_rstd,
+            k_norm,
+            k_rstd,
+            beta_sigmoid,
         ) = outputs
         return golden.Cache(
             out=out,
@@ -288,20 +313,13 @@ _RECOMPUTE = os.environ.get("KDA_GRAD_RECOMPUTE", "0") == "1"
 def _operator_cache(
     cache, *, batch: int, storage: int, layout="BNSD", bounds=None, use_fwd=False
 ):
-    """Reshape the flat token-major cache into the operator's BNSD cache ABI.
-
-    The renamed operator validates ``(B, Nv, S, D)`` token caches,
-    ``(B, Nv, chunks, 64, 64)`` Aqk/Akk and ``(B, Nv, chunks, Dk, Dv)`` chunk
-    states, while the host reference keeps everything token-major
-    (``(T, Nv, D)`` / ``(chunks_total, Nv, 64, 64)``). Both are views of the
-    same values, so the reshape does not change any number.
-    """
+    """Pack reference caches into the public GM layouts used by backward."""
 
     def tokens(tensor, *, scalar=False):
-        if tensor is None:
-            return None
-        if layout == "TND":
+        if tensor is None or use_fwd:
             return tensor
+        if layout == "TND":
+            return tensor.transpose(0, 1).contiguous()
         if tensor.ndim == (3 if scalar else 4):
             return tensor
         if tensor.ndim == 2:
@@ -328,7 +346,7 @@ def _operator_cache(
             )
         else:
             result = tensor.new_zeros(
-                (batch, heads, (storage + 63) // 64, *tensor.shape[2:])
+                (batch, (storage + 63) // 64, heads, *tensor.shape[2:])
             )
         cursor = 0
         for seq, (start, end) in enumerate(bounds):
@@ -337,22 +355,42 @@ def _operator_cache(
                 slot = start // 64 + seq
                 result[slot : slot + count] = tensor[cursor : cursor + count]
             else:
-                result[seq, :, :count] = tensor[cursor : cursor + count].transpose(0, 1)
+                result[seq, :count] = tensor[cursor : cursor + count]
             cursor += count
         return result
 
-    akk = chunked(cache.Akk)
+    def matrices(tensor):
+        if use_fwd:
+            return tensor
+        heads = tensor.shape[1]
+        shape = (heads, storage, 64) if layout == "TND" else (batch, heads, storage, 64)
+        result = tensor.new_zeros(shape)
+        cursor = 0
+        for seq, (start, end) in enumerate(bounds):
+            for row in range(0, end - start, 64):
+                valid = min(64, end - start - row)
+                block = tensor[cursor, :, :valid]
+                if layout == "TND":
+                    result[:, start + row : start + row + valid] = block
+                else:
+                    result[seq, :, row : row + valid] = block
+                cursor += 1
+        return result
+
+    # Recompute-mode forward may omit saved states. Preserve None; the saved
+    # cache path uses the public BF16 ABI, just like the CPU peer cache.
+    saved_states = chunked(cache.chunk_states)
     return {
-        "Aqk": chunked(cache.Aqk),
-        "Akk": akk,
-        "chunk_states": chunked(cache.chunk_states),
+        "Aqk": matrices(cache.Aqk),
+        "Akk": matrices(cache.Akk),
+        "chunk_states": None if saved_states is None else saved_states.bfloat16(),
         "qg": tokens(cache.qg),
         "kg": tokens(cache.kg),
         "w": tokens(cache.w),
         "u": tokens(cache.u),
         "v_new": tokens(cache.v_new),
         "g_cumsum": tokens(cache.g_cumsum),
-        "q_rtsd": tokens(cache.q_rstd, scalar=True),
+        "q_rstd": tokens(cache.q_rstd, scalar=True),
         "k_rstd": tokens(cache.k_rstd, scalar=True),
         "beta_sigmoid": tokens(cache.beta_sigmoid, scalar=True),
     }
@@ -414,31 +452,39 @@ def npu(
         use_beta_sigmoid_in_kernel=bool(use_beta_sigmoid_in_kernel),
     )
 
+    cache_bias, dht = golden.normalize_backward_optionals(
+        q, v, initial_state, dt_bias, dht, layout, cu_seqlens
+    )
     if q.device.type != "npu":
         # Host replay: identical signature and identical cache dtypes.
         cache = golden.build_cache(
-            q, k, v, g, beta, initial_state, A_log, dt_bias, emulate_bf16=True, **common
+            q,
+            k,
+            v,
+            g,
+            beta,
+            initial_state,
+            A_log,
+            cache_bias,
+            emulate_bf16=True,
+            **common,
         )
-        return golden.staged_backward(
-            q, k, v, g, beta, do, dht, cache, A_log=A_log, dt_bias=dt_bias, **common
+        grads = golden.staged_backward(
+            q, k, v, g, beta, do, dht, cache, A_log=A_log, dt_bias=cache_bias, **common
         )
+        return golden.restore_bias_gradient(grads, dt_bias)
 
     bwd, bwd_metadata = _load_operator()
     use_fwd = str(cache_source).lower() == "fwd"
     cache = _build_cache(
-        q, k, v, g, beta, initial_state, A_log, dt_bias, use_fwd=use_fwd, **common
+        q, k, v, g, beta, initial_state, A_log, cache_bias, use_fwd=use_fwd, **common
     )
     # With L2Norm enabled, backward consumes saved normalized Q/K and the
     # inverse norms; it returns gradients of the original raw inputs.
     q_for_bwd, k_for_bwd = q, k
     if use_qk_l2norm_in_kernel:
         if use_fwd:
-            # Device forward saves Q/K in BNSD, including for BSND inputs.
-            q_for_bwd = cache.q_norm
-            k_for_bwd = cache.k_norm
-            if layout == "BSND":
-                q_for_bwd = q_for_bwd.transpose(1, 2).contiguous()
-                k_for_bwd = k_for_bwd.transpose(1, 2).contiguous()
+            q_for_bwd, k_for_bwd = cache.q_norm, cache.k_norm
         else:
             # The host reference saves flattened token-major Q/K.
             q_for_bwd = golden.restore_layout(cache.q_norm, q, layout)
@@ -476,7 +522,13 @@ def npu(
     # In recompute mode retain Aqk/Akk, norm and beta caches, but pass None for
     # the seven tracks the kernel rebuilds from normalized Q/K and initial_state.
     recompute = _RECOMPUTE if disable_recompute is None else not bool(disable_recompute)
-    return bwd(
+    if layout == "BNSD":
+        do = do.transpose(1, 2)
+        g, beta = g.transpose(1, 2), beta.transpose(1, 2)
+    input_g_dtype, input_beta_dtype = g.dtype, beta.dtype
+    g = g if use_gate_in_kernel else g.float()
+    beta = beta if use_beta_sigmoid_in_kernel else beta.float()
+    result = bwd(
         q=q_for_bwd,
         k=k_for_bwd,
         v=v,
@@ -497,7 +549,7 @@ def npu(
         qg=None if recompute else op_cache["qg"],
         kg=None if recompute else op_cache["kg"],
         g_cumsum=None if recompute else op_cache["g_cumsum"],
-        q_rtsd=op_cache["q_rtsd"] if use_qk_l2norm_in_kernel else None,
+        q_rstd=op_cache["q_rstd"] if use_qk_l2norm_in_kernel else None,
         k_rstd=op_cache["k_rstd"] if use_qk_l2norm_in_kernel else None,
         beta_sigmoid=op_cache["beta_sigmoid"] if use_beta_sigmoid_in_kernel else None,
         A_log=A_log if use_gate_in_kernel else None,
@@ -511,3 +563,11 @@ def npu(
         layout=layout,
         disable_recompute=not recompute,
     )
+    dq, dk, dv, dh0, dg, dbeta, da, dbias = result
+    # The public kernel takes activated inputs in FP32. Undo this adapter's
+    # input casts for their gradients, as autograd does through Tensor.float().
+    # TTK's golden and peer return gradients in the original input dtypes.
+    dg, dbeta = dg.to(input_g_dtype), dbeta.to(input_beta_dtype)
+    if layout == "BNSD":
+        dg, dbeta = dg.transpose(1, 2), dbeta.transpose(1, 2)
+    return dq, dk, dv, dh0, dg, dbeta, da, dbias

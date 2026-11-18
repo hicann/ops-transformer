@@ -32,8 +32,8 @@ The three roles are intentionally played by three different code paths:
 ``tolerance``
     ``cross_check`` with ``level: L2`` — TTK's acceptance preset
     (``mare_ratio`` 2.0, ``mere_ratio`` 1.2, ``rmse_ratio`` 1.2). Declared for
-    both output dtypes: BF16 for ``dq/dk/dv/dg/dbeta``, FP32 for
-    ``dh0/dA/dBias``.
+    both output dtypes: BF16 for ``dq/dk/dv``, the input dtype for
+    ``dg/dbeta``, and FP32 for ``dh0/dA/dBias``.
 
 Why this composition is the right acceptance standard for a *backward* op:
 
@@ -59,16 +59,7 @@ from flash_kda_grad_ttk import golden
 
 __spec__ = {"flash_kda_grad_ttk.npu": "FlashKdaGradTestSpec"}
 
-_GOLDEN_ABI_DTYPE = {
-    "dq": "input",
-    "dk": "input",
-    "dv": "input",
-    "dh0": "float32",
-    "dg": "input",
-    "dbeta": "input",
-    "dA": "float32",
-    "dBias": "float32",
-}
+_GRAD_NAMES = ("dq", "dk", "dv", "dh0", "dg", "dbeta", "dA", "dBias")
 
 _FLOAT_ATTRS = ("scale", "lower_bound")
 _BOOL_ATTRS = (
@@ -203,7 +194,7 @@ class FlashKdaGradTestSpec:
             "Tables are diagnostic only; the following native cross_check L2 comparison "
             "determines PASS/FAIL, including the third-party reference."
         )
-        count = len(_GOLDEN_ABI_DTYPE)
+        count = len(_GRAD_NAMES)
         if len(outputs_and_goldens) != 2 * count:
             logging.warning(
                 "KDA comparison table skipped: expected %d output/golden slots, got %d",
@@ -211,7 +202,7 @@ class FlashKdaGradTestSpec:
                 len(outputs_and_goldens),
             )
             return
-        for index, name in enumerate(_GOLDEN_ABI_DTYPE):
+        for index, name in enumerate(_GRAD_NAMES):
             _log_output_comparison(
                 name, outputs_and_goldens[index], outputs_and_goldens[count + index]
             )
@@ -243,9 +234,9 @@ class FlashKdaGradTestSpec:
         disable_recompute=None,
         **kwargs,
     ):
-        """FP32 token autograd reference, cast to each output's ABI dtype."""
-        # Recompute controls device cache delivery, not the FP32 golden math.
-        del cache_source, disable_recompute, kwargs
+        """High precision KDA autograd, cast to each output's ABI dtype."""
+        # The end-to-end forward comparison also checks errors from cache creation.
+        del disable_recompute, kwargs
         grads = golden.token_golden_backward(
             q,
             k,
@@ -267,13 +258,21 @@ class FlashKdaGradTestSpec:
             use_qk_l2norm_in_kernel=bool(use_qk_l2norm_in_kernel),
             use_gate_in_kernel=bool(use_gate_in_kernel),
             use_beta_sigmoid_in_kernel=bool(use_beta_sigmoid_in_kernel),
+            dtype=torch.float64
+            if str(cache_source).lower() == "fwd"
+            else torch.float32,
         )
-        input_dtype = q.dtype if q.is_floating_point() else torch.bfloat16
-        out = []
-        for name, value in zip(_GOLDEN_ABI_DTYPE, grads):
-            if value is None:
-                out.append(None)
-                continue
-            dtype = input_dtype if _GOLDEN_ABI_DTYPE[name] == "input" else torch.float32
-            out.append(value.to(dtype))
-        return out
+        dtypes = (
+            q.dtype,
+            k.dtype,
+            v.dtype,
+            torch.float32,
+            g.dtype,
+            beta.dtype,
+            torch.float32,
+            torch.float32,
+        )
+        return [
+            value.to(dtype) if value is not None else None
+            for value, dtype in zip(grads, dtypes)
+        ]

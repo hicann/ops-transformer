@@ -42,9 +42,9 @@ class FlashKdaGradOpBuilder(OpBuilder):
                 "Tensor do, Tensor dht, Tensor Aqk, Tensor Akk, Tensor? metadata=None, *, "
                 "Tensor? initial_state=None, Tensor? chunk_states=None, Tensor? w=None, "
                 "Tensor? u=None, Tensor? v_new=None, Tensor? qg=None, Tensor? kg=None, "
-                "Tensor? g_cumsum=None, Tensor? q_rtsd=None, Tensor? k_rstd=None, "
+                "Tensor? g_cumsum=None, Tensor? q_rstd=None, Tensor? k_rstd=None, "
                 "Tensor? beta_sigmoid=None, Tensor? A_log=None, Tensor? dt_bias=None, "
-                "Tensor? cu_seqlens=None, Tensor? seqused=None, float? scale=None, "
+                "Tensor? cu_seqlens=None, int[]? cu_seqlens_cpu=None, Tensor? seqused=None, float? scale=None, "
                 "bool use_qk_l2norm_in_kernel=True, bool use_gate_in_kernel=True, "
                 "bool use_beta_sigmoid_in_kernel=True, bool allow_neg_eigval=False, "
                 "bool disable_recompute=False, float? lower_bound=None, "
@@ -85,12 +85,13 @@ def _flash_kda_grad_meta(
     qg: Optional[torch.Tensor] = None,
     kg: Optional[torch.Tensor] = None,
     g_cumsum: Optional[torch.Tensor] = None,
-    q_rtsd: Optional[torch.Tensor] = None,
+    q_rstd: Optional[torch.Tensor] = None,
     k_rstd: Optional[torch.Tensor] = None,
     beta_sigmoid: Optional[torch.Tensor] = None,
     A_log: Optional[torch.Tensor] = None,
     dt_bias: Optional[torch.Tensor] = None,
     cu_seqlens: Optional[torch.Tensor] = None,
+    cu_seqlens_cpu: Optional[list[int]] = None,
     seqused: Optional[torch.Tensor] = None,
     scale: Optional[float] = None,
     use_qk_l2norm_in_kernel: bool = True,
@@ -101,6 +102,8 @@ def _flash_kda_grad_meta(
     lower_bound: Optional[float] = None,
     layout: str = "TND",
 ):
+    if cu_seqlens_cpu is not None:
+        raise ValueError("cu_seqlens_cpu must be None")
     torch._check(
         layout in ("TND", "BNSD", "BSND"), lambda: "unsupported FlashKDA layout"
     )
@@ -117,24 +120,59 @@ def _flash_kda_grad_meta(
         if layout == "BNSD"
         else v.shape[1]
     )
-    padded_length = length + length % 2
-    if layout == "TND":
-        dbeta = torch.empty(
-            (heads, padded_length), dtype=beta.dtype, device=beta.device
-        )[:, :length].t()
-    else:
-        dbeta = torch.empty(
-            (v.shape[0], heads, padded_length), dtype=beta.dtype, device=beta.device
-        )[:, :, :length]
-        if layout == "BSND":
-            dbeta = dbeta.transpose(1, 2)
+    expected_beta = (length, heads) if layout == "TND" else (v.shape[0], length, heads)
+    torch._check(
+        beta.shape == expected_beta, lambda: "beta shape does not match layout"
+    )
+    torch._check(
+        g.shape == (*expected_beta, 128), lambda: "g shape does not match layout"
+    )
+    torch._check(k.shape == q.shape, lambda: "k must match q")
+    torch._check(do.shape == (*expected_beta, 128), lambda: "do must use BSND or TND")
+    batch = dht.shape[0] if layout == "TND" else v.shape[0]
+    state_shape = (batch, heads, 128, 128)
+    torch._check(dht.shape == state_shape, lambda: "dht shape does not match layout")
+    chunks = (length + 63) // 64
+    prefix = (chunks + batch, heads) if layout == "TND" else (batch, chunks, heads)
+    q_heads = q.shape[2 if layout == "BSND" else 1]
+    cache_prefix = (heads, length) if layout == "TND" else (batch, heads, length)
+    norm_shape = (q_heads, length) if layout == "TND" else (batch, q_heads, length)
+    for name, tensor, shape in (
+        ("Aqk", Aqk, (*cache_prefix, 64)),
+        ("Akk", Akk, (*cache_prefix, 64)),
+        ("initial_state", initial_state, state_shape),
+        ("chunk_states", chunk_states, (*prefix, 128, 128)),
+        ("w", w, (*cache_prefix, 128)),
+        ("u", u, (*cache_prefix, 128)),
+        ("qg", qg, (*cache_prefix, 128)),
+        ("kg", kg, (*cache_prefix, 128)),
+        ("v_new", v_new, (*cache_prefix, 128)),
+        ("g_cumsum", g_cumsum, (*cache_prefix, 128)),
+        ("q_rstd", q_rstd, norm_shape),
+        ("k_rstd", k_rstd, norm_shape),
+        ("beta_sigmoid", beta_sigmoid, cache_prefix),
+    ):
+        if tensor is not None:
+            torch._check(
+                tensor.shape == shape, lambda: f"{name} must have shape {shape}"
+            )
+    if chunk_states is not None:
+        torch._check(
+            chunk_states.dtype == torch.bfloat16, lambda: "chunk_states must be BF16"
+        )
+    dbeta = torch.empty_like(beta)
     da = (
         torch.empty((heads, 8), dtype=torch.float32, device=q.device)[:, 0]
         if use_gate_in_kernel
         else None
     )
+    if dt_bias is not None:
+        torch._check(
+            dt_bias.shape in ((heads, 128), (heads * 128,)),
+            lambda: "invalid dt_bias shape",
+        )
     dbias = (
-        torch.empty((heads, 128), dtype=torch.float32, device=q.device)
+        torch.empty_like(dt_bias, dtype=torch.float32, device=q.device)
         if use_gate_in_kernel and dt_bias is not None
         else None
     )
@@ -208,12 +246,13 @@ def _flash_kda_grad(
     qg: Optional[torch.Tensor] = None,
     kg: Optional[torch.Tensor] = None,
     g_cumsum: Optional[torch.Tensor] = None,
-    q_rtsd: Optional[torch.Tensor] = None,
+    q_rstd: Optional[torch.Tensor] = None,
     k_rstd: Optional[torch.Tensor] = None,
     beta_sigmoid: Optional[torch.Tensor] = None,
     A_log: Optional[torch.Tensor] = None,
     dt_bias: Optional[torch.Tensor] = None,
     cu_seqlens: Optional[torch.Tensor] = None,
+    cu_seqlens_cpu: Optional[list[int]] = None,
     seqused: Optional[torch.Tensor] = None,
     scale: Optional[float] = None,
     use_qk_l2norm_in_kernel: bool = True,
@@ -243,12 +282,13 @@ def _flash_kda_grad(
         qg=qg,
         kg=kg,
         g_cumsum=g_cumsum,
-        q_rtsd=q_rtsd,
+        q_rstd=q_rstd,
         k_rstd=k_rstd,
         beta_sigmoid=beta_sigmoid,
         A_log=A_log,
         dt_bias=dt_bias,
         cu_seqlens=cu_seqlens,
+        cu_seqlens_cpu=cu_seqlens_cpu,
         seqused=seqused,
         scale=scale,
         use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
@@ -307,12 +347,13 @@ def flash_kda_grad(
     qg: Optional[torch.Tensor] = None,
     kg: Optional[torch.Tensor] = None,
     g_cumsum: Optional[torch.Tensor] = None,
-    q_rtsd: Optional[torch.Tensor] = None,
+    q_rstd: Optional[torch.Tensor] = None,
     k_rstd: Optional[torch.Tensor] = None,
     beta_sigmoid: Optional[torch.Tensor] = None,
     A_log: Optional[torch.Tensor] = None,
     dt_bias: Optional[torch.Tensor] = None,
     cu_seqlens: Optional[torch.Tensor] = None,
+    cu_seqlens_cpu: Optional[list[int]] = None,
     seqused: Optional[torch.Tensor] = None,
     scale: Optional[float] = None,
     use_qk_l2norm_in_kernel: bool = True,
@@ -343,12 +384,13 @@ def flash_kda_grad(
         qg=qg,
         kg=kg,
         g_cumsum=g_cumsum,
-        q_rtsd=q_rtsd,
+        q_rstd=q_rstd,
         k_rstd=k_rstd,
         beta_sigmoid=beta_sigmoid,
         A_log=A_log,
         dt_bias=dt_bias,
         cu_seqlens=cu_seqlens,
+        cu_seqlens_cpu=cu_seqlens_cpu,
         seqused=seqused,
         scale=scale,
         use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,

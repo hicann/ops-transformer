@@ -63,6 +63,7 @@ from cannbotdsl.tensor import tile_slice
 # Shared arithmetic and metadata constants live in the public entry module.
 if __package__:
     from .flash_kda_grad import (
+        _promote_state_row,
         _cube_ring,
         ABI_VERSION,
         CHUNK_SIZE,
@@ -104,6 +105,7 @@ if __package__:
     )
 else:
     from flash_kda_grad import (
+        _promote_state_row,
         _cube_ring,
         ABI_VERSION,
         CHUNK_SIZE,
@@ -158,6 +160,9 @@ class StageTwoTrack:
         ).next_write()
         self.state = fp32_storage[:VALUE_DIM, None]
         self.saved = fp32_storage[VALUE_DIM : 2 * VALUE_DIM, None]
+        self.saved_low = RingBuffer(
+            MemLoc.UB, dtypes.bfloat16, make_layout((1, D_HALF)), depth=1
+        ).next_write()
         self.gate = fp32_storage[2 * VALUE_DIM : 2 * VALUE_DIM + 1, None]
         self.gate_product = fp32_storage[2 * VALUE_DIM + 1 : 2 * VALUE_DIM + 2, None]
         self.state_nz = Buffer(
@@ -528,9 +533,6 @@ class StageTwoTrack:
             row = row + compact_start
         matrix_batch = dtypes.int64(batch)
         matrix_row = row
-        if not padded_layout:
-            matrix_batch = _tnd_chunk_index(compact_start, sequence, chunk)
-            matrix_row = 0
         saved_batch = dtypes.int64(batch)
         saved_chunk = dtypes.int64(chunk)
         if not padded_layout:
@@ -580,14 +582,25 @@ class StageTwoTrack:
                     (0, get_subblock_id()),
                 ),
             )
-        mem_copy(
-            self.saved,
-            tile_slice(
-                stage_two_gm_chunk_states[saved_batch, head, saved_chunk, None, None],
-                (VALUE_DIM, D_HALF),
-                (0, get_subblock_id()),
-            ),
-        )
+        saved_source = stage_two_gm_chunk_states[
+            saved_batch, head, saved_chunk, None, None
+        ]
+        if const_expr(saved_source.dtype == dtypes.bfloat16):
+            for value_row in range(VALUE_DIM):
+                mem_copy(
+                    self.saved_low,
+                    tile_slice(
+                        saved_source, (1, D_HALF), (value_row, get_subblock_id())
+                    ),
+                )
+                _promote_state_row(
+                    tile_slice(self.saved, (1, D_HALF), (value_row, 0)), self.saved_low
+                )
+        else:
+            mem_copy(
+                self.saved,
+                tile_slice(saved_source, (VALUE_DIM, D_HALF), (0, get_subblock_id())),
+            )
         mem_copy(
             self.gate,
             tile_slice(
@@ -1021,9 +1034,6 @@ class StageTwoPersistentState:
             )
             matrix_batch = dtypes.int64(storage_batch)
             matrix_row = source_row_start
-            if not padded_layout:
-                matrix_batch = _tnd_chunk_index(compact_token_start, seq_idx, chunk)
-                matrix_row = 0
             matrix_source = gm_Aqk[matrix_batch, value_head, None, None]
             output_source = gm_output_gradient[storage_batch, value_head, None, None]
             direct = 0
@@ -1413,9 +1423,6 @@ def _finish_full_track_chunk(
     compact_row_start = get_block_idx() * CHUNK_SIZE
     inverse_batch = dtypes.int64(raw_batch)
     inverse_row_start = raw_row_start
-    if not padded_layout:
-        inverse_batch = _tnd_chunk_index(compact_token_start, seq_idx, chunk)
-        inverse_row_start = 0
     inverse_source = gm_Akk[inverse_batch, value_head, None, None]
     d_Aqk_source = gm_stage_two_d_Aqk[get_block_idx(), 0, None, None]
     gm_query = _full_token_tile(query_source, raw_row_start, KEY_DIM)

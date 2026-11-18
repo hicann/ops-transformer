@@ -45,7 +45,7 @@ from cannbotdsl import (
     dtypes,
     get_platform_info,
 )
-from cannbotdsl import make_layout
+from cannbotdsl import aot, make_layout
 from cannbotdsl.ring_buffer import RingBuffer
 from cannbotdsl.lang.jit import jit
 from cannbotdsl.lang.vf import vf
@@ -163,6 +163,16 @@ _scheduled_owner = _metadata._scheduled_owner
 # ---------------------------------------------------------------------------
 
 
+@jit
+def _promote_state_row(dst, src):
+    with vf(mode="simd"):
+        full = create_mask(pattern="all")
+        for column in range(dst.shape[-1] // D_HALF):
+            offset = column * D_HALF
+            value = vload_unpack(src, offset, unpack_mode=UnpackMode.B16_TO_B32)
+            vstore(dst, offset, vcast(value, dtypes.float32, mask=full), full)
+
+
 class BackwardCastVector:
     """Round FP32 matrix operands to BF16 before Cube products.
 
@@ -186,7 +196,17 @@ class BackwardCastVector:
 
     @jit
     def run(self, gm_source, gm_destination):
-        if self.rows > 1 and gm_source.shape[-2] % self.rows == 0:
+        if const_expr(gm_source.dtype == dtypes.bfloat16):
+            for row in range(
+                get_subblock_id(), gm_source.shape[-2], get_subblock_dim()
+            ):
+                low = tile_slice(self.destination.next_write(), (1, self.width), (0, 0))
+                mem_copy(low, tile_slice(gm_source, (1, self.width), (row, 0)))
+                mem_copy(
+                    tile_slice(gm_destination, (1, self.width), (row, 0)),
+                    tile_slice(self.destination.next_read(), (1, self.width), (0, 0)),
+                )
+        elif self.rows > 1 and gm_source.shape[-2] % self.rows == 0:
             for group in range(
                 get_subblock_id(), gm_source.shape[-2] // self.rows, get_subblock_dim()
             ):
@@ -335,6 +355,9 @@ class StageTwoReversePreVector:
         ).next_write()
         self.state = _FixedScratchSlot(storage[:rows, None])
         self.saved_state = _FixedScratchSlot(storage[rows : 2 * rows, None])
+        self.saved_low = RingBuffer(
+            MemLoc.UB, dtypes.bfloat16, make_layout((1, D_HALF)), depth=1
+        ).next_write()
         self.gate_accumulator = storage[2 * rows : 2 * rows + 1, None]
         self.gate_result = _FixedScratchSlot(storage[2 * rows + 1 : 2 * rows + 2, None])
 
@@ -350,10 +373,27 @@ class StageTwoReversePreVector:
                 self.state.next_write(),
                 tile_slice(gm_d_state, (self.rows, D_HALF), (group, subblock_idx)),
             )
-            mem_copy(
-                self.saved_state.next_write(),
-                tile_slice(gm_saved_state, (self.rows, D_HALF), (group, subblock_idx)),
-            )
+            if const_expr(gm_saved_state.dtype == dtypes.bfloat16):
+                for row in range(self.rows):
+                    mem_copy(
+                        self.saved_low,
+                        tile_slice(
+                            gm_saved_state,
+                            (1, D_HALF),
+                            (group * self.rows + row, subblock_idx),
+                        ),
+                    )
+                    dst = tile_slice(
+                        self.saved_state.next_write(), (1, D_HALF), (row, 0)
+                    )
+                    _promote_state_row(dst, self.saved_low)
+            else:
+                mem_copy(
+                    self.saved_state.next_write(),
+                    tile_slice(
+                        gm_saved_state, (self.rows, D_HALF), (group, subblock_idx)
+                    ),
+                )
             self._accumulate_gate(self.state.next_read(), self.saved_state.next_read())
         mem_copy(self.gate_result.next_write(), self.gate_accumulator)
         mem_copy(
@@ -750,11 +790,23 @@ class _StageOneScratchScope:
             ),
             ("value_output", dtypes.bfloat16, (2 * CHUNK_SIZE, VALUE_DIM)),
         ]
-        pool = {}
+        windows = []
+        capacity = 0
         for name, dtype, shape in fields:
-            pool[(name, dtype, shape)] = RingBuffer(
-                MemLoc.UB, dtype, make_layout(shape), depth=1
-            ).next_write()
+            offset = (capacity + 31) // 32 * 32
+            windows.append((name, dtype, shape, offset))
+            capacity = offset + shape[0] * shape[1] * (
+                4 if dtype == dtypes.float32 else 2
+            )
+        storage = RingBuffer(
+            MemLoc.UB, dtypes.uint8, make_layout((capacity,)), depth=1
+        ).next_write()
+        pool = {
+            (name, dtype, shape): from_tensor(
+                storage, dtype=dtype, layout=make_layout(shape), offset=offset
+            )
+            for name, dtype, shape, offset in windows
+        }
         self.token = _STAGE_ONE_SCRATCH_SCOPE.set(pool)
         return self
 
@@ -1207,8 +1259,6 @@ def _prepare_track_chunk(
             valid_rows = CHUNK_SIZE
         source_row_start = source_token_start + chunk * CHUNK_SIZE
         matrix_batch = dtypes.int64(storage_batch)
-        if not padded_layout:
-            matrix_batch = _tnd_chunk_index(compact_token_start, seq_idx, chunk)
         matrix_source = gm_Aqk[matrix_batch, value_head, None, None]
         # Keep-index GM slices preserve singleton batch/head axes.
         # The last two dimensions are always token and feature.
@@ -2635,9 +2685,11 @@ class StageOneVector:
             channel = self.bf16_scalars
         scalar = tile_slice(channel.next_write(), (1,), (0,))
         mem_copy(scalar, tile_slice(gm_source, (1,), (source_row,)))
+        # The destination retains [token, 1]. A rank-one tile addresses its
+        # trailing singleton axis, not the token axis (whose stride is Nv).
         mem_copy(
-            tile_slice(gm_destination, (1,), (destination_row,)),
-            tile_slice(channel.next_read(), (1,), (0,)),
+            tile_slice(gm_destination, (1, 1), (destination_row, 0)),
+            tile_slice(channel.next_read(), (1,), (0,)).view(1, 1),
         )
 
     @jit
@@ -2649,8 +2701,8 @@ class StageOneVector:
             channel = self.bf16_scalars
             self._zero_bf16_row(tile_slice(channel.next_write(), (1,), (0,)), 1)
         mem_copy(
-            tile_slice(gm_destination, (1,), (destination_row,)),
-            tile_slice(channel.next_read(), (1,), (0,)),
+            tile_slice(gm_destination, (1, 1), (destination_row, 0)),
+            tile_slice(channel.next_read(), (1,), (0,)).view(1, 1),
         )
 
     @jit
@@ -2796,15 +2848,13 @@ class StageOneVector:
                     options=copy_options(atomic_add=True),
                 )
         if const_expr(store_alog):
-            mem_copy(
-                tile_slice(self.fp32_rows[0], (1, GATE_SCALAR_TRANSFER_WIDTH), (0, 0)),
-                self.gate_task_alog_sum,
-            )
+            # The scalar slot is already DMA-aligned. Publish it directly
+            # without reusing the staging row of the preceding bias store.
             mem_copy(
                 tile_slice(
                     gm_public_dA, (1, GATE_SCALAR_TRANSFER_WIDTH), (value_head, 0)
                 ),
-                tile_slice(self.fp32_rows[0], (1, GATE_SCALAR_TRANSFER_WIDTH), (0, 0)),
+                self.gate_task_alog_sum,
                 options=copy_options(atomic_add=True),
             )
 
@@ -8938,9 +8988,6 @@ def _finish_masked_track_chunk(
             compact_row_start = gradient_slot * CHUNK_SIZE
             inverse_batch = dtypes.int64(raw_batch)
             inverse_row_start = raw_row_start
-            if not padded_layout:
-                inverse_batch = _tnd_chunk_index(compact_token_start, seq_idx, chunk)
-                inverse_row_start = 0
             inverse_source = gm_Akk[inverse_batch, value_head, None, None]
             d_Aqk_source = gm_stage_two_d_Aqk[gradient_slot, 0, None, None]
             if get_subblock_id() == 0:
@@ -9535,9 +9582,7 @@ class SingleChunkGateSensitivity:
             self._gate_dot_row(staged, row, alog, bound, fp32_gate)
 
     @jit
-    def _gate_dot_row(
-        self, staged, row, alog, bound, fp32_gate: Constexpr[bool]
-    ):
+    def _gate_dot_row(self, staged, row, alog, bound, fp32_gate: Constexpr[bool]):
         # Both halves on every AIV: the coefficient and solve stages read the
         # full gate_dot rows, so each AIV publishes a complete local copy.
         with vf(mode="simd"):
@@ -9548,9 +9593,7 @@ class SingleChunkGateSensitivity:
                     raw = vload(staged, offset)
                 else:
                     raw = vcast(
-                        vload_unpack(
-                            staged, offset, unpack_mode=UnpackMode.B16_TO_B32
-                        ),
+                        vload_unpack(staged, offset, unpack_mode=UnpackMode.B16_TO_B32),
                         dtypes.float32,
                         mask=full,
                     )
@@ -9576,9 +9619,7 @@ class SingleChunkGateSensitivity:
                 )
                 running = vadd(vload(self.gate_running, offset), step, mask=full)
                 vstore(self.gate_running, offset, running, full)
-                vstore(
-                    self.gate_dot, row * SUPPORTED_HEAD_DIM + offset, running, full
-                )
+                vstore(self.gate_dot, row * SUPPORTED_HEAD_DIM + offset, running, full)
             vmem_bar("vst_vld")
 
     @jit
@@ -9717,10 +9758,16 @@ class SingleChunkGateSensitivity:
             get_subblock_id() * D_HALF, (get_subblock_id() + 1) * D_HALF
         ):
             state = self.state_io
-            mem_copy(
-                tile_slice(state, (1, SUPPORTED_HEAD_DIM), (0, 0)),
-                tile_slice(initial_state_source, (1, SUPPORTED_HEAD_DIM), (value, 0)),
+            state_row = tile_slice(state, (1, SUPPORTED_HEAD_DIM), (0, 0))
+            source_row = tile_slice(
+                initial_state_source, (1, SUPPORTED_HEAD_DIM), (value, 0)
             )
+            if const_expr(initial_state_source.dtype == dtypes.bfloat16):
+                low_row = tile_slice(self.low_io, (1, SUPPORTED_HEAD_DIM), (0, 0))
+                mem_copy(low_row, source_row)
+                _promote_state_row(state_row, low_row)
+            else:
+                mem_copy(state_row, source_row)
             mem_copy(
                 tile_slice(state, (1, SUPPORTED_HEAD_DIM), (1, 0)),
                 tile_slice(final_gradient_source, (1, SUPPORTED_HEAD_DIM), (value, 0)),
@@ -10181,13 +10228,9 @@ class SingleChunkGateSensitivity:
                 (CHUNK_SIZE + row) * D_HALF + value - get_subblock_id() * D_HALF,
             )
             loss_error = vload_broadcast(self.loss_error, 0)
-            increment = vsub(
-                vmul(seed, odot, mask=scalar), loss_error, mask=scalar
-            )
+            increment = vsub(vmul(seed, odot, mask=scalar), loss_error, mask=scalar)
             updated = vadd(loss, increment, mask=scalar)
-            loss_error = vsub(
-                vsub(updated, loss, mask=scalar), increment, mask=scalar
-            )
+            loss_error = vsub(vsub(updated, loss, mask=scalar), increment, mask=scalar)
             loss = updated
             term = vadd(
                 vmul(final_coefficient_dot, z, mask=scalar),
@@ -10196,9 +10239,7 @@ class SingleChunkGateSensitivity:
             )
             increment = vsub(term, loss_error, mask=scalar)
             updated = vadd(loss, increment, mask=scalar)
-            loss_error = vsub(
-                vsub(updated, loss, mask=scalar), increment, mask=scalar
-            )
+            loss_error = vsub(vsub(updated, loss, mask=scalar), increment, mask=scalar)
             loss = updated
             vstore_first(self.loss, 0, loss)
             vstore_first(self.loss_error, 0, loss_error)
@@ -10686,7 +10727,12 @@ def _prepare_stage_two(
         raise ValueError("backward metadata task count is invalid")
     if not is_tnd and qg.shape[0] != batch:
         raise ValueError("physical qg batch does not match metadata")
-    physical_matrix_shape = (*qg.shape[:-1], CHUNK_SIZE)
+    physical_matrix_shape = (
+        batch,
+        heads,
+        qg.shape[2 if layout == "BNSD" else 1],
+        CHUNK_SIZE,
+    )
     if not is_tnd and tuple(aqk.shape) != physical_matrix_shape:
         raise ValueError("padded Aqk view must match the token rows")
     if not is_tnd and not (
@@ -10717,7 +10763,7 @@ def _prepare_stage_two(
     w_view = input_view(w)
     v_new_view = input_view(v_new)
     gate_view = input_view(g_cumsum)
-    matrix_view = aqk if is_tnd else input_view(aqk)
+    matrix_view = aqk.unsqueeze(0) if is_tnd else aqk
     state_view = chunk_states.unsqueeze(0).transpose(1, 2) if is_tnd else chunk_states
     output_view = input_view(output_gradient)
     terminal_gradient = final_state_gradient
@@ -11374,25 +11420,19 @@ def _prepare_stage_one(
         return tensor
 
     d_value = torch.empty_like(values)
+    # Allocate the gradient in the public BSN/TN GM layout. Kernel views
+    # preserve those strides and select the strided scalar store as needed.
     if layout == "TND":
-        beta_rows = values.shape[0]
-        beta_aligned_rows = beta_rows + beta_rows % 2
-        d_beta_storage = torch.empty(
-            (value_heads, beta_aligned_rows), dtype=beta_dtype, device=device
+        d_beta = torch.empty(
+            (values.shape[0], value_heads), dtype=beta_dtype, device=device
         )
-        d_beta = d_beta_storage[:, :beta_rows].transpose(0, 1)
     else:
-        beta_rows = values.shape[2] if layout == "BNSD" else values.shape[1]
-        beta_aligned_rows = beta_rows + beta_rows % 2
-        d_beta_storage = torch.empty(
-            (values.shape[0], value_heads, beta_aligned_rows),
-            dtype=beta_dtype,
-            device=device,
+        length = values.shape[2 if layout == "BNSD" else 1]
+        d_beta = torch.empty(
+            (values.shape[0], length, value_heads), dtype=beta_dtype, device=device
         )
-        beta_head_major = d_beta_storage[:, :, :beta_rows]
-        d_beta = (
-            beta_head_major if layout == "BNSD" else beta_head_major.transpose(1, 2)
-        )
+        if layout == "BNSD":
+            d_beta = d_beta.transpose(1, 2)
     d_query = torch.empty_like(query)
     d_key = torch.empty_like(key)
     d_gate = torch.empty_like(raw_gate)
@@ -11471,7 +11511,7 @@ def _prepare_stage_one(
         as_bnsd_view(key),
         as_bnsd_view(values),
         as_bnsd_view(activated_beta, scalar=True),
-        (saved_inverse if layout == "TND" else as_bnsd_view(saved_inverse)),
+        (saved_inverse.unsqueeze(0) if layout == "TND" else saved_inverse),
         as_bnsd_view(saved_qg),
         as_bnsd_view(saved_kg),
         as_bnsd_view(saved_gamma),
@@ -11766,7 +11806,7 @@ def backward_dynamic_compile_request(
         cache,
         cache,
         cache_f32,
-        fake((state_p, nv, state_c, SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM), fp32),
+        fake((state_p, nv, state_c, SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM), bf16),
         sequence(bf16, physical=output_p, size=output_l),
         state,
         metadata,
@@ -12045,7 +12085,7 @@ def _validate_backward_inputs(
     qg: torch.Tensor,
     kg: torch.Tensor,
     g_cumsum: torch.Tensor,
-    q_rtsd: Optional[torch.Tensor],
+    q_rstd: Optional[torch.Tensor],
     k_rstd: Optional[torch.Tensor],
     beta_sigmoid: Optional[torch.Tensor],
     A_log: Optional[torch.Tensor],
@@ -12092,9 +12132,9 @@ def _validate_backward_inputs(
     if any(t.dtype not in (torch.bfloat16, torch.float32) for t in (g, beta)):
         raise ValueError("g and beta must be BF16 or FP32")
     if disable_recompute and (
-        chunk_states.dtype != torch.float32 or g_cumsum.dtype != torch.float32
+        chunk_states.dtype != torch.bfloat16 or g_cumsum.dtype != torch.float32
     ):
-        raise ValueError("chunk_states and g_cumsum must be FP32")
+        raise ValueError("chunk_states must be BF16 and g_cumsum must be FP32")
     if layout not in ("TND", "BNSD", "BSND"):
         raise ValueError("layout must be TND, BNSD, or BSND")
     if (
@@ -12168,13 +12208,13 @@ def _validate_backward_inputs(
         cache_shape = (storage_length, value_heads, SUPPORTED_HEAD_DIM)
         qk_scalar_shape = (storage_length, qk_heads)
         capacity = (storage_length + CHUNK_SIZE - 1) // CHUNK_SIZE + batch
-        matrix_shape = (capacity, value_heads, CHUNK_SIZE, CHUNK_SIZE)
+        matrix_shape = (value_heads, storage_length, CHUNK_SIZE)
         state_shape = (capacity, value_heads, SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM)
     else:
         cache_shape = (batch, value_heads, storage_length, SUPPORTED_HEAD_DIM)
         qk_scalar_shape = (batch, qk_heads, storage_length)
         chunks = (storage_length + CHUNK_SIZE - 1) // CHUNK_SIZE
-        matrix_shape = (batch, value_heads, chunks, CHUNK_SIZE, CHUNK_SIZE)
+        matrix_shape = (batch, value_heads, storage_length, CHUNK_SIZE)
         state_shape = (
             batch,
             value_heads,
@@ -12188,9 +12228,9 @@ def _validate_backward_inputs(
         if any(t.shape != cache_shape for t in (kg, w, u, v_new, g_cumsum)):
             raise ValueError("saved token caches must use the current forward layout")
     if Aqk.shape != matrix_shape or Akk.shape != matrix_shape:
-        raise ValueError("Aqk/Akk must use the current forward chunk cache shape")
+        raise ValueError("Aqk/Akk must use the token-row matrix cache shape")
     if disable_recompute and chunk_states.shape != state_shape:
-        raise ValueError("FP32 chunk_states shape must match the current forward cache")
+        raise ValueError("BF16 chunk_states shape must match the current forward cache")
     if (
         dht.dtype != torch.float32
         or dht.device != q.device
@@ -12215,16 +12255,16 @@ def _validate_backward_inputs(
 
     if use_qk_l2norm_in_kernel:
         if (
-            not isinstance(q_rtsd, torch.Tensor)
+            not isinstance(q_rstd, torch.Tensor)
             or not isinstance(k_rstd, torch.Tensor)
-            or q_rtsd.shape != qk_scalar_shape
+            or q_rstd.shape != qk_scalar_shape
             or k_rstd.shape != qk_scalar_shape
-            or q_rtsd.dtype != torch.float32
+            or q_rstd.dtype != torch.float32
             or k_rstd.dtype != torch.float32
-            or any(t.device != q.device for t in (q_rtsd, k_rstd))
+            or any(t.device != q.device for t in (q_rstd, k_rstd))
         ):
             raise ValueError(
-                "use_qk_l2norm_in_kernel requires valid FP32 q_rtsd and k_rstd caches"
+                "use_qk_l2norm_in_kernel requires valid FP32 q_rstd and k_rstd caches"
             )
     if use_beta_sigmoid_in_kernel:
         if (
@@ -12356,29 +12396,6 @@ def _resolve_backward_metadata(q, v, layout, metadata, cu_seqlens, seqused):
 def _forward_token_view(cache, layout):
     """Forward padded caches are head-major even for BSND inputs."""
     return cache.transpose(1, 2) if layout == "BSND" and cache is not None else cache
-
-
-def _forward_matrix_view(cache, values, layout):
-    if layout == "TND":
-        return cache
-    length = values.shape[1] if layout == "BSND" else values.shape[2]
-    return _forward_token_view(cache.flatten(2, 3)[:, :, :length], layout)
-
-
-def _forward_qk_to_input_layout(cache, reference, layout):
-    expected = (
-        (reference.shape[0], reference.shape[2], reference.shape[1], reference.shape[3])
-        if layout == "BSND"
-        else reference.shape
-    )
-    if (
-        not isinstance(cache, torch.Tensor)
-        or cache.dtype != torch.bfloat16
-        or cache.device != reference.device
-        or cache.shape != expected
-    ):
-        raise ValueError("saved Q/K cache must use the current forward layout")
-    return _forward_token_view(cache, layout)
 
 
 # Recompute and backward share one kernel with a separate program cache.
@@ -12919,6 +12936,11 @@ def _recompute_dynamic_compile_request(
         beta_grad_fp32,
         cube_causal,
     )
+    # Recompute keeps a private FP32 state cache for recurrence.
+    saved_state = specs[6]
+    stride = tuple(cannbotdsl.Dim(f"ARG6_S{axis}", min=0) for axis in range(4)) + (1,)
+    state_spec = cannbotdsl.TensorSpec(saved_state.shape, dtypes.float32, stride=stride)
+    specs = (*specs[:6], state_spec, *specs[7:])
     # Initial state follows dht; the U output shares W's cache layout.
     return (*specs, specs[8], specs[3]), (*scalars[:-1], dtypes.int64, scalars[-1])
 
@@ -13013,19 +13035,26 @@ def _launch_recompute_program(
 
 
 def _allocate_recompute_caches(values, final_state_gradient, layout):
-    """Allocate seven outputs without launching a device operation."""
-    caches = tuple(
-        values.new_empty(
-            values.shape, dtype=torch.float32 if index == 5 else torch.bfloat16
-        )
-        for index in range(6)
-    )
+    """Allocate recompute token caches in head-major GM storage."""
     batch, heads = final_state_gradient.shape[:2]
     length = (
         values.shape[0]
         if layout == "TND"
         else values.shape[1 if layout == "BSND" else 2]
     )
+    width = values.shape[-1]
+    storage_shape = (
+        (heads, length, width) if layout == "TND" else (batch, heads, length, width)
+    )
+    caches = []
+    for dtype in (torch.bfloat16,) * 5 + (torch.float32,):
+        storage = values.new_empty(storage_shape, dtype=dtype)
+        # Existing preparation expects token views in the input layout.
+        if layout == "TND":
+            storage = storage.transpose(0, 1)
+        elif layout == "BSND":
+            storage = storage.transpose(1, 2)
+        caches.append(storage)
     chunks = (length + CHUNK_SIZE - 1) // CHUNK_SIZE
     state_prefix = (
         (chunks + batch, heads) if layout == "TND" else (batch, heads, chunks)
@@ -13057,6 +13086,12 @@ def _backward_variants():
                         )
 
 
+def _recompute_export_variants():
+    # The runtime routes persistent reconstruction with masked chunks to
+    # staged backward before preparing its compile request.
+    return (variant for variant in _backward_variants() if variant[4] or not variant[2])
+
+
 def _backward_export_shard():
     """Select an isolated Native build worker; ordinary exports remain complete."""
     import os
@@ -13069,16 +13104,6 @@ def _backward_export_shard():
     if not 1 <= count <= 72 or not 0 <= index < count:
         raise ValueError("backward export shard requires 0 <= INDEX < COUNT <= 72")
     return index, count
-
-
-def _export_recompute_programs(shard=(0, 1)):
-    variants = tuple(_backward_variants())
-    for index, variant in enumerate(variants, start=len(variants)):
-        if index % shard[1] != shard[0]:
-            continue
-        specs, scalars = _recompute_dynamic_compile_request(*variant)
-        program = cannbotdsl.compile(_RecomputeBackward().run, *specs, *scalars)
-        program.close()
 
 
 def _disable_grad_at_call(fn):
@@ -13098,7 +13123,7 @@ def _disable_grad_at_call(fn):
 
 
 @_disable_grad_at_call
-def flash_kda_grad_npu(
+def _flash_kda_grad_kernel_entry(
     q: torch.Tensor,
     k: torch.Tensor,
     v: torch.Tensor,
@@ -13117,7 +13142,7 @@ def flash_kda_grad_npu(
     qg: Optional[torch.Tensor] = None,
     kg: Optional[torch.Tensor] = None,
     g_cumsum: Optional[torch.Tensor] = None,
-    q_rtsd: Optional[torch.Tensor] = None,
+    q_rstd: Optional[torch.Tensor] = None,
     k_rstd: Optional[torch.Tensor] = None,
     beta_sigmoid: Optional[torch.Tensor] = None,
     A_log: Optional[torch.Tensor] = None,
@@ -13132,6 +13157,8 @@ def flash_kda_grad_npu(
     disable_recompute: bool = False,
     lower_bound: Optional[float] = None,
     layout: str = "TND",
+    *,
+    cu_seqlens_cpu: Optional[list[int]] = None,
 ):
     """Return (dq, dk, dv, dh0, dg, dbeta, dA, dBias).
 
@@ -13151,7 +13178,7 @@ def flash_kda_grad_npu(
     Backward vector epilogues write dg/dbeta
     directly in the corresponding original g/beta dtype, rounding only for BF16.
     With Q/K L2Norm enabled, q/k are the saved normalized forward values;
-    q_rtsd/k_rstd are required FP32 inverse norms. The returned dq/dk are
+    q_rstd/k_rstd are required FP32 inverse norms. The returned dq/dk are
     gradients of the original pre-normalization inputs.
     Host checks supplied sequence metadata, validates the cache ABI, allocates outputs
     and workspace, prepares forward-cache views, and
@@ -13174,6 +13201,8 @@ def flash_kda_grad_npu(
     flash_kda_grad_metadata; any explicit lengths must agree with it.
     Both ``do`` and ``dht`` must be tensors; pass zeros for an absent gradient.
     """
+    if cu_seqlens_cpu is not None:
+        raise ValueError("cu_seqlens_cpu must be None")
     if scale is not None:
         try:
             scale = float(scale)
@@ -13199,7 +13228,7 @@ def flash_kda_grad_npu(
         qg,
         kg,
         g_cumsum,
-        q_rtsd,
+        q_rstd,
         k_rstd,
         beta_sigmoid,
         A_log,
@@ -13214,12 +13243,10 @@ def flash_kda_grad_npu(
         disable_recompute,
         initial_state,
     )
-    Aqk = _forward_matrix_view(Aqk, v, layout)
-    Akk = _forward_matrix_view(Akk, v, layout)
     if use_beta_sigmoid_in_kernel:
         beta_sigmoid = _forward_token_view(beta_sigmoid, layout)
     if use_qk_l2norm_in_kernel:
-        q_rtsd = _forward_token_view(q_rtsd, layout)
+        q_rstd = _forward_token_view(q_rstd, layout)
         k_rstd = _forward_token_view(k_rstd, layout)
     if not disable_recompute:
         w, u, v_new, qg, kg, g_cumsum, chunk_states = _allocate_recompute_caches(
@@ -13289,7 +13316,7 @@ def flash_kda_grad_npu(
                 saved_gamma=g_cumsum,
                 A_log=A_log,
                 dt_bias=dt_bias,
-                query_rstd=q_rtsd if use_qk_l2norm_in_kernel else None,
+                query_rstd=q_rstd if use_qk_l2norm_in_kernel else None,
                 key_rstd=k_rstd if use_qk_l2norm_in_kernel else None,
                 stage_two=stage_two,
                 layout=layout,
@@ -13353,6 +13380,164 @@ def flash_kda_grad_npu(
         return dq, dk, dv, stage_two.dh0, dg, dbeta, dA, dBias
 
 
+@_disable_grad_at_call
+def flash_kda_grad_npu(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    g: torch.Tensor,
+    beta: torch.Tensor,
+    do: torch.Tensor,
+    dht: torch.Tensor,
+    Aqk: torch.Tensor,
+    Akk: torch.Tensor,
+    metadata: Optional[torch.Tensor] = None,
+    initial_state: Optional[torch.Tensor] = None,
+    chunk_states: Optional[torch.Tensor] = None,
+    w: Optional[torch.Tensor] = None,
+    u: Optional[torch.Tensor] = None,
+    v_new: Optional[torch.Tensor] = None,
+    qg: Optional[torch.Tensor] = None,
+    kg: Optional[torch.Tensor] = None,
+    g_cumsum: Optional[torch.Tensor] = None,
+    q_rstd: Optional[torch.Tensor] = None,
+    k_rstd: Optional[torch.Tensor] = None,
+    beta_sigmoid: Optional[torch.Tensor] = None,
+    A_log: Optional[torch.Tensor] = None,
+    dt_bias: Optional[torch.Tensor] = None,
+    cu_seqlens: Optional[torch.Tensor] = None,
+    seqused: Optional[torch.Tensor] = None,
+    scale: Optional[float] = None,
+    use_qk_l2norm_in_kernel: bool = True,
+    use_gate_in_kernel: bool = True,
+    use_beta_sigmoid_in_kernel: bool = True,
+    allow_neg_eigval: bool = False,
+    disable_recompute: bool = False,
+    lower_bound: Optional[float] = None,
+    layout: str = "TND",
+    *,
+    cu_seqlens_cpu: Optional[list[int]] = None,
+):
+    """Run backward using the public FlashKDA gradient tensor layouts."""
+    if cu_seqlens_cpu is not None:
+        raise ValueError("cu_seqlens_cpu must be None")
+    if layout not in ("TND", "BNSD", "BSND"):
+        raise ValueError("layout must be TND, BNSD, or BSND")
+    if not use_gate_in_kernel and g.dtype != torch.float32:
+        raise ValueError("activated g must be FP32")
+    if not use_beta_sigmoid_in_kernel and beta.dtype != torch.float32:
+        raise ValueError("activated beta must be FP32")
+
+    if q.ndim != (3 if layout == "TND" else 4) or v.ndim != q.ndim:
+        raise ValueError("q and v rank must match layout")
+    if layout == "TND":
+        length, heads, dim = v.shape
+        gate_shape = (length, heads, dim)
+        cache_shape = (heads, length, dim)
+        norm_shape = (q.shape[1], length)
+    else:
+        batch = v.shape[0]
+        heads, length = v.shape[1:3] if layout == "BNSD" else v.shape[1:3][::-1]
+        dim = v.shape[-1]
+        gate_shape = (batch, length, heads, dim)
+        cache_shape = (batch, heads, length, dim)
+        norm_shape = (batch, q.shape[1 if layout == "BNSD" else 2], length)
+    matrix_shape = (*cache_shape[:-1], CHUNK_SIZE)
+    if Aqk.shape != matrix_shape or Akk.shape != matrix_shape:
+        raise ValueError(f"Aqk/Akk must have shape {matrix_shape} for {layout}")
+    if chunk_states is not None:
+        if layout == "TND":
+            state_prefix = (
+                (length + CHUNK_SIZE - 1) // CHUNK_SIZE + dht.shape[0],
+                heads,
+            )
+        else:
+            state_prefix = (batch, (length + CHUNK_SIZE - 1) // CHUNK_SIZE, heads)
+        if chunk_states.dtype != torch.bfloat16 or chunk_states.shape != (
+            *state_prefix,
+            dim,
+            dim,
+        ):
+            raise ValueError("chunk_states must use the public BF16 chunk layout")
+    for name, tensor, shape in (
+        ("g", g, gate_shape),
+        ("beta", beta, gate_shape[:-1]),
+        ("w", w, cache_shape),
+        ("u", u, cache_shape),
+        ("qg", qg, cache_shape),
+        ("kg", kg, cache_shape),
+        ("v_new", v_new, cache_shape),
+        ("g_cumsum", g_cumsum, cache_shape),
+        ("q_rstd", q_rstd, norm_shape),
+        ("k_rstd", k_rstd, norm_shape),
+        ("beta_sigmoid", beta_sigmoid, cache_shape[:-1]),
+    ):
+        if tensor is not None and tensor.shape != shape:
+            raise ValueError(f"{name} must have shape {shape} for {layout}")
+
+    if do.shape != gate_shape:
+        raise ValueError(f"do must have shape {gate_shape} for {layout}")
+    bias_is_flat = dt_bias is not None and dt_bias.ndim == 1
+    if bias_is_flat:
+        if dt_bias.numel() != heads * dim:
+            raise ValueError("flat dt_bias must have Nv * Dk elements")
+        dt_bias = dt_bias.view(heads, dim)
+    if layout == "BNSD":
+        do = do.transpose(1, 2)
+        g, beta = g.transpose(1, 2), beta.transpose(1, 2)
+
+    def kernel_cache(tensor):
+        if tensor is None:
+            return None
+        return tensor.transpose(0, 1) if layout == "TND" else tensor
+
+    def kernel_chunks(tensor):
+        if tensor is None:
+            return None
+        return tensor if layout == "TND" else tensor.transpose(1, 2)
+
+    dq, dk, dv, dh0, dg, dbeta, da, dbias = _flash_kda_grad_kernel_entry(
+        q,
+        k,
+        v,
+        g,
+        beta,
+        do,
+        dht,
+        Aqk,
+        Akk,
+        metadata,
+        initial_state=initial_state,
+        chunk_states=kernel_chunks(chunk_states),
+        w=kernel_cache(w),
+        u=kernel_cache(u),
+        qg=kernel_cache(qg),
+        kg=kernel_cache(kg),
+        v_new=kernel_cache(v_new),
+        g_cumsum=kernel_cache(g_cumsum),
+        q_rstd=kernel_cache(q_rstd),
+        k_rstd=kernel_cache(k_rstd),
+        beta_sigmoid=kernel_cache(beta_sigmoid),
+        A_log=A_log,
+        dt_bias=dt_bias,
+        cu_seqlens=cu_seqlens,
+        seqused=seqused,
+        scale=scale,
+        use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
+        use_gate_in_kernel=use_gate_in_kernel,
+        use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
+        allow_neg_eigval=allow_neg_eigval,
+        disable_recompute=disable_recompute,
+        lower_bound=lower_bound,
+        layout=layout,
+    )
+    if layout == "BNSD":
+        dg, dbeta = dg.transpose(1, 2), dbeta.transpose(1, 2)
+    if bias_is_flat and dbias is not None:
+        dbias = dbias.reshape(-1)
+    return dq, dk, dv, dh0, dg, dbeta, da, dbias
+
+
 def flash_kda_grad_from_forward(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -13379,19 +13564,9 @@ def flash_kda_grad_from_forward(
     lower_bound: Optional[float] = None,
     layout: str = "TND",
 ):
-    """Consume the 16 DSL training-forward outputs in their return order.
+    """Run backward with the public 16-slot training-forward result.
 
-    The first two outputs are ``out`` and ``final_state``. ``do`` and ``dht``
-    are their required upstream gradient tensors; use zeros for an absent
-    gradient. Layout defaults to TND. Backward task metadata is required;
-    optional explicit lengths are checked against the supplied snapshot.
-    Optional ``chunk_states_fp32`` must use the same FP32 shape and storage
-    layout as the current forward's state cache when recomputation is disabled.
-    Recompute mode uses initial_state (None means zeros) instead. Other caches are passed
-    through unchanged. With L2Norm enabled, saved normalized Q/K are viewed in
-    the public input layout; matrix/token views are prepared by the main entry.
-    lower_bound defaults to None (softplus gate); pass the forward's explicit
-    bound when it used a bounded sigmoid gate.
+    A legacy FP32 state override is rounded to the BF16 saved-cache ABI.
     """
     if len(forward_outputs) != 16:
         raise ValueError("training forward must return 16 tensors/cache slots")
@@ -13399,11 +13574,7 @@ def flash_kda_grad_from_forward(
     (
         _,
         _,
-        q_norm,
-        k_norm,
-        q_rtsd,
-        k_rstd,
-        beta_activated,
+        chunk_states,
         Aqk,
         Akk,
         w,
@@ -13412,14 +13583,23 @@ def flash_kda_grad_from_forward(
         kg,
         v_new,
         g_cumsum,
-        saved_chunk_states,
+        q_norm,
+        q_rstd,
+        k_norm,
+        k_rstd,
+        beta_activated,
     ) = forward_outputs
-    chunk_states = (
-        chunk_states_fp32 if chunk_states_fp32 is not None else saved_chunk_states
-    )
+    if chunk_states_fp32 is not None:
+        chunk_states = chunk_states_fp32.bfloat16()
     if use_qk_l2norm_in_kernel:
-        q = _forward_qk_to_input_layout(q_norm, q, layout)
-        k = _forward_qk_to_input_layout(k_norm, k, layout)
+        if (
+            q_norm is None
+            or k_norm is None
+            or q_norm.shape != q.shape
+            or k_norm.shape != k.shape
+        ):
+            raise ValueError("normalized Q/K must match the input shapes")
+        q, k = q_norm, k_norm
     return flash_kda_grad_npu(
         q,
         k,
@@ -13439,7 +13619,7 @@ def flash_kda_grad_from_forward(
         qg=qg,
         kg=kg,
         g_cumsum=g_cumsum,
-        q_rtsd=q_rtsd,
+        q_rstd=q_rstd,
         k_rstd=k_rstd,
         beta_sigmoid=beta_activated,
         A_log=A_log,
@@ -13455,55 +13635,53 @@ def flash_kda_grad_from_forward(
     )
 
 
-from cannbotdsl import aot  # noqa: E402 - Keep the existing module initialization order.
-
-
-def _compile_recompute_export_variant(*variant):
-    """Compile one recompute AOT variant (invoked by the AOT variant pool)."""
-    specs, scalars = _recompute_dynamic_compile_request(*variant)
-    cannbotdsl.compile(_RecomputeBackward().run, *specs, *scalars)
-
-
-def _compile_export_variant(kind, *variant):
-    """Compile exactly one AOT variant; entry point of the parallel variant pool."""
-    if kind == "backward":
-        _compile_backward_program(*variant)
-    elif kind == "recompute":
-        _compile_recompute_export_variant(*variant)
-    else:
-        raise ValueError(f"unknown AOT variant kind: {kind!r}")
+@aot.compile_cache
+def _compile_export_variant(
+    recompute,
+    beta_fp32,
+    use_full_chunks,
+    needs_masked_chunks,
+    gate_fp32,
+    staged,
+    beta_grad_fp32,
+    cube_causal,
+):
+    request = (
+        _recompute_dynamic_compile_request
+        if recompute
+        else backward_dynamic_compile_request
+    )
+    launcher = _RecomputeBackward() if recompute else FlashKDAGrad()
+    specs, scalars = request(
+        beta_fp32,
+        use_full_chunks,
+        needs_masked_chunks,
+        gate_fp32,
+        staged,
+        beta_grad_fp32,
+        cube_causal,
+    )
+    return cannbotdsl.compile(launcher.run, *specs, *scalars)
 
 
 def _export_variant_calls():
-    """Enumerate every AOT variant without compiling, so the build can batch them."""
-    for variant in _backward_variants():
-        yield ("backward", *variant), {}
-    for variant in _backward_variants():
-        yield ("recompute", *variant), {}
+    """Enumerate both cache modes in the original shard order."""
+    shard_index, shard_count = _backward_export_shard()
+    variants = tuple(
+        (recompute, *variant)
+        for recompute in (False, True)
+        for variant in (
+            _recompute_export_variants() if recompute else _backward_variants()
+        )
+    )
+    return variants[shard_index::shard_count]
 
 
 @aot.export("flash_kda_grad")
 def export_flash_kda_grad():
     """Export both templates, cache modes and independent g/beta storage types."""
-    shard = _backward_export_shard()
-    entries = []
-    try:
-        for index, variant in enumerate(_backward_variants()):
-            if index % shard[1] == shard[0]:
-                entries.append(_compile_backward_program(*variant))
-    finally:
-        for entry in entries:
-            _close_backward_program(entry)
-    _export_recompute_programs(shard)
-
-
-# Declare the variants so the build compiles them one call at a time in its worker
-# pool instead of running the whole export body serially. Builds that do not
-# understand this attribute keep calling ``export_flash_kda_grad`` above.
-export_flash_kda_grad.__cannbot_aot_variants__ = (
-    "_compile_export_variant",
-    _export_variant_calls,
-)
+    for variant in _export_variant_calls():
+        _compile_export_variant(*variant)
 
 
 __all__ = ["flash_kda_grad_npu", "flash_kda_grad_from_forward"]

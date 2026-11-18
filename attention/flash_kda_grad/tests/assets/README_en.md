@@ -32,18 +32,19 @@ python attention/flash_kda_grad/tests/ut/test_flash_kda_grad_ut.py --profile --h
 python attention/flash_kda_grad/tests/ut/test_flash_kda_grad_ut.py --compare-bin --help
 ```
 
-The `api.py` and `spec.py` of TTK still use `flash_kda_grad_ttk/golden.py` in this directory,
+The `api.py` and `spec.py` of TTK still use `impl/flash_kda_grad_ttk/golden.py` in this directory,
 and do not import the UT module. Test logs, profile results, and bin comparison reports should be written outside the code repository.
 
 ## 1. Files and Entries
 
 ```text
-attention/flash_kda_grad/tests/ttk/
-├── flash_kda_grad_ttk/
-│   ├── api.py                      # npu(...): NPU operator / CPU reference dispatch
-│   ├── golden.py                   # Forward cache, token-by-token golden, staged backward peer
-│   ├── spec.py                     # golden / peer and the TTK default cross_check L2
-│   └── __init__.py                 # Exports npu
+attention/flash_kda_grad/tests/assets/
+├── impl/
+│   └── flash_kda_grad_ttk/
+│       ├── api.py                      # npu(...): NPU operator / CPU reference dispatch
+│       ├── golden.py                   # Forward cache, token-by-token golden, staged backward peer
+│       ├── spec.py                     # golden / peer and the TTK default cross_check L2
+│       └── __init__.py                 # Exports npu
 ├── cases/
 │   ├── flash_kda_grad_stc.csv      # 130 STC cases, including 30 new recompute-specific cases
 │   └── flash_kda_grad_exception.csv # Exception cases, maintained separately
@@ -56,7 +57,7 @@ The CPU branch calls the reference implementation.
 
 ## 2. Inputs, Outputs, and Caches
 
-The input order of [`api.py`](flash_kda_grad_ttk/api.py) is as follows; the BSND layout swaps the S/N axes, and TND uses `[T,N,D]`:
+The input order of [`api.py`](impl/flash_kda_grad_ttk/api.py) is as follows; the BSND layout swaps the S/N axes, and TND uses `[T,N,D]`:
 
 | Order | Tensor | Shape (BNSD) | dtype |
 |---|---|---|---|
@@ -133,7 +134,7 @@ To run only one case, add `-t kdag_stc_022` and similar case names at the end of
 
 `flash_kda_grad_exception.csv` separately maintains a catalog of 60 exception cases; the original 001-050 are unchanged;
 051-060 add recompute-mode errors for initial state types, the last dimension, sequence counts, head counts, and device errors, plus
-missing Aqk, Akk, q_rtsd, beta activation caches, and a wrong k_rstd dtype. All explicitly set
+missing Aqk, Akk, q_rstd, beta activation caches, and a wrong k_rstd dtype. All explicitly set
 `disable_recompute=False`, and are expected to throw `ValueError` before recompute cache allocation and the main computation.
 `initial_state=None` is a legal zero initial state; the seven recomputable caches can be omitted, and none of them is treated as an exception.
 
@@ -153,7 +154,7 @@ This part verifies parameter contracts and does not modify golden, numerical thr
 
 ## 3. Golden, Peer, and Criteria
 
-Currently [`spec.py`](flash_kda_grad_ttk/spec.py) uses the following implementations:
+Currently [`spec.py`](impl/flash_kda_grad_ttk/spec.py) uses the following implementations:
 
 | Role | Implementation | Computation method |
 |---|---|---|
@@ -188,7 +189,7 @@ CANNBotDSL and the TTK dependencies need to be installed in Python. The script d
 
 ```bash
 export KDA_ROOT=/path/to/ops-transformer/attention/flash_kda_grad
-export KDA_ASSETS="$KDA_ROOT/tests/ttk"
+export KDA_ASSETS="$KDA_ROOT/tests/assets"
 # Set this when using the TTK source code; it can be omitted when ttk is already installed in the current Python environment.
 export TTK_REPO=/path/to/ops-test-kit
 export KDA_DEVICES=0
@@ -246,8 +247,9 @@ bash "$KDA_ASSETS/run_one.sh" replay 2>&1 | tee /path/to/your/batch.log
 A remote peer can be used through native TTK commands and a self-created configuration; for example, when `peer.yaml` already exists:
 
 ```bash
+PYTHONPATH="$KDA_ASSETS/impl${PYTHONPATH:+:$PYTHONPATH}" \
 python3 -m ttk e2e -i "$KDA_ASSETS/cases/flash_kda_grad_stc.csv" \
-  --plugin "$KDA_ASSETS/flash_kda_grad_ttk/spec.py" --config /path/to/peer.yaml \
+  --plugin "$KDA_ASSETS/impl/flash_kda_grad_ttk/spec.py" --config /path/to/peer.yaml \
   --device-whitelist "$KDA_DEVICES" --seed 20261027 --pc 1 \
   --proc-no-reuse --proc-timeout 3000 --warmup=false --run 1 \
   --task-prof false -o "$KDA_OUT"
@@ -258,7 +260,7 @@ python3 -m ttk e2e -i "$KDA_ASSETS/cases/flash_kda_grad_stc.csv" \
 The result CSV is specified with `-o` or `KDA_OUT`. The positions of the eight outputs in the terminal and accuracy details are, in order,
 `dq, dk, dv, dh0, dg, dbeta, dA, dBias`. Common fields:
 
-The `pre_compare` hook of [`spec.py`](flash_kda_grad_ttk/spec.py) prints the numerical table of the eight gradients to the terminal and `ttk.log`:
+The `pre_compare` hook of [`spec.py`](impl/flash_kda_grad_ttk/spec.py) prints the numerical table of the eight gradients to the terminal and `ttk.log`:
 the first and last 10 elements each, the 10 elements with the largest absolute difference, and the largest finite
 absolute error and the count of non-finite values. `Index` is the flattened element index,
 `AbsDiff = abs(NpuOut - GoldenOut)`, and `RateDiff = AbsDiff / abs(GoldenOut)`; when golden
@@ -283,3 +285,17 @@ The TTK adapter, golden, and CPU peer accept the same optional Tensor arguments,
 
 The NPU entry keeps the actual layout of the request; the reference caches are generated by valid lengths and mapped to the padded chunk axis of the current operator or the reserved chunk slots of TND. `cache_source="fwd"` also passes the lengths to the forward metadata.
 When running variable-length cases with the CSV, the length tensors need to be provided with exact values through TTK custom inputs or existing input files; random int32 data cannot be treated as a valid prefix sum.
+
+### Build a Native AOT package in parallel
+
+Load the CANN environment first. The builder limits worker count by available CPU and memory, schedules expensive variants first, and publishes one Native package after validating all shards. Reuse `--work-dir` for the compiler cache and choose a new `--output` path for each publication.
+
+```bash
+python3 "$KDA_ASSETS/build_native.py" --jobs 4 \
+  --work-dir /path/to/aot-work --output /path/to/native
+KDA_NATIVE_PACKAGE=/path/to/native CANNBOTDSL_NATIVE_BINARY_MODE=require \
+  KDA_CASES="$KDA_ASSETS/cases/flash_kda_grad_whitebox.csv" \
+  bash "$KDA_ASSETS/run_one.sh"
+```
+
+Use `cases/flash_kda_grad_whitebox.csv` for the original suite. For the second suite with flat `dt_bias` and optional `dht` cases, set `KDA_CASES` to `cases/flash_kda_grad_whitebox2.csv`.

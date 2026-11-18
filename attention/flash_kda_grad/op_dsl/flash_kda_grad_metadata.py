@@ -587,10 +587,8 @@ def _load_packaged_kernel():
     if mode == "off":
         return None
     if not root.exists():
-        if mode == "require":
-            raise RuntimeError(
-                "precompiled FlashKDA backward AICPU metadata is required but not installed"
-            )
+        # metadata 是 host 侧辅助产物，不属于算子二进制；缺失时交给
+        # _get_compiled_kernel() 现编，require 只约束算子二进制本身。
         return None
     manifest = json.loads((root / "manifest.json").read_text())
     expected_name = flash_kda_grad_metadata_kernel.fn.__name__

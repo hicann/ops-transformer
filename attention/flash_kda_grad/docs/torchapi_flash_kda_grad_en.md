@@ -117,12 +117,13 @@ cann_ops_transformer.flash_kda_grad(
     qg: Optional[Tensor] = None,
     kg: Optional[Tensor] = None,
     g_cumsum: Optional[Tensor] = None,
-    q_rtsd: Optional[Tensor] = None,
+    q_rstd: Optional[Tensor] = None,
     k_rstd: Optional[Tensor] = None,
     beta_sigmoid: Optional[Tensor] = None,
     A_log: Optional[Tensor] = None,
     dt_bias: Optional[Tensor] = None,
     cu_seqlens: Optional[Tensor] = None,
+    cu_seqlens_cpu: Optional[list[int]] = None,
     seqused: Optional[Tensor] = None,
     scale: Optional[float] = None,
     use_qk_l2norm_in_kernel: bool = True,
@@ -161,7 +162,7 @@ flash_kda_grad_npu(
     qg: Optional[torch.Tensor] = None,
     kg: Optional[torch.Tensor] = None,
     g_cumsum: Optional[torch.Tensor] = None,
-    q_rtsd: Optional[torch.Tensor] = None,
+    q_rstd: Optional[torch.Tensor] = None,
     k_rstd: Optional[torch.Tensor] = None,
     beta_sigmoid: Optional[torch.Tensor] = None,
     A_log: Optional[torch.Tensor] = None,
@@ -179,7 +180,7 @@ flash_kda_grad_npu(
 )
 ```
 
-`q_rtsd` is the actual parameter name and differs in spelling from `k_rstd`. The main entry has no separate
+`q_rstd` and `k_rstd` are now spelled symmetrically (the former `q_rtsd` typo has been fixed). The main entry has no separate
 `q_norm/k_norm` parameters; with normalization enabled, pass the forward-saved normalized results as `q/k` in the
 input layout.
 
@@ -259,9 +260,10 @@ The shapes below are the shapes actually received by the interface. `layout` app
 | Parameter | TND | BNSD | BSND |
 | :--- | :--- | :--- | :--- |
 | `q`, `k` | `[T,Nqk,Dk]` | `[B,Nqk,S,Dk]` | `[B,S,Nqk,Dk]` |
-| `v`, `do` | `[T,Nv,Dv]` | `[B,Nv,S,Dv]` | `[B,S,Nv,Dv]` |
-| `g` | `[T,Nv,Dk]` | `[B,Nv,S,Dk]` | `[B,S,Nv,Dk]` |
-| `beta` | `[T,Nv]` | `[B,Nv,S]` | `[B,S,Nv]` |
+| `v` | `[T,Nv,Dv]` | `[B,Nv,S,Dv]` | `[B,S,Nv,Dv]` |
+| `do` | `[T,Nv,Dv]` | `[B,S,Nv,Dv]` | `[B,S,Nv,Dv]` |
+| `g` | `[T,Nv,Dk]` | `[B,S,Nv,Dk]` | `[B,S,Nv,Dk]` |
+| `beta` | `[T,Nv]` | `[B,S,Nv]` | `[B,S,Nv]` |
 | `initial_state`, `dht` | `[B,Nv,Dv,Dk]` | `[B,Nv,Dv,Dk]` | `[B,Nv,Dv,Dk]` |
 
 ### Main interface parameters
@@ -281,17 +283,18 @@ correspond to `torch.float32` and `torch.bfloat16`.
 | `Akk` | in | Inverse of the unit lower-triangular matrix of the forward WY transform. | Mandatory in both modes, never recomputed. | BFLOAT16 | ND | cache layout |
 | `metadata` | in | Backward scheduling information. | Mandatory; produced by `flash_kda_grad_metadata`, a forward metadata cannot substitute. | INT32 | ND | `[8+7*B*Nv]` |
 | `initial_state` | in | Forward initial state. | Used in recompute mode; `None` means a zero state; unused in saved-cache mode. | FLOAT32 | ND | `[B,Nv,Dv,Dk]` |
-| `chunk_states` | in | Entry state of each chunk. | Mandatory in saved-cache mode; ignored and regenerated in recompute mode. | FLOAT32 | ND | cache layout |
+| `chunk_states` | in | Entry state of each chunk. | Mandatory in saved-cache mode; ignored and regenerated in recompute mode. | BFLOAT16 | ND | cache layout |
 | `w` | in | Key cache after the WY transform. | Mandatory in saved-cache mode; regenerated in recompute mode. | BFLOAT16 | ND | cache layout |
 | `u` | in | Value cache after the WY transform. | Still required in saved-cache mode; the current backward math does not read the saved values. | BFLOAT16 | ND | cache layout |
 | `v_new` | in | Value corrected with the chunk entry state. | Mandatory in saved-cache mode; regenerated in recompute mode. | BFLOAT16 | ND | cache layout |
 | `qg`, `kg` | in | Q/K caches combined with the cumulative gate. | Mandatory in saved-cache mode; `qg` does not include `scale`. | BFLOAT16 | ND | cache layout |
 | `g_cumsum` | in | Cumulative log gate inside a chunk. | Mandatory in saved-cache mode; the per-token raw `g` cannot substitute. | FLOAT32 | ND | cache layout |
-| `q_rtsd`, `k_rstd` | in | Inverse norms of the forward Q/K L2Norm. | Mandatory when Q/K normalization is on; never recomputed. | FLOAT32 | ND | cache layout |
+| `q_rstd`, `k_rstd` | in | Inverse norms of the forward Q/K L2Norm. | Mandatory when Q/K normalization is on; never recomputed. | FLOAT32 | ND | cache layout |
 | `beta_sigmoid` | in | Activated beta from the forward. | Mandatory when beta sigmoid fusion is on; includes the factor 2 when negative eigenvalues are enabled. | FLOAT32 | ND | cache layout |
 | `A_log` | in | Gate parameter per value head. | Mandatory when `use_gate_in_kernel=True`. | FLOAT32 | ND | `[Nv]` |
-| `dt_bias` | in | Gate bias per value head and Key channel. | Optional; `None` means zero bias when the gate is fused. | FLOAT32 | ND | `[Nv,Dk]` |
+| `dt_bias` | in | Gate bias per value head and Key channel. | Optional; `None` means zero bias when the gate is fused. | FLOAT32 | ND | `[Nv,Dk]` / `[Nv*Dk]` |
 | `cu_seqlens` | in | TND token prefix sums. | May be omitted on the main backward; when provided it must match the metadata. | INT32 | ND | `[B+1]` |
+| `cu_seqlens_cpu` | in | Reserved host sequence boundaries. | Omit or pass `None`. | INT32 array | — | — |
 | `seqused` | in | Effective lengths of BSND/BNSD inputs. | May be omitted on the main backward; when provided it must match the metadata. | INT32 | ND | `[B]` |
 | `scale` | attr | Output/Query scaling factor. | Defaults to `None` meaning `1/sqrt(Dk)`; an explicit value must be finite and match the forward. | float / None | - | - |
 | `use_qk_l2norm_in_kernel` | attr | Whether to compute the Q/K normalization backward. | Default `True`. | bool | - | - |
@@ -305,40 +308,37 @@ correspond to `torch.float32` and `torch.bfloat16`.
 | `dh0` | out | Gradient of the initial state. | Always an FP32 V-first state. | FLOAT32 | ND | `[B,Nv,Dv,Dk]` |
 | `dg`, `dbeta` | out | Gradients of the gate/beta inputs. | Keep the dtype and shape of `g/beta`. | BFLOAT16 / FLOAT32 | ND | same as `g/beta` |
 | `dA` | out | Gradient of `A_log`. | `None` when gate fusion is off. | FLOAT32 | ND | `[Nv]` |
-| `dBias` | out | Gradient of `dt_bias`. | `None` when gate fusion is off or `dt_bias` was not passed. | FLOAT32 | ND | `[Nv,Dk]` |
+| `dBias` | out | Gradient of `dt_bias`. | `None` when gate fusion is off or `dt_bias` was not passed. | FLOAT32 | ND | `[Nv,Dk]` / `[Nv*Dk]` |
 
 ### Forward cache layout
 
-Both BNSD and BSND inputs use head-major forward caches. The caches must not be converted to `[B,S,N,...]` along
-with a BSND input; the main entry creates the required views internally.
+BNSD and BSND share the same cache layouts. State caches are chunk-major. Matrix and token caches are head-major. When gate or beta fusion is disabled, the corresponding input must be FP32.
 
 | Cache | TND | BNSD / BSND | dtype |
 | :--- | :--- | :--- | :--- |
-| `q_norm`, `k_norm` (read by the adapter from the tuple only) | `[T,Nqk,Dk]` | `[B,Nqk,S,Dk]` | BFLOAT16 |
-| `q_rtsd`, `k_rstd` | `[T,Nqk]` | `[B,Nqk,S]` | FLOAT32 |
-| `beta_sigmoid` | `[T,Nv]` | `[B,Nv,S]` | FLOAT32 |
-| `Aqk`, `Akk` | `[Nc,Nv,C,C]` | `[B,Nv,Cmax,C,C]` | BFLOAT16 |
-| `w`, `qg`, `kg` | `[T,Nv,Dk]` | `[B,Nv,S,Dk]` | BFLOAT16 |
-| `u`, `v_new` | `[T,Nv,Dv]` | `[B,Nv,S,Dv]` | BFLOAT16 |
-| `g_cumsum` | `[T,Nv,Dk]` | `[B,Nv,S,Dk]` | FLOAT32 |
-| `chunk_states` | `[Nc,Nv,Dv,Dk]` | `[B,Nv,Cmax,Dv,Dk]` | FLOAT32 |
+| `q_norm`, `k_norm` (read by the adapter from the tuple only) | `[T,Nqk,Dk]` | BSND / BNSD | BFLOAT16 |
+| `q_rstd`, `k_rstd` | `[Nqk,T]` | `[B,Nqk,S]` | FLOAT32 |
+| `beta_sigmoid` | `[Nv,T]` | `[B,Nv,S]` | FLOAT32 |
+| `Aqk`, `Akk` | `[Nv,T,C]` | `[B,Nv,S,C]` | BFLOAT16 |
+| `w`, `qg`, `kg` | `[Nv,T,Dk]` | `[B,Nv,S,Dk]` | BFLOAT16 |
+| `u`, `v_new` | `[Nv,T,Dv]` | `[B,Nv,S,Dv]` | BFLOAT16 |
+| `g_cumsum` | `[Nv,T,Dk]` | `[B,Nv,S,Dk]` | FLOAT32 |
+| `chunk_states` | `[Nc,Nv,Dv,Dk]` | `[B,Cmax,Nv,Dv,Dk]` | BFLOAT16 |
 
 In TND, chunk `j` (0-based) of sequence `s` (0-based) occupies slot `floor(cu_seqlens[s]/64) + s + j`. `Nc` is not
-the sum of the effective chunks; reserved slots do not participate. Matrix and state caches must keep the chunk
-axis; the entry does not accept the legacy compact caches or flattened matrix caches.
+the sum of the effective chunks; reserved slots do not participate. State caches retain their chunk axis.
+
+Matrix rows in GM follow token offsets. Packed tails are read only through the valid sequence boundary and zero-padded in device scratch. Saved chunk states use BF16 in GM. Recompute uses a private FP32 state buffer.
 
 `forward_outputs` must follow the 16-item return order of the training forward:
 
 ```python
-(
-    out, final_state, q_norm, k_norm, q_rtsd, k_rstd, beta_sigmoid,
-    Aqk, Akk, w, u, qg, kg, v_new, g_cumsum, saved_chunk_states,
-)
+(out, final_state, chunk_states, Aqk, Akk, w, u, qg, kg, v_new,
+ g_cumsum, q_norm, q_rstd, k_norm, k_rstd, beta_activated)
 ```
 
 The adapter ignores the values of the first two items, and `do/dht` are still mandatory. `chunk_states_fp32` may
-override `saved_chunk_states` in saved-cache mode, provided its dtype, shape and storage order match the table
-above; recompute mode ignores the override.
+supply an FP32 override with the same shape. The adapter rounds it to BF16 for saved-cache backward.
 
 ### Metadata parameters
 
@@ -392,7 +392,7 @@ need contiguous tensors should call `.contiguous()` explicitly.
 | Common | `dq/dk/dv/dh0` | OUTPUT | Tensor |
 | Forward cache and recompute | `Aqk/Akk/chunk_states/w/u/v_new/qg/kg/g_cumsum/initial_state` | INPUT | Tensor / None |
 | Forward cache and recompute | `disable_recompute` | ATTR | bool |
-| Q/K normalization | `q_rtsd/k_rstd` | INPUT | Tensor / None |
+| Q/K normalization | `q_rstd/k_rstd` | INPUT | Tensor / None |
 | Q/K normalization | `use_qk_l2norm_in_kernel` | ATTR | bool |
 | Gate | `g/A_log/dt_bias` | INPUT | Tensor / None |
 | Gate | `use_gate_in_kernel/lower_bound` | ATTR | bool / float / None |
@@ -435,7 +435,7 @@ need contiguous tensors should call `.contiguous()` explicitly.
 | `w/u/v_new/qg/kg/g_cumsum/chunk_states` | May be omitted or `None`; regenerated even when supplied. | All seven mandatory, matching the forward cache layout. |
 | `initial_state` | `None` means a zero state; a non-zero forward initial state must be passed. | Unused. |
 | `Aqk/Akk` | Mandatory, never recomputed. | Mandatory. |
-| `q_rtsd/k_rstd/beta_sigmoid` | Mandatory when the corresponding fusion is on, never recomputed. | Mandatory when the corresponding fusion is on. |
+| `q_rstd/k_rstd/beta_sigmoid` | Mandatory when the corresponding fusion is on, never recomputed. | Mandatory when the corresponding fusion is on. |
 
 - **Per-parameter**: `chunk_states` is the FP32 chunk entry state. In recompute mode `initial_state` is FP32
   `[B,Nv,Dv,Dk]` and its last-dim stride must be 1.
@@ -449,7 +449,7 @@ need contiguous tensors should call `.contiguous()` explicitly.
 #### Q/K normalization group
 
 - **Existence**: with `use_qk_l2norm_in_kernel=True`, `q/k` of the main entry must be the BF16 normalized values
-  saved by the forward, and FP32 `q_rtsd/k_rstd` must be provided. When off, pass raw Q/K and no inverse norms.
+  saved by the forward, and FP32 `q_rstd/k_rstd` must be provided. When off, pass raw Q/K and no inverse norms.
 - **Consistency**: inverse norms are stored per Nqk heads. For BSND inputs, `q/k` of the main entry are
   `[B,S,Nqk,Dk]` while the inverse norms remain `[B,Nqk,S]`.
 - **Feature cross**: the switch controls the normalization backward and never re-normalizes raw Q/K inside the main
@@ -561,7 +561,7 @@ dq, dk, dv, dh0, dg, dbeta, dA, dBias = ops.flash_kda_grad(
     chunk_states=fwd_outputs[15],
     w=fwd_outputs[9], u=fwd_outputs[10], v_new=fwd_outputs[13],
     qg=fwd_outputs[11], kg=fwd_outputs[12], g_cumsum=fwd_outputs[14],
-    q_rtsd=fwd_outputs[4], k_rstd=fwd_outputs[5],
+    q_rstd=fwd_outputs[4], k_rstd=fwd_outputs[5],
     beta_sigmoid=fwd_outputs[6],
     A_log=A_log, dt_bias=dt_bias,
     scale=scale,
@@ -579,7 +579,7 @@ dq, dk, dv, dh0, dg, dbeta, dA, dBias = ops.flash_kda_grad(
     q, k, v, g, beta, do, dht,
     fwd_outputs[7], fwd_outputs[8], bwd_metadata,
     initial_state=initial_state,
-    q_rtsd=fwd_outputs[4], k_rstd=fwd_outputs[5], beta_sigmoid=fwd_outputs[6],
+    q_rstd=fwd_outputs[4], k_rstd=fwd_outputs[5], beta_sigmoid=fwd_outputs[6],
     A_log=A_log, dt_bias=dt_bias,
     scale=scale,
     disable_recompute=False,
@@ -596,4 +596,18 @@ this example is BNSD, so `q/k` should be replaced by the normalized values in `f
 two items must be converted from `[B,Nqk,S,Dk]` to `[B,S,Nqk,Dk]`; the other caches keep the forward return layout.
 
 Unit tests and reference formulas live in [tests/ut](../tests/ut); TTK precision and performance acceptance is
-described in [tests/ttk/README.md](../tests/ttk/README.md).
+described in [tests/assets/README.md](../tests/assets/README.md).
+
+## Forward autograd integration
+
+Use the Torch Extension under `attention/flash_kda`. Forward dispatch selects
+`op_dsl/arch35` or `op_dsl/arch92` for the device; training validation for this
+backward operator covers arch35. Load the FlashKDA Grad extension, then generate
+metadata with `enable_grad=True` to include both forward and backward schedules.
+The public forward output supports `torch.autograd.grad` and `backward`, with
+saved cache layouts translated to the backward interface.
+
+When in-kernel Q/K L2 normalization is disabled, the adapter uses the Q/K consumed
+by forward; any external normalization remains part of the caller's autograd
+graph. Gradients are returned in the original input dtypes. This interface does
+not depend on `experimental/attention/flash_kda`.
