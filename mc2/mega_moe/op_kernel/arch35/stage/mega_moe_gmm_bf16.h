@@ -103,8 +103,7 @@ __aicore__ inline void ComputeGmm1Tile(Block& block, TensorA& a, TensorB& b, Ten
                                      MakeLayout{}(1U, Get<N_VALUE>(extent)));
     Gmm1OutputView<TensorC> output{c};
     typename Block::TupleShape shape{Get<M_VALUE>(extent), Get<N_VALUE>(extent), config.k, 0U};
-    auto weightView = MakeGmm1WeightView(tileB);
-    block(tileA, weightView, bias, output, shape);
+    block(tileA, tileB, bias, output, shape);
 }
 
 template <bool WeightNZ, bool IsShared, typename TensorC, typename Sync>
