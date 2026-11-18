@@ -408,6 +408,10 @@ public:
                            hcBrcbLocal1, hcScaleGm.GetValue(0), tilingData->hcEps, curRowFactor, tilingData->hcMult);
 
                 if (tilingData->hasPremix != 0) {
+                    // premixLocal 跨 rowOuter 复用：上一轮 ProcessY 仍在读，先等 V 流水读完再启动 MTE2 覆写。
+                    event_t eventIdPremixV_MTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+                    SetFlag<HardEvent::V_MTE2>(eventIdPremixV_MTE2);
+                    WaitFlag<HardEvent::V_MTE2>(eventIdPremixV_MTE2);
                     CopyIn(premixGm[stage2BlockIdx * curRowOfFormerBlock * tilingData->hcMult +
                                     rowOuterIdx * curStage2RowFactor * tilingData->hcMult],
                            premixLocal, 1, curRowFactor * tilingData->hcMult);
