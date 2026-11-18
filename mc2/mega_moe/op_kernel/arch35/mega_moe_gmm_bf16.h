@@ -10,11 +10,12 @@
 #ifndef MEGA_MOE_GMM_BF16_H
 #define MEGA_MOE_GMM_BF16_H
 
-#include "../../arch35_92/common/mega_moe_arch_policy.h"
+#include "../arch35_92/common/mega_moe_arch_policy.h"
 #ifdef MEGA_MOE_ARCH35_DEVICE
 #include "blaze/gemm/block/block_mmad_matmul_basic.h"
-#include "../../arch35_92/stage/mega_moe_gmm1_activation.h"
-#include "../../arch35_92/stage/mega_moe_gmm2_combine.h"
+#include "../arch35_92/stage/mega_moe_gmm1_activation.h"
+#include "../arch35_92/stage/mega_moe_gmm2_combine.h"
+#include "mega_moe_epilogue_bf16.h"
 
 namespace MegaMoeImpl {
 

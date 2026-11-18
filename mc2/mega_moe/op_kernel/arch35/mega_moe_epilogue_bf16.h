@@ -7,17 +7,18 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-#ifndef MEGA_MOE_BLOCK_EPILOGUE_ACTIVATION_BF16_H
-#define MEGA_MOE_BLOCK_EPILOGUE_ACTIVATION_BF16_H
+#ifndef MEGA_MOE_EPILOGUE_BF16_H
+#define MEGA_MOE_EPILOGUE_BF16_H
 
-#include "../../../arch35_92/common/mega_moe_arch_policy.h"
+#include "../arch35_92/common/mega_moe_arch_policy.h"
 #ifdef MEGA_MOE_ARCH35_DEVICE
-#include "../../../arch35_92/common/mega_moe_copy.h"
-#include "../../../arch35_92/common/mega_moe_types.h"
-#include "../../../arch35_92/blaze/epilogue/activation/activation_dispatch.h"
+#include "../arch35_92/common/mega_moe_copy.h"
+#include "../arch35_92/common/mega_moe_types.h"
+#include "../arch35_92/blaze/epilogue/activation/activation_dispatch.h"
 
 namespace MegaMoeImpl {
 
+template <bool TopkWeightsPrefetch>
 class Bf16ActivationEpilogue {
 public:
     struct Params {
@@ -27,7 +28,6 @@ public:
         uint8_t actSubMode = static_cast<uint8_t>(MegaMoeActSubMode::DEFAULT);
         float activationAlpha = 1.0f;
         float activationBeta = 1.0f;
-        bool topkWeightsPrefetch = false;
     };
 
     __aicore__ inline void Init(const Params& params)
@@ -40,20 +40,8 @@ public:
         outputRowOffset_ = rowOffset;
     }
 
-    __aicore__ inline void RunTile(GM_ADDR input, GM_ADDR metadata, uint32_t fullWidth,
-                                    uint32_t row, uint32_t column, uint32_t rows, uint32_t columns)
-    {
-        if (params_.topkWeightsPrefetch) {
-            RunTileImpl<true>(input, metadata, fullWidth, row, column, rows, columns);
-        } else {
-            RunTileImpl<false>(input, metadata, fullWidth, row, column, rows, columns);
-        }
-    }
-
-private:
-    template <bool TopkWeightsPrefetch>
     // GMM1 的 GM 结果按完整 gate/up 两半存放，激活按小行块消费，不分配量化缓冲区。
-    __aicore__ inline void RunTileImpl(GM_ADDR input, GM_ADDR metadata, uint32_t fullWidth,
+    __aicore__ inline void RunTile(GM_ADDR input, GM_ADDR metadata, uint32_t fullWidth,
                                     uint32_t row, uint32_t column, uint32_t rows, uint32_t columns)
     {
         constexpr uint32_t tileN = MegaMoeBf16GmmConfig::TILE_N;
@@ -107,6 +95,7 @@ private:
         }
     }
 
+private:
     Params params_{};
     uint64_t outputRowOffset_ = 0U;
 };

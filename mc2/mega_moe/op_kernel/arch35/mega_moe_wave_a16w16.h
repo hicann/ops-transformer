@@ -20,20 +20,23 @@
 
 #ifdef MEGA_MOE_ARCH35_DEVICE
 #include "mega_moe_wave_a8w8.h"
-#include "blaze/epilogue/mega_moe_block_epilogue_activation_bf16.h"
-#include "stage/mega_moe_gmm_bf16.h"
+#include "mega_moe_gmm_bf16.h"
 
 namespace MegaMoeImpl {
 
 template <>
-struct InputPrepareSelector<bfloat16_t> {
-    using Config = Bf16InputConfig;
-    using Scratch = Bf16InputScratch;
+struct InputConfigSelector<bfloat16_t> {
+    using Type = Bf16InputConfig;
 };
 
-template <uint32_t TileN>
-struct ActivationEpilogueSelector<bfloat16_t, bfloat16_t, TileN> {
-    using Type = Bf16ActivationEpilogue;
+template <>
+struct InputScratchSelector<bfloat16_t> {
+    using Type = Bf16InputScratch;
+};
+
+template <uint32_t TileM, uint32_t TileN, bool Prefetch>
+struct ActivationEpilogueSelector<bfloat16_t, bfloat16_t, TileM, TileN, Prefetch> {
+    using Type = Bf16ActivationEpilogue<Prefetch>;
 };
 
 template <>
@@ -44,10 +47,12 @@ struct GmmBlockContextSelector<bfloat16_t, BF16_PASSTHROUGH> {
 #define TemplateMegaMoeA16W16WaveTypeClass \
     typename XType, typename OutputType, typename TopkWeightsType, typename MoeWeightType, int32_t MoeQuantMode, \
         typename SharedWeightType, int32_t SharedQuantMode, int32_t MoeWeight1Format, int32_t MoeWeight2Format, \
-        int32_t SharedWeight1Format, int32_t SharedWeight2Format
+        int32_t SharedWeight1Format, int32_t SharedWeight2Format, int32_t CombineQuantMode, bool TopkWeightsPrefetch, \
+        typename TopkIndexType
 #define TemplateMegaMoeA16W16WaveTypeFunc \
     XType, OutputType, TopkWeightsType, MoeWeightType, MoeQuantMode, SharedWeightType, SharedQuantMode, \
-        MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format
+        MoeWeight1Format, MoeWeight2Format, SharedWeight1Format, SharedWeight2Format, CombineQuantMode, \
+        TopkWeightsPrefetch, TopkIndexType
 
 template <TemplateMegaMoeA16W16WaveTypeClass>
 class MegaMoeA16W16Wave
@@ -62,8 +67,6 @@ private:
     Bf16GmmBlockContext moeBlockContext_{};
 
 protected:
-    static constexpr uint16_t SHARED_ACTIVATION_SUB_BLOCK_IDX = 0U;
-
     __aicore__ inline void InitPathConfigs(const MegaMoeTilingData* tilingData)
     {
         const auto& compute = tilingData->compute;
@@ -71,8 +74,10 @@ protected:
         inputConfig.layout = CalcBf16TokenScaleLayout(compute.h, compute.topK, tilingData->comm.topkWeightsPrefetch);
         inputConfig.stageBytes = static_cast<uint32_t>(CalcBf16InputStageBytes(
             inputConfig.layout, compute.topK, Std::IsSame<TopkWeightsType, bfloat16_t>::value));
+        // 共享专家直接读取原输入，不额外申请共享输入打包区。
+        this->sharedQuantProcessConfig_ = {CalcBf16TokenScaleLayout(compute.h, compute.topK, false), 0U};
         const uint32_t sendCoreIdx = this->sharedExpertNum_ > 0U ? this->blockIdx_ : this->aivCoreIdx_;
-        this->sendMaskConfig_ = CreateSendMaskConfig(this->params_, sendCoreIdx);
+        this->sendMaskConfig_ = CreateSendMaskConfig<TopkIndexType>(this->params_, sendCoreIdx);
         this->tokenDispatchConfig_ = {
             .maxOutputSize = static_cast<uint64_t>(compute.maxOutputSize),
             .bufferConfig = tilingData->dispatchBufferConfig,
@@ -95,8 +100,7 @@ protected:
             .actMode = tilingData->actMode,
             .actSubMode = tilingData->actSubMode,
             .activationAlpha = tilingData->activationAlpha,
-            .activationBeta = tilingData->activationBeta,
-            .topkWeightsPrefetch = tilingData->isTopkWeightsPrefetch});
+            .activationBeta = tilingData->activationBeta});
     }
 
     __aicore__ inline uint32_t InitInputScratchTensors(uint32_t scratchAddr)
@@ -110,6 +114,29 @@ protected:
                           DOUBLE_BUFFER * stageBytes / sizeof(int16_t));
         PipeFence<PIPE_V, PIPE_MTE2, SYNC_EVENT_ID2>();
         return scratchAddr + DOUBLE_BUFFER * stageBytes;
+    }
+
+    __aicore__ inline void PrepareInputTokenRange(const WorkRange& tokenRange)
+    {
+        PackBf16LocalTokens<TopkWeightsType>(tokenRange, this->commonConfig_, this->params_,
+                                            this->quantProcessConfig_, this->quantScratch_);
+    }
+
+    __aicore__ inline void DispatchBuffInit()
+    {
+        this->template InitDispatchScratchTensors<>(this->commonConfig_.tokenHiddenDim, 0U);
+    }
+
+    __aicore__ inline void DispatchTokenRangeForWave(const ExpertTokenRange& dispatchRange)
+    {
+        if constexpr (g_coreType == AIV) {
+            if (MegaMoeHardwarePolicy::GetSubBlockIdx() == 1U) {
+                DispatchTokenRange<TopkIndexType, bfloat16_t, void, RuntimeBase::GMM1_TILE_M, TopkWeightsPrefetch>(
+                    this->tokenDispatchConfig_, this->commonConfig_, this->gmmExecutionConfig_.blockJob,
+                    this->syncWorkspaceLayout_, this->params_, g_winRankAddr_, this->tokenDispatchScratch_,
+                    dispatchRange);
+            }
+        }
     }
 
     __aicore__ inline void InitMoeGmmTileCounts()
@@ -208,13 +235,27 @@ protected:
         }
     }
 
+    __aicore__ inline void InitSharedGmm1Epilogue()
+    {
+        const auto* data = this->params_.tilingData;
+        this->sharedEpilogueOp_.Init({
+            .yGmAddr = this->params_.workspace.layout.shared.gmm2Input.data.get_ptr(this->params_.workspace.base),
+            .clampLimit = data->clampLimit,
+            .actMode = data->actMode,
+            .actSubMode = data->actSubMode,
+            .activationAlpha = data->activationAlpha,
+            .activationBeta = data->activationBeta});
+    }
+
     __aicore__ inline void ConfigureSharedGmm1Input(
-        GMMAddrInfo& gmmAddrInfo, GmmExecutionConfig&,
+        GMMAddrInfo& gmmAddrInfo, GmmExecutionConfig& gmmConfig,
         Gmm1ActivationSync& sharedGmm1ActivationSync) const
     {
         gmmAddrInfo.aGlobal = this->params_.aGmAddr;
         gmmAddrInfo.aScaleGlobal = nullptr;
         gmmAddrInfo.gmm1ActivationSync = &sharedGmm1ActivationSync;
+        gmmConfig.useStridedInput = true;
+        gmmConfig.inputLayout = {this->commonConfig_.tokenHiddenDim, 0U};
     }
 
     __aicore__ inline void RunSharedExpertGmm1Activation(
@@ -264,6 +305,20 @@ protected:
             this->commonConfig_.activationOutputDivisor);
     }
 
+    __aicore__ inline void FinishMoeActivationSync(int32_t vecSetSyncCom)
+    {
+        // GM 交接额度在公共 ProcessWave 尾部由 Gmm1ActivationSync 排空，不走 MX 的 UB 握手。
+        this->gmm1PingPongIdx_ = 0U;
+        (void)vecSetSyncCom;
+    }
+
+    __aicore__ inline void FinishSharedActivationSync(GmmRuntimeState& runtimeState)
+    {
+        // 共享 GM 交接使用独立事件对，公共尾部统一回收。
+        runtimeState.pingpongIdx = 0U;
+        runtimeState.vecSetSyncCom = 0;
+    }
+
     __aicore__ inline SharedGmmStartCondition GetSharedGmmStartCondition() const
     {
         return this->sharedExpertNum_ == 0U ? SharedGmmStartCondition::NoSharedExpert :
@@ -296,6 +351,15 @@ protected:
         }
     }
 
+    __aicore__ inline uint16_t GetMoeActivationSubBlockIdx() const
+    {
+        return 0U;
+    }
+
+    __aicore__ inline uint16_t GetSharedActivationSubBlockIdx() const
+    {
+        return 0U;
+    }
 };
 
 #undef TemplateMegaMoeA16W16WaveTypeClass

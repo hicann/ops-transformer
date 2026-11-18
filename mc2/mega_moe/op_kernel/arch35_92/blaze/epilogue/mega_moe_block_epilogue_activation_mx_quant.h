@@ -274,7 +274,7 @@ template <bool IsTopkWeightsPrefetch>
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGatedActivationTile(
     const TileExecutionContext& tileContext)
 {
-    auto context = BuildGatedActivationContext<IsTopkWeightsPrefetch>(tileContext);
+    auto context = BuildGatedActivationContext(tileContext);
     Activation::RunGatedActivation<DataTypeIn, IsTopkWeightsPrefetch>(
         context, actMode_, actSubMode_, clampLimit_, activationAlpha_, activationBeta_);
 }
