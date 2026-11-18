@@ -242,25 +242,27 @@ static aclnnStatus CheckShape(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams
 
 static aclnnStatus CheckDtype(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams params)
 {
-    static const std::vector<DataType> commonInputTypes = {DataType::DT_FLOAT8_E4M3FN, DataType::DT_FLOAT8_E5M2,
-                                                           DataType::DT_HIFLOAT8};
-    static const std::vector<DataType> inputTypesDav92 = {DataType::DT_FLOAT8_E4M3FN, DataType::DT_FLOAT8_E5M2,
-                                                          DataType::DT_HIFLOAT8, Ops::Transformer::DT_HIFLOAT4};
-    static const std::vector<DataType> inputTypesDav3510 = {DataType::DT_FLOAT8_E4M3FN, DataType::DT_FLOAT8_E5M2,
-                                                            DataType::DT_HIFLOAT8, DataType::DT_FLOAT4_E2M1};
     const auto curNpuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
     const bool isDav92 = curNpuArch == NpuArch::DAV_9201 || curNpuArch == NpuArch::DAV_9202;
-    const auto& supportedInputTypes =
-        isDav92 ? inputTypesDav92 : (curNpuArch == NpuArch::DAV_3510 ? inputTypesDav3510 : commonInputTypes);
-    auto x1Dtype = params.x1->GetDataType();
-    auto x2Dtype = params.x2->GetDataType();
+    const auto x1Dtype = params.x1->GetDataType();
+    const auto x2Dtype = params.x2->GetDataType();
+    const auto isMx8Type = [](DataType dtype) {
+        return dtype == DataType::DT_FLOAT8_E4M3FN || dtype == DataType::DT_FLOAT8_E5M2;
+    };
+    const bool isMx8 = isMx8Type(x1Dtype) && isMx8Type(x2Dtype);
+    const bool isMx4 =
+        curNpuArch == NpuArch::DAV_3510 && x1Dtype == DataType::DT_FLOAT4_E2M1 && x2Dtype == DataType::DT_FLOAT4_E2M1;
+    const bool isHiF4 = isDav92 && x1Dtype == Ops::Transformer::DT_HIFLOAT4 && x2Dtype == Ops::Transformer::DT_HIFLOAT4;
+    const bool isHiF8 = x1Dtype == DataType::DT_HIFLOAT8 && x2Dtype == DataType::DT_HIFLOAT8;
     QGMM_INPLACE_ADD_CHECK_REPORT(
-        gmm::CheckDTypeInVector(x1Dtype, supportedInputTypes) && gmm::CheckDTypeInVector(x2Dtype, supportedInputTypes),
-        return ACLNN_ERR_PARAM_INVALID,
+        isMx8 || isMx4 || isHiF4 || isHiF8, return ACLNN_ERR_PARAM_INVALID,
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
             QGMM_INPLACE_ADD_ACLNN_OP_NAME, "x1 and x2",
             "x1=" + std::string(op::ToString(x1Dtype).GetString()) + ", x2=" + op::ToString(x2Dtype).GetString(),
-            "supported input types on the current platform: " + gmm::DTypeVectorToString(supportedInputTypes)));
+            std::string(
+                "in quant case, the dtypes od x1 and x2 must be within the range both FLOAT8_E4M3FN/FLOAT8_E5M2 "
+                "or both HIFLOAT8") +
+                (isDav92 ? ", or both HIFLOAT4" : (curNpuArch == NpuArch::DAV_3510 ? ", or both FLOAT4_E2M1" : ""))));
     QGMM_INPLACE_ADD_CHECK_REPORT(
         params.yRef->GetDataType() == DataType::DT_FLOAT, return ACLNN_ERR_PARAM_INVALID,
         OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "yRef",
@@ -269,41 +271,27 @@ static aclnnStatus CheckDtype(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams
         params.groupList->GetDataType() == DataType::DT_INT64, return ACLNN_ERR_PARAM_INVALID,
         OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "groupList",
                                   op::ToString(params.groupList->GetDataType()).GetString(), "INT64"));
-    // MXFP8: both x1/x2 in {FLOAT8_E4M3FN, FLOAT8_E5M2}; MXFP4: both x1/x2 == FLOAT4_E2M1.
-    // Both MX combinations share the same dual FLOAT8_E8M0 scale contract below.
-    bool isMx8 = (x1Dtype == DataType::DT_FLOAT8_E4M3FN || x1Dtype == DataType::DT_FLOAT8_E5M2) &&
-                 (x2Dtype == DataType::DT_FLOAT8_E4M3FN || x2Dtype == DataType::DT_FLOAT8_E5M2);
-    bool isMx4 = (x1Dtype == DataType::DT_FLOAT4_E2M1 && x2Dtype == DataType::DT_FLOAT4_E2M1);
-    if (isMx8 || isMx4) {
-        CHECK_COND(IsMxQuantDim(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "Check IsMxQuantDim failed.");
-        QGMM_INPLACE_ADD_CHECK_REPORT(
-            params.scale2->GetDataType() == DataType::DT_FLOAT8_E8M0, return ACLNN_ERR_PARAM_INVALID,
-            OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale2",
-                                      op::ToString(params.scale2->GetDataType()).GetString(), "FLOAT8_E8M0"));
-        QGMM_INPLACE_ADD_CHECK_REPORT(
-            params.scale1Optional->GetDataType() == DataType::DT_FLOAT8_E8M0, return ACLNN_ERR_PARAM_INVALID,
-            OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale1",
-                                      op::ToString(params.scale1Optional->GetDataType()).GetString(), "FLOAT8_E8M0"));
-    } else if (x1Dtype == Ops::Transformer::DT_HIFLOAT4 && x2Dtype == Ops::Transformer::DT_HIFLOAT4) {
+    if (isHiF8) {
+        return ACLNN_SUCCESS;
+    }
+
+    if (isHiF4) {
         CHECK_COND(CheckHiF4QuantDim(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
                    "Check CheckHiF4QuantDim failed.");
-        QGMM_INPLACE_ADD_CHECK_REPORT(
-            params.scale2->GetDataType() == Ops::Transformer::DT_HIFLOAT4_SCALE, return ACLNN_ERR_PARAM_INVALID,
-            OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale2",
-                                      op::ToString(params.scale2->GetDataType()).GetString(), "HIFLOAT4_SCALE"));
-        QGMM_INPLACE_ADD_CHECK_REPORT(
-            params.scale1Optional->GetDataType() == Ops::Transformer::DT_HIFLOAT4_SCALE, return ACLNN_ERR_PARAM_INVALID,
-            OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale1",
-                                      op::ToString(params.scale1Optional->GetDataType()).GetString(),
-                                      "HIFLOAT4_SCALE"));
-    } else if (!(x1Dtype == DataType::DT_HIFLOAT8 && x2Dtype == DataType::DT_HIFLOAT8)) {
-        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
-            QGMM_INPLACE_ADD_ACLNN_OP_NAME, "x1 and x2",
-            "x1=" + std::string(op::ToString(x1Dtype).GetString()) + ", x2=" + op::ToString(x2Dtype).GetString(),
-            "in quant case, the dtypes of x1 and x2 must be within the range both FLOAT8_E4M3FN/FLOAT8_E5M2, "
-            "both HIFLOAT8, both HIFLOAT4 or both FLOAT4_E2M1");
-        return ACLNN_ERR_PARAM_INVALID;
+    } else {
+        CHECK_COND(IsMxQuantDim(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "Check IsMxQuantDim failed.");
     }
+
+    const auto expectedScaleDtype = isHiF4 ? Ops::Transformer::DT_HIFLOAT4_SCALE : DataType::DT_FLOAT8_E8M0;
+    const char* expectedScaleName = isHiF4 ? "HIFLOAT4_SCALE" : "FLOAT8_E8M0";
+    const auto scale2Dtype = params.scale2->GetDataType();
+    const auto scale1Dtype = params.scale1Optional->GetDataType();
+    QGMM_INPLACE_ADD_CHECK_REPORT(scale2Dtype == expectedScaleDtype, return ACLNN_ERR_PARAM_INVALID,
+                                  OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale2",
+                                                            op::ToString(scale2Dtype).GetString(), expectedScaleName));
+    QGMM_INPLACE_ADD_CHECK_REPORT(scale1Dtype == expectedScaleDtype, return ACLNN_ERR_PARAM_INVALID,
+                                  OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale1",
+                                                            op::ToString(scale1Dtype).GetString(), expectedScaleName));
     return ACLNN_SUCCESS;
 }
 
