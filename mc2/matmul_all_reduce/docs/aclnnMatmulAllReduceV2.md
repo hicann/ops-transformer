@@ -138,7 +138,7 @@ aclnnStatus aclnnMatmulAllReduceV2(
           <td>reduceOp</td>
           <td>输入</td>
           <td>reduce操作类型。</td>
-          <td>当前版本仅支持输入"sum"。</td>
+          <td>当前版本仅支持输入“sum”。</td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -312,7 +312,7 @@ aclnnStatus aclnnMatmulAllReduceV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950,910b" id12 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：

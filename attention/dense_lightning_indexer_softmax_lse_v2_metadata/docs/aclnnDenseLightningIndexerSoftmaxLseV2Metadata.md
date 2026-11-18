@@ -433,7 +433,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2Metadata(
 <details>
 <summary><a id="Metadata"></a>Metadata输出布局</summary>
 
-  metadata输出为INT32 Tensor，当前shape固定为(64,)，字段布局如下。
+  metadata输出为INT32 Tensor，当前shape固定为(64,)，字段布局如下：
 
   <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 180px">

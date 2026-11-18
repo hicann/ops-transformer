@@ -540,7 +540,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     - constExpertAlpha1Optional预留参数，当前版本不支持，传空指针即可。
     - constExpertAlpha2Optional预留参数，当前版本不支持，传空指针即可。
     - constExpertVOptional预留参数，当前版本不支持，传空指针即可。
-    - zeroExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
+    - zeroExpertNum当commAlg="fullmesh"时，取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
     - copyExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum当前版本不支持，传0即可。
     - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
@@ -549,10 +549,10 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 
     <!-- npu="A3" id8 -->
     <details>
-    <summary><term>Atlas A3系列产品</term>  ：</summary>
+    <summary><term>Atlas A3系列产品</term>：</summary>
 
     - expertScales仅支持传入形状为(BS, K)的有效Tensor并进行加权聚合，不支持空Tensor。
-    - commAlg支持""，"hierarchy"两种输入方式。""：默认值，不开启hierarchy跨超模板；"hierarchy": 开启跨超模板，该模板支持各rank BS不一致，仅支持tpWorldSize为1、共享专家为0的场景，且不支持二维mask、特殊专家、performanceInfo场景。可变BS场景需为所有rank配置相同且非0的globalBs容量，并且不传xActiveMaskOptional。
+    - commAlg支持""，"hierarchy"两种输入方式。""：默认值，不开启hierarchy跨超模板；"hierarchy"： 开启跨超模板，该模板支持各rank BS不一致，仅支持tpWorldSize为1、共享专家为0的场景，且不支持二维mask、特殊专家、performanceInfo场景。可变BS场景需为所有rank配置相同且非0的globalBs容量，并且不传xActiveMaskOptional。
     - epSendCounts的shape为(epWorldSize \* localExpertNum, )。
     - tpSendCountsOptional为预留参数，TP域通信不再支持，传空指针即可。
     - xActiveMaskOptional要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。
@@ -574,7 +574,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     - constExpertVOptional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为 <code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
     - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
     - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
-    - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
+    - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
     - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     </details>
     <!-- end id8 -->
@@ -721,11 +721,11 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
-  | A            | 本卡需分发的最大token数，取值范围如下: <ul><li>对于共享专家，要满足<code>A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum</code>。</li><li>对于MoE专家，当globalBs为0时，要满足<code>A >= BS \* epWorldSize \* min(localExpertNum, K)</code>；当globalBs非0时，要满足<code>A >= globalBs \* min(localExpertNum, K)</code>。 </li></ul>|
-  | H            | 表示hidden size隐藏层大小: 具体产品差异见下方说明。 |
-  | BS           | 本卡最终输出token数: 具体产品差异见下方说明。 |
+  | A            | 本卡需分发的最大token数，取值范围如下： <ul><li>对于共享专家，要满足<code>A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum</code>。</li><li>对于MoE专家，当globalBs为0时，要满足<code>A >= BS \* epWorldSize \* min(localExpertNum, K)</code>；当globalBs非0时，要满足<code>A >= globalBs \* min(localExpertNum, K)</code>。 </li></ul>|
+  | H            | 表示hidden size隐藏层大小： 具体产品差异见下方说明。 |
+  | BS           | 本卡最终输出token数： 具体产品差异见下方说明。 |
   | K | 表示选取topK个专家，取值范围为0 < K ≤ 16，且<code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>。具体产品差异见下方说明。 |
-  | serverNum    | 服务器节点数:具体产品差异见下方说明。 |
+  | serverNum    | 服务器节点数：具体产品差异见下方说明。 |
   | localExpertNum |  本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，localExpertNum > 1时不支持TP通信。 </li><li>具体产品差异见下方说明。</li></ul> |
 
   <!-- npu="A3" id32 -->
@@ -748,7 +748,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
   - BS：<term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"支持(0, 256]；"hierarchy"并且驱动版本≥25.0.RC1.1时支持(0, 512]。
   <!-- end id26 -->
   <!-- npu="A3" id27 -->
-  - BS：<term>Atlas A3系列产品</term>  ：依commAlg取值，"fullmesh_v2"和"hierarchy"取值范围为(0 < BS ≤ 256), "fullmesh_v1"和""取值范围为(0 < BS ≤ 512)。
+  - BS：<term>Atlas A3系列产品</term>  ：依commAlg取值，"fullmesh_v2"和"hierarchy"取值范围为(0 < BS ≤ 256)，"fullmesh_v1"和""取值范围为(0 < BS ≤ 512)。
   <!-- end id27 -->
   <!-- npu="950" id28 -->
   - BS：<term>Ascend 950DT系列产品</term>：0 < BS ≤512。
@@ -769,7 +769,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
       <!-- npu="910b" id11 -->
       - <term>Atlas A2系列产品</term>：
         - commAlg配置为""或nullptr：依照HCCL_INTRA_PCIE_ENABLE和HCCL_INTRA_ROCE_ENABLE环境变量配置，选择"fullmesh"或"hierarchy"公式。
-        - commAlg配置为"fullmesh": 要求 <code>= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)</code>。
+        - commAlg配置为"fullmesh"： 要求 <code>= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)</code>。
         - commAlg配置为"hierarchy": 要求 >= (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
       <!-- end id11 -->
       <!-- npu="A3" id12 -->

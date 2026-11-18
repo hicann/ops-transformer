@@ -25,7 +25,7 @@
 
 - **接口功能**：BlockSparseAttentionV3稀疏注意力计算，支持灵活的块级稀疏模式，通过BlockSparseMask指定每个Q块选择的KV块，实现高效的稀疏注意力计算。
 
-  相比于BlockSparseAttentionV2,本接口新增pQuantScaleOptional、quantMode、dstTypeMax参数。
+  相比于BlockSparseAttentionV2，本接口新增pQuantScaleOptional、quantMode、dstTypeMax参数。
 - **计算公式**：稀疏块大小：$blockShapeX \times blockShapeY$，selectIdx指定稀疏模式
 
   $$
@@ -55,7 +55,7 @@
   - qDequantScaleOptional：
 
     - MX 量化模式，仅支持Rowwise E8M0 Micro Scaling
-    - 数据类型: FLOAT8_E8M0
+    - 数据类型：FLOAT8_E8M0
     - shape:
       - BNSD: [B, Nq, Sq, CeilDiv(D, 64), 2]；
       - BSND: [B, Sq, Nq, CeilDiv(D, 64), 2]；
@@ -505,7 +505,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
           <li>0：表示非量化。</li>
           <li>1：表示FP8量化。</li>
           <li>2：表示MXFP4 OCP量化(量化scale向下截断)。</li>
-          <li>3：表示MXFP4 CX量化(自定义量化量程, 量化scale向上截断)。</li>
+          <li>3：表示MXFP4 CX量化(自定义量化量程，量化scale向上截断)。</li>
           <li>4：表示MXFP8 OCP量化(QKV为FLOAT8_E4M3FN，scale为FLOAT8_E8M0)。</li>
           <li>5：表示HIF8 per-tensor量化，产品支持及输入类型要求详见<a href="#constraint_rule">约束说明</a>。</li>
         </ul>
@@ -518,7 +518,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     <tr>
       <td>dstTypeMax（double）</td>
       <td>输入</td>
-      <td>MXFP4 CX量化时,传入的自定义量化量程。</td>
+      <td>MXFP4 CX量化时，传入的自定义量化量程。</td>
       <td>
         仅当quantMode=3（MXFP4 CX）时使用，支持设置为0.0或[6.0, 12.0]。其他量化模式不使用该参数，建议传入0.0。
         <ul>
@@ -670,7 +670,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - qInputLayout和kvInputLayout当前仅支持相同的"TND"、"BNSD"或"BSND"布局；其中"BSND"仅<term>Ascend 950PR&950DT系列产品</term>支持。
 - 当前query、key、value的InputLayout必须保持一致。
 - 输入query、key、value的数据类型必须一致：非量化模式（quantMode=0）支持FLOAT16和BFLOAT16；quantMode=1/4支持FLOAT8_E4M3FN；quantMode=2/3支持FLOAT4_E2M1；quantMode=5支持HIFLOAT8。量化模式仅<term>Ascend 950PR&950DT系列产品</term>支持。
-- query、key、value的D轴当前仅支持配置为64或128
+- query、key、value的D轴当前仅支持配置为64或128。
 - blockShapeOptional如果传入，则必须包含两个元素[blockShapeX, blockShapeY]，且值必须大于0。blockShapeX/blockShapeY在不同产品上的倍数约束如下：
   <!-- npu="950" id7 -->
   - 在<term>Ascend 950PR&950DT系列产品</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）与MXFP8量化（quantMode=4）时，blockShapeX和blockShapeY均只支持64的倍数；HIF8量化（quantMode=5）时，blockShapeX和blockShapeY均须为16的倍数。
@@ -727,11 +727,11 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - **quantMode=2/3 (MXFP4量化模式)相关约束（新增）**
 
   - 仅<term>Ascend 950PR&950DT系列产品</term>支持
-  - D仅支持64/128;
-  - attentionOut数据类型仅支持FLOAT16或BFLOAT16；
+  - D仅支持64/128。
+  - attentionOut数据类型仅支持FLOAT16或BFLOAT16。
   - 暂不支持attenMaskOptional、PagedAttention、softmaxLse等高阶特性。
   - **量化公式**
-    - 以P的量化为例, 其中 $P_{\text{max}}$ 为一个group（32个元素）内元素绝对值的最大值。
+    - 以P的量化为例，其中 $P_{\text{max}}$ 为一个group（32个元素）内元素绝对值的最大值。
     - **OCP 量化公式**
 
       $$ P_{\text{Scale}} = \frac{2^{\lfloor \log_2 P_{\text{max}} \rfloor}}{4} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor - 2} $$

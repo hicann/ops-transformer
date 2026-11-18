@@ -758,54 +758,54 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
   - 输入为INT8，输出为INT8的场景：入参deqScale1、quantScale1、deqScale2、quantScale2需要同时存在，quantOffset2可选，不传时默认为0。
   - 输入为INT8，输出为FLOAT16的场景：入参deqScale1、quantScale1、deqScale2需要同时存在，若存在入参quantOffset2或quantScale2（即不为nullptr），则报错并返回。
   - 输入为FLOAT16或BFLOAT16，输出为INT8的场景：入参quantScale2需存在，quantOffset2可选，不传时默认为0，若存在入参deqScale1或quantScale1或deqScale2（即不为nullptr），则报错并返回。
-  - 入参quantScale2和quantOffset2支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型。若传入quantOffset2 ，需保证其类型和shape信息与quantScale2一致。当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16 ，否则仅支持FLOAT32 。per-channel格式，当输出layout为BSH时，要求quantScale2所有维度的乘积等于H；其他layout要求乘积等于N*D。（建议输出layout为BSH时，quantScale2 shape传入[1,1,H]或[H]；输出为BNSD时，建议传入[1,N,1,D]或[N,D]；输出为BSND时，建议传入[1,1,N,D]或[N,D]）。
+  - 入参quantScale2和quantOffset2支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型。若传入quantOffset2，需保证其类型和shape信息与quantScale2一致。当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16，否则仅支持FLOAT32。per-channel格式，当输出layout为BSH时，要求quantScale2所有维度的乘积等于H；其他layout要求乘积等于N*D。（建议输出layout为BSH时，quantScale2 shape传入[1,1,H]或[H]；输出为BNSD时，建议传入[1,N,1,D]或[N,D]；输出为BSND时，建议传入[1,1,N,D]或[N,D]）。
   - inputLayout仅支持BSH、BNSD、BSND、BNSD_BSND。
 - <a id="AntiQuant"></a>伪量化参数antiquantScale和antiquantOffset约束：
 
   - 仅支持kv_dtype为int8的伪量化场景。
   - per-channel模式：两个参数的shape可支持\(2, N, 1, D\)，\(2, N, D\)，\(2, H\)，N为numKeyValueHeads。参数数据类型和query数据类型相同，antiquantMode置0。
-  - per-tensor模式：两个参数的shape均为(2)，数据类型和query数据类型相同， antiquantMode置0。
-  - per-token模式：两个参数的shape均为\(2, B, S\),数据类型固定为FLOAT32, antiquantMode置1。
-  - 非对称量化模式下， antiquantScale和antiquantOffset参数需同时存在。
+  - per-tensor模式：两个参数的shape均为(2)，数据类型和query数据类型相同，antiquantMode置0。
+  - per-token模式：两个参数的shape均为\(2, B, S\)，数据类型固定为FLOAT32，antiquantMode置1。
+  - 非对称量化模式下，antiquantScale和antiquantOffset参数需同时存在。
   - 对称量化模式下，antiquantOffset可以为空（即nullptr）；当antiquantOffset参数为空时，执行对称量化，否则执行非对称量化。
 
 - TND、TND_NTD、NTD_TND场景下query，key，value输入的综合限制：
 
-  - actualSeqLengths和actualSeqLengthsKv必须传入，且以该入参元素的数量作为Batch值。该入参中每个元素的值表示当前Batch与之前所有Batch的Sequence Length和，因此后一个元素的值必须大于等于前一个元素的值；
+  - actualSeqLengths和actualSeqLengthsKv必须传入，且以该入参元素的数量作为Batch值。该入参中每个元素的值表示当前Batch与之前所有Batch的Sequence Length和，因此后一个元素的值必须大于等于前一个元素的值。
 
   <!-- npu="910b" id6 -->
   - <term>Atlas A2系列产品</term>：
-    - sparse模式仅支持sparse=0且attenMask为nullptr，或sparse=3且attenMask不为nullptr，或sparse=4且传入attenMask不为nullptr；
+    - sparse模式仅支持sparse=0且attenMask为nullptr，或sparse=3且attenMask不为nullptr，或sparse=4且传入attenMask不为nullptr。
     - 当query的d等于512时：
-      - 支持TND、TND_NTD;
-      - 必须开启page attention，此时actualSeqLengthsKv长度等于key/value的batch值，每个元素表示对应batch的逻辑KV长度，且不大于blockTable第二维长度与blockSize的乘积（可大于单个cache block的blockSize）；
-      - 支持query每个batch的s为1-16；
-      - 要求query的n为32/64/128，key、value的n为1；
-      - 要求queryRope和keyRope不等于空，queryRope和keyRope的d为64；
-      - 不支持左padding、tensorlist、pse、prefix、伪量化、全量化、后量化；
+      - 支持TND、TND_NTD。
+      - 必须开启page attention，此时actualSeqLengthsKv长度等于key/value的batch值，每个元素表示对应batch的逻辑KV长度，且不大于blockTable第二维长度与blockSize的乘积（可大于单个cache block的blockSize）。
+      - 支持query每个batch的s为1-16。
+      - 要求query的n为32/64/128，key、value的n为1。
+      - 要求queryRope和keyRope不等于空，queryRope和keyRope的d为64。
+      - 不支持左padding、tensorlist、pse、prefix、伪量化、全量化、后量化。
       - NTD_TND场景，不支持开启SoftMaxLse。
     - 当query的d不等于512时：
-      - 当queryRope和keyRope为空时：TND场景，要求Q_D、K_D、V_D相等且小于等于256，或者Q_D、K_D等于192，V_D等于128/192；NTD_TND场景，要求Q_D、K_D等于128/192，V_D等于128。当queryRope和keyRope不为空时，要求Q_D、K_D、V_D等于128；
-      - 支持TND、NTD_TND；
-      - TND场景，数据类型仅支持FLOAT16、BFLOAT16；NTD_TND场景，数据类型仅支持BFLOAT16；
+      - 当queryRope和keyRope为空时：TND场景，要求Q_D、K_D、V_D相等且小于等于256，或者Q_D、K_D等于192，V_D等于128/192；NTD_TND场景，要求Q_D、K_D等于128/192，V_D等于128。当queryRope和keyRope不为空时，要求Q_D、K_D、V_D等于128。
+      - 支持TND、NTD_TND。
+      - TND场景，数据类型仅支持FLOAT16、BFLOAT16；NTD_TND场景，数据类型仅支持BFLOAT16。
       - TND场景，当head配比为GQA/MQA时（即必须完整传入numHeads和numKeyValueHeads参数，且numHeads是numKeyValueHeads的整数倍，且二者不相等），有如下约束：
         - 当数据类型为FLOAT16、BFLOAT16时，支持sparse=0且attenMask为nullptr，或sparse=1（传入allMask），或sparse=3且传入优化后的attenMask：
-             - Q_D、K_D、V_D相等且小于等于256或Q_D、K_D等于192，V_D等于128/192场景下，支持sparse=4且传入优化后的attenMask，要求preTokens>=-actualSeqLengths、nextTokens>=-actualSeqLengthsKv、preTokens+nextTokens>=0;
-        - 仅支持innerPrecise=0，即不带行无效的高精度模式；
-        - 支持page attention，kv cache排布格式支持BnBsH（blocknum, blocksize, H），H不大于65535，blockSize支持<=128 16对齐；
+             - Q_D、K_D、V_D相等且小于等于256或Q_D、K_D等于192，V_D等于128/192场景下，支持sparse=4且传入优化后的attenMask，要求preTokens>=-actualSeqLengths、nextTokens>=-actualSeqLengthsKv、preTokens+nextTokens>=0。
+        - 仅支持innerPrecise=0，即不带行无效的高精度模式。
+        - 支持page attention，kv cache排布格式支持BnBsH（blocknum, blocksize, H），H不大于65535，blockSize支持<=128 16对齐。
       - TND场景，当head配比为MHA时，有如下约束：
-        - 当数据类型为FLOAT16、BFLOAT16时，支持sparse=0且attenMask为nullptr，或sparse=3，4且传入优化后的attenMask；
-        - 当数据类型为FLOAT16时，支持innerPrecise=0和innerPrecise=1；
-        - 当数据类型为BFLOAT16时，仅支持innerPrecise=0；
-        - 支持page attention，kv cache排布格式支持BnBsH（blocknum, blocksize, H），H不大于65535，blockSize支持<=128 16对齐；
-      - NTD_TND场景，不支持page attention；
-      - 当sparse=3时，要求每个batch单独的actualSeqLengths < actualSeqLengthsKv；
-      - 不支持左padding、tensorlist、pse、page attention、prefix、伪量化、全量化、后量化；
+        - 当数据类型为FLOAT16、BFLOAT16时，支持sparse=0且attenMask为nullptr，或sparse=3，4且传入优化后的attenMask。
+        - 当数据类型为FLOAT16时，支持innerPrecise=0和innerPrecise=1。
+        - 当数据类型为BFLOAT16时，仅支持innerPrecise=0。
+        - 支持page attention，kv cache排布格式支持BnBsH（blocknum, blocksize, H），H不大于65535，blockSize支持<=128 16对齐。
+      - NTD_TND场景，不支持page attention。
+      - 当sparse=3时，要求每个batch单独的actualSeqLengths < actualSeqLengthsKv。
+      - 不支持左padding、tensorlist、pse、page attention、prefix、伪量化、全量化、后量化。
       - actualSeqLengths和actualSeqLengthsKv的元素个数不大于4096。
   <!-- end id6 -->
   <!-- npu="950" id7 -->
   - Ascend 950PR&950DT系列产品：
-    - 支持TND;
+    - 支持TND。
     - 不支持左padding、tensorlist、pseType=0、prefix。
 
   <!-- end id7 -->
@@ -816,43 +816,43 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
   - keyRope的数据类型、数据格式与key一致。
   - queryRope和keyRope要求同时配置或同时不配置，不支持只配置其中一个。
   - 输入queryRope和keyRope时，仅支持如下特性：
-    - dtype：FP16、BF16；
-    - query的d只支持512/128；
+    - dtype：FP16、BF16。
+    - query的d只支持512/128。
 
     <!-- npu="910b" id8 -->
     - <term>Atlas A2系列产品</term>：
       - 当配置Q_S大于1（即MTP）时，仅inputLayout为TND时支持配置actualSeqLengths参数，其他layout不支持。
       - 当query的d等于512时：
-        - queryRope配置时要求query的s为1-16，queryRope的shape中d为64，其余维度与query一致；
-        - keyRope配置时要求key的n为1，d为512，keyRope的shape中d为64，其余维度与key一致；
-        - sparse：Q_S等于1时只支持sparse=0且attenMask为nullptr，Q_S大于1时只支持sparse=3且传入mask；
-        - key&value&keyRope支持ND和NZ输入，当输入NZ时，输入格式为[blockNum, N, D/16, blockSize, 16]；
-        - inputLayout：BSH、BSND、BNSD、BNSD_NBSD、BSND_NBSD、BSH_NBSD、TND、TND_NTD，其中NZ输入不支持BNSD、BNSD_NBSD；
-        - 必须开启page attention：blockSize支持16、128，其中NZ输入不支持配置16；
-        - 不支持左padding、tensorlist、pse、prefix、伪量化、全量化、后量化；
+        - queryRope配置时要求query的s为1-16，queryRope的shape中d为64，其余维度与query一致。
+        - keyRope配置时要求key的n为1，d为512，keyRope的shape中d为64，其余维度与key一致。
+        - sparse：Q_S等于1时只支持sparse=0且attenMask为nullptr，Q_S大于1时只支持sparse=3且传入mask。
+        - key&value&keyRope支持ND和NZ输入，当输入NZ时，输入格式为[blockNum, N, D/16, blockSize, 16]。
+        - inputLayout：BSH、BSND、BNSD、BNSD_NBSD、BSND_NBSD、BSH_NBSD、TND、TND_NTD，其中NZ输入不支持BNSD、BNSD_NBSD。
+        - 必须开启page attention：blockSize支持16、128，其中NZ输入不支持配置16。
+        - 不支持左padding、tensorlist、pse、prefix、伪量化、全量化、后量化。
       - 当query的d等于128时：
         - inputLayout：TND、NTD_TND；
-        - queryRope配置时要求queryRope的shape中d为64，其余维度与query一致；
-        - keyRope配置时要求keyRope的shape中d为64，其余维度与key一致；
-        - 其余约束同TND、NTD_TND场景下的综合限制保持一致；
+        - queryRope配置时要求queryRope的shape中d为64，其余维度与query一致。
+        - keyRope配置时要求keyRope的shape中d为64，其余维度与key一致。
+        - 其余约束同TND、NTD_TND场景下的综合限制保持一致。
         - 不支持左padding、tensorlist、pse、page attention、prefix、伪量化、全量化、后量化。
     <!-- end id8 -->
     <!-- npu="950" id9 -->
     - Ascend 950PR&950DT系列产品：
       - 当query的d等于512时：
-        - queryRope配置时要求query的s为1-16，d为512，queryRope的shape中b、n、s与query一致，d为64；
-        - keyRope配置时要求key的n为1，d为512，keyRope的shape中b、n、s与key一致，d为64；
-        - sparse：支持sparse=0，sparse为3且传入mask，sparse为4且传入mask；
+        - queryRope配置时要求query的s为1-16，d为512，queryRope的shape中b、n、s与query一致，d为64。
+        - keyRope配置时要求key的n为1，d为512，keyRope的shape中b、n、s与key一致，d为64。
+        - sparse：支持sparse=0，sparse为3且传入mask，sparse为4且传入mask。
         - key&value支持ND输入。
         - inputLayout：BSH、BSND、BNSD、TND。
-        - 支持actualSeqLengths、actualSeqLengthsKv参数，当配置Q_S大于1（即MTP）且key&value的normal部分复用同一份数据场景下，仅inputLayout为TND时支持配置actualSeqLengths参数，其他layout不支持;
+        - 支持actualSeqLengths、actualSeqLengthsKv参数，当配置Q_S大于1（即MTP）且key&value的normal部分复用同一份数据场景下，仅inputLayout为TND时支持配置actualSeqLengths参数，其他layout不支持。
         - 不支持pse。
       - 当query的d等于128时：
-        - queryRope配置时要求queryRope的shape中b、n、s与query一致，d为64；
-        - keyRope配置时要求keyRope的shape中b、n、s与key一致，d为64；
-        - inputLayout：BSH、BSND、BNSD、BNSD_BSND、TND；
-        - 不支持page attention、prefix、伪量化、全量化、后量化；
-        - 当kv为tensorlist时，keyRope的shape中b需要与tensorlist长度保持一致，n、s需要与tensorlist中每个tensor的n、s相等，d为64;
+        - queryRope配置时要求queryRope的shape中b、n、s与query一致，d为64。
+        - keyRope配置时要求keyRope的shape中b、n、s与key一致，d为64。
+        - inputLayout：BSH、BSND、BNSD、BNSD_BSND、TND。
+        - 不支持page attention、prefix、伪量化、全量化、后量化。
+        - 当kv为tensorlist时，keyRope的shape中b需要与tensorlist长度保持一致，n、s需要与tensorlist中每个tensor的n、s相等，d为64。
         - 不支持pse。
 
     <!-- end id9 -->
@@ -861,7 +861,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
 
   <!-- npu="950" id10 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-    - 伪量化和全量化场景下numHeads与numKeyValueHeads的比值不能大于64; 非量化MLA decode场景下numHeads与numKeyValueHeads的比值无限制;非量化和MLA prefill场景下当且仅当D轴等于64或者128时支持numHeads与numKeyValueHeads的比值大于64，其他D轴不支持。
+    - 伪量化和全量化场景下numHeads与numKeyValueHeads的比值不能大于64；非量化MLA decode场景下numHeads与numKeyValueHeads的比值无限制；非量化和MLA prefill场景下当且仅当D轴等于64或者128时支持numHeads与numKeyValueHeads的比值大于64，其他D轴不支持。
 
   <!-- end id10 -->
 
@@ -1059,7 +1059,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
 
 - softmaxLse使用限制如下：
 
-  - ring attention算法对query乘key的结果，先取max得到softmax_max。query乘key的结果减去softmax_max,再取exp，接着求sum，得到softmax_sum。最后对softmax_sum取log，再加上softmax_max得到的结果。
+  - ring attention算法对query乘key的结果，先取max得到softmax_max。query乘key的结果减去softmax_max，再取exp，接着求sum，得到softmax_sum。最后对softmax_sum取log，再加上softmax_max得到的结果。
   - softmaxLseFlag为True时，一般情况下，shape必须为[B,N,Q_S,1]，当inputLayout为TND/NTD_TND时，shape必须为[T,N,1]。
   - softmaxLseFlag为False时，如果softmaxLse传入的Tensor非空，则直接返回该Tensor数据，如果softmaxLse传入的是nullptr，则返回shape为{1}全0的Tensor。
 
@@ -1180,13 +1180,13 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
   - 参数sparseMode当前仅支持值为0、1、2、3、4的场景，取其它值时会报错。
 
     - sparseMode = 0时，attenMask如果为空指针，或者在左padding场景传入attenMask，则忽略入参preTokens、nextTokens。
-    - sparseMode = 2、3、4时，attenMask的shape需要为S,S或1,S,S或1,1,S,S,其中S的值需要固定为2048，且需要用户保证传入的attenMask为下三角，attenMask为nullptr或者传入的shape不正确报错。
+    - sparseMode = 2、3、4时，attenMask的shape需要为S,S或1,S,S或1,1,S,S，其中S的值需要固定为2048，且需要用户保证传入的attenMask为下三角，attenMask为nullptr或者传入的shape不正确报错。
     - sparseMode = 1、2、3的场景忽略入参preTokens、nextTokens并按照相关规则赋值。
   - kvCache反量化的合成参数场景仅支持query为FLOAT16时，将INT8类型的key和value反量化到FLOAT16。入参key/value的datarange与入参antiquantScale的datarange乘积范围在（-1，1）范围内，高性能模式可以保证精度，否则需要开启高精度模式来保证精度。
   - page attention场景：
 
     - page attention的开启必要条件是blockTable存在且有效，同时key、value是按照blockTable中的索引在一片连续内存中排布，在该场景下key、value的inputLayout参数无效。blockTable中填充的是blockid，当前不会对blockid的合法性进行校验，需用户自行保证。
-    - blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在开启page attention场景下，blockSize最小为128,最大为512，且要求是128的倍数。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
+    - blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在开启page attention场景下，blockSize最小为128，最大为512，且要求是128的倍数。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
     - page attention场景下，当输入kv cache排布格式为BnBsH（blocknum, blocksize, H），且KV_N * D超过65535时，受硬件指令约束，会被拦截报错。可通过开启GQA（减小KV_N）或调整kv cache排布格式为BnNBsD（blocknum, KV_N, blocksize, D）解决。当query的inputLayout为BNSD、TND时，kv cache排布支持BnBsH和BnNBsD两种格式，当query的inputLayout为BSH、BSND时，kv cache排布只支持BnBsH一种格式。blocknum不能小于根据actualSeqLengthsKv和blockSize计算的每个batch的block数量之和。且key和value的shape需保证一致。
     - page attention伪量化场景
 
@@ -1286,15 +1286,15 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
       - per-token模式：两个参数的shape可支持(1, B, S)，( B, S)，数据类型固定为FLOAT32，当key、value数据类型为INT8、INT4(INT32)时支持。
       - per-tensor叠加per-head模式：两个参数的shape均为(N)，数据类型和query数据类型相同，当key、value数据类型为INT8时支持。
       - key支持per-channel叠加value支持per-token模式：对于key支持per-channel，两个参数的shape可支持(1, N, 1, D)，(1, N, D)，(1, H)，(N, 1, D)，(N, D)，(H)且参数数据类型和query数据类型相同；对于value支持per-token，两个参数的shape均为(1, B, S)且数据类型固定为FLOAT32，当key、value数据类型为INT8、INT4(INT32)时支持。当key、value数据类型为INT8时，query和输出只支持FLOAT16。
-      - per-token-group模式：antiquantScale的shape为(1, B, N, S, D/32),数据类型固定为FLOAT8_E8M0，不支持带antiquantOffset。当key、value数据类型为FLOAT4_E2M1时支持。
+      - per-token-group模式：antiquantScale的shape为(1, B, N, S, D/32)，数据类型固定为FLOAT8_E8M0，不支持带antiquantOffset。当key、value数据类型为FLOAT4_E2M1时支持。
       - per-token叠加per-head模式：两个参数的shape均为(B, N, S)，数据类型固定为FLOAT32，当key、value数据类型为INT8、INT4(INT32)时支持。
       - per-token模式使用page attention管理scale/offset模式：两个参数的shape均为(blocknum, blocksize)，数据类型固定为FLOAT32，当key、value数据类型为INT8时支持。
       - per-token叠加per-head模式并使用page attention管理scale/offset模式：两个参数的shape均为(blocknum, N, blocksize)，数据类型固定为FLOAT32，当key、value数据类型为INT8时支持。
       - 当伪量化参数和KV分离量化参数同时传入时，以KV分离量化参数为准。
       - INT4(INT32)伪量化场景仅支持KV伪量化参数分离，具体包括：
-        - per-channel模式；
-        - per-token模式；
-        - per-token叠加per-head模式；
+        - per-channel模式。
+        - per-token模式。
+        - per-token叠加per-head模式。
         - key支持per-channel叠加value支持per-token模式。
       - 部分伪量化场景不支持后量化
         - <term>Atlas A2系列产品</term>：INT4(INT32)伪量化场景不支持后量化。
@@ -1384,7 +1384,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
       - 开启pseShift，如pseShift shape为\(B, N, 1, S\)。
       - 开启伪量化per-token模式：输入参数antiquantScale和antiquantOffset的shape均为\(2, B, S\)。
       - 开启per-token叠加per-head模式：两个参数的shape均为\(B, N, S\)，数据类型固定为FLOAT32，当key、value数据类型为INT8、INT4\(INT32\)时支持。
-      - 开启per-token-group模式：antiquantScale的shape为\(1, B, N, S, D/32\),数据类型固定为FLOAT8_E8M0，不支持带antiquantOffset。当key、value数据类型为FLOAT4_E2M1时支持。
+      - 开启per-token-group模式：antiquantScale的shape为\(1, B, N, S, D/32\)，数据类型固定为FLOAT8_E8M0，不支持带antiquantOffset。当key、value数据类型为FLOAT4_E2M1时支持。
   - kv左padding场景：
 
     <!-- npu="910b" id47 -->
@@ -1427,11 +1427,11 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
       - 当伪量化参数和KV分离量化参数同时传入时，以KV分离量化参数为准。
     <!-- end id50 -->
     - INT4(INT32)伪量化场景仅支持KV伪量化参数分离，具体包括：
-      - per-tensor模式；
-      - per-channel模式；
-      - per-token模式；
-      - per-tensor叠加per-head模式；
-      - per-token叠加per-head模式；
+      - per-tensor模式。
+      - per-channel模式。
+      - per-token模式。
+      - per-tensor叠加per-head模式。
+      - per-token叠加per-head模式。
       - key支持per-channel叠加value支持per-token模式。
     - 部分伪量化场景不支持后量化
 

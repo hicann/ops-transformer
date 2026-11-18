@@ -449,7 +449,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 
   <ul>
     <!-- npu="A3" id7 -->
-    <li><term>Atlas A3系列产品</term> ：不支持sequsedQOptional、cmpTopkLengthOptional，numHeadsQ/numHeadsKv支持[1, 128]内的任意整数；SWA稀疏oriKvOptional场景支持oriTopkLengthOptional、oriTopk大于0及oriMaskMode为0，oriWinLeft和oriWinRight各自支持-1或非负数；其他SWA场景oriTopk为0、oriMaskMode为4、oriWinLeft为127、oriWinRight为0；cmpTopk支持[0, 8192]，其中0表示非稀疏压缩KV，cmpMaskMode仅支持3，SWA不传入cmpKvOptional，cmpRatio不参与计算、CSA支持1、2或4、HCA支持128。</li>
+    <li><term>Atlas A3系列产品</term>：不支持sequsedQOptional、cmpTopkLengthOptional，numHeadsQ/numHeadsKv支持[1, 128]内的任意整数；SWA稀疏oriKvOptional场景支持oriTopkLengthOptional、oriTopk大于0及oriMaskMode为0，oriWinLeft和oriWinRight各自支持-1或非负数；其他SWA场景oriTopk为0、oriMaskMode为4、oriWinLeft为127、oriWinRight为0；cmpTopk支持[0, 8192]，其中0表示非稀疏压缩KV，cmpMaskMode仅支持3，SWA不传入cmpKvOptional，cmpRatio不参与计算、CSA支持1、2或4、HCA支持128。</li>
     <!-- end id7 -->
     <!-- npu="910b" id8 -->
     <li><term>Atlas A2系列产品</term> ：不支持sequsedQOptional、cmpTopkLengthOptional，numHeadsQ/numHeadsKv支持[1, 128]内的任意整数；SWA稀疏oriKvOptional场景支持oriTopkLengthOptional、oriTopk大于0及oriMaskMode为0，oriWinLeft和oriWinRight各自支持-1或非负数；其他SWA场景oriTopk为0、oriMaskMode为4、oriWinLeft为127、oriWinRight为0；cmpTopk支持[0, 8192]，其中0表示非稀疏压缩KV，cmpMaskMode仅支持3，SWA不传入cmpKvOptional，cmpRatio不参与计算、CSA支持1、2或4、HCA支持128。</li>

@@ -315,8 +315,8 @@ aclnnStatus aclnnMatmulReduceScatter(
   - m为卡数rank_size的整数倍。
   - k的取值范围为[256, 65535)。
   - x1/x2支持的空tensor场景，m和n可以为0，k不可为0，且需满足以下条件：
-    - m为0，k不为0，n不为0；
-    - m不为0，k不为0，n为0；
+    - m为0，k不为0，n不为0。
+    - m不为0，k不为0，n为0。
     - m为0，k不为0，n为0。
   - rank_size为卡数。
 - x2支持转置/不转置场景，x1只支持不转置场景。

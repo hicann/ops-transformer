@@ -107,7 +107,7 @@ aclnnStatus aclnnBlockSparseAttention(
       <th>使用说明</th>
       <th>数据类型</th>
       <th>数据格式</th>
-      <th>维度(shape)</th>
+      <th>维度（shape）</th>
       <th>非连续Tensor</th>
     </tr>
   </thead>
@@ -197,7 +197,7 @@ aclnnStatus aclnnBlockSparseAttention(
           <li>当配置了blockSparseMaskOptional时：如配置此输入，算子会从中获取稀疏块尺寸；如不配置此输入，算子将默认稀疏块尺寸为[128,128]。</li>
           <li>当未配置blockSparseMaskOptional时：无论此项如何配置，算子均将忽略。</li>
         </ul>
-        当配置此输入时：必须包含两个元素[blockShapeX, blockShapeY]
+        当配置此输入时：必须包含两个元素[blockShapeX, blockShapeY]。
         <ul>
           <li>blockShapeX: Q方向块大小，值必须大于0。</li>
           <li>blockShapeY: KV方向块大小，值必须大于0；在<term>Ascend 950PR&950DT系列产品</term>上须为16的倍数，在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上须为128的倍数。</li>
@@ -284,7 +284,7 @@ aclnnStatus aclnnBlockSparseAttention(
       <td>输入</td>
       <td>表示attention计算中的掩码类型。</td>
       <td>
-        当前只支持传0
+        当前只支持传0：
         <ul>
           <li>0：代表不加mask场景</li>
         </ul>
@@ -309,7 +309,7 @@ aclnnStatus aclnnBlockSparseAttention(
       <td>输入</td>
       <td>Softmax计算采取的精度级别。</td>
       <td>
-        控制online softmax阶段以及rescale阶段运算使用的数据类型。当前只支持传0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>在FLOAT16/BFLOAT16非量化输入时支持配置为0或4，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持配置为0或1
+        控制online softmax阶段以及rescale阶段运算使用的数据类型。当前只支持传0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>在FLOAT16/BFLOAT16非量化输入时支持配置为0或4，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持配置为0或1：
         <ul>
           <li>0：表示online softmax和rescale全部采取fp32数据类型，适合追求计算精度的场景使用。</li>
           <li>1：仅支持输入的query、key、value均为fp16数据类型时配置，表示online softmax和rescale全部采取fp16数据类型，性能更好，但精度较低，且可能发生计算时的数值溢出，使用者需根据值域范围自行判断是否使用。</li>

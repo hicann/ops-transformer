@@ -117,7 +117,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
 
 ## aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize
 
-- **参数说明:**
+- **参数说明：**
 
     <table style="undefined;table-layout: fixed; width: 1550px">
         <colgroup>
@@ -681,7 +681,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
         </tbody>
     </table>
 <!-- npu="950" id8 -->
-    <term>Ascend 950PR&950DT系列产品</term>：N1额外支持48，Nidx1额外支持24，二者仅允许(48,24)组合，禁止其余数值配对; B、S1、S2均支持泛化。
+    <term>Ascend 950PR&950DT系列产品</term>：N1额外支持48，Nidx1额外支持24，二者仅允许(48,24)组合，禁止其余数值配对；B、S1、S2均支持泛化。
 <!-- end id8 -->
 ## 调用示例
 

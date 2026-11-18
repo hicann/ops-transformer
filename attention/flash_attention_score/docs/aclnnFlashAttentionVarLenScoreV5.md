@@ -37,7 +37,7 @@
   Attention=Dropout(Softmax(Mask(scale*(query*key^T + queryRope*keyRope^T) + pse),atten\_mask),keep\_prob)*value
   $$
 
-  其中增加**sink**之后计算逻辑见下，主要修改相关softmax_max和softmax_sum逻辑计算部分
+  其中增加**sink**之后计算逻辑见下，主要修改相关softmax_max和softmax_sum逻辑计算部分。
 
   $$
   S = Q * K^{T}
@@ -544,10 +544,10 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV5(
   - 参数每个batch不相同时，shape为BNHSkv(H=1024)。
   - 每个batch相同时，shape为1NHSkv(H=1024)。
   - TND场景下，每个batch段内部仍按[N, Sq\_i, Skv\_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq\_i、真实key/value长度为Skv\_i，则该段PSE元素个数为N\*Sq_i\*Skv_i，整段PSE总长度pseTotalLen为sum_i(N\*Sq_i\*Skv_i)。
-  - 如果pseType为2或3的时候，数据类型需为FLOAT32,对应shape支持范围是[B,N]或[N]。
+  - 如果pseType为2或3的时候，数据类型需为FLOAT32，对应shape支持范围是[B,N]或[N]。
   - 如果不开启该参数，realShiftOptional需要传入nullptr，pseType需要传入1。
 - innerPrecise：当前0、1为保留配置值，2为开启无效行计算，其功能是避免在计算过程中存在整行mask进而导致精度有损失，但是该配置会导致性能下降。如果算子可判断出存在无效行场景，会自动开启无效行计算，例如sparseMode为3，Sq > Skv场景。
-- sparseMode的约束如下:
+- sparseMode的约束如下：
   - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量。
   - 配置为1、2、3、6时，用户配置的preTokens、nextTokens不会生效。
   - 配置为0、4、7时，须保证attenMaskOptional与preTokens、nextTokens的范围一致。

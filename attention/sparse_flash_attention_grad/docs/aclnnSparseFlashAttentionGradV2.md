@@ -45,7 +45,7 @@
 
 <div style="padding-left:40px;">
 
-  阶段1：根据矩阵乘法导数规则，计算$dP$和$dV$:
+  阶段1：根据矩阵乘法导数规则，计算$dP$和$dV$：
 
 </div>
 
@@ -59,7 +59,7 @@
 
 <div style="padding-left:40px;">
 
-   阶段2：计算$dS$:
+   阶段2：计算$dS$：
 
 </div>
 
@@ -69,7 +69,7 @@
 
 <div style="padding-left:40px;">
 
-   阶段3：计算$dQ$与$dK$:
+   阶段3：计算$dQ$与$dK$：
 
 </div>
 
@@ -87,7 +87,7 @@
 
 </div>
 
-  Sink在前向中扮演一个"虚拟key"角色，其对应的"虚拟value"为0，不直接贡献输出O，但通过softmax归一化因子$\ell$间接影响所有注意力权重$P_j$。因此Sink参与前向softmax的max与sum的计算：
+  Sink在前向中扮演一个“虚拟key”角色，其对应的“虚拟value”为0，不直接贡献输出O，但通过softmax归一化因子$\ell$间接影响所有注意力权重$P_j$。因此Sink参与前向softmax的max与sum的计算：
 
   $$
    m \mathop{{}}=\mathop{{}}\nolimits max \left( max \mathop{{}}\nolimits_{{j}} \left( S \mathop{{}}\nolimits_{{t,j}} \right) ,\mathop{{}}\nolimits sink \right)
@@ -111,7 +111,7 @@
    dSink \left[ h \right] = P \mathop{{}}\nolimits_{{sink}} \odot \left( dP \mathop{{}}\nolimits_{{sink}} - D_{i} \right) = \sum \mathop{{}}\nolimits_{{b,i}} P \mathop{{}}\nolimits_{{sink}} \left[ b,i,h \right] \cdot \left( - D_{i} \left[ b,i,h \right] \right)
   $$
 
-  > 说明：Sink的score梯度遵循softmax反向的"挤压效应"——Sink概率增大时，会挤压其他token的概率，因此$dSink$与所有token的平均收益$D_{i}$相关，最终对所有Batch和Query位置求和得到维度为$[N1]$的$dSink$。
+  > 说明：Sink的score梯度遵循softmax反向的“挤压效应”——Sink概率增大时，会挤压其他token的概率，因此$dSink$与所有token的平均收益$D_{i}$相关，最终对所有Batch和Query位置求和得到维度为$[N1]$的$dSink$。
 
 ## 函数原型
 

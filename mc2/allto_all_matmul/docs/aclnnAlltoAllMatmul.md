@@ -24,7 +24,7 @@
 ## 功能说明
 
 - 接口功能：完成AlltoAll通信、Permute（保证通信后地址连续）和Matmul计算的融合，**先通信后计算**。
-- 计算公式：假设x1输入shape为(BS, H)，rankSize为NPU卡数
+- 计算公式：假设x1输入shape为(BS, H)，rankSize为NPU卡数。
 
   $$
   commOut = AlltoAll(x1.view(rankSize, BS/rankSize, H)) \\
@@ -313,7 +313,7 @@ aclnnStatus aclnnAlltoAllMatmul(
   - <term>Atlas A2系列产品</term>：支持[1, 35000]。
   <!-- end id10 -->
   <!-- npu="950,A3" id11 -->
-  - <term>Atlas A3系列产品</term>  、<term>Ascend 950PR&950DT系列产品</term>：支持[2, 65535]。
+  - <term>Atlas A3系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：支持[2, 65535]。
   <!-- end id11 -->
 
 * 空tensor的支持度根据不同设备型号有不同的限制：
@@ -363,7 +363,7 @@ aclnnStatus aclnnAlltoAllMatmul(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="A3,910b" id21 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：

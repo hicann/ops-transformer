@@ -355,7 +355,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
   <!-- npu="A3,910b" id9 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
-    - x1仅支持INT8。维度为(m, k)，维度m的取值范围为[1,16\*1024\*8]，k支持2048;
+    - x1仅支持INT8。维度为(m, k)，维度m的取值范围为[1,16\*1024\*8]，k支持2048。
     - x2仅支持INT4。当输入为INT32时维度为(e, k, n / 8)，输入转为INT4时维度为(e, k, n)，e取值范围[1,256]，k支持2048，n支持7168。仅支持非转置，即transposeX2必须为false。
     - scaleOptional支持INT64。shape支持三维，维度为(e, 1, n)，e、n和w的e、n一致。
     - biasOptional支持FLOAT32。e、n和w的e、n一致。
@@ -476,7 +476,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：aclnnGroupedMatmulFinalizeRoutingV3默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
   <!-- end id11 -->
   <!-- npu="950" id12 -->
-  - <term>Ascend 950PR&950DT系列产品</term> ：aclnnGroupedMatmulFinalizeRoutingV3默认非确定性实现，不支持通过aclrtSetSysParamOpt开启确定性。
+  - <term>Ascend 950PR&950DT系列产品</term>：aclnnGroupedMatmulFinalizeRoutingV3默认非确定性实现，不支持通过aclrtSetSysParamOpt开启确定性。
 
   <!-- end id12 -->
 

@@ -323,11 +323,11 @@ aclnnStatus aclnnKeyPool(
 
 其中：
 
-- `D`为K和Gate的head dimension，由`wk`的第0维决定；
-- `R=cmpRatio`；
-- `N`为物理block数；
-- `BS`为block size；
-- `L`为每个Batch的最大逻辑block数；
+- `D`为K和Gate的head dimension，由`wk`的第0维决定。
+- `R=cmpRatio`。
+- `N`为物理block数。
+- `BS`为block size。
+- `L`为每个Batch的最大逻辑block数。
 - BSH输出为`[B,Sr,D]`，`Sr=ceil(S/cmpRatio)`。
 - TH输出为`[Tr,D]`，`Tr=min(T,floor(T/cmpRatio)+B)`。
 - 每个Batch的有效行数为`n[b]=floor((startPos[b]+seqLen[b])/cmpRatio)-floor(startPos[b]/cmpRatio)`。

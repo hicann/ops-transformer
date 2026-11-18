@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：对Token数据进行量化（可选），进行EP（Expert Parallelism）域的AllToAllV通信。TP（Tensor Parallelism）域通信当前版本不再支持，TP相关参数为预留参数。
+- 接口功能：对token数据进行量化（可选），进行EP（Expert Parallelism）域的AllToAllV通信。TP（Tensor Parallelism）域通信当前版本不再支持，TP相关参数为预留参数。
 
 - 计算公式：
 
@@ -515,7 +515,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
         - 对于MoE专家，当`globalBs`为0时，要满足`A` >= `BS` \* `epWorldSize` \* min(`localExpertNum`, `K`)；当`globalBs`非0时，要满足`A` >= `globalBs` \* min(`localExpertNum`, `K`)。
     - `localExpertNum`：表示本卡专家数量。
         - 对于共享专家卡，`localExpertNum` = 1
-        - 对于MoE专家卡，`localExpertNum` = `moeExpertNum` / (`epWorldSize` - `sharedExpertRankNum`)`；当前版本不支持TP域通信。
+        - 对于MoE专家卡，`localExpertNum` = `moeExpertNum` / (`epWorldSize` - `sharedExpertRankNum`)；当前版本不支持TP域通信。
 
 - 本文公式中的"/"表示整除。
 
@@ -600,7 +600,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
 
         3. 安装cann包并参考下方指导编译运行。
 
-    - 关于rankTable:
+    - 关于rankTable：
 
         1. 开发者可以通过ranktable文件配置参与集合通信的NPU资源信息，详细配置请参考[《集合通信用户指南》](https://hiascend.com/document/redirect/CannCommunityHcclUg)中“通信功能开发>集群信息配置>ranktable文件配置资源信息”。
 

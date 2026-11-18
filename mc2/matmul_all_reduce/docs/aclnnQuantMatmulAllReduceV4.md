@@ -36,22 +36,22 @@
 
   - 公式1，开启低bit通信的公式2或公式3场景：
 
-    x1，x2为INT8，commQuantScale1Optional, commQuantScale2Optional不为空时:
+    x1，x2为INT8，commQuantScale1Optional、commQuantScale2Optional不为空时：
 
     $$
-    matmulAddOutput = (x2Scale * x1ScaleOptional * (x1_{int8}@x2_{int8} + biasOptional_{int32}) + x3Optional);
-    $$
-
-    $$
-    alltoallOutput_{int8} = AllToAll(matmulAddOutput / commQuantScale1Optional);
+    matmulAddOutput = (x2Scale * x1ScaleOptional * (x1_{int8}@x2_{int8} + biasOptional_{int32}) + x3Optional)
     $$
 
     $$
-    reduceSumOutput_{int8} = (add(alltoallOutput_{int8}) * (commQuantScale1Optional / commQuantScale2Optional));
+    alltoallOutput_{int8} = AllToAll(matmulAddOutput / commQuantScale1Optional)
     $$
 
     $$
-    output = (AllGather(reduceSumOutput_{int8}) * commQuantScale2Optional);
+    reduceSumOutput_{int8} = (add(alltoallOutput_{int8}) * (commQuantScale1Optional / commQuantScale2Optional))
+    $$
+
+    $$
+    output = (AllGather(reduceSumOutput_{int8}) * commQuantScale2Optional)
     $$
 
   - 公式2，perchannel量化 && pertensor量化：
@@ -64,7 +64,7 @@
 
   - 公式3，pertoken-perchannel量化 && pertoken-pertensor量化：
 
-    x1，x2为INT8，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32/BFLOAT16，可选biasOptional为INT32, out为FLOAT16/BFLOAT16：
+    x1，x2为INT8，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32/BFLOAT16，可选biasOptional为INT32，out为FLOAT16/BFLOAT16：
 
     $$
     output = AllReduce((x1@x2 + biasOptional) * x2Scale * x1ScaleOptional + x3Optional)
@@ -72,7 +72,7 @@
 
   - 公式4，MXFP量化：
 
-    x1，x2为`FLOAT4_E2M1`/`FLOAT8_E4M3FN`/`FLOAT8_E5M2`，x1ScaleOptional为`FLOAT8_E8M0`，x2Scale为`FLOAT8_E8M0`，可选biasOptional为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
+    x1，x2为`FLOAT4_E2M1`/`FLOAT8_E4M3FN`/`FLOAT8_E5M2`，x1ScaleOptional为`FLOAT8_E8M0`，x2Scale为`FLOAT8_E8M0`，可选biasOptional为FLOAT32，out为FLOAT16/BFLOAT16/FLOAT32：
 
     $$
     output = AllReduce((x1* x1ScaleOptional)@(x2* x2Scale) + biasOptional + x3Optional)
@@ -80,7 +80,7 @@
 
   - 公式5，perchannel量化 && pertensor量化：
 
-    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x2Scale为UINT64/INT64，可选bias为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
+    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x2Scale为UINT64/INT64，可选bias为FLOAT32，out为FLOAT16/BFLOAT16/FLOAT32：
 
   $$
   output = AllReduce((x1@x2 + biasOptional) * x2Scale  + x3Optional)
@@ -96,7 +96,7 @@
 
   - 公式7，perblock-perblock量化：
 
-    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32，无biasOptional。当x1为(a0, a1)，x2为(b0, b1)时x1ScaleOptional为(ceilDiv(a0，128)，ceilDiv(a1，128))，x2Scale为(ceilDiv(b0，128)，ceilDiv(b1，128))，out为FLOAT16/BFLOAT16/FLOAT32:
+    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32，无biasOptional。当x1为(a0, a1)，x2为(b0, b1)时x1ScaleOptional为(ceilDiv(a0，128)，ceilDiv(a1，128))，x2Scale为(ceilDiv(b0，128)，ceilDiv(b1，128))，out为FLOAT16/BFLOAT16/FLOAT32：
 
     $$
     output_{pq} = AllReduce(\sum_{0}^{\left \lfloor \frac{k}{128} \right \rfloor} (x1_{pr}@x2_{rq}*(x1ScaleOptional_{pr}*x2Scale_{rq})) + x3Optional)
@@ -107,43 +107,43 @@
     x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32，可选biasOptional为FLOAT32，commQuantMode为1，out为FLOAT16/BFLOAT16/FLOAT32:
 
     $$
-    matmulAddOutput_{fp32} = (x2Scale * x1ScaleOptional * (x1_{fp8}@x2_{fp8} + biasOptional_{fp32}) + x3Optional);
+    matmulAddOutput_{fp32} = (x2Scale * x1ScaleOptional * (x1_{fp8}@x2_{fp8} + biasOptional_{fp32}) + x3Optional)
     $$
 
     $$
-    scaleOut_{fp32} = (matmulAddOutput_{fp32} / (reduceMax(abs(matmulAddOutput_{fp32})) / FP32\_MAX));
+    scaleOut_{fp32} = (matmulAddOutput_{fp32} / (reduceMax(abs(matmulAddOutput_{fp32})) / FP32\_MAX))
     $$
 
     $$
-    quantOutput_{fp8} = (append((matmulAddOutput_{fp32} * scaleOut{fp32})@scaleOut_{fp32}));
+    quantOutput_{fp8} = (append((matmulAddOutput_{fp32} * scaleOut{fp32})@scaleOut_{fp32}))
     $$
 
     $$
-    alltoallOutput_{fp8} = (AllToAll(quantOut_{fp8}));
+    alltoallOutput_{fp8} = (AllToAll(quantOut_{fp8}))
     $$
 
     $$
-    dequantOutput_{fp32} = (alltoallOutput_{fp8} / scaleOut_{fp32});
+    dequantOutput_{fp32} = (alltoallOutput_{fp8} / scaleOut_{fp32})
     $$
 
     $$
-    reduceSumOutput_{fp32} = (reduceSum(dequantOutput_{fp32}));
+    reduceSumOutput_{fp32} = (reduceSum(dequantOutput_{fp32}))
     $$
 
     $$
-    preAllGatherQuantScale_{fp32} = (reduceSumOutput_{fp32} / (reduceMax(abs(reduceSumOutput_{fp32})) / FP8\_MAX));
+    preAllGatherQuantScale_{fp32} = (reduceSumOutput_{fp32} / (reduceMax(abs(reduceSumOutput_{fp32})) / FP8\_MAX))
     $$
 
     $$
-    preAllGatherQuantOutput_{fp8} = (append((reduceSumOutput_{fp32} * preAllGatherQuantScale_{fp32})@preAllGatherQuantScale_{fp32}));
+    preAllGatherQuantOutput_{fp8} = (append((reduceSumOutput_{fp32} * preAllGatherQuantScale_{fp32})@preAllGatherQuantScale_{fp32}))
     $$
 
     $$
-    allGatherOutput_{fp8} = (AllGather(preAllGatherQuantOutput_{fp8}));
+    allGatherOutput_{fp8} = (AllGather(preAllGatherQuantOutput_{fp8}))
     $$
 
     $$
-    output = (cast(allGatherOutput_{fp32} / preAllGatherQuantScale_{fp32}));
+    output = (cast(allGatherOutput_{fp32} / preAllGatherQuantScale_{fp32}))
     $$
 
 ## 函数原型
@@ -258,7 +258,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
           <td>x2Scale</td>
           <td>输入</td>
           <td>MatMul计算后的去量化系数，即计算公式中的x2Scale。</td>
-          <td><ul><li>shape在pertensor场景为(1)，perchannel场景为(n)/(1, n)。</li><li>输入为int8且输出为BFLOAT16时，直接将BFLOAT16类型的x2Scale传入本接口。</li><li>输出为FLOAT16且输入为INT8时，x1ScaleOptional不为空，可直接将FLOAT32类型的x2Scale传入本接口，如果x1ScaleOptional为空，则需提前调用TransQuantParamV2算子的aclnn接口来将x2Scale转成INT64/UINT64数据类型。</li><li>数据类型为FLOAT8_E8M0时，仅支持转置，shape为[n, ceilDiv(k, 64), 2]。</li> <li>x2为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数.</li><li>perblock场景下，x2的shape为[ceilDiv(k, 128), ceilDiv(n, 128)]，x2转置时，x2Scale的shape为[ceilDiv(n, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，ceilDiv(k, 64)轴不支持为1。</li></ul></td>
+          <td><ul><li>shape在pertensor场景为(1)，perchannel场景为(n)/(1, n)。</li><li>输入为int8且输出为BFLOAT16时，直接将BFLOAT16类型的x2Scale传入本接口。</li><li>输出为FLOAT16且输入为INT8时，x1ScaleOptional不为空，可直接将FLOAT32类型的x2Scale传入本接口，如果x1ScaleOptional为空，则需提前调用TransQuantParamV2算子的aclnn接口来将x2Scale转成INT64/UINT64数据类型。</li><li>数据类型为FLOAT8_E8M0时，仅支持转置，shape为[n, ceilDiv(k, 64), 2]。</li> <li>x2为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数。</li><li>perblock场景下，x2的shape为[ceilDiv(k, 128), ceilDiv(n, 128)]，x2转置时，x2Scale的shape为[ceilDiv(n, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，ceilDiv(k, 64)轴不支持为1。</li></ul></td>
           <td>INT64、UINT64、FLOAT32、BFLOAT16、FLOAT8_E8M0</td>
           <td>ND</td>
           <td>1-3</td>
@@ -487,14 +487,14 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
 - INT8和FP8低bit通信仅在通信bound的情况下存在性能收益，计算bound的情况不建议开启INT8或FP8低bit通信，即不建议输入commQuantScale1和commQuantScale2，且commQuantMode输入0。（注：INT8低bit通信指输入为int8且开启commQuantScale1Optional、commQuantScale2Optional；FP8低bit通信指输入为FLOAT8_E4M3FN/FLOAT8_E5M2且开启commQuantMode=1。）
 - 空tensor支持度：
   - 不支持空tensor。
-- groupSize相关约束:
+- groupSize相关约束：
   - 仅当x1Scale和x2Scale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
   - 传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据x1/x2/x1Scale/x2Scale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。原理：假设groupSizeM=0，表示m方向量化分组值由接口推断，推断公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与x1 shape中的m一致，scaleM与x1Scale shape中的m一致。
     $$
     groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32
     $$
 
-输入和输出支持以下数据类型组合
+输入和输出支持以下数据类型组合：
 
 <!-- npu="910b" id13 -->
 - <term>Atlas A2系列产品</term>：
@@ -557,7 +557,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
 <!-- npu="950" id14 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
 
-    int8输入时，支持pertoken-perchannel量化 && pertensor-perchannel量化
+    int8输入时，支持pertoken-perchannel量化 && pertensor-perchannel量化：
     <table>
     <thead>
         <tr>
@@ -763,7 +763,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950,910b" id15 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：

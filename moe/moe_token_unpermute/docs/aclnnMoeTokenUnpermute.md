@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能: 根据sortedIndices存储的下标，获取permutedTokens中存储的输入数据；如果存在probs数据，permutedTokens会与probs相乘；最后进行累加求和，并输出计算结果。
+- 接口功能：根据sortedIndices存储的下标，获取permutedTokens中存储的输入数据；如果存在probs数据，permutedTokens会与probs相乘；最后进行累加求和，并输出计算结果。
 - 计算公式：
 
     - probs非None计算公式如下：

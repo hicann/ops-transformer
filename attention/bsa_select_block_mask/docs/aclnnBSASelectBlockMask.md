@@ -27,7 +27,7 @@
 
 - 计算公式​：
 
-  设blockShape = [blockShapeX, blockShapeY]，Sq是query最大序列长度，Skv是key最大序列长度, 则压缩后块数：
+  设blockShape = [blockShapeX, blockShapeY]，Sq是query最大序列长度，Skv是key最大序列长度，则压缩后块数：
 
   $$
   Xblocks = \lceil Sq / blockShapeX \rceil,\quad Yblocks = \lceil Skv / blockShapeY \rceil
@@ -267,7 +267,7 @@ aclnnStatus aclnnBSASelectBlockMask(
     <td>actualBlockLenKey（aclIntArray*）</td>
     <td>输入</td>
     <td>每个key block内实际压缩的有效seq长度，即公式中的actualBlockLenKey。<br>该参数用于部分压缩场景（如末尾不完整块或仅压缩有效token）。</td>
-    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Yblocks]。</li><li>TND场景：shape为 [TotalBlockNum_K]（各batch的实际有效Yblocks堆叠，validYblocks = ceil（actualSeqK / blockShapeY））。</li><li>每个元素取值范围 [0, blockShapeY]。</li><li>当actualBlockLen = 0时：对应block的k_compressed填0向量， 不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
+    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Yblocks]。</li><li>TND场景：shape为 [TotalBlockNum_K]（各batch的实际有效Yblocks堆叠，validYblocks = ceil（actualSeqK / blockShapeY））。</li><li>每个元素取值范围 [0, blockShapeY]。</li><li>当actualBlockLen = 0时：对应block的k_compressed填0向量，不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
     <li>如不配置（传nullptr）：对key进行完整压缩（使用完整blockShapeY长度）。</li></ul></td>
     <td>INT64</td>
     <td>-</td>

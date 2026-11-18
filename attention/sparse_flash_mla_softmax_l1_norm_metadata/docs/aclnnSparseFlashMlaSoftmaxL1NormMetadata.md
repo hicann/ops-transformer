@@ -136,7 +136,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>cmpResidualKOptional</td>
       <td>输入</td>
       <td>表示不同batch中key的sequence length与cmpRatio相关的残差。</td>
-      <td>支持空Tensor。maskMode=3且cmpRatio!=1时必须传</td>
+      <td>支持空Tensor。maskMode=3且cmpRatio!=1时必须传。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
@@ -436,7 +436,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
 <details>
 <summary><a id="Metadata"></a>Metadata输出布局</summary>
 
-  metadata输出为INT32 Tensor，当前shape固定为(64,)，字段布局如下。
+  metadata输出为INT32 Tensor，当前shape固定为(64,)，字段布局如下：
 
   <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 180px">

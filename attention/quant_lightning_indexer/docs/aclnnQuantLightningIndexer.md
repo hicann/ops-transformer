@@ -457,8 +457,8 @@ aclnnStatus aclnnQuantLightningIndexer(
 - Ascend 950PR&950DT系列产品：
   - query N1仅支持8、16、24、32、64。
   - query和key的数据类型支持`FLOAT8_E4M3、HIFLOAT8、INT8`。
-  - 当query和key的数据类型为`FLOAT8_E4M3`时，支持weights、queryDequantScale、keyDequantScale的数据类型为`BFLOAT16、FLOAT、FLOAT`或`FLOAT16、FLOAT16、FLOAT16`；
-  - 当query和key的数据类型为`HIFLOAT8`时，仅支持weights、queryDequantScale、keyDequantScale数据类型为`BFLOAT16、FLOAT、FLOAT`；
+  - 当query和key的数据类型为`FLOAT8_E4M3`时，支持weights、queryDequantScale、keyDequantScale的数据类型为`BFLOAT16、FLOAT、FLOAT`或`FLOAT16、FLOAT16、FLOAT16`。
+  - 当query和key的数据类型为`HIFLOAT8`时，仅支持weights、queryDequantScale、keyDequantScale数据类型为`BFLOAT16、FLOAT、FLOAT`。
   - 当query和key的数据类型为`INT8`时，仅支持weights、queryDequantScale、keyDequantScale数据类型为`FLOAT16、FLOAT16、FLOAT16`。
 
 <!-- end id7 -->

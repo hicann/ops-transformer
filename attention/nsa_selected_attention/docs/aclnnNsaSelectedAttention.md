@@ -133,7 +133,7 @@ aclnnStatus aclnnNsaSelectedAttention(
         <td>topkIndices</td>
         <td>输入</td>
         <td>公式中的topk_indices。</td>
-        <td>shape需为[T_q, N_kv, selected_block_count],表示所选数据的索引。</td>
+        <td>shape需为[T_q, N_kv, selected_block_count]，表示所选数据的索引。</td>
         <td>INT32</td>
         <td>ND</td>
         <td>3</td>

@@ -384,7 +384,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
     </tr>
     </tbody></table>
 
-  x1QuantMode、x2QuantMode、commQuantMode的枚举值与[量化模式](../../../docs/zh/context/quant_mode_introduction.md)关系如下:
+  x1QuantMode、x2QuantMode、commQuantMode的枚举值与[量化模式](../../../docs/zh/context/quant_mode_introduction.md)关系如下：
   * 0: 不量化
   * 1: pertensor
   * 2: perchannel
@@ -517,7 +517,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
   - <term>Ascend 950PR&950DT系列产品</term>：在x1QuantMode为pertoken动态量化场景下，不支持传入x1ScaleOptional。
   <!-- end id15 -->
 
-* groupSize相关约束:
+* groupSize相关约束：
   - 仅当x1ScaleOptional和x2Scale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
   - 传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据x1/x2/x1ScaleOptional/x2Scale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。原理：假设groupSizeM=0，表示m方向量化分组值由接口推断，推断公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与x1 shape中的m一致，scaleM与x1ScaleOptional shape中的m一致，k和n方向同理。
     $$
@@ -658,7 +658,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="910b" id22 -->
 - <term>Atlas A2系列产品</term>：

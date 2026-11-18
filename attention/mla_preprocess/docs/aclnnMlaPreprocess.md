@@ -572,7 +572,7 @@ aclnnStatus aclnnMlaPreprocess(
       <td>输出</td>
       <td>表示Key经过ReshapeAndCache后的输出。</td>
       <td>shape和dtype随cacheMode变化：<ul>
-        <li>cacheMode为0：shape为[blockNum, blockSize, 1, 576]， dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
+        <li>cacheMode为0：shape为[blockNum, blockSize, 1, 576]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1：shape为[blockNum, blockSize, 1, 512]， dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为2：shape为[blockNum, 16, blockSize, 32]，dtype为INT8，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li>
         <li>cacheMode为3：shape为[blockNum, 32, blockSize, 16]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li></ul>
@@ -634,7 +634,7 @@ aclnnStatus aclnnMlaPreprocess(
 
 - **返回值**
 
-  aclnnStatus: 返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
   第一段接口完成入参校验，出现以下场景时报错：
   <table style="undefined;table-layout: fixed; width: 1155px"><colgroup>

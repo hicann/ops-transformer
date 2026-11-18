@@ -382,7 +382,7 @@ aclnnStatus aclnnFusedCausalConv1dV2(
       <td>cacheIndicesOptional（aclTensor*）</td>
       <td>输入</td>
       <td>缓存索引，指定每个序列对应的缓存状态在convStates中的索引。</td>
-      <td><ul><li>不支持空tensor，APC开启时不能为None且必须为二维。</li><li>1维shape[batch,]或2维shape[batch, maxNumBlocks], maxNumBlocks范围[1,1024]。</li><li>值需要互不相同（除非等于padSlotId）。</li></ul></td>
+      <td><ul><li>不支持空tensor，APC开启时不能为None且必须为二维。</li><li>1维shape[batch,]或2维shape[batch, maxNumBlocks]，maxNumBlocks范围[1,1024]。</li><li>值需要互不相同（除非等于padSlotId）。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1-2</td>
@@ -412,7 +412,7 @@ aclnnStatus aclnnFusedCausalConv1dV2(
       <td>numAcceptedTokensOptional（aclTensor*）</td>
       <td>输入</td>
       <td>公式中的numAcceptedTokens，表示每个batch的投机数。</td>
-      <td><ul><li>prefile对应的元素值为0, decode时，1<=numAcceptedTokens中的值<=seqlen -1，seqlen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
+      <td><ul><li>prefile对应的元素值为0，decode时，1<=numAcceptedTokens中的值<=seqlen -1，seqlen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
@@ -662,7 +662,7 @@ aclnnStatus aclnnFusedCausalConv1dV2(
     - convStates必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndicesOptional不等于padSlotId的batch个数）。
     - queryStartLocOptional必须存在。
     - cacheIndicesOptional为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G]，batch范围[1, 256]。
     - maxNumBlocks >= ceil(maxQueryLen, blockSize)。
     - maxQueryLen > maxDraftTokens + 1。
   - prefill和decode混合场景：
@@ -703,7 +703,7 @@ aclnnStatus aclnnFusedCausalConv1dV2(
     - blockIdxLastScheduledTokenOptional[i] < maxNumBlocks
   - numAcceptedTokensOptional分为None和非None，非None情况下长度为batch，prefill对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seqLen-1。
   - numComputedTokensOptional中每个元素取值大于等于0。
-  - cacheIndicesOptional的取值范围为[0, convStates.dim[0]-1],且值均不能相等（除非等于padSlotId）。
+  - cacheIndicesOptional的取值范围为[0, convStates.dim[0]-1]，且值均不能相等（除非等于padSlotId）。
   - maxQueryLen = batch中的最大seqLen。
   - maxDraftTokens的取值范围为[0, 16]。
   - Pangu V2 模式（convMode = 1）下，numComputedTokensOptional不能为 None。

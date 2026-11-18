@@ -23,8 +23,8 @@
 
 ## 功能说明
 
-- 接口功能:
-    aclnnMatmulReduceScatterV2接口是对aclnnMatmulReduceScatter接口的功能扩展，在支持x1和x2输入类型为FLOAT16/BFLOAT16的基础上，
+- 接口功能：
+    aclnnMatmulReduceScatterV2接口是对aclnnMatmulReduceScatter接口的功能扩展，在支持x1和x2输入类型为FLOAT16/BFLOAT16的基础上：
 
     <!-- npu="950" id7 -->
     - <term>Ascend 950PR&950DT系列产品</term>：
@@ -49,7 +49,7 @@
         output=ReduceScatter((x1Scale*x2Scale)*(x1@x2) + bias_{optional})
         $$
 
-    - 情形3：如果x1和x2数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8的perblock场景，且不输出amaxOut，当x1的shape为(m, k)、x2的shape为(k, n)时， x1Scale的shape为(ceildiv(m, 128), ceildiv(k, 128))、x2Scale的shape为(ceildiv(k, 128), ceildiv(n, 128))时，入参x1、x2进行matmul计算和dequant计算后，再进行ReduceScatter通信。
+    - 情形3：如果x1和x2数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8的perblock场景，且不输出amaxOut，当x1的shape为(m, k)、x2的shape为(k, n)时，x1Scale的shape为(ceildiv(m, 128), ceildiv(k, 128))、x2Scale的shape为(ceildiv(k, 128), ceildiv(n, 128))时，入参x1、x2进行matmul计算和dequant计算后，再进行ReduceScatter通信。
 
         $$
         output=ReduceScatter(\sum_{0}^{\left \lfloor \frac{k}{blockSize=128} \right \rfloor} (x1_{pr}@x2_{rq}*(x1Scale_{pr}*x2Scale_{rq})))
@@ -184,7 +184,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>blockSize（int64_t）</td>
         <td>输入</td>
         <td>用于表示mm输出矩阵在M轴方向上和N轴方向上可以用于对应方向上的多少个数的量化。</td>
-        <td>blockSize由blockSizeM、blockSizeN、blockSizeK三个值拼接而成，每个值占16位，计算公式为blockSize = blockSizeK | blockSizeN << 16 | blockSizeM << 32，mm输出矩阵不涉及K轴，blockSizeK固定为0,当前版本只支持blockSizeM=blockSizeN=0。</td>
+        <td>blockSize由blockSizeM、blockSizeN、blockSizeK三个值拼接而成，每个值占16位，计算公式为blockSize = blockSizeK | blockSizeN << 16 | blockSizeM << 32，mm输出矩阵不涉及K轴，blockSizeK固定为0，当前版本只支持blockSizeM=blockSizeN=0。</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -308,7 +308,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         - bias：如果x1的数据类型是FLOAT16、BFLOAT16，则bias的数据类型必须为FLOAT16、BFLOAT16。如果x1的数据类型是FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1时，在pertensor和mx量化场景下，bias的数据类型必须为FLOAT。在perblock场景下，仅支持输入为nullptr。
         - x1Scale：当x1和x2数据类型为FLOAT16、BFLOAT16时，仅支持输入为nullptr。在pertensor场景下，shape为[1]。在perblock场景下，shape为[ceildiv(m, 128), ceildiv(k, 128)]。在pertensor和perblock场景下，数据类型支持FLOAT。在mx量化场景下（MXFP8和MXFP4），数据类型为FLOAT8_E8M0，shape为(m, ceilDiv(k, 64), 2)。
         - x2Scale：当x1和x2数据类型为FLOAT16、BFLOAT16时，仅支持输入为nullptr。在pertensor场景下，shape为[1]。在perblock场景下，shape为[ceildiv(k, 128), ceildiv(n, 128)]。在pertensor和perblock场景下，数据类型支持FLOAT。在mx场景下（MXFP8和MXFP4），数据类型为FLOAT8_E8M0，当x2转置时shape为(n, ceilDiv(k, 64), 2)，当x2不转置时shape为(ceilDiv(k, 64), n, 2)。
-        - groupSize:
+        - groupSize：
             - 仅当x1Scale和x2Scale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
             - groupSize值支持公式推导：传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据x1/x2/x1Scale/x2Scale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。设置原理：如果groupSizeM=0，表示m方向量化分组值由接口推导，推导公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与x1 shape中的m一致，scaleM与x1Scale shape中的m一致；如果groupSizeK=0，表示k方向量化分组值由接口推导，推导公式为groupSizeK = k / scaleK（需保证k能被scaleK整除），其中k与x1 shape中的k一致，scaleK与x1Scale shape中的k一致；如果groupSizeN=0，表示n方向量化分组值由接口推导，推导公式为groupSizeN = n / scaleN（需保证n能被scaleN整除），其中n与x2 shape中的n一致，scaleN与x2Scale shape中的n一致。
             $$
@@ -407,7 +407,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
   - <term>Atlas A3系列产品</term>：仅支持commMode为"aiv"，且通信缓冲区大于等于200MB。
   <!-- end id12 -->
   <!-- npu="950" id13 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：当前版本仅支持输入commMode为“ai_cpu” 或 “ccu”。
+  - <term>Ascend 950PR&950DT系列产品</term>：当前版本仅支持输入commMode为“ai_cpu”或“ccu”。
 
   <!-- end id13 -->
 
@@ -420,10 +420,10 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - 输入x1为2维，其shape为\(m, k\)，m须为卡数rank\_size的整数倍。
     - 输入x2为2维，其viewshape必须为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。
     - bias为1维，shape为\(n,\)。
-    - 输出为2维，其shape为\(m/rank\_size, n\), rank\_size为卡数。
+    - 输出为2维，其shape为\(m/rank\_size, n\)，rank\_size为卡数。
     - 当x1、x2的数据类型为FLOAT16/BFLOAT16时，x1/x2支持的空tensor场景，m和n可以为空，k不可为空，且需满足以下条件：
-        - m为空，k不为空，n不为空；
-        - m不为空，k不为空，n为空；
+        - m为空，k不为空，n不为空。
+        - m不为空，k不为空，n为空。
         - m为空，k不为空，n为空。
     - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1时，不支持空tensor。
     - 当x1、x2的数据类型为FLOAT16/BFLOAT16/HIFLOAT8/FLOAT4_E2M1时，x1和x2的数据类型需要保持一致。
@@ -451,10 +451,10 @@ aclnnStatus aclnnMatmulReduceScatterV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="A3,910b" id16 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  ：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
     ```c++
     #include <iostream>

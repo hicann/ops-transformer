@@ -28,9 +28,9 @@
 
   注意力的正向计算公式如下：
 
-  - psetype=1时，与[aclnnFlashAttentionVarLenScore](./aclnnFlashAttentionVarLenScore.md)计算公式相同。
+  - pseType=1时，与[aclnnFlashAttentionVarLenScore](./aclnnFlashAttentionVarLenScore.md)计算公式相同。
 
-  - psetype=其他取值时，公式如下：
+  - pseType=其他取值时，公式如下：
 
     $$
     attention\_out=Dropout(Softmax(Mask(scale*(query*key^T) + pse),atten\_mask),keep\_prob)*value
@@ -458,9 +458,9 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV2(
 
 - 确定性计算：
   - aclnnFlashAttentionVarLenScoreV2默认确定性实现。
-- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配
+- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - 输入query、key、value的约束如下：
-  - B：batchsize必须相等。
+  - B：Batch Size必须相等。
   - D：Head-Dim必须满足(qD == kD && kD >= vD)。
   - inputLayout必须一致。
 - 关于数据shape的约束，其中：
@@ -472,9 +472,9 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV2(
   - 参数每个batch不相同时，shape为BNHSkv(H=1024)。
   - 每个batch相同时，shape为1NHSkv(H=1024)。
   - TND场景下，每个batch段内部仍按[N, Sq\_i, Skv\_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq\_i、真实key/value长度为Skv\_i，则该段PSE元素个数为N\*Sq_i\*Skv_i，整段PSE总长度pseTotalLen为sum_i(N\*Sq_i\*Skv_i)。
-  - 如果pseType为2或3的时候，数据类型需为FLOAT32,对应shape支持范围是[B,N]或[N]。
+  - 如果pseType为2或3的时候，数据类型需为FLOAT32，对应shape支持范围是[B,N]或[N]。
   - 如果不开启该参数，realShiftOptional需要传入nullptr，pseType需要传入1。
-- pseType各个取值含义
+- pseType各个取值含义。
 
     | pseType     | 含义                              |      备注   |
     | ----------- | --------------------------------- | ----------|
@@ -485,9 +485,9 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV2(
 
 - pseType为2或3的时候，当前只支持Sq和Skv等长。
 - innerPrecise：当前0、1为保留配置值，2为开启无效行计算，其功能是避免在计算过程中存在整行mask进而导致精度有损失，但是该配置会导致性能下降。如果算子可判断出存在无效行场景，会自动开启无效行计算，例如sparseMode为3，Sq > Skv场景。
-- sparseMode的约束如下:
-  - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量；
-  - 配置为1、2、3时，用户配置的preTokens、nextTokens不会生效；
+- sparseMode的约束如下：
+  - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量。
+  - 配置为1、2、3时，用户配置的preTokens、nextTokens不会生效。
   - 配置为0、4时，须保证attenMaskOptional与preTokens、nextTokens的范围一致。
   - 用户不特意指定时建议传入0。
   - sparse不同模式的详细说明请参见[sparse模式说明](../../../docs/zh/context/sparse_mode_introduction.md)。

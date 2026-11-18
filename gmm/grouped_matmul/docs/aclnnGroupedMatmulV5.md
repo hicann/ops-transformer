@@ -122,7 +122,7 @@ $$
   y_i=x_i\times (weight_i + antiquant\_offset_i) * antiquant\_scale_i + bias_i
   $$
 
-- x为INT8，weight为INT4（仅支持x、weight、y均为单tensor的场景）。其中$bias$为必选参数，是离线计算的辅助结果，且 $bias_i=8\times weight_i  * scale_i$ ，并沿k轴规约。
+- x为INT8，weight为INT4（仅支持x、weight、y均为单tensor的场景）。其中$bias$为必选参数，是离线计算的辅助结果，且 $bias_i=8\times weight_i  * scale_i$，并沿k轴规约。
 
   $$
   y_i=((x_i - 8) \times weight_i * scale_i+bias_i ) * per\_token\_scale_i
@@ -329,7 +329,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 
 #### groupType 支持场景
 
-> x、weight、y 输入为 aclTensorList。"单" = 单元素TensorList，"多" = 多元素TensorList。
+> x、weight、y 输入为 aclTensorList。“单” = 单元素TensorList，“多” = 多元素TensorList。
 
 | groupType | x | weight | y | splitItem | groupListOptional | 转置 | 其余场景限制 |
 |:---:|:---:|:---:|:---:|:---:|:---|:---|:---|
@@ -682,7 +682,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 
 - **约束说明**
 
-  除平台约束外，非量化场景其余约束如下
+  除平台约束外，非量化场景其余约束如下：
   - 支持 groupType=-1、0、2，actType=0，groupListType=0/1/2。
 
 </details>
@@ -705,7 +705,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 
 - **约束说明**
 
-  除平台约束外，A8W8场景其余约束如下
+  除平台约束外，A8W8场景其余约束如下：
   - 仅支持groupType=0（M轴分组）
   - 当前仅支持x、weight、out均为长度为1的TensorList
   - x不支持转置
@@ -751,7 +751,7 @@ aclnnGroupedMatmulV5默认确定性实现。
   - weight的数据格式为ND时，要求n为8的整数倍。
   - 支持perchannel和pergroup量化。perchannel场景的scale的shape需为 $[E, N]$，pergroup场景需为 $[E, G, N]$。
   - pergroup场景下，$G$必须要能整除$K$，且$k/G$需为偶数。
-  - 开启右矩阵NZ转置后，$K/G$必须按照64对齐， K按照64对齐， N按照16对齐。
+  - 开启右矩阵NZ转置后，$K/G$必须按照64对齐，K按照64对齐，N按照16对齐。
 
 </details>
 
@@ -787,7 +787,7 @@ aclnnGroupedMatmulV5默认确定性实现。
     - scale为pergroup与perchannel离线融合后的结果，shape要求为 $[E, quantGroupNum, N]$，其中 $quantGroupNum = k \div quantGroupSize$，当前支持quantGroupSize=64/128/256
     - 该场景下offsetOptional不为空。非对称量化offsetOptional为计算过程中离线计算辅助结果，即 $antiquantOffset \times scale$，shape要求为 $[E, quantGroupNum, N]$，dtype为FLOAT32
     - 该场景不支持使能tuningConfigOptional第二位
-  - tuningConfigOptional数组第二个元素可置1，以使能A8W4场景(仅支持perchannel)中weight的特殊格式模板，以优化算子性能(性能优势的shape范围参考：K >= 2048 && N >= 2048)。需要说明的是，该模板要求weight的shape为（E，N，K）,然后再对其进行ND2NZ转换后作为算子输入
+  - tuningConfigOptional数组第二个元素可置1，以使能A8W4场景（仅支持perchannel）中weight的特殊格式模板，以优化算子性能（性能优势的shape范围参考：K >= 2048 && N >= 2048）。需要说明的是，该模板要求weight的shape为（E，N，K），然后再对其进行ND2NZ转换后作为算子输入
 
 </details>
 

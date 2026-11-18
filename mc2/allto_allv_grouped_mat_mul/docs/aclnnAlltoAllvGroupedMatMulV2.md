@@ -435,7 +435,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
   - `sendCounts`或`recvCounts`为`nullptr`、空数组时，由接口入口检查并返回`ACLNN_ERR_PARAM_INVALID`（161002）。
 
 <!-- npu="A3" id10 -->
-- <term>Atlas A3系列产品</term>  : 单卡通信量在2MB以下可能存在性能劣化。
+- <term>Atlas A3系列产品</term>：单卡通信量在2MB以下可能存在性能劣化。
 
 <!-- end id10 -->
 

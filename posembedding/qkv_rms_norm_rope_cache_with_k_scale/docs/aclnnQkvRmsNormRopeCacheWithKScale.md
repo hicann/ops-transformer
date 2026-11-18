@@ -24,8 +24,8 @@
 ## 功能说明
 
 - 接口功能：`aclnnQkvRmsNormRopeCacheWithKScale`在一次调用中完成融合QKV拆分、Q/K RMSNorm与位置编码、按场景执行Q/K矩阵乘或量化，并更新PagedAttention KV Cache。Q分支根据场景写入`qOut`和`qScaleOptional`；K、V分支根据`slotMapping`原地更新`kCacheRef`、`vCacheRef`和`kScaleCacheRef`。当前支持三种完整语义场景：
-  - RoPE：Q/K执行`RMSNorm -> RoPE -> rotation -> PerTokenPerHead量化`，Q/K数据为FP8 E4M3FN、scale为FP32；
-  - M-RoPE：Q/K执行`RMSNorm -> M-RoPE -> rotation`，Q直接输出BF16，K执行PerTokenPerHead INT8量化；
+  - RoPE：Q/K执行`RMSNorm -> RoPE -> rotation -> PerTokenPerHead量化`，Q/K数据为FP8 E4M3FN、scale为FP32。
+  - M-RoPE：Q/K执行`RMSNorm -> M-RoPE -> rotation`，Q直接输出BF16，K执行PerTokenPerHead INT8量化。
   - M-RoPE MX：Q/K执行`RMSNorm -> M-RoPE -> Dynamic MX Quant`，不执行`rotationOptional`；每个D32 block使用cuBLAS MX FP8的FLOAT8_E8M0二次幂scale量化为FP8 E4M3FN。
   V分支不执行RMSNorm、位置编码或矩阵乘；M-RoPE MX使用`vScaleOptional[Nv,D]`进行per-head-per-channel静态量化并输出FP8 E4M3FN。
 

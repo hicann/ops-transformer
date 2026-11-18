@@ -555,7 +555,7 @@ aclnnStatus aclnnMhcPreBackwardV2(
 - 确定性计算：
   - aclnnMhcPreBackwardV2默认采用确定性实现。
 
-- 规格约束
+- 规格约束：
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
     <table style="undefined;table-layout: fixed; width: 600px"><colgroup>

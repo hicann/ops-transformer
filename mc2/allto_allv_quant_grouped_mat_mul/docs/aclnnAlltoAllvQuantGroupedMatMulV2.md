@@ -281,7 +281,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(
     <tr>
         <td>group</td>
         <td>输入</td>
-        <td>专家并行的通信域名，字符串长度要求 (0, 128)。</td>
+        <td>专家并行的通信域名，字符串长度要求(0, 128)。</td>
         <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
         <td>STRING</td>
         <td>-</td>
@@ -420,7 +420,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(
     </tr>
     </tbody></table>
 
-- gmmXQuantMode、gmmWeightQuantMode、mmXQuantMode、mmWeightQuantMode的枚举值跟量化模式关系如下:
+- gmmXQuantMode、gmmWeightQuantMode、mmXQuantMode、mmWeightQuantMode的枚举值跟量化模式关系如下：
   - 0: 非量化
   - 1: pertensor
   - 2: perchannel

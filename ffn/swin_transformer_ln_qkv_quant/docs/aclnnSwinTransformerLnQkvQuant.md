@@ -99,7 +99,7 @@ aclnnStatus aclnnSwinTransformerLnQkvQuant(
       <td>-</td>
       <td>FLOAT16</td>
       <td>ND</td>
-      <td>只支持维度为[B,S,H]，其中B为batch size且只支持[1,32],S为原始图像长宽的乘积，H为序列长度和通道数的乘积且小于等于1024</td>
+      <td>只支持维度为[B,S,H]，其中B为batch size且只支持[1,32]，S为原始图像长宽的乘积，H为序列长度和通道数的乘积且小于等于1024</td>
       <td>-</td>
     </tr>
     <tr>

@@ -74,7 +74,7 @@
     \alpha(l) = \begin{cases} 1 & l \bmod 3 = 1 \ \text{且}\ l < 3 m_1 \\ 2 & l \bmod 3 = 2 \ \text{且}\ l < 3 m_2 \\ 0 & \text{其他} \end{cases}
     $$
 
-    该规则只读取`mropeSection`的第2、3个分量（m<sub>1</sub>、m<sub>2</sub>），第1个分量m<sub>0</sub>不参与计算，时间轴是"其余全归它"的兜底轴。因此`mropeSection=[16,16,16]`实际得到时间/高度/宽度 = 32/16/16，而`[64,16,16]`与`[0,16,16]`的轴映射逐位相同。`mropeSection`为空时α(l) ≡ 0，退化为标准RoPE。非接口参数。
+    该规则只读取`mropeSection`的第2、3个分量（m<sub>1</sub>、m<sub>2</sub>），第1个分量m<sub>0</sub>不参与计算，时间轴是“其余全归它”的兜底轴。因此`mropeSection=[16,16,16]`实际得到时间/高度/宽度 = 32/16/16，而`[64,16,16]`与`[0,16,16]`的轴映射逐位相同。`mropeSection`为空时α(l) ≡ 0，退化为标准RoPE。非接口参数。
 
   - cos<sub>l</sub>、sin<sub>l</sub>：按α(l)选轴、以`positions`中对应位置值为行号从`cosSinCache`查得的旋转角分量，非接口参数。
   - x<sub>h</sub>：单个头的D维输入向量，从X<sub>t</sub>中按头拆分得到，非接口参数。

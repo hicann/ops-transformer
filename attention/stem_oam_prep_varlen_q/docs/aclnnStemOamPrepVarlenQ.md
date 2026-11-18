@@ -38,14 +38,14 @@
   阶段4 Flatten:
   $$qflat[b, h, qb, g \times D : (g+1) \times D] = Q\_group\_sum[b, h, qb, g, :]$$
 
-  阶段5 Cast输出:
+  阶段5 Cast输出：
   $$qflat\_out = qflat.to(\text{BF16})$$
 
 - 关键特性：Q侧stride维度为自然顺序（不翻转），与K侧的翻转处理不同。
 
 ## 函数原型
 
-每个算子分为两段式接口，必须先调用"aclnnStemOamPrepVarlenQGetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnStemOamPrepVarlenQ"接口执行计算。
+每个算子分为两段式接口，必须先调用“aclnnStemOamPrepVarlenQGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnStemOamPrepVarlenQ”接口执行计算。
 
 ```cpp
 aclnnStatus aclnnStemOamPrepVarlenQGetWorkspaceSize(
@@ -137,7 +137,7 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
     <tr>
       <td>stemBlockSize（int64_t）</td>
       <td>输入</td>
-      <td>表示stem block大小,对应公式中B。控制每个stem block的token数量,决定Q Processing的分组粒度。</td>
+      <td>表示stem block大小，对应公式中B。控制每个stem block的token数量，决定Q Processing的分组粒度。</td>
       <td><ul><li>仅支持128。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -147,7 +147,7 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
     <tr>
       <td>stemStride（int64_t）</td>
       <td>输入</td>
-      <td>表示stem stride大小,对应公式中S。控制stem block内stride group的token数量,决定qFlat的维度粒度。</td>
+      <td>表示stem stride大小，对应公式中S。控制stem block内stride group的token数量，决定qFlat的维度粒度。</td>
       <td><ul><li>仅支持16。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -267,7 +267,7 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
 
 - 确定性说明：aclnnStemOamPrepVarlenQ默认确定性实现。
 - q的最后一维D必须等于128。
-- stemBlockSize仅支持128，stemStride仅支持16。派生值：R = stemBlockSize / stemStride = 8, kflat_dim = stemStride × D = 2048。
+- stemBlockSize仅支持128，stemStride仅支持16。派生值：R = stemBlockSize / stemStride = 8，kflat_dim = stemStride × D = 2048。
 - qFlat输出维度kflat_dim = stemStride × D = 16 × 128 = 2048。
 - Q侧stride维度为自然顺序（g ∈ [0, S-1]），不翻转（与K侧处理不同）。
 - 当qSeqLens中某batch值为0时，该batch对应的qFlat输出填充为零。

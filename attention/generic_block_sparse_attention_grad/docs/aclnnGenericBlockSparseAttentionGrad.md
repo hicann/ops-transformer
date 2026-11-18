@@ -211,7 +211,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   </td>
                   <td>FLOAT32</td>
                   <td>ND</td>
-                  <td>TND：(T1,N1,1)；BNSD：(B,N1,S1,1)；BSND：(B,S1,N1,1)或(B,N1,S1,1)，详见约束说明</td>
+                  <td>TND：(T1,N1,1)；BNSD：(B,N1,S1,1)；BSND：(B,S1,N1,1)或(B,N1,S1,1)，详见约束说明。</td>
                   <td>√</td>
               </tr>
               <tr>

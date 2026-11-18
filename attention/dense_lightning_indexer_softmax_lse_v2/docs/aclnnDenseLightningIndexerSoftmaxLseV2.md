@@ -76,7 +76,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
 
 ## aclnnDenseLightningIndexerSoftmaxLseV2GetWorkspaceSize
 
-- **参数说明:**
+- **参数说明：**
 
     <table style="undefined;table-layout: fixed; width: 1550px">
     <colgroup>

@@ -296,7 +296,7 @@ aclnnStatus aclnnNsaCompressWithCache(
       <td>activeNum、expertNum、expertCapacity的值小于0。</td>
     </tr>
     <tr>
-      <td>compress_block_size、compress_stride不是16的整数倍</td>
+      <td>compress_block_size、compress_stride不是16的整数倍。</td>
     </tr>
     <tr>
       <td>compress_stride小于等于0。</td>
