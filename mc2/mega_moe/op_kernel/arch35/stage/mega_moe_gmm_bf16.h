@@ -22,14 +22,15 @@ struct Bf16GmmBlockContext {
     template <typename Block>
     __aicore__ inline void Init(Block& block, uint32_t tileN = MegaMoeBf16GmmConfig::TILE_N) const
     {
+        using C = MegaMoeBf16GmmConfig;
         typename Block::Params params{};
-        params.mL1 = MegaMoeBf16GmmConfig::TILE_M;
+        params.mL1 = C::TILE_M;
         params.nL1 = tileN;
-        params.kL1 = MegaMoeBf16GmmConfig::L1_TILE_K;
-        params.mL0 = MegaMoeBf16GmmConfig::L0_TILE_M;
+        params.kL1 = C::L1_TILE_K;
+        params.mL0 = C::L0_TILE_M;
         params.nL0 = tileN;
-        params.kL0 = MegaMoeBf16GmmConfig::L0_TILE_K;
-        params.l1Stages = MegaMoeBf16GmmConfig::BUFFER_COUNT;
+        params.kL0 = C::L0_TILE_K;
+        params.l1Stages = C::BUFFER_COUNT;
         params.l0cStages = 1U;
         block.Init(params);
     }
@@ -62,8 +63,8 @@ struct ProblemConfig {
 
 // GMM2 按 128 行 L0 分条计算，结果以 BF16 写回 GM。
 template <typename Block, typename TensorA, typename TensorB, typename TensorC>
-__aicore__ inline void ComputeGmm2Tile(Block& block, TensorA& a, TensorB& b, TensorC& c, uint32_t row, uint32_t column,
-                                       uint32_t rows, uint32_t columns, uint32_t k)
+__aicore__ inline void ComputeTile(Block& block, TensorA& a, TensorB& b, TensorC& c, uint32_t row, uint32_t column,
+                                   uint32_t rows, uint32_t columns, uint32_t k)
 {
     auto bias = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(static_cast<__gm__ float*>(nullptr)),
                                      asc::te::frame_layout_format<asc::te::nd_ext_layout_ptn>{}(1U, columns));
@@ -83,24 +84,25 @@ template <typename Block, typename TensorA, typename TensorB, typename TensorC, 
 __aicore__ inline void ComputeGmm1Tile(Block& block, TensorA& a, TensorB& b, TensorC& ub, const Coord& coord,
                                        const Extent& extent, const ProblemConfig& config)
 {
-    const uint32_t branchColumnOffset = Get<N_VALUE>(coord) / config.activationOutputDivisor;
-    const uint32_t branchColumnCount = Get<N_VALUE>(extent) / config.activationOutputDivisor;
+    using C = MegaMoeBf16GmmConfig;
+    const uint32_t column = Get<N_VALUE>(coord) / config.activationOutputDivisor;
+    const uint32_t columns = Get<N_VALUE>(extent) / config.activationOutputDivisor;
     const uint32_t branchWidth = config.n / config.activationOutputDivisor;
-    const uint32_t ubBranchWidth = MegaMoeBf16GmmConfig::TILE_N / config.activationOutputDivisor;
+    const uint32_t ubBranchWidth = C::TILE_N / config.activationOutputDivisor;
     auto bias = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(static_cast<__gm__ float*>(nullptr)),
-                                     MakeLayout{}(1U, branchColumnCount));
-    for (uint32_t offset = 0U; offset < Get<M_VALUE>(extent); offset += MegaMoeBf16GmmConfig::L0_TILE_M) {
+                                     MakeLayout{}(1U, columns));
+    for (uint32_t offset = 0U; offset < Get<M_VALUE>(extent); offset += C::L0_TILE_M) {
         const uint32_t remaining = Get<M_VALUE>(extent) - offset;
-        const uint32_t rows = remaining < MegaMoeBf16GmmConfig::L0_TILE_M ? remaining : MegaMoeBf16GmmConfig::L0_TILE_M;
+        const uint32_t rows = remaining < C::L0_TILE_M ? remaining : C::L0_TILE_M;
         auto tileA =
             a.slice(asc::te::make_coord(Get<M_VALUE>(coord) + offset, 0U), asc::te::make_shape(rows, config.k));
         for (uint32_t branch = 0U; branch < config.activationOutputDivisor; ++branch) {
-            auto tileB = b.slice(asc::te::make_coord(0U, branchColumnOffset + branch * branchWidth),
-                                 asc::te::make_shape(config.k, branchColumnCount));
-            auto tileC = ub.slice(asc::te::make_coord(offset, branch * ubBranchWidth),
-                                  asc::te::make_shape(rows, branchColumnCount));
+            auto tileB =
+                b.slice(asc::te::make_coord(0U, column + branch * branchWidth), asc::te::make_shape(config.k, columns));
+            auto tileC =
+                ub.slice(asc::te::make_coord(offset, branch * ubBranchWidth), asc::te::make_shape(rows, columns));
             Gmm1OutputView<decltype(tileC)> output{tileC};
-            typename Block::TupleShape shape{rows, branchColumnCount, config.k, 0U};
+            typename Block::TupleShape shape{rows, columns, config.k, 0U};
             block(tileA, tileB, bias, output, shape);
         }
     }
@@ -111,18 +113,19 @@ __aicore__ inline void RunGmm1Aic(const Bf16GmmBlockContext& context, GmmKernel:
                                   const GMMAddrInfo& addresses, const ProblemConfig& config, uint32_t first,
                                   uint32_t tiles, GmmRuntimeState& runtimeState)
 {
-    typename Kernel<WeightNZ>::Block block;
-    context.Init(block, MegaMoeBf16GmmConfig::TILE_N / config.activationOutputDivisor);
+    using C = MegaMoeBf16GmmConfig;
+    using K = Kernel<WeightNZ>;
+    typename K::Block block;
+    context.Init(block, C::TILE_N / config.activationOutputDivisor);
     auto a = asc::te::make_tensor(
         asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ bfloat16_t*>(addresses.aGlobal)),
         MakeLayout{}(config.m, config.k));
     auto b = asc::te::make_tensor(
         asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ bfloat16_t*>(addresses.bGlobal)),
-        typename Kernel<WeightNZ>::MakeLayoutB{}(config.k, config.n));
+        typename K::MakeLayoutB{}(config.k, config.n));
     auto ub = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, bfloat16_t>(0U),
-                                   MakeLayout{}(MegaMoeBf16GmmConfig::TILE_M, MegaMoeBf16GmmConfig::TILE_N));
-    Gmm1UbActivationSyncBase<MegaMoeBf16GmmConfig::GMM1_UB_BUFFER_COUNT> sync(runtimeState.vecSetSyncCom,
-                                                                              runtimeState.pingpongIdx);
+                                   MakeLayout{}(C::TILE_M, C::TILE_N));
+    Gmm1UbActivationSyncBase<C::GMM1_UB_BUFFER_COUNT> sync(runtimeState.vecSetSyncCom, runtimeState.pingpongIdx);
     uint32_t lastWaveWaited = static_cast<uint32_t>(-1);
     for (uint32_t tile = first; tile < tiles; tile += config.blockNum) {
         const auto coord = scheduler.GetBlockCoord(tile);
@@ -161,13 +164,13 @@ __aicore__ inline void RunGmm1(const Bf16GmmBlockContext& context, Epilogue& epi
                                const GMMAddrInfo& addresses, const BlockJobContext& job, GmmRuntimeState& runtimeState,
                                uint32_t divisor)
 {
+    using C = MegaMoeBf16GmmConfig;
     const uint32_t m = static_cast<uint32_t>(Get<M_VALUE>(shape));
     const uint32_t n = static_cast<uint32_t>(Get<N_VALUE>(shape));
     const uint32_t k = static_cast<uint32_t>(Get<K_VALUE>(shape));
-    const ProblemConfig config{m, n, k, MegaMoeBf16GmmConfig::TILE_M, job.totalJobs, job.jobIndex, divisor};
+    const ProblemConfig config{m, n, k, C::TILE_M, job.totalJobs, job.jobIndex, divisor};
     GmmKernel::BlockScheduler scheduler(
-        {m, n, k}, GmmKernel::BlockScheduler::Params{asc::te::make_coord(int64_t{MegaMoeBf16GmmConfig::TILE_M},
-                                                                         int64_t{MegaMoeBf16GmmConfig::TILE_N})});
+        {m, n, k}, GmmKernel::BlockScheduler::Params{asc::te::make_coord(int64_t{C::TILE_M}, int64_t{C::TILE_N})});
     const uint32_t tiles = static_cast<uint32_t>(scheduler.GetTileNum());
     const uint32_t first = (job.jobIndex + job.totalJobs - runtimeState.startBlockIdx) % job.totalJobs;
     if constexpr (g_coreType == AIC) {
@@ -183,27 +186,28 @@ __aicore__ inline void RunGmm2(const Bf16GmmBlockContext& context, const Problem
                                const GMMAddrInfo& addresses, const Params& params, const BlockJobContext& job,
                                uint32_t& startBlockIdx, uint32_t divisor)
 {
+    using C = MegaMoeBf16GmmConfig;
+    using K = Kernel<WeightNZ>;
     const uint32_t m = static_cast<uint32_t>(Get<M_VALUE>(shape));
     const uint32_t n = static_cast<uint32_t>(Get<K_VALUE>(shape));
     const uint32_t k = static_cast<uint32_t>(Get<N_VALUE>(shape)) / divisor;
-    const ProblemConfig config{m, n, k, MegaMoeBf16GmmConfig::TILE_M, job.totalJobs, job.jobIndex, divisor};
+    const ProblemConfig config{m, n, k, C::TILE_M, job.totalJobs, job.jobIndex, divisor};
     GmmKernel::BlockScheduler scheduler(
-        {m, n, k}, GmmKernel::BlockScheduler::Params{asc::te::make_coord(int64_t{MegaMoeBf16GmmConfig::TILE_M},
-                                                                         int64_t{MegaMoeBf16GmmConfig::TILE_N})});
+        {m, n, k}, GmmKernel::BlockScheduler::Params{asc::te::make_coord(int64_t{C::TILE_M}, int64_t{C::TILE_N})});
     const uint32_t tiles = static_cast<uint32_t>(scheduler.GetTileNum());
     const uint32_t first = (job.jobIndex + job.totalJobs - startBlockIdx) % job.totalJobs;
     auto c = asc::te::make_tensor(
         asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ bfloat16_t*>(addresses.gmm2OutGlobal)),
         MakeLayout{}(m, n));
     if constexpr (g_coreType == AIC) {
-        typename Kernel<WeightNZ>::Block block;
+        typename K::Block block;
         context.Init(block);
         auto a = asc::te::make_tensor(
             asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ bfloat16_t*>(addresses.aGlobal)),
             MakeLayout{}(m, k));
         auto b = asc::te::make_tensor(
             asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ bfloat16_t*>(addresses.bGlobal)),
-            typename Kernel<WeightNZ>::MakeLayoutB{}(k, n));
+            typename K::MakeLayoutB{}(k, n));
         for (uint32_t tile = first; tile < tiles; tile += job.totalJobs) {
             const auto coord = scheduler.GetBlockCoord(tile);
             const auto extent = scheduler.GetBlockShape(coord);
@@ -212,7 +216,7 @@ __aicore__ inline void RunGmm2(const Bf16GmmBlockContext& context, const Problem
             if constexpr (NotifyCombine) {
                 addresses.gmm2CombineSync->WaitForCombine();
             }
-            ComputeGmm2Tile(block, a, b, c, row, Get<N_VALUE>(coord), Get<M_VALUE>(extent), Get<N_VALUE>(extent), k);
+            ComputeTile(block, a, b, c, row, Get<N_VALUE>(coord), Get<M_VALUE>(extent), Get<N_VALUE>(extent), k);
             if constexpr (NotifyCombine) {
                 addresses.gmm2CombineSync->NotifyCombine();
             } else if constexpr (IsShared) {
