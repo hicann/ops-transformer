@@ -22,6 +22,8 @@
     2. 相关性结果与`q`和`k`对应的反量化系数`q_descale`（$Scale_Q$）和`k_descale`（$Scale_K^T$）相乘，通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
     3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$out$，作为Attention的输入。
 
+- 接口分层说明：算子支持两级TopK候选源(source)模式；aclnn层由[aclnnQuantLightningIndexerV2](./docs/aclnnQuantLightningIndexerV2.md)承接基础接口，由[aclnnQuantLightningIndexerV3](./docs/aclnnQuantLightningIndexerV3.md)承接两级TopK候选源(source)模式。PyTorch层由`quant_lightning_indexer`统一承接：未传入候选参数时返回两个Tensor；同时传入`candidate_topk_blocks`和`candidate_block_size`时返回四个Tensor。两项均为-1时关闭候选选择，仍返回四个Tensor，后两个为空Tensor。
+
 ## 参数说明
 
 | 参数名                     | 输入/输出/属性 | 描述  | 数据类型       | 数据格式   |
@@ -47,8 +49,12 @@
 | mask_mode | 可选属性      | 表示mask的模式，默认值0。 | INT64          | -         |
 | cmp_ratio      | 可选属性      | 用于稀疏计算，表示k的压缩倍数，默认值1。 | INT64          | -         |
 | return_value      |  可选属性     | 表示是否输出`sparse_values`，默认值0。 | INT64          | -         |
+| candidate_topk_blocks | 可选属性 | 候选块输出容量。与candidate_block_size同时提供；两项均为-1时关闭候选选择，开启时仅支持2048。 | INT64 | - |
+| candidate_block_size | 可选属性 | 每个候选逻辑块包含的Key位置数。candidate_topk_blocks为-1时必须为-1，为2048时必须为8；与quant_sparse_lightning_indexer的配置一致。 | INT64 | - |
 | sparse_indices     | 输出      | 公式中的输出Out，参与稀疏attention计算的token索引值。 | INT32          | ND         |
 | sparse_values           | 输出      | 公式中的Indices输出对应的value值。`return_value`为1时shape与`sparse_indices`一致，`return_value`为0时shape为(0,) | BFLOAT16         | ND          |
+| candidate_block_indices | 输出 | 两级TopK候选源(source)模式输出的batch内逻辑块号。BSND布局为[B, S1, N2, candidate_topk_blocks]，TND布局为[T, N2, candidate_topk_blocks]；无效部分填-1，候选关闭时为空Tensor。 | INT32 | ND |
+| candidate_block_length | 输出 | 每行实际有效候选数。BSND布局为[B, S1, N2]，TND布局为[T, N2]；与candidate_block_indices成对传给quant_sparse_lightning_indexer，候选关闭时为空Tensor。 | INT32 | ND |
 
 ## 约束说明
 
@@ -76,5 +82,6 @@
 
 | 调用方式 | 调用样例 | 说明 |
 |----------|----------|------|
-| PyTorch API | - | 通过[torch.ops.cann_ops_transformer.quant_lightning_indexer](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)接口调用QuantLightningIndexerV2算子。 |
-| aclnn API | [test_aclnn_quant_lightning_indexer_v2](examples/test_aclnn_quant_lightning_indexer_v2.cpp) | 通过[aclnnQuantLightningIndexerV2](docs/aclnnQuantLightningIndexerV2.md)两段式接口调用QuantLightningIndexerV2算子。 |
+| PyTorch API | [torchapi_quant_lightning_indexer](./docs/torchapi_quant_lightning_indexer.md) | 通过[torch.ops.cann_ops_transformer.quant_lightning_indexer](./docs/torchapi_quant_lightning_indexer.md)接口调用，包含基础调用及两级TopK候选源(source)模式。 |
+| aclnn API | [test_aclnn_quant_lightning_indexer_v2](./examples/test_aclnn_quant_lightning_indexer_v2.cpp) | 通过[aclnnQuantLightningIndexerV2](./docs/aclnnQuantLightningIndexerV2.md)接口调用QuantLightningIndexerV2算子。 |
+| aclnn API（candidate） | [test_aclnn_quant_lightning_indexer_v3](./examples/test_aclnn_quant_lightning_indexer_v3.cpp) | 通过[aclnnQuantLightningIndexerV3](./docs/aclnnQuantLightningIndexerV3.md)接口调用两级TopK候选源(source)模式。 |

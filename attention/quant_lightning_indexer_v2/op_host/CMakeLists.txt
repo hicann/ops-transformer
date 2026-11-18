@@ -11,7 +11,7 @@ add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
     set(quant_lightning_indexer_v2_depends attention/lightning_indexer_v2 CACHE INTERNAL "Dependencies for quant_lightning_indexer_v2")
-    target_sources(op_host_aclnn PRIVATE
+    target_sources(op_host_aclnnInner PRIVATE
         quant_lightning_indexer_v2_def.cpp
     )
 endif()
@@ -26,7 +26,12 @@ add_ops_compile_options(
 )
 
 if (NOT BUILD_OPS_RTY_KERNEL)
-    add_modules_sources(OPTYPE quant_lightning_indexer_v2 ACLNNTYPE aclnn)
+    add_modules_sources(
+        OP_API_INDEPENDENT ON
+        OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
+        OPTYPE quant_lightning_indexer_v2
+        ACLNNTYPE aclnn_inner
+    )
     include(${CMAKE_CURRENT_SOURCE_DIR}/../../lightning_indexer_v2/op_host/checkers/checker_sources.cmake)
     add_lightning_indexer_v2_common_checker_sources(${OPHOST_NAME}_tiling_obj)
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE

@@ -97,7 +97,7 @@ def get_values(kwargs, name, tensor):
 
 
 def max_sequence(prefix, used, fallback):
-    if used:
+    if used and any(used):
         return max(int(value) for value in used)
     if prefix and len(prefix) > 1:
         return max(
@@ -120,7 +120,8 @@ def restore_mx_dtypes(query, key, query_scale, key_scale, quant_mode):
                 continue
             if tensor.dtype != fp4_dtype:
                 raise TypeError(f"QLI_V2 {name} must use {dtype_name} or packed uint8")
-            tensor.data = tensor.data.view(torch.uint8)
+            if quant_mode == QUANT_MODE_HIF4:
+                tensor.data = tensor.data.view(torch.uint8)
         if quant_mode == QUANT_MODE_HIF4:
             return
     if quant_mode == QUANT_MODE_MXFP8:
@@ -141,6 +142,12 @@ def restore_mx_dtypes(query, key, query_scale, key_scale, quant_mode):
         if not torch.is_tensor(tensor):
             continue
         if tensor.dtype == dtype:
+            continue
+        if (
+            quant_mode == QUANT_MODE_MXFP4
+            and name in ("query", "key")
+            and tensor.dtype == fp4_dtype
+        ):
             continue
         if tensor.dtype != torch.uint8:
             raise TypeError(
@@ -236,7 +243,15 @@ def move_to_device(value, target):
 def run_metadata(arguments, metadata):
     import cann_ops_transformer  # noqa: F401
 
-    return torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata(
+    candidate_arguments = {
+        name: arguments[name]
+        for name in ("candidate_topk_blocks", "candidate_block_size")
+        if name in arguments
+    }
+    metadata_api = torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata
+    if candidate_arguments:
+        metadata_api = metadata_api.candidate
+    return metadata_api(
         int(arguments["num_heads_q"]),
         int(arguments["num_heads_k"]),
         int(arguments["head_dim"]),
@@ -247,13 +262,19 @@ def run_metadata(arguments, metadata):
         seqused_q=move_to_device(arguments.get("seqused_q"), metadata),
         seqused_k=move_to_device(arguments.get("seqused_k"), metadata),
         cmp_residual_k=move_to_device(arguments.get("cmp_residual_k"), metadata),
-        batch_size=int(arguments["batch_size"]),
+        batch_size=(
+            None
+            if candidate_arguments.get("candidate_topk_blocks", -1) > 0
+            and arguments["layout_k"] == "TND"
+            else int(arguments["batch_size"])
+        ),
         max_seqlen_q=int(arguments["max_seqlen_q"]),
         max_seqlen_k=int(arguments["max_seqlen_k"]),
         layout_q=str(arguments["layout_q"]),
         layout_k=str(arguments["layout_k"]),
         mask_mode=int(arguments["mask_mode"]),
         cmp_ratio=int(arguments["cmp_ratio"]),
+        **candidate_arguments,
     )
 
 
@@ -284,6 +305,22 @@ def run(
     is_error_case = expect_error(kwargs)
     del weights
     restore_mx_dtypes(query, key, query_dequant_scale, key_dequant_scale, quant_mode)
+    # Keep native FP4 inputs at stable addresses for ACLGraph replay.
+    for tensor in (query, key):
+        if (
+            torch.is_tensor(tensor)
+            and tensor.device.type == "npu"
+            and tensor.dtype == getattr(torch, "float4_e2m1fn_x2", None)
+        ):
+            torch._dynamo.mark_static_address(tensor)
+    # Keep original strides when ACLGraph replays noncontiguous inputs.
+    for tensor in (key, key_dequant_scale):
+        if (
+            torch.is_tensor(tensor)
+            and tensor.device.type == "npu"
+            and not tensor.is_contiguous()
+        ):
+            torch._dynamo.mark_static_address(tensor)
     arguments_kwargs = dict(kwargs)
     arguments_kwargs.update(
         {
@@ -355,6 +392,9 @@ def run(
         force_metadata_refresh,
     )
     target = metadata if metadata is not None else _metadata_target
+    for name in ("candidate_topk_blocks", "candidate_block_size"):
+        if name in kwargs:
+            arguments[name] = int(kwargs[name])
     generated = run_metadata(arguments, target if target is not None else query)
     if metadata is None:
         return {"metadata": generated}

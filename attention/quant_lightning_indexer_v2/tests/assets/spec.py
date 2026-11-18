@@ -46,6 +46,7 @@ golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
 metadata_inputs_module = load_impl_module("metadata_inputs")
 compare_module = load_impl_module("compare")
+candidate_module = load_impl_module("candidate")
 
 
 class QuantLightningIndexerV2Spec:
@@ -87,6 +88,12 @@ class AclnnQuantLightningIndexerV2Spec(QuantLightningIndexerV2Spec):
     npu_preprocess = npu_preprocess_module.run_aclnn
 
 
+class QuantLightningIndexerCandidateSpec(QuantLightningIndexerV2Spec):
+    customize_inputs = candidate_module.customize_inputs
+    golden = candidate_module.golden
+    compare = candidate_module.compare
+
+
 class QuantLightningIndexerMetadataSpec:
     customize_inputs = (
         metadata_inputs_module.generate_quant_lightning_indexer_metadata_inputs
@@ -94,6 +101,7 @@ class QuantLightningIndexerMetadataSpec:
 
 
 __spec__ = {
+    "torch.ops.cann_ops_transformer.quant_lightning_indexer.candidate": "QuantLightningIndexerCandidateSpec",
     "torch.ops.cann_ops_transformer.quant_lightning_indexer": "QuantLightningIndexerV2Spec",
     "torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata": (
         "QuantLightningIndexerMetadataSpec"

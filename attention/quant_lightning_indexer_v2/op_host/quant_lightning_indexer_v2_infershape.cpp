@@ -31,6 +31,12 @@ constexpr uint32_t ATTR_SPARSE_COUNT_INDEX = 0;
 constexpr uint32_t ATTR_QUERY_LAYOUT_INDEX = 3;
 constexpr uint32_t ATTR_KV_LAYOUT_INDEX = 4;
 constexpr uint32_t ATTR_RETURN_VALUE_INDEX = 7;
+constexpr uint32_t ATTR_CANDIDATE_TOPK_BLOCKS_INDEX = 8;
+constexpr uint32_t ATTR_CANDIDATE_BLOCK_SIZE_INDEX = 9;
+constexpr uint32_t CANDIDATE_BLOCK_INDICES_OUTPUT_INDEX = 2;
+constexpr uint32_t CANDIDATE_BLOCK_LENGTH_OUTPUT_INDEX = 3;
+constexpr int64_t CANDIDATE_TOPK_BLOCKS = 2048;
+constexpr int64_t CANDIDATE_BLOCK_SIZE = 8;
 constexpr uint32_t DIM_NUM_3 = 3;
 constexpr uint32_t DIM_NUM_4 = 4;
 
@@ -135,6 +141,37 @@ static ge::graphStatus InferShapeQuantLightningIndexerV2(gert::InferShapeContext
         sparseValuesShape->SetDim(0, 0);
     }
 
+    const int64_t* candidateTopkBlocksPtr = attrs->GetInt(ATTR_CANDIDATE_TOPK_BLOCKS_INDEX);
+    const int64_t* candidateBlockSizePtr = attrs->GetInt(ATTR_CANDIDATE_BLOCK_SIZE_INDEX);
+    const int64_t candidateTopkBlocks = candidateTopkBlocksPtr == nullptr ? -1 : *candidateTopkBlocksPtr;
+    const int64_t candidateBlockSize = candidateBlockSizePtr == nullptr ? -1 : *candidateBlockSizePtr;
+    const bool candidateOff = candidateTopkBlocks == -1 && candidateBlockSize == -1;
+    if (!candidateOff && (candidateTopkBlocks != CANDIDATE_TOPK_BLOCKS || candidateBlockSize != CANDIDATE_BLOCK_SIZE)) {
+        OP_LOGE(context->GetNodeName(), "Candidate attributes must be (-1, -1) or (2048, 8).");
+        return ge::GRAPH_FAILED;
+    }
+    gert::Shape* candidateBlockIndicesShape = context->GetOutputShape(CANDIDATE_BLOCK_INDICES_OUTPUT_INDEX);
+    gert::Shape* candidateBlockLengthShape = context->GetOutputShape(CANDIDATE_BLOCK_LENGTH_OUTPUT_INDEX);
+    if (!candidateOff) {
+        OP_CHECK_NULL_WITH_CONTEXT(context, candidateBlockIndicesShape);
+        OP_CHECK_NULL_WITH_CONTEXT(context, candidateBlockLengthShape);
+        *candidateBlockIndicesShape = *sparseIndicesShape;
+        candidateBlockIndicesShape->SetDim(sparseIndicesShape->GetDimNum() - 1, candidateTopkBlocks);
+        candidateBlockLengthShape->SetDimNum(sparseIndicesShape->GetDimNum() - 1);
+        for (size_t i = 0; i < candidateBlockLengthShape->GetDimNum(); ++i) {
+            candidateBlockLengthShape->SetDim(i, sparseIndicesShape->GetDim(i));
+        }
+    } else {
+        if (candidateBlockIndicesShape != nullptr) {
+            candidateBlockIndicesShape->SetDimNum(1);
+            candidateBlockIndicesShape->SetDim(0, 0);
+        }
+        if (candidateBlockLengthShape != nullptr) {
+            candidateBlockLengthShape->SetDimNum(1);
+            candidateBlockLengthShape->SetDim(0, 0);
+        }
+    }
+
     OP_LOGD(context->GetNodeName(), "QuantLightningIndexerV2 InferShape end.");
     return ge::GRAPH_SUCCESS;
 }
@@ -152,6 +189,16 @@ static ge::graphStatus InferDataTypeQuantLightningIndexerV2(gert::InferDataTypeC
     // default index data type is int32
     ge::DataType outputType = Ops::Transformer::DT_INT32;
     context->SetOutputDataType(0, outputType);
+    if (context->GetComputeNodeOutputNum() > CANDIDATE_BLOCK_INDICES_OUTPUT_INDEX) {
+        OP_CHECK_IF(context->SetOutputDataType(CANDIDATE_BLOCK_INDICES_OUTPUT_INDEX, ge::DT_INT32) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(context->GetNodeName(), "Failed to set candidate output data type."),
+                    return ge::GRAPH_FAILED);
+    }
+    if (context->GetComputeNodeOutputNum() > CANDIDATE_BLOCK_LENGTH_OUTPUT_INDEX) {
+        OP_CHECK_IF(context->SetOutputDataType(CANDIDATE_BLOCK_LENGTH_OUTPUT_INDEX, ge::DT_INT32) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(context->GetNodeName(), "Failed to set candidate output data type."),
+                    return ge::GRAPH_FAILED);
+    }
     OP_LOGD(context->GetNodeName(), "QuantLightningIndexerV2 InferDataType end.");
     return GRAPH_SUCCESS;
 }

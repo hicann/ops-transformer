@@ -24,6 +24,8 @@ English | [简体中文](./README.md)
     2. Multiply the relevance result by the dequantization coefficients `q_descale` ($Scale_Q$) and `k_descale` ($Scale_K^T$) corresponding to `q` and `k`, filter invalid negative relevance signals through the activation function $ReLU$, and obtain the relevance score vector between the current token and all preceding tokens.
     3. After multiplying it by the weight coefficient `w` ($W$), select the first $Top-k$ index values along the g direction to obtain the output $out$, which serves as the input of Attention.
 
+- API organization: The operator supports the two-level TopK candidate source mode. At the aclnn layer, [aclnnQuantLightningIndexerV2](./docs/aclnnQuantLightningIndexerV2_en.md) provides the base interface, and [aclnnQuantLightningIndexerV3](./docs/aclnnQuantLightningIndexerV3.md) provides the two-level TopK candidate source mode. At the PyTorch layer, `quant_lightning_indexer` provides a unified interface: it returns two Tensors when candidate parameters are omitted, and four Tensors when both `candidate_topk_blocks` and `candidate_block_size` are provided. When both are -1, candidate selection is disabled; four Tensors are still returned, with the last two being empty Tensors.
+
 ## Parameter Description
 
 | Parameter Name                     | Input/Output/Attribute | Description  | Data Type       | Data Format   |
@@ -49,8 +51,12 @@ English | [简体中文](./README.md)
 | mask_mode | Optional attribute      | Represents the mask mode, with a default value of 0. | INT64          | -         |
 | cmp_ratio      | Optional attribute      | Used for sparse computation; represents the compression ratio of k, with a default value of 1. | INT64          | -         |
 | return_value      |  Optional attribute     | Indicates whether to output `sparse_values`, with a default value of 0. | INT64          | -         |
+| candidate_topk_blocks | Optional attribute | Output capacity for candidate blocks. Must be provided together with candidate_block_size. When both are -1, candidate selection is disabled; when enabled, only 2048 is supported. | INT64 | - |
+| candidate_block_size | Optional attribute | Number of Key positions in each logical candidate block. Must be -1 when candidate_topk_blocks is -1, and 8 when candidate_topk_blocks is 2048. Must match the configuration of quant_sparse_lightning_indexer. | INT64 | - |
 | sparse_indices     | Output      | Output Out in the formula, representing the token index values that participate in the sparse attention computation. | INT32          | ND         |
 | sparse_values           | Output      | Value corresponding to the Indices output in the formula. When `return_value` is 1, the shape is consistent with `sparse_indices`; when `return_value` is 0, the shape is (0,) | BFLOAT16         | ND          |
+| candidate_block_indices | Output | Logical block numbers within each batch, output in the two-level TopK candidate source mode. The shape is [B, S1, N2, candidate_topk_blocks] for BSND and [T, N2, candidate_topk_blocks] for TND. Invalid entries are padded with -1. An empty Tensor is returned when candidate selection is disabled. | INT32 | ND |
+| candidate_block_length | Output | Number of valid candidates in each row. The shape is [B, S1, N2] for BSND and [T, N2] for TND. Passed to quant_sparse_lightning_indexer together with candidate_block_indices. An empty Tensor is returned when candidate selection is disabled. | INT32 | ND |
 
 ## Constraint Description
 
@@ -78,5 +84,6 @@ English | [简体中文](./README.md)
 
 | Invocation Method | Invocation Example | Description |
 |----------|----------|------|
-| PyTorch API | - | Call the QuantLightningIndexerV2 operator through the [torch.ops.cann_ops_transformer.quant_lightning_indexer](docs/torchapi_quant_lightning_indexer_en.md) interface. |
-| aclnn API | [test_aclnn_quant_lightning_indexer_v2](examples/test_aclnn_quant_lightning_indexer_v2.cpp) | Call the QuantLightningIndexerV2 operator through the [aclnnQuantLightningIndexerV2](docs/aclnnQuantLightningIndexerV2_en.md) two-phase interface. |
+| PyTorch API | [torchapi_quant_lightning_indexer](./docs/torchapi_quant_lightning_indexer_en.md) | Calls the [torch.ops.cann_ops_transformer.quant_lightning_indexer](./docs/torchapi_quant_lightning_indexer_en.md) interface, including the base call and the two-level TopK candidate source mode. |
+| aclnn API | [test_aclnn_quant_lightning_indexer_v2](./examples/test_aclnn_quant_lightning_indexer_v2.cpp) | Calls the QuantLightningIndexerV2 operator through the [aclnnQuantLightningIndexerV2](./docs/aclnnQuantLightningIndexerV2_en.md) API. |
+| aclnn API (candidate) | [test_aclnn_quant_lightning_indexer_v3](./examples/test_aclnn_quant_lightning_indexer_v3.cpp) | Calls the two-level TopK candidate source mode through the [aclnnQuantLightningIndexerV3](./docs/aclnnQuantLightningIndexerV3.md) API. |

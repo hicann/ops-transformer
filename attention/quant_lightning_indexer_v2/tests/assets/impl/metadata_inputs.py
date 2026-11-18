@@ -106,4 +106,5 @@ def generate_quant_lightning_indexer_metadata_inputs(
     )
     for name, tensor in zip(_VECTOR_NAMES, tensors):
         values = sidecar[name] if name in sidecar else kwargs.get(f"{name}_values")
-        copy_values(tensor, values, name)
+        if values is not None:
+            copy_values(tensor, values, name)

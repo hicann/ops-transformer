@@ -17,6 +17,8 @@ English | [简体中文](./README.md)
 
 - Operator function: `QuantLightningIndexerV2Metadata` is a preceding operator of the `QuantLightningIndexerV2` operator and generates a load-balanced task partition scheme. This operator does not perform the actual LightningIndexer computation. Instead, it computes on the AI CPU the start and end ranges that each AI Core should process based on the input parameters, thereby maximizing the utilization of computing resources and preventing unbalanced loads among Cores.
 
+- API organization: [aclnnQuantLightningIndexerV2Metadata](./docs/aclnnQuantLightningIndexerV2Metadata_en.md) is used with the V2 computation interface, and [aclnnQuantLightningIndexerV3Metadata](./docs/aclnnQuantLightningIndexerV3Metadata.md) is used with the V3 computation interface. At the PyTorch layer, `quant_lightning_indexer_metadata` provides a unified interface. The two-level TopK candidate source mode requires both `candidate_topk_blocks` and `candidate_block_size`; the return value remains a single metadata Tensor.
+
 ## Parameters
 
 <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
@@ -156,9 +158,23 @@ English | [简体中文](./README.md)
       <td>-</td>
     </tr>
     <tr>
+      <td>candidate_topk_blocks</td>
+      <td>Optional attribute</td>
+      <td>Output capacity for candidate blocks in the two-level TopK candidate source mode. Must be provided together with candidate_block_size. Only -1 or 2048 is supported, and the value must match the computation interface.</td>
+      <td>INT64</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>candidate_block_size</td>
+      <td>Optional attribute</td>
+      <td>Logical block size in the two-level TopK candidate source mode. Must be -1 when candidate_topk_blocks is -1, and 8 when candidate_topk_blocks is 2048. The value must match the computation interface.</td>
+      <td>INT64</td>
+      <td>-</td>
+    </tr>
+    <tr>
       <td>metadata</td>
       <td>Output</td>
-      <td>Output of the load balancing result. The shape is fixed to (1024, )</td>
+      <td>Output of the load balancing result. The shape is (8 * (1 + aic_num + aiv_num) + 256,) for the V2 interface, where the core counts are obtained from the current device, and (1024,) for the V3 interface. The PyTorch interface returns (1024,) when candidate selection is enabled; otherwise, its output shape follows the V2 interface.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -199,9 +215,12 @@ English | [简体中文](./README.md)
   - When layout_k is BSND, the seqlen is preferentially obtained from the elements in seqused_k; if seqused_k is not passed in, the seqlen is obtained from max_seqlen_k.
   - When layout_k is TND, the seqlen is preferentially obtained from the elements in seqused_k; if seqused_k is not passed in, the seqlen is obtained from the elements in cu_seqlens_k.
 
-## Invocation
+- Candidate parameters, sequence information, head configuration, and computation attributes must match the V3 computation interface. Metadata from the V2 base interface cannot be reused. For detailed constraints, see [aclnnQuantLightningIndexerV3Metadata](./docs/aclnnQuantLightningIndexerV3Metadata.md).
+
+## Invocation Example
 
 | Invocation Method  | Sample Code                                                     | Description                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| aclnn API | [test_aclnn_quant_lightning_indexer_v2_metadata](./examples/test_aclnn_quant_lightning_indexer_v2_metadata.cpp) | Calls the QuantLightningIndexerV2Metadata operator through the [aclnnQuantLightningIndexerV2Metadata](docs/aclnnQuantLightningIndexerV2Metadata_en.md) API |
 | PyTorch API | [test_torch_quant_lightning_indexer_v2_metadata](./examples/test_torch_quant_lightning_indexer_v2_metadata.py) | Calls the QuantLightningIndexerV2Metadata operator through the [quant_lightning_indexer_metadata](../quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer_en.md) API |
+| aclnn API | [test_aclnn_quant_lightning_indexer_v2_metadata](./examples/test_aclnn_quant_lightning_indexer_v2_metadata.cpp) | Calls the QuantLightningIndexerV2Metadata operator through the [aclnnQuantLightningIndexerV2Metadata](./docs/aclnnQuantLightningIndexerV2Metadata_en.md) API |
+| aclnn API (candidate) | [test_aclnn_quant_lightning_indexer_v3_metadata](./examples/test_aclnn_quant_lightning_indexer_v3_metadata.cpp) | Generates metadata for the two-level TopK candidate source mode through the [aclnnQuantLightningIndexerV3Metadata](./docs/aclnnQuantLightningIndexerV3Metadata.md) API. |

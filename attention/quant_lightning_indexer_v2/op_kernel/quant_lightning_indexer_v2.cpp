@@ -49,7 +49,8 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* weights, __gm__ uint8_t* queryScale,
     __gm__ uint8_t* keyScale, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensK, __gm__ uint8_t* sequsedQ,
     __gm__ uint8_t* sequsedK, __gm__ uint8_t* cmpResidualK, __gm__ uint8_t* blockTable, __gm__ uint8_t* outputIdxOffset,
-    __gm__ uint8_t* metadata, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseValues, __gm__ uint8_t* workspace,
+    __gm__ uint8_t* metadata, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseValues,
+    __gm__ uint8_t* candidateBlockIndices, __gm__ uint8_t* candidateBlockLength, __gm__ uint8_t* workspace,
     __gm__ uint8_t* tiling)
 {
     __gm__ uint8_t* user = GetUserWorkspace(workspace);

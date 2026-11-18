@@ -15,8 +15,9 @@ import math
 OPERATOR = "quant_lightning_indexer_v2"
 INPUT_COUNT = 13
 E2E_API = "torch.ops.cann_ops_transformer.quant_lightning_indexer"
+CANDIDATE_E2E_API = E2E_API + ".candidate"
 ACLNN_API = "aclnnQuantLightningIndexerV2"
-API_ALIASES = ("torch.ops.cann_ops_transformer.quant_lightning_indexer",)
+API_ALIASES = (E2E_API, CANDIDATE_E2E_API)
 METADATA_INDEX = 12
 ATTRIBUTES = (
     ("topk", "topk", None),
@@ -384,7 +385,23 @@ def convert_case(raw, mode):
             record[name] = raw[name]
     record["testcase_name"] = case
     record["is_enabled"] = str(boolean(cell(raw, "is_enabled", default=True)))
-    record["api_name"] = E2E_API
+    candidate_names = ("candidate_topk_blocks", "candidate_block_size")
+    for name in candidate_names:
+        value = cell(raw, name)
+        if value is not None:
+            if name in attributes and attributes[name] != value:
+                raise ValueError(f"conflicting Candidate attribute {name!r}")
+            attributes[name] = value
+    candidate = any(name in attributes for name in candidate_names)
+    if candidate:
+        pair = tuple(attributes.get(name) for name in candidate_names)
+        if pair not in ((2048, 8), (-1, -1)):
+            raise ValueError("Candidate requires (2048,8) or (-1,-1)")
+        if mode != "e2e":
+            raise ValueError("Candidate conversion requires E2E mode")
+    elif cell(raw, "api_name") == CANDIDATE_E2E_API:
+        raise ValueError("Candidate API requires both Candidate attributes")
+    record["api_name"] = CANDIDATE_E2E_API if candidate else E2E_API
     record["attributes"] = repr(normalize_attributes(attributes))
     record.setdefault("precision_tolerances", "")
     record.setdefault("absolute_precision", "")

@@ -15,6 +15,8 @@
 
 - 算子功能：`QuantLightningIndexerV2Metadata`是`QuantLightningIndexerV2`算子的前置算子，用于生成负载均衡的任务划分方案。本算子不执行实际的LightningIndexer计算，而是根据输入参数在AI CPU计算出每个AI Core应处理的计算起止范围，从而最大化计算资源的利用率，避免各Core间负载不均衡的问题。
 
+- 接口分层说明：[aclnnQuantLightningIndexerV2Metadata](./docs/aclnnQuantLightningIndexerV2Metadata.md)与V2计算接口配套，[aclnnQuantLightningIndexerV3Metadata](./docs/aclnnQuantLightningIndexerV3Metadata.md)与V3计算接口配套。PyTorch层统一使用`quant_lightning_indexer_metadata`，两级TopK候选源(source)模式需同时提供`candidate_topk_blocks`和`candidate_block_size`，返回值仍为一个metadata Tensor。
+
 ## 参数说明
 
 <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
@@ -154,9 +156,23 @@
       <td>-</td>
     </tr>
     <tr>
+      <td>candidate_topk_blocks</td>
+      <td>可选属性</td>
+      <td>两级TopK候选源(source)模式的候选块输出容量。与candidate_block_size同时提供，仅支持-1或2048，必须与计算接口一致。</td>
+      <td>INT64</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>candidate_block_size</td>
+      <td>可选属性</td>
+      <td>两级TopK候选源(source)模式的逻辑块大小。candidate_topk_blocks为-1时必须为-1，为2048时必须为8，必须与计算接口一致。</td>
+      <td>INT64</td>
+      <td>-</td>
+    </tr>
+    <tr>
       <td>metadata</td>
       <td>输出</td>
-      <td>表示负载均衡结果输出，shape固定为(1024, )</td>
+      <td>表示负载均衡结果输出。V2接口的shape为(8 * (1 + aic_num + aiv_num) + 256,)，核数从当前设备获取；V3接口为(1024,)。PyTorch接口在开启候选选择时返回(1024,)，其余场景按V2接口计算。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -197,9 +213,12 @@
   - layout_k为BSND时，优先通过seqused_k中的元素获取seqlen，seqused_k未传入则通过max_seqlen_k获取seqlen。
   - layout_k为TND时，优先通过seqused_k中的元素获取seqlen，seqused_k未传入则通过cu_seqlens_k中的元素获取seqlen。
 
-## 调用说明
+- 候选参数、序列信息、head配置和计算属性必须与V3计算接口一致，不能复用V2基础接口的metadata；详细约束见[aclnnQuantLightningIndexerV3Metadata](./docs/aclnnQuantLightningIndexerV3Metadata.md)。
+
+## 调用示例
 
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| aclnn API | [test_aclnn_quant_lightning_indexer_v2_metadata](./examples/test_aclnn_quant_lightning_indexer_v2_metadata.cpp) | 通过[aclnnQuantLightningIndexerV2Metadata](./docs/aclnnQuantLightningIndexerV2Metadata.md)接口调用QuantLightningIndexerV2Metadata算子 |
 | PyTorch API | [test_torch_quant_lightning_indexer_v2_metadata](./examples/test_torch_quant_lightning_indexer_v2_metadata.py) | 通过[quant_lightning_indexer_metadata](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)接口调用QuantLightningIndexerV2Metadata算子 |
+| aclnn API | [test_aclnn_quant_lightning_indexer_v2_metadata](./examples/test_aclnn_quant_lightning_indexer_v2_metadata.cpp) | 通过[aclnnQuantLightningIndexerV2Metadata](./docs/aclnnQuantLightningIndexerV2Metadata.md)接口调用QuantLightningIndexerV2Metadata算子 |
+| aclnn API（candidate） | [test_aclnn_quant_lightning_indexer_v3_metadata](./examples/test_aclnn_quant_lightning_indexer_v3_metadata.cpp) | 通过[aclnnQuantLightningIndexerV3Metadata](./docs/aclnnQuantLightningIndexerV3Metadata.md)接口生成两级TopK候选源(source)模式配套的metadata。 |

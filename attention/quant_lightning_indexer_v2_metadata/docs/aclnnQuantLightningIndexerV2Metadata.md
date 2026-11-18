@@ -23,16 +23,17 @@
 
 ## 功能说明
 
-- 算子功能：`aclnnQuantLightningIndexerV2Metadata`是`aclnnQuantLightningIndexerV2`算子的前置算子，用于生成负载均衡的任务划分方案。本算子不执行实际的LightningIndexer计算，而是根据输入参数在AI CPU计算出每个AI Core应处理的计算起止范围，从而最大化计算资源的利用率，避免各Core间负载不均衡的问题。
+- 算子功能：`aclnnQuantLightningIndexerV2Metadata`是`aclnnQuantLightningIndexerV2`的前置算子，用于生成负载均衡的任务划分方案。本算子根据序列长度、head配置和计算属性，在AI CPU上计算各AI Core的任务起止范围，不执行实际的QuantLightningIndexer计算。
 
-  **该算子不建议单独使用，建议与aclnnQuantLightningIndexerV2算子配合使用，形成完整的工作流。**
-    1. 接受aclnnQuantLightningIndexerV2算子接口输入数据shape信息，包含batchSize、qSeqlen、kSeqlen、mask。通过对输入分块并模拟计算耗时，均匀分配分块到可用核上，以降低aclnnQuantLightningIndexerV2算子的整体计算耗时，并提高硬件利用率。
-    2. 分配结果输出后，后续作为输入供aclnnQuantLightningIndexerV2算子使用。
-    3. 分配结果包含每个AIC核基本块的起始点和终止点，以及每个AIV核的FD任务信息。详细内容可以参考[调用示例](#调用示例)。
+  本接口需与aclnnQuantLightningIndexerV2配套使用，主要过程如下：
+
+  1. 根据输入shape、序列信息及计算属性划分任务，并估算各任务的计算量。
+  2. 将任务分配到可用计算核，生成各核的任务起止信息。
+  3. 输出各AIC核基本块的起止位置及AIV核的FD任务信息，并将metadata传入aclnnQuantLightningIndexerV2，用于后续计算。
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize"获取workspace大小，再调用"aclnnQuantLightningIndexerV2Metadata"执行计算。
+算子执行接口为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize”接口获取计算所需workspace大小及执行器，再调用“aclnnQuantLightningIndexerV2Metadata”接口执行计算。
 
 ``` cpp
 aclnnStatus aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize(
@@ -387,6 +388,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
 ## 约束说明
 
   - aclnnQuantLightningIndexerV2Metadata默认确定性实现。
+  - Batch一致性说明：本接口生成当前批次的分核信息，不涉及计算结果的Batch一致性；批次的大小、顺序或序列信息变化后需重新生成metadata，不要求不同批次的metadata内容相同。
   - B（Batch）表示输入样本批量大小，q、k为配套的aclnnQuantLightningIndexerV2算子的入参，S1表示layoutQOptional=BSND时，q shape中的S轴的大小，S2表示layoutKOptional=BSND时，k shape中的S轴的大小。
   - 参数cuSeqlensQOptional、cuSeqlensKOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
   - 参数sequsedQOptional、sequsedKOptional要求其值表示每个Batch中的有效token数。
@@ -614,7 +616,7 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.numHeadsQ = 1;
     context.numHeadsK = 1;
     context.headDim = 128;
-    context.topk = 0;
+    context.topk = 512;
     context.quantMode = 2; // 2: per-token-head / 3: group-scaling
     ret = aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Failed to query AIC count\n");
@@ -670,8 +672,8 @@ int main() {
 
     // 2. 构造输入与输出，需要根据API的接口定义构造
     ArgScenario scenario {};
-    scenario.hasCuSeq = true;
-    scenario.hasSeqused = true;
+    scenario.hasCuSeq = false;
+    scenario.hasSeqused = false;
     ArgContext context {};
     ret = CreateArgs(scenario, context);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create input arguments failed. ERROR: %d", ret);

@@ -39,6 +39,7 @@ inline bool IsFp4CompatibleTensor(const at::Tensor& tensor)
     return tensor.scalar_type() == at::kFloat4_e2m1fn_x2 || tensor.scalar_type() == at::kByte;
 }
 
+constexpr int64_t QLI_CANDIDATE_METADATA_SIZE = 1024;
 constexpr int64_t E8M0_SCALE_PACK_NUM = 2;
 constexpr uint32_t QUANT_MODE_HIFLOAT8 = 4;
 constexpr uint32_t QUANT_MODE_MXFP4 = 5;
@@ -131,12 +132,10 @@ at::Tensor QuantLightningIndexerMetadata(
 
     std::string layoutQStr = std::string(layoutQ);
     std::string layoutKStr = std::string(layoutK);
-    char* layoutQPtr = const_cast<char*>(layoutQStr.c_str());
-    char* layoutKPtr = const_cast<char*>(layoutKStr.c_str());
 
     ACLNN_CMD(aclnnQuantLightningIndexerV2Metadata, cuSeqlensQVal, cuSeqlensKVal, sequsedQVal, sequsedKVal,
               cmpResidualKVal, numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK,
-              layoutQPtr, layoutKPtr, maskMode, cmpRatio, output);
+              layoutQStr, layoutKStr, maskMode, cmpRatio, output);
     return output;
 }
 
@@ -198,9 +197,6 @@ std::tuple<at::Tensor, at::Tensor> QuantLightningIndexer(
         ConstructQuantLightningIndexerOutputTensor(query, key, topk, queryLayoutStr, keyLayoutStr, returnValue);
     at::Tensor sparseIndicesOut = std::get<0>(quantLightningIndexerOutput);
     at::Tensor sparseValuesOut = std::get<1>(quantLightningIndexerOutput);
-    // convert str
-    char* queryLayoutPtr = const_cast<char*>(queryLayoutStr.c_str());
-    char* keyLayoutPtr = const_cast<char*>(keyLayoutStr.c_str());
 
     auto queryWrapper = MakeWrapper(query);
     auto keyWrapper = MakeWrapper(key);
@@ -210,15 +206,104 @@ std::tuple<at::Tensor, at::Tensor> QuantLightningIndexer(
 
     ACLNN_CMD(aclnnQuantLightningIndexerV2, queryWrapper, keyWrapper, weights, queryScaleWrapper, keyScaleWrapper,
               cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blockTable, outputIdxOffset, metadata, topk,
-              quantMode, maxSeqlenQ, queryLayoutPtr, keyLayoutPtr, maskMode, cmpRatio, returnValue, sparseIndicesOut,
+              quantMode, maxSeqlenQ, queryLayoutStr, keyLayoutStr, maskMode, cmpRatio, returnValue, sparseIndicesOut,
               sparseValuesOut);
 
     return std::tuple<at::Tensor, at::Tensor>(sparseIndicesOut, sparseValuesOut);
 }
+// Candidate entry points require the new ACLNN symbols; the legacy ABI is unchanged.
+at::Tensor QuantLightningIndexerMetadataCandidate(int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
+                                                  int64_t quantMode, const c10::optional<at::Tensor>& cuSeqlensQ,
+                                                  const c10::optional<at::Tensor>& cuSeqlensK,
+                                                  const c10::optional<at::Tensor>& sequsedQ,
+                                                  const c10::optional<at::Tensor>& sequsedK,
+                                                  const c10::optional<at::Tensor>& cmpResidualK, int64_t batchSize,
+                                                  int64_t maxSeqlenQ, int64_t maxSeqlenK, c10::string_view layoutQ,
+                                                  c10::string_view layoutK, int64_t maskMode, int64_t cmpRatio,
+                                                  int64_t candidateTopkBlocks, int64_t candidateBlockSize)
+{
+    TORCH_CHECK(
+        (candidateTopkBlocks == -1 && candidateBlockSize == -1) || (candidateTopkBlocks > 0 && candidateBlockSize > 0),
+        "candidate_topk_blocks and candidate_block_size must both be -1 or both be positive");
+    at::Device outputDevice = at::Device(std::string("npu"));
+    if (cuSeqlensQ.has_value()) {
+        outputDevice = cuSeqlensQ.value().device();
+    } else if (cuSeqlensK.has_value()) {
+        outputDevice = cuSeqlensK.value().device();
+    } else if (sequsedQ.has_value()) {
+        outputDevice = sequsedQ.value().device();
+    } else if (sequsedK.has_value()) {
+        outputDevice = sequsedK.value().device();
+    } else if (cmpResidualK.has_value()) {
+        outputDevice = cmpResidualK.value().device();
+    }
+
+    at::Tensor output = torch::empty({QLI_CANDIDATE_METADATA_SIZE}, torch::dtype(torch::kInt32).device(outputDevice));
+
+    std::string layoutQStr = std::string(layoutQ);
+    std::string layoutKStr = std::string(layoutK);
+
+    ACLNN_CMD(aclnnQuantLightningIndexerV3Metadata, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, numHeadsQ,
+              numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK, layoutQStr, layoutKStr, maskMode,
+              cmpRatio, candidateTopkBlocks, candidateBlockSize, output);
+    return output;
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> QuantLightningIndexerCandidate(
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& weights, const at::Tensor& queryDequantScale,
+    const at::Tensor& keyDequantScale, int64_t topk, int64_t quantMode, const c10::optional<at::Tensor>& cuSeqlensQ,
+    const c10::optional<at::Tensor>& cuSeqlensK, const c10::optional<at::Tensor>& sequsedQ,
+    const c10::optional<at::Tensor>& sequsedK, const c10::optional<at::Tensor>& cmpResidualK,
+    const c10::optional<at::Tensor>& blockTable, const c10::optional<at::Tensor>& outputIdxOffset,
+    const c10::optional<at::Tensor>& metadata, int64_t maxSeqlenQ, c10::string_view layoutQ, c10::string_view layoutK,
+    int64_t maskMode, int64_t cmpRatio, int64_t returnValue, int64_t candidateTopkBlocks, int64_t candidateBlockSize)
+{
+    const bool candidateEnabled = candidateTopkBlocks > 0 && candidateBlockSize > 0;
+    TORCH_CHECK(candidateEnabled || (candidateTopkBlocks == -1 && candidateBlockSize == -1),
+                "candidate_topk_blocks and candidate_block_size must both be -1 or both be positive");
+    TORCH_CHECK(layoutQ == "BSND" || layoutQ == "TND", "layout_q must be BSND or TND");
+    TORCH_CHECK(query.numel() > 0, "Tensor query is empty.")
+    TORCH_CHECK(key.numel() > 0, "Tensor key is empty.")
+
+    std::string queryLayoutStr = std::string(layoutQ);
+    std::string keyLayoutStr = std::string(layoutK);
+
+    // construct the output tensor
+    std::tuple<at::Tensor, at::Tensor> quantLightningIndexerOutput =
+        ConstructQuantLightningIndexerOutputTensor(query, key, topk, queryLayoutStr, keyLayoutStr, returnValue);
+    at::Tensor sparseIndicesOut = std::get<0>(quantLightningIndexerOutput);
+    at::Tensor sparseValuesOut = std::get<1>(quantLightningIndexerOutput);
+    auto lengthShape = sparseIndicesOut.sizes().vec();
+    lengthShape.pop_back();
+    auto candidateShape = lengthShape;
+    candidateShape.push_back(candidateTopkBlocks);
+    at::Tensor candidateBlockIndicesOut = candidateEnabled ?
+                                              at::empty(candidateShape, query.options().dtype(at::kInt)) :
+                                              at::empty({0}, query.options().dtype(at::kInt));
+    at::Tensor candidateBlockLengthOut = candidateEnabled ? at::empty(lengthShape, query.options().dtype(at::kInt)) :
+                                                            at::empty({0}, query.options().dtype(at::kInt));
+
+    auto queryWrapper = MakeWrapper(query);
+    auto keyWrapper = MakeWrapper(key);
+    auto queryScaleWrapper = MakeWrapper(queryDequantScale);
+    auto keyScaleWrapper = MakeWrapper(keyDequantScale);
+    FixQLIV2AclDtypes(quantMode, queryWrapper, keyWrapper, queryScaleWrapper, keyScaleWrapper);
+
+    ACLNN_CMD(aclnnQuantLightningIndexerV3, queryWrapper, keyWrapper, weights, queryScaleWrapper, keyScaleWrapper,
+              cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blockTable, outputIdxOffset, metadata, topk,
+              quantMode, maxSeqlenQ, queryLayoutStr, keyLayoutStr, maskMode, cmpRatio, returnValue, candidateTopkBlocks,
+              candidateBlockSize, sparseIndicesOut, sparseValuesOut, candidateBlockIndicesOut, candidateBlockLengthOut);
+
+    return std::make_tuple(sparseIndicesOut, sparseValuesOut, candidateBlockIndicesOut, candidateBlockLengthOut);
+}
+
 // Bind the C++ function to Python module
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     m.def("quant_lightning_indexer_metadata", &QuantLightningIndexerMetadata, "quant_lightning_indexer_metadata");
     m.def("quant_lightning_indexer", &QuantLightningIndexer, "quant_lightning_indexer");
+    m.def("quant_lightning_indexer_candidate", &QuantLightningIndexerCandidate, "quant_lightning_indexer_candidate");
+    m.def("quant_lightning_indexer_metadata_candidate", &QuantLightningIndexerMetadataCandidate,
+          "quant_lightning_indexer_metadata_candidate");
 }
 } // namespace op_api

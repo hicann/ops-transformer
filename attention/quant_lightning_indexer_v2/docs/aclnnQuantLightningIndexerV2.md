@@ -23,25 +23,25 @@
 
 ## 功能说明
 
-- 接口功能：`QuantLightningIndexerV2`是推理场景下，稀疏attention前处理的计算，选出关键的稀疏token，并对输入q和k进行量化实现存8算8，获取最大收益。
+- 算子功能：`aclnnQuantLightningIndexerV2`用于推理场景下稀疏Attention的前处理。算子接收量化后的q、k及对应的反量化系数，计算每个Query token与Key token的相关性分数，并选出TopK位置索引及可选的对应分数。
 
 - 版本演进：在QuantLightningIndexer的基础上，新增压缩k场景、分核计算metadata、稀疏value输出等能力。
 
 - 计算公式：
 
-$$
-out = \text{Top-}k\left\{[1]_{1\times g}@\left[(W@[1]_{1\times S_{k}})\odot\text{ReLU}\left(\left(Scale_Q@Scale_K^T\right)\odot\left(Q_{index}^{Quant}@{\left(K_{index}^{Quant}\right)}^T\right)\right)\right]\right\}
-$$
+  $$
+  out = \text{Top-}k\left\{[1]_{1\times g}@\left[(W@[1]_{1\times S_{k}})\odot\text{ReLU}\left(\left(Scale_Q@Scale_K^T\right)\odot\left(Q_{index}^{Quant}@{\left(K_{index}^{Quant}\right)}^T\right)\right)\right]\right\}
+  $$
 
-主要计算过程为：
+- 主要计算过程为：
 
-1. 将某个token对应的输入参数`q`（$Q_{index}^{Quant}\in\R^{g\times d}$）乘以给定上下文`k`（$K_{index}^{Quant}\in\R^{S_{k}\times d}$），得到相关性。
-2. 相关性结果与`q`和`k`对应的反量化系数`qDescale`（$Scale_Q$）和`kDescale`（$Scale_K^T$）相乘，通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
-3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$out$，作为Attention的输入。
+  1. 将某个token对应的输入参数`q`（$Q_{index}^{Quant}\in\R^{g\times d}$）乘以给定上下文`k`（$K_{index}^{Quant}\in\R^{S_{k}\times d}$），得到相关性。
+  2. 相关性结果与`q`和`k`对应的反量化系数`qDescale`（$Scale_Q$）和`kDescale`（$Scale_K^T$）相乘，通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
+  3. 将其与权重系数`w`（$W$）相乘后，沿g方向求和，按分数选取前$Top-k$个位置，得到位置索引及可选的对应分数，作为Attention的输入。
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnQuantLightningIndexerV2GetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnQuantLightningIndexerV2"接口执行计算。
+算子执行接口为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnQuantLightningIndexerV2GetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnQuantLightningIndexerV2”接口执行计算。
 
 ```Cpp
 aclnnStatus aclnnQuantLightningIndexerV2GetWorkspaceSize(
@@ -84,11 +84,11 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 
 - **参数说明：**
 
-> [!NOTE]
->
-> - q、k、w参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
-> - S1表示q shape中的S，S2表示k shape中的S，T1表示q shape中的T，T2表示k shape中的T，N1表示q shape中的N，N2表示k shape中的N。
-> - maxBlockNumPerSeq表示每个Batch中最大sequsedKOptional对应的block数量，S2_MAX表示sequsedKOptional中的最大值
+  > [!NOTE]
+  >
+  > - q、k、w参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
+  > - S1表示q shape中的S，S2表示k shape中的S，T1表示q shape中的T，T2表示k shape中的T，N1表示q shape中的N，N2表示k shape中的N。
+  > - maxBlockNumPerSeq表示每个Batch中最大sequsedKOptional对应的block数量，S2_MAX表示sequsedKOptional中的最大值
 
   <table style="undefined;table-layout: fixed; width: 1601px"><colgroup>
   <col style="width: 264px">
@@ -562,6 +562,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 - 当`quantMode`为3/5时，`qDescale`和`kDescale`的维数分别比`q`和`k`多1，前缀维度保持一致，末两维为(D/64, 2)；D必须为64的倍数，每个scale对应D轴上连续32个逻辑元素。
 - 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。q N1为24或32场景暂不支持TND Padding功能，不应传入sequsedQOptional，传入时接口报错。
 - **确定性说明：** aclnnQuantLightningIndexerV2默认确定性实现。
+- **Batch一致性说明：** 默认支持Batch一致性：在输入样本及其计算参数保持不变、配套metadata按当前批次重新生成的条件下，同一样本的sparseIndicesOut及对应sparseValuesOut与所在批次的大小、位置无关。
 
 ## 调用示例
 
@@ -589,6 +590,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 #include "securec.h"
 #include "acl/acl.h"
 #include "aclnnop/aclnn_quant_lightning_indexer_v2.h"
+#include "aclnnop/aclnn_quant_lightning_indexer_v2_metadata.h"
 #include "aclnn/opdev/platform.h"
 
 using namespace std;
@@ -779,9 +781,28 @@ int ExecuteQuantLightningIndexerV2(TensorResources& resources, aclrtStream strea
         LOG_PRINT("memcpy_s layoutK failed. ERROR: %d\n", memcpyRet);
         return -1;
     }
+    // 先生成与本示例输入匹配的metadata，不能将全零Tensor作为分核信息。
+    uint64_t metadataWorkspaceSize = 0;
+    aclOpExecutor* metadataExecutor = nullptr;
+    int ret = aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize(
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        64, 1, 128, topk, quantMode, 2, 4, 8, layoutQ, layoutK, maskMode, cmpRatio,
+        resources.metadataTensor, &metadataWorkspaceSize, &metadataExecutor);
+    if (!CHECK_RET(ret == ACL_SUCCESS)) { return ret; }
+    void* metadataWorkspace = nullptr;
+    if (metadataWorkspaceSize > 0) {
+        ret = aclrtMalloc(&metadataWorkspace, metadataWorkspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        if (!CHECK_RET(ret == ACL_SUCCESS)) { return ret; }
+    }
+    ret = aclnnQuantLightningIndexerV2Metadata(metadataWorkspace, metadataWorkspaceSize, metadataExecutor, stream);
+    auto syncRet = aclrtSynchronizeStream(stream);
+    if (metadataWorkspace != nullptr) { aclrtFree(metadataWorkspace); }
+    if (!CHECK_RET(ret == ACL_SUCCESS)) { return ret; }
+    if (!CHECK_RET(syncRet == ACL_SUCCESS)) { return syncRet; }
+
     aclOpExecutor* executor;
 
-    int ret = aclnnQuantLightningIndexerV2GetWorkspaceSize(
+    ret = aclnnQuantLightningIndexerV2GetWorkspaceSize(
         resources.queryTensor, resources.keyTensor, resources.weightsTensor,
         resources.qScaleTensor, resources.kScaleTensor,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -857,9 +878,6 @@ void CleanupResources(TensorResources& resources, void* workspaceAddr,
 } // namespace
 
 int main() {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
-        return 0;
-    }
     int32_t deviceId = 0;
     aclrtStream stream = nullptr;
     TensorResources resources = {};
@@ -876,6 +894,12 @@ int main() {
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         LOG_PRINT("Init acl failed. ERROR: %d\n", ret);
         return ret;
+    }
+
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+        LOG_PRINT("This FP8 example requires Ascend 950.\n");
+        CleanupResources(resources, workspaceAddr, stream, deviceId);
+        return 1;
     }
 
     ret = InitializeTensors(resources);
@@ -899,9 +923,9 @@ int main() {
         return ret;
     }
 
-    PrintOutResult(sparseIndicesShape, resources.sparseIndicesDeviceAddr);
+    ret = PrintOutResult(sparseIndicesShape, resources.sparseIndicesDeviceAddr);
 
     CleanupResources(resources, workspaceAddr, stream, deviceId);
-    return 0;
+    return ret;
 }
 ```

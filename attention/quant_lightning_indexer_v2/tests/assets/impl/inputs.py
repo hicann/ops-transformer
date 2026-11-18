@@ -186,6 +186,8 @@ class QuantLightningIndexerV2InputAdapter:
     def list_value(kwargs, name):
         value = kwargs.get(f"{name}_values")
         if value is None:
+            value = kwargs.get(name)
+        if value is None:
             return None
         if torch.is_tensor(value):
             value = value.detach().cpu().reshape(-1).tolist()
@@ -407,6 +409,8 @@ class QuantLightningIndexerV2InputAdapter:
         if output_range is None:
             output_range = kwargs.get("output_idx_offset_range")
             output_range = None if output_range is None else repr(list(output_range))
+        if output_range is None:
+            output_range = self.list_value(kwargs, "output_idx_offset")
         max_seqlen_q = kwargs.get("max_seqlen_q")
         max_seqlen_q = None if max_seqlen_q is None else int(max_seqlen_q)
         dtype_params = (self.qk_dtype_name(query, quant_mode),)
@@ -856,7 +860,7 @@ class QuantLightningIndexerV2InputAdapter:
                 dtype=key_scale.dtype,
             )
 
-        _, scores, _ = model.forward(
+        cpu_result, scores, cpu_topk_value = model.forward(
             query,
             key_for_cpu,
             weights,
@@ -871,6 +875,8 @@ class QuantLightningIndexerV2InputAdapter:
         )
         return {
             "params": params,
+            "cpu_result": cpu_result,
+            "cpu_topk_value": cpu_topk_value,
             "scores": scores,
             "topk_value": scores,
             "output_idx_offset": None if offset is None else offset.detach().cpu(),
@@ -896,6 +902,15 @@ class QuantLightningIndexerV2InputAdapter:
         layout_key,
         kwargs,
     ):
+        kwargs = dict(kwargs)
+        kwargs.update(
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_k=cu_seqlens_k,
+            seqused_q=seqused_q,
+            seqused_k=seqused_k,
+            cmp_residual_k=cmp_residual_k,
+            output_idx_offset=output_idx_offset,
+        )
         pytest_golden = self.load_pytest_golden()
         quant_mode = int(kwargs.get("quant_mode") or 1)
         if quant_mode == QUANT_MODE_HIF4:

@@ -2003,6 +2003,16 @@ ge::graphStatus TilingForQuantLightningIndexerV2(gert::TilingContext* context)
         REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
                                   (std::vector<const char*>{"QuantLightningIndexerV2", "Tiling context is null."})),
         return ge::GRAPH_FAILED);
+    const auto* attrs = context->GetAttrs();
+    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    constexpr uint32_t ATTR_CANDIDATE_TOPK_BLOCKS_INDEX = 8;
+    constexpr uint32_t ATTR_CANDIDATE_BLOCK_SIZE_INDEX = 9;
+    const int64_t* candidateTopkBlocks = attrs->GetInt(ATTR_CANDIDATE_TOPK_BLOCKS_INDEX);
+    const int64_t* candidateBlockSize = attrs->GetInt(ATTR_CANDIDATE_BLOCK_SIZE_INDEX);
+    OP_CHECK_IF((candidateTopkBlocks != nullptr && *candidateTopkBlocks != -1) ||
+                    (candidateBlockSize != nullptr && *candidateBlockSize != -1),
+                OP_LOGE(context->GetNodeName(), "Candidate tiling and kernel are not implemented yet."),
+                return ge::GRAPH_FAILED);
     QLIV2TilingInfo QLIV2Info;
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(

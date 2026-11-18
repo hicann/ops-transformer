@@ -33,6 +33,10 @@
   2. 相关性结果与`query`和`key`对应的反量化系数`query_dequant_scale`（$Scale_Q$）和`key_dequant_scale`（$Scale_K^T$）相乘，通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
   3. 将其与权重系数`weights`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$sparse\_indices$，并输出对应的$sparse\_values$，作为Attention的输入。
 
+  本接口同时提供两级TopK候选源(source)模式。两级TopK候选源(source)模式在位置级TopK之外，按`candidate_block_size`将逻辑Key位置划分为块，根据块内可见token的最大分数选择候选块。可见前缀末尾不足整块时，优先保留该尾块。候选选择与位置级TopK共用相关性分数，不改变位置级TopK的定义。
+
+  候选输出包括逻辑块索引`candidate_block_indices`和每行实际有效候选数`candidate_block_length`，供`quant_sparse_lightning_indexer`使用。
+
 - **计算公式**：
 
   $$
@@ -50,7 +54,6 @@ cann_ops_transformer.quant_lightning_indexer_metadata(
   head_dim,
   topk,
   quant_mode,
-  *,
   cu_seqlens_q=None,
   cu_seqlens_k=None,
   seqused_q=None,
@@ -62,7 +65,10 @@ cann_ops_transformer.quant_lightning_indexer_metadata(
   layout_q=None,
   layout_k=None,
   mask_mode=None,
-  cmp_ratio=None
+  cmp_ratio=None,
+  *,
+  candidate_topk_blocks=...,
+  candidate_block_size=...,
 ) -> Tensor
 ```
 
@@ -89,9 +95,13 @@ cann_ops_transformer.quant_lightning_indexer(
   layout_k="BSND",
   mask_mode=0,
   cmp_ratio=1,
-  return_value=0
-) -> (Tensor, Tensor)
+  return_value=0,
+  candidate_topk_blocks=...,
+  candidate_block_size=...,
+) -> (Tensor, Tensor) 或 (Tensor, Tensor, Tensor, Tensor)
 ```
+
+> **说明：** `candidate_topk_blocks`和`candidate_block_size`用于配置两级TopK候选源(source)模式，必须同时按关键字传入。未传入时返回2元组`(sparse_indices, sparse_values)`；同时传入时返回4元组`(sparse_indices, sparse_values, candidate_block_indices, candidate_block_length)`。两项为(2048,8)时开启候选选择，为(-1,-1)时关闭候选选择，后两个输出为空Tensor。`sparse_values`在`return_value`为1时返回与`sparse_indices`按槽位一一对应的分数，为0时返回空Tensor。metadata接口始终返回一个Tensor，候选参数须与计算接口一致。
 
 ## 参数说明
 
@@ -101,7 +111,9 @@ cann_ops_transformer.quant_lightning_indexer(
 
 ### quant_lightning_indexer_metadata
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+基础接口与两级TopK候选源(source)模式共用下表。两级TopK候选源(source)模式的规格限制见[约束说明](#约束说明)。
+
+| 参数名 | 参数类型 | <span style="display: inline-block; min-width: 80px; white-space: nowrap;">可选/必选</span> | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
 | num_heads_q | int | 必选 | 表示query的head个数。 | int64 | - |
 | num_heads_k | int | 必选 | 表示key的head个数，当前仅支持1。 | int64 | - |
@@ -120,10 +132,14 @@ cann_ops_transformer.quant_lightning_indexer(
 | layout_k | str | 可选 | 表示key的排列格式，支持BSND、TND、PA_BBND，默认值为None。 | string | - |
 | mask_mode | int | 可选 | 表示sparse模式，0表示No mask，3表示rightDownCausal模式，默认值为None。 | int64 | - |
 | cmp_ratio | int | 可选 | 表示key的压缩率，取值范围[1, 128]，1表示无压缩，默认值为None。 | int64 | - |
+| candidate_topk_blocks | int | 可选 | 候选块数量。与candidate_block_size同时按关键字提供；两项均为-1时关闭候选选择，开启时仅支持2048。 | int64 | - |
+| candidate_block_size | int | 可选 | 每个候选块包含的逻辑Key位置数。candidate_topk_blocks为-1时必须为-1，为2048时必须为8；与后续quant_sparse_lightning_indexer使用相同配置。 | int64 | - |
 
 ### quant_lightning_indexer
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+基础接口与两级TopK候选源(source)模式共用下表。两级TopK候选源(source)模式的规格限制见[约束说明](#约束说明)。
+
+| 参数名 | 参数类型 | <span style="display: inline-block; min-width: 80px; white-space: nowrap;">可选/必选</span> | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
 | query | Tensor | 必选 | 公式中的量化输入$Q_{index}^{Quant}$。不支持空tensor。数据格式为ND。 | int8、float8_e4m3fn、HIfloat8、float4_e2m1 | layout_q为BSND时shape为(b,q_s,q_n,d)；layout_q为TND时shape为(q_t,q_n,d) |
 | key | Tensor | 必选 | 公式中的量化输入$K_{index}^{Quant}$。不支持空tensor。数据格式为ND，仅PA_BBND场景下0轴支持非连续。PA_BBND场景下block_size取值为16的倍数，最大支持1024。 | int8、float8_e4m3fn、HIfloat8、float4_e2m1 | layout_k为BSND时shape为(b,k_s,k_n,d)；layout_k为TND时shape为(k_t,k_n,d)；layout_k为PA_BBND时shape为(block_num,block_size,k_n,d) |
@@ -139,45 +155,51 @@ cann_ops_transformer.quant_lightning_indexer(
 | cmp_residual_k | Tensor | 可选 | 表示key压缩前token数量除以cmp_ratio的余数，需满足0 \<= cmp_residual_k\[i\] \< cmp_ratio。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。 | int32 | (b,) |
 | block_table | Tensor | 可选 | 表示PageAttention中KV存储使用的block映射表。不支持空tensor。layout_k为PA_BBND时必须传入。数据格式为ND。 | int32 | (b, k_s_max/block_size) |
 | output_idx_offset | Tensor | 可选 | 表示topK结果输出索引所需要加上的偏移。值必须大于等于0，加上偏移后topk index不能超过int32最大值。数据格式为ND。 | int32 | layout_q为BSND时shape为(b,q_s,k_n)；layout_q为TND时shape为(q_t,k_n) |
-| metadata | Tensor | 可选 | quant_lightning_indexer_metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。不支持空tensor。数据格式为ND。 | int32 | (8 * (1 + aic_num + aiv_num) + 256,) |
+| metadata | Tensor | 可选 | 配套quant_lightning_indexer_metadata生成的分核信息，包含使用核数、分块大小以及每个核的任务起止位置。不支持空tensor。数据格式为ND。 | int32 | 基础接口及候选参数均为-1时为(8 * (1 + aic_num + aiv_num) + 256,)；开启候选选择时为(1024,) |
 | max_seqlen_q | int | 可选 | query的最大序列长度。-1表示任意可能长度，默认值为-1。 | int64 | - |
 | layout_q | str | 可选 | 用于标识输入query的数据排布格式，支持BSND、TND，默认值为BSND。 | string | - |
 | layout_k | str | 可选 | 用于标识输入key的数据排布格式，支持BSND、TND、PA_BBND，默认值为BSND。 | string | - |
 | mask_mode | int | 可选 | 表示mask的模式，0代表defaultMask模式，3代表rightDownCausal模式，默认值为0。 | int64 | - |
 | cmp_ratio | int | 可选 | 用于稀疏计算，表示key的压缩倍数。默认值为1，表示无压缩。 | int64 | - |
 | return_value | int | 可选 | 代表是否需要返回sparse_indices对应的sparse_values值。0代表不返回，1代表返回值，默认值为0。 | int64 | - |
+| candidate_topk_blocks | int | 可选 | 候选块数量。与candidate_block_size同时按关键字提供；两项均为-1时关闭候选选择，开启时仅支持2048。 | int64 | - |
+| candidate_block_size | int | 可选 | 每个候选块包含的逻辑Key位置数。candidate_topk_blocks为-1时必须为-1，为2048时必须为8；与后续quant_sparse_lightning_indexer使用相同配置。 | int64 | - |
 
 ## 返回值说明
 
 ### quant_lightning_indexer_metadata
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+| 参数名 | 参数类型 | <span style="display: inline-block; min-width: 80px; white-space: nowrap;">可选/必选</span> | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| metadata | Tensor | 必选 | 每个AIcore的Attention计算任务的batch、head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。 | int32 | (8 * (1 + aic_num + aiv_num) + 256,)  |
+| metadata | Tensor | 必选 | 每个AI Core计算任务的分核信息。数据格式为ND，使用连续存储。 | int32 | 基础接口及候选参数均为-1时为(8 * (1 + aic_num + aiv_num) + 256,)；开启候选选择时为(1024,) |
 
 ### quant_lightning_indexer
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
+未提供候选参数时，返回两个Tensor：`(sparse_indices, sparse_values)`。
+
+| 参数名 | 参数类型 | <span style="display: inline-block; min-width: 80px; white-space: nowrap;">可选/必选</span> | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| sparse_indices | Tensor | 必选 | 公式中的Indices输出。不支持空tensor。无效部分填-1。数据格式为ND。 | int32 | layout_q为BSND时shape为(b,q_s,k_n,topk)；layout_q为TND时shape为(q_t,k_n,topk) |
-| sparse_values | Tensor | 条件输出 | 公式中的Indices对应的Values输出。当return_value为1时输出对应值；当return_value为0时输出shape为[0]的空tensor。无效部分填-inf。数据格式为ND。 | bfloat16 | layout_q为BSND时shape为(b,q_s,k_n,topk)；layout_q为TND时shape为(q_t,k_n,topk)；return_value为0时shape为(0,) |
+| sparse_indices | Tensor | 必选 | 位置级TopK的索引输出，无效部分填-1。数据格式为ND。 | int32 | layout_q为BSND时为(b,q_s,k_n,topk)；layout_q为TND时为(q_t,k_n,topk) |
+| sparse_values | Tensor | 可选 | sparse_indices对应的分数。return_value为1时输出对应分数，无效部分填-inf；为0时返回空Tensor。数据格式为ND。 | bfloat16 | return_value为1时与sparse_indices相同；为0时为(0,) |
+
+同时提供两个候选参数时，返回四个Tensor：`(sparse_indices, sparse_values, candidate_block_indices, candidate_block_length)`。
+
+| 参数名 | 参数类型 | <span style="display: inline-block; min-width: 80px; white-space: nowrap;">可选/必选</span> | 描述 | 数据类型 | 维度(shape) |
+|--------|----------|-----------|------|----------|-------------|
+| sparse_indices | Tensor | 必选 | 位置级TopK的索引输出，候选选择不改变其定义，无效部分填-1。 | int32 | layout_q为BSND时为(b,q_s,k_n,topk)；layout_q为TND时为(q_t,k_n,topk) |
+| sparse_values | Tensor | 可选 | return_value为1时返回位置索引对应的分数，无效部分填-inf；为0时返回空Tensor。 | bfloat16 | return_value为1时与sparse_indices相同；为0时为(0,) |
+| candidate_block_indices | Tensor | 必选 | 候选逻辑块号。每行前candidate_block_length个槽位为有效候选，其余槽位填-1；关闭候选选择时返回空Tensor。 | int32 | 开启且layout_q为BSND时为(b,q_s,k_n,candidate_topk_blocks)，layout_q为TND时为(q_t,k_n,candidate_topk_blocks)；关闭时为(0,) |
+| candidate_block_length | Tensor | 必选 | 每行实际有效候选块数，范围为[0,candidate_topk_blocks]；关闭候选选择时返回空Tensor。 | int32 | 开启且layout_q为BSND时为(b,q_s,k_n)，layout_q为TND时为(q_t,k_n)；关闭时为(0,) |
 
 ## 约束说明
 
 - 该接口支持推理场景下使用。
 - 该接口支持单算子模式和TorchAir（aclgraph）图模式调用。
 - quant_lightning_indexer_metadata接口需与quant_lightning_indexer算子配套使用。
-- b（batch）表示输入样本批量大小。
-- 参数cu_seqlens_q、cu_seqlens_k要求其值为当前batch与前序batch有效token数的累加值，第一个元素必须为0，且后一个元素的值必须大于等于前一个元素的值。
-- 参数seqused_q、seqused_k要求其值表示每个batch中的有效token数。
-- 参数cmp_residual_k需满足0 <= cmp_residual_k\[i\] < cmp_ratio。
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../docs/zh/context/sparse_mode_introduction.md)。
-- pa_kv_cache支持0轴非连续；pa_block_size支持[16, 1024]，且是16的倍数。
-- 参数query、key的数据类型应保持一致。
 - 该接口的TopK排序过程对NaN排序是未定义行为。
-- 当layout_q为BSND时，不支持传入cu_seqlens_q；当layout_k为BSND或PA_BBND时，不支持传入cu_seqlens_k。
 - 当传入的cmp_ratio > 1且mask_mode = 3时，必须传入cmp_residual_k，其余情况不传入。
-- sparse_indices无效部分填-1；sparse_values无效部分填-inf。
+
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - topk取值范围当前仅支持[1, 2048]。
@@ -191,6 +213,7 @@ cann_ops_transformer.quant_lightning_indexer(
   - layout_k支持PA_BBND、TND：num_heads_q为64时仅支持PA_BBND，必须传入seqused_k；num_heads_q为24/32时支持PA_BBND（必须传入seqused_k）或TND（必须传入cu_seqlens_k，不支持传入seqused_k）。
   - cmp_ratio仅支持2的幂次方值：1/2/4/8/16/32/64/128；num_heads_q为24/32时仅支持1。
   - 不支持return_value功能，不建议传入该参数。
+  - 两级TopK候选源(source)模式在本系列产品上支持开启：`quant_lightning_indexer`同时传入`candidate_topk_blocks=2048`和`candidate_block_size=8`即开启（返回4元组）；开启时topk仅支持[1, 2048]；未传入候选参数时行为与既有版本完全一致（返回2元组）。
   - num_heads_q为24/32暂不支持TND Padding功能：layout_q为TND时不支持传入seqused_q，传入时接口报错。
 <!-- end id7 -->
 <!-- npu="950" id5 -->
@@ -200,10 +223,11 @@ cann_ops_transformer.quant_lightning_indexer(
   - cmp_ratio支持[1, 128]。
   - 当传入output_idx_offset时，支持大于等于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparse_indices值不超过INT32的最大值。
   - 当layout_q为TND时，必须传入cu_seqlens_q，如果也传入seqused_q，应保证由seqused_q传入的各个batch的query长度不超过根据cu_seqlens_q计算出的各个batch的query序列长度。当某个batch由seqused_q传入的query序列长度seqlen1小于由cu_seqlens_q计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1的差值部分的query输出的sparse_indices和sparse_values全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致AI Core执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
-  - 参数metadata必须传入，shape为(8 * (1 + aic_num + aiv_num) + 256,)，核数从当前设备获取。
+  - 参数metadata必须传入。未开启两级TopK候选源(source)模式时，shape为(8 * (1 + aic_num + aiv_num) + 256,)，核数从当前设备获取；开启时shape为(1024,)。
   - query、key在quant_mode为1/3时支持float8_e4m3fn，quant_mode为4时支持HIfloat8，quant_mode为5时支持float4_e2m1，quant_mode为2时支持int8。
   - query_dequant_scale和key_dequant_scale在quant_mode为3/5时支持float8_e8m0，quant_mode为1/4时支持float32，quant_mode为2时支持float16。
   - weights在quant_mode为2时支持float16，quant_mode为1/3/4/5时支持float32。
+  - 两级TopK候选源(source)模式在本系列产品上支持开启：`quant_lightning_indexer`同时传入`candidate_topk_blocks=2048`和`candidate_block_size=8`即开启（返回4元组）；开启时quant_mode必须为5，num_heads_q仅支持[1, 32]，topk支持[1, 8192]，return_value值域为{0,1}，为1时sparse_values输出位置级TopK真实分数；未传入候选参数时行为与既有版本完全一致（返回2元组）。
 <!-- end id5 -->
 
 ### 特性参数组
@@ -215,6 +239,7 @@ cann_ops_transformer.quant_lightning_indexer(
 |   SeqLens参数组   | cu_seqlens_q、cu_seqlens_k、seqused_q、seqused_k、max_seqlen_q |
 |   稀疏压缩参数组    | cmp_ratio、cmp_residual_k |
 | Paged Attention参数组 | block_table |
+| 两级TopK候选源(source)模式参数组 | candidate_topk_blocks、candidate_block_size、candidate_block_indices、candidate_block_length |
 
 ### 基准信息说明
 
@@ -379,7 +404,7 @@ metadata校验：
             </td>
             <td>可选参数</td>
             <td>无</td>
-            <td>传入时需与quant_lightning_indexer_v2_metadata生成的结果一致</td>
+            <td>传入时需与quant_lightning_indexer_metadata生成的结果一致</td>
         </tr>
     </tbody>
 </table>
@@ -568,7 +593,7 @@ mask_mode参数解释：
 
   B = 2
   S1 = 64
-  N1 = 64
+  N1 = 32
   N2 = 1
   D = 128
   blockNum = 128
@@ -576,13 +601,14 @@ mask_mode参数解释：
   topk = 32
 
   # 构造输入
-  query = torch.randn(B, S1, N1, D).to(torch.float8_e4m3fn).npu()
-  key = torch.randn(blockNum, blockSize, N2, D).to(torch.float8_e4m3fn).npu()
-  weights = torch.randn(B, S1, N1).npu()
-  query_dequant_scale = torch.randn(B, S1, N1).npu()
-  key_dequant_scale = torch.randn(blockNum, blockSize, N2).npu()
+  query = torch.randint(0, 256, (B * S1, N1, D // 2), dtype=torch.uint8).npu()
+  key = torch.randint(0, 256, (blockNum, blockSize, N2, D // 2), dtype=torch.uint8).npu()
+  weights = torch.randn(B * S1, N1).npu()
+  query_dequant_scale = torch.full((B * S1, N1, 2, 2), 127, dtype=torch.uint8).view(torch.float8_e8m0fnu).npu()
+  key_dequant_scale = torch.full((blockNum, blockSize, N2, 2, 2), 127, dtype=torch.uint8).view(torch.float8_e8m0fnu).npu()
   block_table = torch.arange(blockNum, dtype=torch.int32).expand(B, -1).npu()
   seqused_k = torch.full((B,), blockNum * blockSize, dtype=torch.int32).npu()
+  cu_seqlens_q = torch.arange(0, (B + 1) * S1, S1, dtype=torch.int32).npu()
 
   # 生成metadata
   metadata = quant_lightning_indexer_metadata(
@@ -590,34 +616,42 @@ mask_mode参数解释：
       num_heads_k=N2,
       head_dim=D,
       topk=topk,
-      quant_mode=1,
+      quant_mode=5,
+      cu_seqlens_q=cu_seqlens_q,
       seqused_k=seqused_k,
       batch_size=B,
       max_seqlen_q=S1,
       max_seqlen_k=blockNum * blockSize,
-      layout_q="BSND",
-      layout_k="PA_BBND",
-      mask_mode=0,
-      cmp_ratio=1
-  )
-
-  # 执行quant_lightning_indexer
-  sparse_indices, sparse_values = quant_lightning_indexer(
-      query, key, weights, query_dequant_scale, key_dequant_scale,
-      topk=topk,
-      quant_mode=1,
-      block_table=block_table,
-      metadata=metadata,
-      seqused_k=seqused_k,
-      max_seqlen_q=-1,
-      layout_q="BSND",
+      layout_q="TND",
       layout_k="PA_BBND",
       mask_mode=0,
       cmp_ratio=1,
-      return_value=1
+      candidate_topk_blocks=2048,
+      candidate_block_size=8
+  )
+
+  # 执行quant_lightning_indexer
+  sparse_indices, sparse_values, candidate_block_indices, candidate_block_length = quant_lightning_indexer(
+      query, key, weights, query_dequant_scale, key_dequant_scale,
+      topk=topk,
+      quant_mode=5,
+      block_table=block_table,
+      metadata=metadata,
+      cu_seqlens_q=cu_seqlens_q,
+      seqused_k=seqused_k,
+      max_seqlen_q=-1,
+      layout_q="TND",
+      layout_k="PA_BBND",
+      mask_mode=0,
+      cmp_ratio=1,
+      return_value=1,
+      candidate_topk_blocks=2048,
+      candidate_block_size=8
   )
   print(f"sparse_indices shape: {sparse_indices.shape}")
   print(f"sparse_values shape: {sparse_values.shape}")
+  print(f"candidate_block_indices shape: {candidate_block_indices.shape}")
+  print(f"candidate_block_length shape: {candidate_block_length.shape}")
   ```
 
 - aclgraph图模式调用：
@@ -631,48 +665,58 @@ mask_mode参数解释：
   B = 2
   S1 = 64
   S2 = 128
-  N1 = 64
+  N1 = 32
   N2 = 1
   D = 128
   topk = 32
 
-  query = torch.randn(B, S1, N1, D).to(torch.float8_e4m3fn).npu()
-  key = torch.randn(B, S2, N2, D).to(torch.float8_e4m3fn).npu()
-  weights = torch.randn(B, S1, N1).npu()
-  query_dequant_scale = torch.randn(B, S1, N1).npu()
-  key_dequant_scale = torch.randn(B, S2, N2).npu()
+  query = torch.randint(0, 256, (B * S1, N1, D // 2), dtype=torch.uint8).npu()
+  key = torch.randint(0, 256, (B * S2, N2, D // 2), dtype=torch.uint8).npu()
+  weights = torch.randn(B * S1, N1).npu()
+  query_dequant_scale = torch.full((B * S1, N1, 2, 2), 127, dtype=torch.uint8).view(torch.float8_e8m0fnu).npu()
+  key_dequant_scale = torch.full((B * S2, N2, 2, 2), 127, dtype=torch.uint8).view(torch.float8_e8m0fnu).npu()
+  cu_seqlens_q = torch.arange(0, (B + 1) * S1, S1, dtype=torch.int32).npu()
+  cu_seqlens_k = torch.arange(0, (B + 1) * S2, S2, dtype=torch.int32).npu()
 
   class QuantLightningIndexerNetwork(torch.nn.Module):
       def __init__(self):
           super(QuantLightningIndexerNetwork, self).__init__()
 
-      def forward(self, query, key, weights, query_dequant_scale, key_dequant_scale):
+      def forward(self, query, key, weights, query_dequant_scale, key_dequant_scale, cu_seqlens_q, cu_seqlens_k):
           metadata = torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata(
               num_heads_q=N1,
               num_heads_k=N2,
               head_dim=D,
               topk=topk,
-              quant_mode=1,
-              batch_size=B,
+              quant_mode=5,
+              cu_seqlens_q=cu_seqlens_q,
+              cu_seqlens_k=cu_seqlens_k,
+              batch_size=None,
               max_seqlen_q=S1,
               max_seqlen_k=S2,
-              layout_q="BSND",
-              layout_k="BSND",
+              layout_q="TND",
+              layout_k="TND",
               mask_mode=0,
-              cmp_ratio=1
+              cmp_ratio=1,
+              candidate_topk_blocks=2048,
+              candidate_block_size=8
           )
 
           return torch.ops.cann_ops_transformer.quant_lightning_indexer(
               query, key, weights, query_dequant_scale, key_dequant_scale,
               topk=topk,
-              quant_mode=1,
+              quant_mode=5,
+              cu_seqlens_q=cu_seqlens_q,
+              cu_seqlens_k=cu_seqlens_k,
               metadata=metadata,
               max_seqlen_q=-1,
-              layout_q="BSND",
-              layout_k="BSND",
+              layout_q="TND",
+              layout_k="TND",
               mask_mode=0,
               cmp_ratio=1,
-              return_value=1
+              return_value=1,
+              candidate_topk_blocks=2048,
+              candidate_block_size=8
           )
 
   from torchair.configs.compiler_config import CompilerConfig
@@ -681,7 +725,9 @@ mask_mode参数解释：
   npu_backend = torchair.get_npu_backend(compiler_config=config)
   torch._dynamo.reset()
   npu_mode = torch.compile(QuantLightningIndexerNetwork(), fullgraph=True, backend=npu_backend, dynamic=False)
-  sparse_indices, sparse_values = npu_mode(query, key, weights, query_dequant_scale, key_dequant_scale)
+  sparse_indices, sparse_values, candidate_block_indices, candidate_block_length = npu_mode(query, key, weights, query_dequant_scale, key_dequant_scale, cu_seqlens_q, cu_seqlens_k)
   print(f"sparse_indices shape: {sparse_indices.shape}")
   print(f"sparse_values shape: {sparse_values.shape}")
+  print(f"candidate_block_indices shape: {candidate_block_indices.shape}")
+  print(f"candidate_block_length shape: {candidate_block_length.shape}")
   ```

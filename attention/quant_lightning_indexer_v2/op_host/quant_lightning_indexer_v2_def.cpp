@@ -83,6 +83,14 @@ public:
             .AutoContiguous();
         this->Output("sparse_indices").ParamType(REQUIRED).DataTypeList({Ops::Transformer::DT_INT32}).FormatList({ge::FORMAT_ND});
         this->Output("sparse_values").ParamType(REQUIRED).DataTypeList({Ops::Transformer::DT_BF16}).FormatList({ge::FORMAT_ND});
+        this->Output("candidate_block_indices")
+            .ParamType(OPTIONAL)
+            .DataTypeList({Ops::Transformer::DT_INT32})
+            .FormatList({ge::FORMAT_ND});
+        this->Output("candidate_block_length")
+            .ParamType(OPTIONAL)
+            .DataTypeList({Ops::Transformer::DT_INT32})
+            .FormatList({ge::FORMAT_ND});
         this->Attr("topk").AttrType(REQUIRED).Int(2048);       // 2048: 筛选前2048个作为输出index
         this->Attr("quant_mode").AttrType(REQUIRED).Int(1);    // 1: per-token-head
         this->Attr("max_seqlen_q").AttrType(OPTIONAL).Int(-1); // -1: 默认值，表示任意可能长度
@@ -91,6 +99,8 @@ public:
         this->Attr("mask_mode").AttrType(OPTIONAL).Int(0); // 0: 默认值，无mask
         this->Attr("cmp_ratio").AttrType(OPTIONAL).Int(1);
         this->Attr("return_value").AttrType(OPTIONAL).Int(0); //  0: 默认值
+        this->Attr("candidate_topk_blocks").AttrType(OPTIONAL).Int(-1);
+        this->Attr("candidate_block_size").AttrType(OPTIONAL).Int(-1);
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
