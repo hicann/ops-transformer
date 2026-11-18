@@ -11,7 +11,7 @@
 #include <cstdio>
 #include <cstddef>
 #include "aclnn_msa_index_score_v2.h"
-#include "aclnn/opdev/op_errno.h"
+#include "opdev/op_errno.h"
 
 #ifdef __cplusplus
 extern "C" {
