@@ -37,10 +37,6 @@ enum DispatchQuantOutDtype : int64_t {
     E5M2_QUANT = 3U,
     E4M3_QUANT = 4U,
     E2M1_QUANT = 5U,
-#ifndef MEGA_MOE_ARCH92_DEVICE
-    // 与接口的 BF16 输出类型标识对齐；直通模式仍由 dispatch_quant_mode=0 表达。
-    BF16_PASSTHROUGH = 15U,
-#endif
 };
 
 using ProblemShape = Shape<int64_t, int64_t, int64_t, int64_t>;
@@ -195,20 +191,10 @@ struct QuantTypeTraits<E2M1_QUANT> {
     using Type = fp4x2_e2m1_t;
 };
 
-#ifndef MEGA_MOE_ARCH92_DEVICE
-template <>
-struct QuantTypeTraits<BF16_PASSTHROUGH> {
-    using Type = bfloat16_t;
-};
-#endif
-
 enum class AxWMode : uint8_t {
     A8W8,
     A8W4,
     A4W4,
-#ifndef MEGA_MOE_ARCH92_DEVICE
-    A16W16,
-#endif
 };
 
 template <typename WeightType, typename QuantOutType>
@@ -249,15 +235,6 @@ struct QuantConfig {
     static constexpr uint32_t A_ELEMS_PER_BYTE = PackedElementTraits<QuantOutType>::ELEMENTS_PER_BYTE;
     static constexpr uint32_t B_ELEMS_PER_BYTE = PackedElementTraits<WeightType>::ELEMENTS_PER_BYTE;
     static constexpr uint32_t C_ELEMS_PER_BYTE = PackedElementTraits<ActivationQuantOutType>::ELEMENTS_PER_BYTE;
-};
-
-// BF16 路径直接给出数据类型，不依赖 MX scale 或每字节元素数配置。
-template <>
-struct QuantConfig<bfloat16_t, BF16_PASSTHROUGH> {
-    using QuantOutType = bfloat16_t;
-    using QuantStorageType = bfloat16_t;
-    using ActivationQuantOutType = bfloat16_t;
-    static constexpr AxWMode AXW_MODE = AxWMode::A16W16;
 };
 #endif
 

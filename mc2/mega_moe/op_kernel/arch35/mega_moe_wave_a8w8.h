@@ -41,8 +41,6 @@ private:
     friend MegaMoeBase;
 
 public:
-    static constexpr bool kImplementationReady = true;
-
     __aicore__ inline void Init(
         GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
         GM_ADDR weight2, GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales,
@@ -867,11 +865,7 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>
 __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDerived>::Process()
 {
-    // 就绪状态取自最终实现类型，TODO 派生框架不能进入公共流水。
-    static_assert(ImplType::kImplementationReady, "MegaMoe derived kernel implementation is not ready.");
-    if constexpr (ImplType::kImplementationReady) {
-        this->ProcessWave(GetImpl());
-    }
+    this->ProcessWave(GetImpl());
 }
 
 #undef TemplateMegaMoeA8W8WaveTypeClass
