@@ -495,7 +495,7 @@ __aicore__ inline GM_ADDR MegaMoe<TemplateMegaMoeTypeFunc>::InitBaseState(
     GM_ADDR sharedWeight1, GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
     GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData, GM_ADDR tilingGM)
 {
-    GM_ADDR dumpBase = InitRuntimeContext(context, tilingData);
+    const GM_ADDR dumpBase = InitRuntimeContext(context, tilingData);
     BindTensorAddresses(x, topkIds, topkWeights, weight1, weight2, weightScales1, weightScales2, scales,
                         sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
                         expertTokenNumsOut);
@@ -526,7 +526,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     GM_ADDR sharedWeight1, GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
     GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData, GM_ADDR tilingGM)
 {
-    GM_ADDR dumpBase = InitBaseState(
+    const GM_ADDR dumpBase = InitBaseState(
         context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2, scales,
         sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut, expertTokenNumsOut,
         workspaceGM, tilingData, tilingGM);
