@@ -32,7 +32,7 @@ class LightningIndexerKLLossOpBuilder(OpBuilder):
         def lightning_indexer_kl_loss_meta(
             target_score, index_probs, eps=1e-9, weight_type="logits"
         ):
-            return torch.empty((), dtype=target_score.dtype, device="meta")
+            return torch.empty(1, dtype=target_score.dtype, device="meta")
 
 
 lightning_indexer_kl_loss_op_builder = LightningIndexerKLLossOpBuilder()

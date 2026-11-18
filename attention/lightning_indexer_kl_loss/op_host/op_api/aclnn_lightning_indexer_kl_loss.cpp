@@ -24,6 +24,7 @@
 #include "opdev/tensor_view_utils.h"
 #include "opdev/make_op_executor.h"
 #include "aclnn_kernels/contiguous.h"
+#include "level0/zero_op.h"
 
 using namespace op;
 
@@ -106,6 +107,18 @@ static aclnnStatus CheckParams(const LightningIndexerKLLossParams& params)
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "weightType must be 'logits' or 'probs', but got '%s'.", params.weightType);
         return ACLNN_ERR_PARAM_INVALID;
     }
+    // loss 校验：dtype 与 targetScore 一致，shape 为 (1,)
+    if (params.loss->GetDataType() != params.targetScore->GetDataType()) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "loss dtype %d != targetScore dtype %d.",
+                static_cast<int32_t>(params.loss->GetDataType()),
+                static_cast<int32_t>(params.targetScore->GetDataType()));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    const auto& lossShape = params.loss->GetViewShape();
+    if (lossShape.GetDimNum() != 1 || lossShape.GetDim(0) != 1) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "loss shape must be (1,), but got %s.", op::ToString(lossShape).GetString());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     return ACLNN_SUCCESS;
 }
 
@@ -140,11 +153,23 @@ aclnnStatus aclnnLightningIndexerKLLossGetWorkspaceSize(const aclTensor* targetS
     aclnnStatus ret = CheckParams(params);
     CHECK_COND(ret == ACLNN_SUCCESS, ret, "aclnnLightningIndexerKLLossGetWorkspaceSize checkParams failed.");
 
-    // create OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     if (targetScore->IsEmpty()) {
-        *workspaceSize = 0;
+        // 空集合求和结果为 0：空输入时 loss 仍为非空标量输出，需显式写 0，避免返回 SUCCESS 但输出未初始化
+        const aclTensor* lossZero = l0op::ZerosLike(loss, uniqueExecutor.get());
+        if (lossZero == nullptr) {
+            OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR,
+                                   "ZerosLike returned nullptr; propagate lower-layer first error.");
+            return ACLNN_ERR_INNER_NULLPTR;
+        }
+        auto viewCopyResult = l0op::ViewCopy(lossZero, loss, uniqueExecutor.get());
+        if (viewCopyResult == nullptr) {
+            OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR,
+                                   "ViewCopy returned nullptr; propagate lower-layer first error.");
+            return ACLNN_ERR_INNER_NULLPTR;
+        }
+        *workspaceSize = uniqueExecutor->GetWorkspaceSize();
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }

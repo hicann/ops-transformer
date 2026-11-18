@@ -30,8 +30,8 @@ at::Tensor lightning_indexer_kl_loss(const at::Tensor& targetScore, const at::Te
     {
         auto local_device = c10::Device(targetScore.device());
         const c10::OptionalDeviceGuard device_guard(local_device);
-        // 输出为标量，分配一个单元素 tensor
-        loss = at::empty({}, targetScore.options());
+        // 输出为标量，shape 为 (1,)（与 aclnn 接口约定一致）
+        loss = at::empty({1}, targetScore.options());
     }
 
     char* weightTypePtr = const_cast<char*>(weightType.c_str());
