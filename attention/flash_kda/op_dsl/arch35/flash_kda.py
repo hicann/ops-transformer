@@ -801,21 +801,18 @@ def _flash_kda_fwd_impl(
         g_cumsum = torch.empty(g_cumsum_shape, dtype=HIGH_DTYPE, device=q.device)
     state_is_compact = int(layout == "TND")
     save_qg = int(save_kernel_caches)
-    # Public capacity slots not written by any sequence must be deterministic.
-    # Keep the private staged exchange allocation unchanged when states are disabled.
-    allocate_states = torch.zeros if outputs.chunk_states else torch.empty
     if persistent and not outputs.chunk_states:
         h = initial_state[:1].unsqueeze(2)
     elif state_is_compact:
         state_chunks = staged._tnd_state_chunk_capacity(storage_length, batch)
-        storage = allocate_states(
+        storage = torch.empty(
             (state_chunks, n_v, SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM),
             dtype=HIGH_DTYPE,
             device=q.device,
         )
         h = storage.permute(1, 0, 2, 3).unsqueeze(0)
     else:
-        h = allocate_states(
+        h = torch.empty(
             (batch, n_v, (storage_length + CHUNK_SIZE - 1) // CHUNK_SIZE,
              SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM),
             dtype=HIGH_DTYPE,

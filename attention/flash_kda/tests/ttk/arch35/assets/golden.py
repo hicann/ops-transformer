@@ -7,7 +7,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 
 
-"""CPU references and native TTK TestSpec."""
+"""CPU 高精度参考，以及 CPU 低精度模拟或 FLA GPU 三方精度比较配置。"""
 
 import dataclasses
 
@@ -102,8 +102,10 @@ def _reference_lower_matmul(
     diagonal: int,
     cast_operand=None,
     safe_diagonal: bool = True,
+    shared_references: bool = False,
+    left_scale: float = 1.0,
 ) -> torch.Tensor:
-    """Compute causal QK/KKT tiles with 16-token relative-decay references."""
+    """按所选参考位置计算因果 QK/KKT；共享路径模拟 32 行中心参考和 BF16 交接。"""
     result = torch.zeros(
         *left.shape[:-1],
         right.shape[-2],
@@ -113,11 +115,17 @@ def _reference_lower_matmul(
     cast = (lambda x: x) if cast_operand is None else cast_operand
     for row_start in range(0, CHUNK_SIZE, REFERENCE_BLOCK_SIZE):
         row_end = row_start + REFERENCE_BLOCK_SIZE
-        reference = cumulative_decay[..., row_start : row_start + 1, :]
-        left_rows = cast(
+        # 共享路径前后两个 32 行面板分别使用第 16、48 行。
+        reference_row = (row_start // 32) * 32 + 16 if shared_references else row_start
+        reference = cumulative_decay[..., reference_row : reference_row + 1, :]
+        left_values = (
             left[..., row_start:row_end, :]
             * (cumulative_decay[..., row_start:row_end, :] - reference).exp()
         )
+        if shared_references:
+            # 与 kernel 一致，Q 先乘衰减、再乘 scale，最后转 BF16。
+            left_values = left_values * left_scale
+        left_rows = cast(left_values)
         for col_start in range(0, row_end, REFERENCE_BLOCK_SIZE):
             col_end = col_start + REFERENCE_BLOCK_SIZE
             if safe_diagonal and col_start == row_start:
@@ -227,7 +235,7 @@ def _stage1_cpu(K, V, Q, beta_brc, g, *, scale_value) -> _StageOneGolden:
 
 
 def _stage1_npu(
-    K, V, Q, beta_brc, g, *, scale_value, safe_diagonal=True
+    K, V, Q, beta_brc, g, *, scale_value, safe_diagonal=True, shared_references=False
 ) -> _StageOneGolden:
     """Stage1 NPU-oriented golden：显式 batch/head/chunk 循环 + bf16/fp16 交接。"""
     if V.shape[1] != K.shape[1]:
@@ -284,17 +292,20 @@ def _stage1_npu(
                         diagonal=-1,
                         cast_operand=_to_bf16_to_fp32,
                         safe_diagonal=safe_diagonal,
+                        shared_references=shared_references,
                     )
                     * beta_c
                 )
                 Mqk_c = _to_bf16_to_fp32(
                     _reference_lower_matmul(
-                        Q_c * scale_value,
+                        Q_c if shared_references else Q_c * scale_value,
                         K_c,
                         g_cumsum,
                         diagonal=0,
+                        left_scale=scale_value if shared_references else 1.0,
                         cast_operand=_to_bf16_to_fp32,
                         safe_diagonal=safe_diagonal,
+                        shared_references=shared_references,
                     )
                 )
 
@@ -449,7 +460,7 @@ def _chain_cpu(inputs: KdaInputs) -> _ChainGolden:
 
 
 def _chain_npu(
-    inputs: KdaInputs, *, safe_diagonal=True, direct_u=False
+    inputs: KdaInputs, *, safe_diagonal=True, direct_u=False, shared_references=False
 ) -> _ChainGolden:
     s1 = _stage1_npu(
         inputs.K,
@@ -459,6 +470,7 @@ def _chain_npu(
         inputs.g,
         scale_value=inputs.scale_value,
         safe_diagonal=safe_diagonal,
+        shared_references=shared_references,
     )
     s2 = _stage2_npu(s1, inputs.initial_state, direct_u=direct_u)
     s3 = _stage3_npu(s1, s2)
@@ -470,7 +482,6 @@ def empty():
 
 
 def reference(inputs, c, kind):
-    load_asset("inputs").validate_metadata(inputs[5])
     f = effective(c)
     direct_u = False
     if kind == "npu_chunk":
@@ -535,11 +546,32 @@ def reference(inputs, c, kind):
         if kind == "cpu_chunk":
             chain = _chain_cpu(args)
         else:
-            # The native bounded-gate reference uses a shared 16-row origin.
-            # Unbounded/preprocessed gates need causal differences to avoid
-            # overflow in the unused upper triangle before it is masked.
+            # 按真实模板分支选择参考点；FP32 数学参考保持原计算路径。
             bounded_gate = f["use_gate_in_kernel"] and f["lower_bound"] is not None
-            chain = _chain_npu(args, safe_diagonal=not bounded_gate, direct_u=direct_u)
+            shared_references = (
+                bounded_gate
+                and f["lower_bound"] >= -5.0
+                and -0.125 <= args.scale_value <= 0.125
+                and not f["allow_neg_eigval"]
+            )
+            if direct_u:
+                # persistent 仅在原融合推理契约下启用共享参考，训练不启用。
+                shared_references = (
+                    shared_references
+                    and c["inference"]
+                    and f["output_final_state"]
+                    and not f["return_intermediate_states"]
+                    and f["use_qk_l2norm_in_kernel"]
+                    and f["use_beta_sigmoid_in_kernel"]
+                    and c["dt_bias_mode"] != "none"
+                )
+            chain = _chain_npu(
+                # persistent 推理与 staged 均在状态乘积相加前将 U_pre 舍入 BF16。
+                args,
+                safe_diagonal=not bounded_gate,
+                direct_u=direct_u and not c["inference"],
+                shared_references=shared_references,
+            )
         result[0].append(chain.stage3.output[:, :, :n].flatten())
         if f["output_final_state"]:
             result[1].append(chain.stage2.S.transpose(-1, -2).flatten())
@@ -636,6 +668,10 @@ def golden(
         raise RuntimeError(
             "Performance CSV requires golden_api=disable; no long CPU golden"
         )
+    if load_asset("fla_adapter").enabled():
+        load_asset("fla_adapter").check_case(c)
+        # FLA 模式比较公开三项，chunk 状态的启用条件和 BF16 舍入沿用当前 golden。
+        return select_reference(reference(inputs, c, "cpu_chunk"), c)
     # TTK compares forward results; the bool also requires unified-entry L2 and consistency.
     return select_reference(reference(inputs, c, "cpu_chunk"), c, forward=True) + [
         torch.ones(1, dtype=torch.bool)
@@ -643,7 +679,7 @@ def golden(
 
 
 class CpuSimulation:
-    """CPU baseline for cross_check; not an independent GPU implementation."""
+    """在 CPU 上模拟 NPU 低精度计算，作为 cross_check 的三方基准。"""
 
     def __call__(
         self,
@@ -685,7 +721,14 @@ class FlashKdaTestSpec:
     """Native TestSpec, independent of TTK internal APIs."""
 
     golden = staticmethod(golden)
-    third_party = {"torch": CpuSimulation}
+    # 默认使用 CPU 低精度模拟；显式选择 fla 时使用 GPU 三方实现。
+    third_party = {
+        "torch": (
+            load_asset("fla_adapter").FLAThirdParty
+            if load_asset("fla_adapter").enabled()
+            else CpuSimulation
+        )
+    }
     tolerance = {
         "bfloat16": {"standard": "cross_check", "level": "L2"},
         "float32": {"standard": "cross_check", "level": "L2"},

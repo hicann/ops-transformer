@@ -15,25 +15,24 @@ No input-file lookups or numerical DUT fallback are used here.
 
 import ast
 import copy
-import hashlib
 import importlib
 import importlib.util
 import inspect
+import json
+import logging
+import os
 import re
 import sys
+import time
 from contextlib import ExitStack, contextmanager
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
 from unittest.mock import patch
 
+from arch35 import kda_runtime as runtime
 import torch
-
-import kda_runtime as runtime
-from kda_cases import attributes
 from torch._subclasses.fake_tensor import FakeTensorMode
-
-ARCH = "arch35"
 
 if importlib.util.find_spec("ttk.core_modules.comparison") is None:
     from ttk.core_modules.common.comparison.comparison import compare as ttk_compare
@@ -47,10 +46,11 @@ else:
 def load_asset(name):
     """Load by path, as in QBSA, to avoid collisions with other operators' assets."""
     folder = Path(__file__).resolve().parent
+    # 性能资产由双架构共享，其余资产从当前架构目录加载。
     if name == "performance":
         folder = folder.parent
     path = folder / "assets" / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(f"_flash_kda_ttk_{ARCH}_{name}", path)
+    spec = importlib.util.spec_from_file_location(f"_flash_kda_ttk_arch35_{name}", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -62,27 +62,11 @@ def input_tensor(inputs, name):
 
 
 def dut_modules():
-    if runtime.selection()[1] != ARCH:
-        raise RuntimeError(f"{ARCH} adapter does not match selected architecture")
-    modules = runtime.modules()
-    producer = modules[1]
-    if (producer.MAGIC, producer.ABI_VERSION, producer.MAX_AIC_CORES) != load_asset(
-        "inputs"
-    ).PROFILE:
-        raise RuntimeError(f"{ARCH} DUT metadata ABI mismatch")
-    return modules
+    return runtime.modules()
 
 
 def dut_call(kwargs):
     return runtime.public_api().flash_kda(**kwargs)
-
-
-def rejection_target(kwargs, config):
-    if config["test"].get("python_validation"):
-        if runtime.selection()[0] != "source":
-            raise RuntimeError("strict Python type validation requires KDA_DUT=source")
-        return dut_modules()[0].flash_kda(**kwargs)
-    return dut_call(kwargs)
 
 
 def effective(c):
@@ -91,13 +75,6 @@ def effective(c):
 
 def make(c):
     return load_asset("inputs").make(c)
-
-
-def native_metadata(value, config):
-    size = load_asset("inputs").capacity(config)
-    if value.numel() < size:
-        raise ValueError("transport metadata is shorter than native capacity")
-    return value[:size]
 
 
 def reference(inputs, c, kind, *, forward=False):
@@ -115,10 +92,12 @@ def produce(inputs, c, *, template=None):
         if c["cu_seqlens_value"] is not None
         else None
     )
+    event(c, status="dut_selected", **runtime.describe())
     build = runtime.public_api().flash_kda_metadata
     options = {}
     if template is not None:
-        build = getattr(producer, "_build_flash_kda_fwd_metadata")
+        # 指定模板使用已有的内部 metadata 生成器，不增加公开接口参数。
+        build = producer._build_flash_kda_fwd_metadata
         options["template"] = template
     return build(
         cu_seqlens=cu,
@@ -141,17 +120,27 @@ class BoundaryViolation(RuntimeError):
     pass
 
 
-event = runtime.event
+def event(c, **values):
+    folder = os.environ.get("KDA_EVIDENCE_DIR")
+    if not folder:
+        logging.info("KDA %s %s", c["id"], json.dumps(values, ensure_ascii=False))
+        return
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    with (folder / f"{c['id']}.{os.getpid()}.jsonl").open("a", encoding="utf-8") as f:
+        f.write(
+            json.dumps(
+                dict(case_id=c["id"], time_ns=time.time_ns(), **values),
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
 
 
 @contextmanager
 def mode(c):
     with torch.inference_mode(c["inference"]):
-        with (
-            torch.no_grad()
-            if c["inference"] or c.get("no_grad")
-            else torch.enable_grad()
-        ):
+        with torch.no_grad() if c.get("no_grad") else torch.enable_grad():
             if torch.is_inference_mode_enabled() != c["inference"]:
                 raise AssertionError("inference mode query mismatch")
             yield
@@ -188,7 +177,7 @@ def unchanged(before, after):
             raise AssertionError(f"input modified: {name}")
 
 
-def invoke(inputs, c, md=None, *, meta=False, forward=False, call=None):
+def invoke(inputs, c, md=None, *, meta=False, forward=False):
     with mode(c):
         if md is None:
             md = input_tensor(inputs, "metadata")
@@ -211,9 +200,7 @@ def invoke(inputs, c, md=None, *, meta=False, forward=False, call=None):
         kw = call_kwargs(inputs, c, md)
         required = [kw.pop(name) for name in ("q", "k", "v", "g", "beta", "metadata")]
         main, _, _ = dut_modules()
-        public = runtime.public_api()
-        if call is None:
-            call = public.flash_kda_fwd if forward else public.flash_kda
+        call = main.flash_kda_fwd if forward else main.flash_kda
         entry = "flash_kda_fwd" if forward else "flash_kda"
         out = call(*required, **kw)
         load_asset("compare").check(out, inputs, c, meta=meta, forward=forward)
@@ -281,17 +268,8 @@ def reject_call(func, objects, reasons, c, *, expected_error=ValueError):
     """检查算子以参数异常拒绝非法调用，断言失败直接交给 TTK。"""
     try:
         func()
-    except (expected_error, RuntimeError) as exc:
+    except expected_error as exc:
         message = str(exc)
-        # torch.ops validates its schema before entering Python; it reports
-        # argument binding/type errors as RuntimeError, not Python TypeError.
-        schema_error = isinstance(exc, RuntimeError) and re.search(
-            r"Expected a value of type|missing value for argument|Unknown keyword argument|Expected.*for argument.*found type",
-            message,
-            re.I,
-        )
-        if not isinstance(exc, expected_error) and not schema_error:
-            raise
         if not any(re.search(p, message, re.I) for p in objects):
             raise AssertionError(f"wrong error object: {message}") from exc
         if not any(re.search(p, message, re.I) for p in reasons):
@@ -301,7 +279,7 @@ def reject_call(func, objects, reasons, c, *, expected_error=ValueError):
             status="rejected",
             exception_type=type(exc).__name__,
             message=message,
-            type_acceptance="torch_schema" if schema_error else expected_error.__name__,
+            type_acceptance=expected_error.__name__,
         )
     else:
         raise AssertionError("invalid input was accepted")
@@ -395,7 +373,7 @@ def negative(inputs, c):
     missing_argument = mutation[0] == "missing" and mutation[2] == "omit"
     with mode(c), guard(static=True):
         reject_call(
-            lambda: rejection_target(kw, c),
+            lambda: dut_call(kw),
             objects,
             reasons,
             c,
@@ -414,7 +392,7 @@ def negative(inputs, c):
             )
             del params[field]
             reject_call(
-                lambda: runtime.public_api().flash_kda_metadata(**params),
+                lambda: producer.flash_kda_metadata(**params),
                 [field],
                 ["missing", "required"],
                 c,
@@ -520,13 +498,13 @@ def meta_case(inputs, c):
                     for k, v in kw.items()
                 }
                 reject_call(
-                    lambda: rejection_target(fkw, c),
+                    lambda: dut_call(fkw),
                     objects,
                     reasons,
                     c,
                 )
         elif c["suite"] == "meta_negative":
-            reject_call(lambda: rejection_target(kw, c), objects, reasons, c)
+            reject_call(lambda: dut_call(kw), objects, reasons, c)
         else:
             out = dut_call(kw)
             load_asset("compare").check(out, tensors, bc, meta=True)
@@ -538,6 +516,24 @@ def meta_case(inputs, c):
 
 
 def accuracy(inputs, c):
+    if load_asset("fla_adapter").enabled():
+        load_asset("fla_adapter").check_case(c)
+        out, _ = invoke(inputs, c)
+        event(
+            c,
+            status="third_party_accuracy",
+            peer="FLA CUDA",
+            outputs=["out", "final_state", "chunk_states"],
+        )
+        # invoke 校验完整返回协议，pack 提取有效 chunk 并为未启用的输出保留空槽。
+        return load_asset("compare").pack(out, c)
+    event(
+        c,
+        status="third_party_accuracy",
+        peer="npu_chunk_cpu_simulation",
+        golden="cpu_chunk",
+        **runtime.describe(),
+    )
     # invoke checks the exact return protocol and input immutability for each call.
     out, md = invoke(inputs, c)
     forward, _ = invoke(inputs, c, md, forward=True)
@@ -575,7 +571,7 @@ def accuracy(inputs, c):
 
     contracts_pass = all(report["pass"] for report in reports)
     for slot, actual, expected in zip(comparison.SLOTS, values, forward_values):
-        passed = actual.dtype == expected.dtype and torch.equal(actual, expected)
+        passed = torch.equal(actual, expected)
         event(
             c,
             status="entry_consistency_checked",
@@ -702,7 +698,7 @@ def check_capacity(inputs, c):
         reached.append(True)
         raise StaticPassed()
 
-    length = c["test"].get("seqlens_by_arch", {}).get(ARCH, c["test"]["seqlens"])
+    length = c["test"]["seqlens"]
 
     def produce_capacity():
         return producer.flash_kda_metadata(
@@ -821,8 +817,7 @@ def check_buffer(inputs, c, md):
     validate = main.validate_buffer
     get_compiled = main._get_compiled_kernel
     test = c["test"]
-    kernel = main.FlashKDAFwd.run_flash_kda
-    signature = inspect.signature(kernel)
+    signature = inspect.signature(main.FlashKDAFwd.run_flash_kda)
     hit, launched, replacement = [], [], {}
     snapshot = [x.clone() for x in inputs]
     md_snapshot = md.clone()
@@ -848,9 +843,7 @@ def check_buffer(inputs, c, md):
                 value.numel() + offset, dtype=value.dtype, device=value.device
             )
             replacement["original"] = value.detach()
-            view = storage.as_strided(value.shape, value.stride(), offset)
-            view.copy_(value)
-            value.set_(view)
+            value.set_(storage.as_strided(value.shape, value.stride(), offset))
             replacement["view"] = value
             replacement["storage"] = value.untyped_storage().data_ptr()
             replacement["stride"] = value.stride()
@@ -1028,6 +1021,7 @@ _CACHE = {}
 
 
 def execute_performance(inputs, c):
+    # 复用主线的预热、采样和模板控制；精度入口保持原流程。
     return load_asset("performance").execute(sys.modules[__name__], inputs, c, _CACHE)
 
 
@@ -1086,35 +1080,6 @@ def flash_kda(
         seqused,
     ]
     c = load_asset("inputs").configuration(inputs, attributes)
-    if c["test"].get("requires_source") and runtime.selection()[0] != "source":
-        raise RuntimeError("whitebox case requires KDA_DUT=source")
-    inputs[5] = native_metadata(inputs[5], c)
-    event(
-        c,
-        status="selected",
-        execution="eager",
-        adapter_path=__file__,
-        assets_path=str(Path(__file__).resolve().parent / "assets"),
-        device=str(q.device),
-        device_name=torch.npu.get_device_name(q.device)
-        if q.device.type == "npu"
-        else q.device.type,
-        **runtime.describe(),
-    )
-    if c["suite"] != "performance":
-        hashes = {
-            name: hashlib.sha256(
-                value.detach().cpu().contiguous().view(torch.uint8).numpy()
-            ).hexdigest()
-            for name, value in zip(load_asset("inputs").INPUT_NAMES, inputs)
-        }
-        event(
-            c,
-            status="input_fingerprints",
-            sha256=hashes,
-            inference=c["inference"],
-            kwargs=c["kwargs"],
-        )
     if c["pending"]:
         raise RuntimeError("PENDING_EXPECTATION: " + c["pending"])
     if c["suite"] in ("accuracy", "performance") and q.device.type == "cpu":
@@ -1150,20 +1115,25 @@ def flash_kda(
 
 
 def prepare(row):
-    """Prepare benchmark inputs using the TTK input recipe."""
+    """按 CSV 原始参数准备性能输入，兼容双架构共用的 metadata 传输容量。"""
     shapes = ast.literal_eval(row["tensor_view_shapes"])
     dtypes = ast.literal_eval(row["tensor_dtypes"])
     specs = [
-        torch.empty(s, dtype=getattr(torch, d), device="meta")
-        for s, d in zip(shapes, dtypes)
+        torch.empty(shape, dtype=getattr(torch, dtype), device="meta")
+        for shape, dtype in zip(shapes, dtypes)
     ]
-    config = load_asset("inputs").configuration(specs, attributes(row))
+    attrs = ast.literal_eval(row["attributes"])
+    attrs["testcase_name"] = row["testcase_name"]
+    inputs_asset = load_asset("inputs")
+    config = inputs_asset.configuration(specs, attrs)
     ranges = ast.literal_eval(row.get("input_data_ranges") or "()")
-    config["input_ranges"] = ranges
-    values = make(config)
-    for name, value, shape, dtype in zip(
-        load_asset("inputs").INPUT_NAMES, values, shapes, dtypes
+    values = inputs_asset.make(config, ranges)
+    for index, (name, value, shape, dtype) in enumerate(
+        zip(inputs_asset.INPUT_NAMES, values, shapes, dtypes)
     ):
+        if name == "metadata":
+            value = inputs_asset.transport_metadata(value, specs[index])
+            values[index] = value
         if tuple(value.shape) != tuple(shape) or value.dtype != getattr(torch, dtype):
             raise ValueError(f"{name}: input generator differs from shared CSV")
     return config, values

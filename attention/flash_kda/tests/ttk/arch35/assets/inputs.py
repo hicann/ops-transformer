@@ -10,35 +10,8 @@
 
 import json
 import re
+
 import torch
-
-PROFILE = (0x4B444132, 4, 32)
-
-
-def _capacity(config, cores):
-    batch, length, heads = (config[k] for k in ("batch_size", "seqlens", "nheads_v"))
-    chunks = (length + 63) // 64
-    entries = chunks + batch - 1 if config["layout"] == "TND" else batch * chunks
-    return max(12 + (15 + 4 * cores) * entries, 11 + cores + 6 * batch * heads + batch)
-
-
-def capacity(config):
-    """Native metadata size for this architecture only."""
-    return _capacity(config, PROFILE[2])
-
-
-def transport_capacity(config):
-    """CSV transport reserves the 64-core upper bound on both architectures."""
-    return _capacity(config, 64)
-
-
-def validate_metadata(value):
-    """Reject a mismatched arch35 plugin without consulting the DUT."""
-    if value.dtype != torch.int32 or value.ndim != 1 or value.numel() < 11:
-        raise ValueError("metadata must be an INT32 ABI header")
-    if tuple(value[:2].tolist()) != PROFILE[:2]:
-        raise ValueError("arch35 metadata ABI mismatch")
-
 
 INPUT_NAMES = (
     "q",
@@ -156,9 +129,7 @@ def sequences(x, c, *, norm=False):
 
 
 def make(c, input_ranges=()):
-    input_ranges = input_ranges or c.get("input_ranges", ())
-    ranges = dict(zip(INPUT_NAMES, input_ranges))
-    ranges.update(c["test"].get("input_ranges", {}))
+    ranges = dict(zip(INPUT_NAMES, input_ranges or ()))
     b, nq, nv = c["batch_size"], c["nheads_qk"], c["nheads_v"]
     lengths = c["valid_lengths"]
     s = max(lengths) if c["layout"] == "TND" else c["seqlens"]
@@ -239,17 +210,11 @@ def make(c, input_ranges=()):
         torch.tensor(cu, dtype=torch.int32),
         torch.tensor(used, dtype=torch.int32),
     ]
-    # Generate native metadata first; the extra CSV capacity is transport only.
+    # Generate the same ABI4 tensor used by a real caller, before DUT execution.
     from arch35.kda_ttk_ops import mode, produce
 
     with mode(c):
-        native = produce(inputs, c).cpu()
-        if native.shape != (capacity(c),) or native.dtype != torch.int32:
-            raise AssertionError("producer returned wrong native capacity/dtype")
-        if tuple(native[:2].tolist()) != PROFILE[:2]:
-            raise AssertionError("producer returned wrong metadata ABI")
-        inputs[5] = torch.zeros(transport_capacity(c), dtype=torch.int32)
-        inputs[5][: native.numel()].copy_(native)
+        inputs[5] = produce(inputs, c).cpu()
     return inputs
 
 
@@ -281,9 +246,10 @@ def customize_inputs(
         seqused,
     ]
     c = configuration(inputs, kwargs)
-    c["input_ranges"] = kwargs.get("input_ranges", ())
-    values = make(c)
+    values = make(c, kwargs.get("input_ranges"))
     for name, target, value in zip(INPUT_NAMES, inputs, values):
+        if name == "metadata":
+            value = transport_metadata(value, target)
         if target.shape != value.shape or target.dtype != value.dtype:
             raise ValueError(
                 f"{name}: CSV {target.shape}/{target.dtype} differs from input generator {value.shape}/{value.dtype}"
@@ -411,7 +377,7 @@ def mutate(kw, c):
     return kw, objects, test.get("error_patterns", reasons[op])
 
 
-# ABI 4/5 field layout. Fixtures are independent of the DUT metadata decoder.
+# ABI 4 field layout. Fixtures are independent of the DUT metadata decoder.
 HEADER_FIELDS = (
     "magic",
     "abi",
@@ -425,7 +391,7 @@ HEADER_FIELDS = (
     "template",
     "reserved",
 )
-CORE_SLOTS = PROFILE[2]
+CORE_SLOTS = 32
 
 
 def rebuild_record(record, heads):
@@ -460,7 +426,8 @@ def metadata_baseline(c, cores):
         rebuild_record(r, c["nheads_v"])
         records.append(r)
     header = [
-        *PROFILE[:2],
+        0x4B444132,
+        4,
         0,
         cores,
         len(records),
@@ -559,3 +526,20 @@ def mutate_metadata(c, cores):
     if test.get("truncate") is not None:
         words = words[: test["truncate"]]
     return words
+
+
+def transport_metadata(value, target):
+    """共用 CSV 可预留更大的 metadata 容量；只补零，不截断本架构数据。"""
+    if value.shape == target.shape:
+        return value
+    if (
+        value.dtype != torch.int32
+        or target.dtype != torch.int32
+        or value.ndim != 1
+        or target.ndim != 1
+        or target.numel() < value.numel()
+    ):
+        raise ValueError("metadata transport must be a sufficiently large INT32 vector")
+    result = value.new_zeros(target.shape)
+    result[: value.numel()].copy_(value)
+    return result

@@ -3088,6 +3088,7 @@ def run_staged_flash_kda_fwd(
                 if intersection_start < intersection_end:
                     task_start = intersection_start - prefix_start
                     task_end = intersection_end - prefix_start
+                logical_batch = gm_metadata[batch_idx_base + active_batch_idx]
                 storage_batch = gm_metadata[storage_batch_idx_base + active_batch_idx]
                 storage_batch_end = storage_batch + 1
                 token_start = gm_metadata[token_start_base + active_batch_idx]

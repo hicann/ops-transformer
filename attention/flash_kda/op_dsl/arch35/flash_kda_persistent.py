@@ -510,7 +510,9 @@ class RecurrentStateUpdate:
         ).next_write()
         self.state_l1 = RingBuffer(MemLoc.L1, dtypes.bfloat16, make_layout((SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM)), depth=2)
         self.gamma_ub = RingBuffer(MemLoc.UB, dtypes.float32, make_layout((D_HALF,)), depth=2)
+        # 训练由 FIX 写入，推理由 MTE3 写入，分别使用独立缓冲以隔离同步关系。
         self.u_l1 = RingBuffer(MemLoc.L1, dtypes.bfloat16, make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)), depth=1)
+        self.u_l1_bf16 = RingBuffer(MemLoc.L1, dtypes.bfloat16, make_layout((CHUNK_SIZE, SUPPORTED_HEAD_DIM)), depth=1)
 
     @jit
     def load(self, gm_state_rows):
@@ -539,6 +541,25 @@ class RecurrentStateUpdate:
         copy_destination = self.state_l1.next_write().partition(dim=1, part_id=self.subblock_idx)
         copy_source = self.ub_state_nz
         mem_copy(copy_destination, copy_source[:copy_destination.shape[0], :copy_destination.shape[1]])
+
+    @jit
+    def publish_u_with_bf16_upre(self):
+        # 复用本轮尚未写入状态增量的缓冲区，两半分别保存 U_pre 和 -W@S。
+        with vf(mode="simd"):
+            lane_mask, _ = update_mask(D_HALF, elem_bits=32)
+            low_mask, _ = update_mask(D_HALF, elem_bits=16)
+            for row in dsl_range(0, CHUNK_SIZE, 1, unroll=2):
+                u_pre = vload(self.ub_state_delta, row * D_HALF)
+                u_pre = vcast(vcast(u_pre, dtypes.bfloat16, mask=lane_mask), dtypes.float32, mask=lane_mask)
+                w_state = vload(self.ub_state_delta, (CHUNK_SIZE + row) * D_HALF)
+                u_value = vadd(u_pre, w_state, mask=lane_mask)
+                u_packed = cast_and_pack_bf16(u_value, lane_mask)
+                vstore_strided(
+                    self.ub_state_nz, row * staged.NZ_TILE, u_packed, low_mask,
+                    block_stride=self.ub_state_nz.physical_layout.stride[0] // staged.NZ_TILE,
+                )
+        destination = self.u_l1_bf16.next_write().partition(dim=1, part_id=self.subblock_idx)
+        mem_copy(destination, self.ub_state_nz[:CHUNK_SIZE, None])
 
     @jit
     def update_recurrent_state(self):
@@ -614,6 +635,7 @@ class ChunkMatmul:
 
         # 由任务分发器在对应阶段运行前绑定。
         self.save_backward_inputs = None
+        self.use_bf16_u_pre = None
         self.saved_w = None
         self.saved_u = None
         self.saved_v_new = None
@@ -895,10 +917,20 @@ class ChunkMatmul:
         q_l0a_source = preprocessing.operand_tiles[Q_DECAYED_OPERAND_INDEX]
         q_l0a = from_tensor(q_l0a, layout=make_layout(q_l0a_source.shape))
         mem_copy(q_l0a, q_l0a_source)
-        matmul(self.l0c_w, w_l0a, state_l0b, init=False)
+        if self.use_bf16_u_pre != 0:
+            # 推理时先保存 U_pre，独立计算 -W@S，再将 U_pre 舍入 BF16 后相加。
+            mem_copy(recurrent_state.ub_state_delta[:CHUNK_SIZE, None], self.l0c_w.partition(dim=1))
+            matmul(self.l0c_w, w_l0a, state_l0b, init=True)
+            mem_copy(recurrent_state.ub_state_delta[CHUNK_SIZE:, None], self.l0c_w.partition(dim=1))
+        else:
+            # 训练保留原 FP32 累加结果，供后续计算和 v_new 缓存写出。
+            matmul(self.l0c_w, w_l0a, state_l0b, init=False)
         matmul(self.l0c_o, q_l0a, state_l0b, init=True)
 
-        mem_copy(recurrent_state.u_l1.next_write(), self.l0c_w)
+        if self.use_bf16_u_pre != 0:
+            recurrent_state.publish_u_with_bf16_upre()
+        else:
+            mem_copy(recurrent_state.u_l1.next_write(), self.l0c_w)
         if self.save_backward_inputs != 0:
             mem_copy(
                 tile_slice(
@@ -919,17 +951,31 @@ class ChunkMatmul:
         causal_scores_l0a_source = scores_and_inverse.mqk_l1.next_read()
         causal_scores_l0a = from_tensor(causal_scores_l0a, layout=make_layout(causal_scores_l0a_source.shape))
         mem_copy(causal_scores_l0a, causal_scores_l0a_source)
-        u_l1 = recurrent_state.u_l1.next_read()
-        u_l0a = from_tensor(self.l0a_recurrent.next_write(), layout=make_layout((SUPPORTED_HEAD_DIM, CHUNK_SIZE)), data_format='nz')
-        u_l0a_source = u_l1.permute(1, 0)
-        u_l0a = u_l0a[tuple(map(slice, u_l0a_source.shape))]
-        mem_copy(u_l0a, u_l0a_source)
-        matmul(self.l0c_state, u_l0a, k_l0b, init=True)
-        u_l0b = self.l0b_recurrent.next_write()
-        u_l0b_source = u_l1.permute(1, 0)
-        u_l0b = from_tensor(u_l0b, layout=make_layout(u_l0b_source.shape))
-        mem_copy(u_l0b, u_l0b_source)
-        matmul(self.l0c_o, causal_scores_l0a, u_l0b, init=False)
+        # 在各自分支内读取并搬运，保持原有搬运与矩阵计算顺序。
+        if self.use_bf16_u_pre != 0:
+            u_l1 = recurrent_state.u_l1_bf16.next_read()
+            u_l0a = from_tensor(self.l0a_recurrent.next_write(), layout=make_layout((SUPPORTED_HEAD_DIM, CHUNK_SIZE)), data_format='nz')
+            u_l0a_source = u_l1.permute(1, 0)
+            u_l0a = u_l0a[tuple(map(slice, u_l0a_source.shape))]
+            mem_copy(u_l0a, u_l0a_source)
+            matmul(self.l0c_state, u_l0a, k_l0b, init=True)
+            u_l0b = self.l0b_recurrent.next_write()
+            u_l0b_source = u_l1.permute(1, 0)
+            u_l0b = from_tensor(u_l0b, layout=make_layout(u_l0b_source.shape))
+            mem_copy(u_l0b, u_l0b_source)
+            matmul(self.l0c_o, causal_scores_l0a, u_l0b, init=False)
+        else:
+            u_l1 = recurrent_state.u_l1.next_read()
+            u_l0a = from_tensor(self.l0a_recurrent.next_write(), layout=make_layout((SUPPORTED_HEAD_DIM, CHUNK_SIZE)), data_format='nz')
+            u_l0a_source = u_l1.permute(1, 0)
+            u_l0a = u_l0a[tuple(map(slice, u_l0a_source.shape))]
+            mem_copy(u_l0a, u_l0a_source)
+            matmul(self.l0c_state, u_l0a, k_l0b, init=True)
+            u_l0b = self.l0b_recurrent.next_write()
+            u_l0b_source = u_l1.permute(1, 0)
+            u_l0b = from_tensor(u_l0b, layout=make_layout(u_l0b_source.shape))
+            mem_copy(u_l0b, u_l0b_source)
+            matmul(self.l0c_o, causal_scores_l0a, u_l0b, init=False)
         mem_copy(recurrent_state.ub_state_delta, (self.l0c_state).partition(dim=1))
         output_tile = tile_slice(out, (CHUNK_SIZE, SUPPORTED_HEAD_DIM), (chunk_idx, 0))
         if const_expr(self.has_tail):
@@ -1923,6 +1969,8 @@ def _run_persistent_training_tasks(
     caches.save_matrices = save_matrices
     caches.save_final_state = save_final_state
     matmul_stage.save_backward_inputs = save_qg
+    # 训练始终输出 Aqk/Akk；仅推理采用 U_pre 的 BF16 交接。
+    matmul_stage.use_bf16_u_pre = save_matrices == 0
     preprocessing.cache_writer = caches
     preprocessing.saved_qg_nd = caches.ub_cast_bf16
     preprocessing.saved_kg_nd = preprocessing.ub_v_raw
