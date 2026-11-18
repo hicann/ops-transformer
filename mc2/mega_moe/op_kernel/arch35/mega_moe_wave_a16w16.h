@@ -20,6 +20,7 @@
 
 #ifdef MEGA_MOE_ARCH35_DEVICE
 #include "mega_moe_wave_a8w8.h"
+#include "blaze/epilogue/mega_moe_block_epilogue_activation_bf16.h"
 #include "stage/mega_moe_gmm_bf16.h"
 
 namespace MegaMoeImpl {
@@ -28,6 +29,11 @@ template <>
 struct InputPrepareSelector<bfloat16_t> {
     using Config = Bf16InputConfig;
     using Scratch = Bf16InputScratch;
+};
+
+template <uint32_t TileN>
+struct ActivationEpilogueSelector<bfloat16_t, bfloat16_t, TileN> {
+    using Type = Bf16ActivationEpilogue;
 };
 
 template <>

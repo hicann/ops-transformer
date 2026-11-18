@@ -27,7 +27,6 @@
 #include "../arch35_92/common/mega_moe_utils.h"
 #include "../arch35_92/common/mega_moe_arch35_92_exception_dump_policy.h"
 #include "../arch35_92/blaze/epilogue/mega_moe_block_epilogue_activation_mx_quant.h"
-#include "blaze/epilogue/mega_moe_block_epilogue_activation_bf16.h"
 #include "../arch35_92/stage/mega_moe_token_quant.h"
 #include "../arch35_92/stage/mega_moe_send_mask.h"
 #include "../arch35_92/stage/mega_moe_workspace_reset.h"
@@ -47,14 +46,9 @@ struct InputPrepareSelector {
     using Scratch = QuantProcessScratch<StorageType>;
 };
 
-template <typename OutType, typename InType>
+template <typename OutType, typename InType, uint32_t TileN>
 struct ActivationEpilogueSelector {
-    using Type = BlockEpilogueActivationMxQuant<OutType, InType>;
-};
-
-template <>
-struct ActivationEpilogueSelector<bfloat16_t, bfloat16_t> {
-    using Type = Bf16ActivationEpilogue;
+    using Type = BlockEpilogueActivationMxQuant<OutType, InType, TileN>;
 };
 
 template <typename WeightType, int32_t QuantMode>
@@ -221,10 +215,10 @@ protected:
 
     using ActivationQuantOutType = typename MoeQuantConfig::ActivationQuantOutType;
 
-    using BlockEpilogue = typename ActivationEpilogueSelector<ActivationQuantOutType, bfloat16_t>::Type;
+    using BlockEpilogue = typename ActivationEpilogueSelector<ActivationQuantOutType, bfloat16_t, L1_TILE_N>::Type;
 
-    using SharedBlockEpilogue =
-        typename ActivationEpilogueSelector<typename SharedQuantConfig::ActivationQuantOutType, bfloat16_t>::Type;
+    using SharedBlockEpilogue = typename ActivationEpilogueSelector<typename SharedQuantConfig::ActivationQuantOutType,
+                                                                    bfloat16_t, L1_TILE_N>::Type;
     BlockEpilogue epilogueOp_;
     SharedBlockEpilogue sharedEpilogueOp_;
     TokenDispatchScratch<ActivationType> tokenDispatchScratch_;
