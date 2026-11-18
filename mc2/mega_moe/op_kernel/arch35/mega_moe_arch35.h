@@ -154,12 +154,17 @@ protected:
     __aicore__ inline void InitSharedGmm1Epilogue();
     __aicore__ inline void ConfigureSharedGmm1Input(GMMAddrInfo& gmmAddrInfo, GmmExecutionConfig& gmmConfig,
                                                 Gmm1ActivationSync& sharedGmm1ActivationSync) const;
-    __aicore__ inline void RunSharedExpertGmm1Activation(
-        GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, const GmmExecutionConfig& gmmConfig,
+    __aicore__ inline void RunSharedExpertGmm1ActivationSlice(
+        GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, const GmmExecutionConfig& sharedGmmConfig,
         GmmRuntimeState& runtimeState, uint32_t sharedExpertIdx);
+    __aicore__ inline void RunSharedExpertGmm1Activation(const GMMAddrInfo& gmmAddrInfo,
+                                                      const ProblemShape& problemShape,
+                                                      const GmmExecutionConfig& gmmConfig,
+                                                      GmmRuntimeState& runtimeState, uint32_t sharedExpertIdx);
     __aicore__ inline void FinishSharedActivationSync(GmmRuntimeState& runtimeState);
-    __aicore__ inline void RunSharedExpertGmm2(
+    __aicore__ inline void RunSharedExpertGmm2Slice(
         GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, uint32_t sharedExpertIdx);
+    __aicore__ inline void RunSharedExpertGmm2(const GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape);
     template <typename Derived>
     __aicore__ inline void ProcessSharedExpertGmm1Loop(
         Derived& derived, GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape,
@@ -315,6 +320,22 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::PrepareInputTokenRange(
 }
 
 template <TemplateMegaMoeTypeClass>
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunSharedExpertGmm1ActivationSlice(
+    GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, const GmmExecutionConfig& sharedGmmConfig,
+    GmmRuntimeState& runtimeState, uint32_t sharedExpertIdx)
+{
+    using SharedQuantScaleType = typename SharedQuantConfig::QuantScaleType;
+
+    const auto& workspace = params_.workspace.layout;
+    const auto& buffer = params_.workspace.base;
+    UpdateSharedExpertGmm1GlobalBuffer<SharedWeightType, SharedActivationOutType, SharedQuantScaleType,
+                                       SharedQuantConfig::AXW_MODE == AxWMode::A8W4>(
+        commonConfig_, sharedGmmConfig, workspace, buffer, sharedWeightTensorListAddrs_, sharedEpilogueOp_,
+        gmmAddrInfo, sharedExpertIdx);
+    RunSharedExpertGmm1Activation(gmmAddrInfo, problemShape, sharedGmmConfig, runtimeState, sharedExpertIdx);
+}
+
+template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitSharedGmm1Epilogue()
 {
     const auto& workspace = params_.workspace.layout;
@@ -335,6 +356,20 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::FinishSharedActivationS
 {
     Gmm1UbActivationSync::EndSync(runtimeState.vecSetSyncCom, runtimeState.pingpongIdx);
     gmm1PingPongIdx_ = 0U;
+}
+
+template <TemplateMegaMoeTypeClass>
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunSharedExpertGmm2Slice(
+    GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, uint32_t sharedExpertIdx)
+{
+    using SharedQuantScaleType = typename SharedQuantConfig::QuantScaleType;
+
+    const auto& workspace = params_.workspace.layout;
+    const auto& buffer = params_.workspace.base;
+    UpdateSharedExpertGmm2GlobalBuffer<SharedActivationOutType, SharedWeightType, SharedQuantScaleType,
+                                       GMM1_TILE_M>(commonConfig_, gmmExecutionConfig_, workspace, buffer,
+                                                    sharedWeightTensorListAddrs_, gmmAddrInfo, sharedExpertIdx);
+    RunSharedExpertGmm2(gmmAddrInfo, problemShape);
 }
 
 template <TemplateMegaMoeTypeClass>
@@ -901,20 +936,13 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ConfigureSharedGmm1Inpu
 
 template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunSharedExpertGmm1Activation(
-    GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, const GmmExecutionConfig& gmmConfig,
+    const GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, const GmmExecutionConfig& gmmConfig,
     GmmRuntimeState& runtimeState, uint32_t sharedExpertIdx)
 {
     using SharedQuantScaleType = typename SharedQuantConfig::QuantScaleType;
 
     // 共享专家不使用路由专家的 topk 权重。
     constexpr bool sharedTopkWeightsPrefetch = false;
-    const auto& workspace = params_.workspace.layout;
-    const auto& buffer = params_.workspace.base;
-    UpdateSharedExpertGmm1GlobalBuffer<SharedWeightType, SharedActivationOutType, SharedQuantScaleType,
-                                       SharedQuantConfig::AXW_MODE == AxWMode::A8W4>(
-        commonConfig_, gmmConfig, workspace, buffer, sharedWeightTensorListAddrs_, sharedEpilogueOp_,
-        gmmAddrInfo, sharedExpertIdx);
-
     uint32_t expertBeforeCnt = sharedExpertIdx * commonConfig_.tokenNum;
     auto runGmm = [&](const auto&... layoutArgs) __attribute__((cce_aicore))
     {
@@ -948,8 +976,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessSharedExpertGmm1
     const GmmExecutionConfig& sharedGmmConfig, GmmRuntimeState& runtimeState)
 {
     for (uint32_t sharedExpertIdx = 0U; sharedExpertIdx < sharedExpertNum_; ++sharedExpertIdx) {
-        derived.RunSharedExpertGmm1Activation(gmmAddrInfo, problemShape, sharedGmmConfig, runtimeState,
-                                             sharedExpertIdx);
+        derived.RunSharedExpertGmm1ActivationSlice(gmmAddrInfo, problemShape, sharedGmmConfig, runtimeState,
+                                                    sharedExpertIdx);
     }
 }
 
@@ -1051,19 +1079,13 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessSharedExpertGmm1
 }
 
 template <TemplateMegaMoeTypeClass>
-__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunSharedExpertGmm2(
-    GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape, uint32_t sharedExpertIdx)
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunSharedExpertGmm2(const GMMAddrInfo& gmmAddrInfo,
+                                                                             const ProblemShape& problemShape)
 {
     using SharedQuantScaleType = typename SharedQuantConfig::QuantScaleType;
 
     constexpr bool sharedTopkWeightsPrefetch = false;
     constexpr bool notifyCombineTileReady = false;
-    const auto& workspace = params_.workspace.layout;
-    const auto& buffer = params_.workspace.base;
-    UpdateSharedExpertGmm2GlobalBuffer<SharedActivationOutType, SharedWeightType, SharedQuantScaleType,
-                                       GMM1_TILE_M>(commonConfig_, gmmExecutionConfig_, workspace, buffer,
-                                                    sharedWeightTensorListAddrs_, gmmAddrInfo, sharedExpertIdx);
-
     // 共享 GMM1 和 GMM2 的所有量化模式都按 256-token group 交接 activation；
     // topk 权重在激活量化阶段同步计算仍关闭，权重 L2 bypass 仍仅用于 A8W8。
     if constexpr (SharedQuantConfig::AXW_MODE == AxWMode::A8W4 || SharedQuantConfig::AXW_MODE == AxWMode::A4W4) {
@@ -1087,7 +1109,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessSharedExpertGmm2
     Derived& derived, GMMAddrInfo& gmmAddrInfo, const ProblemShape& problemShape)
 {
     for (uint32_t sharedExpertIdx = 0U; sharedExpertIdx < sharedExpertNum_; ++sharedExpertIdx) {
-        derived.RunSharedExpertGmm2(gmmAddrInfo, problemShape, sharedExpertIdx);
+        derived.RunSharedExpertGmm2Slice(gmmAddrInfo, problemShape, sharedExpertIdx);
     }
 }
 
