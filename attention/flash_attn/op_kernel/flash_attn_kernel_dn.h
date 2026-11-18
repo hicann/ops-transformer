@@ -125,6 +125,14 @@ public:
         metadataAicNum_ = ((__gm__ uint32_t*)fiaMetaData)[METADATA_HEADER_AIC_NUM_INDEX];
         metadataAivNum_ = ((__gm__ uint32_t*)fiaMetaData)[METADATA_HEADER_AIV_NUM_INDEX];
         constInfo_.enableFlashDecode = static_cast<bool>(((__gm__ uint32_t*)fiaMetaData)[METADATA_HEADER_HAS_FD_INDEX]);
+        const uint32_t skipInitOutput = ((__gm__ uint32_t*)fiaMetaData)[METADATA_HEADER_SKIP_INIT_OUTPUT_INDEX];
+        constInfo_.needInitOutput = skipInitOutput != 1U;
+        if constexpr (LAYOUT_T != FA_LAYOUT::TND) {
+            if (skipInitOutput == 2U) {
+                constInfo_.needInitOutput =
+                    ((__gm__ uint32_t*)fiaMetaData)[METADATA_HEADER_UNIFORM_Q_LEN_INDEX] != constInfo_.s1Size;
+            }
+        }
         constInfo_.learnableSinkFlag = (learnableSink != nullptr);
 
         faMetaDataGm_.SetGlobalBuffer((__gm__ uint32_t*)(fiaMetaData + METADATA_HEADER_OFFSET),
@@ -177,7 +185,6 @@ public:
         constInfo_.scaleValue = static_cast<float>(tilingData_->flashAttnBaseParams.scaleValue);
         constInfo_.coreNum = tilingData_->flashAttnBaseParams.coreNum;
         constInfo_.outputLayout = static_cast<FA_LAYOUT>(tilingData_->flashAttnBaseParams.outputLayout);
-        constInfo_.needInitOutput = tilingData_->flashAttnBaseParams.needInitOutput;
 
         constInfo_.maskMode = tilingData_->flashAttnAttenMaskParams.maskMode;
         constInfo_.preTokens = tilingData_->flashAttnAttenMaskParams.winLefts;

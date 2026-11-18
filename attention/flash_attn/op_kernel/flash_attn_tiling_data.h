@@ -27,6 +27,8 @@ constexpr uint32_t METADATA_HEADER_SECTION_NUM_INDEX = 0;
 constexpr uint32_t METADATA_HEADER_HAS_FD_INDEX = 1;
 constexpr uint32_t METADATA_HEADER_AIC_NUM_INDEX = 4;
 constexpr uint32_t METADATA_HEADER_AIV_NUM_INDEX = 5;
+constexpr uint32_t METADATA_HEADER_SKIP_INIT_OUTPUT_INDEX = 8;
+constexpr uint32_t METADATA_HEADER_UNIFORM_Q_LEN_INDEX = 9;
 
 // No CORE_ENABLE field in AICPU format; inactive cores have all-zero data.
 constexpr uint32_t FLASH_ATTN_BN1_START_INDEX = 0;
@@ -71,7 +73,7 @@ struct FlashAttnBaseParams {
     uint8_t isSoftMaxLseEnable;
     uint32_t coreNum;
     uint32_t outputLayout;
-    bool needInitOutput;
+    uint8_t reservedInitOutput = 0; // Preserve tiling layout; the flag now comes from metadata head[8].
     // kvcache non-contiguous strides (valid only for tensor v2 view inputs)
     uint64_t keyBnStride = 0;
     uint64_t keyN2Stride = 0;

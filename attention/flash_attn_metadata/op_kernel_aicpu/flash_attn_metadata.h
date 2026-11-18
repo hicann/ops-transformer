@@ -33,6 +33,10 @@ constexpr uint32_t HEAD_S2_BASE_SIZE_INDEX = 3U;
 constexpr uint32_t HEAD_AIC_NUM_INDEX = 4U;
 constexpr uint32_t HEAD_AIV_NUM_INDEX = 5U;
 constexpr uint32_t HEAD_OUTPUT_LAYOUT_INDEX = 6U;
+// head[7] is the FAG offset. head[8]: 0 = initialize, 1 = skip, 2 = compare head[9] with physical Q S.
+// Mode 2 is only valid for non-TND layouts; older kernels initialize for this mode.
+constexpr uint32_t HEAD_SKIP_INIT_OUTPUT_INDEX = 8U;
+constexpr uint32_t HEAD_UNIFORM_Q_LEN_INDEX = 9U;
 
 // FA Metadata Index Definitions
 constexpr uint32_t FA_BN_START_INDEX = 0U;

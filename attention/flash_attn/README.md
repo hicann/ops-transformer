@@ -424,7 +424,7 @@ for bN2 in [bN2Start, bN2End):        # batch × KV head 维度
 metadata 为每个 section 独立记录两种任务段，kernel 按核号直接读取自己的区间执行：
 
 ```
-header（16 字段）：sectionNum | isFd | mBaseSize | s2BaseSize | ...
+header（16 字段）：sectionNum | isFd | mBaseSize | s2BaseSize | aicNum | aivNum | outputLayout | fagStartOffset | skipInitOutput | uniformQLen | reserved[6]
 FA 段  [section][aicIdx(36)][16 字段]：bN2Start/gS1Start/s2Start, bN2End/gS1End/s2End, firstFdDataWorkspaceIdx
 FD 段  [section][aivIdx(72)][16 字段]：bN2Idx, mIdx(gS1Idx), workspaceIdx, s2SplitNum, mStart, mLen
 总大小 = 16 + sectionNum×(36+72)×16 个 uint32
@@ -506,7 +506,11 @@ Process():
   FreeEventID + UnInitCrossCoreSync
 ```
 
-**① InitOutput**（`flash_attn_block_vec_dn.h` / `flash_attn_block_vec_nd.h` 的 `ClearOutput`，`needInitOutput=true` 时执行）：计算 attn_out 与 softmax_lse 的总大小（TND 取 T×g×N×DV），由 `2×coreNum` 个 AIV 按 32KB POP buffer 并行写 GM：attn_out 清零（0），LSE 预置 `3e+99`；写完后 `SyncAll` 保证后续计算可见（`flash_attn_block_vec_dn.h:263-291`）。
+**① InitOutput**（`flash_attn_block_vec_dn.h` / `flash_attn_block_vec_nd.h` 的 `ClearOutput`，metadata header[8] 为 0 时执行；为 1 时跳过；为 2 时由非 TND kernel 比较 header[9] 的统一 Q 有效长度与物理 S，仅相等时跳过；metadata 同时检查各 batch 的 KV 长度与 mask 窗口；旧 metadata 默认初始化）：计算 attn_out 与 softmax_lse 的总大小（TND 取 T×g×N×DV），由 `2×coreNum` 个 AIV 按 32KB POP buffer 并行写 GM：attn_out 清零（0），LSE 预置 `3e+99`；写完后 `SyncAll` 保证后续计算可见（`flash_attn_block_vec_dn.h:263-291`）。
+
+TND 用累计长度差判断物理 Q 行覆盖，确认覆盖且 KV/mask 条件满足时将 header[8] 置为 1。非 TND 传入 `seqused_q` 时，若各 batch 的 Q 有效长度不同则初始化；若全部相同且各 batch 均满足 KV/mask 条件，则将 header[8] 置为 2、统一长度写入 header[9]，由 kernel 比较实际 Q 张量的物理 S 后决定是否跳过。KV 有效长度不要求各 batch 相同，也不要求等于 KV 张量的物理 S，但必须非空且不能使 Q 行全被 causal/band mask 遮住。
+
+header[8] 为 0 或未知值时保守初始化；TND 不使用模式 2。旧 metadata 的空闲位为 0，新 kernel 会初始化；旧 kernel 仅识别模式 1，因此遇到模式 2 也会保守初始化。header 仍为 16 个 uint32，FAG 的 header[7] 不变，header[10..15] 继续保留。
 
 **② FlashAttention（FA）——核心 while 循环**（`flash_attn_kernel_dn.h:213-265`）：
 

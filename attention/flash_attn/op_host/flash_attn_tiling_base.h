@@ -73,7 +73,6 @@ protected:
     void CalcNumBlocks(uint32_t aicNum);
     void FillTiling();
     ge::graphStatus SetTilingData(FlashAttnTilingData& tilingData);
-    bool CheckNeedInitOutput() const;
 
     FlashAttnTilingData tilingData_;
     FaTilingKeyInfo tilingKeyInfo_;

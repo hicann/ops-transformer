@@ -255,7 +255,6 @@ void FlashAttnTilingBase::SetFATilingData()
         maxBlockNumPerBatch = faInfo_->opParamInfo.blockTable.tensor->GetStorageShape().GetDim(1);
     }
     tilingData_.baseTiling.flashAttnPageAttentionParams.maxBlockNumPerBatch = maxBlockNumPerBatch;
-    tilingData_.baseTiling.flashAttnBaseParams.needInitOutput = CheckNeedInitOutput();
 
     // kvcache非连续场景: 从tensor stride取偏移值, 连续时stride值即默认值, 不影响
     if (faInfo_->hasViewStride) {
@@ -264,34 +263,6 @@ void FlashAttnTilingBase::SetFATilingData()
         tilingData_.baseTiling.flashAttnBaseParams.valueBnStride = faInfo_->valueBnStride;
         tilingData_.baseTiling.flashAttnBaseParams.valueN2Stride = faInfo_->valueN2Stride;
     }
-}
-bool FlashAttnTilingBase::CheckNeedInitOutput() const
-{
-    // varlen场景可能存在长度为0的batch, 对应行无计算, 必须清零
-    if (seqUsedQFlag_ || seqUsedKvFlag_) {
-        return true;
-    }
-    // 传入cuSeqLenKv时默认清零，可能会有空batch
-    if (cuSeqLenKVFlag_) {
-        return true;
-    }
-    // 非TND固定shape: 按mask模式判断是否存在整行被mask掉的query块
-    if (faInfo_->maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
-        return false;
-    }
-    if (faInfo_->maskMode == static_cast<int64_t>(MaskMode::CAUSAL)) {
-        // 下三角: s1>s2时首个query块的窗口全在s2负侧
-        return faInfo_->s1Size > faInfo_->s2Size;
-    }
-    if (faInfo_->maskMode == static_cast<int64_t>(MaskMode::BAND)) {
-        // winRight==-1表示右窗口无限大(被转为MASK_MODE_INT_MAX传给kernel), 每行必有有效S2块
-        if (faInfo_->winRight == -1) {
-            return false;
-        }
-        // 窗口右端=s2Size-s1Size+winRight, s1远大于s2时右端为负, 整行被mask
-        return (faInfo_->s1Size - faInfo_->s2Size) > faInfo_->winRight;
-    }
-    return false;
 }
 ge::graphStatus FlashAttnTilingBase::SetTilingData(FlashAttnTilingData& tilingData)
 {

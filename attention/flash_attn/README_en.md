@@ -424,7 +424,7 @@ Each tile performs one pass of BMM1(Q×K^T) → Softmax → BMM2(attn×V), and t
 Metadata records the two task segments independently for each section, and the kernel directly reads its own interval by core id for execution:
 
 ```
-header (16 fields): sectionNum | isFd | mBaseSize | s2BaseSize | ...
+header (16 fields): sectionNum | isFd | mBaseSize | s2BaseSize | aicNum | aivNum | outputLayout | fagStartOffset | skipInitOutput | uniformQLen | reserved[6]
 FA segment  [section][aicIdx(36)][16 fields]: bN2Start/gS1Start/s2Start, bN2End/gS1End/s2End, firstFdDataWorkspaceIdx
 FD segment  [section][aivIdx(72)][16 fields]: bN2Idx, mIdx(gS1Idx), workspaceIdx, s2SplitNum, mStart, mLen
 Total size = 16 + sectionNum×(36+72)×16 uint32 entries
@@ -506,7 +506,11 @@ Process():
   FreeEventID + UnInitCrossCoreSync
 ```
 
-**① InitOutput** (`ClearOutput` in `flash_attn_block_vec_dn.h` / `flash_attn_block_vec_nd.h`, executed when `needInitOutput=true`): computes the total size of attn_out and softmax_lse (TND uses T×g×N×DV), and `2×coreNum` AIVs write GM in parallel with 32KB POP buffers: attn_out is cleared to 0, and LSE is preset to `3e+99`; after the writes, `SyncAll` guarantees visibility for subsequent computation (`flash_attn_block_vec_dn.h:263-291`).
+**① InitOutput** (`ClearOutput` in `flash_attn_block_vec_dn.h` / `flash_attn_block_vec_nd.h`, executed when metadata header[8] is 0; skipped when it is 1; when it is 2, a non-TND kernel compares the uniform effective Q length in header[9] with the physical S dimension and skips initialization only if they match; metadata also checks each batch's KV length and mask window; old metadata defaults to initialization): computes the total size of attn_out and softmax_lse (TND uses T×g×N×DV), and `2×coreNum` AIVs write GM in parallel with 32KB POP buffers: attn_out is cleared to 0, and LSE is preset to `3e+99`; after the writes, `SyncAll` guarantees visibility for subsequent computation (`flash_attn_block_vec_dn.h:263-291`).
+
+TND uses differences between cumulative sequence lengths to check physical Q row coverage, and sets header[8] to 1 only when coverage and the KV/mask conditions are satisfied. For non-TND inputs with `seqused_q`, different effective Q lengths across batches require initialization. If all effective Q lengths are equal and every batch satisfies the KV/mask conditions, metadata sets header[8] to 2 and writes the uniform length to header[9]; the kernel then compares it with the actual Q tensor's physical S dimension. Effective KV lengths may differ across batches and need not equal the KV tensor's physical S dimension, but must be nonzero and must not leave Q rows fully masked by causal/band masking.
+
+A header[8] value of 0 or an unknown value conservatively requires initialization; TND does not use mode 2. Reserved fields in old metadata are zero, so new kernels initialize outputs. Older kernels that recognize only mode 1 also conservatively initialize outputs when they receive mode 2. The header remains 16 uint32 values; FAG's header[7] is unchanged, and header[10..15] remain reserved.
 
 **② FlashAttention (FA) — core while loop** (`flash_attn_kernel_dn.h:213-265`):
 

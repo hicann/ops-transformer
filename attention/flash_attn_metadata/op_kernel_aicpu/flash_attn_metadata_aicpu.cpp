@@ -476,10 +476,63 @@ bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult&
     return true;
 }
 
+bool FlashAttnMetadataCpuKernel::CheckNeedInitOutput(uint32_t& uniformQLen) const
+{
+    // For padded layouts, the kernel must compare the uniform used Q length with physical S.
+    const bool checkUniformQ = layoutQ_ != "TND" && !actualSeqlenQ_.empty();
+    uniformQLen = 0;
+    // seqused may leave physical query rows without a scheduled task.
+    const auto cuSeqlensQ = GetTensorDataAsInt64(cuSeqlensQ_);
+    for (uint32_t batchIdx = 0; batchIdx < baseInfo.batchSize; ++batchIdx) {
+        const int64_t qLen = baseInfo.GetQuerySeqSize(batchIdx);
+        const int64_t kvLen = baseInfo.GetKvSeqSize(batchIdx);
+        if (checkUniformQ) {
+            if (batchIdx == 0) {
+                uniformQLen = static_cast<uint32_t>(qLen);
+            } else if (qLen != uniformQLen) {
+                return true;
+            }
+        } else {
+            int64_t physicalQLen = maxSeqlenQ_;
+            if (layoutQ_ == "TND") {
+                if (cuSeqlensQ.size() <= static_cast<size_t>(batchIdx) + 1) {
+                    return true; // Physical coverage cannot be established.
+                }
+                physicalQLen = cuSeqlensQ[batchIdx + 1] - cuSeqlensQ[batchIdx];
+            }
+            if (physicalQLen < 0 || qLen < physicalQLen) {
+                return true;
+            }
+        }
+        if (qLen == 0) {
+            continue; // Physical Q coverage is checked separately; no KV is needed for zero effective Q.
+        }
+        if (kvLen == 0) {
+            return true;
+        }
+        if (maskMode_ == static_cast<int32_t>(load_balance::SparseMode::RIGHT_DOWN_CAUSAL) && qLen > kvLen) {
+            return true;
+        }
+        if (maskMode_ == static_cast<int32_t>(load_balance::SparseMode::BAND) && winRight_ != -1 &&
+            qLen - kvLen > winRight_) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void FlashAttnMetadataCpuKernel::SetMetadataHead(const load_balance::SectionStreamKResult& splitRes,
                                                  optiling::detail::FaMetadata& faMetadata)
 {
     faMetadata.SetHeadMetadata(HEAD_SECTION_NUM_INDEX, splitRes.sectionNum);
+    uint32_t uniformQLen = 0;
+    uint32_t skipInitOutput = 0;
+    if (!CheckNeedInitOutput(uniformQLen)) {
+        // Mode 2 requires a physical-Q check in the kernel; older kernels conservatively initialize.
+        skipInitOutput = (layoutQ_ != "TND" && !actualSeqlenQ_.empty()) ? 2U : 1U;
+    }
+    faMetadata.SetHeadMetadata(HEAD_SKIP_INIT_OUTPUT_INDEX, skipInitOutput);
+    faMetadata.SetHeadMetadata(HEAD_UNIFORM_Q_LEN_INDEX, skipInitOutput == 2U ? uniformQLen : 0U);
     faMetadata.SetHeadMetadata(HEAD_M_BASE_SIZE_INDEX, mBaseSize_);
     faMetadata.SetHeadMetadata(HEAD_S2_BASE_SIZE_INDEX, s2BaseSize_);
     if (std::any_of(splitRes.sectionFdResult.begin(), splitRes.sectionFdResult.end(),

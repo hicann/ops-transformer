@@ -44,6 +44,7 @@ private:
     bool BalanceSchedule(load_balance::SectionStreamKResult& splitRes);
     bool GenMetadata(load_balance::SectionStreamKResult& splitRes);
 
+    bool CheckNeedInitOutput(uint32_t& uniformQLen) const;
     bool ParamsCheck();
     bool CheckActualQuerySeq();
     bool CheckActualKvSeq();
