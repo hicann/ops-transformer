@@ -75,22 +75,21 @@ __aicore__ inline void WaitForCube(uint16_t value = 0)
 
 // Non-owning view of the caller's UB state. State advances at the same notify
 // sites as before and remains alive across expert/wave calls.
-template <uint32_t SlotCount>
-class Gmm1UbActivationSyncBase {
+class Gmm1UbActivationSync {
 public:
-    __aicore__ explicit inline Gmm1UbActivationSyncBase(uint16_t& pingpongIdx)
+    __aicore__ explicit inline Gmm1UbActivationSync(uint16_t& pingpongIdx)
         : pingpongIdx_(pingpongIdx)
     {}
 
-    __aicore__ inline Gmm1UbActivationSyncBase(int32_t& submittedTiles, uint16_t& pingpongIdx)
+    __aicore__ inline Gmm1UbActivationSync(int32_t& submittedTiles, uint16_t& pingpongIdx)
         : pingpongIdx_(pingpongIdx),
           submittedTiles_(&submittedTiles)
     {}
 
     __aicore__ inline void WaitForActivation()
     {
-        // 已提交槽全部占用后，复用前等待 Activation 完成。
-        if (*submittedTiles_ >= static_cast<int32_t>(SlotCount)) {
+        // 首次填满双缓冲后，复用槽位前等待 Activation 完成。
+        if (*submittedTiles_ >= static_cast<int32_t>(DOUBLE_BUFFER)) {
             WaitForVector(pingpongIdx_);
         }
     }
@@ -99,7 +98,7 @@ public:
     {
         NotifyVector(pingpongIdx_);
         ++(*submittedTiles_);
-        pingpongIdx_ = (pingpongIdx_ + 1U) % SlotCount;
+        pingpongIdx_ = 1U - pingpongIdx_;
     }
 
     __aicore__ inline void WaitForGmm1()
@@ -110,7 +109,7 @@ public:
     __aicore__ inline void NotifyGmm1()
     {
         NotifyCube(pingpongIdx_);
-        pingpongIdx_ = (pingpongIdx_ + 1U) % SlotCount;
+        pingpongIdx_ = 1U - pingpongIdx_;
     }
 
     __aicore__ static inline void EndSync(int32_t vecSetSyncCom, uint16_t pingpongIdx)
@@ -119,9 +118,11 @@ public:
             return;
         }
         if constexpr (g_coreType == AscendC::AIC) {
-            const uint32_t pending = vecSetSyncCom < static_cast<int32_t>(SlotCount) ? vecSetSyncCom : SlotCount;
-            for (uint32_t i = 0U; i < pending; ++i) {
-                WaitForVector((pingpongIdx + SlotCount - pending + i) % SlotCount);
+            if (vecSetSyncCom == 1) {
+                WaitForVector(1U - pingpongIdx);
+            } else {
+                WaitForVector(pingpongIdx);
+                WaitForVector(1U - pingpongIdx);
             }
         }
     }
@@ -130,8 +131,6 @@ private:
     uint16_t& pingpongIdx_;
     int32_t* submittedTiles_ = nullptr; // Required only for AIC submission.
 };
-
-using Gmm1UbActivationSync = Gmm1UbActivationSyncBase<DOUBLE_BUFFER>;
 
 // GMM1 -> Activation：A8W8/A4W4 使用 AIV0，A8W4 使用 AIV1。
 class Gmm1ActivationSync {

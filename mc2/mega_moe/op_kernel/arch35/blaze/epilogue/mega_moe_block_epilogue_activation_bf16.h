@@ -33,12 +33,6 @@ public:
     __aicore__ inline void Init(const Params& params)
     {
         params_ = params;
-        constexpr uint32_t inputBytes =
-            MegaMoeBf16GmmConfig::TILE_M * MegaMoeBf16GmmConfig::TILE_N * sizeof(bfloat16_t);
-        const bool isGelu = params.actMode == static_cast<uint8_t>(MegaMoeActMode::GELU);
-        input_ = reinterpret_cast<__ubuf__ bfloat16_t*>(0U);
-        output_ = isGelu ? input_ : reinterpret_cast<__ubuf__ bfloat16_t*>(inputBytes);
-        weights_ = reinterpret_cast<__ubuf__ float*>(isGelu ? inputBytes : inputBytes + inputBytes / ACTIVATION_N_HALF);
     }
 
     __aicore__ inline void SetOutputRowOffset(uint64_t rowOffset)
@@ -46,64 +40,75 @@ public:
         outputRowOffset_ = rowOffset;
     }
 
-    __aicore__ inline void RunTile(GM_ADDR metadata, uint32_t outputWidth, uint32_t row, uint32_t column, uint32_t rows,
-                                   uint32_t columns)
+    __aicore__ inline void RunTile(GM_ADDR input, GM_ADDR metadata, uint32_t fullWidth,
+                                    uint32_t row, uint32_t column, uint32_t rows, uint32_t columns)
     {
-        const uint32_t divisor = GetActivationOutputDivisor(params_.actMode);
-        const uint32_t outputStride = MegaMoeBf16GmmConfig::TILE_N / divisor;
         if (params_.topkWeightsPrefetch) {
-            CopyGmToUb(weights_, metadata + static_cast<uint64_t>(row) * META_INFO_SIZE * sizeof(int32_t),
-                       rows * META_INFO_SIZE * static_cast<uint32_t>(sizeof(int32_t)));
-            PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID0>();
-            RunActivation<true>(rows, columns, outputStride);
+            RunTileImpl<true>(input, metadata, fullWidth, row, column, rows, columns);
         } else {
-            RunActivation<false>(rows, columns, outputStride);
+            RunTileImpl<false>(input, metadata, fullWidth, row, column, rows, columns);
         }
-        PipeFence<PIPE_V, PIPE_MTE3, SYNC_EVENT_ID0>();
-        const uint64_t destinationOffset = ((outputRowOffset_ + row) * outputWidth + column) * sizeof(bfloat16_t);
-        CopyUbToGm(params_.yGmAddr + destinationOffset, output_,
-                   CopyRows{static_cast<uint16_t>(rows), columns * static_cast<uint32_t>(sizeof(bfloat16_t)),
-                            static_cast<uint64_t>(outputWidth) * sizeof(bfloat16_t),
-                            outputStride * static_cast<uint32_t>(sizeof(bfloat16_t))});
-        // ACK 由 Vector 发出，等待搬出完成后再允许 AIC 复用输入槽。
-        PipeFence<PIPE_MTE3, PIPE_V, SYNC_EVENT_ID0>();
-        PipeFence<PIPE_MTE3, PIPE_S, SYNC_EVENT_ID0>();
     }
 
 private:
     template <bool TopkWeightsPrefetch>
-    __aicore__ inline void RunActivation(uint32_t rows, uint32_t columns, uint32_t outputStride)
+    // GMM1 的 GM 结果按完整 gate/up 两半存放，激活按小行块消费，不分配量化缓冲区。
+    __aicore__ inline void RunTileImpl(GM_ADDR input, GM_ADDR metadata, uint32_t fullWidth,
+                                    uint32_t row, uint32_t column, uint32_t rows, uint32_t columns)
     {
-        constexpr uint32_t inputStride = MegaMoeBf16GmmConfig::TILE_N;
-        if (params_.actMode == static_cast<uint8_t>(MegaMoeActMode::GELU)) {
-            Activation::GeluActivationTileContext<bfloat16_t> context{input_,
-                                                                      output_,
-                                                                      TopkWeightsPrefetch ? weights_ : nullptr,
-                                                                      inputStride,
-                                                                      static_cast<uint16_t>(rows),
-                                                                      static_cast<uint16_t>(columns)};
-            Activation::RunGeluActivation<bfloat16_t, TopkWeightsPrefetch>(context);
-        } else {
-            Activation::GatedActivationTileContext<bfloat16_t> context{};
-            context.gate = input_;
-            context.up = input_ + inputStride / ACTIVATION_N_HALF;
-            context.output = output_;
-            context.topkWeights = TopkWeightsPrefetch ? weights_ : nullptr;
-            context.inputRowStrideElements = inputStride;
-            context.outputRowStrideElements = outputStride;
-            context.rowLoopCount = static_cast<uint16_t>(rows);
-            Activation::ConfigureGatedActivationTail(context, static_cast<uint16_t>(columns));
-            Activation::RunGatedActivation<bfloat16_t, TopkWeightsPrefetch>(
-                context, params_.actMode, params_.actSubMode, params_.clampLimit, params_.activationAlpha,
-                params_.activationBeta);
+        constexpr uint32_t tileN = MegaMoeBf16GmmConfig::TILE_N;
+        constexpr uint32_t chunkRows = MegaMoeBf16GmmConfig::ACTIVATION_TILE_ROWS;
+        constexpr uint32_t slabBytes = chunkRows * tileN * sizeof(bfloat16_t);
+        auto* gate = reinterpret_cast<__ubuf__ bfloat16_t*>(0U);
+        auto* up = reinterpret_cast<__ubuf__ bfloat16_t*>(slabBytes);
+        auto* output = reinterpret_cast<__ubuf__ bfloat16_t*>(2U * slabBytes);
+        auto* weights = reinterpret_cast<__ubuf__ float*>(3U * slabBytes);
+        const uint32_t divisor = GetActivationOutputDivisor(params_.actMode);
+        const uint32_t outputWidth = fullWidth / divisor;
+        for (uint32_t offset = 0U; offset < rows; offset += chunkRows) {
+            const uint32_t count = rows - offset < chunkRows ? rows - offset : chunkRows;
+            const uint64_t sourceOffset =
+                (static_cast<uint64_t>(row + offset) * fullWidth + column) * sizeof(bfloat16_t);
+            const CopyRows copyIn{static_cast<uint16_t>(count), columns * static_cast<uint32_t>(sizeof(bfloat16_t)),
+                                  static_cast<uint64_t>(fullWidth) * sizeof(bfloat16_t), tileN * sizeof(bfloat16_t)};
+            PipeFence<PIPE_MTE3, PIPE_MTE2, SYNC_EVENT_ID0>();
+            CopyGmToUb(gate, input + sourceOffset, copyIn);
+            if (divisor == ACTIVATION_N_HALF) {
+                CopyGmToUb(up, input + sourceOffset + static_cast<uint64_t>(outputWidth) * sizeof(bfloat16_t), copyIn);
+            }
+            if constexpr (TopkWeightsPrefetch) {
+                CopyGmToUb(weights, metadata + static_cast<uint64_t>(row + offset) * META_INFO_SIZE * sizeof(int32_t),
+                           count * META_INFO_SIZE * static_cast<uint32_t>(sizeof(int32_t)));
+            }
+            PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID0>();
+            if (divisor == 1U) {
+                Activation::GeluActivationTileContext<bfloat16_t> context{
+                    gate, output, weights, tileN, static_cast<uint16_t>(count), static_cast<uint16_t>(columns)};
+                Activation::RunGeluActivation<bfloat16_t, TopkWeightsPrefetch>(context);
+            } else {
+                Activation::GatedActivationTileContext<bfloat16_t> context{};
+                context.gate = gate;
+                context.up = up;
+                context.output = output;
+                context.topkWeights = TopkWeightsPrefetch ? weights : nullptr;
+                context.inputRowStrideElements = tileN;
+                context.outputRowStrideElements = tileN;
+                context.rowLoopCount = static_cast<uint16_t>(count);
+                Activation::ConfigureGatedActivationTail(context, static_cast<uint16_t>(columns));
+                Activation::RunGatedActivation<bfloat16_t, TopkWeightsPrefetch>(context, params_.actMode,
+                    params_.actSubMode, params_.clampLimit, params_.activationAlpha, params_.activationBeta);
+            }
+            PipeFence<PIPE_V, PIPE_MTE3, SYNC_EVENT_ID0>();
+            const uint64_t destinationOffset =
+                ((outputRowOffset_ + row + offset) * outputWidth + column) * sizeof(bfloat16_t);
+            CopyUbToGm(params_.yGmAddr + destinationOffset, output,
+                CopyRows{static_cast<uint16_t>(count), columns * static_cast<uint32_t>(sizeof(bfloat16_t)),
+                         static_cast<uint64_t>(outputWidth) * sizeof(bfloat16_t), tileN * sizeof(bfloat16_t)});
         }
     }
 
     Params params_{};
     uint64_t outputRowOffset_ = 0U;
-    __ubuf__ bfloat16_t* input_ = nullptr;
-    __ubuf__ bfloat16_t* output_ = nullptr;
-    __ubuf__ float* weights_ = nullptr;
 };
 
 } // namespace MegaMoeImpl
