@@ -47,6 +47,8 @@ CMP_EXTERN_C ge::graphStatus TilingQuantCompressor(gert::TilingContext* context)
         return TilingQuantCompressorArch35(context);
     } else if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201) {
         return TilingQuantCompressorArch92(context);
+    } else {
+        return ge::GRAPH_SUCCESS;
     }
 }
 

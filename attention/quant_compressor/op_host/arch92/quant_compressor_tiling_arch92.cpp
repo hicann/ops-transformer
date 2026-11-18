@@ -331,8 +331,11 @@ ge::graphStatus QuantCompressorTiling::SetInnerSplitInfo()
 {
     if (context_->templateId == TemplateId::FULL_LOAD) {
         return SetFullLoadSplitInfo();
+    } else if (context_->templateId == TemplateId::NORMAL) {
+        return SetNormalSplitInfo();
+    } else {
+        return ge::GRAPH_SUCCESS;
     }
-    return SetNormalSplitInfo();
 }
 
 ge::graphStatus QuantCompressorTiling::CalcWorkSpace()

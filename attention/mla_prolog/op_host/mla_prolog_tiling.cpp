@@ -769,26 +769,25 @@ ge::graphStatus MlaPrologTiling::GenTilingKey() const
             return ge::GRAPH_FAILED;
         }
     } else if (GetCurNpuArch() == NpuArch::DAV_9201) {
-        if ((cvMode == ASCENDC_TPL_MIX_AIC_1_1) &&
-            (scenarioInfo_.quantMode_ != QUANT_MODE::NO_QUANT &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::MXFP8_FULL_QUANT_KV_NO_QUANT &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::MXFP8_FULL_QUANT_KV_QUANT_PER_TENSOR &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::MXFP8_FULL_QUANT_KV_QUANT_PER_TILE &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::HIF8_FULL_QUANT_KV_NO_QUANT &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::HIF8_FULL_QUANT_KV_QUANT_PER_TENSOR &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::HIF8_FULL_QUANT_KV_QUANT_PER_TILE &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::FP8_FULL_QUANT_KV_NO_QUANT &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::FP8_FULL_QUANT_KV_QUANT_PER_TENSOR &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::FP8_FULL_QUANT_KV_QUANT_PER_TILE &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::PARTIAL_QUANT_KV_NO_QUANT &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::PARTIAL_QUANT_KV_QUANT_PER_CHANNEL &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::PARTIAL_QUANT_KV_QUANT_PER_TILE &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::FULL_QUANT_KV_NO_QUANT &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::FULL_QUANT_KV_QUANT_PER_TENSOR &&
-             scenarioInfo_.quantMode_ != QUANT_MODE::FULL_QUANT_KV_QUANT_PER_TILE)) {
+        if (scenarioInfo_.quantMode_ != QUANT_MODE::NO_QUANT &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::MXFP8_FULL_QUANT_KV_NO_QUANT &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::MXFP8_FULL_QUANT_KV_QUANT_PER_TENSOR &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::MXFP8_FULL_QUANT_KV_QUANT_PER_TILE &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::HIF8_FULL_QUANT_KV_NO_QUANT &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::HIF8_FULL_QUANT_KV_QUANT_PER_TENSOR &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::HIF8_FULL_QUANT_KV_QUANT_PER_TILE &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::FP8_FULL_QUANT_KV_NO_QUANT &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::FP8_FULL_QUANT_KV_QUANT_PER_TENSOR &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::FP8_FULL_QUANT_KV_QUANT_PER_TILE &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::PARTIAL_QUANT_KV_NO_QUANT &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::PARTIAL_QUANT_KV_QUANT_PER_CHANNEL &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::PARTIAL_QUANT_KV_QUANT_PER_TILE &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::FULL_QUANT_KV_NO_QUANT &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::FULL_QUANT_KV_QUANT_PER_TENSOR &&
+            scenarioInfo_.quantMode_ != QUANT_MODE::FULL_QUANT_KV_QUANT_PER_TILE) {
             OP_LOGE(
                 context_->opName,
-                "CV1:1 mode only support quantMode is in {NO_QUANT,"
+                "DAV_9201 mode only support quantMode is in {NO_QUANT,"
                 "MXFP8_FULL_QUANT_KV_NO_QUANT, MXFP8_FULL_QUANT_KV_QUANT_PER_TENSOR, "
                 "MXFP8_FULL_QUANT_KV_QUANT_PER_TILE,"
                 "HIF8_FULL_QUANT_KV_NO_QUANT, HIF8_FULL_QUANT_KV_QUANT_PER_TENSOR, HIF8_FULL_QUANT_KV_QUANT_PER_TILE,"
