@@ -112,7 +112,6 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
       <td>Optional input</td>
       <td>INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: TND: [Tq,qHeadNum]; BSND: [B,Sq,qHeadNum]; BNSD: [B,qHeadNum,Sq]. For MXFP8 on Ascend 950PR&950DT products (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5/8, pass nullptr. A4C4 (quantType=4) requires FLOAT8_E8M0; see the <a href="./docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4">A4C4</a> scale shapes.</td>
       <td>FLOAT32 (INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>) or FLOAT8_E8M0 (MXFP8/A4C4 on Ascend 950PR&950DT products)</td>
-
       <td>ND</td>
     </tr>
     <tr>
@@ -120,7 +119,6 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
       <td>Optional input</td>
       <td>INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: PA_BBND/PA_BNBD: [numBlocks,kvHeadNum,128]; TND: [kvHeadNum,Tkv]; BSND/BNSD: [B,kvHeadNum,Sk]. For MXFP8 on Ascend 950PR&950DT products (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale. A4C4 (quantType=4) requires FLOAT8_E8M0; see the <a href="./docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4">A4C4</a> scale shapes.</td>
       <td>FLOAT32 (INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>) or FLOAT8_E8M0 (MXFP8/A4C4 on Ascend 950PR&950DT products), BFLOAT16 (A8C4)</td>
-
       <td>ND</td>
     </tr>
     <tr>
@@ -128,14 +126,12 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
       <td>Optional input</td>
       <td>INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [kvHeadNum,D]. For MXFP8 on Ascend 950PR&950DT products (quantType=6), an E8M0 scale is required; see the MXFP8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale. A4C4 (quantType=4) requires FLOAT8_E8M0; see the <a href="./docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4">A4C4</a> scale shapes.</td>
       <td>FLOAT32 (INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>) or FLOAT8_E8M0 (MXFP8/A4C4 on Ascend 950PR&950DT products), BFLOAT16 (A8C4)</td>
-
       <td>ND</td>
     </tr>
     <tr>
       <td>pQuantScaleOptional</td>
       <td>Optional input</td>
       <td>INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [1]. For MXFP8 on Ascend 950PR&950DT products (quantType=6), P scale is optional FLOAT32 [1], default 16.0. For quantType=0/4/5/8, pass nullptr.</td>
-
       <td>FLOAT</td>
       <td>ND</td>
     </tr>

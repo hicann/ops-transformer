@@ -108,7 +108,6 @@
       <td>可选输入</td>
       <td><term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8量化（quantType=7）必传，要求FLOAT32、连续存储、有限且大于0。INT8场景：TND：[Tq,qHeadNum]；BSND：[B,Sq,qHeadNum]；BNSD：[B,qHeadNum,Sq]。<term>Ascend 950PR&950DT系列产品</term> MXFP8（quantType=6）须传E8M0，shape见MXFP8量化契约；quantType=0/5/8传入nullptr。A4C4（quantType=4）必传FLOAT8_E8M0，shape见<a href="./docs/aclnnGenericBlockSparseAttention.md#a4c4quanttype4">A4C4</a>量化参数说明。</td>
       <td>FLOAT32（<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8）或FLOAT8_E8M0（<term>Ascend 950PR&950DT系列产品</term> MXFP8/A4C4）</td>
-
       <td>ND</td>
     </tr>
     <tr>
@@ -116,7 +115,6 @@
       <td>可选输入</td>
       <td><term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8量化（quantType=7）必传，要求FLOAT32、连续存储、有限且大于0。INT8场景：PA_BBND/PA_BNBD：[numBlocks,kvHeadNum,128]；TND：[kvHeadNum,Tkv]；BSND/BNSD：[B,kvHeadNum,Sk]。<term>Ascend 950PR&950DT系列产品</term> MXFP8（quantType=6）须传E8M0，shape见MXFP8量化契约；quantType=0/5传入nullptr。A8C4 需传独立的 BFLOAT16 scale。A4C4（quantType=4）必传FLOAT8_E8M0，shape见<a href="./docs/aclnnGenericBlockSparseAttention.md#a4c4quanttype4">A4C4</a>量化参数说明。</td>
       <td>FLOAT32（<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8）或FLOAT8_E8M0（<term>Ascend 950PR&950DT系列产品</term> MXFP8/A4C4）、BFLOAT16（A8C4）</td>
-
       <td>ND</td>
     </tr>
     <tr>
@@ -124,14 +122,12 @@
       <td>可选输入</td>
       <td><term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8量化（quantType=7）必传，要求FLOAT32、连续存储、有限且大于0。INT8场景：[kvHeadNum,D]。<term>Ascend 950PR&950DT系列产品</term> MXFP8（quantType=6）须传E8M0，shape见MXFP8量化契约；quantType=0/5传入nullptr。A8C4 需传独立的 BFLOAT16 scale。A4C4（quantType=4）必传FLOAT8_E8M0，shape见<a href="./docs/aclnnGenericBlockSparseAttention.md#a4c4quanttype4">A4C4</a>量化参数说明。</td>
       <td>FLOAT32（<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8）或FLOAT8_E8M0（<term>Ascend 950PR&950DT系列产品</term> MXFP8/A4C4）、BFLOAT16（A8C4）</td>
-
       <td>ND</td>
     </tr>
     <tr>
       <td>pQuantScaleOptional</td>
       <td>可选输入</td>
       <td><term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8量化（quantType=7）必传，要求FLOAT32、连续存储、有限且大于0。INT8场景：FLOAT32 [1]。<term>Ascend 950PR&950DT系列产品</term> MXFP8（quantType=6）的P scale为可选FLOAT32 [1]，缺省16.0；quantType=0/4/5/8传入nullptr。</td>
-
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
@@ -251,7 +247,6 @@
       <td>returnSoftmaxlse</td>
       <td>属性</td>
       <td>是否输出softmaxLse。非量化（quantType=0）、A4C4（quantType=4）、<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8（quantType=7）和 <term>Ascend 950PR&950DT系列产品</term> A8C4（quantType=8）支持0或1；<term>Ascend 950PR&950DT系列产品</term> 高精 FP8（含常规和 Union，quantType=5、softmaxPrecision=0、D=128）支持0或1；<term>Ascend 950PR&950DT系列产品</term> 常规低精 FP8（quantType=5、softmaxPrecision=1）和 MXFP8（quantType=6）仅支持0。</td>
-
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -280,7 +275,6 @@
       <td>softmaxLseOptional</td>
       <td>输出</td>
       <td>Softmax的log-sum-exp结果。非量化（quantType=0）、<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8（quantType=7）、A4C4（quantType=4）、<term>Ascend 950PR&950DT系列产品</term> A8C4（quantType=8）及 <term>Ascend 950PR&950DT系列产品</term> 高精 FP8（含常规和 Union，quantType=5、softmaxPrecision=0、D=128）支持输出。returnSoftmaxlse=1时必传FLOAT32 Tensor，shape为TND：[Tq,qHeadNum,1]，BSND/BNSD：[B,qHeadNum,Sq,1]；returnSoftmaxlse=0时传入nullptr。<term>Ascend 950PR&950DT系列产品</term> 常规低精 FP8（quantType=5、softmaxPrecision=1）和 MXFP8（quantType=6）不支持输出 LSE。</td>
-
       <td>FLOAT</td>
       <td>ND</td>
     </tr>

@@ -120,7 +120,6 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>Input</td>
       <td>The query in the formula.</td>
       <td>Supports layoutQ="TND"/"BSND"/"BNSD". For shapes and product scope, see <a href="#layout-correspondence-description">Layout Correspondence Description</a> and <a href="#other-constraints">Other Constraints</a>.</td>
-
       <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, INT8, FLOAT4_E2M1</td>
       <td>ND</td>
       <td>[totalQTokens, headNum, headDim]</td>
@@ -131,7 +130,6 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>Input</td>
       <td>key in the formula.</td>
       <td>Can be used as the original Key or Paged KV Cache. Supports layoutKv="TND"/"BSND"/"BNSD"/"PA_BBND"/"PA_BNBD" within product scope, including matching dense Q/KV layouts or PA layouts subject to product and quantization constraints below. For shapes, see <a href="#layout-correspondence-description">Layout Correspondence Description</a> and <a href="#paged-attention-related-description">Paged Attention Related Description</a>; for non-contiguous dim0, see <a href="#other-constraints">Other Constraints</a>.</td>
-
       <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, INT8, FLOAT4_E2M1</td>
       <td>ND</td>
       <td>[numBlocks, blockSize, numKeyValueHeads, headDim]</td>
@@ -142,7 +140,6 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>Input</td>
       <td>value in the formula.</td>
       <td>Can be used as the original Value input or Paged KV Cache input, and its shape is the same as that of key. Supported layouts match key, including PA_BBND/PA_BNBD KV or matching dense Q/KV layouts, subject to the product and quantization constraints below. See <a href="#other-constraints">Other Constraints</a>.</td>
-
       <td>FLOAT16, BFLOAT16, FLOAT8_E4M3FN, INT8, FLOAT4_E2M1</td>
       <td>ND</td>
       <td>Same as key</td>
