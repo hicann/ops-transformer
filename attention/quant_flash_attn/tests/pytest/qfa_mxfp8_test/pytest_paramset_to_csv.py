@@ -272,7 +272,8 @@ def _derive_case(case):
     total_q = cu_q[-1] if cu_q else sum(act_q)
     total_kv = cu_kv[-1] if cu_kv else sum(act_kv)
     num_groups = _num_groups(D)
-    # 与 golden resolve_q_scale_layout 的 BNSD/BSND 覆盖规则保持一致
+    # 生成符合 tiling 校验的合法组合 (与 golden resolve_q_scale_layout 的约束一致):
+    # layout_q=TND -> {TND,N2TGD}; layout_q=BNSD -> {BNSD}; layout_q=BSND -> {BSND,BN2SGD}
     if input_layout == "BNSD":
         q_scale_layout = "BNSD"
     elif input_layout == "BSND":

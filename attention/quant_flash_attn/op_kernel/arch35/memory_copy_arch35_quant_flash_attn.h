@@ -358,6 +358,20 @@ __aicore__ inline void DataCopySoftmaxLseTNDtoNTArch35(GlobalTensor<float> softm
                                                        uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
                                                        const CONST_INFO_T& constInfo)
 {
+    // realGSize=1(G 合入 N2)时一个任务只属于一个 query 头, GM 上该头的 s1 连续,
+    // UB 里每行 LSE 占一个 32B block, 因此一次批量写出即可, 省去逐 s1 发起小拷贝
+    if (constInfo.realGSize == 1U) {
+        if (dealCount == 0U) {
+            return;
+        }
+        DataCopyExtParams fastParams;
+        fastParams.blockCount = dealCount;
+        fastParams.blockLen = sizeof(float);
+        fastParams.srcStride = 0;
+        fastParams.dstStride = 0;
+        DataCopyPad(softmaxLseGm[bN2Offset + mOffset], lseSrc, fastParams);
+        return;
+    }
     uint32_t startS1Idx = mOffset / constInfo.realGSize;
     uint32_t startGIdx = mOffset % constInfo.realGSize;
     uint32_t endS1Idx = (mOffset + dealCount - 1) / constInfo.realGSize;
@@ -413,6 +427,24 @@ __aicore__ inline void DataCopySoftmaxLseNTDArch35(GlobalTensor<float> softmaxLs
         startS1Idx = 0;
         ubOffset += curDealRowCount * AttentionCommon::FP32_BLOCK_ELEMENT_NUM;
     }
+}
+
+// ----------------------------------------------Copy LSE UB To Gm (S1_ONLY) arch35--------------------------------
+// DN 范式(realGSize=1)下每个任务只属于一个 query 头, LSE 在 UB 中按 s1 连续排布,
+// 且 GM 上同一个头的 s1 也是连续的, 因此算好头基址后一次整块搬出, 无需逐 s1 搬运。
+// 各 layout 的头基址由调用方预计算:
+//   TND:      realN2Idx * realGSize * t1Size + prefixBS1
+//   BSND/BNSD: bIdx * n2Size * gSize * s1Size + realN2Idx * realGSize * s1Size
+template <typename T>
+__aicore__ inline void DataCopySoftmaxLseS1OnlyArch35(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
+                                                      uint64_t bN2Offset, uint32_t s1Offset, uint32_t dealCount)
+{
+    DataCopyExtParams dataCopyParams;
+    dataCopyParams.blockCount = dealCount;
+    dataCopyParams.blockLen = sizeof(float);
+    dataCopyParams.srcStride = 0;
+    dataCopyParams.dstStride = 0;
+    DataCopyPad(softmaxLseGm[bN2Offset + s1Offset], lseSrc, dataCopyParams);
 }
 
 #endif

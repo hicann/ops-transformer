@@ -171,7 +171,9 @@ def _sink_values_for(head_idx):
 
 # Layout 选择
 INPUT_LAYOUT = "TND"  # 支持: BNSD, BSND, TND
-Q_SCALE_LAYOUT = "TND"  # 支持: TND, N2TGD
+# 支持: AUTO, TND, N2TGD, BNSD, BSND, BN2SGD; AUTO 表示按 INPUT_LAYOUT 推导。
+# 显式指定时必须满足 tiling 约束: TND→{TND,N2TGD}, BNSD→{BNSD}, BSND→{BSND,BN2SGD}
+Q_SCALE_LAYOUT = "AUTO"
 P_SCALE = 1.0
 # 与 kernel 常量一致 (vf_basic_block_utils.h): LN2/INV_LN2 的 fp32 值
 # kernel 的 m 对齐用乘法 S*INV_LN2 而非除法 S/LN2, fp32 下结果可差 1~2 ulp,
@@ -450,18 +452,35 @@ def canonical_q_scale_layout(layout):
 
 
 def resolve_q_scale_layout(layout=None):
-    effective = layout or Q_SCALE_LAYOUT
-    # BNSD/BSND 非 PA 场景: 算子约束 layout_q_descale 与模板绑定
-    if INPUT_LAYOUT in ("BNSD", "BSND"):
-        if INPUT_LAYOUT == "BNSD":
-            effective = "BNSD"  # BNSD: 仅 prefill 模板(USE_DN=true), q_scale 恒 BNSD
-        else:  # BSND: prefill -> BSND, decode -> BN2SGD
-            effective = "BN2SGD" if effective in ("N2TGD", "BN2SGD") else "BSND"
-    resolved = canonical_q_scale_layout(effective)
+    """解析 layout_q_descale, 并校验与 layout_q 的组合是否满足 tiling 约束。
+
+    AUTO: 按 INPUT_LAYOUT 推导 (TND→TND, BNSD→BNSD, BSND→BSND)。
+    显式指定时不再静默改写非法组合, 直接报错, 避免掩盖 tiling 校验问题。
+    """
+    requested = (layout or Q_SCALE_LAYOUT).upper()
+    if requested == "AUTO":
+        requested = {"BNSD": "BNSD", "BSND": "BSND"}.get(INPUT_LAYOUT, "TND")
+    resolved = canonical_q_scale_layout(requested)
+
+    allowed = {
+        "TND": ("TND", "N2TGD"),
+        "BNSD": ("BNSD",),
+        "BSND": ("BSND", "BN2SGD"),
+    }
+    supported = allowed.get(INPUT_LAYOUT)
+    if supported is None:
+        raise ValueError(
+            f"Unsupported layout_q: {INPUT_LAYOUT}, expected one of {list(allowed)}"
+        )
+    if resolved not in supported:
+        raise ValueError(
+            f"layout_q={INPUT_LAYOUT} 不支持 layout_q_descale={resolved}, "
+            f"合法取值: {list(supported)}"
+        )
+
     if N_kv <= 0 or N_q % N_kv != 0:
         raise ValueError(f"N_q must be divisible by N_kv, got N_q={N_q}, N_kv={N_kv}")
-    group = N_q // N_kv
-    return resolved, group
+    return resolved, N_q // N_kv
 
 
 def pack_qk_scale_for_npu(scale_flat):
@@ -1142,8 +1161,12 @@ def _compute_s_block(
     return S_ij * softmax_scale
 
 
-def _online_softmax_update(S_ij, mask_j, mi, si, oi, ln_p_scale, LN2, tail_mask=None):
-    """Return the p_scale-adjusted block max, raw sum and quantized probabilities."""
+def _online_softmax_update(S_ij, mask_j, ln_p_scale, LN2):
+    """Return the p_scale-adjusted own-grid block max and its raw exp sum.
+
+    注意: P 的 fp8/bf16 cast 在调用方按 max(running, own) 网格重算,
+    这里不做 cast, 避免每个 K block 重复一次 exp+cast。
+    """
     S_ij = S_ij.masked_fill(mask_j, float("-inf"))
 
     m_block_j, _ = torch.max(S_ij, dim=-1, keepdims=True)
@@ -1155,16 +1178,9 @@ def _online_softmax_update(S_ij, mask_j, mi, si, oi, ln_p_scale, LN2, tail_mask=
         torch.zeros_like(m_block_j),
         m_own_j,
     )
-    P_ij_raw = torch.exp(S_ij - m_safe)
-    s_block_j = torch.sum(P_ij_raw, dim=-1, keepdims=True)
-    P_ij_drop = quant_p_direct(P_ij_raw)
-    if tail_mask is not None:
-        P_ij_drop = torch.where(
-            tail_mask, P_ij_raw.to(torch.bfloat16).to(torch.float32), P_ij_drop
-        )
-    s_block_j_quant = torch.sum(P_ij_drop, dim=-1, keepdims=True)
+    s_block_j = torch.sum(torch.exp(S_ij - m_safe), dim=-1, keepdims=True)
 
-    return m_own_j, s_block_j, P_ij_drop, s_block_j_quant
+    return m_own_j, s_block_j
 
 
 # ==============================================================================
@@ -1254,11 +1270,14 @@ def _build_qfa_section_info(actual_seq_q, actual_seq_kv):
         return None
     torch.npu.set_device(int(DEVICE_ID))
 
-    layout_q = "TND" if ENABLE_PA else INPUT_LAYOUT
+    # 与算子实际调用保持一致: prepare_npu_inputs 的 PA 分支同样透传 INPUT_LAYOUT 作为
+    # layout_q/layout_out, 这里不能因 ENABLE_PA 硬编码 TND, 否则 BSND/BNSD + PA 时
+    # metadata 会报 "layoutQDescale is BSND, layoutQ must be BSND, but got TND"。
+    layout_q = INPUT_LAYOUT
     # KV_CACHE_LAYOUT 与算子 kv_cache_layout 命名已统一 (PA_BNBD/PA_BBND/PA_NZ),
     # 直接透传, 不再做 BnNBsD->PA_BNBD 映射。
     layout_kv = KV_CACHE_LAYOUT if ENABLE_PA else INPUT_LAYOUT
-    layout_out = "TND" if ENABLE_PA else INPUT_LAYOUT
+    layout_out = INPUT_LAYOUT
     q_runtime_layout, _ = resolve_q_scale_layout()
 
     def _derive_cu(seqused):
@@ -1895,7 +1914,11 @@ def cpu_mxfp8_golden(
                 kr_bf16=kr_bf16,
             )
         except Exception as exc:  # pylint: disable=broad-except
-            logger.warning("[Section] 分段 golden 计算失败(%s), 回退全局量化语义", exc)
+            logger.warning(
+                "[Section] 分段 golden 计算失败(%s); 回退全局 online softmax 语义, "
+                "该参考的 P 量化网格与算子不同, 结果仅供参考",
+                exc,
+            )
 
     # FP8 → FP32 反量化
     q_tensor = q_fp8.to(torch.float32)
@@ -2048,9 +2071,7 @@ def cpu_mxfp8_golden(
                 Qi, Kj, deq_scale_q_i, deq_scale_k_j, softmax_scale, Qri, Krj
             )
             mask_j = mask_global[:, :, Sq_start:Sq_end, Sk_start:Sk_end]
-            m_block_j, s_block_j, P_ij_drop, s_block_j_q = _online_softmax_update(
-                S_ij, mask_j, mi, si, oi, ln_p_scale, LN2, tail_mask=tail_mask_j
-            )
+            m_block_j, s_block_j = _online_softmax_update(S_ij, mask_j, ln_p_scale, LN2)
 
             if j + 1 < TILES_KV:
                 # --- 第二个 K block (j+1) ---
@@ -2070,17 +2091,11 @@ def cpu_mxfp8_golden(
                     tail_mask_j1 = col_j1.view(1, 1, 1, -1) >= vtail_tail_start.view(
                         -1, 1, 1, 1
                     )
-                m_block_j1, s_block_j1, P_ij1_drop, s_block_j1_q = (
-                    _online_softmax_update(
-                        S_ij1,
-                        mask_j1,
-                        m_block_j,
-                        s_block_j,
-                        oi,
-                        ln_p_scale,
-                        LN2,
-                        tail_mask=tail_mask_j1,
-                    )
+                m_block_j1, s_block_j1 = _online_softmax_update(
+                    S_ij1,
+                    mask_j1,
+                    ln_p_scale,
+                    LN2,
                 )
 
                 # V block: 一个 V_BLOCK_SIZE 对应两个 K_BLOCK_SIZE
