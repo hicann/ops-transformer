@@ -96,7 +96,7 @@ cann_ops_transformer.msa_index_score(
     <td>query</td>
     <td>Required</td>
     <td>$Q_{idx}$ TND</td>
-    <td>fp16/bf16</td>
+    <td>fp16/bf16; Ascend 950 also supports float8_e5m2, float8_e4m3fn and float4_e2m1fn_x2</td>
     <td><code>[T1,N1,D]</code></td>
   </tr>
   <tr>
@@ -123,8 +123,8 @@ cann_ops_transformer.msa_index_score(
   <tr>
     <td>query_scale</td>
     <td>Optional</td>
-    <td>Quantization scale of query. Reserved. Must be None.</td>
-    <td>float32</td>
+    <td>Independent MXFP4 Q group32 scales; None for other dtypes</td>
+    <td>float8_e8m0fnu</td>
     <td>-</td>
   </tr>
     <tr>
@@ -232,3 +232,9 @@ score_tnd = cann_ops_transformer.msa_index_score(
     actual_seq_qlen=actual_seq_qlen, actual_seq_klen=actual_seq_klen_tnd,
     layout_key="TND")
 ```
+
+`actual_seq_qlen` and `actual_seq_klen` may be on CPU or the query NPU; CPU lengths are copied to the device, and the current NPU stream is synchronized before returning; this path does not support external streams or NPU graph capture. Other supplied tensors must be on the query NPU.
+
+### MXFP4 (A4C4)
+
+Ascend 950 supports matching `float4_e2m1fn_x2` Q/K, logical D=64 or 128, and N2=1. Torch stores two FP4 values per element, so the tensor last dimension is D/2. Independent `float8_e8m0fnu` Q/K scales use the same outer dimensions and last dimension D/32; scale each group before the dot product.

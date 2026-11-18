@@ -127,7 +127,7 @@ aclnnStatus aclnnMsaIndexScore(
       <td>Input</td>
       <td>$Q_{idx}$ in the formula.</td>
       <td>Supported layout: TND.</td>
-      <td>BFLOAT16, FLOAT16</td>
+      <td>BFLOAT16, FLOAT16; Ascend 950 also supports FLOAT8_E5M2, FLOAT8_E4M3FN and FLOAT4_E2M1</td>
       <td>ND</td>
       <td>3 ($[T1, N1, D]$)</td>
     </tr>
@@ -161,11 +161,20 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>queryScaleOptional</td>
       <td>Input</td>
-      <td>Quantization coefficient of query.</td>
-      <td>Same dtype and format as <code>keyScaleOptional</code>. Reserved. Pass <code>nullptr</code>.</td>
-      <td>FLOAT</td>
+      <td>MXFP4 Q group scales.</td>
+      <td>Required for MXFP4; pass nullptr for other dtypes.</td>
+      <td>FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>Same as keyScaleOptional</td>
+      <td>Same outer dimensions as query; last dimension D/32</td>
+    </tr>
+    <tr>
+      <td>keyScaleOptional</td>
+      <td>Input</td>
+      <td>Key dequantization scales.</td>
+      <td>MXFP4 requires independent E8M0 group32 scales; native floating-point inputs pass nullptr.</td>
+      <td>FLOAT, FLOAT8_E8M0</td>
+      <td>ND</td>
+      <td>For MXFP4, same outer dimensions as key; last dimension D/32</td>
     </tr>
         <tr>
       <td>attenMaskOptional</td>
@@ -386,6 +395,10 @@ aclnnStatus aclnnMsaIndexScore(
   </table>
 
 ## Constraints
+
+- MXFP4 requires matching FLOAT4_E2M1 Q/K on Ascend 950, logical D=64 or 128, and N2=1. Apply each independent E8M0 group32 scale before the dot product; the original scalar post-matmul scale formula does not describe MXFP4 group scaling.
+
+- When calling ACLNN directly, all tensor data addresses, including sequence lengths, must be on the current device. Ordinary host memory is not copied automatically.
 
 - This API keeps query in TND and the logical block size at 128.
 - `layoutKeyOptional` is `"BBND"`, `"BNBD"`, `"TND"`, `"BSND"` ($[B, S2, N2, D]$), or `"BNSD"` ($[B, N2, S2, D]$). The default is `"BBND"`.

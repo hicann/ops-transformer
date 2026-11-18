@@ -38,12 +38,12 @@ if _TORCHAIR_AVAILABLE:
         query: Tensor,
         key: Tensor,
         start_loc: Tensor,
-        block_table: Optional[Tensor],
-        query_scale: Optional[Tensor],
-        key_scale: Optional[Tensor],
-        atten_mask: Optional[Tensor],
-        actual_seq_qlen: Optional[Tensor],
-        actual_seq_klen: Optional[Tensor],
+        block_table: Optional[Tensor] = None,
+        query_scale: Optional[Tensor] = None,
+        key_scale: Optional[Tensor] = None,
+        atten_mask: Optional[Tensor] = None,
+        actual_seq_qlen: Optional[Tensor] = None,
+        actual_seq_klen: Optional[Tensor] = None,
         *,
         layout_key: str = "BBND",
         sparse_mode: int = 3,
@@ -51,22 +51,25 @@ if _TORCHAIR_AVAILABLE:
         local_blocks: int = 1,
         layout_query: str = "TND",
         pool_block_size: int = 128,
+        compress_factor: int = 1,
         dependencies=None,
         node_name=None,
     ):
+        if compress_factor != 1:
+            raise ValueError("compress_factor only supports 1")
         if dependencies is None:
             dependencies = []
 
         inputs = {
             "query": query,
             "key": key,
+            "start_loc": start_loc,
             "block_table": block_table,
             "query_scale": query_scale,
             "key_scale": key_scale,
             "atten_mask": atten_mask,
             "actual_seq_qlen": actual_seq_qlen,
             "actual_seq_klen": actual_seq_klen,
-            "start_loc": start_loc,
         }
         attrs = {
             "layout_key": attr.Str(layout_key),
@@ -77,7 +80,7 @@ if _TORCHAIR_AVAILABLE:
             "pool_block_size": attr.Int(pool_block_size),
             "return_choice": attr.Int(0),
             "topk": attr.Int(16),
-            "compress_factor": attr.Int(1),
+            "compress_factor": attr.Int(compress_factor),
         }
         outputs = ["score"]
         return ge_op(
@@ -111,7 +114,9 @@ if _TORCHAIR_AVAILABLE:
             .attr("return_choice", attr.Int(0))
             .attr("topk", attr.Int(16))
             .attr("compress_factor", attr.Int(1))
-            .output("score", "DT_FLOAT, DT_FLOAT16"),
+            .output("score", "DT_FLOAT, DT_FLOAT16")
+            .output("sparse_indices", "DT_INT32")
+            .output("sparse_values", "DT_FLOAT, DT_FLOAT16"),
         )
 
     @register_fx_node_ge_converter(
@@ -121,12 +126,12 @@ if _TORCHAIR_AVAILABLE:
         query: Tensor,
         key: Tensor,
         start_loc: Tensor,
-        block_table: Optional[Tensor],
-        query_scale: Optional[Tensor],
-        key_scale: Optional[Tensor],
-        atten_mask: Optional[Tensor],
-        actual_seq_qlen: Optional[Tensor],
-        actual_seq_klen: Optional[Tensor],
+        block_table: Optional[Tensor] = None,
+        query_scale: Optional[Tensor] = None,
+        key_scale: Optional[Tensor] = None,
+        atten_mask: Optional[Tensor] = None,
+        actual_seq_qlen: Optional[Tensor] = None,
+        actual_seq_klen: Optional[Tensor] = None,
         *,
         layout_key: str = "BBND",
         sparse_mode: int = 3,
@@ -134,6 +139,7 @@ if _TORCHAIR_AVAILABLE:
         local_blocks: int = 1,
         layout_query: str = "TND",
         pool_block_size: int = 128,
+        compress_factor: int = 1,
         meta_outputs: TensorSpec = None,
     ):
         return MsaIndexScoreV2(
@@ -152,6 +158,7 @@ if _TORCHAIR_AVAILABLE:
             local_blocks=local_blocks,
             layout_query=layout_query,
             pool_block_size=pool_block_size,
+            compress_factor=compress_factor,
         )
 
 else:

@@ -85,6 +85,8 @@ TILING_DATA_FIELD_DEF(uint32_t, qScratchElems)
 TILING_DATA_FIELD_DEF(uint32_t, returnChoice)
 TILING_DATA_FIELD_DEF(uint32_t, topk)
 TILING_DATA_FIELD_DEF(uint32_t, scoreWorkspaceElems)
+// MXFP4 score template: 0=N256, 1=N512.
+TILING_DATA_FIELD_DEF(uint32_t, mxFp4WideN)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(MsaIndexScore, MsaIndexScoreTilingData)
 
@@ -113,6 +115,7 @@ struct MsaIndexScoreInfo {
     uint32_t returnChoice = 0;
     uint32_t topk = 0;
     bool isQuant = false;
+    bool isMxFp4 = false;
     bool isAscend950 = false;
     ge::DataType queryDtype = ge::DT_BF16;
     ge::DataType keyDtype = ge::DT_BF16;

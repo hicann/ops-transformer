@@ -55,12 +55,12 @@
 
 | 参数名 | 输入/输出/属性 | 描述 | 数据类型 | 数据格式 |
 | --- | --- | --- | --- | --- |
-| query | 输入 | $Q_{idx}$。非V2固定TND $[T1, N1, D]$。V2还可为BSND $[B, S1, N1, D]$、BNSD $[B, N1, S1, D]$，这两种仅<term>Ascend 950PR&950DT系列产品</term>。 | BFLOAT16、FLOAT16；<term>Ascend 950PR&950DT系列产品</term>另支持FLOAT8_E5M2、FLOAT8_E4M3FN。 | ND |
-| key | 输入 | $K_{idx}$。TND $[T2, N2, D]$；BSND $[B, S2, N2, D]$；BNSD $[B, N2, S2, D]$；BBND $[block\_num, block\_size, N2, D]$；BNBD $[block\_num, N2, block\_size, D]$。V2的非分页key必须与query同布局，且BSND/BNSD仅<term>Ascend 950PR&950DT系列产品</term>、逻辑块长16。PA允许首轴非连续。 | 与query同型。 | ND |
+| query | 输入 | $Q_{idx}$。非V2固定TND $[T1, N1, D]$。V2还可为BSND $[B, S1, N1, D]$、BNSD $[B, N1, S1, D]$，这两种仅<term>Ascend 950PR&950DT系列产品</term>。 | BFLOAT16、FLOAT16；<term>Ascend 950PR&950DT系列产品</term>另支持FLOAT8_E5M2、FLOAT8_E4M3FN及配套双侧E8M0的FLOAT4_E2M1。 | ND |
+| key | 输入 | $K_{idx}$。TND $[T2, N2, D]$；BSND $[B, S2, N2, D]$；BNSD $[B, N2, S2, D]$；BBND $[block\_num, block\_size, N2, D]$；BNBD $[block\_num, N2, block\_size, D]$。V2的BSND/BNSD顺序K配同布局Q时使用block16，配TND Q时使用block128。PA允许首轴非连续。 | 与query同型。 | ND |
 | start_loc | 输入 | 当前query所在逻辑block索引，shape $[B]$，用于$local\_mask$。 | INT32 | ND |
 | block_table | 可选输入 | PA的逻辑block到物理page映射，shape $[B, maxBlockNumPerSeq]$。TND / BSND / BNSD不传。 | INT32 | ND |
-| query_scale | 可选输入 | query的量化系数。当前仅预留，须为空。 | FLOAT | ND |
-| key_scale | 可选输入 | key的反量化系数。非量化与FP8必须为空。 | FLOAT | ND |
+| query_scale | 可选输入 | MXFP4必填的独立Q E8M0 group32系数；其他类型为空。 | FLOAT8_E8M0 | ND |
+| key_scale | 可选输入 | MXFP4必填的独立K E8M0 group32系数；原生浮点为空，原有FLOAT预留不变。 | FLOAT、FLOAT8_E8M0 | ND |
 | atten_mask | 可选输入 | `sparse_mode=3`时必传，shape $[2048, 2048]$。1表示不参与计算，0表示参与。 | INT8 | ND |
 | actual_seq_qlen | 可选输入 | query前缀和，shape $[B+1]$。 | INT32 | ND |
 | actual_seq_klen | 可选输入 | TND / BSND / BNSD为key前缀和$[B+1]$。PA为各请求可见长度$[B]$。BSND/BNSD每个请求的长度差不超过$S2$。 | INT32 | ND |
@@ -81,11 +81,13 @@
 
 ## 约束说明
 
+- MXFP4（A4C4）仅支持Ascend 950：Q/K均为FLOAT4_E2M1，逻辑D为64或128，N2=1；两份E8M0 scale每32个元素一组，形状前缀与对应Q/K相同、末维D/32。先分别缩放Q/K再点积，不能改成点积后乘一个标量。
+
 - 非V2 aclnn接口（`aclnnMsaIndexScore`）：query固定TND，逻辑块长128。key可为`BBND` / `BNBD` / `TND` / `BSND` / `BNSD`，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>与<term>Ascend 950PR&950DT系列产品</term>都支持。BSND / BNSD不传`block_table`，`actual_seq_klen`为$[B+1]$前缀和，每个请求的长度差不超过key的$S2$。
-- V2 aclnn接口（`aclnnMsaIndexScoreV2`）：query可为TND / BSND / BNSD。非分页key必须与query同布局，仅支持<term>Ascend 950PR&950DT系列产品</term>，`pool_block_size`为16，`actual_seq_klen`为$[B+1]$前缀和。
+- V2 aclnn接口（`aclnnMsaIndexScoreV2`）：query可为TND / BSND / BNSD。BSND/BNSD顺序K配同布局Q时`pool_block_size`为16，配TND Q时为128，仅支持<term>Ascend 950PR&950DT系列产品</term>，`actual_seq_klen`为$[B+1]$前缀和。
 - PageAttention必须传`block_table`，`actual_seq_klen`为$[B]$可见长度。TND / BSND / BNSD不得传`block_table`，`actual_seq_klen`为$[B+1]$前缀和。
-- 非量化时key与query同dtype，`key_scale`为空。<term>Ascend 950PR&950DT系列产品</term>支持FLOAT8_E5M2与FLOAT8_E4M3FN。`query_scale`当前须为空。`compress_factor`当前只支持1。
-- 以下数据类型组合只在原型中预留，当前计算会拒绝：A2/A3上原组合的`score`/`sparse_values`为FLOAT16，以及query/key均为INT8；Ascend 950上FLOAT4_E2M1配对（scale为FLOAT8_E8M0）、bf16/fp16的FLOAT16输出，以及query为FLOAT8_E4M3FN、key为FLOAT4_E2M1（`key_scale`为FLOAT8_E4M3FN）。已实现路径的`score`与`sparse_values`仍为FLOAT。
+- 非量化时key与query同dtype，`key_scale`为空（MXFP4除外）。<term>Ascend 950PR&950DT系列产品</term>支持FLOAT8_E5M2与FLOAT8_E4M3FN。
+- 以下数据类型组合只在原型中预留，当前计算会拒绝：A2/A3上原组合的`score`/`sparse_values`为FLOAT16，以及query/key均为INT8；Ascend 950上bf16/fp16的FLOAT16输出，以及query为FLOAT8_E4M3FN、key为FLOAT4_E2M1（`key_scale`为FLOAT8_E4M3FN）。已实现路径的`score`与`sparse_values`仍为FLOAT。
 - `sparse_mode`仅0或3。为3时`atten_mask`必须是$[2048, 2048]$。
 - `init_blocks`、`local_blocks`必须$\ge 0$，且不超过逻辑block数。两者都为0时不写$local\_mask$。
 - `q_len` / `kv_len`允许为0。空KV的score填`-inf`。

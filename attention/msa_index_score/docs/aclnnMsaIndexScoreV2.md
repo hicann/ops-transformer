@@ -110,7 +110,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>输入</td>
       <td>公式中的$Q_{idx}$。</td>
       <td>支持TND、BSND、BNSD。由<code>layoutQueryOptional</code>指定，不传时为TND。</td>
-      <td>BFLOAT16、FLOAT16</td>
+      <td>BFLOAT16、FLOAT16；Ascend950另支持FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1</td>
       <td>ND</td>
       <td>3（$[T1, N1, D]$）或4（$[B, S1, N1, D]$、$[B, N1, S1, D]$）</td>
       <td>×</td>
@@ -119,7 +119,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>key</td>
       <td>输入</td>
       <td>公式中的$K_{idx}$。</td>
-      <td>支持TND、BSND、BNSD、BBND、BNBD。非分页（TND / BSND / BNSD）必须与query同布局，且不允许非连续。分页BBND / BNBD可配任意query布局，允许dim0（物理page）非连续，size>1的非首轴须连续。TND的逻辑块长固定为128，每个head只做一次块内max。BBND/BNBD的存储页长为128。</td>
+      <td>支持TND、BSND、BNSD、BBND、BNBD。非分页通常与query同布局，block128另允许TND query配BSND/BNSD key。分页可配任意合法query布局，允许dim0（物理page）非连续，其余轴连续。pool为16/128，物理页16/128且pool不大于页长；block16跨head归约，block128分别输出各head。</td>
       <td>与query同型</td>
       <td>ND</td>
       <td>3（$[T2, N2, D]$）或4（$[B, S2, N2, D]$、$[B, N2, S2, D]$、$[block\_num, N2, block\_size, D]$、$[block\_num, block\_size, N2, D]$）</td>
@@ -148,11 +148,21 @@ aclnnStatus aclnnMsaIndexScoreV2(
     <tr>
       <td>queryScaleOptional</td>
       <td>输入</td>
-      <td>query的量化系数。</td>
-      <td>数据类型、数据格式与<code>keyScaleOptional</code>相同。当前仅预留，须传<code>nullptr</code>。</td>
-      <td>FLOAT</td>
+      <td>Q的MXFP4逐组系数。</td>
+      <td>MXFP4必须提供；非MX必须传空。</td>
+      <td>FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>与keyScaleOptional相同</td>
+      <td>与query同rank和形状前缀，末维为逻辑D/32。</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>keyScaleOptional</td>
+      <td>输入</td>
+      <td>K的反量化系数；MXFP4为逐组E8M0系数。</td>
+      <td>非量化与原生FP8传空；MXFP4必须提供，形状前缀与K一致、末维为逻辑D/32，连续存储。</td>
+      <td>MXFP4为FLOAT8_E8M0；原有反量化登记为FLOAT</td>
+      <td>ND</td>
+      <td>MXFP4与key同rank，末维D/32；其他预留反量化形状沿用原定义。</td>
       <td>-</td>
     </tr>
         <tr>
@@ -189,7 +199,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>layoutKeyOptional</td>
       <td>输入</td>
       <td>key的数据排布。</td>
-      <td>取值<code>"TND"</code> / <code>"BSND"</code> / <code>"BNSD"</code> / <code>"BBND"</code> / <code>"BNBD"</code>。不传或空串时默认<code>"BBND"</code>。必须与<code>key</code>实际shape一致，不可仅凭维度推断。非分页取值必须与<code>layoutQueryOptional</code>相同。</td>
+      <td>取值<code>"TND"</code> / <code>"BSND"</code> / <code>"BNSD"</code> / <code>"BBND"</code> / <code>"BNBD"</code>。不传或空串时默认<code>"BBND"</code>。必须与<code>key</code>实际shape一致，不可仅凭维度推断。非分页通常与<code>layoutQueryOptional</code>相同，block128的BSND/BNSD key另允许TND query。</td>
       <td>CHAR*</td>
       <td>-</td>
       <td>-</td>
@@ -290,11 +300,11 @@ aclnnStatus aclnnMsaIndexScoreV2(
 
   <!-- npu="950" id7 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-      - query、key：数据类型除BFLOAT16、FLOAT16外，还支持FLOAT8_E5M2、FLOAT8_E4M3FN。FLOAT4_E2M1、FLOAT16 score，以及FLOAT8_E4M3FN query配FLOAT4_E2M1 key仅预留，当前会拒绝。
-      - query：BSND、BNSD布局仅支持FLOAT16/BFLOAT16。
-      - key：BSND、BNSD的逻辑块长固定为16，且仅支持FLOAT16/BFLOAT16；BBND/BNBD的存储页长还支持16（FLOAT16/BFLOAT16）。
+      - query、key：数据类型除BFLOAT16、FLOAT16外，还支持FLOAT8_E5M2、FLOAT8_E4M3FN，以及配套双侧E8M0 group32系数的FLOAT4_E2M1。
+      - query：BSND、BNSD布局支持FLOAT16、BFLOAT16、MXFP4。
+      - key：BSND/BNSD配同布局Q时，poolBlockSize为16，支持FLOAT16、BFLOAT16、MXFP4；配TND Q时还支持block128。BBND/BNBD的物理页长为16或128，须为poolBlockSize的正整数倍。
       - layoutQueryOptional：支持BSND、BNSD。
-      - poolBlockSize：取值为16时，仅支持FLOAT16/BFLOAT16。
+      - poolBlockSize：取值为16时，支持FLOAT16、BFLOAT16、MXFP4。
   <!-- end id7 -->
 
 - **返回值：**
@@ -406,19 +416,23 @@ aclnnStatus aclnnMsaIndexScoreV2(
 
 ## 约束说明
 
-- 打分池化块长由`poolBlockSize`决定，缺省128：TND取128时每个head只在该块的128个token上做一次max；取16时走两级maxpool。key为BSND/BNSD且`poolBlockSize=128`时，逻辑块长为128。BBND/BNBD的存储页长支持128。
+- MXFP4仅支持Ascend 950：Q/K均为FLOAT4_E2M1，逻辑D为64或128，N2=1；Q/K分别使用E8M0 group32系数，先逐组还原再点积。原公式中的点积后标量scale不适用于MXFP4分组缩放。
+
+- 直接调用 ACLNN 时，所有传入的 Tensor 数据地址（包括实际序列长度）必须位于当前设备，不会自动搬运普通 Host 内存。
+
+- 打分池化块长由`poolBlockSize`决定，缺省128：TND取128时每个head只在该块的128个token上做一次max；取16时走两级maxpool。key为BSND/BNSD且`poolBlockSize=128`时，逻辑块长为128。Ascend950的BBND/BNBD物理页长支持16/128，pool不得大于物理页长。
 - `layoutQueryOptional`指定query：`"TND"`为$[T1, N1, D]$，`"BSND"`为$[B, S1, N1, D]$，`"BNSD"`为$[B, N1, S1, D]$。不传时默认`"TND"`。
 - `layoutKeyOptional`指定key：`"BBND"`（$[block\_num, block\_size, N2, D]$）、`"BNBD"`（$[block\_num, N2, block\_size, D]$）、`"TND"`（$[T2, N2, D]$）、`"BSND"`（$[B, S2, N2, D]$）、`"BNSD"`（$[B, N2, S2, D]$）。不传时默认`"BBND"`。key为TND时必须与query布局相同；key为BSND/BNSD且`poolBlockSize=128`时，query须为TND，`poolBlockSize=16`时，query必须与key同布局；key为BBND/BNBD时query可以是三种中的任意一种。
-- 逻辑块长为16时（query为BSND/BNSD，或`poolBlockSize=16`）：8个长度为16的逻辑块拼成一次128列GEMM。先在每个head内对16个token取max，再对每个block取head间max，即$score[0][t][i] = \max_{h'} \max_{j \in block_i} (Q[t][h'] \cdot K[j])$。head维为1。query的head数必须整除128，因此支持$N1=16$。BBND/BNBD必须传入`blockTableOptional`；BSND/BNSD不得传入。TND经`aclnnMsaIndexScoreV2`显式传`poolBlockSize=16`时也走这条路径。
+- 逻辑块长为16时（`poolBlockSize=16`）：8个长度为16的逻辑块拼成一次128列GEMM。先在每个head内对16个token取max，再对每个block取head间max，即$score[0][t][i] = \max_{h'} \max_{j \in block_i} (Q[t][h'] \cdot K[j])$。head维为1。query的head数必须整除128，因此支持$N1=16$。BBND/BNBD必须传入`blockTableOptional`；BSND/BNSD不得传入。TND经`aclnnMsaIndexScoreV2`显式传`poolBlockSize=16`时也走这条路径。
 - PageAttention（`layoutKey`为`"BBND"`/`"BNBD"`）场景下，`blockTableOptional`必须传入；TND/BSND/BNSD不得传入。TND/BSND/BNSD的`actualSeqKlenOptional`统一为$[B+1]$前缀和，PA为$[B]$可见长度。BSND/BNSD每个请求的q、kv长度不能超过对应shape里的$S$。
-- 非量化时`key` dtype与`query`相同（BFLOAT16/FLOAT16），`keyScaleOptional`为`nullptr`。`queryScaleOptional`当前须为`nullptr`，`compressFactor`当前须为1。
+- 原生浮点时`key` dtype与`query`相同（BFLOAT16/FLOAT16，Ascend950另支持两种FP8），Q/K scale均传空；MXFP4的两份E8M0系数均必填。
 - `sparseMode`当前仅支持0、3：
     - 为0时，代表defaultMask模式，`attenMaskOptional`传入`nullptr`；
     - 为3时，代表rightDownCausal模式，`attenMaskOptional`必须传入，shape为$[2048, 2048]$，取值为1代表该位不参与计算，为0代表该位参与计算。
-- `initBlocks`、`localBlocks`必须$\ge 0$且不超过逻辑block数（PA为`blockTableOptional`第二维；非分页为score末维对齐宽度）。两者均为0时跳过$local\_mask$。
+- `initBlocks`、`localBlocks`必须$\ge 0$且不超过逻辑block数（PA为页表宽×物理页长÷pool块长；非分页为score末维对齐宽度）。两者均为0时跳过$local\_mask$。
 - `q_len`/`kv_len`允许为0（含整batch）。对应请求跳过QK；空KV的score填$-inf$；整batch $T1=0$时`SetBlockDim(1)`（对齐FIA PR 9246）。
 - PageAttention`key`（BBND/BNBD）允许首轴非连续（`key | gap | key | ...`），tiling通过`GetInputStride`读取dim0元素stride写入`strideKvBlock`。非首轴（size>1的dim1至末维）必须等于紧凑stride，否则返回不支持/非法输入；TND / BSND / BNSD `key`不允许非连续。`scale`仍按逻辑page紧凑布局。
-- PageAttention`blockTable`第二维可以大于实际KV逻辑block数；score末维为$\mathrm{RoundUp}(width, 16)$。
+- PageAttention`blockTable`第二维可以大于实际KV物理页数；score末维为$\mathrm{RoundUp}(width \times pageSize / poolBlockSize, 16)$。
 
 <!-- npu="A3, 910b" id8 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
@@ -428,10 +442,10 @@ aclnnStatus aclnnMsaIndexScoreV2(
 <!-- end id8 -->
 <!-- npu="950" id9 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
-    - query、key：数据类型除BFLOAT16、FLOAT16外，还支持FLOAT8_E5M2、FLOAT8_E4M3FN。
-    - `layoutQueryOptional`：支持BSND、BNSD；query为BSND/BNSD时仅支持FLOAT16/BFLOAT16，逻辑块长固定为16。
-    - `layoutKeyOptional`：key为BSND/BNSD且`poolBlockSize=16`时，query必须与key同布局，仅支持FLOAT16/BFLOAT16。
-    - `poolBlockSize`：取值为16时走两级maxpool，仅支持FLOAT16/BFLOAT16；BBND/BNBD的存储页长另支持16。
+    - query、key：数据类型除BFLOAT16、FLOAT16外，还支持FLOAT8_E5M2、FLOAT8_E4M3FN，以及配套双侧E8M0 group32系数的FLOAT4_E2M1。
+    - `layoutQueryOptional`：MXFP4支持TND/BSND/BNSD；分页K时block16/128均可，顺序K要求：TND/TND支持block16/128，同布局BSND/BNSD仅支持block16，TND query配BSND/BNSD key仅支持block128。
+    - `layoutKeyOptional`：key为BSND/BNSD且`poolBlockSize=16`时，query必须与key同布局，支持FLOAT16/BFLOAT16/MXFP4。
+    - `poolBlockSize`：取值为16时走两级maxpool，支持FLOAT16/BFLOAT16/MXFP4；BBND/BNBD的存储页长另支持16。
     - 按估计M-task数启动MIX（单batch为$\mathrm{CeilDiv}(T1\cdot N1,128)$；多batch取packed+$B$上界并截到AIC数），短decode不打满空核。在M-task填不满AIC且可见KV tile $>1$时沿S切`kvChunks`；宽`blockTable`只按可见page估核，避免短KV空转。
     - C2UB路径对超过256列的score末维按256列滑窗flush，并补写后续$-inf$。
 <!-- end id9 -->
@@ -816,3 +830,11 @@ char layoutKeyBnsd[] = "BNSD";
 std::vector<int64_t> queryShapeBnsd = {B, N1, S1, D};
 std::vector<int64_t> keyShapeBnsd = {B, N2, S2, D};
 ```
+
+### MXFP4布局的输出容量
+
+MXFP4在TND query配BSND/BNSD key、poolBlockSize=128时，score末维按K的静态序列容量S计算：`roundUp(max(1, ceil(S/128)), 16)`；实际长度限定有效计算和mask。原生类型保留原有按实际长度或容量回退的形状规则。
+
+原生类型按CPU实际长度计算输出形状时，FakeTensor无法读取长度值，因此不支持该路径的静态形状推导。其他顺序布局的形状约定不变。
+
+- `compressFactor`：目前仅支持1，ACLNN、Host、Torch与Meta均拒绝其他值，不静默忽略。

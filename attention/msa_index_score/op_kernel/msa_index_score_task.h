@@ -128,7 +128,7 @@ public:
                                 const AscendC::GlobalTensor<int32_t>& actualSeqKlen,
                                 const AscendC::GlobalTensor<int32_t>& startLoc, bool rotateChunk = false,
                                 uint32_t qMaxSeq = 0U, uint32_t kMaxSeq = 0U, uint32_t tableWidth = 0U,
-                                uint32_t chunkBudget = 0U)
+                                uint32_t chunkBudget = 0U, uint32_t pageSize = MSA_BLOCK_SIZE, uint32_t totalQ = ~0U)
     {
         batch_ = batch;
         numQHeads_ = numQHeads;
@@ -143,6 +143,8 @@ public:
         qMaxSeq_ = qMaxSeq;
         kMaxSeq_ = kMaxSeq;
         tableWidth_ = tableWidth;
+        pageSize_ = pageSize;
+        totalQ_ = totalQ;
         gActualSeqQlen_ = actualSeqQlen;
         gActualSeqKlen_ = actualSeqKlen;
         gStartLoc_ = startLoc;
@@ -248,7 +250,8 @@ private:
     __aicore__ inline uint32_t BlockCap() const
     {
         if (MsaIsPaKeyLayout(keyLayout_) && tableWidth_ > 0U) {
-            return MsaMinU32(tableWidth_, maxBlocksPerBatch_);
+            const uint64_t tableBlocks = static_cast<uint64_t>(tableWidth_) * (pageSize_ / BLOCK_SIZE);
+            return tableBlocks < maxBlocksPerBatch_ ? static_cast<uint32_t>(tableBlocks) : maxBlocksPerBatch_;
         }
         return maxBlocksPerBatch_;
     }
@@ -421,8 +424,16 @@ private:
         if (qLen_ < 0) {
             qLen_ = 0;
         }
-        if (qMaxSeq_ > 0U && qLen_ > static_cast<int32_t>(qMaxSeq_)) {
-            qLen_ = static_cast<int32_t>(qMaxSeq_);
+        if (qMaxSeq_ > 0U) {
+            // Packed BSND/BNSD output rows can be smaller than B*S. Device
+            // lengths must not create tasks past that extent. TND output
+            // capacity is checked against the query shape by Host.
+            if (static_cast<int32_t>(cuQStart_) < 0 || cuQStart_ >= totalQ_) {
+                qLen_ = 0;
+            } else {
+                const uint32_t available = MsaMinU32(qMaxSeq_, totalQ_ - cuQStart_);
+                qLen_ = static_cast<int32_t>(MsaMinU32(static_cast<uint32_t>(qLen_), available));
+            }
         }
         curRows_ = static_cast<uint32_t>(qLen_) * numQHeads_;
         // 顺序布局统一使用 [B+1] 前缀和；PA 使用 [B] 可见长度。
@@ -448,6 +459,7 @@ private:
     AscendC::GlobalTensor<int32_t> gActualSeqKlen_;
     AscendC::GlobalTensor<int32_t> gStartLoc_;
 
+    uint32_t totalQ_ = 0;
     uint32_t batch_ = 0;
     uint32_t numQHeads_ = 1;
     uint32_t maxBlocksPerBatch_ = 0;
@@ -461,6 +473,7 @@ private:
     bool rotateChunk_ = false;
     uint32_t qMaxSeq_ = 0;
     uint32_t kMaxSeq_ = 0;
+    uint32_t pageSize_ = MSA_BLOCK_SIZE;
     uint32_t tableWidth_ = 0;
 
     uint32_t totalTasks_ = 0;

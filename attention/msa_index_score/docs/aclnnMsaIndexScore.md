@@ -127,7 +127,7 @@ aclnnStatus aclnnMsaIndexScore(
       <td>输入</td>
       <td>公式中的$Q_{idx}$。</td>
       <td>支持的shape为：TND。</td>
-      <td>BFLOAT16、FLOAT16</td>
+      <td>BFLOAT16、FLOAT16；950还支持FP8和MXFP4（FLOAT4_E2M1）</td>
       <td>ND</td>
       <td>3（$[T1, N1, D]$）</td>
     </tr>
@@ -161,11 +161,20 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>queryScaleOptional</td>
       <td>输入</td>
-      <td>query的量化系数。</td>
-      <td>数据类型、数据格式与<code>keyScaleOptional</code>相同。当前仅预留，须传<code>nullptr</code>。</td>
-      <td>FLOAT</td>
+      <td>Q的MXFP4逐组系数。</td>
+      <td>MXFP4必须提供；非MXFP4传nullptr。</td>
+      <td>FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>与keyScaleOptional相同</td>
+      <td>形状前缀与query相同，末维为逻辑D/32。</td>
+    </tr>
+    <tr>
+      <td>keyScaleOptional</td>
+      <td>输入</td>
+      <td>K的反量化系数；MXFP4为逐组E8M0系数。</td>
+      <td>MXFP4必须提供；其他路径沿用原有约束。</td>
+      <td>FLOAT、FLOAT8_E8M0</td>
+      <td>ND</td>
+      <td>MXFP4形状前缀与key相同，末维为逻辑D/32。</td>
     </tr>
         <tr>
       <td>attenMaskOptional</td>
@@ -275,9 +284,9 @@ aclnnStatus aclnnMsaIndexScore(
   <!-- end id8 -->
   <!-- npu="950" id7 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-      - query、key：数据类型除BFLOAT16、FLOAT16外，还支持FLOAT8_E5M2、FLOAT8_E4M3FN。
+      - query、key：数据类型除BFLOAT16、FLOAT16外，还支持FLOAT8_E5M2、FLOAT8_E4M3FN，以及配套双侧E8M0系数的FLOAT4_E2M1。
   <!-- end id7 -->
-  - 原型另预留、当前实现会拒绝的组合：A2/A3的FLOAT16 `score`/`sparseValues`、INT8 query+INT8 key；Ascend 950的FLOAT4_E2M1（scale为FLOAT8_E8M0）、bf16/fp16的FLOAT16输出，以及FLOAT8_E4M3FN query配FLOAT4_E2M1 key。已实现路径的score与sparse values仍为FLOAT。
+  - 原型另预留、当前实现会拒绝的组合：A2/A3的FLOAT16 `score`/`sparseValues`、INT8 query+INT8 key；Ascend 950的bf16/fp16的FLOAT16输出，以及FLOAT8_E4M3FN query配FLOAT4_E2M1 key。已实现路径的score与sparse values仍为FLOAT。
 
 - **返回值：**
 
@@ -387,6 +396,10 @@ aclnnStatus aclnnMsaIndexScore(
   </table>
 
 ## 约束说明
+
+- MXFP4仅支持Ascend 950：Q/K均为FLOAT4_E2M1，逻辑D为64或128，N2=1；Q/K分别使用E8M0 group32系数，先逐组还原再点积。原公式中的点积后标量scale不适用于MXFP4分组缩放。
+
+- 直接调用 ACLNN 时，所有传入的 Tensor 数据地址（包括实际序列长度）必须位于当前设备，不会自动搬运普通 Host 内存。
 
 - 本接口query为TND，逻辑块长128。
 - `layoutKeyOptional`为`"BBND"`、`"BNBD"`、`"TND"`、`"BSND"`（$[B, S2, N2, D]$）或`"BNSD"`（$[B, N2, S2, D]$）。不传时默认`"BBND"`。

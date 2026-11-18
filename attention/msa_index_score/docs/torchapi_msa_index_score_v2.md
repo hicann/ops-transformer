@@ -86,7 +86,7 @@ cann_ops_transformer.msa_index_score_v2(
     <td>query</td>
     <td>必选</td>
     <td>$Q_{idx}$。由<code>layout_query</code>指定：TND/BSND/BNSD，默认TND。</td>
-    <td>fp16/bf16</td>
+    <td>fp16/bf16；Ascend 950另支持float8_e5m2、float8_e4m3fn及float4_e2m1fn_x2</td>
     <td><code>[T1,N1,D]</code> / <code>[B,S1,N1,D]</code> / <code>[B,N1,S1,D]</code></td>
   </tr>
   <tr>
@@ -113,8 +113,8 @@ cann_ops_transformer.msa_index_score_v2(
   <tr>
     <td>query_scale</td>
     <td>可选</td>
-    <td>query量化系数。预留，须为None</td>
-    <td>float32</td>
+    <td>MXFP4的Q逐组系数；其他类型为None</td>
+    <td>float8_e8m0fnu</td>
     <td>-</td>
   </tr>
     <tr>
@@ -260,3 +260,9 @@ score_bnsd = cann_ops_transformer.msa_index_score_v2(
     actual_seq_qlen=actual_seq_qlen, actual_seq_klen=actual_seq_klen_bnsd,
     layout_key="BNSD", layout_query="BNSD")
 ```
+
+`actual_seq_qlen` 与 `actual_seq_klen` 可在 CPU 或 query 所在 NPU；CPU 长度会复制到设备，并在调用返回前等待当前 NPU 流完成；该路径不支持外部流或 NPU 图捕获。其他已传入的 Tensor 必须位于 query 所在 NPU。
+
+### MXFP4（A4C4）
+
+仅Ascend 950支持Q/K均为`float4_e2m1fn_x2`，逻辑D为64或128、N2=1。Torch每个元素打包两个FP4值，因此输入末维为D/2；两份独立`float8_e8m0fnu`系数的形状前缀与对应Q/K相同、末维D/32，按每32个元素分别缩放后再点积。

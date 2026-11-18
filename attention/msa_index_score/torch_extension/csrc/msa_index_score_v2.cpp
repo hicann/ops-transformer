@@ -12,15 +12,17 @@
  * \file msa_index_score_v2.cpp
  * \brief torch_extension 适配：aclnnMsaIndexScoreV2 C++ wrapper。
  *        key 支持 PA BBND/BNBD 与 TND / BSND / BNSD。
- *        950 另支持 query/key 同型 HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN；
+ *        950 另支持同型 FLOAT8_E5M2 / FLOAT8_E4M3FN 和双侧 E8M0 系数的 MXFP4；
  *        PA key 允许 dim0 非连续（torch view stride 经 ConvertType 传入）。
  */
 
+#include <algorithm>
 #include <cctype>
 #include <string>
 #include <torch/extension.h>
 #include "acl/acl.h"
 #include "aclnn_common.h"
+#include "torch_npu/csrc/core/npu/NPUGraphsUtils.h"
 
 namespace op_api {
 namespace {
@@ -36,7 +38,7 @@ constexpr int64_t SCALE_TND_DIM = 2;
 constexpr int64_t ATTEN_MASK_DIM = 2;
 constexpr int64_t SCORE_STRIDE_ALIGN = 16;
 constexpr int64_t SUPPORTED_BLOCK_SIZE = 128;
-constexpr int64_t BLOCK16_SIZE = 16; // BSND/BNSD，以及 BBND/BNBD 页长 16。TND 固定 128
+constexpr int64_t BLOCK16_SIZE = 16; // 顺序输入与分页输入的归约块长。
 constexpr int64_t HEAD_DIM_ALIGN = 16;
 constexpr int64_t MAX_HEAD_DIM = 128;
 constexpr int64_t ATTEN_MASK_SIZE = 2048;
@@ -119,7 +121,7 @@ void CheckMsaLayoutRanks(const at::Tensor& query, const at::Tensor& key, const c
     TORCH_CHECK(start_loc.dim() == START_LOC_DIM, "start_loc must be 1D [B], but got dim=", start_loc.dim());
 }
 
-void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& scale,
+void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& key_scale,
                              const c10::optional<at::Tensor>& atten_mask, const at::Tensor& cu_q,
                              const at::Tensor& kv_len, const at::Tensor& start_loc, int64_t sparse_mode, bool is_tnd)
 {
@@ -141,7 +143,9 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
         const char* name = c10::toString(t);
         return name != nullptr && (std::string(name) == "hifloat8" || std::string(name) == "HiFloat8");
     };
-    const bool q_ok = query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16 ||
+    const bool is_mx = query.scalar_type() == at::ScalarType::Float4_e2m1fn_x2 &&
+                       key.scalar_type() == at::ScalarType::Float4_e2m1fn_x2;
+    const bool q_ok = is_mx || query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16 ||
                       query.scalar_type() == at::kFloat8_e5m2 || query.scalar_type() == at::kFloat8_e4m3fn ||
                       is_hifloat8(query.scalar_type());
     TORCH_CHECK(q_ok, "query dtype must be float16 / bfloat16 / hifloat8 / float8_e5m2 / float8_e4m3fn, but got ",
@@ -149,21 +153,25 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
     const bool is_fp8 = query.scalar_type() == at::kFloat8_e5m2 || query.scalar_type() == at::kFloat8_e4m3fn ||
                         is_hifloat8(query.scalar_type());
     const bool is_quant = (key.scalar_type() == at::kChar);
-    if (is_quant) {
+    if (is_mx) {
+        TORCH_CHECK(key_scale.has_value() && key_scale.value().defined(), "MXFP4 requires key_scale.");
+        TORCH_CHECK(key_scale.value().scalar_type() == at::ScalarType::Float8_e8m0fnu, "MXFP4 key_scale must be E8M0.");
+    } else if (is_quant) {
         TORCH_CHECK(query.scalar_type() == at::kHalf, "int8 key requires float16 query.");
-        TORCH_CHECK(scale.has_value() && scale.value().defined() && scale.value().numel() > 0,
+        TORCH_CHECK(key_scale.has_value() && key_scale.value().defined() && key_scale.value().numel() > 0,
                     "int8 key requires dequant key_scale.");
-        TORCH_CHECK(scale.value().scalar_type() == at::kFloat, "key_scale dtype must be float32.");
+        TORCH_CHECK(key_scale.value().scalar_type() == at::kFloat, "key_scale dtype must be float32.");
         if (is_tnd) {
-            TORCH_CHECK(scale.value().dim() == SCALE_TND_DIM || (scale.value().dim() == 1 && key.size(1) == 1),
+            TORCH_CHECK(key_scale.value().dim() == SCALE_TND_DIM || (key_scale.value().dim() == 1 && key.size(1) == 1),
                         "TND key_scale must be [T2, N2] or [T2].");
         } else {
-            TORCH_CHECK(scale.value().dim() == SCALE_PA_DIM, "PA key_scale must be 3D [NP, N_kv, P].");
+            TORCH_CHECK(key_scale.value().dim() == SCALE_PA_DIM, "PA key_scale must be 3D [NP, N_kv, P].");
         }
     } else {
         TORCH_CHECK(key.scalar_type() == query.scalar_type(), "non-quant key dtype must match query.");
-        TORCH_CHECK(!scale.has_value() || !scale.value().defined(), "non-quant path must not pass key_scale.");
-        TORCH_CHECK(!is_fp8 || (!scale.has_value() || !scale.value().defined()), "FP8 path must not pass key_scale.");
+        TORCH_CHECK(!key_scale.has_value() || !key_scale.value().defined(), "non-quant path must not pass key_scale.");
+        TORCH_CHECK(!is_fp8 || (!key_scale.has_value() || !key_scale.value().defined()),
+                    "FP8 path must not pass key_scale.");
     }
     TORCH_CHECK(cu_q.scalar_type() == at::kInt, "actual_seq_qlen dtype must be int32.");
     TORCH_CHECK(kv_len.scalar_type() == at::kInt, "actual_seq_klen dtype must be int32.");
@@ -203,7 +211,7 @@ MsaKeyMeta ResolveTndKeyMeta(const at::Tensor& key, const at::Tensor& cu_q, cons
 
 MsaKeyMeta ResolvePaKeyMeta(const at::Tensor& key, const at::Tensor& bt, const std::string& layoutKeyStr,
                             const at::Tensor& cu_q, const at::Tensor& kv_len, const at::Tensor& start_loc,
-                            int64_t init_blocks, int64_t local_blocks)
+                            int64_t init_blocks, int64_t local_blocks, int64_t logicalBlock)
 {
     MsaKeyMeta meta;
     TORCH_CHECK(bt.dim() == BLOCK_TABLE_DIM, "block_table must be 2D [B, MB], but got dim=", bt.dim());
@@ -223,9 +231,10 @@ MsaKeyMeta ResolvePaKeyMeta(const at::Tensor& key, const at::Tensor& bt, const s
     TORCH_CHECK(start_loc.size(0) == kv_len.size(0), "start_loc size must equal batch.");
     TORCH_CHECK(bt.size(0) == kv_len.size(0), "block_table batch must equal batch.");
     TORCH_CHECK(init_blocks >= 0 && local_blocks >= 0, "init_blocks/local_blocks must be >= 0.");
-    TORCH_CHECK(init_blocks <= bt.size(1) && local_blocks <= bt.size(1),
-                "init_blocks/local_blocks must be <= maxBlocks.");
-    meta.maxBlocks = bt.size(1);
+    const int64_t pageSize = (layoutKeyStr == "BBND") ? key.size(1) : key.size(DIM_2);
+    meta.maxBlocks = bt.size(1) * (pageSize / logicalBlock);
+    TORCH_CHECK(init_blocks <= meta.maxBlocks && local_blocks <= meta.maxBlocks,
+                "init_blocks/local_blocks must be <= logical maxBlocks.");
     return meta;
 }
 
@@ -247,13 +256,31 @@ at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key, co
                               int64_t sparse_mode, int64_t init_blocks, int64_t local_blocks,
                               c10::string_view layout_query, int64_t pool_block_size, int64_t compress_factor)
 {
+    TORCH_CHECK(compress_factor == 1, "compress_factor only supports 1, got ", compress_factor);
     CheckMsaRequiredTensors(query, key, start_loc, actual_seq_qlen, actual_seq_klen);
+    TORCH_CHECK(query.device().type() == torch_npu::utils::get_npu_device_type(), "query must be an NPU tensor");
+    TORCH_CHECK(key.device() == query.device(), "key must be on query's device");
+    TORCH_CHECK(start_loc.device() == query.device(), "start_loc must be on query's device");
+    const auto check_device = [&query](const c10::optional<at::Tensor>& tensor, const char* name) {
+        TORCH_CHECK(!tensor.has_value() || !tensor->defined() || tensor->device() == query.device(), name,
+                    " must be on query's device");
+    };
+    check_device(block_table, "block_table");
+    check_device(query_scale, "query_scale");
+    check_device(key_scale, "key_scale");
+    check_device(atten_mask, "atten_mask");
+    TORCH_CHECK(actual_seq_qlen->device().is_cpu() || actual_seq_qlen->device() == query.device(),
+                "actual_seq_qlen must be on CPU or query's device");
+    TORCH_CHECK(actual_seq_klen->device().is_cpu() || actual_seq_klen->device() == query.device(),
+                "actual_seq_klen must be on CPU or query's device");
     const std::string layoutKeyStr = ParseLayoutKey(layout_key);
     const std::string layoutQueryStr = NormalizeLayoutName(layout_query, "TND");
     TORCH_CHECK(layoutQueryStr == "TND" || layoutQueryStr == "BSND" || layoutQueryStr == "BNSD",
                 "layout_query must be TND, BSND or BNSD, got ", layoutQueryStr);
     const bool seq_key = (layoutKeyStr == "TND" || layoutKeyStr == "BSND" || layoutKeyStr == "BNSD");
-    if (seq_key) {
+    const bool batchKey128 = layoutQueryStr == "TND" && pool_block_size == SUPPORTED_BLOCK_SIZE &&
+                             (layoutKeyStr == "BSND" || layoutKeyStr == "BNSD");
+    if (seq_key && !batchKey128) {
         TORCH_CHECK(layoutKeyStr == layoutQueryStr,
                     "non-paged key layout must match layout_query, got query=", layoutQueryStr, " key=", layoutKeyStr);
     }
@@ -261,16 +288,22 @@ at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key, co
     const at::Tensor& kv_len = actual_seq_klen.value();
     CheckMsaLayoutRanks(query, key, block_table, layoutKeyStr, layoutQueryStr, cu_q, kv_len, start_loc);
     CheckMsaSparseAndDtypes(query, key, key_scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, seq_key);
-    TORCH_CHECK(!query_scale.has_value() || !query_scale.value().defined(),
-                "query_scale is reserved and not supported.");
-    TORCH_CHECK(compress_factor == 1, "compress_factor only supports 1, got ", compress_factor);
+    const bool is_mx = query.scalar_type() == at::ScalarType::Float4_e2m1fn_x2;
+    if (is_mx) {
+        TORCH_CHECK(query_scale.has_value() && query_scale.value().defined() &&
+                        query_scale.value().scalar_type() == at::ScalarType::Float8_e8m0fnu,
+                    "MXFP4 requires E8M0 query_scale.");
+    } else {
+        TORCH_CHECK(!query_scale.has_value() || !query_scale.value().defined(),
+                    "query_scale is only supported for MXFP4.");
+    }
     // pool_block_size 只允许 16 / 128；BSND/BNSD 固定 16。存储页长（key 的页维度）与打分块长解耦，
     // 但打分块不能超过存储页容量（kernel 按页表取每块前 bs 个 token）。
     const int64_t keyPage = seq_key ? 0 : (layoutKeyStr == "BBND") ? key.size(1) : key.size(DIM_2);
     const int64_t poolBlockSize = pool_block_size;
     TORCH_CHECK(poolBlockSize == SUPPORTED_BLOCK_SIZE || poolBlockSize == BLOCK16_SIZE,
                 "pool_block_size must be 16 or 128, got ", poolBlockSize);
-    if (layoutKeyStr == "BSND" || layoutKeyStr == "BNSD") {
+    if ((layoutKeyStr == "BSND" || layoutKeyStr == "BNSD") && !batchKey128) {
         TORCH_CHECK(poolBlockSize == BLOCK16_SIZE, "BSND/BNSD requires pool_block_size=16, got ", poolBlockSize);
     } else if (!seq_key) {
         TORCH_CHECK(poolBlockSize <= keyPage, "pool_block_size(", poolBlockSize,
@@ -281,7 +314,11 @@ at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key, co
     MsaKeyMeta meta =
         seq_key ? ResolveTndKeyMeta(key, cu_q, kv_len, start_loc, init_blocks, local_blocks, seqBlock, keySeqCap) :
                   ResolvePaKeyMeta(key, block_table.value(), layoutKeyStr, cu_q, kv_len, start_loc, init_blocks,
-                                   local_blocks);
+                                   local_blocks, poolBlockSize);
+    if (batchKey128 && (is_mx || !kv_len.device().is_cpu())) {
+        // MX and device lengths use static K capacity; host-visible native lengths keep the original shape rule.
+        meta.maxBlocks = std::max<int64_t>(1, (keySeqCap + seqBlock - 1) / seqBlock);
+    }
     if (layoutKeyStr == "BSND") {
         meta.numKvHeads = key.size(2);
         meta.keyHeadDim = key.size(3);
@@ -308,9 +345,9 @@ at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key, co
     }
     const bool m3Layout =
         layoutQueryStr == "BSND" || layoutQueryStr == "BNSD" || layoutKeyStr == "BSND" || layoutKeyStr == "BNSD";
-    if (m3Layout) {
-        TORCH_CHECK(query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16,
-                    "BSND/BNSD supports float16 / bfloat16 only.");
+    if (m3Layout && poolBlockSize == BLOCK16_SIZE) {
+        TORCH_CHECK(is_mx || query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16,
+                    "BSND/BNSD supports float16 / bfloat16 / MXFP4.");
         TORCH_CHECK(key.scalar_type() == query.scalar_type(), "BSND/BNSD key dtype must match query.");
     }
     // 块长 16（TND 16、BSND/BNSD、页长 16）做 head 间 max，N1 必须整除 128。
@@ -321,9 +358,22 @@ at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key, co
     const int64_t score_stride = ((meta.maxBlocks + SCORE_STRIDE_ALIGN - 1) / SCORE_STRIDE_ALIGN) * SCORE_STRIDE_ALIGN;
     const int64_t score_heads = (poolBlockSize == BLOCK16_SIZE) ? 1 : num_q_heads;
     at::Tensor score = at::empty({score_heads, total_q, score_stride}, query.options().dtype(at::kFloat));
-    ACLNN_CMD(aclnnMsaIndexScoreV2, query, key, start_loc, block_table, query_scale, key_scale, atten_mask,
-              actual_seq_qlen, actual_seq_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, layoutQueryStr,
-              poolBlockSize, compress_factor, score);
+    // The ACLNN handler may be queued without owning input tensors. Keep host-length copies alive until completion.
+    const bool host_lengths = actual_seq_qlen->device().is_cpu() || actual_seq_klen->device().is_cpu();
+    if (host_lengths) {
+        const c10::OptionalDeviceGuard length_device_guard(query.device());
+        TORCH_CHECK(c10_npu::currentStreamCaptureStatusMayInitCtx() == c10_npu::CaptureStatus::None,
+                    "CPU sequence lengths are not supported during NPU graph capture");
+        (void)c10_npu::getCurrentNPUStream(query.device().index()).query();
+    }
+    c10::optional<at::Tensor> device_qlen = actual_seq_qlen.value().to(query.device());
+    c10::optional<at::Tensor> device_klen = actual_seq_klen.value().to(query.device());
+    ACLNN_CMD(aclnnMsaIndexScoreV2, query, key, start_loc, block_table, query_scale, key_scale, atten_mask, device_qlen,
+              device_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, layoutQueryStr, poolBlockSize,
+              compress_factor, score);
+    if (host_lengths) {
+        c10_npu::getCurrentNPUStream(query.device().index()).synchronize();
+    }
     return score;
 }
 

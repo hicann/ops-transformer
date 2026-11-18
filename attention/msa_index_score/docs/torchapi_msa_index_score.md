@@ -84,8 +84,8 @@ cann_ops_transformer.msa_index_score(
 | key | 必选 | $K_{idx}$。PA允许dim0非连续 | 与query同型。 | `[NP,P,N2,D]` / `[NP,N2,P,D]` / `[T2,N2,D]` / `[B,S2,N2,D]` / `[B,N2,S2,D]` |
 | start_loc | 必选 | query所在逻辑block | int32 | `[B]` |
 | block_table | PA必选 | 逻辑block到物理page。TND / BSND / BNSD不传 | int32 | `[B,MB]` |
-| query_scale | 可选 | query量化系数。预留，须为None | float32 | - |
-| key_scale | 可选 | key反量化系数。非量化与FP8不传 | float32 | - |
+| query_scale | 可选 | MXFP4的Q逐组系数，其他类型为None | float8_e8m0fnu | Q形状前缀相同，末维D/32 |
+| key_scale | 可选 | MXFP4的K逐组系数，原生浮点不传 | float32 / float8_e8m0fnu | MXFP4与K形状前缀相同，末维D/32 |
 | atten_mask | mode=3必选 | 因果模板 | int8 | `[2048,2048]` |
 | actual_seq_qlen | 必选 | query前缀和 | int32 | `[B+1]` |
 | actual_seq_klen | 必选 | PA为各请求可见长度；TND / BSND / BNSD为前缀和 | int32 | `[B]` / `[B+1]` |
@@ -102,7 +102,7 @@ cann_ops_transformer.msa_index_score(
 <!-- npu="950" id7 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
     - query、key：数据类型除fp16/bf16外，还支持float8_e4m3fn / float8_e5m2。
-- 原型预留但当前会拒绝：A2/A3的float16 score/values、int8 query+int8 key；950的float4_e2m1（scale为float8_e8m0）、bf16/fp16的float16输出，以及float8_e4m3fn query配float4_e2m1 key。
+- 原型预留但当前会拒绝：A2/A3的float16 score/values、int8 query+int8 key；bf16/fp16的float16输出，以及float8_e4m3fn query配float4_e2m1 key。
 <!-- end id7 -->
 
 ## 返回值说明
@@ -114,6 +114,8 @@ cann_ops_transformer.msa_index_score(
 | sparse_values（`return_choice=2`） | float32 | `[N1, T1, topk]` |
 
 ## 约束说明
+
+- `actual_seq_qlen` 和 `actual_seq_klen` 可在 CPU 或 query 所在 NPU；CPU 长度会复制到设备，并在调用返回前等待当前 NPU 流完成；该路径不支持外部流或 NPU 图捕获。其他已传入的 Tensor 必须位于 query 所在 NPU。
 
 - query固定TND，逻辑块长128。BSND / BNSD的$S2$是定长槽，`actual_seq_klen[b+1] - actual_seq_klen[b]`不超过$S2$，且不传`block_table`。
 - `q_len` / `kv_len`允许为0。空KV的score为`-inf`。
@@ -173,3 +175,7 @@ score_bsnd = cann_ops_transformer.msa_index_score(
     actual_seq_qlen=actual_seq_qlen, actual_seq_klen=actual_seq_klen_bsnd,
     layout_key="BSND")
 ```
+
+### MXFP4（A4C4）
+
+仅Ascend 950支持Q/K均为`float4_e2m1fn_x2`，逻辑D为64或128、N2=1。Torch每个元素打包两个FP4值，因此输入末维为D/2；两份独立`float8_e8m0fnu`系数的形状前缀与对应Q/K相同、末维D/32，按每32个元素分别缩放后再点积。

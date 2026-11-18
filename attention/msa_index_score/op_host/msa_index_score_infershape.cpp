@@ -187,7 +187,7 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
                     OP_LOGE(context, "BBND/BNBD page size(%ld) must be a positive multiple of pool_block_size(%ld).",
                             pageLen, poolBlockSizeAttr),
                     return ge::GRAPH_FAILED);
-        maxBlocks = blockTableShape->GetDim(1);
+        maxBlocks = blockTableShape->GetDim(1) * (pageLen / poolBlockSizeAttr);
     } else {
         const size_t expectRank = (keyLayout == MSA_KEY_LAYOUT_TND) ? MSA_KEY_TND_DIM_NUM : MSA_KEY_PA_DIM_NUM;
         OP_CHECK_IF(keyShape->GetDimNum() != expectRank,
@@ -225,6 +225,18 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
             const int64_t totalK = keyShape->GetDim(0);
             maxBlocks = (totalK + seqBlock - 1) / seqBlock;
         } else {
+            const int64_t seq = (keyLayout == MSA_KEY_LAYOUT_BSND) ? keyShape->GetDim(1) : keyShape->GetDim(2);
+            maxBlocks = (seq + seqBlock - 1) / seqBlock;
+        }
+        const auto* queryDesc = context->GetInputDesc(MSA_QUERY_INDEX);
+        const auto* keyDesc = context->GetInputDesc(MSA_KEY_INDEX);
+        const bool mxOrUnknown =
+            queryDesc == nullptr || keyDesc == nullptr || queryDesc->GetDataType() == ge::DT_UNDEFINED ||
+            keyDesc->GetDataType() == ge::DT_UNDEFINED || queryDesc->GetDataType() == ge::DT_FLOAT4_E2M1 ||
+            keyDesc->GetDataType() == ge::DT_FLOAT4_E2M1;
+        if (batchKey128 && mxOrUnknown) {
+            // MX and unknown dtype use static capacity; native types keep PR15456's
+            // host-visible length semantics and fall back to capacity otherwise.
             const int64_t seq = (keyLayout == MSA_KEY_LAYOUT_BSND) ? keyShape->GetDim(1) : keyShape->GetDim(2);
             maxBlocks = (seq + seqBlock - 1) / seqBlock;
         }

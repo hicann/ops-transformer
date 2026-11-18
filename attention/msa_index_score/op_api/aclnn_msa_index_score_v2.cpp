@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstddef>
 #include "aclnn_msa_index_score_v2.h"
+#include "aclnn/opdev/op_errno.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +41,9 @@ ACLNN_API aclnnStatus aclnnMsaIndexScoreV2GetWorkspaceSize(
     int64_t sparseMode, int64_t initBlocks, int64_t localBlocks, char* layoutQueryOptional, int64_t poolBlockSize,
     int64_t compressFactor, const aclTensor* score, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
+    if (score == nullptr) {
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
     // 缺省归一：空 / 空串回落 TND；poolBlockSize 非正数回落 128（host tiling 再做 16/128 白名单校验）。
     char layoutQueryDefault[] = "TND";
     char* layoutQuery =

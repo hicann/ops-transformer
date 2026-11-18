@@ -98,6 +98,13 @@ constexpr uint32_t MSA_UB_ALIGN_BYTES = 512;
 constexpr uint32_t MSA_L1B_STAGES_INT8 = 2;
 constexpr uint32_t MSA_L1B_STAGES_FP16 = 3;
 
+// Shared byte offset for AIC/AIV handoff of an already-NZ MXFP4 Q-scale tile.
+template <uint32_t STAGES, bool WIDE>
+struct MsaMxL1Layout {
+    static constexpr uint32_t COLS = MSA_BLOCK_SIZE * (WIDE ? 4U : 2U);
+    static constexpr uint32_t SCALE_A_OFFSET = MSA_ROW_TILE_M * MSA_K_TILE + STAGES * COLS * MSA_K_TILE;
+};
+
 // score 输出末维的对齐粒度。
 constexpr uint32_t MSA_SCORE_STRIDE_ALIGN = 16;
 
@@ -196,10 +203,16 @@ MSA_FN uint64_t MsaSeqKeyBlockElem(uint32_t keyLayout, uint32_t batchIdx, uint32
     return static_cast<uint64_t>(cuKStart + localTok) * numKvHeads * headDim;
 }
 
+// block16 一次 MMAD 最多并几个 128 列窗。nWin=4 + N512：L0C 单级 128×512。
+constexpr uint32_t MSA_BLOCK16_MAX_WIN_GROUP = 4;
+constexpr uint32_t MSA_A5_S_PING_BYTES_B16 = MSA_A5_S_PING_ROWS * MSA_BLOCK16_MAX_WIN_GROUP * MSA_BLOCK_SIZE * 2U;
+
+constexpr uint32_t MSA_MX_GROUP = 32;
+
 } // namespace MsaIndexScoreNs
 
 // TilingKey：按 query dtype × key 是否 int8 分支。
-// 必须是宏而非 constexpr —— TILING_KEY_IS() 在算子预编译阶段按文本解析，只接受数值常量或宏。
+// 模式编号同时用于 Host 选路与 schMode 模板注册；保持已有数值编码。
 #define MSA_TILING_KEY_BF16 0
 #define MSA_TILING_KEY_FP16 1
 #define MSA_TILING_KEY_BF16_INT8 2
@@ -257,5 +270,11 @@ MSA_FN constexpr uint32_t MsaAlignUpPow2(uint32_t value, uint32_t align)
 {
     return (value + align - 1U) & ~(align - 1U);
 }
+
+#define MSA_TILING_KEY_MXFP4 15
+#define MSA_TILING_KEY_MXFP4_BLK16 16
+#define MSA_TILING_KEY_MXFP4_TOPK 18
+#define MSA_TILING_KEY_MXFP4_PREFILL 19
+#define MSA_TILING_KEY_MXFP4_LATENCY 23
 
 #endif // MSA_INDEX_SCORE_COMMON_H
