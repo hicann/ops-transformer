@@ -19,9 +19,11 @@
 
 namespace FaVectorApi {
 
-static constexpr Reg::CastTrait castTraitP0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT, Reg::MaskMergeMode::ZEROING,
+// post-quant cast from high precision to low precision (int8/fp8/hif8) must saturate:
+// out-of-range values are clamped to the destination range instead of wrapping/inf.
+static constexpr Reg::CastTrait castTraitP0 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
                                                RoundMode::CAST_RINT};
-static constexpr Reg::CastTrait castTraitP1 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT, Reg::MaskMergeMode::ZEROING,
+static constexpr Reg::CastTrait castTraitP1 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
                                                RoundMode::CAST_HYBRID};
 
 template <typename T, typename OUTPUT_T>

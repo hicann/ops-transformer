@@ -20,9 +20,9 @@ namespace FaVectorApi {
 // w4转Q_T
 static constexpr Reg::CastTrait castTraitW4 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN, Reg::MaskMergeMode::ZEROING,
                                                RoundMode::UNKNOWN};
-// fp32转Q_T
-static constexpr Reg::CastTrait castTraitW4_0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
-                                                 Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+// fp32转Q_T，窄化cast使用饱和模式
+static constexpr Reg::CastTrait castTraitW4_0 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
+                                                 RoundMode::CAST_RINT};
 // bf16转fp16
 static constexpr Reg::CastTrait castTraitW4_1 = {Reg::RegLayout::UNKNOWN, Reg::SatMode::SAT,
                                                  Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
@@ -30,8 +30,8 @@ static constexpr Reg::CastTrait castTraitW4_1 = {Reg::RegLayout::UNKNOWN, Reg::S
 static constexpr Reg::CastTrait castTraitW4_2 = {Reg::RegLayout::UNKNOWN, Reg::SatMode::UNKNOWN,
                                                  Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 // fp32转fp16
-static constexpr Reg::CastTrait castTraitFp32 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
-                                                 Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait castTraitFp32 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
+                                                 RoundMode::CAST_RINT};
 
 template <typename Q_T, typename KV_T>
 __simd_callee__ inline void CastMulStoreW4GroupNz(Reg::RegTensor<KV_T>& vKvData, Reg::RegTensor<half>& vCastFp16Res,

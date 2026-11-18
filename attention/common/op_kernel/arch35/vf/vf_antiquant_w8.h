@@ -21,8 +21,8 @@ namespace FaVectorApi {
 // w8转Q_T
 static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN, Reg::MaskMergeMode::ZEROING,
                                              RoundMode::UNKNOWN};
-// fp32->Q_T
-static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT, Reg::MaskMergeMode::ZEROING,
+// fp32->Q_T，窄化cast使用饱和模式
+static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
                                               RoundMode::CAST_RINT};
 // fp16 -> bf16
 static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::UNKNOWN, Reg::SatMode::UNKNOWN,
@@ -34,11 +34,11 @@ static constexpr Reg::CastTrait castTraitFp8_1 = {Reg::RegLayout::ZERO, Reg::Sat
 static constexpr Reg::CastTrait castTraitFp8_2 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
                                                   Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 // fp32->fp16
-static constexpr Reg::CastTrait castTraitFp8_3 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
-                                                  Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait castTraitFp8_3 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
+                                                  RoundMode::CAST_RINT};
 // fp32->fp16
-static constexpr Reg::CastTrait castTraitFp8_4 = {Reg::RegLayout::ONE, Reg::SatMode::NO_SAT,
-                                                  Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait castTraitFp8_4 = {Reg::RegLayout::ONE, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
+                                                  RoundMode::CAST_RINT};
 
 template <typename Q_T, typename KV_T, typename ANTIQ_PARAMS_T, uint32_t baseSize, bool hasOffset = false>
 __simd_vf__ void AntiquantVFImplW8Nz(__ubuf__ uint8_t* ubSrcAddr, __ubuf__ Q_T* ubDstAddr, __ubuf__ Q_T* ubOffsetAddr,
