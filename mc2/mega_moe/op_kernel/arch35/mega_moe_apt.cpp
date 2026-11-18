@@ -75,8 +75,8 @@ class MegaMoeMteWave<XType, OutputType, TopkWeightsType, fp4x2_e2m1_t, MoeWeight
 
 #ifdef MEGA_MOE_ARCH35_DEVICE
 // BF16 直通固定为两级 BF16 计算和非量化 Combine，其余参数沿用原入口。
-template <typename TopkWeightsType, int32_t MoeWeight1Format, int32_t MoeWeight2Format, int32_t SharedWeight1Format,
-          int32_t SharedWeight2Format>
+template <typename TopkWeightsType, int32_t MoeWeight1Format, int32_t MoeWeight2Format,
+          int32_t SharedWeight1Format, int32_t SharedWeight2Format>
 class MegaMoeMteWave<bfloat16_t, bfloat16_t, TopkWeightsType, bfloat16_t, MoeWeight1Format, MoeWeight2Format,
                      bfloat16_t, SharedWeight1Format, SharedWeight2Format, EXPERT_QUANT_OUT_DTYPE_BF16,
                      EXPERT_QUANT_OUT_DTYPE_BF16>

@@ -452,7 +452,8 @@ __aicore__ inline void PackBf16LocalTokens(const WorkRange& tokenRange, const Mo
         const TEventID event = static_cast<TEventID>(slot);
         auto* stage = scratch.stages[slot];
         PipeWait<PIPE_MTE3, PIPE_MTE2>(event);
-        CopyGmToUb(stage, input + tokenIndex * layout.dataValidBytes, static_cast<uint32_t>(layout.dataValidBytes));
+        CopyGmToUb(stage, input + tokenIndex * layout.dataValidBytes,
+                   static_cast<uint32_t>(layout.dataValidBytes));
         if (layout.weightBytes != 0) {
             auto* weightGm = weights + tokenIndex * common.topK * sizeof(TopkWeightsType);
             if constexpr (Std::IsSame<TopkWeightsType, bfloat16_t>::value) {
@@ -460,8 +461,8 @@ __aicore__ inline void PackBf16LocalTokens(const WorkRange& tokenRange, const Mo
                 CopyGmToUb(weightBf16, weightGm, common.topK * static_cast<uint32_t>(sizeof(TopkWeightsType)));
                 PipeNotify<PIPE_MTE2, PIPE_V>(event);
                 PipeWait<PIPE_MTE2, PIPE_V>(event);
-                CastBf16ToFp32VF(reinterpret_cast<__ubuf__ float*>(stage + layout.weightOffsetBytes), weightBf16,
-                                 common.topK);
+                CastBf16ToFp32VF(reinterpret_cast<__ubuf__ float*>(stage + layout.weightOffsetBytes),
+                                  weightBf16, common.topK);
                 PipeNotify<PIPE_V, PIPE_MTE3>(event);
                 PipeWait<PIPE_V, PIPE_MTE3>(event);
             } else {

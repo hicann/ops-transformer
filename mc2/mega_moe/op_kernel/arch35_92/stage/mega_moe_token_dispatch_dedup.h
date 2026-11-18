@@ -140,8 +140,8 @@ __aicore__ inline void StoreDedupEntry(bool topkWeightsPrefetch, const TokenDisp
     __ubuf__ ActivationType* tokenScaleBuffer = GetDispatchCopyBuffer(context, scratch, bufferIdx);
     __ubuf__ QuantScaleType* scaleBuffer = nullptr;
     if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
-        scaleBuffer = reinterpret_cast<__ubuf__ QuantScaleType*>(reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) +
-                                                                 context.quantTokenAlignBytes);
+        scaleBuffer = reinterpret_cast<__ubuf__ QuantScaleType*>(
+            reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) + context.quantTokenAlignBytes);
     }
     // 与 Fetch 侧事件分叉同条件：记录带权重段（topk 提前乘权或 tkw=0 combine 去重）走 MTE2_S。
     const bool recordHasWeights = (topkWeightsPrefetch || IsCombineDedupOn(params.tilingData->compute.dedupMode));
@@ -149,8 +149,8 @@ __aicore__ inline void StoreDedupEntry(bool topkWeightsPrefetch, const TokenDisp
     if (recordHasWeights) {
         PipeWait<PIPE_MTE2, PIPE_S>(eventId);
         uint32_t weightOffsetInUb = context.quantTokenAlignBytes + context.quantScaleAlignBytes;
-        weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) +
-                                                               weightOffsetInUb);
+        weightBitsTensor = reinterpret_cast<__ubuf__ int32_t*>(
+            reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) + weightOffsetInUb);
     } else {
         // Fetch 在无权重段布局下为 ring meta 置了 S_MTE3；本路径不消费 ring meta，在此配平。
         PipeWait<PIPE_S, PIPE_MTE3>(eventId);

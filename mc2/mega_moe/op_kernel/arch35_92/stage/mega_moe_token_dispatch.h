@@ -144,8 +144,8 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(bool topkWeightsPrefetch, c
     // void 表示报文没有 scale 段，仅搬运 token 和可选路由权重。
     __ubuf__ QuantScaleType* scaleBuffer = nullptr;
     if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
-        scaleBuffer = reinterpret_cast<__ubuf__ QuantScaleType*>(reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) +
-                                                                 context.quantTokenAlignBytes);
+        scaleBuffer = reinterpret_cast<__ubuf__ QuantScaleType*>(
+            reinterpret_cast<__ubuf__ uint8_t*>(tokenScaleBuffer) + context.quantTokenAlignBytes);
     }
     if (topkWeightsPrefetch || IsCombineDedupOn(params.tilingData->compute.dedupMode)) {
         PipeWait<PIPE_MTE2, PIPE_S>(eventId);
@@ -192,13 +192,11 @@ __aicore__ inline DispatchCopyTargets<ActivationType, QuantScaleType> CreateDisp
     const auto& workspace = params.workspace.layout;
     const auto& buffer = params.workspace.base;
     DispatchCopyTargets<ActivationType, QuantScaleType> targets;
-    targets.tokenRev =
-        reinterpret_cast<__gm__ ActivationType*>(workspace.routed.gmm1Input.data.get_ptr(buffer) +
-                                                 physicalRowOffset * scratch.revTokenElemCnt * sizeof(ActivationType));
+    targets.tokenRev = reinterpret_cast<__gm__ ActivationType*>(workspace.routed.gmm1Input.data.get_ptr(buffer) +
+        physicalRowOffset * scratch.revTokenElemCnt * sizeof(ActivationType));
     if constexpr (!Std::IsSame<QuantScaleType, void>::value) {
         targets.scaleRev = reinterpret_cast<__gm__ QuantScaleType*>(workspace.routed.gmm1Input.scale.get_ptr(buffer) +
-                                                                    physicalRowOffset * scratch.revScaleElemCnt *
-                                                                        sizeof(QuantScaleType));
+            physicalRowOffset * scratch.revScaleElemCnt * sizeof(QuantScaleType));
     }
     targets.remoteRank = reinterpret_cast<__gm__ ActivationType*>(winRankAddr[remoteRankIdx] + context.quantWinOffset);
     targets.metaInfo = reinterpret_cast<__gm__ int32_t*>(workspace.routing.receivedTokenMetadata.get_ptr(buffer) +

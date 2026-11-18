@@ -67,8 +67,7 @@ protected:
     {
         const auto& compute = tilingData->compute;
         auto& inputConfig = this->quantProcessConfig_;
-        inputConfig.layout = CalcTokenScaleLayout(compute.h, compute.dispatchInputStorage, compute.topK,
-                                                  tilingData->comm.topkWeightsPrefetch);
+        inputConfig.layout = CalcBf16TokenScaleLayout(compute.h, compute.topK, tilingData->comm.topkWeightsPrefetch);
         inputConfig.stageBytes = static_cast<uint32_t>(
             CalcBf16InputStageBytes(inputConfig.layout, compute.topK, Std::IsSame<TopkWeightsType, bfloat16_t>::value));
         const uint32_t sendCoreIdx = this->sharedExpertNum_ > 0U ? this->blockIdx_ : this->aivCoreIdx_;
