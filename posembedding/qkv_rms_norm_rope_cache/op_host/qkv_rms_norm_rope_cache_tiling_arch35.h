@@ -41,7 +41,6 @@ TILING_DATA_FIELD_DEF(float, reciprocal); // 1 / D
 // (否则 host 预算与内核实际分配是两套算法,少算一个通道就越界)
 TILING_DATA_FIELD_DEF(int64_t, inUbBytes);
 TILING_DATA_FIELD_DEF(int64_t, cosSinUbBytes);
-TILING_DATA_FIELD_DEF(int64_t, qOutUbBytes);
 TILING_DATA_FIELD_DEF(int64_t, kProtoUbBytes);
 TILING_DATA_FIELD_DEF(int64_t, vProtoUbBytes);
 TILING_DATA_FIELD_DEF(int64_t, kCacheUbBytes);
@@ -101,7 +100,6 @@ private:
     // host 侧一次算准的 UB buffer 字节数,内核只透传
     int64_t perTokenUbBytes_{0};
     int64_t cosSinUbBytes_{0};
-    int64_t qOutUbBytes_{0};
     int64_t kProtoUbBytes_{0};
     int64_t vProtoUbBytes_{0};
     int64_t kCacheUbBytes_{0};

@@ -184,35 +184,35 @@ English | [简体中文](./README.md)
     <tr>
       <td>v_cache</td>
       <td>Input/Output</td>
-      <td>Cache allocated in advance, where the input and output reuse the same address. The data type is the same as that of the input qkv (v is not quantized) or INT8 (v is quantized). The shape is [BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 16, BlockSize, 16] (v is not quantized) or [BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 32, BlockSize, 32] (v is quantized).</td>
+      <td>Cache allocated in advance, where the input and output reuse the same address. The data type is the same as that of the input qkv (v is not quantized) or INT8 (v is quantized). The shape is [BlockNum, N<sub>v</sub> * D<sub>qkv</sub> // 16, BlockSize, 16] (v is not quantized) or [BlockNum, N<sub>v</sub> * D<sub>qkv</sub> // 32, BlockSize, 32] (v is quantized).</td>
       <td>FLOAT16, BFLOAT16, INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>k_scale</td>
       <td>Optional input</td>
-      <td>This input parameter is required when the data type of k_cache is INT8, corresponding to kScale in the formula. The shape is [N<sub>k</sub>, D<sub>qkv</sub>].</td>
+      <td>This input parameter is required when the data type of k_cache is INT8, corresponding to kScale in the formula; if the data type of k_cache is not INT8, this parameter must not be passed in. The shape is [N<sub>k</sub>, D<sub>qkv</sub>].</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>v_scale</td>
       <td>Optional input</td>
-      <td>This input parameter is required when the data type of v_cache is INT8, corresponding to vScale in the formula. The shape is [N<sub>v</sub>, D<sub>qkv</sub>].</td>
+      <td>This input parameter is required when the data type of v_cache is INT8, corresponding to vScale in the formula; if the data type of v_cache is not INT8, this parameter must not be passed in. The shape is [N<sub>v</sub>, D<sub>qkv</sub>].</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>k_offset</td>
       <td>Optional input</td>
-      <td>This parameter input is required when the data type of k_cache is INT8, the corresponding k_scale input exists, and the quantization scenario is asymmetric quantization, corresponding to kOffset in the formula. The shape is [N<sub>k</sub>, D<sub>qkv</sub>].</td>
+      <td>This parameter input is required when the data type of k_cache is INT8, the corresponding k_scale input exists, and the quantization scenario is asymmetric quantization, corresponding to kOffset in the formula; if the data type of k_cache is not INT8, this parameter must not be passed in. The shape is [N<sub>k</sub>, D<sub>qkv</sub>].</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>v_offset</td>
       <td>Optional input</td>
-      <td>This parameter input is required when the data type of v_cache is INT8, the corresponding v_scale input exists, and the quantization scenario is asymmetric quantization, corresponding to vOffset in the formula. The shape is [N<sub>v</sub>, D<sub>qkv</sub>].</td>
+      <td>This parameter input is required when the data type of v_cache is INT8, the corresponding v_scale input exists, and the quantization scenario is asymmetric quantization, corresponding to vOffset in the formula; if the data type of v_cache is not INT8, this parameter must not be passed in. The shape is [N<sub>v</sub>, D<sub>qkv</sub>].</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
@@ -288,7 +288,7 @@ English | [简体中文](./README.md)
 
 * Input shape restrictions:
     * B<sub>qkv</sub> is the batch_size of the input qkv, and S<sub>qkv</sub> is the sequence length of the input qkv. The sizes are determined by qkvSize.
-    * N<sub>qkv</sub> is the head number of the input qkv, and D<sub>qkv</sub> is the head dim of the input qkv. Currently only 128 is supported. D<sub>q</sub>, D<sub>k</sub>, and D<sub>k</sub> are the head dims of q, k, and v respectively. D<sub>qkv</sub> = D<sub>q</sub> = D<sub>k</sub> = D<sub>v</sub> is required, and D<sub>qkv</sub> must satisfy that (D<sub>qkv</sub> * the number of bytes occupied by the qkv data type) is divisible by 32.
+    * N<sub>qkv</sub> is the head number of the input qkv, and D<sub>qkv</sub> is the head dim of the input qkv. Currently only 128 is supported. D<sub>q</sub>, D<sub>k</sub>, and D<sub>v</sub> are the head dims of q, k, and v respectively. D<sub>qkv</sub> = D<sub>q</sub> = D<sub>k</sub> = D<sub>v</sub> is required, and D<sub>qkv</sub> must satisfy that (D<sub>qkv</sub> * the number of bytes occupied by the qkv data type) is divisible by 32.
     * According to the rope rules, D<sub>k</sub> and D<sub>q</sub> must be even numbers. In the scenario where cache_mode is PA_NZ, D<sub>k</sub> and D<sub>q</sub> must be aligned to 32B, and BlockSize must be aligned to 32B.
     * For the preceding 32B alignment cases, the alignment value is determined by the data type of the cache. Taking BlockSize as an example, if the data type of the cache is int8, BlockSize % 32 = 0 must be satisfied; if the data type of the cache is float16, BlockSize % 16 = 0 must be satisfied; if the dtypes of the k_cache and v_cache parameters are inconsistent, BlockSize must satisfy both BlockSize % 32 = 0 and BlockSize % 16 = 0.
     * BlockNum is the number of memory blocks written to the cache. The size is determined by the user input scenario, and BlockNum >= Ceil(S<sub>qkv</sub> / BlockSize) * B<sub>qkv</sub> is required.
@@ -301,5 +301,5 @@ English | [简体中文](./README.md)
 
 | Calling Method   | Calling Sample           | Description                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
-| aclnn invocation  | [test_aclnn_qkv_rms_norm_rope_cache](examples/test_aclnn_qkv_rms_norm_rope_cache.cpp) | Calls the QkvRmsNormRopeCache operator through the [aclnnQkvRmsNormRopeCache](docs/aclnnQkvRmsNormRopeCache_en.md) API. |
-| Graph mode | [test_geir_qkv_rms_norm_rope_cache](examples/test_geir_qkv_rms_norm_rope_cache.cpp)  | Calls the QkvRmsNormRopeCache operator through [Operator IR](op_graph/qkv_rms_norm_rope_cache_proto.h) graph construction.         |
+| aclnn API  | [test_aclnn_qkv_rms_norm_rope_cache](examples/test_aclnn_qkv_rms_norm_rope_cache.cpp) | Calls the QkvRmsNormRopeCache operator through the [aclnnQkvRmsNormRopeCache](docs/aclnnQkvRmsNormRopeCache_en.md) API. |
+| GE graph mode | [test_geir_qkv_rms_norm_rope_cache](examples/test_geir_qkv_rms_norm_rope_cache.cpp)  | Calls the QkvRmsNormRopeCache operator through [Operator IR](op_graph/qkv_rms_norm_rope_cache_proto.h) graph construction.         |

@@ -148,6 +148,13 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckKCacheValid()
     OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "k_cache must be 4D tensor."), return ge::GRAPH_FAILED);
     blockNum_ = kCacheShapePtr->GetStorageShape().GetDim(0);
     blockSize_ = kCacheShapePtr->GetStorageShape().GetDim(2);
+    // blockSize_ 下文要作除数(算 blockNum 下界),必须先拒 0/负值:
+    // 后置的 CheckBlockSizeAlign 用的是"乘 + 取模",0*2 % 32 == 0 拦不住它。
+    OP_CHECK_IF(
+        blockSize_ <= 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "blockSize", std::to_string(blockSize_).c_str(),
+                                              "the 3rd dim of k_cache/v_cache must be greater than 0"),
+        return ge::GRAPH_FAILED);
     if (isKQuant_) {
         isValid =
             isValid && (kCacheShapePtr->GetStorageShape().GetDim(1) == numHeadK_ * qkvDim_ / INT8_BLOCK_ALIGN_NUM);
@@ -263,6 +270,31 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckKOffsetValid()
                 OP_LOGE(context_->GetNodeName(), "when k_Cache dtype is not int8, k_offset must be None."),
                 return ge::GRAPH_FAILED);
     if (kOffsetShapePtr != nullptr) {
+        // 内核按 [Nk, Dqkv] 整块读 k_offset(regbase.h 的 quant buffer 装载),
+        // 形状不符会让 host 预算与内核读取错位,故与 k_scale 同口径逐维校验。
+        const gert::Shape& kOffsetShape = kOffsetShapePtr->GetStorageShape();
+        if (kOffsetShape.GetDimNum() != NUM_TWO) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "k_offset",
+                                                     std::to_string(kOffsetShape.GetDimNum()).c_str(),
+                                                     "k_offset must be 2D tensor [Nk, Dqkv]");
+            return ge::GRAPH_FAILED;
+        }
+        if (kOffsetShape.GetDim(0) != numHeadK_) {
+            const std::string kOffsetShapeMsg = Ops::Base::ToString(kOffsetShape);
+            const std::string kOffsetReasonMsg =
+                "The first dim of k_offset must be Nk=" + std::to_string(numHeadK_) + " (head_nums[1])";
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "k_offset", kOffsetShapeMsg.c_str(),
+                                                  kOffsetReasonMsg.c_str());
+            return ge::GRAPH_FAILED;
+        }
+        if (kOffsetShape.GetDim(1) != qkvDim_) {
+            const std::string kOffsetShapeMsg = Ops::Base::ToString(kOffsetShape);
+            const std::string kOffsetReasonMsg =
+                "The second dim of k_offset must be Dqkv=" + std::to_string(qkvDim_) + " (qkv_size[3])";
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "k_offset", kOffsetShapeMsg.c_str(),
+                                                  kOffsetReasonMsg.c_str());
+            return ge::GRAPH_FAILED;
+        }
         auto kOffsetDesc = context_->GetOptionalInputDesc(K_OFFSET_IDX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, kOffsetDesc);
         auto kOffsetDtype = kOffsetDesc->GetDataType();
@@ -279,6 +311,30 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckVOffsetValid()
                 OP_LOGE(context_->GetNodeName(), "when v_Cache dtype is not int8, v_offset must be None."),
                 return ge::GRAPH_FAILED);
     if (vOffsetShapePtr != nullptr) {
+        // 同 k_offset:内核按 [Nv, Dqkv] 整块读 v_offset。
+        const gert::Shape& vOffsetShape = vOffsetShapePtr->GetStorageShape();
+        if (vOffsetShape.GetDimNum() != NUM_TWO) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "v_offset",
+                                                     std::to_string(vOffsetShape.GetDimNum()).c_str(),
+                                                     "v_offset must be 2D tensor [Nv, Dqkv]");
+            return ge::GRAPH_FAILED;
+        }
+        if (vOffsetShape.GetDim(0) != numHeadV_) {
+            const std::string vOffsetShapeMsg = Ops::Base::ToString(vOffsetShape);
+            const std::string vOffsetReasonMsg =
+                "The first dim of v_offset must be Nv=" + std::to_string(numHeadV_) + " (head_nums[2])";
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "v_offset", vOffsetShapeMsg.c_str(),
+                                                  vOffsetReasonMsg.c_str());
+            return ge::GRAPH_FAILED;
+        }
+        if (vOffsetShape.GetDim(1) != qkvDim_) {
+            const std::string vOffsetShapeMsg = Ops::Base::ToString(vOffsetShape);
+            const std::string vOffsetReasonMsg =
+                "The second dim of v_offset must be Dqkv=" + std::to_string(qkvDim_) + " (qkv_size[3])";
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "v_offset", vOffsetShapeMsg.c_str(),
+                                                  vOffsetReasonMsg.c_str());
+            return ge::GRAPH_FAILED;
+        }
         auto vOffsetDesc = context_->GetOptionalInputDesc(V_OFFSET_IDX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, vOffsetDesc);
         auto vOffsetDtype = vOffsetDesc->GetDataType();
@@ -306,6 +362,18 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::GetShapeAttrsInfoInner()
     OP_CHECK_IF(batchSize_ <= 0 || seqLength_ <= 0 || numHead_ <= 0 || qkvDim_ <= 0,
                 OP_LOGE(context_->GetNodeName(), "Check qkv_size failed, the value of qkv_size must > 0."),
                 return ge::GRAPH_FAILED);
+    // int64 上界保护:下文要算 B*S(qkv/q_out 形状校验、切核)与 N*D(缓存形状校验),
+    // 单维限制在 INT32_MAX 内即可保证这些乘积不溢出 int64(2^62 量级以内)。
+    constexpr int64_t DIM_VALUE_UPPER_BOUND = 2147483647LL; // INT32_MAX
+    OP_CHECK_IF(
+        batchSize_ > DIM_VALUE_UPPER_BOUND || seqLength_ > DIM_VALUE_UPPER_BOUND || numHead_ > DIM_VALUE_UPPER_BOUND ||
+            qkvDim_ > DIM_VALUE_UPPER_BOUND,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "qkv_size",
+                                              (std::to_string(batchSize_) + "," + std::to_string(seqLength_) + "," +
+                                               std::to_string(numHead_) + "," + std::to_string(qkvDim_))
+                                                  .c_str(),
+                                              "each dim of qkv_size must be <= INT32_MAX to avoid int64 overflow"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(qkvDim_ != 128, OP_LOGE(context_->GetNodeName(), "Dqkv must be 128."), return ge::GRAPH_FAILED);
     reciprocal_ = 1.0 / static_cast<float>(qkvDim_);
     auto headNumsPtr = attrs->GetListInt(HEAD_NUMS_IDX); // 获取Nq、Nk、Nv
@@ -319,6 +387,14 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::GetShapeAttrsInfoInner()
     OP_CHECK_IF(numHeadQ_ <= 0 || numHeadK_ <= 0 || numHeadV_ <= 0,
                 OP_LOGE(context_->GetNodeName(), "Check headNums failed, the value of headNums must > 0."),
                 return ge::GRAPH_FAILED);
+    // 与 qkv_size 同口径:Nk/Nv 会与 Dqkv 相乘(缓存形状校验),先限上界防溢出。
+    OP_CHECK_IF(
+        numHeadQ_ > DIM_VALUE_UPPER_BOUND || numHeadK_ > DIM_VALUE_UPPER_BOUND || numHeadV_ > DIM_VALUE_UPPER_BOUND,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context_->GetNodeName(), "headNums",
+            (std::to_string(numHeadQ_) + "," + std::to_string(numHeadK_) + "," + std::to_string(numHeadV_)).c_str(),
+            "each head num must be <= INT32_MAX to avoid int64 overflow"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(numHead_ != numHeadQ_ + numHeadK_ + numHeadV_,
                 OP_LOGE(context_->GetNodeName(), "Check headNums failed, N is not equal to Nq + Nk + Nv."),
                 return ge::GRAPH_FAILED);
@@ -420,9 +496,14 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CalUbTiling()
     const int64_t vCacheBytes = (isVQuant_ != 0) ? INT8_BYTES : qkvBytes;
     const int64_t dimBytes = qkvDim_;
 
-    // 与 token 数无关的常驻 buffer:gamma(q_gamma + k_gamma)+ 量化因子(scale/offset × K/V)
+    // 与 token 数无关的常驻 buffer:gamma(q_gamma + k_gamma)+ 量化因子(scale/offset)
     gammaUbBytes_ = 2 * dimBytes * qkvBytes;
-    quantUbBytes_ = 2 * (numHeadK_ + numHeadV_) * dimBytes * FLOAT32_BYTES;
+    // scale/offset 只在对应 cache 为 int8 时存在:非 int8 的一侧内核按编译期 trait
+    // (IsSameType<T_*_CACHE, int8_t>) 根本不搬,这里也必须不记账。
+    // 曾经无条件按 k/v 两侧各 scale+offset 预留 2*(Nk+Nv)*D*4,对两侧都不量化的形态白留
+    // 26624 B —— 实测 L1_167(bf16 k/v)仅因此差 1024 B 就把唯一的 token 预算顶成 ubFactor=0。
+    quantUbBytes_ =
+        2 * ((isKQuant_ != 0 ? numHeadK_ : 0) + (isVQuant_ != 0 ? numHeadV_ : 0)) * dimBytes * FLOAT32_BYTES;
 
     // 每个 token 占用的 UB(与 arch35 内核的 buffer 布局一一对应)
     // 单 token 的各个 buffer 字节数也在这里一次算准,随 tiling 下发给内核,内核不重算
@@ -437,13 +518,18 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CalUbTiling()
     // 撑爆 UB,报 VEC_ERROR(实测 ubFactor=40 的 fp16 形态必挂,39 及以下正常)。
     int64_t perTokenBytes = numHead_ * dimBytes * qkvBytes; // x(整行 qkv)
     cosSinUbBytes_ = dimBytes * qkvBytes;                   // cos(或 sin)单份
-    qOutUbBytes_ = numHeadQ_ * dimBytes * qkvBytes;         // q_out / q_out_before_quant
-    kProtoUbBytes_ = numHeadK_ * dimBytes * qkvBytes;       // k_out_before_quant
-    vProtoUbBytes_ = numHeadV_ * dimBytes * qkvBytes;       // v_out_before_quant
-    kCacheUbBytes_ = numHeadK_ * dimBytes * kCacheBytes;    // k_cache 散射源
-    vCacheUbBytes_ = numHeadV_ * dimBytes * vCacheBytes;    // v_cache 散射源
-    perTokenBytes +=
-        2 * cosSinUbBytes_ + qOutUbBytes_ + kProtoUbBytes_ + vProtoUbBytes_ + kCacheUbBytes_ + vCacheUbBytes_;
+    // q_out 不再单独占一块 UB:内核对每个 head 行做完 RmsNorm+RoPE 后**就地写回输入行
+    // 的 q 段**(x 行布局 [Q | K | V],q 段恰好与 ND 的 q_out 行同构),CopyOut 再按
+    // tokenStride_ 跨行搬出。数据依赖已核:q 段写回时,同一行 K/V 段尚未读,且两段地址
+    // 不重叠([0,Nq*D) vs [Nq*D,N*D)),行内又是"先全读进寄存器、后写回",无读后写风险。
+    // 省下 Nq*D*qkvBytes —— Nq≫Nk 的形态(L1_569:Nq=464/Nk=16)靠这一条才进得了 UB。
+    // *_out_before_quant 只有 is_output_qkv=true 时才有下游消费者:false 时内核连 ND 都不写
+    // (WriteNd=false),这里不能白留 Nk/Nv 行 —— L1_569 就是被这 8192 B 压过临界线。
+    kProtoUbBytes_ = (isOutputQkv_ != 0) ? numHeadK_ * dimBytes * qkvBytes : 0; // k_out_before_quant
+    vProtoUbBytes_ = (isOutputQkv_ != 0) ? numHeadV_ * dimBytes * qkvBytes : 0; // v_out_before_quant
+    kCacheUbBytes_ = numHeadK_ * dimBytes * kCacheBytes;                        // k_cache 散射源
+    vCacheUbBytes_ = numHeadV_ * dimBytes * vCacheBytes;                        // v_cache 散射源
+    perTokenBytes += 2 * cosSinUbBytes_ + kProtoUbBytes_ + vProtoUbBytes_ + kCacheUbBytes_ + vCacheUbBytes_;
 
     const int64_t fixedBytes = gammaUbBytes_ + quantUbBytes_;
     const int64_t available = static_cast<int64_t>(ubSize_) - UB_RESERVED_BYTES - fixedBytes;
@@ -471,7 +557,6 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CalUbTiling()
     }
     inUbBytes_ = ubFactor_ * numHead_ * dimBytes * qkvBytes;
     cosSinUbBytes_ *= ubFactor_;
-    qOutUbBytes_ *= ubFactor_;
     kProtoUbBytes_ *= ubFactor_;
     vProtoUbBytes_ *= ubFactor_;
     kCacheUbBytes_ *= ubFactor_;
@@ -509,6 +594,9 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckCosSinExact()
 
 ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::DoOpTiling()
 {
+    OP_CHECK_IF(coreNum_ == 0 || ubSize_ == 0,
+                OP_LOGE(context_->GetNodeName(), "coreNum and ubSize got from platform must be greater than 0"),
+                return ge::GRAPH_FAILED);
     // A5 私有校验入口(实现见本文件上半部分)
     OP_CHECK_IF(GetShapeAttrsInfoInner() == ge::GRAPH_FAILED,
                 OP_LOGE(context_->GetNodeName(), "GetShapeAttrsInfoInner failed."), return ge::GRAPH_FAILED);
@@ -538,7 +626,6 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::DoOpTiling()
     tilingData_.set_reciprocal(reciprocal_);
     tilingData_.set_inUbBytes(inUbBytes_);
     tilingData_.set_cosSinUbBytes(cosSinUbBytes_);
-    tilingData_.set_qOutUbBytes(qOutUbBytes_);
     tilingData_.set_kProtoUbBytes(kProtoUbBytes_);
     tilingData_.set_vProtoUbBytes(vProtoUbBytes_);
     tilingData_.set_kCacheUbBytes(kCacheUbBytes_);

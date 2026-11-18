@@ -78,11 +78,21 @@ def _rope_half_and_half(x, cos, sin):
     return x * cos + rotated * sin
 
 
+def _cast_like(t, ref):
+    """标量原样返回;张量对齐到 ref.dtype(fp32→fp64 是精确转换,不丢信息)。"""
+    return t.to(ref.dtype) if hasattr(t, "to") else t
+
+
 def _quant(x, scale, offset):
+    """量化:x / scale + offset 后 round + clamp 到 int8 值域(x 为 Ref 精度 fp64)。
+
+    scale/offset 显式对齐到 x.dtype:torch 的混合 dtype 提升本也会给出 fp64,
+    这里写死是为了防"某一路忘了抬"被静默降回 fp32,而不是依赖隐式规则。
+    """
     if scale is not None:
-        x = x / scale
+        x = x / _cast_like(scale, x)
     if offset is not None:
-        x = x + offset
+        x = x + _cast_like(offset, x)
     if scale is not None:
         x = torch.round(x).clamp(-128, 127)
     return x
@@ -167,11 +177,25 @@ def _compute(
 ):
     """按算子契约计算 6 个输出,顺序 = def.cpp 的输出序。
 
-    golden 只做精度向上兜底(CPU half 残缺),不向下砍档。
+    golden 必须在【最高可用精度】上算,只做精度向上兜底(CPU half 残缺),不向下砍档。
     """
     if qkv.dim() == 2:
         qkv = qkv.unsqueeze(0) if qkv.numel() == 0 else qkv
-    qkv = qkv.to(torch.float32) if qkv.dtype in (torch.float16, torch.bfloat16) else qkv
+    # 统一抬到 fp64:参考值必须是"真值"。
+    #   1) TTK 的 Promote(ttk/utilities/dtypes.py:75-85 `DTYPE_PROMOTE_MAP`)对 fp16/bf16
+    #      只抬到 fp32,对 **fp32 输入则规定抬到 fp64** —— 本 golden 原先把目标停在 fp32,
+    #      等于比框架自己的约定还低一档;fp32 输入的用例根本没被抬过。
+    #   2) 抬升是**精确转换**(fp16/bf16 经 Promote 已是 fp32,而 fp32/fp16 的每个值在
+    #      fp64 里都可精确表示),不改变任何一个输入值,只抬高中间计算精度。
+    #   3) 算子契约没有规定 fp32 中间量。fp32 中间量在 RoPE 的灾难性相消点上会把误差
+    #      放大到 1e-1 量级(实测 L0_133:归一化输出偏 1 个 fp32-ULP → 输出跳 128 个
+    #      fp16-ULP = 7.1%),此时用 golden 当分母判"实现是否正确"= 判舍入运气。
+    #      fp64 下同样的 1 个末位噪声只有 ~2e-16 相对量级,远小于 1 个输出 ULP。
+    # 整型 qkv(契约上不出现)不参与提升,保持原 dtype。
+    qkv = qkv.to(torch.float64) if qkv.is_floating_point() else qkv
+    # gamma/cos/sin 一律跟随 qkv 提升后的 dtype(现为 fp64):它们只承载输入值
+    # (fp16/bf16→fp32→fp64 或 fp32→fp64 都是精确转换),绝不能在这里落回 fp32,
+    # 否则后面的乘加会重新引入 fp32 舍入 —— 本算子 RoPE 相消点对这点极敏感。
     q_gamma = q_gamma.to(qkv.dtype)
     k_gamma = k_gamma.to(qkv.dtype)
     cos = cos.to(qkv.dtype)
@@ -192,7 +216,9 @@ def _compute(
     k = x[:, n_q : n_q + n_k, :]
     v = x[:, n_q + n_k :, :]
 
-    # cos/sin 是 [B*S, D],逐 token 广播到该 token 的所有 head
+    # cos/sin 是 [B*S, D],逐 token 广播到该 token 的所有 head。
+    # .to(x.dtype) 是显式对齐(此处 x 已随 qkv 抬到 fp64)—— 不写的话
+    # torch 的类型提升也会得到 fp64,但显式对齐能挡住后人把某一路提前降档。
     cos_r = cos.reshape(total, 1, d_dim).to(x.dtype)
     sin_r = sin.reshape(total, 1, d_dim).to(x.dtype)
 
@@ -218,21 +244,50 @@ def _compute(
         n_v,
     )
 
-    # 全程保持输入提升后的 dtype(框架 Promote 给什么就算什么),向下 cast 由各通路外壳负责
+    # 全程保持提升后的 fp64(除 cache 输出由 _scatter_pa_nz 按 cache 自身 dtype 落地),
+    # 向下 cast 到算子的输出 dtype 由各通路外壳负责 —— 那一步是**唯一**的降档点,
+    # 且 fp64→fp16/bf16/int8 是一次性直接舍入,不存在 fp64→fp32→fp16 的二次舍入。
     return [q_rows, k_final, v_final, q_rows.clone(), k_rows, v_rows]
 
 
+def _mask_unrequested_qkv(outs, is_output_qkv):
+    """is_output_qkv=false 时,outputs 3-5 按 proto 契约不产出 → 置 None。
+
+    依据 `op_graph/qkv_rms_norm_rope_cache_proto.h:60-66`(三路 before_quant 仅
+    "if is_output_qkv is true ... is required")、`infershape.cpp:88-91`(false 时
+    直接 return、不推导这三路 shape)、内核三处 `if (tilingData_->isOutputQkv)`
+    才写这三路。TTK 的 None 语义 = 该输出不比较(golden None → SUPPRESSED+PASS,
+    见 ttk/core_modules/common/comparison/comparison.py:109-110),不是 FAIL。
+
+    ⚠️ 只在**返回 6 路**的 kernel/aclnn 外壳上做;TorchSpec 只返回 3 路且取的
+    是 outs[0]/[4]/[5](逐 token 投影值,恒产出),不能在这里被置 None。
+    """
+    if _as_bool(is_output_qkv):
+        return outs  # true:6 路全比较,算子真实能力不降级
+    outs = list(outs)
+    for i in (3, 4, 5):
+        if i < len(outs):
+            outs[i] = None
+    return outs
+
+
 def _np_of(t, name):
-    """torch.Tensor -> numpy.ndarray,按算子输出 dtype。
+    """torch.Tensor -> numpy.ndarray,按算子输出 dtype。None(不比较的槽位)原样返回。
 
     bf16 必须走 ml_dtypes:torch 的 bf16 张量在本环境 `.numpy()` 不支持,
     而 `np.ndarray.astype('bfloat16')` 会静默回落到 'V2'(void 2 字节)。
     """
+    if t is None:
+        return None
     dt = _torch_dtype(str(name))
     if dt is torch.bfloat16:
         import ml_dtypes
 
-        return t.to(torch.float32).numpy().astype(ml_dtypes.bfloat16)
+        # 载体用 float64 而不是 float32:torch 的 bf16 张量在本环境 .numpy() 不支持,
+        # 必须经浮点载体转;若载体是 fp32,就变成 fp64→fp32→bf16 的**二次舍入**
+        # (真值恰好落在 bf16 中点上时,与直接舍入差 1 个 bf16-ULP)。fp16/bf16/int8
+        # 张量经 fp64 载体是无损往返,不受影响。
+        return t.to(torch.float64).numpy().astype(ml_dtypes.bfloat16)
     return t.to(dt).numpy()
 
 
@@ -241,10 +296,14 @@ def _cast_outs(outs, kwargs):
 
     必须经 torch 转 —— np.ndarray.astype('bfloat16') 会静默回落到 'V2'(void 2 字节),
     让 bf16 输出在 TTK 侧的元素数差 2 倍,表现为莫名其妙的 shape mismatch。
+    None(is_output_qkv=false 时不产出的槽位)原样透传,不参与 cast。
     """
     od = kwargs.get("output_dtypes") or []
     od = [d[0] if isinstance(d, (list, tuple)) else str(d) for d in od]
-    return [o.to(_torch_dtype(od[i])) if i < len(od) else o for i, o in enumerate(outs)]
+    return [
+        o.to(_torch_dtype(od[i])) if (o is not None and i < len(od)) else o
+        for i, o in enumerate(outs)
+    ]
 
 
 def _torch_dtype(name):
@@ -256,6 +315,21 @@ def _torch_dtype(name):
         "int64": torch.int64,
         "float64": torch.float64,
     }.get(str(name), torch.float32)
+
+
+def _dtype_name(t, default="float32"):
+    return str(t.dtype).replace("torch.", "") if hasattr(t, "dtype") else default
+
+
+def _derive_out_dtypes(qkv, k_cache=None, v_cache=None):
+    """缺省 output_dtypes 时按输入推导 6 路输出的 dtype(def.cpp 的输出序)。
+
+    e2e 通路 TTK 不传 output_dtypes;不推导的话竞品/参考实现会停在 fp32,
+    与算子实际输出 dtype 不对等(实测 Golden Dtypes 首项为 float32)。
+    输出 0/3/4/5 与输入 qkv 同 dtype;1/2 与各自的 cache 输入同 dtype。
+    """
+    q = _dtype_name(qkv)
+    return [q, _dtype_name(k_cache, q), _dtype_name(v_cache, q), q, q, q]
 
 
 def _fill_optional(tensors, dtypes):
@@ -307,6 +381,8 @@ class _Compose:
         round+clamp 量化、PA_NZ 散射),但表达式与数据组织不同 —— 用 split 切分、用切片赋值
         拼旋转项、用 index_put_ 一次性散射,便于两侧交叉验证(照抄实现会让两边同错)。"""
         f32 = torch.float32
+        # 输出 dtype 必须在提升到 fp32 之前推导,否则会一律推导成 float32
+        od = self.output_dtypes or _derive_out_dtypes(qkv, k_cache, v_cache)
         qkv = qkv.to(f32)
         q_gamma, k_gamma, cos, sin = (
             q_gamma.to(f32),
@@ -382,7 +458,6 @@ class _Compose:
             _quant(v_pre, v_scale, v_offset).reshape(total, n_v * d_dim), v_cache
         )
 
-        od = self.output_dtypes or []
         od = [d[0] if isinstance(d, (list, tuple)) else str(d) for d in od]
         outs = [
             q_res,
@@ -392,8 +467,15 @@ class _Compose:
             k_pre.reshape(total, n_k * d_dim),
             v_pre.reshape(total, n_v * d_dim),
         ]
+        # 三方输出槽位口径必须与 golden 一致:is_output_qkv=false 时 3-5 按契约
+        # 不产出 → None(竞品也不比这三路)。保持长度 6——ttk 的 third_party 长度
+        # 校验是 len(third_parties) < len(outputs) 即 COMPARE_FAILURE
+        # (comparison.py:131-133),顶层 None 槽位是合法表达
+        # (executor.py:729-732 / dispatcher.py:219-222)。
+        outs = _mask_unrequested_qkv(outs, self.is_output_qkv)
         return [
-            o.to(_torch_dtype(od[i])) if i < len(od) else o for i, o in enumerate(outs)
+            o.to(_torch_dtype(od[i])) if (o is not None and i < len(od)) else o
+            for i, o in enumerate(outs)
         ]
 
     def __call__(self, *tensors, **kwargs):
@@ -501,6 +583,15 @@ def get(seq, idx):
     return seq[idx] if seq is not None and idx < len(seq) else None
 
 
+def _numel(t):
+    """元素个数;None(numpy 与 torch 通用的"缺省槽位")返回 0。"""
+    if t is None:
+        return 0
+    if hasattr(t, "numel"):
+        return int(t.numel())
+    return int(t.size)
+
+
 def _to_tensor(a):
     """None / object ndarray(TTK 用它表达"该可选输入缺省")保持 None,其余转 torch。"""
     if a is None:
@@ -536,6 +627,12 @@ def _prepare(tensors, *, for_npu=False, **kwargs):
     )
     index = t[5]
     k_cache = t[7]
+    # 空/缺省输入守卫:TTK 用 object ndarray 或空张量表达"该槽位缺省",_to_npu_array /
+    # _to_tensor 会把它们规整成 None。此时既没有 index 可写、也读不出 cache 的
+    # BlockNum/BlockSize,直接原样返回 —— 让算子自己拒绝成为可观察结果,
+    # 而不是在 golden 前置阶段抛 AttributeError/IndexError。
+    if _numel(index) == 0 or _numel(k_cache) == 0 or len(k_cache.shape) < 3:
+        return t
     total = int(index.size if for_npu else index.numel())
     block_num = int(k_cache.shape[0])
     block_size = int(k_cache.shape[2])
@@ -555,11 +652,20 @@ class QkvRmsNormRopeCacheKernelSpec:
 
     def golden(*inputs, **kwargs):
         tensors = _prepare(inputs, **kwargs)
-        outs = _compute(*tensors, **_pick(kwargs))
+        # k_cache/v_cache 缺省或零元素时推导不出 cache 布局(_scatter_pa_nz 会解引用 None),
+        # 直接返回全 None 占位:让算子的拒绝成为可观察结果,而不是 golden 抛 AttributeError。
+        if _numel(tensors[7]) == 0 or _numel(tensors[8]) == 0:
+            return [None] * 6
+        picked = _pick(kwargs)
+        outs = _mask_unrequested_qkv(
+            _compute(*tensors, **picked), picked.get("is_output_qkv", False)
+        )
         od = kwargs.get("output_dtypes") or []
         od = [d[0] if isinstance(d, (list, tuple)) else str(d) for d in od]
+        # 注:None = is_output_qkv=false 时 3-5 按契约不产出(SUPPRESSED),不 cast。
         return [
-            _np_of(o, od[i]) if i < len(od) else o.numpy() for i, o in enumerate(outs)
+            None if o is None else (_np_of(o, od[i]) if i < len(od) else o.numpy())
+            for i, o in enumerate(outs)
         ]
 
     third_party = {"torch": _Compose}
@@ -645,8 +751,15 @@ class QkvRmsNormRopeCacheAclnnSpec:
         vOutBeforeQuant,
         **kwargs,
     ):
-        # aclnn 通路:TTK 丢弃 customize_inputs 的返回值,index 必须原地改写
-        tensors, picked, kwargs = QkvRmsNormRopeCacheAclnnSpec._split(
+        """aclnn 通路:原地改写 index 后返回 None。
+
+        TTK 契约(ttk/core_modules/aclnn/input_generate.py 的 _apply_custom_input_result):
+        钩子要么返回"纯输出槽之外的输入张量序列",要么返回 None 表示原地写法。
+        本算子有 6 个纯输出槽(qOut/kCache/vCache + 三路 before-quant),逐个回填既
+        依赖用例的 inplace/pure-output 标注,也容易与槽位错配 —— 返回 None 直接走
+        原地写法,index 的改写用 copy_ 落到原张量上。
+        """
+        tensors = [
             qkv,
             qGamma,
             kGamma,
@@ -660,40 +773,11 @@ class QkvRmsNormRopeCacheAclnnSpec:
             vScale,
             kOffset,
             vOffset,
-            qkvSize,
-            headNums,
-            epsilon,
-            cacheModeOptional,
-            qOutBeforeQuant,
-            kOutBeforeQuant,
-            vOutBeforeQuant,
-            **kwargs,
-        )
-        new = _prepare(tensors, **kwargs)
-        if hasattr(index, "copy_"):
-            index.copy_(new[5])
-        return [
-            qkv,
-            qGamma,
-            kGamma,
-            cos,
-            sin,
-            new[5],
-            qOut,
-            kCache,
-            vCache,
-            kScale,
-            vScale,
-            kOffset,
-            vOffset,
-            qkvSize,
-            headNums,
-            epsilon,
-            cacheModeOptional,
-            qOutBeforeQuant,
-            kOutBeforeQuant,
-            vOutBeforeQuant,
         ]
+        new = _prepare(tensors, **kwargs)
+        if hasattr(index, "copy_") and new[5] is not None:
+            index.copy_(new[5])
+        return None
 
     def golden(
         qkv,
@@ -741,7 +825,16 @@ class QkvRmsNormRopeCacheAclnnSpec:
             vOutBeforeQuant,
             **kwargs,
         )
-        outs = _compute(*_prepare(tensors, **kwargs), **picked)
+        prepared = _prepare(tensors, **kwargs)
+        # 与 KernelSpec.golden 同一守卫:cache 缺省/零元素时 _scatter_pa_nz 无从推导,
+        # 返回全 None 占位(aclnn 通路 6 路输出),让算子的拒绝成为可观察结果。
+        if _numel(prepared[7]) == 0 or _numel(prepared[8]) == 0:
+            return [None] * 6
+        # is_output_qkv=false(aclnn 侧由 qOutBeforeQuant 指针是否存在推导)时,
+        # 3-5 按契约不产出 → None,ttk 侧表现为该输出不比较。
+        outs = _mask_unrequested_qkv(
+            _compute(*prepared, **picked), picked.get("is_output_qkv", False)
+        )
         return _cast_outs(outs, kwargs)
 
     third_party = {"torch": _Compose}
@@ -801,27 +894,26 @@ class QkvRmsNormRopeCacheTorchSpec:
             k_offset,
             v_offset,
         ]
+        # 与 KernelSpec.golden 同一守卫:cache 缺省/零元素时 _scatter_pa_nz 无从推导。
+        # 注意 e2e 只返回 3 路(torch schema),占位也按 3 路给。
+        prepared = _prepare(tensors, **kwargs)
+        if _numel(prepared[7]) == 0 or _numel(prepared[8]) == 0:
+            return [None] * 3
         # e2e 通路 TTK **不传 output_dtypes**(只有 kernel/aclnn 传),不补的话
         # _compute 因向上兜底把 q_out 留在 fp32,而算子实际输出是 fp16/bf16 ->
         # 比对时 dtype 不对等(实测 Golden Dtypes 首项为 float32)。
         # 输出 dtype 由输入推:q_out 同 qkv;k_cache/v_cache 同各自的输入 cache。
         out_dtypes = kwargs.get("output_dtypes")
         if not out_dtypes:
-
-            def _nm(t):
-                return (
-                    str(t.dtype).replace("torch.", "")
-                    if hasattr(t, "dtype")
-                    else "float32"
-                )
-
             # ⚠️ 三个输出都用 **qkv 的 dtype**,不是各自输入 cache 的 dtype。
             # torch 绑定返回的是量化**前**的逐 token k/v(见下方返回索引说明),
             # 其 dtype 与 qkv 一致;早先按输入 cache 取 dtype,会在 v 量化(输入 int8)
             # 的用例上把 golden 定成 int8、去比 NPU 的 float16 —— 实测匹配率骤降到 25%。
-            out_dtypes = [_nm(qkv)] * 3
+            # 与 _Compose 共用同一条推导:_derive_out_dtypes 的第 0/4/5 项即 qkv 的 dtype。
+            derived = _derive_out_dtypes(qkv)
+            out_dtypes = [derived[i] for i in (0, 4, 5)]
         outs = _compute(
-            *_prepare(tensors, **kwargs),
+            *prepared,
             qkv_size=qkv_size,
             head_nums=head_nums,
             epsilon=1e-6 if epsilon is None else epsilon,

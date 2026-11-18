@@ -132,8 +132,8 @@ __aicore__ inline void QuantTwoVl(Reg::RegTensor<float>& low, Reg::RegTensor<flo
 template <typename T_QKV, typename T_CACHE, bool WRITE_CACHE>
 __aicore__ inline void VfNormRopeRow(__ubuf__ T_QKV* xRow, __ubuf__ T_QKV* cosRow, __ubuf__ T_QKV* sinRow,
                                      __ubuf__ T_QKV* gammaRow, float reciprocal, float epsilon, __ubuf__ T_QKV* ndRow,
-                                     __ubuf__ T_CACHE* cacheRow, __ubuf__ float* scaleRow, __ubuf__ float* offsetRow,
-                                     bool hasOffset, int64_t headIdx)
+                                     bool writeNd, __ubuf__ T_CACHE* cacheRow, __ubuf__ float* scaleRow,
+                                     __ubuf__ float* offsetRow, bool hasOffset, int64_t headIdx)
 {
     __VEC_SCOPE__
     {
@@ -173,8 +173,12 @@ __aicore__ inline void VfNormRopeRow(__ubuf__ T_QKV* xRow, __ubuf__ T_QKV* cosRo
         Reg::MulAddDst(outHigh, xLow, sinHigh, pFull);
 
         // ---- 量化前的值(ND 输出:q_out / k_out_before_quant) ----
-        StoreTensorForDtypeTOut<T_QKV>(ndRow, outLow, pFull, 0);
-        StoreTensorForDtypeTOut<T_QKV>(ndRow, outHigh, pFull, static_cast<uint32_t>(REGBASE_VL_FP32));
+        // is_output_qkv=false 时 k 的 before_quant 无人消费,host 也不下发该 buffer,
+        // 这里必须整段跳过(否则 ndRow 是空指针且越界写)
+        if (writeNd) {
+            StoreTensorForDtypeTOut<T_QKV>(ndRow, outLow, pFull, 0);
+            StoreTensorForDtypeTOut<T_QKV>(ndRow, outHigh, pFull, static_cast<uint32_t>(REGBASE_VL_FP32));
+        }
 
         // ---- cache 输出 ----
         if constexpr (WRITE_CACHE) {
@@ -197,7 +201,7 @@ __aicore__ inline void VfNormRopeRow(__ubuf__ T_QKV* xRow, __ubuf__ T_QKV* cosRo
 // VF:V 分支(不做 RmsNorm / RoPE,可选量化)
 // ---------------------------------------------------------------------------
 template <typename T_QKV, typename T_CACHE>
-__aicore__ inline void VfQuantRow(__ubuf__ T_QKV* xRow, __ubuf__ T_QKV* ndRow, __ubuf__ T_CACHE* cacheRow,
+__aicore__ inline void VfQuantRow(__ubuf__ T_QKV* xRow, __ubuf__ T_QKV* ndRow, bool writeNd, __ubuf__ T_CACHE* cacheRow,
                                   __ubuf__ float* scaleRow, __ubuf__ float* offsetRow, bool hasOffset, int64_t headIdx)
 {
     __VEC_SCOPE__
@@ -207,9 +211,11 @@ __aicore__ inline void VfQuantRow(__ubuf__ T_QKV* xRow, __ubuf__ T_QKV* ndRow, _
         LoadTensorForDtypeT<T_QKV>(xRow, xLow, pFull, 0);
         LoadTensorForDtypeT<T_QKV>(xRow, xHigh, pFull, static_cast<uint32_t>(REGBASE_VL_FP32));
 
-        // 量化前的值(ND 输出:v_out_before_quant)
-        StoreTensorForDtypeTOut<T_QKV>(ndRow, xLow, pFull, 0);
-        StoreTensorForDtypeTOut<T_QKV>(ndRow, xHigh, pFull, static_cast<uint32_t>(REGBASE_VL_FP32));
+        // 量化前的值(ND 输出:v_out_before_quant);is_output_qkv=false 时无人消费、buffer 不存在
+        if (writeNd) {
+            StoreTensorForDtypeTOut<T_QKV>(ndRow, xLow, pFull, 0);
+            StoreTensorForDtypeTOut<T_QKV>(ndRow, xHigh, pFull, static_cast<uint32_t>(REGBASE_VL_FP32));
+        }
 
         if constexpr (IsSameType<T_CACHE, int8_t>::value) {
             QuantTwoVl(xLow, xHigh, scaleRow, offsetRow, headIdx, hasOffset, pFull);
@@ -281,7 +287,6 @@ private:
         tokenStride_ = numHead_ * qkvDim_;
         inUbBytes_ = tiling_->inUbBytes;
         cosSinUbBytes_ = tiling_->cosSinUbBytes;
-        qOutUbBytes_ = tiling_->qOutUbBytes;
         kProtoUbBytes_ = tiling_->kProtoUbBytes;
         vProtoUbBytes_ = tiling_->vProtoUbBytes;
         kCacheUbBytes_ = tiling_->kCacheUbBytes;
@@ -362,13 +367,38 @@ private:
         pipe_->InitBuffer(inQueueX_, 1, inUbBytes_);
         pipe_->InitBuffer(inQueueCos_, 1, cosSinUbBytes_);
         pipe_->InitBuffer(inQueueSin_, 1, cosSinUbBytes_);
-        pipe_->InitBuffer(outQueueQ_, 1, qOutUbBytes_);
-        pipe_->InitBuffer(outQueueKProto_, 1, kProtoUbBytes_);
-        pipe_->InitBuffer(outQueueVProto_, 1, vProtoUbBytes_);
+        // q_out 就地写回 inQueueX_ 的 q 段,不再单独分配 outQueueQ_
+        // host 在 is_output_qkv=false 时下发 0 字节:kProto/vProto 的 queue 不初始化、不使用
+        if (kProtoUbBytes_ > 0) {
+            pipe_->InitBuffer(outQueueKProto_, 1, kProtoUbBytes_);
+        }
+        if (vProtoUbBytes_ > 0) {
+            pipe_->InitBuffer(outQueueVProto_, 1, vProtoUbBytes_);
+        }
         pipe_->InitBuffer(outQueueK_, 1, kCacheUbBytes_);
         pipe_->InitBuffer(outQueueV_, 1, vCacheUbBytes_);
         pipe_->InitBuffer(gammaBuf_, gammaUbBytes_);
-        pipe_->InitBuffer(quantBuf_, quantUbBytes_);
+        // 两侧 cache 都不量化时 host 下发 0 字节:不分配 0 长度 buffer,量化通路整体不走
+        if (quantUbBytes_ > 0) {
+            pipe_->InitBuffer(quantBuf_, quantUbBytes_);
+        }
+    }
+
+    // quantBuf 的紧凑布局:[k_scale | k_offset | v_scale | v_offset],
+    // 只有对应 cache 为 int8 的一侧才占位(与 host quantUbBytes_ 的记账严格一致)。
+    __aicore__ inline void GetQuantLayout(int64_t& kOffsetIdx, int64_t& vScaleIdx, int64_t& vOffsetIdx) const
+    {
+        int64_t kScaleSpan = 0;
+        int64_t vScaleSpan = 0;
+        if constexpr (IsSameType<T_K_CACHE, int8_t>::value) {
+            kScaleSpan = numHeadK_ * qkvDim_;
+        }
+        if constexpr (IsSameType<T_V_CACHE, int8_t>::value) {
+            vScaleSpan = numHeadV_ * qkvDim_;
+        }
+        kOffsetIdx = kScaleSpan;             // k_scale 之后
+        vScaleIdx = 2 * kScaleSpan;          // k_scale + k_offset 之后
+        vOffsetIdx = vScaleIdx + vScaleSpan; // 再跳过 v_scale
     }
 
     // q_gamma / k_gamma 每核只搬一次,常驻 UB
@@ -390,6 +420,10 @@ private:
     // 每个 tile 搬一次量化因子:k_scale / k_offset / v_scale / v_offset,全 head 连续
     __aicore__ inline void LoadQuantFactors()
     {
+        // 两侧 cache 都不量化:quantBuf_ 未分配(0 字节),没有可搬的因子
+        if constexpr (!IsSameType<T_K_CACHE, int8_t>::value && !IsSameType<T_V_CACHE, int8_t>::value) {
+            return;
+        }
         LocalTensor<float> quant = quantBuf_.Get<float>();
         DataCopyExtParams copyParams;
         copyParams.blockCount = 1;
@@ -397,11 +431,12 @@ private:
         copyParams.dstStride = 0;
         copyParams.rsv = 0;
         DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
-        // 偏移必须与 Compute 里 kOffsetIdx/vScaleIdx/vOffsetIdx 的固定布局一致:
-        // 即使某一档不量化(该块不搬),后面的块也不得前移。
-        const int64_t kOffsetIdx = numHeadK_ * qkvDim_;
-        const int64_t vScaleIdx = 2 * numHeadK_ * qkvDim_;
-        const int64_t vOffsetIdx = (2 * numHeadK_ + numHeadV_) * qkvDim_;
+        // 偏移必须与 Compute 里取指针的布局一致(GetQuantLayout):只有 int8 的一侧占位,
+        // 非量化的一侧不占位,后面的块也不得前移。
+        int64_t kOffsetIdx = 0;
+        int64_t vScaleIdx = 0;
+        int64_t vOffsetIdx = 0;
+        GetQuantLayout(kOffsetIdx, vScaleIdx, vOffsetIdx);
         if constexpr (IsSameType<T_K_CACHE, int8_t>::value) {
             copyParams.blockLen = static_cast<uint32_t>(numHeadK_ * qkvDim_ * sizeof(float));
             DataCopyPad(quant[0], kScaleGm_, copyParams, padParams);
@@ -451,9 +486,16 @@ private:
         LocalTensor<T_QKV> cos = inQueueCos_.DeQue<T_QKV>();
         LocalTensor<T_QKV> sin = inQueueSin_.DeQue<T_QKV>();
 
-        LocalTensor<T_QKV> qOut = outQueueQ_.AllocTensor<T_QKV>();
-        LocalTensor<T_QKV> kProto = outQueueKProto_.AllocTensor<T_QKV>();
-        LocalTensor<T_QKV> vProto = outQueueVProto_.AllocTensor<T_QKV>();
+        // q_out 就地写回 x 的 q 段,故 x 要留到 CopyOut 用完再 Free
+        xQOut_ = x;
+        // is_output_qkv=false 时 host 下发 0 字节、这两个 queue 未初始化:不分配、不写
+        LocalTensor<T_QKV> kProto;
+        LocalTensor<T_QKV> vProto;
+        const bool writeNd = isOutputQkv_ != 0;
+        if (writeNd) {
+            kProto = outQueueKProto_.AllocTensor<T_QKV>();
+            vProto = outQueueVProto_.AllocTensor<T_QKV>();
+        }
         LocalTensor<T_K_CACHE> kOut = outQueueK_.AllocTensor<T_K_CACHE>();
         LocalTensor<T_V_CACHE> vOut = outQueueV_.AllocTensor<T_V_CACHE>();
 
@@ -461,26 +503,37 @@ private:
         __ubuf__ T_QKV* cosBuf = (__ubuf__ T_QKV*)cos.GetPhyAddr();
         __ubuf__ T_QKV* sinBuf = (__ubuf__ T_QKV*)sin.GetPhyAddr();
         __ubuf__ T_QKV* gammaBuf = (__ubuf__ T_QKV*)gammaBuf_.Get<T_QKV>().GetPhyAddr();
-        __ubuf__ T_QKV* qOutBuf = (__ubuf__ T_QKV*)qOut.GetPhyAddr();
-        __ubuf__ T_QKV* kProtoBuf = (__ubuf__ T_QKV*)kProto.GetPhyAddr();
-        __ubuf__ T_QKV* vProtoBuf = (__ubuf__ T_QKV*)vProto.GetPhyAddr();
+        __ubuf__ T_QKV* kProtoBuf = writeNd ? (__ubuf__ T_QKV*)kProto.GetPhyAddr() : nullptr;
+        __ubuf__ T_QKV* vProtoBuf = writeNd ? (__ubuf__ T_QKV*)vProto.GetPhyAddr() : nullptr;
         __ubuf__ T_K_CACHE* kOutBuf = (__ubuf__ T_K_CACHE*)kOut.GetPhyAddr();
         __ubuf__ T_V_CACHE* vOutBuf = (__ubuf__ T_V_CACHE*)vOut.GetPhyAddr();
-        __ubuf__ float* quantBuf = (__ubuf__ float*)quantBuf_.Get<float>().GetPhyAddr();
 
-        // quantBuf 布局: [k_scale | k_offset | v_scale | v_offset]
-        const int64_t kOffsetIdx = numHeadK_ * qkvDim_;
-        const int64_t vScaleIdx = 2 * numHeadK_ * qkvDim_;
-        const int64_t vOffsetIdx = (2 * numHeadK_ + numHeadV_) * qkvDim_;
+        // quantBuf 紧凑布局: [k_scale | k_offset | v_scale | v_offset](只对 int8 的一侧占位)
+        __ubuf__ float* quantBuf = nullptr;
+        __ubuf__ float* kOffsetBuf = nullptr;
+        __ubuf__ float* vScaleBuf = nullptr;
+        __ubuf__ float* vOffsetBuf = nullptr;
+        if constexpr (IsSameType<T_K_CACHE, int8_t>::value || IsSameType<T_V_CACHE, int8_t>::value) {
+            int64_t kOffsetIdx = 0;
+            int64_t vScaleIdx = 0;
+            int64_t vOffsetIdx = 0;
+            GetQuantLayout(kOffsetIdx, vScaleIdx, vOffsetIdx);
+            quantBuf = (__ubuf__ float*)quantBuf_.Get<float>().GetPhyAddr();
+            kOffsetBuf = quantBuf + kOffsetIdx;
+            vScaleBuf = quantBuf + vScaleIdx;
+            vOffsetBuf = quantBuf + vOffsetIdx;
+        }
 
-        // ---- Q 分支: RmsNorm -> RoPE -> q_out(ND),q 不量化 ----
+        // ---- Q 分支: RmsNorm -> RoPE -> q_out(ND,就地写回 x 的 q 段),q 不量化 ----
+        // 依赖说明:本行 x 全部读进寄存器后才写回同一行(q 段 [h*D,(h+1)*D) ⊂ [0,Nq*D)),
+        // 后续 K/V 段读的是 [Nq*D, N*D),与 q 段不重叠 -> 无读后写交叉。
         for (int64_t h = 0; h < numHeadQ_; ++h) {
             for (int64_t t = 0; t < numTokens; ++t) {
-                const int64_t row = (t * numHeadQ_ + h) * qkvDim_;
+                const int64_t row = t * tokenStride_ + h * qkvDim_;
                 // gammaBuf 布局: [q_gamma | k_gamma]
-                VfNormRopeRow<T_QKV, T_QKV, false>(xBuf + t * tokenStride_ + h * qkvDim_, cosBuf + t * qkvDim_,
-                                                   sinBuf + t * qkvDim_, gammaBuf, reciprocal_, epsilon_, qOutBuf + row,
-                                                   (__ubuf__ T_QKV*)nullptr, nullptr, nullptr, false, 0);
+                VfNormRopeRow<T_QKV, T_QKV, false>(xBuf + row, cosBuf + t * qkvDim_, sinBuf + t * qkvDim_, gammaBuf,
+                                                   reciprocal_, epsilon_, xBuf + row, true, (__ubuf__ T_QKV*)nullptr,
+                                                   nullptr, nullptr, false, 0);
             }
         }
 
@@ -490,8 +543,8 @@ private:
                 const int64_t row = (t * numHeadK_ + h) * qkvDim_;
                 VfNormRopeRow<T_QKV, T_K_CACHE, true>(xBuf + t * tokenStride_ + (numHeadQ_ + h) * qkvDim_,
                                                       cosBuf + t * qkvDim_, sinBuf + t * qkvDim_, gammaBuf + qkvDim_,
-                                                      reciprocal_, epsilon_, kProtoBuf + row, kOutBuf + row, quantBuf,
-                                                      quantBuf + kOffsetIdx, hasOffsetK_, h);
+                                                      reciprocal_, epsilon_, writeNd ? kProtoBuf + row : nullptr,
+                                                      writeNd, kOutBuf + row, quantBuf, kOffsetBuf, hasOffsetK_, h);
             }
         }
 
@@ -500,53 +553,61 @@ private:
             for (int64_t t = 0; t < numTokens; ++t) {
                 const int64_t row = (t * numHeadV_ + h) * qkvDim_;
                 VfQuantRow<T_QKV, T_V_CACHE>(xBuf + t * tokenStride_ + (numHeadQ_ + numHeadK_ + h) * qkvDim_,
-                                             vProtoBuf + row, vOutBuf + row, quantBuf + vScaleIdx,
-                                             quantBuf + vOffsetIdx, hasOffsetV_, h);
+                                             writeNd ? vProtoBuf + row : nullptr, writeNd, vOutBuf + row, vScaleBuf,
+                                             vOffsetBuf, hasOffsetV_, h);
             }
         }
 
-        inQueueX_.FreeTensor(x);
+        // x 的 q 段被就地改写:先等 V 侧写完成,再做 CopyOut 的 MTE3 搬运
+        SetWaitFlag<HardEvent::V_MTE3>();
         inQueueCos_.FreeTensor(cos);
         inQueueSin_.FreeTensor(sin);
-        outQueueQ_.EnQue(qOut);
-        outQueueKProto_.EnQue(kProto);
-        outQueueVProto_.EnQue(vProto);
+        if (writeNd) {
+            outQueueKProto_.EnQue(kProto);
+            outQueueVProto_.EnQue(vProto);
+        }
         outQueueK_.EnQue(kOut);
         outQueueV_.EnQue(vOut);
     }
 
     __aicore__ inline void CopyOut(int64_t tokenStart, int64_t numTokens)
     {
-        LocalTensor<T_QKV> qOut = outQueueQ_.DeQue<T_QKV>();
         DataCopyExtParams copyParams;
         copyParams.blockCount = static_cast<uint16_t>(numTokens);
         copyParams.srcStride = 0;
         copyParams.dstStride = 0;
         copyParams.rsv = 0;
+        // q_out 在 x buffer 里按 tokenStride_ 跨行存放(每行只有前 Nq*D 是 q 结果):
+        // 一次带 srcStride 的搬出即可。块起点/块长/块间隔都是 256B 的整数倍,满足 32B 对齐。
         copyParams.blockLen = static_cast<uint32_t>(numHeadQ_ * qkvDim_ * sizeof(T_QKV));
-        DataCopyPad(qOutGm_[tokenStart * numHeadQ_ * qkvDim_], qOut, copyParams);
+        // UB 侧的 srcStride 单位是 32Byte(见 dav_3510 CopyUbufToGmAlignV2:srcStride*32+burstLength)
+        copyParams.srcStride =
+            static_cast<uint32_t>((tokenStride_ - numHeadQ_ * qkvDim_) * sizeof(T_QKV) / REGBASE_UB_BLOCK);
+        DataCopyPad(qOutGm_[tokenStart * numHeadQ_ * qkvDim_], xQOut_, copyParams);
         if (!qOutIsAliased_) {
-            DataCopyPad(qOutOutGm_[tokenStart * numHeadQ_ * qkvDim_], qOut, copyParams);
+            DataCopyPad(qOutOutGm_[tokenStart * numHeadQ_ * qkvDim_], xQOut_, copyParams);
         }
-        // q 不量化,q_out_before_quant 与 q_out 同值,同一份 UB 再写一路
+        // q 不量化,q_out_before_quant 与 q_out 同值,同一份数据再写一路
         if (isOutputQkv_ != 0) {
-            DataCopyPad(qOutProtoGm_[tokenStart * numHeadQ_ * qkvDim_], qOut, copyParams);
+            DataCopyPad(qOutProtoGm_[tokenStart * numHeadQ_ * qkvDim_], xQOut_, copyParams);
         }
-        outQueueQ_.FreeTensor(qOut);
+        // 以上 MTE3 读的是 inQueueX_ 的 buffer:读完之前下一轮 CopyIn(MTE2)不能覆盖它
+        SetWaitFlag<HardEvent::MTE3_MTE2>();
+        inQueueX_.FreeTensor(xQOut_);
 
-        LocalTensor<T_QKV> kProto = outQueueKProto_.DeQue<T_QKV>();
+        // is_output_qkv=false 时 host 下发 0 字节 buffer、Compute 也未 Alloc:整段跳过
         if (isOutputQkv_ != 0) {
+            copyParams.srcStride = 0; // k/v before_quant 是紧凑 buffer,不是跨行排布
+            LocalTensor<T_QKV> kProto = outQueueKProto_.DeQue<T_QKV>();
             copyParams.blockLen = static_cast<uint32_t>(numHeadK_ * qkvDim_ * sizeof(T_QKV));
             DataCopyPad(kOutProtoGm_[tokenStart * numHeadK_ * qkvDim_], kProto, copyParams);
-        }
-        outQueueKProto_.FreeTensor(kProto);
+            outQueueKProto_.FreeTensor(kProto);
 
-        LocalTensor<T_QKV> vProto = outQueueVProto_.DeQue<T_QKV>();
-        if (isOutputQkv_ != 0) {
+            LocalTensor<T_QKV> vProto = outQueueVProto_.DeQue<T_QKV>();
             copyParams.blockLen = static_cast<uint32_t>(numHeadV_ * qkvDim_ * sizeof(T_QKV));
             DataCopyPad(vOutProtoGm_[tokenStart * numHeadV_ * qkvDim_], vProto, copyParams);
+            outQueueVProto_.FreeTensor(vProto);
         }
-        outQueueVProto_.FreeTensor(vProto);
 
         // k_cache / v_cache: 逐 (token, head) 按 index 散射
         LocalTensor<T_K_CACHE> kOut = outQueueK_.DeQue<T_K_CACHE>();
@@ -622,13 +683,16 @@ private:
     GlobalTensor<float> kScaleGm_, vScaleGm_, kOffsetGm_, vOffsetGm_;
 
     TQue<QuePosition::VECIN, 1> inQueueX_, inQueueCos_, inQueueSin_;
-    TQue<QuePosition::VECOUT, 1> outQueueQ_, outQueueKProto_, outQueueVProto_, outQueueK_, outQueueV_;
+    // q_out 就地写回 inQueueX_(见 Compute/CopyOut),故不再有 outQueueQ_;
+    // xQOut_ 让 x 的 LocalTensor 活到 CopyOut 搬完为止
+    LocalTensor<T_QKV> xQOut_;
+    TQue<QuePosition::VECOUT, 1> outQueueKProto_, outQueueVProto_, outQueueK_, outQueueV_;
     TBuf<TPosition::VECCALC> gammaBuf_, quantBuf_;
 
     int64_t numHead_{0}, qkvDim_{0}, numHeadQ_{0}, numHeadK_{0}, numHeadV_{0};
     int64_t blockSize_{0}, blockNum_{0}, tokenStride_{0};
     int64_t blockFactor_{1}, ubFactor_{1};
-    int64_t inUbBytes_{0}, cosSinUbBytes_{0}, qOutUbBytes_{0}, kProtoUbBytes_{0}, vProtoUbBytes_{0};
+    int64_t inUbBytes_{0}, cosSinUbBytes_{0}, kProtoUbBytes_{0}, vProtoUbBytes_{0};
     int64_t kCacheUbBytes_{0}, vCacheUbBytes_{0}, gammaUbBytes_{0}, quantUbBytes_{0};
     int64_t tokenSum_{0}, coreStart_{0}, coreEnd_{0};
     float epsilon_{1e-6f}, reciprocal_{1.0f};

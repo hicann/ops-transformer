@@ -23,12 +23,12 @@
 
 ## 功能说明
 
-- 接口功能：输入qkv融合张量，通过SplitVD拆分q、k、v张量，执行RmsNorm、ApplyRotaryPosEmb、Quant、Scatter融合操作，输出qOut、kCache、vCache、qBeforeQuant(可选)、kBeforeQuant(可选)、vBeforeQuant(可选)。
+- 接口功能：输入qkv融合张量，通过SplitVD拆分q、k、v张量，执行RmsNorm、ApplyRotaryPosEmb、Quant、Scatter融合操作，输出qOut、kCache、vCache、qOutBeforeQuant(可选)、kOutBeforeQuant(可选)、vOutBeforeQuant(可选)。
 - 本接口目前支持的场景如下表：
 
   |场景类型|情况概要|
   |:---|:---|
-  |<ul><li>cacheMode为PA_NZ</li><li>q无量化</li><li>k和v支持无量化、对称量化和非对称量化</li><li>qBeforeQuant/kBeforeQuant/vBeforeQuant不输出</li></ul>|qkv Shape为[$B_{qkv}$ *$S_{qkv}$, $N_{qkv}$* $D_{qkv}$]，q、k、v具有完全相同的D维度。主要计算过程与输出对应关系：<br><ul><li>qkv经过SplitVD->q、k、v</li><li>q经过RmsNorm、RoPE->qOut</li><li>k经过RmsNorm、RoPE、Quant(可选)、Scatter->kCache</li><li>v经过Quant(可选)、Scatter->vCache</li></ul>|
+  |<ul><li>cacheMode为PA_NZ</li><li>q无量化</li><li>k和v支持无量化、对称量化和非对称量化</li><li>qOutBeforeQuant/kOutBeforeQuant/vOutBeforeQuant不输出</li></ul>|qkv Shape为[$B_{qkv}$ *$S_{qkv}$, $N_{qkv}$* $D_{qkv}$]，q、k、v具有完全相同的D维度。主要计算过程与输出对应关系：<br><ul><li>qkv经过SplitVD->q、k、v</li><li>q经过RmsNorm、RoPE->qOut</li><li>k经过RmsNorm、RoPE、Quant(可选)、Scatter->kCache</li><li>v经过Quant(可选)、Scatter->vCache</li></ul>|
 
 - 计算公式：
 
@@ -180,7 +180,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     </tr></thead>
   <tbody>
     <tr>
-      <td>qkv</td>
+      <td>qkv（aclTensor*）</td>
       <td>输入</td>
       <td>用于切分出q、k、v的输入数据，对应计算公式中的qkv。</td>
       <td><ul><li>不支持空Tensor。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>qkv</sub> * D<sub>qkv</sub>]。</li></ul></td>
@@ -190,7 +190,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>√</td>
     </tr>
     <tr>
-      <td>qGamma</td>
+      <td>qGamma（aclTensor*）</td>
       <td>输入</td>
       <td>用于q的rms_norm计算的输入数据，对应计算公式中的gamma。</td>
       <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同。</li><li>shape为[D<sub>qkv</sub>]。</li></ul></td>
@@ -200,7 +200,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>√</td>
     </tr>
     <tr>
-      <td>kGamma</td>
+      <td>kGamma（aclTensor*）</td>
       <td>输入</td>
       <td>用于k的rms_norm计算的输入数据，对应计算公式中的gamma。</td>
       <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同。</li><li>shape为[D<sub>qkv</sub>]。</li></ul></td>
@@ -210,7 +210,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>√</td>
     </tr>
     <tr>
-      <td>cos</td>
+      <td>cos（aclTensor*）</td>
       <td>输入</td>
       <td>用于rope计算的输入数据，对输入张量进行余弦变换，对应计算公式中的cos。</td>
       <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, 1 * D_rope]，D_rope = D<sub>qkv</sub>且要求（D<sub>qkv</sub> * qkv数据类型所占字节数）可以被32整除。</li></ul></td>
@@ -220,7 +220,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>√</td>
     </tr>
     <tr>
-      <td>sin</td>
+      <td>sin（aclTensor*）</td>
       <td>输入</td>
       <td>用于rope计算的输入数据，对输入张量进行正弦变换，对应计算公式中的sin。</td>
       <td><ul><li>不支持空Tensor。</li><li>与输入cos的数据类型、格式保持一致。</li></ul></td>
@@ -230,17 +230,17 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>√</td>
     </tr>
     <tr>
-      <td>index</td>
+      <td>index（aclTensor*）</td>
       <td>输入</td>
       <td>用于指定写入cache的具体索引位置，对应计算公式中的index。</td>
-      <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>]，要求index的value不能重复，value的数值范围为[-1, BlockNum * BlockSize]。</li></ul></td>
+      <td><ul><li>不支持空Tensor。</li><li>数据类型固定为INT64，与全局cache槽位索引对应。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>]，要求index的value不能重复，value的数值范围为[-1, BlockNum * BlockSize)，-1表示跳过该token的cache更新。</li></ul></td>
       <td>INT64</td>
       <td>ND</td>
       <td>1</td>
       <td>√</td>
     </tr>
     <tr>
-      <td>qOut</td>
+      <td>qOut（aclTensor*）</td>
       <td>输入\输出</td>
       <td>提前申请的cache，输入输出同地址复用。</td>
       <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>q</sub> * D<sub>qkv</sub>]。</li></ul></td>
@@ -250,7 +250,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>√</td>
     </tr>
     <tr>
-      <td>kCache</td>
+      <td>kCache（aclTensor*）</td>
       <td>输入\输出</td>
       <td>提前申请的cache，输入输出同地址复用。</td>
       <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同（k不量化），或者INT8（k量化）。</li><li>shape为[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 16, BlockSize, 16]（k不量化），或者[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 32, BlockSize, 32]（k量化）。</li></ul></td>
@@ -260,57 +260,57 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>√</td>
     </tr>
     <tr>
-      <td>vCache</td>
+      <td>vCache（aclTensor*）</td>
       <td>输入\输出</td>
       <td>提前申请的cache，输入输出同地址复用。</td>
-      <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同（v不量化），或者INT8（v量化）。</li><li>shape为[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 16, BlockSize, 16]（v不量化），或者[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 32, BlockSize, 32]（v量化）。</li></ul></td>
+      <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同（v不量化），或者INT8（v量化）。</li><li>shape为[BlockNum, N<sub>v</sub> * D<sub>qkv</sub> // 16, BlockSize, 16]（v不量化），或者[BlockNum, N<sub>v</sub> * D<sub>qkv</sub> // 32, BlockSize, 32]（v量化）。</li></ul></td>
       <td>FLOAT16、BFLOAT16、INT8</td>
       <td>ND</td>
       <td>4</td>
       <td>√</td>
     </tr>
     <tr>
-      <td>kScaleOptional</td>
+      <td>kScaleOptional（aclTensor*）</td>
       <td>可选输入</td>
-      <td>当kCache为INT8数据类型时需要存在，对应计算公式中的kScale。</td>
-      <td>shape为[N<sub>k</sub>, D<sub>qkv</sub>]。</td>
+      <td>对应计算公式中的kScale。</td>
+      <td><ul><li>当kCache为INT8数据类型时需要存在，kCache非INT8数据类型时必须不传（传空指针）。</li><li>shape为[N<sub>k</sub>, D<sub>qkv</sub>]。</li></ul></td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>2</td>
       <td>√</td>
     </tr>
     <tr>
-      <td>vScaleOptional</td>
+      <td>vScaleOptional（aclTensor*）</td>
       <td>可选输入</td>
-      <td>当vCache为INT8数据类型时需要存在，对应计算公式中的vScale。</td>
-      <td>shape为[N<sub>v</sub>, D<sub>qkv</sub>]。</td>
+      <td>对应计算公式中的vScale。</td>
+      <td><ul><li>当vCache为INT8数据类型时需要存在，vCache非INT8数据类型时必须不传（传空指针）。</li><li>shape为[N<sub>v</sub>, D<sub>qkv</sub>]。</li></ul></td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>2</td>
       <td>√</td>
     </tr>
     <tr>
-      <td>kOffsetOptional</td>
+      <td>kOffsetOptional（aclTensor*）</td>
       <td>可选输入</td>
       <td>对应计算公式中的kOffset。</td>
-      <td><ul><li>当kCache数据类型为INT8且对应的kScaleOptional输入存在并量化场景为非对称量化时，需要此参数输入。</li><li>shape为[N<sub>k</sub>, D<sub>qkv</sub>]。</li></ul></td>
+      <td><ul><li>当kCache数据类型为INT8且对应的kScaleOptional输入存在并量化场景为非对称量化时，需要此参数输入。</li><li>kCache数据类型非INT8时必须不传（传空指针）。</li><li>shape为[N<sub>k</sub>, D<sub>qkv</sub>]。</li></ul></td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>2</td>
       <td>√</td>
     </tr>
     <tr>
-      <td>vOffsetOptional</td>
+      <td>vOffsetOptional（aclTensor*）</td>
       <td>可选输入</td>
       <td>对应计算公式中的vOffset。</td>
-      <td><ul><li>当vCache数据类型为INT8且对应的vScaleOptional输入存在并量化场景为非对称量化时，需要此参数输入。</li><li>shape为[N<sub>v</sub>, D<sub>qkv</sub>]。</li></ul></td>
+      <td><ul><li>当vCache数据类型为INT8且对应的vScaleOptional输入存在并量化场景为非对称量化时，需要此参数输入。</li><li>vCache数据类型非INT8时必须不传（传空指针）。</li><li>shape为[N<sub>v</sub>, D<sub>qkv</sub>]。</li></ul></td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>2</td>
       <td>√</td>
     </tr>
     <tr>
-      <td>qkvSize</td>
+      <td>qkvSize（aclIntArray*）</td>
       <td>输入</td>
       <td>按[B<sub>qkv</sub>, S<sub>qkv</sub>, N<sub>qkv</sub>, D<sub>qkv</sub>]顺序传入，提供输入参数qkv矩阵的B、S、N、D维度具体尺寸。</td>
       <td><ul><li>要求N<sub>qkv</sub> = N<sub>q</sub> + N<sub>k</sub> + N<sub>v</sub>。</li><li>元素数量严格等于4，各元素必须为非零有效正整数。</li></ul></td>
@@ -320,7 +320,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>-</td>
     </tr>
     <tr>
-      <td>headNums</td>
+      <td>headNums（aclIntArray*）</td>
       <td>输入</td>
       <td>按[N<sub>q</sub>, N<sub>k</sub>, N<sub>v</sub>]顺序传入，提供输入参数qkv矩阵中，qkv分量单元中的N维度具体尺寸。</td>
       <td>[N<sub>q</sub>, N<sub>k</sub>, N<sub>v</sub>]必须为实际原始值，不可进行约化。</td>
@@ -330,57 +330,57 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>-</td>
     </tr>
     <tr>
-      <td>epsilon</td>
+      <td>epsilon（double）</td>
       <td>输入</td>
       <td>RmsNorm计算中防止除0，对应计算公式中的epsilon。</td>
       <td>建议值为1e-6</td>
-      <td>FLOAT32</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>cacheModeOptional</td>
+      <td>cacheModeOptional（char*）</td>
       <td>输入</td>
       <td>表示cache的格式。</td>
       <td>建议值为"PA_NZ"。</td>
-      <td>CHAR*</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>qOutBeforeQuant</td>
+      <td>qOutBeforeQuant（aclTensor*）</td>
       <td>输出</td>
       <td>表示即将写入到qOut中的数据。</td>
-      <td><ul><li>格式、数据类型，需要与输入参数qkv保持一致。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>q</sub> * D<sub>qkv</sub>]。</li></ul></td>
+      <td><ul><li>可选输出，不需要输出时传空指针。</li><li>qOutBeforeQuant、kOutBeforeQuant、vOutBeforeQuant须同时传入或同时传空指针。</li><li>格式、数据类型，需要与输入参数qkv保持一致。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>q</sub> * D<sub>qkv</sub>]。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>2</td>
       <td>√</td>
     </tr>
     <tr>
-      <td>kOutBeforeQuant</td>
+      <td>kOutBeforeQuant（aclTensor*）</td>
       <td>输出</td>
       <td>表示即将写入到kCache中的数据，在未经量化和Scatter前的中间计算结果。</td>
-      <td><ul><li>分型、数据类型，需要与输入参数qkv保持一致。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>k</sub> * D<sub>qkv</sub>]。</li></ul></td>
+      <td><ul><li>可选输出，不需要输出时传空指针，且须与其余两个before-quant输出同时传入或同时为空。</li><li>格式、数据类型，需要与输入参数qkv保持一致。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>k</sub> * D<sub>qkv</sub>]。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>2</td>
       <td>√</td>
     </tr>
     <tr>
-      <td>vOutBeforeQuant</td>
+      <td>vOutBeforeQuant（aclTensor*）</td>
       <td>输出</td>
       <td>表示即将写入到vCache中的数据，在未经量化和Scatter前的中间计算结果。</td>
-      <td><ul><li>分型、数据类型，需要与输入参数qkv保持一致。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>v</sub> * D<sub>qkv</sub>]。</li></ul></td>
+      <td><ul><li>可选输出，不需要输出时传空指针，且须与其余两个before-quant输出同时传入或同时为空。</li><li>格式、数据类型，需要与输入参数qkv保持一致。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>v</sub> * D<sub>qkv</sub>]。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>2</td>
       <td>√</td>
     </tr>
     <tr>
-      <td>workspaceSize</td>
+      <td>workspaceSize（uint64_t*）</td>
       <td>输出</td>
       <td>返回需要在Device侧申请的workspace大小。</td>
       <td>-</td>
@@ -390,7 +390,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>-</td>
     </tr>
     <tr>
-      <td>executor</td>
+      <td>executor（aclOpExecutor**）</td>
       <td>输出</td>
       <td>返回op执行器，包含了算子计算流程。</td>
       <td>-</td>
@@ -519,7 +519,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -528,7 +528,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<int8_t> resultData(size, 0);
@@ -540,7 +540,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -553,8 +553,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -605,128 +605,163 @@ int main()
     std::vector<int16_t> kGammaHostData(128, 0);
     std::vector<int16_t> cosHostData(48 * 128, 0);
     std::vector<int16_t> sinHostData(48 * 128, 0);
+    // index的取值不能重复，且须落在[-1, BlockNum * BlockSize)内；此处取0..47递增
     std::vector<int64_t> indexHostData(48, 0);
+    for (int64_t i = 0; i < static_cast<int64_t>(indexHostData.size()); i++) {
+        indexHostData[i] = i;
+    }
     std::vector<int16_t> qOutHostData(48 * 2048, 0);
     std::vector<int16_t> kCacheHostData(16 * 4 * 128 * 32, 0);
     std::vector<int16_t> vCacheHostData(16 * 4 * 128 * 32, 0);
-    std::vector<float> kScaleHostData(1 * 128, 0.0f);
-    std::vector<float> vScaleHostData(1 * 128, 0.0f);
+    // kScale/vScale是对称量化的缩放因子，不能为0
+    std::vector<float> kScaleHostData(1 * 128, 1.0f);
+    std::vector<float> vScaleHostData(1 * 128, 1.0f);
 
-    void *qkvDeviceAddr = nullptr;
-    void *qGammaDeviceAddr = nullptr;
-    void *kGammaDeviceAddr = nullptr;
-    void *cosDeviceAddr = nullptr;
-    void *sinDeviceAddr = nullptr;
-    void *indexDeviceAddr = nullptr;
-    void *qOutDeviceAddr = nullptr;
-    void *kCacheDeviceAddr = nullptr;
-    void *vCacheDeviceAddr = nullptr;
-    void *kScaleDeviceAddr = nullptr;
-    void *vScaleDeviceAddr = nullptr;
+    void* qkvDeviceAddr = nullptr;
+    void* qGammaDeviceAddr = nullptr;
+    void* kGammaDeviceAddr = nullptr;
+    void* cosDeviceAddr = nullptr;
+    void* sinDeviceAddr = nullptr;
+    void* indexDeviceAddr = nullptr;
+    void* qOutDeviceAddr = nullptr;
+    void* kCacheDeviceAddr = nullptr;
+    void* vCacheDeviceAddr = nullptr;
+    void* kScaleDeviceAddr = nullptr;
+    void* vScaleDeviceAddr = nullptr;
 
-    aclTensor *qkv = nullptr;
-    aclTensor *qGamma = nullptr;
-    aclTensor *kGamma = nullptr;
-    aclTensor *cos = nullptr;
-    aclTensor *sin = nullptr;
-    aclTensor *index = nullptr;
-    aclTensor *qOut = nullptr;
-    aclTensor *kCache = nullptr;
-    aclTensor *vCache = nullptr;
-    aclTensor *kScale = nullptr;
-    aclTensor *vScale = nullptr;
+    aclTensor* qkv = nullptr;
+    aclTensor* qGamma = nullptr;
+    aclTensor* kGamma = nullptr;
+    aclTensor* cos = nullptr;
+    aclTensor* sin = nullptr;
+    aclTensor* index = nullptr;
+    aclTensor* qOut = nullptr;
+    aclTensor* kCache = nullptr;
+    aclTensor* vCache = nullptr;
+    aclTensor* kScale = nullptr;
+    aclTensor* vScale = nullptr;
 
-    aclIntArray *qkv_size = aclCreateIntArray(qkv_size_list.data(), qkv_size_list.size());
-    aclIntArray *head_nums = aclCreateIntArray(head_nums_list.data(), head_nums_list.size());
+    aclIntArray* qkv_size = nullptr;
+    aclIntArray* head_nums = nullptr;
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     double epsilon = 1e-6;
-    char *cacheMode = "PA_NZ";
+    char* cacheMode = "PA_NZ";
+
+    // 失败路径统一走 cleanup:任何一步失败都要把已申请的张量、aclIntArray、设备内存与
+    // 运行资源释放掉(逐条 return 的写法会把前面申请的资源泄漏在失败路径上)。
+    auto destroyTensor = [](aclTensor*& tensor) {
+        if (tensor != nullptr) {
+            aclDestroyTensor(tensor);
+            tensor = nullptr;
+        }
+    };
+    auto destroyIntArray = [](aclIntArray*& array) {
+        if (array != nullptr) {
+            aclDestroyIntArray(array);
+            array = nullptr;
+        }
+    };
+    auto freeDeviceAddr = [](void*& addr) {
+        if (addr != nullptr) {
+            aclrtFree(addr);
+            addr = nullptr;
+        }
+    };
+    auto cleanup = [&]() {
+        // 6. 释放aclTensor与aclIntArray，需要根据具体API的接口定义修改
+        destroyTensor(qkv);
+        destroyTensor(qGamma);
+        destroyTensor(kGamma);
+        destroyTensor(cos);
+        destroyTensor(sin);
+        destroyTensor(index);
+        destroyTensor(qOut);
+        destroyTensor(kCache);
+        destroyTensor(vCache);
+        destroyTensor(kScale);
+        destroyTensor(vScale);
+        destroyIntArray(qkv_size);
+        destroyIntArray(head_nums);
+
+        // 7. 释放device 资源
+        freeDeviceAddr(qkvDeviceAddr);
+        freeDeviceAddr(qGammaDeviceAddr);
+        freeDeviceAddr(kGammaDeviceAddr);
+        freeDeviceAddr(cosDeviceAddr);
+        freeDeviceAddr(sinDeviceAddr);
+        freeDeviceAddr(indexDeviceAddr);
+        freeDeviceAddr(qOutDeviceAddr);
+        freeDeviceAddr(kCacheDeviceAddr);
+        freeDeviceAddr(vCacheDeviceAddr);
+        freeDeviceAddr(kScaleDeviceAddr);
+        freeDeviceAddr(vScaleDeviceAddr);
+        freeDeviceAddr(workspaceAddr);
+
+        aclrtDestroyStream(stream);
+        aclrtResetDevice(deviceId);
+        aclFinalize();
+    };
+
+    qkv_size = aclCreateIntArray(qkv_size_list.data(), qkv_size_list.size());
+    head_nums = aclCreateIntArray(head_nums_list.data(), head_nums_list.size());
+    CHECK_RET(qkv_size != nullptr && head_nums != nullptr, LOG_PRINT("aclCreateIntArray failed.\n"); cleanup();
+              return -1);
 
     ret = CreateAclTensor(qkvHostData, qkvShape, &qkvDeviceAddr, aclDataType::ACL_FLOAT16, &qkv);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(qGammaHostData, qGammaShape, &qGammaDeviceAddr, aclDataType::ACL_FLOAT16, &qGamma);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(kGammaHostData, kGammaShape, &kGammaDeviceAddr, aclDataType::ACL_FLOAT16, &kGamma);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(cosHostData, cosShape, &cosDeviceAddr, aclDataType::ACL_FLOAT16, &cos);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(sinHostData, sinShape, &sinDeviceAddr, aclDataType::ACL_FLOAT16, &sin);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(indexHostData, indexShape, &indexDeviceAddr, aclDataType::ACL_INT64, &index);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(qOutHostData, qOutShape, &qOutDeviceAddr, aclDataType::ACL_FLOAT16, &qOut);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(kCacheHostData, kCacheShape, &kCacheDeviceAddr, aclDataType::ACL_INT8, &kCache);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(vCacheHostData, vCacheShape, &vCacheDeviceAddr, aclDataType::ACL_INT8, &vCache);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(kScaleHostData, kScaleShape, &kScaleDeviceAddr, aclDataType::ACL_FLOAT, &kScale);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
     ret = CreateAclTensor(vScaleHostData, vScaleShape, &vScaleDeviceAddr, aclDataType::ACL_FLOAT, &vScale);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    CHECK_RET(ret == ACL_SUCCESS, cleanup(); return ret);
 
     // 3. 调用CANN算子库API，需要修改为具体的API
-    uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
-
     // 调用aclnnQkvRmsNormRopeCache第一段接口
     ret = aclnnQkvRmsNormRopeCacheGetWorkspaceSize(qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache, kScale,
                                                    vScale, nullptr, nullptr, qkv_size, head_nums, epsilon, cacheMode,
                                                    nullptr, nullptr, nullptr, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnQkvRmsNormRopeCacheGetWorkspaceSize failed. ERROR: %d\n", ret);
-              return ret);
+              cleanup(); return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); cleanup(); return ret);
     }
 
     // 调用aclnnQkvRmsNormRopeCache第二段接口
     ret = aclnnQkvRmsNormRopeCache(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnQkvRmsNormRopeCache failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnQkvRmsNormRopeCache failed. ERROR: %d\n", ret); cleanup();
+              return ret);
 
     // 4. 固定写法，同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); cleanup(); return ret);
 
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
     PrintOutResult(kCacheShape, &kCacheDeviceAddr);
     PrintOutResult(vCacheShape, &vCacheDeviceAddr);
 
-    // 6. 释放aclTensor，需要根据具体API的接口定义修改
-    aclDestroyTensor(qkv);
-    aclDestroyTensor(qGamma);
-    aclDestroyTensor(kGamma);
-    aclDestroyTensor(cos);
-    aclDestroyTensor(sin);
-    aclDestroyTensor(index);
-    aclDestroyTensor(qOut);
-    aclDestroyTensor(kCache);
-    aclDestroyTensor(vCache);
-    aclDestroyTensor(kScale);
-    aclDestroyTensor(vScale);
-
-    // 7. 释放device 资源
-    aclrtFree(qkvDeviceAddr);
-    aclrtFree(qGammaDeviceAddr);
-    aclrtFree(kGammaDeviceAddr);
-    aclrtFree(cosDeviceAddr);
-    aclrtFree(sinDeviceAddr);
-    aclrtFree(indexDeviceAddr);
-    aclrtFree(qOutDeviceAddr);
-    aclrtFree(kCacheDeviceAddr);
-    aclrtFree(vCacheDeviceAddr);
-    aclrtFree(kScaleDeviceAddr);
-    aclrtFree(vScaleDeviceAddr);
-
-    if (workspaceSize > 0) {
-        aclrtFree(workspaceAddr);
-    }
-    aclrtDestroyStream(stream);
-    aclrtResetDevice(deviceId);
-    aclFinalize();
+    // 6/7. 释放aclTensor、aclIntArray与device资源(与失败路径共用同一套清理)
+    cleanup();
 
     return 0;
 }

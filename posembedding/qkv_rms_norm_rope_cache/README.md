@@ -182,35 +182,35 @@
     <tr>
       <td>v_cache</td>
       <td>输入/输出</td>
-      <td>提前申请的cache，输入输出同地址复用。与输入qkv的数据类型相同（v不量化），或者INT8（v量化）。shape为[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 16, BlockSize, 16]（v不量化），或者[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 32, BlockSize, 32]（v量化）。</td>
+      <td>提前申请的cache，输入输出同地址复用。与输入qkv的数据类型相同（v不量化），或者INT8（v量化）。shape为[BlockNum, N<sub>v</sub> * D<sub>qkv</sub> // 16, BlockSize, 16]（v不量化），或者[BlockNum, N<sub>v</sub> * D<sub>qkv</sub> // 32, BlockSize, 32]（v量化）。</td>
       <td>FLOAT16、BFLOAT16、INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>k_scale</td>
       <td>可选输入</td>
-      <td>当k_cache数据类型为INT8时需要此输入参数，对应公式中的kScale。shape为[N<sub>k</sub>, D<sub>qkv</sub>]。</td>
+      <td>当k_cache数据类型为INT8时需要此输入参数，对应公式中的kScale；k_cache数据类型非INT8时必须不传该参数。shape为[N<sub>k</sub>, D<sub>qkv</sub>]。</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>v_scale</td>
       <td>可选输入</td>
-      <td>当v_cache数据类型为INT8时需要此输入参数，对应公式中的vScale。shape为[N<sub>v</sub>, D<sub>qkv</sub>]。</td>
+      <td>当v_cache数据类型为INT8时需要此输入参数，对应公式中的vScale；v_cache数据类型非INT8时必须不传该参数。shape为[N<sub>v</sub>, D<sub>qkv</sub>]。</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>k_offset</td>
       <td>可选输入</td>
-      <td>当k_cache数据类型为INT8且对应的k_scale输入存在并量化场景为非对称量化时，需要此参数输入，对应公式中的kOffset。shape为[N<sub>k</sub>, D<sub>qkv</sub>]。</td>
+      <td>当k_cache数据类型为INT8且对应的k_scale输入存在并量化场景为非对称量化时，需要此参数输入，对应公式中的kOffset；k_cache数据类型非INT8时必须不传该参数。shape为[N<sub>k</sub>, D<sub>qkv</sub>]。</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>v_offset</td>
       <td>可选输入</td>
-      <td>当v_cache数据类型为INT8且对应的v_scale输入存在并量化场景为非对称量化时，需要此参数输入，对应公式中的vOffset。shape为[N<sub>v</sub>, D<sub>qkv</sub>]。</td>
+      <td>当v_cache数据类型为INT8且对应的v_scale输入存在并量化场景为非对称量化时，需要此参数输入，对应公式中的vOffset；v_cache数据类型非INT8时必须不传该参数。shape为[N<sub>v</sub>, D<sub>qkv</sub>]。</td>
       <td>FLOAT32</td>
       <td>ND</td>
     </tr>
@@ -286,7 +286,7 @@
 
 * 输入shape限制：
     * B<sub>qkv</sub>为输入qkv的batch_size，S<sub>qkv</sub>为输入qkv的sequence length，大小由qkvSize决定。
-    * N<sub>qkv</sub>为输入qkv的head number。D<sub>qkv</sub>为输入qkv的head dim，目前仅支持128。D<sub>q</sub>、D<sub>k</sub>和D<sub>k</sub>分别为q、k、v的head dim，要求D<sub>qkv</sub> = D<sub>q</sub> = D<sub>k</sub> = D<sub>v</sub>，D<sub>qkv</sub>需要满足（D<sub>qkv</sub>*qkv数据类型占字节数）可以被32整除。
+    * N<sub>qkv</sub>为输入qkv的head number。D<sub>qkv</sub>为输入qkv的head dim，目前仅支持128。D<sub>q</sub>、D<sub>k</sub>和D<sub>v</sub>分别为q、k、v的head dim，要求D<sub>qkv</sub> = D<sub>q</sub> = D<sub>k</sub> = D<sub>v</sub>，D<sub>qkv</sub>需要满足（D<sub>qkv</sub>*qkv数据类型占字节数）可以被32整除。
     * 根据rope规则，D<sub>k</sub>和D<sub>q</sub>为偶数。若cache_mode为PA_NZ场景下，D<sub>k</sub>、D<sub>q</sub>需32B对齐；BlockSize需32B对齐。
     * 关于上述32B对齐的情形，对齐值由cache的数据类型决定。以BlockSize为例，若cache的数据类型为int8，则需要满足BlockSize % 32 = 0；若cache的数据类型为float16，则需要满足BlockSize % 16 = 0；若k_cache与v_cache参数的dtype不一致，BlockSize需同时满足BlockSize % 32 = 0和BlockSize % 16 = 0。
     * BlockNum为写入cache的内存块数，大小由用户输入场景决定，要求BlockNum >= Ceil(S<sub>qkv</sub> / BlockSize) * B<sub>qkv</sub>。
@@ -299,5 +299,5 @@
 
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
-| aclnn接口  | [test_aclnn_qkv_rms_norm_rope_cache](examples/test_aclnn_qkv_rms_norm_rope_cache.cpp) | 通过[aclnnQkvRmsNormRopeCache](docs/aclnnQkvRmsNormRopeCache.md)接口方式调用QkvRmsNormRopeCache算子。 |
-| 图模式 | [test_geir_qkv_rms_norm_rope_cache](examples/test_geir_qkv_rms_norm_rope_cache.cpp)  | 通过[算子IR](op_graph/qkv_rms_norm_rope_cache_proto.h)构图方式调用QkvRmsNormRopeCache算子。         |
+| aclnn API  | [test_aclnn_qkv_rms_norm_rope_cache](examples/test_aclnn_qkv_rms_norm_rope_cache.cpp) | 通过[aclnnQkvRmsNormRopeCache](docs/aclnnQkvRmsNormRopeCache.md)接口方式调用QkvRmsNormRopeCache算子。 |
+| GE图模式 | [test_geir_qkv_rms_norm_rope_cache](examples/test_geir_qkv_rms_norm_rope_cache.cpp)  | 通过[算子IR](op_graph/qkv_rms_norm_rope_cache_proto.h)构图方式调用QkvRmsNormRopeCache算子。         |
