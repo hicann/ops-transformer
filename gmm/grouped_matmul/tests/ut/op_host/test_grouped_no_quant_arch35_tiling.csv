@@ -44,3 +44,10 @@ Ascend960DT,invalid_groupnum_zero_960dt,true,invalid_groupnum_zero_960dt,64,256,
 Ascend960DT,invalid_grouptype_960dt,true,invalid_grouptype_960dt,64,256,1024,512,2,false,false,3,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,32,0,,,
 Ascend950,split_m_sms_2d_single_weight,true,split_m_sms_2d_single_weight,,256,1024,512,1,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,,2,1
 Ascend950,split_m_sms_2d_single_weight_grouplist2_neg,true,split_m_sms_2d_single_weight_grouplist2_neg,,256,1024,512,1,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,,,,,,2,2
+Ascend950,act_relu_splitm,true,act_relu_splitm,,256,1024,512,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,32,16,2 32 1 1 1 0 0 0 1 1 0 1 1 0 32 256 512 1024 1024 256 256 1024 256 256 64 8 8 1 1 0 0 0 0 0 0 0 0 0 0 0 4 4 0 0 2 2 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0,,,,,1
+Ascend950,act_relu_nosplit,true,act_relu_nosplit,,256,1024,512,2,false,false,-1,0,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,32,16,1 32 1 1 0 -1 0 0 1 1 0 1 1 0 32 256 512 1024 1024 256 64 1024 64 64 256 8 8 1 1 0 0 0 0 0 0 0 0 0 0 0 4 4 0 0 2 2 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0,,,,,1
+Ascend950,act_gelu_splitm,true,act_gelu_splitm,,256,1024,512,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,32,32,2 32 1 1 1 0 0 0 1 1 0 2 1 0 32 256 512 1024 1024 256 256 1024 256 256 64 8 8 1 1 0 0 0 0 0 0 0 0 0 0 0 4 4 0 0 2 2 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0,,,,,2
+Ascend950,act_gelu_nosplit,true,act_gelu_nosplit,,256,1024,512,2,false,false,-1,0,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,32,32,1 32 1 1 0 -1 0 0 1 1 0 2 1 0 32 256 512 1024 1024 256 64 1024 64 64 256 8 8 1 1 0 0 0 0 0 0 0 0 0 0 0 4 4 0 0 2 2 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0,,,,,2
+Ascend950,act_relu_splitk_invalid,true,act_relu_splitk_invalid,,256,1024,512,2,false,false,2,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,,,,,,,,1
+Ascend950,act_gelu_splitk_invalid,true,act_gelu_splitk_invalid,,256,1024,512,2,false,false,2,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,,,,,,,,2
+Ascend950,act_type_invalid,true,act_type_invalid,,256,1024,512,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,,,,,,,,3

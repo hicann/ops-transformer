@@ -66,7 +66,8 @@ string TilingData2Str(const void* tilingData, size_t tilingSize)
 }
 
 vector<gert::TilingContextPara::OpAttr> GetGroupedNoQuantAttrs(int64_t splitItem, bool transposeX, bool transposeWeight,
-                                                               int64_t groupType, int64_t groupListType)
+                                                               int64_t groupType, int64_t groupListType,
+                                                               int64_t actType)
 {
     return {
         {"split_item", Ops::Transformer::AnyValue::CreateFrom<int64_t>(splitItem)},
@@ -75,7 +76,7 @@ vector<gert::TilingContextPara::OpAttr> GetGroupedNoQuantAttrs(int64_t splitItem
         {"transpose_weight", Ops::Transformer::AnyValue::CreateFrom<bool>(transposeWeight)},
         {"group_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupType)},
         {"group_list_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupListType)},
-        {"act_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        {"act_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(actType)},
         {"tuning_config", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0})},
     };
 }
@@ -167,8 +168,8 @@ public:
                 {MakeEmptyShape(), ge::DT_FLOAT, ge::FORMAT_ND}, // perTokenScale (empty for no quant)
             },
             {{ops::ut::MakeGertStorageShape({m}, {n}), yDtype, ge::FORMAT_ND}},
-            GetGroupedNoQuantAttrs(splitItem, transposeX, transposeWeight, groupType, groupListType), &compileInfo,
-            GetNpuArchString(), compileInfo.aicNum, compileInfo.ubSize);
+            GetGroupedNoQuantAttrs(splitItem, transposeX, transposeWeight, groupType, groupListType, actType),
+            &compileInfo, GetNpuArchString(), compileInfo.aicNum, compileInfo.ubSize);
 
         TilingInfo tilingInfo;
         bool tilingResult = ExecuteTiling(tilingContextPara, tilingInfo);
@@ -223,6 +224,7 @@ public:
     int64_t weightDimNum = 3; // 3: weight 为 (E, K, N)；2: weight 为 (K, N)（WeightNz 单 x-单 y 特殊场景）
     int64_t groupListLen = 0; // 0: 与 groupNum 一致；>0: 显式指定 groupList 长度（负向用例）
     int64_t splitItem = 0;
+    int64_t actType = 0; // 0: none, 1: relu, 2: gelu tanh (same as aclnn actType)
     string weightFormat;
     ge::DataType xDtype = ge::DT_UNDEFINED;
     ge::DataType weightDtype = ge::DT_UNDEFINED;
@@ -314,6 +316,11 @@ vector<GroupedNoQuantArch35TilingTestParam> GetParams(const string& socVersion)
             idx++;
             if (items.size() > idx && !Trim(items[idx]).empty()) {
                 param.groupListLen = stoll(items[idx]);
+            }
+            idx++;
+            // actType: 0(none)/1(relu)/2(gelu tanh), mirrors the aclnn actType attribute.
+            if (items.size() > idx && !Trim(items[idx]).empty()) {
+                param.actType = stoll(items[idx]);
             }
             idx++;
             params.push_back(param);

@@ -27,10 +27,20 @@ using GMMNoQuantTilingData = GroupedMatmulTilingData::GMMNoQuantTilingData;
 
 namespace GROUPED_MATMUL {
 
-template <typename LayoutA, typename LayoutB, bool EnableGelu = false>
+enum class GmmActMode : uint8_t {
+    NONE = 0,
+    RELU = 1,
+    GELU_TANH = 2,
+};
+
+template <typename LayoutA, typename LayoutB, GmmActMode ActMode = GmmActMode::NONE>
 __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR groupList, GM_ADDR y,
                                            GM_ADDR tiling)
 {
+    constexpr bool ENABLE_GELU = (ActMode == GmmActMode::GELU_TANH);
+    constexpr bool ENABLE_RELU = (ActMode == GmmActMode::RELU);
+    constexpr uint64_t FUSED_OP_TYPE = ENABLE_RELU ? Blaze::Gemm::OP_TYPE_RELU : Blaze::Gemm::OP_TYPE_EMPTY;
+
     GET_TILING_DATA_MEMBER(GMMNoQuantTilingData, gmmNoQuantParam, gmmBaseParams, tiling);
     GET_TILING_DATA_MEMBER(GMMNoQuantTilingData, mmTilingData, mmTilingData, tiling);
 
@@ -38,21 +48,21 @@ __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bi
     using BType = DTYPE_X;
     using CType = DTYPE_Y;
     using BiasType = DTYPE_BIAS;
-    using EpilogueInputType = AscendC::Std::conditional_t<EnableGelu, float, CType>;
+    using EpilogueInputType = AscendC::Std::conditional_t<ENABLE_GELU, float, CType>;
     using LayoutC = asc::te::nd_ext_layout_ptn;
     using LayoutBias = asc::te::nd_ext_layout_ptn;
     using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
     using BasicDispatchPolicy =
-        Blaze::Gemm::MatmulMultiBlockBasic<0, Blaze::Gemm::OP_TYPE_EMPTY, Blaze::Gemm::KernelGroupedMmadNoQuant, 0,
+        Blaze::Gemm::MatmulMultiBlockBasic<0, FUSED_OP_TYPE, Blaze::Gemm::KernelGroupedMmadNoQuant, 0,
                                            Blaze::Gemm::MatmulOutputMode::OVERWRITE>;
     using GeluDispatchPolicy =
         Blaze::Gemm::MatmulMultiBlockFixpipeOpti<Blaze::Gemm::ND_ALIG_1V2_FIXPIPE, Blaze::Gemm::OP_TYPE_GELU,
                                                  Blaze::Gemm::KernelGroupedMmadNoQuant>;
-    using DispatchPolicy = AscendC::Std::conditional_t<EnableGelu, GeluDispatchPolicy, BasicDispatchPolicy>;
+    using DispatchPolicy = AscendC::Std::conditional_t<ENABLE_GELU, GeluDispatchPolicy, BasicDispatchPolicy>;
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AType, LayoutA, BType, LayoutB, CType, LayoutC,
                                                     BiasType, LayoutBias>;
     using BlockEpilogue =
-        AscendC::Std::conditional_t<EnableGelu,
+        AscendC::Std::conditional_t<ENABLE_GELU,
                                     Blaze::Epilogue::Block::BlockEpilogueGeluFixpipe<CType, EpilogueInputType>,
                                     Blaze::Epilogue::Block::BlockEpilogueEmpty>;
     using BlockScheduler = Blaze::Gemm::Block::BlockSchedulerGmmNoQuant;
@@ -108,7 +118,7 @@ __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bi
     mmParams.kL0 = static_cast<uint32_t>(baseK);
     mmParams.l1Stages = 2U;
     mmParams.l0cStages = static_cast<uint16_t>(mmTilingData.dbL0C);
-    if constexpr (EnableGelu) {
+    if constexpr (ENABLE_GELU) {
         // Keep the current grouped GELU path on the single-L0C-stage configuration selected by tiling.
         mmParams.l0cStages = 1U;
         mmParams.oriK = static_cast<uint64_t>(mmTilingData.Ka);

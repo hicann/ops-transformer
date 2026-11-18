@@ -51,7 +51,9 @@ constexpr uint64_t ATTR_IDX_TRANS_X = 3UL;
 constexpr uint64_t ATTR_IDX_GROUPTYPE = 4UL;
 constexpr uint64_t ATTR_IDX_GROUP_LIST_TYPE = 5UL;
 constexpr uint64_t ATTR_IDX_ACT_TYPE = 6UL;
+// Same values as the aclnn actType parameter (GMMActType): 0=NONE, 1=RELU, 2=GELU_TANH.
 constexpr int64_t ACT_TYPE_NONE = 0L;
+constexpr int64_t ACT_TYPE_RELU = 1L;
 constexpr int64_t ACT_TYPE_GELU_TANH = 2L;
 constexpr int32_t NO_SPLIT = -1;
 constexpr int32_t SPLIT_M = 0;
@@ -80,7 +82,7 @@ public:
     // 对应20位，转置场景
     uint8_t gmmTrans = 0;
 
-    // 激活类型：0-none，1-gelu tanh
+    // 激活类型：0-none，1-relu，2-gelu tanh
     uint8_t act = 0;
 
 public:

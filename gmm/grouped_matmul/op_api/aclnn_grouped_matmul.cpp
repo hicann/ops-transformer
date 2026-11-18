@@ -1658,6 +1658,27 @@ void LogUnsupportedQuantActivationWarning(const gmm::GroupedMatmulParams& gmmPar
             opName, gmmParams.activeType);
 }
 
+// No-quant activation is enabled only on DAV_3510 with FP16/BF16 output:
+//   RELU      - applied by the fixpipe during the L0C->GM transfer of the basic matmul path;
+//   GELU_TANH - uses the 1V2 fixpipe epilogue and cannot run with SPLIT_K, so it is restricted to
+//               NO_SPLIT(-1)/SPLIT_M(0).
+static bool IsNoQuantActivationSupported(const gmm::GroupedMatmulParams& gmmParams)
+{
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+        return false;
+    }
+    DataType yDtype = (*gmmParams.y)[0]->GetDataType();
+    if (yDtype != DataType::DT_FLOAT16 && yDtype != DataType::DT_BF16) {
+        return false;
+    }
+    const bool isGroupTypeSupported = (gmmParams.groupType == -1L || gmmParams.groupType == 0L);
+    if (gmmParams.activeType == GMMActType::GMM_ACT_TYPE_RELU ||
+        gmmParams.activeType == GMMActType::GMM_ACT_TYPE_GELU_TANH) {
+        return isGroupTypeSupported;
+    }
+    return false;
+}
+
 static aclnnStatus CheckFunctionParams(const gmm::GroupedMatmulParams& gmmParams, const char* opName)
 {
     DataType weightDtype = (*gmmParams.weight)[0]->GetDataType();
@@ -1682,16 +1703,10 @@ static aclnnStatus CheckFunctionParams(const gmm::GroupedMatmulParams& gmmParams
                        gmmParams.activeType);
             return gmm::AclnnGroupedMatmulWeightQuantDAV3510Checker(gmmParams).CheckGroupedMatmulWeightQuantDAV3510();
         } else {
-            const bool isDav3510 = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
-            // No-quant: GELU_TANH post-process is enabled only on DAV_3510 for FP16/BF16 output. The first
-            // phase restricts it to NO_SPLIT(-1)/SPLIT_M(0); SPLIT_K(2) is deferred.
-            DataType yDtype = (*gmmParams.y)[0]->GetDataType();
-            bool isGeluSupported = isDav3510 && gmmParams.activeType == GMMActType::GMM_ACT_TYPE_GELU_TANH &&
-                                   (yDtype == DataType::DT_FLOAT16 || yDtype == DataType::DT_BF16) &&
-                                   (gmmParams.groupType == -1L || gmmParams.groupType == 0L);
-            CHECK_COND(isNoActivation || isGeluSupported, ACLNN_ERR_PARAM_INVALID,
+            CHECK_COND(isNoActivation || IsNoQuantActivationSupported(gmmParams), ACLNN_ERR_PARAM_INVALID,
                        "When input is No-Quant, activation is not supported on this platform"
-                       " except GELU_TANH with FP16/BF16 output and groupType in {-1, 0}."
+                       " except RELU or GELU_TANH with FP16/BF16 output and groupType in {-1, 0}"
+                       " (K-split is not supported together with activation)."
                        " activeType[%ld] is not supported.",
                        gmmParams.activeType);
         }
@@ -1721,10 +1736,8 @@ static aclnnStatus CheckFunctionParams(const gmm::GroupedMatmulParams& gmmParams
         }
         CHECK_COND(CheckNonQuantMatmulDataType(gmmParams, weightDtype, opName) == ACLNN_SUCCESS,
                    ACLNN_ERR_PARAM_INVALID, "In op [%s], when non-quant, data type check failed.", opName);
-        // No-quant GELU_TANH is only enabled on DAV_3510 (y dtype checked above).
-        bool isNoQuantActAllowed =
-            isNoActivation || (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 &&
-                               gmmParams.activeType == GMMActType::GMM_ACT_TYPE_GELU_TANH);
+        // No-quant activation (RELU / GELU_TANH) is only enabled on DAV_3510 with FP16/BF16 output.
+        bool isNoQuantActAllowed = isNoActivation || IsNoQuantActivationSupported(gmmParams);
         CHECK_COND(isNoQuantActAllowed, ACLNN_ERR_PARAM_INVALID,
                    "In op [%s], when %s, [%s] is not supported, got [%ld]. Constraint:[activation is not supported].",
                    opName, GetGmmScenarioName(gmmParams.xDtype, weightDtype), "activeType", gmmParams.activeType);

@@ -323,7 +323,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 - tuningConfigOptional：可选参数，数组中的第一个值表示各个专家处理的token数的预期值，当前无场景使用。
 - actType（0~5）：
   - 伪量化仅支持 0。
-  - 非量化在x、weight、out数据类型为BFLOAT16/FLOAT16，不分组/M轴分组场景下支持0/2；其余场景仅支持0。
+  - 非量化在x、weight、out数据类型为BFLOAT16/FLOAT16，不分组/M轴分组场景下支持传入0/1/2；其余场景仅支持0。
   - 全量化下x、weight数据类型为INT8且out数据类型为BFLOAT16/FLOAT16，静态T-C或动态K-C、scale数据类型为FLOAT32/BFLOAT16时支持0/1/2/4/5（注意3不支持）；其余场景仅支持0。
 - 输入参数 x、weight，输出参数 out在非量化场景支持最多 1024个Tensor，在伪量化支持最多 128个Tensor，在全量化场景最多支持 1个Tensor。
 
