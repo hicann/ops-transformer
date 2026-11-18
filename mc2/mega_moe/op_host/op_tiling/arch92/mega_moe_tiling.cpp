@@ -22,41 +22,31 @@ static ge::graphStatus CheckAndSetTensorMetadata(const gert::TilingContext* cont
                                                  MegaMoeExpertParams& expertParams, MegaMoeTilingData* tilingData,
                                                  const char* nodeName)
 {
-    OP_TILING_CHECK(CheckAndSetWeightAndScaleLayout(context, expertParams, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                        nodeName, "expert weight and scale tensors",
-                        "The layout, dtype, or format of expert weight or scale tensors is invalid"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckAndSetWeightAndScaleLayout(context, expertParams, tilingData, nodeName) != ge::GRAPH_SUCCESS,
+        OP_LOGE_WITHOUT_REPORT(nodeName, "The layout, dtype, or format of expert weight or scale tensors is invalid."),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckNonWeightInputDataTypes(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "non-weight inputs",
-                                                             "The dtype of a non-weight input is invalid"),
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "The dtype of a non-weight input is invalid."),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckNonWeightTensorFormats(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "non-weight inputs",
-                                                             "The format of a non-weight tensor is invalid"),
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "The format of a non-weight tensor is invalid."),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckOutputDataTypes(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "output tensors",
-                                                             "The dtype of an output tensor is invalid"),
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "The dtype of an output tensor is invalid."),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(
-        CheckWeightScaleDataTypesAndFormats(context, expertParams, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "weight and scale tensors",
-                                                 "The dtype or format of a weight or scale tensor is invalid"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckWeightScaleDataTypesAndFormats(context, expertParams, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "The dtype or format of a weight or scale tensor is invalid."),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckDispatchInputShapes(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "dispatch inputs",
-                                                             "The shape of a dispatch input tensor is invalid"),
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "The shape of a dispatch input tensor is invalid."),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(
-        CheckWeightAndScaleShapeRelations(context, config, expertParams, tilingData->actMode, nodeName) !=
-            ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "weight and scale tensors",
-                                                 "The shape relation between weight and scale tensors is invalid"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckWeightAndScaleShapeRelations(context, config, expertParams, tilingData->actMode, nodeName) !=
+                        ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "The shape relation between weight and scale tensors is invalid."),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckYShape(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "y", "The shape of y is invalid"),
-                    return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "The shape of y is invalid."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -70,18 +60,19 @@ static ge::graphStatus CheckAndSetIndependentAttrs(const gert::TilingContext* co
                                                    MegaMoeTilingData* tilingData, const char* nodeName)
 {
     OP_TILING_CHECK(CheckAndSetTopoType(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "topology type is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "topology type is invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckAndSetEpWorldSizeAttr(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "EP world size is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "EP world size is invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckDedupRequestAttrs(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "communication algorithm is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "communication algorithm is invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckAndSetQuantModeAttrs(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "quantization mode attributes are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "quantization mode attributes are invalid."),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckActivationParams(context, config, tilingData->compute.topoType, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "activation parameters are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "activation parameters are invalid."), return ge::GRAPH_FAILED);
     SetActivationAttrParams(context, config, tilingData);
     OP_TILING_CHECK(CheckAndSetTopkWeightsTypeAttr(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "topK weights type is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "topK weights type is invalid."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -97,24 +88,21 @@ static ge::graphStatus CheckAndSetExpertExecutionParams(const gert::TilingContex
 {
     OP_TILING_CHECK(CheckAndSetQuantOutDtypes(context, config, expertParams, tilingData->compute.topoType, nodeName) !=
                         ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "expert quantization settings are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "expert quantization settings are invalid."),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckAndSetExpertGmmModes(context, expertParams, tilingData->compute.topoType, tilingData,
                                               nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "expert GMM modes are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "expert GMM modes are invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckAndSetTokenDimensions(context, tilingData, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "token dimensions are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "token dimensions are invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckAndSetHiddenDim(context, tilingData, expertParams, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "hiddenDim is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "hiddenDim is invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         CheckAndSetExpertCountAttrs(context, config, expertParams, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "expert count attributes",
-                                                 "One or more expert count attributes are invalid"),
-        return ge::GRAPH_FAILED);
+        OP_LOGE_WITHOUT_REPORT(nodeName, "One or more expert count attributes are invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         CheckExpertTokenNumsShape(context, config, tilingData->compute.moeExpertPerRank, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "expertTokenNums",
-                                                 "The shape of expertTokenNums is invalid"),
-        return ge::GRAPH_FAILED);
+        OP_LOGE_WITHOUT_REPORT(nodeName, "The shape of expert_token_nums is invalid."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -125,9 +113,10 @@ static ge::graphStatus CheckAndSetCapacityAttrs(const gert::TilingContext* conte
                                                 MegaMoeTilingData* tilingData, const char* nodeName)
 {
     OP_TILING_CHECK(CheckAndSetMaxTokensPerRankAttr(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "maximum tokens per rank is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "maximum tokens per rank is invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckAndSetMaxRecvTokenNumAttr(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "maximum received token count is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "maximum received token count is invalid."),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -143,10 +132,10 @@ static ge::graphStatus SetDedupModeParams(const gert::TilingContext* context, co
     (void)context;
     (void)config;
     OP_TILING_CHECK(ApplyDedupPrepassChunkGuard(tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "dedup prepass capacity check failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "dedup prepass capacity check failed."), return ge::GRAPH_FAILED);
     ApplyDedupBenefitGate(tilingData, nodeName);
     OP_TILING_CHECK(ApplyDedupCombineCapacityGate(tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "combine dedup capacity check failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "combine dedup capacity check failed."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -160,7 +149,15 @@ static ge::graphStatus CheckArchitectureCapability(gert::TilingContext* context,
     bool moeSupported = supportedGmmMode(tilingData->moeGmmMode);
     bool sharedSupported = tilingData->compute.sharedExpertNum == 0U || supportedGmmMode(tilingData->sharedGmmMode);
     OP_TILING_CHECK(tilingData->compute.topoType != TOPO_TYPE_MTE || !moeSupported || !sharedSupported,
-                    OP_LOGE(nodeName, "arch92 only enables A8W8/A4W4 MTE"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        nodeName, "topo_type, weight1/weight2 dtype and format",
+                        "[topo_type=" + std::to_string(tilingData->compute.topoType) +
+                            ", moeGmmMode=" + std::to_string(tilingData->moeGmmMode) + ", sharedGmmMode=" +
+                            (tilingData->compute.sharedExpertNum == 0U ? std::string("absent") :
+                                                                         std::to_string(tilingData->sharedGmmMode)) +
+                            "]",
+                        "arch92 only supports A8W8/A4W4 GMM modes with topo_type=MTE(0)"),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -361,6 +358,18 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
 }
 
 /*
+ * 平台资源不足导致的 Tiling 失败属「合法输入下 Tiling 执行失败」，按 EZ1008 首报正式码。
+ * 裸 OP_LOGE 的宏体写死 EZ9999 内部码，不可用于对外首报。
+ */
+static void ReportPlatformTilingFailure(const char* nodeName, const std::string& reason)
+{
+    OP_LOGE_WITHOUT_REPORT(nodeName, "%s", reason.c_str());
+    const std::vector<const char*> msgKey = {"opName", "reason"};
+    const std::vector<const char*> msgValue = {nodeName, reason.c_str()};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgValue);
+}
+
+/*
  * 按依赖顺序生成 dispatch、SendMask 和 unpermute 的自适应 UB 配置。
  */
 static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext* context, const MegaMoeConfig& config,
@@ -369,12 +378,13 @@ static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext* conte
 {
     auto topKWeightsDesc = context->GetInputDesc(config.topkWeightsIndex);
     auto xDesc = context->GetInputDesc(config.xIndex);
-    OP_TILING_CHECK(availableUbBytes < ARCH92_FIXED_WORK_UB_BYTES + ARCH92_DISPATCH_TABLE_BYTES,
-                    OP_LOGE(nodeName,
-                            "Arch92 UB is insufficient: available=%u bytes, fixed working area=%u bytes, "
-                            "dispatch tables=%u bytes.",
-                            availableUbBytes, ARCH92_FIXED_WORK_UB_BYTES, ARCH92_DISPATCH_TABLE_BYTES),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        availableUbBytes < ARCH92_FIXED_WORK_UB_BYTES + ARCH92_DISPATCH_TABLE_BYTES,
+        ReportPlatformTilingFailure(
+            nodeName, "Arch92 UB is insufficient: available=" + std::to_string(availableUbBytes) +
+                          " bytes, fixed working area=" + std::to_string(ARCH92_FIXED_WORK_UB_BYTES) +
+                          " bytes, dispatch tables=" + std::to_string(ARCH92_DISPATCH_TABLE_BYTES) + " bytes."),
+        return ge::GRAPH_FAILED);
     const uint32_t dispatchUbBytes = (availableUbBytes - ARCH92_DISPATCH_TABLE_BYTES) /
                                      static_cast<uint32_t>(ALIGN_512) * static_cast<uint32_t>(ALIGN_512);
     tilingData->dispatchTableUbBaseAddr = dispatchUbBytes;
@@ -441,10 +451,11 @@ static ge::graphStatus CalcMegaMoeL1Layout(uint64_t maxGmmK, uint64_t l1Bytes, M
     constexpr uint64_t MIN_SCALE_TOTAL_BYTES = SCALE_BUFFER_NUM * (MIN_SCALE_A_BYTES + MIN_SCALE_B_BYTES);
     constexpr uint64_t MIN_L1_BYTES = A_BYTES + B_BYTES + MIN_SCALE_TOTAL_BYTES;
 
-    OP_TILING_CHECK(
-        l1Bytes < MIN_L1_BYTES,
-        OP_LOGE(nodeName, "platform L1 size %lu is smaller than the minimum required size %lu", l1Bytes, MIN_L1_BYTES),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(l1Bytes < MIN_L1_BYTES,
+                    ReportPlatformTilingFailure(nodeName, "platform L1 size " + std::to_string(l1Bytes) +
+                                                              " is smaller than the minimum required size " +
+                                                              std::to_string(MIN_L1_BYTES)),
+                    return ge::GRAPH_FAILED);
 
     // 第 1 步：scale 硬件按 K64 成对存储，每行对应两个 scale 字节。
     // M/N 和 tile 字节数已对齐，不需要额外计算 padding。
@@ -503,7 +514,7 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
                                                  static_cast<uint64_t>(GetActivationOutputWidth(
                                                      tilingData->compute.hiddenDim, tilingData->actMode))),
                                         l1Size, tilingData->a8w4L1Layout, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "calculate A8W4 L1 layout failed"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "calculate A8W4 L1 layout failed"), return ge::GRAPH_FAILED);
 
     WorkspaceLayout workspaceLayout(tilingData->compute,
                                     WorkspaceLayout::Arch92{tilingData->moeGmmMode, tilingData->sharedGmmMode});
@@ -513,9 +524,9 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
     capacityComm.dispatchStorage = {MemoryLayoutDetail::FP8_BITS};
     OP_TILING_CHECK(CheckCclBufferCapacity(context, config, tilingData, workspaceLayout, nodeName, &capacityComm) !=
                         ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CCL buffer capacity is insufficient."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "CCL buffer capacity is insufficient."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(SetWorkspace(context, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Tiling set workspace failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling set workspace failed."), return ge::GRAPH_FAILED);
 
     context->SetBlockDim(
         ascendcPlatform.CalcTschBlockDim(tilingData->blockAivNum, tilingData->compute.aicNum, tilingData->blockAivNum));
@@ -541,51 +552,54 @@ ge::graphStatus MegaMoeTilingFuncImplArch92(gert::TilingContext* context, MegaMo
     OP_CHECK_NULL_WITH_CONTEXT(context, tilingData);
 
     OP_TILING_CHECK(CheckRequiredTensorPtrNullptr(context, config) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "tensor pointer check failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "tensor pointer check failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckUnsupportedOptionalInputs(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "unsupported optional input is present."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "unsupported optional input is present."),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckRequiredAttrPtrNullptr(context, config) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "attribute pointer check failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "attribute pointer check failed."), return ge::GRAPH_FAILED);
 
     // 独立属性：topo_type、ep_world_size、comm_alg、dispatch_quant_mode、combine_quant_mode、
     // activation、activation_params 和 topk_weights_type。
     OP_TILING_CHECK(CheckAndSetIndependentAttrs(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "independent attributes are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "independent attributes are invalid."), return ge::GRAPH_FAILED);
     // scales 的 descriptor/shape 判空必须先于后续 dtype、format 和 shape 校验。
     OP_TILING_CHECK(CheckScalesInput(context, config, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "scales input requirements are not satisfied."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "scales input requirements are not satisfied."),
+                    return ge::GRAPH_FAILED);
 
     // Tensor 契约：不读取 attr；先确定 weight/scale 组织形式，再校验 dtype、format 和 shape。
     MegaMoeExpertParams expertParams = MakeExpertParams(config);
     OP_TILING_CHECK(CheckAndSetTensorMetadata(context, config, expertParams, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "tensor metadata is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "tensor metadata is invalid."), return ge::GRAPH_FAILED);
 
     // 专家执行属性：dispatch_quant_out_dtype、shared_expert_quant_out_dtype 和 expert_num。
     OP_TILING_CHECK(
         CheckAndSetExpertExecutionParams(context, config, expertParams, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE(nodeName, "expert execution parameters are invalid."), return ge::GRAPH_FAILED);
+        OP_LOGE_WITHOUT_REPORT(nodeName, "expert execution parameters are invalid."), return ge::GRAPH_FAILED);
 
     // 容量属性：num_max_tokens_per_rank、max_recv_token_num 和 ccl_buffer_size。
     OP_TILING_CHECK(CheckAndSetCapacityAttrs(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "capacity attributes are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "capacity attributes are invalid."), return ge::GRAPH_FAILED);
 
     // 通信去重：请求位落库 + per-shape 收益/容量门。prepass 容量护栏要读 numMaxTokensPerRank，
     // 故必须排在容量属性落库之后；CCL 窗口下界在收益门确定最终布局后于 CommitTilingResult 中检查。
     OP_TILING_CHECK(SetDedupModeParams(context, config, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "dedup mode params are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "dedup mode params are invalid."), return ge::GRAPH_FAILED);
 
     // 平台与资源规划。
     uint32_t aicNum = 0U;
     uint64_t ubSize = 0U;
     OP_TILING_CHECK(CheckAndSetPlatformParams(context, tilingData, aicNum, ubSize, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "platform parameters are invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "platform parameters are invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckArchitectureCapability(context, tilingData, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "architecture capability is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "architecture capability is invalid."), return ge::GRAPH_FAILED);
 
     SetWaveParams(tilingData, aicNum);
     OP_TILING_CHECK(SetAdaptiveBufferConfigs(context, config, expertParams, tilingData, static_cast<uint32_t>(ubSize),
                                              nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "adaptive UB buffer configuration failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "adaptive UB buffer configuration failed."),
+                    return ge::GRAPH_FAILED);
 
     return CommitTilingResult(context, config, expertParams, tilingData, nodeName);
 }

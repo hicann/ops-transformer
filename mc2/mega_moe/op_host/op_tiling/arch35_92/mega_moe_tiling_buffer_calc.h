@@ -97,8 +97,18 @@ struct ExpertWeightInputIndices {
     uint32_t weightScalesTwo;
 };
 
+// 专家权重类输入的 IR 公开参数名（见 mega_moe_def.cpp）；error message 的 paramName 必须用它，
+// 不能用内部角色名——MoE 与共享专家共用同一校验链，角色名无法区分 weight1 与 shared_weight1。
+struct ExpertWeightInputNames {
+    const char* weightOne;
+    const char* weightTwo;
+    const char* weightScalesOne;
+    const char* weightScalesTwo;
+};
+
 struct ExpertParams {
     ExpertWeightInputIndices inputs;
+    ExpertWeightInputNames names;
     const char* expertTypeName;
     int64_t expertCount;
     ge::DataType quantOutDtype;
@@ -127,9 +137,11 @@ static MegaMoeExpertParams MakeExpertParams(const MegaMoeConfig& config)
     MegaMoeExpertParams params{};
     params.moe.inputs = {config.weight1Index, config.weight2Index, config.weightScales1Index,
                          config.weightScales2Index};
+    params.moe.names = {"weight1", "weight2", "weight_scales1", "weight_scales2"};
     params.moe.expertTypeName = "MoE expert";
     params.shared.inputs = {config.sharedWeight1Index, config.sharedWeight2Index, config.sharedWeightScales1Index,
                             config.sharedWeightScales2Index};
+    params.shared.names = {"shared_weight1", "shared_weight2", "shared_weight_scales1", "shared_weight_scales2"};
     params.shared.expertTypeName = "shared expert";
     return params;
 }

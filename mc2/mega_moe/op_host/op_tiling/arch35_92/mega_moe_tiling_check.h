@@ -75,14 +75,14 @@ static ge::graphStatus CheckSwiGluActivationParams(const float* activationParams
                                                    const char* nodeName)
 {
     OP_TILING_CHECK(paramCount > 1U,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParamsSize", std::to_string(paramCount).c_str(),
-                                              "0 or 1 for swiglu/swiglustep"),
+                    OP_LOGE_FOR_INVALID_LISTSIZE(nodeName, "activation_params", std::to_string(paramCount).c_str(),
+                                                 "0 or 1 for swiglu/swiglustep"),
                     return ge::GRAPH_FAILED);
     if (paramCount == 1U) {
         const float activationClamp = activationParams[0];
         OP_TILING_CHECK(activationClamp < 0.0f || std::isnan(activationClamp),
-                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationClamp", std::to_string(activationClamp).c_str(),
-                                                  "should be >= 0 and not NAN"),
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation_params[0]",
+                                                  std::to_string(activationClamp).c_str(), ">= 0 and not NAN"),
                         return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -96,21 +96,21 @@ static ge::graphStatus CheckSwiGluOaiActivationParams(const float* activationPar
                                                       const char* nodeName)
 {
     OP_TILING_CHECK(paramCount != 0U && paramCount != 3U,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParamsSize", std::to_string(paramCount).c_str(),
-                                              "0 or 3 for swigluoai [clamp, alpha, beta]"),
+                    OP_LOGE_FOR_INVALID_LISTSIZE(nodeName, "activation_params", std::to_string(paramCount).c_str(),
+                                                 "0 or 3 for swigluoai [clamp, alpha, beta]"),
                     return ge::GRAPH_FAILED);
     if (paramCount == 3U) {
         const float activationClamp = activationParams[0];
         OP_TILING_CHECK(activationClamp < 0.0f || std::isnan(activationClamp),
-                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationClamp", std::to_string(activationClamp).c_str(),
-                                                  ">= 0 and not NAN"),
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation_params[0]",
+                                                  std::to_string(activationClamp).c_str(), ">= 0 and not NAN"),
                         return ge::GRAPH_FAILED);
         OP_TILING_CHECK(!std::isfinite(activationParams[1]),
-                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationAlpha",
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation_params[1]",
                                                   std::to_string(activationParams[1]).c_str(), "finite"),
                         return ge::GRAPH_FAILED);
         OP_TILING_CHECK(!std::isfinite(activationParams[2]),
-                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationBeta",
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation_params[2]",
                                                   std::to_string(activationParams[2]).c_str(), "finite"),
                         return ge::GRAPH_FAILED);
     }
@@ -127,19 +127,19 @@ static ge::graphStatus CheckSituGluActivationParams(const float* activationParam
                                                     const char* nodeName)
 {
     OP_TILING_CHECK(paramCount < 1U || paramCount > 2U,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParamsSize", std::to_string(paramCount).c_str(),
-                                              "should be 1 or 2 for situglu"),
+                    OP_LOGE_FOR_INVALID_LISTSIZE(nodeName, "activation_params", std::to_string(paramCount).c_str(),
+                                                 "1 or 2 for situglu"),
                     return ge::GRAPH_FAILED);
     const float beta = activationParams[0];
     OP_TILING_CHECK(!std::isfinite(beta) || beta <= 0.0f,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "situglu_beta", std::to_string(beta).c_str(),
-                                              "should be finite and greater than 0"),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation_params[0]", std::to_string(beta).c_str(),
+                                              "finite and greater than 0"),
                     return ge::GRAPH_FAILED);
     if (paramCount == 2U) {
         const float linearBeta = activationParams[1];
         OP_TILING_CHECK(!std::isfinite(linearBeta) || linearBeta <= 0.0f,
-                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "situglu_linear_beta", std::to_string(linearBeta).c_str(),
-                                                  "should be finite and greater than 0"),
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation_params[1]", std::to_string(linearBeta).c_str(),
+                                                  "finite and greater than 0"),
                         return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -152,11 +152,11 @@ static ge::graphStatus CheckGeluActivationParams(const float* activationParams, 
 {
     OP_TILING_CHECK(
         paramCount != 1U,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParamsSize", std::to_string(paramCount).c_str(), "1 for gelu"),
+        OP_LOGE_FOR_INVALID_LISTSIZE(nodeName, "activation_params", std::to_string(paramCount).c_str(), "1 for gelu"),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         activationParams[0] != DEFAULT_ACTIVATION_CLAMP,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParams[0]", std::to_string(activationParams[0]).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation_params[0]", std::to_string(activationParams[0]).c_str(),
                                   "float maximum placeholder for gelu"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
@@ -214,8 +214,8 @@ static ge::graphStatus CheckAndSetEpWorldSizeAttr(const gert::TilingContext* con
     int64_t maxEpWorldSize =
         IsLayeredTopology(tilingData->compute.topoType) ? MAX_URMA_EP_WORLD_SIZE : MAX_MTE_EP_WORLD_SIZE;
     OP_TILING_CHECK(epWorldSize < MIN_EP_WORLD_SIZE || epWorldSize > maxEpWorldSize,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "epWorldSize", std::to_string(epWorldSize).c_str(),
-                                              (std::string("should in [") + std::to_string(MIN_EP_WORLD_SIZE) + ", " +
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "ep_world_size", std::to_string(epWorldSize).c_str(),
+                                              (std::string("in [") + std::to_string(MIN_EP_WORLD_SIZE) + ", " +
                                                std::to_string(maxEpWorldSize) + "] for the selected topology")
                                                   .c_str()),
                     return ge::GRAPH_FAILED);
@@ -225,8 +225,11 @@ static ge::graphStatus CheckAndSetEpWorldSizeAttr(const gert::TilingContext* con
     OP_TILING_CHECK(
         IsLayeredTopology(tilingData->compute.topoType) &&
             (rankNumPerServer <= 0 || rankNumPerServer > epWorldSize || epWorldSize % rankNumPerServer != 0),
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "rankNumPerServer", std::to_string(rankNumPerServer).c_str(),
-                                  "should be in [1, epWorldSize] and divide epWorldSize for URMA"),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "rank_num_per_server", std::to_string(rankNumPerServer).c_str(),
+            (std::string("it must be in [1, ep_world_size(") + std::to_string(epWorldSize) +
+             ")] and divide ep_world_size evenly for URMA topology")
+                .c_str()),
         return ge::GRAPH_FAILED);
     tilingData->rankNumPerServer = IsLayeredTopology(tilingData->compute.topoType) ?
                                        static_cast<uint32_t>(rankNumPerServer) :
@@ -301,34 +304,40 @@ static ge::graphStatus CheckAndSetExpertCountAttrs(const gert::TilingContext* co
 
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>((config.attrMoeExpertNumIndex));
     int64_t moeExpertNum = static_cast<int64_t>(*moeExpertNumPtr);
-    OP_TILING_CHECK((moeExpertNum < epWorldSize || moeExpertNum > MAX_MOE_EXPERT_NUM) || (moeExpertNum % epWorldSize),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "moeExpertNum", std::to_string(moeExpertNum).c_str(),
-                                              (std::string("should in [") + std::to_string(epWorldSize) + ", " +
-                                               std::to_string(MAX_MOE_EXPERT_NUM) + "] and mod(..., epWorldSize(" +
-                                               std::to_string(epWorldSize) + ")) == 0")
-                                                  .c_str()),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (moeExpertNum < epWorldSize || moeExpertNum > MAX_MOE_EXPERT_NUM) || (moeExpertNum % epWorldSize),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
+            (std::string("it must be in [") + std::to_string(epWorldSize) + ", " + std::to_string(MAX_MOE_EXPERT_NUM) +
+             "] and divisible by ep_world_size(" + std::to_string(epWorldSize) + ")")
+                .c_str()),
+        return ge::GRAPH_FAILED);
 
     int64_t moeExpertPerRank = moeExpertNum / epWorldSize;
     OP_TILING_CHECK(moeExpertPerRank < MIN_EXPERT_PER_RANK || moeExpertPerRank > MAX_EXPERT_PER_RANK,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "moeExpertPerRank", std::to_string(moeExpertPerRank).c_str(),
-                                              (std::string("should in [") + std::to_string(MIN_EXPERT_PER_RANK) + ", " +
-                                               std::to_string(MAX_EXPERT_PER_RANK) + "]")
-                                                  .c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        nodeName, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
+                        (std::string("the derived expert count per rank (moe_expert_num / ep_world_size) is ") +
+                         std::to_string(moeExpertPerRank) + ", but it must be in [" +
+                         std::to_string(MIN_EXPERT_PER_RANK) + ", " + std::to_string(MAX_EXPERT_PER_RANK) + "]")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(expertParams.moe.expertCount != moeExpertPerRank,
-                    OP_LOGE_FOR_INVALID_VALUE(
-                        nodeName, "weight1 expert count", std::to_string(expertParams.moe.expertCount).c_str(),
-                        (std::string("should equal the local MoE expert count (moeExpertNum / epWorldSize) = ") +
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        nodeName, expertParams.moe.names.weightOne,
+                        (std::string("its expert count is ") + std::to_string(expertParams.moe.expertCount) +
+                         ", but it must equal the local MoE expert count (moe_expert_num / ep_world_size) = " +
                          std::to_string(moeExpertPerRank))
                             .c_str()),
                     return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(
-        expertParams.shared.expertCount > MAX_SHARED_EXPERT_NUM,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertNum", std::to_string(expertParams.shared.expertCount).c_str(),
-                                  "only support 0-4"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(expertParams.shared.expertCount > MAX_SHARED_EXPERT_NUM,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        nodeName, expertParams.shared.names.weightOne,
+                        (std::string("its shared expert count is ") + std::to_string(expertParams.shared.expertCount) +
+                         ", but at most " + std::to_string(MAX_SHARED_EXPERT_NUM) + " shared experts are supported")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
 
     tilingData->compute.moeExpertPerRank = static_cast<uint32_t>(moeExpertPerRank);
     tilingData->compute.sharedExpertNum = static_cast<uint32_t>(expertParams.shared.expertCount);
@@ -353,16 +362,17 @@ static ge::graphStatus CheckAndResolveDispatchDtype(const gert::TilingContext* c
     if (IsBf16PassthroughX(context, config)) {
         OP_TILING_CHECK(
             attrDtype != ge::DT_UNDEFINED,
-            OP_LOGE_FOR_INVALID_VALUE(nodeName, "dispatch_quant_out_dtype", std::to_string(attrDtype).c_str(),
+            OP_LOGE_FOR_INVALID_DTYPE(nodeName, "dispatch_quant_out_dtype", Ops::Base::ToString(attrDtype).c_str(),
                                       "DT_UNDEFINED (leave dispatch_quant_out_dtype unset for A16W16)"),
             return ge::GRAPH_FAILED);
         dispatchDtype = ge::DT_BF16;
         return ge::GRAPH_SUCCESS;
     }
-    OP_TILING_CHECK(!IsPreQuantizedXType(attrDtype),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "dispatch_quant_out_dtype", std::to_string(attrDtype).c_str(),
-                                              "fp8_e5m2, fp8_e4m3fn or fp4_e2m1 for quantized input"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        !IsPreQuantizedXType(attrDtype),
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "dispatch_quant_out_dtype", Ops::Base::ToString(attrDtype).c_str(),
+                                  "DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN or DT_FLOAT4_E2M1 for quantized input"),
+        return ge::GRAPH_FAILED);
     dispatchDtype = attrDtype;
     return ge::GRAPH_SUCCESS;
 }
@@ -429,8 +439,8 @@ static ge::graphStatus CheckAndSetQuantModeAttrs(const gert::TilingContext* cont
         *combineQuantModePtr != COMBINE_QUANT_OUT_TYPE_NO_QUANT &&
             *combineQuantModePtr != COMBINE_QUANT_OUT_TYPE_E5M2 &&
             *combineQuantModePtr != COMBINE_QUANT_OUT_TYPE_E4M3FN,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "combineQuantMode", std::to_string(*combineQuantModePtr).c_str(),
-                                  "only support no_quant(0), fp8_e5m2(3) and fp8_e4m3fn(4)"),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_quant_mode", std::to_string(*combineQuantModePtr).c_str(),
+                                  "0 (no quant), 3 (fp8_e5m2) or 4 (fp8_e4m3fn)"),
         return ge::GRAPH_FAILED);
     tilingData->dispatchQuantMode = static_cast<uint32_t>(*dispatchQuantModePtr);
     tilingData->combineQuantMode = static_cast<uint32_t>(*combineQuantModePtr);
@@ -446,13 +456,13 @@ static ge::graphStatus CheckPreQuantizedXAttrs(const gert::TilingContext* contex
 {
     auto xDesc = context->GetInputDesc(config.xIndex);
     // 预量化输入不再由 x dtype 反推类型，属性与接口补充的逻辑 descriptor 必须严格一致。
-    OP_TILING_CHECK(
-        xDesc->GetDataType() != moeQuantOutDtype,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "dispatch_quant_out_dtype", std::to_string(moeQuantOutDtype).c_str(),
-                                  (std::string("the same dtype as x (") + Ops::Base::ToString(xDesc->GetDataType()) +
-                                   ") for pre-quantized input")
-                                      .c_str()),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(xDesc->GetDataType() != moeQuantOutDtype,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        nodeName, "dispatch_quant_out_dtype", Ops::Base::ToString(moeQuantOutDtype).c_str(),
+                        (std::string("it must be the same dtype as x (") + Ops::Base::ToString(xDesc->GetDataType()) +
+                         ") for pre-quantized input")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(topoType != TOPO_TYPE_MTE,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "topo_type", std::to_string(topoType).c_str(),
                                               "0 (MTE), because pre-quantized x does not support URMA"),
@@ -461,10 +471,10 @@ static ge::graphStatus CheckPreQuantizedXAttrs(const gert::TilingContext* contex
     // 预量化 x 只有一份 data/scales；共享专家显式配置类型时只能与 MoE 专家保持一致。
     const bool hasExplicitSharedQuantDtype = sharedQuantOutDtype != ge::DT_UNDEFINED;
     OP_TILING_CHECK(hasExplicitSharedQuantDtype && sharedQuantOutDtype != moeQuantOutDtype,
-                    OP_LOGE_FOR_INVALID_VALUE(
-                        nodeName, "shared_expert_quant_out_dtype", std::to_string(sharedQuantOutDtype).c_str(),
-                        (std::string("DT_UNDEFINED or the same dtype as dispatch_quant_out_dtype (") +
-                         std::to_string(moeQuantOutDtype) + ") for pre-quantized x")
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        nodeName, "shared_expert_quant_out_dtype", Ops::Base::ToString(sharedQuantOutDtype).c_str(),
+                        (std::string("it must be DT_UNDEFINED or the same dtype as dispatch_quant_out_dtype (") +
+                         Ops::Base::ToString(moeQuantOutDtype) + ") for pre-quantized x")
                             .c_str()),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
@@ -481,16 +491,16 @@ static ge::graphStatus CheckAndSetQuantOutDtypes(const gert::TilingContext* cont
     auto dispatchQuantModePtr = attrs->GetAttrPointer<int64_t>((config.attrDispatchQuantModeIndex));
     ge::DataType moeQuantOutDtype = ge::DT_UNDEFINED;
     OP_TILING_CHECK(CheckAndResolveDispatchDtype(context, config, moeQuantOutDtype, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "dispatch input dtype is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "dispatch input dtype is invalid."), return ge::GRAPH_FAILED);
 
     auto sharedQuantOutDtypePtr = attrs->GetAttrPointer<int64_t>(config.attrSharedExpertQuantOutDtypeIndex);
     ge::DataType sharedQuantOutDtype = static_cast<ge::DataType>(*sharedQuantOutDtypePtr);
     bool hasExplicitSharedQuantDtype = sharedQuantOutDtype != ge::DT_UNDEFINED;
     OP_TILING_CHECK(params.shared.expertCount > 0 && hasExplicitSharedQuantDtype &&
                         sharedQuantOutDtype != ge::DT_BF16 && !IsPreQuantizedXType(sharedQuantOutDtype),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "shared_expert_quant_out_dtype",
-                                              std::to_string(*sharedQuantOutDtypePtr).c_str(),
-                                              "DT_UNDEFINED, bf16, fp8_e5m2, fp8_e4m3fn or fp4_e2m1"),
+                    OP_LOGE_FOR_INVALID_DTYPE(
+                        nodeName, "shared_expert_quant_out_dtype", Ops::Base::ToString(sharedQuantOutDtype).c_str(),
+                        "DT_UNDEFINED, DT_BF16, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN or DT_FLOAT4_E2M1"),
                     return ge::GRAPH_FAILED);
 
     const bool isPreQuantizedX =
@@ -498,7 +508,8 @@ static ge::graphStatus CheckAndSetQuantOutDtypes(const gert::TilingContext* cont
     if (isPreQuantizedX) {
         OP_TILING_CHECK(CheckPreQuantizedXAttrs(context, config, moeQuantOutDtype, sharedQuantOutDtype, topoType,
                                                 nodeName) != ge::GRAPH_SUCCESS,
-                        OP_LOGE(nodeName, "pre-quantized x attributes are invalid."), return ge::GRAPH_FAILED);
+                        OP_LOGE_WITHOUT_REPORT(nodeName, "pre-quantized x attributes are invalid."),
+                        return ge::GRAPH_FAILED);
     } else {
         auto xDesc = context->GetInputDesc(config.xIndex);
         OP_TILING_CHECK(
@@ -527,27 +538,33 @@ static ge::graphStatus CheckAndSetExpertGmmMode(const gert::TilingContext* conte
 
     ge::DataType weightOneDtype = weightOneDesc->GetDataType();
     ge::DataType weightTwoDtype = weightTwoDesc->GetDataType();
-    std::string weightNames = std::string(expertParams.expertTypeName) + " weight1, weight2";
+    const std::string weightOneName = expertParams.names.weightOne;
+    const std::string weightTwoName = expertParams.names.weightTwo;
+    std::string weightNames = weightOneName + ", " + weightTwoName;
     std::string weightDtypes =
         "[" + Ops::Base::ToString(weightOneDtype) + ", " + Ops::Base::ToString(weightTwoDtype) + "]";
     OP_TILING_CHECK(weightOneDtype != weightTwoDtype,
-                    OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
-                        nodeName, weightNames.c_str(), weightDtypes.c_str(),
-                        "weight1 and weight2 within the same expert group must have the same dtype."),
+                    OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(nodeName, weightNames.c_str(), weightDtypes.c_str(),
+                                                           (weightOneName + " and " + weightTwoName +
+                                                            " within the same expert group must have the same dtype.")),
                     return ge::GRAPH_FAILED);
 
     ge::Format weightOneFormat = weightOneDesc->GetStorageFormat();
     ge::Format weightTwoFormat = weightTwoDesc->GetStorageFormat();
     expertParams.gmmMode =
         ResolveExpertGmmMode(expertParams.quantOutDtype, weightOneDtype, weightOneFormat, weightTwoFormat);
-    std::string actualConfig = "[" + Ops::Base::ToString(expertParams.quantOutDtype) + ", " +
-                               Ops::Base::ToString(weightOneDtype) + ", " + Ops::Base::ToString(weightOneFormat) +
-                               ", " + Ops::Base::ToString(weightTwoFormat) + "]";
+    // 结构化实际值进多参宏的 incorrect_values 槽（EZ0027），并逐项带标签：quant output dtype 由属性派生、
+    // 不是 weight 张量的属性，靠标签说明归属，避免「两个参数名配四个裸值」的名值错配。
+    const std::string actualConfig = "[quant output dtype=" + Ops::Base::ToString(expertParams.quantOutDtype) + ", " +
+                                     weightOneName + " dtype=" + Ops::Base::ToString(weightOneDtype) + ", " +
+                                     weightOneName + " format=" + Ops::Base::ToString(weightOneFormat) + ", " +
+                                     weightTwoName + " format=" + Ops::Base::ToString(weightTwoFormat) + "]";
     OP_TILING_CHECK(
         expertParams.gmmMode == std::numeric_limits<uint8_t>::max(),
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
-            nodeName, "quant output dtype, weight dtype, weight1 format, weight2 format", actualConfig.c_str(),
-            (std::string(expertParams.expertTypeName) + " configuration does not form a supported GMM mode.").c_str()),
+            nodeName, weightNames.c_str(), actualConfig.c_str(),
+            (std::string("this combination is not a supported GMM mode for the ") + expertParams.expertTypeName)
+                .c_str()),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -592,19 +609,23 @@ static ge::graphStatus CheckAndSetMaxTokensPerRankAttr(const gert::TilingContext
     auto attrs = context->GetAttrs();
     auto numMaxTokensPerRankPtr = attrs->GetAttrPointer<int64_t>((config.attrNumMaxTokensPerRankIndex));
     int64_t numMaxTokensPerRank = static_cast<int64_t>(*numMaxTokensPerRankPtr);
-    OP_TILING_CHECK(IsLayeredTopology(tilingData->compute.topoType) && tilingData->compute.bs == 0U,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "bs", "0", "should be greater than 0 for URMA"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        IsLayeredTopology(tilingData->compute.topoType) && tilingData->compute.bs == 0U,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            nodeName, "x", Ops::Base::ToString(context->GetInputShape(config.xIndex)->GetOriginShape()).c_str(),
+            "dim 0 (BS) must be greater than 0 when topo_type selects URMA"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(IsLayeredTopology(tilingData->compute.topoType) && numMaxTokensPerRank == 0,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "numMaxTokensPerRank", "0",
-                                              "should be >= bs and identical on all ranks for URMA"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "num_max_tokens_per_rank", "0",
+                                                          "it must be greater than or equal to bs (dim 0 of x) and "
+                                                          "identical on all ranks when topo_type selects URMA"),
                     return ge::GRAPH_FAILED);
     // 下游 token 索引仍使用 uint32，因此保留 UINT32_MAX 上界。
     OP_TILING_CHECK(
         numMaxTokensPerRank < 0 || numMaxTokensPerRank > 0xFFFFFFFFLL ||
             (numMaxTokensPerRank != 0 && tilingData->compute.bs > numMaxTokensPerRank),
         OP_LOGE_FOR_INVALID_VALUE(
-            nodeName, "numMaxTokensPerRank", std::to_string(numMaxTokensPerRank).c_str(),
+            nodeName, "num_max_tokens_per_rank", std::to_string(numMaxTokensPerRank).c_str(),
             (std::string("0 or in [bs, UINT32_MAX], bs is ") + std::to_string(tilingData->compute.bs).c_str())),
         return ge::GRAPH_FAILED);
     if (numMaxTokensPerRank == 0) {
@@ -616,8 +637,12 @@ static ge::graphStatus CheckAndSetMaxTokensPerRankAttr(const gert::TilingContext
     OP_TILING_CHECK(
         IsLayeredTopology(tilingData->compute.topoType) && (routeCapacity > std::numeric_limits<int32_t>::max() ||
                                                             maxOutputCapacity > std::numeric_limits<int32_t>::max()),
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "URMA token capacity", std::to_string(maxOutputCapacity).c_str(),
-                                  "route indexes and prefix sums should fit in INT32_MAX"),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "num_max_tokens_per_rank", std::to_string(numMaxTokensPerRank).c_str(),
+            (std::string("the URMA route index capacity (") + std::to_string(routeCapacity) +
+             ") and output token capacity (" + std::to_string(maxOutputCapacity) +
+             ") derived from it must both fit in INT32_MAX")
+                .c_str()),
         return ge::GRAPH_FAILED);
     tilingData->compute.numMaxTokensPerRank = static_cast<uint32_t>(numMaxTokensPerRank);
     tilingData->topkIndexTypeBytes = static_cast<uint32_t>(CalcTopkIndexTypeBytesForTopology(
@@ -634,8 +659,8 @@ static ge::graphStatus CheckAndSetTopkWeightsTypeAttr(const gert::TilingContext*
     auto attrs = context->GetAttrs();
     int64_t topkWeightsType = *attrs->GetAttrPointer<int64_t>((config.attrTopkWeightsTypeIndex));
     OP_TILING_CHECK(topkWeightsType != 0 && topkWeightsType != 1,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "topkWeightsType", std::to_string(topkWeightsType).c_str(),
-                                              "only support 0(disabled) or 1(enabled)"),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "topk_weights_type", std::to_string(topkWeightsType).c_str(),
+                                              "0 (disabled) or 1 (enabled)"),
                     return ge::GRAPH_FAILED);
 
     tilingData->isTopkWeightsPrefetch = static_cast<bool>(topkWeightsType);
@@ -662,8 +687,8 @@ static ge::graphStatus CheckCclBufferCapacity(const gert::TilingContext* context
     int64_t requiredCclBufferSize = cclComputeOffset + workspaceLayout.workspaceSize;
     OP_TILING_CHECK(
         cclBufferSize < requiredCclBufferSize,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "cclBufferSize", std::to_string(cclBufferSize).c_str(),
-                                  (std::string("should >= ") + std::to_string(requiredCclBufferSize)).c_str()),
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "ccl_buffer_size", std::to_string(cclBufferSize).c_str(),
+                                  (std::string("at least ") + std::to_string(requiredCclBufferSize)).c_str()),
         return ge::GRAPH_FAILED);
     OP_LOGD(nodeName, "cclBufferSize=%ld, cclComputeOffset=%ld, cclComputeSize=%ld", cclBufferSize, cclComputeOffset,
             workspaceLayout.workspaceSize);
@@ -679,22 +704,31 @@ static ge::graphStatus CheckAndSetMaxRecvTokenNumAttr(const gert::TilingContext*
     auto attrs = context->GetAttrs();
     int64_t maxRecvTokenNum = static_cast<int64_t>(*attrs->GetAttrPointer<int64_t>((config.attrMaxRecvTokenNumIndex)));
     OP_TILING_CHECK(maxRecvTokenNum < 0,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "maxRecvTokenNum", std::to_string(maxRecvTokenNum).c_str(),
-                                              "should be greater than or equal to 0"),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "max_recv_token_num", std::to_string(maxRecvTokenNum).c_str(),
+                                              "greater than or equal to 0"),
                     return ge::GRAPH_FAILED);
 
     uint64_t defaultMaxOutputSize = static_cast<uint64_t>(tilingData->compute.numMaxTokensPerRank) *
                                     tilingData->compute.epWorldSize *
                                     std::min(tilingData->compute.topK, tilingData->compute.moeExpertPerRank);
     uint64_t maxOutputSize = maxRecvTokenNum != 0 ? static_cast<uint64_t>(maxRecvTokenNum) : defaultMaxOutputSize;
-    OP_TILING_CHECK(maxOutputSize > std::numeric_limits<uint32_t>::max(),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "maxOutputSize", std::to_string(maxOutputSize).c_str(),
-                                              "should be less than or equal to UINT32_MAX"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        maxOutputSize > std::numeric_limits<uint32_t>::max(),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "max_recv_token_num", std::to_string(maxRecvTokenNum).c_str(),
+            (std::string("the resulting maximum output token number (") + std::to_string(maxOutputSize) +
+             ") must not exceed UINT32_MAX; when max_recv_token_num is 0 it falls back to the capacity derived from "
+             "num_max_tokens_per_rank, ep_world_size, moe_expert_num and topk")
+                .c_str()),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(IsLayeredTopology(tilingData->compute.topoType) &&
                         static_cast<uint64_t>(maxRecvTokenNum) > defaultMaxOutputSize,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "maxRecvTokenNum", std::to_string(maxRecvTokenNum).c_str(),
-                                              "should not exceed the URMA maximum receive token capacity"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        nodeName, "max_recv_token_num", std::to_string(maxRecvTokenNum).c_str(),
+                        (std::string("in layered topology it must not exceed num_max_tokens_per_rank * "
+                                     "ep_world_size * min(topK, moe_expert_per_rank) = ") +
+                         std::to_string(defaultMaxOutputSize))
+                            .c_str()),
                     return ge::GRAPH_FAILED);
     tilingData->compute.maxOutputSize = static_cast<uint32_t>(maxOutputSize);
     return ge::GRAPH_SUCCESS;
@@ -746,27 +780,48 @@ static void SetActivationAttrParams(const gert::TilingContext* context, const Me
     }
 }
 
+// 专家权重类动态输入的「输入索引 + IR 公开名」配对，用于让报错点精确到命中的那一个输入。
+struct ExpertTensorSlot {
+    uint32_t index;
+    const char* name;
+};
+
 // 专家权重首项及其 scale 的指针统一在入口检查；共享专家允许整体缺省。
 static ge::graphStatus CheckExpertInputPtrs(const gert::TilingContext* context, const ExpertWeightInputIndices& inputs,
-                                            bool required)
+                                            const ExpertWeightInputNames& names, bool required)
 {
+    // MoE 与共享专家各调一次本函数且 names 不同，下面两张表禁写 static（会冻结首次调用的名字）。
+    const ExpertTensorSlot weightSlots[] = {{inputs.weightOne, names.weightOne}, {inputs.weightTwo, names.weightTwo}};
     bool requiresScales = false;
-    for (uint32_t index : {inputs.weightOne, inputs.weightTwo}) {
-        const auto* desc = context->GetDynamicInputDesc(index, 0);
-        const auto* shape = context->GetDynamicInputShape(index, 0);
-        if (!required && desc == nullptr && shape == nullptr) {
-            continue;
+    for (const auto& slot : weightSlots) {
+        const auto* desc = context->GetDynamicInputDesc(slot.index, 0);
+        const auto* shape = context->GetDynamicInputShape(slot.index, 0);
+        if (desc == nullptr && shape == nullptr) {
+            if (!required) {
+                continue;
+            }
+            // 仅覆盖「公开 API 传了空张量列表」这一种姿势：经 aclnn 完全不传时，aclnn_mega_moe.cpp 的
+            // CreateEmptyTensor 会建 shape=[0] 占位张量，desc/shape 非空、走不到这里，由后续维数校验拦下。
+            OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), slot.name);
+            return ge::GRAPH_FAILED;
         }
         OP_CHECK_NULL_WITH_CONTEXT(context, desc);
         OP_CHECK_NULL_WITH_CONTEXT(context, shape);
         requiresScales = requiresScales || (desc->GetDataType() != ge::DT_BF16 &&
                                             (required || shape->GetOriginShape().GetShapeSize() != 0));
     }
-    for (uint32_t index : {inputs.weightScalesOne, inputs.weightScalesTwo}) {
-        const auto* desc = context->GetDynamicInputDesc(index, 0);
-        const auto* shape = context->GetDynamicInputShape(index, 0);
-        if (!requiresScales && desc == nullptr && shape == nullptr) {
-            continue;
+    const ExpertTensorSlot scaleSlots[] = {{inputs.weightScalesOne, names.weightScalesOne},
+                                           {inputs.weightScalesTwo, names.weightScalesTwo}};
+    for (const auto& slot : scaleSlots) {
+        const auto* desc = context->GetDynamicInputDesc(slot.index, 0);
+        const auto* shape = context->GetDynamicInputShape(slot.index, 0);
+        if (desc == nullptr && shape == nullptr) {
+            if (!requiresScales) {
+                continue;
+            }
+            // 权重非 BF16 时 scale 必传；与上同理，这里只覆盖传了空张量列表的姿势。
+            OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), slot.name);
+            return ge::GRAPH_FAILED;
         }
         OP_CHECK_NULL_WITH_CONTEXT(context, desc);
         OP_CHECK_NULL_WITH_CONTEXT(context, shape);
@@ -788,11 +843,13 @@ static ge::graphStatus CheckRequiredTensorPtrNullptr(const gert::TilingContext* 
         OP_CHECK_NULL_WITH_CONTEXT(context, context->GetOutputShape(index));
     }
     const auto params = MakeExpertParams(config);
-    OP_TILING_CHECK(CheckExpertInputPtrs(context, params.moe.inputs, true) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context->GetNodeName(), "MoE expert input pointers are invalid."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckExpertInputPtrs(context, params.shared.inputs, false) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context->GetNodeName(), "Shared expert input pointers are invalid."),
+    OP_TILING_CHECK(CheckExpertInputPtrs(context, params.moe.inputs, params.moe.names, true) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "MoE expert input pointers are invalid."),
                     return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckExpertInputPtrs(context, params.shared.inputs, params.shared.names, false) != ge::GRAPH_SUCCESS,
+        OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Shared expert input pointers are invalid."),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -803,8 +860,8 @@ static ge::graphStatus CheckUnsupportedOptionalInputs(const gert::TilingContext*
                                                       const char* nodeName)
 {
     auto xActiveMaskDesc = context->GetOptionalInputDesc(config.xActiveMaskIndex);
-    OP_TILING_CHECK(xActiveMaskDesc != nullptr, OP_LOGE_FOR_INVALID_VALUE(nodeName, "xActiveMask", "not null", "null"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(xActiveMaskDesc != nullptr,
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "x_active_mask", "not null", "null"), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -899,10 +956,10 @@ static ge::graphStatus CheckTensorListEntryMatchesReference(const gert::StorageS
  * 以第 0 项为基准，从第 1 项开始逐项比较。
  */
 static ge::graphStatus CheckTensorListInternalConsistency(const gert::TilingContext* context, uint32_t inputIndex,
-                                                          const char* inputRole, const char* expertTypeName,
-                                                          const char* nodeName)
+                                                          const char* paramName, const char* nodeName)
 {
-    std::string inputName = std::string(inputRole) + " of " + expertTypeName;
+    // paramName 为 IR 公开参数名，直接作为 error message 的参数名，不再拼接展示用的专家类型文字。
+    std::string inputName(paramName);
     uint32_t tensorCount = GetDynamicInputTensorCount(context, inputIndex);
     OP_TILING_CHECK(tensorCount == 0U, OP_LOGE_WITH_INVALID_INPUT(nodeName, inputName.c_str()),
                     return ge::GRAPH_FAILED);
@@ -944,18 +1001,25 @@ static ge::graphStatus CheckWeightDimRelation(const gert::StorageShape* shape, u
 static ge::graphStatus CheckEmptyWeightScales(const gert::TilingContext* context, const ExpertParams& expertParams,
                                               const char* nodeName)
 {
-    for (uint32_t index : {expertParams.inputs.weightScalesOne, expertParams.inputs.weightScalesTwo}) {
+    // 宏只有一个实际值槽，paramName 必须是命中的那一个输入，不能把两个名字拼在一起；表禁写 static。
+    const ExpertTensorSlot scaleSlots[] = {{expertParams.inputs.weightScalesOne, expertParams.names.weightScalesOne},
+                                           {expertParams.inputs.weightScalesTwo, expertParams.names.weightScalesTwo}};
+    for (const auto& slot : scaleSlots) {
         for (uint32_t tensorIndex = 0U;; ++tensorIndex) {
-            const auto* desc = context->GetDynamicInputDesc(index, tensorIndex);
-            const auto* shape = context->GetDynamicInputShape(index, tensorIndex);
+            const auto* desc = context->GetDynamicInputDesc(slot.index, tensorIndex);
+            const auto* shape = context->GetDynamicInputShape(slot.index, tensorIndex);
             if (desc == nullptr && shape == nullptr) {
                 break;
             }
             OP_CHECK_NULL_WITH_CONTEXT(context, desc);
             OP_CHECK_NULL_WITH_CONTEXT(context, shape);
-            OP_TILING_CHECK(shape->GetOriginShape().GetShapeSize() != 0,
-                            OP_LOGE(nodeName, "%s: A16W16 的 weight scales 必须为空。", expertParams.expertTypeName),
-                            return ge::GRAPH_FAILED);
+            OP_TILING_CHECK(
+                shape->GetOriginShape().GetShapeSize() != 0,
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    nodeName, slot.name, std::to_string(shape->GetOriginShape().GetShapeSize()),
+                    std::string("A16W16 requires empty weight scales for the ") + expertParams.expertTypeName +
+                        "; the tensor at list index " + std::to_string(tensorIndex) + " is not empty"),
+                return ge::GRAPH_FAILED);
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -981,18 +1045,19 @@ static ge::graphStatus CheckWeightAndScaleDimNum(const gert::TilingContext* cont
 {
     const auto& inputs = expertParams.inputs;
     const uint32_t scaleDimNum = weightDimNum + 1U;
-    const std::string nameSuffix = std::string(" of ") + expertParams.expertTypeName;
-    const std::string weightOneName = "weight1[0]" + nameSuffix;
-    const std::string weightTwoName = "weight2[0]" + nameSuffix;
-    const std::string weightScalesOneName = "weight_scales1[0]" + nameSuffix;
-    const std::string weightScalesTwoName = "weight_scales2[0]" + nameSuffix;
+    const std::string weightOneName = expertParams.names.weightOne;
+    const std::string weightTwoName = expertParams.names.weightTwo;
+    const std::string weightScalesOneName = expertParams.names.weightScalesOne;
+    const std::string weightScalesTwoName = expertParams.names.weightScalesTwo;
 
     auto weightOneShape = context->GetDynamicInputShape(inputs.weightOne, 0);
     auto weightTwoShape = context->GetDynamicInputShape(inputs.weightTwo, 0);
     auto weightScalesOneShape = context->GetDynamicInputShape(inputs.weightScalesOne, 0);
     auto weightScalesTwoShape = context->GetDynamicInputShape(inputs.weightScalesTwo, 0);
+    // 第一处的参照固定为 MoE 的 weight1：weightDimNum 由 CheckAndSetWeightAndScaleLayout 从 moe.weightOne 取出
+    // 后同时传给两侧，MoE 侧恒等必过，这条只可能在共享专家侧触发，故参照名不随本侧专家类型变。
     bool hasInvalidDimNum = CheckWeightDimRelation(weightOneShape, weightDimNum, weightDimNum, weightOneName.c_str(),
-                                                   "weight1[0] of MoE expert", nodeName) != ge::GRAPH_SUCCESS ||
+                                                   "weight1", nodeName) != ge::GRAPH_SUCCESS ||
                             CheckWeightDimRelation(weightTwoShape, weightDimNum, weightDimNum, weightTwoName.c_str(),
                                                    weightOneName.c_str(), nodeName) != ge::GRAPH_SUCCESS;
     if (hasInvalidDimNum) {
@@ -1023,12 +1088,13 @@ static ge::graphStatus CheckWeightScaleTrailingDim(const gert::TilingContext* co
         GetSingleExpertTensorDimSize(weightScalesOneShape, WEIGHT_SCALE_MULTI_BASE_DIM_INDEX, isPerExpertWeightTensor);
     const int64_t scaleTwoMultiBase =
         GetSingleExpertTensorDimSize(weightScalesTwoShape, WEIGHT_SCALE_MULTI_BASE_DIM_INDEX, isPerExpertWeightTensor);
-    const std::string scaleNames = std::string(expertParams.expertTypeName) + " weight_scales1, weight_scales2";
+    const std::string scaleNames =
+        std::string(expertParams.names.weightScalesOne) + ", " + expertParams.names.weightScalesTwo;
     const std::string trailingDimensions =
         "[" + std::to_string(scaleOneMultiBase) + ", " + std::to_string(scaleTwoMultiBase) + "]";
     OP_TILING_CHECK(
         scaleOneMultiBase != WEIGHT_SCALE_MULTI_BASE_DIM_SIZE || scaleTwoMultiBase != WEIGHT_SCALE_MULTI_BASE_DIM_SIZE,
-        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(nodeName, scaleNames.c_str(), trailingDimensions.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(nodeName, scaleNames.c_str(), trailingDimensions.c_str(),
                                                "The trailing dimension of each weight scale tensor must be 2"),
         return ge::GRAPH_FAILED);
 
@@ -1043,6 +1109,9 @@ static ge::graphStatus CheckWeightAndScaleTensorCounts(const gert::TilingContext
                                                        const char* nodeName)
 {
     const auto& inputs = expertParams.inputs;
+    const std::string weightAndScaleNames = std::string(expertParams.names.weightOne) + ", " +
+                                            expertParams.names.weightTwo + ", " + expertParams.names.weightScalesOne +
+                                            ", " + expertParams.names.weightScalesTwo;
     uint32_t weightOneTensorCount = GetDynamicInputTensorCount(context, inputs.weightOne);
     uint32_t weightTwoTensorCount = GetDynamicInputTensorCount(context, inputs.weightTwo);
     uint32_t weightScalesOneTensorCount = GetDynamicInputTensorCount(context, inputs.weightScalesOne);
@@ -1052,10 +1121,12 @@ static ge::graphStatus CheckWeightAndScaleTensorCounts(const gert::TilingContext
                                                                   weightScalesTwoTensorCount != weightOneTensorCount));
     OP_TILING_CHECK(
         tensorCountsMismatch || (!isPerExpertWeightTensor && weightOneTensorCount != 1U),
-        OP_LOGE(nodeName,
-                "weight1, weight2, weight_scales1 and weight_scales2 of %s must contain the same number of tensors; "
-                "stacked layout requires exactly one tensor.",
-                expertParams.expertTypeName),
+        OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
+            nodeName, weightAndScaleNames,
+            std::to_string(weightOneTensorCount) + ", " + std::to_string(weightTwoTensorCount) + ", " +
+                std::to_string(weightScalesOneTensorCount) + ", " + std::to_string(weightScalesTwoTensorCount),
+            std::string("the weight and weight scale inputs of the ") + expertParams.expertTypeName +
+                " must contain the same number of tensors; stacked layout requires exactly one tensor"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1067,6 +1138,9 @@ static ge::graphStatus CheckStackedExpertDimConsistency(const gert::TilingContex
                                                         const ExpertParams& expertParams, const char* nodeName)
 {
     const auto& inputs = expertParams.inputs;
+    const std::string weightNames = std::string(expertParams.names.weightOne) + ", " + expertParams.names.weightTwo;
+    const std::string scaleNames =
+        std::string(expertParams.names.weightScalesOne) + ", " + expertParams.names.weightScalesTwo;
     auto weightOneShape = context->GetDynamicInputShape(inputs.weightOne, 0);
     auto weightTwoShape = context->GetDynamicInputShape(inputs.weightTwo, 0);
     auto weightScalesOneShape = context->GetDynamicInputShape(inputs.weightScalesOne, 0);
@@ -1074,7 +1148,10 @@ static ge::graphStatus CheckStackedExpertDimConsistency(const gert::TilingContex
     int64_t expertCount = weightOneShape->GetStorageShape().GetDim(0);
     OP_TILING_CHECK(weightTwoShape->GetStorageShape().GetDim(0) != expertCount,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        nodeName, "weight1, weight2", "mismatched",
+                        nodeName, weightNames.c_str(),
+                        (Ops::Base::ToString(weightOneShape->GetStorageShape()) + ", " +
+                         Ops::Base::ToString(weightTwoShape->GetStorageShape()))
+                            .c_str(),
                         (std::string("The first dimensions must have matching expert counts for ") +
                          expertParams.expertTypeName + " inputs")
                             .c_str()),
@@ -1083,7 +1160,10 @@ static ge::graphStatus CheckStackedExpertDimConsistency(const gert::TilingContex
         OP_TILING_CHECK(weightScalesOneShape->GetStorageShape().GetDim(0) != expertCount ||
                             weightScalesTwoShape->GetStorageShape().GetDim(0) != expertCount,
                         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                            nodeName, "weight_scales1, weight_scales2", "mismatched",
+                            nodeName, scaleNames.c_str(),
+                            (Ops::Base::ToString(weightScalesOneShape->GetStorageShape()) + ", " +
+                             Ops::Base::ToString(weightScalesTwoShape->GetStorageShape()))
+                                .c_str(),
                             (std::string("The first dimensions must have matching expert counts for ") +
                              expertParams.expertTypeName + " inputs")
                                 .c_str()),
@@ -1107,15 +1187,15 @@ static ge::graphStatus CheckWeightAndScaleConsistency(const gert::TilingContext*
     }
 
     bool inconsistentTensorLists =
-        CheckTensorListInternalConsistency(context, inputs.weightOne, "weight1", expertParams.expertTypeName,
-                                           nodeName) != ge::GRAPH_SUCCESS ||
-        CheckTensorListInternalConsistency(context, inputs.weightTwo, "weight2", expertParams.expertTypeName,
-                                           nodeName) != ge::GRAPH_SUCCESS ||
+        CheckTensorListInternalConsistency(context, inputs.weightOne, expertParams.names.weightOne, nodeName) !=
+            ge::GRAPH_SUCCESS ||
+        CheckTensorListInternalConsistency(context, inputs.weightTwo, expertParams.names.weightTwo, nodeName) !=
+            ge::GRAPH_SUCCESS ||
         (expertParams.hasWeightScales &&
-         (CheckTensorListInternalConsistency(context, inputs.weightScalesOne, "weight_scales1",
-                                             expertParams.expertTypeName, nodeName) != ge::GRAPH_SUCCESS ||
-          CheckTensorListInternalConsistency(context, inputs.weightScalesTwo, "weight_scales2",
-                                             expertParams.expertTypeName, nodeName) != ge::GRAPH_SUCCESS));
+         (CheckTensorListInternalConsistency(context, inputs.weightScalesOne, expertParams.names.weightScalesOne,
+                                             nodeName) != ge::GRAPH_SUCCESS ||
+          CheckTensorListInternalConsistency(context, inputs.weightScalesTwo, expertParams.names.weightScalesTwo,
+                                             nodeName) != ge::GRAPH_SUCCESS));
     if (inconsistentTensorLists) {
         return ge::GRAPH_FAILED;
     }
@@ -1132,12 +1212,13 @@ static ge::graphStatus CheckExpertWeightAndScaleLayout(const gert::TilingContext
                                                        const char* nodeName)
 {
     OP_TILING_CHECK(CheckWeightAndScaleDimNum(context, expertParams, weightDimNum, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Expert weight or scale tensor dimensions are invalid."),
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Expert weight or scale tensor dimensions are invalid."),
                     return ge::GRAPH_FAILED);
     if (expertParams.hasWeightScales) {
         OP_TILING_CHECK(
             CheckWeightScaleTrailingDim(context, expertParams, weightDimNum == TWO_DIMS, nodeName) != ge::GRAPH_SUCCESS,
-            OP_LOGE(nodeName, "Expert weight scale trailing dimension is invalid."), return ge::GRAPH_FAILED);
+            OP_LOGE_WITHOUT_REPORT(nodeName, "Expert weight scale trailing dimension is invalid."),
+            return ge::GRAPH_FAILED);
     }
     return CheckWeightAndScaleConsistency(context, expertParams, weightDimNum, nodeName);
 }
@@ -1154,14 +1235,16 @@ static ge::graphStatus CheckAndSetWeightAndScaleLayout(const gert::TilingContext
     uint32_t weightDimNum = weightOneShape->GetStorageShape().GetDimNum();
     OP_TILING_CHECK(
         weightDimNum != TWO_DIMS && weightDimNum != THREE_DIMS,
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "weight1", (std::to_string(weightDimNum) + "D").c_str(),
-                                                 "weight1 must be one stacked 3D tensor or a list of 2D tensors."),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            nodeName, params.moe.names.weightOne, (std::to_string(weightDimNum) + "D").c_str(),
+            std::string(params.moe.names.weightOne) + " must be one stacked 3D tensor or a list of 2D tensors"),
         return ge::GRAPH_FAILED);
     params.isPerExpertWeightTensor = weightDimNum == TWO_DIMS;
     OP_TILING_CHECK(CheckAndSetWeightScalePolicy(context, params.moe, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "MoE expert weight scale policy is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "MoE expert weight scale policy is invalid."),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckExpertWeightAndScaleLayout(context, params.moe, weightDimNum, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "MoE expert weight layout is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "MoE expert weight layout is invalid."), return ge::GRAPH_FAILED);
     params.moe.expertCount = GetWeightExpertCount(context, params.moe.inputs.weightOne, params.isPerExpertWeightTensor);
 
     // 共享专家沿用共同的成对输入规则，BF16 仅调整 scale 的使用策略。
@@ -1175,25 +1258,36 @@ static ge::graphStatus CheckAndSetWeightAndScaleLayout(const gert::TilingContext
     const bool hasSharedScalesTwo =
         GetWeightExpertCount(context, params.shared.inputs.weightScalesTwo, params.isPerExpertWeightTensor) > 0;
     params.shared.hasWeightScales = params.moe.hasWeightScales;
+    const std::string sharedWeightAndScaleNames =
+        std::string(params.shared.names.weightOne) + ", " + params.shared.names.weightTwo + ", " +
+        params.shared.names.weightScalesOne + ", " + params.shared.names.weightScalesTwo;
     if (hasSharedWeightOne && hasSharedWeightTwo) {
         OP_TILING_CHECK(CheckAndSetWeightScalePolicy(context, params.shared, nodeName) != ge::GRAPH_SUCCESS,
-                        OP_LOGE(nodeName, "Shared expert weight scale policy is invalid."), return ge::GRAPH_FAILED);
+                        OP_LOGE_WITHOUT_REPORT(nodeName, "Shared expert weight scale policy is invalid."),
+                        return ge::GRAPH_FAILED);
     }
     OP_TILING_CHECK(
         hasSharedWeightOne != hasSharedWeightTwo ||
             (params.shared.hasWeightScales &&
              (hasSharedWeightOne != hasSharedScalesOne || hasSharedWeightOne != hasSharedScalesTwo)),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "shared expert weights and weight scales", "partially provided",
-                                              "Shared expert weights and weight scales must be provided "
-                                              "together"),
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            nodeName, sharedWeightAndScaleNames,
+            (std::string("[") + (hasSharedWeightOne ? "present" : "absent") + ", " +
+             (hasSharedWeightTwo ? "present" : "absent") + ", " + (hasSharedScalesOne ? "present" : "absent") + ", " +
+             (hasSharedScalesTwo ? "present" : "absent") + "]")
+                .c_str(),
+            (std::string(params.shared.names.weightOne) + " and " + params.shared.names.weightTwo +
+             " must be provided together; when weight scales are in use, " + params.shared.names.weightScalesOne +
+             " and " + params.shared.names.weightScalesTwo + " must be provided alongside them")),
         return ge::GRAPH_FAILED);
     if (hasSharedWeightOne) {
         OP_TILING_CHECK(
             CheckExpertWeightAndScaleLayout(context, params.shared, weightDimNum, nodeName) != ge::GRAPH_SUCCESS,
-            OP_LOGE(nodeName, "Shared expert weight layout is invalid."), return ge::GRAPH_FAILED);
+            OP_LOGE_WITHOUT_REPORT(nodeName, "Shared expert weight layout is invalid."), return ge::GRAPH_FAILED);
     } else if (!params.shared.hasWeightScales) {
         OP_TILING_CHECK(CheckEmptyWeightScales(context, params.shared, nodeName) != ge::GRAPH_SUCCESS,
-                        OP_LOGE(nodeName, "A16W16 的共享专家 weight scales 必须为空。"), return ge::GRAPH_FAILED);
+                        OP_LOGE_WITHOUT_REPORT(nodeName, "Shared expert empty weight scales check failed."),
+                        return ge::GRAPH_FAILED);
     }
     tilingData->isPerExpertWeightTensor = params.isPerExpertWeightTensor;
     return ge::GRAPH_SUCCESS;
@@ -1228,22 +1322,27 @@ static ge::graphStatus CheckWeightPairShapeRelations(const gert::TilingContext* 
     const std::string commonMatrixDimensionsString = "[" + std::to_string(weight1ColumnCount) + ", " +
                                                      std::to_string(weight2RowCount) + ", " +
                                                      std::to_string(xColumnCount) + "]";
-    OP_TILING_CHECK(weight1ColumnCount != weight2RowCount || weight1ColumnCount != xColumnCount,
-                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        nodeName, expertParams.expertTypeName, commonMatrixDimensionsString.c_str(),
-                        "weight1 column count and weight2 row count must equal x column count"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        weight1ColumnCount != weight2RowCount || weight1ColumnCount != xColumnCount,
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            nodeName, (std::string(expertParams.names.weightOne) + ", " + expertParams.names.weightTwo + ", x").c_str(),
+            commonMatrixDimensionsString.c_str(),
+            (std::string(expertParams.names.weightOne) + " column count (GMM1 K) and " + expertParams.names.weightTwo +
+             " row count (GMM2 K) must equal x column count")),
+        return ge::GRAPH_FAILED);
 
     const std::string weightRowColumnDimensionsString =
         "[" + std::to_string(weight1RowCount) + ", " + std::to_string(weight2ColumnCount) + "]";
     const int64_t outputDivisor = static_cast<int64_t>(GetActivationOutputDivisor(actMode));
-    OP_TILING_CHECK(weight1RowCount % outputDivisor != 0 || weight2ColumnCount != weight1RowCount / outputDivisor,
-                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        nodeName, expertParams.expertTypeName, weightRowColumnDimensionsString.c_str(),
-                        (std::string("weight2 column count must equal weight1 row count divided by ") +
-                         std::to_string(outputDivisor))
-                            .c_str()),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        weight1RowCount % outputDivisor != 0 || weight2ColumnCount != weight1RowCount / outputDivisor,
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            nodeName, (std::string(expertParams.names.weightOne) + ", " + expertParams.names.weightTwo).c_str(),
+            weightRowColumnDimensionsString.c_str(),
+            (std::string(expertParams.names.weightTwo) + " column count (GMM2 N) must equal " +
+             expertParams.names.weightOne + " row count (GMM1 N) divided by " + std::to_string(outputDivisor))
+                .c_str()),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1284,9 +1383,9 @@ static ge::graphStatus CheckYShape(const gert::TilingContext* context, const Meg
     const int64_t yDim1 = yStorageShape->GetStorageShape().GetDim(1);
     OP_TILING_CHECK(
         yDim0 != bs || yDim1 != h,
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
             nodeName, "y", (std::string("[") + std::to_string(yDim0) + ", " + std::to_string(yDim1) + "]").c_str(),
-            (std::string("The shape of y must be [bs, h] = [") + std::to_string(bs) + ", " + std::to_string(h) + "].")
+            (std::string("The shape of y must be [bs, h] = [") + std::to_string(bs) + ", " + std::to_string(h) + "]")
                 .c_str()),
         return ge::GRAPH_FAILED);
 
@@ -1308,9 +1407,9 @@ static ge::graphStatus CheckExpertTokenNumsShape(const gert::TilingContext* cont
     OP_TILING_CHECK(
         expertTokenNumsDim0 != moeExpertPerRank,
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            nodeName, "expertTokenNums", (std::string("dim0=") + std::to_string(expertTokenNumsDim0)).c_str(),
-            (std::string("The shape [dim0] of expertTokenNums must be equal to moeExpertPerRank(") +
-             std::to_string(moeExpertPerRank) + ").")
+            nodeName, "expert_token_nums", (std::string("dim0=") + std::to_string(expertTokenNumsDim0)).c_str(),
+            (std::string("The shape [dim0] of expert_token_nums must be equal to moe_expert_num / ep_world_size(") +
+             std::to_string(moeExpertPerRank) + ")")
                 .c_str()),
         return ge::GRAPH_FAILED);
 
@@ -1324,9 +1423,8 @@ static ge::graphStatus CheckExpertTokenNumsShape(const gert::TilingContext* cont
  */
 static ge::graphStatus CheckWeightScaleShapeRelation(const gert::StorageShape* weightScaleStorageShape,
                                                      const gert::StorageShape* weightStorageShape,
-                                                     bool isPerExpertWeightTensor, const char* expertTypeName,
-                                                     const char* weightScaleRole, const char* weightRole,
-                                                     const char* nodeName)
+                                                     bool isPerExpertWeightTensor, const char* weightScaleRole,
+                                                     const char* weightRole, const char* nodeName)
 {
     const int64_t weightScaleMatrixDimSize =
         GetSingleExpertTensorDimSize(weightScaleStorageShape, WEIGHT_SCALE_MATRIX_DIM_INDEX, isPerExpertWeightTensor);
@@ -1339,17 +1437,17 @@ static ge::graphStatus CheckWeightScaleShapeRelation(const gert::StorageShape* w
 
     OP_TILING_CHECK(weightScaleMatrixDimSize != weightRowCount,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        nodeName, (std::string(expertTypeName) + " " + weightScaleRole).c_str(),
+                        nodeName, weightScaleRole,
                         (std::string("matrix dimension=") + std::to_string(weightScaleMatrixDimSize)).c_str(),
-                        (std::string("The matrix dimension must equal the row count of ") + expertTypeName + " " +
-                         weightRole + "(" + std::to_string(weightRowCount) + ")")
+                        (std::string("The matrix dimension must equal the row count of ") + weightRole + "(" +
+                         std::to_string(weightRowCount) + ")")
                             .c_str()),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(weightScaleGroupDimSize != ops::CeilDiv(weightColumnCount, INPUT_WEIGHT_SCALES_CEIL_ALIGN),
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        nodeName, (std::string(expertTypeName) + " " + weightScaleRole).c_str(),
+                        nodeName, weightScaleRole,
                         (std::string("group dimension=") + std::to_string(weightScaleGroupDimSize)).c_str(),
-                        (std::string("The group dimension must equal CeilDiv(") + expertTypeName + " " + weightRole +
+                        (std::string("The group dimension must equal CeilDiv(") + weightRole +
                          " column count, INPUT_WEIGHT_SCALES_CEIL_ALIGN) = " +
                          std::to_string(ops::CeilDiv(weightColumnCount, INPUT_WEIGHT_SCALES_CEIL_ALIGN)))
                             .c_str()),
@@ -1373,13 +1471,13 @@ static ge::graphStatus CheckWeightScaleShapeRelations(const gert::TilingContext*
 
     ge::graphStatus checkStatus =
         CheckWeightScaleShapeRelation(weightScalesOneStorageShape, weightOneStorageShape, isPerExpertWeightTensor,
-                                      expertParams.expertTypeName, "weight_scales1", "weight1", nodeName);
+                                      expertParams.names.weightScalesOne, expertParams.names.weightOne, nodeName);
     if (checkStatus != ge::GRAPH_SUCCESS) {
         return checkStatus;
     }
     checkStatus =
         CheckWeightScaleShapeRelation(weightScalesTwoStorageShape, weightTwoStorageShape, isPerExpertWeightTensor,
-                                      expertParams.expertTypeName, "weight_scales2", "weight2", nodeName);
+                                      expertParams.names.weightScalesTwo, expertParams.names.weightTwo, nodeName);
     if (checkStatus != ge::GRAPH_SUCCESS) {
         return checkStatus;
     }
@@ -1427,14 +1525,14 @@ static ge::graphStatus CheckRoutingInputShapes(const gert::TilingContext* contex
                                                int64_t bs, const char* nodeName)
 {
     const gert::StorageShape* topkIdsStorageShape = context->GetInputShape(config.topkIdsIndex);
-    if (CheckTensorDimNum(topkIdsStorageShape, TWO_DIMS, "topkIds", nodeName) != ge::GRAPH_SUCCESS) {
+    if (CheckTensorDimNum(topkIdsStorageShape, TWO_DIMS, "topk_ids", nodeName) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     const int64_t topkIdsDim0 = topkIdsStorageShape->GetStorageShape().GetDim(0);
     const int64_t topkIdsDim1 = topkIdsStorageShape->GetStorageShape().GetDim(1);
 
     const gert::StorageShape* topkWeightsStorageShape = context->GetInputShape(config.topkWeightsIndex);
-    if (CheckTensorDimNum(topkWeightsStorageShape, TWO_DIMS, "topkWeights", nodeName) != ge::GRAPH_SUCCESS) {
+    if (CheckTensorDimNum(topkWeightsStorageShape, TWO_DIMS, "topk_weights", nodeName) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     const int64_t topkWeightsDim0 = topkWeightsStorageShape->GetStorageShape().GetDim(0);
@@ -1442,19 +1540,19 @@ static ge::graphStatus CheckRoutingInputShapes(const gert::TilingContext* contex
 
     OP_TILING_CHECK(bs != topkIdsDim0 || bs != topkWeightsDim0,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        nodeName, "x, topkIds, topkWeights",
+                        nodeName, "x, topk_ids, topk_weights",
                         (std::string("[") + std::to_string(bs) + ", " + std::to_string(topkIdsDim0) + ", " +
                          std::to_string(topkWeightsDim0) + "]")
                             .c_str(),
-                        "The shape [dim0] of x, topkIds, and topkWeights must be equal."),
+                        "The shape [dim0] of x, topk_ids, and topk_weights must be equal"),
                     return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(
         topkIdsDim1 != topkWeightsDim1,
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-            nodeName, "topkIds, topkWeights",
+            nodeName, "topk_ids, topk_weights",
             (std::string("[") + std::to_string(topkIdsDim1) + ", " + std::to_string(topkWeightsDim1) + "]").c_str(),
-            "The shape [dim1] of topkIds and topkWeights must be equal."),
+            "The shape [dim1] of topk_ids and topk_weights must be equal"),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -1478,12 +1576,10 @@ static ge::graphStatus CheckDispatchInputShapes(const gert::TilingContext* conte
     const int64_t bs = xStorageShape->GetOriginShape().GetDim(0);
     const int64_t h = xStorageShape->GetOriginShape().GetDim(1);
     OP_TILING_CHECK(CheckXScalesShape(context, config, bs, h, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x scales", "The shape of x scales is invalid"),
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "The shape of x scales is invalid."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckRoutingInputShapes(context, config, bs, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "The shape of a routing input is invalid."),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(
-        CheckRoutingInputShapes(context, config, bs, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "routing inputs", "The shape of a routing input is invalid"),
-        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1497,8 +1593,7 @@ static ge::graphStatus CheckWeightAndScaleShapeRelations(const gert::TilingConte
 {
     OP_TILING_CHECK(
         CheckWeightShapeRelations(context, expertParams, config.xIndex, actMode, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "weight tensors",
-                                                 "The shape relation between weight tensors is invalid"),
+        OP_LOGE_WITHOUT_REPORT(nodeName, "The shape relation between weight tensors is invalid."),
         return ge::GRAPH_FAILED);
 
     if (expertParams.shared.expertCount > 0) {
@@ -1510,19 +1605,22 @@ static ge::graphStatus CheckWeightAndScaleShapeRelations(const gert::TilingConte
                                                             expertParams.isPerExpertWeightTensor);
         int64_t sharedHiddenDim = GetSingleExpertTensorDimSize(sharedWeightOneShape, WEIGHT_MATRIX_ROW_DIM_INDEX,
                                                                expertParams.isPerExpertWeightTensor);
-        OP_TILING_CHECK(sharedHiddenDim != moeHiddenDim,
-                        OP_LOGE_FOR_INVALID_VALUE(
-                            nodeName, "shared expert hiddenDim", std::to_string(sharedHiddenDim).c_str(),
-                            (std::string("must equal MoE expert hiddenDim ") + std::to_string(moeHiddenDim)).c_str()),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            sharedHiddenDim != moeHiddenDim,
+            // 这条是跨侧比较，两个名字分属共享与 MoE 两侧，不能用单侧 expertParams.names 代入。
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                nodeName, "shared_weight1, weight1",
+                (std::string("[") + std::to_string(sharedHiddenDim) + ", " + std::to_string(moeHiddenDim) + "]")
+                    .c_str(),
+                "The hiddenDim (row dim of a single expert's weight1) of shared_weight1 and weight1 "
+                "must be equal."),
+            return ge::GRAPH_FAILED);
     }
 
     if (expertParams.moe.hasWeightScales) {
         OP_TILING_CHECK(CheckWeightScaleShapeRelations(context, expertParams.moe, expertParams.isPerExpertWeightTensor,
-                                                       nodeName) == ge::GRAPH_FAILED,
-                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "MoE weight scales",
-                                                                 "The shape relation of MoE weight scales is "
-                                                                 "invalid"),
+                                                       nodeName) != ge::GRAPH_SUCCESS,
+                        OP_LOGE_WITHOUT_REPORT(nodeName, "The shape relation of MoE weight scales is invalid."),
                         return ge::GRAPH_FAILED);
     }
 
@@ -1530,8 +1628,7 @@ static ge::graphStatus CheckWeightAndScaleShapeRelations(const gert::TilingConte
         expertParams.shared.expertCount > 0 && expertParams.shared.hasWeightScales &&
             CheckWeightScaleShapeRelations(context, expertParams.shared, expertParams.isPerExpertWeightTensor,
                                            nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "shared weight scales",
-                                                 "The shape relation of shared weight scales is invalid"),
+        OP_LOGE_WITHOUT_REPORT(nodeName, "The shape relation of shared weight scales is invalid."),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -1549,36 +1646,30 @@ static ge::graphStatus CheckNonWeightInputDataTypes(const gert::TilingContext* c
     auto topkWeightsDesc = context->GetInputDesc(config.topkWeightsIndex);
 
     OP_TILING_CHECK(contextDesc->GetDataType() != ge::DT_INT32,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "context",
-                                                          Ops::Base::ToString(contextDesc->GetDataType()).c_str(),
-                                                          "The dtype of context must be DT_INT32."),
+                    OP_LOGE_FOR_INVALID_DTYPE(nodeName, "context",
+                                              Ops::Base::ToString(contextDesc->GetDataType()).c_str(), "DT_INT32"),
                     return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(
-        xDesc->GetDataType() != ge::DT_BF16 && !IsPreQuantizedXType(xDesc->GetDataType()),
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(),
-                                              "The dtype of x must be DT_BF16, DT_FLOAT8_E5M2, "
-                                              "DT_FLOAT8_E4M3FN or DT_FLOAT4_E2M1"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(xDesc->GetDataType() != ge::DT_BF16 && !IsPreQuantizedXType(xDesc->GetDataType()),
+                    OP_LOGE_FOR_INVALID_DTYPE(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(),
+                                              "DT_BF16, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN or DT_FLOAT4_E2M1"),
+                    return ge::GRAPH_FAILED);
 
     auto scalesDesc = context->GetOptionalInputDesc(config.scalesIndex);
     OP_TILING_CHECK(scalesDesc != nullptr && scalesDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        nodeName, "scales", Ops::Base::ToString(scalesDesc->GetDataType()).c_str(),
-                        "For pre-quantized x, the dtype of scales must be DT_FLOAT8_E8M0"),
+                    OP_LOGE_FOR_INVALID_DTYPE(nodeName, "scales",
+                                              Ops::Base::ToString(scalesDesc->GetDataType()).c_str(), "DT_FLOAT8_E8M0"),
                     return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(topkIdsDesc->GetDataType() != ge::DT_INT32,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "topkIds",
-                                                          Ops::Base::ToString(topkIdsDesc->GetDataType()).c_str(),
-                                                          "The dtype of topkIds must be DT_INT32."),
+                    OP_LOGE_FOR_INVALID_DTYPE(nodeName, "topk_ids",
+                                              Ops::Base::ToString(topkIdsDesc->GetDataType()).c_str(), "DT_INT32"),
                     return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(
         ((topkWeightsDesc->GetDataType() != ge::DT_BF16) && (topkWeightsDesc->GetDataType() != ge::DT_FLOAT)),
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "topkWeights",
-                                              Ops::Base::ToString(topkWeightsDesc->GetDataType()).c_str(),
-                                              "The dtype of topkWeights must be DT_FLOAT or DT_BF16."),
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "topk_weights", Ops::Base::ToString(topkWeightsDesc->GetDataType()).c_str(),
+                                  "DT_FLOAT or DT_BF16"),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -1595,15 +1686,14 @@ static ge::graphStatus CheckOutputDataTypes(const gert::TilingContext* context, 
 
     OP_TILING_CHECK(
         yDesc->GetDataType() != ge::DT_BF16,
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "y", Ops::Base::ToString(yDesc->GetDataType()).c_str(),
-                                              "The dtype of y must be DT_BF16."),
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "y", Ops::Base::ToString(yDesc->GetDataType()).c_str(), "DT_BF16"),
         return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(expertTokenNumsDesc->GetDataType() != ge::DT_INT32,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        nodeName, "expertTokenNums", Ops::Base::ToString(expertTokenNumsDesc->GetDataType()).c_str(),
-                        "The dtype of expertTokenNums must be DT_INT32."),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        expertTokenNumsDesc->GetDataType() != ge::DT_INT32,
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "expert_token_nums",
+                                  Ops::Base::ToString(expertTokenNumsDesc->GetDataType()).c_str(), "DT_INT32"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1651,7 +1741,8 @@ static ge::graphStatus CheckExpertScaleDataTypesAndFormats(const gert::TilingCon
 {
     auto scaleOneDesc = context->GetDynamicInputDesc(expertParams.inputs.weightScalesOne, 0);
     auto scaleTwoDesc = context->GetDynamicInputDesc(expertParams.inputs.weightScalesTwo, 0);
-    const std::string scaleNames = std::string(expertParams.expertTypeName) + " weight_scales1, weight_scales2";
+    const std::string scaleNames =
+        std::string(expertParams.names.weightScalesOne) + ", " + expertParams.names.weightScalesTwo;
 
     bool invalidDtype =
         scaleOneDesc->GetDataType() != ge::DT_FLOAT8_E8M0 || scaleTwoDesc->GetDataType() != ge::DT_FLOAT8_E8M0;
@@ -1681,13 +1772,15 @@ static ge::graphStatus CheckWeightScaleDataTypesAndFormats(const gert::TilingCon
 {
     if (expertParams.moe.hasWeightScales) {
         OP_TILING_CHECK(CheckExpertScaleDataTypesAndFormats(context, expertParams.moe, nodeName) != ge::GRAPH_SUCCESS,
-                        OP_LOGE(nodeName, "MoE expert weight scale properties are invalid."), return ge::GRAPH_FAILED);
+                        OP_LOGE_WITHOUT_REPORT(nodeName, "MoE expert weight scale properties are invalid."),
+                        return ge::GRAPH_FAILED);
     }
 
     if (expertParams.shared.expertCount > 0 && expertParams.shared.hasWeightScales) {
         OP_TILING_CHECK(
             CheckExpertScaleDataTypesAndFormats(context, expertParams.shared, nodeName) != ge::GRAPH_SUCCESS,
-            OP_LOGE(nodeName, "shared expert weight scale properties are invalid."), return ge::GRAPH_FAILED);
+            OP_LOGE_WITHOUT_REPORT(nodeName, "shared expert weight scale properties are invalid."),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -1702,30 +1795,38 @@ static ge::graphStatus CheckAndSetTokenDimensions(const gert::TilingContext* con
     const gert::StorageShape* topkIdsStorageShape = context->GetInputShape(config.topkIdsIndex);
     int64_t bs = xStorageShape->GetOriginShape().GetDim(0);
     int64_t topkIdsDim1 = topkIdsStorageShape->GetStorageShape().GetDim(1);
-    OP_TILING_CHECK(bs <= 0 || bs > std::numeric_limits<uint32_t>::max(),
-                    OP_LOGE(nodeName, "BS must be positive and fit in uint32."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        bs <= 0 || bs > std::numeric_limits<uint32_t>::max(),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "x", (std::string("dim0=") + std::to_string(bs)).c_str(),
+                                              "BS (dim 0 of x) must be positive and fit in uint32"),
+        return ge::GRAPH_FAILED);
 
     // 校验 topK 取值范围。
-    OP_TILING_CHECK(
-        topkIdsDim1 < MIN_TOPK || topkIdsDim1 > MAX_TOPK,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "topK", std::to_string(topkIdsDim1).c_str(), "only support [1, 32]"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(topkIdsDim1 < MIN_TOPK || topkIdsDim1 > MAX_TOPK,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        nodeName, "topk_ids", Ops::Base::ToString(topkIdsStorageShape->GetStorageShape()).c_str(),
+                        (std::string("topK (dim 1 of topk_ids) must be in range [") + std::to_string(MIN_TOPK) + ", " +
+                         std::to_string(MAX_TOPK) + "]")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
 
     int64_t xDim1 = xStorageShape->GetOriginShape().GetDim(1);
     // 校验 H 取值范围。
-    OP_TILING_CHECK(
-        xDim1 < MIN_H || xDim1 > MAX_H,
-        OP_LOGE_FOR_INVALID_VALUE(
-            nodeName, "H", std::to_string(xDim1).c_str(),
-            (std::string("should in [") + std::to_string(MIN_H) + ", " + std::to_string(MAX_H) + "]").c_str()),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(xDim1 < MIN_H || xDim1 > MAX_H,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "x",
+                                                          Ops::Base::ToString(xStorageShape->GetOriginShape()).c_str(),
+                                                          (std::string("H (dim 1 of x) must be in range [") +
+                                                           std::to_string(MIN_H) + ", " + std::to_string(MAX_H) + "]")
+                                                              .c_str()),
+                    return ge::GRAPH_FAILED);
     // MTE 与 URMA/Layered 统一按 64 对齐：满足 W4 NZ_C0_32 的 GMM K 分形要求，
     // A8W8 的 ND/NZ 路径沿用同一口径。
     int64_t requiredHAlignment = IsLayeredTopology(tilingData->compute.topoType) ? URMA_H_ALIGN : MTE_H_ALIGN;
     OP_TILING_CHECK(
         xDim1 % requiredHAlignment != 0,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "H", std::to_string(xDim1).c_str(),
-                                  (std::string("multiple of ") + std::to_string(requiredHAlignment)).c_str()),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            nodeName, "x", Ops::Base::ToString(xStorageShape->GetOriginShape()).c_str(),
+            (std::string("H (dim 1 of x) must be a multiple of ") + std::to_string(requiredHAlignment)).c_str()),
         return ge::GRAPH_FAILED);
 
     tilingData->compute.bs = static_cast<uint32_t>(bs);
@@ -1744,14 +1845,20 @@ static ge::graphStatus CheckAndSetHiddenDim(const gert::TilingContext* context, 
     int64_t hiddenDim = GetSingleExpertTensorDimSize(weightOneStorageShape, WEIGHT_MATRIX_ROW_DIM_INDEX,
                                                      expertParams.isPerExpertWeightTensor);
     OP_TILING_CHECK(hiddenDim < MIN_HIDDEN_DIM || hiddenDim > MAX_HIDDEN_DIM,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "hiddenDim", std::to_string(hiddenDim).c_str(),
-                                              (std::string("should in [") + std::to_string(MIN_HIDDEN_DIM) + ", " +
-                                               std::to_string(MAX_HIDDEN_DIM) + "]")
-                                                  .c_str()),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        nodeName, expertParams.moe.names.weightOne,
+                        Ops::Base::ToString(weightOneStorageShape->GetStorageShape()).c_str(),
+                        (std::string("hiddenDim (row dim of a single expert's weight1) must be in range [") +
+                         std::to_string(MIN_HIDDEN_DIM) + ", " + std::to_string(MAX_HIDDEN_DIM) + "]")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(hiddenDim % HIDDEN_DIM_ALIGN != 0,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "hiddenDim", std::to_string(hiddenDim).c_str(),
-                                              (std::string("multiple of ") + std::to_string(HIDDEN_DIM_ALIGN)).c_str()),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        nodeName, expertParams.moe.names.weightOne,
+                        Ops::Base::ToString(weightOneStorageShape->GetStorageShape()).c_str(),
+                        (std::string("hiddenDim (row dim of a single expert's weight1) must be a multiple of ") +
+                         std::to_string(HIDDEN_DIM_ALIGN))
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
     tilingData->compute.hiddenDim = static_cast<uint32_t>(hiddenDim);
@@ -1785,7 +1892,7 @@ static ge::graphStatus CheckAndSetPlatformParams(gert::TilingContext* context, M
     OP_TILING_CHECK(aivNum == 0U || aicNum == 0U,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "aivNum/aicNum",
                                               (std::to_string(aivNum) + ", " + std::to_string(aicNum)).c_str(),
-                                              "should both be > 0"),
+                                              "both greater than 0"),
                     return ge::GRAPH_FAILED);
 
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
@@ -1947,9 +2054,12 @@ static ge::graphStatus ApplyDedupCombineCapacityGate(MegaMoeTilingData* tilingDa
     }
     constexpr int64_t DEDUP_COMBINE_MAX_H = 9216;
     OP_TILING_CHECK(static_cast<int64_t>(tilingData->compute.h) > DEDUP_COMBINE_MAX_H,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", "1",
-                                              "combine dedup requires h <= 9216 (UB capacity), "
-                                              "set combine_comm_mode=0 for this shape"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        nodeName, "combine_comm_mode", "1",
+                        (std::string("enabling combine dedup requires h <= ") + std::to_string(DEDUP_COMBINE_MAX_H) +
+                         " (UB capacity) but h is " + std::to_string(tilingData->compute.h) +
+                         "; set combine_comm_mode=0 for this shape")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
