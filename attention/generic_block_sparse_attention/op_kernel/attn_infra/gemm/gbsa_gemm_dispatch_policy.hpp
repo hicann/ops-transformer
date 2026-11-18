@@ -79,16 +79,6 @@ struct MmadAtlasA5BsaPV : public MmadAtlasA5 {
     static constexpr bool PRECOMPUTE_SPARSE = PRECOMPUTE_SPARSE_;
 };
 
-// MXFP8 owns separate QK/PV implementations. Paging is resolved by the
-// packed descriptor producer before these blocks consume the sparse records.
-struct MmadAtlasA5GbsaQKMxfp8 : public MmadAtlasA5 {
-    static constexpr uint32_t L0_STAGES = 2;
-};
-
-struct MmadAtlasA5GbsaPVMxfp8 : public MmadAtlasA5 {
-    static constexpr uint32_t L0_STAGES = 2;
-};
-
 // MXFP4 QK and PV use separate policies because their right-operand loads differ.
 template <bool PAGED_CACHE_FLAG_ = false>
 struct MmadAtlasA5GbsaQKMxfp4 : public MmadAtlasA5 {

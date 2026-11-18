@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <string>
+#include "../op_kernel/arch35/gbsa_layout_utils.hpp"
 #include "register/tilingdata_base.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "tiling/tiling_api.h"
@@ -21,185 +22,44 @@
 namespace optiling {
 
 constexpr int64_t GBSA_QUANT_TYPE_A4C4 = 4;
-
 namespace Mxfp8Tiling {
-// Host-only budgets mirror the device components. Keep these inline so Host
-// validation can exercise them without exporting symbols from the tiling library.
+// Host selects one complete head-group tile: Q32/KV512 or Q64/KV256.
+using GbsaKernelArch35::Mxfp8Descriptor::QueryTile;
+using GbsaKernelArch35::Mxfp8Descriptor::KvTile;
+constexpr uint32_t MAX_GROUP_SIZE = GbsaKernelArch35::Mxfp8Descriptor::MAX_GROUP_SIZE;
+constexpr uint32_t QUERY_TILE = 32U;
+constexpr uint32_t KV_TILE = 512U;
+constexpr uint32_t CAPACITY_DIM = 256U;
+constexpr uint32_t DESCRIPTOR_WORKSPACE_SLOTS = GbsaKernelArch35::Mxfp8Descriptor::WORKSPACE_SLOTS;
+constexpr uint32_t RAW_STAGES = 3U;
+constexpr uint32_t KSCALE_STAGES = 3U;
+constexpr uint32_t COMPUTE_STAGES = 2U;
+constexpr uint32_t STATS_STAGES = 4U;
+constexpr uint32_t P_STAGES = 3U;
 constexpr uint64_t UB_CAPACITY = 256U * 1024U;
-constexpr uint64_t L1_DATA_CAPACITY = 512U * 1024U - 16U * 1024U - 3U * 4096U;
-constexpr uint64_t CAPACITY = 128U * 1024U;
-constexpr uint64_t DESCRIPTOR_RING_SLOTS = 4U;
-constexpr uint32_t GROUP_TOKENS = 128U;
-constexpr uint32_t GROUPED_TILE_TOKENS = 512U;
-constexpr uint32_t GROUPS_PER_TILE = GROUPED_TILE_TOKENS / GROUP_TOKENS;
-constexpr uint32_t GROUPS_PER_AIV = GROUPS_PER_TILE / 2U;
-constexpr uint32_t RAW_STAGES = 2U;
-constexpr uint32_t GROUPED_RAW_STAGES = 3U;
-constexpr uint32_t NZ_STAGES = 2U;
-constexpr uint32_t RAW_ROW_BYTES = 32U;
-constexpr uint32_t UB_QUERY_ROW_ALIGNMENT = 16U;
-constexpr uint32_t UB_STATS_ROWS = 64U;
-constexpr uint32_t UB_COMPUTE_STAGES = 2U;
-constexpr uint32_t UB_DELTA_STAGES = 3U;
-constexpr uint32_t SCORE_ELEMENT_BYTES = sizeof(float);
-constexpr uint32_t PROBABILITY_ELEMENT_BYTES = sizeof(uint8_t);
+constexpr uint64_t L1_CAPACITY = 512U * 1024U;
 
-inline uint64_t Align(uint64_t value, uint64_t alignment)
+inline uint32_t DescriptorRows(uint32_t dim, bool paged, uint32_t tileTokens = KV_TILE)
 {
-    return (value + alignment - 1U) / alignment * alignment;
+    return GbsaKernelArch35::Mxfp8Descriptor::Rows(dim, paged, tileTokens);
 }
-
-inline uint64_t BufferDim(uint64_t dim)
+inline uint64_t DescriptorTileWords(uint32_t rows, uint32_t blockY, bool paged, uint32_t tileTokens = KV_TILE)
 {
-    // D192 and D256 share the D256 capacity tier. This is a reservation width,
-    // never the active tensor width or a GM/scale address stride.
-    return Align(dim, 128U);
+    return GbsaKernelArch35::Mxfp8Descriptor::TileWords(rows, blockY, paged, tileTokens);
 }
-
-inline uint32_t QueryTileRows(uint64_t group)
+inline uint64_t L1Bytes(uint32_t group = QUERY_TILE)
 {
-    return group <= 16U ? 16U : group <= 32U ? 32U : group <= 64U ? 64U : 128U;
+    const uint32_t q = QueryTile(group), kv = KvTile(group);
+    return q * CAPACITY_DIM + kv * CAPACITY_DIM + P_STAGES * q * kv + 2U * kv * CAPACITY_DIM + q * CAPACITY_DIM / 32U +
+           KSCALE_STAGES * kv * (CAPACITY_DIM / 32U);
 }
-
-inline uint32_t KvTileTokens(uint64_t group)
+inline uint64_t UbBytes(uint32_t group = QUERY_TILE)
 {
-    return group <= 32U ? 512U : group <= 64U ? 256U : 128U;
-}
-
-inline uint32_t VectorRows(uint64_t qTile)
-{
-    // Each AIV reserves half the Q tile, rounded up to a 16-row capacity.
-    return static_cast<uint32_t>(Align(qTile / 2U, UB_QUERY_ROW_ALIGNMENT));
-}
-
-inline uint64_t ScoreUbSlotBytes(uint64_t qTile, uint64_t tile)
-{
-    // All four supported M/KV tiers reserve 32 KiB per FP32 S slot per AIV.
-    return VectorRows(qTile) * tile * SCORE_ELEMENT_BYTES;
-}
-
-inline uint32_t PvUbStages(uint64_t qTile)
-{
-    return qTile <= 64U ? UB_COMPUTE_STAGES : 1U;
-}
-
-inline uint64_t OutputUbSlotBytes(uint64_t dim, uint64_t qTile)
-{
-    return VectorRows(qTile) * BufferDim(dim) * sizeof(float);
-}
-
-inline uint64_t ValueScaleUbBytes(uint64_t dim)
-{
-    return BufferDim(dim) * sizeof(uint16_t);
-}
-
-inline uint64_t NzScaleUbSlotBytes(uint64_t dim)
-{
-    return Align(GROUP_TOKENS * (BufferDim(dim) / 32U), 256U);
-}
-
-inline uint32_t GroupsPerAiv(uint64_t tile)
-{
-    // A 128-token tile still gives AIV1 one empty notification to balance READY/FREE.
-    return static_cast<uint32_t>((tile / GROUP_TOKENS + 1U) / 2U);
-}
-
-inline uint64_t RawTileTokens(uint64_t tile)
-{
-    return GroupsPerAiv(tile) * GROUP_TOKENS;
-}
-
-inline uint64_t DescriptorGroupWords()
-{
-    // Reserve an eight-word header and two words per possible token span.
-    // Keep this conservative descriptor capacity independent of blockY.
-    return 8U + 2U * GROUP_TOKENS;
-}
-
-inline uint64_t DescriptorTileWords(uint64_t tile)
-{
-    // Keep a header for AIV1's empty group in the single-group tier.
-    return 2U * GroupsPerAiv(tile) * DescriptorGroupWords();
-}
-
-inline uint64_t PipelineL1End(uint64_t dim, uint64_t qTile, uint64_t kvTile)
-{
-    // Q, three K groups, three full P tiles, and two full V tiles (all FP8).
-    const uint64_t capacityDim = BufferDim(dim);
-    return qTile * capacityDim + 3U * GROUP_TOKENS * capacityDim + UB_DELTA_STAGES * qTile * kvTile +
-           2U * kvTile * capacityDim;
-}
-
-inline uint32_t RawBlockRows(uint64_t blockY, bool headMajor)
-{
-    return headMajor ? static_cast<uint32_t>(blockY < 16U ? blockY : 16U) : 1U;
-}
-
-inline uint64_t RawCapacityBytes(uint64_t tokens)
-{
-    // Both layouts reserve 4 KiB per 128-token group. Each AIV tile slot
-    // contains two groups for KV512 and one group for KV256/KV128.
-    // BNSD keeps its compact payload at the beginning of each group region.
-    return tokens * RAW_ROW_BYTES;
-}
-
-inline uint64_t StreamBytes(uint64_t dim, uint64_t tile, uint64_t blockY = 1U, bool headMajor = false)
-{
-    // BSND selects one head from each token and pads each row to 32 B.
-    // BNSD keeps a contiguous microblock (at most 16 tokens) in one DMA block;
-    // only that block's end is padded. This is the payload's padded footprint,
-    // not the reserved capacity or the stride between groups/tile slots.
-    const uint64_t rows = RawBlockRows(blockY, headMajor);
-    return (tile + rows - 1U) / rows * Align(rows * (dim / 32U), RAW_ROW_BYTES);
-}
-
-inline bool StreamFits(uint64_t heads, uint64_t dim, uint64_t tile, uint64_t blockY = 1U, bool headMajor = false)
-{
-    const uint64_t capacity = RawCapacityBytes(tile);
-    return heads != 0U && dim >= 32U && capacity <= CAPACITY && StreamBytes(dim, tile, blockY, headMajor) <= capacity;
-}
-
-inline uint64_t PipelineAuxBytes(uint64_t dim)
-{
-    return NZ_STAGES * NzScaleUbSlotBytes(dim);
-}
-
-inline uint64_t PipelineCacheOffset(uint64_t dim, uint64_t tile, uint64_t qTile = 16U)
-{
-    const uint64_t rows = VectorRows(qTile);
-    const uint64_t scoreBytes = ScoreUbSlotBytes(qTile, tile) * UB_COMPUTE_STAGES;
-    const uint64_t probabilityBytes = rows * tile * PROBABILITY_ELEMENT_BYTES * UB_COMPUTE_STAGES;
-    // The largest head group has one PV result buffer and one FP32 accumulator.
-    const uint64_t outputBytes = OutputUbSlotBytes(dim, qTile) * (PvUbStages(qTile) + 1U);
-    // Local/global maxima and sums, plus three online correction buffers.
-    const uint64_t statisticsBytes = (4U + UB_DELTA_STAGES) * UB_STATS_ROWS * sizeof(float);
-    const uint64_t rowScratchBytes = UB_STATS_ROWS * 32U;
-    const uint64_t valueScaleBytes = ValueScaleUbBytes(dim);
-    return Align(scoreBytes + probabilityBytes + outputBytes + statisticsBytes + rowScratchBytes + valueScaleBytes,
-                 256U);
-}
-
-inline uint64_t PipelineUbEndForStages(uint64_t dim, uint64_t tile, uint32_t rawStages, uint64_t qTile = 16U)
-{
-    // Unsupported tile sizes must not accidentally pass the Host capacity check.
-    if ((qTile != 16U && qTile != 32U && qTile != 64U && qTile != 128U) || tile != KvTileTokens(qTile)) {
-        return UB_CAPACITY + 1U;
-    }
-    const uint64_t cacheOffset = PipelineCacheOffset(dim, tile, qTile);
-    return cacheOffset + rawStages * RawCapacityBytes(RawTileTokens(tile)) + PipelineAuxBytes(dim) +
-           DescriptorTileWords(tile) * sizeof(uint64_t);
-}
-
-inline uint32_t PipelineRawStages(uint64_t dim, uint64_t tile, uint64_t qTile = 16U)
-{
-    // Retain the grouped three-slot preference and its bounded two-slot fallback.
-    return PipelineUbEndForStages(dim, tile, GROUPED_RAW_STAGES, qTile) <= UB_CAPACITY ? GROUPED_RAW_STAGES :
-                                                                                         RAW_STAGES;
-}
-
-inline uint64_t PipelineUbEnd(uint64_t dim, uint64_t tile, uint64_t qTile = 16U)
-{
-    return PipelineUbEndForStages(dim, tile, PipelineRawStages(dim, tile, qTile), qTile);
+    const uint32_t r = QueryTile(group) / 2U, kv = KvTile(group);
+    // Raw retains 8 KiB per tile in both tiers; NZ/descriptors keep their capacity.
+    return 2U * r * kv * sizeof(float) + 3U * r * CAPACITY_DIM * sizeof(float) + 2U * r * kv +
+           (3U * STATS_STAGES + 3U) * 256U + 512U + 256U + r * 32U + RAW_STAGES * 256U * 32U +
+           256U * (CAPACITY_DIM / 32U) + 2U * (8U + 128U * 4U) * sizeof(uint64_t);
 }
 } // namespace Mxfp8Tiling
 
@@ -267,8 +127,7 @@ TILING_DATA_FIELD_DEF(uint64_t, totalQTokens);
 TILING_DATA_FIELD_DEF(uint64_t, totalKvTokens);
 TILING_DATA_FIELD_DEF_STRUCT(GbsaBaseTiling, baseTileInfo);
 TILING_DATA_FIELD_DEF_STRUCT(GbsaMmPhaseL1Tiling, mmPhaseL1TileInfo);
-// Nonquantized: descriptor base/words per tile. MXFP8 leaves both fields zero;
-// its per-core descriptor rings start at workspace offset zero and use the kernel descriptor layout.
+// Descriptor workspace base and words per complete tile, for all arch35 paths.
 TILING_DATA_FIELD_DEF(uint64_t, kvOffsetInfoOffset);
 TILING_DATA_FIELD_DEF(uint32_t, kvOffsetTileWords);
 // Fixed per-batch storage capacities for BSND/BNSD. TND uses cuSeqLengths instead.
@@ -342,11 +201,29 @@ private:
     {
         return quantType_ == GBSA_QUANT_TYPE_A4C4 && dataType_ == ge::DT_FLOAT4_E2M1;
     }
-    bool IsMxfp8() const
-    {
-        return quantType_ == 6 && dataType_ == ge::DT_FLOAT8_E4M3FN;
-    }
-    bool IsMxfp8PackedPath() const;
+    enum class Mxfp8ConfigError {
+        NONE,
+        SOC_VERSION,
+        QUANT_TYPE,
+        BATCH,
+        Q_LAYOUT,
+        DENSE_KV_LAYOUT,
+        PAGED_KV_LAYOUT,
+        PAGE_SIZE,
+        HEAD_DIM,
+        BLOCK_X,
+        BLOCK_Y,
+        GROUP_SIZE,
+        KV_CAPACITY,
+        KV_HEADS,
+        Q_TASK_CAPACITY,
+        Q_HEAD_STRIDE,
+        L1_CAPACITY,
+        UB_CAPACITY,
+    };
+    Mxfp8ConfigError GetMxfp8ConfigError() const;
+    void LogMxfp8ConfigError(gert::TilingContext* context, Mxfp8ConfigError error) const;
+    bool IsMxfp8FullTilePath() const;
     uint64_t GenerateTilingKey();
 
     uint32_t batch_ = 0;

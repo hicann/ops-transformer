@@ -22,6 +22,44 @@
 
 namespace GbsaKernelArch35 {
 
+namespace Mxfp8Descriptor {
+constexpr uint32_t KV_TILE = 512U;
+constexpr uint32_t MAX_GROUP_SIZE = 64U;
+GBSA_LAYOUT_INLINE constexpr uint32_t QueryTile(uint32_t group)
+{
+    return group <= 32U ? 32U : 64U;
+}
+GBSA_LAYOUT_INLINE constexpr uint32_t KvTile(uint32_t group)
+{
+    return group <= 32U ? 512U : 256U;
+}
+constexpr uint32_t HEADER_WORDS = 8U;
+constexpr uint32_t RECORD_WORDS = 2U;
+constexpr uint32_t CAPACITY_RECORD_WORDS = 4U;
+constexpr uint32_t WORKSPACE_SLOTS = 12U;
+
+GBSA_LAYOUT_INLINE constexpr uint32_t Rows(uint32_t dim, bool paged, uint32_t tileTokens = KV_TILE)
+{
+    return tileTokens == 256U ? 128U : (dim == 256U || !paged ? 256U : 128U);
+}
+
+GBSA_LAYOUT_INLINE constexpr uint32_t GroupWords(uint32_t rows, uint32_t blockY, bool paged)
+{
+    uint32_t spans = (rows + 2U * blockY - 2U) / blockY;
+    if (paged) {
+        spans = spans * 2U < rows ? spans * 2U : rows;
+    }
+    // Both dense and PA use two-word records; preserve four-word capacity.
+    return (HEADER_WORDS + spans * CAPACITY_RECORD_WORDS + 7U) / 8U * 8U;
+}
+
+GBSA_LAYOUT_INLINE constexpr uint64_t TileWords(uint32_t rows, uint32_t blockY, bool paged,
+                                                uint32_t tileTokens = KV_TILE)
+{
+    return static_cast<uint64_t>(tileTokens / rows) * GroupWords(rows, blockY, paged);
+}
+} // namespace Mxfp8Descriptor
+
 enum class Format {
     TND = 0,
     BNSD = 1,

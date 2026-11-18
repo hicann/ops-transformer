@@ -11,138 +11,202 @@
 #ifndef GBSA_MX_PACKED_RECORDS_HPP
 #define GBSA_MX_PACKED_RECORDS_HPP
 
-// Extracted from the nonquant QK/PV descriptor consumers. It changes no MX scale,
-// matrix, L0 or cross-core event handling.
+#include "gbsa_copy_gm_to_l1_a5.hpp"
+#include "../../../arch35/gbsa_layout_utils.hpp"
+
 namespace NpuArch::Gemm::Tile {
 
-namespace Mxfp8DescriptorLayout {
-constexpr uint32_t GROUP_TOKENS = 128U;
-constexpr uint32_t RING_SLOTS = 4U;
-
-__aicore__ inline uint64_t DescriptorGroupWords()
+__aicore__ inline void PreloadMxfp8FullDescriptorHeader(const AscendC::GlobalTensor<uint64_t>& descriptor)
 {
-    // Reserve an eight-word header and two words per possible token span.
-    // Keep this conservative descriptor capacity independent of blockY.
-    return 8U + 2U * GROUP_TOKENS;
-}
-
-__aicore__ inline uint64_t DescriptorTileWords(uint64_t tile)
-{
-    // Keep a header for AIV1's empty group in the single-group tier.
-    return 2U * static_cast<uint32_t>((tile / GROUP_TOKENS + 1U) / 2U) * DescriptorGroupWords();
-}
-} // namespace Mxfp8DescriptorLayout
-
-// Caller must first wait for the producer's MTE3-ready cross-core event on PIPE_S.
-// The same GM slot may hold a previous tile: a ready flag alone does not invalidate
-// the AIC scalar data cache. QK refreshes once, and PV reuses these cache lines.
-// Descriptor layout: 64-byte header, then {elementOffset, packedMeta} records.
-__aicore__ inline uint32_t RefreshGbsaMxPackedRecords(AscendC::GlobalTensor<uint64_t> info)
-{
-    constexpr uint32_t CACHE_LINE_WORDS = 8U;
-    AscendC::DataCacheCleanAndInvalid<uint64_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
-        info);
-    AscendC::DataCacheCleanAndInvalid<uint64_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
-        info[CACHE_LINE_WORDS]);
-    AscendC::DataCachePreload(info, static_cast<int64_t>(0));
-    AscendC::DataCachePreload(info[CACHE_LINE_WORDS], static_cast<int64_t>(0));
-
-    // READY and the cache refresh protect this descriptor generation. Read it
-    // through the scalar tensor API; the producer cannot reuse the slot until
-    // the delayed PV consumer releases it.
-    const uint32_t recordCount = static_cast<uint32_t>(info.GetValue(0U));
-    const uint32_t recordEnd = CACHE_LINE_WORDS + recordCount * 2U;
-    // Keep invalidation and prefetch in separate loops: a later DCCI must not
-    // drain an earlier descriptor prefetch. The first record line is done above.
-    for (uint32_t word = 2U * CACHE_LINE_WORDS; word < recordEnd; word += CACHE_LINE_WORDS) {
+    // Called only after both AIVs publish this descriptor generation.
+    for (uint32_t word = 0; word < 16; word += 8) {
         AscendC::DataCacheCleanAndInvalid<uint64_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
-                                          AscendC::DcciDst::CACHELINE_OUT>(info[word]);
+                                          AscendC::DcciDst::CACHELINE_OUT>(descriptor[word]);
     }
-    for (uint32_t word = 2U * CACHE_LINE_WORDS; word < recordEnd; word += CACHE_LINE_WORDS) {
-        AscendC::DataCachePreload(info[word], static_cast<int64_t>(0));
-    }
-    // Only the packed producer uses this tag; callers preserve it until copy.
-    return recordCount | (info.GetValue(1U) == 1U ? 0x80000000U : 0U);
+    AscendC::DataCachePreload(descriptor, static_cast<int64_t>(0));
+    AscendC::DataCachePreload(descriptor[8], static_cast<int64_t>(0));
 }
 
-// Records stay within one QK L1-N group: 128 tokens in the grouped 512-token
-// pipeline, or the non-grouped tile size. QK/PV use exactly the same
-// logical row order; paired records must NOT reorder either source block.
-// Source matrix strides are in ElementB elements. The initial producer uses a
-// conservative 32-byte-aligned pairing guard; D=192/256, blockY=4/8 and dense
-// BSND satisfy it. This is not a claim that all ND2NZ source strides need 32B.
-// Any tail padding/zero-fill remains the caller's responsibility, as before.
-template <bool IS_PV, class ElementB, class ArchTag, class TensorB, class TensorL1B>
-__aicore__ inline void CopyGbsaMxPackedRecords(TensorB& gBTensor, TensorL1B& l1BTensor,
-                                               AscendC::GlobalTensor<uint64_t> info, uint32_t recordCount,
-                                               uint32_t embed, uint32_t embedInnerOffset = 0U)
+template <bool Paged = false, bool HeaderReady = false>
+__aicore__ inline void RefreshMxfp8FullDescriptor(const AscendC::GlobalTensor<uint64_t>& descriptor,
+                                                  uint32_t groupWords)
 {
-    static_assert(sizeof(ElementB) == 1U, "This candidate targets packed FP8 K/V only");
-    constexpr uint32_t ELEMENTS_PER_C0 = 32U / sizeof(ElementB);
-    const auto& srcData = gBTensor.data();
-    const auto& dstStorage = l1BTensor.data();
-    // Preserve the proven nonquant consumer's explicit L1 address rebinding.
-    const AscendC::LocalTensor<ElementB> l1Base(AscendC::TPosition::A1, 0, ArchTag::L1_SIZE / sizeof(ElementB));
-    const uint32_t dstAddr = static_cast<uint32_t>((uint64_t)dstStorage.GetPhyAddr() - (uint64_t)l1Base.GetPhyAddr());
-    const AscendC::LocalTensor<ElementB> dstData(AscendC::TPosition::A1, dstAddr, dstStorage.GetSize());
-    const auto dstBase = l1BTensor.layout()(l1BTensor.coord());
-    uint32_t dstTokenStride;
-    AscendC::Nd2NzParams copyParams{};
-    copyParams.dValue = embed;
-    if constexpr (IS_PV) {
-        dstTokenStride = tla::get<0, 0>(l1BTensor.stride());
-        copyParams.srcDValue = tla::get<0>(gBTensor.stride());
-        copyParams.dstNzC0Stride = tla::get<1, 1>(l1BTensor.stride()) / ELEMENTS_PER_C0;
-    } else {
-        dstTokenStride = tla::get<1, 0>(l1BTensor.stride());
-        copyParams.srcDValue = tla::get<1>(gBTensor.stride());
-        copyParams.dstNzC0Stride = tla::get<0, 1>(l1BTensor.stride()) / ELEMENTS_PER_C0;
+    if constexpr (!HeaderReady) {
+        PreloadMxfp8FullDescriptorHeader(descriptor);
     }
-    copyParams.dstNzNStride = dstTokenStride / ELEMENTS_PER_C0;
-
-    if ((recordCount & 0x80000000U) != 0U) {
-        // Prepared FP8 NZ records: src{stride32, offset32},
-        // dst{rows16, unused16, byteOffset16, ndNum16}. Both packed NZ
-        // layouts have a 32-byte token stride. Preserve runtime C0 pitch:
-        // QK rounds N to16 while PV pads the reduction to64.
-        // These are the same intrinsics used by AscendC's dav_3510
-        // DataCopyGM2L1ND2NZImplBase, with the per-record NZ bits prepacked.
-        const uint64_t geometry = (static_cast<uint64_t>(copyParams.dstNzC0Stride) << 32U) |
-                                  (static_cast<uint64_t>(copyParams.dstNzNStride) << 16U);
-        auto dst = reinterpret_cast<__cbuf__ int8_t*>(dstData.GetPhyAddr()) + dstBase;
-        // The intrinsic API takes a mutable GM pointer but only reads it.
-        auto src =
-            const_cast<__gm__ int8_t*>(reinterpret_cast<const __gm__ int8_t*>(srcData.GetPhyAddr())) + embedInnerOffset;
-        // Use a counted loop. A pointer-inequality loop made this compiler
-        // branch through an800-NOP prefix on every descriptor iteration.
-        const uint32_t count = recordCount & 0x7fffffffU;
-        for (uint32_t index = 0U; index < count; ++index) {
-            const uint64_t source = info.GetValue(8U + index * 2U);
-            const uint64_t target = info.GetValue(9U + index * 2U);
-            set_mte2_nz_para((target & 0xffff00000000ffffULL) | geometry);
-            copy_gm_to_cbuf_multi_nd2nz(dst + ((target >> 16U) & 0xffffU), src + static_cast<uint32_t>(source), 0U,
-                                        copyParams.srcDValue, 0U, static_cast<uint16_t>(target >> 48U), embed,
-                                        source >> 32U, false);
-        }
-        return;
+    const __gm__ uint64_t* records = descriptor.GetPhyAddr();
+    // MXFP8 dense and PA both store [offset, meta]; reserved slot spans stay unchanged.
+    const uint32_t end =
+        min(groupWords, GbsaKernelArch35::Mxfp8Descriptor::HEADER_WORDS +
+                            static_cast<uint32_t>(records[0]) * GbsaKernelArch35::Mxfp8Descriptor::RECORD_WORDS);
+    for (uint32_t word = 16; word < end; word += 8) {
+        AscendC::DataCacheCleanAndInvalid<uint64_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
+                                          AscendC::DcciDst::CACHELINE_OUT>(descriptor[word]);
     }
-    uint32_t rowOffset = 0U;
-    for (uint32_t record = 0U; record < recordCount; ++record) {
-        const uint32_t word = 8U + record * 2U;
-        const uint64_t sourceOffset = info.GetValue(word);
-        const uint64_t meta = info.GetValue(word + 1U);
-        const uint32_t rows = static_cast<uint32_t>(meta) >> 1U;
-        const uint32_t matrices = 1U + static_cast<uint32_t>(meta & 1U);
-        copyParams.ndNum = matrices;
-        copyParams.nValue = rows;
-        copyParams.srcNdMatrixStride = static_cast<uint32_t>(meta >> 32U);
-        copyParams.dstNzMatrixStride = rows * dstTokenStride;
-        AscendC::DataCopy(dstData[dstBase + rowOffset * dstTokenStride], srcData[sourceOffset + embedInnerOffset],
-                          copyParams);
-        rowOffset += matrices * rows;
+    for (uint32_t word = 16; word < end; word += 8) {
+        AscendC::DataCachePreload(descriptor[word], static_cast<int64_t>(0));
     }
 }
+
+// Both producers use this predicate on the same immutable descriptor. A direct
+// group owns complete scale fractals; short or paired records remain on AIV.
+template <class Records>
+__aicore__ inline bool CanCopyKScaleDirectMxfp8Full(const AscendC::GlobalTensor<uint8_t>& keyScale, Records records,
+                                                    uint64_t tokenStrideBytes, uint32_t D, uint32_t GroupRows)
+{
+    if (tokenStrideBytes != D || records[0] != 1) {
+        return false;
+    }
+    const uint64_t offset = records[GbsaKernelArch35::Mxfp8Descriptor::HEADER_WORDS];
+    if (static_cast<uint32_t>(records[GbsaKernelArch35::Mxfp8Descriptor::HEADER_WORDS + 1U]) != GroupRows * 2U ||
+        offset % 32 != 0) {
+        return false;
+    }
+    // Conservative first implementation: the complete source scale address
+    // must be 32B-aligned, including its batch/head base.
+    const uint64_t address = reinterpret_cast<uint64_t>(keyScale.GetPhyAddr()) + offset / 32;
+    return address % 32 == 0;
+}
+
+// GM offsets and strides are bytes: one FP8 element occupies one byte.
+struct CopyPackedGmToL1Mxfp8Full {
+    __aicore__ inline void operator()(const AscendC::LocalTensor<uint8_t>& dst,
+                                      const AscendC::GlobalTensor<uint8_t>& src, uint64_t sourceByteOffset,
+                                      uint32_t dstRow, uint32_t rows, uint32_t headDim, uint64_t sourceTokenStrideBytes,
+                                      uint32_t parentRows, uint32_t matrices = 1, uint32_t sourceMatrixStride = 0) const
+    {
+        if (rows == 0) {
+            return;
+        }
+        auto gLayout =
+            tla::MakeLayout(tla::MakeShape(rows, headDim), tla::MakeStride(sourceTokenStrideBytes, tla::Int<1>{}));
+        auto gTensor = tla::MakeTensor(src[sourceByteOffset], gLayout, Arch::PositionGM{});
+        auto l1Layout = tla::MakeLayout<uint8_t, layout::zN>(parentRows, headDim);
+        auto l1Tensor = tla::MakeTensor(dst, l1Layout, Arch::PositionL1{});
+        auto l1Tile = GetTile(l1Tensor, tla::MakeCoord(dstRow, 0), tla::MakeShape(rows, headDim));
+        TileCopyTla<Arch::AtlasA5, decltype(gTensor), decltype(l1Tile)> copyGmToL1;
+        copyGmToL1(l1Tile, gTensor, matrices, sourceMatrixStride, rows * BYTE_PER_C0);
+    }
+};
+
+// Only used for contiguous Q banks starting on a 16-row boundary. Sparse K
+// scale uses PrepareKScaleMxfp8Full, as Y=4/8 fragments cannot use this DN2NZ offset.
+struct CopyQueryScaleGmToL1Mxfp8Full {
+    __aicore__ inline void operator()(const AscendC::LocalTensor<uint8_t>& dst,
+                                      const AscendC::GlobalTensor<uint8_t>& src, uint32_t sourceRow,
+                                      uint32_t destinationRow, uint32_t rows, uint32_t headDim,
+                                      uint32_t headStride = 1) const
+    {
+        if (rows == 0) {
+            return;
+        }
+        const uint32_t pairs = headDim / 64;
+        AscendC::GlobalTensor<half> source;
+        source.SetGlobalBuffer((__gm__ half*)src.GetPhyAddr());
+        AscendC::Dn2NzParams params;
+        params.dnNum = 1;
+        params.dValue = rows;
+        params.nValue = pairs;
+        params.srcDnMatrixStride = 0;
+        params.srcDValue = pairs * headStride;
+        params.dstNzC0Stride = pairs;
+        params.dstNzNStride = 1;
+        params.dstNzMatrixStride = 0;
+        AscendC::DataCopy(dst.ReinterpretCast<half>()[destinationRow * pairs], source[sourceRow * pairs], params);
+    }
+};
+
+template <bool Paged>
+struct CopySparsePackedGmToL1Mxfp8Full {
+    uint32_t D, KV_ROWS, GroupRows;
+    __aicore__ CopySparsePackedGmToL1Mxfp8Full(uint32_t dim, uint32_t kvRows, uint32_t groupRows)
+        : D(dim),
+          KV_ROWS(kvRows),
+          GroupRows(groupRows)
+    {}
+
+    template <bool Value>
+    __aicore__ inline void operator()(const AscendC::LocalTensor<uint8_t>& dst,
+                                      const AscendC::GlobalTensor<uint8_t>& src,
+                                      const AscendC::GlobalTensor<uint64_t>& descriptors, uint32_t groupWords,
+                                      uint32_t validTokens, uint64_t sourceTokenStrideBytes,
+                                      uint32_t firstToken = 0U) const
+    {
+        Copy<Value, false>(dst, src, descriptors, groupWords, validTokens, sourceTokenStrideBytes, dst, src,
+                           firstToken);
+    }
+
+    template <bool HeaderReady = false>
+    __aicore__ inline void CopyKeyAndScale(const AscendC::LocalTensor<uint8_t>& dst,
+                                           const AscendC::GlobalTensor<uint8_t>& src,
+                                           const AscendC::LocalTensor<uint8_t>& dstScale,
+                                           const AscendC::GlobalTensor<uint8_t>& srcScale,
+                                           const AscendC::GlobalTensor<uint64_t>& descriptors, uint32_t groupWords,
+                                           uint32_t validTokens, uint64_t sourceTokenStrideBytes,
+                                           uint32_t firstToken = 0U) const
+    {
+        Copy<false, true, HeaderReady>(dst, src, descriptors, groupWords, validTokens, sourceTokenStrideBytes, dstScale,
+                                       srcScale, firstToken);
+    }
+
+private:
+    template <bool Value, bool WithScale, bool HeaderReady = false>
+    __aicore__ inline void Copy(const AscendC::LocalTensor<uint8_t>& dst, const AscendC::GlobalTensor<uint8_t>& src,
+                                const AscendC::GlobalTensor<uint64_t>& descriptors, uint32_t groupWords,
+                                uint32_t validTokens, uint64_t sourceTokenStrideBytes,
+                                const AscendC::LocalTensor<uint8_t>& dstScale,
+                                const AscendC::GlobalTensor<uint8_t>& srcScale, uint32_t firstToken = 0U) const
+    {
+        constexpr uint32_t recordWords = GbsaKernelArch35::Mxfp8Descriptor::RECORD_WORDS;
+        // Fix the logical position before the descriptor loop, as in the
+        // non-quantized Block. DataCopy can then select L1 at compile time.
+        const AscendC::LocalTensor<uint8_t> l1Base(AscendC::TPosition::A1, 0, Arch::AtlasA5::L1_SIZE);
+        const uint32_t dstAddress = static_cast<uint32_t>((uint64_t)dst.GetPhyAddr() - (uint64_t)l1Base.GetPhyAddr());
+        const AscendC::LocalTensor<uint8_t> dstData(AscendC::TPosition::A1, dstAddress, dst.GetSize());
+        auto l1Layout = tla::MakeLayout<uint8_t, layout::zN>(KV_ROWS, D);
+        auto l1Tensor = tla::MakeTensor(dstData, l1Layout, Arch::PositionL1{});
+        AscendC::Nd2NzParams copyParams;
+        copyParams.dValue = D;
+        copyParams.srcDValue = sourceTokenStrideBytes;
+        copyParams.dstNzC0Stride = tla::get<1, 1>(l1Tensor.stride()) / BYTE_PER_C0;
+        copyParams.dstNzNStride = tla::get<0, 0>(l1Tensor.stride()) / BYTE_PER_C0;
+        for (uint32_t group = 0; group * GroupRows < validTokens; ++group) {
+            auto descriptor = descriptors[group * groupWords];
+            if constexpr (!Value) {
+                // Start this group's DMA before refreshing the next group.
+                // PV reuses the immutable descriptor until it releases the slot.
+                RefreshMxfp8FullDescriptor<Paged, HeaderReady>(descriptor, groupWords);
+            }
+            const __gm__ uint64_t* records = descriptor.GetPhyAddr();
+            const uint32_t count = records[0];
+            uint32_t dstRow = firstToken + group * GroupRows;
+            if constexpr (WithScale && !Paged) {
+                if (CanCopyKScaleDirectMxfp8Full(srcScale, records, sourceTokenStrideBytes, D, GroupRows)) {
+                    CopyQueryScaleGmToL1Mxfp8Full copyScale;
+                    copyScale(dstScale, srcScale[records[GbsaKernelArch35::Mxfp8Descriptor::HEADER_WORDS] / 32], 0,
+                              dstRow, GroupRows, D);
+                }
+            }
+            const __gm__ uint64_t* record = records + GbsaKernelArch35::Mxfp8Descriptor::HEADER_WORDS;
+            for (uint32_t index = 0; index < count; ++index, record += recordWords) {
+                const uint64_t offset = record[0];
+                const uint64_t meta = record[1];
+                const uint32_t rows = static_cast<uint32_t>(meta) >> 1;
+                const uint32_t matrices = 1 + static_cast<uint32_t>(meta & 1);
+                const uint32_t stride = static_cast<uint32_t>(meta >> 32);
+                // Paired records use one ND2NZ, preserving compact destination order.
+                copyParams.ndNum = matrices;
+                copyParams.nValue = rows;
+                copyParams.srcNdMatrixStride = stride;
+                copyParams.dstNzMatrixStride = rows * BYTE_PER_C0;
+                // The producer emits only positive-length records; an empty
+                // group has count == 0 and never enters this loop.
+                AscendC::DataCopy(dstData[l1Layout(tla::MakeCoord(dstRow, 0))], src[offset], copyParams);
+                dstRow += rows * matrices;
+            }
+        }
+    }
+};
 
 } // namespace NpuArch::Gemm::Tile
-
 #endif // GBSA_MX_PACKED_RECORDS_HPP

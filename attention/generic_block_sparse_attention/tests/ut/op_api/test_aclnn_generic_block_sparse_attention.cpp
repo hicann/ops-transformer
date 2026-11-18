@@ -1013,3 +1013,43 @@ TEST_F(aclnn_generic_block_sparse_attention_ut, int8_rejects_fp8_quant_type)
 // ============================================================================
 // Case 2: required query is nullptr
 // ============================================================================
+
+TEST_F(aclnn_generic_block_sparse_attention_ut, mxfp8_precision_and_lse_output_contract)
+{
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
+    auto query = TensorDesc({4, 24, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ToAclType();
+    auto key = TensorDesc({256, 2, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ToAclType();
+    auto idx = TensorDesc({2, 4, 2}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto count = TensorDesc({2, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto metadata = TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    auto cuQ = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 4}).ToAclType();
+    auto cuKv = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 256}).ToAclType();
+    auto out = TensorDesc({4, 24, 256}, ACL_BF16, ACL_FORMAT_ND).ToAclType();
+    auto lse = TensorDesc({4, 24, 1}, ACL_FLOAT, ACL_FORMAT_ND).ToAclType();
+    auto badType = TensorDesc({4, 24, 1}, ACL_BF16, ACL_FORMAT_ND).ToAclType();
+    auto badShape = TensorDesc({4, 24, 2}, ACL_FLOAT, ACL_FORMAT_ND).ToAclType();
+    auto badRank = TensorDesc({1, 24, 4, 1}, ACL_FLOAT, ACL_FORMAT_ND).ToAclType();
+    const vector<int64_t> shape = {1, 4};
+    auto blocks = aclCreateIntArray(shape.data(), shape.size());
+    char layout[] = "TND";
+    auto check = [&](int64_t precision, aclTensor* lseOutput) {
+        uint64_t workspaceSize = 0;
+        aclOpExecutor* executor = nullptr;
+        auto status = aclnnGenericBlockSparseAttentionGetWorkspaceSize(
+            query.get(), key.get(), key.get(), idx.get(), count.get(), metadata.get(), nullptr, nullptr, nullptr,
+            nullptr, nullptr, cuQ.get(), cuKv.get(), nullptr, nullptr, nullptr, blocks, layout, layout, 4, 0.0625, 0, 6,
+            0.0, precision, -1, -1, 1, 0, false, out.get(), lseOutput, &workspaceSize, &executor);
+        if (executor != nullptr) {
+            aclDestroyAclOpExecutor(executor);
+        }
+        return status;
+    };
+    for (int64_t precision : {1, -1, 2}) {
+        EXPECT_EQ(check(precision, lse.get()), ACLNN_ERR_PARAM_INVALID);
+    }
+    EXPECT_EQ(check(0, nullptr), ACLNN_ERR_PARAM_NULLPTR);
+    EXPECT_EQ(check(0, badType.get()), ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(check(0, badShape.get()), ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(check(0, badRank.get()), ACLNN_ERR_PARAM_INVALID);
+    aclDestroyIntArray(blocks);
+}

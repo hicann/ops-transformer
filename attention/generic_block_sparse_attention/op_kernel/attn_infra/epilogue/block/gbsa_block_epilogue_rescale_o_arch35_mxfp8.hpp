@@ -11,860 +11,573 @@
 #ifndef GBSA_BLOCK_EPILOGUE_RESCALE_O_ARCH35_MXFP8_HPP
 #define GBSA_BLOCK_EPILOGUE_RESCALE_O_ARCH35_MXFP8_HPP
 
-#include "../../../attn_infra/gbsa_base_defs.hpp"
-#include "../../../attn_infra/arch/gbsa_resource.hpp"
-#include "../../../attn_infra/epilogue/gbsa_epilogue_dispatch_policy.hpp"
-#include "../../../attn_infra/epilogue/block/gbsa_block_epilogue_arch35_utils.hpp"
-#include "../../../attn_infra/epilogue/tile_common/gbsa_epilogue_tile_copy.hpp"
-#include "../../../attn_infra/gbsa_gemm_coord.hpp"
-#include "../../../attn_infra/gbsa_matrix_coord.hpp"
-#include "../../../tla/gbsa_tla_tensor.hpp"
-#include "../../../tla/gbsa_tla_layout.hpp"
+#include "gbsa_block_epilogue.hpp"
+#include "gbsa_block_epilogue_arch35_utils.hpp"
+#include "../gbsa_epilogue_dispatch_policy.hpp"
+
+namespace NpuArch::Epilogue::Block::GbsaMxfp8BaseVF {
+using namespace AscendC;
+using namespace AscendC::Reg;
+constexpr float EMPTY_LSE = -3.402823466e+38f;
+
+__simd_vf__ inline void CopyVector(__ubuf__ float* dst, __ubuf__ float* src, uint32_t validRows)
+{
+    LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
+    RegTensor<float> value;
+    MaskReg mask = UpdateMask<float>(validRows);
+    LoadAlign(value, src);
+    StoreAlign(dst, value, mask);
+}
+
+__aicore__ inline void CopyVectorCallVF(const LocalTensor<float>& dst, const LocalTensor<float>& src, uint32_t rows)
+{
+    CopyVector(reinterpret_cast<__ubuf__ float*>(dst.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(src.GetPhyAddr()),
+               rows);
+}
+
+template <uint16_t D, bool ClearStats = true>
+__simd_vf__ inline void StaticInitTask(__ubuf__ float* output, __ubuf__ float* sum, __ubuf__ float* maximum,
+                                       __ubuf__ float* groupMax, uint32_t rows)
+{
+    MaskReg all = CreateMask<float, MaskPattern::ALL>();
+    // UpdateMask consumes its count argument; preserve the loop bound.
+    uint32_t maskRows = rows;
+    MaskReg rowMask = UpdateMask<float>(maskRows);
+    RegTensor<float> zero, negative;
+    Duplicate(zero, 0.0f);
+    Duplicate(negative, (-__builtin_inff()));
+    StoreAlign(sum, zero, rowMask);
+    StoreAlign(maximum, negative, rowMask);
+    if constexpr (ClearStats) {
+        StoreAlign(groupMax, negative, rowMask);
+        StoreAlign(groupMax + 64, negative, rowMask);
+        StoreAlign(groupMax + 128, negative, rowMask);
+        StoreAlign(groupMax + 192, negative, rowMask);
+    }
+    for (uint16_t row = 0; row < rows; ++row) {
+        StoreAlign(output + row * D, zero, all);
+        if constexpr (D >= 128) {
+            StoreAlign(output + row * D + 64, zero, all);
+        }
+        if constexpr (D >= 192) {
+            StoreAlign(output + row * D + 128, zero, all);
+        }
+        if constexpr (D == 256) {
+            StoreAlign(output + row * D + 192, zero, all);
+        }
+    }
+}
+
+template <uint16_t D, bool ClearStats = true>
+__aicore__ inline void StaticInitTaskCallVF(const LocalTensor<float>& output, const LocalTensor<float>& sum,
+                                            const LocalTensor<float>& maximum, const LocalTensor<float>& groupMax,
+                                            uint32_t rows)
+{
+    StaticInitTask<D, ClearStats>(reinterpret_cast<__ubuf__ float*>(output.GetPhyAddr()),
+                                  reinterpret_cast<__ubuf__ float*>(sum.GetPhyAddr()),
+                                  reinterpret_cast<__ubuf__ float*>(maximum.GetPhyAddr()),
+                                  reinterpret_cast<__ubuf__ float*>(groupMax.GetPhyAddr()), rows);
+}
+
+template <bool ClearStats = true>
+__aicore__ inline void InitTaskCallVF(const LocalTensor<float>& output, const LocalTensor<float>& sum,
+                                      const LocalTensor<float>& maximum, const LocalTensor<float>& groupMax,
+                                      uint32_t rows, uint16_t D)
+{
+    if (D == 64) {
+        StaticInitTaskCallVF<64, ClearStats>(output, sum, maximum, groupMax, rows);
+    } else if (D == 128) {
+        StaticInitTaskCallVF<128, ClearStats>(output, sum, maximum, groupMax, rows);
+    } else if (D == 192) {
+        StaticInitTaskCallVF<192, ClearStats>(output, sum, maximum, groupMax, rows);
+    } else if (D == 256) {
+        StaticInitTaskCallVF<256, ClearStats>(output, sum, maximum, groupMax, rows);
+    }
+}
+template <typename OutputT>
+__simd_vf__ inline void FillEmptyOutput(__ubuf__ OutputT* output, __ubuf__ float* lse, uint32_t elements, uint32_t rows,
+                                        bool outputLse, bool packedLse)
+{
+    RegTensor<OutputT> zero;
+    RegTensor<float> empty;
+    RegTensor<uint32_t> indices;
+    Duplicate(zero, static_cast<OutputT>(0));
+    const uint32_t repeats = (elements + 127U) / 128U;
+    for (uint32_t i = 0; i < repeats; ++i) {
+        MaskReg mask = UpdateMask<OutputT>(elements);
+        StoreAlign(output + i * 128U, zero, mask);
+    }
+    if (outputLse) {
+        MaskReg mask = UpdateMask<float>(rows);
+        Duplicate(empty, EMPTY_LSE);
+        if (packedLse) {
+            Arange((RegTensor<int32_t>&)indices, 0);
+            Muls(indices, indices, static_cast<uint32_t>(8), mask);
+            Scatter(lse, empty, indices, mask);
+        } else {
+            StoreAlign(lse, empty, mask);
+        }
+    }
+}
+
+template <typename OutputT>
+__aicore__ inline void FillEmptyOutputCallVF(const LocalTensor<OutputT>& output, const LocalTensor<float>& lse,
+                                             uint32_t elements, uint32_t rows, bool outputLse, bool packedLse)
+{
+    FillEmptyOutput<OutputT>(reinterpret_cast<__ubuf__ OutputT*>(output.GetPhyAddr()),
+                             reinterpret_cast<__ubuf__ float*>(lse.GetPhyAddr()), elements, rows, outputLse, packedLse);
+}
+
+template <uint16_t D, uint16_t R>
+__simd_vf__ inline void StaticRescaleOutput(__ubuf__ float* accumulator, __ubuf__ float* pv,
+                                            __ubuf__ float* localRowsum, __ubuf__ float* outL, __ubuf__ float* tileDm,
+                                            uint32_t validRows)
+{
+    LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
+    MaskReg all = CreateMask<float, MaskPattern::ALL>();
+    uint32_t rows = validRows;
+    MaskReg rowMask = UpdateMask<float>(rows);
+    RegTensor<float> dm, previous, current;
+    RegTensor<float> previous0, previous1, previous2, previous3;
+    RegTensor<float> current0, current1, current2, current3;
+    LoadAlign(dm, tileDm);
+    LoadAlign(previous, outL);
+    LoadAlign(current, localRowsum);
+    Mul(previous, previous, dm, rowMask);
+    Add(current, current, previous, rowMask);
+    StoreAlign(outL, current, rowMask);
+    for (uint16_t row = 0; row < validRows; ++row) {
+        LoadAlign<float, LoadDist::DIST_BRC_B32>(dm, tileDm + row);
+        LoadAlign(previous0, accumulator + row * D + 0);
+        if constexpr (D >= 128) {
+            LoadAlign(previous1, accumulator + row * D + 64);
+        }
+        if constexpr (D >= 192) {
+            LoadAlign(previous2, accumulator + row * D + 128);
+        }
+        if constexpr (D >= 256) {
+            LoadAlign(previous3, accumulator + row * D + 192);
+        }
+        LoadAlign(current0, pv + row * D + 0);
+        if constexpr (D >= 128) {
+            LoadAlign(current1, pv + row * D + 64);
+        }
+        if constexpr (D >= 192) {
+            LoadAlign(current2, pv + row * D + 128);
+        }
+        if constexpr (D >= 256) {
+            LoadAlign(current3, pv + row * D + 192);
+        }
+        Mul(previous0, previous0, dm, all);
+        if constexpr (D >= 128) {
+            Mul(previous1, previous1, dm, all);
+        }
+        if constexpr (D >= 192) {
+            Mul(previous2, previous2, dm, all);
+        }
+        if constexpr (D >= 256) {
+            Mul(previous3, previous3, dm, all);
+        }
+        Add(current0, current0, previous0, all);
+        if constexpr (D >= 128) {
+            Add(current1, current1, previous1, all);
+        }
+        if constexpr (D >= 192) {
+            Add(current2, current2, previous2, all);
+        }
+        if constexpr (D >= 256) {
+            Add(current3, current3, previous3, all);
+        }
+        StoreAlign(accumulator + row * D + 0, current0, all);
+        if constexpr (D >= 128) {
+            StoreAlign(accumulator + row * D + 64, current1, all);
+        }
+        if constexpr (D >= 192) {
+            StoreAlign(accumulator + row * D + 128, current2, all);
+        }
+        if constexpr (D >= 256) {
+            StoreAlign(accumulator + row * D + 192, current3, all);
+        }
+    }
+}
+
+__simd_vf__ inline void PackLse(__ubuf__ float* dst, __ubuf__ float* src, uint32_t rows)
+{
+    LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
+    MaskReg mask = UpdateMask<float>(rows);
+    RegTensor<float> value;
+    RegTensor<uint32_t> indices;
+    Arange((RegTensor<int32_t>&)indices, 0);
+    Muls(indices, indices, static_cast<uint32_t>(8), mask);
+    LoadAlign(value, src);
+    Scatter(dst, value, indices, mask);
+}
+
+__aicore__ inline void PackLseCallVF(const LocalTensor<float>& dst, const LocalTensor<float>& src, uint32_t rows)
+{
+    PackLse(reinterpret_cast<__ubuf__ float*>(dst.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(src.GetPhyAddr()),
+            rows);
+}
+
+template <uint16_t D, uint16_t R>
+__aicore__ inline void StaticRescaleCallVF(const LocalTensor<float>& output, const LocalTensor<float>& pv,
+                                           const LocalTensor<float>& rowSum, const LocalTensor<float>& sum,
+                                           const LocalTensor<float>& dm, uint32_t rows)
+{
+    StaticRescaleOutput<D, R>(
+        reinterpret_cast<__ubuf__ float*>(output.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(pv.GetPhyAddr()),
+        reinterpret_cast<__ubuf__ float*>(rowSum.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(sum.GetPhyAddr()),
+        reinterpret_cast<__ubuf__ float*>(dm.GetPhyAddr()), rows);
+}
+
+__aicore__ inline void RescaleCallVF(const LocalTensor<float>& output, const LocalTensor<float>& pv,
+                                     const LocalTensor<float>& rowSum, const LocalTensor<float>& sum,
+                                     const LocalTensor<float>& dm, uint32_t rows, uint16_t D, uint16_t R)
+{
+    if (D == 64) {
+        StaticRescaleCallVF<64, 64>(output, pv, rowSum, sum, dm, rows);
+    } else if (D == 128) {
+        StaticRescaleCallVF<128, 64>(output, pv, rowSum, sum, dm, rows);
+    } else if (D == 192) {
+        StaticRescaleCallVF<192, 64>(output, pv, rowSum, sum, dm, rows);
+    } else if (D == 256) {
+        StaticRescaleCallVF<256, 64>(output, pv, rowSum, sum, dm, rows);
+    }
+}
+
+} // namespace NpuArch::Epilogue::Block::GbsaMxfp8BaseVF
+
+namespace NpuArch::Epilogue::Block::GbsaMxfp8FullVF {
+using namespace AscendC;
+using namespace AscendC::Reg;
+template <class OutputT>
+__simd_vf__ inline void Normalize(__ubuf__ OutputT* output, __ubuf__ float* numerator, __ubuf__ float* sum,
+                                  __ubuf__ uint16_t* channelScale, uint16_t firstRow, uint16_t rows, uint16_t dim,
+                                  float inversePScale)
+{
+    LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
+    MaskReg all = CreateMask<float, MaskPattern::ALL>();
+    RegTensor<uint16_t> packed;
+    RegTensor<uint32_t> bits, minimum;
+    RegTensor<float> denominator, value, zero, unit;
+    RegTensor<OutputT> converted;
+    Duplicate(zero, 0.0f);
+    Duplicate(unit, 1.0f);
+    Duplicate(minimum, uint32_t(0x00400000U), all);
+    for (uint16_t row = 0; row < rows; ++row) {
+        LoadAlign<float, LoadDist::DIST_BRC_B32>(denominator, sum + firstRow + row);
+        MaskReg valid;
+        Compares<float, CMPMODE::GT>(valid, denominator, 0.0f, all);
+        Select(denominator, denominator, unit, valid);
+        for (uint16_t column = 0; column < dim; column += 64U) {
+            LoadAlign<uint16_t, LoadDist::DIST_UNPACK_B16>(packed, channelScale + column);
+            ShiftRights(bits, (RegTensor<uint32_t>&)packed, int16_t(8), all);
+            ShiftLefts(bits, bits, int16_t(23), all);
+            MaskReg subnormal;
+            Compares<uint32_t, CMPMODE::EQ>(subnormal, bits, uint32_t(0), all);
+            Select(bits, minimum, bits, subnormal);
+            LoadAlign(value, numerator + (firstRow + row) * dim + column);
+            Muls(value, value, inversePScale, all);
+            Div(value, value, denominator, all);
+            Mul(value, value, (RegTensor<float>&)bits, all);
+            Select(value, value, zero, valid);
+            if constexpr (AscendC::IsSameType<OutputT, float>::value) {
+                StoreAlign(output + row * dim + column, value, all);
+            } else {
+                Cast<OutputT, float, FP8_RINT>(converted, value, all);
+                StoreAlign<OutputT, StoreDist::DIST_PACK_B32>(output + row * dim + column, converted, all);
+            }
+        }
+    }
+}
+
+__simd_vf__ inline void Lse(__ubuf__ float* output, __ubuf__ float* maximum, __ubuf__ float* sum, uint32_t rows)
+{
+    LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
+    MaskReg mask = UpdateMask<float>(rows), valid;
+    RegTensor<float> m, l, one, empty;
+    LoadAlign(m, maximum);
+    LoadAlign(l, sum);
+    Duplicate(one, 1.0f);
+    Duplicate(empty, -3.402823466e+38f);
+    Compares<float, CMPMODE::GT>(valid, l, 0.0f, mask);
+    Select(l, l, one, valid);
+    Ln(l, l, mask);
+    Add(l, l, m, mask);
+    Select(l, l, empty, valid);
+    StoreAlign(output, l, mask);
+}
+
+} // namespace NpuArch::Epilogue::Block::GbsaMxfp8FullVF
 
 namespace NpuArch::Epilogue::Block {
 
-template <class ElementO_, class ElementOTmp_, class ElementS_, class ElementKV_, class TileCopy_,
-          class OTmpSrcPos_, // the src TPosition of pv res, viable configurations: GM/L0C
-          LseMode LSE_MODE_, LseFormat LSE_FORMAT_>
-class BlockEpilogue<EpilogueAtlasA5GbsaRescaleOMxfp8<LSE_MODE_, LSE_FORMAT_>, ElementO_, ElementOTmp_, ElementS_,
-                    ElementKV_, TileCopy_, OTmpSrcPos_> {
+template <typename OutputT, uint32_t QueryCapacity = 32U>
+class RescaleOMxfp8Full {
 public:
-    using DispatchPolicy = EpilogueAtlasA5GbsaRescaleOMxfp8<LSE_MODE_, LSE_FORMAT_>;
-    using ArchTag = typename DispatchPolicy::ArchTag;
-    using ElementO = ElementO_;
-    using ElementOTmp = ElementOTmp_;
+    using ArchTag = Arch::AtlasA5;
+    uint32_t D, R;
+    using ElementO = OutputT;
     using ElementLse = float;
-    using SMDtype = ElementS_;
-    using ElementKV = ElementKV_;
-    using TileCopy = TileCopy_;
-    using OTmpSrcPos = OTmpSrcPos_;
-    static_assert(AscendC::IsSameType<ElementKV, fp8_e4m3fn_t>::value &&
-                      AscendC::IsSameType<ElementOTmp, float>::value && AscendC::IsSameType<SMDtype, float>::value &&
-                      TileCopy::APPLY_MX_V_CHANNEL_SCALE && TileCopy::MX_V_GENERAL_DIM &&
-                      TileCopy::CACHE_MX_V_CHANNEL_SCALE,
-                  "MXFP8 rescale requires FP32 intermediates and channel-wise V scale");
-
-    using CopyUbToGmO = typename TileCopy::CopyUbToGmO;
-
-    static constexpr uint32_t UB_OTMP_BUF_STAGES = 2;
-    static constexpr uint32_t RESCALE_ROW_MAX_ELEM_NUM = 64;
-    static constexpr uint32_t RESCALE_COL_MAX_ELEM_NUM = 128;
-    static constexpr uint32_t RESCALE_VREG_SIZE = 256 / sizeof(ElementOTmp);
-    float pDequantScale_ = 1.0f / 448.0f;
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, UBufTileHelper& uBufTileHelper)
+    struct Buffers {
+        uint32_t LOCAL_ROW_SUM_OFFSET;
+        uint32_t LSE_OFFSET;
+        uint32_t LSE_PACKED_OFFSET;
+        uint32_t OUTPUT_SCRATCH_BYTES;
+        uint32_t OUTPUT_SCRATCH_OFFSET;
+        uint32_t OUT_G_OFFSET;
+        uint32_t OUT_L_OFFSET;
+        uint32_t O_OFFSET;
+        uint32_t PV_OFFSET;
+        uint32_t PV_SLOTS;
+        uint32_t PV_SLOT_BYTES;
+        uint32_t TILE_DM_OFFSET;
+        uint32_t TILE_G_OFFSET;
+        uint32_t VSCALE_OFFSET;
+    };
+    Buffers layout;
+    using Resource = Arch::Resource<Arch::AtlasA5>;
+    __aicore__ inline explicit RescaleOMxfp8Full(Resource& resource, uint32_t dim, uint32_t vecRows,
+                                                 const Buffers& buffers, float pScale)
+        : D(dim),
+          R(vecRows),
+          layout(buffers),
+          inversePScale_(1.0f / pScale)
     {
-        loUbBufNum = uBufTileHelper.loUbBufNum;
-        loUbRowNum = uBufTileHelper.loUbRowNum;
-        loGmTransit = uBufTileHelper.loGmTransit;
-        for (uint32_t i = 0; i < UB_OTMP_BUF_STAGES; i++) {
-            loUbTensor[i] = resource.ubBuf.template GetBufferByByte<ElementOTmp>(
-                uBufTileHelper.loStartOffset +
-                loUbRowNum * uBufTileHelper.loUbColCapacity * sizeof(ElementOTmp) * (i % loUbBufNum));
+        channelScaleUB = resource.ubBuf.template GetBufferByByte<uint16_t>(layout.VSCALE_OFFSET);
+        outputUBTensor = resource.ubBuf.template GetBufferByByte<float>(layout.O_OFFSET);
+        for (uint32_t slot = 0; slot < layout.PV_SLOTS; ++slot) {
+            pvUBTensor[slot] =
+                resource.ubBuf.template GetBufferByByte<float>(layout.PV_OFFSET + slot * layout.PV_SLOT_BYTES);
         }
-        goUbTensor32 = resource.ubBuf.template GetBufferByByte<ElementOTmp>(uBufTileHelper.goStartOffset);
-        goUbTensor16 = resource.ubBuf.template GetBufferByByte<ElementO>(uBufTileHelper.goStartOffset);
-        glUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper.glStartOffset);
-        dmUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper.dmStartOffset);
-        gmUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper.gmStartOffset);
-        lseUbTensor32 = resource.ubBuf.template GetBufferByByte<float>(uBufTileHelper.lseStartOffset);
-        {
-            mxVScaleUb = resource.ubBuf.template GetBufferByByte<uint8_t>(uBufTileHelper.mxVScaleStartOffset);
+        lsePackedUBTensor = resource.ubBuf.template GetBufferByByte<float>(layout.LSE_PACKED_OFFSET);
+        rowsumUBTensor = resource.ubBuf.template GetBufferByByte<float>(layout.LOCAL_ROW_SUM_OFFSET);
+        sumUBTensor = resource.ubBuf.template GetBufferByByte<float>(layout.OUT_L_OFFSET);
+        maxUBTensor = resource.ubBuf.template GetBufferByByte<float>(layout.OUT_G_OFFSET);
+        lseUBTensor = resource.ubBuf.template GetBufferByByte<float>(layout.LSE_OFFSET);
+        resultUBTensor = resource.ubBuf.template GetBufferByByte<OutputT>(layout.OUTPUT_SCRATCH_OFFSET);
+        for (uint32_t slot = 0; slot < 4; ++slot) {
+            tileMaxUBTensor[slot] = resource.ubBuf.template GetBufferByByte<float>(layout.TILE_G_OFFSET + slot * 256);
+            dmUBTensor[slot] = resource.ubBuf.template GetBufferByByte<float>(layout.TILE_DM_OFFSET + slot * 256);
         }
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(3);
     }
-
-    __aicore__ inline void SetPQuantScale(float scale)
+    __aicore__ inline ~RescaleOMxfp8Full()
     {
-        pDequantScale_ = 1.0f / scale;
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(3);
     }
-
-    __aicore__ inline void SetMxVScale(AscendC::GlobalTensor<uint8_t> scale)
+    __aicore__ inline void SetValueScale(const AscendC::GlobalTensor<uint8_t>& scale)
     {
-        mxVScaleGm = scale;
-    }
-
-    // Each uint16_t contains the equal E8M0 scales of two adjacent 32-element
-    // V groups. Unpack it to a uint32 lane, retain the upper byte, then construct
-    // the FP32 exponent. E8M0 zero denotes 2^-127, not floating-point zero.
-    static __simd_vf__ inline void ApplyMxVScaleFunc(__ubuf__ float* output, __ubuf__ uint16_t* packedScale,
-                                                     uint16_t rows, uint16_t columns, uint16_t rowStride)
-    {
-        using namespace AscendC::Reg;
-        RegTensor<uint16_t> packed;
-        RegTensor<uint32_t> scaleBits;
-        RegTensor<uint32_t> minScaleBits;
-        RegTensor<float> value;
-        MaskReg all = CreateMask<uint32_t, MaskPattern::ALL>();
-        Duplicate(minScaleBits, uint32_t(0x00400000U), all);
-        const uint16_t lanes = AscendC::GetVecLen() / sizeof(float);
-        const uint16_t loops = (columns + lanes - 1U) / lanes;
-        uint32_t remaining = columns;
-        for (uint16_t column = 0; column < loops; ++column) {
-            MaskReg mask = UpdateMask<uint32_t>(remaining);
-            LoadAlign<uint16_t, LoadDist::DIST_UNPACK_B16>(packed, packedScale + column * lanes);
-            ShiftRights(scaleBits, (RegTensor<uint32_t>&)packed, int16_t(8), mask);
-            ShiftLefts(scaleBits, scaleBits, int16_t(23), mask);
-            MaskReg zeroScale;
-            Compares<uint32_t, AscendC::CMPMODE::EQ>(zeroScale, scaleBits, uint32_t(0U), mask);
-            Select(scaleBits, minScaleBits, scaleBits, zeroScale);
-            for (uint16_t row = 0; row < rows; ++row) {
-                LoadAlign(value, output + row * rowStride + column * lanes);
-                Mul(value, value, (RegTensor<float>&)scaleBits, mask);
-                StoreAlign(output + row * rowStride + column * lanes, value, mask);
-            }
-        }
-    }
-
-    static __simd_vf__ inline void ClearMxVScaleTail(__ubuf__ uint16_t* packedScale, uint32_t columns)
-    {
-        using namespace AscendC::Reg;
-        RegTensor<uint16_t> zero;
-        Duplicate(zero, uint16_t(0U));
-        uint32_t tailGroupColumns = 64U;
-        MaskReg mask = UpdateMask<uint16_t>(tailGroupColumns);
-        StoreAlign(packedScale + columns / 64U * 64U, zero, mask);
-    }
-
-    __aicore__ inline void ApplyMxVScaleGeneral(uint32_t rows, uint32_t columns, uint32_t rowStride)
-    {
-        {
-            if (cachedMxVScaleColumns == columns &&
-                cachedMxVScaleAddress == reinterpret_cast<uint64_t>(mxVScaleGm.GetPhyAddr())) {
-                ApplyMxVScaleFunc(reinterpret_cast<__ubuf__ float*>(goUbTensor32.GetPhyAddr()),
-                                  reinterpret_cast<__ubuf__ uint16_t*>(mxVScaleUb.GetPhyAddr()), rows, columns,
-                                  rowStride);
-                return;
-            }
-        }
-        // This private buffer is read only by final-output V instructions.
-        // IDs 0/1 belong to softmax input DMA and 6/7 to LO workspace DMA.
-        if (columns % 64U != 0U) {
-            ClearMxVScaleTail(reinterpret_cast<__ubuf__ uint16_t*>(mxVScaleUb.GetPhyAddr()), columns);
-        }
-        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
-        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
-        if (columns % 64U == 0U) {
-            AscendC::DataCopy(mxVScaleUb, mxVScaleGm, columns * 2U);
-        } else {
-            // The remaining vector-load padding was cleared above. DMA only
-            // pads to 32 bytes and never reads beyond the per-head GM scales.
-            AscendC::DataCopyExtParams copyParams{1U, columns * 2U, 0U, 0U, 0U};
-            AscendC::DataCopyPadExtParams<uint8_t> padParams{
-                true, 0U, static_cast<uint8_t>((RoundUp(columns, 16U) - columns) * 2U), 0U};
-            AscendC::DataCopyPad(mxVScaleUb, mxVScaleGm, copyParams, padParams);
-        }
-        AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID2);
-        AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID2);
-        {
-            cachedMxVScaleAddress = reinterpret_cast<uint64_t>(mxVScaleGm.GetPhyAddr());
-            cachedMxVScaleColumns = columns;
-        }
-        ApplyMxVScaleFunc(reinterpret_cast<__ubuf__ float*>(goUbTensor32.GetPhyAddr()),
-                          reinterpret_cast<__ubuf__ uint16_t*>(mxVScaleUb.GetPhyAddr()), rows, columns, rowStride);
-    }
-
-    __aicore__ inline ~BlockEpilogue() {}
-
-    __aicore__ inline void SetLoWorkspace(AscendC::GlobalTensor<ElementOTmp> workspace, uint64_t tileElems)
-    {
-        gLo = workspace;
-        loGmTileElems = tileElems;
-    }
-
-    __aicore__ inline void ComputeLoRows(uint32_t rowOffset, uint32_t rows, uint32_t colStride, uint32_t cols,
-                                         uint32_t curTileMod, uint32_t loBufId, bool isFirst, bool isLast)
-    {
-        auto go = goUbTensor32[rowOffset * colStride];
-        auto lo = loUbTensor[loBufId];
-        auto* goPtr = reinterpret_cast<__ubuf__ ElementOTmp*>(go.GetPhyAddr());
-        auto* loPtr = reinterpret_cast<__ubuf__ ElementOTmp*>(lo.GetPhyAddr());
-        auto* glPtr = reinterpret_cast<__ubuf__ ElementOTmp*>(glUbTensor32[rowOffset].GetPhyAddr());
-        auto* dmPtr = reinterpret_cast<__ubuf__ ElementOTmp*>(
-            dmUbTensor32[curTileMod * RESCALE_ROW_MAX_ELEM_NUM + rowOffset].GetPhyAddr());
-        const uint16_t vl = AscendC::GetVecLen() / sizeof(ElementOTmp);
-        const uint32_t tail = (cols - 1U) % vl + 1U;
-        if (isFirst && !isLast) {
-            AscendC::DataCopy(go, lo, rows * colStride);
-            AscendC::PipeBarrier<PIPE_V>();
-        } else if (isFirst) {
-            DivFuncLastAndFirst(goPtr, loPtr, glPtr, colStride, tail, vl, rows / 2U, cols / vl, rows % 2U,
-                                cols % vl != 0U, pDequantScale_);
-        } else if (!isLast) {
-            RescaleFunc(goPtr, loPtr, dmPtr, colStride, tail, vl, rows / 2U, cols / vl, rows % 2U, cols % vl != 0U);
-        } else {
-            RescaleFuncLastNotFirst(goPtr, loPtr, dmPtr, glPtr, colStride, tail, vl, rows / 2U, cols / vl, rows % 2U,
-                                    cols % vl != 0U, pDequantScale_);
-        }
-    }
-
-    __aicore__ inline void LoadLoRows(uint64_t gmOffset, uint32_t rows, uint32_t stride, uint32_t bufId)
-    {
-        const uint32_t eventId = 6U + bufId;
-        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventId);
-        AscendC::DataCopy(loUbTensor[bufId], gLo[gmOffset], rows * stride);
-        AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventId);
-    }
-
-    template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
-    {
-        // in mode 4, AIC set for 2 AIVs seperately
-        if constexpr (MODE == 4U) {
-            Arch::CrossCoreSetFlag<MODE, PIPE>(crossCoreFlag);
-        }
-    }
-
-    template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
-    {
-        // in mode 4, AIC wait for 2 AIVs seperately
-        if constexpr (MODE == 4U) {
-            Arch::CrossCoreWaitFlag<MODE, PIPE>(crossCoreFlag);
-        }
-    }
-
-    template <class TensorLseGm, class TensorLseUb>
-    __aicore__ inline void CopyUbToGmLse(TensorLseGm const& gLseTensorTlaTile, TensorLseUb const& ubLseTensorTla)
-    {
-        AscendC::DataCopyExtParams repeatParams;
-        if constexpr ((DispatchPolicy::LSE_FORMAT == LseFormat::TN1) ||
-                      (DispatchPolicy::LSE_FORMAT == LseFormat::BSN1)) {
-            repeatParams.blockCount = tla::get<0>(ubLseTensorTla.shape());
-            repeatParams.blockLen = sizeof(float);
-            repeatParams.srcStride = 0;
-            repeatParams.dstStride = (tla::get<0>(gLseTensorTlaTile.stride()) - 1) * sizeof(float);
-        } else if constexpr (DispatchPolicy::LSE_FORMAT == LseFormat::BNS1) {
-            repeatParams.blockCount = 1;
-            repeatParams.blockLen = tla::get<0>(ubLseTensorTla.shape()) * sizeof(float);
-            repeatParams.srcStride = 0;
-            repeatParams.dstStride = 0;
-        }
-        auto dstOffset = gLseTensorTlaTile.layout()(gLseTensorTlaTile.coord());
-        auto srcOffset = ubLseTensorTla.layout()(ubLseTensorTla.coord());
-        AscendC::DataCopyPad(gLseTensorTlaTile.data()[dstOffset], ubLseTensorTla.data()[srcOffset], repeatParams);
-    }
-
-    template <bool IS_FD, class TensorO, class TensorLse>
-    __aicore__ inline void SubCoreCompute(TensorO& gOTensorTlaTile, TensorLse& gLseTensorTlaTile, uint32_t curTileMod,
-                                          uint32_t ubOTmpBufId, bool isFirstKvSTile, bool isLastKvSTile,
-                                          uint32_t colStrideCurSubCore, Arch::CrossCoreFlag mm2ToReFlag,
-                                          AscendC::GlobalTensor<float>& gPartialO,
-                                          AscendC::GlobalTensor<float>& gPartialLse, uint32_t fdTaskId,
-                                          uint32_t groupRowOffset, uint32_t groupSize, uint32_t fdLseSubStride)
-    {
-        uint32_t rowNumCurSubCore = tla::get<0>(gOTensorTlaTile.shape());
-        uint32_t colNumCurSubCore = tla::get<1>(gOTensorTlaTile.shape());
-        uint32_t vlElemNum = AscendC::GetVecLen() / sizeof(ElementOTmp);
-        uint32_t colTail = (colNumCurSubCore - 1) % vlElemNum + 1;
-        uint16_t mLoop = rowNumCurSubCore / 2U;
-        uint16_t nLoop = colNumCurSubCore / vlElemNum;
-        uint16_t hasMTail = rowNumCurSubCore % 2U;
-        uint16_t hasNTail = colNumCurSubCore % vlElemNum != 0U;
-
-        __ubuf__ ElementOTmp* goUb = (__ubuf__ ElementOTmp*)goUbTensor32.GetPhyAddr();
-        __ubuf__ ElementOTmp* loUb = (__ubuf__ ElementOTmp*)loUbTensor[ubOTmpBufId].GetPhyAddr();
-        __ubuf__ ElementOTmp* glUb = (__ubuf__ ElementOTmp*)glUbTensor32.GetPhyAddr();
-        __ubuf__ ElementOTmp* dmUb =
-            (__ubuf__ ElementOTmp*)dmUbTensor32[curTileMod * RESCALE_ROW_MAX_ELEM_NUM].GetPhyAddr();
-        __ubuf__ float* gmUb = (__ubuf__ float*)gmUbTensor32.GetPhyAddr();
-        __ubuf__ float* lseUb = (__ubuf__ float*)lseUbTensor32.GetPhyAddr();
-
-        if (loGmTransit) {
-            WaitCrossCoreSync<4, PIPE_MTE2>(mm2ToReFlag);
-        } else {
-            WaitCrossCoreSync<4, PIPE_V>(mm2ToReFlag);
-        }
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
-        if (loGmTransit) {
-            const uint64_t gmOffset =
-                ubOTmpBufId * loGmTileElems + static_cast<uint64_t>(groupRowOffset) * colStrideCurSubCore;
-            const uint32_t chunks = CeilDiv(rowNumCurSubCore, loUbRowNum);
-            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID6);
-            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID7);
-            LoadLoRows(gmOffset, min(loUbRowNum, rowNumCurSubCore), colStrideCurSubCore, 0U);
-            for (uint32_t chunk = 0; chunk < chunks; ++chunk) {
-                const uint32_t bufId = chunk % UB_OTMP_BUF_STAGES;
-                const uint32_t rowOffset = chunk * loUbRowNum;
-                if (chunk + 1U < chunks) {
-                    const uint32_t nextRow = rowOffset + loUbRowNum;
-                    LoadLoRows(gmOffset + static_cast<uint64_t>(nextRow) * colStrideCurSubCore,
-                               min(loUbRowNum, rowNumCurSubCore - nextRow), colStrideCurSubCore, 1U - bufId);
-                }
-                AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(6U + bufId);
-                ComputeLoRows(rowOffset, min(loUbRowNum, rowNumCurSubCore - rowOffset), colStrideCurSubCore,
-                              colNumCurSubCore, curTileMod, bufId, isFirstKvSTile, isLastKvSTile);
-                AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(6U + bufId);
-            }
-            AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID6);
-            AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID7);
-        } else if (isFirstKvSTile) {
-            if (!isLastKvSTile) {
-                uint32_t totalCopyElems = rowNumCurSubCore * colStrideCurSubCore;
-                AscendC::DataCopy(goUbTensor32, loUbTensor[ubOTmpBufId], totalCopyElems);
-                AscendC::PipeBarrier<PIPE_V>();
-            } else {
-                DivFuncLastAndFirst(goUb, loUb, glUb, colStrideCurSubCore, colTail, vlElemNum, mLoop, nLoop, hasMTail,
-                                    hasNTail, pDequantScale_);
-            }
-        } else if (!isLastKvSTile) {
-            RescaleFunc(goUb, loUb, dmUb, colStrideCurSubCore, colTail, vlElemNum, mLoop, nLoop, hasMTail, hasNTail);
-        } else {
-            RescaleFuncLastNotFirst(goUb, loUb, dmUb, glUb, colStrideCurSubCore, colTail, vlElemNum, mLoop, nLoop,
-                                    hasMTail, hasNTail, pDequantScale_);
-        }
-        // release lo buf
-        SetCrossCoreSync<4, PIPE_V>(mm2ToReFlag);
-        if (isLastKvSTile) {
-            {
-                // Shared by the regular and GM-transit paths; keep FP32 until
-                // the channel dequantization is complete, then cast to output.
-                {
-                    ApplyMxVScaleGeneral(rowNumCurSubCore, colNumCurSubCore, colStrideCurSubCore);
-                }
-            }
-            if constexpr (IS_FD) {
-                const uint32_t rowCountAlign = RoundUp(rowNumCurSubCore, 8);
-                AscendC::Ln(lseUbTensor32, glUbTensor32, rowCountAlign);
-                AscendC::PipeBarrier<PIPE_V>();
-                AscendC::Add(lseUbTensor32, lseUbTensor32, gmUbTensor32, rowCountAlign);
-                AscendC::PipeBarrier<PIPE_V>();
-                AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-                AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-                const uint64_t oOffset = static_cast<uint64_t>(fdTaskId) * groupSize * colStrideCurSubCore +
-                                         static_cast<uint64_t>(groupRowOffset) * colStrideCurSubCore;
-                AscendC::DataCopy(gPartialO[oOffset], goUbTensor32, rowNumCurSubCore * colStrideCurSubCore);
-                const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-                const uint64_t lseOffset =
-                    static_cast<uint64_t>(fdTaskId) * 2 * fdLseSubStride + subBlockIdx * fdLseSubStride;
-                AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
-                AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
-                AscendC::DataCopyPad(gPartialLse[lseOffset], lseUbTensor32,
-                                     AscendC::DataCopyExtParams(1, rowNumCurSubCore * sizeof(float), 0, 0, 0));
-                AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
-                return;
-            }
-            if constexpr (DispatchPolicy::LSE_MODE == LseMode::OUT_ONLY) {
-                uint32_t colNumLseUb = 0;
-                uint32_t colStrideLseUb = 0;
-                if constexpr ((DispatchPolicy::LSE_FORMAT == LseFormat::TN1) ||
-                              (DispatchPolicy::LSE_FORMAT == LseFormat::BSN1)) {
-                    LogSumExpFuncQSAxisIncontinuous(gmUb, glUb, lseUb, rowNumCurSubCore);
-                    colNumLseUb = 8;
-                    colStrideLseUb = 8;
-                } else if constexpr (DispatchPolicy::LSE_FORMAT == LseFormat::BNS1) {
-                    LogSumExpFuncQSAxisContinuous(gmUb, glUb, lseUb, rowNumCurSubCore);
-                    colNumLseUb = 1;
-                    colStrideLseUb = 1;
-                }
-                AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
-                AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
-                auto ubLseLayoutTla = tla::MakeLayout(tla::MakeShape(rowNumCurSubCore, colNumLseUb),
-                                                      tla::MakeStride(colStrideLseUb, tla::Int<1>{}));
-                auto ubLseTensorTla = tla::MakeTensor(lseUbTensor32, ubLseLayoutTla, Arch::PositionUB{});
-                CopyUbToGmLse(gLseTensorTlaTile, ubLseTensorTla);
-            }
-            AscendC::PipeBarrier<PIPE_V>();
-
-            if (std::is_same<ElementO, bfloat16_t>::value) {
-                AscendC::Cast(goUbTensor16, goUbTensor32, AscendC::RoundMode::CAST_RINT,
-                              rowNumCurSubCore * colStrideCurSubCore);
-            } else {
-                AscendC::Cast(goUbTensor16, goUbTensor32, AscendC::RoundMode::CAST_NONE,
-                              rowNumCurSubCore * colStrideCurSubCore);
-            }
-            AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-            AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-            auto ubOLayoutTla = tla::MakeLayout(tla::MakeShape(rowNumCurSubCore, colNumCurSubCore),
-                                                tla::MakeStride(colStrideCurSubCore, tla::Int<1>{}));
-            auto ubOTensorTla = tla::MakeTensor(goUbTensor16, ubOLayoutTla, Arch::PositionUB{});
-            copyUbToGmO(gOTensorTlaTile, ubOTensorTla);
-        }
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
-    }
-
-    static __simd_vf__ inline void RescaleFunc(__ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb,
-                                               __ubuf__ ElementOTmp* dmUb, uint16_t colStride, uint32_t colTail,
-                                               uint16_t vlElemNum, uint16_t mLoop, uint16_t nLoop, uint16_t hasMTail,
-                                               uint16_t hasNTail)
-    {
-        using namespace AscendC::Reg;
-        RegTensor<float> dmVreg0;
-        RegTensor<float> dmVreg1;
-        RegTensor<float> goPreVreg0;
-        RegTensor<float> goPreVreg1;
-        RegTensor<float> loVreg0;
-        RegTensor<float> loVreg1;
-        RegTensor<float> mulVreg0;
-        RegTensor<float> mulVreg1;
-        RegTensor<float> goCurVreg0;
-        RegTensor<float> goCurVreg1;
-        MaskReg pregFull = CreateMask<float, MaskPattern::ALL>();
-        MaskReg pregTail = UpdateMask<float>(colTail);
-
-        for (uint16_t i = 0; i < mLoop; i++) {
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(dmVreg0, dmUb + 2U * i);
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(dmVreg1, dmUb + 2U * i + 1U);
-            for (uint16_t j = 0; j < nLoop; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg0, goUb + 2U * i * colStride + j * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg1,
-                                                            goUb + (2U * i + 1U) * colStride + j * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg0, loUb + 2U * i * colStride + j * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg1, loUb + (2U * i + 1U) * colStride + j * vlElemNum);
-                Mul(mulVreg0, goPreVreg0, dmVreg0, pregFull);
-                Mul(mulVreg1, goPreVreg1, dmVreg1, pregFull);
-                Add(goCurVreg0, mulVreg0, loVreg0, pregFull);
-                Add(goCurVreg1, mulVreg1, loVreg1, pregFull);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + j * vlElemNum, goCurVreg0,
-                                                                  pregFull);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + (2U * i + 1U) * colStride + j * vlElemNum,
-                                                                  goCurVreg1, pregFull);
-            }
-            for (uint16_t j = 0; j < hasNTail; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg0,
-                                                            goUb + 2U * i * colStride + (nLoop + j) * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg1,
-                                                            goUb + (2U * i + 1U) * colStride + (nLoop + j) * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg0,
-                                                            loUb + 2U * i * colStride + (nLoop + j) * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg1,
-                                                            loUb + (2U * i + 1U) * colStride + (nLoop + j) * vlElemNum);
-                Mul(mulVreg0, goPreVreg0, dmVreg0, pregTail);
-                Mul(mulVreg1, goPreVreg1, dmVreg1, pregTail);
-                Add(goCurVreg0, mulVreg0, loVreg0, pregTail);
-                Add(goCurVreg1, mulVreg1, loVreg1, pregTail);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + (nLoop + j) * vlElemNum,
-                                                                  goCurVreg0, pregTail);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(
-                    goUb + (2U * i + 1U) * colStride + (nLoop + j) * vlElemNum, goCurVreg1, pregTail);
-            }
-        }
-
-        for (uint16_t i = 0; i < hasMTail; i++) {
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(dmVreg0, dmUb + 2U * mLoop + i);
-            for (uint16_t j = 0; j < nLoop; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg0,
-                                                            goUb + (2U * mLoop + i) * colStride + j * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg0,
-                                                            loUb + (2U * mLoop + i) * colStride + j * vlElemNum);
-                Mul(mulVreg0, goPreVreg0, dmVreg0, pregFull);
-                Add(goCurVreg0, mulVreg0, loVreg0, pregFull);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + (2U * mLoop + i) * colStride + j * vlElemNum,
-                                                                  goCurVreg0, pregFull);
-            }
-            for (uint16_t j = 0; j < hasNTail; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(
-                    goPreVreg0, goUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(
-                    loVreg0, loUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum);
-                Mul(mulVreg0, goPreVreg0, dmVreg0, pregTail);
-                Add(goCurVreg0, mulVreg0, loVreg0, pregTail);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(
-                    goUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum, goCurVreg0, pregTail);
-            }
-        }
-    }
-
-    static __simd_vf__ inline void RescaleFuncLastNotFirst(__ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb,
-                                                           __ubuf__ ElementOTmp* dmUb, __ubuf__ ElementOTmp* glUb,
-                                                           uint16_t colStride, uint32_t colTail, uint16_t vlElemNum,
-                                                           uint16_t mLoop, uint16_t nLoop, uint16_t hasMTail,
-                                                           uint16_t hasNTail, float pDequantScale)
-    {
-        using namespace AscendC::Reg;
-        RegTensor<float> dmVreg0;
-        RegTensor<float> dmVreg1;
-        RegTensor<float> glVreg0;
-        RegTensor<float> glVreg1;
-        RegTensor<float> goPreVreg0;
-        RegTensor<float> goPreVreg1;
-        RegTensor<float> loVreg0;
-        RegTensor<float> loVreg1;
-        RegTensor<float> mulVreg0;
-        RegTensor<float> mulVreg1;
-        RegTensor<float> goCurVreg0;
-        RegTensor<float> goCurVreg1;
-        RegTensor<float> divVreg0;
-        RegTensor<float> divVreg1;
-        MaskReg pregFull = CreateMask<float, MaskPattern::ALL>();
-        MaskReg pregTail = UpdateMask<float>(colTail);
-
-        for (uint16_t i = 0; i < mLoop; i++) {
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(dmVreg0, dmUb + 2U * i);
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(dmVreg1, dmUb + 2U * i + 1U);
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glVreg0, glUb + 2U * i);
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glVreg1, glUb + 2U * i + 1U);
-            for (uint16_t j = 0; j < nLoop; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg0, goUb + 2U * i * colStride + j * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg1,
-                                                            goUb + (2U * i + 1U) * colStride + j * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg0, loUb + 2U * i * colStride + j * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg1, loUb + (2U * i + 1U) * colStride + j * vlElemNum);
-                Mul(mulVreg0, goPreVreg0, dmVreg0, pregFull);
-                Mul(mulVreg1, goPreVreg1, dmVreg1, pregFull);
-                Add(goCurVreg0, mulVreg0, loVreg0, pregFull);
-                Add(goCurVreg1, mulVreg1, loVreg1, pregFull);
-                Div(divVreg0, goCurVreg0, glVreg0, pregFull);
-                Div(divVreg1, goCurVreg1, glVreg1, pregFull);
-                {
-                    Muls(divVreg0, divVreg0, pDequantScale, pregFull);
-                    Muls(divVreg1, divVreg1, pDequantScale, pregFull);
-                }
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + j * vlElemNum, divVreg0,
-                                                                  pregFull);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + (2U * i + 1U) * colStride + j * vlElemNum,
-                                                                  divVreg1, pregFull);
-            }
-            for (uint16_t j = 0; j < hasNTail; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg0,
-                                                            goUb + 2U * i * colStride + (nLoop + j) * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg1,
-                                                            goUb + (2U * i + 1U) * colStride + (nLoop + j) * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg0,
-                                                            loUb + 2U * i * colStride + (nLoop + j) * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg1,
-                                                            loUb + (2U * i + 1U) * colStride + (nLoop + j) * vlElemNum);
-                Mul(mulVreg0, goPreVreg0, dmVreg0, pregTail);
-                Mul(mulVreg1, goPreVreg1, dmVreg1, pregTail);
-                Add(goCurVreg0, mulVreg0, loVreg0, pregTail);
-                Add(goCurVreg1, mulVreg1, loVreg1, pregTail);
-                Div(divVreg0, goCurVreg0, glVreg0, pregTail);
-                Div(divVreg1, goCurVreg1, glVreg1, pregTail);
-                {
-                    Muls(divVreg0, divVreg0, pDequantScale, pregTail);
-                    Muls(divVreg1, divVreg1, pDequantScale, pregTail);
-                }
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + (nLoop + j) * vlElemNum,
-                                                                  divVreg0, pregTail);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(
-                    goUb + (2U * i + 1U) * colStride + (nLoop + j) * vlElemNum, divVreg1, pregTail);
-            }
-        }
-
-        for (uint16_t i = 0; i < hasMTail; i++) {
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(dmVreg0, dmUb + 2U * mLoop + i);
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glVreg0, glUb + 2U * mLoop + i);
-            for (uint16_t j = 0; j < nLoop; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goPreVreg0,
-                                                            goUb + (2U * mLoop + i) * colStride + j * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(loVreg0,
-                                                            loUb + (2U * mLoop + i) * colStride + j * vlElemNum);
-                Mul(mulVreg0, goPreVreg0, dmVreg0, pregFull);
-                Add(goCurVreg0, mulVreg0, loVreg0, pregFull);
-                Div(divVreg0, goCurVreg0, glVreg0, pregFull);
-                {
-                    Muls(divVreg0, divVreg0, pDequantScale, pregFull);
-                }
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + (2U * mLoop + i) * colStride + j * vlElemNum,
-                                                                  divVreg0, pregFull);
-            }
-            for (uint16_t j = 0; j < hasNTail; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(
-                    goPreVreg0, goUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(
-                    loVreg0, loUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum);
-                Mul(mulVreg0, goPreVreg0, dmVreg0, pregTail);
-                Add(goCurVreg0, mulVreg0, loVreg0, pregTail);
-                Div(divVreg0, goCurVreg0, glVreg0, pregTail);
-                {
-                    Muls(divVreg0, divVreg0, pDequantScale, pregTail);
-                }
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(
-                    goUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum, divVreg0, pregTail);
-            }
-        }
-    }
-
-    static __simd_vf__ inline void DivFuncLastAndFirst(__ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb,
-                                                       __ubuf__ ElementOTmp* glUb, uint16_t colStride, uint32_t colTail,
-                                                       uint16_t vlElemNum, uint16_t mLoop, uint16_t nLoop,
-                                                       uint16_t hasMTail, uint16_t hasNTail, float pDequantScale)
-    {
-        using namespace AscendC::Reg;
-        RegTensor<float> glVreg0;
-        RegTensor<float> glVreg1;
-        RegTensor<float> goCurVreg0;
-        RegTensor<float> goCurVreg1;
-        RegTensor<float> divVreg0;
-        RegTensor<float> divVreg1;
-        MaskReg pregFull = CreateMask<float, MaskPattern::ALL>();
-        MaskReg pregTail = UpdateMask<float>(colTail);
-
-        for (uint16_t i = 0; i < mLoop; i++) {
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glVreg0, glUb + 2U * i);
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glVreg1, glUb + 2U * i + 1U);
-            for (uint16_t j = 0; j < nLoop; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goCurVreg0, loUb + 2U * i * colStride + j * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goCurVreg1,
-                                                            loUb + (2U * i + 1U) * colStride + j * vlElemNum);
-                Div(divVreg0, goCurVreg0, glVreg0, pregFull);
-                Div(divVreg1, goCurVreg1, glVreg1, pregFull);
-                {
-                    Muls(divVreg0, divVreg0, pDequantScale, pregFull);
-                    Muls(divVreg1, divVreg1, pDequantScale, pregFull);
-                }
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + j * vlElemNum, divVreg0,
-                                                                  pregFull);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + (2U * i + 1U) * colStride + j * vlElemNum,
-                                                                  divVreg1, pregFull);
-            }
-            for (uint16_t j = 0; j < hasNTail; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goCurVreg0,
-                                                            loUb + 2U * i * colStride + (nLoop + j) * vlElemNum);
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goCurVreg1,
-                                                            loUb + (2U * i + 1U) * colStride + (nLoop + j) * vlElemNum);
-                Div(divVreg0, goCurVreg0, glVreg0, pregTail);
-                Div(divVreg1, goCurVreg1, glVreg1, pregTail);
-                {
-                    Muls(divVreg0, divVreg0, pDequantScale, pregTail);
-                    Muls(divVreg1, divVreg1, pDequantScale, pregTail);
-                }
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + 2U * i * colStride + (nLoop + j) * vlElemNum,
-                                                                  divVreg0, pregTail);
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(
-                    goUb + (2U * i + 1U) * colStride + (nLoop + j) * vlElemNum, divVreg1, pregTail);
-            }
-        }
-
-        for (uint16_t i = 0; i < hasMTail; i++) {
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glVreg0, glUb + 2U * mLoop + i);
-            for (uint16_t j = 0; j < nLoop; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(goCurVreg0,
-                                                            loUb + (2U * mLoop + i) * colStride + j * vlElemNum);
-                Div(divVreg0, goCurVreg0, glVreg0, pregFull);
-                {
-                    Muls(divVreg0, divVreg0, pDequantScale, pregFull);
-                }
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + (2U * mLoop + i) * colStride + j * vlElemNum,
-                                                                  divVreg0, pregFull);
-            }
-            for (uint16_t j = 0; j < hasNTail; j++) {
-                LoadAlign<ElementOTmp, LoadDist::DIST_NORM>(
-                    goCurVreg0, loUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum);
-                Div(divVreg0, goCurVreg0, glVreg0, pregTail);
-                {
-                    Muls(divVreg0, divVreg0, pDequantScale, pregTail);
-                }
-                StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(
-                    goUb + (2U * mLoop + i) * colStride + (nLoop + j) * vlElemNum, divVreg0, pregTail);
-            }
-        }
-    }
-    // When qS can be copied from UB to GM continuously,
-    // qS would be stored from reg to UB continuously.
-    __simd_vf__ inline void LogSumExpFuncQSAxisContinuous(__ubuf__ float* gmUb, __ubuf__ float* glUb,
-                                                          __ubuf__ float* lseUb, uint32_t row)
-    {
-        // This vf works only when the rowNum in each AIV does not exceed 64
-        using namespace AscendC::Reg;
-        RegTensor<float> gmVreg;
-        RegTensor<float> glVreg;
-        RegTensor<float> logGlVreg;
-        RegTensor<float> lseVreg;
-        MaskReg pregFull = CreateMask<float, MaskPattern::ALL>();
-        MaskReg pregTail = UpdateMask<float>(row);
-        static constexpr LnSpecificMode mode = {MaskMergeMode::ZEROING, AscendC::LnAlgo::PRECISION_1ULP_FTZ_FALSE};
-
-        LoadAlign<float, LoadDist::DIST_NORM>(glVreg, glUb);
-        LoadAlign<float, LoadDist::DIST_NORM>(gmVreg, gmUb);
-        Ln<float, &mode>(logGlVreg, glVreg, pregTail);
-        Add(lseVreg, logGlVreg, gmVreg, pregTail);
-        StoreAlign<float, StoreDist::DIST_NORM_B32>(lseUb, lseVreg, pregTail);
-    }
-
-    // When qS cannot be copied from UB to GM continuously,
-    // lse would be broadcasted and then stored from reg to UB continuously.
-    __simd_vf__ inline void LogSumExpFuncQSAxisIncontinuous(__ubuf__ float* gmUb, __ubuf__ float* glUb,
-                                                            __ubuf__ float* lseUb, uint32_t row)
-    {
-        using namespace AscendC::Reg;
-        RegTensor<float> gmRowwiseVreg0;
-        RegTensor<float> gmRowwiseVreg1;
-        RegTensor<float> glRowwiseVreg0;
-        RegTensor<float> glRowwiseVreg1;
-        RegTensor<float> logGlRowwiseVreg0;
-        RegTensor<float> logGlRowwiseVreg1;
-        RegTensor<float> lseRowwiseVreg0;
-        RegTensor<float> lseRowwiseVreg1;
-        UnalignReg rowwiseUreg0;
-        UnalignReg rowwiseUreg1;
-        MaskReg pregFull = CreateMask<float, MaskPattern::ALL>();
-        static constexpr LnSpecificMode mode = {MaskMergeMode::ZEROING, AscendC::LnAlgo::PRECISION_1ULP_FTZ_FALSE};
-        static constexpr uint32_t postUpdateStride = 32 / sizeof(float);
-
-        for (uint16_t i = 0; i < row; i += 2) {
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glRowwiseVreg0, glUb + i);
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glRowwiseVreg1, glUb + (i + 1));
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(gmRowwiseVreg0, gmUb + i);
-            LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(gmRowwiseVreg1, gmUb + (i + 1));
-            Ln<float, &mode>(logGlRowwiseVreg0, glRowwiseVreg0, pregFull);
-            Ln<float, &mode>(logGlRowwiseVreg1, glRowwiseVreg1, pregFull);
-            Add(lseRowwiseVreg0, logGlRowwiseVreg0, gmRowwiseVreg0, pregFull);
-            Add(lseRowwiseVreg1, logGlRowwiseVreg1, gmRowwiseVreg1, pregFull);
-            StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(lseUb, lseRowwiseVreg0, rowwiseUreg0, postUpdateStride);
-            StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(lseUb, lseRowwiseVreg1, rowwiseUreg1, postUpdateStride);
-        }
-        StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(lseUb, rowwiseUreg0, postUpdateStride);
-        StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(lseUb, rowwiseUreg1, postUpdateStride);
-    }
-
-    template <class TensorO, class TensorLse>
-    __aicore__ inline void operator()(TensorO& gOTensor, TensorLse& gLseTensor, GemmCoord actualOriShape,
-                                      uint32_t curTileMod, uint32_t gatheredKvSTileIdx, bool isFirstKvSTile,
-                                      bool isLastKvSTile, Arch::CrossCoreFlag mm2ToReFlag)
-    {
-        uint32_t rowNumOri = actualOriShape[0];
-        uint32_t colNumOri = actualOriShape[1];
-        uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-        uint32_t subBlockNum = AscendC::GetSubBlockNum();
-
-        uint32_t rowNumOriAligned2 = RoundUp(rowNumOri, 2);
-        uint32_t colNumOriAligned16 = RoundUp(colNumOri, 16);
-
-        uint32_t rowNumSplit = rowNumOriAligned2 / subBlockNum;
-        rowNumSplit = (rowNumOri < rowNumSplit) ? rowNumOri : rowNumSplit;
-        uint32_t rowNumCurSubCore = (subBlockIdx == 0) ? rowNumSplit : (rowNumOri - rowNumSplit);
-        uint32_t rowOffsetCurSubCore = rowNumSplit * subBlockIdx;
-        uint32_t colNumCurSubCore = colNumOri;
-        uint32_t colStrideCurSubCore = colNumOriAligned16;
-
-        auto gOTensorTlaTile = GetTile(gOTensor, tla::MakeCoord(rowOffsetCurSubCore, 0),
-                                       tla::MakeShape(rowNumCurSubCore, colNumCurSubCore));
-        auto gLseTensorTlaTile =
-            GetTile(gLseTensor, tla::MakeCoord(rowOffsetCurSubCore, 0), tla::MakeShape(rowNumCurSubCore, 1));
-        uint32_t ubOTmpBufId = gatheredKvSTileIdx % loUbBufNum;
-        AscendC::GlobalTensor<float> dummyPartialO;
-        AscendC::GlobalTensor<float> dummyPartialLse;
-
-        if (rowNumCurSubCore > 0) {
-            SubCoreCompute<false>(gOTensorTlaTile, gLseTensorTlaTile, curTileMod, ubOTmpBufId, isFirstKvSTile,
-                                  isLastKvSTile, colStrideCurSubCore, mm2ToReFlag, dummyPartialO, dummyPartialLse, 0U,
-                                  rowOffsetCurSubCore, rowNumOri, 0U);
-        } else {
-            Arch::CrossCoreWaitFlag<4, PIPE_V>(mm2ToReFlag);
-            Arch::CrossCoreSetFlag<4, PIPE_V>(mm2ToReFlag);
-        }
-    }
-
-    template <class TensorO, class TensorLse>
-    __aicore__ inline void ProcessPartial(TensorO& gOTensor, TensorLse& gLseTensor, GemmCoord actualOriShape,
-                                          uint32_t curTileMod, uint32_t gatheredKvSTileIdx, bool isFirstKvSTile,
-                                          bool isLastKvSTile, Arch::CrossCoreFlag mm2ToReFlag,
-                                          AscendC::GlobalTensor<float>& gPartialO,
-                                          AscendC::GlobalTensor<float>& gPartialLse, uint32_t fdTaskId,
-                                          uint32_t fdLseSubStride)
-    {
-        const uint32_t rowNumOri = actualOriShape[0];
-        const uint32_t colNumOri = actualOriShape[1];
-        const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-        uint32_t rowNumSplit = RoundUp(rowNumOri, 2) / AscendC::GetSubBlockNum();
-        rowNumSplit = (rowNumOri < rowNumSplit) ? rowNumOri : rowNumSplit;
-        const uint32_t rowNumCurSubCore = subBlockIdx == 0 ? rowNumSplit : rowNumOri - rowNumSplit;
-        const uint32_t rowOffsetCurSubCore = rowNumSplit * subBlockIdx;
-        const uint32_t colStrideCurSubCore = RoundUp(colNumOri, 16);
-        auto gOTensorTlaTile =
-            GetTile(gOTensor, tla::MakeCoord(rowOffsetCurSubCore, 0), tla::MakeShape(rowNumCurSubCore, colNumOri));
-        auto gLseTensorTlaTile =
-            GetTile(gLseTensor, tla::MakeCoord(rowOffsetCurSubCore, 0), tla::MakeShape(rowNumCurSubCore, 1));
-        const uint32_t ubOTmpBufId = gatheredKvSTileIdx % loUbBufNum;
-        if (rowNumCurSubCore > 0) {
-            SubCoreCompute<true>(gOTensorTlaTile, gLseTensorTlaTile, curTileMod, ubOTmpBufId, isFirstKvSTile,
-                                 isLastKvSTile, colStrideCurSubCore, mm2ToReFlag, gPartialO, gPartialLse, fdTaskId,
-                                 rowOffsetCurSubCore, rowNumOri, fdLseSubStride);
-        } else {
-            Arch::CrossCoreWaitFlag<4, PIPE_V>(mm2ToReFlag);
-            Arch::CrossCoreSetFlag<4, PIPE_V>(mm2ToReFlag);
-        }
-    }
-
-    __aicore__ inline void WriteNeutralPartial(AscendC::GlobalTensor<float>& gPartialO,
-                                               AscendC::GlobalTensor<float>& gPartialLse, uint32_t fdTaskId,
-                                               uint32_t groupSize, uint32_t colNum, uint32_t fdLseSubStride)
-    {
-        const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-        uint32_t rowNumSplit = RoundUp(groupSize, 2) / AscendC::GetSubBlockNum();
-        rowNumSplit = groupSize < rowNumSplit ? groupSize : rowNumSplit;
-        const uint32_t rowNum = subBlockIdx == 0 ? rowNumSplit : groupSize - rowNumSplit;
-        const uint32_t rowOffset = rowNumSplit * subBlockIdx;
-        if (rowNum == 0) {
+        const auto address = reinterpret_cast<uint64_t>(scale.GetPhyAddr());
+        if (address == scaleAddress_) {
             return;
         }
-        const uint32_t colStride = RoundUp(colNum, 16);
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
-        AscendC::Duplicate(goUbTensor32, 0.0f, rowNum * colStride);
-        AscendC::Duplicate(lseUbTensor32, -3.402823466e+38F, RoundUp(rowNum, 8));
-        AscendC::PipeBarrier<PIPE_V>();
-        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-        const uint64_t oOffset =
-            static_cast<uint64_t>(fdTaskId) * groupSize * colStride + static_cast<uint64_t>(rowOffset) * colStride;
-        AscendC::DataCopy(gPartialO[oOffset], goUbTensor32, rowNum * colStride);
-        const uint64_t lseOffset = static_cast<uint64_t>(fdTaskId) * 2 * fdLseSubStride + subBlockIdx * fdLseSubStride;
-        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
-        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
-        AscendC::DataCopyPad(gPartialLse[lseOffset], lseUbTensor32,
-                             AscendC::DataCopyExtParams(1, rowNum * sizeof(float), 0, 0, 0));
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
+        // Raw uses V_MTE2/MTE2_V 0..5; event 6 is private to channel VScale.
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(6);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(6);
+        AscendC::DataCopy(channelScaleUB.ReinterpretCast<uint8_t>(), scale, D * 2U);
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(6);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(6);
+        scaleAddress_ = address;
     }
-
-    template <class TensorO, class TensorLse>
-    __aicore__ inline void WriteEmptyOutput(TensorO& gOTensor, TensorLse& gLseTensor, GemmCoord actualOriShape)
+    __aicore__ inline void BeginTask(uint32_t rows, bool flashDecode)
     {
-        const uint32_t rowNumOri = actualOriShape[0];
-        const uint32_t colNumOri = actualOriShape[1];
-        const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
-        uint32_t rowNumSplit = RoundUp(rowNumOri, 2) / AscendC::GetSubBlockNum();
-        rowNumSplit = rowNumOri < rowNumSplit ? rowNumOri : rowNumSplit;
-        const uint32_t rowNum = subBlockIdx == 0 ? rowNumSplit : rowNumOri - rowNumSplit;
-        const uint32_t rowOffset = rowNumSplit * subBlockIdx;
-        if (rowNum == 0) {
+        if (flashDecode) {
+            // A previous partial DMA reads N/G/L until this credit arrives.
+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(3);
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(3);
+        }
+        // The frontend may already own the statistics of the following task.
+        GbsaMxfp8BaseVF::InitTaskCallVF<false>(outputUBTensor, sumUBTensor, maxUBTensor, tileMaxUBTensor[0], rows, D);
+        AscendC::PipeBarrier<PIPE_V>();
+    }
+    __aicore__ inline void ConsumeTile(uint32_t statsSlot, uint32_t pvSlot, uint32_t rows, bool saveMax)
+    {
+        GbsaMxfp8BaseVF::RescaleCallVF(outputUBTensor, pvUBTensor[pvSlot], rowsumUBTensor[statsSlot * 64], sumUBTensor,
+                                       dmUBTensor[statsSlot], rows, D, R);
+        AscendC::PipeBarrier<PIPE_V>();
+        // Only final LSE or FD partial output consumes this G snapshot.
+        if (saveMax) {
+            GbsaMxfp8BaseVF::CopyVectorCallVF(maxUBTensor, tileMaxUBTensor[statsSlot], rows);
+            AscendC::PipeBarrier<PIPE_V>();
+        }
+    }
+    __aicore__ inline void StorePartial(const AscendC::GlobalTensor<float>& numerator,
+                                        const AscendC::GlobalTensor<float>& stats, uint32_t validRows,
+                                        uint32_t subStride)
+    {
+        if (validRows == 0U) {
             return;
         }
-        // UB source rows consumed by MTE3 must keep a 32-byte aligned start address.
-        // ElementO is 2 bytes in the A5 non-quant path, hence 16 elements per row.
-        const uint32_t colStride = RoundUp(colNumOri, 16);
-        auto gOTile = GetTile(gOTensor, tla::MakeCoord(rowOffset, 0), tla::MakeShape(rowNum, colNumOri));
-        auto gLseTile = GetTile(gLseTensor, tla::MakeCoord(rowOffset, 0), tla::MakeShape(rowNum, 1));
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
-        AscendC::Duplicate(goUbTensor16, static_cast<ElementO>(0), rowNum * colStride);
-        if constexpr (DispatchPolicy::LSE_MODE == LseMode::OUT_ONLY) {
-            AscendC::Duplicate(lseUbTensor32, -3.402823466e+38F, rowNum * 8U);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(0);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(1);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(3);
+        auto result = resultUBTensor.template ReinterpretCast<float>();
+        AscendC::DataCopyExtParams copy = {1, validRows * static_cast<uint32_t>(sizeof(float)), 0, 0, 0};
+        if constexpr (QueryCapacity <= 32U) {
+            Normalize<float>(result, outputUBTensor, sumUBTensor, 0U, validRows);
+            ComputeLse(lseUBTensor, maxUBTensor, sumUBTensor, validRows);
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(3);
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(3);
+            copy.blockLen = validRows * D * sizeof(float);
+            AscendC::DataCopyPad(numerator, result, copy);
+        } else {
+            // FP32 partials may exceed the P scratch region. Normalize rows
+            // into the same bounded scratch only after its MTE3 reader retires.
+            ComputeLse(lseUBTensor, maxUBTensor, sumUBTensor, validRows);
+            const uint32_t chunkRows = layout.OUTPUT_SCRATCH_BYTES / (D * sizeof(float));
+            for (uint32_t first = 0U; first < validRows; first += chunkRows) {
+                const uint32_t rows = min(validRows - first, chunkRows);
+                if (first != 0U) {
+                    AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(3);
+                }
+                Normalize<float>(result, outputUBTensor, sumUBTensor, first, rows);
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(3);
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(3);
+                copy.blockLen = rows * D * sizeof(float);
+                AscendC::DataCopyPad(numerator[first * D], result, copy);
+                if (first + rows < validRows) {
+                    AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(3);
+                }
+            }
         }
-        AscendC::PipeBarrier<PIPE_V>();
-        if constexpr (DispatchPolicy::LSE_MODE == LseMode::OUT_ONLY) {
-            AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
-            AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID1);
-            auto ubLseLayout = tla::MakeLayout(tla::MakeShape(rowNum, 8U), tla::MakeStride(8U, tla::Int<1>{}));
-            auto ubLseTensor = tla::MakeTensor(lseUbTensor32, ubLseLayout, Arch::PositionUB{});
-            CopyUbToGmLse(gLseTile, ubLseTensor);
+        copy.blockLen = validRows * sizeof(float);
+        AscendC::DataCopyPad(stats, lseUBTensor, copy);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(3);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(0);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(1);
+    }
+
+    __aicore__ inline void Store(const AscendC::GlobalTensor<OutputT>& output, const AscendC::GlobalTensor<float>& lse,
+                                 uint32_t validRows, bool outputLse, uint32_t headStride, uint32_t lseHeadStride)
+    {
+        StoreOutput(output, lse, validRows, outputLse, headStride, lseHeadStride, outputUBTensor, sumUBTensor,
+                    maxUBTensor);
+    }
+
+    __aicore__ inline void StoreTile(const AscendC::GlobalTensor<OutputT>& output,
+                                     const AscendC::GlobalTensor<float>& lse, uint32_t validRows, bool outputLse,
+                                     uint32_t headStride, uint32_t lseHeadStride, uint32_t statsSlot, uint32_t pvSlot)
+    {
+        // A complete single-tile task has no earlier numerator to rescale.
+        StoreOutput(output, lse, validRows, outputLse, headStride, lseHeadStride, pvUBTensor[pvSlot],
+                    rowsumUBTensor[statsSlot * 64U], tileMaxUBTensor[statsSlot]);
+    }
+
+    __aicore__ inline void StoreEmpty(const AscendC::GlobalTensor<OutputT>& output,
+                                      const AscendC::GlobalTensor<float>& lse, uint32_t validRows, bool outputLse,
+                                      uint32_t headStride, uint32_t lseHeadStride)
+    {
+        if (validRows == 0U) {
+            return;
         }
-        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-        auto ubOLayout = tla::MakeLayout(tla::MakeShape(rowNum, colNumOri), tla::MakeStride(colStride, tla::Int<1>{}));
-        auto ubOTensor = tla::MakeTensor(goUbTensor16, ubOLayout, Arch::PositionUB{});
-        copyUbToGmO(gOTile, ubOTensor);
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(0);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(1);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(3);
+        const uint32_t chunkRows = layout.OUTPUT_SCRATCH_BYTES / (D * static_cast<uint32_t>(sizeof(OutputT)));
+        auto lseSource = lseHeadStride == 1U ? lseUBTensor : lsePackedUBTensor;
+        GbsaMxfp8BaseVF::FillEmptyOutputCallVF(resultUBTensor, lseSource, min(validRows, chunkRows) * D, validRows,
+                                               outputLse, lseHeadStride != 1U);
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(3);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(3);
+        for (uint32_t first = 0U; first < validRows; first += chunkRows) {
+            const uint32_t rows = min(validRows - first, chunkRows);
+            AscendC::DataCopyExtParams copy = {static_cast<uint16_t>(rows), D * static_cast<uint32_t>(sizeof(OutputT)),
+                                               0, static_cast<int64_t>((headStride - 1U) * D * sizeof(OutputT)), 0};
+            AscendC::DataCopyPad(output[first * headStride * D], resultUBTensor, copy);
+        }
+        if (outputLse) {
+            AscendC::DataCopyExtParams copy = {
+                static_cast<uint16_t>(lseHeadStride == 1U ? 1U : validRows),
+                static_cast<uint32_t>((lseHeadStride == 1U ? validRows : 1U) * sizeof(float)), 0,
+                static_cast<int64_t>((lseHeadStride - 1U) * sizeof(float)), 0};
+            AscendC::DataCopyPad(lse, lseSource, copy);
+        }
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(3);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(0);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(1);
     }
 
 private:
-    uint32_t loUbBufNum;
-    uint32_t loUbRowNum;
-    bool loGmTransit;
-    uint64_t loGmTileElems;
-    AscendC::GlobalTensor<ElementOTmp> gLo;
-    AscendC::LocalTensor<ElementOTmp> loUbTensor[UB_OTMP_BUF_STAGES];
-    AscendC::LocalTensor<SMDtype> dmUbTensor16;
-    AscendC::LocalTensor<SMDtype> glUbTensor16;
-    AscendC::LocalTensor<float> gmUbTensor32;
-    AscendC::LocalTensor<float> dmUbTensor32;
-    AscendC::LocalTensor<float> glUbTensor32;
-    AscendC::LocalTensor<ElementO> goUbTensor16;
-    AscendC::LocalTensor<ElementOTmp> goUbTensor32;
-    AscendC::LocalTensor<float> lseUbTensor32;
-    AscendC::LocalTensor<uint8_t> mxVScaleUb;
-    AscendC::GlobalTensor<uint8_t> mxVScaleGm;
-    uint64_t cachedMxVScaleAddress = 0U;
-    uint32_t cachedMxVScaleColumns = 0U;
+    __aicore__ inline void StoreOutput(const AscendC::GlobalTensor<OutputT>& output,
+                                       const AscendC::GlobalTensor<float>& lse, uint32_t validRows, bool outputLse,
+                                       uint32_t headStride, uint32_t lseHeadStride,
+                                       const AscendC::LocalTensor<float>& numerator,
+                                       const AscendC::LocalTensor<float>& denominator,
+                                       const AscendC::LocalTensor<float>& maximum)
+    {
+        if (validRows == 0) {
+            return;
+        }
+        // Output conversion shares P storage with the frontend. Preserve its
+        // credits while waiting for the current P stores to complete.
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(0);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(1);
+        const uint32_t CHUNK_ROWS = layout.OUTPUT_SCRATCH_BYTES / (D * static_cast<uint32_t>(sizeof(OutputT)));
+        auto scratch = resultUBTensor;
+        for (uint32_t first = 0; first < validRows; first += CHUNK_ROWS) {
+            const uint32_t rows = validRows - first < CHUNK_ROWS ? validRows - first : CHUNK_ROWS;
+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(3);
+            Normalize<OutputT>(scratch, numerator, denominator, first, rows);
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(3);
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(3);
+            AscendC::DataCopyExtParams copy = {
+                static_cast<uint16_t>(rows), D * static_cast<uint32_t>(sizeof(OutputT)), 0,
+                static_cast<int64_t>((headStride - 1) * D * static_cast<uint32_t>(sizeof(OutputT))), 0};
+            AscendC::DataCopyPad(output[first * headStride * D], scratch, copy);
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(3);
+        }
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(3);
+        if (outputLse) {
+            ComputeLse(lseUBTensor, maximum, denominator, validRows);
+            if (lseHeadStride == 1U) {
+                // ComputeLse already stores contiguous FP32 values. Keep one
+                // transfer for a contiguous GM view, including short row tails.
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(3);
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(3);
+                AscendC::DataCopyExtParams copy = {1, validRows * static_cast<uint32_t>(sizeof(float)), 0, 0, 0};
+                AscendC::DataCopyPad(lse, lseUBTensor, copy);
+            } else {
+                GbsaMxfp8BaseVF::PackLseCallVF(lsePackedUBTensor, lseUBTensor, validRows);
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(3);
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(3);
+                AscendC::DataCopyExtParams copy = {static_cast<uint16_t>(validRows), sizeof(float), 0,
+                                                   static_cast<int64_t>((lseHeadStride - 1U) * sizeof(float)), 0};
+                AscendC::DataCopyPad(lse, lsePackedUBTensor, copy);
+            }
+        }
+        // Only Vector reuses the output and LSE sources. Keep its credits;
+        // independent Scalar descriptor work may proceed during the writeback.
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(3);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(0);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(1);
+    }
 
-    CopyUbToGmO copyUbToGmO;
+private:
+    template <class T>
+    __aicore__ void Normalize(const AscendC::LocalTensor<T>& dst, const AscendC::LocalTensor<float>& n,
+                              const AscendC::LocalTensor<float>& l, uint32_t first, uint32_t rows)
+    {
+        GbsaMxfp8FullVF::Normalize<T>(
+            reinterpret_cast<__ubuf__ T*>(dst.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(n.GetPhyAddr()),
+            reinterpret_cast<__ubuf__ float*>(l.GetPhyAddr()),
+            reinterpret_cast<__ubuf__ uint16_t*>(channelScaleUB.GetPhyAddr()), first, rows, D, inversePScale_);
+    }
+    __aicore__ void ComputeLse(const AscendC::LocalTensor<float>& dst, const AscendC::LocalTensor<float>& m,
+                               const AscendC::LocalTensor<float>& l, uint32_t rows)
+    {
+        GbsaMxfp8FullVF::Lse(reinterpret_cast<__ubuf__ float*>(dst.GetPhyAddr()),
+                             reinterpret_cast<__ubuf__ float*>(m.GetPhyAddr()),
+                             reinterpret_cast<__ubuf__ float*>(l.GetPhyAddr()), rows);
+    }
+    float inversePScale_;
+    uint64_t scaleAddress_ = 0;
+    AscendC::LocalTensor<uint16_t> channelScaleUB;
+    AscendC::LocalTensor<float> outputUBTensor, pvUBTensor[2], rowsumUBTensor;
+    AscendC::LocalTensor<float> lsePackedUBTensor, sumUBTensor, maxUBTensor, lseUBTensor;
+    AscendC::LocalTensor<float> tileMaxUBTensor[4], dmUBTensor[4];
+    AscendC::LocalTensor<OutputT> resultUBTensor;
 };
+
 } // namespace NpuArch::Epilogue::Block
 #endif

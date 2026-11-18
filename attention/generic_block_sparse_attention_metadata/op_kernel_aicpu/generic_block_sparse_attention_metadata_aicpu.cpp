@@ -48,9 +48,10 @@ uint32_t GenericBlockSparseAttentionMetadataAicpu::Compute(CpuKernelContext& ctx
     std::vector<int64_t> kvSeqLens;
     std::vector<int64_t> qStorageBlockStarts;
     std::vector<int64_t> validBlockNums;
+    uint64_t residualPaddingTokens = 0U;
     if (!ParseQSeqLens(qSeqLens, kvSeqLens, qStorageBlockStarts) ||
-        !ParseValidBlockNums(qSeqLens, kvSeqLens, qStorageBlockStarts, validBlockNums) ||
-        !GenerateMetadata(qSeqLens, validBlockNums)) {
+        !ParseValidBlockNums(qSeqLens, kvSeqLens, qStorageBlockStarts, validBlockNums, residualPaddingTokens) ||
+        !GenerateMetadata(qSeqLens, validBlockNums, residualPaddingTokens)) {
         return KERNEL_STATUS_PARAM_INVALID;
     }
     return KERNEL_STATUS_OK;
@@ -81,6 +82,7 @@ bool GenericBlockSparseAttentionMetadataAicpu::Prepare(CpuKernelContext& ctx)
     }
 
     // Optional for compatibility with callers predating quantization-aware scheduling.
+    // MXFP8 additionally gates FD using the effective KV512 work per base task.
     quantType_ = 0;
     GetAttrValueOpt(ctx, "quant_type", quantType_);
     const bool attrsValid =
@@ -321,10 +323,12 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
 bool GenericBlockSparseAttentionMetadataAicpu::ParseValidBlockNums(const std::vector<int64_t>& qSeqLens,
                                                                    const std::vector<int64_t>& kvSeqLens,
                                                                    const std::vector<int64_t>& qStorageBlockStarts,
-                                                                   std::vector<int64_t>& validBlockNums) const
+                                                                   std::vector<int64_t>& validBlockNums,
+                                                                   uint64_t& residualPaddingTokens) const
 {
     const auto* counts = static_cast<const int32_t*>(sparseBlockCount_->GetData());
     validBlockNums.clear();
+    residualPaddingTokens = 0U;
     if (maskType_ == 3) {
         // Union mode: one count per (group, head); groups concatenated in batch order.
         int64_t groupBase = 0;
@@ -364,6 +368,17 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseValidBlockNums(const std::ve
                                      blockIndexStride_);
                     return false;
                 }
+                if (quantType_ == 6 && residualBlockMode_ == 1) {
+                    if (visibleKvEnd < 0 || count > visibleKvEnd / blockShapeY_) {
+                        KERNEL_LOG_ERROR("MXFP8 residual mode requires explicit count <= visible full blocks.");
+                        return false;
+                    }
+                    const uint64_t padding = residual != 0 ? blockShapeY_ - visibleKvEnd % blockShapeY_ : 0U;
+                    if (generic_block_sparse_attention_metadata::AddOverflow(residualPaddingTokens, padding,
+                                                                             residualPaddingTokens)) {
+                        return false;
+                    }
+                }
                 validBlockNums.push_back(count + residual);
             }
         }
@@ -372,7 +387,8 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseValidBlockNums(const std::ve
 }
 
 bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vector<int64_t>& qSeqLens,
-                                                                const std::vector<int64_t>& validBlockNums) const
+                                                                const std::vector<int64_t>& validBlockNums,
+                                                                uint64_t residualPaddingTokens) const
 {
     generic_block_sparse_attention_metadata::ScheduleInput input;
     input.batchSize = batchSize_;
@@ -394,6 +410,7 @@ bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vecto
 
     input.aicCoreNum = aicCoreNum_;
     input.validBlockNums = validBlockNums;
+    input.residualPaddingTokens = residualPaddingTokens;
     if (maskType_ == 3) {
         // Keep union distinct from ordinary non-causal attention so it cannot
         // enter FD scheduling. The config signature keeps its non-causal tag.

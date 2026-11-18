@@ -24,6 +24,7 @@
 #include "opdev/op_log.h"
 #include "opdev/platform.h"
 #include "../../generic_block_sparse_attention_metadata_tiling.h"
+#include "../../../generic_block_sparse_attention/op_kernel/arch35/gbsa_layout_utils.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -180,8 +181,10 @@ aclnnStatus CheckGbsaBlockAttrs(int64_t blockShapeX, int64_t blockShapeY, int64_
                 blockShapeX, maskType, expectedBlockShapeX);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (mxfp8 && blockShapeY != 4 && blockShapeY != 8) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 blockShapeY only supports 4 or 8, but got %lld.", blockShapeY);
+    if (mxfp8 && blockShapeY != 4 && blockShapeY != 8 && blockShapeY != 16 && blockShapeY != 32 && blockShapeY != 64 &&
+        blockShapeY != 128) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 blockShapeY only supports 4, 8, 16, 32, 64 or 128, but got %lld.",
+                blockShapeY);
         return ACLNN_ERR_PARAM_INVALID;
     }
     const bool isPowerOfTwoY = blockShapeY > 0 && (blockShapeY & (blockShapeY - 1)) == 0;
@@ -252,7 +255,7 @@ aclnnStatus CheckGbsaScalarAttrs(int64_t numQHeads, int64_t numKvHeads, int64_t 
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A2/A3 headDim must be in [1, 256], got %lld.", headDim);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    // Union needs maskType for X=8; MXFP8 needs the mxfp8 Y=4/8 gate. Arch35
+    // Union needs maskType for X=8; MXFP8 needs the mxfp8 Y=4/8/16/32/64/128 gate. Arch35
     // non-quant/FP8/Union may use Y in [1, 128] when mxfp8 is false.
     return CheckGbsaBlockAttrs(blockShapeX, blockShapeY, layoutSparsePattern, maskType, isArch35 || mxfp8,
                                arch22GeneralizedY, arch22PagedGeneralizedY, mxfp8);
@@ -434,6 +437,10 @@ aclnnStatus CheckGbsaSoftmaxPrecision(int64_t softmaxPrecision, int64_t quantTyp
                 GBSA_SOFTMAX_PRECISION_HIGH, GBSA_SOFTMAX_PRECISION_MIXED, softmaxPrecision);
         return ACLNN_ERR_PARAM_INVALID;
     }
+    if (quantType == GBSA_QUANT_TYPE_MXFP8 && softmaxPrecision != GBSA_SOFTMAX_PRECISION_HIGH) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 only supports softmaxPrecision=0 (FP32 scores).");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     if ((quantType == GBSA_QUANT_TYPE_A8C4 || quantType == GBSA_QUANT_TYPE_A4C4) &&
         softmaxPrecision != GBSA_SOFTMAX_PRECISION_HIGH) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A8C4/A4C4 require FP32 softmaxPrecision=0.");
@@ -465,12 +472,12 @@ aclnnStatus CheckGbsaPlatformAttrs(int64_t quantType, int64_t softmaxPrecision, 
     return CheckGbsaSoftmaxPrecision(softmaxPrecision, quantType, maskType);
 }
 
-aclnnStatus CheckGbsaResidualBlockMode(int64_t residualBlockMode, bool arch35NonQuant, bool arch22 = false)
+aclnnStatus CheckGbsaResidualBlockMode(int64_t residualBlockMode, bool arch35Residual, bool arch22 = false)
 {
     if (residualBlockMode != GBSA_RESIDUAL_BLOCK_MODE_NONE &&
-        !((arch35NonQuant || arch22) && residualBlockMode == GBSA_RESIDUAL_BLOCK_MODE_FORCE)) {
+        !((arch35Residual || arch22) && residualBlockMode == GBSA_RESIDUAL_BLOCK_MODE_FORCE)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "residual_block_mode=%lld is unsupported; mode 1 supports non-quant, A4C4 and A2/A3 INT8.",
+                "residual_block_mode=%lld is unsupported; mode 1 supports non-quant, A4C4, A5 MXFP8 and A2/A3 INT8.",
                 residualBlockMode);
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -653,8 +660,9 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
     if (status != ACLNN_SUCCESS) {
         return status;
     }
-    status = CheckGbsaResidualBlockMode(residualBlockMode, isArch35 && (quantType == GBSA_QUANT_TYPE_NONE || a4c4),
-                                        !isArch35);
+    status = CheckGbsaResidualBlockMode(
+        residualBlockMode,
+        isArch35 && (quantType == GBSA_QUANT_TYPE_NONE || a4c4 || quantType == GBSA_QUANT_TYPE_MXFP8), !isArch35);
     if (status != ACLNN_SUCCESS) {
         return status;
     }
@@ -701,6 +709,11 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     const op::PlatformInfo& platformInfo = op::GetCurrentPlatformInfo();
     const uint32_t aicCoreNum = platformInfo.GetCubeCoreNum();
+    if (quantType == GBSA_QUANT_TYPE_MXFP8 && numKvHeads > 0 &&
+        numQHeads / numKvHeads > GbsaKernelArch35::Mxfp8Descriptor::MAX_GROUP_SIZE) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 Q32/KV512 and Q64/KV256 require GQA groupSize in [1,64].");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     const bool isArch35 = platformInfo.GetCurNpuArch() == NpuArch::DAV_3510;
     status = CheckGbsaMetadataParams(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional,
                                      sequsedQOptional, sequsedKvOptional, maxQSeqLen, maxKvSeqLen, numQHeads,

@@ -13,6 +13,7 @@
  * \brief Generic Sparse Attention Kernel Interface
  */
 #include "kernel_operator.h"
+#include "generic_block_sparse_attention_tilingkey.h"
 #if (__CCE_AICORE__ == 220)
 #include "arch22/generic_block_sparse_attention_kernel_arch22.h"
 #include "arch22/generic_block_sparse_attention_kernel_arch22_union.h"
@@ -20,12 +21,24 @@
 #if (__CCE_AICORE__ == 310)
 #include "arch35/generic_block_sparse_attention_kernel_arch35.h"
 #include "arch35/generic_block_sparse_attention_kernel_arch35_union.h"
-#if !defined(TILING_KEY_VAR) || (TILING_KEY_VAR >= 9250002900000020ULL && TILING_KEY_VAR <= 9250002900000023ULL) || \
-    (TILING_KEY_VAR >= 9250002900000032ULL && TILING_KEY_VAR <= 9250002900000035ULL) || \
-    (TILING_KEY_VAR >= 9250002900000040ULL && TILING_KEY_VAR <= 9250002900000047ULL) || \
-    (TILING_KEY_VAR >= 9250002900000050ULL && TILING_KEY_VAR <= 9250002900000055ULL)
+#if (!defined(ORIG_DTYPE_QUERY) || ORIG_DTYPE_QUERY == -1 || ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN) && \
+    (!defined(ORIG_DTYPE_KEY) || ORIG_DTYPE_KEY == -1 || ORIG_DTYPE_KEY == DT_FLOAT8_E4M3FN)
+#if !defined(TILING_KEY_VAR) || \
+    (GBSA_MXFP8_LAYOUT_KEY >= 9250002900000020ULL && GBSA_MXFP8_LAYOUT_KEY <= 9250002900000021ULL) || \
+    (GBSA_MXFP8_LAYOUT_KEY >= 9250002900000032ULL && GBSA_MXFP8_LAYOUT_KEY <= 9250002900000033ULL) || \
+    (GBSA_MXFP8_LAYOUT_KEY >= 9250002900000040ULL && GBSA_MXFP8_LAYOUT_KEY <= 9250002900000047ULL) || \
+    (GBSA_MXFP8_LAYOUT_KEY >= 9250002900000050ULL && GBSA_MXFP8_LAYOUT_KEY <= 9250002900000055ULL)
 #include "arch35/generic_block_sparse_attention_kernel_arch35_mxfp8_full_quant.h"
-#endif
+#include "attn_infra/epilogue/block/gbsa_block_epilogue_prepare_k_scale_arch35_mxfp8.hpp"
+#include "attn_infra/epilogue/block/gbsa_block_epilogue_rescale_o_arch35_mxfp8.hpp"
+#include "attn_infra/epilogue/block/gbsa_block_epilogue_online_softmax_arch35_mxfp8.hpp"
+#include "attn_infra/gemm/block/gbsa_block_mmad_pv_arch35_mxfp8.hpp"
+#include "attn_infra/gemm/block/gbsa_block_mmad_qk_arch35_mxfp8.hpp"
+#include "attn_infra/epilogue/block/gbsa_block_epilogue_prepare_kv_mxfp8_arch35.hpp"
+
+#endif // Full KV512 MXFP8 components
+#endif // MXFP8 input dtypes
+
 #if defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN) && \
     (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
 #include "arch35/generic_block_sparse_attention_kernel_arch35_a8c4.h"
@@ -292,6 +305,92 @@ __aicore__ inline void GbsaInferInterfaceMxfp4(const Mxfp4::KernelParams& params
 
 #endif // MXFP4-only entry helpers
 
+#if (!defined(ORIG_DTYPE_QUERY) || ORIG_DTYPE_QUERY == -1 || ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN) && \
+    (!defined(ORIG_DTYPE_KEY) || ORIG_DTYPE_KEY == -1 || ORIG_DTYPE_KEY == DT_FLOAT8_E4M3FN)
+#if !defined(TILING_KEY_VAR) || \
+    (GBSA_MXFP8_LAYOUT_KEY >= 9250002900000020ULL && GBSA_MXFP8_LAYOUT_KEY <= 9250002900000021ULL) || \
+    (GBSA_MXFP8_LAYOUT_KEY >= 9250002900000032ULL && GBSA_MXFP8_LAYOUT_KEY <= 9250002900000033ULL) || \
+    (GBSA_MXFP8_LAYOUT_KEY >= 9250002900000040ULL && GBSA_MXFP8_LAYOUT_KEY <= 9250002900000047ULL) || \
+    (GBSA_MXFP8_LAYOUT_KEY >= 9250002900000050ULL && GBSA_MXFP8_LAYOUT_KEY <= 9250002900000055ULL)
+template <uint32_t D, class OutputT, Format QFormat, Format KvFormat, bool Paged, bool Residual, uint32_t Q,
+          bool OutputLse>
+__aicore__ inline void GbsaInferMxfp8FullTile(const Mxfp8Full::KernelParams& params)
+{
+    using QK = Gemm::Block::BlockQKMxfp8Full<Paged>;
+    using PV = Gemm::Block::BlockPVMxfp8Full<Paged>;
+    using Softmax = Epilogue::Block::SoftmaxMxfp8Full<Q / 2U, Q == 64U ? 256U : 512U>;
+    using Rescale = Epilogue::Block::RescaleOMxfp8Full<OutputT, Q>;
+    using Scale = Epilogue::Block::PrepareKScaleMxfp8Full<Paged, Q == 64U ? 256U : 512U>;
+    using Offsets = Epilogue::Block::PrepareMxfp8FullOffsets<Paged, Residual>;
+    GbsaMxfp8FullTileKernelArch35<QK, PV, Softmax, Rescale, Offsets, Scale, QFormat, KvFormat, Residual, OutputLse, Q>
+        kernel(D);
+    kernel(params);
+}
+
+template <class OutputT, Format QFormat, Format KvFormat, bool Paged, bool Residual, uint32_t Q, bool OutputLse>
+__aicore__ inline void GbsaInferMxfp8FullHead(const Mxfp8Full::KernelParams& params, uint32_t dim)
+{
+    if (dim == 192U) {
+        GbsaInferMxfp8FullTile<192U, OutputT, QFormat, KvFormat, Paged, Residual, Q, OutputLse>(params);
+    } else {
+        GbsaInferMxfp8FullTile<256U, OutputT, QFormat, KvFormat, Paged, Residual, Q, OutputLse>(params);
+    }
+}
+
+template <class OutDtype, Format QFormat = Format::BSND, Format KvFormat = QFormat, bool IsPaged = false>
+__aicore__ inline void GbsaInferInterfaceMxfp8Full(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
+                                                   GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
+                                                   GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
+                                                   GM_ADDR blockTable, GM_ADDR qDequantScale, GM_ADDR kDequantScale,
+                                                   GM_ADDR vDequantScale, GM_ADDR o, GM_ADDR softmaxLse,
+                                                   GM_ADDR workspace, GM_ADDR tiling, GM_ADDR pQuantScale = nullptr)
+{
+    GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, data, tiling);
+    Mxfp8Full::KernelParams params{q,
+                                   k,
+                                   v,
+                                   sparseBlockIdx,
+                                   sparseBlockCount,
+                                   metaData,
+                                   cuSeqLengths,
+                                   cuSeqLengthsKv,
+                                   sequsedQ,
+                                   sequsedKv,
+                                   blockTable,
+                                   qDequantScale,
+                                   kDequantScale,
+                                   vDequantScale,
+                                   pQuantScale,
+                                   o,
+                                   softmaxLse,
+                                   workspace,
+                                   tiling};
+    constexpr uint32_t queryCapacity = GBSA_MXFP8_QUERY_CAPACITY;
+#ifdef __DAV_CUBE__
+    // LSE is written by the paired vector cores. Sharing the cube body avoids
+    // compiling duplicate QK/PV pipelines for the same physical tiling key.
+    GbsaInferMxfp8FullHead<OutDtype, QFormat, KvFormat, IsPaged, GBSA_MXFP8_HAS_RESIDUAL, queryCapacity, false>(
+        params, data.embeddingSize);
+#else
+    // The physical key is shared by both outputs. Decode the logical LSE field
+    // without runtime division: the arch/MXFP8/residual prefix is fixed for this
+    // specialization, and all remaining layout/mask/dtype fields are below LSE.
+    constexpr uint64_t lseField = 100000000ULL;
+    constexpr uint64_t mxfp8Field = 2000000000ULL;
+    constexpr uint64_t logicalPrefix =
+        GBSA_OP_ARCH35_BASE + mxfp8Field + (GBSA_MXFP8_HAS_RESIDUAL ? GBSA_RESIDUAL_BLOCK_MODE_OFFSET : 0ULL);
+    if (data.tilingKey < logicalPrefix + lseField) {
+        GbsaInferMxfp8FullHead<OutDtype, QFormat, KvFormat, IsPaged, GBSA_MXFP8_HAS_RESIDUAL, queryCapacity, false>(
+            params, data.embeddingSize);
+    } else {
+        GbsaInferMxfp8FullHead<OutDtype, QFormat, KvFormat, IsPaged, GBSA_MXFP8_HAS_RESIDUAL, queryCapacity, true>(
+            params, data.embeddingSize);
+    }
+#endif
+}
+#endif // Full KV512 MXFP8 dispatch
+#endif // MXFP8 input dtypes
+
 template <class InDtype, class SMDtype, class REDtype, Format qFormat, Format kvFormat, bool isPaged,
           bool isCausal = true, bool hasResidualBlock = false, Epilogue::LseMode lseMode = Epilogue::LseMode::NONE,
           Epilogue::LseFormat lseFormat = Epilogue::LseFormat::TN1, class OutDtype = InDtype>
@@ -534,146 +633,6 @@ __global__ __aicore__ void GbsaInferInterfaceFullQuant(GM_ADDR q, GM_ADDR k, GM_
                                        cuSeqLengthsKv, sequsedQ, sequsedKv, blockTable, o, softmaxLse, workspace,
                                        tiling);
 }
-#if !defined(TILING_KEY_VAR) || (TILING_KEY_VAR >= 9250002900000020ULL && TILING_KEY_VAR <= 9250002900000023ULL) || \
-    (TILING_KEY_VAR >= 9250002900000032ULL && TILING_KEY_VAR <= 9250002900000035ULL) || \
-    (TILING_KEY_VAR >= 9250002900000040ULL && TILING_KEY_VAR <= 9250002900000047ULL) || \
-    (TILING_KEY_VAR >= 9250002900000050ULL && TILING_KEY_VAR <= 9250002900000055ULL)
-namespace GbsaMxScaleMode {
-constexpr auto PIPELINE = 4U;           // Grouped K-scale streaming.
-constexpr auto COALESCED_PIPELINE = 5U; // Retained prefill dispatch alias of grouped streaming.
-} // namespace GbsaMxScaleMode
-
-template <class OutDtype, uint32_t ScaleMode = GbsaMxScaleMode::PIPELINE, Format QFormat = Format::BSND,
-          Format KvFormat = QFormat, bool IsPaged = false>
-__global__ __aicore__ void GbsaInferInterfaceMxfp8Packed(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
-                                                         GM_ADDR sparseBlockCount, GM_ADDR metaData,
-                                                         GM_ADDR cuSeqLengths, GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ,
-                                                         GM_ADDR sequsedKv, GM_ADDR blockTable, GM_ADDR qDequantScale,
-                                                         GM_ADDR kDequantScale, GM_ADDR vDequantScale, GM_ADDR o,
-                                                         GM_ADDR softmaxLse, GM_ADDR workspace, GM_ADDR tiling,
-                                                         GM_ADDR pQuantScale = nullptr)
-{
-    static_assert(ScaleMode == GbsaMxScaleMode::PIPELINE || ScaleMode == GbsaMxScaleMode::COALESCED_PIPELINE,
-                  "Unsupported MXFP8 scale mode");
-    using ArchTag = Arch::AtlasA5;
-    using ElementQ = fp8_e4m3fn_t;
-    using ElementK = fp8_e4m3fn_t;
-    using ElementV = fp8_e4m3fn_t;
-    // Keep QK scores in FP32 through Fixpipe and online softmax. OutDtype
-    // controls only the final attention output, including legacy precision=1.
-    using ElementS = float;
-    using ElementP = fp8_e4m3fn_t;
-    using ElementO = OutDtype;
-    using ElementOTmp = float;
-
-    using LayoutQ = layout::RowMajor;
-    using LayoutK = layout::ColumnMajor;
-    using LayoutS = layout::RowMajor;
-    using LayoutPDummy = layout::zN;
-    using LayoutV = layout::RowMajor;
-    using LayoutO = layout::RowMajor;
-    using LayoutOTmp = layout::RowMajor;
-
-    using L1TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
-    // Packed tiles contain one, two or four N128 groups, selected by the head ratio.
-    using L0TileShapeQK = Shape<Int<128>, Int<128>, Int<256>>;
-    // The packed matrix loader gathers dense sparse blocks in logical index order.
-    using DispatchPolicyQK = Gemm::MmadAtlasA5GbsaQKMxfp8;
-    static constexpr auto MM1_COPY_MODE = AscendC::IsSameType<ElementS, float>::value ?
-                                              Gemm::Tile::CopyL0CToUBMode::SPLIT_M :
-                                              Gemm::Tile::CopyL0CToUBMode::NO_SPLIT;
-    using TileCopyQKBase = Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementQ, LayoutQ, ElementK, LayoutK, ElementS,
-                                                             LayoutS, void, MM1_COPY_MODE>;
-    using TileCopyQK = Gemm::Tile::GbsaMxPackedQKTileCopy<TileCopyQKBase>;
-    using TileMmadQK = Gemm::Tile::GbsaMxPackedQKSingleKMmad<L0TileShapeQK>;
-    using BlockMmadQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, ElementQ, ElementK,
-                                                  ElementS, void, TileCopyQK, TileMmadQK>;
-
-    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxGbsaMxfp8;
-    using PType = Gemm::GemmType<ElementP, LayoutPDummy>;
-    using SType = Gemm::GemmType<ElementS, LayoutS>;
-    using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType>;
-
-    using L1TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
-    using L0TileShapePV = Shape<Int<128>, Int<128>, Int<256>>;
-    // The packed matrix loader gathers dense sparse blocks in logical index order.
-    using DispatchPolicyPV = Gemm::MmadAtlasA5GbsaPVMxfp8;
-    using TileCopyPVBase =
-        Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementP, LayoutPDummy, ElementV, LayoutV, ElementOTmp, LayoutOTmp,
-                                          void, Gemm::Tile::CopyL0CToUBMode::SPLIT_M>;
-    using TileCopyPV = Gemm::Tile::GbsaMxPackedPVTileCopy<TileCopyPVBase>;
-    using TileMmadPV = Gemm::Tile::TileMmadTla<ArchTag, ElementP, typename TileCopyPV::LayoutTagL1A>;
-    using BlockMmadPV = Gemm::Block::BlockMmadTla<DispatchPolicyPV, L1TileShapePV, L0TileShapePV, ElementP, ElementV,
-                                                  ElementOTmp, void, TileCopyPV, TileMmadPV>;
-
-    using DispatchPolicyRescaleO =
-        Epilogue::EpilogueAtlasA5GbsaRescaleOMxfp8<Epilogue::LseMode::NONE, Epilogue::LseFormat::TN1>;
-    using TileCopyRescaleOBase = Epilogue::Tile::TileCopyRescaleO<ArchTag, ElementO, LayoutO, LayoutOTmp>;
-    using TileCopyRescaleO = Epilogue::Tile::TileCopyRescaleOMxV<TileCopyRescaleOBase, true, true>;
-    using EpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, ElementO, ElementOTmp, ElementS,
-                                                            ElementK, TileCopyRescaleO, Arch::PositionL0C>;
-
-    using GbsaKernel = GbsaMxfp8PackedKernelArch35<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
-                                                   GbsaMxQkVariant::D192, QFormat, KvFormat, IsPaged>;
-
-    GbsaFullQuantKernelParamsArch35 params{q,
-                                           k,
-                                           v,
-                                           sparseBlockIdx,
-                                           sparseBlockCount,
-                                           metaData,
-                                           cuSeqLengths,
-                                           cuSeqLengthsKv,
-                                           sequsedQ,
-                                           sequsedKv,
-                                           blockTable,
-                                           qDequantScale,
-                                           kDequantScale,
-                                           vDequantScale,
-                                           o,
-                                           softmaxLse,
-                                           workspace,
-                                           tiling};
-    params.pQuantScale = pQuantScale;
-    GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, packedTiling, tiling);
-    if constexpr (ScaleMode == GbsaMxScaleMode::COALESCED_PIPELINE) {
-        // Host selects this policy only for D256. Do not emit unused D192
-        // implementations into the coalesced entry and its device image.
-        using WideL0Shape = Shape<Int<128>, Int<128>, Int<256>>;
-        using WideQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, WideL0Shape, ElementQ, ElementK,
-                                                 ElementS, void, TileCopyQK, Gemm::Tile::GbsaMxMmad>;
-        using WideKernel = GbsaMxfp8PackedKernelArch35<WideQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
-                                                       GbsaMxQkVariant::D256, QFormat, KvFormat, IsPaged>;
-        WideKernel kernel;
-        kernel(params);
-    } else if (packedTiling.embeddingSize == 256U) {
-        // N128/K256 MMADs form the logical KV tile selected by the host.
-        using WideL0Shape = Shape<Int<128>, Int<128>, Int<256>>;
-        using WideQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, WideL0Shape, ElementQ, ElementK,
-                                                 ElementS, void, TileCopyQK, Gemm::Tile::GbsaMxMmad>;
-        using WideKernel = GbsaMxfp8PackedKernelArch35<WideQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
-                                                       GbsaMxQkVariant::D256, QFormat, KvFormat, IsPaged>;
-        WideKernel kernel;
-        kernel(params);
-    } else if (!IsPaged && packedTiling.embeddingSize == 192U && packedTiling.blockShapeY == 8U &&
-               packedTiling.kvHeads == 4U && packedTiling.groupSize == 16U &&
-               AscendC::IsSameType<OutDtype, bfloat16_t>::value &&
-               packedTiling.qSeqCapacity == packedTiling.kvSeqCapacity && packedTiling.qSeqCapacity >= 1024U &&
-               packedTiling.qSeqCapacity <= 8192U) {
-        // Retain the dense CSA dispatch alias with an explicit actual D192.
-        // Both aliases use grouped KScale preparation on the two AIVs.
-        using DenseCsaKernel =
-            GbsaMxfp8PackedKernelArch35<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
-                                        GbsaMxQkVariant::D192_PREFILL, QFormat, KvFormat, IsPaged>;
-        DenseCsaKernel kernel;
-        kernel(params);
-    } else {
-        GbsaKernel gbsaKernel;
-        gbsaKernel(params);
-    }
-}
-#endif // Packed MXFP8 dispatch
-
 #if defined(ORIG_DTYPE_QUERY) && defined(ORIG_DTYPE_KEY) && (ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN) && \
     (ORIG_DTYPE_KEY == DT_FLOAT4_E2M1)
 template <class BaseCopy>

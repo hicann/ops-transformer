@@ -40,6 +40,31 @@ __aicore__ inline uint32_t GetCurQSTileNum(int64_t curQSeqlen, uint32_t blockSha
     return (xBlockNum - 1) * qSTileNumPerFullXBlock + lastXBlockQSTileNum;
 }
 
+namespace Mxfp8Full {
+struct KernelParams {
+    GM_ADDR q;
+    GM_ADDR k;
+    GM_ADDR v;
+    GM_ADDR sparseBlockIdx;
+    GM_ADDR sparseBlockCount;
+    GM_ADDR metaData;
+    GM_ADDR cuSeqLengths;
+    GM_ADDR cuSeqLengthsKv;
+    GM_ADDR sequsedQ;
+    GM_ADDR sequsedKv;
+    GM_ADDR blockTable;
+    GM_ADDR qDequantScale;
+    GM_ADDR kDequantScale;
+    GM_ADDR vDequantScale;
+    GM_ADDR pQuantScale;
+    GM_ADDR o;
+    GM_ADDR softmaxLse;
+    GM_ADDR workspace;
+    GM_ADDR tiling;
+};
+
+} // namespace Mxfp8Full
+
 // Regular (non-quantized) kernel params.
 struct GbsaKernelParamsArch35 {
     GM_ADDR q;
@@ -86,7 +111,7 @@ struct GbsaKernelParamsArch35 {
     {}
 };
 
-// Full-quant (FP8) kernel params.
+// Full-quant parameters used by the A8C4 kernel.
 struct GbsaFullQuantKernelParamsArch35 {
     GM_ADDR q;
     GM_ADDR k;
@@ -106,7 +131,6 @@ struct GbsaFullQuantKernelParamsArch35 {
     GM_ADDR softmaxLse;
     GM_ADDR workSpace;
     GM_ADDR tiling;
-    GM_ADDR pQuantScale = nullptr;
 
     __aicore__ inline GbsaFullQuantKernelParamsArch35() {}
     __aicore__ inline GbsaFullQuantKernelParamsArch35(GM_ADDR q_, GM_ADDR k_, GM_ADDR v_, GM_ADDR sparseBlockIdx_,

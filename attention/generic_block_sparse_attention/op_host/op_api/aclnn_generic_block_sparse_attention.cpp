@@ -219,11 +219,38 @@ static aclnnStatus ValidateA8C4Shape(const aclTensor* query, const aclTensor* ke
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ValidateAdditionalParams(int64_t softmaxPrecision, const aclTensor* attentionOut,
+static aclnnStatus ValidateMxfp8Lse(const aclTensor* query, const aclTensor* lse, const std::string& layout)
+{
+    if (lse->GetDataType() != DataType::DT_FLOAT) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 softmaxLse must have FLOAT32 dtype.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    const auto& qShape = query->GetViewShape();
+    const auto& shape = lse->GetViewShape();
+    const size_t rank = layout == "TND" ? 3U : 4U;
+    if (qShape.GetDimNum() != rank || shape.GetDimNum() != rank) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 softmaxLse rank must match query layout.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    const int64_t heads = qShape.GetDim(layout == "BSND" ? 2U : 1U);
+    const int64_t sequence = qShape.GetDim(layout == "BSND" ? 1U : 2U);
+    if (shape.GetDim(0) != qShape.GetDim(0) || shape.GetDim(1) != heads || shape.GetDim(rank - 1U) != 1 ||
+        (rank == 4U && shape.GetDim(2) != sequence)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 softmaxLse shape must be [Tq,Nq,1] or [B,Nq,Sq,1].");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+static aclnnStatus ValidateAdditionalParams(int64_t softmaxPrecision, int64_t quantType, const aclTensor* attentionOut,
                                             uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (softmaxPrecision != 0 && softmaxPrecision != 1) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "softmaxPrecision must be 0 or 1, got %ld.", softmaxPrecision);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (quantType == MXFP8_QUANT_TYPE && softmaxPrecision != 0) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MXFP8 only supports softmaxPrecision=0 (FP32 scores).");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -503,7 +530,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             return ret;
         }
     }
-    ret = ValidateAdditionalParams(softmaxPrecision, attentionOut, workspaceSize, executor);
+    ret = ValidateAdditionalParams(softmaxPrecision, quantType, attentionOut, workspaceSize, executor);
     if (ret != ACLNN_SUCCESS) {
         return ret;
     }
@@ -516,6 +543,12 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     }
     if (returnSoftmaxlse == LSE_OUT) {
         OP_CHECK_NULL(softmaxLseOptional, return ACLNN_ERR_PARAM_NULLPTR);
+        if (quantType == MXFP8_QUANT_TYPE) {
+            ret = ValidateMxfp8Lse(query, softmaxLseOptional, layoutQ);
+            if (ret != ACLNN_SUCCESS) {
+                return ret;
+            }
+        }
     }
 
     L2_DFX_PHASE_1(

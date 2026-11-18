@@ -84,17 +84,6 @@ using EpilogueAtlasA5BsaRescaleO = EpilogueAtlasA5RescaleOTag<false, LSE_MODE_, 
 template <LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::TN1>
 using EpilogueAtlasA5UnionRescaleO = EpilogueAtlasA5RescaleOTag<true, LSE_MODE_, LSE_FORMAT_>;
 
-struct EpilogueOnlineSoftmaxGbsaMxfp8 {
-    using ArchTag = Arch::AtlasA5;
-};
-
-template <LseMode LSE_MODE_ = LseMode::NONE, LseFormat LSE_FORMAT_ = LseFormat::TN1>
-struct EpilogueAtlasA5GbsaRescaleOMxfp8 {
-    using ArchTag = Arch::AtlasA5;
-    static constexpr LseMode LSE_MODE = LSE_MODE_;
-    static constexpr LseFormat LSE_FORMAT = LSE_FORMAT_;
-};
-
 template <uint32_t HeadDim_, uint32_t QueryTile_>
 struct EpilogueAtlasA5Mxfp4Base {
     using ArchTag = Arch::AtlasA5;

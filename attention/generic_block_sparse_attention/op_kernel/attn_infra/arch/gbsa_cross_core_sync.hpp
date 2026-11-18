@@ -39,6 +39,21 @@ constexpr FlagID FLAG_ID20 = 20;
 constexpr FlagID FLAG_ID21 = 21;
 constexpr FlagID FLAG_ID22 = 22;
 
+// Mode 4 pairs one local AIV flag with the second bank at flag + 16.
+template <pipe_t Pipe>
+__aicore__ inline void CubeWaitBoth(uint32_t flag)
+{
+    AscendC::CrossCoreWaitFlag<4, Pipe>(flag);
+    AscendC::CrossCoreWaitFlag<4, Pipe>(flag + 16U);
+}
+
+template <pipe_t Pipe>
+__aicore__ inline void CubePublishBoth(uint32_t flag)
+{
+    AscendC::CrossCoreSetFlag<4, Pipe>(flag);
+    AscendC::CrossCoreSetFlag<4, Pipe>(flag + 16U);
+}
+
 struct CrossCoreFlag {
     __aicore__ inline CrossCoreFlag()
         : id(0)

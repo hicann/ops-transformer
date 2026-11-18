@@ -30,6 +30,86 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
 
 #include "generic_block_sparse_attention_tilingkey_register.h"
 
+// Register all nine layout combinations for each MXFP8 output dtype.
+#if (__CCE_AICORE__ == 310) && (ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN) && (ORIG_DTYPE_KEY == DT_FLOAT8_E4M3FN)
+#if ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16
+        TILING_KEY_IS(GBSA_MXFP8_SCALE_PIPELINE_FP16_SM1_LSE0);
+        TILING_KEY_IS(GBSA_MXFP8_SCALE_PIPELINE_FP16_SM1_LSE0_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_SCALE_PIPELINE_FP16_SM1_LSE0_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_SCALE_PIPELINE_FP16_SM1_LSE0_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PIPELINE_FP16_SM1_LSE0);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PIPELINE_FP16_SM1_LSE0_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PIPELINE_FP16_SM1_LSE0_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PIPELINE_FP16_SM1_LSE0_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BBND_FP16);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BBND_FP16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BBND_FP16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BBND_FP16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BNBD_FP16);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BNBD_FP16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BNBD_FP16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BNBD_FP16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BBND_FP16);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BBND_FP16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BBND_FP16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BBND_FP16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BNBD_FP16);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BNBD_FP16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BNBD_FP16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BNBD_FP16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BBND_FP16);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BBND_FP16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BBND_FP16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BBND_FP16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BNBD_FP16);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BNBD_FP16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BNBD_FP16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BNBD_FP16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PIPELINE_FP16);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PIPELINE_FP16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PIPELINE_FP16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PIPELINE_FP16_RESIDUAL_Q64);
+#endif
+#if ORIG_DTYPE_ATTENTION_OUT == DT_BF16
+        TILING_KEY_IS(GBSA_MXFP8_SCALE_PIPELINE_BF16_SM1_LSE0);
+        TILING_KEY_IS(GBSA_MXFP8_SCALE_PIPELINE_BF16_SM1_LSE0_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_SCALE_PIPELINE_BF16_SM1_LSE0_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_SCALE_PIPELINE_BF16_SM1_LSE0_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PIPELINE_BF16_SM1_LSE0);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PIPELINE_BF16_SM1_LSE0_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PIPELINE_BF16_SM1_LSE0_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PIPELINE_BF16_SM1_LSE0_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BBND_BF16);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BBND_BF16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BBND_BF16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BBND_BF16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BNBD_BF16);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BNBD_BF16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BNBD_BF16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BSND_PA_BNBD_BF16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BBND_BF16);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BBND_BF16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BBND_BF16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BBND_BF16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BNBD_BF16);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BNBD_BF16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BNBD_BF16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_BNSD_PA_BNBD_BF16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BBND_BF16);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BBND_BF16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BBND_BF16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BBND_BF16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BNBD_BF16);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BNBD_BF16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BNBD_BF16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PA_BNBD_BF16_RESIDUAL_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PIPELINE_BF16);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PIPELINE_BF16_Q64);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PIPELINE_BF16_RESIDUAL);
+        TILING_KEY_IS(GBSA_MXFP8_TND_PIPELINE_BF16_RESIDUAL_Q64);
+#endif
+#endif
+
 #if (__CCE_AICORE__ == 310) && TILING_KEY_VAR >= (GBSA_OP_ARCH35_BASE + GBSA_MXFP4_MODE_OFFSET) && \
     TILING_KEY_VAR < (GBSA_OP_ARCH35_BASE + GBSA_MXFP4_MODE_OFFSET + 2000000000ULL)
         constexpr uint64_t modeKey = TILING_KEY_VAR - GBSA_OP_ARCH35_BASE - GBSA_MXFP4_MODE_OFFSET;
@@ -1009,6 +1089,95 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                              NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_SCALE_PIPELINE_FP16_SM1_LSE0
+        GbsaInferInterfaceMxfp8Full<half>(query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths,
+                                          cuSeqLengthsKv, sequsedQ, sequsedKv, blockTable, qDequantScale, kDequantScale,
+                                          vDequantScale, attentionOut, softmaxLse, user, tiling, pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_SCALE_PIPELINE_BF16_SM1_LSE0
+        GbsaInferInterfaceMxfp8Full<bfloat16_t>(query, key, value, sparseBlockIdx, sparseBlockCount, metaData,
+                                                cuSeqLengths, cuSeqLengthsKv, sequsedQ, sequsedKv, blockTable,
+                                                qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse,
+                                                user, tiling, pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_TND_PIPELINE_FP16
+        GbsaInferInterfaceMxfp8Full<half, Format::TND, Format::TND, false>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_TND_PIPELINE_BF16
+        GbsaInferInterfaceMxfp8Full<bfloat16_t, Format::TND, Format::TND, false>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_TND_PA_BBND_FP16
+        GbsaInferInterfaceMxfp8Full<half, Format::TND, Format::BSND, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_TND_PA_BBND_BF16
+        GbsaInferInterfaceMxfp8Full<bfloat16_t, Format::TND, Format::BSND, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_TND_PA_BNBD_FP16
+        GbsaInferInterfaceMxfp8Full<half, Format::TND, Format::BNSD, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_TND_PA_BNBD_BF16
+        GbsaInferInterfaceMxfp8Full<bfloat16_t, Format::TND, Format::BNSD, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BSND_PA_BBND_FP16
+        GbsaInferInterfaceMxfp8Full<half, Format::BSND, Format::BSND, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BSND_PA_BBND_BF16
+        GbsaInferInterfaceMxfp8Full<bfloat16_t, Format::BSND, Format::BSND, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BSND_PA_BNBD_FP16
+        GbsaInferInterfaceMxfp8Full<half, Format::BSND, Format::BNSD, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BSND_PA_BNBD_BF16
+        GbsaInferInterfaceMxfp8Full<bfloat16_t, Format::BSND, Format::BNSD, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BNSD_PA_BBND_FP16
+        GbsaInferInterfaceMxfp8Full<half, Format::BNSD, Format::BSND, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BNSD_PA_BBND_BF16
+        GbsaInferInterfaceMxfp8Full<bfloat16_t, Format::BNSD, Format::BSND, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BNSD_PA_BNBD_FP16
+        GbsaInferInterfaceMxfp8Full<half, Format::BNSD, Format::BNSD, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BNSD_PA_BNBD_BF16
+        GbsaInferInterfaceMxfp8Full<bfloat16_t, Format::BNSD, Format::BNSD, true>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BNSD_PIPELINE_FP16_SM1_LSE0
+        GbsaInferInterfaceMxfp8Full<half, Format::BNSD>(query, key, value, sparseBlockIdx, sparseBlockCount, metaData,
+                                                        cuSeqLengths, cuSeqLengthsKv, sequsedQ, sequsedKv, blockTable,
+                                                        qDequantScale, kDequantScale, vDequantScale, attentionOut,
+                                                        softmaxLse, user, tiling, pQuantScale);
+#elif GBSA_MXFP8_LAYOUT_KEY == GBSA_MXFP8_BNSD_PIPELINE_BF16_SM1_LSE0
+        GbsaInferInterfaceMxfp8Full<bfloat16_t, Format::BNSD>(
+            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
+            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
+            pQuantScale);
 #elif TILING_KEY_VAR == GBSA_FP16_BSND_BSND_FP32SM_TILING
         GbsaInferIntfRegular<half, float, float, GbsaKernelArch35::Format::BSND, GbsaKernelArch35::Format::BSND, false,
                              true, false, NpuArch::Epilogue::LseMode::NONE, NpuArch::Epilogue::LseFormat::TN1>(
@@ -1914,116 +2083,6 @@ extern "C" __global__ __aicore__ void generic_block_sparse_attention(
                              NpuArch::Epilogue::LseMode::OUT_ONLY, NpuArch::Epilogue::LseFormat::TN1>(
             query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
             sequsedKv, blockTable, attentionOut, softmaxLse, user, tiling);
-#elif TILING_KEY_VAR == GBSA_MXFP8_SCALE_PIPELINE_FP16_SM1_LSE0
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::PIPELINE>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_SCALE_PIPELINE_BF16_SM1_LSE0
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::PIPELINE>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_COALESCED_PIPELINE_FP16_SM1_LSE0
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::COALESCED_PIPELINE>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_COALESCED_PIPELINE_BF16_SM1_LSE0
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::COALESCED_PIPELINE>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_TND_PIPELINE_FP16
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::PIPELINE, Format::TND, Format::TND, false>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_TND_PIPELINE_BF16
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::PIPELINE, Format::TND, Format::TND, false>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_TND_PA_BBND_FP16
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::PIPELINE, Format::TND, Format::BSND, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_TND_PA_BBND_BF16
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::PIPELINE, Format::TND, Format::BSND, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_TND_PA_BNBD_FP16
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::PIPELINE, Format::TND, Format::BNSD, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_TND_PA_BNBD_BF16
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::PIPELINE, Format::TND, Format::BNSD, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BSND_PA_BBND_FP16
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::PIPELINE, Format::BSND, Format::BSND, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BSND_PA_BBND_BF16
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::PIPELINE, Format::BSND, Format::BSND, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BSND_PA_BNBD_FP16
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::PIPELINE, Format::BSND, Format::BNSD, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BSND_PA_BNBD_BF16
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::PIPELINE, Format::BSND, Format::BNSD, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BNSD_PA_BBND_FP16
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::PIPELINE, Format::BNSD, Format::BSND, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BNSD_PA_BBND_BF16
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::PIPELINE, Format::BNSD, Format::BSND, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BNSD_PA_BNBD_FP16
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::PIPELINE, Format::BNSD, Format::BNSD, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BNSD_PA_BNBD_BF16
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::PIPELINE, Format::BNSD, Format::BNSD, true>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BNSD_PIPELINE_FP16_SM1_LSE0
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::PIPELINE, Format::BNSD>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BNSD_PIPELINE_BF16_SM1_LSE0
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::PIPELINE, Format::BNSD>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BNSD_COALESCED_PIPELINE_FP16_SM1_LSE0
-        GbsaInferInterfaceMxfp8Packed<half, GbsaMxScaleMode::COALESCED_PIPELINE, Format::BNSD>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
-#elif TILING_KEY_VAR == GBSA_MXFP8_BNSD_COALESCED_PIPELINE_BF16_SM1_LSE0
-        GbsaInferInterfaceMxfp8Packed<bfloat16_t, GbsaMxScaleMode::COALESCED_PIPELINE, Format::BNSD>(
-            query, key, value, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ,
-            sequsedKv, blockTable, qDequantScale, kDequantScale, vDequantScale, attentionOut, softmaxLse, user, tiling,
-            pQuantScale);
 #elif TILING_KEY_VAR == GBSA_FP8_TND_PA_BBND_FP16SM_TILING
         GbsaInferInterfaceFullQuant<fp8_e4m3fn_t, half, float, GbsaKernelArch35::Format::TND,
                                     GbsaKernelArch35::Format::BSND, true>(

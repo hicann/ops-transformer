@@ -21,6 +21,7 @@
 #include "err/ops_err.h"
 #include "graph/types.h"
 #include "graph/tensor.h"
+#include "graph/utils/type_utils.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "op_host/tiling_base.h"
 
@@ -150,10 +151,10 @@ constexpr uint32_t GBSA_SUPPORTED_UNION_SIZE = 8U;
 constexpr uint64_t GBSA_UNION_MODE_TILING_OFFSET = 2000000000ULL;
 constexpr int64_t GBSA_QUANT_TYPE_MXFP8 = 6;
 constexpr uint64_t GBSA_MXFP8_TILING_OFFSET = 2000000000ULL;
+constexpr uint64_t GBSA_MXFP8_RESIDUAL_DISPATCH_OFFSET = 100ULL;
+constexpr uint64_t GBSA_MXFP8_Q64_DISPATCH_OFFSET = 200ULL;
 constexpr uint64_t GBSA_MXFP8_SCALE_PIPELINE_DISPATCH_BASE = 9250002900000020ULL;
-constexpr uint64_t GBSA_MXFP8_COALESCED_PIPELINE_DISPATCH_BASE = 9250002900000022ULL;
 constexpr uint64_t GBSA_MXFP8_BNSD_PIPELINE_DISPATCH_BASE = 9250002900000032ULL;
-constexpr uint64_t GBSA_MXFP8_BNSD_COALESCED_PIPELINE_DISPATCH_BASE = 9250002900000034ULL;
 constexpr uint64_t GBSA_MXFP8_BSND_PA_BBND_DISPATCH_BASE = 9250002900000040ULL;
 constexpr uint64_t GBSA_MXFP8_BSND_PA_BNBD_DISPATCH_BASE = 9250002900000042ULL;
 constexpr uint64_t GBSA_MXFP8_BNSD_PA_BBND_DISPATCH_BASE = 9250002900000044ULL;
@@ -161,8 +162,6 @@ constexpr uint64_t GBSA_MXFP8_BNSD_PA_BNBD_DISPATCH_BASE = 9250002900000046ULL;
 constexpr uint64_t GBSA_MXFP8_TND_PIPELINE_DISPATCH_BASE = 9250002900000050ULL;
 constexpr uint64_t GBSA_MXFP8_TND_PA_BBND_DISPATCH_BASE = 9250002900000052ULL;
 constexpr uint64_t GBSA_MXFP8_TND_PA_BNBD_DISPATCH_BASE = 9250002900000054ULL;
-constexpr uint32_t GBSA_MXFP8_COALESCED_PREFILL_MIN_TOKENS = 1024U;
-constexpr uint32_t GBSA_MXFP8_COALESCED_PREFILL_MAX_TOKENS = 8192U;
 
 constexpr int64_t GBSA_QUANT_TYPE_INT8 = 7;
 constexpr int64_t GBSA_QUANT_TYPE_A8C4 = 8;
@@ -278,15 +277,14 @@ ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext* context)
     }
 
     const int64_t* softmaxPrecPtr = attrs->GetInt(ATTR_SOFTMAX_PRECISION_INDEX);
-    if (softmaxPrecPtr != nullptr) {
-        softmaxPrecision_ = static_cast<uint32_t>(*softmaxPrecPtr);
-    }
-    if (softmaxPrecision_ != 0 && softmaxPrecision_ != 1) {
+    const int64_t requestedPrecision = softmaxPrecPtr != nullptr ? *softmaxPrecPtr : 0;
+    if (requestedPrecision != 0 && requestedPrecision != 1) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "softmaxPrecision",
-                                              std::to_string(softmaxPrecision_).c_str(),
+                                              std::to_string(requestedPrecision).c_str(),
                                               "only 0 (fp32 SM) or 1 (half/low SM) are supported");
         return ge::GRAPH_FAILED;
     }
+    softmaxPrecision_ = static_cast<uint32_t>(requestedPrecision);
 
     const int64_t* maskTypePtr = attrs->GetInt(ATTR_MASK_TYPE_INDEX);
     if (maskTypePtr != nullptr) {
@@ -329,11 +327,12 @@ ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext* context)
     const bool residualModeSupported = residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_NONE ||
                                        (residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_FORCE &&
                                         (quantType_ == GBSA_QUANT_TYPE_NONE || IsMxfp4() ||
+                                         (socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_MXFP8) ||
                                          (socVer_ != SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_INT8)));
     if (!residualModeSupported) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "residual_block_mode",
-                                              std::to_string(residualBlockMode_).c_str(),
-                                              "mode 1 supports non-quant, A4C4 and A2/A3 INT8 full quantization");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "residual_block_mode", std::to_string(residualBlockMode_).c_str(),
+            "mode 1 supports non-quant, A4C4, A5 MXFP8 and A2/A3 INT8 full quantization");
         return ge::GRAPH_FAILED;
     }
 
@@ -598,8 +597,10 @@ ge::graphStatus GBSATiling::ParseKvCacheStride0(gert::TilingContext* context)
 
     // Packed MXFP8 shares physical offsets between K/V and KScale. ACLNN
     // makes these caches contiguous; direct GE callers must provide that layout.
-    if (IsMxfp8() && (kStride0_ != pageElems || vStride0_ != pageElems)) {
-        OP_LOGE(context->GetNodeName(), "MXFP8 paged K/V require contiguous page storage.");
+    if (quantType_ == GBSA_QUANT_TYPE_MXFP8 && (kStride0_ != pageElems || vStride0_ != pageElems)) {
+        OP_LOGE_FOR_INVALID_STRIDE(context->GetNodeName(), "key/value dim0",
+                                   (std::to_string(kStride0_) + "/" + std::to_string(vStride0_)).c_str(),
+                                   (std::to_string(pageElems) + " elements for contiguous A8C8 pages").c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -1002,18 +1003,20 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
         pipelineWorkspaceSize = mm1OutSize_ + smOnlineOutSize_ + mm2OutSize_ + updateSize_;
     } else {
         // MXFP8 uses descriptor rings instead of an identity index array.
-        pipelineWorkspaceSize = IsMxfp8() ? 32U : static_cast<uint64_t>(topK_) * sizeof(int32_t);
-        if (IsMxfp8PackedPath()) {
-            // Four AIV-produced K/V descriptor slots per AIC.
-            // Each slot has a cache-line header plus at most one 16-byte record
-            // per sparse block. Match the packed kernel's descriptor lookahead ring.
-            const uint64_t descriptorBytes = Mxfp8Tiling::DescriptorTileWords(kvBaseTile_) * sizeof(uint64_t);
-            constexpr uint64_t descriptorSlots = Mxfp8Tiling::DESCRIPTOR_RING_SLOTS;
-            pipelineWorkspaceSize = blockDim_ * descriptorSlots * descriptorBytes;
-            // K/V payloads remain in their input layout and go directly to L1.
-            // Only bounded descriptor rings occupy the packed workspace.
-            tilingData_->set_kvOffsetInfoOffset(0U);
-            tilingData_->set_kvOffsetTileWords(0U);
+        pipelineWorkspaceSize =
+            quantType_ == GBSA_QUANT_TYPE_MXFP8 ? 32U : static_cast<uint64_t>(topK_) * sizeof(int32_t);
+        if (IsMxfp8FullTilePath()) {
+            const uint32_t rows =
+                Mxfp8Tiling::DescriptorRows(embeddingSize_, isPaged_, Mxfp8Tiling::KvTile(groupSize_));
+            const uint64_t words =
+                Mxfp8Tiling::DescriptorTileWords(rows, blockShapeY_, isPaged_, Mxfp8Tiling::KvTile(groupSize_));
+            // Match the source workspace alignment. The 64-byte descriptor
+            // header is independent of the 512-byte workspace base alignment.
+            const uint64_t offset = AlignUp(pipelineWorkspaceSize, GSA_FD_WORKSPACE_ALIGNMENT);
+            pipelineWorkspaceSize =
+                offset + blockDim_ * Mxfp8Tiling::DESCRIPTOR_WORKSPACE_SLOTS * words * sizeof(uint64_t);
+            tilingData_->set_kvOffsetInfoOffset(offset);
+            tilingData_->set_kvOffsetTileWords(static_cast<uint32_t>(words));
         }
         if (embeddingSize_ > GBSA_TILE_SIZE_256 && qBaseTile_ > GBSA_TILE_SIZE_64) {
             // Two complete FP32 LO tiles per physical AIC; FD workspace follows this region.
@@ -1028,7 +1031,7 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
     // PA entries hold {K offset, V offset, K meta, V meta}; dense entries
     // pack {offset, meta} but retain the original four-word capacity.
     // Arch35 Regular/FP8 gather and Union precompute KV gather descriptors; MXFP8 uses its own rings.
-    if (socVer_ == SOC_VER_950_CODE && !IsMxfp8()) {
+    if (socVer_ == SOC_VER_950_CODE && quantType_ != GBSA_QUANT_TYPE_MXFP8) {
         const bool isMxfp4 = dataType_ == ge::DT_FLOAT4_E2M1;
         const uint64_t historySlots = isMxfp4 ? 12U : 4U;
         const uint64_t descriptorRows = isMxfp4 ? 128U : mm1L1TileN_;
@@ -1230,7 +1233,7 @@ ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext* con
                                               "atten_mask is not supported yet and must be nullptr");
         return ge::GRAPH_FAILED;
     }
-    if (IsMxfp8()) {
+    if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
         return CheckMxfp8Scales(context);
     }
     if (dataType_ == ge::DT_INT8) {
@@ -1277,25 +1280,63 @@ ge::graphStatus GBSATiling::CheckMxfp8Scales(gert::TilingContext* context)
 {
     const auto& qShape = context->GetInputShape(QUERY_INDEX)->GetStorageShape();
     const auto& kShape = context->GetInputShape(KEY_INDEX)->GetOriginShape();
-    // The trailing pair packs two independent group-of-32 E8M0 scales.
-    // V is per-channel: the caller repeats each channel scale over the sequence groups.
-    const auto checkScale = [&](int index, ge::DataType dtype, const std::vector<int64_t>& dimensions) -> bool {
-        const auto* shape = context->GetOptionalInputShape(index);
-        const auto* desc = context->GetOptionalInputDesc(index);
-        if (shape == nullptr || desc == nullptr || desc->GetDataType() != dtype ||
-            shape->GetStorageShape().GetDimNum() != dimensions.size()) {
-            OP_LOGE(context->GetNodeName(), "MXFP8 scale input %d is missing or has invalid dtype/rank.", index);
+    const auto checkShape = [context](const char* name, const gert::Shape& shape,
+                                      const std::vector<int64_t>& dimensions) -> bool {
+        if (shape.GetDimNum() != dimensions.size()) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), name, std::to_string(shape.GetDimNum()).c_str(),
+                                         std::to_string(dimensions.size()).c_str());
             return false;
         }
-        size_t axis = 0;
-        for (const int64_t expected : dimensions) {
-            if (shape->GetStorageShape().GetDim(axis) != expected) {
-                OP_LOGE(context->GetNodeName(), "MXFP8 scale input %d dim %zu must be %ld.", index, axis, expected);
+        for (size_t axis = 0; axis < dimensions.size(); ++axis) {
+            if (shape.GetDim(axis) != dimensions[axis]) {
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context->GetNodeName(), name,
+                    ("dim[" + std::to_string(axis) + "]=" + std::to_string(shape.GetDim(axis))).c_str(),
+                    ("A8C8 requires dim[" + std::to_string(axis) + "]=" + std::to_string(dimensions[axis])).c_str());
                 return false;
             }
-            ++axis;
         }
         return true;
+    };
+    if (returnSoftmaxlse_) {
+        constexpr uint32_t lseIndex = 1U;
+        const auto* desc = context->GetOutputDesc(lseIndex);
+        const auto* outputShape = context->GetOutputShape(lseIndex);
+        if (desc == nullptr || outputShape == nullptr) {
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "softmaxLse",
+                                                     "A8C8 requires this output when returnSoftmaxlse=1");
+            return ge::GRAPH_FAILED;
+        }
+        if (desc->GetDataType() != ge::DT_FLOAT) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "softmaxLse",
+                                                  ge::TypeUtils::DataTypeToSerialString(desc->GetDataType()).c_str(),
+                                                  "A8C8 requires FLOAT32");
+            return ge::GRAPH_FAILED;
+        }
+        const std::vector<int64_t> dimensions = layoutQ_ == "TND" ?
+                                                    std::vector<int64_t>{qShape.GetDim(0), numHeads_, 1} :
+                                                    std::vector<int64_t>{qShape.GetDim(0), numHeads_, qSeqCapacity_, 1};
+        if (!checkShape("softmaxLse", outputShape->GetStorageShape(), dimensions)) {
+            return ge::GRAPH_FAILED;
+        }
+    }
+    // The trailing pair packs two independent group-of-32 E8M0 scales.
+    // V is per-channel: the caller repeats each channel scale over the sequence groups.
+    const auto checkScale = [&](int index, const char* name, ge::DataType dtype,
+                                const std::vector<int64_t>& dimensions) -> bool {
+        const auto* shape = context->GetOptionalInputShape(index);
+        const auto* desc = context->GetOptionalInputDesc(index);
+        if (shape == nullptr || desc == nullptr) {
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), name, "A8C8 scale must be provided");
+            return false;
+        }
+        if (desc->GetDataType() != dtype) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                context->GetNodeName(), name, ge::TypeUtils::DataTypeToSerialString(desc->GetDataType()).c_str(),
+                dtype == ge::DT_FLOAT ? "A8C8 requires FLOAT32" : "A8C8 requires FLOAT8_E8M0");
+            return false;
+        }
+        return checkShape(name, shape->GetStorageShape(), dimensions);
     };
     const auto packedDimensions = [this](const gert::Shape& shape) {
         std::vector<int64_t> dimensions;
@@ -1312,13 +1353,13 @@ ge::graphStatus GBSATiling::CheckMxfp8Scales(gert::TilingContext* context)
         !isPaged_ ? std::vector<int64_t>{batch_, kvHeads_, embeddingSize_, 2} :
                     (isPaBnbd_ ? std::vector<int64_t>{kShape.GetDim(0), kvHeads_, 2, embeddingSize_, 2} :
                                  std::vector<int64_t>{kShape.GetDim(0), 2, kvHeads_, embeddingSize_, 2});
-    if (!checkScale(Q_DEQUANT_SCALE_INDEX, ge::DT_FLOAT8_E8M0, packedDimensions(qShape)) ||
-        !checkScale(K_DEQUANT_SCALE_INDEX, ge::DT_FLOAT8_E8M0, packedDimensions(kShape)) ||
-        !checkScale(V_DEQUANT_SCALE_INDEX, ge::DT_FLOAT8_E8M0, vDimensions)) {
+    if (!checkScale(Q_DEQUANT_SCALE_INDEX, "q_dequant_scale", ge::DT_FLOAT8_E8M0, packedDimensions(qShape)) ||
+        !checkScale(K_DEQUANT_SCALE_INDEX, "k_dequant_scale", ge::DT_FLOAT8_E8M0, packedDimensions(kShape)) ||
+        !checkScale(V_DEQUANT_SCALE_INDEX, "v_dequant_scale", ge::DT_FLOAT8_E8M0, vDimensions)) {
         return ge::GRAPH_FAILED;
     }
     if (context->GetOptionalInputShape(P_QUANT_SCALE_INDEX) != nullptr &&
-        !checkScale(P_QUANT_SCALE_INDEX, ge::DT_FLOAT, {1})) {
+        !checkScale(P_QUANT_SCALE_INDEX, "p_quant_scale", ge::DT_FLOAT, {1})) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -1399,6 +1440,12 @@ ge::graphStatus GBSATiling::ParseSequenceInputs(gert::TilingContext* context)
 
 ge::graphStatus GBSATiling::CheckSoftmaxPrecision(gert::TilingContext* context)
 {
+    if (quantType_ == GBSA_QUANT_TYPE_MXFP8 && softmaxPrecision_ != 0U) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "softmaxPrecision",
+                                              std::to_string(softmaxPrecision_).c_str(),
+                                              "MXFP8 only supports softmaxPrecision=0 (FP32 scores)");
+        return ge::GRAPH_FAILED;
+    }
     if (socVer_ == SOC_VER_950_CODE) {
         // SoftmaxUnion always runs FP32 S; require softmaxPrecision=0 for both
         // non-quant and FP8 union.
@@ -1694,7 +1741,7 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
         return CheckInt8Config(context);
     }
     // Preserve arch22 non-quant capabilities while adding arch35 MXFP8 and Union.
-    const bool isMxfp8 = IsMxfp8();
+    const bool isMxfp8 = quantType_ == GBSA_QUANT_TYPE_MXFP8;
     const bool isQuant = quantType_ != GBSA_QUANT_TYPE_NONE;
     const bool generalizedMxfp8 = socVer_ == SOC_VER_950_CODE && isMxfp8 && dataType_ == ge::DT_FLOAT8_E4M3FN;
     const bool highPrecisionFp8 = socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_FULL &&
@@ -1705,7 +1752,7 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
             context->GetNodeName(), "quantType and query/key/value dtype",
             ("quantType=" + std::to_string(quantType_) + ", dtype=" + std::to_string(static_cast<int32_t>(dataType_)))
                 .c_str(),
-            "Dense or batched layouts require FP16/BF16, Ascend 950 FP8/MXFP8, or Union");
+            "Dense or batched layouts require FP16/BF16, Ascend 950 high-precision FP8/MXFP8, or Union");
         return ge::GRAPH_FAILED;
     }
     const bool isFp8 = (dataType_ == ge::DT_FLOAT8_E4M3FN);
@@ -1813,38 +1860,156 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
     return ge::GRAPH_SUCCESS;
 }
 
-bool GBSATiling::IsMxfp8PackedPath() const
+GBSATiling::Mxfp8ConfigError GBSATiling::GetMxfp8ConfigError() const
 {
-    // Q layout controls output strides; KV layout independently controls Raw
-    // scale packing. Paged inputs retain 128-token pages and descriptor groups.
-    const bool qHeadMajor = layoutQ_ == "BNSD";
-    const bool headMajor = layoutKv_ == "BNSD" || layoutKv_ == "PA_BNBD";
-    const bool packedLayout =
-        (layoutQ_ == "TND" || layoutQ_ == "BSND" || qHeadMajor) &&
-        (isPaged_ ? blockSize_ == 128U && (layoutKv_ == "PA_BBND" || layoutKv_ == "PA_BNBD") : layoutKv_ == layoutQ_);
-    // TND has no fixed per-batch capacity in the shape. Bound addresses by
-    // total storage tokens; the kernel uses cuKv and optional sequsedKv per batch.
+    // Keep one side-effect-free predicate for validation and dispatch selection.
+    if (socVer_ != SOC_VER_950_CODE) {
+        return Mxfp8ConfigError::SOC_VERSION;
+    }
+    if (quantType_ != GBSA_QUANT_TYPE_MXFP8) {
+        return Mxfp8ConfigError::QUANT_TYPE;
+    }
+    if (batch_ == 0U) {
+        return Mxfp8ConfigError::BATCH;
+    }
+    if (layoutQ_ != "TND" && layoutQ_ != "BSND" && layoutQ_ != "BNSD") {
+        return Mxfp8ConfigError::Q_LAYOUT;
+    }
+    if (isPaged_) {
+        if (blockSize_ != 128U) {
+            return Mxfp8ConfigError::PAGE_SIZE;
+        }
+        if (layoutKv_ != "PA_BBND" && layoutKv_ != "PA_BNBD") {
+            return Mxfp8ConfigError::PAGED_KV_LAYOUT;
+        }
+    } else if (layoutKv_ != layoutQ_) {
+        return Mxfp8ConfigError::DENSE_KV_LAYOUT;
+    }
+    if (embeddingSize_ != 192U && embeddingSize_ != GBSA_TILE_SIZE_256) {
+        return Mxfp8ConfigError::HEAD_DIM;
+    }
+    if (blockShapeX_ != 1U) {
+        return Mxfp8ConfigError::BLOCK_X;
+    }
+    if (blockShapeY_ != 4U && blockShapeY_ != 8U && blockShapeY_ != 16U && blockShapeY_ != 32U && blockShapeY_ != 64U &&
+        blockShapeY_ != 128U) {
+        return Mxfp8ConfigError::BLOCK_Y;
+    }
+    // G=1..32 uses Q32/KV512; G=33..64 uses Q64/KV256. D reserves 256.
+    if (groupSize_ == 0U || groupSize_ > Mxfp8Tiling::MAX_GROUP_SIZE) {
+        return Mxfp8ConfigError::GROUP_SIZE;
+    }
+    // TND has no fixed per-batch capacity in the shape. Use total storage tokens
+    // for the nonempty check; the kernel reads cuKv/optional sequsedKv per batch.
     const uint64_t kvCapacity = isPaged_           ? static_cast<uint64_t>(maxBlocksPerBatch_) * blockSize_ :
                                 layoutKv_ == "TND" ? totalKvTokens_ :
                                                      kvSeqCapacity_;
+    if (kvCapacity == 0U) {
+        return Mxfp8ConfigError::KV_CAPACITY;
+    }
     const uint64_t kScaleRowBytes = static_cast<uint64_t>(kvHeads_) * (embeddingSize_ / 32U);
-    const uint32_t qTile = Mxfp8Tiling::QueryTileRows(groupSize_);
-    const uint32_t tile = Mxfp8Tiling::KvTileTokens(groupSize_);
-    return socVer_ == SOC_VER_950_CODE && IsMxfp8() && batch_ != 0U && packedLayout &&
-           (embeddingSize_ == 192U || embeddingSize_ == GBSA_TILE_SIZE_256) &&
-           (blockShapeY_ == 4U || blockShapeY_ == 8U) &&
-           // Both accepted precision values use FP32 scores. Value 1 remains
-           // a compatibility alias; ParseAttrs rejects values outside 0/1.
-           // D192 and D256 share both the four head-group tiers and D256 buffer
-           // capacity. Input/output and scale strides still use the actual D.
-           groupSize_ <= 128U && !returnSoftmaxlse_ && kvCapacity != 0U && kScaleRowBytes != 0U &&
-           kvCapacity * kvHeads_ <= UINT32_MAX / embeddingSize_ &&
-           // Output DataCopyPad's GM head stride is a uint32_t byte count.
-           (!qHeadMajor || static_cast<uint64_t>(qSeqCapacity_) * embeddingSize_ * sizeof(uint16_t) <= UINT32_MAX) &&
-           Mxfp8Tiling::StreamFits(kvHeads_, embeddingSize_, Mxfp8Tiling::RawTileTokens(tile), blockShapeY_,
-                                   headMajor) &&
-           Mxfp8Tiling::PipelineL1End(embeddingSize_, qTile, tile) <= Mxfp8Tiling::L1_DATA_CAPACITY &&
-           Mxfp8Tiling::PipelineUbEnd(embeddingSize_, tile, qTile) <= Mxfp8Tiling::UB_CAPACITY;
+    // Each complete GQA head group stays one task in either capacity tier.
+    const uint64_t tasksPerToken = kvHeads_;
+    if (kScaleRowBytes == 0U || tasksPerToken == 0U) {
+        return Mxfp8ConfigError::KV_HEADS;
+    }
+    if (totalQTokens_ > UINT32_MAX / tasksPerToken) {
+        return Mxfp8ConfigError::Q_TASK_CAPACITY;
+    }
+    // Output DataCopyPad's GM head stride is a uint32_t byte count.
+    if (layoutQ_ == "BNSD" && static_cast<uint64_t>(qSeqCapacity_) * embeddingSize_ * sizeof(uint16_t) > UINT32_MAX) {
+        return Mxfp8ConfigError::Q_HEAD_STRIDE;
+    }
+    if (Mxfp8Tiling::L1Bytes(groupSize_) > Mxfp8Tiling::L1_CAPACITY) {
+        return Mxfp8ConfigError::L1_CAPACITY;
+    }
+    if (Mxfp8Tiling::UbBytes(groupSize_) > Mxfp8Tiling::UB_CAPACITY) {
+        return Mxfp8ConfigError::UB_CAPACITY;
+    }
+    return Mxfp8ConfigError::NONE;
+}
+
+bool GBSATiling::IsMxfp8FullTilePath() const
+{
+    return GetMxfp8ConfigError() == Mxfp8ConfigError::NONE;
+}
+
+void GBSATiling::LogMxfp8ConfigError(gert::TilingContext* context, Mxfp8ConfigError error) const
+{
+    const auto logValue = [context](const char* name, auto value, const char* reason) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), name, std::to_string(value).c_str(), reason);
+    };
+    switch (error) {
+        case Mxfp8ConfigError::SOC_VERSION:
+            logValue("socVersion", socVer_, "A8C8 requires Ascend 950PR/950DT");
+            break;
+        case Mxfp8ConfigError::QUANT_TYPE:
+            logValue("quantType", quantType_, "A8C8 requires quantType=6");
+            break;
+        case Mxfp8ConfigError::BATCH:
+            logValue("batch", batch_, "A8C8 requires batch > 0");
+            break;
+        case Mxfp8ConfigError::Q_LAYOUT:
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "q_input_layout", layoutQ_.c_str(),
+                                                  "A8C8 supports TND, BSND or BNSD");
+            break;
+        case Mxfp8ConfigError::DENSE_KV_LAYOUT:
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "q_input_layout and kv_input_layout",
+                                                   (layoutQ_ + "/" + layoutKv_).c_str(),
+                                                   "A8C8 nonpaged KV must use the same layout as query");
+            break;
+        case Mxfp8ConfigError::PAGED_KV_LAYOUT:
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "kv_input_layout", layoutKv_.c_str(),
+                                                  "A8C8 paged KV supports PA_BBND or PA_BNBD");
+            break;
+        case Mxfp8ConfigError::PAGE_SIZE:
+            logValue("blockSize", blockSize_, "A8C8 paged KV requires blockSize=128");
+            break;
+        case Mxfp8ConfigError::HEAD_DIM:
+            logValue("headDim", embeddingSize_, "A8C8 supports headDim=192 or 256");
+            break;
+        case Mxfp8ConfigError::BLOCK_X:
+            logValue("blockShapeX", blockShapeX_, "A8C8 requires blockShapeX=1");
+            break;
+        case Mxfp8ConfigError::BLOCK_Y:
+            logValue("blockShapeY", blockShapeY_, "A8C8 supports blockShapeY=4, 8, 16, 32, 64 or 128");
+            break;
+        case Mxfp8ConfigError::GROUP_SIZE:
+            logValue("groupSize", groupSize_,
+                     ("A8C8 requires groupSize in [1, " + std::to_string(Mxfp8Tiling::MAX_GROUP_SIZE) + "]").c_str());
+            break;
+        case Mxfp8ConfigError::KV_CAPACITY:
+            logValue("KV storage capacity", 0U, "A8C8 requires nonempty KV storage");
+            break;
+        case Mxfp8ConfigError::KV_HEADS:
+            logValue("numKeyValueHeads", kvHeads_, "A8C8 requires numKeyValueHeads > 0");
+            break;
+        case Mxfp8ConfigError::Q_TASK_CAPACITY:
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                context->GetNodeName(), "totalQTokens and numKeyValueHeads",
+                (std::to_string(totalQTokens_) + "/" + std::to_string(kvHeads_)).c_str(),
+                ("A8C8 requires totalQTokens * numKeyValueHeads <= " + std::to_string(UINT32_MAX)).c_str());
+            break;
+        case Mxfp8ConfigError::Q_HEAD_STRIDE:
+            OP_LOGE_FOR_INVALID_STRIDE(
+                context->GetNodeName(), "attentionOut head stride bytes",
+                std::to_string(static_cast<uint64_t>(qSeqCapacity_) * embeddingSize_ * sizeof(uint16_t)).c_str(),
+                ("at most " + std::to_string(UINT32_MAX) + " bytes for A8C8 BNSD output").c_str());
+            break;
+        case Mxfp8ConfigError::L1_CAPACITY:
+            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "A8C8 L1 layout exceeds capacity: %llu/%llu bytes.",
+                                        static_cast<unsigned long long>(Mxfp8Tiling::L1Bytes(groupSize_)),
+                                        static_cast<unsigned long long>(Mxfp8Tiling::L1_CAPACITY));
+            break;
+        case Mxfp8ConfigError::UB_CAPACITY:
+            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "A8C8 UB layout exceeds capacity: %llu/%llu bytes.",
+                                        static_cast<unsigned long long>(Mxfp8Tiling::UbBytes(groupSize_)),
+                                        static_cast<unsigned long long>(Mxfp8Tiling::UB_CAPACITY));
+            break;
+        case Mxfp8ConfigError::NONE:
+        default:
+            break;
+    }
 }
 
 uint64_t GBSATiling::GenerateTilingKey()
@@ -1878,7 +2043,7 @@ uint64_t GBSATiling::GenerateTilingKey()
     if (dataType_ == ge::DT_FLOAT16) {
         // +0
     } else if (dataType_ == ge::DT_BF16) {
-        tilingKey += 22220ULL;
+        tilingKey += GbsaTilingKeyEncoding::BF16_DTYPE_FIELD;
     } else if (dataType_ == ge::DT_FLOAT8_E4M3FN || dataType_ == ge::DT_FLOAT4_E2M1) {
         if (attentionOutDtype_ == ge::DT_FLOAT16) {
             tilingKey += GbsaTilingKeyEncoding::FP8_OUT_FP16_FIELD;
@@ -1924,7 +2089,7 @@ uint64_t GBSATiling::GenerateTilingKey()
     if (residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_FORCE) {
         tilingKey += GBSA_RESIDUAL_BLOCK_MODE_TILING_OFFSET;
     }
-    if (IsMxfp8()) {
+    if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
         tilingKey += GBSA_MXFP8_TILING_OFFSET;
     }
     // MXFP4 uses the same semantic key for LSE on/off across every layout,
@@ -2059,18 +2224,12 @@ ge::graphStatus GBSATiling::FillTilingData(gert::TilingContext* context)
     tilingData_->set_groupSize(groupSize_);
     uint64_t tilingKey = GenerateTilingKey();
     tilingData_->set_tilingKey(tilingKey);
-    const bool packed = IsMxfp8PackedPath();
+    const bool packed = IsMxfp8FullTilePath();
     // Both precision values select the same FP32-S grouped kernel. Preserve
     // the requested precision in metadata/tiling validation and retain the keys.
-    const bool coalescedPipeline = packed && !isPaged_ && embeddingSize_ == GBSA_TILE_SIZE_256 && blockShapeY_ == 4U &&
-                                   maskType_ == 1U && qSeqCapacity_ == kvSeqCapacity_ &&
-                                   qSeqCapacity_ >= GBSA_MXFP8_COALESCED_PREFILL_MIN_TOKENS &&
-                                   qSeqCapacity_ <= GBSA_MXFP8_COALESCED_PREFILL_MAX_TOKENS;
     const bool headMajor = layoutQ_ == "BNSD";
-    uint64_t pipelineDispatch = headMajor ? (coalescedPipeline ? GBSA_MXFP8_BNSD_COALESCED_PIPELINE_DISPATCH_BASE :
-                                                                 GBSA_MXFP8_BNSD_PIPELINE_DISPATCH_BASE) :
-                                            (coalescedPipeline ? GBSA_MXFP8_COALESCED_PIPELINE_DISPATCH_BASE :
-                                                                 GBSA_MXFP8_SCALE_PIPELINE_DISPATCH_BASE);
+    uint64_t pipelineDispatch =
+        headMajor ? GBSA_MXFP8_BNSD_PIPELINE_DISPATCH_BASE : GBSA_MXFP8_SCALE_PIPELINE_DISPATCH_BASE;
     if (layoutQ_ == "TND") {
         pipelineDispatch =
             isPaged_ ? (isPaBnbd_ ? GBSA_MXFP8_TND_PA_BNBD_DISPATCH_BASE : GBSA_MXFP8_TND_PA_BBND_DISPATCH_BASE) :
@@ -2079,6 +2238,13 @@ ge::graphStatus GBSATiling::FillTilingData(gert::TilingContext* context)
         pipelineDispatch =
             headMajor ? (isPaBnbd_ ? GBSA_MXFP8_BNSD_PA_BNBD_DISPATCH_BASE : GBSA_MXFP8_BNSD_PA_BBND_DISPATCH_BASE) :
                         (isPaBnbd_ ? GBSA_MXFP8_BSND_PA_BNBD_DISPATCH_BASE : GBSA_MXFP8_BSND_PA_BBND_DISPATCH_BASE);
+    }
+    // Keep mode=0 binaries independent from the implicit-tail specialization.
+    if (packed && residualBlockMode_ == GBSA_RESIDUAL_BLOCK_MODE_FORCE) {
+        pipelineDispatch += GBSA_MXFP8_RESIDUAL_DISPATCH_OFFSET;
+    }
+    if (packed && qBaseTile_ == 64U) {
+        pipelineDispatch += GBSA_MXFP8_Q64_DISPATCH_OFFSET;
     }
     const uint64_t dispatchKey =
         packed ? pipelineDispatch + (attentionOutDtype_ == ge::DT_FLOAT16 ? 0U : 1U) : tilingKey;
@@ -2139,19 +2305,12 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
     if (CheckMetadata(context) != ge::GRAPH_SUCCESS || CheckReservedOptionalInputs(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    if (IsMxfp8() && !IsMxfp8PackedPath()) {
-        OP_LOGE(context->GetNodeName(),
-                "Unsupported MXFP8 configuration: only grouped packed execution is supported; "
-                "Fragment fallback has been removed. Requires nonempty B/KV, TND/BSND/BNSD Q with matching dense KV "
-                "or PA_BBND/PA_BNBD KV (128-token contiguous pages), "
-                "TND cuSeqLengths for storage prefixes (optional seqused for actual lengths), "
-                "D192/256 groupSize<=128, softmaxPrecision=0/1 (FP32 scores), "
-                "returnSoftmaxlse=false, and blockY=4/8. "
-                "Address and UB capacity limits must also be satisfied. "
-                "Got B=%u, Sq=%u, Skv=%u, D=%u, blockY=%u, groupSize=%u, layouts=%s/%s, precision=%u, LSE=%u.",
-                batch_, qSeqCapacity_, kvSeqCapacity_, embeddingSize_, blockShapeY_, groupSize_, layoutQ_.c_str(),
-                layoutKv_.c_str(), static_cast<uint32_t>(softmaxPrecision_), static_cast<uint32_t>(returnSoftmaxlse_));
-        return ge::GRAPH_FAILED;
+    if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
+        const auto error = GetMxfp8ConfigError();
+        if (error != Mxfp8ConfigError::NONE) {
+            LogMxfp8ConfigError(context, error);
+            return ge::GRAPH_FAILED;
+        }
     }
     if (socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_FULL && maskType_ == GBSA_MASK_TYPE_UNION) {
         // FP8 union: only specialize tiles when GQA would select qBaseTile=128.
@@ -2160,7 +2319,7 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
             CalcBaseTileTilingParams950();
         }
         CalcMatmulPhaseL1TileInfo950();
-    } else if (socVer_ == SOC_VER_950_CODE && !IsMxfp8()) {
+    } else if (socVer_ == SOC_VER_950_CODE && quantType_ != GBSA_QUANT_TYPE_MXFP8) {
         CalcBaseTileTilingParams950();
         CalcMatmulPhaseL1TileInfo950();
         if (quantType_ == GBSA_QUANT_TYPE_A8C4) {
@@ -2193,20 +2352,17 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
             const bool smallM = groupSize_ <= GBSA_TILE_SIZE_16 && blockShapeX_ == 1U;
             kvBaseTile_ = smallM && embeddingSize_ <= GBSA_TILE_SIZE_256 ? GBSA_TILE_SIZE_512 : GBSA_TILE_SIZE_256;
         }
-    } else if (IsMxfp8()) {
-        qBaseTile_ = Mxfp8Tiling::QueryTileRows(groupSize_);
-        kvBaseTile_ = Mxfp8Tiling::KvTileTokens(groupSize_);
+    } else if (quantType_ == GBSA_QUANT_TYPE_MXFP8) {
+        qBaseTile_ = Mxfp8Tiling::QueryTile(groupSize_);
+        kvBaseTile_ = Mxfp8Tiling::KvTile(groupSize_);
         mm1L1TileM_ = qBaseTile_;
-        // QK streams 1/2/4 K groups through three physical L1 slots.
-        // P/V retain the full 128/256/512-token logical tile selected by the head group.
-        mm1L1TileN_ = Mxfp8Tiling::GROUP_TOKENS;
-        mm1L1TileKLeft_ = Mxfp8Tiling::BufferDim(embeddingSize_);
-        mm1L1TileKRight_ = mm1L1TileKLeft_;
+        mm1L1TileN_ = kvBaseTile_;
+        mm1L1TileKLeft_ = mm1L1TileKRight_ = Mxfp8Tiling::CAPACITY_DIM;
         mm2L1TileM_ = qBaseTile_;
-        mm2L1TileN_ = Mxfp8Tiling::BufferDim(embeddingSize_);
-        mm2L1TileKLeft_ = kvBaseTile_;
-        mm2L1TileKRight_ = kvBaseTile_;
-        kL1BufNum_ = 3U;
+        mm2L1TileN_ = Mxfp8Tiling::CAPACITY_DIM;
+        mm2L1TileKLeft_ = mm2L1TileKRight_ = kvBaseTile_;
+        qL1BufNum_ = kL1BufNum_ = 1U;
+        pL1BufNum_ = Mxfp8Tiling::P_STAGES;
         vL1BufNum_ = 2U;
     }
     // SoftmaxUnion adds exact-mask UB cost beyond regular 950 packing. Keep the

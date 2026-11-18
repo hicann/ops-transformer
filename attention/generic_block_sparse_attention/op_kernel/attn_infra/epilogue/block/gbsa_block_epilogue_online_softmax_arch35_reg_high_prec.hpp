@@ -30,9 +30,7 @@ public:
     using ElementInput = float;
     using LayoutOutput = typename OutputType_::Layout;
 
-    static constexpr bool FULL_QUANT_FP8 = AscendC::IsSameType<ElementOutput, fp8_e4m3fn_t>::value;
-    static constexpr uint32_t ELE_NUM_PER_C0 = FULL_QUANT_FP8 ? 32U : 16U;
-    static constexpr uint32_t SCORE_COL_ALIGNMENT = 16U;
+    static constexpr uint32_t ELE_NUM_PER_C0 = 16;
     static constexpr uint32_t C0_NUM_PER_FRACTAL = 16;
     static constexpr uint32_t FLOAT_VECTOR_SIZE = 64;
     static constexpr uint32_t SM_ROW_MAX_ELEM_NUM = 64;
@@ -68,11 +66,6 @@ public:
 
     __aicore__ inline ~BlockEpilogue() {}
 
-    __aicore__ inline void SetPQuantScale(float scale)
-    {
-        pQuantScale = scale;
-    }
-
     template <class TensorDst, class TensorSrc>
     __aicore__ inline void CopyPUbToPL1(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t m)
     {
@@ -105,7 +98,7 @@ public:
     template <class TensorP>
     __aicore__ inline void operator()(TensorP& l1PTensorTla, GemmCoord actualBlockShape, uint32_t isFirstKvSTile,
                                       uint32_t ubSBufId, uint32_t l1PBufId, Arch::CrossCoreFlag mm1ToSmFlag,
-                                      Arch::CrossCoreFlag smToMm2Flag, uint32_t paddedPColumns = 0U)
+                                      Arch::CrossCoreFlag smToMm2Flag)
     {
         uint32_t mCopyOffset = RoundUp(actualBlockShape.m(), 2) / 2;
         uint32_t m = actualBlockShape.m() < mCopyOffset ? actualBlockShape.m() : mCopyOffset;
@@ -120,9 +113,7 @@ public:
 
         uint32_t n = actualBlockShape.n();
         uint16_t mRound = RoundUp(m, C0_NUM_PER_FRACTAL);
-        uint16_t nRound = RoundUp(n, SCORE_COL_ALIGNMENT);
-        const uint32_t copyN =
-            FULL_QUANT_FP8 ? (paddedPColumns != 0U ? paddedPColumns : RoundUp(n, FLOAT_VECTOR_SIZE)) : n;
+        uint16_t nRound = RoundUp(n, ELE_NUM_PER_C0);
         uint32_t blockStride = mRound;
         uint16_t nLoop = n / P_STORE_COL_COUNT;
         const uint32_t tailCols = n % P_STORE_COL_COUNT;
@@ -147,33 +138,23 @@ public:
         }
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(ubSBufId + 2);
-        if constexpr (FULL_QUANT_FP8) {
-            if (isFirstKvSTile) {
-                ComputePAndUpdateSumFP8<true>(pUbAddr, sUbAddr, gmUbAddr, glUbAddr, dmUbAddr, m, n, blockStride, nRound,
-                                              copyN, pQuantScale);
-            } else {
-                ComputePAndUpdateSumFP8<false>(pUbAddr, sUbAddr, gmUbAddr, glUbAddr, dmUbAddr, m, n, blockStride,
-                                               nRound, copyN, pQuantScale);
-            }
+        if (isFirstKvSTile) {
+            ComputePAndUpdateSum<true>(pUbAddr, sUbAddr, gmUbAddr, glUbAddr, dmUbAddr, m, firstTail, secondTail,
+                                       tailCols, blockStride, nRound, nLoop, hasNTail, hasSecondTail);
         } else {
-            if (isFirstKvSTile) {
-                ComputePAndUpdateSum<true>(pUbAddr, sUbAddr, gmUbAddr, glUbAddr, dmUbAddr, m, firstTail, secondTail,
-                                           tailCols, blockStride, nRound, nLoop, hasNTail, hasSecondTail);
-            } else {
-                ComputePAndUpdateSum<false>(pUbAddr, sUbAddr, gmUbAddr, glUbAddr, dmUbAddr, m, firstTail, secondTail,
-                                            tailCols, blockStride, nRound, nLoop, hasNTail, hasSecondTail);
-            }
+            ComputePAndUpdateSum<false>(pUbAddr, sUbAddr, gmUbAddr, glUbAddr, dmUbAddr, m, firstTail, secondTail,
+                                        tailCols, blockStride, nRound, nLoop, hasNTail, hasSecondTail);
         }
 
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(ubSBufId);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(ubSBufId);
         SetCrossCoreSync<4, PIPE_V>(mm1ToSmFlag);
 
-        auto ubPLayoutTla = tla::MakeLayout<ElementOutput, LayoutOutput>(mRound, FULL_QUANT_FP8 ? copyN : nRound);
+        auto ubPLayoutTla = tla::MakeLayout<ElementOutput, LayoutOutput>(mRound, nRound);
         auto ubPTensorTla = tla::MakeTensor(lpUbTensor[ubSBufId], ubPLayoutTla, Arch::PositionUB{});
-        auto ubPTensorTlaTile = GetTile(ubPTensorTla, tla::MakeCoord(0, 0), tla::MakeShape(m, copyN));
+        auto ubPTensorTlaTile = GetTile(ubPTensorTla, tla::MakeCoord(0, 0), tla::MakeShape(m, n));
         auto l1PTensorTlaTile =
-            GetTile(l1PTensorTla, tla::MakeCoord(subBlockIdx_ * mCopyOffset, 0), tla::MakeShape(m, copyN));
+            GetTile(l1PTensorTla, tla::MakeCoord(subBlockIdx_ * mCopyOffset, 0), tla::MakeShape(m, n));
         WaitCrossCoreSync<4, PIPE_MTE3>(smToMm2Flag);
         CopyPUbToPL1(l1PTensorTlaTile, ubPTensorTlaTile, m);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(ubSBufId + 2);
@@ -258,8 +239,11 @@ private:
                                                         uint16_t hasSecondTail)
     {
         using namespace AscendC::Reg;
+        constexpr auto roundMode = AscendC::IsSameType<ElementOutput, fp8_e4m3fn_t>::value ?
+                                       AscendC::RoundMode::CAST_RINT :
+                                       AscendC::RoundMode::CAST_ROUND;
         constexpr static CastTrait castTraitZeroRound = {RegLayout::ZERO, SatMode::SAT, MaskMergeMode::ZEROING,
-                                                         AscendC::RoundMode::CAST_ROUND};
+                                                         roundMode};
         RegTensor<float> sVreg0;
         RegTensor<float> sVreg1;
         RegTensor<float> pVreg0;
@@ -329,90 +313,8 @@ private:
         vstas(glUreg, glUb, 0, POST_UPDATE);
     }
 
-    // Keep the normalization statistics in FP32. Only the P operand sent to
-    // PV is scaled and quantized, with zeroes in all padded MXFP8 columns.
-    template <bool IsFirstKvSTile>
-    static __simd_vf__ inline void ComputePAndUpdateSumFP8(__ubuf__ ElementOutput* pUb, __ubuf__ float* sUb,
-                                                           __ubuf__ float* gmUb, __ubuf__ float* glUb,
-                                                           __ubuf__ float* dmUb, uint16_t m, uint32_t n,
-                                                           uint32_t blockStride, uint16_t s2BaseSize,
-                                                           uint32_t paddedColumns, float pScale)
-    {
-        using namespace AscendC::Reg;
-        constexpr static CastTrait castTraitZeroRint = {RegLayout::ZERO, SatMode::SAT, MaskMergeMode::ZEROING,
-                                                        AscendC::RoundMode::CAST_RINT};
-        RegTensor<float> sVreg;
-        RegTensor<float> pVreg0;
-        RegTensor<float> pVreg1;
-        RegTensor<float> zeroVreg;
-        RegTensor<float> sumVreg;
-        RegTensor<float> llVreg;
-        RegTensor<float> hmVreg;
-        RegTensor<float> dmVreg;
-        RegTensor<float> glVreg;
-        RegTensor<ElementOutput> quantizedVreg0;
-        RegTensor<ElementOutput> quantizedVreg1;
-        RegTensor<ElementOutput> packedVreg;
-        RegTensor<ElementOutput> packedTmpVreg;
-        UnalignReg glUreg;
-        MaskReg full = CreateMask<float, MaskPattern::ALL>();
-        Duplicate(zeroVreg, 0.0f);
-        const uint16_t columnLoops = (n + P_STORE_COL_COUNT - 1U) / P_STORE_COL_COUNT;
-        for (uint16_t i = 0; i < m; ++i) {
-            LoadAlign<float, LoadDist::DIST_BRC_B32>(hmVreg, gmUb + i);
-            Duplicate(sumVreg, 0.0f);
-            for (uint16_t j = 0; j < columnLoops; ++j) {
-                const uint32_t columnOffset = j * P_STORE_COL_COUNT;
-                const uint32_t remaining = n - columnOffset;
-                uint32_t firstColumns = remaining < FLOAT_VECTOR_SIZE ? remaining : FLOAT_VECTOR_SIZE;
-                uint32_t secondColumns = remaining > FLOAT_VECTOR_SIZE ? remaining - FLOAT_VECTOR_SIZE : 0U;
-                secondColumns = secondColumns < FLOAT_VECTOR_SIZE ? secondColumns : FLOAT_VECTOR_SIZE;
-                uint32_t storedColumns = paddedColumns - columnOffset;
-                storedColumns = storedColumns < P_STORE_COL_COUNT ? storedColumns : P_STORE_COL_COUNT;
-                MaskReg firstMask = UpdateMask<float>(firstColumns);
-                MaskReg secondMask = UpdateMask<float>(secondColumns);
-                MaskReg storeMask = UpdateMask<uint8_t>(storedColumns);
-
-                LoadAlign(sVreg, sUb + i * s2BaseSize + columnOffset);
-                FusedExpSub(pVreg0, sVreg, hmVreg, firstMask);
-                Select(pVreg0, pVreg0, zeroVreg, firstMask);
-                Duplicate(pVreg1, 0.0f);
-                if (remaining > FLOAT_VECTOR_SIZE) {
-                    LoadAlign(sVreg, sUb + i * s2BaseSize + columnOffset + FLOAT_VECTOR_SIZE);
-                    FusedExpSub(pVreg1, sVreg, hmVreg, secondMask);
-                    Select(pVreg1, pVreg1, zeroVreg, secondMask);
-                }
-                Add(sumVreg, sumVreg, pVreg0, full);
-                Add(sumVreg, sumVreg, pVreg1, full);
-                Muls(pVreg0, pVreg0, pScale, full);
-                Muls(pVreg1, pVreg1, pScale, full);
-                Cast<ElementOutput, float, castTraitZeroRint>(quantizedVreg0, pVreg0, full);
-                Cast<ElementOutput, float, castTraitZeroRint>(quantizedVreg1, pVreg1, full);
-                // FP32 registers hold consecutive columns. Compact their
-                // 32-bit cast slots to 16-bit slots, then to contiguous bytes.
-                DeInterleave((RegTensor<uint16_t>&)packedVreg, (RegTensor<uint16_t>&)packedTmpVreg,
-                             (RegTensor<uint16_t>&)quantizedVreg0, (RegTensor<uint16_t>&)quantizedVreg1);
-                DeInterleave(quantizedVreg0, quantizedVreg1, packedVreg, packedVreg);
-                StoreAlign<ElementOutput, DataCopyMode::DATA_BLOCK_COPY>(
-                    pUb + i * ELE_NUM_PER_C0 + columnOffset * blockStride, quantizedVreg0, blockStride, storeMask);
-            }
-            ReduceSum(llVreg, sumVreg, full);
-            if constexpr (IsFirstKvSTile) {
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(glUb, llVreg, glUreg, 1);
-            } else {
-                LoadAlign<float, LoadDist::DIST_BRC_B32>(dmVreg, dmUb + i);
-                LoadAlign<float, LoadDist::DIST_BRC_B32>(glVreg, glUb);
-                Mul(glVreg, glVreg, dmVreg, full);
-                Add(glVreg, glVreg, llVreg, full);
-                StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(glUb, glVreg, glUreg, 1);
-            }
-        }
-        vstas(glUreg, glUb, 0, POST_UPDATE);
-    }
-
 private:
     float scaleValue;
-    float pQuantScale = 448.0f;
     AscendC::LocalTensor<float> lsUbTensor[UB_S_P_BUF_STAGES];
     AscendC::LocalTensor<ElementOutput> lpUbTensor[UB_S_P_BUF_STAGES];
     AscendC::LocalTensor<float> lmUbTensor;

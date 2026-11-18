@@ -28,7 +28,7 @@ __aicore__ inline uint32_t HashConfigValue(uint32_t hash, uint32_t value)
     return hash;
 }
 
-template <bool isCausal = true>
+template <bool isCausal = true, uint32_t QuantType = 0U>
 __aicore__ inline uint32_t CalculateConfigSignature(
     const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
 {
@@ -55,6 +55,9 @@ __aicore__ inline uint32_t CalculateConfigSignature(
 #endif
         hash = HashConfigValue(hash, 0U);
     }
+    if constexpr (QuantType == 6U) {
+        hash = HashConfigValue(hash, QuantType);
+    }
     return hash;
 }
 
@@ -63,7 +66,7 @@ __aicore__ inline bool ValidateMetadata(__gm__ const GbsaMetadata::Metadata* met
                                         const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData,
                                         uint32_t physicalAicNum, uint32_t* validatedFlags = nullptr)
 {
-    uint32_t signature = CalculateConfigSignature<isCausal>(tilingData);
+    uint32_t signature = CalculateConfigSignature<isCausal, QuantType>(tilingData);
     if constexpr (QuantType == GBSA_QUANT_TYPE_A4C4) {
         signature = HashConfigValue(signature, QuantType);
     }
@@ -87,7 +90,7 @@ __aicore__ inline bool ValidateMetadata(__gm__ const GbsaMetadata::Metadata* met
     if ((flags & GbsaMetadata::FD_SCHEDULE_ENABLED) == 0U) {
         return meta->fdActiveCoreNum == 0 && meta->combineTaskNum == 0 && meta->fdPartialTaskNum == 0;
     }
-    if constexpr (QuantType == GBSA_QUANT_TYPE_A4C4) {
+    if constexpr (QuantType == GBSA_QUANT_TYPE_A4C4 || QuantType == 6U) {
         if (tilingData->fdStaticEnabled == 0U) {
             return false;
         }

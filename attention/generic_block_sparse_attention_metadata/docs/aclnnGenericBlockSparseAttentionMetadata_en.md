@@ -287,7 +287,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>quantType</td>
       <td>Input</td>
       <td>Represents the quantization method used.</td>
-      <td>Quantization type: 0 for non-quantized inputs, 4 for Ascend 950PR&950DT products A4C4 (MXFP4 CX), 5 for FP8 on Ascend 950PR&950DT products, 6 for MXFP8 on Ascend 950PR&950DT products, 7 for INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, and 8 for A8C4 on Ascend 950PR&950DT products. Values 1, 2, and 3 are reserved and unsupported. See product-specific constraints.</td>
+      <td>Quantization type: 0 for non-quantized inputs, 4 for Ascend 950PR&950DT products A4C4 (MXFP4 CX), 5 for Ascend 950PR&950DT products FP8, 6 for Ascend 950PR&950DT products A8C8, 7 for <term>Atlas A2 products</term> and <term>Atlas A3 products</term> INT8, and 8 for Ascend 950PR&950DT products A8C4. Values 1, 2, and 3 are reserved and unsupported. See product-specific constraints.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -577,6 +577,14 @@ On Ascend 950PR and 950DT, use headDim=128, blockShape=[1,128], a GQA group size
 A8C4 limits `maxQSeqLen` to 16. For TND, the actual Q sequence length is also limited to 16 per batch item. `numQHeads` must not exceed INT32_MAX. For PA_BBND, BSND, and TND KV layouts, `numKvHeads` must be at most five. This five-head limit does not apply to BNSD or PA_BNBD.
 
 The sparse-index capacity limit is INT32_MAX. Existing index, count, and scheduling overflow constraints apply.
+
+### A8C8 metadata (quantType=6)
+
+On <term>Ascend 950PR&950DT products</term>, A8C8 supports `headDim=192/256`, `blockShape=[1,Y]` with Y in {4,8,16,32,64,128}, and a GQA group size of 1 to 64. Q supports `TND`, `BSND`, and `BNSD`; KV uses the same nonpaged layout or `PA_BBND`/`PA_BNBD` with 128-token pages. `maskType=0/1` and `residualBlockMode=0/1` are supported. Metadata rejects other head dimensions or sparse block sizes with `ACLNN_ERR_PARAM_INVALID`.
+
+A8C8 requires `softmaxPrecision=0` (FP32 scores and Softmax); value 1 is rejected. The Attention operator optionally returns FP32 LSE with `returnSoftmaxlse=1`. Metadata has no LSE switch; use matching precision, layouts, sparse inputs, and sequence lengths in both APIs. Metadata does not read Q/K/V or their scales; its validation does not replace the Attention operator's scale, address, and buffer-capacity checks. See the [A8C8 quantization contract](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#a8c8quanttype6) for scale shapes and types.
+
+With `residualBlockMode=1`, the explicit count includes only visible complete blocks. Metadata adds an implicit partial tail when needed without increasing the sparse-index capacity. FD scheduling covers the explicit blocks and this tail, and estimates work from the actual effective count and blockShapeY. GQA group sizes of 1 to 32 use KV512; sizes of 33 to 64 use KV256. If the work is too small for FD, ordinary scheduling is retained.
 
 <a name="a4c4metadataquanttype4"></a>
 
