@@ -8,10 +8,10 @@
 - <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Not supported
+- <term>Atlas A3 products</term>: Supported
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 products</term>: Not supported
+- <term>Atlas A2 products</term>: Supported
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 inference products</term>: Not supported
@@ -95,13 +95,13 @@ cann_ops_transformer.kv_quant_sparse_flash_attention(
 
 | Name | Type | Required/Optional | Description | Data Type | Data Format | Dimension |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| query | Tensor | Required | Q input of the attention structure. Non-contiguous input is not supported. The input is obtained by concatenating `q_nope` and `q_rope` of the same data type along dimension D. The shape is `(B, Q_S, Q_N, Q_D)` when `layout_query` is `BSND`, and `(Q_T, Q_N, Q_D)` when `layout_query` is `TND`. Q_D supports only 576, that is, q_nope+q_rope=512+64. Q_N supports 1/2/4/8/16/32/48/64/128. | float16, bfloat16 | ND | `BSND`: (B, Q_S, Q_N, Q_D)<br>`TND`: (Q_T, Q_N, Q_D) |
-| key | Tensor | Required | K input of the attention structure. The input is obtained by concatenating `k_nope`, `k_rope` of the same data type as query, and quantization parameters of float32 along dimension D. The shape is `(B, KV_S, KV_N, KV_D)` when `layout_kv` is `BSND`, `(KV_T, KV_N, KV_D)` when `layout_kv` is `TND`, and `(block_num, block_size, KV_N, KV_D)` when `layout_kv` is `PA_BSND` (PageAttention), where block_size is a multiple of 16 and supports a maximum of 1024. KV_N supports only 1. KV_D supports only 656, that is, nope+rope*2+dequant_scale*4=512+64*2+4*4. | float8_e4m3, int8, hifloat8 | ND | `BSND`: (B, KV_S, KV_N, KV_D)<br>`TND`: (KV_T, KV_N, KV_D)<br>`PA_BSND`: (block_num, block_size, KV_N, KV_D) |
+| query | Tensor | Required | Q input of the attention structure. Non-contiguous input is not supported. The input is obtained by concatenating `q_nope` and `q_rope` of the same data type along dimension D. The shape is `(B, Q_S, Q_N, Q_D)` when `layout_query` is `BSND`, and `(Q_T, Q_N, Q_D)` when `layout_query` is `TND`. Q_D supports only 576, that is, q_nope+q_rope=512+64. Q_N supports 1 to 128. | float16, bfloat16 | ND | `BSND`: (B, Q_S, Q_N, Q_D)<br>`TND`: (Q_T, Q_N, Q_D) |
+| key | Tensor | Required | K input of the attention structure. The input is obtained by concatenating `k_nope`, `k_rope` of the same data type as query, and quantization parameters of float32 along dimension D. The shape is `(B, KV_S, KV_N, KV_D)` when `layout_kv` is `BSND`, `(KV_T, KV_N, KV_D)` when `layout_kv` is `TND`, and `(block_num, block_size, KV_N, KV_D)` when `layout_kv` is `PA_BSND` (PageAttention), where block_size is a multiple of 16 and supports a maximum of 1024. KV_N supports only 1. KV_D supports only 656 (per_tile quantization) or 386 (TQ4 quantization), where 656 = nope+rope*2+dequant_scale*4=512+64*2+4*4. | float8_e4m3, int8, hifloat8 | ND | `BSND`: (B, KV_S, KV_N, KV_D)<br>`TND`: (KV_T, KV_N, KV_D)<br>`PA_BSND`: (block_num, block_size, KV_N, KV_D) |
 | value | Tensor | Required | V input of the attention structure. The data type is the same as that of key. | float8_e4m3, int8, hifloat8 | ND | Same as key |
 | sparse_indices | Tensor | Required | Represents the indices for discrete access to kvCache. Non-contiguous input is not supported. The shape is `(B, Q_S, KV_N, sparse_size)` when `layout_query` is `BSND`, and `(Q_T, KV_N, sparse_size)` when `layout_query` is `TND`. In each row, valid values are in the first half, invalid values (-1) are in the second half, and sparse_size must be greater than 0. If key and value are of the hifloat8 type, sparse_size supports only 2048. | int32 | ND | `BSND`: (B, Q_S, KV_N, sparse_size)<br>`TND`: (Q_T, KV_N, sparse_size) |
 | scale_value | float | Required | Reciprocal of the square root of $d_k$ in the formula. Represents the scaling factor, used as the scalar value of Muls after the matrix multiplication of query and key. | float32 | - | - |
-| key_quant_mode | int64 | Required | Represents the quantization mode of key. Only 2 is supported, indicating the per_tile quantization mode. | int64 | - | - |
-| value_quant_mode | int64 | Required | Represents the quantization mode of value. Only 2 is supported, indicating the per_tile quantization mode. | int64 | - | - |
+| key_quant_mode | int64 | Required | Represents the quantization mode of key. Supports 2 (per_tile quantization mode) or 3 (TQ4 quantization mode). | int64 | - | - |
+| value_quant_mode | int64 | Required | Represents the quantization mode of value. Supports 2 (per_tile quantization mode) or 3 (TQ4 quantization mode). | int64 | - | - |
 | key_dequant_scale | Tensor | Optional | Reserved parameter. | - | - | - |
 | value_dequant_scale | Tensor | Optional | Reserved parameter. | - | - | - |
 | block_table | Tensor | Optional | Represents the block mapping table used for kvCache storage in PageAttention. The shape is `(B, ceil(KV_S_max/block_size))`, where the first dimension is B, and the second dimension is no less than the number of blocks corresponding to the maximum KV_S across all batches, that is, the rounded-up value of KV_S_max/block_size. | int32 | ND | (B, ceil(KV_S_max/block_size)) |
@@ -137,12 +137,24 @@ cann_ops_transformer.kv_quant_sparse_flash_attention(
 - This API can be called in single-operator mode.
 - In non-PageAttention use cases, `layout_query` and `layout_kv` must be set to the same value.
 - If `return_softmax_lse=False`, an empty float32 placeholder tensor of shape `[0]` is returned. If `return_softmax_lse=True`, the float32 softmax_max and softmax_sum results are returned.
+<!-- npu="950" id7 -->
 - <term>Ascend 950PR&950DT products</term>:
   - The data types of key and value support only float8_e4m3, int8, and hifloat8.
   - The parameter `sparse_block_size` supports only 1.
   - key supports non-contiguous axis 0 only when `layout_kv` is `PA_BSND`.
   - The optional input parameter sinks is supported.
   - If key/value is hifloat8, `sparse_size` (the last dimension of sparse_indices) supports only 2048.
+  - TQ4 INT4 mode (key\_quant\_mode=3, value\_quant\_mode=3) is not supported. If 3 is passed in, the tiling check rejects it.
+  - `rope_head_dim` supports only 64. If 0 is passed in, the tiling check rejects it.
+<!-- end id7 -->
+
+<!-- npu="A3,910b" id8 -->
+- <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
+  - Q_N of query supports 1 to 128.
+  - The data types of key and value support only int8.
+  - TQ4 INT4 mode (key\_quant\_mode=value\_quant\_mode=3) is supported. The KV_D of key/value is 386, and both quantization modes must be set to 3 at the same time. A TQ4 slot consists of 512 int4 values, 64 BF16 RoPE values, and 1 FP16 scale.
+  - When rope\_head\_dim is 0, only key\_quant\_mode=value\_quant\_mode=2, quant\_scale\_repo\_mode=1, and tile\_size=128 are supported. The Q_D of query is 512, and the KV_D of key/value is 528. Each slot consists of 512 INT8 values and 4 FLOAT32 scales.
+<!-- end id8 -->
 
 ## Deterministic Computation
 

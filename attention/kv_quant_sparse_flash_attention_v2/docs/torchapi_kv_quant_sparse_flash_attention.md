@@ -6,10 +6,10 @@
 - <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2推理产品</term>：不支持
@@ -93,13 +93,13 @@ cann_ops_transformer.kv_quant_sparse_flash_attention(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| query | Tensor | 必选 | attention结构的Q输入，不支持非连续。由相同数据类型的`q_nope`和`q_rope`按D维度拼接得到。`layout_query`为`BSND`时shape为`(B, Q_S, Q_N, Q_D)`；`layout_query`为`TND`时shape为`(Q_T, Q_N, Q_D)`。其中Q_D值仅支持576，即q_nope+q_rope=512+64；A2/A3 和 A5 的 V2 Q_N 支持 1-128；其他平台按对应约束。 | float16、bfloat16 | ND | `BSND`：(B, Q_S, Q_N, Q_D)<br>`TND`：(Q_T, Q_N, Q_D) |
-| key | Tensor | 必选 | attention结构的K输入。由`k_nope`、与query相同数据类型的`k_rope`和float32的量化参数按D维度拼接得到。`layout_kv`为`BSND`时shape为`(B, KV_S, KV_N, KV_D)`；`layout_kv`为`TND`时shape为`(KV_T, KV_N, KV_D)`；`layout_kv`为`PA_BSND`（PageAttention）时shape为`(block_num, block_size, KV_N, KV_D)`，其中block_size取值为16的整数倍，最大支持到1024。KV_N仅支持1；KV_D值仅支持656，即nope+rope*2+dequant_scale*4=512+64*2+4*4。 | float8_e4m3、int8、hifloat8 | ND | `BSND`：(B, KV_S, KV_N, KV_D)<br>`TND`：(KV_T, KV_N, KV_D)<br>`PA_BSND`：(block_num, block_size, KV_N, KV_D) |
+| query | Tensor | 必选 | attention结构的Q输入，不支持非连续。由相同数据类型的`q_nope`和`q_rope`按D维度拼接得到。`layout_query`为`BSND`时shape为`(B, Q_S, Q_N, Q_D)`；`layout_query`为`TND`时shape为`(Q_T, Q_N, Q_D)`。其中Q_D值仅支持576，即q_nope+q_rope=512+64；Q_N支持1-128。 | float16、bfloat16 | ND | `BSND`：(B, Q_S, Q_N, Q_D)<br>`TND`：(Q_T, Q_N, Q_D) |
+| key | Tensor | 必选 | attention结构的K输入。由`k_nope`、与query相同数据类型的`k_rope`和float32的量化参数按D维度拼接得到。`layout_kv`为`BSND`时shape为`(B, KV_S, KV_N, KV_D)`；`layout_kv`为`TND`时shape为`(KV_T, KV_N, KV_D)`；`layout_kv`为`PA_BSND`（PageAttention）时shape为`(block_num, block_size, KV_N, KV_D)`，其中block_size取值为16的整数倍，最大支持到1024。KV_N仅支持1；KV_D值仅支持656（per_tile量化）或386（TQ4量化），即656=nope+rope*2+dequant_scale*4=512+64*2+4*4。 | float8_e4m3、int8、hifloat8 | ND | `BSND`：(B, KV_S, KV_N, KV_D)<br>`TND`：(KV_T, KV_N, KV_D)<br>`PA_BSND`：(block_num, block_size, KV_N, KV_D) |
 | value | Tensor | 必选 | attention结构的V输入。数据类型与key相同。 | float8_e4m3、int8、hifloat8 | ND | 与key保持一致 |
 | sparse_indices | Tensor | 必选 | 代表离散取kvCache的索引，不支持非连续。`layout_query`为`BSND`时shape为`(B, Q_S, KV_N, sparse_size)`；`layout_query`为`TND`时shape为`(Q_T, KV_N, sparse_size)`。每行有效值均在前半部分，无效值（-1）均在后半部分，且sparse_size需大于0。当key和value的数据类型为hifloat8时，sparse_size仅支持2048。 | int32 | ND | `BSND`：(B, Q_S, KV_N, sparse_size)<br>`TND`：(Q_T, KV_N, sparse_size) |
 | scale_value | float | 必选 | 公式中$d_k$开根号的倒数，代表缩放系数，作为query和key矩阵乘后Muls的scalar值。 | float32 | - | - |
-| key_quant_mode | int64 | 必选 | 代表key的量化模式，仅支持传入2，即per_tile量化模式。 | int64 | - | - |
-| value_quant_mode | int64 | 必选 | 代表value的量化模式，仅支持传入2，即per_tile量化模式。 | int64 | - | - |
+| key_quant_mode | int64 | 必选 | 代表key的量化模式，支持传入2（per_tile量化模式）或3（TQ4量化模式）。 | int64 | - | - |
+| value_quant_mode | int64 | 必选 | 代表value的量化模式，支持传入2（per_tile量化模式）或3（TQ4量化模式）。 | int64 | - | - |
 | key_dequant_scale | Tensor | 可选 | 预留参数。 | - | - | - |
 | value_dequant_scale | Tensor | 可选 | 预留参数。 | - | - | - |
 | block_table | Tensor | 可选 | 表示PageAttention中kvCache存储使用的block映射表。shape为`(B, ceil(KV_S_max/block_size))`，其中第一维长度为B，第二维长度不小于所有batch中最大的KV_S对应的block数量，即KV_S_max/block_size向上取整。 | int32 | ND | (B, ceil(KV_S_max/block_size)) |
@@ -135,12 +135,24 @@ cann_ops_transformer.kv_quant_sparse_flash_attention(
 - 该接口支持单算子模式调用。
 - 非PageAttention场景`layout_query`和`layout_kv`取值需要保持一致。
 - `return_softmax_lse=False`时返回空shape为`[0]`的float32占位Tensor；`return_softmax_lse=True`时返回float32的softmax_max与softmax_sum结果。
+<!-- npu="950" id7 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
   - 参数key、value数据类型仅支持float8_e4m3、int8、hifloat8数据类型。
   - 参数`sparse_block_size`仅支持1。
   - 仅在`layout_kv`为`PA_BSND`时，key支持0轴非连续。
   - 支持可选入参sinks。
   - 当key/value为hifloat8时，`sparse_size`（sparse_indices最后一维）仅支持2048。
+  - TQ4 INT4 模式（key\_quant\_mode=3、value\_quant\_mode=3）不支持，传入3会被tiling校验拦截。
+  - `rope_head_dim`仅支持64，传入0会被tiling校验拦截。
+<!-- end id7 -->
+
+<!-- npu="A3,910b" id8 -->
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+  - query的Q_N支持1-128。
+  - 参数key、value数据类型仅支持int8数据类型。
+  - TQ4 INT4 模式（key\_quant\_mode=value\_quant\_mode=3）支持，key/value的KV_D为386，两个量化模式必须同时为3；TQ4槽位由512个int4值、64个BF16 RoPE值和1个FP16 scale组成。
+  - 当rope\_head\_dim为0时，仅支持key\_quant\_mode=value\_quant\_mode=2、quant\_scale\_repo\_mode=1、tile\_size=128；query的Q_D为512，key/value的KV_D为528，每个槽位由512个INT8值和4个FLOAT32 scale组成。
+<!-- end id8 -->
 
 ## 确定性计算
 

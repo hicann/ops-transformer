@@ -50,14 +50,14 @@ The released `kv_quant_sparse_flash_attention_v2` is a new operator designed for
       <tr>
           <td>query</td>
           <td>Input</td>
-          <td>Q input of the attention structure. Non-contiguous input is not supported. query is obtained by concatenating q_nope and q_rope of the same data type along the D dimension. When layout_query is "BSND", the shape is [B, Q_S, Q_N, Q_D]. When layout_query is "TND", the shape is [Q_T, Q_N, Q_D]. Q_D supports only 576, that is, q_nope+q_rope=512+64. For V2, Q_N supports all integers from 1 to 128 on A2/A3 and A5 platforms. A6 follows its platform-specific constraints.</td>
+          <td>Q input of the attention structure. Non-contiguous input is not supported. query is obtained by concatenating q_nope and q_rope of the same data type along the D dimension. When layout_query is "BSND", the shape is [B, Q_S, Q_N, Q_D]. When layout_query is "TND", the shape is [Q_T, Q_N, Q_D]. Q_D supports only 576, that is, q_nope+q_rope=512+64. Q_N supports 1 to 128.</td>
           <td>FLOAT16, BFLOAT16</td>
           <td>ND</td>
       </tr>
       <tr>
           <td>key</td>
           <td>Input</td>
-          <td>K input of the attention structure. key is obtained by concatenating k_nope, k_rope of the same data type as query, and the float32 quantization parameters along the D dimension. When layout_kv is "BSND", the shape is [B, KV_S, KV_N, KV_D]. When layout_kv is "TND", the shape is [KV_T, KV_N, KV_D]. When layout_kv is "PA_BSND", the shape is [block_num, block_size, KV_N, KV_D], where block_num is the total number of blocks in the PageAttention scenario and block_size is the number of tokens per block. block_size is a multiple of 16 and supports up to 1024. KV_N supports only 1. KV_D supports only 656, that is, nope+rope*2+dequant_scale*4=512+64*2+4*4.</td>
+          <td>K input of the attention structure. key is obtained by concatenating k_nope, k_rope of the same data type as query, and the float32 quantization parameters along the D dimension. When layout_kv is "BSND", the shape is [B, KV_S, KV_N, KV_D]. When layout_kv is "TND", the shape is [KV_T, KV_N, KV_D]. When layout_kv is "PA_BSND", the shape is [block_num, block_size, KV_N, KV_D], where block_num is the total number of blocks in the PageAttention scenario and block_size is the number of tokens per block. block_size is a multiple of 16 and supports up to 1024. KV_N supports only 1. KV_D supports only 656 (per_tile quantization) or 386 (TQ4 quantization), where 656 = nope+rope*2+dequant_scale*4=512+64*2+4*4.</td>
           <td>FLOAT8_E4M3, INT8, HIFLOAT8</td>
           <td>ND</td>
       </tr>
@@ -85,14 +85,14 @@ The released `kv_quant_sparse_flash_attention_v2` is a new operator designed for
       <tr>
           <td>key_quant_mode</td>
           <td>Attribute</td>
-          <td>Represents the quantization mode of key. Only 2 is supported, indicating the per_tile quantization mode.</td>
+          <td>Represents the quantization mode of key. Supports 2 (per_tile quantization mode) or 3 (TQ4 quantization mode).</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>value_quant_mode</td>
           <td>Attribute</td>
-          <td>Represents the quantization mode of value. Only 2 is supported, indicating the per_tile quantization mode.</td>
+          <td>Represents the quantization mode of value. Supports 2 (per_tile quantization mode) or 3 (TQ4 quantization mode).</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
@@ -204,7 +204,7 @@ The released `kv_quant_sparse_flash_attention_v2` is a new operator designed for
       <tr>
           <td>rope_head_dim</td>
           <td>Optional attribute</td>
-          <td>Represents the size of rope_head_dim in the MLA architecture. It is valid only when attention_mode is 2. The default value is 64. INT8 per-tile mode on Atlas A2/A3 products supports 0 and 64; other modes support only 64.</td>
+          <td>Represents the size of rope_head_dim in the MLA architecture. It is valid only when attention_mode is 2. The default value is 64. The supported values depend on the quantization mode and product form; see the product-specific constraints under "Constraints" below.</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
@@ -243,17 +243,24 @@ The released `kv_quant_sparse_flash_attention_v2` is a new operator designed for
 
 - This API supports graph mode.
 - In non-PageAttention scenarios, layout\_query and layout\_kv must be set to the same value.
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR&950DT products</term>:
   - The data types of key and value support only float8_e4m3, int8, and hifloat8.
   - sparse\_block\_size supports only 1.
   - Only when layout_kv is PA_BSND does key support non-contiguous input along axis 0.
   - The optional input sinks is supported.
+  - TQ4 INT4 mode (key\_quant\_mode=3, value\_quant\_mode=3) is not supported. If 3 is passed in, the tiling check rejects it.
+  - rope\_head\_dim supports only 64. If 0 is passed in, the tiling check rejects it.
+<!-- end id1 -->
+<!-- npu="A3,910b" id2 -->
 - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
   - Q_N of query supports all integers from 1 to 128.
   - The data types of key and value support only int8.
   - sparse\_block\_size supports [1,16] and must be a power of two. In the PageAttention scenario, sparse\_block\_size must divide block\_size exactly.
   - Only when layout_kv is PA_BSND do key and value support non-contiguous input along axis 0; all other axes must be contiguous. Non-contiguous input is not supported in non-PageAttention scenarios.
+  - TQ4 INT4 mode (key\_quant\_mode=value\_quant\_mode=3) is supported. The KV_D of key/value is 386, and both quantization modes must be set to 3 at the same time. A TQ4 slot consists of 512 int4 values, 64 BF16 RoPE values, and 1 FP16 scale.
   - When rope\_head\_dim is 0, only key\_quant\_mode=value\_quant\_mode=2, quant\_scale\_repo\_mode=1, and tile\_size=128 are supported. The Q_D of query is 512, and the KV_D of key/value is 528. Each slot consists of 512 INT8 values and 4 FLOAT32 scales.
+<!-- end id2 -->
 
 ## Invocation Description
 
