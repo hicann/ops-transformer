@@ -65,6 +65,8 @@ constexpr int64_t K_MIN_VAL = 256;
 constexpr int64_t K_MAX_VAL = 65535;
 constexpr uint64_t M_TAIL_ALIGN = 16UL; // m方向对齐粒度，确保 L0C 拷出时首地址 1024 对齐
 constexpr uint64_t HCCL_BUFFER_RESERVED_BYTES = 2UL * 1024UL * 1024UL; // 通信 buffer 预留量（2MB）
+constexpr uint32_t DUMP_WORKSPACE_SEG_COUNT = 2U;                      // libapi 和 state_dump 两段
+constexpr uint32_t DUMP_PEERMEM_SEG_COUNT = 2U;                        // dataRegion 和 scaleRegion 两段
 
 constexpr uint64_t GROUP_MNK_BIT_SIZE = 0xFFFF;
 constexpr uint64_t GROUP_N_OFFSET = 16UL;
@@ -842,7 +844,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext* context, const ShapeIn
     tilingData->dumpInfo.workspaceLayout.segments[0] = {
         0UL, libApiSize, static_cast<uint8_t>(Utils::WS_SEG_LIB_API), {}};
     tilingData->dumpInfo.workspaceLayout.totalSize += Utils::STATE_DUMP_TOTAL_SIZE;
-    tilingData->dumpInfo.workspaceLayout.segCount = 2; // libapi and state_dump
+    tilingData->dumpInfo.workspaceLayout.segCount = DUMP_WORKSPACE_SEG_COUNT;
     tilingData->dumpInfo.workspaceLayout.segments[1] = {
         libApiSize, Utils::STATE_DUMP_TOTAL_SIZE, static_cast<uint8_t>(Utils::WS_SEG_STATE_DUMP), {}};
     auto x1Dtype = context->GetInputDesc(IDX_INPUT_X1)->GetDataType();
@@ -852,7 +854,7 @@ static ge::graphStatus SetTilingData(gert::TilingContext* context, const ShapeIn
     uint64_t scaleRegionBytes = rankSize * m * scaleKDim * 2;
     tilingData->dumpInfo.peermemDataSize = dataRegionBytes + scaleRegionBytes;
     tilingData->dumpInfo.peermemLayout.totalSize = tilingData->dumpInfo.peermemDataSize;
-    tilingData->dumpInfo.peermemLayout.segCount = 2; // dataRegion and scaleRegion
+    tilingData->dumpInfo.peermemLayout.segCount = DUMP_PEERMEM_SEG_COUNT;
     tilingData->dumpInfo.peermemLayout.segments[0] = {
         0UL, dataRegionBytes, static_cast<uint8_t>(Utils::PEERMEM_SEG_DATA), {}};
     tilingData->dumpInfo.peermemLayout.segments[1] = {
