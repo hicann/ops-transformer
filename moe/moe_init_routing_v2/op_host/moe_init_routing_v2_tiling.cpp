@@ -654,13 +654,15 @@ ge::graphStatus MoeInitRoutingV2TilingBase::PostTiling()
 {
     context_->SetBlockDim(aivNum);
     size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, currentWorkspace);
     currentWorkspace[0] = workspaceSize_;
     if (regBase) {
         context_->SetLocalMemorySize(aicoreParams_.ubSize);
     }
-    moeInitRoutingTilingData.SaveToBuffer(context_->GetRawTilingData()->GetData(),
-                                          context_->GetRawTilingData()->GetCapacity());
-    context_->GetRawTilingData()->SetDataSize(moeInitRoutingTilingData.GetDataSize());
+    auto rawTilingData = context_->GetRawTilingData();
+    OP_CHECK_NULL_WITH_CONTEXT(context_, rawTilingData);
+    moeInitRoutingTilingData.SaveToBuffer(rawTilingData->GetData(), rawTilingData->GetCapacity());
+    rawTilingData->SetDataSize(moeInitRoutingTilingData.GetDataSize());
     return ge::GRAPH_SUCCESS;
 }
 

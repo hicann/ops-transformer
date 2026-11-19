@@ -629,6 +629,7 @@ ge::graphStatus MoeInitRoutingQuantV2TilingBase::PostTiling()
     CopyTilingData();
     context_->SetBlockDim(aivNum);
     size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, currentWorkspace);
     currentWorkspace[0] = workspaceSize_;
     context_->SetLocalMemorySize(aicoreParams_.ubSize);
     auto rawTilingData = context_->GetRawTilingData();
