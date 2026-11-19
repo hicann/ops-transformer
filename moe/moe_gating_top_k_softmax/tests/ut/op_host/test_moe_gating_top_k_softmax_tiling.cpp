@@ -702,3 +702,92 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_310p_fail_exp
     // DoOpTiling logs misalign error but returns false(=GRAPH_SUCCESS); skip tilingKey check
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, std::numeric_limits<uint64_t>::max(), "", {});
 }
+
+// [FIX regression] tail-shard UB overflow: oneCoreRow = Align(min(row, ubBound), 16*blockNum)
+// rounds 25 up to 160 for blockNum=10. When row < 160, activateCore collapses to 1 and the
+// whole input becomes one tail shard; non-8-multiple shards in (144, 159] overflow the
+// softmax UB budget and corrupt the output (TopK garbage indices, empty generations in
+// vLLM GSM8K). The guard shrinks oneCoreRow by 16 until both shards fit UB.
+// Fake platform: "Ascend310P", coreNum=10, ubSize=262144 -> blockNum=10, ubRowBound=25.
+TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_310p_tail_overflow_156_rows)
+{
+    // row=156 (GSM8K batch shape from the field incident): old tiling gave oneCoreRow=160,
+    // activateCore=1, tailRow=156 -> softmax single-block ~400KB > 245760B UB. Guard must
+    // shrink to oneCoreRow=144, activateCore=2, tailRow=12 (both shards fit UB).
+    optiling::MoeGatingTopKSoftmaxCompileInfo compileInfo = {10, 262144};
+    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmax",
+                                              {
+                                                  {{{1, 156, 256}, {1, 156, 256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {{{1, 156, 8}, {1, 156, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1, 156, 8}, {1, 156, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 156, 8}, {1, 156, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+                                              },
+                                              &compileInfo, "Ascend310P", 10, 262144);
+    // tilingKey 18 = 310P fp16 path. Decode the packed int32 fields directly from the raw
+    // tiling data (row/col/k/kAlign/blockNum/workspaceSize/hasFinished precede them) and
+    // assert the guard produced the expected shard split:
+    // row=156 must split as oneCoreRow=144 / activateCore=2 / tailRow=12.
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+    const int32_t* packed = reinterpret_cast<const int32_t*>(tilingInfo.tilingData.get());
+    EXPECT_EQ(packed[8], 144); // oneCoreRow
+    EXPECT_EQ(packed[9], 2);   // activateCore
+    EXPECT_EQ(packed[10], 12); // tailRow
+}
+
+TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_310p_tail_overflow_152_rows_unchanged)
+{
+    // row=152 stays on the healthy path: oneCoreRow=160, activateCore=1, tailRow=152
+    // (152 = 8-multiple -> 4 even softmax blocks). Guard must NOT touch it.
+    optiling::MoeGatingTopKSoftmaxCompileInfo compileInfo = {10, 262144};
+    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmax",
+                                              {
+                                                  {{{1, 152, 256}, {1, 152, 256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {{{1, 152, 8}, {1, 152, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1, 152, 8}, {1, 152, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 152, 8}, {1, 152, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+                                              },
+                                              &compileInfo, "Ascend310P", 10, 262144);
+    // row=152 must stay unguarded: oneCoreRow=160 / activateCore=1 / tailRow=152 (8-multiple,
+    // 4 even softmax blocks). The guard must not touch healthy shapes.
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+    const int32_t* packed = reinterpret_cast<const int32_t*>(tilingInfo.tilingData.get());
+    EXPECT_EQ(packed[8], 160);  // oneCoreRow
+    EXPECT_EQ(packed[9], 1);    // activateCore
+    EXPECT_EQ(packed[10], 152); // tailRow
+}
+
+TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_310p_tail_overflow_huge_col_rejected)
+{
+    // With a very wide expert dimension (col=2064) even the 16-row minimum shard needs
+    // (16/4+16)*2064*6 = 247680B > 245760B UB, so no feasible shard exists. The tiling
+    // must fail explicitly (GRAPH_FAILED) instead of silently emitting an overflowing
+    // shard. col=2064 is 32-byte aligned for fp16 (2064*2 % 32 == 0).
+    optiling::MoeGatingTopKSoftmaxCompileInfo compileInfo = {10, 262144};
+    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmax",
+                                              {
+                                                  {{{1, 40, 2064}, {1, 40, 2064}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {{{1, 40, 8}, {1, 40, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1, 40, 8}, {1, 40, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 40, 8}, {1, 40, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+                                              },
+                                              &compileInfo, "Ascend310P", 10, 262144);
+    TilingInfo tilingInfo;
+    ASSERT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
+}

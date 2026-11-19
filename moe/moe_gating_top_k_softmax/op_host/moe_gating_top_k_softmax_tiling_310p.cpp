@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <string>
 
 using namespace AscendC;
 using namespace Ops::Transformer::OpTiling;
@@ -128,9 +129,47 @@ ge::graphStatus MoeGatingTopKSoftmax310PTiling::DoOpTiling()
     tilingData.set_hasFinished(hasFinishedTmp);
 
     // Set FormerRow
-    const int64_t oneCoreRow = Align(std::min(rowTmp, UB_SIZE / (32 * (colTmp + 3 * kAlign))), 16 * blockNum);
-    const int64_t activateCore = CeilDiv(rowTmp, oneCoreRow);
-    const int64_t tailRow = rowTmp - (activateCore - 1) * oneCoreRow;
+    const int64_t ubRowBound = UB_SIZE / (32 * (colTmp + 3 * kAlign));
+    int64_t oneCoreRow = Align(std::min(rowTmp, ubRowBound), 16 * blockNum);
+    int64_t activateCore = CeilDiv(rowTmp, oneCoreRow);
+    int64_t tailRow = rowTmp - (activateCore - 1) * oneCoreRow;
+
+    // [FIX] Guard the tail shard against softmax UB overflow.
+    // SoftMaxTilingFunc serves a shard of m rows via its single-block path when m is
+    // not a multiple of 8; that path needs roughly (m + 16) * col * fp16 * 3 bytes of
+    // UB, which overflows MAX_UB_SIZE (245760) once m > UB_SIZE / (6 * col) - 16
+    // (= 144 rows for col = 256). Multiples of 8 are split into 4 even blocks and stay
+    // safe while (m / 4 + 16) * col * 6 <= UB_SIZE.
+    // Align() above rounds oneCoreRow up to 16 * blockNum. When that overshoots
+    // rowTmp (e.g. rowTmp=156, blockNum=10 -> oneCoreRow=160 > 156), activateCore
+    // collapses to 1 and the whole input becomes a single tail shard. For rowTmp in
+    // [145, 159] that tail is not a multiple of 8, takes the single-block path, and
+    // the softmax output is corrupted (TopK then emits garbage expert indices ->
+    // wrong expert routing). Shrink oneCoreRow step by step until both the former
+    // and the tail shards provably fit the UB budget. Healthy shapes are untouched.
+    auto shardFitsUb = [&colTmp](int64_t m) -> bool {
+        if (m % 8 == 0) { // 4-even-block path inside SoftMaxTilingFunc
+            return (m / 4 + 16) * colTmp * FP16_SIZE * 3 <= UB_SIZE;
+        }
+        return (m + 16) * colTmp * FP16_SIZE * 3 <= UB_SIZE; // single-block path
+    };
+    while (oneCoreRow > 16 && (!shardFitsUb(oneCoreRow) || !shardFitsUb(tailRow))) {
+        oneCoreRow -= 16; // keep the former shard 8-divisible (16-aligned)
+        activateCore = CeilDiv(rowTmp, oneCoreRow);
+        tailRow = rowTmp - (activateCore - 1) * oneCoreRow;
+    }
+    // Final check: with a very wide expert dimension the minimum shard (16 rows) may still
+    // exceed the UB budget. Fail the tiling explicitly instead of silently handing an
+    // overflowing shard to the kernel (which would only surface as a precision anomaly).
+    OP_CHECK_IF(
+        (!shardFitsUb(oneCoreRow) || !shardFitsUb(tailRow)),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context_->GetNodeName(), "x", ("[" + std::to_string(rowTmp) + "," + std::to_string(colTmp) + "]").c_str(),
+            ("Softmax shard exceeds UB budget: row=" + std::to_string(rowTmp) + ", col=" + std::to_string(colTmp) +
+             ", kAlign=" + std::to_string(kAlign) + ", oneCoreRow=" + std::to_string(oneCoreRow) +
+             ", tailRow=" + std::to_string(tailRow))
+                .c_str()),
+        return ge::GRAPH_FAILED);
 
     tilingData.set_oneCoreRow(oneCoreRow);
     tilingData.set_activateCore(activateCore);
