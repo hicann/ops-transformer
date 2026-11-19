@@ -128,81 +128,170 @@ static ge::graphStatus InferExpertIdsShape(gert::InferShapeContext* context, int
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferExpandXAndScalesShape(gert::InferShapeContext* context, int64_t k, int64_t h,
-                                                  int64_t& localExpertNum, int64_t globalBsReal, int64_t epWorldSize)
+struct ExpandShapeOutputs {
+    gert::Shape* expandX;
+    gert::Shape* dynamicScales;
+    gert::Shape* expandScales;
+};
+
+static ge::graphStatus GetExpandShapeOutputs(gert::InferShapeContext* context, ExpandShapeOutputs& outputs)
 {
-    gert::Shape* expandXShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_X_INDEX);
-    OP_CHECK_IF(expandXShape == nullptr,
+    outputs.expandX = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_X_INDEX);
+    OP_CHECK_IF(outputs.expandX == nullptr,
                 ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output expand_x shape holder is absent"),
                 return ge::GRAPH_FAILED);
-    gert::Shape* dynamicScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_DYNAMIC_SCALES_INDEX);
+    outputs.dynamicScales = context->GetOutputShape(DISPATCH_OUTPUT_DYNAMIC_SCALES_INDEX);
     OP_CHECK_IF(
-        dynamicScalesShape == nullptr,
+        outputs.dynamicScales == nullptr,
         ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output dynamic_scales shape holder is absent"),
         return ge::GRAPH_FAILED);
-    gert::Shape* expandScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_SCALES);
+    outputs.expandScales = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_SCALES);
     OP_CHECK_IF(
-        expandScalesShape == nullptr,
+        outputs.expandScales == nullptr,
         ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output expand_scales shape holder is absent"),
         return ge::GRAPH_FAILED);
-    const gert::Shape* expertScalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_EXPERT_SCALES_IDX_INDEX);
+    return ge::GRAPH_SUCCESS;
+}
+
+struct ExpandShapeAttrs {
+    const gert::Shape* expertScales;
+    const int64_t* moeExpertNum;
+    const int64_t* sharedExpertRankNum;
+    const int64_t* epRankId;
+    const int64_t* expertShardType;
+};
+
+static ge::graphStatus GetExpandShapeAttrs(gert::InferShapeContext* context, int64_t epWorldSize,
+                                           ExpandShapeAttrs& attrsOut)
+{
     const auto attrs = context->GetAttrs();
-    const auto moeExpertNum = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_MOE_EXPERT_NUM_INDEX);
-    const auto sharedExpertRankNum = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_SHARED_EXPERT_RANK_NUM_INDEX);
-    const auto epRankId = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EP_RANK_ID_INDEX);
-    const auto expertShardType = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EXPERT_SHARD_TYPE_INDEX);
+    attrsOut.expertScales = context->GetOptionalInputShape(DISPATCH_INPUT_EXPERT_SCALES_IDX_INDEX);
+    attrsOut.moeExpertNum = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_MOE_EXPERT_NUM_INDEX);
+    attrsOut.sharedExpertRankNum = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_SHARED_EXPERT_RANK_NUM_INDEX);
+    attrsOut.epRankId = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EP_RANK_ID_INDEX);
+    attrsOut.expertShardType = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EXPERT_SHARD_TYPE_INDEX);
     OP_CHECK_IF(
-        epRankId == nullptr,
+        attrsOut.epRankId == nullptr,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "ep_rank_id", "required attribute is absent"),
         return ge::GRAPH_FAILED);
-    OP_CHECK_IF(moeExpertNum == nullptr,
+    OP_CHECK_IF(attrsOut.moeExpertNum == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "moe_expert_num",
                                                          "required attribute is absent"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(expertShardType == nullptr,
+    OP_CHECK_IF(attrsOut.expertShardType == nullptr,
                 ReportDispatchInferMetadata(context->GetNodeName(), __func__,
                                             "defaulted attribute expert_shard_type is absent from RuntimeAttrs"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(sharedExpertRankNum == nullptr,
+    OP_CHECK_IF(attrsOut.sharedExpertRankNum == nullptr,
                 ReportDispatchInferMetadata(context->GetNodeName(), __func__,
                                             "defaulted attribute shared_expert_rank_num is absent from RuntimeAttrs"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF((*sharedExpertRankNum < 0) || (*sharedExpertRankNum >= epWorldSize),
+    OP_CHECK_IF((*attrsOut.sharedExpertRankNum < 0) || (*attrsOut.sharedExpertRankNum >= epWorldSize),
                 OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "sharedExpertRankNum",
-                                          std::to_string(*sharedExpertRankNum).c_str(),
+                                          std::to_string(*attrsOut.sharedExpertRankNum).c_str(),
                                           (std::string("[0, ") + std::to_string(epWorldSize) + ")").c_str()),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF((*epRankId < 0) || (*epRankId >= epWorldSize),
-                OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "epRankId", std::to_string(*epRankId).c_str(),
-                                          (std::string("[0, ") + std::to_string(epWorldSize) + ")").c_str()),
+    OP_CHECK_IF(
+        (*attrsOut.epRankId < 0) || (*attrsOut.epRankId >= epWorldSize),
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "epRankId", std::to_string(*attrsOut.epRankId).c_str(),
+                                  (std::string("[0, ") + std::to_string(epWorldSize) + ")").c_str()),
+        return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+static void SetExpandShapeOutputs(gert::InferShapeContext* context, const ExpandShapeOutputs& outputs, int64_t h,
+                                  int64_t realA, int64_t a, bool hasExpertScales)
+{
+    outputs.expandX->SetDimNum(DIM_TWO);
+    outputs.expandX->SetDim(0U, realA);
+    outputs.expandX->SetDim(1U, h);
+    OP_LOGD(context->GetNodeName(), "expandXShape is:%s after infershape.",
+            Ops::Base::ToString(*outputs.expandX).c_str());
+    outputs.dynamicScales->SetDimNum(DIM_ONE);
+    outputs.dynamicScales->SetDim(0U, realA);
+    OP_LOGD(context->GetNodeName(), "dynamicScalesShape shape is:%s after infershape.",
+            Ops::Base::ToString(*outputs.dynamicScales).c_str());
+    outputs.expandScales->SetDimNum(DIM_ONE);
+    outputs.expandScales->SetDim(0U, hasExpertScales ? a : 0);
+    OP_LOGD(context->GetNodeName(), "expandScalesShape shape is:%s after infershape.",
+            Ops::Base::ToString(*outputs.expandScales).c_str());
+}
+
+static ge::graphStatus InferExpandXAndScalesShape(gert::InferShapeContext* context, int64_t k, int64_t h,
+                                                  int64_t& localExpertNum, int64_t globalBsReal, int64_t epWorldSize)
+{
+    ExpandShapeOutputs outputs{};
+    OP_CHECK_IF(GetExpandShapeOutputs(context, outputs) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "GetExpandShapeOutputs failed."),
                 return ge::GRAPH_FAILED);
-    int64_t moeRankNum = epWorldSize - *sharedExpertRankNum;
+    ExpandShapeAttrs attrs{};
+    OP_CHECK_IF(GetExpandShapeAttrs(context, epWorldSize, attrs) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "GetExpandShapeAttrs failed."), return ge::GRAPH_FAILED);
+    int64_t moeRankNum = epWorldSize - *attrs.sharedExpertRankNum;
     OP_CHECK_IF(
         moeRankNum <= 0,
         OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "moeRankNum", std::to_string(moeRankNum).c_str(), "> 0"),
         return ge::GRAPH_FAILED);
-    int64_t localMoeExpertNum = *moeExpertNum / moeRankNum;
-    bool isSharedExpert = (*expertShardType == 0) ? (*epRankId < *sharedExpertRankNum) :
-                                                    (*epRankId >= (epWorldSize - *sharedExpertRankNum));
+    int64_t localMoeExpertNum = *attrs.moeExpertNum / moeRankNum;
+    bool isSharedExpert = (*attrs.expertShardType == 0) ?
+                              (*attrs.epRankId < *attrs.sharedExpertRankNum) :
+                              (*attrs.epRankId >= (epWorldSize - *attrs.sharedExpertRankNum));
     localExpertNum = isSharedExpert ? 1 : localMoeExpertNum;
-    int64_t a = isSharedExpert ? (globalBsReal / *sharedExpertRankNum) : (globalBsReal * std::min(localExpertNum, k));
-    auto realA = a;
-    expandXShape->SetDimNum(DIM_TWO);
-    expandXShape->SetDim(0U, realA);
-    expandXShape->SetDim(1U, h);
-    OP_LOGD(context->GetNodeName(), "expandXShape is:%s after infershape.", Ops::Base::ToString(*expandXShape).c_str());
-    dynamicScalesShape->SetDimNum(DIM_ONE);
-    dynamicScalesShape->SetDim(0U, realA);
-    OP_LOGD(context->GetNodeName(), "dynamicScalesShape shape is:%s after infershape.",
-            Ops::Base::ToString(*dynamicScalesShape).c_str());
-    expandScalesShape->SetDimNum(DIM_ONE);
-    expandScalesShape->SetDim(0U, 0);
-    if (expertScalesShape != nullptr) {
-        expandScalesShape->SetDim(0U, a);
-    }
-    OP_LOGD(context->GetNodeName(), "expandScalesShape shape is:%s after infershape.",
-            Ops::Base::ToString(*expandScalesShape).c_str());
+    int64_t a =
+        isSharedExpert ? (globalBsReal / *attrs.sharedExpertRankNum) : (globalBsReal * std::min(localExpertNum, k));
+    SetExpandShapeOutputs(context, outputs, h, a, a, attrs.expertScales != nullptr);
     return ge::GRAPH_SUCCESS;
+}
+
+struct DispatchInferOutputs {
+    gert::Shape* expertTokenNums;
+    gert::Shape* epRecvCounts;
+    gert::Shape* tpRecvCounts;
+};
+
+static ge::graphStatus GetDispatchInferOutputs(gert::InferShapeContext* context, DispatchInferOutputs& outputs)
+{
+    outputs.expertTokenNums = context->GetOutputShape(DISPATCH_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    OP_CHECK_IF(outputs.expertTokenNums == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "output expert_token_nums shape holder is absent"),
+                return ge::GRAPH_FAILED);
+    outputs.epRecvCounts = context->GetOutputShape(DISPATCH_OUTPUT_EP_RECV_COUNTS_INDEX);
+    OP_CHECK_IF(
+        outputs.epRecvCounts == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output ep_recv_counts shape holder is absent"),
+        return ge::GRAPH_FAILED);
+    outputs.tpRecvCounts = context->GetOutputShape(DISPATCH_OUTPUT_TP_RECV_COUNTS_INDEX);
+    OP_CHECK_IF(
+        outputs.tpRecvCounts == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output tp_recv_counts shape holder is absent"),
+        return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+static void SetDispatchInferOutputs(gert::InferShapeContext* context, const DispatchInferOutputs& outputs, int64_t k,
+                                    int64_t localExpertNum, int64_t globalBsReal, int64_t epWorldSize,
+                                    int64_t tpWorldSize)
+{
+    outputs.expertTokenNums->SetDimNum(DIM_ONE);
+    outputs.expertTokenNums->SetDim(0U, localExpertNum);
+    OP_LOGD(context->GetNodeName(), "expertTokenNumsShape shape is :%s after infershape.",
+            Ops::Base::ToString(*outputs.expertTokenNums).c_str());
+    outputs.epRecvCounts->SetDimNum(DIM_ONE);
+    if (IsPlatform910B(context->GetNodeName())) {
+        // 910B reserves 2 * k * globalBsReal elements for receive-count capacity,
+        // allowing ranks with different batch sizes to share the receive buffer.
+        int64_t shapeDim = epWorldSize * localExpertNum + globalBsReal * 2 * k * epWorldSize / RANK_NUM_PER_NODE;
+        outputs.epRecvCounts->SetDim(0U, shapeDim);
+    } else {
+        outputs.epRecvCounts->SetDim(0U, epWorldSize * localExpertNum);
+    }
+    OP_LOGD(context->GetNodeName(), "epRecvCountShape shape is :%s after infershape.",
+            Ops::Base::ToString(*outputs.epRecvCounts).c_str());
+    outputs.tpRecvCounts->SetDimNum(DIM_ONE);
+    outputs.tpRecvCounts->SetDim(0U, tpWorldSize);
+    OP_LOGD(context->GetNodeName(), "tpRecvCountShape shape is :%s after infershape.",
+            Ops::Base::ToString(*outputs.tpRecvCounts).c_str());
 }
 
 static ge::graphStatus InferShapeMoeDistributeDispatch(gert::InferShapeContext* context)
@@ -211,21 +300,10 @@ static ge::graphStatus InferShapeMoeDistributeDispatch(gert::InferShapeContext* 
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMoeDistributeDispatch.");
-    gert::Shape* expertTokenNumsShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
-    OP_CHECK_IF(expertTokenNumsShape == nullptr,
-                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
-                                            "output expert_token_nums shape holder is absent"),
+    DispatchInferOutputs outputs{};
+    OP_CHECK_IF(GetDispatchInferOutputs(context, outputs) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "GetDispatchInferOutputs failed."),
                 return ge::GRAPH_FAILED);
-    gert::Shape* epRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_EP_RECV_COUNTS_INDEX);
-    OP_CHECK_IF(
-        epRecvCountShape == nullptr,
-        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output ep_recv_counts shape holder is absent"),
-        return ge::GRAPH_FAILED);
-    gert::Shape* tpRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_TP_RECV_COUNTS_INDEX);
-    OP_CHECK_IF(
-        tpRecvCountShape == nullptr,
-        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output tp_recv_counts shape holder is absent"),
-        return ge::GRAPH_FAILED);
     const auto attrs = context->GetAttrs();
     OP_CHECK_IF(attrs == nullptr,
                 ReportDispatchInferMetadata(context->GetNodeName(), __func__, "RuntimeAttrs holder is absent"),
@@ -249,28 +327,13 @@ static ge::graphStatus InferShapeMoeDistributeDispatch(gert::InferShapeContext* 
     OP_CHECK_IF(
         InferExpandXAndScalesShape(context, k, h, localExpertNum, globalBsReal, *epWorldSize) != ge::GRAPH_SUCCESS,
         OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "InferExpandXAndScalesShape failed."), return ge::GRAPH_FAILED);
-    expertTokenNumsShape->SetDimNum(DIM_ONE);
-    expertTokenNumsShape->SetDim(0U, localExpertNum);
-    OP_LOGD(context->GetNodeName(), "expertTokenNumsShape shape is :%s after infershape.",
-            Ops::Base::ToString(*expertTokenNumsShape).c_str());
-    epRecvCountShape->SetDimNum(DIM_ONE);
-    if (IsPlatform910B(context->GetNodeName())) {
-        // 2：globalbs * 2kn memory size, to support different bs in ranks
-        int64_t shapeDim = *epWorldSize * localExpertNum + globalBsReal * 2 * k * (*epWorldSize) / RANK_NUM_PER_NODE;
-        epRecvCountShape->SetDim(0U, shapeDim);
-    } else {
-        epRecvCountShape->SetDim(0U, (*epWorldSize) * localExpertNum);
-    }
-    OP_LOGD(context->GetNodeName(), "epRecvCountShape shape is :%s after infershape.",
-            Ops::Base::ToString(*epRecvCountShape).c_str());
-    tpRecvCountShape->SetDimNum(DIM_ONE);
-    tpRecvCountShape->SetDim(0U, *tpWorldSize);
-    OP_LOGD(context->GetNodeName(), "tpRecvCountShape shape is :%s after infershape.",
-            Ops::Base::ToString(*tpRecvCountShape).c_str());
+    SetDispatchInferOutputs(context, outputs, k, localExpertNum, globalBsReal, *epWorldSize, *tpWorldSize);
     OP_LOGD(context->GetNodeName(), "End to do InferShapeMoeDistributeDispatch.");
     return ge::GRAPH_SUCCESS;
 }
 
+// InferShape and InferDataType are registered together for this operator; keep both callbacks in this TU
+// to preserve the existing host registration layout.
 static ge::graphStatus InferDataTypeMoeDistributeDispatch(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeDispatch.");

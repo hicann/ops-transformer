@@ -70,6 +70,18 @@ private:
     __aicore__ inline void InitBasicParam(GM_ADDR x, GM_ADDR expertIds, GM_ADDR expandXOut, GM_ADDR dynamicScalesOut,
                                           GM_ADDR expandIdxOut, GM_ADDR expertTokenNumsOut, GM_ADDR sendCountsOut,
                                           const MoeDistributeDispatchTilingData* tilingData);
+    __aicore__ inline void InitBasicTilingParam(const MoeDistributeDispatchTilingData* tilingData);
+    __aicore__ inline void InitBasicGlobalBuffers(GM_ADDR x, GM_ADDR expertIds, GM_ADDR expandXOut,
+                                                  GM_ADDR dynamicScalesOut, GM_ADDR expertTokenNumsOut);
+    __aicore__ inline void InitBasicDerivedParam(GM_ADDR expandIdxOut, GM_ADDR sendCountsOut);
+    __aicore__ inline void LoadInputToken(uint32_t inputTokenIndex);
+    __aicore__ inline void CopySharedExpertToken(GlobalTensor<ExpandXOutType>& dstWinGMTensor, uint32_t tokenIndex,
+                                                 uint32_t preCnt);
+    __aicore__ inline void CopyMoeExpertToken(GlobalTensor<ExpandXOutType>& dstWinGMTensor, int32_t tokenIndex,
+                                              uint32_t dstExpertId);
+    __aicore__ inline void CopyLocalWindowExpert(LocalTensor<int32_t>& outCountLocal, uint32_t index, uint32_t count,
+                                                 uint32_t& beginIdx);
+    __aicore__ inline void WriteLocalSendCounts(LocalTensor<int32_t>& outCountLocal);
     __aicore__ inline void InitStatusBuffer();
     __aicore__ inline void InitDataBuffer(GM_ADDR scales);
     __aicore__ inline void UpdateMultiMoeTokenNumsOut();
@@ -245,6 +257,15 @@ __aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::InitBasi
     GM_ADDR x, GM_ADDR expertIds, GM_ADDR expandXOut, GM_ADDR dynamicScalesOut, GM_ADDR expandIdxOut,
     GM_ADDR expertTokenNumsOut, GM_ADDR sendCountsOut, const MoeDistributeDispatchTilingData* tilingData)
 {
+    InitBasicTilingParam(tilingData);
+    InitBasicGlobalBuffers(x, expertIds, expandXOut, dynamicScalesOut, expertTokenNumsOut);
+    InitBasicDerivedParam(expandIdxOut, sendCountsOut);
+}
+
+template <TemplateDispatchTypeClass>
+__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::InitBasicTilingParam(
+    const MoeDistributeDispatchTilingData* tilingData)
+{
     axisBS_ = tilingData->moeDistributeDispatchInfo.bs;
     axisH_ = tilingData->moeDistributeDispatchInfo.h;
     epWorldSize_ = tilingData->moeDistributeDispatchInfo.epWorldSize;
@@ -265,6 +286,12 @@ __aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::InitBasi
 #endif
     axisK_ = tilingData->moeDistributeDispatchInfo.k;
     aivNum_ = tilingData->moeDistributeDispatchInfo.aivNum;
+}
+
+template <TemplateDispatchTypeClass>
+__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::InitBasicGlobalBuffers(
+    GM_ADDR x, GM_ADDR expertIds, GM_ADDR expandXOut, GM_ADDR dynamicScalesOut, GM_ADDR expertTokenNumsOut)
+{
     xGMTensor_.SetGlobalBuffer((__gm__ XType*)x);
     expertIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t*)expertIds);
     expandXOutGMTensor_.SetGlobalBuffer((__gm__ ExpandXOutType*)expandXOut);
@@ -274,6 +301,12 @@ __aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::InitBasi
     windowInstatusTensor_.SetGlobalBuffer((__gm__ int32_t*)(statusSpaceGm_));
     windowInstatusFp32Tensor_.SetGlobalBuffer((__gm__ float*)(statusSpaceGm_));
     expandXOutGM_ = expandXOut;
+}
+
+template <TemplateDispatchTypeClass>
+__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::InitBasicDerivedParam(GM_ADDR expandIdxOut,
+                                                                                              GM_ADDR sendCountsOut)
+{
     expandIdxOutGM_ = expandIdxOut;   // 无GlobalTensor
     sendCountsOutGM_ = sendCountsOut; // 无GlobalTensor
     isQuant_ = StaticQuant | DynamicQuant;
@@ -371,6 +404,52 @@ __aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::QuantIni
 }
 
 template <TemplateDispatchTypeClass>
+__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::LoadInputToken(uint32_t inputTokenIndex)
+{
+    if constexpr (DynamicQuant || StaticQuant) {
+        xInTensor_ = xInQueue_.AllocTensor<XType>();
+        DataCopy(xInTensor_, xGMTensor_[inputTokenIndex * axisH_], axisH_); // 约束对齐
+        xInQueue_.EnQue(xInTensor_);
+        xInTensor_ = xInQueue_.DeQue<XType>();
+    } else {
+        xTmpTensor_ = xQueue_.AllocTensor<ExpandXOutType>();
+        DataCopy(xTmpTensor_, xGMTensor_[inputTokenIndex * axisH_], axisH_); // 约束对齐
+        xQueue_.EnQue(xTmpTensor_);
+        xTmpTensor_ = xQueue_.DeQue<ExpandXOutType>();
+    }
+}
+
+template <TemplateDispatchTypeClass>
+__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::CopySharedExpertToken(
+    GlobalTensor<ExpandXOutType>& dstWinGMTensor, uint32_t tokenIndex, uint32_t preCnt)
+{
+    if constexpr (DynamicQuant || StaticQuant) {
+        LoadInputToken(tokenIndex);
+        xOutTensor_ = xOutQueue_.AllocTensor<ExpandXOutType>();
+        QuantProcess(0);
+        xOutQueue_.EnQue(xOutTensor_);
+        xOutTensor_ = xOutQueue_.DeQue<ExpandXOutType>();
+        if (isShareExpertRank_) {
+            xOutFp32Tensor_ = xOutTensor_.template ReinterpretCast<float>();
+            DataCopyPad(dynamicScalesOutGMTensor_[tokenIndex], xOutFp32Tensor_[axisH_ / sizeof(float)],
+                        dataCopyParamsFloat_);
+            DataCopy(expandXOutGMTensor_[tokenIndex * axisH_], xOutTensor_, axisH_); // 约束对齐
+        } else {
+            DataCopy(dstWinGMTensor[(tokenIndex - preCnt) * axisHCommu_], xOutTensor_, axisHCommu_); // 约束对齐
+        }
+        xOutQueue_.FreeTensor(xOutTensor_);
+    } else {
+        LoadInputToken(tokenIndex);
+        if (isShareExpertRank_) {
+            DataCopy(expandXOutGMTensor_[tokenIndex * axisHCommu_], xTmpTensor_, axisHCommu_);
+        } else {
+            DataCopy(dstWinGMTensor[(tokenIndex - preCnt) * axisHCommu_], xTmpTensor_, axisHCommu_); // 约束对齐
+        }
+        xQueue_.FreeTensor<ExpandXOutType>(xTmpTensor_);
+    }
+}
+
+template <TemplateDispatchTypeClass>
 __aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::SendToSharedExpert()
 {
     uint32_t startTokenId, endTokenId, sendTokenNum;
@@ -391,36 +470,7 @@ __aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::SendToSh
         OOMCheckAddrRange<ExpandXOutType>((__gm__ ExpandXOutType*)(GetWindAddrByRankId(moeOnShareRank)),
                                           totalWinSizeEp_);
 #endif
-        if constexpr (DynamicQuant || StaticQuant) {
-            xInTensor_ = xInQueue_.AllocTensor<XType>();
-            DataCopy(xInTensor_, xGMTensor_[tokenIndex * axisH_], axisH_); // 约束对齐
-            xInQueue_.EnQue(xInTensor_);
-            xInTensor_ = xInQueue_.DeQue<XType>();
-            xOutTensor_ = xOutQueue_.AllocTensor<ExpandXOutType>();
-            QuantProcess(0);
-            xOutQueue_.EnQue(xOutTensor_);
-            xOutTensor_ = xOutQueue_.DeQue<ExpandXOutType>();
-            if (isShareExpertRank_) {
-                xOutFp32Tensor_ = xOutTensor_.template ReinterpretCast<float>();
-                DataCopyPad(dynamicScalesOutGMTensor_[tokenIndex], xOutFp32Tensor_[axisH_ / sizeof(float)],
-                            dataCopyParamsFloat_);
-                DataCopy(expandXOutGMTensor_[tokenIndex * axisH_], xOutTensor_, axisH_); // 约束对齐
-            } else {
-                DataCopy(dstWinGMTensor[(tokenIndex - preCnt) * axisHCommu_], xOutTensor_, axisHCommu_); // 约束对齐
-            }
-            xOutQueue_.FreeTensor(xOutTensor_);
-        } else {
-            xTmpTensor_ = xQueue_.AllocTensor<ExpandXOutType>();
-            DataCopy(xTmpTensor_, xGMTensor_[tokenIndex * axisH_], axisH_); // 约束对齐
-            xQueue_.EnQue(xTmpTensor_);
-            xTmpTensor_ = xQueue_.DeQue<ExpandXOutType>();
-            if (isShareExpertRank_) {
-                DataCopy(expandXOutGMTensor_[tokenIndex * axisHCommu_], xTmpTensor_, axisHCommu_);
-            } else {
-                DataCopy(dstWinGMTensor[(tokenIndex - preCnt) * axisHCommu_], xTmpTensor_, axisHCommu_); // 约束对齐
-            }
-            xQueue_.FreeTensor<ExpandXOutType>(xTmpTensor_);
-        }
+        CopySharedExpertToken(dstWinGMTensor, tokenIndex, preCnt);
     }
 }
 
@@ -483,6 +533,26 @@ __aicore__ inline int32_t MoeDistributeDispatch<TemplateDispatchTypeFunc>::CalSh
 }
 
 template <TemplateDispatchTypeClass>
+__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::CopyMoeExpertToken(
+    GlobalTensor<ExpandXOutType>& dstWinGMTensor, int32_t tokenIndex, uint32_t dstExpertId)
+{
+    if constexpr (DynamicQuant || StaticQuant) {
+        LoadInputToken(tokenIndex / axisK_);
+        xOutTensor_ = xOutQueue_.AllocTensor<ExpandXOutType>();
+        uint32_t expertIndex = sharedExpertRankNum_ != 0 ? (dstExpertId + 1) : dstExpertId;
+        QuantProcess(expertIndex);
+        xOutQueue_.EnQue(xOutTensor_);
+        xOutTensor_ = xOutQueue_.DeQue<ExpandXOutType>();
+        DataCopy(dstWinGMTensor, xOutTensor_, axisHCommu_); // 约束对齐
+        xOutQueue_.FreeTensor(xOutTensor_);
+    } else {
+        LoadInputToken(tokenIndex / axisK_);
+        DataCopy(dstWinGMTensor, xTmpTensor_, axisHCommu_); // 约束对齐
+        xQueue_.FreeTensor<ExpandXOutType>(xTmpTensor_);
+    }
+}
+
+template <TemplateDispatchTypeClass>
 __aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::SendToMoeExpert()
 {
     uint32_t startTokenId = 0;
@@ -509,26 +579,7 @@ __aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::SendToMo
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
         OOMCheckAddrRange<ExpandXOutType>((__gm__ ExpandXOutType*)(GetWindAddrByRankId(tempRankId)), totalWinSizeEp_);
 #endif
-        if constexpr (DynamicQuant || StaticQuant) {
-            xInTensor_ = xInQueue_.AllocTensor<XType>();
-            DataCopy(xInTensor_, xGMTensor_[tokenIndex / axisK_ * axisH_], axisH_); // 约束对齐
-            xInQueue_.EnQue(xInTensor_);
-            xInTensor_ = xInQueue_.DeQue<XType>();
-            xOutTensor_ = xOutQueue_.AllocTensor<ExpandXOutType>();
-            uint32_t expertIndex = sharedExpertRankNum_ != 0 ? (dstExpertId + 1) : dstExpertId;
-            QuantProcess(expertIndex);
-            xOutQueue_.EnQue(xOutTensor_);
-            xOutTensor_ = xOutQueue_.DeQue<ExpandXOutType>();
-            DataCopy(dstWinGMTensor, xOutTensor_, axisHCommu_); // 约束对齐
-            xOutQueue_.FreeTensor(xOutTensor_);
-        } else {
-            xTmpTensor_ = xQueue_.AllocTensor<ExpandXOutType>();
-            DataCopy(xTmpTensor_, xGMTensor_[tokenIndex / axisK_ * axisH_], axisH_); // 约束对齐
-            xQueue_.EnQue(xTmpTensor_);
-            xTmpTensor_ = xQueue_.DeQue<ExpandXOutType>();
-            DataCopy(dstWinGMTensor, xTmpTensor_, axisHCommu_); // 约束对齐
-            xQueue_.FreeTensor<ExpandXOutType>(xTmpTensor_);
-        }
+        CopyMoeExpertToken(dstWinGMTensor, tokenIndex, dstExpertId);
     }
     GlobalTensor<int32_t> expandIdxGMTensor;
     expandIdxGMTensor.SetGlobalBuffer((__gm__ int32_t*)(expandIdxOutGM_ + startTokenId * sizeof(int32_t)));
@@ -748,77 +799,79 @@ __aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::CreateZe
 }
 
 template <TemplateDispatchTypeClass>
-__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::LocalWindowCopy()
+__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::CopyLocalWindowExpert(
+    LocalTensor<int32_t>& outCountLocal, uint32_t index, uint32_t count, uint32_t& beginIdx)
 {
-    uint32_t totalMoeExpert = 0;
-    LocalTensor<int32_t> outCountLocal;
-    if (isShareExpertRank_) {
-        totalMoeExpert = epWorldSize_;
-    } else {
-        // 处理MOE专家，获取本卡状态空间中的索引及token数目
-        totalMoeExpert = epWorldSize_ * moeExpertNumPerRank_;
+    uint32_t i = index - startExpertId_;
+    if (i > 0) {
+        outCountLocal.SetValue(i, outCountLocal.GetValue(i - 1) + outCountLocal.GetValue(index));
     }
-    SplitToCore(totalMoeExpert, aivNum_, startExpertId_, endExpertId_, sendExpertNum_);
-    if (startExpertId_ >= totalMoeExpert) { // 多余的核return
+    uint32_t countFromStatus = count;
+    beginIdx = outCountLocal.GetValue(i) - countFromStatus;
+    SyncFunc<AscendC::HardEvent::S_MTE2>();
+    if (isShareExpertRank_ && index < sharedExpertRankNum_) {
+        // Shared-expert ranks keep these leading local tokens in place; only epRecvCnt is accumulated.
+        beginIdx += countFromStatus;
         return;
     }
-    GetCumSum(outCountLocal, startExpertId_ + 1);
-    SyncFunc<AscendC::HardEvent::V_S>();
-    uint32_t index = 0;
-    uint32_t beginIdx = 0;
-    for (uint32_t index = startExpertId_; index < endExpertId_; index++) {
-        uint32_t i = index - startExpertId_;
-        if (i > 0) {
-            outCountLocal.SetValue(i, outCountLocal.GetValue(i - 1) + outCountLocal.GetValue(index));
-        }
-        uint32_t count = statusTensor_.GetValue(index * 8 + 1);
-        beginIdx = outCountLocal.GetValue(i) - count;
-        SyncFunc<AscendC::HardEvent::S_MTE2>();
-        if (isShareExpertRank_) {
-            if (index < sharedExpertRankNum_) { // 共享专家前面排布的是本卡数据，只需要统计epRecvCnt，不需要去搬出
-                beginIdx += count;
-                continue;
-            }
-        }
-        uint32_t winOffset = index;
-        if (!isShareExpertRank_) {
-            if (moeExpertNumPerRank_ > 1) {
-                winOffset =
-                    index % epWorldSize_ * moeExpertNumPerRank_ + index / epWorldSize_; // 转换成数据区的排布偏移
-            }
-        }
-        GM_ADDR wAddr = (__gm__ uint8_t*)(windowGM_) + winOffset * expertPerSizeOnWin_;
-        GlobalTensor<ExpandXOutType> tokGlobal;
-        GlobalTensor<ExpandXOutType> expandXOutGlobal;
-#if !(defined(ASCENDC_OOM) && ASCENDC_OOM == 1)
-        tokGlobal.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-#endif
-        for (uint32_t j = 0; j < count; j++) {
-            tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(wAddr + j * hCommuSize_));
-            // 将数据从Window拷贝到UB
-            xTmpTensor_ = xQueue_.AllocTensor<ExpandXOutType>();
-            DataCopy(xTmpTensor_, tokGlobal, axisHCommu_);
-            xQueue_.EnQue(xTmpTensor_);
-            xTmpTensor_ = xQueue_.DeQue<ExpandXOutType>();
-            if constexpr (DynamicQuant || StaticQuant) {
-                xOutFp32Tensor_ = xTmpTensor_.template ReinterpretCast<float>();
-                DataCopyPad(dynamicScalesOutGMTensor_[beginIdx + j], xOutFp32Tensor_[axisH_ / sizeof(float)],
-                            dataCopyParamsFloat_);
-            }
-            expandXOutGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(expandXOutGM_) + (beginIdx + j) * axisH_, axisH_);
-            DataCopy(expandXOutGlobal, xTmpTensor_, axisH_);
-            xQueue_.FreeTensor(xTmpTensor_);
-        }
-        beginIdx += count;
+    uint32_t winOffset = index;
+    if (!isShareExpertRank_ && moeExpertNumPerRank_ > 1) {
+        // Status order is rank-major, while the window data area is laid out expert-major within each rank.
+        winOffset = index % epWorldSize_ * moeExpertNumPerRank_ + index / epWorldSize_;
     }
-    totalCnt_ = beginIdx;
-    lastCore_ = MIN(totalMoeExpert, aivNum_) - 1;
+    GM_ADDR wAddr = (__gm__ uint8_t*)(windowGM_) + winOffset * expertPerSizeOnWin_;
+    GlobalTensor<ExpandXOutType> tokGlobal;
+    GlobalTensor<ExpandXOutType> expandXOutGlobal;
+#if !(defined(ASCENDC_OOM) && ASCENDC_OOM == 1)
+    tokGlobal.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
+#endif
+    for (uint32_t j = 0; j < countFromStatus; j++) {
+        tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(wAddr + j * hCommuSize_));
+        xTmpTensor_ = xQueue_.AllocTensor<ExpandXOutType>();
+        DataCopy(xTmpTensor_, tokGlobal, axisHCommu_);
+        xQueue_.EnQue(xTmpTensor_);
+        xTmpTensor_ = xQueue_.DeQue<ExpandXOutType>();
+        if constexpr (DynamicQuant || StaticQuant) {
+            xOutFp32Tensor_ = xTmpTensor_.template ReinterpretCast<float>();
+            DataCopyPad(dynamicScalesOutGMTensor_[beginIdx + j], xOutFp32Tensor_[axisH_ / sizeof(float)],
+                        dataCopyParamsFloat_);
+        }
+        expandXOutGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(expandXOutGM_) + (beginIdx + j) * axisH_, axisH_);
+        DataCopy(expandXOutGlobal, xTmpTensor_, axisH_);
+        xQueue_.FreeTensor(xTmpTensor_);
+    }
+    beginIdx += countFromStatus;
+}
 
+template <TemplateDispatchTypeClass>
+__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::WriteLocalSendCounts(
+    LocalTensor<int32_t>& outCountLocal)
+{
     DataCopyExtParams dataCopyOutParams = {1U, static_cast<uint32_t>(sendExpertNum_ * sizeof(int32_t)), 0U, 0U, 0U};
     GlobalTensor<int32_t> sendCountsGlobal;
     sendCountsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sendCountsOutGM_));
     DataCopyPad(sendCountsGlobal[startExpertId_], outCountLocal, dataCopyOutParams);
     PipeBarrier<PIPE_MTE3>();
+}
+
+template <TemplateDispatchTypeClass>
+__aicore__ inline void MoeDistributeDispatch<TemplateDispatchTypeFunc>::LocalWindowCopy()
+{
+    uint32_t totalMoeExpert = isShareExpertRank_ ? epWorldSize_ : epWorldSize_ * moeExpertNumPerRank_;
+    LocalTensor<int32_t> outCountLocal;
+    SplitToCore(totalMoeExpert, aivNum_, startExpertId_, endExpertId_, sendExpertNum_);
+    if (startExpertId_ >= totalMoeExpert) {
+        return;
+    }
+    GetCumSum(outCountLocal, startExpertId_ + 1);
+    SyncFunc<AscendC::HardEvent::V_S>();
+    uint32_t beginIdx = 0;
+    for (uint32_t index = startExpertId_; index < endExpertId_; index++) {
+        CopyLocalWindowExpert(outCountLocal, index, statusTensor_.GetValue(index * 8 + 1), beginIdx);
+    }
+    totalCnt_ = beginIdx;
+    lastCore_ = MIN(totalMoeExpert, aivNum_) - 1;
+    WriteLocalSendCounts(outCountLocal);
 }
 
 // 更新多专家卡上的tokenNumsOut tensor

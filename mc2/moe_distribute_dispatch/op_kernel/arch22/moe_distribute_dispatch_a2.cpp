@@ -25,6 +25,37 @@ using namespace MoeDistributeDispatchA2Impl;
 using namespace Mc2Tiling;
 using namespace AscendC;
 
+template <bool DynamicQuant, bool SmoothScale>
+__aicore__ inline void RunA2Mte(GM_ADDR x, GM_ADDR expertIds, GM_ADDR scales, GM_ADDR xActiveMask, GM_ADDR expandXOut,
+                                GM_ADDR dynamicScalesOut, GM_ADDR expandIdxOut, GM_ADDR expertTokenNumsOut,
+                                GM_ADDR epSendCountsOut, GM_ADDR workspaceGM, TPipe* pipe, GM_ADDR tilingGM)
+{
+    MoeDistributeDispatchA2<DTYPE_X, DTYPE_EXPAND_X, false, DynamicQuant, SmoothScale, false> op;
+    op.Init(x, expertIds, scales, xActiveMask, nullptr, expandXOut, dynamicScalesOut, expandIdxOut, expertTokenNumsOut,
+            epSendCountsOut, workspaceGM, pipe, tilingGM);
+    op.Process();
+}
+
+template <bool DynamicQuant, bool SmoothScale>
+__aicore__ inline void RunA2Layered(GM_ADDR x, GM_ADDR expertIds, GM_ADDR scales, GM_ADDR expertScales,
+                                    GM_ADDR expandXOut, GM_ADDR dynamicScalesOut, GM_ADDR expandIdxOut,
+                                    GM_ADDR expertTokenNumsOut, GM_ADDR epSendCountsOut, GM_ADDR expandScalesOut,
+                                    GM_ADDR workspaceGM, TPipe* pipe, GM_ADDR tilingGM, GM_ADDR contextGM0)
+{
+    DataplaneMode dataplaneMode = GetDataplaneMode(contextGM0);
+    if (dataplaneMode == DataplaneMode::AICPU) {
+        MoeDistributeDispatchA2LayeredAicpu<DTYPE_X, DTYPE_EXPAND_X, false, DynamicQuant, SmoothScale> op;
+        op.Init(x, expertIds, scales, expertScales, expandXOut, dynamicScalesOut, expandIdxOut, expertTokenNumsOut,
+                epSendCountsOut, expandScalesOut, workspaceGM, pipe, tilingGM, contextGM0);
+        op.Process();
+    } else if (dataplaneMode == DataplaneMode::AIV) {
+        MoeDistributeDispatchA2Layered<DTYPE_X, DTYPE_EXPAND_X, false, DynamicQuant, SmoothScale> op;
+        op.Init(x, expertIds, scales, expertScales, nullptr, expandXOut, dynamicScalesOut, expandIdxOut,
+                expertTokenNumsOut, epSendCountsOut, expandScalesOut, workspaceGM, pipe, tilingGM, contextGM0);
+        op.Process();
+    }
+}
+
 template <uint8_t QuantMode, bool ScaleMode, uint8_t FullMesh, uint8_t CommMode, uint8_t ArchTag>
 __global__ __aicore__ void moe_distribute_dispatch(GM_ADDR x, GM_ADDR expertIds, GM_ADDR scales, GM_ADDR xActiveMask,
                                                    GM_ADDR expertScales, GM_ADDR expandXOut, GM_ADDR dynamicScalesOut,
@@ -35,66 +66,18 @@ __global__ __aicore__ void moe_distribute_dispatch(GM_ADDR x, GM_ADDR expertIds,
     REGISTER_TILING_DEFAULT(MoeDistributeDispatchA2TilingData);
     GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchA2TilingData, tilingData, tilingGM);
     TPipe pipe;
-#if ((ORIG_DTYPE_EXPAND_X == DT_BF16) || (ORIG_DTYPE_EXPAND_X == DT_FLOAT16))
+#if ((ORIG_DTYPE_EXPAND_X == DT_BF16) || (ORIG_DTYPE_EXPAND_X == DT_FLOAT16) || (ORIG_DTYPE_EXPAND_X == DT_INT8))
+    constexpr bool dynamicQuant = (ORIG_DTYPE_EXPAND_X == DT_INT8);
+    constexpr bool smoothScale = dynamicQuant && ScaleMode;
     if constexpr ((ArchTag == TILINGKEY_TPL_A2) && (CommMode == TILINGKEY_TPL_MTE)) {
-        MoeDistributeDispatchA2<DTYPE_X, DTYPE_EXPAND_X, false, false, false, false> op;
-        op.Init(x, expertIds, scales, xActiveMask, nullptr, expandXOut, dynamicScalesOut, expandIdxOut,
-                expertTokenNumsOut, epSendCountsOut, workspaceGM, &pipe, tilingGM);
-        op.Process();
+        RunA2Mte<dynamicQuant, smoothScale>(x, expertIds, scales, xActiveMask, expandXOut, dynamicScalesOut,
+                                            expandIdxOut, expertTokenNumsOut, epSendCountsOut, workspaceGM, &pipe,
+                                            tilingGM);
     } else if constexpr ((ArchTag == TILINGKEY_TPL_A2) && (CommMode == TILINGKEY_TPL_AICPU)) {
         GM_ADDR contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-        DataplaneMode dataplaneMode = GetDataplaneMode(contextGM0);
-        if (dataplaneMode == DataplaneMode::AICPU) {
-            MoeDistributeDispatchA2LayeredAicpu<DTYPE_X, DTYPE_EXPAND_X, false, false, false> op;
-            op.Init(x, expertIds, scales, expertScales, expandXOut, dynamicScalesOut, expandIdxOut, expertTokenNumsOut,
-                    epSendCountsOut, expandScalesOut, workspaceGM, &pipe, tilingGM, contextGM0);
-            op.Process();
-        } else if (dataplaneMode == DataplaneMode::AIV) {
-            MoeDistributeDispatchA2Layered<DTYPE_X, DTYPE_EXPAND_X, false, false, false> op;
-            op.Init(x, expertIds, scales, expertScales, nullptr, expandXOut, dynamicScalesOut, expandIdxOut,
-                    expertTokenNumsOut, epSendCountsOut, expandScalesOut, workspaceGM, &pipe, tilingGM, contextGM0);
-            op.Process();
-        }
-    }
-#elif (ORIG_DTYPE_EXPAND_X == DT_INT8)
-    if constexpr ((ArchTag == TILINGKEY_TPL_A2) && (CommMode == TILINGKEY_TPL_MTE) && (ScaleMode == false)) {
-        MoeDistributeDispatchA2<DTYPE_X, DTYPE_EXPAND_X, false, true, false, false> op;
-        op.Init(x, expertIds, scales, xActiveMask, nullptr, expandXOut, dynamicScalesOut, expandIdxOut,
-                expertTokenNumsOut, epSendCountsOut, workspaceGM, &pipe, tilingGM);
-        op.Process();
-    } else if constexpr ((ArchTag == TILINGKEY_TPL_A2) && (CommMode == TILINGKEY_TPL_MTE) && (ScaleMode == true)) {
-        MoeDistributeDispatchA2<DTYPE_X, DTYPE_EXPAND_X, false, true, true, false> op;
-        op.Init(x, expertIds, scales, xActiveMask, nullptr, expandXOut, dynamicScalesOut, expandIdxOut,
-                expertTokenNumsOut, epSendCountsOut, workspaceGM, &pipe, tilingGM);
-        op.Process();
-    } else if constexpr ((ArchTag == TILINGKEY_TPL_A2) && (CommMode == TILINGKEY_TPL_AICPU) && (ScaleMode == false)) {
-        GM_ADDR contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-        DataplaneMode dataplaneMode = GetDataplaneMode(contextGM0);
-        if (dataplaneMode == DataplaneMode::AICPU) {
-            MoeDistributeDispatchA2LayeredAicpu<DTYPE_X, DTYPE_EXPAND_X, false, true, false> op;
-            op.Init(x, expertIds, scales, expertScales, expandXOut, dynamicScalesOut, expandIdxOut, expertTokenNumsOut,
-                    epSendCountsOut, expandScalesOut, workspaceGM, &pipe, tilingGM, contextGM0);
-            op.Process();
-        } else if (dataplaneMode == DataplaneMode::AIV) {
-            MoeDistributeDispatchA2Layered<DTYPE_X, DTYPE_EXPAND_X, false, true, false> op;
-            op.Init(x, expertIds, scales, expertScales, nullptr, expandXOut, dynamicScalesOut, expandIdxOut,
-                    expertTokenNumsOut, epSendCountsOut, expandScalesOut, workspaceGM, &pipe, tilingGM, contextGM0);
-            op.Process();
-        }
-    } else if constexpr ((ArchTag == TILINGKEY_TPL_A2) && (CommMode == TILINGKEY_TPL_AICPU) && (ScaleMode == true)) {
-        GM_ADDR contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-        DataplaneMode dataplaneMode = GetDataplaneMode(contextGM0);
-        if (dataplaneMode == DataplaneMode::AICPU) {
-            MoeDistributeDispatchA2LayeredAicpu<DTYPE_X, DTYPE_EXPAND_X, false, true, true> op;
-            op.Init(x, expertIds, scales, expertScales, expandXOut, dynamicScalesOut, expandIdxOut, expertTokenNumsOut,
-                    epSendCountsOut, expandScalesOut, workspaceGM, &pipe, tilingGM, contextGM0);
-            op.Process();
-        } else if (dataplaneMode == DataplaneMode::AIV) {
-            MoeDistributeDispatchA2Layered<DTYPE_X, DTYPE_EXPAND_X, false, true, true> op;
-            op.Init(x, expertIds, scales, expertScales, nullptr, expandXOut, dynamicScalesOut, expandIdxOut,
-                    expertTokenNumsOut, epSendCountsOut, expandScalesOut, workspaceGM, &pipe, tilingGM, contextGM0);
-            op.Process();
-        }
+        RunA2Layered<dynamicQuant, smoothScale>(x, expertIds, scales, expertScales, expandXOut, dynamicScalesOut,
+                                                expandIdxOut, expertTokenNumsOut, epSendCountsOut, expandScalesOut,
+                                                workspaceGM, &pipe, tilingGM, contextGM0);
     }
 #endif
 }
