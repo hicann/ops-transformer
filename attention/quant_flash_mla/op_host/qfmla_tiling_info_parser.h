@@ -134,7 +134,7 @@ private:
     int64_t attenMaskS2Size_ = 0;
 
     // quant
-    QfmlaQuantMode quantMode_ = QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT;
+    QfmlaQuantMode quantMode_ = QfmlaQuantMode::A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR;
     float softmaxScale_ = 1.0f / 24.0f;
 
     // layout

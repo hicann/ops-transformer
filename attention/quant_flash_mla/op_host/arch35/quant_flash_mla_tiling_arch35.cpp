@@ -10,7 +10,7 @@
 
 /*!
  * \file quant_flash_mla_tiling_arch35.cpp
- * \brief QuantFlashMla arch35 tiling implementation (MLA_FP8_E4M3_FULLQUANT)
+ * \brief QuantFlashMla arch35 tiling implementation
  */
 
 #include "quant_flash_mla_tiling_arch35.h"
@@ -45,14 +45,16 @@ bool QuantFlashMlaTilingFp8Impl::IsCapable()
     if (qfmlaInfo_ == nullptr) {
         return false;
     }
-    if (qfmlaInfo_->quantMode != QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT &&
-        qfmlaInfo_->quantMode != QfmlaQuantMode::MLA_HIF8_FULLQUANT) {
+    if (static_cast<int64_t>(qfmlaInfo_->quantMode) != A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR &&
+        static_cast<int64_t>(qfmlaInfo_->quantMode) != A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR) {
         return false;
     }
-    if (qfmlaInfo_->quantMode == QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT && qfmlaInfo_->qType != ge::DT_FLOAT8_E4M3FN) {
+    if (static_cast<int64_t>(qfmlaInfo_->quantMode) == A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR &&
+        qfmlaInfo_->qType != ge::DT_FLOAT8_E4M3FN) {
         return false;
     }
-    if (qfmlaInfo_->quantMode == QfmlaQuantMode::MLA_HIF8_FULLQUANT && qfmlaInfo_->qType != ge::DT_HIFLOAT8) {
+    if (static_cast<int64_t>(qfmlaInfo_->quantMode) == A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR &&
+        qfmlaInfo_->qType != ge::DT_HIFLOAT8) {
         return false;
     }
     return true;
@@ -176,10 +178,8 @@ void QuantFlashMlaTilingFp8Impl::UpdateTilingKeyKvLayout()
 
 void QuantFlashMlaTilingFp8Impl::UpdateTilingKeyQuantMode()
 {
-    // tiling key的QuantMode与quant_mode属性一致: 1=FP8_E4M3全量化, 0=HIF8全量化
-    tilingKeyInfo_.quantMode = (qfmlaInfo_->quantMode == QfmlaQuantMode::MLA_HIF8_FULLQUANT) ?
-                                   QFMLA_MLA_HIF8_FULLQUANT :
-                                   QFMLA_MLA_FP8_E4M3_FULLQUANT;
+    // tiling key的QuantMode与quant_mode属性一致: 0=HIF8全量化, 1=FP8_E4M3全量化
+    tilingKeyInfo_.quantMode = static_cast<uint64_t>(qfmlaInfo_->quantMode);
 }
 
 void QuantFlashMlaTilingFp8Impl::UpdateTilingKeyInfo()

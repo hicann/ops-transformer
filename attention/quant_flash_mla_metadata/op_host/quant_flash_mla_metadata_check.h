@@ -88,17 +88,19 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::CheckBaseAttr(int64_t maxSeqlenQ,
                                                              int64_t numHeadsKv, int64_t headDimQk, int64_t headDimV,
                                                              int64_t quantMode, const char* layoutQ)
 {
-    constexpr int64_t MLA_FP8_E4M3_FULLQUANT = 1;
-    constexpr int64_t MLA_HIF8_FULLQUANT = 0;
+    constexpr int64_t A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR = 0;
+    constexpr int64_t A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR = 1;
     constexpr int64_t MLA_INT8_FULLQUANT = 2;
-    static const std::unordered_set<int64_t> quantModeSet = {MLA_FP8_E4M3_FULLQUANT, MLA_HIF8_FULLQUANT,
+    static const std::unordered_set<int64_t> quantModeSet = {A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR,
+                                                             A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR,
                                                              MLA_INT8_FULLQUANT};
     CHECK_COND(quantModeSet.count(quantMode) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "quantMode only supports 1 (MLA_FP8_E4M3_FULLQUANT), 0 (MLA_HIF8_FULLQUANT) or "
+               "quantMode only supports 0 (A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR), 1 "
+               "(A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR) or "
                "2 (MLA_INT8_FULLQUANT, arch22), but got %ld",
                quantMode);
     // A2/A5 场景按 npuArch 区分（npuArch 为唯一场景依据，与主算子 parser 交叉校验对齐）:
-    // arch22(DAV_2201) 仅支持 quant_mode=2 (MLA_INT8_FULLQUANT); A5(DAV_3510/DAV_9201) 仅支持 1 (FP8) / 0 (HIF8)
+    // arch22(DAV_2201) 仅支持 quant_mode=2 (MLA_INT8_FULLQUANT); A5(DAV_3510/DAV_9201) 仅支持 0 (HIF8) / 1 (FP8)
     const bool isArch22 = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201;
     CHECK_COND(isArch22 == (quantMode == MLA_INT8_FULLQUANT), ACLNN_ERR_RUNTIME_ERROR,
                "quantMode=%ld does not match current NpuArch(%d): quant_mode=2 (MLA_INT8_FULLQUANT) is arch22 "

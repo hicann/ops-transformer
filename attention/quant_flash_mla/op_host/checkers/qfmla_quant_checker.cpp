@@ -34,8 +34,9 @@ using namespace Ops::Base;
 
 ge::graphStatus QuantChecker::CheckSingleParaQuantMode(const QfmlaTilingInfo& qfmlaInfo)
 {
-    // quant_mode: 支持 1 (MLA_FP8_E4M3_FULLQUANT)、0 (MLA_HIF8_FULLQUANT)、2 (MLA_INT8_FULLQUANT, arch22)
-    // (取值合法性已在 parser 中校验, q/k dtype 匹配在 CommonChecker::CheckSingleParaDtype 中校验)
+    // quant_mode: 支持 0 (A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR)、1
+    // (A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR)、2 (MLA_INT8_FULLQUANT, arch22) (取值合法性已在 parser
+    // 中校验, q/k dtype 匹配在 CommonChecker::CheckSingleParaDtype 中校验)
     (void)qfmlaInfo;
     return ge::GRAPH_SUCCESS;
 }

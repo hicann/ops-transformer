@@ -112,13 +112,13 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
     (void)qRope; // arch22 int8专用输入, arch92不使用
     (void)kRope;
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
-    if constexpr (quantMode == QFMLA_MLA_FP8_E4M3_FULLQUANT) {
+    if constexpr (quantMode == A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR) {
         quant_flash_mla_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(
             query, key, qDescale, kDescale, blockTable, cacheSeqLens, cuSeqLensQ, sequsedQ, attnMask, metadata, attnOut,
             softmaxLse, workspace, tiling);
     }
 #elif (ORIG_DTYPE_Q == DT_HIFLOAT8)
-    if constexpr (quantMode == QFMLA_MLA_HIF8_FULLQUANT) {
+    if constexpr (quantMode == A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR) {
         quant_flash_mla_fp8<hifloat8_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(
             query, key, qDescale, kDescale, blockTable, cacheSeqLens, cuSeqLensQ, sequsedQ, attnMask, metadata, attnOut,
             softmaxLse, workspace, tiling);
@@ -223,14 +223,14 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
     (void)qRope; // arch22 int8专用输入, arch35不使用
     (void)kRope;
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
-    if constexpr (quantMode == QFMLA_MLA_FP8_E4M3_FULLQUANT) {
+    if constexpr (quantMode == A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR) {
         quant_flash_mla_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(
             query, key, qDescale, kDescale, blockTable, cacheSeqLens, cuSeqLensQ, sequsedQ, attnMask, metadata, attnOut,
             softmaxLse, workspace, tiling);
     }
 #elif (ORIG_DTYPE_Q == DT_HIFLOAT8)
     // MLA HIF8全量化: 复用fp8模板(hifloat8_t实例化), P矩阵cast在vec块内按INPUT_T分支
-    if constexpr (quantMode == QFMLA_MLA_HIF8_FULLQUANT) {
+    if constexpr (quantMode == A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR) {
         quant_flash_mla_fp8<hifloat8_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(
             query, key, qDescale, kDescale, blockTable, cacheSeqLens, cuSeqLensQ, sequsedQ, attnMask, metadata, attnOut,
             softmaxLse, workspace, tiling);

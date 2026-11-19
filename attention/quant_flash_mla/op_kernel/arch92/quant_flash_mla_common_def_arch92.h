@@ -26,10 +26,10 @@
 #endif
 
 // QuantMode（quant_mode属性/tiling key取值）
-// 1: Q/K均为FP8_E4M3全量化, Q per-token-head动态量化, K per-tensor静态量化
 // 0: Q/K均为HIFLOAT8全量化, 量化粒度与FP8场景一致
-#define QFMLA_MLA_FP8_E4M3_FULLQUANT 1
-#define QFMLA_MLA_HIF8_FULLQUANT 0
+// 1: Q/K均为FP8_E4M3全量化, Q per-token-head动态量化, K per-tensor静态量化
+#define A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR 0
+#define A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR 1
 
 // InOutLayoutType: TND输入时输出layout由layout_out属性决定; BSND/BNSD输入时输出与输入同layout
 #define InOutLayoutType_TND_TND 0   // 输入TND, 输出TND

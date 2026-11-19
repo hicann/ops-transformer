@@ -56,8 +56,8 @@ enum class QfmlaKvLayout : int64_t {
 
 // MLA量化模式
 enum class QfmlaQuantMode : int64_t {
-    MLA_HIF8_FULLQUANT = 0,
-    MLA_FP8_E4M3_FULLQUANT = 1,
+    A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR = 0,
+    A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR = 1,
     MLA_INT8_FULLQUANT = 2, // arch22: Q/KV均INT8（Q per-token-head、KV per-tensor），rope分离
 };
 
@@ -139,7 +139,7 @@ struct QfmlaTilingInfo : public TilingInfo {
     int64_t attenMaskS2Size = 0;
 
     // Quant
-    QfmlaQuantMode quantMode = QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT;
+    QfmlaQuantMode quantMode = QfmlaQuantMode::A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR;
     float softmaxScale = 1.0f / 24.0f;
 
     // arch22 int8全量化: rope分离标志（KV descale统一由k_descale承载, 无独立v_descale）

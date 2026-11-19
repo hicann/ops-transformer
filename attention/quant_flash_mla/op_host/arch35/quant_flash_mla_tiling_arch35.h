@@ -10,7 +10,7 @@
 
 /*!
  * \file quant_flash_mla_tiling_arch35.h
- * \brief QuantFlashMla arch35 tiling implementation (MLA_FP8_E4M3_FULLQUANT)
+ * \brief QuantFlashMla arch35 tiling implementation
  */
 #ifndef QUANT_FLASH_MLA_TILING_IMPL_FP8_H_
 #define QUANT_FLASH_MLA_TILING_IMPL_FP8_H_

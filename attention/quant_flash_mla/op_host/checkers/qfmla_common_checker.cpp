@@ -101,10 +101,11 @@ ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfmlaTilingInfo& qfmla
         expectDtypeName = "int8";
         sceneName = "MLA_INT8_FULLQUANT";
     } else {
-        const bool isHif8 = qfmlaInfo.quantMode == QfmlaQuantMode::MLA_HIF8_FULLQUANT;
+        const bool isHif8 = qfmlaInfo.quantMode == QfmlaQuantMode::A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR;
         expectDtype = isHif8 ? ge::DT_HIFLOAT8 : ge::DT_FLOAT8_E4M3FN;
         expectDtypeName = isHif8 ? "hifloat8" : "float8_e4m3fn";
-        sceneName = isHif8 ? "MLA_HIF8_FULLQUANT" : "MLA_FP8_E4M3_FULLQUANT";
+        sceneName = isHif8 ? "A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR" :
+                             "A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR";
     }
     // q: dtype 与 quant_mode 匹配
     OP_CHECK_IF(qfmlaInfo.qType != expectDtype,

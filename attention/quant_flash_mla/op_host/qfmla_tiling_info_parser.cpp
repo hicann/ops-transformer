@@ -221,20 +221,22 @@ ge::graphStatus QfmlaInfoParser::GetQuantMode()
     OP_CHECK_IF(opParamInfo_.quantMode == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "quant_mode"),
                 return ge::GRAPH_FAILED);
     int64_t quantModeVal = *opParamInfo_.quantMode;
-    if (quantModeVal != static_cast<int64_t>(QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT) &&
-        quantModeVal != static_cast<int64_t>(QfmlaQuantMode::MLA_HIF8_FULLQUANT) &&
+    if (quantModeVal != static_cast<int64_t>(QfmlaQuantMode::A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR) &&
+        quantModeVal != static_cast<int64_t>(QfmlaQuantMode::A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR) &&
         quantModeVal != static_cast<int64_t>(QfmlaQuantMode::MLA_INT8_FULLQUANT)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
-            "quant_mode must be 1 (MLA_FP8_E4M3_FULLQUANT: Q/K/V FP8_E4M3, Q per-token-head, K per-tensor) "
-            "or 0 (MLA_HIF8_FULLQUANT: Q/K/V HIFLOAT8, Q per-token-head, K per-tensor) "
+            "quant_mode must be 0 (A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR: Q/K/V HIFLOAT8, Q per-token-head, K "
+            "per-tensor) "
+            "or 1 (A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR: Q/K/V FP8_E4M3, Q per-token-head, K "
+            "per-tensor) "
             "or 2 (MLA_INT8_FULLQUANT: Q/K/V INT8, Q per-token-head, K per-tensor, rope split, arch22 only)");
         return ge::GRAPH_FAILED;
     }
     quantMode_ = static_cast<QfmlaQuantMode>(quantModeVal);
     // A2/A5 场景按 npuArch 区分（npuArch 为唯一场景依据，GetNpuInfo 先于本函数执行）:
     // arch22(DAV_2201) 仅支持 quant_mode=2 (MLA_INT8_FULLQUANT);
-    // A5(DAV_3510/DAV_9201) 仅支持 quant_mode=1 (FP8) / 0 (HIF8)
+    // A5(DAV_3510/DAV_9201) 仅支持 quant_mode=0 (HIF8) / 1 (FP8)
     OP_CHECK_IF(
         npuArch_ == NpuArch::DAV_2201 && quantModeVal != static_cast<int64_t>(QfmlaQuantMode::MLA_INT8_FULLQUANT),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(

@@ -35,8 +35,8 @@ ASCENDC_TPL_ARGS_DECL(QuantFlashMla,
                       //    0: Config_S1Aligned64_S2Aligned256_DAligned576_DVAligned512
                       ASCENDC_TPL_UINT_DECL(Config, ASCENDC_TPL_10_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 1023),
                       //    QuantMode (5-bit)
-                      //    1: QFMLA_MLA_FP8_E4M3_FULLQUANT
-                      //    0: QFMLA_MLA_HIF8_FULLQUANT
+                      //    0: A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR
+                      //    1: A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR
                       ASCENDC_TPL_UINT_DECL(QuantMode, ASCENDC_TPL_5_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 31),
                       //    HasAttenMask
                       //    false / true
@@ -56,7 +56,8 @@ ASCENDC_TPL_SEL(
         ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND, InOutLayoutType_TND_NTD,
                              InOutLayoutType_BSND_BSND, InOutLayoutType_BNSD_BNSD),
         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned64_S2Aligned256_DAligned576_DVAligned512),
-        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFMLA_MLA_FP8_E4M3_FULLQUANT, QFMLA_MLA_HIF8_FULLQUANT),
+        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR,
+                             A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR),
         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD,
                              KvLayoutType_PA_NZ),

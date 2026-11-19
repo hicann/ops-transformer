@@ -29,8 +29,8 @@ MLA_ROPE_DIM = 64
 class QuantMode(IntEnum):
     """quant_mode 枚举：对外字符串/int 经由本枚举映射为传给算子侧的 int。"""
 
-    MLA_FP8_E4M3_FULLQUANT = 1
-    MLA_HIF8_FULLQUANT = 0
+    A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR = 0
+    A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR = 1
     MLA_INT8_FULLQUANT = (
         2  # arch22: Q/KV INT8（Q per-token-head、KV per-tensor），rope分离
     )
@@ -220,12 +220,12 @@ def _check_metadata_parameters(
     torch._check(
         quant_mode
         in (
-            int(QuantMode.MLA_FP8_E4M3_FULLQUANT),
-            int(QuantMode.MLA_HIF8_FULLQUANT),
+            int(QuantMode.A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR),
+            int(QuantMode.A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR),
             int(QuantMode.MLA_INT8_FULLQUANT),
         ),
-        lambda: f"quant_mode only supports 1 (MLA_FP8_E4M3_FULLQUANT), "
-        f"0 (MLA_HIF8_FULLQUANT) or 2 (MLA_INT8_FULLQUANT, arch22), but got {quant_mode}",
+        lambda: f"quant_mode only supports 0 (A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR), "
+        f"1 (A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR) or 2 (MLA_INT8_FULLQUANT, arch22), but got {quant_mode}",
     )
     is_int8 = quant_mode == int(QuantMode.MLA_INT8_FULLQUANT)
     torch._check(
@@ -488,7 +488,7 @@ def quant_flash_mla_metadata(
     if quant_mode not in (0, 1, 2):
         raise ValueError(
             f"The quant_mode of quant_flash_mla_metadata only supports "
-            f"1 (MLA_FP8_E4M3_FULLQUANT), 0 (MLA_HIF8_FULLQUANT) or "
+            f"0 (A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR), 1 (A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR) or "
             f"2 (MLA_INT8_FULLQUANT, arch22), but got {quant_mode}"
         )
     if num_heads_kv != 1:
@@ -626,7 +626,7 @@ def quant_flash_mla(
     if quant_mode not in (0, 1, 2):
         raise ValueError(
             f"The quant_mode of quant_flash_mla only supports "
-            f"1 (MLA_FP8_E4M3_FULLQUANT), 0 (MLA_HIF8_FULLQUANT) or "
+            f"0 (A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR), 1 (A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR) or "
             f"2 (MLA_INT8_FULLQUANT, arch22), but got {quant_mode}"
         )
     quant_mode = _resolve_quant_mode(quant_mode)
@@ -696,7 +696,9 @@ def quant_flash_mla(
         raise ValueError(
             f"k_cache with layout {layout_kv} expects {kv_expected} dims, but got {k_cache.dim()} dims"
         )
-    if quant_mode == int(QuantMode.MLA_FP8_E4M3_FULLQUANT):
+    if quant_mode == int(
+        QuantMode.A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR
+    ):
         if q.dtype != torch.float8_e4m3fn:
             raise ValueError(
                 f"In FP8_E4M3 mode (quant_mode=1), q must be float8_e4m3fn, but got {q.dtype}"
@@ -705,7 +707,7 @@ def quant_flash_mla(
             raise ValueError(
                 f"In FP8_E4M3 mode (quant_mode=1), k_cache must be float8_e4m3fn, but got {k_cache.dtype}"
             )
-    elif quant_mode == int(QuantMode.MLA_HIF8_FULLQUANT):
+    elif quant_mode == int(QuantMode.A8C8_Q_HIF8_PER_TOKEN_HEAD_KV_HIF8_PER_TENSOR):
         # HIF8: torch侧无原生hifloat8 dtype, 以uint8承载hif8编码, csrc侧映射为ACL_HIFLOAT8
         if q.dtype != torch.uint8:
             raise ValueError(
