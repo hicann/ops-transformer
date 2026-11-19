@@ -1433,6 +1433,9 @@ public:
             QfaState().qfaVScaleCache_ = QfaState().qfaVDescaleGm.GetValue(head * QfaState().qfaVDescaleStrideHead);
             const uint32_t pages = (kvLength + constInfo.kvCacheBlockSize - 1U) / constInfo.kvCacheBlockSize;
             if (QfaState().planCachedBatch != batch) {
+                const auto btWar = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE2));
+                SetFlag<HardEvent::S_MTE2>(btWar);
+                WaitFlag<HardEvent::S_MTE2>(btWar);
                 QfaState().planCachedBatch = batch;
                 QfaState().qfaTaskBtCount_ = pages <= QFA_BT_CACHE_ELEMS ? pages : 0U;
                 if (QfaState().qfaTaskBtCount_ != 0U) {
