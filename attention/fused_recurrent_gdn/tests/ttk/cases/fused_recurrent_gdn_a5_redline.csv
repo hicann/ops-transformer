@@ -1,0 +1,2 @@
+testcase_name,api_name,tensor_view_shapes,tensor_dtypes,attributes,input_data_ranges,is_enabled,golden_api,remark,absolute_precision
+ARC-011,gdn_ttk_ops.fused_recurrent_gdn,"((2048, 2, 128), (2048, 2, 128), (2048, 2, 128), (2048, 2), (2048, 2), (1, 2, 128, 128))","('bfloat16', 'bfloat16', 'bfloat16', 'bfloat16', 'float32', 'float32')","{'scale': 1.0, 'seed': 101}","((0, 1), (0, 1), (0, 1), (0, 1), (-1, 0), (0, 1))",true,,PR 15847 ARC-011 adapted to static TND with external Q/K normalization,"(0.01, 0.0001)"
