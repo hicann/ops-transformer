@@ -23,6 +23,7 @@ const int64_t QUANT_MODE_MXFP4 = 5;
 const int64_t QUANT_MODE_HIF8 = 0;
 const int64_t QUANT_MODE_HIF4 = 10;
 const int64_t QUANT_MODE_A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16 = 12;
+const int64_t QUANT_MODE_HIF4_P_HIF4_LEVEL1 = 7;
 const int64_t FLOAT4_E2M1 = 296;
 const int64_t FLOAT8_E8M0 = 293;
 const int64_t HIFLOAT8 = 34;
@@ -33,7 +34,8 @@ inline int64_t GetQkvDtypeRatio(int64_t quant_mode)
 {
     // mxfp4 时 q/k/v 在 Python 端被 pack 成 uint8（每 byte 2 个 fp4 元素），
     // 因此 v.size(-1) 是 packed 维度（d/2），output 需要展开为逻辑 d（即 2 倍）。
-    if (quant_mode == QUANT_MODE_MXFP4 || quant_mode == QUANT_MODE_HIF4) {
+    if (quant_mode == QUANT_MODE_MXFP4 || quant_mode == QUANT_MODE_HIF4 ||
+        quant_mode == QUANT_MODE_HIF4_P_HIF4_LEVEL1) {
         return 2;
     }
     return 1;
@@ -146,7 +148,7 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_attn_impl(
                     "Compact INT8 output must remain within its physical 32-channel alignment bucket");
     }
     TORCH_CHECK(quant_mode == 0 || quant_mode == 1 || quant_mode == 3 || quant_mode == 5 || quant_mode == 6 ||
-                    quant_mode == 10 ||
+                    quant_mode == 10 || quant_mode == QUANT_MODE_HIF4_P_HIF4_LEVEL1 ||
                     quant_mode == QUANT_MODE_A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16,
                 "Unsupported quant_mode");
     const bool pagedInt8 =
@@ -261,7 +263,7 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_attn_impl(
                   block_table_tail, seqused_v_tail, quant_mode, softmax_scale, mask_mode, win_left, win_right,
                   max_seqlen_q, max_seqlen_kv, layout_q_ptr, layout_q_descale_ptr, layout_kv_ptr, layout_out_ptr,
                   return_softmax_lse, attentionOutput, softmaxLse);
-    } else if (quant_mode == QUANT_MODE_HIF4) {
+    } else if (quant_mode == QUANT_MODE_HIF4 || quant_mode == QUANT_MODE_HIF4_P_HIF4_LEVEL1) {
         TensorWrapper q_wrapper = make_wrapper(q, HIFLOAT4);
         TensorWrapper k_wrapper = make_wrapper(k, HIFLOAT4);
         TensorWrapper v_wrapper = make_wrapper(v, HIFLOAT4);

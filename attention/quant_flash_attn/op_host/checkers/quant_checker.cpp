@@ -43,6 +43,7 @@ const std::map<QfaQuantMode, std::pair<ge::DataType, std::string>> DESCALE_DTYPE
     {QfaQuantMode::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32,
      {Ops::Transformer::DT_FLOAT, "FLOAT32"}},
     {QfaQuantMode::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32, {Ops::Transformer::DT_FLOAT, "FLOAT32"}},
+    {QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16, {Ops::Transformer::DT_HIFLOAT4_SCALE, "HIFLOAT4_SCALE"}},
     {QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16, {Ops::Transformer::DT_HIFLOAT4_SCALE, "HIFLOAT4_SCALE"}},
 };
 } // namespace
@@ -74,6 +75,16 @@ ge::graphStatus QuantChecker::CheckSingleParaQuantMode(const QfaTilingInfo& qfaI
                 supportedQuantModes.end(),
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "quant_mode", std::to_string(quantModeVal).c_str(),
                                                   "The value of quant_mode must be 1 (MxFP8) or 10 (HiF4)"),
+            return ge::GRAPH_FAILED);
+    } else if (qfaInfo.npuArch == NpuArch::DAV_9202) {
+        // 支持输入范围为 1、10
+        const std::vector<uint32_t> supportedQuantModes = {
+            static_cast<uint32_t>(QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16)};
+        OP_CHECK_IF(
+            std::find(supportedQuantModes.begin(), supportedQuantModes.end(), quantModeVal) ==
+                supportedQuantModes.end(),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "quant_mode", std::to_string(quantModeVal).c_str(),
+                                                  "The value of quant_mode must be 7 (HiF4_P_HIF4_LEVEL1)"),
             return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -919,6 +930,10 @@ ge::graphStatus QuantChecker::CheckDescaleDtype(const QfaTilingInfo& qfaInfo) co
             qfaInfo.quantMode != QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) {
             return ge::GRAPH_SUCCESS;
         }
+    } else if (qfaInfo.npuArch == NpuArch::DAV_9202) {
+        if (qfaInfo.quantMode != QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16) {
+            return ge::GRAPH_SUCCESS;
+        }
     }
 
     const auto it = DESCALE_DTYPE_TABLE.find(qfaInfo.quantMode);
@@ -986,6 +1001,8 @@ const std::map<QfaQuantMode, QfaLayoutConstraintConfig> QFA_LAYOUT_CONSTRAINT_TA
       {QfaLayout::TND, QfaLayout::BSND, QfaLayout::BNSD},
       {QfaLayout::BSND},
       true}},
+    {QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16,
+     {{QfaLayout::BNSD}, {QfaLayout::BNSD}, {QfaLayout::BNSD}, {QfaLayout::BNSD}, true}},
     {QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16,
      {{QfaLayout::BNSD}, {QfaLayout::BNSD}, {QfaLayout::BNSD}, {QfaLayout::BNSD}, true}},
 };
@@ -1584,7 +1601,8 @@ ge::graphStatus QuantChecker::CheckQkvDtype(const QfaTilingInfo& qfaInfo) const
     if (qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
         expectedDtype = Ops::Transformer::DT_HIFLOAT8;
         expectedDtypeStr = "HIFLOAT8";
-    } else if (qfaInfo.quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) {
+    } else if (qfaInfo.quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16 ||
+               qfaInfo.quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16) {
         expectedDtype = Ops::Transformer::DT_HIFLOAT4;
         expectedDtypeStr = "HIFLOAT4";
     } else {
@@ -1631,7 +1649,8 @@ ge::graphStatus QuantChecker::CheckQkvShapeDim(const QfaTilingInfo& qfaInfo) con
         qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
         supportedDims = {DIM_NUM_3, DIM_NUM_4};
         dimStr = "3D/4D";
-    } else if (qfaInfo.quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) {
+    } else if (qfaInfo.quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16 ||
+               qfaInfo.quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16) {
         supportedDims = {DIM_NUM_4};
         dimStr = "4D";
     } else {

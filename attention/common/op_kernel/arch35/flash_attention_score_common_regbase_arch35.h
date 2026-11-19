@@ -37,6 +37,7 @@ constexpr uint64_t DATACOPYPAD_PADDING_VALUE_ZERO = 0;
 constexpr uint32_t NEGATIVE_MIN_VALUE_FP32 = 0xFF7FFFFF;
 constexpr uint32_t NEGATIVE_MIN_VALUE_FP32_LN2 = 0xFF7FFFFE;
 constexpr uint32_t NEGATIVE_MIN_VALUE_FP16 = 0xFBFF;
+constexpr uint16_t NEGATIVE_MIN_VALUE_BF16 = 0xFF7F;
 constexpr uint32_t POSITIVE_MAX_VALUE_FP32 = 0x7F7FFFFF;
 constexpr uint32_t POSITIVE_MAX_VALUE_FP16 = 0x7BFF;
 constexpr int64_t pse1NS1S2 = 2;

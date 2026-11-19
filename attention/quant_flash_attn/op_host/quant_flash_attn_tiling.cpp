@@ -74,7 +74,8 @@ ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttn(gert::TilingContext* conte
         OP_LOGE(context, "A2/A3 requires quant_mode=12 for INT8 prefill or paged decode.");
         return ge::GRAPH_FAILED;
     }
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201) {
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201 ||
+        ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9202) {
         if (IsEmptyInput(context)) {
             return ge::GRAPH_SUCCESS;
         }

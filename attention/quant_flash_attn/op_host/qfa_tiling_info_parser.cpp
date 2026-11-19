@@ -147,7 +147,8 @@ ge::graphStatus QfaInfoParser::GetNpuInfo()
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     OP_CHECK_IF(aicNum == 0 || aivNum == 0, OP_LOGE(opName_, "num of core obtained is 0."), return GRAPH_FAILED);
     npuArch_ = ascendcPlatform.GetCurNpuArch();
-    if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_2201) {
+    if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_9202 &&
+        npuArch_ != NpuArch::DAV_2201) {
         OP_LOGE(opName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
     }
@@ -327,6 +328,12 @@ ge::graphStatus QfaInfoParser::GetQuantMode()
                 opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
                 "quant_mode must be 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) or "
                 "10 (A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16)");
+            return ge::GRAPH_FAILED;
+        }
+    } else if (npuArch_ == NpuArch::DAV_9202) {
+        if (quantModeVal != static_cast<int64_t>(QM::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16)) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
+                                                  "quant_mode must be 7 (A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16)");
             return ge::GRAPH_FAILED;
         }
     }

@@ -90,6 +90,9 @@ ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfaTilingInfo& qfaInfo
     } else if (qfaInfo.npuArch == NpuArch::DAV_9201) {
         supportedQuantDtypes = {Ops::Transformer::DT_FLOAT8_E4M3FN, Ops::Transformer::DT_HIFLOAT4};
         supportedQuantDtypesStr = "FLOAT8_E4M3FN/DT_HIFLOAT4";
+    } else if (qfaInfo.npuArch == NpuArch::DAV_9202) {
+        supportedQuantDtypes = {Ops::Transformer::DT_HIFLOAT4};
+        supportedQuantDtypesStr = "DT_HIFLOAT4";
     }
     const auto checkQuantDtype = [&](const gert::CompileTimeTensorDesc* desc,
                                      const std::string& name) -> ge::graphStatus {

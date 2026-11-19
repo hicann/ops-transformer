@@ -148,6 +148,8 @@ static constexpr ConfigParams ConfigValue[] = {{inferS1TemplateType::Aligned128,
                                                {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned512,
                                                 inferDTemplateType::Aligned256, inferDTemplateType::Aligned256},
                                                {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned1024,
+                                                inferDTemplateType::Aligned128, inferDTemplateType::Aligned128},
+                                               {inferS1TemplateType::Aligned256, inferS2TemplateType::Aligned128,
                                                 inferDTemplateType::Aligned128, inferDTemplateType::Aligned128}};
 
 #define Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64 0
@@ -159,9 +161,11 @@ static constexpr ConfigParams ConfigValue[] = {{inferS1TemplateType::Aligned128,
 #define Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128 6
 #define Config_S1Aligned64_S2Aligned512_DAligned256_DVAligned256 7
 #define Config_S1Aligned128_S2Aligned1024_DAligned128_DVAligned128 8
+#define Config_S1Aligned256_S2Aligned128_DAligned128_DVAligned128 9
 
 #define QFA_MXFP8_FP32_PREFILL 1
 #define QFA_MXFP8_FP32_DECODE 2
+#define QFA_HIF4_LEVEL1_FP16_PREFILL 7
 #define QFA_HIFP4_FP16_PREFILL 10
 
 #define false 0
@@ -193,6 +197,7 @@ struct RunInfoX {
     uint32_t gIdx = 0;
     uint32_t s1Idx = 0;
     uint32_t s2Idx = 0;
+    uint32_t s2EndIdx = 0;
     uint32_t realN2Idx = 0;
     uint64_t actS1Size = 1;
     uint64_t actS2Size = 1;

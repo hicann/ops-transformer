@@ -10,7 +10,8 @@
 
 /*!
  * \file quant_flash_attn_tiling_hifp4.cpp
- * \brief QuantFlashAttn arch92 tiling implementation (A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16)
+ * \brief QuantFlashAttn arch92 tiling implementation (A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16 and
+ * A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16)
  */
 
 #include "quant_flash_attn_tiling_hifp4.h"
@@ -39,7 +40,8 @@ bool QuantFlashAttnHiFP4TilingImpl::IsCapable()
     if (qfaInfo_ == nullptr) {
         return false;
     }
-    if (qfaInfo_->quantMode != QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) {
+    if (qfaInfo_->quantMode != QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16 &&
+        qfaInfo_->quantMode != QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) {
         return false;
     }
     return true;
@@ -119,7 +121,10 @@ void QuantFlashAttnHiFP4TilingImpl::InitImplParam()
 void QuantFlashAttnHiFP4TilingImpl::SplitPolicy()
 {
     // 121调整基本块大小 todo
-    if (qfaInfo_->quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) {
+    if (qfaInfo_->quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16) {
+        sOuterFactor_ = SOUTER_256;
+        sInnerFactor_ = SINNER_128;
+    } else if (qfaInfo_->quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) {
         sOuterFactor_ = SOUTER_128;
         sInnerFactor_ = SINNER_1024;
     }
@@ -156,7 +161,9 @@ void QuantFlashAttnHiFP4TilingImpl::UpdateTilingKeyConfig()
         dVsize = DSIZE_512;
     }
 
-    if (sOuter == SOUTER_128 && sInner == SINNER_1024 && dSize == DSIZE_128 && dVsize == DSIZE_128) {
+    if (sOuter == SOUTER_256 && sInner == SINNER_128 && dSize == DSIZE_128 && dVsize == DSIZE_128) {
+        tilingKeyInfo_.config = Config_S1Aligned256_S2Aligned128_DAligned128_DVAligned128;
+    } else if (sOuter == SOUTER_128 && sInner == SINNER_1024 && dSize == DSIZE_128 && dVsize == DSIZE_128) {
         tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned1024_DAligned128_DVAligned128;
     }
 }
@@ -197,7 +204,9 @@ void QuantFlashAttnHiFP4TilingImpl::UpdateTilingKeyInfo()
 
 void QuantFlashAttnHiFP4TilingImpl::UpdateTilingKeyQuantMode()
 {
-    if (qfaInfo_->quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) {
+    if (qfaInfo_->quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16) {
+        tilingKeyInfo_.quantMode = static_cast<uint64_t>(QFA_HIF4_LEVEL1_FP16_PREFILL);
+    } else if (qfaInfo_->quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16) {
         tilingKeyInfo_.quantMode = static_cast<uint64_t>(QFA_HIFP4_FP16_PREFILL);
     }
 }
@@ -410,5 +419,7 @@ void QuantFlashAttnHiFP4TilingImpl::PrintAllTilingData()
 using quant_flash_attn::QuantFlashAttnHiFP4TilingImpl;
 
 REGISTER_TILING_TEMPLATE_FIA(QuantFlashAttn, QuantFlashAttnHiFP4TilingImpl,
-                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_9201)}), 2);
+                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_9201),
+                                                   static_cast<int32_t>(NpuArch::DAV_9202)}),
+                             2);
 } // namespace optiling

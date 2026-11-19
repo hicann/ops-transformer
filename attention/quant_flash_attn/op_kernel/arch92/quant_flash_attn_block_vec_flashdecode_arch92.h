@@ -466,10 +466,10 @@ protected:
         fa_base_vector::GetSafeActToken(actSeqLensQ_, actSeqLensKv_, safePreToken, safeNextToken,
                                         constInfo_.sparseMode);
 
-        if (constInfo_.sparseMode == BAND) {
+        if (constInfo_.sparseMode == fa_base_vector::BAND) {
             preTokensPerBatch_ = safePreToken;
             nextTokensPerBatch_ = actSeqLensKv_ - actSeqLensQ_ + safeNextToken;
-        } else if ((constInfo_.sparseMode == DEFAULT_MASK) && HAS_MASK) {
+        } else if ((constInfo_.sparseMode == fa_base_vector::DEFAULT_MASK) && HAS_MASK) {
             nextTokensPerBatch_ = safeNextToken;
             preTokensPerBatch_ = actSeqLensKv_ - actSeqLensQ_ + safePreToken;
         } else {
@@ -486,7 +486,8 @@ protected:
             return;
         }
 
-        if (constInfo_.sparseMode == ALL_MASK || constInfo_.sparseMode == LEFT_UP_CAUSAL) {
+        if (constInfo_.sparseMode == fa_base_vector::ALL_MASK ||
+            constInfo_.sparseMode == fa_base_vector::LEFT_UP_CAUSAL) {
             return;
         }
 
@@ -511,7 +512,8 @@ protected:
         if constexpr (!HAS_MASK) {
             return;
         }
-        if (constInfo_.sparseMode != DEFAULT_MASK && constInfo_.sparseMode != ALL_MASK) {
+        if (constInfo_.sparseMode != fa_base_vector::DEFAULT_MASK &&
+            constInfo_.sparseMode != fa_base_vector::ALL_MASK) {
             return;
         }
         LocalTensor<T> lseMaxUb = (cntM & 1) == 0 ? fdLseMaxUbBuf1_ : fdLseMaxUbBuf2_;

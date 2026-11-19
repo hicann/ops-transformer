@@ -18,13 +18,6 @@
 #include "register/op_def_registry.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 
-#if __has_include("version/asc_devkit_version.h")
-#include "version/asc_devkit_version.h"
-#if ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR >= 3)
-#define ENABLE_QFA_DT_HIFLOAT4
-#endif
-#endif
-
 namespace ops {
 
 class QuantFlashAttn : public OpDef {
@@ -237,7 +230,6 @@ public:
         this->AICore().AddConfig("ascend950", aicore_config_95);
         this->AICore().AddConfig("ascend350", aicore_config_95);
 
-#ifdef ENABLE_QFA_DT_HIFLOAT4
         OpAICoreConfig aicore_config_96;
         aicore_config_96.Input("q")
             .ParamType(REQUIRED)
@@ -306,7 +298,7 @@ public:
             .ExtendCfgInfo("opFile.value", "quant_flash_attn");
 
         this->AICore().AddConfig("ascend960dt", aicore_config_96);
-#endif
+        this->AICore().AddConfig("ascend960pr", aicore_config_96);
     }
 };
 
