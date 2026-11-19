@@ -394,7 +394,11 @@ class StageTwoReversePreVector:
                         gm_saved_state, (self.rows, D_HALF), (group, subblock_idx)
                     ),
                 )
-            self._accumulate_gate(self.state.next_read(), self.saved_state.next_read())
+            self._accumulate_gate(
+                self.state.next_read(),
+                self.saved_state.next_read(),
+                gm_saved_state.dtype == dtypes.float32,
+            )
         mem_copy(self.gate_result.next_write(), self.gate_accumulator)
         mem_copy(
             tile_slice(gm_d_gate_last, (1, D_HALF), (0, subblock_idx)),
@@ -410,7 +414,7 @@ class StageTwoReversePreVector:
             vmem_bar("vst_vld")
 
     @jit
-    def _accumulate_gate(self, state, saved_state):
+    def _accumulate_gate(self, state, saved_state, round_saved: Constexpr[bool]):
         with vf(mode="simd"):
             full = create_mask(pattern="all")
             total = vload(self.gate_accumulator, 0)
@@ -418,9 +422,16 @@ class StageTwoReversePreVector:
                 # Each vmadd still produces FP32 in exactly the original
                 # row order; keeping that FP32 value in a register avoids
                 # a redundant UB store/reload inside this DMA group.
+                saved = vload(saved_state, row * saved_state.physical_layout.stride[0])
+                if const_expr(round_saved):
+                    saved = vcast(
+                        vcast(saved, dtypes.bfloat16, mask=full),
+                        dtypes.float32,
+                        mask=full,
+                    )
                 total = vmadd(
                     vload(state, row * state.physical_layout.stride[0]),
-                    vload(saved_state, row * saved_state.physical_layout.stride[0]),
+                    saved,
                     total,
                     mask=full,
                 )
@@ -9768,6 +9779,18 @@ class SingleChunkGateSensitivity:
                 _promote_state_row(state_row, low_row)
             else:
                 mem_copy(state_row, source_row)
+                with vf(mode="simd"):
+                    mask = create_mask(pattern="all")
+                    for offset in range(0, SUPPORTED_HEAD_DIM, D_HALF):
+                        value_fp32 = vload(state_row, offset)
+                        rounded = vcast(value_fp32, dtypes.bfloat16, mask=mask)
+                        vstore(
+                            state_row,
+                            offset,
+                            vcast(rounded, dtypes.float32, mask=mask),
+                            mask,
+                        )
+                    vmem_bar("vst_vld")
             mem_copy(
                 tile_slice(state, (1, SUPPORTED_HEAD_DIM), (1, 0)),
                 tile_slice(final_gradient_source, (1, SUPPORTED_HEAD_DIM), (value, 0)),
@@ -12942,7 +12965,10 @@ def _recompute_dynamic_compile_request(
     state_spec = cannbotdsl.TensorSpec(saved_state.shape, dtypes.float32, stride=stride)
     specs = (*specs[:6], state_spec, *specs[7:])
     # Initial state follows dht; the U output shares W's cache layout.
-    return (*specs, specs[8], specs[3]), (*scalars[:-1], dtypes.int64, scalars[-1])
+    u_spec = cannbotdsl.TensorSpec(
+        specs[3].shape, dtypes.float32, stride=specs[3].stride
+    )
+    return (*specs, specs[8], u_spec), (*scalars[:-1], dtypes.int64, scalars[-1])
 
 
 _RECOMPUTE_PROGRAMS = OrderedDict()
@@ -13055,6 +13081,10 @@ def _allocate_recompute_caches(values, final_state_gradient, layout):
         elif layout == "BSND":
             storage = storage.transpose(1, 2)
         caches.append(storage)
+    u_cache = caches[1]
+    caches[1] = torch.empty_strided(
+        u_cache.shape, u_cache.stride(), dtype=torch.float32, device=u_cache.device
+    )
     chunks = (length + CHUNK_SIZE - 1) // CHUNK_SIZE
     state_prefix = (
         (chunks + batch, heads) if layout == "TND" else (batch, heads, chunks)

@@ -157,9 +157,11 @@ def _clear_padded_caches(
         vmem_bar("vst_vld")
     for start in range(length, capacity, C):
         rows = min(C, capacity - start)
-        for destination in (w, u, v_new, qg, kg):
+        for destination in (w, v_new, qg, kg):
             window = destination[batch, head, start : start + rows, None]
             mem_copy(tile_slice(window, (C, HALF), (0, part)), low[:rows, None])
+        window_u = u[batch, head, start : start + rows, None]
+        mem_copy(tile_slice(window_u, (C, HALF), (0, part)), high[:rows, None])
         window = gamma[batch, head, start : start + rows, None]
         mem_copy(tile_slice(window, (C, HALF), (0, part)), high[:rows, None])
 
@@ -307,7 +309,6 @@ class _Preprocess:
                 if const_expr(has_dt_bias):
                     dt_bias = vload(self.ub_dt_bias, 0)
             prefix = vdups(0.0, dtypes.float32, mask=lane_mask)
-            prefix_error = vdups(0.0, dtypes.float32, mask=lane_mask)
             if const_expr(raw_beta.dtype == dtypes.float32):
                 beta_value = vload(raw_beta, 0)
             else:
@@ -329,6 +330,11 @@ class _Preprocess:
             for row in dsl_range(0, valid_rows, 1):
                 if const_expr(raw_gate.dtype == dtypes.float32):
                     gate_value = vload(raw_gate, row * D_HALF)
+                    gate_value = vcast(
+                        vcast(gate_value, dtypes.bfloat16, mask=lane_mask),
+                        dtypes.float32,
+                        mask=lane_mask,
+                    )
                 else:
                     gate_value = vcast(
                         vload_unpack(
@@ -342,14 +348,14 @@ class _Preprocess:
                     biased_gate = vadd(gate_value, dt_bias, mask=lane_mask)
                     if const_expr(gate_mode == 2):
                         logit = vmul(negative_exp_a, biased_gate, mask=lane_mask)
-                        # Match the saved-cache FP32 activation boundary:
-                        # sigmoid is rounded before multiplication by the bound.
-                        sigmoid = vdiv(
-                            vdups(1.0, dtypes.float32, mask=lane_mask),
-                            vadds(vexp(logit, mask=lane_mask), 1.0, mask=lane_mask),
+                        denominator = vadds(
+                            vexp(logit, mask=lane_mask), 1.0, mask=lane_mask
+                        )
+                        gate = vdiv(
+                            vdups(bound, dtypes.float32, mask=lane_mask),
+                            denominator,
                             mask=lane_mask,
                         )
-                        gate = vmuls(sigmoid, bound, mask=lane_mask)
                     else:
                         softplus_tail = vlog(
                             vadds(
@@ -372,14 +378,7 @@ class _Preprocess:
                             mask=lane_mask,
                         )
                         gate = vmul(negative_exp_a, softplus, mask=lane_mask)
-                # Retain the low bits lost while accumulating FP32 log-decays.
-                # Long negative prefixes otherwise perturb every exp-derived cache.
-                increment = vsub(gate, prefix_error, mask=lane_mask)
-                next_prefix = vadd(prefix, increment, mask=lane_mask)
-                prefix_error = vsub(
-                    vsub(next_prefix, prefix, mask=lane_mask), increment, mask=lane_mask
-                )
-                prefix = next_prefix
+                prefix = vadd(prefix, gate, mask=lane_mask)
                 vstore(self.ub_g_cumsum, row * D_HALF, prefix, lane_mask)
             if const_expr(self.has_tail):
                 for row in dsl_range(valid_rows, CHUNK_SIZE, 1):
@@ -637,23 +636,6 @@ class _Matmul:
             k_beta_l0b,
             init=True,
         )
-        k_beta_low = self._load_beta_to_l0b(preprocessing.operand_tiles[4])
-        matmul(
-            self.l0c_w_product,
-            from_tensor(
-                inverse_l0a, offset=0, layout=make_layout((CHUNK_SIZE, CHUNK_SIZE))
-            ),
-            k_beta_low,
-            init=False,
-        )
-        k_beta_remainder = self._load_beta_to_l0b(preprocessing.operand_tiles[6])
-        matmul(
-            self.l0c_w_product,
-            from_tensor(inverse_l0a, layout=make_layout((C, C))),
-            k_beta_remainder,
-            init=False,
-        )
-        # Round W once at the cache boundary, after all three operand products.
         mem_copy(self.w_l1, self.l0c_w_product.convert(self.w_l1.dtype, scale=-1.0))
         v_beta_l0b = self._load_beta_to_l0b(
             preprocessing.operand_tiles[V_BETA_OPERAND_INDEX]
@@ -665,22 +647,6 @@ class _Matmul:
             ),
             v_beta_l0b,
             init=True,
-        )
-        v_beta_low = self._load_beta_to_l0b(preprocessing.operand_tiles[5])
-        matmul(
-            self.l0c_w,
-            from_tensor(
-                inverse_l0a, offset=0, layout=make_layout((CHUNK_SIZE, CHUNK_SIZE))
-            ),
-            v_beta_low,
-            init=False,
-        )
-        v_beta_remainder = self._load_beta_to_l0b(preprocessing.operand_tiles[7])
-        matmul(
-            self.l0c_w,
-            from_tensor(inverse_l0a, layout=make_layout((C, C))),
-            v_beta_remainder,
-            init=False,
         )
         if self.save_backward_inputs != 0:
             mem_copy(
@@ -1105,7 +1071,7 @@ class _StagedState:
             ),
         )
         self.gamma = Buffer(MemLoc.UB, dtypes.float32, make_layout((HALF,)))
-        self.u = Buffer(MemLoc.UB, dtypes.bfloat16, make_layout((C // 2, value_rows)))
+        self.u = Buffer(MemLoc.UB, dtypes.float32, make_layout((C // 2, value_rows)))
         self.new = Buffer(MemLoc.UB, dtypes.bfloat16, make_layout((C // 2, value_rows)))
         self.new_nz = Buffer(
             MemLoc.UB,
@@ -1202,13 +1168,7 @@ class _StagedState:
                     offset = row * self.value_rows + column
                     value = vdups(0.0, dtypes.float32, mask=mask)
                     if row < live_rows:
-                        raw = vcast(
-                            vload_unpack(
-                                self.u, offset, unpack_mode=UnpackMode.B16_TO_B32
-                            ),
-                            dtypes.float32,
-                            mask=mask,
-                        )
+                        raw = vload(self.u, offset)
                         value = vsub(raw, vload(correction, offset), mask=mask)
                     low = vcast(value, dtypes.bfloat16, mask=mask)
                     vstore_pack(
@@ -1341,16 +1301,6 @@ def _recompute_staged_states(
                     recurrence.w_l0a,
                     recurrence.state_l0b,
                     init=True,
-                )
-                mem_copy(
-                    recurrence.state_l0b,
-                    tile_slice(state_panels, (value_rows, D), (1, 0)),
-                )
-                matmul(
-                    recurrence.correction_l0c,
-                    recurrence.w_l0a,
-                    recurrence.state_l0b,
-                    init=False,
                 )
                 mem_copy(
                     from_tensor(

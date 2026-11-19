@@ -579,6 +579,7 @@ def _chunk_step(
     persistent_forward=False,
     emit_output=True,
     advance_state=True,
+    persistent_inverse=False,
 ):
     """Chunkwise KDA step; every ABI-stored tensor is rounded to ``low_dtype``.
 
@@ -630,6 +631,8 @@ def _chunk_step(
     identity = torch.eye(length, dtype=high_dtype, device=Q.device)
     if length == 1:
         inverse = identity.to(low_dtype)
+    elif persistent_inverse:
+        inverse = _peer_persistent_inverse(lower).to(low_dtype)
     elif emulate_npu_forward and not use_gate_in_kernel and not persistent_forward:
         inverse = _forward_staged_inverse(lower).to(low_dtype)
     else:
@@ -704,6 +707,43 @@ def _forward_safe_cube_scores(q, k, gate, scale):
             scores[row, columns] = _bf16_operand(q[row] * scale) @ right
             kk[row, columns] = k[row] @ right
     return scores, kk
+
+
+def _peer_persistent_inverse(lower):
+    """Mirror the persistent forward's FP16 inverse handoffs."""
+    length = lower.shape[0]
+    negative = lower.new_zeros((CHUNK_SIZE, CHUNK_SIZE))
+    negative[:length, :length] = (-lower).to(torch.float16).float()
+    inverse = torch.zeros_like(negative)
+    identity = torch.eye(16, dtype=lower.dtype, device=lower.device)
+
+    def fp16(value):
+        return value.to(torch.float16).to(lower.dtype)
+
+    for start in range(0, CHUNK_SIZE, 16):
+        block = slice(start, start + 16)
+        coefficients = negative[block, block]
+        result = torch.empty_like(coefficients)
+        for row in range(16):
+            acc = identity[row]
+            for col in range(row):
+                # One FP32 rounding per FMA; prior rows stay in FP32.
+                acc = (
+                    acc.double()
+                    + coefficients[row, col].double() * result[col].double()
+                ).float()
+            result[row] = acc
+        inverse[block, block] = fp16(result)
+
+    # The 32-row result is published to FP16 for the 64-row product.
+    # Its original L0C entries stay in FP32 for the final BF16 export.
+    for size in (16, 32):
+        for start in range(0, CHUNK_SIZE, 2 * size):
+            left = slice(start, start + size)
+            right = slice(start + size, start + 2 * size)
+            partial = negative[right, left] @ fp16(inverse[left, left])
+            inverse[right, left] = fp16(inverse[right, right]) @ fp16(partial)
+    return inverse[:length, :length]
 
 
 def _forward_staged_inverse(lower):
@@ -821,6 +861,7 @@ def build_cache(
     storage_dtype: Optional[torch.dtype] = None,
     _peer_only: bool = False,
     emulate_npu_forward: bool = False,
+    _persistent_inverse: bool = False,
 ) -> Cache:
     """Chunkwise forward producing the backward cache.
 
@@ -935,6 +976,7 @@ def build_cache(
                 persistent_forward=persistent_forward,
                 emit_output=not _peer_only,
                 advance_state=not _peer_only or local_chunk + 1 < len(chunks),
+                persistent_inverse=_persistent_inverse,
                 **common,
             )
             state = step.state
@@ -2093,11 +2135,8 @@ def bf16_peer(
         use_gate_in_kernel=bool(use_gate_in_kernel),
         use_beta_sigmoid_in_kernel=bool(use_beta_sigmoid_in_kernel),
     )
-    # pr_45 给算子加了 ``disable_recompute``：True 表示消费外部保存的前向缓存，
-    # False 表示 kernel 自己重算缓存。CPU 侧两种模式的数学完全一致（缓存是
-    # 确定性的，同一份输入必然得到同一份缓存），所以这里只把契约对齐：
-    # - 未传 ``cache`` 时按 ``disable_recompute=False`` 自己构建；
-    # - 传了 ``cache`` 时按 ``disable_recompute=True`` 只消费、不重建。
+    # An explicit cache is consumed as supplied. Otherwise the peer builds its
+    # own cache and applies the persistent inverse model for bounded BNSD recompute.
     raw_bias = dt_bias
     dt_bias, dht = normalize_backward_optionals(
         q, v, initial_state, dt_bias, dht, layout, cu_seqlens
@@ -2120,6 +2159,13 @@ def bf16_peer(
             storage_dtype=torch.bfloat16,
             _peer_only=True,
             emulate_npu_forward=emulate_npu_forward,
+            _persistent_inverse=(
+                not disable_recompute
+                and emulate_npu_forward
+                and layout == "BNSD"
+                and use_gate_in_kernel
+                and gate_mode == "bounded"
+            ),
             **kwargs,
         )
     grads = staged_backward(
