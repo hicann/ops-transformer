@@ -27,6 +27,7 @@
 #include "../../../op_kernel/arch22/mhc_post_tiling_key.h"
 #include "../../../op_kernel/arch22/mhc_post_four_constants.h"
 #include "tiling/platform/platform_ascendc.h"
+#include "op_common/op_host/util/op_const_def.h"
 
 namespace optiling {
 
@@ -66,7 +67,6 @@ static const int64_t DIM_NUM_4 = 4;
 constexpr int64_t N_SIZE_4 = 4;
 constexpr int64_t D_MAX_VALUE = 100000;
 constexpr int64_t D_ALIGN_SIZE = 128;
-constexpr uint32_t SOC_VER_950_CODE = 4;
 
 class MhcPostTilingBaseArch22 : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
@@ -492,8 +492,7 @@ ge::graphStatus MhcPostTilingBaseArch22::CheckSpecConstraints()
     }
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    uint32_t socVer = static_cast<uint32_t>(ascendcPlatform.GetSocVersion());
-    if (socVer == SOC_VER_950_CODE) {
+    if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_3510) {
         return ge::GRAPH_SUCCESS;
     }
 
@@ -643,5 +642,5 @@ uint64_t MhcPostTilingBaseArch22::GetTilingKey() const
     return GET_TPL_TILING_KEY(usePermanentX_);
 }
 
-REGISTER_TILING_TEMPLATE_WITH_ARCH(MhcPost, MhcPostTilingBaseArch22, static_cast<int32_t>(NpuArch::DAV_2201), 0);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(MhcPost, MhcPostTilingBaseArch22, static_cast<int32_t>(Ops::Base::DAV_2201), 0);
 } // namespace optiling

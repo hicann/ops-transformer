@@ -15,6 +15,7 @@
 
 #include "aclnn_mhc_post.h"
 #include "mhc_post.h"
+#include "op_common/op_host/util/op_const_def.h"
 
 #include "aclnn_kernels/contiguous.h"
 #include "external/aclnn_kernels/aclnn_platform.h"
@@ -63,7 +64,7 @@ static aclnnStatus CheckNotNull(const aclTensor* x, const aclTensor* hRes, const
     CHECK_COND(x != nullptr, ACLNN_ERR_PARAM_NULLPTR, "x must not be nullptr.");
     // hRes is optional on A5 (DAV_3510) and A6 (DAV_9201/DAV_9202), required on A2/A3
     auto curArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
-    if (curArch != NpuArch::DAV_3510 && curArch != NpuArch::DAV_9201 && curArch != NpuArch::DAV_9202) {
+    if (curArch != Ops::Base::DAV_3510 && curArch != Ops::Base::DAV_9201 && curArch != Ops::Base::DAV_9202) {
         CHECK_COND(hRes != nullptr, ACLNN_ERR_PARAM_NULLPTR, "hRes must not be nullptr.");
     }
     CHECK_COND(hOut != nullptr, ACLNN_ERR_PARAM_NULLPTR, "hOut must not be nullptr.");

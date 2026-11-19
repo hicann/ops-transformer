@@ -13,6 +13,7 @@
 #include "../../../../op_host/op_tiling/mhc_post_tiling.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
+#include "op_common/op_host/util/op_const_def.h"
 
 using namespace std;
 using namespace optiling;
@@ -34,7 +35,7 @@ protected:
 
 TEST_F(MhcPostTiling, test_mhc_post_950_3d_fp16_success)
 {
-    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND950, NpuArch::DAV_3510};
+    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND950, Ops::Base::DAV_3510};
     gert::TilingContextPara tilingContextPara("MhcPost",
                                               {
                                                   {{{1024, 4, 5120}, {1024, 4, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -54,7 +55,7 @@ TEST_F(MhcPostTiling, test_mhc_post_950_3d_fp16_success)
 
 TEST_F(MhcPostTiling, test_mhc_post_950_regbase_4d_fp16)
 {
-    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND950, NpuArch::DAV_3510};
+    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND950, Ops::Base::DAV_3510};
     gert::TilingContextPara tilingContextPara("MhcPost",
                                               {
                                                   {{{1, 128, 8, 128}, {1, 128, 8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},

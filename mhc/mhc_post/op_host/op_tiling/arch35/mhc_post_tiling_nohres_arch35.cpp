@@ -26,6 +26,7 @@
 #include "../../../op_kernel/arch35/mhc_post_tiling_data.h"
 #include "../../../op_kernel/arch35/mhc_post_tiling_key.h"
 #include "tiling/platform/platform_ascendc.h"
+#include "op_common/op_host/util/op_const_def.h"
 
 namespace optiling {
 
@@ -526,8 +527,8 @@ uint64_t MhcPostTilingNoHResArch35::GetTilingKey() const
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(MhcPost, MhcPostTilingNoHResArch35,
-                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510),
-                                                         static_cast<int32_t>(NpuArch::DAV_9201),
-                                                         static_cast<int32_t>(NpuArch::DAV_9202)}),
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_3510),
+                                                         static_cast<int32_t>(Ops::Base::DAV_9201),
+                                                         static_cast<int32_t>(Ops::Base::DAV_9202)}),
                                    5);
 } // namespace optiling

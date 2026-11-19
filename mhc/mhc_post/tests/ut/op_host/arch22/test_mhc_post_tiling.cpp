@@ -12,6 +12,7 @@
 #include "../../../../op_host/op_tiling/mhc_post_tiling.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
+#include "op_common/op_host/util/op_const_def.h"
 
 using namespace std;
 using namespace optiling;
@@ -22,7 +23,7 @@ class MhcPostTilingArch22 : public testing::Test {};
 
 TEST_F(MhcPostTilingArch22, test_mhc_post_3d_fp16_success)
 {
-    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, NpuArch::DAV_3002};
+    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, Ops::Base::DAV_3002};
     gert::TilingContextPara tilingContextPara("MhcPost",
                                               {
                                                   // input info: x, h_res, h_out, h_post
@@ -47,7 +48,7 @@ TEST_F(MhcPostTilingArch22, test_mhc_post_3d_fp16_success)
 
 TEST_F(MhcPostTilingArch22, test_mhc_post_4d_fp16_success)
 {
-    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, NpuArch::DAV_3002};
+    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, Ops::Base::DAV_3002};
     gert::TilingContextPara tilingContextPara(
         "MhcPost",
         {
@@ -73,7 +74,7 @@ TEST_F(MhcPostTilingArch22, test_mhc_post_4d_fp16_success)
 
 TEST_F(MhcPostTilingArch22, test_mhc_post_3d_n6_invalid)
 {
-    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, NpuArch::DAV_3002};
+    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, Ops::Base::DAV_3002};
     gert::TilingContextPara tilingContextPara("MhcPost",
                                               {
                                                   // input info: x, h_res, h_out, h_post
@@ -95,7 +96,7 @@ TEST_F(MhcPostTilingArch22, test_mhc_post_3d_n6_invalid)
 
 TEST_F(MhcPostTilingArch22, test_mhc_post_invalid_n)
 {
-    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, NpuArch::DAV_3002};
+    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, Ops::Base::DAV_3002};
     gert::TilingContextPara tilingContextPara("MhcPost",
                                               {
                                                   // input info: x, h_res, h_out, h_post
@@ -117,7 +118,7 @@ TEST_F(MhcPostTilingArch22, test_mhc_post_invalid_n)
 
 TEST_F(MhcPostTilingArch22, test_mhc_post_invalid_d)
 {
-    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, NpuArch::DAV_3002};
+    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND910B, Ops::Base::DAV_3002};
     gert::TilingContextPara tilingContextPara("MhcPost",
                                               {
                                                   // input info: x, h_res, h_out, h_post

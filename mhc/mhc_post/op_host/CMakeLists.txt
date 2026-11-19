@@ -13,28 +13,22 @@ if (BUILD_OPEN_PROJECT)
         mhc_post_def.cpp
     )
 
-    if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
+    if("${ASCEND_COMPUTE_UNIT}" STREQUAL "DAV_3510")
         add_ops_compile_options(
             OP_NAME MhcPost
-            COMPUTE_UNIT Ascend950PR_9599
+            COMPUTE_UNIT DAV_3510
             OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
         )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960dt")
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "DAV_9201")
         add_ops_compile_options(
             OP_NAME MhcPost
-            COMPUTE_UNIT Ascend960DT_968B7
+            COMPUTE_UNIT DAV_9201
             OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
         )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960pr")
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "DAV_9202")
         add_ops_compile_options(
             OP_NAME MhcPost
-            COMPUTE_UNIT Ascend960PR_969A1
-            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
-        )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend350")
-        add_ops_compile_options(
-            OP_NAME MhcPost
-            COMPUTE_UNIT Ascend350_355e
+            COMPUTE_UNIT DAV_9202
             OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
         )
     else()
