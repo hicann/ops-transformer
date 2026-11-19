@@ -5,19 +5,3 @@
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
-
-if(BUILD_OPEN_PROJECT)
-    enable_cannbotdsl_kernel(attn_epilogue "${CMAKE_CURRENT_SOURCE_DIR}/op_dsl")
-    get_property(_attn_epilogue_dsl_available GLOBAL PROPERTY CANNBOTDSL_AVAILABLE)
-    if(NOT _attn_epilogue_dsl_available)
-        message(STATUS "attn_epilogue: DSL is unavailable for the current SOC/toolchain; skip operator registration")
-        return()
-    endif()
-endif()
-
-add_op_to_compiled_list(OP_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-
-add_modules_sources(
-    OPTYPE attn_epilogue
-    ACLNNTYPE aclnn_exclude
-)
