@@ -161,3 +161,9 @@ if (ENABLE_TILING_SINK)
         add_subdirectory(src/tiling_sink)
     endif()
 endif()
+
+# FE compatibility registration scaffold; enabled by default, pass metadata filled in later.
+option(OP_GRAPH_FE_REGISTRY "Build FE compatibility fusion pass registry" ON)
+if(OP_GRAPH_FE_REGISTRY AND ENABLE_BUILT_IN AND NOT BUILD_OPS_RTY_KERNEL)
+    add_subdirectory(src/op_graph)
+endif()
