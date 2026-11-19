@@ -1185,6 +1185,37 @@ static ge::graphStatus FillNonQuantScalesInfo(const char* nodeName, int64_t scal
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus CheckNonQuantTokenSizeArch92(const gert::TilingContext* context, const char* nodeName,
+                                                    ge::DataType inputType, uint64_t h, uint64_t scalesCol,
+                                                    uint32_t scalesTypeSize)
+{
+    const auto arch = mc2tiling::GetNpuArch(context);
+    if (arch != Ops::Base::DAV_9201 && arch != Ops::Base::DAV_9202) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const bool isB4 = inputType == ge::DT_FLOAT4_E2M1 || inputType == ge::DT_FLOAT4_E1M2 ||
+                      inputType == Ops::Transformer::DT_HIFLOAT4;
+    const bool isB8 =
+        inputType == ge::DT_HIFLOAT8 || inputType == ge::DT_FLOAT8_E5M2 || inputType == ge::DT_FLOAT8_E4M3FN;
+    if (!isB4 && !isB8) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const uint64_t tokenBytes = isB4 ? (h + 1U) / EVEN_ALIGN : h;
+    const uint64_t scaleBytes = scalesCol * scalesTypeSize;
+    // Match the packed token layout, including the shared triple/expertScale block.
+    const uint64_t actualRowBytes =
+        mc2tiling::AlignUp<uint64_t>(mc2tiling::AlignUp<uint64_t>(tokenBytes, UB_ALIGN) + scaleBytes, UB_ALIGN) +
+        UB_ALIGN;
+    const uint64_t commonRowBytes = mc2tiling::AlignUp<uint64_t>(h * MAX_OUT_DTYPE_SIZE, UB_ALIGN) + UB_ALIGN;
+    OP_TILING_CHECK(actualRowBytes > commonRowBytes,
+                    OP_LOGE(nodeName,
+                            "Arch92 low-bit non-quant token with scales exceeds the communication row budget: "
+                            "actual=%luB, budget=%luB, H=%lu, scalesCol=%lu, scalesTypeSize=%uB.",
+                            actualRowBytes, commonRowBytes, h, scalesCol, scalesTypeSize),
+                    return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
 static ge::graphStatus FillScalesInfo(const gert::TilingContext* context, const char* nodeName,
                                       MoeDistributeDispatchV2TilingData& tilingData, const bool isScales,
                                       const uint32_t quantMode, DispatchV2Config& config, uint64_t& scalesRow,
@@ -1213,6 +1244,11 @@ static ge::graphStatus FillScalesInfo(const gert::TilingContext* context, const 
         } else if (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
             const int64_t scalesDim1 = scalesStorageShape->GetStorageShape().GetDim(1);
             if (FillNonQuantScalesInfo(nodeName, scalesDim0, scalesDim1, bs, h, scalesCol, scalesCount) !=
+                ge::GRAPH_SUCCESS) {
+                return ge::GRAPH_FAILED;
+            }
+            const auto inputType = context->GetInputDesc(config.xIndex)->GetDataType();
+            if (CheckNonQuantTokenSizeArch92(context, nodeName, inputType, h, scalesCol, scalesTypeSize) !=
                 ge::GRAPH_SUCCESS) {
                 return ge::GRAPH_FAILED;
             }
@@ -1692,10 +1728,13 @@ static uint32_t CeilAlign(uint32_t dividend, uint32_t divisor, const char* nodeN
     return 0;
 }
 
-static bool IsFullMeshSerialMode(const MoeDistributeDispatchV2Info& info)
+static bool IsFullMeshSerialMode(const gert::TilingContext* context, const MoeDistributeDispatchV2Info& info)
 {
     uint32_t maxBs = info.globalBs / info.epWorldSize;
-    return maxBs <= SERIAL_MODE_BS_THRESHOLD && info.epWorldSize < SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD;
+    const auto arch = mc2tiling::GetNpuArch(context);
+    const bool isArch92 = arch == Ops::Base::DAV_9201 || arch == Ops::Base::DAV_9202;
+    const bool isSmallBs = isArch92 ? maxBs < SERIAL_MODE_BS_THRESHOLD : maxBs <= SERIAL_MODE_BS_THRESHOLD;
+    return isSmallBs && info.epWorldSize < SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD;
 }
 
 static uint32_t SendToMoeExpertUsedBuffer(const gert::TilingContext* context,
@@ -1735,21 +1774,14 @@ static uint32_t SendToMoeExpertUsedBuffer(const gert::TilingContext* context,
         UbForMoe = UbForMoe + expertMaskBufSize;                                             // expertMaskBuf
         UbForMoe = UbForMoe + CeilAlign(moeExpertNum * sizeof(int32_t), UB_ALIGN, nodeName); // tokenNumToExpertBuf
     }
-    if (IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info) &&
+    if (IsFullMeshSerialMode(context, tilingData.moeDistributeDispatchV2Info) &&
         mc2tiling::GetNpuArch(context) != Ops::Base::DAV_2201) {
         uint32_t countNumPerCore = CeilAlign(totalExpertNum, aivNum, nodeName) / aivNum;
-        if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_3510) {
-            uint32_t rankNumPerCore = CeilAlign(epWorldSize, aivNum, nodeName) / aivNum;
-            uint32_t expertNumPerRank = std::max(moeExpertNumPerRank, 1U);
-            countNumPerCore = std::max(countNumPerCore, rankNumPerCore * expertNumPerRank);
-        }
         uint32_t statusCntAlign = CeilAlign(countNumPerCore, UB_ALIGN_INT32_NUM, nodeName);
         UbForMoe = UbForMoe + statusCntAlign * UB_ALIGN_VAL;
-        if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
-            uint32_t histoGroupNum =
-                (statusCntAlign + Mc2Kernel::EXPERT_PER_HISTO_GROUP - 1U) / Mc2Kernel::EXPERT_PER_HISTO_GROUP;
-            UbForMoe += histoGroupNum * Mc2Kernel::EXPERT_HISTO_BIN_NUM * sizeof(uint16_t);
-        }
+        uint32_t histoGroupNum =
+            (statusCntAlign + Mc2Kernel::EXPERT_PER_HISTO_GROUP - 1U) / Mc2Kernel::EXPERT_PER_HISTO_GROUP;
+        UbForMoe += histoGroupNum * Mc2Kernel::EXPERT_HISTO_BIN_NUM * sizeof(uint16_t);
     }
     return UbForMoe;
 }
@@ -2010,18 +2042,43 @@ static bool NeedA5CastBuf(const gert::TilingContext* context, const MoeDistribut
 static ge::graphStatus SetRecvSlotAndRSWBufferIdx(const gert::TilingContext* context, MoeDistributeDispatchV2Info& info,
                                                   const char* nodeName, const CheckWinSizeData& winSizeData)
 {
-    (void)context;
     info.rswBufferIdx = winSizeData.rswBufferIdx;
     info.tokenNumPerSlot = winSizeData.tokenNumPerSlot;
-    if (winSizeData.rswBufferSize == 0U) {
+    const auto arch = mc2tiling::GetNpuArch(context);
+    if ((arch != Ops::Base::DAV_9201 && arch != Ops::Base::DAV_9202) || winSizeData.isLayered) {
         return ge::GRAPH_SUCCESS;
     }
-    // 初始 CheckWinSize 已按实际 token 行（A6 非量化带 scales 时）或 2B 上界完成档位与槽容量选择，
-    // 这里只校验下发值自洽，不再重复做窗口选择。
-    OP_TILING_CHECK((info.tokenNumPerSlot == 0U) || (info.rswBufferIdx >= RSW_BUFFER_TIER_COUNT),
-                    OP_LOGE(nodeName, "Invalid RSW plan: rswBufferIdx=%u, tokenNumPerSlot=%u.", info.rswBufferIdx,
-                            info.tokenNumPerSlot),
-                    return ge::GRAPH_FAILED);
+    const uint32_t tokenBytes = CalcA5TokenOutAlignSize(context, info, nodeName);
+    if (winSizeData.rswBufferSize != 0U) {
+        // Low-bit pass-through rows were checked against the common two-byte budget in FillScalesInfo.
+        const uint32_t commonTokenBytes = CeilAlign(info.h * MAX_OUT_DTYPE_SIZE, UB_ALIGN, nodeName) + UB_ALIGN;
+        OP_TILING_CHECK(tokenBytes > commonTokenBytes,
+                        OP_LOGE(nodeName, "RSW token row exceeds the planned budget: actual=%uB, budget=%uB.",
+                                tokenBytes, commonTokenBytes),
+                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK((info.tokenNumPerSlot == 0U) || (info.rswBufferIdx >= RSW_BUFFER_TIER_COUNT),
+                        OP_LOGE(nodeName, "Invalid RSW plan: rswBufferIdx=%u, tokenNumPerSlot=%u.", info.rswBufferIdx,
+                                info.tokenNumPerSlot),
+                        return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
+    if (IsFullMeshSerialMode(context, info) && !info.hasElasticInfo) {
+        // CheckSerialReceiveUbSizeA5 already accounts for the non-RSW receive buffers.
+        return ge::GRAPH_SUCCESS;
+    }
+    auto platform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    uint64_t ubBytes = 0;
+    platform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubBytes);
+    const uint32_t aivNum = platform.GetCoreNumAiv();
+    OP_TILING_CHECK(aivNum == 0U, OP_LOGE(nodeName, "AIV core count must be positive."), return ge::GRAPH_FAILED);
+    const uint32_t available = CalcParallelUbSizeForTokenCopy(winSizeData, aivNum, ubBytes);
+    const uint32_t blocks = CeilAlign(tokenBytes, SPLIT_BLOCK_DATA_SIZE, nodeName) / SPLIT_BLOCK_DATA_SIZE;
+    const uint32_t required = BUFFER_NUM * blocks * SPLIT_BLOCK_DATA_SIZE + blocks * UB_ALIGN +
+                              CeilAlign(blocks * sizeof(float), SIZE_ALIGN_256, nodeName);
+    OP_TILING_CHECK(
+        available < required,
+        OP_LOGE(nodeName, "Non-RSW receive needs %uB for one token, but only %uB is available.", required, available),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -2129,10 +2186,8 @@ static uint32_t CalcCumSumUsedUbSize(const gert::TilingContext* context, const M
     uint32_t recStatusSpace = CeilAlign(recStatusNumPerCore * sizeof(float), UB_ALIGN, nodeName);
     uint32_t recvWinSpace = CeilAlign(info.epWorldSize * moeExpertNumPerRank * sizeof(float), UB_ALIGN, nodeName);
     cumSumUbSize += std::max(recStatusSpace, recvWinSpace);
-    uint32_t histoExpertNum =
-        mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 ? statusCntAlign : info.moeExpertNum;
     uint32_t histoGroupNum =
-        (histoExpertNum + Mc2Kernel::EXPERT_PER_HISTO_GROUP - 1U) / Mc2Kernel::EXPERT_PER_HISTO_GROUP;
+        (statusCntAlign + Mc2Kernel::EXPERT_PER_HISTO_GROUP - 1U) / Mc2Kernel::EXPERT_PER_HISTO_GROUP;
     histoGroupNum = (histoGroupNum == 0U) ? 1U : histoGroupNum;
     cumSumUbSize += histoGroupNum * Mc2Kernel::EXPERT_HISTO_BIN_NUM * sizeof(uint16_t);
     cumSumUbSize += 2U * aivNum * UB_ALIGN;
@@ -2165,7 +2220,7 @@ static ge::graphStatus CheckCumSumUbSizeA5(const gert::TilingContext* context, c
     OP_TILING_CHECK(CalcA5CumsumUbBudget(ubRealSize, nodeName, cumsumUbBudget) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Calc cumsum UB budget failed."), return ge::GRAPH_FAILED);
     const auto& info = tilingData.moeDistributeDispatchV2Info;
-    if (IsFullMeshSerialMode(info)) {
+    if (IsFullMeshSerialMode(context, info)) {
         OP_TILING_CHECK(CheckSerialReceiveUbSizeA5(context, nodeName, tilingData, config) != ge::GRAPH_SUCCESS,
                         OP_LOGE(nodeName, "Check serial receive UB size failed."), return ge::GRAPH_FAILED);
         if (!info.hasElasticInfo) {
@@ -2643,8 +2698,7 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
     ubDetail += "; expertScalesBuf:" + std::to_string(expertScalesBufSize);
 
     uint32_t calTokenIdxBuffSize = CeilAlign(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
-    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
-        IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info)) {
+    if (!isArch22 && IsFullMeshSerialMode(context, tilingData.moeDistributeDispatchV2Info)) {
         calTokenIdxBuffSize = std::max(calTokenIdxBuffSize, SIZE_ALIGN_256);
     }
 
@@ -2669,7 +2723,7 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
     param.hasExpertMaskOrZeroCompute = hasExpertMaskOrZeroCompute;
     param.reuseValidExpertIndexForTemp = reuseValidExpertIndexForTemp;
     param.isScales = isScales;
-    param.isSerialA5 = isA5Arch && IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info);
+    param.isSerialA5 = isA5Arch && IsFullMeshSerialMode(context, tilingData.moeDistributeDispatchV2Info);
     param.isRoce = config.isRoce;
 
     uint32_t sendToMoeUsedBuffer = SendToMoeExpertUsedBuffer(context, tilingData, expertIdsBufSize, kSize, nodeName);

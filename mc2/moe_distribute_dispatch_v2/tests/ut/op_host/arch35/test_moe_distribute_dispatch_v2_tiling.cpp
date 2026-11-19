@@ -41,7 +41,12 @@ protected:
         hadOriginalEnv_ = value != nullptr;
         originalEnv_ = hadOriginalEnv_ ? value : "";
         const bool smallScaledWindow = param.case_name == "arch35_boundary_nonquant_scales8192_v1_small_win";
-        ASSERT_EQ(setenv("HCCL_BUFFSIZE", smallScaledWindow ? "32768" : "65536", 1), 0);
+        const char* windowMb = smallScaledWindow ? "32768" : "65536";
+        if (param.case_name.rfind("arch92_nonrsw_1mb_", 0) == 0) {
+            // Force the RSW planner to fall back while the small software-flag window still fits.
+            windowMb = "1";
+        }
+        ASSERT_EQ(setenv("HCCL_BUFFSIZE", windowMb, 1), 0);
         windowEnvSet_ = true;
     }
 

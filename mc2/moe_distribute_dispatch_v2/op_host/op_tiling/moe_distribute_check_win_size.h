@@ -334,7 +334,7 @@ inline uint64_t CalcRSWDispatchDataSectionSize(const gert::TilingContext* contex
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubRealSize);
     uint32_t maxBs = winSizeData.globalBs / winSizeData.epWorldSize;
     uint32_t ubSizeForCopy = CalcParallelUbSizeForTokenCopy(winSizeData, aivNum, ubRealSize);
-    if (maxBs <= SERIAL_MODE_BS_THRESHOLD && winSizeData.epWorldSize < SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD) {
+    if (maxBs < SERIAL_MODE_BS_THRESHOLD && winSizeData.epWorldSize < SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD) {
         // 缩容时可能切换到并行收，槽布局取两种模式共同满足的容量。
         ubSizeForCopy = std::min(ubSizeForCopy, CalcSerialUbSizeForTokenCopy(winSizeData, aivNum, ubRealSize));
     }
