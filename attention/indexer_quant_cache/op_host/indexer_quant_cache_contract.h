@@ -11,6 +11,7 @@
 #ifndef INDEXER_QUANT_CACHE_CONTRACT_H
 #define INDEXER_QUANT_CACHE_CONTRACT_H
 
+#include "common/include/op_host/op_const_def_transformer.h"
 #include <cstdint>
 #include "graph/types.h"
 
@@ -38,7 +39,7 @@ inline bool IsValidQuantTypes(int64_t mode, ge::DataType cache, ge::DataType sca
         case MXFP4_QUANT_MODE:
             return (cache == ge::DT_FLOAT4_E2M1 || cache == ge::DT_FLOAT4_E1M2) && scale == ge::DT_FLOAT8_E8M0;
         case HIFP4_QUANT_MODE:
-            return cache == ge::DT_HIFLOAT4 && scale == ge::DT_HIFLOAT4_SCALE;
+            return cache == Ops::Transformer::DT_HIFLOAT4 && scale == Ops::Transformer::DT_HIFLOAT4_SCALE;
         default:
             return false;
     }

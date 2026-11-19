@@ -15,6 +15,7 @@
 #ifndef OPS_OP_PROTO_INC_IndexerQuantCache_H_
 #define OPS_OP_PROTO_INC_IndexerQuantCache_H_
 
+#include "common/include/op_host/op_const_def_transformer.h"
 #include "graph/operator_reg.h"
 #include "graph/types.h"
 
@@ -73,9 +74,9 @@ REG_OP(IndexerQuantCache)
     .ATTR(round_scale, Bool, true)
     .ATTR(x_scale, Float, 1.0)
     .DATATYPE(T0, TensorType({DT_FLOAT16, DT_BF16}))
-    .DATATYPE(T1,
-              TensorType({DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_UINT8, DT_FLOAT4_E2M1, DT_FLOAT4_E1M2, ge::DT_HIFLOAT4}))
-    .DATATYPE(T2, TensorType({DT_FLOAT, DT_FLOAT8_E8M0, ge::DT_HIFLOAT4_SCALE}))
+    .DATATYPE(T1, TensorType({DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_UINT8, DT_FLOAT4_E2M1, DT_FLOAT4_E1M2,
+                              Ops::Transformer::DT_HIFLOAT4}))
+    .DATATYPE(T2, TensorType({DT_FLOAT, DT_FLOAT8_E8M0, Ops::Transformer::DT_HIFLOAT4_SCALE}))
     .OP_END_FACTORY_REG(IndexerQuantCache)
 } // namespace ge
 

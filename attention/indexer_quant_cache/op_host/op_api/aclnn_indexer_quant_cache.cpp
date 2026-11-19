@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "common/include/op_host/op_const_def_transformer.h"
 #include "aclnn_indexer_quant_cache.h"
 #include "indexer_quant_cache.h"
 
@@ -97,8 +98,8 @@ aclnnStatus aclnnIndexerQuantCacheGetWorkspaceSize(aclTensor* cacheRef, aclTenso
 
     if (quantMode == indexer_quant_cache::HIFP4_QUANT_MODE) {
         if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_9201 ||
-            cacheRef->GetDataType() != op::DataType::DT_HIFLOAT4 ||
-            cacheScaleRef->GetDataType() != op::DataType::DT_HIFLOAT4_SCALE) {
+            cacheRef->GetDataType() != Ops::Transformer::DT_HIFLOAT4 ||
+            cacheScaleRef->GetDataType() != Ops::Transformer::DT_HIFLOAT4_SCALE) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "HiFloat4 requires ASCEND960DT and HIFLOAT4/HIFLOAT4_SCALE.");
             return ACLNN_ERR_PARAM_INVALID;
         }

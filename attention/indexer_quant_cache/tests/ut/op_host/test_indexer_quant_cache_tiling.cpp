@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "common/include/op_host/op_const_def_transformer.h"
 #include <gtest/gtest.h>
 #include <iostream>
 #include <limits>
@@ -585,11 +586,13 @@ TEST(IndexerQuantCacheContract, HiFloat4Pairs)
 {
     using indexer_quant_cache::IsValidQuantTypes;
     for (auto x : {ge::DT_FLOAT16, ge::DT_BF16}) {
-        EXPECT_TRUE(IsValidQuantTypes(4, ge::DT_HIFLOAT4, ge::DT_HIFLOAT4_SCALE, x, ge::DT_INT32));
-        EXPECT_FALSE(IsValidQuantTypes(4, ge::DT_FLOAT4_E1M2, ge::DT_HIFLOAT4_SCALE, x, ge::DT_INT32));
-        EXPECT_FALSE(IsValidQuantTypes(4, ge::DT_HIFLOAT4, ge::DT_FLOAT8_E8M0, x, ge::DT_INT32));
+        EXPECT_TRUE(
+            IsValidQuantTypes(4, Ops::Transformer::DT_HIFLOAT4, Ops::Transformer::DT_HIFLOAT4_SCALE, x, ge::DT_INT32));
+        EXPECT_FALSE(IsValidQuantTypes(4, ge::DT_FLOAT4_E1M2, Ops::Transformer::DT_HIFLOAT4_SCALE, x, ge::DT_INT32));
+        EXPECT_FALSE(IsValidQuantTypes(4, Ops::Transformer::DT_HIFLOAT4, ge::DT_FLOAT8_E8M0, x, ge::DT_INT32));
         for (int mode = 0; mode < 4; ++mode) {
-            EXPECT_FALSE(IsValidQuantTypes(mode, ge::DT_HIFLOAT4, ge::DT_HIFLOAT4_SCALE, x, ge::DT_INT32));
+            EXPECT_FALSE(IsValidQuantTypes(mode, Ops::Transformer::DT_HIFLOAT4, Ops::Transformer::DT_HIFLOAT4_SCALE, x,
+                                           ge::DT_INT32));
         }
     }
 }
@@ -625,14 +628,18 @@ TEST_F(IndexerQuantCacheTiling, HiFloat4PlatformAndShape)
         gert::TilingContextPara para(
             "IndexerQuantCache",
             {
-                {{{2048, 1, 1, c.cacheDim}, {2048, 1, 1, c.cacheDim}}, ge::DT_HIFLOAT4, ge::FORMAT_ND},
-                {{{2048, 1, 1, c.scaleDim}, {2048, 1, 1, c.scaleDim}}, ge::DT_HIFLOAT4_SCALE, ge::FORMAT_ND},
+                {{{2048, 1, 1, c.cacheDim}, {2048, 1, 1, c.cacheDim}}, Ops::Transformer::DT_HIFLOAT4, ge::FORMAT_ND},
+                {{{2048, 1, 1, c.scaleDim}, {2048, 1, 1, c.scaleDim}},
+                 Ops::Transformer::DT_HIFLOAT4_SCALE,
+                 ge::FORMAT_ND},
                 {{{c.bs, c.d}, {c.bs, c.d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                 {{{c.bs}, {c.bs}}, ge::DT_INT32, ge::FORMAT_ND},
             },
             {
-                {{{2048, 1, 1, c.cacheDim}, {2048, 1, 1, c.cacheDim}}, ge::DT_HIFLOAT4, ge::FORMAT_ND},
-                {{{2048, 1, 1, c.scaleDim}, {2048, 1, 1, c.scaleDim}}, ge::DT_HIFLOAT4_SCALE, ge::FORMAT_ND},
+                {{{2048, 1, 1, c.cacheDim}, {2048, 1, 1, c.cacheDim}}, Ops::Transformer::DT_HIFLOAT4, ge::FORMAT_ND},
+                {{{2048, 1, 1, c.scaleDim}, {2048, 1, 1, c.scaleDim}},
+                 Ops::Transformer::DT_HIFLOAT4_SCALE,
+                 ge::FORMAT_ND},
             },
             {
                 {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
