@@ -340,6 +340,7 @@ protected:
     int64_t s1BaseN2GD;
     int64_t s1BaseN2GDRope = 0;
     int64_t s1BaseBN2GD;
+    int64_t s1BaseBN2GDRope = 0;
     int64_t s1BaseD;
     int64_t s2BaseNratioD;
     int64_t s2BaseNratioN2D;
@@ -642,6 +643,7 @@ __aicore__ inline void FlashAttentionScoreS1s2Bn2gs1SameAB<implMode, layOutType,
         this->s2BaseN2DRope = this->s2BaseSize * this->n2DRope;
         this->bN2DRope = this->tilingData->inputParams.bSize * n2DRope;
         this->bN2GDRope = this->tilingData->inputParams.bSize * n2GDRope;
+        this->s1BaseBN2GDRope = this->cubeS1BaseSize * this->tilingData->inputParams.bSize * this->n2GDRope;
     }
 
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BSH) {
