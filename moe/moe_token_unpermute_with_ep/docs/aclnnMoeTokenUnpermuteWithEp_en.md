@@ -29,24 +29,32 @@
 
 - **Formula:**
 
-  Let `sortedIndices[k]` be the k-th element of sortedIndices, `num_tokens = len(sortedIndices) / numTopk`, and `rangeOptional = [start, end)` (`start = rangeOptional[0]`, `end = rangeOptional[1]`; `topK_num` in the formulas is the parameter `numTopk`). A slot is read only when `start <= sortedIndices[k] < end`, and the row is `permutedTokens[sortedIndices[k] - start]`; otherwise the slot contributes 0. An empty `rangeOptional` is equivalent to the default value `{0, 0}`, so no slot is valid and the output is all zeros.
+  $$
+  sortedIndices = sortedIndices[rangeOptional[0]<=i<rangeOptional[1]]
+  $$
 
-  (1) When probs is not None, the formula is as follows, where $i \in {0, 1, 2, ..., num\_tokens - 1}$, $j \in {0, 1, 2, ..., topK\_num - 1}$, and the slot index is $k = i * topK\_num + j$:
-
-    $$
-    out_{i} = \sum_{j=0}^{topK\_num - 1} \begin{cases}
-    permutedTokens[sortedIndices[k] - start] * probs_{i,j}, & start \le sortedIndices[k] < end \\
-    0, & \text{otherwise}
-    \end{cases}
-    $$
-
-  (2) When probs is None, the formula is as follows, where $i \in {0, 1, 2, ..., num\_tokens - 1}$, $j \in {0, 1, 2, ..., topK\_num - 1}$, and the slot index is $k = i * topK\_num + j$:
+  (1) When probs is not None, the formula is as follows, where $i \in {0, 1, 2, ..., num\_tokens - 1}$, $j \in {0, 1, 2, ..., topK\_num - 1}$, and $k \in {0, 1, 2, ..., num\_tokens * topK\_num}$:
 
     $$
-    out_{i} = \sum_{j=0}^{topK\_num - 1} \begin{cases}
-    permutedTokens[sortedIndices[k] - start], & start \le sortedIndices[k] < end \\
-    0, & \text{otherwise}
-    \end{cases}
+    permutedTokens = permutedTokens.indexSelect(0, sortedIndices)
+    $$
+
+    $$
+    permutedTokens_{k} = permutedTokens_{k} * probs_{i,j}
+    $$
+
+    $$
+    out_{i} = \sum_{k=i*topK\_num}^{(i+1)*topK\_num - 1 } permutedTokens_{k}
+    $$
+
+  (2) When probs is None, the formula is as follows, where $i \in {0, 1, 2, ..., num\_tokens - 1}$ and $j \in {0, 1, 2, ..., topK\_num - 1}$:
+
+    $$
+    permutedTokens = permutedTokens.indexSelect(0, sortedIndices)
+    $$
+
+    $$
+    out_{i} = \sum_{k=i*topK\_num}^{(i+1)*topK\_num - 1 } permutedTokens_{k}
     $$
 
 ## Function Prototype
@@ -124,7 +132,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
       <td>probsOptional</td>
       <td>Optional input</td>
       <td>Represents the expert probability corresponding to the input tokens.</td>
-      <td>The shape is 2D. Empty tensors are not supported. num_tokens is the number of original tokens, and the length of the second dimension (dim(1)) must be equal to numTopk.<br>When a non-empty and valid tensor is passed in, the input data in permutedTokens is multiplied by probsOptional.<br>When a null pointer is passed in, the input data in permutedTokens is not multiplied.</td>
+      <td>The shape is 2D. Empty tensors are not supported. num_tokens is the number of original tokens, and the length of the first dimension must be equal to numTopk.<br>When a non-empty and valid tensor is passed in, the input data in permutedTokens is multiplied by probsOptional.<br>When a null pointer is passed in, the input data in permutedTokens is not multiplied.</td>
       <td>BFLOAT16, FLOAT16, FLOAT32</td>
       <td>ND</td>
       <td>(num_tokens, numTopk)</td>
@@ -134,7 +142,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
       <td>numTopk</td>
       <td>Input</td>
       <td>Number of selected experts.</td>
-      <td>The value must be in the range [1, 512].</td>
+      <td>The value must be greater than or equal to 1. When probsOptional is not None, the value must be less than or equal to 512.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -143,9 +151,9 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
     <tr>
       <td>rangeOptional</td>
       <td>Optional input</td>
-      <td>Valid range for EP split [start, end), with a size of 2. The element type is INT64.</td>
-      <td>A null pointer can be passed. If a null pointer is passed, the default value {0,0} is used and the output is all 0. When it is not null, 0 &lt;= start &lt;= end &lt;= start + shape[0] of permutedTokens must hold.</td>
-      <td>INT64</td>
+      <td>Valid range for EP split, with a size of 2.</td>
+      <td>A null pointer can be passed. If a null pointer is passed, the default value {0,0} is used and the output is all 0.</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -165,7 +173,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
       <td>Optional input</td>
       <td>-</td>
       <td>Reserved parameter. Currently, only a null pointer can be passed.</td>
-      <td>INT64</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -282,8 +290,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
 - Deterministic computation:
   - aclnnMoeTokenUnpermuteWithEp defaults to a deterministic implementation.
 
-- numTopk must be in the range [1, 512].
-- sortedIndices must be 1D with length num_tokens*numTopk, where num_tokens is greater than or equal to 1. Empty tensors are not supported.
+- numTopk must be greater than or equal to 1. If probsOptional is not null, numTopk must be less than or equal to 512.
 - Broadcast is not supported.
 - Using -1 in the shape of aclTensor to represent a dynamic dimension or -2 to represent a dynamic rank is not supported.
 - paddedMode being `True` is not supported.

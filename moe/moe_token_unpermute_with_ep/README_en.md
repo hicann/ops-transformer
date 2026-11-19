@@ -20,24 +20,32 @@ English | [简体中文](./README.md)
 - Operator function: obtains the input data in permutedTokens based on the index positions stored in sortedIndices, multiplies the data by probs, and performs merged accumulation.
 - Computation formula:
 
-Let `sortedIndices[k]` be the k-th element of sortedIndices, `num_tokens = len(sortedIndices) / numTopk`, and `rangeOptional = [start, end)`. A slot is read only when `start <= sortedIndices[k] < end`, and the row is `permutedTokens[sortedIndices[k] - start]`; otherwise the slot contributes 0. An empty `rangeOptional` is equivalent to the default value `{0, 0}`, so no slot is valid and the output is all zeros.
-
-(1) When probs is not None, the computation formula is as follows, where $i \in {0, 1, 2, ..., num\_tokens - 1}$, $j \in {0, 1, 2, ..., numTopk - 1}$, and the slot index is $k = i * numTopk + j$:
-
 $$
-out_{i} = \sum_{j=0}^{numTopk - 1} \begin{cases}
-permutedTokens[sortedIndices[k] - start] * probs_{i,j}, & start \le sortedIndices[k] < end \\
-0, & \text{otherwise}
-\end{cases}
+sortedIndices = sortedIndices[rangeOptional[0]<=i<rangeOptional[1]]
 $$
 
-(2) When probs is None, the computation formula is as follows, where $i \in {0, 1, 2, ..., num\_tokens - 1}$, $j \in {0, 1, 2, ..., numTopk - 1}$, and the slot index is $k = i * numTopk + j$:
+(1) When probs is not None, the computation formula is as follows, where $i \in {0, 1, 2, ..., num\_tokens - 1}$, $j \in {0, 1, 2, ..., numTopk - 1}$, and $k \in {0, 1, 2, ..., num\_tokens * numTopk}$:
 
 $$
-out_{i} = \sum_{j=0}^{numTopk - 1} \begin{cases}
-permutedTokens[sortedIndices[k] - start], & start \le sortedIndices[k] < end \\
-0, & \text{otherwise}
-\end{cases}
+permutedTokens = permutedTokens.indexSelect(0, sortedIndices)
+$$
+
+$$
+permutedTokens_{k} = permutedTokens_{k} * probs_{i,j}
+$$
+
+$$
+out_{i} = \sum_{k=i*numTopk}^{(i+1)*numTopk - 1 } permutedTokens_{k}
+$$
+
+(2) When probs is None, the computation formula is as follows, where $i \in {0, 1, 2, ..., num\_tokens - 1}$ and $j \in {0, 1, 2, ..., numTopk - 1}$:
+
+$$
+permutedTokens = permutedTokens.indexSelect(0, sortedIndices)
+$$
+
+$$
+out_{i} = \sum_{k=i*numTopk}^{(i+1)*numTopk - 1 } permutedTokens_{k}
 $$
 
 ## Parameter Description
@@ -63,21 +71,21 @@ $$
     <tr>
       <td>permutedTokens</td>
       <td>Input</td>
-      <td>Tokens that have been expanded and sorted, corresponding to <code>permutedTokens</code> in the formula.</td>
+      <td>Tokens that have been expanded and sorted, corresponding to `permutedTokens` in the formula.</td>
       <td>FLOAT16, BFLOAT16, FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>sortedIndices</td>
       <td>Input</td>
-      <td>Indicates the positions of the data to be computed in permutedTokens, corresponding to <code>sortedIndices</code> in the formula.</td>
+      <td>Indicates the positions of the data to be computed in permutedTokens, corresponding to `sortedIndices` in the formula.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>probsOptional</td>
       <td>Optional Input</td>
-      <td>Expert probabilities corresponding to the input tokens, corresponding to <code>probs</code> in the formula.</td>
+      <td>Expert probabilities corresponding to the input tokens, corresponding to `probs` in the formula.</td>
       <td>FLOAT16, BFLOAT16, FLOAT32</td>
       <td>ND</td>
     </tr>
@@ -91,8 +99,8 @@ $$
     <tr>
       <td>rangeOptional</td>
       <td>Attribute</td>
-      <td>Valid range for EP split [start, end), with a size of 2. The element type is INT64.</td>
-      <td>INT64 (aclIntArray*)</td>
+      <td>Valid range for EP partitioning; the size is 2.</td>
+      <td>aclIntArray*</td>
       <td>-</td>
     </tr>
     <tr>
@@ -106,13 +114,13 @@ $$
       <td>restoreShapeOptional</td>
       <td>Attribute</td>
       <td>Currently only nullptr is supported.</td>
-      <td>INT64 (aclIntArray*)</td>
+      <td>aclIntArray*</td>
       <td>-</td>
     </tr>
     <tr>
       <td>out</td>
       <td>Output</td>
-      <td>Output result of the unpermute operation on permutedTokens, corresponding to <code>out</code> in the formula.</td>
+      <td>Output result of the unpermute operation on permutedTokens, corresponding to `out` in the formula.</td>
       <td>FLOAT16, BFLOAT16, FLOAT32</td>
       <td>ND</td>
     </tr>
@@ -122,9 +130,7 @@ $$
 
 ## Constraints
 
-- numTopk must be in the range [1, 512].
-- sortedIndices must be 1D with length num_tokens*numTopk, where num_tokens is greater than or equal to 1. Empty tensors are not supported.
-- When rangeOptional is not empty, 0 <= rangeOptional[0] <= rangeOptional[1] <= rangeOptional[0] + shape[0] of permutedTokens must hold.
+- numTopk must be greater than or equal to 1. When probsOptional is not empty, numTopk must be less than or equal to 512.
 - Broadcast is not supported.
 - paddedMode set to `True` is not supported.
 - When rangeOptional is empty, the default value {0,0} is used, the output is all 0s, and no fallback call to other operators is performed.
