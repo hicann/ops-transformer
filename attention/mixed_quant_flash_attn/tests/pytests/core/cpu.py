@@ -1281,7 +1281,8 @@ def tforward(sinner=-1, souter=-1, mode="cpu", **kwargs):
                     )
                     if mode == "npu":
                         mm2 = npu_batch_matmul_fp32(
-                            p_block.to(q.dtype), v_block.contiguous()
+                            p_block.to(torch.float16),
+                            v_block.to(torch.float16).contiguous(),
                         )
                     else:
                         # Preserve default FP32 accumulation; use FP64 in high-precision mode.

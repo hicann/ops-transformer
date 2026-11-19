@@ -139,14 +139,14 @@ CSV_DTYPE_MAP = {
     "FP4_E2M1": "uint8",
     "HIFLOAT4": "uint8",
     "FP8_E8M0": "float8_e8m0fnu",
-    "hifloat4_scale": "float32",
+    "hifloat4_scale": "hifloat4_scale",
     "INT8": "int8",
     "INT32": "int32",
     "FP32": "float32",
 }
 
 # quant_compute_mode -> kv descale dtype（CSV）
-CSV_SCALE_DTYPE = {1: "float8_e8m0", 2: "float32"}
+CSV_SCALE_DTYPE = {1: "float8_e8m0", 2: "hifloat4_scale"}
 
 # quant_compute_mode -> kv descale 数据范围（与 inputs.py _gen_*_scale 默认 low/high 一致）
 CSV_SCALE_RANGE = {1: (0.01, 10.0), 2: (125.0, 129.0)}

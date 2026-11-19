@@ -28,6 +28,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+from ttk.switches import get_global_storage
+
 
 _impl_dir = Path(__file__).with_name("impl")
 _impl_cache = {}
@@ -55,19 +57,18 @@ def load_impl_module(stem):
     return _impl_cache[stem]
 
 
-# 三方比对专用容差（仅 --compare cross_check 时生效）。与 tolerance 分开声明，
-# 避免默认(stat_rel_err)模式下触发 TTK 的 golden Promote / 第三方抓取逻辑。
-CROSS_CHECK_TOLERANCE = {
-    "float16": {"standard": "cross_check", "level": "L2"},
-    "bfloat16": {"standard": "cross_check", "level": "L2"},
-}
+def third_party_mixed_quant_flash_attn(**kwargs):
+    return load_impl_module("golden").run_mixed_quant_flash_attn(mode="npu", **kwargs)
 
 
 class MixedQuantFlashAttnSpec:
     tolerance = {
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
+        "float16": {"standard": "stat_rel_err", "level": "L2"},
+        "bfloat16": {"standard": "stat_rel_err", "level": "L2"},
+        "float32": {"standard": "stat_rel_err", "level": "L2"},
     }
+
+    third_party = {"torch": third_party_mixed_quant_flash_attn}
 
     @staticmethod
     def golden(*args, **kwargs):
@@ -81,27 +82,13 @@ class MixedQuantFlashAttnSpec:
     def npu_preprocess(*args, **kwargs):
         return load_impl_module("npu_preprocess").run(*args, **kwargs)
 
-    @staticmethod
-    def compare(*outputs, compare_context=None, **kwargs):
-        compare_mod = load_impl_module("compare")
-        compare_method = compare_mod._get_compare_method()
-        if compare_method == "cross_check":
-            if not compare_mod.is_cross_check_available():
-                raise RuntimeError("cross_check requires TTK CrossCheckComparison")
-            # Rebuild the selected third-party outputs; golden outputs are the FP64 CPU truth.
-            golden_mod = load_impl_module("golden")
-            golden_mod.rebuild_golden_context_from_compare_context(compare_context)
-            ctx = golden_mod.get_golden_context()
-            bench_outputs = ctx.get("bench_outputs")
-            kwargs["data_type"] = ctx.get("data_type") or kwargs.get("data_type")
-            if bench_outputs is None:
-                raise RuntimeError(
-                    "cross_check third-party golden outputs are unavailable"
-                )
-            return compare_mod._run_ttk_cross_check_e2e(
-                outputs, kwargs, bench_outputs, CROSS_CHECK_TOLERANCE
-            )
-        return compare_mod.compare(*outputs)
+    # TTK gives custom compare precedence over --compare; returning None is invalid.
+    # Register the legacy comparator only outside native cross_check mode.
+    if get_global_storage().compare_method != "cross_check":
+
+        @staticmethod
+        def compare(*outputs, **kwargs):
+            return load_impl_module("compare").compare(*outputs)
 
 
 __spec__ = {

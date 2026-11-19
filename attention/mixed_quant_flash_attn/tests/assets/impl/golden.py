@@ -21,40 +21,10 @@ __golden__ = {
     }
 }
 
-import sys
-import traceback
-
 import numpy as np
 import torch
 
 from core.cpu import run_cpu_golden
-
-try:
-    from ttk.utilities.container_utils import get_global_storage
-except ImportError:
-    try:
-        from ttk.switches import get_global_storage
-    except ImportError:
-        get_global_storage = None
-
-
-_GOLDEN_CONTEXT = {}
-
-
-def _record_bench_error(exc):
-    """第三方 golden 失败时打印根因到 stderr，避免静默吞掉。"""
-    detail = f"{type(exc).__name__}: {exc}"
-    print(f"[golden] third-party golden failed: {detail}", file=sys.stderr, flush=True)
-    traceback.print_exc(file=sys.stderr)
-
-
-def _get_compare_method():
-    if get_global_storage is not None:
-        try:
-            return getattr(get_global_storage(), "compare_method", None)
-        except Exception:
-            return None
-    return None
 
 
 def _to_torch(val, dtype=None):
@@ -79,13 +49,11 @@ def _to_torch(val, dtype=None):
     return torch.tensor(val)
 
 
-def _run_third_party_golden(input_kwargs):
-    # 第三方切换：注释当前 return，取消另一行注释；同进程和独立进程重建共用此处。
-    return run_cpu_golden(input_kwargs, mode="npu")  # NPU 小算子
-    # return run_cpu_golden(input_kwargs, mode="cpu")  # CPU 低精
+def cpu_mixed_quant_flash_attn(*args, **kwargs):
+    return run_mixed_quant_flash_attn(*args, **kwargs)
 
 
-def cpu_mixed_quant_flash_attn(
+def run_mixed_quant_flash_attn(
     q,
     k,
     v,
@@ -116,6 +84,9 @@ def cpu_mixed_quant_flash_attn(
     **kwargs,
 ):
     """TTK golden adapter: 调用 pytest tforward 计算 CPU golden。"""
+    mode = kwargs.get("mode")
+    if mode is None:
+        mode = "cpu_high" if kwargs.get("golden_mode") == "Promote" else "cpu"
     # numpy → torch 转换
     input_kwargs = {
         "q": _to_torch(q, torch.bfloat16),
@@ -144,78 +115,5 @@ def cpu_mixed_quant_flash_attn(
         "souter": int(kwargs.get("souter", 32)),
     }
 
-    cross_check = _get_compare_method() == "cross_check"
-    result = run_cpu_golden(input_kwargs, mode="cpu_high" if cross_check else "cpu")
-    if cross_check:
-        # FP64 CPU result is the truth; bench_outputs holds the third-party result.
-        _GOLDEN_CONTEXT["data_type"] = str(getattr(q, "dtype", "bfloat16"))
-        try:
-            bench = _run_third_party_golden(input_kwargs)
-            _GOLDEN_CONTEXT["bench_outputs"] = (bench["attn_out"], bench["softmax_lse"])
-        except Exception as exc:
-            _GOLDEN_CONTEXT["bench_outputs"] = None
-            _record_bench_error(exc)
+    result = run_cpu_golden(input_kwargs, mode=mode)
     return result["attn_out"], result["softmax_lse"]
-
-
-def get_golden_context():
-    return _GOLDEN_CONTEXT
-
-
-def rebuild_golden_context_from_compare_context(compare_context):
-    """Re-run the selected third-party golden from compare_context.
-
-    TTK 可能在独立进程里跑 golden 与 compare，cross_check 需要在 compare 进程里
-    重建 bench_outputs。仅计算第三方结果（golden 本体已由 TTK 传入）。
-    """
-    if compare_context is None:
-        return
-    try:
-        tensors = (
-            list(compare_context.input_tensors)
-            if compare_context.input_tensors is not None
-            else []
-        )
-        attrs = dict(compare_context.attributes or {})
-
-        def _t(idx):
-            return tensors[idx] if idx < len(tensors) else None
-
-        def _attr(*names, default=None):
-            for n in names:
-                if n in attrs:
-                    return attrs[n]
-            return default
-
-        input_kwargs = {
-            "q": _to_torch(_t(0), torch.bfloat16),
-            "k": _to_torch(_t(1), torch.uint8),
-            "v": _to_torch(_t(2), torch.uint8),
-            "k_descale": _to_torch(_t(3)),
-            "v_descale": _to_torch(_t(4)),
-            "block_table": _to_torch(_t(5), torch.int32),
-            "cu_seqlens_q": _to_torch(_t(6), torch.int32),
-            "seqused_q": _to_torch(_t(7), torch.int32),
-            "seqused_kv": _to_torch(_t(8), torch.int32),
-            "sinks": _to_torch(_t(9), torch.float32),
-            "attn_mask": _to_torch(_t(10), torch.int8),
-            "quant_mode": int(_attr("quant_mode", "quant_compute_mode", default=1)),
-            "softmax_scale": float(_attr("softmax_scale", default=1.0)),
-            "mask_mode": int(_attr("mask_mode", default=0)),
-            "win_left": int(_attr("win_left", default=-1)),
-            "win_right": int(_attr("win_right", default=-1)),
-            "max_seqlen_q": int(_attr("max_seqlen_q", default=-1)),
-            "max_seqlen_kv": int(_attr("max_seqlen_kv", default=-1)),
-            "layout_q": _attr("layout_q", default="BSND"),
-            "layout_kv": _attr("layout_kv", default="PA_BBND"),
-            "layout_attn_out": _attr("layout_attn_out", default="BSND"),
-            "return_softmax_lse": bool(_attr("return_softmax_lse", default=False)),
-            "sinner": int(_attr("sinner", default=512)),
-            "souter": int(_attr("souter", default=32)),
-        }
-        _GOLDEN_CONTEXT["data_type"] = str(input_kwargs["q"].dtype)
-        bench = _run_third_party_golden(input_kwargs)
-        _GOLDEN_CONTEXT["bench_outputs"] = (bench["attn_out"], bench["softmax_lse"])
-    except Exception as exc:
-        _GOLDEN_CONTEXT["bench_outputs"] = None
-        _record_bench_error(exc)

@@ -83,15 +83,15 @@ CSV_DTYPE_MAP = {
     "fp4_e2m1": "uint8",
     "fp4_e1m2": "uint8",
     "fp8_e8m0": "float8_e8m0fnu",
-    "hifp4_scale": "float32",
-    "fp32_e6m2e1e16": "float32",
+    "hifp4_scale": "hifloat4_scale",
+    "fp32_e6m2e1e16": "hifloat4_scale",
     "int8": "int8",
     "int32": "int32",
     "fp32": "float32",
     "float32": "float32",
 }
 
-CSV_SCALE_DTYPE = {1: "float8_e8m0", 2: "float32"}
+CSV_SCALE_DTYPE = {1: "float8_e8m0", 2: "hifloat4_scale"}
 CSV_SCALE_RANGE = {1: (0.01, 10.0), 2: (125.0, 129.0)}
 
 # 跳过的边界/异常用例字段（这些用例构造非法输入，TTK CSV 模式无法表达）
