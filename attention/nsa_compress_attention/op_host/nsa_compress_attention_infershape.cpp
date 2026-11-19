@@ -84,7 +84,7 @@ ge::graphStatus InferShapeNsaCompressAttention(gert::InferShapeContext* context)
     // topkIndicesOut: (N2, T, selectBlockCount)
     gert::Shape* topkIndicesOutShape = context->GetOutputShape(3);
     OP_CHECK_NULL_WITH_CONTEXT(context, topkIndicesOutShape);
-    const int* selectBlockCountPtr = attrs->GetAttrPointer<int32_t>(7);
+    const int64_t* selectBlockCountPtr = attrs->GetAttrPointer<int64_t>(7);
     auto selectBlockCount = *selectBlockCountPtr;
     topkIndicesOutShape->SetDimNum(DIM_NUM_3);
     topkIndicesOutShape->SetDim(DIM_NUM_0, shapeN2);

@@ -443,10 +443,10 @@ bool NsaCompressAttentionTilingBase::AnalyzeAttrs()
     auto n1SizePtr = attrs->GetAttrPointer<uint32_t>(idx++);
     inputLayout = attrs->GetAttrPointer<char>(idx++);
     auto sparseModePtr = attrs->GetAttrPointer<int64_t>(idx++);
-    auto compressBlockSizePtr = attrs->GetAttrPointer<char>(idx++);
-    auto compressStridePtr = attrs->GetAttrPointer<char>(idx++);
-    auto selectBlockSizePtr = attrs->GetAttrPointer<char>(idx++);
-    auto selectBlockCountPtr = attrs->GetAttrPointer<char>(idx++);
+    auto compressBlockSizePtr = attrs->GetAttrPointer<int64_t>(idx++);
+    auto compressStridePtr = attrs->GetAttrPointer<int64_t>(idx++);
+    auto selectBlockSizePtr = attrs->GetAttrPointer<int64_t>(idx++);
+    auto selectBlockCountPtr = attrs->GetAttrPointer<int64_t>(idx++);
 
     scaleValue = *scaleValuePtr;
     n1Size = *n1SizePtr;
@@ -471,13 +471,6 @@ bool NsaCompressAttentionTilingBase::AnalyzeAttrs()
 
 ge::graphStatus NsaCompressAttentionTilingBase::CheckAttr()
 {
-    uint64_t minS2Val = *std::min_element(actualSeqLenKvData.begin(), actualSeqLenKvData.begin() + bSize);
-    uint64_t isM = selectBlockSize / compressStride;
-    uint64_t minSelS2Val = CeilDiv(minS2Val, isM);
-    OP_CHECK_IF(selectBlockCount < 1 || selectBlockCount > 32 || static_cast<uint64_t>(selectBlockCount) > minSelS2Val,
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    opName, "selectBlockCount must be greater than 1 and less than 32 and less than min(SelSkv)."),
-                return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         compressBlockSize < 16U || compressBlockSize > 128U || compressBlockSize % 16U != 0,
         OPS_REPORT_VECTOR_INNER_ERR(
@@ -498,6 +491,13 @@ ge::graphStatus NsaCompressAttentionTilingBase::CheckAttr()
     OP_CHECK_IF(selectBlockSize % compressStride != 0,
                 OPS_REPORT_VECTOR_INNER_ERR(opName, "selectBlockSize must be divisible by compressStride"),
                 return ge::GRAPH_FAILED);
+    uint64_t minS2Val = *std::min_element(actualSeqLenKvData.begin(), actualSeqLenKvData.begin() + bSize);
+    uint64_t isM = selectBlockSize / compressStride;
+    uint64_t minSelS2Val = CeilDiv(minS2Val, isM);
+    OP_CHECK_IF(selectBlockCount < 1 || selectBlockCount > 32 || static_cast<uint64_t>(selectBlockCount) > minSelS2Val,
+                OPS_REPORT_VECTOR_INNER_ERR(
+                    opName, "selectBlockCount must be greater than 1 and less than 32 and less than min(SelSkv)."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -515,7 +515,10 @@ bool NsaCompressAttentionTilingBase::AnalyzeLayout()
     OP_CHECK_IF(!Analyze3DimLayout(queryShape, keyShape, valueShape, layoutLen) ||
                     !Analyze4DimLayout(queryShape, keyShape, valueShape, layoutLen),
                 OPS_REPORT_VECTOR_INNER_ERR(opName, "Get unsupported layout: %s", inputLayout), return false);
-    OP_CHECK_IF(gSize == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "gSize is zero."), return false);
+    OP_CHECK_IF(
+        gSize <= 0 || gSize >= 128 || 128 % gSize != 0,
+        OPS_REPORT_VECTOR_INNER_ERR(opName, "G must satisfy G > 0, G < 128 and 128 %% G == 0, but got G=%ld.", gSize),
+        return false);
     OP_CHECK_IF(n2Size == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "n2Size is zero."), return false);
     OP_CHECK_IF(dSize > HEAD_DIM_MAX_VALUE || dSize <= 0L,
                 OPS_REPORT_VECTOR_INNER_ERR(opName, "dSize is not in range:(0, %ld].", HEAD_DIM_MAX_VALUE),
