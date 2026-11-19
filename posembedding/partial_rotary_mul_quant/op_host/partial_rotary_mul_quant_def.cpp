@@ -13,6 +13,7 @@
  * \brief
  */
 #include "common/include/op_host/op_const_def_transformer.h"
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -77,8 +78,8 @@ public:
                        Ops::Transformer::DT_HIFLOAT4_SCALE})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
-        this->AICore().AddConfig("ascend960dt", ascend960dtCfg);
-        this->AICore().AddConfig("ascend960pr", ascend960dtCfg);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, ascend960dtCfg);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, ascend960dtCfg);
 #endif
 
         OpAICoreConfig ascend950Cfg;

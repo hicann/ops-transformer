@@ -12,6 +12,7 @@
  * \file rotary_position_embedding.cc
  * \brief
  */
+#include "op_common/op_host/util/op_const_def.h"
 #include "rotary_position_embedding_tiling.h"
 #include "rope_rotate_matrix_tiling.h"
 #include "rope_rotate_half_tiling.h"
@@ -32,14 +33,14 @@ ge::graphStatus RotaryPosEmbeddingMembaseTilingClass::GetPlatformInfo()
         aicoreParams_.numBlocks = ascendcPlatform.GetCoreNumAiv();
         uint64_t ubSizePlatForm;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
-        socVersion_ = ascendcPlatform.GetSocVersion();
+        npuArch_ = ascendcPlatform.GetCurNpuArch();
         aicoreParams_.ubSize = ubSizePlatForm;
     } else {
         auto compileInfoPtr = reinterpret_cast<const RotaryPositionEmbeddingCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
         aicoreParams_.numBlocks = compileInfoPtr->numBlocks;
-        socVersion_ = compileInfoPtr->socVersion;
+        npuArch_ = compileInfoPtr->npuArch;
     }
     return ge::GRAPH_SUCCESS;
 }

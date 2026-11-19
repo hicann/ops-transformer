@@ -14,6 +14,7 @@
  */
 #ifndef OPS_BUILD_IN_OP_TILING_RUNTIME_rope_rotate_tiling_H
 #define OPS_BUILD_IN_OP_TILING_RUNTIME_rope_rotate_tiling_H
+#include "op_common/op_host/util/op_const_def.h"
 #include "register/op_def_registry.h"
 #include "rotary_position_embedding_tiling.h"
 
@@ -34,9 +35,7 @@ public:
 protected:
     bool IsCapable() override
     {
-        if ((socVersion_ == platform_ascendc::SocVersion::ASCEND910B ||
-             socVersion_ == platform_ascendc::SocVersion::ASCEND910_93) &&
-            context_->GetOptionalInputDesc(ROTATE_INPUT_IDX) != nullptr) {
+        if ((npuArch_ == Ops::Base::DAV_2201) && context_->GetOptionalInputDesc(ROTATE_INPUT_IDX) != nullptr) {
             return true;
         }
         return false;

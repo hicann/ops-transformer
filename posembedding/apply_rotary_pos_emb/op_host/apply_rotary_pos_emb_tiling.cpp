@@ -12,6 +12,7 @@
  * \file apply_rotary_pos_emb_tiling.cpp
  * \brief
  */
+#include "op_common/op_host/util/op_const_def.h"
 #include "apply_rotary_pos_emb_tiling.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "platform/platform_infos_def.h"
@@ -115,7 +116,7 @@ struct ApplyRotaryPosEmbParams {
     int64_t mask = 0;
     int64_t tilingKey = 0;
     int64_t blockMoveQ = 0;
-    platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch = Ops::Base::DAV_2201;
 };
 
 class ApplyRotaryPosEmbTiling {
@@ -549,7 +550,7 @@ protected:
             OP_CHECK_NULL_WITH_CONTEXT(context_, platformInfo);
             auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
             params.totalCoreNum = ascendcPlatform.GetCoreNumAiv();
-            params.socVersion = ascendcPlatform.GetSocVersion();
+            params.npuArch = ascendcPlatform.GetCurNpuArch();
 
             uint64_t platformUbSize = 0;
             platformInfo->GetLocalMemSize(fe::LocalMemType::UB, platformUbSize);
@@ -559,13 +560,13 @@ protected:
             params.sysWorkspaceSize = sysWorkspaceSize > WORK_SPACE_SIZE ? sysWorkspaceSize : WORK_SPACE_SIZE;
 
             aropeCompileInfo = std::make_unique<ApplyRotaryPosEmbCompileInfo>(ApplyRotaryPosEmbCompileInfo{
-                params.totalCoreNum, platformUbSize, params.sysWorkspaceSize, params.socVersion});
+                params.totalCoreNum, platformUbSize, params.sysWorkspaceSize, params.npuArch});
         } else {
             OP_LOGD(context_->GetNodeName(), "get platform information from compile info.");
             params.totalCoreNum = aropeCompileInfo->numBlocks;
             params.totalUbSize = aropeCompileInfo->ubSize;
             params.sysWorkspaceSize = aropeCompileInfo->sysWorkspaceSize;
-            params.socVersion = aropeCompileInfo->socVersion;
+            params.npuArch = aropeCompileInfo->npuArch;
         }
         OP_LOGD(context_->GetNodeName(), "totalCoreNum is %ld", params.totalCoreNum);
         OP_CHECK_IF(params.totalCoreNum <= 0, OP_LOGE(context_->GetNodeName(), "PrepareTiling failed to get core num."),
@@ -646,7 +647,7 @@ static ge::graphStatus TilingPrepare4ApplyRotaryPosEmb(gert::TilingParseContext*
                 return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-    compileInfoPtr->socVersion = ascendcPlatform.GetSocVersion();
+    compileInfoPtr->npuArch = ascendcPlatform.GetCurNpuArch();
     compileInfoPtr->numBlocks = ascendcPlatform.GetCoreNumAiv();
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);
     return ge::GRAPH_SUCCESS;

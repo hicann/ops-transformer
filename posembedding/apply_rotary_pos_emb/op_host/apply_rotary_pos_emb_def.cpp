@@ -13,6 +13,7 @@
  * \brief
  */
 #include <vector>
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -66,10 +67,9 @@ public:
             .DynamicRankSupportFlag(true)
             .DynamicShapeSupportFlag(true)
             .ExtendCfgInfo("opFile.value", "apply_rotary_pos_emb_apt");
-        this->AICore().AddConfig("ascend950", regbaseCfg);
-        this->AICore().AddConfig("ascend960dt", regbaseCfg);
-        this->AICore().AddConfig("ascend960pr", regbaseCfg);
-        this->AICore().AddConfig("ascend350", regbaseCfg);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, regbaseCfg);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, regbaseCfg);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, regbaseCfg);
         this->AICore().AddConfig("mc62", regbaseCfg);
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)
@@ -108,7 +108,7 @@ public:
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
         aicore_config.ExtendCfgInfo("opFile.value", "apply_rotary_pos_emb");
-        this->AICore().AddConfig("ascend310p", aicore_config);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_2002, aicore_config);
         this->AICore().AddConfig("kirinx90", aicore_config);
         this->AICore().AddConfig("kirin9030", aicore_config);
     }

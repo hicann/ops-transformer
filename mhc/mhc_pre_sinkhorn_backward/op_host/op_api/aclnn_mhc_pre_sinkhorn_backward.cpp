@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "op_common/op_host/util/op_const_def.h"
 #include <dlfcn.h>
 #include <new>
 #include <memory>
@@ -551,7 +552,7 @@ static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams& params)
     int64_t nVal = is3D ? xShape.GetDim(1) : xShape.GetDim(2);
     int64_t cVal = is3D ? xShape.GetDim(2) : xShape.GetDim(3);
     auto curArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    bool isArch92 = (curArch == NpuArch::DAV_9201 || curArch == NpuArch::DAV_9202);
+    bool isArch92 = (curArch == Ops::Base::DAV_9201 || curArch == Ops::Base::DAV_9202);
     if (Ops::Transformer::AclnnUtil::IsRegbase() || isArch92) {
         if (nVal <= 0 || nVal > 8) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "N must be > 0 and <= 8, but got %ld", nVal);

@@ -12,6 +12,7 @@
  * \file rope_interleaved.cc
  * \brief
  */
+#include "op_common/op_host/util/op_const_def.h"
 #include "rope_interleaved_tiling.h"
 #include "rotary_position_embedding_tiling.h"
 #include "register/op_def_registry.h"
@@ -351,7 +352,7 @@ ge::graphStatus TilingSplit(gert::TilingContext* context, const gert::StorageSha
 ge::graphStatus RopeInterLeavedTilingClass::DoOpTiling()
 {
     const auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
-    OP_CHECK_IF(ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND310P,
+    OP_CHECK_IF(ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_2002,
                 OP_LOGE(context_, "current soc does not support interleaved."), return ge::GRAPH_FAILED);
 
     const gert::StorageShape* xShape = context_->GetInputShape(INPUT_X_IDX);

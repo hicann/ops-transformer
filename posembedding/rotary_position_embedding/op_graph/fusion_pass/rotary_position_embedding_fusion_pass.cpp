@@ -24,7 +24,7 @@
 #include "ge/es_graph_builder.h"
 #include "ge/ge_utils.h"
 #include "log/log.h"
-#include "op_host/util/op_const_def.h"
+#include "op_common/op_host/util/op_const_def.h"
 #include "runtime/rt_external_base.h"
 
 namespace ops {

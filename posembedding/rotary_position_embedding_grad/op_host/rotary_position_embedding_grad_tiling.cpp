@@ -12,6 +12,7 @@
  * \file rotary_position_embedding_grad.cc
  * \brief
  */
+#include "op_common/op_host/util/op_const_def.h"
 #include "rotary_position_embedding_grad_tiling.h"
 #include "rope_half_grad_tiling.h"
 #include "rope_interleaved_grad_tiling.h"
@@ -32,13 +33,13 @@ ge::graphStatus RotaryPosEmbeddingGradMembaseTilingClass::GetPlatformInfo()
         uint64_t ubSizePlatForm;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
         aicoreParams_.ubSize = ubSizePlatForm;
-        socVersion_ = ascendcPlatform.GetSocVersion();
+        npuArch_ = ascendcPlatform.GetCurNpuArch();
     } else {
         auto compileInfoPtr = context_->GetCompileInfo<RotaryPositionEmbeddingGradCompileInfo>();
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aicoreParams_.numBlocks = compileInfoPtr->numBlocks;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
-        socVersion_ = compileInfoPtr->socVersion;
+        npuArch_ = compileInfoPtr->npuArch;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -133,7 +134,7 @@ ge::graphStatus TilingPrepareForRotaryPositionEmbeddingGrad(gert::TilingParseCon
     uint64_t ubSizePlatForm;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
     compileInfoPtr->ubSize = ubSizePlatForm;
-    compileInfoPtr->socVersion = ascendcPlatform.GetSocVersion();
+    compileInfoPtr->npuArch = ascendcPlatform.GetCurNpuArch();
     if (Ops::Transformer::OpTiling::IsRegbaseSocVersion(context)) {
         return TilingPrepare4ReduceOp(context, &compileInfoPtr->opInfo);
     }

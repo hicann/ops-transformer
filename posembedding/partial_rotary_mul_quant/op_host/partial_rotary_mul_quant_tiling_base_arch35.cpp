@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include "op_common/op_host/util/op_const_def.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 #include <graph/utils/type_utils.h>
 #include "tiling/tiling_api.h"
@@ -56,7 +57,7 @@ ge::graphStatus QuantRopeRegBaseTilingClass::GetPlatformInfo()
         uint64_t ubSizePlatForm;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
         aicoreParams_.ubSize = ubSizePlatForm;
-        socVersion_ = ascendcPlatform.GetSocVersion();
+        npuArch_ = ascendcPlatform.GetCurNpuArch();
     } else {
         auto compileInfoPtr =
             reinterpret_cast<const QuantRotaryPositionEmbeddingCompileInfo*>(context_->GetCompileInfo());
@@ -64,7 +65,7 @@ ge::graphStatus QuantRopeRegBaseTilingClass::GetPlatformInfo()
                     return ge::GRAPH_FAILED);
         aicoreParams_.blockDim = compileInfoPtr->blockDim;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
-        socVersion_ = compileInfoPtr->socVersion;
+        npuArch_ = compileInfoPtr->npuArch;
     }
     blockSize_ = BLOCK_SIZE;
     return ge::GRAPH_SUCCESS;
@@ -435,8 +436,8 @@ ge::graphStatus QuantRopeRegBaseTilingClass::GetShapeAttrsInfo()
 ge::graphStatus QuantRopeRegBaseTilingClass::CheckHiF8Support()
 {
     auto platform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
-    OP_CHECK_IF(platform.GetSocVersion() != platform_ascendc::SocVersion::ASCEND950,
-                OP_LOGE(context_->GetNodeName(), "HiFloat8 requires Ascend950"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platform.GetCurNpuArch() != Ops::Base::DAV_3510,
+                OP_LOGE(context_->GetNodeName(), "HiFloat8 requires DAV_3510"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(!noRope_ && sliceEnd_ != d_, OP_LOGE(context_->GetNodeName(), "HiFloat8 requires sliceEnd == D"),
                 return ge::GRAPH_FAILED);
     int64_t divisor = rotaryMode_ == RotaryPosEmbeddingMode::QUARTER ? 4 : 2;

@@ -15,36 +15,17 @@ if (BUILD_OPEN_PROJECT)
     add_modules_sources(OPTYPE rotary_position_embedding ACLNNTYPE aclnn_exclude)
 endif()
 
-set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
-if("${CONDITION_UNIT}" STREQUAL "ascend950")
-    set(rotary_position_embedding_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for rotary_position_embedding")
-    add_ops_compile_options(
+foreach(_soc IN LISTS ASCEND_COMPUTE_UNIT)
+    get_npu_arch_by_soc_version("${_soc}" _arch)
+    if(_arch MATCHES "^dav_(3510|9201|9202)$")
+        set(rotary_position_embedding_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for rotary_position_embedding")
+    endif()
+endforeach()
+add_ops_compile_options(
         OP_NAME RotaryPositionEmbedding
-        COMPUTE_UNIT Ascend950PR_9599
+        COMPUTE_UNIT dav_3510 dav_9201 dav_9202
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
-elseif("${CONDITION_UNIT}" STREQUAL "ascend350")
-    set(rotary_position_embedding_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for rotary_position_embedding")
-    add_ops_compile_options(
-        OP_NAME RotaryPositionEmbedding
-        COMPUTE_UNIT Ascend350_355e
-        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
-    )
-elseif("${CONDITION_UNIT}" STREQUAL "ascend960dt")
-    set(rotary_position_embedding_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for rotary_position_embedding")
-    add_ops_compile_options(
-        OP_NAME RotaryPositionEmbedding
-        COMPUTE_UNIT ascend960dt_968B7
-        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
-    )
-elseif("${CONDITION_UNIT}" STREQUAL "ascend960pr")
-    set(rotary_position_embedding_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for rotary_position_embedding")
-    add_ops_compile_options(
-        OP_NAME RotaryPositionEmbedding
-        COMPUTE_UNIT Ascend960PR_969A1
-        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
-    )
-endif()
 
 if (BUILD_OPS_RTY_KERNEL)
     add_ops_compile_options(

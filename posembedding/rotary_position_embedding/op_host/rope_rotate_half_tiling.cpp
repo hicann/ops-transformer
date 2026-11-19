@@ -12,6 +12,7 @@
  * \file rope_rotate_half.cc
  * \brief
  */
+#include "op_common/op_host/util/op_const_def.h"
 #include "rope_rotate_half_tiling.h"
 #include "rotary_position_embedding_tiling.h"
 #include "log/log.h"
@@ -132,7 +133,7 @@ public:
     uint64_t tilingDtype = TILING_DTYPE_UNKNOWN;
     uint64_t tilingKey = TILING_KEY_PREFIX;
     bool isTndLayOut = false;
-    platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND310P;
+    NpuArch npuArch = Ops::Base::DAV_2002;
     RotaryPositionEmbeddingTilingData tiling;
     RotateHalfParams& tilingData_ = tiling.rotateHalfParams;
     ge::graphStatus DoRotateHalfTiling();
@@ -499,8 +500,7 @@ inline bool RotateHalfTiling::CalcFullLoadXDTiling(const ge::DataType& origType,
 inline bool RotateHalfTiling::CheckRotHalfFullLoadXDConds(const ge::DataType& origType, const uint64_t ubSize)
 {
     // FullLoadXD kernel only supports 910B and 910C
-    if (socVersion != platform_ascendc::SocVersion::ASCEND910_93 &&
-        socVersion != platform_ascendc::SocVersion::ASCEND910B) {
+    if (npuArch != Ops::Base::DAV_2201) {
         return false;
     }
 
@@ -685,7 +685,7 @@ ge::graphStatus RotateHalfTiling::DoRotateHalfTiling()
     uint64_t ubSize;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     coreNum = aivNum;
-    socVersion = ascendcPlatform.GetSocVersion();
+    npuArch = ascendcPlatform.GetCurNpuArch();
 
     // get x and r shape. layout: [..., head_dim]
     auto inputXShapePtr = context->GetInputShape(INDEX_INPUT_X);
@@ -739,12 +739,11 @@ ge::graphStatus RotateHalfTiling::DoRotateHalfTiling()
 
     // check D/2 aligned
     GetAlignedInfo(inputDtype, dLength);
-    OP_CHECK_IF(
-        tilingData_.get_isAligned() == 0 && ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND910,
-        OP_LOGE(context, "current soc does not support non aligned calculations."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(tilingData_.get_isAligned() == 0 && ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_1001,
+                OP_LOGE(context, "current soc does not support non aligned calculations."), return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(dLength != 32 && dLength != 64 && dLength != 96 && dLength != 128 &&
-                    ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND310P,
+                    ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_2002,
                 OP_LOGE(context, "current soc only supports d = 32/64/96/128."), return ge::GRAPH_FAILED);
 
     ChooseTilingMode(xShape, cosShape);
@@ -762,7 +761,7 @@ ge::graphStatus RotateHalfTiling::DoRotateHalfTiling()
     OP_CHECK_IF(!tilingData_.get_tailAxesFLBoost() && tilingData_.get_storeSLines() <= 0,
                 OP_LOGE(context, "head_dim shape is too large to compute."), return ge::GRAPH_FAILED);
 
-    if (ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND310P) {
+    if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_2002) {
         OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckStrideSupport(inputDtype),
                     OP_LOGE(context, "Stride is too large to compute."), return ge::GRAPH_FAILED);
     }

@@ -13,6 +13,7 @@
  * \brief AttentionUpdate ascendc impl
  */
 
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -58,10 +59,9 @@ public:
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "attention_update_apt");
 
-        this->AICore().AddConfig("ascend950", config_95);
-        this->AICore().AddConfig("ascend960dt", config_95);
-        this->AICore().AddConfig("ascend960pr", config_95);
-        this->AICore().AddConfig("ascend350", config_95);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, config_95);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, config_95);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, config_95);
     }
 };
 

@@ -14,6 +14,7 @@
  */
 
 #include <cstdint>
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -47,10 +48,9 @@ public:
         this->Attr("round_scale").AttrType(OPTIONAL).Bool(true);
         this->Attr("x_scale").AttrType(OPTIONAL).Float(1.0f);
 
-        this->AICore().AddConfig("ascend950");
-        this->AICore().AddConfig("ascend350");
-        this->AICore().AddConfig("ascend960dt");
-        this->AICore().AddConfig("ascend960pr");
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202);
         this->AICore().AddConfig("ascend910b");
         this->AICore().AddConfig("ascend910_93");
     }

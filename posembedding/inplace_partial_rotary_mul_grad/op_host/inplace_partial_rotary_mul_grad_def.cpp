@@ -12,6 +12,7 @@
  * \file inplace_partial_rotary_mul_grad_def.cpp
  * \brief
  */
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -42,7 +43,7 @@ public:
             .DynamicShapeSupportFlag(true)
             .ExtendCfgInfo("opFile.value", "inplace_partial_rotary_mul_grad_apt");
         this->AICore().AddConfig("ascend950", config950);
-        this->AICore().AddConfig("ascend960dt", config950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, config950);
     }
 };
 

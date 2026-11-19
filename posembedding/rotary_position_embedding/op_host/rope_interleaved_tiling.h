@@ -14,6 +14,7 @@
  */
 #ifndef OPS_BUILD_IN_OP_TILING_RUNTIME_ROPE_INTERLEAVED_H
 #define OPS_BUILD_IN_OP_TILING_RUNTIME_ROPE_INTERLEAVED_H
+#include "op_common/op_host/util/op_const_def.h"
 #include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
 #include "rotary_position_embedding_tiling.h"
@@ -34,10 +35,8 @@ public:
 protected:
     bool IsCapable() override
     {
-        if ((socVersion_ == platform_ascendc::SocVersion::ASCEND910B ||
-             socVersion_ == platform_ascendc::SocVersion::ASCEND310P ||
-             socVersion_ == platform_ascendc::SocVersion::KIRINX90 ||
-             socVersion_ == platform_ascendc::SocVersion::KIRIN9030) &&
+        if ((npuArch_ == Ops::Base::DAV_2201 || npuArch_ == Ops::Base::DAV_2002 || npuArch_ == Ops::Base::DAV_3003 ||
+             npuArch_ == Ops::Base::DAV_3113) &&
             inputMode_ == MODE_ROTATE_INTERLEAVED) {
             return true;
         }

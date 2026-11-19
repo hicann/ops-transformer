@@ -15,6 +15,7 @@
 #ifndef OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_GRAD_H
 #define OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_GRAD_H
 
+#include "op_common/op_host/util/op_const_def.h"
 #include "register/tilingdata_base.h"
 #include "register/op_def_registry.h"
 #include "op_host/tiling_templates_registry.h"
@@ -103,7 +104,7 @@ REGISTER_TILING_DATA_CLASS(RotaryPositionEmbeddingGrad, RotaryPositionEmbeddingG
 struct RotaryPositionEmbeddingGradCompileInfo {
     int64_t numBlocks;
     uint64_t ubSize;
-    platform_ascendc::SocVersion socVersion;
+    NpuArch npuArch;
     Ops::Base::ReduceOpCompileInfo opInfo;
 };
 
@@ -181,7 +182,7 @@ protected:
     static const uint32_t MODE_ROTATE_HALF = 0;
     static const uint32_t MODE_ROTATE_INTERLEAVED = 1;
     uint32_t inputMode_ = 0;
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch_ = Ops::Base::DAV_2201;
 };
 
 class RopeGradRegBaseTilingClass : public Ops::Transformer::OpTiling::TilingBaseClass {
@@ -248,7 +249,7 @@ protected:
     ge::graphStatus TilingReduce();
     ge::graphStatus SetTilingKeyBlockDim(uint32_t dxTilingKey);
     ge::graphStatus SetRotaryXTilingData();
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch_ = Ops::Base::DAV_2201;
     const static int64_t MAX_COPY_BLOCK_COUNT = 4095;
     int64_t b_{0};
     int64_t s_{0};

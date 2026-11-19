@@ -15,6 +15,7 @@
 #ifndef OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_H
 #define OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_H
 
+#include "op_common/op_host/util/op_const_def.h"
 #include "register/tilingdata_base.h"
 #include "op_host/tiling_base.h"
 #include "op_host/tiling_util.h"
@@ -107,7 +108,7 @@ ge::graphStatus Tiling4PartialRotaryMulQuant(gert::TilingContext* context);
 struct QuantRotaryPositionEmbeddingCompileInfo {
     int64_t blockDim;
     uint64_t ubSize;
-    platform_ascendc::SocVersion socVersion;
+    NpuArch npuArch;
 };
 
 struct QuantAiCoreParams {
@@ -203,7 +204,7 @@ public:
     }
 
 protected:
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND950;
+    NpuArch npuArch_ = Ops::Base::DAV_3510;
     int64_t b_{0};
     int64_t s_{0};
     int64_t n_{0};

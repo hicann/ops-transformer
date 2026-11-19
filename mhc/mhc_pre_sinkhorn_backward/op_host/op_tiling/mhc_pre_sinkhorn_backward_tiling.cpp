@@ -13,6 +13,7 @@
  * \brief MhcPreSinkhornBackward tiling file
  */
 
+#include "op_common/op_host/util/op_const_def.h"
 #include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
 #include "tiling/platform/platform_ascendc.h"
@@ -34,7 +35,7 @@ static ge::graphStatus Tiling4MhcPreSinkhornBackward(gert::TilingContext* contex
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
 
     const auto npuArch = ascendcPlatform.GetCurNpuArch();
-    if (npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) {
+    if (npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
         return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context, {100, 110});
     }
 

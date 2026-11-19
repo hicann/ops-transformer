@@ -15,32 +15,11 @@ if (BUILD_OPEN_PROJECT)
     add_modules_sources(OPTYPE inplace_partial_rotary_mul ACLNNTYPE aclnn_inner)
 endif()
 
-set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
-if("${CONDITION_UNIT}" STREQUAL "ascend950")
-    add_ops_compile_options(
+add_ops_compile_options(
         OP_NAME InplacePartialRotaryMul
-        COMPUTE_UNIT Ascend950PR_9599
+        COMPUTE_UNIT dav_3510 dav_9201 dav_9202
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
-elseif("${CONDITION_UNIT}" STREQUAL "ascend350")
-    add_ops_compile_options(
-        OP_NAME InplacePartialRotaryMul
-        COMPUTE_UNIT Ascend350_355e
-        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
-    )
-elseif("${CONDITION_UNIT}" STREQUAL "ascend960dt")
-    add_ops_compile_options(
-        OP_NAME InplacePartialRotaryMul
-        COMPUTE_UNIT ascend960dt_968B7
-        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
-    )
-elseif("${CONDITION_UNIT}" STREQUAL "ascend960pr")
-    add_ops_compile_options(
-        OP_NAME InplacePartialRotaryMul
-        COMPUTE_UNIT Ascend960PR_969A1
-        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
-    )
-endif()
 
 if (BUILD_OPS_RTY_KERNEL)
     add_ops_compile_options(

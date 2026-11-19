@@ -10,7 +10,14 @@
 add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
-    if (ASCEND_COMPUTE_UNIT STREQUAL "ascend960dt" OR ASCEND_COMPUTE_UNIT STREQUAL "ascend960pr")
+    set(_partial_rotary_hif4 FALSE)
+    foreach(_soc IN LISTS ASCEND_COMPUTE_UNIT)
+        get_npu_arch_by_soc_version("${_soc}" _arch)
+        if(_arch STREQUAL "dav_9201" OR _arch STREQUAL "dav_9202")
+            set(_partial_rotary_hif4 TRUE)
+        endif()
+    endforeach()
+    if(_partial_rotary_hif4)
         # Register HiFloat4 outputs only when building for Ascend960DT/Ascend960PR.
         set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/partial_rotary_mul_quant_def.cpp
             DIRECTORY ${PROJECT_SOURCE_DIR} APPEND PROPERTY COMPILE_OPTIONS

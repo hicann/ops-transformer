@@ -15,6 +15,7 @@
 
 #include <cstdlib>
 #include <functional>
+#include "op_common/op_host/util/op_const_def.h"
 #include <sstream>
 #include "mhc_pre_sinkhorn_tiling.h"
 #include "../../op_kernel/mhc_pre_sinkhorn_tiling_key.h"
@@ -154,7 +155,7 @@ ge::graphStatus MhcPreSinkhornTiling::GetPlatformInfo()
         l0bSize_ = memSize;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, memSize);
         l0cSize_ = memSize;
-        socVersion_ = ascendcPlatform.GetSocVersion();
+        npuArch_ = ascendcPlatform.GetCurNpuArch();
     }
     OP_CHECK_IF(aicCoreNum_ == 0, OP_LOGE(context_, "aicCoreNum is 0, cannot do tiling"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(aivCoreNum_ == 0, OP_LOGE(context_, "aivCoreNum_ is 0, cannot do tiling"), return ge::GRAPH_FAILED);

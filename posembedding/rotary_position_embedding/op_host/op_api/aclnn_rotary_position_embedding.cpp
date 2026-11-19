@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "op_common/op_host/util/op_const_def.h"
 #include "aclnn_rotary_position_embedding.h"
 #include "aclnn_rotary_position_embedding_v2.h"
 #include "rotary_position_embedding.h"
@@ -186,7 +187,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor* x, c
     L2_DFX_PHASE_1(aclnnRotaryPositionEmbeddingV2, DFX_IN(x, cos, sin, mode, rotate), DFX_OUT(out));
 
     if (rotate != nullptr) {
-        CHECK_COND(op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201, ACLNN_ERR_PARAM_INVALID,
+        CHECK_COND(op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2201, ACLNN_ERR_PARAM_INVALID,
                    "the rotate parameter is only supported on Ascend910B/Ascend910_93, "
                    "please pass nullptr for rotate");
     }

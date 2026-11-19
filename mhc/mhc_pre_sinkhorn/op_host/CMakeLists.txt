@@ -13,45 +13,33 @@ if (BUILD_OPEN_PROJECT)
         mhc_pre_sinkhorn_def.cpp
     )
 
-    if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
-        add_ops_compile_options(
-            OP_NAME MhcPreSinkhorn
-            OPTIONS --cce-auto-sync=off
-                    -Wno-deprecated-declarations
-                    -Werror
-                    -mllvm -cce-aicore-hoist-movemask=false
-                    --op_relocatable_kernel_binary=true
-        )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960dt")
-        add_ops_compile_options(
-            OP_NAME MhcPreSinkhorn
-            COMPUTE_UNIT ascend960dt_968B7
-            OPTIONS --cce-auto-sync=off
-                    -Wno-deprecated-declarations
-                    -Werror
-                    -mllvm -cce-aicore-hoist-movemask=false
-                    -mllvm -cce-aicore-dcci-before-kernel-end=false
-                    --op_relocatable_kernel_binary=true
-        )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960pr")
-        add_ops_compile_options(
-            OP_NAME MhcPreSinkhorn
-            COMPUTE_UNIT Ascend960PR_969A1
-            OPTIONS --cce-auto-sync=off
-                    -Wno-deprecated-declarations
-                    -Werror
-                    -mllvm -cce-aicore-hoist-movemask=false
-                    -mllvm -cce-aicore-dcci-before-kernel-end=false
-                    --op_relocatable_kernel_binary=true
-        )
-    else()
-        add_ops_compile_options(
-            OP_NAME MhcPreSinkhorn
-            OPTIONS --cce-auto-sync=off
-                    -Wno-deprecated-declarations
-                    -Werror
-        )
-    endif()
+    add_ops_compile_options(
+        OP_NAME MhcPreSinkhorn
+        COMPUTE_UNIT dav_3510
+        OPTIONS --cce-auto-sync=off
+                -Wno-deprecated-declarations
+                -Werror
+                -mllvm -cce-aicore-hoist-movemask=false
+                --op_relocatable_kernel_binary=true
+    )
+    add_ops_compile_options(
+        OP_NAME MhcPreSinkhorn
+        COMPUTE_UNIT dav_9201 dav_9202
+        OPTIONS --cce-auto-sync=off
+                -Wno-deprecated-declarations
+                -Werror
+                -mllvm -cce-aicore-hoist-movemask=false
+                -mllvm -cce-aicore-dcci-before-kernel-end=false
+                --op_relocatable_kernel_binary=true
+    )
+    add_ops_compile_options(
+        OP_NAME MhcPreSinkhorn
+        COMPUTE_UNIT dav_2201
+        OPTIONS --cce-auto-sync=off
+                -Wno-deprecated-declarations
+                -Werror
+    )
+
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL)

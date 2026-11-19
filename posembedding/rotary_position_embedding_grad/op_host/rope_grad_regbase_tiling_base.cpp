@@ -12,6 +12,7 @@
  * \file rope_grad_regbase_tiling_base.cc
  * \brief
  */
+#include "op_common/op_host/util/op_const_def.h"
 #include <cmath>
 #include <graph/utils/type_utils.h>
 #include "tiling/tiling_api.h"
@@ -57,13 +58,13 @@ ge::graphStatus RopeGradRegBaseTilingClass::GetPlatformInfo()
         uint64_t ubSizePlatForm;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
         aicoreParams_.ubSize = ubSizePlatForm;
-        socVersion_ = ascendcPlatform.GetSocVersion();
+        npuArch_ = ascendcPlatform.GetCurNpuArch();
     } else {
         auto compileInfoPtr = context_->GetCompileInfo<RotaryPositionEmbeddingGradCompileInfo>();
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aicoreParams_.numBlocks = compileInfoPtr->numBlocks;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
-        socVersion_ = compileInfoPtr->socVersion;
+        npuArch_ = compileInfoPtr->npuArch;
     }
     blockSize_ = Ops::Base::GetUbBlockSize(context_);
     vLength_ = Ops::Base::GetVRegSize(context_);

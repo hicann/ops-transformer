@@ -13,42 +13,29 @@ if (BUILD_OPEN_PROJECT)
         mhc_pre_sinkhorn_backward_def.cpp
     )
 
-    if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
-        add_ops_compile_options(
-            OP_NAME MhcPreSinkhornBackward
-            COMPUTE_UNIT Ascend950PR_9599
-            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
-        )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960dt")
-        add_ops_compile_options(
-            OP_NAME MhcPreSinkhornBackward
-            COMPUTE_UNIT Ascend960DT_968B7
-            OPTIONS --cce-auto-sync=off
-                    -Wno-deprecated-declarations
-                    -Werror
-                    -mllvm -cce-aicore-hoist-movemask=false
-                    -mllvm -cce-aicore-dcci-before-kernel-end=false
-                    --op_relocatable_kernel_binary=true
-        )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960pr")
-        add_ops_compile_options(
-            OP_NAME MhcPreSinkhornBackward
-            COMPUTE_UNIT Ascend960PR_969A1
-            OPTIONS --cce-auto-sync=off
-                    -Wno-deprecated-declarations
-                    -Werror
-                    -mllvm -cce-aicore-hoist-movemask=false
-                    -mllvm -cce-aicore-dcci-before-kernel-end=false
-                    --op_relocatable_kernel_binary=true
-        )
-    else()
-        add_ops_compile_options(
-            OP_NAME MhcPreSinkhornBackward
-            OPTIONS --cce-auto-sync=off
-                    -Wno-deprecated-declarations
-                    -Werror
-        )
-    endif()
+    add_ops_compile_options(
+        OP_NAME MhcPreSinkhornBackward
+        COMPUTE_UNIT dav_3510
+        OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
+    )
+    add_ops_compile_options(
+        OP_NAME MhcPreSinkhornBackward
+        COMPUTE_UNIT dav_9201 dav_9202
+        OPTIONS --cce-auto-sync=off
+                -Wno-deprecated-declarations
+                -Werror
+                -mllvm -cce-aicore-hoist-movemask=false
+                -mllvm -cce-aicore-dcci-before-kernel-end=false
+                --op_relocatable_kernel_binary=true
+    )
+    add_ops_compile_options(
+        OP_NAME MhcPreSinkhornBackward
+        COMPUTE_UNIT dav_2201
+        OPTIONS --cce-auto-sync=off
+                -Wno-deprecated-declarations
+                -Werror
+    )
+
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL)

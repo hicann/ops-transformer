@@ -15,6 +15,7 @@
 #ifndef OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_H
 #define OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_H
 
+#include "op_common/op_host/util/op_const_def.h"
 #include <cstddef>
 #include "register/tilingdata_base.h"
 #include "register/op_def_registry.h"
@@ -184,7 +185,7 @@ REGISTER_TILING_DATA_CLASS(RotaryPositionEmbedding_20030, RopeRegbaseABTilingDat
 struct RotaryPositionEmbeddingCompileInfo {
     int64_t numBlocks;
     uint64_t ubSize;
-    platform_ascendc::SocVersion socVersion;
+    NpuArch npuArch;
 };
 
 enum class RopeLayout : uint8_t {
@@ -251,7 +252,7 @@ protected:
 protected:
     static const uint32_t MODE_ROTATE_INTERLEAVED = 1;
     uint32_t inputMode_ = 0;
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch_ = Ops::Base::DAV_2201;
 };
 
 class RopeRegBaseTilingClass : public Ops::Transformer::OpTiling::TilingBaseClass {
@@ -311,7 +312,7 @@ protected:
     {
         return true;
     }
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch_ = Ops::Base::DAV_2201;
     int64_t b_{0};
     int64_t s_{0};
     int64_t n_{0};

@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include "op_common/op_host/util/op_const_def.h"
 #include <sstream>
 #include "mhc_pre_sinkhorn_tiling.h"
 
@@ -337,7 +338,7 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
         ubSize_ = ubSizePlatForm;
         sysWorkspaceSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
-        socVersion_ = ascendcPlatform.GetSocVersion();
+        npuArch_ = ascendcPlatform.GetCurNpuArch();
         OP_CHECK_IF(aicCoreNum_ == 0 || aivCoreNum_ == 0 || aivCoreNum_ % aicCoreNum_ != 0,
                     OP_LOGE(context_->GetNodeName(), "Invalid CV core counts: aivCoreNum=%lu, aicCoreNum=%lu",
                             aivCoreNum_, aicCoreNum_),

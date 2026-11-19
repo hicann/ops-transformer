@@ -12,6 +12,7 @@
  * \file mhc_pre_sinkhorn_backward_def.cpp
  * \brief MhcPreSinkhornBackward operator definition
  */
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -139,8 +140,8 @@ public:
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
             .ExtendCfgInfo("opFile.value", "mhc_pre_sinkhorn_backward_apt");
         this->AICore().AddConfig("ascend950", aicore_Config_950);
-        this->AICore().AddConfig("ascend960dt", aicore_Config_950);
-        this->AICore().AddConfig("ascend960pr", aicore_Config_950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, aicore_Config_950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, aicore_Config_950);
     }
 };
 OP_ADD(MhcPreSinkhornBackward);

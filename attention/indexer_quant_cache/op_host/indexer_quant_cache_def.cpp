@@ -12,6 +12,7 @@
  * \file indexer_quant_cache_def.cpp
  * \brief
  */
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -170,8 +171,8 @@ public:
                                  ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
                                  ge::FORMAT_ND});
 
-        this->AICore().AddConfig("ascend960dt", config960dt);
-        this->AICore().AddConfig("ascend960pr", config960dt);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, config960dt);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, config960dt);
     }
 };
 

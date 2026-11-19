@@ -15,6 +15,7 @@
 #ifndef AIR_RUNTIME_V2_OP_IMPL_APPLY_ROTARY_POS_EMB_TILING_H
 #define AIR_RUNTIME_V2_OP_IMPL_APPLY_ROTARY_POS_EMB_TILING_H
 
+#include "op_common/op_host/util/op_const_def.h"
 #include <cstddef>
 #include "register/tilingdata_base.h"
 #include "register/op_def_registry.h"
@@ -129,7 +130,7 @@ struct ApplyRotaryPosEmbCompileInfo {
     int64_t numBlocks = 0;
     uint64_t ubSize = 0;
     int64_t sysWorkspaceSize = 0;
-    platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch = Ops::Base::DAV_2201;
 };
 
 enum class ApplyRotaryPosEmbTilingKey : int64_t {
@@ -196,7 +197,7 @@ protected:
     {
         return true;
     }
-    platform_ascendc::SocVersion socVersion_;
+    NpuArch npuArch_;
     int64_t b_;
     int64_t s_;
     int64_t qn_;

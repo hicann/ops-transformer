@@ -13,32 +13,19 @@ if (BUILD_OPEN_PROJECT)
         indexer_quant_cache_def.cpp
     )
 
-    if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
-        add_ops_compile_options(
-            OP_NAME IndexerQuantCache
-            COMPUTE_UNIT Ascend950PR_9599
-            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
-        )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960dt")
-        add_ops_compile_options(
-            OP_NAME IndexerQuantCache
-            COMPUTE_UNIT ascend960dt_968B7
-            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
-        )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960pr")
-        add_ops_compile_options(
-            OP_NAME IndexerQuantCache
-            COMPUTE_UNIT Ascend960PR_969A1
-            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
-        )
-    else()
-        add_ops_compile_options(
-            OP_NAME IndexerQuantCache
-            OPTIONS --cce-auto-sync=off
-                    -Wno-deprecated-declarations
-                    -Werror
-        )
-    endif()
+    add_ops_compile_options(
+        OP_NAME IndexerQuantCache
+        COMPUTE_UNIT dav_3510 dav_9201 dav_9202
+        OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
+    )
+    add_ops_compile_options(
+        OP_NAME IndexerQuantCache
+        COMPUTE_UNIT dav_2201
+        OPTIONS --cce-auto-sync=off
+                -Wno-deprecated-declarations
+                -Werror
+    )
+
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL)

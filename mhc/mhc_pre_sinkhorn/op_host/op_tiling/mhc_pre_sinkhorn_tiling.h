@@ -16,6 +16,7 @@
 #ifndef MHC_PRE_SINKHORN_TILING_H
 #define MHC_PRE_SINKHORN_TILING_H
 
+#include "op_common/op_host/util/op_const_def.h"
 #include <vector>
 #include <iostream>
 #include "log/log.h"
@@ -278,7 +279,7 @@ private:
     int64_t sinkhornRowFactor_ = 0;
     int64_t sinkhornTailRowFactorOfFormerBlock_ = 0;
     int64_t sinkhornTailRowFactorOfTailBlock_ = 0;
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch_ = Ops::Base::DAV_2201;
 };
 
 class MhcPreSinkhornTilingRegbase {
@@ -328,7 +329,7 @@ private:
     double hcEps_ = 0.0;
     double normEps_ = 0.0;
     bool needGrad_ = true;
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch_ = Ops::Base::DAV_2201;
 };
 
 } // namespace optiling

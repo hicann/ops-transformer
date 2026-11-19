@@ -12,6 +12,7 @@
  * \file apply_rotary_pos_emb_regbase_tiling_base.cpp
  * \brief
  */
+#include "op_common/op_host/util/op_const_def.h"
 #include <algorithm>
 #include "apply_rotary_pos_emb_tiling.h"
 #include "log/log.h"
@@ -49,13 +50,13 @@ ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::GetPlatformInfo()
         uint64_t ubSizePlatForm;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
         aicoreParams_.ubSize = ubSizePlatForm;
-        socVersion_ = ascendcPlatform.GetSocVersion();
+        npuArch_ = ascendcPlatform.GetCurNpuArch();
     } else {
         auto compileInfoPtr = reinterpret_cast<const ApplyRotaryPosEmbCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_NULL_WITH_CONTEXT(context_, compileInfoPtr);
         aicoreParams_.numBlocks = compileInfoPtr->numBlocks;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
-        socVersion_ = compileInfoPtr->socVersion;
+        npuArch_ = compileInfoPtr->npuArch;
     }
     blockSize_ = BLOCK_SIZE;
     vLength_ = V_REG_SIZE;

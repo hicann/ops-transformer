@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include "op_common/op_host/util/op_const_def.h"
 #include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
 #include "tiling/platform/platform_ascendc.h"
@@ -138,7 +139,8 @@ ge::graphStatus MhcPreSinkhornBackward960Tiling::GetPlatformInfo()
                 return ge::GRAPH_FAILED);
     coreNumAic_ = coreNumAic;
     // Ascend960系列(960DT/960PR) 的 AIC:AIV 为 1:1（KERNEL_TYPE_MIX_AIC_1_1），AIV 核数按 AIC 核数对齐
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9202) {
+    if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_9201 ||
+        ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_9202) {
         coreNumAiv_ = coreNumAic_;
     }
     uint64_t ubSizePlatForm;

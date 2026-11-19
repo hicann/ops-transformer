@@ -13,6 +13,7 @@
  * \brief aclnn_mhc_pre_sinkhorn
  */
 
+#include "op_common/op_host/util/op_const_def.h"
 #include "aclnn_mhc_pre_sinkhorn.h"
 #include "mhc_pre_sinkhorn.h"
 #include "aclnn_kernels/contiguous.h"
@@ -45,7 +46,7 @@ static constexpr int64_t NUM_ITERS_DEFAULT_VALUE = 20;
 static bool IsPlatformSupportTnd()
 {
     auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    return (npuArch == NpuArch::DAV_3510) || (npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202);
+    return (npuArch == Ops::Base::DAV_3510) || (npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202);
 }
 
 static bool CheckNotNull(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
