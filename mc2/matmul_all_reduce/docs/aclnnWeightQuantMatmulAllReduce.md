@@ -315,7 +315,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduce(
 - 确定性计算：
 
   <!-- npu="910b" id7 -->
-  - <term>Atlas A2系列产品</term>：`aclnnWeightQuantMatmulAllReduce`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算
+  - <term>Atlas A2系列产品</term>：`aclnnWeightQuantMatmulAllReduce`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：`aclnnWeightQuantMatmulAllReduce`默认确定性实现。

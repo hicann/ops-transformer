@@ -33,7 +33,7 @@
     - K-C量化场景：
 
       $$
-      computeOut = (x1 @ x2) * x1Scale * x2Scale  + bias \\
+      computeOut = (x1 @ x2) * x1Scale * x2Scale + bias \\
       permutedOut = computeOut.view(BS, rankSize, H2 / rankSize).permute(1, 0, 2) \\
       output = AlltoAll(permutedOut).view(rankSize * BS, H2 / rankSize)
       $$
@@ -228,7 +228,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllV2(
     <tr>
     <td>group</td>
     <td>输入</td>
-    <td>标识列组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
+    <td>标识通信组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
     <td>字符串长度要求(0, 128)。</td>
     <td>-</td>
     <td>-</td>
@@ -238,7 +238,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllV2(
     <tr>
     <td>commMode</td>
     <td>输入</td>
-    <td>指定当前通信类型。</td>
+    <td>指定当前通信引擎。</td>
     <td>支持输入"aiv"、"ai_cpu"或"ccu"。</td>
     <td>-</td>
     <td>-</td>
@@ -474,7 +474,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllV2(
   - <term>Ascend 950PR&950DT系列产品</term>：仅支持x2为非连续tensor，其它非连续tensor均不支持。
   <!-- end id14 -->
 
-* 传入的x1、x2、x1Scale、x2Scale与output均不为空指针，且
+* 传入的x1、x2、x1Scale、x2Scale与output均不为空指针：
 
   <!-- npu="910b" id15 -->
   - <term>Atlas A2系列产品</term>：biasOptional不支持传入空指针。
@@ -603,7 +603,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllV2(
 <!-- npu="910b" id22 -->
 - <term>Atlas A2系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>
@@ -839,7 +839,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllV2(
 <!-- npu="950" id23 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

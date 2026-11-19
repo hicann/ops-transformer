@@ -283,7 +283,7 @@ aclnnStatus aclnnLightningIndexerGrad(
     <tr>
       <td>executor</td>
       <td>输出</td>
-      <td>返回op执行器，包含算子计算流程。</td>
+      <td>返回OP执行器，包含了算子计算流程。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -377,7 +377,7 @@ aclnnStatus aclnnLightningIndexerGrad(
   - aclnnLightningIndexerGrad默认非确定性实现，不支持通过aclrtSetSysParamOpt开启确定性。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - inputLayout支持TND/BSND。
-- 关于数据shape的约束，以Layout的BSND举例。其中：
+- 关于数据shape的约束，以Layout的BSND举例，其中：
 
   - B（Batch）：取值范围为1\~1024。
   - N（Head-Num）：取值为1\~64。

@@ -36,7 +36,7 @@
   - 场景1（quantMode=0，MX-FP8）：scale存储为`float8_e8m0`，固定向上取到2的幂，不受`roundScale`控制。
   - 场景2（quantMode=1，Normal）：按行动态量化，scale存储为`float32`；`roundScale=true`时，对上述公式算出的正scale再取`2^ceil(log2(scale))`，用于量化并写回。Normal模式的UINT8 cache承载HiFloat8编码。
   - 场景3（quantMode=2，HiFloat8）：输出为$x \times xScale$后的hifloat8。
-  - 场景4（quantMode=3，MX-FP4）：按标准MX块（每32元素）量化为FP4（`uint8`每字节打包2个fp4值），scale存储为`float8_e8m0`。
+  - 场景4（quantMode=3，MX-FP4）：按标准MX块（每32个元素）量化为FP4（`uint8`每字节打包2个fp4值），scale存储为`float8_e8m0`。
 
   - 场景5（quantMode=4，HiFloat4）：仅ascend960dt（DAV_9201）支持，要求`d % 64 == 0`，cache为HIFLOAT4，cacheScale为HIFLOAT4_SCALE，每行d/64个scale元素。
 
@@ -263,7 +263,7 @@ aclnnStatus aclnnIndexerQuantCache(
 - cache/cacheScale**仅在blockNum维支持非连续**（分页）：各block可不紧密排布，但block内（blockSize、headDim维）须连续。
 - **headDim长度约束**：
   - **cache.headDim ≥ d**（MX-FP4/HiFloat4模式以4位元素计，d个值占 ⌈d/2⌉ 字节）。
-  - **MX-FP4/HiFloat4（quantMode=3/4）模式下，cache.headDim 必须为偶数**。
+  - **MX-FP4/HiFloat4（quantMode=3/4）模式下，cache.headDim必须为偶数**。
   - **cacheScale.headDim ≥ scaleCol**，scaleCol：MX-FP8/MX-FP4（quantMode=0/3）为 ⌈d/32⌉；Normal/HiFloat8（quantMode=1/2）为 1；HiFloat4（quantMode=4）为 d/64。
   - 示例：d=128、quantMode=0 → scaleCol=4 → cache.headDim ≥ 128 且 cacheScale.headDim ≥ 4。
 - x的最后一维（d轴）须能被32整除且 d ≤ 8192。

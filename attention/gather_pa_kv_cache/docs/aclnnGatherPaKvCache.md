@@ -26,11 +26,11 @@
 - 接口功能：根据blockTables中的blockId值、seqLens中key/value的seqLen从keyCache/valueCache中将内存不连续的token搬运、拼接成连续的key/value序列。
 - 计算逻辑：
   - keyRef/valueRef的第一个维度取决于seq_lens大小。
-  - 如果isSeqLensCumsum为true，则seqLens中最后一个值即为keyRef/valueRef的第一个维度大小： keyRef[dim0] = seqLens[-1]
+  - 如果isSeqLensCumsum为true，则seqLens中最后一个值即为keyRef/valueRef的第一个维度大小：keyRef[dim0] = seqLens[-1]
   - 如果isSeqLensCumsum为false，则seqLens中所有值的累加和即为keyRef/valueRef的第一个维度大小：keyRef[dim0] = sum(seqLens)
 
   关于**keyRef**、**valueRef**的一些限制条件如下：
-  - 每个token大小控制在148k以内，例如，对于fp16/bf16类型，num_heads *head_size(keyRef/valueRef)取128*576。
+  - 每个token大小控制在148KB以内，例如，对于FP16/BF16类型，num_heads * head_size(keyRef/valueRef)取128*576。
   - 为保证keyRef/valueRef全部来自Cache中的实际元素，blockTables需满足覆盖条件：对每个batch `i`，设该batch的请求序列长度`length[i]`（isSeqLensCumsum为false时，`length[i] = seqLens[i]`；isSeqLensCumsum为true时，`length[i] = seqLens[i + 1] - seqLens[i]`），并设表列起始偏移`tableStart[i]`（不传入seqOffsetOptional时为0；传入时为`seqOffsetOptional[i] / block_size`，整数除法取商），需满足`tableStart[i] >= 0`且`tableStart[i] + ceil(length[i] / block_size) <= block_indices`。
 
 - 示例：
@@ -214,7 +214,7 @@ aclnnStatus aclnnGatherPaKvCache(
   </table>
 
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR&950DT系列产品</term>:
+  - <term>Ascend 950PR&950DT系列产品</term>：
     - 允许keyCache为FLOAT8_E4M3FN、valueCache为FLOAT16或BFLOAT16的组合。
     - 当blockTables宽度不满足功能说明中的覆盖条件时，blockTableOffset越出block_indices范围的逻辑块对应的token将被填零后写入keyRef/valueRef；blockId越界（超出[0, num_blocks)范围）的块同样填零。其他产品路径未定义该行为，调用方应保证blockTables满足覆盖条件。
   <!-- end id7 -->
@@ -297,7 +297,7 @@ aclnnStatus aclnnGatherPaKvCache(
   </tbody>
   </table>
 
-- **返回值**
+- **返回值：**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 

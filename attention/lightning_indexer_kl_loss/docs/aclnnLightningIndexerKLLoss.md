@@ -23,10 +23,10 @@
 
 ## 功能说明
 
-- 接口功能：`lightning_indexer_kl_loss` 计算 Lightning Indexer 中 teacher 分布与 student 分布之间的 KL 散度损失函数。
+- 接口功能：`lightning_indexer_kl_loss` 计算Lightning Indexer中teacher分布与student分布之间的KL散度损失函数。
 
-  - **teacher 侧**（target_score）：压缩段未归一化的原始主注意力分数（sum ≠ 1），用 `clamp_min` 防止 y=0 处 log(0) 导致 NaN。
-  - **student 侧**（index_probs）：indexer softmax 后的概率分布，用 `+eps` 保住 Y→0 处的梯度。
+  - **teacher 侧**（target_score）：压缩段的未归一化原始主注意力分数（sum ≠ 1），用 `clamp_min` 防止y=0处log(0)导致NaN。
+  - **student 侧**（index_probs）：indexer softmax后的概率分布，用 `+eps` 保持 Y→0 处的梯度。
 
 - 计算公式：
 
@@ -52,7 +52,7 @@
 
   其中 $\varepsilon$ 为 `eps` 参数。
 
-  weight 的选择由 `weightType` 控制：
+  weight的选择由 `weightType` 控制：
 
   - `'logits'`：weight = y，即原始未归一化分数
   - `'probs'`：weight = P，即归一化概率
@@ -111,7 +111,7 @@ aclnnStatus aclnnLightningIndexerKLLoss(
     <tr>
       <td>targetScore</td>
       <td>输入</td>
-      <td>teacher 未归一化的原始主注意力分数。</td>
+      <td>teacher未归一化的原始主注意力分数。</td>
       <td>shape 支持 (T, K) 或 (B, S, K)。</td>
       <td>FLOAT16、BFLOAT16、FLOAT</td>
       <td>ND</td>
@@ -121,8 +121,8 @@ aclnnStatus aclnnLightningIndexerKLLoss(
     <tr>
       <td>indexProbs</td>
       <td>输入</td>
-      <td>student softmax 后的概率分布。</td>
-      <td>shape 与 targetScore 保持一致。</td>
+      <td>student softmax后的概率分布。</td>
+      <td>shape与targetScore保持一致。</td>
       <td>FLOAT16、BFLOAT16、FLOAT</td>
       <td>ND</td>
       <td>2-3</td>
@@ -132,7 +132,7 @@ aclnnStatus aclnnLightningIndexerKLLoss(
       <td>eps</td>
       <td>属性</td>
       <td>数值稳定常数。</td>
-      <td>用于防止 log(0) 导致 NaN。</td>
+      <td>用于防止log(0)导致NaN。</td>
       <td>double</td>
       <td>-</td>
       <td>-</td>
@@ -142,7 +142,7 @@ aclnnStatus aclnnLightningIndexerKLLoss(
       <td>weightType</td>
       <td>属性</td>
       <td>外层权重选择，'logits' 或 'probs'。</td>
-      <td>'logits'用原始 target_score 作为外层权重，'probs' 用归一化概率 P = target_score / sum(target_score) 作为外层权重。</td>
+      <td>'logits'用原始 target_score 作为外层权重，'probs'用归一化概率P = target_score / sum(target_score)作为外层权重。</td>
       <td>string</td>
       <td>-</td>
       <td>-</td>
@@ -152,7 +152,7 @@ aclnnStatus aclnnLightningIndexerKLLoss(
       <td>loss</td>
       <td>输出</td>
       <td>损失函数值，标量。</td>
-      <td>数据类型与 targetScore 一致。shape 为 (1,)。</td>
+      <td>数据类型与targetScore一致。shape为(1,)。</td>
       <td>FLOAT16、BFLOAT16、FLOAT</td>
       <td>ND</td>
       <td>1</td>
@@ -234,7 +234,7 @@ aclnnStatus aclnnLightningIndexerKLLoss(
   - aclnnLightningIndexerKLLoss默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 - 输入shape限制：
   - 支持 shape 为 (B, S, K) 或 (T, K)，B的取值范围为1\~512，最后一维 K 的取值范围为 1\~8192。
-- `eps` 必须大于 0。
+- `eps` 必须大于0。
 - `weightType` 必须为 `'logits'` 或 `'probs'`。
 
 ## 调用示例

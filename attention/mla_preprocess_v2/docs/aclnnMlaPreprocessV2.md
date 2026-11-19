@@ -52,10 +52,10 @@
     RmsNormQuant(x) = ({RmsNorm}(x) + bias) * deqScale
     $$
 
-    Query计算公式，包括W^{DQKV}矩阵乘、W^{UK}矩阵乘、RmsNormQuant和ROPE旋转位置编码处理
+    Query计算公式，包括W^{DQKV}矩阵乘、W^{UK}矩阵乘、RmsNormQuant和RoPE旋转位置编码处理
 
     $$
-    q^N =  RmsNormQuant(x) \cdot W^{DQKV} \cdot W^{UK}
+    q^N = RmsNormQuant(x) \cdot W^{DQKV} \cdot W^{UK}
     $$
 
     $$
@@ -395,7 +395,7 @@ aclnnStatus aclnnMlaPreprocessV2(
     <tr>
       <td>ctkvScale</td>
       <td>输入</td>
-      <td>输出量化处理中参与计算的系数</td>
+      <td>输出量化处理中参与计算的系数。</td>
       <td>必填参数，不支持空指针。shape为[1]，dtype与input一致，数据格式为ND。仅在cacheMode为2时参与计算；其余cacheMode仍需传入同形状占位张量，其内容不会被读取。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
@@ -572,7 +572,7 @@ aclnnStatus aclnnMlaPreprocessV2(
       <td>shape和dtype随cacheMode变化：<ul>
         <li>cacheMode为0：shape为[tokenNum, headNum, 576]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1或3：shape为[tokenNum, headNum, 512]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
-        <li>cacheMode为2：shape为[tokenNum, headNum, 512]，dtype为INT8，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND格式。</li></ul>
+        <li>cacheMode为2：shape为[tokenNum, headNum, 512]，dtype为INT8，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li></ul>
       </td>
       <td>INT8、FLOAT16、BFLOAT16</td>
       <td>ND</td>
@@ -597,7 +597,7 @@ aclnnStatus aclnnMlaPreprocessV2(
     <tr>
       <td>qRopeOut</td>
       <td>输出</td>
-      <td>表示Query经过旋转编码后的输出。</td>
+      <td>表示Query经过旋转位置编码后的输出。</td>
       <td>必填参数，不支持空指针。不参与计算时仍需传入占位张量，其内容不会被写入。shape和dtype随cacheMode变化：<ul>
         <li>cacheMode为0：不参与计算。占位张量shape为[tokenNum, headNum, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1或3：shape为[tokenNum, headNum, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
@@ -684,12 +684,12 @@ aclnnStatus aclnnMlaPreprocessV2(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内部调用npu runtime的接口异常。</td>
+      <td>API内部调用NPU Runtime的接口异常。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_INNER_TILING_ERROR</td>
       <td>561002</td>
-      <td>tiling发生异常，入参的dtype类型或者shape错误。</td>
+      <td>Tiling发生异常，入参的dtype类型或者shape错误。</td>
     </tr>
   </tbody>
   </table>
@@ -746,8 +746,8 @@ aclnnStatus aclnnMlaPreprocessV2(
     - headNum：表示多头数，取值范围：1~128
     - blockNum：PagedAttention场景下的块数，取值固定为：192
     - blockSize：PagedAttention场景下的块大小，取值固定为：128
-    - qloraDim：表示Q矩阵的LoRA输入维度，取值范围：32~4096，为32的倍数
-    - keyTotalDim：表示Key部分的总维度，取值固定为：576（512主维度+64 rope维度）
+    - qLoraDim：表示Q矩阵的LoRA输入维度，取值范围：32~4096，为32的倍数
+    - keyTotalDim：表示Key部分的总维度，取值固定为：576（512主维度+64 RoPE维度）
     - qRopeDim：表示Q矩阵中旋转编码部分的维度，取值固定为：64
     - qNoRopeDim：表示Q矩阵中无旋转编码部分的维度，取值范围：16~256，为16的倍数
 - rope模式约束
@@ -757,7 +757,7 @@ aclnnStatus aclnnMlaPreprocessV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 /**
  * This program is free software, you can redistribute it and/or modify.
  * Copyright (c) 2025 Huawei Technologies Co., Ltd.|Hisilicon Technologies Co., Ltd.

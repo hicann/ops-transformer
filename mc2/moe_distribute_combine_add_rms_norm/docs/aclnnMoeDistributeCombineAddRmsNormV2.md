@@ -228,7 +228,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     <tr>
     <td>xActiveMaskOptional</td>
     <td>输入</td>
-    <td>标识token是否参与通信。</td>
+    <td>表示token是否参与通信。</td>
     <td><ul><li>可传有效数据或空指针，默认所有token参与通信，1D时shape为(BS,)，2D时shape为(BS, K)。</li></ul></td>
     <td>BOOL</td>
     <td>ND</td>
@@ -299,7 +299,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     <td>oriXOptional</td>
     <td>输入</td>
     <td>未经过FFN的token数据（公式中的oriXOptional）。</td>
-    <td>copyExpertNum/constExpertNum>0时必传；传入时为2D Tensor, shape为(Bs, H)。</td>
+    <td>copyExpertNum/constExpertNum>0时必传；传入时为2D Tensor，shape为(Bs, H)。</td>
     <td>BFLOAT16</td>
     <td>ND</td>
     <td>-</td>
@@ -709,7 +709,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     - Bs：表示batch sequence size，即本卡最终输出的token数量，取值范围为0 < Bs ≤ 512。
     - K：表示选取topK个专家，取值范围为0 < K ≤ 16，同时满足0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum。
     - localExpertNum：表示本卡专家数量。
-        - 对于共享专家卡，localExpertNum = 1
+        - 对于共享专家卡，localExpertNum = 1。
         - 对于MoE专家卡，localExpertNum = moeExpertNum / (epWorldSize - sharedExpertRankNum)，当前版本不支持TP域通信。
 
 - 环境变量约束：
@@ -745,7 +745,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

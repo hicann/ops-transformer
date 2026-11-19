@@ -325,7 +325,7 @@ aclnnStatus aclnnCompressor(
     <tr>
       <td>executor（aclOpExecutor**）</td>
       <td>输出</td>
-      <td>返回op执行器，包含了算子计算流程。</td>
+      <td>返回OP执行器，包含了算子计算流程。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -479,7 +479,7 @@ aclnnStatus aclnnCompressor(
         <tr><td>100</td><td>261120</td><td>4096</td></tr>
       </tbody>
       </table>
-  - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下stateCacheRef不做更新，输出cmpKvOut为空tensor。
+  - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空Tensor，其余入参不支持传入空Tensor。该场景下stateCacheRef不做更新，输出cmpKvOut为空Tensor。
   - stateBlockTableOptional元素取值范围为[0, block_num)，block_num为stateCacheRef第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cacheMode=1（连续buffer）下写state_cache操作跳过该位置；cacheMode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cacheMode=1下元素值0为“未分配”哨兵值可重复出现，非0值须全局唯一；cacheMode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
 - 输入属性限制：
   - 支持D为128/512。

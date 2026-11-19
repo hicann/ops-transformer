@@ -33,10 +33,10 @@
     mm\_y=(mm\_x × mm\_x\_scale) @ (mm\_weight × mm\_weight\_scale)
     $$
 
-  - Alltoallv通信和permute
+  - AlltoAllv通信和permute
 
     $$
-    permute\_out=Alltoallv(gmm\_x)
+    permute\_out=AlltoAllv(gmm\_x)
     $$
 
   - 本卡路由专家按专家维度分组矩阵乘计算
@@ -540,7 +540,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
 <!-- npu="950" id7 -->
-注意：由于量化接口仅支持<term>Ascend 950DT系列产品</term>，以下示例基于该系列实现。本示例代码以2卡为例，请根据实际环境卡数修改 `EP_WORLD_SIZE`。
+注意：由于量化接口仅支持<term>Ascend 950DT系列产品</term>，以下示例基于该系列实现。本示例代码以2张卡为例，请根据实际环境卡数修改 `EP_WORLD_SIZE`。
 <!-- end id7 -->
 
 ```cpp

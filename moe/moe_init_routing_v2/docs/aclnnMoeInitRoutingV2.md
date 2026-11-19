@@ -31,7 +31,7 @@
   - 删除rowIdx输入。
 
   **说明：**
-  Routing计算是MoE模型中的一个环节。MoE模型主要由一组专家模型和一个门控模型组成，在计算时，输入的数据会先根据门控网络（Gating Network，包含MoeGatingTopKSoftmax算子）计算出每个数据元素对应权重最高的k个专家，然后该结果会输入MoeInitRouting算子，生成Routing矩阵。在后续，模型中的每个专家会根据Routing矩阵处理其应处理的数据，产生相应的输出。各专家的输出最后与权重加权求和，形成最终的预测结果。
+  Routing计算是MoE模型中的一个环节。MoE模型主要由一组专家模型和一个门控网络组成，在计算时，输入的数据会先根据门控网络（Gating Network，包含MoeGatingTopKSoftmax算子）计算出每个数据元素对应权重最高的k个专家，然后该结果会输入MoeInitRouting算子，生成Routing矩阵。在后续，模型中的每个专家会根据Routing矩阵处理其应处理的数据，产生相应的输出。各专家的输出最后与权重加权求和，形成最终的预测结果。
 - **计算公式**：
 
   1.将输入shape为[numRows, k]或[numRows]的expertIdx展平为一行做排序，得出排序后的结果sortedExpertIdx和对应的序号sortedRowIdx，其中numRows为token个数，k表示token数据元素对应权重最高的k个专家，当expertIdx为1维时记k为1：
@@ -124,7 +124,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>x</td>
       <td>输入</td>
       <td>MoE的输入，即token特征输入。</td>
-      <td><ul><li>支持空tensor。</li><li>要求为一个2D的Tensor，shape为[numRows, h]，numRows代表Token个数，h代表每个Token的长度。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>要求为一个2D的Tensor，shape为[numRows, h]，numRows代表Token个数，h代表每个Token的长度。</li></ul></td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>2</td>
@@ -134,7 +134,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>expertIdx</td>
       <td>输入</td>
       <td>为每个Token对应的k个处理专家的序号。</td>
-      <td><ul><li>支持空tensor。</li><li>在Drop/Pad场景下或者非Drop/Pad场景下且需要输出expertTokensCountOrCumsumOut时，要求值域范围是[0, expertNum - 1]，其他场景要求大于等于0。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>在Drop/Pad场景下或者非Drop/Pad场景下且需要输出expertTokensCountOrCumsumOut时，要求值域范围是[0, expertNum - 1]，其他场景要求大于等于0。</li></ul></td>
       <td>INT32、INT64</td>
       <td>ND</td>
       <td>1或2</td>
@@ -204,7 +204,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>expandedXOut</td>
       <td>输出</td>
       <td>根据expertIdx进行扩展过的特征。</td>
-      <td><ul><li>支持空tensor。</li><li>数据类型需与x相同。</li><li>在Dropless/Active场景下要求是一个2D的Tensor，Dropless场景shape为[numRows * k, h]，Active场景shape为[min(activeNum, numRows * k), h]<br>在Drop/Pad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, h]。</li></ul>
+      <td><ul><li>支持空Tensor。</li><li>数据类型需与x相同。</li><li>在Dropless/Active场景下要求是一个2D的Tensor，Dropless场景shape为[numRows * k, h]，Active场景shape为[min(activeNum, numRows * k), h]<br>在Drop/Pad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, h]。</li></ul>
       </td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
@@ -215,7 +215,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>expandedRowIdxOut</td>
       <td>输出</td>
       <td>expandedXOut和x的索引映射关系。</td>
-      <td><ul><li>支持空tensor</li><li>要求是一个1D的Tensor，Shape为[numRows*k]。</li></ul></td>
+      <td><ul><li>支持空Tensor</li><li>要求是一个1D的Tensor，Shape为[numRows*k]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
@@ -225,7 +225,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>expertTokensCountOrCumsumOutOptional</td>
       <td>输出</td>
       <td>输出每个专家处理的token数量的统计结果及累加值。</td>
-      <td><ul><li>支持空tensor</li><li>通过expertTokensCountOrCumsumFlag参数控制是否输出，该值仅在非Drop/Pad场景下输出，要求是一个1D的Tensor，Shape为[expertNum]。</li></ul></td>
+      <td><ul><li>支持空Tensor</li><li>通过expertTokensCountOrCumsumFlag参数控制是否输出，该值仅在非Drop/Pad场景下输出，要求是一个1D的Tensor，Shape为[expertNum]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
@@ -235,7 +235,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>expertTokensBeforeCapacityOutOptional</td>
       <td>输出</td>
       <td>输出drop之前每个专家处理的token数量的统计结果。</td>
-      <td><ul><li>支持空tensor</li><li>通过expertTokensBeforeCapacityFlag参数控制是否输出，该值仅在Drop/Pad场景下输出，要求是一个1D的Tensor，Shape为[expertNum]。</li></ul></td>
+      <td><ul><li>支持空Tensor</li><li>通过expertTokensBeforeCapacityFlag参数控制是否输出，该值仅在Drop/Pad场景下输出，要求是一个1D的Tensor，Shape为[expertNum]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>

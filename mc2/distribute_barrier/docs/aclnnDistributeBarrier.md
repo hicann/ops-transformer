@@ -239,7 +239,7 @@ aclnnStatus aclnnDistributeBarrier(
 <!-- npu="950,A3" id10 -->
 - <term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

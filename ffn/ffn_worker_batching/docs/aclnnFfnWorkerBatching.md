@@ -147,7 +147,7 @@ aclnnStatus aclnnFfnWorkerBatching(
       <td>tokenDtype</td>
       <td>输入</td>
       <td>输入token的数据类型：0为FP16；1为BF16；2为INT8动态量化，每行一个FP32 scale；3为FLOAT8_E5M2；4为FLOAT8_E4M3FN（float8_e4m3）；5为FLOAT4_E2M1。3、4、5每32个逻辑hidden state元素对应一个FLOAT8_E8M0 scale，全部scale紧跟整行token数据。</td>
-      <td>取值为0～5</td>
+      <td>取值为0～5。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -186,7 +186,7 @@ aclnnStatus aclnnFfnWorkerBatching(
     <tr>
       <td>groupList</td>
       <td>输出</td>
-      <td>每个专家处理的token范围。每行格式为 [expert_id, expert_token_num]，未使用的专家填 [0, 0]。</td>
+      <td>每个专家处理的token数。每行格式为 [expert_id, expert_token_num]，未使用的专家填 [0, 0]。</td>
       <td>-</td>
       <td>INT64</td>
       <td>ND</td>
@@ -361,7 +361,7 @@ aclnnStatus aclnnFfnWorkerBatching(
 - <term>Ascend 950PR&950DT系列产品</term>有如下约束：
   - 参数H（hidden size）大于0；`tokenDtype=5`时H须为偶数。
   - 额外支持`tokenDtype=3、4、5`。
-  - 令`S=ceil(H/32)`，tokenDtype=3、4、5时的`dynamicScale`为FLOAT8_E8M0，shape为`(Y,S)`。所有scale紧跟整行token数据，以字节计，可包含行尾padding
+  - 令`S=ceil(H/32)`，tokenDtype=3、4、5时的`dynamicScale`为FLOAT8_E8M0，shape为`(Y,S)`。所有scale紧跟整行token数据，以字节计，可包含行尾padding。
 <!-- end id7 -->
 
 - 确定性计算：

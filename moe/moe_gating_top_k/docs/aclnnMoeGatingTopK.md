@@ -49,7 +49,7 @@
 
     否则 $normValue = normOut$。
 
-    **Step 3: 分组筛选**（仅groupCount > 1 时执行）
+    **Step 3: 分组筛选**（仅groupCount > 1时执行）
 
     将normValue按groupCount分组，根据groupSelectMode计算每组得分：
 
@@ -100,7 +100,7 @@
     \quad yOut = \frac{gathered}{ReduceSum(gathered,\ dim=-1) + eps}
     $$
 
-    否则 $yOut = gathered$
+    否则 $yOut = gathered$。
 
     最终输出：
 
@@ -433,7 +433,7 @@ aclnnStatus aclnnMoeGatingTopK(
     * 要求1 <= kGroup <= groupCount，并且kGroup * x_shape[-1] / groupCount的值要大于等于k。
     * 要求groupCount > 0，x_shape[-1]能够被groupCount整除且整除后的结果大于groupSelectMode，并且整除的结果按照32个数对齐后乘groupCount的结果不大于2048。
 * 其他限制：
-    * groupSelectMode取值0和1，0表示使用最大值对group进行排序， 1表示使用topk2的sum值对group进行排序。
+    * groupSelectMode取值0和1，0表示使用最大值对group进行排序，1表示使用topk2的sum值对group进行排序。
     * normType取值范围和含义：0表示使用Softmax函数，1表示使用Sigmoid函数并做renorm，2表示使用SqrtSoftplus函数并做renorm，3表示使用Sigmoid函数，且由renorm控制是否对选中专家的得分归一化（renorm=0表示不做renorm，renorm=1表示做renorm）。
         <!-- npu="A3,910b" id7 -->
         * <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：

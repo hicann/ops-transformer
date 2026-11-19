@@ -23,9 +23,9 @@
 
 ## 功能说明
 
-- **功能更新**：（相对于aclnnMlaPrologV3weightNz的差异）
+- **功能更新**：（相对于aclnnMlaPrologV3WeightNz的差异）
     - 新增可选参数doRope：控制是否对queryRopeOut与krCache执行旋转位置编码；默认true；doRope=true时ropeSin/ropeCos必须传入非空有效Tensor，doRope=false时跳过RoPE并写直通结果，此时ropeSin/ropeCos必须同时为空（nullptr或空Tensor）。
-    - N:Head-Num（多头数）范围调整为1-128
+    - N:Head-Num（多头数）范围调整为1-128。
 - **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路：
     - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后，乘以Query尺度矫正因子$\alpha_q$得到$c^Q$，再分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后得到$q^N$；第二路乘以$W^{QR}$后，在doRope=true时经过旋转位置编码得到$q^R$，doRope=false时对$c^Q \cdot W^{QR}$直通写出。
     - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后，乘以Key尺度矫正因子$\alpha_{kv}$传入Cache中得到$k^C$。
@@ -964,7 +964,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
             <li>当CacheMode="PA_BLK_BSND"/"PA_BLK_NZ"时，取值大于或等于B * ⌈S / BlockSize⌉。</li>
           </ul>
           <p>注：BS合轴场景，每个Batch中的S长度可以不同，因此BlockNum的取值需大于或等于各Batch中S长度除以BlockSize后的向上取整结果相加。</p>
-          <p>举例：actualSeqLenOptional数值为[47, 151, 261, 422]，blocksize=128，那么Batch中的长度分别为[47, 104, 110, 161]，此时BlockNum = ⌈47/128⌉ + ⌈104/128⌉ + ⌈110/128⌉ + ⌈161/128⌉ = 5</p>
+          <p>举例：actualSeqLenOptional数值为[47, 151, 261, 422]，BlockSize=128，那么Batch中的长度分别为[47, 104, 110, 161]，此时BlockNum = ⌈47/128⌉ + ⌈104/128⌉ + ⌈110/128⌉ + ⌈161/128⌉ = 5</p>
         </td>
       </tr>
       <tr>
@@ -1019,13 +1019,13 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
   - B、S、T、Skv值允许一个或多个取0，即Shape与B、S、T、Skv值相关的入参允许传入空Tensor，其余入参不支持传入空Tensor。
       - 如果B、S、T取值为0，则queryOut、queryRopeOut输出空Tensor，kvCacheRef、krCacheRef不做更新。
       - 如果Skv取值为0，则queryOut、queryRopeOut、dequantScaleQNopeOutOptional正常计算，kvCacheRef、krCacheRef不做更新，即输出空Tensor。
-  - 当CacheMode为BSND时
+  - 当CacheMode为BSND时。
       - tokenX应不采用BS合轴，即维度为(B, S, He)
       - kvCache的维度为(B,S,Nkv,Dr)
-  - 当CacheMode为TND时
+  - 当CacheMode为TND时。
       - tokenX应采用BS合轴，即维度为(T, He)
       - kvCache的维度为(T,Nkv,Dr)
-  - 当ckvkrRepoMode=1时
+  - 当ckvkrRepoMode=1时。
       - krCache的维度应包含0，支持shape为(0)
 
   </details>

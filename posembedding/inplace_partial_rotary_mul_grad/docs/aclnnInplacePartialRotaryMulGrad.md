@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：执行局部旋转位置编码InplacePartialRotaryMul的反向计算。该算子对输入dy的D维度上切片[start, end)区域执行旋转位置编码梯度计算，计算结果inplace写回dy。
+- 接口功能：执行局部旋转位置编码InplacePartialRotaryMul的反向计算。该算子对输入dy的D维度上的切片[start, end)区域执行旋转位置编码梯度计算，计算结果inplace写回dy。
 - 计算公式：
 
     取旋转位置编码的正向计算中，broadcast的轴列表为`dims`，在D维度上的切片范围为`[start, end)`，令参与计算的切片数据为：
@@ -211,7 +211,7 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
     <tr>
       <td>partialSlice</td>
       <td>输入</td>
-      <td>dyRef最后一维(D维)上的切片范围，为[start, end)，表示对dyRef[..., start:end]执行旋转位置编码梯度计算。必须为2个元素。</td>
+      <td>dyRef最后一维（D维）上的切片范围，为[start, end)，表示对dyRef[..., start:end]执行旋转位置编码梯度计算。必须为2个元素。</td>
       <td>-</td>
       <td>IntArray</td>
       <td>-</td>
@@ -334,9 +334,9 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
 
 ## 约束说明
 
-- 该算子仅支持Ascend 950 AI Processor。
+- 该算子仅支持Ascend 950PR&950DT系列产品。
 - 该算子仅支持连续Tensor，不支持非连续Tensor。
-- **该算子当前版本仅支持 interleave 模式（`rotary_mode=1`）**。half（0）、quarter（2）、interleave-half（3）模式暂未实现。
+- **该算子当前版本仅支持interleave模式（`rotary_mode=1`）**。half（0）、quarter（2）、interleave-half（3）模式暂未实现。
 
 - 确定性计算：
   - aclnnInplacePartialRotaryMulGrad默认确定性实现。

@@ -122,7 +122,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
     <tr>
       <td>key（aclTensor）</td>
       <td>输入</td>
-      <td>attention结构的Key输入</td>
+      <td>attention结构的Key输入。</td>
       <td>
           <ul>
                 <li>不支持空tensor。</li>
@@ -194,7 +194,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
                 <li>不支持空tensor。</li>
                 <li>如果不指定seqlen可传入None，表示和query的shape的S长度相同。</li>
                 <li>该入参中每个Batch的有效token数不超过query中的维度S大小且不小于0。支持长度为B的一维tensor。</li>
-                <li>layoutQueryOptional为TND时，该入参必须传入，且以该入参元素的数量作为B值，该参数中每个元素的值表示当前batch与之前所有batch的token数总和。</li>
+                <li>layoutQueryOptional为TND时，该入参必须传入，且以该入参元素的数量作为B值，该参数中每个元素的值表示当前Batch与之前所有Batch的token数总和。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -212,7 +212,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
                 <li>如果不指定seqlen可传入None，表示和key的shape的S长度相同。</li>
                 <li>该参数中每个Batch的有效token数不超过key/value中的维度S大小且不小于0。支持长度为B的一维tensor。</li>
                 <li>当layoutKvOptional为TND或PA_BSND时，该入参必须传入。</li>
-                <li>layoutKvOptional为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>layoutKvOptional为TND，该参数中每个元素的值表示当前Batch与之前所有Batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -223,7 +223,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
     <tr>
       <td>queryRopeOptional（aclTensor）</td>
       <td>输入</td>
-      <td>表示MLA结构中的query的rope信息。</td>
+      <td>表示MLA结构中的query的RoPE信息。</td>
       <td>
           <ul>
                 <li>可选项。须与keyRopeOptional成对为空指针（不使用rope），或成对传入非空tensor（使用rope，Dr为64）。</li>
@@ -548,7 +548,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
 - N2仅支持1。
 - block_size为一个block的token数，block_size取值为16的倍数，且最大支持1024。
 - 参数query中的D和key、value的D值相等为512。
-- queryRopeOptional与keyRopeOptional须成对为空指针或成对传入非空tensor：均为空指针时表示不使用rope，仅对512维nope部分做注意力计算；均传入非空tensor时Dr相等为64。不支持空tensor。
+- queryRopeOptional与keyRopeOptional须成对为空指针或成对传入非空tensor：均为空指针时表示不使用RoPE，仅对512维nope部分做注意力计算；均传入非空tensor时Dr相等为64。不支持空tensor。
 - 参数query、key、value的数据类型必须保持一致。
 - 支持sparseBlockSizeOptional整除block_size。
 
@@ -558,7 +558,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
   <!-- end id9 -->
   <!-- npu="A3,910b" id10 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-    - 支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparseBlockSizeOptional整除block_size
+    - 支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparseBlockSizeOptional整除block_size。
   <!-- end id10 -->
 
 - returnSoftmaxLse为True时，layoutKvOptional约束如下：

@@ -39,7 +39,7 @@
   o := \frac{S_t q_t}{\sqrt{d_k}}
   $$
 
-  其中，$S_{t-1},S_t \in R^{d_v \times d_k}$，$q_t, k_t \in R^{d_k}$，$v_t \in R^{d_v}$，$\alpha_t \in R$，$\alpha_{kt} \in R^{d_k}$，$\beta_t \in R$，$o \in R^{d_v}$
+  其中，$S_{t-1},S_t \in R^{d_v \times d_k}$，$q_t, k_t \in R^{d_k}$，$v_t \in R^{d_v}$，$\alpha_t \in R$，$\alpha_{kt} \in R^{d_k}$，$\beta_t \in R$，$o \in R^{d_v}$。
 
 ## 函数原型
 
@@ -181,7 +181,7 @@ aclnnStatus aclnnRecurrentGatedDeltaRule(
     <tr>
       <td>gk</td>
       <td>输入</td>
-      <td>衰减系数，公式中的αk=e^gk</td>
+      <td>衰减系数，公式中的αk=e^gk。</td>
       <td><ul><li>不支持空Tensor。</li><li>如果传入nullptr，则表示全0的tensor。</li></ul></td>
       <td>FLOAT32</td>
       <td>ND</td>

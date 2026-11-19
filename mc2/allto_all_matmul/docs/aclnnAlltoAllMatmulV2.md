@@ -25,7 +25,7 @@
 
 - 接口功能：完成AlltoAll通信、Permute（保证通信后地址连续）和Matmul计算的融合，**先通信后计算**。
 
-- 计算公式：假设x1输入shape为(BS, H)，rankSize为NPU卡数
+- 计算公式：假设x1输入shape为(BS, H)，rankSize为NPU卡数。
 
   $$
   commOut = AlltoAll(x1.view(rankSize, BS/rankSize, H)) \\
@@ -145,7 +145,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
     <tr>
     <td>group</td>
     <td>输入</td>
-    <td>Host侧标识列组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
+    <td>Host侧标识列组的字符串，即通信域名称，通过HCCL接口HcclGetCommName获取commName作为该参数。</td>
     <td>字符串长度要求(0, 128)。</td>
     <td>-</td>
     <td>-</td>
@@ -276,7 +276,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
 
 ## aclnnAlltoAllMatmulV2
 
-- **参数说明：**
+- **参数说明**
 
     <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 168px">
@@ -323,7 +323,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
 * NPU卡数（rankSize），根据设备型号有不同限制：
 
   <!-- npu="910b" id10 -->
-  - <term>Atlas A2系列产品</term>：支持2、4、8卡。
+  - <term>Atlas A2系列产品</term>：支持2、4、8张卡。
   <!-- end id10 -->
   <!-- npu="A3" id11 -->
   - <term>Atlas A3系列产品</term>：支持2、4、8、16卡。
@@ -340,7 +340,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
   - <term>Atlas A2系列产品</term>：支持[1, 35000]。
   <!-- end id13 -->
   <!-- npu="950,A3" id14 -->
-  - <term>Atlas A3系列产品</term>  、<term>Ascend 950PR&950DT系列产品</term>：支持[2, 65535]。
+  - <term>Atlas A3系列产品</term> 、<term>Ascend 950PR&950DT系列产品</term>：支持[2, 65535]。
   <!-- end id14 -->
 
 * 空tensor的支持度根据不同设备型号有不同的限制：
@@ -372,7 +372,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
   <!-- end id20 -->
 
 * 通算融合算子不支持并发调用，不同的通算融合算子也不支持并发调用。
-* 不支持跨超节点通信，只支持超节点内。
+* 不支持跨超节点通信，只支持超节点内通信。
 * 通信引擎参数commMode根据不同设备型号有不同的限制：
 
    <!-- npu="910b" id21 -->
@@ -405,7 +405,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="910b" id27 -->
 - <term>Atlas A2系列产品</term>：

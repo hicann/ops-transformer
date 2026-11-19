@@ -252,8 +252,8 @@ aclnnStatus aclnnMoeTokenUnpermuteGrad(
     <tbody>
       <tr><td>workspace</td><td>输入</td><td>在Device侧申请的workspace内存地址。</td></tr>
       <tr><td>workspaceSize </td><td>输入</td><td>在Device侧申请的workspace大小，由第一段接口aclnnMoeTokenUnpermuteGradGetWorkspaceSize获取。</td></tr>
-      <tr><td>executor</td><td>输入</td><td> op执行器，包含了算子计算流程。 </td></tr>
-      <tr><td>stream </td><td>输入</td><td> 指定执行任务的Stream。 </td></tr>
+      <tr><td>executor</td><td>输入</td><td> op执行器，包含了算子计算流程。</td></tr>
+      <tr><td>stream </td><td>输入</td><td> 指定执行任务的Stream。</td></tr>
     </tbody>
   </table>
 

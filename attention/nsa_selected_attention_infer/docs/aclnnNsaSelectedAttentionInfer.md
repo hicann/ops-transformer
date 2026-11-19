@@ -28,7 +28,7 @@
 
   Self-attention（自注意力）利用输入样本自身的关系构建了一种注意力模型。其原理是假设有一个长度为$n$的输入样本序列$x$，$x$的每个元素都是一个$d$维向量，可以将每个$d$维向量看作一个token embedding，将这样一条序列经过3个权重矩阵变换得到3个维度为$n*d$的矩阵。
 
-  Selected Attention的计算由topk索引取数与attention计算融合而成，外加paged attention取kvCache。首先，通过$topkIndices$索引从$key$中取出$key_{topk}$，从$value$中取出$value_{topk}$，计算self_attention公式如下：
+  Selected Attention的计算由topk索引取数与attention计算融合而成，外加paged attention取kvCache。首先，通过$topkIndices$索引从$key$中取出$key_{topk}$，从$value$中取出$value_{topk}$，计算Self-attention公式如下：
 
   $$
   Attention(query,key,value)=Softmax(\frac{query · key_{topk}^T}{\sqrt{d}})value_{topk}
@@ -127,8 +127,8 @@ aclnnStatus aclnnNsaSelectedAttentionInfer(
             <ul style="list-style-type: circle; margin: 0; padding-left: 20px;">
               <li>数据类型保持与query、value的数据类型一致。</li>
               <li> 支持key的N轴小于等于256。</li>
-               <li>支持Key的D轴等于192。</li>
-               <li>支持Key的blockSize等于64或128。</li>
+               <li>支持key的D轴等于192。</li>
+               <li>支持key的blockSize等于64或128。</li>
                 <li>key中的N和numHeads值相等，并且numHeads是numKeyValueHeads的倍数关系。</li>
             </ul>
           </td>
@@ -146,7 +146,7 @@ aclnnStatus aclnnNsaSelectedAttentionInfer(
               <li>数据类型保持与query、key的数据类型一致。</li>
               <li>支持value的N轴小于等于256。</li>
                <li>支持value的D轴等于128。</li>
-               <li>支持Value的blockSize等于64或128。</li>
+               <li>支持value的blockSize等于64或128。</li>
                <li>value中的N和numHeads值相等，并且numHeads是numKeyValueHeads的倍数关系。</li>
                <li>value的D(H/numKeyValueHeads)和output的D值相等。</li>
             </ul>
@@ -431,7 +431,7 @@ aclnnStatus aclnnNsaSelectedAttentionInfer(
         <tr>
           <td>workspace</td>
           <td>输入</td>
-          <td>在Device申请的workspace内存地址。</td>
+          <td>在Device侧申请的workspace内存地址。</td>
         </tr>
         <tr>
           <td>workspaceSize</td>

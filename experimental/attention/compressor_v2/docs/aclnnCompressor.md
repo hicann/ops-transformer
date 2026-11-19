@@ -232,7 +232,7 @@ aclnnStatus aclnnCompressorV2(
     <tr>
       <td>executor（aclOpExecutor**）</td>
       <td>输出</td>
-      <td>返回op执行器，包含了算子计算流程。</td>
+      <td>返回OP执行器，包含了算子计算流程。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -383,7 +383,7 @@ aclnnStatus aclnnCompressorV2(
         <tr><td>100</td><td>261120</td><td>4096</td></tr>
       </tbody>
       </table>
-  - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下stateCacheRef不做更新，输出cmpKvOut为空tensor。
+  - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空Tensor，其余入参不支持传入空Tensor。该场景下stateCacheRef不做更新，输出cmpKvOut为空Tensor。
 - 输入属性限制：
   - 支持D为128/512。
   - 支持H为1K~10K，512对齐。

@@ -28,7 +28,7 @@
 - 支持以下场景：
   - 场景一（decode/update场景 — 固定batch）：
 
-    ```Cpp
+    ```cpp
     x: [batch, 1, dim]
     weight: [K, dim]，其中K∈{2,3,4}
     convStatesRef: [numCacheLines, stateLen, dim]
@@ -46,7 +46,7 @@
 
   - 场景二（decode/update场景 — 投机解码变长序列）：
 
-    ```Cpp
+    ```cpp
     x: [cuSeqLen, dim]
     weight: [K, dim]，其中K∈{2,3,4}
     convStatesRef: [numCacheLines, stateLen, dim]
@@ -136,7 +136,7 @@ aclnnStatus aclnnCausalConv1dUpdate(
       <td>x（aclTensor*）</td>
       <td>输入</td>
       <td>计算公式中的x，代表输入序列。</td>
-      <td><ul><li>不支持空tensor。</li><li>decode固定batch场景：shape为[batch, 1, dim]（3D）。</li><li>投机解码变长场景：shape为[cuSeqLen, dim]（2D），需同时提供numAcceptedTokens。非投机解码的decode场景请使用3D输入[batch, 1, dim]。</li></ul></td>
+      <td><ul><li>不支持空Tensor。</li><li>decode固定batch场景：shape为[batch, 1, dim]（3D）。</li><li>投机解码变长场景：shape为[cuSeqLen, dim]（2D），需同时提供numAcceptedTokens。非投机解码的decode场景请使用3D输入[batch, 1, dim]。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>2-3</td>
@@ -146,7 +146,7 @@ aclnnStatus aclnnCausalConv1dUpdate(
       <td>weight（aclTensor*）</td>
       <td>输入</td>
       <td>计算公式中的w，代表因果一维卷积核。</td>
-      <td><ul><li>不支持空tensor。</li><li>shape为[K, dim]，K∈{2,3,4}。</li></ul></td>
+      <td><ul><li>不支持空Tensor。</li><li>shape为[K, dim]，K∈{2,3,4}。</li></ul></td>
       <td>数据类型与x一致</td>
       <td>ND</td>
       <td>2</td>
@@ -156,7 +156,7 @@ aclnnStatus aclnnCausalConv1dUpdate(
       <td>convStatesRef（aclTensor*）</td>
       <td>输入/输出</td>
       <td>缓存状态张量，存储各序列的历史token数据，各序列计算完成后原地更新为最新状态。</td>
-      <td><ul><li>不支持空tensor。</li><li>shape为[numCacheLines, stateLen, dim]。</li><li>stateLen ≥ K-1。</li><li>numCacheLines ≥ batch（未提供cacheIndices时）。</li><li>每次调用后，算子将最新状态写回此张量。</li></ul></td>
+      <td><ul><li>不支持空Tensor。</li><li>shape为[numCacheLines, stateLen, dim]。</li><li>stateLen ≥ K-1。</li><li>numCacheLines ≥ batch（未提供cacheIndices时）。</li><li>每次调用后，算子将最新状态写回此张量。</li></ul></td>
       <td>数据类型与x一致</td>
       <td>ND</td>
       <td>3</td>

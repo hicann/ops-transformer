@@ -94,8 +94,8 @@ aclnnStatus aclnnKdaInputProj(
       <th>使用说明</th>
       <th>数据类型</th>
       <th>数据格式</th>
-      <th>维度(shape)</th>
-      <th>非连续tensor</th>
+      <th>维度（shape）</th>
+      <th>非连续Tensor</th>
     </tr></thead>
   <tbody>
     <tr>
@@ -222,7 +222,7 @@ aclnnStatus aclnnKdaInputProj(
 
 - **返回值**
 
-  aclnnStatus: 返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
   第一段接口完成入参校验，出现以下场景时报错：
   <table style="undefined;table-layout: fixed; width: 1155px"><colgroup>
@@ -301,7 +301,7 @@ aclnnStatus aclnnKdaInputProj(
 
 - **返回值**
 
-  aclnnStatus: 返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 
@@ -321,7 +321,7 @@ aclnnStatus aclnnKdaInputProj(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。完整源码见[test_aclnn_kda_input_proj.cpp](../examples/test_aclnn_kda_input_proj.cpp)。
 
-```Cpp
+```cpp
 #include <cstdint>
 #include <cstdio>
 #include <vector>

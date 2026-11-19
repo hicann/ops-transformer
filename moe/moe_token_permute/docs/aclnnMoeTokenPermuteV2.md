@@ -59,16 +59,16 @@ aclnnStatus aclnnMoeTokenPermuteV2(
 
 | 参数名 | 输入/输出 | 描述 | 使用说明 | 数据类型 | 数据格式 | 维度 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `tokens` | 输入 | 输入token特征。 | 支持空Tensor；要求维度等于2，第一维为`num_tokens`。Ascend 950量化模式仅支持FLOAT16、BFLOAT16。 | 非量化：FLOAT16、BFLOAT16、FLOAT32、INT8；量化：FLOAT16、BFLOAT16 | ND | 2 |
-| `indices` | 输入 | 输入indices索引。 | 支持空Tensor；shape为1D或2D。`paddedMode=false`时表示每个输入token对应的topK个专家索引。在Ascend 950上调用`aclnnMoeTokenPermuteV2`时，元素表示expert ID，取值范围为`[0, 10240)`。 | INT32、INT64 | ND | 1或2 |
-| `numOutTokens` | 输入 | 有效输出token数。 | `0`表示不删除token；大于0时保留排序后的前`numOutTokens`个token；小于0时按负切片索引处理。 | - | - | - |
-| `paddedMode` | 输入 | 是否为填充模式。 | 当前不支持`true`，建议固定为`false`。 | - | - | - |
-| `quantMode` | 输入 | 量化模式。 | `-1`为非量化；`2`为MXFP8 E5M2；`3`为MXFP8 E4M3FN；`9`为MXFP4 E2M1。非Ascend 950平台静默忽略量化参数。 | - | - | - |
-| `permuteTokensOut` | 输出 | 根据indices扩展并排序后的tokens。 | 非量化时数据类型同`tokens`；`quantMode=2/3/9`时分别为FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。 | FLOAT16、BFLOAT16、FLOAT32、INT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1 | ND | ≥2 |
-| `sortedIndicesOut` | 输出 | `permuteTokensOut`和`tokens`的映射关系。 | 1D Tensor，shape为`[indices.numel()]`。 | INT32 | ND | 1 |
-| `expandedScaleOut` | 输出 | 量化后的per-token分块scale。 | 量化场景必须提供有效输出；非量化场景可传shape为`[0]`、dtype为FLOAT32的空Tensor。 | FLOAT8_E8M0、FLOAT32 | ND | 1、2或3 |
-| `workspaceSize` | 输出 | 返回需要在Device侧申请的workspace大小。 | - | - | - | - |
-| `executor` | 输出 | 返回op执行器，包含算子计算流程。 | - | - | - | - |
+| tokens | 输入 | 输入token特征。 | 支持空Tensor；要求维度等于2，第一维为`num_tokens`。Ascend 950量化模式仅支持FLOAT16、BFLOAT16。 | 非量化：FLOAT16、BFLOAT16、FLOAT32、INT8；量化：FLOAT16、BFLOAT16 | ND | 2 |
+| indices | 输入 | 输入indices索引。 | 支持空Tensor；shape为1D或2D。`paddedMode=false`时表示每个输入token对应的topK个专家索引。在Ascend 950上调用`aclnnMoeTokenPermuteV2`时，元素表示expert ID，取值范围为`[0, 10240)`。 | INT32、INT64 | ND | 1或2 |
+| numOutTokens | 输入 | 有效输出token数。 | `0`表示不删除token；大于0时保留排序后的前`numOutTokens`个token；小于0时按负切片索引处理。 | - | - | - |
+| paddedMode | 输入 | 是否为填充模式。 | 当前不支持`true`，建议固定为`false`。 | - | - | - |
+| quantMode | 输入 | 量化模式。 | `-1`为非量化；`2`为MXFP8 E5M2；`3`为MXFP8 E4M3FN；`9`为MXFP4 E2M1。非Ascend 950平台静默忽略量化参数。 | - | - | - |
+| permuteTokensOut | 输出 | 根据indices扩展并排序后的tokens。 | 非量化时数据类型同`tokens`；`quantMode=2/3/9`时分别为FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。 | FLOAT16、BFLOAT16、FLOAT32、INT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1 | ND | ≥2 |
+| sortedIndicesOut | 输出 | `permuteTokensOut`和`tokens`的映射关系。 | 1D Tensor，shape为`[indices.numel()]`。 | INT32 | ND | 1 |
+| expandedScaleOut | 输出 | 量化后的per-token分块scale。 | 量化场景必须提供有效输出；非量化场景可传shape为`[0]`、dtype为FLOAT32的空Tensor。 | FLOAT8_E8M0、FLOAT32 | ND | 1、2或3 |
+| workspaceSize | 输出 | 返回需要在Device侧申请的workspace大小。 | - | - | - | - |
+| executor | 输出 | 返回op执行器，包含算子计算流程。 | - | - | - | - |
 
 ## 输出Shape
 
@@ -117,10 +117,10 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
 
 | 参数名 | 输入/输出 | 描述 |
 | --- | --- | --- |
-| `workspace` | 输入 | 在Device侧申请的workspace内存地址。 |
-| `workspaceSize` | 输入 | 在Device侧申请的workspace大小，由第一段接口`aclnnMoeTokenPermuteV2GetWorkspaceSize`获取。 |
-| `executor` | 输入 | op执行器，包含算子计算流程。 |
-| `stream` | 输入 | 指定执行任务的Stream流。 |
+| workspace | 输入 | 在Device侧申请的workspace内存地址。 |
+| workspaceSize | 输入 | 在Device侧申请的workspace大小，由第一段接口`aclnnMoeTokenPermuteV2GetWorkspaceSize`获取。 |
+| executor | 输入 | op执行器，包含算子计算流程。 |
+| stream | 输入 | 指定执行任务的Stream流。 |
 
 ## 约束说明
 

@@ -42,7 +42,7 @@
    y_{t,:}=\operatorname{Softmax}(I_{t,:})
    $$
 
-   本接口将$y$写出到softmaxOut。目标分布$p$由attnSoftmaxL1Norm输入提供，由main attention score沿head平均得到，不沿上下文做L1归一化。记$Z_{t}$为$p$沿上下文的求和，$t$为L1归一化后的target分布：
+   本接口将$y$写出到softmaxOut。目标分布$p$由attnSoftmaxL1Norm输入提供，由main attention score沿head平均得到，不沿上下文做L1归一化。记$Z_{t}$为$p$沿上下文的求和，$t$为L1归一化后的目标分布：
 
    $$
    Z_{t}=\sum_{j}p_{t,j},\quad t_{t,:}=\frac{p_{t,:}}{Z_{t}}
@@ -413,7 +413,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
                 <td>361001</td>
-                <td>API内部调用npu runtime的接口异常。</td>
+                <td>API内部调用NPU Runtime的接口异常。</td>
             </tr>
         </tbody>
     </table>

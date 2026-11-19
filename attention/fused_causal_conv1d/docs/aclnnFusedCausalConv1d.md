@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：对序列执行因果一维卷积，沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后，将当前序列部分数据更新到缓存；在因果一维卷积输出的基础上，将原始输入加到输出上以实现残差连接。支持APC（Automatic Prefix Caching）、MTP（Multi-Token Prediction，多令牌预测，可用于投机解码）、残差连接等特性。相较于标准causal_conv1d算子，本算子新增APC缓存复用、PD混部、残差连接可选等功能。<br>
+- 接口功能：对序列执行因果一维卷积，沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后，将当前序列部分数据更新到缓存；在因果一维卷积输出的基础上，将原始输入加到输出上以实现残差连接。支持APC（Automatic Prefix Caching）、MTP（Multi-Token Prediction，多Token预测，可用于投机解码）、残差连接等特性。相较于标准causal_conv1d算子，本算子新增APC缓存复用、PD混部、残差连接可选等功能。<br>
 
 - 支持以下场景：
   - 场景一（prefill场景）：
@@ -160,7 +160,7 @@
       $$
 
       $$
-      cachedState[i, dim] = convStates[readCacheLine][i, dim], \quad 0 \leq i <   offset + K - 1
+      cachedState[i, dim] = convStates[readCacheLine][i, dim], \quad 0 \leq i < offset + K - 1
       $$
 
       Case 3：默认模式
@@ -337,7 +337,7 @@ aclnnStatus aclnnFusedCausalConv1d(
       <td>x（aclTensor*）</td>
       <td>输入</td>
       <td>计算公式中的x，代表输入序列。</td>
-      <td><ul><li>不支持空tensor。</li><li>prefill场景：shape为[cuSeqLen, dim]。</li><li>decode场景：shape为[cuSeqLen, dim]或[batch, seqLen, dim]。</li>
+      <td><ul><li>不支持空Tensor。</li><li>prefill场景：shape为[cuSeqLen, dim]。</li><li>decode场景：shape为[cuSeqLen, dim]或[batch, seqLen, dim]。</li>
       <li>只支持token维 (2D为dim0，3D为dim1)非连续且stride大于等于1</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
@@ -348,7 +348,7 @@ aclnnStatus aclnnFusedCausalConv1d(
       <td>weight（aclTensor*）</td>
       <td>输入</td>
       <td>计算公式中的w，代表因果1维卷积核。</td>
-      <td><ul><li>不支持空tensor。</li><li>shape为[K, dim]。</li></ul></td>
+      <td><ul><li>不支持空Tensor。</li><li>shape为[K, dim]。</li></ul></td>
       <td>数据类型与x一致</td>
       <td>ND</td>
       <td>2</td>
@@ -358,7 +358,7 @@ aclnnStatus aclnnFusedCausalConv1d(
       <td>convStates（aclTensor*）</td>
       <td>输入/输出</td>
       <td>计算公式中的cachedState，代表缓存状态张量，存储各序列的历史token数据，各序列计算完成后原地更新。</td>
-      <td><ul><li>不支持空tensor。</li><li>shape为[..., stateLen, dim]，第0维的大小不固定。</li><li>stateLen == K-1+m，prefill场景下m=0，decode、PD混部场景下m=[0,7]。</li><li>m表示投机个数，映射numAcceptedTokens参数的值。</li><li>支持dim0和dim1非连续且stride大于等于1</li></ul></td>
+      <td><ul><li>不支持空Tensor。</li><li>shape为[..., stateLen, dim]，第0维的大小不固定。</li><li>stateLen == K-1+m，prefill场景下m=0，decode、PD混部场景下m=[0,7]。</li><li>m表示投机个数，映射numAcceptedTokens参数的值。</li><li>支持dim0和dim1非连续且stride大于等于1</li></ul></td>
       <td>数据类型与x一致</td>
       <td>ND</td>
       <td>3</td>
@@ -368,7 +368,7 @@ aclnnStatus aclnnFusedCausalConv1d(
       <td>queryStartLoc（aclTensor*）</td>
       <td>可选输入</td>
       <td>序列起始位置索引，记录各序列在拼接张量x中的起始位置。</td>
-      <td><ul><li>不支持空tensor。</li><li>shape为[batch+1,]。</li><li>queryStartLoc[i]表示第i个序列的起始偏移。</li><li>queryStartLoc[0]必须为0，queryStartLoc[-1]必须为cuSeqLen，相邻两个数据不相等。</li></ul></td>
+      <td><ul><li>不支持空Tensor。</li><li>shape为[batch+1,]。</li><li>queryStartLoc[i]表示第i个序列的起始偏移。</li><li>queryStartLoc[0]必须为0，queryStartLoc[-1]必须为cuSeqLen，相邻两个数据不相等。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
@@ -378,7 +378,7 @@ aclnnStatus aclnnFusedCausalConv1d(
       <td>cacheIndices（aclTensor*）</td>
       <td>可选输入</td>
       <td>缓存索引，指定每个序列对应的缓存状态在convStates中的索引。</td>
-      <td><ul><li>不支持空tensor，APC开启时不能为None且必须为二维。</li><li>1维shape[batch,]或2维shape[batch, maxNumBlocks], maxNumBlocks范围[1,1024]。</li><li>值需要互不相同（除非等于padSlotId）。</li></ul></td>
+      <td><ul><li>不支持空Tensor，APC开启时不能为None且必须为二维。</li><li>1维shape[batch,]或2维shape[batch, maxNumBlocks], maxNumBlocks范围[1,1024]。</li><li>值需要互不相同（除非等于padSlotId）。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1-2</td>
@@ -648,7 +648,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - convStates必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4GB], batch范围[1, 256]。
     - maxNumBlocks >= ceil(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - prefill和decode混合场景：
@@ -657,7 +657,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - convStates必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4GB], batch范围[1, 256]。
     - maxNumBlocks >= ceil(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - decode场景（变长序列）：
@@ -680,13 +680,13 @@ aclnnStatus aclnnFusedCausalConv1d(
 
 - 输入值域限制：
   - queryStartLoc是累计偏移量，取值范围[0, cuSeqLen]，长度为batch+1，queryStartLoc[i]表示第i个序列的起始偏移，queryStartLoc[batch]表示最后一个序列的结束位置。
-  - blockSize为0或者大于等于2，apc开启时不为0。
+  - blockSize为0或者大于等于2，APC开启时不为0。
   - blockIdxFirstScheduledToken、blockIdxLastScheduledToken、initialStateIdx、numComputedTokens和cacheIndices均存在时表示APC开启，且满足以下条件（i为batch的索引）：
-    - cacheIndices为2维
-    - initialStateIdx[i] <= blockIdxFirstScheduledToken[i]+1
+    - cacheIndices为2维。
+    - initialStateIdx[i] <= blockIdxFirstScheduledToken[i]+1。
     - initialStateIdx[i] <= blockIdxLastScheduledToken[i]
     - blockIdxFirstScheduledToken[i] <= blockIdxLastScheduledToken[i]
-    - blockIdxLastScheduledToken[i] < maxNumBlocks
+    - blockIdxLastScheduledToken[i] < maxNumBlocks。
   - numAcceptedTokens分为None和非None，非None情况下长度为batch，prefill对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seqLen-1。
   - numComputedTokens中每个元素取值大于等于0。
   - cacheIndices的取值范围为[0, convStates.dim[0]-1],且值均不能相等（除非等于padSlotId）。

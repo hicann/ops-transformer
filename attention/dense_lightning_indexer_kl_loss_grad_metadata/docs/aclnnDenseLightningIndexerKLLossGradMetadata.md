@@ -204,7 +204,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>layoutQOptional（char*）</td>
       <td>输入</td>
       <td>表示query侧的排列格式。</td>
-      <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
+      <td><ul><li>支持BSND、TND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -214,7 +214,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>layoutKOptional（char*）</td>
       <td>输入</td>
       <td>表示key侧的排列格式。</td>
-      <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
+      <td><ul><li>支持BSND、TND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -367,12 +367,12 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
 
 ## 约束说明
 
-- 确定性说明：aclnnDenseLightningIndexerKLLossGradMetadata默认确定性实现。
+- 确定性说明：aclnnDenseLightningIndexerKLLossGradMetadata默认确定性实现
 - BSND场景
-  - 必传batchSize、maxSeqlenQ和maxSeqlenK参数，以获取shape信息。
+  - 必传batchSize、maxSeqlenQ和maxSeqlenK参数，以获取shape信息
 - TND场景
-  - 必传cuSeqlensQOptional、cuSeqlensKOptional参数，以获取正确shape信息。
-  - 当batchSize为0时，通过cuSeqlensQOptional的shape推导batch。
+  - 必传cuSeqlensQOptional、cuSeqlensKOptional参数，以获取正确shape信息
+  - 当batchSize为0时，通过cuSeqlensQOptional的shape推导batch
 
 <details>
 <summary><a id="Mask"></a>Mask</summary>
@@ -428,7 +428,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
 <details>
 <summary><a id="Metadata"></a>Metadata输出布局</summary>
 
-  metadata输出为INT32 Tensor，当前shape固定为(64,)，字段布局如下。
+  metadata输出为INT32 Tensor，当前shape固定为(64,)，字段布局如下：
 
   <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 180px">
@@ -461,17 +461,17 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
         <tr>
         <td>remainCoreNum</td>
         <td>3</td>
-        <td>处理remainCoreSize的cube core数量</td>
+        <td>处理remainCoreSize的cube core数量。</td>
         </tr>
         <tr>
         <td>usedCoreNum</td>
         <td>4</td>
-        <td>主kernel实际使用的cube core数量。</td>
+        <td>主算子实际使用的cube core数量。</td>
         </tr>
         <tr>
         <td>maxSeqK</td>
         <td>5</td>
-        <td>key的最大sequence length</td>
+        <td>key的最大sequence length。</td>
         </tr>
         <tr>
         <td>reserved</td>

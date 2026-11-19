@@ -52,7 +52,7 @@
 
     - **计算过程**
 
-      - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList))$。
+      - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList))$。
 
         >例子：groupList=[3,4,4,6]。
         >
@@ -62,7 +62,7 @@
         >
         >第2个右矩阵`W[2,:,:]`，对应索引位置[4,4)的token`x[4:4]`（共4-4=0个token），对应`x_scale[4:4]`、`w_scale[2]`、`Q[4:4]`、`Q_scale[4:4]`；
         >
-        >第3个右矩阵`W[3,:,:]`，对应索引位置[4,6)的token`x[4:6]`（共6-4=2个token），对应`x_scale[4:6]`、`w_scale[3]`、`Q[4:6]`、`Q_scale[4:6]`；
+        >第3个右矩阵`W[3,:,:]`，对应索引位置[4,6)的token`x[4:6]`（共6-4=2个token），对应`x_scale[4:6]`、`w_scale[3]`、`Q[4:6]`、`Q_scale[4:6]`。
         >
         >注：groupList中未指定的部分将不会参与更新。
         >例如当groupList=[12,14,18]，x的shape为[30,N/2]时。
@@ -79,9 +79,9 @@
 
         $C_{i,act}, gate_{i} = split(C_{i})$
 
-        $S_{i}=Swish(C_{i,act})\odot gate_{i}$  &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
+        $S_{i}=Swish(C_{i,act})\odot gate_{i}$ &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-      - 3.量化输出结果
+      - 3.量化输出结果。
 
         $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -111,7 +111,7 @@
       * $Q\_scale∈\mathbb{R}^{M}$：量化缩放因子。
     - **计算过程**
       - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList))$。
-        - 分组逻辑与A8W8相同。
+        - 分组逻辑与A8W8相同
       - 2.生成辅助矩阵（weightAssistMatrix）的计算过程（请注意weightAssistMatrix部分计算为离线生成作为输入，并非算子内部完成）：
         - 当为per-channel量化（$w\_scale$为2维）：
 
@@ -137,9 +137,9 @@
 
           per-group：
 
-          $C\_high_{i} = \\ Σ_{k=0}^{K-1}((X\_high\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k *   num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
+          $C\_high_{i} = \\ Σ_{k=0}^{K-1}((X\_high\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k * num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
 
-          $C\_low_{i} = \\ Σ_{k=0}^{K-1}((X\_low\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k *   num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
+          $C\_low_{i} = \\ Σ_{k=0}^{K-1}((X\_low\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k * num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
 
         - 3.3.将高低位的矩阵乘结果还原为整体的结果
 
@@ -147,9 +147,9 @@
 
           $C_{i,act}, gate_{i} = split(C_{i})$
 
-          $S_{i}=Swish(C_{i,act})\odot gate_{i}$  &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
+          $S_{i}=Swish(C_{i,act})\odot gate_{i}$ &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-      - 3.量化输出结果
+      - 4.量化输出结果
 
         $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -254,8 +254,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
       <tr>
         <td>weightScale</td>
         <td rowspan="1">输入</td>
-        <td>右矩阵的量化因子，对应公式中的w_scale。</td>
-        <td>首轴长度需与weight的首轴维度相等，尾轴长度需要与weight还原为ND格式的尾轴相同。</td>
+        <td>右矩阵的缩放因子，对应公式中的w_scale。</td>
+        <td>首轴长度需与weight的首轴维度相等，尾轴长度需要与weight还原为ND格式的尾轴长度相同。</td>
         <td>FLOAT、FLOAT16、BFLOAT16</td>
         <td>ND</td>
         <td>2（per-channel）或3（per-group）</td>
@@ -317,7 +317,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
       <tr>
         <td>workspaceSize</td>
         <td rowspan="1">输出</td>
-        <td>返回用户需要在npu device侧申请的workspace大小。</td>
+        <td>返回用户需要在NPU Device侧申请的workspace大小。</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -431,14 +431,14 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
     - A8W8场景（`A`指激活矩阵（左矩阵），`W`指权重矩阵（右矩阵），`8`指数据类型为`INT8`）
         - 1.x的尾轴长度不能大于等于65536。
         - 2.N轴长度不能超过10240。
-        - 3.bias不参与计算。传入非空指针时接口返回成功，输出与传空指针相同。
+        - 3.bias不参与计算。传入非空指针时接口返回成功，输出与传入空指针相同。
     - A8W4场景（`A`指激活矩阵（左矩阵），`W`指权重矩阵（右矩阵），`4`指数据类型为`INT4`）
         - 1.x的尾轴长度不能大于等于20000。
         - 2.N轴长度不能超过10240。
   <!-- end id7 -->
   <!-- npu="950" id11 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-    - groupList为一维Tensor，长度等于专家数E，groupList第1维最大支持1024，即最多支持1024个group。
+    - groupList为一维Tensor，长度等于专家数E，groupList第1维最大支持1024，即最多支持1024个group
     - groupList必须为非负单调非递减数列（累计和），最后一个值不大于M。
   - A8W8 pertoken量化场景需满足以下约束条件：
     - 数据类型需要满足下表：

@@ -23,9 +23,9 @@
 
 ## 功能说明
 
-- **接口功能**：MoE的permute计算，根据索引indices将tokens和可选probs广播后排序并按照rangeOptional中范围切片。
+- **接口功能**：MoE的permute计算，根据索引indices将tokens和可选probs广播后排序并按照rangeOptional中的范围切片。
 - **计算公式**：
-  - paddedMode为`false`时，公式如下。topK表示每个token选择的专家数量。如果indices为2维，则topK等于indices最后一维的大小。如果indices为1维，则topK为1。下文参数表与约束说明中的topK_num即topK。
+  - paddedMode为`false`时，公式如下：topK表示每个token选择的专家数量。如果indices为2维，则topK等于indices最后一维的大小。如果indices为1维，则topK为1。下文参数表与约束说明中的topK_num即topK。
 
     $$
     sortedIndicesFirst=argSort(\text{flatten}(indices))
@@ -35,7 +35,7 @@
     sortedIndicesOut=argSort(sortedIndicesFirst)
     $$
 
-    当rangeOptional[0] <= sortedIndicesOut[i] < rangeOptional[1]时:
+    当rangeOptional[0] <= sortedIndicesOut[i] < rangeOptional[1]时：
 
     $$
     permuteTokensOut[sortedIndicesOut[i] - rangeOptional[0]]=tokens[i//topK]
@@ -182,7 +182,7 @@ aclnnStatus aclnnMoeTokenPermuteWithEp(
       <td>sortedIndicesOut（aclTensor*）</td>
       <td>输出</td>
       <td>permuteTokensOut和tokens的映射关系。</td>
-      <td><ul><li>要求是一个1D的Tensor，Shape为(num_tokens * topK_num)。</li></ul></td>
+      <td><ul><li>要求是一个1D的Tensor，shape为(num_tokens * topK_num)。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
@@ -224,7 +224,7 @@ aclnnStatus aclnnMoeTokenPermuteWithEp(
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-  一段接口完成入参校验，出现以下场景时报错：
+  第一段接口完成入参校验，出现以下场景时报错：
   <table style="undefined;table-layout: fixed; width: 1000px">
     <colgroup>
       <col style="width: 250px">

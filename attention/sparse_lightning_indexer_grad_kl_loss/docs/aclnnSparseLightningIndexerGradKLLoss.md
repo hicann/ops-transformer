@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：SparseLightningIndexerGradKLLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，存放在SparseIndices中，从而减少长序列场景下Attention的计算量，加速长序列网络的推理和训练。
+- 接口功能：SparseLightningIndexerGradKLLoss算子是LightningIndexer的反向算子，额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的内在联系最高的TopK个筛选出来，存放在SparseIndices中，从而减少长序列场景下Attention的计算量，加速长序列网络的推理和训练。
 
 - 计算公式：
    用于取Top-k的value的计算公式可以表示为：
@@ -40,7 +40,7 @@
    L(I){=}\sum_tD_{KL}(p_{t,:}||Softmax(I_{t,:}))
    $$
 
-   其中，$p$是target distribution，通过对main attention score进行所有的head的求和，然后把求和结果沿着上下文方向进行L1正则化得到。$D_{KL}$为KL散度，其表达式为：
+   其中，$p$是target distribution，通过对main attention score进行所有head的求和，然后把求和结果沿着上下文方向进行L1正则化得到。$D_{KL}$为KL散度，其表达式为：
 
    $$
    D_{KL}(a||b){=}\sum_ia_i\mathrm{log}{\left(\frac{a_i}{b_i}\right)}
@@ -476,7 +476,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
                 <td>361001</td>
-                <td>API内部调用npu runtime的接口异常。</td>
+                <td>API内部调用NPU Runtime的接口异常。</td>
             </tr>
         </tbody>
     </table>
@@ -530,7 +530,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
   - aclnnSparseLightningIndexerGradKLLoss默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 - 公共约束
     - 参数query、key、queryIndex、keyIndex的数据类型应保持一致。
-    - 参数weight不为float32时，参数query、key、queryIndex、keyIndex、weight的数据类型应保持一致。
+    - 参数weight不为FLOAT32时，参数query、key、queryIndex、keyIndex、weight的数据类型应保持一致。
     - 入参为空的场景处理：
         - query为空Tensor：直接返回。
         - 公共约束里入参为空的场景和FAG保持一致。

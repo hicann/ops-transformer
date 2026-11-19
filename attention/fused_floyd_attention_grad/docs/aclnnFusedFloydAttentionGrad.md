@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：训练场景下，计算Floyd注意力的反向输出，FloydAttn相较于传统FA主要是计算qk/pv注意力时会额外将seq作为batch轴从而转换为batchMatmul。
+- 接口功能：训练场景下，计算Floyd注意力的反向输出。FloydAttn与传统FA的主要区别在于：计算QK、PV注意力时会额外将seq作为batch轴，从而转换为batchMatmul计算。
 - 计算公式：
 
     已知注意力的正向计算公式为：
@@ -380,7 +380,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
 
 ## 约束说明
 
-- 该接口不支持确定性。
+- 该接口不支持确定性计算。
 - 该接口不支持非连续输出。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - 关于数据shape的约束，其中：

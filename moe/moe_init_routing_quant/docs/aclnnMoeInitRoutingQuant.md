@@ -95,7 +95,7 @@ aclnnStatus aclnnMoeInitRoutingQuant(
     <tr>
       <td>x</td>
       <td>输入</td>
-      <td>MOE的输入即token特征输入。</td>
+      <td>MoE的输入即token特征输入。</td>
       <td><ul><li>支持空tensor。</li><li>要求为一个2D的Tensor，shape为(NUM_ROWS, H)。</li></ul></td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
@@ -204,7 +204,7 @@ aclnnStatus aclnnMoeInitRoutingQuant(
     </tr>
   </tbody></table>
 
-- **返回值**
+- **返回值：**
 
   返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 

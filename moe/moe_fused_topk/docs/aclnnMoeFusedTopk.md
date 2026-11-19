@@ -26,7 +26,7 @@
 - 接口功能：MoE计算中，对输入x做Sigmoid计算，对计算结果分组进行排序，最后根据分组排序的结果选取前k个专家。
 - 计算公式：
 
-    对输入做sigmoid：
+    对输入做Sigmoid：
 
     $$
     sigmoidRes=sigmoid(x)
@@ -59,7 +59,7 @@
 
     > **说明**：未选中组的元素以0参与最终TopK，而不是被排除。因此当`addNum`使`normOut`为负时，未选中组的0可能排在被选中组的负值之前，从而被选入`indices`。
 
-    根据indices从sigmoidRes中选出y:
+    根据indices从sigmoidRes中选出y：
 
     $$
     y = gather(sigmoidRes, indices)
@@ -234,7 +234,7 @@ aclnnStatus aclnnMoeFusedTopk(
     <tr>
       <td>scale</td>
       <td>输入</td>
-      <td>归一化后的系数乘。</td>
+      <td>归一化后的乘系数。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -378,7 +378,7 @@ aclnnStatus aclnnMoeFusedTopk(
   </tbody>
   </table>
 
-- **返回值：**
+- **返回值**：
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 

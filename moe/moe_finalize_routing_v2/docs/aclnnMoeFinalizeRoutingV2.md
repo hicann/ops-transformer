@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **接口功能**：MoE(Mixture of Experts，专家混合)计算中，最后处理合并MoE FFN(Feed-Forward Network，前馈网络)的输出结果。
+- **接口功能**：MoE(Mixture of Experts，混合专家)计算中，最后处理合并MoE FFN(Feed-Forward Network，前馈网络)的输出结果。
 - **计算公式**：
 
   $$

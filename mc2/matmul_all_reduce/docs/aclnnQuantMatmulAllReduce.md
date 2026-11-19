@@ -343,7 +343,7 @@ aclnnStatus aclnnQuantMatmulAllReduce(
 <!-- npu="950,910b" id14 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <iostream>
     #include <vector>
     #include <thread>

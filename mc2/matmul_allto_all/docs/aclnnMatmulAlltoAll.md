@@ -370,7 +370,7 @@ aclnnStatus aclnnMatmulAlltoAll(
 <!-- npu="910b" id25 -->
 - <term>Atlas A2系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>
@@ -579,7 +579,7 @@ aclnnStatus aclnnMatmulAlltoAll(
 <!-- npu="950" id26 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

@@ -112,7 +112,7 @@ aclnnStatus aclnnQuantCompressorGetWorkspaceSize(
     aclOpExecutor   **executor)
 ```
 
-``` cpp
+```cpp
 aclnnStatus aclnnQuantCompressor(
   void          *workspace,
   uint64_t       workspaceSize,
@@ -279,7 +279,7 @@ aclnnStatus aclnnQuantCompressor(
     <tr>
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
-      <td>用于稀疏计算，表示数据压缩率。</td>
+      <td>用于稀疏计算，表示数据压缩比。</td>
       <td>取值范围为[2, 128]内的整数。</td>
       <td>INT64</td>
       <td>-</td>
@@ -507,7 +507,7 @@ aclnnStatus aclnnQuantCompressor(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 /**
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of

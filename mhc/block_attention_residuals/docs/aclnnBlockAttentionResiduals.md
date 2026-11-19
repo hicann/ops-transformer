@@ -67,17 +67,17 @@
 
   其中：
 
-  - $T$ 表示 token 数量，$N$ 表示 `blockRes` 的 block 数量，$H$ 表示 hidden size。
+  - $T$ 表示token数量，$N$ 表示 `blockRes` 的block数量，$H$ 表示 hidden size。
 
-  - $v_{t,i,h}$ 表示 `blockRes` 与 `partialBlock` 拼接后的 value，维度为 $(T,N+1,H)$。
+  - $v_{t,i,h}$ 表示 `blockRes` 与 `partialBlock` 拼接后的value，维度为 $(T,N+1,H)$。
   - $inv\_rms_{t,i}$ 表示前向逐行归一化系数。
   - $score\_weight_{h}$ 表示 `normWeight` 与 `projWeight` 逐元素相乘的结果。
-  - $probs_{t,i}$ 表示前向 softmax 输出概率。
+  - $probs_{t,i}$ 表示前向softmax输出概率。
   - $hidden\_states_{t,h}$ 表示前向加权融合输出。
 
 ## 函数原型
 
-每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnBlockAttentionResidualsGetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnBlockAttentionResiduals"接口执行计算。
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnBlockAttentionResidualsGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnBlockAttentionResiduals”接口执行计算。
 
 ```Cpp
 aclnnStatus aclnnBlockAttentionResidualsGetWorkspaceSize(
@@ -105,7 +105,7 @@ aclnnStatus aclnnBlockAttentionResiduals(
 
 ## aclnnBlockAttentionResidualsGetWorkspaceSize
 
-- **参数说明：**
+- **参数说明**
 
   <table style="undefined;table-layout: fixed; width: 1550px"><colgroup>
   <col style="width: 187px">
@@ -299,7 +299,7 @@ aclnnStatus aclnnBlockAttentionResiduals(
     <tr>
     <td> ACLNN_ERR_RUNTIME_ERROR </td>
     <td> 361001 </td>
-    <td>API内部调用npu runtime的接口异常。</td>
+    <td>API内部调用NPU Runtime的接口异常。</td>
     </tr>
   </tbody></table>
 

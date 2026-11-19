@@ -42,7 +42,7 @@
 
   当前支持的布局：
 
-  - qInputLayout: "TND" "BNSD"
+  - qInputLayout: "TND"、"BNSD"
   - kvInputLayout: "TND" "BNSD"
 
   qInputLayout与kvInputLayout必须相同：两者都为"TND"或都为"BNSD"，不支持混用布局。
