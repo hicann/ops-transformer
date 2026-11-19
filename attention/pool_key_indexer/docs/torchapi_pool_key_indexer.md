@@ -51,7 +51,10 @@
   3. 将其与权重系数`weights`（$W$）相乘后，沿g的方向聚合。
   4. 在pool空间选取前$Top\text{-}k / pool\_size$个pool索引，展开为$Top\text{-}k$个token索引。
   5. 追加尾部pool中未被完整pool_size覆盖的有效token（由`pool_tail_k`指定），无效位置填-1。
-- **输出布局（sparse_indices 每行，紧凑布局）**：`[0, expandTotal)` 为有效展开的 token 索引（expandTotal = min(有效池数, topk/pool_size)×pool_size），`[expandTotal, expandTotal+visibleTailK)` 为尾部追加 token（紧跟有效展开，无 -1 缝隙），其余无效位 -1 全部位于行尾。长序列（有效池数 ≥ topk/pool_size）时 expandTotal = topk，尾部 token 恰从偏移 topk 开始。
+- **输出布局（sparse_indices 每行）**：由`sparse_indices_mode`决定（expandTotal = min(有效池数, topk/pool_size)×pool_size，为有效展开的token数；visibleTailK为因果可见的尾部有效token数）：
+  - `sparse_indices_mode=0`（legacy布局，默认）：`[0, expandTotal)` 为有效展开的token索引，尾部追加token固定从偏移topk处写入，短序列时展开区与尾区之间为-1缝隙，与V1接口（aclnnPoolKeyIndexer）历史行为逐比特一致。
+  - `sparse_indices_mode=1`（compact布局）：`[0, expandTotal)` 为有效展开的token索引，`[expandTotal, expandTotal+visibleTailK)` 为尾部追加token（紧跟有效展开，无-1缝隙），其余无效位-1全部位于行尾。
+  - 两种布局下每行有效token集合与数量完全一致，仅位置布局不同；长序列（有效池数 ≥ topk/pool_size）时expandTotal = topk，尾部token恰从偏移topk开始，两种布局完全一致。
 - **计算公式**：
 
   $$
@@ -81,7 +84,8 @@ cann_ops_transformer.pool_key_indexer(
   pool_size=16,
   mask_mode=3,
   quant_mode=-1,
-  return_value=False
+  return_value=False,
+  sparse_indices_mode=0
 ) -> (Tensor, Tensor)
 ```
 
@@ -111,6 +115,7 @@ cann_ops_transformer.pool_key_indexer(
 | mask_mode    | int      | 可选      | 表示mask的模式，0表示No mask，3表示rightDownCausal模式，默认值为3。                                                          | int32             | -                                                                                                                          |
 | quant_mode   | int      | 可选      | 表示量化模式。-1表示不量化；0表示FP8 per-token-head量化（query/pool_key为float8_e4m3fn，q_descale/k_descale为float）；1表示mxFP8量化（query/pool_key为float8_e4m3fn，q_descale/k_descale为float8_e8m0且末尾追加[D/64, 2]维）；2表示int8量化（query/pool_key为INT8，weights与反量化系数q_descale/k_descale为FLOAT16）。默认值为-1。 | int32             | -                                                                                                                          |
 | return_value | bool     | 可选      | 表示是否需要返回Indices对应的Values值。False表示不返回，True表示返回值。默认值为False。                                      | bool              | -                                                                                                                          |
+| sparse_indices_mode | int      | 可选      | 表示索引输出布局模式（尾部token追加模式），控制sparse_indices中尾部token的写入位置。0表示legacy布局：尾部token固定从偏移topk处写入，短序列（有效池数小于topk/pool_size）时展开区与尾区之间存在-1缝隙，与V1接口（aclnnPoolKeyIndexer）历史行为逐比特一致；1表示compact布局：尾部token紧跟有效展开token写入，-1全部位于行尾，消除中间缝隙。两种布局下每行有效token集合与数量完全一致，仅位置布局不同。仅支持0或1，其他取值报错。默认值为0。 | int32             | -                                                                                                                          |
 
 ## 返回值说明
 
@@ -126,6 +131,7 @@ cann_ops_transformer.pool_key_indexer(
 - B（Batch）表示输入样本批量大小。
 - 参数query、pool_key的数据类型应保持一致。
 - topk需能被pool_size整除。
+- sparse_indices_mode仅支持0（legacy布局）或1（compact布局），其他取值报错；两种布局下每行有效token集合与数量完全一致，仅位置布局不同。
 - 纯尾块模式：某batch无任何完整池（池数0）时，其全部有效token经pool_tail_k（∈[1, pool_size-1]）表达，尾token按因果可见性写入输出（与有池批次的尾块通道同一公式），池选择为空、sparse_values全-inf；混合批次（部分batch 0池）同样支持。
 - pool_tail_k取值范围为[0, pool_size-1]。取值校验仅对CPU输入在host侧执行；NPU输入经aclnn Tensor变体直传device数据，host侧不做值校验（与TorchAir图模式一致），调用方须自行保证取值合法，否则kernel行为未定义。
 - pool_tail_k、actual_seq_q、actual_seq_k支持CPU或NPU输入：全部为CPU时走host取值链路（aclgraph捕获后值为图常量，修改需重新捕获）；任一为NPU时自动切换为device输入链路（无阻塞D2H，aclgraph捕获后修改buffer内容replay自动生效）。

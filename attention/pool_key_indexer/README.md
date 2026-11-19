@@ -58,6 +58,7 @@
 | return_value | 属性 | 表示是否输出sparse_values。True表示输出，False表示不输出（输出shape为(0,)的空tensor）。默认值为False。 | BOOL | - |
 | key_stride0 | 属性 | pool_key第0轴的stride（元素单位），用于layout_k为PA_BBND场景下0轴非连续pool_key的寻址。-1表示未指定，按连续输入由shape推导stride。默认值为-1。 | INT64 | - |
 | k_descale_stride0 | 属性 | k_descale第0轴的stride（元素单位），用于layout_k为PA_BBND场景下0轴非连续k_descale的寻址，仅量化场景有效。-1表示未指定，按连续输入由shape推导stride。默认值为-1。 | INT64 | - |
+| sparse_indices_mode | 属性 | 索引输出布局模式（尾部token追加模式），控制sparse_indices中尾部token的写入位置。0表示legacy布局：尾部token固定从偏移topk处写入，短序列时展开区与尾区之间为-1缝隙；1表示compact布局：尾部token紧跟有效展开token写入，-1全部位于行尾。两种布局下每行有效token集合与数量一致。仅通过aclnnPoolKeyIndexerV2接口暴露，默认值为0。 | INT64 | - |
 | sparse_indices | 输出 | 公式中的Indices输出，展开后的稀疏token索引，无效部分填-1。layout_q为BSND时，shape为[B, S1, topk + pool_size - 1]；layout_q为TND时，shape为[T1, topk + pool_size - 1]。 | INT32 | ND |
 | sparse_values | 输出 | 公式中的Indices对应的Values输出，即选中pool的分数值，无效部分填-inf。return_value为True时，layout_q为BSND时shape为[B, S1, topk // pool_size]，layout_q为TND时shape为[T1, topk // pool_size]；return_value为False时，shape为(0,)。| FLOAT | ND |
 
@@ -89,4 +90,5 @@
 | 调用方式 | 样例代码 | 说明 |
 |----------|----------|------|
 | aclnn接口 | [test_aclnn_pool_key_indexer](./examples/test_aclnn_pool_key_indexer.cpp) | 通过[aclnnPoolKeyIndexer](./docs/aclnnPoolKeyIndexer.md)接口方式调用算子。|
+| aclnn V2接口 | - | 通过[aclnnPoolKeyIndexerV2](./docs/aclnnPoolKeyIndexerV2.md)接口方式调用算子，新增sparse_indices_mode属性控制索引输出布局。|
 | PyTorch API | - | 通过[torchapi_pool_key_indexer](./docs/torchapi_pool_key_indexer.md)接口调用pool_key_indexer算子。|

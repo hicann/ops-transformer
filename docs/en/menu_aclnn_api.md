@@ -281,5 +281,6 @@
 - [aclnnDenseLightningIndexerKLLossGradMetadata](../../attention/dense_lightning_indexer_kl_loss_grad_metadata/docs/aclnnDenseLightningIndexerKLLossGradMetadata_en.md)
 - [aclnnKeyPool](../../attention/key_pool/docs/aclnnKeyPool_en.md)
 - [aclnnPoolKeyIndexer](../../attention/pool_key_indexer/docs/aclnnPoolKeyIndexer_en.md)
+- [aclnnPoolKeyIndexerV2](../../attention/pool_key_indexer/docs/aclnnPoolKeyIndexerV2_en.md)
 - [Compile and Run Samples](context/compile_and_run_sample.md)
 - [aclnn Return Codes](context/aclnn_return_code.md)

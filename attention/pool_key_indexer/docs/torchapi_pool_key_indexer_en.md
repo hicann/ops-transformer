@@ -51,7 +51,10 @@
   3. Multiply it by the weight coefficient `weights` ($W$) and aggregate along the g direction.
   4. Select the top $Top\text{-}k / pool\_size$ pool indices in the pool space, and expand them to $Top\text{-}k$ token indices.
   5. Append valid tokens from the tail pool that are not fully covered by `pool_size` (specified by `pool_tail_k`), and fill invalid positions with -1.
-- **Output layout (each row of sparse_indices, compact layout)**: `[0, expandTotal)` contains the valid expanded token indices (expandTotal = min(number of valid pools, topk/pool_size)×pool_size), `[expandTotal, expandTotal+visibleTailK)` contains the appended tail tokens (immediately following the valid expansion, without -1 gaps), and all remaining invalid positions -1 are located at the end of the row. For long sequences (number of valid pools >= topk/pool_size), expandTotal = topk, and the tail tokens start exactly at the offset topk.
+- **Output layout (each row of sparse_indices)**: Determined by `sparse_indices_mode` (expandTotal = min(number of valid pools, topk/pool_size)×pool_size, which is the number of valid expanded tokens; visibleTailK is the number of causally visible valid tail tokens):
+  - `sparse_indices_mode=0` (legacy layout, default): `[0, expandTotal)` contains the valid expanded token indices; the appended tail tokens are written starting from the fixed offset topk. For short sequences, a -1 gap exists between the expansion region and the tail region. This is bit-for-bit identical to the historical behavior of the V1 API (aclnnPoolKeyIndexer).
+  - `sparse_indices_mode=1` (compact layout): `[0, expandTotal)` contains the valid expanded token indices; `[expandTotal, expandTotal+visibleTailK)` contains the appended tail tokens (immediately following the valid expansion, without -1 gaps), and all remaining invalid positions -1 are located at the end of the row.
+  - The set and number of valid tokens in each row are completely identical in both layouts; only the position layout differs. For long sequences (number of valid pools >= topk/pool_size), expandTotal = topk, the tail tokens start exactly at the offset topk, and the two layouts are identical.
 - **Formula**:
 
   $$
@@ -80,7 +83,8 @@ cann_ops_transformer.pool_key_indexer(
   pool_size=16,
   mask_mode=3,
   quant_mode=-1,
-  return_value=False
+  return_value=False,
+  sparse_indices_mode=0
 ) -> (Tensor, Tensor)
 ```
 
@@ -110,6 +114,7 @@ cann_ops_transformer.pool_key_indexer(
 | mask_mode | int | Optional | Mask mode. 0 indicates No mask, 3 indicates rightDownCausal mode. Default value is 3. | int32 | - |
 | quant_mode | int | Optional | Quantization mode. -1 indicates no quantization; 0 indicates FP8 per-token-head quantization (query/pool_key are float8_e4m3fn, q_descale/k_descale are float); 1 indicates mxFP8 quantization (query/pool_key are float8_e4m3fn, q_descale/k_descale are float8_e8m0 with trailing [D/64, 2] dims); 2 indicates int8 quantization (query/pool_key are INT8, and weights and the dequantization coefficients q_descale/k_descale are FLOAT16). Default value is -1. | int32 | - |
 | return_value | bool | Optional | Whether to return the Values corresponding to Indices. False means no return, True means return values. Default value is False. | bool | - |
+| sparse_indices_mode | int | Optional | Index output layout mode (tail-token appending mode), which controls the write position of the tail tokens in sparse_indices. 0 indicates the legacy layout: tail tokens are written starting from the fixed offset topk. For short sequences (the number of valid pools is less than topk/pool_size), a -1 gap exists between the expansion region and the tail region, which is bit-for-bit identical to the historical behavior of the V1 API (aclnnPoolKeyIndexer). 1 indicates the compact layout: tail tokens are written immediately after the valid expanded tokens, all -1 values are located at the end of the row, and the gap is eliminated. The set and number of valid tokens in each row are completely identical in both layouts; only the position layout differs. Only 0 and 1 are supported; an error is reported for other values. Default value is 0. | int32 | - |
 
 ## Return Value Description
 
@@ -125,6 +130,7 @@ cann_ops_transformer.pool_key_indexer(
 - B (Batch) indicates the input sample batch size.
 - The data types of the query and pool_key parameters must be consistent.
 - topk must be divisible by pool_size.
+- sparse_indices_mode supports only 0 (legacy layout) or 1 (compact layout); an error is reported for other values. The set and number of valid tokens in each row are completely identical in both layouts; only the position layout differs.
 - Pure tail-block mode: when a batch has no complete pool (0 pools), all its valid tokens are expressed by pool_tail_k (∈[1, pool_size-1]), and the tail tokens are written to the output based on causal visibility (using the same formula as the tail-block channel of batches with pools); the pool selection is empty and sparse_values is all -inf. Mixed batches (some batches with 0 pools) are also supported.
 - The value range of pool_tail_k is [0, pool_size-1]. Value validation is performed on the host side only for CPU inputs. For NPU inputs passed via aclnn Tensor variant directly to device data, no value validation is performed on the host side (consistent with TorchAir graph mode). The caller must ensure the value is valid; otherwise, the kernel behavior is undefined.
 - pool_tail_k, actual_seq_q, and actual_seq_k support CPU or NPU inputs. When all are CPU inputs, the host value retrieval path is used (after aclgraph capture, values become graph constants; modification requires recapture). When any is an NPU input, the device input path is automatically used (non-blocking D2H; after aclgraph capture, modifying buffer content takes effect automatically during replay).
