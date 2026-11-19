@@ -90,7 +90,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>paddedMode</td>
       <td>Attribute</td>
-      <td>The default value is false, and it does not take effect currently.</td>
+      <td>Currently, only false is supported.</td>
       <td>BOOL</td>
       <td>-</td>
     </tr>

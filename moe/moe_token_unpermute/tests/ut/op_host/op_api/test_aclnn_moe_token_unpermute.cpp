@@ -95,7 +95,7 @@ TEST_F(l2_moe_token_unpermute_test, Ascend950_moe_token_unpermute_with_probs_fp1
 {
     auto permutedTokens = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto sortedIndices = TensorDesc({6}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2);
-    auto probsOptional = TensorDesc({6}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(0, 1);
+    auto probsOptional = TensorDesc({2, 3}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(0, 1);
     auto out = TensorDesc({2, 5}, ACL_FLOAT16, ACL_FORMAT_ND);
     bool paddedMode = false;
     std::vector<int64_t> restoreShape = {2, 5};

@@ -43,7 +43,7 @@ private:
 TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_fp16)
 {
     auto permuteTokens = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
-    auto unpermutedTokensGrad = TensorDesc({2, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
+    auto unpermutedTokensGrad = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto sortedIndices = TensorDesc({6}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2);
     auto permutedTokensGradOut = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND);
     auto probsGradOut = TensorDesc({6}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -64,7 +64,7 @@ TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_fp16
 TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_fp32)
 {
     auto permuteTokens = TensorDesc({6, 5}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
-    auto unpermutedTokensGrad = TensorDesc({2, 5}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
+    auto unpermutedTokensGrad = TensorDesc({6, 5}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto sortedIndices = TensorDesc({6}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2);
     auto permutedTokensGradOut = TensorDesc({6, 5}, ACL_FLOAT, ACL_FORMAT_ND);
     auto probsGradOut = TensorDesc({6}, ACL_FLOAT, ACL_FORMAT_ND);
@@ -85,7 +85,7 @@ TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_fp32
 TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_bf16)
 {
     auto permuteTokens = TensorDesc({6, 5}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-10, 10);
-    auto unpermutedTokensGrad = TensorDesc({2, 5}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-10, 10);
+    auto unpermutedTokensGrad = TensorDesc({6, 5}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto sortedIndices = TensorDesc({6}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2);
     auto permutedTokensGradOut = TensorDesc({6, 5}, ACL_BF16, ACL_FORMAT_ND);
     auto probsGradOut = TensorDesc({6}, ACL_BF16, ACL_FORMAT_ND);
@@ -108,9 +108,9 @@ TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_with
     auto permuteTokens = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto unpermutedTokensGrad = TensorDesc({2, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto sortedIndices = TensorDesc({6}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2);
-    auto probsOptional = TensorDesc({6}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(0, 1);
+    auto probsOptional = TensorDesc({2, 3}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(0, 1);
     auto permutedTokensGradOut = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto probsGradOut = TensorDesc({6}, ACL_FLOAT16, ACL_FORMAT_ND);
+    auto probsGradOut = TensorDesc({2, 3}, ACL_FLOAT16, ACL_FORMAT_ND);
     bool paddedMode = false;
     std::vector<int64_t> restoreShape = {2, 5};
     auto restoreShapeOptional = aclCreateIntArray(restoreShape.data(), restoreShape.size());
@@ -373,7 +373,7 @@ TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_dtyp
 TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_execute)
 {
     auto permuteTokens = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
-    auto unpermutedTokensGrad = TensorDesc({2, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
+    auto unpermutedTokensGrad = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto sortedIndices = TensorDesc({6}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2);
     auto permutedTokensGradOut = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND);
     auto probsGradOut = TensorDesc({6}, ACL_FLOAT16, ACL_FORMAT_ND);

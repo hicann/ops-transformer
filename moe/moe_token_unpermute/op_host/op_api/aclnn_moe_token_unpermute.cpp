@@ -42,6 +42,43 @@ static inline bool CheckNotNull(const aclTensor* permutedTokens, const aclTensor
     return true;
 }
 
+static bool CheckInputShape(const aclTensor* permutedTokens, const aclTensor* sortedIndices,
+                            const aclTensor* probsOptional)
+{
+    const auto tokensRank = permutedTokens->GetViewShape().GetDimNum();
+    OP_CHECK(tokensRank == 2,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("MoeTokenUnpermute", "permutedTokens", std::to_string(tokensRank),
+                                                      "Expected a 2D tensor"),
+             return false);
+    const auto& indicesShape = sortedIndices->GetViewShape();
+    const auto indicesRank = indicesShape.GetDimNum();
+    OP_CHECK(indicesRank == 1,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("MoeTokenUnpermute", "sortedIndices", std::to_string(indicesRank),
+                                                      "Expected a 1D tensor"),
+             return false);
+    if (probsOptional == nullptr) {
+        return true;
+    }
+
+    const auto& probsShape = probsOptional->GetViewShape();
+    const auto probsRank = probsShape.GetDimNum();
+    OP_CHECK(probsRank == 2,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("MoeTokenUnpermute", "probsOptional", std::to_string(probsRank),
+                                                      "Expected a 2D tensor"),
+             return false);
+    const int64_t indexCount = indicesShape.GetDim(0);
+    const int64_t rows = probsShape.GetDim(0);
+    const int64_t topK = probsShape.GetDim(1);
+    OP_CHECK(topK > 0 && indexCount % topK == 0 && indexCount / topK == rows,
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                 "MoeTokenUnpermute", "sortedIndices, probsOptional",
+                 "Expected sortedIndices length to equal R * K with positive K, but got length " +
+                     std::to_string(indexCount) + " and probsOptional shape [" + std::to_string(rows) + ", " +
+                     std::to_string(topK) + "]"),
+             return false);
+    return true;
+}
+
 static inline bool CheckDtypeValid(const aclTensor* permutedTokens, const aclTensor* sortedIndices,
                                    const aclTensor* probsOptional, const aclTensor* out)
 {
@@ -66,6 +103,7 @@ static aclnnStatus CheckParams(const aclTensor* permutedTokens, const aclTensor*
 {
     CHECK_RET(CheckNotNull(permutedTokens, sortedIndices, out), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(permutedTokens, sortedIndices, probsOptional, out), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckInputShape(permutedTokens, sortedIndices, probsOptional), ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
 

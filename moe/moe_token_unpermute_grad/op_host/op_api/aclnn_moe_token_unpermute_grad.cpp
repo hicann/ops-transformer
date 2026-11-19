@@ -77,6 +77,79 @@ static inline bool CheckDtypeValid(const aclTensor* unpermutedTokensGrad, const 
     return true;
 }
 
+static bool CheckPermuteTokensShape(const aclTensor* permuteTokens, int64_t indexCount, int64_t hiddenSize)
+{
+    const auto& tokensShape = permuteTokens->GetViewShape();
+    const auto tokensRank = tokensShape.GetDimNum();
+    OP_CHECK(tokensRank == 2,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("MoeTokenUnpermuteGrad", "permuteTokensOptional",
+                                                      std::to_string(tokensRank), "Expected a 2D tensor"),
+             return false);
+    OP_CHECK(tokensShape.GetDim(0) == indexCount && tokensShape.GetDim(1) == hiddenSize,
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                 "MoeTokenUnpermuteGrad", "permuteTokensOptional",
+                 "Expected shape [" + std::to_string(indexCount) + ", " + std::to_string(hiddenSize) +
+                     "] from sortedIndices length and unpermutedTokensGrad hidden_size, but got [" +
+                     std::to_string(tokensShape.GetDim(0)) + ", " + std::to_string(tokensShape.GetDim(1)) + "]"),
+             return false);
+    return true;
+}
+
+static bool CheckProbsShapeAndIndexCount(const aclTensor* probsOptional, int64_t rows, int64_t indexCount)
+{
+    int64_t topK = 1;
+    if (probsOptional != nullptr) {
+        const auto& probsShape = probsOptional->GetViewShape();
+        const auto probsRank = probsShape.GetDimNum();
+        OP_CHECK(probsRank == 2,
+                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("MoeTokenUnpermuteGrad", "probsOptional",
+                                                          std::to_string(probsRank), "Expected a 2D tensor"),
+                 return false);
+        OP_CHECK(probsShape.GetDim(0) == rows,
+                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                     "MoeTokenUnpermuteGrad", "probsOptional, unpermutedTokensGrad",
+                     "Expected the same number of rows, but got " + std::to_string(probsShape.GetDim(0)) + " and " +
+                         std::to_string(rows)),
+                 return false);
+        topK = probsShape.GetDim(1);
+    }
+    OP_CHECK(topK > 0 && indexCount % topK == 0 && indexCount / topK == rows,
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                 "MoeTokenUnpermuteGrad", "sortedIndices, unpermutedTokensGrad, probsOptional",
+                 "Expected sortedIndices length to equal tokens_num * topK with positive topK, but got length " +
+                     std::to_string(indexCount) + ", tokens_num " + std::to_string(rows) + ", and topK " +
+                     std::to_string(topK)),
+             return false);
+    return true;
+}
+
+static bool CheckInputShape(const aclTensor* unpermutedTokensGrad, const aclTensor* sortedIndices,
+                            const aclTensor* permuteTokens, const aclTensor* probsOptional)
+{
+    const auto& gradShape = unpermutedTokensGrad->GetViewShape();
+    const auto gradRank = gradShape.GetDimNum();
+    OP_CHECK(gradRank == 2,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("MoeTokenUnpermuteGrad", "unpermutedTokensGrad",
+                                                      std::to_string(gradRank), "Expected a 2D tensor"),
+             return false);
+    const int64_t rows = gradShape.GetDim(0);
+    const int64_t hiddenSize = gradShape.GetDim(1);
+    OP_CHECK(hiddenSize > 0,
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("MoeTokenUnpermuteGrad", "unpermutedTokensGrad",
+                                                      "hidden_size must be greater than 0"),
+             return false);
+
+    const auto& indicesShape = sortedIndices->GetViewShape();
+    const auto indicesRank = indicesShape.GetDimNum();
+    OP_CHECK(indicesRank == 1,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("MoeTokenUnpermuteGrad", "sortedIndices",
+                                                      std::to_string(indicesRank), "Expected a 1D tensor"),
+             return false);
+    const int64_t indexCount = indicesShape.GetDim(0);
+    return CheckPermuteTokensShape(permuteTokens, indexCount, hiddenSize) &&
+           CheckProbsShapeAndIndexCount(probsOptional, rows, indexCount);
+}
+
 static aclnnStatus CheckParams(const aclTensor* unpermutedTokensGrad, const aclTensor* sortedIndices,
                                const aclTensor* permuteTokens, const aclTensor* probsOptional,
                                const aclTensor* permutedTokensGradOut, const aclTensor* probsGradOut)
@@ -85,6 +158,8 @@ static aclnnStatus CheckParams(const aclTensor* unpermutedTokensGrad, const aclT
               ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(unpermutedTokensGrad, sortedIndices, permuteTokens, probsOptional, permutedTokensGradOut,
                               probsGradOut),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckInputShape(unpermutedTokensGrad, sortedIndices, permuteTokens, probsOptional),
               ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
