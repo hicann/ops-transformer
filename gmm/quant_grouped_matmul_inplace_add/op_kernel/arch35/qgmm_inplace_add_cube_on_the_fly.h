@@ -21,11 +21,26 @@
 #include "cgmct/block/block_scheduler_gmm_aswt_with_tail_split.h"
 #include "qgmm_inplace_add_utils.h"
 #include "quant_grouped_matmul_inplace_add_tiling_data.h"
+#include "qgmm_mx_ub_output_policy.h"
 
 using namespace Cgmct::Gemm;
 using namespace Cgmct::Gemm::Kernel;
 
-template <typename layoutA, typename layoutB>
+// Keep the original GM builder unchanged; only the MX mixed path
+// uses the existing split-M Fixpipe policy to deliver FP32 results to both AIVs.
+template <class BaseBuilder>
+struct QGmmMxUbBuilder : BaseBuilder {
+    static constexpr bool useUbAdd = true;
+    using GmMmadOp = typename BaseBuilder::BlockMmadOp;
+    using CMatmulType = MatmulType<AscendC::TPosition::VECIN, CubeFormat::ND_ALIGN, float>;
+    using BlockMmadOp =
+        Block::BlockMmad<QuantMatmulMultiBlock<>, typename BaseBuilder::L1TileShape, typename BaseBuilder::L0TileShape,
+                         typename BaseBuilder::AMatmulType, typename BaseBuilder::BMatmulType, CMatmulType,
+                         typename BaseBuilder::BiasMatmulType,
+                         Tile::TileCopy<Arch::DAV3510, Tile::CopyInAndCopyOutSplitMWithParams>>;
+};
+
+template <typename layoutA, typename layoutB, bool useUbAdd = false>
 __aicore__ inline void QGmmInplaceAddAswt(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale2, GM_ADDR groupList, GM_ADDR scale1,
                                           GM_ADDR y, GM_ADDR tiling)
 {
@@ -46,8 +61,9 @@ __aicore__ inline void QGmmInplaceAddAswt(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale2
     // 定义scheduler类型
     using BlockScheduler = GroupedMatmulAswtWithTailSplitScheduler;
     // 定义MMAD类型
-    using BlockMmad = Block::BlockQuantMatmulBuilder<AType, LayoutA, BType, LayoutB, CType, LayoutC, L1TileShape,
-                                                     L0TileShape, BlockScheduler, QuantMatmulMultiBlock<>>;
+    using GmBlockMmad = Block::BlockQuantMatmulBuilder<AType, LayoutA, BType, LayoutB, CType, LayoutC, L1TileShape,
+                                                       L0TileShape, BlockScheduler, QuantMatmulMultiBlock<>>;
+    using BlockMmad = AscendC::Std::conditional_t<useUbAdd, QGmmMxUbBuilder<GmBlockMmad>, GmBlockMmad>;
     // 定义BlockEpilogue类型
     using BlockEpilogue = Block::BlockEpilogueEmpty;
     // 定义shape的形状，tuple保存 m n k batch
@@ -68,7 +84,11 @@ __aicore__ inline void QGmmInplaceAddAswt(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale2
                      // gmm tiling data
                      gmmParams};
     QGmmKernel op;
-    op(params);
+    if constexpr (useUbAdd) {
+        op.template RunTwoPass<QGmmMxUbPolicy::GroupKPolicy>(params);
+    } else {
+        op(params);
+    }
 }
 
 #endif

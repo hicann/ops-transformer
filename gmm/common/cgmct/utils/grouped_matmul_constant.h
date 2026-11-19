@@ -38,6 +38,10 @@ constexpr uint32_t K0_B8 = 32;
 constexpr uint32_t GMM_k0_FLOAT16 = 16;
 constexpr uint16_t GMM_DATA_BLOCK = 32;
 
+// Shared by GMMIA host UB sizing and the kernel's split-M writeback.
+constexpr uint32_t GMMIA_UB_SPLIT_M_PARTS = 2;
+constexpr uint32_t GMMIA_OLD_Y_CHUNK_ROWS = 16;
+
 enum class QuantMode : uint32_t {
     DEFAULT = 0x0U,
     PERTENSOR_MODE = 0x1U,

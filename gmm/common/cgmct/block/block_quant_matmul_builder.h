@@ -61,6 +61,7 @@ public:
     using LayoutB = LayoutB_;
     using LayoutC = LayoutC_;
     using BlockMatmulPolicy = BlockMatmulPolicy_;
+    static constexpr bool useUbAdd = false;
 
     // transA and transB are deduced from LayoutA and LayoutB
     static constexpr bool transA = TagToTrans<LayoutA>::value;

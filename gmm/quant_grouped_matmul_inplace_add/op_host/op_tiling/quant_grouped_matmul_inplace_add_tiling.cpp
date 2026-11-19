@@ -18,7 +18,9 @@
 #include "quant_grouped_matmul_inplace_add_tiling.h"
 #include "quant_grouped_matmul_inplace_add_basic_api_tiling.h"
 #include "quant_grouped_matmul_inplace_add_tiling_utils.h"
+#include "../../../common/cgmct/utils/grouped_matmul_constant.h"
 #include "../../op_kernel/arch35/qgmm_inplace_add_tiling_key.h"
+#include "../../op_kernel/arch35/qgmm_mx_ub_output_policy.h"
 using namespace Ops::Transformer::OpTiling;
 using namespace QuantGroupedMatmulInplaceAdd;
 using namespace optiling::GmmConstant;
@@ -173,6 +175,21 @@ ge::graphStatus QuantGroupedInplaceAddTiling::DoLibApiTiling()
     if (supportMmadF16S8_ && inputParams_.aQuantMode == optiling::QuantMode::PERTENSOR_MODE) {
         basicTiling_.baseM = std::min(basicTiling_.baseM, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));
         basicTiling_.baseN = std::min(basicTiling_.baseN, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));
+    }
+    // Admit only the calibrated DAV3510 shape domain and complete output tiles.
+    // The kernel checks actual group K values; totalK / groupNum is not enough.
+    // Transposed-A L0C tails still require a different split-M source stride.
+    constexpr auto splitMParts = Cgmct::Gemm::GroupedMatmul::GMMIA_UB_SPLIT_M_PARTS;
+    constexpr auto oldYChunkRows = Cgmct::Gemm::GroupedMatmul::GMMIA_OLD_Y_CHUNK_ROWS;
+    const auto* compileInfo = context_->GetCompileInfo<GMMCompileInfo>();
+    const uint64_t deltaRows = (static_cast<uint64_t>(basicTiling_.baseM) + splitMParts - 1) / splitMParts;
+    const uint64_t mxUbBytes = (deltaRows + oldYChunkRows) * basicTiling_.baseN * sizeof(float);
+    if (IsMicroScaling() && QGmmMxUbPolicy::IsTotalKCandidate(inputParams_.kSize, inputParams_.groupNum) &&
+        compileInfo != nullptr && compileInfo->npuArch == NpuArch::DAV_3510 &&
+        QGmmMxUbPolicy::IsShapeCandidate(inputParams_.mSize, inputParams_.nSize, basicTiling_.baseM, basicTiling_.baseN,
+                                         inputParams_.groupNum, aicoreParams_.aicNum) &&
+        mxUbBytes <= aicoreParams_.ubSize) {
+        inputParams_.kernelType = static_cast<decltype(inputParams_.kernelType)>(QGMM_INPLACE_ADD_MX_UB_ADD);
     }
     OP_CHECK_IF(CalL1Tiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"),
                 return ge::GRAPH_FAILED);

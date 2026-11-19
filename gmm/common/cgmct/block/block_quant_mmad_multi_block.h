@@ -40,6 +40,7 @@ public:
     using BType = BType_;
     using CType = CType_;
     using BiasType = BiasType_;
+    using ScaleType = AscendC::fp8_e8m0_t;
     using TileCopy = AscendC::Std::conditional_t<AscendC::Std::is_same_v<TileCopy_, void>,
                                                  Tile::TileCopy<Arch::DAV2201, Tile::CopyWithParams>, TileCopy_>;
 
@@ -56,7 +57,16 @@ public:
     template <const auto& MM_CFG, typename Impl, typename InputAType, typename InputBType, typename OutputCType,
               typename InputBiasType>
     struct MatmulPolicyNew : public AscendC::Impl::Detail::MatmulWithScalePolicy<MM_CFG, Impl, InputAType, InputBType,
-                                                                                 OutputCType, InputBiasType> {};
+                                                                                 OutputCType, InputBiasType> {
+        template <class InputType, class OutputType, typename T = void>
+        using AdaptedCubeOut = typename TileCopy::template CopyCo1ToOut<InputType, OutputType>;
+        using CopyCubeOut = AscendC::Std::conditional_t<
+            PosIsUB<OutputCType::pos>(),
+            AscendC::Impl::Detail::CopyCubeOut<Impl, InputAType, InputBType, OutputCType, MM_CFG,
+                                               AscendC::McgShfMode::SINGLE_DST_MODE, void, AdaptedCubeOut>,
+            typename AscendC::Impl::Detail::MatmulWithScalePolicy<MM_CFG, Impl, InputAType, InputBType, OutputCType,
+                                                                  InputBiasType>::CopyCubeOut>;
+    };
     constexpr static MatmulShapeParams shapeParams =
         GetMatmulShapeParams<typename DispatchPolicy::SingleShape, L0Shape>();
     constexpr static MatmulConfig cfg = GetMMConfig<MatmulConfigMode::CONFIG_MDL>(
@@ -78,6 +88,10 @@ public:
     {
         matmul_.SetSingleShape(singleM, singleN, singleK);
     }
+    __aicore__ inline void SetUbOutputShape(int orgM, int orgN, int orgK, int outputStride)
+    {
+        matmul_.SetOrgShape(orgM, orgN, orgK, orgK, outputStride);
+    }
     __aicore__ inline void SetTensorA(const AscendC::GlobalTensor<typename AType::T>& gm, bool isTransposeA = false)
     {
         matmul_.SetTensorA(gm, isTransposeA);
@@ -86,12 +100,12 @@ public:
     {
         matmul_.SetTensorB(gm, isTransposeB);
     }
-    __aicore__ inline void SetTensorScaleA(const AscendC::GlobalTensor<AscendC::fp8_e8m0_t>& scaleAGlobal,
+    __aicore__ inline void SetTensorScaleA(const AscendC::GlobalTensor<ScaleType>& scaleAGlobal,
                                            bool isTransposeA = false)
     {
         matmul_.SetTensorScaleA(scaleAGlobal, isTransposeA);
     }
-    __aicore__ inline void SetTensorScaleB(const AscendC::GlobalTensor<AscendC::fp8_e8m0_t>& scaleBGlobal,
+    __aicore__ inline void SetTensorScaleB(const AscendC::GlobalTensor<ScaleType>& scaleBGlobal,
                                            bool isTransposeB = false)
     {
         matmul_.SetTensorScaleB(scaleBGlobal, isTransposeB);
@@ -118,8 +132,8 @@ public:
     }
     __aicore__ inline void operator()(const AscendC::GlobalTensor<typename AType::T>& aGlobal,
                                       const AscendC::GlobalTensor<typename BType::T>& bGlobal,
-                                      const AscendC::GlobalTensor<AscendC::fp8_e8m0_t>& scaleAGlobal,
-                                      const AscendC::GlobalTensor<AscendC::fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<ScaleType>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<ScaleType>& scaleBGlobal,
                                       const AscendC::GlobalTensor<typename CType::T>& cGlobal,
                                       const AscendC::Std::tuple<int32_t, int32_t, int32_t>& singleShape,
                                       bool isTransposeA = false, bool isTransposeB = false)
@@ -135,6 +149,23 @@ public:
     __aicore__ inline void End()
     {
         matmul_.End();
+    }
+
+    __aicore__ inline void operator()(const AscendC::GlobalTensor<typename AType::T>& aGlobal,
+                                      const AscendC::GlobalTensor<typename BType::T>& bGlobal,
+                                      const AscendC::GlobalTensor<ScaleType>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<ScaleType>& scaleBGlobal,
+                                      const AscendC::LocalTensor<typename CType::T>& cLocal,
+                                      const AscendC::Std::tuple<int32_t, int32_t, int32_t>& singleShape,
+                                      bool isTransposeA = false, bool isTransposeB = false)
+    {
+        matmul_.SetSingleShape(Get<0>(singleShape), Get<1>(singleShape), Get<2>(singleShape));
+        matmul_.SetTensorA(aGlobal, isTransposeA);
+        matmul_.SetTensorB(bGlobal, isTransposeB);
+        matmul_.SetTensorScaleA(scaleAGlobal, isTransposeA);
+        matmul_.SetTensorScaleB(scaleBGlobal, isTransposeB);
+        matmul_.Iterate();
+        matmul_.GetTensorC(cLocal);
     }
 
 private:

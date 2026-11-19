@@ -150,6 +150,9 @@ public:
     using BlockMatmulPolicy = BlockMatmulPolicy_;
     using TileCopyParam = TileCopyParam_;
 
+    // This Basic API adapter retains the existing GM AtomicAdd writeback.
+    static constexpr bool useUbAdd = false;
+
     static constexpr bool transA = TagToTrans<LayoutA>::value;
     static constexpr bool transB = TagToTrans<LayoutB>::value;
     static constexpr CubeFormat formatA = TagToFormat<LayoutA>::format;

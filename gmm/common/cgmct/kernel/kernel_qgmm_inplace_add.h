@@ -129,6 +129,79 @@ public:
     BlockOffset baseOffset_{0, 0, 0, 0, 0, 0};
     BlockOffset blockOffset_{0, 0, 0, 0, 0, 0};
     uint64_t preOffset_ = 0;
+    AscendC::LocalTensor<float> deltaUb_;
+    AscendC::LocalTensor<float> oldYUb_;
+    bool ubTilePending_ = false;
+    static constexpr uint8_t UB_SYNC_MODE = GroupedMatmul::GMM_AIC_SYNC_AIV_MODE;
+    static constexpr uint16_t UB_READY_FLAG = 4;
+    static constexpr uint16_t UB_FREE_FLAG = 6;
+    // On DAV3510, mode 4 maps AIV1's local flags [0, 15] to AIC flags [16, 31].
+    // Both AIVs use the same local IDs; only the AIC addresses the second bank.
+    static constexpr uint16_t UB_FLAG_OFFSET = GroupedMatmul::GMM_FLAG_ID_MAX;
+
+    __aicore__ inline void InitUbBuffers(int32_t baseM, int32_t baseN)
+    {
+        const uint32_t deltaElements = CeilDiv(baseM, GroupedMatmul::GMMIA_UB_SPLIT_M_PARTS) * baseN;
+        deltaUb_ = AscendC::LocalTensor<float>(AscendC::TPosition::VECIN, 0, deltaElements);
+        oldYUb_ = AscendC::LocalTensor<float>(AscendC::TPosition::VECIN, deltaElements * sizeof(float),
+                                              GroupedMatmul::GMMIA_OLD_Y_CHUNK_ROWS * baseN);
+    }
+
+    __aicore__ inline void WaitUbFree()
+    {
+        AscendC::CrossCoreWaitFlag<UB_SYNC_MODE, PIPE_FIX>(UB_FREE_FLAG);
+        AscendC::CrossCoreWaitFlag<UB_SYNC_MODE, PIPE_FIX>(UB_FREE_FLAG + UB_FLAG_OFFSET);
+    }
+
+    __aicore__ inline void AddFp32(__ubuf__ float* dst, __ubuf__ float* delta, uint32_t count)
+    {
+        constexpr uint32_t elementsPerReg = AscendC::VECTOR_REG_WIDTH / sizeof(float);
+        uint16_t loops = CeilDiv(count, elementsPerReg);
+        __VEC_SCOPE__
+        {
+            AscendC::Reg::RegTensor<float> yReg, deltaReg;
+            uint32_t remaining = count;
+            for (uint16_t i = 0; i < loops; ++i) {
+                auto mask = AscendC::Reg::UpdateMask<float>(remaining);
+                AscendC::Reg::LoadAlign(yReg, dst + i * elementsPerReg);
+                AscendC::Reg::LoadAlign(deltaReg, delta + i * elementsPerReg);
+                AscendC::Reg::Add(yReg, yReg, deltaReg, mask);
+                AscendC::Reg::StoreAlign(dst + i * elementsPerReg, yReg, mask);
+            }
+        }
+    }
+
+    __aicore__ inline void AddAndStoreUb(int64_t m, int64_t n, int64_t gmStride, int64_t offset)
+    {
+        // Split-M Fixpipe uses ceil(m / 2) rows for the first subblock.
+        int64_t halfM = CeilDiv(m, GroupedMatmul::GMMIA_UB_SPLIT_M_PARTS);
+        int64_t rowStart = AscendC::GetSubBlockIdx() * halfM;
+        int64_t rows = Min(halfM, m - rowStart);
+        constexpr int64_t fp32PerUbBlock = AscendC::ONE_BLK_SIZE / sizeof(float);
+        int64_t ubStride = CeilAlign(n, fp32PerUbBlock);
+        constexpr int64_t oldYChunkRows = GroupedMatmul::GMMIA_OLD_Y_CHUNK_ROWS;
+        for (int64_t row = 0; row < rows; row += oldYChunkRows) {
+            uint16_t chunkRows = Min(oldYChunkRows, rows - row);
+            AscendC::DataCopyExtParams load{chunkRows, static_cast<uint32_t>(n * sizeof(float)),
+                                            static_cast<uint32_t>((gmStride - n) * sizeof(float)), 0, 0};
+            AscendC::DataCopyPadExtParams<float> pad{false, 0, 0, 0};
+            int64_t gmOffset = offset + (rowStart + row) * gmStride;
+            AscendC::DataCopyPad(oldYUb_, cGlobal_[gmOffset], load, pad);
+            AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
+            AddFp32((__ubuf__ float*)oldYUb_.GetPhyAddr(), (__ubuf__ float*)deltaUb_.GetPhyAddr() + row * ubStride,
+                    chunkRows * ubStride);
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
+            AscendC::DataCopyExtParams store{chunkRows, static_cast<uint32_t>(n * sizeof(float)), 0,
+                                             static_cast<uint32_t>((gmStride - n) * sizeof(float)), 0};
+            AscendC::DataCopyPad(cGlobal_[gmOffset], oldYUb_, store);
+            // The first implementation deliberately drains each chunk before
+            // reusing its old-y buffer. Delta remains live until all chunks end.
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+        }
+    }
 
     struct GMMTiling {
         uint32_t groupNum;
@@ -242,7 +315,8 @@ public:
         groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(params.mmadParams.groupListGmAddr));
     }
 
-    __aicore__ inline void ProcessSingleGroup(const Params& params, BlockSchedulerOp& bs, BlockMmadOp& blockMmadOp)
+    template <bool useUb = BlockMmadBuilder::useUbAdd, class Mmad>
+    __aicore__ inline void ProcessSingleGroup(const Params& params, BlockSchedulerOp& bs, Mmad& blockMmadOp)
     {
         int64_t m = Get<M_VALUE>(problemShape_);
         int64_t n = Get<N_VALUE>(problemShape_);
@@ -251,7 +325,9 @@ public:
         // The matmul implementation uses it to clip tail loads in GM/L1 for
         // small groups whose dimensions are not block aligned.
         if constexpr (!isHiF4) {
-            blockMmadOp.SetOrgShape(m, n, k);
+            if ASCEND_IS_AIC {
+                blockMmadOp.SetOrgShape(m, n, k);
+            }
         }
         CoordClass coord(m, n, k, params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
         BlockCoord tileIdx;
@@ -269,28 +345,131 @@ public:
             }
             AscendC::Std::tuple<int32_t, int32_t, int32_t> mmSingleShape{Get<M_VALUE>(singleShape),
                                                                          Get<N_VALUE>(singleShape), k};
-            blockMmadOp(aGlobal_[Get<IDX_A_OFFSET>(blockOffset_)], bGlobal_[Get<IDX_B_OFFSET>(blockOffset_)],
-                        x1ScaleGlobal_[Get<IDX_X1SCALE_OFFSET>(blockOffset_)],
-                        x2ScaleGlobal_[Get<IDX_X2SCALE_OFFSET>(blockOffset_)],
-                        cGlobal_[Get<IDX_C_OFFSET>(blockOffset_)], mmSingleShape, transA, transB);
+            if constexpr (useUb) {
+                if ASCEND_IS_AIC {
+                    if (ubTilePending_) {
+                        WaitUbFree();
+                    }
+                    blockMmadOp.SetUbOutputShape(m, n, k, Get<N_VALUE>(singleShape));
+                    blockMmadOp(aGlobal_[Get<IDX_A_OFFSET>(blockOffset_)], bGlobal_[Get<IDX_B_OFFSET>(blockOffset_)],
+                                x1ScaleGlobal_[Get<IDX_X1SCALE_OFFSET>(blockOffset_)],
+                                x2ScaleGlobal_[Get<IDX_X2SCALE_OFFSET>(blockOffset_)], deltaUb_, mmSingleShape, transA,
+                                transB);
+                    AscendC::CrossCoreSetFlag<UB_SYNC_MODE, PIPE_FIX>(UB_READY_FLAG);
+                    AscendC::CrossCoreSetFlag<UB_SYNC_MODE, PIPE_FIX>(UB_READY_FLAG + UB_FLAG_OFFSET);
+                    ubTilePending_ = true;
+                }
+                if ASCEND_IS_AIV {
+                    AscendC::CrossCoreWaitFlag<UB_SYNC_MODE, PIPE_V>(UB_READY_FLAG);
+                    AddAndStoreUb(Get<M_VALUE>(singleShape), Get<N_VALUE>(singleShape), n,
+                                  Get<IDX_C_OFFSET>(blockOffset_));
+                    AscendC::CrossCoreSetFlag<UB_SYNC_MODE, PIPE_MTE3>(UB_FREE_FLAG);
+                }
+            } else {
+                blockMmadOp(aGlobal_[Get<IDX_A_OFFSET>(blockOffset_)], bGlobal_[Get<IDX_B_OFFSET>(blockOffset_)],
+                            x1ScaleGlobal_[Get<IDX_X1SCALE_OFFSET>(blockOffset_)],
+                            x2ScaleGlobal_[Get<IDX_X2SCALE_OFFSET>(blockOffset_)],
+                            cGlobal_[Get<IDX_C_OFFSET>(blockOffset_)], mmSingleShape, transA, transB);
+            }
         }
+    }
+
+    template <class GroupKPolicy>
+    __aicore__ inline void RunTwoPass(const Params& params)
+    {
+        InitUbBuffers(params.gmmParams.baseM, params.gmmParams.baseN);
+        BlockMmadOp ubMmad;
+        typename BlockMmadBuilder::GmMmadOp gmMmad;
+        auto* tiling = const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling);
+        auto* pipe = GetTPipePtr();
+        InitParamsAndTensor(params);
+        BlockSchedulerOp bs(params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
+        enum class WritebackPath : uint8_t {
+            UNINITIALIZED,
+            UB,
+            ATOMIC_GM
+        };
+        WritebackPath active = WritebackPath::UNINITIALIZED;
+        constexpr uint32_t writebackPassCount = 2; // UB first, then AtomicAdd.
+        const uint32_t groupNum = params.gmmParams.groupNum;
+        const uint32_t end = writebackPassCount * groupNum;
+        for (uint32_t i = 0; i < end; ++i) {
+            const bool ubPass = i < groupNum;
+            if (i == groupNum) {
+                // Replay the original address walk, retaining the tile scheduler state.
+                preOffset_ = 0;
+                baseOffset_ = BlockOffset{0, 0, 0, 0, 0, 0};
+                Get<K_VALUE>(problemShape_) = 0;
+            }
+            const uint32_t group = ubPass ? i : i - groupNum;
+            if (!UpdateGroupParams(params, group)) {
+                continue;
+            }
+            const int64_t k = Get<K_VALUE>(problemShape_);
+            const bool useUb = GroupKPolicy::UseUb(k);
+            if (useUb != ubPass) {
+                continue;
+            }
+            if ASCEND_IS_AIC {
+                const auto path = useUb ? WritebackPath::UB : WritebackPath::ATOMIC_GM;
+                if (active != path) {
+                    if (ubTilePending_) {
+                        WaitUbFree();
+                        ubTilePending_ = false;
+                    }
+                    if (active != WritebackPath::UNINITIALIZED) {
+                        AscendC::PipeBarrier<PIPE_ALL>();
+                        pipe->Reset();
+                    }
+                    if (useUb) {
+                        AscendC::SetAtomicNone();
+                        ubMmad.Init(tiling, pipe);
+                    } else {
+                        AscendC::SetAtomicAdd<float>();
+                        gmMmad.Init(tiling, pipe);
+                    }
+                    active = path;
+                }
+            }
+            bs.UpdateNextProblem(problemShape_);
+            if (useUb) {
+                ProcessSingleGroup<true>(params, bs, ubMmad);
+            } else if ASCEND_IS_AIC {
+                ProcessSingleGroup<false>(params, bs, gmMmad);
+            }
+        }
+        if ASCEND_IS_AIC {
+            if (ubTilePending_) {
+                WaitUbFree();
+            }
+        }
+        AscendC::SetAtomicNone();
     }
 
     __aicore__ inline void operator()(const Params& params)
     {
         if ASCEND_IS_AIV {
-            return;
+            if constexpr (!BlockMmadBuilder::useUbAdd) {
+                return;
+            }
         }
         // Get blockIdx
         int64_t curBlockIdx = AscendC::GetBlockIdx();
         int64_t blockNum = AscendC::GetBlockNum();
-        AscendC::SetAtomicAdd<float>(); // GMM res + yIn
+        if constexpr (BlockMmadBuilder::useUbAdd) {
+            AscendC::SetAtomicNone();
+            InitUbBuffers(params.gmmParams.baseM, params.gmmParams.baseN);
+        } else {
+            AscendC::SetAtomicAdd<float>(); // GMM res + yIn
+        }
         // Instantiate mmadOp
         BlockMmadOp blockMmadOp;
-        if constexpr (AscendC::Std::is_base_of_v<MatmulWithScale<>, typename BlockMmadBuilder::BlockMatmulPolicy>) {
-            blockMmadOp.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling));
-        } else {
-            blockMmadOp.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+        if ASCEND_IS_AIC {
+            if constexpr (AscendC::Std::is_base_of_v<MatmulWithScale<>, typename BlockMmadBuilder::BlockMatmulPolicy>) {
+                blockMmadOp.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling));
+            } else {
+                blockMmadOp.Init(const_cast<TCubeTiling* __restrict>(params.gmmParams.matmulTiling), GetTPipePtr());
+            }
         }
         InitParamsAndTensor(params);
         uint32_t groupNum = params.gmmParams.groupNum;
@@ -305,6 +484,13 @@ public:
             }
             bs.UpdateNextProblem(problemShape_);
             ProcessSingleGroup(params, bs, blockMmadOp);
+        }
+        if constexpr (BlockMmadBuilder::useUbAdd) {
+            if ASCEND_IS_AIC {
+                if (ubTilePending_) {
+                    WaitUbFree();
+                }
+            }
         }
         AscendC::SetAtomicNone();
     }
