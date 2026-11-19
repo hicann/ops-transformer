@@ -37,8 +37,8 @@ using namespace MoeDistributeV2Base;
 using namespace Mc2Kernel;
 using namespace Mc2Aclnn;
 #define A6MteCombineTypeClass \
-    typename ExpandXType, typename XType, typename ExpandIdxType, uint8_t QuantMode, bool HasAddRmsNorm, bool SupportRsw
-#define A6MteCombineTypeFunc ExpandXType, XType, ExpandIdxType, QuantMode, HasAddRmsNorm, SupportRsw
+    typename ExpandXType, typename XType, typename ExpandIdxType, uint8_t QuantMode, bool HasAddRmsNorm
+#define A6MteCombineTypeFunc ExpandXType, XType, ExpandIdxType, QuantMode, HasAddRmsNorm
 
 constexpr uint32_t SPLIT_BLOCK_SIZE = 512U;
 constexpr uint32_t SPLIT_BLOCK_DATA_SIZE = 480U;
@@ -279,9 +279,9 @@ private:
     uint32_t expectedSlotBytes_{0};  // = commDataBytes_, 仅rsw协议有效
     RemoteDataCopyParams paraRsw4k_; // rsw远端写: 首包4K对齐
     RemoteDataCopyParams paraRsw_;   // rsw本卡写: 普通写
-    bool isRSW_ = false; // 是否实际启用rsw协议: 平台支持(模板参数SupportRsw) 且 tilingdata.rswBufferSize!=0
-    uint32_t rswQuantBufStride_{0}; // rsw协议: 量化结果buffer单份步长(仅量化模式, 32B对齐)
-    uint32_t rswPrevToRankId_{0};   // rsw协议: 多buffer流水延迟一轮直发, 记录上一token目的rank
+    bool isRSW_ = false;             // 是否实际启用rsw协议: tilingdata.rswBufferSize != 0
+    uint32_t rswQuantBufStride_{0};  // rsw协议: 量化结果buffer单份步长(仅量化模式, 32B对齐)
+    uint32_t rswPrevToRankId_{0};    // rsw协议: 多buffer流水延迟一轮直发, 记录上一token目的rank
     uint32_t scaleNumAlignSize_{0};
     uint32_t flagRcvCount_{0};
     uint32_t axisBsAlignSize_{0};
@@ -569,11 +569,6 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::InitAt
 template <A6MteCombineTypeClass>
 __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::RswInit()
 {
-    if constexpr (!SupportRsw) {
-        // 平台不支持rsw协议: 编译期剪裁掉后续rsw初始化
-        hAlignWinSize_ = blockCntPerToken_ * SPLIT_BLOCK_SIZE;
-        return;
-    }
     if (rswBufferSize_ == 0U) {
         // 平台支持rsw协议, 但tiling判定窗口不足已回退: 仍走旧协议槽位步长
         hAlignWinSize_ = blockCntPerToken_ * SPLIT_BLOCK_SIZE;
@@ -739,20 +734,18 @@ template <A6MteCombineTypeClass>
 __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::CalDispatchBufBytes(
     uint32_t& expandXInSize, uint32_t& perDispatchBufBytes)
 {
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            // rsw协议: 无打包队列, 输入与量化结果buffer按流水份数分配; 挡位值(≥16KB)不进UB预算
-            if constexpr (QuantMode == UNQUANT) {
-                expandXInSize = hExpandXAlign32Size_;
-                hExpandXAlignSize_ = expandXInSize;
-                perDispatchBufBytes = expandXInSize + SLOT_COUNT_BLK_SIZE;
-            } else {
-                // 直发按commDataBytes_精确发送, 量化结果无需覆盖480B打包补齐
-                rswQuantBufStride_ = Ceil(commDataBytes_, UB_ALIGN) * UB_ALIGN;
-                perDispatchBufBytes = expandXInSize + rswQuantBufStride_ + SLOT_COUNT_BLK_SIZE;
-            }
-            return;
+    if (isRSW_) {
+        // rsw协议: 无打包队列, 输入与量化结果buffer按流水份数分配; 挡位值(≥16KB)不进UB预算
+        if constexpr (QuantMode == UNQUANT) {
+            expandXInSize = hExpandXAlign32Size_;
+            hExpandXAlignSize_ = expandXInSize;
+            perDispatchBufBytes = expandXInSize + SLOT_COUNT_BLK_SIZE;
+        } else {
+            // 直发按commDataBytes_精确发送, 量化结果无需覆盖480B打包补齐
+            rswQuantBufStride_ = Ceil(commDataBytes_, UB_ALIGN) * UB_ALIGN;
+            perDispatchBufBytes = expandXInSize + rswQuantBufStride_ + SLOT_COUNT_BLK_SIZE;
         }
+        return;
     }
 
     // 旧协议默认值
@@ -774,11 +767,7 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Dispat
     uint32_t perDispatchBufBytes = 0U;
     CalDispatchBufBytes(expandXInSize, perDispatchBufBytes);
     // 旧协议的一次性量化结果buffer: 必须落在下方 calBeginBuf_~calEndBuf_ 的UB预算统计窗口内
-    if constexpr (SupportRsw) {
-        if (!isRSW_) {
-            InitLegacyQuantResultBuf();
-        }
-    } else {
+    if (!isRSW_) {
         InitLegacyQuantResultBuf();
     }
 
@@ -814,11 +803,9 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Dispat
     if (dispatchBufferNum_ > 8U) {
         dispatchBufferNum_ = 8U;
     }
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            DispatchBufferRswInit(expandXInSize);
-            return;
-        }
+    if (isRSW_) {
+        DispatchBufferRswInit(expandXInSize);
+        return;
     }
     tpipe_->InitBuffer(expandXInBuf_, dispatchBufferNum_ * expandXInSize);
     tpipe_->InitBuffer(xOutPackageBuf_, dispatchBufferNum_ * hAlignWinSize_);
@@ -853,12 +840,10 @@ __aicore__ inline uint32_t MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Ca
     const uint32_t flagBytes =
         Ceil(maxSlotCount * blockCntPerToken_ * SPLIT_BLOCK_FLAG_SIZE, ALIGNED_LEN) * ALIGNED_LEN;
     moeQueueBytes = moeQueueBytes > flagBytes ? moeQueueBytes : flagBytes;
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            // rsw协议: 接收数据连续于rsw_buffer头部, 无480/512交错打包
-            moeQueueBytes = Ceil(commDataBytes_, UB_ALIGN) * UB_ALIGN;
-            moeQueueBytes = (moeQueueBytes > hExpandXAlign32Size_) ? moeQueueBytes : hExpandXAlign32Size_;
-        }
+    if (isRSW_) {
+        // rsw协议: 接收数据连续于rsw_buffer头部, 无480/512交错打包
+        moeQueueBytes = Ceil(commDataBytes_, UB_ALIGN) * UB_ALIGN;
+        moeQueueBytes = (moeQueueBytes > hExpandXAlign32Size_) ? moeQueueBytes : hExpandXAlign32Size_;
     }
     return moeQueueBytes;
 }
@@ -868,11 +853,9 @@ __aicore__ inline uint32_t MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Ca
 {
     // 旧协议默认值
     uint32_t clearFlagCount = flagRcvCount_ * blockCntPerToken_ * SPLIT_BLOCK_FLAG_COUNT;
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            // rsw协议: 清整个128B尾区
-            clearFlagCount = flagRcvCount_ * (SLOT_TRAILER_SIZE / sizeof(float));
-        }
+    if (isRSW_) {
+        // rsw协议: 清整个128B尾区
+        clearFlagCount = flagRcvCount_ * (SLOT_TRAILER_SIZE / sizeof(float));
     }
     return clearFlagCount;
 }
@@ -895,12 +878,12 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::AlltoA
     // InitBuffer需要在tiling中计算ub总量
     tpipe_->InitBuffer(tokenBuf_, maxSizeTokenBuf);             // 16K 用于搬入输入token
     tpipe_->InitBuffer(rowTmpFloatBuf_, maxSizeRowTmpFloatBuf); // 32K 用于存储cast之后的fp32 token数据
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            // rsw: count 到达检测专用 buffer
-            tpipe_->InitBuffer(countBuf_, flagRcvCount_ * SLOT_COUNT_BLK_SIZE);
-        }
+
+    if (isRSW_) {
+        // rsw: count 到达检测专用 buffer
+        tpipe_->InitBuffer(countBuf_, flagRcvCount_ * SLOT_COUNT_BLK_SIZE);
     }
+
     tpipe_->InitBuffer(mulBuf_, mulBufSize); // 32K buffer复用， 最大用于存储Brcb之后的token，需要256对齐
     tpipe_->InitBuffer(sumFloatBuf_, hFloatAlign32Size_ * bufferNum_); // 单buf按序处理，双buf交错处理
 
@@ -1338,26 +1321,24 @@ template <A6MteCombineTypeClass>
 __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::ExpertAlltoAllDispatchRswCopyAdd(
     uint32_t toRankId, GM_ADDR rankGM, uint32_t tkIndex, uint32_t bufferIndex)
 {
-    if constexpr (SupportRsw) {
-        // rsw协议: 按token大小RemoteDataCopy直发(enableRSW硬件维护计数), 原打包路径不执行
-        if (dispatchBufferNum_ == 1U) {
-            // 只有一份输入buffer时，必须完成当前token处理后才能搬入下一份
-            ExpertAlltoAllDispatchRswCopyExpandX(tkIndex, bufferIndex);
-            ExpertAlltoAllDispatchRswQuantSend(bufferIndex, toRankId, rankGM);
-            dispatchTokenCount_++;
-            return;
-        }
-        // 提前搬入当前token，再量化直发前一个token，使搬入与计算有机会重叠
+    // rsw协议: 按token大小RemoteDataCopy直发(enableRSW硬件维护计数), 原打包路径不执行
+    if (dispatchBufferNum_ == 1U) {
+        // 只有一份输入buffer时，必须完成当前token处理后才能搬入下一份
         ExpertAlltoAllDispatchRswCopyExpandX(tkIndex, bufferIndex);
-        if (dispatchTokenCount_ > 0U) {
-            uint32_t computeBufferIndex = (dispatchTokenCount_ - 1U) % dispatchBufferNum_;
-            ExpertAlltoAllDispatchRswQuantSend(computeBufferIndex, rswPrevToRankId_, rankGM_);
-        }
-        // 前一个token直发下发后再更新地址与目的rank，供下一轮或收尾发送当前token使用
-        rswPrevToRankId_ = toRankId;
-        rankGM_ = rankGM;
+        ExpertAlltoAllDispatchRswQuantSend(bufferIndex, toRankId, rankGM);
         dispatchTokenCount_++;
+        return;
     }
+    // 提前搬入当前token，再量化直发前一个token，使搬入与计算有机会重叠
+    ExpertAlltoAllDispatchRswCopyExpandX(tkIndex, bufferIndex);
+    if (dispatchTokenCount_ > 0U) {
+        uint32_t computeBufferIndex = (dispatchTokenCount_ - 1U) % dispatchBufferNum_;
+        ExpertAlltoAllDispatchRswQuantSend(computeBufferIndex, rswPrevToRankId_, rankGM_);
+    }
+    // 前一个token直发下发后再更新地址与目的rank，供下一轮或收尾发送当前token使用
+    rswPrevToRankId_ = toRankId;
+    rankGM_ = rankGM;
+    dispatchTokenCount_++;
 }
 
 template <A6MteCombineTypeClass>
@@ -1367,11 +1348,9 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Expert
     uint32_t bufferIndex = dispatchTokenCount_ % dispatchBufferNum_;
     uint32_t epOffset = tokenId * (axisK_ + sharedExpertNum_) + topkId;
     GM_ADDR rankGM = GetWinAddrByRankId(toRankId, EP_DOMAIN) + static_cast<uint64_t>(epOffset) * hAlignWinSize_;
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            ExpertAlltoAllDispatchRswCopyAdd(toRankId, rankGM, tkIndex, bufferIndex);
-            return;
-        }
+    if (isRSW_) {
+        ExpertAlltoAllDispatchRswCopyAdd(toRankId, rankGM, tkIndex, bufferIndex);
+        return;
     }
     if (dispatchBufferNum_ == 1U) {
         // 只有一份输入buffer时，必须完成当前token处理后才能搬入下一份
@@ -1417,11 +1396,9 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Expert
 template <A6MteCombineTypeClass>
 __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::ExpertAlltoAllDispatchFinishSend()
 {
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            ExpertAlltoAllDispatchRswFinishSend();
-            return;
-        }
+    if (isRSW_) {
+        ExpertAlltoAllDispatchRswFinishSend();
+        return;
     }
     // 多buffer流水最后一份输入尚未处理，单buffer路径已在循环内完成发送
     if ((dispatchTokenCount_ > 0U) && (dispatchBufferNum_ > 1U)) {
@@ -1576,11 +1553,9 @@ template <A6MteCombineTypeClass>
 __aicore__ inline uint32_t MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::CheckTokenArrive(GM_ADDR wAddr,
                                                                                                uint32_t slotCount)
 {
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            // rsw协议: 按槽位尾区计数判断到达
-            return CheckSlotArriveByCount(wAddr, slotCount);
-        }
+    if (isRSW_) {
+        // rsw协议: 按槽位尾区计数判断到达
+        return CheckSlotArriveByCount(wAddr, slotCount);
     }
     return CheckPackedTokenArrive(wAddr, slotCount);
 }
@@ -1811,15 +1786,9 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Proces
     GM_ADDR wAddr = (__gm__ uint8_t*)(epWindowGM_) + (tokenIndexOffset + topkId) * hAlignWinSize_;
     rowTmpGlobal_.SetGlobalBuffer((__gm__ XType*)wAddr);
     LocalTensor<XType> tmpUb = moeMainSumQueue_.AllocTensor<XType>();
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            const DataCopyExtParams rswDataCopyParams{1U, commDataBytes_, 0U, 0U, 0U};
-            DataCopyPad(tmpUb, rowTmpGlobal_, rswDataCopyParams, copyPadExtParams); // rsw协议: 数据连续于rsw_buffer头部
-        } else if constexpr (QuantMode > UNQUANT) {
-            DataCopyPad(tmpUb, rowTmpGlobal_, xScaleCopyParams, copyPadExtParams);
-        } else {
-            DataCopyPad(tmpUb, rowTmpGlobal_, expandXCopyParams, copyPadExtParams);
-        }
+    if (isRSW_) {
+        const DataCopyExtParams rswDataCopyParams{1U, commDataBytes_, 0U, 0U, 0U};
+        DataCopyPad(tmpUb, rowTmpGlobal_, rswDataCopyParams, copyPadExtParams); // rsw协议: 数据连续于rsw_buffer头部
     } else if constexpr (QuantMode > UNQUANT) {
         DataCopyPad(tmpUb, rowTmpGlobal_, xScaleCopyParams, copyPadExtParams);
     } else {
@@ -2006,15 +1975,9 @@ __aicore__ inline bool MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Proces
         rowTmpGlobal_.SetGlobalBuffer((__gm__ XType*)wAddr);
         tmpUb = moeMainSumQueue_.AllocTensor<XType>();
 
-        if constexpr (SupportRsw) {
-            if (isRSW_) {
-                DataCopyPad(tmpUb, rowTmpGlobal_, rswDataCopyParams,
-                            copyPadExtParams); // rsw协议: 数据连续于rsw_buffer头部
-            } else if constexpr (QuantMode > UNQUANT) {
-                DataCopyPad(tmpUb, rowTmpGlobal_, xScaleCopyParams, copyPadExtParams);
-            } else {
-                DataCopyPad(tmpUb, rowTmpGlobal_, expandXCopyParams, copyPadExtParams);
-            }
+        if (isRSW_) {
+            DataCopyPad(tmpUb, rowTmpGlobal_, rswDataCopyParams,
+                        copyPadExtParams); // rsw协议: 数据连续于rsw_buffer头部
         } else if constexpr (QuantMode > UNQUANT) {
             DataCopyPad(tmpUb, rowTmpGlobal_, xScaleCopyParams, copyPadExtParams);
         } else {
@@ -2104,11 +2067,9 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::LocalW
     LocalTensor<float> flagTensor = packedClearFlagBuf_.Get<float>();
     // 旧协议默认值
     uint32_t clearDupCount = flagRcvCount_ * blockCntPerToken_ * SPLIT_BLOCK_FLAG_COUNT;
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            // rsw协议: 预填整个128B尾区大小的清零值
-            clearDupCount = flagRcvCount_ * (SLOT_TRAILER_SIZE / sizeof(float));
-        }
+    if (isRSW_) {
+        // rsw协议: 预填整个128B尾区大小的清零值
+        clearDupCount = flagRcvCount_ * (SLOT_TRAILER_SIZE / sizeof(float));
     }
     Duplicate<float>(flagTensor, float(0), clearDupCount);
     SyncFunc<AscendC::HardEvent::V_S>();
@@ -2189,12 +2150,8 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Proces
     SyncFunc<AscendC::HardEvent::S_MTE3>();
     DataCopyPad(selfDataStatusGMTensor_[1], dataStateLocalTensor_, dataStateParams);
     SetFlag<AscendC::HardEvent::MTE3_S>(progressCopyEvent_);
-    if constexpr (SupportRsw) {
-        if (isRSW_) {
-            ClearSlotTrailer(tokenIndex);
-        } else {
-            ClearPackedTokenFlags(tokenIndex);
-        }
+    if (isRSW_) {
+        ClearSlotTrailer(tokenIndex);
     } else {
         ClearPackedTokenFlags(tokenIndex);
     }

@@ -48,7 +48,7 @@ __global__ __aicore__ void moe_distribute_combine_v2(GM_ADDR expandX, GM_ADDR ex
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
     if constexpr ((ArchTag == TILINGKEY_TPL_A6) && (LayeredMode == TILINGKEY_TPL_MTE)) {
         GM_ADDR contextGM0 = (GM_ADDR)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-        MoeDistributeCombineV2A6Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode, false, true> op;
+        MoeDistributeCombineV2A6Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode, false> op;
         op.Init(contextGM0, expandX, expertIds, assistInfoForCombine, epSendCount, nullptr, nullptr, scales,
                 xActiveMask, sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV,
                 performanceInfo, nullptr, nullptr, XOut, workspaceGM, &pipe, &combineV2Info);

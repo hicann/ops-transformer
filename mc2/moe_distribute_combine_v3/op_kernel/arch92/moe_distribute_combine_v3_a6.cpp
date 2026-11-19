@@ -45,7 +45,7 @@ __global__ __aicore__ void moe_distribute_combine_v3(GM_ADDR mc2Context, GM_ADDR
 
 #if (ORIG_DTYPE_EXPAND_X == DT_BF16 || ORIG_DTYPE_EXPAND_X == DT_FLOAT16)
     if constexpr ((ArchTag == TILINGKEY_TPL_A6) && (LayeredMode == TILINGKEY_TPL_MTE)) {
-        MoeDistributeCombineV2A6Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode, false, true> op;
+        MoeDistributeCombineV2A6Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode, false> op;
         op.Init(mc2Context, expandX, expertIds, assistInfoForCombine, epSendCount, nullptr, nullptr, scales,
                 xActiveMask, sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV,
                 performanceInfo, nullptr, nullptr, XOut, workspaceGM, &pipe, &combineV2Info);
