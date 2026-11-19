@@ -161,8 +161,13 @@ __aicore__ inline void KernelMoeTokenUnpermuteWithEp<T1, T2, T3, PROBS, ISTOKEN>
         out_block_offset = out_block_offset * this->top_k;
     }
 
-    this->outGM.SetGlobalBuffer((__gm__ T1*)unpermuted_tokens + out_block_offset,
-                                this->tokens_core_length * this->hidden_size);
+    // probs 分支（ISTOKEN=false）每个 token 写 top_k 个元素，缓冲区跨度须按 top_k 计；
+    // hidden_size 在该模板实例下恒为 1，仅乘以 hidden_size 会低估 probs_grad 的写入跨度。
+    int64_t out_block_length = this->tokens_core_length * this->hidden_size;
+    if constexpr (!ISTOKEN) {
+        out_block_length = this->tokens_core_length * this->top_k;
+    }
+    this->outGM.SetGlobalBuffer((__gm__ T1*)unpermuted_tokens + out_block_offset, out_block_length);
     if constexpr (ISTOKEN) {
         this->pipe->InitBuffer(tokens_inque, tiling_data->buffer_num, hidden_splited_length_align512 * sizeof(T1));
     } else {

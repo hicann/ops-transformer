@@ -254,7 +254,7 @@ aclnnStatus aclnnMoeTokenPermuteWithEpGrad(
           <tr>
           <td> ACLNN_ERR_PARAM_INVALID </td>
           <td> 161002 </td>
-          <td>The data type or data format of the input or output is not within the supported range.</td>
+          <td>The data type or data format of the input or output is not within the supported range, or the shape of a parameter does not meet the constraint.</td>
           </tr>
       </tbody>
   </table>
@@ -307,7 +307,9 @@ aclnnStatus aclnnMoeTokenPermuteWithEpGrad(
 - deterministic computation:
   - aclnnMoeTokenPermuteWithEpGrad defaults to a deterministic implementation.
 
-- numTopk <= 512.
+- 1 <= numTopk <= 512.
+- The data types of permutedTokensOutputGrad, permutedProbsOutputGradOptional, tokenGradOut, and probsGradOut must be the same, being one of BFLOAT16, FLOAT16, or FLOAT32.
+- The values of sortedIndices represent global permuted positions, ranging from [0, num_tokens * numTopk); only elements with rangeOptional[0] <= value < rangeOptional[1] participate in the computation.
 - paddedMode being `True` is not supported.
 - If rangeOptional is empty, permutedProbsOutputGradOptional and probsGradOut are ignored, and the execution logic falls back to [aclnnMoeTokenPermuteGrad](../../moe_token_permute_grad/docs/aclnnMoeTokenPermuteGrad_en.md).
 

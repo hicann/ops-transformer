@@ -138,7 +138,9 @@ Computation formula:
 
 ## Constraints
 
- - numTopk <= 512.
+ - 1 <= numTopk <= 512.
+ - The data types of permutedTokensOutputGrad, permutedProbsOutputGradOptional, tokenGradOut, and probsGradOut must be the same, being one of BFLOAT16, FLOAT16, or FLOAT32.
+ - The values of sortedIndices represent global permuted positions, ranging from [0, num_tokens * numTopk).
  - paddedMode set to `True` is not supported.
  - When rangeOptional is empty, permutedProbsOutputGradOptional and probsGradOut are ignored, and the execution logic falls back to [aclnnMoeTokenPermuteGrad](../moe_token_permute_grad/docs/aclnnMoeTokenPermuteGrad_en.md).
 

@@ -253,7 +253,7 @@ aclnnStatus aclnnMoeTokenPermuteWithEpGrad(
           <tr>
           <td> ACLNN_ERR_PARAM_INVALID </td>
           <td> 161002 </td>
-          <td>输入和输出的数据类型和数据格式不在支持的范围之内。</td>
+          <td>输入和输出的数据类型和数据格式不在支持的范围之内，或参数 shape 不满足约束。</td>
           </tr>
       </tbody>
   </table>
@@ -306,7 +306,9 @@ aclnnStatus aclnnMoeTokenPermuteWithEpGrad(
 - 确定性计算：
   - aclnnMoeTokenPermuteWithEpGrad默认确定性实现。
 
-- numTopk <= 512。
+- 1 <= numTopk <= 512。
+- permutedTokensOutputGrad、permutedProbsOutputGradOptional、tokenGradOut、probsGradOut 的数据类型必须一致，同时为 BFLOAT16、FLOAT16 或 FLOAT32 之一。
+- sortedIndices 的元素取值表示全局 permuted 位置，取值范围为 [0, num_tokens * numTopk)，仅 rangeOptional[0] <= 值 < rangeOptional[1] 的元素参与计算。
 - 不支持paddedMode为`True`。
 - 当rangeOptional为空时，忽略permutedProbsOutputGradOptional和probsGradOut，执行逻辑回退到[aclnnMoeTokenPermuteGrad](../../moe_token_permute_grad/docs/aclnnMoeTokenPermuteGrad.md)。
 

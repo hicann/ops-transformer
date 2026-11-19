@@ -126,6 +126,9 @@ static inline ge::graphStatus MoeTokenUnpermuteWithEpInputParamCheck(const gert:
     OP_CHECK_IF(inputTopK < 1,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "num_topk", "input num TopK cannot less than 1."),
                 return ge::GRAPH_FAILED);
+    OP_CHECK_IF(inputTopK > 512,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "num_topk", "topK cannot larger than 512."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(tokensShape == nullptr || indicesShape == nullptr || dataTensor0 == nullptr || dataTensor1 == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Ops::Base::GetOpInfo(nodeName),
                                                          "tokensShape, indicesShape, dataTensor0, dataTensor1",
@@ -135,6 +138,27 @@ static inline ge::graphStatus MoeTokenUnpermuteWithEpInputParamCheck(const gert:
         tokensShape->GetStorageShape().GetDimNum() != 2,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "permuted_tokens", "permutedTokens's shape is not 2D."),
         return ge::GRAPH_FAILED);
+    OP_CHECK_IF(indicesShape->GetStorageShape().GetDimNum() != 1,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "sorted_indices",
+                                                         std::to_string(indicesShape->GetStorageShape().GetDimNum()),
+                                                         "sorted_indices must be 1D."),
+                return ge::GRAPH_FAILED);
+    int64_t totalLength = indicesShape->GetStorageShape().GetDim(0);
+    OP_CHECK_IF(
+        totalLength <= 0,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "sorted_indices", "sorted_indices length must be positive."),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(totalLength % inputTopK != 0,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "sorted_indices, num_topk",
+                                                         "sorted_indices length must be a multiple of num_topk."),
+                return ge::GRAPH_FAILED);
+    auto attrPtr = context->GetAttrs();
+    OP_CHECK_IF(attrPtr == nullptr, OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "attrPtr", "attrPtr is null."),
+                return ge::GRAPH_FAILED);
+    const bool* paddedModePtr = attrPtr->GetAttrPointer<bool>(2);
+    OP_CHECK_IF(paddedModePtr != nullptr && *paddedModePtr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "padded_mode", "padded_mode only supports False."),
+                return ge::GRAPH_FAILED);
 
     if (probsShape != nullptr) {
         int64_t probsDimNum = probsShape->GetStorageShape().GetDimNum();
@@ -197,8 +221,10 @@ static inline ge::graphStatus Init(const gert::TilingContext* context, const int
     if (GetTopKAttr(context, inputTopK) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
+    bool rangeProvided = false;
     auto rangePtr = attrPtr->GetAttrPointer<gert::ContinuousVector>(UNPERMUTE_WITH_EP_ARRT_RANGE);
     if (rangePtr != nullptr) {
+        rangeProvided = true;
         OP_CHECK_IF(rangePtr->GetSize() != RANGE_SIZE,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "range",
                                                              "the size of range only support 2"),
@@ -212,8 +238,19 @@ static inline ge::graphStatus Init(const gert::TilingContext* context, const int
                     param.input.start, param.input.end);
         }
     } else {
+        // range 未提供时回退全量范围（等效 aclnnMoeTokenPermuteGrad：对全部 token 计算 permute-grad）。
+        // 结束索引取 sorted_indices 全长度，避免 start/end 同为 0 导致 kernel needCopyIn 恒为 false。
         param.input.start = 0;
-        param.input.end = 0;
+        param.input.end = sortedIndicesShape->GetStorageShape().GetDim(0);
+        // range 为空时回退到全量，语义变为不进行 EP 切分，应接受全部 token 输入，
+        // 所以 permuted_tokens_output_grad 的大小必须与 sorted_indices 大小相等。
+        if (!isUnpermute) {
+            OP_CHECK_IF(tokensShape->GetStorageShape().GetDim(0) != sortedIndicesShape->GetStorageShape().GetDim(0),
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                            context->GetNodeName(), "permuted_tokens_output_grad, sorted_indices",
+                            "permuted_tokens_output_grad rows must equal sorted_indices length when range is absent."),
+                        return ge::GRAPH_FAILED);
+        }
     }
 
     param.input.numOutTokens = tokensShape->GetStorageShape().GetDim(0); // numOutTokens根据tokens第0维获取；
@@ -236,7 +273,16 @@ static inline ge::graphStatus Init(const gert::TilingContext* context, const int
         param.input.PermuteProbGradSize = 1;
         param.input.tokensNum = safeDiv(param.input.totalLength, param.input.topK);
     }
-    param.input.haveProbs = (probsShape != nullptr);
+    // permute-grad 场景（range 提供时）probs 输入存在时必须有 probs_grad 输出，否则 op2 会向空输出地址写导致越界；
+    // probs 缺失时允许 probs_grad 输出存在但被忽略（haveProbs 为 false，不写 probs_grad）。
+    if (!isUnpermute && rangeProvided && probsShape != nullptr && context->GetOutputShape(1) == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            context->GetNodeName(), "probs_grad",
+            "probs_grad output is required when permuted_probs_output_grad is provided.");
+        return ge::GRAPH_FAILED;
+    }
+    // range 为空时回退到aclnnMoeTokenPermuteGrad，忽略 probs
+    param.input.haveProbs = (probsShape != nullptr) && (isUnpermute || rangeProvided);
     return ge::GRAPH_SUCCESS;
 }
 

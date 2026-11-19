@@ -61,7 +61,7 @@ int Init(int32_t deviceId, aclrtStream* stream)
 template <typename T>
 int CreateAclIntArray(const std::vector<T>& hostData, void** deviceAddr, aclIntArray** intArray)
 {
-    auto size = GetShapeSize(hostData) * sizeof(T);
+    auto size = hostData.size() * sizeof(T);
     // Call aclrtMalloc to allocate memory on the device.
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
@@ -121,11 +121,11 @@ int main()
     aclTensor* permuted_prob_output_grad = nullptr;
 
     ret = CreateAclTensor(permuted_token_output_grad_Data, permuted_token_output_grad_Shape,
-                          &permuted_token_output_grad_Addr, aclDataType::ACL_BF16, &permuted_token_output_grad);
+                          &permuted_token_output_grad_Addr, aclDataType::ACL_FLOAT, &permuted_token_output_grad);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     ret = CreateAclTensor(permuted_prob_output_grad_Data, permuted_prob_output_grad_Shape,
-                          &permuted_prob_output_grad_Addr, aclDataType::ACL_BF16, &permuted_prob_output_grad);
+                          &permuted_prob_output_grad_Addr, aclDataType::ACL_FLOAT, &permuted_prob_output_grad);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<int> sortedIndicesData = {2, 0, 4, 1, 5, 3};
@@ -148,7 +148,7 @@ int main()
     void* tokenOutAddr = nullptr;
     aclTensor* tokenOut = nullptr;
 
-    ret = CreateAclTensor(tokenOutData, tokenOutShape, &tokenOutAddr, aclDataType::ACL_BF16, &tokenOut);
+    ret = CreateAclTensor(tokenOutData, tokenOutShape, &tokenOutAddr, aclDataType::ACL_FLOAT, &tokenOut);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<float> probOutData = {0, 0, 0, 0, 0, 0};
@@ -156,7 +156,7 @@ int main()
     void* probOutAddr = nullptr;
     aclTensor* probOut = nullptr;
 
-    ret = CreateAclTensor(probOutData, probOutShape, &probOutAddr, aclDataType::ACL_BF16, &probOut);
+    ret = CreateAclTensor(probOutData, probOutShape, &probOutAddr, aclDataType::ACL_FLOAT, &probOut);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称

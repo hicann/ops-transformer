@@ -136,7 +136,9 @@
 
 ## 约束说明
 
- - numTopk <= 512。
+ - 1 <= numTopk <= 512。
+ - permutedTokensOutputGrad、permutedProbsOutputGradOptional、tokenGradOut、probsGradOut 的数据类型必须一致，同时为 BFLOAT16、FLOAT16 或 FLOAT32 之一。
+ - sortedIndices 的元素取值表示全局 permuted 位置，取值范围为 [0, num_tokens * numTopk)。
  - 不支持paddedMode为`True`。
  - 当rangeOptional为空时，忽略permutedProbsOutputGradOptional和probsGradOut，执行逻辑回退到[aclnnMoeTokenPermuteGrad](../moe_token_permute_grad/docs/aclnnMoeTokenPermuteGrad.md)。
 
