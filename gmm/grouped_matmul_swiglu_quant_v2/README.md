@@ -13,8 +13,7 @@
 
 ## 功能说明
 
-- 算子功能：融合GroupedMatmul 、dequant、swiglu和quant，详细解释见计算公式。
-- Ascend 950PR&950DT系列产品上新增`aclnnGroupedMatmulSwigluQuantWeightNzV3`接口，用于单Tensor MXFP8 weight FRACTAL_NZ场景下的可配置SwiGLU计算。当前`swigluMode`仅支持2，详见[aclnnGroupedMatmulSwigluQuantWeightNzV3](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)。
+- 算子功能：融合分组矩阵乘、反量化、SwiGLU激活和量化。MX A8W4场景支持在激活后、量化前乘以按专家区分的平滑因子，详细解释见计算公式。
 - 计算公式：
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     <details>
@@ -160,19 +159,41 @@
 
         - 2.根据分组确定的入参进行如下计算：
 
-          $C_{i} = (X_{i}\cdot W_{i} )\odot xScale_{i\ BroadCast} \odot wScale_{i\ BroadCast}$
+          $C_i[m,n]=\sum_{k=0}^{K-1}\left(X_i[m,k]\cdot s_i^X[m,\lfloor k/32\rfloor]\right)\left(W_i[k,n]\cdot s_i^W[\lfloor k/32\rfloor,n]\right)$
+
+          其中$s_i^X$和$s_i^W$为解码后的MX scale，每32个K元素共享一个scale，缩放在K方向求和之前完成。
 
           $C_{i,act}, gate_{i} = split(C_{i})$
 
-          $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
+          swigluMode为0时，$S_i=Swish(C_{i,act})\odot gate_i$，其中$Swish(x)=\frac{x}{1+e^{-x}}$。
+
+          swigluMode为2时，沿N维前后分半，先裁剪两路数据，再计算SwiGLU：
+
+          $A_i'=\min(C_{i,act},L),\qquad B_i'=\operatorname{clip}(gate_i,-L,L)$
+
+          $S_i=A_i'\odot\operatorname{sigmoid}(\alpha A_i')\odot(B_i'+\beta)$
+
+          其中$L$、$\alpha$、$\beta$分别为clampLimit、gluAlpha、gluBias。
+
+          MX A8W4场景下，x为FLOAT8_E4M3FN、weight为FLOAT4_E2M1。可选平滑因子smoothScale为FLOAT类型，shape为$(E,N/2)$，第$i$行在对应专家的token行上广播；未传入时按全1处理。SwiGLU和平滑乘法使用FLOAT计算，再按最近偶数舍入转为BF16：
+
+          $V_i=\operatorname{BF16}_{\mathrm{rint}}(S_i\odot smoothScale_i)$
 
         - 3.量化输出结果
 
-          $shared\_exp = \left\lfloor \log_2(max_i(|S_i|)) \right\rceil - emax$
+          MX A8W4以$V_i$作为量化输入$Z_i$，输出FLOAT8_E4M3FN及FLOAT8_E8M0量化因子；其余场景以下式中的$Z_i$表示激活结果$S_i$。
+
+          对每个量化组的非零有限最大绝对值$a=\max_j|Z_{i,j}|$，OCP算法使用其指数计算共享scale：
+
+          $shared\_exp = \lfloor\log_2 a\rfloor - emax$
+
+          MX A8W4的scaleAlg为1时使用cuBLAS算法，按E4M3FN最大有限值448计算：
+
+          $shared\_exp = \lceil\log_2(a/448)\rceil$
 
           $QScale = 2 ^ {shared\_exp}$
 
-          $Q_i = quantize\_to\_element\_format(S_i/Qscale), \space i\space from\space 1\space to\space blocksize$
+          $Q_{i,j} = quantize\_to\_element\_format(Z_{i,j}/QScale), \space j\space from\space 1\space to\space blocksize$
           - $emax$: 对应数据类型的最大正则数的指数位。
 
             |   DataType    | emax |
@@ -289,9 +310,9 @@
   <tr>
     <td>smoothScale</td>
     <td rowspan="1">可选输入</td>
-    <td>表示左矩阵的量化因子。</td>
+    <td>表示按专家、按输出通道的平滑量化因子，默认不传入；传入时在SwiGLU后、输出量化前逐元素相乘，shape为(E,N/2)。适用场景见约束说明。</td>
     <td>FLOAT</td>
-    <td>-</td>
+    <td>ND</td>
   </tr>
   <tr>
     <td>groupList</td>
@@ -338,8 +359,8 @@
   <tr>
     <td>output</td>
     <td rowspan="1">输出</td>
-    <td>表示输出的量化结果，公式中的Q。</td>
-    <td>FLOAT8_E4M3FN<sup>1</sup>、FLOAT8_E5M2<sup>1</sup>、FLOAT4_E2M1<sup>1</sup>、FLOAT4_E1M2<sup>1</sup>、INT8、HIFLOAT8<sup>1</sup></td>
+    <td>表示输出结果，量化输出对应公式中的Q；V3 A4W4直出场景为BF16结果。</td>
+    <td>FLOAT8_E4M3FN<sup>1</sup>、FLOAT8_E5M2<sup>1</sup>、FLOAT4_E2M1<sup>1</sup>、FLOAT4_E1M2<sup>1</sup>、INT8、BFLOAT16、HIFLOAT8<sup>1</sup></td>
     <td>ND</td>
   </tr>
   <tr>
@@ -483,12 +504,13 @@
       - MXFP4场景不支持K=2。
       - MXFP4场景需满足K为偶数。
 
-    - `aclnnGroupedMatmulSwigluQuantWeightNzV3`增量场景仅支持MXFP8、单Tensor和weight FRACTAL_NZ；`x`、`weight`和`output`仅支持FLOAT8_E4M3FN，`swigluMode`仅支持2，`scaleAlg`支持0（OCP）或1（cuBLAS）。完整约束见[ACLNN接口资料](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)。
+    - `aclnnGroupedMatmulSwigluQuantWeightNzV3`量化输出场景支持MX A8W8和MX A8W4，均要求单TensorList和FRACTAL_NZ权重。A8W8的x/weight为FLOAT8_E4M3FN/FLOAT8_E4M3FN；A8W4为FLOAT8_E4M3FN/FLOAT4_E2M1，K/N均须为128的倍数，仅支持转置权重。两者的输出均为FLOAT8_E4M3FN，scale为FLOAT8_E8M0，swigluMode仅支持2，scaleAlg支持0或1。仅A8W4支持可选FLOAT smoothScale，shape为(E,N/2)。原有A4W4 BF16输出不产生outputScale，其接口约束保持不变。完整约束见[ACLNN接口资料](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)。
 
 ## 调用说明
 
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
 | aclnn API | [test_aclnn_quant_grouped_matmul_swiglu_quant_V2](examples/test_aclnn_grouped_matmul_swiglu_quant_v2_a8w8.cpp) | 通过接口方式调用[GroupedMatmulSwigluQuantV2](docs/aclnnGroupedMatmulSwigluQuantV2.md)算子。 |
-| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3.cpp) | 通过[aclnnGroupedMatmulSwigluQuantWeightNzV3](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)调用Ascend 950PR&950DT系列产品的MXFP8 weight FRACTAL_NZ增量场景。 |
-| PyTorch API | [grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md#调用说明) | 通过[grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md)调用上述增量场景。 |
+| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3.cpp) | 通过[aclnnGroupedMatmulSwigluQuantWeightNzV3](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)调用V3 WeightNZ场景；MX A8W4参数和约束见该接口资料，当前链接样例为原有MX A8W8场景。 |
+| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3_a8w4](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3_a8w4.cpp) | V3 MX A8W4、转置 WeightNZ、SwiGLU mode 2 和可选 smoothScale；[编译运行说明](examples/arch35/README_v3_a8w4.md)。 |
+| PyTorch API | [grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md#调用说明) | 通过[grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md)调用MX A8W8或MX A8W4 WeightNZ场景；Torch资料提供A8W4转置权重及smooth_scale示例。 |

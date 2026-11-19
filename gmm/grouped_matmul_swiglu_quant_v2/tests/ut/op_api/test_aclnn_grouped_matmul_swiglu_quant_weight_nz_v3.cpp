@@ -29,6 +29,7 @@
 #include "op_api_ut_common/op_api_ut.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "opdev/platform.h"
+#include "opdev/tensor_view_utils.h"
 #include "gmm_csv_acl_parse_utils.h"
 
 using namespace std;
@@ -297,6 +298,68 @@ aclnnStatus RunHostGroupListCase(const vector<int64_t>& storageValues, int64_t s
     return ret;
 }
 
+aclnnStatus RunMxA8W4PlacementCase(bool hostGroupList, bool hostSmoothScale, bool strided, int64_t groupListType,
+                                   bool transposeWeight, bool torchBaseFormats = false)
+{
+    SetupPlatformForCase();
+    // Own genuine Host tensors until the queried API executor has been destroyed.
+    auto inputExecutor = CREATE_EXECUTOR();
+    if (inputExecutor.get() == nullptr) {
+        return ACLNN_ERR_INNER_NULLPTR;
+    }
+    SwigluApiTensors tensors;
+    tensors.x = BuildAclTensorDescFromSpec("32:128", "FLOAT8_E4M3FN", "ND").ToAclType();
+    tensors.weight = BuildAclTensorListDesc(
+                         transposeWeight ? "2:128:128#16384:1:128#2:2:8:16:64" : "2:128:128#16384:128:1#2:2:8:16:64",
+                         "FLOAT4_E2M1", "FRACTAL_NZ")
+                         .ToAclType();
+    tensors.weightScale = BuildAclTensorListDesc(transposeWeight ? "2:2:128:2#512:2:4:1" : "2:2:128:2", "FLOAT8_E8M0",
+                                                 torchBaseFormats ? "NCHW" : "ND")
+                              .ToAclType();
+    tensors.xScale = BuildAclTensorDescFromSpec("32:2:2", "FLOAT8_E8M0", torchBaseFormats ? "NCL" : "ND").ToAclType();
+    tensors.groupList = BuildAclTensorDescFromSpec(strided ? "2#2#3" : "2", "INT64", "ND").ToAclType();
+    tensors.smoothScale = BuildAclTensorDescFromSpec(strided ? "2:64#128:2#2:128" : "2:64", "FLOAT", "ND").ToAclType();
+    tensors.output = BuildAclTensorDescFromSpec("32:64", "FLOAT8_E4M3FN", "ND").ToAclType();
+    tensors.outputScale =
+        BuildAclTensorDescFromSpec("32:1:2", "FLOAT8_E8M0", torchBaseFormats ? "NCL" : "ND").ToAclType();
+    const aclTensor* groupList = tensors.groupList.get();
+    const aclTensor* smoothScale = tensors.smoothScale.get();
+    EXPECT_EQ(groupList->GetPlacement(), op::TensorPlacement::kOnDeviceHbm);
+    EXPECT_EQ(smoothScale->GetPlacement(), op::TensorPlacement::kOnDeviceHbm);
+    if (hostGroupList) {
+        const int64_t lastValue = groupListType == 0 ? GROUP_TOTAL_M : GROUP_HALF_M;
+        const vector<int64_t> values = strided ? vector<int64_t>{GROUP_HALF_M, GROUP_PADDING_SENTINEL, lastValue} :
+                                                 vector<int64_t>{GROUP_HALF_M, lastValue};
+        auto* hostTensor = inputExecutor->AllocHostTensor(values.data(), values.size(), op::DataType::DT_INT64);
+        if (hostTensor == nullptr) {
+            return ACLNN_ERR_INNER_NULLPTR;
+        }
+        hostTensor->SetViewShape(op::Shape({TWO_GROUP_COUNT}));
+        hostTensor->SetViewStrides(op::Strides({strided ? GROUP_PAIR_STRIDE : GROUP_UNIT_STRIDE}));
+        groupList = hostTensor;
+        EXPECT_TRUE(gert::TensorPlacementUtils::IsOnHost(groupList->GetPlacement()));
+    }
+    if (hostSmoothScale) {
+        const vector<float> values(strided ? 256 : 128, 1.0F);
+        auto* hostTensor = inputExecutor->AllocHostTensor(values.data(), values.size(), op::DataType::DT_FLOAT);
+        if (hostTensor == nullptr) {
+            return ACLNN_ERR_INNER_NULLPTR;
+        }
+        hostTensor->SetViewShape(op::Shape({2, 64}));
+        hostTensor->SetStorageShape(op::Shape({2, strided ? 128 : 64}));
+        hostTensor->SetViewStrides(strided ? op::Strides({128, 2}) : op::Strides({64, 1}));
+        smoothScale = hostTensor;
+        EXPECT_TRUE(gert::TensorPlacementUtils::IsOnHost(smoothScale->GetPlacement()));
+    }
+    return tensors.GetWorkspaceSize([&](uint64_t* workspaceSize, aclOpExecutor** executor) {
+        return aclnnGroupedMatmulSwigluQuantWeightNzV3GetWorkspaceSize(
+            tensors.x.get(), tensors.weight.get(), tensors.weightScale.get(), nullptr, nullptr, tensors.xScale.get(),
+            smoothScale, groupList, MX_QUANT_MODE, 0, MX_QUANT_MODE, groupListType, nullptr, SPLIT_SWIGLU_MODE,
+            DEFAULT_CLAMP_LIMIT, DEFAULT_GLU_ALPHA, DEFAULT_GLU_BIAS, "rint", 0, 0.0, tensors.output.get(),
+            tensors.outputScale.get(), workspaceSize, executor);
+    });
+}
+
 aclOpExecutor* CreateTestExecutor()
 {
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -324,6 +387,8 @@ struct V3Case : CsvExpectation {
     string groupListDtype;
     string outputSpec;
     string outputScaleSpec;
+    string outputDtype{"FLOAT8_E4M3FN"};
+    string outputScaleDtype{"FLOAT8_E8M0"};
     int64_t dequantMode;
     int64_t dequantDtype;
     int64_t quantMode;
@@ -360,10 +425,10 @@ struct V3Case : CsvExpectation {
             tensors.groupList = BuildAclTensorDescFromSpec(groupListSpec, groupListDtype, "ND").ToAclType();
         }
         if (nullArg != "output") {
-            tensors.output = BuildAclTensorDescFromSpec(outputSpec, "FLOAT8_E4M3FN", "ND").ToAclType();
+            tensors.output = BuildAclTensorDescFromSpec(outputSpec, outputDtype, "ND").ToAclType();
         }
         if (nullArg != "output_scale") {
-            tensors.outputScale = BuildAclTensorDescFromSpec(outputScaleSpec, "FLOAT8_E8M0", "ND").ToAclType();
+            tensors.outputScale = BuildAclTensorDescFromSpec(outputScaleSpec, outputScaleDtype, "ND").ToAclType();
         }
         // NULL cases take precedence over the optional-input rejection cases, as in the original UT.
         if (tensors.x && tensors.weight && tensors.weightScale && tensors.xScale && tensors.groupList &&
@@ -377,6 +442,15 @@ struct V3Case : CsvExpectation {
             } else if (optionalInput == "smooth") {
                 tensors.smoothScale =
                     MakeAclTensorDesc({OPTIONAL_TENSOR_ELEMENTS}, ACL_FLOAT, ACL_FORMAT_ND).ToAclType();
+            } else if (optionalInput.compare(0, 7, "smooth|") == 0) {
+                vector<string> smoothSpec;
+                SplitStr2Vec(optionalInput, "|", smoothSpec);
+                if (smoothSpec.size() != 4) {
+                    ADD_FAILURE() << "Invalid smooth descriptor: " << optionalInput;
+                    return ACLNN_ERR_PARAM_INVALID;
+                }
+                tensors.smoothScale =
+                    BuildAclTensorDescFromSpec(smoothSpec[1], smoothSpec[2], smoothSpec[3]).ToAclType();
             }
         }
         tensors.SetTuningConfig(tuningConfig);
@@ -436,6 +510,24 @@ bool ParseV3Case(const vector<string>& cols, V3Case& item)
 
 class grouped_matmul_swiglu_quant_weight_nz_v3_opapi_csv_test : public SwigluOpApiCsvTest<V3Case> {};
 
+TEST(grouped_matmul_swiglu_quant_weight_nz_v3_opapi, mxa8w4_requires_fp8_output_and_e8m0_scale)
+{
+    vector<string> cols;
+    SplitStr2Vec("mxa8w4_output,ACLNN_SUCCESS,32:128,FLOAT8_E4M3FN,ND,"
+                 "2:128:256#32768:1:128#2:2:16:16:64,FLOAT4_E2M1,FRACTAL_NZ,"
+                 "2:2:256:2#1024:2:4:1,FLOAT8_E8M0,ND,32:2:2,FLOAT8_E8M0,2,INT64,"
+                 "32:128,32:2:2,2,0,2,0,2,7.0,1.702,1.0,rint,0,0.0,none,NONE,none",
+                 ",", cols);
+    V3Case item;
+    ASSERT_TRUE(ParseV3Case(cols, item));
+    EXPECT_EQ(item.Run(), ACLNN_SUCCESS);
+    item.outputDtype = "BF16";
+    EXPECT_EQ(item.Run(), ACLNN_ERR_PARAM_INVALID);
+    item.outputDtype = "FLOAT8_E4M3FN";
+    item.outputScaleDtype = "FLOAT";
+    EXPECT_EQ(item.Run(), ACLNN_ERR_PARAM_INVALID);
+}
+
 TEST_P(grouped_matmul_swiglu_quant_weight_nz_v3_opapi_csv_test, get_workspace_size)
 {
     CheckWorkspaceSize();
@@ -445,6 +537,39 @@ TEST(grouped_matmul_swiglu_quant_weight_nz_v3_opapi, phase1_output_pointers_retu
 {
     EXPECT_EQ(RunPhase1NullPointerCase(Phase1NullPointerTarget::kWorkspaceSize), ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_EQ(RunPhase1NullPointerCase(Phase1NullPointerTarget::kExecutor), ACLNN_ERR_PARAM_NULLPTR);
+}
+
+TEST(grouped_matmul_swiglu_quant_weight_nz_v3_opapi, mxa8w4_requires_device_group_list_and_smooth_scale)
+{
+    for (int64_t groupListType : {int64_t{0}, GROUP_LIST_COUNTS}) {
+        for (bool strided : {false, true}) {
+            for (bool transposeWeight : {false, true}) {
+                SCOPED_TRACE(testing::Message() << "groupListType=" << groupListType << ", strided=" << strided
+                                                << ", transposeWeight=" << transposeWeight);
+                const aclnnStatus expected = transposeWeight ? ACLNN_SUCCESS : ACLNN_ERR_PARAM_INVALID;
+                EXPECT_EQ(RunMxA8W4PlacementCase(false, false, strided, groupListType, transposeWeight), expected);
+                EXPECT_EQ(RunMxA8W4PlacementCase(true, false, strided, groupListType, transposeWeight),
+                          ACLNN_ERR_PARAM_INVALID);
+                EXPECT_EQ(RunMxA8W4PlacementCase(false, true, strided, groupListType, transposeWeight),
+                          ACLNN_ERR_PARAM_INVALID);
+                EXPECT_EQ(RunMxA8W4PlacementCase(true, true, strided, groupListType, transposeWeight),
+                          ACLNN_ERR_PARAM_INVALID);
+            }
+        }
+    }
+}
+
+TEST(grouped_matmul_swiglu_quant_weight_nz_v3_opapi, mxa8w4_accepts_torch_dense_scale_formats)
+{
+    for (int64_t groupListType : {int64_t{0}, GROUP_LIST_COUNTS}) {
+        for (bool strided : {false, true}) {
+            for (bool transposeWeight : {false, true}) {
+                const aclnnStatus expected = transposeWeight ? ACLNN_SUCCESS : ACLNN_ERR_PARAM_INVALID;
+                EXPECT_EQ(RunMxA8W4PlacementCase(false, false, strided, groupListType, transposeWeight, true),
+                          expected);
+            }
+        }
+    }
 }
 
 TEST(grouped_matmul_swiglu_quant_weight_nz_v3_opapi, host_group_list_strided_views_ignore_padding)
@@ -495,6 +620,17 @@ TEST(grouped_matmul_swiglu_quant_weight_nz_v3_opapi, a4w4_bf16_output_does_not_r
         MX_QUANT_MODE, 0, MX_QUANT_MODE, 0, nullptr, SPLIT_SWIGLU_MODE, DEFAULT_CLAMP_LIMIT, DEFAULT_GLU_ALPHA,
         DEFAULT_GLU_BIAS, "rint", 0, 0.0, output.get(), nullptr, &workspaceSize, &executor);
     EXPECT_EQ(ret, ACLNN_SUCCESS);
+    if (executor != nullptr) {
+        (void)aclDestroyAclOpExecutor(executor);
+    }
+    executor = nullptr;
+    auto smooth = BuildAclTensorDescFromSpec("1:64", "FLOAT", "ND").ToAclType();
+    EXPECT_EQ(
+        aclnnGroupedMatmulSwigluQuantWeightNzV3GetWorkspaceSize(
+            x.get(), weight.get(), weightScale.get(), nullptr, nullptr, xScale.get(), smooth.get(), groupList.get(),
+            MX_QUANT_MODE, 0, MX_QUANT_MODE, 0, nullptr, SPLIT_SWIGLU_MODE, DEFAULT_CLAMP_LIMIT, DEFAULT_GLU_ALPHA,
+            DEFAULT_GLU_BIAS, "rint", 0, 0.0, output.get(), nullptr, &workspaceSize, &executor),
+        ACLNN_ERR_PARAM_INVALID);
     if (executor != nullptr) {
         (void)aclDestroyAclOpExecutor(executor);
     }

@@ -21,12 +21,14 @@
 namespace op_api {
 namespace {
 constexpr int64_t kCeilDivAdjustment = 1;
-constexpr int64_t kWeightRank = 3;
 constexpr int64_t kWeightScaleRank = 4;
+constexpr int64_t kWeightRank = 3;
+constexpr int64_t kPenultimateDim = -2;
 constexpr int64_t kSwigluSplitFactor = 2;
 constexpr int64_t kMxScalePairSize = 2;
 constexpr int64_t kMxQuantMode = 2;
 constexpr int64_t kDim0 = 0;
+constexpr int64_t kDim1 = 1;
 constexpr int64_t kDim2 = 2;
 constexpr int64_t kMxGroupSize = 64;
 constexpr int64_t kMaxGroupNum = 1024;
@@ -95,10 +97,17 @@ void CheckListForIndexing(const std::vector<at::Tensor>& tensors, const char* na
     TORCH_CHECK(tensors[0].defined(), name, "[0] must be defined.");
 }
 
-int64_t InferLogicalN(const at::Tensor& weightScale)
+int64_t InferLogicalN(const at::Tensor& weightScale, const at::Tensor& x, bool isA8W4)
 {
     TORCH_CHECK(weightScale.dim() == kWeightScaleRank, "weight_scale[0] must be 4D in the V3 MXFP8 scenario, but got ",
                 weightScale.dim(), ".");
+    if (isA8W4) {
+        TORCH_CHECK(x.dim() == kDim2, "MX A8W4 requires 2D x.");
+        const int64_t kGroups = CeilDiv(x.size(kDim1), kMxGroupSize);
+        TORCH_CHECK(weightScale.size(kDim1) == kGroups || weightScale.size(kDim2) == kGroups,
+                    "MX A8W4 weight_scale must have a ceil(K/64) axis.");
+        return weightScale.size(weightScale.size(kDim1) == kGroups ? kDim2 : kDim1);
+    }
     // Both the non-transposed scale and the view produced by
     // weightScaleSource.transpose(-3, -2) are [E, ceil(K / 64), N, 2].
     return weightScale.size(kDim2);
@@ -110,6 +119,150 @@ void CheckGroupListMetadata(const at::Tensor& groupList, int64_t groupListType)
                 "group_list must be a 1D torch.int64 tensor.");
     TORCH_CHECK(groupListType == 0 || groupListType == 1, "group_list_type must be 0 or 1.");
     TORCH_CHECK(groupList.numel() >= 1 && groupList.numel() <= kMaxGroupNum, "group_list length must be in [1, 1024].");
+}
+
+void CheckBridgeInputs(const at::Tensor& x, const std::vector<at::Tensor>& weight,
+                       const std::vector<at::Tensor>& weightScale, const c10::optional<int64_t>& swigluMode,
+                       const c10::optional<std::vector<at::Tensor>>& bias, const c10::optional<int64_t>& quantDtype,
+                       const std::string& roundMode)
+{
+    CheckListForIndexing(weight, "weight");
+    CheckListForIndexing(weightScale, "weight_scale");
+    TORCH_CHECK(weight[0].dim() == kWeightRank, "weight[0] must be 3D, but got ", weight[0].dim(), ".");
+    TORCH_CHECK(x.defined() && x.dim() > kDim0, "x must be defined and have a dimension for output shape inference.");
+    TORCH_CHECK(swigluMode.has_value(), "swiglu_mode must be specified; use torch_npu for legacy V2 calls.");
+    // The Torch schema has a TensorList bias, while ACLNN takes one Tensor.
+    // Keep the empty-list bridge explicit instead of silently discarding input.
+    TORCH_CHECK(!bias.has_value() || bias->empty(), "The V3 wrapper requires an empty bias TensorList.");
+    // ACLNN has no quant_dtype attribute: the caller provides the output tensor.
+    // Its dtype must agree with the FP8 allocation below.
+    TORCH_CHECK(!quantDtype.has_value() || NormalizeGeDtype(quantDtype.value()) == kGeDtypeFloat8E4M3Fn,
+                "swiglu_mode=2 only supports torch.float8_e4m3fn output.");
+    // ACLNN takes a C string: reject embedded NUL bytes instead of silently
+    // validating only the prefix of the Python/std::string value.
+    TORCH_CHECK(roundMode.find('\0') == std::string::npos, "round_mode must not contain embedded NUL bytes.");
+}
+
+aclDataType GetWeightAclDtype(const at::Tensor& weight, const c10::optional<int64_t>& weightDtype, bool isA8W4)
+{
+    if (isA8W4) {
+        const auto storageType = weight.scalar_type();
+        TORCH_CHECK(storageType == at::ScalarType::Float4_e2m1fn_x2 || storageType == at::ScalarType::Byte ||
+                        storageType == at::ScalarType::Char,
+                    "MX A8W4 weight must use native packed FP4 or int8/uint8 packed storage.");
+        // The common FP4 converter expands packed shape/strides and NZ C0 exactly once.
+        return ACL_FLOAT4_E2M1;
+    }
+    return GetTensorAclDtype(weightDtype, weight, "weight");
+}
+
+void CheckA8W4Transpose(const at::Tensor& weight, const at::Tensor& weightScale, bool isA8W4)
+{
+    if (isA8W4) {
+        TORCH_CHECK(
+            weight.dim() == kWeightScaleRank - 1 && weight.stride(kPenultimateDim) == 1 &&
+                weight.stride(-1) == weight.size(kPenultimateDim) && weightScale.stride(kDim1) == kMxScalePairSize &&
+                weightScale.stride(kDim2) == weightScale.size(kDim1) * kMxScalePairSize && weightScale.stride(-1) == 1,
+            "MX A8W4 only supports transposed WeightNZ and weight_scale views.");
+    }
+}
+
+void CheckSmoothScale(const c10::optional<at::Tensor>& smoothScale, const at::Tensor& weightScale, const at::Tensor& x,
+                      int64_t n, bool isA8W4)
+{
+    if (isA8W4 && smoothScale.has_value() && smoothScale->defined()) {
+        const auto& smooth = smoothScale.value();
+        TORCH_CHECK(smooth.scalar_type() == at::ScalarType::Float && smooth.dim() == kDim2 &&
+                        smooth.size(kDim0) == weightScale.size(kDim0) && smooth.size(kDim1) == n / kSwigluSplitFactor &&
+                        smooth.device() == x.device(),
+                    "MX A8W4 smooth_scale must be same-device FP32 (E,N/2).");
+    }
+}
+
+std::tuple<at::Tensor, at::Tensor> AllocateOutputs(const at::Tensor& x, int64_t m, int64_t n)
+{
+    at::Tensor output;
+    at::Tensor outputScale;
+    {
+        const c10::OptionalDeviceGuard deviceGuard(c10::Device(x.device()));
+        output = at::empty({m, n / kSwigluSplitFactor}, x.options().dtype(at::ScalarType::Float8_e4m3fn));
+        // The MXFP8 kernel clears scale rows outside group_list.
+        // For MX A8W4, only scale rows covered by group_list have defined values.
+        outputScale = at::empty({m, CeilDiv(n / kSwigluSplitFactor, kMxGroupSize), kMxScalePairSize},
+                                x.options().dtype(at::ScalarType::Byte))
+                          .view(at::ScalarType::Float8_e8m0fnu);
+    }
+
+    return std::tie(output, outputScale);
+}
+
+struct QuantAttrs {
+    int64_t dequantModeValue;
+    int64_t dequantDtypeValue;
+    int64_t quantModeValue;
+    int64_t groupListTypeValue;
+    int64_t swigluModeValue;
+    double clampLimitArg;
+    double gluAlphaArg;
+    double gluBiasArg;
+    int64_t scaleAlgValue;
+    double dstTypeMaxArg;
+};
+
+QuantAttrs MakeQuantAttrs(c10::optional<int64_t> dequantMode, c10::optional<int64_t> dequantDtype,
+                          c10::optional<int64_t> quantMode, c10::optional<int64_t> groupListType,
+                          c10::optional<int64_t> swigluMode, c10::optional<double> clampLimit,
+                          c10::optional<double> gluAlpha, c10::optional<double> gluBias, int64_t scaleAlg,
+                          double dstTypeMax)
+{
+    int64_t dtype = dequantDtype.value_or(static_cast<int64_t>(ACL_FLOAT));
+    if (dtype == static_cast<int64_t>(at::ScalarType::Float)) {
+        dtype = static_cast<int64_t>(ACL_FLOAT);
+    }
+    return {dequantMode.value_or(kMxQuantMode),
+            dtype,
+            quantMode.value_or(kMxQuantMode),
+            groupListType.value_or(0),
+            swigluMode.value(),
+            clampLimit.value_or(kDefaultClampLimit),
+            gluAlpha.value_or(kDefaultGluAlpha),
+            gluBias.value_or(kDefaultGluBias),
+            scaleAlg,
+            dstTypeMax};
+}
+
+void LaunchQuant(const at::Tensor& x, const std::vector<at::Tensor>& weight, const std::vector<at::Tensor>& weightScale,
+                 const at::Tensor& xScale, const at::Tensor& groupList, const c10::optional<at::Tensor>& smoothScale,
+                 const c10::optional<std::vector<at::Tensor>>& weightAssistMatrix,
+                 const c10::optional<std::vector<int64_t>>& tuningConfig, const std::string& roundMode,
+                 aclDataType xAclDtype, aclDataType weightAclDtype, aclDataType weightScaleAclDtype,
+                 aclDataType xScaleAclDtype, bool isA8W4, at::Tensor& output, at::Tensor& outputScale, QuantAttrs attrs)
+{
+    at::TensorList weightRef = weight;
+    at::TensorList weightScaleRef = weightScale;
+    const std::vector<at::Tensor> emptyAssist;
+    const std::vector<at::Tensor>& assist = weightAssistMatrix.has_value() ? weightAssistMatrix.value() : emptyAssist;
+    at::TensorList assistRef = assist;
+    const at::Tensor biasRef = at::Tensor();
+    const at::Tensor smoothScaleRef = smoothScale.value_or(at::Tensor());
+    c10::optional<at::IntArrayRef> tuningConfigRef = c10::nullopt;
+    if (tuningConfig.has_value()) {
+        tuningConfigRef = at::IntArrayRef(tuningConfig.value());
+    }
+
+    const at::Tensor xScaleForOp = isA8W4 ? xScale.contiguous() : xScale;
+    TensorWrapper xWrapper = {x, xAclDtype};
+    TensorListWrapper weightWrapper = {weightRef, weightAclDtype};
+    TensorListWrapper weightScaleWrapper = {weightScaleRef, weightScaleAclDtype};
+    TensorWrapper xScaleWrapper = {xScaleForOp, xScaleAclDtype};
+    TensorWrapper outputWrapper = {output, ACL_FLOAT8_E4M3FN};
+    TensorWrapper outputScaleWrapper = {outputScale, ACL_FLOAT8_E8M0};
+    const char* roundModePtr = roundMode.c_str();
+    ACLNN_CMD(aclnnGroupedMatmulSwigluQuantWeightNzV3, xWrapper, weightWrapper, weightScaleWrapper, assistRef, biasRef,
+              xScaleWrapper, smoothScaleRef, groupList, attrs.dequantModeValue, attrs.dequantDtypeValue,
+              attrs.quantModeValue, attrs.groupListTypeValue, tuningConfigRef, attrs.swigluModeValue,
+              attrs.clampLimitArg, attrs.gluAlphaArg, attrs.gluBiasArg, roundModePtr, attrs.scaleAlgValue,
+              attrs.dstTypeMaxArg, outputWrapper, outputScaleWrapper);
 }
 
 } // namespace
@@ -126,91 +279,29 @@ std::tuple<at::Tensor, at::Tensor> grouped_matmul_swiglu_quant(
     c10::optional<double> gluAlpha, c10::optional<double> gluBias, const std::string& roundMode, int64_t scaleAlg,
     double dstTypeMax)
 {
-    const double clampLimitValue = clampLimit.value_or(kDefaultClampLimit);
-    const double gluAlphaValue = gluAlpha.value_or(kDefaultGluAlpha);
-    const double gluBiasValue = gluBias.value_or(kDefaultGluBias);
-    CheckListForIndexing(weight, "weight");
-    CheckListForIndexing(weightScale, "weight_scale");
-    TORCH_CHECK(weight[0].dim() == kWeightRank, "weight[0] must be 3D, but got ", weight[0].dim(), ".");
-    TORCH_CHECK(x.defined() && x.dim() > kDim0, "x must be defined and have a dimension for output shape inference.");
-    TORCH_CHECK(swigluMode.has_value(), "swiglu_mode must be specified; use torch_npu for legacy V2 calls.");
-    // The Torch schema has a TensorList bias, while ACLNN takes one Tensor.
-    // Keep the empty-list bridge explicit instead of silently discarding input.
-    TORCH_CHECK(!bias.has_value() || bias->empty(), "The V3 wrapper requires an empty bias TensorList.");
-    // ACLNN has no quant_dtype attribute: the caller provides the output tensor.
-    // Its dtype must agree with the FP8 allocation below.
-    TORCH_CHECK(!quantDtype.has_value() || NormalizeGeDtype(quantDtype.value()) == kGeDtypeFloat8E4M3Fn,
-                "swiglu_mode=2 only supports torch.float8_e4m3fn output.");
-    // ACLNN takes a C string: reject embedded NUL bytes instead of silently
-    // validating only the prefix of the Python/std::string value.
-    TORCH_CHECK(roundMode.find('\0') == std::string::npos, "round_mode must not contain embedded NUL bytes.");
-
-    const int64_t m = x.size(kDim0);
-    const int64_t n = InferLogicalN(weightScale[0]);
-    TORCH_CHECK(n >= 0 && n % kSwigluSplitFactor == 0,
-                "The logical N dimension must be non-negative and even, but got ", n, ".");
-    CheckGroupListMetadata(groupList, groupListType.value_or(0));
+    CheckBridgeInputs(x, weight, weightScale, swigluMode, bias, quantDtype, roundMode);
     const aclDataType xAclDtype = GetTensorAclDtype(xDtype, x, "x");
-    const aclDataType weightAclDtype = GetTensorAclDtype(weightDtype, weight[0], "weight");
+    const bool isA8W4 = xAclDtype == ACL_FLOAT8_E4M3FN &&
+                        (weightDtype.has_value() ? GetAclDtypeFromValue(weightDtype.value()) == ACL_FLOAT4_E2M1 :
+                                                   weight[0].scalar_type() == at::ScalarType::Float4_e2m1fn_x2);
+    const aclDataType weightAclDtype = GetWeightAclDtype(weight[0], weightDtype, isA8W4);
+    const int64_t m = x.size(kDim0);
+    const int64_t n = InferLogicalN(weightScale[0], x, isA8W4);
+    CheckA8W4Transpose(weight[0], weightScale[0], isA8W4);
+    TORCH_CHECK((isA8W4 ? n > 0 : n >= 0) && n % kSwigluSplitFactor == 0, "The logical N dimension is invalid: ", n,
+                ".");
+    CheckGroupListMetadata(groupList, groupListType.value_or(0));
     const aclDataType weightScaleAclDtype = GetMxScaleAclDtype(weightScaleDtype, weightScale[0], "weight_scale");
     const aclDataType xScaleAclDtype = GetMxScaleAclDtype(xScaleDtype, xScale, "x_scale");
+    CheckSmoothScale(smoothScale, weightScale[0], x, n, isA8W4);
 
-    at::Tensor output;
-    at::Tensor outputScale;
-    {
-        const c10::OptionalDeviceGuard deviceGuard(c10::Device(x.device()));
-        output = at::empty({m, n / kSwigluSplitFactor}, x.options().dtype(at::ScalarType::Float8_e4m3fn));
-        // The kernel writes valid scales and N padding, and clears scale rows
-        // not covered by group_list. No separate InplaceZero task is needed.
-        outputScale = at::empty({m, CeilDiv(n / kSwigluSplitFactor, kMxGroupSize), kMxScalePairSize},
-                                x.options().dtype(at::ScalarType::Byte))
-                          .view(at::ScalarType::Float8_e8m0fnu);
-    }
+    at::Tensor output, outputScale;
+    std::tie(output, outputScale) = AllocateOutputs(x, m, n);
 
-    at::TensorList weightRef = weight;
-    at::TensorList weightScaleRef = weightScale;
-    const std::vector<at::Tensor> emptyAssist;
-    const std::vector<at::Tensor>& assist = weightAssistMatrix.has_value() ? weightAssistMatrix.value() : emptyAssist;
-    at::TensorList assistRef = assist;
-    // V3 currently accepts only an empty bias TensorList. ACLNN V3 keeps its
-    // optional single-tensor ABI, so pass an undefined tensor.
-    const at::Tensor biasRef = at::Tensor();
-    const at::Tensor smoothScaleRef = smoothScale.value_or(at::Tensor());
-    c10::optional<at::IntArrayRef> tuningConfigRef = c10::nullopt;
-    if (tuningConfig.has_value()) {
-        tuningConfigRef = at::IntArrayRef(tuningConfig.value());
-    }
-
-    TensorWrapper xWrapper = {x, xAclDtype};
-    TensorListWrapper weightWrapper = {weightRef, weightAclDtype};
-    TensorListWrapper weightScaleWrapper = {weightScaleRef, weightScaleAclDtype};
-    TensorWrapper xScaleWrapper = {xScale, xScaleAclDtype};
-    TensorWrapper outputWrapper = {output, ACL_FLOAT8_E4M3FN};
-    TensorWrapper outputScaleWrapper = {outputScale, ACL_FLOAT8_E8M0};
-    const char* roundModePtr = roundMode.c_str();
-    // ACLNN_CMD forwards every argument through the ACL type converter, whose
-    // interface takes non-const lvalue references.  Keep the scalar attributes
-    // in named variables instead of passing value_or() / temporary expressions.
-    int64_t dequantModeValue = dequantMode.value_or(kMxQuantMode);
-    // Preserve the legacy Torch FP32 enum alias, but forward every other value
-    // unchanged so ACLNN, not this bridge, validates the dequantization mode.
-    int64_t dequantDtypeValue = dequantDtype.value_or(static_cast<int64_t>(ACL_FLOAT));
-    if (dequantDtypeValue == static_cast<int64_t>(at::ScalarType::Float)) {
-        dequantDtypeValue = static_cast<int64_t>(ACL_FLOAT);
-    }
-    int64_t quantModeValue = quantMode.value_or(kMxQuantMode);
-    int64_t groupListTypeValue = groupListType.value_or(0);
-    int64_t swigluModeValue = swigluMode.value();
-    double clampLimitArg = clampLimitValue;
-    double gluAlphaArg = gluAlphaValue;
-    double gluBiasArg = gluBiasValue;
-    int64_t scaleAlgValue = scaleAlg;
-    double dstTypeMaxArg = dstTypeMax;
-
-    ACLNN_CMD(aclnnGroupedMatmulSwigluQuantWeightNzV3, xWrapper, weightWrapper, weightScaleWrapper, assistRef, biasRef,
-              xScaleWrapper, smoothScaleRef, groupList, dequantModeValue, dequantDtypeValue, quantModeValue,
-              groupListTypeValue, tuningConfigRef, swigluModeValue, clampLimitArg, gluAlphaArg, gluBiasArg,
-              roundModePtr, scaleAlgValue, dstTypeMaxArg, outputWrapper, outputScaleWrapper);
+    auto attrs = MakeQuantAttrs(dequantMode, dequantDtype, quantMode, groupListType, swigluMode, clampLimit, gluAlpha,
+                                gluBias, scaleAlg, dstTypeMax);
+    LaunchQuant(x, weight, weightScale, xScale, groupList, smoothScale, weightAssistMatrix, tuningConfig, roundMode,
+                xAclDtype, weightAclDtype, weightScaleAclDtype, xScaleAclDtype, isA8W4, output, outputScale, attrs);
     return std::tie(output, outputScale);
 }
 

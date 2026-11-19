@@ -36,6 +36,9 @@ using GMMSQWeightQuantAswTilingData = GMMSQArch35Tiling::GMMSQWeightQuantAswTili
 #include "arch35/weight_quant_basic_block/grouped_matmul_swiglu_quant_v2_weight_quant_tiling_data.h"
 #include "arch35/weight_quant_basic_block/gmmsq_weight_quant_resplit_controller.h"
 #include "arch35/weight_quant_basic_block/grouped_matmul_swiglu_quant_v2_weight_quant_tiling_key.h"
+#if GMM_SWIGLU_QUANT_V3_A8W4_ENABLED
+#include "arch35/grouped_matmul_tensor_api_swiglu_quant_v3_a8w4_kernel.h"
+#endif
 #else
 // 全量化Mx量化
 #include "arch35/grouped_matmul_swiglu_quant_v2_tiling_data.h"
@@ -88,7 +91,7 @@ constexpr bool isMxFp8Input =
 #if defined(GMM_SWIGLU_QUANT_WEIGHT_QUANT_ASW)
 template <int8_t QUANT_B_TRANS, int8_t QUANT_A_TRANS>
 #elif defined(GMM_SWIGLU_QUANT_WEIGHT_QUANT)
-template <int8_t QUANT_B_TRANS, int8_t QUANT_A_TRANS, bool IS_SINGLE_MULTI_SINGLE>
+template <int8_t QUANT_B_TRANS, int8_t QUANT_A_TRANS, int8_t KERNEL_TYPE>
 #else
 template <int8_t QUANT_B_TRANS, int8_t QUANT_A_TRANS, int8_t KERNEL_TYPE>
 #endif
@@ -114,23 +117,40 @@ __global__ __aicore__ void grouped_matmul_swiglu_quant_v2(GM_ADDR x, GM_ADDR xSc
     }
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);
 #elif defined(GMM_SWIGLU_QUANT_WEIGHT_QUANT)
-    // MxA8W4场景
-    AscendC::InitSocState();
-    int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
-    // enable overflow mode to avoid nan/inf value
-    AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-    REGISTER_TILING_DEFAULT(GMMSQArch35Tiling::GMMSQWeightQuantTilingData);
-    GET_TILING_DATA_WITH_STRUCT(GMMSQArch35Tiling::GMMSQWeightQuantTilingData, tilingDataIn, tiling);
+#if GMM_SWIGLU_QUANT_V3_A8W4_ENABLED
+    REGISTER_TILING_FOR_TILINGKEY(GMM_SWIGLU_QUANT_V3_A8W4_TILING_KEY_MATCH,
+                                  GroupedMatmulSwigluQuantV2TensorApi::GMMSwigluQuantV2TensorApiTilingData);
+    if constexpr (KERNEL_TYPE == GMM_SWIGLU_QUANT_V3_A8W4_KERNEL_TYPE) {
+        static_assert(QUANT_A_TRANS == GMM_SWIGLU_QUANT_NO_TRANS, "A8W4 V3 requires non-transposed x");
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+        AscendC::InitSocState();
+        const int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
+        AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
+        GmmTensorApiSwigluQuantV3A8W4Kernel<QUANT_B_TRANS == GMM_SWIGLU_QUANT_TRANS>(
+            x, weight, weightScale, xScale, smoothScale, groupList, y, yScale, tiling);
+        AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);
+    } else
+#endif
+    {
+        // MxA8W4场景
+        AscendC::InitSocState();
+        int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
+        // enable overflow mode to avoid nan/inf value
+        AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+        REGISTER_TILING_DEFAULT(GMMSQArch35Tiling::GMMSQWeightQuantTilingData);
+        GET_TILING_DATA_WITH_STRUCT(GMMSQArch35Tiling::GMMSQWeightQuantTilingData, tilingDataIn, tiling);
 
-    GMMSQWeightQuant::GMMSQWeightQuantResplitController<
-        DTYPE_X, DTYPE_WEIGHT, DTYPE_WEIGHT_SCALE, DTYPE_X_SCALE, DTYPE_Y, DTYPE_Y_SCALE, GMMSQWeightQuant::MXA8W4_NZNK,
-        GMMSQWeightQuant::VEC_ANTIQUANT_CONFIG_DYNAMIC, IS_SINGLE_MULTI_SINGLE>
-        controller;
+        GMMSQWeightQuant::GMMSQWeightQuantResplitController<DTYPE_X, DTYPE_WEIGHT, DTYPE_WEIGHT_SCALE, DTYPE_X_SCALE,
+                                                            DTYPE_Y, DTYPE_Y_SCALE, GMMSQWeightQuant::MXA8W4_NZNK,
+                                                            GMMSQWeightQuant::VEC_ANTIQUANT_CONFIG_DYNAMIC,
+                                                            KERNEL_TYPE == GMM_SWIGLU_QUANT_SINGLE_MULTI_SINGLE>
+            controller;
 
-    controller.Init(x, weight, weightScale, groupList, xScale, y, yScale, &tilingDataIn);
-    controller.Process();
-    AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);
+        controller.Init(x, weight, weightScale, groupList, xScale, y, yScale, &tilingDataIn);
+        controller.Process();
+        AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);
+    }
 #else
 #if ORIG_DTYPE_X_SCALE == DT_HIFLOAT4_SCALE
     AscendC::InitSocState();

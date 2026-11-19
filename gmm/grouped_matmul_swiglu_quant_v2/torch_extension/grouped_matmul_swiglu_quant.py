@@ -23,10 +23,13 @@ GE_DTYPE_INT8 = 1
 GE_DTYPE_FLOAT8_E5M2 = 35
 GE_DTYPE_FLOAT8_E4M3FN = 36
 GE_DTYPE_FLOAT8_E8M0 = 37
+GE_DTYPE_FLOAT4_E2M1 = 40
 ACL_DTYPE_OFFSET = 256
 MX_GROUP_SIZE = 64
 WEIGHT_SCALE_RANK = 4
 WEIGHT_SCALE_N_AXIS = 2
+X_RANK = 2
+SMOOTH_SCALE_RANK = 2
 SWIGLU_SPLIT_FACTOR = 2
 MX_SCALE_PAIR_SIZE = 2
 CEIL_DIV_ADJUSTMENT = 1
@@ -43,6 +46,8 @@ _TORCH_DTYPE_TO_GE_DTYPE = {
     torch.float8_e4m3fn: GE_DTYPE_FLOAT8_E4M3FN,
     FLOAT8_E8M0_DTYPE: GE_DTYPE_FLOAT8_E8M0,
 }
+if hasattr(torch, "float4_e2m1fn_x2"):
+    _TORCH_DTYPE_TO_GE_DTYPE[torch.float4_e2m1fn_x2] = GE_DTYPE_FLOAT4_E2M1
 
 
 def _normalize_tensor_list(value, name):
@@ -94,10 +99,48 @@ def _normalize_v3_quant_dtype(dtype):
     return dtype
 
 
-def _infer_v3_n(weight_scale):
+def _is_a8w4(x, weight, weight_dtype):
+    return x.dtype == torch.float8_e4m3fn and (
+        _normalize_dtype(weight_dtype) == GE_DTYPE_FLOAT4_E2M1
+        if weight_dtype is not None
+        else weight.dtype == getattr(torch, "float4_e2m1fn_x2", None)
+    )
+
+
+def _infer_v3_n(weight_scale, x=None, is_a8w4=False):
     if weight_scale.dim() != WEIGHT_SCALE_RANK:
         raise ValueError("weight_scale[0] must be 4D in the V3 MXFP8 scenario.")
+    if is_a8w4:
+        if x.dim() != X_RANK:
+            raise ValueError("MX A8W4 requires 2D x.")
+        k_groups = (x.shape[1] + MX_GROUP_SIZE - CEIL_DIV_ADJUSTMENT) // MX_GROUP_SIZE
+        torch._check(
+            (weight_scale.shape[1] == k_groups)
+            | (weight_scale.shape[WEIGHT_SCALE_N_AXIS] == k_groups),
+            lambda: "MX A8W4 weight_scale must have a ceil(K/64) axis.",
+        )
+        return weight_scale.shape[
+            WEIGHT_SCALE_N_AXIS if weight_scale.shape[1] == k_groups else 1
+        ]
     return weight_scale.shape[WEIGHT_SCALE_N_AXIS]
+
+
+def _check_a8w4_smooth(smooth_scale, weight_scale, n, x):
+    if smooth_scale is None:
+        return
+    torch._check(
+        smooth_scale.dtype == torch.float32 and smooth_scale.dim() == SMOOTH_SCALE_RANK,
+        lambda: "MX A8W4 smooth_scale must be FP32 (E,N/2).",
+    )
+    torch._check(
+        smooth_scale.device == x.device,
+        lambda: "MX A8W4 smooth_scale must be on the same device as x.",
+    )
+    torch._check(
+        (smooth_scale.shape[0] == weight_scale.shape[0])
+        & (smooth_scale.shape[1] == n // SWIGLU_SPLIT_FACTOR),
+        lambda: "MX A8W4 smooth_scale must be FP32 (E,N/2).",
+    )
 
 
 class GroupedMatmulSwigluQuantOpBuilder(OpBuilder):
@@ -163,7 +206,30 @@ class GroupedMatmulSwigluQuantOpBuilder(OpBuilder):
             if x.dim() == 0:
                 raise ValueError("x must have a dimension for output shape inference.")
             _normalize_v3_quant_dtype(quant_dtype)
-            n = _infer_v3_n(weight_scale[0])
+            is_a8w4 = _is_a8w4(x, weight[0], weight_dtype)
+            if is_a8w4:
+                torch._check(
+                    weight[0].dtype
+                    in (
+                        torch.int8,
+                        torch.uint8,
+                        getattr(torch, "float4_e2m1fn_x2", None),
+                    ),
+                    lambda: "MX A8W4 weight must use native packed FP4 or int8/uint8 packed storage.",
+                )
+            n = _infer_v3_n(weight_scale[0], x, is_a8w4)
+            if is_a8w4:
+                torch._check(
+                    weight[0].dim() == WEIGHT_SCALE_RANK - 1
+                    and weight[0].stride(-2) == 1
+                    and weight[0].stride(-1) == weight[0].shape[-2]
+                    and weight_scale[0].stride(1) == MX_SCALE_PAIR_SIZE
+                    and weight_scale[0].stride(2)
+                    == weight_scale[0].shape[1] * MX_SCALE_PAIR_SIZE
+                    and weight_scale[0].stride(-1) == 1,
+                    lambda: "MX A8W4 only supports transposed WeightNZ and weight_scale views.",
+                )
+                _check_a8w4_smooth(smooth_scale, weight_scale[0], n, x)
             if n <= 0 or n % SWIGLU_SPLIT_FACTOR != 0:
                 raise ValueError("The logical N dimension must be positive and even.")
             m = x.shape[0]
@@ -282,7 +348,7 @@ def grouped_matmul_swiglu_quant(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """调用 GroupedMatmulSwigluQuantWeightNzV3。
 
-    当前扩展仅支持 ``swiglu_mode=2`` 的 Ascend 950 单 Tensor MXFP8
+    当前扩展仅支持 ``swiglu_mode=2`` 的 Ascend 950 单 Tensor MXFP8/MX A8W4
     FRACTAL_NZ weight 场景；未传 ``swiglu_mode`` 的旧 V2 场景仍使用
     ``torch_npu.npu_grouped_matmul_swiglu_quant_v2``。
     """

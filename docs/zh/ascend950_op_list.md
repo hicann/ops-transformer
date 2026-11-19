@@ -774,7 +774,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
-    <td>融合GroupedMatmul 、dequant、swiglu和quant，新增了MXFP8量化场景（仅Ascend 950PR&950DT系列产品 AI处理器支持）。</td>
+    <td>融合GroupedMatmul、dequant、SwiGLU和quant，支持MXFP8量化及MX A8W4 WeightNZ场景，MX A8W4支持量化前按专家传入smoothScale（仅Ascend 950PR&950DT系列产品 AI处理器支持）。</td>
   </tr>
   <tr>
     <td>gmm</td>

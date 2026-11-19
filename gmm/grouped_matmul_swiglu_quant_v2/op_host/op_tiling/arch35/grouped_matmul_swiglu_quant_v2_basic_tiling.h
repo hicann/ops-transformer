@@ -28,6 +28,8 @@
 
 namespace optiling {
 using namespace Ops::Transformer::OpTiling;
+// UINT declaration [0, 1, 2, 3], args (transB, transA, kernelType) = (1, 0, 3).
+constexpr uint64_t GMMSQ_V3_A8W4_TILING_KEY = 49;
 class GroupedMatmulSwigluQuantV2Tiling950 : public GroupedQmmTiling {
 public:
     explicit GroupedMatmulSwigluQuantV2Tiling950(gert::TilingContext* context, bool activation = false)
@@ -74,9 +76,22 @@ private:
         return useV3Path_;
     }
     bool AnalyzeActivationAttrs();
+    void FillA8W4MatmulTiling();
+    void FillLegacyMatmulTiling();
+    bool CheckV3Attrs(int64_t quantDtype, bool transposeWeight, int64_t groupListType, int64_t swigluMode,
+                      const char* roundMode, int64_t scaleAlg, float dstTypeMax) const;
+    bool CheckV3DtypeAndFormat() const;
+    bool CheckV3WeightStorageShape(const gert::Shape& weightStorageShape, int64_t e, int64_t k, int64_t n) const;
+    bool CheckV3WeightScaleShape(const gert::Shape& weightScaleShape, int64_t e, int64_t kScale, int64_t n) const;
     bool AnalyzeV3Attrs();
     bool AnalyzeV3Dtype();
     bool AnalyzeV3Inputs();
+    bool IsV3A8W4() const
+    {
+        return IsSplitSwigluMode() && !activation_ && inputParams_.aDtype == ge::DT_FLOAT8_E4M3FN &&
+               inputParams_.bDtype == ge::DT_FLOAT4_E2M1;
+    }
+    bool CheckV3SmoothScale() const;
     bool CheckV3ShapeAndScale(const gert::Shape& xShape, const gert::Shape& weightShape,
                               const gert::Shape& weightStorageShape, const gert::Shape& weightScaleShape,
                               const gert::Shape& groupListShape) const;

@@ -21,6 +21,7 @@
 #include "tiling_case_executor.h"
 #include "gmm_csv_ge_parse_utils.h"
 #include "../../../op_host/op_tiling/arch35/grouped_matmul_swiglu_quant_v2_basic_tiling.h"
+#include "../../../op_host/op_tiling/arch35/grouped_matmul_swiglu_quant_tensor_api_tiling_common.h"
 #include "../../../op_kernel/arch35/grouped_matmul_swiglu_quant_v2_tiling_data.h"
 #include "../../../op_kernel/arch35/grouped_matmul_swiglu_quant_v2_tensor_api_tiling_data.h"
 
@@ -97,6 +98,11 @@ constexpr int64_t V3_CGMCT_NZ_KEY = 0;
 constexpr int64_t V3_CGMCT_ZN_KEY = 1;
 constexpr int64_t V3_TENSOR_API_NZ_KEY = 16;
 constexpr int64_t V3_TENSOR_API_ZN_KEY = 17;
+constexpr int64_t V3_A8W4_TENSOR_API_ZN_KEY = 49;
+constexpr int64_t A8W4_GROUP_NUM = 4;
+constexpr int64_t NZ_FP4_C0 = NZ_C0 * SWIGLU_SPLIT_FACTOR;
+constexpr int64_t A8W4_UNALIGNED_SIZE = EXPECTED_TENSOR_BASE_N + MX_GROUP_SIZE;
+constexpr int64_t A8W4_FULL_N_WITH_TAIL = EXPECTED_TENSOR_BASE_N * SWIGLU_SPLIT_FACTOR + EXPECTED_TENSOR_BASE_N;
 
 using CgmctTilingData = ::GMMSwigluQuantV2TilingDataParams;
 using TensorApiTilingData = GroupedMatmulSwigluQuantV2TensorApi::GMMSwigluQuantV2TensorApiTilingData;
@@ -207,6 +213,225 @@ std::vector<RouteCsvCase> LoadRouteCases()
     }
     EXPECT_FALSE(cases.empty()) << "No valid route cases in " << path;
     return cases;
+}
+
+gert::TilingContextPara MakeA8W4Context(const RouteCase& route, optiling::GMMSwigluV2CompileInfo* info,
+                                        bool smooth = false, int groupListType = 0, int scaleAlg = 0)
+{
+    auto context = MakeContext(route, info, scaleAlg);
+    const int64_t c0 = NZ_FP4_C0;
+    const std::vector<int64_t> view =
+        route.trans ? std::vector<int64_t>{route.e, route.n, route.k} : std::vector<int64_t>{route.e, route.k, route.n};
+    const std::vector<int64_t> storage =
+        route.trans ? std::vector<int64_t>{route.e, (route.k + c0 - 1) / c0, (route.n + NZ_K0 - 1) / NZ_K0, NZ_K0, c0} :
+                      std::vector<int64_t>{route.e, (route.n + c0 - 1) / c0, (route.k + NZ_K0 - 1) / NZ_K0, NZ_K0, c0};
+    using Desc = gert::TilingContextPara::TensorDescription;
+    context.inputTensorDesc_[WEIGHT_INPUT_INDEX] =
+        Desc(ops::ut::MakeGertStorageShape(view, storage), ge::DT_FLOAT4_E2M1, ge::FORMAT_FRACTAL_NZ);
+    context.attrs_[optiling::GroupedMatmulSwigluQuantV2Tiling::ATTR_INDEX_GROUPLIST_TYPE].attr_ =
+        Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupListType);
+    if (smooth) {
+        const std::vector<int64_t> dims{route.e, route.n / SWIGLU_SPLIT_FACTOR};
+        context.inputInstanceNum_[optiling::GroupedMatmulSwigluQuantV2Tiling::SMOOTH_SCALE_INDEX] = 1;
+        context.inputTensorDesc_.emplace_back(ops::ut::MakeGertStorageShape(dims, dims), ge::DT_FLOAT, ge::FORMAT_ND);
+    }
+    return context;
+}
+
+TEST(GroupedMatmulSwigluQuantV3Route, A8W4UsesDedicatedTensorApiKeyForSmallMTails)
+{
+    for (bool transpose : {true}) {
+        for (int64_t n : {static_cast<int64_t>(EXPECTED_TENSOR_BASE_N), EXPECTED_TENSOR_BASE_N * SWIGLU_SPLIT_FACTOR,
+                          A8W4_FULL_N_WITH_TAIL}) {
+            for (int64_t m :
+                 {int64_t{1}, NZ_K0 + 1, static_cast<int64_t>(EXPECTED_TENSOR_BASE_M) - 1,
+                  static_cast<int64_t>(EXPECTED_TENSOR_BASE_M), static_cast<int64_t>(EXPECTED_TENSOR_BASE_M) + 1}) {
+                for (bool smooth : {false, true}) {
+                    for (int groupListType : {0, 1}) {
+                        for (int scaleAlg : {0, 1}) {
+                            SCOPED_TRACE(::testing::Message()
+                                         << m << ',' << n << ',' << smooth << ',' << groupListType << ',' << scaleAlg);
+                            optiling::GMMSwigluV2CompileInfo info{};
+                            const int64_t key = V3_A8W4_TENSOR_API_ZN_KEY;
+                            const RouteCase route{m, EXPECTED_TENSOR_BASE_K, n, A8W4_GROUP_NUM, transpose, key};
+                            auto context = MakeA8W4Context(route, &info, smooth, groupListType, scaleAlg);
+                            TilingInfo result;
+                            ASSERT_TRUE(ExecuteTiling(context, result));
+                            EXPECT_EQ(result.tilingKey, key);
+                            ASSERT_EQ(result.tilingDataSize, sizeof(TensorApiTilingData));
+                            TensorApiTilingData data{};
+                            std::memcpy(&data, result.tilingData.get(), sizeof(data));
+                            EXPECT_EQ(data.gmmQuantParams.groupNum, route.e);
+                            EXPECT_EQ(data.gmmQuantParams.groupListType, groupListType);
+                            EXPECT_EQ(data.mmTilingData.m, m);
+                            EXPECT_EQ(data.mmTilingData.n, route.n);
+                            EXPECT_EQ(data.mmTilingData.k, route.k);
+                            EXPECT_EQ(data.mmTilingData.baseM, EXPECTED_TENSOR_BASE_M);
+                            EXPECT_EQ(data.mmTilingData.baseN, EXPECTED_TENSOR_BASE_N);
+                            EXPECT_EQ(data.mmTilingData.baseK, EXPECTED_TENSOR_BASE_K);
+                            EXPECT_EQ(data.swigluParams.swigluMode, SPLIT_SWIGLU_MODE);
+                            EXPECT_EQ(data.swigluParams.scaleAlg, scaleAlg);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST(GroupedMatmulSwigluQuantV3Route, A8W4RejectsUnsupportedLayoutShapesAndPlatform)
+{
+    for (const std::string mutation :
+         {"k_alignment", "n_alignment", "smooth_rank", "smooth_width", "smooth_dtype", "smooth_format", "core_ratio",
+          "l1_size", "nz_c0", "nd_weight", "non_transposed"}) {
+        SCOPED_TRACE(mutation);
+        optiling::GMMSwigluV2CompileInfo info{};
+        RouteCase route{
+            NZ_K0 + 1, EXPECTED_TENSOR_BASE_K,   EXPECTED_TENSOR_BASE_N * SWIGLU_SPLIT_FACTOR, A8W4_GROUP_NUM,
+            true,      V3_A8W4_TENSOR_API_ZN_KEY};
+        if (mutation == "k_alignment") {
+            route.k = A8W4_UNALIGNED_SIZE;
+        }
+        if (mutation == "n_alignment") {
+            route.n = A8W4_UNALIGNED_SIZE;
+        }
+        if (mutation == "non_transposed") {
+            route.trans = false;
+        }
+        auto context = MakeA8W4Context(route, &info, true);
+        using Desc = gert::TilingContextPara::TensorDescription;
+        const std::vector<int64_t> smoothDims{route.e, route.n / SWIGLU_SPLIT_FACTOR};
+        if (mutation.rfind("smooth_", 0) == 0) {
+            const std::vector<int64_t> dims = mutation == "smooth_rank" ?
+                                                  std::vector<int64_t>{route.n / SWIGLU_SPLIT_FACTOR} :
+                                              mutation == "smooth_width" ? std::vector<int64_t>{route.e, route.n} :
+                                                                           smoothDims;
+            context.inputTensorDesc_.back() =
+                Desc(ops::ut::MakeGertStorageShape(dims, dims), mutation == "smooth_dtype" ? ge::DT_BF16 : ge::DT_FLOAT,
+                     mutation == "smooth_format" ? ge::FORMAT_NCHW : ge::FORMAT_ND);
+        }
+        if (mutation == "core_ratio") {
+            info.aivNum_ = AIC_CORE_COUNT;
+            const std::string original = "\"vector_core_cnt\":" + std::to_string(AIV_CORE_COUNT);
+            context.socInfoString_.replace(context.socInfoString_.find(original), original.size(),
+                                           "\"vector_core_cnt\":" + std::to_string(AIC_CORE_COUNT));
+        }
+        if (mutation == "l1_size") {
+            info.l1Size_ = 0;
+            const std::string original = "\"L1_SIZE\":" + std::to_string(L1_BYTES);
+            context.socInfoString_.replace(context.socInfoString_.find(original), original.size(), "\"L1_SIZE\":0");
+        }
+        if (mutation == "nz_c0") {
+            const std::vector<int64_t> view{route.e, route.n, route.k};
+            const std::vector<int64_t> wrongStorage{route.e, route.k / NZ_C0, route.n / NZ_K0, NZ_K0, NZ_C0};
+            context.inputTensorDesc_[WEIGHT_INPUT_INDEX] =
+                Desc(ops::ut::MakeGertStorageShape(view, wrongStorage), ge::DT_FLOAT4_E2M1, ge::FORMAT_FRACTAL_NZ);
+        }
+        if (mutation == "nd_weight") {
+            const std::vector<int64_t> view{route.e, route.n, route.k};
+            context.inputTensorDesc_[WEIGHT_INPUT_INDEX] =
+                Desc(ops::ut::MakeGertStorageShape(view, view), ge::DT_FLOAT4_E2M1, ge::FORMAT_ND);
+        }
+        TilingInfo result;
+        EXPECT_FALSE(ExecuteTiling(context, result));
+    }
+}
+
+TEST(GroupedMatmulSwigluQuantV3Route, A8W4RequiresPlatformMemoryInfo)
+{
+    for (const std::string insufficientResource : {"none", "L1_SIZE", "L0C_SIZE"}) {
+        SCOPED_TRACE(insufficientResource);
+        optiling::GMMSwigluV2CompileInfo info{};
+        const RouteCase route{NZ_K0 + 1, EXPECTED_TENSOR_BASE_K,   A8W4_FULL_N_WITH_TAIL, A8W4_GROUP_NUM,
+                              true,      V3_A8W4_TENSOR_API_ZN_KEY};
+        auto context = MakeA8W4Context(route, &info, true);
+        info.l1Size_ = insufficientResource == "L1_SIZE" ? 0 : L1_BYTES;
+        info.l0CSize_ = insufficientResource == "L0C_SIZE" ? 0 : L0C_BYTES;
+        const auto replaceMemorySize = [&context](const std::string& name, uint64_t previous, uint64_t current) {
+            const std::string original = "\"" + name + "\":" + std::to_string(previous);
+            context.socInfoString_.replace(context.socInfoString_.find(original), original.size(),
+                                           "\"" + name + "\":" + std::to_string(current));
+        };
+        replaceMemorySize("L1_SIZE", L1_BYTES, info.l1Size_);
+        replaceMemorySize("L0C_SIZE", L0C_BYTES, info.l0CSize_);
+        TilingInfo result;
+        if (insufficientResource == "none") {
+            ASSERT_TRUE(ExecuteTiling(context, result));
+            EXPECT_EQ(result.tilingKey, V3_A8W4_TENSOR_API_ZN_KEY);
+        } else {
+            EXPECT_FALSE(ExecuteTiling(context, result));
+        }
+    }
+}
+
+TEST(GroupedMatmulSwigluQuantV3Route, PerTokenFp8PreservesEmptySmoothPlaceholder)
+{
+    namespace P = optiling::GroupedMatmulSwigluQuantV2Tiling;
+    using Value = Ops::Transformer::AnyValue;
+    using Desc = gert::TilingContextPara::TensorDescription;
+    const RouteCase route{EXPECTED_TENSOR_BASE_M,
+                          EXPECTED_TENSOR_BASE_K,
+                          EXPECTED_TENSOR_BASE_N * SWIGLU_SPLIT_FACTOR,
+                          A8W4_GROUP_NUM,
+                          false,
+                          0L};
+    const auto tensor = [](std::vector<int64_t> dims, ge::DataType dtype) {
+        return Desc(ops::ut::MakeGertStorageShape(dims, dims), dtype, ge::FORMAT_ND);
+    };
+    for (auto xType : {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2}) {
+        for (auto weightType : {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2}) {
+            optiling::GMMSwigluV2CompileInfo info{};
+            auto context = MakeContext(route, &info, 0, AIV_CORE_COUNT, 0L);
+            context.inputTensorDesc_[P::X_INDEX].dtype_ = xType;
+            context.inputTensorDesc_[P::X_SCALE_INDEX] = tensor({route.m}, ge::DT_FLOAT);
+            context.inputTensorDesc_[P::WEIGHT_INDEX] = tensor({route.e, route.k, route.n}, weightType);
+            context.inputTensorDesc_[P::WEIGHT_SCALE_INDEX] = tensor({route.e, route.n}, ge::DT_FLOAT);
+            context.outputTensorDesc_[P::Y_SCALE_INDEX] = tensor({route.m}, ge::DT_FLOAT);
+            context.attrs_[P::ATTR_INDEX_DEQUANT_MODE].attr_ = Value::CreateFrom<int64_t>(0L);
+            context.attrs_[P::ATTR_INDEX_QUANT_MODE].attr_ = Value::CreateFrom<int64_t>(0L);
+            TilingInfo absent;
+            ASSERT_TRUE(ExecuteTiling(context, absent));
+            context.inputInstanceNum_[P::SMOOTH_SCALE_INDEX] = SINGLE_INPUT_COUNT;
+            context.inputTensorDesc_.push_back(tensor({0L}, ge::DT_FLOAT));
+            TilingInfo empty;
+            ASSERT_TRUE(ExecuteTiling(context, empty));
+            EXPECT_EQ(empty.tilingKey, absent.tilingKey);
+            ASSERT_EQ(empty.tilingDataSize, absent.tilingDataSize);
+            EXPECT_EQ(std::memcmp(empty.tilingData.get(), absent.tilingData.get(), empty.tilingDataSize), 0);
+        }
+    }
+}
+
+TEST(GroupedMatmulSwigluQuantV3Route, A8W8RejectsNonemptySmoothScaleAndAcceptsEmptyPlaceholder)
+{
+    for (bool transpose : {false, true}) {
+        for (int64_t swigluMode : {0L, SPLIT_SWIGLU_MODE}) {
+            SCOPED_TRACE(testing::Message() << "transpose=" << transpose << ", swigluMode=" << swigluMode);
+            optiling::GMMSwigluV2CompileInfo info{};
+            const RouteCase route{LARGE_ROUTE_M,
+                                  EXPECTED_TENSOR_BASE_K,
+                                  EXPECTED_TENSOR_BASE_N * SWIGLU_SPLIT_FACTOR,
+                                  A8W4_GROUP_NUM,
+                                  transpose,
+                                  0L};
+            auto noSmooth = MakeContext(route, &info, 0, AIV_CORE_COUNT, swigluMode);
+            TilingInfo validResult;
+            ASSERT_TRUE(ExecuteTiling(noSmooth, validResult));
+            for (bool emptyTensor : {false, true}) {
+                SCOPED_TRACE(testing::Message() << "emptyTensor=" << emptyTensor);
+                auto context = MakeContext(route, &info, 0, AIV_CORE_COUNT, swigluMode);
+                const std::vector<int64_t> dims = emptyTensor ?
+                                                      std::vector<int64_t>{0L} :
+                                                      std::vector<int64_t>{route.e, route.n / SWIGLU_SPLIT_FACTOR};
+                context.inputInstanceNum_[optiling::GroupedMatmulSwigluQuantV2Tiling::SMOOTH_SCALE_INDEX] =
+                    SINGLE_INPUT_COUNT;
+                context.inputTensorDesc_.emplace_back(ops::ut::MakeGertStorageShape(dims, dims), ge::DT_FLOAT,
+                                                      ge::FORMAT_ND);
+                TilingInfo result;
+                EXPECT_EQ(ExecuteTiling(context, result), emptyTensor);
+            }
+        }
+    }
 }
 
 template <typename T>

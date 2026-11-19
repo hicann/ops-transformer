@@ -24,6 +24,7 @@
 #define GMM_SWIGLU_QUANT_ORIGINAL_KERNEL_TYPE 0     // 原有kernel实现
 #define GMM_SWIGLU_QUANT_TENSOR_LEVEL_KERNEL_TYPE 1 // 切换tensorApi kernel实现
 #define GMM_SWIGLU_HIF4_QUANT_KERNEL_TYPE 2
+#define GMM_SWIGLU_QUANT_V3_A8W4_KERNEL_TYPE 3
 
 #if !defined(__NPU_ARCH__) || \
     ((__NPU_ARCH__ == 3510) && defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && defined(ORIG_DTYPE_X_SCALE) && \
@@ -47,7 +48,7 @@ ASCENDC_TPL_ARGS_DECL(GroupedMatmulSwigluQuantV2, // 算子OpType
                       ASCENDC_TPL_UINT_DECL(KERNEL_TYPE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,
                                             GMM_SWIGLU_QUANT_ORIGINAL_KERNEL_TYPE,
                                             GMM_SWIGLU_QUANT_TENSOR_LEVEL_KERNEL_TYPE,
-                                            GMM_SWIGLU_HIF4_QUANT_KERNEL_TYPE));
+                                            GMM_SWIGLU_HIF4_QUANT_KERNEL_TYPE, GMM_SWIGLU_QUANT_V3_A8W4_KERNEL_TYPE));
 
 // 模板参数组合
 // 用于调用GET_TPL_TILING_KEY获取TilingKey时，接口内部校验TilingKey是否合法

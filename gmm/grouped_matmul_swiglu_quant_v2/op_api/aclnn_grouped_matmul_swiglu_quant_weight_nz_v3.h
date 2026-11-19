@@ -14,8 +14,8 @@
 #include "aclnn/aclnn_base.h"
 #include "aclnn_util.h"
 
-// Ascend 950 V3 WeightNZ supports MXFP8 E4M3/E4M3 quantized output and
-// MXFP4 E2M1/E2M1 direct BF16 output. outputScale is nullptr for direct BF16.
+// Ascend 950 V3 WeightNZ supports E4M3/E4M3 and E4M3/E2M1 quantized output, and
+// E2M1/E2M1 direct BF16 output. outputScale is nullptr for direct BF16.
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,8 +26,11 @@ extern "C" {
  * @domain aclnn_ops_infer
  *
  * 当前仅支持 Ascend 950 的单 Tensor weight FRACTAL_NZ 场景：MXFP8
- * E4M3/E4M3量化输出，以及MXFP4
+ * E4M3/E4M3、MX A8W4 E4M3/E2M1量化输出，以及MXFP4
  * E2M1/E2M1直接BF16输出。
+ * MX A8W4仅支持非转置x和转置weightNZ，weightScale必须为对应转置view，K/N均按128对齐。
+ * weight入口view均为(E,K,N)，转置stride为(K*N,1,K)，非转置stride为(K*N,N,1)。
+ * FP4 C0为64：转置storage为(E,K/64,N/16,16,64)，非转置为(E,N/64,K/16,16,64)。
  *
  * @param [in] x: 激活矩阵，FLOAT8_E4M3FN或FLOAT4_E2M1、ND。
  * @param [in] weight: 权重
@@ -37,23 +40,24 @@ extern "C" {
  * @param [in] weightAssistMatrix: 权重辅助矩阵，当前仅支持空值。
  * @param [in] bias: 偏置，当前不支持。
  * @param [in] xScale: 激活矩阵量化因子，FLOAT8_E8M0、ND。
- * @param [in] smoothScale: 平滑缩放因子，当前不支持。
- * @param [in] groupList: 分组索引，INT64、ND。
+ * @param [in] smoothScale: 可选的平滑缩放因子，仅MX A8W4支持，FLOAT32、ND、Device，shape为(E,N/2)。
+ * 按专家对FP32 SwiGLU结果逐通道相乘，再进行BF16舍入和MX量化；其他输入组合必须为空值。
+ * @param [in] groupList: 分组索引，INT64、ND；MX A8W4必须为Device HBM Tensor。
  * @param [in] dequantMode: 反量化模式，当前仅支持 2。
  * @param [in] dequantDtype: GroupedMatmul 中间结果的数据类型，当前仅支持 DT_FLOAT。
  * @param [in] quantMode: 输出量化模式，当前仅支持 2。
  * @param [in] groupListType: groupList 的解释方式；0 表示 cumsum，1 表示 count。
  * @param [in] tuningConfigOptional: 调优参数，当前仅支持空值。
- * @param [in] swigluMode: SwiGLU 模式，当前仅支持 2。
+ * @param [in] swigluMode: SwiGLU 模式，A8W8/A8W4仅支持2，A4W4还支持0。
  * @param [in] clampLimit: SwiGLU clamp 上界。
  * @param [in] gluAlpha: SwiGLU 的 alpha 参数。
  * @param [in] gluBias: SwiGLU 的 bias 参数。
  * @param [in] roundMode: MX 量化舍入模式，当前仅支持 "rint"。
  * @param [in] scaleAlg: MX 量化 scale 算法，支持 0（OCP）和 1（cuBLAS）。
  * @param [in] dstTypeMax: MX 量化目标类型最大值，当前仅支持 0.0。
- * @param [out] output: MXFP8场景为FLOAT8_E4M3FN，MXFP4 A4W4场景为BF16、ND。
+ * @param [out] output: MX A8W8/A8W4场景为FLOAT8_E4M3FN，MXFP4 A4W4场景为BF16、ND。
  * @param [out] outputScale:
- * MXFP8场景为FLOAT8_E8M0、ND；MXFP4 A4W4场景必须为nullptr。
+ * MX A8W8/A8W4场景为FLOAT8_E8M0、ND；MXFP4 A4W4场景必须为nullptr。
  * @param [out] workspaceSize: 在 NPU device
  * 侧申请的 workspace 大小。
  * @param [out] executor: 算子执行器，包含计算流程。

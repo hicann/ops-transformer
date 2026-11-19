@@ -15,8 +15,7 @@ English | [简体中文](./README.md)
 
 ## Description
 
-- Operator function: fuses GroupedMatmul, dequant, swiglu, and quant. For details, see the computation formula.
-- The `aclnnGroupedMatmulSwigluQuantWeightNzV3` API is newly added on Ascend 950PR&950DT products for configurable SwiGLU computation in the single-tensor MXFP8 weight FRACTAL_NZ scenario. Currently, `swigluMode` supports only the value 2. For details, see [aclnnGroupedMatmulSwigluQuantWeightNzV3](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md).
+- Operator function: fuses grouped matrix multiplication, dequantization, SwiGLU activation, and quantization. In the MX A8W4 scenario, an expert-specific smoothing factor can be applied after activation and before quantization. For details, see the computation formula.
 - Computation formula:
   - For <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
     <details>
@@ -162,19 +161,41 @@ English | [简体中文](./README.md)
 
         - 2. Perform the following computation with the input parameters determined by the grouping:
 
-          $C_{i} = (X_{i}\cdot W_{i} )\odot xScale_{i\ BroadCast} \odot wScale_{i\ BroadCast}$
+          $C_i[m,n]=\sum_{k=0}^{K-1}\left(X_i[m,k]\cdot s_i^X[m,\lfloor k/32\rfloor]\right)\left(W_i[k,n]\cdot s_i^W[\lfloor k/32\rfloor,n]\right)$
+
+          Here, $s_i^X$ and $s_i^W$ are decoded MX scales. Each scale is shared by 32 elements along K, and scaling is applied before summation along K.
 
           $C_{i,act}, gate_{i} = split(C_{i})$
 
-          $S_{i}=Swish(C_{i,act})\odot gate_{i}$, where $Swish(x)=\frac{x}{1+e^{-x}}$
+          When swigluMode is 0, $S_i=Swish(C_{i,act})\odot gate_i$, where $Swish(x)=\frac{x}{1+e^{-x}}$.
+
+          When swigluMode is 2, split the result into two halves along N, clamp the two branches, and compute SwiGLU:
+
+          $A_i'=\min(C_{i,act},L),\qquad B_i'=\operatorname{clip}(gate_i,-L,L)$
+
+          $S_i=A_i'\odot\operatorname{sigmoid}(\alpha A_i')\odot(B_i'+\beta)$
+
+          Here, $L$, $\alpha$, and $\beta$ correspond to clampLimit, gluAlpha, and gluBias, respectively.
+
+          In the MX A8W4 scenario, x is FLOAT8_E4M3FN and weight is FLOAT4_E2M1. The optional smoothScale has type FLOAT and shape $(E,N/2)$. Its i-th row is broadcast over the token rows of the corresponding expert; omitting it is equivalent to using all ones. SwiGLU and smoothing use FLOAT arithmetic, followed by conversion to BF16 with round-to-nearest-even:
+
+          $V_i=\operatorname{BF16}_{\mathrm{rint}}(S_i\odot smoothScale_i)$
 
         - 3. Quantize the output result
 
-          $shared\_exp = \left\lfloor \log_2(max_i(|S_i|)) \right\rceil - emax$
+          MX A8W4 uses $V_i$ as the quantization input $Z_i$ and produces FLOAT8_E4M3FN output and FLOAT8_E8M0 scales. For other scenarios, $Z_i$ in the following formulas denotes the activation result $S_i$.
+
+          For the nonzero finite maximum absolute value $a=\max_j|Z_{i,j}|$ of each quantization group, the OCP algorithm computes the shared scale from its exponent:
+
+          $shared\_exp = \lfloor\log_2 a\rfloor - emax$
+
+          In MX A8W4, scaleAlg=1 selects the cuBLAS algorithm, using the maximum finite E4M3FN value of 448:
+
+          $shared\_exp = \lceil\log_2(a/448)\rceil$
 
           $QScale = 2 ^ {shared\_exp}$
 
-          $Q_i = quantize\_to\_element\_format(S_i/Qscale), \space i\space from\space 1\space to\space blocksize$
+          $Q_{i,j} = quantize\_to\_element\_format(Z_{i,j}/QScale), \space j\space from\space 1\space to\space blocksize$
           - $emax$: the exponent of the largest normal number for the corresponding data type.
 
             |   DataType    | emax |
@@ -291,9 +312,9 @@ English | [简体中文](./README.md)
   <tr>
     <td>smoothScale</td>
     <td rowspan="1">Optional input</td>
-    <td>Represents the quantization factor of the left matrix.</td>
+    <td>Optional expert-specific, per-output-channel smoothing factors. When supplied, they are multiplied element-wise after SwiGLU and before output quantization. The shape is (E,N/2). For supported scenarios, see Constraints.</td>
     <td>FLOAT</td>
-    <td>-</td>
+    <td>ND</td>
   </tr>
   <tr>
     <td>groupList</td>
@@ -340,8 +361,8 @@ English | [简体中文](./README.md)
   <tr>
     <td>output</td>
     <td rowspan="1">Output</td>
-    <td>Represents the quantized output result, corresponding to Q in the formula.</td>
-    <td>FLOAT8_E4M3FN<sup>1</sup>, FLOAT8_E5M2<sup>1</sup>, FLOAT4_E2M1<sup>1</sup>, FLOAT4_E1M2<sup>1</sup>, INT8, HIFLOAT8<sup>1</sup></td>
+    <td>Represents the output result. Quantized output corresponds to Q in the formula; the V3 A4W4 direct-output scenario produces BF16 results.</td>
+    <td>FLOAT8_E4M3FN<sup>1</sup>, FLOAT8_E5M2<sup>1</sup>, FLOAT4_E2M1<sup>1</sup>, FLOAT4_E1M2<sup>1</sup>, INT8, BFLOAT16, HIFLOAT8<sup>1</sup></td>
     <td>ND</td>
   </tr>
   <tr>
@@ -485,12 +506,13 @@ English | [简体中文](./README.md)
       - K=2 is not supported in the MXFP4 scenario.
       - K must be an even number in the MXFP4 scenario.
 
-    - The `aclnnGroupedMatmulSwigluQuantWeightNzV3` incremental scenario supports only MXFP8, a single tensor, and weight in FRACTAL_NZ format. `x`, `weight`, and `output` support only FLOAT8_E4M3FN, `swigluMode` supports only the value 2, and `scaleAlg` supports 0 (OCP) or 1 (cuBLAS). For the complete constraints, see [ACLNN API Documentation](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md).
+    - The quantized-output scenarios of `aclnnGroupedMatmulSwigluQuantWeightNzV3` support MX A8W8 and MX A8W4, both requiring a single TensorList and FRACTAL_NZ weights. The x/weight types are FLOAT8_E4M3FN/FLOAT8_E4M3FN for A8W8 and FLOAT8_E4M3FN/FLOAT4_E2M1 for A8W4. A8W4 requires K and N to be multiples of 128 and supports only transposed weights. Both scenarios produce FLOAT8_E4M3FN output and FLOAT8_E8M0 scales; swigluMode supports only 2, and scaleAlg supports 0 or 1. Only A8W4 supports optional FLOAT smoothScale with shape (E,N/2). The existing A4W4 BF16 direct-output scenario does not produce outputScale, and its API constraints remain unchanged. For complete constraints, see [ACLNN API Documentation](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md).
 
 ## Invocation
 
 | Invocation Method | Invocation Example | Description |
 |--------------|-------------------------|--------------------------------------------------------------|
 | aclnn API | [test_aclnn_quant_grouped_matmul_swiglu_quant_V2](examples/test_aclnn_grouped_matmul_swiglu_quant_v2_a8w8.cpp) | Invokes the [GroupedMatmulSwigluQuantV2](docs/aclnnGroupedMatmulSwigluQuantV2_en.md) operator through the API. |
-| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3.cpp) | Invokes the MXFP8 weight FRACTAL_NZ incremental scenario on Ascend 950PR&950DT products through [aclnnGroupedMatmulSwigluQuantWeightNzV3](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md). |
-| PyTorch API | [grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md#调用说明) | Invokes the preceding incremental scenario through [grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md). |
+| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3.cpp) | Invokes V3 WeightNZ scenarios through [aclnnGroupedMatmulSwigluQuantWeightNzV3](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md). See that API reference for MX A8W4 parameters and constraints; this linked example covers the existing MX A8W8 scenario. |
+| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3_a8w4](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3_a8w4.cpp) | V3 MX A8W4 with transposed WeightNZ, SwiGLU mode 2, and optional smoothScale; see [Build and Run](examples/arch35/README_v3_a8w4_en.md). |
+| PyTorch API | [grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md#调用说明) | Invokes MX A8W8 or MX A8W4 WeightNZ through [grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md). The Torch documentation provides an A8W4 example with transposed weights and smooth_scale. |

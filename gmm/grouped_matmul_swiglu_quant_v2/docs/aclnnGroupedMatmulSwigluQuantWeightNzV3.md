@@ -23,23 +23,25 @@
 
 ## 功能说明
 
-- 接口功能：融合GroupedMatmul、dequant、SwiGLU和quant。该接口为weight NZ特化版本，当前仅支持Ascend 950PR&950DT系列产品的单Tensor MXFP8场景。`weight`必须为三维FRACTAL_NZ格式，支持非转置和转置输入，`x`仅支持非转置输入。
+- 接口功能：融合GroupedMatmul、dequant、SwiGLU和quant。该接口为weight NZ特化版本，支持Ascend 950PR&950DT系列产品的单Tensor MX A8W8、MX A8W4及A4W4 BF16输出场景。`weight`必须为三维FRACTAL_NZ格式，A8W8和A4W4支持转置和非转置weightNZ；MX A8W4仅支持转置weightNZ。`x`仅支持非转置输入。
 
-- 与V2接口的主要区别：增加SwiGLU计算参数`swigluMode`、`clampLimit`、`gluAlpha`和`gluBias`，以及MX量化参数`roundMode`、`scaleAlg`和`dstTypeMax`。当前`swigluMode`仅支持2。
+- 与V2接口的主要区别：增加SwiGLU计算参数`swigluMode`、`clampLimit`、`gluAlpha`和`gluBias`，以及MX量化参数`roundMode`、`scaleAlg`和`dstTypeMax`。量化输出路径的`swigluMode`仅支持2；原有A4W4 BF16输出路径支持0或2，且`outputScale`必须为nullptr。
 
 - 计算公式：
 
   1. 根据`groupList`和`groupListType`将`x`划分为不同的分组，并为每个分组选择对应的权重切片。
-  2. 执行grouped matmul，并结合`xScale`和`weightScale`完成MXFP8反量化，得到待进行SwiGLU计算的矩阵`x_i`：
+  2. 执行grouped matmul，并结合`xScale`和`weightScale`完成MX分块反量化，得到待进行SwiGLU计算的矩阵`x_i`：
 
      $$x_i[m,n] = \sum_{k=0}^{K-1} \left(X_i[m,k] \cdot s_i^X[m,\lfloor k/32\rfloor]\right) \left(W_i[k,n] \cdot s_i^W[\lfloor k/32\rfloor,n]\right)$$
 
      其中`W_i`表示逻辑上的`[K,N]`权重，$s_i^X$、$s_i^W$是解码后的逻辑缩放因子，按MX block规则在K方向每32个元素一组广播，每64个元素存储两个E8M0 scale。缩放发生在K方向求和之前，不能将随K变化的scale移到矩阵乘法结果之后相乘。
 
   3. 沿最后一维前后分半，对前半部分执行带clamp和alpha的SiLU，对后半部分执行带clamp和bias的线性分支，再逐元素相乘，得到`swigluOut_i`。
-  4. 对`swigluOut_i`执行MXFP8动态量化，输出量化结果`output`和E8M0格式的`outputScale`：
+  4. MX A8W4传入`smoothScale`时，先在FP32精度将`swigluOut_i[m,j]`乘以`smoothScale[i,j]`；未传入时跳过该乘法。随后按既有BF16最近偶数舍入及MXFP8动态量化规则，输出`output`和E8M0格式的`outputScale`：
 
-     $$output, outputScale = DynamicMxQuant(swigluOut_i)$$
+     $$V_i = \operatorname{BF16}_{\mathrm{rint}}(swigluOut_i \cdot smoothScale[i,:]),\qquad output, outputScale = DynamicMxQuant(V_i)$$
+
+     `smoothScale[i,:]`在该expert的token行上广播；缺省时按全1处理。乘法必须发生在BF16舍入之前，不得先将SwiGLU结果舍入为BF16再乘smooth。
 
   - `swigluMode`取值和计算公式：
 
@@ -55,7 +57,7 @@
 
   本接口当前固定沿最后一维拆分，具体约束见“约束说明”。
 
-  - MX量化先将`swigluOut_i`按最近偶数舍入转为BF16，再沿输出的N轴每32个元素组成一个量化组；每64个元素在`outputScale`中存储两个E8M0 scale。设该组的BF16元素为$V_j$，最大绝对值为$a=\max_j |V_j|$。输出类型固定为FLOAT8_E4M3FN，其最大有限值为448。对处于正常可表示范围的非零有限$a$，两种`scaleAlg`的计算公式分别为：
+  - MXFP8输出场景先对`smoothScale`处理后的SwiGLU结果（未传入时为`swigluOut_i`）按最近偶数舍入转为BF16，再沿输出的N轴每32个元素组成一个量化组；每64个元素在`outputScale`中存储两个E8M0 scale。设该组的BF16元素为$V_j$，最大绝对值为$a=\max_j |V_j|$。输出类型固定为FLOAT8_E4M3FN，其最大有限值为448。对处于正常可表示范围的非零有限$a$，两种`scaleAlg`的计算公式分别为：
 
     - `scaleAlg=0`（OCP）：共享指数不向上进位。
 
@@ -75,7 +77,7 @@
 
       $P_j$按原位置组成`output`。有限scale的E8M0编码$s$解码为$YScale=2^{s-127}$。`dstTypeMax=0.0`表示采用E4M3FN的默认最大值448，并非以0为除数；当前不支持非零自定义值。
 
-  非转置和转置的`weight`均使用`ACL_FORMAT_FRACTAL_NZ`格式，通过view stride和物理存储排列区分。
+  非转置和转置的`weight`均使用`ACL_FORMAT_FRACTAL_NZ`格式，通过view stride和物理存储排列区分；`weightScale`的转置属性必须与`weight`一致。
 
 ## 函数原型
 
@@ -106,7 +108,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3GetWorkspaceSize(
     aclTensor           *output,
     aclTensor           *outputScale,
     uint64_t            *workspaceSize,
-    aclOpExecutor      **executor);
+    aclOpExecutor      **executor)
 ```
 
 ```cpp
@@ -114,7 +116,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
     void          *workspace,
     uint64_t       workspaceSize,
     aclOpExecutor *executor,
-    aclrtStream    stream);
+    aclrtStream    stream)
 ```
 
 ## aclnnGroupedMatmulSwigluQuantWeightNzV3GetWorkspaceSize
@@ -125,28 +127,28 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
 
   | 参数名 | 输入/输出 | 描述 | 使用说明 | 数据类型 | 数据格式 | 维度 | 非连续的Tensor |
   | --- | --- | --- | --- | --- | --- | --- | --- |
-  | x（aclTensor *） | 输入 | 激活矩阵。 | MXFP8输入；当前仅支持FLOAT8_E4M3FN。 | FLOAT8_E4M3FN | ND | 2 | √ |
-  | weight（aclTensorList *） | 输入 | 分组权重矩阵。 | 支持非转置和转置输入，具体view和storage shape见约束说明。 | FLOAT8_E4M3FN | FRACTAL_NZ | 3 | 仅支持约束说明中的转置weight view |
-  | weightScale（aclTensorList *） | 输入 | 权重量化因子。 | 与weight对应，具体view和storage shape见约束说明。 | FLOAT8_E8M0 | ND | 4 | √ |
-  | weightAssistMatrix（aclTensorList *） | 输入 | 权重辅助矩阵。 | 当前不支持有效数据；可传nullptr、长度为0的TensorList，或长度为1且唯一元素为nullptr/shape (0)的TensorList。 | - | - | - | - |
-  | bias（aclTensor *） | 输入 | 矩阵乘偏置。 | 当前不支持，必须传nullptr。 | - | - | - | - |
-  | xScale（aclTensor *） | 输入 | 激活量化因子。 | 按K方向每64个元素对应两个E8M0 scale。 | FLOAT8_E8M0 | ND | 3 | √ |
-  | smoothScale（aclTensor *） | 输入 | 平滑量化因子。 | 当前不支持，必须传nullptr。 | - | - | - | - |
-  | groupList（aclTensor *） | 输入 | 分组信息。 | 其语义由groupListType决定。 | INT64 | ND | (E) | √ |
+  | x（const aclTensor *） | 输入 | 激活矩阵。 | A8W8/A8W4为FP8；A4W4为FP4。 | FLOAT8_E4M3FN、FLOAT4_E2M1 | ND | 2维，(M, K) | √ |
+  | weight（const aclTensorList *） | 输入 | 分组权重矩阵。 | 支持转置和非转置weightNZ；具体view和storage shape见约束说明。 | FLOAT8_E4M3FN、FLOAT4_E2M1 | FRACTAL_NZ | 3维，(E, K, N) | 仅支持约束说明中的转置weight view |
+  | weightScale（const aclTensorList *） | 输入 | 权重量化因子。 | 与weight对应，具体view和storage shape见约束说明。 | FLOAT8_E8M0 | ND | 4维，(E, ceil(K / 64), N, 2) | √ |
+  | weightAssistMatrix（const aclTensorList *） | 可选输入 | 权重辅助矩阵。 | 当前不支持有效数据；可传nullptr、长度为0的TensorList，或长度为1且唯一元素为nullptr/shape (0)的TensorList。 | - | - | - | - |
+  | bias（const aclTensor *） | 可选输入 | 矩阵乘偏置。 | 当前不支持，必须传nullptr。 | - | - | - | - |
+  | xScale（const aclTensor *） | 输入 | 激活量化因子。 | 按K方向每64个元素对应两个E8M0 scale。 | FLOAT8_E8M0 | ND | 3维，(M, ceil(K / 64), 2) | √ |
+  | smoothScale（const aclTensor *） | 可选输入 | 按expert的平滑量化因子。 | 仅MX A8W4可选，非空时必须为Device HBM内存，不接受Host Tensor；其他场景必须传nullptr。FP32 SwiGLU结果乘smooth后再进行BF16舍入和MX量化。 | FLOAT | ND | 2维，(E, N / 2) | √，入口连续化 |
+  | groupList（const aclTensor *） | 输入 | 分组信息。 | 长度必须为E；其语义由groupListType决定。A8W4及A4W4 BF16输出要求Device内存；A8W8保持原有行为。 | INT64 | ND | 1维，(E) | √ |
   | dequantMode（int64_t） | 输入 | 反量化模式。 | 当前仅支持2，表示MX量化反量化。 | - | - | - | - |
   | dequantDtype（int64_t） | 输入 | GroupedMatmul中间结果类型。 | 当前仅支持ACL_FLOAT（枚举值为0）。 | - | - | - | - |
   | quantMode（int64_t） | 输入 | 输出量化模式。 | 当前仅支持2，表示MX量化。 | - | - | - | - |
   | groupListType（int64_t） | 输入 | 分组列表解释方式。 | 0表示cumsum，1表示count。 | - | - | - | - |
-  | tuningConfigOptional（aclIntArray *） | 输入 | tiling调优配置。 | 当前不支持，必须传nullptr或空数组。 | INT64 | - | - | - |
-  | swigluMode（int64_t） | 输入 | SwiGLU计算模式。 | 当前仅支持2：沿最后一维前后分半，前半为激活分支，后半为线性分支。 | - | - | - | - |
+  | tuningConfigOptional（const aclIntArray *） | 可选输入 | tiling调优配置。 | 当前不支持，必须传nullptr或空数组。 | INT64 | - | - | - |
+  | swigluMode（int64_t） | 输入 | SwiGLU计算模式。 | 量化输出仅支持2：沿最后一维前后分半，前半为激活分支，后半为线性分支。A4W4 BF16输出还支持0。 | - | - | - | - |
   | clampLimit（double） | 输入 | 表示SwiGLU中间结果的裁剪上限。 | 激活分支裁剪上限为clampLimit，线性分支裁剪范围为[-clampLimit, clampLimit]；必须为有限、可由FLOAT表示且大于0的值。 | - | - | - | - |
   | gluAlpha（double） | 输入 | 表示Sigmoid输入的缩放系数。 | 必须为有限且可由FLOAT表示的值。 | - | - | - | - |
   | gluBias（double） | 输入 | 表示线性分支的偏置。 | 必须为有限且可由FLOAT表示的值。 | - | - | - | - |
   | roundMode（const char *） | 输入 | MX量化舍入模式。 | 传入nullptr或空字符串时按`"rint"`处理；当前仅支持`"rint"`。 | - | - | - | - |
   | scaleAlg（int64_t） | 输入 | MX量化scale算法。 | 当前接口支持0（OCP）和1（cuBLAS）；其他值会报错。 | - | - | - | - |
   | dstTypeMax（double） | 输入 | MX量化目标类型最大值。 | 当前MXFP8输出仅支持0.0。 | - | - | - | - |
-  | output（aclTensor *） | 输出 | MXFP8量化结果。 | 调用方创建并传入，当前仅支持FLOAT8_E4M3FN。 | FLOAT8_E4M3FN | ND | 2 | √ |
-  | outputScale（aclTensor *） | 输出 | MXFP8输出scale。 | 调用方创建并传入。 | FLOAT8_E8M0 | ND | 3 | √ |
+  | output（aclTensor *） | 输出 | 计算结果。 | A8W8/A8W4为FP8量化结果；A4W4为BF16。 | FLOAT8_E4M3FN、BFLOAT16 | ND | 2维，(M, N / 2) | √ |
+  | outputScale（aclTensor *） | 可选输出 | MXFP8输出scale。 | A8W8/A8W4必须传入；A4W4 BF16输出必须传nullptr。 | FLOAT8_E8M0 | ND | 3维，(M, ceil((N / 2) / 64), 2) | √ |
   | workspaceSize（uint64_t *） | 输出 | Device侧workspace大小。 | 返回值。 | - | - | - | - |
   | executor（aclOpExecutor **） | 输出 | 算子执行器。 | 返回值，传给第二段接口。 | - | - | - | - |
 
@@ -177,7 +179,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
     <tr>
       <td rowspan="7">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="7">161002</td>
-      <td>输入或输出的数据类型不在支持范围内；当前MXFP8 weightNZ场景要求x、weight和output为FLOAT8_E4M3FN，xScale、weightScale和outputScale为FLOAT8_E8M0，groupList为INT64。</td>
+      <td>输入或输出的数据类型不在支持范围内；A8W8要求x、weight和output为FLOAT8_E4M3FN，A8W4的weight为FLOAT4_E2M1且output仍为FLOAT8_E4M3FN；两者的xScale、weightScale和outputScale均为FLOAT8_E8M0，groupList为INT64。</td>
     </tr>
     <tr>
       <td>输入或输出的参数维度、shape或format不满足约束，例如weight不是三维FRACTAL_NZ格式，或输出shape不匹配。</td>
@@ -189,7 +191,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
       <td>dequantMode、quantMode、dequantDtype不满足2、2、ACL_FLOAT的约束。</td>
     </tr>
     <tr>
-      <td>weightAssistMatrix、bias、smoothScale或tuningConfigOptional传入了当前场景不支持的内容。</td>
+      <td>weightAssistMatrix、bias、smoothScale或tuningConfigOptional传入了当前场景不支持的内容；MX A8W4的groupList或非空smoothScale不是Device HBM Tensor。</td>
     </tr>
     <tr>
       <td>swigluMode不等于2，或clampLimit、gluAlpha、gluBias不满足有限性及float32可表示性约束；其中clampLimit还必须大于0。</td>
@@ -218,6 +220,20 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
   `aclnnStatus`：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
+
+### 新增MX A8W4
+
+- `x`固定为FLOAT8_E4M3FN，`weight`固定为FLOAT4_E2M1 FRACTAL_NZ；不接受FLOAT8_E5M2、FLOAT4_E1M2或ND权重。`xScale`、`weightScale`及`outputScale`均为FLOAT8_E8M0，`output`固定为FLOAT8_E4M3FN。
+- 当前仅支持单Tensor承载全部expert，仅支持`transposeWeight=true`，由weight和weightScale的view stride识别，不额外暴露转置参数。
+- API入口的weight view均为`(E, K, N)`。转置stride为`(K*N, 1, K)`，物理storage为`(E, ceil(K/64), ceil(N/16), 16, 64)`。FP4的C0为64，不能沿用FP8的32；storage维度以FP4元素计数，每字节打包两个FP4元素。
+- weightScale的入口view均为`(E, ceil(K/64), N, 2)`。转置stride为`(N*ceil(K/64)*2, 2, ceil(K/64)*2, 1)`，对应storage为`(E, N, ceil(K/64), 2)`。weight与weightScale的转置属性必须一致。入口复用既有转置归一化和scale连续化函数。
+- `E`范围为`[1,1024]`，`M`为正整数，`K`、`N`为正的128整数倍；`xScale`、输出及groupList的shape和分组语义与下方A8W8规则一致。
+- `smoothScale`可为nullptr；非空时必须严格为FLOAT、ND、`(E,N/2)`，不接受`(E)`、`(N/2)`或其他广播shape。支持非连续输入，入口检查存储边界后进行连续化，并传给既有执行函数。
+- 新A8W4的`groupList`以及非空`smoothScale`必须为Device HBM Tensor；Host输入在第一段接口返回`ACLNN_ERR_PARAM_INVALID`，包括连续和非连续Host Tensor。调用方应先完成H2D拷贝，再创建对应Device Tensor。kernel直接通过GM地址读取两者，入口没有可依赖的executor自动H2D保证，`Contiguous`只负责连续化，不能视为Host到Device搬运。旧A8W8的Host groupList处理及原A4W4校验保持不变。
+- 仅支持`swigluMode=2`、`dequantMode=2`、`dequantDtype=ACL_FLOAT`、`quantMode=2`、`roundMode="rint"`（nullptr或空字符串取默认值）、`scaleAlg=0/1`、`dstTypeMax=0.0`。其余可选参数沿用原有拒绝规则。
+- FP32 SwiGLU结果先乘对应expert的smooth，再进行既有BF16最近偶数舍入和MX量化。ACLNN入口负责校验和传参，该计算顺序依赖配套host tiling/kernel/APT实现；入口UT不验证设备数值精度。
+
+### 原有MX A8W8
 
   - 确定性计算：
       - aclnnGroupedMatmulSwigluQuantWeightNzV3默认为确定性实现。
@@ -305,7 +321,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
         - groupList约束：长度为E，`groupListType`仅支持0或1。
             - `groupListType=0`：groupList须为非负单调非递减数列（累积和），最后一个值不大于x中tensor的第一维。
             - `groupListType=1`：groupList须为非负数列（各组大小），数值总和不大于x中tensor的第一维。
-            - groupList未指定的output区域不参与计算，对应的outputScale填充编码0。
+            - groupList未指定的output区域不参与计算，其内容不作保证。MXFP8场景下，对应的outputScale填充编码0。MX A8W4场景下，对应的outputScale内容不作保证。
   <!-- end id7 -->
 
 ## 调用示例
