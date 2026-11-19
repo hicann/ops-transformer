@@ -16,8 +16,10 @@
 #ifndef BLOCK_ATTN_RES_PREPARE_VECTOR_TILING_H
 #define BLOCK_ATTN_RES_PREPARE_VECTOR_TILING_H
 
+#include <cstdint>
+
 #include "block_attn_res_prepare_base_tiling.h"
-#include "../../op_kernel/arch35/block_attn_res_prepare_tiling_data.h"
+#include "../../../op_kernel/arch35/block_attn_res_prepare_tiling_data.h"
 
 namespace optiling {
 
@@ -25,24 +27,25 @@ class BlockAttnResPrepareVectorTiling final : public BlockAttnResPrepareBaseTili
 public:
     explicit BlockAttnResPrepareVectorTiling(gert::TilingContext* context)
         : BlockAttnResPrepareBaseTiling(context)
-    {}
+    {
+        tilingDataPtr_ = &tilingData_;
+        tilingDataSize_ = sizeof(tilingData_);
+    }
     ~BlockAttnResPrepareVectorTiling() override = default;
 
 protected:
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
     uint64_t GetTilingKey() const override;
-    void DumpTilingInfo() override;
-    TilingDataView GetTilingDataView() const override;
 
 private:
-    bool SelectVectorBaseD(bool hasMultipleWorkRounds);
+    bool CanCacheVPerToken() const;
+    bool SelectVCacheCapacity(bool hasMultipleWorkRounds);
+    void SetTilingData(uint64_t sBlockCount, uint64_t totalWorkUnits);
 
-    uint32_t baseD_ = 0;
-    uint32_t qBufferNum_ = 1;
-    uint32_t vBufferNum_ = 1;
-    uint32_t oBufferNum_ = 1;
-    uint32_t vCacheRows_ = 0;
+    uint32_t sBlockSize_ = 1;
+    uint8_t vCacheRows_ = 0;       // N is validated within [1, 64].
+    bool useSingleSCache_ = false; // Selects the single-S cache template.
 
     BlockAttnResPrepareTilingData tilingData_{};
 };

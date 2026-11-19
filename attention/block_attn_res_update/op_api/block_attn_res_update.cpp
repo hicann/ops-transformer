@@ -57,9 +57,11 @@ static bool IsEmptyWorkload(const aclTensor* partialBlockRef)
 
 const aclTensor* BlockAttnResUpdate(aclTensor* partialBlockRef, const aclTensor* delta, const aclTensor* pseudoQuery,
                                     const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum,
-                                    double eps, aclOpExecutor* executor)
+                                    const aclTensor* outputNormWeightOptional, double eps, double outputNormEps,
+                                    aclOpExecutor* executor)
 {
-    L0_DFX(BlockAttnResUpdate, partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum, eps);
+    L0_DFX(BlockAttnResUpdate, partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum,
+           outputNormWeightOptional, eps, outputNormEps);
 
     if (!CheckNotNull(partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum, executor)) {
         return nullptr;
@@ -76,14 +78,16 @@ const aclTensor* BlockAttnResUpdate(aclTensor* partialBlockRef, const aclTensor*
     auto h = executor->AllocTensor(DataType::DT_BF16, Format::FORMAT_ND, Format::FORMAT_ND);
     OP_CHECK(h != nullptr, OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "BlockAttnResUpdate AllocTensor failed."), return nullptr);
 
-    auto ret =
-        INFER_SHAPE(BlockAttnResUpdate, OP_INPUT(partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum),
-                    OP_OUTPUT(partialBlockRef, h), OP_ATTR(static_cast<float>(eps)));
+    auto ret = INFER_SHAPE(
+        BlockAttnResUpdate,
+        OP_INPUT(partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum, outputNormWeightOptional),
+        OP_OUTPUT(partialBlockRef, h), OP_ATTR(static_cast<float>(eps), static_cast<float>(outputNormEps)));
     OP_CHECK_INFERSHAPE(ret != ACLNN_SUCCESS, return nullptr, "BlockAttnResUpdate InferShape failed.");
 
-    ret = ADD_TO_LAUNCHER_LIST_AICORE(BlockAttnResUpdate,
-                                      OP_INPUT(partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum),
-                                      OP_OUTPUT(partialBlockRef, h), OP_ATTR(static_cast<float>(eps)));
+    ret = ADD_TO_LAUNCHER_LIST_AICORE(
+        BlockAttnResUpdate,
+        OP_INPUT(partialBlockRef, delta, pseudoQuery, numerator, logitMax, expSum, outputNormWeightOptional),
+        OP_OUTPUT(partialBlockRef, h), OP_ATTR(static_cast<float>(eps), static_cast<float>(outputNormEps)));
     OP_CHECK_ADD_TO_LAUNCHER_LIST_AICORE(ret != ACLNN_SUCCESS, return nullptr,
                                          "BlockAttnResUpdate ADD_TO_LAUNCHER_LIST_AICORE failed.");
     return h;

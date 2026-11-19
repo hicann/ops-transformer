@@ -16,13 +16,10 @@
 #ifndef BLOCK_ATTN_RES_PREPARE_MIX_H
 #define BLOCK_ATTN_RES_PREPARE_MIX_H
 
+#include <cstdint>
+
 #include "block_attn_res_prepare_tiling_data.h"
 #include "kernel_operator.h"
-#include "blaze/gemm/utils/common_utils.h"
-
-using namespace AscendC;
-using Blaze::Gemm::CeilAlign;
-
 #include "blaze/attention/kernel/kernel_universal.h"
 
 namespace BlockAttnResPrepare {
@@ -112,10 +109,10 @@ __aicore__ inline void AssembleSchedulerParams(Params& params, const optiling::B
 }
 } // namespace BlockAttnResPrepareMixDetail
 
-__aicore__ inline void BlockAttnResPrepareTensorApiBlazeKernel(GM_ADDR blockRes, GM_ADDR validBlocks,
-                                                               GM_ADDR pseudoQuery, GM_ADDR numerator, GM_ADDR logitMax,
-                                                               GM_ADDR expSum, GM_ADDR workspace,
-                                                               const optiling::BlockAttnResPrepareMixTilingData& tiling)
+__aicore__ inline void BlockAttnResPrepareBlazeKernel(GM_ADDR blockRes, GM_ADDR validBlocks, GM_ADDR pseudoQuery,
+                                                      GM_ADDR numerator, GM_ADDR logitMax, GM_ADDR expSum,
+                                                      GM_ADDR workspace,
+                                                      const optiling::BlockAttnResPrepareMixTilingData& tiling)
 {
     BlockAttnResPrepareMixDetail::Params params{};
     BlockAttnResPrepareMixDetail::AssembleProblemShape(params, tiling);

@@ -3,90 +3,84 @@
 ## 产品支持情况
 
 | 产品 | 是否支持 |
-| ---- | :----:|
-|<term>Ascend 950PR&950DT系列产品</term>|√|
-|<term>Atlas A3系列产品</term>|×|
-|<term>Atlas A2系列产品</term>|×|
-|<term>Atlas 200I/500 A2推理产品</term>|×|
-|<term>Atlas推理系列产品</term>|×|
-|<term>Atlas训练系列产品</term>|×|
+| :--- | :---: |
+| <term>Ascend 950PR&950DT系列产品</term> | √ |
+| <term>Atlas A3系列产品</term> | × |
+| <term>Atlas A2系列产品</term> | × |
+| <term>Atlas 200I/500 A2推理产品</term> | × |
+| <term>Atlas推理系列产品</term> | × |
+| <term>Atlas训练系列产品</term> | × |
 
 ## 功能说明
 
-- 算子功能：完成BlockAttnRes第二阶段更新。算子首先使用增量delta更新局部注意力结果partial_block，再计算更新结果与pseudo_query的归一化相关分数，并结合已有在线Softmax状态numerator、logit_max和exp_sum生成注意力输出h。
+- 算子功能：将当前增量原地累加到局部残差，计算归一化score，与历史在线Softmax状态合并得到注意力输出，并支持融合输出均方根归一化（Root Mean Square Normalization，RMSNorm）。
+
+- 版本演进：[aclnnBlockAttnResUpdateV2](docs/aclnnBlockAttnResUpdateV2.md)在[aclnnBlockAttnResUpdate](docs/aclnnBlockAttnResUpdate.md)的基础上，新增`output_norm_weight`和`output_norm_eps`对应的可选输出RMSNorm能力。
 
 - 计算公式：
 
-对于每个token $t$，首先更新局部注意力结果：
+  对每个token $t$，先更新局部残差并原地写回：
 
-$$
-p_t = partial\_block_t + \operatorname{float}(delta_t)
-$$
+  $$
+  p_t=P_t+\operatorname{FP32}(\Delta_t),\qquad
+  P^{\mathrm{out}}_t=p_t
+  $$
 
-计算更新结果的RMS和归一化相关分数：
+  通过RMSNorm和Query点积得到当前残差的score：
 
-$$
-rms_t = \sqrt{\frac{1}{D}\sum_{j=0}^{D-1}p_{t,j}^{2} + eps}
-$$
+  $$
+  C_t=\left\langle Q,\operatorname{RMSNorm}(p_t,\mathbf{1},\epsilon)\right\rangle
+  $$
 
-$$
-score_t = \frac{\sum_{j=0}^{D-1}p_{t,j} \cdot pseudo\_query_j}{rms_t}
-$$
+  将当前残差与历史在线Softmax状态合并：
 
-使用在线Softmax方式融合已有状态和当前结果：
+  $$
+  m_t=\max(M_t,C_t),\qquad
+  \alpha_t=\exp(M_t-m_t),\qquad
+  \beta_t=\exp(C_t-m_t)
+  $$
 
-$$
-max_t = \max(logit\_max_t, score_t)
-$$
+  $$
+  H^{(0)}_t=\operatorname{BF16}\left(
+  \frac{\alpha_t O_t+\beta_t p_t}{\alpha_t L_t+\beta_t}
+  \right)
+  $$
 
-$$
-alpha_t = \exp(logit\_max_t-max_t), \qquad
-beta_t = \exp(score_t-max_t)
-$$
+  未传入`output_norm_weight`时，输出 $H=H^{(0)}$；否则对BF16混合结果执行输出RMSNorm：
 
-$$
-denominator_t = exp\_sum_t \cdot alpha_t + beta_t
-$$
+  $$
+  H_t=\operatorname{BF16}\left(
+  \operatorname{RMSNorm}\left(\operatorname{FP32}(H^{(0)}_t),\operatorname{FP32}(W),\epsilon_{\mathrm{out}}\right)
+  \right)
+  $$
 
-最终输出为：
+  其中：
 
-$$
-partial\_block\_out_t = p_t
-$$
+  - $T$ 和 $D$ 分别表示token数和隐藏维度，$t\in[0,T)$；$P_t$、$p_t$、$\Delta_t$、$O_t$、$H_t$ 和 $Q$ 均为 $D$ 维向量。
+  - $P$ 和 $P^{\mathrm{out}}$ 分别表示`partial_block`调用前后的值，$\Delta$ 表示`delta`，$Q$ 表示`pseudo_query`；$p$ 为FP32残差累加结果。
+  - $O$、$M$、$L$ 分别表示历史状态`numerator`、`logit_max`、`exp_sum`，$H$ 表示输出`h`。$W$ 表示`output_norm_weight`。
+  - $\epsilon=\operatorname{FP32}(\texttt{eps})$，$\epsilon_{\mathrm{out}}=\operatorname{FP32}(\texttt{output\_norm\_eps})$，两者分别用于打分和输出归一化。
+  - RMSNorm沿 $D$ 维计算，打分时的缩放参数为全1向量；打分所需的缩放参数可预先与原始Query逐元素相乘，合并到 $Q$ 中。
 
-$$
-h_t = \operatorname{bfloat16}\left(
-numerator_t \cdot \frac{alpha_t}{denominator_t} +
-p_t \cdot \frac{beta_t}{denominator_t}\right)
-$$
+  对于token $t$ 的非空历史集合 $\mathcal{H}_t$，设历史logit为 $z_{t,i}$、对应的 $D$ 维value为 $v_{t,i}$，输入状态满足：
 
-其中，$T$表示token数，$D$表示隐藏维度，$t \in [0,T)$，$j \in [0,D)$。
-
-对于token $t$ 的非空历史集合 $\mathcal{H}_t$，设历史logit为 $s_{t,i}$、对应的$D$维value为
-$v_{t,i}$，则输入的在线Softmax状态必须满足：
-
-$$
-logit\_max_t = \max_{i \in \mathcal{H}_t}s_{t,i}
-$$
-
-$$
-exp\_sum_t = \sum_{i \in \mathcal{H}_t}\exp(s_{t,i}-logit\_max_t) > 0
-$$
-
-$$
-numerator_t = \sum_{i \in \mathcal{H}_t}\exp(s_{t,i}-logit\_max_t)v_{t,i}
-$$
-
-本算子只读取该历史状态，并将当前的$p_t$与其融合，不更新numerator、logit_max或exp_sum。
+  $$
+  \begin{aligned}
+  M_t&=\max_{i\in\mathcal{H}_t}z_{t,i} \\
+  L_t&=\sum_{i\in\mathcal{H}_t}\exp(z_{t,i}-M_t)>0 \\
+  O_t&=\sum_{i\in\mathcal{H}_t}\exp(z_{t,i}-M_t)v_{t,i}
+  \end{aligned}
+  $$
 
 ## 参数说明
 
-<table style="undefined;table-layout: fixed; width: 980px"><colgroup>
-  <col style="width: 100px">
-  <col style="width: 150px">
-  <col style="width: 280px">
-  <col style="width: 330px">
-  <col style="width: 120px">
+<table style="table-layout: fixed; width: 1000px">
+  <colgroup>
+    <col style="width: 160px">
+    <col style="width: 150px">
+    <col style="width: 450px">
+    <col style="width: 140px">
+    <col style="width: 100px">
   </colgroup>
   <thead>
     <tr>
@@ -95,111 +89,119 @@ $$
       <th>描述</th>
       <th>数据类型</th>
       <th>数据格式</th>
-    </tr></thead>
+    </tr>
+  </thead>
   <tbody>
     <tr>
-      <td>partial_block</td>
+      <td style="white-space: nowrap;">partial_block</td>
       <td>输入</td>
-      <td>待更新的局部注意力结果，公式中的partial_block，shape为$(T, D)$；与同名输出复用存储。</td>
-      <td>FLOAT</td>
+      <td>待更新的局部残差，对应公式中的P，shape为<code>[T, D]</code>；与同名输出复用存储。</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
-      <td>delta</td>
+      <td style="white-space: nowrap;">delta</td>
       <td>输入</td>
-      <td>局部注意力结果的增量，公式中的delta，shape为$(T, D)$。</td>
+      <td>局部残差的增量，对应公式中的Δ，shape为<code>[T, D]</code>。</td>
       <td>BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
-      <td>pseudo_query</td>
+      <td style="white-space: nowrap;">pseudo_query</td>
       <td>输入</td>
-      <td>用于计算归一化相关分数的伪Query向量，公式中的pseudo_query，shape为$(D)$。</td>
-      <td>FLOAT</td>
+      <td>用于计算归一化score的有效Query，对应公式中的Q，shape为<code>[D]</code>。</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
-      <td>numerator</td>
+      <td style="white-space: nowrap;">numerator</td>
       <td>输入</td>
-      <td>非空历史在线Softmax状态对应的分子，公式中的numerator，shape为$(T, D)$；本算子只读。</td>
-      <td>FLOAT</td>
+      <td>非空历史在线Softmax状态的加权分子，对应公式中的O，shape为<code>[T, D]</code>；本算子只读。</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
-      <td>logit_max</td>
+      <td style="white-space: nowrap;">logit_max</td>
       <td>输入</td>
-      <td>非空历史在线Softmax状态中每个token的有限最大值，公式中的logit_max，shape为$(T)$；本算子只读。</td>
-      <td>FLOAT</td>
+      <td>非空历史在线Softmax状态的最大logit，对应公式中的M，shape为<code>[T]</code>；本算子只读。</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
-      <td>exp_sum</td>
+      <td style="white-space: nowrap;">exp_sum</td>
       <td>输入</td>
-      <td>非空历史在线Softmax状态中每个token的有限正指数和，公式中的exp_sum，shape为$(T)$；本算子只读。</td>
-      <td>FLOAT</td>
+      <td>非空历史在线Softmax状态的指数和，对应公式中的L，shape为<code>[T]</code>；本算子只读。</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
-      <td>partial_block</td>
+      <td style="white-space: nowrap;">output_norm_weight</td>
+      <td>可选输入</td>
+      <td>输出RMSNorm的gamma，对应公式中的W，shape为<code>[D]</code>；默认不传入，表示禁用输出RMSNorm。</td>
+      <td>BFLOAT16、FLOAT32</td>
+      <td>ND</td>
+    </tr>
+    <tr>
+      <td style="white-space: nowrap;">partial_block</td>
       <td>输出</td>
-      <td>更新后的局部注意力结果，公式中的partial_block_out，shape为$(T, D)$；与同名输入构成引用关系。</td>
-      <td>FLOAT</td>
+      <td>FP32残差累加结果，对应公式中的P<sup>out</sup>，shape为<code>[T, D]</code>；与同名输入构成引用关系。</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
-      <td>h</td>
+      <td style="white-space: nowrap;">h</td>
       <td>输出</td>
-      <td>融合更新后的局部结果与已有在线Softmax状态得到的注意力结果，公式中的h，shape为$(T, D)$。</td>
+      <td>当前层输出，对应公式中的H，shape为<code>[T, D]</code>；传入权重时为输出RMSNorm结果。</td>
       <td>BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
-      <td>eps</td>
+      <td style="white-space: nowrap;">eps</td>
       <td>可选属性</td>
-      <td>RMS计算中的稳定项，必须为有限值且大于0，默认值为$10^{-6}$。</td>
-      <td>FLOAT</td>
+      <td>
+        <ul>
+          <li>残差RMS score计算的稳定项，必须为有限正数。</li>
+          <li>默认值为<code>1e-6</code>。</li>
+        </ul>
+      </td>
+      <td>FLOAT32</td>
       <td>-</td>
     </tr>
-  </tbody></table>
+    <tr>
+      <td style="white-space: nowrap;">output_norm_eps</td>
+      <td>可选属性</td>
+      <td>
+        <ul>
+          <li>输出RMSNorm的独立稳定项，启用时转换为FLOAT32前必须在<code>[FLT_MIN, FLT_MAX]</code>范围内；禁用时忽略。</li>
+          <li>默认值为<code>1e-6</code>。</li>
+        </ul>
+      </td>
+      <td>FLOAT32</td>
+      <td>-</td>
+    </tr>
+  </tbody>
+</table>
 
 ## 约束说明
 
-- $T$和$D$必须是已知正整数，且$D$的取值范围为$[1, 8192]$。
-- partial_block、delta、numerator及输出partial_block、h的shape必须相同，均为$(T, D)$；pseudo_query、logit_max和exp_sum的shape必须分别为$(D)$、$(T)$和$(T)$。
-- 所有输入的原始格式和存储格式均必须为ND；所有输入、输出的StorageShape必须与OriginShape完全一致。
-- numerator、logit_max和exp_sum是位于GM（Global Memory）中的运行时只读状态，Host Tiling不读取或校验其元素值。
-  调用者必须保证每个token的历史状态非空：logit_max和numerator中的元素为有限值，exp_sum为有限值且严格大于0，
-  并且三者来自同一份历史状态。当前不支持以`logit_max=-inf`、`exp_sum=0`和零numerator表示的空历史状态。
-- $T \times D$不能超出有符号64位Kernel GM元素偏移的表示范围；按核切分后的$T$大小不能超出uint32_t的表示范围。
-- 一行完整的$D$维数据必须能够以双缓冲方式放入统一缓冲区（Unified Buffer，UB），否则Tiling失败。
-- partial_block为原地更新参数。框架调用时由引用关系保证输入、输出复用存储；Kernel直接通过partial_block输入地址读写，不访问对应的输出ABI地址。
-- 当前Host Tiling申请的workspace大小为0，Kernel不访问workspace地址。
-- RMS计算使用FP32的sqrt和除法，不进行牛顿迭代，也不对输入Tensor中的零值、极值、NaN或Inf做额外处理。
+- 启用输出RMSNorm时，`output_norm_eps`须在`[FLT_MIN, FLT_MAX]`范围内；`FLT_MIN = 2^-126 ≈ 1.1754943508222875e-38`，`FLT_MAX ≈ 3.4028234663852886e38`。不支持次正规epsilon，以免默认Sqrt的FTZ模式将其清零。
+- 非空计算时，`T`和`D`必须为已知正整数，且`1 <= D <= 8192`。空Tensor行为请参见[aclnnBlockAttnResUpdate](docs/aclnnBlockAttnResUpdate.md#约束说明)、[aclnnBlockAttnResUpdateV2](docs/aclnnBlockAttnResUpdateV2.md#约束说明)和[PyTorch接口](docs/torchapi_block_attn_res_update.md#约束说明)。
+- `partial_block`、`delta`、`numerator`及输出`partial_block`、`h`的shape必须为`[T, D]`；`pseudo_query`和非空`output_norm_weight`为`[D]`；`logit_max`、`exp_sum`为`[T]`。
+- 非空计算时，调用者须保证每个token的历史状态非空：`logit_max`和`numerator`中的元素有限，`exp_sum`中的元素有限且严格大于0，且三者来自同一份历史在线Softmax状态。Host不读取或校验这些运行时元素，不支持以`logit_max=-inf`、`exp_sum=0`和零`numerator`表示的空历史状态。
+- `T * D`不能超出有符号64位元素偏移的表示范围；按核切分后的`T`大小不能超出`uint32_t`的表示范围。
+- 完整D维数据、可选归一化权重及双缓冲区必须满足统一缓冲区（Unified Buffer，UB）预算，否则Tiling失败。
+- 输出RMSNorm只作用于注意力混合结果；`partial_block`始终原地保存FP32残差累加值。输入中的零值、极值、NaN或Inf不做额外处理。
 
 ## 调用说明
 
-<table><thead>
-  <tr>
-    <th>调用方式</th>
-    <th>调用样例</th>
-    <th>说明</th>
-  </tr></thead>
-<tbody>
-  <tr>
-    <td>aclnn调用</td>
-    <td><a href="examples/arch35/test_aclnn_block_attn_res_update.cpp">test_aclnn_block_attn_res_update.cpp</a></td>
-    <td>通过aclnnBlockAttnResUpdate接口调用，详细说明参见<a href="docs/aclnnBlockAttnResUpdate.md">接口文档</a>。</td>
-  </tr>
-  <tr>
-    <td>PyTorch API</td>
-    <td>-</td>
-    <td>通过<a href="../../attention/block_attn_res_update/docs/torchapi_block_attn_res_update.md">cann_ops_transformer.block_attn_res_update</a>接口调用。</td>
-  </tr>
-</tbody>
-</table>
+| 调用方式 | 样例代码 | 说明 |
+| --- | --- | --- |
+| aclnn API | [test_aclnn_block_attn_res_update](examples/arch35/test_aclnn_block_attn_res_update.cpp) | 通过[aclnnBlockAttnResUpdate](docs/aclnnBlockAttnResUpdate.md)接口方式调用BlockAttnResUpdate算子。 |
+| aclnn API（V2，推荐） | [test_aclnn_block_attn_res_update_v2](examples/arch35/test_aclnn_block_attn_res_update_v2.cpp) | 通过[aclnnBlockAttnResUpdateV2](docs/aclnnBlockAttnResUpdateV2.md)接口方式调用BlockAttnResUpdate算子，支持可选输出RMSNorm。 |
+| PyTorch API | [调用示例](docs/torchapi_block_attn_res_update.md#调用示例) | 通过[cann_ops_transformer.block_attn_res_update](docs/torchapi_block_attn_res_update.md)接口方式调用BlockAttnResUpdate算子。 |
+
+在仓库根目录执行以下命令编译算子，详细步骤请参考[算子调用](../../docs/zh/invocation/quick_op_invocation.md)。
 
 ```bash
-## 快速启动
-# 在仓库根目录执行，假设已准备好环境变量
-bash build.sh --soc=${soc_version} --ops=block_attn_res_update
+bash build.sh --soc=ascend950 --ops=block_attn_res_update
 ```

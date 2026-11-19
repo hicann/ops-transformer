@@ -13,11 +13,12 @@
  * \brief Shape and dtype inference for BlockAttnResPrepare.
  */
 
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
 #include "log/log.h"
 #include "register/op_impl_registry.h"
-#include "util/shape_util.h"
-
-#include <string>
 
 namespace ops {
 namespace {
@@ -56,16 +57,17 @@ ge::graphStatus InferShapeBlockAttnResPrepare(gert::InferShapeContext* context)
                                                       "the input shape of pseudo_query must not be nullptr"),
                 return ge::GRAPH_FAILED);
 
-    const std::string blockResShapeStr = Ops::Base::ToString(*blockResShape);
     const std::string validBlocksShapeStr = Ops::Base::ToString(*validBlocksShape);
-    const std::string pseudoQueryShapeStr = Ops::Base::ToString(*pseudoQueryShape);
     OP_CHECK_IF(validBlocksShape->GetDimNum() != VALID_BLOCKS_RANK || validBlocksShape->GetDim(0) != 1,
                 OP_LOGE_FOR_INVALID_SHAPE(context->GetNodeName(), "valid_blocks", validBlocksShapeStr.c_str(), "[1]"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(blockResShape->GetDimNum() != BLOCK_RES_RANK || pseudoQueryShape->GetDimNum() != PSEUDO_QUERY_RANK,
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "block_res.shape, pseudo_query.shape",
-                                                       (blockResShapeStr + ", " + pseudoQueryShapeStr).c_str(),
-                                                       "block_res.shape must be 3D and pseudo_query.shape must be 2D"),
+    OP_CHECK_IF(blockResShape->GetDimNum() != BLOCK_RES_RANK,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "block_res",
+                                             std::to_string(blockResShape->GetDimNum()).c_str(), "3"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(pseudoQueryShape->GetDimNum() != PSEUDO_QUERY_RANK,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "pseudo_query",
+                                             std::to_string(pseudoQueryShape->GetDimNum()).c_str(), "2"),
                 return ge::GRAPH_FAILED);
 
     const int64_t totalT = blockResShape->GetDim(T_DIM_INDEX);

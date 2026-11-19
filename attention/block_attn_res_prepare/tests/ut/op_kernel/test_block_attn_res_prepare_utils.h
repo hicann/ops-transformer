@@ -13,19 +13,22 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
-#include <cstring>
+#include <exception>
 #include <fstream>
 #include <limits>
 #include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "gmm_csv_parse_utils.h"
 #include "gtest/gtest.h"
+#include "securec.h"
 
 #ifdef __CCE_KT_TEST__
 #include "kernel_ut_runner.h"
@@ -40,16 +43,19 @@ struct BlockAttnResPrepareKernelTestParam {
     std::string caseName;
     std::string kernelUtTarget;
     std::string prefix;
+    std::vector<int32_t> tilingData;
+    uint64_t validBlocks = 0U;
+    uint64_t tilingKey = 0UL;
+
     uint32_t t = 0U;
     uint32_t n = 0U;
     uint32_t s = 0U;
     uint32_t d = 0U;
-    uint64_t validBlocks = 0U;
     uint32_t seed = 0U;
-    bool result = false;
     uint32_t numBlocks = 0U;
-    uint64_t tilingKey = 0UL;
-    std::vector<int32_t> tilingData;
+
+    bool result = false;
+    bool bf16 = false;
 };
 
 struct BlockAttnResPrepareKernelCsvLoadResult {
@@ -92,8 +98,9 @@ public:
 
             const std::string caseName = fields.size() > 1UL ? ops::ut::Trim(fields[1]) : "";
             try {
-                constexpr size_t REQUIRED_COLUMN_COUNT = 15UL;
-                if (fields.size() < REQUIRED_COLUMN_COUNT) {
+                constexpr size_t requiredColumnCount = 15UL;
+                constexpr char bf16Dtype[] = "BF16";
+                if (fields.size() < requiredColumnCount) {
                     throw std::runtime_error("invalid CSV column count");
                 }
 
@@ -121,6 +128,9 @@ public:
                 param.numBlocks = ParseU32(fields[index++], "numBlocks");
                 param.tilingKey = std::stoull(ops::ut::Trim(fields[index++]));
                 param.tilingData = ParseTilingData(fields[index++]);
+                if (index < fields.size() && ops::ut::Trim(fields[index]) == bf16Dtype) {
+                    param.bf16 = true;
+                }
                 ValidateParam(param);
                 result.params.emplace_back(std::move(param));
             } catch (const std::exception& error) {
@@ -133,8 +143,29 @@ public:
         return result;
     }
 
+    static uint16_t FloatToBf16(float value)
+    {
+        constexpr uint32_t fp32ToBf16Shift = 16U;
+        constexpr uint32_t fp32ExponentMask = 0x7F800000U;
+        constexpr uint32_t fp32MantissaMask = 0x007FFFFFU;
+        constexpr uint16_t bf16QuietNanMask = 0x0040U;
+        constexpr uint32_t bf16RneRoundBias = 0x7FFFU;
+        uint32_t bits = 0U;
+        if (memcpy_s(&bits, sizeof(bits), &value, sizeof(value)) != EOK) {
+            throw std::runtime_error("failed to copy FP32 bits");
+        }
+        if ((bits & fp32ExponentMask) == fp32ExponentMask && (bits & fp32MantissaMask) != 0U) {
+            // Keep NaNs out of integer rounding, including payloads confined to the discarded low bits.
+            return static_cast<uint16_t>((bits >> fp32ToBf16Shift) | bf16QuietNanMask);
+        }
+        // Round finite values to nearest even; signed zeros and infinities remain unchanged.
+        const uint32_t roundingBias = bf16RneRoundBias + ((bits >> fp32ToBf16Shift) & 1U);
+        return static_cast<uint16_t>((bits + roundingBias) >> fp32ToBf16Shift);
+    }
+
 #ifdef __CCE_KT_TEST__
-    static void TestOneParamCase(const BlockAttnResPrepareKernelTestParam& param)
+    template <typename InputStorageT, typename KernelFunc>
+    static void TestOneParamCase950Impl(const BlockAttnResPrepareKernelTestParam& param, KernelFunc kernelFunc)
     {
         ASSERT_TRUE(param.result) << "op_kernel CSV currently supports successful launch cases only";
 
@@ -146,7 +177,7 @@ public:
         std::vector<float> pseudoQueryInput(pseudoQueryElements);
         InitInputData(param, blockResInput, pseudoQueryInput);
 
-        GmBuffer blockResGm(blockResElements * sizeof(float));
+        GmBuffer blockResGm(blockResElements * sizeof(InputStorageT));
         GmBuffer validBlocksGm(sizeof(uint64_t));
         GmBuffer pseudoQueryGm(pseudoQueryElements * sizeof(float));
         GmBuffer numeratorGm(numeratorElements * sizeof(float));
@@ -162,16 +193,35 @@ public:
         ASSERT_TRUE(expSumGm.IsValid());
         ASSERT_TRUE(tilingGm.IsValid());
 
-        std::memcpy(blockResGm.Get(), blockResInput.data(), blockResElements * sizeof(float));
-        std::memcpy(validBlocksGm.Get(), &param.validBlocks, sizeof(param.validBlocks));
-        std::memcpy(pseudoQueryGm.Get(), pseudoQueryInput.data(), pseudoQueryElements * sizeof(float));
-        std::memset(numeratorGm.Get(), 0xFF, numeratorElements * sizeof(float));
-        std::memset(logitMaxGm.Get(), 0xFF, statsElements * sizeof(float));
-        std::memset(expSumGm.Get(), 0xFF, statsElements * sizeof(float));
-        std::memcpy(tilingGm.Get(), param.tilingData.data(), param.tilingData.size() * sizeof(int32_t));
+        if constexpr (std::is_same<InputStorageT, uint16_t>::value) {
+            std::vector<uint16_t> blockResBf16(blockResElements);
+            for (size_t index = 0UL; index < blockResElements; ++index) {
+                blockResBf16[index] = FloatToBf16(blockResInput[index]);
+            }
+            ASSERT_EQ(memcpy_s(blockResGm.Get(), blockResElements * sizeof(InputStorageT), blockResBf16.data(),
+                               blockResElements * sizeof(uint16_t)),
+                      EOK);
+        } else {
+            ASSERT_EQ(memcpy_s(blockResGm.Get(), blockResElements * sizeof(InputStorageT), blockResInput.data(),
+                               blockResElements * sizeof(float)),
+                      EOK);
+        }
+        ASSERT_EQ(memcpy_s(pseudoQueryGm.Get(), pseudoQueryElements * sizeof(float), pseudoQueryInput.data(),
+                           pseudoQueryElements * sizeof(float)),
+                  EOK);
+        ASSERT_EQ(
+            memcpy_s(validBlocksGm.Get(), sizeof(param.validBlocks), &param.validBlocks, sizeof(param.validBlocks)),
+            EOK);
+        ASSERT_EQ(
+            memset_s(numeratorGm.Get(), numeratorElements * sizeof(float), 0xFF, numeratorElements * sizeof(float)),
+            EOK);
+        ASSERT_EQ(memset_s(logitMaxGm.Get(), statsElements * sizeof(float), 0xFF, statsElements * sizeof(float)), EOK);
+        ASSERT_EQ(memset_s(expSumGm.Get(), statsElements * sizeof(float), 0xFF, statsElements * sizeof(float)), EOK);
+        ASSERT_EQ(memcpy_s(tilingGm.Get(), param.tilingData.size() * sizeof(int32_t), param.tilingData.data(),
+                           param.tilingData.size() * sizeof(int32_t)),
+                  EOK);
 
         const uint32_t launchBlocks = std::min(MAX_NUM_BLOCKS, param.numBlocks);
-        const auto kernelFunc = &block_attn_res_prepare<BLOCK_ATTN_RES_PREPARE_TPL_ONLY_VECTOR>;
         ICPU_SET_TILING_KEY(param.tilingKey);
         ASSERT_TRUE(KERNEL_RUN_KF(kernelFunc, launchBlocks, blockResGm.Get(), validBlocksGm.Get(), pseudoQueryGm.Get(),
                                   numeratorGm.Get(), logitMaxGm.Get(), expSumGm.Get(), nullptr, tilingGm.Get()))
@@ -239,27 +289,39 @@ private:
         }
 
         optiling::BlockAttnResPrepareTilingData tiling{};
-        std::memcpy(&tiling, param.tilingData.data(), sizeof(tiling));
-        const uint64_t expectedWorkUnits = static_cast<uint64_t>(param.t) * param.s;
+        if (memcpy_s(&tiling, sizeof(tiling), param.tilingData.data(), sizeof(tiling)) != EOK) {
+            throw std::runtime_error("failed to copy tilingData");
+        }
+        if (tiling.sBlockSize == 0U || tiling.sBlockSize > param.s) {
+            throw std::runtime_error("sBlockSize must be within the S dimension");
+        }
+        const uint64_t expectedSBlockCount =
+            (static_cast<uint64_t>(param.s) + tiling.sBlockSize - 1U) / tiling.sBlockSize;
+        const uint64_t expectedWorkUnits = static_cast<uint64_t>(param.t) * expectedSBlockCount;
         if (tiling.totalT != param.t || tiling.totalN != param.n || tiling.totalS != param.s ||
-            tiling.totalD != param.d || tiling.totalWorkUnits != expectedWorkUnits) {
+            tiling.totalD != param.d) {
             throw std::runtime_error("tilingData dimensions do not match the CSV case");
         }
-        using BlockAttnResPrepareTilingKey::g_tilingDeclareParams;
-        if (param.tilingKey != GET_TPL_TILING_KEY(BLOCK_ATTN_RES_PREPARE_TPL_ONLY_VECTOR)) {
-            throw std::runtime_error("kernel UT currently supports the Vector tiling key only");
+        if (expectedWorkUnits > std::numeric_limits<uint32_t>::max()) {
+            throw std::runtime_error("derived work count exceeds uint32_t range");
         }
-        if (tiling.usedCoreNum == 0U || tiling.usedCoreNum > param.numBlocks || tiling.blockFactor == 0U ||
-            tiling.tailBlockFactor == 0U || tiling.baseD == 0U || tiling.baseD > tiling.totalD ||
-            tiling.statUbElems == 0U || tiling.qBufferNum == 0U || tiling.vBufferNum == 0U || tiling.oBufferNum == 0U ||
-            !std::isfinite(tiling.eps) || tiling.eps <= 0.0F) {
+        using BlockAttnResPrepareTilingKey::g_tilingDeclareParams;
+        const uint64_t vectorKey = GET_TPL_TILING_KEY(BLOCK_ATTN_RES_PREPARE_ONLY_VECTOR_TPL);
+        if (param.tilingKey != vectorKey) {
+            throw std::runtime_error("kernel UT currently supports the shared Vector tiling key only");
+        }
+        if (tiling.usedCoreNum == 0U || tiling.usedCoreNum > param.numBlocks ||
+            tiling.usedCoreNum > expectedWorkUnits || tiling.vCacheRows > tiling.totalN || !std::isfinite(tiling.eps) ||
+            tiling.eps <= 0.0F) {
             throw std::runtime_error("tilingData contains an invalid scheduling or buffer field");
         }
-        const uint32_t expectedTail = tiling.blockFactor + (tiling.bigCoreNum > 0U ? 1U : 0U);
-        const uint64_t coveredWork = static_cast<uint64_t>(tiling.usedCoreNum) * tiling.blockFactor + tiling.bigCoreNum;
-        if (tiling.bigCoreNum >= tiling.usedCoreNum || tiling.tailBlockFactor != expectedTail ||
-            coveredWork != expectedWorkUnits || tiling.vCacheRows > tiling.totalN) {
-            throw std::runtime_error("tilingData work distribution does not cover the CSV case");
+        const uint32_t rowAlign = param.bf16 ? 16U : 8U;
+        const uint64_t expectedDAlign = (static_cast<uint64_t>(param.d) + rowAlign - 1U) / rowAlign * rowAlign;
+        const uint32_t expectedQBufferNum = tiling.sBlockSize > 1U || expectedWorkUnits > tiling.usedCoreNum ? 2U : 1U;
+        if (tiling.sBlockCount != expectedSBlockCount || tiling.workPerCore != expectedWorkUnits / tiling.usedCoreNum ||
+            tiling.remainder != expectedWorkUnits % tiling.usedCoreNum || tiling.dAlign != expectedDAlign ||
+            tiling.qBufferNum != expectedQBufferNum || tiling.reciprocalD != 1.0F / static_cast<float>(param.d)) {
+            throw std::runtime_error("tilingData contains inconsistent precomputed fields");
         }
         const uint32_t launchBlocks = std::min(MAX_NUM_BLOCKS, param.numBlocks);
         if (tiling.usedCoreNum > launchBlocks) {
@@ -299,15 +361,18 @@ private:
     static void InitInputData(const BlockAttnResPrepareKernelTestParam& param, std::vector<float>& blockRes,
                               std::vector<float>& pseudoQuery)
     {
+        // Perturb binary-exact query values to exercise FP32 Q precision without BF16 pre-rounding.
+        constexpr float pseudoQueryFp32Offset = 0.000123F;
         for (size_t index = 0UL; index < blockRes.size(); ++index) {
             const int32_t value = static_cast<int32_t>((index * 3UL + param.seed) % 11UL) - 5;
             blockRes[index] = static_cast<float>(value) * 0.0625F;
         }
         for (size_t index = 0UL; index < pseudoQuery.size(); ++index) {
             const int32_t value = static_cast<int32_t>((index * 5UL + param.seed) % 9UL) - 4;
-            pseudoQuery[index] = static_cast<float>(value) * 0.125F;
+            pseudoQuery[index] = static_cast<float>(value) * 0.125F + pseudoQueryFp32Offset;
         }
     }
+
 #endif
 };
 

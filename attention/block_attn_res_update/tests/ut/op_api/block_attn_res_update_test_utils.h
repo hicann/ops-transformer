@@ -30,7 +30,7 @@
 #include "opdev/op_errno.h"
 #include "opdev/platform.h"
 
-namespace block_attn_res_update::test {
+namespace BlockAttnResUpdate::Test {
 
 constexpr size_t PATH_BUFFER_SIZE = 4096U;
 
@@ -86,6 +86,7 @@ struct AclTensorSpec {
     std::vector<int64_t> viewDims;
     std::vector<int64_t> stride;
     std::vector<int64_t> storageDims;
+    int64_t offset = 0;
 };
 
 inline AclTensorSpec ParseAclTensorSpec(const std::string& value)
@@ -103,6 +104,9 @@ inline AclTensorSpec ParseAclTensorSpec(const std::string& value)
     if (sections.size() > 2U) {
         spec.storageDims = ParseDims(sections[2]);
     }
+    if (sections.size() > 3U) {
+        spec.offset = std::stoll(Trim(sections[3]));
+    }
     return spec;
 }
 
@@ -110,6 +114,7 @@ inline aclDataType ParseAclDtype(const std::string& dtype)
 {
     static const std::map<std::string, aclDataType> dtypeMap = {
         {"FLOAT", ACL_FLOAT},
+        {"FLOAT16", ACL_FLOAT16},
         {"BF16", ACL_BF16},
     };
     const auto iterator = dtypeMap.find(Trim(dtype));
@@ -223,6 +228,6 @@ inline std::string BuildCsvParseErrorMessage(const std::string& csvPath, size_t 
     return message.str();
 }
 
-} // namespace block_attn_res_update::test
+} // namespace BlockAttnResUpdate::Test
 
 #endif // BLOCK_ATTN_RES_UPDATE_TEST_UTILS_H

@@ -66,7 +66,7 @@ struct BlockAttnResUpdateInferCase {
         }
 
         const std::vector<uint32_t> inputInstanceNum = {
-            1U, 1U, 1U, 1U, 1U, 1U,
+            1U, 1U, 1U, 1U, 1U, 1U, 0U,
         };
         const std::vector<uint32_t> outputInstanceNum = {
             partialRefPresent ? 1U : 0U,

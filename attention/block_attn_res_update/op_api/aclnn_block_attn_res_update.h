@@ -30,7 +30,7 @@ extern "C" {
  * @param numerator [in] 必选连续输入，数据类型为 FLOAT。
  * @param logitMax [in] 必选连续输入，数据类型为 FLOAT。
  * @param expSum [in] 必选连续输入，数据类型为 FLOAT。
- * @param eps [in] 必选 DOUBLE 浮点属性，必须为有限正数。
+ * @param eps [in] 必选 DOUBLE 浮点属性，必须为有限正数，非空计算时转换为 FLOAT32 后仍须为有限正数。
  * @param h [out] 必选连续输出，数据类型为 BFLOAT16，shape 与 delta 一致。
  * @param workspaceSize [out] 返回所需 workspace 大小。
  * @param executor [out] 返回执行器。
@@ -44,7 +44,7 @@ ACLNN_API aclnnStatus aclnnBlockAttnResUpdateGetWorkspaceSize(aclTensor* partial
 
 /**
  * @brief 执行 block_attn_res_update 算子计算。
- * @param workspace [in] workspace 内存地址。
+ * @param workspace [in] workspace 内存地址，workspaceSize 为 0 时可传入 nullptr。
  * @param workspaceSize [in] workspace 大小。
  * @param executor [in] 执行器。
  * @param stream [in] ACL 流。

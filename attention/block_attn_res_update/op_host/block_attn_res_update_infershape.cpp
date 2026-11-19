@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include <exe_graph/runtime/infer_shape_context.h>
-#include <register/op_impl_registry.h>
+#include "exe_graph/runtime/infer_shape_context.h"
+#include "register/op_impl_registry.h"
 #include "log/log.h"
 
 namespace ops {

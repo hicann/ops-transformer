@@ -125,11 +125,11 @@ struct BlockAttnResPrepareInfershapeCase {
     std::string blockResDtype;
     std::string validBlocksDtype;
     std::string pseudoQueryDtype;
-    bool expectSuccess = false;
     std::string expectNumeratorShape;
     std::string expectLogitMaxShape;
     std::string expectExpSumShape;
     std::string expectOutputDtypes;
+    bool expectSuccess = false;
 };
 
 std::vector<BlockAttnResPrepareInfershapeCase> LoadCases()

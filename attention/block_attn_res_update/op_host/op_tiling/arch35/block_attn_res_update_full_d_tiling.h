@@ -16,7 +16,7 @@
 #include "../../../op_kernel/arch35/block_attn_res_update_tiling_data.h"
 
 namespace optiling {
-namespace block_attn_res_update {
+namespace BlockAttnResUpdate {
 
 // Host-side calculation state. SetTilingData serializes only the fields required by the kernel ABI.
 struct BlockAttnResUpdateFullDTilingInfo {
@@ -27,8 +27,6 @@ struct BlockAttnResUpdateFullDTilingInfo {
     uint32_t dAlignBf16 = 0;
     uint32_t tileT = 0;
     uint32_t statsTStride = 0;
-    // Used only for Host-side UB diagnostics.
-    uint64_t selectedUbBytes = 0;
 };
 
 class BlockAttnResUpdateFullDTiling : public BlockAttnResUpdateTilingBase {
@@ -46,15 +44,15 @@ protected:
 
 private:
     void SetTilingData();
-    ge::graphStatus SelectUbTiling(uint64_t maxTPerCore);
     bool TryUbTiling(uint64_t maxTPerCore);
-    uint64_t CalcUbBytes(uint32_t tileT, uint32_t& statsTStride) const;
+    uint64_t GetOutputNormWeightUbBytes() const;
+    uint64_t CalcUbBytes(uint32_t tileT) const;
 
     BlockAttnResUpdateFullDTilingInfo tilingInfo_{};
     BlockAttnResUpdateTilingData tilingData_{};
 };
 
-} // namespace block_attn_res_update
+} // namespace BlockAttnResUpdate
 } // namespace optiling
 
 #endif // BLOCK_ATTN_RES_UPDATE_FULL_D_TILING_H

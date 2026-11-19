@@ -91,10 +91,10 @@
     <td><a href="../../attention/block_attn_res_update/README.md">block_attn_res_update</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✗</td>
     <td>AI Core</td>
-    <td>BlockAttnRes第二阶段更新算子，用于更新partial block并计算在线Softmax状态对应的注意力输出。</td>
+    <td>BlockAttnRes第二阶段更新算子，用于更新局部残差，与历史online softmax状态合并得到注意力输出，并支持可选输出RMSNorm。</td>
   </tr>
   <tr>
     <td>attention</td>

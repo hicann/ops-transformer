@@ -16,21 +16,18 @@
 #define BLOCK_ATTN_RES_PREPARE_APT_TILING_KEY_H
 
 #include "ascendc/host_api/tiling/template_argument.h"
-#include "block_attn_res_prepare_tiling_data.h"
 
-#define BLOCK_ATTN_RES_PREPARE_TPL_ONLY_VECTOR 0UL
-#define BLOCK_ATTN_RES_PREPARE_TPL_MIX 1UL
-#define BLOCK_ATTN_RES_PREPARE_TEMPLATE_MODE_BIT_WIDTH 1U
+#define BLOCK_ATTN_RES_PREPARE_ONLY_VECTOR_TPL 0UL
+// One S per task; V can remain cached across adjacent tasks of the same token.
+#define BLOCK_ATTN_RES_PREPARE_SINGLE_S_CACHE_TPL 1UL
+#define BLOCK_ATTN_RES_PREPARE_MIX_TPL 2UL
 
 namespace BlockAttnResPrepareTilingKey {
 
-static_assert(BLOCK_ATTN_RES_PREPARE_TPL_ONLY_VECTOR == optiling::BLOCK_ATTN_RES_PREPARE_VECTOR_KEY);
-static_assert(BLOCK_ATTN_RES_PREPARE_TPL_MIX == optiling::BLOCK_ATTN_RES_PREPARE_MIX_KEY);
-
 ASCENDC_TPL_ARGS_DECL(BlockAttnResPrepare,
-                      ASCENDC_TPL_UINT_DECL(TEMPLATE_MODE, BLOCK_ATTN_RES_PREPARE_TEMPLATE_MODE_BIT_WIDTH,
-                                            ASCENDC_TPL_UI_LIST, BLOCK_ATTN_RES_PREPARE_TPL_ONLY_VECTOR,
-                                            BLOCK_ATTN_RES_PREPARE_TPL_MIX));
+                      ASCENDC_TPL_UINT_DECL(TEMPLATE_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,
+                                            BLOCK_ATTN_RES_PREPARE_ONLY_VECTOR_TPL,
+                                            BLOCK_ATTN_RES_PREPARE_SINGLE_S_CACHE_TPL, BLOCK_ATTN_RES_PREPARE_MIX_TPL));
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
 #define BLOCK_ATTN_RES_PREPARE_MIX_KERNEL_TYPE ASCENDC_TPL_MIX_AIC_1_1
@@ -40,10 +37,11 @@ ASCENDC_TPL_ARGS_DECL(BlockAttnResPrepare,
 
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_AIV_ONLY),
                                      ASCENDC_TPL_UINT_SEL(TEMPLATE_MODE, ASCENDC_TPL_UI_LIST,
-                                                          BLOCK_ATTN_RES_PREPARE_TPL_ONLY_VECTOR)),
+                                                          BLOCK_ATTN_RES_PREPARE_ONLY_VECTOR_TPL,
+                                                          BLOCK_ATTN_RES_PREPARE_SINGLE_S_CACHE_TPL)),
                 ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(BLOCK_ATTN_RES_PREPARE_MIX_KERNEL_TYPE),
                                      ASCENDC_TPL_UINT_SEL(TEMPLATE_MODE, ASCENDC_TPL_UI_LIST,
-                                                          BLOCK_ATTN_RES_PREPARE_TPL_MIX)));
+                                                          BLOCK_ATTN_RES_PREPARE_MIX_TPL)));
 
 } // namespace BlockAttnResPrepareTilingKey
 

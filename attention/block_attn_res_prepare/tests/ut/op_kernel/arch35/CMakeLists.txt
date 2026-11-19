@@ -21,9 +21,9 @@ function(add_block_attn_res_prepare_kernel_ut block_attn_res_prepare_soc_version
     set(CMAKE_CURRENT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/${block_attn_res_prepare_soc_version}")
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
     set(block_attn_res_prepare_tiling_files
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../op_host/op_tiling/block_attn_res_prepare_base_tiling.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../op_host/op_tiling/block_attn_res_prepare_vector_tiling.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../op_host/op_tiling/block_attn_res_prepare_mix_tiling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../op_host/op_tiling/arch35/block_attn_res_prepare_base_tiling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../op_host/op_tiling/arch35/block_attn_res_prepare_vector_tiling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../op_host/op_tiling/arch35/block_attn_res_prepare_mix_tiling.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/block_attn_res_prepare_tiling_registry_stub.cpp
     )
 

@@ -16,8 +16,10 @@
 #ifndef BLOCK_ATTN_RES_PREPARE_MIX_TILING_H
 #define BLOCK_ATTN_RES_PREPARE_MIX_TILING_H
 
+#include <cstdint>
+
 #include "block_attn_res_prepare_base_tiling.h"
-#include "../../op_kernel/arch35/block_attn_res_prepare_tiling_data.h"
+#include "../../../op_kernel/arch35/block_attn_res_prepare_tiling_data.h"
 
 namespace optiling {
 
@@ -25,28 +27,29 @@ class BlockAttnResPrepareMixTiling final : public BlockAttnResPrepareBaseTiling 
 public:
     explicit BlockAttnResPrepareMixTiling(gert::TilingContext* context)
         : BlockAttnResPrepareBaseTiling(context)
-    {}
+    {
+        tilingDataPtr_ = &tilingData_;
+        tilingDataSize_ = sizeof(tilingData_);
+    }
     ~BlockAttnResPrepareMixTiling() override = default;
 
 protected:
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
     uint64_t GetTilingKey() const override;
-    void DumpTilingInfo() override;
-    TilingDataView GetTilingDataView() const override;
 
 private:
     struct TileCandidate;
     struct ResourceUsage;
 
     bool SelectMixTileShape();
-    bool TrySelectTileForS(uint64_t sCandidate, uint64_t mixedCoreNum, uint64_t usableL1Bytes, uint64_t usableUbBytes);
-    bool TrySelectTileForT(uint64_t sCandidate, uint64_t candidateT, uint64_t usableL1Bytes, uint64_t usableUbBytes);
-    TileCandidate BuildTileCandidate(uint64_t sCandidate, uint64_t candidateT, uint64_t candidateD) const;
+    bool TrySelectTileForS(uint64_t candidateS, uint64_t mixCoreNum, uint64_t usableL1Bytes, uint64_t usableUbBytes);
+    bool TrySelectTileForT(uint64_t candidateS, uint64_t candidateT, uint64_t usableL1Bytes, uint64_t usableUbBytes);
+    TileCandidate BuildTileCandidate(uint64_t candidateS, uint64_t candidateT, uint64_t candidateD) const;
     ResourceUsage CalculateResourceUsage(const TileCandidate& candidate) const;
     bool DoesCandidateFit(const ResourceUsage& usage, uint64_t usableL1Bytes, uint64_t usableUbBytes) const;
     void ApplyTileCandidate(const TileCandidate& candidate);
-    ge::graphStatus CalculateMixWork(uint64_t& totalWorkUnits);
+    ge::graphStatus CalculateWorkDistribution(uint64_t& totalWorkUnits);
     ge::graphStatus CalculateWorkspaceSize();
     void FillTilingData(uint64_t totalWorkUnits);
 

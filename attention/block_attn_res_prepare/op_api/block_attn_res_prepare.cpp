@@ -17,8 +17,9 @@
 
 #include "opdev/make_op_executor.h"
 #include "opdev/op_dfx.h"
+#include "opdev/op_executor.h"
 #include "opdev/op_log.h"
-#include "opdev/tensor_view_utils.h"
+#include "opdev/shape_utils.h"
 
 using namespace op;
 
@@ -54,28 +55,29 @@ const std::array<const aclTensor*, BLOCK_ATTN_RES_PREPARE_OUTPUT_NUM> BlockAttnR
     // dereference it. The kernel clamps values above N to N at run time.
     auto numerator = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
     if (numerator == nullptr) {
-        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Failed to allocate the numerator tensor.");
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR, "Failed to allocate the numerator tensor.");
         return {nullptr, nullptr, nullptr};
     }
     auto logitMax = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
     if (logitMax == nullptr) {
-        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Failed to allocate the logitMax tensor.");
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR, "Failed to allocate the logitMax tensor.");
         return {nullptr, nullptr, nullptr};
     }
     auto expSum = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
     if (expSum == nullptr) {
-        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Failed to allocate the expSum tensor.");
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR, "Failed to allocate the expSum tensor.");
         return {nullptr, nullptr, nullptr};
     }
     const aclnnStatus ret = INFER_SHAPE(BlockAttnResPrepare, OP_INPUT(blockRes, validBlocks, pseudoQuery),
                                         OP_OUTPUT(numerator, logitMax, expSum), OP_ATTR(static_cast<float>(eps)));
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "BlockAttnResPrepare infer shape failed: ret=%d, blockRes.shape=%s, validBlocks.shape=%s, "
-                "pseudoQuery.shape=%s, eps=%f.",
-                ret, op::ToString(blockRes->GetViewShape()).GetString(),
-                op::ToString(validBlocks->GetViewShape()).GetString(),
-                op::ToString(pseudoQuery->GetViewShape()).GetString(), eps);
+        OP_LOGE_WITHOUT_REPORT(
+            ACLNN_ERR_PARAM_INVALID,
+            "BlockAttnResPrepare infer shape failed: ret=%d, blockRes.shape=%s, validBlocks.shape=%s, "
+            "pseudoQuery.shape=%s, eps=%f.",
+            ret, op::ToString(blockRes->GetViewShape()).GetString(),
+            op::ToString(validBlocks->GetViewShape()).GetString(),
+            op::ToString(pseudoQuery->GetViewShape()).GetString(), eps);
         return {nullptr, nullptr, nullptr};
     }
 

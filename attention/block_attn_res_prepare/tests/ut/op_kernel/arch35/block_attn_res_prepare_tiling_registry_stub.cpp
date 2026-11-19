@@ -15,8 +15,6 @@
 namespace optiling {
 
 BEGIN_TILING_DATA_DEF(BlockAttnResPrepareMixTilingData)
-TILING_DATA_FIELD_DEF(uint64_t, qL1Elems);
-TILING_DATA_FIELD_DEF(uint64_t, vL1Elems);
 TILING_DATA_FIELD_DEF(uint64_t, eL1Elems);
 TILING_DATA_FIELD_DEF(uint64_t, vUbElems);
 TILING_DATA_FIELD_DEF(uint64_t, dotUbElems);
@@ -36,11 +34,8 @@ TILING_DATA_FIELD_DEF(uint32_t, dTileNum);
 TILING_DATA_FIELD_DEF(uint32_t, sAlign);
 TILING_DATA_FIELD_DEF(uint32_t, nAlign);
 TILING_DATA_FIELD_DEF(uint32_t, mm1NAlign);
-TILING_DATA_FIELD_DEF(uint32_t, dAlign);
 TILING_DATA_FIELD_DEF(float, eps);
 TILING_DATA_FIELD_DEF(uint16_t, usedCoreNum);
-TILING_DATA_FIELD_DEF(uint16_t, aicCoreNum);
-TILING_DATA_FIELD_DEF(uint16_t, aivCoreNum);
 TILING_DATA_FIELD_DEF(uint8_t, totalN);
 TILING_DATA_FIELD_DEF(uint8_t, qL1BufferNum);
 TILING_DATA_FIELD_DEF(uint8_t, vL1BufferNum);

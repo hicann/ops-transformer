@@ -14,7 +14,7 @@ namespace ops {
 
 class BlockAttnResUpdate : public OpDef {
 public:
-    explicit BlockAttnResUpdate(const char *name)
+    explicit BlockAttnResUpdate(const char* name)
         : OpDef(name)
     {
         this->Input("partial_block")
@@ -31,6 +31,11 @@ public:
         this->Input("numerator").ParamType(REQUIRED).DataType({ge::DT_FLOAT}).Format({ge::FORMAT_ND}).AutoContiguous();
         this->Input("logit_max").ParamType(REQUIRED).DataType({ge::DT_FLOAT}).Format({ge::FORMAT_ND}).AutoContiguous();
         this->Input("exp_sum").ParamType(REQUIRED).DataType({ge::DT_FLOAT}).Format({ge::FORMAT_ND}).AutoContiguous();
+        this->Input("output_norm_weight")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_BF16, ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
         // The same input/output name declares partial_block as a reference tensor for ACLNNGraph.
         this->Output("partial_block")
             .ParamType(REQUIRED)
@@ -40,6 +45,7 @@ public:
         this->Output("h").ParamType(REQUIRED).DataType({ge::DT_BF16}).Format({ge::FORMAT_ND}).AutoContiguous();
         // eps is serialized into BlockAttnResUpdateTilingData; it is not a kernel tensor argument.
         this->Attr("eps").AttrType(OPTIONAL).Float(1e-6F);
+        this->Attr("output_norm_eps").AttrType(OPTIONAL).Float(1e-6F);
 
         OpAICoreConfig aicoreConfig;
         aicoreConfig.DynamicCompileStaticFlag(true)

@@ -22,18 +22,18 @@
  * \brief block_attn_res_update aclnn example for Ascend 950PR/Ascend 950DT.
  */
 
-#define CHECK_RET(cond, return_expr) \
+#define CHECK_RET(cond, returnExpr) \
     do { \
         if (!(cond)) { \
-            return_expr; \
+            returnExpr; \
         } \
     } while (0)
 
-#define CHECK_FREE_RET(cond, return_expr) \
+#define CHECK_FREE_RET(cond, returnExpr) \
     do { \
         if (!(cond)) { \
             Finalize(deviceId, stream); \
-            return_expr; \
+            returnExpr; \
         } \
     } while (0)
 

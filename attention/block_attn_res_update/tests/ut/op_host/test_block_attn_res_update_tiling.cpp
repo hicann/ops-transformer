@@ -25,7 +25,7 @@
 #include <utility>
 #include <vector>
 
-#include "../../../op_host/op_tiling/arch35/block_attn_res_update_tiling.h"
+#include "../../../op_host/op_tiling/arch35/block_attn_res_update_tiling_base.h"
 #include "../../../op_kernel/arch35/block_attn_res_update_tiling_data.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 #include "gmm_csv_ge_parse_utils.h"
@@ -74,8 +74,9 @@ gert::TilingContextPara MakeValidTilingContextPara()
                                        {ParseShape("3:63"), ge::DT_FLOAT, ge::FORMAT_ND},
                                        {ParseShape("3:63"), ge::DT_BF16, ge::FORMAT_ND},
                                    },
-                                   std::vector<gert::TilingContextPara::OpAttr>{}, &gCompileInfo, NPU_ARCH,
-                                   VALID_AIC_NUM, VALID_UB_SIZE, VALID_TILING_DATA_CAPACITY);
+                                   std::vector<gert::TilingContextPara::OpAttr>{},
+                                   std::vector<uint32_t>{1U, 1U, 1U, 1U, 1U, 1U, 0U}, std::vector<uint32_t>{1U, 1U},
+                                   &gCompileInfo, NPU_ARCH, VALID_AIC_NUM, VALID_UB_SIZE, VALID_TILING_DATA_CAPACITY);
 }
 
 struct BlockAttnResUpdateTilingCase {
@@ -85,21 +86,34 @@ struct BlockAttnResUpdateTilingCase {
         if (eps != "DEFAULT") {
             attrs.emplace_back("eps", Ops::Transformer::AnyValue::CreateFrom<float>(std::stof(eps)));
         }
+        if (outputNormEps != "DEFAULT") {
+            if (attrs.empty()) {
+                attrs.emplace_back("eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6F));
+            }
+            // std::stof may throw on subnormal values instead of passing them to the tiling validator.
+            const float normEps = static_cast<float>(std::stod(outputNormEps));
+            attrs.emplace_back("output_norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps));
+        }
 
-        gert::TilingContextPara para(OP_NAME,
-                                     {
-                                         {ParseShape(partialShape), partialDtype, ge::FORMAT_ND},
-                                         {ParseShape(deltaShape), deltaDtype, ge::FORMAT_ND},
-                                         {ParseShape(pseudoQueryShape), pseudoQueryDtype, ge::FORMAT_ND},
-                                         {ParseShape(numeratorShape), numeratorDtype, ge::FORMAT_ND},
-                                         {ParseShape(logitMaxShape), logitMaxDtype, ge::FORMAT_ND},
-                                         {ParseShape(expSumShape), expSumDtype, ge::FORMAT_ND},
-                                     },
-                                     {
-                                         {ParseShape(partialRefShape), partialRefDtype, ge::FORMAT_ND},
-                                         {ParseShape(hShape), hDtype, ge::FORMAT_ND},
-                                     },
-                                     attrs, &gCompileInfo, npuArch, aivNum, ubSize, tilingDataCapacity);
+        gert::TilingContextPara para(
+            OP_NAME,
+            {
+                {ParseShape(partialShape), partialDtype, ge::FORMAT_ND},
+                {ParseShape(deltaShape), deltaDtype, ge::FORMAT_ND},
+                {ParseShape(pseudoQueryShape), pseudoQueryDtype, ge::FORMAT_ND},
+                {ParseShape(numeratorShape), numeratorDtype, ge::FORMAT_ND},
+                {ParseShape(logitMaxShape), logitMaxDtype, ge::FORMAT_ND},
+                {ParseShape(expSumShape), expSumDtype, ge::FORMAT_ND},
+            },
+            {
+                {ParseShape(partialRefShape), partialRefDtype, ge::FORMAT_ND},
+                {ParseShape(hShape), hDtype, ge::FORMAT_ND},
+            },
+            attrs, std::vector<uint32_t>{1U, 1U, 1U, 1U, 1U, 1U, outputNormWeightShape == "NONE" ? 0U : 1U},
+            std::vector<uint32_t>{1U, 1U}, &gCompileInfo, npuArch, aivNum, ubSize, tilingDataCapacity);
+        if (outputNormWeightShape != "NONE") {
+            para.inputTensorDesc_.push_back({ParseShape(outputNormWeightShape), outputNormWeightDtype, ge::FORMAT_ND});
+        }
 
         TilingInfo actual;
         const bool actualResult = ExecuteTiling(para, actual);
@@ -122,6 +136,7 @@ struct BlockAttnResUpdateTilingCase {
         EXPECT_EQ(tilingData->tileT, expectTileT) << "case=" << caseName;
         EXPECT_EQ(tilingData->statsTStride, expectStatsTStride) << "case=" << caseName;
         EXPECT_FLOAT_EQ(tilingData->eps, expectEps) << "case=" << caseName;
+        EXPECT_FLOAT_EQ(tilingData->outputNormEps, expectOutputNormEps) << "case=" << caseName;
         EXPECT_FLOAT_EQ(tilingData->invD, expectInvD) << "case=" << caseName;
         EXPECT_EQ(tilingData->usedCoreNum, expectUsedCoreNum) << "case=" << caseName;
     }
@@ -130,10 +145,8 @@ struct BlockAttnResUpdateTilingCase {
     std::string npuArch;
     std::string caseName;
     std::string prefix;
-    uint32_t aivNum = 0U;
     uint64_t ubSize = 0UL;
     uint64_t tilingDataCapacity = 0UL;
-
     std::string partialShape;
     std::string deltaShape;
     std::string pseudoQueryShape;
@@ -142,7 +155,14 @@ struct BlockAttnResUpdateTilingCase {
     std::string expSumShape;
     std::string partialRefShape;
     std::string hShape;
+    std::string eps;
+    std::string outputNormWeightShape = "NONE";
+    std::string outputNormEps = "DEFAULT";
+    uint64_t expectBlockDim = 0UL;
+    uint64_t expectTilingKey = 0UL;
+    int64_t expectWorkspace = 0;
 
+    uint32_t aivNum = 0U;
     ge::DataType partialDtype = ge::DT_UNDEFINED;
     ge::DataType deltaDtype = ge::DT_UNDEFINED;
     ge::DataType pseudoQueryDtype = ge::DT_UNDEFINED;
@@ -151,12 +171,8 @@ struct BlockAttnResUpdateTilingCase {
     ge::DataType expSumDtype = ge::DT_UNDEFINED;
     ge::DataType partialRefDtype = ge::DT_UNDEFINED;
     ge::DataType hDtype = ge::DT_UNDEFINED;
-
-    std::string eps;
-    bool expectSuccess = false;
-    uint64_t expectBlockDim = 0UL;
-    uint64_t expectTilingKey = 0UL;
-    int64_t expectWorkspace = 0;
+    ge::DataType outputNormWeightDtype = ge::DT_FLOAT;
+    float expectOutputNormEps = 1e-6F;
     uint32_t expectDSize = 0U;
     uint32_t expectTPerCore = 0U;
     uint32_t expectLastTPerCore = 0U;
@@ -164,7 +180,10 @@ struct BlockAttnResUpdateTilingCase {
     uint32_t expectStatsTStride = 0U;
     float expectEps = 0.0F;
     float expectInvD = 0.0F;
+
     uint16_t expectUsedCoreNum = 0U;
+
+    bool expectSuccess = false;
 };
 
 struct TilingCsvLoadResult {
@@ -263,6 +282,13 @@ TilingCsvLoadResult LoadTilingCases()
                 testCase.expectInvD = std::stof(ops::ut::Trim(items[index++]));
                 testCase.expectUsedCoreNum = static_cast<uint16_t>(std::stoul(ops::ut::Trim(items[index++])));
             }
+            if (items.size() >= SUCCESS_COLUMN_COUNT + 4UL) {
+                testCase.outputNormWeightShape = ops::ut::Trim(items[SUCCESS_COLUMN_COUNT]);
+                testCase.outputNormWeightDtype = ParseDtype(items[SUCCESS_COLUMN_COUNT + 1UL]);
+                testCase.outputNormEps = ops::ut::Trim(items[SUCCESS_COLUMN_COUNT + 2UL]);
+                testCase.expectOutputNormEps =
+                    static_cast<float>(std::stod(ops::ut::Trim(items[SUCCESS_COLUMN_COUNT + 3UL])));
+            }
             result.cases.emplace_back(std::move(testCase));
         } catch (const std::exception& error) {
             result.errors.emplace_back(ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error));
@@ -351,6 +377,26 @@ TEST(BlockAttnResUpdateTilingDirect, RejectsNonNdInputFormats)
 TEST_P(BlockAttnResUpdateTilingTest, CsvDrivenCase)
 {
     GetParam().Run();
+}
+
+// CSV describes logical shapes; physical storage mismatches require direct descriptor mutation.
+TEST(BlockAttnResUpdateTilingDirect, RejectsInvalidOutputNormPhysicalMetadata)
+{
+    for (const auto dtype : {ge::DT_FLOAT, ge::DT_BF16}) {
+        for (const bool invalidFormat : {false, true}) {
+            auto para = MakeValidTilingContextPara();
+            para.inputTensorDesc_.push_back({ParseShape("63"), dtype, ge::FORMAT_ND});
+            para.inputInstanceNum_.back() = 1U;
+            auto& weight = para.inputTensorDesc_.back();
+            if (invalidFormat) {
+                weight.format_ = ge::FORMAT_NCHW;
+            } else {
+                weight.shape_.MutableStorageShape().SetDim(0U, 64);
+            }
+            TilingInfo actual;
+            EXPECT_FALSE(ExecuteTiling(para, actual));
+        }
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(BLOCK_ATTN_RES_UPDATE_TILING_CSV, BlockAttnResUpdateTilingTest,

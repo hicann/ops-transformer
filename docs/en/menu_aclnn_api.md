@@ -25,6 +25,7 @@
 - [aclnnBlockAttentionResidualsGrad](../../mhc/block_attention_residuals_grad/docs/aclnnBlockAttentionResidualsGrad_en.md)
 - [aclnnBlockAttnResPrepare](../../attention/block_attn_res_prepare/docs/aclnnBlockAttnResPrepare_en.md)
 - [aclnnBlockAttnResUpdate](../../attention/block_attn_res_update/docs/aclnnBlockAttnResUpdate_en.md)
+- [aclnnBlockAttnResUpdateV2](../../attention/block_attn_res_update/docs/aclnnBlockAttnResUpdateV2_en.md)
 - [aclnnBlockSparseAttention](../../attention/block_sparse_attention/docs/aclnnBlockSparseAttention_en.md)
 - [aclnnBlockSparseAttentionGrad](../../attention/block_sparse_attention_grad/docs/aclnnBlockSparseAttentionGrad_en.md)
 - [aclnnBlockSparseAttentionV2](../../attention/block_sparse_attention/docs/aclnnBlockSparseAttentionV2_en.md)

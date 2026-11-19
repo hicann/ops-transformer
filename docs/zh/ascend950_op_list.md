@@ -374,7 +374,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✗</td>
     <td>AI Core</td>
-    <td>计算历史残差块间注意力，输出Softmax加权结果和统计量。</td>
+    <td>计算历史残差块间注意力，输出在线Softmax的加权分子、最大logit和指数和。</td>
   </tr>
   <tr>
     <td>attention</td>
@@ -384,7 +384,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✗</td>
     <td>AI Core</td>
-    <td>更新局部残差，并结合在线Softmax状态计算注意力输出。</td>
+    <td>原地更新局部残差，与历史在线Softmax状态合并得到注意力输出，并支持可选输出RMSNorm。</td>
   </tr>
   <tr>
     <td>attention</td>

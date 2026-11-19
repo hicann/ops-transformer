@@ -21,10 +21,11 @@ BEGIN_TILING_DATA_DEF(BlockAttnResUpdateTilingData)
 TILING_DATA_FIELD_DEF(uint32_t, dSize);
 TILING_DATA_FIELD_DEF(uint32_t, tPerCore);
 TILING_DATA_FIELD_DEF(uint32_t, lastTPerCore);
-TILING_DATA_FIELD_DEF(uint32_t, tileT);
-TILING_DATA_FIELD_DEF(uint32_t, statsTStride);
 TILING_DATA_FIELD_DEF(float, eps);
 TILING_DATA_FIELD_DEF(float, invD);
+TILING_DATA_FIELD_DEF(float, outputNormEps);
+TILING_DATA_FIELD_DEF(uint16_t, tileT);
+TILING_DATA_FIELD_DEF(uint16_t, statsTStride);
 TILING_DATA_FIELD_DEF(uint16_t, usedCoreNum);
 END_TILING_DATA_DEF;
 

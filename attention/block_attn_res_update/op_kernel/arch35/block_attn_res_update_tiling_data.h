@@ -20,15 +20,19 @@ struct alignas(8) BlockAttnResUpdateTilingData {
     uint32_t tPerCore;
     // The last participating core processes the remaining rows along T.
     uint32_t lastTPerCore;
-    // Maximum number of T rows processed by one UB tile.
-    uint32_t tileT;
-    // Element stride between FP32 stats planes, aligned to a 32-byte boundary.
-    uint32_t statsTStride;
     float eps;
     // Host-computed reciprocal of D used by the RMS normalization.
     float invD;
+    // Independent epsilon for the optional trailing RMSNorm. The BF16 h rounding boundary is preserved.
+    float outputNormEps;
+    // Maximum number of T rows processed by one UB tile; bounded by the data-copy block count.
+    uint16_t tileT;
+    // Element stride between FP32 stats planes: tileT aligned to 8 elements, at most 4096.
+    uint16_t statsTStride;
     uint16_t usedCoreNum;
 };
 #pragma pack(pop)
+
+static_assert(sizeof(BlockAttnResUpdateTilingData) == 32, "BlockAttnResUpdateTilingData must fit in 32 bytes");
 
 #endif // BLOCK_ATTN_RES_UPDATE_TILING_DATA_H

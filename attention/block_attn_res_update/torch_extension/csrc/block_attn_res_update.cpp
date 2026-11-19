@@ -13,6 +13,7 @@
 #include <c10/core/DeviceGuard.h>
 
 #include <cmath>
+#include <limits>
 
 #include "aclnn_common.h"
 
@@ -105,11 +106,24 @@ void CheckInputs(const at::Tensor& partialBlock, const at::Tensor& delta, const 
 }
 } // namespace
 
-at::Tensor block_attn_res_update(at::Tensor& partialBlock, const at::Tensor& delta, const at::Tensor& pseudoQuery,
-                                 const at::Tensor& numerator, const at::Tensor& logitMax, const at::Tensor& expSum,
-                                 double eps)
+at::Tensor BlockAttnResUpdate(at::Tensor& partialBlock, const at::Tensor& delta, const at::Tensor& pseudoQuery,
+                              const at::Tensor& numerator, const at::Tensor& logitMax, const at::Tensor& expSum,
+                              double eps, const c10::optional<at::Tensor>& outputNormWeightOptional,
+                              double outputNormEps)
 {
     CheckInputs(partialBlock, delta, pseudoQuery, numerator, logitMax, expSum, eps);
+    if (outputNormWeightOptional.has_value()) {
+        const auto& weight = outputNormWeightOptional.value();
+        TORCH_CHECK(weight.scalar_type() == at::kBFloat16 || weight.scalar_type() == at::kFloat,
+                    "output_norm_weight must be bfloat16 or float32, but got ", weight.scalar_type(), ".");
+        CheckTensorDevice(weight, partialBlock.device(), "output_norm_weight");
+        CheckTensorContiguous(weight, "output_norm_weight");
+        TORCH_CHECK(weight.dim() == VECTOR_DIM_NUM && weight.size(0) == partialBlock.size(HIDDEN_DIM_INDEX),
+                    "output_norm_weight must have shape [D], but got ", weight.sizes(), ".");
+        TORCH_CHECK(
+            outputNormEps >= std::numeric_limits<float>::min() && outputNormEps <= std::numeric_limits<float>::max(),
+            "output_norm_eps must be in [FLT_MIN, FLT_MAX] before conversion to float32, but got ", outputNormEps, ".");
+    }
 
     at::Tensor h{nullptr};
     {
@@ -118,14 +132,19 @@ at::Tensor block_attn_res_update(at::Tensor& partialBlock, const at::Tensor& del
         h = at::empty(delta.sizes(), delta.options());
     }
 
-    // aclnnBlockAttnResUpdate updates partial_block in place; the Torch API only returns h.
-    ACLNN_CMD(aclnnBlockAttnResUpdate, partialBlock, delta, pseudoQuery, numerator, logitMax, expSum, eps, h);
+    // V2 updates partial_block in place; an absent weight disables output RMSNorm.
+    ACLNN_CMD(aclnnBlockAttnResUpdateV2, partialBlock, delta, pseudoQuery, numerator, logitMax, expSum,
+              outputNormWeightOptional, eps, outputNormEps, h);
 
     return h;
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, module)
 {
-    m.def("block_attn_res_update", &block_attn_res_update, "block_attn_res_update torch wrapper");
+    module.def("block_attn_res_update", &BlockAttnResUpdate, "block_attn_res_update torch wrapper",
+               pybind11::arg("partial_block"), pybind11::arg("delta"), pybind11::arg("pseudo_query"),
+               pybind11::arg("numerator"), pybind11::arg("logit_max"), pybind11::arg("exp_sum"),
+               pybind11::arg("eps") = 1e-6, pybind11::arg("output_norm_weight") = pybind11::none(),
+               pybind11::arg("output_norm_eps") = 1e-6);
 }
 } // namespace op_api

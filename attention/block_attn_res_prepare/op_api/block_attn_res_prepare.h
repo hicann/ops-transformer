@@ -14,7 +14,7 @@
 #include <array>
 #include <cstddef>
 
-#include "opdev/op_executor.h"
+#include "aclnn/acl_meta.h"
 
 namespace l0op {
 

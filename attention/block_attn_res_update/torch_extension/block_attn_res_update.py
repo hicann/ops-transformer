@@ -9,6 +9,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import math
+from typing import Optional
 
 import torch
 from torch.library import impl
@@ -21,6 +22,8 @@ TOKEN_DIM_INDEX = 0
 HIDDEN_DIM_INDEX = 1
 MAX_HIDDEN_SIZE = 8192
 DEFAULT_EPS = 1.0e-6
+MIN_OUTPUT_NORM_EPS = torch.finfo(torch.float32).tiny
+MAX_OUTPUT_NORM_EPS = torch.finfo(torch.float32).max
 
 
 class BlockAttnResUpdateOpBuilder(OpBuilder):
@@ -37,7 +40,8 @@ class BlockAttnResUpdateOpBuilder(OpBuilder):
             "block_attn_res_update("
             "Tensor(a!) partial_block, Tensor delta, Tensor pseudo_query, "
             "Tensor numerator, Tensor logit_max, Tensor exp_sum, *, "
-            f"float eps={DEFAULT_EPS}) -> Tensor"
+            f"float eps={DEFAULT_EPS}, Tensor? output_norm_weight=None, "
+            f"float output_norm_eps={DEFAULT_EPS}) -> Tensor"
         )
 
     def register_meta(self):
@@ -51,6 +55,8 @@ class BlockAttnResUpdateOpBuilder(OpBuilder):
             exp_sum,
             *,
             eps=DEFAULT_EPS,
+            output_norm_weight=None,
+            output_norm_eps=DEFAULT_EPS,
         ):
             torch._check(
                 partial_block.dtype == torch.float32,
@@ -81,6 +87,13 @@ class BlockAttnResUpdateOpBuilder(OpBuilder):
                 ("logit_max", logit_max),
                 ("exp_sum", exp_sum),
             ):
+                torch._check(
+                    tensor.device == partial_block.device,
+                    lambda name=name, tensor=tensor: (
+                        f"{name} must be on the same device as partial_block, but got "
+                        f"{tensor.device} and {partial_block.device}."
+                    ),
+                )
                 torch._check(
                     tensor.is_contiguous(),
                     lambda name=name: f"{name} must be contiguous.",
@@ -204,6 +217,44 @@ class BlockAttnResUpdateOpBuilder(OpBuilder):
                     f"{partial_block.shape[HIDDEN_DIM_INDEX]}."
                 ),
             )
+            if output_norm_weight is not None:
+                torch._check(
+                    output_norm_weight.dtype in (torch.bfloat16, torch.float32),
+                    lambda: f"output_norm_weight must be bfloat16 or float32, but got {output_norm_weight.dtype}.",
+                )
+                torch._check(
+                    output_norm_weight.is_contiguous(),
+                    lambda: (
+                        "output_norm_weight must be contiguous, but got shape "
+                        f"{output_norm_weight.shape} and stride {output_norm_weight.stride()}."
+                    ),
+                )
+                torch._check(
+                    output_norm_weight.device == partial_block.device,
+                    lambda: (
+                        "output_norm_weight must be on the same device as partial_block, but got "
+                        f"{output_norm_weight.device} and {partial_block.device}."
+                    ),
+                )
+                torch._check(
+                    output_norm_weight.dim() == VECTOR_DIM_NUM,
+                    lambda: f"output_norm_weight must be 1D, but got {output_norm_weight.dim()}D.",
+                )
+                torch._check(
+                    output_norm_weight.shape[0]
+                    == partial_block.shape[HIDDEN_DIM_INDEX],
+                    lambda: (
+                        "output_norm_weight must have shape [D], but got "
+                        f"{output_norm_weight.shape} with D={partial_block.shape[HIDDEN_DIM_INDEX]}."
+                    ),
+                )
+                torch._check(
+                    MIN_OUTPUT_NORM_EPS <= output_norm_eps <= MAX_OUTPUT_NORM_EPS,
+                    lambda: (
+                        "output_norm_eps must be in [FLT_MIN, FLT_MAX] before conversion to float32, but got "
+                        f"{output_norm_eps}."
+                    ),
+                )
             h = torch.empty(delta.shape, dtype=delta.dtype, device="meta")
             return h
 
@@ -222,6 +273,8 @@ def _block_attn_res_update(
     exp_sum,
     *,
     eps=DEFAULT_EPS,
+    output_norm_weight=None,
+    output_norm_eps=DEFAULT_EPS,
 ):
     op_module = _block_attn_res_update_op_builder.load()
     return op_module.block_attn_res_update(
@@ -232,6 +285,8 @@ def _block_attn_res_update(
         logit_max,
         exp_sum,
         eps,
+        output_norm_weight,
+        output_norm_eps,
     )
 
 
@@ -244,10 +299,12 @@ def block_attn_res_update(
     exp_sum: torch.Tensor,
     *,
     eps: float = DEFAULT_EPS,
+    output_norm_weight: Optional[torch.Tensor] = None,
+    output_norm_eps: float = DEFAULT_EPS,
 ) -> torch.Tensor:
-    """block_attn_res_update(partial_block, delta, pseudo_query, numerator, logit_max, exp_sum, *, eps=1e-6) -> Tensor
+    """Update the partial residual and optionally apply RMSNorm to the BF16 mixed output.
 
-    封装 ``block_attn_res_update`` 的 ``aclnnBlockAttnResUpdate`` 调用。
+    封装 ``block_attn_res_update`` 的 ``aclnnBlockAttnResUpdateV2`` 调用。
 
     将当前 ``delta`` 原地累加到 FP32 ``partial_block``，计算当前
     ``partial_block`` 的 RMSNorm score，并与 ``block_attn_res_prepare``
@@ -270,7 +327,13 @@ def block_attn_res_update(
         exp_sum (Tensor): ``block_attn_res_prepare`` 输出的历史 softmax
             分母累积值，shape ``(T,)``，dtype 为 ``torch.float32``，且必须连续。
         eps (float64, optional): RMSNorm 数值稳定项，必须为有限正数，
-            默认值为 ``1e-6``。调用 ACLNN 前转换为 float32。
+            默认值为 ``1e-6``。以 double 传入 ACLNN，非空计算时转换为 float32 后仍须为有限正数。
+        output_norm_weight (Tensor, optional): 下一子层 RMSNorm 的 gamma，shape ``(D,)``，
+            dtype 为 BF16 或 FP32，必须连续且与其他输入在同一设备。``None`` 表示不启用输出 RMSNorm。
+        output_norm_eps (float64, optional): 输出 RMSNorm 独立的 epsilon，默认 ``1e-6``；
+            启用时转换为 FP32 前必须在 ``[FLT_MIN, FLT_MAX]`` 范围内，不支持次正规 epsilon。
+            归一化保留原始 ``h`` 的 BF16 舍入边界，
+            平方和、归一化及 gamma 乘法使用 FP32，最终输出 BF16。禁用时忽略本属性。
 
         当 ``T == 0`` 或 ``D == 0`` 时，所有输入仍必须满足上述 dimension 和
         shape 关系。ACLNN L0 直接返回 shape 与 ``delta`` 一致的空
@@ -288,4 +351,6 @@ def block_attn_res_update(
         logit_max,
         exp_sum,
         eps=eps,
+        output_norm_weight=output_norm_weight,
+        output_norm_eps=output_norm_eps,
     )

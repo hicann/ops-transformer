@@ -2,93 +2,76 @@
 
 <!-- md-trans-meta sourceCommit=unknown translatedAt=2026-09-21T08:05:21.745Z -->
 
-## Applicable Products
+## Product Support
 
 <!-- npu="950" id1 -->
-
 - <term>Ascend 950PR&950DT products</term>: Supported
-
 <!-- end id1 -->
-
 <!-- npu="A3" id2 -->
-
 - <term>Atlas A3 products</term>: Not supported
-
 <!-- end id2 -->
-
 <!-- npu="910b" id3 -->
-
 - <term>Atlas A2 products</term>: Not supported
-
 <!-- end id3 -->
-
 <!-- npu="310b" id4 -->
-
 - <term>Atlas 200I/500 A2 inference products</term>: Not supported
-
 <!-- end id4 -->
-
 <!-- npu="310p" id5 -->
-
 - <term>Atlas inference products</term>: Not supported
-
 <!-- end id5 -->
-
 <!-- npu="910" id6 -->
-
 - <term>Atlas training products</term>: Not supported
-
 <!-- end id6 -->
 
-## Function
+## Function Description
 
-- **Description**:
+- Accumulates `delta` into `partial_block` in place, computes the normalized score of the updated residual, and combines it with the historical online Softmax state to produce `h`. Optional output RMSNorm is applied to the BFLOAT16 mixed result.
 
-  Phase 2 of the two-phase historical residual attention computation for Attention Residuals: accumulates `delta` into `partial_block` in place and computes the RMSNorm score of the updated residual; then computes the output `h` together with the softmax statistics `numerator`, `logit_max`, and `exp_sum` (corresponding to O, M, and L, respectively) returned by the first-phase API `block_attn_res_prepare`, and writes the updated residual back to `partial_block` in place.
-- **Formula**:
+- Output RMSNorm is provided by [aclnnBlockAttnResUpdateV2](aclnnBlockAttnResUpdateV2_en.md), using `output_norm_weight` and the independent `output_norm_eps`.
 
-  Let `T` denote the number of tokens and `D` denote the hidden size. The main computation process is as follows:
+- Computation
 
-  1. Update the current `partial_block`:
+  For each token $t$, update the partial residual and write it back in place.
 
-     $$
-     p[t,d] = partial\_block[t,d] + \operatorname{FP32}(delta[t,d])
-     $$
-  2. Compute the RMSNorm denominator and the current score:
+  $$
+  p_t=P_t+\operatorname{FP32}(\Delta_t),\qquad
+  P^{\mathrm{out}}_t=p_t
+  $$
 
-     $$
-     r[t] = \sqrt{\frac{1}{D}\sum_{d=0}^{D-1}p[t,d]^2 + eps}
-     $$
+  Compute the current score using root mean square normalization (RMSNorm) and a query dot product.
 
-     $$
-     score[t] = \frac{\sum_{d=0}^{D-1}p[t,d] \times pseudo\_query[d]}{r[t]}
-     $$
-  3. Merge the current score with the historical online softmax states:
+  $$
+  C_t=\left\langle Q,\operatorname{RMSNorm}(p_t,\mathbf{1},\epsilon)\right\rangle
+  $$
 
-     $$
-     m[t] = \max(logit\_max[t], score[t])
-     $$
+  Merge the current residual with the historical online Softmax state.
 
-     $$
-     alpha[t] = \exp(logit\_max[t] - m[t]), \qquad beta[t] = \exp(score[t] - m[t])
-     $$
+  $$
+  m_t=\max(M_t,C_t),\qquad
+  \alpha_t=\exp(M_t-m_t),\qquad
+  \beta_t=\exp(C_t-m_t)
+  $$
 
-     $$
-     ell[t] = exp\_sum[t] \times alpha[t] + beta[t]
-     $$
+  $$
+  H^{(0)}_t=\operatorname{BF16}\left(
+  \frac{\alpha_t O_t+\beta_t p_t}{\alpha_t L_t+\beta_t}
+  \right)
+  $$
 
-     $$
-     updated\_numerator[t,d] = numerator[t,d] \times alpha[t] + p[t,d] \times beta[t]
-     $$
-  4. Generate the output:
+  If `output_norm_weight` is `None`, return $H=H^{(0)}$. Otherwise, apply output RMSNorm to the BFLOAT16 mixed result.
 
-     $$
-     partial\_block[t,d] \leftarrow p[t,d]
-     $$
+  $$
+  H_t=\operatorname{BF16}\left(
+  \operatorname{RMSNorm}\left(\operatorname{FP32}(H^{(0)}_t),\operatorname{FP32}(W),\epsilon_{\mathrm{out}}\right)
+  \right)
+  $$
 
-     $$
-     h[t,d] = \operatorname{Cast}_{delta.dtype}\left(\frac{updated\_numerator[t,d]}{ell[t]}\right)
-     $$
+  Here, $W$ is `output_norm_weight` and $\epsilon_{\mathrm{out}}=\operatorname{FP32}(\texttt{output\_norm\_eps})$.
+
+  - $T$ and $D$ are the token count and hidden dimension, with $t\in[0,T)$. The residuals, query, numerator, and output are $D$-dimensional vectors.
+  - $P$ and $P^{\mathrm{out}}$ are the values of `partial_block` before and after the call. $\Delta$ is `delta`, $Q$ is `pseudo_query`, and $p$ is the FLOAT32 residual sum.
+  - $O$, $M$, and $L$ are `numerator`, `logit_max`, and `exp_sum`. $H$ is `h`.
+  - $\epsilon=\operatorname{FP32}(\texttt{eps})$. RMSNorm operates along $D$ and uses an all-ones scale vector for scoring. The scoring scale can be multiplied elementwise into the original query in advance to form $Q$.
 
 ## Function Prototype
 
@@ -102,48 +85,48 @@ cann_ops_transformer.block_attn_res_update(
     exp_sum,
     *,
     eps=1e-6,
+    output_norm_weight=None,
+    output_norm_eps=1e-6,
 ) -> Tensor
 ```
 
 ## Parameters
 
-| Name       | Type      | Type | Description                                                | Data Type          | Dimension (Shape) |
-| --------------- | --------- | ----------------- | ---------------------------------------------------------- | ------------------ | ----------------- |
-| `partial_block` | Tensor    | Required          | Accumulated `partial_block`. Updated in place after the call completes. | `torch.float32`    | `(T, D)`    |
-| `delta`         | Tensor    | Required          | `delta` to be accumulated in this call.                    | `torch.bfloat16`   | `(T, D)`    |
-| `pseudo_query`  | Tensor    | Required          | `pseudo_query` used to compute logits of the current `partial_block`. | `torch.float32`    | `(D,)`      |
-| `numerator`     | Tensor    | Required          | Historical online softmax weighted sum output by `block_attn_res_prepare`. | `torch.float32`    | `(T, D)`    |
-| `logit_max`     | Tensor    | Required          | Historical maximum logit output by `block_attn_res_prepare`. | `torch.float32`    | `(T,)`      |
-| `exp_sum`       | Tensor    | Required          | Historical cumulative softmax denominator output by `block_attn_res_prepare`. | `torch.float32`    | `(T,)`      |
-| `eps`           | `float`   | Optional          | Numerical stability term in the RMSNorm computation, with a default value of `1e-6`. | `float64`          | -           |
+| Parameter | Type | Required/Optional | Description | Data Type | Dimensions (Shape) |
+| --- | --- | --- | --- | --- | --- |
+| `partial_block` | Tensor | Required | Partial residual $P$, updated in place with the FLOAT32 sum $P^{\mathrm{out}}$. | torch.float32 | [T, D] |
+| `delta` | Tensor | Required | Increment $\Delta$ added to the partial residual. | torch.bfloat16 | [T, D] |
+| `pseudo_query` | Tensor | Required | Effective query $Q$ used to score the updated residual. | torch.float32 | [D] |
+| `numerator` | Tensor | Required | Read-only weighted numerator $O$ of the historical online Softmax state. | torch.float32 | [T, D] |
+| `logit_max` | Tensor | Required | Read-only maximum historical logit $M$ for each token. | torch.float32 | [T] |
+| `exp_sum` | Tensor | Required | Read-only historical exponential sum $L$ for each token. | torch.float32 | [T] |
+| `eps` | float | Optional | Stability term $\epsilon$ for residual scoring. Must be finite and positive. Defaults to `1e-6`. | float64 | - |
+| `output_norm_weight` | Optional[Tensor] | Optional | Output RMSNorm scale $W$. Defaults to `None`, which disables output RMSNorm. | torch.bfloat16, torch.float32 | [D] |
+| `output_norm_eps` | float | Optional | Stability term $\epsilon_{\mathrm{out}}$ for output RMSNorm. Defaults to `1e-6`. Must be in `[FLT_MIN, FLT_MAX]` when a weight is supplied and is ignored otherwise. | float64 | - |
 
 ## Return Values
 
-| Name | Type | Type | Description | Data Type | Dimension (Shape) |
-| ------ | -------- | --------- | ---------------------------------------------------------------------- | ---------------- | ----------- |
-| `h`    | Tensor   | Required      | Output of `block_attn_res_update`. Its data type and shape are the same as those of `delta`. It is a contiguous tensor. | `torch.bfloat16` | `(T, D)`    |
+| Parameter | Type | Required/Optional | Description | Data Type | Dimensions (Shape) |
+| --- | --- | --- | --- | --- | --- |
+| `h` | Tensor | Required | Contiguous output $H$ for the current layer. When `output_norm_weight` is supplied, $H$ contains the output RMSNorm result. | torch.bfloat16 | [T, D] |
 
 ## Constraints
 
-- This API supports use in inference scenarios.
-- This API supports calls in single-operator mode and aclgraph mode.
-- All tensor inputs and outputs must be contiguous.
-- `T` must satisfy `T >= 0`, and `D` must satisfy `0 <= D <= 8192`.
-- An empty tensor can be returned when `T == 0` or `D == 0`.
-- The shapes of `partial_block`, `delta`, and `numerator` must be the same, all `(T, D)`.
-- The shape of `pseudo_query` must be `(D,)`, and the shapes of `logit_max` and `exp_sum` must be `(T,)`.
-- `eps` must be a finite positive number; if omitted, the default value `1e-6` is used. The Torch C++ bridge explicitly converts it to float32 before calling ACLNN.
-- Tensor data type combinations must satisfy:
-
-  | partial_block     | delta              | pseudo_query      | numerator         | logit_max         | exp_sum           | h                  |
-  | ----------------- | ------------------ | ----------------- | ----------------- | ----------------- | ----------------- | ------------------ |
-  | `torch.float32`   | `torch.bfloat16`   | `torch.float32`   | `torch.float32`   | `torch.float32`   | `torch.float32`   | `torch.bfloat16`   |
+- This API supports inference workloads.
+- Single-operator mode and aclgraph mode are supported.
+- All input and output tensors must be contiguous and on the same device.
+- `T >= 0` and `0 <= D <= 8192`. `partial_block`, `delta`, `numerator`, and `h` have shape `[T, D]`. `pseudo_query` and a supplied `output_norm_weight` have shape `[D]`. `logit_max` and `exp_sum` have shape `[T]`.
+- When `T == 0` or `D == 0`, parameter validation still applies and an empty output of the corresponding shape is returned. A supplied weight must still satisfy its dtype, shape, layout, and epsilon requirements.
+- `eps` is passed to ACLNN as a double and converted to float32 for computation. It must be finite and positive. For non-empty workloads, the converted value must also be finite and positive.
+- When `output_norm_weight` is supplied, `output_norm_eps` must be in `[FLT_MIN, FLT_MAX]` before float32 conversion. With `None`, output RMSNorm is disabled and `output_norm_eps` is ignored. Here, `FLT_MIN = 2^-126 ≈ 1.1754943508222875e-38` and `FLT_MAX ≈ 3.4028234663852886e38`. Subnormal epsilon values are unsupported because the default Sqrt FTZ mode flushes them to zero.
+- For each token in a non-empty workload, `numerator` and `logit_max` must contain finite values, and `exp_sum` must contain finite, strictly positive values. All three inputs must describe the same non-empty historical online Softmax state and are read-only.
+- Further underlying constraints are described in [aclnnBlockAttnResUpdateV2](aclnnBlockAttnResUpdateV2_en.md).
 
 ## Deterministic Computation
 
 Defaults to a deterministic implementation.
 
-## Example
+## Examples
 
 - Call in single-operator mode:
 
@@ -159,11 +142,14 @@ Defaults to a deterministic implementation.
   partial_block = torch.rand((T, D), dtype=torch.float32).npu()
   delta = torch.rand((T, D), dtype=torch.bfloat16).npu()
   pseudo_query = torch.rand((D,), dtype=torch.float32).npu()
-  numerator = torch.rand((T, D), dtype=torch.float32).npu()
-  logit_max = torch.rand((T,), dtype=torch.float32).npu()
-  exp_sum = torch.rand((T,), dtype=torch.float32).npu()
+  # Construct O/M/L from one historical item with a zero value and a zero logit.
+  numerator = torch.zeros((T, D), dtype=torch.float32).npu()
+  logit_max = torch.zeros((T,), dtype=torch.float32).npu()
+  exp_sum = torch.ones((T,), dtype=torch.float32).npu()
 
-  # Call the single-operator API.
+  output_norm_weight = torch.ones((D,), dtype=torch.float32).npu()
+
+  # Call the single-operator API with output RMSNorm.
   h = cann_ops_transformer.block_attn_res_update(
       partial_block,
       delta,
@@ -171,6 +157,9 @@ Defaults to a deterministic implementation.
       numerator,
       logit_max,
       exp_sum,
+      eps=1e-6,
+      output_norm_weight=output_norm_weight,
+      output_norm_eps=1e-6,
   )
   ```
 
@@ -222,9 +211,10 @@ Defaults to a deterministic implementation.
   partial_block = torch.rand((T, D), dtype=torch.float32).npu()
   delta = torch.rand((T, D), dtype=torch.bfloat16).npu()
   pseudo_query = torch.rand((D,), dtype=torch.float32).npu()
-  numerator = torch.rand((T, D), dtype=torch.float32).npu()
-  logit_max = torch.rand((T,), dtype=torch.float32).npu()
-  exp_sum = torch.rand((T,), dtype=torch.float32).npu()
+  # Construct O/M/L from one historical item with a zero value and a zero logit.
+  numerator = torch.zeros((T, D), dtype=torch.float32).npu()
+  logit_max = torch.zeros((T,), dtype=torch.float32).npu()
+  exp_sum = torch.ones((T,), dtype=torch.float32).npu()
 
   # Execute the compiled network.
   h = compiled_op(

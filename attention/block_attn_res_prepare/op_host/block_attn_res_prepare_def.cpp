@@ -16,50 +16,45 @@
 #include "register/op_def_registry.h"
 
 namespace ops {
-namespace {
-
-constexpr float DEFAULT_EPS = 1e-6F;
-
-} // namespace
 
 class BlockAttnResPrepare : public OpDef {
 public:
-    explicit BlockAttnResPrepare(const char *name)
+    explicit BlockAttnResPrepare(const char* name)
         : OpDef(name)
     {
         this->Input("block_res")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_BF16})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("valid_blocks")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_UINT64})
+            .DataType({ge::DT_UINT64, ge::DT_UINT64})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("pseudo_query")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
 
         this->Output("numerator")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Output("logit_max")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Output("exp_sum")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
 
-        this->Attr("eps").AttrType(OPTIONAL).Float(DEFAULT_EPS);
+        this->Attr("eps").AttrType(OPTIONAL).Float(1e-6F);
 
         OpAICoreConfig config950;
         config950.DynamicCompileStaticFlag(true)

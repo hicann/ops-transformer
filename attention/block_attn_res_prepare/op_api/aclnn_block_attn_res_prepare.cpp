@@ -60,8 +60,7 @@ constexpr const char* API_NAME = "aclnnBlockAttnResPrepareGetWorkspaceSize";
 aclnnStatus CheckRequiredParameter(const void* parameter, const char* parameterName)
 {
     if (parameter == nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, parameterName, "nullptr",
-                                              "required parameter must not be nullptr");
+        OP_LOGE_WITH_INVALID_INPUT(API_NAME, parameterName);
         return ACLNN_ERR_PARAM_NULLPTR;
     }
     return ACLNN_SUCCESS;
@@ -98,9 +97,16 @@ aclnnStatus CheckTensorDtype(const aclTensor* tensor, const char* tensorName, Da
 aclnnStatus CheckDtype(const aclTensor* blockRes, const aclTensor* validBlocks, const aclTensor* pseudoQuery,
                        const aclTensor* numerator, const aclTensor* logitMax, const aclTensor* expSum)
 {
-    if (CheckTensorDtype(blockRes, "blockRes", DataType::DT_FLOAT) != ACLNN_SUCCESS ||
-        CheckTensorDtype(validBlocks, "validBlocks", DataType::DT_UINT64) != ACLNN_SUCCESS ||
-        CheckTensorDtype(pseudoQuery, "pseudoQuery", DataType::DT_FLOAT) != ACLNN_SUCCESS ||
+    const DataType inputDtype = blockRes->GetDataType();
+    if (inputDtype != DataType::DT_FLOAT && inputDtype != DataType::DT_BF16) {
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(API_NAME, "blockRes", op::ToString(inputDtype).GetString(),
+                                              "supported dtypes are FLOAT and BFLOAT16");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (CheckTensorDtype(pseudoQuery, "pseudoQuery", DataType::DT_FLOAT) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (CheckTensorDtype(validBlocks, "validBlocks", DataType::DT_UINT64) != ACLNN_SUCCESS ||
         CheckTensorDtype(numerator, "numerator", DataType::DT_FLOAT) != ACLNN_SUCCESS ||
         CheckTensorDtype(logitMax, "logitMax", DataType::DT_FLOAT) != ACLNN_SUCCESS ||
         CheckTensorDtype(expSum, "expSum", DataType::DT_FLOAT) != ACLNN_SUCCESS) {
@@ -112,8 +118,10 @@ aclnnStatus CheckDtype(const aclTensor* blockRes, const aclTensor* validBlocks, 
 aclnnStatus CheckTensorContiguous(const aclTensor* tensor, const char* tensorName)
 {
     if (!IsContiguous(tensor)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must be contiguous, but got shape %s and strides %s.", tensorName,
-                op::ToString(tensor->GetViewShape()).GetString(), op::ToString(tensor->GetViewStrides()).GetString());
+        const std::string reason = std::string("tensor must be contiguous, but got shape ") +
+                                   op::ToString(tensor->GetViewShape()).GetString() + " and strides " +
+                                   op::ToString(tensor->GetViewStrides()).GetString();
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(API_NAME, tensorName, reason.c_str());
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -308,7 +316,9 @@ aclnnStatus aclnnBlockAttnResPrepareGetWorkspaceSize(const aclTensor* blockRes, 
               ACLNN_ERR_PARAM_NULLPTR);
     const auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
     if (npuArch != NpuArch::DAV_3510 && npuArch != NpuArch::DAV_9201) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "BlockAttnResPrepare only supports Ascend 950, Ascend 350, and Ascend 960DT.");
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "BlockAttnResPrepare only supports Ascend 950, Ascend 350, and Ascend 960DT, but got NpuArch %d.",
+                static_cast<int32_t>(npuArch));
         return ACLNN_ERR_RUNTIME_ERROR;
     }
 

@@ -21,6 +21,10 @@
 #include <vector>
 
 #include "log/log.h"
+#include "op_host/tiling_templates_registry.h"
+#include "util/math_util.h"
+#include "util/platform_util.h"
+#include "../../../op_kernel/arch35/block_attn_res_prepare_apt_tiling_key.h"
 
 namespace {
 
@@ -33,11 +37,10 @@ namespace optiling {
 namespace {
 
 constexpr uint64_t FP32_BYTES = sizeof(float);
-constexpr uint64_t UB_RESERVED_BYTES = 8UL * 1024UL;
 constexpr uint64_t L1_RESERVED_BYTES = 8UL * 1024UL;
 constexpr uint32_t FP32_REG_ELEMS = 64U;
-constexpr uint32_t CUBE_BLOCK = 16U;
-constexpr uint32_t CUBE_MAX_BASE_S = 32U;
+constexpr uint32_t CUBE_BLOCK_ELEMS = 16U;
+constexpr uint32_t CUBE_BASE_S_SMALL = 32U;
 constexpr uint32_t CUBE_MIN_T = 32U;
 constexpr uint32_t CUBE_MIN_S = 16U;
 constexpr uint32_t CUBE_MIN_D = 256U;
@@ -65,7 +68,6 @@ struct BlockAttnResPrepareMixTiling::TileCandidate {
     uint64_t baseS;
     uint64_t baseD;
     uint64_t baseDAlign;
-    uint32_t sAlign;
     uint64_t dTileNum;
     uint64_t mm1NAlign;
     uint64_t qL1BufferNum;
@@ -78,6 +80,7 @@ struct BlockAttnResPrepareMixTiling::TileCandidate {
     uint64_t dotUbElems;
     uint64_t reduceUbElems;
     uint64_t softmaxUbElems;
+    uint32_t sAlign;
 };
 
 struct BlockAttnResPrepareMixTiling::ResourceUsage {
@@ -95,9 +98,12 @@ struct BlockAttnResPrepareMixTiling::ResourceUsage {
 
 bool BlockAttnResPrepareMixTiling::IsCapable()
 {
+    // The Mix kernel accepts FP32 residuals; route BF16 inputs to the Vector template.
+    if (blockResDtype_ != ge::DT_FLOAT) {
+        return false;
+    }
     const auto platform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
-    // 9201 uses MIX_AIC_1_1 (one AIV per AIC), while the default ratio is for 950's MIX_AIC_1_2.
-    // Match the kernel launch ratio for core-count checks and mixed-core work distribution.
+    // Match the MIX_AIC_1_1 launch ratio on 960DT and MIX_AIC_1_2 on 950/350.
     if (platform.GetCurNpuArch() == NpuArch::DAV_9201) {
         aivCoreNumPerAic_ = 1UL;
     }
@@ -117,72 +123,70 @@ bool BlockAttnResPrepareMixTiling::IsCapable()
 
 bool BlockAttnResPrepareMixTiling::SelectMixTileShape()
 {
-    const uint64_t usableUbBytes = ubSize_ - UB_RESERVED_BYTES;
     const uint64_t usableL1Bytes = l1Size_ - L1_RESERVED_BYTES;
-    const uint64_t mixedCoreNum = std::min<uint64_t>(aicCoreNum_, aivCoreNum_ / aivCoreNumPerAic_);
-    if (mixedCoreNum == 0U) {
+    const uint64_t mixCoreNum = std::min<uint64_t>(aicCoreNum_, aivCoreNum_ / aivCoreNumPerAic_);
+    if (mixCoreNum == 0U) {
         return false;
     }
-    tilingData_.nAlign = static_cast<uint32_t>(AlignUp<uint64_t>(totalN_, CUBE_BLOCK));
-    tilingData_.dAlign = static_cast<uint32_t>(AlignUp<uint64_t>(totalD_, CUBE_BLOCK));
+    tilingData_.nAlign = static_cast<uint32_t>(Ops::Base::CeilAlign<uint64_t>(totalN_, CUBE_BLOCK_ELEMS));
 
     // Pack adjacent token matrices into MM1's N dimension until one 16-column Cube tile is filled. The
     // load-balance guard keeps the maximum number of token/S tiles assigned to one core no larger than baseT=1,
     // because MM2 and its AIV epilogue still execute once per token.
     const std::array<uint64_t, CUBE_BASE_S_CANDIDATE_NUM> sCandidates = {
         totalS_, std::min<uint64_t>(totalS_, CUBE_BASE_S_LARGE), std::min<uint64_t>(totalS_, CUBE_BASE_S_MEDIUM),
-        std::min<uint64_t>(totalS_, CUBE_MAX_BASE_S), std::min<uint64_t>(totalS_, CUBE_BLOCK)};
-    uint64_t previousS = 0U;
-    for (const uint64_t sCandidate : sCandidates) {
-        if (sCandidate == 0U || sCandidate == previousS) {
+        std::min<uint64_t>(totalS_, CUBE_BASE_S_SMALL), std::min<uint64_t>(totalS_, CUBE_BLOCK_ELEMS)};
+    uint64_t previousCandidateS = 0U;
+    for (const uint64_t candidateS : sCandidates) {
+        if (candidateS == 0U || candidateS == previousCandidateS) {
             continue;
         }
-        previousS = sCandidate;
-        if (TrySelectTileForS(sCandidate, mixedCoreNum, usableL1Bytes, usableUbBytes)) {
+        previousCandidateS = candidateS;
+        if (TrySelectTileForS(candidateS, mixCoreNum, usableL1Bytes, ubSize_)) {
             return true;
         }
     }
     return false;
 }
 
-bool BlockAttnResPrepareMixTiling::TrySelectTileForS(uint64_t sCandidate, uint64_t mixedCoreNum, uint64_t usableL1Bytes,
+bool BlockAttnResPrepareMixTiling::TrySelectTileForS(uint64_t candidateS, uint64_t mixCoreNum, uint64_t usableL1Bytes,
                                                      uint64_t usableUbBytes)
 {
     const std::array<uint64_t, CUBE_BASE_T_CANDIDATE_NUM> tCandidates = {CUBE_BASE_T_LARGE, CUBE_BASE_T_MEDIUM,
                                                                          CUBE_BASE_T_SMALL, 1UL};
-    const uint64_t candidateSTileNum = CeilDiv(totalS_, sCandidate);
+    const uint64_t candidateSTileNum = Ops::Base::CeilDiv(totalS_, candidateS);
     const uint64_t baselineWorkUnits = totalT_ * candidateSTileNum;
-    const uint64_t baselineUsedCores = std::min<uint64_t>(mixedCoreNum, baselineWorkUnits);
-    const uint64_t baselineTokenWork = CeilDiv(baselineWorkUnits, baselineUsedCores);
+    const uint64_t baselineUsedCores = std::min<uint64_t>(mixCoreNum, baselineWorkUnits);
+    const uint64_t baselineTokenWorkPerCore = Ops::Base::CeilDiv(baselineWorkUnits, baselineUsedCores);
     for (const uint64_t candidateT : tCandidates) {
-        if (candidateT > totalT_ || candidateT * totalN_ > CUBE_BLOCK) {
+        if (candidateT > totalT_ || candidateT * totalN_ > CUBE_BLOCK_ELEMS) {
             continue;
         }
-        const uint64_t candidateTGroups = CeilDiv(totalT_, candidateT);
-        const uint64_t groupedWorkUnits = candidateTGroups * candidateSTileNum;
-        const uint64_t groupedUsedCores = std::min<uint64_t>(mixedCoreNum, groupedWorkUnits);
-        const uint64_t groupedTokenWork = CeilDiv(groupedWorkUnits, groupedUsedCores) * candidateT;
-        if (groupedTokenWork <= baselineTokenWork &&
-            TrySelectTileForT(sCandidate, candidateT, usableL1Bytes, usableUbBytes)) {
+        const uint64_t candidateTTileNum = Ops::Base::CeilDiv(totalT_, candidateT);
+        const uint64_t groupedWorkUnits = candidateTTileNum * candidateSTileNum;
+        const uint64_t groupedUsedCores = std::min<uint64_t>(mixCoreNum, groupedWorkUnits);
+        const uint64_t groupedTokenWorkPerCore = Ops::Base::CeilDiv(groupedWorkUnits, groupedUsedCores) * candidateT;
+        if (groupedTokenWorkPerCore <= baselineTokenWorkPerCore &&
+            TrySelectTileForT(candidateS, candidateT, usableL1Bytes, usableUbBytes)) {
             return true;
         }
     }
     return false;
 }
 
-bool BlockAttnResPrepareMixTiling::TrySelectTileForT(uint64_t sCandidate, uint64_t candidateT, uint64_t usableL1Bytes,
+bool BlockAttnResPrepareMixTiling::TrySelectTileForT(uint64_t candidateS, uint64_t candidateT, uint64_t usableL1Bytes,
                                                      uint64_t usableUbBytes)
 {
     const std::array<uint64_t, CUBE_BASE_D_CANDIDATE_NUM> dCandidates = {
         std::min<uint64_t>(totalD_, CUBE_BASE_D_LARGE), std::min<uint64_t>(totalD_, CUBE_BASE_D_MEDIUM),
         std::min<uint64_t>(totalD_, CUBE_BASE_D_SMALL)};
-    uint64_t previousD = 0U;
+    uint64_t previousCandidateD = 0U;
     for (const uint64_t candidateD : dCandidates) {
-        if (candidateD == 0U || candidateD == previousD) {
+        if (candidateD == 0U || candidateD == previousCandidateD) {
             continue;
         }
-        previousD = candidateD;
-        const TileCandidate candidate = BuildTileCandidate(sCandidate, candidateT, candidateD);
+        previousCandidateD = candidateD;
+        const TileCandidate candidate = BuildTileCandidate(candidateS, candidateT, candidateD);
         const ResourceUsage usage = CalculateResourceUsage(candidate);
         if (DoesCandidateFit(usage, usableL1Bytes, usableUbBytes)) {
             ApplyTileCandidate(candidate);
@@ -192,18 +196,18 @@ bool BlockAttnResPrepareMixTiling::TrySelectTileForT(uint64_t sCandidate, uint64
     return false;
 }
 
-BlockAttnResPrepareMixTiling::TileCandidate BlockAttnResPrepareMixTiling::BuildTileCandidate(uint64_t sCandidate,
+BlockAttnResPrepareMixTiling::TileCandidate BlockAttnResPrepareMixTiling::BuildTileCandidate(uint64_t candidateS,
                                                                                              uint64_t candidateT,
                                                                                              uint64_t candidateD) const
 {
     TileCandidate candidate{};
     candidate.baseT = candidateT;
-    candidate.baseS = sCandidate;
+    candidate.baseS = candidateS;
     candidate.baseD = candidateD;
-    candidate.baseDAlign = AlignUp<uint64_t>(candidateD, CUBE_BLOCK);
-    candidate.sAlign = static_cast<uint32_t>(AlignUp<uint64_t>(sCandidate, CUBE_BLOCK));
-    candidate.dTileNum = CeilDiv(totalD_, candidateD);
-    candidate.mm1NAlign = AlignUp<uint64_t>(candidateT * totalN_, CUBE_BLOCK);
+    candidate.baseDAlign = Ops::Base::CeilAlign<uint64_t>(candidateD, CUBE_BLOCK_ELEMS);
+    candidate.sAlign = static_cast<uint32_t>(Ops::Base::CeilAlign<uint64_t>(candidateS, CUBE_BLOCK_ELEMS));
+    candidate.dTileNum = Ops::Base::CeilDiv(totalD_, candidateD);
+    candidate.mm1NAlign = Ops::Base::CeilAlign<uint64_t>(candidateT * totalN_, CUBE_BLOCK_ELEMS);
     candidate.qL1BufferNum = candidate.dTileNum > 1U ? DOUBLE_BUFFER_NUM : 1U;
     candidate.vL1BufferNum = candidate.dTileNum > 1U ? DOUBLE_BUFFER_NUM : 1U;
     candidate.vUbBufferNum = DOUBLE_BUFFER_NUM;
@@ -263,8 +267,6 @@ void BlockAttnResPrepareMixTiling::ApplyTileCandidate(const TileCandidate& candi
     tilingData_.qL1BufferNum = static_cast<uint8_t>(candidate.qL1BufferNum);
     tilingData_.vL1BufferNum = static_cast<uint8_t>(candidate.vL1BufferNum);
     tilingData_.vUbBufferNum = static_cast<uint8_t>(candidate.vUbBufferNum);
-    tilingData_.qL1Elems = candidate.qL1Elems;
-    tilingData_.vL1Elems = candidate.vL1Elems;
     tilingData_.eL1Elems = candidate.eL1Elems;
     tilingData_.vUbElems = candidate.vUbElems;
     tilingData_.dotUbElems = candidate.dotUbElems;
@@ -281,28 +283,33 @@ ge::graphStatus BlockAttnResPrepareMixTiling::DoOpTiling()
                 return ge::GRAPH_FAILED);
 
     uint64_t totalWorkUnits = 0U;
-    if (CalculateMixWork(totalWorkUnits) != ge::GRAPH_SUCCESS || CalculateWorkspaceSize() != ge::GRAPH_SUCCESS) {
+    if (CalculateWorkDistribution(totalWorkUnits) != ge::GRAPH_SUCCESS ||
+        CalculateWorkspaceSize() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     FillTilingData(totalWorkUnits);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BlockAttnResPrepareMixTiling::CalculateMixWork(uint64_t& totalWorkUnits)
+ge::graphStatus BlockAttnResPrepareMixTiling::CalculateWorkDistribution(uint64_t& totalWorkUnits)
 {
-    tilingData_.sTileNum = static_cast<uint32_t>(CeilDiv<uint64_t>(totalS_, tilingData_.baseS));
-    const uint64_t tTileNum = CeilDiv<uint64_t>(totalT_, tilingData_.baseT);
+    tilingData_.sTileNum = static_cast<uint32_t>(Ops::Base::CeilDiv<uint64_t>(totalS_, tilingData_.baseS));
+    const uint64_t tTileNum = Ops::Base::CeilDiv<uint64_t>(totalT_, tilingData_.baseT);
     OP_CHECK_IF(tTileNum > std::numeric_limits<uint64_t>::max() / tilingData_.sTileNum,
                 OP_LOGE(context_->GetNodeName(), "Mix work count overflows uint64: tTileNum=%lu, sTileNum=%u", tTileNum,
                         tilingData_.sTileNum),
                 return ge::GRAPH_FAILED);
     totalWorkUnits = tTileNum * tilingData_.sTileNum;
-    const uint64_t mixedCoreNum = std::min<uint64_t>(aicCoreNum_, aivCoreNum_ / aivCoreNumPerAic_);
-    WorkDistribution distribution;
-    if (CalculateWorkDistribution(totalWorkUnits, mixedCoreNum, "Mix", distribution) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-    usedCoreNum_ = distribution.usedCoreNum;
+    OP_CHECK_IF(totalWorkUnits > std::numeric_limits<uint32_t>::max(),
+                OP_LOGE(context_->GetNodeName(), "Mix totalWorkUnits=%lu exceeds uint32 maximum=%u", totalWorkUnits,
+                        std::numeric_limits<uint32_t>::max()),
+                return ge::GRAPH_FAILED);
+    const uint64_t mixCoreNum = std::min<uint64_t>(aicCoreNum_, aivCoreNum_ / aivCoreNumPerAic_);
+    usedCoreNum_ = static_cast<uint32_t>(std::min(mixCoreNum, totalWorkUnits));
+    OP_CHECK_IF(usedCoreNum_ == 0U,
+                OP_LOGE(context_->GetNodeName(), "Mix usedCoreNum is zero: totalWorkUnits=%lu, availableCoreNum=%lu",
+                        totalWorkUnits, mixCoreNum),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -347,31 +354,13 @@ void BlockAttnResPrepareMixTiling::FillTilingData(uint64_t totalWorkUnits)
     tilingData_.totalWorkUnits = static_cast<uint32_t>(totalWorkUnits);
     tilingData_.totalD = static_cast<uint32_t>(totalD_);
     tilingData_.usedCoreNum = static_cast<uint16_t>(usedCoreNum_);
-    tilingData_.aicCoreNum = static_cast<uint16_t>(aicCoreNum_);
-    tilingData_.aivCoreNum = static_cast<uint16_t>(aivCoreNum_);
     tilingData_.eps = eps_;
 }
 
 uint64_t BlockAttnResPrepareMixTiling::GetTilingKey() const
 {
-    return GET_TPL_TILING_KEY(BLOCK_ATTN_RES_PREPARE_TPL_MIX);
-}
-
-BlockAttnResPrepareBaseTiling::TilingDataView BlockAttnResPrepareMixTiling::GetTilingDataView() const
-{
-    return {&tilingData_, sizeof(tilingData_), "Mix"};
-}
-
-void BlockAttnResPrepareMixTiling::DumpTilingInfo()
-{
-    OP_LOGI(context_->GetNodeName(),
-            "BlockAttnResPrepare Mix tiling: T=%lu N=%lu S=%lu D=%lu cores=%u baseS=%u baseD=%u "
-            "baseT=%u sLoops=%u dLoops=%u qL1/vL1/vUb buffers=%u/%u/%u nAlign/mm1NAlign=%u/%u "
-            "workspacePerCore=%lu workspace=%lu",
-            totalT_, totalN_, totalS_, totalD_, usedCoreNum_, tilingData_.baseS, tilingData_.baseD, tilingData_.baseT,
-            tilingData_.sTileNum, tilingData_.dTileNum, tilingData_.qL1BufferNum, tilingData_.vL1BufferNum,
-            tilingData_.vUbBufferNum, tilingData_.nAlign, tilingData_.mm1NAlign, tilingData_.workspacePerCoreElems,
-            workspaceSize_);
+    using namespace BlockAttnResPrepareTilingKey;
+    return GET_TPL_TILING_KEY(BLOCK_ATTN_RES_PREPARE_MIX_TPL);
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(BlockAttnResPrepare, BlockAttnResPrepareMixTiling, supportedNpuArch,

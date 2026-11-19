@@ -16,18 +16,18 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_block_attn_res_prepare.h"
 
-#define CHECK_RET(cond, return_expr) \
+#define CHECK_RET(cond, returnExpr) \
     do { \
         if (!(cond)) { \
-            return_expr; \
+            returnExpr; \
         } \
     } while (0)
 
-#define CHECK_FREE_RET(cond, return_expr) \
+#define CHECK_FREE_RET(cond, returnExpr) \
     do { \
         if (!(cond)) { \
             Finalize(deviceId, stream); \
-            return_expr; \
+            returnExpr; \
         } \
     } while (0)
 
@@ -92,7 +92,7 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-int aclnnBlockAttnResPrepareTest(int32_t deviceId, aclrtStream& stream)
+int RunBlockAttnResPrepare(int32_t deviceId, aclrtStream& stream)
 {
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
@@ -208,8 +208,8 @@ int main()
     // 根据实际运行环境设置Device ID。
     constexpr int32_t deviceId = 0;
     aclrtStream stream = nullptr;
-    const auto ret = aclnnBlockAttnResPrepareTest(deviceId, stream);
-    CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBlockAttnResPrepareTest failed. ERROR: %d\n", ret); return ret);
+    const auto ret = RunBlockAttnResPrepare(deviceId, stream);
+    CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("RunBlockAttnResPrepare failed. ERROR: %d\n", ret); return ret);
 
     Finalize(deviceId, stream);
     return ACL_SUCCESS;

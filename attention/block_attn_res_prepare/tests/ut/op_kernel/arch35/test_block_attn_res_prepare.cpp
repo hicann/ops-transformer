@@ -9,7 +9,16 @@
  */
 
 #ifdef __CCE_KT_TEST__
+#define DTYPE_BLOCK_RES float
+#define block_attn_res_prepare block_attn_res_prepare_fp32
 #include "../../../../op_kernel/block_attn_res_prepare_apt.cpp"
+#undef block_attn_res_prepare
+#undef DTYPE_BLOCK_RES
+#define DTYPE_BLOCK_RES bfloat16_t
+#define block_attn_res_prepare block_attn_res_prepare_bf16
+#include "../../../../op_kernel/block_attn_res_prepare_apt.cpp"
+#undef block_attn_res_prepare
+#undef DTYPE_BLOCK_RES
 #endif
 #include "../test_block_attn_res_prepare_utils.h"
 
@@ -55,7 +64,14 @@ TEST(BlockAttnResPrepareKernelCsv, LoadsSelectedSocCases)
 TEST_P(BlockAttnResPrepareKernelTest, RunKernel)
 {
 #ifdef __CCE_KT_TEST__
-    BlockAttnResPrepareKernelTestUtils::TestOneParamCase(GetParam());
+    const auto& param = GetParam();
+    if (param.bf16) {
+        BlockAttnResPrepareKernelTestUtils::TestOneParamCase950Impl<uint16_t>(
+            param, &block_attn_res_prepare_bf16<BLOCK_ATTN_RES_PREPARE_ONLY_VECTOR_TPL>);
+    } else {
+        BlockAttnResPrepareKernelTestUtils::TestOneParamCase950Impl<float>(
+            param, &block_attn_res_prepare_fp32<BLOCK_ATTN_RES_PREPARE_ONLY_VECTOR_TPL>);
+    }
 #else
     GTEST_SKIP() << "Kernel CPU simulator is unavailable";
 #endif

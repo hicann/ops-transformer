@@ -15,83 +15,63 @@ English | [简体中文](./README.md)
 
 ## Function Description
 
-- Operator function: Completes the first stage of the two-stage computation of Attention Residuals historical residual attention. It computes the inter-block attention of all $S$ target slots in parallel at one time and returns the softmax weighted numerator and the statistics $(O,M,L)$ for the next stage to fuse the current residual.
+- Computes the first stage of Attention Residuals historical residual attention. It produces the online Softmax state $(O,M,L)$ for all $S$ target slots, which the update stage combines with the current residual.
 
-- Computation formula:
+- Computation
 
-    $$
-    \operatorname{block\_attn\_res\_prepare}
-    \left(V,Q,\operatorname{valid\_blocks};\epsilon\right)
-    \longrightarrow (O,M,L)
-    $$
+  Let $V$ be the FLOAT32 representation of `block_res`, $Q$ be `pseudo_query`, $N_v=\min(\texttt{valid\_blocks[0]},N)$ be the number of valid historical blocks, and $\epsilon=\operatorname{FP32}(\texttt{eps})$.
 
-    Computes the RMS normalization factor for the $n$-th valid historical source of token $t$:
+  For $N_v>0$, compute root mean square normalization (RMSNorm) along the hidden dimension and the attention logits.
 
-    $$
-    R_{t,n}=\sqrt{\frac{1}{D}\sum_{d=0}^{D-1}V_{t,n,d}^{2}+\epsilon}
-    $$
+  $$
+  \widehat V_{t,n}=\operatorname{RMSNorm}(V_{t,n},\mathbf{1},\epsilon),\qquad
+  Z_{s,t,n}=\left\langle Q_s,\widehat V_{t,n}\right\rangle
+  $$
 
-    Computes the logit for each target slot, token, and valid historical source:
+  Compute the online Softmax state over the valid historical blocks.
 
-    $$
-    Z_{s,t,n}=R_{t,n}^{-1}\sum_{d=0}^{D-1}Q_{s,d}V_{t,n,d}
-    $$
+  $$
+  M_{s,t}=\max_{0\le n<N_v}Z_{s,t,n},\qquad
+  E_{s,t,n}=\exp(Z_{s,t,n}-M_{s,t})
+  $$
 
-    Let $N_v$ be the number of valid historical sources specified by `valid_blocks`. Then:
+  $$
+  L_{s,t}=\sum_{n=0}^{N_v-1}E_{s,t,n},\qquad
+  O_{s,t,d}=\sum_{n=0}^{N_v-1}E_{s,t,n}V_{t,n,d}
+  $$
 
-    $$
-    M_{s,t}=\max_{0\le n<N_v}Z_{s,t,n}
-    $$
+  - $T$, $N$, $S$, and $D$ are the token count, historical block capacity, target slot count, and hidden dimension. The corresponding indices are $t\in[0,T)$, $n\in[0,N_v)$, $s\in[0,S)$, and $d\in[0,D)$.
+  - RMSNorm uses an all-ones scale vector. The scoring scale can be multiplied elementwise into the original query in advance to form $Q$.
+  - $O$, $M$, and $L$ correspond to `numerator`, `logit_max`, and `exp_sum`. The weighted numerator $O$ has not been divided by $L$.
 
-    $$
-    E_{s,t,n}=\exp\left(Z_{s,t,n}-M_{s,t}\right)
-    $$
+  For $N_v=0$, return the empty online Softmax state.
 
-    $$
-    L_{s,t}=\sum_{n=0}^{N_v-1}E_{s,t,n}
-    $$
+  $$
+  O=\mathbf{0}_{S\times T\times D},\qquad
+  M=m_{\min}\mathbf{1}_{S\times T},\qquad
+  L=\mathbf{0}_{S\times T},\qquad
+  m_{\min}=-3.4028234663852886\times10^{38}
+  $$
 
-    $$
-    O_{s,t,d}=\sum_{n=0}^{N_v-1}E_{s,t,n}V_{t,n,d}
-    $$
+  Here, $m_{\min}$ is the minimum finite FLOAT32 value.
 
-    When `valid_blocks[0] == 0`, the preceding softmax computation is not performed, and the following values are returned directly:
+## Parameters
 
-    $$
-    O=\mathbf{0}_{S\times T\times D},\qquad
-    M=m_{\min}\mathbf{1}_{S\times T},\qquad
-    L=\mathbf{0}_{S\times T},\qquad
-    m_{\min}=-3.4028234663852886\times10^{38}
-    $$
-
-    That is, `numerator` is an all-0 tensor with the shape `[S, T, D]`, `logit_max` is a tensor with the shape `[S, T]` whose elements are all the minimum finite FLOAT32 value $m_{\min}$, and `exp_sum` is an all-0 tensor with the shape `[S, T]`. This result indicates the empty state of online softmax.
-
-    where:
-
-    - $V\in\mathbb{R}^{T\times N\times D}$ denotes the input `block_res`; $V_{t,n,d}$ denotes the value of the $d$-th hidden feature of the $n$-th historical residual block of the $t$-th token.
-    - $Q\in\mathbb{R}^{S\times D}$ denotes the input `pseudo_query`; each target slot corresponds to a query vector, and $Q_{s,d}$ denotes the value of the $d$-th hidden feature of the $s$-th target slot.
-    - $T$ denotes the number of tokens, $N$ denotes the number of historical residual blocks that dimension 1 of `block_res` can hold, $S$ denotes the number of target slots, and $D$ denotes HiddenSize.
-    - $N_v=\min(\texttt{valid\_blocks[0]},N)$ denotes the number of historical residual blocks that actually participate in the computation.
-    - $R$ denotes the RMS normalization factor, $Z$ denotes the normalized attention logit, and $E$ denotes the exponential value after max-shift.
-    - $O$, $M$, and $L$ denote the softmax weighted numerator, the maximum logit, and the exponential sum, corresponding to the outputs `numerator`, `logit_max`, and `exp_sum`, respectively.
-    - $\epsilon$ denotes the numerical stability term of RMS normalization, corresponding to the attribute `eps`.
-
-## Parameter Description
-
-<table style="undefined;table-layout: fixed; width: 980px"><colgroup>
-  <col style="width: 120px">
-  <col style="width: 150px">
-  <col style="width: 490px">
-  <col style="width: 120px">
-  <col style="width: 100px">
+<table style="table-layout: fixed; width: 1000px">
+  <colgroup>
+    <col style="width: 160px">
+    <col style="width: 150px">
+    <col style="width: 450px">
+    <col style="width: 140px">
+    <col style="width: 100px">
   </colgroup>
   <thead>
     <tr>
-      <th>Parameter name</th>
+      <th>Parameter</th>
       <th>Input/Output/Attribute</th>
       <th>Description</th>
-      <th>Data type</th>
-      <th>Data format</th>
+      <th>Data Type</th>
+      <th>Data Format</th>
     </tr>
   </thead>
   <tbody>
@@ -99,84 +79,68 @@ English | [简体中文](./README.md)
       <td>block_res</td>
       <td>Input</td>
       <td>Historical residual blocks, corresponding to V in the formula, with the shape [T, N, D].</td>
-      <td>FLOAT</td>
+      <td>BFLOAT16, FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>valid_blocks</td>
       <td>Input</td>
-      <td>Number of currently valid historical sources, with the shape [1]. When the value is 0, numerator returns an all-0 tensor, logit_max returns a tensor whose elements are all the minimum finite FLOAT32 value, and exp_sum returns an all-0 tensor. When the value is greater than N, it is processed as N.</td>
+      <td>Number of valid historical residual blocks, with shape [1]. Zero produces an empty history, and values above N are clipped to N.</td>
       <td>UINT64</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>pseudo_query</td>
       <td>Input</td>
-      <td>Pseudo query, corresponding to Q in the formula. Each target slot corresponds to a query vector, with the shape [S, D].</td>
-      <td>FLOAT</td>
+      <td>Pseudo-query matrix Q with shape [S, D], with one row per target slot.</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>numerator</td>
       <td>Output</td>
       <td>Softmax weighted numerator, corresponding to O in the formula, with the shape [S, T, D].</td>
-      <td>FLOAT</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>logit_max</td>
       <td>Output</td>
       <td>Maximum logit of valid historical sources, corresponding to M in the formula, with the shape [S, T].</td>
-      <td>FLOAT</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>exp_sum</td>
       <td>Output</td>
       <td>Exponential sum after max-shift, corresponding to L in the formula, with the shape [S, T].</td>
-      <td>FLOAT</td>
+      <td>FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>eps</td>
-      <td>Attribute</td>
-      <td>Numerical stability term of RMS normalization. Optional. The default value is 1e-6. Computed internally in FLOAT32; it must be finite and in `[FLT_MIN, FLT_MAX]`. Subnormal values are not supported.</td>
-      <td>FLOAT</td>
+      <td>Optional attribute</td>
+      <td>Stability term for RMS normalization. The default is <code>1e-6</code>. The value must be in the positive normal FLOAT32 range <code>[FLT_MIN, FLT_MAX]</code>.</td>
+      <td>FLOAT32</td>
       <td>-</td>
     </tr>
   </tbody>
 </table>
 
-## Constraint Description
+## Constraints
 
-- `T >= 0`, `S >= 0`, `1 <= N <= 64`, and `1 <= D <= 8192`. Non-empty computation (`T > 0` and `S > 0`) additionally requires `T <= 4294967295` (`UINT32_MAX`, the maximum unsigned 32-bit integer), `S <= 4294967295` (`UINT32_MAX`), and `T * S <= 9223372036854775807` (`INT64_MAX`, the maximum signed 64-bit integer).
-- The shape of `block_res` is `[T, N, D]`, and the shape of `pseudo_query` is `[S, D]`. The shapes of `numerator`, `logit_max`, and `exp_sum` are `[S, T, D]`, `[S, T]`, and `[S, T]`, respectively.
-- The shape of `valid_blocks` must be `[1]`. When `valid_blocks[0] == 0`, `numerator` returns an all-0 tensor, `logit_max` returns a tensor whose elements are all the minimum finite FLOAT32 value, and `exp_sum` returns an all-0 tensor. When `valid_blocks[0] > N`, it is processed as `N`.
-- All input and output tensors must be contiguous tensors. Non-contiguous tensors are not supported.
+- `T >= 0`, `S >= 0`, `1 <= N <= 64`, and `1 <= D <= 8192`.
+- For non-empty computation (`T > 0` and `S > 0`), `T` and `S` must not exceed `4294967295` (`UINT32_MAX`), and `T * S` must not exceed `9223372036854775807` (`INT64_MAX`).
+- All input and output tensors must be contiguous.
 - `eps` must be finite and in the positive normal FLOAT32 range `[FLT_MIN, FLT_MAX]` (approximately `[1.1754943508222875e-38, 3.4028234663852886e+38]`). The double value received by ACLNN is validated against this range before conversion to a FLOAT32 attribute. Subnormal values and values that narrow to zero or Inf are not supported.
-- If `T == 0` or `S == 0`, empty outputs of the corresponding shapes are returned after parameter validation and shape inference, without launching AICore computation. The limits for non-empty computation above do not apply as checks on this path; the valid `eps` range and other API checks still apply.
+- If `T == 0` or `S == 0`, empty outputs of the corresponding shapes are returned after parameter validation and shape inference, without launching AICore computation. The limits for non-empty computation above do not apply to this path; the valid `eps` range and other API checks still apply.
 
-## Invocation Description
+## Invocation
 
-<table><thead>
-  <tr>
-    <th>Invocation method</th>
-    <th>Invocation sample</th>
-    <th>Description</th>
-  </tr></thead>
-<tbody>
-  <tr>
-    <td>aclnn invocation</td>
-    <td><a href="./examples/arch35/test_aclnn_block_attn_res_prepare.cpp">test_aclnn_block_attn_res_prepare</a></td>
-    <td>Invokes the operator through <a href="./docs/aclnnBlockAttnResPrepare_en.md">aclnnBlockAttnResPrepare_en.md</a>, and compiles the operator block_attn_res_prepare. For the detailed operator compilation and running methods, see <a href="../../docs/zh/invocation/quick_op_invocation.md">Operator Invocation</a>.</td>
-  </tr>
-  <tr>
-    <td>PyTorch API</td>
-    <td>-</td>
-    <td>Invokes the block_attn_res_prepare operator through the <a href="../../attention/block_attn_res_prepare/docs/torchapi_block_attn_res_prepare_en.md">block_attn_res_prepare</a> interface.</td>
-  </tr>
-</tbody>
-</table>
+| Invocation Method | Sample | Description |
+| --- | --- | --- |
+| aclnn API | [test_aclnn_block_attn_res_prepare.cpp](examples/arch35/test_aclnn_block_attn_res_prepare.cpp) | Calls [aclnnBlockAttnResPrepare](docs/aclnnBlockAttnResPrepare_en.md). See [Compile and Run Samples](../../docs/en/context/compile_and_run_sample.md) for build instructions. |
+| PyTorch API | [Example](docs/torchapi_block_attn_res_prepare_en.md#examples) | Calls [block_attn_res_prepare](docs/torchapi_block_attn_res_prepare_en.md). |
 
 ```bash
 # Execute in the root directory of the ops-transformer repository

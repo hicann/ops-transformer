@@ -21,14 +21,14 @@ extern "C" {
 /**
  * @brief 计算BlockAttnResPrepare所需的工作空间大小。
  *
- * @param blockRes [输入] 形状为[T, N, D]的FP32 ND张量。
+ * @param blockRes [输入] 形状为[T, N, D]的FP32或BF16 ND张量。
  * @param validBlocks [输入] 形状为[1]的UINT64 ND张量。
- * @param pseudoQuery [输入] FP32 ND张量，shape为[S, D]。
+ * @param pseudoQuery [输入] 形状为[S, D]的FP32 ND张量。
  *
  * @param numerator [输出] 形状为[S, T, D]的FP32 ND张量。
  * @param logitMax [输出] 形状为[S, T]的FP32 ND张量。
  * @param expSum [输出] 形状为[S, T]的FP32 ND张量。
- * @param eps [输入] 用于保证数值稳定性的DOUBLE正数。
+ * @param eps [输入] 数值稳定项，DOUBLE值须位于[FLT_MIN, FLT_MAX]，校验后转换为FLOAT32。
  * @param workspaceSize [输出] 设备侧所需的工作空间大小，单位为字节。
  * @param executor [输出] 第二段接口使用的执行器。
  * @return 成功时返回ACLNN_SUCCESS。

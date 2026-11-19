@@ -47,6 +47,7 @@ struct BlockAttnResUpdateKernelTestParam {
     uint32_t numBlocks = 0U;
     uint64_t tilingKey = 0UL;
     std::vector<int32_t> tilingData;
+    std::string outputNormWeightDtype = "NONE";
 };
 
 struct BlockAttnResUpdateKernelCsvLoadResult {
@@ -89,8 +90,8 @@ public:
 
             const std::string caseName = fields.size() > 1UL ? ops::ut::Trim(fields[1]) : "";
             try {
-                constexpr size_t REQUIRED_COLUMN_COUNT = 12UL;
-                if (fields.size() < REQUIRED_COLUMN_COUNT) {
+                constexpr size_t requiredColumnCount = 13UL;
+                if (fields.size() < requiredColumnCount) {
                     throw std::runtime_error("invalid CSV column count");
                 }
 
@@ -115,6 +116,7 @@ public:
                 param.numBlocks = ParseU32(fields[index++], "numBlocks");
                 param.tilingKey = std::stoull(ops::ut::Trim(fields[index++]));
                 param.tilingData = ParseTilingData(fields[index++]);
+                param.outputNormWeightDtype = ops::ut::Trim(fields[index++]);
                 ValidateParam(param);
                 result.params.emplace_back(std::move(param));
             } catch (const std::exception& error) {
@@ -153,6 +155,7 @@ public:
         GmBuffer logitMaxGm(statsBytes);
         GmBuffer expSumGm(statsBytes);
         GmBuffer hGm(bf16MatrixBytes);
+        GmBuffer outputNormWeightGm(queryBytes);
         GmBuffer tilingGm(param.tilingData.size() * sizeof(int32_t));
 
         ASSERT_TRUE(partialGm.IsValid());
@@ -162,6 +165,7 @@ public:
         ASSERT_TRUE(logitMaxGm.IsValid());
         ASSERT_TRUE(expSumGm.IsValid());
         ASSERT_TRUE(hGm.IsValid());
+        ASSERT_TRUE(outputNormWeightGm.IsValid());
         ASSERT_TRUE(tilingGm.IsValid());
 
         std::memcpy(partialGm.Get(), partialInput.data(), partialBytes);
@@ -172,17 +176,37 @@ public:
         std::memcpy(expSumGm.Get(), expSumInput.data(), statsBytes);
         std::memset(hGm.Get(), 0xFF, bf16MatrixBytes);
         std::memcpy(tilingGm.Get(), param.tilingData.data(), param.tilingData.size() * sizeof(int32_t));
+        for (uint32_t dIdx = 0U; dIdx < param.d; ++dIdx) {
+            const float weight = 0.5F + static_cast<float>((dIdx + param.seed) % 13U) * 0.125F;
+            if (param.outputNormWeightDtype == "BF16") {
+                const uint16_t value = FloatToBf16(weight);
+                std::memcpy(outputNormWeightGm.Get() + dIdx * sizeof(value), &value, sizeof(value));
+            } else {
+                std::memcpy(outputNormWeightGm.Get() + dIdx * sizeof(weight), &weight, sizeof(weight));
+            }
+        }
 
         const uint32_t launchBlocks = std::min(MAX_NUM_BLOCKS, param.numBlocks);
-        const auto kernelFunc =
-            param.tilingKey == GET_TPL_TILING_KEY(true) ? &block_attn_res_update<true> : &block_attn_res_update<false>;
+        auto kernelFunc = &block_attn_res_update<false, false, BARU_NORM_WEIGHT_BF16>;
+        if (param.tilingKey == GET_TPL_TILING_KEY(true, false, BARU_NORM_WEIGHT_BF16)) {
+            kernelFunc = &block_attn_res_update<true, false, BARU_NORM_WEIGHT_BF16>;
+        } else if (param.tilingKey == GET_TPL_TILING_KEY(false, true, BARU_NORM_WEIGHT_FP32)) {
+            kernelFunc = &block_attn_res_update<false, true, BARU_NORM_WEIGHT_FP32>;
+        } else if (param.tilingKey == GET_TPL_TILING_KEY(true, true, BARU_NORM_WEIGHT_FP32)) {
+            kernelFunc = &block_attn_res_update<true, true, BARU_NORM_WEIGHT_FP32>;
+        } else if (param.tilingKey == GET_TPL_TILING_KEY(false, true, BARU_NORM_WEIGHT_BF16)) {
+            kernelFunc = &block_attn_res_update<false, true, BARU_NORM_WEIGHT_BF16>;
+        } else if (param.tilingKey == GET_TPL_TILING_KEY(true, true, BARU_NORM_WEIGHT_BF16)) {
+            kernelFunc = &block_attn_res_update<true, true, BARU_NORM_WEIGHT_BF16>;
+        }
         ICPU_SET_TILING_KEY(param.tilingKey);
         // The CPU-debug Reg/VF stubs only validate scheduling and a clean launch here.
         // Numerical accuracy is checked by the on-device ST cases for each SoC.
         // partial_block_ref and workspace are ABI-only here; nullptr makes any accidental kernel access fail this UT.
         ASSERT_TRUE(KERNEL_RUN_KF(kernelFunc, launchBlocks, partialGm.Get(), deltaGm.Get(), pseudoQueryGm.Get(),
-                                  numeratorGm.Get(), logitMaxGm.Get(), expSumGm.Get(), nullptr, hGm.Get(), nullptr,
-                                  tilingGm.Get()))
+                                  numeratorGm.Get(), logitMaxGm.Get(), expSumGm.Get(),
+                                  param.outputNormWeightDtype == "NONE" ? nullptr : outputNormWeightGm.Get(), nullptr,
+                                  hGm.Get(), nullptr, tilingGm.Get()))
             << "case=" << param.caseName << ", kernel CPU simulation failed";
     }
 #endif
@@ -243,12 +267,26 @@ private:
             tiling.statsTStride != expectStatsTStride) {
             throw std::runtime_error("tilingData contains an invalid T scheduling field");
         }
-        const uint64_t expectedTilingKey = GET_TPL_TILING_KEY(tiling.tPerCore <= tiling.tileT);
+        if (param.outputNormWeightDtype != "NONE" && param.outputNormWeightDtype != "FLOAT" &&
+            param.outputNormWeightDtype != "BF16") {
+            throw std::runtime_error("outputNormWeightDtype must be NONE, FLOAT or BF16");
+        }
+        const bool applyOutputNorm = param.outputNormWeightDtype != "NONE";
+        uint32_t normWeightMode = BARU_NORM_WEIGHT_BF16;
+        if (applyOutputNorm) {
+            normWeightMode = param.outputNormWeightDtype == "BF16" ? BARU_NORM_WEIGHT_BF16 : BARU_NORM_WEIGHT_FP32;
+        }
+        const uint64_t expectedTilingKey =
+            GET_TPL_TILING_KEY(tiling.tPerCore <= tiling.tileT, applyOutputNorm, normWeightMode);
         if (param.tilingKey != expectedTilingKey) {
             throw std::runtime_error("tilingKey does not match the SINGLE_TILE scheduling condition");
         }
         if (!std::isfinite(tiling.eps) || tiling.eps <= 0.0F || tiling.invD != 1.0F / static_cast<float>(param.d)) {
             throw std::runtime_error("tilingData contains an invalid eps or invD value");
+        }
+        if (applyOutputNorm &&
+            (!std::isfinite(tiling.outputNormEps) || tiling.outputNormEps < std::numeric_limits<float>::min())) {
+            throw std::runtime_error("tilingData contains an invalid outputNormEps value");
         }
         const uint64_t coveredT =
             static_cast<uint64_t>(tiling.usedCoreNum - 1U) * tiling.tPerCore + tiling.lastTPerCore;

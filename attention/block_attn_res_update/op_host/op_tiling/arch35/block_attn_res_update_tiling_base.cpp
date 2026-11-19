@@ -12,26 +12,34 @@
 
 #include <array>
 #include <cmath>
-#include <graph/utils/type_utils.h>
+#include "graph/utils/type_utils.h"
 #include <limits>
 #include <string>
 #include "log/log.h"
+#include "op_host/tiling_templates_registry.h"
 #include "tiling/platform/platform_ascendc.h"
 
 namespace optiling {
-namespace block_attn_res_update {
+namespace {
+constexpr const char* OP_NAME = "BlockAttnResUpdate";
+// Platform data is read directly from TilingContext, so the parse stage carries no compile-time payload.
+struct TilingParsePlaceholder {};
+} // namespace
+
+namespace BlockAttnResUpdate {
 namespace {
 
-constexpr const char* OP_NAME = "BlockAttnResUpdate";
 constexpr uint32_t INPUT_PARTIAL_BLOCK = 0U;
 constexpr uint32_t INPUT_DELTA = 1U;
 constexpr uint32_t INPUT_PSEUDO_QUERY = 2U;
 constexpr uint32_t INPUT_NUMERATOR = 3U;
 constexpr uint32_t INPUT_LOGIT_MAX = 4U;
 constexpr uint32_t INPUT_EXP_SUM = 5U;
+constexpr uint32_t INPUT_OUTPUT_NORM_WEIGHT = 6U;
 constexpr uint32_t OUTPUT_PARTIAL_BLOCK = 0U;
 constexpr uint32_t OUTPUT_H = 1U;
 constexpr uint32_t ATTR_EPS = 0U;
+constexpr uint32_t ATTR_OUTPUT_NORM_EPS = 1U;
 constexpr float DEFAULT_EPS = 1e-6F;
 constexpr int64_t MAX_D_SIZE = 8192;
 
@@ -173,7 +181,8 @@ bool CheckInputMetadata(gert::TilingContext* context, const char* opName, Tensor
                     return false);
 
         const auto* inputDesc = context->GetInputDesc(i);
-        OP_CHECK_IF(inputDesc == nullptr, OP_LOGE(opName, "Input %s desc is nullptr.", INPUT_NAMES[i]), return false);
+        OP_CHECK_IF(inputDesc == nullptr, OP_LOGE(opName, "Input %s descriptor is nullptr.", INPUT_NAMES[i]),
+                    return false);
         if (!CheckTensorDtype(opName, INPUT_NAMES[i], inputDesc->GetDataType(), EXPECTED_DTYPES[i])) {
             return false;
         }
@@ -190,8 +199,8 @@ bool CheckOutputMetadata(gert::TilingContext* context, const char* opName, Tenso
     OP_CHECK_IF(tensorInfo.partialBlockOutputStorageShape == nullptr,
                 OP_LOGE(opName, "Reference output partial_block shape is nullptr."), return false);
     const auto* partialBlockOutputDesc = context->GetOutputDesc(OUTPUT_PARTIAL_BLOCK);
-    OP_CHECK_IF(partialBlockOutputDesc == nullptr, OP_LOGE(opName, "Reference output partial_block desc is nullptr."),
-                return false);
+    OP_CHECK_IF(partialBlockOutputDesc == nullptr,
+                OP_LOGE(opName, "Reference output partial_block descriptor is nullptr."), return false);
     if (!CheckTensorDtype(opName, REFERENCE_OUTPUT_PARTIAL_BLOCK_NAME, partialBlockOutputDesc->GetDataType(),
                           ge::DT_FLOAT)) {
         return false;
@@ -200,7 +209,7 @@ bool CheckOutputMetadata(gert::TilingContext* context, const char* opName, Tenso
     tensorInfo.hStorageShape = context->GetOutputShape(OUTPUT_H);
     OP_CHECK_IF(tensorInfo.hStorageShape == nullptr, OP_LOGE(opName, "Output h shape is nullptr."), return false);
     const auto* hDesc = context->GetOutputDesc(OUTPUT_H);
-    OP_CHECK_IF(hDesc == nullptr, OP_LOGE(opName, "Output h desc is nullptr."), return false);
+    OP_CHECK_IF(hDesc == nullptr, OP_LOGE(opName, "Output h descriptor is nullptr."), return false);
     if (!CheckTensorDtype(opName, "h", hDesc->GetDataType(), ge::DT_BF16)) {
         return false;
     }
@@ -297,6 +306,32 @@ bool CheckRawTilingData(gert::TilingContext* context, const char* opName)
     return true;
 }
 
+bool CheckOutputNormWeight(gert::TilingContext* context, const char* opName, uint32_t dSize, bool& applyOutputNorm,
+                           ge::DataType& weightDtype)
+{
+    const auto* desc = context->GetOptionalInputDesc(INPUT_OUTPUT_NORM_WEIGHT);
+    const auto* shape = context->GetOptionalInputShape(INPUT_OUTPUT_NORM_WEIGHT);
+    applyOutputNorm = desc != nullptr;
+    if (!applyOutputNorm) {
+        OP_CHECK_IF(shape != nullptr,
+                    OP_LOGE(opName, "Input output_norm_weight descriptor is missing while shape metadata is present."),
+                    return false);
+        return true;
+    }
+    OP_CHECK_IF(shape == nullptr, OP_LOGE(opName, "Input output_norm_weight shape metadata is nullptr."), return false);
+    const auto dtype = desc->GetDataType();
+    OP_CHECK_IF(dtype != ge::DT_FLOAT && dtype != ge::DT_BF16,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "output_norm_weight",
+                                                      ge::TypeUtils::DataTypeToSerialString(dtype).c_str(),
+                                                      "The dtype of output_norm_weight must be FLOAT or BF16"),
+                return false);
+    weightDtype = dtype;
+    return CheckTensorNdFormats(opName, "output_norm_weight", *desc) &&
+           CheckStorageShapeMatchesOrigin(opName, "output_norm_weight", *shape) &&
+           CheckShapeDimNum(opName, "output_norm_weight", shape->GetOriginShape(), VECTOR_DIM_NUM) &&
+           CheckVectorLength(opName, "output_norm_weight", shape->GetOriginShape(), dSize, "D");
+}
+
 } // namespace
 
 ge::graphStatus BlockAttnResUpdateTilingBase::DoLibApiTiling()
@@ -324,13 +359,20 @@ ge::graphStatus BlockAttnResUpdateTilingBase::GetShapeAttrsInfo()
     const auto* attrs = context_->GetAttrs();
     const float* eps = attrs == nullptr ? nullptr : attrs->GetAttrPointer<float>(ATTR_EPS);
     const float epsValue = eps == nullptr ? DEFAULT_EPS : *eps;
-    if (!std::isfinite(epsValue) || epsValue <= 0.0F) {
-        const std::string epsValueStr = std::to_string(epsValue);
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "eps", epsValueStr.c_str(),
-                                              "The value of eps must be finite and greater than 0");
-        return ge::GRAPH_FAILED;
-    }
+    OP_CHECK_IF(!std::isfinite(epsValue) || epsValue <= 0.0F,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "eps", std::to_string(epsValue).c_str(),
+                                                      "The value of eps must be finite and greater than 0"),
+                return ge::GRAPH_FAILED);
     eps_ = epsValue;
+    if (applyOutputNorm_) {
+        const float* normEps = attrs == nullptr ? nullptr : attrs->GetAttrPointer<float>(ATTR_OUTPUT_NORM_EPS);
+        outputNormEps_ = normEps == nullptr ? DEFAULT_EPS : *normEps;
+        OP_CHECK_IF(
+            !std::isfinite(outputNormEps_) || outputNormEps_ < std::numeric_limits<float>::min(),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "output_norm_eps", std::to_string(outputNormEps_).c_str(),
+                                                  "The value of output_norm_eps must be in [FLT_MIN, FLT_MAX]"),
+            return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -357,6 +399,9 @@ ge::graphStatus BlockAttnResUpdateTilingBase::CheckContext()
     if (!CheckDimSizes(opName_, tensorInfo, tSize_, dSize_)) {
         return ge::GRAPH_FAILED;
     }
+    if (!CheckOutputNormWeight(context_, opName_, dSize_, applyOutputNorm_, outputNormWeightDtype_)) {
+        return ge::GRAPH_FAILED;
+    }
     if (!CheckRawTilingData(context_, opName_)) {
         return ge::GRAPH_FAILED;
     }
@@ -377,5 +422,23 @@ ge::graphStatus BlockAttnResUpdateTilingBase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-} // namespace block_attn_res_update
+} // namespace BlockAttnResUpdate
+
+ge::graphStatus Tiling4BlockAttnResUpdate(gert::TilingContext* context)
+{
+    OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "Context is nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context->GetNodeType() == nullptr, OP_LOGE(OP_NAME, "Node type is nullptr."), return ge::GRAPH_FAILED);
+    return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
+}
+
+ge::graphStatus TilingPrepare4BlockAttnResUpdate(gert::TilingParseContext* context)
+{
+    OP_CHECK_IF(context == nullptr, OP_LOGE(OP_NAME, "Context is nullptr."), return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+IMPL_OP_OPTILING(BlockAttnResUpdate)
+    .Tiling(Tiling4BlockAttnResUpdate)
+    .TilingParse<TilingParsePlaceholder>(TilingPrepare4BlockAttnResUpdate);
+
 } // namespace optiling

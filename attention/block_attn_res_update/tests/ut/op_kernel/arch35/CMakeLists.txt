@@ -21,7 +21,6 @@ function(add_block_attn_res_update_kernel_ut block_attn_res_update_soc_version)
     set(CMAKE_CURRENT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/${block_attn_res_update_soc_version}")
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
     set(block_attn_res_update_tiling_files
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../op_host/op_tiling/arch35/block_attn_res_update_tiling.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../op_host/op_tiling/arch35/block_attn_res_update_tiling_base.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../op_host/op_tiling/arch35/block_attn_res_update_full_d_tiling.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/block_attn_res_update_tiling_registry_stub.cpp
