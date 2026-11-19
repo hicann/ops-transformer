@@ -89,7 +89,7 @@ aclnnStatus aclnnAlltoAllMatmul(
     <td>x1</td>
     <td>输入</td>
     <td>融合算子的左矩阵输入，对应公式中的x1。</td>
-    <td>该输入进行AlltoAll通信与Permute操作后结果作为MatMul计算的左矩阵输入。</td>
+    <td>该输入进行AlltoAll通信与Permute操作后结果作为Matmul计算的左矩阵输入。</td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
     <td>2维，shape为(BS, H)</td>
@@ -98,8 +98,8 @@ aclnnStatus aclnnAlltoAllMatmul(
     <tr>
     <td>x2</td>
     <td>输入</td>
-    <td>融合算子的右矩阵输入，也是MatMul计算的右矩阵。</td>
-    <td>直接作为MatMul计算的右矩阵输入。</td>
+    <td>融合算子的右矩阵输入，也是Matmul计算的右矩阵。</td>
+    <td>直接作为Matmul计算的右矩阵输入。</td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
     <td>2维，shape为(H*rankSize, N)</td>
@@ -128,7 +128,7 @@ aclnnStatus aclnnAlltoAllMatmul(
     <tr>
     <td>group</td>
     <td>输入</td>
-    <td>Host侧标识列组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
+    <td>Host侧标识列组的字符串，即通信域名称，通过HCCL接口HcclGetCommName获取commName作为该参数。</td>
     <td>字符串长度要求(0, 128)。</td>
     <td>-</td>
     <td>-</td>
@@ -149,7 +149,7 @@ aclnnStatus aclnnAlltoAllMatmul(
     <td>transposeX2</td>
     <td>输入</td>
     <td>标识右矩阵是否转置过。</td>
-    <td>配置为True时右矩阵Shape为(N, rankSize*H)。</td>
+    <td>配置为True时右矩阵shape为(N, rankSize*H)。</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -363,7 +363,7 @@ aclnnStatus aclnnAlltoAllMatmul(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="A3,910b" id21 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：

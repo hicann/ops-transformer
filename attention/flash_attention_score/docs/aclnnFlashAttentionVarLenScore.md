@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：训练场景下，使用Flash Attention算法实现self-attention（自注意力）的计算。**跟[aclnnFlashAttentionScore](./aclnnFlashAttentionScore.md)接口的区别是该接口支持可变长S的计算，即可以一次传入多个长度不相等的sequence。使用此接口时，query，key和value使用TND的格式传入数据，其中T意为total number，表示其所有sequence的length总和，同时使用actualSeqQLenOptional与actualSeqKvLenOptional传入每个sequence依次的累积长度以区分不同sequence。每个sequence单独计算其注意力结果**。
+- 接口功能：训练场景下，使用Flash Attention算法实现self-attention（自注意力）的计算。**跟[aclnnFlashAttentionScore](./aclnnFlashAttentionScore.md)接口的区别是该接口支持可变长S的计算，即可以一次传入多个长度不相等的sequence。使用此接口时，query、key和value使用TND的格式传入数据，其中T意为total number，表示其所有sequence的length总和，同时使用actualSeqQLenOptional与actualSeqKvLenOptional传入每个sequence依次的累积长度以区分不同sequence。每个sequence单独计算其注意力结果**。
 - 计算公式：
 
   注意力的正向计算公式如下：
@@ -180,7 +180,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
       <tr>
         <td>actualSeqQLenOptional</td>
         <td>可选输入</td>
-        <td>描述了每个Batch对应的query的sequence length。</td>
+        <td>描述了每个Batch对应的query的序列长度。</td>
         <td>-</td>
         <td>INT64</td>
         <td>ND</td>
@@ -190,7 +190,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
       <tr>
         <td>actualSeqKvLenOptional</td>
         <td>可选输入</td>
-        <td>描述了每个Batch对应的key/value的sequence length。</td>
+        <td>描述了每个Batch对应的key/value的序列长度。</td>
         <td>-</td>
         <td>INT64</td>
         <td>ND</td>
@@ -420,7 +420,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
 
 - 确定性计算：
   - aclnnFlashAttentionVarLenScore默认确定性实现。
-- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配
+- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - 输入query、key、value的约束如下：
   - B：Batch size必须相等。
   - D：Head-Dim必须满足(qD == kD && kD >= vD)。
@@ -432,7 +432,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
     - T：取值范围为1\~1M。
     - N：取值范围为1\~256。
     - D：取值范围为1\~768。
-- realShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可开启alibi位置编码压缩，此时只需要输入原始pse最后1024行进行内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
+- realShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可开启alibi位置编码压缩，此时只需要输入原始PSE最后1024行进行内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
   - 参数每个batch不相同时，shape为BNHSkv(H=1024)。
   - 每个batch相同时，shape为1NHSkv(H=1024)。
   - TND场景下，每个batch段内部仍按[N, Sq\_i, Skv\_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq\_i、真实key/value长度为Skv\_i，则该段PSE元素个数为N\*Sq_i\*Skv_i，整段PSE总长度pseTotalLen为sum_i(N\*Sq_i\*Skv_i)。
@@ -447,12 +447,12 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
   - sparseMode为1、2、3、4、6、7、8时，应传入对应正确的attenMaskOptional，否则将导致计算结果错误。当attenMaskOptional输入为None时，sparseMode、preTokens、nextTokens参数不生效，固定为全计算。
   - 配置为3时，不支持无效行计算，需要满足每个batch的Sq<=Skv。
   - 配置为7时，不支持可选输入realShiftOptional。
-  - 配置为8时，当每个sequence的q、kv等长时支持可选输入realShiftOptional，针对全局做pse生成。支持q方向进行外切，需要外切前每个sequence的q、kv等长。
+  - 配置为8时，当每个sequence的q、kv等长时支持可选输入realShiftOptional，针对全局做PSE生成。支持q方向进行外切，需要外切前每个sequence的q、kv等长。
 - 部分场景下，如果计算量过大可能会导致算子执行超时（AI Core error类型报错，errorStr为：timeout or trap error），此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 - prefixOptional稀疏计算场景即sparseMode=6，当Sq > Skv时，prefix的N值取值范围\[0, Skv\]，当Sq <= Skv时，prefix的N值取值范围\[Skv-Sq, Skv\]。
 - band场景，preTokens和nextTokens之间必须要有交集。
 - attenMaskOptional输入不支持补pad，即attenMaskOptional中不能存在某一行全1的场景。
-- actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入realShiftOptional，假设真实的S长度为\[2,2,0,2,2\]，则传入的actualSeqQLenOptional为\[2,4,4,6,8\]。actualSeqQLenOptional的长度取值范围为1\~2K。当存在prefixOptional输入的时候，其长度最大支持1K。
+- actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入realShiftOptional，假设真实的S长度为\[2,2,0,2,2\]，则传入的actualSeqQLenOptional为\[2,4,4,6,8\]。actualSeqQLenOptional的长度取值范围为1\~2k。当存在prefixOptional输入的时候，其长度最大支持1k。
 
 ## 调用示例
 

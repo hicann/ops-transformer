@@ -531,7 +531,7 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV5(
 - 支持输入query的N和key/value的N不相等，但必须成比例关系，即Nq/Nkv必须是非0整数，Nq取值范围1~256。当Nq/Nkv > 1时，即为GQA（grouped-query attention）；当Nkv=1时，即为MQA（multi-query attention）。本文如无特殊说明，N表示的是Nq。
 - 关于数据shape的约束，其中：
   - T(B*S)：取值范围为1\~1M。
-  - B：取值范围为1\~20000。带prefixOptional的时候B最大支持1K。
+  - B：取值范围为1\~20000。带prefixOptional的时候B最大支持1k。
   - N：取值范围为1\~256。
   - S：取值范围为1\~1M。
   - D：取值范围为1\~768。

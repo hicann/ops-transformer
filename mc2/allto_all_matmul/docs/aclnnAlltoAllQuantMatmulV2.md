@@ -24,7 +24,7 @@
 ## 功能说明
 
 - 接口功能：完成AlltoAll通信、Permute（保证通信后地址连续）、Quant、Matmul和Dequant计算的融合，**先通信后计算**，支持K-C量化、K-C动态量化和mx[量化模式](../../../docs/zh/context/quant_mode_introduction.md)。
-- 计算公式：假设x1输入shape为(BS, H)，mx量化场景下x1ScaleOptional输入shape为(BS, ceil(H/64), 2)，rankSize为NPU卡数
+- 计算公式：假设x1输入shape为(BS, H)，mx量化场景下x1ScaleOptional输入shape为(BS, ceil(H/64), 2)，rankSize为NPU卡数。
 
   <!-- npu="910b" id7 -->
   - <term>Atlas A2系列产品</term>：
@@ -156,7 +156,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
     <td>x1</td>
     <td>输入</td>
     <td>融合算子的左矩阵输入，对应公式中的x1。</td>
-    <td>该输入进行AlltoAll通信与Permute操作后结果作为MatMul计算的左矩阵输入。根据设备型号对数据类型有不同限制，详细参见<a href="#约束说明">约束说明</a>。</td>
+    <td>该输入进行AlltoAll通信与Permute操作后的结果作为MatMul计算的左矩阵输入。根据设备型号对数据类型有不同限制，详细参见<a href="#约束说明">约束说明</a>。</td>
     <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1、INT4</td>
     <td>ND</td>
     <td>2维，shape为(BS, H)</td>
@@ -306,7 +306,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
     <td>x1QuantDtype</td>
     <td>输入</td>
     <td>量化Matmul左矩阵的量化类型。</td>
-    <td>AlltoAll通信与Permute操作后结果，按照该参数配置量化后作为MatMul计算的左矩阵输入，根据设备型号对取值有不同限制，详细参见<a href="#约束说明">约束说明</a>。</td>
+    <td>AlltoAll通信与Permute操作后的结果，按照该参数配置量化后作为MatMul计算的左矩阵输入，根据设备型号对取值有不同限制，详细参见<a href="#约束说明">约束说明</a>。</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -315,8 +315,8 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
     <tr>
     <td>groupSize</td>
     <td>输入</td>
-    <td>用于Matmul计算三个方向上的量化分组大小，由3个方向的groupSizeM，groupSizeN，groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（groupSize中的高16位的数值无效）。</td>
-    <td><ul><li>mx量化场景下仅支持[groupSizeM, groupSizeN, groupSizeK] = [1, 1, 32]，对应的groupSize具体取值详细参见<a href="#约束说明">约束说明</a>。其余量化场景默认配置为0，取值不生效。</li><li>支持参数自动推导，当根据计算公式分解的groupSizeM，groupSizeN，groupSizeK任一或多个参数为0时，算子自动推导这些参数值，具体规则详细参见<a href="#约束说明">约束说明</a></li></ul></td>
+    <td>用于Matmul计算三个方向上的量化分组大小，由3个方向的groupSizeM、groupSizeN、groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（groupSize中的高16位的数值无效）。</td>
+    <td><ul><li>mx量化场景下仅支持[groupSizeM, groupSizeN, groupSizeK] = [1, 1, 32]，对应的groupSize具体取值详细参见<a href="#约束说明">约束说明</a>。其余量化场景默认配置为0，取值不生效。</li><li>支持参数自动推导，当根据计算公式分解的groupSizeM、groupSizeN、groupSizeK任一或多个参数为0时，算子自动推导这些参数值，具体规则详细参见<a href="#约束说明">约束说明</a></li></ul></td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -511,7 +511,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
   - <term>Ascend 950PR&950DT系列产品</term>：仅支持x2为非连续tensor，其它非连续tensor均不支持。
   <!-- end id14 -->
 
-* 传入的x1、x2、x2Scale和output不为空指针，且
+* 传入的x1、x2、x2Scale和output不为空指针，且：
 
   <!-- npu="950" id15 -->
   - <term>Ascend 950PR&950DT系列产品</term>：在x1QuantMode为pertoken动态量化场景下，不支持传入x1ScaleOptional。
@@ -658,7 +658,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="910b" id22 -->
 - <term>Atlas A2系列产品</term>：

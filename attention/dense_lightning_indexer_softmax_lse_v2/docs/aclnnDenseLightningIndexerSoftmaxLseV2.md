@@ -155,7 +155,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>seqUsedQOptional（aclTensor*）</td>
       <td>可选输入</td>
       <td>不同 Batch 中 q 的实际使用长度。</td>
-      <td><ul><li>支持空 Tensor。当该入参存在时，各 batch 按 seqused_q 的实际值参与运算。</li><li>seqused_q 的值不大于各 Batch 的实际 seqlen_q。</li></ul></td>
+      <td><ul><li>支持空 Tensor。当该入参存在时，各Batch按seqused_q的实际值参与运算。</li><li>seqused_q 的值不大于各 Batch 的实际 seqlen_q。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape 为 (B,)</td>
@@ -165,7 +165,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>seqUsedKOptional（aclTensor*）</td>
       <td>可选输入</td>
       <td>不同 Batch 中 k 的实际使用长度。</td>
-      <td><ul><li>支持空 Tensor。当该入参存在时，各 batch 按 seqused_k 的实际值参与运算。</li><li>seqused_k 的值不大于各 Batch 的实际 seqlen_k。</li></ul></td>
+      <td><ul><li>支持空 Tensor。当该入参存在时，各Batch按seqused_k的实际值参与运算。</li><li>seqused_k 的值不大于各 Batch 的实际 seqlen_k。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape 为 (B,)</td>
@@ -184,7 +184,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
      <tr>
       <td>metadataOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>前置 AICPU 算子输出的分核负载均衡信息。</td>
+      <td>前置AI CPU算子输出的分核负载均衡信息。</td>
       <td><ul><li>必须传入。由 aclnnDenseLightningIndexerSoftmaxLseV2Metadata 算子输出，减少 tiling 阶段对 host array 的访问。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -347,7 +347,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
 
   - 确定性说明：aclnnDenseLightningIndexerSoftmaxLseV2默认确定性实现。
 
-  - 公共约束
+  - 公共约束：
     - 入参为空的场景处理：
         - queryIndex 为空 Tensor：直接返回。
 
@@ -377,7 +377,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
     </tbody>
     </table>
 
-  - 规格约束
+  - 规格约束：
 
     <table style="undefined;table-layout: fixed; width: 909px"><colgroup>
     <col style="width: 125px">
@@ -399,7 +399,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
     </tr>
     <tr>
       <td>S1、S2</td>
-      <td>0~128K</td>
+      <td>0~128k</td>
       <td>S1、S2 支持不等长。</td>
     </tr>
     <tr>
@@ -435,7 +435,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
     </tbody>
     </table>
 
-  - 特殊约束
+  - 特殊约束：
     - BSND 场景下，必须传入 batch_size 和 max_seqlen_q 相关信息（通过 tensor shape 体现）。
     - TND 场景下，必须传入 cuSeqLensQ 和 cuSeqLensK。
     - 当 maskMode=3 且 cmpRatio>1 时，必须传入 cmpResidualK，且 cmpResidualK 的每个值必须小于 cmpRatio。

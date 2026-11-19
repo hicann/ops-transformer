@@ -159,7 +159,7 @@ aclnnStatus aclnnDistributeBarrierV2(
     <!-- end id7 -->
     <!-- npu="950" id8 -->
     - <term>Ascend 950DT系列产品</term>：
-        - timeOut参数里的超时时间单位为us，建议配置5000000us，根据实际环境不同超时时间下限可能不同。
+        - `timeOut`参数里的超时时间单位为μs，建议配置5000000μs，根据实际环境不同超时时间下限可能不同。
         - `worldSize`取值支持[2, 1024]。
 
     <!-- end id8 -->
@@ -190,10 +190,10 @@ aclnnStatus aclnnDistributeBarrierV2(
     <tr>
     <td rowspan="4" align="left">ACLNN_ERR_PARAM_INVALID</td>
     <td rowspan="4" align="left">161002</td>
-    <td align="left">传入的xRef，timeOut，elasticInfo，group，worldSize的数据类型不在支持的范围内。</td>
+    <td align="left">传入的xRef、timeOut、elasticInfo、group、worldSize的数据类型不在支持的范围内。</td>
     </tr>
-    <tr><td align="left">传入的xRef，timeOut，elasticInfo，group，worldSize的数据格式不在支持的范围内。</td></tr>
-    <tr><td align="left">传入的xRef，timeOut，elasticInfo，group，worldSize的shape不匹配。</td></tr>
+    <tr><td align="left">传入的xRef、timeOut、elasticInfo、group、worldSize的数据格式不在支持的范围内。</td></tr>
+    <tr><td align="left">传入的xRef、timeOut、elasticInfo、group、worldSize的shape不匹配。</td></tr>
     <tr><td align="left">group为空字符串或长度大于等于HCCL_GROUP_NAME_MAX（128）。</td></tr>
     </tbody></table>
 
@@ -271,7 +271,7 @@ aclnnStatus aclnnDistributeBarrierV2(
 <!-- end id10 -->
 - 示例代码如下，仅供参考
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

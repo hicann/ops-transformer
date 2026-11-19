@@ -38,7 +38,7 @@
   - S：表示输入样本序列长度（Seq-Length）
   - H：表示隐藏层的大小（Head-Size）
   - N：表示多头数（Head-Num）
-  - D：表示隐藏层最小的单元尺寸，需满足D=H/N（Head-Dim）
+  - D：表示隐藏层最小的单元尺寸，需满足D = H/N（Head-Dim）
 
   当前支持的布局：
 
@@ -187,7 +187,6 @@ aclnnStatus aclnnBlockSparseAttention(
       <td>×</td>
     </tr>
     <tr>
-    <tr>
       <td>blockShapeOptional</td>
       <td>输入</td>
       <td>稀疏块形状数组。</td>
@@ -208,6 +207,7 @@ aclnnStatus aclnnBlockSparseAttention(
       <td>1</td>
       <td>-</td>
     </tr>
+    <tr>
       <td>actualSeqLengthsOptional</td>
       <td>输入</td>
       <td>描述每个Batch对应的query序列长度。</td>
@@ -439,12 +439,12 @@ aclnnStatus aclnnBlockSparseAttention(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>输入query，key，value传入的是空指针。</td>
+      <td>输入query、key、value传入的是空指针。</td>
     </tr>
     <tr>
       <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="4">161002</td>
-      <td>query，key，value数据类型不在支持的范围之内。</td>
+      <td>query、key、value数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>qInputLayout或kvInputLayout不合法。</td>
@@ -506,10 +506,10 @@ aclnnStatus aclnnBlockSparseAttention(
 - 确定性计算：
   - aclnnBlockSparseAttention默认确定性实现。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- qInputLayout和kvInputLayout当前仅支持相同的"TND"、"BNSD"或"BSND"布局；其中"BSND"仅<term>Ascend 950PR&950DT系列产品</term>支持。
+- qInputLayout和kvInputLayout当前仅支持相同的“TND”、“BNSD”或“BSND”布局；其中“BSND”仅<term>Ascend 950PR&950DT系列产品</term>支持。
 - 当前query、key、value的InputLayout必须保持一致。
 - 输入query、key、value的数据类型必须一致，支持FLOAT16和BFLOAT16。
-- query、key、value的D轴当前仅支持配置为64或128
+- query、key、value的D轴当前仅支持配置为64或128。
 - blockShapeOptional如果传入，则必须包含至少两个元素[blockShapeX, blockShapeY]，且值必须大于0，blockShapeY在<term>Ascend 950PR&950DT系列产品</term>上须为16的倍数，在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上须为128的倍数。
 - blockSparseMaskOptional当前必须传入，且shape为[batch, headNum, qBlockNum, kvBlockNum]。TND时，qBlockNum = ceilDiv(max(actualSeqLengths), blockShapeX)，kvBlockNum = ceilDiv(max(actualSeqLengthsKv), blockShapeY)。BNSD/BSND时，qBlockNum = ceilDiv(Q shape中的S, blockShapeX)，kvBlockNum = ceilDiv(K shape中的S, blockShapeY)；若传入actualSeqLengths和actualSeqLengthsKv，也可按实际长度计算：qBlockNum = ceilDiv(max(actualSeqLengths), blockShapeX)，kvBlockNum = ceilDiv(max(actualSeqLengthsKv), blockShapeY)。
 - attenMaskOptional当前只支持传入nullptr。

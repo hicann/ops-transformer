@@ -296,10 +296,10 @@ aclnnStatus aclnnFusedFloydAttention(
 
 ## 约束说明<a name="1"></a>
 
-- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配
+- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - 该接口不支持非连续输出。
 - 关于数据shape的约束，其中：
-  - B：取值范围为1\~2K。
+  - B：取值范围为1\~2k。
   - H：取值范围为1\~256。
   - N：取值范围为16\~1M且N%16==0。
   - M：取值范围为128\~1M且M%128==0。

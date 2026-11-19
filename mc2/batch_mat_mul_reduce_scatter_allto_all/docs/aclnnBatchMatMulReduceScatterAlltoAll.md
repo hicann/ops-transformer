@@ -116,7 +116,7 @@ aclnnStatus aclnnBatchMatMulReduceScatterAlltoAll(
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
     <td>3</td>
-    <td>√（仅适用转置场景）</td>
+    <td>√（仅适用于转置场景）</td>
     </tr>
     <tr>
     <td>biasOptional(aclTensor*)</td>
@@ -299,7 +299,7 @@ aclnnStatus aclnnBatchMatMulReduceScatterAlltoAll(
 - 确定性计算：
   - aclnnBatchMatMulReduceScatterAlltoAll默认确定性实现。
 
-  - 因为集合通信及BatchMatMul计算所需，输入输出shape需满足以下数学关系：（其中ep=epWorldSize，tp=tpWorldSize）
+  - 因为集合通信及BatchMatMul计算所需，输入输出shape需满足以下数学关系：（其中ep=epWorldSize，tp=tpWorldSize）。
   - 按H轴进行ReduceScatter场景，即yShardType为0场景：
 
       - x: (E/ep, ep*C, M/tp)
@@ -321,7 +321,7 @@ aclnnStatus aclnnBatchMatMulReduceScatterAlltoAll(
   - E/ep的取值范围为：[1, 32]。
   - ep、tp均仅支持2、4、8、16、32。
   - groupEp和groupTp名称不能相同。
-  - C大于0，上限为算子device内存上限，当yShardType为1时，C是tp的整数倍。
+  - C大于0，上限为算子Device内存上限，当yShardType为1时，C是tp的整数倍。
   - 通算融合算子不支持并发调用，不同的通算融合算子也不支持并发调用。
   - 不支持跨超节点，只支持超节点内。
 
@@ -332,7 +332,7 @@ aclnnStatus aclnnBatchMatMulReduceScatterAlltoAll(
 <!-- npu="A3" id7 -->
 - <term>Atlas A3系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

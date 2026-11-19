@@ -163,7 +163,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
     <tr>
         <td>sin</td>
         <td>输入</td>
-        <td>公式中的用于位置编码的输入sin。</td>
+        <td>公式中用于位置编码的输入sin。</td>
         <td>x为3维时shape为[B, S, 1, D]，x为2维时shape为[B, D]。</td>
         <td>和cos保持一致</td>
         <td>ND</td>
@@ -263,7 +263,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
     <tr>
         <td>biasOptional</td>
         <td>输入</td>
-        <td>公式中的输入用于反量化的偏置biasOptional。</td>
+        <td>公式中的输入biasOptional用于反量化的偏置。</td>
         <td>shape为[H]。</td>
         <td>FLOAT、FLOAT16、INT32、BFLOAT16</td>
         <td>ND</td>
@@ -303,7 +303,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
     <tr>
         <td>kvOutput</td>
         <td>输入</td>
-        <td>Host侧布尔值。表示是否输出kOut和vOut。</td>
+        <td>Host侧布尔值，表示是否输出kOut和vOut。</td>
         <td>为true时，kOut和vOut必须具有与x对应的3维或4维shape；为false时，kOut和vOut均必须为空Tensor（元素个数为0），不能传入空指针。</td>
         <td>BOOL</td>
         <td>-</td>
@@ -458,14 +458,14 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
 
 2. cacheModeOptional为contiguous时：kCacheRef的第0维大于等于x的第0维。x为3维时，indices数据值大于等于0且小于等于kCacheRef的第1维减x的第1维；x为2维时，indices数据值大于等于0且小于等于kCacheRef的第1维减1。
 3. cacheModeOptional为page时：indices数据值大于等于0，小于kCacheRef的第0维*第1维且不重复。
-4. 输入x不为INT32时，x、cos、sin与输出qOut、kOut、vOut的数据类型保持一致，此时activationScaleOptional，weightScaleOptional、biasOptional不生效。
+4. 输入x不为INT32时，x、cos、sin与输出qOut、kOut、vOut的数据类型保持一致，此时activationScaleOptional、weightScaleOptional、biasOptional不生效。
 5. 输入x为INT32时，cos、sin与输出qOut、kOut、vOut的数据类型保持一致，此时weightScaleOptional必选，activationScaleOptional、biasOptional可选（biasOptional不需要与其他输入类型一致）。
 6. x的尾轴小于等于4096，且按64对齐。
 7. sizeSplits的元素个数必须为3，各元素均不得小于0；sizeSplits[1]与sizeSplits[2]必须相等，且分别等于Nkv*D；x的尾轴必须等于sizeSplits三个元素之和。
 8. kCacheRef和vCacheRef必须为4维且shape一致；D必须为16的正整数倍。scaleK、scaleV以及可选输入offsetKOptional、offsetVOptional的元素个数均必须为Nkv*D。
 9. qOut以及kvOutput为true时的kOut、vOut必须满足参数说明中的完整shape约束。不支持仅保持元素个数相同的其他shape，例如将4维qOut展平为2维或扩展为5维。
 10. kvOutput为false时，kOut和vOut均必须为空Tensor（元素个数为0），不能传入空指针。
-11. 支持B=0或S=0的空tensor场景：x为2维且B=0，或x为3维且B=0或S=0时，qOut、kOut、vOut的元素个数为0，kCacheRef、vCacheRef保持输入值不变。该场景仍要求x尾轴、Nkv、D、scaleK、scaleV等结构参数满足上述约束；D=0、Nkv=0或必选scale为空不属于本支持场景。
+11. 支持B=0或S=0的空Tensor场景：x为2维且B=0，或x为3维且B=0或S=0时，qOut、kOut、vOut的元素个数为0，kCacheRef、vCacheRef保持输入值不变。该场景仍要求x尾轴、Nkv、D、scaleK、scaleV等结构参数满足上述约束；D=0、Nkv=0或必选scale为空不属于本支持场景。
 
 ## 调用示例
 

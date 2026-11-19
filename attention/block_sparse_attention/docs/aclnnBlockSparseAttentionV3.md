@@ -54,24 +54,24 @@
 
   - qDequantScaleOptional：
 
-    - MX 量化模式，仅支持Rowwise E8M0 Micro Scaling
+    - MX量化模式，仅支持Rowwise E8M0 Micro Scaling
     - 数据类型：FLOAT8_E8M0
-    - shape:
+    - shape：
       - BNSD: [B, Nq, Sq, CeilDiv(D, 64), 2]；
       - BSND: [B, Sq, Nq, CeilDiv(D, 64), 2]；
       - TND: [Tq, Nq, CeilDiv(D, 64), 2]。
   - kDequantScaleOptional：
 
-    - MX 量化模式，仅支持Rowwise E8M0 Micro Scaling
-    - 数据类型: FLOAT8_E8M0
+    - MX量化模式，仅支持Rowwise E8M0 Micro Scaling
+    - 数据类型： FLOAT8_E8M0
     - shape:
       - BNSD:[B, Nkv, Skv, CeilDiv(D, 64), 2]；
       - BSND:[B, Skv, Nkv, CeilDiv(D, 64), 2]；
       - TND: [Tkv, Nkv, CeilDiv(D, 64), 2]。
   - vDequantScaleOptional：
 
-    - MX 量化模式，仅支持Columnwise E8M0 Micro Scaling
-    - 数据类型: FLOAT8_E8M0
+    - MX量化模式，仅支持Columnwise E8M0 Micro Scaling
+    - 数据类型：FLOAT8_E8M0
     - shape
 
       - BNSD:[B, Nkv, CeilDiv(Skv, 64), D, 2]；
@@ -178,8 +178,8 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>支持的shape为：
         <ul>
           <li>TND: [totalKTokens, numKeyValueHeads, headDim]。</li>
-          <li>BNSD: [batch, numKeyValueHeads, maxKvSeqLength, headDim]。</li>
-          <li>BSND: [batch, maxKvSeqLength, numKeyValueHeads, headDim]。</li>
+          <li>BNSD: [batch, numKeyValueHeads, maxKVSeqLength, headDim]。</li>
+          <li>BSND: [batch, maxKVSeqLength, numKeyValueHeads, headDim]。</li>
         </ul>
       </td>
       <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1、HIFLOAT8</td>
@@ -195,8 +195,8 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         支持的shape为：
         <ul>
           <li>TND: [totalVTokens, numKeyValueHeads, headDim]。</li>
-          <li>BNSD: [batch, numKeyValueHeads, maxKvSeqLength, headDim]。</li>
-          <li>BSND: [batch, maxKvSeqLength, numKeyValueHeads, headDim]。</li>
+          <li>BNSD: [batch, numKeyValueHeads, maxKVSeqLength, headDim]。</li>
+          <li>BSND: [batch, maxKVSeqLength, numKeyValueHeads, headDim]。</li>
         </ul>
       </td>
       <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1、HIFLOAT8</td>
@@ -441,7 +441,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         <ul>
           <li>0：表示online softmax和rescale全部采取fp32数据类型，适合追求计算精度的场景使用。</li>
           <li>1：仅支持输入的query、key、value均为fp16数据类型时配置，表示online softmax和rescale全部采取fp16数据类型，性能更好，但精度较低，且可能发生计算时的数值溢出，使用者需根据值域范围自行判断是否使用。</li>
-          <li>4：表示混合精度运算，在性能与精度上取得一个折中。online softmax采取fp16/bf16数据类型（与query、key、value数据类型相同），rescale采取fp32数据类型，在online softmax阶段可能发生数值溢出。mxfp4量化模式（quantMode=2/3）与mxfp8量化模式（quantMode=4）下，online softmax仅支持fp16数据类型。</li>
+          <li>4：表示混合精度运算，在性能与精度上取得一个折中。online softmax采取fp16/bf16数据类型（与query、key、value数据类型相同），rescale采取fp32数据类型，在online softmax阶段可能发生数值溢出。MXFP4量化模式（quantMode=2/3）与MXFP8量化模式（quantMode=4）下，online softmax仅支持fp16数据类型。</li>
         </ul>
       </td>
       <td>INT64</td>
@@ -526,7 +526,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
           <li>[6.0, 12.0]：取值为6.0-12.0代表Amax(DType)为传入值。</li>
         </ul>
       </td>
-      <td>double</td>
+      <td>DOUBLE</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -601,12 +601,12 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>输入query，key，value传入的是空指针。</td>
+      <td>输入query、key、value传入的是空指针。</td>
     </tr>
     <tr>
       <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="4">161002</td>
-      <td>query，key，value数据类型不在支持的范围之内。</td>
+      <td>query、key、value数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>qInputLayout或kvInputLayout不合法。</td>
@@ -726,13 +726,13 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 <!-- npu="950" id12 -->
 - **quantMode=2/3 (MXFP4量化模式)相关约束（新增）**
 
-  - 仅<term>Ascend 950PR&950DT系列产品</term>支持
+  - 仅<term>Ascend 950PR&950DT系列产品</term>支持。
   - D仅支持64/128。
   - attentionOut数据类型仅支持FLOAT16或BFLOAT16。
   - 暂不支持attenMaskOptional、PagedAttention、softmaxLse等高阶特性。
   - **量化公式**
     - 以P的量化为例，其中 $P_{\text{max}}$ 为一个group（32个元素）内元素绝对值的最大值。
-    - **OCP 量化公式**
+    - **OCP量化公式**
 
       $$ P_{\text{Scale}} = \frac{2^{\lfloor \log_2 P_{\text{max}} \rfloor}}{4} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor - 2} $$
 
@@ -744,16 +744,16 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 <!-- npu="950" id13 -->
 - **quantMode=4 (MXFP8 OCP量化模式)相关约束（新增）**
 
-  - 仅<term>Ascend 950PR&950DT系列产品</term>支持
-  - 输入 query/key/value 为 FLOAT8_E4M3FN，scale 为 FLOAT8_E8M0
-  - blockShapeX 与 blockShapeY 均只支持 64 的倍数
-  - D仅支持64/128
-  - attentionOut数据类型仅支持FLOAT16或BFLOAT16
+  - 仅<term>Ascend 950PR&950DT系列产品</term>支持。
+  - 输入 query/key/value 为 FLOAT8_E4M3FN，scale 为 FLOAT8_E8M0。
+  - blockShapeX 与 blockShapeY 均只支持 64 的倍数。
+  - D仅支持64/128。
+  - attentionOut数据类型仅支持FLOAT16或BFLOAT16。
   - innerPrecise 必须为 4；暂不支持attenMaskOptional、PagedAttention。softmaxLseFlag=1 可以输出 softmaxLse。
-  - 仅支持 V3 接口显式传入 quantMode=4，V1/V2 不会自动推断 mxfp8
+  - 仅支持 V3 接口显式传入 quantMode=4，V1/V2不会自动推断MXFP8。
   - **量化公式**（e4m3 的 emax=8）
     - 以P的量化为例, 其中 $P_{\text{max}}$ 为一个group（32个元素）内元素绝对值的最大值。
-    - **OCP 量化公式**
+    - **OCP量化公式**
 
       $$ P_{\text{Scale}} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor - 8} $$
 <!-- end id13 -->

@@ -133,7 +133,7 @@
 
 - 计算公式：
 
-  计算公式：K 是卷积核宽度，L 是当前 batch 的序列长度，dim 是特征维度，batchId 是当前处理的变长序列索引，C 是 convStates 缓存空间长度（convStates.size(1)），B 是 APC 块大小（bSize）。对输入 x 中的每一个 batch 进行以下操作：
+  K是卷积核宽度，L是当前batch的序列长度，dim是特征维度，batchId是当前处理的变长序列索引，C是convStates缓存空间长度（convStates.size(1)），B是APC块大小（blockSize）。对输入x中的每一个batch进行以下操作：
   1. 缓存读取
 
       缓存行索引：
@@ -163,7 +163,7 @@
       $$
 
       $$
-      cachedState[i, dim] = convStates[readCacheLine][i, dim], \quad 0 \leq i <   offset + K - 1
+      cachedState[i, dim] = convStates[readCacheLine][i, dim], \quad 0 \leq i < offset + K - 1
       $$
 
       Case 3：默认模式
@@ -342,7 +342,7 @@ aclnnStatus aclnnFusedCausalConv1dV2(
       <td>输入</td>
       <td>计算公式中的x，代表输入序列。</td>
       <td><ul><li>不支持空tensor。</li><li>prefill场景：shape为[cuSeqLen, dim]。</li><li>decode场景：shape为[cuSeqLen, dim]或[batch, seqLen, dim]。</li>
-      <li>只支持token维 (2D为dim0，3D为dim1)非连续且stride大于等于1</li></ul></td>
+      <li>只支持token维 (2D为dim0，3D为dim1)非连续且stride大于等于1。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>2-3</td>
@@ -361,8 +361,8 @@ aclnnStatus aclnnFusedCausalConv1dV2(
     <tr>
       <td>convStates（aclTensor*）</td>
       <td>输入/输出</td>
-      <td>计算公式中的cacheState，代表缓存状态张量，存储各序列的历史token数据，各序列计算完成后原地更新。</td>
-      <td><ul><li>不支持空tensor。</li><li>shape为[..., stateLen, dim]，第0维的大小不固定。</li><li>stateLen == K-1+m，prefill场景下m=0，decode、PD混部场景下m=[0, maxDraftTokens]。</li><li>m表示投机个数，映射numAcceptedTokensOptional参数的值。</li><li>支持dim0和dim1非连续且stride大于等于1</li></ul></td>
+      <td>计算公式中的cachedState，代表缓存状态张量，存储各序列的历史token数据，各序列计算完成后原地更新。</td>
+      <td><ul><li>不支持空tensor。</li><li>shape为[..., stateLen, dim]，第0维的大小不固定。</li><li>stateLen == K-1+m，prefill场景下m=0，decode、PD混部场景下m=[0, maxDraftTokens]。</li><li>m表示投机个数，映射numAcceptedTokensOptional参数的值。</li><li>支持dim0和dim1非连续且stride大于等于1。</li></ul></td>
       <td>数据类型与x一致</td>
       <td>ND</td>
       <td>3</td>
@@ -412,7 +412,7 @@ aclnnStatus aclnnFusedCausalConv1dV2(
       <td>numAcceptedTokensOptional（aclTensor*）</td>
       <td>输入</td>
       <td>公式中的numAcceptedTokens，表示每个batch的投机数。</td>
-      <td><ul><li>prefile对应的元素值为0，decode时，1<=numAcceptedTokens中的值<=seqlen -1，seqlen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
+      <td><ul><li>prefill对应的元素值为0，decode时，1<=numAcceptedTokens中的值<=seqLen -1，seqLen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
@@ -694,7 +694,7 @@ aclnnStatus aclnnFusedCausalConv1dV2(
 
 - 输入值域限制：
   - queryStartLocOptional是累计偏移量，取值范围[0, cuSeqLen]，长度为batch+1，queryStartLocOptional[i]表示第i个序列的起始偏移，queryStartLocOptional[batch]表示最后一个序列的结束位置。
-  - blockSize 为0或者大于等于2，apc开启时不为0。
+  - blockSize为0或者大于等于2，APC开启时不为0。
   - blockIdxFirstScheduledTokenOptional、blockIdxLastScheduledTokenOptional、initialStateIdxOptional、numComputedTokensOptional和cacheIndicesOptional均存在时表示APC开启，且满足以下条件（i为batch的索引）：
     - cacheIndices为2维
     - initialStateIdxOptional[i] <= blockIdxFirstScheduledTokenOptional[i]+1
@@ -706,9 +706,9 @@ aclnnStatus aclnnFusedCausalConv1dV2(
   - cacheIndicesOptional的取值范围为[0, convStates.dim[0]-1]，且值均不能相等（除非等于padSlotId）。
   - maxQueryLen = batch中的最大seqLen。
   - maxDraftTokens的取值范围为[0, 16]。
-  - Pangu V2 模式（convMode = 1）下，numComputedTokensOptional不能为 None。
+  - Pangu V2模式（convMode = 1）下，numComputedTokensOptional不能为None。
   - 算子入参与中间计算结果，在对应数据类型（float16/bfloat16）下，数值均不会超出该类型值域范围。
-  - 算子输入不支持有±inf和Nan的情况。
+  - 算子输入不支持有±inf和NaN的情况。
 
 ## 调用示例
 

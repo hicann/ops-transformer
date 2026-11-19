@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：完成路由专家 AlltoAllv、Permute、GroupedMatMul 融合并实现与共享专家 MatMul 并行融合，**先通信后计算**。
+- 接口功能：完成路由专家AlltoAllv、Permute、GroupedMatMul融合并实现与共享专家MatMul并行融合，**先通信后计算**。
 
 - 计算公式：
     - 路由专家：
@@ -119,7 +119,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
     <tr>
         <td>gmmX(aclTensor*)</td>
         <td>输入</td>
-        <td>该输入进行 AlltoAllv 通信与 Permute 操作后结果作为 GroupedMatMul 计算的左矩阵。</td>
+        <td>该输入进行AlltoAllv通信与Permute操作后的结果作为GroupedMatMul计算的左矩阵。</td>
         <td>支持2维，shape为(BSK, H1)。</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
@@ -129,12 +129,12 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
     <tr>
         <td>gmmWeight(aclTensor*)</td>
         <td>输入</td>
-        <td>GroupedMatMul 计算的右矩阵。</td>
+        <td>GroupedMatMul计算的右矩阵。</td>
         <td>支持3维，shape为(e, H1, N1)。</td>
         <td>与gmmX保持一致</td>
         <td>ND</td>
         <td>3</td>
-        <td>√（仅适用转置场景）</td>
+        <td>√（仅适用于转置场景）</td>
     </tr>
     <tr>
         <td>sendCountsTensorOptional(aclTensor*)</td>
@@ -174,13 +174,13 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
         <td>与gmmX保持一致</td>
         <td>ND</td>
         <td>2</td>
-        <td>√（仅适用转置场景）</td>
+        <td>√（仅适用于转置场景）</td>
     </tr>
     <tr>
         <td>group(char*)</td>
         <td>输入</td>
         <td>专家并行的通信域名，字符串长度要求(0, 128)。</td>
-        <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
+        <td>通过HCCL提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
         <td>STRING</td>
         <td>-</td>
         <td>-</td>
@@ -189,7 +189,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
     <tr>
         <td>commMode(char*)</td>
         <td>输入</td>
-        <td>指定当前通信类型。</td>
+        <td>指定当前通信引擎类型。</td>
         <td>具体产品差异见下方说明。</td>
         <td>STRING</td>
         <td>-</td>
@@ -197,9 +197,9 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
         <td>-</td>
     </tr>
     <tr>
-        <td>epWorldSize（int64_t）</td>
+        <td>epWorldSize(int64_t)</td>
         <td>输入</td>
-        <td>ep通信域的大小。</td>
+        <td>EP通信域的大小。</td>
         <td>支持2、4、8、16、32、64、128、256。</td>
         <td>INT64</td>
         <td>-</td>
@@ -287,7 +287,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
         <td>x</td>
     </tr>
     <tr>
-        <td>workspaceSize（uint64_t*）</td>
+        <td>workspaceSize(uint64_t*)</td>
         <td>输出</td>
         <td>返回需要在Device侧申请的workspace大小。</td>
         <td>-</td>
@@ -352,7 +352,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
     <tr>
     <td>ACLNN_ERR_INNER_TILING_ERROR</td>
     <td>561002</td>
-    <td>第一阶段内部tiling失败。例如，AIV模式下通过接口入口检查后，在tiling阶段发现sendCounts或recvCounts包含负值、单项超过对应本卡输入/输出的token数、非空数组长度不等于e * epWorldSize或超过1024，以及sendCounts之和不等于BSK、recvCounts之和不等于A。</td>
+    <td>第一阶段内部Tiling失败。例如，AIV模式下通过接口入口检查后，在Tiling阶段发现sendCounts或recvCounts包含负值、单项超过对应本卡输入/输出的token数、非空数组长度不等于e * epWorldSize或超过1024，以及sendCounts之和不等于BSK、recvCounts之和不等于A。</td>
     </tr>
     </tbody></table>
 
@@ -409,7 +409,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
   - <term>Atlas A3系列产品</term>：支持AIV和AI CPU通信。
   <!-- end id8 -->
   <!-- npu="950" id9 -->
-  - <term>Ascend 950DT系列产品</term>：支持 CCU 通信和 AI CPU 通信，CCU 仅支持单机UB域内互联，AI CPU 可支持跨机 UB 域内互联。
+  - <term>Ascend 950DT系列产品</term>：支持CCU通信和AI CPU通信，CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
 
   <!-- end id9 -->
 
@@ -431,22 +431,22 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
 
 - 参数说明里shape使用的变量：
   - BSK：本卡发送的token数，是sendCounts参数累加之和，取值范围(0, 52428800)。
-  - H1：表示路由专家hidden size隐藏层大小，取值范围(0, 65536)。
-  - H2：表示共享专家hidden size隐藏层大小，取值范围(0, 12288]。
-  - e：表示单卡上专家个数，e<=48，e * epWorldSize最大支持384。
+  - H1：表示路由专家的hidden size，取值范围(0, 65536)。
+  - H2：表示共享专家的hidden size，取值范围(0, 12288]。
+  - e：表示单卡上专家个数，e <= 48，e * epWorldSize最大支持384。
   - N1：表示路由专家的head_num，取值范围(0, 65536)。
   - N2：表示共享专家的head_num，取值范围(0, 65536)。
   - BS：batch sequence size。
   - K：表示选取TopK个专家，K的范围[2, 8]。
   - A：本卡收到的token数，是recvCounts参数累加之和。
-  - ep通信域内的总接收token数（各rank的A之和）须等于总发送token数（各rank的BSK之和）。同时，各rank的`sendCounts`与对端`recvCounts`须在源、目的rank维度上互为转置，expert维度保持不变。
+  - EP通信域内的总接收token数（各rank的A之和）须等于总发送token数（各rank的BSK之和）。同时，各rank的`sendCounts`与对端`recvCounts`须在源、目的rank维度上互为转置，expert维度保持不变。
 
 - commMode为`"aiv"`时的附加约束与内存布局：
   <!-- npu="A3,910b" id18 -->
-  - Atlas A2的epWorldSize支持2、4、8；Atlas A3支持2、4、8、16、32、64、128。gmmX、gmmWeight、gmmY必须为相同的FLOAT16或BFLOAT16类型、ND格式，shape分别为2维、3维、2维。
+  - Atlas A2系列产品的epWorldSize支持2、4、8；Atlas A3支持2、4、8、16、32、64、128。gmmX、gmmWeight、gmmY必须为相同的FLOAT16或BFLOAT16类型、ND格式，shape分别为2维、3维、2维。
   <!-- end id18 -->
   - AIV模式下BSK/A取值范围为[1, 5000000]，H1/N1取值范围为[1, 65535]；本卡专家数e不超过512，`epWorldSize * e`不超过1024。
-  - sendCounts和recvCounts接口属性为INT64直接计数数组，布局为`[rank][localExpert]`。第一阶段的主机侧tiling（根据输入和平台生成计算及通信配置的阶段）校验数组长度为`e * epWorldSize`且不超过1024，每项非负且不超过对应本卡输入/输出M，并校验sendCounts之和等于BSK、recvCounts之和等于A；这些检查在tiling阶段失败时，`aclnnAlltoAllvGroupedMatMulV2GetWorkspaceSize`返回`ACLNN_ERR_INNER_TILING_ERROR`（561002）。
+  - sendCounts和recvCounts接口属性为INT64直接计数数组，布局为`[rank][localExpert]`。第一阶段的主机侧Tiling（根据输入和平台生成计算及通信配置的阶段）校验数组长度为`e * epWorldSize`且不超过1024，每项非负且不超过对应本卡输入/输出M，并校验sendCounts之和等于BSK、recvCounts之和等于A；这些检查在Tiling阶段失败时，`aclnnAlltoAllvGroupedMatMulV2GetWorkspaceSize`返回`ACLNN_ERR_INNER_TILING_ERROR`（561002）。
   - `sendCounts`或`recvCounts`为`nullptr`、空数组时，由接口入口检查并返回`ACLNN_ERR_PARAM_INVALID`（161002）。
 
 <!-- npu="A3" id10 -->

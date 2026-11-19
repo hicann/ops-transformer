@@ -366,9 +366,9 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2Metadata(
 
   - aclnnDenseLightningIndexerSoftmaxLseV2Metadata为确定性实现，确定性计算配置不会改变其输出规则。
 
-  - BSND场景
+  - BSND场景：
     - 必传batchSize、maxSeqLenQ和maxSeqLenK参数，以获取shape信息。
-  - TND场景
+  - TND场景：
     - 必传cuSeqLensQOptional和cuSeqLensKOptional参数，以获取正确shape信息。
     - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
 
@@ -381,7 +381,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2Metadata(
         </colgroup>
         <thead>
             <tr>
-                <th>mask_mode</th>
+                <th>maskMode</th>
                 <th>含义</th>
                 <th>备注</th>
             </tr>
