@@ -89,7 +89,7 @@ For fixed-length layouts, the sequence dimension of `g` and `beta` precedes the 
 | --- | --- | --- |
 | PyTorch API | [Inference example](torch_extension/README_en.md#example) | Call [flash_kda, flash_kda_fwd, or flash_kda_metadata](torch_extension/README_en.md). |
 
-See the [PyTorch extension guide](../../torch_extension/README.md) for build and installation instructions. This DSL implementation also requires compatible versions of CANN, torch_npu, and the CANNBot DSL runtime.
+See the [PyTorch extension guide](../../torch_extension/README_en.md) for build and installation instructions. This DSL implementation also requires compatible versions of CANN, torch_npu, and the CANNBot DSL runtime.
 
 ## References
 

@@ -73,7 +73,7 @@ The training output contract remains active under `torch.no_grad()` and is indep
 
 ## Example
 
-Install compatible versions of CANN, PyTorch, torch_npu, and CANNBot DSL in a Linux NPU environment. Follow the [extension build instructions](../../../torch_extension/README.md) to build and install the package. The example imports the dedicated `cann_ops_transformer_flash_kda` package built with `--ops=flash_kda --vendor_name=flash_kda`. Include the native build artifacts for your device in the package.
+Install compatible versions of CANN, PyTorch, torch_npu, and CANNBot DSL in a Linux NPU environment. Follow the [extension build instructions](../../../torch_extension/README_en.md) to build and install the package. The example imports the dedicated `cann_ops_transformer_flash_kda` package built with `--ops=flash_kda --vendor_name=flash_kda`. Include the native build artifacts for your device in the package.
 
 ```python
 import torch
