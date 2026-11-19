@@ -33,6 +33,9 @@ def _moe_gating_top_k_backward_torch(
 
     参数均为 torch.Tensor（expert_idx 为整数型），返回 grad_x（与 x_norm 同形状）。
     与 kernel 保持一致：中间计算在 fp32 上进行，最终结果转为 grad_y 的 dtype。
+    norm_type=0 为 softmax 反传（是否重归一化由 renorm 决定）；
+    norm_type=1 为 sigmoid + Top-K 重归一化反传（忽略 renorm，历史兼容）；
+    norm_type=3 为 sigmoid，归一化与否由 renorm 决定（0=不归一化，非 0=归一化）。
     """
     x_f32 = x_norm.to(torch.float32)
     grad_y_f32 = grad_y.to(torch.float32)
@@ -40,14 +43,19 @@ def _moe_gating_top_k_backward_torch(
     grad_y_scaled = grad_y_f32 * routed_scaling_factor
     selected = torch.gather(x_f32, dim=1, index=idx)
 
-    if norm_type == 1:
-        # The forward operator renormalizes Top-K sigmoid values for this mode.
-        denominator = selected.sum(dim=1, keepdim=True) + eps
-        weights = selected / denominator
-        beta = (weights * grad_y_scaled).sum(dim=1, keepdim=True)
-        grad_selected = (grad_y_scaled - beta) / denominator
+    if norm_type == 1 or norm_type == 3:
+        if norm_type == 3 and renorm == 0:
+            # Sigmoid 不归一化：梯度仅按 routedScalingFactor 缩放后直接散射
+            grad_selected = grad_y_scaled
+        else:
+            # norm_type=1 恒归一化；norm_type=3 且 renorm!=0 走归一化：D/beta 反传
+            denominator = selected.sum(dim=1, keepdim=True) + eps
+            weights = selected / denominator
+            beta = (weights * grad_y_scaled).sum(dim=1, keepdim=True)
+            grad_selected = (grad_y_scaled - beta) / denominator
 
         grad_norm = torch.zeros_like(x_f32)
+        # 使用 scatter_add_ 将梯度分散到对应专家位置（支持多选，若索引重复则累加）
         grad_norm.scatter_add_(dim=1, index=idx, src=grad_selected)
         grad_x = x_f32 * (1 - x_f32) * grad_norm
     elif norm_type == 0:

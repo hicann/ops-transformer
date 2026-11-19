@@ -51,7 +51,7 @@ def _normalize_x_norm(values, norm_type):
             values = np.where(zero_rows, 1.0, values)
             denominator = np.sum(values, axis=1, keepdims=True)
         return values / denominator
-    if norm_type == 1:
+    if norm_type == 1 or norm_type == 3:
         if np.any(values < 0.0) or np.any(values > 1.0):
             values = 1.0 / (1.0 + np.exp(-values))
         return values
@@ -74,7 +74,7 @@ def _normalize_x_norm_torch(values, norm_type):
             denominator,
         )
         return values / denominator
-    if norm_type == 1:
+    if norm_type == 1 or norm_type == 3:
         if bool((values < 0).any()) or bool((values > 1).any()):
             return torch.sigmoid(values)
         return values
@@ -115,15 +115,15 @@ def aclnn_moe_gating_top_k_backward_inputs(
     """ACLNN 模式 input 插件。
 
     参数顺序与 aclnnMoeGatingTopKBackwardGetWorkspaceSize 一致（不含 workspaceSize/executor）。
-    注意：aclnn 模式的 _call_custom_input 不消费返回值，必须 in-place 修改传入的
-    torch.Tensor 才能生效。
+    注意：aclnn 模式必须 in-place 修改传入的 torch.Tensor 才能生效，返回 None
+    表示原地写法（新版 TTK 会校验返回值槽位数，纯输出槽不可出现在返回值中）。
     """
     topk = expertIdx.shape[1]
     values = _normalize_x_norm_torch(xNorm, normType)
     xNorm.copy_(values.to(dtype=xNorm.dtype))
     _, sorted_idx = torch.sort(values, dim=1, descending=True, stable=True)
     expertIdx.copy_(sorted_idx[:, :topk].to(expertIdx.dtype))
-    return [xNorm, gradY, expertIdx, out]
+    return None
 
 
 def e2e_moe_gating_top_k_backward_inputs(

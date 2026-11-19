@@ -289,10 +289,11 @@ __aicore__ inline void CallSigmoidRenormBackwardVF(LocalTensor<float> xNorm, Loc
                             partialSumAddr);
 }
 
-// renorm=0：gradYBase 中已存放 gradY*routedScalingFactor，逐行散射到 gradNormX 对齐行。
-__simd_vf__ void SoftmaxScatterNoRenormVF(__ubuf__ int32_t* expertIdxBase, __ubuf__ float* gradYBase,
-                                          __ubuf__ float* gradNormXBase, uint16_t curRows, uint16_t k, uint16_t kAlign,
-                                          uint16_t nAlign)
+// 免归一散射（softmax 或 normType=3 sigmoid 且 renorm=0）：gradYBase 中已存放
+// gradY*routedScalingFactor，逐行按 expertIdx 散射到 gradNormX 对齐行，不做 D/beta 反传。
+__simd_vf__ void ScatterNoRenormVF(__ubuf__ int32_t* expertIdxBase, __ubuf__ float* gradYBase,
+                                   __ubuf__ float* gradNormXBase, uint16_t curRows, uint16_t k, uint16_t kAlign,
+                                   uint16_t nAlign)
 {
     constexpr uint16_t chunkSize = kReduceChunkLane;
     uint16_t repeatTimes = static_cast<uint16_t>((k + chunkSize - 1) / chunkSize);
@@ -377,14 +378,14 @@ __simd_vf__ void SoftmaxGradVF(__ubuf__ float* xNormBase, __ubuf__ float* gradNo
     }
 }
 
-__aicore__ inline void CallSoftmaxScatterNoRenormVF(LocalTensor<int32_t> expertIdx, LocalTensor<float> gradY,
-                                                    LocalTensor<float> gradNormX, uint16_t curRows, uint16_t k,
-                                                    uint16_t kAlign, uint16_t nAlign)
+__aicore__ inline void CallScatterNoRenormVF(LocalTensor<int32_t> expertIdx, LocalTensor<float> gradY,
+                                             LocalTensor<float> gradNormX, uint16_t curRows, uint16_t k,
+                                             uint16_t kAlign, uint16_t nAlign)
 {
     __ubuf__ int32_t* expertIdxAddr = (__ubuf__ int32_t*)expertIdx.GetPhyAddr();
     __ubuf__ float* gradYAddr = (__ubuf__ float*)gradY.GetPhyAddr();
     __ubuf__ float* gradNormXAddr = (__ubuf__ float*)gradNormX.GetPhyAddr();
-    SoftmaxScatterNoRenormVF(expertIdxAddr, gradYAddr, gradNormXAddr, curRows, k, kAlign, nAlign);
+    ScatterNoRenormVF(expertIdxAddr, gradYAddr, gradNormXAddr, curRows, k, kAlign, nAlign);
 }
 
 template <typename T>

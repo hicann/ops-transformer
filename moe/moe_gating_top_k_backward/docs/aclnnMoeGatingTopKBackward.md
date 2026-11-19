@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：完成MoE（Mixture of Experts）门控Top-K选择的反向梯度计算。该算子是aclnnMoeGatingTopK的反向算子，根据前向算子输出的归一化得分（xNorm）、上游梯度（gradY）和专家索引（expertIdx），计算输入得分矩阵的梯度（gradX）。支持softmax模式（normType=0）和sigmoid模式（normType=1）。
+- 接口功能：完成MoE（Mixture of Experts）门控Top-K选择的反向梯度计算。该算子是aclnnMoeGatingTopK的反向算子，根据前向算子输出的归一化得分（xNorm）、上游梯度（gradY）和专家索引（expertIdx），计算输入得分矩阵的梯度（gradX）。支持softmax模式（normType=0）、sigmoid模式（normType=1，恒归一化）和sigmoid模式（normType=3，是否归一化由renorm属性决定）。
 - 计算公式：
 
   1. 缩放梯度
@@ -32,7 +32,7 @@
       gradYScaled_{ip} = routedScalingFactor \cdot gradY_{ip}
       $$
 
-  2. renorm的反向传播（softmax模式且renorm=0时跳过，直接 $gradWPrime_{ip} = gradYScaled_{ip}$；其余情况均执行）
+  2. renorm的反向传播（normType=0或normType=3且renorm=0时跳过，直接 $gradWPrime_{ip} = gradYScaled_{ip}$；其余情况均执行）
 
       $$
       wPrime_{ip} = xNorm_{i,\ expertIdx_{ip}}
@@ -72,7 +72,7 @@
         gradX_{ij} = xNorm_{ij} \cdot (gradNormX_{ij} - dot_i)
         $$
 
-      - sigmoid模式（normType=1）：
+      - sigmoid模式（normType=1或normType=3）：
 
         $$
         gradX_{ij} = xNorm_{ij} \cdot (1 - xNorm_{ij}) \cdot gradNormX_{ij}
@@ -163,8 +163,8 @@ aclnnStatus aclnnMoeGatingTopKBackward(
     <tr>
       <td>renorm（int64_t）</td>
       <td>输入</td>
-      <td>表示前向算子在softmax模式下renorm标记。</td>
-      <td>0：不做renorm；1：需要做renorm。仅在normType=0（softmax）模式下生效；normType=1（sigmoid）时恒按renorm处理。</td>
+      <td>表示前向算子的renorm标记。</td>
+      <td>0：不做renorm；1：需要做renorm。在normType=0（softmax）与normType=3（sigmoid）模式下生效；normType=1（sigmoid）时恒按renorm处理（忽略该属性）。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -174,7 +174,7 @@ aclnnStatus aclnnMoeGatingTopKBackward(
       <td>normType（int64_t）</td>
       <td>输入</td>
       <td>表示norm函数类型。</td>
-      <td>0表示Softmax函数，1表示Sigmoid函数。</td>
+      <td>0表示Softmax函数；1表示Sigmoid函数（恒归一化）；3表示Sigmoid函数（是否归一化由renorm属性决定）。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>

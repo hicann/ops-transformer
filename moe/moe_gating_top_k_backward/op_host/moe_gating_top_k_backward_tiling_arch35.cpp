@@ -20,6 +20,7 @@ namespace optiling {
 
 const static int64_t NORM_TYPE_SOFTMAX = 0;
 const static int64_t NORM_TYPE_SIGMOID = 1;
+const static int64_t NORM_TYPE_SIGMOID_RENORM_ATTR = 3;
 const static size_t X_NORM_INPUT_DIMS = 2;
 const static size_t GRAD_Y_INPUT_DIMS = 2;
 const static size_t EXPERT_IDX_INPUT_DIMS = 2;
@@ -325,9 +326,10 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckAttr()
         normType_ = *normTypePtr;
     }
     OP_LOGI(context_, "Attr normType: %ld.", normType_);
-    if (normType_ != NORM_TYPE_SIGMOID && normType_ != NORM_TYPE_SOFTMAX) {
+    if (normType_ != NORM_TYPE_SOFTMAX && normType_ != NORM_TYPE_SIGMOID &&
+        normType_ != NORM_TYPE_SIGMOID_RENORM_ATTR) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "norm_type", std::to_string(normType_).c_str(),
-                                              "The value of norm_type must be 0 or 1");
+                                              "The value of norm_type must be 0, 1 or 3");
         return ge::GRAPH_FAILED;
     }
 

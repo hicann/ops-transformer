@@ -15,7 +15,7 @@ English | [简体中文](./README.md)
 
 ## Function Description
 
-- Operator function: performs backward gradient computation for the MoE (Mixture of Experts) gating Top-K selection. This operator is the backward operator of MoeGatingTopK. Based on the normalized scores (xNorm) output by the forward operator, the upstream gradient (gradY), and the expert indices (expertIdx), it computes the gradient (gradX) of the input score matrix. The softmax mode (normType=0) and the sigmoid mode (normType=1) are supported.
+- Operator function: performs backward gradient computation for the MoE (Mixture of Experts) gating Top-K selection. This operator is the backward operator of MoeGatingTopK. Based on the normalized scores (xNorm) output by the forward operator, the upstream gradient (gradY), and the expert indices (expertIdx), it computes the gradient (gradX) of the input score matrix. The softmax mode (normType=0), sigmoid mode (normType=1, always renormalized), and sigmoid mode (normType=3, whether renormalization is performed is determined by the renorm attribute) are supported.
 - Computation formula:
 
   1. Scaling the gradient
@@ -24,7 +24,7 @@ English | [简体中文](./README.md)
     gradYScaled_{ip} = routedScalingFactor \cdot gradY_{ip}
     $$
 
-  2. Backpropagation of renorm (skipped in softmax mode when renorm=0, in which case $gradWPrime_{ip} = gradYScaled_{ip}$ is set directly; executed in all other cases)
+  2. Backpropagation of renorm (skipped when normType=0 or normType=3 and renorm=0, in which case $gradWPrime_{ip} = gradYScaled_{ip}$ is set directly; executed in all other cases)
 
     $$
     wPrime_{ip} = xNorm_{i,\ expertIdx_{ip}}
@@ -64,7 +64,7 @@ English | [简体中文](./README.md)
       gradX_{ij} = xNorm_{ij} \cdot (gradNormX_{ij} - dot_i)
       $$
 
-    - Sigmoid mode (normType=1):
+    - Sigmoid mode (normType=1 or normType=3):
 
       $$
       gradX_{ij} = xNorm_{ij} \cdot (1 - xNorm_{ij}) \cdot gradNormX_{ij}
@@ -112,14 +112,14 @@ English | [简体中文](./README.md)
   <tr>
     <td>renorm</td>
     <td>Optional attribute</td>
-    <td>renorm flag of the forward operator in softmax mode. 0: renorm is not performed; 1: renorm is performed. It takes effect only in the norm_type=0 (softmax) mode. When norm_type=1 (sigmoid), renorm is always applied.</td>
+    <td>renorm flag of the forward operator. 0: renorm is not performed; 1: renorm is performed. It takes effect in the norm_type=0 (softmax) and norm_type=3 (sigmoid) modes. When norm_type=1 (sigmoid), renorm is always applied (this attribute is ignored).</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>norm_type</td>
     <td>Optional attribute</td>
-    <td>Type of the norm function. 0 means the Softmax function, and 1 means the Sigmoid function.</td>
+    <td>Type of the norm function. 0 means the Softmax function; 1 means the Sigmoid function (always renormalized); 3 means the Sigmoid function (whether renormalization is performed is determined by the renorm attribute).</td>
     <td>INT64</td>
     <td>-</td>
   </tr>

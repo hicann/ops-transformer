@@ -25,6 +25,8 @@ using namespace AscendC;
 
 constexpr int64_t NORM_TYPE_SOFTMAX = 0;
 
+constexpr int64_t NORM_TYPE_SIGMOID_RENORM_ATTR = 3; // sigmoid：归一化与否由 renorm 属性决定
+
 template <typename T>
 class MoeGatingTopKBackward {
 public:
@@ -182,7 +184,8 @@ __aicore__ inline void MoeGatingTopKBackward<T>::CopyInExpertIdx(int64_t loopIdx
     expertIdxLocal_ = indicesQue_.DeQue<int32_t>();
 }
 
-// 散射出 gradNormX[row, alignedN]：Sigmoid 恒 renorm；Softmax 由 renorm 属性决定。
+// 散射出 gradNormX[row, alignedN]：Sigmoid(normType=1) 恒 renorm；Softmax(normType=0) 与
+// sigmoid(normType=3) 由 renorm 属性决定——renorm=0 免归一散射，renorm!=0 走 D/beta 反传。
 template <typename T>
 __aicore__ inline void MoeGatingTopKBackward<T>::ScatterGrad()
 {
@@ -191,13 +194,13 @@ __aicore__ inline void MoeGatingTopKBackward<T>::ScatterGrad()
     LocalTensor<float> gradNormX = gradNormXBuf_.Get<float>();
     Duplicate<float>(gradNormX, 0.0f, curRows_ * alignedN_);
     PipeBarrier<PIPE_V>();
-    if (normType_ == NORM_TYPE_SOFTMAX && renorm_ == 0) {
-        // Softmax + renorm=0：grad_selected = gradY * routedScalingFactor
-        CallSoftmaxScatterNoRenormVF(expertIdxLocal_, wCache, gradNormX, static_cast<uint16_t>(curRows_),
-                                     static_cast<uint16_t>(tilingData_->k), static_cast<uint16_t>(kAlign_),
-                                     static_cast<uint16_t>(alignedN_));
+    if ((normType_ == NORM_TYPE_SOFTMAX || normType_ == NORM_TYPE_SIGMOID_RENORM_ATTR) && renorm_ == 0) {
+        // Softmax/sigmoid + renorm=0：grad_selected = gradY * routedScalingFactor
+        CallScatterNoRenormVF(expertIdxLocal_, wCache, gradNormX, static_cast<uint16_t>(curRows_),
+                              static_cast<uint16_t>(tilingData_->k), static_cast<uint16_t>(kAlign_),
+                              static_cast<uint16_t>(alignedN_));
     } else {
-        // Sigmoid（恒 renorm）或 Softmax + renorm=1：D/beta 反传，行 stride 用 alignedN_
+        // Sigmoid（恒 renorm）或 renorm=1：D/beta 反传，行 stride 用 alignedN_
         CallSigmoidRenormBackwardVF(xNormLocal_, expertIdxLocal_, wCache, gradNormX, tilingData_->eps,
                                     static_cast<uint16_t>(curRows_), static_cast<uint16_t>(tilingData_->k),
                                     static_cast<uint16_t>(kAlign_), static_cast<uint16_t>(alignedN_),
