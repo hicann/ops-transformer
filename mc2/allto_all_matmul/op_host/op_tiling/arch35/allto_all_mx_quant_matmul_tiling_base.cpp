@@ -949,10 +949,9 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::PostTiling()
     context_->SetScheduleMode(1);
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
     if (usingApaceImpl_) {
-        // hcomm 路径: 输出 hcommAllToAllMatmulTilingData
+        // hcomm 路径: 输出 HcommQuantTilingData
         SetHcommTilingInfo(hcommTilingData_);
-        Apace::hcommAllToAllMatmulTilingData* outTilingData =
-            context_->GetTilingData<Apace::hcommAllToAllMatmulTilingData>();
+        Apace::HcommQuantTilingData* outTilingData = context_->GetTilingData<Apace::HcommQuantTilingData>();
 #if MC2_DFX_ENABLE
         hcommTilingData_.dumpInfo.workspaceLayout = workspaceLayout_;
 #endif
@@ -968,7 +967,7 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::PostTiling()
             return ge::GRAPH_FAILED;
         }
         OP_LOGD(opName_, "Final hcomm tiling data size=%zu, context capacity size=%zu, rankDim=%u.",
-                sizeof(Apace::hcommAllToAllMatmulTilingData), context_->GetRawTilingData()->GetCapacity(),
+                sizeof(Apace::HcommQuantTilingData), context_->GetRawTilingData()->GetCapacity(),
                 hcommTilingData_.rankDim);
         const size_t registeredMaxTilingSize = sizeof(AlltoAllQuantMatmulTilingData);
         if (tilingBufCap >= registeredMaxTilingSize && registeredMaxTilingSize > sizeof(hcommTilingData_)) {
@@ -982,7 +981,7 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::PostTiling()
             }
             context_->GetRawTilingData()->SetDataSize(registeredMaxTilingSize);
         } else {
-            context_->GetRawTilingData()->SetDataSize(sizeof(Apace::hcommAllToAllMatmulTilingData));
+            context_->GetRawTilingData()->SetDataSize(sizeof(Apace::HcommQuantTilingData));
         }
     } else {
         // arch35 主线路径: 输出 AlltoAllQuantMatmulTilingData
@@ -1040,7 +1039,7 @@ void AllToAllMxQuantMatmulTilingBase::SetTilingInfo(AlltoAllMatmulTilingInfo& ti
  *
  * @param tilingData 目标结构体
  */
-void AllToAllMxQuantMatmulTilingBase::SetHcommTilingInfo(Apace::hcommAllToAllMatmulTilingData& tilingData) const
+void AllToAllMxQuantMatmulTilingBase::SetHcommTilingInfo(Apace::HcommQuantTilingData& tilingData) const
 {
     tilingData.rankDim = static_cast<uint32_t>(contextInfo_.args_.rankDim);
     auto& tilingInfo = tilingData.commTilingData;
@@ -1071,20 +1070,20 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::DoHcommMxQuantMMTiling()
             tilingSwat;
         tilingSwat.SetPlatformInfoPtr(context_->GetPlatformInfo());
         tilingSwat.SetBiasInfo(hasBias);
-        tilingSwat.GetTilingData(perRankM, nValue, perRankK, false, transB, hcommTilingData_.tileQbmmTilingData);
+        tilingSwat.GetTilingData(perRankM, nValue, perRankK, false, transB, hcommTilingData_.matmulTilingData);
     } else if (isMxFp4_) {
         QuantMatmulTilingSwat<mm::DataType::DT_FLOAT4_E2M1, mm::DataType::DT_FLOAT4_E2M1, mm::BiasDataType::DT_FLOAT>
             tilingSwat;
         tilingSwat.SetPlatformInfoPtr(context_->GetPlatformInfo());
         tilingSwat.SetBiasInfo(hasBias);
-        tilingSwat.GetTilingData(perRankM, nValue, perRankK, false, transB, hcommTilingData_.tileQbmmTilingData);
+        tilingSwat.GetTilingData(perRankM, nValue, perRankK, false, transB, hcommTilingData_.matmulTilingData);
     } else {
         QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN,
                               mm::BiasDataType::DT_FLOAT>
             tilingSwat;
         tilingSwat.SetPlatformInfoPtr(context_->GetPlatformInfo());
         tilingSwat.SetBiasInfo(hasBias);
-        tilingSwat.GetTilingData(perRankM, nValue, perRankK, false, transB, hcommTilingData_.tileQbmmTilingData);
+        tilingSwat.GetTilingData(perRankM, nValue, perRankK, false, transB, hcommTilingData_.matmulTilingData);
     }
     hcommTilingData_.localMatmul = localMatmulDisabled;
     OP_LOGD(opName_, "HcommMxQuantMM tiling: perRankM=%lu perRankK=%lu N=%lu", perRankM, perRankK, nValue);

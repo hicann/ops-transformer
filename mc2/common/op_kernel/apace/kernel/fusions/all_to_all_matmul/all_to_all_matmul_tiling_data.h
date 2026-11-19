@@ -46,17 +46,21 @@ struct CommContext {
     Apace::AivComm::CommUbmemContext ubmemCtx;
 };
 
-// Hcomm通信MX量化tiling结构体
 namespace Apace {
-// DFX 约定: dumpInfo 位于 mc2InitTiling/mc2CcTiling 之后，
-// 异常 dump 回调按调用方传入的 offsetof(..., dumpInfo) 偏移解析 DfxDumpInfo
-struct hcommAllToAllMatmulTilingData {
+// HCOMM APACE tiling shared by quantized and floating-point Matmul kernels.
+template <typename MatmulTilingDataType>
+struct HcommAllToAllMatmulTilingData {
+    // DFX 约定: dumpInfo 位于 mc2InitTiling/mc2CcTiling 之后，
+    // 异常 dump 回调按调用方传入的 offsetof(..., dumpInfo) 偏移解析 DfxDumpInfo
     Mc2InitTiling mc2InitTiling;
     Mc2CcTiling mc2CcTiling;
     Utils::DfxDumpInfo dumpInfo{};
     CommTilingData commTilingData;
-    QuantMatmulTilingData tileQbmmTilingData;
+    MatmulTilingDataType matmulTilingData;
     uint32_t localMatmul{0};
     uint32_t rankDim{0}; // Host-provided rank count for AIV initialization without HCCL calls.
 };
+
+using HcommQuantTilingData = HcommAllToAllMatmulTilingData<QuantMatmulTilingData>;
+using HcommFpTilingData = HcommAllToAllMatmulTilingData<MatmulTilingData>;
 } // namespace Apace

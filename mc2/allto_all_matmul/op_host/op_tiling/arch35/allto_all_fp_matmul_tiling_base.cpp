@@ -16,6 +16,7 @@
 #include "../../../../common/op_kernel/apace/tiling/matmul_tiling_swat.h"
 
 #include <algorithm>
+#include <limits>
 #include "common/utils/mc2_comm_utils.h"
 #include "common/utils/op_mc2.h"
 #include "mc2/matmul_allto_all/op_host/op_tiling/common/allto_all_comm_algo_table.h"
@@ -26,6 +27,46 @@ using namespace AscendC;
 using namespace Mc2Tiling;
 
 namespace MC2Tiling {
+
+namespace {
+constexpr uint32_t HCOMM_REPEAT_MAX = std::numeric_limits<uint8_t>::max();
+constexpr uint32_t BATCH_MODE_SCHEDULE = 1U;
+
+template <typename TilingData>
+ge::graphStatus WriteTilingData(gert::TilingContext* context, const char* opName, const TilingData& tilingData,
+                                size_t registeredTilingSize)
+{
+    auto* rawTilingData = context->GetRawTilingData();
+    const size_t capacity = rawTilingData->GetCapacity();
+    auto* output = context->GetTilingData<TilingData>();
+    if (output == nullptr) {
+        OP_LOGE(opName, "Failed to get tiling data from context.");
+        return ge::GRAPH_FAILED;
+    }
+    if (capacity < sizeof(TilingData)) {
+        OP_LOGE(opName, "Tiling buffer capacity is too small, capacity=%zu, need=%zu.", capacity, sizeof(TilingData));
+        return ge::GRAPH_FAILED;
+    }
+    errno_t ret = memcpy_s(output, capacity, &tilingData, sizeof(TilingData));
+    if (ret != EOK) {
+        OP_LOGE(opName, "Failed to copy tiling data, ret=%d.", ret);
+        return ge::GRAPH_FAILED;
+    }
+
+    size_t dataSize = sizeof(TilingData);
+    if (capacity >= registeredTilingSize && registeredTilingSize > dataSize) {
+        ret = memset_s(reinterpret_cast<uint8_t*>(output) + dataSize, capacity - dataSize, 0,
+                       registeredTilingSize - dataSize);
+        if (ret != EOK) {
+            OP_LOGE(opName, "Failed to clear tiling padding, ret=%d.", ret);
+            return ge::GRAPH_FAILED;
+        }
+        dataSize = registeredTilingSize;
+    }
+    rawTilingData->SetDataSize(dataSize);
+    return ge::GRAPH_SUCCESS;
+}
+} // namespace
 
 /**
  * @brief AlltoAllMatmul非量化的准入条件，当前仅实现非量化，所以直接return true
@@ -132,11 +173,14 @@ ge::graphStatus AllToAllFpMatmulTilingBase::DoOpTiling()
     // 进行通算切分
     MC2_CHECK_LOG_RET(opName_, TileCommAndCompute());
     const bool isA6 = npuArch_ == Ops::Base::DAV_9201;
-    usingApaceImpl_ = isA6 && inferredInfo_.tileM > 0 && inferredInfo_.tileCnt > 0 && inferredInfo_.tileCnt <= 255 &&
-                      inferredInfo_.tailCnt <= 255;
+    usingApaceImpl_ = isA6 && inferredInfo_.tileM > 0 && inferredInfo_.tileCnt > 0;
     OP_LOGD(opName_, "FP APACE platform gate: npuArch=%d, rankDim=%u, enabled=%d", static_cast<int32_t>(npuArch_),
             contextInfo_.args_.rankDim, usingApaceImpl_);
     if (usingApaceImpl_) {
+        OP_TILING_CHECK(inferredInfo_.tileCnt > HCOMM_REPEAT_MAX || inferredInfo_.tailCnt > HCOMM_REPEAT_MAX,
+                        OP_LOGE(opName_, "HCOMM tile count exceeds uint8 limit, tileCnt=%u, tailCnt=%u, max=%u.",
+                                inferredInfo_.tileCnt, inferredInfo_.tailCnt, HCOMM_REPEAT_MAX),
+                        return ge::GRAPH_FAILED);
         int64_t groupRankDim = 0;
         OP_TILING_CHECK(!mc2tiling::GetRankSize(opName_, contextInfo_.group.c_str(), groupRankDim),
                         OP_LOGE(opName_, "Failed to query communication group rank size."), return ge::GRAPH_FAILED);
@@ -166,13 +210,14 @@ ge::graphStatus AllToAllFpMatmulTilingBase::DoMMTiling()
             OP_LOGE(opName_, "Invalid APACE FP platform or dtype size."), return ge::GRAPH_FAILED);
         MatmulTilingSwat tilingSwat;
         tilingSwat.SetPlatformInfoPtr(platformInfo);
+        auto& swatTilingData = hcommFpTilingData_.matmulTilingData;
         // Use the post-AlltoAll per-rank output M, matching the device problemShape.
         tilingSwat.GetTilingData(contextInfo_.args_.mValue, contextInfo_.args_.nValue, contextInfo_.args_.orgKValue,
-                                 contextInfo_.args_.inputDtypeSize, false, contextInfo_.args_.isBTrans,
-                                 localTilingData_.apaceMmTilingData, contextInfo_.args_.isBias);
-        const auto& mmTile = localTilingData_.apaceMmTilingData;
-        OP_TILING_CHECK(mmTile.usedCoreNum == 0 || mmTile.baseM == 0 || mmTile.baseN == 0 || mmTile.baseK == 0 ||
-                            mmTile.mL1 == 0 || mmTile.nL1 == 0 || mmTile.kL1 == 0,
+                                 contextInfo_.args_.inputDtypeSize, false, contextInfo_.args_.isBTrans, swatTilingData,
+                                 contextInfo_.args_.isBias);
+        OP_TILING_CHECK(swatTilingData.usedCoreNum == 0 || swatTilingData.baseM == 0 || swatTilingData.baseN == 0 ||
+                            swatTilingData.baseK == 0 || swatTilingData.mL1 == 0 || swatTilingData.nL1 == 0 ||
+                            swatTilingData.kL1 == 0,
                         OP_LOGE(opName_, "Invalid APACE FP SWAT Matmul tiling."), return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
@@ -268,8 +313,13 @@ ge::graphStatus AllToAllFpMatmulTilingBase::SetHcclTiling()
     if (!allToAllBuilder.isSuccess()) {
         return ge::GRAPH_FAILED;
     }
-    allToAllTilingConfig.GetTiling(localTilingData_.mc2InitTiling);
-    allToAllTilingConfig.GetTiling(localTilingData_.mc2CcTiling);
+    if (usingApaceImpl_) {
+        allToAllTilingConfig.GetTiling(hcommFpTilingData_.mc2InitTiling);
+        allToAllTilingConfig.GetTiling(hcommFpTilingData_.mc2CcTiling);
+    } else {
+        allToAllTilingConfig.GetTiling(localTilingData_.mc2InitTiling);
+        allToAllTilingConfig.GetTiling(localTilingData_.mc2CcTiling);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -343,30 +393,37 @@ uint8_t AllToAllFpMatmulTilingBase::ChooseAddBiasSplitMode() const
  */
 ge::graphStatus AllToAllFpMatmulTilingBase::PostTiling()
 {
-    SetTilingInfo(localTilingData_.alltoAllMatmulTilingInfo);
-    localTilingData_.localMatmul = 0; // FP APACE当前固定使用全rank REMOTE确定性累加
-    AlltoAllMatmulTilingData* outTilingData = context_->GetTilingData<AlltoAllMatmulTilingData>();
-    size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
-    OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get tiling data from context"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((tilingBufCap < sizeof(localTilingData_)),
-                    OP_LOGE(opName_, "TilingBuffer capacity too small, capacity = %zu, need = %zu.", tilingBufCap,
-                            sizeof(localTilingData_)),
-                    return ge::GRAPH_FAILED);
-
-    errno_t ret = memcpy_s(outTilingData, tilingBufCap, &localTilingData_, sizeof(localTilingData_));
-    if (ret != EOK) {
-        OP_LOGE(opName_, "PostTiling: memcpy_s tiling data failed, ret=%d.", ret);
-        return ge::GRAPH_FAILED;
+    MC2_CHECK_LOG_RET(opName_, context_->SetScheduleMode(BATCH_MODE_SCHEDULE));
+    if (usingApaceImpl_) {
+        SetHcommFpTilingInfo(hcommFpTilingData_);
+        hcommFpTilingData_.localMatmul = 0; // FP APACE当前固定使用全rank REMOTE确定性累加
+#if MC2_DFX_ENABLE
+        // FP APACE currently does not support state dump. Keep the default empty workspace layout so
+        // OpStateDump::Init/DoDump safely become no-ops without reserving the extra 64 KB dump segment.
+        hcommFpTilingData_.dumpInfo.workspaceLayout = workspaceLayout_;
+#endif
+        MC2_CHECK_LOG_RET(opName_,
+                          WriteTilingData(context_, opName_, hcommFpTilingData_, sizeof(AlltoAllMatmulTilingData)));
+        PrintHcommFpTilingData(hcommFpTilingData_);
+    } else {
+        SetTilingInfo(localTilingData_.alltoAllMatmulTilingInfo);
+        MC2_CHECK_LOG_RET(opName_,
+                          WriteTilingData(context_, opName_, localTilingData_, sizeof(AlltoAllMatmulTilingData)));
+        PrintAlltoAllMatmulTilingData(localTilingData_);
     }
-
-    OP_LOGD(opName_, "Final tiling data size=%zu and context capacity size=%zu.", sizeof(AlltoAllMatmulTilingData),
-            context_->GetRawTilingData()->GetCapacity());
-
-    context_->GetRawTilingData()->SetDataSize(sizeof(AlltoAllMatmulTilingData));
     context_->SetBlockDim(contextInfo_.args_.aicCoreNum);
-    PrintAlltoAllMatmulTilingData(*outTilingData);
     return ge::GRAPH_SUCCESS;
+}
+
+void AllToAllFpMatmulTilingBase::SetHcommFpTilingInfo(Apace::HcommFpTilingData& tilingData) const
+{
+    auto& commTiling = tilingData.commTilingData;
+    commTiling.splitAxisTileSize = inferredInfo_.tileM;
+    commTiling.splitAxisTileCnt = inferredInfo_.tileCnt;
+    commTiling.splitAxisTailSize = inferredInfo_.tailM;
+    commTiling.splitAxisTailCnt = inferredInfo_.tailCnt;
+    commTiling.nonSplitAxisSize = contextInfo_.args_.orgKValue * contextInfo_.args_.rankDim;
+    tilingData.rankDim = static_cast<uint32_t>(contextInfo_.args_.rankDim);
 }
 
 /**
@@ -399,21 +456,24 @@ void AllToAllFpMatmulTilingBase::SetTilingInfo(AlltoAllMatmulTilingInfo& tilingI
  */
 void AllToAllFpMatmulTilingBase::PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingData& alltoAllMatmulTilingData)
 {
-    OP_LOGD(opName_, "TilingData.localMatmul: %u", alltoAllMatmulTilingData.localMatmul);
     PrintAlltoAllMatmulTilingInfo(opName_, alltoAllMatmulTilingData.alltoAllMatmulTilingInfo);
-    if (usingApaceImpl_) {
-        const auto& mm = alltoAllMatmulTilingData.apaceMmTilingData;
-        OP_LOGD(opName_, "APACE FP MM SWAT: cores=%u base=(%u,%u,%u) L1=(%u,%u,%u) stages=(%u,%u)", mm.usedCoreNum,
-                mm.baseM, mm.baseN, mm.baseK, mm.mL1, mm.nL1, mm.kL1, static_cast<uint32_t>(mm.l1BufferNum),
-                static_cast<uint32_t>(mm.l0cDB));
-        return;
-    }
     PrintMMV3TilingData(opName_, alltoAllMatmulTilingData.mc2MmV3TileTilingData);
     if (alltoAllMatmulTilingData.alltoAllMatmulTilingInfo.tailCnt == 0) {
         return;
     }
     OP_LOGD(opName_, "Matmulalltoall has tail");
     PrintMMV3TilingData(opName_, alltoAllMatmulTilingData.mc2MmV3TailTilingData);
+}
+
+void AllToAllFpMatmulTilingBase::PrintHcommFpTilingData(const Apace::HcommFpTilingData& tilingData) const
+{
+    const auto& comm = tilingData.commTilingData;
+    const auto& mm = tilingData.matmulTilingData;
+    OP_LOGD(opName_, "FP APACE HCOMM: rankDim=%u rankN=%u rankK=%u comm=(%lu,%lu,%lu,%lu) local=%u.",
+            tilingData.rankDim, mm.n, mm.k, comm.splitAxisTileSize, comm.splitAxisTileCnt, comm.splitAxisTailSize,
+            comm.splitAxisTailCnt, tilingData.localMatmul);
+    OP_LOGD(opName_, "FP APACE MM: base=(%u,%u,%u) L1=(%u,%u,%u) stages=(%u,%u).", mm.baseM, mm.baseN, mm.baseK, mm.mL1,
+            mm.nL1, mm.kL1, static_cast<uint32_t>(mm.l1BufferNum), static_cast<uint32_t>(mm.l0cDB));
 }
 
 /**

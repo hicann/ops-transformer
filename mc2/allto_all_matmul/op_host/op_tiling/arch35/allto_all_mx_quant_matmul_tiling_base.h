@@ -87,13 +87,13 @@ protected:
                                       TilingContextInfo& contextInfo);
 
     void SetTilingInfo(AlltoAllMatmulTilingInfo& tilingInfo) const;
-    void SetHcommTilingInfo(Apace::hcommAllToAllMatmulTilingData& tilingData) const;
+    void SetHcommTilingInfo(Apace::HcommQuantTilingData& tilingData) const;
     ge::graphStatus DoHcommMxQuantMMTiling();
     void PrintAlltoAllMxQuantMatmulTilingData(AlltoAllQuantMatmulTilingData& outTilingData);
 
 private:
     AlltoAllQuantMatmulTilingData localTilingData_;
-    Apace::hcommAllToAllMatmulTilingData hcommTilingData_;
+    Apace::HcommQuantTilingData hcommTilingData_;
     bool isMxFp4_ = false;
     bool isHiF4_ = false;
     bool usingApaceImpl_ = false;

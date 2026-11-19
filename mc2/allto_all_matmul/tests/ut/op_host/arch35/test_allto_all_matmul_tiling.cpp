@@ -91,6 +91,10 @@ TEST_P(AlltoAllMatmulArch35TilingTest, param)
 
     gert::TilingContextPara tilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo,
                                               param.soc);
+    if (param.case_name == "fp_apace_tiling_capacity_insufficient") {
+        constexpr uint64_t INSUFFICIENT_TILING_DATA_CAPACITY = 1U;
+        tilingContextPara.tilingDataSize_ = INSUFFICIENT_TILING_DATA_CAPACITY;
+    }
     if (param.worldSize > 0 && param.worldSize <= 64 &&
         ((param.x1QuantMode == 0 && param.x2QuantMode == 0) || (param.x1QuantMode == 6 && param.x2QuantMode == 6) ||
          (param.x1QuantMode == 8 && param.x2QuantMode == 8))) { // APACE 非量化、MX 与 HiF4 均需 mock 通信域 rank 数

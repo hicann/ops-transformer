@@ -28,8 +28,8 @@
 #if MC2_DFX_ENABLE
 // Register exception dump func
 // dump 回调按算子仅注册一次，dfxInfoOffset 取自 AlltoAllMatmulTilingData；
-// AlltoAllQuantMatmulTilingData 与 Apace::hcommAllToAllMatmulTilingData 需与其保持相同的
-// mc2InitTiling/mc2CcTiling/dumpInfo 前缀（即 dumpInfo 偏移一致），
+// AlltoAllQuantMatmulTilingData、Apace::HcommQuantTilingData 与
+// Apace::HcommFpTilingData 需保持相同的 mc2InitTiling/mc2CcTiling/dumpInfo 前缀，
 // 调整任一结构体前缀时必须同步维护该约束
 inline void AlltoAllMatmulExceptionImplWrapper(aclrtExceptionInfo* args, void* userdata)
 {

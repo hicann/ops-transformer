@@ -50,16 +50,19 @@ protected:
                                      Mc2MatMulV3TilingData& tilingData);
     ge::graphStatus SetHcclTiling();
     void SetTilingInfo(AlltoAllMatmulTilingInfo& tilingInfo) const;
+    void SetHcommFpTilingInfo(Apace::HcommFpTilingData& tilingData) const;
     // 非量化+有bias时, 选择 add_bias 节点的分核策略
     uint8_t ChooseAddBiasSplitMode() const;
 
 private:
     void PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingData& alltoAllMatmulTilingData);
+    void PrintHcommFpTilingData(const Apace::HcommFpTilingData& tilingData) const;
     void PrintAlltoAllMatmulTilingInfo(const std::string& opName, AlltoAllMatmulTilingInfo& tilingInfo);
     void PrintMMV3TilingData(const std::string& opName, Mc2MatMulV3TilingData& tiling);
 
     bool usingApaceImpl_{false};
     AlltoAllMatmulTilingData localTilingData_{};
+    Apace::HcommFpTilingData hcommFpTilingData_{};
     Mc2MatMulV3Args mmV3Args_;
     Mc2MatmulV3CompileInfo mmV3compileInfo_;
     QuantType matmulQuantType_ = QuantType::FP_QUANT;

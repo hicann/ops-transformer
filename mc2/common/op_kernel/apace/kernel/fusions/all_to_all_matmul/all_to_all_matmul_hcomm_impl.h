@@ -234,39 +234,27 @@ private:
     static constexpr uint8_t POS_COMM_BEFORE = 0U;
     static constexpr uint8_t POS_COMP_LOCAL_BEFORE = 1U;
     static constexpr uint8_t POS_COMP_REMOTE_BEFORE = 2U;
-    static constexpr uint8_t POS_FINALIZE_BEFORE = 3U;
     AlltoAllMatmulTilingDataType* tilingData_;
 
-    GM_ADDR x1_;
-    GM_ADDR x2_;
-    GM_ADDR y_;
-    GM_ADDR bias_;
-    GM_ADDR x1Scale_;
-    GM_ADDR x2Scale_;
-    GM_ADDR workspaceGM_;
-    GM_ADDR commX1ScaleGM1_;
-    GM_ADDR commOutGM_;
-    GM_ADDR permuteOutGM_{nullptr};
+    GM_ADDR x1Addr_{nullptr};
+    GM_ADDR x2Addr_{nullptr};
+    GM_ADDR yAddr_{nullptr};
+    GM_ADDR biasAddr_{nullptr};
+    GM_ADDR x1ScaleAddr_{nullptr};
+    GM_ADDR x2ScaleAddr_{nullptr};
+    GM_ADDR commX1ScaleAddr_{nullptr};
+    GM_ADDR commDataAddr_{nullptr};
+    GM_ADDR allToAllOutAddr_{nullptr};
     AscendC::TPipe* pipe_{nullptr};
 
     // Scale 通信数据类型: MX 为 E8M0; HiF4 的 hif4_scale 为完整 4 字节元数据(E6M2+E1_8+E1_16),
     // HCCL 未提供专用类型, E8M0和hif4_scale 均按 FP8E8M0 传输, 实际传输时乘数据类型
     static constexpr uint64_t scaleHcclDataType_ = AscendC::HCCL_DATA_TYPE_FP8E8M0;
     static constexpr uint64_t x1HcclDataType_ = GetX1HcclDataType<X1Type>();
-    // A common view adapts the existing FP and MX host tiling layouts.
-    struct CommTilingView {
-        uint64_t splitAxisTileSize;
-        uint64_t splitAxisTileCnt;
-        uint64_t splitAxisTailSize;
-        uint64_t splitAxisTailCnt;
-        uint64_t nonSplitAxisSize;
-    };
-    CommTilingView commTiling_{};
-    uint32_t localMatmul_{0};
+    uint32_t localMatmulStrategy_{0};
     uint32_t rankId_{0};
     uint32_t rankDim_{0};
     uint64_t splitAxisSize_{0};
-    bool isBias_{false};
 
     static constexpr uint64_t PACKED_4BIT_ELEMENTS_PER_BYTE = 2UL;
     static constexpr uint64_t ALIGN_NUM = 512UL;
@@ -282,7 +270,17 @@ private:
         }
     }
 
-    __aicore__ inline void SetupParams(Params& out, MatmulMode matmulMode);
+    __aicore__ inline uint32_t CalcSplitKNum(MatmulMode matmulMode, bool excludeLocalRank) const
+    {
+        if (matmulMode == MatmulMode::LOCAL) {
+            return 1;
+        }
+        return excludeLocalRank ? rankDim_ - 1 : rankDim_;
+    }
+
+    __aicore__ inline void SetupParams(Params& params, MatmulMode matmulMode);
+    __aicore__ inline void SetupFpParams(Params& params, MatmulMode matmulMode);
+    __aicore__ inline void SetupQuantParams(Params& params, MatmulMode matmulMode);
     __aicore__ inline void MatmulProcess(MatmulMode matmulMode);
     __aicore__ inline void WaitOutputTiles();
 
@@ -304,20 +302,9 @@ AllToAllMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMatmulTil
                                                                         AscendC::TPipe* pipe)
 {
     pipe_ = pipe;
-    if constexpr (IsFp) {
-        const auto& info = tilingData_->alltoAllMatmulTilingInfo;
-        commTiling_ = {info.tileM, info.tileCnt, info.tailM, info.tailCnt,
-                       static_cast<uint64_t>(info.rankK) * info.rankDim};
-        rankDim_ = info.rankDim;
-        localMatmul_ = tilingData_->localMatmul;
-    } else {
-        const auto& info = tilingData_->commTilingData;
-        commTiling_ = {info.splitAxisTileSize, info.splitAxisTileCnt, info.splitAxisTailSize, info.splitAxisTailCnt,
-                       info.nonSplitAxisSize};
-        rankDim_ = tilingData_->rankDim;
-        localMatmul_ = tilingData_->localMatmul;
-    }
-    auto&& commTiling = commTiling_;
+    rankDim_ = tilingData_->rankDim;
+    localMatmulStrategy_ = tilingData_->localMatmul;
+    const auto& commTiling = tilingData_->commTilingData;
     splitAxisSize_ = commTiling.splitAxisTileSize * commTiling.splitAxisTileCnt +
                      commTiling.splitAxisTailSize * commTiling.splitAxisTailCnt;
     if constexpr (EnableHcommAllToAllOut || IsFp) {
@@ -325,48 +312,44 @@ AllToAllMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMatmulTil
         commState_.nextNotifyTile_ = 0;
         commState_.acknowledgedTiles_ = 0;
     }
-    x1_ = x1;
-    x2_ = x2;
-    y_ = y;
-    bias_ = bias;
-    isBias_ = (bias != nullptr);
-    x1Scale_ = x1_scale;
-    x2Scale_ = x2_scale;
-    workspaceGM_ = workspaceGM;
+    x1Addr_ = x1;
+    x2Addr_ = x2;
+    yAddr_ = y;
+    biasAddr_ = bias;
+    x1ScaleAddr_ = x1_scale;
+    x2ScaleAddr_ = x2_scale;
     // The generated arch35 entry already passes user workspace, after the system reservation.
-    commX1ScaleGM1_ = workspaceGM;
+    commX1ScaleAddr_ = workspaceGM;
     // scale 通信空间(字节): MX 为 组数*2(E8M0)*M 行; HiF4 为 组数*4(hif4_scale)*M 行
     // 每 64 元素组 scale 单元数与单元宽度统一由 MxScaleKLen 泛化
-    uint64_t x1ScaleLen = 0;
+    uint64_t x1ScaleBytes = 0;
     if constexpr (!IsFp) {
-        x1ScaleLen = static_cast<uint64_t>(Blaze::Gemm::MxScaleKLen<X1Type>(commTiling.nonSplitAxisSize)) *
-                     splitAxisSize_ * sizeof(ScaleType);
-        x1ScaleLen = Blaze::Gemm::CeilDiv(x1ScaleLen, ALIGN_NUM) * ALIGN_NUM;
+        x1ScaleBytes = static_cast<uint64_t>(Blaze::Gemm::MxScaleKLen<X1Type>(commTiling.nonSplitAxisSize)) *
+                       splitAxisSize_ * sizeof(ScaleType);
+        x1ScaleBytes = Blaze::Gemm::CeilDiv(x1ScaleBytes, ALIGN_NUM) * ALIGN_NUM;
     }
     if constexpr (EnableHcommAllToAllOut) {
         // AIC keeps reading raw communication data while AIV writes a separate output.
-        commOutGM_ = workspaceGM + x1ScaleLen;
-        permuteOutGM_ = all2all_out;
+        commDataAddr_ = workspaceGM + x1ScaleBytes;
+        allToAllOutAddr_ = all2all_out;
     } else {
-        commOutGM_ = all2all_out;
+        commDataAddr_ = all2all_out;
         if (all2all_out == nullptr) {
-            commOutGM_ = workspaceGM + x1ScaleLen;
+            commDataAddr_ = workspaceGM + x1ScaleBytes;
         }
-        permuteOutGM_ = nullptr;
+        allToAllOutAddr_ = nullptr;
     }
     if ASCEND_IS_AIC {
 #if MC2_DFX_ENABLE
-        if constexpr (!IsFp) {
-            opStateDump_.Init(workspaceGM_, &tilingData_->dumpInfo.workspaceLayout,
-                              tilingData_->tileQbmmTilingData.usedCoreNum);
-        }
+        opStateDump_.Init(workspaceGM, &tilingData_->dumpInfo.workspaceLayout,
+                          tilingData_->matmulTilingData.usedCoreNum);
 #endif
         GetWaitPolicy().state_ = &commState_;
         if constexpr (IsFp) {
             commState_.originalM_ = splitAxisSize_;
             commState_.headTileSize_ = commTiling.splitAxisTileSize;
             commState_.tailTileSize_ = commTiling.splitAxisTailSize;
-            commState_.virtualTileM_ = tilingData_->apaceMmTilingData.baseM;
+            commState_.virtualTileM_ = tilingData_->matmulTilingData.baseM;
         }
         GetWaitPolicy().slotNum = static_cast<uint32_t>(commTiling.splitAxisTileCnt + commTiling.splitAxisTailCnt);
         commState_.hccl_.InitV2(AscendC::GetHcclContext<0>(), &(tilingData_->mc2InitTiling));
@@ -374,41 +357,41 @@ AllToAllMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMatmulTil
         rankId_ = commState_.hccl_.GetRankId();
         rankDim_ = commState_.hccl_.GetRankDim();
 
-        uint64_t originalRankForComm = commTiling.nonSplitAxisSize / rankDim_;
-        uint64_t rankForComm = originalRankForComm;
+        uint64_t elementsPerRank = commTiling.nonSplitAxisSize / rankDim_;
+        uint64_t commElementsPerRank = elementsPerRank;
         if constexpr (IsMxFp4 || isHiF4) {
             // 4-bit 打包(MXFP4/HiF4): 2 个元素共享 1 字节, 通信字节数为元素数的一半
-            rankForComm = Blaze::Gemm::CeilDiv(rankForComm, PACKED_4BIT_ELEMENTS_PER_BYTE);
+            commElementsPerRank = Blaze::Gemm::CeilDiv(commElementsPerRank, PACKED_4BIT_ELEMENTS_PER_BYTE);
         }
         // scale 每 rank 通信单元数(按 scale 元素计): MX 为 E8M0 单元(Ka/64*2), HiF4 为 UINT32 单元(Ka/64)
-        uint64_t dataStrideCount = static_cast<uint64_t>(splitAxisSize_) * rankForComm;
+        uint64_t dataStrideElements = static_cast<uint64_t>(splitAxisSize_) * commElementsPerRank;
         if constexpr (!IsFp) {
-            uint32_t scaleKPerRank = static_cast<uint32_t>(Blaze::Gemm::MxScaleKLen<X1Type>(originalRankForComm));
+            uint32_t scaleKPerRank = static_cast<uint32_t>(Blaze::Gemm::MxScaleKLen<X1Type>(elementsPerRank));
 
-            uint64_t scaleSendCount = static_cast<uint64_t>(splitAxisSize_) * scaleKPerRank;
+            uint64_t scaleSendElements = static_cast<uint64_t>(splitAxisSize_) * scaleKPerRank;
             opStateDump_.DoDump(DUMP_FIELD_STEP, POS_COMM_BEFORE, static_cast<uint8_t>(Utils::RT_PHASE_COMM_PREPARE));
             // DoDump does not count the scale commit.
             commState_.scaleHandle_ = commState_.hccl_.template AlltoAll<true>(
-                x1Scale_, commX1ScaleGM1_, scaleSendCount * static_cast<uint64_t>(sizeof(ScaleType)),
+                x1ScaleAddr_, commX1ScaleAddr_, scaleSendElements * static_cast<uint64_t>(sizeof(ScaleType)),
                 static_cast<AscendC::HcclDataType>(scaleHcclDataType_),
-                scaleSendCount * static_cast<uint64_t>(sizeof(ScaleType)), 1);
+                scaleSendElements * static_cast<uint64_t>(sizeof(ScaleType)), 1);
         }
 
         if (commTiling.splitAxisTileCnt > 0) {
-            uint64_t headSendCount = static_cast<uint64_t>(commTiling.splitAxisTileSize) * rankForComm;
+            uint64_t headSendElements = static_cast<uint64_t>(commTiling.splitAxisTileSize) * commElementsPerRank;
             commState_.dataHeadHandle_ = commState_.hccl_.template AlltoAll<true>(
-                x1_, commOutGM_, headSendCount, static_cast<AscendC::HcclDataType>(x1HcclDataType_), dataStrideCount,
-                static_cast<uint8_t>(commTiling.splitAxisTileCnt));
+                x1Addr_, commDataAddr_, headSendElements, static_cast<AscendC::HcclDataType>(x1HcclDataType_),
+                dataStrideElements, static_cast<uint8_t>(commTiling.splitAxisTileCnt));
             opStateDump_.DoDump(DUMP_FIELD_COMMIT, 0, 0, 0, commTiling.splitAxisTileCnt);
         }
 
         if (commTiling.splitAxisTailCnt > 0) {
-            uint64_t headOffset = static_cast<uint64_t>(commTiling.splitAxisTileCnt) * commTiling.splitAxisTileSize *
-                                  rankForComm * sizeof(X1Type);
-            uint64_t tailSendCount = static_cast<uint64_t>(commTiling.splitAxisTailSize) * rankForComm;
+            uint64_t headOffsetBytes = static_cast<uint64_t>(commTiling.splitAxisTileCnt) *
+                                       commTiling.splitAxisTileSize * commElementsPerRank * sizeof(X1Type);
+            uint64_t tailSendElements = static_cast<uint64_t>(commTiling.splitAxisTailSize) * commElementsPerRank;
             commState_.dataTailHandle_ = commState_.hccl_.template AlltoAll<true>(
-                x1_ + headOffset, commOutGM_ + headOffset, tailSendCount,
-                static_cast<AscendC::HcclDataType>(x1HcclDataType_), dataStrideCount,
+                x1Addr_ + headOffsetBytes, commDataAddr_ + headOffsetBytes, tailSendElements,
+                static_cast<AscendC::HcclDataType>(x1HcclDataType_), dataStrideElements,
                 static_cast<uint8_t>(commTiling.splitAxisTailCnt));
             opStateDump_.DoDump(DUMP_FIELD_COMMIT, 0, 0, 0, commTiling.splitAxisTailCnt);
         }
@@ -424,13 +407,13 @@ __aicore__ inline void AllToAllMatmulHcommImpl<X1Type, X2Type, YType, CommDataTy
 {
     if ASCEND_IS_AIC {
         if constexpr (IsFp) {
-            if (localMatmul_ == 2) {
+            if (localMatmulStrategy_ == 2) {
                 MatmulProcess(MatmulMode::LOCAL);
             }
-            const MatmulMode mode = localMatmul_ == 1 ? MatmulMode::DEFERRED_SYNC : MatmulMode::REMOTE;
-            MatmulProcess(mode);
+            const MatmulMode matmulMode = localMatmulStrategy_ == 1 ? MatmulMode::DEFERRED_SYNC : MatmulMode::REMOTE;
+            MatmulProcess(matmulMode);
         } else {
-            if (localMatmul_ != 0) {
+            if (localMatmulStrategy_ != 0) {
                 opStateDump_.DoDump(DUMP_FIELD_POSITION, POS_COMP_LOCAL_BEFORE);
                 MatmulProcess(MatmulMode::LOCAL);
             }
@@ -462,36 +445,36 @@ __aicore__ inline void
 AllToAllMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMatmulTilingDataType, ServerType, IsMxFp4,
                         TransB, EnableHcommAllToAllOut, BiasType>::WaitOutputTiles()
 {
-    auto&& commTiling = commTiling_;
+    const auto& commTiling = tilingData_->commTilingData;
     const uint64_t elementsPerRank = commTiling.nonSplitAxisSize / rankDim_;
     // 4-bit 打包场景(MXFP4/HiF4): 2 个元素共享 1 字节, 通信字节数为元素数的一半,
-    // 与 Init 中 rankForComm、tiling 中 commLen 的 (IsMxFp4 || isHiF4) 口径保持一致
+    // 与 Init 中 commElementsPerRank、tiling 中 commLen 的 (IsMxFp4 || isHiF4) 口径保持一致
     const uint64_t bytesPerRank =
         (IsMxFp4 || isHiF4) ? elementsPerRank / PACKED_4BIT_ELEMENTS_PER_BYTE : elementsPerRank * sizeof(X1Type);
     // This method is called only by AIV in the output specialization; AIC allocates no UB here.
-    AllToAllPermute permute;
+    AllToAllPermute allToAllPermute;
     // WaitOutputTiles() 在 Run() 中已被 ASCEND_IS_AIV 守护。 GetTaskRatio() 在950下配置CV核 MIX_AIC_1_2
     // 获得2，在960下配置CV核 MIX_AIC_1_1 获得1。
     const uint32_t aivWorkerCount =
         static_cast<uint32_t>(AscendC::GetBlockNum()) * static_cast<uint32_t>(AscendC::GetTaskRatio());
-    permute.Init(commOutGM_, permuteOutGM_, splitAxisSize_, rankDim_, bytesPerRank,
-                 static_cast<uint32_t>(AscendC::GetBlockIdx()), aivWorkerCount, pipe_);
+    allToAllPermute.Init(commDataAddr_, allToAllOutAddr_, splitAxisSize_, rankDim_, bytesPerRank,
+                         static_cast<uint32_t>(AscendC::GetBlockIdx()), aivWorkerCount, pipe_);
     for (uint32_t tileIdx = 0; tileIdx < commState_.totalTileCnt_; ++tileIdx) {
         AscendC::CrossCoreWaitFlag(HCOMM_DATA_READY_FLAG);
-        const bool isHead = tileIdx < commTiling.splitAxisTileCnt;
-        const uint64_t rowCount = isHead ? commTiling.splitAxisTileSize : commTiling.splitAxisTailSize;
+        const bool isHeadTile = tileIdx < commTiling.splitAxisTileCnt;
+        const uint64_t rowCount = isHeadTile ? commTiling.splitAxisTileSize : commTiling.splitAxisTailSize;
         const uint64_t rowStart =
-            isHead ? static_cast<uint64_t>(tileIdx) * commTiling.splitAxisTileSize :
-                     static_cast<uint64_t>(commTiling.splitAxisTileCnt) * commTiling.splitAxisTileSize +
-                         (tileIdx - commTiling.splitAxisTileCnt) * commTiling.splitAxisTailSize;
+            isHeadTile ? static_cast<uint64_t>(tileIdx) * commTiling.splitAxisTileSize :
+                         static_cast<uint64_t>(commTiling.splitAxisTileCnt) * commTiling.splitAxisTileSize +
+                             (tileIdx - commTiling.splitAxisTileCnt) * commTiling.splitAxisTailSize;
         // AlltoAll's recv contract includes self rank. Keep matmul's original local-x1 path unchanged.
-        permute.CopyTile(rowStart, rowCount);
+        allToAllPermute.CopyTile(rowStart, rowCount);
         // Idle AIVs still participate in every notification and window ACK.
         if ((tileIdx + 1) % HCOMM_NOTIFY_WINDOW == 0 || tileIdx + 1 == commState_.totalTileCnt_) {
             AscendC::CrossCoreSetFlag<2, PIPE_MTE3>(HCOMM_WINDOW_ACK_FLAG);
         }
     }
-    permute.Finish();
+    allToAllPermute.Finish();
 }
 
 template <typename X1Type, typename X2Type, typename YType, typename CommDataTypeX1,
@@ -499,96 +482,95 @@ template <typename X1Type, typename X2Type, typename YType, typename CommDataTyp
           bool EnableHcommAllToAllOut, typename BiasType>
 __aicore__ inline void
 AllToAllMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMatmulTilingDataType, ServerType, IsMxFp4,
-                        TransB, EnableHcommAllToAllOut, BiasType>::SetupParams(Params& out, MatmulMode matmulMode)
+                        TransB, EnableHcommAllToAllOut, BiasType>::SetupParams(Params& params, MatmulMode matmulMode)
 {
     if constexpr (IsFp) {
-        const auto& info = tilingData_->alltoAllMatmulTilingInfo;
-        const auto& fpTile = tilingData_->apaceMmTilingData;
-        out = {};
-        out.problemShape = ProblemShape{static_cast<int64_t>(splitAxisSize_), info.rankN, info.rankK, 1L};
-        auto& mm = out.mmadParams;
-        mm.aGmAddr = commOutGM_;
-        mm.bGmAddr = x2_;
-        mm.cGmAddr = y_;
-        // Match AddMM/MX split-K semantics: load bias on splitKIdx == 0 and accumulate all K fragments in L0C.
-        mm.biasGmAddr = bias_;
-        mm.mL1 = fpTile.mL1;
-        mm.mL0 = fpTile.baseM;
-        mm.nL1 = fpTile.nL1;
-        mm.nL0 = fpTile.baseN;
-        mm.kL0 = fpTile.baseK;
-        mm.kL1 = fpTile.kL1;
-        mm.l1Stages = fpTile.l1BufferNum;
-        mm.l0cStages = fpTile.l0cDB;
-        if (matmulMode == MatmulMode::LOCAL) {
-            mm.splitKNum = 1;
-        } else if (localMatmul_ == 2) {
-            mm.splitKNum = rankDim_ - 1;
-        } else {
-            mm.splitKNum = rankDim_;
-        }
-        auto& sch = out.schParams;
-        sch.mL1 = mm.mL1;
-        sch.baseM = mm.mL0;
-        sch.nL1 = mm.nL1;
-        sch.baseN = mm.nL0;
-        sch.kL1 = mm.kL1;
-        sch.baseK = mm.kL0;
-        sch.mTailCnt = fpTile.mTailCnt;
-        sch.nTailCnt = fpTile.nTailCnt;
-        sch.mBaseTailSplitCnt = fpTile.mBaseTailSplitCnt;
-        sch.nBaseTailSplitCnt = fpTile.nBaseTailSplitCnt;
-        sch.mTailMain = fpTile.mTailMain;
-        sch.nTailMain = fpTile.nTailMain;
-        sch.windowLen = 1;
-        out.mmTiling = {mm.mL0, mm.nL0, mm.kL0, mm.l0cStages};
-        // localMatmul is host-selected: 0 uses deterministic all-rank REMOTE, 1 uses DEFERRED_SYNC,
-        // and 2 computes LOCAL first and accumulates the remaining ranks through REMOTE.
-        out.localParams = {rankId_, rankDim_, splitAxisSize_, x1_, localMatmul_, matmulMode, fpTile.baseM};
+        SetupFpParams(params, matmulMode);
     } else {
-        using L1Params = typename MatmulKernelImpl::L1Params;
-        using QBMMTiling = typename MatmulKernelImpl::QBMMTiling;
-        auto&& commTiling = commTiling_;
-        const auto& mmTile = tilingData_->tileQbmmTilingData;
-
-        ProblemShape problemShape{mmTile.m, mmTile.n, mmTile.k, 1UL};
-
-        BlockMmadParams mmadParams;
-        mmadParams.aGmAddr = commOutGM_;
-        mmadParams.scaleAGmAddr = commX1ScaleGM1_;
-        mmadParams.bGmAddr = x2_;
-        mmadParams.scaleBGmAddr = x2Scale_;
-        mmadParams.cGmAddr = y_;
-        mmadParams.biasGmAddr = bias_;
-
-        uint32_t splitKNum;
-        if (matmulMode == MatmulMode::LOCAL) {
-            splitKNum = 1;
-        } else if (localMatmul_ != 0) {
-            splitKNum = rankDim_ - 1;
-        } else {
-            splitKNum = rankDim_;
-        }
-
-        LocalParams localParams{rankId_,   rankDim_,   splitAxisSize_,
-                                x1_,       x1Scale_,   localMatmul_,
-                                splitKNum, matmulMode, static_cast<uint32_t>(commTiling.splitAxisTileSize)};
-
-        L1Params l1Params{static_cast<uint64_t>(mmTile.stepK) * mmTile.baseK, mmTile.scaleKL1, mmTile.nBufferNum};
-
-        BlockSchedulerParams schedulerParams{mmTile.baseM,
-                                             mmTile.baseN,
-                                             mmTile.mTailTile,
-                                             mmTile.nTailTile,
-                                             mmTile.mBaseTailSplitCnt,
-                                             mmTile.nBaseTailSplitCnt,
-                                             mmTile.mTailMain,
-                                             mmTile.nTailMain};
-
-        QBMMTiling qbmmParams{mmTile.baseM, mmTile.baseN, mmTile.baseK, mmTile.dbL0c, isBias_};
-
-        out = {problemShape, mmadParams, l1Params, schedulerParams, qbmmParams, localParams};
+        SetupQuantParams(params, matmulMode);
     }
+}
+
+template <typename X1Type, typename X2Type, typename YType, typename CommDataTypeX1,
+          typename AlltoAllMatmulTilingDataType, AscendC::HcclServerType ServerType, bool IsMxFp4, bool TransB,
+          bool EnableHcommAllToAllOut, typename BiasType>
+__aicore__ inline void
+AllToAllMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMatmulTilingDataType, ServerType, IsMxFp4,
+                        TransB, EnableHcommAllToAllOut, BiasType>::SetupFpParams(Params& params, MatmulMode matmulMode)
+{
+    const auto& fpTile = tilingData_->matmulTilingData;
+    params = {};
+    params.problemShape = ProblemShape{static_cast<int64_t>(splitAxisSize_), fpTile.n, fpTile.k, 1L};
+    auto& mmadParams = params.mmadParams;
+    mmadParams.aGmAddr = commDataAddr_;
+    mmadParams.bGmAddr = x2Addr_;
+    mmadParams.cGmAddr = yAddr_;
+    mmadParams.biasGmAddr = biasAddr_;
+    mmadParams.mL1 = fpTile.mL1;
+    mmadParams.mL0 = fpTile.baseM;
+    mmadParams.nL1 = fpTile.nL1;
+    mmadParams.nL0 = fpTile.baseN;
+    mmadParams.kL0 = fpTile.baseK;
+    mmadParams.kL1 = fpTile.kL1;
+    mmadParams.l1Stages = fpTile.l1BufferNum;
+    mmadParams.l0cStages = fpTile.l0cDB;
+    mmadParams.splitKNum = CalcSplitKNum(matmulMode, localMatmulStrategy_ == 2);
+
+    auto& schedulerParams = params.schParams;
+    schedulerParams.mL1 = mmadParams.mL1;
+    schedulerParams.baseM = mmadParams.mL0;
+    schedulerParams.nL1 = mmadParams.nL1;
+    schedulerParams.baseN = mmadParams.nL0;
+    schedulerParams.kL1 = mmadParams.kL1;
+    schedulerParams.baseK = mmadParams.kL0;
+    schedulerParams.mTailCnt = fpTile.mTailCnt;
+    schedulerParams.nTailCnt = fpTile.nTailCnt;
+    schedulerParams.mBaseTailSplitCnt = fpTile.mBaseTailSplitCnt;
+    schedulerParams.nBaseTailSplitCnt = fpTile.nBaseTailSplitCnt;
+    schedulerParams.mTailMain = fpTile.mTailMain;
+    schedulerParams.nTailMain = fpTile.nTailMain;
+    schedulerParams.windowLen = 1;
+    params.mmTiling = {mmadParams.mL0, mmadParams.nL0, mmadParams.kL0, mmadParams.l0cStages};
+    // AllToAllMmKernel produces a virtual Matmul tile index; WaitTile maps it to the actual HCOMM tile.
+    params.localParams = {rankId_, rankDim_, splitAxisSize_, x1Addr_, localMatmulStrategy_, matmulMode, fpTile.baseM};
+}
+
+template <typename X1Type, typename X2Type, typename YType, typename CommDataTypeX1,
+          typename AlltoAllMatmulTilingDataType, AscendC::HcclServerType ServerType, bool IsMxFp4, bool TransB,
+          bool EnableHcommAllToAllOut, typename BiasType>
+__aicore__ inline void AllToAllMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMatmulTilingDataType,
+                                               ServerType, IsMxFp4, TransB, EnableHcommAllToAllOut,
+                                               BiasType>::SetupQuantParams(Params& params, MatmulMode matmulMode)
+{
+    using L1Params = typename MatmulKernelImpl::L1Params;
+    using QBMMTiling = typename MatmulKernelImpl::QBMMTiling;
+    const auto& commTiling = tilingData_->commTilingData;
+    const auto& mmTile = tilingData_->matmulTilingData;
+    ProblemShape problemShape{mmTile.m, mmTile.n, mmTile.k, 1UL};
+
+    BlockMmadParams mmadParams;
+    mmadParams.aGmAddr = commDataAddr_;
+    mmadParams.bGmAddr = x2Addr_;
+    mmadParams.cGmAddr = yAddr_;
+    mmadParams.biasGmAddr = biasAddr_;
+    mmadParams.scaleAGmAddr = commX1ScaleAddr_;
+    mmadParams.scaleBGmAddr = x2ScaleAddr_;
+
+    const uint32_t splitKNum = CalcSplitKNum(matmulMode, localMatmulStrategy_ != 0);
+    LocalParams localParams{rankId_,   rankDim_,     splitAxisSize_,
+                            x1Addr_,   x1ScaleAddr_, localMatmulStrategy_,
+                            splitKNum, matmulMode,   static_cast<uint32_t>(commTiling.splitAxisTileSize)};
+    L1Params l1Params{static_cast<uint64_t>(mmTile.stepK) * mmTile.baseK, mmTile.scaleKL1, mmTile.nBufferNum};
+    BlockSchedulerParams schedulerParams{mmTile.baseM,
+                                         mmTile.baseN,
+                                         mmTile.mTailTile,
+                                         mmTile.nTailTile,
+                                         mmTile.mBaseTailSplitCnt,
+                                         mmTile.nBaseTailSplitCnt,
+                                         mmTile.mTailMain,
+                                         mmTile.nTailMain};
+    QBMMTiling qbmmParams{mmTile.baseM, mmTile.baseN, mmTile.baseK, mmTile.dbL0c, biasAddr_ != nullptr};
+    params = {problemShape, mmadParams, l1Params, schedulerParams, qbmmParams, localParams};
 }
 
 template <typename X1Type, typename X2Type, typename YType, typename CommDataTypeX1,
