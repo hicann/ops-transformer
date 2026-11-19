@@ -11,6 +11,7 @@
 #define OPS_TRANSFORMER_MHC_MEGA_MHC_PRE_H
 
 #include "rms_norm_common.h"
+#include "mega_mhc_sinkhorn.h"
 
 namespace MegaMhc::Compute {
 constexpr uint32_t kVectorSegmentsPerPair = 2U;
@@ -224,10 +225,12 @@ __aicore__ inline void NormalizeProjectionRows(__ubuf__ float* partial, __ubuf__
 /** Compute gates from packed [pre:4, post:4, res:16]: logits=alpha[branch]*normalized+bias;
  * pre=sigmoid(logits[0:4])+eps; post=hc_post_scale*sigmoid(logits[4:8]); res=logits[8:24].
  * This produces current pre coefficients; external shifted_prev_mix uses a separate caller-owned UB plane.
- * Keep separate Mul/Add rounding. Output planes are [pre:4*alignedRows, post:4*alignedRows, res:16*alignedRows]. */
+ * Keep separate Mul/Add rounding. Output planes are [pre:4*alignedRows, post:4*alignedRows, res:16*alignedRows].
+ * Sinkhorn, when enabled, normalizes only the Res plane before the caller publishes the coefficients. */
 __aicore__ inline void ComputeGateRows(__ubuf__ float* normalized, __ubuf__ float* alpha, __ubuf__ float* bias,
                                        float eps, float hcPostScale, uint32_t rows, uint32_t rowStride,
-                                       uint32_t alignedRows, __ubuf__ float* coefficients)
+                                       uint32_t alignedRows, __ubuf__ float* coefficients, float sinkhornEps = 1.0e-6f,
+                                       uint32_t sinkhornIters = 0U)
 {
     const uint16_t rowCount = static_cast<uint16_t>(rows);
     __VEC_SCOPE__
@@ -270,6 +273,7 @@ __aicore__ inline void ComputeGateRows(__ubuf__ float* normalized, __ubuf__ floa
             Reg::Store<float>(preRow, gate, kHeadCount);
         }
     }
+    ComputeSinkhorn4x4Rows(coefficients + alignedRows * kGateGroupElements, rows, sinkhornEps, sinkhornIters);
 }
 
 /** Mix four heads: hIn[d]=Cast<T>(sum_n hPre[n]*FP32(x2[n,d])).

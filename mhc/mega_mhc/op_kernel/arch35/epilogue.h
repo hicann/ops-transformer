@@ -171,7 +171,8 @@ __aicore__ inline void PrepareEpilogueRows(Kernel::Tensors<T>& tensors, const Me
     Compute::ComputeGateRows(
         reinterpret_cast<__ubuf__ float*>(partial.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(alpha.GetPhyAddr()),
         reinterpret_cast<__ubuf__ float*>(bias.GetPhyAddr()), tiling.hcEps, tiling.hcPostScale, rows, tiling.nzN,
-        tiling.reduceRowsAligned, reinterpret_cast<__ubuf__ float*>(coefficients.GetPhyAddr()));
+        tiling.reduceRowsAligned, reinterpret_cast<__ubuf__ float*>(coefficients.GetPhyAddr()), tiling.sinkhornEps,
+        tiling.numSinkhornIters);
     if constexpr (ASYNC_COEFFICIENTS) {
         SetFlag<HardEvent::V_MTE3>(EVENT_ID3);
         WaitFlag<HardEvent::V_MTE3>(EVENT_ID3);
@@ -589,7 +590,8 @@ __aicore__ inline void PrepareBsCompactEpilogueRows(Kernel::Tensors<T>& tensors,
     Compute::ComputeGateRows(
         reinterpret_cast<__ubuf__ float*>(partial.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(alpha.GetPhyAddr()),
         reinterpret_cast<__ubuf__ float*>(bias.GetPhyAddr()), tiling.hcEps, tiling.hcPostScale, rows, tiling.nzN,
-        tiling.reduceRowsAligned, reinterpret_cast<__ubuf__ float*>(coefficients.GetPhyAddr()));
+        tiling.reduceRowsAligned, reinterpret_cast<__ubuf__ float*>(coefficients.GetPhyAddr()), tiling.sinkhornEps,
+        tiling.numSinkhornIters);
     // Both disjoint coefficient ranges share one Vector-to-MTE3 handoff and completion.
     SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);

@@ -496,9 +496,11 @@ ge::graphStatus MegaMhcTiling::ParseInputsAndAttributes()
         return ge::GRAPH_FAILED;
     }
     hcPostScale_ = postScale == nullptr ? kDefaultHcPostScale : *postScale;
+    sinkhornEps_ = sinkhornEps == nullptr ? kDefaultEpsilon : *sinkhornEps;
+    const int64_t iterations = sinkhornIters == nullptr ? 0 : *sinkhornIters;
     if ((hcMult != nullptr && *hcMult != kRequiredHcMultiplier) || !std::isfinite(hcPostScale_) ||
-        (sinkhornEps != nullptr && *sinkhornEps != kDefaultEpsilon) ||
-        (sinkhornIters != nullptr && *sinkhornIters != 0) || (rmsScale != nullptr && *rmsScale != 1.0f)) {
+        !std::isfinite(sinkhornEps_) || sinkhornEps_ <= 0.0f || (iterations != 0 && iterations != 20) ||
+        (rmsScale != nullptr && *rmsScale != 1.0f)) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
             context_->GetNodeName(), "hc_mult, hc_post_scale, sinkhorn_eps, num_sinkhorn_iters, rms_norm_scale",
             (std::to_string(hcMult == nullptr ? kRequiredHcMultiplier : *hcMult) + ", " + std::to_string(hcPostScale_) +
@@ -506,9 +508,11 @@ ge::graphStatus MegaMhcTiling::ParseInputsAndAttributes()
              std::to_string(sinkhornIters == nullptr ? 0 : *sinkhornIters) + ", " +
              std::to_string(rmsScale == nullptr ? 1.0f : *rmsScale))
                 .c_str(),
-            "hc_mult must be 4, hc_post_scale finite, and reserved attributes must retain defaults 1e-6, 0 and 1");
+            "hc_mult must be 4, hc_post_scale finite, sinkhorn_eps finite and positive, "
+            "num_sinkhorn_iters must be 0 or 20, and rms_norm_scale must be 1");
         return ge::GRAPH_FAILED;
     }
+    numSinkhornIters_ = static_cast<uint32_t>(iterations);
     normEps_ = normEps == nullptr ? kDefaultEpsilon : *normEps;
     mhcPreNormEps_ = mhcPreNormEps == nullptr ? kDefaultEpsilon : *mhcPreNormEps;
     hcEps_ = hcEps == nullptr ? kDefaultEpsilon : *hcEps;
@@ -659,6 +663,8 @@ ge::graphStatus MegaMhcTiling::DoOpTiling()
     tilingData_.set_mhcPreNormEps(mhcPreNormEps_);
     tilingData_.set_hcEps(hcEps_);
     tilingData_.set_hcPostScale(hcPostScale_);
+    tilingData_.set_sinkhornEps(sinkhornEps_);
+    tilingData_.set_numSinkhornIters(numSinkhornIters_);
     FillCubeTilingData();
     const uint32_t waveProducerRows = request.wavePipeline ? cubeTiling_.mTile / (cubeTiling_.kGrid * kAivPerAic) : 0U;
     const uint32_t waveTileCount = cubeTiling_.lastKCoreL1FullLoops;

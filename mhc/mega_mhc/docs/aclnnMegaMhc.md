@@ -115,15 +115,15 @@
 
      传入的`shifted_prev_mix`不再经过上述Pre分支的Sigmoid和`hc_pre_eps`处理；它仅替换加权合并所用的`pre_mix`，不改变Post、Res分支系数的生成。合并结果`h_in`仍在第5阶段执行`rms_norm_1`。本次`pre_mix`与外部`shifted_prev_mix`使用独立UB区域；外部系数可提前载入，本次系数写回后，其UB区域方可再次生成新值。
 
-     MhcPre算子的Res分支Sinkhorn归一化阶段（预留功能）
+     MhcPre算子的Res分支Sinkhorn归一化阶段
 
-     令$L=num\_sinkhorn\_iters$。当前版本仅支持$L=0$，直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或Sinkhorn归一化：
+     令$L=num\_sinkhorn\_iters$。当前版本支持$L=0$或$L=20$。$L=0$时直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或Sinkhorn归一化：
 
      $$
      new\_comb\_res\_mix=comb\_logits.
      $$
 
-     以下$L>0$的计算为预留功能，当前版本不支持。对每个token的$N\times N$矩阵独立计算，第一次迭代先沿最后一维执行softmax，再执行列归一化：
+     当$L=20$时，执行20次Sinkhorn迭代，不进行动态收敛判定或提前退出。对每个token的$N\times N$矩阵独立计算，第一次迭代先沿最后一维执行softmax，再执行列归一化：
 
      $$
      \begin{aligned}
@@ -132,7 +132,7 @@
      \end{aligned}
      $$
 
-     随后对$r=1,\ldots,L-1$依次执行行归一化和列归一化：
+     随后再执行19次迭代（$r=1,\ldots,L-1$），每次依次执行行归一化和列归一化：
 
      $$
      \begin{aligned}
@@ -142,7 +142,7 @@
      \end{aligned}
      $$
 
-     其中$i$为行索引，$j$为列索引；$L=1$时直接输出$H^{(0)}$。`sinkhorn_eps`仅用于上述Sinkhorn计算，与MhcPre算子的Pre分支Sigmoid阶段的`hc_pre_eps`及均方根归一化阶段的`hc_norm_eps`分别独立。
+     其中$i$为行索引，$j$为列索引；当前支持的非零迭代数为20。`sinkhorn_eps`仅用于上述Sinkhorn计算，与MhcPre算子的Pre分支Sigmoid阶段的`hc_pre_eps`及均方根归一化阶段的`hc_norm_eps`分别独立。
 
   5. 执行RmsNorm算子功能，对加权合并结果进行均方根归一化，简称rms_norm_1阶段。
 
@@ -394,8 +394,8 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>sinkhornEps（double）</td>
     <td>输入</td>
-    <td>预留参数。</td>
-    <td>本版仅支持1e-6。</td>
+    <td>Sinkhorn归一化的epsilon。</td>
+    <td>转换为FLOAT32后须有限且大于0，默认值为1e-6。</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -404,8 +404,8 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>numSinkhornIters（int64_t）</td>
     <td>输入</td>
-    <td>预留参数。</td>
-    <td>本版仅支持0。</td>
+    <td>Sinkhorn迭代次数。</td>
+    <td>默认值为0，仅支持0或20。0不执行Sinkhorn迭代并输出logits；20表示执行20次Sinkhorn迭代后输出归一化结果。</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -454,7 +454,7 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>newCombResMixOut（aclTensor*）</td>
     <td>输出</td>
-    <td>MhcPre算子的Res分支系数生成阶段的新系数，对应公式中的new_comb_res_mix；本版仅输出comb_logits。</td>
+    <td>MhcPre算子的Res分支系数生成阶段的新系数，对应公式中的new_comb_res_mix；迭代次数为0时输出comb_logits，为20时输出执行20次Sinkhorn迭代后的归一化结果。</td>
     <td>不支持空Tensor。</td>
     <td>FLOAT32</td>
     <td>ND</td>
@@ -546,7 +546,7 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>ACLNN_ERR_PARAM_INVALID</td>
     <td>161002</td>
-    <td>数据类型、格式、shape或输出布局不符合参数规格；系数最后一维不为1；hcMult不为4；opImplMode不为0或1；预留参数numSinkhornIters不为0或sinkhornEps不为1e-6；参与计算的epsilon转换为FLOAT32后非有限或不大于0；hcPostScale转换为FLOAT32后非有限；预留参数rmsNormScale不为1.0；outputMode不为0（1、2为预留取值，其他值非法）；yQuantOut或yScaleOut非空；shiftedPrevMixOptional为空时newPrevMixOut非空。</td>
+    <td>数据类型、格式、shape或输出布局不符合参数规格；系数最后一维不为1；hcMult不为4；opImplMode不为0或1；numSinkhornIters不为0或20；sinkhornEps转换为FLOAT32后非有限或不大于0；参与计算的epsilon转换为FLOAT32后非有限或不大于0；hcPostScale转换为FLOAT32后非有限；预留参数rmsNormScale不为1.0；outputMode不为0（1、2为预留取值，其他值非法）；yQuantOut或yScaleOut非空；shiftedPrevMixOptional为空时newPrevMixOut非空。</td>
   </tr>
   </tbody>
   </table>

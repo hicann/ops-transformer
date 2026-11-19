@@ -118,7 +118,8 @@ aclnnStatus CheckContract(const Inputs& inputs, const Outputs& outputs, double n
             CHECK_RET(outputs[index] == nullptr, ACLNN_ERR_PARAM_INVALID);
         }
     }
-    CHECK_RET(hcMult == HEADS && numSinkhornIters == 0 && static_cast<float>(sinkhornEps) == 1.0e-6f &&
+    CHECK_RET(hcMult == HEADS && (numSinkhornIters == 0 || numSinkhornIters == 20) &&
+                  std::isfinite(static_cast<float>(sinkhornEps)) && static_cast<float>(sinkhornEps) > 0.0f &&
                   rmsNormScale == 1.0 && std::isfinite(static_cast<float>(hcPostScale)),
               ACLNN_ERR_PARAM_INVALID);
     const float norm = static_cast<float>(normEps);

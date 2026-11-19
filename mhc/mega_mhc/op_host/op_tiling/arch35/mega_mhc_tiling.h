@@ -64,6 +64,8 @@ private:
     float normEps_ = 1.0e-6f;
     float hcPostScale_ = 2.0f;
     float hcEps_ = 1.0e-6f;
+    float sinkhornEps_ = 1.0e-6f;
+    uint32_t numSinkhornIters_ = 0U;
     uint64_t workspaceBytes_ = 0;
 };
 } // namespace optiling

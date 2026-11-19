@@ -536,7 +536,7 @@ gert::TilingContextPara::TensorDescription MakeTensor(const std::vector<int64_t>
 }
 
 gert::TilingContextPara MakeContext(int64_t rows, int64_t d, bool mid, int64_t mode, ge::DataType type = ge::DT_FLOAT16,
-                                    int64_t outputMode = 0)
+                                    int64_t outputMode = 0, int64_t sinkhornIters = 0, float sinkhornEps = 1.0e-6f)
 {
     using Ops::Transformer::AnyValue;
     std::vector<gert::TilingContextPara::TensorDescription> inputs{
@@ -558,16 +558,17 @@ gert::TilingContextPara MakeContext(int64_t rows, int64_t d, bool mid, int64_t m
                                                                     MakeTensor({rows, d}, type),
                                                                     MakeTensor({0}, ge::DT_FLOAT8_E4M3FN),
                                                                     MakeTensor({0}, ge::DT_FLOAT8_E8M0)};
-    std::vector<gert::TilingContextPara::OpAttr> attrs{{"rms_norm_eps", AnyValue::CreateFrom<float>(1e-6f)},
-                                                       {"hc_norm_eps", AnyValue::CreateFrom<float>(1e-6f)},
-                                                       {"hc_pre_eps", AnyValue::CreateFrom<float>(1e-6f)},
-                                                       {"op_impl_mode", AnyValue::CreateFrom<int64_t>(mode)},
-                                                       {"hc_mult", AnyValue::CreateFrom<int64_t>(4)},
-                                                       {"hc_post_scale", AnyValue::CreateFrom<float>(2.0f)},
-                                                       {"sinkhorn_eps", AnyValue::CreateFrom<float>(1e-6f)},
-                                                       {"num_sinkhorn_iters", AnyValue::CreateFrom<int64_t>(0)},
-                                                       {"rms_norm_scale", AnyValue::CreateFrom<float>(1.0f)},
-                                                       {"output_mode", AnyValue::CreateFrom<int64_t>(outputMode)}};
+    std::vector<gert::TilingContextPara::OpAttr> attrs{
+        {"rms_norm_eps", AnyValue::CreateFrom<float>(1e-6f)},
+        {"hc_norm_eps", AnyValue::CreateFrom<float>(1e-6f)},
+        {"hc_pre_eps", AnyValue::CreateFrom<float>(1e-6f)},
+        {"op_impl_mode", AnyValue::CreateFrom<int64_t>(mode)},
+        {"hc_mult", AnyValue::CreateFrom<int64_t>(4)},
+        {"hc_post_scale", AnyValue::CreateFrom<float>(2.0f)},
+        {"sinkhorn_eps", AnyValue::CreateFrom<float>(sinkhornEps)},
+        {"num_sinkhorn_iters", AnyValue::CreateFrom<int64_t>(sinkhornIters)},
+        {"rms_norm_scale", AnyValue::CreateFrom<float>(1.0f)},
+        {"output_mode", AnyValue::CreateFrom<int64_t>(outputMode)}};
     const std::string soc = R"({"hardware_info":{"UB_SIZE":253952,"L1_SIZE":524288,"L0A_SIZE":65536,)"
                             R"("L0B_SIZE":65536,"L0C_SIZE":262144,"L2_SIZE":33554432,"CORE_NUM":32,"cube_core_cnt":32,)"
                             R"("vector_core_cnt":64,"socVersion":"Ascend950","load3d_constraints":"1",)"
@@ -612,6 +613,27 @@ TEST(MegaMhcTiling, Bf16DimensionTails)
         TilingInfo info;
         EXPECT_TRUE(ExecuteTiling(MakeContext(33, d, true, 1, ge::DT_BF16), info));
     }
+}
+
+TEST(MegaMhcTiling, SinkhornAttributesAreSerializedAndValidated)
+{
+    for (int64_t iterations : {int64_t{0}, int64_t{20}}) {
+        TilingInfo info;
+        ASSERT_TRUE(ExecuteTiling(MakeContext(33, 2560, false, 1, ge::DT_BF16, 0, iterations, 1.0e-5f), info));
+        // The two new fields follow T/D/K and the four existing FP32 attributes.
+        float epsilon = 0.0f;
+        uint32_t count = 0U;
+        ASSERT_EQ(memcpy_s(&epsilon, sizeof(epsilon), info.tilingData.get() + 7U * sizeof(uint32_t), sizeof(epsilon)),
+                  EOK);
+        ASSERT_EQ(memcpy_s(&count, sizeof(count), info.tilingData.get() + 8U * sizeof(uint32_t), sizeof(count)), EOK);
+        EXPECT_FLOAT_EQ(epsilon, 1.0e-5f);
+        EXPECT_EQ(count, iterations);
+        EXPECT_EQ(info.tilingDataSize % sizeof(uint64_t), 0U);
+    }
+    for (int64_t iterations : {-1, 1, 19, 21}) {
+        ExecuteTestCase(MakeContext(16, 2560, false, 0, ge::DT_FLOAT16, 0, iterations), ge::GRAPH_FAILED);
+    }
+    ExecuteTestCase(MakeContext(16, 2560, false, 0, ge::DT_FLOAT16, 0, 20, 0.0f), ge::GRAPH_FAILED);
 }
 
 TEST(MegaMhcTiling, RejectInvalidContract)

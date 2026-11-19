@@ -41,6 +41,8 @@ class MegaMhcTestSpec:
         hc_norm_eps=1e-6,
         hc_pre_eps=1e-6,
         hc_post_scale=2.0,
+        sinkhorn_eps=1e-6,
+        num_sinkhorn_iters=0,
         golden_activation_dtype=None,
         **kwargs,
     ):
@@ -86,6 +88,14 @@ class MegaMhcTestSpec:
         pre = (sigmoid[:, :4] + np.float32(hc_pre_eps)).reshape(*leading, 4, 1)
         post = (sigmoid[:, 4:8] * np.float32(hc_post_scale)).reshape(*leading, 4, 1)
         comb = logits[:, 8:24].reshape(*leading, 4, 4)
+        if num_sinkhorn_iters > 0:
+            exponential = np.exp(comb - np.max(comb, axis=-1, keepdims=True))
+            comb = exponential / np.sum(exponential, axis=-1, keepdims=True)
+            comb += np.float32(sinkhorn_eps)
+            comb /= np.sum(comb, axis=-2, keepdims=True) + np.float32(sinkhorn_eps)
+            for _ in range(1, num_sinkhorn_iters):
+                comb /= np.sum(comb, axis=-1, keepdims=True) + np.float32(sinkhorn_eps)
+                comb /= np.sum(comb, axis=-2, keepdims=True) + np.float32(sinkhorn_eps)
         weights = pre if shifted_prev_mix is None else shifted_prev_mix
         h_in = np.sum(
             weights.astype(np.float32) * x2.astype(np.float32), axis=-2

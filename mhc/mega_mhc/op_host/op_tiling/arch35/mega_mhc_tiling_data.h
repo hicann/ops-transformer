@@ -22,6 +22,8 @@ TILING_DATA_FIELD_DEF(float, normEps);
 TILING_DATA_FIELD_DEF(float, mhcPreNormEps);
 TILING_DATA_FIELD_DEF(float, hcEps);
 TILING_DATA_FIELD_DEF(float, hcPostScale);
+TILING_DATA_FIELD_DEF(float, sinkhornEps);
+TILING_DATA_FIELD_DEF(uint32_t, numSinkhornIters);
 
 TILING_DATA_FIELD_DEF(uint32_t, activeAiv);
 TILING_DATA_FIELD_DEF(uint32_t, kGrid);

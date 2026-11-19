@@ -108,15 +108,15 @@ English | [简体中文](./README.md)
 
      The supplied `shifted_prev_mix` values do not pass through the Pre branch's Sigmoid or `hc_pre_eps` addition. They replace only the `pre_mix` used by the weighted merge; the Post and Res branches still generate their coefficients. The merged `h_in` still passes through `rms_norm_1` in stage 5. The current `pre_mix` and external `shifted_prev_mix` occupy separate UB regions. External coefficients can be prefetched, and the current coefficient region can be overwritten only after its output transfer completes.
 
-     Sinkhorn normalization stage of the Res branch of the MhcPre operator (reserved function)
+     Sinkhorn normalization stage of the Res branch of the MhcPre operator
 
-     Let $L=num\_sinkhorn\_iters$. This version supports only $L=0$, which directly returns the logits of the coefficient generation stage of the Res branch of the MhcPre operator without exponential transformation or Sinkhorn normalization:
+     Let $L=num\_sinkhorn\_iters$. This version supports $L=0$ or $L=20$. When $L=0$, it directly returns the logits of the coefficient generation stage of the Res branch of the MhcPre operator without exponential transformation or Sinkhorn normalization:
 
      $$
      new\_comb\_res\_mix=comb\_logits.
      $$
 
-     The following computation for $L>0$ is reserved and is not supported in this version. It operates independently on the $N\times N$ matrix of each token. In the first iteration, softmax is performed along the last dimension first, and then column normalization is performed:
+     When $L=20$, 20 Sinkhorn iterations are performed without dynamic convergence checking or early termination. Each token's $N\times N$ matrix is processed independently. In the first iteration, softmax is performed along the last dimension first, and then column normalization is performed:
 
      $$
      \begin{aligned}
@@ -125,7 +125,7 @@ English | [简体中文](./README.md)
      \end{aligned}
      $$
 
-     Then, row normalization and column normalization are performed in sequence for $r=1,\ldots,L-1$:
+     The remaining 19 iterations ($r=1,\ldots,L-1$) each perform row normalization followed by column normalization:
 
      $$
      \begin{aligned}
@@ -135,7 +135,7 @@ English | [简体中文](./README.md)
      \end{aligned}
      $$
 
-     Here, $i$ is the row index and $j$ is the column index. When $L=1$, $H^{(0)}$ is output directly. `sinkhorn_eps` is used only for the preceding Sinkhorn computation and is independent of `hc_pre_eps` in the Sigmoid stage of the Pre branch of the MhcPre operator and `hc_norm_eps` in the root mean square normalization stage.
+     Here, $i$ is the row index and $j$ is the column index. The supported nonzero iteration count is 20. `sinkhorn_eps` is used only for the preceding Sinkhorn computation and is independent of `hc_pre_eps` in the Sigmoid stage of the Pre branch of the MhcPre operator and `hc_norm_eps` in the root mean square normalization stage.
 
   5. Performs the RmsNorm operator function to perform root mean square normalization on the weighted merging result, referred to as the rms_norm_1 stage.
 
@@ -166,7 +166,7 @@ English | [简体中文](./README.md)
 | rms_norm_mid_weight | Optional input | The default value is empty, which skips the rms_norm_mid stage of the RmsNorm operator. When the value is not empty, it is the per-channel weight of the rms_norm_mid stage of the RmsNorm operator, corresponding to rms_norm_mid_weight in the formula. The shape is [K]. | FLOAT32 | ND |
 | new_residual | Output | Updated residual state, corresponding to new_residual in the formula. When the rms_norm_mid stage is not performed, it is the output of the output fusion stage of the MhcPost operator. When the stage is performed, it is the output of the rms_norm_mid stage of the RmsNorm operator. The shape is [B,S,N,D] or [T,N,D]. | Same as x | ND |
 | new_post_mix | Output | New coefficient of the coefficient generation stage of the Post branch of the MhcPre operator, corresponding to new_post_mix in the formula. The shape is [B,S,N,1] or [T,N,1]. | FLOAT32 | ND |
-| new_comb_res_mix | Output | New coefficient of the coefficient generation stage of the Res branch of the MhcPre operator, corresponding to new_comb_res_mix in the formula. This version outputs only comb_logits, and Sinkhorn normalization is a reserved function. The shape is [B,S,N,N] or [T,N,N]. | FLOAT32 | ND |
+| new_comb_res_mix | Output | New coefficient of the coefficient generation stage of the Res branch of the MhcPre operator, corresponding to new_comb_res_mix in the formula. Returns comb_logits when no Sinkhorn iterations are performed, and normalized coefficients after 20 Sinkhorn iterations. The shape is [B,S,N,N] or [T,N,N]. | FLOAT32 | ND |
 | new_prev_mix | Optional output | Required when `shifted_prev_mix` is supplied; returns the current `pre_mix` with the same shape as `post_mix`. When the input is empty, this output is absent. The current and external coefficients occupy separate UB regions and are used for output and weighted merging, respectively. | FLOAT32 | ND |
 | y | Optional output | Original-precision result of the weighted merging stage of MhcPre followed by the rms_norm_1 stage of RmsNorm, corresponding to y in the formula. The shape is [B,S,D] or [T,D]. Although optional in the interface prototype, this output is required in this version. | Same as x | ND |
 | y_quant | Optional output | Reserved parameter. It is not specified by default and is not output in this version. | FLOAT8_E4M3FN | ND |
@@ -177,8 +177,8 @@ English | [简体中文](./README.md)
 | op_impl_mode | Optional attribute | Default value: 0. It selects the computation mode of the matrix multiplication stage of the MhcPre operator: 0 indicates FLOAT32 computation, and 1 indicates HF32 computation. 2 (3BF16) is a reserved value and is not supported in this version. | INT | - |
 | hc_mult | Optional attribute | Default value: 4. It corresponds to N in the formula and must be consistent with the head dimension of residual. Only 4 is supported in this version, and other values are reserved. | INT | - |
 | hc_post_scale | Optional attribute | Output scale factor of the Sigmoid stage of the Post branch of the MhcPre operator, corresponding to hc_post_scale in the formula. Default value: 2.0. After conversion to FLOAT32, the value must be finite. | FLOAT | - |
-| sinkhorn_eps | Optional attribute | Reserved parameter. Default value: 1e-6. Only 1e-6 is supported in this version, and it does not participate in computation. | FLOAT | - |
-| num_sinkhorn_iters | Optional attribute | Reserved parameter. Default value: 0. Only 0 is supported in this version. | INT | - |
+| sinkhorn_eps | Optional attribute | Sinkhorn epsilon. Default value: 1e-6. Must be finite and positive after conversion to FLOAT32. | FLOAT | - |
+| num_sinkhorn_iters | Optional attribute | Number of Sinkhorn iterations. Default value: 0. Currently supports only 0 or 20. A value of 0 skips Sinkhorn iterations and returns logits; a value of 20 performs 20 Sinkhorn iterations and returns normalized coefficients. | INT | - |
 | rms_norm_scale | Optional attribute | Reserved parameter. Default value: 1.0. Only 1.0 is supported in this version. | FLOAT | - |
 | output_mode | Optional attribute | Specifies the output mode. Default value: 0. 0: outputs the non-quantized result. 1: outputs the MX Quant quantized result. 2: outputs both the quantized and non-quantized results. Other values are not supported. 1 and 2 are reserved values, and only 0 is supported in this version. | INT | - |
 

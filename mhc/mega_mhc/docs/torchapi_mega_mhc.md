@@ -115,15 +115,15 @@
 
      传入的`shifted_prev_mix`不再经过上述Pre分支的Sigmoid和`hc_pre_eps`处理；它仅替换加权合并所用的`pre_mix`，不改变Post、Res分支系数的生成。合并结果`h_in`仍在第5阶段执行`rms_norm_1`。本次`pre_mix`与外部`shifted_prev_mix`使用独立UB区域；外部系数可提前载入，本次系数写回后，其UB区域方可再次生成新值。
 
-      MhcPre算子的Res分支Sinkhorn归一化阶段（预留功能）。
+      MhcPre算子的Res分支Sinkhorn归一化阶段
 
-     令$L=num\_sinkhorn\_iters$。当前版本仅支持$L=0$，直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或Sinkhorn归一化：
+     令$L=num\_sinkhorn\_iters$。当前版本支持$L=0$或$L=20$。$L=0$时直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或Sinkhorn归一化：
 
      $$
      new\_comb\_res\_mix=comb\_logits.
      $$
 
-     以下$L>0$的计算为预留功能，当前版本不支持。对每个token的$N\times N$矩阵独立计算，第一次迭代先沿最后一维执行softmax，再执行列归一化：
+     当$L=20$时，执行20次Sinkhorn迭代，不进行动态收敛判定或提前退出。对每个token的$N\times N$矩阵独立计算，第一次迭代先沿最后一维执行softmax，再执行列归一化：
 
      $$
      \begin{aligned}
@@ -132,7 +132,7 @@
      \end{aligned}
      $$
 
-     随后对$r=1,\ldots,L-1$依次执行行归一化和列归一化：
+     随后再执行19次迭代（$r=1,\ldots,L-1$），每次依次执行行归一化和列归一化：
 
      $$
      \begin{aligned}
@@ -142,7 +142,7 @@
      \end{aligned}
      $$
 
-     其中$i$为行索引，$j$为列索引；$L=1$时直接输出$H^{(0)}$。`sinkhorn_eps`仅用于上述Sinkhorn计算，与MhcPre算子的Pre分支Sigmoid阶段的`hc_pre_eps`及均方根归一化阶段的`hc_norm_eps`分别独立。
+     其中$i$为行索引，$j$为列索引；当前支持的非零迭代数为20。`sinkhorn_eps`仅用于上述Sinkhorn计算，与MhcPre算子的Pre分支Sigmoid阶段的`hc_pre_eps`及均方根归一化阶段的`hc_norm_eps`分别独立。
 
   5. 执行RmsNorm算子功能，对加权合并结果进行均方根归一化，简称rms_norm_1阶段。
 
@@ -208,8 +208,8 @@ $N=hc\_mult$，当前为4；$Q=N(N+2)=24$，$K=N\cdot D$。
 | inner_precise | int | 可选 | 指定MhcPre算子的矩阵乘阶段的计算模式，作用于公式中的x_2_rs与proj_w相乘。默认值为0，0：使用float32计算；1：使用HF32计算；2（3BF16）为预留取值，本版不支持。 | - | - |
 | hc_mult | int | 可选 | 默认值为4，对应公式中的N，须与residual的head维一致；本版仅支持4，其他取值为预留取值。 | - | - |
 | hc_post_scale | float | 可选 | MhcPre算子的Post分支Sigmoid阶段的输出倍率，对应公式中的hc_post_scale；默认值为2.0，转换为float32后须有限。 | - | - |
-| sinkhorn_eps | float | 可选 | 预留参数，默认值为1e-6，本版仅支持1e-6，不参与计算。 | - | - |
-| num_sinkhorn_iters | int | 可选 | 预留参数，默认值为0，本版仅支持0。 | - | - |
+| sinkhorn_eps | float | 可选 | Sinkhorn归一化的epsilon，默认值为1e-6，转换为FLOAT32后须有限且大于0。 | - | - |
+| num_sinkhorn_iters | int | 可选 | Sinkhorn迭代次数，默认值为0，当前仅支持0或20。取0时不执行Sinkhorn迭代，直接输出logits；取20时执行20次Sinkhorn迭代并输出归一化结果。 | - | - |
 | rms_norm_scale | float | 可选 | 预留参数，默认值为1.0，本版仅支持1.0。 | - | - |
 | output_mode | int | 可选 | 指定输出模式，默认值为0，0：输出非量化结果；1：输出MX Quant量化结果；2：同时输出量化和非量化结果。不支持其他取值；1、2为预留取值，本版仅支持0。 | - | - |
 
@@ -221,7 +221,7 @@ $N=hc\_mult$，当前为4；$Q=N(N+2)=24$，$K=N\cdot D$。
 | --- | --- | --- | --- | --- | --- |
 | new_residual | Tensor | 必选 | MhcPost算子的输出融合阶段的残差状态；rms_norm_mid_weight非空时为RmsNorm算子的rms_norm_mid阶段的输出，对应公式中的new_residual，即x_2。 | 与x相同 | `[B,S,N,D]`或`[T,N,D]` |
 | new_post_mix | Tensor | 必选 | MhcPre算子的Post分支系数生成阶段的新系数，对应公式中的new_post_mix。 | float32 | `[B,S,N,1]`或`[T,N,1]` |
-| new_comb_res_mix | Tensor | 必选 | MhcPre算子的Res分支系数生成阶段的新系数，对应公式中的new_comb_res_mix；本版仅输出comb_logits，Sinkhorn归一化为预留功能。 | float32 | `[B,S,N,N]`或`[T,N,N]` |
+| new_comb_res_mix | Tensor | 必选 | MhcPre算子的Res分支系数生成阶段的新系数，对应公式中的new_comb_res_mix；迭代次数为0时输出comb_logits，为20时输出执行20次Sinkhorn迭代后的归一化结果。 | float32 | `[B,S,N,N]`或`[T,N,N]` |
 | new_prev_mix | Optional[Tensor] | 可选 | `shifted_prev_mix`非空时返回本次计算的`pre_mix`，为空时返回`None`；本次系数与外部系数使用独立UB区域，输出形状与`post_mix`相同。 | float32 | `[B,S,N,1]`或`[T,N,1]` |
 | y | Optional[Tensor] | 可选 | MhcPre算子的加权合并阶段与RmsNorm算子的rms_norm_1阶段计算并应用倍率后的原精度结果，对应公式中的y；本版必须输出。 | 与x相同 | `[B,S,D]`或`[T,D]` |
 | y_quant | Optional[Tensor] | 可选 | 预留参数，本版返回None。 | float8_e4m3fn | - |

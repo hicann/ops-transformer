@@ -136,6 +136,9 @@ TEST(MegaMhcOpApi, RejectNonpositiveAndNonfiniteEpsilons)
         c = Case{};
         c.gateEpsilon = value;
         EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+        c = Case{};
+        c.sinkhornEpsilon = value;
+        EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
     }
 }
 
@@ -149,9 +152,6 @@ TEST(MegaMhcOpApi, RejectUnsupportedModesAndReservedAttributes)
     EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
     c = Case{};
     c.iterations = 1;
-    EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
-    c = Case{};
-    c.sinkhornEpsilon = 1e-5;
     EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
     c = Case{};
     c.rmsScale = 0.5;
@@ -168,16 +168,25 @@ TEST(MegaMhcOpApi, RejectReservedAndInvalidOutputModes)
     }
 }
 
-TEST(MegaMhcOpApi, ReservedSinkhornEpsilonUsesFloatAttributePrecision)
+TEST(MegaMhcOpApi, SinkhornSupportsZeroOrTwentyIterations)
 {
-    Case c;
-    c.sinkhornEpsilon = static_cast<double>(1.0e-6f);
-    EXPECT_EQ(Workspace(c), ACLNN_SUCCESS);
-    for (double value : {static_cast<double>(std::nextafter(1.0e-6f, 0.0f)), std::numeric_limits<double>::infinity(),
-                         std::numeric_limits<double>::quiet_NaN()}) {
-        c.sinkhornEpsilon = value;
+    for (int64_t iterations : {int64_t{0}, int64_t{20}}) {
+        for (double epsilon : {1.0e-6, 1.0e-5}) {
+            Case c;
+            c.iterations = iterations;
+            c.sinkhornEpsilon = epsilon;
+            EXPECT_EQ(Workspace(c), ACLNN_SUCCESS);
+        }
+    }
+    for (int64_t iterations :
+         {int64_t{-1}, int64_t{1}, int64_t{19}, int64_t{21}, std::numeric_limits<int64_t>::max()}) {
+        Case c;
+        c.iterations = iterations;
         EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
     }
+    Case c;
+    c.sinkhornEpsilon = std::numeric_limits<double>::denorm_min();
+    EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
 }
 
 TEST(MegaMhcOpApi, OptionalRms0WithBothTypesModesAndMidStates)

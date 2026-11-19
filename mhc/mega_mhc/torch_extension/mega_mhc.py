@@ -180,7 +180,8 @@ def mega_mhc(
     comb_res_mix must be provided in this version.
     rms_norm_0_weight=None skips RMSNorm_0 and sends x directly to Post.
     rms_norm_mid_weight=None skips Mid; the projection RMS scaling still runs.
-    hc_post_scale scales the post sigmoid; Sinkhorn and quantized outputs are reserved.
+    hc_post_scale scales the post sigmoid. num_sinkhorn_iters is the Sinkhorn
+    iteration count: 0 preserves Res logits; 20 runs 20 normalization iterations.
     Only output_mode=0 is supported; modes 1/2 are reserved for MX Quant outputs.
     Returns (new_residual, new_post_mix, new_comb_res_mix, new_prev_mix, y, None, None).
     new_prev_mix contains the current pre_mix when shifted_prev_mix is provided;
