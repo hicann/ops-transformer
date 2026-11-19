@@ -58,6 +58,26 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/attn_epilogue/README.md">attn_epilogue</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>Attention输出投影后处理算子，融合inverse RoPE、两级MXFP8激活量化与WoA/WoB矩阵乘，支持NG=8/2/1及ND/NZ权重。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../experimental/attention/fused_qkv_proj_norm_rope_cache/README.md">fused_qkv_proj_norm_rope_cache</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>WeLMv4 QKV投影全融合算子，融合QKV投影、K RMSNorm、Q/K RoPE、BF16转换与KV cache散写，支持N=2048/2560。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/block_sparse_attention/README.md">block_sparse_attention</a></td>
     <td>✓</td>
     <td>✓</td>

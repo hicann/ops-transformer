@@ -41,6 +41,8 @@
 |[apply_rotary_pos_emb_grad](../../posembedding/apply_rotary_pos_emb_grad/docs/torchapi_apply_rotary_pos_emb_grad.md)|执行双路旋转位置编码的反向计算，将query和key两路梯度计算融合为一次kernel调用。|-|默认支持确定性计算|
 |[attention_to_ffn](../../mc2/attention_to_ffn_v2/docs/torchapi_attention_to_ffn.md)|将Attention节点上数据发往FFN节点。|-|默认支持确定性计算|
 |[attention_worker_combine](../../attention/attention_worker_combine/docs/torchapi_attention_worker_combine.md)|融合FFN侧返回的专家token；Ascend 950支持MXFP反量化。|默认支持确定性计算|默认支持确定性计算|
+|[attn_epilogue](../../attention/attn_epilogue/docs/torchapi_attn_epilogue.md)|Attention输出投影后处理，融合inverse RoPE、两级MXFP8激活量化与WoA/WoB矩阵乘，支持NG=8/2/1及ND/NZ权重。|-|沿用DSL算子实现|
+|[fused_qkv_proj_norm_rope_cache](../../experimental/attention/fused_qkv_proj_norm_rope_cache/docs/torchapi_fused_qkv_proj_norm_rope_cache.md)|WeLMv4 QKV投影全融合，融合QKV投影、K RMSNorm、Q/K RoPE、BF16转换与KV cache散写，支持N=2048/2560。|-|沿用DSL算子实现|
 |[all_gather_quant_matmul](../../mc2/all_gather_matmul_v3/docs/torchapi_all_gather_quant_matmul.md)|完成AllGather通信与MX量化矩阵乘法的融合计算。|-|默认支持确定性计算|
 |[all_to_all_quant_matmul](../../mc2/allto_all_matmul_v2/docs/torchapi_all_to_all_quant_matmul.md)|完成All-to-All通信与MX量化矩阵乘法的融合计算。|-|默认支持确定性计算|
 |[causal_conv1d_fn](../../mamba/causal_conv1d/docs/torchapi_causal_conv1d_fn.md)| 因果一维卷积前向计算（prefill/chunk-prefill），封装aclnnCausalConv1dFn。| - | 默认支持确定性计算 |

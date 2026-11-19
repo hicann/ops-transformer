@@ -872,7 +872,7 @@ function(enable_cannbotdsl_kernel op_name source_dir)
     get_property(_checked GLOBAL PROPERTY CANNBOTDSL_CHECKED)
     if(NOT _checked)
         execute_process(COMMAND "${HI_PYTHON}" -c
-            "import importlib.util, sys; sys.exit(0 if all(importlib.util.find_spec(name) for name in ('cannbotdsl', 'opkit')) else 1)"
+            "import cannbotdsl, opkit"
             RESULT_VARIABLE _result OUTPUT_QUIET ERROR_QUIET)
         if(_result EQUAL 0)
             set_property(GLOBAL PROPERTY CANNBOTDSL_AVAILABLE TRUE)
