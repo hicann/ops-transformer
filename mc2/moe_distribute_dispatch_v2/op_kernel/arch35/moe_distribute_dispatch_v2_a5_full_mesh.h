@@ -1826,6 +1826,8 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     LocalTensor<int32_t> shiftTensor = dstExpBuf_.Get<int32_t>();
     LocalTensor<uint8_t> binTensor = subExpBuf_.Get<uint8_t>();
     const uint32_t chunkScanElems = chunkRecomputeElems_ > 0 ? chunkRecomputeElems_ : 1;
+    LocalTensor<uint16_t> scratchTensor = shiftTensor.ReinterpretCast<uint16_t>();
+    LocalTensor<int16_t> scratchInt16 = scratchTensor.ReinterpretCast<int16_t>();
 
     for (uint32_t group = 0; group < groupNum; ++group) {
         uint32_t base = expertFreqStart_ + group * EXPERT_PER_HISTO_GROUP;
@@ -1833,6 +1835,7 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
             (base + EXPERT_PER_HISTO_GROUP > endMoeExpertId) ? (endMoeExpertId - base) : EXPERT_PER_HISTO_GROUP;
 
         LocalTensor<uint16_t> freqTensor = expertFreqTensor_[group * EXPERT_HISTO_BIN_NUM];
+        LocalTensor<int16_t> historyInt16 = freqTensor.ReinterpretCast<int16_t>();
         Duplicate<uint16_t>(freqTensor, 0, EXPERT_HISTO_BIN_NUM);
 
         for (uint32_t chunkBase = 0; chunkBase < calCnt; chunkBase += chunkScanElems) {
@@ -1847,19 +1850,9 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
 
             Cast(binTensor, shiftTensor, RoundMode::CAST_NONE, chunkLen);
             SyncFunc<AscendC::HardEvent::V_S>();
-
-            for (uint32_t e = 0; e <= groupSize; ++e) {
-                shiftTensor.SetValue(e, freqTensor.GetValue(e));
-            }
-            SyncFunc<AscendC::HardEvent::S_V>();
-
-            GetExpertFreq(freqTensor, binTensor, chunkLen);
+            GetExpertFreq(scratchTensor, binTensor, chunkLen);
+            Add(historyInt16, historyInt16, scratchInt16, EXPERT_HISTO_BIN_NUM);
             SyncFunc<AscendC::HardEvent::V_S>();
-
-            for (uint32_t e = 0; e <= groupSize; ++e) {
-                freqTensor.SetValue(e, freqTensor.GetValue(e) + shiftTensor.GetValue(e));
-            }
-            SyncFunc<AscendC::HardEvent::S_V>();
         }
     }
 }
@@ -2042,7 +2035,6 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
 template <TemplateMC2A5FullMeshTypeClass>
 __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::WaitDispatchClearStatus()
 {
-    SyncFunc<AscendC::HardEvent::MTE3_S>();
     DataCopyParams intriOutParams{static_cast<uint16_t>(recStatusNumPerCore_), 1, 0, 0};
     uint64_t duplicateMask[2] = {0x101010101010101, 0}; // 一次操作256字节，每8个数将首个设置为0
     LocalTensor<int32_t> cleanStateTensor = waitStatusBuf_.Get<int32_t>();
@@ -2051,7 +2043,6 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     SyncFunc<AscendC::HardEvent::V_MTE3>();
     DataCopy(windowInstatusFp32Tensor_[startStatusIndex_ * STATE_OFFSET / sizeof(float)],
              cleanStateTensor.ReinterpretCast<float>(), intriOutParams);
-    SyncFunc<AscendC::HardEvent::MTE3_S>();
 }
 
 template <TemplateMC2A5FullMeshTypeClass>
@@ -2936,8 +2927,11 @@ template <TemplateMC2A5FullMeshTypeClass>
 __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::SetValidExpertInfoSerial(
     uint32_t& validNum)
 {
+    uint32_t curPrefix = 0U;
     for (uint32_t index = startId_; index < endId_; ++index) {
         uint32_t count = static_cast<uint32_t>(recvCountTensor_.GetValue(index - startId_));
+        curPrefix += count;
+        sendCntTensor_.SetValue(index - recvCntPrefixStartId_, static_cast<int32_t>(curPrefix));
         if (count != 0) {
             expertMapTensor_.SetValue(validNum, index);
             expertFinishNumTensor_.SetValue(validNum, 0U);
@@ -3024,7 +3018,7 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     expertFinishNumTensor_ = serialExpertFinishBuf_.Get<uint32_t>();
     expertLeftNumTensor_ = serialExpertLeftBuf_.Get<uint32_t>();
 
-    // 计算本核负责区间的累计位置，前面的总和只需要一个标量。
+    // 跨核前缀搬入时准备本核计数和专家输出
     recvCntBeforeStart_ = 0U;
     LocalTensor<float> sumLocalTensor = sumLocalBuf_.Get<float>();
     if (aivId_ > 0U) {
@@ -3032,6 +3026,7 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         DataCopy(sumLocalTensor, cumsumWsGMTensor_, sumCopyParams);
     }
     SetValidExpertInfoSerial(validNum);
+    SetExpertTokenNumsSerial();
     if (aivId_ > 0U) {
         SyncFunc<AscendC::HardEvent::MTE2_S>();
         LocalTensor<int32_t> sumLocalIntTensor = sumLocalTensor.ReinterpretCast<int32_t>();
@@ -3041,18 +3036,14 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         }
         recvCntBeforeStart_ = static_cast<uint32_t>(prefixSum);
     }
-    uint32_t curPrefix = recvCntBeforeStart_;
-    for (uint32_t index = startId_; index < endId_; ++index) {
-        curPrefix += static_cast<uint32_t>(recvCountTensor_.GetValue(index - startId_));
-        sendCntTensor_.SetValue(index - recvCntPrefixStartId_, static_cast<int32_t>(curPrefix));
-    }
+    SyncFunc<AscendC::HardEvent::S_V>();
+    Adds(sendCntTensor_, sendCntTensor_, static_cast<int32_t>(recvCntBeforeStart_), sendNum_);
 
     GlobalTensor<int32_t> sendCountsGlobal;
     sendCountsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sendCountsOutGM_));
     DataCopyExtParams sendCountsCopyParams{1U, static_cast<uint32_t>(sendNum_ * sizeof(int32_t)), 0U, 0U, 0U};
-    SyncFunc<AscendC::HardEvent::S_MTE3>();
+    SyncFunc<AscendC::HardEvent::V_MTE3>();
     DataCopyPad(sendCountsGlobal[startId_], sendCntTensor_, sendCountsCopyParams);
-    SetExpertTokenNumsSerial();
 }
 
 template <TemplateMC2A5FullMeshTypeClass>

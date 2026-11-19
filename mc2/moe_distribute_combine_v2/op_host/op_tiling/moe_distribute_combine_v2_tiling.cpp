@@ -2225,24 +2225,23 @@ static uint64_t GetComputeBufferSize(const gert::TilingContext* context,
     uint32_t maxSizeTokenBuf = (hExpandXTypeSize + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
     uint32_t activeMaskAlignSize = axisBS * ((axisK * sizeof(bool) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN);
     uint32_t hExpandXAlign32Size = (hExpandXTypeSize + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
-    uint32_t hFloatAlign32Size = GetFloatAlignSize(hFloatSize, UB_ALIGN, isA5OrA6FusedQuant);
     uint32_t hFloatAlign256Size = GetFloatAlignSize(hFloatSize, ALIGNED_LEN, isA5OrA6FusedQuant);
     uint32_t mulBufSize = hFloatAlign256Size;
     if (!IsA5MteCombine(context, config, false) || config.hasAddRmsNorm) {
         uint32_t bsKFloatAlign = (axisBS * axisK * sizeof(float) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
         mulBufSize = std::max(hFloatAlign256Size, bsKFloatAlign);
     }
-    uint32_t maxSizeRowTmpFloatBuf = hFloatAlign32Size;
+    uint32_t maxSizeRowTmpFloatBuf = hFloatAlign256Size;
 
     if (isInputExpertMaskFlag) {
         uint32_t activeMaskAlignHalfSize = activeMaskAlignSize * DTYPE_SIZE_HALF;
         maxSizeTokenBuf = (activeMaskAlignSize > hExpandXAlign32Size ? activeMaskAlignSize : hExpandXAlign32Size);
         maxSizeRowTmpFloatBuf =
-            (activeMaskAlignHalfSize > hFloatAlign32Size ? activeMaskAlignHalfSize : hFloatAlign32Size);
+            (activeMaskAlignHalfSize > hFloatAlign256Size ? activeMaskAlignHalfSize : hFloatAlign256Size);
     }
 
     uint64_t totalBufferSize = static_cast<uint64_t>(maxSizeTokenBuf) + maxSizeRowTmpFloatBuf + mulBufSize +
-                               hFloatAlign32Size * bufferNum + UB_ALIGN;
+                               hFloatAlign256Size * bufferNum + UB_ALIGN;
     if (tilingData->moeDistributeCombineV2Info.rswBufferSize != 0UL) {
         uint32_t flagRcvCount = axisK + tilingData->moeDistributeCombineV2Info.sharedExpertNum;
         // rsw: count 到达检测专用 buffer，与 kernel 侧一致
@@ -2440,6 +2439,7 @@ static uint64_t GetCommBufferSize(const gert::TilingContext* context,
     uint64_t commBufferSize = static_cast<uint64_t>(scaleNumAlignSize) + clearFlagBufSize;
     dispatchBufferSize =
         GetDispatchBufferSize(tilingData, moeQueueBytes, quantResultDataBytes, packedDataBytes, quantBufferSize);
+    moeQueueBytes = std::max(moeQueueBytes, (hExpandXTypeSize + 127U) / 128U * 128U);
     // 只扩接收队列，不改变发送侧预算；rsw计数检查使用独立临时区。
     fullFlagQueueBytes = moeQueueBytes;
     // 只扩接收队列，不改变发送侧预算; rsw协议标志检查走CheckSlotArriveByCount, 不占接收队列
