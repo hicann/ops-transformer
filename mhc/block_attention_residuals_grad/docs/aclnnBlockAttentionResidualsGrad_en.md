@@ -25,7 +25,7 @@
 
 ## Function
 
-- Description: `BlockAttentionResidualsGrad` is the backward propagation operator of the forward operator `BlockAttentionResiduals` (attention residual). Based on the invNorm and probs saved during forward propagation, the forward parameters projWeight and normWeight, and gradHiddenStates, this API computes the gradients of partialBlock, blockRes, projWeight, and normWeight. Only -1 is supported for validBlockNum; other values cause an error.
+- Description: `BlockAttentionResidualsGrad` is the backward propagation operator of the forward operator `BlockAttentionResiduals` (attention residual). Based on the invNorm and probs saved during forward propagation, the forward parameters projWeight and normWeight, and gradHiddenStates, this API computes the gradients of partialBlock, blockRes, projWeight, and normWeight.
 
 - Formula:
 
@@ -172,8 +172,8 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
           <tr>
               <td>validBlockNum (int64_t)</td>
               <td>Attribute</td>
-              <td>Reserved attribute, does not participate in the computation currently; only -1 is supported.</td>
-              <td><li>Reserved attribute, does not participate in the computation currently; only -1 is supported.</li></td>
+              <td>Reserved attribute, currently unused in computation.</td>
+              <td><li>Supports -1 (all N blocks) or N (blockRes.shape[1]).</li></td>
               <td>INT64</td>
               <td>-</td>
               <td>Scalar</td>
@@ -351,12 +351,11 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
 
 - Deterministic computation: aclnnBlockAttentionResidualsGrad defaults to a deterministic implementation.
 - The data types of partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, and their corresponding outputs must remain consistent. FLOAT16, BFLOAT16, and FLOAT32 are supported.
-- validBlockNum is an INT64 reserved attribute with a default value of -1. It does not participate in the computation currently. Only -1 is supported. Other values return a parameter error.
+- validBlockNum is a reserved INT64 attribute with a default value of -1. Only -1 or N (blockRes.shape[1]) is supported; other values return a parameter error.
 - Only the ND format is supported for partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, and probs.
 - The shapes must meet the following requirements: partialBlock is (T,H), blockRes is (T,N,H), projWeight is (1,H), normWeight is (H), gradHiddenStates is (T,H), invNorm is (T,N+1), and probs is (T,N+1). T and H are non-negative integers, and N is in the range [0,128]. T and H must remain consistent across all tensors, and N+1 must remain consistent between invNorm and probs.
 - Non-contiguous input tensors are supported. The API internally converts them to the Contiguous format before computation.
 - probs must be the forward softmax output, and invNorm must be the forward row-wise normalization coefficient. Only FLOAT32 is supported for invNorm and probs. The current implementation relies entirely on the saved probs and invNorm.
-- validBlockNum is a reserved attribute and does not participate in actual computation; only -1 is supported.
 - When T=0 or H=0, the aclnn layer skips the main operator. Non-empty weight gradient outputs are zeroed, while empty outputs retain the shapes of the corresponding inputs. When H=0, all outputs are empty and no zeroing tasks are scheduled. For T=0 and H>0, the zeroing tasks must still be executed by calling the second-phase API.
 - Only when N=0 and both T and H are non-zero, the API does not return early; partialBlock and the weight gradients are still computed.
 
@@ -452,7 +451,7 @@ int main()
     std::vector<uint16_t> gradHiddenStatesData    (GetShapeSize(gradHiddenStatesShape),     0x3C00);
     std::vector<float> invNormData           (GetShapeSize(invNormShape),         1.0f);
     std::vector<float> probsData            (GetShapeSize(probsShape),          1.0f);
-    int64_t validBlockNum = -1; // Reserved attribute. Only -1 is supported.
+    int64_t validBlockNum = -1; // Reserved attribute: -1 or N (blockRes.shape[1]).
 
     aclTensor *partialBlock = nullptr, *blockRes = nullptr, *projWeight = nullptr, *normWeight = nullptr;
     aclTensor *gradHiddenStates = nullptr, *invNorm = nullptr, *probs = nullptr;
