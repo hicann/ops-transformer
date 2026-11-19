@@ -132,9 +132,11 @@ ge::graphStatus MhcPreTiling::GetShapeAttrsInfoInner(int8_t& gammaExist)
 
     auto shapeAlpha = context_->GetInputShape(2);
     int64_t scaleFirstDim = shapeAlpha->GetStorageShape().GetDim(0);
-    OP_CHECK_IF(scaleFirstDim != 2 && scaleFirstDim != 3,
-                OP_LOGE(context_->GetNodeName(), "alpha size should be 2 or 3, but is %ld", scaleFirstDim),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        scaleFirstDim != 2 && scaleFirstDim != 3,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "alpha", std::to_string(scaleFirstDim).c_str(),
+                                              "The element num of alpha must be 2 or 3"),
+        return ge::GRAPH_FAILED);
     hasResi = (scaleFirstDim == 3);
 
     auto shapePhi = context_->GetInputShape(1);
@@ -146,10 +148,12 @@ ge::graphStatus MhcPreTiling::GetShapeAttrsInfoInner(int8_t& gammaExist)
 
     //
     if (hasResi) {
-        OP_CHECK_IF(hcMix_ != nn_fac && hcMix_ != nn_pow,
-                    OP_LOGE(context_->GetNodeName(), "Phi dim 0 should be equal with %ld or %ld, but is %ld", nn_fac,
-                            nn_pow, hcMix_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            hcMix_ != nn_fac && hcMix_ != nn_pow,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "phi", std::to_string(hcMix_).c_str(),
+                ("The dim 0 of phi must be " + std::to_string(nn_fac) + " or " + std::to_string(nn_pow)).c_str()),
+            return ge::GRAPH_FAILED);
         if (hcMix_ == nn_fac) {
             isFac = true;
         } else {
@@ -158,18 +162,21 @@ ge::graphStatus MhcPreTiling::GetShapeAttrsInfoInner(int8_t& gammaExist)
     } else {
         OP_CHECK_IF(
             hcMix_ != 2 * hcMult_,
-            OP_LOGE(context_->GetNodeName(), "Phi dim 0 should be equal with %ld, but is %ld", 2 * hcMult_, hcMix_),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "phi", std::to_string(hcMix_).c_str(),
+                                                  ("The dim 0 of phi must be " + std::to_string(2 * hcMult_)).c_str()),
             return ge::GRAPH_FAILED);
         isFac = false;
     }
 
     OP_CHECK_IF(shapePhi->GetStorageShape().GetDim(1) != d_ * hcMult_,
-                OP_LOGE(context_->GetNodeName(), "Phi dim 1 should be equal with d_ * hcMult_  %ld, but is %ld",
-                        d_ * hcMult_, shapePhi->GetStorageShape().GetDim(1)),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "phi", std::to_string(shapePhi->GetStorageShape().GetDim(1)).c_str(),
+                    ("The dim 1 of phi must be d * hcMult = " + std::to_string(d_ * hcMult_)).c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         biasFirstDim != expectedBias,
-        OP_LOGE(context_->GetNodeName(), "Bias dim 0 should be equal with %ld, but is %ld", expectedBias, biasFirstDim),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "bias", std::to_string(biasFirstDim).c_str(),
+                                              ("The dim 0 of bias must be " + std::to_string(expectedBias)).c_str()),
         return ge::GRAPH_FAILED);
 
     auto shapeGamma = context_->GetOptionalInputShape(4);
@@ -177,10 +184,13 @@ ge::graphStatus MhcPreTiling::GetShapeAttrsInfoInner(int8_t& gammaExist)
     if (gammaExist == 1) {
         int64_t gammaFirstDim = shapeGamma->GetStorageShape().GetDim(0);
         int64_t gammaSecondDim = shapeGamma->GetStorageShape().GetDim(1);
-        OP_CHECK_IF(gammaFirstDim != hcMult_ || gammaSecondDim != d_,
-                    OP_LOGE(context_->GetNodeName(), "gamma shape should be equal with [%ld, %ld], but is [%ld, %ld]",
-                            hcMult_, d_, gammaFirstDim, gammaSecondDim),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            gammaFirstDim != hcMult_ || gammaSecondDim != d_,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "gamma",
+                ("[" + std::to_string(gammaFirstDim) + ", " + std::to_string(gammaSecondDim) + "]").c_str(),
+                ("The shape of gamma must be [" + std::to_string(hcMult_) + ", " + std::to_string(d_) + "]").c_str()),
+            return ge::GRAPH_FAILED);
     }
     OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "get attr failed."),
                 return ge::GRAPH_FAILED);

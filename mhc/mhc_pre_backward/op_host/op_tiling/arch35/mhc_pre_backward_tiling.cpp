@@ -133,11 +133,20 @@ ge::graphStatus MhcPreBackwardTiling::GetInputTensors(const gert::Tensor*& gradH
                                                       const gert::Tensor*& gradHResTensor)
 {
     gradHInTensor = context_->GetDynamicInputTensor(GRAD_H_IN_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, gradHInTensor);
+    if (gradHInTensor == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "grad_h_in", "must not be null");
+        return ge::GRAPH_FAILED;
+    }
     gradHPostTensor = context_->GetDynamicInputTensor(GRAD_H_POST_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, gradHPostTensor);
+    if (gradHPostTensor == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "grad_h_post", "must not be null");
+        return ge::GRAPH_FAILED;
+    }
     gradHResTensor = context_->GetDynamicInputTensor(GRAD_H_RES_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, gradHResTensor);
+    if (gradHResTensor == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "grad_h_res", "must not be null");
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -147,24 +156,31 @@ ge::graphStatus MhcPreBackwardTiling::ValidateInputDims(int64_t gradHInDims, int
     if ((gradHInDims != BSD_DIM_NUM && gradHInDims != TD_DIM_NUM) ||
         (gradHPostDims != BSD_DIM_NUM && gradHPostDims != TN_DIM_NUM) ||
         (gradHResDims != BSNN_DIM_NUM && gradHResDims != TNN_DIM_NUM)) {
-        OP_LOGE(context_->GetNodeName(),
-                "input dims invalid for MhcPreBackward, gradHInDims=%ld (expected %ld or %ld), gradHPostDims=%ld "
-                "(expected %ld or %ld), gradHResDims=%ld (expected %ld or %ld)",
-                gradHInDims, BSD_DIM_NUM, TD_DIM_NUM, gradHPostDims, BSD_DIM_NUM, TN_DIM_NUM, gradHResDims,
-                BSNN_DIM_NUM, TNN_DIM_NUM);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "grad_h_in/grad_h_post/grad_h_res",
+            ("gradHIn=" + std::to_string(gradHInDims) + ", gradHPost=" + std::to_string(gradHPostDims) +
+             ", gradHRes=" + std::to_string(gradHResDims))
+                .c_str(),
+            ("grad_h_in dims must be " + std::to_string(BSD_DIM_NUM) + " or " + std::to_string(TD_DIM_NUM) +
+             ", grad_h_post dims must be " + std::to_string(BSD_DIM_NUM) + " or " + std::to_string(TN_DIM_NUM) +
+             ", grad_h_res dims must be " + std::to_string(BSNN_DIM_NUM) + " or " + std::to_string(TNN_DIM_NUM))
+                .c_str());
         return ge::GRAPH_FAILED;
     }
     if (gradHInDims != gradHPostDims) {
-        OP_LOGE(context_->GetNodeName(),
-                "grad_h_in and grad_h_post must have the same dim num, gradHInDims=%ld, gradHPostDims=%ld", gradHInDims,
-                gradHPostDims);
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            context_->GetNodeName(), "grad_h_in/grad_h_post",
+            ("grad_h_in=" + std::to_string(gradHInDims) + ", grad_h_post=" + std::to_string(gradHPostDims)).c_str(),
+            "grad_h_in and grad_h_post must have the same dimension count");
         return ge::GRAPH_FAILED;
     }
     if ((gradHInDims == BSD_DIM_NUM && gradHResDims != BSNN_DIM_NUM) ||
         (gradHInDims == TD_DIM_NUM && gradHResDims != TNN_DIM_NUM)) {
-        OP_LOGE(context_->GetNodeName(),
-                "grad_h_in and grad_h_res dims mismatch, gradHInDims=%ld requires gradHResDims=%ld, but got %ld",
-                gradHInDims, gradHInDims == BSD_DIM_NUM ? BSNN_DIM_NUM : TNN_DIM_NUM, gradHResDims);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "grad_h_res", std::to_string(gradHResDims).c_str(),
+            ("When grad_h_in has " + std::to_string(gradHInDims) + " dims, grad_h_res must have " +
+             std::to_string(gradHInDims == BSD_DIM_NUM ? BSNN_DIM_NUM : TNN_DIM_NUM) + " dims")
+                .c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -181,21 +197,29 @@ ge::graphStatus MhcPreBackwardTiling::ParseBSDFormat(const gert::Tensor* gradHIn
 
     if (gradHPostTensor->GetStorageShape().GetDim(INDEX_B) != batch ||
         gradHPostTensor->GetStorageShape().GetDim(INDEX_S) != sequence) {
-        OP_LOGE(context_->GetNodeName(),
-                "grad_h_post shape must align with grad_h_in on B and S dims, grad_h_post[B,S]=[%ld,%ld], expected "
-                "[%lu,%lu]",
-                gradHPostTensor->GetStorageShape().GetDim(INDEX_B), gradHPostTensor->GetStorageShape().GetDim(INDEX_S),
-                batch, sequence);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "grad_h_post",
+            ("[B, S] = [" + std::to_string(gradHPostTensor->GetStorageShape().GetDim(INDEX_B)) + ", " +
+             std::to_string(gradHPostTensor->GetStorageShape().GetDim(INDEX_S)) + "]")
+                .c_str(),
+            ("The first two dims of grad_h_post must align with grad_h_in: [B, S] = [" + std::to_string(batch) + ", " +
+             std::to_string(sequence) + "]")
+                .c_str());
         return ge::GRAPH_FAILED;
     }
     if (gradHResTensor->GetStorageShape().GetDim(0) != batch ||
         gradHResTensor->GetStorageShape().GetDim(1) != sequence || gradHResTensor->GetStorageShape().GetDim(2) != N_ ||
         gradHResTensor->GetStorageShape().GetDim(3) != N_) {
-        OP_LOGE(context_->GetNodeName(),
-                "grad_h_res shape must be [B, S, N, N], actual=[%ld,%ld,%ld,%ld], expected=[%lu,%lu,%lu,%lu]",
-                gradHResTensor->GetStorageShape().GetDim(0), gradHResTensor->GetStorageShape().GetDim(1),
-                gradHResTensor->GetStorageShape().GetDim(2), gradHResTensor->GetStorageShape().GetDim(3), batch,
-                sequence, N_, N_);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "grad_h_res",
+            ("[" + std::to_string(gradHResTensor->GetStorageShape().GetDim(0)) + ", " +
+             std::to_string(gradHResTensor->GetStorageShape().GetDim(1)) + ", " +
+             std::to_string(gradHResTensor->GetStorageShape().GetDim(2)) + ", " +
+             std::to_string(gradHResTensor->GetStorageShape().GetDim(3)) + "]")
+                .c_str(),
+            ("The shape of grad_h_res must be [B, S, N, N] = [" + std::to_string(batch) + ", " +
+             std::to_string(sequence) + ", " + std::to_string(N_) + ", " + std::to_string(N_) + "]")
+                .c_str());
         return ge::GRAPH_FAILED;
     }
     totalLength_ = batch * sequence;
@@ -211,17 +235,22 @@ ge::graphStatus MhcPreBackwardTiling::ParseTNDFormat(const gert::Tensor* gradHIn
     N_ = gradHPostTensor->GetStorageShape().GetDim(INDEX_N);
 
     if (gradHPostTensor->GetStorageShape().GetDim(INDEX_T) != t) {
-        OP_LOGE(context_->GetNodeName(),
-                "grad_h_post shape must align with grad_h_in on T dim, grad_h_post[T]=%ld, expected %lu",
-                gradHPostTensor->GetStorageShape().GetDim(INDEX_T), t);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "grad_h_post",
+            std::to_string(gradHPostTensor->GetStorageShape().GetDim(INDEX_T)).c_str(),
+            ("The dim 0 of grad_h_post must align with grad_h_in: T = " + std::to_string(t)).c_str());
         return ge::GRAPH_FAILED;
     }
     if (gradHResTensor->GetStorageShape().GetDim(0) != t || gradHResTensor->GetStorageShape().GetDim(1) != N_ ||
         gradHResTensor->GetStorageShape().GetDim(2) != N_) {
-        OP_LOGE(context_->GetNodeName(),
-                "grad_h_res shape must be [T, N, N], actual=[%ld,%ld,%ld], expected=[%lu,%lu,%lu]",
-                gradHResTensor->GetStorageShape().GetDim(0), gradHResTensor->GetStorageShape().GetDim(1),
-                gradHResTensor->GetStorageShape().GetDim(2), t, N_, N_);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "grad_h_res",
+                                              ("[" + std::to_string(gradHResTensor->GetStorageShape().GetDim(0)) +
+                                               ", " + std::to_string(gradHResTensor->GetStorageShape().GetDim(1)) +
+                                               ", " + std::to_string(gradHResTensor->GetStorageShape().GetDim(2)) + "]")
+                                                  .c_str(),
+                                              ("The shape of grad_h_res must be [T, N, N] = [" + std::to_string(t) +
+                                               ", " + std::to_string(N_) + ", " + std::to_string(N_) + "]")
+                                                  .c_str());
         return ge::GRAPH_FAILED;
     }
     totalLength_ = t;
@@ -232,13 +261,16 @@ ge::graphStatus MhcPreBackwardTiling::ValidateShapeParams()
 {
     static const std::vector<uint64_t> legalN(LEGAL_N_VALUES, LEGAL_N_VALUES + LEGAL_N_COUNT);
     if (std::find(legalN.begin(), legalN.end(), N_) == legalN.end()) {
-        OP_LOGE(context_->GetNodeName(), "Invalid input shape N=%lu. Expected one of {4,6,8}", N_);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", std::to_string(N_).c_str(),
+                                              "N in x shape must be 4, 6 or 8");
         return ge::GRAPH_FAILED;
     }
     if (D_ < MIN_D_LENGTH || D_ > MAX_D_LENGTH || D_ % D_ALIGN != 0) {
-        OP_LOGE(context_->GetNodeName(),
-                "Invalid input shape D=%lu. Expected to be in [%u, %u] and %u-element alignment", D_, MIN_D_LENGTH,
-                MAX_D_LENGTH, D_ALIGN);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "x", std::to_string(D_).c_str(),
+            ("D in x shape must be in [" + std::to_string(MIN_D_LENGTH) + ", " + std::to_string(MAX_D_LENGTH) +
+             "] and a multiple of " + std::to_string(D_ALIGN))
+                .c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -369,7 +401,6 @@ ge::graphStatus MhcPreBackwardTiling::GetInputShape()
 ge::graphStatus MhcPreBackwardTiling::ParseInputAndAttr()
 {
     if (GetInputShape() != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context_->GetNodeName(), "get input shape failed");
         return ge::GRAPH_FAILED;
     }
 
@@ -452,7 +483,7 @@ ge::graphStatus MhcPreBackwardTiling::DoOpTiling()
 {
     auto inputXDesc = context_->GetInputDesc(0);
     if (inputXDesc == nullptr) {
-        OP_LOGE(context_->GetNodeName(), "invalid input pointer: x");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "x", "must not be null");
         return ge::GRAPH_FAILED;
     }
 

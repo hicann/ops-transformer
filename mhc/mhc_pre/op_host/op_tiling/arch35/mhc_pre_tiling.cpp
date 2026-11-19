@@ -159,13 +159,25 @@ inline size_t MhcPreBaseTiling::GetLastRequiredInputIndex() const
 ge::graphStatus MhcPreBaseTiling::GetInputShape()
 {
     auto xTensor = context_->GetDynamicInputTensor(X_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, xTensor);
+    if (xTensor == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "x", "must not be null");
+        return ge::GRAPH_FAILED;
+    }
     auto phiTensor = context_->GetDynamicInputTensor(PHI_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, phiTensor);
+    if (phiTensor == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "phi", "must not be null");
+        return ge::GRAPH_FAILED;
+    }
     auto alphaTensor = context_->GetDynamicInputTensor(ALPHA_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, alphaTensor);
+    if (alphaTensor == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "alpha", "must not be null");
+        return ge::GRAPH_FAILED;
+    }
     auto biasTensor = context_->GetDynamicInputTensor(BIAS_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, biasTensor);
+    if (biasTensor == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "bias", "must not be null");
+        return ge::GRAPH_FAILED;
+    }
 
     auto alphaShape = alphaTensor->GetStorageShape();
     OP_CHECK_IF(alphaShape.GetDimNum() != 1,

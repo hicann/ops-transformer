@@ -100,9 +100,18 @@ static ge::graphStatus InferShape4MhcPre(InferShapeContext* context)
     const gert::Shape* xShape = context->GetDynamicInputShape(X_INDEX, 0);
     const gert::Shape* phiShape = context->GetDynamicInputShape(PHI_INDEX, 0);
     const gert::Shape* alphaShape = context->GetDynamicInputShape(ALPHA_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, phiShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, alphaShape);
+    if (xShape == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "x", "must not be null");
+        return GRAPH_FAILED;
+    }
+    if (phiShape == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "phi", "must not be null");
+        return GRAPH_FAILED;
+    }
+    if (alphaShape == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "alpha", "must not be null");
+        return GRAPH_FAILED;
+    }
 
     int64_t phiDim = phiShape->GetDimNum();
     int64_t xDim = xShape->GetDimNum();

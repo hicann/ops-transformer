@@ -60,11 +60,20 @@ ge::graphStatus GetInputShapes(InferShapeContext* context, const gert::Shape*& g
                                const gert::Shape*& gradHPostShape, const gert::Shape*& gradHResShape)
 {
     gradHInShape = context->GetDynamicInputShape(GRAD_H_IN_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, gradHInShape);
+    if (gradHInShape == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "grad_h_in", "must not be null");
+        return GRAPH_FAILED;
+    }
     gradHPostShape = context->GetDynamicInputShape(GRAD_H_POST_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, gradHPostShape);
+    if (gradHPostShape == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "grad_h_post", "must not be null");
+        return GRAPH_FAILED;
+    }
     gradHResShape = context->GetDynamicInputShape(GRAD_H_RES_INDEX, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, gradHResShape);
+    if (gradHResShape == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "grad_h_res", "must not be null");
+        return GRAPH_FAILED;
+    }
     return GRAPH_SUCCESS;
 }
 
@@ -151,7 +160,6 @@ static ge::graphStatus InferShape4mHCPreGrad(InferShapeContext* context)
 
     auto ret = GetInputShapes(context, gradHInShape, gradHPostShape, gradHResShape);
     if (ret != GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "input shapes are invalid");
         return ret;
     }
 
@@ -167,7 +175,13 @@ static ge::graphStatus InferShape4mHCPreGrad(InferShapeContext* context)
 
     ret = ValidateInputDims(gradHInDimNum, gradHPostDimNum, gradHResDimNum);
     if (ret != GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "input dims invalid for MhcPreBackward");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context->GetNodeName(), "grad_h_in/grad_h_post/grad_h_res",
+            ("gradHIn=" + std::to_string(gradHInDimNum) + ", gradHPost=" + std::to_string(gradHPostDimNum) +
+             ", gradHRes=" + std::to_string(gradHResDimNum))
+                .c_str(),
+            "Dim combinations must be grad_h_in=grad_h_post with 3 dims and grad_h_res with 3 or 4 dims (BSND), or "
+            "grad_h_in=grad_h_post with 2 dims and grad_h_res with 2 or 3 dims (TND)");
         return ret;
     }
 
