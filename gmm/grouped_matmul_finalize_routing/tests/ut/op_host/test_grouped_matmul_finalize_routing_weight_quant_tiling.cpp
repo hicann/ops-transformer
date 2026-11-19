@@ -64,6 +64,7 @@ static optiling::GroupedMatmulFinalizeRoutingCompileInfo DEFAULT_COMPILE_INFO = 
 struct CsvWeightQuantTestCase {
     string testName;
     int m, k, n, e, bs;
+    int64_t yBatch;
     string xDtype, wDtype, scaleDtype, biasDtype, pertokenScaleDtype;
     bool transposeW;
     string outputBs;
@@ -182,7 +183,7 @@ static map<string, CsvWeightQuantTestCase> LoadCsvTestCases()
             continue;
 
         vector<string> fields = ParseCsvLine(line);
-        if (fields.size() < 16)
+        if (fields.size() < 19)
             continue;
 
         CsvWeightQuantTestCase tc;
@@ -205,6 +206,7 @@ static map<string, CsvWeightQuantTestCase> LoadCsvTestCases()
         tc.verifyBlockNum = (fields.size() > 16 && fields[16] == "true");
         tc.description = (fields.size() > 17) ? fields[17] : "";
 
+        tc.yBatch = stoll(fields[18]);
         cases[tc.testName] = tc;
     }
 
@@ -260,7 +262,7 @@ protected:
         gert::StorageShape sharedInputShape = {{bs, n}, {bs, n}};
         gert::StorageShape logitShape = {{m}, {m}};
         gert::StorageShape rowindexShape = {{m}, {m}};
-        gert::StorageShape yShape = {{m, n}, {m, n}};
+        gert::StorageShape yShape = {{tc.yBatch, n}, {tc.yBatch, n}};
 
         // Get dtypes from CSV
         ge::DataType xDtype = StringToDataType(tc.xDtype);
@@ -487,12 +489,22 @@ TEST_F(GroupedMatmulFinalizeRoutingWeightQuantTiling, TestMXA8W4WeightNzEZeroWit
 TEST_F(GroupedMatmulFinalizeRoutingWeightQuantTiling, TestCsvFileLoaded)
 {
     auto& cases = GetCsvTestCases();
-    EXPECT_EQ(cases.size(), 30) << "Expected 30 test cases in CSV file";
+    EXPECT_EQ(cases.size(), 32) << "Expected 32 test cases in CSV file";
 
     cout << "Successfully loaded " << cases.size() << " test cases from CSV" << endl;
     for (const auto& pair : cases) {
         cout << "  - " << pair.first << endl;
     }
+}
+
+TEST_F(GroupedMatmulFinalizeRoutingWeightQuantTiling, TestMXA8W4WeightNzOutputBsEqualsM)
+{
+    ExecuteCsvTest("TestMXA8W4WeightNzOutputBsEqualsM");
+}
+
+TEST_F(GroupedMatmulFinalizeRoutingWeightQuantTiling, TestMXA8W4WeightNzOutputBsExceedsM)
+{
+    ExecuteCsvTest("TestMXA8W4WeightNzOutputBsExceedsM");
 }
 
 TEST_F(GroupedMatmulFinalizeRoutingWeightQuantTiling, TestMXA8W4WeightNzInvalidAicAivRatio)

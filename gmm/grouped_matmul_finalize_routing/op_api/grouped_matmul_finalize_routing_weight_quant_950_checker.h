@@ -235,6 +235,12 @@ public:
         int64_t n = (gmmParams_.x2)->GetViewShape().GetDim(WQ_DIM_ONE);
         int64_t e = (gmmParams_.x2)->GetViewShape().GetDim(0);
         int64_t outputBS = gmmParams_.out->GetViewShape().GetDim(0);
+        if (unlikely(outputBS < 0 || outputBS > m)) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                ACLNN_NAME, "out batch", std::to_string(outputBS),
+                "out batch must be greater than or equal to 0 and less than or equal to m(" + std::to_string(m) + ")");
+            return false;
+        }
         if (unlikely(k <= 0)) {
             // 保证M/N非0已校验
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(ACLNN_NAME, "k", std::to_string(k), "The k must be positive");

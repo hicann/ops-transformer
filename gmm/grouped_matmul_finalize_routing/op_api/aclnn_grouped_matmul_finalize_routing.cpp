@@ -1665,6 +1665,35 @@ static inline aclnnStatus CheckSupportSceneforV3(const aclTensor* x1, const aclT
     OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "%s", errMsg.c_str());
     return ACLNN_ERR_PARAM_NULLPTR;
 }
+static inline aclnnStatus CheckDtypeForV3(const aclTensor* scaleOptional, const aclTensor* out, int64_t dtype,
+                                          bool isMXValid)
+{
+    if (dtype != ACLNN_OUT_DTYPE_FLOAT32) {
+        OP_LOGE_FOR_INVALID_VALUE("aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize", "dtype", std::to_string(dtype),
+                                  "0 (FLOAT32)");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (isMXValid && (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+                      op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
+                      op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9202)) {
+        // V3 supports MX inputs only on these platforms. Validate their scale before
+        // the shared checker derives a quantization mode from the scale dtype.
+        if (!IsMxScaleTypeSupported(scaleOptional->GetDataType())) {
+            OP_LOGE_FOR_INVALID_DTYPE("aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize", "scaleOptional",
+                                      op::ToString(scaleOptional->GetDataType()).GetString(),
+                                      gmm::DTypeVectorToString(GetMxScaleTypeSupportList()).c_str());
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    if (out->GetDataType() != DataType::DT_FLOAT) {
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize", "out",
+                                              op::ToString(out->GetDataType()).GetString(),
+                                              "when dtype is 0, out must be DT_FLOAT");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
 aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(
     const aclTensor* x1, aclTensor* x2, const aclTensor* scaleOptional, const aclTensor* biasOptional,
     const aclTensor* offsetOptional, const aclTensor* antiquantScaleOptional, const aclTensor* antiquantOffsetOptional,
@@ -1763,11 +1792,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(
             "HIFLOAT4 is only supported on DAV_9201/DAV_9202");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (dtype != ACLNN_OUT_DTYPE_FLOAT32) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "aclnnGroupedMatmulFinalizeRoutingV3 dtype must be 0 (FLOAT32), but is %lld.",
-                dtype);
-        return ACLNN_ERR_PARAM_INVALID;
-    }
+    auto dtypeRet = CheckDtypeForV3(scaleOptional, out, dtype, isMXValid);
+    CHECK_RET(dtypeRet == ACLNN_SUCCESS, dtypeRet);
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     GroupedMatmulParams params = GroupedMatmulParamsBuilder::Create(x1, x2, out)

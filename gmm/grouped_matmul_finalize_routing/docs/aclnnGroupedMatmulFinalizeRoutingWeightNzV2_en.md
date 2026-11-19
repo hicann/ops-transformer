@@ -342,7 +342,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
     - When the data types of x1 and x2 are INT8, rowIndex supports the INT64 and INT32 data types; when the data types of x1 and x2 are FLOAT8_E4M3FN, HIFLOAT8, or the MxA8W4 quantization mode, rowIndex supports only the INT64 data type.
     - x1, x2, scale, groupList, logit, and rowIndex are required parameters; pertokenScaleOptional, sharedInput, and bias are optional parameters. In the MxA8W4 use case, pertokenScaleOptional is a required parameter. Currently, the offsetOptional parameter is not supported and must be nullptr.
     - When groupListType is 0, groupList must be a non-negative monotonically non-decreasing sequence (cumulative sum), and the last value must not be greater than the first dimension of the tensor in x1; when groupListType is 1, groupList must be a non-negative array (size of each group), and the sum of the values must not be greater than the first dimension of the tensor in x1.
-    - The first dimension batch of out and sharedInputOffset must be greater than or equal to 0 and less than or equal to m.
+    - The first dimension batch of out must be in [0, m]. sharedInputOffset must be in [0, batch], including when the shared input is null.
     - When sharedInput is not empty, its first dimension is sharedInputLen. sharedInputOffset, sharedInputLen, and their sum must be less than or equal to the first dimension batch of out.
     - x1 supports M = 0 and x2 supports N = 0; other empty tensor use cases are not supported.
 

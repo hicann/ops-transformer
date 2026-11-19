@@ -644,6 +644,14 @@ static bool CheckMxA8W4AttrWithInput(gert::TilingContext* context)
                                               "Attr outputBS must be >=0");
         return false;
     }
+    const auto xShape = context->GetInputShape(X_INDEX);
+    OP_CHECK_IF(xShape == nullptr, OP_LOGE(context->GetNodeName(), "Input x shape cannot be nullptr."), return false);
+    const int64_t m = xShape->GetOriginShape().GetDim(0);
+    if (unlikely(outputBS > m)) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, "output_bs", std::to_string(outputBS),
+                                              "outputBS must be less than or equal to M (" + std::to_string(m) + ")");
+        return false;
+    }
 
     auto sharedInputDesc = context->GetOptionalInputDesc(SHARE_INPUT_INDEX);
     if (sharedInputDesc != nullptr) {

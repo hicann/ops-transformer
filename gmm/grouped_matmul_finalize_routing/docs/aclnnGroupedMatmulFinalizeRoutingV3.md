@@ -379,7 +379,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - rowIndexOptional仅支持INT64。
     - x1、x2、scaleOptional、pertokenScaleOptional、groupListOptional、logitOptional、rowIndexOptional是必选参数，biasOptional，sharedInputOptional是可选参数。目前暂不支持offsetOptional参数。
     - 当groupListType为0时，groupListOptional须为非负单调非递减数列（累积和），且最后一个值不大于x1中tensor的第一维；当groupListType为1时，groupListOptional须为非负数组（各组大小），且数值的总和不大于x1中tensor的第一维。
-    - out的第一维batch、sharedInputOffset必须大于等于0，且小于等于m。
+    - out的第一维batch必须在[0, m]范围内。sharedInputOffset必须在[0, batch]范围内；共享输入为空时也须满足该约束。
     - 当sharedInputOptional不为空时，其第一维长度为sharedInputLen。sharedInputOffset、sharedInputLen以及两者之和均需小于等于out的第一维batch。
     - x1支持M为0，x2支持N为0；其他空Tensor场景不支持。
 

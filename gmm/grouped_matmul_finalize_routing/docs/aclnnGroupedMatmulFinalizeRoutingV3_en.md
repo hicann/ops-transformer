@@ -384,7 +384,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - rowIndexOptional only supports INT64.
     - x1, x2, scaleOptional, pertokenScaleOptional, groupListOptional, logitOptional, and rowIndexOptional are mandatory parameters; biasOptional and sharedInputOptional are optional parameters. The offsetOptional parameter is currently not supported.
     - When groupListType is 0, groupListOptional must be a non-negative, monotonically non-decreasing sequence (cumulative sum), and the last value must not be greater than the first dimension of the tensor in x1; when groupListType is 1, groupListOptional must be a non-negative array (size of each group), and the sum of the values must not be greater than the first dimension of the tensor in x1.
-    - batch (the first dimension of out) and sharedInputOffset must be greater than or equal to 0 and less than or equal to m.
+    - The first dimension batch of out must be in [0, m]. sharedInputOffset must be in [0, batch], including when the shared input is null.
     - When sharedInputOptional is not empty, the length of its first dimension is sharedInputLen. sharedInputOffset, sharedInputLen, and their sum must be less than or equal to batch, the first dimension of out.
     - x1 supports M being 0, and x2 supports N being 0. Other empty tensor use cases are not supported.
 

@@ -342,7 +342,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
     - MXFP8/MXFP4场景中，scale和pertokenScaleOptional的数据类型均为FLOAT8_E8M0。输出为BFLOAT16时，bias必须为null，logit支持FLOAT或BFLOAT16，dtype必须取2；输出为FLOAT时，logit仅支持FLOAT，dtype必须取0。
     - x1、x2、scale、groupList、logit、rowIndex是必选参数，pertokenScaleOptional、sharedInput、bias是可选参数。MxA8W4场景下pertokenScaleOptional为必选参数。目前暂不支持offsetOptional参数，必须为nullptr。
     - 当groupListType为0时，groupList须为非负单调非递减数列（累积和），且最后一个值不大于x1中tensor的第一维；当groupListType为1时，groupList须为非负数组（各组大小），且数值的总和不大于x1中tensor的第一维。
-    - out的第一维batch、sharedInputOffset必须大于等于0，且小于等于m。
+    - out的第一维batch必须在[0, m]范围内。sharedInputOffset必须在[0, batch]范围内；共享输入为空时也须满足该约束。
     - 当sharedInput不为空时，其第一维长度为sharedInputLen。sharedInputOffset、sharedInputLen以及两者之和均需小于等于out的第一维batch。
     - x1支持M为0，x2支持N为0；其他空Tensor场景不支持。
 

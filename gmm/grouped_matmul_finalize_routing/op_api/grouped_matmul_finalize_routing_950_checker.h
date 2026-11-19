@@ -314,6 +314,11 @@ public:
                                              (gmmParams_.x2)->GetViewShape().GetDim(TWO_DIM);
         int64_t e = (gmmParams_.x2)->GetViewShape().GetDim(0); // 从weight的第0维获取e
         int64_t outputBS = gmmParams_.out->GetViewShape().GetDim(0);
+        GMMFR_CHECK_REPORT(
+            outputBS >= 0 && outputBS <= m, return false,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                GMMFR_ACLNN_OP_NAME, "out batch", std::to_string(outputBS),
+                "out batch must be greater than or equal to 0 and less than or equal to m(" + std::to_string(m) + ")"));
         if (k <= 0) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(GMMFR_ACLNN_OP_NAME, "x", ViewShapeToString(gmmParams_.x1),
                                                   "when the M or N value is not 0 [M=" + std::to_string(m) + ", N=" +
