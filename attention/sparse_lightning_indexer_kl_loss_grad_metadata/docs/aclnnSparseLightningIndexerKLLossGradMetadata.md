@@ -379,11 +379,12 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 
   - aclnnSparseLightningIndexerKLLossGradMetadata为确定性实现，确定性计算配置不会改变其输出规则。
   - B（Batch）表示输入样本批量大小，q为配套的aclnnSparseLightningIndexerKLLossGrad算子的入参，S1表示layoutQOptional=BSND时，q shape中的S轴的大小。
-  - 参数cuSeqlensQOptional、cuSeqlensKOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
-  - 参数sequsedQOptional、sequsedKOptional要求其值表示每个Batch中的有效token数。
+  - cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional的内部值约束无法进行校验，调用者须保证传入值满足约束；若传入非法值，算子行为未定义，不保证返回参数错误码或得到正确结果。
+  - 参数cuSeqlensQOptional、cuSeqlensKOptional表示各batch分配长度的前缀和。每个元素必须大于等于0，首元素固定为0，后一个元素必须大于等于前一个元素。
+  - 参数sequsedQOptional、sequsedKOptional表示每个batch实际使用的q/k有效长度。传入时每个值必须大于等于0，且不得超过对应batch的分配长度。BSND的分配长度分别为maxSeqlenQ、maxSeqlenK，须与主算子的S1、S2一致；TND中须满足0 <= sequsedQOptional[b] <= cuSeqlensQOptional[b+1] - cuSeqlensQOptional[b]、0 <= sequsedKOptional[b] <= cuSeqlensKOptional[b+1] - cuSeqlensKOptional[b]。
   - 参数sequsedQOptional、sequsedKOptional、cmpResidualKOptional传入时均须保证shape为(B,)的一维INT32张量，长度必须等于实际Batch数B。
   - cmpRatio不为1且maskMode为3时，cmpResidualKOptional必须传入非空张量。
-  - 参数cmpResidualKOptional需满足cmpResidualKOptional[i] < cmpRatio。
+  - 参数cmpResidualKOptional传入时，每个值必须满足0 <= cmpResidualKOptional[b] < cmpRatio。
   - layoutQOptional、layoutKOptional须相同。
   - numHeadsQ必须能被numHeadsK整除。
   <!-- npu="950" id10 -->

@@ -474,8 +474,11 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
   - 参数sparseIndices、cuSeqLensQOptional、cuSeqLensKOptional、seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional、metadataOptional的数据类型应为INT32。
   - layoutQ和layoutK当前支持BSND和TND。
   - 当layoutQ为TND时，需要传入cuSeqLensQOptional；当layoutK为TND时，需要传入cuSeqLensKOptional。
-  - seqUsedQOptional、seqUsedKOptional存在时，每个值必须位于对应batch的分配长度范围内；BSND的分配长度分别为S1、S2，TND的分配长度为对应cuSeqLens相邻元素之差。
-  - sparseIndices中有效位置必须位于当前batch的有效key序列范围内；传入seqUsedKOptional时以seqUsedKOptional对应值为上界。每行有效key下标从最后一维第0列开始连续存放，无效位置仅在尾部使用-1填充，不支持在有效位置之前或之间填充-1。
+  - sparseIndices、cuSeqLensQOptional、cuSeqLensKOptional、seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional的内部值约束无法进行校验，调用者须保证传入值满足约束；若传入非法值，算子行为未定义，不保证返回参数错误码或得到正确结果。
+  - cuSeqLensQOptional、cuSeqLensKOptional表示各batch分配长度的前缀和。每个元素必须大于等于0，首元素固定为0，后一个元素必须大于等于前一个元素。
+  - seqUsedQOptional、seqUsedKOptional存在时，每个值必须大于等于0，且不得超过对应batch的分配长度。BSND的分配长度分别为S1、S2；TND中须满足0 <= seqUsedQOptional[b] <= cuSeqLensQOptional[b+1] - cuSeqLensQOptional[b]、0 <= seqUsedKOptional[b] <= cuSeqLensKOptional[b+1] - cuSeqLensKOptional[b]。
+  - cmpResidualKOptional存在时，每个值必须满足0 <= cmpResidualKOptional[b] < cmpRatio。
+  - sparseIndices的值必须为-1，或满足0 <= index < 当前batch的有效key个数。有效key个数为seqUsedKOptional[b]（传入时），否则为S2（BSND）或cuSeqLensKOptional[b+1] - cuSeqLensKOptional[b]（TND）。下标为当前batch内的局部下标。每行有效key下标从最后一维第0列开始连续存放，无效位置仅在尾部使用-1填充，不支持在有效位置之前或之间填充-1。
   - attnSoftmaxL1Norm的无效top-k位置建议置零，并与sparseIndices的有效位置保持一致。
 
     <table style="undefined;table-layout: fixed; width: 942px">

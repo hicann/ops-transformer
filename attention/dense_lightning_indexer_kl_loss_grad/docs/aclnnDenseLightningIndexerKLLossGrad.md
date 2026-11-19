@@ -474,6 +474,10 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGrad(
   - 参数cuSeqLensQOptional、cuSeqLensKOptional、seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional、metadataOptional的数据类型应为INT32。
   - layoutQ和layoutK当前支持BSND和TND。
   - 当layoutQ为TND时，需要传入cuSeqLensQOptional；当layoutK为TND时，需要传入cuSeqLensKOptional。
+  - cuSeqLensQOptional、cuSeqLensKOptional、seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional的内部值约束无法进行校验，调用者须保证传入值满足约束；若传入非法值，算子行为未定义，不保证返回参数错误码或得到正确结果。
+  - cuSeqLensQOptional、cuSeqLensKOptional表示各batch分配长度的前缀和。每个元素必须大于等于0，首元素固定为0，后一个元素必须大于等于前一个元素。
+  - seqUsedQOptional、seqUsedKOptional存在时，每个值必须大于等于0，且不得超过对应batch的分配长度。BSND的分配长度分别为S1、S2；TND中须满足0 <= seqUsedQOptional[b] <= cuSeqLensQOptional[b+1] - cuSeqLensQOptional[b]、0 <= seqUsedKOptional[b] <= cuSeqLensKOptional[b+1] - cuSeqLensKOptional[b]。
+  - cmpResidualKOptional存在时，每个值必须满足0 <= cmpResidualKOptional[b] < cmpRatio。
   - attnSoftmaxL1Norm的维度为(B,S1,N2,S2)或(T1,N2,maxSeqLenK)，覆盖全部key的目标分布。
   - softmaxLse由DenseLightningIndexerSoftmaxLse算子预先计算提供，维度为(B,N2,S1)或(N2,T1)，用于数值稳定计算。
   - metadata输入必须传入，用于计算分核信息。

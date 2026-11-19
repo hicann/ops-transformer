@@ -199,6 +199,10 @@ dense_lightning_indexer_kl_loss_grad(
 - `cu_seqlens_q`、`cu_seqlens_k`、`seqused_q`、`seqused_k`、`cmp_residual_k`、`metadata` 的数据类型应为 `int32`。
 - `layout_q` 和 `layout_k` 支持 `BSND` 和 `TND`。
 - `layout_q="TND"` 时需要传入 `cu_seqlens_q`；`layout_k="TND"` 时需要传入 `cu_seqlens_k`。
+- `cu_seqlens_q`、`cu_seqlens_k`、`seqused_q`、`seqused_k`、`cmp_residual_k` 的内部值约束无法进行校验，调用者须保证传入值满足约束；若传入非法值，算子行为未定义，不保证返回参数错误码或得到正确结果。
+- `cu_seqlens_q`、`cu_seqlens_k` 表示各batch分配长度的前缀和。每个元素必须大于等于0，首元素固定为0，后一个元素必须大于等于前一个元素。
+- `seqused_q`、`seqused_k` 传入时，每个值必须大于等于0，且不得超过对应batch的分配长度。BSND的分配长度分别为 `S1`、`S2`；TND中须满足 `0 <= seqused_q[b] <= cu_seqlens_q[b+1] - cu_seqlens_q[b]`、`0 <= seqused_k[b] <= cu_seqlens_k[b+1] - cu_seqlens_k[b]`。
+- `cmp_residual_k` 传入时，每个值必须满足 `0 <= cmp_residual_k[b] < cmp_ratio`。
 - 当前 `num_heads_k` 仅支持 1。
 - `attn_softmax_l1_norm` 在TND场景下最后一维是max_seqlen_k，所有batch中最长的seqlen_k。
 - `mask_mode` 当前支持 `0` 和 `3`。

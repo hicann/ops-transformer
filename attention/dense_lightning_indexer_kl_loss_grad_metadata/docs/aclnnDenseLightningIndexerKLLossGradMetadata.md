@@ -368,6 +368,10 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
 ## 约束说明
 
 - 确定性说明：aclnnDenseLightningIndexerKLLossGradMetadata默认确定性实现
+- cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional的内部值约束无法进行校验，调用者须保证传入值满足约束；若传入非法值，算子行为未定义，不保证返回参数错误码或得到正确结果。
+- 参数cuSeqlensQOptional、cuSeqlensKOptional表示各batch分配长度的前缀和。每个元素必须大于等于0，首元素固定为0，后一个元素必须大于等于前一个元素。
+- 参数sequsedQOptional、sequsedKOptional表示每个batch实际使用的q/k有效长度。传入时每个值必须大于等于0，且不得超过对应batch的分配长度。BSND的分配长度分别为maxSeqlenQ、maxSeqlenK，须与主算子的S1、S2一致；TND中须满足0 <= sequsedQOptional[b] <= cuSeqlensQOptional[b+1] - cuSeqlensQOptional[b]、0 <= sequsedKOptional[b] <= cuSeqlensKOptional[b+1] - cuSeqlensKOptional[b]。
+- 参数cmpResidualKOptional传入时，每个值必须满足0 <= cmpResidualKOptional[b] < cmpRatio。
 - BSND场景
   - 必传batchSize、maxSeqlenQ和maxSeqlenK参数，以获取shape信息
 - TND场景

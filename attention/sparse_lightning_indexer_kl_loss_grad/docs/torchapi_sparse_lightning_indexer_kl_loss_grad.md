@@ -204,7 +204,11 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 - `layout_q` 和 `layout_k` 支持 `BSND` 和 `TND`。
 - `layout_q="TND"` 时需要传入 `cu_seqlens_q`；`layout_k="TND"` 时需要传入 `cu_seqlens_k`。
 - 当前 `num_heads_k` 仅支持1。
-- `sparse_indices` 中有效位置必须位于当前batch的key序列范围内；每行有效key下标从最后一维第0列开始连续存放，无效位置仅在尾部使用 `-1` 填充，不支持在有效位置之前或之间填充 `-1`。
+- `sparse_indices`、`cu_seqlens_q`、`cu_seqlens_k`、`seqused_q`、`seqused_k`、`cmp_residual_k` 的内部值约束无法进行校验，调用者须保证传入值满足约束；若传入非法值，算子行为未定义，不保证返回参数错误码或得到正确结果。
+- `cu_seqlens_q`、`cu_seqlens_k` 表示各batch分配长度的前缀和。每个元素必须大于等于0，首元素固定为0，后一个元素必须大于等于前一个元素。
+- `seqused_q`、`seqused_k` 传入时，每个值必须大于等于0，且不得超过对应batch的分配长度。BSND的分配长度分别为 `S1`、`S2`；TND中须满足 `0 <= seqused_q[b] <= cu_seqlens_q[b+1] - cu_seqlens_q[b]`、`0 <= seqused_k[b] <= cu_seqlens_k[b+1] - cu_seqlens_k[b]`。
+- `cmp_residual_k` 传入时，每个值必须满足 `0 <= cmp_residual_k[b] < cmp_ratio`。
+- `sparse_indices` 的值必须为 `-1`，或满足 `0 <= index < 当前batch的有效key个数`。有效key个数为 `seqused_k[b]`（传入时），否则为 `S2`（BSND）或 `cu_seqlens_k[b+1] - cu_seqlens_k[b]`（TND）。下标为当前batch内的局部下标。每行有效key下标从最后一维第0列开始连续存放，无效位置仅在尾部使用 `-1` 填充，不支持在有效位置之前或之间填充 `-1`。
 - `attn_softmax_l1_norm` 的无效top-k位置建议置0，并与 `sparse_indices` 的有效位置保持一致。
 - `mask_mode` 当前支持 `0` 和 `3`。
 - `cmp_ratio` 取值范围为 `[1, 128]`。
