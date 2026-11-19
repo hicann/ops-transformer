@@ -168,7 +168,7 @@ This document uses the following dimension symbols:
 
 | Invocation Mode | Sample Code | Description |
 | :--- | :--- | :--- |
-| aclnn API | [test_aclnn_chunk_kda_fwd.cpp](./examples/test_aclnn_chunk_kda_fwd.cpp) | Calls the ChunkKdaFwd operator through [aclnnChunkKdaFwd](docs/aclnnChunkKdaFwd_en.md). For compilation and running steps, see [Invocation Sample Description](./examples/README_en.md). |
+| aclnn API | [test_aclnn_chunk_kda_fwd.cpp](./examples/test_aclnn_chunk_kda_fwd.cpp) | Calls the ChunkKdaFwd operator through [aclnnChunkKdaFwd](./docs/aclnnChunkKdaFwd_en.md). For compilation and running steps, see [Invocation Sample Description](./examples/README_en.md). |
 | PyTorch API | [torchapi_chunk_kda_fwd](./docs/torchapi_chunk_kda_fwd.md) | Calls the ChunkKdaFwd operator through `cann_ops_transformer.ops.chunk_kda_fwd`. |
 
 For stage division, platform templates, and pipeline design, refer to [ChunkKdaFwd Operator Design Introduction](./docs/ChunkKdaFwd_design_en.md).

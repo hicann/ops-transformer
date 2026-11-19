@@ -169,4 +169,4 @@
 | aclnn API | [test_aclnn_chunk_kda_fwd.cpp](./examples/test_aclnn_chunk_kda_fwd.cpp) | 通过[aclnnChunkKdaFwd](./docs/aclnnChunkKdaFwd.md)调用ChunkKdaFwd算子。编译与运行步骤见[调用示例说明](./examples/README.md)。 |
 | PyTorch API | [torchapi_chunk_kda_fwd](./docs/torchapi_chunk_kda_fwd.md) | 通过`cann_ops_transformer.ops.chunk_kda_fwd`调用ChunkKdaFwd算子。 |
 
-阶段划分、平台模板和流水设计见[ChunkKdaFwd算子设计介绍](./docs/ChunkKdaFwd算子设计介绍.md)。
+阶段划分、平台模板和流水设计见[ChunkKdaFwd算子设计介绍](./docs/ChunkKdaFwd_design.md)。

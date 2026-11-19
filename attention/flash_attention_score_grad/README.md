@@ -227,4 +227,4 @@
 
 ## 参考资源
 
-- [FAG算子设计介绍](./docs/FAG算子设计介绍.md)
+- [FAG算子设计介绍](./docs/FAG_design.md)

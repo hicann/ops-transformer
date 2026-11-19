@@ -22,6 +22,7 @@ This project provides development and invocation samples for AI Core operators. 
 │   ├── attention                  # Examples of attention operators
 │   │   └── flash_attn
 │   │       └── L0_minimal         # Minimal FlashAttention sample, with only op_kernel and no Host Tiling
+│   ├── fast_kernel_launch_example # Example of simple operator (`<<<>>>` direct invocation) development
 │   ├── mc2                        # Examples of communication-computation fusion operators
 │   │   ├── all_gather_add         # Directory name of the AllGatherAdd operator, generally in lowercase with underscores
 │   │   │   └── ...
@@ -38,3 +39,4 @@ This project provides development and invocation samples for AI Core operators. 
 | mc2/all_gather_add | 	Performs AllGather collective communication first, and then performs element-wise addition.	 | For the end-to-end operator development process, see the [AI Core Operator Development Guide](./mc2/all_gather_add/docs/AllGatherAdd_design_en.md). |For the invocation sample, see [README](mc2/all_gather_add/README_en.md)|
 | mc2/ccu_alltoall | CCU direct-call (`<<<>>>`) AllToAll collective communication + Blaze MXFP8 MatMul dual-stream operator fusion (kernel direct-call sample). | — | For the invocation sample, see [README](mc2/ccu_alltoall/README_en.md)|
 | attention/flash_attn/L0_minimal | 	Minimal FlashAttention implementation, with no mask, no combine, and no independent Host Tiling.	 | For the operator implementation details, see [FA_IMPL.md](attention/flash_attn/L0_minimal/ascend_ops/csrc/flash_attn_minimal/FA_IMPL_en.md). |For the invocation sample, see [README](attention/flash_attn/L0_minimal/README_en.md)|
+| fast_kernel_launch_example | Develops simple operators with Ascend C and the PyTorch Extension. A single file completes both operator development and framework adaptation, and `<<<>>>` direct invocation is supported. | For the operator development process, see the [Simple Operator Development Guide](fast_kernel_launch_example/README_en.md). |For the invocation sample, see [README](fast_kernel_launch_example/README_en.md)|

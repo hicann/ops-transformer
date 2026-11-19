@@ -224,7 +224,7 @@ English | [简体中文](./README.md)
 
 | Invocation Method           | Sample Code                                                                                                              | Description                                                                                                                    |
 |----------------|-------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
-| aclnn invocation | [test_aclnn_flash_attention_score_grad_v2](./examples/test_aclnn_flash_attention_score_grad_v2.cpp)                     | In non-TND scenarios, the FlashAttentionGrad operator is invoked through the [aclnnFlashAttentionScoreGradV2](docs/aclnnFlashAttentionScoreGradV2_en.md) interface.                   |
+| aclnn invocation | [test_aclnn_flash_attention_score_grad_v2](./examples/test_aclnn_flash_attention_score_grad_v2.cpp)                     | In non-TND scenarios, the FlashAttentionGrad operator is invoked through the [aclnnFlashAttentionScoreGradV2](./docs/aclnnFlashAttentionScoreGradV2_en.md) interface.                   |
 | Graph mode invocation | [test_geir_flash_attention_score_grad](./examples/test_geir_flash_attention_score_grad.cpp) | The FlashAttentionGrad operator is invoked by constructing a graph with [Ascend IR](./docs/ascendir_FlashAttentionScoreGrad_en.md). |
 
 ## Reference Resources

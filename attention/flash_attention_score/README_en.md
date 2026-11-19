@@ -388,7 +388,7 @@ English | [简体中文](./README.md)
 
 | Calling Method           | Calling Sample                                                                                    | Description                                                                                                  |
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| aclnn call | [test_aclnn_flash_attention_score](./examples/test_aclnn_flash_attention_score.cpp) | In non-TND scenarios, calls the FlashAttention operator through the [aclnnFlashAttentionScore](docs/aclnnFlashAttentionScoreV2_en.md) API.             |
+| aclnn call | [test_aclnn_flash_attention_score](./examples/test_aclnn_flash_attention_score.cpp) | In non-TND scenarios, calls the FlashAttention operator through the [aclnnFlashAttentionScore](./docs/aclnnFlashAttentionScoreV2_en.md) API.             |
 | Graph mode call | [test_geir_flash_attention_score](./examples/test_geir_flash_attention_score.cpp) | Calls the FlashAttention operator by building a graph through [Ascend IR](./docs/ascendir_FlashAttentionScore_en.md). |
 
 ## Reference Resources
