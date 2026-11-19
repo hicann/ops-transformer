@@ -14,6 +14,9 @@ import os
 import subprocess
 from typing import Optional, List
 
+METADATA_STRIDE = 16
+ALIGN_SIZE = 4096
+
 
 class MixedQuantFlashAttnMetadataOp:
     def __init__(
@@ -201,6 +204,17 @@ class MixedQuantFlashAttnMetadataOp:
 
         return metadata
 
+    def _calculate_metadata_size(self, output_json: dict) -> int:
+        input_info = output_json["input"]
+        aic_core_num = int(input_info["aicCoreMaxNum"])
+        aiv_core_num = int(input_info["aivCoreMaxNum"])
+        batch_size = int(input_info["batchSize"])
+        num_heads_kv = int(input_info["kvHeadNum"])
+        raw_size = (
+            (aic_core_num + aiv_core_num) * batch_size * num_heads_kv + 1
+        ) * METADATA_STRIDE
+        return (raw_size + ALIGN_SIZE - 1) // ALIGN_SIZE * ALIGN_SIZE
+
     def npu_mixed_quant_flash_attn_metadata(
         self,
         num_heads_q: int,
@@ -258,5 +272,9 @@ class MixedQuantFlashAttnMetadataOp:
         output_json = self._run_binary()
 
         metadata = self._parse_output_to_metadata(output_json)
+
+        allocation_size = self._calculate_metadata_size(output_json)
+        if len(metadata) < allocation_size:
+            metadata.extend([0] * (allocation_size - len(metadata)))
 
         return metadata

@@ -54,12 +54,21 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FaTilingInfo&
         OP_LOGE_FOR_INVALID_SHAPEDIM(faInfo.opName, "seqused_q", (std::to_string(sequsedQDimNum) + "D").c_str(), "1D"),
         return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        faInfo.seqUsedQSize != faInfo.bSize,
-        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-            faInfo.opName, "seqused_q", std::to_string(faInfo.seqUsedQSize).c_str(),
-            ("The shape size of seqused_q must be equal to batch_size (" + std::to_string(faInfo.bSize) + ")").c_str()),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(faInfo.qLayout == FaLayout::TND && faInfo.seqUsedQSize != faInfo.bSize,
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    faInfo.opName, "seqused_q", std::to_string(faInfo.seqUsedQSize).c_str(),
+                    ("When layout_q is TND, the shape size of seqused_q must be equal to the shape size (" +
+                     std::to_string(faInfo.cuSeqLensQSize) + ") of the cu_seqlens_q minus 1")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(faInfo.qLayout != FaLayout::TND && faInfo.seqUsedQSize != faInfo.bSize,
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    faInfo.opName, "seqused_q", std::to_string(faInfo.seqUsedQSize).c_str(),
+                    ("When layout_q is " + LayoutToSerialString(faInfo.qLayout) +
+                     ", the shape size of seqused_q must be equal to the size (" + std::to_string(faInfo.bSize) +
+                     ") of the 0th axis (batch) of q")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -86,10 +95,19 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedKv(const FaTilingInfo
                                              (std::to_string(sequsedKvDimNum) + "D").c_str(), "1D"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(faInfo.seqUsedKvSize != faInfo.bSize,
+    OP_CHECK_IF(faInfo.qLayout == FaLayout::TND && faInfo.seqUsedKvSize != faInfo.bSize,
                 OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
                     faInfo.opName, "seqused_kv", std::to_string(faInfo.seqUsedKvSize).c_str(),
-                    ("The shape size of seqused_kv must be equal to batch_size (" + std::to_string(faInfo.bSize) + ")")
+                    ("When layout_q is TND, the shape size of seqused_kv must be equal to the shape size (" +
+                     std::to_string(faInfo.cuSeqLensQSize) + ") of the cu_seqlens_q minus 1")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(faInfo.qLayout != FaLayout::TND && faInfo.seqUsedKvSize != faInfo.bSize,
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    faInfo.opName, "seqused_kv", std::to_string(faInfo.seqUsedKvSize).c_str(),
+                    ("When layout_q is " + LayoutToSerialString(faInfo.qLayout) +
+                     ", the shape size of seqused_kv must be equal to the size (" + std::to_string(faInfo.bSize) +
+                     ") of the 0th axis (batch) of q")
                         .c_str()),
                 return ge::GRAPH_FAILED);
 
@@ -118,14 +136,6 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FaTilingInf
                 OP_LOGE_FOR_INVALID_SHAPEDIM(faInfo.opName, "cu_seqlens_q",
                                              (std::to_string(cuSeqlensQDimNum) + "D").c_str(), "1D"),
                 return ge::GRAPH_FAILED);
-
-    OP_CHECK_IF(
-        faInfo.cuSeqLensQSize != faInfo.bSize + 1,
-        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-            faInfo.opName, "cu_seqlens_q", std::to_string(faInfo.cuSeqLensQSize).c_str(),
-            ("The shape size of cu_seqlens_q must be equal to batch_size (" + std::to_string(faInfo.bSize) + ") plus 1")
-                .c_str()),
-        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
