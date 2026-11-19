@@ -168,7 +168,7 @@ private:
     }
 
     static constexpr bool MX_SCALES_IN_FLAG =
-        !SupportRsw && !HasAddRmsNorm && (QuantMode == MXFP8_E5M2_COMM_QUANT || QuantMode == MXFP8_E4M3_COMM_QUANT);
+        !HasAddRmsNorm && (QuantMode == MXFP8_E5M2_COMM_QUANT || QuantMode == MXFP8_E4M3_COMM_QUANT);
 
     TPipe* tpipe_{nullptr};
     GlobalTensor<ExpandXType> expandXGM_;
