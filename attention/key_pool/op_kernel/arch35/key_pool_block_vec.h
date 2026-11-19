@@ -1257,6 +1257,9 @@ __aicore__ inline void KeyPoolBlockVector<COMP>::PrepareNormalizedKv(const Vec1R
                 SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
                 WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
                 SaveState(tailKv, stateCacheGm_, stateBlockTableGm_, tailCacheSlice, 0U, constInfo_.headDim, 0U);
+                // Complete the tail write before the next batch reuses tailKv in tmpBuff2.
+                SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+                WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
             }
             tailIterator.IteratorSlice();
         }

@@ -47,6 +47,7 @@ private:
     __aicore__ inline void InitWorkspace(__gm__ uint8_t* workspace);
     // ================================Process functions================================
     __aicore__ inline void InitTilingData();
+    __aicore__ inline void SetBalancedBaseSize();
     __aicore__ inline void SplitK();
     // 获取基本块数量
     __aicore__ inline uint32_t GetLoopTimes();
@@ -146,6 +147,7 @@ __aicore__ inline void KeyPoolKernel<COMP>::Init(__gm__ uint8_t* hidden_states, 
     // 0. 计算最后一个Tc块的起始位置
     constInfo.bIdxOfLastTc = constInfo.batchSize - 1;
     // 1. 计算head_dim的切分大小, 构建ConstInfo的其他信息
+    SetBalancedBaseSize();
     CalcSplitCoreInfo();
     SplitK(); // K轴切分
     // 2. 计算循环次数
@@ -193,6 +195,57 @@ __aicore__ inline void KeyPoolKernel<COMP>::InitTilingData()
     constInfo.vec1TailCacheSize = tilingData_->workspaceParams.vec1TailCacheSize;
     constInfo.dbWorkspaceRatio = tilingData_->workspaceParams.dbWorkspaceRatio;
     constInfo.batchConsistency = tilingData_->baseParams.batchConsistency;
+}
+
+template <typename COMP>
+__aicore__ inline void KeyPoolKernel<COMP>::SetBalancedBaseSize()
+{
+    constexpr uint32_t SUPPORTED_HEAD_DIM = 128U;
+    constexpr uint32_t CHANNEL_TILE_SIZE = 32U;
+    constexpr uint32_t WIDE_CHANNEL_TILE_SIZE = 64U;
+    constexpr uint32_t TOKEN_TILE_ALIGNMENT = 32U;
+    if (constInfo.headDim != SUPPORTED_HEAD_DIM || constInfo.usedCoreNum < SUPPORTED_HEAD_DIM / CHANNEL_TILE_SIZE ||
+        constInfo.batchConsistency == BATCH_CONSISTENCY) {
+        return;
+    }
+    // seqused is rejected by host validation, so tokenSize is the total current-token count.
+    const uint32_t tokenCount = tilingData_->baseParams.tokenSize;
+    // Keep every tile on a compression boundary, including ratios larger than 32.
+    const uint32_t tokenAlignment = max(TOKEN_TILE_ALIGNMENT, constInfo.cmpRatio);
+    const uint32_t maxBalancedTokens = constInfo.usedCoreNum * (constInfo.mBaseSize - tokenAlignment);
+    if (tokenCount <= constInfo.mBaseSize || tokenCount > maxBalancedTokens) {
+        return;
+    }
+    // Include each sequence's historical prefix and incomplete tail in the Pool workload.
+    // This keeps multi-batch/history tiles within the same per-core capacity as fresh input.
+    if constexpr (COMP::hiddenStatesLayout == HIDDEN_STATES_LAYOUT::BSH) {
+        if (static_cast<uint64_t>(constInfo.batchSize) * Align(constInfo.sSize, constInfo.cmpRatio) >
+            maxBalancedTokens) {
+            return;
+        }
+    }
+    uint32_t poolTokenCount = 0U;
+    for (uint32_t batchIdx = 0U; batchIdx < constInfo.batchSize; ++batchIdx) {
+        const uint32_t seqLength = tools_.GetSeqLength(batchIdx);
+        if (seqLength == 0U) {
+            continue;
+        }
+        const uint32_t historicalRows = tools_.GetStartPos(batchIdx) % constInfo.cmpRatio;
+        poolTokenCount += Align(historicalRows + seqLength, constInfo.cmpRatio);
+        if (poolTokenCount > maxBalancedTokens) {
+            return;
+        }
+    }
+    // Split independent output channels, then balance tokens across their core groups.
+    // More independent channel tasks reduce the need for Split-K workspace reductions.
+    const uint32_t narrowGroups = constInfo.usedCoreNum / (constInfo.headDim / CHANNEL_TILE_SIZE);
+    const uint32_t wideGroups = constInfo.usedCoreNum / (constInfo.headDim / WIDE_CHANNEL_TILE_SIZE);
+    constInfo.dBaseSize =
+        poolTokenCount <= narrowGroups * constInfo.mBaseSize ?
+            CHANNEL_TILE_SIZE :
+            (poolTokenCount <= wideGroups * constInfo.mBaseSize ? WIDE_CHANNEL_TILE_SIZE : constInfo.headDim);
+    const uint32_t groupCount = constInfo.usedCoreNum / (constInfo.headDim / constInfo.dBaseSize);
+    constInfo.mBaseSize = min(constInfo.mBaseSize, Align(CeilDivT(poolTokenCount, groupCount), tokenAlignment));
 }
 
 template <typename COMP>
