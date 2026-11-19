@@ -35,4 +35,18 @@ public:
     TCubeTiling matmulTiling{};
 };
 
+class MhcPostBackwardOptimizedTilingDataArch35 {
+public:
+    uint32_t totalItems{0};
+    uint32_t usedAic{0};
+    uint32_t n{0};
+    uint32_t D{0};
+    uint32_t tileD{0};
+    uint32_t cubeBatchGroup{0};
+    uint32_t cubeL1K{0};
+    uint32_t cubeBaseK{0};
+    uint32_t cubeKPartitionCount{1};
+    uint32_t cubeKPartitionSize{0};
+};
+
 #endif // MHC_POST_BACKWARD_TILING_DATA_ARCH35_H

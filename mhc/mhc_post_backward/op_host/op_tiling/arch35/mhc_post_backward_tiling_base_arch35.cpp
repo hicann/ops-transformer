@@ -22,6 +22,7 @@
 #include "platform/platform_info.h"
 #include "log/log.h"
 #include "../mhc_post_backward_tiling.h"
+#include "mhc_post_backward_tiling_cost_model.h"
 #include "../../../op_kernel/arch35/mhc_post_backward_tiling_data_arch35.h"
 #include "../../../op_kernel/arch35/mhc_post_backward_tiling_key_arch35.h"
 
@@ -46,7 +47,7 @@ constexpr uint64_t TILING_KEY_GENERALIZED = 0;
 constexpr uint32_t BF16_FP16_ALIGN_SIZE = 16;
 constexpr uint32_t FLOAT32_ALIGN_SIZE = 8;
 
-const static int64_t GRAD_OUTPUT_INPUT_INDEX = 0;
+const static int64_t GRAD_Y_INPUT_INDEX = 0;
 const static int64_t X_INPUT_INDEX = 1;
 const static int64_t H_RES_INPUT_INDEX = 2;
 const static int64_t H_OUT_INPUT_INDEX = 3;
@@ -64,6 +65,7 @@ public:
     {
         Reset();
     }
+
     ~MhcPostBackwardTilingBaseArch35() override = default;
 
     void Reset(gert::TilingContext* context) override
@@ -79,42 +81,59 @@ protected:
     }
 
     ge::graphStatus GetPlatformInfo() override;
+
     ge::graphStatus GetShapeAttrsInfo() override;
+
     ge::graphStatus DoOpTiling() override;
+
     ge::graphStatus DoLibApiTiling() override;
+
     uint64_t GetTilingKey() const override;
+
     ge::graphStatus GetWorkspaceSize() override;
+
     ge::graphStatus PostTiling() override;
+
     void Reset();
 
 private:
     ge::graphStatus CheckNullptr();
+
     ge::graphStatus CheckShapeAllPositive(int64_t idx) const;
+
     ge::graphStatus CheckShapeAllPositive();
+
     ge::graphStatus CheckDataType();
+
     ge::graphStatus CheckShapeConsistency();
+
     ge::graphStatus CheckSpecConstraints();
+
     ge::graphStatus CheckParam();
+
     ge::graphStatus ComputeTiling();
 
-    const gert::Shape* gradOutputShape_ = nullptr;
+    ge::graphStatus ComputeOptimizedTiling();
+
+    const gert::Shape* gradYShape_ = nullptr;
 
     uint32_t B_ = 0;
     uint32_t S_ = 0;
     uint32_t n_ = 0;
     uint32_t D_ = 0;
     uint32_t totalItems_ = 0;
+    uint32_t usedAic_ = 0;
     uint32_t usedCores_ = 0;
     uint32_t itemsPerCore_ = 0;
     uint32_t remainderItems_ = 0;
     uint32_t tileD_ = 0;
     uint32_t nTilesD_ = 0;
-    uint32_t usedAic_ = 0;
     uint32_t itemsPerAic_ = 0;
     uint32_t remainderItemsAic_ = 0;
     uint32_t isNAligned_ = 0;
     uint32_t isNNAligned_ = 0;
     uint32_t isDAligned_ = 0;
+    bool useOptimized_ = false;
     bool isHResActive_ = true;
 
     const char* opName_ = "MhcPostBackward";
@@ -139,34 +158,13 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::GetPlatformInfo()
 
 ge::graphStatus MhcPostBackwardTilingBaseArch35::GetShapeAttrsInfo()
 {
-    auto totalInputs = context_->GetComputeNodeInputNum();
-    OP_LOGI(context_, "GetShapeAttrsInfo: totalInputs=%zu", totalInputs);
-    for (size_t i = 0; i < totalInputs; i++) {
-        auto desc = context_->GetInputDesc(i);
-        auto shape = context_->GetInputShape(i);
-        if (desc == nullptr || shape == nullptr) {
-            OP_LOGI(context_, "  input[%zu]: desc=%p, shape=%p", i, desc, shape);
-        } else {
-            const auto& s = shape->GetStorageShape();
-            std::string shapeStr = "[";
-            for (size_t d = 0; d < s.GetDimNum(); d++) {
-                shapeStr += std::to_string(s.GetDim(d));
-                if (d + 1 < s.GetDimNum())
-                    shapeStr += ",";
-            }
-            shapeStr += "]";
-            OP_LOGI(context_, "  input[%zu]: dtype=%d, shape=%s, shapeSize=%ld", i,
-                    static_cast<int32_t>(desc->GetDataType()), shapeStr.c_str(), s.GetShapeSize());
-        }
-    }
-
-    auto gradOutputShapePtr = context_->GetInputShape(GRAD_OUTPUT_INPUT_INDEX);
-    if (gradOutputShapePtr == nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "Storage shape of grad_output", "null",
-                                              "grad_output shape must not be null");
+    auto gradYShapePtr = context_->GetInputShape(GRAD_Y_INPUT_INDEX);
+    if (gradYShapePtr == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "Storage shape of grad_y", "null",
+                                              "grad_y shape must not be null");
         return ge::GRAPH_FAILED;
     }
-    gradOutputShape_ = &gradOutputShapePtr->GetStorageShape();
+    gradYShape_ = &gradYShapePtr->GetStorageShape();
 
     auto hResDesc = context_->GetInputDesc(H_RES_INPUT_INDEX);
     if (hResDesc == nullptr) {
@@ -187,7 +185,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::GetShapeAttrsInfo()
 
 ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckNullptr()
 {
-    for (int64_t i = GRAD_OUTPUT_INPUT_INDEX; i <= H_POST_INPUT_INDEX; i++) {
+    for (int64_t i = GRAD_Y_INPUT_INDEX; i <= H_POST_INPUT_INDEX; i++) {
         auto desc = context_->GetInputDesc(i);
         if (desc == nullptr) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -243,7 +241,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeAllPositive(int64_t i
 
 ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeAllPositive()
 {
-    const int64_t requiredIndices[] = {GRAD_OUTPUT_INPUT_INDEX, X_INPUT_INDEX, H_OUT_INPUT_INDEX, H_POST_INPUT_INDEX};
+    const int64_t requiredIndices[] = {GRAD_Y_INPUT_INDEX, X_INPUT_INDEX, H_OUT_INPUT_INDEX, H_POST_INPUT_INDEX};
     for (auto i : requiredIndices) {
         if (CheckShapeAllPositive(i) != ge::GRAPH_SUCCESS) {
             OP_LOGE(context_, "input %ld has non-positive shape", i);
@@ -278,12 +276,12 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeAllPositive()
 
 ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckDataType()
 {
-    dtype_ = context_->GetInputDesc(GRAD_OUTPUT_INPUT_INDEX)->GetDataType();
+    dtype_ = context_->GetInputDesc(GRAD_Y_INPUT_INDEX)->GetDataType();
 
     const std::vector<ge::DataType> supportedDtype = {ge::DT_BF16, ge::DT_FLOAT16};
     if (std::find(supportedDtype.begin(), supportedDtype.end(), dtype_) == supportedDtype.end()) {
         std::string dtypeStr = std::to_string(static_cast<int32_t>(dtype_));
-        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "dtype of grad_output", dtypeStr.c_str(),
+        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "dtype of grad_y", dtypeStr.c_str(),
                                   "[27(DT_BF16), 1(DT_FLOAT16)]");
         return ge::GRAPH_FAILED;
     }
@@ -292,7 +290,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckDataType()
     if (xType != dtype_) {
         std::string xTypeStr = std::to_string(static_cast<int32_t>(xType));
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "dtype of x", xTypeStr.c_str(),
-                                              "x dtype must be same as grad_output dtype");
+                                              "x dtype must be same as grad_y dtype");
         return ge::GRAPH_FAILED;
     }
 
@@ -300,7 +298,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckDataType()
     if (hOutType != dtype_) {
         std::string hOutTypeStr = std::to_string(static_cast<int32_t>(hOutType));
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "dtype of h_out", hOutTypeStr.c_str(),
-                                              "h_out dtype must be same as grad_output dtype");
+                                              "h_out dtype must be same as grad_y dtype");
         return ge::GRAPH_FAILED;
     }
 
@@ -322,7 +320,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckDataType()
     if (gradXType != dtype_) {
         std::string gradXTypeStr = std::to_string(static_cast<int32_t>(gradXType));
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "dtype of grad_x", gradXTypeStr.c_str(),
-                                              "grad_x dtype must be same as grad_output dtype");
+                                              "grad_x dtype must be same as grad_y dtype");
         return ge::GRAPH_FAILED;
     }
 
@@ -330,7 +328,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckDataType()
     if (gradHOutType != dtype_) {
         std::string gradHOutTypeStr = std::to_string(static_cast<int32_t>(gradHOutType));
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "dtype of grad_h_out", gradHOutTypeStr.c_str(),
-                                              "grad_h_out dtype must be same as grad_output dtype");
+                                              "grad_h_out dtype must be same as grad_y dtype");
         return ge::GRAPH_FAILED;
     }
 
@@ -355,18 +353,18 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckDataType()
 
 ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
 {
-    if (gradOutputShape_ == nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "Storage shape of grad_output", "null",
-                                              "grad_output shape must not be null");
+    if (gradYShape_ == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "Storage shape of grad_y", "null",
+                                              "grad_y shape must not be null");
         return ge::GRAPH_FAILED;
     }
 
-    uint32_t dimNum = gradOutputShape_->GetDimNum();
+    uint32_t dimNum = gradYShape_->GetDimNum();
     if (dimNum == 4) {
-        int64_t B_int = gradOutputShape_->GetDim(0);
-        int64_t S_int = gradOutputShape_->GetDim(1);
-        int64_t n_int = gradOutputShape_->GetDim(2);
-        int64_t D_int = gradOutputShape_->GetDim(3);
+        int64_t B_int = gradYShape_->GetDim(0);
+        int64_t S_int = gradYShape_->GetDim(1);
+        int64_t n_int = gradYShape_->GetDim(2);
+        int64_t D_int = gradYShape_->GetDim(3);
 
         B_ = static_cast<uint32_t>(B_int);
         S_ = static_cast<uint32_t>(S_int);
@@ -375,9 +373,9 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         totalItems_ = B_ * S_;
         OP_LOGI(context_, "BSND format: B=%u, S=%u, n=%u, D=%u, totalItems=%u", B_, S_, n_, D_, totalItems_);
     } else if (dimNum == 3) {
-        int64_t T_int = gradOutputShape_->GetDim(0);
-        int64_t n_int = gradOutputShape_->GetDim(1);
-        int64_t D_int = gradOutputShape_->GetDim(2);
+        int64_t T_int = gradYShape_->GetDim(0);
+        int64_t n_int = gradYShape_->GetDim(1);
+        int64_t D_int = gradYShape_->GetDim(2);
 
         B_ = 1;
         S_ = 1;
@@ -386,7 +384,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         D_ = static_cast<uint32_t>(D_int);
         OP_LOGI(context_, "TND format: T=%u, n=%u, D=%u", totalItems_, n_, D_);
     } else {
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "Dimension count of grad_output",
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "Dimension count of grad_y",
                                      std::to_string(dimNum).c_str(), "3(TND) or 4(BSND)");
         return ge::GRAPH_FAILED;
     }
@@ -406,11 +404,11 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (xShape->GetDim(0) != B || xShape->GetDim(1) != S || xShape->GetDim(2) != n || xShape->GetDim(3) != D) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "x, grad_output",
+                context_->GetNodeName(), "x, grad_y",
                 (std::to_string(xShape->GetDim(0)) + "," + std::to_string(xShape->GetDim(1)) + "," +
                  std::to_string(xShape->GetDim(2)) + "," + std::to_string(xShape->GetDim(3)))
                     .c_str(),
-                "x shape must match grad_output shape (B,S,n,D)");
+                "x shape must match grad_y shape (B,S,n,D)");
             return ge::GRAPH_FAILED;
         }
 
@@ -426,7 +424,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
             if (hResShape->GetDim(0) != B || hResShape->GetDim(1) != S || hResShape->GetDim(2) != n ||
                 hResShape->GetDim(3) != n) {
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                    context_->GetNodeName(), "h_res, grad_output",
+                    context_->GetNodeName(), "h_res, grad_y",
                     (std::to_string(hResShape->GetDim(0)) + "," + std::to_string(hResShape->GetDim(1)) + "," +
                      std::to_string(hResShape->GetDim(2)) + "," + std::to_string(hResShape->GetDim(3)))
                         .c_str(),
@@ -444,7 +442,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (hOutShape->GetDim(0) != B || hOutShape->GetDim(1) != S || hOutShape->GetDim(2) != D) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "h_out, grad_output",
+                context_->GetNodeName(), "h_out, grad_y",
                 (std::to_string(hOutShape->GetDim(0)) + "," + std::to_string(hOutShape->GetDim(1)) + "," +
                  std::to_string(hOutShape->GetDim(2)))
                     .c_str(),
@@ -461,7 +459,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (hPostShape->GetDim(0) != B || hPostShape->GetDim(1) != S || hPostShape->GetDim(2) != n) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "h_post, grad_output",
+                context_->GetNodeName(), "h_post, grad_y",
                 (std::to_string(hPostShape->GetDim(0)) + "," + std::to_string(hPostShape->GetDim(1)) + "," +
                  std::to_string(hPostShape->GetDim(2)))
                     .c_str(),
@@ -480,11 +478,11 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         if (gradXShape->GetDim(0) != B || gradXShape->GetDim(1) != S || gradXShape->GetDim(2) != n ||
             gradXShape->GetDim(3) != D) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "grad_x, grad_output",
+                context_->GetNodeName(), "grad_x, grad_y",
                 (std::to_string(gradXShape->GetDim(0)) + "," + std::to_string(gradXShape->GetDim(1)) + "," +
                  std::to_string(gradXShape->GetDim(2)) + "," + std::to_string(gradXShape->GetDim(3)))
                     .c_str(),
-                "grad_x shape must match grad_output shape (B,S,n,D)");
+                "grad_x shape must match grad_y shape (B,S,n,D)");
             return ge::GRAPH_FAILED;
         }
 
@@ -499,7 +497,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         if (gradHResShape->GetDim(0) != B || gradHResShape->GetDim(1) != S || gradHResShape->GetDim(2) != n ||
             gradHResShape->GetDim(3) != n) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "grad_h_res, grad_output",
+                context_->GetNodeName(), "grad_h_res, grad_y",
                 (std::to_string(gradHResShape->GetDim(0)) + "," + std::to_string(gradHResShape->GetDim(1)) + "," +
                  std::to_string(gradHResShape->GetDim(2)) + "," + std::to_string(gradHResShape->GetDim(3)))
                     .c_str(),
@@ -516,7 +514,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (gradHOutShape->GetDim(0) != B || gradHOutShape->GetDim(1) != S || gradHOutShape->GetDim(2) != D) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "grad_h_out, grad_output",
+                context_->GetNodeName(), "grad_h_out, grad_y",
                 (std::to_string(gradHOutShape->GetDim(0)) + "," + std::to_string(gradHOutShape->GetDim(1)) + "," +
                  std::to_string(gradHOutShape->GetDim(2)))
                     .c_str(),
@@ -533,7 +531,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (gradHPostShape->GetDim(0) != B || gradHPostShape->GetDim(1) != S || gradHPostShape->GetDim(2) != n) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "grad_h_post, grad_output",
+                context_->GetNodeName(), "grad_h_post, grad_y",
                 (std::to_string(gradHPostShape->GetDim(0)) + "," + std::to_string(gradHPostShape->GetDim(1)) + "," +
                  std::to_string(gradHPostShape->GetDim(2)))
                     .c_str(),
@@ -554,11 +552,11 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (xShape->GetDim(0) != T || xShape->GetDim(1) != n || xShape->GetDim(2) != D) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "x, grad_output",
+                context_->GetNodeName(), "x, grad_y",
                 (std::to_string(xShape->GetDim(0)) + "," + std::to_string(xShape->GetDim(1)) + "," +
                  std::to_string(xShape->GetDim(2)))
                     .c_str(),
-                "x shape must match grad_output shape (T,n,D)");
+                "x shape must match grad_y shape (T,n,D)");
             return ge::GRAPH_FAILED;
         }
 
@@ -573,7 +571,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
             }
             if (hResShape->GetDim(0) != T || hResShape->GetDim(1) != n || hResShape->GetDim(2) != n) {
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                    context_->GetNodeName(), "h_res, grad_output",
+                    context_->GetNodeName(), "h_res, grad_y",
                     (std::to_string(hResShape->GetDim(0)) + "," + std::to_string(hResShape->GetDim(1)) + "," +
                      std::to_string(hResShape->GetDim(2)))
                         .c_str(),
@@ -591,7 +589,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (hOutShape->GetDim(0) != T || hOutShape->GetDim(1) != D) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "h_out, grad_output",
+                context_->GetNodeName(), "h_out, grad_y",
                 (std::to_string(hOutShape->GetDim(0)) + "," + std::to_string(hOutShape->GetDim(1))).c_str(),
                 "h_out shape must be (T,D)");
             return ge::GRAPH_FAILED;
@@ -606,7 +604,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (hPostShape->GetDim(0) != T || hPostShape->GetDim(1) != n) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "h_post, grad_output",
+                context_->GetNodeName(), "h_post, grad_y",
                 (std::to_string(hPostShape->GetDim(0)) + "," + std::to_string(hPostShape->GetDim(1))).c_str(),
                 "h_post shape must be (T,n)");
             return ge::GRAPH_FAILED;
@@ -622,11 +620,11 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (gradXShape->GetDim(0) != T || gradXShape->GetDim(1) != n || gradXShape->GetDim(2) != D) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "grad_x, grad_output",
+                context_->GetNodeName(), "grad_x, grad_y",
                 (std::to_string(gradXShape->GetDim(0)) + "," + std::to_string(gradXShape->GetDim(1)) + "," +
                  std::to_string(gradXShape->GetDim(2)))
                     .c_str(),
-                "grad_x shape must match grad_output shape (T,n,D)");
+                "grad_x shape must match grad_y shape (T,n,D)");
             return ge::GRAPH_FAILED;
         }
 
@@ -640,7 +638,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (gradHResShape->GetDim(0) != T || gradHResShape->GetDim(1) != n || gradHResShape->GetDim(2) != n) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "grad_h_res, grad_output",
+                context_->GetNodeName(), "grad_h_res, grad_y",
                 (std::to_string(gradHResShape->GetDim(0)) + "," + std::to_string(gradHResShape->GetDim(1)) + "," +
                  std::to_string(gradHResShape->GetDim(2)))
                     .c_str(),
@@ -657,7 +655,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (gradHOutShape->GetDim(0) != T || gradHOutShape->GetDim(1) != D) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "grad_h_out, grad_output",
+                context_->GetNodeName(), "grad_h_out, grad_y",
                 (std::to_string(gradHOutShape->GetDim(0)) + "," + std::to_string(gradHOutShape->GetDim(1))).c_str(),
                 "grad_h_out shape must be (T,D)");
             return ge::GRAPH_FAILED;
@@ -672,7 +670,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
         }
         if (gradHPostShape->GetDim(0) != T || gradHPostShape->GetDim(1) != n) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "grad_h_post, grad_output",
+                context_->GetNodeName(), "grad_h_post, grad_y",
                 (std::to_string(gradHPostShape->GetDim(0)) + "," + std::to_string(gradHPostShape->GetDim(1))).c_str(),
                 "grad_h_post shape must be (T,n)");
             return ge::GRAPH_FAILED;
@@ -810,6 +808,157 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::ComputeTiling()
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus MhcPostBackwardTilingBaseArch35::ComputeOptimizedTiling()
+{
+    auto platform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
+    // Runtime chip isolation: the adaptive cost model is a host-only opt-in for
+    // ASCEND950 + DAV_3510; any other platform keeps the conservative V1 tile.
+    const bool useA5CostModel = platform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND950 &&
+                                platform.GetCurNpuArch() == NpuArch::DAV_3510;
+    const uint32_t cores = static_cast<uint32_t>(platform.GetCoreNumAic());
+    uint64_t l1 = 0, l0a = 0, l0b = 0, l0c = 0;
+    platform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, l1);
+    platform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, l0a);
+    platform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, l0b);
+    platform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, l0c);
+
+    auto align = [](uint64_t value, uint64_t unit) { return (value + unit - 1) / unit * unit; };
+
+    constexpr uint64_t FLOAT_BLOCK_ELEMENTS = 32 / sizeof(float);
+    constexpr uint64_t GRAD_H_POST_ACCUMULATOR_ELEMENTS = 128;
+    const bool increaseParallelism = totalItems_ <= cores / 2 && (totalItems_ > 1 || D_ >= 4096);
+    const uint32_t group = increaseParallelism ? 2 : 16 / n_ / 2 * 2;
+    const uint32_t batchPerAiv = group / 2;
+    const uint64_t weights = align(n_ * n_, FLOAT_BLOCK_ELEMENTS) + align(n_, FLOAT_BLOCK_ELEMENTS);
+    // Preserve the previous AIC K chunk as the initial control value.
+    const uint64_t previousFixedUb = (2 * weights + 2 * n_ * 128) * sizeof(float);
+    if (cores == 0 || aicoreParams_.ubSize <= previousFixedUb || l0c < 2 * 16 * 16 * 4) {
+        return ge::GRAPH_FAILED;
+    }
+    uint64_t previousTile = std::min<uint64_t>(
+        align(D_, 128), ((aicoreParams_.ubSize - previousFixedUb) / ((4 * (n_ + 1) + n_) * 2)) / 128 * 128);
+    previousTile = std::min<uint64_t>(previousTile, l1 / (4 * 16 * 2) / 64 * 128);
+    // Each AIV holds its whole BS range for one K chunk, with double-buffered I/O.
+    const uint64_t fixedUb = (2 * batchPerAiv * weights + batchPerAiv * n_ * GRAD_H_POST_ACCUMULATOR_ELEMENTS +
+                              2 * align(n_, FLOAT_BLOCK_ELEMENTS)) *
+                             sizeof(float);
+    if (aicoreParams_.ubSize <= fixedUb) {
+        return ge::GRAPH_FAILED;
+    }
+    const uint64_t bytesPerK = (4 * batchPerAiv * (n_ + 1) + 2 * n_) * 2;
+    uint64_t tile = std::min<uint64_t>(previousTile / 2, (aicoreParams_.ubSize - fixedUb) / bytesPerK / 64 * 64);
+    if (tile < 64) {
+        return ge::GRAPH_FAILED;
+    }
+    const uint32_t baseKCapacity =
+        static_cast<uint32_t>(std::min<uint64_t>(1024, std::min(l0a, l0b) / (2 * 16 * 2)) / 16 * 16);
+    const uint32_t baseK = baseKCapacity;
+    if (baseK == 0) {
+        OP_LOGE(context_, "Insufficient L0A/L0B for the minimum MMAD block");
+        return ge::GRAPH_FAILED;
+    }
+
+    const bool precisionPartition =
+        totalItems_ <= cores / 2 && align(D_, 256) >= std::max<uint64_t>(8192, cores * 256) / sizeof(uint16_t);
+    // Accumulate the complete K in L0C unless small-BS precision requires partitions.
+    uint32_t maxAccumK = D_;
+    if (precisionPartition) {
+        const uint32_t parallelK = (D_ + cores / totalItems_ - 1) / (cores / totalItems_);
+        const uint32_t precisionK = std::max<uint32_t>(64, std::min<uint32_t>(2048, parallelK / 64 * 64));
+        maxAccumK = std::min(maxAccumK, precisionK);
+    }
+
+    if (D_ > 8192 || precisionPartition) {
+        // Reserve the diagonal extraction buffer and coordinate L1 tiles with K partitions.
+        tile = std::min<uint64_t>(tile, (aicoreParams_.ubSize - fixedUb - n_ * 32) / bytesPerK / 64 * 64);
+        if (precisionPartition) {
+            tile = tile / 64 * 64;
+            const uint32_t partitionCount = (D_ + maxAccumK - 1) / maxAccumK;
+            if (tile >= maxAccumK && partitionCount >= cores) {
+                tile = tile / maxAccumK * maxAccumK;
+            } else {
+                tile = std::min<uint64_t>(tile, maxAccumK);
+                while (maxAccumK % tile != 0) {
+                    tile -= 64;
+                }
+            }
+        } else {
+            uint64_t alignedTile = 64;
+            while (alignedTile * 2 <= tile && alignedTile * 2 <= 2048) {
+                alignedTile *= 2;
+            }
+            tile = alignedTile;
+        }
+    }
+    // Adaptive tileD selection. Task-approved domain only: BF16, n==4, hRes-active,
+    // optimized path, no precision partition, D <= 8192. The V1 tile (already final
+    // at this point) is the conservative fallback; eligibility failure keeps V1.
+    const uint32_t v1TileSnapshot = static_cast<uint32_t>(tile);
+    const bool adaptiveEligible = useA5CostModel && !precisionPartition && D_ <= 8192 && n_ == 4 &&
+                                  context_->GetInputDesc(X_INPUT_INDEX)->GetDataType() == ge::DT_BF16;
+    mhc_adaptive::TileDecision decision{};
+    if (adaptiveEligible) {
+        mhc_adaptive::AdaptiveShapeInput in{};
+        in.totalItems = totalItems_;
+        in.n = n_;
+        in.d = D_;
+        in.aicCores = cores;
+        in.group = group;
+        in.baseK = baseK;
+        in.ubSize = aicoreParams_.ubSize;
+        in.l1Size = l1;
+        in.fixedUb = fixedUb;
+        in.bytesPerK = bytesPerK;
+        in.v1Tile = v1TileSnapshot;
+        in.useA5CostModel = useA5CostModel;
+        decision = mhc_adaptive::SelectTileDAdaptive(in);
+        tile = decision.tileD;
+        OP_LOGI(context_, "ADAPT tiling: v1Tile=%u selected=%u adaptive=%d byGate=%d reason=%s", v1TileSnapshot,
+                decision.tileD, static_cast<int>(decision.adaptiveUsed), static_cast<int>(decision.v1KeptByGate),
+                decision.reason);
+        for (uint32_t ci = 0; ci < decision.candidateCount; ++ci) {
+            const auto& cand = decision.candidates[ci];
+            OP_LOGI(context_,
+                    "ADAPT cand[%u]: tile=%u v1=%d legal=%d tiles=%u mmads=%u predNs=%ld "
+                    "aivMte2=%ld aivVf=%ld aivMte3=%ld aicMte2=%ld aicMmad=%ld",
+                    ci, cand.tileD, static_cast<int>(cand.isV1), static_cast<int>(cand.legal), cand.tiles, cand.mmads,
+                    static_cast<long>(cand.predictedNs), static_cast<long>(cand.busiestTile.aivMte2),
+                    static_cast<long>(cand.busiestTile.aivVf), static_cast<long>(cand.busiestTile.aivMte3),
+                    static_cast<long>(cand.busiestTile.aicMte2), static_cast<long>(cand.busiestTile.aicMmad));
+        }
+    } else {
+        OP_LOGI(context_, "ADAPT tiling: ineligible v1Tile=%u reason=%s", v1TileSnapshot,
+                !useA5CostModel ? "unsupported-platform" :
+                                  (!precisionPartition ? "dtype-or-n-or-D-domain" : "precisionPartition"));
+    }
+    const uint32_t kL1 = static_cast<uint32_t>(tile);
+    // Only small-BS precision candidates use K-partitioned result writes.
+    const uint32_t kPartitionSize = precisionPartition ? maxAccumK : static_cast<uint32_t>(align(maxAccumK, kL1));
+    uint32_t kPartitionCount = (D_ + kPartitionSize - 1) / kPartitionSize;
+    const uint32_t tailK = D_ % kPartitionSize;
+    if (kPartitionCount > 1 && tailK != 0 && tailK < 64) {
+        --kPartitionCount;
+    }
+    const uint32_t groups = (totalItems_ + group - 1) / group;
+    usedAic_ = std::min(cores, groups);
+
+    auto* t = context_->GetTilingData<MhcPostBackwardOptimizedTilingDataArch35>();
+    t->totalItems = totalItems_;
+    t->usedAic = usedAic_;
+    t->n = n_;
+    t->D = D_;
+    t->tileD = static_cast<uint32_t>(tile);
+    t->cubeBatchGroup = group;
+    t->cubeL1K = kL1;
+    t->cubeBaseK = baseK;
+    t->cubeKPartitionCount = kPartitionCount;
+    t->cubeKPartitionSize = kPartitionSize;
+
+    OP_LOGI(context_, "CV tiling: items=%u, n=%u, D=%u, cores=%u, group=%u, tileD=%u, kL1=%u, baseK=%u", totalItems_,
+            n_, D_, usedAic_, group, t->tileD, kL1, baseK);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus MhcPostBackwardTilingBaseArch35::DoOpTiling()
 {
     auto ret = CheckParam();
@@ -817,7 +966,15 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::DoOpTiling()
         return ret;
     }
 
-    return ComputeTiling();
+    const uint32_t mergeBatchLowerInclusive = 2048;
+    const uint32_t mergeBatchUpperInclusive = 49152;
+    const uint32_t mergeBatchHeadCount = 4;
+    const bool mergeBatchDimSupported = D_ == 2560 || D_ == 3584 || D_ == 5120 || D_ == 6144 || D_ == 7168;
+    useOptimized_ = totalItems_ >= mergeBatchLowerInclusive && totalItems_ <= mergeBatchUpperInclusive &&
+                    n_ == mergeBatchHeadCount && mergeBatchDimSupported && isHResActive_;
+    OP_LOGI(context_, "Template dispatch: BS=%u, n=%u, D=%u, hRes=%u, optimized=%u", totalItems_, n_, D_, isHResActive_,
+            useOptimized_);
+    return useOptimized_ ? ComputeOptimizedTiling() : ComputeTiling();
 }
 
 ge::graphStatus MhcPostBackwardTilingBaseArch35::DoLibApiTiling()
@@ -851,26 +1008,33 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::PostTiling()
 
 uint64_t MhcPostBackwardTilingBaseArch35::GetTilingKey() const
 {
-    return isHResActive_ ? GET_TPL_TILING_KEY(1, 1) : GET_TPL_TILING_KEY(1, 0);
+    if (useOptimized_) {
+        return GET_TPL_TILING_KEY(MHC_POST_BACKWARD_MERGE_BATCH_MATMUL, true);
+    }
+    return GET_TPL_TILING_KEY(MHC_POST_BACKWARD_HIGH_LEVEL_MATMUL, isHResActive_);
 }
 
 void MhcPostBackwardTilingBaseArch35::Reset()
 {
     opName_ = "MhcPostBackward";
-    gradOutputShape_ = nullptr;
+    gradYShape_ = nullptr;
     B_ = 0;
     S_ = 0;
     n_ = 0;
     D_ = 0;
     totalItems_ = 0;
+    usedAic_ = 0;
     usedCores_ = 0;
     itemsPerCore_ = 0;
     remainderItems_ = 0;
     tileD_ = 0;
     nTilesD_ = 0;
-    usedAic_ = 0;
     itemsPerAic_ = 0;
     remainderItemsAic_ = 0;
+    isNAligned_ = 0;
+    isNNAligned_ = 0;
+    isDAligned_ = 0;
+    useOptimized_ = false;
     isHResActive_ = true;
 }
 

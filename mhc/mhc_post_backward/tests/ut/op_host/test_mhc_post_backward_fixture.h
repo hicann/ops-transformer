@@ -302,8 +302,11 @@ protected:
             ApplyErrorModifications(tilingContextPara, errorType, true, n, D, T, 0, 0);
         }
 
-        // arch35 tiling key 将 IS_HRES 编码到 bit1，h_res 生效时 GET_TPL_TILING_KEY(1,1)=2
-        int64_t expectTilingKey = 2;
+        // arch35 tiling key 编码: bit0 = impl(0=high-level, 1=merge-batch), bit2 = IS_HRES。
+        // h_res 生效时: high-level=4, merge-batch=5; 进入 merge-batch 域与 DoOpTiling 门控一致。
+        const bool mergeBatchDomain =
+            T >= 2048 && T <= 49152 && n == 4 && (D == 2560 || D == 5120 || D == 6144 || D == 7168);
+        int64_t expectTilingKey = mergeBatchDomain ? 5 : 4;
         string expectTilingDataStr = "";
         ge::graphStatus expectStatus = (errorType == ErrorType::NONE) ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
         std::vector<size_t> expectWorkspaces =
@@ -327,8 +330,11 @@ protected:
             ApplyErrorModifications(tilingContextPara, errorType, false, n, D, 0, B, S);
         }
 
-        // arch35 tiling key 将 IS_HRES 编码到 bit1，h_res 生效时 GET_TPL_TILING_KEY(1,1)=2
-        int64_t expectTilingKey = 2;
+        // arch35 tiling key 编码: bit0 = impl(0=high-level, 1=merge-batch), bit2 = IS_HRES。
+        // h_res 生效时: high-level=4, merge-batch=5; 进入 merge-batch 域与 DoOpTiling 门控一致。
+        const bool mergeBatchDomain =
+            (B * S) >= 2048 && (B * S) <= 49152 && n == 4 && (D == 2560 || D == 5120 || D == 6144 || D == 7168);
+        int64_t expectTilingKey = mergeBatchDomain ? 5 : 4;
         string expectTilingDataStr = "";
         ge::graphStatus expectStatus = (errorType == ErrorType::NONE) ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
         std::vector<size_t> expectWorkspaces =

@@ -17,12 +17,25 @@
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
-ASCENDC_TPL_ARGS_DECL(MhcPostBackward, ASCENDC_TPL_UINT_DECL(TILING_KEY, 1, ASCENDC_TPL_UI_LIST, 1),
+#define MHC_POST_BACKWARD_HIGH_LEVEL_MATMUL 1
+#define MHC_POST_BACKWARD_MERGE_BATCH_MATMUL 2
+
+// UINT values use list indices: high-level = 0, merge-batch = 1; IS_HRES occupies bit 2.
+#define MHC_POST_BACKWARD_MERGE_BATCH_KEY_PATTERN "(TILING_KEY_VAR & 3) == 1"
+
+ASCENDC_TPL_ARGS_DECL(MhcPostBackward,
+                      ASCENDC_TPL_UINT_DECL(MATMUL_IMPL, 2, ASCENDC_TPL_UI_LIST, MHC_POST_BACKWARD_HIGH_LEVEL_MATMUL,
+                                            MHC_POST_BACKWARD_MERGE_BATCH_MATMUL),
                       ASCENDC_TPL_BOOL_DECL(IS_HRES, 0, 1));
 
-ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
-                                     ASCENDC_TPL_UINT_SEL(TILING_KEY, ASCENDC_TPL_UI_LIST, 1),
-                                     ASCENDC_TPL_BOOL_SEL(IS_HRES, 0, 1),
-                                     ASCENDC_TPL_TILING_STRUCT_SEL(MhcPostBackwardTilingDataArch35)));
+ASCENDC_TPL_SEL(
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
+                         ASCENDC_TPL_UINT_SEL(MATMUL_IMPL, ASCENDC_TPL_UI_LIST, MHC_POST_BACKWARD_HIGH_LEVEL_MATMUL),
+                         ASCENDC_TPL_BOOL_SEL(IS_HRES, 0, 1),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(MhcPostBackwardTilingDataArch35)),
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
+                         ASCENDC_TPL_UINT_SEL(MATMUL_IMPL, ASCENDC_TPL_UI_LIST, MHC_POST_BACKWARD_MERGE_BATCH_MATMUL),
+                         ASCENDC_TPL_BOOL_SEL(IS_HRES, 0, 1),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(MhcPostBackwardOptimizedTilingDataArch35)));
 
 #endif
