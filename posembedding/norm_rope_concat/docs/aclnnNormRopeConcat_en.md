@@ -111,8 +111,10 @@ Disclaimer: This document is licensed under the [Creative Commons License versio
     5. The shape of the RoPE input `ropeSin` is `(seqRope, D)`, where
 
       $$
-      seqRope \leq \min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)
+      seqRope \leq \max(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)
       $$
+
+      When the total lengths of the two sequences are different, `seqRope` can be the larger of the two total lengths. The tail positions not covered by `seqRope` are not processed by RoPE.
 
     6. In training scenarios, `queryMean, queryRstd, encoderQueryMean, encoderQueryRstd` are output for subsequent backward propagation.
 
@@ -340,7 +342,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>Need to provide when ropeType!=0.</td>
         <td>FLOAT16, BFLOAT16, FLOAT</td>
         <td>ND</td>
-        <td>[SD]</td>
+        <td>[seqRope, D]</td>
         <td>√</td>
       </tr>
       <tr>
@@ -350,7 +352,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>Need to provide when ropeType!=0.</td>
         <td>FLOAT16, BFLOAT16, FLOAT</td>
         <td>ND</td>
-        <td>[SD]</td>
+        <td>[seqRope, D]</td>
         <td>√</td>
       </tr>
       <tr>
@@ -421,7 +423,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT16, BFLOAT16, FLOAT</td>
         <td>ND</td>
         <td>[BNSD]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>keyOutput</td>
@@ -431,7 +433,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT16, BFLOAT16, FLOAT</td>
         <td>ND</td>
         <td>[BNSD]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>valueOutput</td>
@@ -441,7 +443,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT16, BFLOAT16, FLOAT</td>
         <td>ND</td>
         <td>[BNSD]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normQueryMean</td>
@@ -451,7 +453,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normQueryRstd</td>
@@ -461,7 +463,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normKeyMean</td>
@@ -471,7 +473,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normKeyRstd</td>
@@ -481,7 +483,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normAddedQueryMean</td>
@@ -491,7 +493,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normAddedQueryRstd</td>
@@ -501,7 +503,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normAddedKeyMean</td>
@@ -511,7 +513,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normAddedKeyRstd</td>
@@ -521,7 +523,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
     </tbody></table>
 
@@ -551,7 +553,7 @@ aclnnStatus aclnnNormRopeConcat(
     <tr>
       <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="2">161002</td>
-      <td>The data type of an input or output is not supported.</td>
+      <td>The data type or data format of an input or output is not supported.</td>
     </tr>
     <tr>
       <td>The input shape is not supported.</td>
@@ -559,15 +561,10 @@ aclnnStatus aclnnNormRopeConcat(
     <tr>
       <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
       <td rowspan="2">561002</td>
-      <td>The NormType or NormAddedType of the input parameter is not in the supported range.</td>
+      <td>The normType, normAddedType, ropeType, or concatOrder of the input parameter is not in the supported range.</td>
     </tr>
     <tr>
       <td>The shapes of the input tensors do not meet the constraints.</td>
-    </tr>
-     <tr>
-      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td>361001</td>
-      <td>The ropeType or concatOrder of the input parameter takes a value beyond the constraints.</td>
     </tr>
   </tbody>
   </table>
@@ -621,7 +618,8 @@ aclnnStatus aclnnNormRopeConcat(
   - aclnnNormRopeConcat defaults to a deterministic implementation.
 - The data types of query, key, value, encoderQuery, encoderKey, and encoderValue must be consistent.
 - The headDim length is in the range [1, 1024] and must be an even number.
-- The seqRope length ranges from 1 to Min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey).
+- The seqRope length ranges from 1 to Max(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey).
+- Non-contiguous tensors: inputs are supported and converted to contiguous internally; outputs are not supported and must be contiguous.
 
 ## Example
 

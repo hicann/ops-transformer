@@ -39,6 +39,28 @@ static std::string ShapeToString(const gert::Shape& shape)
     return result + "]";
 }
 
+static std::string ExpectedShapeToString(const std::vector<int64_t>& shape)
+{
+    std::string result = "[";
+    for (size_t i = 0; i < shape.size(); ++i) {
+        result += (i == 0 ? "" : ",") + std::to_string(shape[i]);
+    }
+    return result + "]";
+}
+
+static inline bool IsLayerNormType(int64_t normType)
+{
+    return normType == static_cast<int64_t>(NormType::LAYER_NORM) ||
+           normType == static_cast<int64_t>(NormType::LAYER_NORM_AFFINE);
+}
+
+// 优先使用origin shape（调用方声明的逻辑shape）；未知场景下回退到storage shape
+static const gert::Shape& GetCheckedShape(const gert::StorageShape& shape)
+{
+    const gert::Shape& originShape = shape.GetOriginShape();
+    return originShape.GetDimNum() > 0 ? originShape : shape.GetStorageShape();
+}
+
 ge::graphStatus NormRopeConcatTiling::CheckInput(const InputTensorInfo& x)
 {
     if (x.isRequired) {
@@ -156,6 +178,96 @@ ge::graphStatus NormRopeConcatTiling::CheckInput()
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_.opName, "norm_added_type", std::to_string(normAddedType).c_str(),
                                               "the value of norm_added_type is out of the supported range"),
         return ge::GRAPH_FAILED);
+    int64_t ropeType = *context_.ropeType;
+    OP_CHECK_IF(!IsRopeTypeValid(ropeType),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_.opName, "rope_type", std::to_string(ropeType).c_str(),
+                                                      "the value of rope_type is out of the supported range"),
+                return ge::GRAPH_FAILED);
+    int64_t concatOrder = *context_.concatOrder;
+    OP_CHECK_IF(
+        !IsConcatOrderValid(concatOrder),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_.opName, "concat_order", std::to_string(concatOrder).c_str(),
+                                              "the value of concat_order is out of the supported range"),
+        return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus NormRopeConcatTiling::CheckOutputShape(gert::TilingContext* ctx, size_t index, const char* name,
+                                                       const std::vector<int64_t>& expectShape)
+{
+    const gert::StorageShape* shape = ctx->GetOutputShape(index);
+    if (shape == nullptr) {
+        OP_LOGW(context_.opName, "[NormRopeConcat] output %s shape is nullptr, expected %s, skip shape check.", name,
+                ExpectedShapeToString(expectShape).c_str());
+        return ge::GRAPH_SUCCESS;
+    }
+    // kernel按输入推导出的形状连续写出，使用origin shape与推导值比对
+    const gert::Shape& originShape = GetCheckedShape(*shape);
+    bool matched = originShape.GetDimNum() == expectShape.size();
+    for (size_t i = 0; matched && i < expectShape.size(); ++i) {
+        // 动态shape场景下未知维(-1)不参与比较
+        if (originShape.GetDim(i) < 0 || expectShape[i] < 0) {
+            continue;
+        }
+        matched = originShape.GetDim(i) == expectShape[i];
+    }
+    if (!matched) {
+        OP_LOGW(context_.opName,
+                "[NormRopeConcat] output %s shape %s does not match the shape derived from inputs %s, "
+                "kernel will still write by the derived shape.",
+                name, ShapeToString(originShape).c_str(), ExpectedShapeToString(expectShape).c_str());
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus NormRopeConcatTiling::CheckStatsOutput(gert::TilingContext* ctx, size_t index, const char* name,
+                                                       const std::vector<int64_t>& expectShape)
+{
+    const gert::StorageShape* shape = ctx->GetOutputShape(index);
+    // 可选输出未提供时shape为空，此种调用方式保持可用，不参与校验
+    if (shape == nullptr || GetCheckedShape(*shape).GetDimNum() == 0) {
+        return ge::GRAPH_SUCCESS;
+    }
+    (void)CheckOutputShape(ctx, index, name, expectShape);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus NormRopeConcatTiling::CheckOutput(gert::TilingContext* ctx)
+{
+    const size_t queryOutput = static_cast<size_t>(OutputIndexForward::QUERY_OUTPUT_INDEX);
+    const size_t keyOutput = static_cast<size_t>(OutputIndexForward::KEY_OUTPUT_INDEX);
+    const size_t valueOutput = static_cast<size_t>(OutputIndexForward::VALUE_OUTPUT_INDEX);
+    const std::vector<int64_t> queryOutputShape{batchSize_, headNum_, totalQuerySeq_, headDim_};
+    const std::vector<int64_t> keyOutputShape{batchSize_, headNum_, totalKeySeq_, headDim_};
+    const std::vector<int64_t> valueOutputShape{batchSize_, headNum_, totalValueSeq_, headDim_};
+    (void)CheckOutputShape(ctx, queryOutput, "query_output", queryOutputShape);
+    (void)CheckOutputShape(ctx, keyOutput, "key_output", keyOutputShape);
+    (void)CheckOutputShape(ctx, valueOutput, "value_output", valueOutputShape);
+
+    const bool isTraining = *(context_.isTraining);
+    // LayerNorm且训练模式下kernel才会输出均值/标准差倒数，其余场景不校验，保持已有调用方式不受影响
+    if (isTraining && IsLayerNormType(*(context_.normType))) {
+        (void)CheckStatsOutput(ctx, static_cast<size_t>(OutputIndexForward::NORM_QUERY_MEAN_INDEX), "norm_query_mean",
+                               {batchSize_, querySeq_, headNum_, 1});
+        (void)CheckStatsOutput(ctx, static_cast<size_t>(OutputIndexForward::NORM_QUERY_RSTD_INDEX), "norm_query_rstd",
+                               {batchSize_, querySeq_, headNum_, 1});
+        (void)CheckStatsOutput(ctx, static_cast<size_t>(OutputIndexForward::NORM_KEY_MEAN_INDEX), "norm_key_mean",
+                               {batchSize_, keySeq_, headNum_, 1});
+        (void)CheckStatsOutput(ctx, static_cast<size_t>(OutputIndexForward::NORM_KEY_RSTD_INDEX), "norm_key_rstd",
+                               {batchSize_, keySeq_, headNum_, 1});
+    }
+    if (isTraining && IsLayerNormType(*(context_.normAddedType))) {
+        const std::vector<int64_t> addedQueryStatsShape{batchSize_, encoderQuerySeq_, headNum_, 1};
+        const std::vector<int64_t> addedKeyStatsShape{batchSize_, encoderKeySeq_, headNum_, 1};
+        (void)CheckStatsOutput(ctx, static_cast<size_t>(OutputIndexForward::NORM_ADDED_QUERY_MEAN_INDEX),
+                               "norm_added_query_mean", addedQueryStatsShape);
+        (void)CheckStatsOutput(ctx, static_cast<size_t>(OutputIndexForward::NORM_ADDED_QUERY_RSTD_INDEX),
+                               "norm_added_query_rstd", addedQueryStatsShape);
+        (void)CheckStatsOutput(ctx, static_cast<size_t>(OutputIndexForward::NORM_ADDED_KEY_MEAN_INDEX),
+                               "norm_added_key_mean", addedKeyStatsShape);
+        (void)CheckStatsOutput(ctx, static_cast<size_t>(OutputIndexForward::NORM_ADDED_KEY_RSTD_INDEX),
+                               "norm_added_key_rstd", addedKeyStatsShape);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -212,6 +324,9 @@ ge::graphStatus NormRopeConcatTiling::GetShapeInfo()
     if (ropeSinShape != nullptr && ropeSinShape->GetStorageShape().GetDimNum() == ROPE_DIM_NUM) {
         ropeSeq_ = ropeSinShape->GetStorageShape().GetDim(ROPE_SEQ_DIM);
         ropeDim_ = ropeSinShape->GetStorageShape().GetDim(ROPE_DIM_DIM);
+    } else if (*context_.ropeType == static_cast<int64_t>(RopeType::NONE)) {
+        // ropeType=0时不传ropeSin/ropeCos，ropeDim默认0会导致value等通路搬运0字节，此处按headDim补齐
+        ropeDim_ = headDim_;
     }
 
     totalQuerySeq_ = querySeq_ + encoderQuerySeq_;
@@ -395,9 +510,10 @@ ge::graphStatus NormRopeConcatTiling::DoTiling(gert::TilingContext* ctx)
     workspace_ = workspaceSizes;
 
     if (GetShapeInfo() != ge::GRAPH_SUCCESS || CheckInput() != ge::GRAPH_SUCCESS ||
-        ComputeTilingKey() != ge::GRAPH_SUCCESS || ComputeCoreTilingStrategy() != ge::GRAPH_SUCCESS ||
-        ComputeUBTilingStrategy() != ge::GRAPH_SUCCESS || ComputeWorkSpace() != ge::GRAPH_SUCCESS ||
-        FillTilingData() != ge::GRAPH_SUCCESS || PrintTilingData(ctx) != ge::GRAPH_SUCCESS) {
+        CheckOutput(ctx) != ge::GRAPH_SUCCESS || ComputeTilingKey() != ge::GRAPH_SUCCESS ||
+        ComputeCoreTilingStrategy() != ge::GRAPH_SUCCESS || ComputeUBTilingStrategy() != ge::GRAPH_SUCCESS ||
+        ComputeWorkSpace() != ge::GRAPH_SUCCESS || FillTilingData() != ge::GRAPH_SUCCESS ||
+        PrintTilingData(ctx) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     ctx->SetTilingKey(tilingKey_);

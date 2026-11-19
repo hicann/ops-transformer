@@ -15,6 +15,7 @@
 #ifndef _NORM_ROPE_CONCAT_TILING_H_
 #define _NORM_ROPE_CONCAT_TILING_H_
 
+#include <vector>
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "op_host/tiling_base.h"
@@ -168,6 +169,11 @@ private:
     ge::graphStatus GetShapeInfo();
     ge::graphStatus CheckInput();
     ge::graphStatus CheckInput(const InputTensorInfo& x);
+    ge::graphStatus CheckOutput(gert::TilingContext* ctx);
+    ge::graphStatus CheckOutputShape(gert::TilingContext* ctx, size_t index, const char* name,
+                                     const std::vector<int64_t>& expectShape);
+    ge::graphStatus CheckStatsOutput(gert::TilingContext* ctx, size_t index, const char* name,
+                                     const std::vector<int64_t>& expectShape);
     ge::graphStatus ComputeTilingKey();
     ge::graphStatus ComputeCoreTilingStrategy();
     ge::graphStatus ComputeUBTilingStrategy();

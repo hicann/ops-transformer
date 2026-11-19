@@ -15,6 +15,31 @@
 #include <string>
 #include "graph/types.h"
 #include "aclnn_norm_rope_concat.h"
+#include "opdev/op_log.h"
+#include "opdev/tensor_view_utils.h"
+
+using namespace op;
+
+// 文档口径：非连续输入由接口内部转为连续，非连续输出不支持；按issue要求仅告警不拦截，保持原有调用方式可用
+static void WarnIfOutputNonContiguous(const aclTensor* queryOutput, const aclTensor* keyOutput,
+                                      const aclTensor* valueOutput, const aclTensor* normQueryMean,
+                                      const aclTensor* normQueryRstd, const aclTensor* normKeyMean,
+                                      const aclTensor* normKeyRstd, const aclTensor* normAddedQueryMean,
+                                      const aclTensor* normAddedQueryRstd, const aclTensor* normAddedKeyMean,
+                                      const aclTensor* normAddedKeyRstd)
+{
+    const aclTensor* outputs[] = {queryOutput,        keyOutput,        valueOutput,     normQueryMean,
+                                  normQueryRstd,      normKeyMean,      normKeyRstd,     normAddedQueryMean,
+                                  normAddedQueryRstd, normAddedKeyMean, normAddedKeyRstd};
+    for (const aclTensor* output : outputs) {
+        if (output != nullptr && !IsContiguous(output)) {
+            OP_LOGW("aclnnNormRopeConcat: non-contiguous output is not supported and outputs must be contiguous, "
+                    "because the kernel writes in the contiguous layout. Pass a contiguous output and copy the "
+                    "result to the target view if needed.");
+            return;
+        }
+    }
+}
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,6 +74,8 @@ aclnnStatus aclnnNormRopeConcatGetWorkspaceSize(
     const aclTensor* normAddedKeyMean, const aclTensor* normAddedKeyRstd, uint64_t* workspaceSize,
     aclOpExecutor** executor)
 {
+    WarnIfOutputNonContiguous(queryOutput, keyOutput, valueOutput, normQueryMean, normQueryRstd, normKeyMean,
+                              normKeyRstd, normAddedQueryMean, normAddedQueryRstd, normAddedKeyMean, normAddedKeyRstd);
     return aclnnInnerNormRopeConcatGetWorkspaceSize(
         query, key, value, encoderQuery, encoderKey, encoderValue, normQueryWeight, normQueryBias, normKeyWeight,
         normKeyBias, normAddedQueryWeight, normAddedQueryBias, normAddedKeyWeight, normAddedKeyBias, ropeSin, ropeCos,

@@ -61,7 +61,7 @@
         \frac{\partial L}{\partial x} = \frac{\partial L}{\partial y} \cdot \text{cos} + Half({\frac{\partial L}{\partial y} \cdot \text{sin}}) \odot  \text{negMask}
     $$
 
-    - **其中，Interleave()表示headDim维度奇数与偶数位置交替重组，Half()表示headDim维度后半和前一半元素交替重组，例如x = [0,1,2,3,4,5,6,7],则Interleave(x) = [1,0,3,2,5,4,7,6]，Half(x)=[4,0,5,1,6,2,7,3]；negMask为headDim长度，偶数位为1，奇数位为-1，即(1, -1, 1, -1, 1, ...)**
+    - **其中，Interleave()表示headDim维度奇数与偶数位置交替重组，Half()表示headDim维度后一半与前一半整体重组（即先取后一半、再取前一半），例如x = [0,1,2,3,4,5,6,7],则Interleave(x) = [1,0,3,2,5,4,7,6]，Half(x)=[4,5,6,7,0,1,2,3]；negMask长度与headDim一致，取值随RoPE模式变化：Interleave模式下偶数位为1、奇数位为-1，即(1, -1, 1, -1, 1, ...)；Half模式下前一半为1、后一半为-1，即(1, ..., 1, -1, ..., -1)**
 
 ## 函数原型
 
@@ -169,8 +169,8 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <tr>
           <td>gradValueOutput</td>
           <td>输入</td>
-          <td>网络层对value和encoderValue正向输出结果的反向梯度值，对应公式中的y。</td>
-          <td>encoderValue参数为nullptr时seqEncoderValue值为0，seqValue长度大小与seqKey一致，seqEncoderValue长度大小与seqEncoderKey一致，数据类型与参数gradQueryOutput保持一致。</td>
+          <td>网络层对正向输出value（value与encoder部分按concatOrder拼接后的结果）的反向梯度值，对应公式中的y。</td>
+          <td>接口无encoderValue入参；seqValue长度与seqKey一致，seqEncoderValue长度与seqEncoderKey一致，gradValueOutput的seq维等于seqValue+seqEncoderValue，数据类型与参数gradQueryOutput保持一致。</td>
           <td>FLOAT32、FLOAT16、BFLOAT16</td>
           <td>ND</td>
           <td>[batch, headNum, seqValue+seqEncoderValue, headDim]</td>
@@ -389,7 +389,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <tr>
           <td>concatOrder</td>
           <td>可选输入</td>
-          <td>指定query与encoderQuery、key与encoderKey、value与encoderValue的Concat操作叠加顺序。</td>
+          <td>指定query与encoderQuery、key与encoderKey、value与其encoder部分（长度由seqEncoderKey确定）的Concat操作叠加顺序。</td>
           <td>以query为例，0：[query, encoderQuery]，1：[encoderQuery, query]，用户不特意指定时建议传入为0。</td>
           <td>INT64</td>
           <td>-</td>
@@ -449,7 +449,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <tr>
           <td>gradEncoderValue</td>
           <td>可选输出</td>
-          <td>公式中网络层对正向输入encoderValue的反向梯度值。</td>
+          <td>公式中网络层对正向value的encoder部分（长度由seqEncoderKey确定，接口无encoderValue入参）的反向梯度值。</td>
           <td>当文本Value参与训练时输出，数据类型与参数gradQueryOutput保持一致。</td>
           <td>FLOAT32、FLOAT16、BFLOAT16</td>
           <td>ND</td>
@@ -585,7 +585,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
     <tr>
       <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="1">161002</td>
-      <td>计算输入和输出的数据类型不在支持范围内。</td>
+      <td>计算输入和输出的数据类型或数据格式不在支持范围内，或入参与属性组合不在支持范围内。</td>
     </tr>
   </tbody>
   </table>
@@ -636,6 +636,8 @@ aclnnStatus aclnnNormRopeConcatBackward(
 
 - 确定性计算：
   - aclnnNormRopeConcatBackward默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
+- 接口无encoderValue入参：seqValue与seqKey一致，seqEncoderValue与seqEncoderKey一致，gradValueOutput的seq维等于seqValue+seqEncoderValue。
+- gradNormQueryWeight、gradNormQueryBias、gradNormKeyWeight、gradNormKeyBias、gradNormAddedQueryWeight、gradNormAddedQueryBias、gradNormAddedKeyWeight、gradNormAddedKeyBias的数据类型必须与gradQueryOutput一致。
 
 ## 调用示例
 

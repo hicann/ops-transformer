@@ -219,3 +219,80 @@ TEST_F(NormRopeConcatGradTiling, NormRopeConcatGrad_fp32_001)
     std::vector<size_t> expectWorkspaces = {37814272};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
+
+namespace {
+gert::StorageShape MakeStorageShape(const std::vector<int64_t>& dims)
+{
+    gert::StorageShape shape;
+    for (const auto dim : dims) {
+        shape.MutableOriginShape().AppendDim(dim);
+        shape.MutableStorageShape().AppendDim(dim);
+    }
+    return shape;
+}
+
+gert::TilingContextPara::TensorDescription MakeTensorDesc(const std::vector<int64_t>& dims,
+                                                          ge::DataType dtype = ge::DT_FLOAT16)
+{
+    return gert::TilingContextPara::TensorDescription(MakeStorageShape(dims), dtype, ge::FORMAT_ND);
+}
+
+// 不含encoder的构造；withRope=false 表示ropeSin/ropeCos两个可选输入传nullptr
+gert::TilingContextPara MakeTilingPara(int64_t querySeq, int64_t keySeq, int64_t ropeSeq, int64_t ropeType,
+                                       bool withRope, int64_t normType = 0, int64_t normAddedType = 0)
+{
+    constexpr int64_t batch = 1;
+    constexpr int64_t headNum = 8;
+    constexpr int64_t headDim = 64;
+    static optiling::NormRopeConcatGradCompileInfo compileInfo = {};
+    std::vector<gert::TilingContextPara::TensorDescription> inputs;
+    inputs.emplace_back(MakeTensorDesc({batch, headNum, querySeq, headDim}));
+    inputs.emplace_back(MakeTensorDesc({batch, headNum, keySeq, headDim}));
+    inputs.emplace_back(MakeTensorDesc({batch, headNum, keySeq, headDim}));
+    inputs.emplace_back(MakeTensorDesc({batch, querySeq, headNum, headDim}));
+    inputs.emplace_back(MakeTensorDesc({batch, keySeq, headNum, headDim}));
+    for (size_t i = 0; i < 16; ++i) {
+        inputs.emplace_back(MakeTensorDesc({}));
+    }
+    if (withRope) {
+        inputs[19] = MakeTensorDesc({ropeSeq, headDim});
+        inputs[20] = MakeTensorDesc({ropeSeq, headDim});
+    }
+    std::vector<gert::TilingContextPara::TensorDescription> outputs;
+    outputs.emplace_back(MakeTensorDesc({batch, querySeq, headNum, headDim}));
+    outputs.emplace_back(MakeTensorDesc({batch, keySeq, headNum, headDim}));
+    outputs.emplace_back(MakeTensorDesc({batch, keySeq, headNum, headDim}));
+    for (size_t i = 0; i < 11; ++i) {
+        outputs.emplace_back(MakeTensorDesc({}));
+    }
+    std::vector<gert::TilingContextPara::OpAttr> attrs = {
+        {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(normType)},
+        {"norm_added_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(normAddedType)},
+        {"rope_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ropeType)},
+        {"concat_order", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+    };
+    return gert::TilingContextPara("NormRopeConcatGrad", inputs, outputs, attrs, &compileInfo);
+}
+} // namespace
+
+// ropeType=0且不传ropeSin/ropeCos时应正常tiling，且ropeDim按headDim补齐，避免value通路搬运0字节
+TEST_F(NormRopeConcatGradTiling, NormRopeConcatGrad_rope_none_without_rope_inputs)
+{
+    auto tilingContextPara = MakeTilingPara(4, 8, 0, 0, false);
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+    auto* tilingData = reinterpret_cast<const int64_t*>(tilingInfo.tilingData.get());
+    ASSERT_NE(tilingData, nullptr);
+    EXPECT_EQ(tilingData[16], 64); // ropeDim，tilingKey占用第0个字段
+    EXPECT_EQ(tilingData[11], 0);  // ropeActualSeq
+}
+
+// normType/normAddedType在[0,2]内的组合均应在第一段tiling放行
+TEST_F(NormRopeConcatGradTiling, NormRopeConcatGrad_norm_type_combinations)
+{
+    const int64_t cases[][2] = {{0, 0}, {0, 1}, {1, 0}, {1, 1}, {0, 2}, {2, 0}, {2, 2}};
+    for (const auto& normTypes : cases) {
+        auto tilingContextPara = MakeTilingPara(4, 8, 0, 0, false, normTypes[0], normTypes[1]);
+        ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
+    }
+}

@@ -63,7 +63,7 @@
         \frac{\partial L}{\partial x} = \frac{\partial L}{\partial y} \cdot \text{cos} + Half({\frac{\partial L}{\partial y} \cdot \text{sin}}) \odot  \text{negMask}
     $$
 
-    - **Where Interleave() denotes alternating the odd and even positions in the headDim dimension, and Half() denotes alternating the second half and first half elements in the headDim dimension. For example, if x = [0,1,2,3,4,5,6,7], then Interleave(x) = [1,0,3,2,5,4,7,6] and Half(x)=[4,0,5,1,6,2,7,3]. negMask has a length of headDim, with even positions set to 1 and odd positions set to -1, that is, (1, -1, 1, -1, 1, ...)**
+    - **Where Interleave() denotes alternating the odd and even positions in the headDim dimension, and Half() denotes recombining the second half followed by the first half (that is, take the second half first and then the first half). For example, if x = [0,1,2,3,4,5,6,7], then Interleave(x) = [1,0,3,2,5,4,7,6] and Half(x)=[4,5,6,7,0,1,2,3]. negMask has a length of headDim and varies with the RoPE mode: in Interleave mode, even positions are 1 and odd positions are -1, that is, (1, -1, 1, -1, 1, ...); in Half mode, the first half is 1 and the second half is -1, that is, (1, ..., 1, -1, ..., -1)**
 
 ## Function Prototype
 
@@ -171,8 +171,8 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <tr>
           <td>gradValueOutput</td>
           <td>Input</td>
-          <td>Backward gradient value of the forward output result of value and encoderValue in the network layer pair, corresponding to y in the formula.</td>
-          <td>When the encoderValue parameter is nullptr, seqEncoderValue is 0. The length size of seqValue remains consistent with seqKey, and the length size of seqEncoderValue remains consistent with seqEncoderKey. The data type remains consistent with parameter gradQueryOutput.</td>
+          <td>Backward gradient value of the forward output value (the result of concatenating value and its encoder part in concatOrder) in the network layer, corresponding to y in the formula.</td>
+          <td>The interface has no encoderValue input. The length of seqValue is consistent with seqKey, and the length of seqEncoderValue is consistent with seqEncoderKey. The seq dimension of gradValueOutput equals seqValue + seqEncoderValue. The data type remains consistent with parameter gradQueryOutput.</td>
           <td>FLOAT32, FLOAT16, BFLOAT16</td>
           <td>ND</td>
           <td>[batch, headNum, seqValue+seqEncoderValue, headDim]</td>
@@ -391,7 +391,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <tr>
           <td>concatOrder</td>
           <td>Optional input</td>
-          <td>Specifies the stacking order of the Concat operation between query and encoderQuery, key and encoderKey, and value and encoderValue.</td>
+          <td>Specifies the stacking order of the Concat operation between query and encoderQuery, key and encoderKey, and value and its encoder part (whose length is determined by seqEncoderKey).</td>
           <td>Taking query as an example: 0: [query, encoderQuery], 1: [encoderQuery, query]. If the user does not specifically specify it, it is recommended to pass in 0.</td>
           <td>INT64</td>
           <td>-</td>
@@ -451,7 +451,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <tr>
           <td>gradEncoderValue</td>
           <td>optional output</td>
-          <td>Backward gradient value of the forward input encoderValue of the network layer pair in the formula.</td>
+          <td>Backward gradient value of the encoder part of the forward input value in the network layer (whose length is determined by seqEncoderKey; the interface has no encoderValue input).</td>
           <td>Output when text Value participates in training. The data type must remain consistent with parameter gradQueryOutput.</td>
           <td>FLOAT32, FLOAT16, BFLOAT16</td>
           <td>ND</td>
@@ -638,6 +638,8 @@ aclnnStatus aclnnNormRopeConcatBackward(
 
 - deterministic computation:
   - aclnnNormRopeConcatBackward defaults to a non-deterministic implementation. Deterministic computation can be enabled through aclrtSetSysParamOpt.
+- The interface has no encoderValue input: seqValue is consistent with seqKey, seqEncoderValue is consistent with seqEncoderKey, and the seq dimension of gradValueOutput equals seqValue + seqEncoderValue.
+- The data types of gradNormQueryWeight, gradNormQueryBias, gradNormKeyWeight, gradNormKeyBias, gradNormAddedQueryWeight, gradNormAddedQueryBias, gradNormAddedKeyWeight, and gradNormAddedKeyBias must be consistent with gradQueryOutput.
 
 ## Example
 

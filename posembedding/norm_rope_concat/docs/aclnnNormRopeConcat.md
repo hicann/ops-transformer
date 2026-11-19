@@ -109,8 +109,10 @@
     5. RoPE的输入`ropeSin`的shape为`(seqRope, D)`，其中
 
       $$
-      seqRope \leq \min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)
+      seqRope \leq \max(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)
       $$
+
+      当两路序列总长度不同时，`seqRope`可取到两路总长度的较大值，未被`seqRope`覆盖的尾部位置不做RoPE。
 
     6. 当场景为训练时，会输出`queryMean, queryRstd, encoderQueryMean, encoderQueryRstd`供后续反向使用。
 
@@ -338,7 +340,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>ropeType!=0时需要提供。</td>
         <td>FLOAT16、BFLOAT16、FLOAT</td>
         <td>ND</td>
-        <td>[SD]</td>
+        <td>[seqRope, D]</td>
         <td>√</td>
       </tr>
       <tr>
@@ -348,7 +350,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>ropeType!=0时需要提供。</td>
         <td>FLOAT16、BFLOAT16、FLOAT</td>
         <td>ND</td>
-        <td>[SD]</td>
+        <td>[seqRope, D]</td>
         <td>√</td>
       </tr>
       <tr>
@@ -419,7 +421,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT16、BFLOAT16、FLOAT</td>
         <td>ND</td>
         <td>[BNSD]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>keyOutput</td>
@@ -429,7 +431,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT16、BFLOAT16、FLOAT</td>
         <td>ND</td>
         <td>[BNSD]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>valueOutput</td>
@@ -439,7 +441,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT16、BFLOAT16、FLOAT</td>
         <td>ND</td>
         <td>[BNSD]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normQueryMean</td>
@@ -449,7 +451,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normQueryRstd</td>
@@ -459,7 +461,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normKeyMean</td>
@@ -469,7 +471,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normKeyRstd</td>
@@ -479,7 +481,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normAddedQueryMean</td>
@@ -489,7 +491,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normAddedQueryRstd</td>
@@ -499,7 +501,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normAddedKeyMean</td>
@@ -509,7 +511,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
       <tr>
         <td>normAddedKeyRstd</td>
@@ -519,7 +521,7 @@ aclnnStatus aclnnNormRopeConcat(
         <td>FLOAT</td>
         <td>ND</td>
         <td>[BS]</td>
-        <td>√</td>
+        <td>x</td>
       </tr>
     </tbody></table>
 
@@ -549,7 +551,7 @@ aclnnStatus aclnnNormRopeConcat(
     <tr>
       <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="2">161002</td>
-      <td>计算输入和输出的数据类型不在支持范围内。</td>
+      <td>计算输入和输出的数据类型或数据格式不在支持范围内。</td>
     </tr>
     <tr>
       <td>输入的shape不在支持的范围内。</td>
@@ -557,15 +559,10 @@ aclnnStatus aclnnNormRopeConcat(
     <tr>
       <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
       <td rowspan="2">561002</td>
-      <td>入参的NormType、NormAddedType不在支持的范围内。</td>
+      <td>入参的normType、normAddedType、ropeType、concatOrder不在支持的范围内。</td>
     </tr>
     <tr>
       <td>入参的tensor的shape相互不符合约束。</td>
-    </tr>
-     <tr>
-      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td>361001</td>
-      <td>入参的ropeType和concatOrder取约束以外的值。</td>
     </tr>
   </tbody>
   </table>
@@ -619,7 +616,8 @@ aclnnStatus aclnnNormRopeConcat(
   - aclnnNormRopeConcat默认确定性实现。
 - query、key、value、encoderQuery、encoderKey、encoderValue数据类型需一致。
 - headDim长度在[1~1024]之间，且为偶数。
-- seqRope长度在[1~Min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)]之间。
+- seqRope长度在[1~Max(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)]之间。
+- 非连续Tensor：输入支持，接口内部会转为连续；输出不支持，需传入连续Tensor。
 
 ## 调用示例
 

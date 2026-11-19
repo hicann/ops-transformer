@@ -49,7 +49,7 @@ English | [简体中文](./README.md)
         \frac{\partial L}{\partial x} = \frac{\partial L}{\partial y} \cdot \text{cos} + Half({\frac{\partial L}{\partial y} \cdot \text{sin}}) \odot  \text{negMask}
     $$
 
-  - **Where Interleave() indicates that elements at odd and even positions along the headDim dimension are reorganized alternately, and Half() indicates that elements in the second half and the first half along the headDim dimension are reorganized alternately. For example, if x = [0,1,2,3,4,5,6,7], then Interleave(x) = [1,0,3,2,5,4,7,6] and Half(x)=[4,0,5,1,6,2,7,3]. negMask has the length of headDim, where even positions are 1 and odd positions are -1, that is, (1, -1, 1, -1, 1, ...)**
+  - **Where Interleave() indicates that elements at odd and even positions along the headDim dimension are reorganized alternately, and Half() indicates that the second half followed by the first half along the headDim dimension are reorganized (that is, take the second half first and then the first half). For example, if x = [0,1,2,3,4,5,6,7], then Interleave(x) = [1,0,3,2,5,4,7,6] and Half(x)=[4,5,6,7,0,1,2,3]. negMask has the length of headDim and varies with the RoPE mode: in Interleave mode, even positions are 1 and odd positions are -1, that is, (1, -1, 1, -1, 1, ...); in Half mode, the first half is 1 and the second half is -1, that is, (1, ..., 1, -1, ..., -1)**
 
 - **Parameter Description:**
     <table style="undefined;table-layout: fixed; width: 1300px"><colgroup>
@@ -85,7 +85,7 @@ English | [简体中文](./README.md)
         <tr>
           <td>gradValueOutput</td>
           <td>Input</td>
-          <td>Backward gradient value of the forward outputs of value and encoderValue at the network layer, corresponding to y in the formula. When the encoderValue parameter is nullptr, the value of seqEncoderValue is 0. The length of seqValue must be the same as that of seqKey, and the length of seqEncoderValue must be the same as that of seqEncoderKey. The data type must be the same as that of gradQueryOutput. The shape is [batch, headNum, seqValue+seqEncoderValue, headDim].</td>
+          <td>Backward gradient value of the forward output value (the result of concatenating value and its encoder part in concatOrder) at the network layer, corresponding to y in the formula. The interface has no encoderValue input. The length of seqValue must be the same as that of seqKey, and the length of seqEncoderValue must be the same as that of seqEncoderKey. The seq dimension of gradValueOutput equals seqValue + seqEncoderValue. The data type must be the same as that of gradQueryOutput. The shape is [batch, headNum, seqValue+seqEncoderValue, headDim].</td>
           <td>FLOAT32, FLOAT16, BFLOAT16</td>
           <td>ND</td>
         </tr>
@@ -239,7 +239,7 @@ English | [简体中文](./README.md)
         <tr>
           <td>concatOrder</td>
           <td>Optional attribute</td>
-          <td>Specifies the stacking order of the Concat operations on query and encoderQuery, key and encoderKey, and value and encoderValue. Taking query as an example, 0: [query, encoderQuery], 1: [encoderQuery, query]. If you do not specify this parameter, the recommended value is 0.</td>
+          <td>Specifies the stacking order of the Concat operations on query and encoderQuery, key and encoderKey, and value and its encoder part (whose length is determined by seqEncoderKey). Taking query as an example, 0: [query, encoderQuery], 1: [encoderQuery, query]. If you do not specify this parameter, the recommended value is 0.</td>
           <td>INT64</td>
           <td>-</td>
         </tr>
@@ -281,7 +281,7 @@ English | [简体中文](./README.md)
         <tr>
           <td>gradEncoderValue</td>
           <td>Optional output</td>
-          <td>Backward gradient value of the network layer for the forward input encoderValue in the formula. This parameter is output when the text Value participates in training. The data type must be the same as that of gradQueryOutput. The shape is [batch, seqEncoderValue, headNum, headDim].</td>
+          <td>Backward gradient value of the network layer for the encoder part of the forward input value in the formula (whose length is determined by seqEncoderKey; the interface has no encoderValue input). This parameter is output when the text Value participates in training. The data type must be the same as that of gradQueryOutput. The shape is [batch, seqEncoderValue, headNum, headDim].</td>
           <td>FLOAT32, FLOAT16, BFLOAT16</td>
           <td>ND</td>
         </tr>

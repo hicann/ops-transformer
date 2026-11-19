@@ -242,6 +242,9 @@ ge::graphStatus NormRopeConcatGradTiling::GetShapeInfo()
     if (ropeSinShape != nullptr && ropeSinShape->GetStorageShape().GetDimNum() == ROPE_DIM_NUM) {
         ropeSeq_ = ropeSinShape->GetStorageShape().GetDim(ROPE_SEQ_DIM);
         ropeDim_ = ropeSinShape->GetStorageShape().GetDim(ROPE_DIM_DIM);
+    } else if (*context_.ropeType == static_cast<int64_t>(RopeType::NONE)) {
+        // ropeType=0时不传ropeSin/ropeCos，ropeDim默认0会导致value通路搬运0字节，此处按headDim补齐
+        ropeDim_ = headDim_;
     }
 
     totalQuerySeq_ = querySeq_ + encoderQuerySeq_;

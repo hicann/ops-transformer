@@ -91,7 +91,7 @@
     5. RoPE的输入`ropeSin`的shape为`(seqRope, D)`，其中
 
     $$
-    seqRope <= min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)
+    seqRope <= max(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)
     $$
 
     6. 当场景为训练时，会输出`queryMean, queryRstd, encoderQueryMean, encoderQueryRstd`供后续反向使用。
@@ -353,7 +353,7 @@
   - aclnnNormRopeConcat默认确定性实现。
 - query、key、value、encoderQuery、encoderKey、encoderValue数据类型需一致。
 - headDim长度在[1~1024]间，且为偶数。
-- seqRope长度大小在[1~Min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)]之间。
+- seqRope长度大小在[1~Max(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)]之间。
 
 ## 调用说明
 

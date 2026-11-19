@@ -93,7 +93,7 @@ English | [简体中文](./README.md)
     5. The shape of the RoPE input `ropeSin` is `(seqRope, D)`, where
 
     $$
-    seqRope <= min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)
+    seqRope <= max(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)
     $$
 
     6. In the training scenario, `queryMean, queryRstd, encoderQueryMean, encoderQueryRstd` are output for subsequent backward computation.
@@ -355,7 +355,7 @@ English | [简体中文](./README.md)
   - aclnnNormRopeConcat uses a deterministic implementation by default.
 - The data types of query, key, value, encoderQuery, encoderKey, and encoderValue must be the same.
 - The headDim length is in the range [1~1024] and must be an even number.
-- The seqRope length is in the range [1~Min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)].
+- The seqRope length is in the range [1~Max(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)].
 
 ## Calling Instructions
 
