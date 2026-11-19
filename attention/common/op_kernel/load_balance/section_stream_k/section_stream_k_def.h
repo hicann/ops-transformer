@@ -31,6 +31,8 @@ namespace load_balance {
 struct SectionStreamKParam : GeneralBalanceParam {
     uint32_t l2Byte{128 * 1024U * 1024U}; // L2 size in Byte, 0 means infinite large
     int64_t v0Cost{0};
+    CostFunc hbmCostFunc{nullptr}; // Cost func of HBM transfer. Set nullptr to use default cost func
+    bool isConsiderHbm{false};
 };
 
 struct SectionStreamKFaResult {

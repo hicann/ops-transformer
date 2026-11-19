@@ -152,6 +152,7 @@ private:
         int64_t preTokenLeftUp{0};
         int64_t nextTokenLeftUp{0};
         Table<int64_t, BLOCK_MAX_TYPE, BLOCK_MAX_TYPE> typeCost{};
+        Table<int64_t, BLOCK_MAX_TYPE, BLOCK_MAX_TYPE> hbmCost{};
     };
 
     // 分核功能模块内部使用：记录当前行（M）的临时信息
@@ -161,9 +162,11 @@ private:
         uint32_t s2Start{0U};
         uint32_t s2End{0U};
         int64_t mCost{0};
-        int64_t mLastBlockCost{0};
         uint32_t mBlock{0U};
         int64_t mNormalBlockCost{0};
+        int64_t mLastBlockCost{0};
+        uint32_t prevS2End{0U};
+        int64_t hbmNormalBlockCost{0};
     };
 
     // 分核功能模块内部使用：记录分配过程中，当前核的负载信息
@@ -209,6 +212,8 @@ private:
     inline uint32_t ToKernelSplitModeBnIdx(uint32_t bn2Idx, const IBaseInfo& baseInfo) const;
     inline CostTable CalcCostTable(uint32_t s1NormalSize, uint32_t s2NormalSize, uint32_t mTailSize,
                                    uint32_t s2TailSize);
+    inline CostTable CalcHbmCostTable(uint32_t s1NormalSize, uint32_t s2NormalSize, uint32_t mTailSize,
+                                      uint32_t s2TailSize) const;
     static inline Range<uint32_t> CalcCoreRange(uint32_t sectionIdx, const ComputeContext& computeContext);
     inline std::pair<int64_t, int64_t> CalcBatchTokenNum(uint32_t bIdx, const ComputeContext& computeContext);
     inline Range<uint32_t> CalcS2Range(uint32_t mIdx, const IBaseInfo& baseInfo, const BatchCache& batchCache);
@@ -218,7 +223,10 @@ private:
     inline void CalcBatchCost(uint32_t bIdx, const ComputeContext& computeContext, CostInfo& costInfo);
     inline void CalcBatchCache(uint32_t bIdx, const ComputeContext& computeContext, BatchCache& batchCache);
     inline void CalcMCache(uint32_t mIdx, const ComputeContext& computeContext, const BatchCache& batchCache,
-                           MCache& mCache);
+                           const MCache& preMCache, MCache& mCache);
+    inline void CalcMCacheCost(uint32_t mIdx, const ComputeContext& computeContext, const BatchCache& batchCache,
+                               const MCache& preMCache, MCache& mCache);
+    inline int64_t GetBlockCost(const MCache& mCache, uint32_t s2Idx) const;
     inline SectionStreamKImplResult ScheduleSection(uint32_t sectionIdx, const ComputeContext& computeContext);
     inline void ScheduleFa(const FaConfig& faConfig, const ComputeContext& computeContext,
                            SectionStreamKImplResult& result);
@@ -285,6 +293,12 @@ inline uint32_t SectionStreamKImpl::SetParam(const SectionStreamKParam& param)
     if (m_param.costFunc == nullptr) {
         m_param.costFunc = CalcCost;
     }
+    if (m_param.isConsiderHbm) {
+        if (m_param.hbmCostFunc == nullptr) {
+            m_param.hbmCostFunc = [&](uint32_t basicM, uint32_t basicS2) { return CalcCost(basicM, basicS2) * 2; };
+        }
+    }
+
     return SECTION_STREAM_K_SUCCESS;
 }
 
@@ -378,9 +392,11 @@ inline void SectionStreamKImpl::CalcBatchCost(uint32_t bIdx, const ComputeContex
 
     BatchCache bCache;
     MCache mCache;
+    MCache prevMCache;
     CalcBatchCache(bIdx, computeContext, bCache);
     for (uint32_t mIdx = 0; mIdx < gridInfo.mBaseNum[bIdx]; mIdx++) {
-        CalcMCache(mIdx, computeContext, bCache, mCache);
+        prevMCache = mCache;
+        CalcMCache(mIdx, computeContext, bCache, prevMCache, mCache);
         costInfo.bNCostOfEachBatch[bIdx] += mCache.mCost;
         costInfo.bNBlockOfEachBatch[bIdx] += mCache.mBlock;
 
@@ -402,6 +418,26 @@ inline SectionStreamKImpl::CostTable SectionStreamKImpl::CalcCostTable(uint32_t 
     return typeCost;
 }
 
+inline SectionStreamKImpl::CostTable SectionStreamKImpl::CalcHbmCostTable(uint32_t s1NormalSize, uint32_t s2NormalSize,
+                                                                          uint32_t mTailSize, uint32_t s2TailSize) const
+{
+    CostTable hbmCost{};
+    if (!m_param.isConsiderHbm) {
+        hbmCost[NORMAL_BLOCK][NORMAL_BLOCK] = INT64_ZERO;
+        hbmCost[TAIL_BLOCK][NORMAL_BLOCK] = INT64_ZERO;
+        hbmCost[NORMAL_BLOCK][TAIL_BLOCK] = INT64_ZERO;
+        hbmCost[TAIL_BLOCK][TAIL_BLOCK] = INT64_ZERO;
+        return hbmCost;
+    }
+
+    hbmCost[NORMAL_BLOCK][NORMAL_BLOCK] = m_param.hbmCostFunc(s1NormalSize, s2NormalSize);
+    hbmCost[TAIL_BLOCK][NORMAL_BLOCK] = (mTailSize == 0U) ? INT64_ZERO : m_param.hbmCostFunc(mTailSize, s2NormalSize);
+    hbmCost[NORMAL_BLOCK][TAIL_BLOCK] = (s2TailSize == 0U) ? INT64_ZERO : m_param.hbmCostFunc(s1NormalSize, s2TailSize);
+    hbmCost[TAIL_BLOCK][TAIL_BLOCK] =
+        (mTailSize == 0U || s2TailSize == 0U) ? 0U : m_param.hbmCostFunc(mTailSize, s2TailSize);
+    return hbmCost;
+}
+
 inline void SectionStreamKImpl::CalcBatchCache(uint32_t bIdx, const ComputeContext& computeContext,
                                                BatchCache& batchCache)
 {
@@ -415,52 +451,100 @@ inline void SectionStreamKImpl::CalcBatchCache(uint32_t bIdx, const ComputeConte
     batchCache.nextTokenLeftUp = baseInfo.GetNextTokenLeftUp(batchCache.s1Size, batchCache.s2Size);
     batchCache.typeCost =
         CalcCostTable(m_param.mBaseSize, m_param.s2BaseSize, gridInfo.mTailSize[bIdx], gridInfo.s2TailSize[bIdx]);
+    batchCache.hbmCost =
+        CalcHbmCostTable(m_param.mBaseSize, m_param.s2BaseSize, gridInfo.mTailSize[bIdx], gridInfo.s2TailSize[bIdx]);
 }
 
 inline void SectionStreamKImpl::CalcMCache(uint32_t mIdx, const ComputeContext& computeContext,
-                                           const BatchCache& batchCache, MCache& mCache)
+                                           const BatchCache& batchCache, const MCache& preMCache, MCache& mCache)
 {
     const IBaseInfo& baseInfo = computeContext.baseInfo;
     const GridInfo& gridInfo = computeContext.gridInfo;
 
     mCache.bIdx = batchCache.bIdx;
     mCache.mIdx = mIdx;
+    mCache.s2Start = 0U;
+    mCache.s2End = 0U;
+    mCache.mBlock = 0;
+    mCache.mCost = 0;
+    mCache.mLastBlockCost = 0;
+    mCache.mNormalBlockCost = 0;
+    mCache.prevS2End = 0;
 
-    auto s2Range = CalcS2Range(mIdx, baseInfo, batchCache);
-    mCache.s2Start = s2Range.first;
-    mCache.s2End = s2Range.second;
-
-    if (mCache.s2Start >= mCache.s2End || gridInfo.mBaseNum[batchCache.bIdx] == 0) {
-        mCache.mBlock = 0;
-        mCache.mCost = 0;
-        mCache.mLastBlockCost = 0;
-        mCache.mNormalBlockCost = 0;
+    if (gridInfo.mBaseNum[batchCache.bIdx] == 0) {
         return;
     }
 
-    // 计算S2方向满块、尾块数量
-    mCache.mBlock = mCache.s2End - mCache.s2Start;
-    int64_t curTailS2Num =
-        (gridInfo.s2TailSize[batchCache.bIdx] != 0U && mCache.s2End == gridInfo.s2BaseNum[batchCache.bIdx]) ? 1L : 0L;
-    int64_t curNormalS2Num = static_cast<int64_t>(mCache.mBlock) - curTailS2Num;
-    if (mIdx == (gridInfo.mBaseNum[batchCache.bIdx] - 1U) && gridInfo.mTailSize[batchCache.bIdx] != 0U) {
-        mCache.mCost = batchCache.typeCost[TAIL_BLOCK][NORMAL_BLOCK] * curNormalS2Num +
-                       batchCache.typeCost[TAIL_BLOCK][TAIL_BLOCK] * curTailS2Num;
-        mCache.mLastBlockCost = curTailS2Num > 0U ? batchCache.typeCost[TAIL_BLOCK][TAIL_BLOCK] :
-                                                    batchCache.typeCost[TAIL_BLOCK][NORMAL_BLOCK];
-        mCache.mNormalBlockCost = batchCache.typeCost[TAIL_BLOCK][NORMAL_BLOCK];
-    } else {
-        mCache.mCost = batchCache.typeCost[NORMAL_BLOCK][NORMAL_BLOCK] * curNormalS2Num +
-                       batchCache.typeCost[NORMAL_BLOCK][TAIL_BLOCK] * curTailS2Num;
-        mCache.mLastBlockCost = curTailS2Num > 0U ? batchCache.typeCost[NORMAL_BLOCK][TAIL_BLOCK] :
-                                                    batchCache.typeCost[NORMAL_BLOCK][NORMAL_BLOCK];
-        mCache.mNormalBlockCost = batchCache.typeCost[NORMAL_BLOCK][NORMAL_BLOCK];
+    auto s2Range = CalcS2Range(mIdx, baseInfo, batchCache);
+    if (s2Range.first >= s2Range.second) {
+        return;
     }
 
+    mCache.s2Start = s2Range.first;
+    mCache.s2End = s2Range.second;
+    mCache.mBlock = s2Range.second - s2Range.first;
+    CalcMCacheCost(mIdx, computeContext, batchCache, preMCache, mCache);
+}
+
+inline void SectionStreamKImpl::CalcMCacheCost(uint32_t mIdx, const ComputeContext& computeContext,
+                                               const BatchCache& batchCache, const MCache& preMCache, MCache& mCache)
+{
+    const GridInfo& gridInfo = computeContext.gridInfo;
+
+    bool isTailM = (mIdx == gridInfo.mBaseNum[batchCache.bIdx] - 1U) && (gridInfo.mTailSize[batchCache.bIdx] != 0U);
+    bool isTailS2 =
+        (mCache.s2End == gridInfo.s2BaseNum[batchCache.bIdx]) && (gridInfo.s2TailSize[batchCache.bIdx] != 0U);
+    BlockType mType = (isTailM) ? TAIL_BLOCK : NORMAL_BLOCK;
+    BlockType lastS2Type = (isTailS2) ? TAIL_BLOCK : NORMAL_BLOCK;
+
+    int64_t tailBlockNum = (isTailS2) ? 1L : 0L;
+
+    // Calc Cost
+    int64_t normalBlockNum = static_cast<int64_t>(mCache.mBlock) - tailBlockNum;
+    mCache.mNormalBlockCost = batchCache.typeCost[mType][NORMAL_BLOCK];
+    mCache.mCost += mCache.mNormalBlockCost * normalBlockNum;
+
+    // HBM transfer cost
+    mCache.prevS2End = preMCache.s2End;
+    int64_t hbmBlockNum = static_cast<int64_t>(mCache.s2End) - static_cast<int64_t>(mCache.prevS2End);
+    int64_t hbmNormalBlockNum = hbmBlockNum - tailBlockNum;
+    hbmNormalBlockNum = std::max(hbmNormalBlockNum, int64_t{0});
+    mCache.hbmNormalBlockCost = batchCache.hbmCost[mType][NORMAL_BLOCK];
+    mCache.mCost += mCache.hbmNormalBlockCost * hbmNormalBlockNum;
+
+    // Tail
+    mCache.mLastBlockCost += batchCache.typeCost[mType][lastS2Type];
+    mCache.mLastBlockCost += (hbmBlockNum > 0) ? batchCache.hbmCost[mType][lastS2Type] : 0;
+    mCache.mCost += (isTailS2) ? mCache.mLastBlockCost : 0;
+
+    // V0cost
     if (mCache.mBlock == 1) {
         mCache.mLastBlockCost += m_param.v0Cost;
     }
     mCache.mCost += m_param.v0Cost;
+}
+
+inline int64_t SectionStreamKImpl::GetBlockCost(const MCache& mCache, uint32_t s2Idx) const
+{
+    if (s2Idx >= mCache.s2End) {
+        return 0;
+    }
+
+    // last block is the sum of all cost
+    if (s2Idx == ToClosedInterval(mCache.s2End)) {
+        return mCache.mLastBlockCost;
+    }
+
+    int64_t blockCost = mCache.mNormalBlockCost;
+    // first block
+    if (s2Idx == mCache.s2Start) {
+        blockCost += m_param.v0Cost;
+    }
+    // HBM
+    if (s2Idx >= mCache.prevS2End) {
+        blockCost += mCache.hbmNormalBlockCost;
+    }
+    return blockCost;
 }
 
 inline void SectionStreamKImpl::CalcCostInfo(ComputeContext& computeContext)
@@ -698,7 +782,7 @@ inline void SectionStreamKImpl::ScheduleFa(const FaConfig& faConfig, const Compu
     assignContext.bNCost = costInfo.bNCostOfEachBatch[assignContext.curBIdx];
     assignContext.bNBlock = costInfo.bNBlockOfEachBatch[assignContext.curBIdx];
     CalcBatchCache(assignContext.curBIdx, computeContext, assignContext.batchCache);
-    CalcMCache(assignContext.curMIdx, computeContext, assignContext.batchCache, assignContext.mCache);
+    CalcMCache(assignContext.curMIdx, computeContext, assignContext.batchCache, {}, assignContext.mCache);
     assignContext.curS2Idx = assignContext.mCache.s2Start;
 
     for (uint32_t i = 0; i < faConfig.coreNum; ++i) {
@@ -715,19 +799,9 @@ inline void SectionStreamKImpl::ScheduleFa(const FaConfig& faConfig, const Compu
 
         assignContext.coreCache = {};
         assignContext.coreCache.costLimit = assignContext.unassignedCost / static_cast<int64_t>(faConfig.coreNum - i);
-
-        if (!faConfig.FdOn) {
-            assignContext.coreCache.costLimit = std::max(assignContext.coreCache.costLimit, assignContext.mCache.mCost);
-        } else {
-            int64_t curCost = assignContext.mCache.mNormalBlockCost;
-            if (assignContext.curS2Idx == (assignContext.mCache.s2End - 1U)) {
-                curCost = assignContext.mCache.mLastBlockCost;
-            }
-            if (assignContext.curS2Idx == assignContext.mCache.s2Start && assignContext.mCache.mBlock != 1) {
-                curCost += m_param.v0Cost;
-            }
-            assignContext.coreCache.costLimit = std::max(assignContext.coreCache.costLimit, curCost);
-        }
+        int64_t curCost =
+            (faConfig.FdOn) ? GetBlockCost(assignContext.mCache, assignContext.curS2Idx) : assignContext.mCache.mCost;
+        assignContext.coreCache.costLimit = std::max(assignContext.coreCache.costLimit, curCost);
 
         AssignByBatch(computeContext, assignContext);
         AssignByRow(computeContext, assignContext);
@@ -899,7 +973,7 @@ inline void SectionStreamKImpl::AssignByBatch(const ComputeContext& computeConte
         assignContext.bNCost = costInfo.bNCostOfEachBatch[assignContext.curBIdx];
         assignContext.bNBlock = costInfo.bNBlockOfEachBatch[assignContext.curBIdx];
         assignContext.curMIdx = 0U;
-        CalcMCache(assignContext.curMIdx, computeContext, assignContext.batchCache, assignContext.mCache);
+        CalcMCache(assignContext.curMIdx, computeContext, assignContext.batchCache, {}, assignContext.mCache);
         assignContext.curS2Idx = assignContext.mCache.s2Start;
     }
 }
@@ -909,7 +983,6 @@ inline void SectionStreamKImpl::AssignByRow(const ComputeContext& computeContext
     if (assignContext.isFinished) {
         return;
     }
-
     while (IsWithinTolerance(assignContext.coreCache.costLimit,
                              SafeFloorDiv(assignContext.mCache.mLastBlockCost, m_param.faToleranceRatio, INT64_ZERO),
                              assignContext.coreCache.cost + assignContext.mCache.mCost)) {
@@ -924,8 +997,10 @@ inline void SectionStreamKImpl::AssignByRow(const ComputeContext& computeContext
                                     0U;
         // 计算新一行的信息
         do {
+            MCache prevCache = assignContext.mCache;
             assignContext.curMIdx++;
-            CalcMCache(assignContext.curMIdx, computeContext, assignContext.batchCache, assignContext.mCache);
+            CalcMCache(assignContext.curMIdx, computeContext, assignContext.batchCache, prevCache,
+                       assignContext.mCache);
         } while (assignContext.mCache.mBlock == 0);
         assignContext.curS2Idx = assignContext.mCache.s2Start;
     }
@@ -937,33 +1012,20 @@ inline void SectionStreamKImpl::AssignByBlock(AssignContext& assignContext)
         return;
     }
 
-    int64_t curCost = assignContext.mCache.mNormalBlockCost;
-    if (assignContext.curS2Idx == (assignContext.mCache.s2End - 1U)) {
-        curCost = assignContext.mCache.mLastBlockCost;
-    }
-
-    int64_t realCost = curCost;
-    if (assignContext.curS2Idx == assignContext.mCache.s2Start && assignContext.mCache.mBlock != 1U) {
-        realCost += m_param.v0Cost;
-    }
-
+    int64_t blockCost = GetBlockCost(assignContext.mCache, assignContext.curS2Idx);
     while (IsWithinTolerance(assignContext.coreCache.costLimit,
-                             SafeFloorDiv(realCost, m_param.faToleranceRatio, INT64_ZERO),
-                             assignContext.coreCache.cost + realCost)) {
-        assignContext.coreCache.cost += realCost;
+                             SafeFloorDiv(blockCost, m_param.faToleranceRatio, INT64_ZERO),
+                             assignContext.coreCache.cost + blockCost)) {
+        assignContext.coreCache.cost += blockCost;
         assignContext.coreCache.block++;
         assignContext.curS2Idx++;
         // 当前batch被分配一块出去，更新剩余负载
-        assignContext.bNCost = assignContext.bNCost - realCost;
+        assignContext.bNCost = assignContext.bNCost - blockCost;
         // 当前行被分配一块出去，更新剩余负载
-        assignContext.mCache.mCost = assignContext.mCache.mCost - realCost;
+        assignContext.mCache.mCost = assignContext.mCache.mCost - blockCost;
         assignContext.bNBlock--;
         assignContext.mCache.mBlock--;
-
-        realCost = curCost;
-        if (assignContext.curS2Idx == 0U && assignContext.mCache.mBlock != 1U) {
-            realCost += m_param.v0Cost;
-        }
+        blockCost = GetBlockCost(assignContext.mCache, assignContext.curS2Idx);
     }
 }
 

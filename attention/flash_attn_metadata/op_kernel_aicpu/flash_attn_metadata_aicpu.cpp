@@ -403,6 +403,12 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
         maxUsedAicCores_ = kernelConfig.usedCoreNum;
         dnUnmergedRouted = kernelConfig.templateId == FA_Template_DN_Unmerged;
         param.costFunc = FlashAttnMetadataCpuKernel::CostFunc;
+        if (!actualSeqlenKv_.empty() || !actualSeqlenQ_.empty()) {
+            param.isConsiderHbm = true;
+            param.hbmCostFunc = [](uint32_t a, uint32_t b) -> int64_t {
+                return FlashAttnMetadataCpuKernel::CostFunc(a, b) / 4; // 4: 经验值
+            };
+        }
     }
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
