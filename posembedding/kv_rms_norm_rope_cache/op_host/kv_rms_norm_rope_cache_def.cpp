@@ -13,6 +13,7 @@
  * \brief KvRmsNormRopeCache op host config
  */
 
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 constexpr uint32_t KV_RMS_NORM_ROPE_CACHE_VERSION_TWO = 2;
 
@@ -309,10 +310,9 @@ public:
             .DynamicShapeSupportFlag(true)
             .DynamicRankSupportFlag(true)
             .ExtendCfgInfo("opFile.value", "kv_rms_norm_rope_cache_apt");
-        this->AICore().AddConfig("ascend950", config_950);
-        this->AICore().AddConfig("ascend350", config_950);
-        this->AICore().AddConfig("ascend960dt", config_950);
-        this->AICore().AddConfig("ascend960pr", config_950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, config_950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, config_950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, config_950);
 
         OpAICoreConfig config_kirin = GetKirinCoreConfig();
         this->AICore().AddConfig("kirinx90", config_kirin);
