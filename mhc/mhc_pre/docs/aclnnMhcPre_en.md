@@ -369,7 +369,7 @@ aclnnStatus aclnnMhcPre(
   <!-- npu="950" id9 -->
   - <term>Ascend 950PR&950DT products</term>:
     - Currently, n supports 4, 6, and 8.
-    - D supports values in the range 1-16384, and D must be 16-aligned.
+    - D supports values in the range 16-16384, and D must be 16-aligned.
     - When alpha=(3), the hRes output is supported and the following conditions must be satisfied: input phi=(n<sup>2</sup>+2n, nD), bias=(n<sup>2</sup>+2n); output hMixOptional=(B, S, n<sup>2</sup>+2n) or (T, n<sup>2</sup>+2n). When alpha=(2), the hRes output is 0 and the following conditions must be satisfied: input phi=(2n, nD), bias=(2n), output hMixOptional=(B, S, 2n) or (T, 2n).
   <!-- end id9 -->
   <!-- npu="A3,910b" id8 -->

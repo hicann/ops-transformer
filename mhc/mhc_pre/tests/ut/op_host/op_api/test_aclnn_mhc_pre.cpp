@@ -72,15 +72,15 @@ struct MhcPreTensors {
     TensorDescPtr hPre;
 };
 
-MhcPreTensors MakeValidTensors()
+MhcPreTensors MakeValidTensors(int64_t d = D)
 {
     MhcPreTensors tensors;
-    tensors.x = MakeTensor({B, S, N, D}, ACL_FLOAT16, -1, 1);
-    tensors.phi = MakeTensor({PHI_ROWS, ND}, ACL_FLOAT, -1, 1);
+    tensors.x = MakeTensor({B, S, N, d}, ACL_FLOAT16, -1, 1);
+    tensors.phi = MakeTensor({PHI_ROWS, N * d}, ACL_FLOAT, -1, 1);
     tensors.alpha = MakeTensor({3}, ACL_FLOAT, 0.5, 1.5);
     tensors.bias = MakeTensor({PHI_ROWS}, ACL_FLOAT, -1, 1);
-    tensors.gamma = MakeTensor({N, D}, ACL_FLOAT, -1, 1);
-    tensors.hIn = MakeTensor({B, S, D}, ACL_FLOAT16, 0, 0);
+    tensors.gamma = MakeTensor({N, d}, ACL_FLOAT, -1, 1);
+    tensors.hIn = MakeTensor({B, S, d}, ACL_FLOAT16, 0, 0);
     tensors.hPost = MakeTensor({B, S, N}, ACL_FLOAT, 0, 0);
     tensors.hRes = MakeTensor({B, S, N, N}, ACL_FLOAT, 0, 0);
     tensors.invRms = MakeTensor({B, S}, ACL_FLOAT, 0, 0);
@@ -235,6 +235,42 @@ TEST_F(MhcPreOpapiUt, aclnn_mhc_pre_v2_invalid_impl_mode)
         RunMhcPreV2(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma, *tensors.hIn,
                     *tensors.hPost, *tensors.hRes, *tensors.invRms, *tensors.hMix, *tensors.hPre, MHC_PRE_INVALID_MODE),
         ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST_F(MhcPreOpapiUt, aclnn_mhc_pre_valid_feature_dimension_boundaries)
+{
+    for (const int64_t d : {16, 16384}) {
+        SCOPED_TRACE(d);
+        auto tensors = MakeValidTensors(d);
+        EXPECT_EQ(RunMhcPre(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma, *tensors.hIn,
+                            *tensors.hPost, *tensors.hRes, *tensors.invRms, *tensors.hMix, *tensors.hPre),
+                  ACLNN_SUCCESS);
+        for (const auto implMode : {MHC_PRE_DEFAULT, MHC_PRE_USE_HF32}) {
+            SCOPED_TRACE(implMode);
+            EXPECT_EQ(
+                RunMhcPreV2(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma, *tensors.hIn,
+                            *tensors.hPost, *tensors.hRes, *tensors.invRms, *tensors.hMix, *tensors.hPre, implMode),
+                ACLNN_SUCCESS);
+        }
+    }
+}
+
+TEST_F(MhcPreOpapiUt, aclnn_mhc_pre_invalid_feature_dimensions)
+{
+    for (const int64_t d : {8, 16385, 16400, 16416}) {
+        SCOPED_TRACE(d);
+        auto tensors = MakeValidTensors(d);
+        EXPECT_EQ(RunMhcPre(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma, *tensors.hIn,
+                            *tensors.hPost, *tensors.hRes, *tensors.invRms, *tensors.hMix, *tensors.hPre),
+                  ACLNN_ERR_PARAM_INVALID);
+        for (const auto implMode : {MHC_PRE_DEFAULT, MHC_PRE_USE_HF32}) {
+            SCOPED_TRACE(implMode);
+            EXPECT_EQ(
+                RunMhcPreV2(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma, *tensors.hIn,
+                            *tensors.hPost, *tensors.hRes, *tensors.invRms, *tensors.hMix, *tensors.hPre, implMode),
+                ACLNN_ERR_PARAM_INVALID);
+        }
+    }
 }
 
 TEST_F(MhcPreOpapiUt, aclnn_mhc_pre_missing_required_tensor_cases)

@@ -378,7 +378,7 @@ aclnnStatus aclnnMhcPreV2(
 
 - 规格约束：
   - n目前支持4、6、8。
-  - D支持1~16384范围以内，需满足D为16对齐。
+  - D支持16~16384范围以内，需满足D为16对齐。
   - 当alpha=[3]时，支持hRes输出，必须满足以下条件：输入phi=[n^2+2n, n×D],bias=[n^2+2n]，输出hMixOptional=[B,S,n^2+2n] 或 [T,n^2+2n]；当alpha=[2]时，hRes输出为0，必须满足以下条件：输入phi=[2n, n×D],bias=[2n]，输出hMixOptional=[B,S,2n] 或 [T,2n]。
   - 可选输出 invRmsOptional、hMixOptional、hPreOptional 为互存关系，需同时输出或全部不输出，不支持仅返回其中部分，输出条件：invRmsOptional!=nullptr && hMixOptional!=nullptr && hPreOptional!=nullptr。
 

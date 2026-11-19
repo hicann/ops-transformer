@@ -380,7 +380,7 @@ aclnnStatus aclnnMhcPreV2(
 
 - Specification constraints:
   - Currently, n supports 4, 6, and 8.
-  - D supports values in the range 1-16384. D must be aligned to 16.
+  - D supports values in the range 16-16384. D must be aligned to 16.
   - When alpha=[3], the hRes output is supported. The following conditions must be met: inputs phi=[n^2+2n, nD], bias=[n^2+2n], and output hMixOptional=[B,S,n^2+2n] or [T,n^2+2n]. When alpha=[2], the hRes output is 0. The following conditions must be met: inputs phi=[2n, nD], bias=[2n], and output hMixOptional=[B,S,2n] or [T,2n].
   - The optional outputs invRmsOptional, hMixOptional, and hPreOptional are mutually dependent. They must be output together or not output at all. Returning only part of them is not supported. Output condition: invRmsOptional!=nullptr && hMixOptional!=nullptr && hPreOptional!=nullptr.
 

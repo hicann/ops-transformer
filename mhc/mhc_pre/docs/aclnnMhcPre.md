@@ -367,7 +367,7 @@ aclnnStatus aclnnMhcPre(
   <!-- npu="950" id7 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
     - n目前支持4、6、8。
-    - D支持1~16384范围以内，需满足D为16对齐。
+    - D支持16~16384范围以内，需满足D为16对齐。
     - 当alpha=(3)时，支持hRes输出，必须满足以下条件：输入phi=(n<sup>2</sup>+2n, n×D)，bias=(n<sup>2</sup>+2n)；输出hMixOptional=(B, S, n<sup>2</sup>+2n)或(T, n<sup>2</sup>+2n)；当alpha=(2)时，hRes输出为0，必须满足以下条件：输入phi=(2n, n×D)，bias=(2n)，输出hMixOptional=(B, S, 2n) 或 (T, 2n)。
   <!-- end id7 -->
   <!-- npu="A3,910b" id8 -->

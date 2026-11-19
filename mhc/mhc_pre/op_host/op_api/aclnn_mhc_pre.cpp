@@ -55,8 +55,8 @@ constexpr int64_t N_VALID_VALUES[] = {4, 6, 8};
 constexpr int64_t N_VALID_VALUE_A2 = 4;
 constexpr int64_t D_ALIGNMENT = 16;
 constexpr int64_t D_ALIGNMENT_A2 = 128;
-constexpr int64_t D_MIN_ARCH92 = 16;
-constexpr int64_t D_MAX_ARCH92 = 16384;
+constexpr int64_t D_MIN = 16;
+constexpr int64_t D_MAX = 16384;
 constexpr int64_t TOTAL_LENGTH_MAX_ARCH92 = 65536;
 constexpr int64_t ALPHA_DIM_SIZE_3 = 3;
 constexpr int64_t ALPHA_DIM_SIZE_2 = 2;
@@ -660,9 +660,9 @@ static bool ValidateNDParams(int64_t n, int64_t d)
                                               "n in x shape must be positive");
         return false;
     }
-    if (d <= 0) {
+    if (d < D_MIN || d > D_MAX) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "D", std::to_string(d).c_str(),
-                                              "D in x shape must be positive");
+                                              "D in x shape must be in [16, 16384]");
         return false;
     }
     bool isValidN = false;
@@ -875,12 +875,6 @@ static bool CheckShapeRangeArch92(const MhcParamsBase& params)
         return false;
     }
 
-    int64_t d = xShape.GetDim(xShape.GetDimNum() - 1);
-    if (d < D_MIN_ARCH92 || d > D_MAX_ARCH92) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "D", std::to_string(d).c_str(),
-                                              "D in x shape must be in [16, 16384] on Ascend960");
-        return false;
-    }
     return true;
 }
 
