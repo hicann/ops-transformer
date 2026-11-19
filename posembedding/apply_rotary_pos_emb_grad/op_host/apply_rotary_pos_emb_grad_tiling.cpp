@@ -167,26 +167,26 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckOutPutShapeAllPosi
 ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShapeAllPositive() const
 {
     OP_CHECK_IF(CheckInPutShapeAllPositive(GQ_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "grad_query_embed has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "grad_query_embed has non positive shape."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckInPutShapeAllPositive(GK_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "grad_key_embed has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "grad_key_embed has non positive shape."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckInPutShapeAllPositive(COS_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "cos has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "cos has non positive shape."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckInPutShapeAllPositive(SIN_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "sin has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "sin has non positive shape."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckOutPutShapeAllPositive(GRAD_Q_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "grad_query has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "grad_query has non positive shape."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckOutPutShapeAllPositive(GRAD_K_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "grad_key has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "grad_key has non positive shape."), return ge::GRAPH_FAILED);
     if (context_->GetInputShape(QUERY_INDEX) != nullptr) {
         OP_CHECK_IF(CheckInPutShapeAllPositive(QUERY_INDEX) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "query has non positive shape."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_, "query has non positive shape."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(CheckInPutShapeAllPositive(KEY_INDEX) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "key has non positive shape."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_, "key has non positive shape."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(CheckOutPutShapeAllPositive(GRAD_COS_INDEX) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "grad_cos has non positive shape."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_, "grad_cos has non positive shape."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(CheckOutPutShapeAllPositive(GRAD_SIN_INDEX) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "grad_sin has non positive shape."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_, "grad_sin has non positive shape."), return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -333,7 +333,8 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::ValidateBroadcastByLayo
         return ge::GRAPH_SUCCESS;
     }
 
-    OP_LOGE(context_->GetNodeName(), "Unsupported layout value: %ld", attrLayout);
+    std::string layoutValStr = std::to_string(attrLayout);
+    OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "layout", layoutValStr.c_str(), "BSND, SBND or TND");
     return ge::GRAPH_FAILED;
 }
 
@@ -488,9 +489,9 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShape()
 {
     auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
     auto& gqShape = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
-    OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape dim fail."),
+    OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check shape dim fail."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeLimit() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "CheckShapeLimit fail."),
+    OP_CHECK_IF(CheckShapeLimit() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "CheckShapeLimit fail."),
                 return ge::GRAPH_FAILED);
     // cos 与 gq 必须同为 3D 或 4D
     if (cosShape.GetDimNum() != gqShape.GetDimNum()) {
@@ -509,7 +510,7 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckShape()
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(CheckRotaryModeShapeRelation(gqLastDim) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "D is invalid for rotary mode."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "D is invalid for rotary mode."), return ge::GRAPH_FAILED);
     // 约束: gradQueryEmbed和gradKeyEmbed除N维度外其它维度必须相同
     auto& gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
     if (gkShape.GetDimNum() != gqShape.GetDimNum()) {
@@ -604,12 +605,14 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::CheckParam()
     if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_)) {
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check nullptr fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check dtype and attr fail."),
+    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check nullptr fail."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeAllPositive() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape positive fail."),
+    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_, "check dtype and attr fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check shape fail."),
                 return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShapeAllPositive() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_, "check shape positive fail."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -654,18 +657,19 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::GetShapeAttrsInfo()
     int64_t layoutValue = (layoutPtr == nullptr) ? ATTR_LAYOUT_DEFAULT : (*layoutPtr);
     if (layoutValue != ATTR_LAYOUT_BSND && layoutValue != ATTR_LAYOUT_SBND && layoutValue != ATTR_LAYOUT_TND) {
         std::string layoutValStr = std::to_string(layoutValue);
-        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "layout", layoutValStr.c_str(), "1, 2 or 4");
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "layout", layoutValStr.c_str(), "BSND, SBND or TND");
         return ge::GRAPH_FAILED;
     }
 
-    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check param fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check param fail."),
+                return ge::GRAPH_FAILED);
 
     dtype_ = context_->GetInputDesc(GQ_INDEX)->GetDataType();
     gqShape_ = context_->GetInputShape(GQ_INDEX)->GetStorageShape();
     cosShape_ = context_->GetInputShape(COS_INDEX)->GetStorageShape();
     auto& gkShape = context_->GetInputShape(GK_INDEX)->GetStorageShape();
     OP_CHECK_IF(ValidateBroadcastByLayout(layoutValue, gqShape_, gkShape, cosShape_) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "ValidateBroadcastByLayout fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "ValidateBroadcastByLayout fail."), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

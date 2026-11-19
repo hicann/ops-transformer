@@ -14,8 +14,21 @@
  */
 #include "apply_rotary_pos_emb_grad_tiling.h"
 #include <algorithm>
+#include <string>
+#include <vector>
 
 namespace optiling {
+namespace {
+ge::graphStatus ReportTilingFailure(const char* opName, const std::string& reason)
+{
+    const std::vector<const char*> keys = {"opName", "reason"};
+    const std::vector<const char*> values = {opName, reason.c_str()};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", keys, values);
+    OP_LOGE_WITHOUT_REPORT(opName, "%s", reason.c_str());
+    return ge::GRAPH_FAILED;
+}
+} // namespace
+
 constexpr uint64_t APPLY_ROPE_GRAD_A_TILING_PRIORITY = 40000;
 constexpr int64_t DOUBLE_BUFFER = 2;
 constexpr int64_t HALF_COEF = 2;
@@ -82,7 +95,11 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClassA::ComputeUbFactor()
         ubMaxBytes = std::max(ubMaxBytes, stg3Bytes);
     }
     int64_t numDAvail = Ops::Base::FloorDiv(static_cast<int64_t>(aicoreParams_.ubSize), ubMaxBytes);
-    OP_CHECK_IF(numDAvail < 1, OP_LOGE(context_, "D too big for UB"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(numDAvail < 1,
+                ReportTilingFailure(context_->GetNodeName(), "D too big for UB: d=" + std::to_string(d_) +
+                                                                 ", ubMaxBytes=" + std::to_string(ubMaxBytes) +
+                                                                 ", ubSize=" + std::to_string(aicoreParams_.ubSize)),
+                return ge::GRAPH_FAILED);
     ubFactorB_ = std::min(blockFactorB_, numDAvail);
     bool dHalfAligned = ((d_ / HALF_COEF) % (blockSize_ / typeSize)) == 0;
     int64_t maxCopyB = dHalfAligned ? MAX_COPY_BLOCK_COUNT : MAX_COPY_BLOCK_COUNT / HALF_COEF;
@@ -94,7 +111,7 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClassA::DoOpTiling()
 {
     OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "MergeDim failed"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "SplitCore failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(ComputeUbFactor() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "ComputeUbFactor failed"),
+    OP_CHECK_IF(ComputeUbFactor() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "ComputeUbFactor failed"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(InitTilingData() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "InitTilingData failed"),
                 return ge::GRAPH_FAILED);
