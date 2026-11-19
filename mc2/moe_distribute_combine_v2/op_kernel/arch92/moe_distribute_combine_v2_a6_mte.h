@@ -1735,9 +1735,7 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::AddCon
     PipeBarrier<PIPE_V>();
 
     if (hasExpertScalesFlag_) {
-        Muls(mulBufLocal_, rowTmpFloatLocal_, scaleVal, axisH_);
-        PipeBarrier<PIPE_V>();
-        Add(sumFloatBufLocal_, sumFloatBufLocal_, mulBufLocal_, axisH_);
+        Axpy(sumFloatBufLocal_, rowTmpFloatLocal_, scaleVal, axisH_);
     } else {
         Add(sumFloatBufLocal_, sumFloatBufLocal_, rowTmpFloatLocal_, axisH_);
     }
@@ -1761,9 +1759,7 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Proces
     moeMainSumQueue_.FreeTensor<ExpandXType>(tmpUb);
 
     if (hasExpertScalesFlag_) {
-        Muls(mulBufLocal_, rowTmpFloatLocal_, scaleVal, axisH_);
-        PipeBarrier<PIPE_V>();
-        Add(sumFloatBufLocal_, sumFloatBufLocal_, mulBufLocal_, axisH_);
+        Axpy(sumFloatBufLocal_, rowTmpFloatLocal_, scaleVal, axisH_);
     } else {
         Add(sumFloatBufLocal_, sumFloatBufLocal_, rowTmpFloatLocal_, axisH_);
     }
@@ -1810,9 +1806,7 @@ __aicore__ inline void MoeDistributeCombineV2A6Mte<A6MteCombineTypeFunc>::Proces
         moeMainSumQueue_.FreeTensor<XType>(tmpUb);
         PipeBarrier<PIPE_V>();
         if (hasExpertScalesFlag_) {
-            AscendC::Muls(mulBufLocal_, rowTmpFloatLocal_, scaleVal, processLen);
-            PipeBarrier<PIPE_V>();
-            AscendC::Add(sumFloatBufLocal_, sumFloatBufLocal_, mulBufLocal_, processLen);
+            Axpy(sumFloatBufLocal_, rowTmpFloatLocal_, scaleVal, processLen);
         } else {
             Add(sumFloatBufLocal_, sumFloatBufLocal_, rowTmpFloatLocal_, processLen);
         }
