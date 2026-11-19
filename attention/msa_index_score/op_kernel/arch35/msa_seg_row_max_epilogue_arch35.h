@@ -157,7 +157,8 @@ __simd_vf__ inline void MxBatchPageMaxToStageVf(__ubuf__ half* src, __ubuf__ flo
 
 /// IS_BLOCK16：M3 Index Branch。逻辑 block 长 MSA_BLOCK16_SIZE，一个 128 列窗 = 8 个逻辑 block；
 /// 归约在 block 内 maxpool 之前先做 head 间 maxpool，输出对一个 token 的全部 head 取同一个值。
-template <bool IS_QUANT, bool IS_BLOCK16 = false, bool IS_MXFP4 = false, bool MX_FUSED_STAGE = false>
+template <bool IS_QUANT, bool IS_BLOCK16 = false, bool IS_MXFP4 = false, bool MX_FUSED_STAGE = false,
+          bool ENABLE_TOPK = false>
 class MsaSegRowMaxEpilogue {
 public:
     using ArchTag = Catlass::Arch::AtlasA5;
@@ -284,6 +285,12 @@ public:
     {
         mxDirectColumnMask_ = 0U;
         mxDirectStileBase_ = ~0U;
+        if constexpr (ENABLE_TOPK) {
+            constexpr int32_t blockSize = IS_BLOCK16 ? MSA_BLOCK16_SIZE : MSA_BLOCK_SIZE;
+            const int32_t prefixLen = task.kvLen - task.qLen;
+            needTokenLocalMask_ =
+                task.qLen > 1 && prefixLen >= 0 && (prefixLen % blockSize + task.qLen - 1) >= blockSize;
+        }
         const uint32_t subM = MsaCeilDiv(task.mActual, subBlockNum);
         mOff_ = subIdx * subM;
         mSub_ = (mOff_ >= task.mActual) ? 0U : MsaMinU32(subM, task.mActual - mOff_);
@@ -607,7 +614,7 @@ public:
         if (blkBase >= task.visibleEndBlk) {
             AscendC::Duplicate(ubRowMax_, MSA_FILL_VALUE, stageRows_ * MSA_BLOCKS_PER_STILE);
             AscendC::PipeBarrier<PIPE_V>();
-            ApplyLocalMaskUb(task, blkBase, stageRows_);
+            ApplyLocalMaskUb(task, blkBase, stageRows_, mOff_);
             StageScore(blkBase, 0, stageRows_);
             return;
         }
@@ -630,7 +637,7 @@ public:
         AscendC::Maxs<float>(ubRowMax_, ubRowMax_, MSA_FILL_VALUE,
                              static_cast<int32_t>(stageRows_ * MSA_BLOCKS_PER_STILE));
         AscendC::PipeBarrier<PIPE_V>();
-        ApplyLocalMaskUb(task, blkBase, stageRows_);
+        ApplyLocalMaskUb(task, blkBase, stageRows_, mOff_);
         StageScore(blkBase, 0, stageRows_);
     }
 
@@ -696,7 +703,7 @@ public:
             ReleaseSPing(ping);
             AscendC::Duplicate(ubRowMax_, MSA_FILL_VALUE, stageRows_ * nBlocks);
             AscendC::PipeBarrier<PIPE_V>();
-            ApplyLocalMaskUb(task, blkBase, stageRows_, nWin);
+            ApplyLocalMaskUb(task, blkBase, stageRows_, mOff_, nWin);
             StageScore(blkBase, 0, stageRows_, nWin);
             return true;
         }
@@ -758,7 +765,7 @@ public:
         // fp16 域的 -inf 填充抬回 fp32 的 MSA_FILL_VALUE，与其他路径一致。
         AscendC::Maxs<float>(ubRowMax_, ubRowMax_, MSA_FILL_VALUE, static_cast<int32_t>(stageRows_ * nBlocks));
         AscendC::PipeBarrier<PIPE_V>();
-        ApplyLocalMaskUb(task, blkBase, stageRows_, nWin);
+        ApplyLocalMaskUb(task, blkBase, stageRows_, mOff_, nWin);
         StageScore(blkBase, 0, stageRows_, nWin);
         return true;
     }
@@ -960,7 +967,7 @@ private:
         }
 
         FillInvalidBlocks(task, blkBase);
-        ApplyLocalMaskUb(task, blkBase, rows);
+        ApplyLocalMaskUb(task, blkBase, rows, rowOff);
 
         if (stageOn_) {
             StageScore(blkBase, rowOff - mOff_, rows);
@@ -1155,9 +1162,19 @@ private:
         }
     }
 
-    /// Maxpool 之后、Store 之前施加 local_mask。
-    /// 用与 FillInvalidBlocks 相同的位掩码 Duplicate，保证 32B 对齐访问。
-    __aicore__ inline void ApplyLocalMaskUb(const MsaTask& task, uint32_t blkBase, uint32_t rows, uint32_t nWin = 1U)
+    __aicore__ inline void ApplyLocalMaskUb(const MsaTask& task, uint32_t blkBase, uint32_t rows, uint32_t rowOff,
+                                            uint32_t nWin = 1U)
+    {
+        if constexpr (ENABLE_TOPK) {
+            ApplyTokenLocalMaskUb(task, blkBase, rows, rowOff, nWin);
+        } else {
+            ApplyRequestLocalMaskUb(task, blkBase, rows, nWin);
+        }
+    }
+
+    /// 非 TopK 保持原请求级 local_mask 语义和向量化实现不变。
+    __aicore__ inline void ApplyRequestLocalMaskUb(const MsaTask& task, uint32_t blkBase, uint32_t rows,
+                                                   uint32_t nWin = 1U)
     {
         if (task.initBlocks == 0 && task.localBlocks == 0) {
             return;
@@ -1170,7 +1187,6 @@ private:
 
         uint64_t initBits = 0;
         uint64_t localBits = 0;
-        // 高分上限是本 M-tile 最后一行的 visibleEndBlk。块长 16 与 128 相同。
         const int32_t blkLimit = static_cast<int32_t>(task.visibleEndBlk);
         for (uint32_t j = 0; j < nBlocks; ++j) {
             const int32_t blk = static_cast<int32_t>(blkBase + j);
@@ -1184,7 +1200,7 @@ private:
                 localBits |= (1ULL << j);
             }
         }
-        initBits &= ~localBits; // local 覆盖 init
+        initBits &= ~localBits;
 
         const uint8_t repeats = static_cast<uint8_t>((rows * nBlocks + MSA_FP32_PER_REPEAT - 1) / MSA_FP32_PER_REPEAT);
         if (initBits != 0) {
@@ -1206,6 +1222,143 @@ private:
             AscendC::Duplicate<float>(ubRowMax_, MSA_LOCAL_SCORE_LOCAL, mask, repeats, 1,
                                       MSA_FP32_PER_REPEAT / MSA_FP32_PER_BLOCK);
             AscendC::PipeBarrier<PIPE_V>();
+        }
+    }
+
+    __aicore__ inline int32_t QueryBlockForRow(const MsaTask& task, uint32_t rowInReq) const
+    {
+        constexpr int32_t blockSize = IS_BLOCK16 ? MSA_BLOCK16_SIZE : MSA_BLOCK_SIZE;
+        const int32_t prefixLen = task.kvLen - task.qLen;
+        const int32_t tOff = static_cast<int32_t>(rowInReq / numQHeads_);
+        if (prefixLen < 0) {
+            return task.startLoc;
+        }
+        return task.startLoc + (prefixLen % blockSize + tOff) / blockSize;
+    }
+
+    __aicore__ inline uint32_t VisibleEndBlkForRow(const MsaTask& task, uint32_t rowInReq) const
+    {
+        constexpr int32_t blockSize = IS_BLOCK16 ? MSA_BLOCK16_SIZE : MSA_BLOCK_SIZE;
+        const int32_t tOff = static_cast<int32_t>(rowInReq / numQHeads_);
+        const int32_t visibleKeyEnd = VisibleKeyEnd(task, tOff);
+        return visibleKeyEnd > 0 ? static_cast<uint32_t>((visibleKeyEnd + blockSize - 1) / blockSize) : 0U;
+    }
+
+    /// 融合 TopK 的 local_mask 与分离 TopK 对齐：start_loc 对应请求的首个 query token，
+    /// 跨块时逐行推进块号，并以该行可见范围限制 init/local 高分。
+    __aicore__ inline void ApplyTokenLocalMaskUb(const MsaTask& task, uint32_t blkBase, uint32_t rows, uint32_t rowOff,
+                                                 uint32_t nWin = 1U)
+    {
+        if (task.initBlocks == 0 && task.localBlocks == 0) {
+            return;
+        }
+        if (!needTokenLocalMask_) {
+            ApplyRequestLocalMaskUb(task, blkBase, rows, nWin);
+            return;
+        }
+        const uint32_t nBlocks = nWin * MSA_BLOCKS_PER_STILE;
+        const uint32_t rowStep = IS_BLOCK16 ? numQHeads_ : 1U;
+        const uint32_t firstRowInReq = task.mStart + rowOff;
+        if (rows == 0U) {
+            return;
+        }
+        const int32_t firstQBlock = QueryBlockForRow(task, firstRowInReq);
+        const int32_t firstLocalStart = (firstQBlock + 1 > static_cast<int32_t>(task.localBlocks)) ?
+                                            (firstQBlock + 1 - static_cast<int32_t>(task.localBlocks)) :
+                                            0;
+        const bool hasInit = task.initBlocks > 0U && blkBase < task.initBlocks;
+        // 大多数 tile 位于 local 窗口之前，只比较首行即可直接返回，无需再算末行块号。
+        if (!hasInit && (task.localBlocks == 0U || static_cast<int32_t>(blkBase + nBlocks) <= firstLocalStart)) {
+            return;
+        }
+        const uint32_t lastRowInReq = firstRowInReq + (rows - 1U) * rowStep;
+        const int32_t lastQBlock = QueryBlockForRow(task, lastRowInReq);
+        if (!hasInit && static_cast<int32_t>(blkBase) > lastQBlock) {
+            return;
+        }
+        // qBlock 与 visibleEndBlk 均随 token 单调不减，首尾一致即可判定整个行区间一致。
+        const uint32_t firstVisibleEndBlk = VisibleEndBlkForRow(task, firstRowInReq);
+        const uint32_t lastVisibleEndBlk = VisibleEndBlkForRow(task, lastRowInReq);
+        const bool uniform = firstQBlock == lastQBlock && firstVisibleEndBlk == lastVisibleEndBlk;
+
+        if (uniform) {
+            const int32_t localStart = (firstQBlock + 1 > static_cast<int32_t>(task.localBlocks)) ?
+                                           (firstQBlock + 1 - static_cast<int32_t>(task.localBlocks)) :
+                                           0;
+            uint64_t initBits = 0;
+            uint64_t localBits = 0;
+            for (uint32_t j = 0; j < nBlocks; ++j) {
+                const int32_t blk = static_cast<int32_t>(blkBase + j);
+                if (blk < 0 || blk >= static_cast<int32_t>(firstVisibleEndBlk)) {
+                    continue;
+                }
+                if (static_cast<uint32_t>(blk) < task.initBlocks) {
+                    initBits |= (1ULL << j);
+                }
+                if (blk >= localStart && blk <= firstQBlock) {
+                    localBits |= (1ULL << j);
+                }
+            }
+            initBits &= ~localBits;
+            const uint8_t repeats =
+                static_cast<uint8_t>((rows * nBlocks + MSA_FP32_PER_REPEAT - 1) / MSA_FP32_PER_REPEAT);
+            if (initBits != 0) {
+                uint64_t bits = 0;
+                for (uint32_t g = 0; g < MSA_FP32_PER_REPEAT / nBlocks; ++g) {
+                    bits |= (initBits << (g * nBlocks));
+                }
+                uint64_t mask[MSA_VEC_MASK_WORDS] = {bits, 0};
+                AscendC::Duplicate<float>(ubRowMax_, MSA_LOCAL_SCORE_INIT, mask, repeats, 1,
+                                          MSA_FP32_PER_REPEAT / MSA_FP32_PER_BLOCK);
+                AscendC::PipeBarrier<PIPE_V>();
+            }
+            if (localBits != 0) {
+                uint64_t bits = 0;
+                for (uint32_t g = 0; g < MSA_FP32_PER_REPEAT / nBlocks; ++g) {
+                    bits |= (localBits << (g * nBlocks));
+                }
+                uint64_t mask[MSA_VEC_MASK_WORDS] = {bits, 0};
+                AscendC::Duplicate<float>(ubRowMax_, MSA_LOCAL_SCORE_LOCAL, mask, repeats, 1,
+                                          MSA_FP32_PER_REPEAT / MSA_FP32_PER_BLOCK);
+                AscendC::PipeBarrier<PIPE_V>();
+            }
+            return;
+        }
+
+        for (uint32_t r = 0; r < rows; ++r) {
+            const uint32_t rowInReq = firstRowInReq + r * rowStep;
+            const int32_t qBlock = QueryBlockForRow(task, rowInReq);
+            const uint32_t visibleEndBlk = VisibleEndBlkForRow(task, rowInReq);
+            const int32_t localStart = (qBlock + 1 > static_cast<int32_t>(task.localBlocks)) ?
+                                           (qBlock + 1 - static_cast<int32_t>(task.localBlocks)) :
+                                           0;
+            uint64_t initBits = 0;
+            uint64_t localBits = 0;
+            for (uint32_t j = 0; j < nBlocks; ++j) {
+                const int32_t blk = static_cast<int32_t>(blkBase + j);
+                if (blk < 0 || blk >= static_cast<int32_t>(visibleEndBlk)) {
+                    continue;
+                }
+                if (static_cast<uint32_t>(blk) < task.initBlocks) {
+                    initBits |= (1ULL << j);
+                }
+                if (blk >= localStart && blk <= qBlock) {
+                    localBits |= (1ULL << j);
+                }
+            }
+            initBits &= ~localBits;
+            if (initBits != 0) {
+                uint64_t mask[MSA_VEC_MASK_WORDS] = {initBits, 0};
+                AscendC::Duplicate<float>(ubRowMax_[r * nBlocks], MSA_LOCAL_SCORE_INIT, mask, 1, 1,
+                                          MSA_FP32_PER_REPEAT / MSA_FP32_PER_BLOCK);
+                AscendC::PipeBarrier<PIPE_V>();
+            }
+            if (localBits != 0) {
+                uint64_t mask[MSA_VEC_MASK_WORDS] = {localBits, 0};
+                AscendC::Duplicate<float>(ubRowMax_[r * nBlocks], MSA_LOCAL_SCORE_LOCAL, mask, 1, 1,
+                                          MSA_FP32_PER_REPEAT / MSA_FP32_PER_BLOCK);
+                AscendC::PipeBarrier<PIPE_V>();
+            }
         }
     }
 
@@ -1589,7 +1742,7 @@ private:
             AscendC::Maxs<float>(ubRowMax_, ubRowMax_, MSA_FILL_VALUE, static_cast<int32_t>(nElem));
             AscendC::PipeBarrier<PIPE_V>();
         }
-        ApplyLocalMaskUb(task, blkBase, mSub_);
+        ApplyLocalMaskUb(task, blkBase, mSub_, mOff_);
         StageScore(blkBase, 0, mSub_);
     }
 
@@ -1706,6 +1859,7 @@ private:
     uint32_t writeLo_ = 0;
     uint32_t writeHi_ = 0;
     bool stageOn_ = false;
+    bool needTokenLocalMask_ = false;
     uint32_t mxDirectColumnMask_ = 0U;
     uint32_t mxDirectStileBase_ = ~0U;
     bool stileNeedFill_ = true; // 当前 stile 是否预填了 -inf（不满/有不可见列）

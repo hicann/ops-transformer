@@ -95,7 +95,7 @@ public:
     // bf16/fp16、int8、block16、MX、融合 topk 仍是 N=128 逐页。
     static constexpr bool FP8_SCORE_PIPE =
         !IS_QUANT_V && !IS_MXFP4 && !IS_BLOCK16 && !ENABLE_TOPK && (sizeof(ElementQ) == 1);
-    using Epilogue = MsaSegRowMaxEpilogue<IS_QUANT_V, IS_BLOCK16, IS_MXFP4, MX_FUSED_STAGE>;
+    using Epilogue = MsaSegRowMaxEpilogue<IS_QUANT_V, IS_BLOCK16, IS_MXFP4, MX_FUSED_STAGE, ENABLE_TOPK>;
     static constexpr uint32_t K_SCRATCH_SLOTS = (USE_C2UB && IS_BLOCK16 && !IS_MXFP4) ? MSA_A5_S_STAGES : 1U;
     static constexpr uint32_t K_SCRATCH_ELEMS =
         (USE_C2UB ? MSA_A5_K_SCRATCH_ELEM_NUM : MSA_K_SCRATCH_ELEM_NUM) * K_SCRATCH_SLOTS;
