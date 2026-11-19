@@ -6,7 +6,7 @@
 - <term>Ascend 950PR&950DT系列产品</term>：不支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
 - <term>Atlas A2系列产品</term>：支持
@@ -27,10 +27,10 @@
 
 - 计算公式：
 
-    Nsa Compress正向计算公式如下：
+    各batch独立计算完整窗口，其中W=compressBlockSize，S=compressStride。
 
 $$
-\tilde{K}_t^{\text{cmp}} = f_K^{\text{cmp}}(k_{:t}) = \left\{ \varphi(k_{id+1:id+l}) \bigg| 0 \leq i \leq \left\lfloor \frac{t-l}{d} \right\rfloor \right\}
+\mathrm{output}_{i,n,d}=\sum_{j=0}^{W-1}\mathrm{input}_{iS+j,n,d}\cdot\mathrm{weight}_{j,n}
 $$
 
 ## 函数原型
@@ -109,7 +109,7 @@ aclnnStatus aclnnNsaCompress(
           <ul>
             <li>不支持空Tensor。</li>
             <li>数据类型与input数据类型一致。</li>
-            <li>weight与input的shape满足broadcast关系。</li>
+            <li>shape为[compressBlockSize,N]，在窗口内沿D维广播。</li>
           </ul>
         </td>
         <td>FLOAT16、BFLOAT16</td>
@@ -120,7 +120,7 @@ aclnnStatus aclnnNsaCompress(
       <tr>
         <td>actSeqLenOptional</td>
         <td>输入</td>
-        <td>描述每个Batch对应的S大小。</td>
+        <td>各Batch的累计序列长度。</td>
         <td>
           <ul>
             <li>当前不能为空。</li>
@@ -137,7 +137,6 @@ aclnnStatus aclnnNsaCompress(
         <td>代表输入input的数据排布格式。</td>
         <td>
           <ul>
-            <li>支持BSH、SBH、BSND、BNSD、TND。</li>
             <li>当前仅支持TND。</li>
           </ul>
         </td>
@@ -172,9 +171,7 @@ aclnnStatus aclnnNsaCompress(
         <td>描述actSeqLenOptional数值类型。</td>
         <td>
           <ul>
-            <li>可取值0或1。</li>
-            <li>0：数值为cumsum结果；1：数值为每个batch序列大小。</li>
-            <li>当前仅支持0。</li>
+            <li>仅支持0，表示累计序列长度。</li>
           </ul>
         </td>
         <td>INT64</td>
@@ -254,7 +251,7 @@ aclnnStatus aclnnNsaCompress(
       <td>input和weight的数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
-      <td>input和weight的shape无法做broadcast。</td>
+      <td>input、weight的维数或weight.shape不符合要求。</td>
     </tr>
     <tr>
       <td>layoutOptional不合法。</td>
@@ -310,14 +307,14 @@ aclnnStatus aclnnNsaCompress(
 - 确定性计算：
   - aclnnNsaCompress默认确定性实现。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- input和weight需要满足broadcast关系，input.shape[1]=weight.shape[1]，不支持input、weight为空输入。
+- weight在窗口内沿D维广播，input.shape[1]=weight.shape[1]，不支持input、weight为空输入。
 - actSeqLenType目前仅支持取值0，即actSeqLenOptional需要是前缀和模式。
 - actSeqLenOptional目前不支持为空。
 - layoutOptional目前仅支持TND，此时input.shape[0]必须等于actSeqLenOptional[-1]。
 - input.shape[1]=weight.shape[1]，需要小于等于128。
 - input.shape[2]必须是16的倍数，上限256。
 - weight.shape[0]=compressBlockSize，必须是16的倍数，上限128。
-- compressStride必须是16的整数倍，并且compressBlockSize>=compressStride。
+- compressStride必须是16的整数倍，且16<=compressStride<=compressBlockSize。
 
 ## 调用示例
 
@@ -360,7 +357,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
     for (int64_t i = 0; i < size; i++)
     {
-        LOG_PRINT("mean result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
+        LOG_PRINT("compressed result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
     }
 }
 
@@ -421,7 +418,7 @@ int main()
     // 自定义输入与属性
     int64_t compressBlockSize = 32;
     int64_t compressStride = 32;
-    int64_t actSeqLenType = 0; // 0是前缀和模式，1是count计数模式
+    int64_t actSeqLenType = 0; // 0是前缀和模式
     char *layout = "TND";
     int32_t batchSize = 1;
     int32_t sampleLen = 64;
@@ -448,15 +445,8 @@ int main()
     int preActSeqLen = 0;
     for (int i = 0; i < batchSize; i++)
     {
-        if (actSeqLenType == 0)
-        {
-            actSeqHostData[i] = sampleLen + preActSeqLen;
-            preActSeqLen = actSeqHostData[i];
-        }
-        else if (actSeqLenType == 1)
-        {
-            actSeqHostData[i] = sampleLen;
-        }
+        actSeqHostData[i] = sampleLen + preActSeqLen;
+        preActSeqLen = actSeqHostData[i];
         if (sampleLen >= compressBlockSize)
         {
             outputNum += (sampleLen - compressBlockSize) / compressStride + 1;

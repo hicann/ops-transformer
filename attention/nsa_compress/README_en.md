@@ -19,10 +19,10 @@ English | [简体中文](./README.md)
 
 - Computation formula:
 
-    The forward computation formula of Nsa Compress is as follows:
+    Each batch computes complete windows with W=compressBlockSize and S=compressStride as follows:
 
 $$
-\tilde{K}_t^{\text{cmp}} = f_K^{\text{cmp}}(k_{:t}) = \left\{ \varphi(k_{id+1:id+l}) \bigg| 0 \leq i \leq \left\lfloor \frac{t-l}{d} \right\rfloor \right\}
+\mathrm{output}_{i,n,d}=\sum_{j=0}^{W-1}\mathrm{input}_{iS+j,n,d}\cdot\mathrm{weight}_{j,n}
 $$
 
 ## Parameter Description
@@ -30,25 +30,25 @@ $$
 | Parameter Name | Input/Output/Attribute | Description | Data Type | Data Format |
 |--------|---------------|------|----------|----------|
 | input | Input | Tensor to be compressed; supported shape: [T, N, D]. | BFLOAT16, FLOAT16 | ND |
-| weight | Input | Compression weight; supported shape: [compressBlockSize, N], in a broadcast relationship with input. | BFLOAT16, FLOAT16 | ND |
-| actSeqLenOptional | Input | The S size corresponding to each batch. | INT64 | ND |
-| layoutOptional | Input | Input data layout format; supports BSH, SBH, BSND, BNSD, and TND. Currently, only TND is supported. | String | - |
+| weight | Input | Compression weight; supported shape: [compressBlockSize, N], broadcast along D within each window. | BFLOAT16, FLOAT16 | ND |
+| actSeqLenOptional | Input | Cumulative sequence lengths of all batches. | INT64 | ND |
+| layoutOptional | Input | Input data layout format; only TND is supported. | String | - |
 | compressBlockSize | Input | Compression sliding window size. | INT64 | - |
 | compressStride | Input | Interval size between two compression sliding windows. | INT64 | - |
-| actSeqLenType | Input | Sequence length type. The value 0 indicates the cumsum result, and 1 indicates the sequence size of each batch. Currently, only 0 is supported. | INT64 | - |
-| output | Output | Compression result; supported shape: [T, N, D]. | BFLOAT16, FLOAT16 | ND |
+| actSeqLenType | Input | Sequence length type. Only 0 (cumulative lengths) is supported. | INT64 | - |
+| output | Output | Compression result with shape [T_compressed, N, D]. T_compressed is the total number of complete windows across batches. | BFLOAT16, FLOAT16 | ND |
 
 ## Constraints
 
 - When this API is used with PyTorch, the versions of CANN-related packages and PyTorch-related packages must match.
-- input and weight must be in a broadcast relationship, `input.shape[1] = weight.shape[1]`; empty input and weight are not supported.
+- weight is broadcast along D within each window, `input.shape[1] = weight.shape[1]`; empty input and weight are not supported.
 - actSeqLenType currently supports only the value 0, which means actSeqLenOptional must be in prefix-sum mode.
 - actSeqLenOptional cannot currently be empty.
 - layoutOptional currently supports only TND. In this case, input.shape[0] must equal actSeqLenOptional[-1].
 - `input.shape[1] = weight.shape[1]`, and it must be less than or equal to 128.
 - input.shape[2] must be a multiple of 16, with an upper limit of 256.
 - `weight.shape[0] = compressBlockSize`, which must be a multiple of 16, with an upper limit of 128.
-- compressStride must be a multiple of 16, and `compressBlockSize >= compressStride`.
+- compressStride must be a multiple of 16, and satisfy `16 <= compressStride <= compressBlockSize`.
 
 ## Calling Description
 

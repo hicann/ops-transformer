@@ -47,7 +47,7 @@ void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
                            size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
     for (int64_t i = 0; i < size; i++) {
-        LOG_PRINT("mean result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
+        LOG_PRINT("compressed result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
     }
 }
 
@@ -108,7 +108,7 @@ int main()
     // 自定义输入与属性
     int64_t compressBlockSize = 32;
     int64_t compressStride = 32;
-    int64_t actSeqLenType = 0; // 0是前缀和模式，1是count计数模式
+    int64_t actSeqLenType = 0; // 0是前缀和模式
     char* layout = "TND";
     int32_t batchSize = 1;
     int32_t sampleLen = 64;
@@ -132,12 +132,8 @@ int main()
     int outputNum = 0;
     int preActSeqLen = 0;
     for (int i = 0; i < batchSize; i++) {
-        if (actSeqLenType == 0) {
-            actSeqHostData[i] = sampleLen + preActSeqLen;
-            preActSeqLen = actSeqHostData[i];
-        } else if (actSeqLenType == 1) {
-            actSeqHostData[i] = sampleLen;
-        }
+        actSeqHostData[i] = sampleLen + preActSeqLen;
+        preActSeqLen = actSeqHostData[i];
         if (sampleLen >= compressBlockSize) {
             outputNum += (sampleLen - compressBlockSize) / compressStride + 1;
         }

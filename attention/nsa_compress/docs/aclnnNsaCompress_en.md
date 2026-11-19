@@ -8,7 +8,7 @@
 - <term>Ascend 950PR&950DT products</term>: Not supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Not supported
+- <term>Atlas A3 products</term>: Supported
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
 - <term>Atlas A2 products</term>: Supported
@@ -29,10 +29,10 @@
 
 - Formula:
 
-    The forward computation formula of Nsa Compress is as follows:
+    Each batch computes complete windows with W=compressBlockSize and S=compressStride as follows:
 
 $$
-\tilde{K}_t^{\text{cmp}} = f_K^{\text{cmp}}(k_{:t}) = \left\{ \varphi(k_{id+1:id+l}) \bigg| 0 \leq i \leq \left\lfloor \frac{t-l}{d} \right\rfloor \right\}
+\mathrm{output}_{i,n,d}=\sum_{j=0}^{W-1}\mathrm{input}_{iS+j,n,d}\cdot\mathrm{weight}_{j,n}
 $$
 
 ## Function Prototype
@@ -109,7 +109,7 @@ aclnnStatus aclnnNsaCompress(
         <td>          <ul>
             <li>Empty tensors are not supported.</li>
             <li>The data type must be the same as that of input.</li>
-            <li>The shape of weight satisfies the broadcast relationship with the shape of input.</li>
+            <li>Shape [compressBlockSize,N], broadcast along D within each window.</li>
           </ul>
         </td>
         <td>FLOAT16, BFLOAT16</td>
@@ -120,7 +120,7 @@ aclnnStatus aclnnNsaCompress(
       <tr>
         <td>actSeqLenOptional</td>
         <td>Input</td>
-        <td>Indicates the S size of each batch.</td>
+        <td>Cumulative sequence lengths of all batches.</td>
         <td>          <ul>
             <li>Currently, this parameter cannot be empty.</li>
           </ul>
@@ -135,7 +135,6 @@ aclnnStatus aclnnNsaCompress(
         <td>Input</td>
         <td>Indicates the data format of input.</td>
         <td>          <ul>
-            <li>Supported values: BSH, SBH, BSND, BNSD, TND.</li>
             <li>Currently, only TND is supported.</li>
           </ul>
         </td>
@@ -169,9 +168,7 @@ aclnnStatus aclnnNsaCompress(
         <td>Input</td>
         <td>Indicates the numeric type of actSeqLenOptional.</td>
         <td>          <ul>
-            <li>Value options: 0 or 1.</li>
-            <li>0: the value is the cumsum result; 1: the value is the sequence size of each batch.</li>
-            <li>Currently, only 0 is supported.</li>
+            <li>Only 0 (cumulative lengths) is supported.</li>
           </ul>
         </td>
         <td>INT64</td>
@@ -186,7 +183,7 @@ aclnnStatus aclnnNsaCompress(
         <td>          <ul>
             <li>Empty tensor not supported.</li>
             <li>The data type must be the same as that of input.</li>
-            <li>The supported shape is [T, N, D].</li>
+            <li>Shape [T_compressed, N, D], where T_compressed is the total number of complete windows across batches.</li>
           </ul>
         </td>
         <td>FLOAT16, BFLOAT16</td>
@@ -249,7 +246,7 @@ aclnnStatus aclnnNsaCompress(
       <td>The data type of input or weight is out of the supported range.</td>
     </tr>
     <tr>
-      <td>The shapes of input and weight cannot be broadcast.</td>
+      <td>The ranks of input/weight or the shape of weight are invalid.</td>
     </tr>
     <tr>
       <td>layoutOptional is invalid.</td>
@@ -305,14 +302,14 @@ aclnnStatus aclnnNsaCompress(
 - Deterministic computation:
   - aclnnNsaCompress defaults to a deterministic implementation.
 - When using this API with PyTorch, ensure that the versions of CANN-related packages and PyTorch-related packages are compatible.
-- input and weight must satisfy the broadcast relationship where input.shape[1]=weight.shape[1]. Empty inputs for input and weight are not supported.
+- weight is broadcast along D within each window, with input.shape[1]=weight.shape[1]. Empty inputs for input and weight are not supported.
 - actSeqLenType supports only the value 0 currently, which means actSeqLenOptional must be in prefix-sum mode.
 - Empty actSeqLenOptional is not supported currently.
 - Currently, layoutOptional supports only TND. In this case, input.shape[0] must equal actSeqLenOptional[-1].
 - input.shape[1]=weight.shape[1] must be less than or equal to 128.
 - input.shape[2] must be a multiple of 16, with an upper limit of 256.
 - weight.shape[0]=compressBlockSize must be a multiple of 16, with an upper limit of 128.
-- compressStride must be a multiple of 16, and compressBlockSize>=compressStride.
+- compressStride must be a multiple of 16, and satisfy 16<=compressStride<=compressBlockSize.
 
 ## Example
 
@@ -355,7 +352,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
     for (int64_t i = 0; i < size; i++)
     {
-        LOG_PRINT("mean result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
+        LOG_PRINT("compressed result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
     }
 }
 
@@ -416,7 +413,7 @@ int main()
     // Customize inputs and attributes.
     int64_t compressBlockSize = 32;
     int64_t compressStride = 32;
-    int64_t actSeqLenType = 0; // 0: prefix sum mode, 1: count mode.
+    int64_t actSeqLenType = 0; // 0: prefix sum mode.
     char *layout = "TND";
     int32_t batchSize = 1;
     int32_t sampleLen = 64;
@@ -443,15 +440,8 @@ int main()
     int preActSeqLen = 0;
     for (int i = 0; i < batchSize; i++)
     {
-        if (actSeqLenType == 0)
-        {
-            actSeqHostData[i] = sampleLen + preActSeqLen;
-            preActSeqLen = actSeqHostData[i];
-        }
-        else if (actSeqLenType == 1)
-        {
-            actSeqHostData[i] = sampleLen;
-        }
+        actSeqHostData[i] = sampleLen + preActSeqLen;
+        preActSeqLen = actSeqHostData[i];
         if (sampleLen >= compressBlockSize)
         {
             outputNum += (sampleLen - compressBlockSize) / compressStride + 1;
