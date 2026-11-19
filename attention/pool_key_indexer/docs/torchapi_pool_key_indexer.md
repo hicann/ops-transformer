@@ -77,9 +77,9 @@ cann_ops_transformer.pool_key_indexer(
   k_descale=None,
   layout_q="BSND",
   layout_k="BSND",
-  topk=128,
-  pool_size=1,
-  mask_mode=0,
+  topk=2048,
+  pool_size=16,
+  mask_mode=3,
   quant_mode=-1,
   return_value=False
 ) -> (Tensor, Tensor)
@@ -95,21 +95,21 @@ cann_ops_transformer.pool_key_indexer(
 
 | 参数名       | 参数类型 | 可选/必选 | 描述                                                                                                                         | 数据类型          | 维度(shape)                                                                                                                |
 | ------------ | -------- | --------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| query        | Tensor   | 必选      | 公式中的输入Q。不支持空tensor。数据格式为ND。                                                                                | bfloat16、float16、int8（int8仅quant_mode为2时支持） | layout_q为BSND时shape为(B,S1,N1,D)；layout_q为TND时shape为(T1,N1,D)                                                        |
-| pool_key     | Tensor   | 必选      | 公式中的池化后输入K。支持“0 池”空张量（纯尾块模式：BSND S2=0、TND T2=0、PA block_num=0，此时各batch有效key全部由pool_tail_k表达）。数据格式为ND，支持非连续的Tensor（仅PA_BBND场景下0轴支持非连续）。                      | bfloat16、float16、int8（int8仅quant_mode为2时支持） | layout_k为BSND时shape为(B,S2,N2,D)；layout_k为TND时shape为(T2,N2,D)；layout_k为PA_BBND时shape为(block_num,block_size,N2,D) |
+| query        | Tensor   | 必选      | 公式中的输入Q。不支持空tensor。数据格式为ND。                                                                                | bfloat16、float16、float8_e4m3fn（仅quant_mode为0/1时支持）、int8（quant_mode为2时支持） | layout_q为BSND时shape为(B,S1,N1,D)；layout_q为TND时shape为(T1,N1,D)                                                        |
+| pool_key     | Tensor   | 必选      | 公式中的池化后输入K。支持“0 池”空张量（纯尾块模式：BSND S2=0、TND T2=0、PA block_num=0，此时各batch有效key全部由pool_tail_k表达）。数据格式为ND，支持非连续的Tensor（仅PA_BBND场景下0轴支持非连续）。                      | bfloat16、float16、float8_e4m3fn（仅quant_mode为0/1时支持）、int8（quant_mode为2时支持） | layout_k为BSND时shape为(B,S2,N2,D)；layout_k为TND时shape为(T2,N2,D)；layout_k为PA_BBND时shape为(block_num,block_size,N2,D) |
 | weights      | Tensor   | 必选      | 公式中的输入W。不支持空tensor。数据格式为ND。                                                                                | bfloat16、float16（quant_mode为2时仅float16）        | layout_q为BSND时shape为(B,S1,N1)；layout_q为TND时shape为(T1,N1)                                                            |
 | pool_tail_k  | Tensor   | 必选      | 表示每个Batch中最后一个pool未满pool_size时的有效token数。不完整尾池不包含在pool_key中，pool_key仅包含完整pool，每个Batch有效token总数=完整pool数×pool_size+pool_tail_k。取值范围[0, pool_size-1]。数据格式为ND。                            | int64             | (B,)                                                                                                                       |
-| actual_seq_q | Tensor   | 可选      | 表示不同Batch中Query的有效Sequence Length。仅layout_q为TND场景下必传（此时以元素数作为B），第一个值固定为0；BSND场景不传。数据格式为ND，支持非连续的Tensor。    | int64             | (B,)                                                                                                                       |
-| actual_seq_k | Tensor   | 可选      | 表示不同Batch中pool_key的有效Sequence Length。仅layout_k为TND场景下必传（此时以元素数作为B），第一个值固定为0；BSND场景不传。数据格式为ND，支持非连续的Tensor。 | int64             | (B,)                                                                                                                       |
+| actual_seq_q | Tensor   | 可选      | 表示不同Batch中Query的有效序列长度。仅layout_q为TND场景下必传（此时以元素数作为B）：数组长度为B，第i个元素为第0~i个Batch有效token数的累计结束位置（即长度B的前缀和，末元素须等于T1），须非递减；第一个元素为Batch 0的累计结束位置，仅当Batch 0有效长度为0时才为0，并非固定为0；BSND场景不传。数据格式为ND，支持非连续的Tensor。    | int64             | (B,)                                                                                                                       |
+| actual_seq_k | Tensor   | 可选      | 表示不同Batch中pool_key的有效序列长度。layout_k为TND时必传（数组长度为B，第i个元素为第0~i个Batch有效pool数的累计结束位置，末元素须等于T2，须非递减）；layout_k为PA_BBND时必传（数组长度为B，第i个元素为该Batch的有效pool数，采用非前缀和形式）；layout_k为BSND时不传。数据格式为ND，支持非连续的Tensor。 | int64             | (B,)                                                                                                                       |
 | block_table  | Tensor   | 可选      | 表示PageAttention中KV存储使用的block映射表。仅layout_k为PA_BBND场景下必传。数据格式为ND。                                    | int32             | (B, max_block_num_per_seq)                                                                                                 |
-| q_descale    | Tensor   | 可选      | 表示Query的反量化系数。仅quant_mode>=0时有效。数据格式为ND。quant_mode为2时数据类型为float16，shape与quant_mode为0时一致（query去D轴），各维度与query对应维度一致，元素须为正数。 | float、float8_e8m0、float16（float16仅quant_mode为2时支持） | layout_q为BSND时shape为(B,S1,N1)；layout_q为TND时shape为(T1,N1)                                                            |
-| k_descale    | Tensor   | 可选      | 表示pool_key的反量化系数。仅quant_mode>=0时有效。数据格式为ND。quant_mode为2时数据类型为float16，shape与quant_mode为0时一致（pool_key去D轴，PA_BBND场景为(block_num,block_size,N2)，按物理块寻址），各维度与pool_key对应维度一致，元素须为正数。 | float、float8_e8m0、float16（float16仅quant_mode为2时支持） | layout_k为BSND时shape为(B,S2,N2)；layout_k为TND时shape为(T2,N2)；layout_k为PA_BBND时shape为(block_num,block_size,N2)       |
+| q_descale    | Tensor   | 可选      | 表示Query的反量化系数。仅quant_mode>=0时有效。数据格式为ND。quant_mode为0时数据类型为float；quant_mode为1时数据类型为float8_e8m0且末尾追加[D/64, 2]维；quant_mode为2时数据类型为float16。各维度与query对应维度一致（去D轴），元素须为正数。 | float（quant_mode为0）、float8_e8m0（quant_mode为1）、float16（quant_mode为2） | layout_q为BSND时shape为(B,S1,N1)；layout_q为TND时shape为(T1,N1)；quant_mode为1时shape为(B,S1,N1,D/64,2)（BSND）或(T1,N1,D/64,2)（TND） |
+| k_descale    | Tensor   | 可选      | 表示pool_key的反量化系数。仅quant_mode>=0时有效。数据格式为ND。quant_mode为0时数据类型为float；quant_mode为1时数据类型为float8_e8m0且末尾追加[D/64, 2]维；quant_mode为2时数据类型为float16。各维度与pool_key对应维度一致（去D轴，PA_BBND场景为(block_num,block_size,N2)，按物理块寻址），元素须为正数。 | float（quant_mode为0）、float8_e8m0（quant_mode为1）、float16（quant_mode为2） | layout_k为BSND时shape为(B,S2,N2)；layout_k为TND时shape为(T2,N2)；layout_k为PA_BBND时shape为(block_num,block_size,N2)；quant_mode为1时上述shape末尾追加[D/64, 2]（如PA_BBND为(block_num,block_size,N2,D/64,2)） |
 | layout_q     | str      | 可选      | 表示Query的排列格式，支持BSND、TND，默认值为BSND。                                                                           | string            | -                                                                                                                          |
 | layout_k     | str      | 可选      | 表示pool_key的排列格式，支持BSND、TND、PA_BBND，默认值为BSND。                                                               | string            | -                                                                                                                          |
-| topk         | int      | 可选      | 表示从Query中筛选出的关键稀疏token的个数。取值范围[1, 8192]，需能被pool_size整除。默认值为128。                              | int32             | -                                                                                                                          |
-| pool_size    | int      | 可选      | 表示Key侧池化窗口大小。取值范围[1, 128]，默认值为1，表示无池化（退化为lightning_indexer行为）。                              | int32             | -                                                                                                                          |
-| mask_mode    | int      | 可选      | 表示mask的模式，0表示No mask，3表示rightDownCausal模式，默认值为0。                                                          | int32             | -                                                                                                                          |
-| quant_mode   | int      | 可选      | 表示量化模式。-1表示不量化，0表示FP8 per-token-head量化，1表示mxFP8量化，2表示int8量化（query/pool_key为INT8，weights与反量化系数q_descale/k_descale为FLOAT16。默认值为-1。 | int32             | -                                                                                                                          |
+| topk         | int      | 可选      | 表示从Query中筛选出的关键稀疏token的个数。取值范围[1, 2048]或3072、4096、5120、6144、7168、8192，需能被pool_size整除。默认值为2048（省略时sparse_indices末维为2048+pool_size-1）。                              | int32             | -                                                                                                                          |
+| pool_size    | int      | 可选      | 表示Key侧池化窗口大小。取值范围[1, 128]，默认值为16；取值为1表示无池化（退化为lightning_indexer行为）。                              | int32             | -                                                                                                                          |
+| mask_mode    | int      | 可选      | 表示mask的模式，0表示No mask，3表示rightDownCausal模式，默认值为3。                                                          | int32             | -                                                                                                                          |
+| quant_mode   | int      | 可选      | 表示量化模式。-1表示不量化；0表示FP8 per-token-head量化（query/pool_key为float8_e4m3fn，q_descale/k_descale为float）；1表示mxFP8量化（query/pool_key为float8_e4m3fn，q_descale/k_descale为float8_e8m0且末尾追加[D/64, 2]维）；2表示int8量化（query/pool_key为INT8，weights与反量化系数q_descale/k_descale为FLOAT16）。默认值为-1。 | int32             | -                                                                                                                          |
 | return_value | bool     | 可选      | 表示是否需要返回Indices对应的Values值。False表示不返回，True表示返回值。默认值为False。                                      | bool              | -                                                                                                                          |
 
 ## 返回值说明
@@ -133,7 +133,7 @@ cann_ops_transformer.pool_key_indexer(
 - pool_key仅包含完整pool，不完整尾池的pool_tail_k个token不在pool_key中；sparse_indices有效索引为原始KV token索引（batch内局部口径），合法域为[0, 完整pool数×pool_size+pool_tail_k)，调用方须保证原始KV每Batch有效token数与该上界一致。
 - BSND场景（layout_q与layout_k均为BSND）不传actual_seq_q与actual_seq_k；PA_BBND场景下query为BSND时不传actual_seq_q。
 - sparse_indices无效部分填-1；sparse_values无效部分填-inf。
-- 参数actual_seq_q、actual_seq_k要求其值为当前Batch与前序Batch有效token数的累加值（TND场景），后一个元素的值必须大于等于前一个元素的值。
+- TND场景下actual_seq_q、actual_seq_k为长度B的累计结束位置数组（第i个元素=第0~i个Batch有效长度之和，末元素分别等于T1、T2），且必须非递减；PA_BBND场景下actual_seq_k为长度B的每Batch有效pool数，采用非前缀和形式。
 - pool_key支持PA_BBND场景下0轴非连续，其余轴必须连续。
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../docs/zh/context/sparse_mode_introduction.md)。
 - 当layout_k为PA_BBND时，必须传入block_table和actual_seq_k；当layout_k不为PA_BBND时，不支持传入block_table。
@@ -141,7 +141,6 @@ cann_ops_transformer.pool_key_indexer(
 <!-- npu="A3,910b" id7 -->
 
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-  - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
   - 当layout_k为PA_BBND时，必须传入actual_seq_k。
   - 当layout_q为BSND时，不支持传入actual_seq_q；当layout_k为BSND时，不支持传入actual_seq_k。
   - 不支持FLOAT8_E4M3FN与FLOAT8_E8M0数据类型，不支持FP8量化场景（quant_mode为0/1）。
@@ -152,7 +151,7 @@ cann_ops_transformer.pool_key_indexer(
 <!-- npu="950" id8 -->
 
 - <term>Ascend 950PR&950DT系列产品</term>：
-  - 当layout_q为BSND时，不支持传入actual_seq_q；当layout_k为BSND或PA_BBND时，不支持传入actual_seq_k。
+  - 当layout_q为BSND时，不支持传入actual_seq_q；当layout_k为BSND时，不支持传入actual_seq_k；当layout_k为PA_BBND时必须传入actual_seq_k（每个元素为该Batch的有效pool数，采用非前缀和形式）。
   - 当layout_q为TND时，必须传入actual_seq_q。
   - quant_mode支持-1（不量化）、0（FP8 per-token-head量化）、1（mxFP8量化）、2（int8量化）。
 

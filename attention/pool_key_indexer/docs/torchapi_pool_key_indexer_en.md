@@ -76,9 +76,9 @@ cann_ops_transformer.pool_key_indexer(
   k_descale=None,
   layout_q="BSND",
   layout_k="BSND",
-  topk=128,
-  pool_size=1,
-  mask_mode=0,
+  topk=2048,
+  pool_size=16,
+  mask_mode=3,
   quant_mode=-1,
   return_value=False
 ) -> (Tensor, Tensor)
@@ -94,21 +94,21 @@ cann_ops_transformer.pool_key_indexer(
 
 | Parameter Name | Parameter Type | Optional/Required | Description | Data Type | Shape |
 | -------------- | -------------- | ----------------- | ----------- | --------- | ----- |
-| query | Tensor | Required | Input Q in the formula. Empty tensor not supported. Data format is ND. | bfloat16, float16, int8 (int8 is supported only when quant_mode is 2) | When layout_q is BSND, shape is (B,S1,N1,D); when layout_q is TND, shape is (T1,N1,D) |
-| pool_key | Tensor | Required | Input K after pooling in the formula. Supports the "0-pool" empty tensor (pure tail-block mode: BSND S2=0, TND T2=0, PA block_num=0; in this case, all valid keys of each batch are expressed by pool_tail_k). Data format is ND. Supports non-contiguous tensors (only axis 0 supports non-contiguity in the PA_BBND scenario). | bfloat16, float16, int8 (int8 is supported only when quant_mode is 2) | When layout_k is BSND, shape is (B,S2,N2,D); when layout_k is TND, shape is (T2,N2,D); when layout_k is PA_BBND, shape is (block_num,block_size,N2,D) |
+| query | Tensor | Required | Input Q in the formula. Empty tensor not supported. Data format is ND. | bfloat16, float16, float8_e4m3fn (only when quant_mode is 0/1), int8 (supported when quant_mode is 2) | When layout_q is BSND, shape is (B,S1,N1,D); when layout_q is TND, shape is (T1,N1,D) |
+| pool_key | Tensor | Required | Input K after pooling in the formula. Supports the "0-pool" empty tensor (pure tail-block mode: BSND S2=0, TND T2=0, PA block_num=0; in this case, all valid keys of each batch are expressed by pool_tail_k). Data format is ND. Supports non-contiguous tensors (only axis 0 supports non-contiguity in the PA_BBND scenario). | bfloat16, float16, float8_e4m3fn (only when quant_mode is 0/1), int8 (supported when quant_mode is 2) | When layout_k is BSND, shape is (B,S2,N2,D); when layout_k is TND, shape is (T2,N2,D); when layout_k is PA_BBND, shape is (block_num,block_size,N2,D) |
 | weights | Tensor | Required | Input W in the formula. Empty tensor not supported. Data format is ND. | bfloat16, float16 (only float16 when quant_mode is 2) | When layout_q is BSND, shape is (B,S1,N1); when layout_q is TND, shape is (T1,N1) |
 | pool_tail_k | Tensor | Required | Number of valid tokens in the last pool of each batch when it is not full of pool_size. Value range is [0, pool_size-1]. Data format is ND. | int64 | (B,) |
-| actual_seq_q | Tensor | Optional | Valid Sequence Length of Query in different batches. Required only when layout_q is TND. The first value is fixed to 0. Data format is ND. Supports non-contiguous tensors. | int64 | (B,) or (B+1,) |
-| actual_seq_k | Tensor | Optional | Valid Sequence Length of pool_key in different batches. Required only when layout_k is TND. The first value is fixed to 0. Data format is ND. Supports non-contiguous tensors. | int64 | (B,) or (B+1,) |
+| actual_seq_q | Tensor | Optional | Valid sequence length of Query in different batches. Required only when layout_q is TND (B is derived from the element count): the array length is B, and element i is the cumulative end position of the valid token counts of batches 0..i (a length-B prefix sum; the last element must equal T1) and must be non-decreasing. The first element is the cumulative end position of batch 0 (0 only if batch 0 has zero valid length), not fixed to 0. Not passed when layout_q is BSND. Data format is ND. Supports non-contiguous tensors. | int64 | (B,) |
+| actual_seq_k | Tensor | Optional | Valid sequence length of pool_key in different batches. Required when layout_k is TND (array length B, element i is the cumulative end position of the valid pool counts of batches 0..i, the last element must equal T2, non-decreasing); required when layout_k is PA_BBND (array length B, element i is the valid pool count of that batch, non-prefix-sum form); not passed when layout_k is BSND. Data format is ND. Supports non-contiguous tensors. | int64 | (B,) |
 | block_table | Tensor | Optional | Block mapping table used for KV storage in PageAttention. Required only when layout_k is PA_BBND. Data format is ND. | int32 | (B, max_block_num_per_seq) |
-| q_descale | Tensor | Optional | Dequantization coefficient of Query. Valid only when quant_mode >= 0. Data format is ND. When quant_mode is 2, the data type is float16, the shape is consistent with that when quant_mode is 0 (query with the D axis removed), each dimension is consistent with the corresponding dimension of query, and elements must be positive numbers. | float, float8_e8m0, float16 (float16 is supported only when quant_mode is 2) | When layout_q is BSND, shape is (B,S1,N1); when layout_q is TND, shape is (T1,N1) |
-| k_descale | Tensor | Optional | Dequantization coefficient of pool_key. Valid only when quant_mode >= 0. Data format is ND. When quant_mode is 2, the data type is float16, the shape is consistent with that when quant_mode is 0 (pool_key with the D axis removed; in the PA_BBND scenario, (block_num,block_size,N2), addressed by physical block), each dimension is consistent with the corresponding dimension of pool_key, and elements must be positive numbers. | float, float8_e8m0, float16 (float16 is supported only when quant_mode is 2) | When layout_k is BSND, shape is (B,S2,N2); when layout_k is TND, shape is (T2,N2); when layout_k is PA_BBND, shape is (block_num,block_size,N2) |
+| q_descale | Tensor | Optional | Dequantization coefficient of Query. Valid only when quant_mode >= 0. Data format is ND. When quant_mode is 0, the data type is float; when quant_mode is 1, the data type is float8_e8m0 and the trailing [D/64, 2] dims are appended; when quant_mode is 2, the data type is float16. Each dimension is consistent with the corresponding dimension of query (D axis removed), and elements must be positive numbers. | float (quant_mode 0), float8_e8m0 (quant_mode 1), float16 (quant_mode 2) | When layout_q is BSND, shape is (B,S1,N1); when layout_q is TND, shape is (T1,N1); when quant_mode is 1, shape is (B,S1,N1,D/64,2) for BSND or (T1,N1,D/64,2) for TND |
+| k_descale | Tensor | Optional | Dequantization coefficient of pool_key. Valid only when quant_mode >= 0. Data format is ND. When quant_mode is 0, the data type is float; when quant_mode is 1, the data type is float8_e8m0 and the trailing [D/64, 2] dims are appended; when quant_mode is 2, the data type is float16. Each dimension is consistent with the corresponding dimension of pool_key (D axis removed; in the PA_BBND scenario, (block_num,block_size,N2), addressed by physical block), and elements must be positive numbers. | float (quant_mode 0), float8_e8m0 (quant_mode 1), float16 (quant_mode 2) | When layout_k is BSND, shape is (B,S2,N2); when layout_k is TND, shape is (T2,N2); when layout_k is PA_BBND, shape is (block_num,block_size,N2); when quant_mode is 1, the trailing [D/64, 2] dims are appended to the above shapes (e.g. (block_num,block_size,N2,D/64,2) for PA_BBND) |
 | layout_q | str | Optional | Layout format of Query. Supports BSND and TND. Default value is BSND. | string | - |
 | layout_k | str | Optional | Layout format of pool_key. Supports BSND, TND, and PA_BBND. Default value is BSND. | string | - |
-| topk | int | Optional | Number of key sparse tokens to select from Query. Value range is [1, 8192] and must be divisible by pool_size. Default value is 128. | int32 | - |
-| pool_size | int | Optional | Key-side pooling window size. Value range is [1, 128]. Default value is 1, meaning no pooling (degrades to lightning_indexer behavior). | int32 | - |
-| mask_mode | int | Optional | Mask mode. 0 indicates No mask, 3 indicates rightDownCausal mode. Default value is 0. | int32 | - |
-| quant_mode | int | Optional | Quantization mode. -1 indicates no quantization, 0 indicates FP8 per-token-head quantization, 1 indicates mxFP8 quantization, and 2 indicates int8 quantization (query/pool_key is INT8, and weights and the dequantization coefficients q_descale/k_descale are FLOAT16). Default value is -1. | int32 | - |
+| topk | int | Optional | Number of key sparse tokens to select from Query. Value range is [1, 2048] or one of 3072, 4096, 5120, 6144, 7168, 8192, and must be divisible by pool_size. Default value is 2048 (when omitted, the last dimension of sparse_indices is 2048+pool_size-1). | int32 | - |
+| pool_size | int | Optional | Key-side pooling window size. Value range is [1, 128]. Default value is 16; a value of 1 means no pooling (degrades to lightning_indexer behavior). | int32 | - |
+| mask_mode | int | Optional | Mask mode. 0 indicates No mask, 3 indicates rightDownCausal mode. Default value is 3. | int32 | - |
+| quant_mode | int | Optional | Quantization mode. -1 indicates no quantization; 0 indicates FP8 per-token-head quantization (query/pool_key are float8_e4m3fn, q_descale/k_descale are float); 1 indicates mxFP8 quantization (query/pool_key are float8_e4m3fn, q_descale/k_descale are float8_e8m0 with trailing [D/64, 2] dims); 2 indicates int8 quantization (query/pool_key are INT8, and weights and the dequantization coefficients q_descale/k_descale are FLOAT16). Default value is -1. | int32 | - |
 | return_value | bool | Optional | Whether to return the Values corresponding to Indices. False means no return, True means return values. Default value is False. | bool | - |
 
 ## Return Value Description
@@ -130,7 +130,7 @@ cann_ops_transformer.pool_key_indexer(
 - pool_tail_k, actual_seq_q, and actual_seq_k support CPU or NPU inputs. When all are CPU inputs, the host value retrieval path is used (after aclgraph capture, values become graph constants; modification requires recapture). When any is an NPU input, the device input path is automatically used (non-blocking D2H; after aclgraph capture, modifying buffer content takes effect automatically during replay).
 - When pool_size=1 and pool_tail_k=0, the behavior degrades to lightning_indexer, and the output dimension is topk.
 - Invalid parts of sparse_indices are filled with -1. Invalid parts of sparse_values are filled with -inf.
-- The actual_seq_q and actual_seq_k parameters require their values to be the cumulative sum of valid token counts of the current batch and preceding batches (TND scenario). The value of a later element must be greater than or equal to the value of the preceding element.
+- In the TND scenario, actual_seq_q and actual_seq_k are length-B cumulative end position arrays (element i is the sum of valid lengths of batches 0..i; the last elements must equal T1 and T2 respectively) and must be non-decreasing. In the PA_BBND scenario, actual_seq_k is a length-B array of per-batch valid pool counts in non-prefix-sum form.
 - pool_key supports non-contiguous axis 0 in the PA_BBND scenario. All other axes must be contiguous.
 - For a detailed introduction to the mask modes represented by mask_mode, see [Sparse Mode Introduction](../../../docs/en/context/sparse_mode_introduction.md).
 - When layout_k is PA_BBND, block_table and actual_seq_k must be passed. When layout_k is not PA_BBND, block_table is not supported.
@@ -139,7 +139,6 @@ cann_ops_transformer.pool_key_indexer(
 <!-- npu="A3,910b" id7 -->
 
 - <term>Atlas A3 products</term>, <term>Atlas A2 products</term>:
-  - topk value range currently only supports [1, 2048], as well as 3072, 4096, 5120, 6144, 7168, and 8192.
   - When layout_k is PA_BBND, actual_seq_k must be passed.
   - When layout_q is BSND, actual_seq_q is not supported. When layout_k is BSND, actual_seq_k is not supported.
   - The FLOAT8_E4M3FN and FLOAT8_E8M0 data types are not supported, and the FP8 quantization scenario (quant_mode 0/1) is not supported.
@@ -150,7 +149,7 @@ cann_ops_transformer.pool_key_indexer(
 <!-- npu="950" id8 -->
 
 - <term>Ascend 950PR&950DT products</term>:
-  - When layout_q is BSND, actual_seq_q is not supported. When layout_k is BSND or PA_BBND, actual_seq_k is not supported.
+  - When layout_q is BSND, actual_seq_q is not supported. When layout_k is BSND, actual_seq_k is not supported. When layout_k is PA_BBND, actual_seq_k must be passed (each element is the valid pool count of that batch, in non-prefix-sum form).
   - When layout_q is TND, actual_seq_q must be passed.
   - quant_mode supports -1 (no quantization), 0 (FP8 per-token-head quantization), 1 (mxFP8 quantization), and 2 (int8 quantization).
 
