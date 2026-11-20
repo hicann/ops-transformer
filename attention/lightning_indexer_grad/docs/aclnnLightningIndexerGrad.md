@@ -318,12 +318,17 @@ aclnnStatus aclnnLightningIndexerGrad(
       <td>传入参数是必选输入，输出或者必选属性，且是空指针。</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_INNER_NULLPTR</td>
-      <td rowspan="2">561103</td>
-      <td>query、key、dy、sparseIndices、weights的数据类型和数据格式不在支持的范围内。</td>
+      <td>ACLNN_ERR_PARAM_INVALID</td>
+      <td>161002</td>
+      <td>query、key、dy、weights的数据类型和数据格式不在支持的范围内。</td>
     </tr>
     <tr>
+      <td rowspan="2">ACLNN_ERR_INNER_NULLPTR</td>
+      <td rowspan="2">561103</td>
       <td>input_layout输入的类型不在支持的范围内。</td>
+    </tr>
+    <tr>
+      <td>sparseIndices的数据类型不在支持的范围内。</td>
     </tr>
   </tbody>
   </table>
