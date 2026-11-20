@@ -37,6 +37,8 @@ using namespace ge;
 using namespace mc2tiling;
 
 namespace MegaMoeA2A3Tiling {
+namespace MaskLayout = Mc2Tiling::MegaMoeMask;
+
 const char* K_INNER_DEBUG = "MegaMoeA2A3 Tiling Debug";
 const char* K_OP_NAME = "MegaMoe";
 
@@ -126,10 +128,31 @@ constexpr uint32_t THREE_DIMS = 3U;
 constexpr int64_t DISPATCH_QUANT_MODE_PASSTHROUGH = 0;
 constexpr int64_t DISPATCH_QUANT_MODE_PER_TENSOR = 2;
 
-// A3 发送侧逐 chunk 处理的 chunk 大小（与 kernel 侧 PERMUTE_CHUNK=1024 一致）
-constexpr int64_t MOE_PERMUTE_CHUNK = 1024;
+constexpr int64_t MOE_PERMUTE_CHUNK = Mc2Tiling::MEGA_MOE_PERMUTE_CHUNK;
 // prologue 每核计数区的核数上限（与 kernel 侧 const_args.hpp PERMUTE_MAX_CORES=128 一致）
 constexpr int64_t PERMUTE_MAX_CORES = 128;
+
+static bool UseKBitMaskRouting(bool isQuantRouting, bool isW4A8, int64_t topK, int64_t bs, int64_t epWorldSize)
+{
+    return isQuantRouting && !isW4A8 && topK > 0 && topK <= MaskLayout::MAX_TOPK && bs > 0 &&
+           bs <= MaskLayout::MAX_ROUTE_ROWS / topK && epWorldSize <= MaskLayout::MAX_EP_WORLD_SIZE;
+}
+
+// 单次 Mask 调用：位图、ready 槽位和 D 区对齐余量，均在原通信布局预算之外追加。
+static int64_t CalcMaskMetadataSize(int64_t chunkTokens, int64_t epWorldSize, int64_t expertPerRank)
+{
+    const int64_t maskStride = ops::CeilAlign(chunkTokens, static_cast<int64_t>(MaskLayout::MASK_STRIDE_ALIGN));
+    return ALIGN_512 + maskStride * epWorldSize * expertPerRank + epWorldSize * ALIGN_512;
+}
+
+// 保持现有 Workspace 增量：GMM/索引对齐余量、返回索引以及各 (专家, 来源卡) 的展开索引。
+static uint64_t CalcMaskWorkspaceAddon(uint64_t bs, uint64_t topK, uint64_t worldSize, uint64_t expertPerRank,
+                                       uint64_t recvBudget)
+{
+    const uint64_t chunk = std::min(bs, static_cast<uint64_t>(MOE_PERMUTE_CHUNK));
+    const uint64_t slots = ops::CeilAlign(chunk * topK, static_cast<uint64_t>(MaskLayout::SLOT_ALIGN));
+    return 3 * ALIGN_512 + recvBudget * sizeof(int32_t) + slots * worldSize * expertPerRank * sizeof(int32_t);
+}
 
 static int64_t CalcLeastCclBufferSize(int64_t maxRecvTokenNum, int64_t h, int64_t epWorldSize, int64_t expertPerRank,
                                       bool isQuantRouting, bool isW4A8, bool isA3, int64_t bs, int64_t topK)
@@ -188,6 +211,29 @@ static int64_t CalcLeastCclBufferSize(int64_t maxRecvTokenNum, int64_t h, int64_
         offsetFlag = std::max(epWorldSize * ALIGN_512, SYNC_STATE_RESERVED_SIZE);
     }
     return offsetTokenPerExpert + offsetTensor + offsetFlag + RESERVED_SPACE_SIZE;
+}
+
+static bool CanUseA3MaskRouting(const MegaMoeA2A3TilingData& info)
+{
+    if (!UseKBitMaskRouting(info.isQuantRouting, info.isW4A8, info.topK, info.M, info.epWorldSize)) {
+        OP_LOGD(K_INNER_DEBUG,
+                "[MASK] Routing requirements are not met. This invocation uses non-Mask routing. "
+                "Got isQuantRouting=%u, isW4A8=%u, topK=%u, M=%u, EP=%u. "
+                "Mask requires isQuantRouting=1, isW4A8=0, 1<=topK<=%u, M>=1, M*topK<=%u and EP<=%u.",
+                info.isQuantRouting, info.isW4A8, info.topK, info.M, info.epWorldSize, MaskLayout::MAX_TOPK,
+                MaskLayout::MAX_ROUTE_ROWS, MaskLayout::MAX_EP_WORLD_SIZE);
+        return false;
+    }
+    const int64_t expertPerRank = info.moeExpertNum / info.epWorldSize;
+    const int64_t baseSize = CalcLeastCclBufferSize(info.maxRecvTokenNum, info.K, info.epWorldSize, expertPerRank,
+                                                    info.isQuantRouting, info.isW4A8, true, info.M, info.topK);
+    const int64_t chunkTokens = std::min<int64_t>(info.M, MOE_PERMUTE_CHUNK);
+    const int64_t maskSize = CalcMaskMetadataSize(chunkTokens, info.epWorldSize, expertPerRank);
+    const int64_t available = info.cclBufferSize / 2 - baseSize;
+    const bool fits = available >= maskSize;
+    OP_LOGD(K_INNER_DEBUG, "[MASK] enabled=%d, availableWindowBytes=%ld, requiredMaskBytes=%ld", static_cast<int>(fits),
+            available, maskSize);
+    return fits;
 }
 
 // =========================== Attr 校验分函数 ===========================
@@ -1587,9 +1633,10 @@ static ge::graphStatus SetMegaMoeTilingKey(gert::TilingContext* context, MegaMoe
     std::string socVersion = mc2tiling::GetSocVersion(context);
     archCode = socVersion == "Ascend910B" ? SOC_ASCEND910B : SOC_ASCEND910_93;
 
-    uint64_t tilingKey = GET_TPL_TILING_KEY(static_cast<int64_t>(info.isTransposeW1),
-                                            static_cast<int64_t>(info.isTransposeW2), static_cast<int64_t>(quantMode),
-                                            static_cast<int64_t>(quantOutType), static_cast<int64_t>(archCode));
+    uint64_t tilingKey =
+        GET_TPL_TILING_KEY(static_cast<int64_t>(info.isTransposeW1), static_cast<int64_t>(info.isTransposeW2),
+                           static_cast<int64_t>(quantMode), static_cast<int64_t>(quantOutType),
+                           static_cast<int64_t>(archCode), false, false);
     context->SetTilingKey(tilingKey);
     return ge::GRAPH_SUCCESS;
 }
@@ -1723,6 +1770,20 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
         SetA3WorkspaceSize(info, n2, k2, megeMoeWorkspace);
     } else if (archCode == SOC_ASCEND910B) {
         SetA2WorkspaceSize(info, n2, k2, megeMoeWorkspace);
+    }
+
+    // ===== Mask 路由 =====
+    if (archCode == SOC_ASCEND910_93 && CanUseA3MaskRouting(info)) {
+        const bool blockedOutput = info.M >= MaskLayout::L1_TILE_M && info.K % MaskLayout::L1_TILE_N == 0 &&
+                                   info.recvRoundBudget >= std::min<uint64_t>(info.M, MOE_PERMUTE_CHUNK) * info.topK;
+        // 覆盖默认 key，最后两个字段分别控制 Mask 路由和列块输出。
+        const uint64_t maskTilingKey = GET_TPL_TILING_KEY(
+            static_cast<int64_t>(info.isTransposeW1), static_cast<int64_t>(info.isTransposeW2),
+            static_cast<int64_t>(MEGA_MOE_QUANT_MODE_PER_TOKEN), static_cast<int64_t>(MEGA_MOE_QUANT_OUT_TYPE_INT8),
+            static_cast<int64_t>(archCode), true, blockedOutput);
+        context->SetTilingKey(maskTilingKey);
+        megeMoeWorkspace +=
+            CalcMaskWorkspaceAddon(info.M, info.topK, info.worldSize, info.expertPerRank, info.recvRoundBudget);
     }
 
     // ===== 通信零冗余（Dedup）=====

@@ -28,7 +28,8 @@
 using namespace AscendC;
 using namespace MegaMoeImpl;
 
-template <bool TPL_IS_TRANSPOSE_W1, bool TPL_IS_TRANSPOSE_W2, int TPL_QUANT_MODE, int TPL_QUANT_OUT_TYPE, int TPL_ARCH>
+template <bool TPL_IS_TRANSPOSE_W1, bool TPL_IS_TRANSPOSE_W2, int TPL_QUANT_MODE, int TPL_QUANT_OUT_TYPE, int TPL_ARCH,
+          bool TPL_MASK_ROUTING, bool TPL_MASK_BLOCKED_OUTPUT>
 __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
                                     GM_ADDR weight2, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR bias1,
                                     GM_ADDR bias2, GM_ADDR xActiveMask, GM_ADDR scales, GM_ADDR sharedWeight1,
@@ -50,7 +51,15 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
     // instance out of this translation unit while A3 retains the packed W4A8 path.
     if constexpr (!isA2) {
 #endif
-        if constexpr (TPL_QUANT_MODE == MEGA_MOE_QUANT_MODE_PER_TOKEN) {
+        if constexpr (TPL_MASK_ROUTING) {
+            MegaMoe<DTYPE_X, DTYPE_WEIGHT1, DTYPE_Y, TPL_IS_TRANSPOSE_W1, TPL_IS_TRANSPOSE_W2, isNz, isA2, false, true,
+                    TPL_MASK_BLOCKED_OUTPUT>
+                op;
+            op.Init(context, x, topkIds, topkWeights, weight1, weight2, weightScales1, weightScales2, bias1, bias2,
+                    xActiveMask, scales, maskBuffer, yOut, expertTokenNumsOut, workspaceGM, tilingGM);
+            op.Process();
+            return;
+        } else if constexpr (TPL_QUANT_MODE == MEGA_MOE_QUANT_MODE_PER_TOKEN) {
             GET_TILING_DATA_WITH_STRUCT(MegaMoeTilingDataQuant, tilingData, tilingGM);
             // Dedup：仅 A3+W4A8 链双实例化，按 tilingData.common.dedupOn 选实例；
             // DedupOn_=false 裁剪后与基线逐位一致。A2 与其它链走上游统一实例（见下方）。

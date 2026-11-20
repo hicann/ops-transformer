@@ -82,11 +82,12 @@ using namespace Mc2Tiling;
 //   DedupOn_    : 通信零冗余实例；false = 基线实例（if constexpr 裁剪后与基线逐位一致）。
 //            仅 A3+W4A8 链双实例化，其余链缺省 false。
 #define MegaMoeClass \
-    typename AType_, typename BType_, typename CType_, bool TB1_, bool TB2_, bool Nz_, bool IS_A2_, bool DedupOn_
-#define MegaMoeFunc AType_, BType_, CType_, TB1_, TB2_, Nz_, IS_A2_, DedupOn_
+    typename AType_, typename BType_, typename CType_, bool TB1_, bool TB2_, bool Nz_, bool IS_A2_, bool DedupOn_, \
+        bool MASK_ROUTING_, bool BLOCKED_OUTPUT_
+#define MegaMoeFunc AType_, BType_, CType_, TB1_, TB2_, Nz_, IS_A2_, DedupOn_, MASK_ROUTING_, BLOCKED_OUTPUT_
 
 template <typename AType_, typename BType_, typename CType_, bool TB1_, bool TB2_, bool Nz_, bool IS_A2_,
-          bool DedupOn_ = false>
+          bool DedupOn_ = false, bool MASK_ROUTING_ = false, bool BLOCKED_OUTPUT_ = false>
 class MegaMoe {
 public:
     __aicore__ inline MegaMoe(){};
@@ -302,6 +303,7 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Process()
 
     using TileCopy2 = Epilogue::Tile::TileCopy<ArchTag, CType, ScaleType, PerTokenScaleType, D2Type>;
     using IS_A2 = Epilogue::Block::IS_A2_T<IS_A2_>;
+    using MaskRoute = Epilogue::Block::MaskIndexedRouteTagT<BLOCKED_OUTPUT_>;
     using BlockEpilogue2 = std::conditional_t<
         IS_A2_ && isW4A8,
         Epilogue::Block::BlockEpilogue<EpilogueDispatchPolicy2, CType, PerTokenScaleType, D2Type, TileCopy2, IS_A2>,
@@ -309,7 +311,11 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Process()
     using BlockEpilogue3 = std::conditional_t<
         isW4A8,
         Epilogue::Block::BlockEpilogue<EpilogueDispatchPolicy3, CType, PerTokenScaleType, D2Type, TileCopy2, IS_A2>,
-        Epilogue::Block::BlockEpilogue<EpilogueDispatchPolicy3, CType, PerTokenScaleType, D2Type, TileCopy2, IS_A2>>;
+        std::conditional_t<MASK_ROUTING_,
+                           Epilogue::Block::BlockEpilogue<EpilogueDispatchPolicy3, CType, PerTokenScaleType, D2Type,
+                                                          TileCopy2, MaskRoute>,
+                           Epilogue::Block::BlockEpilogue<EpilogueDispatchPolicy3, CType, PerTokenScaleType, D2Type,
+                                                          TileCopy2, IS_A2>>>;
     // Dedup combine 行级 epilogue，仅 DedupOn_=true 实例的 DedupCombineV2 使用
     using EpilogueDispatchPolicyDedup = Epilogue::EpilogueAtlasA2W4A8PostPerTokenDedup<ubStages>;
     using BlockEpilogueDedup =

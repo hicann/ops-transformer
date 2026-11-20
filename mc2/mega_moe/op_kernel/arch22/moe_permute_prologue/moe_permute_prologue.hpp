@@ -41,7 +41,15 @@ struct MoePermutePrologueNonQuantPolicy {
     using ArchTag = Catlass::Arch::AtlasA2;
 };
 
-template <uint32_t UB_STAGES_, class DispatchPolicy_, class ElementSrc_, class ElementDst_>
+template <bool TOKEN_MAJOR>
+struct MoeTokenCoreParams {};
+
+template <>
+struct MoeTokenCoreParams<true> {
+    uint32_t reservedTokenCores{0};
+};
+
+template <uint32_t UB_STAGES_, class DispatchPolicy_, class ElementSrc_, class ElementDst_, bool TOKEN_MAJOR = false>
 class MoePermutePrologue {
 public:
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
@@ -56,7 +64,7 @@ public:
     static constexpr uint32_t MAX_HIDDEN = 10240;
     static constexpr uint32_t MAX_EXPERTS = 1024;
 
-    struct Params {
+    struct Params : MoeTokenCoreParams<TOKEN_MAJOR> {
         int64_t numTokens;
         int64_t hidden;
         int64_t numTopk;
@@ -160,6 +168,19 @@ public:
         int64_t tokenEndIdx = 0;
         int64_t numTokensCurCore = 0;
         SplitCore(numTokens, tokenStartIdx, tokenEndIdx, numTokensCurCore);
+        if constexpr (TOKEN_MAJOR) {
+            if (numTokensCurCore > 0) {
+                AscendC::DataCopyExtParams cp{1, static_cast<uint32_t>(numTokensCurCore * numTopk * sizeof(int32_t)), 0,
+                                              0, 0};
+                AscendC::DataCopyPad(topkIds, gmTopkIds[tokenStartIdx * numTopk], cp, {});
+                AscendC::PipeBarrier<PIPE_ALL>();
+                PermuteTokens<std::is_same_v<ElementDst, int8_t>>(tokenStartIdx, tokenEndIdx, gmX, gmExpandX);
+                AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
+                AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
+                AscendC::DataCopyPad(gmExpandRowIdx[tokenStartIdx * numTopk], expandRowIdx, cp);
+            }
+            return;
+        }
 
         AscendC::DataCopyExtParams topkCopyParams{
             1, static_cast<uint32_t>(numTokensCurCore * numTopk * sizeof(int32_t)), 0, 0, 0};
@@ -201,6 +222,10 @@ private:
         } else {
             coreIdx = AscendC::GetBlockIdx();
             coreNum = AscendC::GetBlockNum();
+        }
+        if constexpr (TOKEN_MAJOR) {
+            coreIdx -= params_.reservedTokenCores;
+            coreNum -= params_.reservedTokenCores;
         }
     }
 
@@ -376,6 +401,17 @@ private:
         if (hasXActiveMask && !gmXActiveMask.GetValue(tokenIdx)) {
             for (int64_t k = 0; k < params_.numTopk; k++) {
                 expandRowIdx.SetValue(rowIdxOffset + k, -1);
+            }
+            return;
+        }
+        if constexpr (TOKEN_MAJOR) {
+            // 每个 token 的特征和量化系数在通信窗口只写一份，循环仅记录各路由的返回槽位。
+            AscendC::DataCopy(gmExpandX[tokenIdx * rowStride], tokenOut, copyLen);
+            for (int64_t k = 0; k < params_.numTopk; ++k) {
+                int32_t expert = topkIds.GetValue(topkBase + k);
+                expandRowIdx.SetValue(rowIdxOffset + k, expert >= 0 && expert < params_.numExperts ?
+                                                            static_cast<int32_t>(tokenIdx * params_.numTopk + k) :
+                                                            -1);
             }
             return;
         }

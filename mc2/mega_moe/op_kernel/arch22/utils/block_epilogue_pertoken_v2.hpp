@@ -16,6 +16,7 @@
 #ifndef CATLASS_EPILOGUE_BLOCK_EPILOGUE_PER_TOKEN_V2_ONLY_HPP
 #define CATLASS_EPILOGUE_BLOCK_EPILOGUE_PER_TOKEN_V2_ONLY_HPP
 
+#include <limits>
 #include <type_traits>
 
 #include "catlass/catlass.hpp"
@@ -39,6 +40,38 @@ struct IS_A2_T {
     static constexpr bool Value = IS_A2_;
 };
 
+// 选择 A3 按返回索引写回的后处理特化。
+template <bool BLOCKED_OUTPUT>
+struct MaskIndexedRouteTagT {
+    static constexpr uint32_t RANK_SHIFT = 16;
+    static constexpr uint32_t SLOT_MASK = (1U << RANK_SHIFT) - 1;
+};
+
+template <bool BLOCKED_OUTPUT>
+struct MaskOutputLayoutState {};
+
+template <>
+struct MaskOutputLayoutState<true> {
+    uint32_t blockedRows{0};
+};
+
+constexpr uint32_t MASK_PAIR_ROWS = 2;
+
+template <class T>
+CATLASS_DEVICE bool CopyMaskPair(AscendC::GlobalTensor<T> const& dst, AscendC::LocalTensor<T> const& src,
+                                 uint32_t first, uint32_t second, uint32_t columns, uint32_t dstStride, uint32_t ubGap,
+                                 uint32_t column = 0)
+{
+    const uint32_t bytes = columns * sizeof(T);
+    const uint64_t distance = static_cast<uint64_t>(second - first) * dstStride * sizeof(T);
+    if (second <= first || distance < bytes || distance - bytes > std::numeric_limits<uint32_t>::max()) {
+        return false;
+    }
+    AscendC::DataCopyPad(dst[static_cast<uint64_t>(first) * dstStride + column], src,
+                         {MASK_PAIR_ROWS, bytes, ubGap, static_cast<uint32_t>(distance - bytes), 0});
+    return true;
+}
+
 namespace detail {
 
 // Only A2 routes cross-server output through a separate window.
@@ -61,10 +94,24 @@ struct PerTokenV2RouteState<true> {
     {}
 };
 
+template <class BaseParams, bool BLOCKED_OUTPUT>
+struct PerTokenV2MaskParams : BaseParams, MaskOutputLayoutState<BLOCKED_OUTPUT> {
+    using BaseParams::BaseParams;
+    GM_ADDR ptrRouteIndex{nullptr};
+};
+
+template <bool MASK_ROUTING, uint32_t UB_STAGES>
+struct PerTokenV2MaskBuffers {};
+
+template <uint32_t UB_STAGES>
+struct PerTokenV2MaskBuffers<true, UB_STAGES> {
+    AscendC::LocalTensor<int32_t> routeIndexUbList[UB_STAGES];
+};
+
 // A2 and A3 share the tile pipeline. Platform and dequantization choices are
 // fixed at compile time, retaining each policy's event and copy sequence.
 template <class DispatchPolicy_, class CType_, class LayoutPerTokenScale_, class DType_, class TileCopy_, bool IS_A2_,
-          bool NEED_DEQUANT_>
+          bool NEED_DEQUANT_, bool MASK_ROUTING_ = false, bool BLOCKED_OUTPUT_ = false>
 class PerTokenV2Impl {
 public:
     using DispatchPolicy = DispatchPolicy_;
@@ -134,13 +181,15 @@ public:
         {}
     };
 
+    using RouteParams = std::conditional_t<MASK_ROUTING_, PerTokenV2MaskParams<Params, BLOCKED_OUTPUT_>, Params>;
+
     CATLASS_DEVICE
-    PerTokenV2Impl(Arch::Resource<ArchTag> const& resource, Params const& params = Params{})
+    PerTokenV2Impl(Arch::Resource<ArchTag> const& resource, RouteParams const& params = RouteParams{})
         : params(params)
     {
         n0 = params.n0;
         size_t ubOffset = 0;
-        for (int32_t i = 0; i < 2; i++) {
+        for (int32_t i = 0; i < (MASK_ROUTING_ ? UB_STAGES : 2); i++) {
             ubCList[i] = resource.ubBuf.template GetBufferByByte<ElementC>(ubOffset);
             ubOffset += max_len * sizeof(ElementC);
             ubDList[i] = resource.ubBuf.template GetBufferByByte<ElementD>(ubOffset);
@@ -151,8 +200,15 @@ public:
             ubOffset += (max_len / n0) * sizeof(float);
             source_scale_offset[i] = -1;
         }
-        tokenPerExpert.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(params.ptrTokenPerExpert));
-        tokenPerExpertLayout = params.tokenPerExpertLayout;
+        if constexpr (MASK_ROUTING_) {
+            for (uint32_t i = 0; i < UB_STAGES; ++i) {
+                maskBuffers.routeIndexUbList[i] = resource.ubBuf.template GetBufferByByte<int32_t>(ubOffset);
+                ubOffset += 128 * sizeof(int32_t);
+            }
+        } else {
+            tokenPerExpert.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(params.ptrTokenPerExpert));
+            tokenPerExpertLayout = params.tokenPerExpertLayout;
+        }
         is_ping = true;
     }
 
@@ -245,6 +301,49 @@ public:
                                        AscendC::GlobalTensor<int32_t> const& preSumBeforeRank, int32_t stTile,
                                        int32_t edTile, int32_t& preSumRankInExpert, int32_t& tileOffset)
     {
+        if constexpr (MASK_ROUTING_) {
+            using MaskRoute = MaskIndexedRouteTagT<BLOCKED_OUTPUT_>;
+            auto& routeIndex = maskBuffers.routeIndexUbList[is_ping];
+            int32_t lenTile = actualBlockShape.m();
+            AscendC::GlobalTensor<ElementD> gmRemotePeer;
+            uint32_t previousRank = std::numeric_limits<uint32_t>::max();
+            for (uint32_t row = 0; row < lenTile;) {
+                const uint32_t route = routeIndex.GetValue(row);
+                const uint32_t dstEpIdx = route >> MaskRoute::RANK_SHIFT;
+                uint32_t dstRow = route & MaskRoute::SLOT_MASK;
+                if (dstEpIdx != previousRank) {
+                    previousRank = dstEpIdx;
+                    __gm__ void* dstPeermemPtr = params.shmem(params.offsetD, dstEpIdx);
+                    if constexpr (BLOCKED_OUTPUT_) {
+                        // 通信 D 区按 [列块][路由槽位][块内列] 排列，此处定位当前列块的起点。
+                        gmRemotePeer.SetGlobalBuffer(reinterpret_cast<__gm__ ElementD*>(dstPeermemPtr) +
+                                                     static_cast<uint64_t>(blockCoord.n()) * params.blockedRows);
+                    } else {
+                        gmRemotePeer.SetGlobalBuffer(reinterpret_cast<__gm__ ElementD*>(dstPeermemPtr));
+                    }
+                }
+                auto dst = gmRemotePeer[static_cast<uint64_t>(dstRow) * params.n2 + blockCoord.n()];
+                if constexpr (BLOCKED_OUTPUT_) {
+                    dst = gmRemotePeer[static_cast<uint64_t>(dstRow) * n0];
+                }
+                if (row + 1 < lenTile) {
+                    const uint32_t nextRoute = routeIndex.GetValue(row + 1);
+                    bool paired = (nextRoute >> MaskRoute::RANK_SHIFT) == dstEpIdx &&
+                                  CopyMaskPair(gmRemotePeer, ubTile[row * n0], dstRow, nextRoute & MaskRoute::SLOT_MASK,
+                                               actualBlockShape.n(), BLOCKED_OUTPUT_ ? n0 : params.n2,
+                                               (n0 - actualBlockShape.n()) * sizeof(ElementD) / BYTE_PER_BLK,
+                                               BLOCKED_OUTPUT_ ? 0 : blockCoord.n());
+                    if (paired) {
+                        row += MASK_PAIR_ROWS;
+                        continue;
+                    }
+                }
+                copyUbToGmD(dst, ubTile[row * n0], LayoutC{1, actualBlockShape.n(), params.n2},
+                            LayoutC{1, actualBlockShape.n(), n0});
+                ++row;
+            }
+            return;
+        }
         for (int32_t dstEpIdx = 0; dstEpIdx < params.EP; dstEpIdx++) {
             int32_t lenRankInExpert = GetLenRankInExpert(dstEpIdx, groupIdx);
             int32_t dstExpertOffset = GetDstExpertOffset(dstEpIdx, groupIdx, preSumBeforeRank);
@@ -279,6 +378,12 @@ public:
         if (source_scale_offset[event_id] != gmScaleOffset) {
             source_scale_offset[event_id] = gmScaleOffset;
             copyScaleGmToUb(scaleUb, gmPerTokenScale[gmScaleOffset], scaleLayout, scaleLayout);
+            if constexpr (MASK_ROUTING_) {
+                AscendC::GlobalTensor<int32_t> routeIndex;
+                routeIndex.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(params.ptrRouteIndex));
+                AscendC::DataCopyPad(maskBuffers.routeIndexUbList[is_ping], routeIndex[gmScaleOffset],
+                                     {1, static_cast<uint32_t>(actualBlockShape.m() * sizeof(int32_t)), 0, 0, 0}, {});
+            }
         }
 
         AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(event_id_2);
@@ -382,11 +487,12 @@ public:
     }
 
 private:
-    Params params;
+    RouteParams params;
     AscendC::LocalTensor<ElementC> ubCList[UB_STAGES];
     AscendC::LocalTensor<ElementD> ubDList[UB_STAGES];
     AscendC::LocalTensor<float> ubFp32List[UB_STAGES];
     AscendC::LocalTensor<float> scaleUbList[UB_STAGES];
+    PerTokenV2MaskBuffers<MASK_ROUTING_, UB_STAGES> maskBuffers;
     int32_t source_scale_offset[UB_STAGES];
 
     int32_t max_len = 8 * 32 / 4 * 128;
@@ -415,6 +521,22 @@ class BlockEpilogue<EpilogueAtlasA2PerTokenDequantV2<UB_STAGES_>, CType_, Gemm::
                                         DType_, TileCopy_, IS_A2_, true>;
 
 public:
+    using Base::Base;
+};
+
+template <uint32_t UB_STAGES_, class CType_, class LayoutPerTokenScale_, class DType_, class TileCopy_,
+          bool BLOCKED_OUTPUT>
+class BlockEpilogue<EpilogueAtlasA2PerTokenDequantV2<UB_STAGES_>, CType_, Gemm::GemmType<float, LayoutPerTokenScale_>,
+                    DType_, TileCopy_, MaskIndexedRouteTagT<BLOCKED_OUTPUT>>
+    : public detail::PerTokenV2Impl<EpilogueAtlasA2PerTokenDequantV2<UB_STAGES_>, CType_, LayoutPerTokenScale_, DType_,
+                                    TileCopy_, false, true, true, BLOCKED_OUTPUT> {
+    using Base = detail::PerTokenV2Impl<EpilogueAtlasA2PerTokenDequantV2<UB_STAGES_>, CType_, LayoutPerTokenScale_,
+                                        DType_, TileCopy_, false, true, true, BLOCKED_OUTPUT>;
+
+public:
+    static constexpr bool MASK_ROUTING = true;
+    static constexpr bool MASK_BLOCKED_OUTPUT = BLOCKED_OUTPUT;
+    using Params = typename Base::RouteParams;
     using Base::Base;
 };
 

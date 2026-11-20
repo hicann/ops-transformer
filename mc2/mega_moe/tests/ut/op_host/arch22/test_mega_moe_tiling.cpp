@@ -529,4 +529,89 @@ TEST_F(MegaMoeArch22TilingTest, CombineCommModeDedupTilingEffect)
     EXPECT_EQ(gatedData->dedupOn, 0U);
 }
 
+TEST_F(MegaMoeArch22TilingTest, W8A8MaskTilingKeyAndWorkspace)
+{
+    struct MegaMoeCompileInfo {};
+    MegaMoeCompileInfo compileInfo;
+    constexpr int64_t bs = 129;
+    constexpr int64_t topK = 3;
+    constexpr int64_t hidden = 1024;
+    constexpr int64_t intermediate = 512;
+    constexpr int64_t ep = 2;
+    constexpr uint32_t expertsPerRank = 4;
+    constexpr int64_t experts = ep * expertsPerRank;
+
+    // 基线包含 10 MiB 保留区、512 KiB 标志区、3072 B 计数区及 387 行数据，每行 3588 B。
+    constexpr int64_t baselineWindow = 12401676;
+    // Mask 元数据包含 512 B 的 D 区对齐预留、每专家 160 B 的位图和两个 512 B 的就绪槽位。
+    constexpr int64_t maskWindow = baselineWindow + 2816;
+    constexpr uint64_t baselineKey = 1092;
+    constexpr uint64_t rowKey = 5188;
+    constexpr uint64_t blockedKey = 13380;
+
+    using Tensor = gert::TilingContextPara::TensorDescription;
+    std::vector<Tensor> inputs{
+        {{{64}, {64}}, ge::DT_INT32, ge::FORMAT_ND},
+        {{{bs, hidden}, {bs, hidden}}, ge::DT_BF16, ge::FORMAT_ND},
+        {{{bs, topK}, {bs, topK}}, ge::DT_INT32, ge::FORMAT_ND},
+        {{{bs, topK}, {bs, topK}}, ge::DT_FLOAT, ge::FORMAT_ND},
+    };
+    inputs.insert(inputs.end(), expertsPerRank,
+                  Tensor{{{hidden, 2 * intermediate}, {hidden, 2 * intermediate}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ});
+    inputs.insert(inputs.end(), expertsPerRank,
+                  Tensor{{{intermediate, hidden}, {intermediate, hidden}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ});
+    inputs.insert(inputs.end(), expertsPerRank,
+                  Tensor{{{2 * intermediate}, {2 * intermediate}}, ge::DT_UINT64, ge::FORMAT_ND});
+    inputs.insert(inputs.end(), expertsPerRank, Tensor{{{hidden}, {hidden}}, ge::DT_UINT64, ge::FORMAT_ND});
+
+    auto buildPara = [&](int64_t window, int64_t receiveBudget) {
+        return gert::TilingContextPara(
+            "MegaMoe", inputs,
+            {{{{bs, hidden}, {bs, hidden}}, ge::DT_BF16, ge::FORMAT_ND},
+             {{{expertsPerRank}, {expertsPerRank}}, ge::DT_INT32, ge::FORMAT_ND}},
+            {{"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(experts)},
+             {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ep)},
+             {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2 * window)},
+             {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(receiveBudget)},
+             {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+             {"dispatch_quant_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ge::DT_INT8)},
+             {"shared_expert_quant_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ge::DT_UNDEFINED)},
+             {"combine_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+             {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},
+             {"num_max_tokens_per_rank", Ops::Transformer::AnyValue::CreateFrom<int64_t>(bs)},
+             {"activation", Ops::Transformer::AnyValue::CreateFrom<std::string>("swiglu")},
+             {"activation_params",
+              Ops::Transformer::AnyValue::CreateFrom<std::vector<float>>({std::numeric_limits<float>::max()})},
+             {"activation_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ge::DT_UNDEFINED)},
+             {"transpose_weight1", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+             {"transpose_weight2", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+             {"weight1_interleave", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+            {1, 1, 1, 1, expertsPerRank, expertsPerRank, expertsPerRank, expertsPerRank}, {1, 1}, &compileInfo,
+            "Ascend910_93", 48, 196608);
+    };
+
+    struct LayoutCase {
+        int64_t budget;
+        uint64_t tilingKey;
+        size_t workspaceIncrement;
+    };
+    // 预算为 64 行时 Permute 工作区更大，预算为 6144 行时 Mask 增量为 1536 + 512 * 8 * 4 + 6144 * 4 B。
+    const LayoutCase cases[] = {{64, rowKey, 0}, {6144, blockedKey, 42496}};
+    Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValues({{"rankNum", ep}});
+    for (const auto& testCase : cases) {
+        SCOPED_TRACE(testing::Message() << "receive budget=" << testCase.budget);
+        TilingInfo fallback;
+        TilingInfo mask;
+        ASSERT_TRUE(ExecuteTiling(buildPara(maskWindow - 1, testCase.budget), fallback));
+        ASSERT_TRUE(ExecuteTiling(buildPara(maskWindow, testCase.budget), mask));
+        EXPECT_EQ(fallback.tilingKey, baselineKey);
+        EXPECT_EQ(mask.tilingKey, testCase.tilingKey);
+        ASSERT_EQ(fallback.workspaceSizes.size(), 1U);
+        ASSERT_EQ(mask.workspaceSizes.size(), 1U);
+        EXPECT_EQ(mask.workspaceSizes[0], fallback.workspaceSizes[0] + testCase.workspaceIncrement);
+    }
+    TilingInfo tooSmall;
+    EXPECT_FALSE(ExecuteTiling(buildPara(baselineWindow - 1, cases[0].budget), tooSmall));
+}
+
 } // namespace MegaMoeUT

@@ -21,6 +21,20 @@
 
 namespace Mc2Tiling {
 
+constexpr int64_t MEGA_MOE_PERMUTE_CHUNK = 1024;
+
+namespace MegaMoeMask {
+constexpr uint32_t MAX_EP_WORLD_SIZE = 16;
+constexpr uint32_t MAX_TOPK = 8;
+constexpr uint32_t MAX_ROUTE_ROWS = 4096;
+constexpr uint32_t SLOT_ALIGN = 128;
+constexpr uint32_t MASK_STRIDE_ALIGN = 32;
+constexpr uint32_t L1_TILE_M = 128;
+constexpr uint32_t L1_TILE_N = 256;
+
+static_assert(MAX_ROUTE_ROWS <= MEGA_MOE_PERMUTE_CHUNK * MAX_TOPK);
+} // namespace MegaMoeMask
+
 // host 侧 TilingBase：推导 workspace
 // expandedX 行步长 rowStride 由 kernel 侧 MoePermutePrologue 按 ElementDst
 // 模板类型推导（int8 → hidden+512，其余 → hidden），host 无需下发。
