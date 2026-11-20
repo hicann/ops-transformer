@@ -627,18 +627,7 @@ static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams& params)
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    // 3. 平台能力校验: premix 能力仅 A2/A3 (非 RegBase) 支持;
-    //    A5 (RegBase: ascend950) 与 arch92 (ascend960dt) 侧 tiling/kernel 未实现
-    //    preMix/gradPre 路径, 传入即拒绝
-    //    (提前到 dim/shape/dtype 之前: 平台不支持时无需检查 preMix 的具体值)
-    if (params.preMix != nullptr && Ops::Transformer::AclnnUtil::IsRegbase()) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "preMix/gradPre are only supported on A2/A3 and not supported on A5 (ascend950) or arch92 "
-                "(ascend960dt) RegBase platforms.");
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-
-    // 4. 校验输入、输出参数维度
+    // 3. 校验输入、输出参数维度
     CHECK_RET(CheckInputOutDims(params), ACLNN_ERR_PARAM_INVALID);
 
     // 5. 校验输入、输出shape参数

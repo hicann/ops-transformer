@@ -18,14 +18,13 @@
 
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
-#include "mhc_pre_sinkhorn_backward_utils_arch35.h"
+#include "mhc_pre_sinkhorn_backward_base_arch35.h"
 #include "mhc_pre_sinkhorn_backward_cube_compute_arch35.h"
 #include "mhc_pre_sinkhorn_backward_sinkhorn_arch35.h"
 
 namespace MhcPreSinkhornBackwardNs {
 
 using namespace AscendC;
-using namespace MhcPreSinkhornBackwardUtils;
 
 constexpr uint32_t MHC_PRE_BACKWARD_IMPL_MODE_HF32 = 1U;
 
@@ -54,10 +53,6 @@ public:
     __aicore__ inline void ProcessV1(uint64_t runBSStart, uint64_t runBSEnd, V0V1Buffers<P>& buffers,
                                      uint64_t vecRuntimesId, LocalTensor<P>& sumBuf, LocalTensor<P>& biasGradSumBuf,
                                      const LocalTensor<P>& hMixInput);
-    __aicore__ inline void AIV02Process(V0V1Buffers<P>& buffers, LocalTensor<P>& hMixGradBuf, uint64_t currentDealBsNum,
-                                        float alphaPre, float alphaPost, float alphaComb);
-    __aicore__ inline void AIV21Process(LocalTensor<P>& invRmsInBuf, LocalTensor<P>& invRmsUb,
-                                        LocalTensor<P>& invRmsGradUb, uint32_t currentChunkSize);
     // 当前行分块的 Sinkhorn 反向计算
     __aicore__ inline void ProcessSinkhorn(uint64_t runBSStart, uint32_t currentDealBsNum, LocalTensor<P>& hResBuf);
 
@@ -99,51 +94,6 @@ public:
     __aicore__ inline void ProcessV3BiasGrad();
     __aicore__ inline void ProcessV3BiasGradSingleCore();
 
-    // 向量化计算函数 (VFDo*)
-    template <bool accumulate>
-    __aicore__ inline void VFDoPreProcessV0(__ubuf__ P* hPreGradAddr, __ubuf__ T* xB16InAddr,
-                                            __ubuf__ T* gradHInB16InAddr, uint16_t curLenN, uint32_t lenD, uint64_t i,
-                                            uint32_t j, uint64_t runBSStart);
-    __aicore__ inline void VFDoV0PreGrad(__ubuf__ P* gradPreOut, __ubuf__ P* hMixAddr, __ubuf__ P* invRmsAddr,
-                                         __ubuf__ P* gradHPreAddr, __ubuf__ P* biasPreAddr, float alphaPre,
-                                         uint32_t rows, uint32_t fusionSize, uint32_t n);
-    __aicore__ inline void VFDoV0PostGrad(__ubuf__ P* gradPostOut, __ubuf__ P* hMixAddr, __ubuf__ P* invRmsAddr,
-                                          __ubuf__ P* gradHPostAddr, __ubuf__ P* biasPostAddr, float alphaPost,
-                                          uint32_t rows, uint32_t fusionSize, uint32_t n);
-    template <uint32_t N>
-    __aicore__ inline void VFDoV0PackedRes(__ubuf__ P* output, __ubuf__ P* hc, __ubuf__ P* inv, __ubuf__ P* upstream,
-                                           __ubuf__ P* bias, float alpha, uint32_t rows);
-    __aicore__ inline void VFDoV0ResGrad(__ubuf__ P* gradResOut, __ubuf__ P* hMixAddr, __ubuf__ P* invRmsAddr,
-                                         __ubuf__ P* skAddr, __ubuf__ P* biasResAddr, float alphaRes, uint32_t rows,
-                                         uint32_t fusionSize, uint32_t n);
-    __aicore__ inline void VFDoV0ProcessGradHPost(__ubuf__ P* hPostIn, __ubuf__ P* gradHPostIn,
-                                                  __ubuf__ P* gradHPostOut, uint32_t stepLen);
-    __aicore__ inline void VFDoV1Process(__ubuf__ P* gradHMix, __ubuf__ P* gradInvRmsOut, __ubuf__ P* gradAlphaOut,
-                                         __ubuf__ P* gatherIn, __ubuf__ P* hMixIn, __ubuf__ P* invRmsIn,
-                                         uint32_t dealBSSize);
-    __aicore__ inline void VFDoV1InvRmsCoeff(__ubuf__ P* invRmsGradAddr, __ubuf__ P* invRmsAddr, uint32_t count,
-                                             float scaleMean);
-    template <bool aligned>
-    __aicore__ inline void VFDoV1ProcessBiasGradForN4N6(__ubuf__ P* outBufDst, __ubuf__ P* gatherFusion,
-                                                        uint32_t curBSSize);
-    __aicore__ inline void VFDoV1ProcessBiasGradForN8(__ubuf__ P* outBufDst, __ubuf__ P* gatherFusion,
-                                                      uint32_t curBSSize);
-    __aicore__ inline void VFDoV2HInMulHPre(__ubuf__ P* xGradVec3BufAddr, __ubuf__ T* hInGradInBufAddr,
-                                            __ubuf__ P* hPreUbAddr, uint32_t currentChunkSize, uint32_t copySizeND,
-                                            uint32_t currentN, uint32_t bsGlobalOffset);
-
-    __aicore__ inline void VFDoV2CastXToFp32(__ubuf__ P* xRsFp32Addr, __ubuf__ P* xRsOutAddr, __ubuf__ T* bf16InputAddr,
-                                             uint32_t currentChunkSize, uint32_t copySizeND);
-
-    __aicore__ inline void VFDoV2AccumulateXGrad(__ubuf__ P* xGradVec3Addr, __ubuf__ P* xRsGradMmAddr,
-                                                 __ubuf__ P* xRsFp32Addr, __ubuf__ P* invRmsAddr,
-                                                 uint32_t currentChunkSize, uint32_t copySizeND);
-
-    __aicore__ inline void VFDoV2CastXGrad(__ubuf__ T* outputAddr, __ubuf__ P* xGradAddr, uint32_t totalElem);
-
-    __aicore__ inline void VFDoV3ProcessAlphaGrad(__ubuf__ P* alphaGradOut, __ubuf__ P* alphaGradIn);
-    __aicore__ inline void VFDoV3ProcessAlphaGradSingleCore(__ubuf__ P* alphaGradOut, __ubuf__ P* alphaGradIn);
-
 private:
     MhcPreSinkhornBackwardCubeCompute cubeCompute_;
     MMConfig mmConfigC0_;
@@ -177,13 +127,16 @@ private:
     GlobalTensor<P> hMixGm_;      // 前向结果 hc_before_norm
     GlobalTensor<P> hPreGm_;      // 前向结果 h_pre
     GlobalTensor<P> hPostGm_;     // 前向结果 h_post
+    GlobalTensor<P> preMixGm_;    // 可选输入 pre_mix（不在场时为占位 tensor，不读取）
+    GlobalTensor<P> gradPreGm_;   // 可选输入 grad_pre（不在场时为占位 tensor，不读取）
     GlobalTensor<P> workSpaceGm_;
     WorkspaceBuffer<P> workspaceBuf_; // Workspace 管理
 
-    GlobalTensor<T> xGradGm_;     // 输出 grad_x
-    GlobalTensor<P> gradPhiGm_;   // 输出 grad_phi
-    GlobalTensor<P> alphaGradGm_; // 输出 grad_alpha
-    GlobalTensor<P> gradBiasGm_;  // 输出 grad_bias
+    GlobalTensor<T> xGradGm_;      // 输出 grad_x
+    GlobalTensor<P> gradPhiGm_;    // 输出 grad_phi
+    GlobalTensor<P> alphaGradGm_;  // 输出 grad_alpha
+    GlobalTensor<P> gradBiasGm_;   // 输出 grad_bias
+    GlobalTensor<P> gradPreMixGm_; // 可选输出 grad_pre_mix（不在场时为占位 tensor，不写入）
 
     LocalTensor<T> gradHInUb;    // grad_h_in
     LocalTensor<P> hPreUb;       // h_pre
@@ -237,8 +190,8 @@ private:
     uint32_t hFusionOffset_;
     uint32_t globalUbOffset_;
     uint32_t vecDealChunk_;
-    uint16_t eleNumPerVf_;
     float scaleMean_;
+    bool hasPreMix_ = false;
 };
 
 template <class T, class P>
@@ -262,15 +215,19 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::InitGlobalBuffersAndT
     invRmsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.inv_rms));
     hMixGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.h_mix));
     hPreGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.h_pre));
+    preMixGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.pre_mix));
+    gradPreGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.grad_pre));
     biasGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.bias));
     xGradGm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(initParams.grad_x));
     xGradGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
     gradPhiGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.grad_phi));
     alphaGradGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.grad_alpha));
     gradBiasGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.grad_bias));
+    gradPreMixGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.grad_pre_mix));
     workSpaceGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P*>(initParams.workspace));
     tiling_ = initParams.tilingData;
     smallM_ = tiling_->smallM != 0U;
+    hasPreMix_ = tiling_->hasPreMix != 0U;
     mmConfigC0_ = tiling_->mmConfigC0;
     mmConfigC1_ = tiling_->mmConfigC1;
     nD_ = static_cast<uint32_t>(tiling_->nD);
@@ -286,7 +243,6 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::InitGlobalBuffersAndT
     cubeDealnDPeCore_ = tiling_->cubeDealnDPeCore;
     v1UsedCubeCoreNum_ = tiling_->v1UsedCubeCoreNum;
     scaleMean_ = (nD_ > 0) ? (1.0f / nD_) : 0.0f;
-    eleNumPerVf_ = GetVRegSize() / sizeof(P);
     workspaceBuf_.Init(totalLength_, fusionSize_, vecCoreNum_, coreNum_);
     blockIdx_ = GetBlockIdx();
 }
@@ -314,11 +270,8 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::InitUBAndAIVBuffers(I
         pipe_->InitBuffer(vecInQueue1_, DOUBLE_BUFFER, INOUT_QUEUE_SIZE);
         pipe_->InitBuffer(vecOutQueueSmall_, 1, SMALL_QUEUE_SIZE);
         pipe_->InitBuffer(fp32TBuf_, FP32_BUF_SIZE);
-        pipe_->InitBuffer(
-            paramsBuf_,
-            MhcPreSinkhornBackwardUtils::CeilAlign<uint32_t>(static_cast<uint32_t>(fusionSize_ * sizeof(P)), 32U) * 2);
-        pipe_->InitBuffer(invScratchBuf_,
-                          MhcPreSinkhornBackwardUtils::CeilAlign<uint32_t>(vecDealChunk_ * sizeof(P), 32U));
+        pipe_->InitBuffer(paramsBuf_, CeilAlign<uint32_t>(static_cast<uint32_t>(fusionSize_ * sizeof(P)), 32U) * 2);
+        pipe_->InitBuffer(invScratchBuf_, CeilAlign<uint32_t>(vecDealChunk_ * sizeof(P), 32U));
         static_assert(MhcPreSinkhornBackwardSinkhornNs::MaxScratchBytes() <= INOUT_QUEUE_SIZE,
                       "Sinkhorn tile exceeds the input queue buffer");
         sinkhorn_.Init(initParams.grad_h_res, initParams.sum_out, initParams.norm_out, tiling_->sinkhornPlan,
@@ -391,53 +344,6 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::Process()
 }
 
 template <class T, class P>
-template <bool accumulate>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoPreProcessV0(__ubuf__ P* hPreGradAddr,
-                                                                            __ubuf__ T* xB16InAddr,
-                                                                            __ubuf__ T* gradHInB16InAddr,
-                                                                            uint16_t curLenN, uint32_t lenD, uint64_t i,
-                                                                            uint32_t j, uint64_t runBSStart)
-{
-    uint16_t eleNumPerVf = 64;
-    uint16_t dLoopCnt = (lenD + eleNumPerVf - 1) / eleNumPerVf;
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> sumReg;
-        uint32_t offset = static_cast<uint32_t>((i - runBSStart) * N_ + j);
-        for (uint16_t offsetN = 0; offsetN < curLenN; offsetN++) { // x [curLenN, lenD],  hinGrad [1, lenD]
-            Reg::Duplicate(sumReg, 0.0f);
-            uint32_t curLenD = lenD;
-            Reg::RegTensor<T> xInB16Reg, gradHInB16InReg;
-            Reg::RegTensor<P> xFp32Reg, gradHInFp32Reg, mulReg, tmpSumPerVfReg;
-            for (uint16_t vfBlockIdx = 0; vfBlockIdx < dLoopCnt; vfBlockIdx++) {
-                Reg::MaskReg mask = Reg::UpdateMask<P>(curLenD);
-
-                Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(
-                    xInB16Reg, xB16InAddr + offsetN * lenD + vfBlockIdx * eleNumPerVf);
-                Reg::Cast<float, T, ctHalf2Fp32Zero>(xFp32Reg, xInB16Reg, mask);
-
-                Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(gradHInB16InReg,
-                                                                  gradHInB16InAddr + vfBlockIdx * eleNumPerVf);
-                Reg::Cast<float, T, ctHalf2Fp32Zero>(gradHInFp32Reg, gradHInB16InReg, mask);
-
-                Reg::Mul(mulReg, xFp32Reg, gradHInFp32Reg, mask);
-                Reg::Reduce<Reg::ReduceType::SUM>(tmpSumPerVfReg, mulReg, mask);
-                Reg::Add(sumReg, sumReg, tmpSumPerVfReg, mask); // 沿 D 维累加
-            }
-            uint32_t bufIdx = offset + offsetN;
-            if constexpr (accumulate) {
-                uint32_t one = 1;
-                Reg::MaskReg scalarMask = Reg::UpdateMask<P>(one);
-                Reg::RegTensor<P> previous;
-                Reg::Load<P>(previous, hPreGradAddr + bufIdx);
-                Reg::Add(sumReg, sumReg, previous, scalarMask);
-            }
-            Reg::Store(hPreGradAddr + bufIdx, sumReg, 1);
-        }
-    }
-}
-
-template <class T, class P>
 __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::PreProcessV0(LocalTensor<P>& hPreGradBuf,
                                                                         uint64_t runBSStart, uint64_t runBSEnd)
 {
@@ -480,7 +386,8 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::PreProcessV0(LocalTen
             __ubuf__ T* xB16InAddr = (__ubuf__ T*)bf16InputBuf.GetPhyAddr();
             __ubuf__ T* gradHInB16InAddr = (__ubuf__ T*)gradHInInputBuf.GetPhyAddr();
             __ubuf__ P* hPreGradAddr = (__ubuf__ P*)hPreGradBuf.GetPhyAddr();
-            VFDoPreProcessV0<false>(hPreGradAddr, xB16InAddr, gradHInB16InAddr, curLenN, copySizeD, i, j, runBSStart);
+            VFDoPreProcessV0<T, P, false>(hPreGradAddr, xB16InAddr, gradHInB16InAddr, curLenN, copySizeD, i, j,
+                                          runBSStart, N_);
 
             inputOffset += copySizeD * curLenN;
             vecInQueue0_.FreeTensor(bf16InputBuf);
@@ -513,13 +420,13 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::PreProcessV0LargeD(Lo
                 vecInQueue0_.EnQue(xIn);
                 vecInQueue0_.DeQue<T>(xIn);
                 if (offsetD == 0) {
-                    VFDoPreProcessV0<false>((__ubuf__ P*)hPreGradBuf.GetPhyAddr(), (__ubuf__ T*)xIn.GetPhyAddr(),
-                                            (__ubuf__ T*)gradIn.GetPhyAddr(), currentN, currentD, row, offsetN,
-                                            runBSStart);
+                    VFDoPreProcessV0<T, P, false>((__ubuf__ P*)hPreGradBuf.GetPhyAddr(), (__ubuf__ T*)xIn.GetPhyAddr(),
+                                                  (__ubuf__ T*)gradIn.GetPhyAddr(), currentN, currentD, row, offsetN,
+                                                  runBSStart, N_);
                 } else {
-                    VFDoPreProcessV0<true>((__ubuf__ P*)hPreGradBuf.GetPhyAddr(), (__ubuf__ T*)xIn.GetPhyAddr(),
-                                           (__ubuf__ T*)gradIn.GetPhyAddr(), currentN, currentD, row, offsetN,
-                                           runBSStart);
+                    VFDoPreProcessV0<T, P, true>((__ubuf__ P*)hPreGradBuf.GetPhyAddr(), (__ubuf__ T*)xIn.GetPhyAddr(),
+                                                 (__ubuf__ T*)gradIn.GetPhyAddr(), currentN, currentD, row, offsetN,
+                                                 runBSStart, N_);
                 }
                 PipeBarrier<PIPE_V>();
                 vecInQueue0_.FreeTensor(xIn);
@@ -582,12 +489,10 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV0Main()
     SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
     WaitFlag<HardEvent::MTE2_V>(EVENT_ID0);
     LocalTensor<P> sumBuf = fp32TBuf_.GetWithOffset<P>(fusionSize_, globalUbOffset_);
-    globalUbOffset_ +=
-        MhcPreSinkhornBackwardUtils::CeilAlign<uint32_t>(fusionSize_, CEIL_ALIGN_DEFAULT / sizeof(P)) * sizeof(P);
+    globalUbOffset_ += CeilAlign<uint32_t>(fusionSize_, CEIL_ALIGN_DEFAULT / sizeof(P)) * sizeof(P);
     // bias 和部分和均按 32 字节对齐，兼容奇数 N。
     LocalTensor<P> biasGradSumBuf =
-        paramsBuf_
-            .Get<P>()[MhcPreSinkhornBackwardUtils::CeilAlign<uint32_t>(fusionSize_, CEIL_ALIGN_DEFAULT / sizeof(P))];
+        paramsBuf_.Get<P>()[CeilAlign<uint32_t>(fusionSize_, CEIL_ALIGN_DEFAULT / sizeof(P))];
     Duplicate(biasGradSumBuf, 0.0f, fusionSize_);
     PipeBarrier<PIPE_V>();
     ProcessV0MainLoop(vecRunTimes, alphaPre, alphaPost, alphaComb, sumBuf, biasGradSumBuf);
@@ -680,11 +585,9 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::AllocV0V1Buffers(uint
     buffers.stepLength = static_cast<uint32_t>((runBSEnd - runBSStart) * N_);
     uint32_t hMixLength = static_cast<uint32_t>((runBSEnd - runBSStart) * N_ * N_);
     buffers.gatherLength = buffers.stepLength * 2 + hMixLength;
-    uint32_t stepOffset1 =
-        MhcPreSinkhornBackwardUtils::CeilAlign(uint32_t(buffers.stepLength * sizeof(P)), uint32_t(CEIL_ALIGN_DEFAULT));
+    uint32_t stepOffset1 = CeilAlign(uint32_t(buffers.stepLength * sizeof(P)), uint32_t(CEIL_ALIGN_DEFAULT));
 
-    uint32_t hpreGradTotlenLen =
-        MhcPreSinkhornBackwardUtils::CeilAlign(buffers.stepLength, uint32_t(CEIL_ALIGN_DEFAULT));
+    uint32_t hpreGradTotlenLen = CeilAlign(buffers.stepLength, uint32_t(CEIL_ALIGN_DEFAULT));
     buffers.hPreGradBuf = fp32TBuf_.GetWithOffset<P>(hpreGradTotlenLen, globalUbOffset_);
 
     uint32_t ubOffset = globalUbOffset_ + hpreGradTotlenLen * sizeof(P);
@@ -728,6 +631,21 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV0(uint64_t ru
     DataCopyPadParams dataCopyPadParams;
     dataCopyPadParams.isPad = false;
 
+    // premix: V0 预计算的 HPreGrad 直写 grad_pre_mix 输出；
+    // 随后用外部 grad_pre 覆盖 hPreGradBuf，sigmoid 反传链的 dPre 改由外部输入提供。
+    if (hasPreMix_) {
+        dataCopyParams.blockLen = buffers.stepLength * sizeof(P);
+        SetFlag<HardEvent::V_MTE3>(EVENT_ID4);
+        WaitFlag<HardEvent::V_MTE3>(EVENT_ID4);
+        DataCopyPad(gradPreMixGm_[runBSStart * N_], buffers.hPreGradBuf, dataCopyParams);
+        // MTE3 读取 hPreGradBuf 完成后才允许 MTE2 覆写同一缓冲区。
+        SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID4);
+        WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID4);
+        DataCopyPad(buffers.hPreGradBuf, gradPreGm_[runBSStart * N_], dataCopyParams, dataCopyPadParams);
+        SetFlag<HardEvent::MTE2_V>(EVENT_ID5);
+        WaitFlag<HardEvent::MTE2_V>(EVENT_ID5);
+    }
+
     auto hMixGradBuf = buffers.calcTmpBuf;
     dataCopyParams.blockLen = buffers.stepLength * sizeof(P);
 
@@ -764,23 +682,23 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV0(uint64_t ru
     hMixBufLocal = vecInQueue1_.DeQue<P>();
 
     // 使用 hc_before_norm 和 inv_rms 重算 z_pre。
-    VFDoV0PreGrad((__ubuf__ P*)buffers.hPreBufS1.GetPhyAddr(), (__ubuf__ P*)hMixBufLocal.GetPhyAddr(),
-                  (__ubuf__ P*)invRmsBufLocal.GetPhyAddr(), (__ubuf__ P*)buffers.hPreGradBuf.GetPhyAddr(),
-                  (__ubuf__ P*)paramBias_.GetPhyAddr(), alphaPre, currentDealBsNum, fusionSize_, N_);
-    VFDoV0PostGrad((__ubuf__ P*)buffers.hPostBufS1.GetPhyAddr(), (__ubuf__ P*)hMixBufLocal.GetPhyAddr(),
-                   (__ubuf__ P*)invRmsBufLocal.GetPhyAddr(), (__ubuf__ P*)gradHPost.GetPhyAddr(),
-                   (__ubuf__ P*)paramBias_.GetPhyAddr() + N_, alphaPost, currentDealBsNum, fusionSize_, N_);
+    VFDoV0PreGrad<P>((__ubuf__ P*)buffers.hPreBufS1.GetPhyAddr(), (__ubuf__ P*)hMixBufLocal.GetPhyAddr(),
+                     (__ubuf__ P*)invRmsBufLocal.GetPhyAddr(), (__ubuf__ P*)buffers.hPreGradBuf.GetPhyAddr(),
+                     (__ubuf__ P*)paramBias_.GetPhyAddr(), alphaPre, currentDealBsNum, fusionSize_, N_);
+    VFDoV0PostGrad<P>((__ubuf__ P*)buffers.hPostBufS1.GetPhyAddr(), (__ubuf__ P*)hMixBufLocal.GetPhyAddr(),
+                      (__ubuf__ P*)invRmsBufLocal.GetPhyAddr(), (__ubuf__ P*)gradHPost.GetPhyAddr(),
+                      (__ubuf__ P*)paramBias_.GetPhyAddr() + N_, alphaPost, currentDealBsNum, fusionSize_, N_);
     vecInQueue0_.FreeTensor(gradHPost);
 
     ProcessSinkhorn(runBSStart, currentDealBsNum, buffers.hResBufS1);
 
     // Sinkhorn 反向完成后计算 exp/max 的梯度。
-    VFDoV0ResGrad((__ubuf__ P*)buffers.hResBufS1.GetPhyAddr(), (__ubuf__ P*)hMixBufLocal.GetPhyAddr(),
-                  (__ubuf__ P*)invRmsBufLocal.GetPhyAddr(), (__ubuf__ P*)buffers.hResBufS1.GetPhyAddr(),
-                  (__ubuf__ P*)paramBias_.GetPhyAddr() + 2 * N_, alphaComb, currentDealBsNum, fusionSize_, N_);
+    VFDoV0ResGrad<P>((__ubuf__ P*)buffers.hResBufS1.GetPhyAddr(), (__ubuf__ P*)hMixBufLocal.GetPhyAddr(),
+                     (__ubuf__ P*)invRmsBufLocal.GetPhyAddr(), (__ubuf__ P*)buffers.hResBufS1.GetPhyAddr(),
+                     (__ubuf__ P*)paramBias_.GetPhyAddr() + 2 * N_, alphaComb, currentDealBsNum, fusionSize_, N_);
     hMixInput = hMixBufLocal;
 
-    AIV02Process(buffers, hMixGradBuf, currentDealBsNum, alphaPre, alphaPost, alphaComb);
+    AIV02Process<P>(buffers, hMixGradBuf, currentDealBsNum, alphaPre, alphaPost, alphaComb, N_);
 }
 
 template <class T, class P>
@@ -789,338 +707,6 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessSinkhorn(uint6
                                                                            LocalTensor<P>& hResBuf)
 {
     sinkhorn_.Process(runBSStart, currentDealBsNum, hResBuf, vecInQueue0_);
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV0PreGrad(__ubuf__ P* gradPreOut, __ubuf__ P* hMixAddr,
-                                                                         __ubuf__ P* invRmsAddr,
-                                                                         __ubuf__ P* gradHPreAddr,
-                                                                         __ubuf__ P* biasPreAddr, float alphaPre,
-                                                                         uint32_t rows, uint32_t fusionSize, uint32_t n)
-{
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> alphaReg;
-        Reg::RegTensor<P> oneReg;
-        Reg::RegTensor<P> invReg;
-        Reg::RegTensor<P> hMixReg;
-        Reg::RegTensor<P> zReg;
-        Reg::RegTensor<P> negReg;
-        Reg::RegTensor<P> expReg;
-        Reg::RegTensor<P> sigReg;
-        Reg::RegTensor<P> gateReg;
-        Reg::RegTensor<P> biasReg;
-        Reg::RegTensor<P> upReg;
-        Reg::RegTensor<P> outReg;
-        Reg::MaskReg maskAll = Reg::CreateMask<P, Reg::MaskPattern::ALL>();
-        Reg::Duplicate(alphaReg, alphaPre, maskAll);
-        Reg::Duplicate(oneReg, 1.0f, maskAll);
-        for (uint16_t r = 0; r < static_cast<uint16_t>(rows); ++r) {
-            uint32_t len = n;
-            Reg::MaskReg mask = Reg::UpdateMask<P>(len);
-            Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(invReg, invRmsAddr + r);
-            Reg::Load<P>(hMixReg, hMixAddr + r * fusionSize);
-            Reg::Mul(zReg, hMixReg, invReg, mask);
-            Reg::Mul(zReg, zReg, alphaReg, mask);
-            Reg::Load<P>(biasReg, biasPreAddr);
-            Reg::Add(zReg, zReg, biasReg, mask);
-            Reg::Muls(negReg, zReg, -1.0f, mask);
-            Reg::Exp(expReg, negReg, mask);
-            Reg::Adds(expReg, expReg, 1.0f, mask);
-            Reg::Div(sigReg, oneReg, expReg, mask);
-            Reg::Exp(gateReg, zReg, mask);
-            Reg::Adds(gateReg, gateReg, 1.0f, mask);
-            Reg::Div(gateReg, oneReg, gateReg, mask);
-            Reg::Mul(sigReg, sigReg, gateReg, mask);
-            Reg::Load<P>(upReg, gradHPreAddr + r * n);
-            Reg::Mul(outReg, sigReg, upReg, mask);
-            Reg::Store<P>(gradPreOut + r * n, outReg, n);
-        }
-    }
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV0PostGrad(
-    __ubuf__ P* gradPostOut, __ubuf__ P* hMixAddr, __ubuf__ P* invRmsAddr, __ubuf__ P* gradHPostAddr,
-    __ubuf__ P* biasPostAddr, float alphaPost, uint32_t rows, uint32_t fusionSize, uint32_t n)
-{
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> alphaReg;
-        Reg::RegTensor<P> oneReg;
-        Reg::RegTensor<P> invReg;
-        Reg::RegTensor<P> hMixReg;
-        Reg::RegTensor<P> zReg;
-        Reg::RegTensor<P> negReg;
-        Reg::RegTensor<P> expReg;
-        Reg::RegTensor<P> sigReg;
-        Reg::RegTensor<P> gateReg;
-        Reg::RegTensor<P> biasReg;
-        Reg::RegTensor<P> upReg;
-        Reg::RegTensor<P> outReg;
-        Reg::MaskReg maskAll = Reg::CreateMask<P, Reg::MaskPattern::ALL>();
-        Reg::Duplicate(alphaReg, alphaPost, maskAll);
-        Reg::Duplicate(oneReg, 1.0f, maskAll);
-        for (uint16_t r = 0; r < static_cast<uint16_t>(rows); ++r) {
-            uint32_t len = n;
-            Reg::MaskReg mask = Reg::UpdateMask<P>(len);
-            Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(invReg, invRmsAddr + r);
-            Reg::Load<P>(hMixReg, hMixAddr + r * fusionSize + n);
-            Reg::Mul(zReg, hMixReg, invReg, mask);
-            Reg::Mul(zReg, zReg, alphaReg, mask);
-            Reg::Load<P>(biasReg, biasPostAddr);
-            Reg::Add(zReg, zReg, biasReg, mask);
-            Reg::Muls(negReg, zReg, -1.0f, mask);
-            Reg::Exp(expReg, negReg, mask);
-            Reg::Adds(expReg, expReg, 1.0f, mask);
-            Reg::Div(sigReg, oneReg, expReg, mask);
-            Reg::Exp(gateReg, zReg, mask);
-            Reg::Adds(gateReg, gateReg, 1.0f, mask);
-            Reg::Div(gateReg, oneReg, gateReg, mask);
-            Reg::Mul(sigReg, sigReg, gateReg, mask);
-            Reg::Muls(sigReg, sigReg, 2.0f, mask);
-            Reg::Load<P>(upReg, gradHPostAddr + r * n);
-            Reg::Mul(outReg, sigReg, upReg, mask);
-            Reg::Store<P>(gradPostOut + r * n, outReg, n);
-        }
-    }
-}
-
-// 每寄存器按 8×8 通道处理 8 行，独立归约最大值、首个最大值下标及加权和。
-template <class T, class P>
-template <uint32_t N>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV0PackedRes(__ubuf__ P* output, __ubuf__ P* hc,
-                                                                           __ubuf__ P* inv, __ubuf__ P* upstream,
-                                                                           __ubuf__ P* bias, float alpha, uint32_t rows)
-{
-    constexpr uint32_t H = N * N + 2U * N;
-    const uint32_t rowCount = rows * N;
-    __VEC_SCOPE__
-    {
-        Reg::MaskReg full = Reg::CreateMask<uint32_t>();
-        Reg::RegTensor<uint32_t> order, group, column, absoluteRow, batch, matrixRow, stride;
-        Reg::RegTensor<uint32_t> gradientIndex, hcIndex, biasIndex, candidate, first, firstBroadcast, sentinel;
-        Reg::Arange((Reg::RegTensor<int32_t>&)order, 0);
-        Reg::ShiftRights(group, order, static_cast<int16_t>(3), full);
-        Reg::Duplicate(stride, 7U);
-        Reg::And(column, order, stride, full);
-        Reg::Duplicate(sentinel, N);
-        Reg::RegTensor<P> a, invReg, mix, b, z, maximum, maxBroadcast, expReg, weighted, total, totalBroadcast, zero;
-        Reg::Duplicate(a, alpha);
-        Reg::Duplicate(zero, 0.0f);
-        for (uint16_t block = 0; block < static_cast<uint16_t>((rowCount + 7U) / 8U); ++block) {
-            Reg::Adds(absoluteRow, group, static_cast<uint32_t>(block) * 8U, full);
-            Reg::MaskReg validRows, validCols, active, equalMax, firstMask;
-            Reg::CompareScalar<uint32_t, CMPMODE::LT>(validRows, absoluteRow, rowCount, full);
-            Reg::CompareScalar<uint32_t, CMPMODE::LT>(validCols, column, N, full);
-            Reg::And(active, validRows, validCols, full);
-            if constexpr (N == 8U) {
-                Reg::ShiftRights(batch, absoluteRow, static_cast<int16_t>(3), full);
-            } else {
-                Reg::Duplicate(stride, N);
-                Reg::Div(batch, absoluteRow, stride, full);
-            }
-            Reg::Duplicate(stride, N);
-            Reg::Mul(matrixRow, batch, stride, full);
-            Reg::Sub(matrixRow, absoluteRow, matrixRow, full);
-            Reg::Mul(gradientIndex, absoluteRow, stride, full);
-            Reg::Add(gradientIndex, gradientIndex, column, full);
-            Reg::Mul(biasIndex, matrixRow, stride, full);
-            Reg::Add(biasIndex, biasIndex, column, full);
-            Reg::Duplicate(stride, H);
-            Reg::Mul(hcIndex, batch, stride, full);
-            Reg::Add(hcIndex, hcIndex, biasIndex, full);
-            Reg::Adds(hcIndex, hcIndex, 2U * N, full);
-            Reg::DataCopyGather(invReg, inv, batch, active);
-            Reg::DataCopyGather(mix, hc, hcIndex, active);
-            Reg::DataCopyGather(b, bias, biasIndex, active);
-            Reg::Mul(z, mix, invReg, active);
-            Reg::Mul(z, z, a, active);
-            Reg::Add(z, z, b, active);
-            Reg::ReduceMaxWithDataBlock(maximum, z, active);
-            Reg::Gather(maxBroadcast, maximum, group);
-            Reg::Compare<P, CMPMODE::EQ>(equalMax, z, maxBroadcast, active);
-            Reg::Select(candidate, column, sentinel, equalMax);
-            Reg::ReduceMinWithDataBlock(first, candidate, active);
-            Reg::Gather(firstBroadcast, first, group);
-            Reg::Compare<uint32_t, CMPMODE::EQ>(firstMask, column, firstBroadcast, active);
-            Reg::Sub(expReg, z, maxBroadcast, active);
-            Reg::Exp(expReg, expReg, active);
-            Reg::DataCopyGather(weighted, upstream, gradientIndex, active);
-            Reg::Mul(weighted, expReg, weighted, active);
-            Reg::ReduceSumWithDataBlock(total, weighted, active);
-            Reg::Gather(totalBroadcast, total, group);
-            Reg::Select(totalBroadcast, totalBroadcast, zero, firstMask);
-            Reg::Sub(weighted, weighted, totalBroadcast, active);
-            Reg::DataCopyScatter(output, weighted, gradientIndex, active);
-        }
-        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
-    }
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV0ResGrad(__ubuf__ P* gradResOut, __ubuf__ P* hMixAddr,
-                                                                         __ubuf__ P* invRmsAddr, __ubuf__ P* skAddr,
-                                                                         __ubuf__ P* biasResAddr, float alphaRes,
-                                                                         uint32_t rows, uint32_t fusionSize, uint32_t n)
-{
-    if (n == 6U) {
-        VFDoV0PackedRes<6U>(gradResOut, hMixAddr, invRmsAddr, skAddr, biasResAddr, alphaRes, rows);
-        return;
-    }
-    if (n == 8U) {
-        VFDoV0PackedRes<8U>(gradResOut, hMixAddr, invRmsAddr, skAddr, biasResAddr, alphaRes, rows);
-        return;
-    }
-
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> invReg;
-        Reg::RegTensor<P> hMixReg;
-        Reg::RegTensor<P> uReg;
-        Reg::RegTensor<P> zReg;
-        Reg::RegTensor<P> biasReg;
-        Reg::RegTensor<P> alphaReg;
-        Reg::RegTensor<P> maxReg;
-        Reg::RegTensor<P> maxBroadcast;
-        Reg::RegTensor<P> expReg;
-        Reg::RegTensor<P> upstreamReg;
-        Reg::RegTensor<P> weighted;
-        Reg::RegTensor<P> weightedSum;
-        Reg::RegTensor<P> weightedBroadcast;
-        Reg::RegTensor<P> zeroReg;
-        Reg::RegTensor<P> correction;
-        Reg::RegTensor<P> gzReg;
-        Reg::RegTensor<int32_t> order;
-        Reg::RegTensor<int32_t> sentinel;
-        Reg::RegTensor<int32_t> candidate;
-        Reg::RegTensor<int32_t> firstIndex;
-        Reg::RegTensor<int32_t> firstBroadcast;
-        uint32_t sregN = n;
-        Reg::MaskReg maskN = Reg::UpdateMask<P>(sregN);
-        Reg::MaskReg equalMax;
-        Reg::MaskReg firstMask;
-        Reg::Duplicate(alphaReg, alphaRes, maskN);
-        Reg::Duplicate(zeroReg, 0.0f, maskN);
-        Reg::Arange(order, static_cast<int32_t>(0));
-        Reg::Duplicate(sentinel, static_cast<int32_t>(n), maskN);
-        uint32_t nn = n * n;
-        for (uint16_t r = 0; r < static_cast<uint16_t>(rows); ++r) {
-            Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(invReg, invRmsAddr + r);
-            for (uint16_t row = 0; row < static_cast<uint16_t>(n); ++row) {
-                Reg::Load<P>(hMixReg, hMixAddr + r * fusionSize + 2 * n + row * n);
-                Reg::Load<P>(biasReg, biasResAddr + row * n);
-                Reg::Mul(uReg, hMixReg, invReg, maskN);
-                Reg::Mul(zReg, uReg, alphaReg, maskN);
-                Reg::Add(zReg, zReg, biasReg, maskN);
-                Reg::Reduce<Reg::ReduceType::MAX>(maxReg, zReg, maskN);
-                Reg::Duplicate(maxBroadcast, maxReg, maskN);
-                Reg::Compare<P, CMPMODE::EQ>(equalMax, zReg, maxBroadcast, maskN);
-                Reg::Select(candidate, order, sentinel, equalMax);
-                Reg::Reduce<Reg::ReduceType::MIN>(firstIndex, candidate, maskN);
-                Reg::Duplicate(firstBroadcast, firstIndex, maskN);
-                Reg::Compare<int32_t, CMPMODE::EQ>(firstMask, order, firstBroadcast, maskN);
-                Reg::Sub(expReg, zReg, maxBroadcast, maskN);
-                Reg::Exp(expReg, expReg, maskN);
-                Reg::Load<P>(upstreamReg, skAddr + r * nn + row * n);
-                Reg::Mul(weighted, expReg, upstreamReg, maskN);
-                Reg::Reduce<Reg::ReduceType::SUM>(weightedSum, weighted, maskN);
-                Reg::Duplicate(weightedBroadcast, weightedSum, maskN);
-                Reg::Select(correction, weightedBroadcast, zeroReg, firstMask);
-                Reg::Sub(gzReg, weighted, correction, maskN);
-                Reg::Store<P>(gradResOut + r * nn + row * n, gzReg, n);
-            }
-        }
-    }
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV0ProcessGradHPost(__ubuf__ P* hPostIn,
-                                                                                  __ubuf__ P* gradHPostIn,
-                                                                                  __ubuf__ P* gradHPostOut,
-                                                                                  uint32_t stepLen)
-{
-    uint16_t loopCnt = CeilDiv(stepLen, uint32_t(eleNumPerVf_));
-    uint32_t curLen = stepLen;
-    __VEC_SCOPE__
-    {
-        Reg::MaskReg mask;
-        Reg::RegTensor<P> gradHPostReg, tmpReg;
-        for (uint16_t vfBlockIdx = 0; vfBlockIdx < loopCnt; vfBlockIdx++) {
-            mask = Reg::UpdateMask<P>(curLen);
-            Reg::LoadAlign(gradHPostReg, hPostIn + vfBlockIdx * eleNumPerVf_);
-            Reg::Muls(tmpReg, gradHPostReg, NEG_HALF, mask);
-            Reg::Adds(tmpReg, tmpReg, ONE, mask);
-            Reg::Mul(gradHPostReg, gradHPostReg, tmpReg, mask);
-            Reg::LoadAlign(tmpReg, gradHPostIn + vfBlockIdx * eleNumPerVf_);
-            Reg::Mul(gradHPostReg, gradHPostReg, tmpReg, mask);
-            Reg::StoreAlign(gradHPostOut + vfBlockIdx * eleNumPerVf_, gradHPostReg, mask);
-        }
-    }
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::AIV02Process(V0V1Buffers<P>& buffers,
-                                                                        LocalTensor<P>& hMixGradBuf,
-                                                                        uint64_t currentDealBsNum, float alphaPre,
-                                                                        float alphaPost, float alphaComb)
-{
-    __ubuf__ P* hPreBufAddr = (__ubuf__ P*)buffers.hPreBufS1.GetPhyAddr();
-    __ubuf__ P* hPostBufAddr = (__ubuf__ P*)buffers.hPostBufS1.GetPhyAddr();
-    __ubuf__ P* hResBufAddr = (__ubuf__ P*)buffers.hResBufS1.GetPhyAddr();
-    __ubuf__ P* gatherFusionOutBufAddr = (__ubuf__ P*)buffers.gatherFusionOutBuf.GetPhyAddr();
-    __ubuf__ P* hMixGradBufAddr = (__ubuf__ P*)hMixGradBuf.GetPhyAddr();
-
-    uint32_t blockLenPre = N_;
-    uint32_t blockLenPost = N_;
-    uint32_t blockLenComb = N_ * N_;
-    uint32_t totalBlockLen = blockLenPre + blockLenPost + blockLenComb;
-
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> gatherReg;
-        Reg::RegTensor<P> hMixGradReg;
-        Reg::RegTensor<P> alphaPreReg;
-        Reg::RegTensor<P> alphaPostReg;
-        Reg::RegTensor<P> alphaCombReg;
-        Reg::MaskReg maskPre = Reg::CreateMask<P, Reg::MaskPattern::ALL>();
-        Reg::MaskReg maskPost = Reg::CreateMask<P, Reg::MaskPattern::ALL>();
-        Reg::MaskReg maskComb = Reg::CreateMask<P, Reg::MaskPattern::ALL>();
-        Reg::Duplicate<P>(alphaPreReg, alphaPre, maskPre);
-        Reg::Duplicate<P>(alphaPostReg, alphaPost, maskPost);
-        Reg::Duplicate<P>(alphaCombReg, alphaComb, maskComb);
-
-        for (uint16_t bsIdx = 0; bsIdx < static_cast<uint16_t>(currentDealBsNum); bsIdx++) {
-            uint32_t curLenPre = blockLenPre;
-            uint32_t curLenPost = blockLenPost;
-            uint32_t curLenComb = blockLenComb;
-            uint32_t bsFusionOffset = bsIdx * totalBlockLen;
-
-            uint32_t srcOffset = bsIdx * blockLenPre;
-            uint32_t dstOffset = bsFusionOffset;
-            maskPre = Reg::UpdateMask<P>(curLenPre);
-            Reg::Load<P>(gatherReg, hPreBufAddr + srcOffset);
-            Reg::Store<P>(gatherFusionOutBufAddr + dstOffset, gatherReg);
-            Reg::Mul(hMixGradReg, gatherReg, alphaPreReg, maskPre);
-            Reg::Store<P>(hMixGradBufAddr + dstOffset, hMixGradReg);
-
-            uint32_t srcOffset1 = bsIdx * blockLenPre;
-            uint32_t dstOffset1 = bsFusionOffset;
-            maskPost = Reg::UpdateMask<P>(curLenPost);
-            Reg::Load<P>(gatherReg, hPostBufAddr + srcOffset1);
-            Reg::Store<P>(gatherFusionOutBufAddr + dstOffset1 + blockLenPre, gatherReg);
-            Reg::Mul(hMixGradReg, gatherReg, alphaPostReg, maskPost);
-            Reg::Store<P>(hMixGradBufAddr + dstOffset1 + blockLenPre, hMixGradReg);
-
-            uint32_t srcOffset2 = bsIdx * blockLenComb;
-            uint32_t dstOffset2 = bsFusionOffset + blockLenPre + blockLenPost;
-            maskComb = Reg::UpdateMask<P>(curLenComb);
-            Reg::Load<P>(gatherReg, hResBufAddr + srcOffset2);
-            Reg::Store<P>(gatherFusionOutBufAddr + dstOffset2, gatherReg);
-            Reg::Mul(hMixGradReg, gatherReg, alphaCombReg, maskComb);
-            Reg::Store<P>(hMixGradBufAddr + dstOffset2, hMixGradReg);
-        }
-    }
 }
 
 template <class T, class P>
@@ -1139,14 +725,16 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV1(uint64_t ru
     AscendC::LocalTensor<P> fp32OutBuf = vecOutQueue1_.AllocTensor<P>();
     AscendC::LocalTensor<P> invRmsGradUb = vecOutQueueSmall_.AllocTensor<P>();
     if (N_ == 8) {
-        VFDoV1ProcessBiasGradForN8((__ubuf__ P*)fp32OutBuf.GetPhyAddr(),
-                                   (__ubuf__ P*)buffers.gatherFusionOutBuf.GetPhyAddr(), curBSSize);
+        VFDoV1ProcessBiasGradForN8<P>((__ubuf__ P*)fp32OutBuf.GetPhyAddr(),
+                                      (__ubuf__ P*)buffers.gatherFusionOutBuf.GetPhyAddr(), curBSSize, fusionSize_);
     } else if ((fusionSize_ % (CEIL_ALIGN_DEFAULT / sizeof(P))) == 0) {
-        VFDoV1ProcessBiasGradForN4N6<true>((__ubuf__ P*)fp32OutBuf.GetPhyAddr(),
-                                           (__ubuf__ P*)buffers.gatherFusionOutBuf.GetPhyAddr(), curBSSize);
+        VFDoV1ProcessBiasGradForN4N6<P, true>((__ubuf__ P*)fp32OutBuf.GetPhyAddr(),
+                                              (__ubuf__ P*)buffers.gatherFusionOutBuf.GetPhyAddr(), curBSSize,
+                                              fusionSize_);
     } else {
-        VFDoV1ProcessBiasGradForN4N6<false>((__ubuf__ P*)fp32OutBuf.GetPhyAddr(),
-                                            (__ubuf__ P*)buffers.gatherFusionOutBuf.GetPhyAddr(), curBSSize);
+        VFDoV1ProcessBiasGradForN4N6<P, false>((__ubuf__ P*)fp32OutBuf.GetPhyAddr(),
+                                               (__ubuf__ P*)buffers.gatherFusionOutBuf.GetPhyAddr(), curBSSize,
+                                               fusionSize_);
     }
     vecOutQueue1_.EnQue(fp32OutBuf);
     LocalTensor<P> BiasOutBuf = vecOutQueue1_.DeQue<P>();
@@ -1168,9 +756,10 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV1(uint64_t ru
                            buffers.brcbTmpBuf);
     PipeBarrier<PIPE_V>();
 
-    VFDoV1Process((__ubuf__ P*)fp32OutBuf.GetPhyAddr(), (__ubuf__ P*)hMixGradBuf.GetPhyAddr(),
-                  (__ubuf__ P*)buffers.hFusionBuf.GetPhyAddr(), (__ubuf__ P*)buffers.gatherFusionOutBuf.GetPhyAddr(),
-                  (__ubuf__ P*)hMixInput.GetPhyAddr(), (__ubuf__ P*)buffers.invRmsBuf.GetPhyAddr(), curBSSize);
+    VFDoV1Process<P>((__ubuf__ P*)fp32OutBuf.GetPhyAddr(), (__ubuf__ P*)hMixGradBuf.GetPhyAddr(),
+                     (__ubuf__ P*)buffers.hFusionBuf.GetPhyAddr(), (__ubuf__ P*)buffers.gatherFusionOutBuf.GetPhyAddr(),
+                     (__ubuf__ P*)hMixInput.GetPhyAddr(), (__ubuf__ P*)buffers.invRmsBuf.GetPhyAddr(), curBSSize,
+                     fusionSize_);
 
     vecOutQueue1_.EnQue(fp32OutBuf);
     LocalTensor<P> hMixGradOutBuf = vecOutQueue1_.DeQue<P>();
@@ -1183,8 +772,8 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV1(uint64_t ru
     vecOutQueueSmall_.EnQue(invRmsGradUb);
     LocalTensor<P> invRmsGradUbtBuf = vecOutQueueSmall_.DeQue<P>();
 
-    VFDoV1InvRmsCoeff((__ubuf__ P*)invRmsGradUbtBuf.GetPhyAddr(), (__ubuf__ P*)invRmsBufLocal.GetPhyAddr(), curBSSize,
-                      scaleMean_);
+    VFDoV1InvRmsCoeff<P>((__ubuf__ P*)invRmsGradUbtBuf.GetPhyAddr(), (__ubuf__ P*)invRmsBufLocal.GetPhyAddr(),
+                         curBSSize, scaleMean_);
     PipeBarrier<PIPE_V>();
     SetFlag<HardEvent::V_MTE3>(EVENT_ID2);
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID2);
@@ -1208,104 +797,6 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV1(uint64_t ru
         Add(sumBuf, hMixGradBuf, sumBuf, fusionSize_);
     }
     PipeBarrier<PIPE_V>();
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV1Process(__ubuf__ P* gradHMixOut,
-                                                                         __ubuf__ P* hMixGradBuf,
-                                                                         __ubuf__ P* gradAlphaOut, __ubuf__ P* gatherIn,
-                                                                         __ubuf__ P* hMixIn, __ubuf__ P* invRmsIn,
-                                                                         uint32_t curBSSize)
-{
-    uint32_t totalElem = curBSSize * fusionSize_;
-    uint16_t nLoopCnt = Ceil(totalElem, eleNumPerVf_);
-    uint32_t curElemCnt = totalElem;
-
-    __VEC_SCOPE__
-    {
-        for (uint16_t vfBlockIdx = 0; vfBlockIdx < nLoopCnt; ++vfBlockIdx) {
-            uint32_t elemOffset = vfBlockIdx * eleNumPerVf_;
-            Reg::MaskReg mask = Reg::UpdateMask<P>(curElemCnt);
-
-            Reg::RegTensor<P> h1GradReg, invRmsReg, hMixReg, gatherReg;
-            Reg::RegTensor<P> hMixGradReg, invRmsGradReg;
-            Reg::RegTensor<P> hMul1Reg, hMul2Reg, hMul3Reg;
-
-            Reg::LoadAlign(h1GradReg, hMixGradBuf + elemOffset);
-            Reg::LoadAlign(invRmsReg, invRmsIn + elemOffset);
-
-            Reg::Mul(hMixGradReg, h1GradReg, invRmsReg, mask);
-            Reg::StoreAlign(gradHMixOut + elemOffset, hMixGradReg, mask);
-
-            Reg::LoadAlign(hMixReg, hMixIn + elemOffset);
-            Reg::Mul(hMul1Reg, h1GradReg, hMixReg, mask);
-            Reg::StoreAlign(hMixGradBuf + elemOffset, hMul1Reg, mask);
-
-            Reg::LoadAlign(gatherReg, gatherIn + elemOffset);
-            Reg::Mul(hMul2Reg, invRmsReg, hMixReg, mask);
-            Reg::Mul(hMul3Reg, hMul2Reg, gatherReg, mask);
-            Reg::StoreAlign(gradAlphaOut + elemOffset, hMul3Reg, mask);
-        }
-    }
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV1ProcessBiasGradForN8(__ubuf__ P* outBufDst,
-                                                                                      __ubuf__ P* gatherFusion,
-                                                                                      uint32_t curBSSize)
-{
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> sumReg1, sumReg2;
-        Reg::Duplicate(sumReg1, 0);
-        Reg::Duplicate(sumReg2, 0);
-        uint32_t dealMask1 = eleNumPerVf_;
-        uint32_t dealMask2 = fusionSize_ - eleNumPerVf_;
-        Reg::MaskReg mask1 = Reg::UpdateMask<P>(dealMask1);
-        Reg::MaskReg mask2 = Reg::UpdateMask<P>(dealMask2);
-        for (uint16_t bsIdx = 0; bsIdx < static_cast<uint16_t>(curBSSize); ++bsIdx) {
-            uint32_t elemOffset1 = bsIdx * fusionSize_;
-            uint32_t elemOffset2 = bsIdx * fusionSize_ + eleNumPerVf_;
-            Reg::RegTensor<P> gatherReg1, gatherReg2;
-
-            Reg::LoadAlign(gatherReg1, gatherFusion + elemOffset1);
-            Reg::LoadAlign(gatherReg2, gatherFusion + elemOffset2);
-
-            Reg::Add(sumReg1, sumReg1, gatherReg1, mask1);
-            Reg::Add(sumReg2, sumReg2, gatherReg2, mask2);
-        }
-        Reg::StoreAlign(outBufDst, sumReg1, mask1);
-        Reg::StoreAlign(outBufDst + eleNumPerVf_, sumReg2, mask2);
-    }
-}
-
-template <class T, class P>
-template <bool aligned>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV1ProcessBiasGradForN4N6(__ubuf__ P* outBufDst,
-                                                                                        __ubuf__ P* gatherFusion,
-                                                                                        uint32_t curBSSize)
-{
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> sumReg;
-        Reg::Duplicate(sumReg, 0);
-        uint32_t dealMask = fusionSize_;
-        Reg::MaskReg mask = Reg::UpdateMask<P>(dealMask);
-        for (uint16_t bsIdx = 0; bsIdx < static_cast<uint16_t>(curBSSize); ++bsIdx) {
-            uint32_t elemOffset1 = bsIdx * fusionSize_;
-            Reg::RegTensor<P> gatherReg;
-
-            if constexpr (aligned) {
-                Reg::LoadAlign(gatherReg, gatherFusion + elemOffset1);
-            } else {
-                // fusionSize 为奇数时，相邻行的 UB 对齐位置不同。
-                Reg::Load<P>(gatherReg, gatherFusion + elemOffset1);
-            }
-
-            Reg::Add(sumReg, sumReg, gatherReg, mask);
-        }
-        Reg::StoreAlign(outBufDst, sumReg, mask);
-    }
 }
 
 template <class T, class P>
@@ -1454,90 +945,6 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV2Pipeline()
 }
 
 template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV2CastXToFp32(__ubuf__ P* xRsFp32Addr,
-                                                                             __ubuf__ P* xRsOutAddr,
-                                                                             __ubuf__ T* bf16InputAddr,
-                                                                             uint32_t currentChunkSize,
-                                                                             uint32_t copySizeND)
-{
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<T> xInB16Reg;
-        Reg::RegTensor<P> xFp32Reg;
-        for (uint16_t tIdx = 0; tIdx < (uint16_t)currentChunkSize; tIdx++) {
-            // copySizeND <= 64，每次处理一行。
-            uint32_t lenND = copySizeND;
-            Reg::MaskReg mask = Reg::UpdateMask<P>(lenND);
-            uint32_t offset = tIdx * copySizeND;
-
-            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(xInB16Reg, bf16InputAddr + offset);
-            Reg::Cast<float, T, ctHalf2Fp32Zero>(xFp32Reg, xInB16Reg, mask);
-
-            Reg::StoreAlign(xRsFp32Addr + offset, xFp32Reg, mask); // 后续复用 xFp32
-
-            Reg::StoreAlign(xRsOutAddr + offset, xFp32Reg, mask);
-        }
-    }
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV2AccumulateXGrad(
-    __ubuf__ P* xGradVec3Addr, __ubuf__ P* xRsGradMmAddr, __ubuf__ P* xRsFp32Addr, __ubuf__ P* invRmsAddr,
-    uint32_t currentChunkSize, uint32_t copySizeND)
-{
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> xRsFp32Reg, xRsGradMmReg, xRsGradReg, xGradReg;
-        Reg::RegTensor<P> invRmsReg;
-        for (uint16_t tIdx = 0; tIdx < (uint16_t)currentChunkSize; tIdx++) {
-            uint32_t lenND = copySizeND;
-            // 每行广播加载一个 FP32 invRms 标量
-            Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(invRmsReg, invRmsAddr + tIdx);
-            // copySizeND <= 64，每次处理一行。
-            Reg::MaskReg mask = Reg::UpdateMask<P>(lenND);
-            uint32_t offset = tIdx * copySizeND;
-            Reg::LoadAlign(xRsGradMmReg, xRsGradMmAddr + offset);
-            Reg::LoadAlign(xGradReg, xGradVec3Addr + offset);
-            Reg::LoadAlign(xRsFp32Reg, xRsFp32Addr + offset);
-
-            Reg::Mul(xRsGradReg, xRsFp32Reg, invRmsReg, mask);
-            Reg::Add(xGradReg, xGradReg, xRsGradReg, mask);
-
-            Reg::Add(xGradReg, xGradReg, xRsGradMmReg, mask);
-            Reg::StoreAlign(xGradVec3Addr + offset, xGradReg, mask);
-        }
-    }
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV2HInMulHPre(
-    __ubuf__ P* xGradVec3BufAddr, __ubuf__ T* hInGradInBufAddr, __ubuf__ P* hPreUbAddr, uint32_t currentChunkSize,
-    uint32_t copySizeND, uint32_t currentN, uint32_t bsGlobalOffset)
-{
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<T> hInReg;
-        Reg::RegTensor<P> hInFP32Reg, hPreReg, hPreFullReg;
-        Reg::MaskReg mask;
-        uint32_t hPreOffset = bsGlobalOffset * N_ + currentN;
-        for (uint16_t tIdx = 0; tIdx < (uint16_t)currentChunkSize; tIdx++) {
-            uint32_t lenND = copySizeND;
-            uint32_t hInOffset = tIdx * copySizeND;
-
-            Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(hPreFullReg, hPreUbAddr + hPreOffset);
-            // copySizeND <= 64，每次处理一行。
-            mask = Reg::UpdateMask<P>(lenND);
-            // hIn 转为 FP32
-            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(hInReg, hInGradInBufAddr + hInOffset);
-            Reg::Cast<float, T, ctHalf2Fp32Zero>(hInFP32Reg, hInReg, mask);
-            Reg::Mul(hInFP32Reg, hInFP32Reg, hPreFullReg, mask);
-            Reg::StoreAlign(xGradVec3BufAddr + hInOffset, hInFP32Reg, mask);
-            hPreOffset += N_;
-        }
-    }
-}
-
-template <class T, class P>
 __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV2(uint32_t offsetND, uint32_t copySizeND,
                                                                      uint64_t bsStart, uint64_t bsEnd, uint32_t buffId)
 {
@@ -1552,23 +959,17 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV2(uint32_t of
     uint32_t maxChunkNDSize = chunkSize * copySizeND;
 
     xRsFp32Buf_ = fp32TBuf_.GetWithOffset<P>(maxChunkNDSize, ubOffset);
-    ubOffset = MhcPreSinkhornBackwardUtils::CeilAlign(uint32_t(ubOffset + maxChunkNDSize * sizeof(P)),
-                                                      uint32_t(CEIL_ALIGN_DEFAULT));
+    ubOffset = CeilAlign(uint32_t(ubOffset + maxChunkNDSize * sizeof(P)), uint32_t(CEIL_ALIGN_DEFAULT));
 
     xGradVec3Buf_ = fp32TBuf_.GetWithOffset<P>(maxChunkNDSize, ubOffset);
-    ubOffset = MhcPreSinkhornBackwardUtils::CeilAlign(uint32_t(ubOffset + maxChunkNDSize * sizeof(P)),
-                                                      uint32_t(CEIL_ALIGN_DEFAULT));
+    ubOffset = CeilAlign(uint32_t(ubOffset + maxChunkNDSize * sizeof(P)), uint32_t(CEIL_ALIGN_DEFAULT));
 
     invRmsUb_ = fp32TBuf_.GetWithOffset<P>(currentBsSize, ubOffset);
-    ubOffset = MhcPreSinkhornBackwardUtils::CeilAlign(uint32_t(ubOffset + currentBsSize * sizeof(P)),
-                                                      uint32_t(CEIL_ALIGN_DEFAULT));
+    ubOffset = CeilAlign(uint32_t(ubOffset + currentBsSize * sizeof(P)), uint32_t(CEIL_ALIGN_DEFAULT));
 
-    uint32_t hPreUbLen =
-        MhcPreSinkhornBackwardUtils::CeilAlign(uint32_t(currentBsSize * N_ * sizeof(P)), uint32_t(CEIL_ALIGN_DEFAULT)) /
-        sizeof(P);
+    uint32_t hPreUbLen = CeilAlign(uint32_t(currentBsSize * N_ * sizeof(P)), uint32_t(CEIL_ALIGN_DEFAULT)) / sizeof(P);
     hPreUb_ = fp32TBuf_.GetWithOffset<P>(hPreUbLen, ubOffset);
-    ubOffset = MhcPreSinkhornBackwardUtils::CeilAlign(uint32_t(ubOffset + currentBsSize * N_ * sizeof(P)),
-                                                      uint32_t(CEIL_ALIGN_DEFAULT));
+    ubOffset = CeilAlign(uint32_t(ubOffset + currentBsSize * N_ * sizeof(P)), uint32_t(CEIL_ALIGN_DEFAULT));
     DataCopyPadParams dataCopyPadParams;
     dataCopyPadParams.isPad = false;
 
@@ -1579,7 +980,9 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV2(uint32_t of
     SetFlag<HardEvent::V_MTE2>(EVENT_ID3);
     WaitFlag<HardEvent::V_MTE2>(EVENT_ID3);
     bsCopyParams.blockLen = currentBsSize * N_ * sizeof(P);
-    DataCopyPad(hPreUb_, hPreGm_[bsStart * N_], bsCopyParams, dataCopyPadParams);
+    // premix: xGradVec3 的加权源由 h_pre 切换为 pre_mix。
+    GlobalTensor<P>& hPreSrcGm = hasPreMix_ ? preMixGm_ : hPreGm_;
+    DataCopyPad(hPreUb_, hPreSrcGm[bsStart * N_], bsCopyParams, dataCopyPadParams);
 
     // 一次加载整个 BS 分块的 RMS 梯度系数，供各行分块复用。
     ProcessV2ChunkLoadInvRms(bsStart, currentBsSize);
@@ -1669,8 +1072,8 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV2ChunkLoadHIn
     __ubuf__ T* gradHInInBufAddr = (__ubuf__ T*)gradHInInBuf_.GetPhyAddr();
     __ubuf__ P* hPreUbAddr = (__ubuf__ P*)hPreUb_.GetPhyAddr();
     __ubuf__ P* xGradVec3BufAddr = (__ubuf__ P*)xGradVec3Buf_.GetPhyAddr();
-    VFDoV2HInMulHPre(xGradVec3BufAddr, gradHInInBufAddr, hPreUbAddr, currentChunkSize, copySizeND, currentN,
-                     (bsChunkStart - bsStart));
+    VFDoV2HInMulHPre<T, P>(xGradVec3BufAddr, gradHInInBufAddr, hPreUbAddr, currentChunkSize, copySizeND, currentN,
+                           static_cast<uint32_t>(bsChunkStart - bsStart), N_);
     if (smallM_) {
         vecInQueue1_.FreeTensor(gradHInInBuf_);
     } else {
@@ -1703,7 +1106,7 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV2ChunkLoadX(u
     __ubuf__ P* xRsFp32Addr = (__ubuf__ P*)xRsFp32Buf_.GetPhyAddr();
     xRsOutUb_ = vecOutQueue1_.AllocTensor<P>();
     __ubuf__ P* xRsOutAddr = (__ubuf__ P*)xRsOutUb_.GetPhyAddr();
-    VFDoV2CastXToFp32(xRsFp32Addr, xRsOutAddr, bf16InputAddr, currentChunkSize, copySizeND);
+    VFDoV2CastXToFp32<T, P>(xRsFp32Addr, xRsOutAddr, bf16InputAddr, currentChunkSize, copySizeND);
     vecInQueue1_.FreeTensor(bf16InputBuf_);
     vecOutQueue1_.EnQue(xRsOutUb_);
     xRsOutUb_ = vecOutQueue1_.DeQue<P>();
@@ -1757,34 +1160,12 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV2ChunkProcess
     __ubuf__ P* xGradVec3Addr = (__ubuf__ P*)xGradVec3Buf_.GetPhyAddr();
     __ubuf__ P* xRsFp32Addr = (__ubuf__ P*)xRsFp32Buf_.GetPhyAddr();
     __ubuf__ P* invRmsAddr = (__ubuf__ P*)invRmsUb_.GetPhyAddr() + (bsChunkStart - bsStart);
-    VFDoV2AccumulateXGrad(xGradVec3Addr, xRsGradMmInBufAddr, xRsFp32Addr, invRmsAddr, currentChunkSize, copySizeND);
+    VFDoV2AccumulateXGrad<P>(xGradVec3Addr, xRsGradMmInBufAddr, xRsFp32Addr, invRmsAddr, currentChunkSize, copySizeND);
     if (!directC0_) {
         vecInQueue0_.FreeTensor(xRsGradMmInBuf_);
     }
 
     PipeBarrier<PIPE_V>();
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV2CastXGrad(__ubuf__ T* outputAddr,
-                                                                           __ubuf__ P* xGradAddr, uint32_t totalElem)
-{
-    uint16_t vfLoopCnt = CeilDiv(totalElem, static_cast<uint32_t>(eleNumPerVf_));
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> xGradReg;
-        Reg::RegTensor<T> outputReg;
-        static constexpr Reg::CastTrait castFp32ToB16 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
-                                                         Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
-        uint32_t len = totalElem;
-        for (uint16_t vfBlockIdx = 0; vfBlockIdx < vfLoopCnt; vfBlockIdx++) {
-            Reg::MaskReg mask = Reg::UpdateMask<P>(len);
-            uint32_t offset = vfBlockIdx * eleNumPerVf_;
-            Reg::LoadAlign(xGradReg, xGradAddr + offset);
-            Reg::Cast<T, P, castFp32ToB16>(outputReg, xGradReg, mask);
-            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(outputAddr + offset, outputReg, mask);
-        }
-    }
 }
 
 // 转换并写回 grad_x
@@ -1795,7 +1176,7 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV2ChunkOutputX
     bf16OutputBuf_ = vecOutQueue1_.AllocTensor<T>();
     __ubuf__ T* outputAddr = (__ubuf__ T*)bf16OutputBuf_.GetPhyAddr();
     __ubuf__ P* xGradAddr = (__ubuf__ P*)xGradVec3Buf_.GetPhyAddr();
-    VFDoV2CastXGrad(outputAddr, xGradAddr, chunkNDSize);
+    VFDoV2CastXGrad<T, P>(outputAddr, xGradAddr, chunkNDSize);
     PipeBarrier<PIPE_V>();
     vecOutQueue1_.EnQue(bf16OutputBuf_);
     bf16OutputBuf_ = vecOutQueue1_.DeQue<T>();
@@ -1810,91 +1191,6 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV2ChunkOutputX
 }
 
 template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV1InvRmsCoeff(__ubuf__ P* invRmsGradAddr,
-                                                                             __ubuf__ P* invRmsAddr, uint32_t count,
-                                                                             float scaleMean)
-{
-    uint16_t loopCnt = CeilDiv(count, uint32_t(eleNumPerVf_));
-    uint32_t curLen = count;
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> invReg, shMixReg, cubeReg, gradReg, outReg, scaleReg;
-        Reg::MaskReg maskAll = Reg::CreateMask<P, Reg::MaskPattern::ALL>();
-        Reg::Duplicate(scaleReg, -scaleMean, maskAll);
-        for (uint16_t vfBlockIdx = 0; vfBlockIdx < loopCnt; vfBlockIdx++) {
-            uint32_t elemOffset = vfBlockIdx * eleNumPerVf_;
-            Reg::MaskReg mask = Reg::UpdateMask<P>(curLen);
-            Reg::LoadAlign(invReg, invRmsAddr + elemOffset);
-            Reg::Mul(shMixReg, invReg, invReg, mask);
-            Reg::Mul(cubeReg, shMixReg, invReg, mask);
-            Reg::LoadAlign(gradReg, invRmsGradAddr + elemOffset);
-            Reg::Mul(outReg, cubeReg, gradReg, mask);
-            Reg::Mul(outReg, outReg, scaleReg, mask);
-            Reg::StoreAlign(invRmsGradAddr + elemOffset, outReg, mask);
-        }
-    }
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::AIV21Process(LocalTensor<P>& invRmsInBuf,
-                                                                        LocalTensor<P>& invRmsUb,
-                                                                        LocalTensor<P>& invRmsGradUb,
-                                                                        uint32_t currentChunkSize)
-{
-    __ubuf__ P* invRmsInBufAddr = (__ubuf__ P*)invRmsInBuf.GetPhyAddr();
-    __ubuf__ P* invRmsUbAddr = (__ubuf__ P*)invRmsUb.GetPhyAddr();
-    __ubuf__ P* invRmsGradUbAddr = (__ubuf__ P*)invRmsGradUb.GetPhyAddr();
-
-    uint32_t vfloopCnt = Ceil(currentChunkSize, eleNumPerVf_);
-    uint32_t curLen = currentChunkSize;
-
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> invRmsInReg;
-        Reg::RegTensor<P> invRmsTempReg;
-        Reg::RegTensor<P> invRmsUbReg;
-        Reg::RegTensor<P> invRmsGradUb;
-        Reg::RegTensor<P> scaleMeanReg;
-        Reg::MaskReg maskAll, mask;
-        maskAll = Reg::CreateMask<P, Reg::MaskPattern::ALL>();
-        Reg::Duplicate<P>(scaleMeanReg, (-scaleMean_), maskAll);
-        for (uint16_t vfBlockIdx = 0; vfBlockIdx < static_cast<uint16_t>(vfloopCnt); vfBlockIdx++) {
-            uint32_t elemOffset = vfBlockIdx * eleNumPerVf_;
-            mask = Reg::UpdateMask<P>(curLen);
-            Reg::LoadAlign(invRmsInReg, invRmsInBufAddr + elemOffset);
-            Reg::Mul(invRmsTempReg, invRmsInReg, invRmsInReg, mask);
-            Reg::Mul(invRmsUbReg, invRmsTempReg, invRmsInReg, mask);
-            Reg::LoadAlign(invRmsGradUb, invRmsGradUbAddr + elemOffset);
-            Reg::Mul(invRmsUbReg, invRmsUbReg, invRmsGradUb, mask);
-            Reg::Mul(invRmsUbReg, invRmsUbReg, scaleMeanReg, mask);
-            Reg::StoreAlign(invRmsUbAddr + elemOffset, invRmsUbReg, mask);
-        }
-    }
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV3ProcessAlphaGradSingleCore(__ubuf__ P* alphaGradOut,
-                                                                                            __ubuf__ P* alphaGradIn)
-{
-    __VEC_SCOPE__
-    {
-        Reg::MaskReg mask = Reg::CreateMask<P, Reg::MaskPattern::ALL>();
-        Reg::RegTensor<P> zero, value, sum;
-        Reg::Duplicate(zero, 0.0f, mask);
-        // 保持 V3 中 0+partial 的累加方式，仅加载三个有效标量。
-        Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(value, alphaGradIn);
-        Reg::Add(sum, zero, value, mask);
-        Reg::Store<P>(alphaGradOut, sum, 1);
-        Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(value, alphaGradIn + ALPHA_GRAD_SHAPE_2_OFFSET);
-        Reg::Add(sum, zero, value, mask);
-        Reg::Store<P>(alphaGradOut + 1, sum, 1);
-        Reg::DataCopy<P, Reg::LoadDist::DIST_BRC_B32>(value, alphaGradIn + ALPHA_GRAD_SHAPE_3_OFFSET);
-        Reg::Add(sum, zero, value, mask);
-        Reg::Store<P>(alphaGradOut + 2, sum, 1);
-    }
-}
-
-template <class T, class P>
 __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV3SingleCore()
 {
     ProcessV3AlphaGradSingleCore();
@@ -1905,8 +1201,8 @@ template <class T, class P>
 __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV3AlphaGradSingleCore()
 {
     LocalTensor<P> alphaGradOutLocal = vecOutQueueSmall_.AllocTensor<P>();
-    VFDoV3ProcessAlphaGradSingleCore((__ubuf__ P*)alphaGradOutLocal.GetPhyAddr(),
-                                     (__ubuf__ P*)invScratchBuf_.Get<P>().GetPhyAddr());
+    VFDoV3ProcessAlphaGradSingleCore<P>((__ubuf__ P*)alphaGradOutLocal.GetPhyAddr(),
+                                        (__ubuf__ P*)invScratchBuf_.Get<P>().GetPhyAddr());
     vecOutQueueSmall_.EnQue(alphaGradOutLocal);
     alphaGradOutLocal = vecOutQueueSmall_.DeQue<P>();
     DataCopyParams dataCopyParams = {1, ALPHA_GRAD_LAST_DIM_SIZE * sizeof(P), 0, 0};
@@ -1919,8 +1215,7 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV3BiasGradSing
 {
     LocalTensor<P> biasGradOutLocal = vecOutQueueSmall_.AllocTensor<P>();
     LocalTensor<P> biasGradInLocal =
-        paramsBuf_
-            .Get<P>()[MhcPreSinkhornBackwardUtils::CeilAlign<uint32_t>(fusionSize_, CEIL_ALIGN_DEFAULT / sizeof(P))];
+        paramsBuf_.Get<P>()[CeilAlign<uint32_t>(fusionSize_, CEIL_ALIGN_DEFAULT / sizeof(P))];
     LocalTensor<uint8_t> tmpLocal = fp32TBuf_.GetWithOffset<uint8_t>(hFusionBufLen_ / 4, 0);
     constexpr bool isReuse = false;
     uint32_t biasGradShapeSrc[] = {1U, fusionSize_};
@@ -1955,7 +1250,8 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV3AlphaGrad()
     DataCopyPad(alphaGradInLocal, workSpaceGm_[workspaceBuf_.GetAlphaGradOffset(0)], dataCopyParams, dataCopyPadParams);
     vecInQueue1_.EnQue(alphaGradInLocal);
     alphaGradInLocal = vecInQueue1_.DeQue<P>();
-    VFDoV3ProcessAlphaGrad((__ubuf__ P*)alphaGradOutLocal.GetPhyAddr(), (__ubuf__ P*)alphaGradInLocal.GetPhyAddr());
+    VFDoV3ProcessAlphaGrad<P>((__ubuf__ P*)alphaGradOutLocal.GetPhyAddr(), (__ubuf__ P*)alphaGradInLocal.GetPhyAddr(),
+                              usedVecCoreNum_);
     vecOutQueueSmall_.EnQue(alphaGradOutLocal);
     alphaGradOutLocal = vecOutQueueSmall_.DeQue<P>();
     PipeBarrier<PIPE_V>();
@@ -1997,35 +1293,6 @@ __aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::ProcessV3BiasGrad()
     DataCopyPad(gradBiasGm_[0], biasGradOutLocal, dataCopyParams);
     vecInQueue1_.FreeTensor(biasGradInLocal);
     vecOutQueueSmall_.FreeTensor(biasGradOutLocal);
-}
-
-template <class T, class P>
-__aicore__ inline void MhcPreSinkhornBackwardKernel<T, P>::VFDoV3ProcessAlphaGrad(__ubuf__ P* alphaGradOut,
-                                                                                  __ubuf__ P* alphaGradIn)
-{
-    __VEC_SCOPE__
-    {
-        Reg::RegTensor<P> sumReg;
-        Reg::Duplicate(sumReg, 0);
-        uint32_t dealMask = ALPHA_GRAD_PADDING;
-        Reg::MaskReg mask = Reg::UpdateMask<P>(dealMask);
-        for (uint16_t vcIdx = 0; vcIdx < static_cast<uint16_t>(usedVecCoreNum_); ++vcIdx) {
-            uint32_t elemOffset = vcIdx * ALPHA_GRAD_PADDING;
-            Reg::RegTensor<P> alphaGradInReg;
-            Reg::LoadAlign(alphaGradInReg, alphaGradIn + elemOffset);
-            Reg::Add(sumReg, sumReg, alphaGradInReg, mask);
-        }
-        uint32_t outputCount = ALPHA_GRAD_LAST_DIM_SIZE;
-        Reg::MaskReg outputMask = Reg::UpdateMask<P>(outputCount);
-        Reg::RegTensor<uint32_t> index, zeroIndex;
-        Reg::Arange((Reg::RegTensor<int32_t>&)index, static_cast<int32_t>(0));
-        Reg::Muls(index, index, static_cast<uint32_t>(ALPHA_GRAD_SHAPE_2_OFFSET), mask);
-        Reg::Duplicate(zeroIndex, 0U);
-        Reg::Select(index, index, zeroIndex, outputMask);
-        Reg::RegTensor<P> packed;
-        Reg::Gather(packed, sumReg, index);
-        Reg::StoreAlign(alphaGradOut, packed, outputMask);
-    }
 }
 
 } // namespace MhcPreSinkhornBackwardNs

@@ -13,6 +13,7 @@
     (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
 #include "arch92/mhc_pre_sinkhorn_backward_entry_arch92.h"
 #else
+
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
 #include "arch35/mhc_pre_sinkhorn_backward_data_arch35.h"
@@ -22,18 +23,12 @@ using namespace AscendC;
 using namespace MhcPreSinkhornBackwardNs;
 
 // arch35 入口：在 MhcPreBackward 的 V0 阶段融合 Sinkhorn 反向。
-// pre_mix/grad_pre 为可选输入、grad_pre_mix 为可选输出形参, 仅用于与算子IR输入输出
-// 列表对齐; A5(RegBase)侧不支持premix能力(带pre_mix的调用在aclnn层被拒绝),
-// 此处不向Init传递
 extern "C" __global__ __aicore__ void mhc_pre_sinkhorn_backward(
     GM_ADDR grad_hin, GM_ADDR grad_h_post, GM_ADDR grad_h_res, GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADDR bias,
     GM_ADDR h_pre, GM_ADDR hc_before_norm, GM_ADDR inv_rms, GM_ADDR sum_out, GM_ADDR norm_out, GM_ADDR pre_mix,
     GM_ADDR grad_pre, GM_ADDR grad_x, GM_ADDR grad_phi, GM_ADDR grad_alpha, GM_ADDR grad_bias, GM_ADDR grad_pre_mix,
     GM_ADDR workspace, GM_ADDR tiling)
 {
-    (void)pre_mix;
-    (void)grad_pre;
-    (void)grad_pre_mix;
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     REGISTER_TILING_DEFAULT(MhcPreSinkhornBackwardArch35TilingData);
     GET_TILING_DATA_WITH_STRUCT(MhcPreSinkhornBackwardArch35TilingData, tilingDataValue, tiling);
@@ -57,10 +52,13 @@ extern "C" __global__ __aicore__ void mhc_pre_sinkhorn_backward(
     params.bias = bias;
     params.sum_out = sum_out;
     params.norm_out = norm_out;
+    params.pre_mix = pre_mix;
+    params.grad_pre = grad_pre;
     params.grad_x = grad_x;
     params.grad_phi = grad_phi;
     params.grad_alpha = grad_alpha;
     params.grad_bias = grad_bias;
+    params.grad_pre_mix = grad_pre_mix;
     params.workspace = userWorkspace;
     params.tPipeIn = &pipe;
     params.tilingData = tilingData;

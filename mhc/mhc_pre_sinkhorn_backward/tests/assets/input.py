@@ -12,7 +12,10 @@ import numpy as np
 import torch
 
 __input__ = {
-    "aclnn": {"aclnnMhcPreSinkhornBackward": "mhc_pre_sinkhorn_backward_input"},
+    "aclnn": {
+        "aclnnMhcPreSinkhornBackward": "mhc_pre_sinkhorn_backward_input",
+        "aclnnMhcPreSinkhornBackwardV2": "mhc_pre_sinkhorn_backward_v2_input",
+    },
     "kernel": {"mhc_pre_sinkhorn_backward": "mhc_pre_sinkhorn_backward_input_kernel"},
 }
 
@@ -58,6 +61,22 @@ def _sinkhorn_grad(grad_h_res, sum_out, norm_out, hc_eps=1e-6):
     return x_grad
 
 
+def _copy_view(dst, src):
+    """就地填充；broadcast 视图（stride 0，多元素共享同一存储）无法直接 copy_
+    （torch 对重叠目标一律拒绝），沿 stride-0 维将 src 取常量后，改经覆盖物理
+    元素的非重叠存储视图写入，保证写入合法且语义一致。"""
+    st = dst.stride()
+    if dst.numel() > 1 and 0 in st:
+        sel = tuple(0 if s == 0 else slice(None) for s in st)
+        core = src[sel]
+        shape = tuple(sz for sz, s in zip(dst.shape, st) if s != 0)
+        strides = tuple(s for s in st if s != 0)
+        phys = dst.as_strided(shape, strides, dst.storage_offset())
+        phys.copy_(core.reshape(shape))
+        return
+    dst.copy_(src)
+
+
 def mhc_pre_sinkhorn_backward_input(
     grad_hin,
     grad_h_post,
@@ -85,10 +104,10 @@ def mhc_pre_sinkhorn_backward_input(
     hc_eps_val = float(hc_eps)
     hm = n * n + 2 * n
 
-    x.copy_(torch.randn_like(x))
-    phi.copy_(torch.randn(phi.shape, dtype=torch.float32, device=x.device))
-    alpha.copy_(torch.randn(3, dtype=torch.float32, device=x.device) * 0.1)
-    bias.copy_(torch.randn(hm, dtype=torch.float32, device=x.device))
+    _copy_view(x, torch.randn_like(x))
+    _copy_view(phi, torch.randn(phi.shape, dtype=torch.float32, device=x.device))
+    _copy_view(alpha, torch.randn(3, dtype=torch.float32, device=x.device) * 0.1)
+    _copy_view(bias, torch.randn(hm, dtype=torch.float32, device=x.device))
 
     x_fp32 = x.float()
     prod_nd = n * c
@@ -127,18 +146,18 @@ def mhc_pre_sinkhorn_backward_input(
     norm_out_val = torch.stack(norm_out_list, dim=0)
     hin = (h_pre_val.unsqueeze(-1) * x_fp32).sum(-2).to(x.dtype)
 
-    h_pre.copy_(h_pre_val.detach())
-    hc_before_norm.copy_(hcbn.detach())
-    inv_rms.copy_(inv_rms_val.detach())
-    sum_out.copy_(sum_out_val.detach())
-    norm_out.copy_(norm_out_val.detach())
+    _copy_view(h_pre, h_pre_val.detach())
+    _copy_view(hc_before_norm, hcbn.detach())
+    _copy_view(inv_rms, inv_rms_val.detach())
+    _copy_view(sum_out, sum_out_val.detach())
+    _copy_view(norm_out, norm_out_val.detach())
 
-    grad_hin.copy_(torch.randn(grad_hin.shape, dtype=x.dtype, device=x.device))
-    grad_h_post.copy_(
-        torch.randn(h_pre_val.shape, dtype=torch.float32, device=x.device)
+    _copy_view(grad_hin, torch.randn(grad_hin.shape, dtype=x.dtype, device=x.device))
+    _copy_view(
+        grad_h_post, torch.randn(h_pre_val.shape, dtype=torch.float32, device=x.device)
     )
-    grad_h_res.copy_(
-        torch.randn(grad_h_res.shape, dtype=torch.float32, device=x.device)
+    _copy_view(
+        grad_h_res, torch.randn(grad_h_res.shape, dtype=torch.float32, device=x.device)
     )
 
     if is_3d:
@@ -192,19 +211,56 @@ def mhc_pre_sinkhorn_backward_input(
     if is_3d:
         gold_x = gold_x.view(x.shape[0], n4, d4)
 
-    grad_x_out.copy_(gold_x.to(x.dtype))
-    grad_phi_out.copy_(gold_phi)
-    grad_alpha_out.copy_(gold_alpha)
-    grad_bias_out.copy_(gold_bias)
+    _copy_view(grad_x_out, gold_x.to(x.dtype))
+    _copy_view(grad_phi_out, gold_phi)
+    _copy_view(grad_alpha_out, gold_alpha)
+    _copy_view(grad_bias_out, gold_bias)
 
-    return [
+    # 原地写法：张量已就地填充，返回 None（TTK 契约，输出槽不入返回值）。
+    return None
+
+
+def mhc_pre_sinkhorn_backward_v2_input(
+    grad_hin,
+    grad_h_post,
+    grad_h_res,
+    x,
+    phi,
+    alpha,
+    bias,
+    h_pre,
+    hc_before_norm,
+    inv_rms,
+    sum_out,
+    norm_out,
+    pre_mix,
+    grad_pre,
+    hc_eps,
+    enable_hf32,
+    grad_x_out,
+    grad_phi_out,
+    grad_alpha_out,
+    grad_bias_out,
+    grad_pre_mix_out,
+    **kwargs,
+):
+    """Generate V2 inputs, reusing the V1 forward/intermediate setup.
+
+    The V2 API keeps the same forward intermediates as V1 and only changes
+    the fold source for ``grad_x`` plus the pre gate's incoming gradient.
+    """
+    del kwargs
+
+    # Populate all mandatory tensors and forward intermediates exactly as the
+    # original V1 generator does.  Its temporary outputs are overwritten below.
+    mhc_pre_sinkhorn_backward_input(
         grad_hin,
         grad_h_post,
         grad_h_res,
-        x.detach(),
-        phi.detach(),
-        alpha.detach(),
-        bias.detach(),
+        x,
+        phi,
+        alpha,
+        bias,
         h_pre,
         hc_before_norm,
         inv_rms,
@@ -215,7 +271,107 @@ def mhc_pre_sinkhorn_backward_input(
         grad_phi_out,
         grad_alpha_out,
         grad_bias_out,
-    ]
+    )
+
+    n = x.shape[-2]
+    c = x.shape[-1]
+    is_3d = x.dim() == 3
+    eps = float(hc_eps)
+
+    if pre_mix is not None:
+        _copy_view(
+            pre_mix, torch.rand(pre_mix.shape, dtype=torch.float32, device=x.device)
+        )
+    if grad_pre is not None:
+        _copy_view(
+            grad_pre, torch.randn(grad_pre.shape, dtype=torch.float32, device=x.device)
+        )
+
+    x_fp32 = x.float()
+    hcbn = hc_before_norm.float()
+    invr = inv_rms.float()
+    alpha_f = alpha.float()
+    bias_f = bias.float()
+    gh = grad_hin.float()
+    gp = grad_h_post.float()
+    if is_3d:
+        x4 = x_fp32.unsqueeze(0)
+        gh4 = gh.unsqueeze(0)
+        gp4 = gp.unsqueeze(0)
+        hcbn4 = hcbn.unsqueeze(0)
+        invr4 = invr.unsqueeze(0)
+        hpre4 = h_pre.float().unsqueeze(0)
+        sum4 = sum_out.float().unsqueeze(1)
+        norm4 = norm_out.float().unsqueeze(1)
+        pm4 = pre_mix.unsqueeze(0) if pre_mix is not None else None
+        gpr4 = grad_pre.unsqueeze(0) if grad_pre is not None else None
+    else:
+        x4, gh4, gp4 = x_fp32, gh, gp
+        hcbn4, invr4, hpre4 = hcbn, invr, h_pre.float()
+        sum4, norm4 = sum_out.float(), norm_out.float()
+        pm4, gpr4 = pre_mix, grad_pre
+
+    B, S, n4, d4 = x4.shape
+    mix_weight = pm4 if pm4 is not None else hpre4
+    grad_x_hin = gh4[..., None, :] * mix_weight[..., None]
+    grad_h_pre = (gh4[..., None, :] * x4).sum(-1)
+    if pm4 is None:
+        d_pre = grad_h_pre if gpr4 is None else grad_h_pre + gpr4.float()
+    else:
+        d_pre = gpr4.float() if gpr4 is not None else torch.zeros_like(grad_h_pre)
+
+    nf = hcbn4 * invr4
+    z_pre = nf[..., :n4] * alpha_f[0] + bias_f[:n4]
+    z_post = nf[..., n4 : 2 * n4] * alpha_f[1] + bias_f[n4 : 2 * n4]
+    z_res = (nf[..., 2 * n4 :] * alpha_f[2] + bias_f[2 * n4 :]).reshape(B, S, n4, n4)
+    grad_z_pre = _sigmoid_grad(z_pre, d_pre)
+    grad_z_post = 2 * _sigmoid_grad(z_post, gp4)
+    grad_h_res4 = grad_h_res.float().unsqueeze(0) if is_3d else grad_h_res.float()
+    # grad_h_res 允许平铺 (..., N*N) 形式，_sinkhorn_grad 要求 (..., N, N)。
+    grad_h_res4 = (
+        grad_h_res4.reshape(*grad_h_res4.shape[:-1], n4, n4)
+        if grad_h_res4.dim() == 3
+        else grad_h_res4
+    )
+    sk_grad = _sinkhorn_grad(grad_h_res4, sum4, norm4, eps)
+    grad_z_res = _exp_grad(z_res, sk_grad).flatten(2)
+
+    grad_bias = torch.cat(
+        [grad_z_pre.sum((0, 1)), grad_z_post.sum((0, 1)), grad_z_res.sum((0, 1))]
+    )
+    grad_alpha = torch.stack(
+        [
+            (nf[..., :n4] * grad_z_pre).sum(),
+            (nf[..., n4 : 2 * n4] * grad_z_post).sum(),
+            (nf[..., 2 * n4 :] * grad_z_res).sum(),
+        ]
+    )
+    grad_norm = torch.cat(
+        [grad_z_pre * alpha_f[0], grad_z_post * alpha_f[1], grad_z_res * alpha_f[2]],
+        dim=-1,
+    )
+    grad_hc = grad_norm * invr4
+    grad_inv = (hcbn4 * grad_norm).sum(-1, keepdim=True)
+    grad_x_rms = _rms_norm_grad(x4.flatten(2), invr4, grad_inv)
+    grad_x_mm = grad_hc @ phi.float()
+    grad_phi = grad_hc.flatten(0, 1).T @ x4.flatten(2).flatten(0, 1)
+    grad_x = grad_x_hin + grad_x_rms.view(x4.shape) + grad_x_mm.view(x4.shape)
+    if is_3d:
+        grad_x = grad_x.view(x.shape[0], n4, d4)
+
+    _copy_view(grad_x_out, grad_x.to(grad_x_out.dtype))
+    _copy_view(grad_phi_out, grad_phi.to(grad_phi_out.dtype))
+    _copy_view(grad_alpha_out, grad_alpha.to(grad_alpha_out.dtype))
+    _copy_view(grad_bias_out, grad_bias.to(grad_bias_out.dtype))
+    if grad_pre_mix_out is not None:
+        if pre_mix is None:
+            grad_pre_mix_out.zero_()
+        else:
+            grad_pm = grad_h_pre.view(-1, n4) if is_3d else grad_h_pre
+            _copy_view(grad_pre_mix_out, grad_pm.to(grad_pre_mix_out.dtype))
+
+    # 原地写法：张量已就地填充，返回 None（TTK 契约，输出槽不入返回值）。
+    return None
 
 
 def mhc_pre_sinkhorn_backward_input_kernel(
@@ -231,11 +387,14 @@ def mhc_pre_sinkhorn_backward_input_kernel(
     inv_rms,
     sum_out,
     norm_out,
+    pre_mix=None,
+    grad_pre=None,
     hc_eps=1e-6,
+    enable_hf32=True,
     **kwargs,
 ):
     """Generate NumPy test inputs using forward-computed intermediates to avoid divergence in Sinkhorn backward."""
-    del kwargs
+    del kwargs, enable_hf32
     rng = np.random.default_rng(0)
     eps = float(hc_eps)
     n = x.shape[-2]
@@ -248,6 +407,10 @@ def mhc_pre_sinkhorn_backward_input_kernel(
     phi[...] = rng.standard_normal(phi.shape).astype(phi.dtype)
     alpha[...] = (rng.standard_normal(3) * 0.1).astype(alpha.dtype)
     bias[...] = rng.standard_normal(hm).astype(bias.dtype)
+    if pre_mix is not None:
+        pre_mix[...] = rng.random(pre_mix.shape).astype(pre_mix.dtype)
+    if grad_pre is not None:
+        grad_pre[...] = rng.standard_normal(grad_pre.shape).astype(grad_pre.dtype)
 
     x_f32 = x.astype(np.float32)
     x_flat = x_f32.reshape(*x_f32.shape[:-2], n * c)
@@ -300,4 +463,6 @@ def mhc_pre_sinkhorn_backward_input_kernel(
         inv_rms,
         sum_out,
         norm_out,
+        pre_mix,
+        grad_pre,
     )

@@ -32,12 +32,15 @@ Input dimension constraints
     inv_rms:        [B, S, 1] or [T, 1]       (Reciprocal RMS)
     sum_out:        [2*iter, B, S, N]         (Sum values saved during Sinkhorn iterations)
     norm_out:       [2*iter, B, S, N, N]      (Norm values saved during Sinkhorn iterations)
+    pre_mix:        optional [B, S, N] or [T, N] (premix fold weights)
+    grad_pre:       optional [B, S, N] or [T, N] (downstream premix gradient)
 
 Output dimension constraints
     grad_x:         [B, S, N, D]              (Gradient with respect to x)
     grad_phi:       [N²+2N, N*D]              (Gradient with respect to phi; key tensor)
     grad_alpha:     [3]                        (Gradient with respect to alpha)
     grad_bias:      [N²+2N]                    (Gradient with respect to bias)
+    grad_pre_mix:   optional, same shape as pre_mix
 
 Kernel and ACLNN register through __spec__ and share _compute.
 Import ml_dtypes only for NumPy bf16 conversions, allowing third_party to run remotely without the dependency installed.
@@ -49,6 +52,7 @@ import torch
 __spec__ = {
     "mhc_pre_sinkhorn_backward": "MhcPreSinkhornBackwardTestSpec",
     "aclnnMhcPreSinkhornBackward": "AclnnMhcPreSinkhornBackwardTestSpec",
+    "aclnnMhcPreSinkhornBackwardV2": "AclnnMhcPreSinkhornBackwardV2TestSpec",
 }
 
 
@@ -118,6 +122,8 @@ def _backward_inputs_empty(
     inv_rms,
     sum_out,
     norm_out,
+    pre_mix=None,
+    grad_pre=None,
 ):
     """Check whether data inputs are empty; exclude phi/alpha/bias from the check."""
     return (
@@ -130,6 +136,8 @@ def _backward_inputs_empty(
         or _numel(inv_rms) == 0
         or _numel(sum_out) == 0
         or _numel(norm_out) == 0
+        or (pre_mix is not None and _numel(pre_mix) == 0)
+        or (grad_pre is not None and _numel(grad_pre) == 0)
     )
 
 
@@ -193,6 +201,8 @@ def _torch_backward(
     sum_out_t,
     norm_out_t,
     hc_eps=1e-6,
+    pre_mix_t=None,
+    grad_pre_t=None,
 ):
     """Analytic backward preserving the promoted input precision."""
     is_3d = x_t.dim() == 3
@@ -206,12 +216,15 @@ def _torch_backward(
         inv_rms_t,
         sum_out_t,
         norm_out_t,
+        pre_mix_t,
+        grad_pre_t,
     ):
 
         def _zeros(t):
             return torch.zeros(t.shape, dtype=torch.float32, device=t.device)
 
-        return _zeros(x_t), _zeros(phi_t), _zeros(alpha_t), _zeros(bias_t)
+        grad_pre_mix = _zeros(pre_mix_t) if pre_mix_t is not None else None
+        return _zeros(x_t), _zeros(phi_t), _zeros(alpha_t), _zeros(bias_t), grad_pre_mix
 
     if is_3d:
         x_t = x_t.unsqueeze(0)
@@ -223,11 +236,21 @@ def _torch_backward(
         inv_rms_t = inv_rms_t.unsqueeze(0)
         sum_out_t = sum_out_t.unsqueeze(1)
         norm_out_t = norm_out_t.unsqueeze(1)
+        if pre_mix_t is not None:
+            pre_mix_t = pre_mix_t.unsqueeze(0)
+        if grad_pre_t is not None:
+            grad_pre_t = grad_pre_t.unsqueeze(0)
 
     B, S, n, d = x_t.shape
 
-    grad_x_from_hin = grad_hin_t[..., None, :] * h_pre_t[..., None]
+    # With premix, the forward fold uses premix instead of this operator's h_pre.
+    mix_weight = pre_mix_t if pre_mix_t is not None else h_pre_t
+    grad_x_from_hin = grad_hin_t[..., None, :] * mix_weight[..., None]
     grad_h_pre = (grad_hin_t[..., None, :] * x_t).sum(-1)
+    if pre_mix_t is None:
+        d_pre = grad_h_pre if grad_pre_t is None else grad_h_pre + grad_pre_t
+    else:
+        d_pre = grad_pre_t if grad_pre_t is not None else torch.zeros_like(grad_h_pre)
 
     norm_out_forward = hc_before_norm_t * inv_rms_t
     z_pre = norm_out_forward[..., :n] * alpha_t[0] + bias_t[:n]
@@ -236,7 +259,7 @@ def _torch_backward(
         B, S, n, n
     )
 
-    grad_z_pre = _sigmoid_grad(z_pre, grad_h_pre)
+    grad_z_pre = _sigmoid_grad(z_pre, d_pre)
     grad_z_post = 2 * _sigmoid_grad(z_post, grad_h_post_t)
     # grad_h_res may be (B,S,N*N) or (B,S,N,N); reshape to (B,S,N,N) for _sinkhorn_grad.
     grad_h_res_4d = (
@@ -278,7 +301,10 @@ def _torch_backward(
     if is_3d:
         grad_x = grad_x.view(-1, n, d)
 
-    return grad_x, grad_phi, grad_alpha, grad_bias
+    grad_pre_mix = grad_h_pre if pre_mix_t is not None else None
+    if grad_pre_mix is not None and is_3d:
+        grad_pre_mix = grad_pre_mix.view(-1, n)
+    return grad_x, grad_phi, grad_alpha, grad_bias, grad_pre_mix
 
 
 def _compute(
@@ -295,13 +321,15 @@ def _compute(
     sum_out,
     norm_out,
     hc_eps=1e-6,
+    pre_mix=None,
+    grad_pre=None,
 ):
     """Analytic backward shared by Kernel and ACLNN.
 
     Compute in fp64 when any input is fp64; otherwise use fp32.
     grad_x follows x's dtype; other outputs retain the computation precision.
     """
-    arrays = (
+    base_arrays = (
         grad_hin,
         grad_h_post,
         grad_h_res,
@@ -315,14 +343,19 @@ def _compute(
         sum_out,
         norm_out,
     )
+    arrays = base_arrays + (pre_mix, grad_pre)
     # Normalize mixed-precision inputs to satisfy matmul dtype requirements.
     compute = torch.float64 if any(_is_fp64(a) for a in arrays) else torch.float32
-    grad_x, grad_phi, grad_alpha, grad_bias = _torch_backward(
-        *(_as_torch(a, compute) for a in arrays),
+    grad_x, grad_phi, grad_alpha, grad_bias, grad_pre_mix = _torch_backward(
+        *(_as_torch(a, compute) for a in base_arrays),
         hc_eps,
+        _as_torch(pre_mix, compute),
+        _as_torch(grad_pre, compute),
     )
     grad_x = grad_x.to(_torch_dtype_of(x))
-    return grad_x, grad_phi, grad_alpha, grad_bias
+    if grad_pre_mix is not None:
+        grad_pre_mix = grad_pre_mix.to(torch.float32)
+    return grad_x, grad_phi, grad_alpha, grad_bias, grad_pre_mix
 
 
 def mhc_pre_sinkhorn_backward_golden(
@@ -338,12 +371,15 @@ def mhc_pre_sinkhorn_backward_golden(
     inv_rms,
     sum_out,
     norm_out,
+    pre_mix=None,
+    grad_pre=None,
     hc_eps=1e-6,
+    enable_hf32=True,
     **kwargs,
 ):
     """Kernel golden reference with NumPy inputs and outputs."""
     del kwargs
-    grad_x, grad_phi, grad_alpha, grad_bias = _compute(
+    grad_x, grad_phi, grad_alpha, grad_bias, grad_pre_mix = _compute(
         grad_hin,
         grad_h_post,
         grad_h_res,
@@ -357,12 +393,19 @@ def mhc_pre_sinkhorn_backward_golden(
         sum_out,
         norm_out,
         hc_eps,
+        pre_mix,
+        grad_pre,
     )
+    if grad_pre_mix is None:
+        # The kernel ABI always has a fifth output slot; without premix it is
+        # a placeholder and the host path treats it as zero.
+        grad_pre_mix = torch.zeros_like(_as_torch(h_pre, torch.float32))
     return (
         _torch_to_numpy(grad_x),
         grad_phi.numpy(),
         grad_alpha.numpy(),
         grad_bias.numpy(),
+        grad_pre_mix.numpy(),
     )
 
 
@@ -424,8 +467,71 @@ def aclnn_mhc_pre_sinkhorn_backward_golden(
     )
     templates = (gradX, gradPhi, gradAlpha, gradBias)
     return tuple(
-        _to_output(value, template) for value, template in zip(result, templates)
+        _to_output(value, template) for value, template in zip(result[:4], templates)
     )
+
+
+def aclnn_mhc_pre_sinkhorn_backward_v2_golden(
+    gradHin,
+    gradHPost,
+    gradHRes,
+    x,
+    phi,
+    alpha,
+    bias,
+    hPre,
+    hcBeforeNorm,
+    invRms,
+    sumOut,
+    normOut,
+    preMix=None,
+    gradPre=None,
+    hcEps=1e-6,
+    enableHf32=True,
+    gradX=None,
+    gradPhi=None,
+    gradAlpha=None,
+    gradBias=None,
+    gradPreMix=None,
+    **kwargs,
+):
+    """Golden for ``aclnnMhcPreSinkhornBackwardV2``.
+
+    ``preMix`` and ``gradPre`` are optional and must be paired by the ACLNN
+    interface.  When ``preMix`` is present, the fifth output is its gradient.
+    ``enableHf32`` is an execution attribute and does not change this analytic
+    reference.
+    """
+    del enableHf32, kwargs
+    hc_eps_val = float(hcEps) if hcEps is not None else 1e-6
+    result = _compute(
+        gradHin,
+        gradHPost,
+        gradHRes,
+        x,
+        phi,
+        alpha,
+        bias,
+        hPre,
+        hcBeforeNorm,
+        invRms,
+        sumOut,
+        normOut,
+        hc_eps_val,
+        preMix,
+        gradPre,
+    )
+    outputs = tuple(
+        _to_output(value, template)
+        for value, template in zip(result[:4], (gradX, gradPhi, gradAlpha, gradBias))
+    )
+    grad_pre_mix_value = result[4]
+    if grad_pre_mix_value is None and gradPreMix is not None:
+        # The ACLNN implementation explicitly zeros this output when the
+        # optional preMix input is absent but a gradPreMix slot is supplied.
+        zero = _as_torch(gradPreMix, torch.float32)
+        grad_pre_mix_value = torch.zeros_like(zero)
+    return outputs + (_to_output(grad_pre_mix_value, gradPreMix),)
 
 
 # ============================================================================
@@ -526,11 +632,14 @@ def _ref_torch_backward(
     sum_out,
     norm_out,
     hc_eps=1e-6,
+    pre_mix=None,
+    grad_pre=None,
+    enable_hf32=True,
 ):
     """Torch reference with explicit HF32 operand rounding for both GEMMs."""
     is_3d = x.dim() == 3
     if any(
-        t.numel() == 0
+        t is not None and t.numel() == 0
         for t in (
             grad_hin,
             grad_h_post,
@@ -541,13 +650,16 @@ def _ref_torch_backward(
             inv_rms,
             sum_out,
             norm_out,
+            pre_mix,
+            grad_pre,
         )
     ):
         # Empty batches still have nonempty parameter gradients, all of which are zero.
         def _zeros(t):
             return torch.zeros_like(t, dtype=torch.float32)
 
-        return _zeros(x), _zeros(phi), _zeros(alpha), _zeros(bias)
+        grad_pre_mix = _zeros(pre_mix) if pre_mix is not None else None
+        return _zeros(x), _zeros(phi), _zeros(alpha), _zeros(bias), grad_pre_mix
 
     # Materialize non-contiguous inputs for subsequent view operations.
     x = x.float().contiguous()
@@ -562,6 +674,10 @@ def _ref_torch_backward(
     inv_rms = inv_rms.float().contiguous()
     sum_out = sum_out.float().contiguous()
     norm_out = norm_out.float().contiguous()
+    if pre_mix is not None:
+        pre_mix = pre_mix.float().contiguous()
+    if grad_pre is not None:
+        grad_pre = grad_pre.float().contiguous()
 
     if is_3d:
         x = x.unsqueeze(0)
@@ -573,18 +689,27 @@ def _ref_torch_backward(
         inv_rms = inv_rms.unsqueeze(0)
         sum_out = sum_out.unsqueeze(1)
         norm_out = norm_out.unsqueeze(1)
+        if pre_mix is not None:
+            pre_mix = pre_mix.unsqueeze(0)
+        if grad_pre is not None:
+            grad_pre = grad_pre.unsqueeze(0)
 
     b, s, n, d = x.shape
 
-    grad_x_from_hin = grad_hin[..., None, :] * h_pre[..., None]
+    mix_weight = pre_mix if pre_mix is not None else h_pre
+    grad_x_from_hin = grad_hin[..., None, :] * mix_weight[..., None]
     grad_h_pre = (grad_hin[..., None, :] * x).sum(-1)
+    if pre_mix is None:
+        d_pre = grad_h_pre if grad_pre is None else grad_h_pre + grad_pre
+    else:
+        d_pre = grad_pre if grad_pre is not None else torch.zeros_like(grad_h_pre)
 
     nf = hc_before_norm * inv_rms
     z_pre = nf[..., :n] * alpha[0] + bias[:n]
     z_post = nf[..., n : 2 * n] * alpha[1] + bias[n : 2 * n]
     z_res = (nf[..., 2 * n :] * alpha[2] + bias[2 * n :]).reshape(b, s, n, n)
 
-    grad_z_pre = _ref_sigmoid_grad(z_pre, grad_h_pre)
+    grad_z_pre = _ref_sigmoid_grad(z_pre, d_pre)
     grad_z_post = _ref_sigmoid_grad(z_post, grad_h_post, 2.0)
     grad_h_res_4d = (
         grad_h_res.reshape(b, s, n, n) if grad_h_res.dim() == 3 else grad_h_res
@@ -618,10 +743,14 @@ def _ref_torch_backward(
     try:
         if x.is_cuda:
             torch.backends.cuda.matmul.allow_tf32 = False
-        grad_x_from_matmul = _ref_hf32_matmul(grad_hc_before_norm, phi)
-        grad_phi = _ref_hf32_matmul(
-            grad_hc_before_norm.flatten(0, 1).T, x_flat.flatten(0, 1)
-        )
+        if enable_hf32:
+            grad_x_from_matmul = _ref_hf32_matmul(grad_hc_before_norm, phi)
+            grad_phi = _ref_hf32_matmul(
+                grad_hc_before_norm.flatten(0, 1).T, x_flat.flatten(0, 1)
+            )
+        else:
+            grad_x_from_matmul = grad_hc_before_norm @ phi
+            grad_phi = grad_hc_before_norm.flatten(0, 1).T @ x_flat.flatten(0, 1)
     finally:
         if x.is_cuda:
             torch.backends.cuda.matmul.allow_tf32 = previous_tf32
@@ -634,7 +763,10 @@ def _ref_torch_backward(
     if is_3d:
         grad_x = grad_x.view(-1, n, d)
 
-    return grad_x, grad_phi, grad_alpha, grad_bias
+    grad_pre_mix = grad_h_pre if pre_mix is not None else None
+    if grad_pre_mix is not None and is_3d:
+        grad_pre_mix = grad_pre_mix.view(-1, n)
+    return grad_x, grad_phi, grad_alpha, grad_bias, grad_pre_mix
 
 
 class MhcPreSinkhornBackwardTorchImpl:
@@ -654,11 +786,14 @@ class MhcPreSinkhornBackwardTorchImpl:
         inv_rms,
         sum_out,
         norm_out,
+        pre_mix=None,
+        grad_pre=None,
         hc_eps=1e-6,
+        enable_hf32=True,
         **kwargs,
     ):
         del kwargs
-        grad_x, grad_phi, grad_alpha, grad_bias = _ref_torch_backward(
+        grad_x, grad_phi, grad_alpha, grad_bias, grad_pre_mix = _ref_torch_backward(
             grad_hin,
             grad_h_post,
             grad_h_res,
@@ -672,10 +807,15 @@ class MhcPreSinkhornBackwardTorchImpl:
             sum_out,
             norm_out,
             float(hc_eps),
+            pre_mix,
+            grad_pre,
+            bool(enable_hf32),
         )
         if x.dtype in (torch.bfloat16, torch.float16):
             grad_x = grad_x.to(x.dtype)
-        return [grad_x, grad_phi, grad_alpha, grad_bias]
+        if grad_pre_mix is None:
+            grad_pre_mix = torch.zeros_like(h_pre, dtype=torch.float32)
+        return [grad_x, grad_phi, grad_alpha, grad_bias, grad_pre_mix]
 
 
 class MhcPreSinkhornBackwardAclnnTorchImpl:
@@ -711,9 +851,57 @@ class MhcPreSinkhornBackwardAclnnTorchImpl:
             invRms,
             sumOut,
             normOut,
-            hcEps,
+            hc_eps=hcEps,
             **kwargs,
+        )[:4]
+
+
+class AclnnMhcPreSinkhornBackwardV2TorchImpl:
+    """ACLNN V2 cross-check reference, including optional premix tensors."""
+
+    def __call__(
+        self,
+        gradHin,
+        gradHPost,
+        gradHRes,
+        x,
+        phi,
+        alpha,
+        bias,
+        hPre,
+        hcBeforeNorm,
+        invRms,
+        sumOut,
+        normOut,
+        preMix=None,
+        gradPre=None,
+        hcEps=1e-6,
+        enableHf32=True,
+        **kwargs,
+    ):
+        del kwargs
+        result = _ref_torch_backward(
+            gradHin,
+            gradHPost,
+            gradHRes,
+            x,
+            phi,
+            alpha,
+            bias,
+            hPre,
+            hcBeforeNorm,
+            invRms,
+            sumOut,
+            normOut,
+            float(hcEps) if hcEps is not None else 1e-6,
+            preMix,
+            gradPre,
+            True if enableHf32 is None else bool(enableHf32),
         )
+        grad_x, grad_phi, grad_alpha, grad_bias, grad_pre_mix = result
+        if x.dtype in (torch.bfloat16, torch.float16):
+            grad_x = grad_x.to(x.dtype)
+        return [grad_x, grad_phi, grad_alpha, grad_bias, grad_pre_mix]
 
 
 # ============================================================================
@@ -740,4 +928,12 @@ class AclnnMhcPreSinkhornBackwardTestSpec:
 
     golden = aclnn_mhc_pre_sinkhorn_backward_golden
     third_party = {"torch": MhcPreSinkhornBackwardAclnnTorchImpl}
+    tolerance = _CROSS_CHECK_TOLERANCE
+
+
+class AclnnMhcPreSinkhornBackwardV2TestSpec:
+    """ACLNN V2 test spec with optional premix/gradient output slots."""
+
+    golden = aclnn_mhc_pre_sinkhorn_backward_v2_golden
+    third_party = {"torch": AclnnMhcPreSinkhornBackwardV2TorchImpl}
     tolerance = _CROSS_CHECK_TOLERANCE

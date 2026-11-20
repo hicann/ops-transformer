@@ -182,6 +182,11 @@ struct MhcPreSinkhornBackwardArch35TilingData {
 
     // Host 按 0 < M <= 512 下发，控制 Stage2 的输出通道和输入队列选择。
     uint32_t smallM = 0;
+
+    // premix 特性开关：可选输入 pre_mix / grad_pre 同时在场时为 1。
+    // v2 路径下 V0 预计算的 HPreGrad 直写 grad_pre_mix 输出，sigmoid 反传链的
+    // dPre 改由外部 grad_pre 提供，xGradVec3 的加权源由 h_pre 切换为 pre_mix。
+    uint32_t hasPreMix = 0;
 };
 
 #endif // MHC_PRE_SINKHORN_BACKWARD_DATA_ARCH35_H

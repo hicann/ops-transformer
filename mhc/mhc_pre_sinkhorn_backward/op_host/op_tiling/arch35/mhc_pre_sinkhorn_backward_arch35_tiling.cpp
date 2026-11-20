@@ -32,12 +32,16 @@ constexpr uint64_t TILING_KEY_ARCH35 = 3000;
 constexpr uint32_t INPUT_X = 3;
 constexpr uint32_t SUM_OUT = 10;
 constexpr uint32_t NORM_OUT = 11;
+constexpr uint32_t PRE_MIX = 12;
+constexpr uint32_t GRAD_PRE = 13;
 constexpr uint32_t OUTPUT_GRAD_X = 0;
 constexpr uint32_t OUTPUT_GRAD_PHI = 1;
 constexpr uint32_t OUTPUT_GRAD_ALPHA = 2;
 constexpr uint32_t OUTPUT_GRAD_BIAS = 3;
+constexpr uint32_t OUTPUT_GRAD_PRE_MIX = 4;
 
 constexpr float DEFAULT_HC_EPS = 1e-6f;
+constexpr uint32_t IMPL_MODE_FP32 = 0U;
 constexpr uint32_t IMPL_MODE_HF32 = 1U;
 
 constexpr uint32_t ALPHA_GRAD_CORE_FACTOR = 24;
@@ -232,6 +236,24 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::CheckDataTypes() const
                                                       .c_str()),
             return ge::GRAPH_FAILED);
     }
+    // Optional premix tensors are real kernel parameters when present; the
+    // direct kernel path does not pass through the ACLNN dtype checker.
+    for (uint32_t index = PRE_MIX; index <= GRAD_PRE; ++index) {
+        auto desc = context_->GetInputDesc(index);
+        if (desc != nullptr) {
+            OP_CHECK_IF(desc->GetDataType() != ge::DT_FLOAT,
+                        OP_LOGE(context_->GetNodeName(), "optional input %u dtype must be FLOAT, got %d", index,
+                                static_cast<int32_t>(desc->GetDataType())),
+                        return ge::GRAPH_FAILED);
+        }
+    }
+    auto gradPreMixDesc = context_->GetOutputDesc(OUTPUT_GRAD_PRE_MIX);
+    if (gradPreMixDesc != nullptr) {
+        OP_CHECK_IF(gradPreMixDesc->GetDataType() != ge::DT_FLOAT,
+                    OP_LOGE(context_->GetNodeName(), "optional output grad_pre_mix dtype must be FLOAT, got %d",
+                            static_cast<int32_t>(gradPreMixDesc->GetDataType())),
+                    return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -348,6 +370,47 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetShapeAttrsInfo()
         OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "MhcPreSinkhornBackward output shape validation failed"),
         return ge::GRAPH_FAILED);
 
+    // premix 可选输入在场检测：pre_mix 与 grad_pre 必须同时传入或同时缺省，
+    // 在场时 shape 须与 h_pre 一致（BSND/TND 同 hPre）。
+    const auto preMixShapePtr = context_->GetOptionalInputShape(PRE_MIX);
+    const auto gradPreShapePtr = context_->GetOptionalInputShape(GRAD_PRE);
+    tilingData_->hasPreMix = (preMixShapePtr != nullptr) ? 1U : 0U;
+    OP_CHECK_IF((preMixShapePtr == nullptr) != (gradPreShapePtr == nullptr),
+                OP_LOGE(context_->GetNodeName(), "pre_mix and grad_pre must be provided or omitted together"),
+                return ge::GRAPH_FAILED);
+    if (preMixShapePtr != nullptr) {
+        if (xRank_ == 3) {
+            int64_t preMixDims[2] = {batchDims[0], n};
+            OP_CHECK_IF(!CheckTensorShape(PRE_MIX, "pre_mix", preMixDims, dataRank) ||
+                            !CheckTensorShape(GRAD_PRE, "grad_pre", preMixDims, dataRank),
+                        OP_LOGE(context_->GetNodeName(), "pre_mix/grad_pre shape validation failed"),
+                        return ge::GRAPH_FAILED);
+        } else {
+            int64_t preMixDims[3] = {batchDims[0], batchDims[1], n};
+            OP_CHECK_IF(!CheckTensorShape(PRE_MIX, "pre_mix", preMixDims, dataRank) ||
+                            !CheckTensorShape(GRAD_PRE, "grad_pre", preMixDims, dataRank),
+                        OP_LOGE(context_->GetNodeName(), "pre_mix/grad_pre shape validation failed"),
+                        return ge::GRAPH_FAILED);
+        }
+    }
+
+    // Validate the optional output whenever the graph supplies its
+    // placeholder descriptor.  Its logical shape is always h_pre's shape.
+    auto gradPreMixShapePtr = context_->GetOutputShape(OUTPUT_GRAD_PRE_MIX);
+    if (gradPreMixShapePtr != nullptr) {
+        if (xRank_ == 3) {
+            int64_t preMixDims[2] = {batchDims[0], n};
+            OP_CHECK_IF(!CheckOutputShape(OUTPUT_GRAD_PRE_MIX, "grad_pre_mix", preMixDims, dataRank),
+                        OP_LOGE(context_->GetNodeName(), "grad_pre_mix shape validation failed"),
+                        return ge::GRAPH_FAILED);
+        } else {
+            int64_t preMixDims[3] = {batchDims[0], batchDims[1], n};
+            OP_CHECK_IF(!CheckOutputShape(OUTPUT_GRAD_PRE_MIX, "grad_pre_mix", preMixDims, dataRank),
+                        OP_LOGE(context_->GetNodeName(), "grad_pre_mix shape validation failed"),
+                        return ge::GRAPH_FAILED);
+        }
+    }
+
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attributes are null"), return ge::GRAPH_FAILED);
     auto hcEpsPtr = attrs->GetAttrPointer<float>(0);
@@ -355,8 +418,10 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetShapeAttrsInfo()
     OP_CHECK_IF(!std::isfinite(hcEps_) || hcEps_ <= 0.0f,
                 OP_LOGE(context_->GetNodeName(), "hc_eps must be finite and positive"), return ge::GRAPH_FAILED);
 
-    // C0/C1 的 FP32 输入默认按 HF32 计算。
-    implMode_ = IMPL_MODE_HF32;
+    // arch35 的默认行为保持 HF32，调用方可通过 enable_hf32=false 切换到普通 FP32。
+    auto enableHf32Ptr = attrs->GetAttrPointer<bool>(1);
+    const bool enableHf32 = enableHf32Ptr == nullptr ? true : *enableHf32Ptr;
+    implMode_ = enableHf32 ? IMPL_MODE_HF32 : IMPL_MODE_FP32;
     tilingData_->totalLength = totalLength_;
     tilingData_->nD = N_ * D_;
     tilingData_->N = N_;

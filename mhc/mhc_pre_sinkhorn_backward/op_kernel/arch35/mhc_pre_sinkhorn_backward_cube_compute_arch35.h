@@ -16,11 +16,10 @@
 #define MHC_PRE_SINKHORN_BACKWARD_CUBE_COMPUTE_H
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
-#include "mhc_pre_sinkhorn_backward_utils_arch35.h"
+#include "mhc_pre_sinkhorn_backward_base_arch35.h"
 
 namespace MhcPreSinkhornBackwardNs {
 using namespace AscendC;
-using namespace MhcPreSinkhornBackwardUtils;
 
 constexpr uint32_t CUBE_L0_EVENT_BASE = 3U;
 constexpr uint32_t CUBE_BLOCK_BYTES = 32U;
