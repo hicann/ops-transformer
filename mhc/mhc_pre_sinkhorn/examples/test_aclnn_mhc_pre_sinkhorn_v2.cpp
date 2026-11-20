@@ -13,7 +13,7 @@
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"
-#include "aclnnop/aclnn_mhc_pre_sinkhorn.h"
+#include "aclnnop/aclnn_mhc_pre_sinkhorn_v2.h"
 
 #define CHECK_RET(cond, return_expr) \
     do { \

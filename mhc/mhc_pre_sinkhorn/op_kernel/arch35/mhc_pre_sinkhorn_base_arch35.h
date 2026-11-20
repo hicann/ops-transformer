@@ -265,6 +265,7 @@ __aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float>& rms
                     pregLoop = UpdateMask<float>(sreg);
                     LoadInputData(x, xLocalAddr, pregLoop, i * curColNumAlign + j * VL_FP32);
                     Mul(x1, x, x, pregLoop);
+                    // Mul zeros inactive lanes; retain all lanes accumulated by earlier windows.
                     Add(sum, sum, x1, pregMain);
                     StoreOutputData(xCastLocalAddr, x, pregLoop, i * dstCurColNumAlign + j * VL_FP32);
                 }
@@ -311,6 +312,177 @@ __aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float>& rms
                     StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, sum,
                                                                                        pregMerge);
                 }
+            }
+        }
+    }
+}
+
+// Stage1 premix hIn fusion: cast x, accumulate invRms and hIn = sum_hc preMix[hc] * x in one pass.
+// WithRmsReduce keeps accumulating the partial invRms across K chunks; WithYReduce keeps accumulating
+// hIn across the hcMult segments that share the same d window.
+template <typename T, bool WithRmsReduce, bool WithYReduce>
+__aicore__ inline void VFProcessCastInvRmsAndPremixYPart1(
+    const LocalTensor<float>& rmsNormLocal, const LocalTensor<float>& yAccLocal, const LocalTensor<float>& xCastLocal,
+    const LocalTensor<float>& preMixLocal, const LocalTensor<T>& xLocal, float coeff, const uint16_t preMixColIdx,
+    const uint16_t preMixRowStride, const uint16_t yAccRowStride, const uint16_t curRowNum, const uint16_t curColNum)
+{
+    __ubuf__ float* rmsAddr = (__ubuf__ float*)rmsNormLocal.GetPhyAddr();
+    __ubuf__ float* yAccAddr = (__ubuf__ float*)yAccLocal.GetPhyAddr();
+    __ubuf__ float* xCastAddr = (__ubuf__ float*)xCastLocal.GetPhyAddr();
+    __ubuf__ float* preMixAddr = (__ubuf__ float*)preMixLocal.GetPhyAddr();
+    __ubuf__ T* xAddr = (__ubuf__ T*)xLocal.GetPhyAddr();
+    uint16_t loopCount = CeilDiv(curColNum, VL_FP32);
+    uint16_t xRowStride = RoundUp<T>(curColNum);
+    uint16_t castRowStride = RoundUp<float>(curColNum) + BLOCK_SIZE / sizeof(float);
+    __VEC_SCOPE__
+    {
+        RegTensor<float> x;
+        RegTensor<float> xSquare;
+        RegTensor<float> squareSum;
+        RegTensor<float> rmsOld;
+        RegTensor<float> mix;
+        RegTensor<float> weightedX;
+        RegTensor<float> yAcc;
+        MaskReg pregLoop;
+        MaskReg pregMain = CreateMask<float>();
+        MaskReg pregScalar = CreateMask<float, AscendC::Reg::MaskPattern::VL1>();
+        uint32_t sreg;
+        for (uint16_t i = 0; i < curRowNum; i++) {
+            Duplicate(squareSum, 0.0f);
+            if constexpr (WithRmsReduce) {
+                LoadInputDataWithBrc<float>(rmsOld, rmsAddr, pregScalar, i);
+            }
+            sreg = curColNum;
+            for (uint16_t j = 0; j < loopCount; j++) {
+                pregLoop = UpdateMask<float>(sreg);
+                uint32_t xOffset = i * xRowStride + j * VL_FP32;
+                uint32_t yAccOffset = i * yAccRowStride + j * VL_FP32;
+                LoadInputData(x, xAddr, pregLoop, xOffset);
+                StoreOutputData(xCastAddr, x, pregLoop, i * castRowStride + j * VL_FP32);
+
+                Mul(xSquare, x, x, pregLoop);
+                // A tail mask on Add would clear the preceding windows' upper lanes.
+                Add(squareSum, squareSum, xSquare, pregMain);
+
+                LoadInputDataWithBrc<float>(mix, preMixAddr, pregLoop, i * preMixRowStride + preMixColIdx);
+                Mul(weightedX, mix, x, pregLoop);
+                if constexpr (WithYReduce) {
+                    LoadInputData<float>(yAcc, yAccAddr, pregLoop, yAccOffset);
+                } else {
+                    Duplicate(yAcc, 0.0f);
+                }
+                Add(yAcc, yAcc, weightedX, pregLoop);
+                StoreOutputData<float>(yAccAddr, yAcc, pregLoop, yAccOffset);
+            }
+            Muls(squareSum, squareSum, coeff, pregMain);
+            Reduce<ReduceType::SUM>(squareSum, squareSum, pregMain);
+            if constexpr (WithRmsReduce) {
+                Add(squareSum, rmsOld, squareSum, pregScalar);
+            }
+            StoreAlign<float, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsAddr + i, squareSum, pregScalar);
+        }
+    }
+}
+
+// Keep the four cast slices in UB, but keep the weighted sum in registers. This
+// preserves the hc order of VFProcessY without spilling yAcc after each segment.
+template <typename T>
+__aicore__ inline void VFProcessPremixYFromCastSegments(const LocalTensor<T>& yLocal,
+                                                        const LocalTensor<float>& preMixLocal,
+                                                        const LocalTensor<float>& xCastSegLocal, const uint16_t rowNum,
+                                                        const uint16_t colNum, const uint16_t hcMult,
+                                                        const uint16_t preMixRowStride, const uint16_t segRows)
+{
+    __ubuf__ T* yAddr = (__ubuf__ T*)yLocal.GetPhyAddr();
+    __ubuf__ float* preMixAddr = (__ubuf__ float*)preMixLocal.GetPhyAddr();
+    __ubuf__ float* xCastAddr = (__ubuf__ float*)xCastSegLocal.GetPhyAddr();
+    const uint16_t yRowStride = RoundUp<T>(colNum);
+    const uint32_t castRowStride = RoundUp<float>(colNum) + BLOCK_SIZE / sizeof(float);
+    const uint32_t segStride = segRows * castRowStride;
+    const uint16_t loops = CeilDiv(colNum, VL_FP32);
+    __VEC_SCOPE__
+    {
+        RegTensor<float> x;
+        RegTensor<float> mix;
+        RegTensor<float> sum;
+        for (uint16_t row = 0; row < rowNum; ++row) {
+            uint32_t remaining = colNum;
+            for (uint16_t w = 0; w < loops; ++w) {
+                MaskReg mask = UpdateMask<float>(remaining);
+                Duplicate(sum, 0.0f, mask);
+                for (uint16_t hc = 0; hc < hcMult; ++hc) {
+                    LoadInputDataWithBrc<float>(mix, preMixAddr, mask, row * preMixRowStride + hc);
+                    LoadInputData<float>(x, xCastAddr, mask, hc * segStride + row * castRowStride + w * VL_FP32);
+                    Mul(x, mix, x, mask);
+                    Add(sum, sum, x, mask);
+                }
+                StoreOutputData<T>(yAddr, sum, mask, row * yRowStride + w * VL_FP32);
+            }
+        }
+    }
+}
+
+// Accumulate hIn for one cast slice into the per-window float accumulator.
+template <bool IsFirst = false>
+__aicore__ inline void VFProcessPremixYAccumulate(const LocalTensor<float>& yAccLocal,
+                                                  const LocalTensor<float>& preMixLocal,
+                                                  const LocalTensor<float>& xCastLocal, const uint16_t curRowNum,
+                                                  const uint16_t curColNum, const uint16_t preMixColIdx,
+                                                  const uint16_t preMixRowStride, const uint32_t yAccRowStride)
+{
+    __ubuf__ float* yAccAddr = (__ubuf__ float*)yAccLocal.GetPhyAddr();
+    __ubuf__ float* preMixAddr = (__ubuf__ float*)preMixLocal.GetPhyAddr();
+    __ubuf__ float* xCastAddr = (__ubuf__ float*)xCastLocal.GetPhyAddr();
+    uint16_t loopCount = CeilDiv(curColNum, VL_FP32);
+    uint16_t castRowStride = RoundUp<float>(curColNum) + BLOCK_SIZE / sizeof(float);
+    __VEC_SCOPE__
+    {
+        RegTensor<float> x;
+        RegTensor<float> mix;
+        RegTensor<float> weightedX;
+        RegTensor<float> yAcc;
+        MaskReg pregLoop;
+        uint32_t sreg;
+        for (uint16_t i = 0; i < curRowNum; i++) {
+            sreg = curColNum;
+            for (uint16_t j = 0; j < loopCount; j++) {
+                pregLoop = UpdateMask<float>(sreg);
+                uint32_t yAccOffset = i * yAccRowStride + j * VL_FP32;
+                LoadInputData<float>(x, xCastAddr, pregLoop, i * castRowStride + j * VL_FP32);
+                LoadInputDataWithBrc<float>(mix, preMixAddr, pregLoop, i * preMixRowStride + preMixColIdx);
+                Mul(weightedX, mix, x, pregLoop);
+                if constexpr (IsFirst) {
+                    Duplicate(yAcc, 0.0f);
+                } else {
+                    LoadInputData<float>(yAcc, yAccAddr, pregLoop, yAccOffset);
+                }
+                Add(yAcc, yAcc, weightedX, pregLoop);
+                StoreOutputData<float>(yAccAddr, yAcc, pregLoop, yAccOffset);
+            }
+        }
+    }
+}
+
+template <typename T>
+__aicore__ inline void VFProcessPremixYCast(const LocalTensor<T>& yLocal, const LocalTensor<float>& yAccLocal,
+                                            const uint32_t yAccRowStride, const uint16_t curRowNum,
+                                            const uint16_t curColNum)
+{
+    __ubuf__ T* yAddr = (__ubuf__ T*)yLocal.GetPhyAddr();
+    __ubuf__ float* yAccAddr = (__ubuf__ float*)yAccLocal.GetPhyAddr();
+    uint16_t loopCount = CeilDiv(curColNum, VL_FP32);
+    uint16_t dstRowStride = RoundUp<T>(curColNum);
+    __VEC_SCOPE__
+    {
+        RegTensor<float> y;
+        MaskReg pregLoop;
+        uint32_t sreg;
+        for (uint16_t i = 0; i < curRowNum; i++) {
+            sreg = curColNum;
+            for (uint16_t j = 0; j < loopCount; j++) {
+                pregLoop = UpdateMask<float>(sreg);
+                LoadInputData<float>(y, yAccAddr, pregLoop, i * yAccRowStride + j * VL_FP32);
+                StoreOutputData<T>(yAddr, y, pregLoop, i * dstRowStride + j * VL_FP32);
             }
         }
     }
@@ -1260,6 +1432,32 @@ __aicore__ inline void CopyToL1(const LocalTensor<T>& srcTensor, const LocalTens
                                 const DataCopyParams dataCopyXParams)
 {
     DataCopy(dstTensor, srcTensor, dataCopyXParams);
+}
+
+__aicore__ inline uint32_t UbRowGapBlocks(uint16_t hcMult, uint16_t hcMix)
+{
+    uint32_t rowPitchBytes = RoundUp<float>(hcMix) * sizeof(float);
+    uint32_t rowFootprintBytes = CeilAlign(static_cast<uint32_t>(hcMult) * sizeof(float), BLOCK_SIZE);
+    return (rowPitchBytes - rowFootprintBytes) / BLOCK_SIZE;
+}
+
+template <typename T>
+__aicore__ inline void CopyInWithUbStride(const GlobalTensor<T>& inputGm, const LocalTensor<T>& inputTensor,
+                                          const uint16_t nBurst, const uint32_t copyLen, uint32_t srcStride,
+                                          uint32_t ubDstStrideBlock)
+{
+    DataCopyPadExtParams<T> dataCopyPadExtParams;
+    dataCopyPadExtParams.isPad = false;
+    dataCopyPadExtParams.leftPadding = 0;
+    dataCopyPadExtParams.rightPadding = 0;
+    dataCopyPadExtParams.paddingValue = 0;
+
+    DataCopyExtParams dataCoptExtParams;
+    dataCoptExtParams.blockCount = nBurst;
+    dataCoptExtParams.blockLen = copyLen * sizeof(T);
+    dataCoptExtParams.srcStride = srcStride * sizeof(T);
+    dataCoptExtParams.dstStride = ubDstStrideBlock; // UB侧stride单位为32B
+    DataCopyPad(inputTensor, inputGm, dataCoptExtParams, dataCopyPadExtParams);
 }
 
 template <typename T>

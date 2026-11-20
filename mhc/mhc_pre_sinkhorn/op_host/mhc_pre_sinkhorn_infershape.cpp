@@ -85,23 +85,30 @@ static ge::graphStatus InferShapeForMhcPreSinkhorn(gert::InferShapeContext* cont
     const bool* needBackwardAttr = attrs->GetAttrPointer<bool>(ATTR_NEED_BACKWARD);
     const int64_t numIters = numItersAttr == nullptr ? DEFAULT_NUM_ITERS : *numItersAttr;
     const bool needBackward = needBackwardAttr == nullptr ? true : *needBackwardAttr;
-    // needGrad=false 但传入 premix 时也要输出 hPre
+    // needGrad=false 但传入 preMix 时也要输出 hPre
     const bool hasPremix = context->GetOptionalInputShape(INDEX_PREMIX) != nullptr;
     const bool needHPre = needBackward || hasPremix;
     const int64_t hcMix = hcMult * hcMult + 2 * hcMult;
 
-    // premix 为可选输入，传入时 shape 应为 x.shape[:-1]，即 (t, n) 或 (b, s, n)
-    const gert::Shape* premixShape = context->GetOptionalInputShape(INDEX_PREMIX);
-    if (premixShape != nullptr) {
-        OP_CHECK_IF(premixShape->GetDimNum() != xDimNum - 1,
-                    OP_LOGE(context->GetNodeName(), "premix dim must be x dim - 1 (%zu), but got %zu.", xDimNum - 1,
-                            premixShape->GetDimNum()),
-                    return ge::GRAPH_FAILED);
+    // preMix 为可选输入，传入时 shape 应为 x.shape[:-1]，即 (t, n) 或 (b, s, n)
+    const gert::Shape* preMixShape = context->GetOptionalInputShape(INDEX_PREMIX);
+    if (preMixShape != nullptr) {
+        OP_CHECK_IF(
+            preMixShape->GetDimNum() != xDimNum - 1,
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                context->GetNodeName(), "preMix", std::to_string(preMixShape->GetDimNum()).c_str(),
+                ("The shape dim of input preMix must be one less than input x, which is " + std::to_string(xDimNum - 1))
+                    .c_str()),
+            return ge::GRAPH_FAILED);
         for (size_t i = 0; i + 1 < xDimNum; i++) {
-            OP_CHECK_IF(premixShape->GetDim(i) != xShape->GetDim(i),
-                        OP_LOGE(context->GetNodeName(), "premix shape[%zu] must equal x shape[%zu] (%ld), but got %ld.",
-                                i, i, xShape->GetDim(i), premixShape->GetDim(i)),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                preMixShape->GetDim(i) >= 0 && xShape->GetDim(i) >= 0 && preMixShape->GetDim(i) != xShape->GetDim(i),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context->GetNodeName(), "preMix, x", Ops::Base::ToString(*preMixShape).c_str(),
+                    ("The dim " + std::to_string(i) + " of input preMix must be equal to the dim " + std::to_string(i) +
+                     " of input x, which is " + std::to_string(xShape->GetDim(i)))
+                        .c_str()),
+                return ge::GRAPH_FAILED);
         }
     }
 

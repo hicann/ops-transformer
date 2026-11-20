@@ -40,8 +40,7 @@ namespace ge {
  *     Float32. Dataformat: ND. Shape:[n * n + 2 * n].
  * @li premix: An optional Tensor. Precomputed mix weights replacing the
  *     internally derived pre gate for hin weighting. Type is Float32.
- *     Dataformat: ND. Shape:[B, S, n] or [T, n]. Not supported on
- *     ascend950/ascend960dt/ascend960pr; leave it unset on those platforms.
+ *     Dataformat: ND. Shape:[B, S, n] or [T, n].
  *
  * @par Outputs:
  * @li hin: A Tensor. Main output, the weighted combination of x. Type is

@@ -25,7 +25,11 @@
 
 - **Description**:
 
-  Computes the $\mathbf{H}'_{\text{res}}$ and $\mathbf{H}_{\text{post}}$ projection matrices of the hidden layer in the MHC architecture, as well as the input matrix $\mathbf{h}_{\text{in}}$ of the Attention or MLP layer. Performs Sinkhorn iterative normalization on the $\mathbf{H}'_{\text{res}}$ matrix to obtain the doubly stochastic matrix $\mathbf{H}_{\text{res}}$. Supports outputting intermediate computation results for backward gradient computation. The computation mode used in the Cube is HF32.
+  Computes the $\mathbf{H}'_{\text{res}}$ and $\mathbf{H}_{\text{post}}$ projection matrices of the hidden layer in the MHC architecture, as well as the input matrix $\mathbf{h}_{\text{in}}$ of the Attention or MLP layer. Performs Sinkhorn iterative normalization on the $\mathbf{H}'_{\text{res}}$ matrix to obtain the approximately doubly stochastic matrix $\mathbf{H}_{\text{res}}$. Supports outputting intermediate computation results for backward gradient computation. The computation mode used in the Cube is HF32 by default.
+
+  <!-- npu="A3,910b" id13 -->
+  <term>Atlas A3 products</term>, <term>Atlas A2 products</term>: The HF32 mode is controlled by the global switch `torch_npu.npu.aclnn.allow_hf32` (default true). The Python wrapper does not expose this parameter separately; it reads it automatically on each call and passes it along with the call. When false semantics are passed in, the mode switches to FP32 computation.
+  <!-- end id13 -->
 
 - **Formula**:
 
@@ -77,7 +81,7 @@
 ## Prototype
 
 ```python
-cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, outFlag) -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)
+cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, outFlag, *, preMix?: Tensor) -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)
 ```
 
 ## Parameters
@@ -170,6 +174,14 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>-</td>
         <td>-</td>
     </tr>
+    <tr>
+        <td>preMix</td>
+        <td>Tensor</td>
+        <td>Optional</td>
+        <td><ul><li>premix weighting coefficients (usually filled with the hPre output from the previous folding point). When provided, the hin weighting uses preMix instead of the internally computed hPre; when not provided, the behavior is completely the same as the original interface.</li><li>The shape must match `x.shape[:-1]`.</li></ul></td>
+        <td>float32</td>
+        <td>2-3</td>
+    </tr>
     </tbody>
     </table>
 
@@ -242,22 +254,17 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
 
 - This API supports training and inference scenarios.
 - This API supports single operator mode and graph mode.
-- Parameter constraints: x, phi, alpha, and bias do not support empty tensors.
+- Parameter constraints: `phi`, `alpha`, and `bias` must satisfy the shapes in the parameter table. When B, S, or T of `x` is 0, the main outputs are empty and the operator computation is skipped; if `pre_mix` is provided, it must still match `x.shape[:-1]`.
 - Data type constraints:
   - The data type of output `hin` must be the same as `x`.
 - Specification constraints:
-  - numIters: Indicates the number of iterations. Currently only supports 20.
-  - N: Currently only supports 4.
-  <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A3 products</term>, <term>Atlas A2 products</term>:
-    - Input x only supports the 4D BSND format, with shape (B, S, N, C).
-    - The tail axis C must be aligned to 128, with a value range of [1, 100000].
-  <!-- end id7 -->
+  - numIters: Indicates the number of iterations. Currently only 20 is supported.
+  - N: Currently only 4 is supported.
+  - Input x supports the 4D BSND format and the 3D TND format, with shapes (B, S, N, C) and (T, N, C) respectively.
+  - In TND format, T indicates the cumulative sum of all batch sequence lengths. The corresponding output shape expands along the T axis as described in the parameter description.
+  - The tail axis C must be a multiple of 128, with a value range of [1, 100000].
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT products</term>:
-    - Input x supports the 4D BSND format and the 3D TND format, with shapes (B, S, N, C) and (T, N, C) respectively.
-    - In TND format, T indicates the cumulative sum of all batch sequence lengths. The corresponding output shape expands along the T axis as described in the parameter description.
-    - The tail axis C only supports 4096 and 7168.
     - The data range of input phi is limited to within $\pm \frac{1}{\sqrt{NC}}$, and eps is limited to 1e-6. Within this range, good numerical stability is achieved.
   <!-- end id8 -->
 

@@ -194,6 +194,9 @@ TILING_DATA_FIELD_DEF(int64_t, mUbSize);
 // separate row factors while sharing the K-reduced workspace.
 TILING_DATA_FIELD_DEF(int64_t, sinkhornCoreNum);
 TILING_DATA_FIELD_DEF(int64_t, sinkhornRowFactor);
+TILING_DATA_FIELD_DEF(int64_t, hasPremix);
+TILING_DATA_FIELD_DEF(int64_t, premixCastSegments); // M-split retains all four cast slices for register reduction.
+TILING_DATA_FIELD_DEF(int64_t, premixStage1);       // Stage 2 is the fallback when K-split hIn fusion cannot fit in UB.
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_1000, MhcPreSinkhornRegbaseTilingData)
@@ -282,6 +285,13 @@ private:
     NpuArch npuArch_ = Ops::Base::DAV_2201;
 };
 
+namespace MhcPreSinkhornRegbase {
+struct CoreRowTiling;
+struct RowAndDTiling;
+struct PremixUbConfig;
+struct PremixUbTiling;
+} // namespace MhcPreSinkhornRegbase
+
 class MhcPreSinkhornTilingRegbase {
 public:
     explicit MhcPreSinkhornTilingRegbase(gert::TilingContext* tilingContext);
@@ -310,6 +320,23 @@ private:
         K_SPLIT,
     };
 
+    using CoreRowTiling = MhcPreSinkhornRegbase::CoreRowTiling;
+    using RowAndDTiling = MhcPreSinkhornRegbase::RowAndDTiling;
+    using PremixUbConfig = MhcPreSinkhornRegbase::PremixUbConfig;
+    using PremixUbTiling = MhcPreSinkhornRegbase::PremixUbTiling;
+
+    int64_t CalcPrePostCoreNum(bool withGradOut, bool isKSplit);
+    ge::graphStatus InitUbTiling(bool isKSplit, PremixUbTiling& ubTiling);
+    PremixUbConfig MakePremixUbConfig(bool isKSplit, int64_t mL1Size, int64_t kL1Size, int64_t initialKUbSize);
+    ge::graphStatus SelectPremixUbTiling(bool isKSplit, PremixUbTiling& ubTiling);
+    ge::graphStatus CalcRowTiling(bool withGradOut, bool isKSplit, const CoreRowTiling& coreRowTiling,
+                                  const PremixUbTiling& ubTiling, RowAndDTiling& rowAndDTiling);
+    void SaveCommonTiling(bool withGradOut, bool isKSplit, const CoreRowTiling& coreRowTiling,
+                          const RowAndDTiling& rowAndDTiling, const PremixUbTiling& ubTiling);
+    void CalcPremixMSplitTiling(int32_t deterministicLevel);
+    bool CalcPremixML1UbTiling(uint64_t mL1Size, PremixUbTiling& ubTiling);
+    uint64_t SelectPremixML1Size();
+    void SelectTilingKey(bool isKSplit);
     ge::graphStatus CalcRegbaseCommonTiling(GradOutMode gradOutMode, SplitMode splitMode);
 
     gert::TilingContext* context_ = nullptr;
@@ -329,6 +356,7 @@ private:
     double hcEps_ = 0.0;
     double normEps_ = 0.0;
     bool needGrad_ = true;
+    bool hasPremix_ = false;
     NpuArch npuArch_ = Ops::Base::DAV_2201;
 };
 

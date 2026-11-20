@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file aclnn_mhc_pre_sinkhorn.cpp
- * \brief aclnn_mhc_pre_sinkhorn
+ * \file aclnn_mhc_pre_sinkhorn_v2.cpp
+ * \brief aclnn_mhc_pre_sinkhorn_v2
  */
 
-#include "aclnn_mhc_pre_sinkhorn.h"
+#include "aclnn_mhc_pre_sinkhorn_v2.h"
 #include "mhc_pre_sinkhorn.h"
 #include "aclnn_kernels/contiguous.h"
 #include "external/aclnn_kernels/aclnn_platform.h"
@@ -153,8 +153,7 @@ static bool CheckShape(const aclTensor* x, const aclTensor* phi, const aclTensor
         return false;
     }
 
-    // premix 为可选输入，shape 应为 x.shape[:-1]，即 (t, n) 或 (b, s, n)；premix 能力仅 A2/A3 (非 RegBase)
-    // 支持，A5 (RegBase) 平台在 CheckParams 中拒绝
+    // premix 为可选输入，shape 应为 x.shape[:-1]，即 (t, n) 或 (b, s, n)
     if (premix != nullptr) {
         auto premixShape = premix->GetViewShape();
         size_t expectedPremixDim = isTnd ? 2 : 3;
@@ -397,13 +396,6 @@ static inline aclnnStatus CheckParams(const aclTensor* x, const aclTensor* phi, 
 {
     CHECK_RET(CheckNotNull(x, phi, alpha, bias, hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut),
               ACLNN_ERR_PARAM_NULLPTR);
-    // premix 能力仅 A2/A3 (非 RegBase) 支持; A5 (RegBase: DAV_3510/DAV_5102) 侧 tiling/kernel 未实现
-    // premix 路径, 传入即拒绝
-    if (premix != nullptr && Ops::Transformer::AclnnUtil::IsRegbase()) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "premix is only supported on A2/A3 and not supported on A5 (RegBase) platform.");
-        return ACLNN_ERR_PARAM_INVALID;
-    }
     CHECK_RET(CheckDtypeValid(x, phi, alpha, bias, premix, hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut,
                               normOut, needBackward),
               ACLNN_ERR_PARAM_INVALID);
@@ -449,6 +441,7 @@ aclnnStatus aclnnMhcPreSinkhornV2GetWorkspaceSize(const aclTensor* x, const aclT
     CHECK_RET(alphaContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     const aclTensor* biasContiguous = l0op::Contiguous(bias, uniqueExecutor.get());
     CHECK_RET(biasContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+
     const aclTensor* premixContiguous = nullptr;
     if (premix != nullptr) {
         premixContiguous = l0op::Contiguous(premix, uniqueExecutor.get());

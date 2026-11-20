@@ -26,6 +26,18 @@ constexpr int64_t HC_MIX = 24;
 constexpr int64_t NUM_ITERS = 20;
 constexpr uint64_t SYS_WORKSPACE_SIZE = 16 * 1024 * 1024;
 
+std::string MakeRegbaseSocInfo(uint64_t aicCoreNum, uint64_t aivCoreNum, uint64_t ubSize)
+{
+    return R"({"hardware_info":{"BT_SIZE":0,"load3d_constraints":"1",)"
+           R"("Intrinsic_fix_pipe_l0c2out":false,"Intrinsic_data_move_l12ub":true,)"
+           R"("Intrinsic_data_move_l0c2ub":true,"Intrinsic_data_move_out2l1_nd2nz":false,)"
+           R"("L2_SIZE":33554432,"L1_SIZE":524288,"L0A_SIZE":65536,"L0B_SIZE":65536,"L0C_SIZE":131072,)"
+           R"("UB_SIZE":)" +
+           std::to_string(ubSize) + R"(,"CORE_NUM":)" + std::to_string(aicCoreNum) + R"(,"cube_core_cnt":)" +
+           std::to_string(aicCoreNum) + R"(,"vector_core_cnt":)" + std::to_string(aivCoreNum) +
+           R"(,"socVersion":"Ascend950"}})";
+}
+
 struct CoreTilingExpected {
     int64_t rowOfFormerBlock;
     int64_t rowLoopOfFormerBlock;
@@ -76,7 +88,8 @@ struct RegbaseTilingBaseline {
 };
 
 std::unique_ptr<gert::TilingContextPara> BuildRegbaseTilingContext(const RegbaseTilingBaseline& baseline,
-                                                                   void* compileInfo)
+                                                                   void* compileInfo, bool hasPremix = false,
+                                                                   int32_t deterministicLevel = 0)
 {
     const int64_t b = 1;
     const int64_t s = baseline.sequenceLength;
@@ -109,6 +122,12 @@ std::unique_ptr<gert::TilingContextPara> BuildRegbaseTilingContext(const Regbase
             {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(baseline.needBackward)},
         },
         compileInfo, ASCEND950_SOC_VERSION, baseline.coreNum, baseline.ubSize));
+    if (hasPremix) {
+        context->inputTensorDesc_.push_back({{{b, s, HC_MULT}, {b, s, HC_MULT}}, ge::DT_FLOAT, ge::FORMAT_ND});
+        context->inputInstanceNum_ = {1, 1, 1, 1, 1};
+        context->outputInstanceNum_ = {1, 1, 1, 1, 1, 1, 1, 1};
+    }
+    context->deterministicLevel_ = deterministicLevel;
     return context;
 }
 
@@ -158,8 +177,26 @@ void DeserializeRegbaseTilingData(const TilingInfo& tilingInfo, optiling::MhcPre
     READ_TILING_FIELD(int64_t, mUbSize);
     READ_TILING_FIELD(int64_t, sinkhornCoreNum);
     READ_TILING_FIELD(int64_t, sinkhornRowFactor);
+    READ_TILING_FIELD(int64_t, hasPremix);
+    READ_TILING_FIELD(int64_t, premixCastSegments);
+    READ_TILING_FIELD(int64_t, premixStage1);
 #undef READ_TILING_FIELD
     EXPECT_EQ(offset, tilingInfo.tilingDataSize) << "Regbase tiling data schema changed; update the deserializer";
+}
+
+bool ExecutePremixTiling(const RegbaseTilingBaseline& baseline, uint64_t ratio,
+                         optiling::MhcPreSinkhornRegbaseTilingData& actual)
+{
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {baseline.coreNum * ratio, baseline.coreNum, baseline.ubSize,
+                                                       SYS_WORKSPACE_SIZE, ratio};
+    auto context = BuildRegbaseTilingContext(baseline, &compileInfo, true);
+    context->socInfoString_ = MakeRegbaseSocInfo(baseline.coreNum, baseline.coreNum * ratio, baseline.ubSize);
+    TilingInfo info;
+    if (!ExecuteTiling(*context, info)) {
+        return false;
+    }
+    DeserializeRegbaseTilingData(info, actual);
+    return true;
 }
 
 void ExpectRegbaseTilingData(const RegbaseTilingBaseline& baseline)
@@ -177,6 +214,9 @@ void ExpectRegbaseTilingData(const RegbaseTilingBaseline& baseline)
     DeserializeRegbaseTilingData(tilingInfo, actual);
 
 #define EXPECT_TILING_FIELD(field, expected) EXPECT_EQ(actual.get_##field(), (expected)) << baseline.name << ": " #field
+    EXPECT_TILING_FIELD(hasPremix, 0);
+    EXPECT_TILING_FIELD(premixCastSegments, 0);
+    EXPECT_TILING_FIELD(premixStage1, 0);
     EXPECT_TILING_FIELD(bs, baseline.sequenceLength);
     EXPECT_TILING_FIELD(hcMix, baseline.hcMix);
     EXPECT_TILING_FIELD(hcMult, HC_MULT);
@@ -329,6 +369,193 @@ TEST_F(MhcPreSinkhornTiling, DAV_3510_regbase_core_tiling_boundary_branches)
         "m_split_negative_buffer_pool", 16384, 4096, false, 262144, 0, 0, {}};
     insufficientMBufferPool.hcMix = 1024;
     ExpectRegbaseTilingFailure(insufficientMBufferPool);
+}
+
+TEST_F(MhcPreSinkhornTiling, ascend950_premix_cast_segments_and_ub_fallback)
+{
+    for (bool needBackward : {false, true}) {
+        // Ratio 1 needs a larger UB to retain the entire AIV row range. Small UB
+        // must keep the accumulator path instead of allocating four oversized slices.
+        for (uint64_t cvRatio : {1U, 2U}) {
+            for (uint64_t ubSize : {131072U, 524288U}) {
+                SCOPED_TRACE(::testing::Message() << needBackward << ":" << cvRatio << ":" << ubSize);
+                RegbaseTilingBaseline baseline = {"premix_m_split", 16385, 4096, needBackward, ubSize, 0, 0, {}};
+                optiling::MhcPreSinkhornCompileInfo compileInfo = {baseline.coreNum, 0, ubSize, SYS_WORKSPACE_SIZE,
+                                                                   cvRatio};
+                auto context = BuildRegbaseTilingContext(baseline, &compileInfo, true);
+                TilingInfo info;
+                ASSERT_TRUE(ExecuteTiling(*context, info));
+                optiling::MhcPreSinkhornRegbaseTilingData actual;
+                DeserializeRegbaseTilingData(info, actual);
+                EXPECT_EQ(actual.get_cubeBlockDimK(), 1);
+                EXPECT_EQ(actual.get_hasPremix(), 1);
+                EXPECT_EQ(actual.get_premixCastSegments(), ubSize == 524288U ? 1 : 0);
+                if (actual.get_premixCastSegments() != 0) {
+                    EXPECT_EQ(actual.get_mUbSize(), (actual.get_mL1Size() + cvRatio - 1) / cvRatio);
+                    EXPECT_EQ(baseline.d % actual.get_kUbSize(), 0);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(MhcPreSinkhornTiling, ascend950_premix_k_split_compares_both_windows)
+{
+    // Both windows fit, but the half window handles more M rows per chunk.
+    const RegbaseTilingBaseline baseline = {"premix_k_split", 256, 4096, true, 98304, 0, 0, {}};
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, baseline.ubSize, SYS_WORKSPACE_SIZE, 2};
+    auto context = BuildRegbaseTilingContext(baseline, &compileInfo, true);
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(*context, info));
+    optiling::MhcPreSinkhornRegbaseTilingData actual;
+    DeserializeRegbaseTilingData(info, actual);
+    EXPECT_GT(actual.get_cubeBlockDimK(), 1);
+    EXPECT_EQ(actual.get_kUbSize(), 32);
+    EXPECT_EQ(actual.get_premixCastSegments(), 0);
+}
+
+TEST_F(MhcPreSinkhornTiling, ascend950_premix_k_split_selects_parallel_stage2)
+{
+    for (uint64_t cores : {28U, 32U}) {
+        for (uint64_t ratio : {1U, 2U}) {
+            for (int64_t rows : {1, 32, 128, 192}) {
+                for (bool needBackward : {false, true}) {
+                    SCOPED_TRACE(::testing::Message() << cores << ":" << ratio << ":" << rows << ":" << needBackward);
+                    RegbaseTilingBaseline baseline = {
+                        "premix_k_accumulator", rows, 4096, needBackward, 253952, 0, 0, {}};
+                    baseline.coreNum = cores;
+                    optiling::MhcPreSinkhornRegbaseTilingData actual;
+                    ASSERT_TRUE(ExecutePremixTiling(baseline, ratio, actual));
+                    EXPECT_GT(actual.get_cubeBlockDimK(), 1);
+                    const int64_t expectedStage1 = !needBackward && ratio == 2 && rows >= 128 ? 0 : 1;
+                    EXPECT_EQ(actual.get_premixStage1(), expectedStage1);
+                    EXPECT_EQ(actual.get_premixCastSegments(), 0);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(MhcPreSinkhornTiling, ascend950_premix_stage_selection_respects_parallelism_and_ub)
+{
+    struct PremixCase {
+        int64_t rows;
+        int64_t d;
+        uint64_t cores;
+        uint64_t ratio;
+        uint64_t ubSize;
+        bool inferenceStage1;
+        bool backwardSupported;
+    };
+    const std::array<PremixCase, 8> cases = {{{1, 2048, 28, 2, 253952, true, true},
+                                              {32, 4096, 28, 2, 253952, true, true},
+                                              {128, 4096, 32, 2, 253952, false, true},
+                                              {192, 7168, 32, 2, 253952, false, true},
+                                              {511, 1024, 32, 2, 253952, true, true},
+                                              {32, 99968, 24, 1, 98304, false, false},
+                                              {192, 2048, 28, 2, 65536, true, true},
+                                              {192, 2048, 28, 1, 253952, true, true}}};
+    for (const auto& test : cases) {
+        for (bool needBackward : {false, true}) {
+            SCOPED_TRACE(::testing::Message() << test.rows << ":" << test.d << ":" << needBackward);
+            RegbaseTilingBaseline baseline = {"premix_ub_fallback", test.rows, test.d, needBackward,
+                                              test.ubSize,          0,         0,      {}};
+            baseline.coreNum = test.cores;
+            optiling::MhcPreSinkhornRegbaseTilingData actual;
+            if (!test.backwardSupported && needBackward) {
+                EXPECT_FALSE(ExecutePremixTiling(baseline, test.ratio, actual));
+                continue;
+            }
+            ASSERT_TRUE(ExecutePremixTiling(baseline, test.ratio, actual));
+            EXPECT_GT(actual.get_cubeBlockDimK(), 1);
+            EXPECT_EQ(actual.get_hasPremix(), 1);
+            EXPECT_EQ(actual.get_premixStage1(), needBackward || test.inferenceStage1 ? 1 : 0);
+        }
+    }
+}
+
+TEST_F(MhcPreSinkhornTiling, ascend950_premix_m_split_avoids_round_quantization_cliff)
+{
+    // Cover both the measured 28/56 platform and the usual 32/64 platform.
+    // Derive tile transitions from the AIC count instead of fixing the 28-core boundary.
+    for (int64_t cores : {28, 32}) {
+        const std::vector<int64_t> rowCases = {cores * 208, cores * 208 + 1,
+                                               cores * 224, cores * 224 + 1,
+                                               cores * 240, cores * 240 + 1,
+                                               cores * 256, cores * 256 + 1,
+                                               5830,        6068,
+                                               6144,        7168,
+                                               7200};
+        for (bool needBackward : {false, true}) {
+            for (int64_t d : {1024, 1792}) {
+                for (int64_t rows : rowCases) {
+                    SCOPED_TRACE(::testing::Message() << cores << ":" << needBackward << ":" << d << ":" << rows);
+                    RegbaseTilingBaseline baseline = {"premix_round_cliff", rows, d, needBackward, 253952, 0, 0, {}};
+                    baseline.coreNum = cores;
+                    optiling::MhcPreSinkhornRegbaseTilingData actual;
+                    ASSERT_TRUE(ExecutePremixTiling(baseline, 2, actual));
+                    ASSERT_EQ(actual.get_cubeBlockDimK(), 1);
+                    ASSERT_EQ(actual.get_cubeBlockDimM(), cores);
+                    const int64_t mL1 = actual.get_mL1Size();
+                    const int64_t mTiles = (rows + mL1 - 1) / mL1;
+                    EXPECT_EQ((mTiles + cores - 1) / cores, rows <= cores * 256 ? 1 : 2);
+                    if (rows > cores * 208 && rows <= cores * 256) {
+                        EXPECT_GE(mL1, 224);
+                        EXPECT_EQ(actual.get_premixCastSegments(), 0);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_F(MhcPreSinkhornTiling, ascend950_premix_multi_round_preserves_wide_k_cast_path)
+{
+    struct PremixCase {
+        int64_t cores;
+        int64_t rows;
+        int64_t mL1;
+        int64_t kL1;
+        int64_t kUb;
+    };
+    const std::array<PremixCase, 4> cases = {
+        {{28, 4096, 160, 128, 64}, {28, 8192, 160, 128, 64}, {28, 65536, 112, 256, 128}, {32, 65536, 208, 128, 64}}};
+    for (const auto& test : cases) {
+        for (bool needBackward : {false, true}) {
+            for (int64_t d : {2048, 2560, 4096, 5120, 7168}) {
+                SCOPED_TRACE(::testing::Message() << test.cores << ":" << test.rows << ":" << needBackward << ":" << d);
+                RegbaseTilingBaseline baseline = {"premix_steady_state", test.rows, d, needBackward, 253952, 0, 0, {}};
+                baseline.coreNum = test.cores;
+                optiling::MhcPreSinkhornRegbaseTilingData actual;
+                ASSERT_TRUE(ExecutePremixTiling(baseline, 2, actual));
+                EXPECT_EQ(actual.get_cubeBlockDimK(), 1);
+                EXPECT_EQ(actual.get_cubeBlockDimM(), test.cores);
+                EXPECT_EQ(actual.get_mL1Size(), test.mL1);
+                EXPECT_EQ(actual.get_kL1Size(), test.kL1);
+                EXPECT_EQ(actual.get_kUbSize(), test.kUb);
+                EXPECT_EQ(actual.get_mUbSize(), test.mL1 / 2);
+                EXPECT_EQ(actual.get_premixCastSegments(), 1);
+            }
+        }
+    }
+}
+
+TEST_F(MhcPreSinkhornTiling, ascend950_premix_m_split_uses_partial_ub_rows)
+{
+    for (int64_t cores : {28, 32}) {
+        for (bool needBackward : {false, true}) {
+            RegbaseTilingBaseline baseline = {"premix_partial_m_ub", cores * 256, 1792, needBackward, 131072, 0, 0, {}};
+            baseline.coreNum = cores;
+            optiling::MhcPreSinkhornRegbaseTilingData actual;
+            ASSERT_TRUE(ExecutePremixTiling(baseline, 2, actual));
+            EXPECT_EQ(actual.get_cubeBlockDimM(), cores);
+            EXPECT_EQ(actual.get_cubeBlockDimK(), 1);
+            EXPECT_EQ(actual.get_mL1Size(), 256);
+            EXPECT_EQ(actual.get_premixCastSegments(), 0);
+            EXPECT_GT(actual.get_mUbSize(), 0);
+            EXPECT_LT(actual.get_mUbSize(), 128);
+        }
+    }
 }
 
 // A2 tiling期望数据说明: premix合并新增了 prePost*/sinkhorn* 17个MPMD计算字段与 hasPremix
@@ -602,45 +829,73 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_premix_B1_S256_N4_C512)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MhcPreSinkhornTiling, ascend950_regbase_rejects_premix)
+TEST_F(MhcPreSinkhornTiling, pre_mix_supports_both_splits_and_cv_ratios)
 {
-    // RegBase(A5) arch35 tiling 未实现 premix 输入, 传入即拒绝(与 aclnn V2 层语义对齐)
-    int64_t B = 1;
-    int64_t S = 256;
-    int64_t N = 4;
-    int64_t C = 512;
-    int64_t hcMix = N * N + 2 * N;
+    for (uint64_t ratio : {1U, 2U}) {
+        for (bool needBackward : {false, true}) {
+            for (int64_t rows : {256, 16384}) {
+                SCOPED_TRACE(testing::Message()
+                             << "ratio=" << ratio << ", backward=" << needBackward << ", rows=" << rows);
+                RegbaseTilingBaseline baseline = {};
+                baseline.sequenceLength = rows;
+                baseline.d = 4096;
+                baseline.needBackward = needBackward;
+                baseline.ubSize = 262144;
+                optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, baseline.ubSize, SYS_WORKSPACE_SIZE, ratio};
+                auto context = BuildRegbaseTilingContext(baseline, &compileInfo);
+                context->inputTensorDesc_.push_back(
+                    {{{1, rows, HC_MULT}, {1, rows, HC_MULT}}, ge::DT_FLOAT, ge::FORMAT_ND});
+                context->inputInstanceNum_ = {1, 1, 1, 1, 1};
+                context->outputInstanceNum_ = {1, 1, 1, 1, 1, 1, 1, 1};
+                TilingInfo info;
+                ASSERT_TRUE(ExecuteTiling(*context, info));
+                EXPECT_EQ(info.tilingKey,
+                          (ratio == 1 ? 3000U : 1000U) + (needBackward ? 1000U : 0U) + (rows == 16384 ? 1U : 0U));
+                optiling::MhcPreSinkhornRegbaseTilingData data;
+                DeserializeRegbaseTilingData(info, data);
+                EXPECT_EQ(data.get_hasPremix(), 1);
+                EXPECT_GT(data.get_dFactor(), 0);
+                EXPECT_GT(rows == 16384 ? data.get_rowInnerFactor() : data.get_stage2RowFactor(), 0);
+            }
+        }
+    }
+}
 
-    // pin cvRatio=2 explicitly for the Ascend950 baselines.
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {20, 0, 196608, SYS_WORKSPACE_SIZE, 2};
+TEST_F(MhcPreSinkhornTiling, pre_mix_rejects_mismatched_leading_dimension_and_dtype)
+{
+    RegbaseTilingBaseline baseline = {};
+    baseline.sequenceLength = 256;
+    baseline.d = 4096;
+    baseline.ubSize = 262144;
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, baseline.ubSize, SYS_WORKSPACE_SIZE, 2};
+    for (bool badDtype : {false, true}) {
+        auto context = BuildRegbaseTilingContext(baseline, &compileInfo);
+        const int64_t rows = badDtype ? 256 : 255;
+        context->inputTensorDesc_.push_back(
+            {{{1, rows, HC_MULT}, {1, rows, HC_MULT}}, badDtype ? ge::DT_FLOAT16 : ge::DT_FLOAT, ge::FORMAT_ND});
+        context->inputInstanceNum_ = {1, 1, 1, 1, 1};
+        context->outputInstanceNum_ = {1, 1, 1, 1, 1, 1, 1, 1};
+        TilingInfo info;
+        EXPECT_FALSE(ExecuteTiling(*context, info));
+    }
+}
 
-    gert::TilingContextPara tilingContextPara(
-        "MhcPreSinkhorn",
-        {
-            {{{B, S, N, C}, {B, S, N, C}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{hcMix, N * C}, {hcMix, N * C}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{3}, {3}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{hcMix}, {hcMix}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{B, S, N}, {B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        },
-        {
-            {{{B, S, C}, {B, S, C}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{B, S, N}, {B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{B, S, N, N}, {B, S, N, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{B, S, N}, {B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{B, S, hcMix}, {B, S, hcMix}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{B, S, 1}, {B, S, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{NUM_ITERS * 2, B, S, N}, {NUM_ITERS * 2, B, S, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{NUM_ITERS * 2, B, S, N, N}, {NUM_ITERS * 2, B, S, N, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        },
-        {
-            {"hc_mult", Ops::Transformer::AnyValue::CreateFrom<int64_t>(N)},
-            {"num_iters", Ops::Transformer::AnyValue::CreateFrom<int64_t>(NUM_ITERS)},
-            {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
-            {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
-            {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-        },
-        &compileInfo, ASCEND950_SOC_VERSION, 20, 196608);
-
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0, "", {});
+TEST_F(MhcPreSinkhornTiling, pre_mix_supports_tnd)
+{
+    RegbaseTilingBaseline baseline = {};
+    baseline.sequenceLength = 256;
+    baseline.d = 4096;
+    baseline.ubSize = 262144;
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, baseline.ubSize, SYS_WORKSPACE_SIZE, 2};
+    auto context = BuildRegbaseTilingContext(baseline, &compileInfo);
+    context->inputTensorDesc_[0] = {{{256, HC_MULT, 4096}, {256, HC_MULT, 4096}}, ge::DT_BF16, ge::FORMAT_ND};
+    context->inputTensorDesc_.push_back({{{256, HC_MULT}, {256, HC_MULT}}, ge::DT_FLOAT, ge::FORMAT_ND});
+    context->inputInstanceNum_ = {1, 1, 1, 1, 1};
+    context->outputInstanceNum_ = {1, 1, 1, 1, 1, 1, 1, 1};
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(*context, info));
+    optiling::MhcPreSinkhornRegbaseTilingData data;
+    DeserializeRegbaseTilingData(info, data);
+    EXPECT_EQ(data.get_hasPremix(), 1);
+    EXPECT_EQ(data.get_bs(), 256);
 }

@@ -25,7 +25,7 @@
 
 ## Function
 
-- Description: Obtains the $\mathbf{H}'_{\text{res}}$ and $\mathbf{H}_{\text{post}}$ projection matrices of the hidden layer in the MHC architecture, and the input matrix $\mathbf{h}_{\text{in}}$ of the Attention or MLP layer, through a series of computations. Performs Sinkhorn iterative normalization on the $\mathbf{H}'_{\text{res}}$ matrix to obtain the doubly stochastic matrix $\mathbf{H}_{\text{res}}$; supports outputting intermediate computation results for backward gradient computation, including the $\mathbf{H^{pre}_l}$ matrix after the sigmoid computation, the result of matrix multiplication between $\vec{x^{'}_{l}}$ and $\mathbf{\varphi}$, the RmsNorm result $\mathbf{\vec{x^{'}_{l}}}$ of input x, the intermediate normalization result and $\mathbf{normOut}$ during the iteration, and the sum result $\mathbf{sumOut}$.
+- Description: Obtains the $\mathbf{H}'_{\text{res}}$ and $\mathbf{H}_{\text{post}}$ projection matrices of the hidden layer in the MHC architecture, and the input matrix $\mathbf{h}_{\text{in}}$ of the Attention or MLP layer, through a series of computations. Performs Sinkhorn iterative normalization on the $\mathbf{H}'_{\text{res}}$ matrix to obtain the doubly stochastic matrix $\mathbf{H}_{\text{res}}$; supports outputting intermediate computation results for backward gradient computation, including the $\mathbf{H^{pre}_l}$ matrix after the sigmoid computation, the result of matrix multiplication between $\vec{x^{'}_{l}}$ and $\mathbf{\varphi}$, the RmsNorm result $\mathbf{\vec{x^{'}_{l}}}$ of input x, the intermediate normalization result $\mathbf{normOut}$ during the iteration, and the sum result $\mathbf{sumOut}$. The computation mode used in the Cube is HF32.
 - Formula
 
   $$
@@ -239,8 +239,8 @@ aclnnStatus aclnnMhcPreSinkhorn(
       <tr>
         <td>hin (aclTensor*)</td>
         <td>Output</td>
-        <td>The output h_in serves as the Atten/MLP layer input.</td>
-        <td>-</td>
+        <td>The output h_in serves as the Attention/MLP layer input.</td>
+        <td>Data type is the same as x.</td>
         <td>FLOAT16, BFLOAT16</td>
         <td>ND</td>
         <td>(bs, seq_len, c)<br>(t, c)</td>
@@ -461,7 +461,7 @@ aclnnStatus aclnnMhcPreSinkhorn(
   - <term>Ascend 950PR&950DT products</term>:
     - The input x supports the 4D BSND format and 3D TND format, with shapes (bs, seq_len, n, c) and (t, n, c) respectively.
     - In the TND format, t indicates the cumulative sum of sequence lengths of all batches; the corresponding output shape is expanded along the t axis as described in Parameters.
-    - The trailing axis c supports only 4096 and 7168.
+    - The trailing axis c must be a multiple of 128, with a value range of [1, 100000].
     - The data range of input phi is limited to $\pm \frac{1}{\sqrt{nc}}$, and eps is limited to 1e-6. This range provides good numerical stability.
   <!-- end id10 -->
 

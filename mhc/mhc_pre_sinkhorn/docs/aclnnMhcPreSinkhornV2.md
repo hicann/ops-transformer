@@ -495,7 +495,7 @@ aclnnStatus aclnnMhcPreSinkhornV2(
   - <term>Ascend 950PR&950DT系列产品</term>：
     - 输入x支持4维BSND格式和3维TND格式，shape分别为(bs, seq_len, n, c)和(t, n, c)。
     - TND格式下，t表示所有Batch序列长度的累加和；对应输出shape按参数说明中的t轴展开。
-    - 尾轴c仅支持4096、7168。
+    - 尾轴c需为128的倍数且取值范围为[1, 100000]。
     - 输入phi的数据范围限定在$\pm \frac{1}{\sqrt{nc}}$范围内，eps限定在1e-6，此范围内具有较好的数值稳定性。
   <!-- end id10 -->
 

@@ -25,7 +25,7 @@ using namespace MhcPreSinkhorn;
 using namespace AscendC;
 
 template <uint32_t schMode>
-__global__ __aicore__ void mhc_pre_sinkhorn(GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADDR bias, GM_ADDR premix,
+__global__ __aicore__ void mhc_pre_sinkhorn(GM_ADDR x, GM_ADDR phi, GM_ADDR alpha, GM_ADDR bias, GM_ADDR preMix,
                                             GM_ADDR hin, GM_ADDR hPost, GM_ADDR hRes, GM_ADDR hPre,
                                             GM_ADDR hcBeforeNorm, GM_ADDR invRms, GM_ADDR sumOut, GM_ADDR normOut,
                                             GM_ADDR workspace, GM_ADDR tiling)
@@ -53,7 +53,7 @@ __global__ __aicore__ void mhc_pre_sinkhorn(GM_ADDR x, GM_ADDR phi, GM_ADDR alph
 
         TPipe pipeStage2;
         MhcPreSinkhorn::MhcPreSinkhornMembaseKSplitCorePart2<DTYPE_X, false> op2;
-        op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
+        op2.Init(x, alpha, bias, hin, hPost, hRes, preMix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
                  tilingData, &pipeStage2);
         op2.Process();
         pipeStage2.Destroy();
@@ -67,7 +67,7 @@ __global__ __aicore__ void mhc_pre_sinkhorn(GM_ADDR x, GM_ADDR phi, GM_ADDR alph
 
         TPipe pipeStage2;
         MhcPreSinkhorn::MhcPreSinkhornMembaseKSplitCorePart2<DTYPE_X, true> op2;
-        op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
+        op2.Init(x, alpha, bias, hin, hPost, hRes, preMix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
                  tilingData, &pipeStage2);
         op2.Process();
         pipeStage2.Destroy();
@@ -81,7 +81,7 @@ __global__ __aicore__ void mhc_pre_sinkhorn(GM_ADDR x, GM_ADDR phi, GM_ADDR alph
 
         TPipe pipeStage2;
         MhcPreSinkhorn::MhcPreSinkhornTinyPart2<DTYPE_X> op2;
-        op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
+        op2.Init(x, alpha, bias, hin, hPost, hRes, preMix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
                  tilingData, &pipeStage2);
         op2.Process();
         pipeStage2.Destroy();
@@ -97,7 +97,7 @@ __global__ __aicore__ void mhc_pre_sinkhorn(GM_ADDR x, GM_ADDR phi, GM_ADDR alph
 
         TPipe pipeStage2;
         MhcPreSinkhorn::MhcPreSinkhornStage2<DTYPE_X> op2;
-        op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
+        op2.Init(x, alpha, bias, hin, hPost, hRes, preMix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
                  tilingData, &pipeStage2);
         op2.Process(false);
         pipeStage2.Destroy();

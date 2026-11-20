@@ -15,6 +15,7 @@
 #include <map>
 #include <new>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "acl/acl.h"
@@ -53,7 +54,9 @@ constexpr int64_t NUM_ITERS = 20;
 struct TestCase {
     DataType xDtype;
     bool needBackward;
-    const char* name;
+    bool hasPreMix;
+    int hf32Mode; // 0: do not set enable_hf32, 1: true, 2: false
+    std::string name;
 };
 } // namespace
 
@@ -148,37 +151,42 @@ int AddDataInput(const std::string& name, uint32_t index, DataType dtype, const 
         op.set_input_alpha(data);
     } else if (name == "bias") {
         op.set_input_bias(data);
+    } else if (name == "premix") {
+        op.set_input_premix(data);
     }
     return SUCCESS;
 }
 
-void SetOutputDesc(ge::op::MhcPreSinkhorn& op, DataType xDtype, bool needBackward)
+void SetOutputDesc(ge::op::MhcPreSinkhorn& op, DataType xDtype, bool needBackward, bool hasPreMix)
 {
     op.update_output_desc_hin(TensorDesc(ge::Shape({BATCH, SEQ_LEN, HIDDEN_DIM}), FORMAT_ND, xDtype));
-    op.update_output_desc_hPost(TensorDesc(ge::Shape({BATCH, SEQ_LEN, HC_MULT}), FORMAT_ND, ge::DT_FLOAT));
-    op.update_output_desc_hRes(TensorDesc(ge::Shape({BATCH, SEQ_LEN, HC_MULT * HC_MULT}), FORMAT_ND, ge::DT_FLOAT));
+    op.update_output_desc_h_post(TensorDesc(ge::Shape({BATCH, SEQ_LEN, HC_MULT}), FORMAT_ND, ge::DT_FLOAT));
+    op.update_output_desc_h_res(TensorDesc(ge::Shape({BATCH, SEQ_LEN, HC_MULT * HC_MULT}), FORMAT_ND, ge::DT_FLOAT));
 
+    if (needBackward || hasPreMix) {
+        op.update_output_desc_h_pre(TensorDesc(ge::Shape({BATCH, SEQ_LEN, HC_MULT}), FORMAT_ND, ge::DT_FLOAT));
+    } else {
+        op.update_output_desc_h_pre(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
+    }
     if (needBackward) {
-        op.update_output_desc_hPre(TensorDesc(ge::Shape({BATCH, SEQ_LEN, HC_MULT}), FORMAT_ND, ge::DT_FLOAT));
-        op.update_output_desc_hcBeforeNorm(TensorDesc(ge::Shape({BATCH, SEQ_LEN, HC_MIX}), FORMAT_ND, ge::DT_FLOAT));
-        op.update_output_desc_invRms(TensorDesc(ge::Shape({BATCH, SEQ_LEN, 1}), FORMAT_ND, ge::DT_FLOAT));
-        op.update_output_desc_sumOut(
+        op.update_output_desc_hc_before_norm(TensorDesc(ge::Shape({BATCH, SEQ_LEN, HC_MIX}), FORMAT_ND, ge::DT_FLOAT));
+        op.update_output_desc_inv_rms(TensorDesc(ge::Shape({BATCH, SEQ_LEN, 1}), FORMAT_ND, ge::DT_FLOAT));
+        op.update_output_desc_sum_out(
             TensorDesc(ge::Shape({NUM_ITERS * 2, BATCH, SEQ_LEN, HC_MULT}), FORMAT_ND, ge::DT_FLOAT));
-        op.update_output_desc_normOut(
+        op.update_output_desc_norm_out(
             TensorDesc(ge::Shape({NUM_ITERS * 2, BATCH, SEQ_LEN, HC_MULT, HC_MULT}), FORMAT_ND, ge::DT_FLOAT));
     } else {
-        op.update_output_desc_hPre(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
-        op.update_output_desc_hcBeforeNorm(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
-        op.update_output_desc_invRms(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
-        op.update_output_desc_sumOut(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
-        op.update_output_desc_normOut(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
+        op.update_output_desc_hc_before_norm(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
+        op.update_output_desc_inv_rms(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
+        op.update_output_desc_sum_out(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
+        op.update_output_desc_norm_out(TensorDesc(ge::Shape({0}), FORMAT_ND, ge::DT_FLOAT));
     }
 }
 
 int CreateGraph(std::vector<Tensor>& input_tensors, std::vector<Operator>& input_ops, std::vector<Operator>& outputs,
                 Graph& graph, const TestCase& testCase)
 {
-    auto mhc_pre_sinkhorn = ge::op::MhcPreSinkhorn(testCase.name);
+    auto mhc_pre_sinkhorn = ge::op::MhcPreSinkhorn(testCase.name.c_str());
 
     if (AddDataInput("x", 0, testCase.xDtype, {BATCH, SEQ_LEN, HC_MULT, HIDDEN_DIM}, graph, input_tensors, input_ops,
                      mhc_pre_sinkhorn) != SUCCESS) {
@@ -194,27 +202,71 @@ int CreateGraph(std::vector<Tensor>& input_tensors, std::vector<Operator>& input
     if (AddDataInput("bias", 3, ge::DT_FLOAT, {HC_MIX}, graph, input_tensors, input_ops, mhc_pre_sinkhorn) != SUCCESS) {
         return FAILED;
     }
+    if (testCase.hasPreMix && AddDataInput("premix", 4, ge::DT_FLOAT, {BATCH, SEQ_LEN, HC_MULT}, graph, input_tensors,
+                                           input_ops, mhc_pre_sinkhorn) != SUCCESS) {
+        return FAILED;
+    }
 
     mhc_pre_sinkhorn.set_attr_hc_mult(HC_MULT);
     mhc_pre_sinkhorn.set_attr_num_iters(NUM_ITERS);
     mhc_pre_sinkhorn.set_attr_hc_eps(1e-6f);
     mhc_pre_sinkhorn.set_attr_norm_eps(1e-6f);
     mhc_pre_sinkhorn.set_attr_need_backward(testCase.needBackward);
-    SetOutputDesc(mhc_pre_sinkhorn, testCase.xDtype, testCase.needBackward);
+    if (testCase.hf32Mode == 1) {
+        mhc_pre_sinkhorn.set_attr_enable_hf32(true);
+    } else if (testCase.hf32Mode == 2) {
+        mhc_pre_sinkhorn.set_attr_enable_hf32(false);
+    }
+    SetOutputDesc(mhc_pre_sinkhorn, testCase.xDtype, testCase.needBackward, testCase.hasPreMix);
 
     outputs.push_back(mhc_pre_sinkhorn);
     return SUCCESS;
 }
 
+bool CheckOutputs(const std::vector<Tensor>& outputs, const TestCase& testCase)
+{
+    if (outputs.size() != 8) {
+        printf("%s - ERROR - [XIR]: output num is %zu, expected 8\n", GetTime().c_str(), outputs.size());
+        return false;
+    }
+    const std::vector<int64_t> empty = {0};
+    const std::vector<int64_t> hPre =
+        (testCase.needBackward || testCase.hasPreMix) ? std::vector<int64_t>{BATCH, SEQ_LEN, HC_MULT} : empty;
+    const std::vector<int64_t> backwardShape = {BATCH, SEQ_LEN, HC_MIX};
+    const std::vector<int64_t> invRms = {BATCH, SEQ_LEN, 1};
+    const std::vector<int64_t> sumOut = {NUM_ITERS * 2, BATCH, SEQ_LEN, HC_MULT};
+    const std::vector<int64_t> normOut = {NUM_ITERS * 2, BATCH, SEQ_LEN, HC_MULT, HC_MULT};
+    const std::vector<std::pair<const char*, std::vector<int64_t>>> expected = {
+        {"hin", {BATCH, SEQ_LEN, HIDDEN_DIM}},
+        {"h_post", {BATCH, SEQ_LEN, HC_MULT}},
+        {"h_res", {BATCH, SEQ_LEN, HC_MULT * HC_MULT}},
+        {"h_pre", hPre},
+        {"hc_before_norm", testCase.needBackward ? backwardShape : empty},
+        {"inv_rms", testCase.needBackward ? invRms : empty},
+        {"sum_out", testCase.needBackward ? sumOut : empty},
+        {"norm_out", testCase.needBackward ? normOut : empty},
+    };
+    for (size_t i = 0; i < expected.size(); ++i) {
+        const auto shape = outputs[i].GetTensorDesc().GetShape().GetDims();
+        if (shape != expected[i].second) {
+            printf("%s - ERROR - [XIR]: %s shape mismatch\n", GetTime().c_str(), expected[i].first);
+            return false;
+        }
+    }
+    return true;
+}
+
 int RunCase(Session& session, uint32_t graphId, const TestCase& testCase)
 {
-    Graph graph(testCase.name);
+    Graph graph(testCase.name.c_str());
     std::vector<Tensor> input_tensors;
     std::vector<Operator> input_ops;
     std::vector<Operator> output_ops;
 
-    printf("%s - INFO - [XIR]: Run case %s, x dtype: %d, need_backward: %d\n", GetTime().c_str(), testCase.name,
-           static_cast<int>(testCase.xDtype), testCase.needBackward);
+    const char* hf32Desc = testCase.hf32Mode == 0 ? "omit" : (testCase.hf32Mode == 1 ? "true" : "false");
+    printf("%s - INFO - [XIR]: Run case %s, x dtype: %d, need_backward: %d, preMix: %d, enable_hf32: %s\n",
+           GetTime().c_str(), testCase.name.c_str(), static_cast<int>(testCase.xDtype), testCase.needBackward,
+           testCase.hasPreMix, hf32Desc);
     Status ret = CreateGraph(input_tensors, input_ops, output_ops, graph, testCase);
     if (ret != SUCCESS) {
         return FAILED;
@@ -224,14 +276,14 @@ int RunCase(Session& session, uint32_t graphId, const TestCase& testCase)
     std::map<AscendString, AscendString> graph_options = {};
     ret = session.AddGraph(graphId, graph, graph_options);
     if (ret != SUCCESS) {
-        printf("%s - ERROR - [XIR]: Add graph failed for case %s\n", GetTime().c_str(), testCase.name);
+        printf("%s - ERROR - [XIR]: Add graph failed for case %s\n", GetTime().c_str(), testCase.name.c_str());
         return FAILED;
     }
 
     std::vector<Tensor> output_tensors;
     ret = session.RunGraph(graphId, input_tensors, output_tensors);
     if (ret != SUCCESS) {
-        printf("%s - ERROR - [XIR]: Run graph failed for case %s\n", GetTime().c_str(), testCase.name);
+        printf("%s - ERROR - [XIR]: Run graph failed for case %s\n", GetTime().c_str(), testCase.name.c_str());
         ge::AscendString error_msg = ge::GEGetErrorMsgV2();
         ge::AscendString warning_msg = ge::GEGetWarningMsgV2();
         std::cout << "Error message: " << error_msg.GetString() << std::endl;
@@ -239,9 +291,9 @@ int RunCase(Session& session, uint32_t graphId, const TestCase& testCase)
         return FAILED;
     }
 
-    printf("%s - INFO - [XIR]: Run graph success for case %s, output num: %zu\n", GetTime().c_str(), testCase.name,
-           output_tensors.size());
-    if (output_tensors.size() != 8) {
+    printf("%s - INFO - [XIR]: Run graph success for case %s, output num: %zu\n", GetTime().c_str(),
+           testCase.name.c_str(), output_tensors.size());
+    if (!CheckOutputs(output_tensors, testCase)) {
         return FAILED;
     }
     return SUCCESS;
@@ -264,12 +316,22 @@ int main()
         return FAILED;
     }
 
-    std::vector<TestCase> testCases = {
-        {ge::DT_BF16, true, "mhc_pre_sinkhorn_bf16_need_backward_true"},
-        {ge::DT_BF16, false, "mhc_pre_sinkhorn_bf16_need_backward_false"},
-        {ge::DT_FLOAT16, true, "mhc_pre_sinkhorn_fp16_need_backward_true"},
-        {ge::DT_FLOAT16, false, "mhc_pre_sinkhorn_fp16_need_backward_false"},
-    };
+    std::vector<TestCase> testCases;
+    const DataType dtypes[] = {ge::DT_BF16, ge::DT_FLOAT16};
+    const char* hf32Names[] = {"omit", "true", "false"};
+    for (auto dtype : dtypes) {
+        const char* dtypeName = dtype == ge::DT_BF16 ? "bf16" : "fp16";
+        for (int needBackward = 0; needBackward < 2; ++needBackward) {
+            for (int hasPreMix = 0; hasPreMix < 2; ++hasPreMix) {
+                for (int hf32Mode = 0; hf32Mode < 3; ++hf32Mode) {
+                    std::string name = std::string("mhc_pre_sinkhorn_") + dtypeName + "_need_backward_" +
+                                       (needBackward ? "true" : "false") + "_premix_" + (hasPreMix ? "true" : "false") +
+                                       "_hf32_" + hf32Names[hf32Mode];
+                    testCases.push_back({dtype, needBackward != 0, hasPreMix != 0, hf32Mode, name});
+                }
+            }
+        }
+    }
 
     for (size_t i = 0; i < testCases.size(); ++i) {
         ret = RunCase(*session, static_cast<uint32_t>(i), testCases[i]);

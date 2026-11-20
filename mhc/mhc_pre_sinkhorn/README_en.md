@@ -210,7 +210,7 @@ English | [简体中文](./README.md)
 - <term>Ascend 950PR&950DT products</term>:
   - Input x supports the 4D BSND format and the 3D TND format, with the shapes (bs, seq_len, n, c) and (t, n, c), respectively.
   - In the TND format, t indicates the cumulative sum of the sequence lengths of all batches.
-  - The last dimension c of input x supports only 4096 and 7168.
+  - The last dimension c of input x must be aligned to 128, and its value range is [1, 100000].
   - The data range of input phi is limited to $\pm \frac{1}{\sqrt{nc}}$, and eps is limited to 1e-6. This range provides good numerical stability.
 
 ## Calling Instructions

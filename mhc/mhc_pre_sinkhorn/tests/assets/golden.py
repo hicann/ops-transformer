@@ -24,12 +24,18 @@ except ImportError:
 
 
 __golden__ = {
-    "aclnn": {"aclnnMhcPreSinkhorn": "aclnn_mhc_pre_sinkhorn_golden"},
+    "aclnn": {
+        "aclnnMhcPreSinkhorn": "aclnn_mhc_pre_sinkhorn_golden",
+        "aclnnMhcPreSinkhornV2": "aclnn_mhc_pre_sinkhorn_v2_golden",
+    },
     "kernel": {"mhc_pre_sinkhorn": "mhc_pre_sinkhorn_golden"},
 }
 
 __input__ = {
-    "aclnn": {"aclnnMhcPreSinkhorn": "aclnn_mhc_pre_sinkhorn_input"},
+    "aclnn": {
+        "aclnnMhcPreSinkhorn": "aclnn_mhc_pre_sinkhorn_input",
+        "aclnnMhcPreSinkhornV2": "aclnn_mhc_pre_sinkhorn_v2_input",
+    },
     "kernel": {"mhc_pre_sinkhorn": "mhc_pre_sinkhorn_input"},
 }
 
@@ -113,6 +119,7 @@ def _compute(
     hc_eps=1e-6,
     norm_eps=1e-6,
     need_backward=True,
+    pre_mix=None,
 ):
     x_np = _to_numpy(x)
     x_dtype = x_np.dtype
@@ -172,7 +179,13 @@ def _compute(
         norm_out[2 * iteration + 1] = current
 
     h_res = current.reshape(*batch_shape, hc_mult * hc_mult)
-    hin = np.sum(x_f32 * h_pre[..., :, None], axis=-2)
+    if pre_mix is None:
+        hin = np.sum(x_f32 * h_pre[..., :, None], axis=-2)
+    else:
+        mix_f32 = _to_numpy(pre_mix).astype(np.float32)
+        if mix_f32.ndim == x_f32.ndim - 1:
+            mix_f32 = mix_f32[None, ...]
+        hin = np.sum(x_f32 * mix_f32[..., :, None], axis=-2)
     if x_dtype.name == "bfloat16":
         if numpy_bfloat16 is not None:
             hin = hin.astype(numpy_bfloat16())
@@ -279,3 +292,89 @@ def aclnn_mhc_pre_sinkhorn_input(
     del numIters, hcEps, normEps, needBackward, hin, hPost, hRes
     del hPre, hcBeforeNorm, invRms, sumOut, normOut, kwargs
     _set_stable_inputs(x, phi, alpha, bias, int(hcMult))
+
+
+def aclnn_mhc_pre_sinkhorn_v2_golden(
+    x,
+    phi,
+    alpha,
+    bias,
+    preMix,
+    hcMult,
+    numIters,
+    hcEps,
+    normEps,
+    needBackward,
+    enableHf32,
+    hin,
+    hPost,
+    hRes,
+    hPre,
+    hcBeforeNorm,
+    invRms,
+    sumOut,
+    normOut,
+    **kwargs,
+):
+    # NumPy 为高精度参考实现，enableHf32 只影响 NPU cube 精度档，不影响 golden。
+    del enableHf32
+    use_torch = kwargs.get("use_torch", False)
+    has_pre_mix = preMix is not None
+    result = list(
+        _compute(
+            x,
+            phi,
+            alpha,
+            bias,
+            int(hcMult),
+            int(numIters),
+            float(hcEps),
+            float(normEps),
+            True,
+            preMix,
+        )
+    )
+    if not needBackward:
+        empty = _empty_outputs()
+        result[4], result[5], result[6], result[7] = (
+            empty[1],
+            empty[2],
+            empty[3],
+            empty[4],
+        )
+        if not has_pre_mix:
+            result[3] = empty[0]
+    templates = (hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut)
+    return tuple(
+        _to_output(value, template, use_torch)
+        for value, template in zip(result, templates)
+    )
+
+
+def aclnn_mhc_pre_sinkhorn_v2_input(
+    x,
+    phi,
+    alpha,
+    bias,
+    preMix,
+    hcMult,
+    numIters,
+    hcEps,
+    normEps,
+    needBackward,
+    enableHf32,
+    hin,
+    hPost,
+    hRes,
+    hPre,
+    hcBeforeNorm,
+    invRms,
+    sumOut,
+    normOut,
+    **kwargs,
+):
+    del numIters, hcEps, normEps, needBackward, enableHf32, hin, hPost, hRes
+    del hPre, hcBeforeNorm, invRms, sumOut, normOut, kwargs
+    _set_stable_inputs(x, phi, alpha, bias, int(hcMult))
+    if preMix is not None:
+        _fill_tensor(preMix, 1.0 / float(hcMult))

@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  基于一系列计算得到MHC架构中hidden层的$\mathbf{{H}'_{\text{res}}}$和$\mathbf{{H}_{\text{post}}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{{h}_{\text{in}}}$。对$\mathbf{{H}'_{\text{res}}}$矩阵执行Sinkhorn迭代归一化变换，最终得到双随机矩阵$\mathbf{{H}_{\text{res}}}$；支持输出中间计算结果，用于反向梯度计算。其中，该接口在Cube中默认使用HF32计算模式（与premix能力合入前一致）。
+  基于一系列计算得到MHC架构中hidden层的$\mathbf{{H}'_{\text{res}}}$和$\mathbf{{H}_{\text{post}}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{{h}_{\text{in}}}$。对$\mathbf{{H}'_{\text{res}}}$矩阵执行Sinkhorn迭代归一化变换，最终得到近似双随机矩阵$\mathbf{{H}_{\text{res}}}$；支持输出中间计算结果，用于反向梯度计算。其中，该接口在Cube中默认使用HF32计算模式。
 
   <!-- npu="A3,910b" id13 -->
   <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：HF32模式由全局开关`torch_npu.npu.aclnn.allow_hf32`控制（缺省true），python封装不单独暴露该参数，每次调用自动读取并随调用下发，传入false语义时切换为FP32计算模式。
@@ -173,22 +173,12 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>preMix</td>
         <td>Tensor</td>
         <td>可选</td>
-        <td><ul><li>premix加权系数（通常填上一个折叠点输出的hPre）。传入时hin的y折叠加权使用preMix而非内部计算的hPre；不传时行为与原接口完全一致</li><li>shape与x的前置维度一致，即(T, N)或(B, S, N)。</li></ul></td>
+        <td><ul><li>premix加权系数（通常填上一个折叠点输出的hPre）。传入时hin的y折叠加权使用preMix而非内部计算的hPre；不传时行为与原接口完全一致；</li><li>Shape须与 `x.shape[:-1]` 匹配</li></ul></td>
         <td>float32</td>
         <td>2-3</td>
     </tr>
 </tbody>
 </table>
-
-  <!-- npu="A3,910b" id11 -->
-- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-  - 可选输入preMix，传入时shape须为(T, N)或(B, S, N)（与x的前置维度一致），dtype为float32；不传时行为与原接口完全一致。
-  <!-- end id11 -->
-
-  <!-- npu="950" id12 -->
-- <term>Ascend 950PR&950DT系列产品</term>：
-  - 可选输入preMix在当前产品使用场景下不可用，传入即报错。
-  <!-- end id12 -->
 
 ## 输出说明
 
@@ -261,23 +251,17 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
 
 - 该接口支持训练、推理场景下使用。
 - 该接口支持单算子模式和图模式调用。
-- 参数约束：x、phi、alpha、bias不支持空Tensor。
+- 参数约束：`phi`、`alpha`、`bias`须满足参数表中的shape。`x`的B、S或T为0时，主输出为空并跳过算子计算；`pre_mix`如已传入，仍须与`x.shape[:-1]`匹配。
 - 数据类型约束：
   - 输出`hin`的数据类型与`x`保持一致。
 - 规格约束：
   - numIters：表示迭代次数，目前仅支持20。
   - N：目前仅支持4。
-
-  <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-    - 输入x仅支持4维BSND格式，shape为(B, S, N, C)；传入可选输入preMix时还支持3维TND格式，shape为(T, N, C)。
-    - 尾轴C要求128对齐，取值范围为[1, 100000]。
-   <!-- end id7 -->
+  - 输入x支持4维BSND格式和3维TND格式，shape分别为(B, S, N, C)和(T, N, C)。
+  - TND格式下，T表示所有Batch序列长度的累加和；对应输出shape按参数说明中的T轴展开。
+  - 尾轴C需为128的倍数且取值范围为[1, 100000]。
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-    - 输入x支持4维BSND格式和3维TND格式，shape分别为(B, S, N, C)和(T, N, C)。
-    - TND格式下，T表示所有Batch序列长度的累加和；对应输出shape按参数说明中的T轴展开。
-    - 尾轴C仅支持4096、7168。
     - 输入phi的数据范围限定在$\pm \frac{1}{\sqrt{NC}}$范围内，eps限定在1e-6，此范围内具有较好的数值稳定性。
   <!-- end id8 -->
 

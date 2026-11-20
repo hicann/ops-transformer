@@ -20,7 +20,51 @@
 
 using namespace ge;
 namespace optiling {
+namespace MhcPreSinkhornRegbase {
+struct CoreRowTiling {
+    int64_t rowOfFormerBlock = 0;
+    int64_t rowOfTailBlock = 0;
+    int64_t usedCoreNum = 0;
+    int64_t rowLoopOfFormerBlock = 0;
+    int64_t rowLoopOfTailBlock = 0;
+    int64_t tailRowFactorOfFormerBlock = 0;
+    int64_t tailRowFactorOfTailBlock = 0;
+};
+
+struct RowAndDTiling {
+    int64_t rowFactor = 0;
+    int64_t dLoop = 0;
+    int64_t dFactor = 0;
+    int64_t tailDFactor = 0;
+};
+
+struct PremixUbConfig {
+    int64_t hcMix = 0;
+    int64_t hcMult = 0;
+    int64_t maxMRows = 0;
+    int64_t maxGroupK = 0;
+    int64_t d = 0;
+    int64_t kL1Size = 0;
+    int64_t initialKUbSize = 0;
+    bool isKSplit = false;
+    bool batchConsistency = false;
+};
+
+struct PremixUbTiling {
+    int64_t kUbSize = 0;
+    int64_t mUbSize = 0;
+    int64_t bufferPool0Size = 0;
+    int64_t bufferPool1Size = 0;
+    bool castSegments = false;
+};
+} // namespace MhcPreSinkhornRegbase
+
 namespace {
+using MhcPreSinkhornRegbase::CoreRowTiling;
+using MhcPreSinkhornRegbase::RowAndDTiling;
+using MhcPreSinkhornRegbase::PremixUbConfig;
+using MhcPreSinkhornRegbase::PremixUbTiling;
+
 int64_t CeilDiv(int64_t x, int64_t y)
 {
     if (y != 0) {
@@ -47,12 +91,23 @@ constexpr int64_t BF16_BYTES = 2;
 constexpr int64_t CUBE_D_ALIGN = 16;
 constexpr int64_t D_FACTOR_ALIGN = 32;
 constexpr uint64_t M_L1_MAX_SIZE = 256;
+// The fallback stage-1 search reduces the K window by 64 elements.
+constexpr int64_t PREMIX_MIN_KUB_SIZE = 64;
+// Retain 256-element vector windows without reducing M below 64 rows.
+constexpr uint64_t PREMIX_KL1_SEARCH_LIMIT = 512;
+// Estimate the per-row cast/RMS setup as one Cube alignment per vector K chunk.
+constexpr uint64_t PREMIX_ROW_CHUNK_OVERHEAD = CUBE_D_ALIGN;
+constexpr uint64_t PREMIX_LATENCY_MAX_ROUNDS = 2;
+constexpr int64_t PREMIX_LATENCY_MIN_KUB_SIZE = 128;
 constexpr uint64_t K_MULIT_CORE_SPLIT_BASE_SIZE = 256;
 constexpr uint64_t A_L1_SIZE = 128 * 256;
 constexpr uint64_t K_L1_MAX_SIZE = 1024;
-// Ascend950(regbase, A5) only supports these two tail-axis(c) sizes, which differs from A2/A3(membase).
-constexpr int64_t C_VALID_VALUE_4096 = 4096;
-constexpr int64_t C_VALID_VALUE_7168 = 7168;
+constexpr int64_t HALF_SPLIT = 2;
+constexpr int64_t K_L1_ALIGN_SIZE = 128;
+// Accepts any tail-axis(c) size that is 128 aligned within [1, 100000].
+constexpr int64_t C_ALIGN_SIZE = 128;
+constexpr int64_t C_MIN_VALUE = 1;
+constexpr int64_t C_MAX_VALUE = 100000;
 constexpr int64_t HCMULT_VALUE = 4;
 constexpr int64_t NUM_ITERS_VALUE = 20;
 constexpr size_t X_DIM_NUM_3 = 3;
@@ -70,23 +125,6 @@ constexpr uint64_t TILING_KEY_CV_ONE_GRAD_M_SPLIT = 4001;
 constexpr uint64_t CV_RATIO_ONE = 1;
 constexpr uint64_t CV_RATIO_TWO = 2;
 
-struct CoreRowTiling {
-    int64_t rowOfFormerBlock = 0;
-    int64_t rowOfTailBlock = 0;
-    int64_t usedCoreNum = 0;
-    int64_t rowLoopOfFormerBlock = 0;
-    int64_t rowLoopOfTailBlock = 0;
-    int64_t tailRowFactorOfFormerBlock = 0;
-    int64_t tailRowFactorOfTailBlock = 0;
-};
-
-struct RowAndDTiling {
-    int64_t rowFactor = 0;
-    int64_t dLoop = 0;
-    int64_t dFactor = 0;
-    int64_t tailDFactor = 0;
-};
-
 struct UbBufferConfig {
     int64_t hcMix = 0;
     int64_t hcMult = 0;
@@ -97,11 +135,48 @@ struct UbBufferConfig {
     bool withGradOut = false;
     bool isKSplit = false;
     bool isMpmd = false;
+    bool hasPremix = false;
+    bool premixStage1 = false;
 };
 
-struct CvUbTiling {
-    int64_t kUbSize = 0;
-    int64_t mUbSize = 0;
+struct PremixMScore {
+    uint64_t rounds = 0;
+    uint64_t work = 0;
+    uint64_t paddedRows = 0;
+    uint64_t kUbSize = 0;
+    bool castSegments = false;
+    bool lowLatency = false;
+
+    bool IsBetterThan(const PremixMScore& other) const
+    {
+        if (other.rounds == 0) {
+            return true;
+        }
+        if (lowLatency != other.lowLatency) {
+            return lowLatency;
+        }
+        if (lowLatency) {
+            if (paddedRows != other.paddedRows) {
+                return paddedRows < other.paddedRows;
+            }
+            if (rounds != other.rounds) {
+                return rounds < other.rounds;
+            }
+        }
+        if (work != other.work) {
+            return work < other.work;
+        }
+        if (kUbSize != other.kUbSize) {
+            return kUbSize > other.kUbSize;
+        }
+        if (paddedRows != other.paddedRows) {
+            return paddedRows < other.paddedRows;
+        }
+        if (castSegments != other.castSegments) {
+            return castSegments;
+        }
+        return rounds < other.rounds;
+    }
 };
 
 bool CalcCoreRowTiling(int64_t bs, int64_t coreNum, CoreRowTiling& rowTiling)
@@ -131,10 +206,19 @@ int64_t CalcUbBufferSize(const UbBufferConfig& config, int64_t rowFactor, int64_
     const int64_t hcMixAlign = RoundUp(config.hcMix, floatAlign);
     const int64_t dAlign = RoundUp(dFactor, CUBE_D_ALIGN);
 
-    int64_t totalSize = rowFactor * hcMixAlign * sizeof(float);                   // mixes
-    totalSize += rowFactor * config.hcMult * dAlign * BF16_BYTES * DOUBLE_BUFFER; // x
-    totalSize += rowFactor * dAlign * BF16_BYTES * DOUBLE_BUFFER;                 // y
-    totalSize += rowFactor * config.hcMultAlign * sizeof(float) * DOUBLE_BUFFER;  // post
+    int64_t totalSize = rowFactor * hcMixAlign * sizeof(float); // mixes
+    if (!config.premixStage1) {
+        totalSize += rowFactor * config.hcMult * dAlign * BF16_BYTES * DOUBLE_BUFFER; // x
+        totalSize += rowFactor * dAlign * BF16_BYTES * DOUBLE_BUFFER;                 // y
+        if (config.hasPremix) {
+            totalSize += rowFactor * config.hcMultAlign * sizeof(float); // external weights
+        }
+    }
+    if (config.hasPremix && !config.withGradOut) {
+        // hPre remains an output regardless of which stage computes hIn.
+        totalSize += rowFactor * config.hcMultAlign * sizeof(float) * DOUBLE_BUFFER; // hPre
+    }
+    totalSize += rowFactor * config.hcMultAlign * sizeof(float) * DOUBLE_BUFFER; // post
     if (!config.isMpmd) {
         totalSize += rowFactor * config.hcMult * config.hcMultAlign * sizeof(float) * DOUBLE_BUFFER; // combFrag
     }
@@ -180,9 +264,52 @@ int64_t CalcStage1TemporaryUbSize(int64_t kUbSize, int64_t mUbSize)
     return totalSize; // nd2NzBuf
 }
 
+// Stage-1 UB footprint when hIn is fused with the invRms pass using the external preMix.
+// hIn is accumulated for the whole AIV row range, so yAcc/preMix do not scale with mUbSize.
+int64_t CalcMPremixPhase1UbSize(int64_t kUbSize, int64_t mUbSize, int64_t vectorMRows, int64_t hcMix)
+{
+    const int64_t b16KAlign = RoundUp(kUbSize, BLOCK_SIZE / sizeof(uint16_t));
+    const int64_t floatKAlign = RoundUp(kUbSize, BLOCK_SIZE / sizeof(float));
+    const int64_t floatAlign = BLOCK_SIZE / sizeof(float);
+    int64_t totalSize = DOUBLE_BUFFER * mUbSize * b16KAlign * sizeof(uint16_t);              // xQue
+    totalSize += DOUBLE_BUFFER * mUbSize * b16KAlign * sizeof(uint16_t);                     // yQue
+    totalSize += mUbSize * (floatKAlign * sizeof(float) + BLOCK_SIZE);                       // cast
+    totalSize += DOUBLE_BUFFER * RoundUp(mUbSize, floatAlign) * floatKAlign * sizeof(float); // nd2Nz
+    totalSize += vectorMRows * RoundUp(hcMix, floatAlign) * sizeof(float);                   // preMix
+    totalSize += vectorMRows * floatKAlign * sizeof(float);                                  // yAcc
+    return totalSize;
+}
+
+int64_t CalcMPremixCastPhase1UbSize(int64_t kUbSize, int64_t mUbSize, int64_t hcMix, int64_t hcMult)
+{
+    const int64_t floatAlign = BLOCK_SIZE / sizeof(float);
+    const int64_t b16KAlign = RoundUp(kUbSize, BLOCK_SIZE / sizeof(uint16_t));
+    const int64_t floatKAlign = RoundUp(kUbSize, floatAlign);
+    int64_t totalSize = DOUBLE_BUFFER * mUbSize * b16KAlign * sizeof(uint16_t);              // xQue
+    totalSize += DOUBLE_BUFFER * mUbSize * b16KAlign * sizeof(uint16_t);                     // yQue
+    totalSize += hcMult * mUbSize * (floatKAlign * sizeof(float) + BLOCK_SIZE);              // cast slices
+    totalSize += DOUBLE_BUFFER * RoundUp(mUbSize, floatAlign) * floatKAlign * sizeof(float); // nd2Nz
+    totalSize += RoundUp(mUbSize, floatAlign) * RoundUp(hcMix, floatAlign) * sizeof(float);  // preMix
+    return totalSize;
+}
+
+int64_t CalcMKPremixPhase1UbSize(int64_t kUbSize, int64_t mUbSize, int64_t maxMRows, int64_t maxGroupK, int64_t hcMix)
+{
+    const int64_t b16KAlign = RoundUp(kUbSize, BLOCK_SIZE / sizeof(uint16_t));
+    const int64_t floatKAlign = RoundUp(kUbSize, BLOCK_SIZE / sizeof(float));
+    const int64_t floatAlign = BLOCK_SIZE / sizeof(float);
+    int64_t totalSize = DOUBLE_BUFFER * mUbSize * b16KAlign * sizeof(uint16_t);              // xQue
+    totalSize += DOUBLE_BUFFER * mUbSize * b16KAlign * sizeof(uint16_t);                     // yQue
+    totalSize += mUbSize * (floatKAlign * sizeof(float) + BLOCK_SIZE);                       // cast
+    totalSize += DOUBLE_BUFFER * RoundUp(mUbSize, floatAlign) * floatKAlign * sizeof(float); // nd2Nz
+    totalSize += maxMRows * RoundUp(hcMix, floatAlign) * sizeof(float);                      // preMix
+    totalSize += maxMRows * floatKAlign * sizeof(float) * CeilDiv(maxGroupK, kUbSize);       // y accumulator
+    return totalSize;
+}
+
 // Solves the stage-1 vector UB tiling for both ratios.
 bool CalcCvUbTiling(int64_t kL1Size, int64_t mL1Size, uint64_t ubSize, uint64_t cvRatio, bool isKSplit, int64_t hcMix,
-                    int64_t hcMult, int64_t hcMultAlign, CvUbTiling& ubTiling)
+                    int64_t hcMult, int64_t hcMultAlign, PremixUbTiling& ubTiling)
 {
     if (kL1Size <= 0 || mL1Size <= 0 || (cvRatio != CV_RATIO_ONE && cvRatio != CV_RATIO_TWO)) {
         return false;
@@ -279,6 +406,98 @@ bool CalcRowAndDTiling(int64_t d, int64_t maxRowFactor, const FitsInUb& fitsInUb
     return result.rowFactor > 0 && result.dFactor > 0;
 }
 
+uint64_t CalcKL1Size(uint64_t mL1Size)
+{
+    return std::min(A_L1_SIZE / mL1Size, K_L1_MAX_SIZE) / K_L1_ALIGN_SIZE * K_L1_ALIGN_SIZE;
+}
+
+int64_t CalcPremixPhase1Size(const PremixUbConfig& config, int64_t mUbSize, int64_t kUbSize, bool castSegments)
+{
+    if (castSegments) {
+        return CalcMPremixCastPhase1UbSize(kUbSize, mUbSize, config.hcMix, config.hcMult);
+    }
+    return config.isKSplit ?
+               CalcMKPremixPhase1UbSize(kUbSize, mUbSize, config.maxMRows, config.maxGroupK, config.hcMix) :
+               CalcMPremixPhase1UbSize(kUbSize, mUbSize, config.maxMRows, config.hcMix);
+}
+
+void TryPremixUbCandidate(const PremixUbConfig& config, int64_t availableSize, int64_t kUbSize, bool castSegments,
+                          PremixUbTiling& ubTiling, int64_t& bestChunkCount)
+{
+    if (kUbSize <= 0 || kUbSize > config.kL1Size || (!config.isKSplit && config.d % kUbSize != 0)) {
+        return;
+    }
+    const auto fitsInUb = [&](int64_t mUbSize) {
+        return CalcPremixPhase1Size(config, mUbSize, kUbSize, castSegments) <= availableSize;
+    };
+    // Accumulators cover the full AIV row range, but the temporary x/cast/NZ
+    // buffers can tile it. Keep full rows for four-cast and batch-consistent paths.
+    const bool requireFullRows = castSegments || (!config.isKSplit && config.batchConsistency);
+    const int64_t mUbSize = requireFullRows ? (fitsInUb(config.maxMRows) ? config.maxMRows : 0) :
+                                              FindMaxRowFactor(config.maxMRows, fitsInUb);
+    if (mUbSize == 0) {
+        return;
+    }
+    const int64_t vectorBlocks = castSegments ? CeilDiv(kUbSize, REPEAT_SIZE / sizeof(float)) : 1;
+    const int64_t chunkCount = CeilDiv(config.maxMRows, mUbSize) * CeilDiv(config.maxGroupK, kUbSize) * vectorBlocks;
+    if (ubTiling.mUbSize == 0 || chunkCount < bestChunkCount ||
+        (chunkCount == bestChunkCount && mUbSize > ubTiling.mUbSize) ||
+        (chunkCount == bestChunkCount && mUbSize == ubTiling.mUbSize && kUbSize > ubTiling.kUbSize)) {
+        bestChunkCount = chunkCount;
+        ubTiling.kUbSize = kUbSize;
+        ubTiling.mUbSize = mUbSize;
+        ubTiling.castSegments = castSegments;
+    }
+}
+
+void SelectPremixUbCandidates(const PremixUbConfig& config, int64_t availableSize, bool castSegments,
+                              PremixUbTiling& ubTiling)
+{
+    const int64_t cubeAlign = static_cast<int64_t>(AscendC::BLOCK_CUBE);
+    const int64_t fullKUb = RoundUp(config.maxGroupK, cubeAlign);
+    const int64_t halfKUb = RoundUp(CeilDiv(config.maxGroupK, HALF_SPLIT), cubeAlign);
+    int64_t bestChunkCount = 0;
+    for (int64_t kUbSize : {fullKUb, halfKUb}) {
+        TryPremixUbCandidate(config, availableSize, kUbSize, castSegments, ubTiling, bestChunkCount);
+        // Batch consistency keeps the existing first-fit reduction partition.
+        if (config.batchConsistency && ubTiling.mUbSize > 0) {
+            break;
+        }
+    }
+}
+
+void SelectPremixUbFallback(const PremixUbConfig& config, int64_t availableSize, PremixUbTiling& ubTiling)
+{
+    const int64_t initialK = config.initialKUbSize > 0 ? config.initialKUbSize : config.kL1Size;
+    for (int64_t kUbSize = std::min(initialK, config.kL1Size); kUbSize >= PREMIX_MIN_KUB_SIZE;
+         kUbSize -= PREMIX_MIN_KUB_SIZE) {
+        if (!config.isKSplit && config.d % kUbSize != 0) {
+            continue;
+        }
+        const int64_t mUbSize = FindMaxRowFactor(config.maxMRows, [&](int64_t rows) {
+            return CalcPremixPhase1Size(config, rows, kUbSize, false) <= availableSize;
+        });
+        if (mUbSize > 0) {
+            ubTiling.kUbSize = kUbSize;
+            ubTiling.mUbSize = mUbSize;
+            return;
+        }
+    }
+}
+
+void SelectPremixPhase1Tiling(const PremixUbConfig& config, int64_t availableSize, PremixUbTiling& selected)
+{
+    if (!config.isKSplit && !config.batchConsistency) {
+        SelectPremixUbCandidates(config, availableSize, true, selected);
+    }
+    if (selected.mUbSize == 0) {
+        SelectPremixUbCandidates(config, availableSize, false, selected);
+    }
+    if (selected.mUbSize == 0) {
+        SelectPremixUbFallback(config, availableSize, selected);
+    }
+}
+
 void PrintFinalTilingData(gert::TilingContext* context, MhcPreSinkhornRegbaseTilingData& tilingData, uint64_t tilingKey,
                           uint64_t blockDim, size_t workspaceSize)
 {
@@ -323,7 +542,8 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetPlatformInfo()
     auto platformInfo = context_->GetPlatformInfo();
     auto compileInfoPtr = context_->GetCompileInfo<MhcPreSinkhornCompileInfo>();
     if (platformInfo == nullptr) {
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "compile info is null"),
+                    return ge::GRAPH_FAILED);
         aivCoreNum_ = compileInfoPtr->coreNum;
         aicCoreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
@@ -340,17 +560,19 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetPlatformInfo()
         ubSize_ = ubSizePlatForm;
         sysWorkspaceSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
         npuArch_ = ascendcPlatform.GetCurNpuArch();
-        OP_CHECK_IF(aicCoreNum_ == 0 || aivCoreNum_ == 0 || aivCoreNum_ % aicCoreNum_ != 0,
-                    OP_LOGE(context_->GetNodeName(), "Invalid CV core counts: aivCoreNum=%lu, aicCoreNum=%lu",
-                            aivCoreNum_, aicCoreNum_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            aicCoreNum_ == 0 || aivCoreNum_ == 0 || aivCoreNum_ % aicCoreNum_ != 0,
+            OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "Invalid CV core counts: aivCoreNum=%lu, aicCoreNum=%lu",
+                                   aivCoreNum_, aicCoreNum_),
+            return ge::GRAPH_FAILED);
         cvRatio_ = aivCoreNum_ / aicCoreNum_;
         if (compileInfoPtr != nullptr && compileInfoPtr->cvRatio != 0) {
             cvRatio_ = compileInfoPtr->cvRatio;
         }
     }
     OP_CHECK_IF(cvRatio_ != CV_RATIO_ONE && cvRatio_ != CV_RATIO_TWO,
-                OP_LOGE(context_->GetNodeName(), "Unsupported CV ratio: %lu", cvRatio_), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "Unsupported CV ratio: %lu", cvRatio_),
+                return ge::GRAPH_FAILED);
     OP_LOGD(context_->GetNodeName(),
             "MhcPreSinkhorn regbase platform: aivCoreNum=%lu, aicCoreNum=%lu, cvRatio=%lu, ubSize=%lu, "
             "sysWorkspaceSize=%lu",
@@ -404,9 +626,10 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetShapeAttrsInfoInner()
         return ge::GRAPH_FAILED;
     }
 
-    OP_CHECK_IF(d_ != C_VALID_VALUE_4096 && d_ != C_VALID_VALUE_7168,
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", std::to_string(d_).c_str(),
-                                                      "The last dim c of input x on Ascend950 must be 4096 or 7168"),
+    OP_CHECK_IF(d_ < C_MIN_VALUE || d_ > C_MAX_VALUE || d_ % C_ALIGN_SIZE != 0,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "x", std::to_string(d_).c_str(),
+                    "The last dim c of input x must be an integer multiple of 128 in [1, 100000]."),
                 return ge::GRAPH_FAILED);
 
     auto shapeHcFn = context_->GetInputShape(1);
@@ -440,6 +663,36 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetShapeAttrsInfoInner()
                 .c_str()),
         return ge::GRAPH_FAILED);
 
+    auto preMixShape = context_->GetOptionalInputShape(4);
+    hasPremix_ = preMixShape != nullptr;
+    if (hasPremix_) {
+        const auto& shape = preMixShape->GetStorageShape();
+        OP_CHECK_IF(
+            shape.GetDimNum() != xDimNum - 1,
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                context_->GetNodeName(), "preMix", std::to_string(shape.GetDimNum()).c_str(),
+                ("The shape dim of input preMix must be one less than input x, which is " + std::to_string(xDimNum - 1))
+                    .c_str()),
+            return ge::GRAPH_FAILED);
+        for (size_t i = 0; i + 1 < xDimNum; ++i) {
+            OP_CHECK_IF(
+                shape.GetDim(i) != xShape->GetStorageShape().GetDim(i),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context_->GetNodeName(), "preMix, x", Ops::Base::ToString(shape).c_str(),
+                    ("The dim " + std::to_string(i) + " of input preMix must be equal to the dim " + std::to_string(i) +
+                     " of input x, which is " + std::to_string(xShape->GetStorageShape().GetDim(i)))
+                        .c_str()),
+                return ge::GRAPH_FAILED);
+        }
+        auto preMixDesc = context_->GetOptionalInputDesc(4);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, preMixDesc);
+        OP_CHECK_IF(preMixDesc->GetDataType() != ge::DT_FLOAT,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "preMix",
+                                                          Ops::Base::ToString(preMixDesc->GetDataType()).c_str(),
+                                                          "The dtype of input preMix must be float32"),
+                    return ge::GRAPH_FAILED);
+    }
+
     OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "get attr failed."),
                 return ge::GRAPH_FAILED);
 
@@ -462,10 +715,8 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetShapeAttrsInfoInner()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode gradOutMode, SplitMode splitMode)
+int64_t MhcPreSinkhornTilingRegbase::CalcPrePostCoreNum(bool withGradOut, bool isKSplit)
 {
-    const bool withGradOut = gradOutMode == GradOutMode::ENABLED;
-    const bool isKSplit = splitMode == SplitMode::K_SPLIT;
     int64_t prePostCoreNum = static_cast<int64_t>(aivCoreNum_);
     tilingData_.set_sinkhornCoreNum(0);
     tilingData_.set_sinkhornRowFactor(0);
@@ -488,14 +739,12 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode
             prePostCoreNum -= sinkhornCoreNum;
         }
     }
-    CoreRowTiling coreRowTiling;
-    OP_CHECK_IF(!CalcCoreRowTiling(bs_, prePostCoreNum, coreRowTiling),
-                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "Invalid row tiling input: bs=%ld, aivCoreNum=%lu", bs_,
-                                       aivCoreNum_),
-                return ge::GRAPH_FAILED);
+    return prePostCoreNum;
+}
 
+ge::graphStatus MhcPreSinkhornTilingRegbase::InitUbTiling(bool isKSplit, PremixUbTiling& ubTiling)
+{
     const int64_t hcMultAlign = RoundUp(hcMult_, BLOCK_SIZE / sizeof(float));
-    CvUbTiling ubTiling;
     OP_CHECK_IF(!CalcCvUbTiling(tilingData_.get_kL1Size(), tilingData_.get_mL1Size(), ubSize_, cvRatio_, isKSplit,
                                 hcMix_, hcMult_, hcMultAlign, ubTiling),
                 OP_LOGE_WITHOUT_REPORT(
@@ -503,48 +752,102 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode
                     "Invalid CV UB tiling: kL1Size=%ld, mL1Size=%ld, ubSize=%lu, cvRatio=%lu, isKSplit=%d",
                     tilingData_.get_kL1Size(), tilingData_.get_mL1Size(), ubSize_, cvRatio_, isKSplit ? 1 : 0),
                 return ge::GRAPH_FAILED);
-    const int64_t kUbSize = ubTiling.kUbSize;
-    const int64_t mUbSize = ubTiling.mUbSize;
     const int64_t vectorMSize = CeilDiv(tilingData_.get_mL1Size(), static_cast<int64_t>(cvRatio_));
-    const int64_t bufferPool0Size = static_cast<int64_t>(ubSize_);
-    const int64_t bufferPool1Size =
+    ubTiling.bufferPool0Size = static_cast<int64_t>(ubSize_);
+    ubTiling.bufferPool1Size =
         isKSplit ? 0 : CalcMOnlyBufferPool1Size(ubSize_, vectorMSize, hcMix_, hcMult_, hcMultAlign);
-    OP_CHECK_IF(!isKSplit && bufferPool1Size < 0,
-                OP_LOGE(context_->GetNodeName(),
-                        "M-split fixed buffers exceed UB: ubSize=%lu, bufferPool1Size=%ld, vectorMSize=%ld, hcMix=%ld",
-                        ubSize_, bufferPool1Size, vectorMSize, hcMix_),
+    OP_CHECK_IF(!isKSplit && ubTiling.bufferPool1Size < 0,
+                OP_LOGE_WITHOUT_REPORT(
+                    context_->GetNodeName(),
+                    "M-split fixed buffers exceed UB: ubSize=%lu, bufferPool1Size=%ld, vectorMSize=%ld, hcMix=%ld",
+                    ubSize_, ubTiling.bufferPool1Size, vectorMSize, hcMix_),
                 return ge::GRAPH_FAILED);
-    const int64_t availableUbSize = isKSplit ? bufferPool0Size : bufferPool1Size;
+    return ge::GRAPH_SUCCESS;
+}
 
+PremixUbConfig MhcPreSinkhornTilingRegbase::MakePremixUbConfig(bool isKSplit, int64_t mL1Size, int64_t kL1Size,
+                                                               int64_t initialKUbSize)
+{
+    PremixUbConfig config;
+    config.hcMix = hcMix_;
+    config.hcMult = hcMult_;
+    config.maxMRows = CeilDiv(mL1Size, static_cast<int64_t>(cvRatio_));
+    config.d = d_;
+    config.kL1Size = kL1Size;
+    config.initialKUbSize = initialKUbSize;
+    config.isKSplit = isKSplit;
+    config.batchConsistency = context_->GetDeterministicLevel() == BATCH_CONSISTENCY_LEVEL;
+    const int64_t dPerCore = isKSplit ? tilingData_.get_multCoreSplitKSize() / hcMult_ : d_;
+    config.maxGroupK = std::min(config.kL1Size, dPerCore);
+    return config;
+}
+
+ge::graphStatus MhcPreSinkhornTilingRegbase::SelectPremixUbTiling(bool isKSplit, PremixUbTiling& ubTiling)
+{
+    const PremixUbConfig config =
+        MakePremixUbConfig(isKSplit, tilingData_.get_mL1Size(), tilingData_.get_kL1Size(), ubTiling.kUbSize);
+    int64_t availableSize = isKSplit ? ubTiling.bufferPool0Size : ubTiling.bufferPool1Size;
+    if (isKSplit) {
+        availableSize -= DOUBLE_BUFFER * RoundUp(config.maxMRows, BLOCK_SIZE / sizeof(float)) * sizeof(float);
+    }
+    PremixUbTiling selected;
+    SelectPremixPhase1Tiling(config, availableSize, selected);
+    OP_CHECK_IF(selected.mUbSize == 0,
+                OP_LOGD(context_->GetNodeName(),
+                        "UB is insufficient for premix stage-1 fusion: ubSize=%lu, available=%ld, "
+                        "vectorMSize=%ld, mL1Size=%ld, kL1Size=%ld, hcMix=%ld",
+                        ubSize_, availableSize, config.maxMRows, tilingData_.get_mL1Size(), config.kL1Size, hcMix_),
+                return ge::GRAPH_FAILED);
+    ubTiling.kUbSize = selected.kUbSize;
+    ubTiling.mUbSize = selected.mUbSize;
+    ubTiling.castSegments = selected.castSegments;
+    OP_LOGD(context_->GetNodeName(),
+            "MhcPreSinkhorn premix stage-1 UB tiling: isKSplit=%d, kUbSize=%ld, mUbSize=%ld, available=%ld, "
+            "castSegments=%d",
+            isKSplit ? 1 : 0, ubTiling.kUbSize, ubTiling.mUbSize, availableSize, ubTiling.castSegments ? 1 : 0);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRowTiling(bool withGradOut, bool isKSplit,
+                                                           const CoreRowTiling& coreRowTiling,
+                                                           const PremixUbTiling& ubTiling, RowAndDTiling& rowAndDTiling)
+{
+    const int64_t vectorMSize = CeilDiv(tilingData_.get_mL1Size(), static_cast<int64_t>(cvRatio_));
+    const int64_t availableUbSize = isKSplit ? ubTiling.bufferPool0Size : ubTiling.bufferPool1Size;
     UbBufferConfig bufferConfig;
     bufferConfig.hcMix = hcMix_;
     bufferConfig.hcMult = hcMult_;
-    bufferConfig.hcMultAlign = hcMultAlign;
+    bufferConfig.hcMultAlign = RoundUp(hcMult_, BLOCK_SIZE / sizeof(float));
     bufferConfig.iterTimes = iterTimes_;
     bufferConfig.kBlockNum = tilingData_.get_cubeBlockDimK();
     bufferConfig.vectorMSize = vectorMSize;
     bufferConfig.withGradOut = withGradOut;
     bufferConfig.isKSplit = isKSplit;
     bufferConfig.isMpmd = tilingData_.get_sinkhornCoreNum() > 0;
+    bufferConfig.hasPremix = hasPremix_;
+    bufferConfig.premixStage1 = tilingData_.get_premixStage1() != 0;
 
     const auto fitsInUb = [&bufferConfig, availableUbSize](int64_t rowFactor, int64_t dFactor) {
         return CalcUbBufferSize(bufferConfig, rowFactor, dFactor) <= availableUbSize;
     };
     const int64_t maxRowFactor = isKSplit ? coreRowTiling.rowOfFormerBlock : vectorMSize;
-    RowAndDTiling rowAndDTiling;
     OP_CHECK_IF(!CalcRowAndDTiling(d_, maxRowFactor, fitsInUb, rowAndDTiling),
                 OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
                                        "UB is insufficient for minimum tile: ubSize=%lu, availableUbSize=%ld, "
                                        "withGradOut=%d, isKSplit=%d",
                                        ubSize_, availableUbSize, withGradOut ? 1 : 0, isKSplit ? 1 : 0),
                 return ge::GRAPH_FAILED);
-    CompleteCoreRowTiling(coreRowTiling, rowAndDTiling.rowFactor);
+    return ge::GRAPH_SUCCESS;
+}
 
+void MhcPreSinkhornTilingRegbase::SaveCommonTiling(bool withGradOut, bool isKSplit, const CoreRowTiling& coreRowTiling,
+                                                   const RowAndDTiling& rowAndDTiling, const PremixUbTiling& ubTiling)
+{
     tilingData_.set_bs(bs_);
     tilingData_.set_hcMix(hcMix_);
     tilingData_.set_hcMult(hcMult_);
     tilingData_.set_d(d_);
-    tilingData_.set_hcMultAlign(hcMultAlign);
+    tilingData_.set_hcMultAlign(RoundUp(hcMult_, BLOCK_SIZE / sizeof(float)));
     tilingData_.set_rowOfFormerBlock(coreRowTiling.rowOfFormerBlock);
     tilingData_.set_rowLoopOfFormerBlock(coreRowTiling.rowLoopOfFormerBlock);
     tilingData_.set_rowLoopOfTailBlock(coreRowTiling.rowLoopOfTailBlock);
@@ -556,25 +859,73 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode
     tilingData_.set_iterTimes(iterTimes_);
     tilingData_.set_hcEps(hcEps_);
     tilingData_.set_normEps(normEps_);
-    tilingData_.set_kUbSize(kUbSize);
-    tilingData_.set_mUbSize(mUbSize);
+    tilingData_.set_hasPremix(hasPremix_ ? 1 : 0);
+    tilingData_.set_premixCastSegments(ubTiling.castSegments ? 1 : 0);
+    tilingData_.set_kUbSize(ubTiling.kUbSize);
+    tilingData_.set_mUbSize(ubTiling.mUbSize);
     tilingData_.set_kBlockFactor(tilingData_.get_cubeBlockDimK());
     if (isKSplit) {
         tilingData_.set_stage2RowFactor(rowAndDTiling.rowFactor);
         tilingData_.set_secondUsedCoreNum(coreRowTiling.usedCoreNum);
     } else {
         tilingData_.set_rowInnerFactor(rowAndDTiling.rowFactor);
-        tilingData_.set_bufferPool0Size(bufferPool0Size);
-        tilingData_.set_bufferPool1Size(bufferPool1Size);
+        tilingData_.set_bufferPool0Size(ubTiling.bufferPool0Size);
+        tilingData_.set_bufferPool1Size(ubTiling.bufferPool1Size);
     }
 
+    const int64_t vectorMSize = CeilDiv(tilingData_.get_mL1Size(), static_cast<int64_t>(cvRatio_));
+    const int64_t maxRowFactor = isKSplit ? coreRowTiling.rowOfFormerBlock : vectorMSize;
+    const int64_t availableUbSize = isKSplit ? ubTiling.bufferPool0Size : ubTiling.bufferPool1Size;
     OP_LOGD(context_->GetNodeName(),
             "MhcPreSinkhorn regbase UB tiling: withGradOut=%d, isKSplit=%d, cvRatio=%lu, availableUbSize=%ld, "
             "kUbSize=%ld, mUbSize=%ld, vectorMSize=%ld, maxRowFactor=%ld, rowFactor=%ld, dFactor=%ld, dLoop=%ld, "
-            "tailDFactor=%ld",
-            withGradOut ? 1 : 0, isKSplit ? 1 : 0, cvRatio_, availableUbSize, kUbSize, mUbSize, vectorMSize,
-            maxRowFactor, rowAndDTiling.rowFactor, rowAndDTiling.dFactor, rowAndDTiling.dLoop,
-            rowAndDTiling.tailDFactor);
+            "tailDFactor=%ld, premixStage1=%ld",
+            withGradOut ? 1 : 0, isKSplit ? 1 : 0, cvRatio_, availableUbSize, ubTiling.kUbSize, ubTiling.mUbSize,
+            vectorMSize, maxRowFactor, rowAndDTiling.rowFactor, rowAndDTiling.dFactor, rowAndDTiling.dLoop,
+            rowAndDTiling.tailDFactor, tilingData_.get_premixStage1());
+}
+
+ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode gradOutMode, SplitMode splitMode)
+{
+    const bool withGradOut = gradOutMode == GradOutMode::ENABLED;
+    const bool isKSplit = splitMode == SplitMode::K_SPLIT;
+    tilingData_.set_premixStage1(hasPremix_ ? 1 : 0);
+    const int64_t prePostCoreNum = CalcPrePostCoreNum(withGradOut, isKSplit);
+    CoreRowTiling coreRowTiling;
+    OP_CHECK_IF(!CalcCoreRowTiling(bs_, prePostCoreNum, coreRowTiling),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "Invalid row tiling input: bs=%ld, aivCoreNum=%lu", bs_,
+                                       aivCoreNum_),
+                return ge::GRAPH_FAILED);
+    PremixUbTiling ubTiling;
+    if (InitUbTiling(isKSplit, ubTiling) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    // For a single inference M tile, stage-2 hIn overlaps the independent
+    // Sinkhorn group. Keep it off the stage-1 barrier's critical path.
+    if (hasPremix_ && tilingData_.get_sinkhornCoreNum() > 0 && tilingData_.get_cubeBlockDimM() == 1 &&
+        bs_ <= tilingData_.get_mL1Size()) {
+        const int64_t vectorMSize = CeilDiv(tilingData_.get_mL1Size(), static_cast<int64_t>(cvRatio_));
+        const int64_t rmsQueSize = DOUBLE_BUFFER * RoundUp(vectorMSize, BLOCK_SIZE / sizeof(float)) * sizeof(float);
+        if (CalcStage1TemporaryUbSize(ubTiling.kUbSize, ubTiling.mUbSize) + rmsQueSize <= ubTiling.bufferPool0Size) {
+            tilingData_.set_premixStage1(0);
+        }
+    }
+    if (hasPremix_ && tilingData_.get_premixStage1() != 0 &&
+        SelectPremixUbTiling(isKSplit, ubTiling) != ge::GRAPH_SUCCESS) {
+        OP_CHECK_IF(!isKSplit || withGradOut,
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "UB is insufficient for premix stage-1 fusion."),
+                    return ge::GRAPH_FAILED);
+        // Retain inference support when fusion exceeds UB.
+        tilingData_.set_premixStage1(0);
+        OP_LOGD(context_->GetNodeName(), "MhcPreSinkhorn premix stage-2 UB fallback: bs=%ld, d=%ld, ubSize=%lu", bs_,
+                d_, ubSize_);
+    }
+    RowAndDTiling rowAndDTiling;
+    if (CalcRowTiling(withGradOut, isKSplit, coreRowTiling, ubTiling, rowAndDTiling) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    CompleteCoreRowTiling(coreRowTiling, rowAndDTiling.rowFactor);
+    SaveCommonTiling(withGradOut, isKSplit, coreRowTiling, rowAndDTiling, ubTiling);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -598,6 +949,97 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcMKSplitCorePart2GradoutTiling()
     return CalcRegbaseCommonTiling(GradOutMode::ENABLED, SplitMode::K_SPLIT);
 }
 
+bool MhcPreSinkhornTilingRegbase::CalcPremixML1UbTiling(uint64_t mL1Size, PremixUbTiling& ubTiling)
+{
+    const int64_t kL1Size = CalcKL1Size(mL1Size);
+    const int64_t hcMultAlign = RoundUp(hcMult_, BLOCK_SIZE / sizeof(float));
+    PremixUbTiling initial;
+    if (!CalcCvUbTiling(kL1Size, mL1Size, ubSize_, cvRatio_, false, hcMix_, hcMult_, hcMultAlign, initial)) {
+        return false;
+    }
+    const PremixUbConfig config = MakePremixUbConfig(false, mL1Size, kL1Size, initial.kUbSize);
+    const int64_t availableSize = CalcMOnlyBufferPool1Size(ubSize_, config.maxMRows, hcMix_, hcMult_, hcMultAlign);
+    SelectPremixPhase1Tiling(config, availableSize, ubTiling);
+    return ubTiling.mUbSize > 0;
+}
+
+uint64_t MhcPreSinkhornTilingRegbase::SelectPremixML1Size()
+{
+    uint64_t bestM = tilingData_.get_mL1Size();
+    PremixMScore bestScore;
+    PremixUbTiling bestUbTiling;
+    const uint64_t mStep = static_cast<uint64_t>(AscendC::BLOCK_CUBE);
+    // Bound the normal search to useful Cube tiles. If UB cannot fit any of
+    // those tiles, retain the wider search as a correctness fallback.
+    for (bool measuredRangeOnly : {true, false}) {
+        for (uint64_t mL1Size = M_L1_MAX_SIZE; mL1Size >= mStep; mL1Size -= mStep) {
+            const uint64_t kL1Size = CalcKL1Size(mL1Size);
+            if (measuredRangeOnly && kL1Size > PREMIX_KL1_SEARCH_LIMIT) {
+                continue;
+            }
+            PremixUbTiling ubTiling;
+            if (!CalcPremixML1UbTiling(mL1Size, ubTiling)) {
+                continue;
+            }
+            const uint64_t rounds = CeilDiv(CeilDiv(bs_, mL1Size), aicCoreNum_);
+            const uint64_t paddedRows = rounds * mL1Size;
+            // M-only premix synchronizes Cube input once per kUbSize window.
+            // Account for row setup/reduction as well as padded element work;
+            // neither a single M round nor cast slices alone predict its cost.
+            const uint64_t work = paddedRows * (d_ + CeilDiv(d_, ubTiling.kUbSize) * PREMIX_ROW_CHUNK_OVERHEAD);
+            // Short inputs benefit from fewer stage transitions, provided K
+            // remains wide and no additional M chunks are needed inside UB.
+            const bool lowLatency = rounds <= PREMIX_LATENCY_MAX_ROUNDS &&
+                                    ubTiling.kUbSize >= PREMIX_LATENCY_MIN_KUB_SIZE &&
+                                    ubTiling.mUbSize == CeilDiv(mL1Size, cvRatio_);
+            const PremixMScore score = {
+                rounds, work, paddedRows, static_cast<uint64_t>(ubTiling.kUbSize), ubTiling.castSegments, lowLatency};
+            if (score.IsBetterThan(bestScore)) {
+                bestM = mL1Size;
+                bestScore = score;
+                bestUbTiling = ubTiling;
+            }
+        }
+        if (bestScore.rounds > 0) {
+            break;
+        }
+    }
+    OP_LOGD(context_->GetNodeName(),
+            "MhcPreSinkhorn premix M-split selection: mL1Size=%lu, kL1Size=%lu, maxRound=%lu, paddedRows=%lu, "
+            "work=%lu, kUbSize=%ld, mUbSize=%ld, castSegments=%d",
+            bestM, CalcKL1Size(bestM), bestScore.rounds, bestScore.paddedRows, bestScore.work, bestUbTiling.kUbSize,
+            bestUbTiling.mUbSize, bestUbTiling.castSegments ? 1 : 0);
+    return bestM;
+}
+
+void MhcPreSinkhornTilingRegbase::CalcPremixMSplitTiling(int32_t deterministicLevel)
+{
+    if (!hasPremix_ || deterministicLevel == BATCH_CONSISTENCY_LEVEL) {
+        return;
+    }
+    tilingData_.set_cubeBlockDimM(aicCoreNum_);
+    const uint64_t mL1Size = SelectPremixML1Size();
+    tilingData_.set_mL1Size(mL1Size);
+    tilingData_.set_kL1Size(CalcKL1Size(mL1Size));
+}
+
+void MhcPreSinkhornTilingRegbase::SelectTilingKey(bool isKSplit)
+{
+    if (isKSplit) {
+        if (cvRatio_ == CV_RATIO_ONE) {
+            tilingKey_ = needGrad_ ? TILING_KEY_CV_ONE_GRAD_K_SPLIT : TILING_KEY_CV_ONE_NO_GRAD_K_SPLIT;
+        } else {
+            tilingKey_ = needGrad_ ? TILING_KEY_GRAD_K_SPLIT : TILING_KEY_NO_GRAD_K_SPLIT;
+        }
+    } else {
+        if (cvRatio_ == CV_RATIO_ONE) {
+            tilingKey_ = needGrad_ ? TILING_KEY_CV_ONE_GRAD_M_SPLIT : TILING_KEY_CV_ONE_NO_GRAD_M_SPLIT;
+        } else {
+            tilingKey_ = needGrad_ ? TILING_KEY_GRAD_M_SPLIT : TILING_KEY_NO_GRAD_M_SPLIT;
+        }
+    }
+}
+
 ge::graphStatus MhcPreSinkhornTilingRegbase::CalcOpTiling()
 {
     uint64_t kSize = hcMult_ * d_;
@@ -618,6 +1060,17 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcOpTiling()
         kDimNum = 1;
     }
 
+    // Once a feasible wide-K M tile can occupy every AIC, avoid K splitting
+    // merely because the initial 256-row partition leaves some cores idle.
+    const uint64_t premixMinM = A_L1_SIZE / PREMIX_KL1_SEARCH_LIMIT;
+    if (hasPremix_ && deterministicLevel != BATCH_CONSISTENCY_LEVEL &&
+        static_cast<uint64_t>(bs_) >= aicCoreNum_ * premixMinM) {
+        PremixUbTiling ubTiling;
+        if (CalcPremixML1UbTiling(premixMinM, ubTiling)) {
+            kDimNum = 1;
+        }
+    }
+
     uint64_t splitKSize = RoundUp(CeilDiv(kSize, kDimNum), K_MULIT_CORE_SPLIT_BASE_SIZE);
     uint64_t actualKBlockNum = CeilDiv(kSize, splitKSize);
 
@@ -627,22 +1080,14 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcOpTiling()
     tilingData_.set_multCoreSplitKSize(splitKSize);
     // 开启batch一致性开关时mL1Size固定取M_L1_MAX_SIZE，使kL1Size不随实际bs_切分结果变化，保证在不同batch下切分一致
     uint64_t mSizeForKL1 = (deterministicLevel == BATCH_CONSISTENCY_LEVEL) ? M_L1_MAX_SIZE : tilingData_.get_mL1Size();
-    tilingData_.set_kL1Size(std::min(A_L1_SIZE / mSizeForKL1, static_cast<uint64_t>(K_L1_MAX_SIZE)) / 128 * 128);
+    tilingData_.set_kL1Size(CalcKL1Size(mSizeForKL1));
 
     bool isKSplit = kDimNum != 1;
-    if (isKSplit) {
-        if (cvRatio_ == CV_RATIO_ONE) {
-            tilingKey_ = needGrad_ ? TILING_KEY_CV_ONE_GRAD_K_SPLIT : TILING_KEY_CV_ONE_NO_GRAD_K_SPLIT;
-        } else {
-            tilingKey_ = needGrad_ ? TILING_KEY_GRAD_K_SPLIT : TILING_KEY_NO_GRAD_K_SPLIT;
-        }
-    } else {
-        if (cvRatio_ == CV_RATIO_ONE) {
-            tilingKey_ = needGrad_ ? TILING_KEY_CV_ONE_GRAD_M_SPLIT : TILING_KEY_CV_ONE_NO_GRAD_M_SPLIT;
-        } else {
-            tilingKey_ = needGrad_ ? TILING_KEY_GRAD_M_SPLIT : TILING_KEY_NO_GRAD_M_SPLIT;
-        }
+    if (!isKSplit) {
+        CalcPremixMSplitTiling(deterministicLevel);
+        mDimNum = tilingData_.get_cubeBlockDimM();
     }
+    SelectTilingKey(isKSplit);
     OP_LOGD(context_->GetNodeName(),
             "MhcPreSinkhorn regbase tiling decision: tilingKey=%lu, needGrad=%d, cvRatio=%lu, deterministicLevel=%d, "
             "mDimNum=%lu, singleCoreM=%lu, originalKDimNum=%lu, finalKDimNum=%lu, actualKBlockNum=%lu, "
