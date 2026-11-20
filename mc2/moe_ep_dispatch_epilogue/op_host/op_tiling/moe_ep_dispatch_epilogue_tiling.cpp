@@ -15,6 +15,7 @@
  *        eAlloc from output shape, workspace for rank+expert prefix sums.
  */
 
+#include <algorithm>
 #include <climits>
 #include <cmath>
 #include <cstdint>
@@ -80,13 +81,31 @@ constexpr uint64_t UB_ALIGN = 32UL;
 constexpr uint64_t MAX_OUT_DTYPE_SIZE = 2UL;
 constexpr uint64_t FP8_DTYPE_SIZE = 1UL;
 constexpr uint64_t METADATA_DTYPE_SIZE = 4UL; // sizeof(int32)=sizeof(float)=4
-constexpr uint64_t METADATA_FIELDS = 5UL;
+constexpr uint64_t METADATA_FIELDS = 4UL;
 constexpr int64_t SCALES_GROUP_SIZE_MXFP = 32;
 constexpr int64_t SCALES_GROUP_SIZE_PERGROUP = 128;
 constexpr int64_t SCALES_ALIGN_EVEN = 2; // fp8 align 2
 constexpr uint32_t NETWORK_DIRECT = 0U;
 constexpr uint32_t NETWORK_HYBRID = 1U;
 constexpr uint32_t TOPK_AND_TOPK_WEIGHT_NUMBER = 2U;
+constexpr uint32_t STAGE_RING = 3U;
+constexpr uint32_t UB_CONTROL_RESERVE = 4096U;
+constexpr uint32_t TOKEN_BATCH_MAX = 8U;
+constexpr uint32_t ROUTE_FRAME_MAX_TOKENS = 32U;
+constexpr uint32_t ROUTE_FRAME_MAX_ROUTES = 512U;
+
+// Host-side UB planning and route-frame layout.
+constexpr uint32_t MOE_EP_UB_BLOCK_BYTES = 32U;
+constexpr uint32_t MOE_EP_INT32_PER_BLOCK = MOE_EP_UB_BLOCK_BYTES / sizeof(int32_t);
+constexpr uint32_t MOE_EP_INT32_PER_INT64 = sizeof(int64_t) / sizeof(int32_t);
+constexpr uint32_t MOE_EP_SLOT_META_SECTIONS = 2U;
+constexpr uint32_t MOE_EP_SLOT_META_EXTRA_FIELDS = 2U;
+constexpr uint32_t MOE_EP_RECV_META_FIELDS = 4U;
+constexpr uint32_t SHARED_PHASE_BYTES = 64U * 1024U;
+constexpr uint32_t MOE_EP_BUFFER_NUM = 2U;
+constexpr uint32_t SHARED_HALF_BYTES = SHARED_PHASE_BYTES / MOE_EP_BUFFER_NUM;
+constexpr uint32_t MOE_EP_ROUTE_SCRATCH_TABLES = 2U;
+constexpr uint32_t MOE_EP_ROUTE_GROUP_FIELDS = MOE_EP_INT32_PER_BLOCK;
 
 static void PrintTilingDataInfo(const char* nodeName, const MoeEpDispatchEpilogueInfo& info)
 {
@@ -95,6 +114,8 @@ static void PrintTilingDataInfo(const char* nodeName, const MoeEpDispatchEpilogu
     OP_LOGD(nodeName, "hidden=%u, topK=%u, numTokens=%u, numMaxTokensPerRank=%u, perSlotBytes=%u", info.cfg.hidden,
             info.cfg.topK, info.cfg.numTokens, info.cfg.numMaxTokensPerRank, info.cfg.perSlotBytes);
     OP_LOGD(nodeName, "aivNum=%u, cached=%u, scalesBytes=%u", info.aivNum, info.cached, info.cfg.scalesBytes);
+    OP_LOGD(nodeName, "tokenBatch=%u, routeFrameSlots=%u, totalUbSize=%lu", info.tokenBatch, info.routeFrameSlots,
+            info.totalUbSize);
 }
 
 // ---------------------------------------------------------------------------
@@ -482,17 +503,19 @@ static ge::graphStatus CheckOutputTensors(const gert::TilingContext* context, co
             return ge::GRAPH_FAILED);
     }
 
-    // Full storage descriptor includes five-column rows, rank offsets, and the local reverse index.
+    // Four-column rows, rank offsets, local reverse index and three compact cache-index columns.
     info.metadataRankOffsetsOffset =
         AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_FIELDS * METADATA_DTYPE_SIZE);
     info.localRecvIndexOffset = info.metadataRankOffsetsOffset +
                                 AlignMoeEpWin((static_cast<uint64_t>(info.cfg.epWorldSize) + 1U) * METADATA_DTYPE_SIZE);
-    // 旧字段的偏移保持不变；尾部仅追加slot终点和metadata行号。
+    // The two copy-entry columns share slotEnds ranges; each column has A_alloc capacity.
     info.slotEndsOffset = info.localRecvIndexOffset + AlignMoeEpWin(static_cast<uint64_t>(info.cfg.numTokens) *
                                                                     info.cfg.topK * METADATA_DTYPE_SIZE);
-    info.slotRowIdsOffset = info.slotEndsOffset + AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_DTYPE_SIZE);
+    info.slotRecvXIdsOffset = info.slotEndsOffset + AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_DTYPE_SIZE);
+    info.slotTopkIdsOffset =
+        info.slotRecvXIdsOffset + AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_DTYPE_SIZE);
     const uint64_t packedElements =
-        (info.slotRowIdsOffset + AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_DTYPE_SIZE)) /
+        (info.slotTopkIdsOffset + AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_DTYPE_SIZE)) /
         METADATA_DTYPE_SIZE;
     auto recvSrcMetaShape = context->GetOutputShape(OUT_RECV_SRC_METADATA_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvSrcMetaShape);
@@ -558,6 +581,123 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* cont
     info.slotWinStateOffset = layout.slotWinStateOffset;
     info.dispatchNotifyCount = layout.dispatchNotifyCount;
     info.totalWinSizeEp = maxWindowSize;
+    return ge::GRAPH_SUCCESS;
+}
+
+static uint32_t AlignUp(uint32_t value, uint32_t alignment = MOE_EP_UB_BLOCK_BYTES)
+{
+    return (value + alignment - 1U) / alignment * alignment;
+}
+
+static ge::graphStatus SetTokenBatch(MoeEpDispatchEpilogueInfo& info, uint32_t xTypeBytes, bool isFp8, bool hasWeights,
+                                     const char* nodeName)
+{
+    const auto& cfg = info.cfg;
+    info.tokenBatch = 1U;
+
+    const uint32_t tokenBytes = AlignUp(cfg.hidden * xTypeBytes) + (isFp8 ? AlignUp(cfg.scalesBytes) : 0U);
+    const uint32_t expertBytes = AlignUp(cfg.numLocalExperts * sizeof(int64_t));
+    const uint32_t countBytes = AlignUp(cfg.numLocalExperts * sizeof(int32_t));
+    const uint32_t recvCountBytes = AlignUp(cfg.epWorldSize * sizeof(int32_t));
+    const uint32_t rankOffsetBytes = AlignUp((cfg.epWorldSize + 1U) * sizeof(int32_t));
+    const uint32_t jointCountBytes =
+        AlignUp(cfg.numLocalExperts, MOE_EP_INT32_PER_BLOCK) * cfg.epWorldSize * sizeof(int32_t);
+    const uint32_t stageBytes = cfg.topK * MOE_EP_INT32_PER_BLOCK * sizeof(int32_t) * STAGE_RING;
+    OP_TILING_CHECK(!info.cached && jointCountBytes > SHARED_HALF_BYTES,
+                    OP_LOGE(nodeName,
+                            "Insufficient UB for rank-expert counts: required=%u, available=%u bytes, "
+                            "ep_world_size=%u, local_experts=%u.",
+                            jointCountBytes, SHARED_HALF_BYTES, cfg.epWorldSize, cfg.numLocalExperts),
+                    return ge::GRAPH_FAILED);
+
+    uint64_t fixedUbBytes = SHARED_PHASE_BYTES + expertBytes + recvCountBytes + rankOffsetBytes + UB_CONTROL_RESERVE;
+    if (!info.cached) {
+        // Budget the independent buffers in InitSlotBuffers.
+        fixedUbBytes += 2 * countBytes + 2 * jointCountBytes + 2 * expertBytes + stageBytes;
+    } else if (hasWeights) {
+        fixedUbBytes += stageBytes;
+    }
+    const uint64_t minTokenBytes = MOE_EP_BUFFER_NUM * static_cast<uint64_t>(tokenBytes);
+    OP_TILING_CHECK(fixedUbBytes + minTokenBytes > info.totalUbSize,
+                    OP_LOGE(nodeName, "Insufficient UB: fixed=%lu, one-batch buffers=%lu, available=%lu.", fixedUbBytes,
+                            minTokenBytes, info.totalUbSize),
+                    return ge::GRAPH_FAILED);
+    const uint64_t maxBatchByUb = (info.totalUbSize - fixedUbBytes) / minTokenBytes;
+    info.tokenBatch = static_cast<uint32_t>(std::min<uint64_t>(maxBatchByUb, TOKEN_BATCH_MAX));
+    OP_LOGD(nodeName, "token batch: fixedUb=%lu, tokenBytes=%u, totalUb=%lu, selected=%u.", fixedUbBytes, tokenBytes,
+            info.totalUbSize, info.tokenBatch);
+    return ge::GRAPH_SUCCESS;
+}
+
+// Fill one route frame layout for `slots` and return the bytes needed by the id scratch,
+// both input frames and both output frames inside the fixed shared phase budget.
+static uint64_t CalcRouteFrameBytes(const MoeEpDispatchEpilogueInfo& info, uint32_t slots, bool hasWeights,
+                                    MoeEpDispatchEpilogueRouteLayout& layout)
+{
+    const auto& cfg = info.cfg;
+    const uint32_t tokensAlign = AlignUp(slots, MOE_EP_INT32_PER_BLOCK);
+    const uint32_t entries = slots * cfg.topK;
+    const uint32_t entriesAlign = AlignUp(entries, MOE_EP_INT32_PER_BLOCK);
+    const uint32_t groupCapacity = std::min(cfg.numLocalExperts, entries);
+
+    layout = {};
+    layout.token = MOE_EP_INT32_PER_BLOCK;
+    layout.rank = layout.token + tokensAlign;
+    layout.ends = layout.rank + tokensAlign;
+    layout.dst = layout.ends + tokensAlign;
+    layout.recvIdx = layout.dst + MOE_EP_INT32_PER_INT64 * entriesAlign;
+    layout.topk = layout.recvIdx + entriesAlign;
+    layout.flatRouteIndex = layout.topk + entriesAlign;
+    layout.ordinal = layout.flatRouteIndex + entriesAlign;
+    layout.groups = layout.ordinal + entriesAlign;
+    layout.metadata = layout.groups + MOE_EP_ROUTE_GROUP_FIELDS * groupCapacity;
+    layout.weights =
+        layout.metadata + AlignUp(MOE_EP_RECV_META_FIELDS * entries + (MOE_EP_INT32_PER_BLOCK - 1U) * groupCapacity,
+                                  MOE_EP_INT32_PER_BLOCK);
+    layout.size =
+        layout.weights +
+        (hasWeights ? AlignUp(entries + (MOE_EP_INT32_PER_BLOCK - 1U) * groupCapacity, MOE_EP_INT32_PER_BLOCK) : 0U);
+
+    const uint32_t routeIdsBase = AlignUp(MOE_EP_ROUTE_SCRATCH_TABLES * cfg.numLocalExperts, MOE_EP_INT32_PER_BLOCK);
+    const uint32_t paddedMetaElems =
+        AlignUp(MOE_EP_SLOT_META_SECTIONS * AlignUp(cfg.topK, MOE_EP_INT32_PER_BLOCK) + MOE_EP_SLOT_META_EXTRA_FIELDS,
+                MOE_EP_INT32_PER_BLOCK);
+    const uint32_t routeInputBase = routeIdsBase + MOE_EP_BUFFER_NUM * tokensAlign;
+    const uint32_t routeOutputBase = routeInputBase + MOE_EP_BUFFER_NUM * slots * paddedMetaElems;
+    return (static_cast<uint64_t>(routeOutputBase) + MOE_EP_BUFFER_NUM * static_cast<uint64_t>(layout.size)) *
+           sizeof(int32_t);
+}
+
+static ge::graphStatus SetRouteLayout(MoeEpDispatchEpilogueInfo& info, bool hasWeights, const char* nodeName)
+{
+    info.routeFrameSlots = 0U;
+    info.routeLayout = {};
+    if (info.cached) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const uint32_t targetSlots = std::min(ROUTE_FRAME_MAX_ROUTES / info.cfg.topK, ROUTE_FRAME_MAX_TOKENS);
+    MoeEpDispatchEpilogueRouteLayout layout{};
+    uint64_t requiredBytes = 0U;
+    uint32_t slots = targetSlots;
+    for (; slots > 0U; --slots) {
+        if (slots >= info.tokenBatch && slots % info.tokenBatch != 0U) {
+            continue;
+        }
+        requiredBytes = CalcRouteFrameBytes(info, slots, hasWeights, layout);
+        if (requiredBytes <= SHARED_PHASE_BYTES) {
+            break;
+        }
+    }
+    // Legal parameters always fit at one slot (worst case below 18 KiB), so this only guards
+    // future changes to the shared phase size or to the route frame composition.
+    OP_TILING_CHECK(slots == 0U,
+                    OP_LOGE(nodeName, "Route frames exceed the shared phase: required=%lu, budget=%u bytes.",
+                            requiredBytes, SHARED_PHASE_BYTES),
+                    return ge::GRAPH_FAILED);
+    info.routeFrameSlots = slots;
+    info.routeLayout = layout;
+    OP_LOGD(nodeName, "route frame: slots=%u/%u, bytes=%lu/%u, frameElems=%u, tokenBatch=%u.", slots, targetSlots,
+            requiredBytes, SHARED_PHASE_BYTES, layout.size, info.tokenBatch);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -647,6 +787,11 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "window layout", "The computed HCCL window size is invalid"),
         return ge::GRAPH_FAILED);
 
+    OP_TILING_CHECK(SetTokenBatch(info, recvXDtypeSize, isFp8, hasTopkWeights, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "Set token batch failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(SetRouteLayout(info, hasTopkWeights, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "Set route layout failed."), return ge::GRAPH_FAILED);
+
     size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
 
@@ -654,7 +799,7 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
     // expert and contributing core. They sit at the very start of this op's user workspace.
     // 必须与 kernel 的 rankExpertCountStride_ 逐字节一致：kernel 按 [rank][expert] 存表，每个 rank 的行先补到
     // ELEM_ALIGN 再乘 epWorldSize_。写成 ceil(numExperts / 8) * 8 只在 numLocalExperts 本身对齐时才相等。
-    uint32_t jointCountStride = ((info.cfg.numLocalExperts + 7U) / 8U) * 8U * info.cfg.epWorldSize;
+    uint32_t jointCountStride = AlignUp(info.cfg.numLocalExperts, MOE_EP_INT32_PER_BLOCK) * info.cfg.epWorldSize;
     uint64_t jointCountBytes = static_cast<uint64_t>(aivNum) * jointCountStride * sizeof(int32_t);
     uint64_t jointCountBytesAlign512 = ((jointCountBytes + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN) * WIN_ADDR_ALIGN;
 

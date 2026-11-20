@@ -43,7 +43,8 @@ __simd_callee__ inline void AddHistogramCounts(__ubuf__ int32_t* counts, Reg::Re
     }
 }
 
-// 每页256个专家；padding为-1，先筛选再统计，避免低字节截断串桶。
+// 每页256个专家；elements仅覆盖Compact搬入的有效ID，尾部用mask屏蔽。
+// 仍须筛选专家范围，避免其他rank的ID在低字节截断后串桶。
 __simd_vf__ __aicore__ inline void CountTopkHits(__ubuf__ int32_t* topk, __ubuf__ int32_t* counts, uint32_t elements,
                                                  uint32_t experts, uint32_t expertBase)
 {
@@ -63,7 +64,7 @@ __simd_vf__ __aicore__ inline void CountTopkHits(__ubuf__ int32_t* topk, __ubuf_
             Reg::Compares<int32_t, CMPMODE::GE>(lower, ids, 0, valid);
             Reg::Compares<int32_t, CMPMODE::LT>(upper, ids, static_cast<int32_t>(pageSize), valid);
             Reg::And(selected, lower, upper, all);
-            // B32掩码只选择每个int32的最低字节；每tile至多128*32项，不溢出uint16。
+            // B32掩码只选择每个int32的最低字节；32 KiB半区每tile至多8192项，不溢出uint16。
             Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN0, Reg::HistogramsType::FREQUENCY>(
                 low, reinterpret_cast<Reg::RegTensor<uint8_t>&>(ids), selected);
             Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN1, Reg::HistogramsType::FREQUENCY>(

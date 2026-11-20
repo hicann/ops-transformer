@@ -30,7 +30,7 @@ _ENGRAM_DTYPE_TO_INT = {
 _ENGRAM_INT_TO_DTYPE = {v: k for k, v in _ENGRAM_DTYPE_TO_INT.items()}
 _ENGRAM_SF_DTYPES = (torch.float32, torch.float8_e8m0fnu)
 _ENGRAM_GRAD_DTYPES = (torch.bfloat16, torch.float16, torch.float32)
-_MOE_EP_METADATA_FIELDS = 5
+_MOE_EP_METADATA_FIELDS = 4
 _MOE_SHARED_JETTY_NUM = 64
 _MOE_COMM_ALG_AUTO = "auto"
 _MOE_COMM_ALG_CLOS_ONLY = "clos_only"
@@ -60,9 +60,9 @@ def _metadata_buffer_layout(capacity: int, ep_world_size: int, route_slots: int)
         rank_offsets_offset + (ep_world_size + 1 + align - 1) // align * align
     )
     total = local_index_offset + (route_slots + align - 1) // align * align
-    # 每个有效slot至少有一条命中；用已有capacity作为两张紧凑索引的容量。
-    # 只存终点，不存隐含的首个0；旧metadata及其顺序不变。
-    total += 2 * ((capacity + align - 1) // align * align)
+    # Each valid source slot has a hit. The three capacity-sized columns are
+    # inclusive slot ends, recv-X IDs and top-k IDs; the latter two share entry indices.
+    total += 3 * ((capacity + align - 1) // align * align)
     return rank_offsets_offset, local_index_offset, total
 
 

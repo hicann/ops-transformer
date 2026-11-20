@@ -61,7 +61,7 @@ constexpr int64_t MIN_NUM_EXPERTS = 2;
 constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024U * 1024U;
 constexpr uint64_t UB_ALIGN = 32UL;
 constexpr uint64_t COMM_ALIGN = 512UL;
-constexpr uint64_t METADATA_FIELDS = 5UL;
+constexpr uint64_t METADATA_FIELDS = 4UL;
 constexpr uint64_t MAX_OUT_DTYPE_SIZE = 2UL;
 constexpr int64_t H_MIN = 1;
 constexpr int64_t H_MAX = 8192;
@@ -174,7 +174,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context,
     const uint64_t packedElements =
         (info.localRecvIndexOffset +
          AlignMoeEpWin(static_cast<uint64_t>(info.cfg.numTokens) * info.cfg.topK * sizeof(int32_t)) +
-         2U * AlignMoeEpWin(info.recvCapacity * sizeof(int32_t))) /
+         3U * AlignMoeEpWin(info.recvCapacity * sizeof(int32_t))) /
         sizeof(int32_t);
     OP_TILING_CHECK(recvSrcMetadataShape->GetStorageShape().GetDimNum() != ONE_DIMS,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "recv_src_metadata", "unknown",

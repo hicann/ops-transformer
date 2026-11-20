@@ -21,11 +21,11 @@
 
 namespace MoeEpCombineLayout {
 
-// Each received token has five int32 metadata fields.
-constexpr uint32_t RECV_META_FIELDS = 5U;
+// Each received token has four int32 fields: srcRank, srcToken, srcTopk, recvXIdx.
+constexpr uint32_t RECV_META_FIELDS = 4U;
 constexpr uint32_t META_TOKEN_IDX_OFFSET = 1U;
 constexpr uint32_t META_TOPK_IDX_OFFSET = 2U;
-constexpr uint32_t META_RECV_X_IDX_OFFSET = 4U;
+constexpr uint32_t META_RECV_X_IDX_OFFSET = 3U;
 
 // Metadata batches are measured in tokens, independently of Hcomm's WQEBB capacity.
 constexpr uint32_t METADATA_BATCH_TOKENS = 256U;

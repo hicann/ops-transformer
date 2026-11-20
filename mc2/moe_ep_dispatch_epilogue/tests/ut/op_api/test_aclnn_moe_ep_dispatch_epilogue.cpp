@@ -48,7 +48,7 @@ TEST_F(AclnnMoeEpDispatchEpilogueTest, nullptr_context)
     auto numRecvTokensPerRank = TensorDesc({2}, ACL_INT32, ACL_FORMAT_ND);
     auto numRecvTokensPerExpert = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND);
     auto recvX = TensorDesc({8, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto recvSrcMetadata = TensorDesc({640}, ACL_INT32, ACL_FORMAT_ND);
+    auto recvSrcMetadata = TensorDesc({768}, ACL_INT32, ACL_FORMAT_ND);
     auto recvTopkWeights = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND);
     auto recvScales = TensorDesc({8, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     auto ut = OP_API_UT(aclnnMoeEpDispatchEpilogue,
@@ -68,7 +68,7 @@ TEST_F(AclnnMoeEpDispatchEpilogueTest, nullptr_recvScales)
     auto numRecvTokensPerRank = TensorDesc({2}, ACL_INT32, ACL_FORMAT_ND);
     auto numRecvTokensPerExpert = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND);
     auto recvX = TensorDesc({8, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto recvSrcMetadata = TensorDesc({640}, ACL_INT32, ACL_FORMAT_ND);
+    auto recvSrcMetadata = TensorDesc({768}, ACL_INT32, ACL_FORMAT_ND);
     auto recvTopkWeights = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND);
     auto ut = OP_API_UT(aclnnMoeEpDispatchEpilogue,
                         INPUT(context, x, topkIdx, numRecvTokensPerRank, numRecvTokensPerExpert, nullptr, 2, 0, 4, 8,
@@ -86,7 +86,7 @@ TEST_F(AclnnMoeEpDispatchEpilogueTest, nullptr_x)
     auto numRecvTokensPerRank = TensorDesc({2}, ACL_INT32, ACL_FORMAT_ND);
     auto numRecvTokensPerExpert = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND);
     auto recvX = TensorDesc({8, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto recvSrcMetadata = TensorDesc({640}, ACL_INT32, ACL_FORMAT_ND);
+    auto recvSrcMetadata = TensorDesc({768}, ACL_INT32, ACL_FORMAT_ND);
     auto recvTopkWeights = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND);
     auto recvScales = TensorDesc({8, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     auto ut = OP_API_UT(aclnnMoeEpDispatchEpilogue,
@@ -106,7 +106,7 @@ TEST_F(AclnnMoeEpDispatchEpilogueTest, invalid_epWorldSize)
     auto numRecvTokensPerRank = TensorDesc({2}, ACL_INT32, ACL_FORMAT_ND);
     auto numRecvTokensPerExpert = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND);
     auto recvX = TensorDesc({8, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto recvSrcMetadata = TensorDesc({640}, ACL_INT32, ACL_FORMAT_ND);
+    auto recvSrcMetadata = TensorDesc({768}, ACL_INT32, ACL_FORMAT_ND);
     auto recvTopkWeights = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND);
     auto recvScales = TensorDesc({8, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     auto ut = OP_API_UT(aclnnMoeEpDispatchEpilogue,
@@ -126,7 +126,7 @@ TEST_F(AclnnMoeEpDispatchEpilogueTest, invalid_epRankId)
     auto numRecvTokensPerRank = TensorDesc({2}, ACL_INT32, ACL_FORMAT_ND);
     auto numRecvTokensPerExpert = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND);
     auto recvX = TensorDesc({8, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto recvSrcMetadata = TensorDesc({640}, ACL_INT32, ACL_FORMAT_ND);
+    auto recvSrcMetadata = TensorDesc({768}, ACL_INT32, ACL_FORMAT_ND);
     auto recvTopkWeights = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND);
     auto recvScales = TensorDesc({8, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     auto ut = OP_API_UT(aclnnMoeEpDispatchEpilogue,
@@ -146,7 +146,7 @@ TEST_F(AclnnMoeEpDispatchEpilogueTest, invalid_topo)
     auto numRecvTokensPerRank = TensorDesc({2}, ACL_INT32, ACL_FORMAT_ND);
     auto numRecvTokensPerExpert = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND);
     auto recvX = TensorDesc({8, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto recvSrcMetadata = TensorDesc({640}, ACL_INT32, ACL_FORMAT_ND);
+    auto recvSrcMetadata = TensorDesc({768}, ACL_INT32, ACL_FORMAT_ND);
     auto recvTopkWeights = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND);
     auto recvScales = TensorDesc({8, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     auto ut = OP_API_UT(aclnnMoeEpDispatchEpilogue,
@@ -166,7 +166,7 @@ TEST_F(AclnnMoeEpDispatchEpilogueTest, invalid_rank_per_server)
     auto numRecvTokensPerRank = TensorDesc({2}, ACL_INT32, ACL_FORMAT_ND);
     auto numRecvTokensPerExpert = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND);
     auto recvX = TensorDesc({8, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto recvSrcMetadata = TensorDesc({640}, ACL_INT32, ACL_FORMAT_ND);
+    auto recvSrcMetadata = TensorDesc({768}, ACL_INT32, ACL_FORMAT_ND);
     auto recvTopkWeights = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND);
     auto recvScales = TensorDesc({8, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     auto ut = OP_API_UT(aclnnMoeEpDispatchEpilogue,

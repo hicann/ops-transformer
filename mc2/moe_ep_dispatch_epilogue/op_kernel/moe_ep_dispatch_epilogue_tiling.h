@@ -12,6 +12,7 @@
 #define MOE_EP_DISPATCH_EPILOGUE_TILING_H
 
 #include "../../common/op_kernel/moe_ep_exception_dump_defs.h"
+#include <cstdint>
 
 struct MoeEpCommonTilingData {
     uint32_t epWorldSize;
@@ -27,6 +28,21 @@ struct MoeEpCommonTilingData {
     uint32_t expertAlignment;
 };
 
+struct MoeEpDispatchEpilogueRouteLayout {
+    uint32_t token;
+    uint32_t rank;
+    uint32_t ends;
+    uint32_t dst;
+    uint32_t recvIdx;
+    uint32_t topk;
+    uint32_t flatRouteIndex;
+    uint32_t ordinal;
+    uint32_t groups;
+    uint32_t metadata;
+    uint32_t weights;
+    uint32_t size;
+};
+
 struct MoeEpDispatchEpilogueInfo {
     MoeEpCommonTilingData cfg;
     MoeEpDumpMetadata dumpMetadata;
@@ -38,17 +54,19 @@ struct MoeEpDispatchEpilogueInfo {
     uint32_t cached = 0;              // 0 = non-cached path, 1 = cached path
     uint32_t isMxQuant = 0;           // 0 = float scales, 1 = fp8_e8m0 scales (MX quant)
     uint32_t networkMode = 0; // 0 = direct(紧拼槽布局 meta@tokenSize), 1 = hybrid(对齐槽布局 meta@hAlign)
-    // 占位，勿删：这个字段曾经死在 metadataRankOffsetsOffset 前面，删掉会把后者前移 8 字节。
-    // tiling 结构体是 host tiling 与 kernel 共用的裸内存 ABI，偏移一变，两侧只要不是同一次构建，
-    // kernel 就会把 metadataRankOffsetsOffset 读成 0，offsets 被写到 recvSrcMetadata + 0，
-    // 随后又被 metadata 行覆盖，表现为 recv_rank_offsets 恒为 torch.empty 的 [0, 0, 0]。
-    // 保留占位即可让新旧 host/kernel 混用时字段偏移不变。
+    // Reserved to preserve the existing tiling data field offsets.
     uint64_t rankExpertHitCountOffsetReserved = 0;
     uint64_t metadataRankOffsetsOffset = 0; // byte offset of the aligned tail in packed metadata
     uint64_t localRecvIndexOffset = 0;      // byte offset of [num_tokens, top_k] local recv_x reverse index
     uint64_t slotEndsOffset = 0;            // compact slot list ends, capacity entries
-    uint64_t slotRowIdsOffset = 0;          // metadata row ids grouped by slot, capacity entries
-    uint64_t totalWinSizeEp = 0;            // 通信窗口总字节数（OOM 检查地址范围登记用）
+    uint64_t slotRecvXIdsOffset = 0;        // recv-X rows grouped by source slot, capacity entries
+    uint64_t totalWinSizeEp = 0;            // communication window size in bytes for OOM diagnostics
+
+    // Append new fields here to preserve prefix offsets. Host and kernel must use the same layout.
+    MoeEpDispatchEpilogueRouteLayout routeLayout; // offsets in int32 elements within the route frame
+    uint32_t tokenBatch = 1U;                     // tokens per copy batch, planned from the UB budget
+    uint32_t routeFrameSlots = 0U;                // source slots per route frame in the non-cached path
+    uint64_t slotTopkIdsOffset = 0;               // matching top-k positions, separate compact column
 };
 
 struct MoeEpDispatchEpilogueTilingData {

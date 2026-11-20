@@ -32,12 +32,12 @@ static uint64_t AlignWin(uint64_t value)
 
 static int64_t CalcPackedMetadataElements(int64_t epWorldSize, int64_t numTokens, int64_t topK, int64_t recvCapacity)
 {
-    uint64_t metadataRankOffsetsOffset = AlignWin(static_cast<uint64_t>(recvCapacity) * 5UL * sizeof(int32_t));
+    uint64_t metadataRankOffsetsOffset = AlignWin(static_cast<uint64_t>(recvCapacity) * 4UL * sizeof(int32_t));
     uint64_t localRecvIndexOffset =
         metadataRankOffsetsOffset + AlignWin((static_cast<uint64_t>(epWorldSize) + 1UL) * sizeof(int32_t));
     uint64_t packedBytes = localRecvIndexOffset +
                            AlignWin(static_cast<uint64_t>(numTokens) * static_cast<uint64_t>(topK) * sizeof(int32_t)) +
-                           2UL * AlignWin(static_cast<uint64_t>(recvCapacity) * sizeof(int32_t));
+                           3UL * AlignWin(static_cast<uint64_t>(recvCapacity) * sizeof(int32_t));
     return static_cast<int64_t>(packedBytes / sizeof(int32_t));
 }
 

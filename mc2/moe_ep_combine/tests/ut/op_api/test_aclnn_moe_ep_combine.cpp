@@ -44,7 +44,7 @@ TEST_F(AclnnMoeEpCombineTest, nullptr_context)
 {
     auto x = TensorDesc({8, 7168}, ACL_FLOAT16, ACL_FORMAT_ND);
     auto topkIdx = TensorDesc({8, 8}, ACL_INT32, ACL_FORMAT_ND);
-    auto recvSrcMetadata = TensorDesc({64}, ACL_INT32, ACL_FORMAT_ND);
+    auto recvSrcMetadata = TensorDesc({768}, ACL_INT32, ACL_FORMAT_ND);
     auto numRecvTokensPerExpert = TensorDesc({32}, ACL_INT32, ACL_FORMAT_ND);
     auto topkWeights = TensorDesc({8, 8}, ACL_FLOAT, ACL_FORMAT_ND);
     auto ut = OP_API_UT(
@@ -61,7 +61,7 @@ TEST_F(AclnnMoeEpCombineTest, invalid_epWorldSize)
     auto context = TensorDesc({2052}, ACL_INT32, ACL_FORMAT_ND);
     auto x = TensorDesc({8, 7168}, ACL_FLOAT16, ACL_FORMAT_ND);
     auto topkIdx = TensorDesc({8, 8}, ACL_INT32, ACL_FORMAT_ND);
-    auto recvSrcMetadata = TensorDesc({64}, ACL_INT32, ACL_FORMAT_ND);
+    auto recvSrcMetadata = TensorDesc({768}, ACL_INT32, ACL_FORMAT_ND);
     auto numRecvTokensPerExpert = TensorDesc({32}, ACL_INT32, ACL_FORMAT_ND);
     auto topkWeights = TensorDesc({8, 8}, ACL_FLOAT, ACL_FORMAT_ND);
     auto ut = OP_API_UT(

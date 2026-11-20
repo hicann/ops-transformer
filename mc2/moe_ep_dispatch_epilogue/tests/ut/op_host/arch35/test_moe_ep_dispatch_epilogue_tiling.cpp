@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 #include "tiling_case_executor.h"
 #include "../../../../../common/op_kernel/moe_shared_jetty_context.h"
+#include "../../../../op_kernel/moe_ep_dispatch_epilogue_tiling.h"
 
 namespace MoeEpDispatchEpilogueUT {
 
@@ -32,13 +33,13 @@ static uint64_t AlignWin(uint64_t value)
 
 static int64_t CalcPackedElements(int64_t epWorldSize, int64_t numTokens, int64_t topK, int64_t aAlloc)
 {
-    uint64_t metadataRankOffsetsOffset = AlignWin(static_cast<uint64_t>(aAlloc) * 5UL * 4UL);
+    uint64_t metadataRankOffsetsOffset = AlignWin(static_cast<uint64_t>(aAlloc) * 4UL * 4UL);
     uint64_t localRecvIndexOffset =
         metadataRankOffsetsOffset + AlignWin((static_cast<uint64_t>(epWorldSize) + 1UL) * 4UL);
     uint64_t slotEndsOffset =
         localRecvIndexOffset + AlignWin(static_cast<uint64_t>(numTokens) * static_cast<uint64_t>(topK) * 4UL);
-    uint64_t slotRowIdsOffset = slotEndsOffset + AlignWin(static_cast<uint64_t>(aAlloc) * 4UL);
-    return static_cast<int64_t>((slotRowIdsOffset + AlignWin(static_cast<uint64_t>(aAlloc) * 4UL)) / 4UL);
+    uint64_t slotRecvXIdsOffset = slotEndsOffset + AlignWin(static_cast<uint64_t>(aAlloc) * 4UL);
+    return static_cast<int64_t>((slotRecvXIdsOffset + 2UL * AlignWin(static_cast<uint64_t>(aAlloc) * 4UL)) / 4UL);
 }
 
 struct MoeEpDispatchEpilogueTestParam {
@@ -158,6 +159,30 @@ TEST_P(MoeEpDispatchEpilogueArch35TilingTest, GeneralCases)
 {
     auto param = GetParam();
     ExecuteTestCase(BuildTilingContextPara(param), param.status, SKIP_KEY, "", {});
+}
+
+TEST_P(MoeEpDispatchEpilogueArch35TilingTest, BatchAndRouteLayoutAreSerialized)
+{
+    const auto param = GetParam();
+    if (param.status != ge::GRAPH_SUCCESS) {
+        return;
+    }
+    TilingInfo result;
+    ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param), result));
+    ASSERT_GE(result.tilingDataSize, sizeof(MoeEpDispatchEpilogueTilingData));
+    const auto* tiling = reinterpret_cast<const MoeEpDispatchEpilogueTilingData*>(result.tilingData.get());
+    const auto& info = tiling->moeEpDispatchEpilogueInfo;
+    EXPECT_GT(info.tokenBatch, 0U);
+    EXPECT_LE(info.tokenBatch, 8U);
+    if (info.cached) {
+        EXPECT_EQ(info.routeFrameSlots, 0U);
+        EXPECT_EQ(info.routeLayout.size, 0U);
+    } else {
+        EXPECT_GT(info.routeFrameSlots, 0U);
+        EXPECT_LE(info.routeFrameSlots, 32U);
+        EXPECT_EQ(info.routeLayout.token, 8U);
+        EXPECT_GT(info.routeLayout.size, info.routeLayout.metadata);
+    }
 }
 
 INSTANTIATE_TEST_CASE_P(MoeEpDispatchEpilogueTilingUT, MoeEpDispatchEpilogueArch35TilingTest,

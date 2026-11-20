@@ -68,7 +68,7 @@ constexpr uint32_t MOE_CHANNEL_HANDLE_NUM = 64U;
 constexpr uint32_t MOE_CHANNEL_NOTIFY_NUM = 3U;
 constexpr uint32_t MEM_HANDLE_NUM = 1U;
 constexpr int64_t SEND_COUNTS_ALIGN_FACTOR = 8;
-constexpr int64_t MOE_EP_METADATA_FIELDS = 5;
+constexpr int64_t MOE_EP_METADATA_FIELDS = 4;
 constexpr int64_t MOE_EP_METADATA_ALIGN_BYTES = 512;
 constexpr uint32_t MIX_LAYERED = 2U;
 constexpr uint32_t MIX_CLOS_SLOT = 0U;
@@ -139,14 +139,14 @@ static inline void CheckMoeEpMetadataTensor(const at::Tensor& metadata, const ch
     TORCH_CHECK(capacity >= 0 && capacity <= INT32_MAX, "metadata capacity must be in [0, INT32_MAX]");
     TORCH_CHECK(epWorldSize >= 2 && epWorldSize <= 1024, "ep_world_size must be in [2, 1024]");
     TORCH_CHECK(routeSlots >= 0 && routeSlots <= INT32_MAX, "metadata route_slots must be in [0, INT32_MAX]");
-    // Packed ABI: five-column A_alloc rows, rank offsets, then the local [token, top_k] reverse index.
+    // Packed ABI: four-column rows, rank offsets, local reverse index, slot ends, recv-X IDs and top-k IDs.
     const int64_t elementBytes = sizeof(int32_t);
     const int64_t rankOffsetsOffset =
         AlignTo(capacity * MOE_EP_METADATA_FIELDS * elementBytes, MOE_EP_METADATA_ALIGN_BYTES);
     const int64_t localIndexOffset =
         rankOffsetsOffset + AlignTo((epWorldSize + 1) * elementBytes, MOE_EP_METADATA_ALIGN_BYTES);
     const int64_t elements = (localIndexOffset + AlignTo(routeSlots * elementBytes, MOE_EP_METADATA_ALIGN_BYTES) +
-                              2 * AlignTo(capacity * elementBytes, MOE_EP_METADATA_ALIGN_BYTES)) /
+                              3 * AlignTo(capacity * elementBytes, MOE_EP_METADATA_ALIGN_BYTES)) /
                              elementBytes;
     TORCH_CHECK(metadata.scalar_type() == at::kInt && metadata.dim() == DIM_ONE, name,
                 " must be a 1D int32 packed tensor");
