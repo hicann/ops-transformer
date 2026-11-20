@@ -233,7 +233,7 @@ protected:
     }
 };
 
-TEST_F(MhcPreSinkhornTiling, ascend950_regbase_tilingdata_matches_pre_refactor)
+TEST_F(MhcPreSinkhornTiling, DAV_3510_regbase_tilingdata_matches_pre_refactor)
 {
     // The first four cases cover the original functions: K/M split x no-grad/grad-out; the last covers D splitting.
     const std::array<RegbaseTilingBaseline, 5> baselines = {{
@@ -285,7 +285,7 @@ TEST_F(MhcPreSinkhornTiling, ascend950_regbase_tilingdata_matches_pre_refactor)
     }
 }
 
-TEST_F(MhcPreSinkhornTiling, ascend950_regbase_core_tiling_boundary_branches)
+TEST_F(MhcPreSinkhornTiling, DAV_3510_regbase_core_tiling_boundary_branches)
 {
     // These cases cover Ascend950-only common tiling boundaries: partial core rows, the dFactor path without
     // DownAlign, and M-split grad-out UB accounting. The preceding regression case covers dFactor DownAlign.

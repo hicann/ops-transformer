@@ -19,7 +19,7 @@
 #include "op_host/tiling_templates_registry.h"
 #include "log/log.h"
 #include "kernel_tiling/kernel_tiling.h"
-
+#include "op_common/op_host/util/op_const_def.h"
 using Ops::Transformer::OpTiling::TilingRegistryNew;
 using Ops::Transformer::OpTiling::TilingRegistryArch;
 
@@ -29,7 +29,7 @@ static ge::graphStatus Tiling4MhcPostBackward(gert::TilingContext* context)
     auto platformInfo = context->GetPlatformInfo();
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
     NpuArch npuArch = ascendcPlatform.GetCurNpuArch();
-    if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) {
+    if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
         return TilingRegistryArch::GetInstance().DoTilingImpl(context);
     }
     return TilingRegistryNew::GetInstance().DoTilingImpl(context);

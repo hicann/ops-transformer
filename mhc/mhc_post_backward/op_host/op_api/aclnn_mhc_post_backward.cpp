@@ -31,7 +31,7 @@
 #include "opdev/shape_utils.h"
 #include "opdev/tensor_view_utils.h"
 #include "opdev/make_op_executor.h"
-
+#include "op_common/op_host/util/op_const_def.h"
 using namespace op;
 
 #ifdef __cplusplus
@@ -69,7 +69,7 @@ static aclnnStatus CheckNotNull(const aclTensor* gradOutput, const aclTensor* x,
     CHECK_COND(x != nullptr, ACLNN_ERR_PARAM_NULLPTR, "x must not be nullptr.");
     // hRes is optional on DAV_3510 / DAV_9201 / DAV_9202, required on A2/A3
     auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    if (npuArch != NpuArch::DAV_3510 && npuArch != NpuArch::DAV_9201 && npuArch != NpuArch::DAV_9202) {
+    if (npuArch != Ops::Base::DAV_3510 && npuArch != Ops::Base::DAV_9201 && npuArch != Ops::Base::DAV_9202) {
         CHECK_COND(hRes != nullptr, ACLNN_ERR_PARAM_NULLPTR, "hRes must not be nullptr.");
     }
     CHECK_COND(hOut != nullptr, ACLNN_ERR_PARAM_NULLPTR, "hOut must not be nullptr.");
@@ -386,7 +386,7 @@ static aclnnStatus CheckShape(const MhcPostBackwardParams& params)
 
     if (IsTNDFormat(xDimNum)) {
         auto xDim1 = params.x->GetViewShape().GetDim(DIM_IDX_1);
-        if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) {
+        if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
             CHECK_COND((xDim1 == 4) || (xDim1 == 6) || (xDim1 == 8), ACLNN_ERR_PARAM_INVALID,
                        "the dim n should be 4 / 6 / 8 for 3D format");
         } else {
@@ -416,7 +416,7 @@ static aclnnStatus CheckShape(const MhcPostBackwardParams& params)
         CHECK_COND(CheckShape3D(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "invalid shape for 3D format");
     } else {
         auto xDim2 = params.x->GetViewShape().GetDim(DIM_IDX_2);
-        if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) {
+        if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
             CHECK_COND((xDim2 == 4) || (xDim2 == 6) || (xDim2 == 8), ACLNN_ERR_PARAM_INVALID,
                        "the dim n should be 4 / 6 / 8 for 4D format");
         } else {

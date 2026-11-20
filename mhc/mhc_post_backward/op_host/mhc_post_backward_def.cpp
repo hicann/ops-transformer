@@ -14,6 +14,7 @@
  */
 
  #include "register/op_def_registry.h"
+#include "op_common/op_host/util/op_arch_helper.h"
 
 namespace ops{
 class MhcPostBackward : public OpDef
@@ -92,8 +93,7 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "mhc_post_backward");
-        this->AICore().AddConfig("ascend910b", aicore_Config_910b);
-        this->AICore().AddConfig("ascend910_93", aicore_Config_910b);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_2201, aicore_Config_910b);
 
         OpAICoreConfig aicore_Config_950;
         aicore_Config_950.DynamicCompileStaticFlag(true)
@@ -103,10 +103,9 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "mhc_post_backward_apt");
-        this->AICore().AddConfig("ascend950", aicore_Config_950);
-        this->AICore().AddConfig("ascend350", aicore_Config_950);
-        this->AICore().AddConfig("ascend960dt", aicore_Config_950);
-        this->AICore().AddConfig("ascend960pr", aicore_Config_950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, aicore_Config_950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, aicore_Config_950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, aicore_Config_950);
     }
 };
 

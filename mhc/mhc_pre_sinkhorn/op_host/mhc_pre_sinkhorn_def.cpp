@@ -95,8 +95,7 @@ public:
         this->Attr("need_backward").AttrType(OPTIONAL).Bool(true);
         this->Attr("enable_hf32").AttrType(OPTIONAL).Bool(true);
 
-        this->AICore().AddConfig("ascend910b");
-        this->AICore().AddConfig("ascend910_93");
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_2201);
 
         OpAICoreConfig regbaseCfg;
         regbaseCfg.DynamicCompileStaticFlag(true)

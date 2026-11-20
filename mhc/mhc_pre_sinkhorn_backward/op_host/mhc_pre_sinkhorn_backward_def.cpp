@@ -127,8 +127,7 @@ public:
             .NeedCheckSupportFlag(false)
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
             .ExtendCfgInfo("opFile.value", "mhc_pre_sinkhorn_backward");
-        this->AICore().AddConfig("ascend910b", aicore_Config_910b);
-        this->AICore().AddConfig("ascend910_93", aicore_Config_910b);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_2201, aicore_Config_910b);
 
         OpAICoreConfig aicore_Config_950;
         aicore_Config_950.DynamicCompileStaticFlag(true)

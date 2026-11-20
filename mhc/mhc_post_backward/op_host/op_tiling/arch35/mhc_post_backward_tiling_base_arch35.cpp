@@ -25,7 +25,7 @@
 #include "mhc_post_backward_tiling_cost_model.h"
 #include "../../../op_kernel/arch35/mhc_post_backward_tiling_data_arch35.h"
 #include "../../../op_kernel/arch35/mhc_post_backward_tiling_key_arch35.h"
-
+#include "op_common/op_host/util/op_const_def.h"
 namespace optiling {
 
 inline int64_t CeilDiv(int64_t a, int64_t b)
@@ -1039,8 +1039,8 @@ void MhcPostBackwardTilingBaseArch35::Reset()
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(MhcPostBackward, MhcPostBackwardTilingBaseArch35,
-                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510),
-                                                         static_cast<int32_t>(NpuArch::DAV_9201),
-                                                         static_cast<int32_t>(NpuArch::DAV_9202)}),
+                                   std::vector<int32_t>({static_cast<int32_t>(Ops::Base::DAV_3510),
+                                                         static_cast<int32_t>(Ops::Base::DAV_9201),
+                                                         static_cast<int32_t>(Ops::Base::DAV_9202)}),
                                    0);
 } // namespace optiling
