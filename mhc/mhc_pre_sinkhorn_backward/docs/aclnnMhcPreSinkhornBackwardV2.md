@@ -625,7 +625,7 @@ aclnnStatus aclnnMhcPreSinkhornBackwardV2(
                 <td>输入或输出tensor的维度(shape)与参数说明不符。</td>
             </tr>
             <tr>
-                <td>输入变量的数据类型和数据格式不在支持的范围内。</td>
+                <td>输入变量的数据类型不在支持的范围内。</td>
             </tr>
             <tr>
                 <td>N取值不符合约束要求。</td>

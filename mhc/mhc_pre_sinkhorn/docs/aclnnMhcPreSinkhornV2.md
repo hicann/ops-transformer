@@ -405,7 +405,7 @@ aclnnStatus aclnnMhcPreSinkhornV2(
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="3">161002</td>
-      <td>输入变量的数据类型、shape维度和数据格式不在支持的范围内。</td>
+      <td>输入变量的数据类型或shape维度不在支持的范围内。</td>
     </tr>
     <tr>
       <td>numIters不为20。</td>
