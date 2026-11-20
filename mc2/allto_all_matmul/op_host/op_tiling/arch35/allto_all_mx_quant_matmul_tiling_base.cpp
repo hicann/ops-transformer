@@ -590,6 +590,33 @@ void AllToAllMxQuantMatmulTilingBase::AlignCutResForKernel(CutResult& cutRes, ui
             cutRes.longTileLen, cutRes.numLongTile, cutRes.shortTileLen, cutRes.numShortTile, cutRes.shortTileAtBack);
 }
 
+ge::graphStatus AllToAllMxQuantMatmulTilingBase::CheckScaleCommSize() const
+{
+    // CCU 单次通信量约束适用于 A5/A6（DAV_3510/DAV_9201）
+    if (npuArch_ != Ops::Base::DAV_3510 && npuArch_ != Ops::Base::DAV_9201) {
+        return ge::GRAPH_SUCCESS;
+    }
+    uint8_t engineType = mc2tiling::A5_AICPU_TS_ENGINE;
+    if (MatmulAlltoAllTilingUtil::GetAndConvertCommMode(context_, opName_, contextInfo_, ALLTOALL_MATMUL_INDEX_SCHEMA,
+                                                        engineType) != ge::GRAPH_SUCCESS ||
+        engineType != mc2tiling::A5_CCU_ENGINE) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    const uint64_t scaleUnitBytes = isHiF4_ ? HIF4_SCALE_UNIT_BYTES : DIM_TWO;
+    // x1Scale per-peer buffer: (BS/rank) * ceil(H/64) * unitBytes
+    const uint64_t scaleRowBytes = Ops::Base::CeilDiv(contextInfo_.args_.orgKValue, MX_SCALE_ALIGN) * scaleUnitBytes;
+    const uint64_t scaleCommBytes = contextInfo_.args_.mValue * scaleRowBytes;
+    if (scaleCommBytes > HCCL_MEM_LIMIT) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName_, "x1Scale AllToAll size", std::to_string(scaleCommBytes).c_str(),
+            "The value of x1Scale AllToAll size must not exceed the HCCL 256MB limit");
+        return ge::GRAPH_FAILED;
+    }
+    OP_LOGD(opName_, "x1Scale AllToAll size=%lu bytes, limit=%lu bytes.", scaleCommBytes, HCCL_MEM_LIMIT);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus AllToAllMxQuantMatmulTilingBase::CheckHcommTileInfo() const
 {
     const uint64_t mValue = contextInfo_.args_.mValue;
@@ -620,6 +647,11 @@ ge::graphStatus AllToAllMxQuantMatmulTilingBase::DoOpTiling()
     MC2_CHECK_LOG_RET(opName_, CheckOpInputInfo());
     // 参数校验通过后赋值给全局上下文变量
     MC2_CHECK_LOG_RET(opName_, InitTilingContextParameters());
+    // x1Scale AllToAll 是单次通信，超限时无法通过切分 M 修复，必须直接报错
+    if (CheckScaleCommSize() != ge::GRAPH_SUCCESS) {
+        OP_LOGE(opName_, "The x1Scale AllToAll communication volume exceeds the HCCL CCU 256MB limit.");
+        return ge::GRAPH_FAILED;
+    }
     // 进行通算切分
     MC2_CHECK_LOG_RET(opName_, TileCommAndCompute());
     if (usingApaceImpl_) {

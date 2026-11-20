@@ -271,6 +271,7 @@ x1QuantMode、x2QuantMode、commQuantMode的枚举值与[量化模式](../../doc
    - <term>Atlas A2系列产品</term>：支持MTE通信。
    - <term>Atlas A3系列产品</term>：支持AI CPU通信。
    - <term>Ascend 950PR&950DT系列产品</term>：支持CCU通信和AI CPU通信，CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
+     - 使用CCU通信引擎时，alltoall(y)集合通信数据总量不能超过63*256MB，集合通信数据总量计算方式为：BS * (H2 / 卡数) * sizeof(y_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
 ## 调用说明
 

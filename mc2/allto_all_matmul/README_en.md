@@ -325,6 +325,8 @@ The enumeration values of x1QuantMode, x2QuantMode, and commQuantMode map to the
    - <term>Atlas A2 products</term>: supports MTE communication.
    - <term>Atlas A3 products</term>: supports AI\_CPU communication.
    - <term>Ascend 950PR&950DT products</term>: supports CCU communication and AI\_CPU communication. CCU communication supports only intra-machine interconnection within the UB domain, and AI_CPU supports interconnection across machines within the UB domain.
+     - When the CCU communication engine is used, the total alltoall(x1) communication volume must not exceed 63*256MB. The total communication volume is calculated as (BS / rankSize) * H * sizeof(x1_dtype). Due to shape differences, the actual supported total volume may be slightly smaller.
+     - When the CCU communication engine is used, x1Scale performs an additional AllToAll in the MX quantization scenario. One communication task must be reserved for x1Scale, so the total alltoall(x1) communication volume must not exceed 62*256MB. The x1Scale AllToAll volume must not exceed 256MB and is calculated as (BS / rankSize) * ceil(H / 64) * 2 bytes.
 
 ## Calling Instructions
 

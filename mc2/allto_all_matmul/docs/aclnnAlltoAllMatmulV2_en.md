@@ -400,6 +400,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
       - Supports CCU communication and AI_CPU communication.
       - CCU communication supports only intra-UB-domain interconnection within a single machine, while AI_CPU communication supports intra-UB-domain interconnection across machines.
       - Communicator constraint: Only one communication mode can be used in the same communicator.
+      - When the CCU communication engine is used, the total alltoall(x1) communication volume within a communication domain must not exceed 63 \* 256MB. The total communication volume is calculated as (BS / rankSize) \* H \* sizeof(x1_dtype). Due to shape differences, the actual supported total volume may be slightly smaller.
 
    <!-- end id26 -->
 

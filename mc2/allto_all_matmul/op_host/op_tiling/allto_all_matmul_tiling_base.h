@@ -16,6 +16,7 @@
 #define ALLTO_ALL_MATMUL_TILING_BASE_H
 
 #include "mc2/matmul_allto_all/op_host/op_tiling/common/allto_all_formulaic_tiling.h"
+#include "mc2/matmul_allto_all/op_host/op_tiling/common/allto_all_hccl_utils.h"
 #include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_util_tiling.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "op_host/op_tiling/mc2_tiling_struct.h"
@@ -46,6 +47,16 @@ protected:
     }
     virtual CutResult GetCutResOfCommAndCompute();
     ge::graphStatus TileCommAndCompute();
+    // CCU 单次通信量约束下允许的 HCCL 任务数上限；AllToAllMatmul MX 会多一次 x1Scale AllToAll，需预留 1 个
+    virtual uint64_t GetHcclMaxCommTasks() const
+    {
+        return HCCL_MAX_TOTAL_TILES;
+    }
+    // 单行通信字节口径：AllToAll 单个 peer 的 K 轴宽度（per-peer），不是 rank 扩展后的完整宽度
+    virtual CommSizeInfo GetHcclCommSizeInfo() const
+    {
+        return CommSizeInfo{contextInfo_.args_.orgKValue, contextInfo_.args_.inputDtypeSize};
+    }
     void SetUserWorkSpace();
     ge::graphStatus CheckAlltoAllOutShape(const gert::TilingContext* context, const char* opName);
     ge::graphStatus CheckAlltoAllOut(const gert::TilingContext* context, const char* opName);
@@ -67,6 +78,9 @@ protected:
 #endif
 
 private:
+    // CCU 门控及总量前置检查；非 CCU 场景返回成功且 useCcuCommLimit=false
+    ge::graphStatus PrepareCcuLimitBeforeTiling(bool& useCcuCommLimit, CommSizeInfo& commSize,
+                                                uint64_t& maxCommTasks) const;
     // 功能后移，基类的GetShapeAttrsInfo在isCapable之前，当前将校验和参数获取放到子类的DoOptiling中
     ge::graphStatus GetShapeAttrsInfo() override;
     // 在框架中没有实际使用

@@ -273,6 +273,7 @@ The relationship between the enumeration values of x1QuantMode, x2QuantMode, and
    - <term>Atlas A2 products</term>: MTE communication is supported.
    - <term>Atlas A3 products</term>: AI CPU communication is supported.
    - <term>Ascend 950PR&950DT products</term>: CCU communication and AI CPU communication are supported. CCU supports only interconnection within the UB domain on a single machine, and AI CPU supports interconnection across machines within the UB domain.
+     - When the CCU communication engine is used, the total alltoall(y) communication volume must not exceed 63*256MB. The total communication volume is calculated as BS * (H2 / rankSize) * sizeof(y_dtype). Due to shape differences, the actual supported total volume may be slightly smaller.
 
 ## Invocation Description
 

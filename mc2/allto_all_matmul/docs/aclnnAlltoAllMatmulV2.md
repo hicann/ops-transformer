@@ -398,6 +398,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
       - 支持CCU通信和AI CPU通信。
       - CCU通信仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
       - 通信域约束：同一个通信域内只能使用同一种通信方式。
+      - 使用CCU通信引擎时，单个通信域内alltoall(x1)集合通信数据总量不能超过63 \* 256MB，集合通信数据总量计算方式为：(BS / 卡数) \* H \* sizeof(x1_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
    <!-- end id26 -->
 

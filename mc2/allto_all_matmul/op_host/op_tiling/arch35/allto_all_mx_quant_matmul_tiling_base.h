@@ -64,7 +64,21 @@ protected:
     ge::graphStatus GetWorkspaceSize() override;
     uint64_t GetTilingKey() const override;
     CutResult GetCutResOfCommAndCompute() override;
+    uint64_t GetHcclMaxCommTasks() const override
+    {
+        return HCCL_MAX_TOTAL_TILES_MX;
+    }
+    CommSizeInfo GetHcclCommSizeInfo() const override
+    {
+        // per-peer 口径：fp4/hif4 沿 K 轴 2:1 打包，通信按 uint8 计；fp8 仍按原始 K 轴
+        if (isMxFp4_ || isHiF4_) {
+            const uint64_t packedInnerDim = (contextInfo_.args_.orgKValue + 1UL) / 2UL;
+            return CommSizeInfo{packedInnerDim, 1UL};
+        }
+        return AllToAllMatmulTilingBase::GetHcclCommSizeInfo();
+    }
     void AlignCutResForKernel(CutResult& cutRes, uint64_t mValue) const;
+    ge::graphStatus CheckScaleCommSize() const;
     ge::graphStatus CheckHcommTileInfo() const;
     ge::graphStatus CheckMxQuantTensorDataType(const gert::TilingContext* context, const char* opName);
     ge::graphStatus CheckX2Transpose(const gert::TilingContext* context, const char* opName,

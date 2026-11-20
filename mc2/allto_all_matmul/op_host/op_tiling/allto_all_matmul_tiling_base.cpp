@@ -164,6 +164,28 @@ CutResult AllToAllMatmulTilingBase::GetCutResOfCommAndCompute()
     return alltoallMatmulTileFormulate.tilingM_.cutRes;
 }
 
+ge::graphStatus AllToAllMatmulTilingBase::PrepareCcuLimitBeforeTiling(bool& useCcuCommLimit, CommSizeInfo& commSize,
+                                                                      uint64_t& maxCommTasks) const
+{
+    useCcuCommLimit = false;
+    maxCommTasks = HCCL_MAX_TOTAL_TILES;
+    if (npuArch_ != Ops::Base::DAV_3510 && npuArch_ != Ops::Base::DAV_9201) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    uint8_t engineType = 0;
+    if (MatmulAlltoAllTilingUtil::GetAndConvertCommMode(context_, opName_, contextInfo_, ALLTOALL_MATMUL_INDEX_SCHEMA,
+                                                        engineType) != ge::GRAPH_SUCCESS ||
+        engineType != mc2tiling::A5_CCU_ENGINE) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    useCcuCommLimit = true;
+    maxCommTasks = GetHcclMaxCommTasks();
+    commSize = GetHcclCommSizeInfo();
+    return CheckCcuTotalCommSize(contextInfo_.args_.mValue, commSize, maxCommTasks, opName_);
+}
+
 /**
  * @brief 进行通算切分:使用公式化tiling的方式，当前阶段公式化tiling只是个预估，AlltoAllMatmul传递的内轴为K,与
  * MatmulAlltoAll的要区分开，用一个额外参数进行隔离
@@ -172,7 +194,26 @@ CutResult AllToAllMatmulTilingBase::GetCutResOfCommAndCompute()
  */
 ge::graphStatus AllToAllMatmulTilingBase::TileCommAndCompute()
 {
+    bool useCcuCommLimit = false;
+    CommSizeInfo commSize{0, 0};
+    uint64_t maxCommTasks = HCCL_MAX_TOTAL_TILES;
+    const ge::graphStatus checkRet = PrepareCcuLimitBeforeTiling(useCcuCommLimit, commSize, maxCommTasks);
+    if (checkRet != ge::GRAPH_SUCCESS) {
+        return checkRet;
+    }
+
     CutResult cutRes = GetCutResOfCommAndCompute();
+    if (useCcuCommLimit) {
+        const ge::graphStatus ret =
+            AdjustCutResultForCCU(cutRes, contextInfo_.args_.mValue, commSize, opName_, maxCommTasks);
+        if (ret != ge::GRAPH_SUCCESS) {
+            OP_LOGE(opName_,
+                    "The communication data volume exceeds the HCCL CCU limit: single communication must not "
+                    "exceed 256MB, total tasks must not exceed %lu.",
+                    maxCommTasks);
+            return ge::GRAPH_FAILED;
+        }
+    }
     if (!cutRes.shortTileAtBack && cutRes.numShortTile > 0) {
         inferredInfo_.tileM = cutRes.shortTileLen;
         inferredInfo_.tileCnt = cutRes.numShortTile;

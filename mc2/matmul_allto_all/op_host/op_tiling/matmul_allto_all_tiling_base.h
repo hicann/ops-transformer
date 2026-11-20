@@ -21,6 +21,7 @@
 #include "op_host/tiling_templates_registry.h"
 #include "common/matmul_allto_all_util_tiling.h"
 #include "common/allto_all_formulaic_tiling.h"
+#include "common/allto_all_hccl_utils.h"
 
 namespace MC2Tiling {
 
@@ -59,6 +60,8 @@ protected:
     TilingInferredInfo inferredInfo;
 
 private:
+    // CCU 门控及总量前置检查；非 CCU 场景返回成功且 useCcuCommLimit=false
+    ge::graphStatus PrepareCcuLimitBeforeTiling(bool& useCcuCommLimit, CommSizeInfo& commSize) const;
     // 功能后移，MatmulAlltoAll的GetShapeAttrsInfo在isCapable之前，当前将校验和参数获取放到子类的DoOptiling中
     ge::graphStatus GetShapeAttrsInfo() override;
     // 在框架中没有实际使用

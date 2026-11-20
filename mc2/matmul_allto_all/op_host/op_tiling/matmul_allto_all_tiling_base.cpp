@@ -16,6 +16,7 @@
 #include "mc2_log.h"
 
 #include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_error.h"
+#include "common/allto_all_hccl_utils.h"
 
 using namespace AscendC;
 using namespace ge;
@@ -125,14 +126,53 @@ CutResult MatmulAllToAllTilingBase::GetTilingResult()
     return formulaicTiling.tilingM_.cutRes;
 }
 
+ge::graphStatus MatmulAllToAllTilingBase::PrepareCcuLimitBeforeTiling(bool& useCcuCommLimit,
+                                                                      CommSizeInfo& commSize) const
+{
+    useCcuCommLimit = false;
+    if (npuArch_ != Ops::Base::DAV_3510 && npuArch_ != Ops::Base::DAV_9201) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    uint8_t engineType = 0;
+    if (MatmulAlltoAllTilingUtil::GetAndConvertCommMode(context_, opName_, contextInfo, MATMUL_ALLTOALL_INDEX_SCHEMA,
+                                                        engineType) != ge::GRAPH_SUCCESS ||
+        engineType != mc2tiling::A5_CCU_ENGINE) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    useCcuCommLimit = true;
+    // CCU 限制按 per-peer 计：单次 AllToAll 发往每个 peer 的数据量为 N / rank
+    commSize = CommSizeInfo{contextInfo.args_.nValue / contextInfo.args_.rankDim, contextInfo.args_.outputDtypeSize};
+    return CheckCcuTotalCommSize(contextInfo.args_.mValue, commSize, HCCL_MAX_TOTAL_TILES, opName_);
+}
+
 /**
  * @brief 返回具体的切分结果
  *
  */
 ge::graphStatus MatmulAllToAllTilingBase::TileCommAndCompute()
 {
+    bool useCcuCommLimit = false;
+    CommSizeInfo commSize{0, 0};
+    const ge::graphStatus checkRet = PrepareCcuLimitBeforeTiling(useCcuCommLimit, commSize);
+    if (checkRet != ge::GRAPH_SUCCESS) {
+        return checkRet;
+    }
+
     OP_LOGD(opName_, "Start to find proper tile by formulaic tiling.");
     CutResult mCutMMAlltoAll = GetTilingResult();
+    if (useCcuCommLimit) {
+        const ge::graphStatus ret =
+            AdjustCutResultForCCU(mCutMMAlltoAll, contextInfo.args_.mValue, commSize, opName_, HCCL_MAX_TOTAL_TILES);
+        if (ret != ge::GRAPH_SUCCESS) {
+            OP_LOGE(opName_,
+                    "The communication data volume exceeds the HCCL CCU limit: single communication must not "
+                    "exceed 256MB, total tasks must not exceed %lu.",
+                    HCCL_MAX_TOTAL_TILES);
+            return ge::GRAPH_FAILED;
+        }
+    }
     // 根据 shortTileAtBack 和 numShortTile 确定主块和尾块
     const bool useLongAsMain = mCutMMAlltoAll.shortTileAtBack || mCutMMAlltoAll.numShortTile == 0;
 
