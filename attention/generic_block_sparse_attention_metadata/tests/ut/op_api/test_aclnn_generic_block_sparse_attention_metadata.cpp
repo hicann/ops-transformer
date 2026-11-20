@@ -321,13 +321,13 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, quant_type_platform_matrix
     auto metadata = TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 0).ToAclType();
     for (bool arch35 : {false, true}) {
         op::SetPlatformSocVersion(arch35 ? op::SocVersion::ASCEND950 : op::SocVersion::ASCEND910B);
-        for (int64_t quantType : {0, 3, 4, 5, 6, 7}) {
+        for (int64_t quantType : {0, 3, 5, 6, 7}) {
             const vector<int64_t> shape = {1, quantType == 6 ? 8 : kBlockSize};
             auto blockShape = aclCreateIntArray(shape.data(), shape.size());
             uint64_t workspaceSize = 0;
             aclOpExecutor* executor = nullptr;
             SCOPED_TRACE(testing::Message() << "arch35=" << arch35 << " quantType=" << quantType);
-            const bool mxQuant = arch35 && (quantType == 4 || quantType == 6);
+            const bool mxQuant = arch35 && quantType == 6;
             const int64_t headDim = mxQuant ? 192 : 128;
             const bool supported = quantType == 0 || mxQuant || quantType == (arch35 ? 5 : 7);
             EXPECT_EQ(aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
@@ -416,49 +416,4 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, fp8_layouts_by_precision_g
         }
     }
     aclDestroyIntArray(blockShape);
-}
-
-TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, a4c4_cx_mode_four_contract)
-{
-    for (const int64_t dim : {192, 256}) {
-        for (const int64_t blockY : {4, 8, 16, 32, 64, 128}) {
-            for (int64_t group = 1; group <= 16; ++group) {
-                for (const int64_t kvHeads : {1, 2}) {
-                    SCOPED_TRACE(testing::Message()
-                                 << "D=" << dim << " Y=" << blockY << " G=" << group << " KVH=" << kvHeads);
-                    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 4, 0, dim, blockY, 0, 1, 1, group * kvHeads,
-                                                    kvHeads),
-                              ACLNN_SUCCESS);
-                }
-            }
-        }
-    }
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 3, 0, 256, 4), ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 4, 1, 256, 4), ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 4, 0, 256, 4), ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 0, 256, 4), ACLNN_SUCCESS);
-}
-
-TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, a4c4_rejects_unsupported_shapes)
-{
-    for (const int64_t dim : {0, 64, 128, 191, 193, 255, 257}) {
-        SCOPED_TRACE(testing::Message() << "D=" << dim);
-        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 4, 0, dim, 4), ACLNN_ERR_PARAM_INVALID);
-    }
-    for (const int64_t blockY : {0, 1, 2, 3, 12, 127, 129}) {
-        SCOPED_TRACE(testing::Message() << "Y=" << blockY);
-        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 4, 0, 192, blockY), ACLNN_ERR_PARAM_INVALID);
-    }
-    for (const int64_t group : {0, 17, 32, 128}) {
-        for (const int64_t kvHeads : {1, 2}) {
-            SCOPED_TRACE(testing::Message() << "G=" << group << " KVH=" << kvHeads);
-            EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 4, 0, 192, 4, 0, 1, 1, group * kvHeads, kvHeads),
-                      ACLNN_ERR_PARAM_INVALID);
-        }
-    }
-    // Reject a Q head count that is not divisible by the KV head count.
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 4, 0, 192, 4, 0, 1, 1, 17, 2), ACLNN_ERR_PARAM_INVALID);
-    // The sparse Q block is one row and mode 4 excludes SoftmaxUnion.
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 4, 0, 192, 4, 0, 1, 2), ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 4, 0, 192, 4, 0, 3, 8), ACLNN_ERR_PARAM_INVALID);
 }

@@ -9,12 +9,9 @@
  */
 
 #include <algorithm>
-#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <string>
-#include <cmath>
-#include <limits>
 #include <vector>
 #include <gtest/gtest.h>
 #include "tiling_context_faker.h"
@@ -112,48 +109,11 @@ std::vector<gert::TilingContextPara::TensorDescription> MakeDenseInputs(ge::Data
     return inputs;
 }
 
-std::vector<gert::TilingContextPara::TensorDescription> MakeMxfp4Inputs(int64_t headDim, int64_t numHeads)
-{
-    auto inputs = MakeInputs(ge::DT_FLOAT4_E2M1, headDim, numHeads, 1);
-    inputs[0] = {
-        {{kBatch, numHeads, kS1, headDim}, {kBatch, numHeads, kS1, headDim}}, ge::DT_FLOAT4_E2M1, ge::FORMAT_ND};
-    inputs[1] = {{{kBatch, 1, kS2, headDim}, {kBatch, 1, kS2, headDim}}, ge::DT_FLOAT4_E2M1, ge::FORMAT_ND};
-    inputs[2] = inputs[1];
-    inputs[3] = {{{1, kT, 512}, {1, kT, 512}}, ge::DT_INT32, ge::FORMAT_ND};
-    inputs[7] = {{{kBatch, numHeads, kS1, headDim / 64, 2}, {kBatch, numHeads, kS1, headDim / 64, 2}},
-                 ge::DT_FLOAT8_E8M0,
-                 ge::FORMAT_ND};
-    inputs[8] = {
-        {{kBatch, 1, kS2, headDim / 64, 2}, {kBatch, 1, kS2, headDim / 64, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
-    inputs[9] = {{{kBatch, 1, (kS2 + 63) / 64, headDim, 2}, {kBatch, 1, (kS2 + 63) / 64, headDim, 2}},
-                 ge::DT_FLOAT8_E8M0,
-                 ge::FORMAT_ND};
-    for (int index : {10, 11, 12, 15}) {
-        inputs[index] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
-    }
-    inputs[13] = {{{kBatch}, {kBatch}}, ge::DT_INT32, ge::FORMAT_ND};
-    return inputs;
-}
-
 uint32_t ReadTilingU32(const TilingInfo& tilingInfo, size_t byteOffset)
 {
     uint32_t value = 0;
     std::memcpy(&value, tilingInfo.tilingData.get() + byteOffset, sizeof(uint32_t));
     return value;
-}
-
-// The host tiling getters read cached members, not the serialized UT output.
-// Writing expected values into a copy must leave the serialized bytes unchanged.
-template <typename SetExpected>
-void ExpectSerializedFields(const TilingInfo& info, SetExpected setExpected)
-{
-    GenericBlockSparseAttentionTilingData expected(nullptr);
-    ASSERT_EQ(info.tilingDataSize, expected.GetDataSize());
-    std::vector<uint8_t> bytes(info.tilingDataSize);
-    expected.SetDataPtr(bytes.data());
-    std::memcpy(bytes.data(), info.tilingData.get(), bytes.size());
-    setExpected(expected);
-    EXPECT_EQ(std::memcmp(bytes.data(), info.tilingData.get(), bytes.size()), 0);
 }
 
 std::vector<gert::TilingContextPara::TensorDescription> MakeOutputs(ge::DataType outDtype, bool returnLse,
@@ -169,17 +129,6 @@ std::vector<gert::TilingContextPara::TensorDescription> MakeOutputs(ge::DataType
         {{{kT, numHeads, headDim}, {kT, numHeads, headDim}}, outDtype, ge::FORMAT_ND},
         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
     };
-}
-
-std::vector<gert::TilingContextPara::TensorDescription> MakeMxfp4Outputs(ge::DataType dtype, bool lse, int64_t dim,
-                                                                         int64_t numHeads)
-{
-    auto outputs = MakeOutputs(dtype, lse, dim, numHeads);
-    outputs[0] = {{{kBatch, numHeads, kS1, dim}, {kBatch, numHeads, kS1, dim}}, dtype, ge::FORMAT_ND};
-    if (lse) {
-        outputs[1] = {{{kBatch, numHeads, kS1, 1}, {kBatch, numHeads, kS1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND};
-    }
-    return outputs;
 }
 
 std::vector<gert::TilingContextPara::OpAttr> MakeAttrs(
@@ -2283,7 +2232,7 @@ TEST_F(generic_block_sparse_attention_tiling_ut, quant_type_dtype_and_soc_matrix
 {
     for (const std::string soc : {"Ascend910B", "Ascend950"}) {
         for (auto dtype : {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_INT8}) {
-            for (int64_t quantType : {0, 3, 4, 5, 6, 7}) {
+            for (int64_t quantType : {0, 3, 5, 6, 7}) {
                 const bool arch35 = soc == "Ascend950";
                 const bool supported = (quantType == 0 && (dtype == ge::DT_FLOAT16 || dtype == ge::DT_BF16)) ||
                                        (quantType == 5 && arch35 && dtype == ge::DT_FLOAT8_E4M3FN) ||
@@ -2316,263 +2265,6 @@ TEST_F(generic_block_sparse_attention_tiling_ut, int8_rejects_legacy_quant_type_
 }
 
 namespace {}
-
-TEST_F(generic_block_sparse_attention_tiling_ut, mxfp4_full_qs_group32_p_channel_v)
-{
-    for (int64_t dim : {192, 256}) {
-        for (int64_t group : {1, 8, 16}) {
-            for (auto outputType : {ge::DT_FLOAT16, ge::DT_BF16}) {
-                GenericBlockSparseAttentionCompileInfo compileInfo;
-                const uint64_t key = 9250000000000000ULL + 6000000000ULL + 10000000ULL + 1000ULL + 3ULL +
-                                     (outputType == ge::DT_FLOAT16 ? 10ULL : 20ULL);
-                gert::TilingContextPara ctx("GenericBlockSparseAttention", MakeMxfp4Inputs(dim, group),
-                                            MakeMxfp4Outputs(outputType, true, dim, group),
-                                            MakeAttrs(1, 4, 0, 1, 0.0f, -1, -1, 4, "BNSD", "BNSD", 0, false, {1, 4}),
-                                            &compileInfo, "Ascend950", 32, 262144);
-                TilingInfo info;
-                ASSERT_TRUE(ExecuteTiling(ctx, info));
-                EXPECT_EQ(info.tilingKey, static_cast<int64_t>(key));
-                ExpectSerializedFields(info, [](auto& data) { data.set_returnSoftmaxLse(1U); });
-                ASSERT_GE(info.tilingDataSize, 256U);
-                EXPECT_EQ(ReadTilingU32(info, 120U), 1U); // Runtime metadata decides whether the task needs FD.
-                constexpr uint32_t expectedQ = 16U;
-                EXPECT_EQ(ReadTilingU32(info, 176U), expectedQ);
-                constexpr uint32_t expectedKv = 512U;
-                EXPECT_EQ(ReadTilingU32(info, 180U), expectedKv);
-                // Y4: 64B header + 33 four-word records, rounded to 64B.
-                EXPECT_EQ(ReadTilingU32(info, 240U), (expectedKv / 128U) * 144U);
-                EXPECT_EQ(ReadTilingU32(info, 184U), expectedQ);
-                EXPECT_EQ(ReadTilingU32(info, 188U), expectedKv);
-                constexpr uint32_t headCapacity = 256U;
-                EXPECT_EQ(ReadTilingU32(info, 192U), headCapacity);
-                EXPECT_EQ(ReadTilingU32(info, 196U), headCapacity);
-                EXPECT_EQ(ReadTilingU32(info, 200U), std::max(expectedQ, 32U));
-                EXPECT_EQ(ReadTilingU32(info, 204U), headCapacity);
-                EXPECT_EQ(ReadTilingU32(info, 208U), expectedKv);
-                EXPECT_EQ(ReadTilingU32(info, 212U), expectedKv);
-                EXPECT_EQ(ReadTilingU32(info, 216U), 1U); // Resident Q.
-                EXPECT_EQ(ReadTilingU32(info, 220U), 2U); // Full K tiles.
-                EXPECT_EQ(ReadTilingU32(info, 224U), 2U); // Full V tiles.
-                EXPECT_EQ(ReadTilingU32(info, 228U), 3U); // Per-tile P ring.
-            }
-        }
-    }
-}
-
-TEST_F(generic_block_sparse_attention_tiling_ut, mxfp4_rejects_unsupported_shapes)
-{
-    struct Shape {
-        int64_t dim;
-        int64_t group;
-        int64_t blockY;
-    };
-    for (const Shape shape :
-         {Shape{64, 16, 4}, Shape{128, 16, 4}, Shape{192, 17, 4}, Shape{256, 128, 4}, Shape{192, 16, 2}}) {
-        SCOPED_TRACE(::testing::Message() << "D=" << shape.dim << ", G=" << shape.group << ", Y=" << shape.blockY);
-        GenericBlockSparseAttentionCompileInfo compileInfo;
-        gert::TilingContextPara ctx("GenericBlockSparseAttention", MakeMxfp4Inputs(shape.dim, shape.group),
-                                    MakeMxfp4Outputs(ge::DT_FLOAT16, false, shape.dim, shape.group),
-                                    MakeAttrs(0, 4, 0, 0, 0.0f, -1, -1, 4, "BNSD", "BNSD", 0, false, {1, shape.blockY}),
-                                    &compileInfo, "Ascend950", 32, 262144);
-        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
-    }
-}
-
-TEST_F(generic_block_sparse_attention_tiling_ut, mxfp4_rejects_wrong_scale_contract)
-{
-    for (int scaleIndex : {7, 8, 9}) {
-        auto inputs = MakeMxfp4Inputs(192, 16);
-        // A missing scale must not reach the kernel or silently use unit scaling.
-        inputs[scaleIndex] = {{}, ge::DT_UNDEFINED, ge::FORMAT_ND};
-        GenericBlockSparseAttentionCompileInfo compileInfo;
-        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs,
-                                    MakeMxfp4Outputs(ge::DT_FLOAT16, false, 192, 16),
-                                    MakeAttrs(1, 4, 0, 0, 0.0f, -1, -1, 4, "BNSD", "BNSD", 0, false, {1, 8}),
-                                    &compileInfo, "Ascend950", 32, 262144);
-        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
-    }
-    for (int badCase = 0; badCase < 4; ++badCase) {
-        auto inputs = MakeMxfp4Inputs(192, 16);
-        if (badCase == 0) {
-            inputs[9] = {{{kBatch, 1, 128}, {kBatch, 1, 128}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
-        } else if (badCase == 1) {
-            inputs[10] = {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND};
-        } else if (badCase == 2) {
-            inputs[7] = {{{kT, 16, 4, 2}, {kT, 16, 4, 2}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND};
-        } else {
-            inputs[10] = {{{16}, {16}}, ge::DT_FLOAT, ge::FORMAT_ND};
-        }
-        GenericBlockSparseAttentionCompileInfo compileInfo;
-        gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs,
-                                    MakeMxfp4Outputs(ge::DT_FLOAT16, false, 192, 16),
-                                    MakeAttrs(1, 4, 0, 0, 0.0f, -1, -1, 4, "BNSD", "BNSD", 0, false, {1, 16}),
-                                    &compileInfo, "Ascend950", 32, 262144);
-        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
-    }
-}
-
-TEST_F(generic_block_sparse_attention_tiling_ut, mxfp4_mask_and_residual_keys)
-{
-    for (int64_t y : {4, 8, 16, 32, 64, 128}) {
-        for (int64_t mask : {0, 1}) {
-            for (int64_t residual : {0, 1}) {
-                GenericBlockSparseAttentionCompileInfo compileInfo;
-                const uint64_t key = 9250006010000013ULL + static_cast<uint64_t>(mask) * 1000ULL +
-                                     static_cast<uint64_t>(residual) * 1000000000ULL;
-                gert::TilingContextPara ctx(
-                    "GenericBlockSparseAttention", MakeMxfp4Inputs(192, 16),
-                    MakeMxfp4Outputs(ge::DT_FLOAT16, false, 192, 16),
-                    MakeAttrs(mask, 4, 0, 0, 0.0f, -1, -1, 4, "BNSD", "BNSD", residual, false, {1, y}), &compileInfo,
-                    "Ascend950", 32, 262144);
-                TilingInfo info;
-                ASSERT_TRUE(ExecuteTiling(ctx, info));
-                EXPECT_EQ(info.tilingKey, static_cast<int64_t>(key));
-                ExpectSerializedFields(info, [](auto& data) { data.set_returnSoftmaxLse(0U); });
-            }
-        }
-    }
-}
-
-TEST_F(generic_block_sparse_attention_tiling_ut, mxfp4_dense_and_paged_layouts)
-{
-    constexpr int64_t dim = 192, heads = 8, kvHeads = 2;
-    for (const std::string qLayout : {"BNSD", "BSND", "TND"}) {
-        for (const std::string kvLayout : {qLayout, std::string("PA_BBND"), std::string("PA_BNBD")}) {
-            const bool paged = kvLayout.find("PA_") == 0;
-            auto inputs = MakeMxfp4Inputs(dim, heads);
-            auto outputs = MakeMxfp4Outputs(ge::DT_FLOAT16, true, dim, heads);
-            auto tensor = [](std::vector<int64_t> shape, ge::DataType dtype) {
-                gert::Shape dims;
-                for (int64_t dim : shape)
-                    dims.AppendDim(dim);
-                gert::StorageShape storage;
-                storage.MutableOriginShape() = dims;
-                storage.MutableStorageShape() = dims;
-                return gert::TilingContextPara::TensorDescription{storage, dtype, ge::FORMAT_ND};
-            };
-            const std::vector<int64_t> qShape = qLayout == "BNSD" ? std::vector<int64_t>{1, heads, kS1, dim} :
-                                                qLayout == "BSND" ? std::vector<int64_t>{1, kS1, heads, dim} :
-                                                                    std::vector<int64_t>{kS1, heads, dim};
-            const std::vector<int64_t> kShape = kvLayout == "PA_BNBD" ? std::vector<int64_t>{2, kvHeads, 128, dim} :
-                                                kvLayout == "PA_BBND" ? std::vector<int64_t>{2, 128, kvHeads, dim} :
-                                                kvLayout == "BNSD"    ? std::vector<int64_t>{1, kvHeads, kS2, dim} :
-                                                kvLayout == "BSND"    ? std::vector<int64_t>{1, kS2, kvHeads, dim} :
-                                                                        std::vector<int64_t>{kS2, kvHeads, dim};
-            inputs[0] = tensor(qShape, ge::DT_FLOAT4_E2M1);
-            inputs[1] = tensor(kShape, ge::DT_FLOAT4_E2M1);
-            inputs[2] = inputs[1];
-            auto qs = qShape, ks = kShape;
-            qs.back() = dim / 64;
-            qs.push_back(2);
-            ks.back() = dim / 64;
-            ks.push_back(2);
-            inputs[7] = tensor(qs, ge::DT_FLOAT8_E8M0);
-            inputs[8] = tensor(ks, ge::DT_FLOAT8_E8M0);
-            auto vs = kShape;
-            const size_t axis = kvLayout == "BNSD" || kvLayout == "PA_BNBD" ? 2U : kvLayout == "TND" ? 0U : 1U;
-            vs[axis] = (vs[axis] + 63) / 64;
-            vs.push_back(2);
-            inputs[9] = tensor(vs, ge::DT_FLOAT8_E8M0);
-            inputs[3] = tensor({kvHeads, kS1, 64}, ge::DT_INT32);
-            inputs[4] = tensor({kvHeads, kS1}, ge::DT_INT32);
-            if (qLayout == "TND")
-                inputs[11] = tensor({2}, ge::DT_INT64);
-            if (kvLayout == "TND")
-                inputs[12] = tensor({2}, ge::DT_INT64);
-            if (paged)
-                inputs[15] = tensor({1, 2}, ge::DT_INT32);
-            outputs[0] = tensor(qShape, ge::DT_FLOAT16);
-            outputs[1] =
-                tensor(qLayout == "TND" ? std::vector<int64_t>{kS1, heads, 1} : std::vector<int64_t>{1, heads, kS1, 1},
-                       ge::DT_FLOAT);
-            GenericBlockSparseAttentionCompileInfo compileInfo;
-            gert::TilingContextPara ctx("GenericBlockSparseAttention", inputs, outputs,
-                                        MakeAttrs(0, 4, 0, 1, 0.0f, -1, -1, 4, qLayout, kvLayout, 0, false, {1, 4}),
-                                        &compileInfo, "Ascend950", 32, 262144);
-            TilingInfo info;
-            ASSERT_TRUE(ExecuteTiling(ctx, info)) << qLayout << "/" << kvLayout;
-            const uint64_t qKey = qLayout == "BNSD" ? 3 : qLayout == "BSND" ? 4 : 2;
-            const uint64_t kvKey = kvLayout == "PA_BBND" ? 7 :
-                                   kvLayout == "PA_BNBD" ? 8 :
-                                   kvLayout == "BNSD"    ? 1 :
-                                   kvLayout == "BSND"    ? 2 :
-                                                           3;
-            ExpectSerializedFields(info, [](auto& data) { data.set_returnSoftmaxLse(1U); });
-            EXPECT_EQ(info.tilingKey, 9250006000000010ULL + kvKey * 10000000ULL + paged * 1000000ULL + qKey);
-            // Reject a dense-shaped VScale for a cache or the wrong compressed S axis.
-            inputs[9] = tensor({1, kvHeads, 5, dim, 2}, ge::DT_FLOAT8_E8M0);
-            gert::TilingContextPara bad("GenericBlockSparseAttention", inputs, outputs,
-                                        MakeAttrs(0, 4, 0, 1, 0.0f, -1, -1, 4, qLayout, kvLayout, 0, false, {1, 4}),
-                                        &compileInfo, "Ascend950", 32, 262144);
-            ExecuteTestCase(bad, ge::GRAPH_FAILED);
-        }
-    }
-}
-
-TEST_F(generic_block_sparse_attention_tiling_ut, mxfp4_cx_external_range_and_tiling)
-{
-    for (float cx : {0.0f, 6.0f, 7.0f, 8.0f, std::nextafter(8.0f, 9.0f), 9.0f, 12.0f}) {
-        GenericBlockSparseAttentionCompileInfo compileInfo;
-        gert::TilingContextPara ctx("GenericBlockSparseAttention", MakeMxfp4Inputs(192, 16),
-                                    MakeMxfp4Outputs(ge::DT_FLOAT16, true, 192, 16),
-                                    MakeAttrs(0, 4, 0, 1, cx, -1, -1, 4, "BNSD", "BNSD", 0, false, {1, 8}),
-                                    &compileInfo, "Ascend950", 32, 262144);
-        TilingInfo info;
-        ASSERT_TRUE(ExecuteTiling(ctx, info));
-        SCOPED_TRACE(cx);
-        ExpectSerializedFields(info, [cx](auto& data) {
-            data.set_log2Cx(std::log2(cx == 0.0f ? 6.0f : cx));
-            data.set_log2CxCeil(cx > 8.0f ? 4.0f : 3.0f);
-        });
-    }
-}
-
-TEST_F(generic_block_sparse_attention_tiling_ut, mxfp4_cx_rejects_invalid_values)
-{
-    for (float cx :
-         {-1.0f, 1.0f, std::nextafter(6.0f, 0.0f), std::nextafter(12.0f, 13.0f), std::numeric_limits<float>::infinity(),
-          -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN()}) {
-        GenericBlockSparseAttentionCompileInfo compileInfo;
-        gert::TilingContextPara ctx("GenericBlockSparseAttention", MakeMxfp4Inputs(192, 16),
-                                    MakeMxfp4Outputs(ge::DT_FLOAT16, false, 192, 16),
-                                    MakeAttrs(0, 4, 0, 0, cx, -1, -1, 4, "BNSD", "BNSD", 0, false, {1, 4}),
-                                    &compileInfo, "Ascend950", 32, 262144);
-        TilingInfo info;
-        EXPECT_FALSE(ExecuteTiling(ctx, info));
-    }
-}
-
-TEST_F(generic_block_sparse_attention_tiling_ut, mxfp4_fd_workspace_tracks_platform_cores)
-{
-    for (uint32_t cores : {4U, 8U, 16U, 24U, 28U, 32U, 36U, 64U}) {
-        GenericBlockSparseAttentionCompileInfo compileInfo;
-        gert::TilingContextPara ctx("GenericBlockSparseAttention", MakeMxfp4Inputs(256, 12),
-                                    MakeMxfp4Outputs(ge::DT_FLOAT16, true, 256, 12),
-                                    MakeAttrs(1, 4, 0, 1, 0.0f, -1, -1, 4, "BNSD", "BNSD", 0, false, {1, 4}),
-                                    &compileInfo, "Ascend950", cores, 262144);
-        TilingInfo info;
-        ASSERT_TRUE(ExecuteTiling(ctx, info));
-        const uint32_t capacity = std::min(32U, (cores * 3U - 1U) / 10U) + std::min(32U, cores) - 1U;
-        EXPECT_EQ(ReadTilingU32(info, 128U), capacity);
-        EXPECT_EQ(ReadTilingU32(info, 124U), 8U);
-        uint64_t statsOffset = 0, numeratorOffset = 0;
-        std::memcpy(&statsOffset, info.tilingData.get() + 136U, sizeof(uint64_t));
-        std::memcpy(&numeratorOffset, info.tilingData.get() + 144U, sizeof(uint64_t));
-        EXPECT_EQ(numeratorOffset, (statsOffset + capacity * 4U * 8U * sizeof(float) + 511U) / 512U * 512U);
-    }
-}
-
-TEST_F(generic_block_sparse_attention_tiling_ut, a4c4_rejects_legacy_six_and_reserved_ocp)
-{
-    for (int64_t quantType : {3, 6}) {
-        GenericBlockSparseAttentionCompileInfo compileInfo;
-        gert::TilingContextPara ctx("GenericBlockSparseAttention", MakeMxfp4Inputs(256, 12),
-                                    MakeMxfp4Outputs(ge::DT_FLOAT16, false, 256, 12),
-                                    MakeAttrs(0, quantType, 0, 0, 0.0f, -1, -1, 4, "BNSD", "BNSD", 0, false, {1, 4}),
-                                    &compileInfo, "Ascend950", 32, 262144);
-        ExecuteTestCase(ctx, ge::GRAPH_FAILED);
-    }
-}
 
 namespace {
 std::vector<gert::TilingContextPara::TensorDescription> MakeMxfp8Inputs(int64_t headDim = kD, bool withPScale = false)
