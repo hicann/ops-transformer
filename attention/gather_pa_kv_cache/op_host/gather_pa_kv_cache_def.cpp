@@ -13,6 +13,7 @@
  * \brief GatherPaKvCache op_host
  */
 #include <cstdint>
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 namespace ops {
@@ -245,8 +246,7 @@ private:
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .ExtendCfgInfo("opFile.value", "gather_pa_kv_cache_apt");
-        this->AICore().AddConfig("ascend950", aicoreConfig);
-        this->AICore().AddConfig("ascend350", aicoreConfig);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, aicoreConfig);
     }
 
     void GatherPaKvCacheDefFor96()
@@ -289,8 +289,8 @@ private:
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .ExtendCfgInfo("opFile.value", "gather_pa_kv_cache_apt");
-        this->AICore().AddConfig("ascend960dt", config_96);
-        this->AICore().AddConfig("ascend960pr", config_96);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, config_96);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, config_96);
     }
 };
 

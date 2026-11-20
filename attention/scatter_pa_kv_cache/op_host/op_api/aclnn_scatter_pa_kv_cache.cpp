@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "op_common/op_host/util/op_const_def.h"
 #include "aclnn_scatter_pa_kv_cache.h"
 
 #include <new>
@@ -83,8 +84,8 @@ static aclnnStatus CheckDtypeValid(const aclTensor* key, const aclTensor* keyCac
 {
     auto& platformInfo = op::GetCurrentPlatformInfo();
     auto socVersion = platformInfo.GetCurNpuArch();
-    bool isArch35 = (socVersion == NpuArch::DAV_3510);
-    bool isAscend96 = (socVersion == NpuArch::DAV_9201 || socVersion == NpuArch::DAV_9202);
+    bool isArch35 = (socVersion == Ops::Base::DAV_3510);
+    bool isAscend96 = (socVersion == Ops::Base::DAV_9201 || socVersion == Ops::Base::DAV_9202);
     auto dtypeSupportList = isArch35 ?
                                 KEY_VALUE_DTYPE_SUPPORT_LIST :
                                 (isAscend96 ? KEY_VALUE_DTYPE_SUPPORT_LIST_960 : KEY_VALUE_DTYPE_SUPPORT_LIST_910);

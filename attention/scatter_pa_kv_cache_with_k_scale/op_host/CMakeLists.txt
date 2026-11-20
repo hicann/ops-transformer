@@ -13,22 +13,11 @@ if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnnExc PRIVATE
         scatter_pa_kv_cache_with_k_scale_def.cpp
     )
-    if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
+    get_npu_arch_by_soc_version("${ASCEND_COMPUTE_UNIT}" kv_cache_npu_arch)
+    if(kv_cache_npu_arch STREQUAL "dav_3510" OR kv_cache_npu_arch STREQUAL "dav_9201")
         add_ops_compile_options(
             OP_NAME ScatterPaKvCacheWithKScale
-            COMPUTE_UNIT Ascend950PR_9599
-            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
-        )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend350")
-        add_ops_compile_options(
-            OP_NAME ScatterPaKvCacheWithKScale
-            COMPUTE_UNIT Ascend350_355e
-            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
-        )
-    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960dt")
-        add_ops_compile_options(
-            OP_NAME ScatterPaKvCacheWithKScale
-            COMPUTE_UNIT ascend960dt_968B7
+            COMPUTE_UNIT "${kv_cache_npu_arch}"
             OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
         )
     else()

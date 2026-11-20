@@ -13,6 +13,7 @@
  * \brief scatter_pa_kv_cache op host
  */
 
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 
@@ -662,8 +663,7 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "scatter_pa_kv_cache_apt");
-        this->AICore().AddConfig("ascend950", config_950);
-        this->AICore().AddConfig("ascend350", config_950);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, config_950);
 
         OpAICoreConfig config_960;
         config_960.Input("key")
@@ -723,8 +723,8 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "scatter_pa_kv_cache_apt");
-        this->AICore().AddConfig("ascend960dt", config_960);
-        this->AICore().AddConfig("ascend960pr", config_960);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, config_960);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, config_960);
     }
 };
 OP_ADD(ScatterPaKvCache);

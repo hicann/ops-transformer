@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "op_common/op_host/util/op_const_def.h"
 #include "gather_pa_kv_cache.h"
 #include "opdev/op_log.h"
 #include "opdev/op_dfx.h"
@@ -31,7 +32,7 @@ std::tuple<const aclTensor*, const aclTensor*> GatherPaKvCache(const aclTensor* 
 
     auto& platformInfo = op::GetCurrentPlatformInfo();
     auto socVersion = platformInfo.GetCurNpuArch();
-    bool isArch35 = (socVersion == NpuArch::DAV_3510);
+    bool isArch35 = (socVersion == Ops::Base::DAV_3510);
 
     const aclTensor* seqOffset = seqOffsetOptional;
     if (!isArch35 && seqOffset == nullptr) {
