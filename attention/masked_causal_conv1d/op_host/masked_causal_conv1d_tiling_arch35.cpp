@@ -111,7 +111,10 @@ ge::graphStatus MaskedCausalConv1dTilingArch35::GetInputShapes()
 // ---- GetInputDtypes ----
 ge::graphStatus MaskedCausalConv1dTilingArch35::GetInputDtypes()
 {
-    OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetInputDesc(INPUT_X_INDEX));
+    OP_CHECK_IF(
+        context_->GetInputDesc(INPUT_X_INDEX) == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "x", "The input desc of x is nullptr"),
+        return ge::GRAPH_FAILED);
     xType_ = context_->GetInputDesc(INPUT_X_INDEX)->GetDataType();
     if (xType_ != ge::DataType::DT_FLOAT16 && xType_ != ge::DataType::DT_BF16) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "x",

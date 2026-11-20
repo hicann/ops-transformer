@@ -760,7 +760,9 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CalcCoreUbTiling(uint64_t coreDim
         ubFactorBS =
             static_cast<uint64_t>(std::min(std::max(maxBS, static_cast<int64_t>(1)), static_cast<int64_t>(coreBS)));
         if (ubFactorBS == 0) {
-            OP_LOGE(context_->GetNodeName(), "UB size is not enough for tiling");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "ub_size",
+                                                  std::to_string(availableUbSize).c_str(),
+                                                  "UB size is not enough for tiling");
             return ge::GRAPH_FAILED;
         }
     }
@@ -931,7 +933,8 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::SearchBestCoreSplit(uint64_t N, u
 ge::graphStatus FusedCausalConv1dCutBSHTiling::ApplyDimSplit(uint64_t N, uint64_t bestDimCores)
 {
     if (bestDimCores == 0) {
-        OP_LOGE(context_->GetNodeName(), "ApplyDimSplit: bestDimCores is 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "best_dim_cores", "0",
+                                              "best_dim_cores must be greater than 0");
         return ge::GRAPH_FAILED;
     }
     constexpr uint64_t DIM_GRANULARITY = DIM_ALIGN_ELEMENTS;

@@ -107,7 +107,11 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetShapeInfo()
         // 2D 输入必须提供 query_start_loc 才能反推 batch 数
         // query_start_loc 形状为 (batch + 1,)，因此 batch = dim0 - 1
         auto queryStartLocShape = context_->GetOptionalInputShape(QUERY_START_LOC_INDEX);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, queryStartLocShape);
+        OP_CHECK_IF(
+            queryStartLocShape == nullptr,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "query_start_loc",
+                                                     "The input shape of query_start_loc is nullptr when x is 2D"),
+            return ge::GRAPH_FAILED);
         auto queryStartLocOriginShape = queryStartLocShape->GetOriginShape();
         // 完整形状校验由 ValidateQueryStartLocShape 完成（要求 dim==1），此处仅保证读 dim0 不越界
         if (queryStartLocOriginShape.GetDimNum() < DIM_1) {
@@ -583,7 +587,10 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateNumAcceptedTokenShape()
     }
 
     auto acceptShape = context_->GetOptionalInputShape(NUM_ACCEPTED_TOKEN_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, acceptShape);
+    OP_CHECK_IF(acceptShape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "num_accepted_token",
+                                                         "The input shape of num_accepted_token is nullptr"),
+                return ge::GRAPH_FAILED);
     auto acceptOriginShape = acceptShape->GetOriginShape();
     if (acceptOriginShape.GetDimNum() != DIM_1) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "num_accepted_token",
@@ -858,7 +865,9 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ComputeInterCoreSplit()
     int64_t N = dim_ / DIM_ALIGN_ELEMENT;
     dimRemainderElems_ = dim_ % DIM_ALIGN_ELEMENT;
     if (dim_ <= 0) {
-        OP_LOGE(context_->GetNodeName(), "dim %ld is invalid", dim_);
+        std::string incorrectShape = "[" + std::to_string(dim_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", incorrectShape.c_str(),
+                                              "The value of dim must be greater than 0");
         return ge::GRAPH_FAILED;
     }
     // dim < 128 时（如 dim=64），N=0，dimRemainderElems_=dim_
@@ -1322,8 +1331,10 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ComputeInterCoreSplitCoarse()
     // dim 方向：最多使用 coarseBlocks 个核（一核一粗块），不超过可用核上限
     dimCoreCnt_ = std::min(coarseBlocks, maxCoresAvailable);
     if (dimCoreCnt_ <= 0) {
-        OP_LOGE(context_->GetNodeName(), "dim %ld is smaller than COARSE_GRAIN_ELEMENT %ld", dim_,
-                COARSE_GRAIN_ELEMENT);
+        std::string incorrectShape = "[" + std::to_string(dim_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", incorrectShape.c_str(),
+                                              "The value of dim must be greater than or equal to 1024 "
+                                              "and at least one core must be available");
         return ge::GRAPH_FAILED;
     }
 
