@@ -1078,7 +1078,12 @@ def make_spec(family, route):
                 "scaleAlg",
                 "dstTypeMax",
             )
-            kwargs.update(zip(names, args[13:20], strict=True))
+            values = args[13:20]
+            if len(values) != len(names):
+                raise ValueError(
+                    "SwiGLU V3 golden requires all seven SwiGLU and quantization attributes"
+                )
+            kwargs.update(zip(names, values))
         return _hook_golden(*args, **kwargs, **meta)
 
     def preprocess(*args, ttk_reference=None, **kwargs):
