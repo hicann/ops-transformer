@@ -1018,16 +1018,23 @@ protected:
         GMM_SWIGLU_CHECK_DTYPE(groupList, "groupList", GROUP_LIST_DTYPE_SUPPORT_LIST, return false);
         GMM_SWIGLU_CHECK_DTYPE(output, "output", QUANTOUT_DTYPE_SUPPORT_LIST_PERTOKEN, return false);
         GMM_SWIGLU_CHECK_DTYPE(outputScale, "outputScale", QUANTSCALEOUT_DTYPE_SUPPORT_LIST_PERTOKEN, return false);
+        const DataType xDtype = x->GetDataType();
         size_t weightLength = gmmDsqParams_.weight->Size();
         for (size_t i = 0; i < weightLength; i++) {
             const aclTensor* weight = (*gmmDsqParams_.weight)[i];
             const aclTensor* weightScale = (*gmmDsqParams_.weightScale)[i];
             if (weight->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) {
+                if (xDtype == DataType::DT_FLOAT8_E5M2) {
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        apiName_.c_str(), "x", op::ToString(xDtype).GetString(),
+                        "when the quantization mode is per-token and the format of weight is FRACTAL_NZ, "
+                        "the dtype of x must be INT8, FLOAT8_E4M3FN, or HIFLOAT8");
+                    return false;
+                }
                 GMM_SWIGLU_CHECK_DTYPE(weight, "weight", WEIGHT_DTYPE_SUPPORT_LIST_PERTOKEN_NZ, return false);
             } else {
                 GMM_SWIGLU_CHECK_DTYPE(weight, "weight", XW_DTYPE_SUPPORT_LIST_PERTOKEN, return false);
             }
-            DataType xDtype = gmmDsqParams_.x->GetDataType();
             if (xDtype == DataType::DT_INT8) {
                 GMM_SWIGLU_CHECK_DTYPE(weightScale, "weightScale", WEIGHT_SCALE_DTYPE_SUPPORT_LIST_PERTOKEN_XINT8,
                                        return false);
@@ -1036,7 +1043,6 @@ protected:
                                        return false);
             }
         }
-        DataType xDtype = gmmDsqParams_.x->GetDataType();
         return IsDtypeCompatiblePertoken(xDtype, ((*gmmDsqParams_.weight)[0])->GetDataType());
     }
 
