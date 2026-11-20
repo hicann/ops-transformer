@@ -39,12 +39,12 @@ current version, for expample (N,). \n The bias only supports nullptr in the per
 supports nullptr when x1's type is float16 or bfloat16. \n The x1_scale only supports one dimension and only one element
 in the per_tensor scenario, for expample (1,). \n The x1_scale only supports two dimensions in the per_block scenario,
 for expample (ceildiv(M, 128), ceildiv(K, 128)). \n The x1_scale only supports three dimensions in the mxfp scenario,
-for expample (M, ceildiv(M, 64), 2). \n
+for expample (M, ceildiv(K, 64), 2). \n
 * @li x2_scale: A matrix tensor. The type supports float32, float_e8m0. The format supports ND. \n The x2_scale only
 supports nullptr when x1's type is float16 or bfloat16. \n The x2_scale only supports one dimension and only one element
 in the per_tensor scenario, for expample (1,). \n The x2_scale only supports two dimensions in the per_block scenario,
 for expample (ceildiv(K, 128), ceildiv(N, 128)). \n The x2_scale only supports three dimensions in the mxfp scenario,
-for expample (M, ceildiv(M, 64), 2). \n
+for expample (N, ceildiv(K, 64), 2) when x2 is transposed, or (ceildiv(K, 64), N, 2) otherwise. \n
 * @li quant_scale: A matrix tensor. The type supports float32. The format supports ND. The quant_scale only supports one
 dimension and only one element, for example (1,). The quant_scale only supports nullptr in current version. \n
 *
