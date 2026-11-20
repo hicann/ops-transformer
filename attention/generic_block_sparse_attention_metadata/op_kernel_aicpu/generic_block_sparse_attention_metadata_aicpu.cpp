@@ -252,7 +252,17 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
             qStorageBlockStarts[static_cast<size_t>(batchIdx)] = batchIdx * maxQSeqLen_;
             groupCount += (static_cast<int64_t>(qUsed[batchIdx]) + blockShapeX_ - 1) / blockShapeX_;
         }
-        return maskType_ != 3 || groupCount == qBlockStorageNum_;
+        // Union: dim1 is capacity; actual G from seqused may be smaller.
+        // Require 0 < G <= capacity; only the first G groups are used.
+        if (maskType_ == 3) {
+            if (groupCount <= 0 || groupCount > qBlockStorageNum_) {
+                KERNEL_LOG_ERROR("Union sparse dim1=%lld must be >= actual group count %lld and G must be > 0.",
+                                 qBlockStorageNum_, groupCount);
+                return false;
+            }
+            return true;
+        }
+        return true;
     }
     const auto* kvPrefix =
         cuSeqLengthsKv_ == nullptr ? nullptr : static_cast<const int64_t*>(cuSeqLengthsKv_->GetData());
@@ -307,14 +317,23 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
                 return false;
             }
             storageBlockBase += storageBlockNum;
-            // Union mode: sparse tensor dim1 is the group count from actual (seqused) Q lengths.
-            // Union size is blockShapeX_ (validated to the supported value in CheckInputs).
+            // Union mode: sparse dim1 is capacity; actual G is from seqused
+            // (may be smaller when graph over-allocates). Union size is
+            // blockShapeX_ (validated to the supported value in CheckInputs).
             groupBase += (actualQSeqLen + blockShapeX_ - 1) / blockShapeX_;
             if (!readKvSeqLen(batchIdx, kvSeqLens[static_cast<size_t>(batchIdx)])) {
                 return false;
             }
         }
-        return maskType_ == 3 ? (groupBase == qBlockStorageNum_) : (storageBlockBase == qBlockStorageNum_);
+        if (maskType_ == 3) {
+            if (groupBase <= 0 || groupBase > qBlockStorageNum_) {
+                KERNEL_LOG_ERROR("Union sparse dim1=%lld must be >= actual group count %lld and G must be > 0.",
+                                 qBlockStorageNum_, groupBase);
+                return false;
+            }
+            return true;
+        }
+        return storageBlockBase == qBlockStorageNum_;
     }
 
     return false;

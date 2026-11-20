@@ -305,11 +305,11 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_rejects_union_mxf
 {
     // Union (maskType=3) only supports quantType=0 or 5; quantType=6 must fail here,
     // not only later in the main operator tiling.
+    // Host-only UT cannot register AICPU (561103); keep reject-path only.
+    // Allowed (0/5) SUCCESS covered by scheduler tiling UT.
     constexpr int64_t kUnionX = 8;
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 0, kD, kBlockSize, 0, 3, kUnionX),
               ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 0, kD, kBlockSize, 0, 3, kUnionX), ACLNN_SUCCESS);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 0, 0, kD, kBlockSize, 0, 3, kUnionX), ACLNN_SUCCESS);
 }
 
 TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, quant_type_platform_matrix)

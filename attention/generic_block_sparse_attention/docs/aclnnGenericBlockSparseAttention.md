@@ -182,7 +182,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>
         详见<a href="#掩码说明">掩码说明</a>。<br>
         maskType=0/1：必须传入nullptr。<br>
-        maskType=3（Union）：必须传入INT32 exactMask，shape为[kvHeads, G, U×blockShapeY]；
+        maskType=3（Union）：必须传入INT32 exactMask，shape为[kvHeads, dim1, U×blockShapeY]，dim1与稀疏第二维（容量）一致；
         每个int32的bit <code>i</code>（低位起，i&lt;unionSize）表示组内第i个Q对该KV列是否可见。
       </td>
       <td>BOOL、INT32</td>
@@ -655,7 +655,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
 | blockSize | 每一页容纳的token数 |
 | maxNumBlocksPerBatch | blockTable第二维，须≥ceilDiv(maxKvSeqLength, blockSize) |
 | qStorageLen_i | cuSeqLengthsQ前缀和差分得到的各batch存储长度 |
-| totalQBlocks | 非 Union 的 TND 路径按 Q 存储长度分块，$\sum_i \mathrm{ceilDiv}(qStorageLen_i, blockShapeX)$。Union（`maskType=3`）按有效 Q 长度分组，$G=\sum_i \mathrm{ceilDiv}(qEffectiveLen_i, 8)$。 |
+| totalQBlocks | 非 Union 的 TND 路径按 Q 存储长度分块，$\sum_i \mathrm{ceilDiv}(qStorageLen_i, blockShapeX)$。Union（`maskType=3`）实际组数$G=\sum_i \mathrm{ceilDiv}(qEffectiveLen_i, 8)$；`sparseBlockIdx`/`sparseBlockCount`/`exactMask` 第二维为容量，须满足$G\le\mathrm{dim1}$；有效组须从前部按 batch 顺序紧密排布。 |
 | totalKBlocks | 按存储长度分块后的KV块总数，即$\sum_i \mathrm{ceilDiv}(kvStorageLen_i, blockShapeY)$ |
 | maxKvBlockCount | sparseBlockIdx最后一维，须不小于sparseBlockCount中所有元素的最大值，容量上限见<a href="#产品差异约束">产品差异约束</a> |
 | blockShapeX / blockShapeY | 稀疏块在Q方向、KV方向的块大小 |
@@ -1035,7 +1035,7 @@ A8C8（quantType=6）的Q/K/V输入均为8位FLOAT8_E4M3FN，输出为FLOAT16或
     <tr>
       <td>3</td>
       <td>Union exactMask</td>
-      <td>传 INT32 exactMask，shape [kvHeads, G, U×blockShapeY]；bit i 表示组内第 i 个 Q 对该列可见</td>
+      <td>传 INT32 exactMask，shape [kvHeads, dim1, U×blockShapeY]，dim1与稀疏第二维（容量）一致；bit i 表示组内第 i 个 Q 对该列可见</td>
       <td>-1/-1</td>
     </tr>
     <tr>
@@ -1063,7 +1063,7 @@ A8C8（quantType=6）的Q/K/V输入均为8位FLOAT8_E4M3FN，输出为FLOAT16或
 - <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>在`maskType=1`时，第q个有效Q token的KV可见长度为`kvLen-qLen+q+1`，q从0开始；`maskType=0`时可见长度为`kvLen`。`residualBlockMode=1`时显式列表只包含可见范围内的完整KV块；当可见长度不是Y的整数倍时，算子隐式加入最后的不完整块，该块不计入`sparseBlockCount`，也不占用topK容量。
 <!-- end id21 -->
 - TND 非 Union（`maskType=0/1`）按 `cuSeqLengthsQOptional` 的相邻差值计算各 batch 的稀疏槽位数，Q 的 padding 仍占用稀疏槽位。
-- Union（`maskType=3`）按 batch 顺序拼接各 batch 的组。TND 优先用 `sequsedQOptional` 作为有效 Q 长度，未传时取 `cuSeqLengthsQOptional` 的相邻差值。`cuSeqLengthsQOptional` 仍用于确定各 batch 的 Q 存储起点。有效 Q 长度为 0 的 batch 不产生组。有有效 Q 但未选中任何 KV 块的组仍保留，`sparseBlockCount=0`。要求总组数 `G > 0`，即至少一个 batch 有有效 Q。
+- Union（`maskType=3`）按 batch 顺序拼接各 batch 的组。TND 优先用 `sequsedQOptional` 作为有效 Q 长度，未传时取 `cuSeqLengthsQOptional` 的相邻差值。`cuSeqLengthsQOptional` 仍用于确定各 batch 的 Q 存储起点。有效 Q 长度为 0 的 batch 不产生组。有有效 Q 但未选中任何 KV 块的组仍保留，`sparseBlockCount=0`。要求总组数 `G > 0`，即至少一个 batch 有有效 Q。稀疏张量第二维可为容量：`dim1 >= G`，仅前 `G` 组参与调度；`exactMask` 第二维须与稀疏张量第二维（容量）一致。
 - layoutKv为PA_BBND/PA_BNBD时须传sequsedKvOptional，不传cuSeqLengthsKvOptional。
 - seqused与对应cu前缀和同时传入时（layoutQ为TND时的Q侧，及layoutKv为TND时的KV侧）：各batch的seqused元素须≤对应cu存储长度，且须与Metadata侧完全一致。
 - quantType=8 时 Q 使用 FLOAT8_E4M3FN，K/V 使用 FLOAT4_E2M1。其他模式要求 Q/K/V 的数据类型一致。

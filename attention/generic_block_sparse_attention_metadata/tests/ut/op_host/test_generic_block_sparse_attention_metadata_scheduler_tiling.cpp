@@ -737,6 +737,33 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionRuntimeBlockShapeX
     EXPECT_EQ(BuildSchedule(input, rejected), BSAScheduleStatus::BSA_INVALID_PARAM);
 }
 
+// Union sparse dim1 is capacity: qBlockStorageNum may exceed actual group count.
+// saTotalTaskNum follows actual groups; signature still hashes the capacity.
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionAcceptsSparseCapacityGreaterThanActualGroups)
+{
+    constexpr int64_t kUnionSize = 8;
+    constexpr int64_t kActualGroups = 2;
+    constexpr int64_t kCapacity = 4;
+    ScheduleInput input = MakeDecodeInput();
+    input.maskType = 3;
+    input.blockShapeX = kUnionSize;
+    input.blockIndexStride = 16;
+    input.qSeqLens = {kActualGroups};
+    input.qBlockStorageNum = kCapacity;
+    input.validBlockNums = {4, 4};
+    ScheduleResult result;
+    ASSERT_EQ(BuildSchedule(input, result), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_EQ(result.saTotalTaskNum, kActualGroups * DECODE_NUM_KV_HEADS);
+    EXPECT_EQ(result.totalQTokenNum, kActualGroups);
+
+    ScheduleInput tight = input;
+    tight.qBlockStorageNum = kActualGroups;
+    ScheduleResult tightResult;
+    ASSERT_EQ(BuildSchedule(tight, tightResult), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_EQ(result.saTotalTaskNum, tightResult.saTotalTaskNum);
+    EXPECT_NE(result.configSignature, tightResult.configSignature);
+}
+
 TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, UnionQuantTypeWhitelist)
 {
     constexpr int64_t kUnionSize = 8;

@@ -183,7 +183,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>
         See <a href="#mask-description">Mask Description</a>.<br>
         maskType=0/1: must be nullptr.<br>
-        maskType=3 (Union): must be INT32 exactMask with shape [kvHeads, G, U×blockShapeY];
+        maskType=3 (Union): must be INT32 exactMask with shape [kvHeads, dim1, U×blockShapeY], where dim1 matches the sparse second dimension (capacity);
         bit <code>i</code> of each int32 (from the low bit, i&lt;unionSize) marks whether the i-th Q in the group can see that KV column.
       </td>
       <td>BOOL, INT32</td>
@@ -606,7 +606,7 @@ The common fields in the constraints are defined as follows:
 | blockSize | Number of tokens each page holds. |
 | maxNumBlocksPerBatch | Second dimension of blockTable, which must be ≥ ceilDiv(maxKvSeqLength, blockSize). |
 | qStorageLen_i | Storage length of each batch obtained by difference of the prefix sum of cuSeqLengthsQ. |
-| totalQBlocks | Non-Union TND paths use the Q storage lengths, $\sum_i \mathrm{ceilDiv}(qStorageLen_i, blockShapeX)$. Union (`maskType=3`) uses the effective Q lengths, $G=\sum_i \mathrm{ceilDiv}(qEffectiveLen_i, 8)$. |
+| totalQBlocks | Non-Union TND paths use the Q storage lengths, $\sum_i \mathrm{ceilDiv}(qStorageLen_i, blockShapeX)$. Union (`maskType=3`) actual group count is $G=\sum_i \mathrm{ceilDiv}(qEffectiveLen_i, 8)$; dim1 of `sparseBlockIdx`/`sparseBlockCount`/`exactMask` is capacity and must satisfy $G\le\mathrm{dim1}$; valid groups must be densely packed from the front in batch order. |
 | totalKBlocks | Total number of KV blocks after chunking by storage length, i.e., $\sum_i \mathrm{ceilDiv}(kvStorageLen_i, blockShapeY)$ |
 | maxKvBlockCount | Last dimension of sparseBlockIdx, which must be no less than the maximum of all elements in sparseBlockCount. Capacity upper limit is INT32_MAX. |
 | blockShapeX / blockShapeY | Size of sparse blocks in the Q and KV directions. |
@@ -994,7 +994,7 @@ Ascend 950PR and 950DT support quantType=0, 4, 5, 6, and 8. Values 1–3 are res
     <tr>
       <td>3</td>
       <td>Union exactMask</td>
-      <td>Pass INT32 exactMask, shape [kvHeads, G, U×blockShapeY]; bit i marks whether the i-th Q in the group can see that column.</td>
+      <td>Pass INT32 exactMask, shape [kvHeads, dim1, U×blockShapeY], where dim1 matches the sparse second dimension (capacity); bit i marks whether the i-th Q in the group can see that column.</td>
       <td>-1/-1</td>
     </tr>
     <tr>
@@ -1021,7 +1021,7 @@ Supports maskType=0 (non-causal) and 1 (built-in causal); both require attenMask
 - Sparse index last-dimension capacity is 1 to `INT32_MAX` for non-quantized <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, non-quantized FLOAT16/BFLOAT16 and `A8C8` on Ascend 950PR&amp;950DT, and regular FP8 including FP8 Union.
 - On <term>Ascend 950PR&950DT products</term>, regular FP8 (`quantType=5`, `maskType=1`) with `softmaxPrecision=0` requires `headDim=128` and `1≤groupSize≤16`. Supported Q/KV layouts are `TND/TND`, `BSND/BSND`, `BNSD/BNSD`, and each Q layout paired with `PA_BBND` or `PA_BNBD`. Set `returnSoftmaxlse` to 0 or 1. Low precision (`softmaxPrecision=1`) supports only `TND/PA_BBND` with LSE disabled.
 - For non-Union TND (`maskType=0/1`), the difference between adjacent elements of `cuSeqLengthsQOptional` determines the number of sparse slots per batch. Q padding still occupies sparse slots.
-- Union (`maskType=3`) concatenates groups in batch order. For TND, use `sequsedQOptional` as the effective Q length when provided, or the difference between adjacent elements of `cuSeqLengthsQOptional` otherwise. `cuSeqLengthsQOptional` still determines where each batch starts in Q storage. A batch with zero effective Q length contributes no groups. A group with effective Q tokens and no selected KV blocks retains its slot with `sparseBlockCount=0`. The total group count `G` must be greater than zero, so at least one batch must have effective Q tokens.
+- Union (`maskType=3`) concatenates groups in batch order. For TND, use `sequsedQOptional` as the effective Q length when provided, or the difference between adjacent elements of `cuSeqLengthsQOptional` otherwise. `cuSeqLengthsQOptional` still determines where each batch starts in Q storage. A batch with zero effective Q length contributes no groups. A group with effective Q tokens and no selected KV blocks retains its slot with `sparseBlockCount=0`. The total group count `G` must be greater than zero, so at least one batch must have effective Q tokens. Sparse dim1 may be a capacity with `dim1 >= G`; only the first `G` groups are scheduled. `exactMask` dim1 must match the sparse capacity dim1.
 - When layoutKv is PA_BBND/PA_BNBD, sequsedKvOptional must be passed in, and cuSeqLengthsKvOptional must not be passed.
 - When seqused and the corresponding cu prefix sum are passed in together (on the Q side, and on the KV side when layoutKv is TND): the core splitting/task space is accumulated based on the actual valid length (seqused) of each batch; the seqused element of each batch must be ≤ the corresponding cu storage length and must be exactly the same as that on the Metadata side.
 - When quantType=8, Q uses FLOAT8_E4M3FN and K/V use FLOAT4_E2M1. Other modes require matching Q/K/V data types.

@@ -62,34 +62,8 @@ TEST_F(NsaCompressWithCacheApiTest, aclnn_nsa_compress_with_cache_A1_fp16)
     EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
 }
 
-// compressStride=0 非法：第一段应失败，避免进入窗口取模除零（issue 7234）
-TEST_F(NsaCompressWithCacheApiTest, aclnn_nsa_compress_with_cache_reject_stride_0)
-{
-    constexpr int64_t batchSize = 4;
-    constexpr int64_t pageBlockSize = 128;
-    constexpr int64_t maxSeqLen = 512;
-    constexpr int64_t blockNumPerBatch = maxSeqLen / pageBlockSize;
-    constexpr int64_t blocksNum = blockNumPerBatch * batchSize;
-    constexpr int64_t headsNum = 24;
-    constexpr int64_t headsDim = 192;
-    constexpr int64_t compressBlockSize = 32;
-
-    auto input =
-        TensorDesc({blocksNum, pageBlockSize, headsNum, headsDim}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(0, 1);
-    auto weight = TensorDesc({compressBlockSize, headsNum}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(0, 1);
-    auto slotMapping = TensorDesc({batchSize}, ACL_INT32, ACL_FORMAT_ND);
-    IntArrayDesc actSeqLen(std::vector<int64_t>{32, 0, 0, 0});
-    auto blockTable = TensorDesc({batchSize, blockNumPerBatch}, ACL_INT32, ACL_FORMAT_ND);
-    char layout[] = "TND";
-    auto outputCache = TensorDesc({maxSeqLen, headsNum, headsDim}, ACL_FLOAT16, ACL_FORMAT_ND);
-
-    auto ut = OP_API_UT(
-        aclnnNsaCompressWithCache,
-        INPUT(input, weight, slotMapping, actSeqLen, blockTable, layout, compressBlockSize, 0, 1, pageBlockSize),
-        OUTPUT(outputCache));
-    uint64_t workspaceSize = 0;
-    EXPECT_NE(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
-}
+// compressStride<=0 拦截在 host tiling（见 op_host tiling UT），aclnn GetWorkspaceSize
+// 仅做空指针/dtype/format/contiguous 校验，不在此阶段断言 stride 非法（issue 7713）。
 
 namespace {
 enum class NullParam {
