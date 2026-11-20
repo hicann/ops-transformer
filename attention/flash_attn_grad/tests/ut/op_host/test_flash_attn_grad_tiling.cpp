@@ -41,6 +41,8 @@ static const char* A5SocInfo = R"JSON({
 
 // attn_mask 压缩掩码固定边长（fag_attr_checker 要求 [ATTN_MASK_DIM, ATTN_MASK_DIM]）
 static constexpr int64_t ATTN_MASK_HW = 2048;
+// Base metadata header (16 words) plus the FAG body (412 words).
+static constexpr int64_t FAG_METADATA_WORDS = 428;
 
 class FlashAttnGradTiling : public testing::Test {
 protected:
@@ -92,8 +94,8 @@ static gert::TilingContextPara MakeBsndContext(optiling::FlashAttnGradCompileInf
                                        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                        // attn_mask: optional（需要 mask 的用例走内联构造）
                                        {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-                                       // metadata: optional
-                                       {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                       // metadata: required one-dimensional int32 tensor
+                                       {{{FAG_METADATA_WORDS}, {FAG_METADATA_WORDS}}, ge::DT_INT32, ge::FORMAT_ND},
                                    },
                                    {
                                        // dq
@@ -204,8 +206,8 @@ TEST_F(FlashAttnGradTiling, Arch35_Bsnd_D128_Causal)
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
             // attn_mask: [2048,2048] INT8（mask_mode=3 必需）
             {{{ATTN_MASK_HW, ATTN_MASK_HW}, {ATTN_MASK_HW, ATTN_MASK_HW}}, ge::DT_INT8, ge::FORMAT_ND},
-            // metadata: optional
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            // metadata: required one-dimensional int32 tensor
+            {{{FAG_METADATA_WORDS}, {FAG_METADATA_WORDS}}, ge::DT_INT32, ge::FORMAT_ND},
         },
         {
             // dq
@@ -327,8 +329,8 @@ TEST_F(FlashAttnGradTiling, Arch35_Bnsd_D128_NoMask)
                                      {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                      // attn_mask: optional
                                      {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-                                     // metadata: optional
-                                     {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                     // metadata: required one-dimensional int32 tensor
+                                     {{{FAG_METADATA_WORDS}, {FAG_METADATA_WORDS}}, ge::DT_INT32, ge::FORMAT_ND},
                                  },
                                  {
                                      // dq: [B, N1, S1, D]
@@ -377,7 +379,8 @@ TEST_F(FlashAttnGradTiling, Arch35_Bsnd_D128_WithSink)
                                      // sinks: [N1] FP32
                                      {{{4}, {4}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                      {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND},
-                                     {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+                                     // metadata: required one-dimensional int32 tensor
+                                     {{{FAG_METADATA_WORDS}, {FAG_METADATA_WORDS}}, ge::DT_INT32, ge::FORMAT_ND},
                                  },
                                  {
                                      {{{1, 256, 4, 128}, {1, 256, 4, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
