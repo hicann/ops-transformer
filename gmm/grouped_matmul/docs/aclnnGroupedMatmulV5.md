@@ -122,7 +122,7 @@ $$
   y_i=x_i\times (weight_i + antiquant\_offset_i) * antiquant\_scale_i + bias_i
   $$
 
-- x为INT8，weight为INT4（仅支持x、weight、y均为单tensor的场景）。其中$bias$为必选参数，是离线计算的辅助结果，且 $bias_i=8\times weight_i  * scale_i$，并沿k轴规约。
+- x为INT8，weight为INT4（仅支持x、weight、y均为单tensor的场景），其中$bias$为必选参数，是离线计算的辅助结果，且 $bias_i=8\times weight_i  * scale_i$，并沿k轴规约。
 
   $$
   y_i=((x_i - 8) \times weight_i * scale_i+bias_i ) * per\_token\_scale_i
@@ -217,7 +217,7 @@ aclnnStatus aclnnGroupedMatmulV5(
 
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-    - weight格式仅支持ND格式，不支持FRACTAL_NZ格式。
+    - weight格式仅支持ND格式，不支持FRACTAL_NZ格式
   <!-- end id8 -->
   <!-- npu="A3,910b" id11 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
@@ -317,9 +317,9 @@ aclnnGroupedMatmulV5默认确定性实现。
 - groupType：支持M轴分组（0）和不分组（-1）。非量化/全量化额外支持K轴分组（2）。
 - 通过本接口传入的weight仅支持ND格式；NZ格式请使用[aclnnGroupedMatmulWeightNz](aclnnGroupedMatmulWeightNz.md)。
 - groupListType：支持0、1、2。
-  - groupListType=0：groupList须为非负单调非递减数列（累积和），最后一个值不大于x中tensor的第一维。以M=256、E=4（各组大小依次为64、0、128、64）为例：`[64, 64, 192, 256]`
-  - groupListType=1：groupList须为非负数列（各组大小），数值总和不大于x中tensor的第一维。例如：`[64, 0, 128, 64]`
-  - groupListType=2：仅全量化和非量化，且groupType=0场景下支持，groupList须为非负数列，shape为`[E, 2]`，E表示Group大小，数据排布为`[[groupIdx0, groupSize0], [groupIdx1, groupSize1], ...]`，其中groupSize为分组轴上每组大小，必须为非负数。所有groupSize非0的分组按groupIdx有序排列在前，所有groupSize为0的分组按groupIdx有序排列在后，确保非零组前置、零值组后置，且组内有序。第二列的数值总和不大于x中tensor的第一维。例如：`[[0, 64], [2, 128], [3, 64], [1, 0]]`
+  - groupListType=0：groupList须为非负单调非递减数列（累积和），最后一个值不大于x中tensor的第一维。以M=256、E=4（各组大小依次为64、0、128、64）为例：`[64, 64, 192, 256]`。
+  - groupListType=1：groupList须为非负数列（各组大小），数值总和不大于x中tensor的第一维。例如：`[64, 0, 128, 64]`。
+  - groupListType=2：仅全量化和非量化，且groupType=0场景下支持，groupList须为非负数列，shape为`[E, 2]`，E表示Group大小，数据排布为`[[groupIdx0, groupSize0], [groupIdx1, groupSize1], ...]`，其中groupSize为分组轴上每组大小，必须为非负数，所有groupSize非0的分组按groupIdx有序排列在前，所有groupSize为0的分组按groupIdx有序排列在后，确保非零组前置、零值组后置，且组内有序。第二列的数值总和不大于x中tensor的第一维。例如：`[[0, 64], [2, 128], [3, 64], [1, 0]]`。
 - tuningConfigOptional：可选参数，数组中的第一个值表示各个专家处理的token数的预期值，当前无场景使用。
 - actType（0~5）：
   - 伪量化仅支持 0。
@@ -621,9 +621,9 @@ aclnnGroupedMatmulV5默认确定性实现。
 - perTokenScaleOptional：通常仅1维，长度与 x的M一致。仅支持 x/weight/out均为单Tensor 场景。
 - groupListOptional：out中TensorList长度为1时，groupList约束输出数据有效范围，未指定部分不参与更新。
 - groupListType：
-  - groupListType=0：须为非负单调非递减数列（累积和）。以M=256、E=4（各组大小依次为64、0、128、64）为例：`[64, 64, 192, 256]`
-  - groupListType=1：须为非负数列（各组大小）。例如：`[64, 0, 128, 64]`
-  - groupListType=2：groupList须为非负数列，shape为`[E, 2]`，E表示Group大小，数据排布为`[[groupIdx0, groupSize0], [groupIdx1, groupSize1], ...]`，其中groupSize为分组轴上每组大小，必须为非负数。所有groupSize非0的分组按groupIdx有序排列在前，所有groupSize为0的分组按groupIdx有序排列在后，确保非零组前置、零值组后置，且组内有序。例如：`[[0, 64], [2, 128], [3, 64], [1, 0]]`
+  - groupListType=0：须为非负单调非递减数列（累积和）。以M=256、E=4（各组大小依次为64、0、128、64）为例：`[64, 64, 192, 256]`。
+  - groupListType=1：须为非负数列（各组大小）。例如：`[64, 0, 128, 64]`。
+  - groupListType=2：groupList须为非负数列，shape为`[E, 2]`，E表示Group大小，数据排布为`[[groupIdx0, groupSize0], [groupIdx1, groupSize1], ...]`，其中groupSize为分组轴上每组大小，必须为非负数，所有groupSize非0的分组按groupIdx有序排列在前，所有groupSize为0的分组按groupIdx有序排列在后，确保非零组前置、零值组后置，且组内有序。例如：`[[0, 64], [2, 128], [3, 64], [1, 0]]`。
 - groupType：支持M轴分组（0）和不分组（-1），非量化额外支持 K轴分组（2）。全量化下 groupType 仅支持0（M轴分组）。
 - tuningConfigOptional：支持，为Host侧INT64 aclIntArray。
   - `[0]`：预期各专家处理的token数，tiling 按此优化，适用场景：A8W4/A8W8/A4W4，x/weight/out 单Tensor。
@@ -683,7 +683,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 - **约束说明**
 
   除平台约束外，非量化场景其余约束如下：
-  - 支持 groupType=-1、0、2，actType=0，groupListType=0/1/2。
+  - 支持 groupType=-1、0、2，actType=0，groupListType=0/1/2
 
 </details>
 
@@ -745,13 +745,13 @@ aclnnGroupedMatmulV5默认确定性实现。
   除平台约束外，A4W4场景其余约束如下：
   - 仅支持groupType=0（M轴分组），actType=0，groupListType=0/1/2
   - 当前仅支持x、weight、out均为长度为1的TensorList
-  - x不支持转置，weight为NZ格式时，支持转置。ND格式仅支持非转置。
+  - x不支持转置，weight为NZ格式时，支持转置。ND格式仅支持非转置
   - x仅支持2维Tensor，Shape为（M，K）
   - weight仅支持3维Tensor，Shape为（E，K，N）
-  - weight的数据格式为ND时，要求n为8的整数倍。
-  - 支持perchannel和pergroup量化。perchannel场景的scale的shape需为 $[E, N]$，pergroup场景需为 $[E, G, N]$。
-  - pergroup场景下，$G$必须要能整除$K$，且$k/G$需为偶数。
-  - 开启右矩阵NZ转置后，$K/G$必须按照64对齐，K按照64对齐，N按照16对齐。
+  - weight的数据格式为ND时，要求n为8的整数倍
+  - 支持perchannel和pergroup量化。perchannel场景的scale的shape需为 $[E, N]$，pergroup场景需为 $[E, G, N]$
+  - pergroup场景下，$G$必须要能整除$K$，且$k/G$需为偶数
+  - 开启右矩阵NZ转置后，$K/G$必须按照64对齐，K按照64对齐，N按照16对齐
 
 </details>
 
@@ -779,7 +779,7 @@ aclnnGroupedMatmulV5默认确定性实现。
   - Bias为计算过程中离线计算的辅助结果，值要求为 $8 \times weight \times scale$，并在第1维累加，shape要求为 $[E, N]$
   - 当weight传入数据类型为INT32时，会将每个INT32视为8个INT4
   - offset为空时
-    - 该场景下仅支持groupListType为1（算子不会检查groupListType的值，会认为groupListType为1），k要求为quantGroupSize的整数倍，且要求k <= 18432。其中quantGroupSize为k方向上pergroup量化长度，当前支持quantGroupSize=256
+    - 该场景下仅支持groupListType为1（算子不会检查groupListType的值，会认为groupListType为1），k要求为quantGroupSize的整数倍，且要求k <= 18432，其中quantGroupSize为k方向上pergroup量化长度，当前支持quantGroupSize=256
     - 该场景下要求n为8的整数倍
     - 该场景下scale为pergroup与perchannel离线融合后的结果，shape要求为 $[E, quantGroupNum, N]$，其中 $quantGroupNum = k \div quantGroupSize$
     - 该场景下，各个专家处理的token数的预期值大于n/4时，即tuningConfigOptional中第一个值大于n/4时，通常会取得更好的性能，此时显存占用会增加 $g \times k \times n$ 字节（其中g为matmul组数即分组数）
@@ -810,8 +810,8 @@ aclnnGroupedMatmulV5默认确定性实现。
   除平台约束外，A16W8场景其余约束如下：
   - x不支持转置
   - 仅支持groupType=-1、0，actType=0，groupListType=0/1/2
-  - 仅支持perchannel量化模式。
-  - 若weight为多tensor，定义pergroup长度 $s_i = k_i / G_i$，要求所有 $s_i (i=1,2,...g)$都相等。
+  - 仅支持perchannel量化模式
+  - 若weight为多tensor，定义pergroup长度 $s_i = k_i / G_i$，要求所有 $s_i (i=1,2,...g)$都相等
   - 伪量化参数antiquantScaleOptional和antiquantOffsetOptional的shape要满足下表（其中g为matmul组数）：
 
     | 使用场景 | 子场景 | shape限制 |
@@ -840,11 +840,11 @@ aclnnGroupedMatmulV5默认确定性实现。
   除平台约束外，A16W4场景其余约束如下：
   - x不支持转置
   - 仅支持groupType=-1、0，actType=0，groupListType=0/1/2
-  - weight中每一组tensor的最后一维大小都应是偶数，最后一维指weight不转置时 $weight_i$ 的N轴或当weight转置时 $weight_i$ 的K轴。
-  - 对称量化支持perchannel和pergroup量化模式，若为pergroup，pergroup数G或 $G_i$ 必须要能整除对应的 $k_i$。
-  - 非对称量化仅支持perchannel模式。
-  - 在pergroup场景下，当weight转置时，要求pergroup长度 $s_i$ 是偶数。
-  - 若weight为多tensor，定义pergroup长度 $s_i = k_i / G_i$，要求所有 $s_i (i=1,2,...g)$都相等。
+  - weight中每一组tensor的最后一维大小都应是偶数，最后一维指weight不转置时 $weight_i$ 的N轴或当weight转置时 $weight_i$ 的K轴
+  - 对称量化支持perchannel和pergroup量化模式，若为pergroup，pergroup数G或 $G_i$ 必须要能整除对应的 $k_i$
+  - 非对称量化仅支持perchannel模式
+  - 在pergroup场景下，当weight转置时，要求pergroup长度 $s_i$ 是偶数
+  - 若weight为多tensor，定义pergroup长度 $s_i = k_i / G_i$，要求所有 $s_i (i=1,2,...g)$都相等
   - 伪量化参数antiquantScaleOptional和antiquantOffsetOptional的shape要满足下表（其中g为matmul组数，G为pergroup数，$G_i$为第i个tensor的pergroup数）：
 
     | 使用场景 | 子场景 | shape限制 |

@@ -514,10 +514,10 @@ aclnnStatus aclnnMoeDistributeDispatch(
         - 对于共享专家，要满足`A` = `BS` \* `epWorldSize` \* `sharedExpertNum` / `sharedExpertRankNum`。
         - 对于MoE专家，当`globalBs`为0时，要满足`A` >= `BS` \* `epWorldSize` \* min(`localExpertNum`, `K`)；当`globalBs`非0时，要满足`A` >= `globalBs` \* min(`localExpertNum`, `K`)。
     - `localExpertNum`：表示本卡专家数量。
-        - 对于共享专家卡，`localExpertNum` = 1
+        - 对于共享专家卡，`localExpertNum` = 1。
         - 对于MoE专家卡，`localExpertNum` = `moeExpertNum` / (`epWorldSize` - `sharedExpertRankNum`)；当前版本不支持TP域通信。
 
-- 本文公式中的"/"表示整除。
+- 本文公式中的“/”表示整除。
 
 - 通信域使用约束：
     - 一个模型中的`MoeDistributeCombine`和`MoeDistributeDispatch`仅支持相同EP通信域，且该通信域中不允许有其他算子。
@@ -542,7 +542,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
         - `BS`：表示batch sequence size，即本卡最终输出的token数量，取值范围为[1, 256]。
         - `K`：表示选取topK个专家，需满足0 < `K` ≤ moeExpertNum，取值范围为[1, 16]。
     - `HCCL_BUFFSIZE`：调用本算子前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB，要求 >= 2 \* (`BS` \* `epWorldSize` \* min(`localExpertNum`, `K`) \* `H` \* sizeof(uint16) + 2MB)。
-    - `HCCL_INTRA_PCIE_ENABLE`和`HCCL_INTRA_ROCE_ENABLE`：设置环境变量`HCCL_INTRA_PCIE_ENABLE` = 1和`HCCL_INTRA_ROCE_ENABLE` = 0可以减少跨机通信数据量，可能提升算子性能。此时，要求`HCCL_BUFFSIZE` >= `moeExpertNum` \* `BS` \* (`H` \* sizeof(dtypeX) + 4 \* ((`K` + 7) / 8 \* 8) \* sizeof(uint32)) + 4MB + 100MB。并且，对于入参`moeExpertNum`，只要求`moeExpertNum` % `epWorldSize` = 0，不要求`moeExpertNum` / `epWorldSize` <= 24，但不支持`scales`特性。
+    - `HCCL_INTRA_PCIE_ENABLE`和`HCCL_INTRA_ROCE_ENABLE`：设置环境变量`HCCL_INTRA_PCIE_ENABLE` = 1和`HCCL_INTRA_ROCE_ENABLE` = 0可以减少跨机通信数据量，可能提升算子性能。此时，要求`HCCL_BUFFSIZE` >= `moeExpertNum` \* `BS` \* (`H` \* sizeof(dtypeX) + 4 \* ((`K` + 7) / 8 \* 8) \* sizeof(uint32)) + 4MB + 100MB，并且，对于入参`moeExpertNum`，只要求`moeExpertNum` % `epWorldSize` = 0，不要求`moeExpertNum` / `epWorldSize` <= 24，但不支持`scales`特性。
     - `epWorldSize`：取值支持16、32、64。
     - `quantMode`相关约束：
         - `quantMode`取值为2时，表示pertoken动态量化场景，`expandX`的数据类型支持`INT8`。

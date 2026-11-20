@@ -432,14 +432,14 @@ aclnnStatus aclnnNsaSelectedAttentionGrad(
   - T1：取值范围为1\~2M。T1表示query所有batch下S的和。
   - T2：取值范围为1\~2M。T2表示key、value所有batch下S的和。
   - B：取值范围为1\~2M。
-  - N1：取值范围为1\~128。表示query的headNum。N1必须为N2的整数倍。
-  - N2：取值范围为1\~128。表示key、value的headNum。
-  - G：取值范围为1\~32。G = N1 / N2
+  - N1：取值范围为1\~128，表示query的headNum。N1必须为N2的整数倍。
+  - N2：取值范围为1\~128，表示key、value的headNum。
+  - G：取值范围为1\~32。G = N1 / N2。
   - S：取值范围为1\~128K。对于key、value的S必须大于等于selectedBlockSize * selectedBlockCount，且必须为selectedBlockSize的整数倍。
   - D：取值范围为192或128，支持K和V的D（HeadDim）不相等。
   - selectedBlockSize支持<=128且满足16的整数倍。
   - selectedBlockCount：支持[1~128]。总计选择的大小`selectedBlockCount * selectedBlockSize` < 128*64(8K)
-  - Layout为TND时，每个Batch的S2都要大于总计选择的大小`selectedBlockCount * selectedBlockSize`
+  - Layout为TND时，每个Batch的S2都要大于总计选择的大小`selectedBlockCount * selectedBlockSize`。
 - 关于softmaxMax与softmaxSum参数shape的约束：\[T1, N1, 8\]。
 - 关于topkIndices参数shape的约束：[T1, N2, selectedBlockCount]。
 

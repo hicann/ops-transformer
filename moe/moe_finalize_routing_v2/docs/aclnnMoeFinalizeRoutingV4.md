@@ -286,7 +286,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV4(
   <!-- npu="A3,910b" id7 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
     - expandedX要求是一个2D/3D的Tensor，支持的数据类型为FLOAT16、BFLOAT16、FLOAT32，支持drop less和drop pad场景。
-    - scalesOptional：混合精度模式下，支持expandedX为BFLOAT16 时scalesOptional为FLOAT32；非混合精度模式下，数据类型要求与expandedX一致。
+    - scalesOptional：混合精度模式下，支持expandedX为BFLOAT16时scalesOptional为FLOAT32；非混合精度模式下，数据类型要求与expandedX一致。
     - xOptional、alpha1Optional、alpha2Optional、vOptional、zeroExpertRange、copyExpertRange、constantExpertRange仅支持传入nullptr。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
@@ -297,8 +297,8 @@ aclnnStatus aclnnMoeFinalizeRoutingV4(
   <!-- npu="310p" id9 -->
   - <term>Atlas推理系列产品</term>：
     - expandedX要求是一个2D的Tensor，数据类型支持FLOAT16、FLOAT32，shape要求尾轴H为32对齐。
-    - x1Optional、x2Optional、biasOptional、expertIdxOptional仅支持传入nullptr
-    - xOptional、alpha1Optional、alpha2Optional、vOptional、zeroExpertRange、copyExpertRange、constantExpertRange仅支持传入nullptr
+    - x1Optional、x2Optional、biasOptional、expertIdxOptional仅支持传入nullptr。
+    - xOptional、alpha1Optional、alpha2Optional、vOptional、zeroExpertRange、copyExpertRange、constantExpertRange仅支持传入nullptr。
     - 仅支持dropPadMode传入2。
     - scalesOptional数据类型支持FLOAT16、FLOAT32，且需要与expandedX一致。
   <!-- end id9 -->

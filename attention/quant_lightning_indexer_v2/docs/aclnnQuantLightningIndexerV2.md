@@ -88,7 +88,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
   >
   > - q、k、w参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
   > - S1表示q shape中的S，S2表示k shape中的S，T1表示q shape中的T，T2表示k shape中的T，N1表示q shape中的N，N2表示k shape中的N。
-  > - maxBlockNumPerSeq表示每个Batch中最大sequsedKOptional对应的block数量，S2_MAX表示sequsedKOptional中的最大值
+  > - maxBlockNumPerSeq表示每个Batch中最大sequsedKOptional对应的block数量，S2_MAX表示sequsedKOptional中的最大值。
 
   <table style="undefined;table-layout: fixed; width: 1601px"><colgroup>
   <col style="width: 264px">

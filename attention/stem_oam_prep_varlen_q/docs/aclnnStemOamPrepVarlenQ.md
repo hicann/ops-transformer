@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：完成Stem OAM block-sparse attention中Q侧预处理计算。将变长Q tensor从paged存储格式转化为按stem block(128 token)分组的flattened qFlat输出，供后续OAM score计算。
+- 接口功能：完成Stem OAM block-sparse attention中Q侧预处理计算，将变长Q tensor从paged存储格式转化为按stem block(128 token)分组的flattened qFlat输出，供后续OAM score计算。
 - 计算公式：
 
   阶段1 Scale Fusion:
@@ -280,7 +280,7 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
 
 <term>Ascend 950PR&950DT系列产品</term>：
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"

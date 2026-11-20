@@ -202,7 +202,7 @@ aclnnStatus aclnnKeyPool(
     <td>normBiasOptional（aclTensor*）</td>
     <td>可选输入</td>
     <td>表示LayerNorm的偏置参数。</td>
-    <td><ul><li>不支持空Tensor。</li><li>与normBiasOptional必须同时提供或同时为空；提供时沿每个token的D维执行LayerNorm。</li><li>shape为[D]。</li></ul></td>
+    <td><ul><li>不支持空Tensor。</li><li>与normWeightOptional必须同时提供或同时为空；提供时沿每个token的D维执行LayerNorm。</li><li>shape为[D]。</li></ul></td>
     <td>FLOAT</td>
     <td>ND</td>
     <td>1</td>
@@ -343,7 +343,7 @@ aclnnStatus aclnnKeyPool(
   和`sin`对K的最后一维中的成对通道执行旋转。本算子当前仅保留RoPE
   参数入口，不执行RoPE，`cosOptional`和`sinOptional`必须传空指针。
 
-输入tensor使用ND格式。`stateCacheRef`是原地输入，用于保存跨算子调用
+输入Tensor使用ND格式。`stateCacheRef`是原地输入，用于保存跨算子调用
 的未完成压缩组状态。
 
 ### 返回值
@@ -415,22 +415,22 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
   <tr>
     <td>workspace</td>
     <td>输入</td>
-    <td>在 Device 侧申请的 workspace 内存地址。</td>
+    <td>在Device侧申请的workspace内存地址。</td>
   </tr>
   <tr>
     <td>workspaceSize</td>
     <td>输入</td>
-    <td>在 Device 侧申请的 workspace 大小，由第一段接口 aclnnKeyPoolGetWorkspaceSize 获取。</td>
+    <td>在Device侧申请的workspace大小，由第一段接口aclnnKeyPoolGetWorkspaceSize获取。</td>
   </tr>
   <tr>
     <td>executor</td>
     <td>输入</td>
-    <td>op 执行器，包含算子计算流程。</td>
+    <td>op执行器，包含算子计算流程。</td>
   </tr>
   <tr>
     <td>stream</td>
     <td>输入</td>
-    <td>指定执行任务的 Stream。</td>
+    <td>指定执行任务的Stream。</td>
   </tr>
 </tbody>
 </table>

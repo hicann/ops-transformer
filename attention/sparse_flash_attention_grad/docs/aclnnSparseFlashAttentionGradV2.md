@@ -24,17 +24,17 @@
 ## 功能说明
 
 - **接口功能**：根据topkIndices对key和value选取大小为selectedBlockSize的数据重排，接着进行训练场景下计算注意力的反向输出。
-- **与 V1 接口的关系**：V2 在 V1（aclnnSparseFlashAttentionGrad，商发兼容、5 输出）基础上，仅新增可选的可学习 OSS Sink 输入 `sinksOptional` 与对应梯度输出 `dSinksOptional`（6 输出），其余参数与 V1 完全一致。V1/V2 共用同一 OpDef 与 inner 实现。
-- **OSS Sink（可选）**：V2 支持可学习 OSS Sink 输入（`sinksOptional`）与对应梯度输出（`dSinksOptional`），传入 `sinksOptional` 时必须同时提供 `dSinksOptional` 输出。`sinksOptional` 仅支持 <term>Ascend 950PR&950DT系列产品</term>。
+- **与V1接口的关系**：V2 在 V1（aclnnSparseFlashAttentionGrad，商发兼容、5 输出）基础上，仅新增可选的可学习 OSS Sink 输入 `sinksOptional` 与对应梯度输出 `dSinksOptional`（6 输出），其余参数与 V1 完全一致。V1/V2 共用同一 OpDef 与 inner 实现。
+- **OSS Sink（可选）**：V2支持可学习OSS Sink输入（`sinksOptional`）与对应梯度输出（`dSinksOptional`），传入`sinksOptional`时必须同时提供`dSinksOptional`输出。`sinksOptional` 仅支持 <term>Ascend 950PR&950DT系列产品</term>。
 
 - **计算公式**：根据传入的topkIndices对key和value选取数量为selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
 
   $$
-   selectedKey\text{ }=\text{ }Gather \left( key,topkIndices \left[ i \left]  \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.
+   selectedKey\text{ }=\text{ }Gather \left( key,topkIndices \left[ i \left] \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.
   $$
 
   $$
-   selectedValue\text{ }=\text{ }Gather \left( value,topkIndices \left[ i \left]  \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.
+   selectedValue\text{ }=\text{ }Gather \left( value,topkIndices \left[ i \left] \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.
   $$
 
   KV merge场景下，若value为空指针，则上述公式中的value按key处理，selectedValue等价于selectedKey。该场景的反向输出不单独返回dValue，dKeyOut表示合并后的梯度：
@@ -64,7 +64,7 @@
 </div>
 
   $$
-   d\mathop{{S}}\nolimits_{{t,:}}= \left[ P\mathop{{}}\nolimits_{{t,:}}@ \left( dP\mathop{{}}\nolimits_{{t,:}}-FlashSoftmaxGrad \left( dO,O \left)  \left)  \right] \right. \right. \right. \right.
+   d\mathop{{S}}\nolimits_{{t,:}}= \left[ P\mathop{{}}\nolimits_{{t,:}}@ \left( dP\mathop{{}}\nolimits_{{t,:}}-FlashSoftmaxGrad \left( dO,O \left) \left) \right] \right. \right. \right. \right.
   $$
 
 <div style="padding-left:40px;">
@@ -83,7 +83,7 @@
 
 <div style="padding-left:40px;">
 
-  阶段4：计算$dSink$（仅当提供 sinksOptional 输入时）：
+  阶段4：计算$dSink$（仅当提供sinksOptional输入时）：
 
 </div>
 
@@ -118,9 +118,9 @@
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnSparseFlashAttentionGradV2GetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnSparseFlashAttentionGradV2”接口执行计算。
 
 > [!NOTE]
-> V2 为新增接口，与 V1 共用同一 OpDef（SparseFlashAttentionGrad）与同一 inner aclnn 实现。需要商发兼容签名（5 输出、无 sinks/dSinks）时请使用 [aclnnSparseFlashAttentionGrad](aclnnSparseFlashAttentionGrad.md)。
+> V2为新增接口，与V1共用同一OpDef（SparseFlashAttentionGrad）与同一 inner aclnn 实现。需要商发兼容签名（5 输出、无 sinks/dSinks）时请使用 [aclnnSparseFlashAttentionGrad](aclnnSparseFlashAttentionGrad.md)。
 
-**与 V1 接口（aclnnSparseFlashAttentionGrad）的对比**
+**与V1接口（aclnnSparseFlashAttentionGrad）的对比**
 
 | 对比项 | V1：aclnnSparseFlashAttentionGrad | V2：aclnnSparseFlashAttentionGradV2 |
 | :--- | :--- | :--- |
@@ -131,7 +131,7 @@
 | 其余参数 | - | 与 V1 完全一致（参数顺序、类型、含义均不变） |
 | OpDef | SparseFlashAttentionGrad | 与 V1 共用同一 OpDef 与 inner aclnn |
 
-> 综上，V2 相比 V1 仅新增了可选的 sinksOptional 输入与对应的 dSinksOptional 输出，其余参数与 V1 完全一致。不提供 sinksOptional/dSinksOptional 时，V2 的输入输出与 V1 行为保持一致。
+> 综上，V2相比V1仅新增了可选的sinksOptional输入与对应的 dSinksOptional 输出，其余参数与 V1 完全一致。不提供 sinksOptional/dSinksOptional 时，V2 的输入输出与 V1 行为保持一致。
 
 ```c++
 aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
@@ -308,18 +308,18 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
         <tr>
             <td>sinksOptional</td>
             <td>输入</td>
-            <td>可学习 OSS Sink 输入。</td>
+            <td>可学习OSS Sink输入。</td>
             <td>
             <ul>
                 <li>可选项，默认值为空指针，未提供时不参与计算；仅 <term>Ascend 950PR&950DT系列产品</term> 支持。</li>
-                <li>传入 sinksOptional 时必须同时提供 dSinksOptional 输出。</li>
-                <li>Sink 参与前向 softmax 的 max/sum 计算，具体公式请参见<a href="#功能说明">功能说明</a>阶段4。</li>
+                <li>传入sinksOptional时必须同时提供dSinksOptional输出。</li>
+                <li>Sink参与前向softmax的max/sum计算，具体公式请参见<a href="#功能说明">功能说明</a>阶段4。</li>
             </ul>
             </td>
             <td>FLOAT32</td>
             <td>ND</td>
             <td>(N1,)<br>
-            N1：与 query 的 N1 保持一致
+            N1：与query的N1保持一致
             </td>
             <td>√</td>
         </tr>
@@ -411,7 +411,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
         <tr>
             <td>layout</td>
             <td>输入</td>
-            <td>输入数据的 layout 格式。</td>
+            <td>输入数据的layout格式。</td>
             <td>
             支持BSND、TND。
             </td>
@@ -511,7 +511,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
             <td>表示value的梯度。</td>
             <td>
             不支持空Tensor。<br>
-            可选项。普通场景下与输入value的Shape维度保持一致；KV merge场景下需传入空指针，dValue不单独输出，其梯度合入dKey（Ascend 950PR&950DT系列产品 与 Atlas A2训练/推理系列产品支持，950上 dValueOut 需传空指针）。
+            可选项。普通场景下与输入value的Shape维度保持一致；KV merge场景下需传入空指针，dValue不单独输出，其梯度合入dKey（Ascend 950PR&950DT系列产品与Atlas A2训练/推理系列产品支持，950上 dValueOut 需传空指针）。
             </td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
@@ -552,11 +552,11 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
         <tr>
             <td>dSinksOptional</td>
             <td>输出</td>
-            <td>表示 sinksOptional 的梯度。</td>
+            <td>表示sinksOptional的梯度。</td>
             <td>
             <ul>
-                <li>当输入 sinksOptional 存在，此变量才会输出。</li>
-                <li>shape 与 sinksOptional 保持一致。</li>
+                <li>当输入sinksOptional存在，此变量才会输出。</li>
+                <li>shape与sinksOptional保持一致。</li>
             </ul>
             </td>
             <td>FLOAT32</td>
@@ -656,9 +656,9 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
   - aclnnSparseFlashAttentionGradV2默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 - 公共约束
     - 当前只支持value和key完全一致的场景。
-    - KV merge场景下（Ascend 950PR&950DT系列产品 与 Atlas A2训练/推理系列产品支持），value和dValueOut需传入空指针，dKeyOut返回dK+dV，不再单独返回dValue。
-    - OSS Sink：传入 sinksOptional 时未提供 dSinksOptional 会返回 ACLNN_ERR_PARAM_INVALID。
-    - OSS Sink：sinksOptional 仅支持 <term>Ascend 950PR&950DT系列产品</term>，其它平台传入 sinksOptional 返回 ACLNN_ERR_RUNTIME_ERROR。
+    - KV merge场景下（Ascend 950PR&950DT系列产品与Atlas A2训练/推理系列产品支持），value和dValueOut需传入空指针，dKeyOut返回dK+dV，不再单独返回dValue。
+    - OSS Sink：传入sinksOptional时未提供dSinksOptional会返回ACLNN_ERR_PARAM_INVALID。
+    - OSS Sink：sinksOptional 仅支持 <term>Ascend 950PR&950DT系列产品</term>，其它平台传入sinksOptional返回ACLNN_ERR_RUNTIME_ERROR。
 
 - Mask
     <table style="undefined;table-layout: fixed; width: 942px"><colgroup>
@@ -784,7 +784,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
         <tr>
             <td>layout</td>
             <td>BSND/TND</td>
-            <td>query 与 key/value 共用同一 layout</td>
+            <td>query与key/value共用同一layout</td>
         </tr>
         </tbody>
     </table>

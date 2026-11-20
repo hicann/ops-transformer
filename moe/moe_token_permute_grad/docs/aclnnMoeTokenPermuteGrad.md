@@ -42,7 +42,7 @@
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnMoeTokenPermuteGradGetWorkspaceSize”接口获取入参并根据计算流程计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnMoeTokenPermuteGrad”接口执行计算。
 
-```c++
+```cpp
 aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(
     const aclTensor *permutedOutputGrad,
     const aclTensor *sortedIndices,
@@ -53,7 +53,7 @@ aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(
     aclOpExecutor  **executor)
 ```
 
-```c++
+```cpp
 aclnnStatus aclnnMoeTokenPermuteGrad(
     void          *workspace,
     uint64_t       workspaceSize,
@@ -132,7 +132,7 @@ aclnnStatus aclnnMoeTokenPermuteGrad(
       <td>输出</td>
       <td>输入token的梯度。</td>
       <td>-</td>
-      <td>BFLOAT16、FLOAT16、FLOAT32。</td>
+      <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>（tokens_num，hidden_size）</td>
       <td>√</td>
@@ -258,7 +258,7 @@ aclnnStatus aclnnMoeTokenPermuteGrad(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 
 #include "acl/acl.h"
 #include "aclnnop/aclnn_moe_token_permute_grad.h"

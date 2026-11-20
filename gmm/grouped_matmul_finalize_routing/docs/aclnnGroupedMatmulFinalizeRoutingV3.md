@@ -492,7 +492,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 
   - 在该场景中，scaleOptional代表per-channel和per-group离线融合的结果。
   - 在该场景中，biasOptional代表离线计算的辅助结果，值要求为$8 \times w \times scaleOptional$，并在第一维累加。
-  - 该场景支持对称量化和非对称量化。在对称量化时，offsetOptional需要设置为空；在非对称量化时，offsetOptional代表离线计算的辅助结果，即为$antiquantOffsetOptional \times   scaleOptional$的结果。
+  - 该场景支持对称量化和非对称量化。在对称量化时，offsetOptional需要设置为空；在非对称量化时，offsetOptional代表离线计算的辅助结果，即为$antiquantOffsetOptional \times scaleOptional$的结果。
   - 在该场景中，antiquantScaleOptional、antiquantOffsetOptional必须设置为空。
 
 <!-- end id13 -->
@@ -521,7 +521,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 <!-- npu="A3,910b" id15 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
-  ```Cpp
+  ```cpp
   #include <iostream>
   #include <memory>
   #include <vector>

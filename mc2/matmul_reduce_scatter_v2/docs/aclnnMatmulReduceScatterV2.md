@@ -244,7 +244,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>commMode(char*)</td>
         <td>输入</td>
         <td>通信模式。</td>
-        <td>支持输入"ai_cpu"、"ccu"或"aiv"</td>
+        <td>支持输入“ai_cpu”、“ccu”或“aiv”</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -314,7 +314,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
             $$
             groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32
             $$
-            - 如果满足重新设置条件，一般情况下，当x1Scale、x2Scale输入都是2维，且数据类型都为FLOAT时，[groupSizeM，groupSizeN，groupSizeK]取值组合会推导为[128, 128, 128]，对应groupSize的值为549764202624；当x1Scale、x2Scale输入都是3维，且数据类型都为FLOAT8_E8M0时，[groupSizeM, groupSizeN, groupSizeK]取值组合会推导为[1, 1, 32]，对应groupSize的值为4295032864。
+            - 如果满足重新设置条件，一般情况下，当x1Scale、x2Scale输入都是2维，且数据类型都为FLOAT时，[groupSizeM, groupSizeN, groupSizeK]取值组合会推导为[128, 128, 128]，对应groupSize的值为549764202624；当x1Scale、x2Scale输入都是3维，且数据类型都为FLOAT8_E8M0时，[groupSizeM, groupSizeN, groupSizeK]取值组合会推导为[1, 1, 32]，对应groupSize的值为4295032864。
         - commMode：支持输入“ai_cpu”或“ccu”。
         - output：如果x1类型为FLOAT16、BFLOAT16，则output类型与x1保持一致。如果x1类型为FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1，则数据类型支持FLOAT16、BFLOAT16、FLOAT。
 
@@ -401,10 +401,10 @@ aclnnStatus aclnnMatmulReduceScatterV2(
 
 - 通信约束：
   <!-- npu="910b" id11 -->
-  - <term>Atlas A2系列产品</term>：仅支持commMode为"aiv"，且通信缓冲区大于等于200MB。
+  - <term>Atlas A2系列产品</term>：仅支持commMode为“aiv”，且通信缓冲区大于等于200MB。
   <!-- end id11 -->
   <!-- npu="A3" id12 -->
-  - <term>Atlas A3系列产品</term>：仅支持commMode为"aiv"，且通信缓冲区大于等于200MB。
+  - <term>Atlas A3系列产品</term>：仅支持commMode为“aiv”，且通信缓冲区大于等于200MB。
   <!-- end id12 -->
   <!-- npu="950" id13 -->
   - <term>Ascend 950PR&950DT系列产品</term>：当前版本仅支持输入commMode为“ai_cpu”或“ccu”。

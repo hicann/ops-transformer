@@ -382,7 +382,7 @@ aclnnStatus aclnnSwinTransformerLnQkvQuant(
 - 确定性计算：
   - aclnnSwinTransformerLnQkvQuant默认确定性实现。
 - seqLength只支持32/64。
-- oriHeight*oriWeight=输入x Tensor的第二维度，且oriHeight为hWinSize的整数倍，oriWeight为wWinSize的整数倍。
+- oriHeight*oriWeight = 输入x Tensor的第二维度，且oriHeight为hWinSize的整数倍，oriWeight为wWinSize的整数倍。
 - hWinSize和wWinSize范围只支持7~32。
 - 输入x Tensor的第一维度B只支持1~32。
 - weight需要转置。
@@ -391,7 +391,7 @@ aclnnStatus aclnnSwinTransformerLnQkvQuant(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"

@@ -59,7 +59,7 @@
     | 5 | m_start，M轴起点 |
     | 6 | m_num，M轴行数 |
 
-- 符号说明
+- 符号说明。
 
   | 符号                | 含义                                                      |
   | ------------------- | --------------------------------------------------------- |
@@ -695,30 +695,30 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
   - hasCmpKv为true时，cmpTopk大于0认为cmpKvOptional部分是稀疏的，cmpTopk为0则认为cmpKvOptional部分是非稀疏的。
   - hasOriKv为true，oriTopk不为0且oriMaskMode为0时，oriTopkLengthOptional必须传入，此时取oriMaskMode规则与oriTopkLengthOptional元素的最小值作为当前q token对应的oriKvOptional的有效seqlen，其他oriKvOptional稀疏场景取oriMaskMode规则与oriTopk的最小值作为当前q token对应的oriKvOptional的有效seqlen。
   - hasCmpKv为true，cmpTopk不为0且cmpMaskMode为0时，cmpTopkLengthOptional必须传入，此时取cmpMaskMode规则与cmpTopkLengthOptional元素的最小值作为当前q token对应的cmpKvOptional的有效seqlen，其他cmpKvOptional稀疏场景取cmpMaskMode规则与cmpTopk的最小值作为当前q token对应的cmpKvOptional的有效seqlen。
-  - layoutQOptional=BSND场景
+  - layoutQOptional=BSND场景。
     - maxSeqlenQ必须传入S1的值。
-  - layoutKvOptional=BSND场景
+  - layoutKvOptional=BSND场景。
     - hasOriKv为true时，maxSeqlenOriKv必须传入S2的值。
     - hasCmpKv为true时，maxSeqlenCmpKv必须传入S3的值。
-  - layoutQOptional=TND场景
+  - layoutQOptional=TND场景。
     - cuSeqlensQOptional必须传入。
-  - layoutKvOptional=TND场景
+  - layoutKvOptional=TND场景。
     - hasOriKv为true时，cuSeqlensOriKvOptional必须传入。
     - hasCmpKv为true时，cuSeqlensCmpKvOptional必须传入。
-  - layoutKvOptional=PA_BBND场景
+  - layoutKvOptional=PA_BBND场景。
     - hasOriKv为true，oriTopk不为0且oriMaskMode为0时（oriTopkLengthOptional必传场景），sequsedOriKvOptional可选传入，其他场景sequsedOriKvOptional必须传入。
     - hasCmpKv为true，cmpTopk不为0且cmpMaskMode为0时（cmpTopkLengthOptional必传场景），sequsedCmpKvOptional可选传入，其他场景sequsedCmpKvOptional必须传入。
-  - Batch取值规则
+  - Batch取值规则。
     - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batchSize获取batch数。
     - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
-  - q Seqlen取值规则
+  - q Seqlen取值规则。
     - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
     - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
-  - oriKvOptional Seqlen取值规则
+  - oriKvOptional Seqlen取值规则。
     - layoutKvOptional为BSND时，优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过maxSeqlenOriKv获取seqlen。
     - layoutKvOptional为TND时，优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过cuSeqlensOriKvOptional中的元素获取seqlen。
     - layoutKvOptional为PA_BBND时，优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过oriTopkLengthOptional获取seqlen。
-  - cmpKvOptional Seqlen取值规则
+  - cmpKvOptional Seqlen取值规则。
     - layoutKvOptional为BSND时，优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过maxSeqlenCmpKv获取seqlen。
     - layoutKvOptional为TND时，优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过cuSeqlensCmpKvOptional中的元素获取seqlen。
     - layoutKvOptional为PA_BBND时，优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过cmpTopkLengthOptional获取seqlen。

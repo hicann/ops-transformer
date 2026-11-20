@@ -23,8 +23,8 @@
 
 ## 功能说明
 
-- **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程如下：
-    - 首先对输入$x$ RmsNormQuant后乘以$W^{DQKV}$进行下采样后分为通路1和通路2。
+- **接口功能**：推理场景，Multi-head Latent Attention前处理的计算。主要计算过程如下：
+    - 首先对输入$x$做RmsNormQuant后乘以$W^{DQKV}$进行下采样后分为通路1和通路2。
     - 通路1做RmsNormQuant后乘以$W^{UQ}$后再分为通路3和通路4。
     - 通路3后乘以$W^{uk}$后输出$q^N$。
     - 通路4后经过旋转位置编码后输出$q^R$。
@@ -52,17 +52,17 @@
     RmsNormQuant(x) = ({RmsNorm}(x) + bias) * deqScale
     $$
 
-    Query计算公式，包括W^{DQKV}矩阵乘、W^{UK}矩阵乘、RmsNormQuant和ROPE旋转位置编码处理
+    Query计算公式，包括W^{DQKV}矩阵乘、W^{UK}矩阵乘、RmsNormQuant和RoPE旋转位置编码处理
 
     $$
-    q^N =  RmsNormQuant(x) \cdot W^{DQKV} \cdot W^{UK}
+    q^N = RmsNormQuant(x) \cdot W^{DQKV} \cdot W^{UK}
     $$
 
     $$
     q^R = ROPE(x^Q)
     $$
 
-    Key计算公式，包括RmsNorm和rope，将计算结果存入cache
+    Key计算公式，包括RmsNorm和RoPE，将计算结果存入cache
 
     $$
     k^N = Cache({RmsNorm}(RmsNormQuant(x)))
@@ -72,7 +72,7 @@
     k^R = Cache(ROPE(RmsNormQuant(x)))
     $$
 
-    `cos`和`sin`同时传入空指针时跳过Q-RoPE和K-RoPE数学运算，$q^R$和$k^R$分别保存未经旋转的原始Q-rope和K-rope分量；二者均为非空Tensor时保持原RoPE行为，禁止仅传入一个空指针。其他计算、输出形状和Cache布局不变。
+    `cos`和`sin`同时传入空指针时跳过Q-RoPE和K-RoPE数学运算，$q^R$和$k^R$分别保存未经旋转的原始Q-RoPE和K-RoPE分量；二者均为非空Tensor时保持原RoPE行为，禁止仅传入一个空指针。其他计算、输出形状和Cache布局不变。
 
 ## 函数原型
 
@@ -423,7 +423,7 @@ aclnnStatus aclnnMlaPreprocess(
     <tr>
       <td>qRopeDim</td>
       <td>输入</td>
-      <td>表示q传入rope的dim大小。</td>
+      <td>表示q传入RoPE的dim大小。</td>
       <td>预留参数，目前只支持64。</td>
       <td>int64_t</td>
       <td>-</td>
@@ -433,7 +433,7 @@ aclnnStatus aclnnMlaPreprocess(
     <tr>
       <td>kRopeDim</td>
       <td>输入</td>
-      <td>表示k传入rope的dim大小。</td>
+      <td>表示k传入RoPE的dim大小。</td>
       <td>预留参数，目前只支持64。</td>
       <td>int64_t</td>
       <td>-</td>
@@ -507,8 +507,8 @@ aclnnStatus aclnnMlaPreprocess(
       <td><ul>
         <li>0：kcache和q均经过拼接后输出。</li>
         <li>1：输出的kvCacheOut拆分为kvCacheOut和krCacheOut，qOut拆分为qOut和qRopeOut。</li>
-        <li>2：krope和ctkv转为NZ格式输出，ctkv和qnope经过per_head静态对称量化为int8类型。</li>
-        <li>3：krope和ctkv转为NZ格式输出。</li></ul>
+        <li>2：kRoPE和ctkv转为NZ格式输出，ctkv和qnope经过per_head静态对称量化为int8类型。</li>
+        <li>3：kRoPE和ctkv转为NZ格式输出。</li></ul>
       </td>
       <td>int64_t</td>
       <td>-</td>
@@ -556,7 +556,7 @@ aclnnStatus aclnnMlaPreprocess(
     <tr>
       <td>qOut</td>
       <td>输出</td>
-      <td>表示Query的输出tensor，对应计算流图中右侧经过NOPE和矩阵乘后的输出。</td>
+      <td>表示Query的输出tensor，对应计算流程图中右侧经过NOPE和矩阵乘后的输出。</td>
       <td>shape和dtype随cacheMode变化：<ul>
         <li>cacheMode为0：shape为[tokenNum, headNum, 576]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1或3：shape为[tokenNum, headNum, 512]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
@@ -585,7 +585,7 @@ aclnnStatus aclnnMlaPreprocess(
     <tr>
       <td>qRopeOut</td>
       <td>输出</td>
-      <td>表示Query经过旋转编码后的输出。</td>
+      <td>表示Query经过旋转位置编码后的输出。</td>
       <td>必填参数，不支持空指针。不参与计算时仍需传入占位张量，其内容不会被写入。shape和dtype随cacheMode变化：<ul>
         <li>cacheMode为0：不参与计算。占位张量shape为[tokenNum, headNum, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1或3：shape为[tokenNum, headNum, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
@@ -599,7 +599,7 @@ aclnnStatus aclnnMlaPreprocess(
     <tr>
       <td>krCacheOut</td>
       <td>输出</td>
-      <td>表示Key经过ROPE和ReshapeAndCache后的输出。</td>
+      <td>表示Key经过RoPE和ReshapeAndCache后的输出。</td>
       <td>必填参数，不支持空指针。不参与计算时仍需传入占位张量，其内容不会被写入。shape和dtype随cacheMode变化：<ul>
         <li>cacheMode为0：不参与计算。占位张量shape为[blockNum, blockSize, 1, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1：shape为[blockNum, blockSize, 1, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
@@ -657,12 +657,12 @@ aclnnStatus aclnnMlaPreprocess(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>输入参数的shape、dtype和数据类型不在支持的范围之内。</td>
+      <td>输入参数的shape、dtype不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内部调用npu runtime的接口异常。</td>
+      <td>API内部调用NPU Runtime的接口异常。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_INNER_TILING_ERROR</td>
@@ -721,22 +721,22 @@ aclnnStatus aclnnMlaPreprocess(
   - aclnnMlaPreprocess默认确定性实现。
 - shape格式字段含义及约束
     - tokenNum：tokenNum表示输入样本批量大小，取值范围：0~256
-    - hiddenSize：hiddenSize表示隐藏层的大小，取值固定为：2048~10240，为256的倍数
+    - hiddenSize：hiddenSize表示隐藏层的大小，取值范围：2048~10240，为256的倍数
     - headNum：表示多头数，取值范围：1~128
     - blockNum：PagedAttention场景下的块数，取值固定为：192
     - blockSize：PagedAttention场景下的块大小，取值固定为：128
-    - qloraDim：表示Q矩阵的LoRA输入维度，取值范围：32~4096，为32的倍数
-    - keyTotalDim：表示Key部分的总维度，取值固定为：576（512主维度+64 rope维度）
+    - qLoraDim：表示Q矩阵的LoRA输入维度，取值范围：32~4096，为32的倍数
+    - keyTotalDim：表示Key部分的总维度，取值固定为：576（512主维度+64 RoPE维度）
     - qRopeDim：表示Q矩阵中旋转编码部分的维度，取值固定为：64
     - qNoRopeDim：表示Q矩阵中无旋转编码部分的维度，取值范围：16~256，为16的倍数
-- rope模式约束
+- RoPE模式约束
     - mla_preprocess算子中的Rotary Position Embedding（RoPE）操作采用half模式，暂不支持interleave模式
 
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 /**
  * This program is free software, you can redistribute it and/or modify.
  * Copyright (c) 2025 Huawei Technologies Co., Ltd.|Hisilicon Technologies Co., Ltd.

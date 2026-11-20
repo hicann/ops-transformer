@@ -316,7 +316,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>hMix（aclTensor*）</td>
             <td>输入</td>
-            <td>正向计算流x@phi的结果</td>
+            <td>正向计算流x@phi的结果。</td>
             <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, 2N+N*N)、(B, S, 2N+N!)、(T, 2N+N*N)、(T, 2N+N!)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。最后一维需与`phi`的第0维（fusionSize）保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -326,7 +326,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>hPre（aclTensor*）</td>
             <td>输入</td>
-            <td>正向sigmoid计算之后的hPre矩阵</td>
+            <td>正向sigmoid计算之后的hPre矩阵。</td>
             <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, N)、(T, N)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -336,7 +336,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>hPost（aclTensor*）</td>
             <td>输入</td>
-            <td>正向的hPost输出</td>
+            <td>正向的hPost输出。</td>
             <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, N)、(T, N)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -346,7 +346,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>gammaOptional（aclTensor*）</td>
             <td>可选输入</td>
-            <td>RmsNorm的缩放系数gamma</td>
+            <td>RmsNorm的缩放系数gamma。</td>
             <td><ul><li>不支持空Tensor。</li><li>如果传入nullptr，则表示全1的tensor。</li><li>shape为(N ,D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -356,7 +356,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>gradXPostOptional（aclTensor*）</td>
             <td>可选输入</td>
-            <td>post反向输出的gradX</td>
+            <td>post反向输出的gradX。</td>
             <td><ul><li>不支持空Tensor。</li><li>如果传入nullptr，则表示全0的tensor。</li><li>shape为(B, S, N, D)、(T, N, D)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
@@ -366,7 +366,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>hcEps（float）</td>
             <td>可选输入</td>
-            <td>HPre的sigmoid后的eps参数</td>
+            <td>HPre的sigmoid后的eps参数。</td>
             <td>
            <li>建议值为1e-6</li>
             </td>
@@ -379,7 +379,7 @@ aclnnStatus aclnnMhcPreBackward(
             <td>gradX（aclTensor*）</td>
             <td>输出</td>
             <td>x对应的梯度。</td>
-            <td><ul><li>不支持空Tensor。</li><li>与输入x的维度、数据类型保持一致</li><li>shape为(B, S, N, D)、(T, N, D)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
+            <td><ul><li>不支持空Tensor。</li><li>与输入x的维度、数据类型保持一致。</li><li>shape为(B, S, N, D)、(T, N, D)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
             <td>3-4</td>
@@ -389,7 +389,7 @@ aclnnStatus aclnnMhcPreBackward(
             <td>gradPhi（aclTensor*）</td>
             <td>输出</td>
             <td>phi对应的梯度。</td>
-            <td><ul><li>不支持空Tensor。</li><li>与输入phi的维度保持一致</li><li>shape为(2N+N*N, N*D)或(2N+N!, N*D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。与`phi`的shape保持一致。</li></ul></td>
+            <td><ul><li>不支持空Tensor。</li><li>与输入phi的维度保持一致。</li><li>shape为(2N+N*N, N*D)或(2N+N!, N*D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。与`phi`的shape保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
             <td>2</td>

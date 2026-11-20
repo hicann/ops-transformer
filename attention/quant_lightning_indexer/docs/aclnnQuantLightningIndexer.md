@@ -101,7 +101,7 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>输入</td>
     <td>公式中的输入Q。</td>
     <td>不支持空tensor。</td>
-    <td>INT8、FLOAT8_E4M3、HIFLOAT8。</td>
+    <td>INT8、FLOAT8_E4M3、HIFLOAT8</td>
     <td>ND</td>
     <td>
         <ul>
@@ -121,7 +121,7 @@ aclnnStatus aclnnQuantLightningIndexer(
                 <li>blockNum为PageAttention时block总数，blockSize为一个block的token数。</li>
         </ul>
     </td>
-    <td>INT8、FLOAT8_E4M3、HIFLOAT8。</td>
+    <td>INT8、FLOAT8_E4M3、HIFLOAT8</td>
     <td>ND</td>
     <td>
         <ul>

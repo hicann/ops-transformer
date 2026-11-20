@@ -361,7 +361,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadata(
       <td>layoutQOptional（char*）</td>
       <td>输入</td>
       <td>表示Query的排列格式。</td>
-      <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
+      <td><ul><li>支持BSND、TND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -371,7 +371,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadata(
       <td>layoutKvOptional（char*）</td>
       <td>输入</td>
       <td>表示Key的排列格式。</td>
-      <td><ul><li>支持 BSND、TND、PA_BBND。</li><li>建议值为BSND。</li></ul></td>
+      <td><ul><li>支持BSND、TND、PA_BBND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -512,8 +512,8 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadata(
 
 ## 约束说明
 
-  - aclnnQuantSparseFlashMlaMetadata默认确定性实现。
-  - B（Batch）表示输入样本批量大小。
+  - aclnnQuantSparseFlashMlaMetadata默认确定性实现
+  - B（Batch）表示输入样本批量大小
   - Batch取值规则
     - 优先获取sequsedQOptional中的Batch信息。
     - 如果未传入sequsedQOptional，且layoutQOptional为TND和传入了cuSeqlensQOptional，则获取cuSeqlensQOptional中的Batch信息。

@@ -83,7 +83,7 @@
     x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x2Scale为UINT64/INT64，可选bias为FLOAT32，out为FLOAT16/BFLOAT16/FLOAT32：
 
   $$
-  output = AllReduce((x1@x2 + biasOptional) * x2Scale  + x3Optional)
+  output = AllReduce((x1@x2 + biasOptional) * x2Scale + x3Optional)
   $$
 
   - 公式6，pertoken-perchannel量化 && pertoken-pertensor量化：
@@ -763,12 +763,12 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="950,910b" id15 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：
 
-  ```Cpp
+  ```cpp
   #include <iostream>
   #include <vector>
   #include <thread>

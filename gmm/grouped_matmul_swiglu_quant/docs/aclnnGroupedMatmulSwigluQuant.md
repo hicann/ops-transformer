@@ -65,7 +65,7 @@
         >第3个右矩阵`W[3,:,:]`，对应索引位置[4,6)的token`x[4:6]`（共6-4=2个token），对应`x_scale[4:6]`、`w_scale[3]`、`Q[4:6]`、`Q_scale[4:6]`。
         >
         >注：groupList中未指定的部分将不会参与更新。
-        >例如当groupList=[12,14,18]，x的shape为[30,N/2]时。
+        >例如当groupList=[12,14,18]，x的shape为[30,N/2]时，
         >
         >则第一个输出Q的shape为[30,N/2]，其中Q[18:,:]的部分不会进行更新和初始化，其中数据为显存空间申请时的原数据。
         >
@@ -79,9 +79,9 @@
 
         $C_{i,act}, gate_{i} = split(C_{i})$
 
-        $S_{i}=Swish(C_{i,act})\odot gate_{i}$  &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
+        $S_{i}=Swish(C_{i,act})\odot gate_{i}$ &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-      - 3.量化输出结果
+      - 3.量化输出结果。
 
         $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -110,7 +110,7 @@
       * $Q\_scale∈\mathbb{R}^{M}$：量化缩放因子。
     - **计算过程**
       - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList))$。
-        - 分组逻辑与A8W8相同。
+        - 分组逻辑与A8W8相同
       - 2.生成辅助矩阵（weightAssistMatrix）的计算过程（请注意weightAssistMatrix部分计算为离线生成作为输入，并非算子内部完成）：
         - 当为per-channel量化（$w\_scale$为2维）：
 
@@ -136,9 +136,9 @@
 
           per-group：
 
-          $C\_high_{i} = \\ Σ_{k=0}^{K-1}((X\_high\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k *   num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
+          $C\_high_{i} = \\ Σ_{k=0}^{K-1}((X\_high\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k * num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
 
-          $C\_low_{i} = \\ Σ_{k=0}^{K-1}((X\_low\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k *   num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
+          $C\_low_{i} = \\ Σ_{k=0}^{K-1}((X\_low\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k * num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
 
         - 3.3.将高低位的矩阵乘结果还原为整体的结果
 
@@ -146,9 +146,9 @@
 
           $C_{i,act}, gate_{i} = split(C_{i})$
 
-          $S_{i}=Swish(C_{i,act})\odot gate_{i}$  &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
+          $S_{i}=Swish(C_{i,act})\odot gate_{i}$ &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-      - 3.量化输出结果
+      - 3.量化输出结果。
 
         $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 

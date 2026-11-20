@@ -284,8 +284,8 @@ aclnnStatus aclnnGroupedMatmulV3(
     - biasOptional支持FLOAT16、BFLOAT16、FLOAT32、INT32
     - y支持FLOAT16、BFLOAT16、FLOAT32、INT8
     - 不支持offsetOptional
-    - groupType支持m轴分组和不分组，仅非量化支持k轴分组。
-    - 输入参数x、weight，输出参数y在非量化场景支持最多1024个tensor，在伪量化场景支持最多128个tensor，在量化场景支持最多1个tensor。
+    - groupType支持m轴分组和不分组，仅非量化支持k轴分组
+    - 输入参数x、weight，输出参数y在非量化场景支持最多1024个tensor，在伪量化场景支持最多128个tensor，在量化场景支持最多1个tensor
 
   <!-- end id10 -->
 

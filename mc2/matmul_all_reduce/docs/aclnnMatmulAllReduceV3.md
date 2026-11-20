@@ -299,8 +299,8 @@ aclnnStatus aclnnMatmulAllReduceV3(
   <!-- end id8 -->
   - 同一条通信链路内，只能选择同一种通信引擎。
   - AICPU和CCU通信引擎简单介绍：
-    - AICPU：不占用计算核，通信效率高，但通信静态开销较大，对小数据量通信场景不友好。适用于大数据高带宽场景。
-    - CCU：能够减少访存带宽与计算核占用，但受限于片上资源，支持的通信域数量有限。适用于高带宽、低时延的通信场景。
+    - AICPU：不占用计算核，通信效率高，但通信静态开销较大，对小数据量通信场景不友好，适用于大数据高带宽场景。
+    - CCU：能够减少访存带宽与计算核占用，但受限于片上资源，支持的通信域数量有限，适用于高带宽、低时延的通信场景。
     - 更详细的通信引擎介绍，请参考[通信引擎](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910beta1/programug/commopdev/hcclopdev_000005.html)。
 - 确定性计算：
 
@@ -336,12 +336,12 @@ aclnnStatus aclnnMatmulAllReduceV3(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="950,910b" id14 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <iostream>
     #include <vector>
     #include <thread>

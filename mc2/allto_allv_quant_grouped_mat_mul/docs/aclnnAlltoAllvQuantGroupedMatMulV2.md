@@ -537,13 +537,13 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(
 - 量化参数约束：
   - 当前版本支持pertensor量化、mx量化。
 - 类型约束
-  - pertensor量化。
+  - pertensor量化：
 
     | gmmX | gmmWeight | gmmXScale | gmmWeightScale | mmXScale | mmWeightScale | gmmY |
     | :------: | :------: | :------: | :------: | :------: | :------: | :------: |
     | HIFLOAT8 | HIFLOAT8 | FLOAT32 | FLOAT32 | FLOAT32 | FLOAT32 | FLOAT16/BFLOAT16 |
 
-  - mx量化。
+  - mx量化：
 
     | gmmX | gmmWeight | gmmXScale | gmmWeightScale | mmXScale | mmWeightScale | gmmY |
     | :------: | :------: | :------: | :------: | :------: | :------: | :------: |
